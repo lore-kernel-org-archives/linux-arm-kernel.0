@@ -1,98 +1,59 @@
-From: dan.j.williams@intel.com (Dan Williams)
-Date: Mon, 09 Sep 2013 15:12:03 -0700
-Subject: [PATCH] MAINTAINERS: update email for Dan Williams
-Message-ID: <20130909221154.4969.71486.stgit@dwillia2-mobl1.amr.corp.intel.com>
+From: rvaswani@codeaurora.org (Rohit Vaswani)
+Date: Mon, 09 Sep 2013 15:30:36 -0700
+Subject: [PATCHv3 1/2] ARM: msm: Add support for APQ8074 Dragonboard
+In-Reply-To: <49CC46F4-F6CE-4B1A-B0D5-E4BB779755B8@codeaurora.org>
+References: <1378495943-2572-1-git-send-email-rvaswani@codeaurora.org>
+ <20130906215051.GA29253@quad.lixom.net> <522E09E6.8040300@codeaurora.org>
+ <FFE100A7-8AD6-4E0D-9F64-120DA3564F89@codeaurora.org>
+ <522E21A8.4060408@wwwdotorg.org>
+ <FA33E8F4-3F85-4D8B-83E1-96F5A8F76CE6@codeaurora.org>
+ <522E3BC9.1030105@wwwdotorg.org>
+ <CA05A23E-41CF-4EC6-BB2D-36105048700B@codeaurora.org>
+ <522E40B2.9010301@codeaurora.org>
+ <49CC46F4-F6CE-4B1A-B0D5-E4BB779755B8@codeaurora.org>
+Message-ID: <522E4C0C.6080309@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Returned to intel.com
+On 9/9/2013 3:04 PM, Kumar Gala wrote:
+> On Sep 9, 2013, at 4:42 PM, Rohit Vaswani wrote:
+>
+>> On 9/9/2013 2:25 PM, Kumar Gala wrote:
+>>> <snip>
+>>> On Fri, Sep 06, 2013 at 12:32:22PM -0700, Rohit Vaswani wrote:
+>>>>>>>>>> This patch adds basic board support for APQ8074 Dragonboard
+>>>>>>>>>> <snip>
+>>>>>>>>>> dtb-$(CONFIG_ARCH_MSM) += msm8660-surf.dtb \
+>>>>>>>>>> -	msm8960-cdp.dtb
+>>>>>>>>>> +	msm8960-cdp.dtb \
+>>>>>>>>>> +	apq8074-dragonboard.dtb
+>>>>>>>>> Please add boards alphabetically.
+>>>>>>>> Will do.
+>>>>>>>>>> dtb-$(CONFIG_ARCH_MVEBU) += armada-370-db.dtb \
+>>>>>>>>>> 	armada-370-mirabox.dtb \
+>>>>>>>>>> 	armada-370-rd.dtb \
+>>>>>>>>>> diff --git a/arch/arm/boot/dts/apq8074-dragonboard.dts b/arch/arm/boot/dts/apq8074-dragonboard.dts
+>>>>>>>>>> new file mode 100644
+>>>>>>>>>> index 0000000..5b7b6a0
+>>>>>>>>>> --- /dev/null
+>>>>>>>>>> +++ b/arch/arm/boot/dts/apq8074-dragonboard.dts
+>>>>>>>>> arch/arm/boot/dts/ is getting really crowded. It's been working best if the SoC
+>>>>>>>>> family or vendor is used as a prefix to keep things a bit more organized. In
+>>>>>>>>> that spirit, prefixing these with msm-<foo> makes sense. Can you please do so?
+>>>>>>>> Sure. But the board is called an APQ8074 and we wanted to keep the naming consistent with that.
+>>>>>>> If we do this we should use qcom, not msm as the prefix.  Match the device tree vendor prefix.
+>> Coming back to this, it would be better if the naming to be consistent with what we call our ARCH - msm and not qcom.
+>> msm8974-dragonboard signifies quite clearly what the board is.
+> I was saying qcom,apq8074-dragonboard or we can do the dir thing as we don't have that mean qcom/msm device trees.
+>
+> - k
 
-Cc: Vinod Koul <vinod.koul@intel.com>
-Cc: Linus Walleij <linus.walleij@linaro.org>
-Cc: Jon Mason <jon.mason@intel.com>
-Cc: Dave Jiang <dave.jiang@intel.com>
-Cc: Neil Brown <neilb@suse.de>
-Cc: Shaohua Li <shli@kernel.org>
-Signed-off-by: Dan Williams <dan.j.williams@intel.com>
----
- MAINTAINERS |   18 +++++++++---------
- 1 file changed, 9 insertions(+), 9 deletions(-)
+Sure, that's fine. If there's a consensus on the name to match the 
+compatible strings, could you send a patch out to rename the older 
+dtsi's and I can add the Dragonboard support with it.
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index defc053..058fb68 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -914,24 +914,24 @@ F:	arch/arm/mach-pxa/colibri-pxa270-income.c
- 
- ARM/INTEL IOP32X ARM ARCHITECTURE
- M:	Lennert Buytenhek <kernel@wantstofly.org>
--M:	Dan Williams <djbw@fb.com>
-+M:	Dan Williams <dan.j.williams@intel.com>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
- S:	Maintained
- 
- ARM/INTEL IOP33X ARM ARCHITECTURE
--M:	Dan Williams <djbw@fb.com>
-+M:	Dan Williams <dan.j.williams@intel.com>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
- S:	Maintained
- 
- ARM/INTEL IOP13XX ARM ARCHITECTURE
- M:	Lennert Buytenhek <kernel@wantstofly.org>
--M:	Dan Williams <djbw@fb.com>
-+M:	Dan Williams <dan.j.williams@intel.com>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
- S:	Maintained
- 
- ARM/INTEL IQ81342EX MACHINE SUPPORT
- M:	Lennert Buytenhek <kernel@wantstofly.org>
--M:	Dan Williams <djbw@fb.com>
-+M:	Dan Williams <dan.j.williams@intel.com>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
- S:	Maintained
- 
-@@ -956,7 +956,7 @@ F:	drivers/pcmcia/pxa2xx_stargate2.c
- 
- ARM/INTEL XSC3 (MANZANO) ARM CORE
- M:	Lennert Buytenhek <kernel@wantstofly.org>
--M:	Dan Williams <djbw@fb.com>
-+M:	Dan Williams <dan.j.williams@intel.com>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
- S:	Maintained
- 
-@@ -1363,7 +1363,7 @@ F:	drivers/platform/x86/asus*.c
- F:	drivers/platform/x86/eeepc*.c
- 
- ASYNCHRONOUS TRANSFERS/TRANSFORMS (IOAT) API
--M:	Dan Williams <djbw@fb.com>
-+M:	Dan Williams <dan.j.williams@intel.com>
- W:	http://sourceforge.net/projects/xscaleiop
- S:	Maintained
- F:	Documentation/crypto/async-tx-api.txt
-@@ -2638,7 +2638,7 @@ T:	git git://git.linaro.org/people/sumitsemwal/linux-dma-buf.git
- 
- DMA GENERIC OFFLOAD ENGINE SUBSYSTEM
- M:	Vinod Koul <vinod.koul@intel.com>
--M:	Dan Williams <djbw@fb.com>
-+M:	Dan Williams <dan.j.williams@intel.com>
- S:	Supported
- F:	drivers/dma/
- F:	include/linux/dma*
-@@ -4263,7 +4263,7 @@ F:	arch/x86/kernel/microcode_core.c
- F:	arch/x86/kernel/microcode_intel.c
- 
- INTEL I/OAT DMA DRIVER
--M:	Dan Williams <djbw@fb.com>
-+M:	Dan Williams <dan.j.williams@intel.com>
- S:	Maintained
- F:	drivers/dma/ioat*
- 
-@@ -4276,7 +4276,7 @@ F:	drivers/iommu/intel-iommu.c
- F:	include/linux/intel-iommu.h
- 
- INTEL IOP-ADMA DMA DRIVER
--M:	Dan Williams <djbw@fb.com>
-+M:	Dan Williams <dan.j.williams@intel.com>
- S:	Odd fixes
- F:	drivers/dma/iop-adma.c
- 
+Thanks,
+Rohit Vaswani
+
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum, hosted by The Linux Foundation
