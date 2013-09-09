@@ -1,66 +1,33 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Sun,  8 Sep 2013 22:00:08 -0300
-Subject: [PATCH 2/2] ARM: dts: Add imx6s-wandboard support
-In-Reply-To: <1378688408-8689-1-git-send-email-festevam@gmail.com>
-References: <1378688408-8689-1-git-send-email-festevam@gmail.com>
-Message-ID: <1378688408-8689-2-git-send-email-festevam@gmail.com>
+From: b32955@freescale.com (Huang Shijie)
+Date: Mon, 9 Sep 2013 11:07:37 +0800
+Subject: [PATCH v3 0/8] Add the Quadspi driver for vf610-twr
+In-Reply-To: <20130908134725.GQ29403@sirena.org.uk>
+References: <593AEF6C47F46446852B067021A273D6D984000B@MUCSE039.lantiq.com>
+ <20130905020435.GA3970@gmail.com>
+ <20980858CB6D3A4BAE95CA194937D5E73EA0C7F4@DBDE04.ent.ti.com>
+ <522817D7.1010206@freescale.com>
+ <20980858CB6D3A4BAE95CA194937D5E73EA0C885@DBDE04.ent
+Message-ID: <522D3B79.3060707@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+? 2013?09?08? 21:47, Mark Brown ??:
+> On Thu, Sep 05, 2013 at 10:36:44PM -0400, Huang Shijie wrote:
+>> On Thu, Sep 05, 2013 at 02:50:32PM +0100, Mark Brown wrote:
+>>> Looking at the current header there just seem to be defines in there, no
+>>> abstraction for the chips.  Perhaps that is what is missing?
+>> we do not need any abstraction for this chip, we only need the SPI NOR 
+>> commands, such as Quad read / DDR quad read.
+> So the abstraction could say what the commands are, or what's supported
+thanks.
 
-Wandboard comes with three mx6 flavours: quad, dual-lite and solo.
+I have already added the comment for what the commands are, please see
+patch 3 & patch 4.
+> if they're standard?
+In actually, there is no standard for the SPI NOR commands now.
 
-Qual and dual-lite boards are already supported.
+I added these commands just in the Spansion section now.
+(Of course, other NOR vendors may also uses the same commands.)
 
-Add support for the wandboard solo type.
-
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/boot/dts/Makefile            |  1 +
- arch/arm/boot/dts/imx6s-wandboard.dts | 22 ++++++++++++++++++++++
- 2 files changed, 23 insertions(+)
- create mode 100644 arch/arm/boot/dts/imx6s-wandboard.dts
-
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 69193be..0e92eb2 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -142,6 +142,7 @@ dtb-$(CONFIG_ARCH_MXC) += \
- 	imx6q-sabresd.dtb \
- 	imx6q-sbc6x.dtb \
- 	imx6q-wandboard.dtb \
-+	imx6s-wandboard.dtb \
- 	imx6sl-evk.dtb \
- 	vf610-twr.dtb
- dtb-$(CONFIG_ARCH_MXS) += imx23-evk.dtb \
-diff --git a/arch/arm/boot/dts/imx6s-wandboard.dts b/arch/arm/boot/dts/imx6s-wandboard.dts
-new file mode 100644
-index 0000000..2b75a94
---- /dev/null
-+++ b/arch/arm/boot/dts/imx6s-wandboard.dts
-@@ -0,0 +1,22 @@
-+/*
-+ * Copyright 2013 Freescale Semiconductor, Inc.
-+ *
-+ * Author: Fabio Estevam <fabio.estevam@freescale.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ */
-+/dts-v1/;
-+#include "imx6s.dtsi"
-+#include "imx6qdl-wandboard.dtsi"
-+
-+/ {
-+	model = "Wandboard i.MX6 Solo Board";
-+	compatible = "wand,imx6s-wandboard", "fsl,imx6s";
-+
-+	memory {
-+		reg = <0x10000000 0x20000000>;
-+	};
-+};
--- 
-1.8.1.2
+thanks
+Huang Shijie
