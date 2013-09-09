@@ -1,29 +1,43 @@
-From: marex@denx.de (Marek Vasut)
-Date: Mon, 9 Sep 2013 18:04:19 +0200
-Subject: [PATCH 3/5] Staging/iio/adc/touchscreen/MXS: add i.MX23 support
- to the LRADC driver
-In-Reply-To: <1378713801-1182-4-git-send-email-jbe@pengutronix.de>
-References: <1378713801-1182-1-git-send-email-jbe@pengutronix.de>
- <1378713801-1182-4-git-send-email-jbe@pengutronix.de>
-Message-ID: <201309091804.20177.marex@denx.de>
+From: robertcnelson@gmail.com (Robert Nelson)
+Date: Mon, 9 Sep 2013 11:19:22 -0500
+Subject: [PATCH 1/2] ARM: dts: mx6: Add mx6solo support
+In-Reply-To: <CAOMZO5Ab9qVsQica-x3091YPhttqpbr_NL=A2ddzL5znuDtAUw@mail.gmail.com>
+References: <1378688408-8689-1-git-send-email-festevam@gmail.com>
+ <20130909150823.GB5815@S2101-09.ap.freescale.net>
+ <CAOMZO5Ab9qVsQica-x3091YPhttqpbr_NL=A2ddzL5znuDtAUw@mail.gmail.com>
+Message-ID: <CAOCHtYhJjxBL1AY0dxc+FofXqRT25g8yaO+Z6d09mfkJWT+i+A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Juergen Beisert,
+On Mon, Sep 9, 2013 at 10:59 AM, Fabio Estevam <festevam@gmail.com> wrote:
+> On Mon, Sep 9, 2013 at 12:08 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
+>> On Sun, Sep 08, 2013 at 10:00:07PM -0300, Fabio Estevam wrote:
+>>> From: Fabio Estevam <fabio.estevam@freescale.com>
+>>>
+>>> Allow booting a device tree kernel on mx6solo.
+>>>
+>>> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+>>> ---
+>>>  arch/arm/boot/dts/imx6s.dtsi   | 82 ++++++++++++++++++++++++++++++++++++++++++
+>>
+>> The imx6s is not another SoC but just imx6dl with one core fused out.
+>> This is the exactly same case as imx6q and imx6d. See commit dc13ba2
+>> (ARM: imx: do not bring up unavailable cores) for how we handle that
+>> in kernel.
+>>
+>> Are you running into any problem to boot imx6s wandboard with
+>> imx6dl-wandboard.dtb?
+>
+> Ok, I made this test and it booted fine.
+>
+> So I will change U-boot so that it searches for imx6dl-wandboard.dtb
+> instead of imx6s-wandboard.dtb.
 
-> Distinguish i.MX23 and i.MX28 at runtime and do the same for both SoC at
-> least for the 4 wire touchscreen.
-> 
-> Signed-off-by: Juergen Beisert <jbe@pengutronix.de>
-> CC: linux-arm-kernel at lists.infradead.org
-> CC: devel at driverdev.osuosl.org
-> CC: Marek Vasut <marex@denx.de>
-> CC: Fabio Estevam <fabio.estevam@freescale.com>
-> CC: Jonathan Cameron <jic23@cam.ac.uk>
+Since there is no WiFi/Bluetooth on the "solo" vs the wandboard dual
+lite, we should really still have a separate solo dtb file..
 
-This patch seems to combine two things -- register access rework AND adjustment 
-of the driver for MX23 touchscreen. Btw the MX23 ADC was already supported, so 
-this "add i.MX23 support" commit message is not accurate.
+Regards,
 
-Best regards,
-Marek Vasut
+-- 
+Robert Nelson
+http://www.rcn-ee.com/
