@@ -1,155 +1,51 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Mon, 9 Sep 2013 14:21:22 -0500
-Subject: [PATCH] ARM: DTS: DRA7: Add TPS659038 PMIC nodes
-In-Reply-To: <1377495411-21984-1-git-send-email-j-keerthy@ti.com>
-References: <1377495411-21984-1-git-send-email-j-keerthy@ti.com>
-Message-ID: <522E1FB2.10809@ti.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 09 Sep 2013 13:29:44 -0600
+Subject: [PATCHv3 1/2] ARM: msm: Add support for APQ8074 Dragonboard
+In-Reply-To: <FFE100A7-8AD6-4E0D-9F64-120DA3564F89@codeaurora.org>
+References: <1378495943-2572-1-git-send-email-rvaswani@codeaurora.org>
+ <20130906215051.GA29253@quad.lixom.net> <522E09E6.8040300@codeaurora.org>
+ <FFE100A7-8AD6-4E0D-9F64-120DA3564F89@codeaurora.org>
+Message-ID: <522E21A8.4060408@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/26/2013 12:36 AM, Keerthy wrote:
-> The Patch adds nodes for TPS659038 PMIC for DRA7 boards.
+On 09/09/2013 01:17 PM, Kumar Gala wrote:
 > 
-> It is based on top of:
-> http://comments.gmane.org/gmane.linux.ports.arm.omap/102459.
+> On Sep 9, 2013, at 12:48 PM, Rohit Vaswani wrote:
 > 
-> Documentation:	Documentation/devicetree/bindings/mfd/palmas.txt
-> 		Documentation/devicetree/bindings/regulator/palmas-pmic.txt		
+>> On 9/6/2013 2:50 PM, Olof Johansson wrote:
+>>> Hi,
+>>>
+>>> Some comments below.
+>>>
+>>> On Fri, Sep 06, 2013 at 12:32:22PM -0700, Rohit Vaswani wrote:
+>>>> This patch adds basic board support for APQ8074 Dragonboard
+>>>> <snip>
+>>>>  dtb-$(CONFIG_ARCH_MSM) += msm8660-surf.dtb \
+>>>> -	msm8960-cdp.dtb
+>>>> +	msm8960-cdp.dtb \
+>>>> +	apq8074-dragonboard.dtb
+>>> Please add boards alphabetically.
+>> Will do.
+>>>
+>>>>  dtb-$(CONFIG_ARCH_MVEBU) += armada-370-db.dtb \
+>>>>  	armada-370-mirabox.dtb \
+>>>>  	armada-370-rd.dtb \
+>>>> diff --git a/arch/arm/boot/dts/apq8074-dragonboard.dts b/arch/arm/boot/dts/apq8074-dragonboard.dts
+>>>> new file mode 100644
+>>>> index 0000000..5b7b6a0
+>>>> --- /dev/null
+>>>> +++ b/arch/arm/boot/dts/apq8074-dragonboard.dts
+>>> arch/arm/boot/dts/ is getting really crowded. It's been working best if the SoC
+>>> family or vendor is used as a prefix to keep things a bit more organized. In
+>>> that spirit, prefixing these with msm-<foo> makes sense. Can you please do so?
+>>
+>> Sure. But the board is called an APQ8074 and we wanted to keep the naming consistent with that.
 > 
-> Boot Tested on DRA7 d1 Board.
-> 
-> Signed-off-by: Keerthy <j-keerthy@ti.com>
-> ---
->  arch/arm/boot/dts/dra7-evm.dts |  118 ++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 118 insertions(+)
-> 
-> Index: linux/arch/arm/boot/dts/dra7-evm.dts
-> ===================================================================
-> --- linux.orig/arch/arm/boot/dts/dra7-evm.dts	2013-08-26 09:57:52.496173554 +0530
-> +++ linux/arch/arm/boot/dts/dra7-evm.dts	2013-08-26 10:38:44.995414695 +0530
-> @@ -93,6 +93,119 @@
->  	pinctrl-names = "default";
->  	pinctrl-0 = <&i2c1_pins>;
->  	clock-frequency = <400000>;
-> +
-> +	tps659038: tps659038 at 58 {
-> +		compatible = "ti,tps659038";
-> +		reg = <0x58>;
-> +
-> +		tps659038_pmic {
-> +			compatible = "ti,tps659038-pmic";
-> +
-> +			regulators {
-> +				smps123_reg: smps123 {
-> +					/* VDD_MPU */
-> +						regulator-name = "smps123";
-> +						regulator-min-microvolt = < 850000>;
-> +						regulator-max-microvolt = <1250000>;
-> +						regulator-always-on;
-> +						regulator-boot-on;
-> +					};
-> +
-> +				smps45_reg: smps45 {
-> +						/* VDD_DSPEVE */
-> +						regulator-name = "smps45";
-> +						regulator-min-microvolt = < 850000>;
-> +						regulator-max-microvolt = <1150000>;
-> +						regulator-boot-on;
-> +					};
-> +
-> +				smps6_reg: smps6 {
-> +						/* VDD_GPU - over VDD_SMPS6 */
-> +						regulator-name = "smps6";
-> +						regulator-min-microvolt = <850000>;
-> +						regulator-max-microvolt = <12500000>;
-> +						regulator-boot-on;
-> +					};
-> +
-> +				smps7_reg: smps7 {
-> +						/* CORE_VDD */
-> +						regulator-name = "smps7";
-> +						regulator-min-microvolt = <850000>;
-> +						regulator-max-microvolt = <1030000>;
-> +						regulator-always-on;
-> +						regulator-boot-on;
-> +					};
-> +
-> +				smps8_reg: smps8 {
-> +						/* VDD_IVAHD */
-> +						regulator-name = "smps8";
-> +						regulator-min-microvolt = < 850000>;
-> +						regulator-max-microvolt = <1250000>;
-> +						regulator-boot-on;
-> +					};
-> +
-> +				smps9_reg: smps9 {
-> +						/* VDDS1V8 */
-> +						regulator-name = "smps9";
-> +						regulator-min-microvolt = <1800000>;
-> +						regulator-max-microvolt = <1800000>;
-> +						regulator-always-on;
-> +						regulator-boot-on;
-> +					};
-> +
-> +				ldo1_reg: ldo1 {
-> +						/* LDO1_OUT --> SDIO  */
-> +						regulator-name = "ldo1";
-> +						regulator-min-microvolt = <1800000>;
-> +						regulator-max-microvolt = <3300000>;
-> +						regulator-boot-on;
-> +					};
-> +
-> +				ldo2_reg: ldo2 {
-> +						/* VDD_RTCIO */
-> +						/* LDO2 -> VDDSHV5, LDO2 also goes to CAN_PHY_3V3 */
-> +						regulator-name = "ldo2";
-> +						regulator-min-microvolt = <3300000>;
-> +						regulator-max-microvolt = <3300000>;
-> +						regulator-boot-on;
-> +					};
-> +
-> +				ldo3_reg: ldo3 {
-> +						/* VDDA_1V8_PHY */
-> +						regulator-name = "ldo3";
-> +						regulator-min-microvolt = <1800000>;
-> +						regulator-max-microvolt = <1800000>;
-> +						regulator-boot-on;
-> +					};
-> +
-> +				ldo9_reg: ldo9 {
-> +						/* VDD_RTC */
-> +						regulator-name = "ldo9";
-> +						regulator-min-microvolt = <1050000>;
-> +						regulator-max-microvolt = <1050000>;
-> +						regulator-boot-on;
-> +					};
-> +
-> +				ldoln_reg: ldoln {
-> +						/* VDDA_1V8_PLL */
-> +						regulator-name = "ldoln";
-> +						regulator-min-microvolt = <1800000>;
-> +						regulator-max-microvolt = <1800000>;
-> +						regulator-always-on;
-> +						regulator-boot-on;
-> +					};
-> +
-> +				ldousb_reg: ldousb {
-> +						/* VDDA_3V_USB: VDDA_USBHS33 */
-> +						regulator-name = "ldousb";
-> +						regulator-min-microvolt = <3300000>;
-> +						regulator-max-microvolt = <3300000>;
-> +						regulator-boot-on;
-> +					};
-> +
-> +				};
-> +			};
-> +		};
->  };
->  
->  &i2c2 {
-> 
-Acked-by: Nishanth Menon <nm@ti.com>
+> If we do this we should use qcom, not msm as the prefix.  Match the device tree vendor prefix.
 
--- 
-Regards,
-Nishanth Menon
+Hmm. It'd be nice for the filenames to be ${soc}-${board} so that e.g.
+U-Boot can easily calculate the DTB filename based on its soc/board
+environment variables... Luckily in my case for Tegra, all the Tegra
+chip names start with "Tegra", so we already sort all our DTB filenames
+together in the directory listing:-)
