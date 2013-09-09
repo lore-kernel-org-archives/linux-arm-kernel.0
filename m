@@ -1,76 +1,35 @@
-From: b45784@freescale.com (Pardeep Kumar Singla)
-Date: Mon, 9 Sep 2013 11:20:04 -0500
-Subject: [RFC] ARM: kernel: io: Optimize memcpy_fromio function.
-Message-ID: <1378743604-7339-1-git-send-email-b45784@freescale.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Mon, 9 Sep 2013 12:31:04 -0400 (EDT)
+Subject: [PATCH] ARM: vexpress: allow dcscb and tc2_pm in a combined ARMv6+v7
+ build
+Message-ID: <alpine.LFD.2.03.1309091224010.20709@syhkavp.arg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently memcpy_fromio function is copying byte by byte data.
-By replacing this function with inline assembly code, it is copying now 32 bytes at one time.
-By running two test cases(Tested on mx6qsabresd board),results are following :-
 
-a)First test case  by calling the memcpy_fromio function only once:-
-	1. With Optimization it is just taking 6 usec.
-	2. Without optimization it is taking 114usec.
-b)Second test case by calling the memcpy_fromio function 100000 times.
-	1.With Optimization it is just taking .8 sec
-	2.Without optimization it is taking 11 sec.
+This fixes the following build error:
 
-Signed-off-by: Pardeep Kumar Singla <b45784@freescale.com>
----
- arch/arm/kernel/io.c |   37 ++++++++++++++++++++++++++++++-------
- 1 file changed, 30 insertions(+), 7 deletions(-)
+/tmp/cce439dZ.s: Assembler messages:
+/tmp/cce439dZ.s:506: Error: selected processor does not support ARM mode `isb '
+/tmp/cce439dZ.s:512: Error: selected processor does not support ARM mode `isb '
+/tmp/cce439dZ.s:513: Error: selected processor does not support ARM mode `dsb '
+/tmp/cce439dZ.s:583: Error: selected processor does not support ARM mode `isb '
+/tmp/cce439dZ.s:589: Error: selected processor does not support ARM mode `isb '
+/tmp/cce439dZ.s:590: Error: selected processor does not support ARM mode `dsb '
 
-diff --git a/arch/arm/kernel/io.c b/arch/arm/kernel/io.c
-index dcd5b4d..3eb8961 100644
---- a/arch/arm/kernel/io.c
-+++ b/arch/arm/kernel/io.c
-@@ -4,16 +4,39 @@
- 
- /*
-  * Copy data from IO memory space to "real" memory space.
-- * This needs to be optimized.
-  */
-+void *asmcopy_8w(void *dst, void *src, int blocks);
-+asm("						\n\
-+	.align  2				\n\
-+	.text					\n\
-+	.global asmcopy_8w			\n\
-+	.type asmcopy_8w, %function		\n\
-+asmcopy_8w:					\n\
-+	stmfd sp!, {r3-r10, lr}			\n\
-+.loop:  ldmia r1!, {r3-r10}			\n\
-+	stmia r0!, {r3-r10}			\n\
-+	subs r2, r2, #1				\n\
-+	bne .loop				\n\
-+	ldmfd sp!, {r3-r10, pc}			\n\
-+");
-+
- void _memcpy_fromio(void *to, const volatile void __iomem *from, size_t count)
- {
--	unsigned char *t = to;
--	while (count) {
--		count--;
--		*t = readb(from);
--		t++;
--		from++;
-+	unsigned char *dst = (unsigned char *)to;
-+	unsigned char *src = (unsigned char *)from;
-+	if ((((int)src & 3) == 0) && (((int)dst & 3) == 0) && (count >= 32)) {
-+		/* copy big chunks */
-+		asmcopy_8w(dst, src, count >> 5);
-+		dst += count & (~0x1f);
-+		src += count & (~0x1f);
-+		count &= 0x1f;
-+	}
-+
-+	/* un-aligned or trailing accesses */
-+	while (count--) {
-+		*dst = readb(src);
-+		dst++;
-+		src++;
- 	}
- }
- 
--- 
-1.7.9.5
+Tested-by: Guenter Roeck <linux@roeck-us.net>
+Signed-off-by: Nicolas Pitre <nico@linaro.org>
+
+diff --git a/arch/arm/mach-vexpress/Makefile b/arch/arm/mach-vexpress/Makefile
+index 36ea824712..505e64ab3e 100644
+--- a/arch/arm/mach-vexpress/Makefile
++++ b/arch/arm/mach-vexpress/Makefile
+@@ -7,6 +7,8 @@ ccflags-$(CONFIG_ARCH_MULTIPLATFORM) := -I$(srctree)/$(src)/include \
+ obj-y					:= v2m.o
+ obj-$(CONFIG_ARCH_VEXPRESS_CA9X4)	+= ct-ca9x4.o
+ obj-$(CONFIG_ARCH_VEXPRESS_DCSCB)	+= dcscb.o	dcscb_setup.o
++CFLAGS_dcscb.o				+= -march=armv7-a
+ obj-$(CONFIG_ARCH_VEXPRESS_TC2_PM)	+= tc2_pm.o spc.o
++CFLAGS_tc2_pm.o				+= -march=armv7-a
+ obj-$(CONFIG_SMP)			+= platsmp.o
+ obj-$(CONFIG_HOTPLUG_CPU)		+= hotplug.o
