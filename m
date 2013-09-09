@@ -1,23 +1,15 @@
 From: dinguyen@altera.com (dinguyen at altera.com)
-Date: Mon, 9 Sep 2013 10:33:52 -0500
-Subject: [PATCH 2/3] mmc: dw_mmc-socfpga: Clean up SOCFPGA platform specific
- functionality
+Date: Mon, 9 Sep 2013 10:33:53 -0500
+Subject: [PATCH 3/3] arm: dts: socfpga: Add support for SD/MMC
 In-Reply-To: <1378740833-4883-1-git-send-email-dinguyen@altera.com>
 References: <1378740833-4883-1-git-send-email-dinguyen@altera.com>
-Message-ID: <1378740833-4883-3-git-send-email-dinguyen@altera.com>
+Message-ID: <1378740833-4883-4-git-send-email-dinguyen@altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Dinh Nguyen <dinguyen@altera.com>
 
-The SDR timing registers for the SD/MMC IP block for SOCFPGA is located
-in the system manager. This system manager IP block is located outside of
-the SD IP block itself. Therefore, the function to set the SDR timing
-register should be in the platform specific code so that the SD driver can
-be autonomous of any future System Manager changes.
-
-Also, there is no need for "altr,dw-mshc-ciu-div" as the driver can get
-the value of the CIU clock from the common clock API.
+Add bindings for SD/MMC for SOCFPGA.
 
 Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
 Cc: Pavel Machek <pavel@denx.de>
@@ -35,113 +27,124 @@ Cc: devicetree at vger.kernel.org
 Cc: linux-mmc at vger.kernel.org
 CC: linux-arm-kernel at lists.infradead.org
 ---
- drivers/mmc/host/dw_mmc-pltfm.h   |    2 +-
- drivers/mmc/host/dw_mmc-socfpga.c |   63 ++-----------------------------------
- 2 files changed, 3 insertions(+), 62 deletions(-)
+ .../devicetree/bindings/mmc/socfpga-dw-mshc.txt    |   38 ++++++++++++++++++++
+ arch/arm/boot/dts/socfpga.dtsi                     |   11 ++++++
+ arch/arm/boot/dts/socfpga_cyclone5.dts             |   12 +++++++
+ arch/arm/boot/dts/socfpga_vt.dts                   |   12 +++++++
+ 4 files changed, 73 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mmc/socfpga-dw-mshc.txt
 
-diff --git a/drivers/mmc/host/dw_mmc-pltfm.h b/drivers/mmc/host/dw_mmc-pltfm.h
-index 68e7fd2..682400f 100644
---- a/drivers/mmc/host/dw_mmc-pltfm.h
-+++ b/drivers/mmc/host/dw_mmc-pltfm.h
-@@ -16,5 +16,5 @@ extern int dw_mci_pltfm_register(struct platform_device *pdev,
- 				const struct dw_mci_drv_data *drv_data);
- extern int dw_mci_pltfm_remove(struct platform_device *pdev);
- extern const struct dev_pm_ops dw_mci_pltfm_pmops;
--
-+extern void socfpga_sysmgr_set_dwmmc_drvsel_smpsel(void);
- #endif /* _DW_MMC_PLTFM_H_ */
-diff --git a/drivers/mmc/host/dw_mmc-socfpga.c b/drivers/mmc/host/dw_mmc-socfpga.c
-index 14b5961..924a950 100644
---- a/drivers/mmc/host/dw_mmc-socfpga.c
-+++ b/drivers/mmc/host/dw_mmc-socfpga.c
-@@ -24,48 +24,14 @@
- #include "dw_mmc.h"
- #include "dw_mmc-pltfm.h"
+diff --git a/Documentation/devicetree/bindings/mmc/socfpga-dw-mshc.txt b/Documentation/devicetree/bindings/mmc/socfpga-dw-mshc.txt
+new file mode 100644
+index 0000000..f565835
+--- /dev/null
++++ b/Documentation/devicetree/bindings/mmc/socfpga-dw-mshc.txt
+@@ -0,0 +1,38 @@
++* Altera SOCFPGA specific extensions to the Synopsis Designware Mobile
++  Storage Host Controller
++
++The Synopsis designware mobile storage host controller is used to interface
++a SoC with storage medium such as eMMC or SD/MMC cards. This file documents
++differences between the core Synopsis dw mshc controller properties described
++by synopsis-dw-mshc.txt and the properties used by the SOCFPGA specific
++extensions to the Synopsis Designware Mobile Storage Host Controller.
++
++Required Properties:
++
++* compatible: should be
++        - "altr,socfpga-dw-mshc": for controllers with Altera SOCFPGA
++          specific extensions.
++
++* samsung,dw-mshc-sdr-timing: See exynos-dw-mshc.txt for more information about
++	this binding.
++
++Example:
++        dwmmc0 at ff704000 {
++                compatible = "altr,socfpga-dw-mshc", "snps,dw-mshc";
++                reg = <0xff704000 0x1000>;
++                interrupts = <0 139 4>;
++                fifo-depth = <0x400>;
++                #address-cells = <1>;
++                #size-cells = <0>;
++                clocks = <&l4_mp_clk>, <&sdmmc_clk>;
++                clock-names = "biu", "ciu";
++                num-slots = <1>;
++                supports-highspeed;
++                broken-cd;
++                samsung,dw-mshc-sdr-timing = <0 3>;
++
++                slot at 0 {
++                        reg = <0>;
++                        bus-width = <4>;
++                };
++        };
+diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
+index bee62a2..25ad850 100644
+--- a/arch/arm/boot/dts/socfpga.dtsi
++++ b/arch/arm/boot/dts/socfpga.dtsi
+@@ -468,6 +468,17 @@
+ 			cache-level = <2>;
+ 		};
  
--#define SYSMGR_SDMMCGRP_CTRL_OFFSET		0x108
--#define DRV_CLK_PHASE_SHIFT_SEL_MASK	0x7
--#define SYSMGR_SDMMC_CTRL_SET(smplsel, drvsel)          \
--	((((smplsel) & 0x7) << 3) | (((drvsel) & 0x7) << 0))
--
--/* SOCFPGA implementation specific driver private data */
--struct dw_mci_socfpga_priv_data {
--	u8	ciu_div; /* card interface unit divisor */
--	u32	hs_timing; /* bitmask for CIU clock phase shift */
--	struct regmap   *sysreg; /* regmap for system manager register */
--};
--
--static int dw_mci_socfpga_priv_init(struct dw_mci *host)
--{
--	struct dw_mci_socfpga_priv_data *priv;
--
--	priv = devm_kzalloc(host->dev, sizeof(*priv), GFP_KERNEL);
--	if (!priv) {
--		dev_err(host->dev, "mem alloc failed for private data\n");
--		return -ENOMEM;
--	}
--
--	priv->sysreg = syscon_regmap_lookup_by_compatible("altr,sys-mgr");
--	if (IS_ERR(priv->sysreg)) {
--		dev_err(host->dev, "regmap for altr,sys-mgr lookup failed.\n");
--		return PTR_ERR(priv->sysreg);
--	}
--	host->priv = priv;
--
--	return 0;
--}
--
- static int dw_mci_socfpga_setup_clock(struct dw_mci *host)
- {
- 	struct dw_mci_socfpga_priv_data *priv = host->priv;
++		mmc: dwmmc0 at ff704000 {
++			compatible = "altr,socfpga-dw-mshc";
++			reg = <0xff704000 0x1000>;
++			interrupts = <0 139 4>;
++			fifo-depth = <0x400>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++			clocks = <&l4_mp_clk>, <&sdmmc_clk>;
++			clock-names = "biu", "ciu";
++		};
++
+ 		/* Local timer */
+ 		timer at fffec600 {
+ 			compatible = "arm,cortex-a9-twd-timer";
+diff --git a/arch/arm/boot/dts/socfpga_cyclone5.dts b/arch/arm/boot/dts/socfpga_cyclone5.dts
+index 973999d..b4b68ad 100644
+--- a/arch/arm/boot/dts/socfpga_cyclone5.dts
++++ b/arch/arm/boot/dts/socfpga_cyclone5.dts
+@@ -48,6 +48,18 @@
+ 			};
+ 		};
  
- 	clk_disable_unprepare(host->ciu_clk);
--	regmap_write(priv->sysreg, SYSMGR_SDMMCGRP_CTRL_OFFSET,
--		priv->hs_timing);
-+	socfpga_sysmgr_set_dwmmc_drvsel_smpsel();
- 	clk_prepare_enable(host->ciu_clk);
++		dwmmc0 at ff704000 {
++			num-slots = <1>;
++			supports-highspeed;
++			broken-cd;
++			samsung,dw-mshc-sdr-timing = <0 3>;
++
++			slot at 0 {
++				reg = <0>;
++				bus-width = <4>;
++			};
++		};
++
+ 		ethernet at ff702000 {
+ 			phy-mode = "rgmii";
+ 			phy-addr = <0xffffffff>; /* probe for phy addr */
+diff --git a/arch/arm/boot/dts/socfpga_vt.dts b/arch/arm/boot/dts/socfpga_vt.dts
+index d1ec0ca..7dc709b 100644
+--- a/arch/arm/boot/dts/socfpga_vt.dts
++++ b/arch/arm/boot/dts/socfpga_vt.dts
+@@ -41,6 +41,18 @@
+ 			};
+ 		};
  
--	host->bus_hz /= (priv->ciu_div + 1);
- 	return 0;
- }
- 
-@@ -73,37 +39,12 @@ static void dw_mci_socfpga_prepare_command(struct dw_mci *host, u32 *cmdr)
- {
- 	struct dw_mci_socfpga_priv_data *priv = host->priv;
- 
--	if (priv->hs_timing & DRV_CLK_PHASE_SHIFT_SEL_MASK)
--		*cmdr |= SDMMC_CMD_USE_HOLD_REG;
--}
--
--static int dw_mci_socfpga_parse_dt(struct dw_mci *host)
--{
--	struct dw_mci_socfpga_priv_data *priv = host->priv;
--	struct device_node *np = host->dev->of_node;
--	u32 timing[2];
--	u32 div = 0;
--	int ret;
--
--	ret = of_property_read_u32(np, "altr,dw-mshc-ciu-div", &div);
--	if (ret)
--		dev_info(host->dev, "No dw-mshc-ciu-div specified, assuming 1");
--	priv->ciu_div = div;
--
--	ret = of_property_read_u32_array(np,
--			"altr,dw-mshc-sdr-timing", timing, 2);
--	if (ret)
--		return ret;
--
--	priv->hs_timing = SYSMGR_SDMMC_CTRL_SET(timing[0], timing[1]);
--	return 0;
-+	*cmdr |= SDMMC_CMD_USE_HOLD_REG;
- }
- 
- static const struct dw_mci_drv_data socfpga_drv_data = {
--	.init			= dw_mci_socfpga_priv_init,
- 	.setup_clock		= dw_mci_socfpga_setup_clock,
- 	.prepare_command	= dw_mci_socfpga_prepare_command,
--	.parse_dt		= dw_mci_socfpga_parse_dt,
- };
- 
- static const struct of_device_id dw_mci_socfpga_match[] = {
++		dwmmc0 at ff704000 {
++			num-slots = <1>;
++			supports-highspeed;
++			broken-cd;
++			samsung,dw-mshc-sdr-timing = <0 3>;
++
++			slot at 0 {
++				reg = <0>;
++				bus-width = <4>;
++			};
++		};
++
+ 		ethernet at ff700000 {
+ 			phy-mode = "gmii";
+ 			status = "okay";
 -- 
 1.7.9.5
