@@ -1,82 +1,87 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Mon,  9 Sep 2013 11:10:07 +0100
-Subject: [PATCH 11/14] iio: pressure-core: st: Provide support for the Vdd_IO
- power supply
+Date: Mon,  9 Sep 2013 11:10:10 +0100
+Subject: [PATCH 14/14] iio: sensors-core: st: Support sensors which don't have
+ a Data Ready pin
 In-Reply-To: <1378721410-30937-1-git-send-email-lee.jones@linaro.org>
 References: <1378721410-30937-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1378721410-30937-12-git-send-email-lee.jones@linaro.org>
+Message-ID: <1378721410-30937-15-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The power to some of the sensors are controlled by regulators. In most
-cases these are 'always on', but if not they will fail to work until
-the regulator is enabled using the relevant APIs. This patch allows for
-the Vdd_IO power supply to be specified by either platform data or
-Device Tree.
+Not all ST's sensors support data ready, so let's make the declaration
+of one conditional.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/iio/pressure/st_pressure_core.c | 13 ++++++++++++-
- include/linux/iio/common/st_sensors.h   |  2 ++
- 2 files changed, 14 insertions(+), 1 deletion(-)
+ drivers/iio/common/st_sensors/st_sensors_core.c | 24 +++++++++++++++++++-----
+ drivers/iio/pressure/st_pressure_core.c         |  3 ++-
+ 2 files changed, 21 insertions(+), 6 deletions(-)
 
+diff --git a/drivers/iio/common/st_sensors/st_sensors_core.c b/drivers/iio/common/st_sensors/st_sensors_core.c
+index 05030e4..8c4c54c 100644
+--- a/drivers/iio/common/st_sensors/st_sensors_core.c
++++ b/drivers/iio/common/st_sensors/st_sensors_core.c
+@@ -198,14 +198,11 @@ int st_sensors_set_axis_enable(struct iio_dev *indio_dev, u8 axis_enable)
+ }
+ EXPORT_SYMBOL(st_sensors_set_axis_enable);
+ 
+-int st_sensors_init_sensor(struct iio_dev *indio_dev,
+-					struct st_sensors_platform_data *pdata)
++int st_sensors_set_drdy_int_pin(struct iio_dev *indio_dev,
++				struct st_sensors_platform_data *pdata)
+ {
+-	int err;
+ 	struct st_sensor_data *sdata = iio_priv(indio_dev);
+ 
+-	mutex_init(&sdata->tb.buf_lock);
+-
+ 	switch (pdata->drdy_int_pin) {
+ 	case 1:
+ 		if (sdata->sensor->drdy_irq.mask_int1 == 0) {
+@@ -228,6 +225,20 @@ int st_sensors_init_sensor(struct iio_dev *indio_dev,
+ 		return -EINVAL;
+ 	}
+ 
++	return 0;
++}
++
++int st_sensors_init_sensor(struct iio_dev *indio_dev,
++					struct st_sensors_platform_data *pdata)
++{
++	int err = 0;
++	struct st_sensor_data *sdata = iio_priv(indio_dev);
++
++	mutex_init(&sdata->tb.buf_lock);
++
++	if (pdata)
++		err = st_sensors_set_drdy_int_pin(indio_dev, pdata);
++
+ 	err = st_sensors_set_enable(indio_dev, false);
+ 	if (err < 0)
+ 		return err;
+@@ -262,6 +273,9 @@ int st_sensors_set_dataready_irq(struct iio_dev *indio_dev, bool enable)
+ 	u8 drdy_mask;
+ 	struct st_sensor_data *sdata = iio_priv(indio_dev);
+ 
++	if (!sdata->sensor->drdy_irq.addr)
++		return 0;
++
+ 	/* Enable/Disable the interrupt generator 1. */
+ 	if (sdata->sensor->drdy_irq.ig1.en_addr > 0) {
+ 		err = st_sensors_write_data_with_mask(indio_dev,
 diff --git a/drivers/iio/pressure/st_pressure_core.c b/drivers/iio/pressure/st_pressure_core.c
-index f11cffc..330701c 100644
+index 330701c..d650039 100644
 --- a/drivers/iio/pressure/st_pressure_core.c
 +++ b/drivers/iio/pressure/st_pressure_core.c
-@@ -319,7 +319,7 @@ void st_press_power_enable(struct iio_dev *indio_dev)
- 	struct st_sensor_data *pdata = iio_priv(indio_dev);
- 	int err;
+@@ -377,7 +377,8 @@ int st_press_common_probe(struct iio_dev *indio_dev,
  
--	/* Regulators not mandatory, but if requested we should enable it. */
-+	/* Regulators not mandatory, but if requested we should enable them. */
- 	pdata->vdd = devm_regulator_get_optional(&indio_dev->dev, "vdd");
- 	if (!IS_ERR(pdata->vdd)) {
- 		err = regulator_enable(pdata->vdd);
-@@ -327,6 +327,14 @@ void st_press_power_enable(struct iio_dev *indio_dev)
- 			dev_warn(&indio_dev->dev,
- 				 "Failed to enable specified Vdd supply\n");
- 	}
-+
-+	pdata->vdd_io = devm_regulator_get_optional(&indio_dev->dev, "vddio");
-+	if (!IS_ERR(pdata->vdd_io)) {
-+		err = regulator_enable(pdata->vdd_io);
-+		if (err != 0)
-+			dev_warn(&indio_dev->dev,
-+				 "Failed to enable specified Vdd_IO supply\n");
-+	}
- }
+ 	pdata->odr = pdata->sensor->odr.odr_avl[0].hz;
  
- void st_press_power_disable(struct iio_dev *indio_dev)
-@@ -335,6 +343,9 @@ void st_press_power_disable(struct iio_dev *indio_dev)
+-	if (!plat_data)
++	/* Some devices don't support a data ready pin. */
++	if (!plat_data && pdata->sensor->drdy_irq.addr)
+ 		plat_data =
+ 			(struct st_sensors_platform_data *)&default_press_pdata;
  
- 	if (!IS_ERR(pdata->vdd))
- 		regulator_disable(pdata->vdd);
-+
-+	if (!IS_ERR(pdata->vdd_io))
-+		regulator_disable(pdata->vdd_io);
- }
- 
- int st_press_common_probe(struct iio_dev *indio_dev,
-diff --git a/include/linux/iio/common/st_sensors.h b/include/linux/iio/common/st_sensors.h
-index 968b84e..3c005eb 100644
---- a/include/linux/iio/common/st_sensors.h
-+++ b/include/linux/iio/common/st_sensors.h
-@@ -203,6 +203,7 @@ struct st_sensors {
-  * @sensor: Pointer to the current sensor struct in use.
-  * @current_fullscale: Maximum range of measure by the sensor.
-  * @vdd: Pointer to sensor's Vdd power supply
-+ * @vdd_io: Pointer to sensor's Vdd-IO power supply
-  * @enabled: Status of the sensor (false->off, true->on).
-  * @multiread_bit: Use or not particular bit for [I2C/SPI] multiread.
-  * @buffer_data: Data used by buffer part.
-@@ -219,6 +220,7 @@ struct st_sensor_data {
- 	struct st_sensors *sensor;
- 	struct st_sensor_fullscale_avl *current_fullscale;
- 	struct regulator *vdd;
-+	struct regulator *vdd_io;
- 
- 	bool enabled;
- 	bool multiread_bit;
 -- 
 1.8.1.2
