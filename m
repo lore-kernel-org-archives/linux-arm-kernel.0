@@ -1,97 +1,78 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Mon, 9 Sep 2013 19:32:00 +0900
-Subject: [PATCH 01/04] ARM: shmobile: Initial r8a7791 SoC support
-In-Reply-To: <CACRpkdY44c_qzQ6XVjCs86axta-0VBqL8ygH5j+q3z294YXjLA@mail.gmail.com>
-References: <20130904034525.12546.24775.sendpatchset@w520>
- <20130904034557.12546.97503.sendpatchset@w520>
- <CACRpkdb7QkqCmTMua1yJNJxSAWff=0f6a2SWkf6K9SqbW0BOVg@mail.gmail.com>
- <CANqRtoQzLKk3EKcm=EiZCg73fgDBZ1xjPi_6fH_PsGdkr6w5sA@mail.gmail.com>
- <CACRpkdZGLR3=UZ7f-9r02Gea2hTomp+6+bz0BDQOvk9zRHTxxw@mail.gmail.com>
- <CANqRtoQ0dnG6HwjJSrK8+Qt8wvJhqsJHxgj-LGvnJvS0KT81nw@mail.gmail.com>
- <CACRpkdY44c_qzQ6XVjCs86axta-0VBqL8ygH5j+q3z294YXjLA@mail.gmail.com>
-Message-ID: <CANqRtoT9TsDadKX1XgmANGcBhXp8sOgcY=6b7+0nPheKPpHduw@mail.gmail.com>
+From: anilk4.v@gmail.com (Anil Kumar)
+Date: Mon, 9 Sep 2013 16:25:29 +0530
+Subject: Build error in torvalds kernel 3.11 for omap2plus
+In-Reply-To: <522CB0DE.2010102@roeck-us.net>
+References: <CABYxbz7m4GdHFNY3fP1Cpv3a_dNTSozdd7dX9yLG6vQ3zZxu9A@mail.gmail.com>
+ <20130908090206.GK25647@n2100.arm.linux.org.uk>
+ <522CB0DE.2010102@roeck-us.net>
+Message-ID: <CABYxbz4rY5LiVruX=YUAFeaRaODC575YYTctaQ=Oezox29GoEg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+Hi Guenter,
 
-On Mon, Sep 9, 2013 at 6:15 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> On Mon, Sep 9, 2013 at 10:05 AM, Magnus Damm <magnus.damm@gmail.com> wrote:
+On Sun, Sep 8, 2013 at 10:46 PM, Guenter Roeck <linux@roeck-us.net> wrote:
+> On 09/08/2013 02:02 AM, Russell King - ARM Linux wrote:
+>>
+>> On Sun, Sep 08, 2013 at 11:34:10AM +0530, Anil Kumar wrote:
+>>>
+>>> scripts/kconfig/conf --silentoldconfig Kconfig
+>>>    CHK     include/generated/uapi/linux/version.h
+>>>    CHK     include/generated/utsrelease.h
+>>> make[1]: `include/generated/mach-types.h' is up to date.
+>>>    CALL    scripts/checksyscalls.sh
+>>>    CHK     include/generated/compile.h
+>>>    AS      arch/arm/mm/cache-v7.o
+>>> arch/arm/mm/cache-v7.S: Assembler messages:
+>>> arch/arm/mm/cache-v7.S:285: Error: garbage following instruction -- `dsb
+>>> ishst'
+>>> arch/arm/mm/cache-v7.S:297: Error: garbage following instruction -- `dsb
+>>> ishst'
+>>> make[1]: *** [arch/arm/mm/cache-v7.o] Error 1
+>>> make: *** [arch/arm/mm] Error 2
+>>
+>>
+>> You need a later binutils for these instructions - 2.22 works just fine,
+>> even with gcc 4.5.x.
 >
->> At
->> this time though, apart from common clocks, extended DT support and
->> multiplatform I'm not so sure what desired cleanup-wise.
 >
-> It'd be nice to switch shmobile to use AUTO_ZRELADDR, as it is
-> the other criteria (apart from common clock) standing in the way
-> for multiplatform. (Maybe this just works if you turn it on?)
-
-This works already for the majority of the boards. My gut feeling is
-that it should be the default for multiplatform.
-
-There is one special case when AUTO_ZRELADDR is not working today -
-both Laurent and I spent a bit of time trying to figure it out - but
-it is currently not moving anywhere due to focus elsewhere. It is
-however only triggering on one board - KZM9G - and that board is not
-yet supported by neither common clocks nor multiplatform yet anyway,
-so it's a problem pretty far away in the future.
-
-> For multiplatform you also have to depopulate <mach/*>
-> completely, either move stuff down into the mach-folder
-> or to <linux/platform_data/*> if absolutely necessary.
-> This will be quite some work, especially if the <mach/*>
-> path is used in a lot of drivers...
-
-Fortunately we don't use mach/ in our drivers, so that shouldn't be
-any issue. At least that used to be the case. See it as a nice side
-effect of doing both SH and ARM. =)
-
-> Then we have a quite broad consensus to depopulate arch/arm/*
-> of drivers, so for shmobile:
+> Since we are at it:
 >
-> clock* -> drivers/clk
-
-Sure, here we have quite a bit to do, no doubt about that!
-
-> cpuidle.c -> drivers/cpuidle (or was this just fixed?)
-
-I don't know the latest state here. For me it would make sense that
-arch/arm actually contained some shared sleep mode support, but if
-that should be in drivers/ instead then that's really no biggie for
-me. We have some cpuidle code that wants to be moved.
-
-> intc* -> drivers/irqchips
-
-We have some legacy SoCs using INTC tables under mach-shmobile/, but
-it is likely that those SoCs will be phased out before we have working
-generic INTC DT binding support. Everything modern is using GIC plus
-drivers under drivers/irqchips already.
-
-> sh-gpio.c -> drivers/pinctrl/gpio
+> Build reference: v3.11-7887-gb409624
 >
-> The last one I know you will soon finish.
+> Building arm:defconfig ... passed
+> Building arm:allmodconfig ... failed
+> --------------
+> Error log:
+> arch/arm/mach-cns3xxx/pcie.c: In function 'cns3xxx_pcie_hw_init':
+> arch/arm/mach-cns3xxx/pcie.c:350:1: warning: the frame size of 1064 bytes is
+> larger than 1024 bytes [-Wframe-larger-than=]
+> arch/arm/kernel/return_address.c:63:2: warning: #warning "TODO:
+> return_address should use unwind tables" [-Wcpp]
+> arch/arm/kernel/return_address.c:63:2: warning: #warning "TODO:
+> return_address should use unwind tables" [-Wcpp]
+> /tmp/cce439dZ.s: Assembler messages:
+> /tmp/cce439dZ.s:506: Error: selected processor does not support ARM mode
+> `isb '
+> /tmp/cce439dZ.s:512: Error: selected processor does not support ARM mode
+> `isb '
+> /tmp/cce439dZ.s:513: Error: selected processor does not support ARM mode
+> `dsb '
+> /tmp/cce439dZ.s:583: Error: selected processor does not support ARM mode
+> `isb '
+> /tmp/cce439dZ.s:589: Error: selected processor does not support ARM mode
+> `isb '
+> /tmp/cce439dZ.s:590: Error: selected processor does not support ARM mode
+> `dsb '
+> make[1]: *** [arch/arm/mach-vexpress/dcscb.o] Error 1
+> make: *** [arch/arm/mach-vexpress] Error 2
+> make: *** Waiting for unfinished jobs....
+> --------------
+>
+> Any solution for this one ? omap2plus passes for me.
 
-I believe Laurent has this under control. Actually, from the top of my
-head I don't even know which IP sh-gpio.c is tied to. I know we have a
-couple of drivers in drivers/gpio and also stuff in drivers/pinctrl/,
-but apart from that..
+I have updated my toolchain Assembler (used binutils 2.22 ) with
+latest one and issue has fixed.
 
-> Then deleteing all board file stuff that is not using DT.
-
-As you noticed, we sort of have a flow of code coming in that is
-written for currently-existing frameworks. Then we have the upstream
-rework and DT support going on in parallel. To aid this we have
-something called DT reference board support, which is basically board
-support code where we add DT bit by bit. Those DT reference boards can
-also be used together with common clocks and multiplatform kernels.
-KZM9D and EMEV2 are multiplatform ready, but lack CCF at this point.
-
-So the idea is that we move individual SoCs and boards over to
-multiplatform and then remove the old board code bit by bit. In
-parallel with this we may phase out old boards and old SoCs.
-
-> After all that it's top-notch I think :-)
-
-Thanks for your suggestions!!
-
-/ magnus
+Thanks,
+Anil
