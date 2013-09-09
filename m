@@ -1,225 +1,106 @@
-From: mikedunn@newsguy.com (Mike Dunn)
-Date: Sun,  8 Sep 2013 12:40:18 -0700
-Subject: [PATCH v2] pwm: pxa: add device tree support to pwm driver
-Message-ID: <1378669218-10944-1-git-send-email-mikedunn@newsguy.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 9 Sep 2013 09:09:15 +0900
+Subject: [GIT PULL 3/3] ARM: shmobile: lager: enable Ether
+In-Reply-To: <CAOesGMg=Nq+2bWr3tW5+t5zJi-YH35DWjE=Sr7aeo_6FtKt1Tg@mail.gmail.com>
+References: <cover.1375839719.git.horms+renesas@verge.net.au>
+ <4901e136aa5c35873701156c4c0af5b3c2c8faee.1375839719.git.horms+renesas@verge.net.au>
+ <87siy3owxj.fsf@linaro.org> <5215115A.1010400@cogentembedded.com>
+ <20130822001647.GA6902@verge.net.au>
+ <20130822065325.GA6615@quad.lixom.net>
+ <20130822070109.GA26589@verge.net.au>
+ <CAOesGMjZ+a6EiDa2p3y-_kkQ0uwSHU6zdcTxuphJxNcr7QhDhw@mail.gmail.com>
+ <20130822073706.GA32091@verge.net.au>
+ <CAOesGMg=Nq+2bWr3tW5+t5zJi-YH35DWjE=Sr7aeo_6FtKt1Tg@mail.gmail.com>
+Message-ID: <20130909000915.GB21921@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds device tree support to the pxa's pwm driver.  Only an OF match
-table is added; nothing needs to be extracted from the device tree node.  The
-existing platform_device id table is reused for the match table data.  Support
-for inverted polarity is also added.
+On Fri, Sep 06, 2013 at 02:32:16PM -0700, Olof Johansson wrote:
+> On Thu, Aug 22, 2013 at 12:37 AM, Simon Horman <horms@verge.net.au> wrote:
+> > On Thu, Aug 22, 2013 at 12:04:59AM -0700, Olof Johansson wrote:
+> >> On Thu, Aug 22, 2013 at 12:01 AM, Simon Horman <horms@verge.net.au> wrote:
+> >> > On Wed, Aug 21, 2013 at 11:53:25PM -0700, Olof Johansson wrote:
+> >> >> On Thu, Aug 22, 2013 at 09:16:49AM +0900, Simon Horman wrote:
+> >> >> > On Wed, Aug 21, 2013 at 11:13:30PM +0400, Sergei Shtylyov wrote:
+> >> >> > > Hello.
+> >> >> > >
+> >> >> > > On 08/21/2013 08:01 PM, Kevin Hilman wrote:
+> >> >> > >
+> >> >> > > >>Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+> >> >> > > >>Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> >> >> > >
+> >> >> > > >This one is triggering a new build failure in -next:
+> >> >> > >
+> >> >> > > >arch/arm/mach-shmobile/board-lager.c:99:2: error: unknown field 'register_type' specified in initializer
+> >> >> > > >arch/arm/mach-shmobile/board-lager.c:99:19: error: 'SH_ETH_REG_FAST_RCAR' undeclared here (not in a function)
+> >> >> > >
+> >> >> > > >>+/* Ether */
+> >> >> > > >>+static struct sh_eth_plat_data ether_pdata __initdata = {
+> >> >> > > >>+       .phy                    = 0x1,
+> >> >> > > >>+       .edmac_endian           = EDMAC_LITTLE_ENDIAN,
+> >> >> > > >>+       .register_type          = SH_ETH_REG_FAST_RCAR,
+> >> >> > >
+> >> >> > > >and it looks to be because this board is trying to use the register_type
+> >> >> > > >field which was removed by:
+> >> >> > >
+> >> >> > > >commit 8d3214c4e8c8be6efd8ec7a172239ebbd4deb04b
+> >> >> > > >Author: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> >> >> > > >Date:   Sun Aug 18 03:13:26 2013 +0400
+> >> >> > > >
+> >> >> > > >     sh_eth: remove 'register_type' field from 'struct sh_eth_plat_data'
+> >> >> > > >
+> >> >> > > >     Now that the 'register_type' field of the 'sh_eth' driver's platform data is not
+> >> >> > > >     used by the driver anymore, it's time to remove it and  its initializers from
+> >> >> > > >     the SH platform code. Also  move *enum* declaring values for this  field from
+> >> >> > > >     <linux/sh_eth.h>  to  the  local driver's  header file as they're only needed
+> >> >> > > >     by the driver itself  now...
+> >> >> > > >
+> >> >> > > >     Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> >> >> > > >     Signed-off-by: David S. Miller <davem@davemloft.net>
+> >> >> > >
+> >> >> > >    Looks like in this case I had no choice since R8A7790 support for
+> >> >> > > the 'sh_eth' driver will be added in 3.12 only, so if I merged these
+> >> >> > > patches thru the shmobile tree, we'd have gotten an error in the
+> >> >> > > driver...
+> >> >> > >    I guess it's too early to fix this in any particular tree except
+> >> >> > > for linux-next itself... let me know what I can do.
+> >> >> >
+> >> >> > This patch ("ARM: shmobile: lager: enable Ether") is also targeted at v3.12.
+> >> >> > So it seems to me that a fix for this could go through the shmobile tree
+> >> >> > if it is acceptable to merge net-next into the base of a pull-request.
+> >> >> >
+> >> >> > Kevin, Olof, could you give some guidance here.
+> >> >>
+> >> >> I don't think we want to pull in net-next here just for this -- that is a
+> >> >> massive branch.
+> >> >>
+> >> >> There's no great solution to any of this, unfortunately.
+> >> >>
+> >> >> I think easiest would be if we add a patch that fixes this up _only_ in
+> >> >> for-next, and merge the same patch upstream as soon as net-next lands
+> >> >> (if it lands after arm-soc, otherwise we include it in our branch),
+> >> >> that might be the least painful way to do this.
+> >> >>
+> >> >> That patch would just remove the assignment to register_type in the
+> >> >> board file.
+> >> >
+> >> > That is fine by me.
+> >> >
+> >> > I think it would be easiest to supply the patch to you as
+> >> > a patch in email rather than a pull request.
+> >> >
+> >> > Does that work for you?
+> >>
+> >> Yes, definitely.
+> >
+> > Thanks, I have posted it as
+> > "[PATCH] ARM: shmobile: lager: Do not use register_type field of struct".
+> 
+> Ok, I forgot to include this when sending the code up today, so lager
+> is currently broken in mainline. I'll include it in the next branch we
+> send up.
 
-Tested on a Palm Treo 680 (both platform data and DT cases).
+Thanks Olof,
 
-Signed-off-by: Mike Dunn <mikedunn@newsguy.com>
----
-Changle log:
-v2:
-- of_match_table contains only the "pxa250-pwm" compatible string; require one
-  device instance per pwm
-- add Documentation/devicetree/bindings/pwm/pxa-pwm.txt
-- add support for polarity flag in DT and implement set_polarity() method
-  (the treo 680 inverts the signal between pwm out and backlight)
-- return -EINVAL instead of -ENODEV if platform data or DT node not found
-- output dev_info string if platform data missing
-- expanded CC list of patch
-
- Documentation/devicetree/bindings/pwm/pxa-pwm.txt | 33 +++++++++++++
- arch/arm/boot/dts/pxa27x.dtsi                     | 24 ++++++++++
- drivers/pwm/pwm-pxa.c                             | 57 +++++++++++++++++++++++
- 3 files changed, 114 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/pwm/pxa-pwm.txt
-
-diff --git a/Documentation/devicetree/bindings/pwm/pxa-pwm.txt b/Documentation/devicetree/bindings/pwm/pxa-pwm.txt
-new file mode 100644
-index 0000000..7b09bfa
---- /dev/null
-+++ b/Documentation/devicetree/bindings/pwm/pxa-pwm.txt
-@@ -0,0 +1,33 @@
-+Marvell pwm controller
-+
-+Required properties:
-+- compatible:
-+  for pxa25x, pxa27x, pxa168, pxa910: must be compatible = "marvell,pxa250-pwm";
-+- reg: physical base address and length of the registers used by the pwm channel
-+  NB: One device instance must be created for each pwm that is used, so the
-+  length covers only the register window for one pwm output, not that of the
-+  entire pwm controller.  Currently length is 0x10 for all supported devices.
-+- #pwm-cells: should be 3.
-+   cell 1: the per-chip index of the PWM to use,
-+   cell 2: the period in nanoseconds,
-+   cell 3: flags; set bit 0 to specify inverse polarity.  The pwm controller
-+   does not implement reverse polarity, but some boards may pass the pwm output
-+   through an external inverter, which can cause problems if a client device
-+   assumes that an increase in the duty cycle results in an increase in output
-+   power.  The pwm-backlight is an example of such a client.
-+
-+Example pwm device node:
-+
-+pwm0: pwm at 40b00000 {
-+	compatible = "marvell,pxa250-pwm";
-+	reg = <0x40b00000 0x10>;
-+	#pwm-cells = <3>;
-+};
-+
-+Example pwm client node:
-+
-+backlight {
-+      	compatible = "pwm-backlight";
-+     	pwms = <&pwm0 0 5000000 1>;  /* pwm output is inverted */
-+	...
-+}
-diff --git a/arch/arm/boot/dts/pxa27x.dtsi b/arch/arm/boot/dts/pxa27x.dtsi
-index d7c5d72..a12fe8e 100644
---- a/arch/arm/boot/dts/pxa27x.dtsi
-+++ b/arch/arm/boot/dts/pxa27x.dtsi
-@@ -10,5 +10,29 @@
- 			marvell,intc-priority;
- 			marvell,intc-nr-irqs = <34>;
- 		};
-+
-+		pwm0: pwm at 40b00000 {
-+			compatible = "marvell,pxa250-pwm";
-+			reg = <0x40b00000 0x10>;
-+			#pwm-cells = <3>;
-+		};
-+
-+		pwm1: pwm at 40b00010 {
-+			compatible = "marvell,pxa250-pwm";
-+			reg = <0x40b00010 0x10>;
-+			#pwm-cells = <3>;
-+		};
-+
-+		pwm2: pwm at 40c00000 {
-+			compatible = "marvell,pxa250-pwm";
-+			reg = <0x40c00000 0x10>;
-+			#pwm-cells = <3>;
-+		};
-+
-+		pwm3: pwm at 40c00010 {
-+			compatible = "marvell,pxa250-pwm";
-+			reg = <0x40c00010 0x10>;
-+			#pwm-cells = <3>;
-+		};
- 	};
- };
-diff --git a/drivers/pwm/pwm-pxa.c b/drivers/pwm/pwm-pxa.c
-index a4d2164..33e6a7d 100644
---- a/drivers/pwm/pwm-pxa.c
-+++ b/drivers/pwm/pwm-pxa.c
-@@ -19,6 +19,7 @@
- #include <linux/clk.h>
- #include <linux/io.h>
- #include <linux/pwm.h>
-+#include <linux/of_device.h>
- 
- #include <asm/div64.h>
- 
-@@ -48,6 +49,7 @@ struct pxa_pwm_chip {
- 
- 	struct clk	*clk;
- 	void __iomem	*mmio_base;
-+	enum pwm_polarity polarity;
- };
- 
- static inline struct pxa_pwm_chip *to_pxa_pwm_chip(struct pwm_chip *chip)
-@@ -88,6 +90,15 @@ static int pxa_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
- 	else
- 		dc = (pv + 1) * duty_ns / period_ns;
- 
-+	if (pc->polarity == PWM_POLARITY_INVERSED) {
-+		if (dc & PWMDCR_FD)
-+			dc = 0;	        /* continuously low */
-+		else if (dc == 0)
-+			dc = PWMDCR_FD; /* continuously high */
-+		else
-+			dc = 1023 - dc; /* complement duty cycle */
-+	}
-+
- 	/* NOTE: the clock to PWM has to be enabled first
- 	 * before writing to the registers
- 	 */
-@@ -117,13 +128,51 @@ static void pxa_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
- 	clk_disable_unprepare(pc->clk);
- }
- 
-+static int pxa_pwm_set_polarity(struct pwm_chip *chip, struct pwm_device *pwm,
-+				enum pwm_polarity polarity)
-+{
-+	struct pxa_pwm_chip *pc = to_pxa_pwm_chip(chip);
-+	pc->polarity = polarity;
-+	return 0;
-+}
-+
- static struct pwm_ops pxa_pwm_ops = {
- 	.config = pxa_pwm_config,
- 	.enable = pxa_pwm_enable,
- 	.disable = pxa_pwm_disable,
-+	.set_polarity = pxa_pwm_set_polarity,
- 	.owner = THIS_MODULE,
- };
- 
-+#ifdef CONFIG_OF
-+/*
-+ * Device tree users should create one device instance for each pwm channel.
-+ * Hence we dispense with the HAS_SECONDARY_PWM and "tell" the original driver
-+ * code that this is a single channel pxa25x-pwm.
-+ */
-+static struct of_device_id pwm_of_match[] = {
-+	{ .compatible = "marvell,pxa250-pwm", .data = &pwm_id_table[0]},
-+	{ }
-+};
-+MODULE_DEVICE_TABLE(of, pwm_of_match);
-+
-+static const struct platform_device_id *pxa_pwm_get_id_dt(struct device *dev)
-+{
-+	const struct of_device_id *pwm_pxa_devid =
-+		of_match_device(pwm_of_match, dev);
-+	if (pwm_pxa_devid)
-+		return (const struct platform_device_id *)pwm_pxa_devid->data;
-+	else
-+		return NULL;
-+}
-+#else  /* !CONFIG_OF */
-+static const struct platform_device_id *pxa_pwm_get_id_dt(struct device *dev)
-+{
-+	dev_info(dev, "missing platform data\n");
-+	return NULL;
-+}
-+#endif
-+
- static int pwm_probe(struct platform_device *pdev)
- {
- 	const struct platform_device_id *id = platform_get_device_id(pdev);
-@@ -131,6 +180,11 @@ static int pwm_probe(struct platform_device *pdev)
- 	struct resource *r;
- 	int ret = 0;
- 
-+	if (id == NULL)		/* using device tree */
-+		id = pxa_pwm_get_id_dt(&pdev->dev);
-+	if (id == NULL)
-+		return -EINVAL;
-+
- 	pwm = devm_kzalloc(&pdev->dev, sizeof(*pwm), GFP_KERNEL);
- 	if (pwm == NULL) {
- 		dev_err(&pdev->dev, "failed to allocate memory\n");
-@@ -145,6 +199,8 @@ static int pwm_probe(struct platform_device *pdev)
- 	pwm->chip.ops = &pxa_pwm_ops;
- 	pwm->chip.base = -1;
- 	pwm->chip.npwm = (id->driver_data & HAS_SECONDARY_PWM) ? 2 : 1;
-+	pwm->chip.of_xlate = of_pwm_xlate_with_flags;
-+	pwm->chip.of_pwm_n_cells = 3;
- 
- 	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	pwm->mmio_base = devm_ioremap_resource(&pdev->dev, r);
-@@ -176,6 +232,7 @@ static struct platform_driver pwm_driver = {
- 	.driver		= {
- 		.name	= "pxa25x-pwm",
- 		.owner	= THIS_MODULE,
-+		.of_match_table	= of_match_ptr(pwm_of_match),
- 	},
- 	.probe		= pwm_probe,
- 	.remove		= pwm_remove,
--- 
-1.8.1.5
+please let me know if there are any problems and you need me
+to help out.
