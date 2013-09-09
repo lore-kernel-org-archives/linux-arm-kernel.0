@@ -1,32 +1,53 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 9 Sep 2013 12:59:19 -0300
-Subject: [PATCH 1/2] ARM: dts: mx6: Add mx6solo support
-In-Reply-To: <20130909150823.GB5815@S2101-09.ap.freescale.net>
-References: <1378688408-8689-1-git-send-email-festevam@gmail.com>
- <20130909150823.GB5815@S2101-09.ap.freescale.net>
-Message-ID: <CAOMZO5Ab9qVsQica-x3091YPhttqpbr_NL=A2ddzL5znuDtAUw@mail.gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 09 Sep 2013 09:59:20 -0600
+Subject: [PATCH v5 1/5] ARM: add basic Trusted Foundations support
+In-Reply-To: <CAAVeFuJF-cu9aPCruGPQk9WHV7VAGhGpU0bU6LToxP38YBnS_g@mail.gmail.com>
+References: <1378351680-14696-1-git-send-email-acourbot@nvidia.com>
+ <1378351680-14696-2-git-send-email-acourbot@nvidia.com>
+ <522A2D1B.3010508@wwwdotorg.org>
+ <CAAVeFuJF-cu9aPCruGPQk9WHV7VAGhGpU0bU6LToxP38YBnS_g@mail.gmail.com>
+Message-ID: <522DF058.8020509@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 9, 2013 at 12:08 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
-> On Sun, Sep 08, 2013 at 10:00:07PM -0300, Fabio Estevam wrote:
->> From: Fabio Estevam <fabio.estevam@freescale.com>
->>
->> Allow booting a device tree kernel on mx6solo.
->>
->> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
->> ---
->>  arch/arm/boot/dts/imx6s.dtsi   | 82 ++++++++++++++++++++++++++++++++++++++++++
->
-> The imx6s is not another SoC but just imx6dl with one core fused out.
-> This is the exactly same case as imx6q and imx6d. See commit dc13ba2
-> (ARM: imx: do not bring up unavailable cores) for how we handle that
-> in kernel.
->
-> Are you running into any problem to boot imx6s wandboard with
-> imx6dl-wandboard.dtb?
+On 09/09/2013 12:38 AM, Alexandre Courbot wrote:
+> On Sat, Sep 7, 2013 at 4:29 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+>> On 09/04/2013 09:27 PM, Alexandre Courbot wrote:
+>>> Trusted Foundations is a TrustZone-based secure monitor for ARM that
+>>> can be invoked  using a consistent SMC-based API on all supported
+>>> platforms. This patch adds initial basic support for Trusted
+>>> Foundations using the ARM firmware API. Current features are limited
+>>> to the ability to boot secondary processors.
 
-Ok, I made this test and it booted fine.
+>>> diff --git a/arch/arm/include/asm/trusted_foundations.h b/arch/arm/include/asm/trusted_foundations.h
+>>
+>> Do we need to add the following here:
+>>
+>> #if !IS_ENABLED(CONFIG_OF)
+>> static inline void register_trusted_foundations(...) {}
+>> #endif
 
-So I will change U-boot so that it searches for imx6dl-wandboard.dtb
-instead of imx6s-wandboard.dtb.
+Uggh. I meant to write **of_**register_trusted_foundations() there.
+
+>> So that there is a dummy no-op function for the non-DT-support case? I
+>> guess Tegra always has CONFIG_OF enabled so that call from
+>> mach-tegra/common.c in patch 2 will never be an issue, but perhaps it
+>> might if anyone else uses this?
+> 
+> My expectation is that register_trusted_foundations() is called by the
+> platform code once it has established (through whatever mean it likes)
+> that Trusted Foundations is required. For platforms supporting DT,
+> of_register_trusted_foundations() takes care of that. Platforms that
+> don't support DT need another way to decide whether they *need* TF or
+> not. Once a platform decided that it needs TF, its absence is not an
+> option, and therefore I'd think that register_trusted_foundations()
+> should hard-fail if support is not compiled in. Or maybe I missed your
+> point?
+
+So yes, you missed my point, but it was my fault:-)
+
+Most of_* can be called irrespective of CONFIG_OF, and since
+of_register_trusted_foundations() is meant to handle internally the "do
+I need to do anything" case, I think it makes sense to be allowed to
+call it unconditionally without determining anything about either
+CONFIG_OF or TF DT node presence?
