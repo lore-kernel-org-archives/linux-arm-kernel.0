@@ -1,61 +1,63 @@
-From: joshc@codeaurora.org (Josh Cartwright)
-Date: Mon, 9 Sep 2013 11:56:04 -0500
-Subject: [PATCH RFC v2 2/5] spmi: Linux driver framework for SPMI
-In-Reply-To: <20130909155224.GQ29403@sirena.org.uk>
-References: <cover.1377202730.git.joshc@codeaurora.org>
- <46db5901fe4d04d09cee8fd81ea1c62068ee9503.1377202730.git.joshc@codeaurora.org>
- <20130822231054.GA31973@kroah.com>
- <20130823160625.GP4035@joshc.qualcomm.com>
- <20130909155224.GQ29403@sirena.org.uk>
-Message-ID: <20130909165604.GM808@joshc.qualcomm.com>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Mon, 9 Sep 2013 10:22:16 -0700
+Subject: linux-next: manual merge of the arm-soc tree with the pm tree
+In-Reply-To: <20130902180900.GC11030@e102568-lin.cambridge.arm.com>
+References: <20130829180425.4aa3d164f01cc65b215187fe@canb.auug.org.au>
+ <20130829175715.GH18542@quad.lixom.net>
+ <20130902180900.GC11030@e102568-lin.cambridge.arm.com>
+Message-ID: <CAGa+x878Kz6mw9UduLtTBTJN3DSfKQeaCvG_-8WTW1QpVadSow@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hey Mark-
+On Mon, Sep 2, 2013 at 11:09 AM, Lorenzo Pieralisi
+<lorenzo.pieralisi@arm.com> wrote:
+> On Thu, Aug 29, 2013 at 06:57:15PM +0100, Olof Johansson wrote:
+>> On Thu, Aug 29, 2013 at 06:04:25PM +1000, Stephen Rothwell wrote:
+>> > Hi all,
+>> >
+>> > Today's linux-next merge of the arm-soc tree got a conflict in
+>> > drivers/cpuidle/Makefile between commits b98e01ad4ed9 ("cpuidle: Add
+>> > Kconfig.arm and move calxeda, kirkwood and zynq") and d3f2950f2ade ("ARM:
+>> > ux500: cpuidle: Move ux500 cpuidle driver to drivers/cpuidle") from the
+>> > pm tree and commit 14d2c34cfa00 ("cpuidle: big.LITTLE: vexpress-TC2 CPU
+>> > idle driver") from the arm-soc tree.
+>> >
+>> > I fixed it up (see below) and can carry the fix as necessary (no action
+>> > is required).
+>> >
+>> > --
+>> > Cheers,
+>> > Stephen Rothwell                    sfr at canb.auug.org.au
+>> >
+>> > diff --cc drivers/cpuidle/Makefile
+>> > index 0b9d200,3b6445c..0000000
+>> > --- a/drivers/cpuidle/Makefile
+>> > +++ b/drivers/cpuidle/Makefile
+>> > @@@ -5,9 -5,7 +5,10 @@@
+>> >   obj-y += cpuidle.o driver.o governor.o sysfs.o governors/
+>> >   obj-$(CONFIG_ARCH_NEEDS_CPU_IDLE_COUPLED) += coupled.o
+>> >
+>> >  -obj-$(CONFIG_CPU_IDLE_CALXEDA) += cpuidle-calxeda.o
+>> >  -obj-$(CONFIG_ARCH_KIRKWOOD) += cpuidle-kirkwood.o
+>> >  -obj-$(CONFIG_CPU_IDLE_ZYNQ) += cpuidle-zynq.o
+>> >  -obj-$(CONFIG_CPU_IDLE_BIG_LITTLE) += cpuidle-big_little.o
+>> >  +##################################################################################
+>> >  +# ARM SoC drivers
+>> >  +obj-$(CONFIG_ARM_HIGHBANK_CPUIDLE)        += cpuidle-calxeda.o
+>> >  +obj-$(CONFIG_ARM_KIRKWOOD_CPUIDLE)        += cpuidle-kirkwood.o
+>> >  +obj-$(CONFIG_ARM_ZYNQ_CPUIDLE)            += cpuidle-zynq.o
+>> >  +obj-$(CONFIG_ARM_U8500_CPUIDLE)         += cpuidle-ux500.o
+>> > ++obj-$(CONFIG_CPU_IDLE_BIG_LITTLE)       += cpuidle-big_little.o
+>>
+>>
+>> Might want to sort u8500 before zynq, but otherwise looks fine.
+>
+> I noticed that owing to the merge, CONFIG_CPU_IDLE_BIG_LITTLE should be moved
+> to the newly introduced Kconfig.arm. How are we going to handle this ? It is
+> just a matter of renaming the config entry and moving it to Kconfig.arm.
+>
 
-Thanks for the comments.
+For the merge window, we'll merge it as is, but a rename
+cleanup/rename patch for v3.12-rc would be appreciated.
 
-On Mon, Sep 09, 2013 at 04:52:24PM +0100, Mark Brown wrote:
-> On Fri, Aug 23, 2013 at 11:06:25AM -0500, Josh Cartwright wrote:
-> > On Thu, Aug 22, 2013 at 04:10:54PM -0700, Greg Kroah-Hartman wrote:
-> > > On Fri, Aug 09, 2013 at 01:37:09PM -0700, Josh Cartwright wrote:
-> 
-> > > > +	"Example: Read 4 bytes starting at register address 0x1234 for SID 2\n"
-> > > > +	"\n"
-> > > > +	"echo 0x21234 > address\n"
-> > > > +	"echo 4 > count\n"
-> > > > +	"cat data\n"
-> > > > +	"\n"
-> > > > +	"Example: Write 3 bytes starting at register address 0x1008 for SID 1\n"
-> > > > +	"\n"
-> > > > +	"echo 0x11008 > address\n"
-> > > > +	"echo 0x01 0x02 0x03 > data\n"
-> > > > +	"\n"
-> > > > +	"Note that the count file is not used for writes.  Since 3 bytes are\n"
-> > > > +	"written to the 'data' file, then 3 bytes will be written across the\n"
-> > > > +	"SPMI bus.\n\n";
-> 
-> > > The help file within the kernel is a nice touch :)
-> 
-> > > Or is this only for "debugging"?  If so, please document it as such.
-> 
-> > It's there because it provides a useful interface for debugging of the
-> > controller code, and for simple peek/poke of the slave registers without
-> > having a full driver in place.  Will document this.
-> 
-> This looks awfully like a version of the debugfs interfaces that regmap
-> provides, and indeed the entire bus sounds like something that could
-> idiomatically be supported via regmap.  Have you considered doing that?
-> This would give access to standard tracepoints as well, plus the cache
-> infrastructure.
-
-It does indeed look like regmap might work out nicely for SPMI.  I
-hadn't seriously considered it just due to a lack of familiarity. I'll
-give it a shot and see if I run into any problems.
-
-Thanks,
-  Josh
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+Kevin
