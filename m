@@ -1,33 +1,54 @@
-From: matt.porter@linaro.org (Matt Porter)
-Date: Mon, 9 Sep 2013 09:31:01 -0400
-Subject: [PATCHv3] ARM: OMAP2+: am335x-bone*: add DT for BeagleBone Black
-In-Reply-To: <1378638746-10627-1-git-send-email-koen@dominion.thruhere.net>
-References: <1378638746-10627-1-git-send-email-koen@dominion.thruhere.net>
-Message-ID: <20130909133059.GD10973@ohporter.com>
+From: mika.westerberg@linux.intel.com (Mika Westerberg)
+Date: Mon,  9 Sep 2013 16:34:37 +0300
+Subject: [PATCH RESEND 0/2] runtime PM support for I2C clients
+Message-ID: <1378733679-19500-1-git-send-email-mika.westerberg@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Sep 08, 2013 at 01:12:26PM +0200, Koen Kooi wrote:
-> The BeagleBone Black is basically a regular BeagleBone with eMMC and HDMI added,
-> so create a common dtsi both can use.
-> 
-> IMPORTANT: booting the existing am335x-bone.dts will blow up the HDMI transceiver 
-> after a dozen boots with an uSD card inserted because LDO will be at 3.3V instead
-> of 1.8. 
-> 
-> MMC support for AM335x still isn't in, so only the LDO change has been added.
-> 
-> Signed-off-by: Koen Kooi <koen@dominion.thruhere.net>
+[Resend with linux-arm-kernel included and added acks from Rafael]
 
-Tested-by: Matt Porter <matt.porter@linaro.org>
+Hi all,
 
-Works fine for me on tip and 3.11. I did notice a regression in musb (worked
-on 3.11, now failing to probe but this is not related to your new dts as it
-happens on am335x-bone.dts too, assuming merge window volatility). One nit,
-git-am picked up a whitespace error on that extra line at EOF so you should
-trim that out.
+With the advent of ACPI 5.0 we are starting to see I2C client devices
+described in ACPI namespace that support power management by the means of
+standard ACPI _PSx-methods. For example Intel Haswell based platforms might
+have touch screen or sensor-hub connected to the I2C bus that can be
+powered on and off by calling _PS0 and _PS3 -methods.
 
-Only thing is...for a clear bug like this that will destroy hardware, it
-should be marked Cc: stable at vger.kernel.org to be picked up in stable.
+In order to support such I2C client devices, we decided to hook the ACPI
+power management for these to the standard Linux runtime PM framework.
 
--Matt
+These patches implement runtime PM support for I2C client devices in a
+similar way that is done already for the PCI bus. Just before a driver is
+bound to an I2C client device the device runtime PM is being prepared for
+that device.
+
+If the device in question has an ACPI handle we attach it to the ACPI power
+domain that then makes sure that the right _PSx methods are called in
+response to runtime PM events the driver generates.
+
+A driver that wants to participate in runtime PM and power manage its
+device should:
+ 1) Implement device specific runtime PM callbacks if needed.
+ 2) Call pm_runtime_put() (or some variant of that) to decrease the runtime
+    PM reference count.
+
+If the driver doesn't do anything the device is regarded as runtime PM
+active and powered on.
+
+Even though this series has been developed specifically for ACPI enumerated
+I2C client devices, I believe it can be useful for other I2C client drivers
+because the I2C core now prepares the runtime PM on behalf of the driver
+and thus reduces the amount of code a driver writer needs to add.
+
+Aaron Lu (1):
+  i2c: prepare runtime PM support for I2C client devices
+
+Lv Zheng (1):
+  i2c: attach/detach I2C client device to the ACPI power domain
+
+ drivers/i2c/i2c-core.c | 57 +++++++++++++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 56 insertions(+), 1 deletion(-)
+
+-- 
+1.8.4.rc2
