@@ -1,36 +1,74 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 9 Sep 2013 16:14:50 +0100
-Subject: [PATCH v3 0/8] Add the Quadspi driver for vf610-twr
-In-Reply-To: <522D3B79.3060707@freescale.com>
-References: <593AEF6C47F46446852B067021A273D6D984000B@MUCSE039.lantiq.com>
- <20130905020435.GA3970@gmail.com>
- <20980858CB6D3A4BAE95CA194937D5E73EA0C7F4@DBDE04.ent.ti.com>
- <522817D7.1010206@freescale.com> <522D3B79.3060707@freescale.com>
-Message-ID: <20130909151450.GI29403@sirena.org.uk>
+From: Sudeep.KarkadaNagesha@arm.com (Sudeep KarkadaNagesha)
+Date: Mon, 09 Sep 2013 16:24:18 +0100
+Subject: [PATCH v4 12/19] cpufreq: cpufreq-cpu0: remove device tree parsing
+ for cpu nodes
+In-Reply-To: <20130909143253.GD4624@S2101-09.ap.freescale.net>
+References: <1374492747-13879-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+ <1376991021-12160-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+ <1376991021-12160-13-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+ <Pine.LNX.4.64.1309061539310.11068@axis700.grange> <522D93D7.4010307@arm.com>
+ <20130909143253.GD4624@S2101-09.ap.freescale.net>
+Message-ID: <522DE822.3030907@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 09, 2013 at 11:07:37AM +0800, Huang Shijie wrote:
-> ? 2013?09?08? 21:47, Mark Brown ??:
+On 09/09/13 15:32, Shawn Guo wrote:
+> Hi Sudeep,
+> 
+> On Mon, Sep 09, 2013 at 10:24:39AM +0100, Sudeep KarkadaNagesha wrote:
+>> Hi Shawn,
+>>
+>> Can you please clarify ? The fix would be as below but I would like to
+>> know if setting cpu_dev to get_cpu_device(0) instead of &pdev->dev has
+>> any impact on other parts of code using cpu_dev ?
+> 
+> I'm sorry.  I should have given it a test on hardware before ACKing the
+> changes.
+> 
+> The fix below should not have other impact except the prefix of dev_err
+> [info, dbg] message output ('cpufreq-cpu0:' to 'cpu cpu0:'), which
+> shouldn't be a problem.
+>
+Hi Shawn,
 
-> > So the abstraction could say what the commands are, or what's supported
+Ok. But I am bit suspicious about devm_clk_get(cpu_dev, NULL).
+I don't understand completely as how the clock are registered(whether
+with dev_id or with connection_id).
 
-> I have already added the comment for what the commands are, please see
-> patch 3 & patch 4.
+A quick grep revealed that i.mx and shmobile is using conection id while
+registering. If the clock is registered with connection id and retrieved
+with cpu_dev(now dev_id is cpu0 and not cpufreq-cpu0), IIUC that would
+break. If we pass pdev->dev for clk_get, it should be fine but again
+IIUC it breaks highbank which gets all the information from DT.
 
-> > if they're standard?
+So only solution I can think of is to continue to have the code
+assigning (&pdev->dev)->of_node with cpu device node which is not clean
+and arguable as incorrect since there is no DT node for cpufreq-cpu0.
+I don't have a strong opinion though.
 
-> In actually, there is no standard for the SPI NOR commands now.
+Let me know how would you like to fix this.
 
-> I added these commands just in the Spansion section now.
-> (Of course, other NOR vendors may also uses the same commands.)
+>>
+>> diff --git a/drivers/cpufreq/cpufreq-cpu0.c b/drivers/cpufreq/cpufreq-cpu0.c
+>> index cbfffa9..871c336 100644
+>> --- a/drivers/cpufreq/cpufreq-cpu0.c
+>> +++ b/drivers/cpufreq/cpufreq-cpu0.c
+>> @@ -177,7 +177,7 @@ static int cpu0_cpufreq_probe(struct platform_device
+>> *pdev)
+>>         struct device_node *np;
+>>         int ret;
+>>
+>> -       cpu_dev = &pdev->dev;
+>> +       cpu_dev = get_cpu_device(0);
+>>
+>>         np = of_node_get(cpu_dev->of_node);
+>>         if (!np) {
+>>
+> 
+> The imx6q-cpufreq driver needs a similar fixing.  Please include the
+> following changes into your fixing patches.  Thanks.
+> 
+Ok no problem I can post the fix based on response for the above question.
 
-So then an abstraction which hides the details of which commands are
-needed from the drivers seems sensible?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130909/907297e1/attachment-0001.sig>
+Regard,
+Sudeep
