@@ -1,54 +1,39 @@
-From: galak@codeaurora.org (Kumar Gala)
-Date: Mon, 9 Sep 2013 17:04:38 -0500
-Subject: [PATCHv3 1/2] ARM: msm: Add support for APQ8074 Dragonboard
-In-Reply-To: <522E40B2.9010301@codeaurora.org>
-References: <1378495943-2572-1-git-send-email-rvaswani@codeaurora.org>
- <20130906215051.GA29253@quad.lixom.net> <522E09E6.8040300@codeaurora.org>
- <FFE100A7-8AD6-4E0D-9F64-120DA3564F89@codeaurora.org>
- <522E21A8.4060408@wwwdotorg.org>
- <FA33E8F4-3F85-4D8B-83E1-96F5A8F76CE6@codeaurora.org>
- <522E3BC9.1030105@wwwdotorg.org>
- <CA05A23E-41CF-4EC6-BB2D-36105048700B@codeaurora.org>
- <522E40B2.9010301@codeaurora.org>
-Message-ID: <49CC46F4-F6CE-4B1A-B0D5-E4BB779755B8@codeaurora.org>
+From: dan.j.williams@intel.com (Dan Williams)
+Date: Mon, 9 Sep 2013 15:10:27 -0700
+Subject: Inte IOP Xscale updates
+In-Reply-To: <CACRpkdZU5mVU15AK=m-BRmpizKJJVAR98JKf3Qcgy2ms+HG+Hw@mail.gmail.com>
+References: <CACRpkdZU5mVU15AK=m-BRmpizKJJVAR98JKf3Qcgy2ms+HG+Hw@mail.gmail.com>
+Message-ID: <CAA9_cmcMLooT6=+PwR9rx4ALmNeKG=qXWn+K_dLJ+CVj9u6tYA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Sep 3, 2013 at 5:01 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> Hi XScale folks,
+>
+> I haven't really seen any functional patches or confirmation that the
+> XScale machines in arch/arm/iop* are even booting since 2010 or
+> so.
+>
+> Can you confirm that you boot-test these machines regularly?
+>
 
-On Sep 9, 2013, at 4:42 PM, Rohit Vaswani wrote:
+I lost access to my boards when I left, but now that I am back I am
+trying to track them down.  iop32x may be the only boards that matter
+here, I never saw an iop13xx outside of the development board.
 
-> On 9/9/2013 2:25 PM, Kumar Gala wrote:
->> <snip>
->> On Fri, Sep 06, 2013 at 12:32:22PM -0700, Rohit Vaswani wrote:
->>>>>>>>> This patch adds basic board support for APQ8074 Dragonboard
->>>>>>>>> <snip>
->>>>>>>>> dtb-$(CONFIG_ARCH_MSM) += msm8660-surf.dtb \
->>>>>>>>> -	msm8960-cdp.dtb
->>>>>>>>> +	msm8960-cdp.dtb \
->>>>>>>>> +	apq8074-dragonboard.dtb
->>>>>>>> Please add boards alphabetically.
->>>>>>> Will do.
->>>>>>>>> dtb-$(CONFIG_ARCH_MVEBU) += armada-370-db.dtb \
->>>>>>>>> 	armada-370-mirabox.dtb \
->>>>>>>>> 	armada-370-rd.dtb \
->>>>>>>>> diff --git a/arch/arm/boot/dts/apq8074-dragonboard.dts b/arch/arm/boot/dts/apq8074-dragonboard.dts
->>>>>>>>> new file mode 100644
->>>>>>>>> index 0000000..5b7b6a0
->>>>>>>>> --- /dev/null
->>>>>>>>> +++ b/arch/arm/boot/dts/apq8074-dragonboard.dts
->>>>>>>> arch/arm/boot/dts/ is getting really crowded. It's been working best if the SoC
->>>>>>>> family or vendor is used as a prefix to keep things a bit more organized. In
->>>>>>>> that spirit, prefixing these with msm-<foo> makes sense. Can you please do so?
->>>>>>> Sure. But the board is called an APQ8074 and we wanted to keep the naming consistent with that.
->>>>>> If we do this we should use qcom, not msm as the prefix.  Match the device tree vendor prefix.
-> 
-> Coming back to this, it would be better if the naming to be consistent with what we call our ARCH - msm and not qcom.
-> msm8974-dragonboard signifies quite clearly what the board is.
+> I am worried that we maintain code that is not used or even working
+> see.
+>
+> What are your thought about multiplatform and device tree? I am
+> pretty certain that if the iop machines were converted to device tree
+> we could collapse these machines into one directory with few files,
+> but I may be wrong.
+>
 
-I was saying qcom,apq8074-dragonboard or we can do the dir thing as we don't have that mean qcom/msm device trees.
+I have not been following device-tree conversions for how they handle
+legacy boot loaders?
 
-- k
+...I'll just start with reviewing your gpio conversion.
 
--- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+--
+Dan
