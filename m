@@ -1,609 +1,119 @@
-From: rvaswani@codeaurora.org (Rohit Vaswani)
-Date: Mon,  9 Sep 2013 16:01:58 -0700
-Subject: [PATCH 1/2] ARM: msm: Remove irqs-*.h files for DT based targets
-Message-ID: <1378767719-27688-1-git-send-email-rvaswani@codeaurora.org>
+From: Russ.Dill@ti.com (Russ Dill)
+Date: Mon, 9 Sep 2013 16:10:14 -0700
+Subject: [RFC 0/4] Create infrastructure for running C code from SRAM.
+In-Reply-To: <CAKv+Gu-eaS9djmz0d5hzY=jkVb-aPZWrLCUOr8wNb6fWoNpMiA@mail.gmail.com>
+References: <1378226665-27090-1-git-send-email-Russ.Dill@ti.com>
+ <20130906111221.GH25647@n2100.arm.linux.org.uk>
+ <CA+Bv8XbbWoBgrv83RmXLiO8AM0TDP9wNQMUFJKMbN82-0w3Scg@mail.gmail.com>
+ <CAKv+Gu-eaS9djmz0d5hzY=jkVb-aPZWrLCUOr8wNb6fWoNpMiA@mail.gmail.com>
+Message-ID: <CA+Bv8Xbf02WNokiagwpUuvjFrAmHv-jL7APt=TFAd0YbN6h33w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stephen Boyd <sboyd@codeaurora.org>
+On Sat, Sep 7, 2013 at 9:21 AM, Ard Biesheuvel
+<ard.biesheuvel@linaro.org> wrote:
+> On 6 September 2013 21:32, Russ Dill <Russ.Dill@ti.com> wrote:
+>> On Fri, Sep 6, 2013 at 4:12 AM, Russell King - ARM Linux
+>> <linux@arm.linux.org.uk> wrote:
+>>> On Tue, Sep 03, 2013 at 09:44:21AM -0700, Russ Dill wrote:
+>>>> SRAM handling code is in the process of being moved from arch directories
+>>>> into drivers/misc/sram.c using device tree and genalloc [1] [2]. This RFC
+>>>> patchset builds on that, including the limitation that the SRAM address is
+>>>> not known at compile time. Because the SRAM address is not known at compile
+>>>> time, the code that runs from SRAM must be compiled with -fPIC. Even if
+>>>> the code were loaded to a fixed virtual address, portions of the code must
+>>>> often be run with the MMU disabled.
+>>>
+>>> What are you doing about the various gcc utility functions that may be
+>>> implicitly called from C code such as memcpy and memset?
+>>
+>> That would create a problem. Would '-ffreestanding' be the correct
+>> flag to add?
+>
+> No, unfortunately, -ffreestanding won't prevent GCC from generating
+> implicit calls to memzero() et al. These are mainly issued when using
+> initialized non-POD stack variables so avoiding those might help you
+> there.
+>> As far as the family of __aeabi_*, I need to add
+>> documentation stating that on ARM, you can't divide, perform modulo,
+>> and can't do 64 bit multiplications. I can then add a make rule that
+>> will grep the symbol lists of .sram sections for ^__aeabi_. Is this
+>> enough?
+>>
+>
+> Well, even printk() needs integer division for its %d/%u modifiers, so
+> this is really not so easy to achieve.
+>
+>>>> The general idea is that for each SRAM user (such as an SoC specific
+>>>> suspend/resume mechanism) to create a group of sections. The section group
+>>>> is created with a single macro for each user, but end up looking like this:
+>>>>
+>>>> .sram.am33xx : AT(ADDR(.sram.am33xx) - 0) {
+>>>>   __sram_am33xx_start = .;
+>>>>   *(.sram.am33xx.*)
+>>>>   __sram_am33xx_end = .;
+>>>> }
+>>>>
+>>>> Any data or functions that should be copied to SRAM for this use should be
+>>>> maked with an appropriate __section() attribute. A helper is then added for
+>>>> translating between the original kernel symbol, and the address of that
+>>>> function or variable once it has been copied into SRAM. Once control is
+>>>> passed to a function within the SRAM section grouping, it can access any
+>>>> variables or functions within that same SRAM section grouping without
+>>>> translation.
+>>>
+>>> What about the relocations which will need to be fixed up - eg, addresses
+>>> in the literal pool, the GOT table contents, etc?  You say nothing about
+>>> this.
+>>
+>> The C code would need to be written so that such accesses do not
+>> occur. From functions that are in the sram text section, only accesses
+>> to other sram sections in their group would be allowed. And above, a
+>> compilation step could be added to make the compilation fail when such
+>> things happen.
+>>
+>
+> The point is that, sadly, GCC is just not very good at generating
+> relocatable code for embedded targets. Playing with -fvisibility may
+> result in code that contains fewer dynamic relocations, but you will
+> always end up with a few that need to be fixed up before the code can
+> run. Another thing to note is that usually, these relocations can only
+> be fixed up once, as the addend is overwritten by the fixed-up
+> address. This means that the code can only run in SRAM, and you should
+> probably best avoid the module loader machinery as it may clobber the
+> addends before you get to process them.
+>
+> One thing that remains implicit in this discussion is that you are
+> executing from SRAM because DRAM is not available (I presume).
+> Wouldn't it be better to treat the code that lives in the SRAM as a
+> completely separate executable? You can generate a PIE executable that
+> supplies minimal memzero et al,  fixup the relocations yourself (look
+> at the uboot sources for an example of this) and you will be
+> absolutely sure that the code can run completely autonomously. In
+> fact, some of this stuff could potentially be reused for other
+> disjoint execution domains such as TZ secure world.
 
-We don't want or need the irqs.h files from the DT based MSM
-targets. Remove these header files and select sparse irq so that
-we don't try to include the mach/irqs.h file.
+This is the path I'm going down, but I'm trying to do it without
+relocations. I'm following the model of arch/arm/boot/compressed and
+generating a relocatable gcc builtin library with weak symbols
+containing lib1funcs.S, string.c, ashldi3.S, and some stubs for div0
+and the unwind symbols, call in sramlib.o.
 
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
- arch/arm/mach-msm/Kconfig                  |   2 +
- arch/arm/mach-msm/include/mach/irqs-8960.h | 277 -----------------------------
- arch/arm/mach-msm/include/mach/irqs-8x60.h | 258 ---------------------------
- arch/arm/mach-msm/include/mach/irqs.h      |   5 -
- 4 files changed, 2 insertions(+), 540 deletions(-)
- delete mode 100644 arch/arm/mach-msm/include/mach/irqs-8960.h
- delete mode 100644 arch/arm/mach-msm/include/mach/irqs-8x60.h
+I'm then doing an objcopy of the .sramlib section, and the .sram.*
+sections into a single object file and performing a link with a linker
+script like:
 
-diff --git a/arch/arm/mach-msm/Kconfig b/arch/arm/mach-msm/Kconfig
-index 905efc8..020240c 100644
---- a/arch/arm/mach-msm/Kconfig
-+++ b/arch/arm/mach-msm/Kconfig
-@@ -49,6 +49,7 @@ config ARCH_MSM8X60
- 	select GPIO_MSM_V2
- 	select HAVE_SMP
- 	select MSM_SCM if SMP
-+	select SPARSE_IRQ
- 	select USE_OF
- 
- config ARCH_MSM8960
-@@ -58,6 +59,7 @@ config ARCH_MSM8960
- 	select HAVE_SMP
- 	select GPIO_MSM_V2
- 	select MSM_SCM if SMP
-+	select SPARSE_IRQ
- 	select USE_OF
- 
- config MSM_HAS_DEBUG_UART_HS
-diff --git a/arch/arm/mach-msm/include/mach/irqs-8960.h b/arch/arm/mach-msm/include/mach/irqs-8960.h
-deleted file mode 100644
-index 81ab2a6..0000000
---- a/arch/arm/mach-msm/include/mach/irqs-8960.h
-+++ /dev/null
-@@ -1,277 +0,0 @@
--/* Copyright (c) 2011 Code Aurora Forum. All rights reserved.
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 and
-- * only version 2 as published by the Free Software Foundation.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- */
--
--#ifndef __ASM_ARCH_MSM_IRQS_8960_H
--#define __ASM_ARCH_MSM_IRQS_8960_H
--
--/* MSM ACPU Interrupt Numbers */
--
--/* 0-15:  STI/SGI (software triggered/generated interrupts)
--   16-31: PPI (private peripheral interrupts)
--   32+:   SPI (shared peripheral interrupts) */
--
--#define GIC_PPI_START 16
--#define GIC_SPI_START 32
--
--#define INT_VGIC				(GIC_PPI_START + 0)
--#define INT_DEBUG_TIMER_EXP			(GIC_PPI_START + 1)
--#define INT_GP_TIMER_EXP			(GIC_PPI_START + 2)
--#define INT_GP_TIMER2_EXP			(GIC_PPI_START + 3)
--#define WDT0_ACCSCSSNBARK_INT			(GIC_PPI_START + 4)
--#define WDT1_ACCSCSSNBARK_INT			(GIC_PPI_START + 5)
--#define AVS_SVICINT				(GIC_PPI_START + 6)
--#define AVS_SVICINTSWDONE			(GIC_PPI_START + 7)
--#define CPU_DBGCPUXCOMMRXFULL			(GIC_PPI_START + 8)
--#define CPU_DBGCPUXCOMMTXEMPTY			(GIC_PPI_START + 9)
--#define CPU_SICCPUXPERFMONIRPTREQ		(GIC_PPI_START + 10)
--#define SC_AVSCPUXDOWN				(GIC_PPI_START + 11)
--#define SC_AVSCPUXUP				(GIC_PPI_START + 12)
--#define SC_SICCPUXACGIRPTREQ			(GIC_PPI_START + 13)
--#define SC_SICCPUXEXTFAULTIRPTREQ		(GIC_PPI_START + 14)
--/* PPI 15 is unused */
--
--#define SC_SICMPUIRPTREQ			(GIC_SPI_START + 0)
--#define SC_SICL2IRPTREQ				(GIC_SPI_START + 1)
--#define SC_SICL2PERFMONIRPTREQ			(GIC_SPI_START + 2)
--#define SC_SICAGCIRPTREQ			(GIC_SPI_START + 3)
--#define TLMM_APCC_DIR_CONN_IRQ_0		(GIC_SPI_START + 4)
--#define TLMM_APCC_DIR_CONN_IRQ_1		(GIC_SPI_START + 5)
--#define TLMM_APCC_DIR_CONN_IRQ_2		(GIC_SPI_START + 6)
--#define TLMM_APCC_DIR_CONN_IRQ_3		(GIC_SPI_START + 7)
--#define TLMM_APCC_DIR_CONN_IRQ_4		(GIC_SPI_START + 8)
--#define TLMM_APCC_DIR_CONN_IRQ_5		(GIC_SPI_START + 9)
--#define TLMM_APCC_DIR_CONN_IRQ_6		(GIC_SPI_START + 10)
--#define TLMM_APCC_DIR_CONN_IRQ_7		(GIC_SPI_START + 11)
--#define TLMM_APCC_DIR_CONN_IRQ_8		(GIC_SPI_START + 12)
--#define TLMM_APCC_DIR_CONN_IRQ_9		(GIC_SPI_START + 13)
--#define PM8921_SEC_IRQ_103			(GIC_SPI_START + 14)
--#define PM8018_SEC_IRQ_106			(GIC_SPI_START + 15)
--#define TLMM_APCC_SUMMARY_IRQ			(GIC_SPI_START + 16)
--#define SPDM_RT_1_IRQ				(GIC_SPI_START + 17)
--#define SPDM_DIAG_IRQ				(GIC_SPI_START + 18)
--#define RPM_APCC_CPU0_GP_HIGH_IRQ		(GIC_SPI_START + 19)
--#define RPM_APCC_CPU0_GP_MEDIUM_IRQ		(GIC_SPI_START + 20)
--#define RPM_APCC_CPU0_GP_LOW_IRQ		(GIC_SPI_START + 21)
--#define RPM_APCC_CPU0_WAKE_UP_IRQ		(GIC_SPI_START + 22)
--#define RPM_APCC_CPU1_GP_HIGH_IRQ		(GIC_SPI_START + 23)
--#define RPM_APCC_CPU1_GP_MEDIUM_IRQ		(GIC_SPI_START + 24)
--#define RPM_APCC_CPU1_GP_LOW_IRQ		(GIC_SPI_START + 25)
--#define RPM_APCC_CPU1_WAKE_UP_IRQ		(GIC_SPI_START + 26)
--#define SSBI2_2_SC_CPU0_SECURE_IRQ		(GIC_SPI_START + 27)
--#define SSBI2_2_SC_CPU0_NON_SECURE_IRQ		(GIC_SPI_START + 28)
--#define SSBI2_1_SC_CPU0_SECURE_IRQ		(GIC_SPI_START + 29)
--#define SSBI2_1_SC_CPU0_NON_SECURE_IRQ		(GIC_SPI_START + 30)
--#define MSMC_SC_SEC_CE_IRQ			(GIC_SPI_START + 31)
--#define MSMC_SC_PRI_CE_IRQ			(GIC_SPI_START + 32)
--#define SLIMBUS0_CORE_EE1_IRQ			(GIC_SPI_START + 33)
--#define SLIMBUS0_BAM_EE1_IRQ			(GIC_SPI_START + 34)
--#define Q6FW_WDOG_EXPIRED_IRQ			(GIC_SPI_START + 35)
--#define Q6SW_WDOG_EXPIRED_IRQ			(GIC_SPI_START + 36)
--#define MSS_TO_APPS_IRQ_0			(GIC_SPI_START + 37)
--#define MSS_TO_APPS_IRQ_1			(GIC_SPI_START + 38)
--#define MSS_TO_APPS_IRQ_2			(GIC_SPI_START + 39)
--#define MSS_TO_APPS_IRQ_3			(GIC_SPI_START + 40)
--#define MSS_TO_APPS_IRQ_4			(GIC_SPI_START + 41)
--#define MSS_TO_APPS_IRQ_5			(GIC_SPI_START + 42)
--#define MSS_TO_APPS_IRQ_6			(GIC_SPI_START + 43)
--#define MSS_TO_APPS_IRQ_7			(GIC_SPI_START + 44)
--#define MSS_TO_APPS_IRQ_8			(GIC_SPI_START + 45)
--#define MSS_TO_APPS_IRQ_9			(GIC_SPI_START + 46)
--#define VPE_IRQ					(GIC_SPI_START + 47)
--#define VFE_IRQ					(GIC_SPI_START + 48)
--#define VCODEC_IRQ				(GIC_SPI_START + 49)
--#define TV_ENC_IRQ				(GIC_SPI_START + 50)
--#define SMMU_VPE_CB_SC_SECURE_IRQ		(GIC_SPI_START + 51)
--#define SMMU_VPE_CB_SC_NON_SECURE_IRQ		(GIC_SPI_START + 52)
--#define SMMU_VFE_CB_SC_SECURE_IRQ		(GIC_SPI_START + 53)
--#define SMMU_VFE_CB_SC_NON_SECURE_IRQ		(GIC_SPI_START + 54)
--#define SMMU_VCODEC_B_CB_SC_SECURE_IRQ		(GIC_SPI_START + 55)
--#define SMMU_VCODEC_B_CB_SC_NON_SECURE_IRQ	(GIC_SPI_START + 56)
--#define SMMU_VCODEC_A_CB_SC_SECURE_IRQ		(GIC_SPI_START + 57)
--#define SMMU_VCODEC_A_CB_SC_NON_SECURE_IRQ	(GIC_SPI_START + 58)
--#define SMMU_ROT_CB_SC_SECURE_IRQ		(GIC_SPI_START + 59)
--#define SMMU_ROT_CB_SC_NON_SECURE_IRQ		(GIC_SPI_START + 60)
--#define SMMU_MDP1_CB_SC_SECURE_IRQ		(GIC_SPI_START + 61)
--#define SMMU_MDP1_CB_SC_NON_SECURE_IRQ		(GIC_SPI_START + 62)
--#define SMMU_MDP0_CB_SC_SECURE_IRQ		(GIC_SPI_START + 63)
--#define SMMU_MDP0_CB_SC_NON_SECURE_IRQ		(GIC_SPI_START + 64)
--#define SMMU_JPEGD_CB_SC_SECURE_IRQ		(GIC_SPI_START + 65)
--#define SMMU_JPEGD_CB_SC_NON_SECURE_IRQ		(GIC_SPI_START + 66)
--#define SMMU_IJPEG_CB_SC_SECURE_IRQ		(GIC_SPI_START + 67)
--#define SMMU_IJPEG_CB_SC_NON_SECURE_IRQ		(GIC_SPI_START + 68)
--#define SMMU_GFX3D_CB_SC_SECURE_IRQ		(GIC_SPI_START + 69)
--#define SMMU_GFX3D_CB_SC_NON_SECURE_IRQ		(GIC_SPI_START + 70)
--#define SMMU_GFX2D0_CB_SC_SECURE_IRQ		(GIC_SPI_START + 71)
--#define SMMU_GFX2D0_CB_SC_NON_SECURE_IRQ	(GIC_SPI_START + 72)
--#define ROT_IRQ					(GIC_SPI_START + 73)
--#define MMSS_FABRIC_IRQ				(GIC_SPI_START + 74)
--#define MDP_IRQ					(GIC_SPI_START + 75)
--#define JPEGD_IRQ				(GIC_SPI_START + 76)
--#define JPEG_IRQ				(GIC_SPI_START + 77)
--#define MMSS_IMEM_IRQ				(GIC_SPI_START + 78)
--#define HDMI_IRQ				(GIC_SPI_START + 79)
--#define GFX3D_IRQ				(GIC_SPI_START + 80)
--#define GFX2D0_IRQ				(GIC_SPI_START + 81)
--#define DSI1_IRQ				(GIC_SPI_START + 82)
--#define CSI_1_IRQ				(GIC_SPI_START + 83)
--#define CSI_0_IRQ				(GIC_SPI_START + 84)
--#define LPASS_SCSS_AUDIO_IF_OUT0_IRQ		(GIC_SPI_START + 85)
--#define LPASS_SCSS_MIDI_IRQ			(GIC_SPI_START + 86)
--#define LPASS_Q6SS_WDOG_EXPIRED			(GIC_SPI_START + 87)
--#define LPASS_SCSS_GP_LOW_IRQ			(GIC_SPI_START + 88)
--#define LPASS_SCSS_GP_MEDIUM_IRQ		(GIC_SPI_START + 89)
--#define LPASS_SCSS_GP_HIGH_IRQ			(GIC_SPI_START + 90)
--#define TOP_IMEM_IRQ				(GIC_SPI_START + 91)
--#define FABRIC_SYS_IRQ				(GIC_SPI_START + 92)
--#define FABRIC_APPS_IRQ				(GIC_SPI_START + 93)
--#define USB1_HS_BAM_IRQ				(GIC_SPI_START + 94)
--#define SDC4_BAM_IRQ				(GIC_SPI_START + 95)
--#define SDC3_BAM_IRQ				(GIC_SPI_START + 96)
--#define SDC2_BAM_IRQ				(GIC_SPI_START + 97)
--#define SDC1_BAM_IRQ				(GIC_SPI_START + 98)
--#define FABRIC_SPS_IRQ				(GIC_SPI_START + 99)
--#define USB1_HS_IRQ				(GIC_SPI_START + 100)
--#define SDC4_IRQ_0				(GIC_SPI_START + 101)
--#define SDC3_IRQ_0				(GIC_SPI_START + 102)
--#define SDC2_IRQ_0				(GIC_SPI_START + 103)
--#define SDC1_IRQ_0				(GIC_SPI_START + 104)
--#define SPS_BAM_DMA_IRQ				(GIC_SPI_START + 105)
--#define SPS_SEC_VIOL_IRQ			(GIC_SPI_START + 106)
--#define SPS_MTI_0				(GIC_SPI_START + 107)
--#define SPS_MTI_1				(GIC_SPI_START + 108)
--#define SPS_MTI_2				(GIC_SPI_START + 109)
--#define SPS_MTI_3				(GIC_SPI_START + 110)
--#define SPS_MTI_4				(GIC_SPI_START + 111)
--#define SPS_MTI_5				(GIC_SPI_START + 112)
--#define SPS_MTI_6				(GIC_SPI_START + 113)
--#define SPS_MTI_7				(GIC_SPI_START + 114)
--#define SPS_MTI_8				(GIC_SPI_START + 115)
--#define SPS_MTI_9				(GIC_SPI_START + 116)
--#define SPS_MTI_10				(GIC_SPI_START + 117)
--#define SPS_MTI_11				(GIC_SPI_START + 118)
--#define SPS_MTI_12				(GIC_SPI_START + 119)
--#define SPS_MTI_13				(GIC_SPI_START + 120)
--#define SPS_MTI_14				(GIC_SPI_START + 121)
--#define SPS_MTI_15				(GIC_SPI_START + 122)
--#define SPS_MTI_16				(GIC_SPI_START + 123)
--#define SPS_MTI_17				(GIC_SPI_START + 124)
--#define SPS_MTI_18				(GIC_SPI_START + 125)
--#define SPS_MTI_19				(GIC_SPI_START + 126)
--#define SPS_MTI_20				(GIC_SPI_START + 127)
--#define SPS_MTI_21				(GIC_SPI_START + 128)
--#define SPS_MTI_22				(GIC_SPI_START + 129)
--#define SPS_MTI_23				(GIC_SPI_START + 130)
--#define SPS_MTI_24				(GIC_SPI_START + 131)
--#define SPS_MTI_25				(GIC_SPI_START + 132)
--#define SPS_MTI_26				(GIC_SPI_START + 133)
--#define SPS_MTI_27				(GIC_SPI_START + 134)
--#define SPS_MTI_28				(GIC_SPI_START + 135)
--#define SPS_MTI_29				(GIC_SPI_START + 136)
--#define SPS_MTI_30				(GIC_SPI_START + 137)
--#define SPS_MTI_31				(GIC_SPI_START + 138)
--#define CSIPHY_4LN_IRQ				(GIC_SPI_START + 139)
--#define CSIPHY_2LN_IRQ				(GIC_SPI_START + 140)
--#define USB2_IRQ				(GIC_SPI_START + 141)
--#define USB1_IRQ				(GIC_SPI_START + 142)
--#define TSSC_SSBI_IRQ				(GIC_SPI_START + 143)
--#define TSSC_SAMPLE_IRQ				(GIC_SPI_START + 144)
--#define TSSC_PENUP_IRQ				(GIC_SPI_START + 145)
--#define GSBI1_UARTDM_IRQ			(GIC_SPI_START + 146)
--#define GSBI1_QUP_IRQ				(GIC_SPI_START + 147)
--#define GSBI2_UARTDM_IRQ			(GIC_SPI_START + 148)
--#define GSBI2_QUP_IRQ			        (GIC_SPI_START + 149)
--#define GSBI3_UARTDM_IRQ			(GIC_SPI_START + 150)
--#define GSBI3_QUP_IRQ				(GIC_SPI_START + 151)
--#define GSBI4_UARTDM_IRQ			(GIC_SPI_START + 152)
--#define GSBI4_QUP_IRQ				(GIC_SPI_START + 153)
--#define GSBI5_UARTDM_IRQ			(GIC_SPI_START + 154)
--#define GSBI5_QUP_IRQ				(GIC_SPI_START + 155)
--#define GSBI6_UARTDM_IRQ			(GIC_SPI_START + 156)
--#define GSBI6_QUP_IRQ				(GIC_SPI_START + 157)
--#define GSBI7_UARTDM_IRQ			(GIC_SPI_START + 158)
--#define GSBI7_QUP_IRQ				(GIC_SPI_START + 159)
--#define GSBI8_UARTDM_IRQ			(GIC_SPI_START + 160)
--#define GSBI8_QUP_IRQ				(GIC_SPI_START + 161)
--#define TSIF_TSPP_IRQ				(GIC_SPI_START + 162)
--#define TSIF_BAM_IRQ				(GIC_SPI_START + 163)
--#define TSIF2_IRQ				(GIC_SPI_START + 164)
--#define TSIF1_IRQ				(GIC_SPI_START + 165)
--#define DSI2_IRQ				(GIC_SPI_START + 166)
--#define ISPIF_IRQ				(GIC_SPI_START + 167)
--#define MSMC_SC_SEC_TMR_IRQ			(GIC_SPI_START + 168)
--#define MSMC_SC_SEC_WDOG_BARK_IRQ		(GIC_SPI_START + 169)
--#define INT_ADM0_SCSS_0_IRQ			(GIC_SPI_START + 170)
--#define INT_ADM0_SCSS_1_IRQ			(GIC_SPI_START + 171)
--#define INT_ADM0_SCSS_2_IRQ			(GIC_SPI_START + 172)
--#define INT_ADM0_SCSS_3_IRQ			(GIC_SPI_START + 173)
--#define CC_SCSS_WDT1CPU1BITEEXPIRED		(GIC_SPI_START + 174)
--#define CC_SCSS_WDT1CPU0BITEEXPIRED		(GIC_SPI_START + 175)
--#define CC_SCSS_WDT0CPU1BITEEXPIRED		(GIC_SPI_START + 176)
--#define CC_SCSS_WDT0CPU0BITEEXPIRED		(GIC_SPI_START + 177)
--#define TSENS_UPPER_LOWER_INT			(GIC_SPI_START + 178)
--#define SSBI2_2_SC_CPU1_SECURE_INT		(GIC_SPI_START + 179)
--#define SSBI2_2_SC_CPU1_NON_SECURE_INT		(GIC_SPI_START + 180)
--#define SSBI2_1_SC_CPU1_SECURE_INT		(GIC_SPI_START + 181)
--#define SSBI2_1_SC_CPU1_NON_SECURE_INT		(GIC_SPI_START + 182)
--#define XPU_SUMMARY_IRQ				(GIC_SPI_START + 183)
--#define BUS_EXCEPTION_SUMMARY_IRQ		(GIC_SPI_START + 184)
--#define HSDDRX_EBI1CH0_IRQ			(GIC_SPI_START + 185)
--#define HSDDRX_EBI1CH1_IRQ			(GIC_SPI_START + 186)
--#define SDC5_BAM_IRQ				(GIC_SPI_START + 187)
--#define SDC5_IRQ_0				(GIC_SPI_START + 188)
--#define GSBI9_UARTDM_IRQ			(GIC_SPI_START + 189)
--#define GSBI9_QUP_IRQ				(GIC_SPI_START + 190)
--#define GSBI10_UARTDM_IRQ			(GIC_SPI_START + 191)
--#define GSBI10_QUP_IRQ				(GIC_SPI_START + 192)
--#define GSBI11_UARTDM_IRQ			(GIC_SPI_START + 193)
--#define GSBI11_QUP_IRQ				(GIC_SPI_START + 194)
--#define GSBI12_UARTDM_IRQ			(GIC_SPI_START + 195)
--#define GSBI12_QUP_IRQ				(GIC_SPI_START + 196)
--#define RIVA_APSS_LTECOEX_IRQ			(GIC_SPI_START + 197)
--#define RIVA_APSS_SPARE_IRQ			(GIC_SPI_START + 198)
--#define RIVA_APSS_WDOG_BITE_RESET_RDY_IRQ	(GIC_SPI_START + 199)
--#define RIVA_ASS_RESET_DONE_IRQ			(GIC_SPI_START + 200)
--#define RIVA_APSS_ASIC_IRQ			(GIC_SPI_START + 201)
--#define RIVA_APPS_WLAN_RX_DATA_AVAIL_IRQ	(GIC_SPI_START + 202)
--#define RIVA_APPS_WLAN_DATA_XFER_DONE_IRQ	(GIC_SPI_START + 203)
--#define RIVA_APPS_WLAM_SMSM_IRQ			(GIC_SPI_START + 204)
--#define RIVA_APPS_LOG_CTRL_IRQ			(GIC_SPI_START + 205)
--#define RIVA_APPS_FM_CTRL_IRQ			(GIC_SPI_START + 206)
--#define RIVA_APPS_HCI_IRQ			(GIC_SPI_START + 207)
--#define RIVA_APPS_WLAN_CTRL_IRQ			(GIC_SPI_START + 208)
--#define A2_BAM_IRQ				(GIC_SPI_START + 209)
--#define SMMU_GFX2D1_CB_SC_SECURE_IRQ		(GIC_SPI_START + 210)
--#define SMMU_GFX2D1_CB_SC_NON_SECURE_IRQ	(GIC_SPI_START + 211)
--#define GFX2D1_IRQ				(GIC_SPI_START + 212)
--#define PPSS_WDOG_TIMER_IRQ			(GIC_SPI_START + 213)
--#define SPS_SLIMBUS_CORE_EE0_IRQ		(GIC_SPI_START + 214)
--#define SPS_SLIMBUS_BAM_EE0_IRQ			(GIC_SPI_START + 215)
--#define QDSS_ETB_IRQ				(GIC_SPI_START + 216)
--#define QDSS_CTI2KPSS_CPU1_IRQ			(GIC_SPI_START + 217)
--#define QDSS_CTI2KPSS_CPU0_IRQ			(GIC_SPI_START + 218)
--#define TLMM_APCC_DIR_CONN_IRQ_16		(GIC_SPI_START + 219)
--#define TLMM_APCC_DIR_CONN_IRQ_17		(GIC_SPI_START + 220)
--#define TLMM_APCC_DIR_CONN_IRQ_18		(GIC_SPI_START + 221)
--#define TLMM_APCC_DIR_CONN_IRQ_19		(GIC_SPI_START + 222)
--#define TLMM_APCC_DIR_CONN_IRQ_20		(GIC_SPI_START + 223)
--#define TLMM_APCC_DIR_CONN_IRQ_21		(GIC_SPI_START + 224)
--#define PM8921_SEC_IRQ_104			(GIC_SPI_START + 225)
--#define PM8018_SEC_IRQ_107			(GIC_SPI_START + 226)
--
--/* For now, use the maximum number of interrupts until a pending GIC issue
-- * is sorted out */
--#define NR_MSM_IRQS 1020
--#define NR_BOARD_IRQS 0
--#define NR_GPIO_IRQS 0
--
--#endif
--
-diff --git a/arch/arm/mach-msm/include/mach/irqs-8x60.h b/arch/arm/mach-msm/include/mach/irqs-8x60.h
-deleted file mode 100644
-index f65841c..0000000
---- a/arch/arm/mach-msm/include/mach/irqs-8x60.h
-+++ /dev/null
-@@ -1,258 +0,0 @@
--/* Copyright (c) 2010 Code Aurora Forum. All rights reserved.
-- *
-- * This software is licensed under the terms of the GNU General Public
-- * License version 2, as published by the Free Software Foundation, and
-- * may be copied, distributed, and modified under those terms.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- *
-- */
--
--#ifndef __ASM_ARCH_MSM_IRQS_8X60_H
--#define __ASM_ARCH_MSM_IRQS_8X60_H
--
--/* MSM ACPU Interrupt Numbers */
--
--/* 0-15:  STI/SGI (software triggered/generated interrupts)
-- * 16-31: PPI (private peripheral interrupts)
-- * 32+:   SPI (shared peripheral interrupts)
-- */
--
--#define GIC_PPI_START 16
--#define GIC_SPI_START 32
--
--#define INT_DEBUG_TIMER_EXP			(GIC_PPI_START + 0)
--#define INT_GP_TIMER_EXP			(GIC_PPI_START + 1)
--#define INT_GP_TIMER2_EXP			(GIC_PPI_START + 2)
--#define WDT0_ACCSCSSNBARK_INT			(GIC_PPI_START + 3)
--#define WDT1_ACCSCSSNBARK_INT			(GIC_PPI_START + 4)
--#define AVS_SVICINT				(GIC_PPI_START + 5)
--#define AVS_SVICINTSWDONE			(GIC_PPI_START + 6)
--#define CPU_DBGCPUXCOMMRXFULL			(GIC_PPI_START + 7)
--#define CPU_DBGCPUXCOMMTXEMPTY			(GIC_PPI_START + 8)
--#define CPU_SICCPUXPERFMONIRPTREQ		(GIC_PPI_START + 9)
--#define SC_AVSCPUXDOWN				(GIC_PPI_START + 10)
--#define SC_AVSCPUXUP				(GIC_PPI_START + 11)
--#define SC_SICCPUXACGIRPTREQ			(GIC_PPI_START + 12)
--/* PPI 13 to 15 are unused */
--
--
--#define SC_SICMPUIRPTREQ			(GIC_SPI_START + 0)
--#define SC_SICL2IRPTREQ				(GIC_SPI_START + 1)
--#define SC_SICL2ACGIRPTREQ			(GIC_SPI_START + 2)
--#define NC					(GIC_SPI_START + 3)
--#define TLMM_SCSS_DIR_CONN_IRQ_0		(GIC_SPI_START + 4)
--#define TLMM_SCSS_DIR_CONN_IRQ_1		(GIC_SPI_START + 5)
--#define TLMM_SCSS_DIR_CONN_IRQ_2		(GIC_SPI_START + 6)
--#define TLMM_SCSS_DIR_CONN_IRQ_3		(GIC_SPI_START + 7)
--#define TLMM_SCSS_DIR_CONN_IRQ_4		(GIC_SPI_START + 8)
--#define TLMM_SCSS_DIR_CONN_IRQ_5		(GIC_SPI_START + 9)
--#define TLMM_SCSS_DIR_CONN_IRQ_6		(GIC_SPI_START + 10)
--#define TLMM_SCSS_DIR_CONN_IRQ_7		(GIC_SPI_START + 11)
--#define TLMM_SCSS_DIR_CONN_IRQ_8		(GIC_SPI_START + 12)
--#define TLMM_SCSS_DIR_CONN_IRQ_9		(GIC_SPI_START + 13)
--#define PM8058_SEC_IRQ_N			(GIC_SPI_START + 14)
--#define PM8901_SEC_IRQ_N			(GIC_SPI_START + 15)
--#define TLMM_SCSS_SUMMARY_IRQ			(GIC_SPI_START + 16)
--#define SPDM_RT_1_IRQ				(GIC_SPI_START + 17)
--#define SPDM_DIAG_IRQ				(GIC_SPI_START + 18)
--#define RPM_SCSS_CPU0_GP_HIGH_IRQ		(GIC_SPI_START + 19)
--#define RPM_SCSS_CPU0_GP_MEDIUM_IRQ		(GIC_SPI_START + 20)
--#define RPM_SCSS_CPU0_GP_LOW_IRQ		(GIC_SPI_START + 21)
--#define RPM_SCSS_CPU0_WAKE_UP_IRQ		(GIC_SPI_START + 22)
--#define RPM_SCSS_CPU1_GP_HIGH_IRQ		(GIC_SPI_START + 23)
--#define RPM_SCSS_CPU1_GP_MEDIUM_IRQ		(GIC_SPI_START + 24)
--#define RPM_SCSS_CPU1_GP_LOW_IRQ		(GIC_SPI_START + 25)
--#define RPM_SCSS_CPU1_WAKE_UP_IRQ		(GIC_SPI_START + 26)
--#define SSBI2_2_SC_CPU0_SECURE_INT		(GIC_SPI_START + 27)
--#define SSBI2_2_SC_CPU0_NON_SECURE_INT		(GIC_SPI_START + 28)
--#define SSBI2_1_SC_CPU0_SECURE_INT		(GIC_SPI_START + 29)
--#define SSBI2_1_SC_CPU0_NON_SECURE_INT		(GIC_SPI_START + 30)
--#define MSMC_SC_SEC_CE_IRQ			(GIC_SPI_START + 31)
--#define MSMC_SC_PRI_CE_IRQ			(GIC_SPI_START + 32)
--#define MARM_FIQ				(GIC_SPI_START + 33)
--#define MARM_IRQ				(GIC_SPI_START + 34)
--#define MARM_L2CC_IRQ				(GIC_SPI_START + 35)
--#define MARM_WDOG_EXPIRED			(GIC_SPI_START + 36)
--#define MARM_SCSS_GP_IRQ_0			(GIC_SPI_START + 37)
--#define MARM_SCSS_GP_IRQ_1			(GIC_SPI_START + 38)
--#define MARM_SCSS_GP_IRQ_2			(GIC_SPI_START + 39)
--#define MARM_SCSS_GP_IRQ_3			(GIC_SPI_START + 40)
--#define MARM_SCSS_GP_IRQ_4			(GIC_SPI_START + 41)
--#define MARM_SCSS_GP_IRQ_5			(GIC_SPI_START + 42)
--#define MARM_SCSS_GP_IRQ_6			(GIC_SPI_START + 43)
--#define MARM_SCSS_GP_IRQ_7			(GIC_SPI_START + 44)
--#define MARM_SCSS_GP_IRQ_8			(GIC_SPI_START + 45)
--#define MARM_SCSS_GP_IRQ_9			(GIC_SPI_START + 46)
--#define VPE_IRQ					(GIC_SPI_START + 47)
--#define VFE_IRQ					(GIC_SPI_START + 48)
--#define VCODEC_IRQ				(GIC_SPI_START + 49)
--#define TV_ENC_IRQ				(GIC_SPI_START + 50)
--#define SMMU_VPE_CB_SC_SECURE_IRQ		(GIC_SPI_START + 51)
--#define SMMU_VPE_CB_SC_NON_SECURE_IRQ		(GIC_SPI_START + 52)
--#define SMMU_VFE_CB_SC_SECURE_IRQ		(GIC_SPI_START + 53)
--#define SMMU_VFE_CB_SC_NON_SECURE_IRQ		(GIC_SPI_START + 54)
--#define SMMU_VCODEC_B_CB_SC_SECURE_IRQ		(GIC_SPI_START + 55)
--#define SMMU_VCODEC_B_CB_SC_NON_SECURE_IRQ	(GIC_SPI_START + 56)
--#define SMMU_VCODEC_A_CB_SC_SECURE_IRQ		(GIC_SPI_START + 57)
--#define SMMU_VCODEC_A_CB_SC_NON_SECURE_IRQ	(GIC_SPI_START + 58)
--#define SMMU_ROT_CB_SC_SECURE_IRQ		(GIC_SPI_START + 59)
--#define SMMU_ROT_CB_SC_NON_SECURE_IRQ		(GIC_SPI_START + 60)
--#define SMMU_MDP1_CB_SC_SECURE_IRQ		(GIC_SPI_START + 61)
--#define SMMU_MDP1_CB_SC_NON_SECURE_IRQ		(GIC_SPI_START + 62)
--#define SMMU_MDP0_CB_SC_SECURE_IRQ		(GIC_SPI_START + 63)
--#define SMMU_MDP0_CB_SC_NON_SECURE_IRQ		(GIC_SPI_START + 64)
--#define SMMU_JPEGD_CB_SC_SECURE_IRQ		(GIC_SPI_START + 65)
--#define SMMU_JPEGD_CB_SC_NON_SECURE_IRQ		(GIC_SPI_START + 66)
--#define SMMU_IJPEG_CB_SC_SECURE_IRQ		(GIC_SPI_START + 67)
--#define SMMU_IJPEG_CB_SC_NON_SECURE_IRQ		(GIC_SPI_START + 68)
--#define SMMU_GFX3D_CB_SC_SECURE_IRQ		(GIC_SPI_START + 69)
--#define SMMU_GFX3D_CB_SC_NON_SECURE_IRQ		(GIC_SPI_START + 70)
--#define SMMU_GFX2D0_CB_SC_SECURE_IRQ		(GIC_SPI_START + 71)
--#define SMMU_GFX2D0_CB_SC_NON_SECURE_IRQ	(GIC_SPI_START + 72)
--#define ROT_IRQ					(GIC_SPI_START + 73)
--#define MMSS_FABRIC_IRQ				(GIC_SPI_START + 74)
--#define MDP_IRQ					(GIC_SPI_START + 75)
--#define JPEGD_IRQ				(GIC_SPI_START + 76)
--#define JPEG_IRQ				(GIC_SPI_START + 77)
--#define MMSS_IMEM_IRQ				(GIC_SPI_START + 78)
--#define HDMI_IRQ				(GIC_SPI_START + 79)
--#define GFX3D_IRQ				(GIC_SPI_START + 80)
--#define GFX2D0_IRQ				(GIC_SPI_START + 81)
--#define DSI_IRQ					(GIC_SPI_START + 82)
--#define CSI_1_IRQ				(GIC_SPI_START + 83)
--#define CSI_0_IRQ				(GIC_SPI_START + 84)
--#define LPASS_SCSS_AUDIO_IF_OUT0_IRQ		(GIC_SPI_START + 85)
--#define LPASS_SCSS_MIDI_IRQ			(GIC_SPI_START + 86)
--#define LPASS_Q6SS_WDOG_EXPIRED			(GIC_SPI_START + 87)
--#define LPASS_SCSS_GP_LOW_IRQ			(GIC_SPI_START + 88)
--#define LPASS_SCSS_GP_MEDIUM_IRQ		(GIC_SPI_START + 89)
--#define LPASS_SCSS_GP_HIGH_IRQ			(GIC_SPI_START + 90)
--#define TOP_IMEM_IRQ				(GIC_SPI_START + 91)
--#define FABRIC_SYS_IRQ				(GIC_SPI_START + 92)
--#define FABRIC_APPS_IRQ				(GIC_SPI_START + 93)
--#define USB1_HS_BAM_IRQ				(GIC_SPI_START + 94)
--#define SDC4_BAM_IRQ				(GIC_SPI_START + 95)
--#define SDC3_BAM_IRQ				(GIC_SPI_START + 96)
--#define SDC2_BAM_IRQ				(GIC_SPI_START + 97)
--#define SDC1_BAM_IRQ				(GIC_SPI_START + 98)
--#define FABRIC_SPS_IRQ				(GIC_SPI_START + 99)
--#define USB1_HS_IRQ				(GIC_SPI_START + 100)
--#define SDC4_IRQ_0				(GIC_SPI_START + 101)
--#define SDC3_IRQ_0				(GIC_SPI_START + 102)
--#define SDC2_IRQ_0				(GIC_SPI_START + 103)
--#define SDC1_IRQ_0				(GIC_SPI_START + 104)
--#define SPS_BAM_DMA_IRQ				(GIC_SPI_START + 105)
--#define SPS_SEC_VIOL_IRQ			(GIC_SPI_START + 106)
--#define SPS_MTI_0				(GIC_SPI_START + 107)
--#define SPS_MTI_1				(GIC_SPI_START + 108)
--#define SPS_MTI_2				(GIC_SPI_START + 109)
--#define SPS_MTI_3				(GIC_SPI_START + 110)
--#define SPS_MTI_4				(GIC_SPI_START + 111)
--#define SPS_MTI_5				(GIC_SPI_START + 112)
--#define SPS_MTI_6				(GIC_SPI_START + 113)
--#define SPS_MTI_7				(GIC_SPI_START + 114)
--#define SPS_MTI_8				(GIC_SPI_START + 115)
--#define SPS_MTI_9				(GIC_SPI_START + 116)
--#define SPS_MTI_10				(GIC_SPI_START + 117)
--#define SPS_MTI_11				(GIC_SPI_START + 118)
--#define SPS_MTI_12				(GIC_SPI_START + 119)
--#define SPS_MTI_13				(GIC_SPI_START + 120)
--#define SPS_MTI_14				(GIC_SPI_START + 121)
--#define SPS_MTI_15				(GIC_SPI_START + 122)
--#define SPS_MTI_16				(GIC_SPI_START + 123)
--#define SPS_MTI_17				(GIC_SPI_START + 124)
--#define SPS_MTI_18				(GIC_SPI_START + 125)
--#define SPS_MTI_19				(GIC_SPI_START + 126)
--#define SPS_MTI_20				(GIC_SPI_START + 127)
--#define SPS_MTI_21				(GIC_SPI_START + 128)
--#define SPS_MTI_22				(GIC_SPI_START + 129)
--#define SPS_MTI_23				(GIC_SPI_START + 130)
--#define SPS_MTI_24				(GIC_SPI_START + 131)
--#define SPS_MTI_25				(GIC_SPI_START + 132)
--#define SPS_MTI_26				(GIC_SPI_START + 133)
--#define SPS_MTI_27				(GIC_SPI_START + 134)
--#define SPS_MTI_28				(GIC_SPI_START + 135)
--#define SPS_MTI_29				(GIC_SPI_START + 136)
--#define SPS_MTI_30				(GIC_SPI_START + 137)
--#define SPS_MTI_31				(GIC_SPI_START + 138)
--#define UXMC_EBI2_WR_ER_DONE_IRQ		(GIC_SPI_START + 139)
--#define UXMC_EBI2_OP_DONE_IRQ			(GIC_SPI_START + 140)
--#define USB2_IRQ				(GIC_SPI_START + 141)
--#define USB1_IRQ				(GIC_SPI_START + 142)
--#define TSSC_SSBI_IRQ				(GIC_SPI_START + 143)
--#define TSSC_SAMPLE_IRQ				(GIC_SPI_START + 144)
--#define TSSC_PENUP_IRQ				(GIC_SPI_START + 145)
--#define INT_UART1DM_IRQ				(GIC_SPI_START + 146)
--#define GSBI1_QUP_IRQ				(GIC_SPI_START + 147)
--#define INT_UART2DM_IRQ				(GIC_SPI_START + 148)
--#define GSBI2_QUP_IRQ				(GIC_SPI_START + 149)
--#define INT_UART3DM_IRQ				(GIC_SPI_START + 150)
--#define GSBI3_QUP_IRQ				(GIC_SPI_START + 151)
--#define INT_UART4DM_IRQ				(GIC_SPI_START + 152)
--#define GSBI4_QUP_IRQ				(GIC_SPI_START + 153)
--#define INT_UART5DM_IRQ				(GIC_SPI_START + 154)
--#define GSBI5_QUP_IRQ				(GIC_SPI_START + 155)
--#define INT_UART6DM_IRQ				(GIC_SPI_START + 156)
--#define GSBI6_QUP_IRQ				(GIC_SPI_START + 157)
--#define INT_UART7DM_IRQ				(GIC_SPI_START + 158)
--#define GSBI7_QUP_IRQ				(GIC_SPI_START + 159)
--#define INT_UART8DM_IRQ				(GIC_SPI_START + 160)
--#define GSBI8_QUP_IRQ				(GIC_SPI_START + 161)
--#define TSIF_TSPP_IRQ				(GIC_SPI_START + 162)
--#define TSIF_BAM_IRQ				(GIC_SPI_START + 163)
--#define TSIF2_IRQ				(GIC_SPI_START + 164)
--#define TSIF1_IRQ				(GIC_SPI_START + 165)
--#define INT_ADM1_MASTER				(GIC_SPI_START + 166)
--#define INT_ADM1_AARM				(GIC_SPI_START + 167)
--#define INT_ADM1_SD2				(GIC_SPI_START + 168)
--#define INT_ADM1_SD3				(GIC_SPI_START + 169)
--#define INT_ADM0_MASTER				(GIC_SPI_START + 170)
--#define INT_ADM0_AARM				(GIC_SPI_START + 171)
--#define INT_ADM0_SD2				(GIC_SPI_START + 172)
--#define INT_ADM0_SD3				(GIC_SPI_START + 173)
--#define CC_SCSS_WDT1CPU1BITEEXPIRED		(GIC_SPI_START + 174)
--#define CC_SCSS_WDT1CPU0BITEEXPIRED		(GIC_SPI_START + 175)
--#define CC_SCSS_WDT0CPU1BITEEXPIRED		(GIC_SPI_START + 176)
--#define CC_SCSS_WDT0CPU0BITEEXPIRED		(GIC_SPI_START + 177)
--#define TSENS_UPPER_LOWER_INT			(GIC_SPI_START + 178)
--#define SSBI2_2_SC_CPU1_SECURE_INT		(GIC_SPI_START + 179)
--#define SSBI2_2_SC_CPU1_NON_SECURE_INT		(GIC_SPI_START + 180)
--#define SSBI2_1_SC_CPU1_SECURE_INT		(GIC_SPI_START + 181)
--#define SSBI2_1_SC_CPU1_NON_SECURE_INT		(GIC_SPI_START + 182)
--#define XPU_SUMMARY_IRQ				(GIC_SPI_START + 183)
--#define BUS_EXCEPTION_SUMMARY_IRQ		(GIC_SPI_START + 184)
--#define HSDDRX_SMICH0_IRQ			(GIC_SPI_START + 185)
--#define HSDDRX_EBI1_IRQ				(GIC_SPI_START + 186)
--#define SDC5_BAM_IRQ				(GIC_SPI_START + 187)
--#define SDC5_IRQ_0				(GIC_SPI_START + 188)
--#define INT_UART9DM_IRQ				(GIC_SPI_START + 189)
--#define GSBI9_QUP_IRQ				(GIC_SPI_START + 190)
--#define INT_UART10DM_IRQ			(GIC_SPI_START + 191)
--#define GSBI10_QUP_IRQ				(GIC_SPI_START + 192)
--#define INT_UART11DM_IRQ			(GIC_SPI_START + 193)
--#define GSBI11_QUP_IRQ				(GIC_SPI_START + 194)
--#define INT_UART12DM_IRQ			(GIC_SPI_START + 195)
--#define GSBI12_QUP_IRQ				(GIC_SPI_START + 196)
--
--/*SPI 197 to 209 arent used in 8x60*/
--#define SMMU_GFX2D1_CB_SC_SECURE_IRQ            (GIC_SPI_START + 210)
--#define SMMU_GFX2D1_CB_SC_NON_SECURE_IRQ        (GIC_SPI_START + 211)
--
--/*SPI 212 to 216 arent used in 8x60*/
--#define SMPSS_SPARE_1				(GIC_SPI_START + 217)
--#define SMPSS_SPARE_2				(GIC_SPI_START + 218)
--#define SMPSS_SPARE_3				(GIC_SPI_START + 219)
--#define SMPSS_SPARE_4				(GIC_SPI_START + 220)
--#define SMPSS_SPARE_5				(GIC_SPI_START + 221)
--#define SMPSS_SPARE_6				(GIC_SPI_START + 222)
--#define SMPSS_SPARE_7				(GIC_SPI_START + 223)
--
--#define NR_GPIO_IRQS 173
--#define NR_MSM_IRQS 256
--#define NR_BOARD_IRQS 0
--
--#endif
-diff --git a/arch/arm/mach-msm/include/mach/irqs.h b/arch/arm/mach-msm/include/mach/irqs.h
-index 3cd78b1..164d355 100644
---- a/arch/arm/mach-msm/include/mach/irqs.h
-+++ b/arch/arm/mach-msm/include/mach/irqs.h
-@@ -24,11 +24,6 @@
- #elif defined(CONFIG_ARCH_QSD8X50)
- #include "irqs-8x50.h"
- #include "sirc.h"
--#elif defined(CONFIG_ARCH_MSM8X60)
--#include "irqs-8x60.h"
--#elif defined(CONFIG_ARCH_MSM8960)
--/* TODO: Make these not generic. */
--#include "irqs-8960.h"
- #elif defined(CONFIG_ARCH_MSM_ARM11)
- #include "irqs-7x00.h"
- #else
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+SECTIONS
+{
+    .text : { *(.sramlib) }
+
+    OVERLAY ALIGN(32) : NOCROSSREFS
+    {
+        .sram.am33xx { *(.sram.am33xx.*) }
+        .sram.am437x { *(.sram.am437x.*) }
+    }
+}
+
+It produces output without any relocations, but from there I'm a
+little fuzzy on how to get the symbols of functions and variables into
+the kernel. In the meantime, I'll look into the u-boot methods.
