@@ -1,39 +1,52 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 9 Sep 2013 09:45:25 +0200
-Subject: [PATCH 01/04] ARM: shmobile: Initial r8a7791 SoC support
-In-Reply-To: <CANqRtoQzLKk3EKcm=EiZCg73fgDBZ1xjPi_6fH_PsGdkr6w5sA@mail.gmail.com>
-References: <20130904034525.12546.24775.sendpatchset@w520>
- <20130904034557.12546.97503.sendpatchset@w520>
- <CACRpkdb7QkqCmTMua1yJNJxSAWff=0f6a2SWkf6K9SqbW0BOVg@mail.gmail.com>
- <CANqRtoQzLKk3EKcm=EiZCg73fgDBZ1xjPi_6fH_PsGdkr6w5sA@mail.gmail.com>
-Message-ID: <CACRpkdZGLR3=UZ7f-9r02Gea2hTomp+6+bz0BDQOvk9zRHTxxw@mail.gmail.com>
+From: jbe@pengutronix.de (Juergen Beisert)
+Date: Mon,  9 Sep 2013 10:03:16 +0200
+Subject: [RFCv3] staging/iio/adc: change the MXS touchscreen driver
+ implementation
+Message-ID: <1378713801-1182-1-git-send-email-jbe@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 9, 2013 at 9:21 AM, Magnus Damm <magnus.damm@gmail.com> wrote:
+The following series replaces the current busy loop touchscreen implementation
+for i.MX28/i.MX23 SoCs by a fully interrupt driven implementation.
 
-> Fortunately there are plans to convert several mach-shmobile SoCs to
-> common clocks over the next 6 months. As you know, we spent much time
-> and efforts converting to pinctrl last two 6 month periods, and now we
-> will be targeting common clocks.
+Since i.MX23 and i.Mx28 silicon differs, the existing implementation can
+be used for the i.MX28 SoC only.
 
-I trust you on this, it's not for me to decide but for the ARM SoC
-maintainers. I think Arnd basically said at one point that it is OK
-to add some new cruft as long as you remove more old cruft at
-the same time, so I guess you will have to make an argument that
-this is happening.
+So, the first two patches of this series move the i.MX28 specific definitions
+out of the way. Then the i.MX23 specific definitions are added, also the code
+to distinguish both SoCs at run-time.
+Up to here the existing driver will now run on an i.MX23 Soc as well.
 
-> There are several incremental patches available for r8a7791, but since
-> this is a new and rare platform it won't be the first SoC we convert
-> to common clocks. So CCF development will happen on r8a7791, but it
-> won't be the first platform.
+When the i.MX23 SoC is running from battery it seems not to be a good idea to
+run a busy loop to detect touches and their locations. The fourth patch adds a
+fully interrupt driven implementation which makes use of the built-in delay
+and multiple sample features of the touchscreen controller. This will reduce
+the interrupt load to a minimum.
 
-This is pretty much the inverse argument of the usual stance of
-the ARM SoC tree - usually we ask that new platforms should use
-new frameworks. I do understand it from a practical point of view,
-that new SoCs only exist in few prototypes.
+The last patch in this series just removes the existing busy loop
+implementation.
 
-But again, this is up for the ARM SoC folks to decide.
+Some restrictions/open questions:
 
-Yours,
-Linus Walleij
+- yet tested on i.MX23 SoC only
+- touchscreen parametrisation ability is provided (with fixed values for now)
+  but should be done via device tree. Some recommendations how to define the
+  bindings would be helpful
+- has someone a good idea how to implement a reliable pressure measurement if
+  the resistances of the touchscree's plates are unknown?
+
+Changes since v2:
+
+- useless debug output removed
+- bug in the pressure calculation routine fixed
+
+Changes since v1:
+
+- adding register access functions to make the existing code more readable
+- adding some functions to distinguish the SoCs at run-time to avoid if-else
+  contructs whenever differences in the register layout between i.MX23 and
+  i.MX28 must be handled
+
+Comments are welcome.
+
+Juergen
