@@ -1,13 +1,13 @@
-From: trini@ti.com (Tom Rini)
-Date: Mon, 9 Sep 2013 09:19:02 -0400
+From: matt.porter@linaro.org (Matt Porter)
+Date: Mon, 9 Sep 2013 09:31:01 -0400
 Subject: [PATCHv3] ARM: OMAP2+: am335x-bone*: add DT for BeagleBone Black
 In-Reply-To: <1378638746-10627-1-git-send-email-koen@dominion.thruhere.net>
 References: <1378638746-10627-1-git-send-email-koen@dominion.thruhere.net>
-Message-ID: <522DCAC6.8080705@ti.com>
+Message-ID: <20130909133059.GD10973@ohporter.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/08/2013 07:12 AM, Koen Kooi wrote:
+On Sun, Sep 08, 2013 at 01:12:26PM +0200, Koen Kooi wrote:
 > The BeagleBone Black is basically a regular BeagleBone with eMMC and HDMI added,
 > so create a common dtsi both can use.
 > 
@@ -19,10 +19,15 @@ On 09/08/2013 07:12 AM, Koen Kooi wrote:
 > 
 > Signed-off-by: Koen Kooi <koen@dominion.thruhere.net>
 
-Grabbed my beaglebone white and black and tested them both on top of
-e5c832d (top of Linus' tree atm), came up with a ramdisk.
+Tested-by: Matt Porter <matt.porter@linaro.org>
 
-Tested-by: Tom Rini <trini@ti.com>
+Works fine for me on tip and 3.11. I did notice a regression in musb (worked
+on 3.11, now failing to probe but this is not related to your new dts as it
+happens on am335x-bone.dts too, assuming merge window volatility). One nit,
+git-am picked up a whitespace error on that extra line at EOF so you should
+trim that out.
 
--- 
-Tom
+Only thing is...for a clear bug like this that will destroy hardware, it
+should be marked Cc: stable at vger.kernel.org to be picked up in stable.
+
+-Matt
