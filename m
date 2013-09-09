@@ -1,21 +1,48 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 9 Sep 2013 08:55:33 +0200
-Subject: [PATCH 01/04] ARM: shmobile: Initial r8a7791 SoC support
-In-Reply-To: <20130909001611.GE21921@verge.net.au>
-References: <20130904034525.12546.24775.sendpatchset@w520>
- <20130904034557.12546.97503.sendpatchset@w520>
- <CACRpkdb7QkqCmTMua1yJNJxSAWff=0f6a2SWkf6K9SqbW0BOVg@mail.gmail.com>
- <20130909001611.GE21921@verge.net.au>
-Message-ID: <CACRpkdacYC-CKbr-=pzN=nLWgBqk4CCQS3rG8LDASKjg3uBP=Q@mail.gmail.com>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Mon, 9 Sep 2013 16:05:33 +0900
+Subject: [PATCH v2 4/4] ARM: shmobile: BOCK-W reference: add Ether PFC
+ settings
+In-Reply-To: <201309070431.35908.sergei.shtylyov@cogentembedded.com>
+References: <201309070423.30672.sergei.shtylyov@cogentembedded.com>
+ <201309070431.35908.sergei.shtylyov@cogentembedded.com>
+Message-ID: <CANqRtoRKFoS9tehteDGaTUYJ8fSBqAYJJDiLxZmoNB9W0N+Mpg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 9, 2013 at 2:16 AM, Simon Horman <horms@verge.net.au> wrote:
+On Sat, Sep 7, 2013 at 9:31 AM, Sergei Shtylyov
+<sergei.shtylyov@cogentembedded.com> wrote:
+> Add the Ether pin group to bockw_pinctrl_map[].
+>
+> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+>
+> ---
+>  arch/arm/mach-shmobile/board-bockw-reference.c |    3 +++
+>  1 file changed, 3 insertions(+)
+>
+> Index: renesas/arch/arm/mach-shmobile/board-bockw-reference.c
+> ===================================================================
+> --- renesas.orig/arch/arm/mach-shmobile/board-bockw-reference.c
+> +++ renesas/arch/arm/mach-shmobile/board-bockw-reference.c
+> @@ -29,6 +29,9 @@
+>   */
+>
+>  static const struct pinctrl_map bockw_pinctrl_map[] = {
+> +       /* Ether */
+> +       PIN_MAP_MUX_GROUP_DEFAULT("fde00000.ethernet", "pfc-r8a7778",
+> +                                 "ether_rmii", "ether"),
+>         /* SCIF0 */
+>         PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.0", "pfc-r8a7778",
+>                                   "scif0_data_a", "scif0"),
 
-> So on those two counts my preference would be for any enhancements
-> to be done as incremental patches on top of this series.
+Hi Sergei,
 
-Again: do such enhancements even exist?
+Thanks for your patches. In general I think your series looks fine. I
+have a single comment, and that's about the pinctrl-related hunk
+above. I can see that this patch is for DT reference for Bock-W, so I
+expect the code to be in DT. Do you have any plans to use DT to
+describe the pinmux bits? Perhaps you have some incremental patch
+planned?
 
-Yours,
-Linus Walleij
+Cheers,
+
+/ magnus
