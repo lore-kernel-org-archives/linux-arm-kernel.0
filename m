@@ -1,38 +1,52 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 9 Sep 2013 21:31:41 +0100
-Subject: Build error in torvalds kernel 3.11 for omap2plus
-In-Reply-To: <20130909160348.GB18975@roeck-us.net>
-References: <CABYxbz7m4GdHFNY3fP1Cpv3a_dNTSozdd7dX9yLG6vQ3zZxu9A@mail.gmail.com>
- <20130908090206.GK25647@n2100.arm.linux.org.uk>
- <522CB0DE.2010102@roeck-us.net>
- <20130909105115.GL25647@n2100.arm.linux.org.uk>
- <522DB86A.8010207@roeck-us.net>
- <alpine.LFD.2.03.1309091023440.20709@syhkavp.arg>
- <20130909160348.GB18975@roeck-us.net>
-Message-ID: <20130909203141.GM25647@n2100.arm.linux.org.uk>
+From: rjw@sisk.pl (Rafael J. Wysocki)
+Date: Mon, 09 Sep 2013 23:08:25 +0200
+Subject: "cpufreq: fix serialization issues with freq change notifiers"
+ breaks cpufreq too
+In-Reply-To: <Pine.LNX.4.64.1309091656200.6602@axis700.grange>
+References: <Pine.LNX.4.64.1309091656200.6602@axis700.grange>
+Message-ID: <1883706.eFcILAzoo8@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 09, 2013 at 09:03:48AM -0700, Guenter Roeck wrote:
-> Unfortunately, there are more problems.
+Hi,
+
+On Monday, September 09, 2013 05:11:10 PM Guennadi Liakhovetski wrote:
+> Sorry guys, I'm trying my best to stop this patch from propagating to 
+> stable and to get it fixed asap, so, the CC list might be a bit excessive. 
+> Also trying to fix the originally spare cc list, which makes it impossible 
+> for me to reply to the original thread, instead have to start a new one.
+
+I'm not sure what you're talking about.  What exactly was wrong with the
+original CC list in particular?
+
+> Commit
 > 
-> arch/arm/kernel/built-in.o: In function `ret_fast_syscall':
-> /home/groeck/src/linux-stable/arch/arm/kernel/entry-common.S:42: undefined reference to `user_enter'
-> arch/arm/kernel/built-in.o: In function `no_work_pending':
-> /home/groeck/src/linux-stable/arch/arm/kernel/entry-common.S:77: undefined reference to `user_enter'
-> arch/arm/kernel/built-in.o: In function `vector_swi':
-> /home/groeck/src/linux-stable/arch/arm/kernel/entry-common.S:376: undefined reference to `user_exit'
-> arch/arm/kernel/built-in.o: In function `__dabt_usr':
-> /home/groeck/src/linux-stable/arch/arm/kernel/entry-armv.S:365: undefined reference to `user_exit'
-> arch/arm/kernel/built-in.o: In function `__irq_usr':
-> /home/groeck/src/linux-stable/arch/arm/kernel/entry-armv.S:375: undefined reference to `user_exit'
-> arch/arm/kernel/built-in.o: In function `__und_usr':
-> /home/groeck/src/linux-stable/arch/arm/kernel/entry-armv.S:388: undefined reference to `user_exit'
-> arch/arm/kernel/built-in.o: In function `__pabt_usr':
-> /home/groeck/src/linux-stable/arch/arm/kernel/entry-armv.S:662: undefined reference to `user_exit'
+> commit dceff5ce18801dddc220d6238628619c93bc3cb6
+> Author: Viresh Kumar <viresh.kumar@linaro.org>
+> Date:   Sun Sep 1 22:19:37 2013 +0530
+> 
+>     cpufreq: fix serialization issues with freq change notifiers
+> 
+> breaks .transition_ongoing counting.
 
-These are due to ad65782fba50 (context_tracking: Optimize main APIs off case
-with static key) converting these functions to be inline.
+Do you know how exactly it breaks that?  If so, care to share that knowledge?
 
-No idea what the fix for this is other than reverting the change.  Any
-ideas Frederic?
+> This leads to cpufreq-cpu0 not working any more. In particular switching the
+> governor from performance to powersave directly after boot doesn't result in
+> a frequency switch any more. Reverting this patch fixes the problem again.
+
+However, this is a regression fix, so I'd prefer to fix the problem on top of
+it instead of reverting this commit entirely.
+
+> Tested with today's 
+> -next.
+> 
+> Please, refrain from including into "stable" until clarified!
+
+Well, dropping the commit altogether and dropping the "CC stable" tag are
+equally disruptive at this point, so I think I'll just defer all of the
+cpufreq fixes I wanted to push for 3.12 before the ending of the merge
+window.
+
+Thanks,
+Rafael
