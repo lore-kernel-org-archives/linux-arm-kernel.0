@@ -1,71 +1,43 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon,  9 Sep 2013 09:35:54 +0200
-Subject: [PATCH] crypto: tegra: use kernel entropy instead of ad-hoc
-Message-ID: <1378712154-30602-1-git-send-email-linus.walleij@linaro.org>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Mon, 9 Sep 2013 16:37:34 +0900
+Subject: [PATCH 01/04] ARM: shmobile: Initial r8a7791 SoC support
+In-Reply-To: <CACRpkdacYC-CKbr-=pzN=nLWgBqk4CCQS3rG8LDASKjg3uBP=Q@mail.gmail.com>
+References: <20130904034525.12546.24775.sendpatchset@w520>
+ <20130904034557.12546.97503.sendpatchset@w520>
+ <CACRpkdb7QkqCmTMua1yJNJxSAWff=0f6a2SWkf6K9SqbW0BOVg@mail.gmail.com>
+ <20130909001611.GE21921@verge.net.au>
+ <CACRpkdacYC-CKbr-=pzN=nLWgBqk4CCQS3rG8LDASKjg3uBP=Q@mail.gmail.com>
+Message-ID: <CANqRtoQirDKYS-vGH-pbrXH52WWDe8q77XzdLBGApbf5XRkH=w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The way I read the Tegra AES RNG is that it has a homebrew
-algorithm for initializing the 128bit RNG using timespec and
-the unique chip ID. This looks like reinventing the (square)
-wheel, instead just grab 128bits from the kernel entropy pool
-where the time and (after another patch) chip unique ID is
-already mixed in.
+Hi Linus,
 
-Incidentally this also gets rid of a rather ugly
-cross-dependence on the machine using an extern declaration.
+On Mon, Sep 9, 2013 at 3:55 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> On Mon, Sep 9, 2013 at 2:16 AM, Simon Horman <horms@verge.net.au> wrote:
+>
+>> So on those two counts my preference would be for any enhancements
+>> to be done as incremental patches on top of this series.
+>
+> Again: do such enhancements even exist?
 
-Cc: Stephen Warren <swarren@wwwdotorg.org>
-Cc: Varun Wadekar <vwadekar@nvidia.com>
-Cc: Neil Horman <nhorman@tuxdriver.com>
-Cc: linux-tegra at vger.kernel.org
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
-Only compile-tested as I don't have this platform.
----
- drivers/crypto/tegra-aes.c | 15 +++------------
- 1 file changed, 3 insertions(+), 12 deletions(-)
+There are several incremental patches available for r8a7791, but since
+this is a new and rare platform it won't be the first SoC we convert
+to common clocks. So CCF development will happen on r8a7791, but it
+won't be the first platform.
 
-diff --git a/drivers/crypto/tegra-aes.c b/drivers/crypto/tegra-aes.c
-index 2d58da9..7f42bfe 100644
---- a/drivers/crypto/tegra-aes.c
-+++ b/drivers/crypto/tegra-aes.c
-@@ -199,8 +199,6 @@ static void aes_workqueue_handler(struct work_struct *work);
- static DECLARE_WORK(aes_work, aes_workqueue_handler);
- static struct workqueue_struct *aes_wq;
- 
--extern unsigned long long tegra_chip_uid(void);
--
- static inline u32 aes_readl(struct tegra_aes_dev *dd, u32 offset)
- {
- 	return readl(dd->io_base + offset);
-@@ -713,9 +711,8 @@ static int tegra_aes_rng_reset(struct crypto_rng *tfm, u8 *seed,
- 	struct tegra_aes_dev *dd = aes_dev;
- 	struct tegra_aes_ctx *ctx = &rng_ctx;
- 	struct tegra_aes_slot *key_slot;
--	struct timespec ts;
- 	int ret = 0;
--	u64 nsec, tmp[2];
-+	u8 tmp[16]; /* 16 bytes = 128 bits of entropy */
- 	u8 *dt;
- 
- 	if (!ctx || !dd) {
-@@ -778,14 +775,8 @@ static int tegra_aes_rng_reset(struct crypto_rng *tfm, u8 *seed,
- 	if (dd->ivlen >= (2 * DEFAULT_RNG_BLK_SZ + AES_KEYSIZE_128)) {
- 		dt = dd->iv + DEFAULT_RNG_BLK_SZ + AES_KEYSIZE_128;
- 	} else {
--		getnstimeofday(&ts);
--		nsec = timespec_to_ns(&ts);
--		do_div(nsec, 1000);
--		nsec ^= dd->ctr << 56;
--		dd->ctr++;
--		tmp[0] = nsec;
--		tmp[1] = tegra_chip_uid();
--		dt = (u8 *)tmp;
-+		get_random_bytes(tmp, sizeof(tmp));
-+		dt = tmp;
- 	}
- 	memcpy(dd->dt, dt, DEFAULT_RNG_BLK_SZ);
- 
--- 
-1.8.3.1
+To be able to start using common clocks we first need to break out the
+basic building blocks and then tie them in on one SoC at a time. These
+basic building blocks of course need to use already-existing CCF bits
+for gating, dividers and plls. We will also need some special handling
+like for instance polling of registers to wait for rate change.
+
+So the issue in my opinion is not so much the SoC specific bits.
+Instead it's the shared CCF bits that need work. The real question is
+probably if new SoC support needs to block on framework support. I'm
+all about incremental changes. If there is something special that
+needs extra focus then of course we will work on that.
+
+Cheers,
+
+/ magnus
