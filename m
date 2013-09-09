@@ -1,49 +1,38 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon,  9 Sep 2013 17:40:31 +0200
-Subject: [PATCH 3/8] ARM: iop32x: read N2100 power key using gpiolib
-Message-ID: <1378741231-12958-1-git-send-email-linus.walleij@linaro.org>
+Date: Mon,  9 Sep 2013 17:40:39 +0200
+Subject: [PATCH 4/8] gpio: decouple the IOP GPIO driver from platform
+Message-ID: <1378741239-12995-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Refrain from using the custom gpio_line_get() to read the power
-key on the N2100, use the gpiolib function gpio_get() instead.
-Also request the line when initializing the machine.
+This removes the only dependence between the IOP GPIO
+driver and the GENERIC_GPIO header in <mach/gpio.h>
+and its common implementation in the <asm/*> namespace
+by copying the one constant it is using into the driver
+file.
 
 Cc: Lennert Buytenhek <kernel@wantstofly.org>
 Cc: Dan Williams <dan.j.williams@intel.com>
 Cc: Mikael Pettersson <mikpe@it.uu.se>
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm/mach-iop32x/n2100.c | 10 +++++++++-
- 1 file changed, 9 insertions(+), 1 deletion(-)
+ drivers/gpio/gpio-iop.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-iop32x/n2100.c b/arch/arm/mach-iop32x/n2100.c
-index cd199c1..d495b4f 100644
---- a/arch/arm/mach-iop32x/n2100.c
-+++ b/arch/arm/mach-iop32x/n2100.c
-@@ -306,7 +306,7 @@ static struct timer_list power_button_poll_timer;
+diff --git a/drivers/gpio/gpio-iop.c b/drivers/gpio/gpio-iop.c
+index 697de6d..d4a170d 100644
+--- a/drivers/gpio/gpio-iop.c
++++ b/drivers/gpio/gpio-iop.c
+@@ -16,8 +16,8 @@
+ #include <linux/errno.h>
+ #include <linux/gpio.h>
+ #include <linux/export.h>
+-#include <asm/hardware/iop3xx.h>
+-#include <mach/gpio.h>
++
++#define IOP3XX_N_GPIOS	8
  
- static void power_button_poll(unsigned long dummy)
+ void gpio_line_config(int line, int direction)
  {
--	if (gpio_line_get(N2100_POWER_BUTTON) == 0) {
-+	if (gpio_get_value(N2100_POWER_BUTTON) == 0) {
- 		ctrl_alt_del();
- 		return;
- 	}
-@@ -339,6 +339,14 @@ static void __init n2100_init_machine(void)
- 	ret = gpio_request(N2100_HARDWARE_RESET, "reset");
- 	if (ret)
- 		pr_err("could not request reset GPIO\n");
-+	ret = gpio_request(N2100_POWER_BUTTON, "power");
-+	if (ret)
-+		pr_err("could not request power GPIO\n");
-+	else {
-+		ret = gpio_direction_input(N2100_POWER_BUTTON);
-+		if (ret)
-+			pr_err("could not set power GPIO as input\n");
-+	}
- }
- 
- MACHINE_START(N2100, "Thecus N2100")
 -- 
 1.8.3.1
