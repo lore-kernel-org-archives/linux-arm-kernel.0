@@ -1,43 +1,76 @@
-From: robertcnelson@gmail.com (Robert Nelson)
-Date: Mon, 9 Sep 2013 11:19:22 -0500
-Subject: [PATCH 1/2] ARM: dts: mx6: Add mx6solo support
-In-Reply-To: <CAOMZO5Ab9qVsQica-x3091YPhttqpbr_NL=A2ddzL5znuDtAUw@mail.gmail.com>
-References: <1378688408-8689-1-git-send-email-festevam@gmail.com>
- <20130909150823.GB5815@S2101-09.ap.freescale.net>
- <CAOMZO5Ab9qVsQica-x3091YPhttqpbr_NL=A2ddzL5znuDtAUw@mail.gmail.com>
-Message-ID: <CAOCHtYhJjxBL1AY0dxc+FofXqRT25g8yaO+Z6d09mfkJWT+i+A@mail.gmail.com>
+From: b45784@freescale.com (Pardeep Kumar Singla)
+Date: Mon, 9 Sep 2013 11:20:04 -0500
+Subject: [RFC] ARM: kernel: io: Optimize memcpy_fromio function.
+Message-ID: <1378743604-7339-1-git-send-email-b45784@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 9, 2013 at 10:59 AM, Fabio Estevam <festevam@gmail.com> wrote:
-> On Mon, Sep 9, 2013 at 12:08 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
->> On Sun, Sep 08, 2013 at 10:00:07PM -0300, Fabio Estevam wrote:
->>> From: Fabio Estevam <fabio.estevam@freescale.com>
->>>
->>> Allow booting a device tree kernel on mx6solo.
->>>
->>> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
->>> ---
->>>  arch/arm/boot/dts/imx6s.dtsi   | 82 ++++++++++++++++++++++++++++++++++++++++++
->>
->> The imx6s is not another SoC but just imx6dl with one core fused out.
->> This is the exactly same case as imx6q and imx6d. See commit dc13ba2
->> (ARM: imx: do not bring up unavailable cores) for how we handle that
->> in kernel.
->>
->> Are you running into any problem to boot imx6s wandboard with
->> imx6dl-wandboard.dtb?
->
-> Ok, I made this test and it booted fine.
->
-> So I will change U-boot so that it searches for imx6dl-wandboard.dtb
-> instead of imx6s-wandboard.dtb.
+Currently memcpy_fromio function is copying byte by byte data.
+By replacing this function with inline assembly code, it is copying now 32 bytes at one time.
+By running two test cases(Tested on mx6qsabresd board),results are following :-
 
-Since there is no WiFi/Bluetooth on the "solo" vs the wandboard dual
-lite, we should really still have a separate solo dtb file..
+a)First test case  by calling the memcpy_fromio function only once:-
+	1. With Optimization it is just taking 6 usec.
+	2. Without optimization it is taking 114usec.
+b)Second test case by calling the memcpy_fromio function 100000 times.
+	1.With Optimization it is just taking .8 sec
+	2.Without optimization it is taking 11 sec.
 
-Regards,
+Signed-off-by: Pardeep Kumar Singla <b45784@freescale.com>
+---
+ arch/arm/kernel/io.c |   37 ++++++++++++++++++++++++++++++-------
+ 1 file changed, 30 insertions(+), 7 deletions(-)
 
+diff --git a/arch/arm/kernel/io.c b/arch/arm/kernel/io.c
+index dcd5b4d..3eb8961 100644
+--- a/arch/arm/kernel/io.c
++++ b/arch/arm/kernel/io.c
+@@ -4,16 +4,39 @@
+ 
+ /*
+  * Copy data from IO memory space to "real" memory space.
+- * This needs to be optimized.
+  */
++void *asmcopy_8w(void *dst, void *src, int blocks);
++asm("						\n\
++	.align  2				\n\
++	.text					\n\
++	.global asmcopy_8w			\n\
++	.type asmcopy_8w, %function		\n\
++asmcopy_8w:					\n\
++	stmfd sp!, {r3-r10, lr}			\n\
++.loop:  ldmia r1!, {r3-r10}			\n\
++	stmia r0!, {r3-r10}			\n\
++	subs r2, r2, #1				\n\
++	bne .loop				\n\
++	ldmfd sp!, {r3-r10, pc}			\n\
++");
++
+ void _memcpy_fromio(void *to, const volatile void __iomem *from, size_t count)
+ {
+-	unsigned char *t = to;
+-	while (count) {
+-		count--;
+-		*t = readb(from);
+-		t++;
+-		from++;
++	unsigned char *dst = (unsigned char *)to;
++	unsigned char *src = (unsigned char *)from;
++	if ((((int)src & 3) == 0) && (((int)dst & 3) == 0) && (count >= 32)) {
++		/* copy big chunks */
++		asmcopy_8w(dst, src, count >> 5);
++		dst += count & (~0x1f);
++		src += count & (~0x1f);
++		count &= 0x1f;
++	}
++
++	/* un-aligned or trailing accesses */
++	while (count--) {
++		*dst = readb(src);
++		dst++;
++		src++;
+ 	}
+ }
+ 
 -- 
-Robert Nelson
-http://www.rcn-ee.com/
+1.7.9.5
