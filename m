@@ -1,50 +1,27 @@
-From: markus.mayer@linaro.org (Markus Mayer)
-Date: Tue, 10 Sep 2013 11:07:03 -0700
-Subject: [PATCH v9 3/3] ARM: bcm281xx: Add device node for the GPIO controller
-In-Reply-To: <1378836423-12467-1-git-send-email-markus.mayer@linaro.org>
-References: <1378836423-12467-1-git-send-email-markus.mayer@linaro.org>
-Message-ID: <1378836423-12467-4-git-send-email-markus.mayer@linaro.org>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 10 Sep 2013 19:09:23 +0100
+Subject: [PATCH v3 5/8] spi: Add Freescale QuadSpi driver
+In-Reply-To: <1377828449-18912-6-git-send-email-b32955@freescale.com>
+References: <1377828449-18912-1-git-send-email-b32955@freescale.com>
+ <1377828449-18912-6-git-send-email-b32955@freescale.com>
+Message-ID: <20130910180923.GC29403@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the GPIO controller device node for the Broadcom bcm281xx family of
-mobile SoCs.
+On Fri, Aug 30, 2013 at 10:07:26AM +0800, Huang Shijie wrote:
+> (0) What is the Quadspi controller?
+> 
+>     The Quadspi(Quad Serial Peripheral Interface) acts as an interface to
+>     one single or two external serial flash devices, each with up to 4
+>     bidirectional data lines.
 
-Signed-off-by: Markus Mayer <markus.mayer@linaro.org>
-Reviewed-by: Tim Kryger <tim.kryger@linaro.org>
-Reviewed-by: Matt Porter <matt.porter@linaro.org>
-Reviewed-by: Tomasz Figa <t.figa@samsung.com>
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
----
- arch/arm/boot/dts/bcm11351.dtsi |   16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
-
-diff --git a/arch/arm/boot/dts/bcm11351.dtsi b/arch/arm/boot/dts/bcm11351.dtsi
-index 05a5aab..77af396 100644
---- a/arch/arm/boot/dts/bcm11351.dtsi
-+++ b/arch/arm/boot/dts/bcm11351.dtsi
-@@ -68,6 +68,22 @@
- 		clock-frequency = <32768>;
- 	};
- 
-+	gpio: gpio at 35003000 {
-+		compatible = "brcm,bcm11351-gpio", "brcm,kona-gpio";
-+		reg = <0x35003000 0x800>;
-+		interrupts =
-+		       <GIC_SPI 106 IRQ_TYPE_LEVEL_HIGH
-+			GIC_SPI 115 IRQ_TYPE_LEVEL_HIGH
-+			GIC_SPI 114 IRQ_TYPE_LEVEL_HIGH
-+			GIC_SPI 113 IRQ_TYPE_LEVEL_HIGH
-+			GIC_SPI 112 IRQ_TYPE_LEVEL_HIGH
-+			GIC_SPI 111 IRQ_TYPE_LEVEL_HIGH>;
-+		#gpio-cells = <2>;
-+		#interrupt-cells = <2>;
-+		gpio-controller;
-+		interrupt-controller;
-+	};
-+
- 	sdio1: sdio at 3f180000 {
- 		compatible = "brcm,kona-sdhci";
- 		reg = <0x3f180000 0x10000>;
--- 
-1.7.9.5
+For review and merge it would be much easier to send a patch which
+implements just the basic SPI support for this device then add the
+support for quad mode separately.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130910/287f2861/attachment.sig>
