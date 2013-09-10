@@ -1,68 +1,29 @@
-From: rjw@sisk.pl (Rafael J. Wysocki)
-Date: Tue, 10 Sep 2013 13:38:14 +0200
-Subject: [PATCH RESEND 1/2] i2c: prepare runtime PM support for I2C client
- devices
-In-Reply-To: <20130910075100.GK7393@intel.com>
-References: <1378733679-19500-1-git-send-email-mika.westerberg@linux.intel.com>
- <20130909154028.GP29403@sirena.org.uk> <20130910075100.GK7393@intel.com>
-Message-ID: <1713872.SpMsCYYTas@vostro.rjw.lan>
+From: thommyj@gmail.com (Thommy Jakobsson)
+Date: Tue, 10 Sep 2013 13:28:50 +0200 (CEST)
+Subject: kmalloc memory slower than malloc
+In-Reply-To: <9848F2DB572E5649BA045B288BE08FBE016A9D4A@039-SN2MPN1-023.039d.mgd.msft.net>
+References: <alpine.DEB.2.02.1309060811400.1299@kelly.ryd.net>
+ <1378458778.4208.30.camel@weser.hi.pengutronix.de>
+ <alpine.DEB.2.02.1309101124450.1305@kelly.ryd.net>
+ <1378807816.4200.6.camel@weser.hi.pengutronix.de>
+ <9848F2DB572E5649BA045B288BE08FBE016A9D4A@039-SN2MPN1-023.039d.mgd.msft.net>
+Message-ID: <alpine.DEB.2.02.1309101327340.1305@kelly.ryd.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, September 10, 2013 10:51:00 AM Mika Westerberg wrote:
-> On Mon, Sep 09, 2013 at 04:40:28PM +0100, Mark Brown wrote:
-> > On Mon, Sep 09, 2013 at 04:34:38PM +0300, Mika Westerberg wrote:
-> > 
-> > > +	/*
-> > > +	 * Enable runtime PM for the client device. If the client wants to
-> > > +	 * participate on runtime PM it should call pm_runtime_put() in its
-> > > +	 * probe() callback.
-> > > +	 *
-> > > +	 * User still needs to allow the PM runtime before it can actually
-> > > +	 * happen.
-> > > +	 */
-> > > +	pm_runtime_forbid(&client->dev);
-> > > +	pm_runtime_get_noresume(&client->dev);
-> > > +	pm_runtime_set_active(&client->dev);
-> > > +	pm_runtime_enable(&client->dev);
-> > 
-> > How is this going to interact with client devices which are already
-> > enabling runtime PM for themselves, and what are the advantages of doing
-> > this over having the client device enable runtime PM for itself (given
-> > that the client still needs an explicit put() adding)?
+
+
+On Tue, 10 Sep 2013, Duan Fugang-B38611 wrote:
+
+> About the diff:
+> dma_alloc_coherent in kernel   4.256s (s=0)
+> dma_alloc_coherent userspace   0.566s (s=0)
 > 
-> My understanding is that you can call pm_runtime_enable() several times
-> (provided that pm_runtime_disable() is called as many times). So that
-> should have no effect on the current drivers that already take advantage of
-> runtime PM.
-
-That's correct.
-
-> There is one difference though -- runtime PM is now blocked by default and
-> it needs to be unblocked from the userspace per each device.
+> I think it call remap_pfn_range() with page attribute (vma->vm_page_prot) transferred from mmap() maybe cacheable.
+> So the performance is the same as malloc/kmalloc in userspace.
 > 
-> For the advantages compared to each driver handling it completely
-> themselves:
-> 
-> 	- Few lines less as you only need to call _put().
-> 	- It follows what is already been done for other buses, like PCI
-> 	  and AMBA .
-> 	- The I2C core makes sure that the device is available (from bus
-> 	  point of view) when the driver ->probe() is called.
-> 
-> > Given that it's relatively common for devices to have both I2C and SPI
-> > control it seems like it'd be sensible to keep the policy common between
-> > the two buses to simplify driver implementation.
-> 
-> Yes and IMHO if I2C and SPI follows what has already been done for other
-> buses it should make the driver writer's job easier as the usage is similar
-> from one bus to another.
+Thats probably true, or at least that is how I explained it to myself in 
+my head =) 
 
-I agree here, FWIW.
-
-Thanks!
-
-
--- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+Thanks,
+Thommy
