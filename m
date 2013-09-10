@@ -1,36 +1,41 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 10 Sep 2013 19:19:50 +0800
-Subject: [PATCH v4 12/19] cpufreq: cpufreq-cpu0: remove device tree
- parsing for cpu nodes
-In-Reply-To: <522EFAD1.4020709@arm.com>
-References: <1374492747-13879-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
- <1376991021-12160-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
- <1376991021-12160-13-git-send-email-Sudeep.KarkadaNagesha@arm.com>
- <Pine.LNX.4.64.1309061539310.11068@axis700.grange>
- <522D93D7.4010307@arm.com>
- <20130909143253.GD4624@S2101-09.ap.freescale.net>
- <522DE822.3030907@arm.com>
- <20130910024404.GC5815@S2101-09.ap.freescale.net>
- <522EFAD1.4020709@arm.com>
-Message-ID: <20130910111947.GH5815@S2101-09.ap.freescale.net>
+From: thommyj@gmail.com (Thommy Jakobsson)
+Date: Tue, 10 Sep 2013 13:27:07 +0200 (CEST)
+Subject: kmalloc memory slower than malloc
+In-Reply-To: <1378807816.4200.6.camel@weser.hi.pengutronix.de>
+References: <alpine.DEB.2.02.1309060811400.1299@kelly.ryd.net>
+ <1378458778.4208.30.camel@weser.hi.pengutronix.de>
+ <alpine.DEB.2.02.1309101124450.1305@kelly.ryd.net>
+ <1378807816.4200.6.camel@weser.hi.pengutronix.de>
+Message-ID: <alpine.DEB.2.02.1309101317500.1305@kelly.ryd.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 10, 2013 at 11:56:17AM +0100, Sudeep KarkadaNagesha wrote:
-> > So we only need to change all clkdev registration to use "cpu0" as
-> > dev_id intstead of "cpufreq-cpu0.0", something like below.
-> > 
-> > And for imx, it should work even without the changes, because we have
-> > device tree lookup ready there, and those clk_register_clkdev() calls
-> > can just be removed now.  But I prefer to include the change and leave
-> > the cleanup to another patch for keeping the change log clear.
-> > 
-> Ok makes sense, do you want me to include this patch also as fix.
-> I can send a series to fix this if you OK:
-> 1. Fix in cpufreq-cpu0
-> 2. Fix in i.MX driver and platform file
-> 3. Patch below
 
-Yes, please.  Thanks.
 
-Shawn
+On Tue, 10 Sep 2013, Lucas Stach wrote:
+
+> How do you init the kmalloc memory? If you do a memset right before the
+> test loop your "kmalloc in kernel" will most likely always hit in the L1
+> cache, that's why it's really fast to do.
+I did do a memset previosly but I removed it to see if I still had the 
+difference. So now I don't initilize the memory at all. The run from which 
+I attached the times had no initilization at all. Besides, I loop through 
+all bytes 10000 times, so I would assume that all would be in cache after 
+the first loop.
+
+> 
+> The userspace mapping of the kmalloc memory will get a different virtual
+> address than the kernel mapping. So if you do a memset in kernelspace,
+> but the test loop in userspace you'll always miss the cache as the ARM
+> v7 caches are virtually indexed. So the processor always fetches data
+> from memory. The performance advantage against an uncached mapping is
+> entirely due to the fact that you are fetching whole cache lines
+> (32bytes) from memory at once, instead of doing a memory/bus transaction
+> per byte.
+
+I thought that the L1 data cache was physically indexed and tagged, 
+whereas the instruction cache used virtual indexing. But maybe I'm 
+wrong. The L2 cache is physically indexed and tagged though, right? 
+
+Thanks,
+Thommy
