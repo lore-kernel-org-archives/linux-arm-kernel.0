@@ -1,69 +1,25 @@
-From: cavokz@gmail.com (Domenico Andreoli)
-Date: Tue, 10 Sep 2013 18:16:34 +0200
-Subject: [PATCH v3 2/5] ARM: bcm4760: Add platform infrastructure
-In-Reply-To: <CAOesGMh=jdTacefrEo8pcwAOggqmOypz3dZuORdHJS9F2vKjcQ@mail.gmail.com>
-References: <20130814221043.528864175@gmail.com>
- <20130814221237.350904818@gmail.com>
- <20130829231729.GA29606@quad.lixom.net>
- <20130830075312.GA2447@glitch> <5221141B.5020105@broadcom.com>
- <CAOesGMh=jdTacefrEo8pcwAOggqmOypz3dZuORdHJS9F2vKjcQ@mail.gmail.com>
-Message-ID: <20130910161633.GA7655@glitch>
+From: coosty@163.com (cini)
+Date: Wed, 11 Sep 2013 00:18:09 +0800 (CST)
+Subject: [PATCH ] ARM: sunxi: Add Emac,SMP and Arch_timer support for
+ sunxi A20;Add phy cnt arch timer for ARMv7 support.
+In-Reply-To: <16b7467c.1f121.141089f3d81.Coremail.coosty@163.com>
+References: <16b7467c.1f121.141089f3d81.Coremail.coosty@163.com>
+Message-ID: <3e13f48b.1f1ae.14108aa6f85.Coremail.coosty@163.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 30, 2013 at 02:58:58PM -0700, Olof Johansson wrote:
-> On Fri, Aug 30, 2013 at 2:52 PM, Christian Daudt <csd@broadcom.com> wrote:
-> > On 13-08-30 12:53 AM, Domenico Andreoli wrote:
-> >>>>
-> >>>> Index: b/arch/arm/mach-bcm/Kconfig
-> >>>> ===================================================================
-> >>>> --- a/arch/arm/mach-bcm/Kconfig
-> >>>> +++ b/arch/arm/mach-bcm/Kconfig
-> >>>> @@ -17,3 +17,10 @@ config ARCH_BCM
-> >>>>           It currently supports the 'BCM281XX' family, which includes
-> >>>>           BCM11130, BCM11140, BCM11351, BCM28145 and
-> >>>>           BCM28155 variants.
-> >>>> +
-> >>>> +config ARCH_BCM4760
-> >>>> +       bool "Broadcom BCM4760 based SoCs (ARM11)" if ARCH_MULTI_V6
-> >>>> +       select ARM_AMBA
-> >>>> +       select ARM_VIC
-> >>>> +       select CLKSRC_OF
-> >>>> +       select SOC_BUS
-> >>>
-> >>> So I think I mentioned this during previous discussions, but I think this
-> >>> should be solved by having:
-> >>>
-> >>> config ARCH_BCM
-> >>>         bool "Broadcom platforms"
-> >>>         help
-> >>>           This enables support for Broadcom based systems
-> >>>
-> >>> menu "Broadcom platform selection"
-> >>>         depends on ARCH_BCM
-> >>>
-> >>> config ARCH_BCM281XX
-> >>>         ... current ARCH_BCM contents
-> >>>
-> >>> config ARCH_BCM4760
-> >>>         ... above conents
-> >>> endmenu
-> >>
-> >> got it.
-> >>
-> >> need to sync with Christian, the current owner of ARCH_BCM.
-> >
-> > This is fine, but it is better to name it MOBILEBCM instead for our
-> > platform, as it plan to keep it single zImage. My plan was to switch the
-> > current usage of ARCH_BCM for chips to ARCH_MOBILEBCM, and then leave
-> > ARCH_BCM as a generic BCM menu option as above. I can send a patch to that
-> > effect if everyone is okay with that.
-> 
-> Sounds good. Let's do that for 2.13.
-
-Christian, can I assume you will prepare a patch to rename ARCH_BCM or do
-you prefer I include it my series, maybe simplifying the merge of it? I'm
-fine with both.
-
-Regards,
-Domenico
+attachment is patch files.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: add_phy_archtimer.patch
+Type: application/octet-stream
+Size: 2322 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130911/bc9cfc56/attachment-0002.obj>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: add_smp_emac_archtimer_forA20.patch
+Type: application/octet-stream
+Size: 3582 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130911/bc9cfc56/attachment-0003.obj>
