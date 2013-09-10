@@ -1,45 +1,29 @@
-From: csd@broadcom.com (Christian Daudt)
-Date: Tue, 10 Sep 2013 14:14:24 -0700
-Subject: [PATCH v9 1/3] gpio: bcm281xx: Add GPIO driver
-In-Reply-To: <522F7AE3.6050105@wwwdotorg.org>
-References: <1378836423-12467-1-git-send-email-markus.mayer@linaro.org>
- <1378836423-12467-2-git-send-email-markus.mayer@linaro.org>
- <522F7AE3.6050105@wwwdotorg.org>
-Message-ID: <522F8BB0.6010301@broadcom.com>
+From: marex@denx.de (Marek Vasut)
+Date: Tue, 10 Sep 2013 23:21:16 +0200
+Subject: [PATCH 3/5] Staging/iio/adc/touchscreen/MXS: add i.MX23 support
+ to the LRADC driver
+In-Reply-To: <20130910205444.GB6329@mwanda>
+References: <1378713801-1182-1-git-send-email-jbe@pengutronix.de>
+ <201309100936.14562.jbe@pengutronix.de> <20130910205444.GB6329@mwanda>
+Message-ID: <201309102321.16382.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
-On 13-09-10 01:02 PM, Stephen Warren wrote:
-> On 09/10/2013 12:07 PM, Markus Mayer wrote:
->> From: Markus Mayer <mmayer@broadcom.com>
->>
->> Add the GPIO driver for the Broadcom bcm281xx family of mobile SoCs.
->> These GPIO controllers may contain up to 8 banks where each bank
->> includes 32 pins that can be driven high or low and act as an edge
->> sensitive interrupt.
-> The binding,
-> Reviewed-by: Stephen Warren <swarren@nvidia.com>
->
-> although ...
->
->> diff --git a/Documentation/devicetree/bindings/gpio/gpio-bcm-kona.txt b/Documentation/devicetree/bindings/gpio/gpio-bcm-kona.txt
->> +This GPIO driver is used in the following Broadcom SoCs:
->> +  BCM11130, BCM11140, BCM11351, BCM28145, BCM28155
-> Given that, I would expect the documentation of the compatible property
-> to enumerate the compatible values for all of those different chips,
-> although the driver could choose to only bind to e.g. brcm,bcm11351-gpio
-> or brcm,kona-gpio, since they're all compatible with it.
->
-How would this help ? All of these chips are part of the same family and 
-thus quite similar (the primary difference being on the memory 
-controller and packaging), and we can't know a priori on which 
-variations bugs will happen, if any. So listing out a number of 
-theoretical compatible properties in the documentation that most likely 
-will never get used anyone doesn't seem to serve a purpose. If we were 
-to need a workaround triggered on compatible, it would more likely be 
-over a specific rev of the chip instead of the model within this family 
-(as we have already done for rev a2 in cache-l2x0.c)
+Dear Dan Carpenter,
 
-  Thanks,
-    csd
+> On Tue, Sep 10, 2013 at 09:36:14AM +0200, J?rgen Beisert wrote:
+> > > This patch seems to combine two things -- register access rework AND
+> > > adjustment of the driver for MX23 touchscreen.
+> > 
+> > It reworks the register access to avoid the i.MX23/i.MX28 runtime
+> > decision all over the code again and again. This is what Dan has
+> > recommended in his comment.
+> 
+> I thought the same as Marek that it would be better as two patches like
+> the one I sent, but I was also willing to let it slide if no one else
+> complained.
+
+Looks like Jurgen can now start cursing me ;-)
+
+Best regards,
+Marek Vasut
