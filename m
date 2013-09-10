@@ -1,29 +1,40 @@
-From: thommyj@gmail.com (Thommy Jakobsson)
-Date: Tue, 10 Sep 2013 13:28:50 +0200 (CEST)
-Subject: kmalloc memory slower than malloc
-In-Reply-To: <9848F2DB572E5649BA045B288BE08FBE016A9D4A@039-SN2MPN1-023.039d.mgd.msft.net>
-References: <alpine.DEB.2.02.1309060811400.1299@kelly.ryd.net>
- <1378458778.4208.30.camel@weser.hi.pengutronix.de>
- <alpine.DEB.2.02.1309101124450.1305@kelly.ryd.net>
- <1378807816.4200.6.camel@weser.hi.pengutronix.de>
- <9848F2DB572E5649BA045B288BE08FBE016A9D4A@039-SN2MPN1-023.039d.mgd.msft.net>
-Message-ID: <alpine.DEB.2.02.1309101327340.1305@kelly.ryd.net>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Tue, 10 Sep 2013 16:59:29 +0530
+Subject: "cpufreq: fix serialization issues with freq change notifiers"
+ breaks cpufreq too
+In-Reply-To: <Pine.LNX.4.64.1309091656200.6602@axis700.grange>
+References: <Pine.LNX.4.64.1309091656200.6602@axis700.grange>
+Message-ID: <CAKohponZ+FnzqXYMbBzbun0-1iQMi2fS4syrEBC_MdF41vLCeA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 9 September 2013 20:41, Guennadi Liakhovetski <g.liakhovetski@gmx.de> wrote:
+> Sorry guys, I'm trying my best to stop this patch from propagating to
+> stable and to get it fixed asap, so, the CC list might be a bit excessive.
+> Also trying to fix the originally spare cc list, which makes it impossible
+> for me to reply to the original thread, instead have to start a new one.
+>
+> Commit
+>
+> commit dceff5ce18801dddc220d6238628619c93bc3cb6
+> Author: Viresh Kumar <viresh.kumar@linaro.org>
+> Date:   Sun Sep 1 22:19:37 2013 +0530
+>
+>     cpufreq: fix serialization issues with freq change notifiers
+>
+> breaks .transition_ongoing counting. This leads to cpufreq-cpu0 not
+> working any more. In particular switching the governor from performance to
+> powersave directly after boot doesn't result in a frequency switch any
+> more. Reverting this patch fixes the problem again. Tested with today's
+> -next.
 
+I have tested it again on my exynos and intel machines and couldn't see
+a single problem with this patch..
 
-On Tue, 10 Sep 2013, Duan Fugang-B38611 wrote:
+I am afraid you need to give us some more information on how it broke
+your stuff.. :)
 
-> About the diff:
-> dma_alloc_coherent in kernel   4.256s (s=0)
-> dma_alloc_coherent userspace   0.566s (s=0)
-> 
-> I think it call remap_pfn_range() with page attribute (vma->vm_page_prot) transferred from mmap() maybe cacheable.
-> So the performance is the same as malloc/kmalloc in userspace.
-> 
-Thats probably true, or at least that is how I explained it to myself in 
-my head =) 
+And I am also not sure cpufreq-cpu0 is different then any other driver..
 
-Thanks,
-Thommy
+--
+viresh
