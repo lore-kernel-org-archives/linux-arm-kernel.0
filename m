@@ -1,42 +1,83 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 10 Sep 2013 13:49:33 +0100
-Subject: [PATCH 32/38] iio: accel-core: st: Move LSM303DLH into correct group
+Date: Tue, 10 Sep 2013 13:49:35 +0100
+Subject: [PATCH 34/38] iio: gyro-core: st: Clean up error handling in probe()
 In-Reply-To: <1378817379-8238-1-git-send-email-lee.jones@linaro.org>
 References: <1378817379-8238-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1378817379-8238-33-git-send-email-lee.jones@linaro.org>
+Message-ID: <1378817379-8238-35-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The LSM303DLH's WAI (WhoAmI) is 0x33, meaning it should be enabled by
-Accel Sensor group one. For the device to probe without error, we'll
-need to ensure it's registered with the correct WAI.
+Reduce the amount of those unnecessary goto calls, as in most cases
+we can simply return immediately. We also only call for the IRQ number
+once and use that value throughout.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/iio/accel/st_accel_core.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/iio/gyro/st_gyro_core.c | 21 ++++++++++-----------
+ 1 file changed, 10 insertions(+), 11 deletions(-)
 
-diff --git a/drivers/iio/accel/st_accel_core.c b/drivers/iio/accel/st_accel_core.c
-index ea62291..03a2b6b 100644
---- a/drivers/iio/accel/st_accel_core.c
-+++ b/drivers/iio/accel/st_accel_core.c
-@@ -170,6 +170,7 @@ static const struct st_sensors st_accel_sensors[] = {
- 			[2] = LSM330D_ACCEL_DEV_NAME,
- 			[3] = LSM330DL_ACCEL_DEV_NAME,
- 			[4] = LSM330DLC_ACCEL_DEV_NAME,
-+			[5] = LSM303DLH_ACCEL_DEV_NAME,
- 		},
- 		.ch = (struct iio_chan_spec *)st_accel_12bit_channels,
- 		.odr = {
-@@ -238,8 +239,7 @@ static const struct st_sensors st_accel_sensors[] = {
- 		.sensors_supported = {
- 			[0] = LIS331DLH_ACCEL_DEV_NAME,
- 			[1] = LSM303DL_ACCEL_DEV_NAME,
--			[2] = LSM303DLH_ACCEL_DEV_NAME,
--			[3] = LSM303DLM_ACCEL_DEV_NAME,
-+			[2] = LSM303DLM_ACCEL_DEV_NAME,
- 		},
- 		.ch = (struct iio_chan_spec *)st_accel_12bit_channels,
- 		.odr = {
+diff --git a/drivers/iio/gyro/st_gyro_core.c b/drivers/iio/gyro/st_gyro_core.c
+index e13c2b0..09e24f9 100644
+--- a/drivers/iio/gyro/st_gyro_core.c
++++ b/drivers/iio/gyro/st_gyro_core.c
+@@ -305,8 +305,9 @@ static const struct iio_trigger_ops st_gyro_trigger_ops = {
+ int st_gyro_common_probe(struct iio_dev *indio_dev,
+ 					struct st_sensors_platform_data *pdata)
+ {
+-	int err;
+ 	struct st_sensor_data *gdata = iio_priv(indio_dev);
++	int irq = gdata->get_irq_data_ready(indio_dev);
++	int err;
+ 
+ 	indio_dev->modes = INDIO_DIRECT_MODE;
+ 	indio_dev->info = &gyro_info;
+@@ -314,7 +315,7 @@ int st_gyro_common_probe(struct iio_dev *indio_dev,
+ 	err = st_sensors_check_device_support(indio_dev,
+ 				ARRAY_SIZE(st_gyro_sensors), st_gyro_sensors);
+ 	if (err < 0)
+-		goto st_gyro_common_probe_error;
++		return err;
+ 
+ 	gdata->num_data_channels = ST_GYRO_NUMBER_DATA_CHANNELS;
+ 	gdata->multiread_bit = gdata->sensor->multi_read_bit;
+@@ -327,12 +328,12 @@ int st_gyro_common_probe(struct iio_dev *indio_dev,
+ 
+ 	err = st_sensors_init_sensor(indio_dev, pdata);
+ 	if (err < 0)
+-		goto st_gyro_common_probe_error;
++		return err;
+ 
+-	if (gdata->get_irq_data_ready(indio_dev) > 0) {
++	if (irq > 0) {
+ 		err = st_gyro_allocate_ring(indio_dev);
+ 		if (err < 0)
+-			goto st_gyro_common_probe_error;
++			return err;
+ 
+ 		err = st_sensors_allocate_trigger(indio_dev,
+ 						  ST_GYRO_TRIGGER_OPS);
+@@ -341,18 +342,16 @@ int st_gyro_common_probe(struct iio_dev *indio_dev,
+ 	}
+ 
+ 	err = iio_device_register(indio_dev);
+-	if (err)
++	if (err && irq > 0)
+ 		goto st_gyro_device_register_error;
+ 
+ 	return err;
+ 
+ st_gyro_device_register_error:
+-	if (gdata->get_irq_data_ready(indio_dev) > 0)
+-		st_sensors_deallocate_trigger(indio_dev);
++	st_sensors_deallocate_trigger(indio_dev);
+ st_gyro_probe_trigger_error:
+-	if (gdata->get_irq_data_ready(indio_dev) > 0)
+-		st_gyro_deallocate_ring(indio_dev);
+-st_gyro_common_probe_error:
++	st_gyro_deallocate_ring(indio_dev);
++
+ 	return err;
+ }
+ EXPORT_SYMBOL(st_gyro_common_probe);
 -- 
 1.8.1.2
