@@ -1,57 +1,167 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 10 Sep 2013 22:35:22 +0100
-Subject: [PATCH RESEND 1/2] i2c: prepare runtime PM support for I2C
- client devices
-In-Reply-To: <3397524.g9aUWuArnm@vostro.rjw.lan>
-References: <1378733679-19500-1-git-send-email-mika.westerberg@linux.intel.com>
- <20130910142631.GL7393@intel.com>
- <20130910161321.GM29403@sirena.org.uk>
- <3397524.g9aUWuArnm@vostro.rjw.lan>
-Message-ID: <20130910213522.GG29403@sirena.org.uk>
+From: sylvester.nawrocki@gmail.com (Sylwester Nawrocki)
+Date: Tue, 10 Sep 2013 23:41:12 +0200
+Subject: [PATCH 1/2] video: ARM CLCD: Add DT support
+In-Reply-To: <1378725559.4082.28.camel@hornet>
+References: <1378488201-21146-1-git-send-email-pawel.moll@arm.com>
+ <522BAED9.4020301@gmail.com> <1378725559.4082.28.camel@hornet>
+Message-ID: <522F91F8.6010207@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 10, 2013 at 10:04:21PM +0200, Rafael J. Wysocki wrote:
-> On Tuesday, September 10, 2013 05:13:21 PM Mark Brown wrote:
+On 09/09/2013 01:19 PM, Pawel Moll wrote:
+> On Sat, 2013-09-07 at 23:55 +0100, Sylwester Nawrocki wrote:
+>> H --- /dev/null
+>>> +++ b/Documentation/devicetree/bindings/video/arm,pl11x.txt
+>>> @@ -0,0 +1,87 @@
+>>> +* ARM PrimeCell Color LCD Controller (CLCD) PL110/PL111
+>>
+>> nit: Shouldn't the abbreviation be CLCDC ?
+>
+> The commonly used acronym for this cell is CLCD. For what its worth, I
+> can make the line read:
+>
+> ARM PrimeCell Color LCD (CLCD) Controller PL110/PL111
 
-> > OK, that is very much not the model which embedded systems follow, in
-> > embedded systems the driver for the device is fully in control of its
-> > own power.  It gets resources like GPIOs and regulators which allow it
-> > to make fine grained decisions.
+OK, that's probably better. A meaningless detail, I've just seen mostly
+CLCDC used in the PL100/PL111 TRM and LCDC would presumably be more 
+intuitive
+for this type of IP block.
 
-> There are platforms where those resources are simply not available for
-> direct manipulation and we need to use ACPI methods for power management.
+>>> +- video-ram: phandle to a node describing specialized video memory
+>>> +		(that is *not* described in the top level "memory" node)
+>>> +                that must be used as a framebuffer, eg. due to restrictions
+>>> +		of the system interconnect; the node must contain a
+>>> +		standard reg property describing the address and the size
+>>> +		of the memory area
+>>
+>> It seems the "specialized video memory" is described by some vendor specific
+>> DT binding ? Is it documented ? It sounds like you are unnecessarily
+>> repeating the memory node details here.
+>
+> I appreciate this property being the hardest to swallow, but the problem
+> it is trying to solve is quite simple, really. System can be designed in
+> such a way that CLCD is *not* able to read data from the main memory. In
+> such case there will be a separate block of (usually static) memory
+> "next" to CLCD, which *must* be used for the framebuffer. And I've got
+> two choices here: to simply define an address and size, or to define a
+> phandle to a node with standard reg property. I'll be really grateful
+> for ideas how to describe the situation better.
 
-> Now, since those methods are used in pretty much the same way for all I2C
-> devices, we add a PM domain for that to avoid duplicating the same code in
-> all of the drivers in question (patch [2/2]).  Does that make sense to you?
+I though about reusing the binding only, the part defining reserved
+(carve out) memory regions.
 
-It doesn't seem like a particular problem, but the existing usage does
-need to be preserved for the systems that use it so things like having
-auto as the default and updating the drivers seem like they're needed.
+>> Perhaps this binding/driver should use the common reserved memory bindings,
+>> see thread http://www.spinics.net/lists/devicetree/msg02880.html
+>
+> No, not really - as I said, this is *not* the main RAM of the system.
+> CMA doesn't even know about its existence.
 
-> > If we're starting to get a reasonable number of buses following the same
-> > pattern it seems like we're in a position to start 
+I'm really not an expert in this area, I'll assume we don't list such
+separate memory chips in the 'memory' node.
 
-> We need that for exactly 3 buses: platform (already done), I2C and SPI.
+But if such memory could be used not only by this single IP block it would
+probably make sense to have it listed in memory/reserved-memory, so it 
+could
+be used by other devices of which drivers possibly wouldn't have to contain
+all the detailed dt parsing/memory handling code.
 
-> No other bus types are going to use ACPI this way for PM, at least for the
-> time being, simply because PCI, USB and SATA/IDE have their own ways of doing
-> this (which are bus-specific) and the spec doesn't cover other bus types
-> directly (it defines support for UART, but we don't have a UART bus type).
+>>> +- max-framebuffer-size: maximum size in bytes of the framebuffer the
+>>> +			system can handle, eg. in terms of available
+>>> +			memory bandwidth
+>>> +
+>>> +In the simplest case of a display panel being connected directly to the
+>>> +CLCD, it can be described in the node:
+>>> +
+>>> +- panel-dimensions: (optional) array of two numbers (width and height)
+>>> +			describing physical dimension in mm of the panel
+>>> +- panel-type: (required) must be "tft" or "stn", defines panel type
+>>> +- panel-tft-interface: (for "tft" panel type) array of 3 numbers defining
+>>> +			widths in bits of the R, G and B components
+>>> +- panel-tft-rb-swapped: (for "tft" panel type) if present means that
+>>> +			the R&   B components are swapped on the board
+>>> +- panel-stn-color: (for "stn" panel type) if present means that
+>>> +			the panel is a colour STN display, if missing
+>>> +			is a monochrome display
+>>> +- panel-stn-dual: (for "stn" panel type) if present means that there
+>>> +			are two STN displays connected
+>>> +- panel-stn-4bit: (for monochrome "stn" panel) if present means
+>>> +			that the monochrome display is connected
+>>> +			via 4 bit-wide interface
+>>
+>> Are this vendor specific or common properties ? Shouldn't those be prefixed
+>> with the vendor name ?
+>
+> I have no answer to this question. My guts are telling me - nope. TFT is
+> TFT, STN is STN, nothing to do with "arm,". But I welcome other
+> opinions.
 
-> Moreover, because PCI and USB use ACPI for PM in their own ways, moving that
-> thing up to the driver core would be rather inconvenient.
+I thought about documenting such a common properties in a common place. 
+  It's
+not immediately clear from names of these properties that they apply to 
+PL110/
+PL111 devices only.  If we let such generic names being redefined across DT
+bindings of different devices it is going to be pretty messy IMHO.  Same
+property in two different dts files would potentially have different 
+meaning.
 
-That only applies to the power domains though, what Mika was saying was
-that the process for enabling runtime PM (just drop a reference) also
-becomes easier with this method regardless of anything else - that makes
-sense to me as something we might want to end up with so do we want to
-just move towards making that a default?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130910/28a97a47/attachment-0001.sig>
+So perhaps instead of panel-dimensions we could define common 
+properties, e.g.
+
+  - display-phys-width: physical horizontal dimension of a display in 
+millimetres
+                        (micrometres ?);
+  - display-phys-height: physical vertical dimension of a display in 
+millimetres
+                        (micrometres ?);
+
+Instead of 'panel-stn-color' a boolean property 'monochrome-display', 
+the default
+when this property was missing would be "colour display".
+
+I'd like to leave defining such common properties to someone having more 
+experience
+in the display area.  I don't think it would take much time come up with 
+generic
+names for that couple properties you need.  Then CDF implementation 
+would simply
+use whatever gets agreed.
+
+>> Anyway I think we need an RFC to possibly standardize properties that are
+>> common across multiple panels and have them listed in a common DT binding.
+>>
+>> It sounds a bit disappointing that for same class devices there are being
+>> introduced custom DT properties for each available device. For instance,
+>> the first 3 properties above look like they could apply to various display
+>> panels and controllers.
+>
+> No argument from here. The Common Display Framework was supposed to
+> address this issue. And the first version of this patch used it:
+>
+> http://thread.gmane.org/gmane.linux.drivers.video-input-infrastructure/63417
+>
+> But you'll notice that it's been almost 10 months since the last version
+> of CDF saw the daylight, and Laurent seems to be too busy with other
+> duties to carry on with this. Additionally the KMS/DRM guys don't look
+> too kindly on it. The bottom line is: there are 3 different platform
+> suffering from lack of DT bindings for CLCD and I've got fed up with
+> waiting. Anyway, I've intentionally kept the panel properties in a
+> separate section and wrote "can be described", to keep an open way for
+> future "display bindings", if and when they appear.
+
+I might risk people start yelling at me, but perhaps you could explicitly
+mark this binding as "preliminary", so it is clear that the intention was
+to switch to whatever common design in future.
+
+The recently posted v3 of the CDF uses DT bindings specified at:
+  Documentation/devicetree/bindings/media/video-interfaces.txt,
+  Documentation/devicetree/bindings/video/display-timing.txt.
+
+Theoretically, the bindings are independent of any OS implementation, thus
+I guess if you used the above bindings, perhaps extended with couple more
+properties, it might have been possible to switch to any common OS API in
+future, without changing the bindings. That all might be highly theoretical
+though. :)
+
+--
+Thanks,
+Sylwester
