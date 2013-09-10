@@ -1,43 +1,58 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 10 Sep 2013 16:17:54 -0600
-Subject: [PATCH v9 1/3] gpio: bcm281xx: Add GPIO driver
-In-Reply-To: <522F8BB0.6010301@broadcom.com>
-References: <1378836423-12467-1-git-send-email-markus.mayer@linaro.org>
- <1378836423-12467-2-git-send-email-markus.mayer@linaro.org>
- <522F7AE3.6050105@wwwdotorg.org> <522F8BB0.6010301@broadcom.com>
-Message-ID: <522F9A92.1040205@wwwdotorg.org>
+From: rjw@sisk.pl (Rafael J. Wysocki)
+Date: Wed, 11 Sep 2013 00:32:55 +0200
+Subject: [PATCH RESEND 1/2] i2c: prepare runtime PM support for I2C client
+ devices
+In-Reply-To: <20130910213522.GG29403@sirena.org.uk>
+References: <1378733679-19500-1-git-send-email-mika.westerberg@linux.intel.com>
+ <3397524.g9aUWuArnm@vostro.rjw.lan> <20130910213522.GG29403@sirena.org.uk>
+Message-ID: <2029393.u6DaKBPszu@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/10/2013 03:14 PM, Christian Daudt wrote:
-> Hi Stephen,
-> On 13-09-10 01:02 PM, Stephen Warren wrote:
->> On 09/10/2013 12:07 PM, Markus Mayer wrote:
->>> From: Markus Mayer <mmayer@broadcom.com>
->>>
->>> Add the GPIO driver for the Broadcom bcm281xx family of mobile SoCs.
->>> These GPIO controllers may contain up to 8 banks where each bank
->>> includes 32 pins that can be driven high or low and act as an edge
->>> sensitive interrupt.
->> The binding,
->> Reviewed-by: Stephen Warren <swarren@nvidia.com>
->>
->> although ...
->>
->>> diff --git a/Documentation/devicetree/bindings/gpio/gpio-bcm-kona.txt
->>> b/Documentation/devicetree/bindings/gpio/gpio-bcm-kona.txt
->>> +This GPIO driver is used in the following Broadcom SoCs:
->>> +  BCM11130, BCM11140, BCM11351, BCM28145, BCM28155
->> Given that, I would expect the documentation of the compatible property
->> to enumerate the compatible values for all of those different chips,
->> although the driver could choose to only bind to e.g. brcm,bcm11351-gpio
->> or brcm,kona-gpio, since they're all compatible with it.
->>
-> How would this help ? All of these chips are part of the same family and
-> thus quite similar (the primary difference being on the memory
-> controller and packaging), and we can't know a priori on which
-> variations bugs will happen, if any.
+On Tuesday, September 10, 2013 10:35:22 PM Mark Brown wrote:
+> On Tue, Sep 10, 2013 at 10:04:21PM +0200, Rafael J. Wysocki wrote:
+> > On Tuesday, September 10, 2013 05:13:21 PM Mark Brown wrote:
+> 
+> > > OK, that is very much not the model which embedded systems follow, in
+> > > embedded systems the driver for the device is fully in control of its
+> > > own power.  It gets resources like GPIOs and regulators which allow it
+> > > to make fine grained decisions.
+> 
+> > There are platforms where those resources are simply not available for
+> > direct manipulation and we need to use ACPI methods for power management.
+> 
+> > Now, since those methods are used in pretty much the same way for all I2C
+> > devices, we add a PM domain for that to avoid duplicating the same code in
+> > all of the drivers in question (patch [2/2]).  Does that make sense to you?
+> 
+> It doesn't seem like a particular problem, but the existing usage does
+> need to be preserved for the systems that use it so things like having
+> auto as the default and updating the drivers seem like they're needed.
+> 
+> > > If we're starting to get a reasonable number of buses following the same
+> > > pattern it seems like we're in a position to start 
+> 
+> > We need that for exactly 3 buses: platform (already done), I2C and SPI.
+> 
+> > No other bus types are going to use ACPI this way for PM, at least for the
+> > time being, simply because PCI, USB and SATA/IDE have their own ways of doing
+> > this (which are bus-specific) and the spec doesn't cover other bus types
+> > directly (it defines support for UART, but we don't have a UART bus type).
+> 
+> > Moreover, because PCI and USB use ACPI for PM in their own ways, moving that
+> > thing up to the driver core would be rather inconvenient.
+> 
+> That only applies to the power domains though, what Mika was saying was
+> that the process for enabling runtime PM (just drop a reference) also
+> becomes easier with this method regardless of anything else - that makes
+> sense to me as something we might want to end up with so do we want to
+> just move towards making that a default?
 
-That's exactly why the DT should include a compatible value that
-precisely describes the chip; so that information is there if it's
-needed in the future.
+Possibly. :-)
+
+At least I don't see any fundamental obstacles ...
+
+
+-- 
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
