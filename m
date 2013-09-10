@@ -1,101 +1,46 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 10 Sep 2013 14:18:03 +0100
-Subject: [PATCH v5 1/5] ARM: add basic Trusted Foundations support
-In-Reply-To: <CAAVeFu+MGGBfmm1jwtKGP_d3EjkLdf5B_E_5RT___PVh1e=8jw@mail.gmail.com>
-References: <1378351680-14696-1-git-send-email-acourbot@nvidia.com>
- <1378351680-14696-2-git-send-email-acourbot@nvidia.com>
- <5228CEDB.1090306@gmail.com>
- <CAAVeFu+MGGBfmm1jwtKGP_d3EjkLdf5B_E_5RT___PVh1e=8jw@mail.gmail.com>
-Message-ID: <CAHkRjk5pqKv0U+NdSf+PmXQkO7jGwKnz+9cL9XX5FOvJSjjswQ@mail.gmail.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Tue, 10 Sep 2013 18:53:35 +0530
+Subject: [PATCH] ARM: davinci: fix build breakage with DEBUG_LL
+Message-ID: <1378819415-28666-1-git-send-email-nsekhar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9 September 2013 07:15, Alexandre Courbot <gnurou@gmail.com> wrote:
-> On Fri, Sep 6, 2013 at 3:35 AM, Rob Herring <robherring2@gmail.com> wrote:
->> On 09/04/2013 10:27 PM, Alexandre Courbot wrote:
->>> Trusted Foundations is a TrustZone-based secure monitor for ARM that
->>> can be invoked  using a consistent SMC-based API on all supported
->>> platforms. This patch adds initial basic support for Trusted
->>> Foundations using the ARM firmware API. Current features are limited
->>> to the ability to boot secondary processors.
->>>
->>> Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
->>> Reviewed-by: Tomasz Figa <t.figa@samsung.com>
->>> Reviewed-by: Stephen Warren <swarren@nvidia.com>
->>> ---
->>>  .../arm/firmware/tl,trusted-foundations.txt        | 17 +++++
->>>  .../devicetree/bindings/vendor-prefixes.txt        |  1 +
->>>  arch/arm/Kconfig                                   |  2 +
->>>  arch/arm/Makefile                                  |  1 +
->>>  arch/arm/firmware/Kconfig                          | 25 +++++++
->>>  arch/arm/firmware/Makefile                         |  1 +
->>>  arch/arm/firmware/trusted_foundations.c            | 82 ++++++++++++++++++++++
->>>  arch/arm/include/asm/trusted_foundations.h         | 53 ++++++++++++++
->>>  8 files changed, 182 insertions(+)
->>>  create mode 100644 Documentation/devicetree/bindings/arm/firmware/tl,trusted-foundations.txt
->>>  create mode 100644 arch/arm/firmware/Kconfig
->>>  create mode 100644 arch/arm/firmware/Makefile
->>>  create mode 100644 arch/arm/firmware/trusted_foundations.c
->>>  create mode 100644 arch/arm/include/asm/trusted_foundations.h
->>>
->>> diff --git a/Documentation/devicetree/bindings/arm/firmware/tl,trusted-foundations.txt b/Documentation/devicetree/bindings/arm/firmware/tl,trusted-foundations.txt
->>> new file mode 100644
->>> index 0000000..3954bbd
->>> --- /dev/null
->>> +++ b/Documentation/devicetree/bindings/arm/firmware/tl,trusted-foundations.txt
->>> @@ -0,0 +1,17 @@
->>> +Trusted Foundations
->>> +
->>> +Boards that use the Trusted Foundations secure monitor can signal its
->>> +presence by declaring a node compatible with "tl,trusted-foundations"
->>> +under the root node.
->>> +
->>> +Required properties:
->>> +- compatible : "tl,trusted-foundations"
->>> +- version-major : major version number of Trusted Foundations firmware
->>> +- version-minor: minor version number of Trusted Foundations firmware
->>> +
->>> +Example:
->>> +     firmware {
->>> +             compatible = "tl,trusted-foundations";
->>> +             version-major = <2>;
->>> +             version-minor = <8>;
->>> +     };
->>
->> I'm wondering how we fit this in with PSCI bindings? Both are pieces of
->> firmware functionality and may co-exist. There's nothing incompatible
->> here, but there should be some commonality. Will future versions of
->> Trusted Foundations follow the SMC calling conventions doc? What about
->> armv8 support.
->
-> I don't have any information about the future of TF unfortunately,
-> excepted that it should remain backward-compatible. What is this SMC
-> calling convention doc your are talking about btw? Is there a standard
-> calling convention defined by ARM?
+commit fcf7157 ("ARM: davinci: serial: get rid of davinci_uart_config")
+introduced build breakage because of a misplaced
+header file include which cause a bunch of errors when
+the file is included in assembly code (like debug-macro.S)
 
-The SMC calling convention is here (it requires free registration):
+Fix the build breakage.
 
-http://infocenter.arm.com/help/topic/com.arm.doc.den0028a/index.html
+Reported-by: Alexander Holler <holler@ahsoftware.de>
+Signed-off-by: Sekhar Nori <nsekhar@ti.com>
+---
+Applies to latest linus/master
 
->From the introduction:
+ arch/arm/mach-davinci/include/mach/serial.h |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-"This document defines a common calling mechanism for use with the
-Secure Monitor Call (SMC)
-instruction in both the ARMv7 and ARMv8 architectures.
-
-The SMC instruction is used to generate a synchronous exception that
-is handled by Secure Monitor code running in EL3. The arguments are
-passed in registers and then used to select which Secure function to
-execute. These calls may then be passed on to a Trusted OS in S-EL1.
-
-This specification aims to ease integration and reduce fragmentation
-between software layers, such as Operating Systems, Hypervisors,
-Trusted OS, Secure Monitor and System Firmware."
-
-
-If you talk about booting secondary CPUs, there is also PSCI:
-
-http://infocenter.arm.com/help/topic/com.arm.doc.den0022b/index.html
-
+diff --git a/arch/arm/mach-davinci/include/mach/serial.h b/arch/arm/mach-davinci/include/mach/serial.h
+index 52b8571..ce402cd 100644
+--- a/arch/arm/mach-davinci/include/mach/serial.h
++++ b/arch/arm/mach-davinci/include/mach/serial.h
+@@ -15,8 +15,6 @@
+ 
+ #include <mach/hardware.h>
+ 
+-#include <linux/platform_device.h>
+-
+ #define DAVINCI_UART0_BASE	(IO_PHYS + 0x20000)
+ #define DAVINCI_UART1_BASE	(IO_PHYS + 0x20400)
+ #define DAVINCI_UART2_BASE	(IO_PHYS + 0x20800)
+@@ -39,6 +37,8 @@
+ #define UART_DM646X_SCR_TX_WATERMARK	0x08
+ 
+ #ifndef __ASSEMBLY__
++#include <linux/platform_device.h>
++
+ extern int davinci_serial_init(struct platform_device *);
+ #endif
+ 
 -- 
-Catalin
+1.7.10.1
