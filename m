@@ -1,49 +1,59 @@
-From: bcousson@baylibre.com (Benoit Cousson)
-Date: Tue, 10 Sep 2013 21:40:01 +0200
-Subject: [PATCH 0/3] ARM: dts: Enable EDMA, MMC and SPI on AM33XX for v3.13
-In-Reply-To: <1378841079-15796-1-git-send-email-joelf@ti.com>
-References: <1378841079-15796-1-git-send-email-joelf@ti.com>
-Message-ID: <522F7591.6010409@baylibre.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 10 Sep 2013 20:43:24 +0100
+Subject: [PATCH v2 1/2] video: ARM CLCD: Add DT support
+In-Reply-To: <1378808726-32535-1-git-send-email-pawel.moll@arm.com>
+References: <1378808726-32535-1-git-send-email-pawel.moll@arm.com>
+Message-ID: <20130910194324.GE12758@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Joel,
+On Tue, Sep 10, 2013 at 11:25:25AM +0100, Pawel Moll wrote:
+> +#ifdef CONFIG_OF
+> +static int clcdfb_of_get_tft_panel(struct device_node *node,
+> +		struct clcd_panel *panel)
+> +{
+> +	int err;
+> +	u32 rgb[3];
+> +
+> +	err = of_property_read_u32_array(node, "panel-tft-interface", rgb, 3);
+> +	if (err)
+> +		return err;
+> +
+> +	/* Bypass pixel clock divider, data output on the falling edge */
+> +	panel->tim2 = TIM2_BCD | TIM2_IPC;
+> +
+> +	/* TFT display, vert. comp. interrupt at the start of the back porch */
+> +	panel->cntl |= CNTL_LCDTFT | CNTL_LCDVCOMP(1);
+> +
+> +	if (rgb[0] >= 4 && rgb[1] >= 4 && rgb[2] >= 4)
+> +		panel->caps |= CLCD_CAP_444;
+> +	if (rgb[0] >= 5 && rgb[1] >= 5 && rgb[2] >= 5)
+> +		panel->caps |= CLCD_CAP_5551;
+> +	if (rgb[0] >= 5 && rgb[1] >= 6 && rgb[2] >= 5)
+> +		panel->caps |= CLCD_CAP_565;
+> +	if (rgb[0] >= 8 && rgb[1] >= 8 && rgb[2] >= 8)
+> +		panel->caps |= CLCD_CAP_888;
 
-Thanks for the repost.
+This definitely isn't right.  Why does a panel which has 8 bits of RGB
+get to indicate that it supports everything below it?
 
-I'll applied that one now.
+This is not how this hardware works.  Look at table A-7 in the TRM.
+If you wire the CLCD controller directly to a panel which is 8-bit RGB
+only, it can't support any of the other formats.
 
-Regards,
-Benoit
+The CLCD controller itself can only support on the hardware 8-bits of
+RGB or 5 bits of RGB plus an intensity bit, so that's two formats.
 
-On 10/09/2013 21:24, Joel Fernandes wrote:
-> Here are last few patches required to add EDMA and MMC/SPI support for AM33xx.
->
-> Now that all dependent DMA patches and fixes are in linux next or mainline, except
-> for [1] which should go in for 3.12 -rc cycle, it is safe to enable MMC and SPI support
-> and this patch series enables it. These are originally Matt Porter's patches with
-> changes to make it work with recent kernels, addition of irq, memory resources and
-> enable other extra properties.
->
-> These patches should cleanly apply on master branch after Koen's patch [2] for basic
-> BBB DT support is applied.
->
-> MMC support is enabled for: Beaglebone, AM335x EVM and EVM-SK boards. MMC support
-> for BBB is intentionally not added due to custom fixes and other patches that are
-> in Koen's tree and which will be separately submitted by him.
->
-> [1] http://marc.info/?l=linux-omap&m=137883926226451&w=2
-> [2] http://comments.gmane.org/gmane.linux.kernel.stable/63648
->
-> Matt Porter (3):
->    ARM: dts: add AM33XX EDMA support
->    ARM: dts: add AM33XX SPI DMA support
->    ARM: dts: add AM33XX MMC support and documentation
->
->   .../devicetree/bindings/mmc/ti-omap-hsmmc.txt      | 26 +++++++++-
->   arch/arm/boot/dts/am335x-bone.dts                  | 11 ++++
->   arch/arm/boot/dts/am335x-evm.dts                   |  7 +++
->   arch/arm/boot/dts/am335x-evmsk.dts                 |  7 +++
->   arch/arm/boot/dts/am33xx.dtsi                      | 60 ++++++++++++++++++++++
->   5 files changed, 110 insertions(+), 1 deletion(-)
->
+However, things are complicated by ARMs addition of an external mux
+on the CLCD output, which gives us the other format possibilities
+by munging the signals to give appropriate formats in the framebuffer
+memory.  In other words, in RGB444 mode, the mux ends up taking
+red from CLD[4:1], green from CLD[9:7,5], blue from CLD[14:13,11:10].
+
+So, it's not true that if you have a RGB888 panel, you can support
+all the lower BPPs.
+
+This is one of the dangers of directly converting what's in the kernel
+to DT properties without getting the hardware documentation and fully
+understanding that first - remember, DT properties are supposed to be
+based on the hardware, not the Linux implementation.
