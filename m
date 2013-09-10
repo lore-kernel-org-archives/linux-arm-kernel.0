@@ -1,56 +1,87 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 10 Sep 2013 09:43:25 -0600
-Subject: [GIT PULL 0/3] ARM: SoC: Second round of changes for v3.12
-In-Reply-To: <CA+55aFyRUZMJiotV0kAUoeEFpFdvK2r-3rXuS7NO4jHoQ+OkPA@mail.gmail.com>
-References: <1378766555-9679-1-git-send-email-khilman@linaro.org>
- <CA+55aFxNbH+G6DVQNxE9di_btA5hxFH93af_vjN2v0eH8e5W-g@mail.gmail.com>
- <1378825549.2627.316.camel@shinybook.infradead.org>
- <CA+55aFyRUZMJiotV0kAUoeEFpFdvK2r-3rXuS7NO4jHoQ+OkPA@mail.gmail.com>
-Message-ID: <522F3E1D.30309@wwwdotorg.org>
+From: mikedunn@newsguy.com (Mike Dunn)
+Date: Tue, 10 Sep 2013 08:54:11 -0700
+Subject: [RESEND PATCH v2] pwm: pxa: add device tree support to pwm driver
+In-Reply-To: <522E3B5B.90406@wwwdotorg.org>
+References: <1378751420-19227-1-git-send-email-mikedunn@newsguy.com>
+ <522E3B5B.90406@wwwdotorg.org>
+Message-ID: <522F40A3.9030701@newsguy.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/10/2013 09:31 AM, Linus Torvalds wrote:
-> On Tue, Sep 10, 2013 at 8:05 AM, David Woodhouse <dwmw2@infradead.org> wrote:
+On 09/09/2013 02:19 PM, Stephen Warren wrote:
+> On 09/09/2013 12:30 PM, Mike Dunn wrote:
+>> This patch adds device tree support to the pxa's pwm driver.  Only an OF match
+>> table is added; nothing needs to be extracted from the device tree node.  The
+>> existing platform_device id table is reused for the match table data.  Support
+>> for inverted polarity is also added.
 >>
->> In cost-sensitive products (and what *isn't* cost-sensitive these days),
->> you really don't want to have to put an extra EEPROM on the board
->> somewhere
+>> Tested on a Palm Treo 680 (both platform data and DT cases).
 > 
-> Don't be silly. Nobody wants an extra chip. Especially not one that is
-> programmable separately from the hardware. That way lies madness and
-> the usual firmware crazies.
+>> diff --git a/Documentation/devicetree/bindings/pwm/pxa-pwm.txt b/Documentation/devicetree/bindings/pwm/pxa-pwm.txt
 > 
-> It's not even what I asked for. I talked about discoverable buses. How
-> hard is that to understand? No extra chips, no eeprom, just a bus with
-> a notion of configuration cycles. It doesn't even have to be as
-> complicated as PCI, it could easily be a read-only model.
+>> +Marvell pwm controller
 > 
-> But no, every SoC designer out there seems to want to make their
-> hardware crap. Don't be surprised when I then call them out on the
-> fact. And don't bring up totally irrelevant issues that have nothing
-> to do with anything.
+> s/pwm/PWM/ throughout.
+> 
+>> +
+>> +Required properties:
+>> +- compatible:
+>> +  for pxa25x, pxa27x, pxa168, pxa910: must be compatible = "marvell,pxa250-pwm";
+> 
+> I think you want a separate compatible value for each HW, to allow for
+> any HW-specific quirks to be enabled later if required. So, you could
+> document "marvell,pxa250-pwm" as the basic compatible value that a
+> driver can bind to, yet also document the other values as being required
+> for the relevant HW?
 
-(Many of) the buses aren't something that ARM SoC designers invented
-though; they're industry standard things like I2C, SPI, I2S, all of
-which are supported by SoC manufacturers solely because there are huge
-numbers of useful chips that attach to these buses, from many many
-manufacturers. This is an industry issue, not some evil conspiracy by
-ARM SoC vendors.
 
-True, it'd be lovely if those standard buses were discoverable; if the
-industry had ended up with more advanced buses (although again: cost, to
-implement those features, even if embedded into the chip itself rather
-than as an external component).
+IOW...
+- compatible: should be one of:
+  - "marvell,pxa250-pwm"
+  - "marvell,pxa270-pwm"
+  - "marvell,pxa168-pwm"
+  - "marvell,pxa910-pwm"
 
-Now, there are certainly cases where everybody just does their own silly
-thing in HW, such as using GPIOs from a separate GPIO controller for SD
-card detect and write-protect signals, rather than having the SDHCI
-controller handle those functions, and hence be standalone. So from that
-perspective your point is justified. However, solving this aspect would
-only solve part of the problem.
+Even though the driver makes no functional distinction currently?
 
-x86 PCs likely have at least some of this exact same HW, e.g. I2C-based
-LM90 thermal sensors. However, I /think/ this all gets hidden from the
-OS by ACPI or other firmware mechanisms. Do you prefer firmware
-abstraction over DT?
+
+> 
+>> +- reg: physical base address and length of the registers used by the pwm channel
+>> +  NB: One device instance must be created for each pwm that is used, so the
+>> +  length covers only the register window for one pwm output, not that of the
+>> +  entire pwm controller.  Currently length is 0x10 for all supported devices.
+>> +- #pwm-cells: should be 3.
+>> +   cell 1: the per-chip index of the PWM to use,
+> 
+> That cell shouldn't be needed if you really want to have one DT node per
+> PWM channel.
+
+
+Yes, but I was afraid to deviate from the format used by the other PWM
+controllers.  (But in that case, it should at least be documented as "must be
+zero". Thanks.)  If going my owm way is acceptable, I'll define my own
+of_xlate() parser and remove this cell.
+
+
+> 
+>> +   cell 2: the period in nanoseconds,
+>> +   cell 3: flags; set bit 0 to specify inverse polarity.  The pwm controller
+>> +   does not implement reverse polarity, but some boards may pass the pwm output
+>> +   through an external inverter, which can cause problems if a client device
+>> +   assumes that an increase in the duty cycle results in an increase in output
+>> +   power.  The pwm-backlight is an example of such a client.
+> 
+> Hmm. I wonder what are the semantics of the PWM subsystem's "inverse
+> polarity" flag. What about a HW block that can do inverse polarity, but
+> also has an inverter on the board? If we subvert this flag (in this
+> case) to mean "there's an inverter on the board", then how can a
+> different PWM binding use it to mean "configure the PWM HW block to
+> invert the signal"?
+
+
+Yeah, Thierry shot this down for the same good reasons.  The correct approach
+for my issue is to fix the pwm-backlight driver.
+
+
+I really appreciate the review Stephen.  Thanks again!
+Mike
