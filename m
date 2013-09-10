@@ -1,45 +1,56 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 10 Sep 2013 23:05:14 +0800
-Subject: [PATCH 1/2] ARM: dts: mx6: Add mx6solo support
-In-Reply-To: <877geohh6r.fsf@linaro.org>
-References: <1378688408-8689-1-git-send-email-festevam@gmail.com>
- <20130909150823.GB5815@S2101-09.ap.freescale.net>
- <CAOMZO5Ab9qVsQica-x3091YPhttqpbr_NL=A2ddzL5znuDtAUw@mail.gmail.com>
- <CAOCHtYhJjxBL1AY0dxc+FofXqRT25g8yaO+Z6d09mfkJWT+i+A@mail.gmail.com>
- <CAOMZO5D8VW=M_DW69p+p512Uw9eySt+PoM-iWN=m3jXb0tfvaw@mail.gmail.com>
- <877geohh6r.fsf@linaro.org>
-Message-ID: <20130910150512.GI5815@S2101-09.ap.freescale.net>
+From: dwmw2@infradead.org (David Woodhouse)
+Date: Tue, 10 Sep 2013 16:05:49 +0100
+Subject: [GIT PULL 0/3] ARM: SoC: Second round of changes for v3.12
+In-Reply-To: <CA+55aFxNbH+G6DVQNxE9di_btA5hxFH93af_vjN2v0eH8e5W-g@mail.gmail.com>
+References: <1378766555-9679-1-git-send-email-khilman@linaro.org>
+ <CA+55aFxNbH+G6DVQNxE9di_btA5hxFH93af_vjN2v0eH8e5W-g@mail.gmail.com>
+Message-ID: <1378825549.2627.316.camel@shinybook.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 10, 2013 at 07:42:04AM -0700, Kevin Hilman wrote:
-> Fabio Estevam <festevam@gmail.com> writes:
+On Mon, 2013-09-09 at 16:49 -0700, Linus Torvalds wrote:
 > 
-> > On Mon, Sep 9, 2013 at 1:19 PM, Robert Nelson <robertcnelson@gmail.com> wrote:
-> >
-> >>> Ok, I made this test and it booted fine.
-> >>>
-> >>> So I will change U-boot so that it searches for imx6dl-wandboard.dtb
-> >>> instead of imx6s-wandboard.dtb.
-> >>
-> >> Since there is no WiFi/Bluetooth on the "solo" vs the wandboard dual
-> >> lite, we should really still have a separate solo dtb file..
-> >
-> > I think we could still represent the im6solo-wandboard using the
-> > imx6dl-wandboard.dts.
-> >
-> > In the case of lack of bcm4329 populated on a mx6solo board, the SDHC3
-> > port will just not probe bcm4329 without any negative effect, right?
-> 
-> I've noticed in my auto build/boot[1] that booting a wandboard solo with
-> imx6dl-wandboard.dtb actually faults[2].  Just disabling usdhc2[3] makes
-> it boot fine.
-> 
-> This only happens on current linus/HEAD.  v3.11 boots fine as does
-> linux-next (as of next-20130910.)  
+> Ok. I still really despise the absolute incredible sh*t that is
+> non-discoverable buses, and I hope that ARM SoC hardware designers all
+> die in some incredibly painful accident.  DT only does so much.
 
-It may be because commit 2af502c (mmc: sdhci: request irq after
-sdhci_init() is called) which is on linux-next right now hasn't landed
-on mainline yet.
+Setting aside the inevitable whining from the emotionally-incontinent
+contingent that the above way of saying it will provoke, I'm not quite
+sure why you still haven't got over the fact that we have
+non-discoverable buses.
 
-Shawn
+In cost-sensitive products (and what *isn't* cost-sensitive these days),
+you really don't want to have to put an extra EEPROM on the board
+somewhere, just to describe what devices you've hung off which
+chip-select today. Storing that in the main flash is just *going* to
+happen, however much we'd like to think that devices should identify
+themselves cleanly and autonomously.
+
+And it isn't even something that a simple number like a PCI ID could
+manage. Peripherals are synthesisable components which vary *wildly*,
+with what are essentially #ifdefs in the VHDL. So a given controller
+could be seen with different FIFO depths, different numbers of queues,
+all kinds of variations. To cover the various permutations, you'd have
+to assign an *insane* number of PCI IDs. And then there's the various
+ways that you can connect blocks *together*...
+
+That's why we end up with the device-tree model which gives us a rich
+way to describe *this* instance of the hardware. If it wasn't
+device-tree, it'd have to be something *else*.
+
+>From a software point of view it *isn't* nice, I agree. But you might as
+well be railing against the sunset, as far as I can tell.
+
+Not that any of this excuses crappy merges with lots of conflicts; but
+those don't seem to be an inexorable result of non-discoverable buses.
+
+-- 
+dwmw2
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: smime.p7s
+Type: application/x-pkcs7-signature
+Size: 5745 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130910/dbeab541/attachment-0001.bin>
