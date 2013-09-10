@@ -1,32 +1,39 @@
-From: B47053@freescale.com (Xiubo Li-B47053)
-Date: Tue, 10 Sep 2013 08:12:07 +0000
-Subject: [PATCHv3 1/4] pwm: Add Freescale FTM PWM driver support
-In-Reply-To: <20130910065146.GA30088@pengutronix.de>
-References: <1378454907-22728-1-git-send-email-Li.Xiubo@freescale.com>
- <1378454907-22728-2-git-send-email-Li.Xiubo@freescale.com>
- <20130910065146.GA30088@pengutronix.de>
-Message-ID: <1DD289F6464F0949A2FCA5AA6DC23F8281470E@039-SN2MPN1-013.039d.mgd.msft.net>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 10 Sep 2013 10:14:59 +0200
+Subject: Inte IOP Xscale updates
+In-Reply-To: <CAA9_cmcMLooT6=+PwR9rx4ALmNeKG=qXWn+K_dLJ+CVj9u6tYA@mail.gmail.com>
+References: <CACRpkdZU5mVU15AK=m-BRmpizKJJVAR98JKf3Qcgy2ms+HG+Hw@mail.gmail.com>
+ <CAA9_cmcMLooT6=+PwR9rx4ALmNeKG=qXWn+K_dLJ+CVj9u6tYA@mail.gmail.com>
+Message-ID: <CACRpkdbLbB_TGbBfCvNzesAP5cB6irk8m=D4kD6n2RTYE0mAnw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Subject: Re: [PATCHv3 1/4] pwm: Add Freescale FTM PWM driver support
-> 
-> On Fri, Sep 06, 2013 at 04:08:24PM +0800, Xiubo Li wrote:
-> > The FTM PWM device can be found on Vybrid VF610 Tower and Layerscape
-> LS-1 SoCs.
-> >
-> > +
-> > +static int fsl_pwm_probe(struct platform_device *pdev) {
-> > +	int ret = 0;
-> > +	struct fsl_pwm_chip *fpc;
-> > +	struct resource *res;
-> > +
-> > +	fpc = devm_kzalloc(&pdev->dev, sizeof(*fpc), GFP_KERNEL);
-> 
-> You don't have to output a message when kzalloc fails, but still you
-> should check for the result and return an error if necessary.
-> 
-Okey, I will.
+On Tue, Sep 10, 2013 at 12:10 AM, Dan Williams <dan.j.williams@intel.com> wrote:
 
---
-Xiubo
+> I have not been following device-tree conversions for how they handle
+> legacy boot loaders?
+
+That is handled by way of the appended device tree.
+
+With such platforms I use this:
+
+--enable USE_OF
+--enable ARM_APPENDED_DTB
+--enable ARM_ATAG_DTB_COMPAT
+--enable PROC_DEVICETREE
+
+Then:
+
+cat foo.dtb >> zImage
+
+And it should appear in /proc/devicetree
+
+The resulting zImage can be wrapped into a uImage
+if U-boot is used, I use this method too.
+
+> ...I'll just start with reviewing your gpio conversion.
+
+Thanks :-)
+
+Yours,
+Linus Walleij
