@@ -1,38 +1,55 @@
 From: Sudeep.KarkadaNagesha@arm.com (Sudeep KarkadaNagesha)
-Date: Tue, 10 Sep 2013 18:59:45 +0100
-Subject: [PATCH 0/4] cpufreq: fixes for v3.12
-Message-ID: <1378835989-19281-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+Date: Tue, 10 Sep 2013 18:59:49 +0100
+Subject: [PATCH 4/4] ARM: shmobile: change dev_id to cpu0 while registering
+ cpu clock
+In-Reply-To: <1378835989-19281-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+References: <1378835989-19281-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+Message-ID: <1378835989-19281-5-git-send-email-Sudeep.KarkadaNagesha@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
 
-Hi Shawn, Guennadi,
+Currently all clkdev registration use "cpufreq-cpu0.0" as dev_id
+for cpu clock which refers to virtual platform device. It needs to
+be "cpu0" instead which is actual cpu0 device id.
 
-These are the fixes for the issue reported by Guennadi.
-cpu_dev should point to cpu0 device instead of cpufreq-cpu0 platform
-devices. The dev_id is also updated while registering the cpu clocks.
+This patch changes the dev_id from "cpufreq-cpu0.0" to "cpu0".
 
-Can you review these ? Tested-by is much appreciated as I don't
-have hardware to check the fix.
-
-Regards,
-Sudeep
-
-Sudeep KarkadaNagesha (4):
-  cpufreq: cpufreq-cpu0: assign cpu_dev correctly to cpu0 device
-  cpufreq: imx6q-cpufreq: assign cpu_dev correctly to cpu0 device
-  ARM: i.MX: change dev_id to cpu0 while registering cpu clock
-  ARM: shmobile: change dev_id to cpu0 while registering cpu clock
-
- arch/arm/mach-imx/clk-imx27.c          | 2 +-
- arch/arm/mach-imx/clk-imx51-imx53.c    | 2 +-
- arch/arm/mach-imx/mach-imx6q.c         | 9 +++++++--
+Reported-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+Cc: Shawn Guo <shawn.guo@linaro.org>
+Cc: Magnus Damm <damm@opensource.se>
+Signed-off-by: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
+---
  arch/arm/mach-shmobile/clock-r8a73a4.c | 2 +-
  arch/arm/mach-shmobile/clock-sh73a0.c  | 2 +-
- drivers/cpufreq/cpufreq-cpu0.c         | 7 ++++++-
- drivers/cpufreq/imx6q-cpufreq.c        | 7 ++++++-
- 7 files changed, 23 insertions(+), 8 deletions(-)
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
+diff --git a/arch/arm/mach-shmobile/clock-r8a73a4.c b/arch/arm/mach-shmobile/clock-r8a73a4.c
+index 8ea5ef6..5bd2e85 100644
+--- a/arch/arm/mach-shmobile/clock-r8a73a4.c
++++ b/arch/arm/mach-shmobile/clock-r8a73a4.c
+@@ -555,7 +555,7 @@ static struct clk_lookup lookups[] = {
+ 	CLKDEV_CON_ID("pll2h",			&pll2h_clk),
+ 
+ 	/* CPU clock */
+-	CLKDEV_DEV_ID("cpufreq-cpu0",		&z_clk),
++	CLKDEV_DEV_ID("cpu0",			&z_clk),
+ 
+ 	/* DIV6 */
+ 	CLKDEV_CON_ID("zb",			&div6_clks[DIV6_ZB]),
+diff --git a/arch/arm/mach-shmobile/clock-sh73a0.c b/arch/arm/mach-shmobile/clock-sh73a0.c
+index 1942eae..c92c023 100644
+--- a/arch/arm/mach-shmobile/clock-sh73a0.c
++++ b/arch/arm/mach-shmobile/clock-sh73a0.c
+@@ -616,7 +616,7 @@ static struct clk_lookup lookups[] = {
+ 	CLKDEV_DEV_ID("smp_twd", &twd_clk), /* smp_twd */
+ 
+ 	/* DIV4 clocks */
+-	CLKDEV_DEV_ID("cpufreq-cpu0", &div4_clks[DIV4_Z]),
++	CLKDEV_DEV_ID("cpu0", &div4_clks[DIV4_Z]),
+ 
+ 	/* DIV6 clocks */
+ 	CLKDEV_CON_ID("vck1_clk", &div6_clks[DIV6_VCK1]),
 -- 
 1.8.1.2
