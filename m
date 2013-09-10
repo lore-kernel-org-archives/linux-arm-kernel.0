@@ -1,67 +1,29 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 10 Sep 2013 10:46:49 -0600
-Subject: [RESEND PATCH v2] pwm: pxa: add device tree support to pwm driver
-In-Reply-To: <522F40A3.9030701@newsguy.com>
-References: <1378751420-19227-1-git-send-email-mikedunn@newsguy.com>
- <522E3B5B.90406@wwwdotorg.org> <522F40A3.9030701@newsguy.com>
-Message-ID: <522F4CF9.3070601@wwwdotorg.org>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 10 Sep 2013 09:51:14 -0700
+Subject: [PATCH 07/38] ARM: ux500: CONFIG: Enable ST's IIO Accelerometer
+ Sensors by default
+In-Reply-To: <20130910153543.GB11227@lee--X1>
+References: <1378817379-8238-1-git-send-email-lee.jones@linaro.org>
+ <1378817379-8238-8-git-send-email-lee.jones@linaro.org>
+ <CAOesGMj+YzkE5bAxUqFYWoJ-RURDdCK5MUWYTc+gWFQMB3KWkg@mail.gmail.com>
+ <20130910153543.GB11227@lee--X1>
+Message-ID: <CAOesGMhSLnSeJ29zYf0kjxDWEtN5gwmumOgJFKUruYACaB9Dzw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/10/2013 09:54 AM, Mike Dunn wrote:
-> On 09/09/2013 02:19 PM, Stephen Warren wrote:
->> On 09/09/2013 12:30 PM, Mike Dunn wrote:
->>> This patch adds device tree support to the pxa's pwm driver.  Only an OF match
->>> table is added; nothing needs to be extracted from the device tree node.  The
->>> existing platform_device id table is reused for the match table data.  Support
->>> for inverted polarity is also added.
->>>
->>> Tested on a Palm Treo 680 (both platform data and DT cases).
->>
->>> diff --git a/Documentation/devicetree/bindings/pwm/pxa-pwm.txt b/Documentation/devicetree/bindings/pwm/pxa-pwm.txt
->>
->>> +Marvell pwm controller
->>
->> s/pwm/PWM/ throughout.
->>
->>> +
->>> +Required properties:
->>> +- compatible:
->>> +  for pxa25x, pxa27x, pxa168, pxa910: must be compatible = "marvell,pxa250-pwm";
->>
->> I think you want a separate compatible value for each HW, to allow for
->> any HW-specific quirks to be enabled later if required. So, you could
->> document "marvell,pxa250-pwm" as the basic compatible value that a
->> driver can bind to, yet also document the other values as being required
->> for the relevant HW?
-> 
-> IOW...
-> - compatible: should be one of:
->   - "marvell,pxa250-pwm"
->   - "marvell,pxa270-pwm"
->   - "marvell,pxa168-pwm"
->   - "marvell,pxa910-pwm"
-> 
-> Even though the driver makes no functional distinction currently?
+On Tue, Sep 10, 2013 at 8:35 AM, Lee Jones <lee.jones@linaro.org> wrote:
 
-Yes (although it's fine to make the driver only look for the first of
-those, since you say they're all compatible, and currently the driver
-doesn't care about exactly which HW is in use).
+>> splitting this and the other config update into two patches? Really?
+>
+> I haven't split anything. I created the patches as I was
+> enabling/testing the drivers, which was at completely different
+> times. The only reason they're close together in the set is because I
+> reorganised it and didn't think it was necessary to squash them
+> together.
 
->>> +- reg: physical base address and length of the registers used by the pwm channel
->>> +  NB: One device instance must be created for each pwm that is used, so the
->>> +  length covers only the register window for one pwm output, not that of the
->>> +  entire pwm controller.  Currently length is 0x10 for all supported devices.
->>> +- #pwm-cells: should be 3.
->>> +   cell 1: the per-chip index of the PWM to use,
->>
->> That cell shouldn't be needed if you really want to have one DT node per
->> PWM channel.
-> 
-> Yes, but I was afraid to deviate from the format used by the other PWM
-> controllers.  (But in that case, it should at least be documented as "must be
-> zero". Thanks.)  If going my owm way is acceptable, I'll define my own
-> of_xlate() parser and remove this cell.
+In this case, squashing makes a lot of sense. But you could even have
+LinusW do that for you when he pulls in the various config updates for
+next release.
 
-I don't think there's any issue with deviating; that's exactly what
-#pwm-cells is for.
+
+-Olof
