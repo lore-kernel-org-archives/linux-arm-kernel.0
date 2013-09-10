@@ -1,43 +1,187 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 10 Sep 2013 23:48:55 +0200
-Subject: [PATCH 2/7] misc: ixp4-beeper: switch to use gpiolib
-In-Reply-To: <1378816210-7977-1-git-send-email-linus.walleij@linaro.org>
-References: <1378816210-7977-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <201309102348.55478.arnd@arndb.de>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Tue, 10 Sep 2013 15:09:08 -0700
+Subject: [PATCHv6 01/45] CLK: TI: Add DPLL clock support
+In-Reply-To: <1377782197-10611-2-git-send-email-t-kristo@ti.com>
+References: <1377782197-10611-1-git-send-email-t-kristo@ti.com>
+ <1377782197-10611-2-git-send-email-t-kristo@ti.com>
+Message-ID: <20130910220908.11074.36005@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 10 September 2013, Linus Walleij wrote:
-> The platform using this beeper has support for gpiolib, so there
-> is no point to use the custom gpio_line* API. A strange ambiguity
-> where a line was first set as input and then driven high was
-> solved by first driving the line high as output and then switch
-> it to input.
+Quoting Tero Kristo (2013-08-29 06:15:53)
+> The OMAP clock driver now supports DPLL clock type. This patch also
+> adds support for DT DPLL nodes.
 > 
-> Cc: Imre Kaloz <kaloz@openwrt.org>
-> Cc: Krzysztof Halasa <khc@pm.waw.pl>
-> Cc: Alexandre Courbot <acourbot@nvidia.com>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
-> Arnd/Greg: seeking your ACK to take this through the GPIO tree
-> as part of the attempt at cleaning out custom GPIO implementations.
+> Signed-off-by: Tero Kristo <t-kristo@ti.com>
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+Tero,
 
->  
-> -	 if (count) {
-> -		gpio_line_config(pin, IXP4XX_GPIO_OUT);
-> -		gpio_line_set(pin, IXP4XX_GPIO_LOW);
-> -
-> +	if (count) {
-> +		gpio_direction_output(pin, 0);
->  		*IXP4XX_OSRT2 = (count & ~IXP4XX_OST_RELOAD_MASK) | IXP4XX_OST_ENABLE;
->  	} else {
+Overall this patch is really great. Some minor comments below.
 
-Too bad we can't just clean up all the open-coded mmio accesses as well. It shouldn't
-be hard, but some platforms are full of them, and there is definitely some regression
-potential.
+> diff --git a/Documentation/devicetree/bindings/clock/ti/dpll.txt b/Documentation/devicetree/bindings/clock/ti/dpll.txt
+> new file mode 100644
+> index 0000000..83c21c6
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/clock/ti/dpll.txt
+> @@ -0,0 +1,68 @@
+> +Binding for Texas Instruments DPLL clock.
+> +
+> +This binding uses the common clock binding[1].  It assumes a
+> +register-mapped DPLL with usually two selectable input clocks
+> +(reference clock and bypass clock), with digital phase locked
+> +loop logic for multiplying the input clock to a desired output
+> +clock. This clock also typically supports different operation
+> +modes (locked, low power stop etc.) This binding has several
+> +sub-types, which effectively result in slightly different setup
+> +for the actual DPLL clock.
+> +
+> +[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
+> +
+> +Required properties:
+> +- compatible : shall be one of:
+> +               "ti,omap4-dpll-x2-clock",
+> +               "ti,omap3-dpll-clock",
+> +               "ti,omap3-dpll-core-clock",
+> +               "ti,omap3-dpll-per-clock",
+> +               "ti,omap3-dpll-per-j-type-clock",
+> +               "ti,omap4-dpll-clock",
+> +               "ti,omap4-dpll-core-clock",
+> +               "ti,omap4-dpll-m4xen-clock",
+> +               "ti,omap4-dpll-j-type-clock",
+> +               "ti,omap4-dpll-no-gate-clock",
+> +               "ti,omap4-dpll-no-gate-j-type-clock",
+> +
+> +- #clock-cells : from common clock binding; shall be set to 0.
+> +- clocks : link phandles of parent clocks, first entry lists reference clock
+> +  and second entry bypass clock
+> +- reg : address and length of the register set for controlling the DPLL.
+> +  It contains the information of registers in the same order as described by
+> +  reg-names.
+> +- reg-names : array of the register names for controlling the device, sorted
+> +  in the same order as the reg property.
+> +       "control" - contains the control register base address
+> +        "idlest" - contains the idle status register base address
+> +        "autoidle" - contains the autoidle register base address
+> +        "mult-div1" - contains the multiplier / divider register base address
+> +
+> +Optional properties:
+> +- ti,modes : available modes for the DPLL, bitmask of:
+> +  0x02 - DPLL supports low power stop mode
+> +  0x20 - DPLL can be put to low power bypass mode
+> +  0x80 - DPLL can be put to lock mode (running)
 
-	Arnd
+Any particular reason to use a bitmask here versus flags/DT properties?
+Something like
+
+Optional properties:
+low-power-stop : DPLL supports low power stop mode, gating output
+low-power-bypass : DPLL output matches rate of parent bypass clock
+lock : DPLL locks in programmed rate
+
+Is there ever a time when a DPLL does not support the locked state? We
+can probably remove that from binding entirely.
+
+> +  Other values currently unsupported.
+> +- ti,clkdm-name : clockdomain name for the DPLL
+
+What does this mean? I thought that the clockdomain data would not go
+into the clock binding?
+
+> diff --git a/drivers/clk/ti/dpll.c b/drivers/clk/ti/dpll.c
+> new file mode 100644
+> index 0000000..3f4236d
+> --- /dev/null
+> +++ b/drivers/clk/ti/dpll.c
+> @@ -0,0 +1,476 @@
+> +/*
+> + * OMAP DPLL clock support
+> + *
+> + * Copyright (C) 2013 Texas Instruments, Inc.
+> + *
+> + * Tero Kristo <t-kristo@ti.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed "as is" WITHOUT ANY WARRANTY of any
+> + * kind, whether express or implied; without even the implied warranty
+> + * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#include <linux/clk-provider.h>
+> +#include <linux/slab.h>
+> +#include <linux/err.h>
+> +#include <linux/of.h>
+> +#include <linux/of_address.h>
+> +#include <linux/clk/ti.h>
+> +
+> +static const struct clk_ops dpll_m4xen_ck_ops = {
+> +       .enable         = &omap3_noncore_dpll_enable,
+> +       .disable        = &omap3_noncore_dpll_disable,
+> +       .recalc_rate    = &omap4_dpll_regm4xen_recalc,
+> +       .round_rate     = &omap4_dpll_regm4xen_round_rate,
+> +       .set_rate       = &omap3_noncore_dpll_set_rate,
+> +       .get_parent     = &omap2_init_dpll_parent,
+> +};
+> +
+> +static const struct clk_ops dpll_core_ck_ops = {
+> +       .recalc_rate    = &omap3_dpll_recalc,
+> +       .get_parent     = &omap2_init_dpll_parent,
+> +};
+> +
+> +static const struct clk_ops omap3_dpll_core_ck_ops = {
+> +       .init           = &omap2_init_clk_clkdm,
+> +       .get_parent     = &omap2_init_dpll_parent,
+> +       .recalc_rate    = &omap3_dpll_recalc,
+> +       .round_rate     = &omap2_dpll_round_rate,
+> +};
+> +
+> +static const struct clk_ops dpll_ck_ops = {
+> +       .enable         = &omap3_noncore_dpll_enable,
+> +       .disable        = &omap3_noncore_dpll_disable,
+> +       .recalc_rate    = &omap3_dpll_recalc,
+> +       .round_rate     = &omap2_dpll_round_rate,
+> +       .set_rate       = &omap3_noncore_dpll_set_rate,
+> +       .get_parent     = &omap2_init_dpll_parent,
+> +       .init           = &omap2_init_clk_clkdm,
+> +};
+> +
+> +static const struct clk_ops dpll_no_gate_ck_ops = {
+> +       .recalc_rate    = &omap3_dpll_recalc,
+> +       .get_parent     = &omap2_init_dpll_parent,
+> +       .round_rate     = &omap2_dpll_round_rate,
+> +       .set_rate       = &omap3_noncore_dpll_set_rate,
+> +};
+> +
+> +static const struct clk_ops omap3_dpll_ck_ops = {
+> +       .init           = &omap2_init_clk_clkdm,
+> +       .enable         = &omap3_noncore_dpll_enable,
+> +       .disable        = &omap3_noncore_dpll_disable,
+> +       .get_parent     = &omap2_init_dpll_parent,
+> +       .recalc_rate    = &omap3_dpll_recalc,
+> +       .set_rate       = &omap3_noncore_dpll_set_rate,
+> +       .round_rate     = &omap2_dpll_round_rate,
+> +};
+> +
+> +static const struct clk_ops omap3_dpll_per_ck_ops = {
+> +       .init           = &omap2_init_clk_clkdm,
+> +       .enable         = &omap3_noncore_dpll_enable,
+> +       .disable        = &omap3_noncore_dpll_disable,
+> +       .get_parent     = &omap2_init_dpll_parent,
+> +       .recalc_rate    = &omap3_dpll_recalc,
+> +       .set_rate       = &omap3_dpll4_set_rate,
+> +       .round_rate     = &omap2_dpll_round_rate,
+> +};
+> +
+> +static const struct clk_ops dpll_x2_ck_ops = {
+> +       .recalc_rate    = &omap3_clkoutx2_recalc,
+> +};
+
+No .set_parent ops for any of the DPLLs? How do you handle bypassing
+them? Are you using another mux clock that is the parent of the DPLL, or
+just open-coding the bypass stuff?
+
+Regards,
+Mike
