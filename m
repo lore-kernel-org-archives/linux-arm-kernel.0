@@ -1,49 +1,37 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Tue, 10 Sep 2013 08:15:33 -0700
-Subject: [PATCH 1/2] ARM: dts: mx6: Add mx6solo support
-In-Reply-To: <20130910150512.GI5815@S2101-09.ap.freescale.net>
-References: <1378688408-8689-1-git-send-email-festevam@gmail.com>
- <20130909150823.GB5815@S2101-09.ap.freescale.net>
- <CAOMZO5Ab9qVsQica-x3091YPhttqpbr_NL=A2ddzL5znuDtAUw@mail.gmail.com>
- <CAOCHtYhJjxBL1AY0dxc+FofXqRT25g8yaO+Z6d09mfkJWT+i+A@mail.gmail.com>
- <CAOMZO5D8VW=M_DW69p+p512Uw9eySt+PoM-iWN=m3jXb0tfvaw@mail.gmail.com>
- <877geohh6r.fsf@linaro.org>
- <20130910150512.GI5815@S2101-09.ap.freescale.net>
-Message-ID: <CAGa+x84egvrdEPebTt3U=1GHpKSoAKHKs14P0ys6+21KhwT9Sw@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 10 Sep 2013 08:20:24 -0700
+Subject: [PATCH 07/38] ARM: ux500: CONFIG: Enable ST's IIO Accelerometer
+ Sensors by default
+In-Reply-To: <1378817379-8238-8-git-send-email-lee.jones@linaro.org>
+References: <1378817379-8238-1-git-send-email-lee.jones@linaro.org>
+ <1378817379-8238-8-git-send-email-lee.jones@linaro.org>
+Message-ID: <CAOesGMj+YzkE5bAxUqFYWoJ-RURDdCK5MUWYTc+gWFQMB3KWkg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 10, 2013 at 8:05 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
-> On Tue, Sep 10, 2013 at 07:42:04AM -0700, Kevin Hilman wrote:
->> Fabio Estevam <festevam@gmail.com> writes:
->>
->> > On Mon, Sep 9, 2013 at 1:19 PM, Robert Nelson <robertcnelson@gmail.com> wrote:
->> >
->> >>> Ok, I made this test and it booted fine.
->> >>>
->> >>> So I will change U-boot so that it searches for imx6dl-wandboard.dtb
->> >>> instead of imx6s-wandboard.dtb.
->> >>
->> >> Since there is no WiFi/Bluetooth on the "solo" vs the wandboard dual
->> >> lite, we should really still have a separate solo dtb file..
->> >
->> > I think we could still represent the im6solo-wandboard using the
->> > imx6dl-wandboard.dts.
->> >
->> > In the case of lack of bcm4329 populated on a mx6solo board, the SDHC3
->> > port will just not probe bcm4329 without any negative effect, right?
->>
->> I've noticed in my auto build/boot[1] that booting a wandboard solo with
->> imx6dl-wandboard.dtb actually faults[2].  Just disabling usdhc2[3] makes
->> it boot fine.
->>
->> This only happens on current linus/HEAD.  v3.11 boots fine as does
->> linux-next (as of next-20130910.)
+On Tue, Sep 10, 2013 at 5:49 AM, Lee Jones <lee.jones@linaro.org> wrote:
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>  arch/arm/configs/u8500_defconfig | 1 +
+>  1 file changed, 1 insertion(+)
 >
-> It may be because commit 2af502c (mmc: sdhci: request irq after
-> sdhci_init() is called) which is on linux-next right now hasn't landed
-> on mainline yet.
+> diff --git a/arch/arm/configs/u8500_defconfig b/arch/arm/configs/u8500_defconfig
+> index 6b29109..24f88d6 100644
+> --- a/arch/arm/configs/u8500_defconfig
+> +++ b/arch/arm/configs/u8500_defconfig
+> @@ -39,6 +39,7 @@ CONFIG_BLK_DEV_RAM_SIZE=65536
+>  CONFIG_SENSORS_BH1780=y
+>  CONFIG_IIO=y
+>  CONFIG_IIO_ST_PRESS=y
+> +CONFIG_IIO_ST_ACCEL_3AXIS=y
+>  CONFIG_NETDEVICES=y
+>  CONFIG_SMSC911X=y
+>  CONFIG_SMSC_PHY=y
 
-Yup, linus/HEAD + that commit makes things work again.  Thanks.
+This is ridiculous.
 
-Kevin
+I know lwn.net's patch author statistics are fun to be on, but
+splitting this and the other config update into two patches? Really?
+
+
+-Olof
