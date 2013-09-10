@@ -1,132 +1,63 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Tue, 10 Sep 2013 19:07:39 +0200 (CEST)
-Subject: "cpufreq: fix serialization issues with freq change notifiers"
- breaks cpufreq too
-In-Reply-To: <CAKohpomK7Y_6aLMA3B+hZrtgYq9U89ihgkbvYWA3BsKN3gJD3g@mail.gmail.com>
-References: <Pine.LNX.4.64.1309091656200.6602@axis700.grange>
- <CAKohponZ+FnzqXYMbBzbun0-1iQMi2fS4syrEBC_MdF41vLCeA@mail.gmail.com>
- <Pine.LNX.4.64.1309101656150.16010@axis700.grange>
- <CAKohpomBBKLhNemVUpUHAftGhPJJe+ZB7T_9UYLD7LwpR1nK0g@mail.gmail.com>
- <Pine.LNX.4.64.1309101740120.16010@axis700.grange>
- <CAKohpomK7Y_6aLMA3B+hZrtgYq9U89ihgkbvYWA3BsKN3gJD3g@mail.gmail.com>
-Message-ID: <Pine.LNX.4.64.1309101853170.16010@axis700.grange>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 10 Sep 2013 11:32:41 -0600
+Subject: [PATCH v2 1/2] video: ARM CLCD: Add DT support
+In-Reply-To: <1378808726-32535-1-git-send-email-pawel.moll@arm.com>
+References: <1378808726-32535-1-git-send-email-pawel.moll@arm.com>
+Message-ID: <522F57B9.5000001@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 10 Sep 2013, Viresh Kumar wrote:
+On 09/10/2013 04:25 AM, Pawel Moll wrote:
+> This patch adds basic DT bindings for the PL11x CLCD cells
+> and make their fbdev driver use them.
 
-> On 10 September 2013 21:52, Guennadi Liakhovetski <g.liakhovetski@gmx.de> wrote:
-> > Of course, isn't that what I've written above? reverted a commit and added
-> > debug - in that order.
-> 
-> Ok, I misread it then :(
-> 
-> > Sure, I can... So, with the performance governor I get
-> >
-> > [    1.290000] cpufreq-cpu0 cpufreq-cpu0: Looking up cpu0-supply from device tree
-> > [    1.290000] cpufreq: trying to register driver generic_cpu0
-> > [    1.290000] cpufreq: adding CPU 0
-> > [    1.290000] cpufreq: Adding link for CPU: 1
-> > [    1.290000] cpufreq: setting new policy for CPU 0: 398667 - 1196000 kHz
-> > [    1.290000] cpufreq: new min and max freqs are 398667 - 1196000 kHz
-> > [    1.290000] cpufreq: governor switch
-> > [    1.290000] cpufreq: __cpufreq_governor for CPU 0, event 4
-> > [    1.290000] cpufreq: __cpufreq_governor for CPU 0, event 1
-> > [    1.290000] cpufreq_performance: setting to 1196000 kHz because of event 1
-> > [    1.290000] cpufreq: __cpufreq_driver_target().1665 1
-> >
-> > This is my debug - .transition_ongoing is incremented ^^^^^^^^
-> >
-> > [    1.300000] cpufreq: target for CPU 0: 1196000 kHz, relation 1, requested 1196000 kHz
-> 
-> Quite straight forward actually..
+> diff --git a/Documentation/devicetree/bindings/video/arm,pl11x.txt b/Documentation/devicetree/bindings/video/arm,pl11x.txt
 
-Apparently, not quite.
+> +Optional properties:
+> +
+> +- video-ram: phandle to a node describing specialized video memory
+> +		(that is *not* described in the top level "memory" node)
+> +		that must be used as a framebuffer, eg. due to restrictions
+> +		of the system interconnect; the node must contain a
+> +		standard reg property describing the address and the size
+> +		of the memory area
 
-> Please try attached patch and see if it fixes
-> your problem.. Which it should if I am not wrong.. I will send it
-> separately then..
+Should this use the "CMA bindings" that are being proposed at the moment?
 
-It helps only once. The first switching works, the second one doesn't. 
-Below debug
+Even if not, I'm not quite clear on what the referenced node is supposed
+to contain; is just a reg property enough, so you'd see the following at
+a completely arbitrary location in the DT:
 
-[   12.010000] cpufreq: setting new policy for CPU 0: 398667 - 1196000 kHz
-[   12.010000] cpufreq: new min and max freqs are 398667 - 1196000 kHz
-[   12.010000] cpufreq: governor switch
-[   12.010000] cpufreq: __cpufreq_governor for CPU 0, event 2
-[   12.010000] cpufreq: __cpufreq_governor for CPU 0, event 5
-[   12.010000] ondemand governor failed, too long transition latency of HW, fallback to performance governor
-[   12.020000] cpufreq: __cpufreq_governor for CPU 0, event 4
-[   12.020000] cpufreq: __cpufreq_governor for CPU 0, event 1
-[   12.020000] cpufreq_performance: setting to 1196000 kHz because of event 1
-[   12.020000] cpufreq: target for CPU 0: 1196000 kHz, relation 1, requested 1196000 kHz
-[   12.020000] cpufreq: governor: change or update limits
-[   12.020000] cpufreq: __cpufreq_governor for CPU 0, event 3
-[   12.020000] cpufreq_performance: setting to 1196000 kHz because of event 3
-[   12.020000] cpufreq: target for CPU 0: 1196000 kHz, relation 1, requested 1196000 kHz
-[   12.030000] cpufreq: setting new policy for CPU 0: 398667 - 1196000 kHz
-[   12.030000] cpufreq: new min and max freqs are 398667 - 1196000 kHz
-[   12.030000] cpufreq: governor switch
-[   12.030000] cpufreq: __cpufreq_governor for CPU 0, event 2
-[   12.030000] cpufreq: __cpufreq_governor for CPU 0, event 5
-[   12.030000] ondemand governor failed, too long transition latency of HW, fallback to performance governor
-[   12.040000] cpufreq: __cpufreq_governor for CPU 0, event 4
-[   12.040000] cpufreq: __cpufreq_governor for CPU 0, event 1
-[   12.040000] cpufreq_performance: setting to 1196000 kHz because of event 1
-[   12.040000] cpufreq: target for CPU 0: 1196000 kHz, relation 1, requested 1196000 kHz
-[   12.040000] cpufreq: governor: change or update limits
-[   12.040000] cpufreq: __cpufreq_governor for CPU 0, event 3
-[   12.040000] cpufreq_performance: setting to 1196000 kHz because of event 3
-[   12.040000] cpufreq: target for CPU 0: 1196000 kHz, relation 1, requested 1196000 kHz
+framebuffer-mem {
+    reg = <0x80000000 0x00100000>;
+};
 
-echo powersave > /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor
+I'm not sure what the benefit of making this a standalone node is; why
+not just put the base/size directly into the video-ram property in the
+CLCD node?
 
-[   66.490000] cpufreq: setting new policy for CPU 0: 398667 - 1196000 kHz
-[   66.490000] cpufreq: new min and max freqs are 398667 - 1196000 kHz
-[   66.490000] cpufreq: governor switch
-[   66.490000] cpufreq: __cpufreq_governor for CPU 0, event 2
-[   66.490000] cpufreq: __cpufreq_governor for CPU 0, event 5
-[   66.490000] cpufreq: __cpufreq_governor for CPU 0, event 4
-[   66.490000] cpufreq: __cpufreq_governor for CPU 0, event 1
-[   66.490000] cpufreq: target for CPU 0: 398667 kHz, relation 0, requested 398667 kHz
-[   66.490000] cpufreq: __cpufreq_driver_target().1677 1
-[   66.500000] cpufreq: notification 0 of frequency transition to 398666 kHz
-[   66.500000] cpufreq: __cpufreq_notify_transition().297 2
-[   66.500000] cpufreq: notification 0 of frequency transition to 398666 kHz
-[   66.500000] cpufreq: __cpufreq_notify_transition().297 3
-[   66.510000] cpufreq: notification 1 of frequency transition to 398666 kHz
-[   66.510000] cpufreq: __cpufreq_notify_transition().327 2
-[   66.520000] cpufreq: FREQ: 398666 - CPU: 0
-[   66.520000] cpufreq: notification 1 of frequency transition to 398666 kHz
-[   66.520000] cpufreq: __cpufreq_notify_transition().327 1
-[   66.520000] cpufreq: FREQ: 398666 - CPU: 1
-[   66.520000] cpufreq: cpufreq_notify_transition().366 0
-[   66.530000] cpufreq: governor: change or update limits
-[   66.530000] cpufreq: __cpufreq_governor for CPU 0, event 3
-[   66.530000] cpufreq: target for CPU 0: 398667 kHz, relation 0, requested 398667 kHz
-[   66.530000] cpufreq: __cpufreq_driver_target().1677 1
+> +- max-framebuffer-size: maximum size in bytes of the framebuffer the
+> +			system can handle, eg. in terms of available
+> +			memory bandwidth
 
-echo performance > /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor
+Size doesn't imply bandwidth, due to the potential for varying bpp,
+frame-rates, margin/porch sizes, etc. If this is a bandwidth limit,
+shouldn't we instead represent that value directly, perhaps along with
+some multiplier to convert theoretical bandwidth to practical bandwidth
+(to account for memory protocol and controller overheads)?
 
-[   72.470000] cpufreq: setting new policy for CPU 0: 398667 - 1196000 kHz
-[   72.470000] cpufreq: new min and max freqs are 398667 - 1196000 kHz
-[   72.470000] cpufreq: governor switch
-[   72.470000] cpufreq: __cpufreq_governor for CPU 0, event 2
-[   72.470000] cpufreq: __cpufreq_governor for CPU 0, event 5
-[   72.470000] cpufreq: __cpufreq_governor for CPU 0, event 4
-[   72.470000] cpufreq: __cpufreq_governor for CPU 0, event 1
-[   72.470000] cpufreq_performance: setting to 1196000 kHz because of event 1
-[   72.470000] cpufreq: target for CPU 0: 1196000 kHz, relation 1, requested 1196000 kHz
-[   72.470000] cpufreq: governor: change or update limits
-[   72.470000] cpufreq: __cpufreq_governor for CPU 0, event 3
-[   72.470000] cpufreq_performance: setting to 1196000 kHz because of event 3
-[   72.470000] cpufreq: target for CPU 0: 1196000 kHz, relation 1, requested 1196000 kHz
+...
+> +- panel-type: (required) must be "tft" or "stn", defines panel type
+...
+> +- panel-stn-4bit: (for monochrome "stn" panel) if present means
+> +			that the monochrome display is connected
+> +			via 4 bit-wide interface
 
-> Thanks for your time..
+I just wanted to confirm that those are a complete/direct representation
+of all the HW options the module supports?
 
-Thanks
-Guennadi
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+> +- display-timings: standard display timings sub-node, see
+> +			Documentation/devicetree/bindings/video/display-timing.txt
+
+Should that be in a "Required sub-nodes" section (I assume required not
+optional) rather than "Optional Properties"?
