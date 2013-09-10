@@ -1,58 +1,36 @@
-From: rjw@sisk.pl (Rafael J. Wysocki)
-Date: Wed, 11 Sep 2013 00:32:55 +0200
-Subject: [PATCH RESEND 1/2] i2c: prepare runtime PM support for I2C client
- devices
-In-Reply-To: <20130910213522.GG29403@sirena.org.uk>
-References: <1378733679-19500-1-git-send-email-mika.westerberg@linux.intel.com>
- <3397524.g9aUWuArnm@vostro.rjw.lan> <20130910213522.GG29403@sirena.org.uk>
-Message-ID: <2029393.u6DaKBPszu@vostro.rjw.lan>
+From: csd@broadcom.com (Christian Daudt)
+Date: Tue, 10 Sep 2013 15:32:02 -0700
+Subject: [PATCH v9 2/3] ARM: bcm281xx: Enable GPIO driver
+In-Reply-To: <1378836423-12467-3-git-send-email-markus.mayer@linaro.org>
+References: <1378836423-12467-1-git-send-email-markus.mayer@linaro.org>
+ <1378836423-12467-3-git-send-email-markus.mayer@linaro.org>
+Message-ID: <522F9DE2.8080605@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, September 10, 2013 10:35:22 PM Mark Brown wrote:
-> On Tue, Sep 10, 2013 at 10:04:21PM +0200, Rafael J. Wysocki wrote:
-> > On Tuesday, September 10, 2013 05:13:21 PM Mark Brown wrote:
-> 
-> > > OK, that is very much not the model which embedded systems follow, in
-> > > embedded systems the driver for the device is fully in control of its
-> > > own power.  It gets resources like GPIOs and regulators which allow it
-> > > to make fine grained decisions.
-> 
-> > There are platforms where those resources are simply not available for
-> > direct manipulation and we need to use ACPI methods for power management.
-> 
-> > Now, since those methods are used in pretty much the same way for all I2C
-> > devices, we add a PM domain for that to avoid duplicating the same code in
-> > all of the drivers in question (patch [2/2]).  Does that make sense to you?
-> 
-> It doesn't seem like a particular problem, but the existing usage does
-> need to be preserved for the systems that use it so things like having
-> auto as the default and updating the drivers seem like they're needed.
-> 
-> > > If we're starting to get a reasonable number of buses following the same
-> > > pattern it seems like we're in a position to start 
-> 
-> > We need that for exactly 3 buses: platform (already done), I2C and SPI.
-> 
-> > No other bus types are going to use ACPI this way for PM, at least for the
-> > time being, simply because PCI, USB and SATA/IDE have their own ways of doing
-> > this (which are bus-specific) and the spec doesn't cover other bus types
-> > directly (it defines support for UART, but we don't have a UART bus type).
-> 
-> > Moreover, because PCI and USB use ACPI for PM in their own ways, moving that
-> > thing up to the driver core would be rather inconvenient.
-> 
-> That only applies to the power domains though, what Mika was saying was
-> that the process for enabling runtime PM (just drop a reference) also
-> becomes easier with this method regardless of anything else - that makes
-> sense to me as something we might want to end up with so do we want to
-> just move towards making that a default?
+On 13-09-10 11:07 AM, Markus Mayer wrote:
+> Turn on the bcm281xx GPIO driver in the kernel configuration.
+>
+> Signed-off-by: Markus Mayer <markus.mayer@linaro.org>
+> Reviewed-by: Christian Daudt <csd@broadcom.com>
+> ---
+>   arch/arm/mach-bcm/Kconfig |    2 +-
+>   1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
+> index 69d67f7..7f6fca8 100644
+> --- a/arch/arm/mach-bcm/Kconfig
+> +++ b/arch/arm/mach-bcm/Kconfig
+> @@ -9,7 +9,7 @@ config ARCH_BCM
+>   	select CLKSRC_OF
+>   	select GENERIC_CLOCKEVENTS
+>   	select GENERIC_TIME
+> -	select GPIO_BCM
+> +	select GPIO_BCM_KONA
+>   	select SPARSE_IRQ
+>   	select TICK_ONESHOT
+>   	select CACHE_L2X0
+Applied to armsoc/for-3.13/soc
 
-Possibly. :-)
-
-At least I don't see any fundamental obstacles ...
-
-
--- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+  thanks,
+    csd
