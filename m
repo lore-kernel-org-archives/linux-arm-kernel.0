@@ -1,50 +1,67 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Tue, 10 Sep 2013 22:04:42 +0530
-Subject: "cpufreq: fix serialization issues with freq change notifiers"
- breaks cpufreq too
-In-Reply-To: <Pine.LNX.4.64.1309101740120.16010@axis700.grange>
-References: <Pine.LNX.4.64.1309091656200.6602@axis700.grange>
- <CAKohponZ+FnzqXYMbBzbun0-1iQMi2fS4syrEBC_MdF41vLCeA@mail.gmail.com>
- <Pine.LNX.4.64.1309101656150.16010@axis700.grange>
- <CAKohpomBBKLhNemVUpUHAftGhPJJe+ZB7T_9UYLD7LwpR1nK0g@mail.gmail.com>
- <Pine.LNX.4.64.1309101740120.16010@axis700.grange>
-Message-ID: <CAKohpomK7Y_6aLMA3B+hZrtgYq9U89ihgkbvYWA3BsKN3gJD3g@mail.gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 10 Sep 2013 10:46:49 -0600
+Subject: [RESEND PATCH v2] pwm: pxa: add device tree support to pwm driver
+In-Reply-To: <522F40A3.9030701@newsguy.com>
+References: <1378751420-19227-1-git-send-email-mikedunn@newsguy.com>
+ <522E3B5B.90406@wwwdotorg.org> <522F40A3.9030701@newsguy.com>
+Message-ID: <522F4CF9.3070601@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10 September 2013 21:52, Guennadi Liakhovetski <g.liakhovetski@gmx.de> wrote:
-> Of course, isn't that what I've written above? reverted a commit and added
-> debug - in that order.
+On 09/10/2013 09:54 AM, Mike Dunn wrote:
+> On 09/09/2013 02:19 PM, Stephen Warren wrote:
+>> On 09/09/2013 12:30 PM, Mike Dunn wrote:
+>>> This patch adds device tree support to the pxa's pwm driver.  Only an OF match
+>>> table is added; nothing needs to be extracted from the device tree node.  The
+>>> existing platform_device id table is reused for the match table data.  Support
+>>> for inverted polarity is also added.
+>>>
+>>> Tested on a Palm Treo 680 (both platform data and DT cases).
+>>
+>>> diff --git a/Documentation/devicetree/bindings/pwm/pxa-pwm.txt b/Documentation/devicetree/bindings/pwm/pxa-pwm.txt
+>>
+>>> +Marvell pwm controller
+>>
+>> s/pwm/PWM/ throughout.
+>>
+>>> +
+>>> +Required properties:
+>>> +- compatible:
+>>> +  for pxa25x, pxa27x, pxa168, pxa910: must be compatible = "marvell,pxa250-pwm";
+>>
+>> I think you want a separate compatible value for each HW, to allow for
+>> any HW-specific quirks to be enabled later if required. So, you could
+>> document "marvell,pxa250-pwm" as the basic compatible value that a
+>> driver can bind to, yet also document the other values as being required
+>> for the relevant HW?
+> 
+> IOW...
+> - compatible: should be one of:
+>   - "marvell,pxa250-pwm"
+>   - "marvell,pxa270-pwm"
+>   - "marvell,pxa168-pwm"
+>   - "marvell,pxa910-pwm"
+> 
+> Even though the driver makes no functional distinction currently?
 
-Ok, I misread it then :(
+Yes (although it's fine to make the driver only look for the first of
+those, since you say they're all compatible, and currently the driver
+doesn't care about exactly which HW is in use).
 
-> Sure, I can... So, with the performance governor I get
->
-> [    1.290000] cpufreq-cpu0 cpufreq-cpu0: Looking up cpu0-supply from device tree
-> [    1.290000] cpufreq: trying to register driver generic_cpu0
-> [    1.290000] cpufreq: adding CPU 0
-> [    1.290000] cpufreq: Adding link for CPU: 1
-> [    1.290000] cpufreq: setting new policy for CPU 0: 398667 - 1196000 kHz
-> [    1.290000] cpufreq: new min and max freqs are 398667 - 1196000 kHz
-> [    1.290000] cpufreq: governor switch
-> [    1.290000] cpufreq: __cpufreq_governor for CPU 0, event 4
-> [    1.290000] cpufreq: __cpufreq_governor for CPU 0, event 1
-> [    1.290000] cpufreq_performance: setting to 1196000 kHz because of event 1
-> [    1.290000] cpufreq: __cpufreq_driver_target().1665 1
->
-> This is my debug - .transition_ongoing is incremented ^^^^^^^^
->
-> [    1.300000] cpufreq: target for CPU 0: 1196000 kHz, relation 1, requested 1196000 kHz
+>>> +- reg: physical base address and length of the registers used by the pwm channel
+>>> +  NB: One device instance must be created for each pwm that is used, so the
+>>> +  length covers only the register window for one pwm output, not that of the
+>>> +  entire pwm controller.  Currently length is 0x10 for all supported devices.
+>>> +- #pwm-cells: should be 3.
+>>> +   cell 1: the per-chip index of the PWM to use,
+>>
+>> That cell shouldn't be needed if you really want to have one DT node per
+>> PWM channel.
+> 
+> Yes, but I was afraid to deviate from the format used by the other PWM
+> controllers.  (But in that case, it should at least be documented as "must be
+> zero". Thanks.)  If going my owm way is acceptable, I'll define my own
+> of_xlate() parser and remove this cell.
 
-Quite straight forward actually.. Please try attached patch and see if it fixes
-your problem.. Which it should if I am not wrong.. I will send it
-separately then..
-
-Thanks for your time..
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0001-fix-target.patch
-Type: application/octet-stream
-Size: 1710 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130910/a9e28bba/attachment-0001.obj>
+I don't think there's any issue with deviating; that's exactly what
+#pwm-cells is for.
