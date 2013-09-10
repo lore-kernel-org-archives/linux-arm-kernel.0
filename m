@@ -1,176 +1,207 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 10 Sep 2013 10:51:10 +0100
-Subject: [RFC PATCH] arm64: KVM: honor cacheability attributes on S2 page fault
-Message-ID: <1378806670-2467-1-git-send-email-marc.zyngier@arm.com>
+From: thommyj@gmail.com (Thommy Jakobsson)
+Date: Tue, 10 Sep 2013 11:54:03 +0200 (CEST)
+Subject: kmalloc memory slower than malloc
+In-Reply-To: <1378458778.4208.30.camel@weser.hi.pengutronix.de>
+References: <alpine.DEB.2.02.1309060811400.1299@kelly.ryd.net>
+ <1378458778.4208.30.camel@weser.hi.pengutronix.de>
+Message-ID: <alpine.DEB.2.02.1309101124450.1305@kelly.ryd.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Anup Patel recently brought up the fact that when we run a guest
-with cache disabled, we don't flush the cache to the Point of
-Coherency, hence possibly missing bits of data that have been
-written in the cache, but have not reached memory.
 
-There are several approaches to this issue:
-- Using the DC bit when caches are off: this breaks guests assuming
-  caches off while doing DMA operations. Bootloaders, for example.
-- Fetch the memory attributes on translation fault, and flush the
-  cache while handling the fault. This relies on using the PAR_EL1
-  register to obtain the Stage-1 memory attributes.
 
-While this second solution is clearly not ideal (it duplicates what
-the HW already does to generate HPFAR_EL2), it is more correct than
-not doing anything.
+On Fri, 6 Sep 2013, Lucas Stach wrote:
 
-Cc: Anup Patel <anup@brainfault.org>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
+> This is the relevant part where you are mapping things uncached into
+> userspace, so no wonder it is slower than cached malloc memory. If you
+> want to use cached userspace mappings you need bracketed MMAP access,
+> where you tell the kernel by using an ioctl or something that userspace
+> is accessing the mapping so it can flush/invalidate caches at the right
+> points in time.
+Removing the pgprot_noncached() seems to make things more what I expected. 
+Both buffers takes about the same time to traverse in userspace. Thanks.
 
- arch/arm/include/asm/kvm_mmu.h    |  4 ++--
- arch/arm/kvm/mmu.c                |  2 +-
- arch/arm64/include/asm/kvm_host.h |  1 +
- arch/arm64/include/asm/kvm_mmu.h  |  9 +++++++--
- arch/arm64/kernel/asm-offsets.c   |  1 +
- arch/arm64/kvm/hyp.S              | 28 ++++++++++++----------------
- 6 files changed, 24 insertions(+), 21 deletions(-)
+I changed the code in my testprogram and driver to do the same thing in 
+kernelspace as well. And now I don't understand the result. The result 
+stepping through and adding all bytes in a page sized buffer is about 4-5 
+times faster to do in the kernel. This is the times for looping through 
+the buffer 10000 times on a imx6:
+dma_alloc_coherent in kernel   4.256s (s=0)
+kmalloc in kernel              0.126s (s=86700000)
+dma_alloc_coherent userspace   0.566s (s=0)
+kmalloc in userspace          0.566s (s=86700000)
+malloc in userspace          0.566s (s=0)
 
-diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
-index 472ac70..faffdf0 100644
---- a/arch/arm/include/asm/kvm_mmu.h
-+++ b/arch/arm/include/asm/kvm_mmu.h
-@@ -105,7 +105,7 @@ static inline void kvm_set_s2pte_writable(pte_t *pte)
+The 's' inside the paranthes is the resulting sum. See below for 
+actual code. I've read the L2 cache controller (PL310) in the imx6 has 
+speculative read. So I assume that it will be a performance increase to 
+have the memory physically continous (like kmalloc). But that should be 
+the same after I have map:ed it to userspace aswell, right? There is no 
+other load on the target during the test run.
+
+I don't really understand the different pgprot-flags (some are obvious 
+like L_PTE_MT_UNCACHED of ocurse), so maybe I still have some errors in my 
+mmap. Can someone point me in the right direction or have any ideas why 
+it is so much faster in the kernel?
+
+Thanks,
+Thommy
+
+code from testdriver:
+--------------------
+static long device_ioctl(struct file *file,
+			 unsigned int cmd, unsigned long arg){
+
+        dma_addr_t pa = 0;	
+	int i,j;
+	unsigned long s=0;
+
+	printk("entering ioctl cmd %d\r\n",cmd);
+	switch(cmd)
+	{
+	case DMAMEM:
+		va_dmabuf = dma_alloc_coherent(0,BUFSIZE,&pa,GFP_KERNEL|GFP_DMA);
+		//memset(va_dmabuf,0,BUFSIZE);
+		//va_dmabuf[15] = 23;
+		pa_dmabuf = pa;	
+		printk("kernel va_dmabuf: 0x%p, pa_dmabuf 0x%08X\r\n",va_dmabuf,pa_dmabuf);
+		break;
+	case DMAMEM_TEST:
+		for(j=0;j<LOOPCNT;j++){
+			for(i=0;i<BUFSIZE;i++){
+				s += va_dmabuf[i];
+			}
+		}
+		break;
+	case KMEM:
+		va_kmbuf = kmalloc(BUFSIZE,GFP_KERNEL);
+		//pa = virt_to_phys(va_kmbuf);
+		//pa = __pa(va_kmbuf);
+		pa = dma_map_single(0,va_kmbuf,BUFSIZE,DMA_FROM_DEVICE);
+		pa_kmbuf = pa;
+		dma_sync_single_for_cpu(0,pa_kmbuf,BUFSIZE,DMA_FROM_DEVICE);
+		//memset(va_kmbuf,0,BUFSIZE);
+		//va_kmbuf[10] = 11;
+		printk("kernel va_kmbuf: 0x%p, pa_kmbuf 0x%08X\r\n",va_kmbuf,pa_kmbuf);
+		break;
+	case KMEM_TEST:
+		for(j=0;j<LOOPCNT;j++){
+			for(i=0;i<BUFSIZE;i++){
+				s += va_kmbuf[i];
+			}
+		}
+		break;
+	case DMAMEM_REL:
+		dma_free_coherent(0,BUFSIZE,va_dmabuf,pa_dmabuf);
+		va_dmabuf = 0;
+		break;
+	case KMEM_REL:
+		kfree(va_kmbuf);
+		va_kmbuf = 0;
+		break;
+	default:
+		break;
+	} 
  
- struct kvm;
- 
--static inline void coherent_icache_guest_page(struct kvm *kvm, gfn_t gfn)
-+static inline void coherent_icache_guest_page(struct kvm_vcpu *vcpu, gfn_t gfn)
+	if(cmd == DMAMEM_TEST || cmd == KMEM_TEST){
+		if(copy_to_user((void*)arg, &s, sizeof(s)))
+			return -EFAULT;
+	}else{
+		pa_currentbuf = pa;
+ 		if(copy_to_user((void*)arg, &pa, sizeof(pa)))
+			return -EFAULT;
+	}
+	return 0;
+}
+
+static int device_mmap(struct file *filp, struct vm_area_struct *vma)
  {
- 	/*
- 	 * If we are going to insert an instruction page and the icache is
-@@ -120,7 +120,7 @@ static inline void coherent_icache_guest_page(struct kvm *kvm, gfn_t gfn)
- 	 * need any kind of flushing (DDI 0406C.b - Page B3-1392).
- 	 */
- 	if (icache_is_pipt()) {
--		unsigned long hva = gfn_to_hva(kvm, gfn);
-+		unsigned long hva = gfn_to_hva(vcpu->kvm, gfn);
- 		__cpuc_coherent_user_range(hva, hva + PAGE_SIZE);
- 	} else if (!icache_is_vivt_asid_tagged()) {
- 		/* any kind of VIPT cache */
-diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-index 0988d9e..ffb3cc4 100644
---- a/arch/arm/kvm/mmu.c
-+++ b/arch/arm/kvm/mmu.c
-@@ -547,7 +547,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
- 		return -EFAULT;
+	unsigned long size;
+	int res = 0;
+	size = vma->vm_end - vma->vm_start;
+	//vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
+//	vma->vm_page_prot = pgprot_writecombine(vma->vm_page_prot);
+//	vma->vm_page_prot = __pgprot_modify(vma->vm_page_prot,L_PTE_MT_MASK,L_PTE_MT_WRITEBACK);
+//	vma->vm_page_prot = __pgprot_modify(vma->vm_page_prot,L_PTE_MT_MASK,L_PTE_MT_DEV_CACHED);
+//	vma->vm_page_prot = __pgprot_modify(vma->vm_page_prot,L_PTE_MT_MASK,L_PTE_MT_WRITETHROUGH);
+
+	if (remap_pfn_range(vma, vma->vm_start,
+			    pa_currentbuf>>PAGE_SHIFT , size, vma->vm_page_prot)) {
+		res = -ENOBUFS;
+		goto device_mmap_exit;
+	}
+
+	vma->vm_flags &= ~VM_IO;	/* using shared anonymous pages */
+
+device_mmap_exit:
+	return res;
+
+ }
+
+
+code from testapplication:
+-------------------------
+	/*
+	 * test speed of dma_alloc_coherent buffer in kernel
+	 */
+	gettimeofday(&t1,NULL);
+	ioctl(fd,DMAMEM_TEST,&s);
+        gettimeofday(&t2,NULL);
+        printf("dma_alloc_coherent in kernel   %.3fs (s=%lu)\n",
+		((t2.tv_sec-t1.tv_sec)*1000000+(t2.tv_usec-t1.tv_usec))/1000000.0,s);
+
+        /*
+         * test speed of kmalloc buffer in kernel
+         */
+        gettimeofday(&t1,NULL);
+	ioctl(fd,KMEM_TEST,&s);
+        gettimeofday(&t2,NULL);
+        printf("kmalloc in kernel              %.3fs (s=%lu)\n",
+		((t2.tv_sec-t1.tv_sec)*1000000+(t2.tv_usec-t1.tv_usec))/1000000.0,s);
  
- 	new_pte = pfn_pte(pfn, PAGE_S2);
--	coherent_icache_guest_page(vcpu->kvm, gfn);
-+	coherent_icache_guest_page(vcpu, gfn);
+
+	/*
+	 * test speed of dma_alloc_coherent buffer
+	 */
+	s=0;
+	gettimeofday(&t1,NULL);
+        for(j=0;j<LOOPCNT;j++){
+		for(i=0;i<BUFSIZE;i++){
+                	s += va_dmabuf[i];
+		}
+	}	
+        gettimeofday(&t2,NULL);
+        printf("dma_alloc_coherent userspace   %.3fs (s=%lu)\n",
+		((t2.tv_sec-t1.tv_sec)*1000000+(t2.tv_usec-t1.tv_usec))/1000000.0,s);
  
- 	spin_lock(&vcpu->kvm->mmu_lock);
- 	if (mmu_notifier_retry(vcpu->kvm, mmu_seq))
-diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index 331a852..2530f92 100644
---- a/arch/arm64/include/asm/kvm_host.h
-+++ b/arch/arm64/include/asm/kvm_host.h
-@@ -79,6 +79,7 @@ struct kvm_mmu_memory_cache {
- struct kvm_vcpu_fault_info {
- 	u32 esr_el2;		/* Hyp Syndrom Register */
- 	u64 far_el2;		/* Hyp Fault Address Register */
-+	u64 par_el2;		/* Result of FAR_EL2 translation */
- 	u64 hpfar_el2;		/* Hyp IPA Fault Address Register */
- };
- 
-diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-index efe609c..84baddd 100644
---- a/arch/arm64/include/asm/kvm_mmu.h
-+++ b/arch/arm64/include/asm/kvm_mmu.h
-@@ -118,11 +118,16 @@ static inline void kvm_set_s2pte_writable(pte_t *pte)
- 
- struct kvm;
- 
--static inline void coherent_icache_guest_page(struct kvm *kvm, gfn_t gfn)
-+static inline void coherent_icache_guest_page(struct kvm_vcpu *vcpu, gfn_t gfn)
- {
- 	if (!icache_is_aliasing()) {		/* PIPT */
--		unsigned long hva = gfn_to_hva(kvm, gfn);
-+		unsigned long hva = gfn_to_hva(vcpu->kvm, gfn);
-+		u8 attr;
- 		flush_icache_range(hva, hva + PAGE_SIZE);
-+		attr = vcpu->arch.fault.par_el2 >> 56;
-+		/* Check for non-device, non-cacheable access */
-+		if ((attr & 0xf0) && (attr & 0x0f) == 4)
-+			__flush_dcache_area((void *)hva, PAGE_SIZE);
- 	} else if (!icache_is_aivivt()) {	/* non ASID-tagged VIVT */
- 		/* any kind of VIPT cache */
- 		__flush_icache_all();
-diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
-index 1f3a39d..e67dcac 100644
---- a/arch/arm64/kernel/asm-offsets.c
-+++ b/arch/arm64/kernel/asm-offsets.c
-@@ -117,6 +117,7 @@ int main(void)
-   DEFINE(CPU_SYSREGS,		offsetof(struct kvm_cpu_context, sys_regs));
-   DEFINE(VCPU_ESR_EL2,		offsetof(struct kvm_vcpu, arch.fault.esr_el2));
-   DEFINE(VCPU_FAR_EL2,		offsetof(struct kvm_vcpu, arch.fault.far_el2));
-+  DEFINE(VCPU_PAR_EL2,		offsetof(struct kvm_vcpu, arch.fault.par_el2));
-   DEFINE(VCPU_HPFAR_EL2,	offsetof(struct kvm_vcpu, arch.fault.hpfar_el2));
-   DEFINE(VCPU_HCR_EL2,		offsetof(struct kvm_vcpu, arch.hcr_el2));
-   DEFINE(VCPU_IRQ_LINES,	offsetof(struct kvm_vcpu, arch.irq_lines));
-diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
-index 20a58fe..417636b 100644
---- a/arch/arm64/kvm/hyp.S
-+++ b/arch/arm64/kvm/hyp.S
-@@ -671,24 +671,16 @@ el1_trap:
- 	ccmp	x2, x0, #4, ne
- 	b.ne	1f		// Not an abort we care about
- 
--	/* This is an abort. Check for permission fault */
--	and	x2, x1, #ESR_EL2_FSC_TYPE
--	cmp	x2, #FSC_PERM
--	b.ne	1f		// Not a permission fault
--
--	/*
--	 * Check for Stage-1 page table walk, which is guaranteed
--	 * to give a valid HPFAR_EL2.
--	 */
--	tbnz	x1, #7, 1f	// S1PTW is set
--
- 	/* Preserve PAR_EL1 */
- 	mrs	x3, par_el1
- 	push	x3, xzr
- 
- 	/*
--	 * Permission fault, HPFAR_EL2 is invalid.
--	 * Resolve the IPA the hard way using the guest VA.
-+	 * Two cases:
-+	 * - S2 translation fault, we need the memory attributes.
-+	 * - S2 permission fault, HPFAR_EL2 is invalid.
-+	 *
-+	 * In both cases, resolve the IPA the hard way using the guest VA.
- 	 * Stage-1 translation already validated the memory access rights.
- 	 * As such, we can use the EL1 translation regime, and don't have
- 	 * to distinguish between EL0 and EL1 access.
-@@ -702,15 +694,19 @@ el1_trap:
- 	pop	x0, xzr			// Restore PAR_EL1 from the stack
- 	msr	par_el1, x0
- 	tbnz	x3, #0, 3f		// Bail out if we failed the translation
-+
-+	mrs	x0, tpidr_el2
-+	str	x3, [x0, #VCPU_PAR_EL2]
- 	ubfx	x3, x3, #12, #36	// Extract IPA
- 	lsl	x3, x3, #4		// and present it like HPFAR
-+
- 	b	2f
- 
--1:	mrs	x3, hpfar_el2
-+1:	mrs	x0, tpidr_el2
- 	mrs	x2, far_el2
-+	mrs	x3, hpfar_el2
- 
--2:	mrs	x0, tpidr_el2
--	str	x1, [x0, #VCPU_ESR_EL2]
-+2:	str	x1, [x0, #VCPU_ESR_EL2]
- 	str	x2, [x0, #VCPU_FAR_EL2]
- 	str	x3, [x0, #VCPU_HPFAR_EL2]
- 
--- 
-1.8.2.3
+
+        /*
+         * test speed of kmalloc buffer
+         */
+	s=0;
+        gettimeofday(&t1,NULL);
+        for(j=0;j<LOOPCNT;j++){
+                for(i=0;i<BUFSIZE;i++){
+                        s += va_kmbuf[i];
+        	}
+	}
+        gettimeofday(&t2,NULL);
+        printf("kmalloc in userspace          %.3fs (s=%lu)\n",
+		((t2.tv_sec-t1.tv_sec)*1000000+(t2.tv_usec-t1.tv_usec))/1000000.0,s);
+
+
+	/*
+	 * test speed of malloc
+	 */
+	s=0;
+	va_mbuf = malloc(BUFSIZE);
+
+        gettimeofday(&t1,NULL);
+        for(j=0;j<LOOPCNT;j++){
+                for(i=0;i<BUFSIZE;i++){
+                        s += va_mbuf[i];
+		}
+        }
+        gettimeofday(&t2,NULL);
+        printf("malloc in userspace          %.3fs (s=%lu)\n",
+		((t2.tv_sec-t1.tv_sec)*1000000+(t2.tv_usec-t1.tv_usec))/1000000.0,s);
