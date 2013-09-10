@@ -1,39 +1,31 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 10 Sep 2013 10:14:59 +0200
-Subject: Inte IOP Xscale updates
-In-Reply-To: <CAA9_cmcMLooT6=+PwR9rx4ALmNeKG=qXWn+K_dLJ+CVj9u6tYA@mail.gmail.com>
-References: <CACRpkdZU5mVU15AK=m-BRmpizKJJVAR98JKf3Qcgy2ms+HG+Hw@mail.gmail.com>
- <CAA9_cmcMLooT6=+PwR9rx4ALmNeKG=qXWn+K_dLJ+CVj9u6tYA@mail.gmail.com>
-Message-ID: <CACRpkdbLbB_TGbBfCvNzesAP5cB6irk8m=D4kD6n2RTYE0mAnw@mail.gmail.com>
+Date: Tue, 10 Sep 2013 10:20:48 +0200
+Subject: [PATCH v2] ARM: omap2: throw the die id into the entropy pool
+In-Reply-To: <alpine.DEB.2.02.1309091908270.28435@utopia.booyaka.com>
+References: <1378366158-31183-1-git-send-email-linus.walleij@linaro.org>
+ <alpine.DEB.2.02.1309091908270.28435@utopia.booyaka.com>
+Message-ID: <CACRpkdartxUGNqNkpymecaTrgVrkcDTg9UN7LRiCVRcwnE01Og@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 10, 2013 at 12:10 AM, Dan Williams <dan.j.williams@intel.com> wrote:
+On Mon, Sep 9, 2013 at 9:14 PM, Paul Walmsley <paul@pwsan.com> wrote:
 
-> I have not been following device-tree conversions for how they handle
-> legacy boot loaders?
+> Heh, that function name "add_device_randomness()" is a bit misleading.
+> It's not actually intended to add "randomness": from
+> drivers/char/random.c:
 
-That is handled by way of the appended device tree.
+Yeah you're right...
 
-With such platforms I use this:
+Tony feel free to edit the commit message when applying.
 
---enable USE_OF
---enable ARM_APPENDED_DTB
---enable ARM_ATAG_DTB_COMPAT
---enable PROC_DEVICETREE
+>  * None of this adds any entropy, it is meant to avoid the
+>  * problem of the nonblocking pool having similar initial state
+>  * across largely identical devices.
 
-Then:
-
-cat foo.dtb >> zImage
-
-And it should appear in /proc/devicetree
-
-The resulting zImage can be wrapped into a uImage
-if U-boot is used, I use this method too.
-
-> ...I'll just start with reviewing your gpio conversion.
-
-Thanks :-)
+It's noble enough, just a few years back I ran into the problem where
+all boards in a test farm came up with the same ethernet MAC
+address due to the initialization of the nonblocking pool being
+constant.
 
 Yours,
 Linus Walleij
