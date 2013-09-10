@@ -1,40 +1,23 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 9 Sep 2013 17:46:00 -0700
-Subject: [GIT PULL] ARM: mvebu: fixes-non-critical for v3.12 (last one)
-In-Reply-To: <20130903122449.GF19598@titan.lakedaemon.net>
-References: <20130903122449.GF19598@titan.lakedaemon.net>
-Message-ID: <CAOesGMjFp9TQMz+ai9z4kLfhOCBLACKjc2SqFbSBy4=qZ3Yw1g@mail.gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 10 Sep 2013 10:04:39 +0900
+Subject: [PATCH] ARM: shmobile: lager: Do not use register_type field of
+ struct sh_eth_plat_data
+In-Reply-To: <20130910002600.GA30656@quad.lixom.net>
+References: <1377156998-15421-1-git-send-email-horms+renesas@verge.net.au>
+ <20130910002600.GA30656@quad.lixom.net>
+Message-ID: <20130910010439.GC2865@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, Sep 09, 2013 at 05:26:00PM -0700, Olof Johansson wrote:
+> On Thu, Aug 22, 2013 at 04:36:38PM +0900, Simon Horman wrote:
+> > As of 8d3214c ("sh_eth: remove 'register_type' field from 'struct
+> > sh_eth_plat_data'") is is no longer necessary or correct to use the
+> > 'register_type' field from 'struct sh_eth_plat_data' and doing so results
+> > in a build error.
+> > 
+> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> 
+> Applied to fixes.
 
-On Tue, Sep 3, 2013 at 5:24 AM, Jason Cooper <jason@lakedaemon.net> wrote:
-> Arnd, Olof, Kevin,
->
-> Here's the last mvebu/fixes-non-critical pull for v3.12, these came in
-> late and have been in -next for about a week.
->
-> thx,
->
-> Jason.
->
->
-> The following changes since commit 35faad2a1563b3d4dc983a82ac41033fe053870c:
->
->   ARM: dts: Fix memory node in skeleton64.dtsi (2013-08-07 16:33:50 +0000)
->
-> are available in the git repository at:
->
->   git://git.infradead.org/linux-mvebu.git tags/fixes-non-3.12-3
->
-> for you to fetch changes up to 4e611ae7ef492fd857f64827efda3eea09f75233:
->
->   bus: mvebu: add missing of_node_put() to fix reference leak (2013-08-27 14:33:38 +0000)
-
-These don't seem to apply cleanly, I'm guessing because of the
-branches that we deferred to 3.13. If that's the case, then just fold
-them in there where appropriate.
-
-
--Olof
+Thanks, it will be nice to get this out of our collective hair.
