@@ -1,56 +1,63 @@
-From: dwmw2@infradead.org (David Woodhouse)
-Date: Tue, 10 Sep 2013 16:05:49 +0100
-Subject: [GIT PULL 0/3] ARM: SoC: Second round of changes for v3.12
-In-Reply-To: <CA+55aFxNbH+G6DVQNxE9di_btA5hxFH93af_vjN2v0eH8e5W-g@mail.gmail.com>
-References: <1378766555-9679-1-git-send-email-khilman@linaro.org>
- <CA+55aFxNbH+G6DVQNxE9di_btA5hxFH93af_vjN2v0eH8e5W-g@mail.gmail.com>
-Message-ID: <1378825549.2627.316.camel@shinybook.infradead.org>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Tue, 10 Sep 2013 08:07:45 -0700
+Subject: Build error in torvalds kernel 3.11 for omap2plus
+In-Reply-To: <alpine.LFD.2.03.1309091714420.20709@syhkavp.arg> (Nicolas
+ Pitre's message of "Mon, 9 Sep 2013 17:16:57 -0400 (EDT)")
+References: <CABYxbz7m4GdHFNY3fP1Cpv3a_dNTSozdd7dX9yLG6vQ3zZxu9A@mail.gmail.com>
+ <20130908090206.GK25647@n2100.arm.linux.org.uk>
+ <522CB0DE.2010102@roeck-us.net>
+ <20130909105115.GL25647@n2100.arm.linux.org.uk>
+ <522DB86A.8010207@roeck-us.net>
+ <alpine.LFD.2.03.1309091023440.20709@syhkavp.arg>
+ <20130909160348.GB18975@roeck-us.net>
+ <20130909203141.GM25647@n2100.arm.linux.org.uk>
+ <20130909210203.GC28416@roeck-us.net>
+ <alpine.LFD.2.03.1309091714420.20709@syhkavp.arg>
+Message-ID: <87y574g1fi.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2013-09-09 at 16:49 -0700, Linus Torvalds wrote:
-> 
-> Ok. I still really despise the absolute incredible sh*t that is
-> non-discoverable buses, and I hope that ARM SoC hardware designers all
-> die in some incredibly painful accident.  DT only does so much.
+Nicolas Pitre <nicolas.pitre@linaro.org> writes:
 
-Setting aside the inevitable whining from the emotionally-incontinent
-contingent that the above way of saying it will provoke, I'm not quite
-sure why you still haven't got over the fact that we have
-non-discoverable buses.
+> Adding Kevin Hilman to the CC as he might be interested as well.
 
-In cost-sensitive products (and what *isn't* cost-sensitive these days),
-you really don't want to have to put an extra EEPROM on the board
-somewhere, just to describe what devices you've hung off which
-chip-select today. Storing that in the main flash is just *going* to
-happen, however much we'd like to think that devices should identify
-themselves cleanly and autonomously.
+Thanks, I'd already noticed this but was distracted getting arm-soc
+changes ready for the merge window.  Looking into it now.
 
-And it isn't even something that a simple number like a PCI ID could
-manage. Peripherals are synthesisable components which vary *wildly*,
-with what are essentially #ifdefs in the VHDL. So a given controller
-could be seen with different FIFO depths, different numbers of queues,
-all kinds of variations. To cover the various permutations, you'd have
-to assign an *insane* number of PCI IDs. And then there's the various
-ways that you can connect blocks *together*...
+Kevin
 
-That's why we end up with the device-tree model which gives us a rich
-way to describe *this* instance of the hardware. If it wasn't
-device-tree, it'd have to be something *else*.
-
->From a software point of view it *isn't* nice, I agree. But you might as
-well be railing against the sunset, as far as I can tell.
-
-Not that any of this excuses crappy merges with lots of conflicts; but
-those don't seem to be an inexorable result of non-discoverable buses.
-
--- 
-dwmw2
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: smime.p7s
-Type: application/x-pkcs7-signature
-Size: 5745 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130910/dbeab541/attachment-0001.bin>
+> On Mon, 9 Sep 2013, Guenter Roeck wrote:
+>
+>> On Mon, Sep 09, 2013 at 09:31:41PM +0100, Russell King - ARM Linux wrote:
+>> > On Mon, Sep 09, 2013 at 09:03:48AM -0700, Guenter Roeck wrote:
+>> > > Unfortunately, there are more problems.
+>> > > 
+>> > > arch/arm/kernel/built-in.o: In function `ret_fast_syscall':
+>> > > /home/groeck/src/linux-stable/arch/arm/kernel/entry-common.S:42:
+>> > > undefined reference to `user_enter'
+>> > > arch/arm/kernel/built-in.o: In function `no_work_pending':
+>> > > /home/groeck/src/linux-stable/arch/arm/kernel/entry-common.S:77:
+>> > > undefined reference to `user_enter'
+>> > > arch/arm/kernel/built-in.o: In function `vector_swi':
+>> > > /home/groeck/src/linux-stable/arch/arm/kernel/entry-common.S:376:
+>> > > undefined reference to `user_exit'
+>> > > arch/arm/kernel/built-in.o: In function `__dabt_usr':
+>> > > /home/groeck/src/linux-stable/arch/arm/kernel/entry-armv.S:365: undefined reference to `user_exit'
+>> > > arch/arm/kernel/built-in.o: In function `__irq_usr':
+>> > > /home/groeck/src/linux-stable/arch/arm/kernel/entry-armv.S:375: undefined reference to `user_exit'
+>> > > arch/arm/kernel/built-in.o: In function `__und_usr':
+>> > > /home/groeck/src/linux-stable/arch/arm/kernel/entry-armv.S:388: undefined reference to `user_exit'
+>> > > arch/arm/kernel/built-in.o: In function `__pabt_usr':
+>> > > /home/groeck/src/linux-stable/arch/arm/kernel/entry-armv.S:662: undefined reference to `user_exit'
+>> > 
+>> > These are due to ad65782fba50 (context_tracking: Optimize main APIs off case
+>> > with static key) converting these functions to be inline.
+>> > 
+>> > No idea what the fix for this is other than reverting the change.  Any
+>> > ideas Frederic?
+>> > 
+>> I am all for reverting unless this can be fixed quickly.
+>> AFAICS this breaks all arm builds if CONFIG_CONTEXT_TRACKING is enabled.
+>> 
+>> Guenter
+>> 
