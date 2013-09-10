@@ -1,34 +1,42 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 10 Sep 2013 13:49:18 +0100
-Subject: [PATCH 17/38] iio: press: st: Append _press to pressure sensor device
- names
-In-Reply-To: <1378817379-8238-1-git-send-email-lee.jones@linaro.org>
-References: <1378817379-8238-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1378817379-8238-18-git-send-email-lee.jones@linaro.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 10 Sep 2013 14:31:35 +0200
+Subject: [PATCH 6/7] ARM: ixp4: delete irq_to_gpio
+Message-ID: <1378816295-8205-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some of ST's sensors are appended with their sensor type and some
-are not. For consistency we're extending the same naming convention
-throughout.
+This dangerous function is not used in the kernel, so let's
+just delete it.
 
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
+Cc: Imre Kaloz <kaloz@openwrt.org>
+Cc: Krzysztof Halasa <khc@pm.waw.pl>
+Cc: Alexandre Courbot <acourbot@nvidia.com>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- drivers/iio/pressure/st_pressure.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/mach-ixp4xx/common.c | 11 -----------
+ 1 file changed, 11 deletions(-)
 
-diff --git a/drivers/iio/pressure/st_pressure.h b/drivers/iio/pressure/st_pressure.h
-index b0b6306..f1bebce 100644
---- a/drivers/iio/pressure/st_pressure.h
-+++ b/drivers/iio/pressure/st_pressure.h
-@@ -14,7 +14,7 @@
- #include <linux/types.h>
- #include <linux/iio/common/st_sensors.h>
+diff --git a/arch/arm/mach-ixp4xx/common.c b/arch/arm/mach-ixp4xx/common.c
+index 5327dec..8708ac8 100644
+--- a/arch/arm/mach-ixp4xx/common.c
++++ b/arch/arm/mach-ixp4xx/common.c
+@@ -117,17 +117,6 @@ static int ixp4xx_gpio_to_irq(struct gpio_chip *chip, unsigned gpio)
+ 	return -EINVAL;
+ }
  
--#define LPS331AP_PRESS_DEV_NAME		"lps331ap"
-+#define LPS331AP_PRESS_DEV_NAME		"lps331ap_press"
- 
- /**
-  * struct st_sensors_platform_data - default press platform data
+-int irq_to_gpio(unsigned int irq)
+-{
+-	int gpio = (irq < 32) ? irq2gpio[irq] : -EINVAL;
+-
+-	if (gpio == -1)
+-		return -EINVAL;
+-
+-	return gpio;
+-}
+-EXPORT_SYMBOL(irq_to_gpio);
+-
+ static int ixp4xx_set_irq_type(struct irq_data *d, unsigned int type)
+ {
+ 	int line = irq2gpio[d->irq];
 -- 
-1.8.1.2
+1.8.3.1
