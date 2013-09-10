@@ -1,86 +1,34 @@
-From: Sudeep.KarkadaNagesha@arm.com (Sudeep KarkadaNagesha)
-Date: Tue, 10 Sep 2013 18:59:47 +0100
-Subject: [PATCH 2/4] cpufreq: imx6q-cpufreq: assign cpu_dev correctly to cpu0
- device
-In-Reply-To: <1378835989-19281-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
-References: <1378835989-19281-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
-Message-ID: <1378835989-19281-3-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+From: markus.mayer@linaro.org (Markus Mayer)
+Date: Tue, 10 Sep 2013 11:07:00 -0700
+Subject: [PATCH v9 0/3] gpio: bcm281xx: GPIO driver
+Message-ID: <1378836423-12467-1-git-send-email-markus.mayer@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
+This patch series adds the GPIO driver, and its device tree bindings,
+for the Broadcom bcm281xx family of mobile SoCs.
 
-Commit cdc58d602d2e657602a90c190cbf745886c95977 "cpufreq: imx6q-cpufreq:
-remove device tree parsing for cpu nodes" assumed the pdev->dev is set to
-cpu0 device in the platform code. But it actually points to the virtual
-cpufreq-cpu0 platform device which is not present in the device tree.
-Most of the information needed by cpufreq is stored in cpu0 DT node.
-So cpu_dev must point to cpu0 device.
+Changes since v8:
+- rebased SHA 26b0332e30c7f93e780aaa054bd84e3437f84354
+  (so it'll apply against 3.12-rc1)
+As a result:
+- patch context in patch 2/3 changed by automatic merge
+- patch context in patch 3/3 changed by manual merge
 
-This patch fixes the wrong assignment to cpu_dev.
+Markus Mayer (3):
+  gpio: bcm281xx: Add GPIO driver
+  ARM: bcm281xx: Enable GPIO driver
+  ARM: bcm281xx: Add device node for the GPIO controller
 
-Reported-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
-Cc: Shawn Guo <shawn.guo@linaro.org>
-Signed-off-by: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
----
- arch/arm/mach-imx/mach-imx6q.c  | 9 +++++++--
- drivers/cpufreq/imx6q-cpufreq.c | 7 ++++++-
- 2 files changed, 13 insertions(+), 3 deletions(-)
+ .../devicetree/bindings/gpio/gpio-bcm-kona.txt     |   52 ++
+ arch/arm/boot/dts/bcm11351.dtsi                    |   16 +
+ arch/arm/mach-bcm/Kconfig                          |    2 +-
+ drivers/gpio/Kconfig                               |    5 +
+ drivers/gpio/Makefile                              |    1 +
+ drivers/gpio/gpio-bcm-kona.c                       |  632 ++++++++++++++++++++
+ 6 files changed, 707 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/gpio/gpio-bcm-kona.txt
+ create mode 100644 drivers/gpio/gpio-bcm-kona.c
 
-diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
-index 85a1b51..90372a2 100644
---- a/arch/arm/mach-imx/mach-imx6q.c
-+++ b/arch/arm/mach-imx/mach-imx6q.c
-@@ -233,10 +233,15 @@ put_node:
- 	of_node_put(np);
- }
- 
--static void __init imx6q_opp_init(struct device *cpu_dev)
-+static void __init imx6q_opp_init(void)
- {
- 	struct device_node *np;
-+	struct device *cpu_dev = get_cpu_device(0);
- 
-+	if (!cpu_dev) {
-+		pr_warn("failed to get cpu0 device\n");
-+		return;
-+	}
- 	np = of_node_get(cpu_dev->of_node);
- 	if (!np) {
- 		pr_warn("failed to find cpu0 node\n");
-@@ -268,7 +273,7 @@ static void __init imx6q_init_late(void)
- 		imx6q_cpuidle_init();
- 
- 	if (IS_ENABLED(CONFIG_ARM_IMX6Q_CPUFREQ)) {
--		imx6q_opp_init(&imx6q_cpufreq_pdev.dev);
-+		imx6q_opp_init();
- 		platform_device_register(&imx6q_cpufreq_pdev);
- 	}
- }
-diff --git a/drivers/cpufreq/imx6q-cpufreq.c b/drivers/cpufreq/imx6q-cpufreq.c
-index 3e39654..c3fd2a1 100644
---- a/drivers/cpufreq/imx6q-cpufreq.c
-+++ b/drivers/cpufreq/imx6q-cpufreq.c
-@@ -7,6 +7,7 @@
-  */
- 
- #include <linux/clk.h>
-+#include <linux/cpu.h>
- #include <linux/cpufreq.h>
- #include <linux/delay.h>
- #include <linux/err.h>
-@@ -202,7 +203,11 @@ static int imx6q_cpufreq_probe(struct platform_device *pdev)
- 	unsigned long min_volt, max_volt;
- 	int num, ret;
- 
--	cpu_dev = &pdev->dev;
-+	cpu_dev = get_cpu_device(0);
-+	if (!cpu_dev) {
-+		pr_err("failed to get cpu0 device\n");
-+		return -ENODEV;
-+	}
- 
- 	np = of_node_get(cpu_dev->of_node);
- 	if (!np) {
 -- 
-1.8.1.2
+1.7.9.5
