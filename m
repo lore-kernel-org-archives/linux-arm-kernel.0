@@ -1,64 +1,292 @@
-From: dwmw2@infradead.org (David Woodhouse)
-Date: Tue, 10 Sep 2013 17:00:47 +0100
-Subject: [GIT PULL 0/3] ARM: SoC: Second round of changes for v3.12
-In-Reply-To: <CA+55aFyRUZMJiotV0kAUoeEFpFdvK2r-3rXuS7NO4jHoQ+OkPA@mail.gmail.com>
-References: <1378766555-9679-1-git-send-email-khilman@linaro.org>
- <CA+55aFxNbH+G6DVQNxE9di_btA5hxFH93af_vjN2v0eH8e5W-g@mail.gmail.com>
- <1378825549.2627.316.camel@shinybook.infradead.org>
- <CA+55aFyRUZMJiotV0kAUoeEFpFdvK2r-3rXuS7NO4jHoQ+OkPA@mail.gmail.com>
-Message-ID: <1378828847.2627.347.camel@shinybook.infradead.org>
+From: coosty@163.com (cini)
+Date: Wed, 11 Sep 2013 00:05:55 +0800 (CST)
+Subject: [PATCH ] ARM: sunxi: Add Emac,SMP and Arch_timer support for sunxi
+ A20;Add phy cnt arch timer for ARMv7 support.
+Message-ID: <16b7467c.1f121.141089f3d81.Coremail.coosty@163.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2013-09-10 at 08:31 -0700, Linus Torvalds wrote:
-> 
-> Don't be silly. Nobody wants an extra chip. Especially not one that is
-> programmable separately from the hardware. 
 
-But if I've got device <foo> attached to pin 15 of a GPIO controller
-<bar>, surely that has to be programmed separately from the synthesis of
-the two components <foo> and <bar>?
+It has been tested on a Cubieboard 2. To use SMP you must set ARM_ARCH_TIMER and ARM_ARCH_TIMER_USE_PHYCNT when make xconfig.?
+If you have any questions or comments please feel free to contact me. ?Have a wonderful day!
 
-Yeah, if they really are all soft IP and we're *really* doing a whole
-system on a single chip, we can do it all at the same time. But it isn't
-always like that.
 
-> It's not even what I asked for. I talked about discoverable buses. How
-> hard is that to understand? No extra chips, no eeprom, just a bus with
-> a notion of configuration cycles. It doesn't even have to be as
-> complicated as PCI, it could easily be a read-only model.
 
-Setting aside the inter-component connections that are used to describe
-a *board* rather than just a bag full of components, that's still far
-from trivial to get right.
 
-Let's assume you can take the same information we have in the
-device-tree, and put it in the device itself to be accessed via
-'configuration cycles'. Yes, you can certainly avoid having physically
-separate EEPROMs for it.
+# On branch master
+# Changes to be committed:
+# ? (use "git reset HEAD <file>..." to unstage)
+#
+#	new file: ? arch/arm/mach-sunxi/headsmp.S
+#	new file: ? arch/arm/mach-sunxi/platform.h
+#	new file: ? arch/arm/mach-sunxi/platsmp.c
+#
+# Changes not staged for commit:
+# ? (use "git add <file>..." to update what will be committed)
+# ? (use "git checkout -- <file>..." to discard changes in working directory)
+#
+#	modified: ? arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
+#	modified: ? arch/arm/boot/dts/sun7i-a20.dtsi
+#	modified: ? arch/arm/include/asm/arch_timer.h
+#	modified: ? arch/arm/mach-sunxi/Makefile
+#	modified: ? arch/arm/mach-sunxi/sunxi.c
+#	modified: ? drivers/clocksource/Kconfig
+#	modified: ? drivers/clocksource/arm_arch_timer.c
 
-But look at the abortion we've made ourselves of defining the 'bindings'
-? the schemas which this extra information needs to conform to, in order
-to support the full range of devices of a given type. That's where the
-pain has *actually* been, and I suspect that's what's responsible for
-the merge issues you were dealing with. Would that really be improved by
-trying to force the various vendors of soft-IP peripherals do it
-instead? Getting *them* to play along would be like herding cats... and
-then they'd have to get their *customers*, who use their designs, to do
-it right too in order for it to really work.
 
-It's all very well saying "put it on the device and access it through
-configuration cycles", but that doesn't actually address the part of the
-problem that's been *most* problematic. If anything, I suspect it would
-make it orders of magnitude worse.
 
--- 
-dwmw2
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: smime.p7s
-Type: application/x-pkcs7-signature
-Size: 5745 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130910/b0b1eb5b/attachment.bin>
+
+
+
+
+1 Add Emac,SMP and Arch_timer support for sunxi A20 patch:
+
+
+
+
+
+
+
+
+diff --git a/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts b/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
+old mode 100644
+new mode 100755
+index 31b76f0..2e9c57c
+--- a/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
++++ b/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
+@@ -19,6 +19,22 @@
+?	compatible = "cubietech,cubieboard2", "allwinner,sun7i-a20";
+?
+?	soc at 01c00000 {
++		emac: ethernet at 01c0b000 {
++			pinctrl-names = "default";
++			pinctrl-0 = <&emac_pins_a>;
++			phy = <&phy1>;
++			status = "okay";
++		};
++
++		mdio at 01c0b080 {
++			status = "okay";
++
++			phy1: ethernet-phy at 1 {
++				reg = <1>;
++			};
++		};
++	
++	
+?		pinctrl at 01c20800 {
+?			led_pins_cubieboard2: led_pins at 0 {
+?				allwinner,pins = "PH20", "PH21";
+diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
+old mode 100644
+new mode 100755
+index 999ff45..4c7dd37
+--- a/arch/arm/boot/dts/sun7i-a20.dtsi
++++ b/arch/arm/boot/dts/sun7i-a20.dtsi
+@@ -20,16 +20,18 @@
+?		#address-cells = <1>;
+?		#size-cells = <0>;
+?
+-		cpu at 0 {
++		cpu0: cpu at 0 ?{
+?			compatible = "arm,cortex-a7";
+?			device_type = "cpu";
+?			reg = <0>;
++			clock-frequency = <1000000000>;
+?		};
+?
+-		cpu at 1 {
++		cpu1: cpu at 1 {
+?			compatible = "arm,cortex-a7";
+?			device_type = "cpu";
+?			reg = <1>;
++			clock-frequency = <1000000000>;			
+?		};
+?	};
+?
+@@ -161,12 +163,36 @@
+?		};
+?	};
+?
++
++
+?	soc at 01c00000 {
+?		compatible = "simple-bus";
+?		#address-cells = <1>;
+?		#size-cells = <1>;
+?		ranges;
+?
++		cc: cpuconfig at 01c25c00 {
++			compatible = "allwinner,sun7i-cc";
++			reg = <0x01c25c00 0x400>;
++		};
++
++		emac: ethernet at 01c0b000 {
++			compatible = "allwinner,sun4i-emac";
++			reg = <0x01c0b000 0x1000>;
++			interrupts = <0 55 1>;
++			clocks = <&ahb_gates 17>;
++			status = "disabled";
++		};
++
++		mdio: mdio at 01c0b080 {
++			compatible = "allwinner,sun4i-mdio";
++			reg = <0x01c0b080 0x14>;
++			status = "disabled";
++			#address-cells = <1>;
++			#size-cells = <0>;
++		};
++
++
+?		pio: pinctrl at 01c20800 {
+?			compatible = "allwinner,sun7i-a20-pinctrl";
+?			reg = <0x01c20800 0x400>;
+@@ -198,6 +224,18 @@
+?				allwinner,drive = <0>;
+?				allwinner,pull = <0>;
+?			};
++
++			emac_pins_a: emac0 at 0 {
++				allwinner,pins = "PA0", "PA1", "PA2",
++						"PA3", "PA4", "PA5", "PA6",
++						"PA7", "PA8", "PA9", "PA10",
++						"PA11", "PA12", "PA13", "PA14",
++						"PA15", "PA16";
++				allwinner,function = "emac";
++				allwinner,drive = <0>;
++				allwinner,pull = <0>;
++			};			
++			
+?		};
+?
+?		timer at 01c20c00 {
+@@ -307,5 +345,15 @@
+?			#interrupt-cells = <3>;
+?			interrupts = <1 9 0xf04>;
+?		};
++		
++		timer {
++			compatible ="arm,armv7-timer";
++			interrupts = <1 13 0x308>,
++				 ? ? <1 14 0x308>,
++				 ? ? <1 11 0x308>,
++				 ? ? <1 10 0x308>;
++			clock-frequency = <24000000>;
++		};		
++		
+?	};
+?};
+diff --git a/arch/arm/mach-sunxi/Makefile b/arch/arm/mach-sunxi/Makefile
+index 93bebfc..d7f1ef4 100644
+--- a/arch/arm/mach-sunxi/Makefile
++++ b/arch/arm/mach-sunxi/Makefile
+@@ -1 +1,3 @@
+?obj-$(CONFIG_ARCH_SUNXI) += sunxi.o
++obj-$(CONFIG_ARCH_SUNXI) += platsmp.o
++obj-$(CONFIG_ARCH_SUNXI) += headsmp.o
+diff --git a/arch/arm/mach-sunxi/sunxi.c b/arch/arm/mach-sunxi/sunxi.c
+old mode 100644
+new mode 100755
+index e79fb34..b6ccf20
+--- a/arch/arm/mach-sunxi/sunxi.c
++++ b/arch/arm/mach-sunxi/sunxi.c
+@@ -137,8 +137,10 @@ static const char * const sunxi_board_dt_compat[] = {
+?	"allwinner,sun7i-a20",
+?	NULL,
+?};
++extern struct smp_operations sunxi7i_smp_ops;
+?
+?DT_MACHINE_START(SUNXI_DT, "Allwinner A1X (Device Tree)")
++	.smp		= smp_ops(sunxi7i_smp_ops),	
+?	.init_machine	= sunxi_dt_init,
+?	.init_time	= sunxi_timer_init,
+?	.dt_compat	= sunxi_board_dt_compat,
+
+
+
+
+
+
+
+
+/***************************************************/
+/***************************************************/
+/***************************************************/
+2 Add phy cnt arch timer for ARMv7 support:
+diff --git a/arch/arm/include/asm/arch_timer.h b/arch/arm/include/asm/arch_timer.h
+old mode 100644
+new mode 100755
+index 5665134..24c904a
+--- a/arch/arm/include/asm/arch_timer.h
++++ b/arch/arm/include/asm/arch_timer.h
+@@ -87,6 +87,17 @@ static inline u64 arch_counter_get_cntvct(void)
+?	return cval;
+?}
+?
++static inline u64 arch_counter_get_cntpct(void)
++{
++	u64 cval;
++
++	isb();
++	asm volatile("mrrc p15, 0, %Q0, %R0, c14" : "=r" (cval));
++	return cval;
++}
++
++
++
+?static inline void arch_counter_set_user_access(void)
+?{
+?	u32 cntkctl;
+diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+old mode 100644
+new mode 100755
+index 41c6946..ae67190
+--- a/drivers/clocksource/Kconfig
++++ b/drivers/clocksource/Kconfig
+@@ -109,3 +109,12 @@ config VF_PIT_TIMER
+?	bool
+?	help
+?	 ?Support for Period Interrupt Timer on Freescale Vybrid Family SoCs.
++menu "Clock Source"
++
++config ARM_ARCH_TIMER_USE_PHYCNT
++	bool "Use Physical Count Timer"
++	depends on ARM_ARCH_TIMER
++	---help---
++ ? ? ? ? ?If bootloader dont set Virtual Offset register,Physical Count Timer is needed to replace Virtual Count Timer.
++
++endmenu	
+diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+old mode 100644
+new mode 100755
+index fbd9ccd..e2fc20a
+--- a/drivers/clocksource/arm_arch_timer.c
++++ b/drivers/clocksource/arm_arch_timer.c
+@@ -372,7 +372,11 @@ static u64 arch_counter_get_cntvct_mem(void)
+? * to exist on arm64. arm doesn't use this before DT is probed so even
+? * if we don't have the cp15 accessors we won't have a problem.
+? */
+-u64 (*arch_timer_read_counter)(void) = arch_counter_get_cntvct;
++#ifdef CONFIG_ARM_ARCH_TIMER_USE_PHYCNT
++	u64 (*arch_timer_read_counter)(void) = arch_counter_get_cntpct;
++#else
++	u64 (*arch_timer_read_counter)(void) = arch_counter_get_cntvct;
++#endif
+?
+?static cycle_t arch_counter_read(struct clocksource *cs)
+?{
+@@ -409,8 +413,12 @@ static void __init arch_counter_register(unsigned type)
+?	u64 start_count;
+?
+?	/* Register the CP15 based counter if we have one */
+-	if (type & ARCH_CP15_TIMER)
++	if (type & ARCH_CP15_TIMER)	
++#ifdef CONFIG_ARM_ARCH_TIMER_USE_PHYCNT
++		arch_timer_read_counter = arch_counter_get_cntpct;
++#else
+?		arch_timer_read_counter = arch_counter_get_cntvct;
++#endif
+?	else
+?		arch_timer_read_counter = arch_counter_get_cntvct_mem;
+?
