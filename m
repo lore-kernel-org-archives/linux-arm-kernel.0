@@ -1,292 +1,98 @@
-From: coosty@163.com (cini)
-Date: Wed, 11 Sep 2013 00:05:55 +0800 (CST)
-Subject: [PATCH ] ARM: sunxi: Add Emac,SMP and Arch_timer support for sunxi
- A20;Add phy cnt arch timer for ARMv7 support.
-Message-ID: <16b7467c.1f121.141089f3d81.Coremail.coosty@163.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 10 Sep 2013 17:13:21 +0100
+Subject: [PATCH RESEND 1/2] i2c: prepare runtime PM support for I2C
+ client devices
+In-Reply-To: <20130910142631.GL7393@intel.com>
+References: <1378733679-19500-1-git-send-email-mika.westerberg@linux.intel.com>
+ <1378733679-19500-2-git-send-email-mika.westerberg@linux.intel.com>
+ <20130909154028.GP29403@sirena.org.uk>
+ <20130910075100.GK7393@intel.com>
+ <20130910122754.GK29403@sirena.org.uk>
+ <20130910142631.GL7393@intel.com>
+Message-ID: <20130910161321.GM29403@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Sep 10, 2013 at 05:26:31PM +0300, Mika Westerberg wrote:
+> On Tue, Sep 10, 2013 at 01:27:54PM +0100, Mark Brown wrote:
 
-It has been tested on a Cubieboard 2. To use SMP you must set ARM_ARCH_TIMER and ARM_ARCH_TIMER_USE_PHYCNT when make xconfig.?
-If you have any questions or comments please feel free to contact me. ?Have a wonderful day!
+> > > There is one difference though -- runtime PM is now blocked by default and
+> > > it needs to be unblocked from the userspace per each device.
 
+> > ...as you say.
 
+> > This seems crazy, why on earth would we want to have userspace be forced
+> > to manually go through every single device and manually enable power
+> > saving?  I can't see anyone finding that helpful and it's going to be a
+> > pain to deploy.
 
+> There are things like HID over I2C devices (e.g touch screen) where going
+> to lower power states too aggressively makes the touch experience really
+> sluggish. However, other HID over I2C devices like sensor hubs it doesn't
+> matter that much. In order to get the best performance we have runtime PM
+> blocked by default (and leave it up to the user to unblock to get power
+> savings).
 
-# On branch master
-# Changes to be committed:
-# ? (use "git reset HEAD <file>..." to unstage)
-#
-#	new file: ? arch/arm/mach-sunxi/headsmp.S
-#	new file: ? arch/arm/mach-sunxi/platform.h
-#	new file: ? arch/arm/mach-sunxi/platsmp.c
-#
-# Changes not staged for commit:
-# ? (use "git add <file>..." to update what will be committed)
-# ? (use "git checkout -- <file>..." to discard changes in working directory)
-#
-#	modified: ? arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
-#	modified: ? arch/arm/boot/dts/sun7i-a20.dtsi
-#	modified: ? arch/arm/include/asm/arch_timer.h
-#	modified: ? arch/arm/mach-sunxi/Makefile
-#	modified: ? arch/arm/mach-sunxi/sunxi.c
-#	modified: ? drivers/clocksource/Kconfig
-#	modified: ? drivers/clocksource/arm_arch_timer.c
+> That's basically what PCI drivers currently do.
 
+So those specific devices need to implement runtime PM in an appropriate
+fashion.  That's no need to implement a poor default for every single
+device to work around poor implementations from some, especially when it
+requires a userspace update to get acceptable performance again from the
+unaffected devices.
 
+> > However I had thought it was just a case of the drivers doing a put()
+> > instead of their current code to enable runtime PM (you mention that
+> > later on)?
 
+> User still needs to unblock runtime PM for the device. The driver can call
+> the runtime PM functions but they don't have any effect until runtime PM is
+> unblocked by the user.
 
+> However, I don't have problems dropping the call to pm_runtime_forbid() in
+> this patch and leave it up to the user to decide whether runtime PM should
+> be blocked for the device.
 
+I think this is essential - we can't really go around forcing userspace
+updates to restore runtime power management, nobody is going to thank us
+for that and it sounds like the issue you're trying to solve is device
+specific anyway.
 
+> > > 	- The I2C core makes sure that the device is available (from bus
+> > > 	  point of view) when the driver ->probe() is called.
 
+> > I can't understand your last point here at all, sorry.  Can you expand
+> > please?
 
-1 Add Emac,SMP and Arch_timer support for sunxi A20 patch:
+> Sorry about that.
 
+> At least with ACPI enumerated I2C client devices, they might be powered off
+> by the BIOS (there are power resources attached to the devices). So when
+> the driver ->probe() is called we can't access the device's registers etc.
 
+> So we bind the device to the ACPI power domain (the second patch in this
+> series) and then call pm_runtime_get() for the device. That makes sure that
+> the device is accessible when ->probe() is called.
 
+OK, that is very much not the model which embedded systems follow, in
+embedded systems the driver for the device is fully in control of its
+own power.  It gets resources like GPIOs and regulators which allow it
+to make fine grained decisions.
 
+> > So then the obvious followup question is why this is even something that
+> > needs to be implemented per bus?  Shouldn't we be enhancing the driver
+> > core to do this, or is that the long term plan and this is a step on the
+> > road to doing that?
 
+> If we end up all buses implementing the same mechanism, I think it makes
+> sense to move it to the driver core.
 
-
-
-diff --git a/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts b/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
-old mode 100644
-new mode 100755
-index 31b76f0..2e9c57c
---- a/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
-+++ b/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
-@@ -19,6 +19,22 @@
-?	compatible = "cubietech,cubieboard2", "allwinner,sun7i-a20";
-?
-?	soc at 01c00000 {
-+		emac: ethernet at 01c0b000 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&emac_pins_a>;
-+			phy = <&phy1>;
-+			status = "okay";
-+		};
-+
-+		mdio at 01c0b080 {
-+			status = "okay";
-+
-+			phy1: ethernet-phy at 1 {
-+				reg = <1>;
-+			};
-+		};
-+	
-+	
-?		pinctrl at 01c20800 {
-?			led_pins_cubieboard2: led_pins at 0 {
-?				allwinner,pins = "PH20", "PH21";
-diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
-old mode 100644
-new mode 100755
-index 999ff45..4c7dd37
---- a/arch/arm/boot/dts/sun7i-a20.dtsi
-+++ b/arch/arm/boot/dts/sun7i-a20.dtsi
-@@ -20,16 +20,18 @@
-?		#address-cells = <1>;
-?		#size-cells = <0>;
-?
--		cpu at 0 {
-+		cpu0: cpu at 0 ?{
-?			compatible = "arm,cortex-a7";
-?			device_type = "cpu";
-?			reg = <0>;
-+			clock-frequency = <1000000000>;
-?		};
-?
--		cpu at 1 {
-+		cpu1: cpu at 1 {
-?			compatible = "arm,cortex-a7";
-?			device_type = "cpu";
-?			reg = <1>;
-+			clock-frequency = <1000000000>;			
-?		};
-?	};
-?
-@@ -161,12 +163,36 @@
-?		};
-?	};
-?
-+
-+
-?	soc at 01c00000 {
-?		compatible = "simple-bus";
-?		#address-cells = <1>;
-?		#size-cells = <1>;
-?		ranges;
-?
-+		cc: cpuconfig at 01c25c00 {
-+			compatible = "allwinner,sun7i-cc";
-+			reg = <0x01c25c00 0x400>;
-+		};
-+
-+		emac: ethernet at 01c0b000 {
-+			compatible = "allwinner,sun4i-emac";
-+			reg = <0x01c0b000 0x1000>;
-+			interrupts = <0 55 1>;
-+			clocks = <&ahb_gates 17>;
-+			status = "disabled";
-+		};
-+
-+		mdio: mdio at 01c0b080 {
-+			compatible = "allwinner,sun4i-mdio";
-+			reg = <0x01c0b080 0x14>;
-+			status = "disabled";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+		};
-+
-+
-?		pio: pinctrl at 01c20800 {
-?			compatible = "allwinner,sun7i-a20-pinctrl";
-?			reg = <0x01c20800 0x400>;
-@@ -198,6 +224,18 @@
-?				allwinner,drive = <0>;
-?				allwinner,pull = <0>;
-?			};
-+
-+			emac_pins_a: emac0 at 0 {
-+				allwinner,pins = "PA0", "PA1", "PA2",
-+						"PA3", "PA4", "PA5", "PA6",
-+						"PA7", "PA8", "PA9", "PA10",
-+						"PA11", "PA12", "PA13", "PA14",
-+						"PA15", "PA16";
-+				allwinner,function = "emac";
-+				allwinner,drive = <0>;
-+				allwinner,pull = <0>;
-+			};			
-+			
-?		};
-?
-?		timer at 01c20c00 {
-@@ -307,5 +345,15 @@
-?			#interrupt-cells = <3>;
-?			interrupts = <1 9 0xf04>;
-?		};
-+		
-+		timer {
-+			compatible ="arm,armv7-timer";
-+			interrupts = <1 13 0x308>,
-+				 ? ? <1 14 0x308>,
-+				 ? ? <1 11 0x308>,
-+				 ? ? <1 10 0x308>;
-+			clock-frequency = <24000000>;
-+		};		
-+		
-?	};
-?};
-diff --git a/arch/arm/mach-sunxi/Makefile b/arch/arm/mach-sunxi/Makefile
-index 93bebfc..d7f1ef4 100644
---- a/arch/arm/mach-sunxi/Makefile
-+++ b/arch/arm/mach-sunxi/Makefile
-@@ -1 +1,3 @@
-?obj-$(CONFIG_ARCH_SUNXI) += sunxi.o
-+obj-$(CONFIG_ARCH_SUNXI) += platsmp.o
-+obj-$(CONFIG_ARCH_SUNXI) += headsmp.o
-diff --git a/arch/arm/mach-sunxi/sunxi.c b/arch/arm/mach-sunxi/sunxi.c
-old mode 100644
-new mode 100755
-index e79fb34..b6ccf20
---- a/arch/arm/mach-sunxi/sunxi.c
-+++ b/arch/arm/mach-sunxi/sunxi.c
-@@ -137,8 +137,10 @@ static const char * const sunxi_board_dt_compat[] = {
-?	"allwinner,sun7i-a20",
-?	NULL,
-?};
-+extern struct smp_operations sunxi7i_smp_ops;
-?
-?DT_MACHINE_START(SUNXI_DT, "Allwinner A1X (Device Tree)")
-+	.smp		= smp_ops(sunxi7i_smp_ops),	
-?	.init_machine	= sunxi_dt_init,
-?	.init_time	= sunxi_timer_init,
-?	.dt_compat	= sunxi_board_dt_compat,
-
-
-
-
-
-
-
-
-/***************************************************/
-/***************************************************/
-/***************************************************/
-2 Add phy cnt arch timer for ARMv7 support:
-diff --git a/arch/arm/include/asm/arch_timer.h b/arch/arm/include/asm/arch_timer.h
-old mode 100644
-new mode 100755
-index 5665134..24c904a
---- a/arch/arm/include/asm/arch_timer.h
-+++ b/arch/arm/include/asm/arch_timer.h
-@@ -87,6 +87,17 @@ static inline u64 arch_counter_get_cntvct(void)
-?	return cval;
-?}
-?
-+static inline u64 arch_counter_get_cntpct(void)
-+{
-+	u64 cval;
-+
-+	isb();
-+	asm volatile("mrrc p15, 0, %Q0, %R0, c14" : "=r" (cval));
-+	return cval;
-+}
-+
-+
-+
-?static inline void arch_counter_set_user_access(void)
-?{
-?	u32 cntkctl;
-diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
-old mode 100644
-new mode 100755
-index 41c6946..ae67190
---- a/drivers/clocksource/Kconfig
-+++ b/drivers/clocksource/Kconfig
-@@ -109,3 +109,12 @@ config VF_PIT_TIMER
-?	bool
-?	help
-?	 ?Support for Period Interrupt Timer on Freescale Vybrid Family SoCs.
-+menu "Clock Source"
-+
-+config ARM_ARCH_TIMER_USE_PHYCNT
-+	bool "Use Physical Count Timer"
-+	depends on ARM_ARCH_TIMER
-+	---help---
-+ ? ? ? ? ?If bootloader dont set Virtual Offset register,Physical Count Timer is needed to replace Virtual Count Timer.
-+
-+endmenu	
-diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-old mode 100644
-new mode 100755
-index fbd9ccd..e2fc20a
---- a/drivers/clocksource/arm_arch_timer.c
-+++ b/drivers/clocksource/arm_arch_timer.c
-@@ -372,7 +372,11 @@ static u64 arch_counter_get_cntvct_mem(void)
-? * to exist on arm64. arm doesn't use this before DT is probed so even
-? * if we don't have the cp15 accessors we won't have a problem.
-? */
--u64 (*arch_timer_read_counter)(void) = arch_counter_get_cntvct;
-+#ifdef CONFIG_ARM_ARCH_TIMER_USE_PHYCNT
-+	u64 (*arch_timer_read_counter)(void) = arch_counter_get_cntpct;
-+#else
-+	u64 (*arch_timer_read_counter)(void) = arch_counter_get_cntvct;
-+#endif
-?
-?static cycle_t arch_counter_read(struct clocksource *cs)
-?{
-@@ -409,8 +413,12 @@ static void __init arch_counter_register(unsigned type)
-?	u64 start_count;
-?
-?	/* Register the CP15 based counter if we have one */
--	if (type & ARCH_CP15_TIMER)
-+	if (type & ARCH_CP15_TIMER)	
-+#ifdef CONFIG_ARM_ARCH_TIMER_USE_PHYCNT
-+		arch_timer_read_counter = arch_counter_get_cntpct;
-+#else
-?		arch_timer_read_counter = arch_counter_get_cntvct;
-+#endif
-?	else
-?		arch_timer_read_counter = arch_counter_get_cntvct_mem;
-?
+If we're starting to get a reasonable number of buses following the same
+pattern it seems like we're in a position to start 
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130910/8e4f01c0/attachment-0001.sig>
