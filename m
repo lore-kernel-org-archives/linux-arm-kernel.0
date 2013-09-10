@@ -1,55 +1,152 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Tue, 10 Sep 2013 12:10:16 +0200
-Subject: kmalloc memory slower than malloc
-In-Reply-To: <alpine.DEB.2.02.1309101124450.1305@kelly.ryd.net>
-References: <alpine.DEB.2.02.1309060811400.1299@kelly.ryd.net>
- <1378458778.4208.30.camel@weser.hi.pengutronix.de>
- <alpine.DEB.2.02.1309101124450.1305@kelly.ryd.net>
-Message-ID: <1378807816.4200.6.camel@weser.hi.pengutronix.de>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Tue, 10 Sep 2013 11:25:26 +0100
+Subject: [PATCH v2 2/2] ARM: vexpress: Add CLCD Device Tree properties
+In-Reply-To: <1378808726-32535-1-git-send-email-pawel.moll@arm.com>
+References: <1378808726-32535-1-git-send-email-pawel.moll@arm.com>
+Message-ID: <1378808726-32535-2-git-send-email-pawel.moll@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, den 10.09.2013, 11:54 +0200 schrieb Thommy Jakobsson:
-> 
-> On Fri, 6 Sep 2013, Lucas Stach wrote:
-> 
-> > This is the relevant part where you are mapping things uncached into
-> > userspace, so no wonder it is slower than cached malloc memory. If you
-> > want to use cached userspace mappings you need bracketed MMAP access,
-> > where you tell the kernel by using an ioctl or something that userspace
-> > is accessing the mapping so it can flush/invalidate caches at the right
-> > points in time.
-> Removing the pgprot_noncached() seems to make things more what I expected. 
-> Both buffers takes about the same time to traverse in userspace. Thanks.
-> 
-> I changed the code in my testprogram and driver to do the same thing in 
-> kernelspace as well. And now I don't understand the result. The result 
-> stepping through and adding all bytes in a page sized buffer is about 4-5 
-> times faster to do in the kernel. This is the times for looping through 
-> the buffer 10000 times on a imx6:
-> dma_alloc_coherent in kernel   4.256s (s=0)
-> kmalloc in kernel              0.126s (s=86700000)
-> dma_alloc_coherent userspace   0.566s (s=0)
-> kmalloc in userspace          0.566s (s=86700000)
-> malloc in userspace          0.566s (s=0)
-> 
-How do you init the kmalloc memory? If you do a memset right before the
-test loop your "kmalloc in kernel" will most likely always hit in the L1
-cache, that's why it's really fast to do.
+... for V2M-P1 motherboard CLCD (limited to 640x480 16bpp and using
+dedicated video RAM bank) and for V2P-CA9 (up to 1024x768 16bpp).
 
-The userspace mapping of the kmalloc memory will get a different virtual
-address than the kernel mapping. So if you do a memset in kernelspace,
-but the test loop in userspace you'll always miss the cache as the ARM
-v7 caches are virtually indexed. So the processor always fetches data
-from memory. The performance advantage against an uncached mapping is
-entirely due to the fact that you are fetching whole cache lines
-(32bytes) from memory at once, instead of doing a memory/bus transaction
-per byte.
+Signed-off-by: Pawel Moll <pawel.moll@arm.com>
+---
+ arch/arm/boot/dts/vexpress-v2m-rs1.dtsi | 25 +++++++++++++++++++++++--
+ arch/arm/boot/dts/vexpress-v2m.dtsi     | 25 +++++++++++++++++++++++--
+ arch/arm/boot/dts/vexpress-v2p-ca9.dts  | 20 ++++++++++++++++++++
+ 3 files changed, 66 insertions(+), 4 deletions(-)
 
-Regards,
-Lucas
+diff --git a/arch/arm/boot/dts/vexpress-v2m-rs1.dtsi b/arch/arm/boot/dts/vexpress-v2m-rs1.dtsi
+index ac870fb..91dff88 100644
+--- a/arch/arm/boot/dts/vexpress-v2m-rs1.dtsi
++++ b/arch/arm/boot/dts/vexpress-v2m-rs1.dtsi
+@@ -41,7 +41,7 @@
+ 			bank-width = <4>;
+ 		};
+ 
+-		vram at 2,00000000 {
++		v2m_vram: vram at 2,00000000 {
+ 			compatible = "arm,vexpress-vram";
+ 			reg = <2 0x00000000 0x00800000>;
+ 		};
+@@ -233,6 +233,27 @@
+ 				interrupts = <14>;
+ 				clocks = <&v2m_oscclk1>, <&smbclk>;
+ 				clock-names = "clcdclk", "apb_pclk";
++
++				video-ram = <&v2m_vram>;
++				max-framebuffer-size = <614400>; /* 640x480 16bpp */
++
++				/* This is the best the CLCD can do here */
++				panel-type = "tft";
++				panel-tft-interface = <8 8 8>;
++				display-timings {
++					native-mode = <&v2m_clcd_timing0>;
++					v2m_clcd_timing0: vga {
++						clock-frequency = <25175000>;
++						hactive = <640>;
++						hback-porch = <40>;
++						hfront-porch = <24>;
++						hsync-len = <96>;
++						vactive = <480>;
++						vback-porch = <32>;
++						vfront-porch = <11>;
++						vsync-len = <2>;
++					};
++				};
+ 			};
+ 		};
+ 
+@@ -282,7 +303,7 @@
+ 				/* CLCD clock */
+ 				compatible = "arm,vexpress-osc";
+ 				arm,vexpress-sysreg,func = <1 1>;
+-				freq-range = <23750000 63500000>;
++				freq-range = <23750000 65000000>;
+ 				#clock-cells = <0>;
+ 				clock-output-names = "v2m:oscclk1";
+ 			};
+diff --git a/arch/arm/boot/dts/vexpress-v2m.dtsi b/arch/arm/boot/dts/vexpress-v2m.dtsi
+index f142036..4bc348c 100644
+--- a/arch/arm/boot/dts/vexpress-v2m.dtsi
++++ b/arch/arm/boot/dts/vexpress-v2m.dtsi
+@@ -40,7 +40,7 @@
+ 			bank-width = <4>;
+ 		};
+ 
+-		vram at 3,00000000 {
++		v2m_vram: vram at 3,00000000 {
+ 			compatible = "arm,vexpress-vram";
+ 			reg = <3 0x00000000 0x00800000>;
+ 		};
+@@ -232,6 +232,27 @@
+ 				interrupts = <14>;
+ 				clocks = <&v2m_oscclk1>, <&smbclk>;
+ 				clock-names = "clcdclk", "apb_pclk";
++
++				video-ram = <&v2m_vram>;
++				max-framebuffer-size = <614400>; /* 640x480 16bpp */
++
++				/* This is the best the CLCD can do here */
++				panel-type = "tft";
++				panel-tft-interface = <8 8 8>;
++				display-timings {
++					native-mode = <&v2m_clcd_timing0>;
++					v2m_clcd_timing0: vga {
++						clock-frequency = <25175000>;
++						hactive = <640>;
++						hback-porch = <40>;
++						hfront-porch = <24>;
++						hsync-len = <96>;
++						vactive = <480>;
++						vback-porch = <32>;
++						vfront-porch = <11>;
++						vsync-len = <2>;
++					};
++				};
+ 			};
+ 		};
+ 
+@@ -281,7 +302,7 @@
+ 				/* CLCD clock */
+ 				compatible = "arm,vexpress-osc";
+ 				arm,vexpress-sysreg,func = <1 1>;
+-				freq-range = <23750000 63500000>;
++				freq-range = <23750000 65000000>;
+ 				#clock-cells = <0>;
+ 				clock-output-names = "v2m:oscclk1";
+ 			};
+diff --git a/arch/arm/boot/dts/vexpress-v2p-ca9.dts b/arch/arm/boot/dts/vexpress-v2p-ca9.dts
+index 62d9b22..fbe1c998 100644
+--- a/arch/arm/boot/dts/vexpress-v2p-ca9.dts
++++ b/arch/arm/boot/dts/vexpress-v2p-ca9.dts
+@@ -73,6 +73,26 @@
+ 		interrupts = <0 44 4>;
+ 		clocks = <&oscclk1>, <&oscclk2>;
+ 		clock-names = "clcdclk", "apb_pclk";
++
++		max-framebuffer-size = <1572864>; /* 1024x768 16bpp */
++
++		/* This is the best the CLCD can do here */
++		panel-type = "tft";
++		panel-tft-interface = <8 8 8>;
++		display-timings {
++			native-mode = <&clcd_timing0>;
++			clcd_timing0: xga {
++				clock-frequency = <63500127>;
++				hactive = <1024>;
++				hback-porch = <152>;
++				hfront-porch = <48>;
++				hsync-len = <104>;
++				vactive = <768>;
++				vback-porch = <23>;
++				vfront-porch = <3>;
++				vsync-len = <4>;
++			};
++		};
+ 	};
+ 
+ 	memory-controller at 100e0000 {
 -- 
-Pengutronix e.K.                           | Lucas Stach                 |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-5076 |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.8.1.2
