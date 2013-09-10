@@ -1,63 +1,38 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 10 Sep 2013 11:32:41 -0600
-Subject: [PATCH v2 1/2] video: ARM CLCD: Add DT support
-In-Reply-To: <1378808726-32535-1-git-send-email-pawel.moll@arm.com>
-References: <1378808726-32535-1-git-send-email-pawel.moll@arm.com>
-Message-ID: <522F57B9.5000001@wwwdotorg.org>
+From: Sudeep.KarkadaNagesha@arm.com (Sudeep KarkadaNagesha)
+Date: Tue, 10 Sep 2013 18:59:45 +0100
+Subject: [PATCH 0/4] cpufreq: fixes for v3.12
+Message-ID: <1378835989-19281-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/10/2013 04:25 AM, Pawel Moll wrote:
-> This patch adds basic DT bindings for the PL11x CLCD cells
-> and make their fbdev driver use them.
+From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
 
-> diff --git a/Documentation/devicetree/bindings/video/arm,pl11x.txt b/Documentation/devicetree/bindings/video/arm,pl11x.txt
+Hi Shawn, Guennadi,
 
-> +Optional properties:
-> +
-> +- video-ram: phandle to a node describing specialized video memory
-> +		(that is *not* described in the top level "memory" node)
-> +		that must be used as a framebuffer, eg. due to restrictions
-> +		of the system interconnect; the node must contain a
-> +		standard reg property describing the address and the size
-> +		of the memory area
+These are the fixes for the issue reported by Guennadi.
+cpu_dev should point to cpu0 device instead of cpufreq-cpu0 platform
+devices. The dev_id is also updated while registering the cpu clocks.
 
-Should this use the "CMA bindings" that are being proposed at the moment?
+Can you review these ? Tested-by is much appreciated as I don't
+have hardware to check the fix.
 
-Even if not, I'm not quite clear on what the referenced node is supposed
-to contain; is just a reg property enough, so you'd see the following at
-a completely arbitrary location in the DT:
+Regards,
+Sudeep
 
-framebuffer-mem {
-    reg = <0x80000000 0x00100000>;
-};
+Sudeep KarkadaNagesha (4):
+  cpufreq: cpufreq-cpu0: assign cpu_dev correctly to cpu0 device
+  cpufreq: imx6q-cpufreq: assign cpu_dev correctly to cpu0 device
+  ARM: i.MX: change dev_id to cpu0 while registering cpu clock
+  ARM: shmobile: change dev_id to cpu0 while registering cpu clock
 
-I'm not sure what the benefit of making this a standalone node is; why
-not just put the base/size directly into the video-ram property in the
-CLCD node?
+ arch/arm/mach-imx/clk-imx27.c          | 2 +-
+ arch/arm/mach-imx/clk-imx51-imx53.c    | 2 +-
+ arch/arm/mach-imx/mach-imx6q.c         | 9 +++++++--
+ arch/arm/mach-shmobile/clock-r8a73a4.c | 2 +-
+ arch/arm/mach-shmobile/clock-sh73a0.c  | 2 +-
+ drivers/cpufreq/cpufreq-cpu0.c         | 7 ++++++-
+ drivers/cpufreq/imx6q-cpufreq.c        | 7 ++++++-
+ 7 files changed, 23 insertions(+), 8 deletions(-)
 
-> +- max-framebuffer-size: maximum size in bytes of the framebuffer the
-> +			system can handle, eg. in terms of available
-> +			memory bandwidth
-
-Size doesn't imply bandwidth, due to the potential for varying bpp,
-frame-rates, margin/porch sizes, etc. If this is a bandwidth limit,
-shouldn't we instead represent that value directly, perhaps along with
-some multiplier to convert theoretical bandwidth to practical bandwidth
-(to account for memory protocol and controller overheads)?
-
-...
-> +- panel-type: (required) must be "tft" or "stn", defines panel type
-...
-> +- panel-stn-4bit: (for monochrome "stn" panel) if present means
-> +			that the monochrome display is connected
-> +			via 4 bit-wide interface
-
-I just wanted to confirm that those are a complete/direct representation
-of all the HW options the module supports?
-
-> +- display-timings: standard display timings sub-node, see
-> +			Documentation/devicetree/bindings/video/display-timing.txt
-
-Should that be in a "Required sub-nodes" section (I assume required not
-optional) rather than "Optional Properties"?
+-- 
+1.8.1.2
