@@ -1,75 +1,169 @@
-From: B38611@freescale.com (Duan Fugang-B38611)
-Date: Tue, 10 Sep 2013 01:26:49 +0000
-Subject: [PATCH v2 2/4] ARM: dts: add fec phy reset for imx6sl evk board
-In-Reply-To: <20130909145333.GA5815@S2101-09.ap.freescale.net>
-References: <1378182385-9205-1-git-send-email-B38611@freescale.com>
- <1378182385-9205-3-git-send-email-B38611@freescale.com>
- <20130909145333.GA5815@S2101-09.ap.freescale.net>
-Message-ID: <9848F2DB572E5649BA045B288BE08FBE016A7AB8@039-SN2MPN1-023.039d.mgd.msft.net>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Tue, 10 Sep 2013 10:23:16 +0800
+Subject: [PATCH 1/1] ARM: imx: mx6sl-evk: Enable USB function
+Message-ID: <1378779796-32004-1-git-send-email-peter.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Shawn Guo [mailto:shawn.guo at linaro.org]
-Sent: Monday, September 09, 2013 10:54 PM + 800
+Enable USB function for OTG 1 and OTG 2 at mx6sololite evk.
+Besides, fix the wrong interrupt number for OTG2 and host 1.
 
-> To: Duan Fugang-B38611
-> Cc: devicetree at vger.kernel.org; linux-arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH v2 2/4] ARM: dts: add fec phy reset for imx6sl evk
-> board
-> 
-> On Tue, Sep 03, 2013 at 12:26:23PM +0800, Fugang Duan wrote:
-> > Add fec phy gpio reset for imx6sl evk board. imx6sl evk board use
-> > GPIO4_21 to do phy reset, so add phy-reset-gpios and
-> > phy-reset-duration propery initial for fec device node.
-> >
-> > Signed-off-by: Fugang Duan  <B38611@freescale.com>
-> 
-> I have to drop this patch for now, because it causes a regression for me.
-> 
-> Before this patch, we can at least get a working fec driver in kernel if
-> U-Boot sets it up properly, e.g. we download kernel from network.  But
-> with the patch, the fec driver stops working on linux-next in the same use
-> case.
-> 
-> Shawn
+Signed-off-by: Peter Chen <peter.chen@freescale.com>
+---
+ arch/arm/boot/dts/imx6sl-evk.dts |   39 ++++++++++++++++++++++++
+ arch/arm/boot/dts/imx6sl.dtsi    |   62 ++++++++++++++++++++++++++++++++++++-
+ 2 files changed, 99 insertions(+), 2 deletions(-)
 
-Shawn, you cannot drop this patch.
-1. Why do you get a working fec driver in kernel if U-Boot sets it up properly ?
-   Because the phy reset done by uboot, kernel cannot depend on uboot.
-   And even so, the driver still have problem for unit test.
-2. You see freescale internal kernel(3.10.9) work fine. There have one driver patch don't upstream.
-   I will send it out to net tree for review.
-
-Thanks,
-Andy
-> 
-> > ---
-> >  arch/arm/boot/dts/imx6sl-evk.dts |    3 +++
-> >  1 files changed, 3 insertions(+), 0 deletions(-)
-> >
-> > diff --git a/arch/arm/boot/dts/imx6sl-evk.dts
-> > b/arch/arm/boot/dts/imx6sl-evk.dts
-> > index 2886a59..c4d32a5 100644
-> > --- a/arch/arm/boot/dts/imx6sl-evk.dts
-> > +++ b/arch/arm/boot/dts/imx6sl-evk.dts
-> > @@ -23,6 +23,8 @@
-> >  	pinctrl-names = "default";
-> >  	pinctrl-0 = <&pinctrl_fec_1>;
-> >  	phy-mode = "rmii";
-> > +	phy-reset-gpios = <&gpio4 21 0>; /* GPIO4_21 */
-> > +	phy-reset-duration = <1>;
-> >  	status = "okay";
-> >  };
-> >
-> > @@ -38,6 +40,7 @@
-> >  				MX6SL_PAD_SD2_DAT7__GPIO5_IO00    0x17059
-> >  				MX6SL_PAD_SD2_DAT6__GPIO4_IO29    0x17059
-> >  				MX6SL_PAD_REF_CLK_32K__GPIO3_IO22 0x17059
-> > +				MX6SL_PAD_FEC_TX_CLK__GPIO4_IO21  0x80000000
-> >  			>;
-> >  		};
-> >  	};
-> > --
-> > 1.7.1
-> >
-> >
+diff --git a/arch/arm/boot/dts/imx6sl-evk.dts b/arch/arm/boot/dts/imx6sl-evk.dts
+index c4d32a5..319afbf 100644
+--- a/arch/arm/boot/dts/imx6sl-evk.dts
++++ b/arch/arm/boot/dts/imx6sl-evk.dts
+@@ -17,6 +17,28 @@
+ 	memory {
+ 		reg = <0x80000000 0x40000000>;
+ 	};
++
++	regulators {
++		compatible = "simple-bus";
++
++		reg_usb_otg1_vbus: usb_otg1_vbus {
++			compatible = "regulator-fixed";
++			regulator-name = "usb_otg1_vbus";
++			regulator-min-microvolt = <5000000>;
++			regulator-max-microvolt = <5000000>;
++			gpio = <&gpio4 0 0>;
++			enable-active-high;
++		};
++
++		reg_usb_otg2_vbus: usb_otg2_vbus {
++			compatible = "regulator-fixed";
++			regulator-name = "usb_otg2_vbus";
++			regulator-min-microvolt = <5000000>;
++			regulator-max-microvolt = <5000000>;
++			gpio = <&gpio4 2 0>;
++			enable-active-high;
++		};
++	};
+ };
+ 
+ &fec {
+@@ -41,6 +63,8 @@
+ 				MX6SL_PAD_SD2_DAT6__GPIO4_IO29    0x17059
+ 				MX6SL_PAD_REF_CLK_32K__GPIO3_IO22 0x17059
+ 				MX6SL_PAD_FEC_TX_CLK__GPIO4_IO21  0x80000000
++				MX6SL_PAD_KEY_COL4__GPIO4_IO00	0x80000000
++				MX6SL_PAD_KEY_COL5__GPIO4_IO02	0x80000000
+ 			>;
+ 		};
+ 	};
+@@ -52,6 +76,21 @@
+ 	status = "okay";
+ };
+ 
++&usbotg1 {
++	vbus-supply = <&reg_usb_otg1_vbus>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_usbotg1_1>;
++	disable-over-current;
++	status = "okay";
++};
++
++&usbotg2 {
++	vbus-supply = <&reg_usb_otg2_vbus>;
++	dr_mode = "host";
++	disable-over-current;
++	status = "okay";
++};
++
+ &usdhc1 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_usdhc1_1>;
+diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
+index eda00e8..bcdbc6c 100644
+--- a/arch/arm/boot/dts/imx6sl.dtsi
++++ b/arch/arm/boot/dts/imx6sl.dtsi
+@@ -562,6 +562,64 @@
+ 					};
+ 				};
+ 
++				usbotg1 {
++					pinctrl_usbotg1_1: usbotg1grp-1 {
++						fsl,pins = <
++							MX6SL_PAD_EPDC_PWRCOM__USB_OTG1_ID 0x17059
++						>;
++					};
++
++					pinctrl_usbotg1_2: usbotg1grp-2 {
++						fsl,pins = <
++							MX6SL_PAD_FEC_RXD0__USB_OTG1_ID 0x17059
++						>;
++					};
++
++					pinctrl_usbotg1_3: usbotg1grp-3 {
++						fsl,pins = <
++							MX6SL_PAD_LCD_DAT1__USB_OTG1_ID 0x17059
++						>;
++					};
++
++					pinctrl_usbotg1_4: usbotg1grp-4 {
++						fsl,pins = <
++							MX6SL_PAD_REF_CLK_32K__USB_OTG1_ID 0x17059
++						>;
++					};
++
++					pinctrl_usbotg1_5: usbotg1grp-5 {
++						fsl,pins = <
++							MX6SL_PAD_SD3_DAT0__USB_OTG1_ID 0x17059
++						>;
++					};
++				};
++
++				usbotg2 {
++					pinctrl_usbotg2_1: usbotg2grp-1 {
++						fsl,pins = <
++							MX6SL_PAD_ECSPI1_SCLK__USB_OTG2_OC 0x17059
++						>;
++					};
++
++					pinctrl_usbotg2_2: usbotg2grp-2 {
++						fsl,pins = <
++							MX6SL_PAD_ECSPI2_SCLK__USB_OTG2_OC 0x17059
++						>;
++					};
++
++					pinctrl_usbotg2_3: usbotg2grp-3 {
++						fsl,pins = <
++							MX6SL_PAD_KEY_ROW5__USB_OTG2_OC 0x17059
++						>;
++					};
++
++					pinctrl_usbotg2_4: usbotg2grp-4 {
++						fsl,pins = <
++							MX6SL_PAD_SD3_DAT2__USB_OTG2_OC 0x17059
++						>;
++					};
++				};
++
+ 				usdhc1 {
+ 					pinctrl_usdhc1_1: usdhc1grp-1 {
+ 						fsl,pins = <
+@@ -669,7 +727,7 @@
+ 			usbotg2: usb@02184200 {
+ 				compatible = "fsl,imx6sl-usb", "fsl,imx27-usb";
+ 				reg = <0x02184200 0x200>;
+-				interrupts = <0 40 0x04>;
++				interrupts = <0 42 0x04>;
+ 				clocks = <&clks IMX6SL_CLK_USBOH3>;
+ 				fsl,usbphy = <&usbphy2>;
+ 				fsl,usbmisc = <&usbmisc 1>;
+@@ -679,7 +737,7 @@
+ 			usbh: usb at 02184400 {
+ 				compatible = "fsl,imx6sl-usb", "fsl,imx27-usb";
+ 				reg = <0x02184400 0x200>;
+-				interrupts = <0 42 0x04>;
++				interrupts = <0 40 0x04>;
+ 				clocks = <&clks IMX6SL_CLK_USBOH3>;
+ 				fsl,usbmisc = <&usbmisc 2>;
+ 				status = "disabled";
+-- 
+1.7.1
