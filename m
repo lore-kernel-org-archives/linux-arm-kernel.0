@@ -1,164 +1,107 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Tue, 10 Sep 2013 18:22:48 +0200 (CEST)
-Subject: "cpufreq: fix serialization issues with freq change notifiers"
- breaks cpufreq too
-In-Reply-To: <CAKohpomBBKLhNemVUpUHAftGhPJJe+ZB7T_9UYLD7LwpR1nK0g@mail.gmail.com>
-References: <Pine.LNX.4.64.1309091656200.6602@axis700.grange>
- <CAKohponZ+FnzqXYMbBzbun0-1iQMi2fS4syrEBC_MdF41vLCeA@mail.gmail.com>
- <Pine.LNX.4.64.1309101656150.16010@axis700.grange>
- <CAKohpomBBKLhNemVUpUHAftGhPJJe+ZB7T_9UYLD7LwpR1nK0g@mail.gmail.com>
-Message-ID: <Pine.LNX.4.64.1309101740120.16010@axis700.grange>
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Tue, 10 Sep 2013 17:23:13 +0100
+Subject: [PATCH 26/38] iio: pressure-core: st: Clean-up probe() function
+In-Reply-To: <1378817379-8238-27-git-send-email-lee.jones@linaro.org>
+References: <1378817379-8238-1-git-send-email-lee.jones@linaro.org>
+ <1378817379-8238-27-git-send-email-lee.jones@linaro.org>
+Message-ID: <02cccf68-fdc6-4ac3-a5d7-adfa10fa1c46@email.android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 10 Sep 2013, Viresh Kumar wrote:
 
-> On 10 September 2013 20:42, Guennadi Liakhovetski <g.liakhovetski@gmx.de> wrote:
-> > 4. reverted that commit, resolving a trivial conflict. Added a debug
-> > output in __cpufreq_driver_target() of
-> >
-> >
-> >         if (cpufreq_disabled())
-> >                 return -ENODEV;
-> > +       pr_info("%s() %d\n", __func__, policy->transition_ongoing);
-> >         if (policy->transition_ongoing)
-> >                 return -EBUSY;
+
+Lee Jones <lee.jones@linaro.org> wrote:
+>This patch contains some pretty basic clean-ups in probe() pertaining
+>to
+>the simplification of error handling and a couple of readability
+>adaptions.
+>
+>Signed-off-by: Lee Jones <lee.jones@linaro.org>
+>---
+>drivers/iio/pressure/st_pressure_core.c | 32
+>++++++++++++++++----------------
+> 1 file changed, 16 insertions(+), 16 deletions(-)
+>
+>diff --git a/drivers/iio/pressure/st_pressure_core.c
+>b/drivers/iio/pressure/st_pressure_core.c
+>index 3abada2..6ffd949 100644
+>--- a/drivers/iio/pressure/st_pressure_core.c
+>+++ b/drivers/iio/pressure/st_pressure_core.c
+>@@ -232,21 +232,23 @@ static const struct iio_trigger_ops
+>st_press_trigger_ops = {
+> int st_press_common_probe(struct iio_dev *indio_dev,
+> 				struct st_sensors_platform_data *plat_data)
+> {
+>-	int err;
+> 	struct st_sensor_data *pdata = iio_priv(indio_dev);
+>+	int irq = pdata->get_irq_data_ready(indio_dev);
+>+	int err;
 > 
-> Are you sure this diff is on linux-next and not after the revert that
-> you mentioned later in the mail? There is some locking introduced
-> by my patch which I can't see in you diff..
-
-Of course, isn't that what I've written above? reverted a commit and added 
-debug - in that order.
-
-> > Built and booted, got
-> >
-> > cpufreq: __cpufreq_driver_target(): 1
-> >
-> > printed out 4 times from the beginning.
-> >
-> > 5. tried
-> >
-> > echo powersave > /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor
-> >
-> > the above output appeared 2 more times - no frequency change resulted.
-> >
-> > 6. reverted commit dceff5ce18801dddc220d6238628619c93bc3cb6, built booted
-> > - cpufreq works again.
-> >
-> >> I am afraid you need to give us some more information on how it broke
-> >> your stuff.. :)
-> >
-> > Hope the above is enough.
+> 	indio_dev->modes = INDIO_DIRECT_MODE;
+> 	indio_dev->info = &press_info;
 > 
-> A bit more would be helpful.. Can you add these debug prints to all the places
-> where transition_ongoing is getting modified? with %s, __func__ to distinguish
-> them better? That will make it a bit easy for me...
+> 	err = st_sensors_check_device_support(indio_dev,
+>-				ARRAY_SIZE(st_press_sensors), st_press_sensors);
+>+					      ARRAY_SIZE(st_press_sensors),
+>+					      st_press_sensors);
+> 	if (err < 0)
+>-		goto st_press_common_probe_error;
+>+		return err;
+> 
+> 	pdata->num_data_channels = ST_PRESS_NUMBER_DATA_CHANNELS;
+>-	pdata->multiread_bit = pdata->sensor->multi_read_bit;
+>-	indio_dev->channels = pdata->sensor->ch;
+>-	indio_dev->num_channels = pdata->sensor->num_ch;
+>+	pdata->multiread_bit     = pdata->sensor->multi_read_bit;
+>+	indio_dev->channels      = pdata->sensor->ch;
+>+	indio_dev->num_channels  = pdata->sensor->num_ch;
+> 
+> 	if (pdata->sensor->fs.addr != 0)
+> 		pdata->current_fullscale = (struct st_sensor_fullscale_avl *)
+>@@ -261,32 +263,30 @@ int st_press_common_probe(struct iio_dev
+>*indio_dev,
+> 
+> 	err = st_sensors_init_sensor(indio_dev, plat_data);
+> 	if (err < 0)
+>-		goto st_press_common_probe_error;
+>+		return err;
+> 
+>-	if (pdata->get_irq_data_ready(indio_dev) > 0) {
+>+	if (irq > 0) {
+> 		err = st_press_allocate_ring(indio_dev);
+> 		if (err < 0)
+>-			goto st_press_common_probe_error;
+>+			return err;
+> 
+> 		err = st_sensors_allocate_trigger(indio_dev,
+>-							ST_PRESS_TRIGGER_OPS);
+>+						  ST_PRESS_TRIGGER_OPS);
+> 		if (err < 0)
+> 			goto st_press_probe_trigger_error;
+> 	}
+> 
+> 	err = iio_device_register(indio_dev);
+>-	if (err)
 
-Sure, I can... So, with the performance governor I get
+This bit of handling is confusing. I would much rather see the if IRQ at the goto. Here the first thought is why is it not an error if there is no IRQ! 
+>+	if (err && irq > 0)
+> 		goto st_press_device_register_error;
+> 
+> 	return err;
+> 
+> st_press_device_register_error:
+>-	if (pdata->get_irq_data_ready(indio_dev) > 0)
+>-		st_sensors_deallocate_trigger(indio_dev);
+>+	st_sensors_deallocate_trigger(indio_dev);
+> st_press_probe_trigger_error:
+>-	if (pdata->get_irq_data_ready(indio_dev) > 0)
+>-		st_press_deallocate_ring(indio_dev);
+>-st_press_common_probe_error:
+>+	st_press_deallocate_ring(indio_dev);
+>+
+> 	return err;
+> }
+> EXPORT_SYMBOL(st_press_common_probe);
 
-[    1.290000] cpufreq-cpu0 cpufreq-cpu0: Looking up cpu0-supply from device tree
-[    1.290000] cpufreq: trying to register driver generic_cpu0
-[    1.290000] cpufreq: adding CPU 0
-[    1.290000] cpufreq: Adding link for CPU: 1
-[    1.290000] cpufreq: setting new policy for CPU 0: 398667 - 1196000 kHz
-[    1.290000] cpufreq: new min and max freqs are 398667 - 1196000 kHz
-[    1.290000] cpufreq: governor switch
-[    1.290000] cpufreq: __cpufreq_governor for CPU 0, event 4
-[    1.290000] cpufreq: __cpufreq_governor for CPU 0, event 1
-[    1.290000] cpufreq_performance: setting to 1196000 kHz because of event 1
-[    1.290000] cpufreq: __cpufreq_driver_target().1665 1
-
-This is my debug - .transition_ongoing is incremented ^^^^^^^^
-
-[    1.300000] cpufreq: target for CPU 0: 1196000 kHz, relation 1, requested 1196000 kHz
-[    1.300000] cpufreq: governor: change or update limits
-[    1.300000] cpufreq: __cpufreq_governor for CPU 0, event 3
-[    1.300000] cpufreq_performance: setting to 1196000 kHz because of event 3
-[    1.300000] cpufreq: initialization complete
-[    1.300000] cpufreq: adding CPU 1
-[    1.300000] cpufreq: driver generic_cpu0 up and running
-
-That's it. It never gets decremented again.
-
-> Also, what's the configuration of your system? How many CPUs?
-
-2 CPU cores.
-
-> And are all of them sharing clock? (I believe yes, as you are using cpufreq-cpu0)..
-
-Correct. Debug diff is below.
-
-Thanks
-Guennadi
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
-
-diff --git a/drivers/cpufreq/cpufreq.c b/drivers/cpufreq/cpufreq.c
-index ecc55d1..374e030 100644
---- a/drivers/cpufreq/cpufreq.c
-+++ b/drivers/cpufreq/cpufreq.c
-@@ -15,6 +15,8 @@
-  * published by the Free Software Foundation.
-  */
- 
-+#define DEBUG
-+
- #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
- 
- #include <linux/cpu.h>
-@@ -292,6 +294,7 @@ static void __cpufreq_notify_transition(struct cpufreq_policy *policy,
- 
- 		policy->transition_ongoing++;
- 		write_unlock_irqrestore(&cpufreq_driver_lock, flags);
-+		pr_info("%s().%d %d\n", __func__, __LINE__, policy->transition_ongoing);
- 
- 		/* detect if the driver reported a value as "old frequency"
- 		 * which is not equal to what the cpufreq core thinks is
-@@ -321,6 +324,7 @@ static void __cpufreq_notify_transition(struct cpufreq_policy *policy,
- 
- 		policy->transition_ongoing--;
- 		write_unlock_irqrestore(&cpufreq_driver_lock, flags);
-+		pr_info("%s().%d %d\n", __func__, __LINE__, policy->transition_ongoing);
- 
- 		adjust_jiffies(CPUFREQ_POSTCHANGE, freqs);
- 		pr_debug("FREQ: %lu - CPU: %lu", (unsigned long)freqs->new,
-@@ -359,6 +363,7 @@ void cpufreq_notify_transition(struct cpufreq_policy *policy,
- 		write_lock_irqsave(&cpufreq_driver_lock, flags);
- 		policy->transition_ongoing--;
- 		write_unlock_irqrestore(&cpufreq_driver_lock, flags);
-+		pr_info("%s().%d %d\n", __func__, __LINE__, policy->transition_ongoing);
- 	}
- }
- EXPORT_SYMBOL_GPL(cpufreq_notify_transition);
-@@ -1356,6 +1361,7 @@ static void cpufreq_out_of_sync(unsigned int cpu, unsigned int old_freq,
- 	}
- 	policy->transition_ongoing++;
- 	write_unlock_irqrestore(&cpufreq_driver_lock, flags);
-+	pr_info("%s().%d %d\n", __func__, __LINE__, policy->transition_ongoing);
- 
- 	cpufreq_notify_transition(policy, &freqs, CPUFREQ_PRECHANGE);
- 	cpufreq_notify_transition(policy, &freqs, CPUFREQ_POSTCHANGE);
-@@ -1656,6 +1662,7 @@ int __cpufreq_driver_target(struct cpufreq_policy *policy,
- 	}
- 	policy->transition_ongoing++;
- 	write_unlock_irqrestore(&cpufreq_driver_lock, flags);
-+	pr_info("%s().%d %d\n", __func__, __LINE__, policy->transition_ongoing);
- 
- 	/* Make sure that target_freq is within supported range */
- 	if (target_freq > policy->max)
-diff --git a/drivers/cpufreq/cpufreq_performance.c b/drivers/cpufreq/cpufreq_performance.c
-index cf117de..5575b08 100644
---- a/drivers/cpufreq/cpufreq_performance.c
-+++ b/drivers/cpufreq/cpufreq_performance.c
-@@ -10,6 +10,8 @@
-  *
-  */
- 
-+#define DEBUG
-+
- #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
- 
- #include <linux/cpufreq.h>
+-- 
+Sent from my Android phone with K-9 Mail. Please excuse my brevity.
