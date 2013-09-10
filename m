@@ -1,54 +1,86 @@
 From: Sudeep.KarkadaNagesha@arm.com (Sudeep KarkadaNagesha)
-Date: Tue, 10 Sep 2013 18:59:48 +0100
-Subject: [PATCH 3/4] ARM: i.MX: change dev_id to cpu0 while registering cpu
- clock
+Date: Tue, 10 Sep 2013 18:59:47 +0100
+Subject: [PATCH 2/4] cpufreq: imx6q-cpufreq: assign cpu_dev correctly to cpu0
+ device
 In-Reply-To: <1378835989-19281-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
 References: <1378835989-19281-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
-Message-ID: <1378835989-19281-4-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+Message-ID: <1378835989-19281-3-git-send-email-Sudeep.KarkadaNagesha@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
 
-Currently all clkdev registration use "cpufreq-cpu0.0" as dev_id
-for cpu clock which refers to virtual platform device. It needs to
-be "cpu0" instead which is actual cpu0 device id.
+Commit cdc58d602d2e657602a90c190cbf745886c95977 "cpufreq: imx6q-cpufreq:
+remove device tree parsing for cpu nodes" assumed the pdev->dev is set to
+cpu0 device in the platform code. But it actually points to the virtual
+cpufreq-cpu0 platform device which is not present in the device tree.
+Most of the information needed by cpufreq is stored in cpu0 DT node.
+So cpu_dev must point to cpu0 device.
 
-This patch changes the dev_id from "cpufreq-cpu0.0" to "cpu0".
+This patch fixes the wrong assignment to cpu_dev.
 
 Reported-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
 Cc: Shawn Guo <shawn.guo@linaro.org>
 Signed-off-by: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
 ---
- arch/arm/mach-imx/clk-imx27.c       | 2 +-
- arch/arm/mach-imx/clk-imx51-imx53.c | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/mach-imx/mach-imx6q.c  | 9 +++++++--
+ drivers/cpufreq/imx6q-cpufreq.c | 7 ++++++-
+ 2 files changed, 13 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/mach-imx/clk-imx27.c b/arch/arm/mach-imx/clk-imx27.c
-index c3cfa41..c6b40f3 100644
---- a/arch/arm/mach-imx/clk-imx27.c
-+++ b/arch/arm/mach-imx/clk-imx27.c
-@@ -285,7 +285,7 @@ int __init mx27_clocks_init(unsigned long fref)
- 	clk_register_clkdev(clk[ata_ahb_gate], "ata", NULL);
- 	clk_register_clkdev(clk[rtc_ipg_gate], NULL, "imx21-rtc");
- 	clk_register_clkdev(clk[scc_ipg_gate], "scc", NULL);
--	clk_register_clkdev(clk[cpu_div], NULL, "cpufreq-cpu0.0");
-+	clk_register_clkdev(clk[cpu_div], NULL, "cpu0");
- 	clk_register_clkdev(clk[emi_ahb_gate], "emi_ahb" , NULL);
+diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
+index 85a1b51..90372a2 100644
+--- a/arch/arm/mach-imx/mach-imx6q.c
++++ b/arch/arm/mach-imx/mach-imx6q.c
+@@ -233,10 +233,15 @@ put_node:
+ 	of_node_put(np);
+ }
  
- 	mxc_timer_init(MX27_IO_ADDRESS(MX27_GPT1_BASE_ADDR), MX27_INT_GPT1);
-diff --git a/arch/arm/mach-imx/clk-imx51-imx53.c b/arch/arm/mach-imx/clk-imx51-imx53.c
-index 1a56a33..de1964c 100644
---- a/arch/arm/mach-imx/clk-imx51-imx53.c
-+++ b/arch/arm/mach-imx/clk-imx51-imx53.c
-@@ -328,7 +328,7 @@ static void __init mx5_clocks_common_init(unsigned long rate_ckil,
- 	clk_register_clkdev(clk[ssi2_ipg_gate], NULL, "imx-ssi.1");
- 	clk_register_clkdev(clk[ssi3_ipg_gate], NULL, "imx-ssi.2");
- 	clk_register_clkdev(clk[sdma_gate], NULL, "imx35-sdma");
--	clk_register_clkdev(clk[cpu_podf], NULL, "cpufreq-cpu0.0");
-+	clk_register_clkdev(clk[cpu_podf], NULL, "cpu0");
- 	clk_register_clkdev(clk[iim_gate], "iim", NULL);
- 	clk_register_clkdev(clk[dummy], NULL, "imx2-wdt.0");
- 	clk_register_clkdev(clk[dummy], NULL, "imx2-wdt.1");
+-static void __init imx6q_opp_init(struct device *cpu_dev)
++static void __init imx6q_opp_init(void)
+ {
+ 	struct device_node *np;
++	struct device *cpu_dev = get_cpu_device(0);
+ 
++	if (!cpu_dev) {
++		pr_warn("failed to get cpu0 device\n");
++		return;
++	}
+ 	np = of_node_get(cpu_dev->of_node);
+ 	if (!np) {
+ 		pr_warn("failed to find cpu0 node\n");
+@@ -268,7 +273,7 @@ static void __init imx6q_init_late(void)
+ 		imx6q_cpuidle_init();
+ 
+ 	if (IS_ENABLED(CONFIG_ARM_IMX6Q_CPUFREQ)) {
+-		imx6q_opp_init(&imx6q_cpufreq_pdev.dev);
++		imx6q_opp_init();
+ 		platform_device_register(&imx6q_cpufreq_pdev);
+ 	}
+ }
+diff --git a/drivers/cpufreq/imx6q-cpufreq.c b/drivers/cpufreq/imx6q-cpufreq.c
+index 3e39654..c3fd2a1 100644
+--- a/drivers/cpufreq/imx6q-cpufreq.c
++++ b/drivers/cpufreq/imx6q-cpufreq.c
+@@ -7,6 +7,7 @@
+  */
+ 
+ #include <linux/clk.h>
++#include <linux/cpu.h>
+ #include <linux/cpufreq.h>
+ #include <linux/delay.h>
+ #include <linux/err.h>
+@@ -202,7 +203,11 @@ static int imx6q_cpufreq_probe(struct platform_device *pdev)
+ 	unsigned long min_volt, max_volt;
+ 	int num, ret;
+ 
+-	cpu_dev = &pdev->dev;
++	cpu_dev = get_cpu_device(0);
++	if (!cpu_dev) {
++		pr_err("failed to get cpu0 device\n");
++		return -ENODEV;
++	}
+ 
+ 	np = of_node_get(cpu_dev->of_node);
+ 	if (!np) {
 -- 
 1.8.1.2
