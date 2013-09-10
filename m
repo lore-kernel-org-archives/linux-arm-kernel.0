@@ -1,46 +1,132 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 10 Sep 2013 09:57:24 -0700
-Subject: [PATCH 01/38] ARM: ux500: Remove PrimeCell IDs from Nomadik I2C
- DT nodes
-In-Reply-To: <20130910153037.GA11227@lee--X1>
-References: <1378817379-8238-1-git-send-email-lee.jones@linaro.org>
- <1378817379-8238-2-git-send-email-lee.jones@linaro.org>
- <CAOesGMgySNLKo_H0h4MCbAWvyW0h2bWa96drWBpnhAYYQwH9mw@mail.gmail.com>
- <20130910153037.GA11227@lee--X1>
-Message-ID: <CAOesGMiBN5SaEY26SxGaw9E4ViR3cC0PcwNMEd4cLJZMfomprQ@mail.gmail.com>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Tue, 10 Sep 2013 19:07:39 +0200 (CEST)
+Subject: "cpufreq: fix serialization issues with freq change notifiers"
+ breaks cpufreq too
+In-Reply-To: <CAKohpomK7Y_6aLMA3B+hZrtgYq9U89ihgkbvYWA3BsKN3gJD3g@mail.gmail.com>
+References: <Pine.LNX.4.64.1309091656200.6602@axis700.grange>
+ <CAKohponZ+FnzqXYMbBzbun0-1iQMi2fS4syrEBC_MdF41vLCeA@mail.gmail.com>
+ <Pine.LNX.4.64.1309101656150.16010@axis700.grange>
+ <CAKohpomBBKLhNemVUpUHAftGhPJJe+ZB7T_9UYLD7LwpR1nK0g@mail.gmail.com>
+ <Pine.LNX.4.64.1309101740120.16010@axis700.grange>
+ <CAKohpomK7Y_6aLMA3B+hZrtgYq9U89ihgkbvYWA3BsKN3gJD3g@mail.gmail.com>
+Message-ID: <Pine.LNX.4.64.1309101853170.16010@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[pruning out the iio list/people]
+On Tue, 10 Sep 2013, Viresh Kumar wrote:
 
-On Tue, Sep 10, 2013 at 8:30 AM, Lee Jones <lee.jones@linaro.org> wrote:
->> On Tue, Sep 10, 2013 at 5:49 AM, Lee Jones <lee.jones@linaro.org> wrote:
->> > Turns out that they're actually not required and the driver probes just
->> > fine without them. The ID is incorrect at the moment anyway. They actually
->> > currently specify the stn8815.
->> >
->> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
->>
->> How did you test this patch? What hardware did you boot it on and with
->> what config?
->
-> Snowball, u8500_defconfig.
->
-> Why? Don't you have the same result with yours?
+> On 10 September 2013 21:52, Guennadi Liakhovetski <g.liakhovetski@gmx.de> wrote:
+> > Of course, isn't that what I've written above? reverted a commit and added
+> > debug - in that order.
+> 
+> Ok, I misread it then :(
+> 
+> > Sure, I can... So, with the performance governor I get
+> >
+> > [    1.290000] cpufreq-cpu0 cpufreq-cpu0: Looking up cpu0-supply from device tree
+> > [    1.290000] cpufreq: trying to register driver generic_cpu0
+> > [    1.290000] cpufreq: adding CPU 0
+> > [    1.290000] cpufreq: Adding link for CPU: 1
+> > [    1.290000] cpufreq: setting new policy for CPU 0: 398667 - 1196000 kHz
+> > [    1.290000] cpufreq: new min and max freqs are 398667 - 1196000 kHz
+> > [    1.290000] cpufreq: governor switch
+> > [    1.290000] cpufreq: __cpufreq_governor for CPU 0, event 4
+> > [    1.290000] cpufreq: __cpufreq_governor for CPU 0, event 1
+> > [    1.290000] cpufreq_performance: setting to 1196000 kHz because of event 1
+> > [    1.290000] cpufreq: __cpufreq_driver_target().1665 1
+> >
+> > This is my debug - .transition_ongoing is incremented ^^^^^^^^
+> >
+> > [    1.300000] cpufreq: target for CPU 0: 1196000 kHz, relation 1, requested 1196000 kHz
+> 
+> Quite straight forward actually..
 
-I have a very weird experience with snowball right now. I noticed this
-yesterday when I decided to look at why multi_v7_defconfig doesn't
-boot on it:
+Apparently, not quite.
 
-* u8500_defconfig doesn't boot as a DT kernel, since the machine ID is
-still enabled. If I disable the machine ID, it doesn't boot.
-* Same for multi_v7_defconfig, since that is only DT: It doesn't boot.
+> Please try attached patch and see if it fixes
+> your problem.. Which it should if I am not wrong.. I will send it
+> separately then..
 
-Unfortunately I can't get to my home network right now to double-check
-boot logs to see if this has changed behavior recently, I'll have to
-do that later today. It'd be interesting to hear if you have the same
-experience w.r.t. DT on u8500_defconfig though.
+It helps only once. The first switching works, the second one doesn't. 
+Below debug
 
+[   12.010000] cpufreq: setting new policy for CPU 0: 398667 - 1196000 kHz
+[   12.010000] cpufreq: new min and max freqs are 398667 - 1196000 kHz
+[   12.010000] cpufreq: governor switch
+[   12.010000] cpufreq: __cpufreq_governor for CPU 0, event 2
+[   12.010000] cpufreq: __cpufreq_governor for CPU 0, event 5
+[   12.010000] ondemand governor failed, too long transition latency of HW, fallback to performance governor
+[   12.020000] cpufreq: __cpufreq_governor for CPU 0, event 4
+[   12.020000] cpufreq: __cpufreq_governor for CPU 0, event 1
+[   12.020000] cpufreq_performance: setting to 1196000 kHz because of event 1
+[   12.020000] cpufreq: target for CPU 0: 1196000 kHz, relation 1, requested 1196000 kHz
+[   12.020000] cpufreq: governor: change or update limits
+[   12.020000] cpufreq: __cpufreq_governor for CPU 0, event 3
+[   12.020000] cpufreq_performance: setting to 1196000 kHz because of event 3
+[   12.020000] cpufreq: target for CPU 0: 1196000 kHz, relation 1, requested 1196000 kHz
+[   12.030000] cpufreq: setting new policy for CPU 0: 398667 - 1196000 kHz
+[   12.030000] cpufreq: new min and max freqs are 398667 - 1196000 kHz
+[   12.030000] cpufreq: governor switch
+[   12.030000] cpufreq: __cpufreq_governor for CPU 0, event 2
+[   12.030000] cpufreq: __cpufreq_governor for CPU 0, event 5
+[   12.030000] ondemand governor failed, too long transition latency of HW, fallback to performance governor
+[   12.040000] cpufreq: __cpufreq_governor for CPU 0, event 4
+[   12.040000] cpufreq: __cpufreq_governor for CPU 0, event 1
+[   12.040000] cpufreq_performance: setting to 1196000 kHz because of event 1
+[   12.040000] cpufreq: target for CPU 0: 1196000 kHz, relation 1, requested 1196000 kHz
+[   12.040000] cpufreq: governor: change or update limits
+[   12.040000] cpufreq: __cpufreq_governor for CPU 0, event 3
+[   12.040000] cpufreq_performance: setting to 1196000 kHz because of event 3
+[   12.040000] cpufreq: target for CPU 0: 1196000 kHz, relation 1, requested 1196000 kHz
 
+echo powersave > /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor
 
--Olof
+[   66.490000] cpufreq: setting new policy for CPU 0: 398667 - 1196000 kHz
+[   66.490000] cpufreq: new min and max freqs are 398667 - 1196000 kHz
+[   66.490000] cpufreq: governor switch
+[   66.490000] cpufreq: __cpufreq_governor for CPU 0, event 2
+[   66.490000] cpufreq: __cpufreq_governor for CPU 0, event 5
+[   66.490000] cpufreq: __cpufreq_governor for CPU 0, event 4
+[   66.490000] cpufreq: __cpufreq_governor for CPU 0, event 1
+[   66.490000] cpufreq: target for CPU 0: 398667 kHz, relation 0, requested 398667 kHz
+[   66.490000] cpufreq: __cpufreq_driver_target().1677 1
+[   66.500000] cpufreq: notification 0 of frequency transition to 398666 kHz
+[   66.500000] cpufreq: __cpufreq_notify_transition().297 2
+[   66.500000] cpufreq: notification 0 of frequency transition to 398666 kHz
+[   66.500000] cpufreq: __cpufreq_notify_transition().297 3
+[   66.510000] cpufreq: notification 1 of frequency transition to 398666 kHz
+[   66.510000] cpufreq: __cpufreq_notify_transition().327 2
+[   66.520000] cpufreq: FREQ: 398666 - CPU: 0
+[   66.520000] cpufreq: notification 1 of frequency transition to 398666 kHz
+[   66.520000] cpufreq: __cpufreq_notify_transition().327 1
+[   66.520000] cpufreq: FREQ: 398666 - CPU: 1
+[   66.520000] cpufreq: cpufreq_notify_transition().366 0
+[   66.530000] cpufreq: governor: change or update limits
+[   66.530000] cpufreq: __cpufreq_governor for CPU 0, event 3
+[   66.530000] cpufreq: target for CPU 0: 398667 kHz, relation 0, requested 398667 kHz
+[   66.530000] cpufreq: __cpufreq_driver_target().1677 1
+
+echo performance > /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor
+
+[   72.470000] cpufreq: setting new policy for CPU 0: 398667 - 1196000 kHz
+[   72.470000] cpufreq: new min and max freqs are 398667 - 1196000 kHz
+[   72.470000] cpufreq: governor switch
+[   72.470000] cpufreq: __cpufreq_governor for CPU 0, event 2
+[   72.470000] cpufreq: __cpufreq_governor for CPU 0, event 5
+[   72.470000] cpufreq: __cpufreq_governor for CPU 0, event 4
+[   72.470000] cpufreq: __cpufreq_governor for CPU 0, event 1
+[   72.470000] cpufreq_performance: setting to 1196000 kHz because of event 1
+[   72.470000] cpufreq: target for CPU 0: 1196000 kHz, relation 1, requested 1196000 kHz
+[   72.470000] cpufreq: governor: change or update limits
+[   72.470000] cpufreq: __cpufreq_governor for CPU 0, event 3
+[   72.470000] cpufreq_performance: setting to 1196000 kHz because of event 3
+[   72.470000] cpufreq: target for CPU 0: 1196000 kHz, relation 1, requested 1196000 kHz
+
+> Thanks for your time..
+
+Thanks
+Guennadi
+---
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
