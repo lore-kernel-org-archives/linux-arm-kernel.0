@@ -1,80 +1,107 @@
-From: zhangwm@marvell.com (Neil Zhang)
-Date: Tue, 10 Sep 2013 13:20:48 +0800
-Subject: [PATCH] ARM: pxa: use spinlock for dma channels
-Message-ID: <1378790448-13468-1-git-send-email-zhangwm@marvell.com>
+From: koen@dominion.thruhere.net (Koen Kooi)
+Date: Tue, 10 Sep 2013 07:45:27 +0200
+Subject: [PATCH] ARM: OMAP2+: am335x-bone*: add DT for BeagleBone Black
+In-Reply-To: <522E5CF2.3080108@ti.com>
+References: <1378736961-21005-1-git-send-email-koen@dominion.thruhere.net>
+ <87zjrm81dl.fsf@linaro.org>
+ <BBAC0939-A4F9-4FEA-B137-0307D8787DC3@dominion.thruhere.net>
+ <522E1325.8050906@ti.com>
+ <41952E65-1037-4117-A1AE-8310FED59E3A@dominion.thruhere.net>
+ <522E18C0.9010909@ti.com> <522E269B.7000802@ti.com>
+ <73968C64-F0B0-4ED6-82B8-BD1966ED9D84@dominion.thruhere.net>
+ <522E2B9E.8050404@ti.com> <522E5CF2.3080108@ti.com>
+Message-ID: <36F35544-5E8D-4595-8B0C-2020130AE804@dominion.thruhere.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dma channels are managed by drivers, and it has the demux function to
-handle irqs. So it is possible to occur conflick when request or free
-dma channels; for example, when core 0 is handling the irq, while core 1
-is going to free the dma channel at the same time. So we need use
-spinlock to synchronise these two operations.
 
-Signed-off-by: Neil Zhang <zhangwm@marvell.com>
----
- arch/arm/plat-pxa/dma.c |   12 ++++++++----
- 1 file changed, 8 insertions(+), 4 deletions(-)
+Op 10 sep. 2013, om 01:42 heeft Joel Fernandes <joelf@ti.com> het volgende geschreven:
 
-diff --git a/arch/arm/plat-pxa/dma.c b/arch/arm/plat-pxa/dma.c
-index 79ef102..7897dca 100644
---- a/arch/arm/plat-pxa/dma.c
-+++ b/arch/arm/plat-pxa/dma.c
-@@ -39,6 +39,8 @@ struct dma_channel {
- static struct dma_channel *dma_channels;
- static int num_dma_channels;
- 
-+static DEFINE_SPINLOCK(dma_lock);
-+
- /*
-  * Debug fs
-  */
-@@ -288,7 +290,7 @@ int pxa_request_dma (char *name, pxa_dma_prio prio,
- 	if (!name || !irq_handler)
- 		return -EINVAL;
- 
--	local_irq_save(flags);
-+	spin_lock_irqsave(&dma_lock, flags);
- 
- 	do {
- 		/* try grabbing a DMA channel with the requested priority */
-@@ -312,7 +314,7 @@ int pxa_request_dma (char *name, pxa_dma_prio prio,
- 		i = -ENODEV;
- 	}
- 
--	local_irq_restore(flags);
-+	spin_unlock_irqrestore(&dma_lock, flags);
- 	return i;
- }
- EXPORT_SYMBOL(pxa_request_dma);
-@@ -328,10 +330,10 @@ void pxa_free_dma (int dma_ch)
- 		return;
- 	}
- 
--	local_irq_save(flags);
-+	spin_lock_irqsave(&dma_lock, flags);
- 	DCSR(dma_ch) = DCSR_STARTINTR|DCSR_ENDINTR|DCSR_BUSERR;
- 	dma_channels[dma_ch].name = NULL;
--	local_irq_restore(flags);
-+	spin_unlock_irqrestore(&dma_lock, flags);
- }
- EXPORT_SYMBOL(pxa_free_dma);
- 
-@@ -340,6 +342,7 @@ static irqreturn_t dma_irq_handler(int irq, void *dev_id)
- 	int i, dint = DINT;
- 	struct dma_channel *channel;
- 
-+	spin_lock(&dma_lock);
- 	while (dint) {
- 		i = __ffs(dint);
- 		dint &= (dint - 1);
-@@ -355,6 +358,7 @@ static irqreturn_t dma_irq_handler(int irq, void *dev_id)
- 			DCSR(i) = DCSR_STARTINTR|DCSR_ENDINTR|DCSR_BUSERR;
- 		}
- 	}
-+	spin_unlock(&dma_lock);
- 	return IRQ_HANDLED;
- }
- 
--- 
-1.7.9.5
+> On 09/09/2013 03:12 PM, Joel Fernandes wrote:
+>> On 09/09/2013 03:00 PM, Koen Kooi wrote:
+>>> 
+>>> Op 9 sep. 2013, om 21:50 heeft Joel Fernandes <joelf@ti.com> het volgende geschreven:
+>>> 
+>>>> On 09/09/2013 01:51 PM, Joel Fernandes wrote:
+>>>>> On 09/09/2013 01:43 PM, Koen Kooi wrote:
+>>>>>> 
+>>>>>> Op 9 sep. 2013, om 20:27 heeft Joel Fernandes <joelf@ti.com> het volgende geschreven:
+>>>>>> 
+>>>>>>> On 09/09/2013 10:51 AM, Koen Kooi wrote:
+>>>>>>>> 
+>>>>>>>> Op 9 sep. 2013, om 17:23 heeft Kevin Hilman <khilman@linaro.org> het volgende geschreven:
+>>>>>>>> 
+>>>>>>>>> Koen Kooi <koen@dominion.thruhere.net> writes:
+>>>>>>>>> 
+>>>>>>>>>> The BeagleBone Black is basically a regular BeagleBone with eMMC and HDMI added,
+>>>>>>>>>> so create a common dtsi both can use.
+>>>>>>>>>> 
+>>>>>>>>>> IMPORTANT: booting the existing am335x-bone.dts will blow up the HDMI transceiver
+>>>>>>>>>> after a dozen boots with an uSD card inserted because LDO will be at 3.3V instead
+>>>>>>>>>> of 1.8.
+>>>>>>>>>> 
+>>>>>>>>>> MMC support for AM335x still isn't in, so only the LDO change has been added.
+>>>>>>>>>> 
+>>>>>>>>>> Cc: stable at vger.kernel.org
+>>>>>>>>>> 
+>>>>>>>>>> Signed-off-by: Koen Kooi <koen@dominion.thruhere.net>
+>>>>>>>>>> Tested-by: Tom Rini <trini@ti.com>
+>>>>>>>>>> Tested-by: Matt Porter <matt.porter@linaro.org>
+>>>>>>>>> 
+>>>>>>>>> I guess the subject should've included v5?
+>>>>>>>> 
+>>>>>>>> Yes, I blame it on being monday :)
+>>>>>>> 
+>>>>>>> The series you're posting will require rebasing on the current MMC DT series
+>>>>>>> that is being discussed last couple of weeks on the mailing list which were
+>>>>>>> waiting until now as DMA support was missing. Now that DMA support is pulled in,
+>>>>>>> it is safe to apply those patches so I will be reposting them shortly.
+>>>>>>> 
+>>>>>>> Please hold off any changes until those patches are posted. This will avoid
+>>>>>>> unnecessary conflicts.
+>>>>>> 
+>>>>>> Or you can rebase on top of this patch since it has no dependencies *and* fixes blowing up boards. FWIW, git-rebase, git-cherry-pick and git-am -3 track the rename in my patch just fine.
+>>>>>> 
+>>>>> 
+>>>>> That's fair enough, since  Kevin Acked and Benoit is pulling it, I'm fine with
+>>>>> rebasing on top of it and we avoid any merge conflicts.
+>>>>> 
+>>>> 
+>>>> I noticed - there were still some comments from Felipe on the v4 series of this
+>>>> patch regarding RF cape and HDMI may be breaking it. How are you addressing that?
+>>> 
+>>> Capes will never go into the .dts and HDMI support needs some serious patching before it can get enabled in the DT. And the RF cape isn't being sold since it has no sw support. No need to worry about things in the 3.15/3.16 timeframe. Unless you want this LDO3 fix not to go in ASAP.
+>>> 
+>>> Joel, is there anything relevant *right now* blocking this patch going in? If not, please test it and add your Tested-by: line.
+>>> 
+>> 
+>> We don't merge things in hurry and focus is to do things the right way.. I just
+>> want to make sure that all possible comments have been addressed.
+>> 
+>> Otherwise patch looks OK and hope everyone else thinks so too. I am dealing with
+>> some merge conflicts right now with my series on top of this though, but they
+>> should be easy enough to fix up. That's delaying my testing, but otherwise as
+>> such I don't have any objection to this patch (provided the conclusion is that
+>> all comments have been addressed..). Thanks!
+> 
+> Koen,
+> 
+> One note though, since I don't use HDMI (or BBB much for that matter), I was ok
+> with taking a risk of upping the ldo3 regulator voltage to 3.3v on my board
+> which I needed to do to get to the boot prompt.
+> I applied my AM335x DMA and MMC patches and tried to boot with rootfs as MMC1.
+> 
+> With 1.8v, I get the following during boot:
+> [    2.236043] mmc0: host doesn't support card's voltages
+> [    2.241659] mmc0: error -22 whilst initialising SD card
+> 
+> That's strange because I do have an SDHC card. With 3.3v it works fine.
+> 
+> I will add a note about this to my series. Since this more of an MMC issue than
+> anything, and your patch series doesn't enable MMC, you can add my tested-by:
+> 
+> Tested-by: Joel Fernandes <joelf@ti.com>
+> 
+> Later on, the regulator voltage may need to be tweaked for MMC support.
+
+See https://lkml.org/lkml/2013/9/6/95 and https://lkml.org/lkml/2013/9/6/183
