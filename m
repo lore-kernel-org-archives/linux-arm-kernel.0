@@ -1,65 +1,75 @@
-From: Sudeep.KarkadaNagesha@arm.com (Sudeep KarkadaNagesha)
-Date: Tue, 10 Sep 2013 13:19:21 +0100
-Subject: [PATCH v2 00/03] ARM: shmobile: r8a7790 APMU SMP support
-In-Reply-To: <20130904083934.GG17329@verge.net.au>
-References: <20130828232148.7321.45739.sendpatchset@w520>
- <20130829001834.GD10207@verge.net.au>
- <CANqRtoTq=w-dsK-fkfWTO+B+VoOMRkuFjCpY=+5qjBZGxDxd+Q@mail.gmail.com>
- <20130829043424.GA20593@verge.net.au> <20130904083934.GG17329@verge.net.au>
-Message-ID: <522F0E49.9070307@arm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 10 Sep 2013 13:27:54 +0100
+Subject: [PATCH RESEND 1/2] i2c: prepare runtime PM support for I2C
+ client devices
+In-Reply-To: <20130910075100.GK7393@intel.com>
+References: <1378733679-19500-1-git-send-email-mika.westerberg@linux.intel.com>
+ <1378733679-19500-2-git-send-email-mika.westerberg@linux.intel.com>
+ <20130909154028.GP29403@sirena.org.uk>
+ <20130910075100.GK7393@intel.com>
+Message-ID: <20130910122754.GK29403@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/09/13 09:39, Simon Horman wrote:
-> On Thu, Aug 29, 2013 at 01:34:28PM +0900, Simon Horman wrote:
->> On Thu, Aug 29, 2013 at 01:11:37PM +0900, Magnus Damm wrote:
->>> On Thu, Aug 29, 2013 at 9:18 AM, Simon Horman <horms@verge.net.au> wrote:
->>>> On Thu, Aug 29, 2013 at 08:21:48AM +0900, Magnus Damm wrote:
->>>>> ARM: shmobile: r8a7790 APMU SMP support
->>>>>
->>>>> [PATCH v2 01/03] ARM: shmobile: Shared APMU SMP support code without DT
->>>>> [PATCH v2 02/03] ARM: shmobile: Add r8a7790 SMP support using APMU code
->>>>> [PATCH v2 03/03] ARM: shmobile: Add r8a7790 CA15 CPU cores
->>>>>
->>>>> This series adds SMP support to r8a7790 using the included APMU code.
->>>>> The previous version of r8a7790 support depended on the APMU code in
->>>>> "[PATCH] ARM: shmobile: Shared APMU SMP support code", but in this
->>>>> version the APMU code has been reworked to not use DT. In the future
->>>>> r8a73a4 and other SoCs may make use of the APMU as well, but the
->>>>> r8a73a4 code first needs to be adjusted to work with the CCI driver.
->>>>>
->>>>> With these patches applied r8a7790 CA15 support for SMP boot
->>>>> and CPU Hotplug is known to be working.
->>>>>
->>>>> Thanks to Sudeep for his feedback.
->>>>>
->>>>> Signed-off-by: Magnus Damm <damm@opensource.se>
->>>>
->>>> Hi Magnus,
->>>>
->>>> can I clarify that these patches are targeted at mainline?
->>>
->>> Hi Simon, yes, that's correct. It's possible to back port too if needed.
->>
->> Thanks for the clarification.
->>
->>> Actual merge is not rushing though, so please don't interpret this as
->>> any last minute v3.12 merge attempt.
->>
->> No problem, I didn't interpret it that way.
-> 
-> I have queued these up for v3.13 and they are present
-> in the freshly baked renesas-devel-20130904 tag.
-> 
-As I already mentioned I asked not to add any custom bindings to support
-multiple cluster. But this version removed APMU node from DT completely
-which is not correct.
+On Tue, Sep 10, 2013 at 10:51:00AM +0300, Mika Westerberg wrote:
+> On Mon, Sep 09, 2013 at 04:40:28PM +0100, Mark Brown wrote:
 
-Also you removed multi cluster support to avoid CCI and MCPM reuse. I
-think you may have to rework these completely when adding multi-cluster
-support. I strongly recommend to reuse the CCI and MPCM code from first
-instead of reworking again, but I leave it SH platform maintainer to
-decide.
+> > How is this going to interact with client devices which are already
+> > enabling runtime PM for themselves, and what are the advantages of doing
+> > this over having the client device enable runtime PM for itself (given
+> > that the client still needs an explicit put() adding)?
 
-Regards,
-Sudeep
+> My understanding is that you can call pm_runtime_enable() several times
+> (provided that pm_runtime_disable() is called as many times). So that
+> should have no effect on the current drivers that already take advantage of
+> runtime PM.
+
+Not quite...
+
+> There is one difference though -- runtime PM is now blocked by default and
+> it needs to be unblocked from the userspace per each device.
+
+...as you say.
+
+This seems crazy, why on earth would we want to have userspace be forced
+to manually go through every single device and manually enable power
+saving?  I can't see anyone finding that helpful and it's going to be a
+pain to deploy.
+
+However I had thought it was just a case of the drivers doing a put()
+instead of their current code to enable runtime PM (you mention that
+later on)?  That seems both sensible and doable, though it would need
+doing as part of the conversion to avoid regressions and I'd expect it
+does mean that SPI needs to be converted at the same time.
+
+> For the advantages compared to each driver handling it completely
+> themselves:
+
+> 	- Few lines less as you only need to call _put().
+> 	- It follows what is already been done for other buses, like PCI
+> 	  and AMBA .
+> 	- The I2C core makes sure that the device is available (from bus
+> 	  point of view) when the driver ->probe() is called.
+
+I can't understand your last point here at all, sorry.  Can you expand
+please?
+
+> > Given that it's relatively common for devices to have both I2C and SPI
+> > control it seems like it'd be sensible to keep the policy common between
+> > the two buses to simplify driver implementation.
+
+> Yes and IMHO if I2C and SPI follows what has already been done for other
+> buses it should make the driver writer's job easier as the usage is similar
+> from one bus to another.
+
+So then the obvious followup question is why this is even something that
+needs to be implemented per bus?  Shouldn't we be enhancing the driver
+core to do this, or is that the long term plan and this is a step on the
+road to doing that?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130910/84c482ec/attachment-0001.sig>
