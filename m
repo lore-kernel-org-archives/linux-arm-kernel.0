@@ -1,82 +1,25 @@
-From: joelf@ti.com (Joel Fernandes)
-Date: Tue, 10 Sep 2013 02:00:34 -0500
-Subject: [PATCH] RFC: interrupt consistency check for OF GPIO IRQs
-In-Reply-To: <51F8CC35.1070704@collabora.co.uk>
-References: <1375101368-17645-1-git-send-email-linus.walleij@linaro.org>
- <CACxGe6uNJNMdZ1HYGgCtLM2t2TWGCR6btjOHVmP=vDXXvvFfRg@mail.gmail.com>
- <CACRpkdYjJL6FZwEbB7XLnb9QtjB=3LeE9Ny6KQ4PkM3zpdNqqg@mail.gmail.com>
- <51F8CC35.1070704@collabora.co.uk>
-Message-ID: <522EC392.8070002@ti.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 10 Sep 2013 15:16:40 +0800
+Subject: [PATCH][RESEND] ARM: imx: remove IRQF_DISABLED
+In-Reply-To: <20130910065838.GC30088@pengutronix.de>
+References: <1378271079-24945-1-git-send-email-michael.opdenacker@free-electrons.com>
+ <20130910065838.GC30088@pengutronix.de>
+Message-ID: <20130910071636.GA7327@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/31/2013 03:35 AM, Javier Martinez Canillas wrote:
-> On 07/31/2013 01:44 AM, Linus Walleij wrote:
->> On Tue, Jul 30, 2013 at 6:30 AM, Grant Likely <grant.likely@linaro.org> wrote:
->>> On Mon, Jul 29, 2013 at 6:36 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
->>>> To solve this dilemma, perform an interrupt consistency check
->>>> when adding a GPIO chip: if the chip is both gpio-controller and
->>>> interrupt-controller, walk all children of the device tree,
->>>> check if these in turn reference the interrupt-controller, and
->>>> if they do, loop over the interrupts used by that child and
->>>> perform gpio_reques() and gpio_direction_input() on these,
->>>> making them unreachable from the GPIO side.
->>>
->>> Ugh, that's pretty awful, and it doesn't actually solve the root
->>> problem of the GPIO and IRQ subsystems not cooperating. It's also a
->>> very DT-centric solution even though we're going to see the exact same
->>> issue on ACPI machines.
->>
->> The problem is that the patches for OMAP that I applied
->> and now have had to revert solves it in an even uglier way,
->> leading to breaking boards, as was noticed.
->>
->> The approach in this patch has the potential to actually
->> work without regressing a bunch of boards...
->>
->> Whether this is a problem in ACPI or not remains to be seen,
->> but I'm not sure about that. Device trees allows for a GPIO line
->> to be used as an interrupt source and GPIO line orthogonally,
->> and that is the root of this problem. Does ACPI have the same
->> problem, or does it impose natural restrictions on such use
->> cases?
->>
+On Tue, Sep 10, 2013 at 08:58:38AM +0200, Sascha Hauer wrote:
+> On Wed, Sep 04, 2013 at 07:04:39AM +0200, Michael Opdenacker wrote:
+> > This flag is a NOOP since 2.6.35 and can be removed.
+> > 
+> > This is an update for 3.11 of a patch already sent for 3.10
+> > 
+> > Signed-off-by: Michael Opdenacker <michael.opdenacker@free-electrons.com>
 > 
-> I agree with Linus here. The problem is that GPIO controllers that can work as
-> IRQ sources are treated in the kernel as if there where two separate controlers
-> that are rather orthogonal: an irq_chip and a gpio_chip.
-> But DT allows to use a GPIO line as an IRQ just by using an omap-gpio phandle as
-> "interrupt-parent".
+> (added shawn to Cc)
 > 
-> So, there should be a place where both irq_chip and gpio_chip has to be related
-> somehow to properly configure a GPIO (request it and setting it as input) when
-> used as an IRQ by DT.
-> 
-> My patch for OMAP used an irq_domain_ops .map function handler to configure the
-> GPIO when a IRQ was mapped since that seemed to me as the best place to do it.
-> This worked well in OMAP2+ platforms but unfortunately broke OMAP1 platforms
-> since they are still using legacy domain mapping thus not call .map.
+> Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
 
-Just wondering- why .map not called for omap1? irq_create_mapping does seem to
-call  -> irq_domain_associate which calls map function. For omap case, GPIO
-driver does call irq_create_mapping, just like omap2+ no?
+Applied, thanks.
 
-Further, if for any reason the .map is not called. Can you not call gpio_request
-yourself direct in omap_gpio_chip_init function?
-
-Does it really matter if you call gpio_request from .map or from the chip_init
-function?
-
-Also on a different note.. this would call gpio_request for *every* gpio line,
-but isn't that what your original patch that got reverted was doing in
-omap_gpio_chip_init:
-
-+       if (!bank->chip.of_node)
-+               for (j = 0; j < bank->width; j++)
-+                       irq_create_mapping(bank->domain, j);
-
-Just trying to understand your initial patch better.
-
-Regards,
-
--Joel
+Shawn
