@@ -1,115 +1,68 @@
-From: joelf@ti.com (Fernandes, Joel)
-Date: Tue, 10 Sep 2013 05:53:16 +0000
-Subject: [PATCH] ARM: OMAP2+: am335x-bone*: add DT for BeagleBone Black
-In-Reply-To: <36F35544-5E8D-4595-8B0C-2020130AE804@dominion.thruhere.net>
-References: <1378736961-21005-1-git-send-email-koen@dominion.thruhere.net>
- <87zjrm81dl.fsf@linaro.org>
- <BBAC0939-A4F9-4FEA-B137-0307D8787DC3@dominion.thruhere.net>
- <522E1325.8050906@ti.com>
- <41952E65-1037-4117-A1AE-8310FED59E3A@dominion.thruhere.net>
- <522E18C0.9010909@ti.com> <522E269B.7000802@ti.com>
- <73968C64-F0B0-4ED6-82B8-BD1966ED9D84@dominion.thruhere.net>
- <522E2B9E.8050404@ti.com> <522E5CF2.3080108@ti.com>,
- <36F35544-5E8D-4595-8B0C-2020130AE804@dominion.thruhere.net>
-Message-ID: <3D397F11-B184-4DC0-BEE2-90C91DBABB0B@ti.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 10 Sep 2013 08:40:44 +0200
+Subject: [PATCHv3 2/4] ARM: dts: Add Freescale FTM PWM node for VF610.
+In-Reply-To: <1378454907-22728-3-git-send-email-Li.Xiubo@freescale.com>
+References: <1378454907-22728-1-git-send-email-Li.Xiubo@freescale.com>
+ <1378454907-22728-3-git-send-email-Li.Xiubo@freescale.com>
+Message-ID: <20130910064044.GZ30088@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On Sep 10, 2013, at 12:45 AM, "Koen Kooi" <koen@dominion.thruhere.net> wrote:
-
+On Fri, Sep 06, 2013 at 04:08:25PM +0800, Xiubo Li wrote:
+> This adds devicetree node for VF610, and there are 8 channels supported
+> by default.
 > 
-> Op 10 sep. 2013, om 01:42 heeft Joel Fernandes <joelf@ti.com> het volgende geschreven:
+> Signed-off-by: Xiubo Li <Li.Xiubo@freescale.com>
+> ---
+>  arch/arm/boot/dts/vf610.dtsi | 103 ++++++++++++++++++++++++++++++++++++++++++-
+>  1 file changed, 102 insertions(+), 1 deletion(-)
 > 
->> On 09/09/2013 03:12 PM, Joel Fernandes wrote:
->>> On 09/09/2013 03:00 PM, Koen Kooi wrote:
->>>> 
->>>> Op 9 sep. 2013, om 21:50 heeft Joel Fernandes <joelf@ti.com> het volgende geschreven:
->>>> 
->>>>> On 09/09/2013 01:51 PM, Joel Fernandes wrote:
->>>>>> On 09/09/2013 01:43 PM, Koen Kooi wrote:
->>>>>>> 
->>>>>>> Op 9 sep. 2013, om 20:27 heeft Joel Fernandes <joelf@ti.com> het volgende geschreven:
->>>>>>> 
->>>>>>>> On 09/09/2013 10:51 AM, Koen Kooi wrote:
->>>>>>>>> 
->>>>>>>>> Op 9 sep. 2013, om 17:23 heeft Kevin Hilman <khilman@linaro.org> het volgende geschreven:
->>>>>>>>> 
->>>>>>>>>> Koen Kooi <koen@dominion.thruhere.net> writes:
->>>>>>>>>> 
->>>>>>>>>>> The BeagleBone Black is basically a regular BeagleBone with eMMC and HDMI added,
->>>>>>>>>>> so create a common dtsi both can use.
->>>>>>>>>>> 
->>>>>>>>>>> IMPORTANT: booting the existing am335x-bone.dts will blow up the HDMI transceiver
->>>>>>>>>>> after a dozen boots with an uSD card inserted because LDO will be at 3.3V instead
->>>>>>>>>>> of 1.8.
->>>>>>>>>>> 
->>>>>>>>>>> MMC support for AM335x still isn't in, so only the LDO change has been added.
->>>>>>>>>>> 
->>>>>>>>>>> Cc: stable at vger.kernel.org
->>>>>>>>>>> 
->>>>>>>>>>> Signed-off-by: Koen Kooi <koen@dominion.thruhere.net>
->>>>>>>>>>> Tested-by: Tom Rini <trini@ti.com>
->>>>>>>>>>> Tested-by: Matt Porter <matt.porter@linaro.org>
->>>>>>>>>> 
->>>>>>>>>> I guess the subject should've included v5?
->>>>>>>>> 
->>>>>>>>> Yes, I blame it on being monday :)
->>>>>>>> 
->>>>>>>> The series you're posting will require rebasing on the current MMC DT series
->>>>>>>> that is being discussed last couple of weeks on the mailing list which were
->>>>>>>> waiting until now as DMA support was missing. Now that DMA support is pulled in,
->>>>>>>> it is safe to apply those patches so I will be reposting them shortly.
->>>>>>>> 
->>>>>>>> Please hold off any changes until those patches are posted. This will avoid
->>>>>>>> unnecessary conflicts.
->>>>>>> 
->>>>>>> Or you can rebase on top of this patch since it has no dependencies *and* fixes blowing up boards. FWIW, git-rebase, git-cherry-pick and git-am -3 track the rename in my patch just fine.
->>>>>> 
->>>>>> That's fair enough, since  Kevin Acked and Benoit is pulling it, I'm fine with
->>>>>> rebasing on top of it and we avoid any merge conflicts.
->>>>> 
->>>>> I noticed - there were still some comments from Felipe on the v4 series of this
->>>>> patch regarding RF cape and HDMI may be breaking it. How are you addressing that?
->>>> 
->>>> Capes will never go into the .dts and HDMI support needs some serious patching before it can get enabled in the DT. And the RF cape isn't being sold since it has no sw support. No need to worry about things in the 3.15/3.16 timeframe. Unless you want this LDO3 fix not to go in ASAP.
->>>> 
->>>> Joel, is there anything relevant *right now* blocking this patch going in? If not, please test it and add your Tested-by: line.
->>> 
->>> We don't merge things in hurry and focus is to do things the right way.. I just
->>> want to make sure that all possible comments have been addressed.
->>> 
->>> Otherwise patch looks OK and hope everyone else thinks so too. I am dealing with
->>> some merge conflicts right now with my series on top of this though, but they
->>> should be easy enough to fix up. That's delaying my testing, but otherwise as
->>> such I don't have any objection to this patch (provided the conclusion is that
->>> all comments have been addressed..). Thanks!
->> 
->> Koen,
->> 
->> One note though, since I don't use HDMI (or BBB much for that matter), I was ok
->> with taking a risk of upping the ldo3 regulator voltage to 3.3v on my board
->> which I needed to do to get to the boot prompt.
->> I applied my AM335x DMA and MMC patches and tried to boot with rootfs as MMC1.
->> 
->> With 1.8v, I get the following during boot:
->> [    2.236043] mmc0: host doesn't support card's voltages
->> [    2.241659] mmc0: error -22 whilst initialising SD card
->> 
->> That's strange because I do have an SDHC card. With 3.3v it works fine.
->> 
->> I will add a note about this to my series. Since this more of an MMC issue than
->> anything, and your patch series doesn't enable MMC, you can add my tested-by:
->> 
->> Tested-by: Joel Fernandes <joelf@ti.com>
->> 
->> Later on, the regulator voltage may need to be tweaked for MMC support.
-> 
-> See https://lkml.org/lkml/2013/9/6/95 and https://lkml.org/lkml/2013/9/6/183
+> diff --git a/arch/arm/boot/dts/vf610.dtsi b/arch/arm/boot/dts/vf610.dtsi
+> index 67d929c..44787b5 100644
+> --- a/arch/arm/boot/dts/vf610.dtsi
+> +++ b/arch/arm/boot/dts/vf610.dtsi
+> @@ -140,6 +140,37 @@
+>  				clock-names = "pit";
+>  			};
+>  
+> +			pwm0: pwm at 40038000 {
+> +				compatible = "fsl,vf610-ftm-pwm";
+> +				#pwm-cells = <3>;
+> +				reg = <0x40038000 0x1000>;
+> +				clock-names = "ftm0", "ftm0_fix_sel", "ftm0_ext_sel";
+> +				clocks = <&clks VF610_CLK_FTM0>,
+> +					<&clks VF610_CLK_FTM0_FIX_SEL>,
+> +					<&clks VF610_CLK_FTM0_EXT_SEL>;
+> +				pinctrl-names = "ch0-active", "ch0-idle", "ch1-active", "ch1-idle",
+> +						"ch2-active", "ch2-idle", "ch3-active", "ch3-idle",
+> +						"ch4-active", "ch4-idle", "ch5-active", "ch5-idle",
+> +						"ch6-active", "ch6-idle", "ch7-active", "ch7-idle";
+> +				pinctrl-0 = <&pinctrl_pwm0_ch0_active>;
+> +				pinctrl-1 = <&pinctrl_pwm0_ch0_idle>;
+> +				pinctrl-2 = <&pinctrl_pwm0_ch1_active>;
+> +				pinctrl-3 = <&pinctrl_pwm0_ch1_idle>;
+> +				pinctrl-4 = <&pinctrl_pwm0_ch2_active>;
+> +				pinctrl-5 = <&pinctrl_pwm0_ch2_idle>;
+> +				pinctrl-6 = <&pinctrl_pwm0_ch3_active>;
+> +				pinctrl-7 = <&pinctrl_pwm0_ch3_idle>;
+> +				pinctrl-8 = <&pinctrl_pwm0_ch4_active>;
+> +				pinctrl-9 = <&pinctrl_pwm0_ch4_idle>;
+> +				pinctrl-10 = <&pinctrl_pwm0_ch5_active>;
+> +				pinctrl-11 = <&pinctrl_pwm0_ch5_idle>;
+> +				pinctrl-12 = <&pinctrl_pwm0_ch6_active>;
+> +				pinctrl-13 = <&pinctrl_pwm0_ch6_idle>;
+> +				pinctrl-14 = <&pinctrl_pwm0_ch7_active>;
+> +				pinctrl-15 = <&pinctrl_pwm0_ch7_idle>;
+> +				status = "disabled";
+> +			};
 
-Ok since you said in above thread you'll rebase the card detect and the regulator fixes , I'll let you do that and drop my drop my hacked mmc1 patch for BBB from my series.
+This is a SoC file, but the pinmux is board specific. The pinmux
+settings probably shouldn't be here.
 
-Regards,
+Sascha
 
--Joel
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
