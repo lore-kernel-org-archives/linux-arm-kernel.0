@@ -1,65 +1,39 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 10 Sep 2013 13:49:02 +0100
-Subject: [PATCH 01/38] ARM: ux500: Remove PrimeCell IDs from Nomadik I2C DT
- nodes
+Date: Tue, 10 Sep 2013 13:49:04 +0100
+Subject: [PATCH 03/38] ARM: ux500: Enable the LSM303DLH Accelerator sensor
+ from DT
 In-Reply-To: <1378817379-8238-1-git-send-email-lee.jones@linaro.org>
 References: <1378817379-8238-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1378817379-8238-2-git-send-email-lee.jones@linaro.org>
+Message-ID: <1378817379-8238-4-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Turns out that they're actually not required and the driver probes just
-fine without them. The ID is incorrect at the moment anyway. They actually
-currently specify the stn8815.
+After applying this node the LSM303DLH sensor chip should probe
+successfully once the driver support has also been applied.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/boot/dts/ste-dbx5x0.dtsi | 5 -----
- 1 file changed, 5 deletions(-)
+ arch/arm/boot/dts/ste-snowball.dts | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/arch/arm/boot/dts/ste-dbx5x0.dtsi b/arch/arm/boot/dts/ste-dbx5x0.dtsi
-index 1c1091e..0c1338e 100644
---- a/arch/arm/boot/dts/ste-dbx5x0.dtsi
-+++ b/arch/arm/boot/dts/ste-dbx5x0.dtsi
-@@ -559,7 +559,6 @@
- 			compatible = "stericsson,db8500-i2c", "st,nomadik-i2c", "arm,primecell";
- 			reg = <0x80004000 0x1000>;
- 			interrupts = <0 21 IRQ_TYPE_LEVEL_HIGH>;
--			arm,primecell-periphid = <0x180024>;
+diff --git a/arch/arm/boot/dts/ste-snowball.dts b/arch/arm/boot/dts/ste-snowball.dts
+index d355d25..d1f4c60 100644
+--- a/arch/arm/boot/dts/ste-snowball.dts
++++ b/arch/arm/boot/dts/ste-snowball.dts
+@@ -161,6 +161,14 @@
+ 				vdd-supply = <&ab8500_ldo_aux1_reg>;
+ 				vddio-supply = <&db8500_vsmps2_reg>;
+ 			};
++
++			lsm303dlh_accel at 19 {
++				compatible = "st,lsm303dlh_accel";
++				reg = <0x19>;
++
++				vdd-supply = <&ab8500_ldo_aux1_reg>;
++				vddio-supply = <&db8500_vsmps2_reg>;
++			};
+ 		};
  
- 			#address-cells = <1>;
- 			#size-cells = <0>;
-@@ -572,7 +571,6 @@
- 			compatible = "stericsson,db8500-i2c", "st,nomadik-i2c", "arm,primecell";
- 			reg = <0x80122000 0x1000>;
- 			interrupts = <0 22 IRQ_TYPE_LEVEL_HIGH>;
--			arm,primecell-periphid = <0x180024>;
- 
- 			#address-cells = <1>;
- 			#size-cells = <0>;
-@@ -585,7 +583,6 @@
- 			compatible = "stericsson,db8500-i2c", "st,nomadik-i2c", "arm,primecell";
- 			reg = <0x80128000 0x1000>;
- 			interrupts = <0 55 IRQ_TYPE_LEVEL_HIGH>;
--			arm,primecell-periphid = <0x180024>;
- 
- 			#address-cells = <1>;
- 			#size-cells = <0>;
-@@ -598,7 +595,6 @@
- 			compatible = "stericsson,db8500-i2c", "st,nomadik-i2c", "arm,primecell";
- 			reg = <0x80110000 0x1000>;
- 			interrupts = <0 12 IRQ_TYPE_LEVEL_HIGH>;
--			arm,primecell-periphid = <0x180024>;
- 
- 			#address-cells = <1>;
- 			#size-cells = <0>;
-@@ -611,7 +607,6 @@
- 			compatible = "stericsson,db8500-i2c", "st,nomadik-i2c", "arm,primecell";
- 			reg = <0x8012a000 0x1000>;
- 			interrupts = <0 51 IRQ_TYPE_LEVEL_HIGH>;
--			arm,primecell-periphid = <0x180024>;
- 
- 			#address-cells = <1>;
- 			#size-cells = <0>;
+ 		uart at 80120000 {
 -- 
 1.8.1.2
