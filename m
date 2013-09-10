@@ -1,65 +1,106 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 10 Sep 2013 08:40:44 +0200
-Subject: [PATCHv3 2/4] ARM: dts: Add Freescale FTM PWM node for VF610.
-In-Reply-To: <1378454907-22728-3-git-send-email-Li.Xiubo@freescale.com>
+Date: Tue, 10 Sep 2013 08:51:46 +0200
+Subject: [PATCHv3 1/4] pwm: Add Freescale FTM PWM driver support
+In-Reply-To: <1378454907-22728-2-git-send-email-Li.Xiubo@freescale.com>
 References: <1378454907-22728-1-git-send-email-Li.Xiubo@freescale.com>
- <1378454907-22728-3-git-send-email-Li.Xiubo@freescale.com>
-Message-ID: <20130910064044.GZ30088@pengutronix.de>
+ <1378454907-22728-2-git-send-email-Li.Xiubo@freescale.com>
+Message-ID: <20130910065146.GA30088@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 06, 2013 at 04:08:25PM +0800, Xiubo Li wrote:
-> This adds devicetree node for VF610, and there are 8 channels supported
-> by default.
+On Fri, Sep 06, 2013 at 04:08:24PM +0800, Xiubo Li wrote:
+> The FTM PWM device can be found on Vybrid VF610 Tower and Layerscape LS-1 SoCs.
 > 
-> Signed-off-by: Xiubo Li <Li.Xiubo@freescale.com>
-> ---
->  arch/arm/boot/dts/vf610.dtsi | 103 ++++++++++++++++++++++++++++++++++++++++++-
->  1 file changed, 102 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/boot/dts/vf610.dtsi b/arch/arm/boot/dts/vf610.dtsi
-> index 67d929c..44787b5 100644
-> --- a/arch/arm/boot/dts/vf610.dtsi
-> +++ b/arch/arm/boot/dts/vf610.dtsi
-> @@ -140,6 +140,37 @@
->  				clock-names = "pit";
->  			};
->  
-> +			pwm0: pwm at 40038000 {
-> +				compatible = "fsl,vf610-ftm-pwm";
-> +				#pwm-cells = <3>;
-> +				reg = <0x40038000 0x1000>;
-> +				clock-names = "ftm0", "ftm0_fix_sel", "ftm0_ext_sel";
-> +				clocks = <&clks VF610_CLK_FTM0>,
-> +					<&clks VF610_CLK_FTM0_FIX_SEL>,
-> +					<&clks VF610_CLK_FTM0_EXT_SEL>;
-> +				pinctrl-names = "ch0-active", "ch0-idle", "ch1-active", "ch1-idle",
-> +						"ch2-active", "ch2-idle", "ch3-active", "ch3-idle",
-> +						"ch4-active", "ch4-idle", "ch5-active", "ch5-idle",
-> +						"ch6-active", "ch6-idle", "ch7-active", "ch7-idle";
-> +				pinctrl-0 = <&pinctrl_pwm0_ch0_active>;
-> +				pinctrl-1 = <&pinctrl_pwm0_ch0_idle>;
-> +				pinctrl-2 = <&pinctrl_pwm0_ch1_active>;
-> +				pinctrl-3 = <&pinctrl_pwm0_ch1_idle>;
-> +				pinctrl-4 = <&pinctrl_pwm0_ch2_active>;
-> +				pinctrl-5 = <&pinctrl_pwm0_ch2_idle>;
-> +				pinctrl-6 = <&pinctrl_pwm0_ch3_active>;
-> +				pinctrl-7 = <&pinctrl_pwm0_ch3_idle>;
-> +				pinctrl-8 = <&pinctrl_pwm0_ch4_active>;
-> +				pinctrl-9 = <&pinctrl_pwm0_ch4_idle>;
-> +				pinctrl-10 = <&pinctrl_pwm0_ch5_active>;
-> +				pinctrl-11 = <&pinctrl_pwm0_ch5_idle>;
-> +				pinctrl-12 = <&pinctrl_pwm0_ch6_active>;
-> +				pinctrl-13 = <&pinctrl_pwm0_ch6_idle>;
-> +				pinctrl-14 = <&pinctrl_pwm0_ch7_active>;
-> +				pinctrl-15 = <&pinctrl_pwm0_ch7_idle>;
-> +				status = "disabled";
-> +			};
+> +
+> +static int fsl_pwm_probe(struct platform_device *pdev)
+> +{
+> +	int ret = 0;
+> +	struct fsl_pwm_chip *fpc;
+> +	struct resource *res;
+> +
+> +	fpc = devm_kzalloc(&pdev->dev, sizeof(*fpc), GFP_KERNEL);
 
-This is a SoC file, but the pinmux is board specific. The pinmux
-settings probably shouldn't be here.
+You don't have to output a message when kzalloc fails, but still you
+should check for the result and return an error if necessary.
+
+With this fixed:
+
+Reviewed-by: Sascha Hauer <s.hauer@pengutronix.de>
 
 Sascha
+
+> +
+> +	ret = fsl_pwm_parse_clk_ps(fpc);
+> +	if (ret < 0)
+> +		return ret;
+> +
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	fpc->base = devm_ioremap_resource(&pdev->dev, res);
+> +	if (IS_ERR(fpc->base)) {
+> +		ret = PTR_ERR(fpc->base);
+> +		return ret;
+> +	}
+> +
+> +	fpc->pinctrl = devm_pinctrl_get(&pdev->dev);
+> +	if (IS_ERR(fpc->pinctrl)) {
+> +		ret = PTR_ERR(fpc->pinctrl);
+> +		return ret;
+> +	}
+> +
+> +	fpc->chip.ops = &fsl_pwm_ops;
+> +	fpc->chip.of_xlate = of_pwm_xlate_with_flags;
+> +	fpc->chip.of_pwm_n_cells = 3;
+> +	fpc->chip.base = -1;
+> +	fpc->chip.npwm = FTM_MAX_CHANNEL;
+> +	ret = pwmchip_add(&fpc->chip);
+> +	if (ret < 0) {
+> +		dev_err(&pdev->dev, "failed to add PWM chip %d\n", ret);
+> +		return ret;
+> +	}
+> +
+> +	platform_set_drvdata(pdev, fpc);
+> +
+> +	return 0;
+> +}
+> +
+> +static int fsl_pwm_remove(struct platform_device *pdev)
+> +{
+> +	struct fsl_pwm_chip *fpc;
+> +
+> +	fpc = platform_get_drvdata(pdev);
+> +
+> +	return pwmchip_remove(&fpc->chip);
+> +}
+> +
+> +static const struct of_device_id fsl_pwm_dt_ids[] = {
+> +	{ .compatible = "fsl,vf610-ftm-pwm", },
+> +	{ /* sentinel */ }
+> +};
+> +MODULE_DEVICE_TABLE(of, fsl_pwm_dt_ids);
+> +
+> +static struct platform_driver fsl_pwm_driver = {
+> +	.driver = {
+> +		.name = "fsl-ftm-pwm",
+> +		.owner = THIS_MODULE,
+> +		.of_match_table = of_match_ptr(fsl_pwm_dt_ids),
+> +	},
+> +	.probe = fsl_pwm_probe,
+> +	.remove = fsl_pwm_remove,
+> +};
+> +module_platform_driver(fsl_pwm_driver);
+> +
+> +MODULE_DESCRIPTION("Freescale FTM PWM Driver");
+> +MODULE_AUTHOR("Xiubo Li <Li.Xiubo@freescale.com>");
+> +MODULE_LICENSE("GPL");
+> -- 
+> 1.8.0
+> 
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
 
 -- 
 Pengutronix e.K.                           |                             |
