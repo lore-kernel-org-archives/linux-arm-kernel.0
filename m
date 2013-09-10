@@ -1,39 +1,29 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 10 Sep 2013 13:49:05 +0100
-Subject: [PATCH 04/38] ARM: ux500: Enable the LSM303DLH Magnetometer sensor
- from DT
+Date: Tue, 10 Sep 2013 13:49:09 +0100
+Subject: [PATCH 08/38] ARM: ux500: CONFIG: Enable ST's IIO Magnetometer
+ Sensors by default
 In-Reply-To: <1378817379-8238-1-git-send-email-lee.jones@linaro.org>
 References: <1378817379-8238-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1378817379-8238-5-git-send-email-lee.jones@linaro.org>
+Message-ID: <1378817379-8238-9-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After applying this node the LSM303DLH sensor chip should probe
-successfully once the driver support has also been applied.
-
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/boot/dts/ste-snowball.dts | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ arch/arm/configs/u8500_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/boot/dts/ste-snowball.dts b/arch/arm/boot/dts/ste-snowball.dts
-index d1f4c60..e37284e 100644
---- a/arch/arm/boot/dts/ste-snowball.dts
-+++ b/arch/arm/boot/dts/ste-snowball.dts
-@@ -169,6 +169,14 @@
- 				vdd-supply = <&ab8500_ldo_aux1_reg>;
- 				vddio-supply = <&db8500_vsmps2_reg>;
- 			};
-+
-+			lsm303dlh_magn at 1e {
-+				compatible = "st,lsm303dlh_magn";
-+				reg = <0x1e>;
-+
-+				vdd-supply = <&ab8500_ldo_aux1_reg>;
-+				vddio-supply = <&db8500_vsmps2_reg>;
-+			};
- 		};
- 
- 		uart at 80120000 {
+diff --git a/arch/arm/configs/u8500_defconfig b/arch/arm/configs/u8500_defconfig
+index 24f88d6..4b94b42 100644
+--- a/arch/arm/configs/u8500_defconfig
++++ b/arch/arm/configs/u8500_defconfig
+@@ -40,6 +40,7 @@ CONFIG_SENSORS_BH1780=y
+ CONFIG_IIO=y
+ CONFIG_IIO_ST_PRESS=y
+ CONFIG_IIO_ST_ACCEL_3AXIS=y
++CONFIG_IIO_ST_MAGN_3AXIS=y
+ CONFIG_NETDEVICES=y
+ CONFIG_SMSC911X=y
+ CONFIG_SMSC_PHY=y
 -- 
 1.8.1.2
