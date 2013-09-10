@@ -1,45 +1,49 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Tue, 10 Sep 2013 20:44:18 +0530
-Subject: "cpufreq: fix serialization issues with freq change notifiers"
- breaks cpufreq too
-In-Reply-To: <4292924.3iHJT5nzNS@vostro.rjw.lan>
-References: <Pine.LNX.4.64.1309091656200.6602@axis700.grange>
- <CAKohponZ+FnzqXYMbBzbun0-1iQMi2fS4syrEBC_MdF41vLCeA@mail.gmail.com>
- <4292924.3iHJT5nzNS@vostro.rjw.lan>
-Message-ID: <CAKohponUdE0LCciPb+nf3t_vfNqAy3MeWQO8gTOdEDvQJeWcgg@mail.gmail.com>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Tue, 10 Sep 2013 08:15:33 -0700
+Subject: [PATCH 1/2] ARM: dts: mx6: Add mx6solo support
+In-Reply-To: <20130910150512.GI5815@S2101-09.ap.freescale.net>
+References: <1378688408-8689-1-git-send-email-festevam@gmail.com>
+ <20130909150823.GB5815@S2101-09.ap.freescale.net>
+ <CAOMZO5Ab9qVsQica-x3091YPhttqpbr_NL=A2ddzL5znuDtAUw@mail.gmail.com>
+ <CAOCHtYhJjxBL1AY0dxc+FofXqRT25g8yaO+Z6d09mfkJWT+i+A@mail.gmail.com>
+ <CAOMZO5D8VW=M_DW69p+p512Uw9eySt+PoM-iWN=m3jXb0tfvaw@mail.gmail.com>
+ <877geohh6r.fsf@linaro.org>
+ <20130910150512.GI5815@S2101-09.ap.freescale.net>
+Message-ID: <CAGa+x84egvrdEPebTt3U=1GHpKSoAKHKs14P0ys6+21KhwT9Sw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10 September 2013 17:19, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
-> That said I'm actually unsure what problems *exactly* are fixed by commit
-> 7c30ed5.  The commit log only says that PRECHANGE or POSTCHAGE shouldn't be
-> called twice in a row, but it doesn't say why.  As the fallout indicates,
-> that actually happened before commit 7c30ed5 and nothing visibly broke, so
-> the benefit from having that commit is questionable to me.  On the other hand,
-> the commit itself is evidently broken, so what exactly is the reason for
-> keeping it?
+On Tue, Sep 10, 2013 at 8:05 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> On Tue, Sep 10, 2013 at 07:42:04AM -0700, Kevin Hilman wrote:
+>> Fabio Estevam <festevam@gmail.com> writes:
+>>
+>> > On Mon, Sep 9, 2013 at 1:19 PM, Robert Nelson <robertcnelson@gmail.com> wrote:
+>> >
+>> >>> Ok, I made this test and it booted fine.
+>> >>>
+>> >>> So I will change U-boot so that it searches for imx6dl-wandboard.dtb
+>> >>> instead of imx6s-wandboard.dtb.
+>> >>
+>> >> Since there is no WiFi/Bluetooth on the "solo" vs the wandboard dual
+>> >> lite, we should really still have a separate solo dtb file..
+>> >
+>> > I think we could still represent the im6solo-wandboard using the
+>> > imx6dl-wandboard.dts.
+>> >
+>> > In the case of lack of bcm4329 populated on a mx6solo board, the SDHC3
+>> > port will just not probe bcm4329 without any negative effect, right?
+>>
+>> I've noticed in my auto build/boot[1] that booting a wandboard solo with
+>> imx6dl-wandboard.dtb actually faults[2].  Just disabling usdhc2[3] makes
+>> it boot fine.
+>>
+>> This only happens on current linus/HEAD.  v3.11 boots fine as does
+>> linux-next (as of next-20130910.)
+>
+> It may be because commit 2af502c (mmc: sdhci: request irq after
+> sdhci_init() is called) which is on linux-next right now hasn't landed
+> on mainline yet.
 
-Okay, so the first question is can we have multiple PRECHANGE notfication
-done without any POSTCHANGE inbetween?
-- Scenario: One reading value of cpuinfo_cur_freq, which will call
-__cpufreq_cpu_get()->cpufreq_out_of_sync()->cpufreq_notify_transition()..
+Yup, linus/HEAD + that commit makes things work again.  Thanks.
 
-And ondemand governor trying to change freq of cpu and so doing notification..
-
-There can be more similar scenarios possible..
-
-
-Now Second question, is this fine to have multiple PRECHANGE notfications
-before any POSTCHANGE notification?
-
-Logically it looks obvious to me that these must be serialized..
-Otherwise this is what we are broadcasting:
-- We are changing for freq X, please prepare and let us know if you are
-okay with it..
-- Oh.. So sorry, we are changing to freq Y instead, please adjust accordingly.
-
-- Yes we have changed to freq Y...
-- Yes we have changed to freq X...
-
-This looks stupid, isn't it? I don't know how the drivers would behave when
-they see such notifications and so got to this patch initially..
+Kevin
