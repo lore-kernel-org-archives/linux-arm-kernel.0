@@ -1,29 +1,32 @@
-From: rjw@sisk.pl (Rafael J. Wysocki)
-Date: Tue, 10 Sep 2013 22:07:04 +0200
-Subject: [PATCH 0/4] cpufreq: fixes for v3.12
-In-Reply-To: <1378835989-19281-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
-References: <1378835989-19281-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
-Message-ID: <2170660.Fok0qj9HIB@vostro.rjw.lan>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 10 Sep 2013 14:02:43 -0600
+Subject: [PATCH v9 1/3] gpio: bcm281xx: Add GPIO driver
+In-Reply-To: <1378836423-12467-2-git-send-email-markus.mayer@linaro.org>
+References: <1378836423-12467-1-git-send-email-markus.mayer@linaro.org>
+ <1378836423-12467-2-git-send-email-markus.mayer@linaro.org>
+Message-ID: <522F7AE3.6050105@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, September 10, 2013 06:59:45 PM Sudeep KarkadaNagesha wrote:
-> From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
+On 09/10/2013 12:07 PM, Markus Mayer wrote:
+> From: Markus Mayer <mmayer@broadcom.com>
 > 
-> Hi Shawn, Guennadi,
+> Add the GPIO driver for the Broadcom bcm281xx family of mobile SoCs.
+> These GPIO controllers may contain up to 8 banks where each bank
+> includes 32 pins that can be driven high or low and act as an edge
+> sensitive interrupt.
 
-Hi,
+The binding,
+Reviewed-by: Stephen Warren <swarren@nvidia.com>
 
-Thanks for the fixes, ->
+although ...
 
-> These are the fixes for the issue reported by Guennadi.
-> cpu_dev should point to cpu0 device instead of cpufreq-cpu0 platform
-> devices. The dev_id is also updated while registering the cpu clocks.
-> 
-> Can you review these ? Tested-by is much appreciated as I don't
-> have hardware to check the fix.
+> diff --git a/Documentation/devicetree/bindings/gpio/gpio-bcm-kona.txt b/Documentation/devicetree/bindings/gpio/gpio-bcm-kona.txt
 
--> but I'll wait for ACKs and Tested-by replies before taking them.
+> +This GPIO driver is used in the following Broadcom SoCs:
+> +  BCM11130, BCM11140, BCM11351, BCM28145, BCM28155
 
-Thanks,
-Rafael
+Given that, I would expect the documentation of the compatible property
+to enumerate the compatible values for all of those different chips,
+although the driver could choose to only bind to e.g. brcm,bcm11351-gpio
+or brcm,kona-gpio, since they're all compatible with it.
