@@ -1,30 +1,40 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Mon, 9 Sep 2013 17:37:41 -0700
-Subject: [PATCH] ARM: vexpress: allow dcscb and tc2_pm in a combined
- ARMv6+v7 build
-In-Reply-To: <alpine.LFD.2.03.1309091224010.20709@syhkavp.arg>
-References: <alpine.LFD.2.03.1309091224010.20709@syhkavp.arg>
-Message-ID: <CAGa+x84k0O-0EZrCf0yt0G1fNbs0y8qcvpW5x9-96uxFoxB9RA@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 9 Sep 2013 17:46:00 -0700
+Subject: [GIT PULL] ARM: mvebu: fixes-non-critical for v3.12 (last one)
+In-Reply-To: <20130903122449.GF19598@titan.lakedaemon.net>
+References: <20130903122449.GF19598@titan.lakedaemon.net>
+Message-ID: <CAOesGMjFp9TQMz+ai9z4kLfhOCBLACKjc2SqFbSBy4=qZ3Yw1g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 9, 2013 at 9:31 AM, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
->
-> This fixes the following build error:
->
-> /tmp/cce439dZ.s: Assembler messages:
-> /tmp/cce439dZ.s:506: Error: selected processor does not support ARM mode `isb '
-> /tmp/cce439dZ.s:512: Error: selected processor does not support ARM mode `isb '
-> /tmp/cce439dZ.s:513: Error: selected processor does not support ARM mode `dsb '
-> /tmp/cce439dZ.s:583: Error: selected processor does not support ARM mode `isb '
-> /tmp/cce439dZ.s:589: Error: selected processor does not support ARM mode `isb '
-> /tmp/cce439dZ.s:590: Error: selected processor does not support ARM mode `dsb '
->
-> Tested-by: Guenter Roeck <linux@roeck-us.net>
-> Signed-off-by: Nicolas Pitre <nico@linaro.org>
+Hi,
 
-Tested-by: Kevin Hilman <khilman@linaro.org>
+On Tue, Sep 3, 2013 at 5:24 AM, Jason Cooper <jason@lakedaemon.net> wrote:
+> Arnd, Olof, Kevin,
+>
+> Here's the last mvebu/fixes-non-critical pull for v3.12, these came in
+> late and have been in -next for about a week.
+>
+> thx,
+>
+> Jason.
+>
+>
+> The following changes since commit 35faad2a1563b3d4dc983a82ac41033fe053870c:
+>
+>   ARM: dts: Fix memory node in skeleton64.dtsi (2013-08-07 16:33:50 +0000)
+>
+> are available in the git repository at:
+>
+>   git://git.infradead.org/linux-mvebu.git tags/fixes-non-3.12-3
+>
+> for you to fetch changes up to 4e611ae7ef492fd857f64827efda3eea09f75233:
+>
+>   bus: mvebu: add missing of_node_put() to fix reference leak (2013-08-27 14:33:38 +0000)
 
-Nice!  this helps quiet down allmodconfig builds.
+These don't seem to apply cleanly, I'm guessing because of the
+branches that we deferred to 3.13. If that's the case, then just fold
+them in there where appropriate.
 
-Kevin
+
+-Olof
