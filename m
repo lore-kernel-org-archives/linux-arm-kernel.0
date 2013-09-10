@@ -1,41 +1,68 @@
-From: thommyj@gmail.com (Thommy Jakobsson)
-Date: Tue, 10 Sep 2013 13:27:07 +0200 (CEST)
-Subject: kmalloc memory slower than malloc
-In-Reply-To: <1378807816.4200.6.camel@weser.hi.pengutronix.de>
-References: <alpine.DEB.2.02.1309060811400.1299@kelly.ryd.net>
- <1378458778.4208.30.camel@weser.hi.pengutronix.de>
- <alpine.DEB.2.02.1309101124450.1305@kelly.ryd.net>
- <1378807816.4200.6.camel@weser.hi.pengutronix.de>
-Message-ID: <alpine.DEB.2.02.1309101317500.1305@kelly.ryd.net>
+From: rjw@sisk.pl (Rafael J. Wysocki)
+Date: Tue, 10 Sep 2013 13:38:14 +0200
+Subject: [PATCH RESEND 1/2] i2c: prepare runtime PM support for I2C client
+ devices
+In-Reply-To: <20130910075100.GK7393@intel.com>
+References: <1378733679-19500-1-git-send-email-mika.westerberg@linux.intel.com>
+ <20130909154028.GP29403@sirena.org.uk> <20130910075100.GK7393@intel.com>
+Message-ID: <1713872.SpMsCYYTas@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On Tue, 10 Sep 2013, Lucas Stach wrote:
-
-> How do you init the kmalloc memory? If you do a memset right before the
-> test loop your "kmalloc in kernel" will most likely always hit in the L1
-> cache, that's why it's really fast to do.
-I did do a memset previosly but I removed it to see if I still had the 
-difference. So now I don't initilize the memory at all. The run from which 
-I attached the times had no initilization at all. Besides, I loop through 
-all bytes 10000 times, so I would assume that all would be in cache after 
-the first loop.
-
+On Tuesday, September 10, 2013 10:51:00 AM Mika Westerberg wrote:
+> On Mon, Sep 09, 2013 at 04:40:28PM +0100, Mark Brown wrote:
+> > On Mon, Sep 09, 2013 at 04:34:38PM +0300, Mika Westerberg wrote:
+> > 
+> > > +	/*
+> > > +	 * Enable runtime PM for the client device. If the client wants to
+> > > +	 * participate on runtime PM it should call pm_runtime_put() in its
+> > > +	 * probe() callback.
+> > > +	 *
+> > > +	 * User still needs to allow the PM runtime before it can actually
+> > > +	 * happen.
+> > > +	 */
+> > > +	pm_runtime_forbid(&client->dev);
+> > > +	pm_runtime_get_noresume(&client->dev);
+> > > +	pm_runtime_set_active(&client->dev);
+> > > +	pm_runtime_enable(&client->dev);
+> > 
+> > How is this going to interact with client devices which are already
+> > enabling runtime PM for themselves, and what are the advantages of doing
+> > this over having the client device enable runtime PM for itself (given
+> > that the client still needs an explicit put() adding)?
 > 
-> The userspace mapping of the kmalloc memory will get a different virtual
-> address than the kernel mapping. So if you do a memset in kernelspace,
-> but the test loop in userspace you'll always miss the cache as the ARM
-> v7 caches are virtually indexed. So the processor always fetches data
-> from memory. The performance advantage against an uncached mapping is
-> entirely due to the fact that you are fetching whole cache lines
-> (32bytes) from memory at once, instead of doing a memory/bus transaction
-> per byte.
+> My understanding is that you can call pm_runtime_enable() several times
+> (provided that pm_runtime_disable() is called as many times). So that
+> should have no effect on the current drivers that already take advantage of
+> runtime PM.
 
-I thought that the L1 data cache was physically indexed and tagged, 
-whereas the instruction cache used virtual indexing. But maybe I'm 
-wrong. The L2 cache is physically indexed and tagged though, right? 
+That's correct.
 
-Thanks,
-Thommy
+> There is one difference though -- runtime PM is now blocked by default and
+> it needs to be unblocked from the userspace per each device.
+> 
+> For the advantages compared to each driver handling it completely
+> themselves:
+> 
+> 	- Few lines less as you only need to call _put().
+> 	- It follows what is already been done for other buses, like PCI
+> 	  and AMBA .
+> 	- The I2C core makes sure that the device is available (from bus
+> 	  point of view) when the driver ->probe() is called.
+> 
+> > Given that it's relatively common for devices to have both I2C and SPI
+> > control it seems like it'd be sensible to keep the policy common between
+> > the two buses to simplify driver implementation.
+> 
+> Yes and IMHO if I2C and SPI follows what has already been done for other
+> buses it should make the driver writer's job easier as the usage is similar
+> from one bus to another.
+
+I agree here, FWIW.
+
+Thanks!
+
+
+-- 
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
