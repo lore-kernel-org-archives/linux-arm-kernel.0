@@ -1,101 +1,28 @@
-From: aaro.koskinen@iki.fi (Aaro Koskinen)
-Date: Tue, 10 Sep 2013 17:14:34 +0300
-Subject: [PATCH 0/8] IOP GPIO refactoring
-In-Reply-To: <1378741198-12847-1-git-send-email-linus.walleij@linaro.org>
-References: <1378741198-12847-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <20130910141434.GD3379@blackmetal.musicnaut.iki.fi>
+From: richardcochran@gmail.com (Richard Cochran)
+Date: Tue, 10 Sep 2013 16:19:13 +0200
+Subject: [PATCH 4/7] ptp: switch to use gpiolib
+In-Reply-To: <1378816260-8091-1-git-send-email-linus.walleij@linaro.org>
+References: <1378816260-8091-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <20130910141912.GB5088@netboy>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, Sep 10, 2013 at 02:31:00PM +0200, Linus Walleij wrote:
+> This platform supports gpiolib, so remove the custom API use
+> and replace with calls to gpiolib. Also request the GPIO before
+> starting to use it.
+> 
+> Cc: Imre Kaloz <kaloz@openwrt.org>
+> Cc: Krzysztof Halasa <khc@pm.waw.pl>
+> Cc: Alexandre Courbot <acourbot@nvidia.com>
+> Cc: Richard Cochran <richardcochran@gmail.com>
+> Cc: netdev at vger.kernel.org
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+> Hi Richard, I'm seeking an ACK on this patch to take it throug
+> the GPIO tree as part of a clean-out of custom GPIO implementations.
 
-On Mon, Sep 09, 2013 at 05:39:58PM +0200, Linus Walleij wrote:
-> This series refactor the IOP GPIO driver to move down to the
-> GPIO subsystem, instatiate as a platform device, remap its
-> I/O address, and kills off the <mach/gpio.h> dependency.
+I don't have this hardware for testing (it is really obsolete now),
+but the change looks okay to me.
 
-Patches 1-5 work on N2100. However, when pressing the power button there
-is a warning:
-
-[   31.995575] reboot: Restarting system
-[   32.023422] ------------[ cut here ]------------
-[   32.051596] WARNING: CPU: 0 PID: 251 at drivers/gpio/gpiolib.c:160 gpio_ensure_requested+0x64/0xc0()
-[   32.110436] ---[ end trace 6b2c83f883af871f ]---
-
-With patch 6 it starts to crash on first gpio_get_value(), I guess
-because gpio-iop platform device is not registered on N2100...?
-
-[    0.134359] could not request reset GPIO
-[    0.138904] could not request power GPIO
-[...]
-[    0.233579] Unable to handle kernel NULL pointer dereference at virtual address 0000004c
-[    0.242684] pgd = c0004000
-[    0.245796] [0000004c] *pgd=00000000
-[    0.249894] Internal error: Oops: f5 [#1] PREEMPT ARM
-[    0.255618] Modules linked in:
-[    0.259130] CPU: 0 PID: 1 Comm: swapper Not tainted 3.11.0-iop32x-los.git-f27051a+ #5
-[    0.267908] task: df842000 ti: df848000 task.ti: df848000
-[    0.274034] PC is at __gpio_get_value+0x1c/0x6c
-[    0.279189] LR is at __gpio_get_value+0x10/0x6c
-[    0.284336] pc : [<c016bfdc>]    lr : [<c016bfd0>]    psr: a0000053
-[    0.284336] sp : df849a58  ip : df849a58  fp : df849a74
-[    0.297272] r10: c043ad90  r9 : c043a580  r8 : c0421528
-[    0.303156] r7 : 00200200  r6 : c001a284  r5 : c0460c48  r4 : 00000000
-[    0.310488] r3 : 00000005  r2 : c043a580  r1 : 00000000  r0 : c0460c48
-[    0.317818] Flags: NzCv  IRQs on  FIQs off  Mode SVC_32  ISA ARM  Segment kernel
-[    0.326144] Control: 0000397f  Table: a0004000  DAC: 00000017
-[    0.332621] Process swapper (pid: 1, stack limit = 0xdf8481b8)
-[    0.339202] Stack: (0xdf849a58 to 0xdf84a000)
-[    0.344148] 9a40:                                                       df849a88 df848000
-[    0.353330] 9a60: 00000100 c001a284 df849a84 df849a78 c001a298 c016bfcc df849aac df849a88
-[    0.362505] 9a80: c00270e8 c001a290 df849aac df849a98 df848000 df849ac8 00000000 00200200
-[    0.371715] 9aa0: df849afc df849ab0 c0027314 c00270c8 00000000 00000000 00000001 c043b390
-[    0.380909] 9ac0: c043b190 c043af90 df849ac8 df849ac8 df849b14 00000101 00000004 c043a448
-[    0.390075] 9ae0: c043a440 df848000 00000001 00000100 df849b44 df849b00 c0020f08 c0027158
-[    0.399268] 9b00: 60000053 00000006 00000004 00200040 ffff8ae8 0000000a c00699f0 df848000
-[    0.408443] 9b20: 00000009 00000000 df849bc4 00000006 60000053 00000006 df849b5c df849b48
-[    0.417655] 9b40: c0021360 c0020e44 00000000 c0427ff4 df849b7c df849b60 c000ffc4 c00212d4
-[    0.426834] 9b60: c004a128 c004a660 60000053 ffffffff df849b8c df849b80 c00081f0 c000ff94
-[    0.436032] 9b80: df849c34 df849b90 c0012828 c00081ec 200000d3 00000000 c0422a4c 00000000
-[    0.445234] 9ba0: df848000 00000042 c0422a3c c043c518 00000006 60000053 00000006 df849c34
-[    0.454418] 9bc0: df849b88 df849bd8 c004a128 c004a660 60000053 ffffffff 00000000 00000000
-[    0.463595] 9be0: df849c40 00000026 c043ce00 00000042 c01babfc c016350c 00000026 00000000
-[    0.472779] 9c00: df849c40 00000000 df849c84 df849c40 00000006 c03b2418 df849cfc 00000000
-[    0.481962] 9c20: df8280e0 df841868 df849cdc df849c38 c01bacec c004a508 c03b2418 df849cfc
-[    0.491157] 9c40: 53425553 45545359 63703d4d 45440069 45434956 63702b3d 30303a69 303a3030
-[    0.500357] 9c60: 32303a30 df00302e df848000 00010000 df8419d8 00000000 df849ccc df849c88
-[    0.509569] 9c80: c0022850 c0021648 df849c94 df849c98 c004a730 80000000 ffffffff 00010000
-[    0.518743] 9ca0: c0013b30 df841800 df849ccc 00000004 df8419d8 df81bc00 00000300 00010000
-[    0.527919] 9cc0: df841868 df849d30 00000006 000001d8 df849cf4 df849ce0 c01bad1c c01baca4
-[    0.537086] 9ce0: 84080000 df849cfc df849d24 df849d00 c01bb7cc c01bad04 c03b2418 c03ae008
-[    0.546270] 9d00: df825d60 df849d30 c0178360 df841800 df8419d8 00000006 df849d48 df849d28
-[    0.555472] 9d20: c01bb824 c01bb780 df840030 df849d50 c03ae460 df849d2c 000001d8 df849d94
-[    0.564665] 9d40: df849d58 c01787a8 c01bb7f8 c03ae460 00000006 df8419d8 60000053 ffffffff
-[    0.573857] 9d60: 00000000 00000000 00000000 df82e540 df8419d8 df849e30 00000000 00000000
-[    0.583044] 9d80: df8280e0 00000006 df849dc4 df849d98 c0178ed0 c01786fc df8280e0 df849e88
-[    0.592226] 9da0: df849e30 df849df0 df849df8 00000000 00000000 df81bc00 df849e2c df849dc8
-[    0.601420] 9dc0: c0179344 c0178e6c df86ec00 00000607 df849e30 df86edd8 0000001c df82e740
-[    0.610630] 9de0: df849e2c df849df0 00000000 c0022a34 df849df0 df849df0 df849df8 df849df8
-[    0.619833] 9e00: c01761c0 df81bc14 df849e30 df81bc14 00000000 00000000 df8280e0 df81bc00
-[    0.629025] 9e20: df849e64 df849e30 c02ff674 c0178f38 df82e800 df82e640 df86ec00 df8280c0
-[    0.638227] 9e40: df81bc00 00000001 00010000 00000001 df8280e0 df849e88 df849e74 df849e68
-[    0.647412] 9e60: c02ff7f0 c02ff620 df849ebc df849e78 c0013a5c c02ff7e4 df8280e0 df849e88
-[    0.656613] 9e80: c01bc73c 00000000 df8280c0 df8280c0 df849ebc c0413748 00000004 00000000
-[    0.665815] 9ea0: c03f34d0 c03f8dec df848000 0000006e df849ecc df849ec0 c03f8e04 c0013840
-[    0.674991] 9ec0: df849f4c df849ed0 c0008728 c03f8df8 df849efc df849ee0 df849f04 df849ee8
-[    0.684201] 9ee0: c03f34ec c015f988 c03f3400 c0e56186 c0316a0c 0000006e df849f4c df849f08
-[    0.693384] 9f00: c0036918 c03f34dc 00000000 00000004 00000004 c03f1210 00000000 c0399918
-[    0.702568] 9f20: df849f4c c0e56100 c0413748 00000004 c0439ce0 c040d378 c040d364 0000006e
-[    0.711770] 9f40: df849f94 df849f50 c03f3bc4 c0008630 00000004 00000004 c03f34d0 00000000
-[    0.720971] 9f60: 00000000 00000000 00000000 00000000 c02fe254 00000000 00000000 00000000
-[    0.730156] 9f80: 00000000 00000000 df849fac df849f98 c02fe264 c03f3adc 00000000 00000000
-[    0.739349] 9fa0: 00000000 df849fb0 c000f170 c02fe260 00000000 00000000 00000000 00000000
-[    0.748558] 9fc0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
-[    0.757733] 9fe0: 00000000 00000000 00000000 00000000 00000013 00000000 00000000 00000000
-[    0.766895] Backtrace: 
-[    0.769775] [<c016bfc0>] (__gpio_get_value+0x0/0x6c) from [<c001a298>] (power_button_poll+0x14/0x4c)
-[    0.780041]  r6:c001a284
-[    0.782659] Unhandled fault: alignment exception (0x803) at 0xdf84974c
-[    0.782668] Internal error: : 803 [#2] PREEMPT ARM
-
-A.
+Acked-by: Richard Cochran <richardcochran@gmail.com>
