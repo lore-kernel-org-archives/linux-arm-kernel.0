@@ -1,39 +1,94 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 10 Sep 2013 13:49:15 +0100
-Subject: [PATCH 14/38] iio: accel: st: Append _accel to accelerator sensor
- device names
+Date: Tue, 10 Sep 2013 13:49:25 +0100
+Subject: [PATCH 24/38] iio: pressure-core: st: Expand and rename LPS331AP's
+ channel descriptor
 In-Reply-To: <1378817379-8238-1-git-send-email-lee.jones@linaro.org>
 References: <1378817379-8238-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1378817379-8238-15-git-send-email-lee.jones@linaro.org>
+Message-ID: <1378817379-8238-25-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some of ST's sensors are appended with their sensor type and some
-are not. For consistency we're extending the same naming convention
-throughout.
+Due to the MACRO used, the task of reading, understanding and maintaining
+the LPS331AP's channel descriptor is substantially difficult. This patch
+is based on the view that it's better to have easy to read, maintainable
+code than to save a few lines here and there. For that reason we're
+expanding the array so initialisation is completed in full.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/iio/accel/st_accel.h | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/iio/pressure/st_pressure_core.c | 45 +++++++++++++++++++++++++--------
+ 1 file changed, 34 insertions(+), 11 deletions(-)
 
-diff --git a/drivers/iio/accel/st_accel.h b/drivers/iio/accel/st_accel.h
-index c387763..d8d22e5 100644
---- a/drivers/iio/accel/st_accel.h
-+++ b/drivers/iio/accel/st_accel.h
-@@ -15,11 +15,11 @@
- #include <linux/iio/common/st_sensors.h>
+diff --git a/drivers/iio/pressure/st_pressure_core.c b/drivers/iio/pressure/st_pressure_core.c
+index 2ee4bcd..60c2ee4 100644
+--- a/drivers/iio/pressure/st_pressure_core.c
++++ b/drivers/iio/pressure/st_pressure_core.c
+@@ -64,16 +64,39 @@
+ #define ST_PRESS_LPS331AP_OUT_XL_ADDR		0x28
+ #define ST_TEMP_LPS331AP_OUT_L_ADDR		0x2b
  
- #define LSM303DLHC_ACCEL_DEV_NAME	"lsm303dlhc_accel"
--#define LIS3DH_ACCEL_DEV_NAME		"lis3dh"
-+#define LIS3DH_ACCEL_DEV_NAME		"lis3dh_accel"
- #define LSM330D_ACCEL_DEV_NAME		"lsm330d_accel"
- #define LSM330DL_ACCEL_DEV_NAME		"lsm330dl_accel"
- #define LSM330DLC_ACCEL_DEV_NAME	"lsm330dlc_accel"
--#define LIS331DLH_ACCEL_DEV_NAME	"lis331dlh"
-+#define LIS331DLH_ACCEL_DEV_NAME	"lis331dlh_accel"
- #define LSM303DL_ACCEL_DEV_NAME		"lsm303dl_accel"
- #define LSM303DLH_ACCEL_DEV_NAME	"lsm303dlh_accel"
- #define LSM303DLM_ACCEL_DEV_NAME	"lsm303dlm_accel"
+-static const struct iio_chan_spec st_press_channels[] = {
+-	ST_SENSORS_LSM_CHANNELS(IIO_PRESSURE,
++static const struct iio_chan_spec st_press_lps331ap_channels[] = {
++	{
++		.type = IIO_PRESSURE,
++		.channel2 = IIO_NO_MOD,
++		.address = ST_PRESS_LPS331AP_OUT_XL_ADDR,
++		.scan_index = ST_SENSORS_SCAN_X,
++		.scan_type = {
++			.sign = 'u',
++			.realbits = 24,
++			.storagebits = 24,
++			.endianness = IIO_LE,
++		},
++		.info_mask_separate =
+ 			BIT(IIO_CHAN_INFO_RAW) | BIT(IIO_CHAN_INFO_SCALE),
+-			ST_SENSORS_SCAN_X, 0, IIO_NO_MOD, 'u', IIO_LE, 24, 24,
+-			ST_PRESS_LPS331AP_OUT_XL_ADDR),
+-	ST_SENSORS_LSM_CHANNELS(IIO_TEMP,
+-			BIT(IIO_CHAN_INFO_RAW) | BIT(IIO_CHAN_INFO_SCALE) |
+-						BIT(IIO_CHAN_INFO_OFFSET),
+-			-1, 0, IIO_NO_MOD, 's', IIO_LE, 16, 16,
+-			ST_TEMP_LPS331AP_OUT_L_ADDR),
++		.modified = 0,
++	},
++	{
++		.type = IIO_TEMP,
++		.channel2 = IIO_NO_MOD,
++		.address = ST_TEMP_LPS331AP_OUT_L_ADDR,
++		.scan_index = -1,
++		.scan_type = {
++			.sign = 'u',
++			.realbits = 16,
++			.storagebits = 16,
++			.endianness = IIO_LE,
++		},
++		.info_mask_separate =
++			BIT(IIO_CHAN_INFO_RAW) |
++			BIT(IIO_CHAN_INFO_SCALE) |
++			BIT(IIO_CHAN_INFO_OFFSET),
++		.modified = 0,
++	},
+ 	IIO_CHAN_SOFT_TIMESTAMP(1)
+ };
+ 
+@@ -83,7 +106,7 @@ static const struct st_sensors st_press_sensors[] = {
+ 		.sensors_supported = {
+ 			[0] = LPS331AP_PRESS_DEV_NAME,
+ 		},
+-		.ch = (struct iio_chan_spec *)st_press_channels,
++		.ch = (struct iio_chan_spec *)st_press_lps331ap_channels,
+ 		.odr = {
+ 			.addr = ST_PRESS_LPS331AP_ODR_ADDR,
+ 			.mask = ST_PRESS_LPS331AP_ODR_MASK,
+@@ -222,7 +245,7 @@ int st_press_common_probe(struct iio_dev *indio_dev,
+ 	pdata->num_data_channels = ST_PRESS_NUMBER_DATA_CHANNELS;
+ 	pdata->multiread_bit = pdata->sensor->multi_read_bit;
+ 	indio_dev->channels = pdata->sensor->ch;
+-	indio_dev->num_channels = ARRAY_SIZE(st_press_channels);
++	indio_dev->num_channels = ARRAY_SIZE(st_press_lps331ap_channels);
+ 
+ 	if (pdata->sensor->fs.addr != 0)
+ 		pdata->current_fullscale = (struct st_sensor_fullscale_avl *)
 -- 
 1.8.1.2
