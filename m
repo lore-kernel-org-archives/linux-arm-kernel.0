@@ -1,169 +1,44 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Tue, 10 Sep 2013 10:23:16 +0800
-Subject: [PATCH 1/1] ARM: imx: mx6sl-evk: Enable USB function
-Message-ID: <1378779796-32004-1-git-send-email-peter.chen@freescale.com>
+From: B47053@freescale.com (Xiubo Li-B47053)
+Date: Tue, 10 Sep 2013 02:35:34 +0000
+Subject: [PATCHv3 1/4] pwm: Add Freescale FTM PWM driver support
+In-Reply-To: <20130909150346.GV30088@pengutronix.de>
+References: <1378454907-22728-1-git-send-email-Li.Xiubo@freescale.com>
+ <1378454907-22728-2-git-send-email-Li.Xiubo@freescale.com>
+ <20130909122008.GC22197@ulmo> <20130909150346.GV30088@pengutronix.de>
+Message-ID: <1DD289F6464F0949A2FCA5AA6DC23F828135D9@039-SN2MPN1-013.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable USB function for OTG 1 and OTG 2 at mx6sololite evk.
-Besides, fix the wrong interrupt number for OTG2 and host 1.
+> Subject: Re: [PATCHv3 1/4] pwm: Add Freescale FTM PWM driver support
+> 
+> On Mon, Sep 09, 2013 at 02:20:09PM +0200, Thierry Reding wrote:
+> > On Fri, Sep 06, 2013 at 04:08:24PM +0800, Xiubo Li wrote:
+> > > The FTM PWM device can be found on Vybrid VF610 Tower and Layerscape
+> LS-1 SoCs.
+> > >
+> > > Signed-off-by: Xiubo Li <Li.Xiubo@freescale.com>
+> > > Signed-off-by: Jingchang Lu <b35083@freescale.com>
+> > > ---
+> > >  drivers/pwm/Kconfig       |  10 +
+> > >  drivers/pwm/Makefile      |   1 +
+> > >  drivers/pwm/pwm-fsl-ftm.c | 505
+> > > ++++++++++++++++++++++++++++++++++++++++++++++
+> > >  3 files changed, 516 insertions(+)
+> > >  create mode 100644 drivers/pwm/pwm-fsl-ftm.c
+> >
+> > This looks pretty good to me. I noticed that you didn't Cc Sascha who
+> > commented on this a lot. Can you please resend with him Cc'ed to make
+> > sure he sees this version of the series?
+> 
+> I'm already aware of this, no need to resend. I'll have a look over it
+> tomorrow.
+> 
 
-Signed-off-by: Peter Chen <peter.chen@freescale.com>
----
- arch/arm/boot/dts/imx6sl-evk.dts |   39 ++++++++++++++++++++++++
- arch/arm/boot/dts/imx6sl.dtsi    |   62 ++++++++++++++++++++++++++++++++++++-
- 2 files changed, 99 insertions(+), 2 deletions(-)
+I'm very sorry, next time I will.
 
-diff --git a/arch/arm/boot/dts/imx6sl-evk.dts b/arch/arm/boot/dts/imx6sl-evk.dts
-index c4d32a5..319afbf 100644
---- a/arch/arm/boot/dts/imx6sl-evk.dts
-+++ b/arch/arm/boot/dts/imx6sl-evk.dts
-@@ -17,6 +17,28 @@
- 	memory {
- 		reg = <0x80000000 0x40000000>;
- 	};
-+
-+	regulators {
-+		compatible = "simple-bus";
-+
-+		reg_usb_otg1_vbus: usb_otg1_vbus {
-+			compatible = "regulator-fixed";
-+			regulator-name = "usb_otg1_vbus";
-+			regulator-min-microvolt = <5000000>;
-+			regulator-max-microvolt = <5000000>;
-+			gpio = <&gpio4 0 0>;
-+			enable-active-high;
-+		};
-+
-+		reg_usb_otg2_vbus: usb_otg2_vbus {
-+			compatible = "regulator-fixed";
-+			regulator-name = "usb_otg2_vbus";
-+			regulator-min-microvolt = <5000000>;
-+			regulator-max-microvolt = <5000000>;
-+			gpio = <&gpio4 2 0>;
-+			enable-active-high;
-+		};
-+	};
- };
- 
- &fec {
-@@ -41,6 +63,8 @@
- 				MX6SL_PAD_SD2_DAT6__GPIO4_IO29    0x17059
- 				MX6SL_PAD_REF_CLK_32K__GPIO3_IO22 0x17059
- 				MX6SL_PAD_FEC_TX_CLK__GPIO4_IO21  0x80000000
-+				MX6SL_PAD_KEY_COL4__GPIO4_IO00	0x80000000
-+				MX6SL_PAD_KEY_COL5__GPIO4_IO02	0x80000000
- 			>;
- 		};
- 	};
-@@ -52,6 +76,21 @@
- 	status = "okay";
- };
- 
-+&usbotg1 {
-+	vbus-supply = <&reg_usb_otg1_vbus>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_usbotg1_1>;
-+	disable-over-current;
-+	status = "okay";
-+};
-+
-+&usbotg2 {
-+	vbus-supply = <&reg_usb_otg2_vbus>;
-+	dr_mode = "host";
-+	disable-over-current;
-+	status = "okay";
-+};
-+
- &usdhc1 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_usdhc1_1>;
-diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
-index eda00e8..bcdbc6c 100644
---- a/arch/arm/boot/dts/imx6sl.dtsi
-+++ b/arch/arm/boot/dts/imx6sl.dtsi
-@@ -562,6 +562,64 @@
- 					};
- 				};
- 
-+				usbotg1 {
-+					pinctrl_usbotg1_1: usbotg1grp-1 {
-+						fsl,pins = <
-+							MX6SL_PAD_EPDC_PWRCOM__USB_OTG1_ID 0x17059
-+						>;
-+					};
-+
-+					pinctrl_usbotg1_2: usbotg1grp-2 {
-+						fsl,pins = <
-+							MX6SL_PAD_FEC_RXD0__USB_OTG1_ID 0x17059
-+						>;
-+					};
-+
-+					pinctrl_usbotg1_3: usbotg1grp-3 {
-+						fsl,pins = <
-+							MX6SL_PAD_LCD_DAT1__USB_OTG1_ID 0x17059
-+						>;
-+					};
-+
-+					pinctrl_usbotg1_4: usbotg1grp-4 {
-+						fsl,pins = <
-+							MX6SL_PAD_REF_CLK_32K__USB_OTG1_ID 0x17059
-+						>;
-+					};
-+
-+					pinctrl_usbotg1_5: usbotg1grp-5 {
-+						fsl,pins = <
-+							MX6SL_PAD_SD3_DAT0__USB_OTG1_ID 0x17059
-+						>;
-+					};
-+				};
-+
-+				usbotg2 {
-+					pinctrl_usbotg2_1: usbotg2grp-1 {
-+						fsl,pins = <
-+							MX6SL_PAD_ECSPI1_SCLK__USB_OTG2_OC 0x17059
-+						>;
-+					};
-+
-+					pinctrl_usbotg2_2: usbotg2grp-2 {
-+						fsl,pins = <
-+							MX6SL_PAD_ECSPI2_SCLK__USB_OTG2_OC 0x17059
-+						>;
-+					};
-+
-+					pinctrl_usbotg2_3: usbotg2grp-3 {
-+						fsl,pins = <
-+							MX6SL_PAD_KEY_ROW5__USB_OTG2_OC 0x17059
-+						>;
-+					};
-+
-+					pinctrl_usbotg2_4: usbotg2grp-4 {
-+						fsl,pins = <
-+							MX6SL_PAD_SD3_DAT2__USB_OTG2_OC 0x17059
-+						>;
-+					};
-+				};
-+
- 				usdhc1 {
- 					pinctrl_usdhc1_1: usdhc1grp-1 {
- 						fsl,pins = <
-@@ -669,7 +727,7 @@
- 			usbotg2: usb@02184200 {
- 				compatible = "fsl,imx6sl-usb", "fsl,imx27-usb";
- 				reg = <0x02184200 0x200>;
--				interrupts = <0 40 0x04>;
-+				interrupts = <0 42 0x04>;
- 				clocks = <&clks IMX6SL_CLK_USBOH3>;
- 				fsl,usbphy = <&usbphy2>;
- 				fsl,usbmisc = <&usbmisc 1>;
-@@ -679,7 +737,7 @@
- 			usbh: usb at 02184400 {
- 				compatible = "fsl,imx6sl-usb", "fsl,imx27-usb";
- 				reg = <0x02184400 0x200>;
--				interrupts = <0 42 0x04>;
-+				interrupts = <0 40 0x04>;
- 				clocks = <&clks IMX6SL_CLK_USBOH3>;
- 				fsl,usbmisc = <&usbmisc 2>;
- 				status = "disabled";
--- 
-1.7.1
+
+Thanks very much.
+
+--
+Best Regards,
+Xiubo
