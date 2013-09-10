@@ -1,114 +1,132 @@
-From: rjw@sisk.pl (Rafael J. Wysocki)
-Date: Tue, 10 Sep 2013 22:04:21 +0200
-Subject: [PATCH RESEND 1/2] i2c: prepare runtime PM support for I2C client
- devices
-In-Reply-To: <20130910161321.GM29403@sirena.org.uk>
-References: <1378733679-19500-1-git-send-email-mika.westerberg@linux.intel.com>
- <20130910142631.GL7393@intel.com> <20130910161321.GM29403@sirena.org.uk>
-Message-ID: <3397524.g9aUWuArnm@vostro.rjw.lan>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Tue, 10 Sep 2013 14:53:29 -0500
+Subject: [PATCH v7 3/4] drivers: of: add initialization code for dma
+ reserved memory
+In-Reply-To: <20130909160154.8D7183E0F23@localhost>
+References: <1377527959-5080-1-git-send-email-m.szyprowski@samsung.com>
+ <1377527959-5080-4-git-send-email-m.szyprowski@samsung.com>
+ <20130829224637.D09183E1222@localhost> <52209278.8040106@samsung.com>
+ <DAF223EB-C84C-4E82-A24A-ACD0A3A0559F@codeaurora.org>
+ <20130909160154.8D7183E0F23@localhost>
+Message-ID: <BA65D7E3-8C15-4B44-95E2-E5DC862DDDE0@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, September 10, 2013 05:13:21 PM Mark Brown wrote:
-> On Tue, Sep 10, 2013 at 05:26:31PM +0300, Mika Westerberg wrote:
-> > On Tue, Sep 10, 2013 at 01:27:54PM +0100, Mark Brown wrote:
-> 
-> > > > There is one difference though -- runtime PM is now blocked by default and
-> > > > it needs to be unblocked from the userspace per each device.
-> 
-> > > ...as you say.
-> 
-> > > This seems crazy, why on earth would we want to have userspace be forced
-> > > to manually go through every single device and manually enable power
-> > > saving?  I can't see anyone finding that helpful and it's going to be a
-> > > pain to deploy.
-> 
-> > There are things like HID over I2C devices (e.g touch screen) where going
-> > to lower power states too aggressively makes the touch experience really
-> > sluggish. However, other HID over I2C devices like sensor hubs it doesn't
-> > matter that much. In order to get the best performance we have runtime PM
-> > blocked by default (and leave it up to the user to unblock to get power
-> > savings).
-> 
-> > That's basically what PCI drivers currently do.
-> 
-> So those specific devices need to implement runtime PM in an appropriate
-> fashion.  That's no need to implement a poor default for every single
-> device to work around poor implementations from some, especially when it
-> requires a userspace update to get acceptable performance again from the
-> unaffected devices.
-> 
-> > > However I had thought it was just a case of the drivers doing a put()
-> > > instead of their current code to enable runtime PM (you mention that
-> > > later on)?
-> 
-> > User still needs to unblock runtime PM for the device. The driver can call
-> > the runtime PM functions but they don't have any effect until runtime PM is
-> > unblocked by the user.
-> 
-> > However, I don't have problems dropping the call to pm_runtime_forbid() in
-> > this patch and leave it up to the user to decide whether runtime PM should
-> > be blocked for the device.
-> 
-> I think this is essential - we can't really go around forcing userspace
-> updates to restore runtime power management, nobody is going to thank us
-> for that and it sounds like the issue you're trying to solve is device
-> specific anyway.
 
-In fact, that's all about what the default should be, because user space
-can very easily change it either way (it takes one loop in shell code to do
-that for all devices on the given bus).
+On Sep 9, 2013, at 11:01 AM, Grant Likely wrote:
 
-And I'm fine with defaulting to "auto".
-
-> > > > 	- The I2C core makes sure that the device is available (from bus
-> > > > 	  point of view) when the driver ->probe() is called.
+> On Fri, 30 Aug 2013 15:26:24 -0500, Kumar Gala <galak@codeaurora.org> wrote:
+>> On Aug 30, 2013, at 7:39 AM, Marek Szyprowski wrote:
+>>> On 8/30/2013 12:46 AM, Grant Likely wrote:
+>>>> On Mon, 26 Aug 2013 16:39:18 +0200, Marek Szyprowski <m.szyprowski@samsung.com> wrote:
+>>>>> +	- "reserved-memory-region" - compatibility is defined, given
+>>>>> +	  region is assigned for exclusive usage for by the respective
+>>>>> +	  devices.
+>>>> 
+>>>> BTW, just so you're aware there is already a binding for marking regions
+>>>> as reserved. It was recently added to arch/powerpc/kernel/prom.c.
+>>>> Unfortunately it doesn't look like it got documented. Search for
+>>>> "reserved-ranges". However, I don't think it blocks your work here. That
+>>>> binding doesn't provide any way for matching devices to reserved ranges.
+>>>> It is only for telling the kernel "hands of that memory".
+>>> 
+>>> ok, good to know.
+>> 
+>> So I think the most generic compatible should effectively be the same
+>> as 'reserved-ranges', ie this region shouldn't be touched by the
+>> kernel.
+>> 
+>> Than we can build on top of that with more specific compatibles.
+>> 
+>> I have examples from FSL networking SoCs where we would carve out
+>> memory for backing storage managed completely by the HW and Linux
+>> wouldn't need to touch it, however we might have a
+>> "fsl,qman-backing-store" compat encase we might want some debug code
+>> in linux to look at the region of memory.
+>> 
+>> I've got examples at qualcomm where we have shared data structures in
+>> specific memory regions between different processors that aren't cache
+>> coherent, so want the memory not to be marked as cacheable by Linux
+>> when it accesses it.  Again we'd have a "qcom,smem" prop on top of the
+>> "reserved-memory-region".
 > 
-> > > I can't understand your last point here at all, sorry.  Can you expand
-> > > please?
+> I think that is a reasonable approach, and works really well for regions
+> associated with specific hardware because the hardware driver can be
+> responsible for wiring it up to CMA or manage the region directly.
+> Whatever the driver desires to do.
 > 
-> > Sorry about that.
+> It still remains what to do for generic regions that any device can use.
+> As I've previously said, I don't like calling out "CMA" specifically in
+> the compatible property because that happens to be a Linux
+> implementation specific details. Two years from now someone may propose
+> a new allocator that should take over what used to be handled by CMA
+> (kind of like how CMA may end up taking over from ION)....
 > 
-> > At least with ACPI enumerated I2C client devices, they might be powered off
-> > by the BIOS (there are power resources attached to the devices). So when
-> > the driver ->probe() is called we can't access the device's registers etc.
+> Alright, I've thought about it some more and it probably does make sense
+> to use an additional compatible string. Marek originally suggested
+> "linux,contiguous-memory-region". I later suggested "shareable-memory-region",
+> but that's actually a worse name because it doesn't have any reference
+> to what the region is for (I was fixating on the kernel being able to
+> use unallocated pages; but that is also an implementation detail). I
+> exercise my right to change my mind and agree that contiguous is
+> appropriate here. But instead of calling out the contiguous allocator,
+> the binding should specifically lay out the usage model for these
+> regions. I would change the contiguous-memory binding to state the
+> following:
+> 	Contiguous-memory is a region of general purpose memory from
+> 	which large buffers of contiguous memory can be allocated.
+> 	Contiguous buffers are often used for DMA buffers. The operating
+> 	system may use the memory for any purpose, but must immediately
+> 	release the pages if a contiguous buffer is required.
 > 
-> > So we bind the device to the ACPI power domain (the second patch in this
-> > series) and then call pm_runtime_get() for the device. That makes sure that
-> > the device is accessible when ->probe() is called.
+> So the way I read things, the current proposal would be:
 > 
-> OK, that is very much not the model which embedded systems follow, in
-> embedded systems the driver for the device is fully in control of its
-> own power.  It gets resources like GPIOs and regulators which allow it
-> to make fine grained decisions.
-
-There are platforms where those resources are simply not available for
-direct manipulation and we need to use ACPI methods for power management.
-
-Now, since those methods are used in pretty much the same way for all I2C
-devices, we add a PM domain for that to avoid duplicating the same code in
-all of the drivers in question (patch [2/2]).  Does that make sense to you?
-
-> > > So then the obvious followup question is why this is even something that
-> > > needs to be implemented per bus?  Shouldn't we be enhancing the driver
-> > > core to do this, or is that the long term plan and this is a step on the
-> > > road to doing that?
+> The generic form for do-not-touch memory:
+> 	compatible = "reserved-memory";
+> - I've dropped '-region' because I think it is redundant
+> - The kernel will not make use of this memory except for when a driver picks it up
 > 
-> > If we end up all buses implementing the same mechanism, I think it makes
-> > sense to move it to the driver core.
+> For contiguous memory:
+> 	compatible = "contiguous-memory", "reserved-memory"
+
+Hmm.., what's an example of a generic use of this compatible set that isn't linux/CMA specific?
+
+> For contiguous memory that Linux will use by default if a specific
+> region isn't specified.
+> 	compatible = "contiguous-memory", "reserved-memory"
+> 	linux,default-contiguous-region;
+> - I stuck with a linux, prefix here because I haven't come up with a
+>   non-linux way to describe this.
 > 
-> If we're starting to get a reasonable number of buses following the same
-> pattern it seems like we're in a position to start 
+> Memory that specific hardware can pick up:
+> 	compatible = "qcom,smem", "reserved-memory"
+> 
+> Nodes with a 'size' property and without a 'reg' property need to have a
+> region allocated and reserved. The allocated region needs to be cached
+> somewhere. We could create a data structure for tracking the reserved
+> regions, or could write it in directly. While I shudder at the thought of
+> modifying the device tree at runtime by the kernel, it might just be the
+> sanest implementation at this time. I'd like to see what the
+> implementation looks like. (Since this is potentially controversial, I
+> would recommend implementing the exact regions in on patch, and add
+> dynamically allocated regions as a follow-up patch)
 
-We need that for exactly 3 buses: platform (already done), I2C and SPI.
+curious, what's the example for this situation of not having a 'reg' but having a size?
 
-No other bus types are going to use ACPI this way for PM, at least for the
-time being, simply because PCI, USB and SATA/IDE have their own ways of doing
-this (which are bus-specific) and the spec doesn't cover other bus types
-directly (it defines support for UART, but we don't have a UART bus type).
+> 
+> As far as proper implementation is concerned, I think it should be
+> explicit in the binding that the kernel should automatically exclude
+> anything under the reserved-memory node, regardless of the compatible
+> value. Merely being a child of the reserved-memory node immediately
+> means that it is a reserved memory region.
+> 
+> g.
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
-Moreover, because PCI and USB use ACPI for PM in their own ways, moving that
-thing up to the driver core would be rather inconvenient.
-
-Thanks,
-Rafael
+-- 
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
