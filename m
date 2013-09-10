@@ -1,55 +1,35 @@
-From: csd@broadcom.com (Christian Daudt)
-Date: Tue, 10 Sep 2013 15:32:26 -0700
-Subject: [PATCH v9 3/3] ARM: bcm281xx: Add device node for the GPIO
- controller
-In-Reply-To: <1378836423-12467-4-git-send-email-markus.mayer@linaro.org>
-References: <1378836423-12467-1-git-send-email-markus.mayer@linaro.org>
- <1378836423-12467-4-git-send-email-markus.mayer@linaro.org>
-Message-ID: <522F9DFA.8000807@broadcom.com>
+From: weiyj.lk@gmail.com (Wei Yongjun)
+Date: Wed, 11 Sep 2013 06:56:35 +0800
+Subject: [PATCH] drm/exynos: fix return value check in
+ lowlevel_buffer_allocate()
+Message-ID: <CAPgLHd-vMjfQEBfun=c8j7x-FPx_pGoTvOBBwKtmF+LTQjVNQw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13-09-10 11:07 AM, Markus Mayer wrote:
-> Add the GPIO controller device node for the Broadcom bcm281xx family of
-> mobile SoCs.
->
-> Signed-off-by: Markus Mayer <markus.mayer@linaro.org>
-> Reviewed-by: Tim Kryger <tim.kryger@linaro.org>
-> Reviewed-by: Matt Porter <matt.porter@linaro.org>
-> Reviewed-by: Tomasz Figa <t.figa@samsung.com>
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
->   arch/arm/boot/dts/bcm11351.dtsi |   16 ++++++++++++++++
->   1 file changed, 16 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/bcm11351.dtsi b/arch/arm/boot/dts/bcm11351.dtsi
-> index 05a5aab..77af396 100644
-> --- a/arch/arm/boot/dts/bcm11351.dtsi
-> +++ b/arch/arm/boot/dts/bcm11351.dtsi
-> @@ -68,6 +68,22 @@
->   		clock-frequency = <32768>;
->   	};
->   
-> +	gpio: gpio at 35003000 {
-> +		compatible = "brcm,bcm11351-gpio", "brcm,kona-gpio";
-> +		reg = <0x35003000 0x800>;
-> +		interrupts =
-> +		       <GIC_SPI 106 IRQ_TYPE_LEVEL_HIGH
-> +			GIC_SPI 115 IRQ_TYPE_LEVEL_HIGH
-> +			GIC_SPI 114 IRQ_TYPE_LEVEL_HIGH
-> +			GIC_SPI 113 IRQ_TYPE_LEVEL_HIGH
-> +			GIC_SPI 112 IRQ_TYPE_LEVEL_HIGH
-> +			GIC_SPI 111 IRQ_TYPE_LEVEL_HIGH>;
-> +		#gpio-cells = <2>;
-> +		#interrupt-cells = <2>;
-> +		gpio-controller;
-> +		interrupt-controller;
-> +	};
-> +
->   	sdio1: sdio at 3f180000 {
->   		compatible = "brcm,kona-sdhci";
->   		reg = <0x3f180000 0x10000>;
-Applied to bcm armsoc/for-3.13/dt
+From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
 
-  thanks,
-    csd
+In case of error, the function drm_prime_pages_to_sg() returns ERR_PTR()
+and never returns NULL. The NULL test in the return value check should
+be replaced with IS_ERR().
+
+Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+---
+ drivers/gpu/drm/exynos/exynos_drm_buf.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/gpu/drm/exynos/exynos_drm_buf.c b/drivers/gpu/drm/exynos/exynos_drm_buf.c
+index 3445a0f..e3ee833 100644
+--- a/drivers/gpu/drm/exynos/exynos_drm_buf.c
++++ b/drivers/gpu/drm/exynos/exynos_drm_buf.c
+@@ -90,9 +90,9 @@ static int lowlevel_buffer_allocate(struct drm_device *dev,
+ 	}
+ 
+ 	buf->sgt = drm_prime_pages_to_sg(buf->pages, nr_pages);
+-	if (!buf->sgt) {
++	if (IS_ERR(buf->sgt)) {
+ 		DRM_ERROR("failed to get sg table.\n");
+-		ret = -ENOMEM;
++		ret = PTR_ERR(buf->sgt);
+ 		goto err_free_attrs;
+ 	}
+ 
