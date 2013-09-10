@@ -1,57 +1,64 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 10 Sep 2013 10:04:22 +0200
-Subject: [PATCH] mmc: atmel-mci: fix oops in atmci_tasklet_func
-In-Reply-To: <1378740719-25164-1-git-send-email-ludovic.desroches@atmel.com>
-References: <1378740719-25164-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <522ED286.4030305@atmel.com>
+From: B47053@freescale.com (Xiubo Li-B47053)
+Date: Tue, 10 Sep 2013 08:10:09 +0000
+Subject: [PATCHv3 2/4] ARM: dts: Add Freescale FTM PWM node for VF610.
+In-Reply-To: <20130910064044.GZ30088@pengutronix.de>
+References: <1378454907-22728-1-git-send-email-Li.Xiubo@freescale.com>
+ <1378454907-22728-3-git-send-email-Li.Xiubo@freescale.com>
+ <20130910064044.GZ30088@pengutronix.de>
+Message-ID: <1DD289F6464F0949A2FCA5AA6DC23F828136F5@039-SN2MPN1-013.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/09/2013 17:31, ludovic.desroches at atmel.com :
-> From: Rodolfo Giometti <giometti@enneenne.com>
->
-> In some cases, a NULL pointer dereference happens because data is NULL when
-> STATE_END_REQUEST case is reached in atmci_tasklet_func.
->
-> Cc: <stable@vger.kernel.org> #3.9+
-> Signed-off-by: Rodolfo Giometti <giometti@enneenne.com>
-> Acked-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+> > diff --git a/arch/arm/boot/dts/vf610.dtsi
+> > b/arch/arm/boot/dts/vf610.dtsi index 67d929c..44787b5 100644
+> > --- a/arch/arm/boot/dts/vf610.dtsi
+> > +++ b/arch/arm/boot/dts/vf610.dtsi
+> > @@ -140,6 +140,37 @@
+> >  				clock-names = "pit";
+> >  			};
+> >
+> > +			pwm0: pwm at 40038000 {
+> > +				compatible = "fsl,vf610-ftm-pwm";
+> > +				#pwm-cells = <3>;
+> > +				reg = <0x40038000 0x1000>;
+> > +				clock-names = "ftm0", "ftm0_fix_sel",
+> "ftm0_ext_sel";
+> > +				clocks = <&clks VF610_CLK_FTM0>,
+> > +					<&clks VF610_CLK_FTM0_FIX_SEL>,
+> > +					<&clks VF610_CLK_FTM0_EXT_SEL>;
+> > +				pinctrl-names = "ch0-active", "ch0-idle", "ch1-
+> active", "ch1-idle",
+> > +						"ch2-active", "ch2-idle", "ch3-
+> active", "ch3-idle",
+> > +						"ch4-active", "ch4-idle", "ch5-
+> active", "ch5-idle",
+> > +						"ch6-active", "ch6-idle", "ch7-
+> active", "ch7-idle";
+> > +				pinctrl-0 = <&pinctrl_pwm0_ch0_active>;
+> > +				pinctrl-1 = <&pinctrl_pwm0_ch0_idle>;
+> > +				pinctrl-2 = <&pinctrl_pwm0_ch1_active>;
+> > +				pinctrl-3 = <&pinctrl_pwm0_ch1_idle>;
+> > +				pinctrl-4 = <&pinctrl_pwm0_ch2_active>;
+> > +				pinctrl-5 = <&pinctrl_pwm0_ch2_idle>;
+> > +				pinctrl-6 = <&pinctrl_pwm0_ch3_active>;
+> > +				pinctrl-7 = <&pinctrl_pwm0_ch3_idle>;
+> > +				pinctrl-8 = <&pinctrl_pwm0_ch4_active>;
+> > +				pinctrl-9 = <&pinctrl_pwm0_ch4_idle>;
+> > +				pinctrl-10 = <&pinctrl_pwm0_ch5_active>;
+> > +				pinctrl-11 = <&pinctrl_pwm0_ch5_idle>;
+> > +				pinctrl-12 = <&pinctrl_pwm0_ch6_active>;
+> > +				pinctrl-13 = <&pinctrl_pwm0_ch6_idle>;
+> > +				pinctrl-14 = <&pinctrl_pwm0_ch7_active>;
+> > +				pinctrl-15 = <&pinctrl_pwm0_ch7_idle>;
+> > +				status = "disabled";
+> > +			};
+> 
+> This is a SoC file, but the pinmux is board specific. The pinmux settings
+> probably shouldn't be here.
+> 
+Yes, agreed.
 
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+I will revise it soon.
 
-Thanks, bye.
-
-> ---
->   drivers/mmc/host/atmel-mci.c | 14 ++++++++------
->   1 file changed, 8 insertions(+), 6 deletions(-)
->
-> diff --git a/drivers/mmc/host/atmel-mci.c b/drivers/mmc/host/atmel-mci.c
-> index e9ea2fc..78d7e47 100644
-> --- a/drivers/mmc/host/atmel-mci.c
-> +++ b/drivers/mmc/host/atmel-mci.c
-> @@ -1792,12 +1792,14 @@ static void atmci_tasklet_func(unsigned long priv)
->   			if (unlikely(status)) {
->   				host->stop_transfer(host);
->   				host->data = NULL;
-> -				if (status & ATMCI_DTOE) {
-> -					data->error = -ETIMEDOUT;
-> -				} else if (status & ATMCI_DCRCE) {
-> -					data->error = -EILSEQ;
-> -				} else {
-> -					data->error = -EIO;
-> +				if (data) {
-> +					if (status & ATMCI_DTOE) {
-> +						data->error = -ETIMEDOUT;
-> +					} else if (status & ATMCI_DCRCE) {
-> +						data->error = -EILSEQ;
-> +					} else {
-> +						data->error = -EIO;
-> +					}
->   				}
->   			}
->
->
-
-
--- 
-Nicolas Ferre
+--
+Xiubo
