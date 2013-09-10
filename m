@@ -1,56 +1,87 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 10 Sep 2013 13:49:23 +0100
-Subject: [PATCH 22/38] iio: sensors-core: st: Clean-up error handling in
- st_sensors_read_info_raw()
+Date: Tue, 10 Sep 2013 13:49:20 +0100
+Subject: [PATCH 19/38] iio: sensors-core: st: Support sensors which don't have
+ a Data Ready pin
 In-Reply-To: <1378817379-8238-1-git-send-email-lee.jones@linaro.org>
 References: <1378817379-8238-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1378817379-8238-23-git-send-email-lee.jones@linaro.org>
+Message-ID: <1378817379-8238-20-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Saving a few lines of code.
+Not all ST's sensors support data ready, so let's make the declaration
+of one conditional.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/iio/common/st_sensors/st_sensors_core.c | 11 ++++-------
- 1 file changed, 4 insertions(+), 7 deletions(-)
+ drivers/iio/common/st_sensors/st_sensors_core.c | 24 +++++++++++++++++++-----
+ drivers/iio/pressure/st_pressure_core.c         |  3 ++-
+ 2 files changed, 21 insertions(+), 6 deletions(-)
 
 diff --git a/drivers/iio/common/st_sensors/st_sensors_core.c b/drivers/iio/common/st_sensors/st_sensors_core.c
-index 148f0e5..25d4c7e 100644
+index eb261a5..b86cad2 100644
 --- a/drivers/iio/common/st_sensors/st_sensors_core.c
 +++ b/drivers/iio/common/st_sensors/st_sensors_core.c
-@@ -359,28 +359,25 @@ int st_sensors_read_info_raw(struct iio_dev *indio_dev,
- 	mutex_lock(&indio_dev->mlock);
- 	if (indio_dev->currentmode == INDIO_BUFFER_TRIGGERED) {
- 		err = -EBUSY;
--		goto read_error;
-+		goto out;
- 	} else {
- 		err = st_sensors_set_enable(indio_dev, true);
- 		if (err < 0)
--			goto read_error;
-+			goto out;
- 
- 		msleep((sdata->sensor->bootime * 1000) / sdata->odr);
- 		err = st_sensors_read_axis_data(indio_dev, ch, val);
- 		if (err < 0)
--			goto read_error;
-+			goto out;
- 
- 		*val = *val >> ch->scan_type.shift;
- 
- 		err = st_sensors_set_enable(indio_dev, false);
- 	}
-+out:
- 	mutex_unlock(&indio_dev->mlock);
- 
- 	return err;
--
--read_error:
--	mutex_unlock(&indio_dev->mlock);
--	return err;
+@@ -198,14 +198,11 @@ int st_sensors_set_axis_enable(struct iio_dev *indio_dev, u8 axis_enable)
  }
- EXPORT_SYMBOL(st_sensors_read_info_raw);
+ EXPORT_SYMBOL(st_sensors_set_axis_enable);
+ 
+-int st_sensors_init_sensor(struct iio_dev *indio_dev,
+-					struct st_sensors_platform_data *pdata)
++int st_sensors_set_drdy_int_pin(struct iio_dev *indio_dev,
++				struct st_sensors_platform_data *pdata)
+ {
+-	int err;
+ 	struct st_sensor_data *sdata = iio_priv(indio_dev);
+ 
+-	mutex_init(&sdata->tb.buf_lock);
+-
+ 	switch (pdata->drdy_int_pin) {
+ 	case 1:
+ 		if (sdata->sensor->drdy_irq.mask_int1 == 0) {
+@@ -231,6 +228,20 @@ int st_sensors_init_sensor(struct iio_dev *indio_dev,
+ 		goto init_error;
+ 	}
+ 
++	return 0;
++}
++
++int st_sensors_init_sensor(struct iio_dev *indio_dev,
++					struct st_sensors_platform_data *pdata)
++{
++	int err = 0;
++	struct st_sensor_data *sdata = iio_priv(indio_dev);
++
++	mutex_init(&sdata->tb.buf_lock);
++
++	if (pdata)
++		err = st_sensors_set_drdy_int_pin(indio_dev, pdata);
++
+ 	err = st_sensors_set_enable(indio_dev, false);
+ 	if (err < 0)
+ 		goto init_error;
+@@ -266,6 +277,9 @@ int st_sensors_set_dataready_irq(struct iio_dev *indio_dev, bool enable)
+ 	u8 drdy_mask;
+ 	struct st_sensor_data *sdata = iio_priv(indio_dev);
+ 
++	if (!sdata->sensor->drdy_irq.addr)
++		return 0;
++
+ 	/* Enable/Disable the interrupt generator 1. */
+ 	if (sdata->sensor->drdy_irq.ig1.en_addr > 0) {
+ 		err = st_sensors_write_data_with_mask(indio_dev,
+diff --git a/drivers/iio/pressure/st_pressure_core.c b/drivers/iio/pressure/st_pressure_core.c
+index 16cfbc5..279aafd 100644
+--- a/drivers/iio/pressure/st_pressure_core.c
++++ b/drivers/iio/pressure/st_pressure_core.c
+@@ -232,7 +232,8 @@ int st_press_common_probe(struct iio_dev *indio_dev,
+ 
+ 	pdata->odr = pdata->sensor->odr.odr_avl[0].hz;
+ 
+-	if (!plat_data)
++	/* Some devices don't support a data ready pin. */
++	if (!plat_data && pdata->sensor->drdy_irq.addr)
+ 		plat_data =
+ 			(struct st_sensors_platform_data *)&default_press_pdata;
  
 -- 
 1.8.1.2
