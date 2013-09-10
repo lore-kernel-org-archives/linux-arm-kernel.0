@@ -1,27 +1,55 @@
-From: aaro.koskinen@iki.fi (Aaro Koskinen)
-Date: Tue, 10 Sep 2013 15:58:15 +0300
-Subject: Inte IOP Xscale updates
-In-Reply-To: <CACRpkdZU5mVU15AK=m-BRmpizKJJVAR98JKf3Qcgy2ms+HG+Hw@mail.gmail.com>
-References: <CACRpkdZU5mVU15AK=m-BRmpizKJJVAR98JKf3Qcgy2ms+HG+Hw@mail.gmail.com>
-Message-ID: <20130910125815.GB3379@blackmetal.musicnaut.iki.fi>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 10 Sep 2013 14:04:31 +0100
+Subject: [PATCH v5 1/5] ARM: add basic Trusted Foundations support
+In-Reply-To: <CAAVeFu+MGGBfmm1jwtKGP_d3EjkLdf5B_E_5RT___PVh1e=8jw@mail.gmail.com>
+References: <1378351680-14696-1-git-send-email-acourbot@nvidia.com>
+ <1378351680-14696-2-git-send-email-acourbot@nvidia.com>
+ <5228CEDB.1090306@gmail.com>
+ <CAAVeFu+MGGBfmm1jwtKGP_d3EjkLdf5B_E_5RT___PVh1e=8jw@mail.gmail.com>
+Message-ID: <20130910130431.GE27966@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi guys,
 
-On Tue, Sep 03, 2013 at 02:01:45PM +0200, Linus Walleij wrote:
-> I haven't really seen any functional patches or confirmation that the
-> XScale machines in arch/arm/iop* are even booting since 2010 or
-> so.
+On Mon, Sep 09, 2013 at 07:15:31AM +0100, Alexandre Courbot wrote:
+> On Fri, Sep 6, 2013 at 3:35 AM, Rob Herring <robherring2@gmail.com> wrote:
+> > On 09/04/2013 10:27 PM, Alexandre Courbot wrote:
+> >> Trusted Foundations is a TrustZone-based secure monitor for ARM that
+> >> can be invoked  using a consistent SMC-based API on all supported
+> >> platforms. This patch adds initial basic support for Trusted
+> >> Foundations using the ARM firmware API. Current features are limited
+> >> to the ability to boot secondary processors.
+
+[...]
+
+> >> +Example:
+> >> +     firmware {
+> >> +             compatible = "tl,trusted-foundations";
+> >> +             version-major = <2>;
+> >> +             version-minor = <8>;
+> >> +     };
+> >
+> > I'm wondering how we fit this in with PSCI bindings? Both are pieces of
+> > firmware functionality and may co-exist. There's nothing incompatible
+> > here, but there should be some commonality. Will future versions of
+> > Trusted Foundations follow the SMC calling conventions doc? What about
+> > armv8 support.
 > 
-> Can you confirm that you boot-test these machines regularly?
-> 
-> I am worried that we maintain code that is not used or even working
-> see.
+> I don't have any information about the future of TF unfortunately,
+> excepted that it should remain backward-compatible. What is this SMC
+> calling convention doc your are talking about btw? Is there a standard
+> calling convention defined by ARM?
 
-I have N2100/iop32x in use, and I also test mainline kernels regularly on
-it. You don't see many patches probably because it has been very stable.
-Not sure where you got the 2010, because from mailing list archives and
-even from "git log" you can find booting/testing reports even from 2013.
+SMC calling convention:
 
-A.
+https://silver.arm.com/download/download.tm?pv=1435186
+
+PSCI:
+
+https://silver.arm.com/download/download.tm?pv=1421585
+
+Although access to these documents requires you to go through a
+click-through license.
+
+Will
