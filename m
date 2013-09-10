@@ -1,55 +1,55 @@
 From: Sudeep.KarkadaNagesha@arm.com (Sudeep KarkadaNagesha)
-Date: Tue, 10 Sep 2013 18:59:49 +0100
-Subject: [PATCH 4/4] ARM: shmobile: change dev_id to cpu0 while registering
- cpu clock
+Date: Tue, 10 Sep 2013 18:59:46 +0100
+Subject: [PATCH 1/4] cpufreq: cpufreq-cpu0: assign cpu_dev correctly to cpu0
+ device
 In-Reply-To: <1378835989-19281-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
 References: <1378835989-19281-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
-Message-ID: <1378835989-19281-5-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+Message-ID: <1378835989-19281-2-git-send-email-Sudeep.KarkadaNagesha@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
 
-Currently all clkdev registration use "cpufreq-cpu0.0" as dev_id
-for cpu clock which refers to virtual platform device. It needs to
-be "cpu0" instead which is actual cpu0 device id.
+Commit f837a9b5ab05c52a07108c6f09ca66f2e0aee757 "cpufreq: cpufreq-cpu0:
+remove device tree parsing for cpu nodes" assumed the pdev->dev is set to
+cpu0 device in the platform code. But it actually points to the virtual
+cpufreq-cpu0 platform device which is not present in the device tree.
+Most of the information needed by cpufreq is stored in cpu0 DT node.
+So cpu_dev must point to cpu0 device.
 
-This patch changes the dev_id from "cpufreq-cpu0.0" to "cpu0".
+This patch fixes the wrong assignment to cpu_dev.
 
 Reported-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
 Cc: Shawn Guo <shawn.guo@linaro.org>
-Cc: Magnus Damm <damm@opensource.se>
 Signed-off-by: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
 ---
- arch/arm/mach-shmobile/clock-r8a73a4.c | 2 +-
- arch/arm/mach-shmobile/clock-sh73a0.c  | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+ drivers/cpufreq/cpufreq-cpu0.c | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-shmobile/clock-r8a73a4.c b/arch/arm/mach-shmobile/clock-r8a73a4.c
-index 8ea5ef6..5bd2e85 100644
---- a/arch/arm/mach-shmobile/clock-r8a73a4.c
-+++ b/arch/arm/mach-shmobile/clock-r8a73a4.c
-@@ -555,7 +555,7 @@ static struct clk_lookup lookups[] = {
- 	CLKDEV_CON_ID("pll2h",			&pll2h_clk),
+diff --git a/drivers/cpufreq/cpufreq-cpu0.c b/drivers/cpufreq/cpufreq-cpu0.c
+index cbfffa9..78c49d8 100644
+--- a/drivers/cpufreq/cpufreq-cpu0.c
++++ b/drivers/cpufreq/cpufreq-cpu0.c
+@@ -12,6 +12,7 @@
+ #define pr_fmt(fmt)	KBUILD_MODNAME ": " fmt
  
- 	/* CPU clock */
--	CLKDEV_DEV_ID("cpufreq-cpu0",		&z_clk),
-+	CLKDEV_DEV_ID("cpu0",			&z_clk),
+ #include <linux/clk.h>
++#include <linux/cpu.h>
+ #include <linux/cpufreq.h>
+ #include <linux/err.h>
+ #include <linux/module.h>
+@@ -177,7 +178,11 @@ static int cpu0_cpufreq_probe(struct platform_device *pdev)
+ 	struct device_node *np;
+ 	int ret;
  
- 	/* DIV6 */
- 	CLKDEV_CON_ID("zb",			&div6_clks[DIV6_ZB]),
-diff --git a/arch/arm/mach-shmobile/clock-sh73a0.c b/arch/arm/mach-shmobile/clock-sh73a0.c
-index 1942eae..c92c023 100644
---- a/arch/arm/mach-shmobile/clock-sh73a0.c
-+++ b/arch/arm/mach-shmobile/clock-sh73a0.c
-@@ -616,7 +616,7 @@ static struct clk_lookup lookups[] = {
- 	CLKDEV_DEV_ID("smp_twd", &twd_clk), /* smp_twd */
+-	cpu_dev = &pdev->dev;
++	cpu_dev = get_cpu_device(0);
++	if (!cpu_dev) {
++		pr_err("failed to get cpu0 device\n");
++		return -ENODEV;
++	}
  
- 	/* DIV4 clocks */
--	CLKDEV_DEV_ID("cpufreq-cpu0", &div4_clks[DIV4_Z]),
-+	CLKDEV_DEV_ID("cpu0", &div4_clks[DIV4_Z]),
- 
- 	/* DIV6 clocks */
- 	CLKDEV_CON_ID("vck1_clk", &div6_clks[DIV6_VCK1]),
+ 	np = of_node_get(cpu_dev->of_node);
+ 	if (!np) {
 -- 
 1.8.1.2
