@@ -1,57 +1,56 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 10 Sep 2013 13:49:26 +0100
-Subject: [PATCH 25/38] iio: pressure-core: st: Allow for number of channels to
- vary
+Date: Tue, 10 Sep 2013 13:49:23 +0100
+Subject: [PATCH 22/38] iio: sensors-core: st: Clean-up error handling in
+ st_sensors_read_info_raw()
 In-Reply-To: <1378817379-8238-1-git-send-email-lee.jones@linaro.org>
 References: <1378817379-8238-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1378817379-8238-26-git-send-email-lee.jones@linaro.org>
+Message-ID: <1378817379-8238-23-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-At the moment the number of channels specified is dictated by the first
-sensor supported by the driver. As we add support for more sensors this
-is likely to vary. Instead of using the ARRAY_SIZE() of the LPS331AP's
-channel specifier we'll use a new adaptable 'struct st_sensors' element
-instead.
+Saving a few lines of code.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/iio/pressure/st_pressure_core.c | 3 ++-
- include/linux/iio/common/st_sensors.h   | 1 +
- 2 files changed, 3 insertions(+), 1 deletion(-)
+ drivers/iio/common/st_sensors/st_sensors_core.c | 11 ++++-------
+ 1 file changed, 4 insertions(+), 7 deletions(-)
 
-diff --git a/drivers/iio/pressure/st_pressure_core.c b/drivers/iio/pressure/st_pressure_core.c
-index 60c2ee4..3abada2 100644
---- a/drivers/iio/pressure/st_pressure_core.c
-+++ b/drivers/iio/pressure/st_pressure_core.c
-@@ -107,6 +107,7 @@ static const struct st_sensors st_press_sensors[] = {
- 			[0] = LPS331AP_PRESS_DEV_NAME,
- 		},
- 		.ch = (struct iio_chan_spec *)st_press_lps331ap_channels,
-+		.num_ch = ARRAY_SIZE(st_press_lps331ap_channels),
- 		.odr = {
- 			.addr = ST_PRESS_LPS331AP_ODR_ADDR,
- 			.mask = ST_PRESS_LPS331AP_ODR_MASK,
-@@ -245,7 +246,7 @@ int st_press_common_probe(struct iio_dev *indio_dev,
- 	pdata->num_data_channels = ST_PRESS_NUMBER_DATA_CHANNELS;
- 	pdata->multiread_bit = pdata->sensor->multi_read_bit;
- 	indio_dev->channels = pdata->sensor->ch;
--	indio_dev->num_channels = ARRAY_SIZE(st_press_lps331ap_channels);
-+	indio_dev->num_channels = pdata->sensor->num_ch;
+diff --git a/drivers/iio/common/st_sensors/st_sensors_core.c b/drivers/iio/common/st_sensors/st_sensors_core.c
+index 148f0e5..25d4c7e 100644
+--- a/drivers/iio/common/st_sensors/st_sensors_core.c
++++ b/drivers/iio/common/st_sensors/st_sensors_core.c
+@@ -359,28 +359,25 @@ int st_sensors_read_info_raw(struct iio_dev *indio_dev,
+ 	mutex_lock(&indio_dev->mlock);
+ 	if (indio_dev->currentmode == INDIO_BUFFER_TRIGGERED) {
+ 		err = -EBUSY;
+-		goto read_error;
++		goto out;
+ 	} else {
+ 		err = st_sensors_set_enable(indio_dev, true);
+ 		if (err < 0)
+-			goto read_error;
++			goto out;
  
- 	if (pdata->sensor->fs.addr != 0)
- 		pdata->current_fullscale = (struct st_sensor_fullscale_avl *)
-diff --git a/include/linux/iio/common/st_sensors.h b/include/linux/iio/common/st_sensors.h
-index e51f654..e732fda 100644
---- a/include/linux/iio/common/st_sensors.h
-+++ b/include/linux/iio/common/st_sensors.h
-@@ -184,6 +184,7 @@ struct st_sensors {
- 	u8 wai;
- 	char sensors_supported[ST_SENSORS_MAX_4WAI][ST_SENSORS_MAX_NAME];
- 	struct iio_chan_spec *ch;
-+	int num_ch;
- 	struct st_sensor_odr odr;
- 	struct st_sensor_power pw;
- 	struct st_sensor_axis enable_axis;
+ 		msleep((sdata->sensor->bootime * 1000) / sdata->odr);
+ 		err = st_sensors_read_axis_data(indio_dev, ch, val);
+ 		if (err < 0)
+-			goto read_error;
++			goto out;
+ 
+ 		*val = *val >> ch->scan_type.shift;
+ 
+ 		err = st_sensors_set_enable(indio_dev, false);
+ 	}
++out:
+ 	mutex_unlock(&indio_dev->mlock);
+ 
+ 	return err;
+-
+-read_error:
+-	mutex_unlock(&indio_dev->mlock);
+-	return err;
+ }
+ EXPORT_SYMBOL(st_sensors_read_info_raw);
+ 
 -- 
 1.8.1.2
