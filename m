@@ -1,41 +1,28 @@
-From: joelf@ti.com (Joel Fernandes)
-Date: Tue, 10 Sep 2013 15:14:56 -0500
-Subject: [PATCH 0/3] ARM: dts: Enable EDMA, MMC and SPI on AM33XX for v3.13
-In-Reply-To: <5EB8AE91-A996-4CF1-86B7-C8FDEC177E89@dominion.thruhere.net>
-References: <1378841079-15796-1-git-send-email-joelf@ti.com>
- <5EB8AE91-A996-4CF1-86B7-C8FDEC177E89@dominion.thruhere.net>
-Message-ID: <522F7DC0.7030603@ti.com>
+From: dan.carpenter@oracle.com (Dan Carpenter)
+Date: Tue, 10 Sep 2013 23:54:44 +0300
+Subject: [PATCH 3/5] Staging/iio/adc/touchscreen/MXS: add i.MX23 support
+ to the LRADC driver
+In-Reply-To: <201309100936.14562.jbe@pengutronix.de>
+References: <1378713801-1182-1-git-send-email-jbe@pengutronix.de>
+ <1378713801-1182-4-git-send-email-jbe@pengutronix.de>
+ <201309091804.20177.marex@denx.de>
+ <201309100936.14562.jbe@pengutronix.de>
+Message-ID: <20130910205444.GB6329@mwanda>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/10/2013 02:39 PM, Koen Kooi wrote:
+On Tue, Sep 10, 2013 at 09:36:14AM +0200, J?rgen Beisert wrote:
+> >
+> > This patch seems to combine two things -- register access rework AND
+> > adjustment of the driver for MX23 touchscreen.
 > 
-> Op 10 sep. 2013, om 21:24 heeft Joel Fernandes <joelf@ti.com> het volgende geschreven:
-> 
->> Here are last few patches required to add EDMA and MMC/SPI support for AM33xx.
->>
->> Now that all dependent DMA patches and fixes are in linux next or mainline, except
->> for [1] which should go in for 3.12 -rc cycle, it is safe to enable MMC and SPI support
->> and this patch series enables it. These are originally Matt Porter's patches with
->> changes to make it work with recent kernels, addition of irq, memory resources and
->> enable other extra properties.
->>
->> These patches should cleanly apply on master branch after Koen's patch [2] for basic
->> BBB DT support is applied.
->>
->> MMC support is enabled for: Beaglebone, AM335x EVM and EVM-SK boards. MMC support
->> for BBB is intentionally not added due to custom fixes and other patches that are
->> in Koen's tree and which will be separately submitted by him.
-> 
-> Correct, but your patches for MMC support on BBW are missing the card detect entries to make it hotplug work.
+> It reworks the register access to avoid the i.MX23/i.MX28 runtime decision all 
+> over the code again and again. This is what Dan has recommended in his 
+> comment.
 
-I thought it was determined that this would be submitted by you separately after
-rebasing as we discussed [1] and [2].
+I thought the same as Marek that it would be better as two patches like
+the one I sent, but I was also willing to let it slide if no one else
+complained.
 
-[1] https://lkml.org/lkml/2013/9/6/183
-[2] http://marc.info/?l=linux-omap&m=137879246709612&w=2
-
-
-Regards,
-
--Joel
+regards,
+dan carpenter
