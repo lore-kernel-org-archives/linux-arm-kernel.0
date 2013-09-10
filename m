@@ -1,49 +1,55 @@
 From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 10 Sep 2013 09:54:39 +0200
-Subject: [PATCH] mmc: atmel-mci: abort transfer on timeout error
-In-Reply-To: <1378740596-25026-1-git-send-email-ludovic.desroches@atmel.com>
-References: <1378740596-25026-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <522ED03F.5070404@atmel.com>
+Date: Tue, 10 Sep 2013 10:04:22 +0200
+Subject: [PATCH] mmc: atmel-mci: fix oops in atmci_tasklet_func
+In-Reply-To: <1378740719-25164-1-git-send-email-ludovic.desroches@atmel.com>
+References: <1378740719-25164-1-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <522ED286.4030305@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/09/2013 17:29, ludovic.desroches at atmel.com :
-> From: Ludovic Desroches <ludovic.desroches@atmel.com>
+On 09/09/2013 17:31, ludovic.desroches at atmel.com :
+> From: Rodolfo Giometti <giometti@enneenne.com>
 >
-> When a software timeout occurs, the transfer is not stopped. In DMA case, it
-> causes DMA channel to be stuck because the transfer is still active causing
-> following transfers to be queued but not computed.
+> In some cases, a NULL pointer dereference happens because data is NULL when
+> STATE_END_REQUEST case is reached in atmci_tasklet_func.
 >
 > Cc: <stable@vger.kernel.org> #3.9+
-> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+> Signed-off-by: Rodolfo Giometti <giometti@enneenne.com>
+> Acked-by: Ludovic Desroches <ludovic.desroches@atmel.com>
 
 Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-Thanks.
+Thanks, bye.
 
-> Reported-by: Alexander Morozov <etesial@gmail.com>
 > ---
->   drivers/mmc/host/atmel-mci.c | 7 +++++++
->   1 file changed, 7 insertions(+)
+>   drivers/mmc/host/atmel-mci.c | 14 ++++++++------
+>   1 file changed, 8 insertions(+), 6 deletions(-)
 >
 > diff --git a/drivers/mmc/host/atmel-mci.c b/drivers/mmc/host/atmel-mci.c
-> index bdb84da..e9ea2fc 100644
+> index e9ea2fc..78d7e47 100644
 > --- a/drivers/mmc/host/atmel-mci.c
 > +++ b/drivers/mmc/host/atmel-mci.c
-> @@ -582,6 +582,13 @@ static void atmci_timeout_timer(unsigned long data)
->   	if (host->mrq->cmd->data) {
->   		host->mrq->cmd->data->error = -ETIMEDOUT;
->   		host->data = NULL;
-> +		/*
-> +		 * With some SDIO modules, sometimes DMA transfer hangs. If
-> +		 * stop_transfer() is not called then the DMA request is not
-> +		 * removed, following ones are queued and never computed.
-> +		 */
-> +		if (host->state == STATE_DATA_XFER)
-> +			host->stop_transfer(host);
->   	} else {
->   		host->mrq->cmd->error = -ETIMEDOUT;
->   		host->cmd = NULL;
+> @@ -1792,12 +1792,14 @@ static void atmci_tasklet_func(unsigned long priv)
+>   			if (unlikely(status)) {
+>   				host->stop_transfer(host);
+>   				host->data = NULL;
+> -				if (status & ATMCI_DTOE) {
+> -					data->error = -ETIMEDOUT;
+> -				} else if (status & ATMCI_DCRCE) {
+> -					data->error = -EILSEQ;
+> -				} else {
+> -					data->error = -EIO;
+> +				if (data) {
+> +					if (status & ATMCI_DTOE) {
+> +						data->error = -ETIMEDOUT;
+> +					} else if (status & ATMCI_DCRCE) {
+> +						data->error = -EILSEQ;
+> +					} else {
+> +						data->error = -EIO;
+> +					}
+>   				}
+>   			}
+>
 >
 
 
