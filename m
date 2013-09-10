@@ -1,42 +1,28 @@
-From: jean.pihet@linaro.org (Jean Pihet)
-Date: Tue, 10 Sep 2013 21:38:49 +0200
-Subject: [PATCH 3/3] perf: parse the .debug_frame section in case
- .eh_frame is not present
-In-Reply-To: <522F6F96.8030803@gmail.com>
-References: <1378720815-23964-1-git-send-email-jean.pihet@linaro.org>
- <1378720815-23964-4-git-send-email-jean.pihet@linaro.org>
- <522F6F96.8030803@gmail.com>
-Message-ID: <CAFrcx1=mOw5=kASC9O=xewWV8QeOy-ga0F9ZGbtcauDJQ2iGFQ@mail.gmail.com>
+From: koen@dominion.thruhere.net (Koen Kooi)
+Date: Tue, 10 Sep 2013 21:39:55 +0200
+Subject: [PATCH 0/3] ARM: dts: Enable EDMA, MMC and SPI on AM33XX for v3.13
+In-Reply-To: <1378841079-15796-1-git-send-email-joelf@ti.com>
+References: <1378841079-15796-1-git-send-email-joelf@ti.com>
+Message-ID: <5EB8AE91-A996-4CF1-86B7-C8FDEC177E89@dominion.thruhere.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10 September 2013 21:14, David Ahern <dsahern@gmail.com> wrote:
-> On 9/9/13 3:00 AM, Jean Pihet wrote:
->>
->> diff --git a/tools/perf/config/Makefile b/tools/perf/config/Makefile
->> index 7014373..54532b8 100644
->> --- a/tools/perf/config/Makefile
->> +++ b/tools/perf/config/Makefile
->> @@ -222,7 +222,7 @@ endif
->>
->>   FLAGS_UNWIND=$(LIBUNWIND_CFLAGS) $(CFLAGS) $(LIBUNWIND_LDFLAGS)
->> $(LDFLAGS) $(EXTLIBS) $(LIBUNWIND_LIBS)
->>   ifneq ($(call try-cc,$(SOURCE_LIBUNWIND),$(FLAGS_UNWIND),libunwind),y)
->> -  msg := $(warning No libunwind found, disabling post unwind support.
->> Please install libunwind-dev[el] >= 0.99);
->> +  msg := $(warning No libunwind found, disabling post unwind support.
->> Please install libunwind-dev[el] >= 1.1);
->>     NO_LIBUNWIND := 1
->>   endif # Libunwind support
->>   endif # NO_LIBUNWIND
->
->
-> Is the 1.1 version required for x86 too?
-Yes if the dwarf unwinding feature is used. I know it is not in use on
-x86 as of now but could be in the future since the dwarf info brings
-more details in the trace, cf. http://lwn.net/Articles/499116/.
 
->
-> David
+Op 10 sep. 2013, om 21:24 heeft Joel Fernandes <joelf@ti.com> het volgende geschreven:
 
-Jean
+> Here are last few patches required to add EDMA and MMC/SPI support for AM33xx.
+> 
+> Now that all dependent DMA patches and fixes are in linux next or mainline, except
+> for [1] which should go in for 3.12 -rc cycle, it is safe to enable MMC and SPI support
+> and this patch series enables it. These are originally Matt Porter's patches with
+> changes to make it work with recent kernels, addition of irq, memory resources and
+> enable other extra properties.
+> 
+> These patches should cleanly apply on master branch after Koen's patch [2] for basic
+> BBB DT support is applied.
+> 
+> MMC support is enabled for: Beaglebone, AM335x EVM and EVM-SK boards. MMC support
+> for BBB is intentionally not added due to custom fixes and other patches that are
+> in Koen's tree and which will be separately submitted by him.
+
+Correct, but your patches for MMC support on BBW are missing the card detect entries to make it hotplug work.
