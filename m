@@ -1,52 +1,62 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 10 Sep 2013 16:35:43 +0100
-Subject: [PATCH 07/38] ARM: ux500: CONFIG: Enable ST's IIO Accelerometer
- Sensors by default
-In-Reply-To: <CAOesGMj+YzkE5bAxUqFYWoJ-RURDdCK5MUWYTc+gWFQMB3KWkg@mail.gmail.com>
-References: <1378817379-8238-1-git-send-email-lee.jones@linaro.org>
- <1378817379-8238-8-git-send-email-lee.jones@linaro.org>
- <CAOesGMj+YzkE5bAxUqFYWoJ-RURDdCK5MUWYTc+gWFQMB3KWkg@mail.gmail.com>
-Message-ID: <20130910153543.GB11227@lee--X1>
+From: zonque@gmail.com (Daniel Mack)
+Date: Tue, 10 Sep 2013 17:46:19 +0200
+Subject: [PATCH v5 4/5] dma: mmp_pdma: add support for residue reporting
+In-Reply-To: <20130825163337.GD2748@intel.com>
+References: <1377086938-29145-1-git-send-email-zonque@gmail.com>
+ <1377086938-29145-5-git-send-email-zonque@gmail.com>
+ <20130825163337.GD2748@intel.com>
+Message-ID: <522F3ECB.3070307@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 10 Sep 2013, Olof Johansson wrote:
+Hi Vinod,
 
-> On Tue, Sep 10, 2013 at 5:49 AM, Lee Jones <lee.jones@linaro.org> wrote:
-> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> > ---
-> >  arch/arm/configs/u8500_defconfig | 1 +
-> >  1 file changed, 1 insertion(+)
-> >
-> > diff --git a/arch/arm/configs/u8500_defconfig b/arch/arm/configs/u8500_defconfig
-> > index 6b29109..24f88d6 100644
-> > --- a/arch/arm/configs/u8500_defconfig
-> > +++ b/arch/arm/configs/u8500_defconfig
-> > @@ -39,6 +39,7 @@ CONFIG_BLK_DEV_RAM_SIZE=65536
-> >  CONFIG_SENSORS_BH1780=y
-> >  CONFIG_IIO=y
-> >  CONFIG_IIO_ST_PRESS=y
-> > +CONFIG_IIO_ST_ACCEL_3AXIS=y
-> >  CONFIG_NETDEVICES=y
-> >  CONFIG_SMSC911X=y
-> >  CONFIG_SMSC_PHY=y
+Sorry for the late response, I've been on vacations.
+
+On 25.08.2013 18:33, Vinod Koul wrote:
+> On Wed, Aug 21, 2013 at 02:08:57PM +0200, Daniel Mack wrote:
+>> In order to report the channel's residue, we walk the list of running
+>> descriptors, look for those which match the cookie, and then try to find
+>> the descriptor which defines upper and lower boundaries that embrace the
+>> current transport pointer.
 > 
-> This is ridiculous.
-> 
-> I know lwn.net's patch author statistics are fun to be on, but
+>>
+>> +		/*
+>> +		 * 'passed' will be latched once we found the descriptor which
+>> +		 * lies inside the boundaries of the curr pointer. All
+>> +		 * descriptors that occur in the list _after_ we found that
+>> +		 * partially handled descriptor are still to be processed and
+>> +		 * are hence added to the residual bytes counter.
+>> +		 */
+> do you have multiple descriptors for one transaction? Should be No.
 
-Jealousy won't get you anywhere... ;)
+Sure, that can be the case. One transaction could span across multiple
+descriptors, especially if its overall length exceeds the maximum length
+of one descriptor.
 
-> splitting this and the other config update into two patches? Really?
+> The cookie is assigned to a transaction when it is submitted. so when you see
+> descriptor cookie is less than completed one, then it already completed and
+> should not be in pending list.
 
-I haven't split anything. I created the patches as I was
-enabling/testing the drivers, which was at completely different
-times. The only reason they're close together in the set is because I
-reorganised it and didn't think it was necessary to squash them
-together.
+Hmm, what about an integer overrun?
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+>>  static enum dma_status mmp_pdma_tx_status(struct dma_chan *dchan,
+>>  			dma_cookie_t cookie, struct dma_tx_state *txstate)
+>>  {
+>> @@ -750,6 +822,7 @@ static enum dma_status mmp_pdma_tx_status(struct dma_chan *dchan,
+>>  
+>>  	spin_lock_irqsave(&chan->desc_lock, flags);
+>>  	ret = dma_cookie_status(dchan, cookie, txstate);
+>> +	txstate->residue = mmp_pdma_residue(chan, cookie);
+> here you check ret value first, if descriptor is completed then you will get
+> DMA_SUCCESS and just return that, no need to check the residue. If it is
+> pending, then also just return size of transaction. Only when it is progress you
+> need to calculate and check
+
+Because in case of success, the residue is always 0. Alright, will
+change that.
+
+
+Thanks for the feedback!
+
+Daniel
