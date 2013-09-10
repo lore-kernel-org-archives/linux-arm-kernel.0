@@ -1,53 +1,31 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Tue, 10 Sep 2013 20:56:31 +0530
-Subject: "cpufreq: fix serialization issues with freq change notifiers"
- breaks cpufreq too
-In-Reply-To: <Pine.LNX.4.64.1309101656150.16010@axis700.grange>
-References: <Pine.LNX.4.64.1309091656200.6602@axis700.grange>
- <CAKohponZ+FnzqXYMbBzbun0-1iQMi2fS4syrEBC_MdF41vLCeA@mail.gmail.com>
- <Pine.LNX.4.64.1309101656150.16010@axis700.grange>
-Message-ID: <CAKohpomBBKLhNemVUpUHAftGhPJJe+ZB7T_9UYLD7LwpR1nK0g@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 10 Sep 2013 16:30:37 +0100
+Subject: [PATCH 01/38] ARM: ux500: Remove PrimeCell IDs from Nomadik I2C
+ DT nodes
+In-Reply-To: <CAOesGMgySNLKo_H0h4MCbAWvyW0h2bWa96drWBpnhAYYQwH9mw@mail.gmail.com>
+References: <1378817379-8238-1-git-send-email-lee.jones@linaro.org>
+ <1378817379-8238-2-git-send-email-lee.jones@linaro.org>
+ <CAOesGMgySNLKo_H0h4MCbAWvyW0h2bWa96drWBpnhAYYQwH9mw@mail.gmail.com>
+Message-ID: <20130910153037.GA11227@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10 September 2013 20:42, Guennadi Liakhovetski <g.liakhovetski@gmx.de> wrote:
-> 4. reverted that commit, resolving a trivial conflict. Added a debug
-> output in __cpufreq_driver_target() of
->
->
->         if (cpufreq_disabled())
->                 return -ENODEV;
-> +       pr_info("%s() %d\n", __func__, policy->transition_ongoing);
->         if (policy->transition_ongoing)
->                 return -EBUSY;
+> On Tue, Sep 10, 2013 at 5:49 AM, Lee Jones <lee.jones@linaro.org> wrote:
+> > Turns out that they're actually not required and the driver probes just
+> > fine without them. The ID is incorrect at the moment anyway. They actually
+> > currently specify the stn8815.
+> >
+> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> 
+> How did you test this patch? What hardware did you boot it on and with
+> what config?
 
-Are you sure this diff is on linux-next and not after the revert that
-you mentioned later in the mail? There is some locking introduced
-by my patch which I can't see in you diff..
+Snowball, u8500_defconfig.
 
-> Built and booted, got
->
-> cpufreq: __cpufreq_driver_target(): 1
->
-> printed out 4 times from the beginning.
->
-> 5. tried
->
-> echo powersave > /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor
->
-> the above output appeared 2 more times - no frequency change resulted.
->
-> 6. reverted commit dceff5ce18801dddc220d6238628619c93bc3cb6, built booted
-> - cpufreq works again.
->
->> I am afraid you need to give us some more information on how it broke
->> your stuff.. :)
->
-> Hope the above is enough.
+Why? Don't you have the same result with yours?
 
-A bit more would be helpful.. Can you add these debug prints to all the places
-where transition_ongoing is getting modified? with %s, __func__ to distinguish
-them better? That will make it a bit easy for me...
-
-Also, what's the configuration of your system? How many CPUs? And are all
-of them sharing clock? (I believe yes, as you are using cpufreq-cpu0)..
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
