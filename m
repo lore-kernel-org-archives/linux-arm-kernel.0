@@ -1,75 +1,68 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 10 Sep 2013 13:27:54 +0100
-Subject: [PATCH RESEND 1/2] i2c: prepare runtime PM support for I2C
- client devices
-In-Reply-To: <20130910075100.GK7393@intel.com>
-References: <1378733679-19500-1-git-send-email-mika.westerberg@linux.intel.com>
- <1378733679-19500-2-git-send-email-mika.westerberg@linux.intel.com>
- <20130909154028.GP29403@sirena.org.uk>
- <20130910075100.GK7393@intel.com>
-Message-ID: <20130910122754.GK29403@sirena.org.uk>
+From: thommyj@gmail.com (Thommy Jakobsson)
+Date: Tue, 10 Sep 2013 14:42:17 +0200 (CEST)
+Subject: kmalloc memory slower than malloc
+In-Reply-To: <20130910114420.GC12758@n2100.arm.linux.org.uk>
+References: <alpine.DEB.2.02.1309060811400.1299@kelly.ryd.net>
+ <1378458778.4208.30.camel@weser.hi.pengutronix.de>
+ <alpine.DEB.2.02.1309101124450.1305@kelly.ryd.net>
+ <1378807816.4200.6.camel@weser.hi.pengutronix.de>
+ <9848F2DB572E5649BA045B288BE08FBE016A9D4A@039-SN2MPN1-023.039d.mgd.msft.net>
+ <alpine.DEB.2.02.1309101327340.1305@kelly.ryd.net>
+ <9848F2DB572E5649BA045B288BE08FBE016A9EE8@039-SN2MPN1-023.039d.mgd.msft.net>
+ <20130910114420.GC12758@n2100.arm.linux.org.uk>
+Message-ID: <alpine.DEB.2.02.1309101435430.1305@kelly.ryd.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 10, 2013 at 10:51:00AM +0300, Mika Westerberg wrote:
-> On Mon, Sep 09, 2013 at 04:40:28PM +0100, Mark Brown wrote:
 
-> > How is this going to interact with client devices which are already
-> > enabling runtime PM for themselves, and what are the advantages of doing
-> > this over having the client device enable runtime PM for itself (given
-> > that the client still needs an explicit put() adding)?
 
-> My understanding is that you can call pm_runtime_enable() several times
-> (provided that pm_runtime_disable() is called as many times). So that
-> should have no effect on the current drivers that already take advantage of
-> runtime PM.
+On Tue, 10 Sep 2013, Russell King - ARM Linux wrote:
 
-Not quite...
+> On Tue, Sep 10, 2013 at 11:36:34AM +0000, Duan Fugang-B38611 wrote:
+> > From: Thommy Jakobsson [mailto:thommyj at gmail.com] 
+> > Data: Tuesday, September 10, 2013 7:29 PM
+> > 
+> > > To: Duan Fugang-B38611
+> > > Cc: Lucas Stach; Thommy Jakobsson; linux-arm-kernel at lists.infradead.org
+> > > Subject: RE: kmalloc memory slower than malloc
+> > > 
+> > > 
+> > > 
+> > > On Tue, 10 Sep 2013, Duan Fugang-B38611 wrote:
+> > > 
+> > > > About the diff:
+> > > > dma_alloc_coherent in kernel   4.256s (s=0)
+> > > > dma_alloc_coherent userspace   0.566s (s=0)
+> > > >
+> > > > I think it call remap_pfn_range() with page attribute (vma->vm_page_prot)
+> > > transferred from mmap() maybe cacheable.
+> > > > So the performance is the same as malloc/kmalloc in userspace.
+> > > >
+> > > Thats probably true, or at least that is how I explained it to myself in
+> > > my head =)
+> > > 
+> > > Thanks,
+> > > Thommy
+> > 
+> > Can you add below code to your device_mmap() to test the performance for above two cases:
+> > 	vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
+> 
+> No, that is not match the page table settings that dma_mmap_coherent
+> would use.  That gets you strongly ordered memory which will be
+> (a) a violation of the ARM architecture requirements, being a different
+> "memory type", and (b) will be a different mapping type compared to
+> that used by the virtual address returned from dma_alloc_coherent().
+> 
+> The appropriate modification here would be pgprot_dmacoherent().
+Using pgprot_dmacoherent() in mmap they look more similar. Still 
+~10-15% difference, but maybe that is normal for kernel/userspace. 
 
-> There is one difference though -- runtime PM is now blocked by default and
-> it needs to be unblocked from the userspace per each device.
+dma_alloc_coherent in kernel   4.257s (s=0)
+kmalloc in kernel              0.126s (s=81370000)
+dma_alloc_coherent userspace   4.907s (s=0)
+kmalloc in userspace          1.815s (s=81370000)
+malloc in userspace          0.566s (s=0)
 
-...as you say.
-
-This seems crazy, why on earth would we want to have userspace be forced
-to manually go through every single device and manually enable power
-saving?  I can't see anyone finding that helpful and it's going to be a
-pain to deploy.
-
-However I had thought it was just a case of the drivers doing a put()
-instead of their current code to enable runtime PM (you mention that
-later on)?  That seems both sensible and doable, though it would need
-doing as part of the conversion to avoid regressions and I'd expect it
-does mean that SPI needs to be converted at the same time.
-
-> For the advantages compared to each driver handling it completely
-> themselves:
-
-> 	- Few lines less as you only need to call _put().
-> 	- It follows what is already been done for other buses, like PCI
-> 	  and AMBA .
-> 	- The I2C core makes sure that the device is available (from bus
-> 	  point of view) when the driver ->probe() is called.
-
-I can't understand your last point here at all, sorry.  Can you expand
-please?
-
-> > Given that it's relatively common for devices to have both I2C and SPI
-> > control it seems like it'd be sensible to keep the policy common between
-> > the two buses to simplify driver implementation.
-
-> Yes and IMHO if I2C and SPI follows what has already been done for other
-> buses it should make the driver writer's job easier as the usage is similar
-> from one bus to another.
-
-So then the obvious followup question is why this is even something that
-needs to be implemented per bus?  Shouldn't we be enhancing the driver
-core to do this, or is that the long term plan and this is a step on the
-road to doing that?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130910/84c482ec/attachment-0001.sig>
+Note that I was lazy and used the same pgprot for all mappings now, which 
+I guess is a violation. 
+//thommy
