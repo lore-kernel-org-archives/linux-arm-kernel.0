@@ -1,25 +1,47 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 10 Sep 2013 15:16:40 +0800
-Subject: [PATCH][RESEND] ARM: imx: remove IRQF_DISABLED
-In-Reply-To: <20130910065838.GC30088@pengutronix.de>
-References: <1378271079-24945-1-git-send-email-michael.opdenacker@free-electrons.com>
- <20130910065838.GC30088@pengutronix.de>
-Message-ID: <20130910071636.GA7327@S2101-09.ap.freescale.net>
+From: jbe@pengutronix.de (=?iso-8859-1?q?J=FCrgen_Beisert?=)
+Date: Tue, 10 Sep 2013 09:36:14 +0200
+Subject: [PATCH 3/5] Staging/iio/adc/touchscreen/MXS: add i.MX23 support
+ to the LRADC driver
+In-Reply-To: <201309091804.20177.marex@denx.de>
+References: <1378713801-1182-1-git-send-email-jbe@pengutronix.de>
+ <1378713801-1182-4-git-send-email-jbe@pengutronix.de>
+ <201309091804.20177.marex@denx.de>
+Message-ID: <201309100936.14562.jbe@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 10, 2013 at 08:58:38AM +0200, Sascha Hauer wrote:
-> On Wed, Sep 04, 2013 at 07:04:39AM +0200, Michael Opdenacker wrote:
-> > This flag is a NOOP since 2.6.35 and can be removed.
-> > 
-> > This is an update for 3.11 of a patch already sent for 3.10
-> > 
-> > Signed-off-by: Michael Opdenacker <michael.opdenacker@free-electrons.com>
-> 
-> (added shawn to Cc)
-> 
-> Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
+Hi Marek,
 
-Applied, thanks.
+On Monday 09 September 2013 18:04:19 Marek Vasut wrote:
+> > Distinguish i.MX23 and i.MX28 at runtime and do the same for both SoC at
+> > least for the 4 wire touchscreen.
+> >
+> > Signed-off-by: Juergen Beisert <jbe@pengutronix.de>
+> > CC: linux-arm-kernel at lists.infradead.org
+> > CC: devel at driverdev.osuosl.org
+> > CC: Marek Vasut <marex@denx.de>
+> > CC: Fabio Estevam <fabio.estevam@freescale.com>
+> > CC: Jonathan Cameron <jic23@cam.ac.uk>
+>
+> This patch seems to combine two things -- register access rework AND
+> adjustment of the driver for MX23 touchscreen.
 
-Shawn
+It reworks the register access to avoid the i.MX23/i.MX28 runtime decision all 
+over the code again and again. This is what Dan has recommended in his 
+comment.
+
+> Btw the MX23 ADC was already supported,
+
+No. This patch is the first in this series which brings in the specific 
+register bits, because the ADC units in the i.MX23 and i.MX28 differ.
+
+> so this "add i.MX23 support" commit message is not accurate.
+
+Hmmm, what else do you think should I write?
+
+Regards,
+Juergen
+
+-- 
+Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?| Juergen Beisert ? ? ? ? ? ? |
+Linux Solutions for Science and Industry ? ? ?| http://www.pengutronix.de/  |
