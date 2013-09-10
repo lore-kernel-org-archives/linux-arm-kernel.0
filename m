@@ -1,35 +1,52 @@
-From: torvalds@linux-foundation.org (Linus Torvalds)
-Date: Tue, 10 Sep 2013 08:31:04 -0700
-Subject: [GIT PULL 0/3] ARM: SoC: Second round of changes for v3.12
-In-Reply-To: <1378825549.2627.316.camel@shinybook.infradead.org>
-References: <1378766555-9679-1-git-send-email-khilman@linaro.org>
- <CA+55aFxNbH+G6DVQNxE9di_btA5hxFH93af_vjN2v0eH8e5W-g@mail.gmail.com>
- <1378825549.2627.316.camel@shinybook.infradead.org>
-Message-ID: <CA+55aFyRUZMJiotV0kAUoeEFpFdvK2r-3rXuS7NO4jHoQ+OkPA@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 10 Sep 2013 16:35:43 +0100
+Subject: [PATCH 07/38] ARM: ux500: CONFIG: Enable ST's IIO Accelerometer
+ Sensors by default
+In-Reply-To: <CAOesGMj+YzkE5bAxUqFYWoJ-RURDdCK5MUWYTc+gWFQMB3KWkg@mail.gmail.com>
+References: <1378817379-8238-1-git-send-email-lee.jones@linaro.org>
+ <1378817379-8238-8-git-send-email-lee.jones@linaro.org>
+ <CAOesGMj+YzkE5bAxUqFYWoJ-RURDdCK5MUWYTc+gWFQMB3KWkg@mail.gmail.com>
+Message-ID: <20130910153543.GB11227@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 10, 2013 at 8:05 AM, David Woodhouse <dwmw2@infradead.org> wrote:
->
-> In cost-sensitive products (and what *isn't* cost-sensitive these days),
-> you really don't want to have to put an extra EEPROM on the board
-> somewhere
+On Tue, 10 Sep 2013, Olof Johansson wrote:
 
-Don't be silly. Nobody wants an extra chip. Especially not one that is
-programmable separately from the hardware. That way lies madness and
-the usual firmware crazies.
+> On Tue, Sep 10, 2013 at 5:49 AM, Lee Jones <lee.jones@linaro.org> wrote:
+> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> > ---
+> >  arch/arm/configs/u8500_defconfig | 1 +
+> >  1 file changed, 1 insertion(+)
+> >
+> > diff --git a/arch/arm/configs/u8500_defconfig b/arch/arm/configs/u8500_defconfig
+> > index 6b29109..24f88d6 100644
+> > --- a/arch/arm/configs/u8500_defconfig
+> > +++ b/arch/arm/configs/u8500_defconfig
+> > @@ -39,6 +39,7 @@ CONFIG_BLK_DEV_RAM_SIZE=65536
+> >  CONFIG_SENSORS_BH1780=y
+> >  CONFIG_IIO=y
+> >  CONFIG_IIO_ST_PRESS=y
+> > +CONFIG_IIO_ST_ACCEL_3AXIS=y
+> >  CONFIG_NETDEVICES=y
+> >  CONFIG_SMSC911X=y
+> >  CONFIG_SMSC_PHY=y
+> 
+> This is ridiculous.
+> 
+> I know lwn.net's patch author statistics are fun to be on, but
 
-It's not even what I asked for. I talked about discoverable buses. How
-hard is that to understand? No extra chips, no eeprom, just a bus with
-a notion of configuration cycles. It doesn't even have to be as
-complicated as PCI, it could easily be a read-only model.
+Jealousy won't get you anywhere... ;)
 
-But no, every SoC designer out there seems to want to make their
-hardware crap. Don't be surprised when I then call them out on the
-fact. And don't bring up totally irrelevant issues that have nothing
-to do with anything.
+> splitting this and the other config update into two patches? Really?
 
-Is there a cost? Yes, it's a cost of good design and effort to try to
-get it right. Usually that cost pays itself back over the years.
+I haven't split anything. I created the patches as I was
+enabling/testing the drivers, which was at completely different
+times. The only reason they're close together in the set is because I
+reorganised it and didn't think it was necessary to squash them
+together.
 
-            Linus
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
