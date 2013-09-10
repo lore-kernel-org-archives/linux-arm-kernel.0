@@ -1,32 +1,41 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 10 Sep 2013 14:02:43 -0600
-Subject: [PATCH v9 1/3] gpio: bcm281xx: Add GPIO driver
-In-Reply-To: <1378836423-12467-2-git-send-email-markus.mayer@linaro.org>
-References: <1378836423-12467-1-git-send-email-markus.mayer@linaro.org>
- <1378836423-12467-2-git-send-email-markus.mayer@linaro.org>
-Message-ID: <522F7AE3.6050105@wwwdotorg.org>
+From: joelf@ti.com (Joel Fernandes)
+Date: Tue, 10 Sep 2013 15:14:56 -0500
+Subject: [PATCH 0/3] ARM: dts: Enable EDMA, MMC and SPI on AM33XX for v3.13
+In-Reply-To: <5EB8AE91-A996-4CF1-86B7-C8FDEC177E89@dominion.thruhere.net>
+References: <1378841079-15796-1-git-send-email-joelf@ti.com>
+ <5EB8AE91-A996-4CF1-86B7-C8FDEC177E89@dominion.thruhere.net>
+Message-ID: <522F7DC0.7030603@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/10/2013 12:07 PM, Markus Mayer wrote:
-> From: Markus Mayer <mmayer@broadcom.com>
+On 09/10/2013 02:39 PM, Koen Kooi wrote:
 > 
-> Add the GPIO driver for the Broadcom bcm281xx family of mobile SoCs.
-> These GPIO controllers may contain up to 8 banks where each bank
-> includes 32 pins that can be driven high or low and act as an edge
-> sensitive interrupt.
+> Op 10 sep. 2013, om 21:24 heeft Joel Fernandes <joelf@ti.com> het volgende geschreven:
+> 
+>> Here are last few patches required to add EDMA and MMC/SPI support for AM33xx.
+>>
+>> Now that all dependent DMA patches and fixes are in linux next or mainline, except
+>> for [1] which should go in for 3.12 -rc cycle, it is safe to enable MMC and SPI support
+>> and this patch series enables it. These are originally Matt Porter's patches with
+>> changes to make it work with recent kernels, addition of irq, memory resources and
+>> enable other extra properties.
+>>
+>> These patches should cleanly apply on master branch after Koen's patch [2] for basic
+>> BBB DT support is applied.
+>>
+>> MMC support is enabled for: Beaglebone, AM335x EVM and EVM-SK boards. MMC support
+>> for BBB is intentionally not added due to custom fixes and other patches that are
+>> in Koen's tree and which will be separately submitted by him.
+> 
+> Correct, but your patches for MMC support on BBW are missing the card detect entries to make it hotplug work.
 
-The binding,
-Reviewed-by: Stephen Warren <swarren@nvidia.com>
+I thought it was determined that this would be submitted by you separately after
+rebasing as we discussed [1] and [2].
 
-although ...
+[1] https://lkml.org/lkml/2013/9/6/183
+[2] http://marc.info/?l=linux-omap&m=137879246709612&w=2
 
-> diff --git a/Documentation/devicetree/bindings/gpio/gpio-bcm-kona.txt b/Documentation/devicetree/bindings/gpio/gpio-bcm-kona.txt
 
-> +This GPIO driver is used in the following Broadcom SoCs:
-> +  BCM11130, BCM11140, BCM11351, BCM28145, BCM28155
+Regards,
 
-Given that, I would expect the documentation of the compatible property
-to enumerate the compatible values for all of those different chips,
-although the driver could choose to only bind to e.g. brcm,bcm11351-gpio
-or brcm,kona-gpio, since they're all compatible with it.
+-Joel
