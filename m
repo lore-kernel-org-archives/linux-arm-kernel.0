@@ -1,23 +1,33 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 10 Sep 2013 11:34:50 +0800
-Subject: [PATCH v2 2/4] ARM: dts: add fec phy reset for imx6sl evk board
-In-Reply-To: <9848F2DB572E5649BA045B288BE08FBE016A8DF9@039-SN2MPN1-023.039d.mgd.msft.net>
-References: <1378182385-9205-1-git-send-email-B38611@freescale.com>
- <1378182385-9205-3-git-send-email-B38611@freescale.com>
- <20130909145333.GA5815@S2101-09.ap.freescale.net>
- <9848F2DB572E5649BA045B288BE08FBE016A7AB8@039-SN2MPN1-023.039d.mgd.msft.net>
- <20130910031138.GD5815@S2101-09.ap.freescale.net>
- <9848F2DB572E5649BA045B288BE08FBE016A8DF9@039-SN2MPN1-023.039d.mgd.msft.net>
-Message-ID: <20130910033448.GF5815@S2101-09.ap.freescale.net>
+From: xobs@kosagi.com (Sean Cross)
+Date: Tue, 10 Sep 2013 03:37:49 +0000
+Subject: [PATCH v2 0/3] Add PCIe support for i.MX6q
+Message-ID: <1378784272-6333-1-git-send-email-xobs@kosagi.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 10, 2013 at 03:23:26AM +0000, Duan Fugang-B38611 wrote:
-> In fact, just for kernel, there have no sequence between the patch and driver patch because
-> Kernel fec also cannot work for imx6sl evk if uboot don't do the initial.
+This patchset adds support for the PCI Express port present on
+the i.MX6 SoC.  The port is based on Synopsis Designware IP with
+a custom PHY.
 
-True.  But in practice, we mostly use U-Boot to download kernel during
-development.  So it's still a nice thing for kernel developers if we can
-boot the board into console with NFS when FEC driver is not fully ready.
+Changes since v1:
+ - Use the Designware controller code for BAR initialization
 
-Shawn
+Sean Cross (3):
+  ARM: imx: Add LVDS general-purpose clocks to i.MX6Q
+  ARM: imx6q: Add PCIe bits to GPR syscon definition
+  PCI: imx6: Add support for i.MX6 PCIe controller
+
+ .../devicetree/bindings/clock/imx6q-clock.txt      |    4 +
+ .../devicetree/bindings/pci/designware-pcie.txt    |    5 +
+ arch/arm/boot/dts/imx6qdl.dtsi                     |   18 +
+ arch/arm/mach-imx/Kconfig                          |    2 +
+ arch/arm/mach-imx/clk-imx6q.c                      |   21 +-
+ drivers/pci/host/Kconfig                           |    6 +
+ drivers/pci/host/Makefile                          |    1 +
+ drivers/pci/host/pci-imx6.c                        |  588 ++++++++++++++++++++
+ include/linux/mfd/syscon/imx6q-iomuxc-gpr.h        |    8 +
+ 9 files changed, 652 insertions(+), 1 deletion(-)
+ create mode 100644 drivers/pci/host/pci-imx6.c
+
+-- 
+1.7.9.5
