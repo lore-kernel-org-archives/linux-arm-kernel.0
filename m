@@ -1,39 +1,82 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 10 Sep 2013 14:29:42 +0200
-Subject: [PATCH 0/7] IXP4 GPIO consolidation
-Message-ID: <1378816182-7903-1-git-send-email-linus.walleij@linaro.org>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 10 Sep 2013 13:49:31 +0100
+Subject: [PATCH 30/38] iio: pressure-core: st: Provide support for the Vdd_IO
+ power supply
+In-Reply-To: <1378817379-8238-1-git-send-email-lee.jones@linaro.org>
+References: <1378817379-8238-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <1378817379-8238-31-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is an attempt to remove the custom GPIO API
-with gpio_line* signatures from the IXP4 platform.
-I'm looking for testing and ACKs to take this through
-the GPIO tree eventually as part of the major clean-up
-attempt.
+The power to some of the sensors are controlled by regulators. In most
+cases these are 'always on', but if not they will fail to work until
+the regulator is enabled using the relevant APIs. This patch allows for
+the Vdd_IO power supply to be specified by either platform data or
+Device Tree.
 
-Please do not report checkpatch errors on patch 7/7 as it
-is just moving already existing code, not introducing new
-code.
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ drivers/iio/pressure/st_pressure_core.c | 13 ++++++++++++-
+ include/linux/iio/common/st_sensors.h   |  2 ++
+ 2 files changed, 14 insertions(+), 1 deletion(-)
 
-Linus Walleij (7):
-  ARM: ixp4xx: convert remaining users to use gpiolib
-  misc: ixp4-beeper: switch to use gpiolib
-  misc: ixp4-beeper: use gpiolib strictly
-  ptp: switch to use gpiolib
-  staging: media/lirc: switch to use gpiolib
-  ARM: ixp4: delete irq_to_gpio
-  ARM: ixp4xx: stop broadcasting the custom GPIO API
-
- arch/arm/mach-ixp4xx/common.c                | 49 +++++++++++++++++++++-------
- arch/arm/mach-ixp4xx/dsmg600-setup.c         | 16 +++++----
- arch/arm/mach-ixp4xx/include/mach/platform.h | 39 ----------------------
- arch/arm/mach-ixp4xx/ixdp425-setup.c         |  8 +++--
- arch/arm/mach-ixp4xx/nas100d-setup.c         | 15 +++++----
- arch/arm/mach-ixp4xx/nslu2-setup.c           | 10 +++---
- drivers/input/misc/ixp4xx-beeper.c           | 25 +++++++++-----
- drivers/ptp/ptp_ixp46x.c                     |  9 ++++-
- drivers/staging/media/lirc/lirc_serial.c     | 16 +++++++--
- 9 files changed, 102 insertions(+), 85 deletions(-)
-
+diff --git a/drivers/iio/pressure/st_pressure_core.c b/drivers/iio/pressure/st_pressure_core.c
+index d52b487..2db3b28 100644
+--- a/drivers/iio/pressure/st_pressure_core.c
++++ b/drivers/iio/pressure/st_pressure_core.c
+@@ -319,7 +319,7 @@ void st_press_power_enable(struct iio_dev *indio_dev)
+ 	struct st_sensor_data *pdata = iio_priv(indio_dev);
+ 	int err;
+ 
+-	/* Regulators not mandatory, but if requested we should enable it. */
++	/* Regulators not mandatory, but if requested we should enable them. */
+ 	pdata->vdd = devm_regulator_get_optional(&indio_dev->dev, "vdd");
+ 	if (!IS_ERR(pdata->vdd)) {
+ 		err = regulator_enable(pdata->vdd);
+@@ -327,6 +327,14 @@ void st_press_power_enable(struct iio_dev *indio_dev)
+ 			dev_warn(&indio_dev->dev,
+ 				 "Failed to enable specified Vdd supply\n");
+ 	}
++
++	pdata->vdd_io = devm_regulator_get_optional(&indio_dev->dev, "vddio");
++	if (!IS_ERR(pdata->vdd_io)) {
++		err = regulator_enable(pdata->vdd_io);
++		if (err != 0)
++			dev_warn(&indio_dev->dev,
++				 "Failed to enable specified Vdd_IO supply\n");
++	}
+ }
+ 
+ void st_press_power_disable(struct iio_dev *indio_dev)
+@@ -335,6 +343,9 @@ void st_press_power_disable(struct iio_dev *indio_dev)
+ 
+ 	if (!IS_ERR(pdata->vdd))
+ 		regulator_disable(pdata->vdd);
++
++	if (!IS_ERR(pdata->vdd_io))
++		regulator_disable(pdata->vdd_io);
+ }
+ 
+ int st_press_common_probe(struct iio_dev *indio_dev,
+diff --git a/include/linux/iio/common/st_sensors.h b/include/linux/iio/common/st_sensors.h
+index 968b84e..3c005eb 100644
+--- a/include/linux/iio/common/st_sensors.h
++++ b/include/linux/iio/common/st_sensors.h
+@@ -203,6 +203,7 @@ struct st_sensors {
+  * @sensor: Pointer to the current sensor struct in use.
+  * @current_fullscale: Maximum range of measure by the sensor.
+  * @vdd: Pointer to sensor's Vdd power supply
++ * @vdd_io: Pointer to sensor's Vdd-IO power supply
+  * @enabled: Status of the sensor (false->off, true->on).
+  * @multiread_bit: Use or not particular bit for [I2C/SPI] multiread.
+  * @buffer_data: Data used by buffer part.
+@@ -219,6 +220,7 @@ struct st_sensor_data {
+ 	struct st_sensors *sensor;
+ 	struct st_sensor_fullscale_avl *current_fullscale;
+ 	struct regulator *vdd;
++	struct regulator *vdd_io;
+ 
+ 	bool enabled;
+ 	bool multiread_bit;
 -- 
-1.8.3.1
+1.8.1.2
