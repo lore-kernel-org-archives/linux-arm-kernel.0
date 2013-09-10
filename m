@@ -1,53 +1,65 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 10 Sep 2013 13:49:01 +0100
-Subject: [PATCH v3 00/38] iio: ST clean-ups and new sensor support
-Message-ID: <1378817379-8238-1-git-send-email-lee.jones@linaro.org>
+Date: Tue, 10 Sep 2013 13:49:02 +0100
+Subject: [PATCH 01/38] ARM: ux500: Remove PrimeCell IDs from Nomadik I2C DT
+ nodes
+In-Reply-To: <1378817379-8238-1-git-send-email-lee.jones@linaro.org>
+References: <1378817379-8238-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <1378817379-8238-2-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jonathan,
+Turns out that they're actually not required and the driver probes just
+fine without them. The ID is incorrect at the moment anyway. They actually
+currently specify the stn8815.
 
-Sorry for the continued development and resubmission. I won't write
-anymore patches now. At least until these have been accepted.
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ arch/arm/boot/dts/ste-dbx5x0.dtsi | 5 -----
+ 1 file changed, 5 deletions(-)
 
-This patch-set includes a few clean-ups surrounding error handling and
-non-mandatory functionality along with regulator support and the addition
-of a new pressure/temperature sensor (LPS001WP) and extended support for
-a new magnetometer sensor (LSM303DLH).
-
-Everything has been tested with Device Tree.
-  
-v2:
- - Rebased onto Linux -next as requested by Jonathan
- - Reworked clean-up patch to address Jonathan's concerns
- - Added binding document (inc regulators)
- - Extended regulator support in the driver
- - Re-worked Data Ready pin handling
-
-v3:
- - Standardise sensor names: <model>_<sensor-type>
- - Added error handling clean-ups
- - More binding documents; for magn, accel and gyro
- - Message on successful sensor bring-up; for press, magn, accel and gyro
- - More device enablement for ux500 by way of CONFIGs
- - New neat reorder/grouping of patches 
-
- Documentation/devicetree/bindings/iio/accel/lsm303dlh.txt        |  21 ++++++++
- Documentation/devicetree/bindings/iio/gyro/l3g4200d.txt          |  21 ++++++++
- Documentation/devicetree/bindings/iio/magnetometer/lsm303dlh.txt |  21 ++++++++
- Documentation/devicetree/bindings/iio/pressure/lps001wp.txt      |  21 ++++++++
- arch/arm/boot/dts/ste-dbx5x0.dtsi                                |   5 --
- arch/arm/boot/dts/ste-snowball.dts                               |  34 ++++++++++++
- arch/arm/configs/u8500_defconfig                                 |   5 ++
- drivers/iio/accel/st_accel.h                                     |   4 +-
- drivers/iio/accel/st_accel_core.c                                |  28 +++++-----
- drivers/iio/common/st_sensors/st_sensors_core.c                  |  79 +++++++++++++++-------------
- drivers/iio/gyro/st_gyro.h                                       |   8 +--
- drivers/iio/gyro/st_gyro_core.c                                  |  24 +++++----
- drivers/iio/magnetometer/st_magn.h                               |   3 +-
- drivers/iio/magnetometer/st_magn_core.c                          |  27 +++++-----
- drivers/iio/pressure/st_pressure.h                               |   3 +-
- drivers/iio/pressure/st_pressure_core.c                          | 303 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++---------------------------
- drivers/iio/pressure/st_pressure_i2c.c                           |   1 +
- include/linux/iio/common/st_sensors.h                            |   6 +++
- 18 files changed, 453 insertions(+), 161 deletions(-)
+diff --git a/arch/arm/boot/dts/ste-dbx5x0.dtsi b/arch/arm/boot/dts/ste-dbx5x0.dtsi
+index 1c1091e..0c1338e 100644
+--- a/arch/arm/boot/dts/ste-dbx5x0.dtsi
++++ b/arch/arm/boot/dts/ste-dbx5x0.dtsi
+@@ -559,7 +559,6 @@
+ 			compatible = "stericsson,db8500-i2c", "st,nomadik-i2c", "arm,primecell";
+ 			reg = <0x80004000 0x1000>;
+ 			interrupts = <0 21 IRQ_TYPE_LEVEL_HIGH>;
+-			arm,primecell-periphid = <0x180024>;
+ 
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+@@ -572,7 +571,6 @@
+ 			compatible = "stericsson,db8500-i2c", "st,nomadik-i2c", "arm,primecell";
+ 			reg = <0x80122000 0x1000>;
+ 			interrupts = <0 22 IRQ_TYPE_LEVEL_HIGH>;
+-			arm,primecell-periphid = <0x180024>;
+ 
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+@@ -585,7 +583,6 @@
+ 			compatible = "stericsson,db8500-i2c", "st,nomadik-i2c", "arm,primecell";
+ 			reg = <0x80128000 0x1000>;
+ 			interrupts = <0 55 IRQ_TYPE_LEVEL_HIGH>;
+-			arm,primecell-periphid = <0x180024>;
+ 
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+@@ -598,7 +595,6 @@
+ 			compatible = "stericsson,db8500-i2c", "st,nomadik-i2c", "arm,primecell";
+ 			reg = <0x80110000 0x1000>;
+ 			interrupts = <0 12 IRQ_TYPE_LEVEL_HIGH>;
+-			arm,primecell-periphid = <0x180024>;
+ 
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+@@ -611,7 +607,6 @@
+ 			compatible = "stericsson,db8500-i2c", "st,nomadik-i2c", "arm,primecell";
+ 			reg = <0x8012a000 0x1000>;
+ 			interrupts = <0 51 IRQ_TYPE_LEVEL_HIGH>;
+-			arm,primecell-periphid = <0x180024>;
+ 
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+-- 
+1.8.1.2
