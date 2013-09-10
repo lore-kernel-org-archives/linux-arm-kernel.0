@@ -1,75 +1,57 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Mon, 09 Sep 2013 17:06:51 -0700
-Subject: [GIT PULL 0/3] ARM: SoC: Second round of changes for v3.12
-In-Reply-To: <CA+55aFxNbH+G6DVQNxE9di_btA5hxFH93af_vjN2v0eH8e5W-g@mail.gmail.com>
- (Linus Torvalds's message of "Mon, 9 Sep 2013 16:49:23 -0700")
-References: <1378766555-9679-1-git-send-email-khilman@linaro.org>
- <CA+55aFxNbH+G6DVQNxE9di_btA5hxFH93af_vjN2v0eH8e5W-g@mail.gmail.com>
-Message-ID: <87ioy97d5w.fsf@linaro.org>
+From: joshc@codeaurora.org (Josh Cartwright)
+Date: Mon, 9 Sep 2013 19:02:07 -0500
+Subject: [PATCH 2/2] ARM: msm: trout: fix uninit var warning
+In-Reply-To: <5350fa5571d24b68d6bb27959d3ef761ccb95b00.1378771874.git.joshc@codeaurora.org>
+References: <5350fa5571d24b68d6bb27959d3ef761ccb95b00.1378771874.git.joshc@codeaurora.org>
+Message-ID: <22aafb8a75c10dfc082093f7ff346de66927904f.1378771874.git.joshc@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Linus Torvalds <torvalds@linux-foundation.org> writes:
+Fix the following warning when !CONFIG_MMC:
 
-> On Mon, Sep 9, 2013 at 3:42 PM, Kevin Hilman <khilman@linaro.org> wrote:
->>
->> The main thing of note (or of potential annoyance factor) here is the
->> handful of conflicts in PULL 2/3 coming from platform changes
->> conflicting with driver changes going in to the V4L tree.  I've listed
->> them in detail in that pull request, and we will work with the
->> platform maintainer on the workflow to avoid this in the future.
->
-> Ok. I still really despise the absolute incredible sh*t that is
-> non-discoverable buses, and I hope that ARM SoC hardware designers all
-> die in some incredibly painful accident.  DT only does so much.
+arch/arm/mach-msm/board-trout.c: In function 'trout_init':
+arch/arm/mach-msm/board-trout.c:67:6: warning: unused variable 'rc' [-Wunused-variable]
+  int rc;
+      ^
 
-In case it helps you feel slightly better... in what some might call a
-painful accident (though probably not the kind you'd like to see), most
-of the designers I used to work with (at TI) were laid off in the last
-year.
+Also, while we're here, rework explicit printk(KERN_CRIT..) to use
+pr_crit.
 
-> So if you see any, send them my love, and possibly puncture the
-> brake-lines on their car and put a little surprise in their coffee,
-> ok?
+Signed-off-by: Josh Cartwright <joshc@codeaurora.org>
+---
+ arch/arm/mach-msm/board-trout.c | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
 
-Got it.  I'll be sure to send your love.
-
->> For future reference, when it comes to these conflicts, do you want to
->> see a summary of the suggested resolutions, a published branch with
->> the resolutions, both or neither?  Just curious.
->
-> I'll basically always end up re-doing the conflict resolution by hand
-> anyway unless it's just *incredibly* messy (and I think that has
-> happened all of once or twice), so anything you send me ends up being
-> just confirmation.
->
-> In this case, for example, I didn't end up looking at your pre-merged
-> stuff, because the summaries were enough for me to just say "ok, that
-> confirms my resolution". In other cases, people don't write detailed
-> summaries, and I end up confirming my resolution by just doing a
-> separate test-merge against their pre-merged branch and comparing.
->
-> And in most cases, the resolution is trivial enough that I don't
-> bother with either.
->
-> And in *all* cases I appreciate it when people do the preparation. It
-> hopefully also makes submaintainers themselves more aware of
-> development flow conflicts and more aware of possible problem issues
-> (same reason I prefer doing all the resolutions by hand myself), so I
-> suspect all of this is healthy even if I don't end up using it.
-
-OK, thanks for the feedback.
-
-> Final note: putting the conflict resolution explanation in the tag
-> message is unnecessary, since it's not really worth it after-the-fact
-> - so I'll just edit it away. It's not a problem, but in general I'd
-> suggest the tag message just contain the "here's the highlights", and
-> you do the conflict resolution notes just in the email. But I suspect
-> you may find the use of the tags a convenient way to jot down the
-> resolution for then sending the email later, and it's not like it
-> hurts me to edit it away afterwards, so not a big deal. Whatever works
-> for you.
-
-Noted, thanks.
-
-Kevin
+diff --git a/arch/arm/mach-msm/board-trout.c b/arch/arm/mach-msm/board-trout.c
+index ccf6621..015d544 100644
+--- a/arch/arm/mach-msm/board-trout.c
++++ b/arch/arm/mach-msm/board-trout.c
+@@ -13,6 +13,7 @@
+  * GNU General Public License for more details.
+  *
+  */
++#define pr_fmt(fmt) "%s: " fmt, __func__
+ 
+ #include <linux/kernel.h>
+ #include <linux/init.h>
+@@ -68,12 +69,11 @@ static void __init trout_init(void)
+ 
+ 	platform_add_devices(devices, ARRAY_SIZE(devices));
+ 
+-#ifdef CONFIG_MMC
+-        rc = trout_init_mmc(system_rev);
+-        if (rc)
+-                printk(KERN_CRIT "%s: MMC init failure (%d)\n", __func__, rc);
+-#endif
+-
++	if (IS_ENABLED(CONFIG_MMC)) {
++		rc = trout_init_mmc(system_rev);
++		if (rc)
++			pr_crit("MMC init failure (%d)\n", rc);
++	}
+ }
+ 
+ static struct map_desc trout_io_desc[] __initdata = {
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
