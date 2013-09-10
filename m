@@ -1,67 +1,29 @@
-From: joelf@ti.com (Joel Fernandes)
-Date: Tue, 10 Sep 2013 13:52:51 -0500
-Subject: [PATCH v3] ARM: EDMA: Fix clearing of unused list for DT DMA resources
-Message-ID: <1378839171-14455-1-git-send-email-joelf@ti.com>
+From: dsahern@gmail.com (David Ahern)
+Date: Tue, 10 Sep 2013 12:14:30 -0700
+Subject: [PATCH 3/3] perf: parse the .debug_frame section in case .eh_frame
+ is not present
+In-Reply-To: <1378720815-23964-4-git-send-email-jean.pihet@linaro.org>
+References: <1378720815-23964-1-git-send-email-jean.pihet@linaro.org>
+ <1378720815-23964-4-git-send-email-jean.pihet@linaro.org>
+Message-ID: <522F6F96.8030803@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-HWMOD removal for MMC is breaking edma_start as the events are being manually
-triggered due to unused channel list not being clear.
+On 9/9/13 3:00 AM, Jean Pihet wrote:
+> diff --git a/tools/perf/config/Makefile b/tools/perf/config/Makefile
+> index 7014373..54532b8 100644
+> --- a/tools/perf/config/Makefile
+> +++ b/tools/perf/config/Makefile
+> @@ -222,7 +222,7 @@ endif
+>
+>   FLAGS_UNWIND=$(LIBUNWIND_CFLAGS) $(CFLAGS) $(LIBUNWIND_LDFLAGS) $(LDFLAGS) $(EXTLIBS) $(LIBUNWIND_LIBS)
+>   ifneq ($(call try-cc,$(SOURCE_LIBUNWIND),$(FLAGS_UNWIND),libunwind),y)
+> -  msg := $(warning No libunwind found, disabling post unwind support. Please install libunwind-dev[el] >= 0.99);
+> +  msg := $(warning No libunwind found, disabling post unwind support. Please install libunwind-dev[el] >= 1.1);
+>     NO_LIBUNWIND := 1
+>   endif # Libunwind support
+>   endif # NO_LIBUNWIND
 
-This patch fixes the issue, by reading the "dmas" property from the DT node if
-it exists and clearing the bits in the unused channel list. For this purpose
-we use the of_* helpers to parse the arguments in the dmas phandle list.
+Is the 1.1 version required for x86 too?
 
-Reviewed-by: Sekhar Nori <nsekhar@ti.com>
-Reported-by: Balaji T K <balajitk@ti.com>
-Cc: Pantel Antoniou <panto@antoniou-consulting.com>
-Signed-off-by: Joel Fernandes <joelf@ti.com>
----
-This patch is a repost of v2 with minor change of return value.
-
-As such this patch fixes DMA breakages on all dependent peripherals (DMA, AES,
-MMC, McASP..) so should go in for -rc cycle.
-
- arch/arm/common/edma.c | 22 +++++++++++++++++++---
- 1 file changed, 19 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm/common/edma.c b/arch/arm/common/edma.c
-index 117f955..88ea067 100644
---- a/arch/arm/common/edma.c
-+++ b/arch/arm/common/edma.c
-@@ -560,14 +560,30 @@ static int reserve_contiguous_slots(int ctlr, unsigned int id,
- static int prepare_unused_channel_list(struct device *dev, void *data)
- {
- 	struct platform_device *pdev = to_platform_device(dev);
--	int i, ctlr;
-+	int i = 0, ctlr;
-+	u32 dma_chan;
-+	const __be32 *dma_chan_p;
-+	struct property *prop;
-+
-+	if (dev->of_node) {
-+		of_property_for_each_u32(dev->of_node, "dmas", prop,
-+					 dma_chan_p, dma_chan) {
-+			if (i++ & 1) {
-+				ctlr = EDMA_CTLR(dma_chan);
-+				clear_bit(EDMA_CHAN_SLOT(dma_chan),
-+					  edma_cc[ctlr]->edma_unused);
-+			}
-+		}
-+		return 0;
-+	}
- 
--	for (i = 0; i < pdev->num_resources; i++) {
-+	/* For non-OF case */
-+	for (; i < pdev->num_resources; i++) {
- 		if ((pdev->resource[i].flags & IORESOURCE_DMA) &&
- 				(int)pdev->resource[i].start >= 0) {
- 			ctlr = EDMA_CTLR(pdev->resource[i].start);
- 			clear_bit(EDMA_CHAN_SLOT(pdev->resource[i].start),
--					edma_cc[ctlr]->edma_unused);
-+				  edma_cc[ctlr]->edma_unused);
- 		}
- 	}
- 
--- 
-1.8.1.2
+David
