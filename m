@@ -1,35 +1,38 @@
-From: rjw@sisk.pl (Rafael J. Wysocki)
-Date: Wed, 11 Sep 2013 15:28:26 +0200
-Subject: "cpufreq: fix serialization issues with freq change notifiers"
- breaks cpufreq too
-In-Reply-To: <Pine.LNX.4.64.1309111015190.26942@axis700.grange>
-References: <Pine.LNX.4.64.1309091656200.6602@axis700.grange>
- <CAKohpokaHU0V86DPB7nEQ8ndwu_mJ_x_Uz47XPHZeyAW3hcP_w@mail.gmail.com>
- <Pine.LNX.4.64.1309111015190.26942@axis700.grange>
-Message-ID: <11617025.s66NV700Er@vostro.rjw.lan>
+From: laurent.pinchart+renesas@ideasonboard.com (Laurent Pinchart)
+Date: Wed, 11 Sep 2013 15:43:25 +0200
+Subject: [PATCH 0/2] ARM: shmobile: Remove #gpio-ranges-cells property
+Message-ID: <1378907007-19152-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, September 11, 2013 10:15:53 AM Guennadi Liakhovetski wrote:
-> On Wed, 11 Sep 2013, Viresh Kumar wrote:
-> 
-> > On 10 September 2013 22:37, Guennadi Liakhovetski <g.liakhovetski@gmx.de> wrote:
-> > > On Tue, 10 Sep 2013, Viresh Kumar wrote:
-> > >> Quite straight forward actually..
-> > >
-> > > Apparently, not quite.
-> > 
-> > I overlooked the situation where we return early from ->target() routines.. :(
-> > 
-> > Please try attached patches, I will repost them later (once I am able to
-> > convince Rafael that these are really important :) )
-> 
-> I'd rather wait until Rafael is convinced, then we'll see.
+The property has been deprecated and unused since commit
+d9fe0039c4247383c2783923a3860227813b4d82 ("gpio: implement gpio-ranges binding
+document fix"). Remove it.
 
-I'm going to revert the commit that was the source of these issues, but that
-doesn't mean that everything is now rosy.  We need to fix the concurrency
-problems that Viresh was trying to fix in that commit, so it would be nice if
-you could verify whether or not he is on the right track.
+This is a v3.12 fix, based on top of the latest mainline master branch.
+Regression and backward compatibility issue should not occur, as:
 
-Thanks,
-Rafael
+- The first patch hardcodes the number of gpio-range cells to 3, which was the
+  value used by all boards so far.
+
+- The second patch removes a property from .dtsi files that isn't used anymore
+  since the above-mentioned commit.
+
+However, care must be taken to merge the patches in the correct order. Linus,
+Simon, would you like to two patches to go through a single tree, or should
+Linus provide a stable branch ?
+
+Laurent Pinchart (2):
+  gpio: rcar: Remove #gpio-range-cells DT property usage
+  ARM: shmobile: Remove #gpio-ranges-cells DT property
+
+ arch/arm/boot/dts/r8a7778.dtsi | 1 -
+ arch/arm/boot/dts/r8a7779.dtsi | 1 -
+ arch/arm/boot/dts/r8a7790.dtsi | 1 -
+ drivers/gpio/gpio-rcar.c       | 7 +++----
+ 4 files changed, 3 insertions(+), 7 deletions(-)
+
+-- 
+Regards,
+
+Laurent Pinchart
