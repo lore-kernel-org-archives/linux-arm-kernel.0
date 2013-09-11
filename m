@@ -1,95 +1,32 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Wed, 11 Sep 2013 15:00:04 -0300
-Subject: [PATCH v3 0/5] Armada XP clocks for timer
-In-Reply-To: <5226ED8E.6010308@linaro.org>
-References: <1377013554-23389-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <20130827085242.GB2286@localhost>
- <20130902142625.GA15975@localhost>
- <20130903124633.GI19598@titan.lakedaemon.net>
- <20130903192632.GM19598@titan.lakedaemon.net>
- <5226ED8E.6010308@linaro.org>
-Message-ID: <20130911180003.GB11003@localhost>
+From: davidb@codeaurora.org (David Brown)
+Date: Wed, 11 Sep 2013 11:00:06 -0700
+Subject: [PATCH 1/2] ARM: msm: Add support for MSM8974 Dragonboard
+In-Reply-To: <1375780486.2725.7.camel@iivanov-dev.int.mm-sol.com>
+References: <1375743779-24993-1-git-send-email-rvaswani@codeaurora.org>
+ <1375780486.2725.7.camel@iivanov-dev.int.mm-sol.com>
+Message-ID: <20130911180006.GA12624@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 04, 2013 at 10:21:34AM +0200, Daniel Lezcano wrote:
-> On 09/03/2013 09:26 PM, Jason Cooper wrote:
-> > On Tue, Sep 03, 2013 at 08:46:33AM -0400, Jason Cooper wrote:
-> >> On Mon, Sep 02, 2013 at 11:26:26AM -0300, Ezequiel Garcia wrote:
-> >>> On Tue, Aug 27, 2013 at 05:52:42AM -0300, Ezequiel Garcia wrote:
-> >>>> Hi Jason and Daniel:
-> >>>>
-> >>>> (I forgot to Cc Daniel on these series, sorry about that!)
-> >>>>
-> >>>> So, now that we have all the acks we need...
-> >>>>
-> >>>> On Tue, Aug 20, 2013 at 12:45:49PM -0300, Ezequiel Garcia wrote:
-> >>>> [...]
-> >>>>>
-> >>>>> Ezequiel Garcia (5):
-> >>>>>   ARM: mvebu: Add the reference 25 MHz fixed-clock to Armada XP
-> >>>>>   ARM: mvebu: Add clock properties to Armada XP timer node
-> >>>>
-> >>>> Jason: I assume these are ready to get merged through mvebu, right?
-> >>>>
-> >>>>>   clocksource: armada-370-xp: Replace WARN_ON with BUG_ON
-> >>>>>   clocksource: armada-370-xp: Get reference fixed-clock by name
-> >>>>>   clocksource: armada-370-xp: Add detailed clock requirements in
-> >>>>>     devicetree binding
-> >>>>>
-> >>>>
-> >>>> Daniel: Will you pick these?
-> >>>>
-> >>>> BTW: Is there any chance you can add your clocksource tree to linux-next?
-> >>>>
-> >>>> Otherwise, our linux-next builds fail to boot whenever Jason pick some
-> >>>> mvebu commits and therefore appears in linux-next, but the corresponding
-> >>>> clocksource commit is taken by you and missing from linux-next.
-> >>>>
-> >>>
-> >>> Daniel,
-> >>>
-> >>> Any updates on this? The merge is really close now, and I'd like
-> >>> to know if you're going to pick these (and where!) for v3.12.
-> >>>
-> >>> Notice that Jason already took the devicetree patches, so unless
-> >>> you merge the clocksource driver changes for v3.12, we'll have
-> >>> to revert the former.
-> >>
-> >> I saw Daniel's pull, so I just sent the last pull for mvebu/dt including
-> >> these changes.
-> > 
-> > Daniel, did your changes make it in?  If so, I'll have to send these as a
-> > fix for -rc1...
-> 
-> Not yet.
-> 
+On Tue, Aug 06, 2013 at 12:14:46PM +0300, Ivan T. Ivanov wrote:
 
-And given Ingo sent the timer pull in September 3rd, it seems none of that
-clocksource stuff will make it for v3.12.
+>Attached patch enables earlyprink for this board.
+>
+>[920] booting linux @ 0x8000, ramdisk @ 0x2000000 (1067699), tags/device tree @ 0x1e00000
+>Uncompressing Linux... done, booting the kernel.
+>[    0.000000] Booting Linux on physical CPU 0x0
+>[    0.000000] Linux version 3.11.0-rc4-00003-g7c8394e (iivanov at dev) (gcc version 4.6.3 (GCC) ) #502 SMP PREEMPT Tue Aug 6 12:09:07 EEST3
+>[    0.000000] CPU: ARMv7 Processor [512f06f0] revision 0 (ARMv7), cr=10c5387d
+>[    0.000000] CPU: PIPT / VIPT nonaliasing data cache, PIPT instruction cache
+>[    0.000000] Machine: Qualcomm MSM (Flattened Device Tree), model: Qualcomm MSM8974 Dragonboard
 
-Jason: If that's the case, then we'll have to ask Olof to revert any patches
-that were included in this two patchsets, and that have been taken by you
-and pulled in arm-soc.
-
-In other words, this one:
-
-commit 5d3b883071763e6448386b875f04fcb201b6e12d
-Author: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-Date:   Tue Aug 13 11:43:15 2013 -0300
-
-    ARM: mvebu: Fix the Armada 370/XP timer compatible strings
----
-
-Right now, Armada 370/XP boards won't boot using Linus' master,
-because of the above patch.
-
-That said, discussing this with Olof he pointed out it was a very bad
-decision to change the compatible while not retaining the old one,
-since we created precisely this kind of break risk! My bad.
+We'll need to have either Rohit include this in his patch series, or
+you'll have to format this as a valid patch.
 
 Thanks,
+David
+
 -- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
