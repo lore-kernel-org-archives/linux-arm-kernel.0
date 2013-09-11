@@ -1,132 +1,104 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 11 Sep 2013 13:33:42 -0600
-Subject: [PATCH 2/2] cpufreq: tegra: Re-model Tegra cpufreq driver
-In-Reply-To: <1378898355-31290-3-git-send-email-bilhuang@nvidia.com>
-References: <1378898355-31290-1-git-send-email-bilhuang@nvidia.com>
- <1378898355-31290-3-git-send-email-bilhuang@nvidia.com>
-Message-ID: <5230C596.7010000@wwwdotorg.org>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Wed, 11 Sep 2013 12:38:55 -0700
+Subject: [RFC PATCH] arm64: KVM: honor cacheability attributes on S2 page
+ fault
+In-Reply-To: <523063AC.8040803@arm.com>
+References: <1378806670-2467-1-git-send-email-marc.zyngier@arm.com>
+ <CAAhSdy2E6aRndw88_S_3wfyTOYd5rQQTc4+Cw5Hd1DFXuM6EBA@mail.gmail.com>
+ <523063AC.8040803@arm.com>
+Message-ID: <20130911193855.GN9860@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/11/2013 05:19 AM, Bill Huang wrote:
-> Re-model Tegra cpufreq driver to support all Tegra series of SoCs.
+On Wed, Sep 11, 2013 at 01:35:56PM +0100, Marc Zyngier wrote:
+> On 11/09/13 13:21, Anup Patel wrote:
+> > On Tue, Sep 10, 2013 at 3:21 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> >> Anup Patel recently brought up the fact that when we run a guest
+> >> with cache disabled, we don't flush the cache to the Point of
+> >> Coherency, hence possibly missing bits of data that have been
+> >> written in the cache, but have not reached memory.
+> >>
+> >> There are several approaches to this issue:
+> >> - Using the DC bit when caches are off: this breaks guests assuming
+> >>   caches off while doing DMA operations. Bootloaders, for example.
+> >> - Fetch the memory attributes on translation fault, and flush the
+> >>   cache while handling the fault. This relies on using the PAR_EL1
+> >>   register to obtain the Stage-1 memory attributes.
+> >>
+> >> While this second solution is clearly not ideal (it duplicates what
+> >> the HW already does to generate HPFAR_EL2), it is more correct than
+> >> not doing anything.
+> >>
+> >> Cc: Anup Patel <anup@brainfault.org>
+> >> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> >> ---
+> >>
+> >>  arch/arm/include/asm/kvm_mmu.h    |  4 ++--
+> >>  arch/arm/kvm/mmu.c                |  2 +-
+> >>  arch/arm64/include/asm/kvm_host.h |  1 +
+> >>  arch/arm64/include/asm/kvm_mmu.h  |  9 +++++++--
+> >>  arch/arm64/kernel/asm-offsets.c   |  1 +
+> >>  arch/arm64/kvm/hyp.S              | 28 ++++++++++++----------------
+> >>  6 files changed, 24 insertions(+), 21 deletions(-)
+> >>
+> >> diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
+> >> index 472ac70..faffdf0 100644
+> >> --- a/arch/arm/include/asm/kvm_mmu.h
+> >> +++ b/arch/arm/include/asm/kvm_mmu.h
+> >> @@ -105,7 +105,7 @@ static inline void kvm_set_s2pte_writable(pte_t *pte)
+> >>
+> >>  struct kvm;
+> >>
+> >> -static inline void coherent_icache_guest_page(struct kvm *kvm, gfn_t gfn)
+> >> +static inline void coherent_icache_guest_page(struct kvm_vcpu *vcpu, gfn_t gfn)
+> >>  {
+> >>         /*
+> >>          * If we are going to insert an instruction page and the icache is
+> >> @@ -120,7 +120,7 @@ static inline void coherent_icache_guest_page(struct kvm *kvm, gfn_t gfn)
+> >>          * need any kind of flushing (DDI 0406C.b - Page B3-1392).
+> >>          */
+> >>         if (icache_is_pipt()) {
+> >> -               unsigned long hva = gfn_to_hva(kvm, gfn);
+> >> +               unsigned long hva = gfn_to_hva(vcpu->kvm, gfn);
+> >>                 __cpuc_coherent_user_range(hva, hva + PAGE_SIZE);
+> >>         } else if (!icache_is_vivt_asid_tagged()) {
+> >>                 /* any kind of VIPT cache */
+> >> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+> >> index 0988d9e..ffb3cc4 100644
+> >> --- a/arch/arm/kvm/mmu.c
+> >> +++ b/arch/arm/kvm/mmu.c
+> >> @@ -547,7 +547,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+> >>                 return -EFAULT;
+> >>
+> >>         new_pte = pfn_pte(pfn, PAGE_S2);
+> >> -       coherent_icache_guest_page(vcpu->kvm, gfn);
+> >> +       coherent_icache_guest_page(vcpu, gfn);
+> >>
+> >>         spin_lock(&vcpu->kvm->mmu_lock);
+> >>         if (mmu_notifier_retry(vcpu->kvm, mmu_seq))
+> >> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+> >> index 331a852..2530f92 100644
+> >> --- a/arch/arm64/include/asm/kvm_host.h
+> >> +++ b/arch/arm64/include/asm/kvm_host.h
+> >> @@ -79,6 +79,7 @@ struct kvm_mmu_memory_cache {
+> >>  struct kvm_vcpu_fault_info {
+> >>         u32 esr_el2;            /* Hyp Syndrom Register */
+> >>         u64 far_el2;            /* Hyp Fault Address Register */
+> >> +       u64 par_el2;            /* Result of FAR_EL2 translation */
+> > 
+> > Please rename this to par_el1 because we are saving result of Stage1
+> > translation only.
 > 
-> * Make tegra-cpufreq.c a generic Tegra cpufreq driver.
-> * Move Tegra20 specific codes into tegra20-cpufreq.c.
-> * Bind Tegra cpufreq dirver with a fake device so defer probe would work
->   when we're going to get regulator in the driver to support voltage
->   scaling (DVFS).
-> * Call tegra_cpufreq_init() in Tegra machine code specifically so it
->   won't be called in multi-platform kernel which is not running on Tegra
->   SoCs.
+> That'd be very confusing, as we deal with PAR_EL1 separately, as part of
+> the guest context.
+> 
+> If anything, I may rename it to "what_I_d_love_HPFAR_to_return" instead.
+> 
 
-That's a lot of things for one patch. Can this please be split up?
+while extremely clear, it may be a bit verbose ;)
 
-In particular, I would like a separate patch for the final bullet point,
-and for that patch to be the first in the series, so that we can merge
-it into both the Tegra and cpufreq trees if needed to resolve any conflicts.
+I honestly think that 'making up' a register name is a bit confusing as
+well.  I can live with it, but perhaps fault_ipa, or s1_fault_attr or
+something like that would work.  Eh.
 
-> diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
-
->  config ARM_TEGRA_CPUFREQ
-> -	bool "TEGRA CPUFreq support"
-> -	depends on ARCH_TEGRA
-> +	bool
-> +	select CPU_FREQ_TABLE
-
-Why make this a hidden option? It'd be best to leave it user-visible, so
-that existing defconfigs aren't broken by this change.
-
-> +config ARM_EXYNOS_CPUFREQ
-> +	bool
->  	select CPU_FREQ_TABLE
-
-I think that Exynos change is a mistake?
-
-> +
-> +config ARM_TEGRA20_CPUFREQ
-> +	bool "NVIDIA TEGRA20"
-> +	depends on ARCH_TEGRA
-
-Shouldn't that be ARCH_TEGRA_2x_SOC specifically?
-
->  	default y
-
-Does the syntax "default ARM_TEGRA_CPUFREQ" work? Actually, this should
-depend on ARM_TEGRA_CPUFREQ rather than select it, and that way you can
-keep this "default y" and it'll only be enabled if Tegra cpufreq is enabled.
-
-In summary, I think the following should work well:
-
-config ARM_TEGRA_CPUFREQ
-	bool "TEGRA CPUFreq support"
-	depends on ARCH_TEGRA
-	select CPU_FREQ_TABLE
-
-config ARM_TEGRA20_CPUFREQ
-	bool "NVIDIA TEGRA20"
-	depends on ARM_TEGRA_CPUFREQ && ARCH_TEGRA_2x_SOC
-	default y
-	help
-	  This adds the CPUFreq driver for NVIDIA TEGRA20 SoC.
-
-	  If in doubt, say N.
-
-> diff --git a/drivers/cpufreq/tegra-cpufreq.c b/drivers/cpufreq/tegra-cpufreq.c
-
-> -#define NUM_CPUS	2
-> +#define NUM_CPUS	4
-
-NUM_ or MAX_?
-
-> diff --git a/drivers/cpufreq/tegra-cpufreq.h b/drivers/cpufreq/tegra-cpufreq.h
-
-> +struct tegra_cpufreq_data {
-> +	struct device *dev;
-> +	struct clk	*cpu_clk;
-> +	struct cpufreq_frequency_table	*freq_table;
-> +	void (*vote_emc_on_cpu_rate)(unsigned long);
-> +	int (*cpu_clk_set_rate)(unsigned long);
-> +	void (*cpufreq_clk_init)(void);
-> +	void (*cpufreq_clk_exit)(void);
-> +};
-
-There's a mix of runtime and configuration-time data there. It'd be
-nicer to split the two out, so that all the configuration data could be
-in a const struct that's pointed to by a field in the runtime data
-struct, or passed back out of tegra20_cpufreq_init() as a separate
-pointer variable and assigned to a separate global in tegra-cpufreq.c,
-to avoid double-indirections everywhere at runtime.
-
-> diff --git a/drivers/cpufreq/tegra20-cpufreq.c b/drivers/cpufreq/tegra20-cpufreq.c
-
-> +static struct cpufreq_frequency_table freq_table[] = {
-> +	{ .frequency = 216000 },
-> +	{ .frequency = 312000 },
-> +	{ .frequency = 456000 },
-> +	{ .frequency = 608000 },
-> +	{ .frequency = 760000 },
-> +	{ .frequency = 816000 },
-> +	{ .frequency = 912000 },
-> +	{ .frequency = 1000000 },
-> +	{ .frequency = CPUFREQ_TABLE_END },
-> +};
-
-Should/can we query that list from the clock driver?
-
-> +int tegra20_cpufreq_init(struct tegra_cpufreq_data *data)
-...
-> +	data->cpu_clk = cpu_clk;
-> +	data->freq_table = freq_table;
-> +	data->vote_emc_on_cpu_rate = tegra20_vote_emc_on_cpu_rate;
-> +	data->cpu_clk_set_rate = tegra20_cpu_clk_set_rate;
-> +	data->cpufreq_clk_init = tegra20_cpufreq_clk_init;
-> +	data->cpufreq_clk_exit = tegra20_cpufreq_clk_exit;
-
-With the struct split I proposed above, most of that could just be:
-
-*soc_config = &tegra20_cpufreq_config;
-
-where there's an extra function parameter "struct tegra_cpufreq_config
-**soc_config", and most of those values are in a static const
-tegra_cpufreq_config tegra20_cpufreq_config = { ... }.
+-Christoffer
