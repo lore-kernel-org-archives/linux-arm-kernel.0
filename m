@@ -1,11 +1,11 @@
 From: rmallon@gmail.com (Ryan Mallon)
-Date: Wed, 11 Sep 2013 10:15:21 +1000
-Subject: [GIT PULL] ep93xx-devel for 3.12
-Message-ID: <522FB619.90603@gmail.com>
+Date: Wed, 11 Sep 2013 10:18:17 +1000
+Subject: [GIT PULL] ep93xx-fixes for 3.12
+Message-ID: <522FB6C9.3030406@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof,
+Hi Arnd, Olof
 
 The following changes since commit ad81f0545ef01ea651886dddac4bef6cec930092:
 
@@ -13,17 +13,15 @@ The following changes since commit ad81f0545ef01ea651886dddac4bef6cec930092:
 
 are available in the git repository at:
 
-  git://github.com/RyanMallon/linux-ep93xx.git tags/ep93xx-devel-for-3.12
+  git://github.com/RyanMallon/linux-ep93xx.git tags/ep93xx-fixes-for-3.12
 
-for you to fetch changes up to 0e98a32f8773993da65ab4759b0c5ba362119ebb:
+for you to fetch changes up to cc3874fe56923e713427e4a3737c40746397347e:
 
-  arm: ep93xx: use soc bus (2013-07-19 10:08:15 +1000)
+  ARM: ep93xx: Don't use modem interface on the second UART (2013-09-03 14:15:04 +1000)
 
 ----------------------------------------------------------------
-H Hartley Sweeten (1):
-      arm: ep93xx: use soc bus
+Petr ?tetiar (1):
+      ARM: ep93xx: Don't use modem interface on the second UART
 
- arch/arm/mach-ep93xx/Kconfig                 |    1 +
- arch/arm/mach-ep93xx/core.c                  |  108 +++++++++++++++++++++++++-
- arch/arm/mach-ep93xx/include/mach/platform.h |    3 +-
- 3 files changed, 110 insertions(+), 2 deletions(-)
+ arch/arm/mach-ep93xx/core.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
