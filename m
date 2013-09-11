@@ -1,43 +1,83 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed, 11 Sep 2013 13:36:58 +0530
-Subject: "cpufreq: fix serialization issues with freq change notifiers"
- breaks cpufreq too
-In-Reply-To: <Pine.LNX.4.64.1309101853170.16010@axis700.grange>
-References: <Pine.LNX.4.64.1309091656200.6602@axis700.grange>
- <CAKohponZ+FnzqXYMbBzbun0-1iQMi2fS4syrEBC_MdF41vLCeA@mail.gmail.com>
- <Pine.LNX.4.64.1309101656150.16010@axis700.grange>
- <CAKohpomBBKLhNemVUpUHAftGhPJJe+ZB7T_9UYLD7LwpR1nK0g@mail.gmail.com>
- <Pine.LNX.4.64.1309101740120.16010@axis700.grange>
- <CAKohpomK7Y_6aLMA3B+hZrtgYq9U89ihgkbvYWA3BsKN3gJD3g@mail.gmail.com>
- <Pine.LNX.4.64.1309101853170.16010@axis700.grange>
-Message-ID: <CAKohpokaHU0V86DPB7nEQ8ndwu_mJ_x_Uz47XPHZeyAW3hcP_w@mail.gmail.com>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Wed, 11 Sep 2013 10:15:00 +0200 (CEST)
+Subject: [PATCH 1/4] cpufreq: cpufreq-cpu0: assign cpu_dev correctly to
+ cpu0 device
+In-Reply-To: <1378835989-19281-2-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+References: <1378835989-19281-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+ <1378835989-19281-2-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+Message-ID: <Pine.LNX.4.64.1309111005310.26942@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10 September 2013 22:37, Guennadi Liakhovetski <g.liakhovetski@gmx.de> wrote:
-> On Tue, 10 Sep 2013, Viresh Kumar wrote:
->> Quite straight forward actually..
->
-> Apparently, not quite.
+Hi Sudeep
 
-I overlooked the situation where we return early from ->target() routines.. :(
+On Tue, 10 Sep 2013, Sudeep KarkadaNagesha wrote:
 
-Please try attached patches, I will repost them later (once I am able to
-convince Rafael that these are really important :) )
+> From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
+> 
+> Commit f837a9b5ab05c52a07108c6f09ca66f2e0aee757 "cpufreq: cpufreq-cpu0:
+> remove device tree parsing for cpu nodes" assumed the pdev->dev is set to
+> cpu0 device in the platform code. But it actually points to the virtual
+> cpufreq-cpu0 platform device which is not present in the device tree.
+> Most of the information needed by cpufreq is stored in cpu0 DT node.
+> So cpu_dev must point to cpu0 device.
+> 
+> This patch fixes the wrong assignment to cpu_dev.
+> 
+> Reported-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+> Cc: Shawn Guo <shawn.guo@linaro.org>
+> Signed-off-by: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
 
---
-viresh
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0001-cpufreq-distinguish-drivers-that-do-asynchronous-not.patch
-Type: application/octet-stream
-Size: 2313 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130911/89e6231f/attachment.obj>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0002-cpufreq-fix-notification-serialization-issues.patch
-Type: application/octet-stream
-Size: 4388 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130911/89e6231f/attachment-0001.obj>
+Thanks for your patches
+
+> ---
+>  drivers/cpufreq/cpufreq-cpu0.c | 7 ++++++-
+>  1 file changed, 6 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/cpufreq/cpufreq-cpu0.c b/drivers/cpufreq/cpufreq-cpu0.=
+> c
+> index cbfffa9..78c49d8 100644
+> --- a/drivers/cpufreq/cpufreq-cpu0.c
+> +++ b/drivers/cpufreq/cpufreq-cpu0.c
+> @@ -12,6 +12,7 @@
+>  #define pr_fmt(fmt)=09KBUILD_MODNAME ": " fmt
+> =20
+
+Noone else seems to complain, but I don't think these =20, =09 etc. codes 
+have been invented on my side and I don't think they belong here. I'm 
+handling enough mails / patches daily to believe, that my mail system 
+isn't the cause of this. Could you please verify and regenerate and 
+resend? Unless I'm mistaken this looks like a corruption on your SMTP 
+side.
+
+Thanks
+Guennadi
+
+>  #include <linux/clk.h>
+> +#include <linux/cpu.h>
+>  #include <linux/cpufreq.h>
+>  #include <linux/err.h>
+>  #include <linux/module.h>
+> @@ -177,7 +178,11 @@ static int cpu0_cpufreq_probe(struct platform_device *=
+> pdev)
+>  =09struct device_node *np;
+>  =09int ret;
+> =20
+> -=09cpu_dev =3D &pdev->dev;
+> +=09cpu_dev =3D get_cpu_device(0);
+> +=09if (!cpu_dev) {
+> +=09=09pr_err("failed to get cpu0 device\n");
+> +=09=09return -ENODEV;
+> +=09}
+> =20
+>  =09np =3D of_node_get(cpu_dev->of_node);
+>  =09if (!np) {
+> --=20
+> 1.8.1.2
+> 
+> 
+
+---
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
