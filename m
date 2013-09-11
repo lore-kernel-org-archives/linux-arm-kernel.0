@@ -1,69 +1,117 @@
-From: aaron.lu@intel.com (Aaron Lu)
-Date: Wed, 11 Sep 2013 09:01:16 +0800
-Subject: [PATCH RESEND 1/2] i2c: prepare runtime PM support for I2C client
- devices
-In-Reply-To: <2029393.u6DaKBPszu@vostro.rjw.lan>
-References: <1378733679-19500-1-git-send-email-mika.westerberg@linux.intel.com>
- <3397524.g9aUWuArnm@vostro.rjw.lan> <20130910213522.GG29403@sirena.org.uk>
- <2029393.u6DaKBPszu@vostro.rjw.lan>
-Message-ID: <522FC0DC.9030708@intel.com>
+From: emilio@elopez.com.ar (=?UTF-8?q?Emilio=20L=C3=B3pez?=)
+Date: Tue, 10 Sep 2013 22:43:01 -0300
+Subject: [PATCH RFC] of: add a basic memory driver
+Message-ID: <1378863781-4235-1-git-send-email-emilio@elopez.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/11/2013 06:32 AM, Rafael J. Wysocki wrote:
-> On Tuesday, September 10, 2013 10:35:22 PM Mark Brown wrote:
->> On Tue, Sep 10, 2013 at 10:04:21PM +0200, Rafael J. Wysocki wrote:
->>> On Tuesday, September 10, 2013 05:13:21 PM Mark Brown wrote:
->>
->>>> OK, that is very much not the model which embedded systems follow, in
->>>> embedded systems the driver for the device is fully in control of its
->>>> own power.  It gets resources like GPIOs and regulators which allow it
->>>> to make fine grained decisions.
->>
->>> There are platforms where those resources are simply not available for
->>> direct manipulation and we need to use ACPI methods for power management.
->>
->>> Now, since those methods are used in pretty much the same way for all I2C
->>> devices, we add a PM domain for that to avoid duplicating the same code in
->>> all of the drivers in question (patch [2/2]).  Does that make sense to you?
->>
->> It doesn't seem like a particular problem, but the existing usage does
->> need to be preserved for the systems that use it so things like having
->> auto as the default and updating the drivers seem like they're needed.
->>
->>>> If we're starting to get a reasonable number of buses following the same
->>>> pattern it seems like we're in a position to start 
->>
->>> We need that for exactly 3 buses: platform (already done), I2C and SPI.
->>
->>> No other bus types are going to use ACPI this way for PM, at least for the
->>> time being, simply because PCI, USB and SATA/IDE have their own ways of doing
->>> this (which are bus-specific) and the spec doesn't cover other bus types
->>> directly (it defines support for UART, but we don't have a UART bus type).
->>
->>> Moreover, because PCI and USB use ACPI for PM in their own ways, moving that
->>> thing up to the driver core would be rather inconvenient.
->>
->> That only applies to the power domains though, what Mika was saying was
->> that the process for enabling runtime PM (just drop a reference) also
->> becomes easier with this method regardless of anything else - that makes
->> sense to me as something we might want to end up with so do we want to
->> just move towards making that a default?
-> 
-> Possibly. :-)
-> 
-> At least I don't see any fundamental obstacles ...
+This driver's only job is to claim and ensure that the necessary clock
+for memory operation on a DT-enabled machine remains enabled.
 
-Looks like, it all boils down to how many I2C devices should be allowed
-for runtime PM by default and how many I2C devices should be forbidden.
-, and then we allow/forbid runtime PM for the majority case in I2C core
-while individual driver can still forbid/allow it in their own code.
+Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
+---
 
-So if the majority case is runtime PM should be allowed by default, I'm
-also OK to not forbid runtime PM for I2C client device in I2C core. My
-original intention to forbid runtime PM by default is to make sure no
-adverse effect would occur to some I2C devices that used to work well
-before runtime PM.
+Hi,
 
-Thanks,
-Aaron
+I am currently facing an issue with the clock setup: a critical but
+unclaimed clock gets disabled as a side effect of disabling one of its
+children. The clock setup looks something like this:
+
+      PLL
+       |
+ ------------
+ |          |
+DDR       Others
+            |
+          periph
+
+The PLL clock is marked with the CLK_IGNORE_UNUSED flag, so on a normal
+boot it remains on, even after the unused clocks cleanup code runs. The
+problem occurs when someone enables "periph" and then, later on, disables
+it: the framework starts disabling clocks upwards on the tree, 
+eventually switching the PLL off (and that kills the machine, as the memory
+clock is shut down).
+
+There's two possible solutions I can think of:
+ 1) add some extra checks on the framework to not turn off clocks marked
+    with such a flag on the non-explicit case (ie, when I'm disabling
+    some other clock)
+ 2) create an actual user of the DDR clock, that way it won't get
+    disabled simply because it's being used.
+
+I considered 1) and implemented it, but the result was not pretty. This 
+patch is my take on 2). Please let me know what you think; all feedback
+is welcome :)
+
+Cheers,
+
+Emilio
+
+ drivers/of/Kconfig     |  6 ++++++
+ drivers/of/Makefile    |  1 +
+ drivers/of/of_memory.c | 30 ++++++++++++++++++++++++++++++
+ 3 files changed, 37 insertions(+)
+ create mode 100644 drivers/of/of_memory.c
+
+diff --git a/drivers/of/Kconfig b/drivers/of/Kconfig
+index 9d2009a..f6c5e20 100644
+--- a/drivers/of/Kconfig
++++ b/drivers/of/Kconfig
+@@ -80,4 +80,10 @@ config OF_RESERVED_MEM
+ 	help
+ 	  Initialization code for DMA reserved memory
+ 
++config OF_MEMORY
++	depends on COMMON_CLK
++	def_bool y
++	help
++	  Simple memory initialization
++
+ endmenu # OF
+diff --git a/drivers/of/Makefile b/drivers/of/Makefile
+index ed9660a..15f0167 100644
+--- a/drivers/of/Makefile
++++ b/drivers/of/Makefile
+@@ -10,3 +10,4 @@ obj-$(CONFIG_OF_PCI)	+= of_pci.o
+ obj-$(CONFIG_OF_PCI_IRQ)  += of_pci_irq.o
+ obj-$(CONFIG_OF_MTD)	+= of_mtd.o
+ obj-$(CONFIG_OF_RESERVED_MEM) += of_reserved_mem.o
++obj-$(CONFIG_OF_MEMORY) += of_memory.o
+diff --git a/drivers/of/of_memory.c b/drivers/of/of_memory.c
+new file mode 100644
+index 0000000..a833f7a
+--- /dev/null
++++ b/drivers/of/of_memory.c
+@@ -0,0 +1,30 @@
++/*
++ * Simple memory driver
++ */
++
++#include <linux/of.h>
++#include <linux/clk.h>
++
++static int __init of_memory_enable(void)
++{
++	struct device_node *np;
++	struct clk *clk;
++
++	np = of_find_node_by_path("/memory");
++	if (!np) {
++		pr_err("no /memory on DT!\n");
++		return 0;
++	}
++
++	clk = of_clk_get(np, 0);
++	if (!IS_ERR(clk)) {
++		clk_prepare_enable(clk);
++		clk_put(clk);
++	}
++
++	of_node_put(np);
++
++	return 0;
++}
++
++device_initcall(of_memory_enable);
+-- 
+1.8.4
