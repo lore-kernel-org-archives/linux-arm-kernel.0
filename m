@@ -1,66 +1,135 @@
 From: mika.westerberg@linux.intel.com (Mika Westerberg)
-Date: Wed, 11 Sep 2013 18:32:33 +0300
-Subject: [PATCH v2 2/9] i2c: attach/detach I2C client device to the ACPI power
- domain
+Date: Wed, 11 Sep 2013 18:32:32 +0300
+Subject: [PATCH v2 1/9] i2c: prepare runtime PM support for I2C client devices
 In-Reply-To: <1378913560-2752-1-git-send-email-mika.westerberg@linux.intel.com>
 References: <1378913560-2752-1-git-send-email-mika.westerberg@linux.intel.com>
-Message-ID: <1378913560-2752-3-git-send-email-mika.westerberg@linux.intel.com>
+Message-ID: <1378913560-2752-2-git-send-email-mika.westerberg@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Lv Zheng <lv.zheng@intel.com>
+From: Aaron Lu <aaron.lu@intel.com>
 
-If the I2C client device is enumerated from ACPI namespace it might have
-ACPI methods that needs to be called in order to transition the device to
-different power states (such as _PSx).
+This patch adds runtime PM support for the I2C bus in a similar way that
+has been done for PCI bus already. This means that the I2C bus core
+prepares runtime PM for a client device just before a driver is about to be
+bound to it. Devices that are not bound to any driver are not prepared for
+runtime PM.
 
-Implement this for I2C client devices by checking if the device has an ACPI
-handle and if that's the case, attach it to the ACPI power domain. In
-addition we make sure that the device is fully powered when its ->probe()
-function gets called.
+In order to take advantage of this runtime PM support, the client device
+driver needs drop the device runtime PM reference count by calling
+pm_runtime_put() in its ->probe() callback and possibly implement rest of
+the runtime PM callbacks.
 
-For non-ACPI devices this patch is a no-op.
+If the driver doesn't support runtime PM (like most of the existing I2C
+client drivers), the device in question is regarded as being runtime PM
+active and powered on.
 
-Signed-off-by: Lv Zheng <lv.zheng@intel.com>
+The patch adds also runtime PM support for the adapter device because it is
+needed to be able to runtime power manage the I2C controller device. The
+adapter device is handled along with the I2C controller device (it uses
+pm_runtime_no_callbacks()).
+
+Signed-off-by: Aaron Lu <aaron.lu@intel.com>
 Signed-off-by: Mika Westerberg <mika.westerberg@linux.intel.com>
-Acked-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
 ---
- drivers/i2c/i2c-core.c | 9 +++++++++
- 1 file changed, 9 insertions(+)
+ drivers/i2c/i2c-core.c | 44 +++++++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 43 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/i2c/i2c-core.c b/drivers/i2c/i2c-core.c
-index 44374b4..ac4ea1f 100644
+index f32ca29..44374b4 100644
 --- a/drivers/i2c/i2c-core.c
 +++ b/drivers/i2c/i2c-core.c
-@@ -251,6 +251,9 @@ static int i2c_device_probe(struct device *dev)
- 	/* Make sure the adapter is active */
- 	pm_runtime_get_sync(&client->adapter->dev);
+@@ -248,11 +248,30 @@ static int i2c_device_probe(struct device *dev)
+ 					client->flags & I2C_CLIENT_WAKE);
+ 	dev_dbg(dev, "probe\n");
  
-+	if (ACPI_HANDLE(&client->dev))
-+		acpi_dev_pm_attach(&client->dev, true);
++	/* Make sure the adapter is active */
++	pm_runtime_get_sync(&client->adapter->dev);
 +
- 	/*
- 	 * Enable runtime PM for the client device. If the client wants to
- 	 * participate on runtime PM it should call pm_runtime_put() in its
-@@ -268,6 +271,9 @@ static int i2c_device_probe(struct device *dev)
- 		pm_runtime_disable(&client->dev);
- 		pm_runtime_set_suspended(&client->dev);
- 		pm_runtime_put_noidle(&client->dev);
++	/*
++	 * Enable runtime PM for the client device. If the client wants to
++	 * participate on runtime PM it should call pm_runtime_put() in its
++	 * probe() callback.
++	 */
++	pm_runtime_get_noresume(&client->dev);
++	pm_runtime_set_active(&client->dev);
++	pm_runtime_enable(&client->dev);
 +
-+		if (ACPI_HANDLE(&client->dev))
-+			acpi_dev_pm_detach(&client->dev, true);
+ 	status = driver->probe(client, i2c_match_id(driver->id_table, client));
+ 	if (status) {
+ 		client->driver = NULL;
+ 		i2c_set_clientdata(client, NULL);
++
++		pm_runtime_disable(&client->dev);
++		pm_runtime_set_suspended(&client->dev);
++		pm_runtime_put_noidle(&client->dev);
  	}
- 
- 	pm_runtime_put(&client->adapter->dev);
-@@ -304,6 +310,9 @@ static int i2c_device_remove(struct device *dev)
- 	pm_runtime_set_suspended(&client->dev);
- 	pm_runtime_put_noidle(&client->dev);
- 
-+	if (ACPI_HANDLE(&client->dev))
-+		acpi_dev_pm_detach(&client->dev, true);
 +
- 	pm_runtime_put(&client->adapter->dev);
++	pm_runtime_put(&client->adapter->dev);
++
  	return status;
  }
+ 
+@@ -265,6 +284,8 @@ static int i2c_device_remove(struct device *dev)
+ 	if (!client || !dev->driver)
+ 		return 0;
+ 
++	pm_runtime_get_sync(&client->adapter->dev);
++
+ 	driver = to_i2c_driver(dev->driver);
+ 	if (driver->remove) {
+ 		dev_dbg(dev, "remove\n");
+@@ -277,6 +298,13 @@ static int i2c_device_remove(struct device *dev)
+ 		client->driver = NULL;
+ 		i2c_set_clientdata(client, NULL);
+ 	}
++
++	/* Undo the runtime PM done in i2c_probe() */
++	pm_runtime_disable(&client->dev);
++	pm_runtime_set_suspended(&client->dev);
++	pm_runtime_put_noidle(&client->dev);
++
++	pm_runtime_put(&client->adapter->dev);
+ 	return status;
+ }
+ 
+@@ -288,8 +316,11 @@ static void i2c_device_shutdown(struct device *dev)
+ 	if (!client || !dev->driver)
+ 		return;
+ 	driver = to_i2c_driver(dev->driver);
+-	if (driver->shutdown)
++	if (driver->shutdown) {
++		pm_runtime_get_sync(&client->adapter->dev);
+ 		driver->shutdown(client);
++		pm_runtime_put(&client->adapter->dev);
++	}
+ }
+ 
+ #ifdef CONFIG_PM_SLEEP
+@@ -1066,6 +1097,15 @@ exit_recovery:
+ 	bus_for_each_drv(&i2c_bus_type, NULL, adap, __process_new_adapter);
+ 	mutex_unlock(&core_lock);
+ 
++	/*
++	 * Make sure the adapter runtime PM follows the parent device (the
++	 * host controller) so that we can suspend it once there aren't any
++	 * active clients anymore.
++	 */
++	pm_runtime_set_active(&adap->dev);
++	pm_runtime_no_callbacks(&adap->dev);
++	pm_runtime_enable(&adap->dev);
++
+ 	return 0;
+ 
+ out_list:
+@@ -1230,6 +1270,8 @@ void i2c_del_adapter(struct i2c_adapter *adap)
+ 		return;
+ 	}
+ 
++	pm_runtime_disable(&adap->dev);
++
+ 	/* Tell drivers about this removal */
+ 	mutex_lock(&core_lock);
+ 	bus_for_each_drv(&i2c_bus_type, NULL, adap,
 -- 
 1.8.4.rc3
