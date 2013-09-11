@@ -1,38 +1,30 @@
-From: rjw@sisk.pl (Rafael J. Wysocki)
-Date: Wed, 11 Sep 2013 14:47:42 +0200
-Subject: [PATCH 1/4] cpufreq: cpufreq-cpu0: assign cpu_dev correctly to
- cpu0 device
-In-Reply-To: <CAKohpokgVqmjNGTUOg61YQyqi1qO-9FaB8dmZqTqq2nQFynOkQ@mail.gmail.com>
-References: <1378835989-19281-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
- <Pine.LNX.4.64.1309111005310.26942@axis700.grange>
- <CAKohpokgVqmjNGTUOg61YQyqi1qO-9FaB8dmZqTqq2nQFynOkQ@mail.gmail.com>
-Message-ID: <2106241.8mK7DMLEOF@vostro.rjw.lan>
+From: anup.patel@linaro.org (Anup Patel)
+Date: Wed, 11 Sep 2013 18:29:51 +0530
+Subject: [PATCH 0/2] Target CPU=Host implementation for KVM ARM/ARM64
+Message-ID: <1378904393-29101-1-git-send-email-anup.patel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, September 11, 2013 02:12:24 PM Viresh Kumar wrote:
-> On 11 September 2013 13:45, Guennadi Liakhovetski <g.liakhovetski@gmx.de> wrote:
-> > Noone else seems to complain, but I don't think these =20, =09 etc. codes
-> > have been invented on my side and I don't think they belong here. I'm
-> > handling enough mails / patches daily to believe, that my mail system
-> > isn't the cause of this. Could you please verify and regenerate and
-> > resend? Unless I'm mistaken this looks like a corruption on your SMTP
-> > side.
-> 
-> Its on Sudeep's side :) .. Or on ARM's side..
-> Don't know why nobody else complained, Atleast people who test these
-> patches (Like Shawn), must have applied them from mail.. Don't know
-> why they aren't shouting :)
+It will be very useful for user space if it has a method of querying
+VCPU target type suitable to underlying Host. We can use such querying
+mechanism and implement machine models in user space where VCPU target
+type is always same-as/suitable-to underlying Host (i.e. Target CPU=Host).
 
-This looks like broken quoted-printable e-mail encoding somewhere (either
-on the sending or on the receiving end).
+This patch series implements KVM_ARM_SUITABLE_TARGET ioclt for querying
+VCPU target type matching underlying host. Using this new ioctl we can
+implement VCPU target CPU=Host in user space (i.e. QEMU/KVMTOOL).
 
-> He mostly send pull requests to Rafael and so this wasn't a issue for
-> Rafael :)
+Also, it is not mandatory to call KVM_ARM_SUITABLE_TARGET ioctl and the 
+old method of using only KVM_ARM_VCPU_INIT ioctl works fine.
 
-Git pulls are, well, from git, so e-mail encoding doesn't have anything to do
-with them ...
+Anup Patel (2):
+  ARM/ARM64: KVM: Implement KVM_ARM_SUITABLE_TARGET ioctl
+  KVM: Add documentation for KVM_ARM_SUITABLE_TARGET ioctl
+
+ Documentation/virtual/kvm/api.txt |   25 ++++++++++++++++++++-----
+ arch/arm/kvm/arm.c                |    2 ++
+ include/uapi/linux/kvm.h          |    1 +
+ 3 files changed, 23 insertions(+), 5 deletions(-)
 
 -- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+1.7.9.5
