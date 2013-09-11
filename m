@@ -1,64 +1,64 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 11 Sep 2013 08:10:53 +0100
-Subject: [PATCH 27/38] iio: pressure-core: st: Give some indication if
- device probing was successful
-In-Reply-To: <43055af7-991f-4122-b308-a3dcddbbb72a@email.android.com>
-References: <1378817379-8238-1-git-send-email-lee.jones@linaro.org>
- <1378817379-8238-28-git-send-email-lee.jones@linaro.org>
- <43055af7-991f-4122-b308-a3dcddbbb72a@email.android.com>
-Message-ID: <20130911071053.GD11227@lee--X1>
+From: holler@ahsoftware.de (Alexander Holler)
+Date: Wed, 11 Sep 2013 09:16:43 +0200
+Subject: [PATCH] RFC: interrupt consistency check for OF GPIO IRQs
+In-Reply-To: <52301655.6080801@ahsoftware.de>
+References: <1375101368-17645-1-git-send-email-linus.walleij@linaro.org>
+ <CACxGe6uNJNMdZ1HYGgCtLM2t2TWGCR6btjOHVmP=vDXXvvFfRg@mail.gmail.com>
+ <CACRpkdYjJL6FZwEbB7XLnb9QtjB=3LeE9Ny6KQ4PkM3zpdNqqg@mail.gmail.com>
+ <51F8CC35.1070704@collabora.co.uk> <522EC392.8070002@ti.com>
+ <522F1BF0.8080608@collabora.co.uk> <522F3408.6050608@ti.com>
+ <52301655.6080801@ahsoftware.de>
+Message-ID: <523018DB.7080004@ahsoftware.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 10 Sep 2013, Jonathan Cameron wrote:
-> Lee Jones <lee.jones@linaro.org> wrote:
-> >At the moment the driver is silent in some error cases and if
-> >successful.
-> >Prior to this patch there was no clear way to know if the driver
-> >succeeded
-> >or not without looking deep into sysfs.
-> >
-> >Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> >---
-> > drivers/iio/pressure/st_pressure_core.c | 3 +++
-> > 1 file changed, 3 insertions(+)
-> >
-> >diff --git a/drivers/iio/pressure/st_pressure_core.c
-> >b/drivers/iio/pressure/st_pressure_core.c
-> >index 6ffd949..34b3fb1 100644
-> >--- a/drivers/iio/pressure/st_pressure_core.c
-> >+++ b/drivers/iio/pressure/st_pressure_core.c
-> >@@ -280,6 +280,9 @@ int st_press_common_probe(struct iio_dev
-> >*indio_dev,
-> > 	if (err && irq > 0)
-> > 		goto st_press_device_register_error;
-> > 
-> >+	if (!err)
-> >+		dev_info(&indio_dev->dev, "Successfully registered\n");
-> >+
-> Not keen. That to my mind is pointless noise.
+Am 11.09.2013 09:05, schrieb Alexander Holler:
+> Am 10.09.2013 17:00, schrieb Joel Fernandes:
+>
+>> I think your initial patch is much better than fixing up DT but then I
+>> may be
+>> missing other problems with your patch that Linus's patch addresses.
+>
+> The initial patch had the problem that it not only did introduce
+> irq-mappings for only those gpios which are marked as IRQs, but it
+> requested those gpios too and preconfigured them
+>
+> And that breaks every driver which uses gpios for IRQs.
+>
+> To summarize what happens if a driver uses a gpio as irq:
+>
+> gpio_request() // This works only if the gpio was not requested before
+> gpio_direction_input()
+> gpio_to_irq() // This needs an irq-mapping
+> request_threaded_irq()
+>
+> So I would suggest multiple steps to change that:
+>
+> 1. Create a mapping for every gpio found in DT (or all gpios if no DT is
+> used). I think that is what Linus patch does (sorry, I haven't really
+> followed this thread and didn't look in deep at the patch).
+>
+> 2. Implement gpio_request_for_irq()
+> This would just be a small macro for gpio_request(); gpio_direction_input()
+>
+> 3. Change all drivers which do use gpio_to_irq() to use
+> gpio_request_for_irq() instead of gpio_request() and
+> gpio_direction_input(). This will end up with a big series of more or
+> less trivial patches (I count 677 occurences of gpio_to_irq) and might
+> be splitted.
+>
+> 4. request gpios and set them to input when a gpio is marked as an IRQ
+> in the DT and DT is used. Change gpio_rquest_for_irq() to a NOP if DT is
+> used or leave it as it is for the none-dt case.
 
-I think it needs to be somewhere. IIO provides no indication whether
-these chips are probed/registered/whathaveyou, or even if the
-subsystem is in use. 
+But I still see a possible problem with requesting a gpio (centralized) 
+if it is marked as IRQ in DT: it does this always.
 
-One line per hardware component is not noise, IMO it's indicative of
-key functionality which is now available:
+I'm not sure, but there might be cases where this isn't wanted. Just 
+that a GPIO is marked as IRQ in the DT for one driver, doesn't mean that 
+this driver will be really used (and something else might use the GPIO 
+instead).
 
-Bootlog:
-<snip>
-iio iio: lsm303dlh_accel: Successfully registered
-iio iio: l3g4200d_gyro: Successfully registered
-iio iio: lps001wp_press: Successfully registered
-iio iio: lsm303dlhc_magn: Successfully registered
-<snip>
+Regards,
 
-> If this made sense then it would be in the driver core not here.
-
-Also fine. Just anything but silence/NULL reporting.
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Alexander Holler
