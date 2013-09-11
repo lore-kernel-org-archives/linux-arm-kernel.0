@@ -1,90 +1,40 @@
-From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
-Date: Wed, 11 Sep 2013 10:54:44 +0200
-Subject: [PATCH] ARM: socfpga: dts: Add support for terasic SoCkit
-In-Reply-To: <1378888451-28096-1-git-send-email-s.trumtrar@pengutronix.de>
-References: <1378888451-28096-1-git-send-email-s.trumtrar@pengutronix.de>
-Message-ID: <1378889684-10467-1-git-send-email-s.trumtrar@pengutronix.de>
+From: Sudeep.KarkadaNagesha@arm.com (Sudeep KarkadaNagesha)
+Date: Wed, 11 Sep 2013 09:55:46 +0100
+Subject: [PATCH 1/4] cpufreq: cpufreq-cpu0: assign cpu_dev correctly to
+ cpu0 device
+In-Reply-To: <CAKohpokgVqmjNGTUOg61YQyqi1qO-9FaB8dmZqTqq2nQFynOkQ@mail.gmail.com>
+References: <1378835989-19281-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+ <1378835989-19281-2-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+ <Pine.LNX.4.64.1309111005310.26942@axis700.grange>
+ <CAKohpokgVqmjNGTUOg61YQyqi1qO-9FaB8dmZqTqq2nQFynOkQ@mail.gmail.com>
+Message-ID: <52303012.3060709@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds basic support for the terasic SoCkit board.
-The board includes an Altera Cyclone 5 SoC.
+On 11/09/13 09:42, Viresh Kumar wrote:
+> On 11 September 2013 13:45, Guennadi Liakhovetski <g.liakhovetski@gmx.de> wrote:
+>> Noone else seems to complain, but I don't think these =20, =09 etc. codes
+>> have been invented on my side and I don't think they belong here. I'm
+>> handling enough mails / patches daily to believe, that my mail system
+>> isn't the cause of this. Could you please verify and regenerate and
+>> resend? Unless I'm mistaken this looks like a corruption on your SMTP
+>> side.
+> 
+> Its on Sudeep's side :) .. Or on ARM's side..
+> Don't know why nobody else complained, Atleast people who test these
+> patches (Like Shawn), must have applied them from mail.. Don't know
+> why they aren't shouting :)
+> 
+> He mostly send pull requests to Rafael and so this wasn't a issue for
+> Rafael :)
+> 
 
-Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
----
-Hi!
-This patch depends on and was tested with
-	the series "socfpga: dts: cleanups"
-    and the series "Add support for SD/MMC on SOCFPGA" in v5
-    and the series "arm: dts: Add clock entries for timers in SOCFPGA" in v4
-    and the series "Enable ethernet support for SOCFPGA"
+Yes looks like its at my end. I will try to fix it. There is alternate
+SMTP which should not have this issue, but it was down recently. I
+forgot to switch back to it once it was fixed.
+
+For now you can fetch it from:
+	git://linux-arm.org/linux-skn.git cpufreq_fixes_v3.12
 
 Regards,
-Steffen
-
- arch/arm/boot/dts/Makefile                    |  1 +
- arch/arm/boot/dts/socfpga_cyclone5_sockit.dts | 41 +++++++++++++++++++++++++++
- 2 files changed, 42 insertions(+)
- create mode 100644 arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
-
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 79a1fa1..e2e28e3 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -212,6 +212,7 @@ dtb-$(CONFIG_ARCH_SHMOBILE) += emev2-kzm9d.dtb \
- 	sh7372-mackerel.dtb
- dtb-$(CONFIG_ARCH_SHMOBILE_MULTI) += emev2-kzm9d-reference.dtb
- dtb-$(CONFIG_ARCH_SOCFPGA) += socfpga_cyclone5_socdk.dtb \
-+	socfpga_cyclone5_sockit.dtb \
- 	socfpga_vt.dtb
- dtb-$(CONFIG_ARCH_SPEAR13XX) += spear1310-evb.dtb \
- 	spear1340-evb.dtb
-diff --git a/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts b/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
-new file mode 100644
-index 0000000..f935460
---- /dev/null
-+++ b/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
-@@ -0,0 +1,41 @@
-+/*
-+ *  Copyright (C) 2013 Steffen Trumtrar <s.trumtrar@pengutronix.de>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+
-+/include/ "socfpga_cyclone5.dtsi"
-+
-+/ {
-+	model = "Terasic SoCkit";
-+	compatible = "altr,socfpga-cyclone5", "altr,socfpga";
-+
-+	chosen {
-+		bootargs = "console=ttyS0,57600";
-+	};
-+
-+	memory {
-+		name = "memory";
-+		device_type = "memory";
-+		reg = <0x0 0x40000000>; /* 1GB */
-+	};
-+};
-+
-+&gmac1 {
-+	status = "okay";
-+};
-+
-+&mmc {
-+	status = "okay";
-+};
--- 
-1.8.4.rc3
+Sudeep
