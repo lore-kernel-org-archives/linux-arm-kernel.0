@@ -1,45 +1,34 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 11 Sep 2013 11:10:09 +0200
-Subject: [PATCH 4/4] ARM: sun7i: olinuxino-micro: Enable the EMAC
-In-Reply-To: <1378890609-28563-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1378890609-28563-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1378890609-28563-5-git-send-email-maxime.ripard@free-electrons.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 11 Sep 2013 17:22:59 +0800
+Subject: [PATCH 1/4] cpufreq: cpufreq-cpu0: assign cpu_dev correctly to
+ cpu0 device
+In-Reply-To: <CAKohpokgVqmjNGTUOg61YQyqi1qO-9FaB8dmZqTqq2nQFynOkQ@mail.gmail.com>
+References: <1378835989-19281-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+ <1378835989-19281-2-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+ <Pine.LNX.4.64.1309111005310.26942@axis700.grange>
+ <CAKohpokgVqmjNGTUOg61YQyqi1qO-9FaB8dmZqTqq2nQFynOkQ@mail.gmail.com>
+Message-ID: <20130911092257.GK5815@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The A20-olinuxino-micro has the EMAC wired in. Enable it in the DT so
-that we can use it.
+On Wed, Sep 11, 2013 at 02:12:24PM +0530, Viresh Kumar wrote:
+> On 11 September 2013 13:45, Guennadi Liakhovetski <g.liakhovetski@gmx.de> wrote:
+> > Noone else seems to complain, but I don't think these =20, =09 etc. codes
+> > have been invented on my side and I don't think they belong here. I'm
+> > handling enough mails / patches daily to believe, that my mail system
+> > isn't the cause of this. Could you please verify and regenerate and
+> > resend? Unless I'm mistaken this looks like a corruption on your SMTP
+> > side.
+> 
+> Its on Sudeep's side :) .. Or on ARM's side..
+> Don't know why nobody else complained, Atleast people who test these
+> patches (Like Shawn), must have applied them from mail.. Don't know
+> why they aren't shouting :)
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts | 15 +++++++++++++++
- 1 file changed, 15 insertions(+)
+I'm not sure what's going on here.  But I did apply the patches from
+mail without any problem, and the patch I got look just like what the
+archive below [1] shows.
 
-diff --git a/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts b/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts
-index 34a6c02..9e77855 100644
---- a/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts
-+++ b/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts
-@@ -19,6 +19,21 @@
- 	compatible = "olimex,a20-olinuxino-micro", "allwinner,sun7i-a20";
- 
- 	soc at 01c00000 {
-+		emac: ethernet at 01c0b000 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&emac_pins_a>;
-+			phy = <&phy1>;
-+			status = "okay";
-+		};
-+
-+		mdio at 01c0b080 {
-+			status = "okay";
-+
-+			phy1: ethernet-phy at 1 {
-+				reg = <1>;
-+			};
-+		};
-+
- 		pinctrl at 01c20800 {
- 			led_pins_olinuxino: led_pins at 0 {
- 				allwinner,pins = "PH2";
--- 
-1.8.4
+Shawn
+
+[1] http://www.spinics.net/lists/arm-kernel/msg272474.html
