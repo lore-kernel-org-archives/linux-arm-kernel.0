@@ -1,32 +1,36 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Wed, 11 Sep 2013 11:00:06 -0700
-Subject: [PATCH 1/2] ARM: msm: Add support for MSM8974 Dragonboard
-In-Reply-To: <1375780486.2725.7.camel@iivanov-dev.int.mm-sol.com>
-References: <1375743779-24993-1-git-send-email-rvaswani@codeaurora.org>
- <1375780486.2725.7.camel@iivanov-dev.int.mm-sol.com>
-Message-ID: <20130911180006.GA12624@codeaurora.org>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Wed, 11 Sep 2013 19:06:06 +0100
+Subject: [RFC PATCH] arm64: KVM: honor cacheability attributes on S2 page
+ fault
+In-Reply-To: <1378806670-2467-1-git-send-email-marc.zyngier@arm.com>
+References: <1378806670-2467-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <CAFEAcA_xWvZa3fizTNPfaH97V02Ktvrn2EPq-UkA2B-YsMnHzQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 06, 2013 at 12:14:46PM +0300, Ivan T. Ivanov wrote:
-
->Attached patch enables earlyprink for this board.
+On 10 September 2013 10:51, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> Anup Patel recently brought up the fact that when we run a guest
+> with cache disabled, we don't flush the cache to the Point of
+> Coherency, hence possibly missing bits of data that have been
+> written in the cache, but have not reached memory.
 >
->[920] booting linux @ 0x8000, ramdisk @ 0x2000000 (1067699), tags/device tree @ 0x1e00000
->Uncompressing Linux... done, booting the kernel.
->[    0.000000] Booting Linux on physical CPU 0x0
->[    0.000000] Linux version 3.11.0-rc4-00003-g7c8394e (iivanov at dev) (gcc version 4.6.3 (GCC) ) #502 SMP PREEMPT Tue Aug 6 12:09:07 EEST3
->[    0.000000] CPU: ARMv7 Processor [512f06f0] revision 0 (ARMv7), cr=10c5387d
->[    0.000000] CPU: PIPT / VIPT nonaliasing data cache, PIPT instruction cache
->[    0.000000] Machine: Qualcomm MSM (Flattened Device Tree), model: Qualcomm MSM8974 Dragonboard
+> There are several approaches to this issue:
+> - Using the DC bit when caches are off: this breaks guests assuming
+>   caches off while doing DMA operations. Bootloaders, for example.
+> - Fetch the memory attributes on translation fault, and flush the
+>   cache while handling the fault. This relies on using the PAR_EL1
+>   register to obtain the Stage-1 memory attributes.
+>
+> While this second solution is clearly not ideal (it duplicates what
+> the HW already does to generate HPFAR_EL2), it is more correct than
+> not doing anything.
 
-We'll need to have either Rohit include this in his patch series, or
-you'll have to format this as a valid patch.
+Are you confident that extending the current very limited
+set of circumstances where we re-do the address translation
+operation doesn't introduce any new races if the guest
+page tables change between taking the fault and redoing
+the translation? I remember being this a pain to think through
+last time around :-)
 
-Thanks,
-David
-
--- 
-sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+thanks
+-- PMM
