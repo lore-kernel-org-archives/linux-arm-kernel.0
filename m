@@ -1,70 +1,125 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 11 Sep 2013 12:48:13 +0900
-Subject: [PATCH v2 00/03] ARM: shmobile: r8a7790 APMU SMP support
-In-Reply-To: <522F0E49.9070307@arm.com>
-References: <20130828232148.7321.45739.sendpatchset@w520>
- <20130829001834.GD10207@verge.net.au>
- <CANqRtoTq=w-dsK-fkfWTO+B+VoOMRkuFjCpY=+5qjBZGxDxd+Q@mail.gmail.com>
- <20130829043424.GA20593@verge.net.au>
- <20130904083934.GG17329@verge.net.au> <522F0E49.9070307@arm.com>
-Message-ID: <20130911034813.GB23073@verge.net.au>
+From: chander.kashyap@linaro.org (Chander Kashyap)
+Date: Wed, 11 Sep 2013 09:49:31 +0530
+Subject: [RFC Patch v2 0/3] add temporary parent migration support
+In-Reply-To: <8013969.VJd4Ll2ItG@localhost>
+References: <1378208072-10173-1-git-send-email-chander.kashyap@linaro.org>
+ <3927125.3UOplv4uU5@localhost> <20130904174328.10934.18433@quantum>
+ <8013969.VJd4Ll2ItG@localhost>
+Message-ID: <CANuQgHFu_2=DbsCH6Q918My=9ekLGxDmc7xBmc7R4NRmq_qDPg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 10, 2013 at 01:19:21PM +0100, Sudeep KarkadaNagesha wrote:
-> On 04/09/13 09:39, Simon Horman wrote:
-> > On Thu, Aug 29, 2013 at 01:34:28PM +0900, Simon Horman wrote:
-> >> On Thu, Aug 29, 2013 at 01:11:37PM +0900, Magnus Damm wrote:
-> >>> On Thu, Aug 29, 2013 at 9:18 AM, Simon Horman <horms@verge.net.au> wrote:
-> >>>> On Thu, Aug 29, 2013 at 08:21:48AM +0900, Magnus Damm wrote:
-> >>>>> ARM: shmobile: r8a7790 APMU SMP support
-> >>>>>
-> >>>>> [PATCH v2 01/03] ARM: shmobile: Shared APMU SMP support code without DT
-> >>>>> [PATCH v2 02/03] ARM: shmobile: Add r8a7790 SMP support using APMU code
-> >>>>> [PATCH v2 03/03] ARM: shmobile: Add r8a7790 CA15 CPU cores
-> >>>>>
-> >>>>> This series adds SMP support to r8a7790 using the included APMU code.
-> >>>>> The previous version of r8a7790 support depended on the APMU code in
-> >>>>> "[PATCH] ARM: shmobile: Shared APMU SMP support code", but in this
-> >>>>> version the APMU code has been reworked to not use DT. In the future
-> >>>>> r8a73a4 and other SoCs may make use of the APMU as well, but the
-> >>>>> r8a73a4 code first needs to be adjusted to work with the CCI driver.
-> >>>>>
-> >>>>> With these patches applied r8a7790 CA15 support for SMP boot
-> >>>>> and CPU Hotplug is known to be working.
-> >>>>>
-> >>>>> Thanks to Sudeep for his feedback.
-> >>>>>
-> >>>>> Signed-off-by: Magnus Damm <damm@opensource.se>
-> >>>>
-> >>>> Hi Magnus,
-> >>>>
-> >>>> can I clarify that these patches are targeted at mainline?
-> >>>
-> >>> Hi Simon, yes, that's correct. It's possible to back port too if needed.
-> >>
-> >> Thanks for the clarification.
-> >>
-> >>> Actual merge is not rushing though, so please don't interpret this as
-> >>> any last minute v3.12 merge attempt.
-> >>
-> >> No problem, I didn't interpret it that way.
-> > 
-> > I have queued these up for v3.13 and they are present
-> > in the freshly baked renesas-devel-20130904 tag.
-> > 
-> As I already mentioned I asked not to add any custom bindings to support
-> multiple cluster. But this version removed APMU node from DT completely
-> which is not correct.
-> 
-> Also you removed multi cluster support to avoid CCI and MCPM reuse. I
-> think you may have to rework these completely when adding multi-cluster
-> support. I strongly recommend to reuse the CCI and MPCM code from first
-> instead of reworking again, but I leave it SH platform maintainer to
-> decide.
+On 4 September 2013 23:31, Tomasz Figa <tomasz.figa@gmail.com> wrote:
+> On Wednesday 04 of September 2013 10:43:28 Mike Turquette wrote:
+>> Quoting Tomasz Figa (2013-09-03 15:36:50)
+>>
+>> > Hi Chander,
+>> >
+>> > On Tuesday 03 of September 2013 17:04:28 Chander Kashyap wrote:
+>> > > Some platform has provision to change cpu parent clock during
+>> > > cpu frequency scaling. This patch series provides a mechanism to
+>> > > implement the same using CCF.
+>> > >
+>> > > Patch1 provides mechanism to migrate to new parent temporarily.
+>> > >
+>> > > Patch2 updates the user of clk_register_mux and DEFINE_CLK_MUX which
+>> > > are modified to add support for clk migration.
+>> > >
+>> > > Patch3 adds support to Exynos5250 to use the clock parent migration
+>> > > feature implemented in CCF.
+>> >
+>> > I don't really like this approach. A need to change mux setting
+>> > temporarily is heavily platform-specific and I don't think it should
+>> > be
+>> > handled by generic code.
+>>
+>> I agree with Tomasz.
+>>
+>> > First of all there are many factor that you would
+>> >
+>> > have to account for to make this solution generic, such as:
+>> >  - board specific alternative parents,
+>> >  - exact moment of parent change,
+>> >  - some other platform specific conditions, like CPU voltage that must
+>> >  be>
+>> > changed when mux is changed, because it changes CPU frequency,
+>> >
+>> >  - and probably a lot of more factors that only people working with
+>> >  all
+>> >
+>> > the platforms supported (and unsupported yet) by Linux.
+>> >
+>> > I can see at least two solutions for this problem that don't require
+>> > changing core code of common clock framework:
+>> >
+>> > 1) Implementing a special clock type using normal mux ops, but also
+>> > registering a notifier for its PRE_RATE_CHANGE and POST_RATE_CHANGE
+>> > events to perform parent switching.
+>>
+>> Creating a custom clock type is the way to go here. It is possible to
+>> wrap the mux clk_ops to re-use that code, or just write a custom clock
+>> type from scratch.
+>>
+>> I do not like using the clock rate-change notifiers for this purpose.
+>> The notifiers provide hooks to drivers that need to take care around
+>> clock transitions. Using the notifiers from within the clock framework
+>> indicates poor design.
+>
+> I was not sure how a .set_parent() from inside a .set_rate() would
+> interact with rate setting, so I mentioned notifiers here, but now as I
+> think of it, CCF is supposed to be re-entrant, so things should be fine.
+>
+>> > 2) Using normal mux clock, but registering such notifiers in clock
+>> > controller or cpufreq driver.
+>>
+>> This depends on what the data sheet or reference manual states. If using
+>> a temporary parent is a property of the clock programming sequence
+>> (e.g. to have a glitch-less transition) then that logic belongs in the
+>> clock provider driver (i.e. a custom clock type needs to be created
+>> with this logic).
+>>
+>> However if using a temporary parent is not required for programming the
+>> clock, but is instead a requirement of the clock consumer (e.g. a CPU,
+>> or some I/O controller) then perhaps putting this logic in that driver
+>> is the right way to go. In that case the logic could be explicit:
+>>
+>>       clk_set_parent(clk, temp_parent);
+>>       clk_set_rate(clk, target_rate);
+>>       clk_set_parent(clk, target_parent);
+>>
+>> Or it could implicit with the use of rate-change notifiers. Again the
+>> rate-change notifiers exist for clock consumer drivers to use, so this
+>> is OK.
+>>
+>> I have a hunch that the right way to do this is for a custom clock type
+>> to be created which simply calls clk_set_parent from within the clock's
+>> .set_rate callback, but I'll wait on feedback from Chander on the needs
+>> of his platform.
+>
+> I believe Chander has exactly the same use case for this as we have for
+> Exynos 4210 and 4x12.
 
-Thanks for your feedback,
+Yes Tomasz,
+I am trying to address the same issue. As this was requirement for
+more than one platform so thought of making it generic.
 
-I plan to meet with Magnus in person on Friday and I will
-discuss this issue with him in our capacities as shmobile
-co-maintainers.
+>
+> On these SoCs, CPU frequency is being scaled by reconfiguring PLL, which
+> needs to be masked for locking time. To let the CPU operate normally, a
+> mux that allows switching CPU clock domain between two PLLs can be
+> switched to the other PLL (MPLL) until the main ARM PLL (APLL) starts
+> operating again.
+>
+> However this issue is not limited to clocks, because there must be also a
+> voltage transition involved if the utility PLL has frequency higher than
+> the one currently being reconfigured.
+>
+> Best regards,
+> Tomasz
+>
+
+
+
+-- 
+with warm regards,
+Chander Kashyap
