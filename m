@@ -1,9 +1,10 @@
 From: liuj97@gmail.com (Jiang Liu)
-Date: Thu, 12 Sep 2013 00:07:08 +0800
-Subject: [RFC PATCH v2 04/25] smp, ARM: kill SMP single function call interrupt
+Date: Thu, 12 Sep 2013 00:07:09 +0800
+Subject: [RFC PATCH v2 05/25] smp,
+ ARM64: kill SMP single function call interrupt
 In-Reply-To: <1378915649-16395-1-git-send-email-liuj97@gmail.com>
 References: <1378915649-16395-1-git-send-email-liuj97@gmail.com>
-Message-ID: <1378915649-16395-5-git-send-email-liuj97@gmail.com>
+Message-ID: <1378915649-16395-6-git-send-email-liuj97@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -16,37 +17,38 @@ is needed for architecture specific code to support generic SMP function
 call interfaces, so kill the redundant single function call interrupt.
 
 Signed-off-by: Jiang Liu <jiang.liu@huawei.com>
+Cc: Jiang Liu <liuj97@gmail.com>
 ---
- arch/arm/include/asm/hardirq.h |  2 +-
- arch/arm/kernel/smp.c          | 10 +---------
+ arch/arm64/include/asm/hardirq.h |  2 +-
+ arch/arm64/kernel/smp.c          | 10 +---------
  2 files changed, 2 insertions(+), 10 deletions(-)
 
-diff --git a/arch/arm/include/asm/hardirq.h b/arch/arm/include/asm/hardirq.h
-index 2740c2a..436e60b 100644
---- a/arch/arm/include/asm/hardirq.h
-+++ b/arch/arm/include/asm/hardirq.h
-@@ -5,7 +5,7 @@
+diff --git a/arch/arm64/include/asm/hardirq.h b/arch/arm64/include/asm/hardirq.h
+index 990c051..3be64c8 100644
+--- a/arch/arm64/include/asm/hardirq.h
++++ b/arch/arm64/include/asm/hardirq.h
+@@ -20,7 +20,7 @@
  #include <linux/threads.h>
  #include <asm/irq.h>
  
--#define NR_IPI	6
-+#define NR_IPI	5
+-#define NR_IPI	4
++#define NR_IPI	3
  
  typedef struct {
  	unsigned int __softirq_pending;
-diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-index 2dc1934..4ea5994 100644
---- a/arch/arm/kernel/smp.c
-+++ b/arch/arm/kernel/smp.c
-@@ -65,7 +65,6 @@ enum ipi_msg_type {
- 	IPI_TIMER,
+diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+index fee5cce..f9b1044 100644
+--- a/arch/arm64/kernel/smp.c
++++ b/arch/arm64/kernel/smp.c
+@@ -59,7 +59,6 @@ volatile unsigned long secondary_holding_pen_release = INVALID_HWID;
+ enum ipi_msg_type {
  	IPI_RESCHEDULE,
  	IPI_CALL_FUNC,
 -	IPI_CALL_FUNC_SINGLE,
  	IPI_CPU_STOP,
  };
  
-@@ -475,7 +474,7 @@ void arch_send_wakeup_ipi_mask(const struct cpumask *mask)
+@@ -437,14 +436,13 @@ void arch_send_call_function_ipi_mask(const struct cpumask *mask)
  
  void arch_send_call_function_single_ipi(int cpu)
  {
@@ -55,15 +57,14 @@ index 2dc1934..4ea5994 100644
  }
  
  static const char *ipi_types[NR_IPI] = {
-@@ -484,7 +483,6 @@ static const char *ipi_types[NR_IPI] = {
- 	S(IPI_TIMER, "Timer broadcast interrupts"),
+ #define S(x,s)	[x - IPI_RESCHEDULE] = s
  	S(IPI_RESCHEDULE, "Rescheduling interrupts"),
  	S(IPI_CALL_FUNC, "Function call interrupts"),
 -	S(IPI_CALL_FUNC_SINGLE, "Single function call interrupts"),
  	S(IPI_CPU_STOP, "CPU stop interrupts"),
  };
  
-@@ -649,12 +647,6 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
+@@ -519,12 +517,6 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
  		irq_exit();
  		break;
  
