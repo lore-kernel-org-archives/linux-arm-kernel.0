@@ -1,39 +1,38 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 11 Sep 2013 13:35:53 +0100
-Subject: [PATCH v3 0/8] Add the Quadspi driver for vf610-twr
-In-Reply-To: <20980858CB6D3A4BAE95CA194937D5E73EA0EAA7@DBDE04.ent.ti.com>
-References: <522817D7.1010206@freescale.com> <522D3B79.3060707@freescale.com>
- <20130909151450.GI29403@sirena.org.uk>
- <522EC33B.9000009@freescale.com>
- <20130910180704.GB29403@sirena.org.uk>
- <522FD78A.6080900@freescale.com>
- <20130911104126.GN29403@sirena.org.uk>
- <52304BFF.4060007@freescale.com>
- <20130911113002.GP29403@sirena.org.uk>
- <20980858CB6D3A4BAE95CA194937D5E73EA0EAA7@DBDE04.ent.ti.com>
-Message-ID: <20130911123553.GS29403@sirena.org.uk>
+From: rjw@sisk.pl (Rafael J. Wysocki)
+Date: Wed, 11 Sep 2013 14:47:42 +0200
+Subject: [PATCH 1/4] cpufreq: cpufreq-cpu0: assign cpu_dev correctly to
+ cpu0 device
+In-Reply-To: <CAKohpokgVqmjNGTUOg61YQyqi1qO-9FaB8dmZqTqq2nQFynOkQ@mail.gmail.com>
+References: <1378835989-19281-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+ <Pine.LNX.4.64.1309111005310.26942@axis700.grange>
+ <CAKohpokgVqmjNGTUOg61YQyqi1qO-9FaB8dmZqTqq2nQFynOkQ@mail.gmail.com>
+Message-ID: <2106241.8mK7DMLEOF@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 11, 2013 at 12:26:10PM +0000, Gupta, Pekon wrote:
-> Hi Mark, Shijie,
+On Wednesday, September 11, 2013 02:12:24 PM Viresh Kumar wrote:
+> On 11 September 2013 13:45, Guennadi Liakhovetski <g.liakhovetski@gmx.de> wrote:
+> > Noone else seems to complain, but I don't think these =20, =09 etc. codes
+> > have been invented on my side and I don't think they belong here. I'm
+> > handling enough mails / patches daily to believe, that my mail system
+> > isn't the cause of this. Could you please verify and regenerate and
+> > resend? Unless I'm mistaken this looks like a corruption on your SMTP
+> > side.
+> 
+> Its on Sudeep's side :) .. Or on ARM's side..
+> Don't know why nobody else complained, Atleast people who test these
+> patches (Like Shawn), must have applied them from mail.. Don't know
+> why they aren't shouting :)
 
-> > Indeed - what I was wondering was if those opcodes could be requested
-> > from the flash driver rather than coded in there.
+This looks like broken quoted-printable e-mail encoding somewhere (either
+on the sending or on the receiving end).
 
-> As the talk is going in SPI framework direction, therefore requesting again..
-> please do not clutter the *generic* SPI framework to pass on opcodes from
-> flash-driver (like m25p80). (Q)SPI framework should remain generic and
-> independent of any upper layer drivers.
+> He mostly send pull requests to Rafael and so this wasn't a issue for
+> Rafael :)
 
-No, this isn't about the SPI framework doing this - this is about
-something outside the SPI framework being able tell the SPI controllers
-that want to know what the opcodes are so we don't have to do this in
-every driver that may be affected.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130911/d6efa5a2/attachment.sig>
+Git pulls are, well, from git, so e-mail encoding doesn't have anything to do
+with them ...
+
+-- 
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
