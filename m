@@ -1,61 +1,39 @@
-From: koen@dominion.thruhere.net (Koen Kooi)
-Date: Wed, 11 Sep 2013 13:02:27 +0200
-Subject: [PATCHv2 2/2] am335x-boneblack: add eMMC DT entry
-In-Reply-To: <1378897347-11840-1-git-send-email-koen@dominion.thruhere.net>
-References: <1378897347-11840-1-git-send-email-koen@dominion.thruhere.net>
-Message-ID: <1378897347-11840-3-git-send-email-koen@dominion.thruhere.net>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Wed, 11 Sep 2013 16:29:23 +0530
+Subject: [PATCH 0/5] CPUFreq: Last set of updates for 3.13
+In-Reply-To: <CAP245DXeU39UE5-_G3J=r=arPt-8DieL4uN9SOOvWQf5xS3wAA@mail.gmail.com>
+References: <cover.1378893296.git.viresh.kumar@linaro.org>
+ <CAP245DXeU39UE5-_G3J=r=arPt-8DieL4uN9SOOvWQf5xS3wAA@mail.gmail.com>
+Message-ID: <CAKohpomFjmfZ5Ce91o1VOhGT33L+jH-5G0NgAQCTFL6v7kNFdw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Koen Kooi <koen@dominion.thruhere.net>
----
+On 11 September 2013 16:23, Amit Kucheria <amit.kucheria@linaro.org> wrote:
+> Thanks for the great work cleaning up all the drivers. IIUC, you have
+> ~200 patches lined up for the 3.13 merge window.
 
-Changes since v1:
-	dropped the ti,non-removable entry per Sehkars request
+227 to be precise :)
 
- arch/arm/boot/dts/am335x-bone-common.dtsi |  7 +++++++
- arch/arm/boot/dts/am335x-boneblack.dts    | 14 ++++++++++++++
- 2 files changed, 21 insertions(+)
+> That causes some worries.
+>
+> Can we quickly do the following to get more confidence that there
+> won't be wide-spread breakage:
+>
+> 1. Get all of these into linux-next quickly
 
-diff --git a/arch/arm/boot/dts/am335x-bone-common.dtsi b/arch/arm/boot/dts/am335x-bone-common.dtsi
-index ced256c..9c61fef 100644
---- a/arch/arm/boot/dts/am335x-bone-common.dtsi
-+++ b/arch/arm/boot/dts/am335x-bone-common.dtsi
-@@ -241,6 +241,13 @@
- 			regulator-always-on;
- 		};
- 	};
-+
-+	vmmcsd_fixed: fixedregulator at 0 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "vmmcsd_fixed";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+	};
- };
- 
- &cpsw_emac0 {
-diff --git a/arch/arm/boot/dts/am335x-boneblack.dts b/arch/arm/boot/dts/am335x-boneblack.dts
-index 197cadf..f4703cf 100644
---- a/arch/arm/boot/dts/am335x-boneblack.dts
-+++ b/arch/arm/boot/dts/am335x-boneblack.dts
-@@ -15,3 +15,17 @@
- 	regulator-max-microvolt = <1800000>;
- 	regulator-always-on;
- };
-+
-+&mmc1 { 
-+	vmmc-supply = <&vmmcsd_fixed>;
-+};
-+
-+&mmc2 { 
-+	vmmc-supply = <&vmmcsd_fixed>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&emmc_pins>;
-+	bus-width = <8>;
-+	status = "okay";
-+	ti,vcc-aux-disable-is-sleep;
-+};
-+
--- 
-1.8.2.1
+Yes, even Myself and Rafael wanted to do that.. And were waiting
+for pull request to go for 3.12-rc1..
+
+I am mostly ready with my patches, wouldn't take long time for
+me to review those completely before sending them..
+
+> 2. Set up a LAVA[1] job to get linux-next kernels running on boards in our farm
+> 3. Run cpufreq functional tests, e.g. PM-QA[2] test suite from Linaro
+> with these kernels
+
+That would be nice actually.. Anyway some people would test it on
+linux-next, but doing that for few boards by Linaro would be
+Awesome..
+
+--
+viresh
