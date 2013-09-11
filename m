@@ -1,76 +1,48 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 11 Sep 2013 11:30:02 +0200
-Subject: [PATCH 1/4] ARM: sun7i: Enable the I2C controllers
+Date: Wed, 11 Sep 2013 11:30:05 +0200
+Subject: [PATCH 4/4] ARM: sun7i: olinuxino-micro: Enable the I2C controllers
 In-Reply-To: <1378891805-28957-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1378891805-28957-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1378891805-28957-2-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1378891805-28957-5-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Allwinner A20 shares the same I2C controller than the one that could
-be found on earlier SoCs from Allwinner. There is only a few more of
-these controllers. Add all of them in the DTSI.
+The A20-olinuxino-micro uses the first three I2C controllers found on
+the A20. Enable them in the DT.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- arch/arm/boot/dts/sun7i-a20.dtsi | 45 ++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 45 insertions(+)
+ arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts | 18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
-index 80559cb..82b1af3 100644
---- a/arch/arm/boot/dts/sun7i-a20.dtsi
-+++ b/arch/arm/boot/dts/sun7i-a20.dtsi
-@@ -324,6 +324,51 @@
- 			status = "disabled";
+diff --git a/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts b/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts
+index 9e77855..ead3013 100644
+--- a/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts
++++ b/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts
+@@ -60,6 +60,24 @@
+ 			pinctrl-0 = <&uart7_pins_a>;
+ 			status = "okay";
  		};
- 
++
 +		i2c0: i2c at 01c2ac00 {
-+			compatible = "allwinner,sun4i-i2c";
-+			reg = <0x01c2ac00 0x400>;
-+			interrupts = <0 7 1>;
-+			clocks = <&apb1_gates 0>;
-+			clock-frequency = <100000>;
-+			status = "disabled";
++			pinctrl-names = "default";
++			pinctrl-0 = <&i2c0_pins_a>;
++			status = "okay";
 +		};
 +
 +		i2c1: i2c at 01c2b000 {
-+			compatible = "allwinner,sun4i-i2c";
-+			reg = <0x01c2b000 0x400>;
-+			interrupts = <0 8 1>;
-+			clocks = <&apb1_gates 1>;
-+			clock-frequency = <100000>;
-+			status = "disabled";
++			pinctrl-names = "default";
++			pinctrl-0 = <&i2c1_pins_a>;
++			status = "okay";
 +		};
 +
 +		i2c2: i2c at 01c2b400 {
-+			compatible = "allwinner,sun4i-i2c";
-+			reg = <0x01c2b400 0x400>;
-+			interrupts = <0 9 1>;
-+			clocks = <&apb1_gates 2>;
-+			clock-frequency = <100000>;
-+			status = "disabled";
++			pinctrl-names = "default";
++			pinctrl-0 = <&i2c2_pins_a>;
++			status = "okay";
 +		};
-+
-+		i2c3: i2c at 01c2b800 {
-+			compatible = "allwinner,sun4i-i2c";
-+			reg = <0x01c2b800 0x400>;
-+			interrupts = <0 88 1>;
-+			clocks = <&apb1_gates 3>;
-+			clock-frequency = <100000>;
-+			status = "disabled";
-+		};
-+
-+		i2c4: i2c at 01c2bc00 {
-+			compatible = "allwinner,sun4i-i2c";
-+			reg = <0x01c2bc00 0x400>;
-+			interrupts = <0 89 1>;
-+			clocks = <&apb1_gates 15>;
-+			clock-frequency = <100000>;
-+			status = "disabled";
-+		};
-+
- 		gic: interrupt-controller at 01c81000 {
- 			compatible = "arm,cortex-a7-gic", "arm,cortex-a15-gic";
- 			reg = <0x01c81000 0x1000>,
+ 	};
+ 
+ 	leds {
 -- 
 1.8.4
