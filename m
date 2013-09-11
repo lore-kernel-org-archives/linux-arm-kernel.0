@@ -1,62 +1,46 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 11 Sep 2013 09:17:17 +0100
-Subject: [PATCH 01/38] ARM: ux500: Remove PrimeCell IDs from Nomadik I2C
- DT nodes
-In-Reply-To: <CAOesGMiBN5SaEY26SxGaw9E4ViR3cC0PcwNMEd4cLJZMfomprQ@mail.gmail.com>
-References: <1378817379-8238-1-git-send-email-lee.jones@linaro.org>
- <1378817379-8238-2-git-send-email-lee.jones@linaro.org>
- <CAOesGMgySNLKo_H0h4MCbAWvyW0h2bWa96drWBpnhAYYQwH9mw@mail.gmail.com>
- <20130910153037.GA11227@lee--X1>
- <CAOesGMiBN5SaEY26SxGaw9E4ViR3cC0PcwNMEd4cLJZMfomprQ@mail.gmail.com>
-Message-ID: <20130911081717.GH11227@lee--X1>
+From: jbe@pengutronix.de (Juergen Beisert)
+Date: Wed, 11 Sep 2013 10:18:26 +0200
+Subject: [PATCH 1/6] Staging/iio/adc/touchscreen/MXS: distinguish i.MX23's and
+ i.MX28's LRADC
+In-Reply-To: <1378887511-24530-1-git-send-email-jbe@pengutronix.de>
+References: <1378887511-24530-1-git-send-email-jbe@pengutronix.de>
+Message-ID: <1378887511-24530-2-git-send-email-jbe@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 10 Sep 2013, Olof Johansson wrote:
+The LRADC units in i.MX23 and i.MX28 differ and we need to distinguish both
+SoC variants in order to make the touchscreen work on i.MX23
 
-> [pruning out the iio list/people]
-> 
-> On Tue, Sep 10, 2013 at 8:30 AM, Lee Jones <lee.jones@linaro.org> wrote:
-> >> On Tue, Sep 10, 2013 at 5:49 AM, Lee Jones <lee.jones@linaro.org> wrote:
-> >> > Turns out that they're actually not required and the driver probes just
-> >> > fine without them. The ID is incorrect at the moment anyway. They actually
-> >> > currently specify the stn8815.
-> >> >
-> >> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> >>
-> >> How did you test this patch? What hardware did you boot it on and with
-> >> what config?
-> >
-> > Snowball, u8500_defconfig.
-> >
-> > Why? Don't you have the same result with yours?
-> 
-> I have a very weird experience with snowball right now. I noticed this
-> yesterday when I decided to look at why multi_v7_defconfig doesn't
-> boot on it:
-> 
-> * u8500_defconfig doesn't boot as a DT kernel, since the machine ID is
-> still enabled. If I disable the machine ID, it doesn't boot.
-> * Same for multi_v7_defconfig, since that is only DT: It doesn't boot.
+Signed-off-by: Juergen Beisert <jbe@pengutronix.de>
+CC: linux-arm-kernel at lists.infradead.org
+CC: devel at driverdev.osuosl.org
+CC: Marek Vasut <marex@denx.de>
+CC: Fabio Estevam <fabio.estevam@freescale.com>
+CC: Jonathan Cameron <jic23@cam.ac.uk>
+---
+ drivers/staging/iio/adc/mxs-lradc.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
-I'm not entirely sure what you mean by this, as I have Snowball
-booting as a Device Tree only platform:
-
-  http://www.spinics.net/lists/kernel/msg1590759.html
-
-The Machine ID should be all F's for DT I think.
-
-> Unfortunately I can't get to my home network right now to double-check
-> boot logs to see if this has changed behavior recently, I'll have to
-> do that later today. It'd be interesting to hear if you have the same
-> experience w.r.t. DT on u8500_defconfig though.
-
-I just changed SNOWBALL's machine ID to 9999 and it still boots just
-fine with DT (ATAGs boot hangs). So what did you do? Can you send me
-a patch of what you did, so I might reproduce your build please?
-
+diff --git a/drivers/staging/iio/adc/mxs-lradc.c b/drivers/staging/iio/adc/mxs-lradc.c
+index a08c173..dffca90 100644
+--- a/drivers/staging/iio/adc/mxs-lradc.c
++++ b/drivers/staging/iio/adc/mxs-lradc.c
+@@ -174,6 +174,8 @@ struct mxs_lradc {
+ 
+ 	struct input_dev	*ts_input;
+ 	struct work_struct	ts_work;
++
++	enum mxs_lradc_id	soc;
+ };
+ 
+ #define	LRADC_CTRL0				0x00
+@@ -920,6 +922,7 @@ static int mxs_lradc_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	lradc = iio_priv(iio);
++	lradc->soc = (enum mxs_lradc_id)of_id->data;
+ 
+ 	/* Grab the memory area */
+ 	iores = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+1.8.4.rc3
