@@ -1,135 +1,84 @@
 From: mika.westerberg@linux.intel.com (Mika Westerberg)
-Date: Wed, 11 Sep 2013 18:32:32 +0300
-Subject: [PATCH v2 1/9] i2c: prepare runtime PM support for I2C client devices
+Date: Wed, 11 Sep 2013 18:32:35 +0300
+Subject: [PATCH v2 4/9] [media] s5p-tv: convert to use I2C core runtime PM
 In-Reply-To: <1378913560-2752-1-git-send-email-mika.westerberg@linux.intel.com>
 References: <1378913560-2752-1-git-send-email-mika.westerberg@linux.intel.com>
-Message-ID: <1378913560-2752-2-git-send-email-mika.westerberg@linux.intel.com>
+Message-ID: <1378913560-2752-5-git-send-email-mika.westerberg@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Aaron Lu <aaron.lu@intel.com>
+The I2C core now prepares runtime PM on behalf of the I2C client device, so
+only thing the driver needs to do is to call pm_runtime_put() at the end of
+its ->probe().
 
-This patch adds runtime PM support for the I2C bus in a similar way that
-has been done for PCI bus already. This means that the I2C bus core
-prepares runtime PM for a client device just before a driver is about to be
-bound to it. Devices that are not bound to any driver are not prepared for
-runtime PM.
+This patch converts s5p-tv driver to use this model.
 
-In order to take advantage of this runtime PM support, the client device
-driver needs drop the device runtime PM reference count by calling
-pm_runtime_put() in its ->probe() callback and possibly implement rest of
-the runtime PM callbacks.
-
-If the driver doesn't support runtime PM (like most of the existing I2C
-client drivers), the device in question is regarded as being runtime PM
-active and powered on.
-
-The patch adds also runtime PM support for the adapter device because it is
-needed to be able to runtime power manage the I2C controller device. The
-adapter device is handled along with the I2C controller device (it uses
-pm_runtime_no_callbacks()).
-
-Signed-off-by: Aaron Lu <aaron.lu@intel.com>
 Signed-off-by: Mika Westerberg <mika.westerberg@linux.intel.com>
 ---
- drivers/i2c/i2c-core.c | 44 +++++++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 43 insertions(+), 1 deletion(-)
+ drivers/media/platform/s5p-tv/sii9234_drv.c | 30 ++++++-----------------------
+ 1 file changed, 6 insertions(+), 24 deletions(-)
 
-diff --git a/drivers/i2c/i2c-core.c b/drivers/i2c/i2c-core.c
-index f32ca29..44374b4 100644
---- a/drivers/i2c/i2c-core.c
-+++ b/drivers/i2c/i2c-core.c
-@@ -248,11 +248,30 @@ static int i2c_device_probe(struct device *dev)
- 					client->flags & I2C_CLIENT_WAKE);
- 	dev_dbg(dev, "probe\n");
- 
-+	/* Make sure the adapter is active */
-+	pm_runtime_get_sync(&client->adapter->dev);
-+
-+	/*
-+	 * Enable runtime PM for the client device. If the client wants to
-+	 * participate on runtime PM it should call pm_runtime_put() in its
-+	 * probe() callback.
-+	 */
-+	pm_runtime_get_noresume(&client->dev);
-+	pm_runtime_set_active(&client->dev);
-+	pm_runtime_enable(&client->dev);
-+
- 	status = driver->probe(client, i2c_match_id(driver->id_table, client));
- 	if (status) {
- 		client->driver = NULL;
- 		i2c_set_clientdata(client, NULL);
-+
-+		pm_runtime_disable(&client->dev);
-+		pm_runtime_set_suspended(&client->dev);
-+		pm_runtime_put_noidle(&client->dev);
+diff --git a/drivers/media/platform/s5p-tv/sii9234_drv.c b/drivers/media/platform/s5p-tv/sii9234_drv.c
+index 3dd762e..c0e8d42 100644
+--- a/drivers/media/platform/s5p-tv/sii9234_drv.c
++++ b/drivers/media/platform/s5p-tv/sii9234_drv.c
+@@ -325,8 +325,7 @@ static int sii9234_probe(struct i2c_client *client,
+ 	ctx = devm_kzalloc(&client->dev, sizeof(*ctx), GFP_KERNEL);
+ 	if (!ctx) {
+ 		dev_err(dev, "out of memory\n");
+-		ret = -ENOMEM;
+-		goto fail;
++		return -ENOMEM;
  	}
-+
-+	pm_runtime_put(&client->adapter->dev);
-+
- 	return status;
- }
+ 	ctx->client = client;
  
-@@ -265,6 +284,8 @@ static int i2c_device_remove(struct device *dev)
- 	if (!client || !dev->driver)
- 		return 0;
+@@ -345,42 +344,25 @@ static int sii9234_probe(struct i2c_client *client,
  
-+	pm_runtime_get_sync(&client->adapter->dev);
-+
- 	driver = to_i2c_driver(dev->driver);
- 	if (driver->remove) {
- 		dev_dbg(dev, "remove\n");
-@@ -277,6 +298,13 @@ static int i2c_device_remove(struct device *dev)
- 		client->driver = NULL;
- 		i2c_set_clientdata(client, NULL);
- 	}
-+
-+	/* Undo the runtime PM done in i2c_probe() */
-+	pm_runtime_disable(&client->dev);
-+	pm_runtime_set_suspended(&client->dev);
-+	pm_runtime_put_noidle(&client->dev);
-+
-+	pm_runtime_put(&client->adapter->dev);
- 	return status;
- }
+ 	v4l2_i2c_subdev_init(&ctx->sd, client, &sii9234_ops);
  
-@@ -288,8 +316,11 @@ static void i2c_device_shutdown(struct device *dev)
- 	if (!client || !dev->driver)
- 		return;
- 	driver = to_i2c_driver(dev->driver);
--	if (driver->shutdown)
-+	if (driver->shutdown) {
-+		pm_runtime_get_sync(&client->adapter->dev);
- 		driver->shutdown(client);
-+		pm_runtime_put(&client->adapter->dev);
+-	pm_runtime_enable(dev);
+-
+-	/* enable device */
+-	ret = pm_runtime_get_sync(dev);
+-	if (ret)
+-		goto fail_pm;
+-
+ 	/* verify chip version */
+ 	ret = sii9234_verify_version(client);
+-	if (ret)
+-		goto fail_pm_get;
++	if (ret) {
++		dev_err(dev, "failed to verify chip version\n");
++		return ret;
 +	}
+ 
+-	/* stop processing */
+ 	pm_runtime_put(dev);
+ 
+ 	dev_info(dev, "probe successful\n");
+ 
+ 	return 0;
+-
+-fail_pm_get:
+-	pm_runtime_put_sync(dev);
+-
+-fail_pm:
+-	pm_runtime_disable(dev);
+-
+-fail:
+-	dev_err(dev, "probe failed\n");
+-
+-	return ret;
  }
  
- #ifdef CONFIG_PM_SLEEP
-@@ -1066,6 +1097,15 @@ exit_recovery:
- 	bus_for_each_drv(&i2c_bus_type, NULL, adap, __process_new_adapter);
- 	mutex_unlock(&core_lock);
+ static int sii9234_remove(struct i2c_client *client)
+ {
+ 	struct device *dev = &client->dev;
  
-+	/*
-+	 * Make sure the adapter runtime PM follows the parent device (the
-+	 * host controller) so that we can suspend it once there aren't any
-+	 * active clients anymore.
-+	 */
-+	pm_runtime_set_active(&adap->dev);
-+	pm_runtime_no_callbacks(&adap->dev);
-+	pm_runtime_enable(&adap->dev);
-+
- 	return 0;
+-	pm_runtime_disable(dev);
++	pm_runtime_get(dev);
  
- out_list:
-@@ -1230,6 +1270,8 @@ void i2c_del_adapter(struct i2c_adapter *adap)
- 		return;
- 	}
+ 	dev_info(dev, "remove successful\n");
  
-+	pm_runtime_disable(&adap->dev);
-+
- 	/* Tell drivers about this removal */
- 	mutex_lock(&core_lock);
- 	bus_for_each_drv(&i2c_bus_type, NULL, adap,
 -- 
 1.8.4.rc3
