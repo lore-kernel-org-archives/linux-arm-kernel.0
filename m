@@ -1,56 +1,69 @@
-From: coosty@163.com (cini)
-Date: Wed, 11 Sep 2013 08:58:44 +0800 (CST)
-Subject: [PATCH ] ARM: sunxi: Add Emac,SMP and Arch_timer support for
- sunxi A20;Add phy cnt arch timer for ARMv7 support.
-In-Reply-To: <522F6964.9060603@elopez.com.ar>
-References: <16b7467c.1f121.141089f3d81.Coremail.coosty@163.com>
- <522F6964.9060603@elopez.com.ar>
-Message-ID: <22532daa.1421.1410a870d46.Coremail.coosty@163.com>
+From: aaron.lu@intel.com (Aaron Lu)
+Date: Wed, 11 Sep 2013 09:01:16 +0800
+Subject: [PATCH RESEND 1/2] i2c: prepare runtime PM support for I2C client
+ devices
+In-Reply-To: <2029393.u6DaKBPszu@vostro.rjw.lan>
+References: <1378733679-19500-1-git-send-email-mika.westerberg@linux.intel.com>
+ <3397524.g9aUWuArnm@vostro.rjw.lan> <20130910213522.GG29403@sirena.org.uk>
+ <2029393.u6DaKBPszu@vostro.rjw.lan>
+Message-ID: <522FC0DC.9030708@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->Hi,
->
->El?10/09/13?13:05,?cini?escribi?:
+On 09/11/2013 06:32 AM, Rafael J. Wysocki wrote:
+> On Tuesday, September 10, 2013 10:35:22 PM Mark Brown wrote:
+>> On Tue, Sep 10, 2013 at 10:04:21PM +0200, Rafael J. Wysocki wrote:
+>>> On Tuesday, September 10, 2013 05:13:21 PM Mark Brown wrote:
 >>
->>?It?has?been?tested?on?a?Cubieboard?2.?To?use?SMP?you?must?set?ARM_ARCH_TIMER?and?ARM_ARCH_TIMER_USE_PHYCNT?when?make?xconfig.
->>?If?you?have?any?questions?or?comments?please?feel?free?to?contact?me.??Have?a?wonderful?day!
->
->First?of?all,?thanks?for?working?on?this!?It?is?very?much?appreciated?:)
->
->Having?said?that,?it?would?be?nice?to?get?properly?split?git?patches,?
->with?a?description?and?signoff?tag.?You?can?read?
->Documentation/SubmittingPatches?on?the?kernel?tree?(I?think?it's?a?bit?
->outdated,?but?it?covers?the?basics),?or?watch?this?video?from?Greg?which?
->explains?it?nicely:
->
->https://www.youtube.com/watch?v=LLBrBBImJt4
->
-Thanks for your response.This is my first patch.I will notice the problem you said.
+>>>> OK, that is very much not the model which embedded systems follow, in
+>>>> embedded systems the driver for the device is fully in control of its
+>>>> own power.  It gets resources like GPIOs and regulators which allow it
+>>>> to make fine grained decisions.
+>>
+>>> There are platforms where those resources are simply not available for
+>>> direct manipulation and we need to use ACPI methods for power management.
+>>
+>>> Now, since those methods are used in pretty much the same way for all I2C
+>>> devices, we add a PM domain for that to avoid duplicating the same code in
+>>> all of the drivers in question (patch [2/2]).  Does that make sense to you?
+>>
+>> It doesn't seem like a particular problem, but the existing usage does
+>> need to be preserved for the systems that use it so things like having
+>> auto as the default and updating the drivers seem like they're needed.
+>>
+>>>> If we're starting to get a reasonable number of buses following the same
+>>>> pattern it seems like we're in a position to start 
+>>
+>>> We need that for exactly 3 buses: platform (already done), I2C and SPI.
+>>
+>>> No other bus types are going to use ACPI this way for PM, at least for the
+>>> time being, simply because PCI, USB and SATA/IDE have their own ways of doing
+>>> this (which are bus-specific) and the spec doesn't cover other bus types
+>>> directly (it defines support for UART, but we don't have a UART bus type).
+>>
+>>> Moreover, because PCI and USB use ACPI for PM in their own ways, moving that
+>>> thing up to the driver core would be rather inconvenient.
+>>
+>> That only applies to the power domains though, what Mika was saying was
+>> that the process for enabling runtime PM (just drop a reference) also
+>> becomes easier with this method regardless of anything else - that makes
+>> sense to me as something we might want to end up with so do we want to
+>> just move towards making that a default?
+> 
+> Possibly. :-)
+> 
+> At least I don't see any fundamental obstacles ...
 
->>?#?On?branch?master
->>?#?Changes?to?be?committed:
->>?#???(use?"git?reset?HEAD?<file>..."?to?unstage)
->>?#
->>?#	new?file:???arch/arm/mach-sunxi/headsmp.S
->>?#	new?file:???arch/arm/mach-sunxi/platform.h
->>?#	new?file:???arch/arm/mach-sunxi/platsmp.c
->
->I?couldn't?find?these?files?on?either?of?your?emails?by?the?way
->
-Sorry for thar, I check the patch. as you said,the new files can not found,I will update a new patch including the new files later.?
+Looks like, it all boils down to how many I2C devices should be allowed
+for runtime PM by default and how many I2C devices should be forbidden.
+, and then we allow/forbid runtime PM for the majority case in I2C core
+while individual driver can still forbid/allow it in their own code.
 
->Is?this?frequency?correct??I?thought?A20?cores?ran?on?900-something?MHz
-A20 manual said the cpu can run 1.2G.
+So if the majority case is runtime PM should be allowed by default, I'm
+also OK to not forbid runtime PM for I2C client device in I2C core. My
+original intention to forbid runtime PM by default is to make sure no
+adverse effect would occur to some I2C devices that used to work well
+before runtime PM.
 
-
->
->This?will?certainly?not?play?nice?with?multiplatform?kernel.?Is?this?
->something?we?can?fix?on?u-boot?to?use?the?virtual?count?timer?as?the?
->rest?of?the?platforms?do?
->
->Cheers,
->
->EmilioYes,
-you are right,Phy Count Register can not be accessed in Non-secure PL1 mode when register CNTHCTL.PL1PCTEN=0.So we can set CNTHCTL.PL1PCTEN=1 in bootloader then ?other multiplatform?kernel should run ok with phy count in any mode.
-If kernel want use ?virtual count timer ,bootloader should set register CNTVOFF=0.On the other way,I think we can get a new nvct= vct-vntvoff as clksource, then kernel can work well even if?CNTVOFF does not set to zero ?by bootload, I will give the patch later.?
+Thanks,
+Aaron
