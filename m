@@ -1,33 +1,73 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 11 Sep 2013 16:35:47 +0100
-Subject: [PATCH 27/38] iio: pressure-core: st: Give some indication if
- device probing was successful
-In-Reply-To: <20130911072955.GG11227@lee--X1>
-References: <1378817379-8238-1-git-send-email-lee.jones@linaro.org>
- <1378817379-8238-28-git-send-email-lee.jones@linaro.org>
- <43055af7-991f-4122-b308-a3dcddbbb72a@email.android.com>
- <20130911071053.GD11227@lee--X1> <52301963.5030006@metafoo.de>
- <20130911072955.GG11227@lee--X1>
-Message-ID: <20130911153547.GU29403@sirena.org.uk>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Wed, 11 Sep 2013 17:43:07 +0200 (CEST)
+Subject: [PATCH 1/4] cpufreq: cpufreq-cpu0: assign cpu_dev correctly to
+ cpu0 device
+In-Reply-To: <1378835989-19281-2-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+References: <1378835989-19281-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+ <1378835989-19281-2-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+Message-ID: <Pine.LNX.4.64.1309111742290.26942@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 11, 2013 at 08:29:55AM +0100, Lee Jones wrote:
+On Tue, 10 Sep 2013, Sudeep KarkadaNagesha wrote:
 
-> Only if you print out every regulator, clock, GPIO pin and things of
-> this nature. Key hardware blocks such as; SD, Flash, USB, Eth, HDMI,
-> Audio, UART, GPIO and I2C controllers and Sensors I think deserve a
-> one line "I'm here and working" message.
+> From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
+> 
+> Commit f837a9b5ab05c52a07108c6f09ca66f2e0aee757 "cpufreq: cpufreq-cpu0:
+> remove device tree parsing for cpu nodes" assumed the pdev->dev is set to
+> cpu0 device in the platform code. But it actually points to the virtual
+> cpufreq-cpu0 platform device which is not present in the device tree.
+> Most of the information needed by cpufreq is stored in cpu0 DT node.
+> So cpu_dev must point to cpu0 device.
+> 
+> This patch fixes the wrong assignment to cpu_dev.
+> 
+> Reported-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+> Cc: Shawn Guo <shawn.guo@linaro.org>
+> Signed-off-by: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
 
-The usual rule people apply with this stuff is if the driver has read
-back information it can display from the hardware (eg, a revision) then
-that's OK.  Things that are likely to crash the system if they fail tend
-to also be OK (this is why the regualtor API is quite chatty for
-example, a lot of the things it does can cause an immediate crash).
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130911/235abe2c/attachment.sig>
+Tested-by: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
+
+Thanks
+Guennadi
+
+> ---
+>  drivers/cpufreq/cpufreq-cpu0.c | 7 ++++++-
+>  1 file changed, 6 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/cpufreq/cpufreq-cpu0.c b/drivers/cpufreq/cpufreq-cpu0.=
+> c
+> index cbfffa9..78c49d8 100644
+> --- a/drivers/cpufreq/cpufreq-cpu0.c
+> +++ b/drivers/cpufreq/cpufreq-cpu0.c
+> @@ -12,6 +12,7 @@
+>  #define pr_fmt(fmt)=09KBUILD_MODNAME ": " fmt
+> =20
+>  #include <linux/clk.h>
+> +#include <linux/cpu.h>
+>  #include <linux/cpufreq.h>
+>  #include <linux/err.h>
+>  #include <linux/module.h>
+> @@ -177,7 +178,11 @@ static int cpu0_cpufreq_probe(struct platform_device *=
+> pdev)
+>  =09struct device_node *np;
+>  =09int ret;
+> =20
+> -=09cpu_dev =3D &pdev->dev;
+> +=09cpu_dev =3D get_cpu_device(0);
+> +=09if (!cpu_dev) {
+> +=09=09pr_err("failed to get cpu0 device\n");
+> +=09=09return -ENODEV;
+> +=09}
+> =20
+>  =09np =3D of_node_get(cpu_dev->of_node);
+>  =09if (!np) {
+> --=20
+> 1.8.1.2
+> 
+> 
+
+---
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
