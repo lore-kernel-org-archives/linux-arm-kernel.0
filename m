@@ -1,39 +1,28 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed, 11 Sep 2013 16:29:23 +0530
-Subject: [PATCH 0/5] CPUFreq: Last set of updates for 3.13
-In-Reply-To: <CAP245DXeU39UE5-_G3J=r=arPt-8DieL4uN9SOOvWQf5xS3wAA@mail.gmail.com>
-References: <cover.1378893296.git.viresh.kumar@linaro.org>
- <CAP245DXeU39UE5-_G3J=r=arPt-8DieL4uN9SOOvWQf5xS3wAA@mail.gmail.com>
-Message-ID: <CAKohpomFjmfZ5Ce91o1VOhGT33L+jH-5G0NgAQCTFL6v7kNFdw@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 11 Sep 2013 12:09:01 +0100
+Subject: [PATCH 3/5] FS: Export poll_select_copy_remaining and rename
+ poll_select_copy_remaining in compat.c so it does not pick the wrong copy.
+In-Reply-To: <1378762380-13152-3-git-send-email-apinski@cavium.com>
+References: <1378762380-13152-1-git-send-email-apinski@cavium.com>
+ <1378762380-13152-3-git-send-email-apinski@cavium.com>
+Message-ID: <20130911110901.GD26777@darko.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11 September 2013 16:23, Amit Kucheria <amit.kucheria@linaro.org> wrote:
-> Thanks for the great work cleaning up all the drivers. IIUC, you have
-> ~200 patches lined up for the 3.13 merge window.
+On Mon, Sep 09, 2013 at 10:32:57PM +0100, Andrew Pinski wrote:
+>   The ILP32 ABI in ARM64 uses a slightly different pselect from either
+>   the compat or even the native LP64 ABI.  We would want to reuse some
+>   of the code path that are used as the size of the timespec is the
+>   same, so this patch exports poll_select_copy_remaining from
+>   fs/select.c and renames the copy in fs/compat.c to make sure that it
+>   is not being used.
+> 
+> Signed-off-by: Andrew Pinski <apinski@cavium.com>
 
-227 to be precise :)
+I think this patch has to wait until we review the ILP32 ABI for arm64.
+When I looked at this some time ago I thought we can just use the native
+arm64 pselect6 and ppoll. Once we agree that's not possible we can push
+this patch. On its own it doesn't have much value.
 
-> That causes some worries.
->
-> Can we quickly do the following to get more confidence that there
-> won't be wide-spread breakage:
->
-> 1. Get all of these into linux-next quickly
-
-Yes, even Myself and Rafael wanted to do that.. And were waiting
-for pull request to go for 3.12-rc1..
-
-I am mostly ready with my patches, wouldn't take long time for
-me to review those completely before sending them..
-
-> 2. Set up a LAVA[1] job to get linux-next kernels running on boards in our farm
-> 3. Run cpufreq functional tests, e.g. PM-QA[2] test suite from Linaro
-> with these kernels
-
-That would be nice actually.. Anyway some people would test it on
-linux-next, but doing that for few boards by Linaro would be
-Awesome..
-
---
-viresh
+-- 
+Catalin
