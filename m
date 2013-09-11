@@ -1,42 +1,73 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Wed, 11 Sep 2013 13:16:25 -0300
-Subject: [PATCH] mtd: nand: pxa3xx: Add pxa3xx_nand_get_variant() stub for
- !CONFIG_OF
-Message-ID: <1378916185-19738-1-git-send-email-ezequiel.garcia@free-electrons.com>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Wed, 11 Sep 2013 18:25:56 +0200 (CEST)
+Subject: [PATCH 4/4] ARM: shmobile: change dev_id to cpu0 while registering
+ cpu clock
+In-Reply-To: <1378835989-19281-5-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+References: <1378835989-19281-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+ <1378835989-19281-5-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+Message-ID: <Pine.LNX.4.64.1309111743130.26942@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adds a dummy pxa3xx_nand_get_variant() stub, to fix
-this build error (with pxa3xx_defconfig or similar):
+On Tue, 10 Sep 2013, Sudeep KarkadaNagesha wrote:
 
-drivers/mtd/nand/pxa3xx_nand.c:1325:2: error: implicit declaration of
-function 'pxa3xx_nand_get_variant' [-Werror=implicit-function-declaration]
+> From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
+> 
+> Currently all clkdev registration use "cpufreq-cpu0.0" as dev_id
+> for cpu clock which refers to virtual platform device. It needs to
+> be "cpu0" instead which is actual cpu0 device id.
+> 
+> This patch changes the dev_id from "cpufreq-cpu0.0" to "cpu0".
+> 
+> Reported-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+> Cc: Shawn Guo <shawn.guo@linaro.org>
+> Cc: Magnus Damm <damm@opensource.se>
+> Signed-off-by: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
 
-Cc: Brian Norris <computersforpeace@gmail.com>
-Cc: David Woodhouse <dwmw2@infradead.org>
-Cc: Olof Johansson <olof@lixom.net>
-Cc: Kevin Hilman <khilman@linaro.org>
-Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+Tested-by: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
+
+Thanks
+Guennadi
+
+> ---
+>  arch/arm/mach-shmobile/clock-r8a73a4.c | 2 +-
+>  arch/arm/mach-shmobile/clock-sh73a0.c  | 2 +-
+>  2 files changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/mach-shmobile/clock-r8a73a4.c b/arch/arm/mach-shmobil=
+> e/clock-r8a73a4.c
+> index 8ea5ef6..5bd2e85 100644
+> --- a/arch/arm/mach-shmobile/clock-r8a73a4.c
+> +++ b/arch/arm/mach-shmobile/clock-r8a73a4.c
+> @@ -555,7 +555,7 @@ static struct clk_lookup lookups[] =3D {
+>  =09CLKDEV_CON_ID("pll2h",=09=09=09&pll2h_clk),
+> =20
+>  =09/* CPU clock */
+> -=09CLKDEV_DEV_ID("cpufreq-cpu0",=09=09&z_clk),
+> +=09CLKDEV_DEV_ID("cpu0",=09=09=09&z_clk),
+> =20
+>  =09/* DIV6 */
+>  =09CLKDEV_CON_ID("zb",=09=09=09&div6_clks[DIV6_ZB]),
+> diff --git a/arch/arm/mach-shmobile/clock-sh73a0.c b/arch/arm/mach-shmobile=
+> /clock-sh73a0.c
+> index 1942eae..c92c023 100644
+> --- a/arch/arm/mach-shmobile/clock-sh73a0.c
+> +++ b/arch/arm/mach-shmobile/clock-sh73a0.c
+> @@ -616,7 +616,7 @@ static struct clk_lookup lookups[] =3D {
+>  =09CLKDEV_DEV_ID("smp_twd", &twd_clk), /* smp_twd */
+> =20
+>  =09/* DIV4 clocks */
+> -=09CLKDEV_DEV_ID("cpufreq-cpu0", &div4_clks[DIV4_Z]),
+> +=09CLKDEV_DEV_ID("cpu0", &div4_clks[DIV4_Z]),
+> =20
+>  =09/* DIV6 clocks */
+>  =09CLKDEV_CON_ID("vck1_clk", &div6_clks[DIV6_VCK1]),
+> --=20
+> 1.8.1.2
+> 
+> 
+
 ---
- drivers/mtd/nand/pxa3xx_nand.c | 6 ++++++
- 1 file changed, 6 insertions(+)
-
-diff --git a/drivers/mtd/nand/pxa3xx_nand.c b/drivers/mtd/nand/pxa3xx_nand.c
-index 5db900d..240a239 100644
---- a/drivers/mtd/nand/pxa3xx_nand.c
-+++ b/drivers/mtd/nand/pxa3xx_nand.c
-@@ -1289,6 +1289,12 @@ static inline int pxa3xx_nand_probe_dt(struct platform_device *pdev)
- {
- 	return 0;
- }
-+
-+static inline enum pxa3xx_nand_variant
-+pxa3xx_nand_get_variant(struct platform_device *pdev)
-+{
-+	return PXA3XX_NAND_VARIANT_PXA;
-+}
- #endif
- 
- static int pxa3xx_nand_probe(struct platform_device *pdev)
--- 
-1.8.1.5
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
