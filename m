@@ -1,36 +1,31 @@
 From: anup.patel@linaro.org (Anup Patel)
-Date: Wed, 11 Sep 2013 18:32:32 +0530
-Subject: [PATCH] arm64: KVM: Increase max VCPUs per-Guest to 8
-Message-ID: <1378904552-29347-1-git-send-email-anup.patel@linaro.org>
+Date: Wed, 11 Sep 2013 18:34:22 +0530
+Subject: [PATCH] KVM: ARM: Fix typo in comments of inject_abt()
+Message-ID: <1378904662-29521-1-git-send-email-anup.patel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Current max VCPUs per-Guest is set to 4 which is preventing
-us from creating a Guest (or VM) with 8 VCPUs on Host (e.g.
-X-Gene Storm SOC) with 8 Host CPUs.
-
-The correct value of max VCPUs per-Guest should be same as
-the max CPUs supported by GICv2 which is 8 hence this patch
-increases KVM_MAX_VCPUS to 8.
+Very minor typo in comments of inject_abt() when we update fault status
+register for injecting prefetch abort.
 
 Signed-off-by: Anup Patel <anup.patel@linaro.org>
 Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
 ---
- arch/arm64/include/asm/kvm_host.h |    2 +-
+ arch/arm/kvm/emulate.c |    2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index 0859a4d..60ef29e 100644
---- a/arch/arm64/include/asm/kvm_host.h
-+++ b/arch/arm64/include/asm/kvm_host.h
-@@ -26,7 +26,7 @@
- #include <asm/kvm_asm.h>
- #include <asm/kvm_mmio.h>
+diff --git a/arch/arm/kvm/emulate.c b/arch/arm/kvm/emulate.c
+index bdede9e..d6c0052 100644
+--- a/arch/arm/kvm/emulate.c
++++ b/arch/arm/kvm/emulate.c
+@@ -354,7 +354,7 @@ static void inject_abt(struct kvm_vcpu *vcpu, bool is_pabt, unsigned long addr)
+ 	*vcpu_pc(vcpu) = exc_vector_base(vcpu) + vect_offset;
  
--#define KVM_MAX_VCPUS 4
-+#define KVM_MAX_VCPUS 8
- #define KVM_USER_MEM_SLOTS 32
- #define KVM_PRIVATE_MEM_SLOTS 4
- #define KVM_COALESCED_MMIO_PAGE_OFFSET 1
+ 	if (is_pabt) {
+-		/* Set DFAR and DFSR */
++		/* Set IFAR and IFSR */
+ 		vcpu->arch.cp15[c6_IFAR] = addr;
+ 		is_lpae = (vcpu->arch.cp15[c2_TTBCR] >> 31);
+ 		/* Always give debug fault for now - should give guest a clue */
 -- 
 1.7.9.5
