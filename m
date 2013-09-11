@@ -1,45 +1,100 @@
 From: mika.westerberg@linux.intel.com (Mika Westerberg)
-Date: Wed, 11 Sep 2013 18:32:37 +0300
-Subject: [PATCH v2 6/9] mfd: wm8994: convert to use I2C core runtime PM
-In-Reply-To: <1378913560-2752-1-git-send-email-mika.westerberg@linux.intel.com>
-References: <1378913560-2752-1-git-send-email-mika.westerberg@linux.intel.com>
-Message-ID: <1378913560-2752-7-git-send-email-mika.westerberg@linux.intel.com>
+Date: Wed, 11 Sep 2013 18:32:31 +0300
+Subject: [PATCH v2 0/9] runtime PM support for I2C and SPI client devices
+Message-ID: <1378913560-2752-1-git-send-email-mika.westerberg@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The I2C core now prepares runtime PM on behalf of the I2C client device, so
-only thing the driver needs to do is to call pm_runtime_put() at the end of
-its ->probe().
+Hi,
 
-This patch converts wm8994 driver to use this model.
+This is second version of the patches. The previous version can be found
+here:
 
-Signed-off-by: Mika Westerberg <mika.westerberg@linux.intel.com>
----
- drivers/mfd/wm8994-core.c | 5 ++---
- 1 file changed, 2 insertions(+), 3 deletions(-)
+	http://www.spinics.net/lists/linux-i2c/msg13152.html
 
-diff --git a/drivers/mfd/wm8994-core.c b/drivers/mfd/wm8994-core.c
-index 3fdee90..9928bb1 100644
---- a/drivers/mfd/wm8994-core.c
-+++ b/drivers/mfd/wm8994-core.c
-@@ -706,8 +706,7 @@ static int wm8994_device_init(struct wm8994 *wm8994, int irq)
- 		goto err_irq;
- 	}
- 
--	pm_runtime_enable(wm8994->dev);
--	pm_runtime_idle(wm8994->dev);
-+	pm_runtime_put(wm8994->dev);
- 
- 	return 0;
- 
-@@ -723,7 +722,7 @@ err:
- 
- static void wm8994_device_exit(struct wm8994 *wm8994)
- {
--	pm_runtime_disable(wm8994->dev);
-+	pm_runtime_get(wm8994->dev);
- 	mfd_remove_devices(wm8994->dev);
- 	wm8994_irq_exit(wm8994);
- 	regulator_bulk_disable(wm8994->num_supplies,
+With the advent of ACPI 5.0 we are starting to see I2C client devices
+described in ACPI namespace that support power management by the means of
+standard ACPI _PSx-methods. For example Intel Haswell based platforms might
+have touch screen or sensor-hub connected to the I2C bus that can be
+powered on and off by calling _PS0 and _PS3 -methods.
+
+In order to support such I2C client devices, we decided to hook the ACPI
+power management for these to the standard Linux runtime PM framework.
+
+These patches implement runtime PM support for I2C client devices in a
+similar way that is done already for the PCI bus. Just before a driver is
+bound to an I2C client device the device runtime PM is being prepared for
+that device.
+
+If the device in question has an ACPI handle we attach it to the ACPI power
+domain that then makes sure that the right _PSx methods are called in
+response to runtime PM events the driver generates.
+
+A driver that wants to participate in runtime PM and power manage its
+device should:
+ 1) Implement device specific runtime PM callbacks if needed.
+ 2) Call pm_runtime_put() (or some variant of that) to decrease the runtime
+    PM reference count.
+
+If the driver doesn't do anything the device is regarded as runtime PM
+active and powered on.
+
+In the previous version we did this only for the I2C bus. However, Mark
+Brown suggested that the same thing should be done also for the SPI bus.
+This series now attempts to address that as well.
+
+In addition we convert the existing I2C client drivers to use this model to
+prevent any regressions from happening. I split the patches per subsystem
+and the maintainers should be in CC list.
+
+Note that I don't have hardware to test these existing I2C drivers so they
+are only compile tested (well, except the s5p-tv which I wasn't able to
+compile at all on x86).
+
+Since the I2C patches are dependent on the core support I suggest that if this
+gets merged, they would go through the I2C tree.
+
+The SPI part could go separately via SPI tree as there are no existing
+runtime PM users.
+
+Changes to the previous version:
+ * Runtime PM is now unblocked by default.
+ * The existing I2C drivers have been converted to this model.
+ * Added runtime PM support for SPI devices.
+
+[ Rafael ACKed the previous version but I've changed the patches a bit, so I
+  only kept his ACK in the second patch (it is unchanged). ]
+
+Aaron Lu (1):
+  i2c: prepare runtime PM support for I2C client devices
+
+Lv Zheng (1):
+  i2c: attach/detach I2C client device to the ACPI power domain
+
+Mika Westerberg (7):
+  Input: misc - convert existing I2C client drivers to use I2C core runtime PM
+  [media] s5p-tv: convert to use I2C core runtime PM
+  drivers/misc: convert existing I2C clients driver to use I2C core runtime PM
+  mfd: wm8994: convert to use I2C core runtime PM
+  ASoC: codecs: convert existing I2C client drivers to use I2C core runtime PM
+  spi: prepare runtime PM support for SPI devices
+  spi: attach/detach SPI device to the ACPI power domain
+
+ drivers/i2c/i2c-core.c                      | 53 +++++++++++++++++++++++++-
+ drivers/input/misc/bma150.c                 |  4 +-
+ drivers/input/misc/mpu3050.c                | 16 ++------
+ drivers/media/platform/s5p-tv/sii9234_drv.c | 30 +++------------
+ drivers/mfd/wm8994-core.c                   |  5 +--
+ drivers/misc/apds9802als.c                  |  7 +---
+ drivers/misc/apds990x.c                     | 16 +++-----
+ drivers/misc/bh1770glc.c                    | 12 +++---
+ drivers/misc/fsa9480.c                      |  2 -
+ drivers/misc/isl29020.c                     |  3 +-
+ drivers/spi/spi.c                           | 58 ++++++++++++++++++++++++++++-
+ sound/soc/codecs/wm2200.c                   | 12 +++---
+ sound/soc/codecs/wm5100.c                   |  8 ++--
+ sound/soc/codecs/wm8962.c                   |  5 +--
+ 14 files changed, 147 insertions(+), 84 deletions(-)
+
 -- 
 1.8.4.rc3
