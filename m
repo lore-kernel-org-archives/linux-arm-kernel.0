@@ -1,100 +1,121 @@
 From: mika.westerberg@linux.intel.com (Mika Westerberg)
-Date: Wed, 11 Sep 2013 18:32:31 +0300
-Subject: [PATCH v2 0/9] runtime PM support for I2C and SPI client devices
-Message-ID: <1378913560-2752-1-git-send-email-mika.westerberg@linux.intel.com>
+Date: Wed, 11 Sep 2013 18:32:39 +0300
+Subject: [PATCH v2 8/9] spi: prepare runtime PM support for SPI devices
+In-Reply-To: <1378913560-2752-1-git-send-email-mika.westerberg@linux.intel.com>
+References: <1378913560-2752-1-git-send-email-mika.westerberg@linux.intel.com>
+Message-ID: <1378913560-2752-9-git-send-email-mika.westerberg@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This patch adds runtime PM support for the SPI bus analogous to what has
+been done for the I2C bus. This means that the SPI core prepares runtime PM
+for a client device just before a driver is about to be bound to it.
+Devices that are not bound to any driver are not prepared for runtime PM.
 
-This is second version of the patches. The previous version can be found
-here:
+In order to participate the runtime PM of the SPI bus a device driver needs
+to drop the device runtime PM reference count by calling pm_runtime_put()
+in its ->probe() callback and possibly implement rest of the runtime PM
+callbacks.
 
-	http://www.spinics.net/lists/linux-i2c/msg13152.html
+If the driver doesn't support runtime PM, the device in question is
+regarded as being runtime PM active and powered on.
 
-With the advent of ACPI 5.0 we are starting to see I2C client devices
-described in ACPI namespace that support power management by the means of
-standard ACPI _PSx-methods. For example Intel Haswell based platforms might
-have touch screen or sensor-hub connected to the I2C bus that can be
-powered on and off by calling _PS0 and _PS3 -methods.
+This patch adds also runtime PM support for the SPI master device because
+it is needed to be able to runtime power manage the SPI controller device.
+The SPI master device is handled along with the SPI controller device.
 
-In order to support such I2C client devices, we decided to hook the ACPI
-power management for these to the standard Linux runtime PM framework.
+Signed-off-by: Mika Westerberg <mika.westerberg@linux.intel.com>
+---
+ drivers/spi/spi.c | 49 +++++++++++++++++++++++++++++++++++++++++++++++--
+ 1 file changed, 47 insertions(+), 2 deletions(-)
 
-These patches implement runtime PM support for I2C client devices in a
-similar way that is done already for the PCI bus. Just before a driver is
-bound to an I2C client device the device runtime PM is being prepared for
-that device.
-
-If the device in question has an ACPI handle we attach it to the ACPI power
-domain that then makes sure that the right _PSx methods are called in
-response to runtime PM events the driver generates.
-
-A driver that wants to participate in runtime PM and power manage its
-device should:
- 1) Implement device specific runtime PM callbacks if needed.
- 2) Call pm_runtime_put() (or some variant of that) to decrease the runtime
-    PM reference count.
-
-If the driver doesn't do anything the device is regarded as runtime PM
-active and powered on.
-
-In the previous version we did this only for the I2C bus. However, Mark
-Brown suggested that the same thing should be done also for the SPI bus.
-This series now attempts to address that as well.
-
-In addition we convert the existing I2C client drivers to use this model to
-prevent any regressions from happening. I split the patches per subsystem
-and the maintainers should be in CC list.
-
-Note that I don't have hardware to test these existing I2C drivers so they
-are only compile tested (well, except the s5p-tv which I wasn't able to
-compile at all on x86).
-
-Since the I2C patches are dependent on the core support I suggest that if this
-gets merged, they would go through the I2C tree.
-
-The SPI part could go separately via SPI tree as there are no existing
-runtime PM users.
-
-Changes to the previous version:
- * Runtime PM is now unblocked by default.
- * The existing I2C drivers have been converted to this model.
- * Added runtime PM support for SPI devices.
-
-[ Rafael ACKed the previous version but I've changed the patches a bit, so I
-  only kept his ACK in the second patch (it is unchanged). ]
-
-Aaron Lu (1):
-  i2c: prepare runtime PM support for I2C client devices
-
-Lv Zheng (1):
-  i2c: attach/detach I2C client device to the ACPI power domain
-
-Mika Westerberg (7):
-  Input: misc - convert existing I2C client drivers to use I2C core runtime PM
-  [media] s5p-tv: convert to use I2C core runtime PM
-  drivers/misc: convert existing I2C clients driver to use I2C core runtime PM
-  mfd: wm8994: convert to use I2C core runtime PM
-  ASoC: codecs: convert existing I2C client drivers to use I2C core runtime PM
-  spi: prepare runtime PM support for SPI devices
-  spi: attach/detach SPI device to the ACPI power domain
-
- drivers/i2c/i2c-core.c                      | 53 +++++++++++++++++++++++++-
- drivers/input/misc/bma150.c                 |  4 +-
- drivers/input/misc/mpu3050.c                | 16 ++------
- drivers/media/platform/s5p-tv/sii9234_drv.c | 30 +++------------
- drivers/mfd/wm8994-core.c                   |  5 +--
- drivers/misc/apds9802als.c                  |  7 +---
- drivers/misc/apds990x.c                     | 16 +++-----
- drivers/misc/bh1770glc.c                    | 12 +++---
- drivers/misc/fsa9480.c                      |  2 -
- drivers/misc/isl29020.c                     |  3 +-
- drivers/spi/spi.c                           | 58 ++++++++++++++++++++++++++++-
- sound/soc/codecs/wm2200.c                   | 12 +++---
- sound/soc/codecs/wm5100.c                   |  8 ++--
- sound/soc/codecs/wm8962.c                   |  5 +--
- 14 files changed, 147 insertions(+), 84 deletions(-)
-
+diff --git a/drivers/spi/spi.c b/drivers/spi/spi.c
+index 978dda2..94ebab9 100644
+--- a/drivers/spi/spi.c
++++ b/drivers/spi/spi.c
+@@ -240,22 +240,61 @@ EXPORT_SYMBOL_GPL(spi_bus_type);
+ static int spi_drv_probe(struct device *dev)
+ {
+ 	const struct spi_driver		*sdrv = to_spi_driver(dev->driver);
++	struct spi_device		*spi = to_spi_device(dev);
++	int				ret;
+ 
+-	return sdrv->probe(to_spi_device(dev));
++	/* Make sure that the master is powered on */
++	pm_runtime_get_sync(&spi->master->dev);
++
++	/*
++	 * Enable runtime PM for the SPI device. The SPI device driver can
++	 * participate in runtime PM by calling pm_runtime_put() in its
++	 * probe() callback.
++	 */
++	pm_runtime_get_noresume(&spi->dev);
++	pm_runtime_set_active(&spi->dev);
++	pm_runtime_enable(&spi->dev);
++
++	ret = sdrv->probe(spi);
++	if (ret) {
++		pm_runtime_disable(&spi->dev);
++		pm_runtime_set_suspended(&spi->dev);
++		pm_runtime_put_noidle(&spi->dev);
++	}
++
++	pm_runtime_put(&spi->master->dev);
++
++	return ret;
+ }
+ 
+ static int spi_drv_remove(struct device *dev)
+ {
+ 	const struct spi_driver		*sdrv = to_spi_driver(dev->driver);
++	struct spi_device		*spi = to_spi_device(dev);
++	int				ret;
++
++	pm_runtime_get_sync(&spi->master->dev);
++
++	ret = sdrv->remove(spi);
++
++	/* Undo the runtime PM done in spi_drv_probe() */
++	pm_runtime_disable(&spi->dev);
++	pm_runtime_set_suspended(&spi->dev);
++	pm_runtime_put_noidle(&spi->dev);
+ 
+-	return sdrv->remove(to_spi_device(dev));
++	pm_runtime_put(&spi->master->dev);
++
++	return ret;
+ }
+ 
+ static void spi_drv_shutdown(struct device *dev)
+ {
+ 	const struct spi_driver		*sdrv = to_spi_driver(dev->driver);
++	struct spi_device		*spi = to_spi_device(dev);
+ 
++	pm_runtime_get_sync(&spi->master->dev);
+ 	sdrv->shutdown(to_spi_device(dev));
++	pm_runtime_put(&spi->master->dev);
+ }
+ 
+ /**
+@@ -1174,6 +1213,10 @@ int spi_register_master(struct spi_master *master)
+ 		}
+ 	}
+ 
++	pm_runtime_set_active(&master->dev);
++	pm_runtime_no_callbacks(&master->dev);
++	pm_runtime_enable(&master->dev);
++
+ 	mutex_lock(&board_lock);
+ 	list_add_tail(&master->list, &spi_master_list);
+ 	list_for_each_entry(bi, &board_list, list)
+@@ -1217,6 +1260,8 @@ void spi_unregister_master(struct spi_master *master)
+ 	list_del(&master->list);
+ 	mutex_unlock(&board_lock);
+ 
++	pm_runtime_disable(&master->dev);
++
+ 	dummy = device_for_each_child(&master->dev, NULL, __unregister);
+ 	device_unregister(&master->dev);
+ }
 -- 
 1.8.4.rc3
