@@ -1,32 +1,91 @@
-From: sameo@linux.intel.com (Samuel Ortiz)
-Date: Wed, 11 Sep 2013 18:12:43 +0200
-Subject: [PATCH v2 6/9] mfd: wm8994: convert to use I2C core runtime PM
-In-Reply-To: <1378913560-2752-7-git-send-email-mika.westerberg@linux.intel.com>
-References: <1378913560-2752-1-git-send-email-mika.westerberg@linux.intel.com>
- <1378913560-2752-7-git-send-email-mika.westerberg@linux.intel.com>
-Message-ID: <20130911161242.GA13015@zurbaran>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Wed, 11 Sep 2013 18:14:54 +0200
+Subject: [PATCH] RFC: interrupt consistency check for OF GPIO IRQs
+In-Reply-To: <52308C91.2000105@ahsoftware.de>
+References: <1375101368-17645-1-git-send-email-linus.walleij@linaro.org>
+ <CACxGe6uNJNMdZ1HYGgCtLM2t2TWGCR6btjOHVmP=vDXXvvFfRg@mail.gmail.com>
+ <CACRpkdYjJL6FZwEbB7XLnb9QtjB=3LeE9Ny6KQ4PkM3zpdNqqg@mail.gmail.com>
+ <344239800.bDEkDg48ZQ@avalon>
+ <CACRpkdavR=fv+y1RCNfdgQypPuRbO6isOSwGsABDrYiGeMdyZw@mail.gmail.com>
+ <52308C91.2000105@ahsoftware.de>
+Message-ID: <523096FE.8080901@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mika,
-
-On Wed, Sep 11, 2013 at 06:32:37PM +0300, Mika Westerberg wrote:
-> The I2C core now prepares runtime PM on behalf of the I2C client device, so
-> only thing the driver needs to do is to call pm_runtime_put() at the end of
-> its ->probe().
+On 09/11/2013 05:30 PM, Alexander Holler wrote:
+> Am 22.08.2013 00:02, schrieb Linus Walleij:
+>> On Tue, Aug 20, 2013 at 12:04 AM, Laurent Pinchart
+>> <laurent.pinchart@ideasonboard.com> wrote:
+>>> On Wednesday 31 July 2013 01:44:53 Linus Walleij wrote:
+>> 
+>>>> I don't see how sharing works here, or how another user, i.e. another one
+>>>> than the user wanting to recieve the IRQ, can validly request such a line?
+>>>> What would the usecase for that valid request be?
+>>>
+>>> When the GPIO is wired to a status signal (such as an MMC card detect signal)
+>>> the driver might want to read the state of the signal independently of the
+>>> interrupt handler.
+>> 
+>> That is true. But for such a complex usecase I think it's reasonable that
+>> we only specify the GPIO in the device tree, and the driver utilizing the
+>> IRQ need to take that and perform gpio_to_irq() on it, and then it still
+>> works to use it both ways.
 > 
-> This patch converts wm8994 driver to use this model.
+> Hmm, the problem is that DT is seen as fixed. So if someone marks a GPIO
+> as an IRQ, it can never be used otherwise. So if you really go this way,
+> you should make this pretty clear in the documentation.
 > 
-> Signed-off-by: Mika Westerberg <mika.westerberg@linux.intel.com>
-Acked-by: Samuel Ortiz <sameo@linux.intel.com>
 
-I think it would make more sense for you to merge that one together with
-the related i2c changes. If you prefer that I take it through MFD,
-please let me know.
+DT is fixed because that describes the hardware which is fixed of course. So if
+a chip IRQ line is connected to a GPIO pin in a controller that should be
+described in the DT and that pin can't be used for anything else.
 
-Cheers,
-Samuel.
+> Looking from the other side, why do you want to mark GPIOs as IRQs in
+> the DT at all? 
 
--- 
-Intel Open Source Technology Centre
-http://oss.intel.com/
+Because from the component point-of-view that is wired to the SoC, that GPIO is
+an IRQ line and so it has to be described.
+
+> And how will this be done? I found the way it was done in
+> the reverted patch very confusing because it needed an IRQ number. That
+> IRQ number depends on the mapping and isn't hw specific (and currently
+> just human doable because of the simple mapping).
+> 
+
+That's is not true. You don't define an IRQ number what you define is a GPIO
+number that is mapped as IRQ. The GPIO number does not depend on the mapping and
+it only depends on the GPIO controller.
+
+This has absolutely nothing to do with the reverted patches and is described in
+Documentation/devicetree/bindings/interrupt-controller/interrupts.txt.
+
+The only difference is that the reverted patches did actually take an action
+when a GPIO pin was mapped as an IRQ (requesting the GPIO and as input).
+
+So for example in an OMAP board DT you can define something like this:
+
+ethernet at 5,0 {
+        compatible = "smsc,lan9221", "smsc,lan9115";
+        interrupt-parent = <&gpio6>;
+        interrupts = <16 8>;
+};
+
+Since each OMAP GPIO bank has 32 GPIO pins, then what you are defining is that
+the GPIO 176 (5 * 32 + 16) will be mapped as the IRQ line for the ethernet
+controller.
+
+I explained the exact use case I'm trying to solve in the thread "Re: [PATCH v3]
+gpio: interrupt consistency check for OF GPIO IRQs" [1] if you need more
+context. I'm sure others cc'ed in this thread have different (but similar)
+requirements.
+
+> Regards,
+> 
+> Alexander Holler
+>
+
+Thanks a lot and best regards,
+Javier
+
+
+[1]: http://www.kernelhub.org/?p=2&msg=326503
