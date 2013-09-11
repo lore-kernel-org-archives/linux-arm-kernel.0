@@ -1,58 +1,59 @@
-From: koen@dominion.thruhere.net (Koen Kooi)
-Date: Wed, 11 Sep 2013 08:12:26 +0200
-Subject: [PATCH 2/2] am335x-boneblack: add eMMC DT entry
-In-Reply-To: <1378879946-13037-1-git-send-email-koen@dominion.thruhere.net>
-References: <1378879946-13037-1-git-send-email-koen@dominion.thruhere.net>
-Message-ID: <1378879946-13037-3-git-send-email-koen@dominion.thruhere.net>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 11 Sep 2013 08:42:48 +0200
+Subject: [RFC PATCHv2 0/4] Add DT support for fixed PHYs
+In-Reply-To: <1378480701-12908-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1378480701-12908-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20130911064248.GI30088@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Koen Kooi <koen@dominion.thruhere.net>
----
- arch/arm/boot/dts/am335x-bone-common.dtsi |  7 +++++++
- arch/arm/boot/dts/am335x-boneblack.dts    | 15 +++++++++++++++
- 2 files changed, 22 insertions(+)
+On Fri, Sep 06, 2013 at 05:18:17PM +0200, Thomas Petazzoni wrote:
+> Hello,
+> 
+> Here is a second version of the patch set that adds a Device Tree
+> binding and the related code to support fixed PHYs. Marked as RFC,
+> this patch set is obviously not intended for merging in 3.12.
+> 
+> Since the first version, the changes have been:
+> 
+>  * Instead of using a 'fixed-link' property inside the Ethernet device
+>    DT node, with a fairly cryptic succession of integer values, we now
+>    use a PHY subnode under the Ethernet device DT node, with explicit
+>    properties to configure the duplex, speed, pause and other PHY
+>    properties.
+> 
+>  * The PHY address is automatically allocated by the kernel and no
+>    longer visible in the Device Tree binding.
+> 
+>  * The PHY device is created directly when the network driver calls
+>    of_phy_connect_fixed_link(), and associated to the PHY DT node,
+>    which allows the existing of_phy_connect() function to work,
+>    without the need to use the deprecated of_phy_connect_fixed_link().
+> 
+> The things I am not entirely happy with yet are:
+> 
+>  * The PHY ID is hardcoded to 0xdeadbeef. Ideally, it should be a
+>    properly reserved vendor/device identifier, but it isn't clear how
+>    to get one allocated for this purpose.
+> 
+>  * The fixed_phy_register() function in drivers/net/phy/fixed.c has
+>    some OF references. So ideally, I would have preferred to put this
+>    code in drivers/of/of_mdio.c, but to call get_phy_device(), we need
+>    a reference to the mii_bus structure that represents the fixed MDIO
+>    bus.
+> 
+>  * There is some error management missing in fixed_phy_register(), but
+>    it can certainly be added easily. This RFC is meant to sort out the
+>    general idea.
 
-diff --git a/arch/arm/boot/dts/am335x-bone-common.dtsi b/arch/arm/boot/dts/am335x-bone-common.dtsi
-index ced256c..9c61fef 100644
---- a/arch/arm/boot/dts/am335x-bone-common.dtsi
-+++ b/arch/arm/boot/dts/am335x-bone-common.dtsi
-@@ -241,6 +241,13 @@
- 			regulator-always-on;
- 		};
- 	};
-+
-+	vmmcsd_fixed: fixedregulator at 0 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "vmmcsd_fixed";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+	};
- };
- 
- &cpsw_emac0 {
-diff --git a/arch/arm/boot/dts/am335x-boneblack.dts b/arch/arm/boot/dts/am335x-boneblack.dts
-index 197cadf..c09947a 100644
---- a/arch/arm/boot/dts/am335x-boneblack.dts
-+++ b/arch/arm/boot/dts/am335x-boneblack.dts
-@@ -15,3 +15,18 @@
- 	regulator-max-microvolt = <1800000>;
- 	regulator-always-on;
- };
-+
-+&mmc1 { 
-+	vmmc-supply = <&vmmcsd_fixed>;
-+};
-+
-+&mmc2 { 
-+	vmmc-supply = <&vmmcsd_fixed>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&emmc_pins>;
-+	bus-width = <8>;
-+	ti,non-removable;
-+	status = "okay";
-+	ti,vcc-aux-disable-is-sleep;
-+};
-+
++1 for the general idea. This really looks good now. I've not much more
+to say. Maybe someone from the devicetree corner has a few words for the
+binding?
+
+Sascha
+
 -- 
-1.8.2.1
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
