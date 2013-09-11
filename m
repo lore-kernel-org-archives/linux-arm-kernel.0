@@ -1,44 +1,63 @@
 From: koen@dominion.thruhere.net (Koen Kooi)
-Date: Wed, 11 Sep 2013 08:12:24 +0200
-Subject: [PATCH 0/2] ARM: dts: Beaglebone MMC fixes
-Message-ID: <1378879946-13037-1-git-send-email-koen@dominion.thruhere.net>
+Date: Wed, 11 Sep 2013 08:12:25 +0200
+Subject: [PATCH 1/2] arm: bone: dts: add CD for mmc1
+In-Reply-To: <1378879946-13037-1-git-send-email-koen@dominion.thruhere.net>
+References: <1378879946-13037-1-git-send-email-koen@dominion.thruhere.net>
+Message-ID: <1378879946-13037-2-git-send-email-koen@dominion.thruhere.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here are two patches to fix MMC on beaglebone, one fixes card detect on BBW,
-the other adds the eMMC entry for BBB and its fixed regulator.
+From: Alexander Holler <holler@ahsoftware.de>
 
-This series depends on:
+This enables the use of MMC cards even when no card was inserted at boot.
 
-http://comments.gmane.org/gmane.linux.kernel.stable/63648
-https://lkml.org/lkml/2013/9/10/454
-http://comments.gmane.org/gmane.linux.kernel.mmc/22381
-
-Or as git-cherry would put it:
-
-[koen at rrMBP patches]$ git cherry -v
-+ c8436cd15251ea42c7f2decd1cc972de536a7573 ARM: OMAP2+: am335x-bone*: add DT for BeagleBone Black
-+ 34596cb58346612101b168b34b7ee75b8b0e9500 ARM: EDMA: Fix clearing of unused list for DT DMA resources
-+ af7f273dfbeeec7669c01a81b8c02f4af2fcf1b9 ARM: dts: add AM33XX EDMA support
-+ a85f9acc8f48a7cb1a07fb93fcba7bd43aa9c853 ARM: dts: add AM33XX SPI DMA support
-+ 72a42fa0b42051251c554d9f75f42b3e9bc6ec8a ARM: dts: add AM33XX MMC support and documentation
-+ 93205a3735613d674b209c3c75ad3e0a7d6be136 arm: bone: dts: add CD for mmc1
-+ b1bd98705a2da3d02f197d29ca040008ad8c662c am335x-boneblack: add eMMC DT entry
-
-Also available as a git branch at https://github.com/koenkooi/linux/commits/mainline
-
+Signed-off-by: Alexander Holler <holler@ahsoftware.de>
+Signed-off-by: Koen Kooi <koen@dominion.thruhere.net>
 ---
-
-Alexander Holler (1):
-  arm: bone: dts: add CD for mmc1
-
-Koen Kooi (1):
-  am335x-boneblack: add eMMC DT entry
-
- arch/arm/boot/dts/am335x-bone-common.dtsi | 21 +++++++++++++++++++++
+ arch/arm/boot/dts/am335x-bone-common.dtsi | 14 ++++++++++++++
  arch/arm/boot/dts/am335x-bone.dts         |  4 ----
- arch/arm/boot/dts/am335x-boneblack.dts    | 15 +++++++++++++++
- 3 files changed, 36 insertions(+), 4 deletions(-)
+ 2 files changed, 14 insertions(+), 4 deletions(-)
 
+diff --git a/arch/arm/boot/dts/am335x-bone-common.dtsi b/arch/arm/boot/dts/am335x-bone-common.dtsi
+index 2f66ded..ced256c 100644
+--- a/arch/arm/boot/dts/am335x-bone-common.dtsi
++++ b/arch/arm/boot/dts/am335x-bone-common.dtsi
+@@ -107,6 +107,11 @@
+ 				0x14c (PIN_INPUT_PULLDOWN | MUX_MODE7)
+ 			>;
+ 		};
++		mmc1_pins: pinmux_mmc1_pins {
++			pinctrl-single,pins = <
++				0x160 (PIN_INPUT | MUX_MODE7) /* GPIO0_6 */
++			>;
++		};
+ 	};
+ 
+ 	ocp {
+@@ -260,3 +265,12 @@
+ 	pinctrl-0 = <&davinci_mdio_default>;
+ 	pinctrl-1 = <&davinci_mdio_sleep>;
+ };
++
++&mmc1 {
++	status = "okay";
++	vmmc-supply = <&ldo3_reg>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&mmc1_pins>;
++	cd-gpios = <&gpio0 6 GPIO_ACTIVE_HIGH>;
++	cd-inverted;
++};
+diff --git a/arch/arm/boot/dts/am335x-bone.dts b/arch/arm/boot/dts/am335x-bone.dts
+index d5f43fe..d34469c 100644
+--- a/arch/arm/boot/dts/am335x-bone.dts
++++ b/arch/arm/boot/dts/am335x-bone.dts
+@@ -16,7 +16,3 @@
+ 	regulator-always-on;
+ };
+ 
+-&mmc1 {
+-	status = "okay";
+-	vmmc-supply = <&ldo3_reg>;
+-};
 -- 
 1.8.2.1
