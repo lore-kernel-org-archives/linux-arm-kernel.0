@@ -1,67 +1,61 @@
 From: koen@dominion.thruhere.net (Koen Kooi)
-Date: Wed, 11 Sep 2013 13:02:26 +0200
-Subject: [PATCHv2 1/2] arm: bone: dts: add CD for mmc1
+Date: Wed, 11 Sep 2013 13:02:27 +0200
+Subject: [PATCHv2 2/2] am335x-boneblack: add eMMC DT entry
 In-Reply-To: <1378897347-11840-1-git-send-email-koen@dominion.thruhere.net>
 References: <1378897347-11840-1-git-send-email-koen@dominion.thruhere.net>
-Message-ID: <1378897347-11840-2-git-send-email-koen@dominion.thruhere.net>
+Message-ID: <1378897347-11840-3-git-send-email-koen@dominion.thruhere.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Alexander Holler <holler@ahsoftware.de>
-
-This enables the use of MMC cards even when no card was inserted at boot.
-
-Signed-off-by: Alexander Holler <holler@ahsoftware.de>
 Signed-off-by: Koen Kooi <koen@dominion.thruhere.net>
 ---
 
 Changes since v1:
-	None, simple repost
+	dropped the ti,non-removable entry per Sehkars request
 
- arch/arm/boot/dts/am335x-bone-common.dtsi | 14 ++++++++++++++
- arch/arm/boot/dts/am335x-bone.dts         |  4 ----
- 2 files changed, 14 insertions(+), 4 deletions(-)
+ arch/arm/boot/dts/am335x-bone-common.dtsi |  7 +++++++
+ arch/arm/boot/dts/am335x-boneblack.dts    | 14 ++++++++++++++
+ 2 files changed, 21 insertions(+)
 
 diff --git a/arch/arm/boot/dts/am335x-bone-common.dtsi b/arch/arm/boot/dts/am335x-bone-common.dtsi
-index 2f66ded..ced256c 100644
+index ced256c..9c61fef 100644
 --- a/arch/arm/boot/dts/am335x-bone-common.dtsi
 +++ b/arch/arm/boot/dts/am335x-bone-common.dtsi
-@@ -107,6 +107,11 @@
- 				0x14c (PIN_INPUT_PULLDOWN | MUX_MODE7)
- 			>;
+@@ -241,6 +241,13 @@
+ 			regulator-always-on;
  		};
-+		mmc1_pins: pinmux_mmc1_pins {
-+			pinctrl-single,pins = <
-+				0x160 (PIN_INPUT | MUX_MODE7) /* GPIO0_6 */
-+			>;
-+		};
  	};
- 
- 	ocp {
-@@ -260,3 +265,12 @@
- 	pinctrl-0 = <&davinci_mdio_default>;
- 	pinctrl-1 = <&davinci_mdio_sleep>;
- };
 +
-+&mmc1 {
-+	status = "okay";
-+	vmmc-supply = <&ldo3_reg>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc1_pins>;
-+	cd-gpios = <&gpio0 6 GPIO_ACTIVE_HIGH>;
-+	cd-inverted;
-+};
-diff --git a/arch/arm/boot/dts/am335x-bone.dts b/arch/arm/boot/dts/am335x-bone.dts
-index d5f43fe..d34469c 100644
---- a/arch/arm/boot/dts/am335x-bone.dts
-+++ b/arch/arm/boot/dts/am335x-bone.dts
-@@ -16,7 +16,3 @@
++	vmmcsd_fixed: fixedregulator at 0 {
++		compatible = "regulator-fixed";
++		regulator-name = "vmmcsd_fixed";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++	};
+ };
+ 
+ &cpsw_emac0 {
+diff --git a/arch/arm/boot/dts/am335x-boneblack.dts b/arch/arm/boot/dts/am335x-boneblack.dts
+index 197cadf..f4703cf 100644
+--- a/arch/arm/boot/dts/am335x-boneblack.dts
++++ b/arch/arm/boot/dts/am335x-boneblack.dts
+@@ -15,3 +15,17 @@
+ 	regulator-max-microvolt = <1800000>;
  	regulator-always-on;
  };
- 
--&mmc1 {
--	status = "okay";
--	vmmc-supply = <&ldo3_reg>;
--};
++
++&mmc1 { 
++	vmmc-supply = <&vmmcsd_fixed>;
++};
++
++&mmc2 { 
++	vmmc-supply = <&vmmcsd_fixed>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&emmc_pins>;
++	bus-width = <8>;
++	status = "okay";
++	ti,vcc-aux-disable-is-sleep;
++};
++
 -- 
 1.8.2.1
