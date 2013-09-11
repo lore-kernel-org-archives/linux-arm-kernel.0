@@ -1,45 +1,132 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 11 Sep 2013 12:25:05 -0700
-Subject: [RFC PATCH] arm64: KVM: honor cacheability attributes on S2 page
- fault
-In-Reply-To: <CAFEAcA_xWvZa3fizTNPfaH97V02Ktvrn2EPq-UkA2B-YsMnHzQ@mail.gmail.com>
-References: <1378806670-2467-1-git-send-email-marc.zyngier@arm.com>
- <CAFEAcA_xWvZa3fizTNPfaH97V02Ktvrn2EPq-UkA2B-YsMnHzQ@mail.gmail.com>
-Message-ID: <20130911192505.GM9860@cbox>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 11 Sep 2013 13:33:42 -0600
+Subject: [PATCH 2/2] cpufreq: tegra: Re-model Tegra cpufreq driver
+In-Reply-To: <1378898355-31290-3-git-send-email-bilhuang@nvidia.com>
+References: <1378898355-31290-1-git-send-email-bilhuang@nvidia.com>
+ <1378898355-31290-3-git-send-email-bilhuang@nvidia.com>
+Message-ID: <5230C596.7010000@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 11, 2013 at 07:06:06PM +0100, Peter Maydell wrote:
-> On 10 September 2013 10:51, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> > Anup Patel recently brought up the fact that when we run a guest
-> > with cache disabled, we don't flush the cache to the Point of
-> > Coherency, hence possibly missing bits of data that have been
-> > written in the cache, but have not reached memory.
-> >
-> > There are several approaches to this issue:
-> > - Using the DC bit when caches are off: this breaks guests assuming
-> >   caches off while doing DMA operations. Bootloaders, for example.
-> > - Fetch the memory attributes on translation fault, and flush the
-> >   cache while handling the fault. This relies on using the PAR_EL1
-> >   register to obtain the Stage-1 memory attributes.
-> >
-> > While this second solution is clearly not ideal (it duplicates what
-> > the HW already does to generate HPFAR_EL2), it is more correct than
-> > not doing anything.
+On 09/11/2013 05:19 AM, Bill Huang wrote:
+> Re-model Tegra cpufreq driver to support all Tegra series of SoCs.
 > 
-> Are you confident that extending the current very limited
-> set of circumstances where we re-do the address translation
-> operation doesn't introduce any new races if the guest
-> page tables change between taking the fault and redoing
-> the translation? I remember being this a pain to think through
-> last time around :-)
-> 
-I'm worried about the performance penalty hit for any translation fault
-here.  I know that ideally locality should reduce the number of times we
-do this, but it seems we are introducing logic on a very general path to
-ensure correct behavior for something very specific.
+> * Make tegra-cpufreq.c a generic Tegra cpufreq driver.
+> * Move Tegra20 specific codes into tegra20-cpufreq.c.
+> * Bind Tegra cpufreq dirver with a fake device so defer probe would work
+>   when we're going to get regulator in the driver to support voltage
+>   scaling (DVFS).
+> * Call tegra_cpufreq_init() in Tegra machine code specifically so it
+>   won't be called in multi-platform kernel which is not running on Tegra
+>   SoCs.
 
-I lost track: would we avoid all of this if we just require user space
-to flush the dcache after loading code into memory?
+That's a lot of things for one patch. Can this please be split up?
 
--Christoffer
+In particular, I would like a separate patch for the final bullet point,
+and for that patch to be the first in the series, so that we can merge
+it into both the Tegra and cpufreq trees if needed to resolve any conflicts.
+
+> diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
+
+>  config ARM_TEGRA_CPUFREQ
+> -	bool "TEGRA CPUFreq support"
+> -	depends on ARCH_TEGRA
+> +	bool
+> +	select CPU_FREQ_TABLE
+
+Why make this a hidden option? It'd be best to leave it user-visible, so
+that existing defconfigs aren't broken by this change.
+
+> +config ARM_EXYNOS_CPUFREQ
+> +	bool
+>  	select CPU_FREQ_TABLE
+
+I think that Exynos change is a mistake?
+
+> +
+> +config ARM_TEGRA20_CPUFREQ
+> +	bool "NVIDIA TEGRA20"
+> +	depends on ARCH_TEGRA
+
+Shouldn't that be ARCH_TEGRA_2x_SOC specifically?
+
+>  	default y
+
+Does the syntax "default ARM_TEGRA_CPUFREQ" work? Actually, this should
+depend on ARM_TEGRA_CPUFREQ rather than select it, and that way you can
+keep this "default y" and it'll only be enabled if Tegra cpufreq is enabled.
+
+In summary, I think the following should work well:
+
+config ARM_TEGRA_CPUFREQ
+	bool "TEGRA CPUFreq support"
+	depends on ARCH_TEGRA
+	select CPU_FREQ_TABLE
+
+config ARM_TEGRA20_CPUFREQ
+	bool "NVIDIA TEGRA20"
+	depends on ARM_TEGRA_CPUFREQ && ARCH_TEGRA_2x_SOC
+	default y
+	help
+	  This adds the CPUFreq driver for NVIDIA TEGRA20 SoC.
+
+	  If in doubt, say N.
+
+> diff --git a/drivers/cpufreq/tegra-cpufreq.c b/drivers/cpufreq/tegra-cpufreq.c
+
+> -#define NUM_CPUS	2
+> +#define NUM_CPUS	4
+
+NUM_ or MAX_?
+
+> diff --git a/drivers/cpufreq/tegra-cpufreq.h b/drivers/cpufreq/tegra-cpufreq.h
+
+> +struct tegra_cpufreq_data {
+> +	struct device *dev;
+> +	struct clk	*cpu_clk;
+> +	struct cpufreq_frequency_table	*freq_table;
+> +	void (*vote_emc_on_cpu_rate)(unsigned long);
+> +	int (*cpu_clk_set_rate)(unsigned long);
+> +	void (*cpufreq_clk_init)(void);
+> +	void (*cpufreq_clk_exit)(void);
+> +};
+
+There's a mix of runtime and configuration-time data there. It'd be
+nicer to split the two out, so that all the configuration data could be
+in a const struct that's pointed to by a field in the runtime data
+struct, or passed back out of tegra20_cpufreq_init() as a separate
+pointer variable and assigned to a separate global in tegra-cpufreq.c,
+to avoid double-indirections everywhere at runtime.
+
+> diff --git a/drivers/cpufreq/tegra20-cpufreq.c b/drivers/cpufreq/tegra20-cpufreq.c
+
+> +static struct cpufreq_frequency_table freq_table[] = {
+> +	{ .frequency = 216000 },
+> +	{ .frequency = 312000 },
+> +	{ .frequency = 456000 },
+> +	{ .frequency = 608000 },
+> +	{ .frequency = 760000 },
+> +	{ .frequency = 816000 },
+> +	{ .frequency = 912000 },
+> +	{ .frequency = 1000000 },
+> +	{ .frequency = CPUFREQ_TABLE_END },
+> +};
+
+Should/can we query that list from the clock driver?
+
+> +int tegra20_cpufreq_init(struct tegra_cpufreq_data *data)
+...
+> +	data->cpu_clk = cpu_clk;
+> +	data->freq_table = freq_table;
+> +	data->vote_emc_on_cpu_rate = tegra20_vote_emc_on_cpu_rate;
+> +	data->cpu_clk_set_rate = tegra20_cpu_clk_set_rate;
+> +	data->cpufreq_clk_init = tegra20_cpufreq_clk_init;
+> +	data->cpufreq_clk_exit = tegra20_cpufreq_clk_exit;
+
+With the struct split I proposed above, most of that could just be:
+
+*soc_config = &tegra20_cpufreq_config;
+
+where there's an extra function parameter "struct tegra_cpufreq_config
+**soc_config", and most of those values are in a static const
+tegra_cpufreq_config tegra20_cpufreq_config = { ... }.
