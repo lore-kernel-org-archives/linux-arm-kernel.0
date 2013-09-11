@@ -1,53 +1,47 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Wed, 11 Sep 2013 14:51:42 -0700
-Subject: [PATCH] mtd: nand: pxa3xx: Add pxa3xx_nand_get_variant() stub
- for !CONFIG_OF
-In-Reply-To: <20130911212300.GA21690@localhost>
-References: <1378916185-19738-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <CAOesGMi00E-AFHRBZdkirECFoeO9FthPDSaeTCURBGQp-gpvWg@mail.gmail.com>
- <20130911205849.GA4550@ld-irv-0074.broadcom.com>
- <20130911212300.GA21690@localhost>
-Message-ID: <20130911215142.GC4550@ld-irv-0074.broadcom.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 11 Sep 2013 15:27:41 -0700
+Subject: [PATCH] ARM: kvm: rename cpu_reset to avoid name clash
+Message-ID: <1378938461-10835-1-git-send-email-olof@lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 11, 2013 at 06:23:01PM -0300, Ezequiel Garcia wrote:
-> On Wed, Sep 11, 2013 at 01:58:49PM -0700, Brian Norris wrote:
-> > On Wed, Sep 11, 2013 at 09:27:11AM -0700, Olof Johansson wrote:
-> > > On Wed, Sep 11, 2013 at 9:16 AM, Ezequiel Garcia
-> > > <ezequiel.garcia@free-electrons.com> wrote:
-> > > > This commit adds a dummy pxa3xx_nand_get_variant() stub, to fix
-> > > > this build error (with pxa3xx_defconfig or similar):
-> > > >
-> > > > drivers/mtd/nand/pxa3xx_nand.c:1325:2: error: implicit declaration of
-> > > > function 'pxa3xx_nand_get_variant' [-Werror=implicit-function-declaration]
-> > > >
-> > > > Cc: Brian Norris <computersforpeace@gmail.com>
-> > > > Cc: David Woodhouse <dwmw2@infradead.org>
-> > > > Cc: Olof Johansson <olof@lixom.net>
-> > > > Cc: Kevin Hilman <khilman@linaro.org>
-> > > > Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> > > 
-> > > Nack. This has already been fixed by you(!), Brian is just sitting on
-> > > the patch and not sending it up for some reason. Brian?
+cpu_reset is already #defined in <asm/proc-fns.h> as processor.reset,
+so it expands here and causes problems.
 
-...
+Signed-off-by: Olof Johansson <olof@lixom.net>
+---
+ arch/arm/kvm/reset.c |    6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-> > Second, David hasn't authorized me to send pull requests, so I'm just
-> > queueing things up for him. I don't know why David removed this patch
-> > (among a few others) from his pull request.
-> 
-> As you may recall, we did the below patch because you (correctly) noticed
-> it was possible to avoid the ifdef. It also fixed the build break, but nobody
-> noticed that until just now, so nobody reported the patch was actually a fix.
-
-Well, your series originally defined this stub function before I
-recommended a change to drop the CONFIG_OF check. See your v2 patch:
-
-  http://lists.infradead.org/pipermail/linux-mtd/2013-August/047863.html
-
-So there never was a build breakage until David rebased; the patch was
-just a dependent part of the series that should never have been
-postponed.
-
-Brian
+diff --git a/arch/arm/kvm/reset.c b/arch/arm/kvm/reset.c
+index 71e08ba..c02ba4a 100644
+--- a/arch/arm/kvm/reset.c
++++ b/arch/arm/kvm/reset.c
+@@ -58,14 +58,14 @@ static const struct kvm_irq_level a15_vtimer_irq = {
+  */
+ int kvm_reset_vcpu(struct kvm_vcpu *vcpu)
+ {
+-	struct kvm_regs *cpu_reset;
++	struct kvm_regs *reset_regs;
+ 	const struct kvm_irq_level *cpu_vtimer_irq;
+ 
+ 	switch (vcpu->arch.target) {
+ 	case KVM_ARM_TARGET_CORTEX_A15:
+ 		if (vcpu->vcpu_id > a15_max_cpu_idx)
+ 			return -EINVAL;
+-		cpu_reset = &a15_regs_reset;
++		reset_regs = &a15_regs_reset;
+ 		vcpu->arch.midr = read_cpuid_id();
+ 		cpu_vtimer_irq = &a15_vtimer_irq;
+ 		break;
+@@ -74,7 +74,7 @@ int kvm_reset_vcpu(struct kvm_vcpu *vcpu)
+ 	}
+ 
+ 	/* Reset core registers */
+-	memcpy(&vcpu->arch.regs, cpu_reset, sizeof(vcpu->arch.regs));
++	memcpy(&vcpu->arch.regs, reset_regs, sizeof(vcpu->arch.regs));
+ 
+ 	/* Reset CP15 registers */
+ 	kvm_reset_coprocs(vcpu);
+-- 
+1.7.10.4
