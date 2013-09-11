@@ -1,31 +1,109 @@
-From: rjw@sisk.pl (Rafael J. Wysocki)
-Date: Thu, 12 Sep 2013 00:58:54 +0200
-Subject: [PATCH 0/4] cpufreq: fixes for v3.12
-In-Reply-To: <1378835989-19281-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
-References: <1378835989-19281-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
-Message-ID: <1795989.18GOYqdUtX@vostro.rjw.lan>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Wed, 11 Sep 2013 16:02:07 -0700
+Subject: [PATCH 1/2] mtd: atmel_nand: remove unneeded ifdef CONFIG_OF
+In-Reply-To: <1378200028-15415-1-git-send-email-josh.wu@atmel.com>
+References: <1378200028-15415-1-git-send-email-josh.wu@atmel.com>
+Message-ID: <20130911230207.GE4550@ld-irv-0074.broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, September 10, 2013 06:59:45 PM Sudeep KarkadaNagesha wrote:
-> From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
-> 
-> Hi Shawn, Guennadi,
-> 
-> These are the fixes for the issue reported by Guennadi.
-> cpu_dev should point to cpu0 device instead of cpufreq-cpu0 platform
-> devices. The dev_id is also updated while registering the cpu clocks.
-> 
-> Can you review these ? Tested-by is much appreciated as I don't
-> have hardware to check the fix.
+Hi Josh,
 
-I have a little problem with this series, because the last patch is based
-on the current Linus' tree rather than on my master branch which is what
-I have ready to push.  I don't think it makes sense to rebase it, however,
-because that would introduce a merge conflict for Linus unnecessarily.
+On Tue, Sep 03, 2013 at 05:20:27PM +0800, Josh Wu wrote:
+> Since following commit
+>   f3b391425d21e6138e57b2432d91134e0bc2b975
 
-To avoid merging stuff back and forth, I'll push this series later in the
-cycle.
+This commit ID will likely change before it gets merged, since there may
+be rebasing, and David usually adds his signoff. David or I can take
+care of that later though.
 
-Thanks,
-Rafael
+>   (of_mtd: Add no-op stubs to support CONFIG_OF=n)
+> 
+> implements the stub for CONFIG_OF=n. Now we can safely remove all
+> CONFIG_OF in atmel_nand. (Thanks to Ezequiel Garcia's for this protype)
+
+I'm not quite so sure about this patch, as I was about the pxa3xx patch.
+With pxa3xx, the compiler can easily tell that pxa3xx_nand_probe_dt()
+will return 0 without doing anything in the !CONFIG_OF case (and so will
+likely remove the dead code), so it's no benefit to have the #ifdef. But
+in this driver, the atmel_of_init_port() function can't be trivially
+determined to do nothing (and in fact, it does something in either
+CONFIG_OF=y or =n case). It's only protected by the 'if
+(pdev->dev.of_node)' check, which the compiler can't predict.
+
+So, I don't know if we should remove the #ifdef at the expense of likely
+significantly larger code. I won't protest, but I won't merge it yet
+either. Perhaps others have better ideas, or perhaps you can find a good
+way to work around this -- e.g., check the of_* helpers for -ENOSYS early
+in atmel_of_init_port()?
+
+> Signed-off-by: Josh Wu <josh.wu@atmel.com>
+> ---
+>  drivers/mtd/nand/atmel_nand.c |   14 +-------------
+>  1 file changed, 1 insertion(+), 13 deletions(-)
+> 
+> diff --git a/drivers/mtd/nand/atmel_nand.c b/drivers/mtd/nand/atmel_nand.c
+> index 060feea..1ca0724 100644
+> --- a/drivers/mtd/nand/atmel_nand.c
+> +++ b/drivers/mtd/nand/atmel_nand.c
+> @@ -1449,7 +1449,6 @@ static void atmel_nand_hwctl(struct mtd_info *mtd, int mode)
+>  		ecc_writel(host->ecc, CR, ATMEL_ECC_RST);
+>  }
+>  
+> -#if defined(CONFIG_OF)
+>  static int atmel_of_init_port(struct atmel_nand_host *host,
+>  			      struct device_node *np)
+>  {
+> @@ -1457,7 +1456,7 @@ static int atmel_of_init_port(struct atmel_nand_host *host,
+>  	u32 offset[2];
+>  	int ecc_mode;
+>  	struct atmel_nand_data *board = &host->board;
+> -	enum of_gpio_flags flags;
+> +	enum of_gpio_flags flags = 0;
+>  
+>  	if (of_property_read_u32(np, "atmel,nand-addr-offset", &val) == 0) {
+>  		if (val >= 32) {
+> @@ -1540,13 +1539,6 @@ static int atmel_of_init_port(struct atmel_nand_host *host,
+>  
+>  	return 0;
+>  }
+> -#else
+> -static int atmel_of_init_port(struct atmel_nand_host *host,
+> -			      struct device_node *np)
+> -{
+> -	return -EINVAL;
+> -}
+> -#endif
+>  
+>  static int __init atmel_hw_nand_init_params(struct platform_device *pdev,
+>  					 struct atmel_nand_host *host)
+> @@ -2207,14 +2199,12 @@ static int __exit atmel_nand_remove(struct platform_device *pdev)
+>  	return 0;
+>  }
+>  
+> -#if defined(CONFIG_OF)
+>  static const struct of_device_id atmel_nand_dt_ids[] = {
+>  	{ .compatible = "atmel,at91rm9200-nand" },
+>  	{ /* sentinel */ }
+>  };
+>  
+>  MODULE_DEVICE_TABLE(of, atmel_nand_dt_ids);
+> -#endif
+>  
+>  static int atmel_nand_nfc_probe(struct platform_device *pdev)
+>  {
+> @@ -2253,12 +2243,10 @@ static int atmel_nand_nfc_probe(struct platform_device *pdev)
+>  	return 0;
+>  }
+>  
+> -#if defined(CONFIG_OF)
+>  static struct of_device_id atmel_nand_nfc_match[] = {
+>  	{ .compatible = "atmel,sama5d3-nfc" },
+>  	{ /* sentinel */ }
+>  };
+> -#endif
+>  
+>  static struct platform_driver atmel_nand_nfc_driver = {
+>  	.driver = {
+
+Brian
