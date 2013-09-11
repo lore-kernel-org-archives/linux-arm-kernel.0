@@ -1,27 +1,60 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed, 11 Sep 2013 14:12:24 +0530
-Subject: [PATCH 1/4] cpufreq: cpufreq-cpu0: assign cpu_dev correctly to
- cpu0 device
-In-Reply-To: <Pine.LNX.4.64.1309111005310.26942@axis700.grange>
-References: <1378835989-19281-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
- <1378835989-19281-2-git-send-email-Sudeep.KarkadaNagesha@arm.com>
- <Pine.LNX.4.64.1309111005310.26942@axis700.grange>
-Message-ID: <CAKohpokgVqmjNGTUOg61YQyqi1qO-9FaB8dmZqTqq2nQFynOkQ@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 11 Sep 2013 10:43:44 +0200
+Subject: [PATCH ] ARM: sunxi: Add Emac,SMP and Arch_timer support for
+ sunxi A20;Add phy cnt arch timer for ARMv7 support.
+In-Reply-To: <16b7467c.1f121.141089f3d81.Coremail.coosty@163.com>
+References: <16b7467c.1f121.141089f3d81.Coremail.coosty@163.com>
+Message-ID: <20130911084344.GH2746@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11 September 2013 13:45, Guennadi Liakhovetski <g.liakhovetski@gmx.de> wrote:
-> Noone else seems to complain, but I don't think these =20, =09 etc. codes
-> have been invented on my side and I don't think they belong here. I'm
-> handling enough mails / patches daily to believe, that my mail system
-> isn't the cause of this. Could you please verify and regenerate and
-> resend? Unless I'm mistaken this looks like a corruption on your SMTP
-> side.
+Hi Cini,
 
-Its on Sudeep's side :) .. Or on ARM's side..
-Don't know why nobody else complained, Atleast people who test these
-patches (Like Shawn), must have applied them from mail.. Don't know
-why they aren't shouting :)
+On Wed, Sep 11, 2013 at 12:05:55AM +0800, cini wrote:
+> It has been tested on a Cubieboard 2. To use SMP you must set
+> ARM_ARCH_TIMER and ARM_ARCH_TIMER_USE_PHYCNT when make xconfig.? If
+> you have any questions or comments please feel free to contact me.
+> ?Have a wonderful day!
 
-He mostly send pull requests to Rafael and so this wasn't a issue for
-Rafael :)
+Thanks for working on this!
+
+You still have to work a bit on the submission part however.
+
+First, make sure you read and follow
+http://www.tuxradar.com/content/newbies-guide-hacking-linux-kernel
+along with Documentation/SubmittingPatches
+
+Basically, you should use git format-patch and git send-email to easily
+contribute your patches to the right format.
+Among other things, your current patches lack some files (platsmp.c,
+headsmp.S, etc.), also lack the Signed-off-by tag (using your real
+name).
+
+You should also try to split the changes you're making into logical
+changes.
+
+In that case, that means that you would probably have different patches
+to :
+  - Add the SMP code to mach-sunxi
+  - Add the SMP-related nodes to the DTSI
+  - Make the modifications to the arch timers
+  - And add the EMAC support
+
+Finally, you should probably look at
+http://linux-sunxi.org/Mainlining_Effort to get in sync with other
+people doing sunxi-related stuff to avoid effort duplication.
+
+Thanks,
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130911/03027161/attachment.sig>
