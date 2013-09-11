@@ -1,48 +1,67 @@
 From: l.stach@pengutronix.de (Lucas Stach)
-Date: Wed, 11 Sep 2013 11:51:08 +0200
-Subject: [PATCH 2/2] ARM: dts: imx53-qsb: select open-drain mode for i2c1 pads
-In-Reply-To: <1378893068-22235-1-git-send-email-l.stach@pengutronix.de>
-References: <1378893068-22235-1-git-send-email-l.stach@pengutronix.de>
-Message-ID: <1378893068-22235-2-git-send-email-l.stach@pengutronix.de>
+Date: Wed, 11 Sep 2013 11:51:07 +0200
+Subject: [PATCH 1/2] ARM: dts: imx53-qsb: add TVE entry
+Message-ID: <1378893068-22235-1-git-send-email-l.stach@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The pull-ups on this bus are connected to the 1.8V plane.
+From: Philipp Zabel <p.zabel@pengutronix.de>
 
+Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
 Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
 ---
- arch/arm/boot/dts/imx53-qsb.dts | 12 +++++++++++-
- 1 file changed, 11 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/imx53-qsb.dts | 25 +++++++++++++++++++++++--
+ 1 file changed, 23 insertions(+), 2 deletions(-)
 
 diff --git a/arch/arm/boot/dts/imx53-qsb.dts b/arch/arm/boot/dts/imx53-qsb.dts
-index 2031ccc..29d81da 100644
+index 512a1f6..2031ccc 100644
 --- a/arch/arm/boot/dts/imx53-qsb.dts
 +++ b/arch/arm/boot/dts/imx53-qsb.dts
-@@ -155,6 +155,16 @@
- 			>;
+@@ -156,6 +156,15 @@
  		};
  	};
-+	
-+	i2c1 {
-+		/* open drain */
-+		pinctrl_i2c1_qsb: i2c1grp-1 {
+ 
++	tve {
++		pinctrl_vga_sync_1: vgasync-grp1 {
 +			fsl,pins = <
-+				MX53_PAD_CSI0_DAT8__I2C1_SDA      0x400001cc
-+				MX53_PAD_CSI0_DAT9__I2C1_SCL      0x400001cc
++				/* VGA_HSYNC, VSYNC with max drive strength */
++				MX53_PAD_EIM_OE__IPU_DI1_PIN7     0xe6
++				MX53_PAD_EIM_RW__IPU_DI1_PIN8     0xe6
 +			>;
 +		};
 +	};
+ };
  
- 	tve {
- 		pinctrl_vga_sync_1: vgasync-grp1 {
-@@ -189,7 +199,7 @@
+ &uart1 {
+@@ -263,8 +272,8 @@
+ 			};
  
- &i2c1 {
- 	pinctrl-names = "default";
--	pinctrl-0 = <&pinctrl_i2c1_1>;
-+	pinctrl-0 = <&pinctrl_i2c1_qsb>;
+ 			ldo8_reg: ldo8 {
+-				regulator-min-microvolt = <1200000>;
+-				regulator-max-microvolt = <3600000>;
++				regulator-min-microvolt = <2750000>;
++				regulator-max-microvolt = <2750000>;
+ 				regulator-always-on;
+ 			};
+ 
+@@ -297,6 +306,18 @@
  	status = "okay";
+ };
  
- 	accelerometer: mma8450 at 1c {
++&tve {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_vga_sync_1>;
++	ddc = <&i2c2>;
++	fsl,tve-mode = "vga";
++	status = "okay";
++	dac-supply = <&ldo7_reg>;
++
++	fsl,hsync-pin = <7>; /* IPU DI1 PIN7 via EIM_OE */
++	fsl,vsync-pin = <8>; /* IPU DI1 PIN8 via EIM_RW */
++};
++
+ &usbh1 {
+        status = "okay";
+ };
 -- 
 1.8.4.rc3
