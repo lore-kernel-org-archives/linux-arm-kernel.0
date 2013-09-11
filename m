@@ -1,59 +1,36 @@
-From: coosty@163.com (cini)
-Date: Thu, 12 Sep 2013 01:45:07 +0800 (CST)
-Subject: [PATCH ] ARM: sunxi: Add Emac,SMP and Arch_timer support for
- sunxi A20;Add phy cnt arch timer for ARMv7 support.
-In-Reply-To: <16b7467c.1f121.141089f3d81.Coremail.coosty@163.com>
-References: <16b7467c.1f121.141089f3d81.Coremail.coosty@163.com>
-Message-ID: <65babca9.e1d6.1410e206c2e.Coremail.coosty@163.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Wed, 11 Sep 2013 10:51:43 -0700
+Subject: [PATCH] KVM: ARM: Fix typo in comments of inject_abt()
+In-Reply-To: <1378904662-29521-1-git-send-email-anup.patel@linaro.org>
+References: <1378904662-29521-1-git-send-email-anup.patel@linaro.org>
+Message-ID: <20130911175143.GH9860@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I have released the new patchs that is clean?
-0001-Add-smp-support-for-Allwinner-A20-sunxi-7i.patch
-0002-Add-cpuconfig-nodes-in-dts-for-smp-configure.patch
-0003-Add-physical-count-arch-timer-support-for-clocksourc.patch
-0004-Add-arch-count-timer-node-in-dts-for-Allwinner-A20-s.patch
-0005-Add-emac-node-for-Allwinner-A20-sun7i.patch
-0006-Add-emac-node-in-dts-for-CubieBoard2.patch
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0001-Add-smp-support-for-Allwinner-A20-sunxi-7i.patch
-Type: application/octet-stream
-Size: 22871 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130912/43f1f568/attachment-0006.obj>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0002-Add-cpuconfig-nodes-in-dts-for-smp-configure.patch
-Type: application/octet-stream
-Size: 1106 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130912/43f1f568/attachment-0007.obj>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0003-Add-physical-count-arch-timer-support-for-clocksourc.patch
-Type: application/octet-stream
-Size: 2753 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130912/43f1f568/attachment-0008.obj>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0004-Add-arch-count-timer-node-in-dts-for-Allwinner-A20-s.patch
-Type: application/octet-stream
-Size: 857 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130912/43f1f568/attachment-0009.obj>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0005-Add-emac-node-for-Allwinner-A20-sun7i.patch
-Type: application/octet-stream
-Size: 1419 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130912/43f1f568/attachment-0010.obj>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0006-Add-emac-node-in-dts-for-CubieBoard2.patch
-Type: application/octet-stream
-Size: 1046 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130912/43f1f568/attachment-0011.obj>
+On Wed, Sep 11, 2013 at 06:34:22PM +0530, Anup Patel wrote:
+> Very minor typo in comments of inject_abt() when we update fault status
+> register for injecting prefetch abort.
+> 
+> Signed-off-by: Anup Patel <anup.patel@linaro.org>
+> Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
+> ---
+>  arch/arm/kvm/emulate.c |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/kvm/emulate.c b/arch/arm/kvm/emulate.c
+> index bdede9e..d6c0052 100644
+> --- a/arch/arm/kvm/emulate.c
+> +++ b/arch/arm/kvm/emulate.c
+> @@ -354,7 +354,7 @@ static void inject_abt(struct kvm_vcpu *vcpu, bool is_pabt, unsigned long addr)
+>  	*vcpu_pc(vcpu) = exc_vector_base(vcpu) + vect_offset;
+>  
+>  	if (is_pabt) {
+> -		/* Set DFAR and DFSR */
+> +		/* Set IFAR and IFSR */
+>  		vcpu->arch.cp15[c6_IFAR] = addr;
+>  		is_lpae = (vcpu->arch.cp15[c2_TTBCR] >> 31);
+>  		/* Always give debug fault for now - should give guest a clue */
+> -- 
+> 1.7.9.5
+> 
+Thanks, applied.
