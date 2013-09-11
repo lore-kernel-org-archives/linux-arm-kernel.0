@@ -1,14 +1,16 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Tue, 10 Sep 2013 19:19:09 -0700
-Subject: [GIT PULL] ep93xx-fixes for 3.12
-In-Reply-To: <522FB6C9.3030406@gmail.com>
-References: <522FB6C9.3030406@gmail.com>
-Message-ID: <CAOesGMgm-QjXNrdXCdPZAzT4KjSAWTvZ5payM2ScH4i=0A6Lww@mail.gmail.com>
+Date: Tue, 10 Sep 2013 19:22:37 -0700
+Subject: [GIT PULL] ep93xx-devel for 3.12
+In-Reply-To: <522FB619.90603@gmail.com>
+References: <522FB619.90603@gmail.com>
+Message-ID: <CAOesGMg8utb11JQpbJGAMNmvdGtz2+DbUfCmbXBNj0Gpw+2vAA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 10, 2013 at 5:18 PM, Ryan Mallon <rmallon@gmail.com> wrote:
-> Hi Arnd, Olof
+Hi Ryan,
+
+On Tue, Sep 10, 2013 at 5:15 PM, Ryan Mallon <rmallon@gmail.com> wrote:
+> Hi Arnd, Olof,
 >
 > The following changes since commit ad81f0545ef01ea651886dddac4bef6cec930092:
 >
@@ -16,13 +18,25 @@ On Tue, Sep 10, 2013 at 5:18 PM, Ryan Mallon <rmallon@gmail.com> wrote:
 >
 > are available in the git repository at:
 >
->   git://github.com/RyanMallon/linux-ep93xx.git tags/ep93xx-fixes-for-3.12
+>   git://github.com/RyanMallon/linux-ep93xx.git tags/ep93xx-devel-for-3.12
 >
-> for you to fetch changes up to cc3874fe56923e713427e4a3737c40746397347e:
+> for you to fetch changes up to 0e98a32f8773993da65ab4759b0c5ba362119ebb:
 >
->   ARM: ep93xx: Don't use modem interface on the second UART (2013-09-03 14:15:04 +1000)
+>   arm: ep93xx: use soc bus (2013-07-19 10:08:15 +1000)
 
-Pulled into fixes. Thanks.
+
+Unfortunately the merge window is already in progress, and we're not
+taking new code into arm-soc for 3.12. We ask that platform
+maintainers send us the code they want into the next release by -rc6
+or -rc7 the latest, so we have some time to merge it and sort it out
+if needed, and so that it has time to sit in linux-next to discover
+any problems.
+
+So, please resend this pull request once 3.12-rc1 is out, and we'll be
+happy to queue it up for 3.13 inclusion!
+
+
+Thanks,
 
 
 -Olof
