@@ -1,34 +1,85 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 11 Sep 2013 17:22:59 +0800
-Subject: [PATCH 1/4] cpufreq: cpufreq-cpu0: assign cpu_dev correctly to
- cpu0 device
-In-Reply-To: <CAKohpokgVqmjNGTUOg61YQyqi1qO-9FaB8dmZqTqq2nQFynOkQ@mail.gmail.com>
-References: <1378835989-19281-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
- <1378835989-19281-2-git-send-email-Sudeep.KarkadaNagesha@arm.com>
- <Pine.LNX.4.64.1309111005310.26942@axis700.grange>
- <CAKohpokgVqmjNGTUOg61YQyqi1qO-9FaB8dmZqTqq2nQFynOkQ@mail.gmail.com>
-Message-ID: <20130911092257.GK5815@S2101-09.ap.freescale.net>
+From: b29396@freescale.com (Dong Aisheng)
+Date: Wed, 11 Sep 2013 17:26:06 +0800
+Subject: [PATCH 5/8] sdhci: sdhci-esdhc-imx: change pinctrl state
+ according to uhs mode
+In-Reply-To: <CAHCPf3tYXsT6kTbJcqJx1gN_G9G2iqi1-f+jRcpw95CEPkW8NQ@mail.gmail.com>
+References: <1378299257-2980-1-git-send-email-b29396@freescale.com>
+ <1378299257-2980-6-git-send-email-b29396@freescale.com>
+ <CAHCPf3tYXsT6kTbJcqJx1gN_G9G2iqi1-f+jRcpw95CEPkW8NQ@mail.gmail.com>
+Message-ID: <20130911092605.GA2891@b29396-Latitude-E6410>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 11, 2013 at 02:12:24PM +0530, Viresh Kumar wrote:
-> On 11 September 2013 13:45, Guennadi Liakhovetski <g.liakhovetski@gmx.de> wrote:
-> > Noone else seems to complain, but I don't think these =20, =09 etc. codes
-> > have been invented on my side and I don't think they belong here. I'm
-> > handling enough mails / patches daily to believe, that my mail system
-> > isn't the cause of this. Could you please verify and regenerate and
-> > resend? Unless I'm mistaken this looks like a corruption on your SMTP
-> > side.
+Hi Matt,
+
+Sorry for the late reply.
+
+On Fri, Sep 06, 2013 at 02:40:06AM +0800, Matt Sealey wrote:
+> > +       if (of_find_property(np, "no-1-8-v", NULL))
+> > +               boarddata->support_vsel = false;
+> > +       else
+> > +               boarddata->support_vsel = true;
+> > +
+> >         return 0;
 > 
-> Its on Sudeep's side :) .. Or on ARM's side..
-> Don't know why nobody else complained, Atleast people who test these
-> patches (Like Shawn), must have applied them from mail.. Don't know
-> why they aren't shouting :)
+> No, no, no, no, no :(
+> 
+> Please do not just strip the prefix from a definition in code, or just
+> convert the underscores into hyphens to make a device tree property.
+> SDHCI_QUIRK2_NO_1_8_V should never, ever, EVER become no-1-8-v and NO
+> DEFINITION FROM SOURCE CODE should EVER make it into a device tree.
+> This is how we ended up with manure like "dr_mode" in the USB
+> bindings. Please follow good common sense as well as the bindings.
+> 
+> In this case a suitable standard for describing a voltage would be
+> no-1v8 (replacing the decimal point with the v) which is how 99.9% of
+> schematics are written in the world where a period is not a desirable
+> character in a net name or component/signal description. But even that
+> is stupid and not expandable.
+> 
 
-I'm not sure what's going on here.  But I did apply the patches from
-mail without any problem, and the patch I got look just like what the
-archive below [1] shows.
+I somehow agree with your idea on the naming.
+But currently i'm just using the standard property defined in:
+Documentation/devicetree/bindings/mmc/mmc.txt
+- no-1-8-v: when present, denotes that 1.8v card voltage is not supported on
+  this system, even if the controller claims it is.
 
-Shawn
+> This property should probably be called "voltage-selects" or something
+> and you should put in a list of supported voltages (in uV units just
+> like cpufreq operating points and regulators, please, for consistency,
+> and update the binding).
+> 
+> Then you can parse the list and find out precisely what voltages you
+> can switch to - there are more possibilities than an implied 3-ish
+> volts and a switch to 1.8V for MMC. The standard for the OCR register
+> is a bunch of ranges - so specify which voltages you HAVE available,
+> if you can switch. The driver (as per standard) can determine if this
+> is in one range or another.
+> 
+> Lack of this property would imply that whatever the chip is driving
+> right now for logic is what it should stay at (support_vsel = false in
+> the code).
+> 
 
-[1] http://www.spinics.net/lists/arm-kernel/msg272474.html
+Here the no-1-8-v is for indicating no 1.8v signal voltage switch support,
+not the host supply voltage.
+The spec only defines 1.8v/3.3v switch, so no-1-8-v seems ok for me currently.
+
+And for host supply voltage, it's usually provided by host controller and
+can be retrieved from host capability register.
+And even if it's using an external regulator, this capability can still be
+retrieved from the standard regulator API regulator_is_supported_voltage.
+That's how sdhci driver used currently.
+So i'm not sure if we really need add the voltage-selects on device tree
+for mmc since that's regulator's work.
+
+Anyway, above is just my initial thoughts on your question.
+Since this issue actually is not related to this series,
+maybe you could create a new mail thread about this if you want
+or patching is welcome for the further discussion more specific.
+
+Regards
+Dong Aisheng
+
+> --
+> Matt Sealey <neko@bakuhatsu.net>
