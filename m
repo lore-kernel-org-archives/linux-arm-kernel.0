@@ -1,40 +1,79 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 11 Sep 2013 13:56:39 -0600
-Subject: [PATCH RFC v2 13/16] ARM: tegra: split tegra_pmc_init() in two
-In-Reply-To: <1377638890-371-14-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1376964271-22715-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1377638890-371-14-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <5230CAF7.6010103@wwwdotorg.org>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 11 Sep 2013 13:36:44 -0700
+Subject: [PATCH 01/38] ARM: ux500: Remove PrimeCell IDs from Nomadik I2C
+ DT nodes
+In-Reply-To: <CACRpkdYfeao6bvwjq7YJhBNCoC_JVxPTwYzPPiWM0tgUQreJKg@mail.gmail.com>
+References: <1378817379-8238-1-git-send-email-lee.jones@linaro.org>
+ <1378817379-8238-2-git-send-email-lee.jones@linaro.org>
+ <CAOesGMgySNLKo_H0h4MCbAWvyW0h2bWa96drWBpnhAYYQwH9mw@mail.gmail.com>
+ <20130910153037.GA11227@lee--X1>
+ <CAOesGMiBN5SaEY26SxGaw9E4ViR3cC0PcwNMEd4cLJZMfomprQ@mail.gmail.com>
+ <CACRpkdY24uU=tXirJqrxLH-45ORFGybJOg-2tDOkpSmFUQUiiw@mail.gmail.com>
+ <20130911081911.GI11227@lee--X1>
+ <CACRpkdY6v+LMggLBdfKc3VUPmRZXTf1zBi4a93EPhQeo21wMeQ@mail.gmail.com>
+ <CAF2Aj3iPdqM-+FQ7R9MZ-6jV1Q1me9TG1P4cEGA7fSBBYH92zA@mail.gmail.com>
+ <CACRpkdYfeao6bvwjq7YJhBNCoC_JVxPTwYzPPiWM0tgUQreJKg@mail.gmail.com>
+Message-ID: <CAOesGMi7zbGuBBaUToe7=PUJvUUT8FkdMAWzfCE0igpYiYTZSg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/27/2013 03:28 PM, Sebastian Hesselbarth wrote:
-> From: Stephen Warren <swarren@nvidia.com>
-> 
-> Tegra's board file currently initializes clocks much earlier than those
-> for most other ARM SoCs. The reason is:
-> 
-> * The PMC HW block is involved in the path of some interrupts (i.e. it
-> inverts, or not, the IRQ input pin dedicated to the PMIC).
-> 
-> * So, that part of the PMC must be initialized early so that the IRQ
-> polarity is correct.
-> 
-> * The PMC initialization is currently monolithic, and the PMC has some
-> clock inputs, so the init routine ends up calling of_clk_get_by_name(),
-> and hence clocks must be set up early too.
-> 
-> In order to defer clock initialization to the more typical location,
-> split out the portions of tegra_pmc_init() that are truly IRQ-related
-> into a separate tegra_pmc_init_irq(), which can be called from the
-> machine descriptor's .init_irq() function, and defer the rest until
-> the machine descriptor's .init_machine() function. With arch/arm calling
-> of_clk_init(NULL) from time_init() this also allows the removal of
-> .init_time() hook.
+On Wed, Sep 11, 2013 at 4:13 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> On Wed, Sep 11, 2013 at 11:39 AM, Lee Jones <lee.jones@linaro.org> wrote:
+>> On 11 Sep 2013 10:33, "Linus Walleij" <linus.walleij@linaro.org> wrote:
+>
+>>> No it was something transient, after a clean rebuild it boots
+>>> just fine. :-/
+>>>
+>>> I'll see if I can boot the same uImage on the Snowball too.
+>
+> Yeah Snowball boots the same DT image with just some random
+> dmesg noise from Torvalds HEAD:
+>
+> U8500 $ mmc rescan 1 ; fat load mmc 1 0x0 /uImage ; bootm 0x0
+> Partition info retrieved
+> Reading /uImage
+>
+> 8997342 bytes read
+> ## Booting kernel from Legacy Image at 00000000 ...
+>    Image Name:   Ux500 Device Tree kernel
+>    Image Type:   ARM Linux Kernel Image (uncompressed)
+>    Data Size:    8997278 Bytes =  8.6 MB
+>    Load Address: 00008000
+>    Entry Point:  00008000
+>    Loading Kernel Image ... OK
+> OK
+>
+> Starting kernel ...
+>
+> Uncompressing Linux... done, booting the kernel.
+> Booting Linux on physical CPU 0x300
+> Linux version 3.11.0-09031-ga22a0fd (linus at localhost.localdomain) (gcc
+> version 4.8.2 20130805 (prerelease) (crosstool-NG
+> linaro-1.13.1-4.8-2013.08 - Linaro GCC 2013.08) ) #48 SMP PREEMPT Wed
+> Sep 11 11:14:36 CEST 2013
+> CPU: ARMv7 Processor [412fc091] revision 1 (ARMv7), cr=10c5387d
+> CPU: PIPT / VIPT nonaliasing data cache, VIPT aliasing instruction cache
+> Machine: ST-Ericsson Ux5x0 platform (Device Tree Support), model:
+> ST-Ericsson HREF (v60+) platform with Device Tree
+> Only cachepolicy=writeback supported on ARMv6 and later
+> Memory policy: ECC disabled, Data cache writealloc
+> DB8500 v2.1 [0x008500b1]
+> (...)
+>
+> I don't know what is the problem with Olof's machine :-/
 
-Sebastian, I assume you're targeting v3.13 or later for this patch
-series? If so, it might be a good idea if I apply this patch myself to
-the Tegra tree so that I can base any future Tegra patches on top of it
-to avoid any possible conflicts. I can put this patch first in the
-cleanup branch so you can merge it into whatever tree you use for the
-rest of this series. Does that work for you? If so, let me know. Thanks.
+Oh! Well, to start with apparantly u8500_defconfig doesn't have
+APPENDED_DTB enabled, which explains some of the confusion here.
+
+With that fixed (and the appropriate options to get the bootargs from
+the atags), I get as far as console probing where output stops, if I
+have DEBUG_LL on. With it disabled I get all the way up.
+
+Not sure what was going on earlier here. Maybe just as in your case it
+was a matter of cleaning out and starting fresh.
+
+multi_v7_defconfig still doesn't boot though, but the failure seems to
+be lower level than any of the others, no output with DEBUG_LL on.
+
+
+-Olof
