@@ -1,44 +1,70 @@
-From: rmallon@gmail.com (Ryan Mallon)
-Date: Wed, 11 Sep 2013 12:42:57 +1000
-Subject: [GIT PULL] ep93xx-devel for 3.12
-In-Reply-To: <CAOesGMg8utb11JQpbJGAMNmvdGtz2+DbUfCmbXBNj0Gpw+2vAA@mail.gmail.com>
-References: <522FB619.90603@gmail.com>
- <CAOesGMg8utb11JQpbJGAMNmvdGtz2+DbUfCmbXBNj0Gpw+2vAA@mail.gmail.com>
-Message-ID: <522FD8B1.4080206@gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 11 Sep 2013 12:48:13 +0900
+Subject: [PATCH v2 00/03] ARM: shmobile: r8a7790 APMU SMP support
+In-Reply-To: <522F0E49.9070307@arm.com>
+References: <20130828232148.7321.45739.sendpatchset@w520>
+ <20130829001834.GD10207@verge.net.au>
+ <CANqRtoTq=w-dsK-fkfWTO+B+VoOMRkuFjCpY=+5qjBZGxDxd+Q@mail.gmail.com>
+ <20130829043424.GA20593@verge.net.au>
+ <20130904083934.GG17329@verge.net.au> <522F0E49.9070307@arm.com>
+Message-ID: <20130911034813.GB23073@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/09/13 12:22, Olof Johansson wrote:
-> Hi Ryan,
+On Tue, Sep 10, 2013 at 01:19:21PM +0100, Sudeep KarkadaNagesha wrote:
+> On 04/09/13 09:39, Simon Horman wrote:
+> > On Thu, Aug 29, 2013 at 01:34:28PM +0900, Simon Horman wrote:
+> >> On Thu, Aug 29, 2013 at 01:11:37PM +0900, Magnus Damm wrote:
+> >>> On Thu, Aug 29, 2013 at 9:18 AM, Simon Horman <horms@verge.net.au> wrote:
+> >>>> On Thu, Aug 29, 2013 at 08:21:48AM +0900, Magnus Damm wrote:
+> >>>>> ARM: shmobile: r8a7790 APMU SMP support
+> >>>>>
+> >>>>> [PATCH v2 01/03] ARM: shmobile: Shared APMU SMP support code without DT
+> >>>>> [PATCH v2 02/03] ARM: shmobile: Add r8a7790 SMP support using APMU code
+> >>>>> [PATCH v2 03/03] ARM: shmobile: Add r8a7790 CA15 CPU cores
+> >>>>>
+> >>>>> This series adds SMP support to r8a7790 using the included APMU code.
+> >>>>> The previous version of r8a7790 support depended on the APMU code in
+> >>>>> "[PATCH] ARM: shmobile: Shared APMU SMP support code", but in this
+> >>>>> version the APMU code has been reworked to not use DT. In the future
+> >>>>> r8a73a4 and other SoCs may make use of the APMU as well, but the
+> >>>>> r8a73a4 code first needs to be adjusted to work with the CCI driver.
+> >>>>>
+> >>>>> With these patches applied r8a7790 CA15 support for SMP boot
+> >>>>> and CPU Hotplug is known to be working.
+> >>>>>
+> >>>>> Thanks to Sudeep for his feedback.
+> >>>>>
+> >>>>> Signed-off-by: Magnus Damm <damm@opensource.se>
+> >>>>
+> >>>> Hi Magnus,
+> >>>>
+> >>>> can I clarify that these patches are targeted at mainline?
+> >>>
+> >>> Hi Simon, yes, that's correct. It's possible to back port too if needed.
+> >>
+> >> Thanks for the clarification.
+> >>
+> >>> Actual merge is not rushing though, so please don't interpret this as
+> >>> any last minute v3.12 merge attempt.
+> >>
+> >> No problem, I didn't interpret it that way.
+> > 
+> > I have queued these up for v3.13 and they are present
+> > in the freshly baked renesas-devel-20130904 tag.
+> > 
+> As I already mentioned I asked not to add any custom bindings to support
+> multiple cluster. But this version removed APMU node from DT completely
+> which is not correct.
 > 
-> On Tue, Sep 10, 2013 at 5:15 PM, Ryan Mallon <rmallon@gmail.com> wrote:
->> Hi Arnd, Olof,
->>
->> The following changes since commit ad81f0545ef01ea651886dddac4bef6cec930092:
->>
->>   Linux 3.11-rc1 (2013-07-14 15:18:27 -0700)
->>
->> are available in the git repository at:
->>
->>   git://github.com/RyanMallon/linux-ep93xx.git tags/ep93xx-devel-for-3.12
->>
->> for you to fetch changes up to 0e98a32f8773993da65ab4759b0c5ba362119ebb:
->>
->>   arm: ep93xx: use soc bus (2013-07-19 10:08:15 +1000)
-> 
-> 
-> Unfortunately the merge window is already in progress, and we're not
-> taking new code into arm-soc for 3.12. We ask that platform
-> maintainers send us the code they want into the next release by -rc6
-> or -rc7 the latest, so we have some time to merge it and sort it out
-> if needed, and so that it has time to sit in linux-next to discover
-> any problems.
+> Also you removed multi cluster support to avoid CCI and MCPM reuse. I
+> think you may have to rework these completely when adding multi-cluster
+> support. I strongly recommend to reuse the CCI and MPCM code from first
+> instead of reworking again, but I leave it SH platform maintainer to
+> decide.
 
-Ugh, my fault sorry. I'm slack on keeping up with the merge windows.
+Thanks for your feedback,
 
-> So, please resend this pull request once 3.12-rc1 is out, and we'll be
-> happy to queue it up for 3.13 inclusion!
-
-Okay, will do.
-
-~Ryan
+I plan to meet with Magnus in person on Friday and I will
+discuss this issue with him in our capacities as shmobile
+co-maintainers.
