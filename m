@@ -1,66 +1,31 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Wed, 11 Sep 2013 15:36:45 +0530
-Subject: [PATCH 2/2] am335x-boneblack: add eMMC DT entry
-In-Reply-To: <1378879946-13037-3-git-send-email-koen@dominion.thruhere.net>
-References: <1378879946-13037-1-git-send-email-koen@dominion.thruhere.net>
- <1378879946-13037-3-git-send-email-koen@dominion.thruhere.net>
-Message-ID: <523040B5.60407@ti.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 11 Sep 2013 11:39:03 +0100
+Subject: [PATCH v3 5/8] spi: Add Freescale QuadSpi driver
+In-Reply-To: <522FD833.2060801@freescale.com>
+References: <1377828449-18912-1-git-send-email-b32955@freescale.com>
+ <1377828449-18912-6-git-send-email-b32955@freescale.com>
+ <20130910180923.GC29403@sirena.org.uk>
+ <522FD833.2060801@freescale.com>
+Message-ID: <20130911103903.GM29403@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 11 September 2013 11:42 AM, Koen Kooi wrote:
-> Signed-off-by: Koen Kooi <koen@dominion.thruhere.net>
-> ---
->  arch/arm/boot/dts/am335x-bone-common.dtsi |  7 +++++++
->  arch/arm/boot/dts/am335x-boneblack.dts    | 15 +++++++++++++++
->  2 files changed, 22 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/am335x-bone-common.dtsi b/arch/arm/boot/dts/am335x-bone-common.dtsi
-> index ced256c..9c61fef 100644
-> --- a/arch/arm/boot/dts/am335x-bone-common.dtsi
-> +++ b/arch/arm/boot/dts/am335x-bone-common.dtsi
-> @@ -241,6 +241,13 @@
->  			regulator-always-on;
->  		};
->  	};
-> +
-> +	vmmcsd_fixed: fixedregulator at 0 {
-> +		compatible = "regulator-fixed";
-> +		regulator-name = "vmmcsd_fixed";
-> +		regulator-min-microvolt = <3300000>;
-> +		regulator-max-microvolt = <3300000>;
-> +	};
->  };
->  
->  &cpsw_emac0 {
-> diff --git a/arch/arm/boot/dts/am335x-boneblack.dts b/arch/arm/boot/dts/am335x-boneblack.dts
-> index 197cadf..c09947a 100644
-> --- a/arch/arm/boot/dts/am335x-boneblack.dts
-> +++ b/arch/arm/boot/dts/am335x-boneblack.dts
-> @@ -15,3 +15,18 @@
->  	regulator-max-microvolt = <1800000>;
->  	regulator-always-on;
->  };
-> +
-> +&mmc1 { 
-> +	vmmc-supply = <&vmmcsd_fixed>;
-> +};
-> +
-> +&mmc2 { 
-> +	vmmc-supply = <&vmmcsd_fixed>;
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&emmc_pins>;
-> +	bus-width = <8>;
-> +	ti,non-removable;
+On Wed, Sep 11, 2013 at 10:40:51AM +0800, Huang Shijie wrote:
+> ? 2013?09?11? 02:09, Mark Brown ??:
 
-There is a standard binding available for this: "non-removable"
-There should not be a need to introduce a TI specific binding for this
-(I know this is not your fault).
+> > For review and merge it would be much easier to send a patch which
+> > implements just the basic SPI support for this device then add the
+> > support for quad mode separately.
 
-I will send a patch to change the existing .dts files and update the
-driver - can you drop this line for now so we don't introduce more
-incompatibilities? I can send a patch adding "non-removable" to this
-node as part of my clean-up series.
+> okay. I can remove the quad-read support in next version.
 
-Thanks,
-Sekhar
+No need to remove it completely, just split it into another patch - that
+way we can hopefully merge the bits that are just a standard SPI driver
+first even if the other bits are still in discussion.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130911/ac3ade0b/attachment.sig>
