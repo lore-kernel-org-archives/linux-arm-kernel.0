@@ -1,94 +1,44 @@
-From: padma.v@samsung.com (Padmavathi Venna)
-Date: Wed, 11 Sep 2013 11:38:03 +0530
-Subject: [PATCH 1/3] dmaengine: pl330: Set residue in tx_status callback.
-In-Reply-To: <1378879685-5352-1-git-send-email-padma.v@samsung.com>
-References: <1378879685-5352-1-git-send-email-padma.v@samsung.com>
-Message-ID: <1378879685-5352-2-git-send-email-padma.v@samsung.com>
+From: koen@dominion.thruhere.net (Koen Kooi)
+Date: Wed, 11 Sep 2013 08:12:24 +0200
+Subject: [PATCH 0/2] ARM: dts: Beaglebone MMC fixes
+Message-ID: <1378879946-13037-1-git-send-email-koen@dominion.thruhere.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dylan Reid <dgreid@chromium.org>
+Here are two patches to fix MMC on beaglebone, one fixes card detect on BBW,
+the other adds the eMMC entry for BBB and its fixed regulator.
 
-Fill txstate.residue with the amount of bytes remaining in the current
-transfer if the transfer is not complete.  This will be of particular
-use to i2s DMA transfers, providing more accurate hw_ptr values to ASoC.
+This series depends on:
 
-Signed-off-by: Dylan Reid <dgreid@chromium.org>
-Reviewed-by: Olof Johansson <olofj@chromium.org>
-Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
+http://comments.gmane.org/gmane.linux.kernel.stable/63648
+https://lkml.org/lkml/2013/9/10/454
+http://comments.gmane.org/gmane.linux.kernel.mmc/22381
+
+Or as git-cherry would put it:
+
+[koen at rrMBP patches]$ git cherry -v
++ c8436cd15251ea42c7f2decd1cc972de536a7573 ARM: OMAP2+: am335x-bone*: add DT for BeagleBone Black
++ 34596cb58346612101b168b34b7ee75b8b0e9500 ARM: EDMA: Fix clearing of unused list for DT DMA resources
++ af7f273dfbeeec7669c01a81b8c02f4af2fcf1b9 ARM: dts: add AM33XX EDMA support
++ a85f9acc8f48a7cb1a07fb93fcba7bd43aa9c853 ARM: dts: add AM33XX SPI DMA support
++ 72a42fa0b42051251c554d9f75f42b3e9bc6ec8a ARM: dts: add AM33XX MMC support and documentation
++ 93205a3735613d674b209c3c75ad3e0a7d6be136 arm: bone: dts: add CD for mmc1
++ b1bd98705a2da3d02f197d29ca040008ad8c662c am335x-boneblack: add eMMC DT entry
+
+Also available as a git branch at https://github.com/koenkooi/linux/commits/mainline
+
 ---
- drivers/dma/pl330.c |   55 ++++++++++++++++++++++++++++++++++++++++++++++++++-
- 1 files changed, 54 insertions(+), 1 deletions(-)
 
-diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
-index 593827b..7ab9136 100644
---- a/drivers/dma/pl330.c
-+++ b/drivers/dma/pl330.c
-@@ -2476,11 +2476,64 @@ static void pl330_free_chan_resources(struct dma_chan *chan)
- 	spin_unlock_irqrestore(&pch->lock, flags);
- }
- 
-+static inline int
-+pl330_src_addr_in_desc(struct dma_pl330_desc *desc, unsigned int sar)
-+{
-+	return ((desc->px.src_addr <= sar) &&
-+		(sar <= (desc->px.src_addr + desc->px.bytes)));
-+}
-+
-+static inline int
-+pl330_dst_addr_in_desc(struct dma_pl330_desc *desc, unsigned int dar)
-+{
-+	return ((desc->px.dst_addr <= dar) &&
-+		(dar <= (desc->px.dst_addr + desc->px.bytes)));
-+}
-+
-+static unsigned int pl330_tx_residue(struct dma_chan *chan)
-+{
-+	struct dma_pl330_chan *pch = to_pchan(chan);
-+	void __iomem *regs = pch->dmac->pif.base;
-+	struct pl330_thread *thrd = pch->pl330_chid;
-+	struct dma_pl330_desc *desc;
-+	unsigned int sar, dar;
-+	unsigned int residue = 0;
-+	unsigned long flags;
-+
-+	sar = readl(regs + SA(thrd->id));
-+	dar = readl(regs + DA(thrd->id));
-+
-+	spin_lock_irqsave(&pch->lock, flags);
-+
-+	/* Find the desc related to the current buffer. */
-+	list_for_each_entry(desc, &pch->work_list, node) {
-+		if (desc->rqcfg.src_inc && pl330_src_addr_in_desc(desc, sar)) {
-+			residue = desc->px.bytes - (sar - desc->px.src_addr);
-+			goto found_unlock;
-+		}
-+		if (desc->rqcfg.dst_inc && pl330_dst_addr_in_desc(desc, dar)) {
-+			residue = desc->px.bytes - (dar - desc->px.dst_addr);
-+			goto found_unlock;
-+		}
-+	}
-+
-+found_unlock:
-+	spin_unlock_irqrestore(&pch->lock, flags);
-+
-+	return residue;
-+}
-+
- static enum dma_status
- pl330_tx_status(struct dma_chan *chan, dma_cookie_t cookie,
- 		 struct dma_tx_state *txstate)
- {
--	return dma_cookie_status(chan, cookie, txstate);
-+	enum dma_status ret;
-+
-+	ret = dma_cookie_status(chan, cookie, txstate);
-+	if (ret != DMA_SUCCESS) /* Not complete, check amount left. */
-+		dma_set_residue(txstate, pl330_tx_residue(chan));
-+
-+	return ret;
- }
- 
- static void pl330_issue_pending(struct dma_chan *chan)
+Alexander Holler (1):
+  arm: bone: dts: add CD for mmc1
+
+Koen Kooi (1):
+  am335x-boneblack: add eMMC DT entry
+
+ arch/arm/boot/dts/am335x-bone-common.dtsi | 21 +++++++++++++++++++++
+ arch/arm/boot/dts/am335x-bone.dts         |  4 ----
+ arch/arm/boot/dts/am335x-boneblack.dts    | 15 +++++++++++++++
+ 3 files changed, 36 insertions(+), 4 deletions(-)
+
 -- 
-1.7.4.4
+1.8.2.1
