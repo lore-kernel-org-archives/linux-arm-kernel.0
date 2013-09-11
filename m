@@ -1,36 +1,95 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 11 Sep 2013 10:51:43 -0700
-Subject: [PATCH] KVM: ARM: Fix typo in comments of inject_abt()
-In-Reply-To: <1378904662-29521-1-git-send-email-anup.patel@linaro.org>
-References: <1378904662-29521-1-git-send-email-anup.patel@linaro.org>
-Message-ID: <20130911175143.GH9860@cbox>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Wed, 11 Sep 2013 15:00:04 -0300
+Subject: [PATCH v3 0/5] Armada XP clocks for timer
+In-Reply-To: <5226ED8E.6010308@linaro.org>
+References: <1377013554-23389-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20130827085242.GB2286@localhost>
+ <20130902142625.GA15975@localhost>
+ <20130903124633.GI19598@titan.lakedaemon.net>
+ <20130903192632.GM19598@titan.lakedaemon.net>
+ <5226ED8E.6010308@linaro.org>
+Message-ID: <20130911180003.GB11003@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 11, 2013 at 06:34:22PM +0530, Anup Patel wrote:
-> Very minor typo in comments of inject_abt() when we update fault status
-> register for injecting prefetch abort.
+On Wed, Sep 04, 2013 at 10:21:34AM +0200, Daniel Lezcano wrote:
+> On 09/03/2013 09:26 PM, Jason Cooper wrote:
+> > On Tue, Sep 03, 2013 at 08:46:33AM -0400, Jason Cooper wrote:
+> >> On Mon, Sep 02, 2013 at 11:26:26AM -0300, Ezequiel Garcia wrote:
+> >>> On Tue, Aug 27, 2013 at 05:52:42AM -0300, Ezequiel Garcia wrote:
+> >>>> Hi Jason and Daniel:
+> >>>>
+> >>>> (I forgot to Cc Daniel on these series, sorry about that!)
+> >>>>
+> >>>> So, now that we have all the acks we need...
+> >>>>
+> >>>> On Tue, Aug 20, 2013 at 12:45:49PM -0300, Ezequiel Garcia wrote:
+> >>>> [...]
+> >>>>>
+> >>>>> Ezequiel Garcia (5):
+> >>>>>   ARM: mvebu: Add the reference 25 MHz fixed-clock to Armada XP
+> >>>>>   ARM: mvebu: Add clock properties to Armada XP timer node
+> >>>>
+> >>>> Jason: I assume these are ready to get merged through mvebu, right?
+> >>>>
+> >>>>>   clocksource: armada-370-xp: Replace WARN_ON with BUG_ON
+> >>>>>   clocksource: armada-370-xp: Get reference fixed-clock by name
+> >>>>>   clocksource: armada-370-xp: Add detailed clock requirements in
+> >>>>>     devicetree binding
+> >>>>>
+> >>>>
+> >>>> Daniel: Will you pick these?
+> >>>>
+> >>>> BTW: Is there any chance you can add your clocksource tree to linux-next?
+> >>>>
+> >>>> Otherwise, our linux-next builds fail to boot whenever Jason pick some
+> >>>> mvebu commits and therefore appears in linux-next, but the corresponding
+> >>>> clocksource commit is taken by you and missing from linux-next.
+> >>>>
+> >>>
+> >>> Daniel,
+> >>>
+> >>> Any updates on this? The merge is really close now, and I'd like
+> >>> to know if you're going to pick these (and where!) for v3.12.
+> >>>
+> >>> Notice that Jason already took the devicetree patches, so unless
+> >>> you merge the clocksource driver changes for v3.12, we'll have
+> >>> to revert the former.
+> >>
+> >> I saw Daniel's pull, so I just sent the last pull for mvebu/dt including
+> >> these changes.
+> > 
+> > Daniel, did your changes make it in?  If so, I'll have to send these as a
+> > fix for -rc1...
 > 
-> Signed-off-by: Anup Patel <anup.patel@linaro.org>
-> Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
-> ---
->  arch/arm/kvm/emulate.c |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+> Not yet.
 > 
-> diff --git a/arch/arm/kvm/emulate.c b/arch/arm/kvm/emulate.c
-> index bdede9e..d6c0052 100644
-> --- a/arch/arm/kvm/emulate.c
-> +++ b/arch/arm/kvm/emulate.c
-> @@ -354,7 +354,7 @@ static void inject_abt(struct kvm_vcpu *vcpu, bool is_pabt, unsigned long addr)
->  	*vcpu_pc(vcpu) = exc_vector_base(vcpu) + vect_offset;
->  
->  	if (is_pabt) {
-> -		/* Set DFAR and DFSR */
-> +		/* Set IFAR and IFSR */
->  		vcpu->arch.cp15[c6_IFAR] = addr;
->  		is_lpae = (vcpu->arch.cp15[c2_TTBCR] >> 31);
->  		/* Always give debug fault for now - should give guest a clue */
-> -- 
-> 1.7.9.5
-> 
-Thanks, applied.
+
+And given Ingo sent the timer pull in September 3rd, it seems none of that
+clocksource stuff will make it for v3.12.
+
+Jason: If that's the case, then we'll have to ask Olof to revert any patches
+that were included in this two patchsets, and that have been taken by you
+and pulled in arm-soc.
+
+In other words, this one:
+
+commit 5d3b883071763e6448386b875f04fcb201b6e12d
+Author: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+Date:   Tue Aug 13 11:43:15 2013 -0300
+
+    ARM: mvebu: Fix the Armada 370/XP timer compatible strings
+---
+
+Right now, Armada 370/XP boards won't boot using Linus' master,
+because of the above patch.
+
+That said, discussing this with Olof he pointed out it was a very bad
+decision to change the compatible while not retaining the old one,
+since we created precisely this kind of break risk! My bad.
+
+Thanks,
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
