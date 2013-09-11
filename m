@@ -1,59 +1,33 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 11 Sep 2013 08:42:48 +0200
-Subject: [RFC PATCHv2 0/4] Add DT support for fixed PHYs
-In-Reply-To: <1378480701-12908-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1378480701-12908-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20130911064248.GI30088@pengutronix.de>
+From: jbe@pengutronix.de (=?iso-8859-1?q?J=FCrgen_Beisert?=)
+Date: Wed, 11 Sep 2013 09:06:57 +0200
+Subject: [PATCH 3/5] Staging/iio/adc/touchscreen/MXS: add i.MX23 support
+ to the LRADC driver
+In-Reply-To: <20130910205444.GB6329@mwanda>
+References: <1378713801-1182-1-git-send-email-jbe@pengutronix.de>
+ <201309100936.14562.jbe@pengutronix.de> <20130910205444.GB6329@mwanda>
+Message-ID: <201309110906.57373.jbe@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 06, 2013 at 05:18:17PM +0200, Thomas Petazzoni wrote:
-> Hello,
-> 
-> Here is a second version of the patch set that adds a Device Tree
-> binding and the related code to support fixed PHYs. Marked as RFC,
-> this patch set is obviously not intended for merging in 3.12.
-> 
-> Since the first version, the changes have been:
-> 
->  * Instead of using a 'fixed-link' property inside the Ethernet device
->    DT node, with a fairly cryptic succession of integer values, we now
->    use a PHY subnode under the Ethernet device DT node, with explicit
->    properties to configure the duplex, speed, pause and other PHY
->    properties.
-> 
->  * The PHY address is automatically allocated by the kernel and no
->    longer visible in the Device Tree binding.
-> 
->  * The PHY device is created directly when the network driver calls
->    of_phy_connect_fixed_link(), and associated to the PHY DT node,
->    which allows the existing of_phy_connect() function to work,
->    without the need to use the deprecated of_phy_connect_fixed_link().
-> 
-> The things I am not entirely happy with yet are:
-> 
->  * The PHY ID is hardcoded to 0xdeadbeef. Ideally, it should be a
->    properly reserved vendor/device identifier, but it isn't clear how
->    to get one allocated for this purpose.
-> 
->  * The fixed_phy_register() function in drivers/net/phy/fixed.c has
->    some OF references. So ideally, I would have preferred to put this
->    code in drivers/of/of_mdio.c, but to call get_phy_device(), we need
->    a reference to the mii_bus structure that represents the fixed MDIO
->    bus.
-> 
->  * There is some error management missing in fixed_phy_register(), but
->    it can certainly be added easily. This RFC is meant to sort out the
->    general idea.
 
-+1 for the general idea. This really looks good now. I've not much more
-to say. Maybe someone from the devicetree corner has a few words for the
-binding?
+On Tuesday 10 September 2013 22:54:44 Dan Carpenter wrote:
+> On Tue, Sep 10, 2013 at 09:36:14AM +0200, J?rgen Beisert wrote:
+> > > This patch seems to combine two things -- register access rework AND
+> > > adjustment of the driver for MX23 touchscreen.
+> >
+> > It reworks the register access to avoid the i.MX23/i.MX28 runtime
+> > decision all over the code again and again. This is what Dan has
+> > recommended in his comment.
+>
+> I thought the same as Marek that it would be better as two patches like
+> the one I sent, but I was also willing to let it slide if no one else
+> complained.
 
-Sascha
+Okay, new (re-worked) patch series will follow.
+
+Regards,
+Juergen
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?| Juergen Beisert ? ? ? ? ? ? |
+Linux Solutions for Science and Industry ? ? ?| http://www.pengutronix.de/  |
