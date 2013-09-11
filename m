@@ -1,117 +1,96 @@
-From: emilio@elopez.com.ar (=?UTF-8?q?Emilio=20L=C3=B3pez?=)
-Date: Tue, 10 Sep 2013 22:43:01 -0300
-Subject: [PATCH RFC] of: add a basic memory driver
-Message-ID: <1378863781-4235-1-git-send-email-emilio@elopez.com.ar>
+From: acourbot@nvidia.com (Alex Courbot)
+Date: Wed, 11 Sep 2013 10:58:00 +0900
+Subject: [PATCH 3/7] misc: ixp4-beeper: use gpiolib strictly
+In-Reply-To: <1378816226-8016-1-git-send-email-linus.walleij@linaro.org>
+References: <1378816226-8016-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <522FCE28.8020909@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This driver's only job is to claim and ensure that the necessary clock
-for memory operation on a DT-enabled machine remains enabled.
+On 09/10/2013 09:30 PM, Linus Walleij wrote:
+> Request and free the GPIO line used for the beeper properly.
+> Then use the gpiolib API to flip the output of the GPIO pin
+> instead of relying on hacks to poke the register bits.
+>
+> Cc: Imre Kaloz <kaloz@openwrt.org>
+> Cc: Krzysztof Halasa <khc@pm.waw.pl>
+> Cc: Alexandre Courbot <acourbot@nvidia.com>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+> Arnd/Greg: seeking your ACK to take this through the GPIO tree
+> as part of the attempt at cleaning out custom GPIO implementations.
+> ---
+>   drivers/input/misc/ixp4xx-beeper.c | 13 +++++++++++--
+>   1 file changed, 11 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/input/misc/ixp4xx-beeper.c b/drivers/input/misc/ixp4xx-beeper.c
+> index f14afd0..fb3bec5 100644
+> --- a/drivers/input/misc/ixp4xx-beeper.c
+> +++ b/drivers/input/misc/ixp4xx-beeper.c
+> @@ -76,11 +76,13 @@ static int ixp4xx_spkr_event(struct input_dev *dev, unsigned int type, unsigned
+>
+>   static irqreturn_t ixp4xx_spkr_interrupt(int irq, void *dev_id)
+>   {
+> +	unsigned int pin = (unsigned int) dev_id;
+> +
+>   	/* clear interrupt */
+>   	*IXP4XX_OSST = IXP4XX_OSST_TIMER_2_PEND;
+>
+>   	/* flip the beeper output */
+> -	*IXP4XX_GPIO_GPOUTR ^= (1 << (unsigned int) dev_id);
+> +	gpio_set_value(pin, ~gpio_get_value(pin));
 
-Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
----
+Don't you want
 
-Hi,
+	gpio_set_value(pin, !gpio_get_value(pin));
 
-I am currently facing an issue with the clock setup: a critical but
-unclaimed clock gets disabled as a side effect of disabling one of its
-children. The clock setup looks something like this:
+instead? From the deleted line I suppose you guess to invert the GPIO 
+value, but using ~ will invert all the bits of the integer returned by 
+gpio_get_value(), meaning that if it returns 1 you will end up calling 
+gpio_set_value(-2). In practice your gpio is very unlikely to ever be 
+set to 0.
 
-      PLL
-       |
- ------------
- |          |
-DDR       Others
-            |
-          periph
+>
+>   	return IRQ_HANDLED;
+>   }
+> @@ -108,11 +110,15 @@ static int ixp4xx_spkr_probe(struct platform_device *dev)
+>   	input_dev->sndbit[0] = BIT_MASK(SND_BELL) | BIT_MASK(SND_TONE);
+>   	input_dev->event = ixp4xx_spkr_event;
+>
+> +	err = gpio_request(dev->id, "ixp4-beeper");
+> +	if (err)
+> +		goto err_free_device;
+> +
+>   	err = request_irq(IRQ_IXP4XX_TIMER2, &ixp4xx_spkr_interrupt,
+>   			  IRQF_NO_SUSPEND, "ixp4xx-beeper",
+>   			  (void *) dev->id);
+>   	if (err)
+> -		goto err_free_device;
+> +		goto err_free_gpio;
+>
+>   	err = input_register_device(input_dev);
+>   	if (err)
+> @@ -124,6 +130,8 @@ static int ixp4xx_spkr_probe(struct platform_device *dev)
+>
+>    err_free_irq:
+>   	free_irq(IRQ_IXP4XX_TIMER2, (void *)dev->id);
+> + err_free_gpio:
+> +	gpio_free(dev->id);
+>    err_free_device:
+>   	input_free_device(input_dev);
+>
+> @@ -142,6 +150,7 @@ static int ixp4xx_spkr_remove(struct platform_device *dev)
+>   	ixp4xx_spkr_control(pin, 0);
+>
+>   	free_irq(IRQ_IXP4XX_TIMER2, (void *)dev->id);
+> +	gpio_free(dev->id);
 
-The PLL clock is marked with the CLK_IGNORE_UNUSED flag, so on a normal
-boot it remains on, even after the unused clocks cleanup code runs. The
-problem occurs when someone enables "periph" and then, later on, disables
-it: the framework starts disabling clocks upwards on the tree, 
-eventually switching the PLL off (and that kills the machine, as the memory
-clock is shut down).
+Just wondering, is there a reason for not using the devm_gpio functions 
+here?
 
-There's two possible solutions I can think of:
- 1) add some extra checks on the framework to not turn off clocks marked
-    with such a flag on the non-explicit case (ie, when I'm disabling
-    some other clock)
- 2) create an actual user of the DDR clock, that way it won't get
-    disabled simply because it's being used.
-
-I considered 1) and implemented it, but the result was not pretty. This 
-patch is my take on 2). Please let me know what you think; all feedback
-is welcome :)
-
-Cheers,
-
-Emilio
-
- drivers/of/Kconfig     |  6 ++++++
- drivers/of/Makefile    |  1 +
- drivers/of/of_memory.c | 30 ++++++++++++++++++++++++++++++
- 3 files changed, 37 insertions(+)
- create mode 100644 drivers/of/of_memory.c
-
-diff --git a/drivers/of/Kconfig b/drivers/of/Kconfig
-index 9d2009a..f6c5e20 100644
---- a/drivers/of/Kconfig
-+++ b/drivers/of/Kconfig
-@@ -80,4 +80,10 @@ config OF_RESERVED_MEM
- 	help
- 	  Initialization code for DMA reserved memory
- 
-+config OF_MEMORY
-+	depends on COMMON_CLK
-+	def_bool y
-+	help
-+	  Simple memory initialization
-+
- endmenu # OF
-diff --git a/drivers/of/Makefile b/drivers/of/Makefile
-index ed9660a..15f0167 100644
---- a/drivers/of/Makefile
-+++ b/drivers/of/Makefile
-@@ -10,3 +10,4 @@ obj-$(CONFIG_OF_PCI)	+= of_pci.o
- obj-$(CONFIG_OF_PCI_IRQ)  += of_pci_irq.o
- obj-$(CONFIG_OF_MTD)	+= of_mtd.o
- obj-$(CONFIG_OF_RESERVED_MEM) += of_reserved_mem.o
-+obj-$(CONFIG_OF_MEMORY) += of_memory.o
-diff --git a/drivers/of/of_memory.c b/drivers/of/of_memory.c
-new file mode 100644
-index 0000000..a833f7a
---- /dev/null
-+++ b/drivers/of/of_memory.c
-@@ -0,0 +1,30 @@
-+/*
-+ * Simple memory driver
-+ */
-+
-+#include <linux/of.h>
-+#include <linux/clk.h>
-+
-+static int __init of_memory_enable(void)
-+{
-+	struct device_node *np;
-+	struct clk *clk;
-+
-+	np = of_find_node_by_path("/memory");
-+	if (!np) {
-+		pr_err("no /memory on DT!\n");
-+		return 0;
-+	}
-+
-+	clk = of_clk_get(np, 0);
-+	if (!IS_ERR(clk)) {
-+		clk_prepare_enable(clk);
-+		clk_put(clk);
-+	}
-+
-+	of_node_put(np);
-+
-+	return 0;
-+}
-+
-+device_initcall(of_memory_enable);
--- 
-1.8.4
+>
+>   	return 0;
+>   }
+>
