@@ -1,86 +1,80 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Wed, 11 Sep 2013 17:02:22 +0100
-Subject: [PATCH v2 1/2] video: ARM CLCD: Add DT support
-In-Reply-To: <20130910194324.GE12758@n2100.arm.linux.org.uk>
-References: <1378808726-32535-1-git-send-email-pawel.moll@arm.com>
- <20130910194324.GE12758@n2100.arm.linux.org.uk>
-Message-ID: <1378915342.4082.140.camel@hornet>
+From: liuj97@gmail.com (Jiang Liu)
+Date: Thu, 12 Sep 2013 00:07:08 +0800
+Subject: [RFC PATCH v2 04/25] smp, ARM: kill SMP single function call interrupt
+In-Reply-To: <1378915649-16395-1-git-send-email-liuj97@gmail.com>
+References: <1378915649-16395-1-git-send-email-liuj97@gmail.com>
+Message-ID: <1378915649-16395-5-git-send-email-liuj97@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2013-09-10 at 20:43 +0100, Russell King - ARM Linux wrote:
-> On Tue, Sep 10, 2013 at 11:25:25AM +0100, Pawel Moll wrote:
-> > +#ifdef CONFIG_OF
-> > +static int clcdfb_of_get_tft_panel(struct device_node *node,
-> > +		struct clcd_panel *panel)
-> > +{
-> > +	int err;
-> > +	u32 rgb[3];
-> > +
-> > +	err = of_property_read_u32_array(node, "panel-tft-interface", rgb, 3);
-> > +	if (err)
-> > +		return err;
-> > +
-> > +	/* Bypass pixel clock divider, data output on the falling edge */
-> > +	panel->tim2 = TIM2_BCD | TIM2_IPC;
-> > +
-> > +	/* TFT display, vert. comp. interrupt at the start of the back porch */
-> > +	panel->cntl |= CNTL_LCDTFT | CNTL_LCDVCOMP(1);
-> > +
-> > +	if (rgb[0] >= 4 && rgb[1] >= 4 && rgb[2] >= 4)
-> > +		panel->caps |= CLCD_CAP_444;
-> > +	if (rgb[0] >= 5 && rgb[1] >= 5 && rgb[2] >= 5)
-> > +		panel->caps |= CLCD_CAP_5551;
-> > +	if (rgb[0] >= 5 && rgb[1] >= 6 && rgb[2] >= 5)
-> > +		panel->caps |= CLCD_CAP_565;
-> > +	if (rgb[0] >= 8 && rgb[1] >= 8 && rgb[2] >= 8)
-> > +		panel->caps |= CLCD_CAP_888;
-> 
-> This definitely isn't right.  Why does a panel which has 8 bits of RGB
-> get to indicate that it supports everything below it?
-> 
-> This is not how this hardware works.  Look at table A-7 in the TRM.
-> If you wire the CLCD controller directly to a panel which is 8-bit RGB
-> only, it can't support any of the other formats.
-> 
-> The CLCD controller itself can only support on the hardware 8-bits of
-> RGB or 5 bits of RGB plus an intensity bit, so that's two formats.
+From: Jiang Liu <jiang.liu@huawei.com>
 
-I must admit I didn't checked the PL110 CLD multiplexing scheme, naively
-expecting it to be the same as PL111. My bad, thanks for pointing this
-out.
+Commit 9a46ad6d6df3b54 "smp: make smp_call_function_many() use logic
+similar to smp_call_function_single()" has unified the way to handle
+single and multiple cross-CPU function calls. Now only one interrupt
+is needed for architecture specific code to support generic SMP function
+call interfaces, so kill the redundant single function call interrupt.
 
-The code above works for PL111 - the signals are laid so with full 888
-wiring and 444 mode the bottom bits are reserved (see table A.10). In
-reality they're zeros, so the colour space is narrowed.
+Signed-off-by: Jiang Liu <jiang.liu@huawei.com>
+---
+ arch/arm/include/asm/hardirq.h |  2 +-
+ arch/arm/kernel/smp.c          | 10 +---------
+ 2 files changed, 2 insertions(+), 10 deletions(-)
 
-Seems that the code will have to behave differently for PL110 and PL111
-here.
-
-> However, things are complicated by ARMs addition of an external mux
-> on the CLCD output, which gives us the other format possibilities
-> by munging the signals to give appropriate formats in the framebuffer
-> memory.  In other words, in RGB444 mode, the mux ends up taking
-> red from CLD[4:1], green from CLD[9:7,5], blue from CLD[14:13,11:10].
-
-It's the Versatile AB/PB hacked CLCD, PL110/111 hybrid, right? It
-doesn't really fall into the "arm,pl110" and "arm,pl111" compatible
-value, so would need to be something like "arm,versatile,clcdc" and
-require custom code. I don't think I want to solve this problem right
-now.
-
-> This is one of the dangers of directly converting what's in the kernel
-> to DT properties without getting the hardware documentation and fully
-> understanding that first - remember, DT properties are supposed to be
-> based on the hardware, not the Linux implementation.
-
-I don't think I've directly converted what's in the kernel to DT
-properties. There is no "caps" property in the binding. There is only
-information how is the cell wired up to a panel, and this information is
-valid for both PL110 and PL111 as it is. My fault I've believed when was
-told that "the two are basically the same." and should have compared the
-TRMs in details.
-
-Will fix the code.
-
-Pawe?
+diff --git a/arch/arm/include/asm/hardirq.h b/arch/arm/include/asm/hardirq.h
+index 2740c2a..436e60b 100644
+--- a/arch/arm/include/asm/hardirq.h
++++ b/arch/arm/include/asm/hardirq.h
+@@ -5,7 +5,7 @@
+ #include <linux/threads.h>
+ #include <asm/irq.h>
+ 
+-#define NR_IPI	6
++#define NR_IPI	5
+ 
+ typedef struct {
+ 	unsigned int __softirq_pending;
+diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+index 2dc1934..4ea5994 100644
+--- a/arch/arm/kernel/smp.c
++++ b/arch/arm/kernel/smp.c
+@@ -65,7 +65,6 @@ enum ipi_msg_type {
+ 	IPI_TIMER,
+ 	IPI_RESCHEDULE,
+ 	IPI_CALL_FUNC,
+-	IPI_CALL_FUNC_SINGLE,
+ 	IPI_CPU_STOP,
+ };
+ 
+@@ -475,7 +474,7 @@ void arch_send_wakeup_ipi_mask(const struct cpumask *mask)
+ 
+ void arch_send_call_function_single_ipi(int cpu)
+ {
+-	smp_cross_call(cpumask_of(cpu), IPI_CALL_FUNC_SINGLE);
++	smp_cross_call(cpumask_of(cpu), IPI_CALL_FUNC);
+ }
+ 
+ static const char *ipi_types[NR_IPI] = {
+@@ -484,7 +483,6 @@ static const char *ipi_types[NR_IPI] = {
+ 	S(IPI_TIMER, "Timer broadcast interrupts"),
+ 	S(IPI_RESCHEDULE, "Rescheduling interrupts"),
+ 	S(IPI_CALL_FUNC, "Function call interrupts"),
+-	S(IPI_CALL_FUNC_SINGLE, "Single function call interrupts"),
+ 	S(IPI_CPU_STOP, "CPU stop interrupts"),
+ };
+ 
+@@ -649,12 +647,6 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
+ 		irq_exit();
+ 		break;
+ 
+-	case IPI_CALL_FUNC_SINGLE:
+-		irq_enter();
+-		generic_smp_call_function_single_interrupt();
+-		irq_exit();
+-		break;
+-
+ 	case IPI_CPU_STOP:
+ 		irq_enter();
+ 		ipi_cpu_stop(cpu);
+-- 
+1.8.1.2
