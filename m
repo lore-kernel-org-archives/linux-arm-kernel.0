@@ -1,166 +1,48 @@
-From: chander.kashyap@linaro.org (Chander Kashyap)
-Date: Wed, 11 Sep 2013 09:52:22 +0530
-Subject: [RFC Patch v2 0/3] add temporary parent migration support
-In-Reply-To: <CAPtuhTgxizdFp2paS-y+Ecaqnm9WnnoF3dV7x=t6UAQ_nBTZng@mail.gmail.com>
-References: <1378208072-10173-1-git-send-email-chander.kashyap@linaro.org>
- <3927125.3UOplv4uU5@localhost> <20130904174328.10934.18433@quantum>
- <8013969.VJd4Ll2ItG@localhost>
- <CAPtuhTgxizdFp2paS-y+Ecaqnm9WnnoF3dV7x=t6UAQ_nBTZng@mail.gmail.com>
-Message-ID: <CANuQgHGThWpeBnuQNi9t=LnOsaVFVF_=TOnF7TXUvaJeum7hfw@mail.gmail.com>
+From: koen@dominion.thruhere.net (Koen Kooi)
+Date: Wed, 11 Sep 2013 07:18:32 +0200
+Subject: [PATCH 0/3] ARM: dts: Enable EDMA, MMC and SPI on AM33XX for v3.13
+In-Reply-To: <522F7DC0.7030603@ti.com>
+References: <1378841079-15796-1-git-send-email-joelf@ti.com>
+ <5EB8AE91-A996-4CF1-86B7-C8FDEC177E89@dominion.thruhere.net>
+ <522F7DC0.7030603@ti.com>
+Message-ID: <88E4C15C-B1AA-4A39-A5E1-CF9E8420C2BE@dominion.thruhere.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6 September 2013 00:02, Mike Turquette <mturquette@linaro.org> wrote:
-> On Wed, Sep 4, 2013 at 11:01 AM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
->> On Wednesday 04 of September 2013 10:43:28 Mike Turquette wrote:
->>> Quoting Tomasz Figa (2013-09-03 15:36:50)
->>>
->>> > Hi Chander,
->>> >
->>> > On Tuesday 03 of September 2013 17:04:28 Chander Kashyap wrote:
->>> > > Some platform has provision to change cpu parent clock during
->>> > > cpu frequency scaling. This patch series provides a mechanism to
->>> > > implement the same using CCF.
->>> > >
->>> > > Patch1 provides mechanism to migrate to new parent temporarily.
->>> > >
->>> > > Patch2 updates the user of clk_register_mux and DEFINE_CLK_MUX which
->>> > > are modified to add support for clk migration.
->>> > >
->>> > > Patch3 adds support to Exynos5250 to use the clock parent migration
->>> > > feature implemented in CCF.
->>> >
->>> > I don't really like this approach. A need to change mux setting
->>> > temporarily is heavily platform-specific and I don't think it should
->>> > be
->>> > handled by generic code.
->>>
->>> I agree with Tomasz.
->>>
->>> > First of all there are many factor that you would
->>> >
->>> > have to account for to make this solution generic, such as:
->>> >  - board specific alternative parents,
->>> >  - exact moment of parent change,
->>> >  - some other platform specific conditions, like CPU voltage that must
->>> >  be>
->>> > changed when mux is changed, because it changes CPU frequency,
->>> >
->>> >  - and probably a lot of more factors that only people working with
->>> >  all
->>> >
->>> > the platforms supported (and unsupported yet) by Linux.
->>> >
->>> > I can see at least two solutions for this problem that don't require
->>> > changing core code of common clock framework:
->>> >
->>> > 1) Implementing a special clock type using normal mux ops, but also
->>> > registering a notifier for its PRE_RATE_CHANGE and POST_RATE_CHANGE
->>> > events to perform parent switching.
->>>
->>> Creating a custom clock type is the way to go here. It is possible to
->>> wrap the mux clk_ops to re-use that code, or just write a custom clock
->>> type from scratch.
->>>
->>> I do not like using the clock rate-change notifiers for this purpose.
->>> The notifiers provide hooks to drivers that need to take care around
->>> clock transitions. Using the notifiers from within the clock framework
->>> indicates poor design.
->>
->> I was not sure how a .set_parent() from inside a .set_rate() would
->> interact with rate setting, so I mentioned notifiers here, but now as I
->> think of it, CCF is supposed to be re-entrant, so things should be fine.
->>
->>> > 2) Using normal mux clock, but registering such notifiers in clock
->>> > controller or cpufreq driver.
->>>
->>> This depends on what the data sheet or reference manual states. If using
->>> a temporary parent is a property of the clock programming sequence
->>> (e.g. to have a glitch-less transition) then that logic belongs in the
->>> clock provider driver (i.e. a custom clock type needs to be created
->>> with this logic).
->>>
->>> However if using a temporary parent is not required for programming the
->>> clock, but is instead a requirement of the clock consumer (e.g. a CPU,
->>> or some I/O controller) then perhaps putting this logic in that driver
->>> is the right way to go. In that case the logic could be explicit:
->>>
->>>       clk_set_parent(clk, temp_parent);
->>>       clk_set_rate(clk, target_rate);
->>>       clk_set_parent(clk, target_parent);
->>>
->>> Or it could implicit with the use of rate-change notifiers. Again the
->>> rate-change notifiers exist for clock consumer drivers to use, so this
->>> is OK.
->>>
->>> I have a hunch that the right way to do this is for a custom clock type
->>> to be created which simply calls clk_set_parent from within the clock's
->>> .set_rate callback, but I'll wait on feedback from Chander on the needs
->>> of his platform.
->>
->> I believe Chander has exactly the same use case for this as we have for
->> Exynos 4210 and 4x12.
->>
->> On these SoCs, CPU frequency is being scaled by reconfiguring PLL, which
->> needs to be masked for locking time. To let the CPU operate normally, a
->> mux that allows switching CPU clock domain between two PLLs can be
->> switched to the other PLL (MPLL) until the main ARM PLL (APLL) starts
->> operating again.
->
-> Right, this is the "glitchless" operation I mentioned earlier and it
-> is not uncommon in PLLs.
->
->>
->> However this issue is not limited to clocks, because there must be also a
->> voltage transition involved if the utility PLL has frequency higher than
->> the one currently being reconfigured.
->
-> Right, that is an altogether different issue. What I would like to see
-> is the temporary parent managed by calls to clk_set_parent from within
-> a custom .set_rate callback.
->
-> As for the voltage scaling, it would be cool to see this working with
-> the voltage notifier series I posted recently. Both parents of the
-> PLLs can have their own operating point tables and each transition
-> would fire off notifiers that scale voltage. Something like this:
->
-> clk_set_rate(pll, rate)
-> -> enter .set_rate
->   -> clk_set_parent(pll, temp_parent)
->     -> temp_parent PRE_RATE_CHANGE notifier is triggered, maybe scale voltage
->     -> .set_parent callback
->     -> temp_parent POST_RATE_CHANGE notifier is triggered, maybe scale voltage
->   -> pll PRE_RATE_CHANGE notifier is triggered, maybe scale voltage
->   -> .set_rate callback
->   -> pll POST_RATE_CHANGE notifier is triggered, maybe scale voltage
->   -> clk_set_parent(pll, original_parent)
->     -> original_parent PRE_RATE_CHANGE notifier is triggered, maybe
-> scale voltage
->     -> .set_parent callback
->     -> original_parent POST_RATE_CHANGE notifier is triggered, maybe
-> scale voltage
->
-> There is some inefficiency in calling the notifiers three times, but
-> the solution is generic.
->
-> I'm sending this from the gmail web interface so hopefully the spacing
-> is preserved...
->
 
-Thanks Mike. Looking at the feedback it seems doing this in generic
-way is not clean enough.
-I will redesign it within platform and resend.
+Op 10 sep. 2013, om 22:14 heeft Joel Fernandes <joelf@ti.com> het volgende geschreven:
 
+> On 09/10/2013 02:39 PM, Koen Kooi wrote:
+>> 
+>> Op 10 sep. 2013, om 21:24 heeft Joel Fernandes <joelf@ti.com> het volgende geschreven:
+>> 
+>>> Here are last few patches required to add EDMA and MMC/SPI support for AM33xx.
+>>> 
+>>> Now that all dependent DMA patches and fixes are in linux next or mainline, except
+>>> for [1] which should go in for 3.12 -rc cycle, it is safe to enable MMC and SPI support
+>>> and this patch series enables it. These are originally Matt Porter's patches with
+>>> changes to make it work with recent kernels, addition of irq, memory resources and
+>>> enable other extra properties.
+>>> 
+>>> These patches should cleanly apply on master branch after Koen's patch [2] for basic
+>>> BBB DT support is applied.
+>>> 
+>>> MMC support is enabled for: Beaglebone, AM335x EVM and EVM-SK boards. MMC support
+>>> for BBB is intentionally not added due to custom fixes and other patches that are
+>>> in Koen's tree and which will be separately submitted by him.
+>> 
+>> Correct, but your patches for MMC support on BBW are missing the card detect entries to make it hotplug work.
+> 
+> I thought it was determined that this would be submitted by you separately after
+> rebasing as we discussed [1] and [2].
+
+I have no problem submitting that, I just think it's weird that the patch you submitted contains a known broken version for BBW.
+
+> 
+> [1] https://lkml.org/lkml/2013/9/6/183
+> [2] http://marc.info/?l=linux-omap&m=137879246709612&w=2
+> 
+> 
 > Regards,
-> Mike
->
->>
->> Best regards,
->> Tomasz
->>
-
-
-
--- 
-with warm regards,
-Chander Kashyap
+> 
+> -Joel
