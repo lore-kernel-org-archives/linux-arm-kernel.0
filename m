@@ -1,40 +1,39 @@
-From: shijie8@gmail.com (Huang Shijie)
-Date: Thu, 12 Sep 2013 23:14:47 -0400
+From: dwmw2@infradead.org (David Woodhouse)
+Date: Thu, 12 Sep 2013 16:22:02 +0100
 Subject: [PATCH v3 0/8] Add the Quadspi driver for vf610-twr
-In-Reply-To: <1378994596.2627.449.camel@shinybook.infradead.org>
-References: <52304BFF.4060007@freescale.com>
- <20130911113002.GP29403@sirena.org.uk>
- <523186DF.4070203@freescale.com>
- <1378982395.2627.416.camel@shinybook.infradead.org>
- <20980858CB6D3A4BAE95CA194937D5E73EA0EE8B@DBDE04.ent.ti.com>
- <1378984665.2627.423.camel@shinybook.infradead.org>
- <20130912114831.GL29403@sirena.org.uk>
- <1378987323.2627.429.camel@shinybook.infradead.org>
- <20130912134345.GQ29403@sirena.org.uk>
- <1378994596.2627.449.camel@shinybook.infradead.org>
-Message-ID: <20130913031444.GB3051@gmail.com>
+In-Reply-To: <20130913025827.GA3051@gmail.com>
+References: <593AEF6C47F46446852B067021A273D6D984000B@MUCSE039.lantiq.com>
+ <20130905020435.GA3970@gmail.com>
+ <20980858CB6D3A4BAE95CA194937D5E73EA0C7F4@DBDE04.ent.ti.com>
+ <522817D7.1010206@freescale.com> <522D3B79.3060707@freescale.com>
+ <52318953.6090405@freescale.com>
+ <1378979431.2627.402.camel@shinybook.infradead.org>
+ <20130913025827.GA3051@gmail.com>
+Message-ID: <1378999322.4210.95.camel@i7.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 12, 2013 at 03:03:16PM +0100, David Woodhouse wrote:
-> On Thu, 2013-09-12 at 14:43 +0100, Mark Brown wrote:
-> > 
+On Thu, 2013-09-12 at 22:58 -0400, Huang Shijie wrote:
 > 
-> So to go back to your question: the commands that it "knows" we are
-> going to send are indeed specific to (one particular type of) SPI NOR
-> flash. But there's nothing on the MTD side which justifies that
-> assumption. Even if you use a different type of SPI NOR flash which uses
-> different opcodes for its commands, this broken scheme will fall over.
+> But for the quadspi driver, it does not need this information.
+> 
+> When the drivers knows that it is a Quad-read transaction, it will uses
+> the relative LUT sequence which uses the 4 lines.
 
-Beside the quad-read/ddr-quad-read commands, all the commands needed by
-this driver is common. If we do not enable the quad-read, this driver
-can works with the fast-read mode.
+But the controller driver shouldn't *have* that incestuous knowledge of
+the command set of the chip that happens to be connected to it.
 
-If we use a different NOR which uses different opcodes
-(different quad-read opcodes ?), i should add a small patch to fix it. 
+That's what we're *complaining* about.
 
+It *should* "need this information", and should just do what it's *told*
+to do by the slave device driver.
 
-I think i should follow Mark's advice to split out the quad-read code.
-
-thanks
-Huang Shijie
+-- 
+dwmw2
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: smime.p7s
+Type: application/x-pkcs7-signature
+Size: 5745 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130912/a88c7648/attachment.bin>
