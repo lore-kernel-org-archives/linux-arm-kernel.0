@@ -1,30 +1,32 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 12 Sep 2013 13:28:05 +0100
-Subject: [PATCH 0/3] perf: parse the dwarf backtrace info from
- .debug_frame section
-In-Reply-To: <20130912121953.GX31370@twins.programming.kicks-ass.net>
-References: <1378720815-23964-1-git-send-email-jean.pihet@linaro.org>
- <CAFrcx1mQ-P7byYfqP-0bYabUzTDeSWyHFx2FJQ6wQLYEcV_Pxw@mail.gmail.com>
- <20130912121953.GX31370@twins.programming.kicks-ass.net>
-Message-ID: <20130912122805.GG15357@mudshark.cambridge.arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 12 Sep 2013 13:32:28 +0100
+Subject: [PATCH 01/38] ARM: ux500: Remove PrimeCell IDs from Nomadik
+ I2C DT nodes
+In-Reply-To: <CACRpkdY-N_VJwdo4+y9-9==+iC_w4qSiiE2oY-hp_jgsJyxQbg@mail.gmail.com>
+References: <CAOesGMgySNLKo_H0h4MCbAWvyW0h2bWa96drWBpnhAYYQwH9mw@mail.gmail.com>
+ <20130910153037.GA11227@lee--X1>
+ <CAOesGMiBN5SaEY26SxGaw9E4ViR3cC0PcwNMEd4cLJZMfomprQ@mail.gmail.com>
+ <CACRpkdY24uU=tXirJqrxLH-45ORFGybJOg-2tDOkpSmFUQUiiw@mail.gmail.com>
+ <20130911081911.GI11227@lee--X1>
+ <CACRpkdY6v+LMggLBdfKc3VUPmRZXTf1zBi4a93EPhQeo21wMeQ@mail.gmail.com>
+ <CAF2Aj3iPdqM-+FQ7R9MZ-6jV1Q1me9TG1P4cEGA7fSBBYH92zA@mail.gmail.com>
+ <CACRpkdYfeao6bvwjq7YJhBNCoC_JVxPTwYzPPiWM0tgUQreJKg@mail.gmail.com>
+ <CAOesGMi7zbGuBBaUToe7=PUJvUUT8FkdMAWzfCE0igpYiYTZSg@mail.gmail.com>
+ <CACRpkdY-N_VJwdo4+y9-9==+iC_w4qSiiE2oY-hp_jgsJyxQbg@mail.gmail.com>
+Message-ID: <20130912123228.GJ12758@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 12, 2013 at 01:19:53PM +0100, Peter Zijlstra wrote:
-> On Thu, Sep 12, 2013 at 02:07:23PM +0200, Jean Pihet wrote:
-> > Hi,
-> > 
-> > -- Adding more maintainers in the To: list --
-> > 
-> > Ping about the patch set, is this one acceptable for mainline?
-> 
-> The below looks to be mostly ARM bits and I would suspect Will to take
-> care of them.
+On Thu, Sep 12, 2013 at 02:23:48PM +0200, Linus Walleij wrote:
+> Yeah somewhere the bit-banging from the LL-prints that just
+> hammer the hardware start conflicting with the kernel control
+> over the same port. I guess it's the same for all users of the
+> PL011.
 
-I wrote those bits too, so I'm happy to take them via my tree. I'd rather
-wait for the last patch to have an ack from somebody like Acme (or for them
-to take it in the tip/perf tree) before I push anything though.
+That shouldn't happen, unless the port becomes disabled (eg, you're
+not using the LL-debug port as your console, and its then placed into
+a low power mode.)
 
-Cheers,
-
-Will
+Again, let me re-interate what LL-debug is for: it's there to assist
+getting the early boot up and running.  Once the early boot is working,
+it should *not* be used.
