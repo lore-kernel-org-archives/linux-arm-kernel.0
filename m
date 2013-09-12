@@ -1,41 +1,53 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 12 Sep 2013 15:40:08 +0100
-Subject: [PATCH 1/4] Add smp support for Allwinner A20(sunxi 7i).
-In-Reply-To: <1378968687-8200-2-git-send-email-cinifr@gmail.com>
-References: <1378968687-8200-1-git-send-email-cinifr@gmail.com>
- <1378968687-8200-2-git-send-email-cinifr@gmail.com>
-Message-ID: <20130912144008.GM12758@n2100.arm.linux.org.uk>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Thu, 12 Sep 2013 15:44:50 +0100
+Subject: [PATCH v5 11/13] xen: introduce xen_alloc/free_coherent_pages
+In-Reply-To: <20130912135347.GA23425@darko.cambridge.arm.com>
+References: <20130906141444.GE1946@arm.com>
+ <alpine.DEB.2.02.1309061554260.6397@kaball.uk.xensource.com>
+ <20130906155928.GH1946@arm.com>
+ <alpine.DEB.2.02.1309061706480.6397@kaball.uk.xensource.com>
+ <20130906162018.GJ1946@arm.com>
+ <alpine.DEB.2.02.1309061740050.6397@kaball.uk.xensource.com>
+ <8492887B-2509-42B5-A5F9-A711C519D912@arm.com>
+ <alpine.DEB.2.02.1309091732230.6397@kaball.uk.xensource.com>
+ <20130911093646.GA26777@darko.cambridge.arm.com>
+ <alpine.DEB.2.02.1309111825210.32236@kaball.uk.xensource.com>
+ <20130912135347.GA23425@darko.cambridge.arm.com>
+Message-ID: <alpine.DEB.2.02.1309121541290.32236@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some other comments:
+On Thu, 12 Sep 2013, Catalin Marinas wrote:
+> On Wed, Sep 11, 2013 at 06:34:17PM +0100, Stefano Stabellini wrote:
+> > On Wed, 11 Sep 2013, Catalin Marinas wrote:
+> > >  static inline void set_dma_ops(struct device *dev, struct dma_map_ops *ops)
+> > >  {
+> > >  	BUG_ON(!dev);
+> > > @@ -32,7 +39,7 @@ static inline void set_dma_ops(struct device *dev, struct dma_map_ops *ops)
+> > >  
+> > >  static inline int dma_set_mask(struct device *dev, u64 mask)
+> > >  {
+> > > -	return get_dma_ops(dev)->set_dma_mask(dev, mask);
+> > > +	return __get_dma_ops(dev)->set_dma_mask(dev, mask);
+> > >  }
+> > >  
+> > >  #ifdef __arch_page_to_dma
+> > 
+> > I don't understand the reason for this change though: shouldn't
+> > set_dma_mask go via the "default" (whatever that is), like the others?
+> 
+> Under Xen, this would mean xen_dma_ops->set_dma_mask(). I thought you
+> want to set the default dma address.
+> 
+> I can see why you may want set_dma_mask() for xen_dma_ops but in also
+> needs to be passed to __get_dma_ops(dev)->set_dma_ops() otherwise the
+> actual dma_alloc_attrs() will miss the mask (and on arm64 it does
+> bouncing via swiotlb).
+ 
+xen_dma_ops->set_dma_mask() is implemented by
+drivers/xen/swiotlb-xen.c:xen_swiotlb_set_dma_mask (provided by this
+patch series). The function takes care of setting:
 
-On Thu, Sep 12, 2013 at 02:51:24PM +0800, Fan Rong wrote:
-> +    /* L1RSTDISABLE hold low */
-> +	pwr_reg = readl(cc_base + AW_CPUCFG_GENCTL);
-> +	pwr_reg &= ~(1<<cpu);
+*dev->dma_mask = dma_mask;
 
-If you pass your patch through checkpatch.pl, it will warn about some of
-this.  You should have one space each side of <<.
-
-> +    /* step3: clear power-off gating */
-> +	pwr_reg = readl(cc_base + AW_CPU1_PWROFF_REG);
-> +	pwr_reg &= ~(1);
-
-You don't need the parens here.
-
-> +	pwr_reg = readl(cc_base + AW_CPUCFG_DBGCTL1);
-> +	pwr_reg |= (1<<cpu);
-
-Nor here.
-
-> +static int sunxi7i_boot_secondary(unsigned int cpu, struct task_struct *idle)
-> +{
-> +	pr_debug("[%s] enter cpu %d\n", __func__, cpu);
-> +	spin_lock(&boot_lock);
-> +	enable_aw_cpu(cpu);
-> +	spin_unlock(&boot_lock);
-
-What exactly does this spinlock protect?  The core code already provides
-the guarantee that only one CPU will be brought online or taken offline
-at a time.
+I think that should be enough to make dma_alloc_attrs happy.
