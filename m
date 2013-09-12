@@ -1,14 +1,15 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 12 Sep 2013 10:14:12 +0100
-Subject: [RFC PATCH v2 04/25] smp, ARM: kill SMP single function call
+Date: Thu, 12 Sep 2013 10:14:29 +0100
+Subject: [RFC PATCH v2 05/25] smp, ARM64: kill SMP single function call
  interrupt
-In-Reply-To: <1378915649-16395-5-git-send-email-liuj97@gmail.com>
-References: <1378915649-16395-5-git-send-email-liuj97@gmail.com>
-Message-ID: <20130912091412.GB15357@mudshark.cambridge.arm.com>
+In-Reply-To: <1378915649-16395-6-git-send-email-liuj97@gmail.com>
+References: <1378915649-16395-1-git-send-email-liuj97@gmail.com>
+ <1378915649-16395-6-git-send-email-liuj97@gmail.com>
+Message-ID: <20130912091429.GC15357@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 11, 2013 at 05:07:08PM +0100, Jiang Liu wrote:
+On Wed, Sep 11, 2013 at 05:07:09PM +0100, Jiang Liu wrote:
 > From: Jiang Liu <jiang.liu@huawei.com>
 > 
 > Commit 9a46ad6d6df3b54 "smp: make smp_call_function_many() use logic
