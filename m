@@ -1,98 +1,62 @@
-From: thommyj@gmail.com (Thommy Jakobsson)
-Date: Thu, 12 Sep 2013 17:58:22 +0200 (CEST)
-Subject: kmalloc memory slower than malloc
-In-Reply-To: <20130910125048.GD12758@n2100.arm.linux.org.uk>
-References: <alpine.DEB.2.02.1309060811400.1299@kelly.ryd.net>
- <1378458778.4208.30.camel@weser.hi.pengutronix.de>
- <alpine.DEB.2.02.1309101124450.1305@kelly.ryd.net>
- <1378807816.4200.6.camel@weser.hi.pengutronix.de>
- <9848F2DB572E5649BA045B288BE08FBE016A9D4A@039-SN2MPN1-023.039d.mgd.msft.net>
- <alpine.DEB.2.02.1309101327340.1305@kelly.ryd.net>
- <9848F2DB572E5649BA045B288BE08FBE016A9EE8@039-SN2MPN1-023.039d.mgd.msft.net>
- <20130910114420.GC12758@n2100.arm.linux.org.uk>
- <alpine.DEB.2.02.1309101435430.1305@kelly.ryd.net>
- <20130910125048.GD12758@n2100.arm.linux.org.uk>
-Message-ID: <alpine.DEB.2.02.1309121121400.2567@kelly.ryd.net>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 12 Sep 2013 16:56:09 +0100
+Subject: [PATCH v2 1/2] video: ARM CLCD: Add DT support
+In-Reply-To: <5231D5FA.4060508@wwwdotorg.org>
+References: <1378808726-32535-1-git-send-email-pawel.moll@arm.com>
+ <522F57B9.5000001@wwwdotorg.org> <1378899931.4082.75.camel@hornet>
+ <5230AAEB.2030607@wwwdotorg.org> <1378991033.13571.33.camel@hornet>
+ <5231D5FA.4060508@wwwdotorg.org>
+Message-ID: <20130912155609.GO12758@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On Tue, 10 Sep 2013, Russell King - ARM Linux wrote:
-
-> On Tue, Sep 10, 2013 at 02:42:17PM +0200, Thommy Jakobsson wrote:
-> > Using pgprot_dmacoherent() in mmap they look more similar. Still 
-> > ~10-15% difference, but maybe that is normal for kernel/userspace. 
+On Thu, Sep 12, 2013 at 08:55:54AM -0600, Stephen Warren wrote:
+> On 09/12/2013 07:03 AM, Pawel Moll wrote:
+> > Ok, so I'll make it a arm,pl11x,specific property. Actually two
+> > properties - one bit I missed was the dual STN panel case, where they
+> > have separate frame buffers. Something along the lines of:
 > > 
-> > dma_alloc_coherent in kernel   4.257s (s=0)
-> > kmalloc in kernel              0.126s (s=81370000)
-> > dma_alloc_coherent userspace   4.907s (s=0)
-> > kmalloc in userspace          1.815s (s=81370000)
-> > malloc in userspace          0.566s (s=0)
+> > Optional:
 > > 
-> > Note that I was lazy and used the same pgprot for all mappings now, which 
-> > I guess is a violation. 
+> > - arm,pl11x,framebuffer-base: a pair of two values, address and size,
+> > 				defining the framebuffer for the upper
+> > 				(or the only one) panel
+> > - arm,pl11x,lower-framebuffer-base: as above, for the lower STN panel,
+> > 					when present
+> > 
+> > Being very hardware-specific, it covers all possible quirky scenarios,
+> > at the same time does not exclude the option of using the CMA region
+> > phandles, if a particular system needed it.
 > 
-> What it means is that the results you end up with are documented to be
-> "unpredictable" which gives scope to manufacturers to come up with any
-> behaviour they desire in that situation - and it doesn't have to be
-> consistent.
-> 
-> What that means is that if you have an area of physical memory mapped as
-> "normal memory cacheable" and it's also mapped "strongly ordered" elsewhere,
-> it is entirely legal for an access via the strongly ordered mapping to
-> hit the cache if a cache line exists, whereas another implementation
-> may miss the cache line if it exists.
-> 
-> Furthermore, with such mappings (and this has been true since ARMv3 days)
-> if you have two such mappings - one cacheable and one non-cacheable, and
-> the cacheable mapping has dirty cache lines, the dirty cache lines can be
-> evicted at any moment, overwriting whatever you're doing via the non-
-> cacheable mapping.
-But isn't the memory received with dma_alloc_coherent() given a noncached 
-mapping? or even strongly ordered? Will that not conflict with the normal 
-kernel mapping which is cached?
+> What do "upper" and "lower" mean in this context? I assume this somehow
+> refers to placement of the displays on the board.
 
-Is all the mappings documented somewhere, what linux mapping corresponds 
-to which mapping in MMU? Seems like the armv7 documentation isn't free 
-either, which isn't making things easier for me.
+CLCD is only one controller - it can only produce one image from one
+framebuffer.
 
-Comning back to the original issue; dissassembling the code I noticed that 
-the userspace code looked really stupid with a lot of unnecessary memory 
-accesses. Kernel looked much better. Even after commenting the actual 
-memory access out in userspace, leaving just the loop itself, I got 
-terrible times.
+What this refers to is a requirement for dual STN displays - rather
+than starting at one corner and working logically to the opposite
+corner, these start at one corner and half way through the display at
+the same time.  So you scan out the upper half of the image at the
+same time that you scan out the lower half of the image.
 
-Previous times:
-dma_alloc_coherent in kernel   4.257s (s=0)
-kmalloc in kernel              0.126s (s=68620000)
-dma_alloc_coherent userspace   0.566s (s=0)
-kmalloc in userspace          0.566s (s=68620000)
-malloc in userspace          0.566s (s=0)
+In order to give an image on the display where the conventional formula
+works:
 
-Commenting out actual memory access (loop not optimized away when checking 
-assembler):
-dma_alloc_coherent in kernel   4.256s (s=0)
-kmalloc in kernel              0.126s (s=84750000)
-dma_alloc_coherent userspace   0.566s (s=0)
-kmalloc in userspace          0.412s (s=0) << just looping
-malloc in userspace          0.566s (s=0)
+	address = start + y * bytes_per_line + x * bits_per_pixel / 8
 
-Kernel is with -O2 so compiling the testprogram with -O2 aswell yield more 
-reasonable results:
-dma_alloc_coherent in kernel   4.257s (s=0)
-kmalloc in kernel              0.126s (s=84560000)
-dma_alloc_coherent userspace   0.124s (s=0)
-kmalloc in userspace          0.124s (s=84560000)
-malloc in userspace          0.113s (s=0)
+this means that the "upper" and "lower" start addresses are related to
+the parameters of the display - you want the lower half to start at
+the address where y = panel_y_res / 2 and x = 0.
 
-As can be seen all tests executed in userspace was cut in 1/4-1/5. Malloc 
-is now a bit faster than kmalloc. Could be faster if physical memory is 
-spread out on different banks, but on other hand cache prefetching should 
-be easier if continous. 
+You may also wish to change the start address (if you have enough RAM)
+to support page flipping - where you switch between two framebuffers -
+one which is currently being displayed while the other is being updated
+by the CPU.  You would use this to provide smooth video playback for
+example.
 
-> I notice you turn off VM_IO - you don't want to do that...
-Fixed
-
-Thanks for all help,
-Thommy
+So, DT has no business directly encoding this information - it should
+be calculated from the information provided by the panel and the
+timings required, and all that the CLCD driver should know is that
+"we have this RAM which starts here, and extends for N bytes" - or
+to use system memory instead.
