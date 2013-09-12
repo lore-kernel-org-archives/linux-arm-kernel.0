@@ -1,143 +1,58 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Thu, 12 Sep 2013 13:36:02 +0300
-Subject: [PATCH 1/7] usb: dwc3: get "usb_phy" only if the platform
- indicates the presence of PHY
-In-Reply-To: <1378136591-7463-2-git-send-email-kishon@ti.com>
-References: <1378136591-7463-1-git-send-email-kishon@ti.com>
- <1378136591-7463-2-git-send-email-kishon@ti.com>
-Message-ID: <52319912.8030203@ti.com>
+From: dwmw2@infradead.org (David Woodhouse)
+Date: Thu, 12 Sep 2013 11:39:55 +0100
+Subject: [PATCH v3 0/8] Add the Quadspi driver for vf610-twr
+In-Reply-To: <523186DF.4070203@freescale.com>
+References: <20130905020435.GA3970@gmail.com>
+ <20980858CB6D3A4BAE95CA194937D5E73EA0C7F4@DBDE04.ent.ti.com>
+ <522817D7.1010206@freescale.com> <522D3B79.3060707@freescale.com>
+ <20130909151450.GI29403@sirena.org.uk> <522EC33B.9000009@freescale.com>
+ <20130910180704.GB29403@sirena.org.uk> <522FD78A.6080900@freescale.com>
+ <20130911104126.GN29403@sirena.org.uk> <52304BFF.4060007@freescale.com>
+ <20130911113002.GP29403@sirena.org.uk> <523186DF.4070203@freescale.com>
+Message-ID: <1378982395.2627.416.camel@shinybook.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kishon,
+On Thu, 2013-09-12 at 17:18 +0800, Huang Shijie wrote:
+> ? 2013?09?11? 19:30, Mark Brown ??:
+> > Indeed - what I was wondering was if those opcodes could be requested
+> > from the flash driver rather than coded in there.  The driver needs to
+> > write the commands to the device but it's not clear to me if it really
+> > needs to know the specific commands.
+> yes. The driver uses the commands to find the _right_ LUT index, and
+> uses the LUT index to
+> trigger the controller.
+>
+> For example, LUT0-LUT3 is used for the READ_STATUS, the driver will
+> match the
+> 0 index for the NOR's read status operation (0x05), and then the driver
+> write 0 to the QSPI_IPCR
+> register to trigger the operation.
 
-On 09/02/2013 06:43 PM, Kishon Vijay Abraham I wrote:
-> There can be systems which does not have a external usb_phy, so get
-> usb_phy only if usb-phy property is added in the case of dt boot or if
-> platform_data indicates the presence of PHY. Also remove checking if
-> return value is -ENXIO since it's now changed to always enable usb_phy layer.
-> 
-> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
-> ---
->  drivers/usb/dwc3/Kconfig         |    1 +
->  drivers/usb/dwc3/core.c          |   60 +++++++++++++++++---------------------
->  drivers/usb/dwc3/platform_data.h |    1 +
->  3 files changed, 28 insertions(+), 34 deletions(-)
-> 
-> diff --git a/drivers/usb/dwc3/Kconfig b/drivers/usb/dwc3/Kconfig
-> index f969ea2..cfc16dd 100644
-> --- a/drivers/usb/dwc3/Kconfig
-> +++ b/drivers/usb/dwc3/Kconfig
-> @@ -2,6 +2,7 @@ config USB_DWC3
->  	tristate "DesignWare USB3 DRD Core Support"
->  	depends on (USB || USB_GADGET) && GENERIC_HARDIRQS && HAS_DMA
->  	depends on EXTCON
-> +	select USB_PHY
->  	select USB_XHCI_PLATFORM if USB_SUPPORT && USB_XHCI_HCD
->  	help
->  	  Say Y or M here if your system has a Dual Role SuperSpeed
-> diff --git a/drivers/usb/dwc3/core.c b/drivers/usb/dwc3/core.c
-> index 474162e..428c29e 100644
-> --- a/drivers/usb/dwc3/core.c
-> +++ b/drivers/usb/dwc3/core.c
-> @@ -387,16 +387,38 @@ static int dwc3_probe(struct platform_device *pdev)
->  	if (node) {
->  		dwc->maximum_speed = of_usb_get_maximum_speed(node);
->  
-> -		dwc->usb2_phy = devm_usb_get_phy_by_phandle(dev, "usb-phy", 0);
-> -		dwc->usb3_phy = devm_usb_get_phy_by_phandle(dev, "usb-phy", 1);
-> +		if (of_property_read_bool(node, "usb-phy")) {
-> +			dwc->usb2_phy = devm_usb_get_phy_by_phandle(dev,
-> +				"usb-phy", 0);
-> +			if (IS_ERR(dwc->usb2_phy))
-> +				return PTR_ERR(dwc->usb2_phy);
-> +			dwc->usb3_phy = devm_usb_get_phy_by_phandle(dev,
-> +				"usb-phy", 1);
-> +			if (IS_ERR(dwc->usb3_phy))
-> +				return PTR_ERR(dwc->usb3_phy);
+But why?
 
-Some DWC3 instances use only usb2_phy. e.g. on DRA7 the 2nd dwc3 instance doesn't use usb3_phy.
-This needs to be a valid case and driver shouldn't error out.
+Your SPI controller's device driver gets a spi_transfer struct which
+(indirectly) comes from the m25p80 *chip* driver. That should contain
+appropriate values for tx_nbits and rx_nbits to indicate the mode which
+its to be used for this particular command.
 
-> +		} else {
-> +			dwc->usb2_phy = NULL;
-> +			dwc->usb3_phy = NULL;
-> +		}
->  
->  		dwc->needs_fifo_resize = of_property_read_bool(node, "tx-fifo-resize");
->  		dwc->dr_mode = of_usb_get_dr_mode(node);
->  	} else if (pdata) {
->  		dwc->maximum_speed = pdata->maximum_speed;
->  
-> -		dwc->usb2_phy = devm_usb_get_phy(dev, USB_PHY_TYPE_USB2);
-> -		dwc->usb3_phy = devm_usb_get_phy(dev, USB_PHY_TYPE_USB3);
-> +		if (pdata->has_phy) {
-> +			dwc->usb2_phy = devm_usb_get_phy(dev,
-> +				USB_PHY_TYPE_USB2);
-> +			if (IS_ERR(dwc->usb2_phy))
-> +				return PTR_ERR(dwc->usb2_phy);
-> +			dwc->usb3_phy = devm_usb_get_phy(dev,
-> +				USB_PHY_TYPE_USB3);
-> +			if (IS_ERR(dwc->usb3_phy))
-> +				return PTR_ERR(dwc->usb3_phy);
+All you need to do then is pick a suitable slot in the LUT table, *fill*
+the LUTn-LUN(n+3) registers with appropriate values, then write (n/4) to
+the QSPI_IPCR register. Or something like that? (Can you provide a URL
+for the datasheet for this controller?)
 
-same here?
+And if this is a command/nbits combination which has recently been used,
+of course you can skip the 'write the LUT registers' step and just use
+the same index you used last time. Add some LRU scheme to handle *which*
+index you use... handwave... 
 
-> +		} else {
-> +			dwc->usb2_phy = NULL;
-> +			dwc->usb3_phy = NULL;
-> +		}
->  
->  		dwc->needs_fifo_resize = pdata->tx_fifo_resize;
->  		dwc->dr_mode = pdata->dr_mode;
-> @@ -409,36 +431,6 @@ static int dwc3_probe(struct platform_device *pdev)
->  	if (dwc->maximum_speed == USB_SPEED_UNKNOWN)
->  		dwc->maximum_speed = USB_SPEED_SUPER;
->  
-> -	if (IS_ERR(dwc->usb2_phy)) {
-> -		ret = PTR_ERR(dwc->usb2_phy);
-> -
-> -		/*
-> -		 * if -ENXIO is returned, it means PHY layer wasn't
-> -		 * enabled, so it makes no sense to return -EPROBE_DEFER
-> -		 * in that case, since no PHY driver will ever probe.
-> -		 */
-> -		if (ret == -ENXIO)
-> -			return ret;
-> -
-> -		dev_err(dev, "no usb2 phy configured\n");
-> -		return -EPROBE_DEFER;
-> -	}
-> -
-> -	if (IS_ERR(dwc->usb3_phy)) {
-> -		ret = PTR_ERR(dwc->usb3_phy);
-> -
-> -		/*
-> -		 * if -ENXIO is returned, it means PHY layer wasn't
-> -		 * enabled, so it makes no sense to return -EPROBE_DEFER
-> -		 * in that case, since no PHY driver will ever probe.
-> -		 */
-> -		if (ret == -ENXIO)
-> -			return ret;
-> -
-> -		dev_err(dev, "no usb3 phy configured\n");
-> -		return -EPROBE_DEFER;
-> -	}
-> -
->  	dwc->xhci_resources[0].start = res->start;
->  	dwc->xhci_resources[0].end = dwc->xhci_resources[0].start +
->  					DWC3_XHCI_REGS_END;
-> diff --git a/drivers/usb/dwc3/platform_data.h b/drivers/usb/dwc3/platform_data.h
-> index 7db34f0..5a5e068 100644
-> --- a/drivers/usb/dwc3/platform_data.h
-> +++ b/drivers/usb/dwc3/platform_data.h
-> @@ -24,4 +24,5 @@ struct dwc3_platform_data {
->  	enum usb_device_speed maximum_speed;
->  	enum usb_dr_mode dr_mode;
->  	bool tx_fifo_resize;
-> +	bool has_phy;
->  };
-> 
+-- 
+dwmw2
 
-cheers,
--roger
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: smime.p7s
+Type: application/x-pkcs7-signature
+Size: 5745 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130912/7f84803e/attachment.bin>
