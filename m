@@ -1,45 +1,61 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 12 Sep 2013 16:19:45 -0600
-Subject: [PATCH 1/2] video: ARM CLCD: Add DT support
-In-Reply-To: <1379009416.13571.68.camel@hornet>
-References: <1378488201-21146-1-git-send-email-pawel.moll@arm.com>
- <522BAED9.4020301@gmail.com> <1378725559.4082.28.camel@hornet>
- <522F91F8.6010207@gmail.com> <1378907036.4082.105.camel@hornet>
- <5230DD1C.6060606@gmail.com> <1378999425.13571.54.camel@hornet>
- <1379009416.13571.68.camel@hornet>
-Message-ID: <52323E01.2070902@wwwdotorg.org>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Fri, 13 Sep 2013 00:22:33 +0200 (CEST)
+Subject: [RFC PATCH 1/4] DRIVERS: IRQCHIP: Add crossbar irqchip driver
+In-Reply-To: <523228B5.5070507@ti.com>
+References: <1379000351-15672-1-git-send-email-r.sricharan@ti.com>
+ <1379000351-15672-2-git-send-email-r.sricharan@ti.com>
+ <alpine.DEB.2.02.1309122201530.4089@ionos.tec.linutronix.de>
+ <523228B5.5070507@ti.com>
+Message-ID: <alpine.DEB.2.02.1309122335440.4089@ionos.tec.linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/12/2013 12:10 PM, Pawel Moll wrote:
-> On Thu, 2013-09-12 at 16:23 +0100, Pawel Moll wrote:
->> Anyway, I think I've got an idea how to render the problem custom panel
->> properties invalid. If so, I'll send another version of the patch.
+On Thu, 12 Sep 2013, Santosh Shilimkar wrote:
+> Specifically for the IRQ case addressed here, the cross-bar IP
+> sits between the interrupt controller and peripheral interrupts.
 > 
-> So, instead of describing the panel I thought I'd go lower level and try
-> to describe the CLCD's signal functions. It gets down to something like
-> this:
+> CPU <-- GIC  <----- CROSSBAR <----- PERIPHERAL IRQs
 > 
-> 8<----
-> - arm,pl11x,panel-data-pads: array of 24 cells, each of them describing
-> 				a function of one of the CLD pads,
-> 				starting from 0 up to 23; each pad can
-> 				be described by one of the following values:
-> 	- 0: reserved (not connected)
-> 	- 0x100-0x107: color upper STN panel data 0 to 7
-...
-> Such approach would also solve problem with bizarre cases like the
-> Versatile's (not Express ;-) muxer Russell mentioned (where there is a
-> de-facto custom wiring used). And no, I had a look at pinmux bindings
-> and I don't think they fit here at all...
+> Just to expand it better, cross-bar input IRQ lines are more than
+> what a GIC IRQ controller can support.
+> e.q Total 250 peripheral IRQ lines out of which GIC support
+> only 160 IRQ lines.
 > 
-> Thoughts?
+> So the idea here is to dynamically map the IRQ lines at
+> cross-bar level to pick based on request_irq() so that one
+> can optimize the use of limited IRQ lines at the GIC level.
+> Strictly speaking the need is just establish the IRQ
+> connection from peripheral to GIC and thats achieved
+> at the request_irq() level.
+> 
+> Earlier approach was to statically build this connections
+> using the DT information in a separate driver probe but
+> it had limitations of fixing the IRQ map and taking away
+> flexibility what this IP provide. 
+>  
+> Hope this gives better picture to you behind the patch
+> series.
 
-I think pinctrl would work just fine here. However, I suspect there's
-little need for pinctrl. pinctrl is required when one module may impose
-requirements on another module's muxable pins. I assume that the
-configuration for pins on CLCD is only relevant for CLCD itself, so
-there's no need to export an interface by which something else can
-configure the pins. Now, if any of the pins could be e.g. "GPIO", then
-this argument might not apply. Hence, I think pinctrl is only "possible"
-here, not "required", and the approach above seems fine to me.
+Yes. I halfways understand what you are trying to achieve.
+
+So CROSSBAR is a routing block between the peripheral and the GIC in
+order to expand the number of possible interrupts.
+
+Now the real question is, how that expansion mechanism is supposed to
+work. There are two possible scenarios:
+
+1) Expand the number of handled interrupts beyond the GIC capacity:
+
+   That requires a mechanism in CROSSBAR to map several CROSSBAR
+   interrupts to a particular GIC interrupt and provide a demux
+   mechanism to invoke the shared handlers.
+
+2) Provide a mapping mechanism between possibly 250 interrupt numbers
+   and a limitation of a total 160 active interrupts by the underlying
+   GIC.
+
+What are you trying to achieve?
+
+Thanks,
+
+	tglx
