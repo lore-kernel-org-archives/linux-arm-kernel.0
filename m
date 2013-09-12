@@ -1,111 +1,83 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Thu, 12 Sep 2013 19:10:16 +0100
-Subject: [PATCH 1/2] video: ARM CLCD: Add DT support
-In-Reply-To: <1378999425.13571.54.camel@hornet>
-References: <1378488201-21146-1-git-send-email-pawel.moll@arm.com>
- <522BAED9.4020301@gmail.com> <1378725559.4082.28.camel@hornet>
- <522F91F8.6010207@gmail.com> <1378907036.4082.105.camel@hornet>
- <5230DD1C.6060606@gmail.com> <1378999425.13571.54.camel@hornet>
-Message-ID: <1379009416.13571.68.camel@hornet>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Thu, 12 Sep 2013 13:15:12 -0500
+Subject: [PATCH] ARM: msm: Move msm devicetrees under a Qualcomm dir
+In-Reply-To: <CAOesGMhN0jEx065cpf989P-JbuxPiOaPRsP4BD3VoW-n5ebP+w@mail.gmail.com>
+References: <1379003839-16068-1-git-send-email-galak@codeaurora.org>
+ <CAOesGMisWLwYKotGDFPW6PyHJs=_+fohTdC08SGjsv2FXaa7Fg@mail.gmail.com>
+ <25E0B143-658E-4CCC-A88A-0AF70FFF33CE@codeaurora.org>
+ <CAOesGMhfdvyJ_2AA2e8iO_2e=q7KgpyNbcriPKFw-RLormG6bA@mail.gmail.com>
+ <3E38F48E-EE41-4564-84A1-36CF07B08811@codeaurora.org>
+ <CAOesGMhN0jEx065cpf989P-JbuxPiOaPRsP4BD3VoW-n5ebP+w@mail.gmail.com>
+Message-ID: <9DD9D9A7-ED55-412F-A18D-599D1E365003@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2013-09-12 at 16:23 +0100, Pawel Moll wrote:
-> Anyway, I think I've got an idea how to render the problem custom panel
-> properties invalid. If so, I'll send another version of the patch.
 
-So, instead of describing the panel I thought I'd go lower level and try
-to describe the CLCD's signal functions. It gets down to something like
-this:
+On Sep 12, 2013, at 1:04 PM, Olof Johansson wrote:
 
-8<----
-- arm,pl11x,panel-data-pads: array of 24 cells, each of them describing
-				a function of one of the CLD pads,
-				starting from 0 up to 23; each pad can
-				be described by one of the following values:
-	- 0: reserved (not connected)
-	- 0x100-0x107: color upper STN panel data 0 to 7
-	- 0x110-0x117: color lower STN panel data 0 to 7
-	- 0x200-0x207: mono upper STN panel data 0 to 7
-	- 0x210-0x217: mono lower STN panel data 0 to 7
-	- 0x300-0x307: red component bit 0 to 7 of TFT panel data
-	- 0x310-0x317: green component bit 0 to 7 of TFT panel data
-	- 0x320-0x327: blue component bit 0 to 7 of TFT panel data
-	- 0x330: intensity bit of TFT panel data
-				Example set of values for standard
-				panel interfaces:
-	- PL110 single colour STN panel:
-			<0x107 0x106 0x105 0x104 0x103 0x102 0x101 0x100>,
-			<0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0>;
-	- PL110 dual colour STN panel:
-			<0x107 0x106 0x105 0x104 0x103 0x102 0x101 0x100>,
-			<0x117 0x116 0x115 0x114 0x113 0x112 0x111 0x110>,
-			<0 0 0 0 0 0 0 0>;
-	- PL110 single mono 4-bit STN panel:
-			<0x203 0x202 0x201 0x200>,
-			<0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0>;
-	- PL110 dual mono 4-bit STN panel:
-			<0x203 0x202 0x201 0x200>, <0 0 0 0>,
-			<0x213 0x212 0x211 0x210>,
-			<0 0 0 0 0 0 0 0 0 0 0 0>;
-	- PL110 single mono 8-bit STN panel:
-			<0x207 0x206 0x205 0x204 0x203 0x202 0x201 0x200>,
-			<0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0>;
-	- PL110 dual mono 8-bit STN panel:
-			<0x207 0x206 0x205 0x204 0x203 0x202 0x201 0x200>,
-			<0x217 0x216 0x215 0x214 0x213 0x212 0x211 0x210>,
-			<0 0 0 0 0 0 0 0>;
-	- PL110 TFT (1:)5:5:5 panel:
-			<0x330 0x300 0x301 0x302 0x303 0x304>,
-			<0x330 0x310 0x311 0x312 0x313 0x314>,
-			<0x330 0x320 0x321 0x322 0x323 0x324>,
-			<0 0 0 0 0 0>
-	- PL110 and PL111 TFT RGB 888 panel:
-			<0x300 0x301 0x302 0x303 0x304 0x305 0x306 0x307>,
-			<0x310 0x311 0x312 0x313 0x314 0x315 0x316 0x317>,
-			<0x320 0x321 0x322 0x323 0x324 0x325 0x326 0x327>;
-	- PL111 single colour STN panel:
-			<0x100 0x101 0x102 0x103 0x104 0x105 0x106 0x107>,
-			<0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0>;
-	- PL111 dual colour STN panel:
-			<0x100 0x101 0x102 0x103 0x104 0x105 0x106 0x107>,
-			<0x110 0x111 0x112 0x113 0x114 0x115 0x116 0x117>,
-			<0 0 0 0 0 0 0 0>;
-	- PL111 single mono 4-bit STN panel:
-			<0x200 0x201 0x202 0x203>,
-			<0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0>;
-	- PL111 dual mono 4-bit STN panel:
-			<0x200 0x201 0x202 0x203>, <0 0 0 0>,
-			<0x210 0x211 0x212 0x213>,
-			<0 0 0 0 0 0 0 0 0 0 0 0>;
-	- PL111 single mono 8-bit STN panel:
-			<0x200 0x201 0x202 0x203 0x204 0x205 0x206 0x207>,
-			<0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0>;
-	- PL111 dual mono 8-bit STN panel:
-			<0x200 0x201 0x202 0x203 0x204 0x205 0x206 0x207>,
-			<0x210 0x211 0x212 0x213 0x214 0x215 0x216 0x217>,
-			<0 0 0 0 0 0 0 0>;
-	- PL111 TFT 4:4:4 panel:
-			<0 0 0 0>, <0x300 0x301 0x302 0x303>,
-			<0 0 0 0>, <0x310 0x311 0x312 0x313>,
-			<0 0 0 0>, <0x320 0x321 0x322 0x323>;
-	- PL111 TFT 5:6:5 panel:
-			<0 0 0>, <0x300 0x301 0x302 0x303 0x304>,
-			<0 0>, <0x310 0x311 0x312 0x313 0x314 0x315>,
-			<0 0 0>, <0x320 0x321 0x322 0x323 0x324>;
-	- PL111 TFT (1):5:5:5 panel:
-			<0 0 0>, <0x300 0x301 0x302 0x303 0x304>,
-			<0 0>, <0x330 0x310 0x311 0x312 0x313 0x314>,
-			<0 0 0>, <0x320 0x321 0x322 0x323 0x324>;
-8<----
+> On Thu, Sep 12, 2013 at 10:55 AM, Kumar Gala <galak@codeaurora.org> wrote:
+>> 
+>> On Sep 12, 2013, at 12:06 PM, Olof Johansson wrote:
+>> 
+>>> On Thu, Sep 12, 2013 at 9:53 AM, Kumar Gala <galak@codeaurora.org> wrote:
+>>>> 
+>>>> On Sep 12, 2013, at 11:46 AM, Olof Johansson wrote:
+>>>> 
+>>>>> On Thu, Sep 12, 2013 at 9:37 AM, Kumar Gala <galak@codeaurora.org> wrote:
+>>>>>> Use the Qualcomm vendor prefix (qcom) as the directory name for
+>>>>>> Qualcomm MSM devicetrees going forward.
+>>>>>> 
+>>>>>> Signed-off-by: Kumar Gala <galak@codeaurora.org>
+>>>>> 
+>>>>> Let's not move just one platform like this. If we are to do this, we
+>>>>> should move everything, and that will be really painful and needs to
+>>>>> be done in a controlled manner, probably scripted and right before a
+>>>>> -rc1 or such.
+>>>> 
+>>>> 
+>>>> Than I suggest we deal with it when we pull the device trees out of the kernel tree.
+>>>> 
+>>>> As such, I'd tell Rohit to go forward with the file being named apq8074-dragonboard.dtb for the time being.
+>>> 
+>>> My original request to please use a common prefix for your product
+>>> families stands. Please prefix with msm-*, or if you have to, qcom-*
+>>> instead, since you guys can't seem to make your mind up on standard
+>>> prefixes (msm, apq, etc).
+>> 
+>> This is silly, I dont see the reason to go with qcom-apq<SOC>-<BOARD>.dts and than in the future drop qcom- when we mostly likely shift to a dir structure.
+>> 
+>> As engineers we are all too aware of the lack of sanity in marketing names, but its what we have so we have to live with it.
+> 
+> And we all have a choice whether we let the marketing people's
+> insanity spread into our engineering projects, or if we keep it as
+> sane as possible in spite of them.
+> 
+> I wouldn't have an objection here if there was some sort of rationale
+> between what "apq" and "msm" means. But it seems like qualcomm rolls a
+> dice and decides if a platform will have one name or the other.
+> Dragonboard dmesg says msm<foo>. DTS file for the same board says apq.
+> DTSI file says one thing, overridden by the dts to something else.
+> Total chaos.
+> 
+> I would be fine with adding two instead of one (after all, platforms
+> like TI has this for AM* vs OMAP*, etc), but there _has_ to be some
+> sort of consistency or you might just as well assign a random string
+> as name.
+> 
+> So, if you can't come up with a reasonable, rational and consistent
+> naming scheme (which, apparantly, you can't since your marketing guys
+> are in control of this and they don't get it right), then at least
+> prefix with a common string for the platform. That's all I'm asking.
+> 
+> 
+> -Olof
 
-Of course the examples above could be #defined.
+I'm not sure get why the insanity of naming impacts anything, those people that care about the platforms know what names mean what.  Plus we have this same set of having to be in the know for other SoC already.  Freescale does this all the time in PPC land, they just do it with numbers and not prefixes.
 
-Such approach would also solve problem with bizarre cases like the
-Versatile's (not Express ;-) muxer Russell mentioned (where there is a
-de-facto custom wiring used). And no, I had a look at pinmux bindings
-and I don't think they fit here@all...
+I suggested doing a qcom/ dir, as it addresses your concern, of putting all of our mess in one place.  Just because every other SoC/mach/plat hasn't done that should stop us from at least doing it for qcom.
 
-Thoughts?
+- k
 
-Pawe?
+-- 
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
