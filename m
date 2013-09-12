@@ -1,109 +1,193 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Wed, 11 Sep 2013 16:02:07 -0700
-Subject: [PATCH 1/2] mtd: atmel_nand: remove unneeded ifdef CONFIG_OF
-In-Reply-To: <1378200028-15415-1-git-send-email-josh.wu@atmel.com>
-References: <1378200028-15415-1-git-send-email-josh.wu@atmel.com>
-Message-ID: <20130911230207.GE4550@ld-irv-0074.broadcom.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Wed, 11 Sep 2013 17:21:32 -0700
+Subject: [PATCH RFC] of: add a basic memory driver
+In-Reply-To: <52303909.5050103@elopez.com.ar>
+References: <1378863781-4235-1-git-send-email-emilio@elopez.com.ar>
+ <20130911075400.GG2746@lukather> <52303909.5050103@elopez.com.ar>
+Message-ID: <20130912002132.27384.14149@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Josh,
-
-On Tue, Sep 03, 2013 at 05:20:27PM +0800, Josh Wu wrote:
-> Since following commit
->   f3b391425d21e6138e57b2432d91134e0bc2b975
-
-This commit ID will likely change before it gets merged, since there may
-be rebasing, and David usually adds his signoff. David or I can take
-care of that later though.
-
->   (of_mtd: Add no-op stubs to support CONFIG_OF=n)
+Quoting Emilio L?pez (2013-09-11 02:34:01)
+> Hi Maxime,
 > 
-> implements the stub for CONFIG_OF=n. Now we can safely remove all
-> CONFIG_OF in atmel_nand. (Thanks to Ezequiel Garcia's for this protype)
-
-I'm not quite so sure about this patch, as I was about the pxa3xx patch.
-With pxa3xx, the compiler can easily tell that pxa3xx_nand_probe_dt()
-will return 0 without doing anything in the !CONFIG_OF case (and so will
-likely remove the dead code), so it's no benefit to have the #ifdef. But
-in this driver, the atmel_of_init_port() function can't be trivially
-determined to do nothing (and in fact, it does something in either
-CONFIG_OF=y or =n case). It's only protected by the 'if
-(pdev->dev.of_node)' check, which the compiler can't predict.
-
-So, I don't know if we should remove the #ifdef at the expense of likely
-significantly larger code. I won't protest, but I won't merge it yet
-either. Perhaps others have better ideas, or perhaps you can find a good
-way to work around this -- e.g., check the of_* helpers for -ENOSYS early
-in atmel_of_init_port()?
-
-> Signed-off-by: Josh Wu <josh.wu@atmel.com>
-> ---
->  drivers/mtd/nand/atmel_nand.c |   14 +-------------
->  1 file changed, 1 insertion(+), 13 deletions(-)
+> El 11/09/13 04:54, Maxime Ripard escribi?:
+> > Hi Emilio,
+> >
+> > On Tue, Sep 10, 2013 at 10:43:01PM -0300, Emilio L?pez wrote:
+> >> This driver's only job is to claim and ensure that the necessary clock
+> >> for memory operation on a DT-enabled machine remains enabled.
+> >>
+> >> Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
+> >> ---
+> >>
+> >> Hi,
+> >>
+> >> I am currently facing an issue with the clock setup: a critical but
+> >> unclaimed clock gets disabled as a side effect of disabling one of its
+> >> children. The clock setup looks something like this:
+> >>
+> >>        PLL
+> >>         |
+> >>   ------------
+> >>   |          |
+> >> DDR       Others
+> >>              |
+> >>            periph
+> >>
+> >> The PLL clock is marked with the CLK_IGNORE_UNUSED flag, so on a normal
+> >> boot it remains on, even after the unused clocks cleanup code runs. The
+> >> problem occurs when someone enables "periph" and then, later on, disables
+> >> it: the framework starts disabling clocks upwards on the tree,
+> >> eventually switching the PLL off (and that kills the machine, as the memory
+> >> clock is shut down).
+> >
+> > That looks like a bug in the clock framework. I'd expect it to at least
+> > behave in the same way when disabling the unused clocks at late startup
+> > and when going up disabling some clocks' parent later on.
 > 
-> diff --git a/drivers/mtd/nand/atmel_nand.c b/drivers/mtd/nand/atmel_nand.c
-> index 060feea..1ca0724 100644
-> --- a/drivers/mtd/nand/atmel_nand.c
-> +++ b/drivers/mtd/nand/atmel_nand.c
-> @@ -1449,7 +1449,6 @@ static void atmel_nand_hwctl(struct mtd_info *mtd, int mode)
->  		ecc_writel(host->ecc, CR, ATMEL_ECC_RST);
->  }
->  
-> -#if defined(CONFIG_OF)
->  static int atmel_of_init_port(struct atmel_nand_host *host,
->  			      struct device_node *np)
->  {
-> @@ -1457,7 +1456,7 @@ static int atmel_of_init_port(struct atmel_nand_host *host,
->  	u32 offset[2];
->  	int ecc_mode;
->  	struct atmel_nand_data *board = &host->board;
-> -	enum of_gpio_flags flags;
-> +	enum of_gpio_flags flags = 0;
->  
->  	if (of_property_read_u32(np, "atmel,nand-addr-offset", &val) == 0) {
->  		if (val >= 32) {
-> @@ -1540,13 +1539,6 @@ static int atmel_of_init_port(struct atmel_nand_host *host,
->  
->  	return 0;
->  }
-> -#else
-> -static int atmel_of_init_port(struct atmel_nand_host *host,
-> -			      struct device_node *np)
-> -{
-> -	return -EINVAL;
-> -}
-> -#endif
->  
->  static int __init atmel_hw_nand_init_params(struct platform_device *pdev,
->  					 struct atmel_nand_host *host)
-> @@ -2207,14 +2199,12 @@ static int __exit atmel_nand_remove(struct platform_device *pdev)
->  	return 0;
->  }
->  
-> -#if defined(CONFIG_OF)
->  static const struct of_device_id atmel_nand_dt_ids[] = {
->  	{ .compatible = "atmel,at91rm9200-nand" },
->  	{ /* sentinel */ }
->  };
->  
->  MODULE_DEVICE_TABLE(of, atmel_nand_dt_ids);
-> -#endif
->  
->  static int atmel_nand_nfc_probe(struct platform_device *pdev)
->  {
-> @@ -2253,12 +2243,10 @@ static int atmel_nand_nfc_probe(struct platform_device *pdev)
->  	return 0;
->  }
->  
-> -#if defined(CONFIG_OF)
->  static struct of_device_id atmel_nand_nfc_match[] = {
->  	{ .compatible = "atmel,sama5d3-nfc" },
->  	{ /* sentinel */ }
->  };
-> -#endif
->  
->  static struct platform_driver atmel_nand_nfc_driver = {
->  	.driver = {
+> Yes, I kind of expected the same, and the flag description seems to 
+> imply so too:
+> 
+>      #define CLK_IGNORE_UNUSED  BIT(3) /* do not gate even if unused */
+> 
+> >> There's two possible solutions I can think of:
+> >>   1) add some extra checks on the framework to not turn off clocks marked
+> >>      with such a flag on the non-explicit case (ie, when I'm disabling
+> >>      some other clock)
+> >>
+> >>   2) create an actual user of the DDR clock, that way it won't get
+> >>      disabled simply because it's being used.
+> >>
+> >> I considered 1) and implemented it, but the result was not pretty.
+> >
+> > What was not pretty about it?
+> 
+> It required adding an extra parameter to __clk_disable/__clk_unprepare 
+> to keep track of the call's explicitness, and ignore the 
+> disable/unprepare callback on the implicit case (when 
+> __clk_disable/__clk_unprepare is called recursively) if the flag is set. 
+> This also means adding a wrapping function to at least __clk_unprepare, 
+> so as to to not break callers outside of the clk framework. Overall it 
+> felt too hacky for something that could be properly handled by the 
+> generic code if it had at least 1 user.
+> 
+> I would like to hear Mike's thoughts on this; maybe CLK_IGNORE_UNUSED is 
+> not what we think it should be.
 
-Brian
+CLK_IGNORE_UNUSED was only meant to solve the issue of gating unclaimed
+clocks during clk_disable_unused that we do not want to gate at that
+point in time. To that end it is doing the right thing for your platform
+and I don't see a bug here.
+
+Your issue is that you have a normal clk_disable chain affecting the
+clock. Always the right way to do this is to have a driver claim that
+clock with clk_get and call clk_enable on it. That is how the clk API
+works. This is what your 2) approach does and is probably The Right
+Thing.
+
+Alternatively a new flag could be added, CLK_ALWON. This flag should be
+discussed but it could do a number of things:
+
+1) any attempts to disable a clk with this flag set will always fail
+silently (since clk_disable has void return type).
+
+2) same as 1) above but the clock framework could additionally call
+clk_enable on it after registering the clock with the CLK_ALWON flag set
+
+Anyways I think a new flag like CLK_ALWON should only really exist to
+solve this problem for clocks that do not have drivers in Linux. Since
+you went to the trouble of writing a small driver then I think just
+claiming the clock and enabling it there is the best solution.
+
+Regards,
+Mike
+
+> 
+> >> This patch is my take on 2). Please let me know what you think; all
+> >> feedback is welcome :)
+> >>
+> >> Cheers,
+> >>
+> >> Emilio
+> >>
+> >>   drivers/of/Kconfig     |  6 ++++++
+> >>   drivers/of/Makefile    |  1 +
+> >>   drivers/of/of_memory.c | 30 ++++++++++++++++++++++++++++++
+> >>   3 files changed, 37 insertions(+)
+> >>   create mode 100644 drivers/of/of_memory.c
+> >>
+> >> diff --git a/drivers/of/Kconfig b/drivers/of/Kconfig
+> >> index 9d2009a..f6c5e20 100644
+> >> --- a/drivers/of/Kconfig
+> >> +++ b/drivers/of/Kconfig
+> >> @@ -80,4 +80,10 @@ config OF_RESERVED_MEM
+> >>      help
+> >>        Initialization code for DMA reserved memory
+> >>
+> >> +config OF_MEMORY
+> >> +    depends on COMMON_CLK
+> >> +    def_bool y
+> >> +    help
+> >> +      Simple memory initialization
+> >> +
+> >>   endmenu # OF
+> >> diff --git a/drivers/of/Makefile b/drivers/of/Makefile
+> >> index ed9660a..15f0167 100644
+> >> --- a/drivers/of/Makefile
+> >> +++ b/drivers/of/Makefile
+> >> @@ -10,3 +10,4 @@ obj-$(CONFIG_OF_PCI)       += of_pci.o
+> >>   obj-$(CONFIG_OF_PCI_IRQ)  += of_pci_irq.o
+> >>   obj-$(CONFIG_OF_MTD)       += of_mtd.o
+> >>   obj-$(CONFIG_OF_RESERVED_MEM) += of_reserved_mem.o
+> >> +obj-$(CONFIG_OF_MEMORY) += of_memory.o
+> >> diff --git a/drivers/of/of_memory.c b/drivers/of/of_memory.c
+> >> new file mode 100644
+> >> index 0000000..a833f7a
+> >> --- /dev/null
+> >> +++ b/drivers/of/of_memory.c
+> >> @@ -0,0 +1,30 @@
+> >> +/*
+> >> + * Simple memory driver
+> >> + */
+> >> +
+> >> +#include <linux/of.h>
+> >> +#include <linux/clk.h>
+> >> +
+> >> +static int __init of_memory_enable(void)
+> >> +{
+> >> +    struct device_node *np;
+> >> +    struct clk *clk;
+> >> +
+> >> +    np = of_find_node_by_path("/memory");
+> >> +    if (!np) {
+> >> +            pr_err("no /memory on DT!\n");
+> >> +            return 0;
+> >> +    }
+> >> +
+> >> +    clk = of_clk_get(np, 0);
+> >> +    if (!IS_ERR(clk)) {
+> >> +            clk_prepare_enable(clk);
+> >> +            clk_put(clk);
+> >> +    }
+> >> +
+> >> +    of_node_put(np);
+> >> +
+> >> +    return 0;
+> >> +}
+> >> +
+> >> +device_initcall(of_memory_enable);
+> >
+> > I like this idea as well. But imho, both 1 and 2 should be done. 2) is
+> > only about memory devices, while 1) is much more generic.
+> >
+> > And fwiw, the Marvell Armada 370 is also in this case of having a
+> > gatable clock for the DDR that could potentially be disabled (but is
+> > not, since it has no other users than the DDR itself, and as such, no
+> > one ever calls clk_disable on it).
+> 
+> Nice to know, thanks for the information :)
+> 
+> Cheers,
+> 
+> Emilio
