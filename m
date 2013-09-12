@@ -1,59 +1,42 @@
-From: sylvester.nawrocki@gmail.com (Sylwester Nawrocki)
-Date: Fri, 13 Sep 2013 00:06:00 +0200
-Subject: [PATCH v2 1/9] i2c: prepare runtime PM support for I2C client
- devices
-In-Reply-To: <1378913560-2752-2-git-send-email-mika.westerberg@linux.intel.com>
-References: <1378913560-2752-1-git-send-email-mika.westerberg@linux.intel.com>
- <1378913560-2752-2-git-send-email-mika.westerberg@linux.intel.com>
-Message-ID: <52323AC8.30403@gmail.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Fri, 13 Sep 2013 00:12:24 +0200 (CEST)
+Subject: [RFC PATCH 1/4] DRIVERS: IRQCHIP: Add crossbar irqchip driver
+In-Reply-To: <alpine.DEB.2.02.1309122334370.4089@ionos.tec.linutronix.de>
+References: <1379000351-15672-1-git-send-email-r.sricharan@ti.com>
+ <1379000351-15672-2-git-send-email-r.sricharan@ti.com>
+ <20130912205417.GA539@radagast>
+ <alpine.DEB.2.02.1309122334370.4089@ionos.tec.linutronix.de>
+Message-ID: <alpine.DEB.2.02.1309130010110.4089@ionos.tec.linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/11/2013 05:32 PM, Mika Westerberg wrote:
-> From: Aaron Lu<aaron.lu@intel.com>
->
-> This patch adds runtime PM support for the I2C bus in a similar way that
-> has been done for PCI bus already. This means that the I2C bus core
-> prepares runtime PM for a client device just before a driver is about to be
-> bound to it. Devices that are not bound to any driver are not prepared for
-> runtime PM.
->
-> In order to take advantage of this runtime PM support, the client device
-> driver needs drop the device runtime PM reference count by calling
-> pm_runtime_put() in its ->probe() callback and possibly implement rest of
-> the runtime PM callbacks.
->
-> If the driver doesn't support runtime PM (like most of the existing I2C
-> client drivers), the device in question is regarded as being runtime PM
-> active and powered on.
->
-> The patch adds also runtime PM support for the adapter device because it is
-> needed to be able to runtime power manage the I2C controller device. The
-> adapter device is handled along with the I2C controller device (it uses
-> pm_runtime_no_callbacks()).
->
-> Signed-off-by: Aaron Lu<aaron.lu@intel.com>
-> Signed-off-by: Mika Westerberg<mika.westerberg@linux.intel.com>
-> ---
->   drivers/i2c/i2c-core.c | 44 +++++++++++++++++++++++++++++++++++++++++++-
->   1 file changed, 43 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/i2c/i2c-core.c b/drivers/i2c/i2c-core.c
-> index f32ca29..44374b4 100644
-> --- a/drivers/i2c/i2c-core.c
-> +++ b/drivers/i2c/i2c-core.c
-> @@ -248,11 +248,30 @@ static int i2c_device_probe(struct device *dev)
->   					client->flags&  I2C_CLIENT_WAKE);
->   	dev_dbg(dev, "probe\n");
->
-> +	/* Make sure the adapter is active */
-> +	pm_runtime_get_sync(&client->adapter->dev);
+On Thu, 12 Sep 2013, Thomas Gleixner wrote:
 
-So there is currently no way to avoid this behaviour, i.e. to have the 
-adapter
-not activated before any of its client devices is probed, but only later on,
-after explicit call to pm_runtime_get*(&client->dev) in the client driver ?
+> On Thu, 12 Sep 2013, Felipe Balbi wrote:
+> 
+> > On Thu, Sep 12, 2013 at 09:09:08PM +0530, Sricharan R wrote:
+> > > +unsigned int crossbar_request_irq(struct irq_data *d)
+> > > +{
+> > > +	int cb_no = d->hwirq;
+> > > +	int virq = allocate_free_irq(cb_no);
+> > > +	void *irq = &cb->crossbar_map[cb_no].hwirq;
+> > > +	int err;
+> > > +
+> > > +	err = request_threaded_irq(virq, crossbar_irq, NULL,
+> > > +				   0, "CROSSBAR", irq);
+> > 
+> > this is wrong, why don't you just set crossbar up as a chained handler.
+> 
+> That's just a detail, which does not solve the underlying problem of
+> the crossbar -> GIC mapping.
 
---
+And actually the thing is the other way round:
+
+GIC distributes to crossbar, so the underlying GIC irq would be the
+chained handler.
+
+Still does not solve the setup/request_irq issue.
+
 Thanks,
-Sylwester
+
+	tglx
