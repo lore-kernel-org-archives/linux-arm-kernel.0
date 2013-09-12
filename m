@@ -1,24 +1,44 @@
-From: ijc@hellion.org.uk (Ian Campbell)
-Date: Thu, 12 Sep 2013 16:39:15 +0100
-Subject: [linux-sunxi] Re: [PATCH 3/4] Add physical count arch timer
- support for clocksource in ARMv7.
-In-Reply-To: <20130912112452.GA22013@e106331-lin.cambridge.arm.com>
-References: <1378968687-8200-1-git-send-email-cinifr@gmail.com>
- <1378968687-8200-4-git-send-email-cinifr@gmail.com>
- <20130912112452.GA22013@e106331-lin.cambridge.arm.com>
-Message-ID: <1379000355.10076.75.camel@kazak.uk.xensource.com>
+From: r.sricharan@ti.com (Sricharan R)
+Date: Thu, 12 Sep 2013 21:09:07 +0530
+Subject: [RFC PATCH 0/4] DRIVERS: IRQCHIP: Add crossbar irqchip driver
+Message-ID: <1379000351-15672-1-git-send-email-r.sricharan@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2013-09-12 at 12:24 +0100, Mark Rutland wrote:
-> 
-> Why can the bootloader not be fixed to set CNTVOFF (or to boot the
-> kernel in Hyp mode)? 
+Some socs have a large number of interrupts requests to service
+the needs of its many peripherals and subsystems. All of the interrupt
+requests lines from the subsystems are not needed at the same
+time, so they have to be muxed to the controllers appropriately.
+In such places a interrupt controllers are preceded by an
+IRQ CROSSBAR that provides flexibility in muxing the device interrupt
+requests to the controller inputs.
 
-It can:
-http://lists.xen.org/archives/html/xen-devel/2013-09/msg00880.html
+This series models the crossbar IP as a cascaded irqchip controller.
+The peripheral crossbar inputs are mapped on to the crossbar irq-domain.
+The driver then allocates a 'free' irq line and maps that to the
+actual interrupt controller's domain. So every external peripheral interrupt
+is routed through the crossbar handler.
 
-I was waiting for Andre's hyp mode u-boot patches to land before posting
-the sunxi bits on top. I'm not sure what the status of that is.
+This series adds a crossbar driver and the DT bindings for the
+same. Also the DT nodes for DRA7xx SOC which has a IRQ
+crossbar has been added here.
 
-Ian.
+Sricharan R (4):
+  DRIVERS: IRQCHIP: Add crossbar irqchip driver
+  ARM: DTS: DRA: Add crossbar device binding
+  ARM: DTS: DRA: Replace peripheral interrupt numbers with crossbar
+    inputs.
+  ARM: DRA: Kconfig: Enable crossbar irqchip driver for DRA7xx
+
+ .../devicetree/bindings/arm/omap/irq-crossbar.txt  |   39 ++
+ arch/arm/boot/dts/dra7.dtsi                        |  104 ++---
+ arch/arm/mach-omap2/Kconfig                        |    1 +
+ drivers/irqchip/Kconfig                            |    9 +
+ drivers/irqchip/Makefile                           |    1 +
+ drivers/irqchip/irq-crossbar.c                     |  407 ++++++++++++++++++++
+ 6 files changed, 517 insertions(+), 44 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/omap/irq-crossbar.txt
+ create mode 100644 drivers/irqchip/irq-crossbar.c
+
+-- 
+1.7.9.5
