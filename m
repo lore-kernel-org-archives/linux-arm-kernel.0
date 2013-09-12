@@ -1,35 +1,59 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 12 Sep 2013 23:01:38 +0100
-Subject: [PATCH RESEND 1/2] i2c: prepare runtime PM support for I2C
- client devices
-In-Reply-To: <87eh8trbob.fsf@linaro.org>
-References: <1378733679-19500-1-git-send-email-mika.westerberg@linux.intel.com>
- <3397524.g9aUWuArnm@vostro.rjw.lan>
- <20130910213522.GG29403@sirena.org.uk>
- <2029393.u6DaKBPszu@vostro.rjw.lan> <522FC0DC.9030708@intel.com>
- <87eh8trbob.fsf@linaro.org>
-Message-ID: <20130912220138.GY29403@sirena.org.uk>
+From: sylvester.nawrocki@gmail.com (Sylwester Nawrocki)
+Date: Fri, 13 Sep 2013 00:06:00 +0200
+Subject: [PATCH v2 1/9] i2c: prepare runtime PM support for I2C client
+ devices
+In-Reply-To: <1378913560-2752-2-git-send-email-mika.westerberg@linux.intel.com>
+References: <1378913560-2752-1-git-send-email-mika.westerberg@linux.intel.com>
+ <1378913560-2752-2-git-send-email-mika.westerberg@linux.intel.com>
+Message-ID: <52323AC8.30403@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 12, 2013 at 02:07:48PM -0700, Kevin Hilman wrote:
+On 09/11/2013 05:32 PM, Mika Westerberg wrote:
+> From: Aaron Lu<aaron.lu@intel.com>
+>
+> This patch adds runtime PM support for the I2C bus in a similar way that
+> has been done for PCI bus already. This means that the I2C bus core
+> prepares runtime PM for a client device just before a driver is about to be
+> bound to it. Devices that are not bound to any driver are not prepared for
+> runtime PM.
+>
+> In order to take advantage of this runtime PM support, the client device
+> driver needs drop the device runtime PM reference count by calling
+> pm_runtime_put() in its ->probe() callback and possibly implement rest of
+> the runtime PM callbacks.
+>
+> If the driver doesn't support runtime PM (like most of the existing I2C
+> client drivers), the device in question is regarded as being runtime PM
+> active and powered on.
+>
+> The patch adds also runtime PM support for the adapter device because it is
+> needed to be able to runtime power manage the I2C controller device. The
+> adapter device is handled along with the I2C controller device (it uses
+> pm_runtime_no_callbacks()).
+>
+> Signed-off-by: Aaron Lu<aaron.lu@intel.com>
+> Signed-off-by: Mika Westerberg<mika.westerberg@linux.intel.com>
+> ---
+>   drivers/i2c/i2c-core.c | 44 +++++++++++++++++++++++++++++++++++++++++++-
+>   1 file changed, 43 insertions(+), 1 deletion(-)
+>
+> diff --git a/drivers/i2c/i2c-core.c b/drivers/i2c/i2c-core.c
+> index f32ca29..44374b4 100644
+> --- a/drivers/i2c/i2c-core.c
+> +++ b/drivers/i2c/i2c-core.c
+> @@ -248,11 +248,30 @@ static int i2c_device_probe(struct device *dev)
+>   					client->flags&  I2C_CLIENT_WAKE);
+>   	dev_dbg(dev, "probe\n");
+>
+> +	/* Make sure the adapter is active */
+> +	pm_runtime_get_sync(&client->adapter->dev);
 
-> IMO, this decision belongs to the PM domain, not to the core.  We have
-> an established legacy with the current core default (auto) and changing
-> that means lots of breakage.
+So there is currently no way to avoid this behaviour, i.e. to have the 
+adapter
+not activated before any of its client devices is probed, but only later on,
+after explicit call to pm_runtime_get*(&client->dev) in the client driver ?
 
-Yup.
-
-> The "forbid by default" can just as easily be handled in the PM domain
-> for the group of devices that need it, so why not do it there?
-
-Or at the device level - I'd guess most I2C devices won't end up in a
-domain outside of ACPI.  Mika's latest version of the patches address
-this issue, the default is left alone.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130912/a652a8d3/attachment.sig>
+--
+Thanks,
+Sylwester
