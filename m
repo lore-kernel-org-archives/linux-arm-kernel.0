@@ -1,44 +1,61 @@
 From: r.sricharan@ti.com (Sricharan R)
-Date: Thu, 12 Sep 2013 21:09:07 +0530
-Subject: [RFC PATCH 0/4] DRIVERS: IRQCHIP: Add crossbar irqchip driver
-Message-ID: <1379000351-15672-1-git-send-email-r.sricharan@ti.com>
+Date: Thu, 12 Sep 2013 21:09:09 +0530
+Subject: [RFC PATCH 2/4] ARM: DTS: DRA: Add crossbar device binding
+In-Reply-To: <1379000351-15672-1-git-send-email-r.sricharan@ti.com>
+References: <1379000351-15672-1-git-send-email-r.sricharan@ti.com>
+Message-ID: <1379000351-15672-3-git-send-email-r.sricharan@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some socs have a large number of interrupts requests to service
-the needs of its many peripherals and subsystems. All of the interrupt
-requests lines from the subsystems are not needed at the same
-time, so they have to be muxed to the controllers appropriately.
-In such places a interrupt controllers are preceded by an
-IRQ CROSSBAR that provides flexibility in muxing the device interrupt
-requests to the controller inputs.
+This adds the irq crossbar device node.
 
-This series models the crossbar IP as a cascaded irqchip controller.
-The peripheral crossbar inputs are mapped on to the crossbar irq-domain.
-The driver then allocates a 'free' irq line and maps that to the
-actual interrupt controller's domain. So every external peripheral interrupt
-is routed through the crossbar handler.
+There is a IRQ crossbar device in the soc, which
+maps the irq requests from the peripherals to the
+mpu interrupt controller's inputs. The Peripheral irq
+requests are connected to only one crossbar
+input and the output of the crossbar is connected to only one
+controller's input line. This models the crossbar as an interrupt
+controller. This a cascaded irqchip where the peripheral interrupt
+lines are connected to the crossbar and the crossbar's outputs
+are in turn connected to the GIC.
 
-This series adds a crossbar driver and the DT bindings for the
-same. Also the DT nodes for DRA7xx SOC which has a IRQ
-crossbar has been added here.
+Signed-off-by: Sricharan R <r.sricharan@ti.com>
+---
+ arch/arm/boot/dts/dra7.dtsi |   16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
 
-Sricharan R (4):
-  DRIVERS: IRQCHIP: Add crossbar irqchip driver
-  ARM: DTS: DRA: Add crossbar device binding
-  ARM: DTS: DRA: Replace peripheral interrupt numbers with crossbar
-    inputs.
-  ARM: DRA: Kconfig: Enable crossbar irqchip driver for DRA7xx
-
- .../devicetree/bindings/arm/omap/irq-crossbar.txt  |   39 ++
- arch/arm/boot/dts/dra7.dtsi                        |  104 ++---
- arch/arm/mach-omap2/Kconfig                        |    1 +
- drivers/irqchip/Kconfig                            |    9 +
- drivers/irqchip/Makefile                           |    1 +
- drivers/irqchip/irq-crossbar.c                     |  407 ++++++++++++++++++++
- 6 files changed, 517 insertions(+), 44 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/omap/irq-crossbar.txt
- create mode 100644 drivers/irqchip/irq-crossbar.c
-
+diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
+index a5d9350..da977e1 100644
+--- a/arch/arm/boot/dts/dra7.dtsi
++++ b/arch/arm/boot/dts/dra7.dtsi
+@@ -84,6 +84,7 @@
+ 		#size-cells = <1>;
+ 		ranges;
+ 		ti,hwmods = "l3_main_1", "l3_main_2";
++		interrupt-parent = <&crossbar_mpu>;
+ 
+ 		counter32k: counter at 4ae04000 {
+ 			compatible = "ti,omap-counter32k";
+@@ -491,5 +492,20 @@
+ 			dmas = <&sdma 70>, <&sdma 71>;
+ 			dma-names = "tx0", "rx0";
+ 		};
++
++		crossbar_mpu: @4a020000 {
++			compatible = "crossbar-irqchip";
++			interrupt-parent = <&gic>;
++			interrupt-controller;
++			#interrupt-cells = <3>;
++			reg = <0x4a002a48 0x130>;
++			max-crossbar-lines = <512>;
++			max-irqs = <160>;
++			reg-size = <2>;
++			irqs-reserved = <0 1 2 3 5 6 131 132 139 140>;
++			#address-cells = <1>;
++			#size-cells = <1>;
++		};
++
+ 	};
+ };
 -- 
 1.7.9.5
