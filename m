@@ -1,59 +1,79 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 12 Sep 2013 21:56:44 +0100
-Subject: [PATCH v3 0/8] Add the Quadspi driver for vf610-twr
-In-Reply-To: <20130913041208.GD3051@gmail.com>
-References: <593AEF6C47F46446852B067021A273D6D984000B@MUCSE039.lantiq.com>
- <20130905020435.GA3970@gmail.com>
- <20980858CB6D3A4BAE95CA194937D5E73EA0C7F4@DBDE04.ent.ti.com>
- <522817D7.1010206@freescale.com> <522D3B79.3060707@freescale.com>
- <52318953.6090405@freescale.com>
- <1378979431.2627.402.camel@shinybook.infradead.org>
- <20130913025827.GA3051@gmail.com>
- <1378999322.4210.95.camel@i7.infradead.org>
- <20130913041208.GD3051@gmail.com>
-Message-ID: <20130912205644.GW29403@sirena.org.uk>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Thu, 12 Sep 2013 14:07:48 -0700
+Subject: [PATCH RESEND 1/2] i2c: prepare runtime PM support for I2C client
+ devices
+In-Reply-To: <522FC0DC.9030708@intel.com> (Aaron Lu's message of "Wed, 11 Sep
+ 2013 09:01:16 +0800")
+References: <1378733679-19500-1-git-send-email-mika.westerberg@linux.intel.com>
+ <3397524.g9aUWuArnm@vostro.rjw.lan>
+ <20130910213522.GG29403@sirena.org.uk>
+ <2029393.u6DaKBPszu@vostro.rjw.lan> <522FC0DC.9030708@intel.com>
+Message-ID: <87eh8trbob.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 13, 2013 at 12:12:14AM -0400, Huang Shijie wrote:
-> On Thu, Sep 12, 2013 at 04:22:02PM +0100, David Woodhouse wrote:
+Aaron Lu <aaron.lu@intel.com> writes:
 
-> > But the controller driver shouldn't *have* that incestuous knowledge of
-> > the command set of the chip that happens to be connected to it.
+> On 09/11/2013 06:32 AM, Rafael J. Wysocki wrote:
+>> On Tuesday, September 10, 2013 10:35:22 PM Mark Brown wrote:
+>>> On Tue, Sep 10, 2013 at 10:04:21PM +0200, Rafael J. Wysocki wrote:
+>>>> On Tuesday, September 10, 2013 05:13:21 PM Mark Brown wrote:
+>>>
+>>>>> OK, that is very much not the model which embedded systems follow, in
+>>>>> embedded systems the driver for the device is fully in control of its
+>>>>> own power.  It gets resources like GPIOs and regulators which allow it
+>>>>> to make fine grained decisions.
+>>>
+>>>> There are platforms where those resources are simply not available for
+>>>> direct manipulation and we need to use ACPI methods for power management.
+>>>
+>>>> Now, since those methods are used in pretty much the same way for all I2C
+>>>> devices, we add a PM domain for that to avoid duplicating the same code in
+>>>> all of the drivers in question (patch [2/2]).  Does that make sense to you?
+>>>
+>>> It doesn't seem like a particular problem, but the existing usage does
+>>> need to be preserved for the systems that use it so things like having
+>>> auto as the default and updating the drivers seem like they're needed.
+>>>
+>>>>> If we're starting to get a reasonable number of buses following the same
+>>>>> pattern it seems like we're in a position to start 
+>>>
+>>>> We need that for exactly 3 buses: platform (already done), I2C and SPI.
+>>>
+>>>> No other bus types are going to use ACPI this way for PM, at least for the
+>>>> time being, simply because PCI, USB and SATA/IDE have their own ways of doing
+>>>> this (which are bus-specific) and the spec doesn't cover other bus types
+>>>> directly (it defines support for UART, but we don't have a UART bus type).
+>>>
+>>>> Moreover, because PCI and USB use ACPI for PM in their own ways, moving that
+>>>> thing up to the driver core would be rather inconvenient.
+>>>
+>>> That only applies to the power domains though, what Mika was saying was
+>>> that the process for enabling runtime PM (just drop a reference) also
+>>> becomes easier with this method regardless of anything else - that makes
+>>> sense to me as something we might want to end up with so do we want to
+>>> just move towards making that a default?
+>> 
+>> Possibly. :-)
+>> 
+>> At least I don't see any fundamental obstacles ...
+>
+> Looks like, it all boils down to how many I2C devices should be allowed
+> for runtime PM by default and how many I2C devices should be forbidden.
+> , and then we allow/forbid runtime PM for the majority case in I2C core
+> while individual driver can still forbid/allow it in their own code.
+>
+> So if the majority case is runtime PM should be allowed by default, I'm
+> also OK to not forbid runtime PM for I2C client device in I2C core. My
+> original intention to forbid runtime PM by default is to make sure no
+> adverse effect would occur to some I2C devices that used to work well
+> before runtime PM.
 
-> I think the controller is designed for the NOR flash, yes, a little
-> strange.
+IMO, this decision belongs to the PM domain, not to the core.  We have
+an established legacy with the current core default (auto) and changing
+that means lots of breakage.
 
-I think this is part of the problem - you're trying to represent
-something that isn't really a SPI controller as a SPI controller (or at
-least trying to implement functionality beyond that which a SPI
-controller has).
+The "forbid by default" can just as easily be handled in the PM domain
+for the group of devices that need it, so why not do it there?
 
-> Mark and you want to create the LUT instruction sequence at the runtime,
-> But there is some disadvantage if we do so:
->   [1] low efficiency: 
-
->   [2] we may can not create all the LUT instruction sequence at the
->       runtime. For example, the buffer program(OPCODE_PP):
-
-> 
->   [3] We may can not create the LUT instruction sequence at the runtime,
->       since we can not get enough information from the spi_transfer{}.
->       A whole LUT instruction sequence may needs the following info:
-
-What this is saying to me is that you should not be impementing this as
-a SPI controller, trying to do that is breaking the abstracton that SPI
-is offering.  Like people have said SPI is just about byte streams.
-
-I think what you should be doing is refactoring the MTD code which
-interfaces to SPI flashes to split out the code so that there's an
-abstraction which can express what this controller (and presumably
-other controllers) can do and then implement this functionaltiy at
-that level.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130912/a0a6b3bb/attachment.sig>
+Kevin
