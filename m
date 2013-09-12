@@ -1,42 +1,31 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Fri, 13 Sep 2013 00:12:24 +0200 (CEST)
-Subject: [RFC PATCH 1/4] DRIVERS: IRQCHIP: Add crossbar irqchip driver
-In-Reply-To: <alpine.DEB.2.02.1309122334370.4089@ionos.tec.linutronix.de>
-References: <1379000351-15672-1-git-send-email-r.sricharan@ti.com>
- <1379000351-15672-2-git-send-email-r.sricharan@ti.com>
- <20130912205417.GA539@radagast>
- <alpine.DEB.2.02.1309122334370.4089@ionos.tec.linutronix.de>
-Message-ID: <alpine.DEB.2.02.1309130010110.4089@ionos.tec.linutronix.de>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Thu, 12 Sep 2013 15:18:51 -0700
+Subject: [PATCH 5/7] staging: media/lirc: switch to use gpiolib
+In-Reply-To: <1378816283-8164-1-git-send-email-linus.walleij@linaro.org>
+References: <1378816283-8164-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <20130912221851.GC11463@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 12 Sep 2013, Thomas Gleixner wrote:
-
-> On Thu, 12 Sep 2013, Felipe Balbi wrote:
+On Tue, Sep 10, 2013 at 02:31:23PM +0200, Linus Walleij wrote:
+> The lirc serial module has special hooks to work with NSLU2,
+> switch these over to use gpiolib, as that is available on the
+> ixp4 platform.
 > 
-> > On Thu, Sep 12, 2013 at 09:09:08PM +0530, Sricharan R wrote:
-> > > +unsigned int crossbar_request_irq(struct irq_data *d)
-> > > +{
-> > > +	int cb_no = d->hwirq;
-> > > +	int virq = allocate_free_irq(cb_no);
-> > > +	void *irq = &cb->crossbar_map[cb_no].hwirq;
-> > > +	int err;
-> > > +
-> > > +	err = request_threaded_irq(virq, crossbar_irq, NULL,
-> > > +				   0, "CROSSBAR", irq);
-> > 
-> > this is wrong, why don't you just set crossbar up as a chained handler.
+> Not even compile tested as there is no way to select this
+> driver from menuconfig on the ixp4 platform.
 > 
-> That's just a detail, which does not solve the underlying problem of
-> the crossbar -> GIC mapping.
+> Cc: Imre Kaloz <kaloz@openwrt.org>
+> Cc: Krzysztof Halasa <khc@pm.waw.pl>
+> Cc: Alexandre Courbot <acourbot@nvidia.com>
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+> Hi Greg: I'm seeking an ACK on this patch to take it through
+> the GPIO tree as part of a clean-up attempt to remove custom
+> GPIO APIs.
 
-And actually the thing is the other way round:
+I'm not the one responsible for drivers/staging/media/ sorry, that's
+Mauro.
 
-GIC distributes to crossbar, so the underlying GIC irq would be the
-chained handler.
-
-Still does not solve the setup/request_irq issue.
-
-Thanks,
-
-	tglx
+greg k-h
