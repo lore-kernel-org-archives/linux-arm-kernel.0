@@ -1,48 +1,29 @@
-From: koen@dominion.thruhere.net (Koen Kooi)
-Date: Thu, 12 Sep 2013 20:35:35 +0200
-Subject: [PATCH v4 4/4] ARM: dts: am335x-bone-common: add cpu0 and mmc1
- triggers
-In-Reply-To: <1379010935-25943-1-git-send-email-koen@dominion.thruhere.net>
-References: <1379010935-25943-1-git-send-email-koen@dominion.thruhere.net>
-Message-ID: <1379010935-25943-5-git-send-email-koen@dominion.thruhere.net>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 12 Sep 2013 11:46:33 -0700
+Subject: [PATCH] ARM: msm: Move msm devicetrees under a Qualcomm dir
+In-Reply-To: <523205E1.2040704@gmail.com>
+References: <1379003839-16068-1-git-send-email-galak@codeaurora.org>
+ <CAOesGMisWLwYKotGDFPW6PyHJs=_+fohTdC08SGjsv2FXaa7Fg@mail.gmail.com>
+ <25E0B143-658E-4CCC-A88A-0AF70FFF33CE@codeaurora.org>
+ <CAOesGMhfdvyJ_2AA2e8iO_2e=q7KgpyNbcriPKFw-RLormG6bA@mail.gmail.com>
+ <3E38F48E-EE41-4564-84A1-36CF07B08811@codeaurora.org>
+ <CAOesGMhN0jEx065cpf989P-JbuxPiOaPRsP4BD3VoW-n5ebP+w@mail.gmail.com>
+ <9DD9D9A7-ED55-412F-A18D-599D1E365003@codeaurora.org>
+ <523205E1.2040704@gmail.com>
+Message-ID: <CAOesGMhSZzpyT5XyECByLnvef0E+92y+uaXByiG0Vpm9f05AxQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This matches the vendor 3.8.x configuration that is shipping with the boards.
+On Thu, Sep 12, 2013 at 11:20 AM, Rob Herring <robherring2@gmail.com> wrote:
 
-The LED layout is now:
+> As Stephen W has pointed out previously, the dtb filename itself is or
+> may be an ABI and the bootloader may be hardcoded to a name. So we
+> should avoid future renames.
 
-USR0: heartbeat
-USR1: mmc0 (micro-SD slot)
-USR2: cpu0
-USR3: mmc1 (eMMC)
+We still have the choice of producing the dtb files under
+arch/arm/boot/dts even if we move dts/dtsi files one level deeper, as
+long as we keep the filenames consistent. So we can do a move, just
+not a rename.
 
-The cpu0 triggers was put in between the mmc triggers to make is easier to see
-where the disk activity is.
 
-Signed-off-by: Koen Kooi <koen@dominion.thruhere.net>
----
- arch/arm/boot/dts/am335x-bone-common.dtsi | 2 ++
- 1 file changed, 2 insertions(+)
-
-diff --git a/arch/arm/boot/dts/am335x-bone-common.dtsi b/arch/arm/boot/dts/am335x-bone-common.dtsi
-index 303df81..adce9fe 100644
---- a/arch/arm/boot/dts/am335x-bone-common.dtsi
-+++ b/arch/arm/boot/dts/am335x-bone-common.dtsi
-@@ -204,12 +204,14 @@
- 		led at 4 {
- 			label = "beaglebone:green:usr2";
- 			gpios = <&gpio1 23 GPIO_ACTIVE_HIGH>;
-+			linux,default-trigger = "cpu0";
- 			default-state = "off";
- 		};
- 
- 		led at 5 {
- 			label = "beaglebone:green:usr3";
- 			gpios = <&gpio1 24 GPIO_ACTIVE_HIGH>;
-+			linux,default-trigger = "mmc1";
- 			default-state = "off";
- 		};
- 	};
--- 
-1.8.2.1
+-Olof
