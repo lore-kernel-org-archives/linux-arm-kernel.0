@@ -1,61 +1,44 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Fri, 13 Sep 2013 00:22:33 +0200 (CEST)
-Subject: [RFC PATCH 1/4] DRIVERS: IRQCHIP: Add crossbar irqchip driver
-In-Reply-To: <523228B5.5070507@ti.com>
-References: <1379000351-15672-1-git-send-email-r.sricharan@ti.com>
- <1379000351-15672-2-git-send-email-r.sricharan@ti.com>
- <alpine.DEB.2.02.1309122201530.4089@ionos.tec.linutronix.de>
- <523228B5.5070507@ti.com>
-Message-ID: <alpine.DEB.2.02.1309122335440.4089@ionos.tec.linutronix.de>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Thu, 12 Sep 2013 15:27:43 -0700
+Subject: [PATCH v4 0/2] ARM: dts: Beaglebone MMC fixes
+In-Reply-To: <1379010935-25943-1-git-send-email-koen@dominion.thruhere.net>
+ (Koen Kooi's message of "Thu, 12 Sep 2013 20:35:31 +0200")
+References: <1379010935-25943-1-git-send-email-koen@dominion.thruhere.net>
+Message-ID: <87y571r7z4.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 12 Sep 2013, Santosh Shilimkar wrote:
-> Specifically for the IRQ case addressed here, the cross-bar IP
-> sits between the interrupt controller and peripheral interrupts.
-> 
-> CPU <-- GIC  <----- CROSSBAR <----- PERIPHERAL IRQs
-> 
-> Just to expand it better, cross-bar input IRQ lines are more than
-> what a GIC IRQ controller can support.
-> e.q Total 250 peripheral IRQ lines out of which GIC support
-> only 160 IRQ lines.
-> 
-> So the idea here is to dynamically map the IRQ lines at
-> cross-bar level to pick based on request_irq() so that one
-> can optimize the use of limited IRQ lines at the GIC level.
-> Strictly speaking the need is just establish the IRQ
-> connection from peripheral to GIC and thats achieved
-> at the request_irq() level.
-> 
-> Earlier approach was to statically build this connections
-> using the DT information in a separate driver probe but
-> it had limitations of fixing the IRQ map and taking away
-> flexibility what this IP provide. 
->  
-> Hope this gives better picture to you behind the patch
-> series.
+Koen Kooi <koen@dominion.thruhere.net> writes:
 
-Yes. I halfways understand what you are trying to achieve.
+> Here are two patches to fix MMC on beaglebone, one fixes card detect on BBW,
+> the other adds the eMMC entry for BBB and its fixed regulator. After that mmc1
+> gets a nice speed boost by moving to 4-bit mode and LED triggers get assigned.
+>
+> This series depends on:
+>
+> http://comments.gmane.org/gmane.linux.kernel.stable/63648
+> https://lkml.org/lkml/2013/9/10/454
+> http://comments.gmane.org/gmane.linux.kernel.mmc/22381
+>
+> Or as git-cherry would put it:
+>
+> [koen at rrMBP patches]$ git cherry -v
+> + 564fc88cc64387af5312e2abd8019c75a13223b2 ARM: OMAP2+: am335x-bone*: add DT for BeagleBone Black
+> + e5133ed98acc1c3e01c370b851041a8ca629cd15 ARM: EDMA: Fix clearing of unused list for DT DMA resources
+> + ac71bb58605d3bdd5d14af770a639fb3ff11c612 ARM: dts: add AM33XX EDMA support
+> + 31a8270a299c57c7de7510f44d9dc36fd1787243 ARM: dts: add AM33XX SPI DMA support
+> + 4fa0a4cb9ea17da30cf43085c03e5ec1361a4fc2 ARM: dts: add AM33XX MMC support and documentation
+> + 0553f50bd45f019a0cc11050e2f20bddbf07dfe0 ARM: dts: am335x-bone: add CD for mmc1
+> + 7d64f765630a2921a63b82f93f9959a6de37f29d ARM: dts: am335x-boneblack: add eMMC DT entry
+> + dc96cd4003e2668d8ec7e7fe19e402e97a198f81 ARM: dts: am335x-bone-common: switch mmc1 to 4-bit mode
+> + f8262e78830cda56c936724549ba9f04dddde312 ARM: dts: am335x-bone-common: add cpu0 and mmc1 triggers
+>
+> Also available as a git branch at https://github.com/koenkooi/linux/commits/mainline
 
-So CROSSBAR is a routing block between the peripheral and the GIC in
-order to expand the number of possible interrupts.
+FWIW, tested this branch on BB black/white with MMC rootfs.
 
-Now the real question is, how that expansion mechanism is supposed to
-work. There are two possible scenarios:
+Tested-by: Kevin Hilman <khilman@linaro.org>
 
-1) Expand the number of handled interrupts beyond the GIC capacity:
+Koen, Thanks for your persistence getting this stuff merged.
 
-   That requires a mechanism in CROSSBAR to map several CROSSBAR
-   interrupts to a particular GIC interrupt and provide a demux
-   mechanism to invoke the shared handlers.
-
-2) Provide a mapping mechanism between possibly 250 interrupt numbers
-   and a limitation of a total 160 active interrupts by the underlying
-   GIC.
-
-What are you trying to achieve?
-
-Thanks,
-
-	tglx
+Kevin
