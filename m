@@ -1,51 +1,309 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 12 Sep 2013 14:43:45 +0100
-Subject: [PATCH v3 0/8] Add the Quadspi driver for vf610-twr
-In-Reply-To: <1378987323.2627.429.camel@shinybook.infradead.org>
-References: <522FD78A.6080900@freescale.com>
- <20130911104126.GN29403@sirena.org.uk>
- <52304BFF.4060007@freescale.com>
- <20130911113002.GP29403@sirena.org.uk>
- <523186DF.4070203@freescale.com>
- <1378982395.2627.416.camel@shinybook.infradead.org>
- <20980858CB6D3A4BAE95CA194937D5E73EA0EE8B@DBDE04.ent.ti.com>
- <1378984665.2627.423.camel@shinybook.infradead.org>
- <20130912114831.GL29403@sirena.org.uk>
- <1378987323.2627.429.camel@shinybook.infradead.org>
-Message-ID: <20130912134345.GQ29403@sirena.org.uk>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 12 Sep 2013 15:45:30 +0200
+Subject: [PATCH 1/2] ARM: ux500: delete surplus PRCMU regulator defines
+Message-ID: <1378993530-24365-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 12, 2013 at 01:02:03PM +0100, David Woodhouse wrote:
-> On Thu, 2013-09-12 at 12:48 +0100, Mark Brown wrote:
+The Ux500 boards are layered like this:
+ste-snowball.dts includes ste-href.dtsi that includes
+ste-dbx500.dtsi.
 
-> > So, to repeat my earlier question can someone tell me what a LUT is?
+The dbx500.dtsi defines the PRCMU SoC regulators so the SoC will
+probe and you can use ampersand references where need be.
 
-> I only know what's in the patch that you have also received, but it
-> seems to be a table of commands. To send a given command to the flash,
-> you write the actual command to the some slot in the LUT, then 'trigger'
-> it by writing its index to another register.
+However the HREF common dtsi and these two boards redefine the
+same PRCMU SoC regulators with the very same names and properties
+for no reason. This is like filling in the same line three
+times instead of drawing it once. Just delete the surplus
+references and have the PRCMU regulators defines in the SoC
+files ste-dbx500.dtsi, this is enough.
 
-OK, so the LUT itself isn't a generic mtd thing, though the commands
-it's apparently sending are?
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ arch/arm/boot/dts/ste-href.dtsi       | 82 -----------------------------------
+ arch/arm/boot/dts/ste-hrefv60plus.dts | 82 -----------------------------------
+ arch/arm/boot/dts/ste-snowball.dts    | 82 -----------------------------------
+ 3 files changed, 246 deletions(-)
 
-> I think this whole thing is about the fact that they are *prepopulating*
-> the LUT with a set of 'known' commands, and have incestuous knowledge
-> about what commands will be used, rather than being a truly generic SPI
-> driver and being able to cope with *any* commands that might be sent to
-> the slave(s), dynamically setting up to the LUT as required.
-
-Yup, and I'm also worrying how this is going to work if the flash driver
-starts supporting SPI controllers which can do the extra data lines but
-are otherwise dumb and so need the device to explicitly send commands to
-the device.  SPI is just byte streams, it's got no idea about commands.
-
-I'm wondering if we want an abstraction between SPI and the flash chips
-which understands SPI commands and could possibly have drivers itself?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130912/613f1d0f/attachment.sig>
+diff --git a/arch/arm/boot/dts/ste-href.dtsi b/arch/arm/boot/dts/ste-href.dtsi
+index 370e03f..f88a659 100644
+--- a/arch/arm/boot/dts/ste-href.dtsi
++++ b/arch/arm/boot/dts/ste-href.dtsi
+@@ -167,88 +167,6 @@
+ 		};
+ 
+ 		prcmu at 80157000 {
+-			db8500-prcmu-regulators {
+-				db8500_vape_reg: db8500_vape {
+-					regulator-name = "db8500-vape";
+-				};
+-
+-				db8500_varm_reg: db8500_varm {
+-					regulator-name = "db8500-varm";
+-				};
+-
+-				db8500_vmodem_reg: db8500_vmodem {
+-					regulator-name = "db8500-vmodem";
+-				};
+-
+-				db8500_vpll_reg: db8500_vpll {
+-					regulator-name = "db8500-vpll";
+-				};
+-
+-				db8500_vsmps1_reg: db8500_vsmps1 {
+-					regulator-name = "db8500-vsmps1";
+-				};
+-
+-				db8500_vsmps2_reg: db8500_vsmps2 {
+-					regulator-name = "db8500-vsmps2";
+-				};
+-
+-				db8500_vsmps3_reg: db8500_vsmps3 {
+-					regulator-name = "db8500-vsmps3";
+-				};
+-
+-				db8500_vrf1_reg: db8500_vrf1 {
+-					regulator-name = "db8500-vrf1";
+-				};
+-
+-				db8500_sva_mmdsp_reg: db8500_sva_mmdsp {
+-					regulator-name = "db8500-sva-mmdsp";
+-				};
+-
+-				db8500_sva_mmdsp_ret_reg: db8500_sva_mmdsp_ret {
+-					regulator-name = "db8500-sva-mmdsp-ret";
+-				};
+-
+-				db8500_sva_pipe_reg: db8500_sva_pipe {
+-					regulator-name = "db8500_sva_pipe";
+-				};
+-
+-				db8500_sia_mmdsp_reg: db8500_sia_mmdsp {
+-					regulator-name = "db8500_sia_mmdsp";
+-				};
+-
+-				db8500_sia_mmdsp_ret_reg: db8500_sia_mmdsp_ret {
+-					regulator-name = "db8500-sia-mmdsp-ret";
+-				};
+-
+-				db8500_sia_pipe_reg: db8500_sia_pipe {
+-					regulator-name = "db8500-sia-pipe";
+-				};
+-
+-				db8500_sga_reg: db8500_sga {
+-					regulator-name = "db8500-sga";
+-				};
+-
+-				db8500_b2r2_mcde_reg: db8500_b2r2_mcde {
+-					regulator-name = "db8500-b2r2-mcde";
+-				};
+-
+-				db8500_esram12_reg: db8500_esram12 {
+-					regulator-name = "db8500-esram12";
+-				};
+-
+-				db8500_esram12_ret_reg: db8500_esram12_ret {
+-					regulator-name = "db8500-esram12-ret";
+-				};
+-
+-				db8500_esram34_reg: db8500_esram34 {
+-					regulator-name = "db8500-esram34";
+-				};
+-
+-				db8500_esram34_ret_reg: db8500_esram34_ret {
+-					regulator-name = "db8500-esram34-ret";
+-				};
+-			};
+-
+ 			ab8500 {
+ 				ab8500-regulators {
+ 					ab8500_ldo_aux1_reg: ab8500_ldo_aux1 {
+diff --git a/arch/arm/boot/dts/ste-hrefv60plus.dts b/arch/arm/boot/dts/ste-hrefv60plus.dts
+index 6e52ebb..0e2be7a 100644
+--- a/arch/arm/boot/dts/ste-hrefv60plus.dts
++++ b/arch/arm/boot/dts/ste-hrefv60plus.dts
+@@ -76,88 +76,6 @@
+ 		};
+ 
+ 		prcmu at 80157000 {
+-			db8500-prcmu-regulators {
+-				db8500_vape_reg: db8500_vape {
+-					regulator-name = "db8500-vape";
+-				};
+-
+-				db8500_varm_reg: db8500_varm {
+-					regulator-name = "db8500-varm";
+-				};
+-
+-				db8500_vmodem_reg: db8500_vmodem {
+-					regulator-name = "db8500-vmodem";
+-				};
+-
+-				db8500_vpll_reg: db8500_vpll {
+-					regulator-name = "db8500-vpll";
+-				};
+-
+-				db8500_vsmps1_reg: db8500_vsmps1 {
+-					regulator-name = "db8500-vsmps1";
+-				};
+-
+-				db8500_vsmps2_reg: db8500_vsmps2 {
+-					regulator-name = "db8500-vsmps2";
+-				};
+-
+-				db8500_vsmps3_reg: db8500_vsmps3 {
+-					regulator-name = "db8500-vsmps3";
+-				};
+-
+-				db8500_vrf1_reg: db8500_vrf1 {
+-					regulator-name = "db8500-vrf1";
+-				};
+-
+-				db8500_sva_mmdsp_reg: db8500_sva_mmdsp {
+-					regulator-name = "db8500-sva-mmdsp";
+-				};
+-
+-				db8500_sva_mmdsp_ret_reg: db8500_sva_mmdsp_ret {
+-					regulator-name = "db8500-sva-mmdsp-ret";
+-				};
+-
+-				db8500_sva_pipe_reg: db8500_sva_pipe {
+-					regulator-name = "db8500_sva_pipe";
+-				};
+-
+-				db8500_sia_mmdsp_reg: db8500_sia_mmdsp {
+-					regulator-name = "db8500_sia_mmdsp";
+-				};
+-
+-				db8500_sia_mmdsp_ret_reg: db8500_sia_mmdsp_ret {
+-					regulator-name = "db8500-sia-mmdsp-ret";
+-				};
+-
+-				db8500_sia_pipe_reg: db8500_sia_pipe {
+-					regulator-name = "db8500-sia-pipe";
+-				};
+-
+-				db8500_sga_reg: db8500_sga {
+-					regulator-name = "db8500-sga";
+-				};
+-
+-				db8500_b2r2_mcde_reg: db8500_b2r2_mcde {
+-					regulator-name = "db8500-b2r2-mcde";
+-				};
+-
+-				db8500_esram12_reg: db8500_esram12 {
+-					regulator-name = "db8500-esram12";
+-				};
+-
+-				db8500_esram12_ret_reg: db8500_esram12_ret {
+-					regulator-name = "db8500-esram12-ret";
+-				};
+-
+-				db8500_esram34_reg: db8500_esram34 {
+-					regulator-name = "db8500-esram34";
+-				};
+-
+-				db8500_esram34_ret_reg: db8500_esram34_ret {
+-					regulator-name = "db8500-esram34-ret";
+-				};
+-			};
+-
+ 			ab8500 {
+ 				ab8500-regulators {
+ 					ab8500_ldo_aux1_reg: ab8500_ldo_aux1 {
+diff --git a/arch/arm/boot/dts/ste-snowball.dts b/arch/arm/boot/dts/ste-snowball.dts
+index f1fc128..acf99ec 100644
+--- a/arch/arm/boot/dts/ste-snowball.dts
++++ b/arch/arm/boot/dts/ste-snowball.dts
+@@ -170,88 +170,6 @@
+ 		};
+ 
+ 		prcmu at 80157000 {
+-			db8500-prcmu-regulators {
+-				db8500_vape_reg: db8500_vape {
+-					regulator-name = "db8500-vape";
+-				};
+-
+-				db8500_varm_reg: db8500_varm {
+-					regulator-name = "db8500-varm";
+-				};
+-
+-				db8500_vmodem_reg: db8500_vmodem {
+-					regulator-name = "db8500-vmodem";
+-				};
+-
+-				db8500_vpll_reg: db8500_vpll {
+-					regulator-name = "db8500-vpll";
+-				};
+-
+-				db8500_vsmps1_reg: db8500_vsmps1 {
+-					regulator-name = "db8500-vsmps1";
+-				};
+-
+-				db8500_vsmps2_reg: db8500_vsmps2 {
+-					regulator-name = "db8500-vsmps2";
+-				};
+-
+-				db8500_vsmps3_reg: db8500_vsmps3 {
+-					regulator-name = "db8500-vsmps3";
+-				};
+-
+-				db8500_vrf1_reg: db8500_vrf1 {
+-					regulator-name = "db8500-vrf1";
+-				};
+-
+-				db8500_sva_mmdsp_reg: db8500_sva_mmdsp {
+-					regulator-name = "db8500-sva-mmdsp";
+-				};
+-
+-				db8500_sva_mmdsp_ret_reg: db8500_sva_mmdsp_ret {
+-					regulator-name = "db8500-sva-mmdsp-ret";
+-				};
+-
+-				db8500_sva_pipe_reg: db8500_sva_pipe {
+-					regulator-name = "db8500_sva_pipe";
+-				};
+-
+-				db8500_sia_mmdsp_reg: db8500_sia_mmdsp {
+-					regulator-name = "db8500_sia_mmdsp";
+-				};
+-
+-				db8500_sia_mmdsp_ret_reg: db8500_sia_mmdsp_ret {
+-					regulator-name = "db8500-sia-mmdsp-ret";
+-				};
+-
+-				db8500_sia_pipe_reg: db8500_sia_pipe {
+-					regulator-name = "db8500-sia-pipe";
+-				};
+-
+-				db8500_sga_reg: db8500_sga {
+-					regulator-name = "db8500-sga";
+-				};
+-
+-				db8500_b2r2_mcde_reg: db8500_b2r2_mcde {
+-					regulator-name = "db8500-b2r2-mcde";
+-				};
+-
+-				db8500_esram12_reg: db8500_esram12 {
+-					regulator-name = "db8500-esram12";
+-				};
+-
+-				db8500_esram12_ret_reg: db8500_esram12_ret {
+-					regulator-name = "db8500-esram12-ret";
+-				};
+-
+-				db8500_esram34_reg: db8500_esram34 {
+-					regulator-name = "db8500-esram34";
+-				};
+-
+-				db8500_esram34_ret_reg: db8500_esram34_ret {
+-					regulator-name = "db8500-esram34-ret";
+-				};
+-			};
+-
+ 			thermal at 801573c0 {
+ 				num-trips = <4>;
+ 
+-- 
+1.8.3.1
