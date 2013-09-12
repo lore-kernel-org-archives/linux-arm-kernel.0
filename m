@@ -1,58 +1,98 @@
-From: holler@ahsoftware.de (Alexander Holler)
-Date: Thu, 12 Sep 2013 17:57:00 +0200
-Subject: [PATCH] RFC: interrupt consistency check for OF GPIO IRQs
-In-Reply-To: <5231DB88.90605@wwwdotorg.org>
-References: <1375101368-17645-1-git-send-email-linus.walleij@linaro.org>
- <CACxGe6uNJNMdZ1HYGgCtLM2t2TWGCR6btjOHVmP=vDXXvvFfRg@mail.gmail.com>
- <CACRpkdYjJL6FZwEbB7XLnb9QtjB=3LeE9Ny6KQ4PkM3zpdNqqg@mail.gmail.com>
- <344239800.bDEkDg48ZQ@avalon>
- <CACRpkdavR=fv+y1RCNfdgQypPuRbO6isOSwGsABDrYiGeMdyZw@mail.gmail.com>
- <52308C91.2000105@ahsoftware.de> <523096FE.8080901@collabora.co.uk>
- <5230AB6E.1070807@ahsoftware.de> <5231817F.8000901@ahsoftware.de>
- <5231934D.4060706@collabora.co.uk> <52319741.5050407@ahsoftware.de>
- <5231A0F8.1070505@ahsoftware.de> <5231A4FE.1070704@ahsoftware.de>
- <5231A791.9080600@ahsoftware.de> <5231DB88.90605@wwwdotorg.org>
-Message-ID: <5231E44C.9070800@ahsoftware.de>
+From: thommyj@gmail.com (Thommy Jakobsson)
+Date: Thu, 12 Sep 2013 17:58:22 +0200 (CEST)
+Subject: kmalloc memory slower than malloc
+In-Reply-To: <20130910125048.GD12758@n2100.arm.linux.org.uk>
+References: <alpine.DEB.2.02.1309060811400.1299@kelly.ryd.net>
+ <1378458778.4208.30.camel@weser.hi.pengutronix.de>
+ <alpine.DEB.2.02.1309101124450.1305@kelly.ryd.net>
+ <1378807816.4200.6.camel@weser.hi.pengutronix.de>
+ <9848F2DB572E5649BA045B288BE08FBE016A9D4A@039-SN2MPN1-023.039d.mgd.msft.net>
+ <alpine.DEB.2.02.1309101327340.1305@kelly.ryd.net>
+ <9848F2DB572E5649BA045B288BE08FBE016A9EE8@039-SN2MPN1-023.039d.mgd.msft.net>
+ <20130910114420.GC12758@n2100.arm.linux.org.uk>
+ <alpine.DEB.2.02.1309101435430.1305@kelly.ryd.net>
+ <20130910125048.GD12758@n2100.arm.linux.org.uk>
+Message-ID: <alpine.DEB.2.02.1309121121400.2567@kelly.ryd.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 12.09.2013 17:19, schrieb Stephen Warren:
->
-> IRQs, DMA channels, and GPIOs are all different things. Their bindings
-> are defined independently. While it's good to define new types of
-> bindings consistently with other bindings, this hasn't always happened,
-> so you can make zero assumptions about the IRQ bindings by reading the
-> documentation for any other kind of binding.
->
-> Multiple interrupts are defined as follows:
->
-> 	// Optional; otherwise inherited from parent/grand-parent/...
-> 	interrupt-parent = <&gpio6>;
-> 	// Must be in a fixed order, unless binding defines that the
-> 	// optional interrupt-names property is to be used.
-> 	interrupts = <1 IRQF_TRIGGER_HIGH> <2 IRQF_TRIGGER_LOW>;
-> 	// Optional; binding for device defines whether it must
-> 	// be present
-> 	interrupt-names = "foo", "bar";
->
-> If you need multiple interrupts, each with a different parent, you need
-> to use an interrupt-map property (Google it for a more complete
-> explanation I guess). Unlike "interrupts", "interrupt-map" has a phandle
-> in each entry, and hence each entry can refer to a different IRQ
-> controller. You end up defining a dummy interrupt controller node (which
-> may be the leaf node with multiple IRQ outputs, which then points at
-> itself as the interrupt parent), pointing the leaf node's
-> interrupt-parent at that node, and then having interrupt-map "demux" the
-> N interrupt outputs to the various interrupt controllers.
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
->
 
-What a mess. I assume that is the price that bindings don't have to change.
 
-Thanks for clarifying that,
+On Tue, 10 Sep 2013, Russell King - ARM Linux wrote:
 
-Alexander Holler
+> On Tue, Sep 10, 2013 at 02:42:17PM +0200, Thommy Jakobsson wrote:
+> > Using pgprot_dmacoherent() in mmap they look more similar. Still 
+> > ~10-15% difference, but maybe that is normal for kernel/userspace. 
+> > 
+> > dma_alloc_coherent in kernel   4.257s (s=0)
+> > kmalloc in kernel              0.126s (s=81370000)
+> > dma_alloc_coherent userspace   4.907s (s=0)
+> > kmalloc in userspace          1.815s (s=81370000)
+> > malloc in userspace          0.566s (s=0)
+> > 
+> > Note that I was lazy and used the same pgprot for all mappings now, which 
+> > I guess is a violation. 
+> 
+> What it means is that the results you end up with are documented to be
+> "unpredictable" which gives scope to manufacturers to come up with any
+> behaviour they desire in that situation - and it doesn't have to be
+> consistent.
+> 
+> What that means is that if you have an area of physical memory mapped as
+> "normal memory cacheable" and it's also mapped "strongly ordered" elsewhere,
+> it is entirely legal for an access via the strongly ordered mapping to
+> hit the cache if a cache line exists, whereas another implementation
+> may miss the cache line if it exists.
+> 
+> Furthermore, with such mappings (and this has been true since ARMv3 days)
+> if you have two such mappings - one cacheable and one non-cacheable, and
+> the cacheable mapping has dirty cache lines, the dirty cache lines can be
+> evicted at any moment, overwriting whatever you're doing via the non-
+> cacheable mapping.
+But isn't the memory received with dma_alloc_coherent() given a noncached 
+mapping? or even strongly ordered? Will that not conflict with the normal 
+kernel mapping which is cached?
+
+Is all the mappings documented somewhere, what linux mapping corresponds 
+to which mapping in MMU? Seems like the armv7 documentation isn't free 
+either, which isn't making things easier for me.
+
+Comning back to the original issue; dissassembling the code I noticed that 
+the userspace code looked really stupid with a lot of unnecessary memory 
+accesses. Kernel looked much better. Even after commenting the actual 
+memory access out in userspace, leaving just the loop itself, I got 
+terrible times.
+
+Previous times:
+dma_alloc_coherent in kernel   4.257s (s=0)
+kmalloc in kernel              0.126s (s=68620000)
+dma_alloc_coherent userspace   0.566s (s=0)
+kmalloc in userspace          0.566s (s=68620000)
+malloc in userspace          0.566s (s=0)
+
+Commenting out actual memory access (loop not optimized away when checking 
+assembler):
+dma_alloc_coherent in kernel   4.256s (s=0)
+kmalloc in kernel              0.126s (s=84750000)
+dma_alloc_coherent userspace   0.566s (s=0)
+kmalloc in userspace          0.412s (s=0) << just looping
+malloc in userspace          0.566s (s=0)
+
+Kernel is with -O2 so compiling the testprogram with -O2 aswell yield more 
+reasonable results:
+dma_alloc_coherent in kernel   4.257s (s=0)
+kmalloc in kernel              0.126s (s=84560000)
+dma_alloc_coherent userspace   0.124s (s=0)
+kmalloc in userspace          0.124s (s=84560000)
+malloc in userspace          0.113s (s=0)
+
+As can be seen all tests executed in userspace was cut in 1/4-1/5. Malloc 
+is now a bit faster than kmalloc. Could be faster if physical memory is 
+spread out on different banks, but on other hand cache prefetching should 
+be easier if continous. 
+
+> I notice you turn off VM_IO - you don't want to do that...
+Fixed
+
+Thanks for all help,
+Thommy
