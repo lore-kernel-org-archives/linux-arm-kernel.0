@@ -1,37 +1,45 @@
-From: afzal@ti.com (Afzal Mohammed)
-Date: Thu, 12 Sep 2013 17:39:34 +0530
-Subject: [PATCH RFC 0/6] ARM: OMAP2+: AM43x/AM335x prcm reset driver
-In-Reply-To: <1378717612.4151.6.camel@pizza.hi.pengutronix.de>
-References: <cover.1378129416.git.afzal@ti.com>
- <1378375634.3948.10.camel@pizza.hi.pengutronix.de> <5228A99D.4020702@ti.com>
- <1378717612.4151.6.camel@pizza.hi.pengutronix.de>
-Message-ID: <5231AEFE.5000206@ti.com>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Thu, 12 Sep 2013 14:19:53 +0200
+Subject: [PATCH 0/3] perf: parse the dwarf backtrace info from
+ .debug_frame section
+In-Reply-To: <CAFrcx1mQ-P7byYfqP-0bYabUzTDeSWyHFx2FJQ6wQLYEcV_Pxw@mail.gmail.com>
+References: <1378720815-23964-1-git-send-email-jean.pihet@linaro.org>
+ <CAFrcx1mQ-P7byYfqP-0bYabUzTDeSWyHFx2FJQ6wQLYEcV_Pxw@mail.gmail.com>
+Message-ID: <20130912121953.GX31370@twins.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Philipp,
+On Thu, Sep 12, 2013 at 02:07:23PM +0200, Jean Pihet wrote:
+> Hi,
+> 
+> -- Adding more maintainers in the To: list --
+> 
+> Ping about the patch set, is this one acceptable for mainline?
 
-On Monday 09 September 2013 02:36 PM, Philipp Zabel wrote:
+The below looks to be mostly ARM bits and I would suspect Will to take
+care of them.
 
-> So if I understand correctly, the only problem is that on OMAP the clock
-> needs to be enabled to deassert the reset, but as long as the clock
-> domain is in hardware supervised mode, it won't be enabled?
+> On 9 September 2013 12:00, Jean Pihet <jean.pihet@linaro.org> wrote:
 
-Yes, enabling clock with reset deassertion might not reset the module if
-the clock domain is in hardware supervised mode.
+> >  arch/arm/Kconfig                        |  2 +
+> >  arch/arm/include/uapi/asm/Kbuild        |  1 +
+> >  arch/arm/include/uapi/asm/perf_regs.h   | 23 +++++++++++
+> >  arch/arm/kernel/Makefile                |  1 +
+> >  arch/arm/kernel/perf_regs.c             | 30 ++++++++++++++
+> >  tools/perf/arch/arm/Makefile            |  3 ++
+> >  tools/perf/arch/arm/include/perf_regs.h | 54 +++++++++++++++++++++++++
+> >  tools/perf/arch/arm/util/unwind.c       | 48 ++++++++++++++++++++++
+> >  tools/perf/config/Makefile              |  9 +++--
+> >  tools/perf/util/unwind.c                | 71 +++++++++++++++++++++++++--------
 
-> Would it be possible to create an internal API to switch the clock
-> domain to software supervised mode, which can be used both by the code
-> behind pm_runtime_get_sync and reset_control_deassert?
+This one looks to be generic code, Acme who do we want to look at that?
 
-I will see if that is acceptable.
-
-Another option that would have to be explored is invoking device_reset()
-(taking care of clear, deassert & status checking as you suggested)
-midway through pm_run_time_get_sync(), when the clockdomain is in
-software supervised mode with reset driver taking care of any particular
-sequence in the case of multiple reset signals, instead of the IP driver
-requiring to take care of it.
-
-Regards
-Afzal
+> >  10 files changed, 223 insertions(+), 19 deletions(-)
+> >  create mode 100644 arch/arm/include/uapi/asm/perf_regs.h
+> >  create mode 100644 arch/arm/kernel/perf_regs.c
+> >  create mode 100644 tools/perf/arch/arm/include/perf_regs.h
+> >  create mode 100644 tools/perf/arch/arm/util/unwind.c
+> >
+> > --
+> > 1.7.11.7
+> >
