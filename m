@@ -1,24 +1,31 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 11 Sep 2013 18:50:02 -0700
-Subject: [PATCH] ARM: kvm: rename cpu_reset to avoid name clash
-In-Reply-To: <CAOesGMjum0TSyudXiZtXHOGX4R7dBAhjUpoYnwjTcfD1MMpTxw@mail.gmail.com>
-References: <1378938461-10835-1-git-send-email-olof@lixom.net>
- <CAOesGMjum0TSyudXiZtXHOGX4R7dBAhjUpoYnwjTcfD1MMpTxw@mail.gmail.com>
-Message-ID: <20130912015002.GO9860@cbox>
+From: bilhuang@nvidia.com (Bill Huang)
+Date: Wed, 11 Sep 2013 19:03:22 -0700
+Subject: [PATCH 2/2] cpufreq: tegra: Re-model Tegra cpufreq driver
+In-Reply-To: <5230C596.7010000@wwwdotorg.org>
+References: <1378898355-31290-1-git-send-email-bilhuang@nvidia.com>
+ <1378898355-31290-3-git-send-email-bilhuang@nvidia.com>
+ <5230C596.7010000@wwwdotorg.org>
+Message-ID: <1378951402.2475.2.camel@bilhuang-vm1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 11, 2013 at 03:39:26PM -0700, Olof Johansson wrote:
-> On Wed, Sep 11, 2013 at 3:27 PM, Olof Johansson <olof@lixom.net> wrote:
-> > cpu_reset is already #defined in <asm/proc-fns.h> as processor.reset,
-> > so it expands here and causes problems.
-> >
-> > Signed-off-by: Olof Johansson <olof@lixom.net>
+On Thu, 2013-09-12 at 03:33 +0800, Stephen Warren wrote:
+> On 09/11/2013 05:19 AM, Bill Huang wrote:
+> > diff --git a/drivers/cpufreq/tegra20-cpufreq.c b/drivers/cpufreq/tegra20-cpufreq.c
 > 
-> I just noticed this is broken on 3.10 too, so if/when applying feel free to add:
+> > +static struct cpufreq_frequency_table freq_table[] = {
+> > +	{ .frequency = 216000 },
+> > +	{ .frequency = 312000 },
+> > +	{ .frequency = 456000 },
+> > +	{ .frequency = 608000 },
+> > +	{ .frequency = 760000 },
+> > +	{ .frequency = 816000 },
+> > +	{ .frequency = 912000 },
+> > +	{ .frequency = 1000000 },
+> > +	{ .frequency = CPUFREQ_TABLE_END },
+> > +};
 > 
-> Cc: <stable@vger.kernel.org> # 3.10+
+> Should/can we query that list from the clock driver?
 > 
-Thanks for the fix, applied.
-
--Christoffer
+It's not easy to query that list from clock driver so I'll leave it as
+it was. I'll take all the other comments, thanks.
