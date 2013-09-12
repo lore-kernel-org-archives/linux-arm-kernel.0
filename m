@@ -1,61 +1,47 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 12 Sep 2013 10:32:23 -0600
-Subject: [PATCH RFC v2 13/16] ARM: tegra: split tegra_pmc_init() in two
-In-Reply-To: <52315D84.10703@gmail.com>
-References: <1376964271-22715-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1377638890-371-14-git-send-email-sebastian.hesselbarth@gmail.com>
- <5230CAF7.6010103@wwwdotorg.org> <52315D84.10703@gmail.com>
-Message-ID: <5231EC97.2060901@wwwdotorg.org>
+From: rvaswani@codeaurora.org (Rohit Vaswani)
+Date: Thu, 12 Sep 2013 09:34:57 -0700
+Subject: [PATCH 1/2] ARM: msm: Add support for MSM8974 Dragonboard
+In-Reply-To: <1378994706.16481.6.camel@iivanov-dev.int.mm-sol.com>
+References: <1375743779-24993-1-git-send-email-rvaswani@codeaurora.org>
+ <1375780486.2725.7.camel@iivanov-dev.int.mm-sol.com>
+ <20130911180006.GA12624@codeaurora.org>
+ <1378994706.16481.6.camel@iivanov-dev.int.mm-sol.com>
+Message-ID: <5231ED31.7080102@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/12/2013 12:21 AM, Sebastian Hesselbarth wrote:
-> On 09/11/2013 09:56 PM, Stephen Warren wrote:
->> On 08/27/2013 03:28 PM, Sebastian Hesselbarth wrote:
->>> From: Stephen Warren <swarren@nvidia.com>
->>>
->>> Tegra's board file currently initializes clocks much earlier than those
->>> for most other ARM SoCs. The reason is:
->>>
->>> * The PMC HW block is involved in the path of some interrupts (i.e. it
->>> inverts, or not, the IRQ input pin dedicated to the PMIC).
->>>
->>> * So, that part of the PMC must be initialized early so that the IRQ
->>> polarity is correct.
->>>
->>> * The PMC initialization is currently monolithic, and the PMC has some
->>> clock inputs, so the init routine ends up calling of_clk_get_by_name(),
->>> and hence clocks must be set up early too.
->>>
->>> In order to defer clock initialization to the more typical location,
->>> split out the portions of tegra_pmc_init() that are truly IRQ-related
->>> into a separate tegra_pmc_init_irq(), which can be called from the
->>> machine descriptor's .init_irq() function, and defer the rest until
->>> the machine descriptor's .init_machine() function. With arch/arm calling
->>> of_clk_init(NULL) from time_init() this also allows the removal of
->>> .init_time() hook.
+On 9/12/2013 7:05 AM, Ivan T. Ivanov wrote:
+> Hi,
+>
+> On Wed, 2013-09-11 at 11:00 -0700, David Brown wrote:
+>> On Tue, Aug 06, 2013 at 12:14:46PM +0300, Ivan T. Ivanov wrote:
 >>
->> Sebastian, I assume you're targeting v3.13 or later for this patch
->> series? If so, it might be a good idea if I apply this patch myself to
->> the Tegra tree so that I can base any future Tegra patches on top of it
->> to avoid any possible conflicts. I can put this patch first in the
->> cleanup branch so you can merge it into whatever tree you use for the
->> rest of this series. Does that work for you? If so, let me know. Thanks.
-> 
-> Yes, I was waiting for v3.12-rc1 to drop to have something stable with
-> the new machs inside. I haven't made up my mind who will finally take
-> the patches but I guess it's either arm-soc or each individual
-> maintainer.
+>>> Attached patch enables earlyprink for this board.
+>>>
+>>> [920] booting linux @ 0x8000, ramdisk @ 0x2000000 (1067699), tags/device tree @ 0x1e00000
+>>> Uncompressing Linux... done, booting the kernel.
+>>> [    0.000000] Booting Linux on physical CPU 0x0
+>>> [    0.000000] Linux version 3.11.0-rc4-00003-g7c8394e (iivanov at dev) (gcc version 4.6.3 (GCC) ) #502 SMP PREEMPT Tue Aug 6 12:09:07 EEST3
+>>> [    0.000000] CPU: ARMv7 Processor [512f06f0] revision 0 (ARMv7), cr=10c5387d
+>>> [    0.000000] CPU: PIPT / VIPT nonaliasing data cache, PIPT instruction cache
+>>> [    0.000000] Machine: Qualcomm MSM (Flattened Device Tree), model: Qualcomm MSM8974 Dragonboard
+>> We'll need to have either Rohit include this in his patch series, or
+>> you'll have to format this as a valid patch.
+> I don't have preferences. Rohit could you send this patch
+> with you changes?
 
-OK, I'll take this one patch through the Tegra tree, making sure it's
-first and based on v3.12-rc1, and I'll create a tag for you to pull into
-your branch as needed.
+Yep. Will fixup this as part of the initial support.
+> Regards,
+> Ivan
+>
+>> Thanks,
+>> David
+>>
+>
 
-> Currently, the patch set includes your original patch and another one to
-> remove .init_time when the arch-wide default callback is available. If
-> you want to take it now, I can add the corresponding dependency to the
-> cover letter and drop the patch from my set.
 
-Sounds good. From memory, that second patch you mentioned can go through
-any tree you want; I don't think it will cause any conflicts since it's
-tiny.
+Thanks,
+Rohit Vaswani
+
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum, hosted by The Linux Foundation
