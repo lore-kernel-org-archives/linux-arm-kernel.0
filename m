@@ -1,36 +1,108 @@
-From: xobs@kosagi.com (Sean Cross)
-Date: Thu, 12 Sep 2013 14:55:27 +0800
-Subject: [PATCH v3 3/3] PCI: imx6: Add support for i.MX6 PCIe
- controller
-In-Reply-To: <0E83723C55F66F43A6041464FE31119D3CEC9F@039-SN2MPN1-011.039d.mgd.msft.net>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 12 Sep 2013 09:01:31 +0200
+Subject: [PATCH v3 3/3] PCI: imx6: Add support for i.MX6 PCIe controller
+In-Reply-To: <6FF3113C3FCC43A4A0D711C8656A4C03@kosagi.com>
 References: <1378958611-4274-1-git-send-email-xobs@kosagi.com>
  <1378958611-4274-4-git-send-email-xobs@kosagi.com>
- <0E83723C55F66F43A6041464FE31119D3CEC9F@039-SN2MPN1-011.039d.mgd.msft.net>
-Message-ID: <28FAEAE3B0A54DB68E2F060072F44EF2@kosagi.com>
+ <20130912062859.GM30088@pengutronix.de>
+ <6FF3113C3FCC43A4A0D711C8656A4C03@kosagi.com>
+Message-ID: <20130912070131.GO30088@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, 12 September, 2013 at 2:35 PM, Zhu Richard-R65037 wrote:
-> Hi Sean Cross:
-> See my comments marked by Richard.
+On Thu, Sep 12, 2013 at 02:44:01PM +0800, Sean Cross wrote:
+> > Sean,
+> > 
+> > Several more comments.
+> > 
+> > Shawn,
+> > 
+> > A question about a clk_set_parent inside.
+> > 
+> > On Thu, Sep 12, 2013 at 04:03:31AM +0000, Sean Cross wrote:
+> > > +
+> > > +#define IMX6_ENTER_RESET 0
+> > > +#define IMX6_EXIT_RESET 1
+> > 
+> > 
+> > 
+> > These are unused
+> > 
+> > > +
+> > > +#define IMX6_POWER_OFF 0
+> > > +#define IMX6_POWER_ON 1
+> > 
+> > 
+> > 
+> > unused aswell
+> > 
+> Thanks.  These leaked out from an earlier revision of the code.  I'll remove them. 
+> > 
+> > > +static int pcie_phy_poll_ack(void __iomem *dbi_base, int max_iterations,
+> > > + int exp_val)
+> > > +{
+> > > + u32 val;
+> > > + u32 wait_counter = 0;
+> > > +
+> > > + do {
+> > > + val = readl(dbi_base + PCIE_PHY_STAT);
+> > > + val = (val >> PCIE_PHY_STAT_ACK_LOC) & 0x1;
+> > > + wait_counter++;
+> > > + } while ((wait_counter < max_iterations) && (val != exp_val));
+> > 
+> > 
+> > 
+> > may_iterations is never something else than 100 so you should drop the
+> > argument.
+> > Also I would prefer a real timeout here rather than a counter.
+> 
+> Is there a construct to have a real timer?  Would a completion work here instead?
 
- 
-> [Richard] It's better to arrange the memory layout like the following one, then the 8MB mem-space can be allocated.
-> ranges = <0x00000800 0 0x01f00000 0x01f00000 0 0x00080000 /* configuration space */
-> 0x81000000 0 0 0x01f80000 0 0x00010000 /* downstream I/O */
-> 0x82000000 0 0x01000000 0x01000000 0 0x00f00000>; /* non-prefetchable memory */
+A completion is overkill. Polling is fine, but it should be a well
+defined amount of time which is independent of current cpu speed. Adding
+a udelay(1) to the loop should be enough.
 
-Thank you.  I'll update the DT file with this new ranges. 
+> > 
+> > 
+> > I'm unsure this should be done here. Shawn, should we do this in SoC
+> > code?
+> 
+> A different board could easily use lvds2 to drive the PCIe clock.  I think that I should change the variable names to simply "lvds_sel".
 
-> +/* Read from the 16-bt PCIe PHY control registers (not memory-mapped)  
-> [Richard]16-bit?
+Why should it use a different clock? It's fine to make this
+configurable, but only if we actually know the reasons why it should be
+configurable.
 
-Oops.  Sloppy.  Good catch. 
-> [Richard] As we know that lvds1 can be configured as input or output.
-> How do you present them by the name of "lvds1_gate"?
+Even if it should be configurable I'm still unsure whether this should
+be done at pci driver level.
 
-This particular clock maps to LVDS1/2_oben and effectively acts as a gate.  Only bits 10 and 11 are exposed in clk-imx6q.c.
-> + mdelay(100);
-> [Richard] mdelay(100) is too long, please use usleep_range(xxx,xxx
+> > 
+> > 
+> > devm_gpio_request_one can still fail.
+> It can fail, but it's only critical for the power switch.  However, arguably it's a critical error even if these GPIOs can't be allocated, so I'll go ahead and add the same consistency check and error return code to the other three switches.
 
-You're right, and 100 is entirely too long to begin with.  I'll cut this value down and use a range, as suggested. 
+If you want to make the gpios optional that's fine, but when
+of_get_named_gpio succeeds, then devm_gpio_request_one should succeed
+aswell, otherwise there's something wrong.
+
+> > > + struct imx6_pcie *imx6_pcie = platform_get_drvdata(pdev);
+> > > +
+> > > + clk_disable_unprepare(imx6_pcie->pcie_axi);
+> > > + clk_disable_unprepare(imx6_pcie->lvds1_gate);
+> > > + clk_disable_unprepare(imx6_pcie->pcie_ref_125m);
+> > 
+> > 
+> > 
+> > Still no unregister for the pcie controller?
+> The Designware core doesn't support unregistering (or even module unloading).  I'm not sure how to handle that case.  For that matter, when is remove() even called on a module that can't be unloaded?
+
+Then don't implement the remove callback. That's better than providing a
+bogus remove function.
+
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
