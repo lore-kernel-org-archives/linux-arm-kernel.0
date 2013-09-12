@@ -1,22 +1,29 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 12 Sep 2013 09:46:31 -0700
-Subject: [PATCH] ARM: msm: Move msm devicetrees under a Qualcomm dir
-In-Reply-To: <1379003839-16068-1-git-send-email-galak@codeaurora.org>
-References: <1379003839-16068-1-git-send-email-galak@codeaurora.org>
-Message-ID: <CAOesGMisWLwYKotGDFPW6PyHJs=_+fohTdC08SGjsv2FXaa7Fg@mail.gmail.com>
+From: soren.brinkmann@xilinx.com (Soren Brinkmann)
+Date: Thu, 12 Sep 2013 09:50:38 -0700
+Subject: [PATCH 0/2] arm: zynq: Enable global timer
+Message-ID: <1379004640-15117-1-git-send-email-soren.brinkmann@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 12, 2013 at 9:37 AM, Kumar Gala <galak@codeaurora.org> wrote:
-> Use the Qualcomm vendor prefix (qcom) as the directory name for
-> Qualcomm MSM devicetrees going forward.
->
-> Signed-off-by: Kumar Gala <galak@codeaurora.org>
+Hi all,
 
-Let's not move just one platform like this. If we are to do this, we
-should move everything, and that will be really painful and needs to
-be done in a controlled manner, probably scripted and right before a
--rc1 or such.
+I'm sitting on this for a while and was waiting for Stephen's patch to
+get merged somewhere. Unfortunately that didn't happen yet.
+The patch to enable the global timer is pretty straight forward.
+Stephen's patch is the result of this thread: https://lkml.org/lkml/2013/7/22/649
+and required to prevent the global_timer from becoming the broadcast
+device, since the system will hang otherwise.
 
+Soren Brinkmann (1):
+  arm: zynq: Enable arm_global_timer
 
--Olof
+Stephen Boyd (1):
+  tick: broadcast: Deny per-cpu clockevents from being broadcast sources
+
+ arch/arm/boot/dts/zynq-7000.dtsi | 8 ++++++++
+ arch/arm/mach-zynq/Kconfig       | 1 +
+ kernel/time/tick-broadcast.c     | 3 +++
+ 3 files changed, 12 insertions(+)
+
+-- 
+1.8.4
