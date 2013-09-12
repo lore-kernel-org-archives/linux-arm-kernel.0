@@ -1,148 +1,27 @@
-From: gautamvivek1987@gmail.com (Vivek Gautam)
-Date: Thu, 12 Sep 2013 14:57:36 +0530
-Subject: [PATCH 2/7] usb: dwc3: adapt dwc3 core to use Generic PHY
- Framework
-In-Reply-To: <1378136591-7463-3-git-send-email-kishon@ti.com>
-References: <1378136591-7463-1-git-send-email-kishon@ti.com>
- <1378136591-7463-3-git-send-email-kishon@ti.com>
-Message-ID: <CAFp+6iH7AbiJrVg-8hhv+21OyLp0cPEH0RdMh5tzTT+W_ifPDQ@mail.gmail.com>
+From: sameo@linux.intel.com (Samuel Ortiz)
+Date: Thu, 12 Sep 2013 11:28:11 +0200
+Subject: [PATCH v2 6/9] mfd: wm8994: convert to use I2C core runtime PM
+In-Reply-To: <20130912092447.GJ7393@intel.com>
+References: <1378913560-2752-1-git-send-email-mika.westerberg@linux.intel.com>
+ <1378913560-2752-7-git-send-email-mika.westerberg@linux.intel.com>
+ <20130911161242.GA13015@zurbaran> <20130912092447.GJ7393@intel.com>
+Message-ID: <20130912092811.GH13015@zurbaran>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kishon,
+On Thu, Sep 12, 2013 at 12:24:47PM +0300, Mika Westerberg wrote:
+> On Wed, Sep 11, 2013 at 06:12:43PM +0200, Samuel Ortiz wrote:
+> > I think it would make more sense for you to merge that one together with
+> > the related i2c changes. If you prefer that I take it through MFD,
+> > please let me know.
+> 
+> I'm hoping that Wolfram takes all the I2C related patches to his tree.
+If Wolfram prepares an immutable branch for that, I can pull it in
+mfd-next and then merge the MFD patch on top of it.
 
-
-On Mon, Sep 2, 2013 at 9:13 PM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
-> Adapted dwc3 core to use the Generic PHY Framework. So for init, exit,
-> power_on and power_off the following APIs are used phy_init(), phy_exit(),
-> phy_power_on() and phy_power_off().
->
-> However using the old USB phy library wont be removed till the PHYs of all
-> other SoC's using dwc3 core is adapted to the Generic PHY Framework.
->
-> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
-> ---
->  Documentation/devicetree/bindings/usb/dwc3.txt |    6 ++-
->  drivers/usb/dwc3/Kconfig                       |    1 +
->  drivers/usb/dwc3/core.c                        |   49 ++++++++++++++++++++++++
->  drivers/usb/dwc3/core.h                        |    7 ++++
->  4 files changed, 61 insertions(+), 2 deletions(-)
->
-> diff --git a/Documentation/devicetree/bindings/usb/dwc3.txt b/Documentation/devicetree/bindings/usb/dwc3.txt
-> index e807635..471366d 100644
-> --- a/Documentation/devicetree/bindings/usb/dwc3.txt
-> +++ b/Documentation/devicetree/bindings/usb/dwc3.txt
-> @@ -6,11 +6,13 @@ Required properties:
->   - compatible: must be "snps,dwc3"
->   - reg : Address and length of the register set for the device
->   - interrupts: Interrupts used by the dwc3 controller.
-> +
-> +Optional properties:
->   - usb-phy : array of phandle for the PHY device.  The first element
->     in the array is expected to be a handle to the USB2/HS PHY and
->     the second element is expected to be a handle to the USB3/SS PHY
-> -
-> -Optional properties:
-> + - phys: from the *Generic PHY* bindings
-> + - phy-names: from the *Generic PHY* bindings
->   - tx-fifo-resize: determines if the FIFO *has* to be reallocated.
->
->  This is usually a subnode to DWC3 glue to which it is connected.
-> diff --git a/drivers/usb/dwc3/Kconfig b/drivers/usb/dwc3/Kconfig
-> index cfc16dd..ad7ce83 100644
-> --- a/drivers/usb/dwc3/Kconfig
-> +++ b/drivers/usb/dwc3/Kconfig
-> @@ -3,6 +3,7 @@ config USB_DWC3
->         depends on (USB || USB_GADGET) && GENERIC_HARDIRQS && HAS_DMA
->         depends on EXTCON
->         select USB_PHY
-> +       select GENERIC_PHY
->         select USB_XHCI_PLATFORM if USB_SUPPORT && USB_XHCI_HCD
->         help
->           Say Y or M here if your system has a Dual Role SuperSpeed
-> diff --git a/drivers/usb/dwc3/core.c b/drivers/usb/dwc3/core.c
-> index 428c29e..485d365 100644
-> --- a/drivers/usb/dwc3/core.c
-> +++ b/drivers/usb/dwc3/core.c
-> @@ -82,6 +82,12 @@ static void dwc3_core_soft_reset(struct dwc3 *dwc)
->
->         usb_phy_init(dwc->usb2_phy);
->         usb_phy_init(dwc->usb3_phy);
-> +
-> +       if (dwc->usb2_generic_phy)
-> +               phy_init(dwc->usb2_generic_phy);
-> +       if (dwc->usb3_generic_phy)
-> +               phy_init(dwc->usb3_generic_phy);
-> +
->         mdelay(100);
->
->         /* Clear USB3 PHY reset */
-> @@ -343,6 +349,11 @@ static void dwc3_core_exit(struct dwc3 *dwc)
->  {
->         usb_phy_shutdown(dwc->usb2_phy);
->         usb_phy_shutdown(dwc->usb3_phy);
-> +
-> +       if (dwc->usb2_generic_phy)
-> +               phy_power_off(dwc->usb2_generic_phy);
-> +       if (dwc->usb3_generic_phy)
-> +               phy_power_off(dwc->usb3_generic_phy);
->  }
->
->  #define DWC3_ALIGN_MASK                (16 - 1)
-> @@ -427,6 +438,23 @@ static int dwc3_probe(struct platform_device *pdev)
->                 dwc->usb3_phy = devm_usb_get_phy(dev, USB_PHY_TYPE_USB3);
->         }
->
-> +       if (of_property_read_bool(node, "phys") || pdata->has_phy) {
-> +               dwc->usb2_generic_phy = devm_phy_get(dev, "usb2-phy");
-> +               if (IS_ERR(dwc->usb2_generic_phy)) {
-> +                       dev_err(dev, "no usb2 phy configured yet");
-> +                       return PTR_ERR(dwc->usb2_generic_phy);
-> +               }
-
-I have a doubt here.
-As i can see in the current phy drivers structuring, for OMAP there
-are two phy drivers :
-omap phy-omap-usb2 (talking to musb controller)
-and phy-omap-usb3(talking to dwc3 controller).
-
-Now dwc3 controller requests both usb2-phy (supported by phy-omap-usb2
-?) and usb3-phy (supported by phy-omap-usb3 ?).
-But phy-omap-usb2 is not the one designated to talk to DWC3
-controller, then why does still DWC3 want to request usb2-phy, which
-end of the day will be phy-omap-usb2.
-May be i am wrong here since i don't have knowledge about OMAP h/w architecture.
-
-Is it like phy-omap-usb2 includes UTMI phys for both musb controller
-as well as dwc3 controller ?
-Because if it is just for musb controller then which usb2-phy will
-DWC3 be getting when it requests that type of phy.
-
-As of now phy-samsung-usb3 driver is the interface for both UTMI+ and
-PIPE3 phys for DWC3 DRD controller, and phy-samsung-usb2 driver is the
-interface
-for a separate USB 2.0 controller itself (not DWC3). So we have
-something to correct things up for Samsung, since dwc3 initializing
-the phy-samsung-usb2 is not a valid scenerio.
-
-Can you please clarify things here ?
-Thanks !!
-
-> +
-> +               dwc->usb3_generic_phy = devm_phy_get(dev, "usb3-phy");
-> +               if (IS_ERR(dwc->usb3_generic_phy)) {
-> +                       dev_err(dev, "no usb3 phy configured yet");
-> +                       return PTR_ERR(dwc->usb3_generic_phy);
-> +               }
-> +       } else {
-> +               dwc->usb2_generic_phy = NULL;
-> +               dwc->usb3_generic_phy = NULL;
-> +       }
-> +
-
-[...]
-
+Cheers,
+Samuel.
 
 -- 
-Best Regards
-Vivek
+Intel Open Source Technology Centre
+http://oss.intel.com/
