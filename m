@@ -1,119 +1,85 @@
-From: romain.izard.pro@gmail.com (Romain Izard)
-Date: Thu, 12 Sep 2013 16:10:39 +0000 (UTC)
-Subject: [PATCH v2] watchdog: sirf: add watchdog driver of CSR
- SiRFprimaII and SiRFatlasVI
-References: <1378953828-374-1-git-send-email-Baohua.Song@csr.com>
- <l0rusk$789$1@ger.gmane.org>
- <CAGsJ_4zxCzmvYvB8NnuPWW3gr3ht3_qexWR4PLN7i1rMrrNf4g@mail.gmail.com>
-Message-ID: <l0sp1v$5tp$1@ger.gmane.org>
+From: nm@ti.com (Nishanth Menon)
+Date: Thu, 12 Sep 2013 11:15:58 -0500
+Subject: [PATCH 1/4] arm: bone: dts: add CD for mmc1
+In-Reply-To: <1379000532-27376-2-git-send-email-koen@dominion.thruhere.net>
+References: <1379000532-27376-1-git-send-email-koen@dominion.thruhere.net>
+ <1379000532-27376-2-git-send-email-koen@dominion.thruhere.net>
+Message-ID: <5231E8BE.7080009@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2013-09-12, Barry Song <21cnbao@gmail.com> wrote:
-> 2013/9/12 Romain Izard <romain.izard.pro@gmail.com>:
->>
->> Does this really mean that both drivers will be loaded?  From what I
->> understand of device tree, this means to use the "sirf,prima2-tick"
->> driver, and then if not available, the "sirf-prima2-wdt" driver.
->> It would be necessary to either add the watchdog support in the
->> clocksource driver, or create a separate node in the device tree
->> (with the same address?) to respect the compatible rules.
->
-> that means both. the 6th timer can act as a watchdog timer when the
-> Watchdog mode is enabled. all 6 timers have been controlled by timer
-> driver, here it is a more-functionality for timer6.
->
+nitpick minor comment:
+$subject: ARM: dts: am335x-bone: add card detect for mmc1
 
-First, from my reading the device tree specification says that the
-compatible property describes an ordered list from which a single driver
-is used.
+btw, please use V3 in $subject next time. --subject-prefix "PATCH V3"
+when generating patch should do the job.
 
-After checking with the platform code, I understand why this is possible,
-but I think the current syntax is not good.
+On 09/12/2013 10:42 AM, Koen Kooi wrote:
+> From: Alexander Holler <holler@ahsoftware.de>
+> 
+> This enables the use of MMC cards even when no card was inserted at boot.
+> 
+> Signed-off-by: Alexander Holler <holler@ahsoftware.de>
+> Signed-off-by: Koen Kooi <koen@dominion.thruhere.net>
+> ---
+> 
+> Changes since v2:
+> 	None, again a simple repost
+> 
+> Changes since v1:
+> 	None, simple repost
+> 
+>  arch/arm/boot/dts/am335x-bone-common.dtsi | 14 ++++++++++++++
+>  arch/arm/boot/dts/am335x-bone.dts         |  4 ----
+>  2 files changed, 14 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/am335x-bone-common.dtsi b/arch/arm/boot/dts/am335x-bone-common.dtsi
+> index 2f66ded..ced256c 100644
+> --- a/arch/arm/boot/dts/am335x-bone-common.dtsi
+> +++ b/arch/arm/boot/dts/am335x-bone-common.dtsi
+> @@ -107,6 +107,11 @@
+>  				0x14c (PIN_INPUT_PULLDOWN | MUX_MODE7)
+>  			>;
+>  		};
 
-The general case for device tree is the following one:
-- Linux parses the device tree on startup with of_platform_populate, and
-  creates a struct platform_device per node in the tree with a
-  compatible string.
-- Creating each device calls device_attach, trying to match and bind the
-  new device with already existing drivers, until one of them succeeds
-  or no driver is left.
-- Registering a new device driver ilater calls driver_attach, trying to
-  match and bind each unbound device with the new driver.
+An EOL here would be nice to separate the nodes.
 
-As each device can only be bound to a single driver, the normal case
-is that only one compatible driver can be bound to a device. As noted
-in http://xillybus.com/tutorials/device-tree-zynq-3, what happens when
-multiple drivers are compatible with a node is dependent on the 
-initialization order.
+> +		mmc1_pins: pinmux_mmc1_pins {
+> +			pinctrl-single,pins = <
+> +				0x160 (PIN_INPUT | MUX_MODE7) /* GPIO0_6 */
+> +			>;
+> +		};
+>  	};
+>  
+>  	ocp {
+> @@ -260,3 +265,12 @@
+>  	pinctrl-0 = <&davinci_mdio_default>;
+>  	pinctrl-1 = <&davinci_mdio_sleep>;
+>  };
+> +
+> +&mmc1 {
+> +	status = "okay";
+> +	vmmc-supply = <&ldo3_reg>;
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&mmc1_pins>;
+> +	cd-gpios = <&gpio0 6 GPIO_ACTIVE_HIGH>;
+> +	cd-inverted;
+> +};
+> diff --git a/arch/arm/boot/dts/am335x-bone.dts b/arch/arm/boot/dts/am335x-bone.dts
+> index d5f43fe..d34469c 100644
+> --- a/arch/arm/boot/dts/am335x-bone.dts
+> +++ b/arch/arm/boot/dts/am335x-bone.dts
+> @@ -16,7 +16,3 @@
+>  	regulator-always-on;
+>  };
+>  
+> -&mmc1 {
+> -	status = "okay";
+> -	vmmc-supply = <&ldo3_reg>;
+> -};
+> 
 
-But in our specific case, "sirf,prima2-tick" does not describe a normal
-device from the kernel point of view, it describes a clocksource node.
-It is used earlier during the startup sequence to avoid cyclic
-dependency issues between the timers and the driver framework. When the
-node is created later on, there is no driver to match with the node from
-the device tree. This is why in this case, and for all clocksource
-nodes, it will be possible to have a second matching compatible string.
-
-So, since this behaviour is specific for clocksource nodes, and does not
-describe the hardware as device tree should, I believe it would be
-appropriate to use "sirf,prima2-tick" as the compatible string for the
-watchdog driver, binding the device left by the clocksource with it.
-
-
->>> diff --git a/arch/arm/configs/prima2_defconfig b/arch/arm/configs/prima2_defconfig
->>> index 002a1ce..eec56e8 100644
->>> --- a/arch/arm/configs/prima2_defconfig
->>> +++ b/arch/arm/configs/prima2_defconfig
->>> @@ -1,4 +1,3 @@
->>> -CONFIG_EXPERIMENTAL=y
->>
->> CONFIG_EXPERIMENTAL is not related to this change.
->
-> i think it is just due to kernel upgrade. here just make menuconfig
-> with enabling watchdog and save defconfig, then there are some minor
-> differences here.
->
-Perhaps would it be better to put it in a different patch?
-
->>> +
->>> +     if (match >= counter)
->>> +             time_left = match-counter;
->>> +     else
->>> +             /* rollover */
->>> +             time_left = (0xffffffffUL - counter) + match;
->>
->> As u32 is a modulo 2^32 type, those values are almost the same (off by one).
->> time_left = match - counter; will be valid in all cases.
->>
-
-On one side, we have:
-	time_left = match - counter (mod 2^32)
-On the other side we have:
-	time_left = (0xffffffffUL - counter) + match (mod 2^32)
-<=>	time_left = match - counter + 0xFFFFFFFF (mod 2^32)
-As we are in the modulo 2^32 space, adding or substracting 2^32 does not
-change the result
-<=>	time_left = match - counter + 0xFFFFFFFF - 2^32 (mod 2^32)
-And since 0xFFFFFFFF = 2^32 - 1
-	time_left = match - counter - 1; (mod 2^32)
-
->>> +
->>> +     if ((0xffffffffUL - counter) >= timeout_ticks)
->>> +             counter += timeout_ticks;
->>> +     else
->>> +             /* Rollover */
->>> +             counter = timeout_ticks - (0xffffffffUL - counter);
->>
->> modulo 2^32 arithmetic, no need for two cases.
->
-> you mean just "counter += timeout_ticks" is ok?
-
-Yes, with the same reasoning as previously. Adding or substracting 
-0xffffffff for 32 bit unsigned values is the same as substracting
-or adding 1. But we do not even want this 1, we just want to
-rollover like the timer itself does, because it counts on 32 bit
-unsigned values.
 
 -- 
-Romain Izard
+Regards,
+Nishanth Menon
