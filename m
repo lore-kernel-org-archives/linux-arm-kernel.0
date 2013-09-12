@@ -1,66 +1,55 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 12 Sep 2013 15:39:22 +0100
-Subject: [PATCH 0/4] Add smp support for Allwinner A20 and phy arch
- count timer
-In-Reply-To: <1378968687-8200-1-git-send-email-cinifr@gmail.com>
-References: <1378968687-8200-1-git-send-email-cinifr@gmail.com>
-Message-ID: <20130912143922.GC22013@e106331-lin.cambridge.arm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 12 Sep 2013 15:40:02 +0100
+Subject: [PATCH v3 0/8] Add the Quadspi driver for vf610-twr
+In-Reply-To: <1378994596.2627.449.camel@shinybook.infradead.org>
+References: <52304BFF.4060007@freescale.com>
+ <20130911113002.GP29403@sirena.org.uk>
+ <523186DF.4070203@freescale.com>
+ <1378982395.2627.416.camel@shinybook.infradead.org>
+ <20980858CB6D3A4BAE95CA194937D5E73EA0EE8B@DBDE04.ent.ti.com>
+ <1378984665.2627.423.camel@shinybook.infradead.org>
+ <20130912114831.GL29403@sirena.org.uk>
+ <1378987323.2627.429.camel@shinybook.infradead.org>
+ <20130912134345.GQ29403@sirena.org.uk>
+ <1378994596.2627.449.camel@shinybook.infradead.org>
+Message-ID: <20130912144002.GT29403@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 12, 2013 at 07:51:23AM +0100, Fan Rong wrote:
-> The patchs add smp support for Allwinner A20. It add cpuregister node
-> in dts forsmp configure. The patchs also add a options for phy count
-> timer to replace vir count timer as ARM arch timer clocksource. About
-> ARM arch timer: 1. Current kernel use vir count timer, vir count timer
-> can be accessed in any cpu mode for kernel, but it need bootloader set
-> vir count offset rigister zero at first. 2. Phy count timer can be
-> accessed in most cpu mode for kernel except NS-PL1 mode when register
-> CNTHCTL.PL1PCTEN is set to zero. To ensure to use phy count timer,
-> bootloader should set register CNTHCTL.PL1PCTEN is 1 at first. At all,
-> to ensure kernel can use arch timer, bootload should set some generic
-> timer register(cntvoff or cnthctl) at first. the kernel should select
-> which count timer by reading current kernel running mode. 
+On Thu, Sep 12, 2013 at 03:03:16PM +0100, David Woodhouse wrote:
 
-Sorry, but I find the above text difficult to understand. It jumps
-between several issues and isn't well formatted.
+> Not so in this case. The controller driver appears "know", in advance,
+> what commands are going to be sent. It preloads its buffers (the LUT)
+> with what it *expects* us to send, and when we make a request it'll just
+> trigger a send from the appropriate buffer. And it will crap itself if
+> we actually try to send anything *different*.
 
-You seem to be suggesting a kernel change (using CNTPCT), but also
-bootloader changes (setting CNTHCTL.PL1PCTEN) to make this possible at
-all. If the bootloader needs to be modified, why can it not be modified
-to set CNTVOFF (or to boot the kernel in Hyp where it can set it
-itself)?
+> Or so I understand it.
 
-I'm not sure what you mean by selecting which timer to use be reading
-the current running mode. We currently decide to use CNTVCT if booted in
-PL1, or CNTPCT if booted in Hyp. I assume this isn't the mode you're
-referring to?
+Yes, that was pretty much my understanding of what was going on here -
+clearly the way the driver is currently figuring out what the commands
+are isn't good enough.
 
-Thanks,
-Mark.
+> So to go back to your question: the commands that it "knows" we are
+> going to send are indeed specific to (one particular type of) SPI NOR
+> flash. But there's nothing on the MTD side which justifies that
+> assumption. Even if you use a different type of SPI NOR flash which uses
+> different opcodes for its commands, this broken scheme will fall over.
 
-> 
-> Fan Rong (4):
->   Add smp support for Allwinner A20(sunxi 7i).
->   Add cpuconfig nodes in dts for smp configure.
->   Add physical count arch timer support for clocksource in ARMv7.
->   Add arch count timer node in dts for Allwinner A20(sunxi 7i).
-> 
->  arch/arm/boot/dts/sun7i-a20.dtsi     |   18 +-
->  arch/arm/include/asm/arch_timer.h    |   11 ++
->  arch/arm/mach-sunxi/Makefile         |    2 +
->  arch/arm/mach-sunxi/headsmp.S        |   12 ++
->  arch/arm/mach-sunxi/platform.h       |  346 ++++++++++++++++++++++++++++++++++
->  arch/arm/mach-sunxi/platsmp.c        |  166 ++++++++++++++++
->  arch/arm/mach-sunxi/sunxi.c          |    4 +
->  drivers/clocksource/Kconfig          |    8 +
->  drivers/clocksource/arm_arch_timer.c |   10 +-
->  9 files changed, 574 insertions(+), 3 deletions(-)
->  create mode 100644 arch/arm/mach-sunxi/headsmp.S
->  create mode 100644 arch/arm/mach-sunxi/platform.h
->  create mode 100644 arch/arm/mach-sunxi/platsmp.c
-> 
-> -- 
-> 1.7.9.5
-> 
-> 
+Right, the specific opcodes do need to variable at least and should be
+being provided by the driver for the flash - but is the generic format
+of the commands and requirement to send them abstractable?  Given that
+it's apparently been baked into hardware and based on having a quick
+scan through drivers/mtd/devices I'd guess so but...
+
+> Unless, as I say, I've completely misunderstood what's going on here.
+> Huang?
+
+...like you say some clarity would be good.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130912/9fedf9a8/attachment.sig>
