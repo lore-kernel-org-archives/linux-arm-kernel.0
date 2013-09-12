@@ -1,54 +1,70 @@
 From: koen@dominion.thruhere.net (Koen Kooi)
-Date: Thu, 12 Sep 2013 17:42:08 +0200
-Subject: [PATCHv3 0/2] ARM: dts: Beaglebone MMC fixes
-Message-ID: <1379000532-27376-1-git-send-email-koen@dominion.thruhere.net>
+Date: Thu, 12 Sep 2013 17:42:09 +0200
+Subject: [PATCH 1/4] arm: bone: dts: add CD for mmc1
+In-Reply-To: <1379000532-27376-1-git-send-email-koen@dominion.thruhere.net>
+References: <1379000532-27376-1-git-send-email-koen@dominion.thruhere.net>
+Message-ID: <1379000532-27376-2-git-send-email-koen@dominion.thruhere.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here are two patches to fix MMC on beaglebone, one fixes card detect on BBW,
-the other adds the eMMC entry for BBB and its fixed regulator. After that mmc1
-gets a nice speed boost by moving to 4-bit mode and LED triggers get assigned.
+From: Alexander Holler <holler@ahsoftware.de>
 
-This series depends on:
+This enables the use of MMC cards even when no card was inserted at boot.
 
-http://comments.gmane.org/gmane.linux.kernel.stable/63648
-https://lkml.org/lkml/2013/9/10/454
-http://comments.gmane.org/gmane.linux.kernel.mmc/22381
-
-Or as git-cherry would put it:
-
-[koen at rrMBP patches]$ git cherry -v
-+ 53aafdbc63c9b30c23f562855c8f359c0893bc40 ARM: OMAP2+: am335x-bone*: add DT for BeagleBone Black
-+ 084f262cb1058e00cf082739cf7ee93cb70761c9 ARM: EDMA: Fix clearing of unused list for DT DMA resources
-+ 6080eee0ef0ee3ab235cc267a69a0a7d3673266e ARM: dts: add AM33XX EDMA support
-+ 7312f68fb49202b65498865bd64680c95ec2f7ea ARM: dts: add AM33XX SPI DMA support
-+ 5580c3d400cefad5a1eb3c5a8e467353e22d526e ARM: dts: add AM33XX MMC support and documentation
-+ a11eddaa0a89c24d2b9768a82519ac096bb793f1 arm: bone: dts: add CD for mmc1
-+ b1e87bfc52775c2666b6c4a89d409193319d33f2 am335x-boneblack: add eMMC DT entry
-+ 090e095b74ba211b2cfbd2c87ae06c52d151453d ARM: am335x-bone-common: switch mmc1 to 4-bit mode
-+ 39f747078f0b01724cfa94ce19fd2e6029ac0bee ARM: dts: am335x-bone-common: add cpu0 and mmc1 triggers
-
-Also available as a git branch at https://github.com/koenkooi/linux/commits/mainline
-
-Changes since v2:
-	Missing pinmux entries for eMMC added
-
-Changes since v1:
-	Removed ti,non-removable entry from eMMC node, see http://marc.info/?l=linux-arm-kernel&m=137889435710552&w=2
+Signed-off-by: Alexander Holler <holler@ahsoftware.de>
+Signed-off-by: Koen Kooi <koen@dominion.thruhere.net>
 ---
 
-Alexander Holler (1):
-  arm: bone: dts: add CD for mmc1
+Changes since v2:
+	None, again a simple repost
 
-Koen Kooi (3):
-  am335x-boneblack: add eMMC DT entry
-  ARM: am335x-bone-common: switch mmc1 to 4-bit mode
-  ARM: dts: am335x-bone-common: add cpu0 and mmc1 triggers
+Changes since v1:
+	None, simple repost
 
- arch/arm/boot/dts/am335x-bone-common.dtsi | 39 +++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/am335x-bone-common.dtsi | 14 ++++++++++++++
  arch/arm/boot/dts/am335x-bone.dts         |  4 ----
- arch/arm/boot/dts/am335x-boneblack.dts    | 14 +++++++++++
- 3 files changed, 53 insertions(+), 4 deletions(-)
+ 2 files changed, 14 insertions(+), 4 deletions(-)
 
+diff --git a/arch/arm/boot/dts/am335x-bone-common.dtsi b/arch/arm/boot/dts/am335x-bone-common.dtsi
+index 2f66ded..ced256c 100644
+--- a/arch/arm/boot/dts/am335x-bone-common.dtsi
++++ b/arch/arm/boot/dts/am335x-bone-common.dtsi
+@@ -107,6 +107,11 @@
+ 				0x14c (PIN_INPUT_PULLDOWN | MUX_MODE7)
+ 			>;
+ 		};
++		mmc1_pins: pinmux_mmc1_pins {
++			pinctrl-single,pins = <
++				0x160 (PIN_INPUT | MUX_MODE7) /* GPIO0_6 */
++			>;
++		};
+ 	};
+ 
+ 	ocp {
+@@ -260,3 +265,12 @@
+ 	pinctrl-0 = <&davinci_mdio_default>;
+ 	pinctrl-1 = <&davinci_mdio_sleep>;
+ };
++
++&mmc1 {
++	status = "okay";
++	vmmc-supply = <&ldo3_reg>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&mmc1_pins>;
++	cd-gpios = <&gpio0 6 GPIO_ACTIVE_HIGH>;
++	cd-inverted;
++};
+diff --git a/arch/arm/boot/dts/am335x-bone.dts b/arch/arm/boot/dts/am335x-bone.dts
+index d5f43fe..d34469c 100644
+--- a/arch/arm/boot/dts/am335x-bone.dts
++++ b/arch/arm/boot/dts/am335x-bone.dts
+@@ -16,7 +16,3 @@
+ 	regulator-always-on;
+ };
+ 
+-&mmc1 {
+-	status = "okay";
+-	vmmc-supply = <&ldo3_reg>;
+-};
 -- 
 1.8.2.1
