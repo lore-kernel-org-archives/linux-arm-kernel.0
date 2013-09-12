@@ -1,140 +1,21 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Thu, 12 Sep 2013 12:11:25 +0200
-Subject: [PATCH] RFC: interrupt consistency check for OF GPIO IRQs
-In-Reply-To: <5231817F.8000901@ahsoftware.de>
-References: <1375101368-17645-1-git-send-email-linus.walleij@linaro.org>
- <CACxGe6uNJNMdZ1HYGgCtLM2t2TWGCR6btjOHVmP=vDXXvvFfRg@mail.gmail.com>
- <CACRpkdYjJL6FZwEbB7XLnb9QtjB=3LeE9Ny6KQ4PkM3zpdNqqg@mail.gmail.com>
- <344239800.bDEkDg48ZQ@avalon>
- <CACRpkdavR=fv+y1RCNfdgQypPuRbO6isOSwGsABDrYiGeMdyZw@mail.gmail.com>
- <52308C91.2000105@ahsoftware.de> <523096FE.8080901@collabora.co.uk>
- <5230AB6E.1070807@ahsoftware.de> <5231817F.8000901@ahsoftware.de>
-Message-ID: <5231934D.4060706@collabora.co.uk>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Thu, 12 Sep 2013 13:14:59 +0300
+Subject: [PATCH 2/2] cpufreq: tegra: Re-model Tegra cpufreq driver
+In-Reply-To: <1378898355-31290-3-git-send-email-bilhuang@nvidia.com>
+References: <1378898355-31290-1-git-send-email-bilhuang@nvidia.com>
+ <1378898355-31290-3-git-send-email-bilhuang@nvidia.com>
+Message-ID: <20130912101459.GG30013@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/12/2013 10:55 AM, Alexander Holler wrote:
-> Am 11.09.2013 19:42, schrieb Alexander Holler:
->> Am 11.09.2013 18:14, schrieb Javier Martinez Canillas:
-> 
->>> So for example in an OMAP board DT you can define something like this:
->>>
->>> ethernet at 5,0 {
->>>          compatible = "smsc,lan9221", "smsc,lan9115";
->>>          interrupt-parent = <&gpio6>;
->>>          interrupts = <16 8>;
->>> };
->>>
->>> Since each OMAP GPIO bank has 32 GPIO pins, then what you are defining
->>> is that
->>> the GPIO 176 (5 * 32 + 16) will be mapped as the IRQ line for the
->>> ethernet
->>> controller.
-> 
-> By the way, how do you define two GPIOs/IRQs from different
-> gpio-banks/irq-controllers wuth that scheme?
-> 
+On Wed, Sep 11, 2013 at 01:19:14PM +0200, Bill Huang wrote:
 
-That is indeed a very good question and I don't have a definite answer.
+> +static inline int tegra_cpufreq_init(void)
+> +{
+> +       retrun EOPNOTSUPP;
 
-> Would that be like below?
-> 
->  ethernet at 5,0 {
->           compatible = "smsc,lan9221", "smsc,lan9115";
->           interrupt-parent = <&gpio6>;
->           interrupts = <16 8>;
->           interrupt-parent = <&gpio7>;
->           interrupts = <1 IRQF_TRIGGER_FALLING>; /* GPIO7_1 */
->  };
->
+This should be -EOPNOTSUPP at least. I think -EINVAL might be better.
 
-I just looked at
-Documentation/devicetree/bindings/interrupt-controller/interrupts.txt and it
-doesn't mention that use-case (same device using two different interrupts from
-two different interrupt-controller).
+Cheers,
 
-So I went and look at the source in drivers/of/irq.c and noticed that the
-"interrupts" property and its "interrupt-parent" is parsed by the
-of_irq_map_one() function.
-
-/**
- * of_irq_map_one - Resolve an interrupt for a device
- * @device: the device whose interrupt is to be resolved
- * @index: index of the interrupt to resolve
- * @out_irq: structure of_irq filled by this function
- *
- * This function resolves an interrupt, walking the tree, for a given
- * device-tree node. It's the high level pendant to of_irq_map_raw().
- */
-int of_irq_map_one(struct device_node *device, int index, struct of_irq *out_irq)
-{
-        struct device_node *p;
-        ...
-        /* Get the interrupts property */
-        intspec = of_get_property(device, "interrupts", &intlen);
-        ...
-        /* Look for the interrupt parent. */
-        p = of_irq_find_parent(device);
-        ...
-}
-
-/**
- * of_irq_find_parent - Given a device node, find its interrupt parent node
- * @child: pointer to device node
- *
- * Returns a pointer to the interrupt parent node, or NULL if the interrupt
- * parent could not be determined.
- */
-struct device_node *of_irq_find_parent(struct device_node *child)
-{
-	struct device_node *p;
-	const __be32 *parp;
-
-	if (!of_node_get(child))
-		return NULL;
-
-	do {
-		parp = of_get_property(child, "interrupt-parent", NULL);
-		if (parp == NULL)
-			p = of_get_parent(child);
-		else {
-			if (of_irq_workarounds & OF_IMAP_NO_PHANDLE)
-				p = of_node_get(of_irq_dflt_pic);
-			else
-				p = of_find_node_by_phandle(be32_to_cpup(parp));
-		}
-		of_node_put(child);
-		child = p;
-	} while (p && of_get_property(p, "#interrupt-cells", NULL) == NULL);
-
-	return p;
-}
-
-So, if I understood the code correctly the DT IRQ core doesn't expect a device
-node to have more than one "interrupt-parent" property.
-
-It *should* work though if you have multiple "interrupts" properties defined and
-all of them have the same "interrupt-parent":
-
-       interrupt-parent = <&gpio6>;
-       interrupts = <1 IRQF_TRIGGER_HIGH>; /* GPIO6_1 */
-       interrupts = <2 IRQF_TRIGGER_LOW>; /* GPIO6_2 */
-
-since of_irq_map_one() will be called for each "interrupts" and the correct
-"interrupt-parent" will get obtained by of_irq_find_parent().
-
-> So multiple definitions of interrupt-parent are allowed and the order
-> does matter? And such does work? Sorry for asking, but I'm relatively
-> new to DT. ;)
->
-
-No worries, I'm very new to DT too so let's wait for Grant, Stephen or Linus to
-give us a definite answer :)
-
-> Regards,
-> 
-> Alexander Holler
-> 
-
-Best regards,
-Javier
+Peter.
