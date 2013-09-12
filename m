@@ -1,27 +1,32 @@
-From: sameo@linux.intel.com (Samuel Ortiz)
-Date: Thu, 12 Sep 2013 11:28:11 +0200
-Subject: [PATCH v2 6/9] mfd: wm8994: convert to use I2C core runtime PM
-In-Reply-To: <20130912092447.GJ7393@intel.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 12 Sep 2013 10:31:45 +0100
+Subject: [PATCH v2 8/9] spi: prepare runtime PM support for SPI devices
+In-Reply-To: <20130912092743.GK7393@intel.com>
 References: <1378913560-2752-1-git-send-email-mika.westerberg@linux.intel.com>
- <1378913560-2752-7-git-send-email-mika.westerberg@linux.intel.com>
- <20130911161242.GA13015@zurbaran> <20130912092447.GJ7393@intel.com>
-Message-ID: <20130912092811.GH13015@zurbaran>
+ <1378913560-2752-9-git-send-email-mika.westerberg@linux.intel.com>
+ <20130911155120.GW29403@sirena.org.uk>
+ <20130912092743.GK7393@intel.com>
+Message-ID: <20130912093145.GA29403@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 12, 2013 at 12:24:47PM +0300, Mika Westerberg wrote:
-> On Wed, Sep 11, 2013 at 06:12:43PM +0200, Samuel Ortiz wrote:
-> > I think it would make more sense for you to merge that one together with
-> > the related i2c changes. If you prefer that I take it through MFD,
-> > please let me know.
-> 
-> I'm hoping that Wolfram takes all the I2C related patches to his tree.
-If Wolfram prepares an immutable branch for that, I can pull it in
-mfd-next and then merge the MFD patch on top of it.
+On Thu, Sep 12, 2013 at 12:27:43PM +0300, Mika Westerberg wrote:
+> On Wed, Sep 11, 2013 at 04:51:20PM +0100, Mark Brown wrote:
 
-Cheers,
-Samuel.
+> > I would be able to have this and the other patch in the SPI tree in case
+> > it overlaps with other work - I'm not sure what the plan will be for
+> > merging this stuff but if there were a branch which I could merge into
+> > the SPI tree that'd be good.
 
--- 
-Intel Open Source Technology Centre
-http://oss.intel.com/
+> I think these two can go via your SPI tree as they shouldn't have
+> dependencies to the I2C tree.
+
+There's all the driver changes though - it seems best to push the whole
+series through one branch so there's fewer bisection problems.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130912/a01fec21/attachment.sig>
