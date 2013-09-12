@@ -1,50 +1,34 @@
-From: soren.brinkmann@xilinx.com (Soren Brinkmann)
-Date: Thu, 12 Sep 2013 09:50:40 -0700
-Subject: [PATCH 2/2] arm: zynq: Enable arm_global_timer
-In-Reply-To: <1379004640-15117-1-git-send-email-soren.brinkmann@xilinx.com>
-References: <1379004640-15117-1-git-send-email-soren.brinkmann@xilinx.com>
-Message-ID: <1379004640-15117-3-git-send-email-soren.brinkmann@xilinx.com>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Thu, 12 Sep 2013 11:53:47 -0500
+Subject: [PATCH] ARM: msm: Move msm devicetrees under a Qualcomm dir
+In-Reply-To: <CAOesGMisWLwYKotGDFPW6PyHJs=_+fohTdC08SGjsv2FXaa7Fg@mail.gmail.com>
+References: <1379003839-16068-1-git-send-email-galak@codeaurora.org>
+ <CAOesGMisWLwYKotGDFPW6PyHJs=_+fohTdC08SGjsv2FXaa7Fg@mail.gmail.com>
+Message-ID: <25E0B143-658E-4CCC-A88A-0AF70FFF33CE@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Zynq is based on an ARM Cortex-A9 MPCore, which features the
-arm_global_timer in its SCU. Therefore enable the timer for Zynq.
 
-Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
----
- arch/arm/boot/dts/zynq-7000.dtsi | 8 ++++++++
- arch/arm/mach-zynq/Kconfig       | 1 +
- 2 files changed, 9 insertions(+)
+On Sep 12, 2013, at 11:46 AM, Olof Johansson wrote:
 
-diff --git a/arch/arm/boot/dts/zynq-7000.dtsi b/arch/arm/boot/dts/zynq-7000.dtsi
-index e32b92b..eaacb39 100644
---- a/arch/arm/boot/dts/zynq-7000.dtsi
-+++ b/arch/arm/boot/dts/zynq-7000.dtsi
-@@ -92,6 +92,14 @@
- 			};
- 		};
- 
-+		global_timer: global_timer at f8f00200 {
-+			compatible = "arm,cortex-a9-global-timer";
-+			reg = <0xf8f00200 0x20>;
-+			interrupts = <1 11 0x301>;
-+			interrupt-parent = <&intc>;
-+			clocks = <&clkc 4>;
-+		};
-+
- 		ttc0: ttc0 at f8001000 {
- 			interrupt-parent = <&intc>;
- 			interrupts = < 0 10 4 0 11 4 0 12 4 >;
-diff --git a/arch/arm/mach-zynq/Kconfig b/arch/arm/mach-zynq/Kconfig
-index 04f8a4a..6b04260 100644
---- a/arch/arm/mach-zynq/Kconfig
-+++ b/arch/arm/mach-zynq/Kconfig
-@@ -13,5 +13,6 @@ config ARCH_ZYNQ
- 	select HAVE_SMP
- 	select SPARSE_IRQ
- 	select CADENCE_TTC_TIMER
-+	select ARM_GLOBAL_TIMER
- 	help
- 	  Support for Xilinx Zynq ARM Cortex A9 Platform
+> On Thu, Sep 12, 2013 at 9:37 AM, Kumar Gala <galak@codeaurora.org> wrote:
+>> Use the Qualcomm vendor prefix (qcom) as the directory name for
+>> Qualcomm MSM devicetrees going forward.
+>> 
+>> Signed-off-by: Kumar Gala <galak@codeaurora.org>
+> 
+> Let's not move just one platform like this. If we are to do this, we
+> should move everything, and that will be really painful and needs to
+> be done in a controlled manner, probably scripted and right before a
+> -rc1 or such.
+
+
+Than I suggest we deal with it when we pull the device trees out of the kernel tree.
+
+As such, I'd tell Rohit to go forward with the file being named apq8074-dragonboard.dtb for the time being.
+
+- k
+
 -- 
-1.8.4
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
