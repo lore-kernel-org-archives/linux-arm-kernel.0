@@ -1,47 +1,55 @@
-From: ricard.wanderlof@axis.com (Ricard Wanderlof)
-Date: Thu, 12 Sep 2013 15:25:45 +0200
-Subject: [PATCH v3 0/8] Add the Quadspi driver for vf610-twr
-In-Reply-To: <20130912115549.GI12758@n2100.arm.linux.org.uk>
-References: <20130910180704.GB29403@sirena.org.uk>
- <522FD78A.6080900@freescale.com> <20130911104126.GN29403@sirena.org.uk>
- <52304BFF.4060007@freescale.com> <20130911113002.GP29403@sirena.org.uk>
- <523186DF.4070203@freescale.com>
- <1378982395.2627.416.camel@shinybook.infradead.org>
- <20980858CB6D3A4BAE95CA194937D5E73EA0EE8B@DBDE04.ent.ti.com>
- <1378984665.2627.423.camel@shinybook.infradead.org>
- <20130912114831.GL29403@sirena.org.uk>
- <20130912115549.GI12758@n2100.arm.linux.org.uk>
-Message-ID: <alpine.DEB.2.00.1309121523130.2394@lnxricardw.se.axis.com>
+From: rogerq@ti.com (Roger Quadros)
+Date: Thu, 12 Sep 2013 16:28:41 +0300
+Subject: [PATCH 6/7] arm/dts: added dt properties to adapt to the new
+ phy framwork
+In-Reply-To: <1378136591-7463-7-git-send-email-kishon@ti.com>
+References: <1378136591-7463-1-git-send-email-kishon@ti.com>
+ <1378136591-7463-7-git-send-email-kishon@ti.com>
+Message-ID: <5231C189.2040406@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
-On Thu, 12 Sep 2013, Russell King - ARM Linux wrote:
+Need some commit log.
 
-> On Thu, Sep 12, 2013 at 12:48:31PM +0100, Mark Brown wrote:
->> On Thu, Sep 12, 2013 at 12:17:45PM +0100, David Woodhouse wrote:
->>
->>> Right. The issue here is that the LUT is currently *pre-populated*, with
->>> an incestuously-"known" set of commands that the slave is expected to
->>> support.
->>
->> So, to repeat my earlier question can someone tell me what a LUT is?
->
-> It's a very common abbreviation - Look Up Table.
->
-> More specifically, it's a set of registers which give the SPI controller
-> a sequence of 16-bit commands to execute, which tell it what to do on
-> the SPI bus.  Each register contains two commands, and it executes them
-> ...
+cheers,
+-roger
 
-A bit of an odd name when used in this context I think; LUTs are usually 
-used to perform mapping or transformation functions, e.g. looking up a 
-value 'y' given an input value 'x'. In this case it's just a table of 
-commands to be executed. But I guess the name LUT has been used in some 
-hardware specification so there's not much we can do about it.
-
-/Ricard
--- 
-Ricard Wolf Wanderl?f                           ricardw(at)axis.com
-Axis Communications AB, Lund, Sweden            www.axis.com
-Phone +46 46 272 2016                           Fax +46 46 13 61 30
+On 09/02/2013 06:43 PM, Kishon Vijay Abraham I wrote:
+> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+> ---
+>  arch/arm/boot/dts/omap5.dtsi |    5 ++++-
+>  1 file changed, 4 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
+> index 94abef5..9fe71ff 100644
+> --- a/arch/arm/boot/dts/omap5.dtsi
+> +++ b/arch/arm/boot/dts/omap5.dtsi
+> @@ -651,7 +651,8 @@
+>  				compatible = "snps,dwc3";
+>  				reg = <0x4a030000 0x10000>;
+>  				interrupts = <GIC_SPI 92 IRQ_TYPE_LEVEL_HIGH>;
+> -				usb-phy = <&usb2_phy>, <&usb3_phy>;
+> +				phys = <&usb2_phy>, <&usb3_phy>;
+> +				phy-names = "usb2-phy", "usb3-phy";
+>  				tx-fifo-resize;
+>  			};
+>  		};
+> @@ -667,6 +668,7 @@
+>  				compatible = "ti,omap-usb2";
+>  				reg = <0x4a084000 0x7c>;
+>  				ctrl-module = <&omap_control_usb2phy>;
+> +				#phy-cells = <0>;
+>  			};
+>  
+>  			usb3_phy: usb3phy at 4a084400 {
+> @@ -676,6 +678,7 @@
+>  				      <0x4a084c00 0x40>;
+>  				reg-names = "phy_rx", "phy_tx", "pll_ctrl";
+>  				ctrl-module = <&omap_control_usb3phy>;
+> +				#phy-cells = <0>;
+>  			};
+>  		};
+>  
+> 
