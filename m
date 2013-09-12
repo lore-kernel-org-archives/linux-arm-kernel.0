@@ -1,39 +1,54 @@
-From: dwmw2@infradead.org (David Woodhouse)
-Date: Thu, 12 Sep 2013 16:22:02 +0100
-Subject: [PATCH v3 0/8] Add the Quadspi driver for vf610-twr
-In-Reply-To: <20130913025827.GA3051@gmail.com>
-References: <593AEF6C47F46446852B067021A273D6D984000B@MUCSE039.lantiq.com>
- <20130905020435.GA3970@gmail.com>
- <20980858CB6D3A4BAE95CA194937D5E73EA0C7F4@DBDE04.ent.ti.com>
- <522817D7.1010206@freescale.com> <522D3B79.3060707@freescale.com>
- <52318953.6090405@freescale.com>
- <1378979431.2627.402.camel@shinybook.infradead.org>
- <20130913025827.GA3051@gmail.com>
-Message-ID: <1378999322.4210.95.camel@i7.infradead.org>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Thu, 12 Sep 2013 16:23:45 +0100
+Subject: [PATCH 1/2] video: ARM CLCD: Add DT support
+In-Reply-To: <5230DD1C.6060606@gmail.com>
+References: <1378488201-21146-1-git-send-email-pawel.moll@arm.com>
+ <522BAED9.4020301@gmail.com> <1378725559.4082.28.camel@hornet>
+ <522F91F8.6010207@gmail.com> <1378907036.4082.105.camel@hornet>
+ <5230DD1C.6060606@gmail.com>
+Message-ID: <1378999425.13571.54.camel@hornet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2013-09-12 at 22:58 -0400, Huang Shijie wrote:
+On Wed, 2013-09-11 at 22:14 +0100, Sylwester Nawrocki wrote:
+> Yes, I wasn't aware then that your "video RAM" is a separate chip attached
+> to a distinct bus.
+> My idea was to reuse memory node structure, including "reserved-memory"
+> compatible value (note there are some fixups pending and those names are
+> subject to change). Not sure about the property in CLCD device node
+> containing phandle to the memory node (currently 'memory-region').
+
+As I just told Steven, I'll just make it painfully low-level property
+defining "address you have to generate to access base of the
+framebuffer". Of course one can still go the CMA way, if such need
+arises.
+
+> > Ok, I see what you're saying. Yes, this could be done. No, I don't claim
+> > to have enough expertise either (micrometers??? :-O ;-) The other thing
+> > is that I don't really expect generic CDF bindings to cover such things.
+> > They will (hopefully) only describe what's connected with what. And the
+> > drivers should know how. Of course they may need the dimensions&  alike
+> > in the tree (of course having them standardised would help here), but
+> > it's not a CDF job to provide those.
 > 
-> But for the quadspi driver, it does not need this information.
-> 
-> When the drivers knows that it is a Quad-read transaction, it will uses
-> the relative LUT sequence which uses the 4 lines.
+> Of course it's always easier to define couple of DT properties that would
+> cover part of functionality of some specific device. But then such 
+> properties should be prefixed with vendor name AFAIU, since they are
+> not approved as common ones and useful for wider set of devices.
 
-But the controller driver shouldn't *have* that incestuous knowledge of
-the command set of the chip that happens to be connected to it.
+This is a policy that changed many times already...
 
-That's what we're *complaining* about.
+Anyway, I think I've got an idea how to render the problem custom panel
+properties invalid. If so, I'll send another version of the patch.
 
-It *should* "need this information", and should just do what it's *told*
-to do by the slave device driver.
+>  From the device tree perspective CDF is just a collection of (display
+> related) devices and a complete set of DT properties will be needed to
+> describe them. Certainly some share of device-specific properties should
+> be expected. Links between (sub)devices can be already described in DT by
+> the binding documented in video-interfaces.txt.
 
--- 
-dwmw2
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: smime.p7s
-Type: application/x-pkcs7-signature
-Size: 5745 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130912/a88c7648/attachment.bin>
+Whether to use the v4l scheme or not still seems to be a bone of
+contention between the video and the DRM/KMS folk, so I wouldn't draw
+any conclusions yet.
+
+Pawe?
