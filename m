@@ -1,65 +1,37 @@
-From: jean.pihet@linaro.org (Jean Pihet)
-Date: Thu, 12 Sep 2013 14:07:23 +0200
-Subject: [PATCH 0/3] perf: parse the dwarf backtrace info from
- .debug_frame section
-In-Reply-To: <1378720815-23964-1-git-send-email-jean.pihet@linaro.org>
-References: <1378720815-23964-1-git-send-email-jean.pihet@linaro.org>
-Message-ID: <CAFrcx1mQ-P7byYfqP-0bYabUzTDeSWyHFx2FJQ6wQLYEcV_Pxw@mail.gmail.com>
+From: afzal@ti.com (Afzal Mohammed)
+Date: Thu, 12 Sep 2013 17:39:34 +0530
+Subject: [PATCH RFC 0/6] ARM: OMAP2+: AM43x/AM335x prcm reset driver
+In-Reply-To: <1378717612.4151.6.camel@pizza.hi.pengutronix.de>
+References: <cover.1378129416.git.afzal@ti.com>
+ <1378375634.3948.10.camel@pizza.hi.pengutronix.de> <5228A99D.4020702@ti.com>
+ <1378717612.4151.6.camel@pizza.hi.pengutronix.de>
+Message-ID: <5231AEFE.5000206@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Philipp,
 
--- Adding more maintainers in the To: list --
+On Monday 09 September 2013 02:36 PM, Philipp Zabel wrote:
 
-Ping about the patch set, is this one acceptable for mainline?
+> So if I understand correctly, the only problem is that on OMAP the clock
+> needs to be enabled to deassert the reset, but as long as the clock
+> domain is in hardware supervised mode, it won't be enabled?
 
-Jean
+Yes, enabling clock with reset deassertion might not reset the module if
+the clock domain is in hardware supervised mode.
 
-On 9 September 2013 12:00, Jean Pihet <jean.pihet@linaro.org> wrote:
-> On ARM the debug info is not present in the .eh_frame sections but
-> in .debug_frame instead, in dwarf format.
->
-> This patch set uses libunwind to load and parse the dwarf debug info from
-> the .debug_frame section if no .eh_frame_hdr section is found; also it
-> sets the hooks in the perf_regs and libunwind code for ARMv7.
->
-> Dependencies:
->  . if present, libunwind >= 1.1 is needed to prevent a segfault when
->    parsing the dwarf info,
->  . libunwind needs to be configured with --enable-debug-frame
->    to prevent a linkage error. Note: --enable-debug-frame is automatically
->    selected on ARM).
->
-> The generated perf has been tested on ARMv7/OMAP4 and x86_64, using the
-> following commands:
->  perf record -g [dwarf] -- <binary>
->  perf report --sort symbol --call-graph --stdio
->
->
-> Jean Pihet (1):
->   perf: parse the .debug_frame section in case .eh_frame is not present
->
-> Will Deacon (2):
->   ARM: perf: add support for perf registers API
->   ARM: perf: wire up perf_regs and unwind support for ARM
->
->  arch/arm/Kconfig                        |  2 +
->  arch/arm/include/uapi/asm/Kbuild        |  1 +
->  arch/arm/include/uapi/asm/perf_regs.h   | 23 +++++++++++
->  arch/arm/kernel/Makefile                |  1 +
->  arch/arm/kernel/perf_regs.c             | 30 ++++++++++++++
->  tools/perf/arch/arm/Makefile            |  3 ++
->  tools/perf/arch/arm/include/perf_regs.h | 54 +++++++++++++++++++++++++
->  tools/perf/arch/arm/util/unwind.c       | 48 ++++++++++++++++++++++
->  tools/perf/config/Makefile              |  9 +++--
->  tools/perf/util/unwind.c                | 71 +++++++++++++++++++++++++--------
->  10 files changed, 223 insertions(+), 19 deletions(-)
->  create mode 100644 arch/arm/include/uapi/asm/perf_regs.h
->  create mode 100644 arch/arm/kernel/perf_regs.c
->  create mode 100644 tools/perf/arch/arm/include/perf_regs.h
->  create mode 100644 tools/perf/arch/arm/util/unwind.c
->
-> --
-> 1.7.11.7
->
+> Would it be possible to create an internal API to switch the clock
+> domain to software supervised mode, which can be used both by the code
+> behind pm_runtime_get_sync and reset_control_deassert?
+
+I will see if that is acceptable.
+
+Another option that would have to be explored is invoking device_reset()
+(taking care of clear, deassert & status checking as you suggested)
+midway through pm_run_time_get_sync(), when the clockdomain is in
+software supervised mode with reset driver taking care of any particular
+sequence in the case of multiple reset signals, instead of the IP driver
+requiring to take care of it.
+
+Regards
+Afzal
