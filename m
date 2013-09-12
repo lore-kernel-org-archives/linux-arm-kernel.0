@@ -1,21 +1,18 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Thu, 12 Sep 2013 13:14:59 +0300
-Subject: [PATCH 2/2] cpufreq: tegra: Re-model Tegra cpufreq driver
-In-Reply-To: <1378898355-31290-3-git-send-email-bilhuang@nvidia.com>
-References: <1378898355-31290-1-git-send-email-bilhuang@nvidia.com>
- <1378898355-31290-3-git-send-email-bilhuang@nvidia.com>
-Message-ID: <20130912101459.GG30013@tbergstrom-lnx.Nvidia.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Thu, 12 Sep 2013 15:41:52 +0530
+Subject: [PATCH] ARM: davinci: remove deprecated IRQF_DISABLED
+In-Reply-To: <1378537633-7232-1-git-send-email-michael.opdenacker@free-electrons.com>
+References: <1378537633-7232-1-git-send-email-michael.opdenacker@free-electrons.com>
+Message-ID: <52319368.7010501@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 11, 2013 at 01:19:14PM +0200, Bill Huang wrote:
+On Saturday 07 September 2013 12:37 PM, Michael Opdenacker wrote:
+> This patch proposes to remove the IRQF_DISABLED flag from Davinci code ;)
+> It's a NOOP since 2.6.35, and will be removed one day
+> 
+> Signed-off-by: Michael Opdenacker <michael.opdenacker@free-electrons.com>
 
-> +static inline int tegra_cpufreq_init(void)
-> +{
-> +       retrun EOPNOTSUPP;
+Thanks for the patch. Queuing for v3.13
 
-This should be -EOPNOTSUPP at least. I think -EINVAL might be better.
-
-Cheers,
-
-Peter.
+~Sekhar
