@@ -1,42 +1,35 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Thu, 12 Sep 2013 14:40:15 -0700
-Subject: [PATCH v2 1/9] i2c: prepare runtime PM support for I2C client
- devices
-In-Reply-To: <87vc25pvvm.fsf@linaro.org>
-References: <1378913560-2752-1-git-send-email-mika.westerberg@linux.intel.com>
- <1378913560-2752-2-git-send-email-mika.westerberg@linux.intel.com>
- <87vc25pvvm.fsf@linaro.org>
-Message-ID: <CAGa+x85vxX8dbmk-8mOEQ03q6Ud1a-OfnV7t5-rNtu06vn_cSQ@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 12 Sep 2013 23:01:38 +0100
+Subject: [PATCH RESEND 1/2] i2c: prepare runtime PM support for I2C
+ client devices
+In-Reply-To: <87eh8trbob.fsf@linaro.org>
+References: <1378733679-19500-1-git-send-email-mika.westerberg@linux.intel.com>
+ <3397524.g9aUWuArnm@vostro.rjw.lan>
+ <20130910213522.GG29403@sirena.org.uk>
+ <2029393.u6DaKBPszu@vostro.rjw.lan> <522FC0DC.9030708@intel.com>
+ <87eh8trbob.fsf@linaro.org>
+Message-ID: <20130912220138.GY29403@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 12, 2013 at 2:34 PM, Kevin Hilman <khilman@linaro.org> wrote:
-> Mika Westerberg <mika.westerberg@linux.intel.com> writes:
->
->> From: Aaron Lu <aaron.lu@intel.com>
->>
->> This patch adds runtime PM support for the I2C bus in a similar way that
->> has been done for PCI bus already. This means that the I2C bus core
->> prepares runtime PM for a client device just before a driver is about to be
->> bound to it. Devices that are not bound to any driver are not prepared for
->> runtime PM.
->>
->> In order to take advantage of this runtime PM support, the client device
->> driver needs drop the device runtime PM reference count by calling
->> pm_runtime_put() in its ->probe() callback and possibly implement rest of
->> the runtime PM callbacks.
->>
->> If the driver doesn't support runtime PM (like most of the existing I2C
->> client drivers), the device in question is regarded as being runtime PM
->> active and powered on.
->
-> But for existing drivers which already support runtime PM (at least 7 by
-> a quick grep), they will be stuck runtime enabled and stop hitting
-> low-power states after this patch.
+On Thu, Sep 12, 2013 at 02:07:48PM -0700, Kevin Hilman wrote:
 
-Oops, nevermind.  I was mixing this up with runtime PM on the i2c
-adapter but this is for the i2c client.
+> IMO, this decision belongs to the PM domain, not to the core.  We have
+> an established legacy with the current core default (auto) and changing
+> that means lots of breakage.
 
-Sorry for the noise.
+Yup.
 
-Kevin
+> The "forbid by default" can just as easily be handled in the PM domain
+> for the group of devices that need it, so why not do it there?
+
+Or at the device level - I'd guess most I2C devices won't end up in a
+domain outside of ACPI.  Mika's latest version of the patches address
+this issue, the default is left alone.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130912/a652a8d3/attachment.sig>
