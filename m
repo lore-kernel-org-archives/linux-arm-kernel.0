@@ -1,47 +1,30 @@
-From: koen@dominion.thruhere.net (Koen Kooi)
-Date: Thu, 12 Sep 2013 17:42:12 +0200
-Subject: [PATCH 4/4] ARM: dts: am335x-bone-common: add cpu0 and mmc1 triggers
-In-Reply-To: <1379000532-27376-1-git-send-email-koen@dominion.thruhere.net>
-References: <1379000532-27376-1-git-send-email-koen@dominion.thruhere.net>
-Message-ID: <1379000532-27376-5-git-send-email-koen@dominion.thruhere.net>
+From: ijc@hellion.org.uk (Ian Campbell)
+Date: Thu, 12 Sep 2013 16:44:46 +0100
+Subject: [linux-sunxi] Re: [PATCH 4/4] Add arch count timer node in dts
+ for Allwinner A20(sunxi 7i).
+In-Reply-To: <20130912145756.GD22013@e106331-lin.cambridge.arm.com>
+References: <1378968687-8200-1-git-send-email-cinifr@gmail.com>
+ <1378968687-8200-5-git-send-email-cinifr@gmail.com>
+ <20130912145756.GD22013@e106331-lin.cambridge.arm.com>
+Message-ID: <1379000686.10076.76.camel@kazak.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This matches the vendor 3.8.x configuration that is shipping with the boards.
+On Thu, 2013-09-12 at 15:57 +0100, Mark Rutland wrote:
 
-The LED layout is now:
+> > +			interrupts = <1 13 0x308>,
+> > +				     <1 14 0x308>,
+> > +				     <1 11 0x308>,
+> > +				     <1 10 0x308>;
+> > +			clock-frequency = <24000000>;
+> 
+> If at all possible, your bootloader should set CNTFREQ, and
+> clock-frequency should only be used as a last resort when it's
+> impossible to get it to set CNTFREQ. It's not possible to set CNTFREQ
+> from the non-secure side, so guests (which might not be Linux, and might
+> not handle DT in the same way) may see a completely wrong frequency
+> value.
 
-USR0: heartbeat
-USR1: mmc0 (micro-SD slot)
-USR2: cpu0
-USR3: mmc1 (eMMC)
+https://groups.google.com/forum/#!topic/linux-sunxi/56Wj1IT-pKU
 
-The cpu0 triggers was put inbetween the mmc triggers to make is easier to see
-where the disk activity is.
-
-Signed-off-by: Koen Kooi <koen@dominion.thruhere.net>
----
- arch/arm/boot/dts/am335x-bone-common.dtsi | 2 ++
- 1 file changed, 2 insertions(+)
-
-diff --git a/arch/arm/boot/dts/am335x-bone-common.dtsi b/arch/arm/boot/dts/am335x-bone-common.dtsi
-index 80407ff..3057f30 100644
---- a/arch/arm/boot/dts/am335x-bone-common.dtsi
-+++ b/arch/arm/boot/dts/am335x-bone-common.dtsi
-@@ -203,12 +203,14 @@
- 		led at 4 {
- 			label = "beaglebone:green:usr2";
- 			gpios = <&gpio1 23 GPIO_ACTIVE_HIGH>;
-+			linux,default-trigger = "cpu0";
- 			default-state = "off";
- 		};
- 
- 		led at 5 {
- 			label = "beaglebone:green:usr3";
- 			gpios = <&gpio1 24 GPIO_ACTIVE_HIGH>;
-+			linux,default-trigger = "mmc1";
- 			default-state = "off";
- 		};
- 	};
--- 
-1.8.2.1
+Ian.
