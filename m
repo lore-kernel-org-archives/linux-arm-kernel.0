@@ -1,578 +1,394 @@
 From: r.sricharan@ti.com (Sricharan R)
-Date: Thu, 12 Sep 2013 21:09:08 +0530
-Subject: [RFC PATCH 1/4] DRIVERS: IRQCHIP: Add crossbar irqchip driver
+Date: Thu, 12 Sep 2013 21:09:10 +0530
+Subject: [RFC PATCH 3/4] ARM: DTS: DRA: Replace peripheral interrupt numbers
+ with crossbar inputs.
 In-Reply-To: <1379000351-15672-1-git-send-email-r.sricharan@ti.com>
 References: <1379000351-15672-1-git-send-email-r.sricharan@ti.com>
-Message-ID: <1379000351-15672-2-git-send-email-r.sricharan@ti.com>
+Message-ID: <1379000351-15672-4-git-send-email-r.sricharan@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some socs have a large number of interrupts requests to service
-the needs of its many peripherals and subsystems. All of the
-interrupt lines from the subsystems are not needed at the same
-time, so they have to be muxed to the irq-controller appropriately.
-In such places a interrupt controllers are preceded by an CROSSBAR
-that provides flexibility in muxing the device requests to the controller
-inputs.
+Now with the crossbar IP in picture, the peripherals do not have the
+fixed interrupt lines. Instead they rely on the crossbar irqchip to
+allocate and map a free interrupt line to its crossbar input. So replacing
+all the peripheral interrupt numbers with its fixed crossbar input lines.
 
-This models the crossbar IP as a cascaded irqchip controller.
-The peripheral crossbar inputs are mapped on to the crossbar irq-domain.
-The driver then allocates a 'free' irq line and maps that to the
-actual interrupt controller's domain. So every external peripheral interrupt
-is routed through the crossbar handler.
-
- GIC  <----- CROSSBAR <----- PERIPHERAL INTERRUPT LINES
-
- peripheral's irq_of_parse_and_map()
-              |
-              |
-        crossbar_xlate()
-              |
-              |
- saves the interrupt properties passed
-
- peripheral's request_irq(crossbar_number)
-              |
-              |
-        crossbar_request_irq
-              |
-              |
-	allocates free irq and maps it to parent domain
-	      |
-	      |
-        request_irq(mapped interrupt number)
-
- gic_interrupt_hanadler
-            |
-            |
- crossbar_irq(interrupt number)
-            |
-            |
- get crossbar number from interrupt number
-            |
-            |
- handle_irq(crossbar_domain(crossbar number))
-
-The irqchip callback hooks added here are just a redirection to the
-parent irqchip.
-
-This adds a extra translation in the fast path. The maximum increase in
-the average interrupt latency due to the same was measured as around 1.63us
-on a cpu running at 1GHZ.
-
-cat /proc/interrupts looks like this, with both crossbar and interrupt number
-
-           CPU0       CPU1
- 45:        267          0       GIC  OMAP UART0
-205:        267          0  CROSSBAR  OMAP UART0
-
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: Linus Walleij <linus.walleij@linaro.org>
-Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Tony Lindgren <tony@atomide.com>
-Cc: Rajendra Nayak <rnayak@ti.com>
 Signed-off-by: Sricharan R <r.sricharan@ti.com>
 ---
-There is lockdep warning during the boot. This is because we try to
-do one request_irq with in another and that results in kmalloc being
-called from an atomic context, which generates the warning.
-Any suggestions to overcome this will help.
+ arch/arm/boot/dts/dra7.dtsi |   88 +++++++++++++++++++++----------------------
+ 1 file changed, 44 insertions(+), 44 deletions(-)
 
-  WARNING: at kernel/lockdep.c:2740 lockdep_trace_alloc+0xe8/0x108()
-  DEBUG_LOCKS_WARN_ON(irqs_disabled_flags(flags))
-
- .../devicetree/bindings/arm/omap/irq-crossbar.txt  |   39 ++
- drivers/irqchip/Kconfig                            |    9 +
- drivers/irqchip/Makefile                           |    1 +
- drivers/irqchip/irq-crossbar.c                     |  407 ++++++++++++++++++++
- 4 files changed, 456 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/omap/irq-crossbar.txt
- create mode 100644 drivers/irqchip/irq-crossbar.c
-
-diff --git a/Documentation/devicetree/bindings/arm/omap/irq-crossbar.txt b/Documentation/devicetree/bindings/arm/omap/irq-crossbar.txt
-new file mode 100644
-index 0000000..5d465cf
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/omap/irq-crossbar.txt
-@@ -0,0 +1,39 @@
-+* IRQ CROSSBAR
-+
-+Some socs have a large number of interrupts requests to service
-+the needs of its many peripherals and subsystems. All of the
-+interrupt lines from the subsystems are not needed at the same
-+time, so they have to be muxed to the irq-controller appropriately.
-+In such places a interrupt controllers are preceded by an CROSSBAR
-+that provides flexibility in muxing the device requests to the controller
-+inputs.
-+
-+Required properties:
-+- compatible : Should be "irq-crossbar"
-+- interrupt-parent: phandle to crossbar's interrupt parent.
-+- interrupt-controller: Identifies the node as an interrupt controller.
-+- interrupt-cells: Should be the same value as the interrupt parent.
-+- reg: Base address and the size of the crossbar registers.
-+- max-crossbar-lines: Total number of input lines of the crossbar.
-+- max-irqs: Total number of irqs available at the interrupt controller.
-+- reg-size: size of the crossbar registers.
-+- irqs-reserved: List of the reserved irq lines that are not muxed using
-+		 crossbar. These interrupt lines are reserved in the soc,
-+		 so crossbar bar driver should not consider them as free
-+		 lines.
-+
-+Examples:
-+		crossbar_mpu: @4a020000 {
-+			compatible = "irq-crossbar";
-+			interrupt-parent = <&gic>;
-+			interrupt-controller;
-+			#interrupt-cells = <3>;
-+			reg = <0x4a002a48 0x130>;
-+			max-crossbar-lines = <512>;
-+			max-irqs = <160>;
-+			reg-size = <2>;
-+			irqs-reserved = <0 1 2 3 5 6 131 132 139 140>;
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+		};
-+
-diff --git a/drivers/irqchip/Kconfig b/drivers/irqchip/Kconfig
-index 4a33351..5152777 100644
---- a/drivers/irqchip/Kconfig
-+++ b/drivers/irqchip/Kconfig
-@@ -41,3 +41,12 @@ config VERSATILE_FPGA_IRQ_NR
-        int
-        default 4
-        depends on VERSATILE_FPGA_IRQ
-+
-+config IRQCHIP_CROSSBAR
-+	bool
-+	help
-+	   Those socs which has a crossbar IP to mux the irqs from peripherals
-+	   to the interrupt-controllers can use this. This driver would
-+	   dynamically allocate a free interrupt line and map the peripheral
-+	   crossbar input to the parent interrupt-controller.
-+
-diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
-index cda4cb5..0033d93 100644
---- a/drivers/irqchip/Makefile
-+++ b/drivers/irqchip/Makefile
-@@ -16,3 +16,4 @@ obj-$(CONFIG_RENESAS_INTC_IRQPIN)	+= irq-renesas-intc-irqpin.o
- obj-$(CONFIG_RENESAS_IRQC)		+= irq-renesas-irqc.o
- obj-$(CONFIG_VERSATILE_FPGA_IRQ)	+= irq-versatile-fpga.o
- obj-$(CONFIG_ARCH_VT8500)		+= irq-vt8500.o
-+obj-$(CONFIG_IRQCHIP_CROSSBAR)		+= irq-crossbar.o
-diff --git a/drivers/irqchip/irq-crossbar.c b/drivers/irqchip/irq-crossbar.c
-new file mode 100644
-index 0000000..3980502
---- /dev/null
-+++ b/drivers/irqchip/irq-crossbar.c
-@@ -0,0 +1,407 @@
-+/*
-+ *  drivers/irqchip/irq-crossbar.c
-+ *
-+ *  Copyright (C) 2013 Texas Instruments Incorporated - http://www.ti.com
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ */
-+#include <linux/err.h>
-+#include <linux/init.h>
-+#include <linux/io.h>
-+#include <linux/irqdomain.h>
-+#include <linux/of_address.h>
-+#include <linux/of_irq.h>
-+#include <linux/platform_device.h>
-+#include <linux/interrupt.h>
-+#include <linux/irq.h>
-+#include <linux/slab.h>
-+#include "irqchip.h"
-+
-+#define IRQ_FREE	-1
-+
-+/*
-+ * @hwirq: hardware irq line number
-+ * @virq: linux irq corresponding to hwirq
-+ * @intspec: interrupt specifier passed from DT
-+ * @intspec_size: intspec size
-+ */
-+struct pirqs {
-+	int hwirq;
-+	int virq;
-+	u32 *intspec;
-+	int intspec_size;
-+};
-+
-+/*
-+ * @irq_map: array of interrupts to crossbar number mapping
-+ * @crossbar_map: array of interrupt parent's virtual irqs
-+ * @crossbar_base: crossbar base address
-+ * @domain: crossbar domain ptr
-+ * @irqp: pointer to crossbar irq parent
-+ * @register_offsets: offsets for each irq number
-+ * @int_max: maximum number of supported interrupts
-+ */
-+struct crossbar_device {
-+	int *irq_map;
-+	struct pirqs *crossbar_map;
-+	void __iomem *crossbar_base;
-+	struct irq_domain *domain;
-+	struct device_node *irqp;
-+	int *register_offsets;
-+	int int_max;
-+	void (*write) (int, int);
-+};
-+
-+static struct crossbar_device *cb;
-+static struct lock_class_key crossbar_lock_class;
-+
-+static inline void crossbar_writel(int irq_no, int cb_no)
-+{
-+	writel(cb_no, cb->crossbar_base + cb->register_offsets[irq_no]);
-+}
-+
-+static inline void crossbar_writew(int irq_no, int cb_no)
-+{
-+	writew(cb_no, cb->crossbar_base + cb->register_offsets[irq_no]);
-+}
-+
-+static inline void crossbar_writeb(int irq_no, int cb_no)
-+{
-+	writeb(cb_no, cb->crossbar_base + cb->register_offsets[irq_no]);
-+}
-+
-+static inline int map_free_irq(int cb_no, int irq)
-+{
-+	int virq;
-+
-+	cb->crossbar_map[cb_no].intspec[1] = irq;
-+
-+	/* This maps the free_irq to the parent domain */
-+	virq = irq_create_of_mapping(cb->irqp,
-+				  (const u32 *)cb->crossbar_map[cb_no].intspec,
-+				  cb->crossbar_map[cb_no].intspec_size);
-+
-+	cb->crossbar_map[cb_no].virq = virq;
-+	cb->crossbar_map[cb_no].hwirq = irq;
-+
-+	return virq;
-+}
-+
-+static inline const u32 allocate_free_irq(int cb_no)
-+{
-+	int i;
-+
-+	for (i = 0; i < cb->int_max; i++) {
-+		if (cb->irq_map[i] == IRQ_FREE) {
-+			cb->irq_map[i] = cb_no;
-+			cb->write(i, cb_no);
-+			return map_free_irq(cb_no, i);
-+		}
-+	}
-+
-+	return -ENODEV;
-+}
-+
-+static irqreturn_t crossbar_irq(int unused,
-+				void *hwirq)
-+{
-+	int *irq = hwirq;
-+	int cb_no = cb->irq_map[*irq];
-+
-+	generic_handle_irq(irq_find_mapping(cb->domain, cb_no));
-+
-+	return IRQ_HANDLED;
-+}
-+
-+static inline int crossbar_to_virq(int irq)
-+{
-+	return cb->crossbar_map[irq].virq;
-+}
-+
-+static inline int crossbar_to_irq(int irq)
-+{
-+	return cb->crossbar_map[irq].hwirq;
-+}
-+
-+static inline void crossbar_to_irq_chip_data(int irq,
-+				struct irq_chip **chip,
-+				struct irq_data **data)
-+{
-+	int virq;
-+
-+	virq = crossbar_to_virq(irq);
-+	*chip = irq_get_chip(virq);
-+	*data = irq_get_irq_data(virq);
-+}
-+
-+/*
-+ * Drivers can call these callbacks directly.
-+ * So re-direct it to the parent chip.
-+ */
-+static void crossbar_eoi_irq(struct irq_data *d)
-+{
-+	struct irq_chip *chip;
-+	struct irq_data *data;
-+
-+	crossbar_to_irq_chip_data(d->hwirq, &chip, &data);
-+
-+	if (chip->irq_eoi)
-+		return chip->irq_eoi(data);
-+}
-+
-+static int crossbar_set_type(struct irq_data *d, unsigned int type)
-+{
-+	struct irq_chip *chip;
-+	struct irq_data *data;
-+	int ret = 0;
-+
-+	crossbar_to_irq_chip_data(d->hwirq, &chip, &data);
-+
-+	if (chip->irq_set_type)
-+		ret = chip->irq_set_type(data, type);
-+
-+	return ret;
-+}
-+
-+static void crossbar_unmask_irq(struct irq_data *d)
-+{
-+	struct irq_chip *chip;
-+	struct irq_data *data;
-+
-+	crossbar_to_irq_chip_data(d->hwirq, &chip, &data);
-+
-+	if (chip->irq_unmask)
-+		return chip->irq_unmask(data);
-+}
-+
-+static void crossbar_mask_irq(struct irq_data *d)
-+{
-+	struct irq_chip *chip;
-+	struct irq_data *data;
-+
-+	crossbar_to_irq_chip_data(d->hwirq, &chip, &data);
-+
-+	if (chip->irq_mask)
-+		return chip->irq_mask(data);
-+}
-+
-+#ifdef CONFIG_SMP
-+static int crossbar_set_affinity(struct irq_data *d,
-+				 const struct cpumask *mask_val,
-+				 bool force)
-+{
-+	struct irq_chip *chip;
-+	struct irq_data *data;
-+	int ret = 0;
-+
-+	crossbar_to_irq_chip_data(d->hwirq, &chip, &data);
-+
-+	if (chip->irq_set_affinity)
-+		ret = chip->irq_set_affinity(data, mask_val, force);
-+
-+	return ret;
-+}
-+#endif
-+
-+/*
-+ * Request and free are already called in atomic contexts
-+ */
-+unsigned int crossbar_request_irq(struct irq_data *d)
-+{
-+	int cb_no = d->hwirq;
-+	int virq = allocate_free_irq(cb_no);
-+	void *irq = &cb->crossbar_map[cb_no].hwirq;
-+	int err;
-+
-+	err = request_threaded_irq(virq, crossbar_irq, NULL,
-+				   0, "CROSSBAR", irq);
-+	if (err)
-+		pr_err("\n request_irq failed for crossbar %d", cb_no);
-+
-+	return 0;
-+}
-+
-+void crossbar_free_irq(struct irq_data *d)
-+{
-+	void *irq = &cb->crossbar_map[d->hwirq].hwirq;
-+	int hwirq = crossbar_to_irq(d->hwirq);
-+	int virq = crossbar_to_virq(d->hwirq);
-+
-+	free_irq(virq, irq);
-+	cb->irq_map[hwirq] = IRQ_FREE;
-+	irq_dispose_mapping(virq);
-+	cb->crossbar_map[d->hwirq].virq = 0;
-+}
-+
-+static void crossbar_print_name(struct irq_data *d, struct seq_file *p)
-+{
-+	struct irq_chip *chip;
-+	struct irq_data *data;
-+	struct irqaction *action;
-+
-+	crossbar_to_irq_chip_data(d->hwirq, &chip, &data);
-+	action = irq_to_desc(data->irq)->action;
-+
-+	seq_printf(p, " %8s", d->chip->name);
-+
-+	/* interrupt proc entries look better this way */
-+	while (action != NULL) {
-+		action->name = irq_to_desc(d->irq)->action->name;
-+		action = action->next;
-+	}
-+}
-+
-+static struct irq_chip crossbar_chip = {
-+	.name			= "CROSSBAR",
-+	.irq_startup		= crossbar_request_irq,
-+	.irq_shutdown		= crossbar_free_irq,
-+	.irq_unmask		= crossbar_unmask_irq,
-+	.irq_mask		= crossbar_mask_irq,
-+	.irq_eoi		= crossbar_eoi_irq,
-+	.irq_set_type		= crossbar_set_type,
-+#ifdef CONFIG_SMP
-+	.irq_set_affinity	= crossbar_set_affinity,
-+#endif
-+	.irq_print_chip		= crossbar_print_name
-+};
-+
-+static int crossbar_domain_map(struct irq_domain *d, unsigned int irq,
-+			       irq_hw_number_t hw)
-+{
-+	irq_set_lockdep_class(irq, &crossbar_lock_class);
-+	irq_set_chip_and_handler(irq, &crossbar_chip,
-+				 handle_simple_irq);
-+
-+	set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
-+	return 0;
-+}
-+
-+static int crossbar_domain_xlate(struct irq_domain *d,
-+				 struct device_node *controller,
-+				 const u32 *intspec, unsigned int intsize,
-+				 unsigned long *out_hwirq,
-+				 unsigned int *out_type)
-+{
-+	int i, cb_no;
-+	u32 *cb_intspec = kzalloc(intsize * sizeof(int), GFP_KERNEL);
-+
-+	if (!cb_intspec)
-+		return -ENOMEM;
-+
-+	cb_no = intspec[1];
-+
-+	if (WARN_ON(intsize < 1))
-+		return -EINVAL;
-+
-+	cb->crossbar_map[cb_no].intspec = cb_intspec;
-+
-+	/*
-+	 * Free irq is allocated and mapped during request_irq
-+	 * So just save the interrupt properties here
-+	 */
-+	for (i = 0; i < intsize; i++)
-+		cb->crossbar_map[cb_no].intspec[i] = intspec[i];
-+
-+	cb->crossbar_map[cb_no].intspec_size = intsize;
-+	*out_hwirq = intspec[1];
-+	*out_type = IRQ_TYPE_NONE;
-+
-+	return 0;
-+}
-+
-+const struct irq_domain_ops crossbar_domain_ops = {
-+	.map = crossbar_domain_map,
-+	.xlate = crossbar_domain_xlate
-+};
-+
-+static int __init crossbar_of_init(struct device_node *node,
-+				   struct device_node *parent)
-+{
-+	int i, size, max, reserved = 0;
-+	const __be32 *irqsr;
-+
-+	if (!parent) {
-+		pr_err("\n interrupt-parent is missing");
-+		return -ENODEV;
-+	}
-+
-+	cb = kzalloc(sizeof(struct cb_device *), GFP_KERNEL);
-+
-+	if (!cb)
-+		return -ENOMEM;
-+
-+	cb->irqp = parent;
-+
-+	cb->crossbar_base = of_iomap(node, 0);
-+	if (!cb->crossbar_base)
-+		return -ENOMEM;
-+
-+	of_property_read_u32(node, "max-crossbar-lines", &max);
-+	cb->crossbar_map = kzalloc(max * sizeof(struct pirqs *), GFP_KERNEL);
-+
-+	if (!cb->crossbar_map)
-+		return -ENOMEM;
-+
-+	cb->domain = irq_domain_add_linear(node, max,
-+				       &crossbar_domain_ops, NULL);
-+
-+	if (!cb->domain) {
-+		pr_err("Couldn't register an IRQ domain\n");
-+		return -ENODEV;
-+	}
-+
-+	of_property_read_u32(node, "max-irqs", &max);
-+	cb->irq_map = kzalloc(max * sizeof(int), GFP_KERNEL);
-+	if (!cb->irq_map)
-+		return -ENOMEM;
-+
-+	cb->int_max = max;
-+
-+	for (i = 0; i < max; i++)
-+		cb->irq_map[i] = IRQ_FREE;
-+
-+	/* Get and mark reserved irqs */
-+	irqsr = of_get_property(node, "irqs-reserved", &size);
-+	size /= sizeof(int);
-+
-+	for (i = 0; i < size; i++)
-+		cb->irq_map[be32_to_cpup(irqsr + i)] = 0;
-+
-+	cb->register_offsets = kzalloc(max * sizeof(int), GFP_KERNEL);
-+	if (!cb->register_offsets)
-+		return -ENOMEM;
-+
-+	of_property_read_u32(node, "reg-size", &size);
-+
-+	/*
-+	 * Register offsets are not linear because of the
-+	 * reserved irqs. so find and store the offsets once.
-+	 */
-+	for (i = 0; i < max; i++) {
-+		if (!cb->irq_map[i])
-+			continue;
-+
-+		cb->register_offsets[i] = reserved;
-+		reserved += size;
-+	}
-+
-+	switch (size) {
-+	case 1:
-+		cb->write = crossbar_writeb;
-+		break;
-+	case 2:
-+		cb->write = crossbar_writew;
-+		break;
-+	case 4:
-+		cb->write = crossbar_writel;
-+		break;
-+	default:
-+		break;
-+	}
-+
-+	return 0;
-+}
-+IRQCHIP_DECLARE(crossbar, "crossbar-irqchip", crossbar_of_init);
+diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
+index da977e1..2c541af 100644
+--- a/arch/arm/boot/dts/dra7.dtsi
++++ b/arch/arm/boot/dts/dra7.dtsi
+@@ -104,10 +104,10 @@
+ 		sdma: dma-controller at 4a056000 {
+ 			compatible = "ti,omap4430-sdma";
+ 			reg = <0x4a056000 0x1000>;
+-			interrupts = <0 12 0x4>,
+-				     <0 13 0x4>,
+-				     <0 14 0x4>,
+-				     <0 15 0x4>;
++			interrupts = <0 7 0x4>,
++				     <0 8 0x4>,
++				     <0 9 0x4>,
++				     <0 10 0x4>;
+ 			#dma-cells = <1>;
+ 			#dma-channels = <32>;
+ 			#dma-requests = <127>;
+@@ -116,7 +116,7 @@
+ 		gpio1: gpio at 4ae10000 {
+ 			compatible = "ti,omap4-gpio";
+ 			reg = <0x4ae10000 0x200>;
+-			interrupts = <0 29 0x4>;
++			interrupts = <0 24 0x4>;
+ 			ti,hwmods = "gpio1";
+ 			gpio-controller;
+ 			#gpio-cells = <2>;
+@@ -127,7 +127,7 @@
+ 		gpio2: gpio at 48055000 {
+ 			compatible = "ti,omap4-gpio";
+ 			reg = <0x48055000 0x200>;
+-			interrupts = <0 30 0x4>;
++			interrupts = <0 25 0x4>;
+ 			ti,hwmods = "gpio2";
+ 			gpio-controller;
+ 			#gpio-cells = <2>;
+@@ -138,7 +138,7 @@
+ 		gpio3: gpio at 48057000 {
+ 			compatible = "ti,omap4-gpio";
+ 			reg = <0x48057000 0x200>;
+-			interrupts = <0 31 0x4>;
++			interrupts = <0 26 0x4>;
+ 			ti,hwmods = "gpio3";
+ 			gpio-controller;
+ 			#gpio-cells = <2>;
+@@ -149,7 +149,7 @@
+ 		gpio4: gpio at 48059000 {
+ 			compatible = "ti,omap4-gpio";
+ 			reg = <0x48059000 0x200>;
+-			interrupts = <0 32 0x4>;
++			interrupts = <0 27 0x4>;
+ 			ti,hwmods = "gpio4";
+ 			gpio-controller;
+ 			#gpio-cells = <2>;
+@@ -160,7 +160,7 @@
+ 		gpio5: gpio at 4805b000 {
+ 			compatible = "ti,omap4-gpio";
+ 			reg = <0x4805b000 0x200>;
+-			interrupts = <0 33 0x4>;
++			interrupts = <0 28 0x4>;
+ 			ti,hwmods = "gpio5";
+ 			gpio-controller;
+ 			#gpio-cells = <2>;
+@@ -171,7 +171,7 @@
+ 		gpio6: gpio at 4805d000 {
+ 			compatible = "ti,omap4-gpio";
+ 			reg = <0x4805d000 0x200>;
+-			interrupts = <0 34 0x4>;
++			interrupts = <0 29 0x4>;
+ 			ti,hwmods = "gpio6";
+ 			gpio-controller;
+ 			#gpio-cells = <2>;
+@@ -182,7 +182,7 @@
+ 		gpio7: gpio at 48051000 {
+ 			compatible = "ti,omap4-gpio";
+ 			reg = <0x48051000 0x200>;
+-			interrupts = <0 35 0x4>;
++			interrupts = <0 30 0x4>;
+ 			ti,hwmods = "gpio7";
+ 			gpio-controller;
+ 			#gpio-cells = <2>;
+@@ -193,7 +193,7 @@
+ 		gpio8: gpio at 48053000 {
+ 			compatible = "ti,omap4-gpio";
+ 			reg = <0x48053000 0x200>;
+-			interrupts = <0 121 0x4>;
++			interrupts = <0 116 0x4>;
+ 			ti,hwmods = "gpio8";
+ 			gpio-controller;
+ 			#gpio-cells = <2>;
+@@ -204,7 +204,7 @@
+ 		uart1: serial at 4806a000 {
+ 			compatible = "ti,omap4-uart";
+ 			reg = <0x4806a000 0x100>;
+-			interrupts = <0 72 0x4>;
++			interrupts = <0 67 0x4>;
+ 			ti,hwmods = "uart1";
+ 			clock-frequency = <48000000>;
+ 		};
+@@ -212,7 +212,7 @@
+ 		uart2: serial at 4806c000 {
+ 			compatible = "ti,omap4-uart";
+ 			reg = <0x4806c000 0x100>;
+-			interrupts = <0 73 0x4>;
++			interrupts = <0 68 0x4>;
+ 			ti,hwmods = "uart2";
+ 			clock-frequency = <48000000>;
+ 		};
+@@ -220,7 +220,7 @@
+ 		uart3: serial at 48020000 {
+ 			compatible = "ti,omap4-uart";
+ 			reg = <0x48020000 0x100>;
+-			interrupts = <0 74 0x4>;
++			interrupts = <0 69 0x4>;
+ 			ti,hwmods = "uart3";
+ 			clock-frequency = <48000000>;
+ 		};
+@@ -228,7 +228,7 @@
+ 		uart4: serial at 4806e000 {
+ 			compatible = "ti,omap4-uart";
+ 			reg = <0x4806e000 0x100>;
+-			interrupts = <0 70 0x4>;
++			interrupts = <0 65 0x4>;
+ 			ti,hwmods = "uart4";
+ 			clock-frequency = <48000000>;
+ 		};
+@@ -236,7 +236,7 @@
+ 		uart5: serial at 48066000 {
+ 			compatible = "ti,omap4-uart";
+ 			reg = <0x48066000 0x100>;
+-			interrupts = <0 105 0x4>;
++			interrupts = <0 100 0x4>;
+ 			ti,hwmods = "uart5";
+ 			clock-frequency = <48000000>;
+ 		};
+@@ -244,7 +244,7 @@
+ 		uart6: serial at 48068000 {
+ 			compatible = "ti,omap4-uart";
+ 			reg = <0x48068000 0x100>;
+-			interrupts = <0 106 0x4>;
++			interrupts = <0 101 0x4>;
+ 			ti,hwmods = "uart6";
+ 			clock-frequency = <48000000>;
+ 		};
+@@ -252,7 +252,7 @@
+ 		timer1: timer at 4ae18000 {
+ 			compatible = "ti,omap5430-timer";
+ 			reg = <0x4ae18000 0x80>;
+-			interrupts = <0 37 0x4>;
++			interrupts = <0 32 0x4>;
+ 			ti,hwmods = "timer1";
+ 			ti,timer-alwon;
+ 		};
+@@ -260,28 +260,28 @@
+ 		timer2: timer at 48032000 {
+ 			compatible = "ti,omap5430-timer";
+ 			reg = <0x48032000 0x80>;
+-			interrupts = <0 38 0x4>;
++			interrupts = <0 33 0x4>;
+ 			ti,hwmods = "timer2";
+ 		};
+ 
+ 		timer3: timer at 48034000 {
+ 			compatible = "ti,omap5430-timer";
+ 			reg = <0x48034000 0x80>;
+-			interrupts = <0 39 0x4>;
++			interrupts = <0 34 0x4>;
+ 			ti,hwmods = "timer3";
+ 		};
+ 
+ 		timer4: timer at 48036000 {
+ 			compatible = "ti,omap5430-timer";
+ 			reg = <0x48036000 0x80>;
+-			interrupts = <0 40 0x4>;
++			interrupts = <0 35 0x4>;
+ 			ti,hwmods = "timer4";
+ 		};
+ 
+ 		timer5: timer at 48820000 {
+ 			compatible = "ti,omap5430-timer";
+ 			reg = <0x48820000 0x80>;
+-			interrupts = <0 41 0x4>;
++			interrupts = <0 36 0x4>;
+ 			ti,hwmods = "timer5";
+ 			ti,timer-dsp;
+ 		};
+@@ -289,7 +289,7 @@
+ 		timer6: timer at 48822000 {
+ 			compatible = "ti,omap5430-timer";
+ 			reg = <0x48822000 0x80>;
+-			interrupts = <0 42 0x4>;
++			interrupts = <0 37 0x4>;
+ 			ti,hwmods = "timer6";
+ 			ti,timer-dsp;
+ 			ti,timer-pwm;
+@@ -298,7 +298,7 @@
+ 		timer7: timer at 48824000 {
+ 			compatible = "ti,omap5430-timer";
+ 			reg = <0x48824000 0x80>;
+-			interrupts = <0 43 0x4>;
++			interrupts = <0 38 0x4>;
+ 			ti,hwmods = "timer7";
+ 			ti,timer-dsp;
+ 		};
+@@ -306,7 +306,7 @@
+ 		timer8: timer at 48826000 {
+ 			compatible = "ti,omap5430-timer";
+ 			reg = <0x48826000 0x80>;
+-			interrupts = <0 44 0x4>;
++			interrupts = <0 39 0x4>;
+ 			ti,hwmods = "timer8";
+ 			ti,timer-dsp;
+ 			ti,timer-pwm;
+@@ -315,21 +315,21 @@
+ 		timer9: timer at 4803e000 {
+ 			compatible = "ti,omap5430-timer";
+ 			reg = <0x4803e000 0x80>;
+-			interrupts = <0 45 0x4>;
++			interrupts = <0 40 0x4>;
+ 			ti,hwmods = "timer9";
+ 		};
+ 
+ 		timer10: timer at 48086000 {
+ 			compatible = "ti,omap5430-timer";
+ 			reg = <0x48086000 0x80>;
+-			interrupts = <0 46 0x4>;
++			interrupts = <0 41 0x4>;
+ 			ti,hwmods = "timer10";
+ 		};
+ 
+ 		timer11: timer at 48088000 {
+ 			compatible = "ti,omap5430-timer";
+ 			reg = <0x48088000 0x80>;
+-			interrupts = <0 47 0x4>;
++			interrupts = <0 42 0x4>;
+ 			ti,hwmods = "timer11";
+ 			ti,timer-pwm;
+ 		};
+@@ -337,21 +337,21 @@
+ 		wdt2: wdt at 4ae14000 {
+ 			compatible = "ti,omap4-wdt";
+ 			reg = <0x4ae14000 0x80>;
+-			interrupts = <0 80 0x4>;
++			interrupts = <0 75 0x4>;
+ 			ti,hwmods = "wd_timer2";
+ 		};
+ 
+ 		dmm: dmm at 4e000000 {
+ 			compatible = "ti,omap5-dmm";
+ 			reg = <0x4e000000 0x800>;
+-			interrupts = <0 113 0x4>;
++			interrupts = <0 108 0x4>;
+ 			ti,hwmods = "dmm";
+ 		};
+ 
+ 		i2c1: i2c at 48070000 {
+ 			compatible = "ti,omap4-i2c";
+ 			reg = <0x48070000 0x100>;
+-			interrupts = <0 56 0x4>;
++			interrupts = <0 51 0x4>;
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+ 			ti,hwmods = "i2c1";
+@@ -360,7 +360,7 @@
+ 		i2c2: i2c at 48072000 {
+ 			compatible = "ti,omap4-i2c";
+ 			reg = <0x48072000 0x100>;
+-			interrupts = <0 57 0x4>;
++			interrupts = <0 52 0x4>;
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+ 			ti,hwmods = "i2c2";
+@@ -369,7 +369,7 @@
+ 		i2c3: i2c at 48060000 {
+ 			compatible = "ti,omap4-i2c";
+ 			reg = <0x48060000 0x100>;
+-			interrupts = <0 61 0x4>;
++			interrupts = <0 56 0x4>;
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+ 			ti,hwmods = "i2c3";
+@@ -378,7 +378,7 @@
+ 		i2c4: i2c at 4807a000 {
+ 			compatible = "ti,omap4-i2c";
+ 			reg = <0x4807a000 0x100>;
+-			interrupts = <0 62 0x4>;
++			interrupts = <0 57 0x4>;
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+ 			ti,hwmods = "i2c4";
+@@ -387,7 +387,7 @@
+ 		i2c5: i2c at 4807c000 {
+ 			compatible = "ti,omap4-i2c";
+ 			reg = <0x4807c000 0x100>;
+-			interrupts = <0 60 0x4>;
++			interrupts = <0 55 0x4>;
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+ 			ti,hwmods = "i2c5";
+@@ -396,7 +396,7 @@
+ 		mmc1: mmc at 4809c000 {
+ 			compatible = "ti,omap4-hsmmc";
+ 			reg = <0x4809c000 0x400>;
+-			interrupts = <0 83 0x4>;
++			interrupts = <0 78 0x4>;
+ 			ti,hwmods = "mmc1";
+ 			ti,dual-volt;
+ 			ti,needs-special-reset;
+@@ -407,7 +407,7 @@
+ 		mmc2: mmc at 480b4000 {
+ 			compatible = "ti,omap4-hsmmc";
+ 			reg = <0x480b4000 0x400>;
+-			interrupts = <0 86 0x4>;
++			interrupts = <0 81 0x4>;
+ 			ti,hwmods = "mmc2";
+ 			ti,needs-special-reset;
+ 			dmas = <&sdma 47>, <&sdma 48>;
+@@ -417,7 +417,7 @@
+ 		mmc3: mmc at 480ad000 {
+ 			compatible = "ti,omap4-hsmmc";
+ 			reg = <0x480ad000 0x400>;
+-			interrupts = <0 94 0x4>;
++			interrupts = <0 89 0x4>;
+ 			ti,hwmods = "mmc3";
+ 			ti,needs-special-reset;
+ 			dmas = <&sdma 77>, <&sdma 78>;
+@@ -427,7 +427,7 @@
+ 		mmc4: mmc at 480d1000 {
+ 			compatible = "ti,omap4-hsmmc";
+ 			reg = <0x480d1000 0x400>;
+-			interrupts = <0 96 0x4>;
++			interrupts = <0 91 0x4>;
+ 			ti,hwmods = "mmc4";
+ 			ti,needs-special-reset;
+ 			dmas = <&sdma 57>, <&sdma 58>;
+@@ -437,7 +437,7 @@
+ 		mcspi1: spi at 48098000 {
+ 			compatible = "ti,omap4-mcspi";
+ 			reg = <0x48098000 0x200>;
+-			interrupts = <0 65 0x4>;
++			interrupts = <0 60 0x4>;
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+ 			ti,hwmods = "mcspi1";
+@@ -457,7 +457,7 @@
+ 		mcspi2: spi at 4809a000 {
+ 			compatible = "ti,omap4-mcspi";
+ 			reg = <0x4809a000 0x200>;
+-			interrupts = <0 66 0x4>;
++			interrupts = <0 61 0x4>;
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+ 			ti,hwmods = "mcspi2";
+@@ -472,7 +472,7 @@
+ 		mcspi3: spi at 480b8000 {
+ 			compatible = "ti,omap4-mcspi";
+ 			reg = <0x480b8000 0x200>;
+-			interrupts = <0 91 0x4>;
++			interrupts = <0 86 0x4>;
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+ 			ti,hwmods = "mcspi3";
+@@ -484,7 +484,7 @@
+ 		mcspi4: spi at 480ba000 {
+ 			compatible = "ti,omap4-mcspi";
+ 			reg = <0x480ba000 0x200>;
+-			interrupts = <0 48 0x4>;
++			interrupts = <0 43 0x4>;
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+ 			ti,hwmods = "mcspi4";
 -- 
 1.7.9.5
