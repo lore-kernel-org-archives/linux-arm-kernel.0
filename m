@@ -1,33 +1,58 @@
-From: galak@codeaurora.org (Kumar Gala)
-Date: Thu, 12 Sep 2013 13:22:25 -0500
-Subject: [PATCH v7 3/4] drivers: of: add initialization code for dma
- reserved memory
-In-Reply-To: <20130909160154.8D7183E0F23@localhost>
-References: <1377527959-5080-1-git-send-email-m.szyprowski@samsung.com>
- <1377527959-5080-4-git-send-email-m.szyprowski@samsung.com>
- <20130829224637.D09183E1222@localhost> <52209278.8040106@samsung.com>
- <DAF223EB-C84C-4E82-A24A-ACD0A3A0559F@codeaurora.org>
- <20130909160154.8D7183E0F23@localhost>
-Message-ID: <13185491-534E-4547-8412-5704346EA2DC@codeaurora.org>
+From: koen@dominion.thruhere.net (Koen Kooi)
+Date: Thu, 12 Sep 2013 20:35:31 +0200
+Subject: [PATCH v4 0/2] ARM: dts: Beaglebone MMC fixes
+Message-ID: <1379010935-25943-1-git-send-email-koen@dominion.thruhere.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Here are two patches to fix MMC on beaglebone, one fixes card detect on BBW,
+the other adds the eMMC entry for BBB and its fixed regulator. After that mmc1
+gets a nice speed boost by moving to 4-bit mode and LED triggers get assigned.
 
-On Sep 9, 2013, at 11:01 AM, Grant Likely wrote:
+This series depends on:
 
-> 
-> The generic form for do-not-touch memory:
-> 	compatible = "reserved-memory";
-> - I've dropped '-region' because I think it is redundant
-> - The kernel will not make use of this memory except for when a driver picks it up
-> 
-> For contiguous memory:
-> 	compatible = "contiguous-memory", "reserved-memory"
+http://comments.gmane.org/gmane.linux.kernel.stable/63648
+https://lkml.org/lkml/2013/9/10/454
+http://comments.gmane.org/gmane.linux.kernel.mmc/22381
 
-Should the phandle references still be 'memory-region' ?
+Or as git-cherry would put it:
 
-- k
+[koen at rrMBP patches]$ git cherry -v
++ 564fc88cc64387af5312e2abd8019c75a13223b2 ARM: OMAP2+: am335x-bone*: add DT for BeagleBone Black
++ e5133ed98acc1c3e01c370b851041a8ca629cd15 ARM: EDMA: Fix clearing of unused list for DT DMA resources
++ ac71bb58605d3bdd5d14af770a639fb3ff11c612 ARM: dts: add AM33XX EDMA support
++ 31a8270a299c57c7de7510f44d9dc36fd1787243 ARM: dts: add AM33XX SPI DMA support
++ 4fa0a4cb9ea17da30cf43085c03e5ec1361a4fc2 ARM: dts: add AM33XX MMC support and documentation
++ 0553f50bd45f019a0cc11050e2f20bddbf07dfe0 ARM: dts: am335x-bone: add CD for mmc1
++ 7d64f765630a2921a63b82f93f9959a6de37f29d ARM: dts: am335x-boneblack: add eMMC DT entry
++ dc96cd4003e2668d8ec7e7fe19e402e97a198f81 ARM: dts: am335x-bone-common: switch mmc1 to 4-bit mode
++ f8262e78830cda56c936724549ba9f04dddde312 ARM: dts: am335x-bone-common: add cpu0 and mmc1 triggers
+
+Also available as a git branch at https://github.com/koenkooi/linux/commits/mainline
+
+Changes since v3:
+	Addressed Nishants nitpicks for commit messages
+	Addressed Russ' comments about moving LDO3 for mmc1 out of the common dtsi
+
+Changes since v2:
+	Missing pinmux entries for eMMC added
+
+Changes since v1:
+	Removed ti,non-removable entry from eMMC node, see http://marc.info/?l=linux-arm-kernel&m=137889435710552&w=2
+---
+
+Alexander Holler (1):
+  arm: bone: dts: add CD for mmc1
+
+Koen Kooi (3):
+  am335x-boneblack: add eMMC DT entry
+  ARM: am335x-bone-common: switch mmc1 to 4-bit mode
+  ARM: dts: am335x-bone-common: add cpu0 and mmc1 triggers
+
+ arch/arm/boot/dts/am335x-bone-common.dtsi | 39 +++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/am335x-bone.dts         |  1 -
+ arch/arm/boot/dts/am335x-boneblack.dts    | 14 +++++++++++
+ 3 files changed, 53 insertions(+), 1 deletion(-)
 
 -- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+1.8.2.1
