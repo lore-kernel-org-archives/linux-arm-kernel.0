@@ -1,37 +1,91 @@
-From: shijie8@gmail.com (Huang Shijie)
-Date: Thu, 12 Sep 2013 23:30:10 -0400
-Subject: [PATCH v3 0/8] Add the Quadspi driver for vf610-twr
-In-Reply-To: <20130912102027.GF29403@sirena.org.uk>
-References: <522D3B79.3060707@freescale.com>
- <20130909151450.GI29403@sirena.org.uk>
- <522EC33B.9000009@freescale.com>
- <20130910180704.GB29403@sirena.org.uk>
- <522FD78A.6080900@freescale.com>
- <20130911104126.GN29403@sirena.org.uk>
- <52304BFF.4060007@freescale.com>
- <20130911113002.GP29403@sirena.org.uk>
- <523186DF.4070203@freescale.com>
- <20130912102027.GF29403@sirena.org.uk>
-Message-ID: <20130913033008.GC3051@gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 12 Sep 2013 09:19:36 -0600
+Subject: [PATCH] RFC: interrupt consistency check for OF GPIO IRQs
+In-Reply-To: <5231A791.9080600@ahsoftware.de>
+References: <1375101368-17645-1-git-send-email-linus.walleij@linaro.org>
+ <CACxGe6uNJNMdZ1HYGgCtLM2t2TWGCR6btjOHVmP=vDXXvvFfRg@mail.gmail.com>
+ <CACRpkdYjJL6FZwEbB7XLnb9QtjB=3LeE9Ny6KQ4PkM3zpdNqqg@mail.gmail.com>
+ <344239800.bDEkDg48ZQ@avalon>
+ <CACRpkdavR=fv+y1RCNfdgQypPuRbO6isOSwGsABDrYiGeMdyZw@mail.gmail.com>
+ <52308C91.2000105@ahsoftware.de> <523096FE.8080901@collabora.co.uk>
+ <5230AB6E.1070807@ahsoftware.de> <5231817F.8000901@ahsoftware.de>
+ <5231934D.4060706@collabora.co.uk> <52319741.5050407@ahsoftware.de>
+ <5231A0F8.1070505@ahsoftware.de> <5231A4FE.1070704@ahsoftware.de>
+ <5231A791.9080600@ahsoftware.de>
+Message-ID: <5231DB88.90605@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 12, 2013 at 11:20:27AM +0100, Mark Brown wrote:
-> On Thu, Sep 12, 2013 at 05:18:23PM +0800, Huang Shijie wrote:
-> 
-> > yes. The driver uses the commands to find the _right_ LUT index, and
-> > uses the LUT index to
-> > trigger the controller.
-> 
-> What is a LUT index?
-we can setup 16 valid instruction sequences at most,
-for example:
-     LUT0 - LUT3: for read status of NOR
-     LUT4 - LUT7: for write enable of NOR
-     ...........
+On 09/12/2013 05:37 AM, Alexander Holler wrote:
+> Am 12.09.2013 13:26, schrieb Alexander Holler:
+>> Am 12.09.2013 13:09, schrieb Alexander Holler:
+>>> Am 12.09.2013 12:28, schrieb Alexander Holler:
+>>>> Am 12.09.2013 12:11, schrieb Javier Martinez Canillas:
+>>>>> On 09/12/2013 10:55 AM, Alexander Holler wrote:
+...
+>>>>> So, if I understood the code correctly the DT IRQ core doesn't expect
+>>>>> a device node to have more than one "interrupt-parent" property.
 
-The LUT index is 0 for read-status;
-the LUT index is 1 for write-enable.
+The root-cause is the binding definition, not the code.
 
-thanks
-Huang Shijie
+The interrupts property does not contain the phandle of the IRQ
+controller, but rather the interrupt-parent property does. Thus, there
+is a single interrupt parent for each node, unless you employ some
+tricks (see below).
+
+>>>>> It *should* work though if you have multiple "interrupts" properties
+>>>>> defined and
+>>>>> all of them have the same "interrupt-parent":
+>>>>>
+>>>>>         interrupt-parent = <&gpio6>;
+>>>>>         interrupts = <1 IRQF_TRIGGER_HIGH>; /* GPIO6_1 */
+>>>>>         interrupts = <2 IRQF_TRIGGER_LOW>; /* GPIO6_2 */
+
+DT is a key/value data structure, not a list of property (name, value)
+pairs. In other words, you can't have multiple properties of the same
+name in a node. At least in the compiled DTB; you /might/ be able to
+compile the DT above with dtc, but if so the second definition of the
+property will just over-write the first.
+
+...
+>> I've just seen how they solved it for dma:
+>>
+>>              dmas = <&edma0 16
+>>                  &edma0 17>;
+>>              dma-names = "rx", "tx";
+...
+> And looking at how gpios are defined, I think it should be like that:
+> 
+>           interrupts = <&gpio6 1 IRQF_TRIGGER_HIGH
+>                         &gpio7 2 IRQF_TRIGGER_LOW
+>           >;
+>           interrupt-names = "foo", "bar";
+> 
+> So without that interrupt-parent.
+
+IRQs, DMA channels, and GPIOs are all different things. Their bindings
+are defined independently. While it's good to define new types of
+bindings consistently with other bindings, this hasn't always happened,
+so you can make zero assumptions about the IRQ bindings by reading the
+documentation for any other kind of binding.
+
+Multiple interrupts are defined as follows:
+
+	// Optional; otherwise inherited from parent/grand-parent/...
+	interrupt-parent = <&gpio6>;
+	// Must be in a fixed order, unless binding defines that the
+	// optional interrupt-names property is to be used.
+	interrupts = <1 IRQF_TRIGGER_HIGH> <2 IRQF_TRIGGER_LOW>;
+	// Optional; binding for device defines whether it must
+	// be present
+	interrupt-names = "foo", "bar";
+
+If you need multiple interrupts, each with a different parent, you need
+to use an interrupt-map property (Google it for a more complete
+explanation I guess). Unlike "interrupts", "interrupt-map" has a phandle
+in each entry, and hence each entry can refer to a different IRQ
+controller. You end up defining a dummy interrupt controller node (which
+may be the leaf node with multiple IRQ outputs, which then points at
+itself as the interrupt parent), pointing the leaf node's
+interrupt-parent at that node, and then having interrupt-map "demux" the
+N interrupt outputs to the various interrupt controllers.
