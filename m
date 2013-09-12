@@ -1,91 +1,50 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 12 Sep 2013 09:19:36 -0600
-Subject: [PATCH] RFC: interrupt consistency check for OF GPIO IRQs
-In-Reply-To: <5231A791.9080600@ahsoftware.de>
-References: <1375101368-17645-1-git-send-email-linus.walleij@linaro.org>
- <CACxGe6uNJNMdZ1HYGgCtLM2t2TWGCR6btjOHVmP=vDXXvvFfRg@mail.gmail.com>
- <CACRpkdYjJL6FZwEbB7XLnb9QtjB=3LeE9Ny6KQ4PkM3zpdNqqg@mail.gmail.com>
- <344239800.bDEkDg48ZQ@avalon>
- <CACRpkdavR=fv+y1RCNfdgQypPuRbO6isOSwGsABDrYiGeMdyZw@mail.gmail.com>
- <52308C91.2000105@ahsoftware.de> <523096FE.8080901@collabora.co.uk>
- <5230AB6E.1070807@ahsoftware.de> <5231817F.8000901@ahsoftware.de>
- <5231934D.4060706@collabora.co.uk> <52319741.5050407@ahsoftware.de>
- <5231A0F8.1070505@ahsoftware.de> <5231A4FE.1070704@ahsoftware.de>
- <5231A791.9080600@ahsoftware.de>
-Message-ID: <5231DB88.90605@wwwdotorg.org>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Thu, 12 Sep 2013 16:26:21 +0100
+Subject: [PATCH v2 1/2] video: ARM CLCD: Add DT support
+In-Reply-To: <5231D5FA.4060508@wwwdotorg.org>
+References: <1378808726-32535-1-git-send-email-pawel.moll@arm.com>
+ <522F57B9.5000001@wwwdotorg.org> <1378899931.4082.75.camel@hornet>
+ <5230AAEB.2030607@wwwdotorg.org> <1378991033.13571.33.camel@hornet>
+ <5231D5FA.4060508@wwwdotorg.org>
+Message-ID: <1378999581.13571.57.camel@hornet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/12/2013 05:37 AM, Alexander Holler wrote:
-> Am 12.09.2013 13:26, schrieb Alexander Holler:
->> Am 12.09.2013 13:09, schrieb Alexander Holler:
->>> Am 12.09.2013 12:28, schrieb Alexander Holler:
->>>> Am 12.09.2013 12:11, schrieb Javier Martinez Canillas:
->>>>> On 09/12/2013 10:55 AM, Alexander Holler wrote:
-...
->>>>> So, if I understood the code correctly the DT IRQ core doesn't expect
->>>>> a device node to have more than one "interrupt-parent" property.
-
-The root-cause is the binding definition, not the code.
-
-The interrupts property does not contain the phandle of the IRQ
-controller, but rather the interrupt-parent property does. Thus, there
-is a single interrupt parent for each node, unless you employ some
-tricks (see below).
-
->>>>> It *should* work though if you have multiple "interrupts" properties
->>>>> defined and
->>>>> all of them have the same "interrupt-parent":
->>>>>
->>>>>         interrupt-parent = <&gpio6>;
->>>>>         interrupts = <1 IRQF_TRIGGER_HIGH>; /* GPIO6_1 */
->>>>>         interrupts = <2 IRQF_TRIGGER_LOW>; /* GPIO6_2 */
-
-DT is a key/value data structure, not a list of property (name, value)
-pairs. In other words, you can't have multiple properties of the same
-name in a node. At least in the compiled DTB; you /might/ be able to
-compile the DT above with dtc, but if so the second definition of the
-property will just over-write the first.
-
-...
->> I've just seen how they solved it for dma:
->>
->>              dmas = <&edma0 16
->>                  &edma0 17>;
->>              dma-names = "rx", "tx";
-...
-> And looking at how gpios are defined, I think it should be like that:
+On Thu, 2013-09-12 at 15:55 +0100, Stephen Warren wrote:
+> > Ok, so I'll make it a arm,pl11x,specific property. Actually two
+> > properties - one bit I missed was the dual STN panel case, where they
+> > have separate frame buffers. Something along the lines of:
+> > 
+> > Optional:
+> > 
+> > - arm,pl11x,framebuffer-base: a pair of two values, address and size,
+> > 				defining the framebuffer for the upper
+> > 				(or the only one) panel
+> > - arm,pl11x,lower-framebuffer-base: as above, for the lower STN panel,
+> > 					when present
+> > 
+> > Being very hardware-specific, it covers all possible quirky scenarios,
+> > at the same time does not exclude the option of using the CMA region
+> > phandles, if a particular system needed it.
 > 
->           interrupts = <&gpio6 1 IRQF_TRIGGER_HIGH
->                         &gpio7 2 IRQF_TRIGGER_LOW
->           >;
->           interrupt-names = "foo", "bar";
-> 
-> So without that interrupt-parent.
+> What do "upper" and "lower" mean in this context? I assume this somehow
+> refers to placement of the displays on the board. If so, it sounds like
+> there should be some better terminology; something that's specific to
+> the CLCD controller itself,
 
-IRQs, DMA channels, and GPIOs are all different things. Their bindings
-are defined independently. While it's good to define new types of
-bindings consistently with other bindings, this hasn't always happened,
-so you can make zero assumptions about the IRQ bindings by reading the
-documentation for any other kind of binding.
+It is very CLCD specific indeed and nothing to do with the board :-)
 
-Multiple interrupts are defined as follows:
+http://arminfo.emea.arm.com/help/topic/com.arm.doc.ddi0293c/I899134.html
 
-	// Optional; otherwise inherited from parent/grand-parent/...
-	interrupt-parent = <&gpio6>;
-	// Must be in a fixed order, unless binding defines that the
-	// optional interrupt-names property is to be used.
-	interrupts = <1 IRQF_TRIGGER_HIGH> <2 IRQF_TRIGGER_LOW>;
-	// Optional; binding for device defines whether it must
-	// be present
-	interrupt-names = "foo", "bar";
+"Upper and Lower Panel Frame Base Address Registers".
 
-If you need multiple interrupts, each with a different parent, you need
-to use an interrupt-map property (Google it for a more complete
-explanation I guess). Unlike "interrupts", "interrupt-map" has a phandle
-in each entry, and hence each entry can refer to a different IRQ
-controller. You end up defining a dummy interrupt controller node (which
-may be the leaf node with multiple IRQ outputs, which then points at
-itself as the interrupt parent), pointing the leaf node's
-interrupt-parent at that node, and then having interrupt-map "demux" the
-N interrupt outputs to the various interrupt controllers.
+>  rather than the environment it's used in.
+> Aalthough it does sound like this is in an FPGA and hence the controller
+> is board-specific, but I don't see why it couldn't be re-used in some
+> other FPGA-based board with different panel layout. Would "A" and "B" or
+> "main" and "primary" or "first" and "second" work better?
+
+Funnily enough I typed "secondary-framebuffer-base" first, but than
+thought "no, let's match the spec" :-)
+
+Pawe?
