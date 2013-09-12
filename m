@@ -1,42 +1,122 @@
-From: dwmw2@infradead.org (David Woodhouse)
-Date: Thu, 12 Sep 2013 10:50:31 +0100
-Subject: [PATCH v3 0/8] Add the Quadspi driver for vf610-twr
-In-Reply-To: <52318953.6090405@freescale.com>
-References: <593AEF6C47F46446852B067021A273D6D984000B@MUCSE039.lantiq.com>
- <20130905020435.GA3970@gmail.com>
- <20980858CB6D3A4BAE95CA194937D5E73EA0C7F4@DBDE04.ent.ti.com>
- <522817D7.1010206@freescale.com> <522D3B79.3060707@freescale.com>
- <20130909151450 <52318953.6090405@freescale.com>
-Message-ID: <1378979431.2627.402.camel@shinybook.infradead.org>
+From: gnurou@gmail.com (Alexandre Courbot)
+Date: Thu, 12 Sep 2013 18:56:16 +0900
+Subject: [PATCH v5 1/5] ARM: add basic Trusted Foundations support
+In-Reply-To: <CACRpkdYLbG3uMfces=jv=G+ysqejW5kdLjKwLvNvghPns5RmWA@mail.gmail.com>
+References: <1378351680-14696-1-git-send-email-acourbot@nvidia.com>
+ <1378351680-14696-2-git-send-email-acourbot@nvidia.com>
+ <5228CEDB.1090306@gmail.com>
+ <CAAVeFu+MGGBfmm1jwtKGP_d3EjkLdf5B_E_5RT___PVh1e=8jw@mail.gmail.com>
+ <20130910130431.GE27966@mudshark.cambridge.arm.com>
+ <CACRpkdYLbG3uMfces=jv=G+ysqejW5kdLjKwLvNvghPns5RmWA@mail.gmail.com>
+Message-ID: <CAAVeFuKsVtfxp0VbXuCTP89+56HeDi-XFOrRaZ13Vh0eFkAo7A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2013-09-12 at 17:28 +0800, Huang Shijie wrote:
-> ? 2013?09?11? 22:05, David Woodhouse ??:
-> > What*actually*  happens, on the wire(s), when the flash driver asks the
-> > SPI controller to perform a transaction?
-> The LUT registers tell the controller how many wires are needed for a 
-> transaction.
-> For example, the read status only use a single line, while the quad read 
-> uses 4 lines.
+On Thu, Sep 12, 2013 at 6:18 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> On Tue, Sep 10, 2013 at 3:04 PM, Will Deacon <will.deacon@arm.com> wrote:
+>> On Mon, Sep 09, 2013 at 07:15:31AM +0100, Alexandre Courbot wrote:
+>
+>>> I don't have any information about the future of TF unfortunately,
+>>> excepted that it should remain backward-compatible. What is this SMC
+>>> calling convention doc your are talking about btw? Is there a standard
+>>> calling convention defined by ARM?
+>>
+>> SMC calling convention:
+>> https://silver.arm.com/download/download.tm?pv=1435186
+>
+> According to the SMC calling convention r0 should be
+> the SMC function identifier.
+>
+> +static void __naked tf_generic_smc(u32 type, u32 subtype, u32 arg)
+> +{
+> +       asm volatile(
+> +               ".arch_extension        sec\n\t"
+> +               "stmfd  sp!, {r4 - r11, lr}\n\t"
+> +               __asmeq("%0", "r0")
+> +               __asmeq("%1", "r1")
+> +               __asmeq("%2", "r2")
+> +               "mov    r3, #0\n\t"
+> +               "mov    r4, #0\n\t"
+> +               "smc    #0\n\t"
+> +               "ldmfd  sp!, {r4 - r11, pc}"
+> +               :
+> +               : "r" (type), "r" (subtype), "r" (arg)
+> +               : "memory");
+> +}
+>
+> So type == function identifier? Or are these two totally
+> different things, such that trusted foundations are already
+> a different beast that what the SMC calling convention
+> specifies?
 
-Is this not something that could theoretically be provided by the caller
-when it *makes* the transaction?
+After looking at the documents linked by Will and Catalin (thanks!), I
+can state with confidence that TF does not follow the SMC calling
+convention and has nothing to do with PSCI neither. The value passed
+in r0 does not match the function identifier definition at all: with
+its two MSBs set to 1, it would be interpreted as a SMC64 Fast Call,
+which it clearly is not.
 
-Conceptually speaking, could it not be an additional argument to
-spi_write_then_read() ? 
+There is also no correspondance with any of the functions ids defined
+in the PSCI specification.
 
-After all, it's the *device* driver (m25p80.c etc.) which will know what
-the transaction actually *is*, and how many lines the device will want
-to use for each transaction?
+> Anyway:
+> r0,r1,r2 = type/subtype/arg.
+>
+> +#define TF_SET_CPU_BOOT_ADDR_SMC 0xfffff200
+> (...)
+> +static int tf_set_cpu_boot_addr(int cpu, unsigned long boot_addr)
+> +{
+> +       tf_generic_smc(TF_SET_CPU_BOOT_ADDR_SMC, boot_addr, 0);
+> +
+> +       return 0;
+> +}
+>
+> What kind of a "subtype" is the boot address? I could have
+> accepted it if the *last* thing, the argument contained the boot
+> address. With the type/subtype/arg convention it would be
+> more natural if the "subtype" was something like 0.
+>
+> Should the SMC function rather have this signature:
+>
+> tf_generic_smc(u32 type, u32 arg1, u32 arg2)
+>
+> ?
+>
+> Then *sometimes* arg1 is a subtype, if the "type" is
+> such that it takes a subtype?
+>
+> (That's a rough guess.)
+>
+> So to begin with the arguments to tf_generic_smc() are either
+> confusingly named or tf_set_cpu_boot_addr() begins the
+> journey with violating the function signature.
 
--- 
-dwmw2
+Indeed the subtype parameter is poorly named. That will teach me
+reproducing the behavior of our downstream kernel without thinking. :/
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: smime.p7s
-Type: application/x-pkcs7-signature
-Size: 5745 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130912/426d49e6/attachment.bin>
+> I also wonder what kind if "type" starts its enumerator on
+> 0xfffff200? Wouldn't it be more natural if it was e.g. 1?
+> It looks like the TF_SET_CPU_BOOT_ADDR_SMC
+> reflects some bit-wise encoding scheme, so some details
+> here wouldn't hurt?
+
+I agree, unfortunately this raw value is all the details I myself have
+access to. /o\
+
+> The main thing is that the patch has to say that this
+> is an API toward trusted foundations, that it has nothing
+> to do with the SMC calling conventions, and only pertain
+> to devices that use trusted foundations, so as to avoid
+> any confusion.
+
+Note that the patch never claimed to follow the SMC calling
+conventions. You guys assumed it should for some reason. ;)
+
+But clearly, it cannot hurt to state this unambiguously, so I will
+make sure to do that. Then I hope the lack of detail about the
+non-standard calling convention will not be an obstacle to its
+merging, as this enables a bunch of retail Tegra devices (e.g. SHIELD)
+to boot.
+
+Thanks,
+Alex.
