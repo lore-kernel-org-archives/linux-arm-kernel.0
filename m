@@ -1,37 +1,54 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 12 Sep 2013 16:41:20 +0100
-Subject: [PATCH v2 1/2] video: ARM CLCD: Add DT support
-In-Reply-To: <5230AAEB.2030607@wwwdotorg.org>
-References: <1378808726-32535-1-git-send-email-pawel.moll@arm.com>
- <522F57B9.5000001@wwwdotorg.org> <1378899931.4082.75.camel@hornet>
- <5230AAEB.2030607@wwwdotorg.org>
-Message-ID: <20130912154120.GN12758@n2100.arm.linux.org.uk>
+From: koen@dominion.thruhere.net (Koen Kooi)
+Date: Thu, 12 Sep 2013 17:42:08 +0200
+Subject: [PATCHv3 0/2] ARM: dts: Beaglebone MMC fixes
+Message-ID: <1379000532-27376-1-git-send-email-koen@dominion.thruhere.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 11, 2013 at 11:39:55AM -0600, Stephen Warren wrote:
-> I don't know how constrained of a system CLCD is, but I do know that
-> mode validation is a very complex process in some real-life graphics
-> drivers.
+Here are two patches to fix MMC on beaglebone, one fixes card detect on BBW,
+the other adds the eMMC entry for BBB and its fixed regulator. After that mmc1
+gets a nice speed boost by moving to 4-bit mode and LED triggers get assigned.
 
-Apart from maximum memory bus bandwidth, probably maximum output
-bandwidth, maximum resolution (determined by what will fit in the
-registers and RAM) there aren't that much constraints.  The hardware
-block is quite simple in that regard.
+This series depends on:
 
-More the problem is to deal with two situations:
-1. you have a particular panel connected to it which requires a certain
-   fixed timing regime.
-2. you have the CLCD connected to a VGA or HDMI connector where the
-   timing is dependent on the connected display.
+http://comments.gmane.org/gmane.linux.kernel.stable/63648
+https://lkml.org/lkml/2013/9/10/454
+http://comments.gmane.org/gmane.linux.kernel.mmc/22381
 
-The former would be the subject of some kind of *common* DT
-representation of the timing requirements of the connected panel.
-For the latter, DT needs to specify how the EDID data is retrieved,
-or if there is no mechanism for that, being able to provide a set
-of allowable timing parameters (such as min/max vsync, min/max
-hsync, max dotclock - in other words, the data which used to be
-provided to X11 in the past.)
+Or as git-cherry would put it:
 
-None of that is specific to CLCD though: it's the same problem as
-the SA11x0 LCD controller or any other scanned video controller.
+[koen at rrMBP patches]$ git cherry -v
++ 53aafdbc63c9b30c23f562855c8f359c0893bc40 ARM: OMAP2+: am335x-bone*: add DT for BeagleBone Black
++ 084f262cb1058e00cf082739cf7ee93cb70761c9 ARM: EDMA: Fix clearing of unused list for DT DMA resources
++ 6080eee0ef0ee3ab235cc267a69a0a7d3673266e ARM: dts: add AM33XX EDMA support
++ 7312f68fb49202b65498865bd64680c95ec2f7ea ARM: dts: add AM33XX SPI DMA support
++ 5580c3d400cefad5a1eb3c5a8e467353e22d526e ARM: dts: add AM33XX MMC support and documentation
++ a11eddaa0a89c24d2b9768a82519ac096bb793f1 arm: bone: dts: add CD for mmc1
++ b1e87bfc52775c2666b6c4a89d409193319d33f2 am335x-boneblack: add eMMC DT entry
++ 090e095b74ba211b2cfbd2c87ae06c52d151453d ARM: am335x-bone-common: switch mmc1 to 4-bit mode
++ 39f747078f0b01724cfa94ce19fd2e6029ac0bee ARM: dts: am335x-bone-common: add cpu0 and mmc1 triggers
+
+Also available as a git branch at https://github.com/koenkooi/linux/commits/mainline
+
+Changes since v2:
+	Missing pinmux entries for eMMC added
+
+Changes since v1:
+	Removed ti,non-removable entry from eMMC node, see http://marc.info/?l=linux-arm-kernel&m=137889435710552&w=2
+---
+
+Alexander Holler (1):
+  arm: bone: dts: add CD for mmc1
+
+Koen Kooi (3):
+  am335x-boneblack: add eMMC DT entry
+  ARM: am335x-bone-common: switch mmc1 to 4-bit mode
+  ARM: dts: am335x-bone-common: add cpu0 and mmc1 triggers
+
+ arch/arm/boot/dts/am335x-bone-common.dtsi | 39 +++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/am335x-bone.dts         |  4 ----
+ arch/arm/boot/dts/am335x-boneblack.dts    | 14 +++++++++++
+ 3 files changed, 53 insertions(+), 4 deletions(-)
+
+-- 
+1.8.2.1
