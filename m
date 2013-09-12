@@ -1,49 +1,119 @@
-From: cinifr@gmail.com (cinifr)
-Date: Fri, 13 Sep 2013 00:09:40 +0800
-Subject: [PATCH 3/4] Add physical count arch timer support for clocksource
- in ARMv7.
-In-Reply-To: <20130912143340.GL12758@n2100.arm.linux.org.uk>
-References: <1378968687-8200-1-git-send-email-cinifr@gmail.com>
- <1378968687-8200-4-git-send-email-cinifr@gmail.com>
- <20130912112452.GA22013@e106331-lin.cambridge.arm.com>
- <20130912143340.GL12758@n2100.arm.linux.org.uk>
-Message-ID: <CAK3cCBz+zvnfNJjjQwZdgreG9uJS9ZQu9GwrQs6CL8A1-_foOg@mail.gmail.com>
+From: romain.izard.pro@gmail.com (Romain Izard)
+Date: Thu, 12 Sep 2013 16:10:39 +0000 (UTC)
+Subject: [PATCH v2] watchdog: sirf: add watchdog driver of CSR
+ SiRFprimaII and SiRFatlasVI
+References: <1378953828-374-1-git-send-email-Baohua.Song@csr.com>
+ <l0rusk$789$1@ger.gmane.org>
+ <CAGsJ_4zxCzmvYvB8NnuPWW3gr3ht3_qexWR4PLN7i1rMrrNf4g@mail.gmail.com>
+Message-ID: <l0sp1v$5tp$1@ger.gmane.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks, but I am tring a  solution in running time.
-
-On 12 September 2013 22:33, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Thu, Sep 12, 2013 at 12:24:52PM +0100, Mark Rutland wrote:
->> On Thu, Sep 12, 2013 at 07:51:26AM +0100, Fan Rong wrote:
->> > diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
->> > index 41c6946..a4981d2 100644
->> > --- a/drivers/clocksource/Kconfig
->> > +++ b/drivers/clocksource/Kconfig
->> > @@ -109,3 +109,11 @@ config VF_PIT_TIMER
->> >     bool
->> >     help
->> >       Support for Period Interrupt Timer on Freescale Vybrid Family SoCs.
->> > +menu "Clock Source"
->> > +
->> > +config ARM_ARCH_TIMER_USE_PHYCNT
->> > +   bool "Use Physical Count Timer"
->> > +   depends on ARM_ARCH_TIMER
->> > +   help
->> > +          If bootloader dont set Virtual Offset register,Physical Count Timer is needed to replace Virtual Count Timer.
->> > +endmenu
+On 2013-09-12, Barry Song <21cnbao@gmail.com> wrote:
+> 2013/9/12 Romain Izard <romain.izard.pro@gmail.com>:
 >>
->> This cannot be a compile-time option as above in a multiplatform build.
->> Other paltforms (e.g. KVM guests) *must* use the virtual counters to get
->> any semblance of a consistent view of time.
+>> Does this really mean that both drivers will be loaded?  From what I
+>> understand of device tree, this means to use the "sirf,prima2-tick"
+>> driver, and then if not available, the "sirf-prima2-wdt" driver.
+>> It would be necessary to either add the watchdog support in the
+>> clocksource driver, or create a separate node in the device tree
+>> (with the same address?) to respect the compatible rules.
 >
-> Also, for future reference:
+> that means both. the 6th timer can act as a watchdog timer when the
+> Watchdog mode is enabled. all 6 timers have been controlled by timer
+> driver, here it is a more-functionality for timer6.
 >
-> 1. Use a single blank lines to separate thing like 'menu' and 'endmenu'.
-> 2. Wrap your the help sensibly, don't put it all on one line.
-> 3. It's conventional to use tabs up to below "help" and then two spaces
->    to indent the help text.
-> 4. "," always has one space after it.
+
+First, from my reading the device tree specification says that the
+compatible property describes an ordered list from which a single driver
+is used.
+
+After checking with the platform code, I understand why this is possible,
+but I think the current syntax is not good.
+
+The general case for device tree is the following one:
+- Linux parses the device tree on startup with of_platform_populate, and
+  creates a struct platform_device per node in the tree with a
+  compatible string.
+- Creating each device calls device_attach, trying to match and bind the
+  new device with already existing drivers, until one of them succeeds
+  or no driver is left.
+- Registering a new device driver ilater calls driver_attach, trying to
+  match and bind each unbound device with the new driver.
+
+As each device can only be bound to a single driver, the normal case
+is that only one compatible driver can be bound to a device. As noted
+in http://xillybus.com/tutorials/device-tree-zynq-3, what happens when
+multiple drivers are compatible with a node is dependent on the 
+initialization order.
+
+But in our specific case, "sirf,prima2-tick" does not describe a normal
+device from the kernel point of view, it describes a clocksource node.
+It is used earlier during the startup sequence to avoid cyclic
+dependency issues between the timers and the driver framework. When the
+node is created later on, there is no driver to match with the node from
+the device tree. This is why in this case, and for all clocksource
+nodes, it will be possible to have a second matching compatible string.
+
+So, since this behaviour is specific for clocksource nodes, and does not
+describe the hardware as device tree should, I believe it would be
+appropriate to use "sirf,prima2-tick" as the compatible string for the
+watchdog driver, binding the device left by the clocksource with it.
+
+
+>>> diff --git a/arch/arm/configs/prima2_defconfig b/arch/arm/configs/prima2_defconfig
+>>> index 002a1ce..eec56e8 100644
+>>> --- a/arch/arm/configs/prima2_defconfig
+>>> +++ b/arch/arm/configs/prima2_defconfig
+>>> @@ -1,4 +1,3 @@
+>>> -CONFIG_EXPERIMENTAL=y
+>>
+>> CONFIG_EXPERIMENTAL is not related to this change.
 >
-> Thanks.
+> i think it is just due to kernel upgrade. here just make menuconfig
+> with enabling watchdog and save defconfig, then there are some minor
+> differences here.
+>
+Perhaps would it be better to put it in a different patch?
+
+>>> +
+>>> +     if (match >= counter)
+>>> +             time_left = match-counter;
+>>> +     else
+>>> +             /* rollover */
+>>> +             time_left = (0xffffffffUL - counter) + match;
+>>
+>> As u32 is a modulo 2^32 type, those values are almost the same (off by one).
+>> time_left = match - counter; will be valid in all cases.
+>>
+
+On one side, we have:
+	time_left = match - counter (mod 2^32)
+On the other side we have:
+	time_left = (0xffffffffUL - counter) + match (mod 2^32)
+<=>	time_left = match - counter + 0xFFFFFFFF (mod 2^32)
+As we are in the modulo 2^32 space, adding or substracting 2^32 does not
+change the result
+<=>	time_left = match - counter + 0xFFFFFFFF - 2^32 (mod 2^32)
+And since 0xFFFFFFFF = 2^32 - 1
+	time_left = match - counter - 1; (mod 2^32)
+
+>>> +
+>>> +     if ((0xffffffffUL - counter) >= timeout_ticks)
+>>> +             counter += timeout_ticks;
+>>> +     else
+>>> +             /* Rollover */
+>>> +             counter = timeout_ticks - (0xffffffffUL - counter);
+>>
+>> modulo 2^32 arithmetic, no need for two cases.
+>
+> you mean just "counter += timeout_ticks" is ok?
+
+Yes, with the same reasoning as previously. Adding or substracting 
+0xffffffff for 32 bit unsigned values is the same as substracting
+or adding 1. But we do not even want this 1, we just want to
+rollover like the timer itself does, because it counts on 32 bit
+unsigned values.
+
+-- 
+Romain Izard
