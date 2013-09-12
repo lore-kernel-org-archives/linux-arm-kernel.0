@@ -1,31 +1,37 @@
-From: r.sricharan@ti.com (Sricharan R)
-Date: Thu, 12 Sep 2013 21:09:11 +0530
-Subject: [RFC PATCH 4/4] ARM: DRA: Kconfig: Enable crossbar irqchip driver for
- DRA7xx
-In-Reply-To: <1379000351-15672-1-git-send-email-r.sricharan@ti.com>
-References: <1379000351-15672-1-git-send-email-r.sricharan@ti.com>
-Message-ID: <1379000351-15672-5-git-send-email-r.sricharan@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 12 Sep 2013 16:41:20 +0100
+Subject: [PATCH v2 1/2] video: ARM CLCD: Add DT support
+In-Reply-To: <5230AAEB.2030607@wwwdotorg.org>
+References: <1378808726-32535-1-git-send-email-pawel.moll@arm.com>
+ <522F57B9.5000001@wwwdotorg.org> <1378899931.4082.75.camel@hornet>
+ <5230AAEB.2030607@wwwdotorg.org>
+Message-ID: <20130912154120.GN12758@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable the crossbar irqchip driver for DRA7xx soc.
+On Wed, Sep 11, 2013 at 11:39:55AM -0600, Stephen Warren wrote:
+> I don't know how constrained of a system CLCD is, but I do know that
+> mode validation is a very complex process in some real-life graphics
+> drivers.
 
-Signed-off-by: Sricharan R <r.sricharan@ti.com>
----
- arch/arm/mach-omap2/Kconfig |    1 +
- 1 file changed, 1 insertion(+)
+Apart from maximum memory bus bandwidth, probably maximum output
+bandwidth, maximum resolution (determined by what will fit in the
+registers and RAM) there aren't that much constraints.  The hardware
+block is quite simple in that regard.
 
-diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-index 8413252..b602168 100644
---- a/arch/arm/mach-omap2/Kconfig
-+++ b/arch/arm/mach-omap2/Kconfig
-@@ -120,6 +120,7 @@ config SOC_DRA7XX
- 	select ARM_GIC
- 	select HAVE_SMP
- 	select COMMON_CLK
-+	select IRQCHIP_CROSSBAR
- 
- comment "OMAP Core Type"
- 	depends on ARCH_OMAP2
--- 
-1.7.9.5
+More the problem is to deal with two situations:
+1. you have a particular panel connected to it which requires a certain
+   fixed timing regime.
+2. you have the CLCD connected to a VGA or HDMI connector where the
+   timing is dependent on the connected display.
+
+The former would be the subject of some kind of *common* DT
+representation of the timing requirements of the connected panel.
+For the latter, DT needs to specify how the EDID data is retrieved,
+or if there is no mechanism for that, being able to provide a set
+of allowable timing parameters (such as min/max vsync, min/max
+hsync, max dotclock - in other words, the data which used to be
+provided to X11 in the past.)
+
+None of that is specific to CLCD though: it's the same problem as
+the SA11x0 LCD controller or any other scanned video controller.
