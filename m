@@ -1,40 +1,65 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 12 Sep 2013 12:55:49 +0100
-Subject: [PATCH v3 0/8] Add the Quadspi driver for vf610-twr
-In-Reply-To: <20130912114831.GL29403@sirena.org.uk>
-References: <20130910180704.GB29403@sirena.org.uk>
- <522FD78A.6080900@freescale.com> <20130911104126.GN29403@sirena.org.uk>
- <52304BFF.4060007@freescale.com> <20130911113002.GP29403@sirena.org.uk>
- <523186DF.4070203@freescale.com>
- <1378982395.2627.416.camel@shinybook.infradead.org>
- <20980858CB6D3A4BAE95CA194937D5E73EA0EE8B@DBDE04.ent.ti.com>
- <1378984665.2627.423.camel@shinybook.infradead.org>
- <20130912114831.GL29403@sirena.org.uk>
-Message-ID: <20130912115549.GI12758@n2100.arm.linux.org.uk>
+From: jean.pihet@linaro.org (Jean Pihet)
+Date: Thu, 12 Sep 2013 14:07:23 +0200
+Subject: [PATCH 0/3] perf: parse the dwarf backtrace info from
+ .debug_frame section
+In-Reply-To: <1378720815-23964-1-git-send-email-jean.pihet@linaro.org>
+References: <1378720815-23964-1-git-send-email-jean.pihet@linaro.org>
+Message-ID: <CAFrcx1mQ-P7byYfqP-0bYabUzTDeSWyHFx2FJQ6wQLYEcV_Pxw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 12, 2013 at 12:48:31PM +0100, Mark Brown wrote:
-> On Thu, Sep 12, 2013 at 12:17:45PM +0100, David Woodhouse wrote:
-> 
-> > Right. The issue here is that the LUT is currently *pre-populated*, with
-> > an incestuously-"known" set of commands that the slave is expected to
-> > support.
-> 
-> So, to repeat my earlier question can someone tell me what a LUT is?
+Hi,
 
-It's a very common abbreviation - Look Up Table.
+-- Adding more maintainers in the To: list --
 
-More specifically, it's a set of registers which give the SPI controller
-a sequence of 16-bit commands to execute, which tell it what to do on
-the SPI bus.  Each register contains two commands, and it executes them
-successively throughout the register set until it reaches a STOP command.
-These commands tell the SPI controller the width of the bus, a command
-to send on SPI, whether to read or write data and how much, etc.
+Ping about the patch set, is this one acceptable for mainline?
 
-If you read the comments in patch 5, and the code, it's all explained
-there.
+Jean
 
-I never saw this before until about an hour ago when I took an interest
-in it after your "what is a LUT" question, and it took less than 15
-minutes to work the above out.
+On 9 September 2013 12:00, Jean Pihet <jean.pihet@linaro.org> wrote:
+> On ARM the debug info is not present in the .eh_frame sections but
+> in .debug_frame instead, in dwarf format.
+>
+> This patch set uses libunwind to load and parse the dwarf debug info from
+> the .debug_frame section if no .eh_frame_hdr section is found; also it
+> sets the hooks in the perf_regs and libunwind code for ARMv7.
+>
+> Dependencies:
+>  . if present, libunwind >= 1.1 is needed to prevent a segfault when
+>    parsing the dwarf info,
+>  . libunwind needs to be configured with --enable-debug-frame
+>    to prevent a linkage error. Note: --enable-debug-frame is automatically
+>    selected on ARM).
+>
+> The generated perf has been tested on ARMv7/OMAP4 and x86_64, using the
+> following commands:
+>  perf record -g [dwarf] -- <binary>
+>  perf report --sort symbol --call-graph --stdio
+>
+>
+> Jean Pihet (1):
+>   perf: parse the .debug_frame section in case .eh_frame is not present
+>
+> Will Deacon (2):
+>   ARM: perf: add support for perf registers API
+>   ARM: perf: wire up perf_regs and unwind support for ARM
+>
+>  arch/arm/Kconfig                        |  2 +
+>  arch/arm/include/uapi/asm/Kbuild        |  1 +
+>  arch/arm/include/uapi/asm/perf_regs.h   | 23 +++++++++++
+>  arch/arm/kernel/Makefile                |  1 +
+>  arch/arm/kernel/perf_regs.c             | 30 ++++++++++++++
+>  tools/perf/arch/arm/Makefile            |  3 ++
+>  tools/perf/arch/arm/include/perf_regs.h | 54 +++++++++++++++++++++++++
+>  tools/perf/arch/arm/util/unwind.c       | 48 ++++++++++++++++++++++
+>  tools/perf/config/Makefile              |  9 +++--
+>  tools/perf/util/unwind.c                | 71 +++++++++++++++++++++++++--------
+>  10 files changed, 223 insertions(+), 19 deletions(-)
+>  create mode 100644 arch/arm/include/uapi/asm/perf_regs.h
+>  create mode 100644 arch/arm/kernel/perf_regs.c
+>  create mode 100644 tools/perf/arch/arm/include/perf_regs.h
+>  create mode 100644 tools/perf/arch/arm/util/unwind.c
+>
+> --
+> 1.7.11.7
+>
