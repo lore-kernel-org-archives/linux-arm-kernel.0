@@ -1,85 +1,80 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Thu, 12 Sep 2013 09:42:28 +0900
-Subject: [PATCH] ARM: shmobile: r8a7791 Architected timer support
-Message-ID: <20130912004228.24348.15536.sendpatchset@w520>
+From: rafael.j.wysocki@intel.com (Rafael J. Wysocki)
+Date: Thu, 12 Sep 2013 02:43:47 +0200
+Subject: "cpufreq: fix serialization issues with freq change notifiers"
+ breaks cpufreq too
+In-Reply-To: <CAKohpokEZcwF-zL6rTXYyC_x=SJzGFvdvxqvmvyhJHa8nPXogQ@mail.gmail.com>
+References: <Pine.LNX.4.64.1309091656200.6602@axis700.grange>
+ <2703632.ul5ekQh5oq@vostro.rjw.lan>
+ <CAKohpo=RKB-_EO=cjaOorAfN=y_cMgJg-j6=xtX71a-TwujgsA@mail.gmail.com>
+ <2013615.oHjWkmedue@vostro.rjw.lan>
+ <CAKohpokEZcwF-zL6rTXYyC_x=SJzGFvdvxqvmvyhJHa8nPXogQ@mail.gmail.com>
+Message-ID: <52310E43.1090808@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm@opensource.se>
+On 9/12/2013 2:39 AM, Viresh Kumar wrote:
+> On 11 September 2013 18:48, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
+>> On Wednesday, September 11, 2013 02:08:44 PM Viresh Kumar wrote:
+>>> That looked like a straight forward issue/bug to me and so I haven't
+>>> gotten deep into it..
+>> Which you should always do when you're going to deal with concurrency issues.
+>> Even if they appear to be obvious, they often are far from that, like in this
+>> case.
+> /me Nods
+>
+>>> Scenario 2:
+>>> --------------
+>>> Governor is changing freq and has called __cpufreq_driver_target().
+>>> At the same time we are changing scaling_{min|max}_freq from
+>>> sysfs, which would eventually end up calling governors:
+>>> CPUFREQ_GOV_LIMITS notification, that will also call:
+>>> __cpufreq_driver_target()..
+>>>
+>>> So, we eventually have two concurrent calls to ->target() and we
+>>> don't really know how hardware will behave in this case.. Most of
+>>> the implementations of ->target() routines just go and change
+>>> freq/voltage without checking if we are already in progress of doing
+>>> that (i.e. based on expectation that this call is not re entrant)..
+>>>
+>>> Now anything can happen at hardware level, which I don't have
+>>> all insight of :(
+>> That is more theoretical, however.
+> Maybe we can get more deeper into it then :)
+> Platform have something like this in their target()
 
-Enable the ARM architected timer included in the CA15 cluster.
-Also make use of the shared R-Car Gen2 code that initializes
-the arch timer frequency based on the MD pins.
+Which platform?
 
-Signed-off-by: Magnus Damm <damm@opensource.se>
----
+> A. If new freq is more than old: Increase voltage
+> B. Change freq
+> C. If new freq is less than old: decrease voltage
+>
+> Now, two concurrent calls to target are X and Y, where X is trying to increase
+> freq and Y is trying to decrease it..
+>
+> And this is the sequence that followed due to races..
+>
+> X.A: voltage increased for larger freq
+> Y.A: nothing happened here
+> Y.B: freq decreased
+> Y.C: voltage decreased
+> X.B: freq increased
+> X.C: nothing happened..
+>
+> We ended up setting a freq which is not supported by the voltage we have
+> set.. That will probably make clock to CPU unstable and system wouldn't
+> be workable anymore...
+>
+> And so I think even this case must also get some space in the changelog :)
 
- Written against renesas-devel-20130906 and
- [PATCH] ARM: shmobile: Break out R-Car Gen2 setup code
+Yes, if you can point to a specific driver having this problem.
 
- arch/arm/boot/dts/r8a7791.dtsi                |    8 ++++++++
- arch/arm/mach-shmobile/Makefile               |    2 +-
- arch/arm/mach-shmobile/board-koelsch.c        |    1 +
- arch/arm/mach-shmobile/include/mach/r8a7791.h |    2 ++
- arch/arm/mach-shmobile/setup-r8a7791.c        |    1 +
- 5 files changed, 13 insertions(+), 1 deletion(-)
+Thanks,
+Rafael
 
---- 0003/arch/arm/boot/dts/r8a7791.dtsi
-+++ work/arch/arm/boot/dts/r8a7791.dtsi	2013-09-12 09:12:16.000000000 +0900
-@@ -39,6 +39,14 @@
- 		interrupts = <1 9 0xf04>;
- 	};
- 
-+	timer {
-+		compatible = "arm,armv7-timer";
-+		interrupts = <1 13 0xf08>,
-+				<1 14 0xf08>,
-+				<1 11 0xf08>,
-+				<1 10 0xf08>;
-+	};
-+
- 	irqc0: interrupt-controller at e61c0000 {
- 		compatible = "renesas,irqc";
- 		#interrupt-cells = <2>;
---- 0002/arch/arm/mach-shmobile/Makefile
-+++ work/arch/arm/mach-shmobile/Makefile	2013-09-12 09:10:42.000000000 +0900
-@@ -15,7 +15,7 @@ obj-$(CONFIG_ARCH_R8A7740)	+= setup-r8a7
- obj-$(CONFIG_ARCH_R8A7778)	+= setup-r8a7778.o
- obj-$(CONFIG_ARCH_R8A7779)	+= setup-r8a7779.o
- obj-$(CONFIG_ARCH_R8A7790)	+= setup-r8a7790.o setup-rcar-gen2.o
--obj-$(CONFIG_ARCH_R8A7791)	+= setup-r8a7791.o
-+obj-$(CONFIG_ARCH_R8A7791)	+= setup-r8a7791.o setup-rcar-gen2.o
- obj-$(CONFIG_ARCH_EMEV2)	+= setup-emev2.o
- 
- # Clock objects
---- 0003/arch/arm/mach-shmobile/board-koelsch.c
-+++ work/arch/arm/mach-shmobile/board-koelsch.c	2013-09-12 09:10:05.000000000 +0900
-@@ -39,6 +39,7 @@ static const char * const koelsch_boards
- 
- DT_MACHINE_START(KOELSCH_DT, "koelsch")
- 	.init_early	= r8a7791_init_early,
-+	.init_time	= rcar_gen2_timer_init,
- 	.init_machine	= koelsch_add_standard_devices,
- 	.dt_compat	= koelsch_boards_compat_dt,
- MACHINE_END
---- 0003/arch/arm/mach-shmobile/include/mach/r8a7791.h
-+++ work/arch/arm/mach-shmobile/include/mach/r8a7791.h	2013-09-12 09:09:22.000000000 +0900
-@@ -1,6 +1,8 @@
- #ifndef __ASM_R8A7791_H__
- #define __ASM_R8A7791_H__
- 
-+#include <mach/rcar-gen2.h>
-+
- void r8a7791_add_standard_devices(void);
- void r8a7791_add_dt_devices(void);
- void r8a7791_clock_init(void);
---- 0003/arch/arm/mach-shmobile/setup-r8a7791.c
-+++ work/arch/arm/mach-shmobile/setup-r8a7791.c	2013-09-12 09:10:20.000000000 +0900
-@@ -176,6 +176,7 @@ static const char *r8a7791_boards_compat
- 
- DT_MACHINE_START(R8A7791_DT, "Generic R8A7791 (Flattened Device Tree)")
- 	.init_early	= r8a7791_init_early,
-+	.init_time	= rcar_gen2_timer_init,
- 	.dt_compat	= r8a7791_boards_compat_dt,
- MACHINE_END
- #endif /* CONFIG_USE_OF */
+--------------------------------------------------------------------
+
+Intel Technology Poland sp. z o.o.
+ul. Slowackiego 173 | 80-298 Gdansk | Sad Rejonowy Gdansk Polnoc | VII Wydzial Gospodarczy Krajowego Rejestru Sadowego - KRS 101882 | NIP 957-07-52-316 | Kapital zakladowy 200.000 PLN.
+
+Ta wiadomosc wraz z zalacznikami jest przeznaczona dla okreslonego adresata i moze zawierac informacje poufne. W razie przypadkowego otrzymania tej wiadomosci, prosimy o powiadomienie nadawcy oraz trwale jej usuniecie; jakiekolwiek przegladanie lub rozpowszechnianie jest zabronione.
+This e-mail and any attachments may contain confidential material for the sole use of the intended recipient(s). If you are not the intended recipient, please contact the sender and delete all copies; any review or distribution by others is strictly prohibited.
