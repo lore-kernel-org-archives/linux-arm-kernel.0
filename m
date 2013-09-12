@@ -1,29 +1,22 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 12 Sep 2013 10:37:50 +0100
-Subject: KVM virtual timer issue with trinity
-In-Reply-To: <20130906163052.GG30450@mudshark.cambridge.arm.com>
-References: <20130906163052.GG30450@mudshark.cambridge.arm.com>
-Message-ID: <20130912093750.GE15357@mudshark.cambridge.arm.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 12 Sep 2013 11:34:34 +0200
+Subject: [PATCH 2/2] dma: ste_dma40: Fix potential null pointer dereference
+In-Reply-To: <1378109699-25245-2-git-send-email-sachin.kamat@linaro.org>
+References: <1378109699-25245-1-git-send-email-sachin.kamat@linaro.org>
+ <1378109699-25245-2-git-send-email-sachin.kamat@linaro.org>
+Message-ID: <CACRpkdZW-GJeQnm9btn+WzNP9ZqqjRAyxBriJoL4E7OjztA4LA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 06, 2013 at 05:30:52PM +0100, Will Deacon wrote:
-> Running trinity as a normal user in a KVM guest on my TC2 (A15s only)
-> eventually leads to a situation where responsiveness is extremely sluggish.
-> Further investigation shows that issuing a `sleep 1' command never returns.
-> This seems to be because the virtual timer has stopped generating interrupts
-> on CPU0 (CPU1 seems ok).
-> 
-> Dumping the timer state (see below), it looks like CPU0's timer expired in
-> the past, but we're perhaps not receiving the interrupt. The trinity logs
-> don't reveal anything obvious (and they're huge, so I can't include them
-> here).
-> 
-> I can reproduce this in an hour or so, so if you want me to try anything out
-> in the host, I can give it a go. I'm using 3.11 as both the guest and host.
+On Mon, Sep 2, 2013 at 10:14 AM, Sachin Kamat <sachin.kamat@linaro.org> wrote:
 
-Any ideas on things I can do to get to the bottom of this? It's preventing
-me from running trinity to find any other issues and there's no reason you
-couldn't hit this lockup under other workloads.
+> kcalloc can return NULL. Check the pointer before dereferencing.
+>
+> Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
 
-Will
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
+
+I guess Vinod can take this into fixes for v3.12?
+
+Yours,
+Linus Walleij
