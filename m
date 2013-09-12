@@ -1,30 +1,62 @@
 From: koen@dominion.thruhere.net (Koen Kooi)
-Date: Thu, 12 Sep 2013 20:35:34 +0200
-Subject: [PATCH v4 3/4] ARM: dts: am335x-bone-common: switch mmc1 to 4-bit mode
+Date: Thu, 12 Sep 2013 20:35:32 +0200
+Subject: [PATCH v4 1/4] ARM: dts: am335x-bone: add CD for mmc1
 In-Reply-To: <1379010935-25943-1-git-send-email-koen@dominion.thruhere.net>
 References: <1379010935-25943-1-git-send-email-koen@dominion.thruhere.net>
-Message-ID: <1379010935-25943-4-git-send-email-koen@dominion.thruhere.net>
+Message-ID: <1379010935-25943-2-git-send-email-koen@dominion.thruhere.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The micro-SD slot hooks up all four data pins so lets' use them.
+From: Alexander Holler <holler@ahsoftware.de>
 
+This enables the use of MMC cards even when no card was inserted at boot.
+
+Signed-off-by: Alexander Holler <holler@ahsoftware.de>
 Signed-off-by: Koen Kooi <koen@dominion.thruhere.net>
 ---
- arch/arm/boot/dts/am335x-bone-common.dtsi | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/boot/dts/am335x-bone-common.dtsi | 14 ++++++++++++++
+ arch/arm/boot/dts/am335x-bone.dts         |  1 -
+ 2 files changed, 14 insertions(+), 1 deletion(-)
 
 diff --git a/arch/arm/boot/dts/am335x-bone-common.dtsi b/arch/arm/boot/dts/am335x-bone-common.dtsi
-index bc8d1a2..303df81 100644
+index 2f66ded..0d95d54 100644
 --- a/arch/arm/boot/dts/am335x-bone-common.dtsi
 +++ b/arch/arm/boot/dts/am335x-bone-common.dtsi
-@@ -291,6 +291,7 @@
+@@ -107,6 +107,12 @@
+ 				0x14c (PIN_INPUT_PULLDOWN | MUX_MODE7)
+ 			>;
+ 		};
++
++		mmc1_pins: pinmux_mmc1_pins {
++			pinctrl-single,pins = <
++				0x160 (PIN_INPUT | MUX_MODE7) /* GPIO0_6 */
++			>;
++		};
+ 	};
+ 
+ 	ocp {
+@@ -260,3 +266,11 @@
+ 	pinctrl-0 = <&davinci_mdio_default>;
+ 	pinctrl-1 = <&davinci_mdio_sleep>;
+ };
++
++&mmc1 {
++	status = "okay";
++	pinctrl-names = "default";
++	pinctrl-0 = <&mmc1_pins>;
++	cd-gpios = <&gpio0 6 GPIO_ACTIVE_HIGH>;
++	cd-inverted;
++};
+diff --git a/arch/arm/boot/dts/am335x-bone.dts b/arch/arm/boot/dts/am335x-bone.dts
+index d5f43fe..0d63348 100644
+--- a/arch/arm/boot/dts/am335x-bone.dts
++++ b/arch/arm/boot/dts/am335x-bone.dts
+@@ -17,6 +17,5 @@
+ };
  
  &mmc1 {
- 	status = "okay";
-+	bus-width = <0x4>;
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&mmc1_pins>;
- 	cd-gpios = <&gpio0 6 GPIO_ACTIVE_HIGH>;
+-	status = "okay";
+ 	vmmc-supply = <&ldo3_reg>;
+ };
 -- 
 1.8.2.1
