@@ -1,32 +1,37 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Thu, 12 Sep 2013 13:21:40 +0530
-Subject: "cpufreq: fix serialization issues with freq change notifiers"
- breaks cpufreq too
-In-Reply-To: <Pine.LNX.4.64.1309120938240.4632@axis700.grange>
-References: <Pine.LNX.4.64.1309091656200.6602@axis700.grange>
- <CAKohponZ+FnzqXYMbBzbun0-1iQMi2fS4syrEBC_MdF41vLCeA@mail.gmail.com>
- <Pine.LNX.4.64.1309101656150.16010@axis700.grange>
- <CAKohpomBBKLhNemVUpUHAftGhPJJe+ZB7T_9UYLD7LwpR1nK0g@mail.gmail.com>
- <Pine.LNX.4.64.1309101740120.16010@axis700.grange>
- <CAKohpomK7Y_6aLMA3B+hZrtgYq9U89ihgkbvYWA3BsKN3gJD3g@mail.gmail.com>
- <Pine.LNX.4.64.1309101853170.16010@axis700.grange>
- <CAKohpokaHU0V86DPB7nEQ8ndwu_mJ_x_Uz47XPHZeyAW3hcP_w@mail.gmail.com>
- <Pine.LNX.4.64.1309120938240.4632@axis700.grange>
-Message-ID: <CAKohpokJJOxKHhyqDRRZnp_Fwc2oXZcUR7KeMF_Zegoqpo_MqA@mail.gmail.com>
+From: Sudeep.KarkadaNagesha@arm.com (Sudeep KarkadaNagesha)
+Date: Thu, 12 Sep 2013 09:18:00 +0100
+Subject: [PATCH 0/4] cpufreq: fixes for v3.12
+In-Reply-To: <1795989.18GOYqdUtX@vostro.rjw.lan>
+References: <1378835989-19281-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+ <1795989.18GOYqdUtX@vostro.rjw.lan>
+Message-ID: <523178B8.8020806@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12 September 2013 13:17, Guennadi Liakhovetski <g.liakhovetski@gmx.de> wrote:
-> Yes, they seem to fix my issues.
+On 11/09/13 23:58, Rafael J. Wysocki wrote:
+> On Tuesday, September 10, 2013 06:59:45 PM Sudeep KarkadaNagesha wrote:
+>> From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
+>>
+>> Hi Shawn, Guennadi,
+>>
+>> These are the fixes for the issue reported by Guennadi.
+>> cpu_dev should point to cpu0 device instead of cpufreq-cpu0 platform
+>> devices. The dev_id is also updated while registering the cpu clocks.
+>>
+>> Can you review these ? Tested-by is much appreciated as I don't
+>> have hardware to check the fix.
+> 
+> I have a little problem with this series, because the last patch is based
+> on the current Linus' tree rather than on my master branch which is what
+> I have ready to push.  I don't think it makes sense to rebase it, however,
+> because that would introduce a merge conflict for Linus unnecessarily.
+> 
+> To avoid merging stuff back and forth, I'll push this series later in the
+> cycle.
+> 
 
-Great!!
+Thanks Rafael.
+Let me know in case if you need me to rebase onto your branch.
 
-> You probably aren't going to submit them
-> in this form, instead, merge them with the original serialisation fix
-> patch, right? So, you don't need my tested-by here. But feel free to cc me
-> when you submit a fixed version.
-
-I will add your tested-by as you have eventually test all three patch that I
-would merge :)
-
-Thanks for testing this..
+Regards,
+Sudeep
