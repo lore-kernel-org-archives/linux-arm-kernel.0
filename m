@@ -1,76 +1,31 @@
 From: bilhuang@nvidia.com (Bill Huang)
-Date: Thu, 12 Sep 2013 04:24:49 -0700
-Subject: [PATCH v2 2/4] cpufreq: tegra: Remove not used header files and clean
- up codes
+Date: Thu, 12 Sep 2013 04:24:51 -0700
+Subject: [PATCH v2 4/4] ARM: tegra: defconfig updates
 In-Reply-To: <1378985091-9447-1-git-send-email-bilhuang@nvidia.com>
 References: <1378985091-9447-1-git-send-email-bilhuang@nvidia.com>
-Message-ID: <1378985091-9447-3-git-send-email-bilhuang@nvidia.com>
+Message-ID: <1378985091-9447-5-git-send-email-bilhuang@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove the inclustion of the not needed header files and remove the
-logic to check the CPU ID to not exceeding the maximum supported CPUs.
+Enable:
+* Tegra CPUFreq driver.
 
 Signed-off-by: Bill Huang <bilhuang@nvidia.com>
 ---
- drivers/cpufreq/tegra-cpufreq.c |   15 ++-------------
- 1 file changed, 2 insertions(+), 13 deletions(-)
+ arch/arm/configs/tegra_defconfig |    1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/cpufreq/tegra-cpufreq.c b/drivers/cpufreq/tegra-cpufreq.c
-index 09c5af0..c2d2910 100644
---- a/drivers/cpufreq/tegra-cpufreq.c
-+++ b/drivers/cpufreq/tegra-cpufreq.c
-@@ -18,14 +18,9 @@
- 
- #include <linux/kernel.h>
- #include <linux/module.h>
--#include <linux/types.h>
--#include <linux/sched.h>
- #include <linux/cpufreq.h>
--#include <linux/delay.h>
--#include <linux/init.h>
- #include <linux/err.h>
- #include <linux/clk.h>
--#include <linux/io.h>
- #include <linux/suspend.h>
- 
- static struct cpufreq_frequency_table freq_table[] = {
-@@ -40,14 +35,14 @@ static struct cpufreq_frequency_table freq_table[] = {
- 	{ .frequency = CPUFREQ_TABLE_END },
- };
- 
--#define NUM_CPUS	2
-+#define MAX_CPUS	4
- 
- static struct clk *cpu_clk;
- static struct clk *pll_x_clk;
- static struct clk *pll_p_clk;
- static struct clk *emc_clk;
- 
--static unsigned long target_cpu_speed[NUM_CPUS];
-+static unsigned long target_cpu_speed[MAX_CPUS];
- static DEFINE_MUTEX(tegra_cpu_lock);
- static bool is_suspended;
- 
-@@ -60,9 +55,6 @@ static unsigned int tegra_getspeed(unsigned int cpu)
- {
- 	unsigned long rate;
- 
--	if (cpu >= NUM_CPUS)
--		return 0;
--
- 	rate = clk_get_rate(cpu_clk) / 1000;
- 	return rate;
- }
-@@ -209,9 +201,6 @@ static struct notifier_block tegra_cpu_pm_notifier = {
- 
- static int tegra_cpu_init(struct cpufreq_policy *policy)
- {
--	if (policy->cpu >= NUM_CPUS)
--		return -EINVAL;
--
- 	clk_prepare_enable(emc_clk);
- 	clk_prepare_enable(cpu_clk);
- 
+diff --git a/arch/arm/configs/tegra_defconfig b/arch/arm/configs/tegra_defconfig
+index ea042e8..64bc8bd 100644
+--- a/arch/arm/configs/tegra_defconfig
++++ b/arch/arm/configs/tegra_defconfig
+@@ -42,6 +42,7 @@ CONFIG_ZBOOT_ROM_BSS=0x0
+ CONFIG_KEXEC=y
+ CONFIG_CPU_FREQ=y
+ CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND=y
++CONFIG_ARM_TEGRA_CPUFREQ=y
+ CONFIG_CPU_IDLE=y
+ CONFIG_VFP=y
+ CONFIG_PM_RUNTIME=y
 -- 
 1.7.9.5
