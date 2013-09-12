@@ -1,67 +1,43 @@
-From: galak@codeaurora.org (Kumar Gala)
-Date: Thu, 12 Sep 2013 11:37:19 -0500
-Subject: [PATCH] ARM: msm: Move msm devicetrees under a Qualcomm dir
-Message-ID: <1379003839-16068-1-git-send-email-galak@codeaurora.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 12 Sep 2013 17:39:31 +0100
+Subject: [PATCH 3/4] Add physical count arch timer support for clocksource
+ in ARMv7.
+In-Reply-To: <CAK3cCBwu4somtfc9J1ZDVcC-iYD1qDJwSWzWeOomTqY9tQA2kg@mail.gmail.com>
+References: <1378968687-8200-1-git-send-email-cinifr@gmail.com>
+ <1378968687-8200-4-git-send-email-cinifr@gmail.com>
+ <20130912112452.GA22013@e106331-lin.cambridge.arm.com>
+ <CAK3cCBwu4somtfc9J1ZDVcC-iYD1qDJwSWzWeOomTqY9tQA2kg@mail.gmail.com>
+Message-ID: <5231EE43.5090900@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the Qualcomm vendor prefix (qcom) as the directory name for
-Qualcomm MSM devicetrees going forward.
+On 12/09/13 17:07, cinifr wrote:
+>> This cannot be a compile-time option as above in a multiplatform build.
+>> Other paltforms (e.g. KVM guests) *must* use the virtual counters to get
+>> any semblance of a consistent view of time.
+> Yes I accept compile-time option is not perfect  in my pre email,
+> But,Why Ohter paltforms *must* use the virtual counters? I think KVM
+> should not limit how to use arch timer in its guest OS. Of cause, if
+> KVM guest use vct can be more efficiency then that use pct. but KVM
+> should and must support guest OS to access pct.
 
-Signed-off-by: Kumar Gala <galak@codeaurora.org>
----
- arch/arm/boot/dts/Makefile                    | 4 ++--
- arch/arm/boot/dts/{ => qcom}/msm8660-surf.dts | 2 +-
- arch/arm/boot/dts/{ => qcom}/msm8960-cdp.dts  | 2 +-
- 3 files changed, 4 insertions(+), 4 deletions(-)
- rename arch/arm/boot/dts/{ => qcom}/msm8660-surf.dts (97%)
- rename arch/arm/boot/dts/{ => qcom}/msm8960-cdp.dts (97%)
+The virtual counter is there for a good reason: it allows a virtual
+machine to:
+- see its time starting at zero
+- be migrated to another host without seeing time shifting one way or
+another.
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index cc0f1fb..d784ba0 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -101,8 +101,8 @@ dtb-$(CONFIG_ARCH_KIRKWOOD) += kirkwood-cloudbox.dtb \
- 	kirkwood-ts219-6282.dtb \
- 	kirkwood-openblocks_a6.dtb
- dtb-$(CONFIG_ARCH_MARCO) += marco-evb.dtb
--dtb-$(CONFIG_ARCH_MSM) += msm8660-surf.dtb \
--	msm8960-cdp.dtb
-+dtb-$(CONFIG_ARCH_MSM) += qcom/msm8660-surf.dtb \
-+	qcom/msm8960-cdp.dtb
- dtb-$(CONFIG_ARCH_MVEBU) += armada-370-db.dtb \
- 	armada-370-mirabox.dtb \
- 	armada-370-netgear-rn102.dtb \
-diff --git a/arch/arm/boot/dts/msm8660-surf.dts b/arch/arm/boot/dts/qcom/msm8660-surf.dts
-similarity index 97%
-rename from arch/arm/boot/dts/msm8660-surf.dts
-rename to arch/arm/boot/dts/qcom/msm8660-surf.dts
-index 386d428..8c5ea9a 100644
---- a/arch/arm/boot/dts/msm8660-surf.dts
-+++ b/arch/arm/boot/dts/qcom/msm8660-surf.dts
-@@ -1,6 +1,6 @@
- /dts-v1/;
- 
--/include/ "skeleton.dtsi"
-+/include/ "../skeleton.dtsi"
- 
- / {
- 	model = "Qualcomm MSM8660 SURF";
-diff --git a/arch/arm/boot/dts/msm8960-cdp.dts b/arch/arm/boot/dts/qcom/msm8960-cdp.dts
-similarity index 97%
-rename from arch/arm/boot/dts/msm8960-cdp.dts
-rename to arch/arm/boot/dts/qcom/msm8960-cdp.dts
-index 93e9f7e..fe2659a 100644
---- a/arch/arm/boot/dts/msm8960-cdp.dts
-+++ b/arch/arm/boot/dts/qcom/msm8960-cdp.dts
-@@ -1,6 +1,6 @@
- /dts-v1/;
- 
--/include/ "skeleton.dtsi"
-+/include/ "../skeleton.dtsi"
- 
- / {
- 	model = "Qualcomm MSM8960 CDP";
+So using the physical counter in a VM is a recipe for disaster if you're
+doing any kind of time tracking. The counter being used for
+sched_clock(), we cannot afford to see it being shifted one way or another.
+
+If you have issues with the use of the virtual counter, I suggest you
+fix your firmware to have a consistent CNTVOFF across CPUs. And/or even
+better, boot your kernel in HYP mode, as it will take care of setting
+CNTVOFF to zero.
+
+Cheers,
+
+	M.
 -- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+Jazz is not dead. It just smells funny...
