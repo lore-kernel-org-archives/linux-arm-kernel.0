@@ -1,33 +1,66 @@
-From: jolsa@redhat.com (Jiri Olsa)
-Date: Thu, 12 Sep 2013 14:38:47 +0200
-Subject: [PATCH 3/3] perf: parse the .debug_frame section in case
- .eh_frame is not present
-In-Reply-To: <1378720815-23964-4-git-send-email-jean.pihet@linaro.org>
-References: <1378720815-23964-1-git-send-email-jean.pihet@linaro.org>
- <1378720815-23964-4-git-send-email-jean.pihet@linaro.org>
-Message-ID: <20130912123847.GB15187@krava.brq.redhat.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 12 Sep 2013 14:50:02 +0200
+Subject: [PATCH 21/33] clk: ux500: Add Device Tree support for the PRCC
+ Kernel clock
+In-Reply-To: <20130827082326.GE6152@lee--X1>
+References: <1370521041-32318-1-git-send-email-lee.jones@linaro.org>
+ <1370521041-32318-22-git-send-email-lee.jones@linaro.org>
+ <CACRpkdY2KOxX=oA7i9GUnzpwRKiK2rXqTBPVpg+zW082f2TJdg@mail.gmail.com>
+ <20130821101448.GJ29850@lee--X1>
+ <CACRpkdYjvFTJAUL6xKxjkVd_v=DHHRkswoB_eq0Npqj5Sw23KQ@mail.gmail.com>
+ <20130822092130.GB22023@lee--X1>
+ <CACRpkdYLJdmhCqXpQ0s5nbxRoFdZ3bLn+hxAhkoGHYfvugc=7A@mail.gmail.com>
+ <20130827082326.GE6152@lee--X1>
+Message-ID: <CACRpkdYvAfEh6UGa7qR_e9ynj3TkPSM2RKtr7Scw7L3p10AgXA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 09, 2013 at 12:00:15PM +0200, Jean Pihet wrote:
-> On ARM the debug info is not present in the .eh_frame sections but
-> in .debug_frame instead, in the dwarf format.
-> Use libunwind to load and parse the debug info.
-> 
-> Dependencies:
->  . if present, libunwind >= 1.1 is needed to prevent a segfault when
->    parsing the dwarf info,
->  . libunwind needs to be configured with --enable-debug-frame
->    to prevent a linkage error. Note: --enable-debug-frame is automatically
->    selected on ARM).
-> 
-> Signed-off-by: Jean Pihet <jean.pihet@linaro.org>
+On Tue, Aug 27, 2013 at 10:23 AM, Lee Jones <lee.jones@linaro.org> wrote:
+> On Fri, 23 Aug 2013, Linus Walleij wrote:
+>> On Thu, Aug 22, 2013 at 11:21 AM, Lee Jones <lee.jones@linaro.org> wrote:
 
-I tested the .eh_frame code is still functional, but
-haven't tested the .debug_frame functionality itself
+>> > 1. Duplicate each of the; clk_reg_prcmu_*(), clk_reg_prcc_pclk(),
+>> > clk_reg_prcc_kclk() calls into your proposed u8500_clk_init_dt(),
+>> > which, while keeping everything separate would be unrealistic.
+>>
+>> I think this is perfectly realistic.
+>>
+>> You're not going to duplicate each clk_register_clkdev(),
+>> which makes it way smaller than the original function,
+>> and since one of the function will be inside a
+>>
+>> #ifdef CONFIG_OF
+>> #endif
+>>
+>> After we switch the entire platform to DT-only it will be pretty
+>> obvious which big chunk of code that needs to go away, it's
+>> a clean cut.
+>>
+>> (Note: I know the #ifdef CONFIG_OF is not necessary anymore
+>> since we switched to multiplatform, but I intend that marker for
+>> humans, not machines.)
+>
+> This sounds gross. To duplicate; u8500_clk_init(), u8540_clk_init()
+> and u9540_clk_init() just for the sake of loading a few pointers into
+> an array for a small part of the development cycle sounds obscene.
+>
+> I genuinely think keeping the current patch in this series and then
+> removing the clk_register_clkdev() in the remove ATAG support series
+> is the best way to go.
 
-otherwise it looks ok:
-Rewieved-by: Jiri Olsa <jolsa@redhat.com>
+So what I am worrying about is not only the looks of the code
+and what is beautiful or not may be something of an opinion
+anway.
 
-thanks,
-jirka
+What I worry about is leaving all the calls to clk_register_clkdev()
+in the DT boot path. Because that has the potential to hide a lot
+of bugs, as clk_get() from drivers that should've got named and
+probed randomly now will still find their clocks from their old
+device names, instead of using the <&ampersand> clocks from
+the device tree.
+
+But if you still don't like this, let me cook a counter-patch so
+I can realized on my own how terribly wrong I am...
+
+Yours,
+Linus Walleij
