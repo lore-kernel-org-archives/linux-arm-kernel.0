@@ -1,67 +1,94 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 12 Sep 2013 18:51:38 -0400
-Subject: [RFC PATCH 1/4] DRIVERS: IRQCHIP: Add crossbar irqchip driver
-In-Reply-To: <alpine.DEB.2.02.1309122335440.4089@ionos.tec.linutronix.de>
-References: <1379000351-15672-1-git-send-email-r.sricharan@ti.com>
- <1379000351-15672-2-git-send-email-r.sricharan@ti.com>
- <alpine.DEB.2.02.1309122201530.4089@ionos.tec.linutronix.de>
- <523228B5.5070507@ti.com>
- <alpine.DEB.2.02.1309122335440.4089@ionos.tec.linutronix.de>
-Message-ID: <5232457A.8080709@ti.com>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Thu, 12 Sep 2013 16:48:32 -0700
+Subject: [PATCH 1/2] tick: broadcast: Deny per-cpu clockevents from being
+ broadcast sources
+In-Reply-To: <alpine.DEB.2.02.1309122224420.4089@ionos.tec.linutronix.de>
+References: <1379004640-15117-1-git-send-email-soren.brinkmann@xilinx.com>
+ <1379004640-15117-2-git-send-email-soren.brinkmann@xilinx.com>
+ <alpine.DEB.2.02.1309122224420.4089@ionos.tec.linutronix.de>
+Message-ID: <54e79f60-d0c4-4897-ab16-ecd50ae7ec0d@DB9EHSMHS019.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 12 September 2013 06:22 PM, Thomas Gleixner wrote:
-> On Thu, 12 Sep 2013, Santosh Shilimkar wrote:
->> Specifically for the IRQ case addressed here, the cross-bar IP
->> sits between the interrupt controller and peripheral interrupts.
->>
->> CPU <-- GIC  <----- CROSSBAR <----- PERIPHERAL IRQs
->>
->> Just to expand it better, cross-bar input IRQ lines are more than
->> what a GIC IRQ controller can support.
->> e.q Total 250 peripheral IRQ lines out of which GIC support
->> only 160 IRQ lines.
->>
->> So the idea here is to dynamically map the IRQ lines at
->> cross-bar level to pick based on request_irq() so that one
->> can optimize the use of limited IRQ lines at the GIC level.
->> Strictly speaking the need is just establish the IRQ
->> connection from peripheral to GIC and thats achieved
->> at the request_irq() level.
->>
->> Earlier approach was to statically build this connections
->> using the DT information in a separate driver probe but
->> it had limitations of fixing the IRQ map and taking away
->> flexibility what this IP provide. 
->>  
->> Hope this gives better picture to you behind the patch
->> series.
-> 
-> Yes. I halfways understand what you are trying to achieve.
-> 
-> So CROSSBAR is a routing block between the peripheral and the GIC in
-> order to expand the number of possible interrupts.
-> 
-> Now the real question is, how that expansion mechanism is supposed to
-> work. There are two possible scenarios:
-> 
-> 1) Expand the number of handled interrupts beyond the GIC capacity:
-> 
->    That requires a mechanism in CROSSBAR to map several CROSSBAR
->    interrupts to a particular GIC interrupt and provide a demux
->    mechanism to invoke the shared handlers.
-> 
-This is not possible in hardware and not supported. Hardware has
-no notion of muxing multiple IRQ's to generate 1 IRQ or ack etc
-functionality. Its a simple MUX to tie knots between input and output
-wires.
+Hi Thomas,
 
-> 2) Provide a mapping mechanism between possibly 250 interrupt numbers
->    and a limitation of a total 160 active interrupts by the underlying
->    GIC.
+On Thu, Sep 12, 2013 at 10:30:15PM +0200, Thomas Gleixner wrote:
+> On Thu, 12 Sep 2013, Soren Brinkmann wrote:
+> > From: Stephen Boyd <sboyd@codeaurora.org>
+> > 
+> > On most ARM systems the per-cpu clockevents are truly per-cpu in
+> > the sense that they can't be controlled on any other CPU besides
+> > the CPU that they interrupt. If one of these clockevents were to
+> > become a broadcast source we will run into a lot of trouble
+> > because the broadcast source is enabled on the first CPU to go
+> > into deep idle (if that CPU suffers from FEAT_C3_STOP) and that
+> > could be a different CPU than what the clockevent is interrupting
+> > (or even worse the CPU that the clockevent interrupts could be
+> > offline).
+> > 
+> > Theoretically it's possible to support per-cpu clockevents as the
+> > broadcast source but so far we haven't needed this and supporting
+> > it is rather complicated. Let's just deny the possibility for now
+> > until this becomes a reality (let's hope it never does!).
 > 
-This is the need and problem we are trying to solve.
+> Well, we can't do it this way. There are globally accessible clock
+> event devices which deliver only to cpu0. So the mask check might be
+> causing failure here.
+> 
+> Just add a feature flag CLOCK_EVT_FEAT_PERCPU to the clock event
+> device and check for it.
 
-Regards,
-Santosh
+I gave it a shot. Is this what you imagine:
+diff --git a/drivers/clocksource/arm_global_timer.c b/drivers/clocksource/arm_global_timer.c
+index b66c1f3..c639b1a 100644
+--- a/drivers/clocksource/arm_global_timer.c
++++ b/drivers/clocksource/arm_global_timer.c
+@@ -169,7 +169,8 @@ static int gt_clockevents_init(struct clock_event_device *clk)
+        int cpu = smp_processor_id();
+ 
+        clk->name = "arm_global_timer";
+-       clk->features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT;
++       clk->features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT |
++               CLOCK_EVT_FEAT_PERCPU;
+        clk->set_mode = gt_clockevent_set_mode;
+        clk->set_next_event = gt_clockevent_set_next_event;
+        clk->cpumask = cpumask_of(cpu);
+diff --git a/include/linux/clockchips.h b/include/linux/clockchips.h
+index 0857922..493aa02 100644
+--- a/include/linux/clockchips.h
++++ b/include/linux/clockchips.h
+@@ -60,6 +60,7 @@ enum clock_event_mode {
+  * Core shall set the interrupt affinity dynamically in broadcast mode
+  */
+ #define CLOCK_EVT_FEAT_DYNIRQ          0x000020
++#define CLOCK_EVT_FEAT_PERCPU          0x000040
+ 
+ /**
+  * struct clock_event_device - clock event device descriptor
+diff --git a/kernel/time/tick-broadcast.c b/kernel/time/tick-broadcast.c
+index d3539e5..de4c5d8 100644
+--- a/kernel/time/tick-broadcast.c
++++ b/kernel/time/tick-broadcast.c
+@@ -70,16 +70,14 @@ static bool tick_check_broadcast_device(struct clock_event_device *curdev,
+                                        struct clock_event_device *newdev)
+ {
+        if ((newdev->features & CLOCK_EVT_FEAT_DUMMY) ||
+-           (newdev->features & CLOCK_EVT_FEAT_C3STOP))
++           (newdev->features & CLOCK_EVT_FEAT_C3STOP) ||
++           (newdev->features & CLOCK_EVT_FEAT_PERCPU))
+                return false;
+ 
+        if (tick_broadcast_device.mode == TICKDEV_MODE_ONESHOT &&
+            !(newdev->features & CLOCK_EVT_FEAT_ONESHOT))
+                return false;
+ 
+-       if (cpumask_equal(newdev->cpumask, cpumask_of(smp_processor_id())))
+-               return false;
+-
+        return !curdev || newdev->rating > curdev->rating;
+ }
+
+If this is the way to go, I can prepare this in a v2.
+
+	Thanks,
+	S?ren
