@@ -1,24 +1,74 @@
-From: henrik@henriknordstrom.net (Henrik =?ISO-8859-1?Q?Nordstr=F6m?=)
-Date: Thu, 12 Sep 2013 21:53:35 +0200
-Subject: [linux-sunxi] Re: [PATCH 4/4] Add arch count timer node in dts
- for Allwinner A20(sunxi 7i).
-In-Reply-To: <CAK3cCByUJG42D6w4e1tdnXY0TQ517yOjQxFZJEnsyS4d0bxZyQ@mail.gmail.com>
-References: <1378968687-8200-1-git-send-email-cinifr@gmail.com>
- <1378968687-8200-5-git-send-email-cinifr@gmail.com>
- <20130912145756.GD22013@e106331-lin.cambridge.arm.com>
- <1379000686.10076.76.camel@kazak.uk.xensource.com>
- <CAK3cCByUJG42D6w4e1tdnXY0TQ517yOjQxFZJEnsyS4d0bxZyQ@mail.gmail.com>
-Message-ID: <1379015615.21661.0.camel@localhost>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 12 Sep 2013 13:01:10 -0700
+Subject: [GIT PULL] ARM: SoC fixes for 3.12-rc
+Message-ID: <20130912200110.GA31255@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-fre 2013-09-13 klockan 00:23 +0800 skrev cinifr:
+Hi Linus,
 
-> Yes, My bootloader dont set it, and I have to set it at  dtsi  fot
-> boot, I found <clock-frequency> is be set in dtsi file for ohters
-> cups.
+The following changes since commit 640414171818c6293c23e74a28d1c69b2a1a7fe5:
 
-The patch from Ian is now in sunxi u-boot.
+  Merge tag 'late-for-linus' of git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc (2013-09-09 16:35:29 -0700)
 
-Regards
-Henrik
+are available in the git repository at:
+
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/fixes-for-linus
+
+for you to fetch changes up to f7ec00b3a5e6c18be350ce44dd8c03b36a8fda02:
+
+  ARM: dts: sun7i: olinuxino-micro: Enable the EMAC (2013-09-12 12:22:48 -0700)
+
+----------------------------------------------------------------
+ARM: SoC fixes for 3.12
+
+A small batch of fixes that have trickled in over the last week of the
+merge window.
+
+Also included are few small devicetree updates for sunxi, since it
+enables me to use one of their newer boards (cubieboard2) for additional
+test coverage. The support for that SoC is new for 3.12, so there's no
+exposure to new regressions due to it.
+
+----------------------------------------------------------------
+Maxime Ripard (4):
+      ARM: dts: sun7i: Enable the Ethernet in the A20
+      ARM: dts: sun7i: Add the muxing options for the EMAC
+      ARM: dts: sun7i: cubieboard2: Enable the EMAC
+      ARM: dts: sun7i: olinuxino-micro: Enable the EMAC
+
+Nicolas Pitre (1):
+      ARM: vexpress: allow dcscb and tc2_pm in a combined ARMv6+v7 build
+
+Olof Johansson (5):
+      ARM: pxa: ssp: Check return values from phandle lookups
+      Merge tag 'renesas-fixes3-for-v3.12' of git://git.kernel.org/.../horms/renesas into fixes
+      Merge branch 'versatile/fixes' into fixes
+      i2c: davinci: Fix bad dev_get_platdata() conversion
+      Merge tag 'ep93xx-fixes-for-3.12' of git://github.com/RyanMallon/linux-ep93xx into fixes
+
+Peter Maydell (3):
+      ARM: PCI: versatile: Fix map_irq function to match hardware
+      ARM: PCI: versatile: Fix PCI I/O
+      ARM: PCI: versatile: Fix SMAP register offsets
+
+Petr ?tetiar (1):
+      ARM: ep93xx: Don't use modem interface on the second UART
+
+Simon Horman (2):
+      ARM: shmobile: r8a7779: Update early timer initialisation order
+      ARM: shmobile: lager: Do not use register_type field of struct sh_eth_plat_data
+
+ arch/arm/boot/dts/sun7i-a20-cubieboard2.dts     | 15 ++++++++
+ arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts | 15 ++++++++
+ arch/arm/boot/dts/sun7i-a20.dtsi                | 27 ++++++++++++++
+ arch/arm/mach-ep93xx/core.c                     |  2 +-
+ arch/arm/mach-shmobile/board-lager.c            |  1 -
+ arch/arm/mach-shmobile/setup-r8a7779.c          |  2 +-
+ arch/arm/mach-versatile/include/mach/platform.h |  2 ++
+ arch/arm/mach-versatile/pci.c                   | 47 ++++++++++++++++---------
+ arch/arm/mach-vexpress/Makefile                 |  2 ++
+ arch/arm/plat-pxa/ssp.c                         | 18 +++++++---
+ drivers/i2c/busses/i2c-davinci.c                |  2 +-
+ 11 files changed, 108 insertions(+), 25 deletions(-)
