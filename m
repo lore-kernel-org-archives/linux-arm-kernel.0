@@ -1,32 +1,33 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 12 Sep 2013 13:32:28 +0100
-Subject: [PATCH 01/38] ARM: ux500: Remove PrimeCell IDs from Nomadik
- I2C DT nodes
-In-Reply-To: <CACRpkdY-N_VJwdo4+y9-9==+iC_w4qSiiE2oY-hp_jgsJyxQbg@mail.gmail.com>
-References: <CAOesGMgySNLKo_H0h4MCbAWvyW0h2bWa96drWBpnhAYYQwH9mw@mail.gmail.com>
- <20130910153037.GA11227@lee--X1>
- <CAOesGMiBN5SaEY26SxGaw9E4ViR3cC0PcwNMEd4cLJZMfomprQ@mail.gmail.com>
- <CACRpkdY24uU=tXirJqrxLH-45ORFGybJOg-2tDOkpSmFUQUiiw@mail.gmail.com>
- <20130911081911.GI11227@lee--X1>
- <CACRpkdY6v+LMggLBdfKc3VUPmRZXTf1zBi4a93EPhQeo21wMeQ@mail.gmail.com>
- <CAF2Aj3iPdqM-+FQ7R9MZ-6jV1Q1me9TG1P4cEGA7fSBBYH92zA@mail.gmail.com>
- <CACRpkdYfeao6bvwjq7YJhBNCoC_JVxPTwYzPPiWM0tgUQreJKg@mail.gmail.com>
- <CAOesGMi7zbGuBBaUToe7=PUJvUUT8FkdMAWzfCE0igpYiYTZSg@mail.gmail.com>
- <CACRpkdY-N_VJwdo4+y9-9==+iC_w4qSiiE2oY-hp_jgsJyxQbg@mail.gmail.com>
-Message-ID: <20130912123228.GJ12758@n2100.arm.linux.org.uk>
+From: jolsa@redhat.com (Jiri Olsa)
+Date: Thu, 12 Sep 2013 14:38:47 +0200
+Subject: [PATCH 3/3] perf: parse the .debug_frame section in case
+ .eh_frame is not present
+In-Reply-To: <1378720815-23964-4-git-send-email-jean.pihet@linaro.org>
+References: <1378720815-23964-1-git-send-email-jean.pihet@linaro.org>
+ <1378720815-23964-4-git-send-email-jean.pihet@linaro.org>
+Message-ID: <20130912123847.GB15187@krava.brq.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 12, 2013 at 02:23:48PM +0200, Linus Walleij wrote:
-> Yeah somewhere the bit-banging from the LL-prints that just
-> hammer the hardware start conflicting with the kernel control
-> over the same port. I guess it's the same for all users of the
-> PL011.
+On Mon, Sep 09, 2013 at 12:00:15PM +0200, Jean Pihet wrote:
+> On ARM the debug info is not present in the .eh_frame sections but
+> in .debug_frame instead, in the dwarf format.
+> Use libunwind to load and parse the debug info.
+> 
+> Dependencies:
+>  . if present, libunwind >= 1.1 is needed to prevent a segfault when
+>    parsing the dwarf info,
+>  . libunwind needs to be configured with --enable-debug-frame
+>    to prevent a linkage error. Note: --enable-debug-frame is automatically
+>    selected on ARM).
+> 
+> Signed-off-by: Jean Pihet <jean.pihet@linaro.org>
 
-That shouldn't happen, unless the port becomes disabled (eg, you're
-not using the LL-debug port as your console, and its then placed into
-a low power mode.)
+I tested the .eh_frame code is still functional, but
+haven't tested the .debug_frame functionality itself
 
-Again, let me re-interate what LL-debug is for: it's there to assist
-getting the early boot up and running.  Once the early boot is working,
-it should *not* be used.
+otherwise it looks ok:
+Rewieved-by: Jiri Olsa <jolsa@redhat.com>
+
+thanks,
+jirka
