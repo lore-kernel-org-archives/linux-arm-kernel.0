@@ -1,45 +1,53 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Thu, 12 Sep 2013 14:19:53 +0200
-Subject: [PATCH 0/3] perf: parse the dwarf backtrace info from
- .debug_frame section
-In-Reply-To: <CAFrcx1mQ-P7byYfqP-0bYabUzTDeSWyHFx2FJQ6wQLYEcV_Pxw@mail.gmail.com>
-References: <1378720815-23964-1-git-send-email-jean.pihet@linaro.org>
- <CAFrcx1mQ-P7byYfqP-0bYabUzTDeSWyHFx2FJQ6wQLYEcV_Pxw@mail.gmail.com>
-Message-ID: <20130912121953.GX31370@twins.programming.kicks-ass.net>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 12 Sep 2013 14:23:48 +0200
+Subject: [PATCH 01/38] ARM: ux500: Remove PrimeCell IDs from Nomadik I2C
+ DT nodes
+In-Reply-To: <CAOesGMi7zbGuBBaUToe7=PUJvUUT8FkdMAWzfCE0igpYiYTZSg@mail.gmail.com>
+References: <1378817379-8238-1-git-send-email-lee.jones@linaro.org>
+ <1378817379-8238-2-git-send-email-lee.jones@linaro.org>
+ <CAOesGMgySNLKo_H0h4MCbAWvyW0h2bWa96drWBpnhAYYQwH9mw@mail.gmail.com>
+ <20130910153037.GA11227@lee--X1>
+ <CAOesGMiBN5SaEY26SxGaw9E4ViR3cC0PcwNMEd4cLJZMfomprQ@mail.gmail.com>
+ <CACRpkdY24uU=tXirJqrxLH-45ORFGybJOg-2tDOkpSmFUQUiiw@mail.gmail.com>
+ <20130911081911.GI11227@lee--X1>
+ <CACRpkdY6v+LMggLBdfKc3VUPmRZXTf1zBi4a93EPhQeo21wMeQ@mail.gmail.com>
+ <CAF2Aj3iPdqM-+FQ7R9MZ-6jV1Q1me9TG1P4cEGA7fSBBYH92zA@mail.gmail.com>
+ <CACRpkdYfeao6bvwjq7YJhBNCoC_JVxPTwYzPPiWM0tgUQreJKg@mail.gmail.com>
+ <CAOesGMi7zbGuBBaUToe7=PUJvUUT8FkdMAWzfCE0igpYiYTZSg@mail.gmail.com>
+Message-ID: <CACRpkdY-N_VJwdo4+y9-9==+iC_w4qSiiE2oY-hp_jgsJyxQbg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 12, 2013 at 02:07:23PM +0200, Jean Pihet wrote:
-> Hi,
-> 
-> -- Adding more maintainers in the To: list --
-> 
-> Ping about the patch set, is this one acceptable for mainline?
+On Wed, Sep 11, 2013 at 10:36 PM, Olof Johansson <olof@lixom.net> wrote:
+> [Me]
+>> I don't know what is the problem with Olof's machine :-/
+>
+> Oh! Well, to start with apparantly u8500_defconfig doesn't have
+> APPENDED_DTB enabled, which explains some of the confusion here.
 
-The below looks to be mostly ARM bits and I would suspect Will to take
-care of them.
+Oh. Well honestly I think we will never be able to rewrite the
+U8500 bootloaders, so maybe I should just send a patch adding
+this to the defconfig by default.
 
-> On 9 September 2013 12:00, Jean Pihet <jean.pihet@linaro.org> wrote:
+> With that fixed (and the appropriate options to get the bootargs from
+> the atags), I get as far as console probing where output stops, if I
+> have DEBUG_LL on. With it disabled I get all the way up.
 
-> >  arch/arm/Kconfig                        |  2 +
-> >  arch/arm/include/uapi/asm/Kbuild        |  1 +
-> >  arch/arm/include/uapi/asm/perf_regs.h   | 23 +++++++++++
-> >  arch/arm/kernel/Makefile                |  1 +
-> >  arch/arm/kernel/perf_regs.c             | 30 ++++++++++++++
-> >  tools/perf/arch/arm/Makefile            |  3 ++
-> >  tools/perf/arch/arm/include/perf_regs.h | 54 +++++++++++++++++++++++++
-> >  tools/perf/arch/arm/util/unwind.c       | 48 ++++++++++++++++++++++
-> >  tools/perf/config/Makefile              |  9 +++--
-> >  tools/perf/util/unwind.c                | 71 +++++++++++++++++++++++++--------
+Yeah somewhere the bit-banging from the LL-prints that just
+hammer the hardware start conflicting with the kernel control
+over the same port. I guess it's the same for all users of the
+PL011.
 
-This one looks to be generic code, Acme who do we want to look at that?
+> Not sure what was going on earlier here. Maybe just as in your case it
+> was a matter of cleaning out and starting fresh.
 
-> >  10 files changed, 223 insertions(+), 19 deletions(-)
-> >  create mode 100644 arch/arm/include/uapi/asm/perf_regs.h
-> >  create mode 100644 arch/arm/kernel/perf_regs.c
-> >  create mode 100644 tools/perf/arch/arm/include/perf_regs.h
-> >  create mode 100644 tools/perf/arch/arm/util/unwind.c
-> >
-> > --
-> > 1.7.11.7
-> >
+Yeah, it's scary :-/
+
+> multi_v7_defconfig still doesn't boot though, but the failure seems to
+> be lower level than any of the others, no output with DEBUG_LL on.
+
+Probably the usual case where one system is screwing up for
+another system. We'll need to look into this.
+
+Yours,
+Linus Walleij
