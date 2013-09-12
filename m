@@ -1,193 +1,290 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Wed, 11 Sep 2013 17:21:32 -0700
-Subject: [PATCH RFC] of: add a basic memory driver
-In-Reply-To: <52303909.5050103@elopez.com.ar>
-References: <1378863781-4235-1-git-send-email-emilio@elopez.com.ar>
- <20130911075400.GG2746@lukather> <52303909.5050103@elopez.com.ar>
-Message-ID: <20130912002132.27384.14149@quantum>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Thu, 12 Sep 2013 09:32:49 +0900
+Subject: [PATCH] ARM: shmobile: Break out R-Car Gen2 setup code
+Message-ID: <20130912003249.24015.41583.sendpatchset@w520>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Emilio L?pez (2013-09-11 02:34:01)
-> Hi Maxime,
-> 
-> El 11/09/13 04:54, Maxime Ripard escribi?:
-> > Hi Emilio,
-> >
-> > On Tue, Sep 10, 2013 at 10:43:01PM -0300, Emilio L?pez wrote:
-> >> This driver's only job is to claim and ensure that the necessary clock
-> >> for memory operation on a DT-enabled machine remains enabled.
-> >>
-> >> Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
-> >> ---
-> >>
-> >> Hi,
-> >>
-> >> I am currently facing an issue with the clock setup: a critical but
-> >> unclaimed clock gets disabled as a side effect of disabling one of its
-> >> children. The clock setup looks something like this:
-> >>
-> >>        PLL
-> >>         |
-> >>   ------------
-> >>   |          |
-> >> DDR       Others
-> >>              |
-> >>            periph
-> >>
-> >> The PLL clock is marked with the CLK_IGNORE_UNUSED flag, so on a normal
-> >> boot it remains on, even after the unused clocks cleanup code runs. The
-> >> problem occurs when someone enables "periph" and then, later on, disables
-> >> it: the framework starts disabling clocks upwards on the tree,
-> >> eventually switching the PLL off (and that kills the machine, as the memory
-> >> clock is shut down).
-> >
-> > That looks like a bug in the clock framework. I'd expect it to at least
-> > behave in the same way when disabling the unused clocks at late startup
-> > and when going up disabling some clocks' parent later on.
-> 
-> Yes, I kind of expected the same, and the flag description seems to 
-> imply so too:
-> 
->      #define CLK_IGNORE_UNUSED  BIT(3) /* do not gate even if unused */
-> 
-> >> There's two possible solutions I can think of:
-> >>   1) add some extra checks on the framework to not turn off clocks marked
-> >>      with such a flag on the non-explicit case (ie, when I'm disabling
-> >>      some other clock)
-> >>
-> >>   2) create an actual user of the DDR clock, that way it won't get
-> >>      disabled simply because it's being used.
-> >>
-> >> I considered 1) and implemented it, but the result was not pretty.
-> >
-> > What was not pretty about it?
-> 
-> It required adding an extra parameter to __clk_disable/__clk_unprepare 
-> to keep track of the call's explicitness, and ignore the 
-> disable/unprepare callback on the implicit case (when 
-> __clk_disable/__clk_unprepare is called recursively) if the flag is set. 
-> This also means adding a wrapping function to at least __clk_unprepare, 
-> so as to to not break callers outside of the clk framework. Overall it 
-> felt too hacky for something that could be properly handled by the 
-> generic code if it had at least 1 user.
-> 
-> I would like to hear Mike's thoughts on this; maybe CLK_IGNORE_UNUSED is 
-> not what we think it should be.
+From: Magnus Damm <damm@opensource.se>
 
-CLK_IGNORE_UNUSED was only meant to solve the issue of gating unclaimed
-clocks during clk_disable_unused that we do not want to gate at that
-point in time. To that end it is doing the right thing for your platform
-and I don't see a bug here.
+Move arch timer workaround code and boot mode pin
+handling from setup-r8a7790.c to setup-rcar-gen2.c.
 
-Your issue is that you have a normal clk_disable chain affecting the
-clock. Always the right way to do this is to have a driver claim that
-clock with clk_get and call clk_enable on it. That is how the clk API
-works. This is what your 2) approach does and is probably The Right
-Thing.
+With this in place the same code can be used on
+other R-Car Generation 2 devices such as r8a7791.
 
-Alternatively a new flag could be added, CLK_ALWON. This flag should be
-discussed but it could do a number of things:
+Signed-off-by: Magnus Damm <damm@opensource.se>
+---
 
-1) any attempts to disable a clk with this flag set will always fail
-silently (since clk_disable has void return type).
+ Written against renesas-devel-20130906
 
-2) same as 1) above but the clock framework could additionally call
-clk_enable on it after registering the clock with the CLK_ALWON flag set
+ arch/arm/mach-shmobile/Makefile                 |    2 
+ arch/arm/mach-shmobile/board-lager-reference.c  |    2 
+ arch/arm/mach-shmobile/board-lager.c            |    2 
+ arch/arm/mach-shmobile/clock-r8a7790.c          |    2 
+ arch/arm/mach-shmobile/include/mach/r8a7790.h   |    6 -
+ arch/arm/mach-shmobile/include/mach/rcar-gen2.h |    8 ++
+ arch/arm/mach-shmobile/setup-r8a7790.c          |   68 -----------------
+ arch/arm/mach-shmobile/setup-rcar-gen2.c        |   91 +++++++++++++++++++++++
+ 8 files changed, 106 insertions(+), 75 deletions(-)
 
-Anyways I think a new flag like CLK_ALWON should only really exist to
-solve this problem for clocks that do not have drivers in Linux. Since
-you went to the trouble of writing a small driver then I think just
-claiming the clock and enabling it there is the best solution.
-
-Regards,
-Mike
-
-> 
-> >> This patch is my take on 2). Please let me know what you think; all
-> >> feedback is welcome :)
-> >>
-> >> Cheers,
-> >>
-> >> Emilio
-> >>
-> >>   drivers/of/Kconfig     |  6 ++++++
-> >>   drivers/of/Makefile    |  1 +
-> >>   drivers/of/of_memory.c | 30 ++++++++++++++++++++++++++++++
-> >>   3 files changed, 37 insertions(+)
-> >>   create mode 100644 drivers/of/of_memory.c
-> >>
-> >> diff --git a/drivers/of/Kconfig b/drivers/of/Kconfig
-> >> index 9d2009a..f6c5e20 100644
-> >> --- a/drivers/of/Kconfig
-> >> +++ b/drivers/of/Kconfig
-> >> @@ -80,4 +80,10 @@ config OF_RESERVED_MEM
-> >>      help
-> >>        Initialization code for DMA reserved memory
-> >>
-> >> +config OF_MEMORY
-> >> +    depends on COMMON_CLK
-> >> +    def_bool y
-> >> +    help
-> >> +      Simple memory initialization
-> >> +
-> >>   endmenu # OF
-> >> diff --git a/drivers/of/Makefile b/drivers/of/Makefile
-> >> index ed9660a..15f0167 100644
-> >> --- a/drivers/of/Makefile
-> >> +++ b/drivers/of/Makefile
-> >> @@ -10,3 +10,4 @@ obj-$(CONFIG_OF_PCI)       += of_pci.o
-> >>   obj-$(CONFIG_OF_PCI_IRQ)  += of_pci_irq.o
-> >>   obj-$(CONFIG_OF_MTD)       += of_mtd.o
-> >>   obj-$(CONFIG_OF_RESERVED_MEM) += of_reserved_mem.o
-> >> +obj-$(CONFIG_OF_MEMORY) += of_memory.o
-> >> diff --git a/drivers/of/of_memory.c b/drivers/of/of_memory.c
-> >> new file mode 100644
-> >> index 0000000..a833f7a
-> >> --- /dev/null
-> >> +++ b/drivers/of/of_memory.c
-> >> @@ -0,0 +1,30 @@
-> >> +/*
-> >> + * Simple memory driver
-> >> + */
-> >> +
-> >> +#include <linux/of.h>
-> >> +#include <linux/clk.h>
-> >> +
-> >> +static int __init of_memory_enable(void)
-> >> +{
-> >> +    struct device_node *np;
-> >> +    struct clk *clk;
-> >> +
-> >> +    np = of_find_node_by_path("/memory");
-> >> +    if (!np) {
-> >> +            pr_err("no /memory on DT!\n");
-> >> +            return 0;
-> >> +    }
-> >> +
-> >> +    clk = of_clk_get(np, 0);
-> >> +    if (!IS_ERR(clk)) {
-> >> +            clk_prepare_enable(clk);
-> >> +            clk_put(clk);
-> >> +    }
-> >> +
-> >> +    of_node_put(np);
-> >> +
-> >> +    return 0;
-> >> +}
-> >> +
-> >> +device_initcall(of_memory_enable);
-> >
-> > I like this idea as well. But imho, both 1 and 2 should be done. 2) is
-> > only about memory devices, while 1) is much more generic.
-> >
-> > And fwiw, the Marvell Armada 370 is also in this case of having a
-> > gatable clock for the DDR that could potentially be disabled (but is
-> > not, since it has no other users than the DDR itself, and as such, no
-> > one ever calls clk_disable on it).
-> 
-> Nice to know, thanks for the information :)
-> 
-> Cheers,
-> 
-> Emilio
+--- 0001/arch/arm/mach-shmobile/Makefile
++++ work/arch/arm/mach-shmobile/Makefile	2013-09-12 08:52:36.000000000 +0900
+@@ -14,7 +14,7 @@ obj-$(CONFIG_ARCH_R8A73A4)	+= setup-r8a7
+ obj-$(CONFIG_ARCH_R8A7740)	+= setup-r8a7740.o
+ obj-$(CONFIG_ARCH_R8A7778)	+= setup-r8a7778.o
+ obj-$(CONFIG_ARCH_R8A7779)	+= setup-r8a7779.o
+-obj-$(CONFIG_ARCH_R8A7790)	+= setup-r8a7790.o
++obj-$(CONFIG_ARCH_R8A7790)	+= setup-r8a7790.o setup-rcar-gen2.o
+ obj-$(CONFIG_ARCH_R8A7791)	+= setup-r8a7791.o
+ obj-$(CONFIG_ARCH_EMEV2)	+= setup-emev2.o
+ 
+--- 0001/arch/arm/mach-shmobile/board-lager-reference.c
++++ work/arch/arm/mach-shmobile/board-lager-reference.c	2013-09-12 08:56:18.000000000 +0900
+@@ -40,7 +40,7 @@ static const char *lager_boards_compat_d
+ DT_MACHINE_START(LAGER_DT, "lager")
+ 	.smp		= smp_ops(r8a7790_smp_ops),
+ 	.init_early	= r8a7790_init_early,
++	.init_time	= rcar_gen2_timer_init,
+ 	.init_machine	= lager_add_standard_devices,
+-	.init_time	= r8a7790_timer_init,
+ 	.dt_compat	= lager_boards_compat_dt,
+ MACHINE_END
+--- 0001/arch/arm/mach-shmobile/board-lager.c
++++ work/arch/arm/mach-shmobile/board-lager.c	2013-09-12 08:55:50.000000000 +0900
+@@ -230,7 +230,7 @@ static const char * const lager_boards_c
+ DT_MACHINE_START(LAGER_DT, "lager")
+ 	.smp		= smp_ops(r8a7790_smp_ops),
+ 	.init_early	= r8a7790_init_early,
+-	.init_time	= r8a7790_timer_init,
++	.init_time	= rcar_gen2_timer_init,
+ 	.init_machine	= lager_add_standard_devices,
+ 	.dt_compat	= lager_boards_compat_dt,
+ MACHINE_END
+--- 0001/arch/arm/mach-shmobile/clock-r8a7790.c
++++ work/arch/arm/mach-shmobile/clock-r8a7790.c	2013-09-12 08:54:38.000000000 +0900
+@@ -300,7 +300,7 @@ static struct clk_lookup lookups[] = {
+ 
+ void __init r8a7790_clock_init(void)
+ {
+-	u32 mode = r8a7790_read_mode_pins();
++	u32 mode = rcar_gen2_read_mode_pins();
+ 	int k, ret = 0;
+ 
+ 	switch (mode & (MD(14) | MD(13))) {
+--- 0001/arch/arm/mach-shmobile/include/mach/r8a7790.h
++++ work/arch/arm/mach-shmobile/include/mach/r8a7790.h	2013-09-12 08:57:18.000000000 +0900
+@@ -1,15 +1,13 @@
+ #ifndef __ASM_R8A7790_H__
+ #define __ASM_R8A7790_H__
+ 
++#include <mach/rcar-gen2.h>
++
+ void r8a7790_add_standard_devices(void);
+ void r8a7790_add_dt_devices(void);
+ void r8a7790_clock_init(void);
+ void r8a7790_pinmux_init(void);
+ void r8a7790_init_early(void);
+-void r8a7790_timer_init(void);
+ extern struct smp_operations r8a7790_smp_ops;
+ 
+-#define MD(nr) BIT(nr)
+-u32 r8a7790_read_mode_pins(void);
+-
+ #endif /* __ASM_R8A7790_H__ */
+--- /dev/null
++++ work/arch/arm/mach-shmobile/include/mach/rcar-gen2.h	2013-09-12 08:51:34.000000000 +0900
+@@ -0,0 +1,8 @@
++#ifndef __ASM_RCAR_GEN2_H__
++#define __ASM_RCAR_GEN2_H__
++
++void rcar_gen2_timer_init(void);
++#define MD(nr) BIT(nr)
++u32 rcar_gen2_read_mode_pins(void);
++
++#endif /* __ASM_RCAR_GEN2_H__ */
+--- 0001/arch/arm/mach-shmobile/setup-r8a7790.c
++++ work/arch/arm/mach-shmobile/setup-r8a7790.c	2013-09-12 08:56:33.000000000 +0900
+@@ -18,7 +18,6 @@
+  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
+  */
+ 
+-#include <linux/clocksource.h>
+ #include <linux/irq.h>
+ #include <linux/kernel.h>
+ #include <linux/of_platform.h>
+@@ -203,71 +202,6 @@ void __init r8a7790_add_standard_devices
+ 	r8a7790_register_thermal();
+ }
+ 
+-#define MODEMR 0xe6160060
+-
+-u32 __init r8a7790_read_mode_pins(void)
+-{
+-	void __iomem *modemr = ioremap_nocache(MODEMR, 4);
+-	u32 mode;
+-
+-	BUG_ON(!modemr);
+-	mode = ioread32(modemr);
+-	iounmap(modemr);
+-
+-	return mode;
+-}
+-
+-#define CNTCR 0
+-#define CNTFID0 0x20
+-
+-void __init r8a7790_timer_init(void)
+-{
+-#ifdef CONFIG_ARM_ARCH_TIMER
+-	u32 mode = r8a7790_read_mode_pins();
+-	void __iomem *base;
+-	int extal_mhz = 0;
+-	u32 freq;
+-
+-	/* At Linux boot time the r8a7790 arch timer comes up
+-	 * with the counter disabled. Moreover, it may also report
+-	 * a potentially incorrect fixed 13 MHz frequency. To be
+-	 * correct these registers need to be updated to use the
+-	 * frequency EXTAL / 2 which can be determined by the MD pins.
+-	 */
+-
+-	switch (mode & (MD(14) | MD(13))) {
+-	case 0:
+-		extal_mhz = 15;
+-		break;
+-	case MD(13):
+-		extal_mhz = 20;
+-		break;
+-	case MD(14):
+-		extal_mhz = 26;
+-		break;
+-	case MD(13) | MD(14):
+-		extal_mhz = 30;
+-		break;
+-	}
+-
+-	/* The arch timer frequency equals EXTAL / 2 */
+-	freq = extal_mhz * (1000000 / 2);
+-
+-	/* Remap "armgcnt address map" space */
+-	base = ioremap(0xe6080000, PAGE_SIZE);
+-
+-	/* Update registers with correct frequency */
+-	iowrite32(freq, base + CNTFID0);
+-	asm volatile("mcr p15, 0, %0, c14, c0, 0" : : "r" (freq));
+-
+-	/* make sure arch timer is started by setting bit 0 of CNTCR */
+-	iowrite32(1, base + CNTCR);
+-	iounmap(base);
+-#endif /* CONFIG_ARM_ARCH_TIMER */
+-
+-	clocksource_of_init();
+-}
+-
+ void __init r8a7790_init_early(void)
+ {
+ #ifndef CONFIG_ARM_ARCH_TIMER
+@@ -285,7 +219,7 @@ static const char * const r8a7790_boards
+ DT_MACHINE_START(R8A7790_DT, "Generic R8A7790 (Flattened Device Tree)")
+ 	.smp		= smp_ops(r8a7790_smp_ops),
+ 	.init_early	= r8a7790_init_early,
+-	.init_time	= r8a7790_timer_init,
++	.init_time	= rcar_gen2_timer_init,
+ 	.dt_compat	= r8a7790_boards_compat_dt,
+ MACHINE_END
+ #endif /* CONFIG_USE_OF */
+--- /dev/null
++++ work/arch/arm/mach-shmobile/setup-rcar-gen2.c	2013-09-12 08:58:30.000000000 +0900
+@@ -0,0 +1,91 @@
++/*
++ * R-Car Generation 2 support
++ *
++ * Copyright (C) 2013  Renesas Solutions Corp.
++ * Copyright (C) 2013  Magnus Damm
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; version 2 of the License.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
++ */
++
++#include <linux/clocksource.h>
++#include <linux/io.h>
++#include <linux/kernel.h>
++#include <mach/common.h>
++#include <mach/rcar-gen2.h>
++#include <asm/mach/arch.h>
++
++#define MODEMR 0xe6160060
++
++u32 __init rcar_gen2_read_mode_pins(void)
++{
++	void __iomem *modemr = ioremap_nocache(MODEMR, 4);
++	u32 mode;
++
++	BUG_ON(!modemr);
++	mode = ioread32(modemr);
++	iounmap(modemr);
++
++	return mode;
++}
++
++#define CNTCR 0
++#define CNTFID0 0x20
++
++void __init rcar_gen2_timer_init(void)
++{
++#ifdef CONFIG_ARM_ARCH_TIMER
++	u32 mode = rcar_gen2_read_mode_pins();
++	void __iomem *base;
++	int extal_mhz = 0;
++	u32 freq;
++
++	/* At Linux boot time the r8a7790 arch timer comes up
++	 * with the counter disabled. Moreover, it may also report
++	 * a potentially incorrect fixed 13 MHz frequency. To be
++	 * correct these registers need to be updated to use the
++	 * frequency EXTAL / 2 which can be determined by the MD pins.
++	 */
++
++	switch (mode & (MD(14) | MD(13))) {
++	case 0:
++		extal_mhz = 15;
++		break;
++	case MD(13):
++		extal_mhz = 20;
++		break;
++	case MD(14):
++		extal_mhz = 26;
++		break;
++	case MD(13) | MD(14):
++		extal_mhz = 30;
++		break;
++	}
++
++	/* The arch timer frequency equals EXTAL / 2 */
++	freq = extal_mhz * (1000000 / 2);
++
++	/* Remap "armgcnt address map" space */
++	base = ioremap(0xe6080000, PAGE_SIZE);
++
++	/* Update registers with correct frequency */
++	iowrite32(freq, base + CNTFID0);
++	asm volatile("mcr p15, 0, %0, c14, c0, 0" : : "r" (freq));
++
++	/* make sure arch timer is started by setting bit 0 of CNTCR */
++	iowrite32(1, base + CNTCR);
++	iounmap(base);
++#endif /* CONFIG_ARM_ARCH_TIMER */
++
++	clocksource_of_init();
++}
