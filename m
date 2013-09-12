@@ -1,37 +1,20 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 12 Sep 2013 08:27:16 -0700
-Subject: KVM virtual timer issue with trinity
-In-Reply-To: <20130912093750.GE15357@mudshark.cambridge.arm.com>
-References: <20130906163052.GG30450@mudshark.cambridge.arm.com>
- <20130912093750.GE15357@mudshark.cambridge.arm.com>
-Message-ID: <20130912152716.GP9860@cbox>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Thu, 12 Sep 2013 16:27:54 +0100
+Subject: [PATCH v2 1/2] video: ARM CLCD: Add DT support
+In-Reply-To: <1378999581.13571.57.camel@hornet>
+References: <1378808726-32535-1-git-send-email-pawel.moll@arm.com>
+ <522F57B9.5000001@wwwdotorg.org> <1378899931.4082.75.camel@hornet>
+ <5230AAEB.2030607@wwwdotorg.org> <1378991033.13571.33.camel@hornet>
+ <5231D5FA.4060508@wwwdotorg.org> <1378999581.13571.57.camel@hornet>
+Message-ID: <1378999674.13571.59.camel@hornet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 12, 2013 at 10:37:50AM +0100, Will Deacon wrote:
-> On Fri, Sep 06, 2013 at 05:30:52PM +0100, Will Deacon wrote:
-> > Running trinity as a normal user in a KVM guest on my TC2 (A15s only)
-> > eventually leads to a situation where responsiveness is extremely sluggish.
-> > Further investigation shows that issuing a `sleep 1' command never returns.
-> > This seems to be because the virtual timer has stopped generating interrupts
-> > on CPU0 (CPU1 seems ok).
-> > 
-> > Dumping the timer state (see below), it looks like CPU0's timer expired in
-> > the past, but we're perhaps not receiving the interrupt. The trinity logs
-> > don't reveal anything obvious (and they're huge, so I can't include them
-> > here).
-> > 
-> > I can reproduce this in an hour or so, so if you want me to try anything out
-> > in the host, I can give it a go. I'm using 3.11 as both the guest and host.
-> 
-> Any ideas on things I can do to get to the bottom of this? It's preventing
-> me from running trinity to find any other issues and there's no reason you
-> couldn't hit this lockup under other workloads.
-> 
-I've been thinking on this, sorry about the late response.
+On Thu, 2013-09-12 at 16:26 +0100, Pawel Moll wrote:
+> http://arminfo.emea.arm.com/help/topic/com.arm.doc.ddi0293c/I899134.html
 
-I see something similar when resuming a suspended guest, but I don't
-have very clever ideas or debug strategies yet.  I plan on looking at
-this once I get a new revision of the save/restore QEMU patches out.
+Sorry, should be:
 
--Christoffer
+http://infocenter.arm.com/help/topic/com.arm.doc.ddi0161e/I899134.html
+
+Pawe?
