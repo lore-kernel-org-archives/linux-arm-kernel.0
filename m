@@ -1,35 +1,38 @@
-From: rdunlap@infradead.org (Randy Dunlap)
-Date: Thu, 12 Sep 2013 10:05:32 -0700
-Subject: [PATCH] dma: use %pa to print dma_addr_t
-In-Reply-To: <1378960710-15648-1-git-send-email-olof@lixom.net>
-References: <1378960710-15648-1-git-send-email-olof@lixom.net>
-Message-ID: <5231F45C.3020500@infradead.org>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 12 Sep 2013 10:06:33 -0700
+Subject: [PATCH] ARM: msm: Move msm devicetrees under a Qualcomm dir
+In-Reply-To: <25E0B143-658E-4CCC-A88A-0AF70FFF33CE@codeaurora.org>
+References: <1379003839-16068-1-git-send-email-galak@codeaurora.org>
+ <CAOesGMisWLwYKotGDFPW6PyHJs=_+fohTdC08SGjsv2FXaa7Fg@mail.gmail.com>
+ <25E0B143-658E-4CCC-A88A-0AF70FFF33CE@codeaurora.org>
+Message-ID: <CAOesGMhfdvyJ_2AA2e8iO_2e=q7KgpyNbcriPKFw-RLormG6bA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/11/13 21:38, Olof Johansson wrote:
-> This resolves some warnings seen when building with CONFIG_ARM_LPAE=y, since
-> dma_addr_t might then be 64-bit:
-> 
->   drivers/dma/imx-sdma.c:1092:3: warning: format '%x' expects argument of type 'unsigned int', but argument 6 has type 'dma_addr_t' [-Wformat=]
->   drivers/dma/imx-sdma.c:1166:3: warning: format '%x' expects argument of type 'unsigned int', but argument 6 has type 'dma_addr_t' [-Wformat=]
->   drivers/dma/imx-dma.c:579:3: warning: format '%x' expects argument of type 'unsigned int', but argument 6 has type 'dma_addr_t' [-Wformat=]
->   drivers/dma/imx-dma.c:579:3: warning: format '%x' expects argument of type 'unsigned int', but argument 7 has type 'dma_addr_t' [-Wformat=]
->   drivers/dma/imx-dma.c:593:4: warning: format '%x' expects argument of type 'unsigned int', but argument 9 has type 'dma_addr_t' [-Wformat=]
->   drivers/dma/imx-dma.c:603:4: warning: format '%x' expects argument of type 'unsigned int', but argument 9 has type 'dma_addr_t' [-Wformat=]
->   drivers/dma/imx-dma.c:930:2: warning: format '%x' expects argument of type 'unsigned int', but argument 6 has type 'dma_addr_t' [-Wformat=]
->   drivers/dma/imx-dma.c:930:2: warning: format '%x' expects argument of type 'unsigned int', but argument 7 has type 'dma_addr_t' [-Wformat=]
->   drivers/dma/imx-dma.c:960:2: warning: format '%x' expects argument of type 'unsigned int', but argument 6 has type 'dma_addr_t' [-Wformat=]
->   drivers/dma/imx-dma.c:960:2: warning: format '%x' expects argument of type 'unsigned int', but argument 7 has type 'dma_addr_t' [-Wformat=]
->   drivers/dma/ipu/ipu_idmac.c:1235:2: warning: format '%x' expects argument of type 'unsigned int', but argument 5 has type 'dma_addr_t' [-Wformat=]
+On Thu, Sep 12, 2013 at 9:53 AM, Kumar Gala <galak@codeaurora.org> wrote:
+>
+> On Sep 12, 2013, at 11:46 AM, Olof Johansson wrote:
+>
+>> On Thu, Sep 12, 2013 at 9:37 AM, Kumar Gala <galak@codeaurora.org> wrote:
+>>> Use the Qualcomm vendor prefix (qcom) as the directory name for
+>>> Qualcomm MSM devicetrees going forward.
+>>>
+>>> Signed-off-by: Kumar Gala <galak@codeaurora.org>
+>>
+>> Let's not move just one platform like this. If we are to do this, we
+>> should move everything, and that will be really painful and needs to
+>> be done in a controlled manner, probably scripted and right before a
+>> -rc1 or such.
+>
+>
+> Than I suggest we deal with it when we pull the device trees out of the kernel tree.
+>
+> As such, I'd tell Rohit to go forward with the file being named apq8074-dragonboard.dtb for the time being.
+
+My original request to please use a common prefix for your product
+families stands. Please prefix with msm-*, or if you have to, qcom-*
+instead, since you guys can't seem to make your mind up on standard
+prefixes (msm, apq, etc).
 
 
-I've been tempted to make similar patches, but CONFIG_PHYS_ADDR_T_64BIT
-and CONFIG_ARCH_DMA_ADDR_T_64BIT are independent AFAICT,
-and %pa is for physical addresses, not necessarily DMA addresses.
-
-Am I confused?
-
-
--- 
-~Randy
+-Olof
