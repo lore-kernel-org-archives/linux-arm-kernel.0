@@ -1,154 +1,102 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Thu, 12 Sep 2013 14:03:53 +0100
-Subject: [PATCH v2 1/2] video: ARM CLCD: Add DT support
-In-Reply-To: <5230AAEB.2030607@wwwdotorg.org>
-References: <1378808726-32535-1-git-send-email-pawel.moll@arm.com>
- <522F57B9.5000001@wwwdotorg.org> <1378899931.4082.75.camel@hornet>
- <5230AAEB.2030607@wwwdotorg.org>
-Message-ID: <1378991033.13571.33.camel@hornet>
+From: rogerq@ti.com (Roger Quadros)
+Date: Thu, 12 Sep 2013 16:11:59 +0300
+Subject: [PATCH 1/7] usb: dwc3: get "usb_phy" only if the platform
+ indicates the presence of PHY
+In-Reply-To: <CAFp+6iGzV4auP0AeySen2Qk6wEJM-xsTnQmfwMQDtp2tg1FMkQ@mail.gmail.com>
+References: <1378136591-7463-1-git-send-email-kishon@ti.com>
+ <1378136591-7463-2-git-send-email-kishon@ti.com> <52319912.8030203@ti.com>
+ <CAFp+6iE+xbSWWp2bNc5MRSUrA4Fi6qVU4vhR4+mtZHZGidkMGg@mail.gmail.com>
+ <52319FC4.8040703@ti.com>
+ <CAFp+6iGzV4auP0AeySen2Qk6wEJM-xsTnQmfwMQDtp2tg1FMkQ@mail.gmail.com>
+Message-ID: <5231BD9F.4020105@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On Wed, 2013-09-11 at 18:39 +0100, Stephen Warren wrote:
-> > From the core's perspective it's just a bit of extra memory, you could,
-> > for example, put a MTD ram disk on it. It seems to deserve a
-> > representation in the tree then.
+On 09/12/2013 02:26 PM, Vivek Gautam wrote:
+> Hi,
 > 
-> Yes, that's a good point. Perhaps it is reasonable to represent the
-> memory somewhere then.
 > 
-> I don't see why this memory couldn't exist in the regular /memory node;
-> it is after all (admittedly slow) RAM. Obviously you'd want to cover the
-> region with a /memreserve/ to avoid it being used just like any other
-> RAM. 
-
-This would be pretty tricky in my particular case... The sram chip lives
-on a motherboard, which lives behind a static memory interface (Chip
-Select + offset). And the memreserve can only take "top level" address,
-which can be different depending on the test chip (SoC) or FPGA SMM
-being used.
-
-> Perhaps the CLCD could reference the memreserve then?
-
-How do you mean reference the memreserve? It's not a node, I don't think you can get
-a phandle to it...
-
-> Alternatively, if you want to represent the region as a regular node
-> rather than a /memory entry, I'd expect there to be a binding defining
-> what that node was, and the node to at least have a compatible value as
-> well. I'm not sure how you would indicate that the node should be MTD
-> vs. a resource for CLCD though; perhaps you'd use a different compatible
-> value depending on the intended use of the memory?
-
-Yes, that's exactly what I have now:
-
-                psram at 1,00000000 { 
-                        compatible = "arm,vexpress-psram", "mtd-ram";
-                        reg = <1 0x00000000 0x02000000>;
-                        bank-width = <4>;
-                };
-                
-                vram at 2,00000000 {
-                        compatible = "arm,vexpress-vram";
-                        reg = <2 0x00000000 0x00800000>;
-                };
-
-which allows mtd to use the psram.
-
-> >> I'm not sure what the benefit of making this a standalone node is; why
-> >> not just put the base/size directly into the video-ram property in the
-> >> CLCD node?
-> > 
-> > This is certainly an option. I've considered this as well, but thought
-> > that the above made more sense.
-> > 
-> > Having said that, there is actually a use case, although a very
-> > non-probable one, for having a direct number there... The interconnect
-> > that CLCD is connected to could have different mapping than the
-> > processor's one. In other word, the memory seen by the core at X, could
-> > be accessed by the CLCD at Y. Or, in even more quirky situation, the
-> > core may not have access to the memory at all, with the graphics being
-> > generated only by GPU (or any other third party). Then the value would
-> > mean "the address you have to use when generating AMBA read transactions
-> > to be get some meaningful data" and would have to be known explicitly.
-> > 
-> > I guess it won't be hard to convince me it's a better option ;-)
+> On Thu, Sep 12, 2013 at 4:34 PM, Roger Quadros <rogerq@ti.com> wrote:
+>> Hi,
+>>
+>> On 09/12/2013 01:47 PM, Vivek Gautam wrote:
+>>> On Thu, Sep 12, 2013 at 4:06 PM, Roger Quadros <rogerq@ti.com> wrote:
+>>>> Hi Kishon,
+>>>>
+>>>> On 09/02/2013 06:43 PM, Kishon Vijay Abraham I wrote:
+>>>>> There can be systems which does not have a external usb_phy, so get
+>>>>> usb_phy only if usb-phy property is added in the case of dt boot or if
+>>>>> platform_data indicates the presence of PHY. Also remove checking if
+>>>>> return value is -ENXIO since it's now changed to always enable usb_phy layer.
+>>>>>
+>>>>> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+>>>>> ---
+>>>>>  drivers/usb/dwc3/Kconfig         |    1 +
+>>>>>  drivers/usb/dwc3/core.c          |   60 +++++++++++++++++---------------------
+>>>>>  drivers/usb/dwc3/platform_data.h |    1 +
+>>>>>  3 files changed, 28 insertions(+), 34 deletions(-)
+>>>>>
+>>>>> diff --git a/drivers/usb/dwc3/Kconfig b/drivers/usb/dwc3/Kconfig
+>>>>> index f969ea2..cfc16dd 100644
+>>>>> --- a/drivers/usb/dwc3/Kconfig
+>>>>> +++ b/drivers/usb/dwc3/Kconfig
+>>>>> @@ -2,6 +2,7 @@ config USB_DWC3
+>>>>>       tristate "DesignWare USB3 DRD Core Support"
+>>>>>       depends on (USB || USB_GADGET) && GENERIC_HARDIRQS && HAS_DMA
+>>>>>       depends on EXTCON
+>>>>> +     select USB_PHY
+>>>>>       select USB_XHCI_PLATFORM if USB_SUPPORT && USB_XHCI_HCD
+>>>>>       help
+>>>>>         Say Y or M here if your system has a Dual Role SuperSpeed
+>>>>> diff --git a/drivers/usb/dwc3/core.c b/drivers/usb/dwc3/core.c
+>>>>> index 474162e..428c29e 100644
+>>>>> --- a/drivers/usb/dwc3/core.c
+>>>>> +++ b/drivers/usb/dwc3/core.c
+>>>>> @@ -387,16 +387,38 @@ static int dwc3_probe(struct platform_device *pdev)
+>>>>>       if (node) {
+>>>>>               dwc->maximum_speed = of_usb_get_maximum_speed(node);
+>>>>>
+>>>>> -             dwc->usb2_phy = devm_usb_get_phy_by_phandle(dev, "usb-phy", 0);
+>>>>> -             dwc->usb3_phy = devm_usb_get_phy_by_phandle(dev, "usb-phy", 1);
+>>>>> +             if (of_property_read_bool(node, "usb-phy")) {
+>>>>> +                     dwc->usb2_phy = devm_usb_get_phy_by_phandle(dev,
+>>>>> +                             "usb-phy", 0);
+>>>>> +                     if (IS_ERR(dwc->usb2_phy))
+>>>>> +                             return PTR_ERR(dwc->usb2_phy);
+>>>>> +                     dwc->usb3_phy = devm_usb_get_phy_by_phandle(dev,
+>>>>> +                             "usb-phy", 1);
+>>>>> +                     if (IS_ERR(dwc->usb3_phy))
+>>>>> +                             return PTR_ERR(dwc->usb3_phy);
+>>>>
+>>>> Some DWC3 instances use only usb2_phy. e.g. on DRA7 the 2nd dwc3 instance doesn't use usb3_phy.
+>>>> This needs to be a valid case and driver shouldn't error out.
+>>>
+>>> So, i think adding flexibility to DWC3 to have either
+>>> usb2-phy/usb3-phy or both of them seems to be valid point.
+>>> Any suggestions ?
+>>>
+>>
+>> For high speed operation we need only usb2_phy but for super speed we need both usb2_phy
+>> and usb3_phy.
+>>
+>> Why would a dwc3 controller use only usb3_phy? A USB3.0 interface has to be compatible with
+>> USB2.0 as well, no?
 > 
-> That's true. Everything in DT is currently set up to describe the CPU's
-> memory map. Either we need to add some more properties to describe the
-> potentially different memory map for other bus masters, and/or we should
-> represent the various buses in DT, and any driver doing DMA should ask
-> each bus's driver in turn to translate the core-visible address to a bus
-> address so we can eventually end up with the address needed by the bus
-> masters.
+> True and for that reason we need both UTMI+ interface as well as PIPE3
+> interface, right ?
+> But as also mentioned in the thread:
+> https://lkml.org/lkml/2013/9/12/181, on Samsung exynos5
+> architecturally same block is managing UTMI+ and PIPE3 interfaces,
+> which is handled by phy-samsung-usb3 driver and denoted by "usb3_phy:
+> usbphy at 12100000" node in "arch/arm/boot/dts/exynos5250.dtsi".
 > 
-> That is indeed complex, and could at least in many situations simple be
-> short-circuited by putting the relevant base address in each other bus
-> master's own node/property. Hopefully we wouldn't get bitten by how
-> non-general that could be.
+> So on exynos5250, DWC3 really needs just usb3-phy, which is compatible
+> for USB 2.0 as well.
 
-Ok, so I'll make it a arm,pl11x,specific property. Actually two
-properties - one bit I missed was the dual STN panel case, where they
-have separate frame buffers. Something along the lines of:
+I'm not familiar with exynos5250 dwc3, but looking at the dts file I can see both usb3_phy
+and usb2_phy nodes and both are referenced in the dwc3 node.
 
-Optional:
+The ehci and ohci controllers don't reference any PHY.
 
-- arm,pl11x,framebuffer-base: a pair of two values, address and size,
-				defining the framebuffer for the upper
-				(or the only one) panel
-- arm,pl11x,lower-framebuffer-base: as above, for the lower STN panel,
-					when present
-
-Being very hardware-specific, it covers all possible quirky scenarios,
-at the same time does not exclude the option of using the CMA region
-phandles, if a particular system needed it.
-
-> > - max-memory-bandwidth: maximum bandwidth in bytes per second that the
-> > 			cell's memory interface can handle
-> > 
-> > and can be then used to calculate maximum bpp depending on the selected
-> > mode.
-> 
-> Yes, that's a better property definition.
-
-Ok, I'll go that way then. Whether derived from the system design
-characteristics or by "hands on experiments", seems hardware-y enough.
-
-> >>> +- display-timings: standard display timings sub-node, see
-> >>> +			Documentation/devicetree/bindings/video/display-timing.txt
-> >>
-> >> Should that be in a "Required sub-nodes" section (I assume required not
-> >> optional) rather than "Optional Properties"?
-> > 
-> > Right, the whole "panel" section is kept separately in a hope that CDF
-> > (or DRM or whatever ;-) generic display pipeline bindings will deprecate
-> > it. So the display-timings is required when optional panel properties
-> > are present. Maybe I should split them into a separate sub-node?
-> > Something along these lines (including the bandwidth example):
-> 
-> I would assume that TFT-vs-STN is a pretty direct representation of the
-> HW (IO bus to panel in particular), and hence wouldn't be replaced by
-> CDF? I would expect CDF to represent the more generic properties. But, I
-> haven't been following CDF too closely, so perhaps that's not true.
-
-I'm not expecting CDF *bindings* to carry this information, no. I'm
-expecting CDF core to provide me with this data in runtime (here's the
-panel; what kind of panel are you? what modes do you provide? etc.) and
-this is what my initial experiments used. The CLCD node only had the
-video-ram and bandwidth-like properties plus a phandle to the display. 
-
-> If you're expecting this binding to change if/when CDF appears, perhaps
-> it'd be better to wait for CDF, or plan for a new compatible property at
-> that time, or add some property indicating old-style configuration vs
-> new-style configuration once CDF is supported?
-
-I'm expecting the panel description inside the CLCD node to be
-deprecated, not changed, by the mythical CDF. As to waiting for it...
-well. It's been over a year since first proposal ("generic panel
-framework" as was it called then ;-). And over 2 years since VE gained
-"DT support except for CLCD, which should be ready soon" ;-) And than 2
-or 3 new platforms had to keep auxdata only for CLCD's sake. So, sure -
-we can wait :-)
-
-Pawe?
+cheers,
+-roger
