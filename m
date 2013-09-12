@@ -1,104 +1,101 @@
-From: gautamvivek1987@gmail.com (Vivek Gautam)
-Date: Thu, 12 Sep 2013 16:56:34 +0530
-Subject: [PATCH 1/7] usb: dwc3: get "usb_phy" only if the platform
- indicates the presence of PHY
-In-Reply-To: <52319FC4.8040703@ti.com>
-References: <1378136591-7463-1-git-send-email-kishon@ti.com>
- <1378136591-7463-2-git-send-email-kishon@ti.com>
- <52319912.8030203@ti.com>
- <CAFp+6iE+xbSWWp2bNc5MRSUrA4Fi6qVU4vhR4+mtZHZGidkMGg@mail.gmail.com>
- <52319FC4.8040703@ti.com>
-Message-ID: <CAFp+6iGzV4auP0AeySen2Qk6wEJM-xsTnQmfwMQDtp2tg1FMkQ@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 12 Sep 2013 12:24:52 +0100
+Subject: [PATCH 3/4] Add physical count arch timer support for
+ clocksource in ARMv7.
+In-Reply-To: <1378968687-8200-4-git-send-email-cinifr@gmail.com>
+References: <1378968687-8200-1-git-send-email-cinifr@gmail.com>
+ <1378968687-8200-4-git-send-email-cinifr@gmail.com>
+Message-ID: <20130912112452.GA22013@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Sep 12, 2013 at 07:51:26AM +0100, Fan Rong wrote:
+> Signed-off-by: Fan Rong <cinifr@gmail.com>
+> ---
+>  arch/arm/include/asm/arch_timer.h    |   11 +++++++++++
+>  drivers/clocksource/Kconfig          |    8 ++++++++
+>  drivers/clocksource/arm_arch_timer.c |   10 +++++++++-
+>  3 files changed, 28 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/include/asm/arch_timer.h b/arch/arm/include/asm/arch_timer.h
+> index 5665134..24c904a 100644
+> --- a/arch/arm/include/asm/arch_timer.h
+> +++ b/arch/arm/include/asm/arch_timer.h
+> @@ -87,6 +87,17 @@ static inline u64 arch_counter_get_cntvct(void)
+>  	return cval;
+>  }
+>  
+> +static inline u64 arch_counter_get_cntpct(void)
+> +{
+> +	u64 cval;
+> +
+> +	isb();
+> +	asm volatile("mrrc p15, 0, %Q0, %R0, c14" : "=r" (cval));
+> +	return cval;
+> +}
+> +
+> +
+> +
+>  static inline void arch_counter_set_user_access(void)
+>  {
+>  	u32 cntkctl;
+> diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+> index 41c6946..a4981d2 100644
+> --- a/drivers/clocksource/Kconfig
+> +++ b/drivers/clocksource/Kconfig
+> @@ -109,3 +109,11 @@ config VF_PIT_TIMER
+>  	bool
+>  	help
+>  	  Support for Period Interrupt Timer on Freescale Vybrid Family SoCs.
+> +menu "Clock Source"
+> +
+> +config ARM_ARCH_TIMER_USE_PHYCNT
+> +	bool "Use Physical Count Timer"
+> +	depends on ARM_ARCH_TIMER
+> +	help
+> +          If bootloader dont set Virtual Offset register,Physical Count Timer is needed to replace Virtual Count Timer.
+> +endmenu
 
+This cannot be a compile-time option as above in a multiplatform build.
+Other paltforms (e.g. KVM guests) *must* use the virtual counters to get
+any semblance of a consistent view of time.
 
-On Thu, Sep 12, 2013 at 4:34 PM, Roger Quadros <rogerq@ti.com> wrote:
-> Hi,
->
-> On 09/12/2013 01:47 PM, Vivek Gautam wrote:
->> On Thu, Sep 12, 2013 at 4:06 PM, Roger Quadros <rogerq@ti.com> wrote:
->>> Hi Kishon,
->>>
->>> On 09/02/2013 06:43 PM, Kishon Vijay Abraham I wrote:
->>>> There can be systems which does not have a external usb_phy, so get
->>>> usb_phy only if usb-phy property is added in the case of dt boot or if
->>>> platform_data indicates the presence of PHY. Also remove checking if
->>>> return value is -ENXIO since it's now changed to always enable usb_phy layer.
->>>>
->>>> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
->>>> ---
->>>>  drivers/usb/dwc3/Kconfig         |    1 +
->>>>  drivers/usb/dwc3/core.c          |   60 +++++++++++++++++---------------------
->>>>  drivers/usb/dwc3/platform_data.h |    1 +
->>>>  3 files changed, 28 insertions(+), 34 deletions(-)
->>>>
->>>> diff --git a/drivers/usb/dwc3/Kconfig b/drivers/usb/dwc3/Kconfig
->>>> index f969ea2..cfc16dd 100644
->>>> --- a/drivers/usb/dwc3/Kconfig
->>>> +++ b/drivers/usb/dwc3/Kconfig
->>>> @@ -2,6 +2,7 @@ config USB_DWC3
->>>>       tristate "DesignWare USB3 DRD Core Support"
->>>>       depends on (USB || USB_GADGET) && GENERIC_HARDIRQS && HAS_DMA
->>>>       depends on EXTCON
->>>> +     select USB_PHY
->>>>       select USB_XHCI_PLATFORM if USB_SUPPORT && USB_XHCI_HCD
->>>>       help
->>>>         Say Y or M here if your system has a Dual Role SuperSpeed
->>>> diff --git a/drivers/usb/dwc3/core.c b/drivers/usb/dwc3/core.c
->>>> index 474162e..428c29e 100644
->>>> --- a/drivers/usb/dwc3/core.c
->>>> +++ b/drivers/usb/dwc3/core.c
->>>> @@ -387,16 +387,38 @@ static int dwc3_probe(struct platform_device *pdev)
->>>>       if (node) {
->>>>               dwc->maximum_speed = of_usb_get_maximum_speed(node);
->>>>
->>>> -             dwc->usb2_phy = devm_usb_get_phy_by_phandle(dev, "usb-phy", 0);
->>>> -             dwc->usb3_phy = devm_usb_get_phy_by_phandle(dev, "usb-phy", 1);
->>>> +             if (of_property_read_bool(node, "usb-phy")) {
->>>> +                     dwc->usb2_phy = devm_usb_get_phy_by_phandle(dev,
->>>> +                             "usb-phy", 0);
->>>> +                     if (IS_ERR(dwc->usb2_phy))
->>>> +                             return PTR_ERR(dwc->usb2_phy);
->>>> +                     dwc->usb3_phy = devm_usb_get_phy_by_phandle(dev,
->>>> +                             "usb-phy", 1);
->>>> +                     if (IS_ERR(dwc->usb3_phy))
->>>> +                             return PTR_ERR(dwc->usb3_phy);
->>>
->>> Some DWC3 instances use only usb2_phy. e.g. on DRA7 the 2nd dwc3 instance doesn't use usb3_phy.
->>> This needs to be a valid case and driver shouldn't error out.
->>
->> So, i think adding flexibility to DWC3 to have either
->> usb2-phy/usb3-phy or both of them seems to be valid point.
->> Any suggestions ?
->>
->
-> For high speed operation we need only usb2_phy but for super speed we need both usb2_phy
-> and usb3_phy.
->
-> Why would a dwc3 controller use only usb3_phy? A USB3.0 interface has to be compatible with
-> USB2.0 as well, no?
+Why can the bootloader not be fixed to set CNTVOFF (or to boot the
+kernel in Hyp mode)?
 
-True and for that reason we need both UTMI+ interface as well as PIPE3
-interface, right ?
-But as also mentioned in the thread:
-https://lkml.org/lkml/2013/9/12/181, on Samsung exynos5
-architecturally same block is managing UTMI+ and PIPE3 interfaces,
-which is handled by phy-samsung-usb3 driver and denoted by "usb3_phy:
-usbphy at 12100000" node in "arch/arm/boot/dts/exynos5250.dtsi".
+Thanks,
+Mark.
 
-So on exynos5250, DWC3 really needs just usb3-phy, which is compatible
-for USB 2.0 as well.
-
->
-> cheers,
-> -roger
->
-
-
-
--- 
-Best Regards
-Vivek
+> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+> index fbd9ccd..884e4d1 100644
+> --- a/drivers/clocksource/arm_arch_timer.c
+> +++ b/drivers/clocksource/arm_arch_timer.c
+> @@ -372,7 +372,11 @@ static u64 arch_counter_get_cntvct_mem(void)
+>   * to exist on arm64. arm doesn't use this before DT is probed so even
+>   * if we don't have the cp15 accessors we won't have a problem.
+>   */
+> -u64 (*arch_timer_read_counter)(void) = arch_counter_get_cntvct;
+> +#ifdef CONFIG_ARM_ARCH_TIMER_USE_PHYCNT
+> +	u64 (*arch_timer_read_counter)(void) = arch_counter_get_cntpct;
+> +#else
+> +	u64 (*arch_timer_read_counter)(void) = arch_counter_get_cntvct;
+> +#endif
+>  
+>  static cycle_t arch_counter_read(struct clocksource *cs)
+>  {
+> @@ -410,7 +414,11 @@ static void __init arch_counter_register(unsigned type)
+>  
+>  	/* Register the CP15 based counter if we have one */
+>  	if (type & ARCH_CP15_TIMER)
+> +#ifdef CONFIG_ARM_ARCH_TIMER_USE_PHYCNT
+> +		arch_timer_read_counter = arch_counter_get_cntpct;
+> +#else
+>  		arch_timer_read_counter = arch_counter_get_cntvct;
+> +#endif
+>  	else
+>  		arch_timer_read_counter = arch_counter_get_cntvct_mem;
+>  
+> -- 
+> 1.7.9.5
+> 
+> 
