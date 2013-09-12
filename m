@@ -1,103 +1,112 @@
-From: holler@ahsoftware.de (Alexander Holler)
-Date: Thu, 12 Sep 2013 13:37:53 +0200
-Subject: [PATCH] RFC: interrupt consistency check for OF GPIO IRQs
-In-Reply-To: <5231A4FE.1070704@ahsoftware.de>
-References: <1375101368-17645-1-git-send-email-linus.walleij@linaro.org>
- <CACxGe6uNJNMdZ1HYGgCtLM2t2TWGCR6btjOHVmP=vDXXvvFfRg@mail.gmail.com>
- <CACRpkdYjJL6FZwEbB7XLnb9QtjB=3LeE9Ny6KQ4PkM3zpdNqqg@mail.gmail.com>
- <344239800.bDEkDg48ZQ@avalon>
- <CACRpkdavR=fv+y1RCNfdgQypPuRbO6isOSwGsABDrYiGeMdyZw@mail.gmail.com>
- <52308C91.2000105@ahsoftware.de> <523096FE.8080901@collabora.co.uk>
- <5230AB6E.1070807@ahsoftware.de> <5231817F.8000901@ahsoftware.de>
- <5231934D.4060706@collabora.co.uk> <52319741.5050407@ahsoftware.de>
- <5231A0F8.1070505@ahsoftware.de> <5231A4FE.1070704@ahsoftware.de>
-Message-ID: <5231A791.9080600@ahsoftware.de>
+From: chanho61.park@samsung.com (Chanho Park)
+Date: Thu, 12 Sep 2013 20:40:32 +0900
+Subject: [PATCH 1/3] dmaengine: pl330: Set residue in tx_status callback.
+In-Reply-To: <1378879685-5352-2-git-send-email-padma.v@samsung.com>
+References: <1378879685-5352-1-git-send-email-padma.v@samsung.com>
+ <1378879685-5352-2-git-send-email-padma.v@samsung.com>
+Message-ID: <00b401ceafac$e3a88170$aaf98450$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 12.09.2013 13:26, schrieb Alexander Holler:
-> Am 12.09.2013 13:09, schrieb Alexander Holler:
->> Am 12.09.2013 12:28, schrieb Alexander Holler:
->>> Am 12.09.2013 12:11, schrieb Javier Martinez Canillas:
->>>> On 09/12/2013 10:55 AM, Alexander Holler wrote:
->>>
-...
->>>
->>>> So, if I understood the code correctly the DT IRQ core doesn't expect
->>>> a device
->>>> node to have more than one "interrupt-parent" property.
->>>>
->>>> It *should* work though if you have multiple "interrupts" properties
->>>> defined and
->>>> all of them have the same "interrupt-parent":
->>>>
->>>>         interrupt-parent = <&gpio6>;
->>>>         interrupts = <1 IRQF_TRIGGER_HIGH>; /* GPIO6_1 */
->>>>         interrupts = <2 IRQF_TRIGGER_LOW>; /* GPIO6_2 */
->>>>
->>>> since of_irq_map_one() will be called for each "interrupts" and the
->>>> correct
->>>> "interrupt-parent" will get obtained by of_irq_find_parent().
->>>
->>> I assumed that answer. So to make such a scenario possible, something
->>> like this might be neccessary:
->>>
->>>           interrupts = <&gpio6 1 IRQF_TRIGGER_HIGH>; /* GPIO6_1 */
->>>           interrupts = <&gpio7 2 IRQF_TRIGGER_LOW>; /* GPIO7_2 */
->>>
->>> or, to be compatible
->>>
->>>           interrupts = <1 IRQF_TRIGGER_HIGH &gpio6>; /* GPIO6_1 */
->>>           interrupts = <1 IRQF_TRIGGER_LOW &gpio7>; /* GPIO7_1 */
->>>
->>> Another problem is the naming. In all the above cases, the driver would
->>> not know which IRQ he should use for what. Maybe the order defines it,
->>> but that wouldn't be very verbose. And I think just changing the name
->>> would make travelling the tree impossible, as only the driver itself
->>> would know the name and it's meaning.
->>
->> On a second look, travelling the tree is still possible if the solution
->> would be like above (without that interrupt-parent). So if a driver
->> requires two interrupts he could use
->>
->>        interrupt-foo = <1 IRQF_TRIGGER_HIGH &gpio6>; /* GPIO6_1 */
->>        interrupt-bar = <1 IRQF_TRIGGER_LOW &gpio7>; /* GPIO7_1 */
->>
->> And travelling the tree will still be possible because walking from the
->> interrupt-controllers (those gpio) downwards would end up at the
->> interrupt definitions, so the name of them isn't needed to find them in
->> the tree.
->
-> I've just seen how they solved it for dma:
->
->              dmas = <&edma0 16
->                  &edma0 17>;
->              dma-names = "rx", "tx";
->
-> so it would be like
->
->        interrupts = <1 IRQF_TRIGGER_HIGH &gpio6>; /* GPIO6_1 */
->        interrupts = <1 IRQF_TRIGGER_LOW &gpio7>; /* GPIO7_1 */
->        interrupt-names = "foo", "bar";
->
-> Or this would be possible:
->
->        interrupt-parent = <&gpio6 &gpio7>;
->        interrupts = <1 IRQF_TRIGGER_HIGH>; /* GPIO6_1 */
->        interrupts = <1 IRQF_TRIGGER_LOW>; /* GPIO7_1 */
->        interrupt-names = "foo", "bar";
->
+Hi Padmavathi,
 
-And looking at how gpios are defined, I think it should be like that:
+> -----Original Message-----
+> From: linux-arm-kernel [mailto:linux-arm-kernel-
+> bounces at lists.infradead.org] On Behalf Of Padmavathi Venna
+> Sent: Wednesday, September 11, 2013 3:08 PM
+> To: linux-samsung-soc at vger.kernel.org; linux-arm-
+> kernel at lists.infradead.org; padma.v at samsung.com; padma.kvr at gmail.com
+> Cc: kgene.kim at samsung.com; arnd at arndb.de; sbkim73 at samsung.com;
+> vinod.koul at intel.com; broonie at kernel.org; dgreid at chromium.org;
+> olofj at chromium.org
+> Subject: [PATCH 1/3] dmaengine: pl330: Set residue in tx_status callback.
+> 
+> From: Dylan Reid <dgreid@chromium.org>
+> 
+> Fill txstate.residue with the amount of bytes remaining in the current
+> transfer if the transfer is not complete.  This will be of particular use
+> to i2s DMA transfers, providing more accurate hw_ptr values to ASoC.
+> 
+> Signed-off-by: Dylan Reid <dgreid@chromium.org>
+> Reviewed-by: Olof Johansson <olofj@chromium.org>
+> Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
+> ---
+>  drivers/dma/pl330.c |   55
+> ++++++++++++++++++++++++++++++++++++++++++++++++++-
+>  1 files changed, 54 insertions(+), 1 deletions(-)
+> 
+> diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c index
+> 593827b..7ab9136 100644
+> --- a/drivers/dma/pl330.c
+> +++ b/drivers/dma/pl330.c
+> @@ -2476,11 +2476,64 @@ static void pl330_free_chan_resources(struct
+> dma_chan *chan)
+>  	spin_unlock_irqrestore(&pch->lock, flags);  }
+> 
+> +static inline int
+> +pl330_src_addr_in_desc(struct dma_pl330_desc *desc, unsigned int sar) {
+> +	return ((desc->px.src_addr <= sar) &&
+> +		(sar <= (desc->px.src_addr + desc->px.bytes))); }
+> +
+> +static inline int
+> +pl330_dst_addr_in_desc(struct dma_pl330_desc *desc, unsigned int dar) {
+> +	return ((desc->px.dst_addr <= dar) &&
+> +		(dar <= (desc->px.dst_addr + desc->px.bytes))); }
+> +
+> +static unsigned int pl330_tx_residue(struct dma_chan *chan) {
+> +	struct dma_pl330_chan *pch = to_pchan(chan);
+> +	void __iomem *regs = pch->dmac->pif.base;
+> +	struct pl330_thread *thrd = pch->pl330_chid;
+> +	struct dma_pl330_desc *desc;
+> +	unsigned int sar, dar;
+> +	unsigned int residue = 0;
+> +	unsigned long flags;
+> +
+> +	sar = readl(regs + SA(thrd->id));
+> +	dar = readl(regs + DA(thrd->id));
+> +
+> +	spin_lock_irqsave(&pch->lock, flags);
+> +
+> +	/* Find the desc related to the current buffer. */
+> +	list_for_each_entry(desc, &pch->work_list, node) {
+> +		if (desc->rqcfg.src_inc && pl330_src_addr_in_desc(desc,
+> sar)) {
+> +			residue = desc->px.bytes - (sar -
+desc->px.src_addr);
+> +			goto found_unlock;
+> +		}
+> +		if (desc->rqcfg.dst_inc && pl330_dst_addr_in_desc(desc,
+> dar)) {
+> +			residue = desc->px.bytes - (dar -
+desc->px.dst_addr);
+> +			goto found_unlock;
+> +		}
+> +	}
+> +
+> +found_unlock:
+> +	spin_unlock_irqrestore(&pch->lock, flags);
+> +
+> +	return residue;
+> +}
+> +
+>  static enum dma_status
+>  pl330_tx_status(struct dma_chan *chan, dma_cookie_t cookie,
+>  		 struct dma_tx_state *txstate)
+>  {
+> -	return dma_cookie_status(chan, cookie, txstate);
+> +	enum dma_status ret;
+> +
+> +	ret = dma_cookie_status(chan, cookie, txstate);
+> +	if (ret != DMA_SUCCESS) /* Not complete, check amount left. */
+> +		dma_set_residue(txstate, pl330_tx_residue(chan));
+> +
+> +	return ret;
 
+Why didn't you use a cookie value to track the request?
+The cookie is assigned when each transfer is submitted.
+If you save the value in the desc, we can find the request easily.
 
-           interrupts = <&gpio6 1 IRQF_TRIGGER_HIGH
-                         &gpio7 2 IRQF_TRIGGER_LOW
-           >;
-           interrupt-names = "foo", "bar";
+Thanks,
 
-So without that interrupt-parent.
-
-Regards,
-
-Alexander
+Best  Regards,
+Chanho Park
