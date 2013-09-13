@@ -1,10 +1,10 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 13 Sep 2013 18:30:58 +0530
-Subject: [PATCH 112/228] cpufreq: p4: don't initialize part of policy that is
+Date: Fri, 13 Sep 2013 18:30:59 +0530
+Subject: [PATCH 113/228] cpufreq: pcc: don't initialize part of policy that is
  set by core too
 In-Reply-To: <cover.1379063063.git.viresh.kumar@linaro.org>
 References: <cover.1379063063.git.viresh.kumar@linaro.org>
-Message-ID: <bb01f4097f78c027a078feba6e54c2b8d2daaf33.1379063063.git.viresh.kumar@linaro.org>
+Message-ID: <980fc9e44953ea5b8d13284ae62a8f2c00130453.1379063063.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,23 +14,28 @@ this driver doesn't need to do it. This patch removes such code.
 Most recent of those changes is to call ->get() in the core after calling
 ->init().
 
-Cc: David S. Miller <davem@davemloft.net>
 Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- drivers/cpufreq/p4-clockmod.c | 1 -
- 1 file changed, 1 deletion(-)
+ drivers/cpufreq/pcc-cpufreq.c | 7 -------
+ 1 file changed, 7 deletions(-)
 
-diff --git a/drivers/cpufreq/p4-clockmod.c b/drivers/cpufreq/p4-clockmod.c
-index 4fe6d4c..6164c1c 100644
---- a/drivers/cpufreq/p4-clockmod.c
-+++ b/drivers/cpufreq/p4-clockmod.c
-@@ -230,7 +230,6 @@ static int cpufreq_p4_cpu_init(struct cpufreq_policy *policy)
- 	/* the transition latency is set to be 1 higher than the maximum
- 	 * transition latency of the ondemand governor */
- 	policy->cpuinfo.transition_latency = 10000001;
--	policy->cur = stock_freq;
+diff --git a/drivers/cpufreq/pcc-cpufreq.c b/drivers/cpufreq/pcc-cpufreq.c
+index 78787e9..ef66347 100644
+--- a/drivers/cpufreq/pcc-cpufreq.c
++++ b/drivers/cpufreq/pcc-cpufreq.c
+@@ -559,13 +559,6 @@ static int pcc_cpufreq_cpu_init(struct cpufreq_policy *policy)
+ 		ioread32(&pcch_hdr->nominal) * 1000;
+ 	policy->min = policy->cpuinfo.min_freq =
+ 		ioread32(&pcch_hdr->minimum_frequency) * 1000;
+-	policy->cur = pcc_get_freq(cpu);
+-
+-	if (!policy->cur) {
+-		pr_debug("init: Unable to get current CPU frequency\n");
+-		result = -EINVAL;
+-		goto out;
+-	}
  
- 	return cpufreq_table_validate_and_show(policy, &p4clockmod_table[0]);
- }
+ 	pr_debug("init: policy->max is %d, policy->min is %d\n",
+ 		policy->max, policy->min);
 -- 
 1.7.12.rc2.18.g61b472e
