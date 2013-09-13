@@ -1,9 +1,9 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 13 Sep 2013 18:30:15 +0530
-Subject: [PATCH 069/228] cpufreq: kirkwood: Use generic cpufreq routines
+Date: Fri, 13 Sep 2013 18:30:18 +0530
+Subject: [PATCH 072/228] cpufreq: maple: Use generic cpufreq routines
 In-Reply-To: <cover.1379063063.git.viresh.kumar@linaro.org>
 References: <cover.1379063063.git.viresh.kumar@linaro.org>
-Message-ID: <c1cbe4428eb9708c437c9f63e661e6a82260b4cb.1379063063.git.viresh.kumar@linaro.org>
+Message-ID: <5de7061f2f4c1038a288a24d86054cbb56ef5fa9.1379063063.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,56 +13,52 @@ by cpufreq drivers then.
 
 This patch uses these generic routines for this driver.
 
-Cc: Andrew Lunn <andrew@lunn.ch>
+Cc: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
 Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- drivers/cpufreq/kirkwood-cpufreq.c | 22 +++-------------------
- 1 file changed, 3 insertions(+), 19 deletions(-)
+ drivers/cpufreq/maple-cpufreq.c | 14 ++------------
+ 1 file changed, 2 insertions(+), 12 deletions(-)
 
-diff --git a/drivers/cpufreq/kirkwood-cpufreq.c b/drivers/cpufreq/kirkwood-cpufreq.c
-index 59cbb35..1a4e4f4 100644
---- a/drivers/cpufreq/kirkwood-cpufreq.c
-+++ b/drivers/cpufreq/kirkwood-cpufreq.c
-@@ -102,11 +102,6 @@ static void kirkwood_cpufreq_set_cpu_state(struct cpufreq_policy *policy,
- 	cpufreq_notify_transition(policy, &freqs, CPUFREQ_POSTCHANGE);
+diff --git a/drivers/cpufreq/maple-cpufreq.c b/drivers/cpufreq/maple-cpufreq.c
+index b3fb661..b23d1d8 100644
+--- a/drivers/cpufreq/maple-cpufreq.c
++++ b/drivers/cpufreq/maple-cpufreq.c
+@@ -64,11 +64,6 @@ static struct cpufreq_frequency_table maple_cpu_freqs[] = {
+ 	{0,			CPUFREQ_TABLE_END},
  };
  
--static int kirkwood_cpufreq_verify(struct cpufreq_policy *policy)
--{
--	return cpufreq_frequency_table_verify(policy, kirkwood_freq_table);
--}
--
- static int kirkwood_cpufreq_target(struct cpufreq_policy *policy,
- 			    unsigned int target_freq,
- 			    unsigned int relation)
-@@ -132,25 +127,14 @@ static int kirkwood_cpufreq_cpu_init(struct cpufreq_policy *policy)
- 	return cpufreq_table_validate_and_show(policy, kirkwood_freq_table);
- }
- 
--static int kirkwood_cpufreq_cpu_exit(struct cpufreq_policy *policy)
--{
--	cpufreq_frequency_table_put_attr(policy->cpu);
--	return 0;
--}
--
--static struct freq_attr *kirkwood_cpufreq_attr[] = {
+-static struct freq_attr *maple_cpu_freqs_attr[] = {
 -	&cpufreq_freq_attr_scaling_available_freqs,
 -	NULL,
 -};
 -
- static struct cpufreq_driver kirkwood_cpufreq_driver = {
- 	.get	= kirkwood_cpufreq_get_cpu_frequency,
--	.verify	= kirkwood_cpufreq_verify,
-+	.verify	= cpufreq_generic_frequency_table_verify,
- 	.target	= kirkwood_cpufreq_target,
- 	.init	= kirkwood_cpufreq_cpu_init,
--	.exit	= kirkwood_cpufreq_cpu_exit,
-+	.exit	= cpufreq_generic_exit,
- 	.name	= "kirkwood-cpufreq",
--	.attr	= kirkwood_cpufreq_attr,
-+	.attr	= cpufreq_generic_attr,
+ /* Power mode data is an array of the 32 bits PCR values to use for
+  * the various frequencies, retrieved from the device-tree
+  */
+@@ -135,11 +130,6 @@ static int maple_scom_query_freq(void)
+  * Common interface to the cpufreq core
+  */
+ 
+-static int maple_cpufreq_verify(struct cpufreq_policy *policy)
+-{
+-	return cpufreq_frequency_table_verify(policy, maple_cpu_freqs);
+-}
+-
+ static int maple_cpufreq_target(struct cpufreq_policy *policy,
+ 	unsigned int target_freq, unsigned int relation)
+ {
+@@ -190,10 +180,10 @@ static struct cpufreq_driver maple_cpufreq_driver = {
+ 	.name		= "maple",
+ 	.flags		= CPUFREQ_CONST_LOOPS,
+ 	.init		= maple_cpufreq_cpu_init,
+-	.verify		= maple_cpufreq_verify,
++	.verify		= cpufreq_generic_frequency_table_verify,
+ 	.target		= maple_cpufreq_target,
+ 	.get		= maple_cpufreq_get_speed,
+-	.attr		= maple_cpu_freqs_attr,
++	.attr		= cpufreq_generic_attr,
  };
  
- static int kirkwood_cpufreq_probe(struct platform_device *pdev)
+ static int __init maple_cpufreq_init(void)
 -- 
 1.7.12.rc2.18.g61b472e
