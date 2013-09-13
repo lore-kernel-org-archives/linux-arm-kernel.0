@@ -1,24 +1,25 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Fri, 13 Sep 2013 10:21:43 +0800
-Subject: [PATCH v3 0/8] Add the Quadspi driver for vf610-twr
-In-Reply-To: <CAOMZO5C54wCdEOHJmwVLk_zkh-twjis1ys20Gd1+T+ygM+A6bg@mail.gmail.com>
-References: <593AEF6C47F46446852B067021A273D6D984000B@MUCSE039.lantiq.com>	<20130905020435.GA3970@gmail.com>	<20980858CB6D3A4BAE95CA194937D5E73EA0C7F4@DBDE04.ent.ti.com>	<522817D7.1010206@freescale.com>	<522D3B79.3060707@freescale.com>	<52318953.6090405@freescale.com>	<1378979431.2627.402.camel@shinybook.infradead.org>	<20130913025827.GA3051@gmail.com>	<1378999322.4210.95.camel@i7.infradead.org>	<20130913041208.GD3051@gmail.com>
- <CAOMZO5C54wCdEOHJmwVLk_zkh-twjis1ys20Gd1+T+ygM+A6bg@mail.gmail.com>
-Message-ID: <523276B7.20807@freescale.com>
+From: leoy@marvell.com (Leo Yan)
+Date: Fri, 13 Sep 2013 10:53:53 +0800
+Subject: [Question] Verification For arm64: suspend/resume implementation
+Message-ID: <52327E41.1070904@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2013?09?13? 00:27, Fabio Estevam ??:
-> On Fri, Sep 13, 2013 at 1:12 AM, Huang Shijie<shijie8@gmail.com>  wrote:
->
->> I will send you the datasheet tomorrow.
-> The Vybrid reference manual is available at:
-> http://cache.freescale.com/files/32bit/doc/ref_manual/VYBRIDRM.pdf
->
-> (Chapter 30 is the one for QuadSPI)
->
-Hi Fabio:
+hi Lorenzo,
 
-thanks a lot !  :)
+I have applied your ARM64's suspend/resume related patches and can built 
+successfully. i want to verify these patches on foundation model 
+firstly, so below are my questions:
 
-Huang Shijie
+"Code has been tested on AEM v8 models and a simple CPU idle driver that 
+enables a C-state where CPUs are reset when wfi is hit."
+
+1. Can u help share this simple cpu idle driver?
+2. On the foundation model, if the core is placed into reset state, then 
+if there have interrupt is routed to the core, the core still cannot be 
+waken up anymore; because the reset bit cannot be released by h/w. So 
+how can let the core return back from the reset state?
+
+-- 
+Thx,
+Leo Yan
