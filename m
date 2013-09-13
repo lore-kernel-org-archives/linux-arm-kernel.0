@@ -1,52 +1,70 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 13 Sep 2013 16:52:25 -0600
-Subject: [PATCH 211/228] cpufreq: tegra: remove calls to
- cpufreq_notify_transition()
-In-Reply-To: <69073c98beae28a6a75103dd202ec2a6b8b1a674.1379063063.git.viresh.kumar@linaro.org>
-References: <cover.1379063063.git.viresh.kumar@linaro.org>
- <69073c98beae28a6a75103dd202ec2a6b8b1a674.1379063063.git.viresh.kumar@linaro.org>
-Message-ID: <52339729.7030309@wwwdotorg.org>
+From: csd@broadcom.com (Christian Daudt)
+Date: Fri, 13 Sep 2013 16:16:44 -0700
+Subject: [PATCH v3 2/5] ARM: bcm4760: Add platform infrastructure
+In-Reply-To: <20130910161633.GA7655@glitch>
+References: <20130814221043.528864175@gmail.com>
+ <20130814221237.350904818@gmail.com>
+ <20130829231729.GA29606@quad.lixom.net> <20130830075312.GA2447@glitch>
+ <5221141B.5020105@broadcom.com>
+ <CAOesGMh=jdTacefrEo8pcwAOggqmOypz3dZuORdHJS9F2vKjcQ@mail.gmail.com>
+ <20130910161633.GA7655@glitch>
+Message-ID: <52339CDC.9080802@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/13/2013 07:02 AM, Viresh Kumar wrote:
-> Most of the drivers do following in their ->target_index() routines:
-> 
-> 	struct cpufreq_freqs freqs;
-> 	freqs.old = old freq...
-> 	freqs.new = new freq...
-> 
-> 	cpufreq_notify_transition(policy, &freqs, CPUFREQ_PRECHANGE);
-> 
-> 	/* Change rate here */
-> 
-> 	cpufreq_notify_transition(policy, &freqs, CPUFREQ_POSTCHANGE);
-> 
-> This is replicated over all cpufreq drivers today and there doesn't exists a
-> good enough reason why this shouldn't be moved to cpufreq core instead.
-> 
-> Earlier patches have added support in cpufreq core to do cpufreq notification on
-> frequency change, this one removes it from this driver.
-> 
-> Some related minor cleanups are also done along with it.
-
-> diff --git a/drivers/cpufreq/tegra-cpufreq.c b/drivers/cpufreq/tegra-cpufreq.c
-
-> @@ -121,21 +117,10 @@ static int tegra_update_cpu_speed(struct cpufreq_policy *policy,
->  	else
->  		clk_set_rate(emc_clk, 100000000);  /* emc 50Mhz */
->  
-> -	cpufreq_notify_transition(policy, &freqs, CPUFREQ_PRECHANGE);
-...
-> -	cpufreq_notify_transition(policy, &freqs, CPUFREQ_POSTCHANGE);
-
-I wonder if this series is bisectable? Perhaps I should just go and read
-the rest of the series, but I presume there's a patch somewhere else
-that adds those two cpufreq_notify_transition() to the cpufreq core.
-Either that happens before this patch (in which case listeners will get
-two notifications each time; perhaps that is safe?), or after this patch
-(in which case with just this patch applied, no notifications will be
-sent until a later patch!
-
-Aside from that, all the Tegra-specific patches in this series,
-Acked-by: Stephen Warren <swarren@nvidia.com>
+On 13-09-10 09:16 AM, Domenico Andreoli wrote:
+> On Fri, Aug 30, 2013 at 02:58:58PM -0700, Olof Johansson wrote:
+>> On Fri, Aug 30, 2013 at 2:52 PM, Christian Daudt <csd@broadcom.com> wrote:
+>>> On 13-08-30 12:53 AM, Domenico Andreoli wrote:
+>>>>>> Index: b/arch/arm/mach-bcm/Kconfig
+>>>>>> ===================================================================
+>>>>>> --- a/arch/arm/mach-bcm/Kconfig
+>>>>>> +++ b/arch/arm/mach-bcm/Kconfig
+>>>>>> @@ -17,3 +17,10 @@ config ARCH_BCM
+>>>>>>            It currently supports the 'BCM281XX' family, which includes
+>>>>>>            BCM11130, BCM11140, BCM11351, BCM28145 and
+>>>>>>            BCM28155 variants.
+>>>>>> +
+>>>>>> +config ARCH_BCM4760
+>>>>>> +       bool "Broadcom BCM4760 based SoCs (ARM11)" if ARCH_MULTI_V6
+>>>>>> +       select ARM_AMBA
+>>>>>> +       select ARM_VIC
+>>>>>> +       select CLKSRC_OF
+>>>>>> +       select SOC_BUS
+>>>>> So I think I mentioned this during previous discussions, but I think this
+>>>>> should be solved by having:
+>>>>>
+>>>>> config ARCH_BCM
+>>>>>          bool "Broadcom platforms"
+>>>>>          help
+>>>>>            This enables support for Broadcom based systems
+>>>>>
+>>>>> menu "Broadcom platform selection"
+>>>>>          depends on ARCH_BCM
+>>>>>
+>>>>> config ARCH_BCM281XX
+>>>>>          ... current ARCH_BCM contents
+>>>>>
+>>>>> config ARCH_BCM4760
+>>>>>          ... above conents
+>>>>> endmenu
+>>>> got it.
+>>>>
+>>>> need to sync with Christian, the current owner of ARCH_BCM.
+>>> This is fine, but it is better to name it MOBILEBCM instead for our
+>>> platform, as it plan to keep it single zImage. My plan was to switch the
+>>> current usage of ARCH_BCM for chips to ARCH_MOBILEBCM, and then leave
+>>> ARCH_BCM as a generic BCM menu option as above. I can send a patch to that
+>>> effect if everyone is okay with that.
+>> Sounds good. Let's do that for 2.13.
+> Christian, can I assume you will prepare a patch to rename ARCH_BCM or do
+> you prefer I include it my series, maybe simplifying the merge of it? I'm
+> fine with both.
+>
+> Regards,
+> Domenico
+>
+Yes. I have a patch going through internal review, I'll post it early 
+next week.
+  thanks,
+    csd
