@@ -1,57 +1,53 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 13 Sep 2013 18:30:00 +0530
-Subject: [PATCH 054/228] cpufreq: sparc: call
- cpufreq_frequency_table_put_attr()
+Date: Fri, 13 Sep 2013 18:30:04 +0530
+Subject: [PATCH 058/228] cpufreq: at32ap: Use generic cpufreq routines
 In-Reply-To: <cover.1379063063.git.viresh.kumar@linaro.org>
 References: <cover.1379063063.git.viresh.kumar@linaro.org>
-Message-ID: <7baecf8302d921d18afa8fc7447e68e41eb434e8.1379063063.git.viresh.kumar@linaro.org>
+Message-ID: <e2d88ba3fcb0b258675f4cbbff4c84217254435b.1379063063.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Drivers which have an exit path must call cpufreq_frequency_table_put_attr() if
-they have called cpufreq_frequency_table_get_attr() in their init path.
+Most of the CPUFreq drivers do similar things in .exit() and .verify() routines
+and .attr. So its better if we have generic routines for them which can be used
+by cpufreq drivers then.
 
-This driver was missing this part and is fixed with this patch.
+This patch uses these generic routines for this driver.
 
-Cc: David S. Miller <davem@davemloft.net>
-Cc: sparclinux at vger.kernel.org
+Acked-by: Hans-Christian Egtvedt <egtvedt@samfundet.no>
 Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- drivers/cpufreq/sparc-us2e-cpufreq.c | 4 +++-
- drivers/cpufreq/sparc-us3-cpufreq.c  | 4 +++-
- 2 files changed, 6 insertions(+), 2 deletions(-)
+ drivers/cpufreq/at32ap-cpufreq.c | 12 +-----------
+ 1 file changed, 1 insertion(+), 11 deletions(-)
 
-diff --git a/drivers/cpufreq/sparc-us2e-cpufreq.c b/drivers/cpufreq/sparc-us2e-cpufreq.c
-index e35840d..8db0c18 100644
---- a/drivers/cpufreq/sparc-us2e-cpufreq.c
-+++ b/drivers/cpufreq/sparc-us2e-cpufreq.c
-@@ -329,8 +329,10 @@ static int __init us2e_freq_cpu_init(struct cpufreq_policy *policy)
+diff --git a/drivers/cpufreq/at32ap-cpufreq.c b/drivers/cpufreq/at32ap-cpufreq.c
+index 1d19fa5..788f7e7 100644
+--- a/drivers/cpufreq/at32ap-cpufreq.c
++++ b/drivers/cpufreq/at32ap-cpufreq.c
+@@ -24,16 +24,6 @@
+ static struct clk *cpuclk;
+ static struct cpufreq_frequency_table *freq_table;
  
- static int us2e_freq_cpu_exit(struct cpufreq_policy *policy)
+-static int at32_verify_speed(struct cpufreq_policy *policy)
+-{
+-	if (policy->cpu != 0)
+-		return -EINVAL;
+-
+-	cpufreq_verify_within_limits(policy, policy->cpuinfo.min_freq,
+-			policy->cpuinfo.max_freq);
+-	return 0;
+-}
+-
+ static unsigned int at32_get_speed(unsigned int cpu)
  {
--	if (cpufreq_us2e_driver)
-+	if (cpufreq_us2e_driver) {
-+		cpufreq_frequency_table_put_attr(policy->cpu);
- 		us2e_set_cpu_divider_index(policy, 0);
-+	}
- 
- 	return 0;
- }
-diff --git a/drivers/cpufreq/sparc-us3-cpufreq.c b/drivers/cpufreq/sparc-us3-cpufreq.c
-index 23f2d3b..120a2df 100644
---- a/drivers/cpufreq/sparc-us3-cpufreq.c
-+++ b/drivers/cpufreq/sparc-us3-cpufreq.c
-@@ -186,8 +186,10 @@ static int __init us3_freq_cpu_init(struct cpufreq_policy *policy)
- 
- static int us3_freq_cpu_exit(struct cpufreq_policy *policy)
- {
--	if (cpufreq_us3_driver)
-+	if (cpufreq_us3_driver) {
-+		cpufreq_frequency_table_put_attr(policy->cpu);
- 		us3_set_cpu_divider_index(policy, 0);
-+	}
- 
- 	return 0;
- }
+ 	/* No SMP support */
+@@ -152,7 +142,7 @@ out_err:
+ static struct cpufreq_driver at32_driver = {
+ 	.name		= "at32ap",
+ 	.init		= at32_cpufreq_driver_init,
+-	.verify		= at32_verify_speed,
++	.verify		= cpufreq_generic_frequency_table_verify,
+ 	.target		= at32_set_target,
+ 	.get		= at32_get_speed,
+ 	.flags		= CPUFREQ_STICKY,
 -- 
 1.7.12.rc2.18.g61b472e
