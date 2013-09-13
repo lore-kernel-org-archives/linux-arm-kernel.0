@@ -1,80 +1,51 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 13 Sep 2013 11:07:17 +0200
-Subject: [PATCH 2/8 v3] ARM: iop32x: request and issue reset using gpio
-Message-ID: <1379063237-12534-1-git-send-email-linus.walleij@linaro.org>
+From: koen@dominion.thruhere.net (Koen Kooi)
+Date: Fri, 13 Sep 2013 11:19:18 +0200
+Subject: [PATCH v4 0/2] ARM: dts: Beaglebone MMC fixes
+In-Reply-To: <87y571r7z4.fsf@linaro.org>
+References: <1379010935-25943-1-git-send-email-koen@dominion.thruhere.net>
+ <87y571r7z4.fsf@linaro.org>
+Message-ID: <D4395EA0-80AD-4B7A-ACC7-2563359A0726@dominion.thruhere.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As the IOP GPIO driver supports gpiolib we can use the standard
-GPIO calls to issue a reset of the machine instead of using the
-custom gpio_line_set/config calls. Also request the GPIO when
-initializing the machine.
 
-Cc: Aaro Koskinen <aaro.koskinen@iki.fi>
-Cc: Lennert Buytenhek <kernel@wantstofly.org>
-Cc: Dan Williams <dan.j.williams@intel.com>
-Cc: Mikael Pettersson <mikpe@it.uu.se>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
-ChangeLog v2->v3:
-- Also check machine_is_n2100() so we don't request the GPIOs
-  on any other machine at boot.
-ChangeLog v1->v2:
-- Request GPIOs in a separate device_initcall() instead of
-  doing it from machine_init, as the gpio chip is registered
-  after the machine init, what was I thinking about?
----
- arch/arm/mach-iop32x/n2100.c | 24 ++++++++++++++++++++++--
- 1 file changed, 22 insertions(+), 2 deletions(-)
+Op 13 sep. 2013, om 00:27 heeft Kevin Hilman <khilman@linaro.org> het volgende geschreven:
 
-diff --git a/arch/arm/mach-iop32x/n2100.c b/arch/arm/mach-iop32x/n2100.c
-index 0691443..6bace5b 100644
---- a/arch/arm/mach-iop32x/n2100.c
-+++ b/arch/arm/mach-iop32x/n2100.c
-@@ -30,6 +30,7 @@
- #include <linux/platform_device.h>
- #include <linux/reboot.h>
- #include <linux/io.h>
-+#include <linux/gpio.h>
- #include <mach/hardware.h>
- #include <asm/irq.h>
- #include <asm/mach/arch.h>
-@@ -288,8 +289,14 @@ static void n2100_power_off(void)
- 
- static void n2100_restart(enum reboot_mode mode, const char *cmd)
- {
--	gpio_line_set(N2100_HARDWARE_RESET, GPIO_LOW);
--	gpio_line_config(N2100_HARDWARE_RESET, GPIO_OUT);
-+	int ret;
-+
-+	ret = gpio_direction_output(N2100_HARDWARE_RESET, 0);
-+	if (ret) {
-+		pr_crit("could not drive reset GPIO low\n");
-+		return;
-+	}
-+	/* Wait for reset to happen */
- 	while (1)
- 		;
- }
-@@ -308,6 +315,19 @@ static void power_button_poll(unsigned long dummy)
- 	add_timer(&power_button_poll_timer);
- }
- 
-+static int __init n2100_request_gpios(void)
-+{
-+	int ret;
-+
-+	if (!machine_is_n2100())
-+		return 0;
-+
-+	ret = gpio_request(N2100_HARDWARE_RESET, "reset");
-+	if (ret)
-+		pr_err("could not request reset GPIO\n");
-+	return 0;
-+}
-+device_initcall(n2100_request_gpios);
- 
- static void __init n2100_init_machine(void)
- {
--- 
-1.8.3.1
+> Koen Kooi <koen@dominion.thruhere.net> writes:
+> 
+>> Here are two patches to fix MMC on beaglebone, one fixes card detect on BBW,
+>> the other adds the eMMC entry for BBB and its fixed regulator. After that mmc1
+>> gets a nice speed boost by moving to 4-bit mode and LED triggers get assigned.
+>> 
+>> This series depends on:
+>> 
+>> http://comments.gmane.org/gmane.linux.kernel.stable/63648
+>> https://lkml.org/lkml/2013/9/10/454
+>> http://comments.gmane.org/gmane.linux.kernel.mmc/22381
+>> 
+>> Or as git-cherry would put it:
+>> 
+>> [koen at rrMBP patches]$ git cherry -v
+>> + 564fc88cc64387af5312e2abd8019c75a13223b2 ARM: OMAP2+: am335x-bone*: add DT for BeagleBone Black
+>> + e5133ed98acc1c3e01c370b851041a8ca629cd15 ARM: EDMA: Fix clearing of unused list for DT DMA resources
+>> + ac71bb58605d3bdd5d14af770a639fb3ff11c612 ARM: dts: add AM33XX EDMA support
+>> + 31a8270a299c57c7de7510f44d9dc36fd1787243 ARM: dts: add AM33XX SPI DMA support
+>> + 4fa0a4cb9ea17da30cf43085c03e5ec1361a4fc2 ARM: dts: add AM33XX MMC support and documentation
+>> + 0553f50bd45f019a0cc11050e2f20bddbf07dfe0 ARM: dts: am335x-bone: add CD for mmc1
+>> + 7d64f765630a2921a63b82f93f9959a6de37f29d ARM: dts: am335x-boneblack: add eMMC DT entry
+>> + dc96cd4003e2668d8ec7e7fe19e402e97a198f81 ARM: dts: am335x-bone-common: switch mmc1 to 4-bit mode
+>> + f8262e78830cda56c936724549ba9f04dddde312 ARM: dts: am335x-bone-common: add cpu0 and mmc1 triggers
+>> 
+>> Also available as a git branch at https://github.com/koenkooi/linux/commits/mainline
+> 
+> FWIW, tested this branch on BB black/white with MMC rootfs.
+> 
+> Tested-by: Kevin Hilman <khilman@linaro.org>
+> 
+> Koen, Thanks for your persistence getting this stuff merged.
+
+No problem, with all comments addressed I can safely disappear for 3 weeks to go on honeymoon :)
+
+regards,
+
+Koen
