@@ -1,10 +1,9 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 13 Sep 2013 18:29:57 +0530
-Subject: [PATCH 051/228] cpufreq: loongson2: call
- cpufreq_frequency_table_put_attr()
+Date: Fri, 13 Sep 2013 18:29:58 +0530
+Subject: [PATCH 052/228] cpufreq: omap: call cpufreq_frequency_table_put_attr()
 In-Reply-To: <cover.1379063063.git.viresh.kumar@linaro.org>
 References: <cover.1379063063.git.viresh.kumar@linaro.org>
-Message-ID: <c2ea40a2a42db568091a48f31073c73f2890a849.1379063063.git.viresh.kumar@linaro.org>
+Message-ID: <36a527d4db453b0f40585973b85e7ee18e1dc80a.1379063063.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,23 +12,23 @@ they have called cpufreq_frequency_table_get_attr() in their init path.
 
 This driver was missing this part and is fixed with this patch.
 
-Cc: John Crispin <blogic@openwrt.org>
+Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
 Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- drivers/cpufreq/loongson2_cpufreq.c | 1 +
+ drivers/cpufreq/omap-cpufreq.c | 1 +
  1 file changed, 1 insertion(+)
 
-diff --git a/drivers/cpufreq/loongson2_cpufreq.c b/drivers/cpufreq/loongson2_cpufreq.c
-index 5dd3692..cec4e72 100644
---- a/drivers/cpufreq/loongson2_cpufreq.c
-+++ b/drivers/cpufreq/loongson2_cpufreq.c
-@@ -145,6 +145,7 @@ static int loongson2_cpufreq_verify(struct cpufreq_policy *policy)
+diff --git a/drivers/cpufreq/omap-cpufreq.c b/drivers/cpufreq/omap-cpufreq.c
+index b68ce4e..091f233 100644
+--- a/drivers/cpufreq/omap-cpufreq.c
++++ b/drivers/cpufreq/omap-cpufreq.c
+@@ -221,6 +221,7 @@ fail_ck:
  
- static int loongson2_cpufreq_exit(struct cpufreq_policy *policy)
+ static int omap_cpu_exit(struct cpufreq_policy *policy)
  {
 +	cpufreq_frequency_table_put_attr(policy->cpu);
- 	clk_put(cpuclk);
+ 	freq_table_free();
+ 	clk_put(mpu_clk);
  	return 0;
- }
 -- 
 1.7.12.rc2.18.g61b472e
