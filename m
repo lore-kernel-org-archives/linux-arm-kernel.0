@@ -1,10 +1,10 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 13 Sep 2013 18:32:25 +0530
-Subject: [PATCH 199/228] cpufreq: p4-clockmod: remove calls to
+Date: Fri, 13 Sep 2013 18:32:27 +0530
+Subject: [PATCH 201/228] cpufreq: pmac: remove calls to
  cpufreq_notify_transition()
 In-Reply-To: <cover.1379063063.git.viresh.kumar@linaro.org>
 References: <cover.1379063063.git.viresh.kumar@linaro.org>
-Message-ID: <9c5d4a95b899267178c9383ca2ce81152f98c824.1379063063.git.viresh.kumar@linaro.org>
+Message-ID: <b71491eda5d2799d704c3d5953f857a392b8881e.1379063063.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -28,41 +28,110 @@ frequency change, this one removes it from this driver.
 
 Some related minor cleanups are also done along with it.
 
-Cc: David S. Miller <davem@davemloft.net>
 Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- drivers/cpufreq/p4-clockmod.c | 10 ----------
- 1 file changed, 10 deletions(-)
+ drivers/cpufreq/pmac32-cpufreq.c | 20 ++++----------------
+ drivers/cpufreq/pmac64-cpufreq.c | 18 +-----------------
+ 2 files changed, 5 insertions(+), 33 deletions(-)
 
-diff --git a/drivers/cpufreq/p4-clockmod.c b/drivers/cpufreq/p4-clockmod.c
-index 3c23053..3d1cba9 100644
---- a/drivers/cpufreq/p4-clockmod.c
-+++ b/drivers/cpufreq/p4-clockmod.c
-@@ -107,15 +107,8 @@ static struct cpufreq_frequency_table p4clockmod_table[] = {
- 
- static int cpufreq_p4_target(struct cpufreq_policy *policy, unsigned int index)
- {
--	struct cpufreq_freqs freqs;
- 	int i;
- 
--	freqs.old = cpufreq_p4_get(policy->cpu);
--	freqs.new = stock_freq * p4clockmod_table[index].driver_data / 8;
--
--	/* notifiers */
--	cpufreq_notify_transition(policy, &freqs, CPUFREQ_PRECHANGE);
--
- 	/* run on each logical CPU,
- 	 * see section 13.15.3 of IA32 Intel Architecture Software
- 	 * Developer's Manual, Volume 3
-@@ -123,9 +116,6 @@ static int cpufreq_p4_target(struct cpufreq_policy *policy, unsigned int index)
- 	for_each_cpu(i, policy->cpus)
- 		cpufreq_p4_setdc(i, p4clockmod_table[index].driver_data);
- 
--	/* notifiers */
--	cpufreq_notify_transition(policy, &freqs, CPUFREQ_POSTCHANGE);
--
+diff --git a/drivers/cpufreq/pmac32-cpufreq.c b/drivers/cpufreq/pmac32-cpufreq.c
+index 9137fa9..476fc4a 100644
+--- a/drivers/cpufreq/pmac32-cpufreq.c
++++ b/drivers/cpufreq/pmac32-cpufreq.c
+@@ -331,21 +331,11 @@ static int pmu_set_cpu_speed(int low_speed)
  	return 0;
  }
  
+-static int do_set_cpu_speed(struct cpufreq_policy *policy, int speed_mode,
+-		int notify)
++static int do_set_cpu_speed(struct cpufreq_policy *policy, int speed_mode)
+ {
+-	struct cpufreq_freqs freqs;
+ 	unsigned long l3cr;
+ 	static unsigned long prev_l3cr;
+ 
+-	freqs.old = cur_freq;
+-	freqs.new = (speed_mode == CPUFREQ_HIGH) ? hi_freq : low_freq;
+-
+-	if (freqs.old == freqs.new)
+-		return 0;
+-
+-	if (notify)
+-		cpufreq_notify_transition(policy, &freqs, CPUFREQ_PRECHANGE);
+ 	if (speed_mode == CPUFREQ_LOW &&
+ 	    cpu_has_feature(CPU_FTR_L3CR)) {
+ 		l3cr = _get_L3CR();
+@@ -361,8 +351,6 @@ static int do_set_cpu_speed(struct cpufreq_policy *policy, int speed_mode,
+ 		if ((prev_l3cr & L3CR_L3E) && l3cr != prev_l3cr)
+ 			_set_L3CR(prev_l3cr);
+ 	}
+-	if (notify)
+-		cpufreq_notify_transition(policy, &freqs, CPUFREQ_POSTCHANGE);
+ 	cur_freq = (speed_mode == CPUFREQ_HIGH) ? hi_freq : low_freq;
+ 
+ 	return 0;
+@@ -378,7 +366,7 @@ static int pmac_cpufreq_target(	struct cpufreq_policy *policy,
+ {
+ 	int		rc;
+ 
+-	rc = do_set_cpu_speed(policy, index, 1);
++	rc = do_set_cpu_speed(policy, index);
+ 
+ 	ppc_proc_freq = cur_freq * 1000ul;
+ 	return rc;
+@@ -420,7 +408,7 @@ static int pmac_cpufreq_suspend(struct cpufreq_policy *policy)
+ 	no_schedule = 1;
+ 	sleep_freq = cur_freq;
+ 	if (cur_freq == low_freq && !is_pmu_based)
+-		do_set_cpu_speed(policy, CPUFREQ_HIGH, 0);
++		do_set_cpu_speed(policy, CPUFREQ_HIGH);
+ 	return 0;
+ }
+ 
+@@ -437,7 +425,7 @@ static int pmac_cpufreq_resume(struct cpufreq_policy *policy)
+ 	 * probably high speed due to our suspend() routine
+ 	 */
+ 	do_set_cpu_speed(policy, sleep_freq == low_freq ?
+-			 CPUFREQ_LOW : CPUFREQ_HIGH, 0);
++			 CPUFREQ_LOW : CPUFREQ_HIGH);
+ 
+ 	ppc_proc_freq = cur_freq * 1000ul;
+ 
+diff --git a/drivers/cpufreq/pmac64-cpufreq.c b/drivers/cpufreq/pmac64-cpufreq.c
+index af970b7..07ef0ee 100644
+--- a/drivers/cpufreq/pmac64-cpufreq.c
++++ b/drivers/cpufreq/pmac64-cpufreq.c
+@@ -79,8 +79,6 @@ static void (*g5_switch_volt)(int speed_mode);
+ static int (*g5_switch_freq)(int speed_mode);
+ static int (*g5_query_freq)(void);
+ 
+-static DEFINE_MUTEX(g5_switch_mutex);
+-
+ static unsigned long transition_latency;
+ 
+ #ifdef CONFIG_PMAC_SMU
+@@ -314,21 +312,7 @@ static int g5_pfunc_query_freq(void)
+ 
+ static int g5_cpufreq_target(struct cpufreq_policy *policy, unsigned int index)
+ {
+-	struct cpufreq_freqs freqs;
+-	int rc;
+-
+-	mutex_lock(&g5_switch_mutex);
+-
+-	freqs.old = g5_cpu_freqs[g5_pmode_cur].frequency;
+-	freqs.new = g5_cpu_freqs[index].frequency;
+-
+-	cpufreq_notify_transition(policy, &freqs, CPUFREQ_PRECHANGE);
+-	rc = g5_switch_freq(index);
+-	cpufreq_notify_transition(policy, &freqs, CPUFREQ_POSTCHANGE);
+-
+-	mutex_unlock(&g5_switch_mutex);
+-
+-	return rc;
++	return g5_switch_freq(index);
+ }
+ 
+ static unsigned int g5_cpufreq_get_speed(unsigned int cpu)
 -- 
 1.7.12.rc2.18.g61b472e
