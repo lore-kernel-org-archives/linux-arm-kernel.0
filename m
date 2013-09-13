@@ -1,44 +1,43 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 13 Sep 2013 21:59:10 +0530
-Subject: [PATCH 106/228] cpufreq: integrator: don't initialize part of
- policy that is set by core too
-In-Reply-To: <20130913161059.GD12758@n2100.arm.linux.org.uk>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 13 Sep 2013 17:26:43 +0100
+Subject: [PATCH 206/228] cpufreq: sa11x0: remove calls to
+ cpufreq_notify_transition()
+In-Reply-To: <CAKohpomBdAgciTYnQPn6fKC7iHvuBxFLiK8kCz62q7jRHhXK1A@mail.gmail.com>
 References: <cover.1379063063.git.viresh.kumar@linaro.org>
- <6d8d406ebca886e5147191cc8c333d926ef9eb30.1379063063.git.viresh.kumar@linaro.org>
- <20130913161059.GD12758@n2100.arm.linux.org.uk>
-Message-ID: <CAKohponAWXXCVtDL1=C5sQv0QB03P4jtkyE7N+=DDdGPLZpW_w@mail.gmail.com>
+ <6e2ca86ce948c0bc35f7709baf22672771fcf1e8.1379063063.git.viresh.kumar@linaro.org>
+ <20130913155424.GB12758@n2100.arm.linux.org.uk>
+ <CAKohpomAj0wDnjdi7XXw=bGsu0LMRrr1SMwdzBsa0GTxGrABoQ@mail.gmail.com>
+ <20130913161527.GE12758@n2100.arm.linux.org.uk>
+ <CAKohpomBdAgciTYnQPn6fKC7iHvuBxFLiK8kCz62q7jRHhXK1A@mail.gmail.com>
+Message-ID: <20130913162643.GF12758@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13 September 2013 21:40, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> This patch actually changes things - the description is misleading.
-> Please explain why this change - which results in different values for
-> policy->min and policy->max doesn't cause any functional difference.
+On Fri, Sep 13, 2013 at 09:52:31PM +0530, Viresh Kumar wrote:
+> On 13 September 2013 21:45, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > The patch to which I'm replying removes the above calls.  These calls are
+> > necessary to shutdown various bits of CPU-clock dependent hardware
+> > before changing the CPU clock, and restore them - reconfiguring them
+> > for the new clock rate after the transition has happened.
+> >
+> > So, if you're removing these calls, what replaces them?  I don't see
+> > anything which does without the above set.
+> 
+> The other patch on which you commented about unnecessary read
+> locks being taken:
+> 
+> [PATCH 181/228] cpufreq: move freq change notifications to cpufreq
+> 
+> That calls these notifiers, for all platforms except the ones that have
+> set CPUFREQ_ASYNC_NOTIFICATION, before and after calling
+> ->target_index()..
+> 
+> And so functionally the code is supposed to be the same.. Unless I
+> have done some stupid mistake..
 
-Yeah, see if below log looks correct (patch attached):
+Ah, sorry, read that that test the other way around.  In that case,
+this patch is fine and can have my ack as per the other acks I've
+already given.
 
-Subject: [PATCH 106/228] cpufreq: integrator: don't initialize part of policy
- that is set by core too
-
-Many common initializations of struct policy are moved to core now and hence
-this driver doesn't need to do it. This patch removes such code.
-
-Most recent of those changes is to call ->get() in the core after calling
-->init(). And so we don't need to set policy->cur from driver anymore.
-
-Over that it sets policy->min and max correctly. They were earlier set to
-current frequency of CPU but they should be set to max and min freq of cpu.
-
-Cc: Russell King <linux@arm.linux.org.uk>
-Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
----
- drivers/cpufreq/integrator-cpufreq.c | 5 ++---
- 1 file changed, 2 insertions(+), 3 deletions(-)
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0106-cpufreq-integrator-don-t-initialize-part-of-policy-t.patch
-Type: application/octet-stream
-Size: 1805 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130913/e71c1e56/attachment.obj>
+Thanks.
