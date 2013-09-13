@@ -1,53 +1,42 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Thu, 12 Sep 2013 15:44:50 +0100
-Subject: [PATCH v5 11/13] xen: introduce xen_alloc/free_coherent_pages
-In-Reply-To: <20130912135347.GA23425@darko.cambridge.arm.com>
-References: <20130906141444.GE1946@arm.com>
- <alpine.DEB.2.02.1309061554260.6397@kaball.uk.xensource.com>
- <20130906155928.GH1946@arm.com>
- <alpine.DEB.2.02.1309061706480.6397@kaball.uk.xensource.com>
- <20130906162018.GJ1946@arm.com>
- <alpine.DEB.2.02.1309061740050.6397@kaball.uk.xensource.com>
- <8492887B-2509-42B5-A5F9-A711C519D912@arm.com>
- <alpine.DEB.2.02.1309091732230.6397@kaball.uk.xensource.com>
- <20130911093646.GA26777@darko.cambridge.arm.com>
- <alpine.DEB.2.02.1309111825210.32236@kaball.uk.xensource.com>
- <20130912135347.GA23425@darko.cambridge.arm.com>
-Message-ID: <alpine.DEB.2.02.1309121541290.32236@kaball.uk.xensource.com>
+From: shijie8@gmail.com (Huang Shijie)
+Date: Thu, 12 Sep 2013 22:58:30 -0400
+Subject: [PATCH v3 0/8] Add the Quadspi driver for vf610-twr
+In-Reply-To: <1378979431.2627.402.camel@shinybook.infradead.org>
+References: <593AEF6C47F46446852B067021A273D6D984000B@MUCSE039.lantiq.com>
+ <20130905020435.GA3970@gmail.com>
+ <20980858CB6D3A4BAE95CA194937D5E73EA0C7F4@DBDE04.ent.ti.com>
+ <522817D7.1010206@freescale.com> <522D3B79.3060707@freescale.com>
+ <52318953.6090405@freescale.com>
+ <1378979431.2627.402.camel@shinybook.infradead.org>
+Message-ID: <20130913025827.GA3051@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 12 Sep 2013, Catalin Marinas wrote:
-> On Wed, Sep 11, 2013 at 06:34:17PM +0100, Stefano Stabellini wrote:
-> > On Wed, 11 Sep 2013, Catalin Marinas wrote:
-> > >  static inline void set_dma_ops(struct device *dev, struct dma_map_ops *ops)
-> > >  {
-> > >  	BUG_ON(!dev);
-> > > @@ -32,7 +39,7 @@ static inline void set_dma_ops(struct device *dev, struct dma_map_ops *ops)
-> > >  
-> > >  static inline int dma_set_mask(struct device *dev, u64 mask)
-> > >  {
-> > > -	return get_dma_ops(dev)->set_dma_mask(dev, mask);
-> > > +	return __get_dma_ops(dev)->set_dma_mask(dev, mask);
-> > >  }
-> > >  
-> > >  #ifdef __arch_page_to_dma
-> > 
-> > I don't understand the reason for this change though: shouldn't
-> > set_dma_mask go via the "default" (whatever that is), like the others?
+On Thu, Sep 12, 2013 at 10:50:31AM +0100, David Woodhouse wrote:
+> On Thu, 2013-09-12 at 17:28 +0800, Huang Shijie wrote:
+> > ? 2013?09?11? 22:05, David Woodhouse ??:
+> > > What*actually*  happens, on the wire(s), when the flash driver asks the
+> > > SPI controller to perform a transaction?
+> > The LUT registers tell the controller how many wires are needed for a 
+> > transaction.
+> > For example, the read status only use a single line, while the quad read 
+> > uses 4 lines.
 > 
-> Under Xen, this would mean xen_dma_ops->set_dma_mask(). I thought you
-> want to set the default dma address.
+> Is this not something that could theoretically be provided by the caller
+> when it *makes* the transaction?
 > 
-> I can see why you may want set_dma_mask() for xen_dma_ops but in also
-> needs to be passed to __get_dma_ops(dev)->set_dma_ops() otherwise the
-> actual dma_alloc_attrs() will miss the mask (and on arm64 it does
-> bouncing via swiotlb).
- 
-xen_dma_ops->set_dma_mask() is implemented by
-drivers/xen/swiotlb-xen.c:xen_swiotlb_set_dma_mask (provided by this
-patch series). The function takes care of setting:
+> Conceptually speaking, could it not be an additional argument to
+> spi_write_then_read() ? 
+> 
+> After all, it's the *device* driver (m25p80.c etc.) which will know what
+> the transaction actually *is*, and how many lines the device will want
+> to use for each transaction?
+yes. we can set the lines information in the spi_write_then_read().
 
-*dev->dma_mask = dma_mask;
+But for the quadspi driver, it does not need this information.
 
-I think that should be enough to make dma_alloc_attrs happy.
+When the drivers knows that it is a Quad-read transaction, it will uses
+the relative LUT sequence which uses the 4 lines.
+
+thanks
+Huang Shijie
