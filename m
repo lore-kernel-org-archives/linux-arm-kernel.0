@@ -1,9 +1,9 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 13 Sep 2013 18:30:05 +0530
-Subject: [PATCH 059/228] cpufreq: blackfin: Use generic cpufreq routines
+Date: Fri, 13 Sep 2013 18:30:06 +0530
+Subject: [PATCH 060/228] cpufreq: cpu0: Use generic cpufreq routines
 In-Reply-To: <cover.1379063063.git.viresh.kumar@linaro.org>
 References: <cover.1379063063.git.viresh.kumar@linaro.org>
-Message-ID: <47d7b682a43f352686a9a927642cb84fc74e8399.1379063063.git.viresh.kumar@linaro.org>
+Message-ID: <a9f262d3998c234bf34b22bf2a5048e1cd4e8cb6.1379063063.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,56 +13,58 @@ by cpufreq drivers then.
 
 This patch uses these generic routines for this driver.
 
-Cc: Steven Miao <realmz6@gmail.com>
+Acked-by: Shawn Guo <shawn.guo@linaro.org>
 Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- drivers/cpufreq/blackfin-cpufreq.c | 22 +++-------------------
- 1 file changed, 3 insertions(+), 19 deletions(-)
+ drivers/cpufreq/cpufreq-cpu0.c | 23 +++--------------------
+ 1 file changed, 3 insertions(+), 20 deletions(-)
 
-diff --git a/drivers/cpufreq/blackfin-cpufreq.c b/drivers/cpufreq/blackfin-cpufreq.c
-index 84d446a..48888cf 100644
---- a/drivers/cpufreq/blackfin-cpufreq.c
-+++ b/drivers/cpufreq/blackfin-cpufreq.c
-@@ -191,11 +191,6 @@ static int bfin_target(struct cpufreq_policy *policy,
- 	return ret;
- }
+diff --git a/drivers/cpufreq/cpufreq-cpu0.c b/drivers/cpufreq/cpufreq-cpu0.c
+index ce4fa47..2847ae6 100644
+--- a/drivers/cpufreq/cpufreq-cpu0.c
++++ b/drivers/cpufreq/cpufreq-cpu0.c
+@@ -29,11 +29,6 @@ static struct clk *cpu_clk;
+ static struct regulator *cpu_reg;
+ static struct cpufreq_frequency_table *freq_table;
  
--static int bfin_verify_speed(struct cpufreq_policy *policy)
+-static int cpu0_verify_speed(struct cpufreq_policy *policy)
 -{
--	return cpufreq_frequency_table_verify(policy, bfin_freq_table);
+-	return cpufreq_frequency_table_verify(policy, freq_table);
 -}
 -
- static int __bfin_cpu_init(struct cpufreq_policy *policy)
+ static unsigned int cpu0_get_speed(unsigned int cpu)
  {
- 
-@@ -213,25 +208,14 @@ static int __bfin_cpu_init(struct cpufreq_policy *policy)
- 	return cpufreq_table_validate_and_show(policy, bfin_freq_table);
+ 	return clk_get_rate(cpu_clk) / 1000;
+@@ -147,27 +142,15 @@ static int cpu0_cpufreq_init(struct cpufreq_policy *policy)
+ 	return 0;
  }
  
--static int __bfin_cpu_exit(struct cpufreq_policy *policy)
+-static int cpu0_cpufreq_exit(struct cpufreq_policy *policy)
 -{
--
 -	cpufreq_frequency_table_put_attr(policy->cpu);
+-
+-	return 0;
 -}
 -
--static struct freq_attr *bfin_freq_attr[] = {
+-static struct freq_attr *cpu0_cpufreq_attr[] = {
 -	&cpufreq_freq_attr_scaling_available_freqs,
 -	NULL,
 -};
 -
- static struct cpufreq_driver bfin_driver = {
--	.verify = bfin_verify_speed,
+ static struct cpufreq_driver cpu0_cpufreq_driver = {
+ 	.flags = CPUFREQ_STICKY,
+-	.verify = cpu0_verify_speed,
 +	.verify = cpufreq_generic_frequency_table_verify,
- 	.target = bfin_target,
- 	.get = bfin_getfreq_khz,
- 	.init = __bfin_cpu_init,
--	.exit = __bfin_cpu_exit,
+ 	.target = cpu0_set_target,
+ 	.get = cpu0_get_speed,
+ 	.init = cpu0_cpufreq_init,
+-	.exit = cpu0_cpufreq_exit,
 +	.exit = cpufreq_generic_exit,
- 	.name = "bfin cpufreq",
--	.attr = bfin_freq_attr,
+ 	.name = "generic_cpu0",
+-	.attr = cpu0_cpufreq_attr,
 +	.attr = cpufreq_generic_attr,
  };
  
- static int __init bfin_cpu_init(void)
+ static int cpu0_cpufreq_probe(struct platform_device *pdev)
 -- 
 1.7.12.rc2.18.g61b472e
