@@ -1,65 +1,61 @@
 From: b29396@freescale.com (Dong Aisheng)
-Date: Fri, 13 Sep 2013 19:11:30 +0800
-Subject: [PATCH v2 1/9] mmc: sdhci: add hooks for platform specific tuning
+Date: Fri, 13 Sep 2013 19:11:31 +0800
+Subject: [PATCH v2 2/9] mmc: sdhci: allow platform access of sdhci_send_command
 In-Reply-To: <1379070698-7344-1-git-send-email-b29396@freescale.com>
 References: <1379070698-7344-1-git-send-email-b29396@freescale.com>
-Message-ID: <1379070698-7344-2-git-send-email-b29396@freescale.com>
+Message-ID: <1379070698-7344-3-git-send-email-b29396@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The tuning of some platforms may not follow the standard host control
-spec v3.0, e.g. Freescale uSDHC on i.MX6Q/DL.
-Add a hook here to allow execute platform specific tuning instead of
-standard host controller tuning.
-
-The hook only replaces the tuning process, so it's placed after tuning
-checking and before the real tuning process.
-
-Some notes for the tuning hook:
-1) it needs handle lock itself if it wants to access host controller
-according platform specific implementation.
-2) do not need to handle runtime pm since it executes with runtime pm
-get already.
+It helps for platform code to use it send tuning commands.
 
 Signed-off-by: Dong Aisheng <b29396@freescale.com>
 ---
-ChangeLog since v1:
-* add more description of hook in commit message
----
- drivers/mmc/host/sdhci.c |    8 ++++++++
- drivers/mmc/host/sdhci.h |    1 +
- 2 files changed, 9 insertions(+), 0 deletions(-)
+ drivers/mmc/host/sdhci.c |    4 ++--
+ drivers/mmc/host/sdhci.h |    2 ++
+ 2 files changed, 4 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
-index 7a7fb4f..072d78c 100644
+index 072d78c..66bce7a 100644
 --- a/drivers/mmc/host/sdhci.c
 +++ b/drivers/mmc/host/sdhci.c
-@@ -1875,6 +1875,14 @@ static int sdhci_execute_tuning(struct mmc_host *mmc, u32 opcode)
- 		return 0;
- 	}
+@@ -49,7 +49,6 @@ static unsigned int debug_quirks2;
  
-+	if (host->ops->platform_execute_tuning) {
-+		spin_unlock(&host->lock);
-+		enable_irq(host->irq);
-+		err = host->ops->platform_execute_tuning(host, opcode);
-+		sdhci_runtime_pm_put(host);
-+		return err;
-+	}
-+
- 	sdhci_writew(host, ctrl, SDHCI_HOST_CONTROL2);
+ static void sdhci_finish_data(struct sdhci_host *);
  
- 	/*
+-static void sdhci_send_command(struct sdhci_host *, struct mmc_command *);
+ static void sdhci_finish_command(struct sdhci_host *);
+ static int sdhci_execute_tuning(struct mmc_host *mmc, u32 opcode);
+ static void sdhci_tuning_timer(unsigned long data);
+@@ -981,7 +980,7 @@ static void sdhci_finish_data(struct sdhci_host *host)
+ 		tasklet_schedule(&host->finish_tasklet);
+ }
+ 
+-static void sdhci_send_command(struct sdhci_host *host, struct mmc_command *cmd)
++void sdhci_send_command(struct sdhci_host *host, struct mmc_command *cmd)
+ {
+ 	int flags;
+ 	u32 mask;
+@@ -1053,6 +1052,7 @@ static void sdhci_send_command(struct sdhci_host *host, struct mmc_command *cmd)
+ 
+ 	sdhci_writew(host, SDHCI_MAKE_CMD(cmd->opcode, flags), SDHCI_COMMAND);
+ }
++EXPORT_SYMBOL_GPL(sdhci_send_command);
+ 
+ static void sdhci_finish_command(struct sdhci_host *host)
+ {
 diff --git a/drivers/mmc/host/sdhci.h b/drivers/mmc/host/sdhci.h
-index b037f18..976c14b 100644
+index 976c14b..0a3ed01 100644
 --- a/drivers/mmc/host/sdhci.h
 +++ b/drivers/mmc/host/sdhci.h
-@@ -288,6 +288,7 @@ struct sdhci_ops {
- 	unsigned int    (*get_ro)(struct sdhci_host *host);
- 	void	(*platform_reset_enter)(struct sdhci_host *host, u8 mask);
- 	void	(*platform_reset_exit)(struct sdhci_host *host, u8 mask);
-+	int	(*platform_execute_tuning)(struct sdhci_host *host, u32 opcode);
- 	int	(*set_uhs_signaling)(struct sdhci_host *host, unsigned int uhs);
- 	void	(*hw_reset)(struct sdhci_host *host);
- 	void	(*platform_suspend)(struct sdhci_host *host);
+@@ -394,6 +394,8 @@ static inline void *sdhci_priv(struct sdhci_host *host)
+ extern void sdhci_card_detect(struct sdhci_host *host);
+ extern int sdhci_add_host(struct sdhci_host *host);
+ extern void sdhci_remove_host(struct sdhci_host *host, int dead);
++extern void sdhci_send_command(struct sdhci_host *host,
++				struct mmc_command *cmd);
+ 
+ #ifdef CONFIG_PM
+ extern int sdhci_suspend_host(struct sdhci_host *host);
 -- 
 1.7.1
