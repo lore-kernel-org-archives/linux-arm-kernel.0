@@ -1,53 +1,68 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 13 Sep 2013 18:32:52 +0530
-Subject: [PATCH 226/228] cpufreq: spear: use cpufreq_generic_get() routine
+Date: Fri, 13 Sep 2013 18:32:53 +0530
+Subject: [PATCH 227/228] cpufreq: tegra: use cpufreq_generic_get() routine
 In-Reply-To: <cover.1379063063.git.viresh.kumar@linaro.org>
 References: <cover.1379063063.git.viresh.kumar@linaro.org>
-Message-ID: <f2370b329d6ec42e92bd5eac3abb3e64774530fe.1379063063.git.viresh.kumar@linaro.org>
+Message-ID: <4c538174b86604a7d9e5b9e0d2521b881704005e.1379063063.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 We have common infrastructure available with us for getting a CPUs clk rate.
 Lets use it for this driver.
 
-Cc: spear-devel at list.st.com
+Cc: Stephen Warren <swarren@nvidia.com>
 Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- drivers/cpufreq/spear-cpufreq.c | 8 ++------
- 1 file changed, 2 insertions(+), 6 deletions(-)
+ drivers/cpufreq/tegra-cpufreq.c | 16 +++-------------
+ 1 file changed, 3 insertions(+), 13 deletions(-)
 
-diff --git a/drivers/cpufreq/spear-cpufreq.c b/drivers/cpufreq/spear-cpufreq.c
-index 658cfe7..ea2f26e 100644
---- a/drivers/cpufreq/spear-cpufreq.c
-+++ b/drivers/cpufreq/spear-cpufreq.c
-@@ -30,11 +30,6 @@ static struct {
- 	u32 cnt;
- } spear_cpufreq;
+diff --git a/drivers/cpufreq/tegra-cpufreq.c b/drivers/cpufreq/tegra-cpufreq.c
+index 7d36b54..360d1a7 100644
+--- a/drivers/cpufreq/tegra-cpufreq.c
++++ b/drivers/cpufreq/tegra-cpufreq.c
+@@ -50,17 +50,6 @@ static struct clk *emc_clk;
+ static DEFINE_MUTEX(tegra_cpu_lock);
+ static bool is_suspended;
  
--static unsigned int spear_cpufreq_get(unsigned int cpu)
+-static unsigned int tegra_getspeed(unsigned int cpu)
 -{
--	return clk_get_rate(spear_cpufreq.clk) / 1000;
+-	unsigned long rate;
+-
+-	if (cpu >= NUM_CPUS)
+-		return 0;
+-
+-	rate = clk_get_rate(cpu_clk) / 1000;
+-	return rate;
 -}
 -
- static struct clk *spear1340_cpu_get_possible_parent(unsigned long newfreq)
+ static int tegra_cpu_clk_set_rate(unsigned long rate)
  {
- 	struct clk *sys_pclk;
-@@ -156,6 +151,7 @@ static int spear_cpufreq_target(struct cpufreq_policy *policy,
+ 	int ret;
+@@ -144,7 +133,7 @@ static int tegra_pm_notify(struct notifier_block *nb, unsigned long event,
+ 		is_suspended = true;
+ 		pr_info("Tegra cpufreq suspend: setting frequency to %d kHz\n",
+ 			freq_table[0].frequency);
+-		if (tegra_getspeed(0) != freq_table[0].frequency)
++		if (clk_get_rate(cpu_clk) / 1000 != freq_table[0].frequency)
+ 			tegra_update_cpu_speed(policy, freq_table[0].frequency);
+ 		cpufreq_cpu_put(policy);
+ 	} else if (event == PM_POST_SUSPEND) {
+@@ -180,6 +169,7 @@ static int tegra_cpu_init(struct cpufreq_policy *policy)
+ 	if (policy->cpu == 0)
+ 		register_pm_notifier(&tegra_cpu_pm_notifier);
  
- static int spear_cpufreq_init(struct cpufreq_policy *policy)
- {
-+	policy->clk = spear_cpufreq.clk;
- 	return cpufreq_generic_init(policy, spear_cpufreq.freq_tbl,
- 			spear_cpufreq.transition_latency);
++	policy->clk = cpu_clk;
+ 	return 0;
  }
-@@ -165,7 +161,7 @@ static struct cpufreq_driver spear_cpufreq_driver = {
- 	.flags		= CPUFREQ_STICKY,
+ 
+@@ -194,7 +184,7 @@ static int tegra_cpu_exit(struct cpufreq_policy *policy)
+ static struct cpufreq_driver tegra_cpufreq_driver = {
  	.verify		= cpufreq_generic_frequency_table_verify,
- 	.target_index	= spear_cpufreq_target,
--	.get		= spear_cpufreq_get,
+ 	.target_index	= tegra_target,
+-	.get		= tegra_getspeed,
 +	.get		= cpufreq_generic_get,
- 	.init		= spear_cpufreq_init,
- 	.exit		= cpufreq_generic_exit,
- 	.attr		= cpufreq_generic_attr,
+ 	.init		= tegra_cpu_init,
+ 	.exit		= tegra_cpu_exit,
+ 	.name		= "tegra",
 -- 
 1.7.12.rc2.18.g61b472e
