@@ -1,41 +1,45 @@
 From: xobs@kosagi.com (Sean Cross)
-Date: Fri, 13 Sep 2013 09:40:19 +0000
-Subject: [PATCH v4 0/3] Add PCIe support for i.MX6q
-Message-ID: <1379065222-7275-1-git-send-email-xobs@kosagi.com>
+Date: Fri, 13 Sep 2013 09:40:21 +0000
+Subject: [PATCH v4 2/3] ARM: imx6q: Add PCIe bits to GPR syscon definition
+In-Reply-To: <1379065222-7275-1-git-send-email-xobs@kosagi.com>
+References: <1379065222-7275-1-git-send-email-xobs@kosagi.com>
+Message-ID: <1379065222-7275-3-git-send-email-xobs@kosagi.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset adds support for the PCI Express port present on
-the i.MX6 SoC.  The port is based on Synopsis Designware IP with
-a custom PHY.
+PCIe requires additional bits be defined for GPR8 and GPR12.
 
-Changes since v3:
- - Moved clock initialization to board clock file
- - Reworked memory range layout
- - Reduced the duration of several sleep calls
+Signed-off-by: Sean Cross <xobs@kosagi.com>
+---
+ include/linux/mfd/syscon/imx6q-iomuxc-gpr.h |    8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-Changes since v2:
- - Reworked source file with Sascha Hauer's suggestions
-
-Changes since v1:
- - Use the Designware controller code for BAR initialization
-
-Sean Cross (3):
-  ARM: imx: Add LVDS general-purpose clocks to i.MX6Q
-  ARM: imx6q: Add PCIe bits to GPR syscon definition
-  PCI: imx6: Add support for i.MX6 PCIe controller
-
- .../devicetree/bindings/clock/imx6q-clock.txt      |    4 +
- .../devicetree/bindings/pci/designware-pcie.txt    |    5 +
- arch/arm/boot/dts/imx6qdl.dtsi                     |   16 +
- arch/arm/mach-imx/Kconfig                          |    2 +
- arch/arm/mach-imx/clk-imx6q.c                      |   32 +-
- drivers/pci/host/Kconfig                           |    6 +
- drivers/pci/host/Makefile                          |    1 +
- drivers/pci/host/pci-imx6.c                        |  482 ++++++++++++++++++++
- include/linux/mfd/syscon/imx6q-iomuxc-gpr.h        |    8 +
- 9 files changed, 555 insertions(+), 1 deletion(-)
- create mode 100644 drivers/pci/host/pci-imx6.c
-
+diff --git a/include/linux/mfd/syscon/imx6q-iomuxc-gpr.h b/include/linux/mfd/syscon/imx6q-iomuxc-gpr.h
+index b6bdcd6..1bf1fe9 100644
+--- a/include/linux/mfd/syscon/imx6q-iomuxc-gpr.h
++++ b/include/linux/mfd/syscon/imx6q-iomuxc-gpr.h
+@@ -241,6 +241,12 @@
+ 
+ #define IMX6Q_GPR5_L2_CLK_STOP			BIT(8)
+ 
++#define IMX6Q_GPR8_TX_DEEMPH_GEN1		(0x3F << 0)
++#define IMX6Q_GPR8_TX_DEEMPH_GEN2_3P5DB		(0x3F << 6)
++#define IMX6Q_GPR8_TX_DEEMPH_GEN2_6DB		(0x3F << 12)
++#define IMX6Q_GPR8_TX_SWING_FULL		(0x7F << 18)
++#define IMX6Q_GPR8_TX_SWING_LOW			(0x7F << 25)
++
+ #define IMX6Q_GPR9_TZASC2_BYP			BIT(1)
+ #define IMX6Q_GPR9_TZASC1_BYP			BIT(0)
+ 
+@@ -273,7 +279,9 @@
+ #define IMX6Q_GPR12_ARMP_AHB_CLK_EN		BIT(26)
+ #define IMX6Q_GPR12_ARMP_ATB_CLK_EN		BIT(25)
+ #define IMX6Q_GPR12_ARMP_APB_CLK_EN		BIT(24)
++#define IMX6Q_GPR12_DEVICE_TYPE			(0xF << 12)
+ #define IMX6Q_GPR12_PCIE_CTL_2			BIT(10)
++#define IMX6Q_GPR12_LOS_LEVEL			(0x1F << 4)
+ 
+ #define IMX6Q_GPR13_SDMA_STOP_REQ		BIT(30)
+ #define IMX6Q_GPR13_CAN2_STOP_REQ		BIT(29)
 -- 
 1.7.9.5
