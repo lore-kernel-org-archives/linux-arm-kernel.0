@@ -1,75 +1,68 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri, 13 Sep 2013 16:38:41 +0100
-Subject: [PATCH v2] drivers: cpuidle: rename ARM big.LITTLE driver config and
- makefile entries
-Message-ID: <1379086721-5242-1-git-send-email-lorenzo.pieralisi@arm.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 13 Sep 2013 17:40:10 +0200
+Subject: [RFC PATCH 0/2] AES in CBC/CTR/XTS modes using ARMv8 Crypto Extensions
+Message-ID: <1379086812-1274-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Following the reorganization of CPU idle drivers configurations into an ARM
-specific Kconfig, the existing idle drivers Kconfig entries were renamed and
-moved to the Kconfig.arm file. Makefile entries were updated accordingly.
+Hello all,
 
-This patch renames the entries in Kconfig.arm and makefile to make the newly
-added big.LITTLE CPUidle driver compliant with the new naming convention.
+This is a first attempt at getting something implemented that uses the ARMv8
+crypto extensions for performing AES encryption in CBC, CTR and XTS modes.
 
-Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Acked-by: Kevin Hilman <khilman@linaro.org>
----
- drivers/cpuidle/Kconfig.arm | 22 +++++++++++-----------
- drivers/cpuidle/Makefile    |  2 +-
- 2 files changed, 12 insertions(+), 12 deletions(-)
+The first patch moves the ablk helper code out of arch/x86. This code is used
+to automagically instantiate async blkciphers based on the synchronous ones in
+my implementation.
 
-diff --git a/drivers/cpuidle/Kconfig.arm b/drivers/cpuidle/Kconfig.arm
-index 8e36603..6a7e6f2 100644
---- a/drivers/cpuidle/Kconfig.arm
-+++ b/drivers/cpuidle/Kconfig.arm
-@@ -2,6 +2,17 @@
- # ARM CPU Idle drivers
- #
- 
-+config ARM_BIG_LITTLE_CPUIDLE
-+	bool "Support for ARM big.LITTLE processors"
-+	depends on ARCH_VEXPRESS_TC2_PM
-+	select ARM_CPU_SUSPEND
-+	select CPU_IDLE_MULTIPLE_DRIVERS
-+	help
-+	  Select this option to enable CPU idle driver for big.LITTLE based
-+	  ARM systems. Driver manages CPUs coordination through MCPM and
-+	  define different C-states for little and big cores through the
-+	  multiple CPU idle drivers infrastructure.
-+
- config ARM_HIGHBANK_CPUIDLE
- 	bool "CPU Idle Driver for Calxeda processors"
- 	depends on ARCH_HIGHBANK
-@@ -26,14 +37,3 @@ config ARM_U8500_CPUIDLE
- 	depends on ARCH_U8500
- 	help
- 	  Select this to enable cpuidle for ST-E u8500 processors
--
--config CPU_IDLE_BIG_LITTLE
--	bool "Support for ARM big.LITTLE processors"
--	depends on ARCH_VEXPRESS_TC2_PM
--	select ARM_CPU_SUSPEND
--	select CPU_IDLE_MULTIPLE_DRIVERS
--	help
--	  Select this option to enable CPU idle driver for big.LITTLE based
--	  ARM systems. Driver manages CPUs coordination through MCPM and
--	  define different C-states for little and big cores through the
--	  multiple CPU idle drivers infrastructure.
-diff --git a/drivers/cpuidle/Makefile b/drivers/cpuidle/Makefile
-index cea5ef5..d08bd40 100644
---- a/drivers/cpuidle/Makefile
-+++ b/drivers/cpuidle/Makefile
-@@ -7,8 +7,8 @@ obj-$(CONFIG_ARCH_NEEDS_CPU_IDLE_COUPLED) += coupled.o
- 
- ##################################################################################
- # ARM SoC drivers
-+obj-$(CONFIG_ARM_BIG_LITTLE_CPUIDLE)	+= cpuidle-big_little.o
- obj-$(CONFIG_ARM_HIGHBANK_CPUIDLE)	+= cpuidle-calxeda.o
- obj-$(CONFIG_ARM_KIRKWOOD_CPUIDLE)	+= cpuidle-kirkwood.o
- obj-$(CONFIG_ARM_ZYNQ_CPUIDLE)		+= cpuidle-zynq.o
- obj-$(CONFIG_ARM_U8500_CPUIDLE)         += cpuidle-ux500.o
--obj-$(CONFIG_CPU_IDLE_BIG_LITTLE)	+= cpuidle-big_little.o
+The second patch contains the actual AES code. Note that this is only compile
+tested, there are most likely numerous bugs that need to be shaken out before
+this will even run, so consider yourselves warned.
+
+Comments highly appreciated,
+
+Regards,
+Ard.
+
+Ard Biesheuvel (2):
+  crypto: move ablk_helper out of arch/x86
+  arm64: add support for AES using ARMv8 Crypto Extensions
+
+ arch/arm64/Makefile                        |   8 +-
+ arch/arm64/crypto/Makefile                 |  12 +
+ arch/arm64/crypto/aesce-cbc.S              |  58 +++++
+ arch/arm64/crypto/aesce-ctr.S              |  83 +++++++
+ arch/arm64/crypto/aesce-glue.c             | 352 +++++++++++++++++++++++++++++
+ arch/arm64/crypto/aesce-macros.S           |  95 ++++++++
+ arch/arm64/crypto/aesce-xts.S              | 129 +++++++++++
+ arch/x86/crypto/Makefile                   |   1 -
+ arch/x86/crypto/ablk_helper.c              | 149 ------------
+ arch/x86/crypto/aesni-intel_glue.c         |   2 +-
+ arch/x86/crypto/camellia_aesni_avx2_glue.c |   2 +-
+ arch/x86/crypto/camellia_aesni_avx_glue.c  |   2 +-
+ arch/x86/crypto/cast5_avx_glue.c           |   2 +-
+ arch/x86/crypto/cast6_avx_glue.c           |   2 +-
+ arch/x86/crypto/serpent_avx2_glue.c        |   2 +-
+ arch/x86/crypto/serpent_avx_glue.c         |   2 +-
+ arch/x86/crypto/serpent_sse2_glue.c        |   2 +-
+ arch/x86/crypto/twofish_avx_glue.c         |   2 +-
+ arch/x86/include/asm/crypto/ablk_helper.h  |  31 ---
+ crypto/Kconfig                             |  28 ++-
+ crypto/Makefile                            |   4 +
+ crypto/ablk_helper_generic.c               | 155 +++++++++++++
+ crypto/ablk_helper_x86.c                   |   8 +
+ include/crypto/ablk_helper.h               |  34 +++
+ 24 files changed, 961 insertions(+), 204 deletions(-)
+ create mode 100644 arch/arm64/crypto/Makefile
+ create mode 100644 arch/arm64/crypto/aesce-cbc.S
+ create mode 100644 arch/arm64/crypto/aesce-ctr.S
+ create mode 100644 arch/arm64/crypto/aesce-glue.c
+ create mode 100644 arch/arm64/crypto/aesce-macros.S
+ create mode 100644 arch/arm64/crypto/aesce-xts.S
+ delete mode 100644 arch/x86/crypto/ablk_helper.c
+ delete mode 100644 arch/x86/include/asm/crypto/ablk_helper.h
+ create mode 100644 crypto/ablk_helper_generic.c
+ create mode 100644 crypto/ablk_helper_x86.c
+ create mode 100644 include/crypto/ablk_helper.h
+
 -- 
-1.8.2.2
+1.8.1.2
