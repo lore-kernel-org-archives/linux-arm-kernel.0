@@ -1,54 +1,52 @@
 From: b.brezillon@overkiz.com (Boris BREZILLON)
-Date: Fri, 13 Sep 2013 09:43:33 +0200
-Subject: [RFC PATCH 0/4] pinctrl: at91: various fixes
-Message-ID: <1379058213-3245-1-git-send-email-b.brezillon@overkiz.com>
+Date: Fri, 13 Sep 2013 09:45:33 +0200
+Subject: [RFC PATCH 1/4] pinctrl: at91: fix typos
+In-Reply-To: <1379058213-3245-1-git-send-email-b.brezillon@overkiz.com>
+References: <1379058213-3245-1-git-send-email-b.brezillon@overkiz.com>
+Message-ID: <1379058333-3286-1-git-send-email-b.brezillon@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Fix AT91_PINCTRL_DEBOUNCE_VAL dt macro typo.
+Fix at91_pinctrl_mux_ops callback typos.
 
-This patch series fixes some errors in the pinctrl drivers:
-- typos in dt-binding macros and pinctrl-at91 driver (patch 1)
-- fix several at91-pinctrl functions (patch 2 and 3)
-- rework the debounce config handling (patches 4)
-
-The last point is the most important one: the at91sam9x5/pio3 controller
-does not provide a per pin debounce time config. Instead it provides a
-common debounce time for all the pins on a given bank (PIOX).
-
-In this series I proposed 2 solutions to gracefully handle this limitation:
-1) Handle debounce time conflicts at config time (PATCH 4/4).
-   In other words, all the pins on a given bank using the debounce option must
-   use the same debounce time. If a device tries to configure a pin with
-   conflicting a debounce time, this will result in an -EINVAL error return
-   during the pin configuration.
-2) Provide a device tree property to define the default debounce time on a
-   given bank (PATCH alt 4/4)
-
-
-I prefer the first solution, as it provides a more future proof approach:
-- the generic pinconf layer provides a per pin debounce time config and if
-  we plan to support it we should take this into consideration
-- IMHO we should be able to (re)configure the debounce time after bootup and
-  the second solution does not provide any way to do this
-
-I might be wrong, so please feel free to share your thoughts about this.
-
-Best Regards,
-
-Boris
-
-
-Boris BREZILLON (4):
-  pinctrl: at91: fix typos
-  pinctrl: at91: reset caller's config variable before setting flags
-  pinctrl: at91: fix get_debounce/deglitch functions for sam9x5
-    controller
-  pinctrl: at91: check for debounce time conflicts
-
- drivers/pinctrl/pinctrl-at91.c     |   60 +++++++++++++++++++++++++++---------
+Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
+---
+ drivers/pinctrl/pinctrl-at91.c     |    6 +++---
  include/dt-bindings/pinctrl/at91.h |    2 +-
- 2 files changed, 46 insertions(+), 16 deletions(-)
+ 2 files changed, 4 insertions(+), 4 deletions(-)
 
+diff --git a/drivers/pinctrl/pinctrl-at91.c b/drivers/pinctrl/pinctrl-at91.c
+index 19afb9a..50b555a 100644
+--- a/drivers/pinctrl/pinctrl-at91.c
++++ b/drivers/pinctrl/pinctrl-at91.c
+@@ -144,11 +144,11 @@ struct at91_pinctrl_mux_ops {
+ 	void (*mux_C_periph)(void __iomem *pio, unsigned mask);
+ 	void (*mux_D_periph)(void __iomem *pio, unsigned mask);
+ 	bool (*get_deglitch)(void __iomem *pio, unsigned pin);
+-	void (*set_deglitch)(void __iomem *pio, unsigned mask, bool in_on);
++	void (*set_deglitch)(void __iomem *pio, unsigned mask, bool is_on);
+ 	bool (*get_debounce)(void __iomem *pio, unsigned pin, u32 *div);
+-	void (*set_debounce)(void __iomem *pio, unsigned mask, bool in_on, u32 div);
++	void (*set_debounce)(void __iomem *pio, unsigned mask, bool is_on, u32 div);
+ 	bool (*get_pulldown)(void __iomem *pio, unsigned pin);
+-	void (*set_pulldown)(void __iomem *pio, unsigned mask, bool in_on);
++	void (*set_pulldown)(void __iomem *pio, unsigned mask, bool is_on);
+ 	bool (*get_schmitt_trig)(void __iomem *pio, unsigned pin);
+ 	void (*disable_schmitt_trig)(void __iomem *pio, unsigned mask);
+ 	/* irq */
+diff --git a/include/dt-bindings/pinctrl/at91.h b/include/dt-bindings/pinctrl/at91.h
+index d7988b4..0fee6ff 100644
+--- a/include/dt-bindings/pinctrl/at91.h
++++ b/include/dt-bindings/pinctrl/at91.h
+@@ -16,7 +16,7 @@
+ #define AT91_PINCTRL_PULL_DOWN		(1 << 3)
+ #define AT91_PINCTRL_DIS_SCHMIT		(1 << 4)
+ #define AT91_PINCTRL_DEBOUNCE		(1 << 16)
+-#define AT91_PINCTRL_DEBOUNCE_VA(x)	(x << 17)
++#define AT91_PINCTRL_DEBOUNCE_VAL(x)	(x << 17)
+ 
+ #define AT91_PINCTRL_PULL_UP_DEGLITCH	(AT91_PINCTRL_PULL_UP | AT91_PINCTRL_DEGLITCH)
+ 
 -- 
 1.7.9.5
