@@ -1,63 +1,63 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 13 Sep 2013 12:06:41 +0200
-Subject: [PATCH v2 12/12] ARM: dts: mvebu: Add a new set of registers to the
- PMSU node
+Date: Fri, 13 Sep 2013 12:06:39 +0200
+Subject: [PATCH v2 10/12] ARM: mvebu: Set the start address of a CPU in a
+ separate function
 In-Reply-To: <1379066801-16276-1-git-send-email-gregory.clement@free-electrons.com>
 References: <1379066801-16276-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1379066801-16276-13-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1379066801-16276-11-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Power Management Unit Service block also controls the Coherency
-Fabric subsystem. This new set of registers is needed for the CPU idle
-implementation for the Armada XP, it allows to enter in a deep CPU
-idle state where the Coherency Fabric and the L2 cache are powerdown.
+Setting the start (or boot) address of A CPU is no more used only
+during SMP bring up, but will also be used by the CPU idle functions
+or later by the CPU hot plug ones.
 
-Cc: devicetree at vger.kernel.org
+This commit moves it in a separate function and exports it.
+
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- Documentation/devicetree/bindings/arm/armada-370-xp-pmsu.txt | 12 +++++++-----
- arch/arm/boot/dts/armada-xp.dtsi                             |  2 +-
- 2 files changed, 8 insertions(+), 6 deletions(-)
+ arch/arm/mach-mvebu/pmsu.c         | 10 ++++++++--
+ include/linux/armada-370-xp-pmsu.h |  1 +
+ 2 files changed, 9 insertions(+), 2 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/arm/armada-370-xp-pmsu.txt b/Documentation/devicetree/bindings/arm/armada-370-xp-pmsu.txt
-index 926b4d6..8a9db0c 100644
---- a/Documentation/devicetree/bindings/arm/armada-370-xp-pmsu.txt
-+++ b/Documentation/devicetree/bindings/arm/armada-370-xp-pmsu.txt
-@@ -7,14 +7,16 @@ Required properties:
- - compatible: "marvell,armada-370-xp-pmsu"
- 
- - reg: Should contain PMSU registers location and length. First pair
--  for the per-CPU SW Reset Control registers, second pair for the
--  Power Management Service Unit.
-+  for the per-CPU SW Reset Control registers, second pair for the CPU
-+  Power Management Service Unit registers, third pair for the Fabric Power
-+  Management Service Unit registers.
- 
- Example:
- 
--armada-370-xp-pmsu at d0022000 {
-+armada-370-xp-pmsu at 22000 {
- 	compatible = "marvell,armada-370-xp-pmsu";
--	reg = <0xd0022100 0x430>,
--	      <0xd0020800 0x20>;
-+	reg = <0x22100 0x430>,
-+	      <0x20800 0x20>,
-+	      <0x22000 0x24>;
+diff --git a/arch/arm/mach-mvebu/pmsu.c b/arch/arm/mach-mvebu/pmsu.c
+index 29ea8c5..5abca96 100644
+--- a/arch/arm/mach-mvebu/pmsu.c
++++ b/arch/arm/mach-mvebu/pmsu.c
+@@ -56,6 +56,13 @@ static struct of_device_id of_pmsu_table[] = {
+ 	{ /* end of list */ },
  };
  
-diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
-index def125c..c79cd53 100644
---- a/arch/arm/boot/dts/armada-xp.dtsi
-+++ b/arch/arm/boot/dts/armada-xp.dtsi
-@@ -48,7 +48,7 @@
++void armada_370_xp_pmsu_set_start_addr(void *start_addr, int hw_cpu)
++{
++	writel(virt_to_phys(start_addr), pmsu_mp_base +
++		PMSU_BOOT_ADDR_REDIRECT_OFFSET(hw_cpu));
++}
++EXPORT_SYMBOL_GPL(armada_370_xp_pmsu_set_start_addr);
++
+ #ifdef CONFIG_SMP
+ int armada_xp_boot_cpu(unsigned int cpu_id, void *boot_addr)
+ {
+@@ -68,8 +75,7 @@ int armada_xp_boot_cpu(unsigned int cpu_id, void *boot_addr)
  
- 			armada-370-xp-pmsu at 22000 {
- 				compatible = "marvell,armada-370-xp-pmsu";
--				reg = <0x22100 0x430>, <0x20800 0x20>;
-+				reg = <0x22100 0x430>, <0x20800 0x20>, <0x22000 0x24>;
- 			};
+ 	hw_cpu = cpu_logical_map(cpu_id);
  
- 			serial at 12200 {
+-	writel(virt_to_phys(boot_addr), pmsu_mp_base +
+-			PMSU_BOOT_ADDR_REDIRECT_OFFSET(hw_cpu));
++	armada_370_xp_pmsu_set_start_addr(boot_addr, hw_cpu);
+ 
+ 	/* Release CPU from reset by clearing reset bit*/
+ 	reg = readl(pmsu_reset_base + PMSU_RESET_CTL_OFFSET(hw_cpu));
+diff --git a/include/linux/armada-370-xp-pmsu.h b/include/linux/armada-370-xp-pmsu.h
+index 235a40c..e09977b 100644
+--- a/include/linux/armada-370-xp-pmsu.h
++++ b/include/linux/armada-370-xp-pmsu.h
+@@ -14,5 +14,6 @@
+ void armada_370_xp_pmsu_enable_l2_powerdown_onidle(void);
+ void armada_370_xp_pmsu_idle_prepare(bool deepidle);
+ void armada_370_xp_pmsu_idle_restore(void);
++void armada_370_xp_pmsu_set_start_addr(void *start_addr, int hw_cpu);
+ 
+ #endif	/* __ARMADA_370_XP__PMSU_H */
 -- 
 1.8.1.2
