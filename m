@@ -1,134 +1,120 @@
-From: josh.wu@atmel.com (Josh Wu)
-Date: Fri, 13 Sep 2013 17:28:13 +0800
-Subject: [PATCH 1/2] mtd: atmel_nand: remove unneeded ifdef CONFIG_OF
-In-Reply-To: <20130911230207.GE4550@ld-irv-0074.broadcom.com>
-References: <1378200028-15415-1-git-send-email-josh.wu@atmel.com>
- <20130911230207.GE4550@ld-irv-0074.broadcom.com>
-Message-ID: <5232DAAD.4020700@atmel.com>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Fri, 13 Sep 2013 11:28:31 +0200
+Subject: [PATCH] ARM: EXYNOS: remove CONFIG_MACH_EXYNOS[4, 5]_DT config options
+Message-ID: <3809234.0NkWBIjRC9@amdc1032>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Brian
+EXYNOS is now Device Tree (DT) only platform so it makes no sense to have
+config options responsible for enabling platform specific DT support.
 
-On 9/12/2013 7:02 AM, Brian Norris wrote:
-> Hi Josh,
->
-> On Tue, Sep 03, 2013 at 05:20:27PM +0800, Josh Wu wrote:
->> Since following commit
->>    f3b391425d21e6138e57b2432d91134e0bc2b975
-> This commit ID will likely change before it gets merged, since there may
-> be rebasing, and David usually adds his signoff. David or I can take
-> care of that later though.
+Moreover the kernel image won't even link if neither CONFIG_MACH_EXYNOS4_DT
+nor CONFIG_MACH_EXYNOS5_DT config option is enabled (linker fails with "no
+machine record defined" error).
 
-OK. I think I need to remove the commit ID part.
+Remove CONFIG_MACH_EXYNOS[4,5]_DT config options and just use the standard
+CONFIG_ARCH_EXYNOS[4,5] ones instead.
 
->
->>    (of_mtd: Add no-op stubs to support CONFIG_OF=n)
->>
->> implements the stub for CONFIG_OF=n. Now we can safely remove all
->> CONFIG_OF in atmel_nand. (Thanks to Ezequiel Garcia's for this protype)
-> I'm not quite so sure about this patch, as I was about the pxa3xx patch.
-> With pxa3xx, the compiler can easily tell that pxa3xx_nand_probe_dt()
-> will return 0 without doing anything in the !CONFIG_OF case (and so will
-> likely remove the dead code), so it's no benefit to have the #ifdef. But
-> in this driver, the atmel_of_init_port() function can't be trivially
-> determined to do nothing (and in fact, it does something in either
-> CONFIG_OF=y or =n case). It's only protected by the 'if
-> (pdev->dev.of_node)' check, which the compiler can't predict.
+Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
+ arch/arm/configs/exynos_defconfig |  1 -
+ arch/arm/mach-exynos/Kconfig      | 38 +++++++++-----------------------------
+ arch/arm/mach-exynos/Makefile     |  4 ++--
+ 3 files changed, 11 insertions(+), 32 deletions(-)
 
-I understand your concern here.
-
->
-> So, I don't know if we should remove the #ifdef at the expense of likely
-> significantly larger code. I won't protest, but I won't merge it yet
-> either. Perhaps others have better ideas, or perhaps you can find a good
-> way to work around this -- e.g., check the of_* helpers for -ENOSYS early
-> in atmel_of_init_port()?
-
-So what about to add one more check? "IS_ENABLE(CONFIG_OF)" in 
-atmel_nand_probe().
-And which is compiler predictable.
-
-if (IS_ENABLED(CONFIG_OF) && pdev->dev.of_node) {
-/* of_node can be parsed only when CONFIG_OF is enable */
-res = atmel_of_init_port(host, pdev->dev.of_node);
-if (res)
-goto err_nand_ioremap;
-} else {
-... ...
-}
-
-And thanks for the comments.
-Best Regards,
-Josh Wu
-
->
->> Signed-off-by: Josh Wu <josh.wu@atmel.com>
->> ---
->>   drivers/mtd/nand/atmel_nand.c |   14 +-------------
->>   1 file changed, 1 insertion(+), 13 deletions(-)
->>
->> diff --git a/drivers/mtd/nand/atmel_nand.c b/drivers/mtd/nand/atmel_nand.c
->> index 060feea..1ca0724 100644
->> --- a/drivers/mtd/nand/atmel_nand.c
->> +++ b/drivers/mtd/nand/atmel_nand.c
->> @@ -1449,7 +1449,6 @@ static void atmel_nand_hwctl(struct mtd_info *mtd, int mode)
->>   		ecc_writel(host->ecc, CR, ATMEL_ECC_RST);
->>   }
->>   
->> -#if defined(CONFIG_OF)
->>   static int atmel_of_init_port(struct atmel_nand_host *host,
->>   			      struct device_node *np)
->>   {
->> @@ -1457,7 +1456,7 @@ static int atmel_of_init_port(struct atmel_nand_host *host,
->>   	u32 offset[2];
->>   	int ecc_mode;
->>   	struct atmel_nand_data *board = &host->board;
->> -	enum of_gpio_flags flags;
->> +	enum of_gpio_flags flags = 0;
->>   
->>   	if (of_property_read_u32(np, "atmel,nand-addr-offset", &val) == 0) {
->>   		if (val >= 32) {
->> @@ -1540,13 +1539,6 @@ static int atmel_of_init_port(struct atmel_nand_host *host,
->>   
->>   	return 0;
->>   }
->> -#else
->> -static int atmel_of_init_port(struct atmel_nand_host *host,
->> -			      struct device_node *np)
->> -{
->> -	return -EINVAL;
->> -}
->> -#endif
->>   
->>   static int __init atmel_hw_nand_init_params(struct platform_device *pdev,
->>   					 struct atmel_nand_host *host)
->> @@ -2207,14 +2199,12 @@ static int __exit atmel_nand_remove(struct platform_device *pdev)
->>   	return 0;
->>   }
->>   
->> -#if defined(CONFIG_OF)
->>   static const struct of_device_id atmel_nand_dt_ids[] = {
->>   	{ .compatible = "atmel,at91rm9200-nand" },
->>   	{ /* sentinel */ }
->>   };
->>   
->>   MODULE_DEVICE_TABLE(of, atmel_nand_dt_ids);
->> -#endif
->>   
->>   static int atmel_nand_nfc_probe(struct platform_device *pdev)
->>   {
->> @@ -2253,12 +2243,10 @@ static int atmel_nand_nfc_probe(struct platform_device *pdev)
->>   	return 0;
->>   }
->>   
->> -#if defined(CONFIG_OF)
->>   static struct of_device_id atmel_nand_nfc_match[] = {
->>   	{ .compatible = "atmel,sama5d3-nfc" },
->>   	{ /* sentinel */ }
->>   };
->> -#endif
->>   
->>   static struct platform_driver atmel_nand_nfc_driver = {
->>   	.driver = {
-> Brian
+diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
+index ad7dfbb..5181d0d 100644
+--- a/arch/arm/configs/exynos_defconfig
++++ b/arch/arm/configs/exynos_defconfig
+@@ -11,7 +11,6 @@ CONFIG_ARCH_EXYNOS=y
+ CONFIG_S3C_LOWLEVEL_UART_PORT=3
+ CONFIG_S3C24XX_PWM=y
+ CONFIG_ARCH_EXYNOS5=y
+-CONFIG_MACH_EXYNOS4_DT=y
+ CONFIG_SMP=y
+ CONFIG_NR_CPUS=2
+ CONFIG_PREEMPT=y
+diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
+index cb36807..b810f2f 100644
+--- a/arch/arm/mach-exynos/Kconfig
++++ b/arch/arm/mach-exynos/Kconfig
+@@ -14,19 +14,28 @@ menu "SAMSUNG EXYNOS SoCs Support"
+ config ARCH_EXYNOS4
+ 	bool "SAMSUNG EXYNOS4"
+ 	default y
++	select ARM_AMBA
++	select CLKSRC_OF
++	select CLKSRC_SAMSUNG_PWM if CPU_EXYNOS4210
++	select CPU_EXYNOS4210
+ 	select GIC_NON_BANKED
++	select KEYBOARD_SAMSUNG if INPUT_KEYBOARD
+ 	select HAVE_ARM_SCU if SMP
+ 	select HAVE_SMP
+ 	select MIGHT_HAVE_CACHE_L2X0
+ 	select PINCTRL
++	select S5P_DEV_MFC
+ 	help
+ 	  Samsung EXYNOS4 SoCs based systems
+ 
+ config ARCH_EXYNOS5
+ 	bool "SAMSUNG EXYNOS5"
++	select ARM_AMBA
++	select CLKSRC_OF
+ 	select HAVE_ARM_SCU if SMP
+ 	select HAVE_SMP
+ 	select PINCTRL
++	select USB_ARCH_HAS_XHCI
+ 	help
+ 	  Samsung EXYNOS5 (Cortex-A15) SoC based systems
+ 
+@@ -110,35 +119,6 @@ config SOC_EXYNOS5440
+ 	help
+ 	  Enable EXYNOS5440 SoC support
+ 
+-comment "Flattened Device Tree based board for EXYNOS SoCs"
+-
+-config MACH_EXYNOS4_DT
+-	bool "Samsung Exynos4 Machine using device tree"
+-	default y
+-	depends on ARCH_EXYNOS4
+-	select ARM_AMBA
+-	select CLKSRC_OF
+-	select CLKSRC_SAMSUNG_PWM if CPU_EXYNOS4210
+-	select CPU_EXYNOS4210
+-	select KEYBOARD_SAMSUNG if INPUT_KEYBOARD
+-	select S5P_DEV_MFC
+-	help
+-	  Machine support for Samsung Exynos4 machine with device tree enabled.
+-	  Select this if a fdt blob is available for the Exynos4 SoC based board.
+-	  Note: This is under development and not all peripherals can be supported
+-	  with this machine file.
+-
+-config MACH_EXYNOS5_DT
+-	bool "SAMSUNG EXYNOS5 Machine using device tree"
+-	default y
+-	depends on ARCH_EXYNOS5
+-	select ARM_AMBA
+-	select CLKSRC_OF
+-	select USB_ARCH_HAS_XHCI
+-	help
+-	  Machine support for Samsung EXYNOS5 machine with device tree enabled.
+-	  Select this if a fdt blob is available for the EXYNOS5 SoC based board.
+-
+ endmenu
+ 
+ endif
+diff --git a/arch/arm/mach-exynos/Makefile b/arch/arm/mach-exynos/Makefile
+index 5369615..8930b66 100644
+--- a/arch/arm/mach-exynos/Makefile
++++ b/arch/arm/mach-exynos/Makefile
+@@ -32,5 +32,5 @@ AFLAGS_exynos-smc.o		:=-Wa,-march=armv7-a$(plus_sec)
+ 
+ # machine support
+ 
+-obj-$(CONFIG_MACH_EXYNOS4_DT)		+= mach-exynos4-dt.o
+-obj-$(CONFIG_MACH_EXYNOS5_DT)		+= mach-exynos5-dt.o
++obj-$(CONFIG_ARCH_EXYNOS4)	+= mach-exynos4-dt.o
++obj-$(CONFIG_ARCH_EXYNOS5)	+= mach-exynos5-dt.o
+-- 
+1.8.2.3
