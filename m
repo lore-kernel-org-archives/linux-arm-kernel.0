@@ -1,63 +1,80 @@
-From: emilio@elopez.com.ar (=?ISO-8859-1?Q?Emilio_L=F3pez?=)
-Date: Thu, 12 Sep 2013 22:31:08 -0300
-Subject: [PATCH] memory: add a basic OF-based memory driver
-In-Reply-To: <CAOesGMiUMniKRLRgGPsimR0bXWQFbx+SL5dUJXOb8t0JfEcHsg@mail.gmail.com>
-References: <1378863781-4235-1-git-send-email-emilio@elopez.com.ar>
- <1379032225-6425-1-git-send-email-emilio@elopez.com.ar>
- <CAOesGMiUMniKRLRgGPsimR0bXWQFbx+SL5dUJXOb8t0JfEcHsg@mail.gmail.com>
-Message-ID: <52326ADC.8040703@elopez.com.ar>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Thu, 12 Sep 2013 21:42:03 -0400
+Subject: [RFC PATCH 1/4] DRIVERS: IRQCHIP: Add crossbar irqchip driver
+In-Reply-To: <alpine.DEB.2.02.1309130138550.4089@ionos.tec.linutronix.de>
+References: <1379000351-15672-1-git-send-email-r.sricharan@ti.com>
+ <1379000351-15672-2-git-send-email-r.sricharan@ti.com>
+ <alpine.DEB.2.02.1309122201530.4089@ionos.tec.linutronix.de>
+ <523228B5.5070507@ti.com>
+ <alpine.DEB.2.02.1309122335440.4089@ionos.tec.linutronix.de>
+ <5232457A.8080709@ti.com>
+ <alpine.DEB.2.02.1309130138550.4089@ionos.tec.linutronix.de>
+Message-ID: <52326D6B.2010003@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
+On Thursday 12 September 2013 08:26 PM, Thomas Gleixner wrote:
+> On Thu, 12 Sep 2013, Santosh Shilimkar wrote:
+>> On Thursday 12 September 2013 06:22 PM, Thomas Gleixner wrote:
+>>> Now the real question is, how that expansion mechanism is supposed to
+>>> work. There are two possible scenarios:
+>>>
+>>> 1) Expand the number of handled interrupts beyond the GIC capacity:
+>>>
+>>>    That requires a mechanism in CROSSBAR to map several CROSSBAR
+>>>    interrupts to a particular GIC interrupt and provide a demux
+>>>    mechanism to invoke the shared handlers.
+>>>
+>> This is not possible in hardware and not supported. Hardware has
+>> no notion of muxing multiple IRQ's to generate 1 IRQ or ack etc
+>> functionality. Its a simple MUX to tie knots between input and output
+>> wires.
+> 
+> It's not a MUX. It's a ROUTING mechanism. That's similar to the
+> mechanisms which are used by MSI[X]. We assign arbitrary interrupt
+> numbers to a device and route them to some underlying limited hardware
+> interrupt controller.
+> 
+>>> 2) Provide a mapping mechanism between possibly 250 interrupt numbers
+>>>    and a limitation of a total 160 active interrupts by the underlying
+>>>    GIC.
+>>>
+>> This is the need and problem we are trying to solve.
+> 
+> Let me summarize:
+> 
+>    - GIC supports up to 160 interrupts
+> 
+>    - CROSSBAR supports up to 250 interrupts 
+> 
+>    - CROSSBAR routes up to 160 out of 250 interrupts to the GIC ones
+> 
+>    - Drivers request a CROSSBAR interrupt number which must be mapped
+>      to some arbitrary available GIC irq number
+> 
+Correct.
 
-El 12/09/13 21:57, Olof Johansson escribi?:
-> On Thu, Sep 12, 2013 at 5:30 PM, Emilio L?pez <emilio@elopez.com.ar> wrote:
->> This driver's only job is to claim and ensure the necessary clock
->> for memory operation on a DT-powered machine remains enabled.
->>
->> Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
->> ---
->>
->> I believe this new patch should resolve all the concerns raised; as
->> always, all feedback is welcome :)
+> So basically the CROSSBAR mechanism is pretty much the same as MSI[X]
+> just in a different flavour and with a different set of semantics and
+> limitations, i.e. poor mans MSI[X] with a new level of bogosity.
+> 
+> So if CROSSBAR is going to be the new fangled SoC MSI[X] long term
+> equivalent then you better provide some infrastructure for that and
+> make the drivers ready to use it. Maybe check with the PCI/MSI folks
+> to share some of the interfaces.
 >
-> I think you're going about this the wrong way.
->
-> If you have a problem with a clock not staying on, shouldn't you just
-> marking it appropriately in the clock table instead, making sure it's
-> initialized with at least one reference to it?
+> If that whole thing is another onetime HW designers wet dream, then
+> please go back to the limited but completely functional (Who is going
+> to use more than 160 peripheral interrupts????) device tree model. I
+> really have no interest to support hardware designer brain farts.
+> 
+Thanks for clear NAK for irqchip approach. I should have looped you
+in the discussion where I was also suggesting against the irqchip
+approach. We will try to look at MSI stuff but if its get too
+complicated am going to fall-back to the initial probe based
+approach to achieve the functionality.
 
-If by "the clock table" you mean the tree as handled by the common clock 
-framework, there is no such flag available as of today; see Mike's reply 
-for more information.
+Thanks again for clear direction and useful discussion.
 
-Personally I feel that if the general case can solve our problems (in 
-this case, having a consumer who prepares and enables the clock), we 
-should avoid adding special cases to the framework.
-
-> I believe that is how
-> some of the other platforms handle this, and it's a lot cleaner than
-> adding a fake binding and a fake driver just to grab a single clock.
-
-The binding doesn't have to be fake; it is actually describing the 
-memory controller hardware:
-
-mc: mc at 0123000 {
-	compatible = "simple-memory-controller";
-	reg = <0x0123000 0x400>;
-	clocks = <&pll5 1>;
-};
-
-If one day we get docs and/or have any special features we may need from 
-the controller, we can use something like
-
-mc: mc at 0123000 {
-	compatible = "vendor,awesome-mc", "simple-memory-controller";
-	reg = <0x0123000 0x400>;
-	clocks = <&pll5 1>;
-};
-
-Cheers,
-
-Emilio
+Regards,
+Santosh
