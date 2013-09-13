@@ -1,40 +1,69 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 12 Sep 2013 17:24:48 -0700
-Subject: More build reports
-Message-ID: <CAOesGMh3LSR_VN_sdo55ttaXn6Z_LUuoYXLCuhgMYY488Qwvvg@mail.gmail.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Fri, 13 Sep 2013 02:26:03 +0200 (CEST)
+Subject: [RFC PATCH 1/4] DRIVERS: IRQCHIP: Add crossbar irqchip driver
+In-Reply-To: <5232457A.8080709@ti.com>
+References: <1379000351-15672-1-git-send-email-r.sricharan@ti.com>
+ <1379000351-15672-2-git-send-email-r.sricharan@ti.com>
+ <alpine.DEB.2.02.1309122201530.4089@ionos.tec.linutronix.de>
+ <523228B5.5070507@ti.com>
+ <alpine.DEB.2.02.1309122335440.4089@ionos.tec.linutronix.de>
+ <5232457A.8080709@ti.com>
+Message-ID: <alpine.DEB.2.02.1309130138550.4089@ionos.tec.linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I've been sending only myself and Kevin the build reports from my own
-builder, but since there seems to be interest for this I'll include
-them on the kernel-build-reports list as well.
+On Thu, 12 Sep 2013, Santosh Shilimkar wrote:
+> On Thursday 12 September 2013 06:22 PM, Thomas Gleixner wrote:
+> > Now the real question is, how that expansion mechanism is supposed to
+> > work. There are two possible scenarios:
+> > 
+> > 1) Expand the number of handled interrupts beyond the GIC capacity:
+> > 
+> >    That requires a mechanism in CROSSBAR to map several CROSSBAR
+> >    interrupts to a particular GIC interrupt and provide a demux
+> >    mechanism to invoke the shared handlers.
+> > 
+> This is not possible in hardware and not supported. Hardware has
+> no notion of muxing multiple IRQ's to generate 1 IRQ or ack etc
+> functionality. Its a simple MUX to tie knots between input and output
+> wires.
 
-I build the following trees on a regular basis, i.e. polling for
-updates multiple times an hour:
+It's not a MUX. It's a ROUTING mechanism. That's similar to the
+mechanisms which are used by MSI[X]. We assign arbitrary interrupt
+numbers to a device and route them to some underlying limited hardware
+interrupt controller.
 
-arm-soc for-next
-mainline master
-linux-next master
-arm-soc to-build, which we use to get a build iteration out of before
-we push it to for-next sometimes
-"queue", which is linux-stable -rc queues, currently 3.9.y - 3.11.y.
+> > 2) Provide a mapping mechanism between possibly 250 interrupt numbers
+> >    and a limitation of a total 160 active interrupts by the underlying
+> >    GIC.
+> > 
+> This is the need and problem we are trying to solve.
 
-I boot them on a selection of boards:
+Let me summarize:
 
-* Cubie
-* Cubie2
-* Cubox
-* Panda ES (omap2plus_defconfig and multi_v7_defconfig)
-* Arndale
-* Atmel SAMA5
-* Tegra3 Beaver (tegra_defconfig and multi_v7_defconfig)
-* STE Snowball (u8500_defconfig and multi_v7_defconfig [known broken])
+   - GIC supports up to 160 interrupts
 
-More hardware will be added over time as I buy it (or receive it from
-generous hardware vendors). Beaglebone black and an A31 eval board
-from Allwinner still need to be added, for example. I also have a
-seemingly broken Wandboard Quad that I'll get replaced and added back
-in.
+   - CROSSBAR supports up to 250 interrupts 
 
+   - CROSSBAR routes up to 160 out of 250 interrupts to the GIC ones
 
--Olof
+   - Drivers request a CROSSBAR interrupt number which must be mapped
+     to some arbitrary available GIC irq number
+
+So basically the CROSSBAR mechanism is pretty much the same as MSI[X]
+just in a different flavour and with a different set of semantics and
+limitations, i.e. poor mans MSI[X] with a new level of bogosity.
+
+So if CROSSBAR is going to be the new fangled SoC MSI[X] long term
+equivalent then you better provide some infrastructure for that and
+make the drivers ready to use it. Maybe check with the PCI/MSI folks
+to share some of the interfaces.
+
+If that whole thing is another onetime HW designers wet dream, then
+please go back to the limited but completely functional (Who is going
+to use more than 160 peripheral interrupts????) device tree model. I
+really have no interest to support hardware designer brain farts.
+
+Thanks,
+
+	tglx
