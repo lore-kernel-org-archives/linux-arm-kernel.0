@@ -1,10 +1,10 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 13 Sep 2013 18:31:00 +0530
-Subject: [PATCH 114/228] cpufreq: pmac: don't initialize part of policy that
- is set by core too
+Date: Fri, 13 Sep 2013 18:31:01 +0530
+Subject: [PATCH 115/228] cpufreq: powernow: don't initialize part of policy
+ that is set by core too
 In-Reply-To: <cover.1379063063.git.viresh.kumar@linaro.org>
 References: <cover.1379063063.git.viresh.kumar@linaro.org>
-Message-ID: <b9cbb0d716bc4c9ecbbd64546b8282975c869b28.1379063063.git.viresh.kumar@linaro.org>
+Message-ID: <878d14d018cba46cdd161e21d801dc0f4a0c3189.1379063063.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -16,33 +16,49 @@ Most recent of those changes is to call ->get() in the core after calling
 
 Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- drivers/cpufreq/pmac32-cpufreq.c | 1 -
- drivers/cpufreq/pmac64-cpufreq.c | 1 -
- 2 files changed, 2 deletions(-)
+ drivers/cpufreq/powernow-k6.c | 1 -
+ drivers/cpufreq/powernow-k7.c | 2 --
+ drivers/cpufreq/powernow-k8.c | 3 ---
+ 3 files changed, 6 deletions(-)
 
-diff --git a/drivers/cpufreq/pmac32-cpufreq.c b/drivers/cpufreq/pmac32-cpufreq.c
-index 8715ab9..672b7f4 100644
---- a/drivers/cpufreq/pmac32-cpufreq.c
-+++ b/drivers/cpufreq/pmac32-cpufreq.c
-@@ -396,7 +396,6 @@ static int pmac_cpufreq_cpu_init(struct cpufreq_policy *policy)
- 		return -ENODEV;
+diff --git a/drivers/cpufreq/powernow-k6.c b/drivers/cpufreq/powernow-k6.c
+index ff05d28..eda1702 100644
+--- a/drivers/cpufreq/powernow-k6.c
++++ b/drivers/cpufreq/powernow-k6.c
+@@ -151,7 +151,6 @@ static int powernow_k6_cpu_init(struct cpufreq_policy *policy)
  
- 	policy->cpuinfo.transition_latency	= transition_latency;
--	policy->cur = cur_freq;
+ 	/* cpuinfo and default policy values */
+ 	policy->cpuinfo.transition_latency = 200000;
+-	policy->cur = busfreq * max_multiplier;
  
- 	return cpufreq_table_validate_and_show(policy, pmac_cpu_freqs);
+ 	return cpufreq_table_validate_and_show(policy, clock_ratio);
  }
-diff --git a/drivers/cpufreq/pmac64-cpufreq.c b/drivers/cpufreq/pmac64-cpufreq.c
-index e853b85..79e40c9 100644
---- a/drivers/cpufreq/pmac64-cpufreq.c
-+++ b/drivers/cpufreq/pmac64-cpufreq.c
-@@ -348,7 +348,6 @@ static unsigned int g5_cpufreq_get_speed(unsigned int cpu)
- static int g5_cpufreq_cpu_init(struct cpufreq_policy *policy)
- {
- 	policy->cpuinfo.transition_latency = transition_latency;
--	policy->cur = g5_cpu_freqs[g5_query_freq()].frequency;
- 	/* secondary CPUs are tied to the primary one by the
- 	 * cpufreq core if in the secondary policy we tell it that
- 	 * it actually must be one policy together with all others. */
+diff --git a/drivers/cpufreq/powernow-k7.c b/drivers/cpufreq/powernow-k7.c
+index 14cd98f..44d345b 100644
+--- a/drivers/cpufreq/powernow-k7.c
++++ b/drivers/cpufreq/powernow-k7.c
+@@ -673,8 +673,6 @@ static int powernow_cpu_init(struct cpufreq_policy *policy)
+ 	policy->cpuinfo.transition_latency =
+ 		cpufreq_scale(2000000UL, fsb, latency);
+ 
+-	policy->cur = powernow_get(0);
+-
+ 	return cpufreq_table_validate_and_show(policy, powernow_table);
+ }
+ 
+diff --git a/drivers/cpufreq/powernow-k8.c b/drivers/cpufreq/powernow-k8.c
+index f054d5b..8721744 100644
+--- a/drivers/cpufreq/powernow-k8.c
++++ b/drivers/cpufreq/powernow-k8.c
+@@ -1161,9 +1161,6 @@ static int powernowk8_cpu_init(struct cpufreq_policy *pol)
+ 	cpumask_copy(pol->cpus, cpu_core_mask(pol->cpu));
+ 	data->available_cores = pol->cpus;
+ 
+-	pol->cur = find_khz_freq_from_fid(data->currfid);
+-	pr_debug("policy current frequency %d kHz\n", pol->cur);
+-
+ 	/* min/max the cpu is capable of */
+ 	if (cpufreq_table_validate_and_show(pol, data->powernow_table)) {
+ 		printk(KERN_ERR FW_BUG PFX "invalid powernow_table\n");
 -- 
 1.7.12.rc2.18.g61b472e
