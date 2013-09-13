@@ -1,43 +1,41 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 13 Sep 2013 18:29:29 +0530
-Subject: [PATCH 023/228] cpufreq: ia64-acpi: use
- cpufreq_table_validate_and_show()
+Date: Fri, 13 Sep 2013 18:29:30 +0530
+Subject: [PATCH 024/228] cpufreq: imx6q: use cpufreq_table_validate_and_show()
 In-Reply-To: <cover.1379063063.git.viresh.kumar@linaro.org>
 References: <cover.1379063063.git.viresh.kumar@linaro.org>
-Message-ID: <2b8c89862530b7be0ece1e9aa2cce7b5f0a8ed0f.1379063063.git.viresh.kumar@linaro.org>
+Message-ID: <96dc59aaf8ee2057813782806a8a0c2b0d9b3770.1379063063.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Lets use cpufreq_table_validate_and_show() instead of calling
 cpufreq_frequency_table_cpuinfo() and cpufreq_frequency_table_get_attr().
 
-Cc: Tony Luck <tony.luck@intel.com>
+Cc: Shawn Guo <shawn.guo@linaro.org>
 Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- drivers/cpufreq/ia64-acpi-cpufreq.c | 4 +---
- 1 file changed, 1 insertion(+), 3 deletions(-)
+ drivers/cpufreq/imx6q-cpufreq.c | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
-diff --git a/drivers/cpufreq/ia64-acpi-cpufreq.c b/drivers/cpufreq/ia64-acpi-cpufreq.c
-index 3e14f03..6cfad51 100644
---- a/drivers/cpufreq/ia64-acpi-cpufreq.c
-+++ b/drivers/cpufreq/ia64-acpi-cpufreq.c
-@@ -335,7 +335,7 @@ acpi_cpufreq_cpu_init (
- 		}
- 	}
+diff --git a/drivers/cpufreq/imx6q-cpufreq.c b/drivers/cpufreq/imx6q-cpufreq.c
+index 3e39654..cd9489f 100644
+--- a/drivers/cpufreq/imx6q-cpufreq.c
++++ b/drivers/cpufreq/imx6q-cpufreq.c
+@@ -160,7 +160,7 @@ static int imx6q_cpufreq_init(struct cpufreq_policy *policy)
+ {
+ 	int ret;
  
--	result = cpufreq_frequency_table_cpuinfo(policy, data->freq_table);
-+	result = cpufreq_table_validate_and_show(policy, data->freq_table);
- 	if (result) {
- 		goto err_freqfree;
- 	}
-@@ -356,8 +356,6 @@ acpi_cpufreq_cpu_init (
- 			(u32) data->acpi_data.states[i].status,
- 			(u32) data->acpi_data.states[i].control);
+-	ret = cpufreq_frequency_table_cpuinfo(policy, freq_table);
++	ret = cpufreq_table_validate_and_show(policy, freq_table);
+ 	if (ret) {
+ 		dev_err(cpu_dev, "invalid frequency table: %d\n", ret);
+ 		return ret;
+@@ -169,7 +169,6 @@ static int imx6q_cpufreq_init(struct cpufreq_policy *policy)
+ 	policy->cpuinfo.transition_latency = transition_latency;
+ 	policy->cur = clk_get_rate(arm_clk) / 1000;
+ 	cpumask_setall(policy->cpus);
+-	cpufreq_frequency_table_get_attr(freq_table, policy->cpu);
  
--	cpufreq_frequency_table_get_attr(data->freq_table, policy->cpu);
--
- 	/* the first call to ->target() should result in us actually
- 	 * writing something to the appropriate registers. */
- 	data->resume = 1;
+ 	return 0;
+ }
 -- 
 1.7.12.rc2.18.g61b472e
