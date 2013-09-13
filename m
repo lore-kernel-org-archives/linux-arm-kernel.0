@@ -1,46 +1,47 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 13 Sep 2013 11:52:20 +0200
-Subject: [PATCH 07/10] clk: mvebu: Staticize of_cpu_clk_setup
-In-Reply-To: <1379064232-10261-7-git-send-email-sachin.kamat@linaro.org>
-References: <1379064232-10261-1-git-send-email-sachin.kamat@linaro.org>
- <1379064232-10261-7-git-send-email-sachin.kamat@linaro.org>
-Message-ID: <5232E054.7010802@free-electrons.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 13 Sep 2013 10:53:47 +0100
+Subject: [PATCH 3/5] FS: Export poll_select_copy_remaining and rename
+ poll_select_copy_remaining in compat.c so it does not pick the wrong copy.
+In-Reply-To: <CA+=Sn1=4KeoJ=beDVE0tb+2nS_i8pDBq9o-GJUwSZmhhLOhoPw@mail.gmail.com>
+References: <1378762380-13152-1-git-send-email-apinski@cavium.com>
+ <1378762380-13152-3-git-send-email-apinski@cavium.com>
+ <20130911110901.GD26777@darko.cambridge.arm.com>
+ <CA+=Sn1=4KeoJ=beDVE0tb+2nS_i8pDBq9o-GJUwSZmhhLOhoPw@mail.gmail.com>
+Message-ID: <20130913095347.GA10385@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/09/2013 11:23, Sachin Kamat wrote:
-> 'of_cpu_clk_setup' is used only in this file. Make it static.
+On Wed, Sep 11, 2013 at 10:00:14PM +0100, Andrew Pinski wrote:
+> On Wed, Sep 11, 2013 at 4:09 AM, Catalin Marinas
+> <catalin.marinas@arm.com> wrote:
+> > On Mon, Sep 09, 2013 at 10:32:57PM +0100, Andrew Pinski wrote:
+> >>   The ILP32 ABI in ARM64 uses a slightly different pselect from either
+> >>   the compat or even the native LP64 ABI.  We would want to reuse some
+> >>   of the code path that are used as the size of the timespec is the
+> >>   same, so this patch exports poll_select_copy_remaining from
+> >>   fs/select.c and renames the copy in fs/compat.c to make sure that it
+> >>   is not being used.
+> >>
+> >> Signed-off-by: Andrew Pinski <apinski@cavium.com>
+> >
+> > I think this patch has to wait until we review the ILP32 ABI for arm64.
+> > When I looked at this some time ago I thought we can just use the native
+> > arm64 pselect6 and ppoll. Once we agree that's not possible we can push
+> > this patch. On its own it doesn't have much value.
 > 
-> Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
-> Cc: Gregory CLEMENT <gregory.clement@free-electrons.com>
-
-Good catch, it should have been part of the "f640c0f clk: mvebu: Use
-common of_clk_init() function" commit.
-
-Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-
-> ---
->  drivers/clk/mvebu/clk-cpu.c |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+> Since fd_set is defined by XPG4.2  to be a struct of an array of
+> "long"'s, we cannot change the definition in user space.
 > 
-> diff --git a/drivers/clk/mvebu/clk-cpu.c b/drivers/clk/mvebu/clk-cpu.c
-> index 1466865..8ebf757 100644
-> --- a/drivers/clk/mvebu/clk-cpu.c
-> +++ b/drivers/clk/mvebu/clk-cpu.c
-> @@ -101,7 +101,7 @@ static const struct clk_ops cpu_ops = {
->  	.set_rate = clk_cpu_set_rate,
->  };
->  
-> -void __init of_cpu_clk_setup(struct device_node *node)
-> +static void __init of_cpu_clk_setup(struct device_node *node)
->  {
->  	struct cpu_clk *cpuclk;
->  	void __iomem *clock_complex_base = of_iomap(node, 0);
-> 
+> I tried using the native ppoll/pselect for the ABI first.  It worked
+> for little-endian just fine but failed hard when big-endian.
+> If we only care about little-endian arm64 at this point, I can remove
+> this part of the patch and keep it for when we (Cavium) submits the
+> big-endian patches.
 
+I see the issue now. I think for the initial set of patches we can
+assume little endian. We need a lot more testing, at least for AArch32
+mode (we can kick off some tests here once these patches get closer to
+merging).
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Catalin
