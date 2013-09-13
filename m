@@ -1,30 +1,31 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 13 Sep 2013 12:28:31 -0600
-Subject: [PATCH] ARM: tegra: enable CPU_FREQ_STAT_DETAILS
-Message-ID: <1379096911-28353-1-git-send-email-swarren@wwwdotorg.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 13 Sep 2013 12:09:48 -0700
+Subject: [PATCH 0/2] WLAN regression fixes for omap4 after moving to DT
+ based booting
+Message-ID: <20130913190811.24617.97699.stgit@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stephen Warren <swarren@nvidia.com>
+Hi all,
 
-This enables various sysfs files that are useful when testing cpufreq.
+Looks like these two patches are still missing as I did not
+update the kernel on my panda for a while but was testing with
+my 4430sdp that does not have the WLAN card..
 
-Signed-off-by: Stephen Warren <swarren@nvidia.com>
+Regards,
+
+Tony
+
 ---
- arch/arm/configs/tegra_defconfig | 1 +
- 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/configs/tegra_defconfig b/arch/arm/configs/tegra_defconfig
-index ea042e8..bb28099 100644
---- a/arch/arm/configs/tegra_defconfig
-+++ b/arch/arm/configs/tegra_defconfig
-@@ -41,6 +41,7 @@ CONFIG_ZBOOT_ROM_TEXT=0x0
- CONFIG_ZBOOT_ROM_BSS=0x0
- CONFIG_KEXEC=y
- CONFIG_CPU_FREQ=y
-+CONFIG_CPU_FREQ_STAT_DETAILS=y
- CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND=y
- CONFIG_CPU_IDLE=y
- CONFIG_VFP=y
+Tony Lindgren (2):
+      ARM: dts: Fix muxing and regulator for wl12xx on the SDIO bus for pandaboard
+      ARM: dts: Fix muxing and regulator for wl12xx on the SDIO bus for blaze
+
+
+ arch/arm/boot/dts/omap4-panda-common.dtsi |   46 ++++++++++++++++++++++++++++-
+ arch/arm/boot/dts/omap4-sdp.dts           |   39 ++++++++++++++++++++++++-
+ 2 files changed, 83 insertions(+), 2 deletions(-)
+
 -- 
-1.8.1.5
+Signature
