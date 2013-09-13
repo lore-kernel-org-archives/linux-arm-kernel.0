@@ -1,78 +1,99 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 13 Sep 2013 09:00:48 -0500
-Subject: [PATCH] memory: add a basic OF-based memory driver
-In-Reply-To: <52326ADC.8040703@elopez.com.ar>
-References: <1378863781-4235-1-git-send-email-emilio@elopez.com.ar>
- <1379032225-6425-1-git-send-email-emilio@elopez.com.ar>
- <CAOesGMiUMniKRLRgGPsimR0bXWQFbx+SL5dUJXOb8t0JfEcHsg@mail.gmail.com>
- <52326ADC.8040703@elopez.com.ar>
-Message-ID: <CAL_JsqJACEtSRaDg0TcYODzhpsHFGa4mFSYa_R3qspypEKH+hQ@mail.gmail.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 13 Sep 2013 15:01:25 +0100
+Subject: [PATCH] drivers: cpuidle: rename ARM big.LITTLE driver config
+ and makefile entries
+In-Reply-To: <5232FCD4.2070802@free-electrons.com>
+References: <1379071966-26757-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <5232FCD4.2070802@free-electrons.com>
+Message-ID: <20130913140125.GA2062@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 12, 2013 at 8:31 PM, Emilio L?pez <emilio@elopez.com.ar> wrote:
-> Hi Olof,
->
-> El 12/09/13 21:57, Olof Johansson escribi?:
->
->> On Thu, Sep 12, 2013 at 5:30 PM, Emilio L?pez <emilio@elopez.com.ar>
->> wrote:
->>>
->>> This driver's only job is to claim and ensure the necessary clock
->>> for memory operation on a DT-powered machine remains enabled.
->>>
->>> Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
->>> ---
->>>
->>> I believe this new patch should resolve all the concerns raised; as
->>> always, all feedback is welcome :)
->>
->>
->> I think you're going about this the wrong way.
->>
->> If you have a problem with a clock not staying on, shouldn't you just
->> marking it appropriately in the clock table instead, making sure it's
->> initialized with at least one reference to it?
->
->
-> If by "the clock table" you mean the tree as handled by the common clock
-> framework, there is no such flag available as of today; see Mike's reply for
-> more information.
->
-> Personally I feel that if the general case can solve our problems (in this
-> case, having a consumer who prepares and enables the clock), we should avoid
-> adding special cases to the framework.
->
->
->> I believe that is how
->> some of the other platforms handle this, and it's a lot cleaner than
->> adding a fake binding and a fake driver just to grab a single clock.
->
->
-> The binding doesn't have to be fake; it is actually describing the memory
-> controller hardware:
->
-> mc: mc at 0123000 {
->         compatible = "simple-memory-controller";
->         reg = <0x0123000 0x400>;
->         clocks = <&pll5 1>;
-> };
->
-> If one day we get docs and/or have any special features we may need from the
-> controller, we can use something like
->
-> mc: mc at 0123000 {
->         compatible = "vendor,awesome-mc", "simple-memory-controller";
->         reg = <0x0123000 0x400>;
->         clocks = <&pll5 1>;
-> };
+On Fri, Sep 13, 2013 at 12:53:56PM +0100, Gregory CLEMENT wrote:
+> Hi Lorenzo,
+> 
+> On 13/09/2013 13:32, Lorenzo Pieralisi wrote:
+> > Following the reorganization of CPU idle drivers configurations into an ARM
+> > specific Kconfig, the existing idle drivers Kconfig entries were renamed and
+> > moved to the Kconfig.arm file. Makefile entries were updated accordingly.
+> > 
+> > This patch renames the entries in Kconfig.arm and makefile to make the newly
+> > added big.LITTLE CPUidle driver compliant with the new naming convention.
+> 
+> Do you also consider to reorder the entries in alphabetic order?
+> It should help to reduce the merge conflict.
 
-Better, but this is still wrong. DT describes the hardware. There is
-no such h/w as a simple-memory-controller. The fact that you have a
-simple-memory-ctrlr kernel driver is a kernel
-feature/artifact/limitation. Describe the h/w with a meaningful
-compatible string and put that string in the simple memory controller
-driver match table. If someday we have a real driver for said memory
-controller, then it is only a kernel change to use a different driver.
+Sure, here it is, thanks for pointing that out.
 
-Rob
+Lorenzo
+
+-- >8 --
+Subject: [PATCH] drivers: cpuidle: rename ARM big.LITTLE driver config and
+ makefile entries
+
+Following the reorganization of CPU idle drivers configurations into an ARM
+specific Kconfig, the existing idle drivers Kconfig entries were renamed and
+moved to the Kconfig.arm file. Makefile entries were updated accordingly.
+
+This patch renames the entries in Kconfig.arm and makefile to make the newly
+added big.LITTLE CPUidle driver compliant with the new naming convention.
+
+Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+---
+ drivers/cpuidle/Kconfig.arm | 22 +++++++++++-----------
+ drivers/cpuidle/Makefile    |  2 +-
+ 2 files changed, 12 insertions(+), 12 deletions(-)
+
+diff --git a/drivers/cpuidle/Kconfig.arm b/drivers/cpuidle/Kconfig.arm
+index 8e36603..6a7e6f2 100644
+--- a/drivers/cpuidle/Kconfig.arm
++++ b/drivers/cpuidle/Kconfig.arm
+@@ -2,6 +2,17 @@
+ # ARM CPU Idle drivers
+ #
+ 
++config ARM_BIG_LITTLE_CPUIDLE
++	bool "Support for ARM big.LITTLE processors"
++	depends on ARCH_VEXPRESS_TC2_PM
++	select ARM_CPU_SUSPEND
++	select CPU_IDLE_MULTIPLE_DRIVERS
++	help
++	  Select this option to enable CPU idle driver for big.LITTLE based
++	  ARM systems. Driver manages CPUs coordination through MCPM and
++	  define different C-states for little and big cores through the
++	  multiple CPU idle drivers infrastructure.
++
+ config ARM_HIGHBANK_CPUIDLE
+ 	bool "CPU Idle Driver for Calxeda processors"
+ 	depends on ARCH_HIGHBANK
+@@ -26,14 +37,3 @@ config ARM_U8500_CPUIDLE
+ 	depends on ARCH_U8500
+ 	help
+ 	  Select this to enable cpuidle for ST-E u8500 processors
+-
+-config CPU_IDLE_BIG_LITTLE
+-	bool "Support for ARM big.LITTLE processors"
+-	depends on ARCH_VEXPRESS_TC2_PM
+-	select ARM_CPU_SUSPEND
+-	select CPU_IDLE_MULTIPLE_DRIVERS
+-	help
+-	  Select this option to enable CPU idle driver for big.LITTLE based
+-	  ARM systems. Driver manages CPUs coordination through MCPM and
+-	  define different C-states for little and big cores through the
+-	  multiple CPU idle drivers infrastructure.
+diff --git a/drivers/cpuidle/Makefile b/drivers/cpuidle/Makefile
+index cea5ef5..d08bd40 100644
+--- a/drivers/cpuidle/Makefile
++++ b/drivers/cpuidle/Makefile
+@@ -7,8 +7,8 @@ obj-$(CONFIG_ARCH_NEEDS_CPU_IDLE_COUPLED) += coupled.o
+ 
+ ##################################################################################
+ # ARM SoC drivers
++obj-$(CONFIG_ARM_BIG_LITTLE_CPUIDLE)	+= cpuidle-big_little.o
+ obj-$(CONFIG_ARM_HIGHBANK_CPUIDLE)	+= cpuidle-calxeda.o
+ obj-$(CONFIG_ARM_KIRKWOOD_CPUIDLE)	+= cpuidle-kirkwood.o
+ obj-$(CONFIG_ARM_ZYNQ_CPUIDLE)		+= cpuidle-zynq.o
+ obj-$(CONFIG_ARM_U8500_CPUIDLE)         += cpuidle-ux500.o
+-obj-$(CONFIG_CPU_IDLE_BIG_LITTLE)	+= cpuidle-big_little.o
+-- 
+1.8.2.2
