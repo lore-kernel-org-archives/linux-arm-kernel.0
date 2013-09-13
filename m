@@ -1,292 +1,545 @@
-From: dongas86@gmail.com (Dong Aisheng)
-Date: Sat, 14 Sep 2013 00:38:34 +0800
-Subject: [PATCH 5/8] sdhci: sdhci-esdhc-imx: change pinctrl state
- according to uhs mode
-In-Reply-To: <CAPDyKFpUgA+180jtNcowjZrznbhvxfDyUSCmJYjefpfGRoOkZQ@mail.gmail.com>
-References: <1378299257-2980-1-git-send-email-b29396@freescale.com>
- <1378299257-2980-6-git-send-email-b29396@freescale.com>
- <CAPDyKFrCoQ7PMw29krxYsuFHH12NyDsPu7OxGb73QC-dNGXDVg@mail.gmail.com>
- <CAA+hA=QCv4q60iNkeQxB=8dafK7DjMNzG5vYmGx0qmT_xjQvNQ@mail.gmail.com>
- <CAPDyKFpUgA+180jtNcowjZrznbhvxfDyUSCmJYjefpfGRoOkZQ@mail.gmail.com>
-Message-ID: <CAA+hA=Rkpq3O3Cm0B31q_csV1dee77dA2z5suAZx8-h30ThASQ@mail.gmail.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 13 Sep 2013 17:39:51 +0100
+Subject: [PATCH 2/2] Documentation: DT: arm: define CPU topology bindings
+In-Reply-To: <1376559743-31848-3-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1376559743-31848-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1376559743-31848-3-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <20130913163950.GB5408@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ulf,
+[replying to self]
 
-Thanks for the reply.
+Bindings defined in this patch have been hanging in the balance for
+quite a while, I would ask DT maintainers (and everyone else) please to have
+a look and provide an ACK/NACK as they deem fit, thank you very much.
 
-On Fri, Sep 13, 2013 at 10:01 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
-> On 5 September 2013 18:04, Dong Aisheng <dongas86@gmail.com> wrote:
->> Hi Ulf,
->>
->> On Thu, Sep 5, 2013 at 3:38 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
->>> On 4 September 2013 14:54, Dong Aisheng <b29396@freescale.com> wrote:
->>>> Without proper pinctrl state, the card may not be able to work
->>>> on high speed stablely. e.g. SDR104.
->>>>
->>>> This patch add pinctrl state switch code according to different
->>>> uhs mode include 100mhz sate, 200mhz sate and normal state
->>>> (50Mhz and below).
->>>>
->>>> Signed-off-by: Dong Aisheng <b29396@freescale.com>
->>>> ---
->>>>  drivers/mmc/host/sdhci-esdhc-imx.c          |  110 ++++++++++++++++++++++++++-
->>>>  include/linux/platform_data/mmc-esdhc-imx.h |    4 +
->>>>  2 files changed, 113 insertions(+), 1 deletions(-)
->>>>
->>>> diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
->>>> index 36b9f63..3e89863 100644
->>>> --- a/drivers/mmc/host/sdhci-esdhc-imx.c
->>>> +++ b/drivers/mmc/host/sdhci-esdhc-imx.c
->>>> @@ -49,6 +49,10 @@
->>>>
->>>>  #define ESDHC_TUNING_BLOCK_PATTERN_LEN 64
->>>>
->>>> +/* pinctrl state */
->>>> +#define ESDHC_PINCTRL_STATE_100MHZ     "state_100mhz"
->>>> +#define ESDHC_PINCTRL_STATE_200MHZ     "state_200mhz"
->>>> +
->>>>  /*
->>>>   * Our interpretation of the SDHCI_HOST_CONTROL register
->>>>   */
->>>> @@ -90,6 +94,10 @@ struct pltfm_imx_data {
->>>>         u32 scratchpad;
->>>>         enum imx_esdhc_type devtype;
->>>>         struct pinctrl *pinctrl;
->>>> +       struct pinctrl_state *pins_current;
->>>> +       struct pinctrl_state *pins_default;
->>>> +       struct pinctrl_state *pins_100mhz;
->>>> +       struct pinctrl_state *pins_200mhz;
->>>>         struct esdhc_platform_data boarddata;
->>>>         struct clk *clk_ipg;
->>>>         struct clk *clk_ahb;
->>>> @@ -642,6 +650,75 @@ static int esdhc_executing_tuning(struct sdhci_host *host, u32 opcode)
->>>>         return ret;
->>>>  }
->>>>
->>>> +static int esdhc_change_pinstate(struct sdhci_host *host,
->>>> +                                               unsigned int uhs)
->>>> +{
->>>> +       struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
->>>> +       struct pltfm_imx_data *imx_data = pltfm_host->priv;
->>>> +       struct pinctrl_state *pinctrl;
->>>> +       int ret;
->>>> +
->>>> +       dev_dbg(mmc_dev(host->mmc), "change pinctrl state for uhs %d\n", uhs);
->>>> +
->>>> +       if (IS_ERR(imx_data->pinctrl) ||
->>>> +               IS_ERR(imx_data->pins_default) ||
->>>> +               IS_ERR(imx_data->pins_100mhz) ||
->>>> +               IS_ERR(imx_data->pins_200mhz))
->>>> +               return -EINVAL;
->>>> +
->>>> +       switch (uhs) {
->>>> +       case MMC_TIMING_UHS_SDR12:
->>>> +       case MMC_TIMING_UHS_SDR25:
->>>> +       case MMC_TIMING_UHS_DDR50:
->>>> +               pinctrl = imx_data->pins_default;
->>>> +               break;
->>>> +       case MMC_TIMING_UHS_SDR50:
->>>> +               pinctrl = imx_data->pins_100mhz;
->>>> +               break;
->>>> +       case MMC_TIMING_UHS_SDR104:
->>>> +               pinctrl = imx_data->pins_200mhz;
->>>> +               break;
->>>> +       default:
->>>> +               /* back to default state for other legacy timing */
->>>> +               pinctrl = imx_data->pins_default;
->>>> +       }
->>>> +
->>>> +       if (pinctrl == imx_data->pins_current)
->>>> +               return 0;
->>>> +
->>>> +       ret = pinctrl_select_state(imx_data->pinctrl, pinctrl);
->>>> +       if (!ret)
->>>> +               imx_data->pins_current = pinctrl;
->>>> +
->>>> +       return ret;
->>>> +}
->>>> +
->>>> +static int esdhc_set_uhs_signaling(struct sdhci_host *host, unsigned int uhs)
->>>> +{
->>>> +       struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
->>>> +       struct pltfm_imx_data *imx_data = pltfm_host->priv;
->>>> +
->>>> +       switch (uhs) {
->>>> +       case MMC_TIMING_UHS_SDR12:
->>>> +               imx_data->uhs_mode = SDHCI_CTRL_UHS_SDR12;
->>>> +               break;
->>>> +       case MMC_TIMING_UHS_SDR25:
->>>> +               imx_data->uhs_mode = SDHCI_CTRL_UHS_SDR25;
->>>> +               break;
->>>> +       case MMC_TIMING_UHS_SDR50:
->>>> +               imx_data->uhs_mode = SDHCI_CTRL_UHS_SDR50;
->>>> +               break;
->>>> +       case MMC_TIMING_UHS_SDR104:
->>>> +               imx_data->uhs_mode = SDHCI_CTRL_UHS_SDR104;
->>>> +               break;
->>>> +       case MMC_TIMING_UHS_DDR50:
->>>> +               imx_data->uhs_mode = SDHCI_CTRL_UHS_DDR50;
->>>> +               break;
->>>> +       }
->>>> +
->>>> +       return esdhc_change_pinstate(host, uhs);
->>>> +}
->>>> +
->>>>  static const struct sdhci_ops sdhci_esdhc_ops = {
->>>>         .read_l = esdhc_readl_le,
->>>>         .read_w = esdhc_readw_le,
->>>> @@ -653,6 +730,7 @@ static const struct sdhci_ops sdhci_esdhc_ops = {
->>>>         .get_min_clock = esdhc_pltfm_get_min_clock,
->>>>         .get_ro = esdhc_pltfm_get_ro,
->>>>         .platform_bus_width = esdhc_pltfm_bus_width,
->>>> +       .set_uhs_signaling = esdhc_set_uhs_signaling,
->>>>         .platform_execute_tuning = esdhc_executing_tuning,
->>>>  };
->>>>
->>>> @@ -695,6 +773,11 @@ sdhci_esdhc_imx_probe_dt(struct platform_device *pdev,
->>>>
->>>>         of_property_read_u32(np, "max-frequency", &boarddata->f_max);
->>>>
->>>> +       if (of_find_property(np, "no-1-8-v", NULL))
->>>> +               boarddata->support_vsel = false;
->>>> +       else
->>>> +               boarddata->support_vsel = true;
->>>> +
->>>>         return 0;
->>>>  }
->>>>  #else
->>>> @@ -757,12 +840,20 @@ static int sdhci_esdhc_imx_probe(struct platform_device *pdev)
->>>>         clk_prepare_enable(imx_data->clk_ipg);
->>>>         clk_prepare_enable(imx_data->clk_ahb);
->>>>
->>>> -       imx_data->pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
->>>> +       imx_data->pinctrl = devm_pinctrl_get(&pdev->dev);
->>>>         if (IS_ERR(imx_data->pinctrl)) {
->>>>                 err = PTR_ERR(imx_data->pinctrl);
->>>>                 goto disable_clk;
->>>>         }
->>>>
->>>> +       imx_data->pins_default = pinctrl_lookup_state(imx_data->pinctrl,
->>>> +                                               PINCTRL_STATE_DEFAULT);
->>>
->>> I believe you should look into the new pinctrl APIs and the new
->>> sequence at device driver core probe, which automatically fetches
->>> default, idle and sleep state pins. Additionally it sets the default
->>> state.
->>>
->>> It should likely simplifies some code in this patch.
->>>
->>
->> After looking into the pinctrl automatically fetch states, it seems
->> above two line may could be replaced as:
->> imx_data->pinctrl = (&pdev->dev)->pins->p;
->> imx_data->pins_default = (&pdev->dev)->pins->default_state;
->
-> pinctrl_pm_select_default_state(dev)
-> pinctrl_pm_select_ilde_state(dev)
-> pinctrl_pm_select_sleep_state(dev)
->
-> The states are fetched from device core at probe.
->
+Comments welcome.
 
-I did not use idle and sleep state, instead, i need get another two private
-defined states,  state_100mhz, state_200mhz and select between them,
-so these API seems not so useful for my case.
-Even i want to use this API, i can only use it for default state which seems
-not so neccesary.
+Thanks,
+Lorenzo
 
-Regards
-Dong Aisheng
-
-> Kind regards
-> Ulf Hansson
->
->
->>
->> However, i'm not sure touching the pinctrl internal implementations in
->> device core is a good choice.
->> So i may still like to keep the exist using.
->>
->> Regards
->> Dong Aisheng
->>
->>> Kind regards
->>> Ulf Hansson
->>>
->>>
->>>> +       if (IS_ERR(imx_data->pins_default)) {
->>>> +               err = PTR_ERR(imx_data->pins_default);
->>>> +               dev_err(mmc_dev(host->mmc), "could not get default state\n");
->>>> +               goto disable_clk;
->>>> +       }
->>>> +
->>>>         host->quirks |= SDHCI_QUIRK_BROKEN_TIMEOUT_VAL;
->>>>
->>>>         if (is_imx25_esdhc(imx_data) || is_imx35_esdhc(imx_data))
->>>> @@ -839,6 +930,23 @@ static int sdhci_esdhc_imx_probe(struct platform_device *pdev)
->>>>                 break;
->>>>         }
->>>>
->>>> +       /* sdr50 and sdr104 needs work on 1.8v signal voltage */
->>>> +       if ((boarddata->support_vsel) && is_imx6q_usdhc(imx_data)) {
->>>> +               imx_data->pins_100mhz = pinctrl_lookup_state(imx_data->pinctrl,
->>>> +                                               ESDHC_PINCTRL_STATE_100MHZ);
->>>> +               imx_data->pins_200mhz = pinctrl_lookup_state(imx_data->pinctrl,
->>>> +                                               ESDHC_PINCTRL_STATE_200MHZ);
->>>> +               if (IS_ERR(imx_data->pins_100mhz) ||
->>>> +                               IS_ERR(imx_data->pins_200mhz)) {
->>>> +                       dev_warn(mmc_dev(host->mmc),
->>>> +                               "could not get ultra high speed state, work on normal mode\n");
->>>> +                       /* fall back to not support uhs by specify no 1.8v quirk */
->>>> +                       host->quirks2 |= SDHCI_QUIRK2_NO_1_8_V;
->>>> +               }
->>>> +       } else {
->>>> +               host->quirks2 |= SDHCI_QUIRK2_NO_1_8_V;
->>>> +       }
->>>> +
->>>>         err = sdhci_add_host(host);
->>>>         if (err)
->>>>                 goto disable_clk;
->>>> diff --git a/include/linux/platform_data/mmc-esdhc-imx.h b/include/linux/platform_data/mmc-esdhc-imx.h
->>>> index d44912d..a0f5a8f 100644
->>>> --- a/include/linux/platform_data/mmc-esdhc-imx.h
->>>> +++ b/include/linux/platform_data/mmc-esdhc-imx.h
->>>> @@ -10,6 +10,8 @@
->>>>  #ifndef __ASM_ARCH_IMX_ESDHC_H
->>>>  #define __ASM_ARCH_IMX_ESDHC_H
->>>>
->>>> +#include <linux/types.h>
->>>> +
->>>>  enum wp_types {
->>>>         ESDHC_WP_NONE,          /* no WP, neither controller nor gpio */
->>>>         ESDHC_WP_CONTROLLER,    /* mmc controller internal WP */
->>>> @@ -32,6 +34,7 @@ enum cd_types {
->>>>   * @cd_gpio:   gpio for card_detect interrupt
->>>>   * @wp_type:   type of write_protect method (see wp_types enum above)
->>>>   * @cd_type:   type of card_detect method (see cd_types enum above)
->>>> + * @support_vsel:  indicate it supports 1.8v switching
->>>>   */
->>>>
->>>>  struct esdhc_platform_data {
->>>> @@ -41,5 +44,6 @@ struct esdhc_platform_data {
->>>>         enum cd_types cd_type;
->>>>         int max_bus_width;
->>>>         unsigned int f_max;
->>>> +       bool support_vsel;
->>>>  };
->>>>  #endif /* __ASM_ARCH_IMX_ESDHC_H */
->>>> --
->>>> 1.7.1
->>>>
->>>>
->>>> --
->>>> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
->>>> the body of a message to majordomo at vger.kernel.org
->>>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->>>
->>> _______________________________________________
->>> linux-arm-kernel mailing list
->>> linux-arm-kernel at lists.infradead.org
->>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+On Thu, Aug 15, 2013 at 10:42:23AM +0100, Lorenzo Pieralisi wrote:
+> The advent of multi-cluster ARM systems requires a mechanism to describe
+> how in hierarchical terms CPUs are connected in ARM SoCs so that the kernel
+> can initialize and map resources like IRQs and memory space to specific
+> group(s) of CPUs.
+> 
+> The CPU topology is made up of multiple hierarchy levels whose bottom
+> layers (aka leaf nodes in device tree syntax) contain links to the HW
+> CPUs in the system.
+> 
+> The topology bindings are generic for both 32-bit and 64-bit systems and
+> lay the groundwork on top of which affinity schemes can be built.
+> 
+> This patch provides the documentation in the kernel required to define the
+> device tree bindings describing the CPU topology for ARM 32-bit and 64-bit
+> systems.
+> 
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> ---
+>  Documentation/devicetree/bindings/arm/topology.txt | 492 +++++++++++++++++++++
+>  1 file changed, 492 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/arm/topology.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/topology.txt b/Documentation/devicetree/bindings/arm/topology.txt
+> new file mode 100644
+> index 0000000..73fe7dd
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/arm/topology.txt
+> @@ -0,0 +1,492 @@
+> +===========================================
+> +ARM topology binding description
+> +===========================================
+> +
+> +===========================================
+> +1 - Introduction
+> +===========================================
+> +
+> +In an ARM system, the hierarchy of CPUs is defined through three entities that
+> +are used to describe the layout of physical CPUs in the system:
+> +
+> +- cluster
+> +- core
+> +- thread
+> +
+> +The cpu nodes (bindings defined in [1]) represent the devices that
+> +correspond to physical CPUs and are to be mapped to the hierarchy levels.
+> +
+> +The bottom hierarchy level sits at core or thread level depending on whether
+> +symmetric multi-threading (SMT) is supported or not.
+> +
+> +For instance in a system where CPUs support SMT, "cpu" nodes represent all
+> +threads existing in the system and map to the hierarchy level "thread" above.
+> +In systems where SMT is not supported "cpu" nodes represent all cores present
+> +in the system and map to the hierarchy level "core" above.
+> +
+> +ARM topology bindings allow one to associate cpu nodes with hierarchical groups
+> +corresponding to the system hierarchy; syntactically they are defined as device
+> +tree nodes.
+> +
+> +The remainder of this document provides the topology bindings for ARM, based
+> +on the ePAPR standard, available from:
+> +
+> +http://www.power.org/documentation/epapr-version-1-1/
+> +
+> +If not stated otherwise, whenever a reference to a cpu node phandle is made its
+> +value must point to a cpu node compliant with the cpu node bindings as
+> +documented in [1].
+> +A topology description containing phandles to cpu nodes that are not compliant
+> +with bindings standardized in [1] is therefore considered invalid.
+> +
+> +===========================================
+> +2 - cpu-map node
+> +===========================================
+> +
+> +The ARM CPU topology is defined within the cpu-map node, which is a direct
+> +child of the cpus node and provides a container where the actual topology
+> +nodes are listed.
+> +
+> +- cpu-map node
+> +
+> +       Usage: Optional - Provide ARM CPU topology to the OS
+> +
+> +       Description: The cpu-map node is just a container node where its
+> +                    subnodes describe the CPU topology
+> +
+> +       Node name must be "cpu-map".
+> +
+> +       The cpu-map node's parent node must be the cpus node.
+> +
+> +       The cpu-map node's child nodes can be:
+> +
+> +       - one or more cluster nodes
+> +
+> +       Any other configuration is considered invalid.
+> +
+> +The cpu-map node can only contain three types of child nodes:
+> +
+> +- cluster node
+> +- core node
+> +- thread node
+> +
+> +whose bindings are described in paragraph 3.
+> +
+> +The nodes describing the CPU topology (cluster/core/thread) can only be
+> +defined within the cpu-map node.
+> +Any other configuration is consider invalid and therefore must be ignored.
+> +
+> +===========================================
+> +2.1 - cpu-map child nodes naming convention
+> +===========================================
+> +
+> +cpu-map child nodes must follow a naming convention where the node name
+> +must be "clusterN", "coreN", "threadN" depending on the node type (ie
+> +cluster/core/thread) (where N = {0, 1, ...} is the node number; nodes which
+> +are siblings within a single common parent node must be given a unique and
+> +sequential N value, starting from 0).
+> +cpu-map child nodes which do not share a common parent node can have the same
+> +name (ie same number N as other cpu-map child nodes at different device tree
+> +levels) since name uniqueness will be guaranteed by the device tree hierarchy.
+> +
+> +===========================================
+> +3 - cluster/core/thread node bindings
+> +===========================================
+> +
+> +Bindings for cluster/cpu/thread nodes are defined as follows:
+> +
+> +- cluster node
+> +
+> +        Description: must be declared within a cpu-map node, one node
+> +                     per cluster. A system can contain several layers of
+> +                     clustering and cluster nodes can be contained in parent
+> +                     cluster nodes.
+> +
+> +       The cluster node name must be "clusterN" as described in 2.1 above.
+> +       A cluster node can not be a leaf node.
+> +
+> +       A cluster node's child nodes must be:
+> +
+> +       - one or more cluster nodes; or
+> +       - one or more core nodes
+> +
+> +       Any other configuration is considered invalid.
+> +
+> +- core node
+> +
+> +       Description: must be declared in a cluster node, one node per core in
+> +                    the cluster. If the system does not support SMT, core
+> +                    nodes are leaf nodes, otherwise they become containers of
+> +                    thread nodes.
+> +
+> +       The core node name must be "coreN" as described in 2.1 above.
+> +
+> +       A core node must be a leaf node if SMT is not supported.
+> +
+> +       Properties for core nodes that are leaf nodes:
+> +
+> +       - cpu
+> +               Usage: required
+> +               Value type: <phandle>
+> +               Definition: a phandle to the cpu node that corresponds to the
+> +                           core node.
+> +
+> +       If a core node is not a leaf node (CPUs supporting SMT) a core node's
+> +       child nodes can be:
+> +
+> +       - one or more thread nodes
+> +
+> +       Any other configuration is considered invalid.
+> +
+> +- thread node
+> +
+> +       Description: must be declared in a core node, one node per thread
+> +                    in the core if the system supports SMT. Thread nodes are
+> +                    always leaf nodes in the device tree.
+> +
+> +       The thread node name must be "threadN" as described in 2.1 above.
+> +
+> +       A thread node must be a leaf node.
+> +
+> +       A thread node must contain the following property:
+> +
+> +       - cpu
+> +               Usage: required
+> +               Value type: <phandle>
+> +               Definition: a phandle to the cpu node that corresponds to
+> +                           the thread node.
+> +
+> +===========================================
+> +4 - Example dts
+> +===========================================
+> +
+> +Example 1 (ARM 64-bit, 16-cpu system, two clusters of clusters):
+> +
+> +cpus {
+> +       #size-cells = <0>;
+> +       #address-cells = <2>;
+> +
+> +       cpu-map {
+> +               cluster0 {
+> +                       cluster0 {
+> +                               core0 {
+> +                                       thread0 {
+> +                                               cpu = <&CPU0>;
+> +                                       };
+> +                                       thread1 {
+> +                                               cpu = <&CPU1>;
+> +                                       };
+> +                               };
+> +
+> +                               core1 {
+> +                                       thread0 {
+> +                                               cpu = <&CPU2>;
+> +                                       };
+> +                                       thread1 {
+> +                                               cpu = <&CPU3>;
+> +                                       };
+> +                               };
+> +                       };
+> +
+> +                       cluster1 {
+> +                               core0 {
+> +                                       thread0 {
+> +                                               cpu = <&CPU4>;
+> +                                       };
+> +                                       thread1 {
+> +                                               cpu = <&CPU5>;
+> +                                       };
+> +                               };
+> +
+> +                               core1 {
+> +                                       thread0 {
+> +                                               cpu = <&CPU6>;
+> +                                       };
+> +                                       thread1 {
+> +                                               cpu = <&CPU7>;
+> +                                       };
+> +                               };
+> +                       };
+> +               };
+> +
+> +               cluster1 {
+> +                       cluster0 {
+> +                               core0 {
+> +                                       thread0 {
+> +                                               cpu = <&CPU8>;
+> +                                       };
+> +                                       thread1 {
+> +                                               cpu = <&CPU9>;
+> +                                       };
+> +                               };
+> +                               core1 {
+> +                                       thread0 {
+> +                                               cpu = <&CPU10>;
+> +                                       };
+> +                                       thread1 {
+> +                                               cpu = <&CPU11>;
+> +                                       };
+> +                               };
+> +                       };
+> +
+> +                       cluster1 {
+> +                               core0 {
+> +                                       thread0 {
+> +                                               cpu = <&CPU12>;
+> +                                       };
+> +                                       thread1 {
+> +                                               cpu = <&CPU13>;
+> +                                       };
+> +                               };
+> +                               core1 {
+> +                                       thread0 {
+> +                                               cpu = <&CPU14>;
+> +                                       };
+> +                                       thread1 {
+> +                                               cpu = <&CPU15>;
+> +                                       };
+> +                               };
+> +                       };
+> +               };
+> +       };
+> +
+> +       CPU0: cpu at 0 {
+> +               device_type = "cpu";
+> +               compatible = "arm,cortex-a57";
+> +               reg = <0x0 0x0>;
+> +               enable-method = "spin-table";
+> +               cpu-release-addr = <0 0x20000000>;
+> +       };
+> +
+> +       CPU1: cpu at 1 {
+> +               device_type = "cpu";
+> +               compatible = "arm,cortex-a57";
+> +               reg = <0x0 0x1>;
+> +               enable-method = "spin-table";
+> +               cpu-release-addr = <0 0x20000000>;
+> +       };
+> +
+> +       CPU2: cpu at 100 {
+> +               device_type = "cpu";
+> +               compatible = "arm,cortex-a57";
+> +               reg = <0x0 0x100>;
+> +               enable-method = "spin-table";
+> +               cpu-release-addr = <0 0x20000000>;
+> +       };
+> +
+> +       CPU3: cpu at 101 {
+> +               device_type = "cpu";
+> +               compatible = "arm,cortex-a57";
+> +               reg = <0x0 0x101>;
+> +               enable-method = "spin-table";
+> +               cpu-release-addr = <0 0x20000000>;
+> +       };
+> +
+> +       CPU4: cpu at 10000 {
+> +               device_type = "cpu";
+> +               compatible = "arm,cortex-a57";
+> +               reg = <0x0 0x10000>;
+> +               enable-method = "spin-table";
+> +               cpu-release-addr = <0 0x20000000>;
+> +       };
+> +
+> +       CPU5: cpu at 10001 {
+> +               device_type = "cpu";
+> +               compatible = "arm,cortex-a57";
+> +               reg = <0x0 0x10001>;
+> +               enable-method = "spin-table";
+> +               cpu-release-addr = <0 0x20000000>;
+> +       };
+> +
+> +       CPU6: cpu at 10100 {
+> +               device_type = "cpu";
+> +               compatible = "arm,cortex-a57";
+> +               reg = <0x0 0x10100>;
+> +               enable-method = "spin-table";
+> +               cpu-release-addr = <0 0x20000000>;
+> +       };
+> +
+> +       CPU7: cpu at 10101 {
+> +               device_type = "cpu";
+> +               compatible = "arm,cortex-a57";
+> +               reg = <0x0 0x10101>;
+> +               enable-method = "spin-table";
+> +               cpu-release-addr = <0 0x20000000>;
+> +       };
+> +
+> +       CPU8: cpu at 100000000 {
+> +               device_type = "cpu";
+> +               compatible = "arm,cortex-a57";
+> +               reg = <0x1 0x0>;
+> +               enable-method = "spin-table";
+> +               cpu-release-addr = <0 0x20000000>;
+> +       };
+> +
+> +       CPU9: cpu at 100000001 {
+> +               device_type = "cpu";
+> +               compatible = "arm,cortex-a57";
+> +               reg = <0x1 0x1>;
+> +               enable-method = "spin-table";
+> +               cpu-release-addr = <0 0x20000000>;
+> +       };
+> +
+> +       CPU10: cpu at 100000100 {
+> +               device_type = "cpu";
+> +               compatible = "arm,cortex-a57";
+> +               reg = <0x1 0x100>;
+> +               enable-method = "spin-table";
+> +               cpu-release-addr = <0 0x20000000>;
+> +       };
+> +
+> +       CPU11: cpu at 100000101 {
+> +               device_type = "cpu";
+> +               compatible = "arm,cortex-a57";
+> +               reg = <0x1 0x101>;
+> +               enable-method = "spin-table";
+> +               cpu-release-addr = <0 0x20000000>;
+> +       };
+> +
+> +       CPU12: cpu at 100010000 {
+> +               device_type = "cpu";
+> +               compatible = "arm,cortex-a57";
+> +               reg = <0x1 0x10000>;
+> +               enable-method = "spin-table";
+> +               cpu-release-addr = <0 0x20000000>;
+> +       };
+> +
+> +       CPU13: cpu at 100010001 {
+> +               device_type = "cpu";
+> +               compatible = "arm,cortex-a57";
+> +               reg = <0x1 0x10001>;
+> +               enable-method = "spin-table";
+> +               cpu-release-addr = <0 0x20000000>;
+> +       };
+> +
+> +       CPU14: cpu at 100010100 {
+> +               device_type = "cpu";
+> +               compatible = "arm,cortex-a57";
+> +               reg = <0x1 0x10100>;
+> +               enable-method = "spin-table";
+> +               cpu-release-addr = <0 0x20000000>;
+> +       };
+> +
+> +       CPU15: cpu at 100010101 {
+> +               device_type = "cpu";
+> +               compatible = "arm,cortex-a57";
+> +               reg = <0x1 0x10101>;
+> +               enable-method = "spin-table";
+> +               cpu-release-addr = <0 0x20000000>;
+> +       };
+> +};
+> +
+> +Example 2 (ARM 32-bit, dual-cluster, 8-cpu system, no SMT):
+> +
+> +cpus {
+> +       #size-cells = <0>;
+> +       #address-cells = <1>;
+> +
+> +       cpu-map {
+> +               cluster0 {
+> +                       core0 {
+> +                               cpu = <&CPU0>;
+> +                       };
+> +                       core1 {
+> +                               cpu = <&CPU1>;
+> +                       };
+> +                       core2 {
+> +                               cpu = <&CPU2>;
+> +                       };
+> +                       core3 {
+> +                               cpu = <&CPU3>;
+> +                       };
+> +               };
+> +
+> +               cluster1 {
+> +                       core0 {
+> +                               cpu = <&CPU4>;
+> +                       };
+> +                       core1 {
+> +                               cpu = <&CPU5>;
+> +                       };
+> +                       core2 {
+> +                               cpu = <&CPU6>;
+> +                       };
+> +                       core3 {
+> +                               cpu = <&CPU7>;
+> +                       };
+> +               };
+> +       };
+> +
+> +       CPU0: cpu at 0 {
+> +               device_type = "cpu";
+> +               compatible = "arm,cortex-a15";
+> +               reg = <0x0>;
+> +       };
+> +
+> +       CPU1: cpu at 1 {
+> +               device_type = "cpu";
+> +               compatible = "arm,cortex-a15";
+> +               reg = <0x1>;
+> +       };
+> +
+> +       CPU2: cpu at 2 {
+> +               device_type = "cpu";
+> +               compatible = "arm,cortex-a15";
+> +               reg = <0x2>;
+> +       };
+> +
+> +       CPU3: cpu at 3 {
+> +               device_type = "cpu";
+> +               compatible = "arm,cortex-a15";
+> +               reg = <0x3>;
+> +       };
+> +
+> +       CPU4: cpu at 100 {
+> +               device_type = "cpu";
+> +               compatible = "arm,cortex-a7";
+> +               reg = <0x100>;
+> +       };
+> +
+> +       CPU5: cpu at 101 {
+> +               device_type = "cpu";
+> +               compatible = "arm,cortex-a7";
+> +               reg = <0x101>;
+> +       };
+> +
+> +       CPU6: cpu at 102 {
+> +               device_type = "cpu";
+> +               compatible = "arm,cortex-a7";
+> +               reg = <0x102>;
+> +       };
+> +
+> +       CPU7: cpu at 103 {
+> +               device_type = "cpu";
+> +               compatible = "arm,cortex-a7";
+> +               reg = <0x103>;
+> +       };
+> +};
+> +
+> +Example 3 (ARM 32-bit, cortex-a8 single core):
+> +
+> +cpus {
+> +       #size-cells = <0>;
+> +       #address-cells = <1>;
+> +
+> +       cpu-map {
+> +               cluster0 {
+> +                       core0 {
+> +                               cpu = <&CPU0>;
+> +                       };
+> +               };
+> +       };
+> +
+> +       CPU0: cpu at 0 {
+> +               device_type = "cpu";
+> +               compatible = "arm,cortex-a8";
+> +               reg = <0x0>;
+> +       };
+> +};
+> +
+> +===============================================================================
+> +[1] ARM Linux kernel documentation
+> +    Documentation/devicetree/bindings/arm/cpus.txt
+> --
+> 1.8.2.2
+> 
