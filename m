@@ -1,71 +1,48 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 13 Sep 2013 16:34:18 -0600
-Subject: [PATCHv4 4/4] Documentation: Add device tree bindings for
- Freescale FTM PWM.
-In-Reply-To: <1379051922-4930-5-git-send-email-Li.Xiubo@freescale.com>
-References: <1379051922-4930-1-git-send-email-Li.Xiubo@freescale.com>
- <1379051922-4930-5-git-send-email-Li.Xiubo@freescale.com>
-Message-ID: <523392EA.6050909@wwwdotorg.org>
+Date: Fri, 13 Sep 2013 16:40:57 -0600
+Subject: [RFC PATCH alt 4/4] pinctrl: at91: rework debounce configuration
+In-Reply-To: <1379058813-3489-1-git-send-email-b.brezillon@overkiz.com>
+References: <1379058213-3245-1-git-send-email-b.brezillon@overkiz.com>
+ <1379058813-3489-1-git-send-email-b.brezillon@overkiz.com>
+Message-ID: <52339479.6030402@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/12/2013 11:58 PM, Xiubo Li wrote:
-> This adds the Document for Freescale FTM PWM driver under
-> Documentation/devicetree/bindings/pwm/.
+On 09/13/2013 01:53 AM, Boris BREZILLON wrote:
+> AT91 SoCs do not support per pin debounce time configuration.
+> Instead you have to configure a debounce time which will be used for all
+> pins of a given bank (PIOA, PIOB, ...).
 
-> diff --git a/Documentation/devicetree/bindings/pwm/pwm-fsl-ftm.txt b/Documentation/devicetree/bindings/pwm/pwm-fsl-ftm.txt
+> diff --git a/Documentation/devicetree/bindings/pinctrl/atmel,at91-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/atmel,at91-pinctrl.txt
 
-> +Required properties:
-
-> +- clock-names : Includes the following module clock source entries:
-> +    "ftm0" (system clock),
-> +    "ftm0_fix_sel" (fixed frequency clock),
-> +    "ftm0_ext_sel" (external clock)
-> +- clocks : Must contain an entry list for entries in clock-names.
-
-s/an entry list/a clock specifier/
-s/for entries/for each entry/
-
-> +- fsl,pwm-counter-clk: The FTM PWM counter clock source, should be one of the
-> +  entries in clock-names.
-
-So the IP block has 3 input clocks, and also a mux to select which one
-to use? That sounds slightly unusual, but possible.
-
-If there is really only 1 clock input to the IP block, and the mux is
-part of some other module, then this binding should have only 1 entry in
-clocks.
-
-> +- For each channel's pinctrl, the "chN-active" and "chN-idle" states should be
-> +  implemented at the same time.
-
-I still don't believe that multiple pinctrl states active at once is
-something that the pinctrl bindings conceptually support. CC+=LinusW, do
-we want to allow this?
-
-Assuming this is allowed, you'd want to write something more like the
-following:
-
-pinctrl-names: Must include "chN-active" and "chN-idle" for each channel
-ID N in range 0..7.
-pinctrl-NNN: One property must exist for each entry in pinctrl-names.
-See ../pinctrl/pinctrl-bindings.txt for details of the property values.
-> +Example:
+> +Optional properties for iomux controller:
+> +- atmel,default-debounce-div: array of debounce divisors (one divisor per bank)
+> +  which describes the debounce timing in use for all pins of a given bank
+> +  configured with the DEBOUNCE option (see the following description).
+> +  Debounce timing is obtained with this formula:
+> +  Tdebounce = 2 * (debouncediv + 1) / Fslowclk
+> +  with Fslowclk = 32KHz
 > +
-> +pwm0: pwm at 40038000 {
-> +		compatible = "fsl,vf610-ftm-pwm";
-> +		reg = <0x40038000 0x1000>;
-> +		#pwm-cells = <3>;
-> +		clock-names = "ftm0", "ftm0_fix_sel", "ftm0_ext_sel";
-> +		clocks = <&clks VF610_CLK_FTM0>,
-> +			<&clks VF610_CLK_FTM0_FIX_SEL>,
-> +			<&clks VF610_CLK_FTM0_EXT_SEL>;
-> +		pinctrl-names = "ch0-active", "ch0-idle", "ch1-active", "ch1-idle",
-> +		....;
-> +		pinctrl-0 = <&pinctrl_pwm0_ch0_active>;
-> +		pinctrl-1 = <&pinctrl_pwm0_ch0_idle>;
-> +		pinctrl-2 = <&pinctrl_pwm0_ch1_active>;
-> +		pinctrl-3 = <&pinctrl_pwm0_ch1_idle>;
-> +		...
-> +		fsl,pwm-counter-clk = "ftm0_ext_sel";
-> +};
+>  Required properties for pin configuration node:
+>  - atmel,pins: 4 integers array, represents a group of pins mux and config
+>    setting. The format is atmel,pins = <PIN_BANK PIN_BANK_NUM PERIPH CONFIG>.
+> @@ -91,7 +99,6 @@ DEGLITCH	(1 << 2): indicate this pin need deglitch.
+>  PULL_DOWN	(1 << 3): indicate this pin need a pull down.
+>  DIS_SCHMIT	(1 << 4): indicate this pin need to disable schmit trigger.
+>  DEBOUNCE	(1 << 16): indicate this pin need debounce.
+> -DEBOUNCE_VAL	(0x3fff << 17): debounce val.
+
+This change would break the DT ABI since it removes a feature that's
+already present.
+
+I suppose it's still up to the Atmel maintainers to decide whether this
+is appropriate, or whether the impact to out-of-tree DT files would be
+problematic.
+
+Assuming the DT ABI can be broken, I think I'd prefer to do so, rather
+than take "non-alt" patch 4/4, since a per-pin DEBOUNCE_VAL clearly
+doesn't correctly model the HW, assuming the patch description is
+correct. I don't think arguments re: the generic pinconf debounce
+property hold; if the Linux-specific/internal generic property doesn't
+apply, the DT binding should not be bent to adjust to it, but should
+rather still represent the HW itself.
