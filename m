@@ -1,10 +1,10 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 13 Sep 2013 18:30:51 +0530
-Subject: [PATCH 105/228] cpufreq: imx6q: don't initialize part of policy that
- is set by core too
+Date: Fri, 13 Sep 2013 18:30:52 +0530
+Subject: [PATCH 106/228] cpufreq: integrator: don't initialize part of policy
+ that is set by core too
 In-Reply-To: <cover.1379063063.git.viresh.kumar@linaro.org>
 References: <cover.1379063063.git.viresh.kumar@linaro.org>
-Message-ID: <ee404bd44ef9e3f86300b0f1dd4a9deb9a00e395.1379063063.git.viresh.kumar@linaro.org>
+Message-ID: <6d8d406ebca886e5147191cc8c333d926ef9eb30.1379063063.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,23 +14,28 @@ this driver doesn't need to do it. This patch removes such code.
 Most recent of those changes is to call ->get() in the core after calling
 ->init().
 
-Cc: Shawn Guo <shawn.guo@linaro.org>
+Cc: Russell King <linux@arm.linux.org.uk>
 Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- drivers/cpufreq/imx6q-cpufreq.c | 1 -
- 1 file changed, 1 deletion(-)
+ drivers/cpufreq/integrator-cpufreq.c | 5 ++---
+ 1 file changed, 2 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/cpufreq/imx6q-cpufreq.c b/drivers/cpufreq/imx6q-cpufreq.c
-index 29767bb..649547f 100644
---- a/drivers/cpufreq/imx6q-cpufreq.c
-+++ b/drivers/cpufreq/imx6q-cpufreq.c
-@@ -162,7 +162,6 @@ static int imx6q_cpufreq_init(struct cpufreq_policy *policy)
- 	}
+diff --git a/drivers/cpufreq/integrator-cpufreq.c b/drivers/cpufreq/integrator-cpufreq.c
+index 8152a9b..babf3e4 100644
+--- a/drivers/cpufreq/integrator-cpufreq.c
++++ b/drivers/cpufreq/integrator-cpufreq.c
+@@ -181,10 +181,9 @@ static int integrator_cpufreq_init(struct cpufreq_policy *policy)
+ {
  
- 	policy->cpuinfo.transition_latency = transition_latency;
--	policy->cur = clk_get_rate(arm_clk) / 1000;
- 	cpumask_setall(policy->cpus);
+ 	/* set default policy and cpuinfo */
+-	policy->cpuinfo.max_freq = 160000;
+-	policy->cpuinfo.min_freq = 12000;
++	policy->max = policy->cpuinfo.max_freq = 160000;
++	policy->min = policy->cpuinfo.min_freq = 12000;
+ 	policy->cpuinfo.transition_latency = 1000000; /* 1 ms, assumed */
+-	policy->cur = policy->min = policy->max = integrator_get(policy->cpu);
  
  	return 0;
+ }
 -- 
 1.7.12.rc2.18.g61b472e
