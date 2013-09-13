@@ -1,38 +1,42 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 13 Sep 2013 18:29:35 +0530
-Subject: [PATCH 029/228] cpufreq: omap: use cpufreq_table_validate_and_show()
+Date: Fri, 13 Sep 2013 18:29:36 +0530
+Subject: [PATCH 030/228] cpufreq: p4-clockmod: use
+ cpufreq_table_validate_and_show()
 In-Reply-To: <cover.1379063063.git.viresh.kumar@linaro.org>
 References: <cover.1379063063.git.viresh.kumar@linaro.org>
-Message-ID: <26205fdeb757f9b549331cfe938b8a99f6078746.1379063063.git.viresh.kumar@linaro.org>
+Message-ID: <1476114c469dd7b3b3a4e793c7c04441021fd315.1379063063.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Lets use cpufreq_table_validate_and_show() instead of calling
 cpufreq_frequency_table_cpuinfo() and cpufreq_frequency_table_get_attr().
 
-Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Cc: David S. Miller <davem@davemloft.net>
 Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- drivers/cpufreq/omap-cpufreq.c | 4 +---
- 1 file changed, 1 insertion(+), 3 deletions(-)
+ drivers/cpufreq/p4-clockmod.c | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
-diff --git a/drivers/cpufreq/omap-cpufreq.c b/drivers/cpufreq/omap-cpufreq.c
-index f31fcfc..b68ce4e 100644
---- a/drivers/cpufreq/omap-cpufreq.c
-+++ b/drivers/cpufreq/omap-cpufreq.c
-@@ -191,12 +191,10 @@ static int omap_cpu_init(struct cpufreq_policy *policy)
+diff --git a/drivers/cpufreq/p4-clockmod.c b/drivers/cpufreq/p4-clockmod.c
+index 2f0a2a6..03478bf 100644
+--- a/drivers/cpufreq/p4-clockmod.c
++++ b/drivers/cpufreq/p4-clockmod.c
+@@ -230,7 +230,6 @@ static int cpufreq_p4_cpu_init(struct cpufreq_policy *policy)
+ 		else
+ 			p4clockmod_table[i].frequency = (stock_freq * i)/8;
+ 	}
+-	cpufreq_frequency_table_get_attr(p4clockmod_table, policy->cpu);
  
- 	atomic_inc_return(&freq_table_users);
+ 	/* cpuinfo and default policy values */
  
--	result = cpufreq_frequency_table_cpuinfo(policy, freq_table);
-+	result = cpufreq_table_validate_and_show(policy, freq_table);
- 	if (result)
- 		goto fail_table;
+@@ -239,7 +238,7 @@ static int cpufreq_p4_cpu_init(struct cpufreq_policy *policy)
+ 	policy->cpuinfo.transition_latency = 10000001;
+ 	policy->cur = stock_freq;
  
--	cpufreq_frequency_table_get_attr(freq_table, policy->cpu);
--
- 	policy->cur = omap_getspeed(policy->cpu);
+-	return cpufreq_frequency_table_cpuinfo(policy, &p4clockmod_table[0]);
++	return cpufreq_table_validate_and_show(policy, &p4clockmod_table[0]);
+ }
  
- 	/*
+ 
 -- 
 1.7.12.rc2.18.g61b472e
