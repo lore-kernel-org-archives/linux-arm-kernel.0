@@ -1,58 +1,47 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 13 Sep 2013 18:31:16 +0530
-Subject: [PATCH 130/228] cpufreq: cris: use cpufreq_generic_init() routine
+Date: Fri, 13 Sep 2013 18:31:17 +0530
+Subject: [PATCH 131/228] cpufreq: davinci: use cpufreq_generic_init() routine
 In-Reply-To: <cover.1379063063.git.viresh.kumar@linaro.org>
 References: <cover.1379063063.git.viresh.kumar@linaro.org>
-Message-ID: <2b5bec06ece382705b51aaf97f53762ff540639f.1379063063.git.viresh.kumar@linaro.org>
+Message-ID: <a324c5d31baeda64af96ce09f612bb14c3f8dbff.1379063063.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Use generic cpufreq_generic_init() routine instead of replicating the same code
 here.
 
-Cc: Jesper Nilsson <jesper.nilsson@axis.com>
-Cc: Mikael Starvik <starvik@axis.com>
-Cc: linux-cris-kernel at axis.com
+Cc: Sekhar Nori <nsekhar@ti.com>
 Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- drivers/cpufreq/cris-artpec3-cpufreq.c | 6 +-----
- drivers/cpufreq/cris-etraxfs-cpufreq.c | 5 +----
- 2 files changed, 2 insertions(+), 9 deletions(-)
+ drivers/cpufreq/davinci-cpufreq.c | 10 +---------
+ 1 file changed, 1 insertion(+), 9 deletions(-)
 
-diff --git a/drivers/cpufreq/cris-artpec3-cpufreq.c b/drivers/cpufreq/cris-artpec3-cpufreq.c
-index 4d88e4f..05fdc7e 100644
---- a/drivers/cpufreq/cris-artpec3-cpufreq.c
-+++ b/drivers/cpufreq/cris-artpec3-cpufreq.c
-@@ -71,13 +71,9 @@ static int cris_freq_target(struct cpufreq_policy *policy,
+diff --git a/drivers/cpufreq/davinci-cpufreq.c b/drivers/cpufreq/davinci-cpufreq.c
+index 55cf094..972583b 100644
+--- a/drivers/cpufreq/davinci-cpufreq.c
++++ b/drivers/cpufreq/davinci-cpufreq.c
+@@ -136,21 +136,13 @@ static int davinci_cpu_init(struct cpufreq_policy *policy)
+ 			return result;
+ 	}
  
- static int cris_freq_cpu_init(struct cpufreq_policy *policy)
- {
--	/* cpuinfo and default policy values */
--	policy->cpuinfo.transition_latency = 1000000; /* 1ms */
+-	result = cpufreq_table_validate_and_show(policy, freq_table);
+-	if (result) {
+-		pr_err("%s: cpufreq_table_validate_and_show() failed",
+-				__func__);
+-		return result;
+-	}
 -
--	return cpufreq_table_validate_and_show(policy, cris_freq_table);
-+	return cpufreq_generic_init(policy, cris_freq_table, 1000000);
+ 	/*
+ 	 * Time measurement across the target() function yields ~1500-1800us
+ 	 * time taken with no drivers on notification list.
+ 	 * Setting the latency to 2000 us to accommodate addition of drivers
+ 	 * to pre/post change notification list.
+ 	 */
+-	policy->cpuinfo.transition_latency = 2000 * 1000;
+-	return 0;
++	return cpufreq_generic_init(policy, freq_table, 2000 * 1000);
  }
  
--
- static struct cpufreq_driver cris_freq_driver = {
- 	.get	= cris_freq_get_cpu_frequency,
- 	.verify	= cpufreq_generic_frequency_table_verify,
-diff --git a/drivers/cpufreq/cris-etraxfs-cpufreq.c b/drivers/cpufreq/cris-etraxfs-cpufreq.c
-index f7d2d49..fac2b26 100644
---- a/drivers/cpufreq/cris-etraxfs-cpufreq.c
-+++ b/drivers/cpufreq/cris-etraxfs-cpufreq.c
-@@ -70,10 +70,7 @@ static int cris_freq_target(struct cpufreq_policy *policy,
- 
- static int cris_freq_cpu_init(struct cpufreq_policy *policy)
- {
--	/* cpuinfo and default policy values */
--	policy->cpuinfo.transition_latency = 1000000;	/* 1ms */
--
--	return cpufreq_table_validate_and_show(policy, cris_freq_table);
-+	return cpufreq_generic_init(policy, cris_freq_table, 1000000);
- }
- 
- static struct cpufreq_driver cris_freq_driver = {
+ static struct cpufreq_driver davinci_driver = {
 -- 
 1.7.12.rc2.18.g61b472e
