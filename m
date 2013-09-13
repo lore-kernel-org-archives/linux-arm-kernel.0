@@ -1,95 +1,56 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 13 Sep 2013 18:29:11 +0530
-Subject: [PATCH 005/228] cpufreq: rename __cpufreq_set_policy() as
- cpufreq_set_policy()
+Date: Fri, 13 Sep 2013 18:29:12 +0530
+Subject: [PATCH 006/228] cpufreq: rewrite cpufreq_driver->flags using shift
+ operator
 In-Reply-To: <cover.1379063063.git.viresh.kumar@linaro.org>
 References: <cover.1379063063.git.viresh.kumar@linaro.org>
-Message-ID: <42ae34cf2b26098569d74980321fe3680fe81c48.1379063063.git.viresh.kumar@linaro.org>
+Message-ID: <b5bba6d36ec319dd26517a1c7fedf9bf1abf8077.1379063063.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Earlier there used to be two functions named __cpufreq_set_policy() and
-cpufreq_set_policy(), but now we only have a single routine lets name it
-cpufreq_set_policy() instead of __cpufreq_set_policy().
+Currently cpufreq_driver's flags are defined directly using 0x1, 0x2, 0x4, 0x8,
+etc.. As the list grows it doesn't stays much readable..
 
-This also removes some invalid comments or fixes some incorrect comments.
+Lets use bitwise shift operator << to generate these numbers for respective
+positions.
 
 Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- drivers/cpufreq/cpufreq.c | 22 +++++++++-------------
- 1 file changed, 9 insertions(+), 13 deletions(-)
+ include/linux/cpufreq.h | 17 +++++++++--------
+ 1 file changed, 9 insertions(+), 8 deletions(-)
 
-diff --git a/drivers/cpufreq/cpufreq.c b/drivers/cpufreq/cpufreq.c
-index e217d8f..d5fb343 100644
---- a/drivers/cpufreq/cpufreq.c
-+++ b/drivers/cpufreq/cpufreq.c
-@@ -457,7 +457,7 @@ show_one(scaling_min_freq, min);
- show_one(scaling_max_freq, max);
- show_one(scaling_cur_freq, cur);
+diff --git a/include/linux/cpufreq.h b/include/linux/cpufreq.h
+index 10ab22d..0eda235 100644
+--- a/include/linux/cpufreq.h
++++ b/include/linux/cpufreq.h
+@@ -212,19 +212,20 @@ struct cpufreq_driver {
+ };
  
--static int __cpufreq_set_policy(struct cpufreq_policy *policy,
-+static int cpufreq_set_policy(struct cpufreq_policy *policy,
- 				struct cpufreq_policy *new_policy);
- 
- /**
-@@ -478,7 +478,7 @@ static ssize_t store_##file_name					\
- 	if (ret != 1)							\
- 		return -EINVAL;						\
- 									\
--	ret = __cpufreq_set_policy(policy, &new_policy);		\
-+	ret = cpufreq_set_policy(policy, &new_policy);		\
- 	policy->user_policy.object = policy->object;			\
- 									\
- 	return ret ? ret : count;					\
-@@ -536,11 +536,7 @@ static ssize_t store_scaling_governor(struct cpufreq_policy *policy,
- 						&new_policy.governor))
- 		return -EINVAL;
- 
--	/*
--	 * Do not use cpufreq_set_policy here or the user_policy.max
--	 * will be wrongly overridden
--	 */
--	ret = __cpufreq_set_policy(policy, &new_policy);
-+	ret = cpufreq_set_policy(policy, &new_policy);
- 
- 	policy->user_policy.policy = policy->policy;
- 	policy->user_policy.governor = policy->governor;
-@@ -887,11 +883,11 @@ static void cpufreq_init_policy(struct cpufreq_policy *policy)
- 	int ret = 0;
- 
- 	memcpy(&new_policy, policy, sizeof(*policy));
--	/* assure that the starting sequence is run in __cpufreq_set_policy */
-+	/* assure that the starting sequence is run in cpufreq_set_policy */
- 	policy->governor = NULL;
- 
- 	/* set default policy */
--	ret = __cpufreq_set_policy(policy, &new_policy);
-+	ret = cpufreq_set_policy(policy, &new_policy);
- 	policy->user_policy.policy = policy->policy;
- 	policy->user_policy.governor = policy->governor;
- 
-@@ -1932,10 +1928,10 @@ int cpufreq_get_policy(struct cpufreq_policy *policy, unsigned int cpu)
- EXPORT_SYMBOL(cpufreq_get_policy);
- 
+ /* flags */
+-#define CPUFREQ_STICKY		0x01	/* the driver isn't removed even if
+-					 * all ->init() calls failed */
+-#define CPUFREQ_CONST_LOOPS	0x02	/* loops_per_jiffy or other kernel
+-					 * "constants" aren't affected by
+-					 * frequency transitions */
+-#define CPUFREQ_PM_NO_WARN	0x04	/* don't warn on suspend/resume speed
+-					 * mismatches */
++#define CPUFREQ_STICKY		(1 << 0)	/* driver isn't removed even if
++						   all ->init() calls failed */
++#define CPUFREQ_CONST_LOOPS	(1 << 1)	/* loops_per_jiffy or other
++						   kernel "constants" aren't
++						   affected by frequency
++						   transitions */
++#define CPUFREQ_PM_NO_WARN	(1 << 2)	/* don't warn on suspend/resume
++						   speed mismatches */
  /*
-- * data   : current policy.
-- * policy : policy to be set.
-+ * policy : current policy.
-+ * new_policy: policy to be set.
+  * Driver will do POSTCHANGE notifications from outside of their ->target()
+  * routine and so must set cpufreq_driver->flags with this flag, so that core
+  * can handle them specially.
   */
--static int __cpufreq_set_policy(struct cpufreq_policy *policy,
-+static int cpufreq_set_policy(struct cpufreq_policy *policy,
- 				struct cpufreq_policy *new_policy)
- {
- 	int ret = 0, failed = 1;
-@@ -2084,7 +2080,7 @@ int cpufreq_update_policy(unsigned int cpu)
- 		}
- 	}
+-#define CPUFREQ_ASYNC_NOTIFICATION 0x08
++#define CPUFREQ_ASYNC_NOTIFICATION	(1 << 3)
  
--	ret = __cpufreq_set_policy(policy, &new_policy);
-+	ret = cpufreq_set_policy(policy, &new_policy);
- 
- 	unlock_policy_rwsem_write(cpu);
- 
+ int cpufreq_register_driver(struct cpufreq_driver *driver_data);
+ int cpufreq_unregister_driver(struct cpufreq_driver *driver_data);
 -- 
 1.7.12.rc2.18.g61b472e
