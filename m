@@ -1,10 +1,10 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 13 Sep 2013 18:30:44 +0530
-Subject: [PATCH 098/228] cpufreq: davinci: don't initialize part of policy
- that is set by core too
+Date: Fri, 13 Sep 2013 18:30:45 +0530
+Subject: [PATCH 099/228] cpufreq: dbx500: don't initialize part of policy that
+ is set by core too
 In-Reply-To: <cover.1379063063.git.viresh.kumar@linaro.org>
 References: <cover.1379063063.git.viresh.kumar@linaro.org>
-Message-ID: <d5846c490ebcbb37458742f13749b3f7722a4827.1379063063.git.viresh.kumar@linaro.org>
+Message-ID: <43f3fedcc13b4cd8a016f2dbbc91936423420cb8.1379063063.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,24 +14,27 @@ this driver doesn't need to do it. This patch removes such code.
 Most recent of those changes is to call ->get() in the core after calling
 ->init().
 
-Cc: Sekhar Nori <nsekhar@ti.com>
+Cc: Linus Walleij <linus.walleij@linaro.org>
 Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- drivers/cpufreq/davinci-cpufreq.c | 2 --
- 1 file changed, 2 deletions(-)
+ drivers/cpufreq/dbx500-cpufreq.c | 5 -----
+ 1 file changed, 5 deletions(-)
 
-diff --git a/drivers/cpufreq/davinci-cpufreq.c b/drivers/cpufreq/davinci-cpufreq.c
-index f228642..55cf094 100644
---- a/drivers/cpufreq/davinci-cpufreq.c
-+++ b/drivers/cpufreq/davinci-cpufreq.c
-@@ -136,8 +136,6 @@ static int davinci_cpu_init(struct cpufreq_policy *policy)
- 			return result;
+diff --git a/drivers/cpufreq/dbx500-cpufreq.c b/drivers/cpufreq/dbx500-cpufreq.c
+index 2d70637..ae1aa60 100644
+--- a/drivers/cpufreq/dbx500-cpufreq.c
++++ b/drivers/cpufreq/dbx500-cpufreq.c
+@@ -83,11 +83,6 @@ static int dbx500_cpufreq_init(struct cpufreq_policy *policy)
+ 		return res;
  	}
  
--	policy->cur = davinci_getspeed(0);
+-	policy->min = policy->cpuinfo.min_freq;
+-	policy->max = policy->cpuinfo.max_freq;
+-	policy->cur = dbx500_cpufreq_getspeed(policy->cpu);
+-	policy->governor = CPUFREQ_DEFAULT_GOVERNOR;
 -
- 	result = cpufreq_table_validate_and_show(policy, freq_table);
- 	if (result) {
- 		pr_err("%s: cpufreq_table_validate_and_show() failed",
+ 	/*
+ 	 * FIXME : Need to take time measurement across the target()
+ 	 *	   function with no/some/all drivers in the notification
 -- 
 1.7.12.rc2.18.g61b472e
