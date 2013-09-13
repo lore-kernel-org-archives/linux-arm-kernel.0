@@ -1,10 +1,10 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 13 Sep 2013 18:31:45 +0530
-Subject: [PATCH 159/228] cpufreq: ia64: Convert to light weight
+Date: Fri, 13 Sep 2013 18:31:46 +0530
+Subject: [PATCH 160/228] cpufreq: imx6q: Convert to light weight
  ->target_index() routine
 In-Reply-To: <cover.1379063063.git.viresh.kumar@linaro.org>
 References: <cover.1379063063.git.viresh.kumar@linaro.org>
-Message-ID: <1c9b241efbaa456013cc6b484bb17d9353aef340.1379063063.git.viresh.kumar@linaro.org>
+Message-ID: <da00e886fa9dbcd316edc893e0235e42d76c791e.1379063063.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,53 +14,56 @@ This patch converts existing .target() to newly defined light weight
 CPUFreq core will call cpufreq_frequency_table_target() before calling this
 routine and will pass index to it.
 
-Cc: Tony Luck <tony.luck@intel.com>
+Cc: Shawn Guo <shawn.guo@linaro.org>
 Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- drivers/cpufreq/ia64-acpi-cpufreq.c | 21 +++------------------
- 1 file changed, 3 insertions(+), 18 deletions(-)
+ drivers/cpufreq/imx6q-cpufreq.c | 17 ++---------------
+ 1 file changed, 2 insertions(+), 15 deletions(-)
 
-diff --git a/drivers/cpufreq/ia64-acpi-cpufreq.c b/drivers/cpufreq/ia64-acpi-cpufreq.c
-index 90c6598..4695fa2 100644
---- a/drivers/cpufreq/ia64-acpi-cpufreq.c
-+++ b/drivers/cpufreq/ia64-acpi-cpufreq.c
-@@ -227,26 +227,11 @@ acpi_cpufreq_get (
- static int
- acpi_cpufreq_target (
- 	struct cpufreq_policy   *policy,
--	unsigned int target_freq,
--	unsigned int relation)
-+	unsigned int index)
- {
--	struct cpufreq_acpi_io *data = acpi_io_data[policy->cpu];
--	unsigned int next_state = 0;
--	unsigned int result = 0;
--
--	pr_debug("acpi_cpufreq_setpolicy\n");
--
--	result = cpufreq_frequency_table_target(policy,
--			data->freq_table, target_freq, relation, &next_state);
--	if (result)
--		return (result);
--
--	result = processor_set_freq(data, policy, next_state);
--
--	return (result);
-+	return processor_set_freq(acpi_io_data[policy->cpu], policy, index);
+diff --git a/drivers/cpufreq/imx6q-cpufreq.c b/drivers/cpufreq/imx6q-cpufreq.c
+index 3fb3f59..e8846d7 100644
+--- a/drivers/cpufreq/imx6q-cpufreq.c
++++ b/drivers/cpufreq/imx6q-cpufreq.c
+@@ -39,30 +39,17 @@ static unsigned int imx6q_get_speed(unsigned int cpu)
+ 	return clk_get_rate(arm_clk) / 1000;
  }
  
--
- static int
- acpi_cpufreq_cpu_init (
- 	struct cpufreq_policy   *policy)
-@@ -379,7 +364,7 @@ acpi_cpufreq_cpu_exit (
+-static int imx6q_set_target(struct cpufreq_policy *policy,
+-			    unsigned int target_freq, unsigned int relation)
++static int imx6q_set_target(struct cpufreq_policy *policy, unsigned int index)
+ {
+ 	struct cpufreq_freqs freqs;
+ 	struct opp *opp;
+ 	unsigned long freq_hz, volt, volt_old;
+-	unsigned int index;
+ 	int ret;
  
- static struct cpufreq_driver acpi_cpufreq_driver = {
- 	.verify 	= cpufreq_generic_frequency_table_verify,
--	.target 	= acpi_cpufreq_target,
-+	.target_index	= acpi_cpufreq_target,
- 	.get 		= acpi_cpufreq_get,
- 	.init		= acpi_cpufreq_cpu_init,
- 	.exit		= acpi_cpufreq_cpu_exit,
+-	ret = cpufreq_frequency_table_target(policy, freq_table, target_freq,
+-					     relation, &index);
+-	if (ret) {
+-		dev_err(cpu_dev, "failed to match target frequency %d: %d\n",
+-			target_freq, ret);
+-		return ret;
+-	}
+-
+ 	freqs.new = freq_table[index].frequency;
+ 	freq_hz = freqs.new * 1000;
+ 	freqs.old = clk_get_rate(arm_clk) / 1000;
+ 
+-	if (freqs.old == freqs.new)
+-		return 0;
+-
+ 	rcu_read_lock();
+ 	opp = opp_find_freq_ceil(cpu_dev, &freq_hz);
+ 	if (IS_ERR(opp)) {
+@@ -158,7 +145,7 @@ static int imx6q_cpufreq_init(struct cpufreq_policy *policy)
+ 
+ static struct cpufreq_driver imx6q_cpufreq_driver = {
+ 	.verify = cpufreq_generic_frequency_table_verify,
+-	.target = imx6q_set_target,
++	.target_index = imx6q_set_target,
+ 	.get = imx6q_get_speed,
+ 	.init = imx6q_cpufreq_init,
+ 	.exit = cpufreq_generic_exit,
 -- 
 1.7.12.rc2.18.g61b472e
