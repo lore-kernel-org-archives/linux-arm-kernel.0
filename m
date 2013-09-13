@@ -1,125 +1,69 @@
-From: padma.kvr@gmail.com (Padma Venkat)
-Date: Fri, 13 Sep 2013 08:33:13 +0530
-Subject: [PATCH 1/3] dmaengine: pl330: Set residue in tx_status callback.
-In-Reply-To: <00b401ceafac$e3a88170$aaf98450$@samsung.com>
-References: <1378879685-5352-1-git-send-email-padma.v@samsung.com>
- <1378879685-5352-2-git-send-email-padma.v@samsung.com>
- <00b401ceafac$e3a88170$aaf98450$@samsung.com>
-Message-ID: <CAAgF-BctHjFaSM7N4Nrpyixv_sLpUMxfMnFcnZqTvymN4hVanw@mail.gmail.com>
+From: b32955@freescale.com (Huang Shijie)
+Date: Fri, 13 Sep 2013 12:55:47 +0800
+Subject: [PATCH v3 0/8] Add the Quadspi driver for vf610-twr
+In-Reply-To: <20130912205644.GW29403@sirena.org.uk>
+References: <593AEF6C47F46446852B067021A273D6D984000B@MUCSE039.lantiq.com>
+ <20130905020435.GA3970@gmail.com>
+ <20980858CB6D3A4BAE95CA194937D5E73EA0C7F4@DBDE04.ent.ti.com>
+ <522817D7.1010206@freescale.com> <522D3B79.3060707@freescale.com>
+ <52318953.6090405@freescale.com>
+ <1378979431.2627.402.camel@shinybook.infradead.org>
+ <20130913025827.GA3051@gmail.com> <1378999322.4210.95.camel@i7.infradead.org>
+ <20130913041208.GD3051@gmail.com> <20130912205644.GW29403@sirena.org.uk>
+Message-ID: <52329AD3.2050608@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chanho,
-
-On Thu, Sep 12, 2013 at 5:10 PM, Chanho Park <chanho61.park@samsung.com> wrote:
-> Hi Padmavathi,
+? 2013?09?13? 04:56, Mark Brown ??:
+> On Fri, Sep 13, 2013 at 12:12:14AM -0400, Huang Shijie wrote:
 >
->> -----Original Message-----
->> From: linux-arm-kernel [mailto:linux-arm-kernel-
->> bounces at lists.infradead.org] On Behalf Of Padmavathi Venna
->> Sent: Wednesday, September 11, 2013 3:08 PM
->> To: linux-samsung-soc at vger.kernel.org; linux-arm-
->> kernel at lists.infradead.org; padma.v at samsung.com; padma.kvr at gmail.com
->> Cc: kgene.kim at samsung.com; arnd at arndb.de; sbkim73 at samsung.com;
->> vinod.koul at intel.com; broonie at kernel.org; dgreid at chromium.org;
->> olofj at chromium.org
->> Subject: [PATCH 1/3] dmaengine: pl330: Set residue in tx_status callback.
->>
->> From: Dylan Reid <dgreid@chromium.org>
->>
->> Fill txstate.residue with the amount of bytes remaining in the current
->> transfer if the transfer is not complete.  This will be of particular use
->> to i2s DMA transfers, providing more accurate hw_ptr values to ASoC.
->>
->> Signed-off-by: Dylan Reid <dgreid@chromium.org>
->> Reviewed-by: Olof Johansson <olofj@chromium.org>
->> Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
->> ---
->>  drivers/dma/pl330.c |   55
->> ++++++++++++++++++++++++++++++++++++++++++++++++++-
->>  1 files changed, 54 insertions(+), 1 deletions(-)
->>
->> diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c index
->> 593827b..7ab9136 100644
->> --- a/drivers/dma/pl330.c
->> +++ b/drivers/dma/pl330.c
->> @@ -2476,11 +2476,64 @@ static void pl330_free_chan_resources(struct
->> dma_chan *chan)
->>       spin_unlock_irqrestore(&pch->lock, flags);  }
->>
->> +static inline int
->> +pl330_src_addr_in_desc(struct dma_pl330_desc *desc, unsigned int sar) {
->> +     return ((desc->px.src_addr <= sar) &&
->> +             (sar <= (desc->px.src_addr + desc->px.bytes))); }
->> +
->> +static inline int
->> +pl330_dst_addr_in_desc(struct dma_pl330_desc *desc, unsigned int dar) {
->> +     return ((desc->px.dst_addr <= dar) &&
->> +             (dar <= (desc->px.dst_addr + desc->px.bytes))); }
->> +
->> +static unsigned int pl330_tx_residue(struct dma_chan *chan) {
->> +     struct dma_pl330_chan *pch = to_pchan(chan);
->> +     void __iomem *regs = pch->dmac->pif.base;
->> +     struct pl330_thread *thrd = pch->pl330_chid;
->> +     struct dma_pl330_desc *desc;
->> +     unsigned int sar, dar;
->> +     unsigned int residue = 0;
->> +     unsigned long flags;
->> +
->> +     sar = readl(regs + SA(thrd->id));
->> +     dar = readl(regs + DA(thrd->id));
->> +
->> +     spin_lock_irqsave(&pch->lock, flags);
->> +
->> +     /* Find the desc related to the current buffer. */
->> +     list_for_each_entry(desc, &pch->work_list, node) {
->> +             if (desc->rqcfg.src_inc && pl330_src_addr_in_desc(desc,
->> sar)) {
->> +                     residue = desc->px.bytes - (sar -
-> desc->px.src_addr);
->> +                     goto found_unlock;
->> +             }
->> +             if (desc->rqcfg.dst_inc && pl330_dst_addr_in_desc(desc,
->> dar)) {
->> +                     residue = desc->px.bytes - (dar -
-> desc->px.dst_addr);
->> +                     goto found_unlock;
->> +             }
->> +     }
->> +
->> +found_unlock:
->> +     spin_unlock_irqrestore(&pch->lock, flags);
->> +
->> +     return residue;
->> +}
->> +
->>  static enum dma_status
->>  pl330_tx_status(struct dma_chan *chan, dma_cookie_t cookie,
->>                struct dma_tx_state *txstate)
->>  {
->> -     return dma_cookie_status(chan, cookie, txstate);
->> +     enum dma_status ret;
->> +
->> +     ret = dma_cookie_status(chan, cookie, txstate);
->> +     if (ret != DMA_SUCCESS) /* Not complete, check amount left. */
->> +             dma_set_residue(txstate, pl330_tx_residue(chan));
->> +
->> +     return ret;
+>> I think the controller is designed for the NOR flash, yes, a little
+>> strange.
+> I think this is part of the problem - you're trying to represent
+> something that isn't really a SPI controller as a SPI controller (or at
+> least trying to implement functionality beyond that which a SPI
+> controller has).
 >
-> Why didn't you use a cookie value to track the request?
-> The cookie is assigned when each transfer is submitted.
-> If you save the value in the desc, we can find the request easily.
+The QuadSpi is not a traditional SPI controller, but i think it is still
+a SPI controller.
+It connects and controls the SPI NOR FLASH, so what do you think it is?
 
-Ok. I will check this and modify the code in the next version of patches.
 
-Thanks for the suggestion.
+>> Mark and you want to create the LUT instruction sequence at the runtime,
+>> But there is some disadvantage if we do so:
+>>   [1] low efficiency: 
+>>   [2] we may can not create all the LUT instruction sequence at the
+>>       runtime. For example, the buffer program(OPCODE_PP):
+>>   [3] We may can not create the LUT instruction sequence at the runtime,
+>>       since we can not get enough information from the spi_transfer{}.
+>>       A whole LUT instruction sequence may needs the following info:
+> What this is saying to me is that you should not be impementing this as
+If the quadspi controller is not a SPI controller, what controller is it?
 
->
-> Thanks,
->
-> Best  Regards,
-> Chanho Park
->
 
-Best Regards
-Padma
+> a SPI controller, trying to do that is breaking the abstracton that SPI
+> is offering.  Like people have said SPI is just about byte streams.
+yes, SPI is now just about the byte streams.
+
+
+
+But the Quadspi controller can not work with the byte streams directly,
+it works with the LUT instruction sequences, so we have to parse the
+byte streams,
+and then uses the right LUT to trigger the transaction.
+
+
+
+> I think what you should be doing is refactoring the MTD code which
+> interfaces to SPI flashes to split out the code so that there's an
+> abstraction which can express what this controller (and presumably
+> other controllers) can do and then implement this functionaltiy at
+> that level.
+If i follow this advice, i have to create a new file cloned by the m25p80.c,
+and replace all the SPI APIs with other APIs.
+
+I have no idea what APIs can be used to replace the SPI APIs.
+
+
+thanks
+Huang Shijie
