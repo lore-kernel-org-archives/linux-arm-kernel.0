@@ -1,10 +1,10 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 13 Sep 2013 18:32:34 +0530
-Subject: [PATCH 208/228] cpufreq: sparc: remove calls to
+Date: Fri, 13 Sep 2013 18:32:31 +0530
+Subject: [PATCH 205/228] cpufreq: s5pv210: remove calls to
  cpufreq_notify_transition()
 In-Reply-To: <cover.1379063063.git.viresh.kumar@linaro.org>
 References: <cover.1379063063.git.viresh.kumar@linaro.org>
-Message-ID: <e9a2b8127585439a3428ebc222b3df1dbe88924e.1379063063.git.viresh.kumar@linaro.org>
+Message-ID: <3542c13d2492d421cf6b157246fe7e16182ed71f.1379063063.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -28,71 +28,76 @@ frequency change, this one removes it from this driver.
 
 Some related minor cleanups are also done along with it.
 
-Cc: David S. Miller <davem@davemloft.net>
-Cc: sparclinux at vger.kernel.org
+Cc: Kukjin Kim <kgene.kim@samsung.com>
 Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- drivers/cpufreq/sparc-us2e-cpufreq.c | 7 -------
- drivers/cpufreq/sparc-us3-cpufreq.c  | 7 -------
- 2 files changed, 14 deletions(-)
+ drivers/cpufreq/s5pv210-cpufreq.c | 16 ++++++----------
+ 1 file changed, 6 insertions(+), 10 deletions(-)
 
-diff --git a/drivers/cpufreq/sparc-us2e-cpufreq.c b/drivers/cpufreq/sparc-us2e-cpufreq.c
-index 3bf5b8f..62aa23e 100644
---- a/drivers/cpufreq/sparc-us2e-cpufreq.c
-+++ b/drivers/cpufreq/sparc-us2e-cpufreq.c
-@@ -251,7 +251,6 @@ static int us2e_freq_target(struct cpufreq_policy *policy, unsigned int index)
- 	unsigned long new_bits, new_freq;
- 	unsigned long clock_tick, divisor, old_divisor, estar;
- 	cpumask_t cpus_allowed;
--	struct cpufreq_freqs freqs;
+diff --git a/drivers/cpufreq/s5pv210-cpufreq.c b/drivers/cpufreq/s5pv210-cpufreq.c
+index 5978b94..e3973da 100644
+--- a/drivers/cpufreq/s5pv210-cpufreq.c
++++ b/drivers/cpufreq/s5pv210-cpufreq.c
+@@ -26,7 +26,6 @@
+ static struct clk *cpu_clk;
+ static struct clk *dmc0_clk;
+ static struct clk *dmc1_clk;
+-static struct cpufreq_freqs freqs;
+ static DEFINE_MUTEX(set_freq_lock);
  
- 	cpumask_copy(&cpus_allowed, tsk_cpus_allowed(current));
- 	set_cpus_allowed_ptr(current, cpumask_of(cpu));
-@@ -265,16 +264,10 @@ static int us2e_freq_target(struct cpufreq_policy *policy, unsigned int index)
+ /* APLL M,P,S values for 1G/800Mhz */
+@@ -179,6 +178,7 @@ static int s5pv210_target(struct cpufreq_policy *policy, unsigned int index)
+ 	unsigned int priv_index;
+ 	unsigned int pll_changing = 0;
+ 	unsigned int bus_speed_changing = 0;
++	unsigned int old_freq, new_freq;
+ 	int arm_volt, int_volt;
+ 	int ret = 0;
  
- 	old_divisor = estar_to_divisor(estar);
+@@ -193,12 +193,12 @@ static int s5pv210_target(struct cpufreq_policy *policy, unsigned int index)
+ 		goto exit;
+ 	}
  
--	freqs.old = clock_tick / old_divisor;
--	freqs.new = new_freq;
+-	freqs.old = s5pv210_getspeed(0);
+-	freqs.new = s5pv210_freq_table[index].frequency;
++	old_freq = s5pv210_getspeed(0);
++	new_freq = s5pv210_freq_table[index].frequency;
+ 
+ 	/* Finding current running level index */
+ 	if (cpufreq_frequency_table_target(policy, s5pv210_freq_table,
+-					   freqs.old, CPUFREQ_RELATION_H,
++					   old_freq, CPUFREQ_RELATION_H,
+ 					   &priv_index)) {
+ 		ret = -EINVAL;
+ 		goto exit;
+@@ -207,7 +207,7 @@ static int s5pv210_target(struct cpufreq_policy *policy, unsigned int index)
+ 	arm_volt = dvs_conf[index].arm_volt;
+ 	int_volt = dvs_conf[index].int_volt;
+ 
+-	if (freqs.new > freqs.old) {
++	if (new_freq > old_freq) {
+ 		ret = regulator_set_voltage(arm_regulator,
+ 				arm_volt, arm_volt_max);
+ 		if (ret)
+@@ -219,8 +219,6 @@ static int s5pv210_target(struct cpufreq_policy *policy, unsigned int index)
+ 			goto exit;
+ 	}
+ 
 -	cpufreq_notify_transition(policy, &freqs, CPUFREQ_PRECHANGE);
 -
- 	if (old_divisor != divisor)
- 		us2e_transition(estar, new_bits, clock_tick * 1000,
- 				old_divisor, divisor);
+ 	/* Check if there need to change PLL */
+ 	if ((index == L0) || (priv_index == L0))
+ 		pll_changing = 1;
+@@ -431,9 +429,7 @@ static int s5pv210_target(struct cpufreq_policy *policy, unsigned int index)
+ 		}
+ 	}
  
 -	cpufreq_notify_transition(policy, &freqs, CPUFREQ_POSTCHANGE);
 -
- 	set_cpus_allowed_ptr(current, &cpus_allowed);
+-	if (freqs.new < freqs.old) {
++	if (new_freq < old_freq) {
+ 		regulator_set_voltage(int_regulator,
+ 				int_volt, int_volt_max);
  
- 	return 0;
-diff --git a/drivers/cpufreq/sparc-us3-cpufreq.c b/drivers/cpufreq/sparc-us3-cpufreq.c
-index 2e54d55..724ffbd 100644
---- a/drivers/cpufreq/sparc-us3-cpufreq.c
-+++ b/drivers/cpufreq/sparc-us3-cpufreq.c
-@@ -98,7 +98,6 @@ static int us3_freq_target(struct cpufreq_policy *policy, unsigned int index)
- 	unsigned int cpu = policy->cpu;
- 	unsigned long new_bits, new_freq, reg;
- 	cpumask_t cpus_allowed;
--	struct cpufreq_freqs freqs;
- 
- 	cpumask_copy(&cpus_allowed, tsk_cpus_allowed(current));
- 	set_cpus_allowed_ptr(current, cpumask_of(cpu));
-@@ -124,16 +123,10 @@ static int us3_freq_target(struct cpufreq_policy *policy, unsigned int index)
- 
- 	reg = read_safari_cfg();
- 
--	freqs.old = get_current_freq(cpu, reg);
--	freqs.new = new_freq;
--	cpufreq_notify_transition(policy, &freqs, CPUFREQ_PRECHANGE);
--
- 	reg &= ~SAFARI_CFG_DIV_MASK;
- 	reg |= new_bits;
- 	write_safari_cfg(reg);
- 
--	cpufreq_notify_transition(policy, &freqs, CPUFREQ_POSTCHANGE);
--
- 	set_cpus_allowed_ptr(current, &cpus_allowed);
- 
- 	return 0;
 -- 
 1.7.12.rc2.18.g61b472e
