@@ -1,82 +1,42 @@
-From: r.sricharan@ti.com (Sricharan R)
-Date: Fri, 13 Sep 2013 14:02:59 +0530
-Subject: [RFC PATCH 1/4] DRIVERS: IRQCHIP: Add crossbar irqchip driver
-In-Reply-To: <52326D6B.2010003@ti.com>
-References: <1379000351-15672-1-git-send-email-r.sricharan@ti.com>
- <1379000351-15672-2-git-send-email-r.sricharan@ti.com>
- <alpine.DEB.2.02.1309122201530.4089@ionos.tec.linutronix.de>
- <523228B5.5070507@ti.com>
- <alpine.DEB.2.02.1309122335440.4089@ionos.tec.linutronix.de>
- <5232457A.8080709@ti.com>
- <alpine.DEB.2.02.1309130138550.4089@ionos.tec.linutronix.de>
- <52326D6B.2010003@ti.com>
-Message-ID: <5232CDBB.6040202@ti.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 13 Sep 2013 10:35:26 +0200
+Subject: [PATCH 3/7] misc: ixp4-beeper: use gpiolib strictly
+In-Reply-To: <522FCE28.8020909@nvidia.com>
+References: <1378816226-8016-1-git-send-email-linus.walleij@linaro.org>
+ <522FCE28.8020909@nvidia.com>
+Message-ID: <CACRpkdamJBKPcCCi0U6C7SY8fD9pR9-e+_k9EGHXLyAfcRvcQA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 13 September 2013 07:12 AM, Santosh Shilimkar wrote:
-> On Thursday 12 September 2013 08:26 PM, Thomas Gleixner wrote:
->> On Thu, 12 Sep 2013, Santosh Shilimkar wrote:
->>> On Thursday 12 September 2013 06:22 PM, Thomas Gleixner wrote:
->>>> Now the real question is, how that expansion mechanism is supposed to
->>>> work. There are two possible scenarios:
->>>>
->>>> 1) Expand the number of handled interrupts beyond the GIC capacity:
->>>>
->>>>    That requires a mechanism in CROSSBAR to map several CROSSBAR
->>>>    interrupts to a particular GIC interrupt and provide a demux
->>>>    mechanism to invoke the shared handlers.
->>>>
->>> This is not possible in hardware and not supported. Hardware has
->>> no notion of muxing multiple IRQ's to generate 1 IRQ or ack etc
->>> functionality. Its a simple MUX to tie knots between input and output
->>> wires.
->> It's not a MUX. It's a ROUTING mechanism. That's similar to the
->> mechanisms which are used by MSI[X]. We assign arbitrary interrupt
->> numbers to a device and route them to some underlying limited hardware
->> interrupt controller.
->>
->>>> 2) Provide a mapping mechanism between possibly 250 interrupt numbers
->>>>    and a limitation of a total 160 active interrupts by the underlying
->>>>    GIC.
->>>>
->>> This is the need and problem we are trying to solve.
->> Let me summarize:
->>
->>    - GIC supports up to 160 interrupts
->>
->>    - CROSSBAR supports up to 250 interrupts 
->>
->>    - CROSSBAR routes up to 160 out of 250 interrupts to the GIC ones
->>
->>    - Drivers request a CROSSBAR interrupt number which must be mapped
->>      to some arbitrary available GIC irq number
->>
-> Correct.
+On Wed, Sep 11, 2013 at 3:58 AM, Alex Courbot <acourbot@nvidia.com> wrote:
+> On 09/10/2013 09:30 PM, Linus Walleij wrote:
+>>         /* flip the beeper output */
+>> -       *IXP4XX_GPIO_GPOUTR ^= (1 << (unsigned int) dev_id);
+>> +       gpio_set_value(pin, ~gpio_get_value(pin));
 >
->> So basically the CROSSBAR mechanism is pretty much the same as MSI[X]
->> just in a different flavour and with a different set of semantics and
->> limitations, i.e. poor mans MSI[X] with a new level of bogosity.
->>
->> So if CROSSBAR is going to be the new fangled SoC MSI[X] long term
->> equivalent then you better provide some infrastructure for that and
->> make the drivers ready to use it. Maybe check with the PCI/MSI folks
->> to share some of the interfaces.
->>
->> If that whole thing is another onetime HW designers wet dream, then
->> please go back to the limited but completely functional (Who is going
->> to use more than 160 peripheral interrupts????) device tree model. I
->> really have no interest to support hardware designer brain farts.
->>
-> Thanks for clear NAK for irqchip approach. I should have looped you
-> in the discussion where I was also suggesting against the irqchip
-> approach. We will try to look at MSI stuff but if its get too
-> complicated am going to fall-back to the initial probe based
-> approach to achieve the functionality.
 >
-> Thanks again for clear direction and useful discussion.
- Thanks for the feedback. I will look in to the MSI driver and
- see if how that would work.
+> Don't you want
+>
+>         gpio_set_value(pin, !gpio_get_value(pin));
+>
+> instead? From the deleted line I suppose you guess to invert the GPIO value,
+> but using ~ will invert all the bits of the integer returned by
+> gpio_get_value(), meaning that if it returns 1 you will end up calling
+> gpio_set_value(-2). In practice your gpio is very unlikely to ever be set to
+> 0.
 
-Regards,
- Sricharan
+You're right, fixed this.
+
+>>         free_irq(IRQ_IXP4XX_TIMER2, (void *)dev->id);
+>> +       gpio_free(dev->id);
+>
+>
+> Just wondering, is there a reason for not using the devm_gpio functions
+> here?
+
+I didn't want to change the style of the whole driver, but I can make
+a separate patch switching the whole driver to use managed
+resources at some later point.
+
+Yours,
+Linus Walleij
