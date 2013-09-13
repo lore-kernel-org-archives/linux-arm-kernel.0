@@ -1,37 +1,45 @@
-From: jean.pihet@linaro.org (Jean Pihet)
-Date: Fri, 13 Sep 2013 19:19:06 +0200
-Subject: [PATCH] perf tools: Check libunwind for availability of dwarf
- parsing feature
-In-Reply-To: <20130913171503.GC14224@mudshark.cambridge.arm.com>
-References: <1379092121-5981-1-git-send-email-jean.pihet@linaro.org>
- <20130913171503.GC14224@mudshark.cambridge.arm.com>
-Message-ID: <CAFrcx1nE8GUa59-5TsJxH9+deBLB-vuX2R+b8dxtgFvOX8FC7w@mail.gmail.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 13 Sep 2013 18:22:24 +0100
+Subject: [PATCH] drivers: cpuidle: rename ARM big.LITTLE driver config
+ and makefile entries
+In-Reply-To: <87ppscg2yn.fsf@linaro.org>
+References: <1379071966-26757-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <5232FCD4.2070802@free-electrons.com>
+ <20130913140125.GA2062@e102568-lin.cambridge.arm.com>
+ <87ppscg2yn.fsf@linaro.org>
+Message-ID: <20130913172224.GB7414@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+On Fri, Sep 13, 2013 at 04:23:44PM +0100, Kevin Hilman wrote:
+> Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> writes:
+> 
+> > On Fri, Sep 13, 2013 at 12:53:56PM +0100, Gregory CLEMENT wrote:
+> >> Hi Lorenzo,
+> >> 
+> >> On 13/09/2013 13:32, Lorenzo Pieralisi wrote:
+> >> > Following the reorganization of CPU idle drivers configurations into an ARM
+> >> > specific Kconfig, the existing idle drivers Kconfig entries were renamed and
+> >> > moved to the Kconfig.arm file. Makefile entries were updated accordingly.
+> >> > 
+> >> > This patch renames the entries in Kconfig.arm and makefile to make the newly
+> >> > added big.LITTLE CPUidle driver compliant with the new naming convention.
+> >> 
+> >> Do you also consider to reorder the entries in alphabetic order?
+> >> It should help to reduce the merge conflict.
+> >
+> > Sure, here it is, thanks for pointing that out.
+> 
+> FYI, updated patches deep inside threads are very likely to be missed.
+> I saw this because I was looking for it, but would've easily been
+> missed.
 
-On 13 September 2013 19:15, Will Deacon <will.deacon@arm.com> wrote:
-> Hi Jean,
->
-> On Fri, Sep 13, 2013 at 06:08:41PM +0100, Jean Pihet wrote:
->> The newly added dwarf unwinding feature [1] requires:
->> . a recent version (>= 1.1) of libunwind,
->> . libunwind to be configured with --enable-debug-frame.
->>
->> [1] http://www.spinics.net/lists/kernel/msg1598951.html
->>
->> Add the corresponding API test in the feature check list.
->
-> Any reason not to merge this in with the third patch in original series? I
-> don't think it's been picked up by anybody yet, so it would make sense to
-> repost with this fixup after the merge window.
-Yes you are right
-Will repost with this patch folded into the third patch, or as a
-fourth patch. Any preference?
+Got it, thanks for that.
 
-Thx,
-Jean
+> Could you resend a v2 with my ack so Daniel can pick up and get it
+> merged for v3.12-rc?  Thanks
 
->
-> Will
+Done.
+
+Thank you,
+Lorenzo
