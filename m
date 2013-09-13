@@ -1,34 +1,19 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Fri, 13 Sep 2013 14:16:06 -0700
-Subject: [PATCH v2] drivers: cpuidle: rename ARM big.LITTLE driver config
- and makefile entries
-In-Reply-To: <1379086721-5242-1-git-send-email-lorenzo.pieralisi@arm.com>
- (Lorenzo Pieralisi's message of "Fri, 13 Sep 2013 16:38:41 +0100")
-References: <1379086721-5242-1-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <878uz0e82x.fsf@linaro.org>
+From: davem@davemloft.net (David Miller)
+Date: Fri, 13 Sep 2013 17:44:06 -0400 (EDT)
+Subject: [PATCH 4/6] ide: drop dependency on ARCH_SHARK
+In-Reply-To: <1379069607-4184-1-git-send-email-linus.walleij@linaro.org>
+References: <1379069607-4184-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <20130913.174406.2143576935429736584.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Daniel,
+From: Linus Walleij <linus.walleij@linaro.org>
+Date: Fri, 13 Sep 2013 12:53:27 +0200
 
-Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> writes:
+> This drops the selection of default IDE chipset for the Shark
+> machine as it has been deleted.
+> 
+> Cc: David S. Miller <davem@davemloft.net>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 
-> Following the reorganization of CPU idle drivers configurations into an ARM
-> specific Kconfig, the existing idle drivers Kconfig entries were renamed and
-> moved to the Kconfig.arm file. Makefile entries were updated accordingly.
->
-> This patch renames the entries in Kconfig.arm and makefile to make the newly
-> added big.LITTLE CPUidle driver compliant with the new naming convention.
->
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Acked-by: Kevin Hilman <khilman@linaro.org>
-
-We picked up this driver originally through arm-soc (with your signoff)
-because of arch/arm dependencies, but you might as well take this one
-directly since it's isolated to drivers/cpuidle.
-
-Can you queue this up for v3.12-rc please?
-
-Thanks,
-
-Kevin
+Acked-by: David S. Miller <davem@davemloft.net>
