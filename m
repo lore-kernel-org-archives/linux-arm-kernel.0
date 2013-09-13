@@ -1,10 +1,10 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 13 Sep 2013 18:30:40 +0530
-Subject: [PATCH 094/228] cpufreq: blackfin: don't initialize part of policy
- that is set by core too
+Date: Fri, 13 Sep 2013 18:30:41 +0530
+Subject: [PATCH 095/228] cpufreq: cpu0: don't initialize part of policy that
+ is set by core too
 In-Reply-To: <cover.1379063063.git.viresh.kumar@linaro.org>
 References: <cover.1379063063.git.viresh.kumar@linaro.org>
-Message-ID: <26f6beb862d15b9c763f0a71737a8d3bb255ffab.1379063063.git.viresh.kumar@linaro.org>
+Message-ID: <23a1491c78ce1a40d109e3239dde2e0361995080.1379063063.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,23 +14,23 @@ this driver doesn't need to do it. This patch removes such code.
 Most recent of those changes is to call ->get() in the core after calling
 ->init().
 
-Cc: Steven Miao <realmz6@gmail.com>
+Cc: Shawn Guo <shawn.guo@linaro.org>
 Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- drivers/cpufreq/blackfin-cpufreq.c | 1 -
+ drivers/cpufreq/cpufreq-cpu0.c | 1 -
  1 file changed, 1 deletion(-)
 
-diff --git a/drivers/cpufreq/blackfin-cpufreq.c b/drivers/cpufreq/blackfin-cpufreq.c
-index 48888cf..0bc9e8c 100644
---- a/drivers/cpufreq/blackfin-cpufreq.c
-+++ b/drivers/cpufreq/blackfin-cpufreq.c
-@@ -204,7 +204,6 @@ static int __bfin_cpu_init(struct cpufreq_policy *policy)
+diff --git a/drivers/cpufreq/cpufreq-cpu0.c b/drivers/cpufreq/cpufreq-cpu0.c
+index 2847ae6..2486c13 100644
+--- a/drivers/cpufreq/cpufreq-cpu0.c
++++ b/drivers/cpufreq/cpufreq-cpu0.c
+@@ -130,7 +130,6 @@ static int cpu0_cpufreq_init(struct cpufreq_policy *policy)
+ 	}
  
- 	policy->cpuinfo.transition_latency = 50000; /* 50us assumed */
+ 	policy->cpuinfo.transition_latency = transition_latency;
+-	policy->cur = clk_get_rate(cpu_clk) / 1000;
  
--	policy->cur = cclk;
- 	return cpufreq_table_validate_and_show(policy, bfin_freq_table);
- }
- 
+ 	/*
+ 	 * The driver only supports the SMP configuartion where all processors
 -- 
 1.7.12.rc2.18.g61b472e
