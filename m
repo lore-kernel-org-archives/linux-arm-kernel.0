@@ -1,66 +1,62 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 13 Sep 2013 18:32:43 +0530
-Subject: [PATCH 217/228] cpufreq: davinci: use cpufreq_generic_get() routine
+Date: Fri, 13 Sep 2013 18:32:44 +0530
+Subject: [PATCH 218/228] cpufreq: dbx500: use cpufreq_generic_get() routine
 In-Reply-To: <cover.1379063063.git.viresh.kumar@linaro.org>
 References: <cover.1379063063.git.viresh.kumar@linaro.org>
-Message-ID: <9306a1c54e69d9fc30afe77c023d0780c84592d7.1379063063.git.viresh.kumar@linaro.org>
+Message-ID: <d447b693596cb56da5973d97127793a17e524646.1379063063.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 We have common infrastructure available with us for getting a CPUs clk rate.
 Lets use it for this driver.
 
-Cc: Sekhar Nori <nsekhar@ti.com>
+We don't have to find closest frequency in platform specific ->get() routine
+wihch dbx500 driver was doing and hence it can be removed as well.
+
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- drivers/cpufreq/davinci-cpufreq.c | 14 ++++----------
- 1 file changed, 4 insertions(+), 10 deletions(-)
+ drivers/cpufreq/dbx500-cpufreq.c | 19 ++-----------------
+ 1 file changed, 2 insertions(+), 17 deletions(-)
 
-diff --git a/drivers/cpufreq/davinci-cpufreq.c b/drivers/cpufreq/davinci-cpufreq.c
-index 5e8a854..cd7fb6e 100644
---- a/drivers/cpufreq/davinci-cpufreq.c
-+++ b/drivers/cpufreq/davinci-cpufreq.c
-@@ -58,14 +58,6 @@ static int davinci_verify_speed(struct cpufreq_policy *policy)
- 	return 0;
+diff --git a/drivers/cpufreq/dbx500-cpufreq.c b/drivers/cpufreq/dbx500-cpufreq.c
+index 0e67ab9..d83129d 100644
+--- a/drivers/cpufreq/dbx500-cpufreq.c
++++ b/drivers/cpufreq/dbx500-cpufreq.c
+@@ -26,24 +26,9 @@ static int dbx500_cpufreq_target(struct cpufreq_policy *policy,
+ 	return clk_set_rate(armss_clk, freq_table[index].frequency * 1000);
  }
  
--static unsigned int davinci_getspeed(unsigned int cpu)
+-static unsigned int dbx500_cpufreq_getspeed(unsigned int cpu)
 -{
--	if (cpu)
--		return 0;
+-	int i = 0;
+-	unsigned long freq = clk_get_rate(armss_clk) / 1000;
 -
--	return clk_get_rate(cpufreq.armclk) / 1000;
+-	/* The value is rounded to closest frequency in the defined table. */
+-	while (freq_table[i + 1].frequency != CPUFREQ_TABLE_END) {
+-		if (freq < freq_table[i].frequency +
+-		   (freq_table[i + 1].frequency - freq_table[i].frequency) / 2)
+-			return freq_table[i].frequency;
+-		i++;
+-	}
+-
+-	return freq_table[i].frequency;
 -}
 -
- static int davinci_target(struct cpufreq_policy *policy, unsigned int idx)
+ static int dbx500_cpufreq_init(struct cpufreq_policy *policy)
  {
- 	struct davinci_cpufreq_config *pdata = cpufreq.dev->platform_data;
-@@ -73,7 +65,7 @@ static int davinci_target(struct cpufreq_policy *policy, unsigned int idx)
- 	unsigned int old_freq, new_freq;
- 	int ret = 0;
++	policy->clk = armss_clk;
+ 	return cpufreq_generic_init(policy, freq_table, 20 * 1000);
+ }
  
--	old_freq = davinci_getspeed(0);
-+	old_freq = policy->cur;
- 	new_freq = pdata->freq_table[idx].frequency;
- 
- 	/* if moving to higher frequency, up the voltage beforehand */
-@@ -116,6 +108,8 @@ static int davinci_cpu_init(struct cpufreq_policy *policy)
- 			return result;
- 	}
- 
-+	policy->clk = cpufreq.armclk;
-+
- 	/*
- 	 * Time measurement across the target() function yields ~1500-1800us
- 	 * time taken with no drivers on notification list.
-@@ -129,7 +123,7 @@ static struct cpufreq_driver davinci_driver = {
- 	.flags		= CPUFREQ_STICKY,
- 	.verify		= davinci_verify_speed,
- 	.target_index	= davinci_target,
--	.get		= davinci_getspeed,
-+	.get		= cpufreq_generic_get,
- 	.init		= davinci_cpu_init,
- 	.exit		= cpufreq_generic_exit,
- 	.name		= "davinci",
+@@ -51,7 +36,7 @@ static struct cpufreq_driver dbx500_cpufreq_driver = {
+ 	.flags  = CPUFREQ_STICKY | CPUFREQ_CONST_LOOPS,
+ 	.verify = cpufreq_generic_frequency_table_verify,
+ 	.target_index = dbx500_cpufreq_target,
+-	.get    = dbx500_cpufreq_getspeed,
++	.get    = cpufreq_generic_get,
+ 	.init   = dbx500_cpufreq_init,
+ 	.name   = "DBX500",
+ 	.attr   = cpufreq_generic_attr,
 -- 
 1.7.12.rc2.18.g61b472e
