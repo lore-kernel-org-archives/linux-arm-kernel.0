@@ -1,26 +1,78 @@
-From: jesper.nilsson@axis.com (Jesper Nilsson)
-Date: Fri, 13 Sep 2013 16:19:00 +0200
-Subject: [PATCH 061/228] cpufreq: cris: Use generic cpufreq routines
-In-Reply-To: <d5f36a652c8fed4bb90bb711f520c964131a0d61.1379063063.git.viresh.kumar@linaro.org>
-References: <cover.1379063063.git.viresh.kumar@linaro.org>
- <d5f36a652c8fed4bb90bb711f520c964131a0d61.1379063063.git.viresh.kumar@linaro.org>
-Message-ID: <20130913141900.GE32443@axis.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Fri, 13 Sep 2013 16:24:29 +0200 (CEST)
+Subject: [RFC PATCH 1/4] DRIVERS: IRQCHIP: Add crossbar irqchip driver
+In-Reply-To: <52326D6B.2010003@ti.com>
+References: <1379000351-15672-1-git-send-email-r.sricharan@ti.com>
+ <1379000351-15672-2-git-send-email-r.sricharan@ti.com>
+ <alpine.DEB.2.02.1309122201530.4089@ionos.tec.linutronix.de>
+ <523228B5.5070507@ti.com>
+ <alpine.DEB.2.02.1309122335440.4089@ionos.tec.linutronix.de>
+ <5232457A.8080709@ti.com>
+ <alpine.DEB.2.02.1309130138550.4089@ionos.tec.linutronix.de>
+ <52326D6B.2010003@ti.com>
+Message-ID: <alpine.DEB.2.02.1309131142540.4089@ionos.tec.linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 13, 2013 at 03:00:07PM +0200, Viresh Kumar wrote:
-> Most of the CPUFreq drivers do similar things in .exit() and .verify() routines
-> and .attr. So its better if we have generic routines for them which can be used
-> by cpufreq drivers then.
+On Thu, 12 Sep 2013, Santosh Shilimkar wrote:
+> On Thursday 12 September 2013 08:26 PM, Thomas Gleixner wrote:
+> > Let me summarize:
+> > 
+> >    - GIC supports up to 160 interrupts
+> > 
+> >    - CROSSBAR supports up to 250 interrupts 
+> > 
+> >    - CROSSBAR routes up to 160 out of 250 interrupts to the GIC ones
+> > 
+> >    - Drivers request a CROSSBAR interrupt number which must be mapped
+> >      to some arbitrary available GIC irq number
+> > 
+> Correct.
 > 
-> This patch uses these generic routines for this driver.
+> > So basically the CROSSBAR mechanism is pretty much the same as MSI[X]
+> > just in a different flavour and with a different set of semantics and
+> > limitations, i.e. poor mans MSI[X] with a new level of bogosity.
+> > 
+> > So if CROSSBAR is going to be the new fangled SoC MSI[X] long term
+> > equivalent then you better provide some infrastructure for that and
+> > make the drivers ready to use it. Maybe check with the PCI/MSI folks
+> > to share some of the interfaces.
+> >
+> > If that whole thing is another onetime HW designers wet dream, then
+> > please go back to the limited but completely functional (Who is going
+> > to use more than 160 peripheral interrupts????) device tree model. I
+> > really have no interest to support hardware designer brain farts.
+> > 
+> Thanks for clear NAK for irqchip approach. I should have looped you
+> in the discussion where I was also suggesting against the irqchip
+> approach. We will try to look at MSI stuff but if its get too
+> complicated am going to fall-back to the initial probe based
+> approach to achieve the functionality.
 
-Acked-by: Jesper Nilsson <jesper.nilsson@axis.com>
+Before you dig into MSI, lets talk about irq domains first.
 
-> Cc: Mikael Starvik <starvik@axis.com>
-> Cc: linux-cris-kernel at axis.com
-> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+GIC implements a legacy irq domain, i.e. a linear domain of all
+possible GIC interrupts with a 1:1 mapping.
 
-/^JN - Jesper Nilsson
--- 
-               Jesper Nilsson -- jesper.nilsson at axis.com
+So why can't you make use of irq domains and have the whole routing
+business implemented sanely?
+
+What's needed is in gic_init_bases():
+
+       if (of_property_read(node, "routable_irqs", &nr_routable_irqs) {
+       	  irq_domain_add_legacy(nr_gic_irqs);
+       } else {
+       	  irq_domain_add_legacy(nr_per_cpu_irqs);
+	  irq_domain_add_linear(nr_routable_irqs);
+       }
+
+Now that separate domain has an xlate function which grabs a free GIC
+irq from a bitmap and returns the hardware irq number in the gic
+space. The map/unmap callbacks take care of setting up / tearing down
+the route in the crossbar.
+
+Thoughts?
+
+Thanks,
+
+	tglx
