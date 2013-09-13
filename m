@@ -1,545 +1,76 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri, 13 Sep 2013 17:39:51 +0100
-Subject: [PATCH 2/2] Documentation: DT: arm: define CPU topology bindings
-In-Reply-To: <1376559743-31848-3-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1376559743-31848-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1376559743-31848-3-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <20130913163950.GB5408@e102568-lin.cambridge.arm.com>
+From: dirk.behme@gmail.com (Dirk Behme)
+Date: Fri, 13 Sep 2013 18:46:06 +0200
+Subject: [PATCH] ARM: imx: i.mx6d/q: disable the double linefill feature
+ of PL310
+In-Reply-To: <1379058532-19843-1-git-send-email-r64343@freescale.com>
+References: <1379058532-19843-1-git-send-email-r64343@freescale.com>
+Message-ID: <5233414E.5010101@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[replying to self]
-
-Bindings defined in this patch have been hanging in the balance for
-quite a while, I would ask DT maintainers (and everyone else) please to have
-a look and provide an ACK/NACK as they deem fit, thank you very much.
-
-Comments welcome.
-
-Thanks,
-Lorenzo
-
-On Thu, Aug 15, 2013 at 10:42:23AM +0100, Lorenzo Pieralisi wrote:
-> The advent of multi-cluster ARM systems requires a mechanism to describe
-> how in hierarchical terms CPUs are connected in ARM SoCs so that the kernel
-> can initialize and map resources like IRQs and memory space to specific
-> group(s) of CPUs.
-> 
-> The CPU topology is made up of multiple hierarchy levels whose bottom
-> layers (aka leaf nodes in device tree syntax) contain links to the HW
-> CPUs in the system.
-> 
-> The topology bindings are generic for both 32-bit and 64-bit systems and
-> lay the groundwork on top of which affinity schemes can be built.
-> 
-> This patch provides the documentation in the kernel required to define the
-> device tree bindings describing the CPU topology for ARM 32-bit and 64-bit
-> systems.
-> 
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Am 13.09.2013 09:48, schrieb Jason Liu:
+> The L2 cache controller(PL310) version on the i.MX6D/Q is r3p1-50rel0
+> The L2 cache controller(PL310) version on the i.MX6DL/SOLO/SL is r3p2
+> But according to ARM PL310 errata: 752271
+> ID: 752271: Double linefill feature can cause data corruption
+> Fault Status: Present in: r3p0, r3p1, r3p1-50rel0. Fixed in r3p2
+> Workaround: The only workaround to this erratum is to disable the
+> double linefill feature. This is the default behavior.
+>
+> without this patch, you will meet the following error when run the
+> memtester application at: http://pyropus.ca/software/memtester/
+>
+> FAILURE: 0x00100000 != 0x00200000 at offset 0x01365664.
+> FAILURE: 0x00100000 != 0x00200000 at offset 0x01365668.
+> FAILURE: 0x00100000 != 0x00200000 at offset 0x0136566c.
+> FAILURE: 0x00100000 != 0x00200000 at offset 0x01365670.
+> FAILURE: 0x00100000 != 0x00200000 at offset 0x01365674.
+> FAILURE: 0x00100000 != 0x00200000 at offset 0x01365678.
+> FAILURE: 0x00100000 != 0x00200000 at offset 0x0136567c.
+>
+> Signed-off-by: Jason Liu <r64343@freescale.com>
 > ---
->  Documentation/devicetree/bindings/arm/topology.txt | 492 +++++++++++++++++++++
->  1 file changed, 492 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/arm/topology.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/topology.txt b/Documentation/devicetree/bindings/arm/topology.txt
-> new file mode 100644
-> index 0000000..73fe7dd
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/topology.txt
-> @@ -0,0 +1,492 @@
-> +===========================================
-> +ARM topology binding description
-> +===========================================
-> +
-> +===========================================
-> +1 - Introduction
-> +===========================================
-> +
-> +In an ARM system, the hierarchy of CPUs is defined through three entities that
-> +are used to describe the layout of physical CPUs in the system:
-> +
-> +- cluster
-> +- core
-> +- thread
-> +
-> +The cpu nodes (bindings defined in [1]) represent the devices that
-> +correspond to physical CPUs and are to be mapped to the hierarchy levels.
-> +
-> +The bottom hierarchy level sits at core or thread level depending on whether
-> +symmetric multi-threading (SMT) is supported or not.
-> +
-> +For instance in a system where CPUs support SMT, "cpu" nodes represent all
-> +threads existing in the system and map to the hierarchy level "thread" above.
-> +In systems where SMT is not supported "cpu" nodes represent all cores present
-> +in the system and map to the hierarchy level "core" above.
-> +
-> +ARM topology bindings allow one to associate cpu nodes with hierarchical groups
-> +corresponding to the system hierarchy; syntactically they are defined as device
-> +tree nodes.
-> +
-> +The remainder of this document provides the topology bindings for ARM, based
-> +on the ePAPR standard, available from:
-> +
-> +http://www.power.org/documentation/epapr-version-1-1/
-> +
-> +If not stated otherwise, whenever a reference to a cpu node phandle is made its
-> +value must point to a cpu node compliant with the cpu node bindings as
-> +documented in [1].
-> +A topology description containing phandles to cpu nodes that are not compliant
-> +with bindings standardized in [1] is therefore considered invalid.
-> +
-> +===========================================
-> +2 - cpu-map node
-> +===========================================
-> +
-> +The ARM CPU topology is defined within the cpu-map node, which is a direct
-> +child of the cpus node and provides a container where the actual topology
-> +nodes are listed.
-> +
-> +- cpu-map node
-> +
-> +       Usage: Optional - Provide ARM CPU topology to the OS
-> +
-> +       Description: The cpu-map node is just a container node where its
-> +                    subnodes describe the CPU topology
-> +
-> +       Node name must be "cpu-map".
-> +
-> +       The cpu-map node's parent node must be the cpus node.
-> +
-> +       The cpu-map node's child nodes can be:
-> +
-> +       - one or more cluster nodes
-> +
-> +       Any other configuration is considered invalid.
-> +
-> +The cpu-map node can only contain three types of child nodes:
-> +
-> +- cluster node
-> +- core node
-> +- thread node
-> +
-> +whose bindings are described in paragraph 3.
-> +
-> +The nodes describing the CPU topology (cluster/core/thread) can only be
-> +defined within the cpu-map node.
-> +Any other configuration is consider invalid and therefore must be ignored.
-> +
-> +===========================================
-> +2.1 - cpu-map child nodes naming convention
-> +===========================================
-> +
-> +cpu-map child nodes must follow a naming convention where the node name
-> +must be "clusterN", "coreN", "threadN" depending on the node type (ie
-> +cluster/core/thread) (where N = {0, 1, ...} is the node number; nodes which
-> +are siblings within a single common parent node must be given a unique and
-> +sequential N value, starting from 0).
-> +cpu-map child nodes which do not share a common parent node can have the same
-> +name (ie same number N as other cpu-map child nodes at different device tree
-> +levels) since name uniqueness will be guaranteed by the device tree hierarchy.
-> +
-> +===========================================
-> +3 - cluster/core/thread node bindings
-> +===========================================
-> +
-> +Bindings for cluster/cpu/thread nodes are defined as follows:
-> +
-> +- cluster node
-> +
-> +        Description: must be declared within a cpu-map node, one node
-> +                     per cluster. A system can contain several layers of
-> +                     clustering and cluster nodes can be contained in parent
-> +                     cluster nodes.
-> +
-> +       The cluster node name must be "clusterN" as described in 2.1 above.
-> +       A cluster node can not be a leaf node.
-> +
-> +       A cluster node's child nodes must be:
-> +
-> +       - one or more cluster nodes; or
-> +       - one or more core nodes
-> +
-> +       Any other configuration is considered invalid.
-> +
-> +- core node
-> +
-> +       Description: must be declared in a cluster node, one node per core in
-> +                    the cluster. If the system does not support SMT, core
-> +                    nodes are leaf nodes, otherwise they become containers of
-> +                    thread nodes.
-> +
-> +       The core node name must be "coreN" as described in 2.1 above.
-> +
-> +       A core node must be a leaf node if SMT is not supported.
-> +
-> +       Properties for core nodes that are leaf nodes:
-> +
-> +       - cpu
-> +               Usage: required
-> +               Value type: <phandle>
-> +               Definition: a phandle to the cpu node that corresponds to the
-> +                           core node.
-> +
-> +       If a core node is not a leaf node (CPUs supporting SMT) a core node's
-> +       child nodes can be:
-> +
-> +       - one or more thread nodes
-> +
-> +       Any other configuration is considered invalid.
-> +
-> +- thread node
-> +
-> +       Description: must be declared in a core node, one node per thread
-> +                    in the core if the system supports SMT. Thread nodes are
-> +                    always leaf nodes in the device tree.
-> +
-> +       The thread node name must be "threadN" as described in 2.1 above.
-> +
-> +       A thread node must be a leaf node.
-> +
-> +       A thread node must contain the following property:
-> +
-> +       - cpu
-> +               Usage: required
-> +               Value type: <phandle>
-> +               Definition: a phandle to the cpu node that corresponds to
-> +                           the thread node.
-> +
-> +===========================================
-> +4 - Example dts
-> +===========================================
-> +
-> +Example 1 (ARM 64-bit, 16-cpu system, two clusters of clusters):
-> +
-> +cpus {
-> +       #size-cells = <0>;
-> +       #address-cells = <2>;
-> +
-> +       cpu-map {
-> +               cluster0 {
-> +                       cluster0 {
-> +                               core0 {
-> +                                       thread0 {
-> +                                               cpu = <&CPU0>;
-> +                                       };
-> +                                       thread1 {
-> +                                               cpu = <&CPU1>;
-> +                                       };
-> +                               };
-> +
-> +                               core1 {
-> +                                       thread0 {
-> +                                               cpu = <&CPU2>;
-> +                                       };
-> +                                       thread1 {
-> +                                               cpu = <&CPU3>;
-> +                                       };
-> +                               };
-> +                       };
-> +
-> +                       cluster1 {
-> +                               core0 {
-> +                                       thread0 {
-> +                                               cpu = <&CPU4>;
-> +                                       };
-> +                                       thread1 {
-> +                                               cpu = <&CPU5>;
-> +                                       };
-> +                               };
-> +
-> +                               core1 {
-> +                                       thread0 {
-> +                                               cpu = <&CPU6>;
-> +                                       };
-> +                                       thread1 {
-> +                                               cpu = <&CPU7>;
-> +                                       };
-> +                               };
-> +                       };
-> +               };
-> +
-> +               cluster1 {
-> +                       cluster0 {
-> +                               core0 {
-> +                                       thread0 {
-> +                                               cpu = <&CPU8>;
-> +                                       };
-> +                                       thread1 {
-> +                                               cpu = <&CPU9>;
-> +                                       };
-> +                               };
-> +                               core1 {
-> +                                       thread0 {
-> +                                               cpu = <&CPU10>;
-> +                                       };
-> +                                       thread1 {
-> +                                               cpu = <&CPU11>;
-> +                                       };
-> +                               };
-> +                       };
-> +
-> +                       cluster1 {
-> +                               core0 {
-> +                                       thread0 {
-> +                                               cpu = <&CPU12>;
-> +                                       };
-> +                                       thread1 {
-> +                                               cpu = <&CPU13>;
-> +                                       };
-> +                               };
-> +                               core1 {
-> +                                       thread0 {
-> +                                               cpu = <&CPU14>;
-> +                                       };
-> +                                       thread1 {
-> +                                               cpu = <&CPU15>;
-> +                                       };
-> +                               };
-> +                       };
-> +               };
-> +       };
-> +
-> +       CPU0: cpu at 0 {
-> +               device_type = "cpu";
-> +               compatible = "arm,cortex-a57";
-> +               reg = <0x0 0x0>;
-> +               enable-method = "spin-table";
-> +               cpu-release-addr = <0 0x20000000>;
-> +       };
-> +
-> +       CPU1: cpu at 1 {
-> +               device_type = "cpu";
-> +               compatible = "arm,cortex-a57";
-> +               reg = <0x0 0x1>;
-> +               enable-method = "spin-table";
-> +               cpu-release-addr = <0 0x20000000>;
-> +       };
-> +
-> +       CPU2: cpu at 100 {
-> +               device_type = "cpu";
-> +               compatible = "arm,cortex-a57";
-> +               reg = <0x0 0x100>;
-> +               enable-method = "spin-table";
-> +               cpu-release-addr = <0 0x20000000>;
-> +       };
-> +
-> +       CPU3: cpu at 101 {
-> +               device_type = "cpu";
-> +               compatible = "arm,cortex-a57";
-> +               reg = <0x0 0x101>;
-> +               enable-method = "spin-table";
-> +               cpu-release-addr = <0 0x20000000>;
-> +       };
-> +
-> +       CPU4: cpu at 10000 {
-> +               device_type = "cpu";
-> +               compatible = "arm,cortex-a57";
-> +               reg = <0x0 0x10000>;
-> +               enable-method = "spin-table";
-> +               cpu-release-addr = <0 0x20000000>;
-> +       };
-> +
-> +       CPU5: cpu at 10001 {
-> +               device_type = "cpu";
-> +               compatible = "arm,cortex-a57";
-> +               reg = <0x0 0x10001>;
-> +               enable-method = "spin-table";
-> +               cpu-release-addr = <0 0x20000000>;
-> +       };
-> +
-> +       CPU6: cpu at 10100 {
-> +               device_type = "cpu";
-> +               compatible = "arm,cortex-a57";
-> +               reg = <0x0 0x10100>;
-> +               enable-method = "spin-table";
-> +               cpu-release-addr = <0 0x20000000>;
-> +       };
-> +
-> +       CPU7: cpu at 10101 {
-> +               device_type = "cpu";
-> +               compatible = "arm,cortex-a57";
-> +               reg = <0x0 0x10101>;
-> +               enable-method = "spin-table";
-> +               cpu-release-addr = <0 0x20000000>;
-> +       };
-> +
-> +       CPU8: cpu at 100000000 {
-> +               device_type = "cpu";
-> +               compatible = "arm,cortex-a57";
-> +               reg = <0x1 0x0>;
-> +               enable-method = "spin-table";
-> +               cpu-release-addr = <0 0x20000000>;
-> +       };
-> +
-> +       CPU9: cpu at 100000001 {
-> +               device_type = "cpu";
-> +               compatible = "arm,cortex-a57";
-> +               reg = <0x1 0x1>;
-> +               enable-method = "spin-table";
-> +               cpu-release-addr = <0 0x20000000>;
-> +       };
-> +
-> +       CPU10: cpu at 100000100 {
-> +               device_type = "cpu";
-> +               compatible = "arm,cortex-a57";
-> +               reg = <0x1 0x100>;
-> +               enable-method = "spin-table";
-> +               cpu-release-addr = <0 0x20000000>;
-> +       };
-> +
-> +       CPU11: cpu at 100000101 {
-> +               device_type = "cpu";
-> +               compatible = "arm,cortex-a57";
-> +               reg = <0x1 0x101>;
-> +               enable-method = "spin-table";
-> +               cpu-release-addr = <0 0x20000000>;
-> +       };
-> +
-> +       CPU12: cpu at 100010000 {
-> +               device_type = "cpu";
-> +               compatible = "arm,cortex-a57";
-> +               reg = <0x1 0x10000>;
-> +               enable-method = "spin-table";
-> +               cpu-release-addr = <0 0x20000000>;
-> +       };
-> +
-> +       CPU13: cpu at 100010001 {
-> +               device_type = "cpu";
-> +               compatible = "arm,cortex-a57";
-> +               reg = <0x1 0x10001>;
-> +               enable-method = "spin-table";
-> +               cpu-release-addr = <0 0x20000000>;
-> +       };
-> +
-> +       CPU14: cpu at 100010100 {
-> +               device_type = "cpu";
-> +               compatible = "arm,cortex-a57";
-> +               reg = <0x1 0x10100>;
-> +               enable-method = "spin-table";
-> +               cpu-release-addr = <0 0x20000000>;
-> +       };
-> +
-> +       CPU15: cpu at 100010101 {
-> +               device_type = "cpu";
-> +               compatible = "arm,cortex-a57";
-> +               reg = <0x1 0x10101>;
-> +               enable-method = "spin-table";
-> +               cpu-release-addr = <0 0x20000000>;
-> +       };
-> +};
-> +
-> +Example 2 (ARM 32-bit, dual-cluster, 8-cpu system, no SMT):
-> +
-> +cpus {
-> +       #size-cells = <0>;
-> +       #address-cells = <1>;
-> +
-> +       cpu-map {
-> +               cluster0 {
-> +                       core0 {
-> +                               cpu = <&CPU0>;
-> +                       };
-> +                       core1 {
-> +                               cpu = <&CPU1>;
-> +                       };
-> +                       core2 {
-> +                               cpu = <&CPU2>;
-> +                       };
-> +                       core3 {
-> +                               cpu = <&CPU3>;
-> +                       };
-> +               };
-> +
-> +               cluster1 {
-> +                       core0 {
-> +                               cpu = <&CPU4>;
-> +                       };
-> +                       core1 {
-> +                               cpu = <&CPU5>;
-> +                       };
-> +                       core2 {
-> +                               cpu = <&CPU6>;
-> +                       };
-> +                       core3 {
-> +                               cpu = <&CPU7>;
-> +                       };
-> +               };
-> +       };
-> +
-> +       CPU0: cpu at 0 {
-> +               device_type = "cpu";
-> +               compatible = "arm,cortex-a15";
-> +               reg = <0x0>;
-> +       };
-> +
-> +       CPU1: cpu at 1 {
-> +               device_type = "cpu";
-> +               compatible = "arm,cortex-a15";
-> +               reg = <0x1>;
-> +       };
-> +
-> +       CPU2: cpu at 2 {
-> +               device_type = "cpu";
-> +               compatible = "arm,cortex-a15";
-> +               reg = <0x2>;
-> +       };
-> +
-> +       CPU3: cpu at 3 {
-> +               device_type = "cpu";
-> +               compatible = "arm,cortex-a15";
-> +               reg = <0x3>;
-> +       };
-> +
-> +       CPU4: cpu at 100 {
-> +               device_type = "cpu";
-> +               compatible = "arm,cortex-a7";
-> +               reg = <0x100>;
-> +       };
-> +
-> +       CPU5: cpu at 101 {
-> +               device_type = "cpu";
-> +               compatible = "arm,cortex-a7";
-> +               reg = <0x101>;
-> +       };
-> +
-> +       CPU6: cpu at 102 {
-> +               device_type = "cpu";
-> +               compatible = "arm,cortex-a7";
-> +               reg = <0x102>;
-> +       };
-> +
-> +       CPU7: cpu at 103 {
-> +               device_type = "cpu";
-> +               compatible = "arm,cortex-a7";
-> +               reg = <0x103>;
-> +       };
-> +};
-> +
-> +Example 3 (ARM 32-bit, cortex-a8 single core):
-> +
-> +cpus {
-> +       #size-cells = <0>;
-> +       #address-cells = <1>;
-> +
-> +       cpu-map {
-> +               cluster0 {
-> +                       core0 {
-> +                               cpu = <&CPU0>;
-> +                       };
-> +               };
-> +       };
-> +
-> +       CPU0: cpu at 0 {
-> +               device_type = "cpu";
-> +               compatible = "arm,cortex-a8";
-> +               reg = <0x0>;
-> +       };
-> +};
-> +
-> +===============================================================================
-> +[1] ARM Linux kernel documentation
-> +    Documentation/devicetree/bindings/arm/cpus.txt
-> --
-> 1.8.2.2
-> 
+>   arch/arm/mach-imx/system.c |   13 ++++++++++++-
+>   1 file changed, 12 insertions(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/mach-imx/system.c b/arch/arm/mach-imx/system.c
+> index 64ff37e..0c3fa48 100644
+> --- a/arch/arm/mach-imx/system.c
+> +++ b/arch/arm/mach-imx/system.c
+> @@ -116,7 +116,18 @@ void __init imx_init_l2cache(void)
+>
+>   	/* Configure the L2 PREFETCH and POWER registers */
+>   	val = readl_relaxed(l2x0_base + L2X0_PREFETCH_CTRL);
+> -	val |= 0x70800000;
+> +	val |= 0x30000000;
+> +	/*
+> +	 * The L2 cache controller(PL310) version on the i.MX6D/Q is r3p1-50rel0
+> +	 * The L2 cache controller(PL310) version on the i.MX6DL/SOLO/SL is r3p2
+> +	 * But according to ARM PL310 errata: 752271
+> +	 * ID: 752271: Double linefill feature can cause data corruption
+> +	 * Fault Status: Present in: r3p0, r3p1, r3p1-50rel0. Fixed in r3p2
+> +	 * Workaround: The only workaround to this erratum is to disable the
+> +	 * double linefill feature. This is the default behavior.
+> +	 */
+> +	if (!of_machine_is_compatible("fsl,imx6q"))
+> +		val |= 0x40800000;
+
+I've been thinking about this issue some time, too. Therefore two 
+questions:
+
+* Why do you set the 0x8 in 0x40800000 only in the non-imx6q case 
+here? This bit shouldn't be affected by the errata and therefore could 
+be set in all cases?
+
+* To make it more clear what we do here (and in case somebody, e.g. a 
+boot loader?) has already set bit 30, I would do something like:
+
+val |= 0x70800000;
+if (!of_machine_is_compatible("fsl,imx6q"))
+	val &= ~(1 << 30);
+
+What do you think?
+
+Best regards
+
+Dirk
