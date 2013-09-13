@@ -1,10 +1,10 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 13 Sep 2013 18:31:05 +0530
-Subject: [PATCH 119/228] cpufreq: s5pv210: don't initialize part of policy
- that is set by core too
+Date: Fri, 13 Sep 2013 18:31:06 +0530
+Subject: [PATCH 120/228] cpufreq: sa11x0: don't initialize part of policy that
+ is set by core too
 In-Reply-To: <cover.1379063063.git.viresh.kumar@linaro.org>
 References: <cover.1379063063.git.viresh.kumar@linaro.org>
-Message-ID: <de77e14bd1aa0e349a5a9f0beac3cbe3c604c909.1379063063.git.viresh.kumar@linaro.org>
+Message-ID: <8e8853f66fadd4816a5d0fc5284c0c1b6a7816ba.1379063063.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,24 +14,36 @@ this driver doesn't need to do it. This patch removes such code.
 Most recent of those changes is to call ->get() in the core after calling
 ->init().
 
-Cc: Kukjin Kim <kgene.kim@samsung.com>
+Cc: Russell King <linux@arm.linux.org.uk>
 Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- drivers/cpufreq/s5pv210-cpufreq.c | 2 --
- 1 file changed, 2 deletions(-)
+ drivers/cpufreq/sa1100-cpufreq.c | 1 -
+ drivers/cpufreq/sa1110-cpufreq.c | 1 -
+ 2 files changed, 2 deletions(-)
 
-diff --git a/drivers/cpufreq/s5pv210-cpufreq.c b/drivers/cpufreq/s5pv210-cpufreq.c
-index 0eafc52..30d9bb7 100644
---- a/drivers/cpufreq/s5pv210-cpufreq.c
-+++ b/drivers/cpufreq/s5pv210-cpufreq.c
-@@ -543,8 +543,6 @@ static int __init s5pv210_cpu_init(struct cpufreq_policy *policy)
- 	s5pv210_dram_conf[1].refresh = (__raw_readl(S5P_VA_DMC1 + 0x30) * 1000);
- 	s5pv210_dram_conf[1].freq = clk_get_rate(dmc1_clk);
+diff --git a/drivers/cpufreq/sa1100-cpufreq.c b/drivers/cpufreq/sa1100-cpufreq.c
+index 80a4fde..a1d1bb7 100644
+--- a/drivers/cpufreq/sa1100-cpufreq.c
++++ b/drivers/cpufreq/sa1100-cpufreq.c
+@@ -220,7 +220,6 @@ static int __init sa1100_cpu_init(struct cpufreq_policy *policy)
+ {
+ 	if (policy->cpu != 0)
+ 		return -EINVAL;
+-	policy->cur = sa11x0_getspeed(0);
+ 	policy->cpuinfo.transition_latency = CPUFREQ_ETERNAL;
  
--	policy->cur = policy->min = policy->max = s5pv210_getspeed(0);
--
- 	policy->cpuinfo.transition_latency = 40000;
+ 	return cpufreq_table_validate_and_show(policy, sa11x0_freq_table);
+diff --git a/drivers/cpufreq/sa1110-cpufreq.c b/drivers/cpufreq/sa1110-cpufreq.c
+index a38d904..9da940e 100644
+--- a/drivers/cpufreq/sa1110-cpufreq.c
++++ b/drivers/cpufreq/sa1110-cpufreq.c
+@@ -334,7 +334,6 @@ static int __init sa1110_cpu_init(struct cpufreq_policy *policy)
+ {
+ 	if (policy->cpu != 0)
+ 		return -EINVAL;
+-	policy->cur = sa11x0_getspeed(0);
+ 	policy->cpuinfo.transition_latency = CPUFREQ_ETERNAL;
  
- 	return cpufreq_table_validate_and_show(policy, s5pv210_freq_table);
+ 	return cpufreq_table_validate_and_show(policy, sa11x0_freq_table);
 -- 
 1.7.12.rc2.18.g61b472e
