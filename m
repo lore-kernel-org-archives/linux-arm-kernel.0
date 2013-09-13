@@ -1,54 +1,37 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Thu, 12 Sep 2013 16:23:45 +0100
-Subject: [PATCH 1/2] video: ARM CLCD: Add DT support
-In-Reply-To: <5230DD1C.6060606@gmail.com>
-References: <1378488201-21146-1-git-send-email-pawel.moll@arm.com>
- <522BAED9.4020301@gmail.com> <1378725559.4082.28.camel@hornet>
- <522F91F8.6010207@gmail.com> <1378907036.4082.105.camel@hornet>
- <5230DD1C.6060606@gmail.com>
-Message-ID: <1378999425.13571.54.camel@hornet>
+From: shijie8@gmail.com (Huang Shijie)
+Date: Thu, 12 Sep 2013 23:30:10 -0400
+Subject: [PATCH v3 0/8] Add the Quadspi driver for vf610-twr
+In-Reply-To: <20130912102027.GF29403@sirena.org.uk>
+References: <522D3B79.3060707@freescale.com>
+ <20130909151450.GI29403@sirena.org.uk>
+ <522EC33B.9000009@freescale.com>
+ <20130910180704.GB29403@sirena.org.uk>
+ <522FD78A.6080900@freescale.com>
+ <20130911104126.GN29403@sirena.org.uk>
+ <52304BFF.4060007@freescale.com>
+ <20130911113002.GP29403@sirena.org.uk>
+ <523186DF.4070203@freescale.com>
+ <20130912102027.GF29403@sirena.org.uk>
+Message-ID: <20130913033008.GC3051@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2013-09-11 at 22:14 +0100, Sylwester Nawrocki wrote:
-> Yes, I wasn't aware then that your "video RAM" is a separate chip attached
-> to a distinct bus.
-> My idea was to reuse memory node structure, including "reserved-memory"
-> compatible value (note there are some fixups pending and those names are
-> subject to change). Not sure about the property in CLCD device node
-> containing phandle to the memory node (currently 'memory-region').
-
-As I just told Steven, I'll just make it painfully low-level property
-defining "address you have to generate to access base of the
-framebuffer". Of course one can still go the CMA way, if such need
-arises.
-
-> > Ok, I see what you're saying. Yes, this could be done. No, I don't claim
-> > to have enough expertise either (micrometers??? :-O ;-) The other thing
-> > is that I don't really expect generic CDF bindings to cover such things.
-> > They will (hopefully) only describe what's connected with what. And the
-> > drivers should know how. Of course they may need the dimensions&  alike
-> > in the tree (of course having them standardised would help here), but
-> > it's not a CDF job to provide those.
+On Thu, Sep 12, 2013 at 11:20:27AM +0100, Mark Brown wrote:
+> On Thu, Sep 12, 2013 at 05:18:23PM +0800, Huang Shijie wrote:
 > 
-> Of course it's always easier to define couple of DT properties that would
-> cover part of functionality of some specific device. But then such 
-> properties should be prefixed with vendor name AFAIU, since they are
-> not approved as common ones and useful for wider set of devices.
+> > yes. The driver uses the commands to find the _right_ LUT index, and
+> > uses the LUT index to
+> > trigger the controller.
+> 
+> What is a LUT index?
+we can setup 16 valid instruction sequences at most,
+for example:
+     LUT0 - LUT3: for read status of NOR
+     LUT4 - LUT7: for write enable of NOR
+     ...........
 
-This is a policy that changed many times already...
+The LUT index is 0 for read-status;
+the LUT index is 1 for write-enable.
 
-Anyway, I think I've got an idea how to render the problem custom panel
-properties invalid. If so, I'll send another version of the patch.
-
->  From the device tree perspective CDF is just a collection of (display
-> related) devices and a complete set of DT properties will be needed to
-> describe them. Certainly some share of device-specific properties should
-> be expected. Links between (sub)devices can be already described in DT by
-> the binding documented in video-interfaces.txt.
-
-Whether to use the v4l scheme or not still seems to be a bone of
-contention between the video and the DRM/KMS folk, so I wouldn't draw
-any conclusions yet.
-
-Pawe?
+thanks
+Huang Shijie
