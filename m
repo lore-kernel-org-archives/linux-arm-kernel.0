@@ -1,73 +1,22 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 13 Sep 2013 10:02:07 +0200
-Subject: [PATCH 3/8 v2] ARM: iop32x: read N2100 power key using gpiolib
-Message-ID: <1379059327-12613-1-git-send-email-linus.walleij@linaro.org>
+Date: Fri, 13 Sep 2013 10:15:58 +0200
+Subject: [PATCH 0/8] IOP GPIO refactoring
+In-Reply-To: <20130910141434.GD3379@blackmetal.musicnaut.iki.fi>
+References: <1378741198-12847-1-git-send-email-linus.walleij@linaro.org>
+ <20130910141434.GD3379@blackmetal.musicnaut.iki.fi>
+Message-ID: <CACRpkdYbHTF0XGu-wLAeaw-nnSTEPh-ej9iizMbojmB8gzvb=Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Refrain from using the custom gpio_line_get() to read the power
-key on the N2100, use the gpiolib function gpio_get() instead.
-Also request the line in the GPIOs initicall, and move the poll
-timer setup to that inicall so the gpio chip is available before
-we request this GPIO and start to poll it.
+On Tue, Sep 10, 2013 at 4:14 PM, Aaro Koskinen <aaro.koskinen@iki.fi> wrote:
 
-Cc: Aaro Koskinen <aaro.koskinen@iki.fi>
-Cc: Lennert Buytenhek <kernel@wantstofly.org>
-Cc: Dan Williams <dan.j.williams@intel.com>
-Cc: Mikael Pettersson <mikpe@it.uu.se>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
-ChangeLog v1->v2:
-- Move the setup and poll init into the new GPIO initialization
-  function to avoid probe order problems.
----
- arch/arm/mach-iop32x/n2100.c | 20 ++++++++++++++------
- 1 file changed, 14 insertions(+), 6 deletions(-)
+> With patch 6 it starts to crash on first gpio_get_value(), I guess
+> because gpio-iop platform device is not registered on N2100...?
 
-diff --git a/arch/arm/mach-iop32x/n2100.c b/arch/arm/mach-iop32x/n2100.c
-index 2dba955..dc5addf 100644
---- a/arch/arm/mach-iop32x/n2100.c
-+++ b/arch/arm/mach-iop32x/n2100.c
-@@ -306,7 +306,7 @@ static struct timer_list power_button_poll_timer;
- 
- static void power_button_poll(unsigned long dummy)
- {
--	if (gpio_line_get(N2100_POWER_BUTTON) == 0) {
-+	if (gpio_get_value(N2100_POWER_BUTTON) == 0) {
- 		ctrl_alt_del();
- 		return;
- 	}
-@@ -322,6 +322,19 @@ static int __init n2100_request_gpios(void)
- 	ret = gpio_request(N2100_HARDWARE_RESET, "reset");
- 	if (ret)
- 		pr_err("could not request reset GPIO\n");
-+	ret = gpio_request(N2100_POWER_BUTTON, "power");
-+	if (ret)
-+		pr_err("could not request power GPIO\n");
-+	else {
-+		ret = gpio_direction_input(N2100_POWER_BUTTON);
-+		if (ret)
-+			pr_err("could not set power GPIO as input\n");
-+	}
-+	/* Set up power button poll timer */
-+	init_timer(&power_button_poll_timer);
-+	power_button_poll_timer.function = power_button_poll;
-+	power_button_poll_timer.expires = jiffies + (HZ / 10);
-+	add_timer(&power_button_poll_timer);
- 	return 0;
- }
- device_initcall(n2100_request_gpios);
-@@ -338,11 +351,6 @@ static void __init n2100_init_machine(void)
- 		ARRAY_SIZE(n2100_i2c_devices));
- 
- 	pm_power_off = n2100_power_off;
--
--	init_timer(&power_button_poll_timer);
--	power_button_poll_timer.function = power_button_poll;
--	power_button_poll_timer.expires = jiffies + (HZ / 10);
--	add_timer(&power_button_poll_timer);
- }
- 
- MACHINE_START(N2100, "Thecus N2100")
--- 
-1.8.3.1
+I think I've fixed this with the v2 versions of patches 1-3, you can
+pull in and test the entire stack on Torvalds HEAD from here:
+
+git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-gpio.git iop-cleanup
+
+Yours,
+Linus Walleij
