@@ -1,9 +1,9 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 13 Sep 2013 18:30:09 +0530
-Subject: [PATCH 063/228] cpufreq: dbx500: Use generic cpufreq routines
+Date: Fri, 13 Sep 2013 18:30:10 +0530
+Subject: [PATCH 064/228] cpufreq: e_powersaver: Use generic cpufreq routines
 In-Reply-To: <cover.1379063063.git.viresh.kumar@linaro.org>
 References: <cover.1379063063.git.viresh.kumar@linaro.org>
-Message-ID: <a3970f9a04fd061a7ad476f983e10a8768c89fd0.1379063063.git.viresh.kumar@linaro.org>
+Message-ID: <398abf18b914085df814f99fc6d2dabbce0bf890.1379063063.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,47 +13,49 @@ by cpufreq drivers then.
 
 This patch uses these generic routines for this driver.
 
-Cc: Linus Walleij <linus.walleij@linaro.org>
 Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- drivers/cpufreq/dbx500-cpufreq.c | 14 ++------------
- 1 file changed, 2 insertions(+), 12 deletions(-)
+ drivers/cpufreq/e_powersaver.c | 15 ++-------------
+ 1 file changed, 2 insertions(+), 13 deletions(-)
 
-diff --git a/drivers/cpufreq/dbx500-cpufreq.c b/drivers/cpufreq/dbx500-cpufreq.c
-index 8a484e9..2d70637 100644
---- a/drivers/cpufreq/dbx500-cpufreq.c
-+++ b/drivers/cpufreq/dbx500-cpufreq.c
-@@ -19,16 +19,6 @@
- static struct cpufreq_frequency_table *freq_table;
- static struct clk *armss_clk;
+diff --git a/drivers/cpufreq/e_powersaver.c b/drivers/cpufreq/e_powersaver.c
+index c1b7c99..a8cbbd0 100644
+--- a/drivers/cpufreq/e_powersaver.c
++++ b/drivers/cpufreq/e_powersaver.c
+@@ -198,12 +198,6 @@ static int eps_target(struct cpufreq_policy *policy,
+ 	return ret;
+ }
  
--static struct freq_attr *dbx500_cpufreq_attr[] = {
+-static int eps_verify(struct cpufreq_policy *policy)
+-{
+-	return cpufreq_frequency_table_verify(policy,
+-			&eps_cpu[policy->cpu]->freq_table[0]);
+-}
+-
+ static int eps_cpu_init(struct cpufreq_policy *policy)
+ {
+ 	unsigned int i;
+@@ -423,19 +417,14 @@ static int eps_cpu_exit(struct cpufreq_policy *policy)
+ 	return 0;
+ }
+ 
+-static struct freq_attr *eps_attr[] = {
 -	&cpufreq_freq_attr_scaling_available_freqs,
 -	NULL,
 -};
 -
--static int dbx500_cpufreq_verify_speed(struct cpufreq_policy *policy)
--{
--	return cpufreq_frequency_table_verify(policy, freq_table);
--}
--
- static int dbx500_cpufreq_target(struct cpufreq_policy *policy,
- 				unsigned int target_freq,
- 				unsigned int relation)
-@@ -113,12 +103,12 @@ static int dbx500_cpufreq_init(struct cpufreq_policy *policy)
- 
- static struct cpufreq_driver dbx500_cpufreq_driver = {
- 	.flags  = CPUFREQ_STICKY | CPUFREQ_CONST_LOOPS,
--	.verify = dbx500_cpufreq_verify_speed,
-+	.verify = cpufreq_generic_frequency_table_verify,
- 	.target = dbx500_cpufreq_target,
- 	.get    = dbx500_cpufreq_getspeed,
- 	.init   = dbx500_cpufreq_init,
- 	.name   = "DBX500",
--	.attr   = dbx500_cpufreq_attr,
-+	.attr   = cpufreq_generic_attr,
+ static struct cpufreq_driver eps_driver = {
+-	.verify		= eps_verify,
++	.verify		= cpufreq_generic_frequency_table_verify,
+ 	.target		= eps_target,
+ 	.init		= eps_cpu_init,
+ 	.exit		= eps_cpu_exit,
+ 	.get		= eps_get,
+ 	.name		= "e_powersaver",
+-	.attr		= eps_attr,
++	.attr		= cpufreq_generic_attr,
  };
  
- static int dbx500_cpufreq_probe(struct platform_device *pdev)
+ 
 -- 
 1.7.12.rc2.18.g61b472e
