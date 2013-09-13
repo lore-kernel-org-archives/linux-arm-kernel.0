@@ -1,9 +1,9 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 13 Sep 2013 18:30:19 +0530
-Subject: [PATCH 073/228] cpufreq: omap: Use generic cpufreq routines
+Date: Fri, 13 Sep 2013 18:30:17 +0530
+Subject: [PATCH 071/228] cpufreq: loongson2: Use generic cpufreq routines
 In-Reply-To: <cover.1379063063.git.viresh.kumar@linaro.org>
 References: <cover.1379063063.git.viresh.kumar@linaro.org>
-Message-ID: <783c4e4fe9ce482205ad3ba1152f977c695ac01c.1379063063.git.viresh.kumar@linaro.org>
+Message-ID: <55bbc7474119455d56c523b25802984b9dab2b19.1379063063.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,52 +13,50 @@ by cpufreq drivers then.
 
 This patch uses these generic routines for this driver.
 
-Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Cc: John Crispin <blogic@openwrt.org>
 Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- drivers/cpufreq/omap-cpufreq.c | 16 ++--------------
- 1 file changed, 2 insertions(+), 14 deletions(-)
+ drivers/cpufreq/loongson2_cpufreq.c | 15 ++-------------
+ 1 file changed, 2 insertions(+), 13 deletions(-)
 
-diff --git a/drivers/cpufreq/omap-cpufreq.c b/drivers/cpufreq/omap-cpufreq.c
-index 091f233..48020b5 100644
---- a/drivers/cpufreq/omap-cpufreq.c
-+++ b/drivers/cpufreq/omap-cpufreq.c
-@@ -40,13 +40,6 @@ static struct clk *mpu_clk;
- static struct device *mpu_dev;
- static struct regulator *mpu_reg;
+diff --git a/drivers/cpufreq/loongson2_cpufreq.c b/drivers/cpufreq/loongson2_cpufreq.c
+index cec4e72..ed7fbe2 100644
+--- a/drivers/cpufreq/loongson2_cpufreq.c
++++ b/drivers/cpufreq/loongson2_cpufreq.c
+@@ -137,12 +137,6 @@ static int loongson2_cpufreq_cpu_init(struct cpufreq_policy *policy)
+ 					    &loongson2_clockmod_table[0]);
+ }
  
--static int omap_verify_speed(struct cpufreq_policy *policy)
+-static int loongson2_cpufreq_verify(struct cpufreq_policy *policy)
 -{
--	if (!freq_table)
--		return -EINVAL;
--	return cpufreq_frequency_table_verify(policy, freq_table);
+-	return cpufreq_frequency_table_verify(policy,
+-					      &loongson2_clockmod_table[0]);
 -}
 -
- static unsigned int omap_getspeed(unsigned int cpu)
+ static int loongson2_cpufreq_exit(struct cpufreq_policy *policy)
  {
- 	unsigned long rate;
-@@ -227,20 +220,15 @@ static int omap_cpu_exit(struct cpufreq_policy *policy)
+ 	cpufreq_frequency_table_put_attr(policy->cpu);
+@@ -150,19 +144,14 @@ static int loongson2_cpufreq_exit(struct cpufreq_policy *policy)
  	return 0;
  }
  
--static struct freq_attr *omap_cpufreq_attr[] = {
+-static struct freq_attr *loongson2_table_attr[] = {
 -	&cpufreq_freq_attr_scaling_available_freqs,
 -	NULL,
 -};
 -
- static struct cpufreq_driver omap_driver = {
- 	.flags		= CPUFREQ_STICKY,
--	.verify		= omap_verify_speed,
-+	.verify		= cpufreq_generic_frequency_table_verify,
- 	.target		= omap_target,
- 	.get		= omap_getspeed,
- 	.init		= omap_cpu_init,
- 	.exit		= omap_cpu_exit,
- 	.name		= "omap",
--	.attr		= omap_cpufreq_attr,
-+	.attr		= cpufreq_generic_attr,
+ static struct cpufreq_driver loongson2_cpufreq_driver = {
+ 	.name = "loongson2",
+ 	.init = loongson2_cpufreq_cpu_init,
+-	.verify = loongson2_cpufreq_verify,
++	.verify = cpufreq_generic_frequency_table_verify,
+ 	.target = loongson2_cpufreq_target,
+ 	.get = loongson2_cpufreq_get,
+ 	.exit = loongson2_cpufreq_exit,
+-	.attr = loongson2_table_attr,
++	.attr = cpufreq_generic_attr,
  };
  
- static int omap_cpufreq_probe(struct platform_device *pdev)
+ static struct platform_device_id platform_device_ids[] = {
 -- 
 1.7.12.rc2.18.g61b472e
