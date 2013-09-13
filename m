@@ -1,212 +1,109 @@
-From: manjunath.goudar@linaro.org (Manjunath Goudar)
-Date: Fri, 13 Sep 2013 18:03:27 +0530
-Subject: [PATCH V2] USB: EHCI: make ehci-w90X900 a separate driver
-In-Reply-To: <1372347109-5563-1-git-send-email-manjunath.goudar@linaro.org>
-References: <1372347109-5563-1-git-send-email-manjunath.goudar@linaro.org>
-Message-ID: <1379075608-5515-1-git-send-email-manjunath.goudar@linaro.org>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 13 Sep 2013 20:42:31 +0800
+Subject: [PATCH v4 1/3] ARM: imx: Add LVDS general-purpose clocks to i.MX6Q
+In-Reply-To: <1379065222-7275-2-git-send-email-xobs@kosagi.com>
+References: <1379065222-7275-1-git-send-email-xobs@kosagi.com>
+ <1379065222-7275-2-git-send-email-xobs@kosagi.com>
+Message-ID: <20130913124229.GC31147@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Separate the W90X900(W90P910) on-chip host controller driver from
-ehci-hcd host code so that it can be built as a separate driver module.
-This work is part of enabling multi-platform kernels on ARM;
-however, note that other changes are still needed before W90X900(W90P910)
-can be booted with a multi-platform kernel
+On Fri, Sep 13, 2013 at 09:40:20AM +0000, Sean Cross wrote:
+> The i.MX6 has two general-purpose LVDS clocks that can be driven
+> from a variety of sources.  This patch adds a mux and a gate for
+> both of these clocks.
+> 
+> Signed-off-by: Sean Cross <xobs@kosagi.com>
+> ---
+>  .../devicetree/bindings/clock/imx6q-clock.txt      |    4 ++++
+>  arch/arm/mach-imx/clk-imx6q.c                      |   21 +++++++++++++++++++-
+>  2 files changed, 24 insertions(+), 1 deletion(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/clock/imx6q-clock.txt b/Documentation/devicetree/bindings/clock/imx6q-clock.txt
+> index 5a90a72..35e82c7 100644
+> --- a/Documentation/devicetree/bindings/clock/imx6q-clock.txt
+> +++ b/Documentation/devicetree/bindings/clock/imx6q-clock.txt
+> @@ -215,6 +215,10 @@ clocks and IDs.
+>  	cko2      		200
+>  	cko      		201
+>  	vdoa      		202
+> +	lvds1_sel		203
+> +	lvds2_sel		204
+> +	lvds1_gate		205
+> +	lvds2_gate		206
+>  
+>  Examples:
+>  
+> diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
+> index 9181a24..679d49a 100644
+> --- a/arch/arm/mach-imx/clk-imx6q.c
+> +++ b/arch/arm/mach-imx/clk-imx6q.c
+> @@ -217,6 +217,16 @@ static const char *cko2_sels[] = {
+>  	"uart_serial", "spdif", "asrc", "hsi_tx",
+>  };
+>  static const char *cko_sels[] = { "cko1", "cko2", };
+> +static const char *lvds1_sels[] = {
+> +	"dummy", "dummy", "dummy", "dummy", "dummy", "dummy",
+> +	"pll4_audio", "pll5_video", "pll8_mlb", "enet_ref",
+> +	"pcie_ref", "sata_ref",
+> +};
+> +static const char *lvds2_sels[] = {
+> +	"dummy", "dummy", "dummy", "dummy", "dummy", "dummy",
+> +	"pll4_audio", "pll5_video", "pll8_mlb", "enet_ref",
+> +	"pcie_ref", "sata_ref",
+> +};
 
-and an ehci driver that only works on one of them.
+Since lvds1 and lvds2 share the same clock selection, we can define just
+one lvds_sels[] to save one string array.
 
-With the infrastructure added by Alan Stern in patch 3e0232039
-"USB: EHCI: prepare to make ehci-hcd a library module", we can
-avoid this problem by turning a bus glue into a separate
-module, as we do here for the w90X900 bus glue.
+>  
+>  enum mx6q_clks {
+>  	dummy, ckil, ckih, osc, pll2_pfd0_352m, pll2_pfd1_594m, pll2_pfd2_396m,
+> @@ -251,7 +261,8 @@ enum mx6q_clks {
+>  	ssi2_ipg, ssi3_ipg, rom, usbphy1, usbphy2, ldb_di0_div_3_5, ldb_di1_div_3_5,
+>  	sata_ref, sata_ref_100m, pcie_ref, pcie_ref_125m, enet_ref, usbphy1_gate,
+>  	usbphy2_gate, pll4_post_div, pll5_post_div, pll5_video_div, eim_slow,
+> -	spdif, cko2_sel, cko2_podf, cko2, cko, vdoa, clk_max
+> +	spdif, cko2_sel, cko2_podf, cko2, cko, vdoa,
+> +	lvds1_sel, lvds2_sel, lvds1_gate, lvds2_gate, clk_max
+>  };
+>  
+>  static struct clk *clk[clk_max];
+> @@ -342,6 +353,12 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
+>  			base + 0xe0, 0, 2, 0, clk_enet_ref_table,
+>  			&imx_ccm_lock);
+>  
+> +	clk[lvds1_sel] = imx_clk_mux("lvds1_sel", base + 0x160, 0, 5, lvds1_sels,         ARRAY_SIZE(lvds1_sels));
+> +	clk[lvds2_sel] = imx_clk_mux("lvds2_sel", base + 0x160, 5, 5, lvds2_sels,         ARRAY_SIZE(lvds2_sels));
 
-Signed-off-by: Manjunath Goudar <manjunath.goudar@linaro.org>
-Signed-off-by: Deepak Saxena <dsaxena@linaro.org>
-Acked-by: Arnd Bergmann <arnd@arndb.de>
-Acked-by: Wan ZongShun <mcuos.com@gmail.com>
-Acked-by: Alan Stern <stern@rowland.harvard.edu>
-Cc: Greg KH <greg@kroah.com>
-Cc: linux-usb at vger.kernel.org
-Cc: linux-kernel at vger.kernel.org
+The indentation before ARRAY_SIZE() does not make sense here.  Using one
+space might fit better.
 
-V1->V2:
--Arranged  #include's in alphabetical order.
--Replaced "w90p910" by "w90x900" because it is supports
- all series of w90x900.
----
- drivers/usb/host/Kconfig        |    2 +-
- drivers/usb/host/Makefile       |    1 +
- drivers/usb/host/ehci-hcd.c     |    5 ---
- drivers/usb/host/ehci-w90x900.c |   89 ++++++++++++++++-----------------------
- 4 files changed, 39 insertions(+), 58 deletions(-)
+> +
+> +	clk[lvds1_gate] = imx_clk_gate("lvds1_gate", "dummy", base + 0x160, 10);
+> +	clk[lvds2_gate] = imx_clk_gate("lvds2_gate", "dummy", base + 0x160, 11);
+> +
 
-diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
-index 8ea1afc..4e298a4 100644
---- a/drivers/usb/host/Kconfig
-+++ b/drivers/usb/host/Kconfig
-@@ -224,7 +224,7 @@ config USB_EHCI_MV
- 	  on-chip EHCI USB controller" for those.
- 
- config USB_W90X900_EHCI
--	bool "W90X900(W90P910) EHCI support"
-+	tristate "W90X900(W90P910) EHCI support"
- 	depends on ARCH_W90X900
- 	---help---
- 		Enables support for the W90X900 USB controller
-diff --git a/drivers/usb/host/Makefile b/drivers/usb/host/Makefile
-index 8fcb8da..0b9fdee 100644
---- a/drivers/usb/host/Makefile
-+++ b/drivers/usb/host/Makefile
-@@ -38,6 +38,7 @@ obj-$(CONFIG_USB_EHCI_S5P)	+= ehci-s5p.o
- obj-$(CONFIG_USB_EHCI_HCD_AT91) += ehci-atmel.o
- obj-$(CONFIG_USB_EHCI_MSM)	+= ehci-msm.o
- obj-$(CONFIG_USB_EHCI_TEGRA)	+= ehci-tegra.o
-+obj-$(CONFIG_USB_W90X900_EHCI)	+= ehci-w90x900.o
- 
- obj-$(CONFIG_USB_OXU210HP_HCD)	+= oxu210hp-hcd.o
- obj-$(CONFIG_USB_ISP116X_HCD)	+= isp116x-hcd.o
-diff --git a/drivers/usb/host/ehci-hcd.c b/drivers/usb/host/ehci-hcd.c
-index 5d6022f..3e3ca83 100644
---- a/drivers/usb/host/ehci-hcd.c
-+++ b/drivers/usb/host/ehci-hcd.c
-@@ -1238,11 +1238,6 @@ MODULE_LICENSE ("GPL");
- #define XILINX_OF_PLATFORM_DRIVER	ehci_hcd_xilinx_of_driver
- #endif
- 
--#ifdef CONFIG_USB_W90X900_EHCI
--#include "ehci-w90x900.c"
--#define	PLATFORM_DRIVER		ehci_hcd_w90x900_driver
--#endif
--
- #ifdef CONFIG_USB_OCTEON_EHCI
- #include "ehci-octeon.c"
- #define PLATFORM_DRIVER		ehci_octeon_driver
-diff --git a/drivers/usb/host/ehci-w90x900.c b/drivers/usb/host/ehci-w90x900.c
-index 1c370df..cdad843 100644
---- a/drivers/usb/host/ehci-w90x900.c
-+++ b/drivers/usb/host/ehci-w90x900.c
-@@ -11,13 +11,28 @@
-  *
-  */
- 
-+#include <linux/dma-mapping.h>
-+#include <linux/io.h>
-+#include <linux/kernel.h>
-+#include <linux/module.h>
-+#include <linux/of.h>
- #include <linux/platform_device.h>
-+#include <linux/usb.h>
-+#include <linux/usb/hcd.h>
-+
-+#include "ehci.h"
- 
- /* enable phy0 and phy1 for w90p910 */
- #define	ENPHY		(0x01<<8)
- #define PHY0_CTR	(0xA4)
- #define PHY1_CTR	(0xA8)
- 
-+#define DRIVER_DESC "EHCI w90x900 driver"
-+
-+static const char hcd_name[] = "ehci-w90x900 ";
-+
-+static struct hc_driver __read_mostly ehci_w90x900_hc_driver;
-+
- static int usb_w90x900_probe(const struct hc_driver *driver,
- 		      struct platform_device *pdev)
- {
-@@ -90,8 +105,8 @@ err1:
- 	return retval;
- }
- 
--static
--void usb_w90x900_remove(struct usb_hcd *hcd, struct platform_device *pdev)
-+static void usb_w90x900_remove(struct usb_hcd *hcd,
-+			struct platform_device *pdev)
- {
- 	usb_remove_hcd(hcd);
- 	iounmap(hcd->regs);
-@@ -99,54 +114,6 @@ void usb_w90x900_remove(struct usb_hcd *hcd, struct platform_device *pdev)
- 	usb_put_hcd(hcd);
- }
- 
--static const struct hc_driver ehci_w90x900_hc_driver = {
--	.description = hcd_name,
--	.product_desc = "Nuvoton w90x900 EHCI Host Controller",
--	.hcd_priv_size = sizeof(struct ehci_hcd),
--
--	/*
--	 * generic hardware linkage
--	 */
--	.irq = ehci_irq,
--	.flags = HCD_USB2|HCD_MEMORY|HCD_BH,
--
--	/*
--	 * basic lifecycle operations
--	 */
--	.reset = ehci_setup,
--	.start = ehci_run,
--
--	.stop = ehci_stop,
--	.shutdown = ehci_shutdown,
--
--	/*
--	 * managing i/o requests and associated device resources
--	 */
--	.urb_enqueue = ehci_urb_enqueue,
--	.urb_dequeue = ehci_urb_dequeue,
--	.endpoint_disable = ehci_endpoint_disable,
--	.endpoint_reset = ehci_endpoint_reset,
--
--	/*
--	 * scheduling support
--	 */
--	.get_frame_number = ehci_get_frame,
--
--	/*
--	 * root hub support
--	 */
--	.hub_status_data = ehci_hub_status_data,
--	.hub_control = ehci_hub_control,
--#ifdef	CONFIG_PM
--	.bus_suspend = ehci_bus_suspend,
--	.bus_resume = ehci_bus_resume,
--#endif
--	.relinquish_port	= ehci_relinquish_port,
--	.port_handed_over	= ehci_port_handed_over,
--
--	.clear_tt_buffer_complete = ehci_clear_tt_buffer_complete,
--};
--
- static int ehci_w90x900_probe(struct platform_device *pdev)
- {
- 	if (usb_disabled())
-@@ -173,7 +140,25 @@ static struct platform_driver ehci_hcd_w90x900_driver = {
- 	},
- };
- 
-+static int __init ehci_w90X900_init(void)
-+{
-+	if (usb_disabled())
-+		return -ENODEV;
-+
-+	pr_info("%s: " DRIVER_DESC "\n", hcd_name);
-+
-+	ehci_init_driver(&ehci_w90x900_hc_driver, NULL);
-+	return platform_driver_register(&ehci_hcd_w90x900_driver);
-+}
-+module_init(ehci_w90X900_init);
-+
-+static void __exit ehci_w90X900_cleanup(void)
-+{
-+	platform_driver_unregister(&ehci_hcd_w90x900_driver);
-+}
-+module_exit(ehci_w90X900_cleanup);
-+
-+MODULE_DESCRIPTION(DRIVER_DESC);
- MODULE_AUTHOR("Wan ZongShun <mcuos.com@gmail.com>");
--MODULE_DESCRIPTION("w90p910 usb ehci driver!");
--MODULE_LICENSE("GPL");
- MODULE_ALIAS("platform:w90p910-ehci");
-+MODULE_LICENSE("GPL v2");
--- 
-1.7.9.5
+It deserves some document, since they are not real gates.
+
+>  	/*                                name              parent_name        reg       idx */
+>  	clk[pll2_pfd0_352m] = imx_clk_pfd("pll2_pfd0_352m", "pll2_bus",     base + 0x100, 0);
+>  	clk[pll2_pfd1_594m] = imx_clk_pfd("pll2_pfd1_594m", "pll2_bus",     base + 0x100, 1);
+> @@ -569,6 +586,8 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
+>  	clk_register_clkdev(clk[cko1_sel], "cko1_sel", NULL);
+>  	clk_register_clkdev(clk[ahb], "ahb", NULL);
+>  	clk_register_clkdev(clk[cko1], "cko1", NULL);
+> +	clk_register_clkdev(clk[lvds1_gate], "lvds1_gate", NULL);
+> +	clk_register_clkdev(clk[lvds2_gate], "lvds2_gate", NULL);
+
+If the clocks are defined in device tree, we can look up them from there
+to save these clkdev registrations.
+
+Shawn
+
+>  	clk_register_clkdev(clk[arm], NULL, "cpu0");
+>  	clk_register_clkdev(clk[pll4_post_div], "pll4_post_div", NULL);
+>  	clk_register_clkdev(clk[pll4_audio], "pll4_audio", NULL);
+> -- 
+> 1.7.9.5
+> 
