@@ -1,120 +1,80 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Fri, 13 Sep 2013 11:28:31 +0200
-Subject: [PATCH] ARM: EXYNOS: remove CONFIG_MACH_EXYNOS[4, 5]_DT config options
-Message-ID: <3809234.0NkWBIjRC9@amdc1032>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 13 Sep 2013 10:30:49 +0100
+Subject: [PATCH 3/4] Add physical count arch timer support for clocksource
+ in ARMv7.
+In-Reply-To: <CAK3cCBzr8_LTYarZDgPYZY7_-5Qco_Qw+ACi=c2uOrn7MqwkBg@mail.gmail.com>
+References: <1378968687-8200-1-git-send-email-cinifr@gmail.com>
+ <1378968687-8200-4-git-send-email-cinifr@gmail.com>
+ <20130912112452.GA22013@e106331-lin.cambridge.arm.com>
+ <CAK3cCBwu4somtfc9J1ZDVcC-iYD1qDJwSWzWeOomTqY9tQA2kg@mail.gmail.com>
+ <5231EE43.5090900@arm.com>
+ <CAK3cCBzr8_LTYarZDgPYZY7_-5Qco_Qw+ACi=c2uOrn7MqwkBg@mail.gmail.com>
+Message-ID: <5232DB49.4050701@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-EXYNOS is now Device Tree (DT) only platform so it makes no sense to have
-config options responsible for enabling platform specific DT support.
+On 13/09/13 09:49, cinifr wrote:
+> On 13 September 2013 00:39, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>> On 12/09/13 17:07, cinifr wrote:
+>>>> This cannot be a compile-time option as above in a multiplatform build.
+>>>> Other paltforms (e.g. KVM guests) *must* use the virtual counters to get
+>>>> any semblance of a consistent view of time.
+>>> Yes I accept compile-time option is not perfect  in my pre email,
+>>> But,Why Ohter paltforms *must* use the virtual counters? I think KVM
+>>> should not limit how to use arch timer in its guest OS. Of cause, if
+>>> KVM guest use vct can be more efficiency then that use pct. but KVM
+>>> should and must support guest OS to access pct.
+>>
+>> The virtual counter is there for a good reason: it allows a virtual
+>> machine to:
+>> - see its time starting at zero
+>> - be migrated to another host without seeing time shifting one way or
+>> another.
+>>
+>> So using the physical counter in a VM is a recipe for disaster if you're
+>> doing any kind of time tracking. The counter being used for
+>> sched_clock(), we cannot afford to see it being shifted one way or another.
+> I accept that virtual count is better in VM than physical counter
+> because hypversion can modify VM timer by set   CNTVOFF. But I think
+> hypversior should support that VM should can access physical counter,
+> When VM use physical count.  hypversior could trap accessing physical
+> count from guest OS, and return a value that guest OS want liking
+> hypervisor set CNTVOFF  for virtual counter. On this way, VM could too
+> see its timer at zero and VM could  too be migrated to another host
+> without seeing time shifting.
 
-Moreover the kernel image won't even link if neither CONFIG_MACH_EXYNOS4_DT
-nor CONFIG_MACH_EXYNOS5_DT config option is enabled (linker fails with "no
-machine record defined" error).
+I urge you to read the ARM ARM, and specifically the section dedicated
+to trapping access to CP15 operations. If you do, you'll quickly notice
+that you *cannot* trap accesses to the timer subsystem.
 
-Remove CONFIG_MACH_EXYNOS[4,5]_DT config options and just use the standard
-CONFIG_ARCH_EXYNOS[4,5] ones instead.
+All you can do is disable access to the physical timer/counter,
+resulting in an UNDEF in the *guest*.
 
-Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
----
- arch/arm/configs/exynos_defconfig |  1 -
- arch/arm/mach-exynos/Kconfig      | 38 +++++++++-----------------------------
- arch/arm/mach-exynos/Makefile     |  4 ++--
- 3 files changed, 11 insertions(+), 32 deletions(-)
+Additionally, please realise the overhead of trapping is enormous, and
+that we do try very hard to minimise it. Why do you think we went out of
+our way to ensure that host and guest would use different timers, always?
 
-diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
-index ad7dfbb..5181d0d 100644
---- a/arch/arm/configs/exynos_defconfig
-+++ b/arch/arm/configs/exynos_defconfig
-@@ -11,7 +11,6 @@ CONFIG_ARCH_EXYNOS=y
- CONFIG_S3C_LOWLEVEL_UART_PORT=3
- CONFIG_S3C24XX_PWM=y
- CONFIG_ARCH_EXYNOS5=y
--CONFIG_MACH_EXYNOS4_DT=y
- CONFIG_SMP=y
- CONFIG_NR_CPUS=2
- CONFIG_PREEMPT=y
-diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
-index cb36807..b810f2f 100644
---- a/arch/arm/mach-exynos/Kconfig
-+++ b/arch/arm/mach-exynos/Kconfig
-@@ -14,19 +14,28 @@ menu "SAMSUNG EXYNOS SoCs Support"
- config ARCH_EXYNOS4
- 	bool "SAMSUNG EXYNOS4"
- 	default y
-+	select ARM_AMBA
-+	select CLKSRC_OF
-+	select CLKSRC_SAMSUNG_PWM if CPU_EXYNOS4210
-+	select CPU_EXYNOS4210
- 	select GIC_NON_BANKED
-+	select KEYBOARD_SAMSUNG if INPUT_KEYBOARD
- 	select HAVE_ARM_SCU if SMP
- 	select HAVE_SMP
- 	select MIGHT_HAVE_CACHE_L2X0
- 	select PINCTRL
-+	select S5P_DEV_MFC
- 	help
- 	  Samsung EXYNOS4 SoCs based systems
- 
- config ARCH_EXYNOS5
- 	bool "SAMSUNG EXYNOS5"
-+	select ARM_AMBA
-+	select CLKSRC_OF
- 	select HAVE_ARM_SCU if SMP
- 	select HAVE_SMP
- 	select PINCTRL
-+	select USB_ARCH_HAS_XHCI
- 	help
- 	  Samsung EXYNOS5 (Cortex-A15) SoC based systems
- 
-@@ -110,35 +119,6 @@ config SOC_EXYNOS5440
- 	help
- 	  Enable EXYNOS5440 SoC support
- 
--comment "Flattened Device Tree based board for EXYNOS SoCs"
--
--config MACH_EXYNOS4_DT
--	bool "Samsung Exynos4 Machine using device tree"
--	default y
--	depends on ARCH_EXYNOS4
--	select ARM_AMBA
--	select CLKSRC_OF
--	select CLKSRC_SAMSUNG_PWM if CPU_EXYNOS4210
--	select CPU_EXYNOS4210
--	select KEYBOARD_SAMSUNG if INPUT_KEYBOARD
--	select S5P_DEV_MFC
--	help
--	  Machine support for Samsung Exynos4 machine with device tree enabled.
--	  Select this if a fdt blob is available for the Exynos4 SoC based board.
--	  Note: This is under development and not all peripherals can be supported
--	  with this machine file.
--
--config MACH_EXYNOS5_DT
--	bool "SAMSUNG EXYNOS5 Machine using device tree"
--	default y
--	depends on ARCH_EXYNOS5
--	select ARM_AMBA
--	select CLKSRC_OF
--	select USB_ARCH_HAS_XHCI
--	help
--	  Machine support for Samsung EXYNOS5 machine with device tree enabled.
--	  Select this if a fdt blob is available for the EXYNOS5 SoC based board.
--
- endmenu
- 
- endif
-diff --git a/arch/arm/mach-exynos/Makefile b/arch/arm/mach-exynos/Makefile
-index 5369615..8930b66 100644
---- a/arch/arm/mach-exynos/Makefile
-+++ b/arch/arm/mach-exynos/Makefile
-@@ -32,5 +32,5 @@ AFLAGS_exynos-smc.o		:=-Wa,-march=armv7-a$(plus_sec)
- 
- # machine support
- 
--obj-$(CONFIG_MACH_EXYNOS4_DT)		+= mach-exynos4-dt.o
--obj-$(CONFIG_MACH_EXYNOS5_DT)		+= mach-exynos5-dt.o
-+obj-$(CONFIG_ARCH_EXYNOS4)	+= mach-exynos4-dt.o
-+obj-$(CONFIG_ARCH_EXYNOS5)	+= mach-exynos5-dt.o
+>> If you have issues with the use of the virtual counter, I suggest you
+>> fix your firmware to have a consistent CNTVOFF across CPUs. And/or even
+>> better, boot your kernel in HYP mode, as it will take care of setting
+>> CNTVOFF to zero.
+>>
+> I am   wondering   what is the principle between kernel and bootload?
+> What should be done in bootloader and what should be done in kernel?
+> As you said, If kernel boot from hyp,  Kernel can set  CNTVOFF to zero
+> directly, does we add the code to set CNTVOFF in kernel?  But, if
+> kernel boot from PL1 NS=0,  Does kernel  need to switch hyp mode to
+> set  CNTVOFF and return  PL1 NS=0 mode? Or,kernel dont care it because
+> kernel   believe bootloader have set CNTVOFF  before?
+
+In an ideal world, the bootloader should set CNTVOFF to zero. The fact
+that the kernel does it too when booted in HYP mode is to preserve
+itself from from broken bootloaders.
+
+CNTVOFF can only be setup from either HYP or Secure Monitor mode with
+SCR.NS == 1, so if you run your kernel in secure mode, it is always best
+to do it in the bootloader.
+
+	M.
 -- 
-1.8.2.3
+Jazz is not dead. It just smells funny...
