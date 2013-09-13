@@ -1,123 +1,52 @@
-From: fweisbec@gmail.com (Frederic Weisbecker)
-Date: Fri, 13 Sep 2013 19:03:34 +0200
-Subject: [PATCH] arm: Fix build error with context tracking calls
-In-Reply-To: <87y574g1fi.fsf@linaro.org>
-References: <20130908090206.GK25647@n2100.arm.linux.org.uk>
- <522CB0DE.2010102@roeck-us.net>
- <20130909105115.GL25647@n2100.arm.linux.org.uk>
- <522DB86A.8010207@roeck-us.net>
- <alpine.LFD.2.03.1309091023440.20709@syhkavp.arg>
- <20130909160348.GB18975@roeck-us.net>
- <20130909203141.GM25647@n2100.arm.linux.org.uk>
- <20130909210203.GC28416@roeck-us.net>
- <alpine.LFD.2.03.1309091714420.20709@syhkavp.arg>
- <87y574g1fi.fsf@linaro.org>
-Message-ID: <20130913170331.GA8453@somewhere>
+From: jean.pihet@linaro.org (Jean Pihet)
+Date: Fri, 13 Sep 2013 19:08:41 +0200
+Subject: [PATCH] perf tools: Check libunwind for availability of dwarf parsing
+ feature
+Message-ID: <1379092121-5981-1-git-send-email-jean.pihet@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 10, 2013 at 08:07:45AM -0700, Kevin Hilman wrote:
-> Nicolas Pitre <nicolas.pitre@linaro.org> writes:
-> 
-> > Adding Kevin Hilman to the CC as he might be interested as well.
-> 
-> Thanks, I'd already noticed this but was distracted getting arm-soc
-> changes ready for the merge window.  Looking into it now.
+The newly added dwarf unwinding feature [1] requires:
+. a recent version (>= 1.1) of libunwind,
+. libunwind to be configured with --enable-debug-frame.
 
-Kevin, can you please try this patch? It built tested fine on ARM
-and live tested correctly on x86. There should be no problem but
-just in case.
+[1] http://www.spinics.net/lists/kernel/msg1598951.html
 
-Thanks!
+Add the corresponding API test in the feature check list.
 
+Signed-off-by: Jean Pihet <jean.pihet@linaro.org>
 ---
->From 9bb601401baea0a2b2eead3909a9f186d894d617 Mon Sep 17 00:00:00 2001
-From: Frederic Weisbecker <fweisbec@gmail.com>
-Date: Tue, 10 Sep 2013 00:54:17 +0200
-Subject: [PATCH] arm: Fix build error with context tracking calls
+ tools/perf/config/feature-tests.mak | 11 ++++++++++-
+ 1 file changed, 10 insertions(+), 1 deletion(-)
 
-ad65782fba50 (context_tracking: Optimize main APIs off case
-with static key) converted context tracking main APIs to inline
-functions and left ARM asm callers behind.
-
-This can be easily fixed by making ARM calling the post static
-keys context tracking functions. We just need to replicate the
-static key checks there. We'll remove these later when ARM will
-support the context tracking static keys.
-
-Reported-by: Guenter Roeck <linux@roeck-us.net>
-Reported-by: Russell King <linux@arm.linux.org.uk>
-Signed-off-by: Frederic Weisbecker <fweisbec@gmail.com>
-Cc: Kevin Hilman <khilman@linaro.org>
-Cc: Guenter Roeck <linux@roeck-us.net>
-Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
-Cc: Anil Kumar <anilk4.v@gmail.com>
-Cc: Tony Lindgren <tony@atomide.com>
-Cc: Benoit Cousson <b-cousson@ti.com>
----
- arch/arm/kernel/entry-header.S |    8 ++++----
- kernel/context_tracking.c      |   12 ++++++++++++
- 2 files changed, 16 insertions(+), 4 deletions(-)
-
-diff --git a/arch/arm/kernel/entry-header.S b/arch/arm/kernel/entry-header.S
-index de23a9b..39f89fb 100644
---- a/arch/arm/kernel/entry-header.S
-+++ b/arch/arm/kernel/entry-header.S
-@@ -329,10 +329,10 @@
- #ifdef CONFIG_CONTEXT_TRACKING
- 	.if	\save
- 	stmdb   sp!, {r0-r3, ip, lr}
--	bl	user_exit
-+	bl	context_tracking_user_exit
- 	ldmia	sp!, {r0-r3, ip, lr}
- 	.else
--	bl	user_exit
-+	bl	context_tracking_user_exit
- 	.endif
- #endif
- 	.endm
-@@ -341,10 +341,10 @@
- #ifdef CONFIG_CONTEXT_TRACKING
- 	.if	\save
- 	stmdb   sp!, {r0-r3, ip, lr}
--	bl	user_enter
-+	bl	context_tracking_user_enter
- 	ldmia	sp!, {r0-r3, ip, lr}
- 	.else
--	bl	user_enter
-+	bl	context_tracking_user_enter
- 	.endif
- #endif
- 	.endm
-diff --git a/kernel/context_tracking.c b/kernel/context_tracking.c
-index 247091b..859c8df 100644
---- a/kernel/context_tracking.c
-+++ b/kernel/context_tracking.c
-@@ -51,6 +51,15 @@ void context_tracking_user_enter(void)
- 	unsigned long flags;
+diff --git a/tools/perf/config/feature-tests.mak b/tools/perf/config/feature-tests.mak
+index 708fb8e..87124d0 100644
+--- a/tools/perf/config/feature-tests.mak
++++ b/tools/perf/config/feature-tests.mak
+@@ -176,14 +176,23 @@ extern int UNW_OBJ(dwarf_search_unwind_table) (unw_addr_space_t as,
+                                       unw_proc_info_t *pi,
+                                       int need_unwind_info, void *arg);
  
- 	/*
-+	 * Repeat the user_enter() check here because some archs may be calling
-+	 * this from asm and if no CPU needs context tracking, they shouldn't
-+	 * go further. We can remove that check here once these archs support the static key
-+	 * check.
-+	 */
-+	if (!static_key_false(&context_tracking_enabled))
-+		return;
+-
+ #define dwarf_search_unwind_table UNW_OBJ(dwarf_search_unwind_table)
+ 
++extern int
++UNW_OBJ(dwarf_find_debug_frame) (int found, unw_dyn_info_t *di_debug,
++				 unw_word_t ip,
++				 unw_word_t segbase,
++				 const char *obj_name, unw_word_t start,
++				 unw_word_t end);
 +
-+	/*
- 	 * Some contexts may involve an exception occuring in an irq,
- 	 * leading to that nesting:
- 	 * rcu_irq_enter() rcu_user_exit() rcu_user_exit() rcu_irq_exit()
-@@ -151,6 +160,9 @@ void context_tracking_user_exit(void)
++#define dwarf_find_debug_frame UNW_OBJ(dwarf_find_debug_frame)
++
+ int main(void)
  {
- 	unsigned long flags;
- 
-+	if (!static_key_false(&context_tracking_enabled))
-+		return;
-+
- 	if (in_interrupt())
- 		return;
- 
+ 	unw_addr_space_t addr_space;
+ 	addr_space = unw_create_addr_space(NULL, 0);
+ 	unw_init_remote(NULL, addr_space, NULL);
++	dwarf_find_debug_frame(0, NULL, 0, 0, NULL, 0, 0);
+ 	dwarf_search_unwind_table(addr_space, 0, NULL, NULL, 0, NULL);
+ 	return 0;
+ }
 -- 
-1.7.5.4
+1.8.1.2
