@@ -1,46 +1,52 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 13 Sep 2013 18:29:46 +0530
-Subject: [PATCH 040/228] cpufreq: sc520: use cpufreq_table_validate_and_show()
+Date: Fri, 13 Sep 2013 18:29:45 +0530
+Subject: [PATCH 039/228] cpufreq: sa11x0: let cpufreq core initialize struct
+ policy fields
 In-Reply-To: <cover.1379063063.git.viresh.kumar@linaro.org>
 References: <cover.1379063063.git.viresh.kumar@linaro.org>
-Message-ID: <573c49b075362c50298d94412f035e3c7125b24a.1379063063.git.viresh.kumar@linaro.org>
+Message-ID: <8a36f8e32d7a9e9f4aa74db0525dbdc74fc023dd.1379063063.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Lets use cpufreq_table_validate_and_show() instead of calling
-cpufreq_frequency_table_cpuinfo() and cpufreq_frequency_table_get_attr().
+Many fields of struct policy are filled by cpufreq core when we call
+cpufreq_table_validate_and_show() and so cpufreq driver doesn't need to set them
+anymore.
 
 Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- drivers/cpufreq/sc520_freq.c | 9 +--------
- 1 file changed, 1 insertion(+), 8 deletions(-)
+ drivers/cpufreq/sa1100-cpufreq.c | 4 +---
+ drivers/cpufreq/sa1110-cpufreq.c | 4 +---
+ 2 files changed, 2 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/cpufreq/sc520_freq.c b/drivers/cpufreq/sc520_freq.c
-index d6f6c6f..bb9c0de 100644
---- a/drivers/cpufreq/sc520_freq.c
-+++ b/drivers/cpufreq/sc520_freq.c
-@@ -106,7 +106,6 @@ static int sc520_freq_target(struct cpufreq_policy *policy,
- static int sc520_freq_cpu_init(struct cpufreq_policy *policy)
+diff --git a/drivers/cpufreq/sa1100-cpufreq.c b/drivers/cpufreq/sa1100-cpufreq.c
+index 1323a69..37fce2f 100644
+--- a/drivers/cpufreq/sa1100-cpufreq.c
++++ b/drivers/cpufreq/sa1100-cpufreq.c
+@@ -220,9 +220,7 @@ static int __init sa1100_cpu_init(struct cpufreq_policy *policy)
  {
- 	struct cpuinfo_x86 *c = &cpu_data(0);
--	int result;
+ 	if (policy->cpu != 0)
+ 		return -EINVAL;
+-	policy->cur = policy->min = policy->max = sa11x0_getspeed(0);
+-	policy->cpuinfo.min_freq = 59000;
+-	policy->cpuinfo.max_freq = 287000;
++	policy->cur = sa11x0_getspeed(0);
+ 	policy->cpuinfo.transition_latency = CPUFREQ_ETERNAL;
  
- 	/* capability check */
- 	if (c->x86_vendor != X86_VENDOR_AMD ||
-@@ -117,13 +116,7 @@ static int sc520_freq_cpu_init(struct cpufreq_policy *policy)
- 	policy->cpuinfo.transition_latency = 1000000; /* 1ms */
- 	policy->cur = sc520_freq_get_cpu_frequency(0);
+ 	return cpufreq_table_validate_and_show(policy, sa11x0_freq_table);
+diff --git a/drivers/cpufreq/sa1110-cpufreq.c b/drivers/cpufreq/sa1110-cpufreq.c
+index adb0524..13760fc 100644
+--- a/drivers/cpufreq/sa1110-cpufreq.c
++++ b/drivers/cpufreq/sa1110-cpufreq.c
+@@ -334,9 +334,7 @@ static int __init sa1110_cpu_init(struct cpufreq_policy *policy)
+ {
+ 	if (policy->cpu != 0)
+ 		return -EINVAL;
+-	policy->cur = policy->min = policy->max = sa11x0_getspeed(0);
+-	policy->cpuinfo.min_freq = 59000;
+-	policy->cpuinfo.max_freq = 287000;
++	policy->cur = sa11x0_getspeed(0);
+ 	policy->cpuinfo.transition_latency = CPUFREQ_ETERNAL;
  
--	result = cpufreq_frequency_table_cpuinfo(policy, sc520_freq_table);
--	if (result)
--		return result;
--
--	cpufreq_frequency_table_get_attr(sc520_freq_table, policy->cpu);
--
--	return 0;
-+	return cpufreq_table_validate_and_show(policy, sc520_freq_table);
- }
- 
- 
+ 	return cpufreq_table_validate_and_show(policy, sa11x0_freq_table);
 -- 
 1.7.12.rc2.18.g61b472e
