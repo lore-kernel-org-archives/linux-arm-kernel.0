@@ -1,35 +1,34 @@
-From: sachin.kamat@linaro.org (Sachin Kamat)
-Date: Fri, 13 Sep 2013 14:53:52 +0530
-Subject: [PATCH 10/10] clk: max77686: Remove redundant break
-In-Reply-To: <1379064232-10261-1-git-send-email-sachin.kamat@linaro.org>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Fri, 13 Sep 2013 15:15:27 +0530
+Subject: [PATCH 02/10] clk: SPEAr: Staticize clk_frac_ops
+In-Reply-To: <1379064232-10261-2-git-send-email-sachin.kamat@linaro.org>
 References: <1379064232-10261-1-git-send-email-sachin.kamat@linaro.org>
-Message-ID: <1379064232-10261-10-git-send-email-sachin.kamat@linaro.org>
+ <1379064232-10261-2-git-send-email-sachin.kamat@linaro.org>
+Message-ID: <CAKohpokpi6z5HExPxscF4=7uaxR_ZjAoze=jjgdG=4rjwRabsg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-'break' after 'goto' is redundant. Remove it.
+On 13 September 2013 14:53, Sachin Kamat <sachin.kamat@linaro.org> wrote:
+> clk_frac_ops is local to this file. Make it static.
+>
+> Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
+> Cc: Viresh Kumar <viresh.kumar@linaro.org>
+> ---
+>  drivers/clk/spear/clk-frac-synth.c |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/drivers/clk/spear/clk-frac-synth.c b/drivers/clk/spear/clk-frac-synth.c
+> index 958aa3a..dffd4ce 100644
+> --- a/drivers/clk/spear/clk-frac-synth.c
+> +++ b/drivers/clk/spear/clk-frac-synth.c
+> @@ -116,7 +116,7 @@ static int clk_frac_set_rate(struct clk_hw *hw, unsigned long drate,
+>         return 0;
+>  }
+>
+> -struct clk_ops clk_frac_ops = {
+> +static struct clk_ops clk_frac_ops = {
+>         .recalc_rate = clk_frac_recalc_rate,
+>         .round_rate = clk_frac_round_rate,
+>         .set_rate = clk_frac_set_rate,
 
-Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
-Cc: Jonghwa Lee <jonghwa3.lee@samsung.com>
----
- drivers/clk/clk-max77686.c |    2 --
- 1 file changed, 2 deletions(-)
-
-diff --git a/drivers/clk/clk-max77686.c b/drivers/clk/clk-max77686.c
-index 9f57bc3..b4a1a97 100644
---- a/drivers/clk/clk-max77686.c
-+++ b/drivers/clk/clk-max77686.c
-@@ -157,11 +157,9 @@ static int max77686_clk_probe(struct platform_device *pdev)
- 			case MAX77686_CLK_AP:
- 				dev_err(&pdev->dev, "Fail to register CLK_AP\n");
- 				goto err_clk_ap;
--				break;
- 			case MAX77686_CLK_CP:
- 				dev_err(&pdev->dev, "Fail to register CLK_CP\n");
- 				goto err_clk_cp;
--				break;
- 			case MAX77686_CLK_PMIC:
- 				dev_err(&pdev->dev, "Fail to register CLK_PMIC\n");
- 				goto err_clk_pmic;
--- 
-1.7.9.5
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
