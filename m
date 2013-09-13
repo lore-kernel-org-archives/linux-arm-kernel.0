@@ -1,52 +1,25 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 13 Sep 2013 18:31:18 +0530
-Subject: [PATCH 132/228] cpufreq: dbx500: use cpufreq_generic_init() routine
-In-Reply-To: <cover.1379063063.git.viresh.kumar@linaro.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 13 Sep 2013 15:18:41 +0200
+Subject: [PATCH 063/228] cpufreq: dbx500: Use generic cpufreq routines
+In-Reply-To: <a3970f9a04fd061a7ad476f983e10a8768c89fd0.1379063063.git.viresh.kumar@linaro.org>
 References: <cover.1379063063.git.viresh.kumar@linaro.org>
-Message-ID: <7703617a46c82433f7de644c35aafba9c880114d.1379063063.git.viresh.kumar@linaro.org>
+ <a3970f9a04fd061a7ad476f983e10a8768c89fd0.1379063063.git.viresh.kumar@linaro.org>
+Message-ID: <CACRpkdbgpuuSpHpu2-pEvOjd3hB-cqn62Ui6__VFbyNHDLu6+g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use generic cpufreq_generic_init() routine instead of replicating the same code
-here.
+On Fri, Sep 13, 2013 at 3:00 PM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
-Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
----
- drivers/cpufreq/dbx500-cpufreq.c | 21 +--------------------
- 1 file changed, 1 insertion(+), 20 deletions(-)
+> Most of the CPUFreq drivers do similar things in .exit() and .verify() routines
+> and .attr. So its better if we have generic routines for them which can be used
+> by cpufreq drivers then.
+>
+> This patch uses these generic routines for this driver.
+>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 
-diff --git a/drivers/cpufreq/dbx500-cpufreq.c b/drivers/cpufreq/dbx500-cpufreq.c
-index ae1aa60..a60f769 100644
---- a/drivers/cpufreq/dbx500-cpufreq.c
-+++ b/drivers/cpufreq/dbx500-cpufreq.c
-@@ -74,26 +74,7 @@ static unsigned int dbx500_cpufreq_getspeed(unsigned int cpu)
- 
- static int dbx500_cpufreq_init(struct cpufreq_policy *policy)
- {
--	int res;
--
--	/* get policy fields based on the table */
--	res = cpufreq_table_validate_and_show(policy, freq_table);
--	if (res) {
--		pr_err("dbx500-cpufreq: Failed to read policy table\n");
--		return res;
--	}
--
--	/*
--	 * FIXME : Need to take time measurement across the target()
--	 *	   function with no/some/all drivers in the notification
--	 *	   list.
--	 */
--	policy->cpuinfo.transition_latency = 20 * 1000; /* in ns */
--
--	/* policy sharing between dual CPUs */
--	cpumask_setall(policy->cpus);
--
--	return 0;
-+	return cpufreq_generic_init(policy, freq_table, 20 * 1000);
- }
- 
- static struct cpufreq_driver dbx500_cpufreq_driver = {
--- 
-1.7.12.rc2.18.g61b472e
+Acked-by. It feels like I acked this before...
+
+Yours,
+Linus Walleij
