@@ -1,10 +1,10 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 13 Sep 2013 18:32:30 +0530
-Subject: [PATCH 204/228] cpufreq: s3c: remove calls to
+Date: Fri, 13 Sep 2013 18:32:32 +0530
+Subject: [PATCH 206/228] cpufreq: sa11x0: remove calls to
  cpufreq_notify_transition()
 In-Reply-To: <cover.1379063063.git.viresh.kumar@linaro.org>
 References: <cover.1379063063.git.viresh.kumar@linaro.org>
-Message-ID: <91d71b130f7a7e499852cf56de49f9f422e73da5.1379063063.git.viresh.kumar@linaro.org>
+Message-ID: <6e2ca86ce948c0bc35f7709baf22672771fcf1e8.1379063063.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -28,157 +28,86 @@ frequency change, this one removes it from this driver.
 
 Some related minor cleanups are also done along with it.
 
-Cc: Kukjin Kim <kgene.kim@samsung.com>
+Cc: Russell King <linux@arm.linux.org.uk>
 Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- drivers/cpufreq/s3c2416-cpufreq.c | 21 ++++-------------
- drivers/cpufreq/s3c64xx-cpufreq.c | 48 +++++++++++++--------------------------
- 2 files changed, 20 insertions(+), 49 deletions(-)
+ drivers/cpufreq/sa1100-cpufreq.c | 17 ++++++-----------
+ drivers/cpufreq/sa1110-cpufreq.c | 12 ++----------
+ 2 files changed, 8 insertions(+), 21 deletions(-)
 
-diff --git a/drivers/cpufreq/s3c2416-cpufreq.c b/drivers/cpufreq/s3c2416-cpufreq.c
-index 4188acc..8d904a0 100644
---- a/drivers/cpufreq/s3c2416-cpufreq.c
-+++ b/drivers/cpufreq/s3c2416-cpufreq.c
-@@ -220,7 +220,7 @@ static int s3c2416_cpufreq_set_target(struct cpufreq_policy *policy,
- 				      unsigned int index)
+diff --git a/drivers/cpufreq/sa1100-cpufreq.c b/drivers/cpufreq/sa1100-cpufreq.c
+index b0da1fe..623da74 100644
+--- a/drivers/cpufreq/sa1100-cpufreq.c
++++ b/drivers/cpufreq/sa1100-cpufreq.c
+@@ -180,22 +180,17 @@ static void sa1100_update_dram_timings(int current_speed, int new_speed)
+ static int sa1100_target(struct cpufreq_policy *policy, unsigned int ppcr)
  {
- 	struct s3c2416_data *s3c_freq = &s3c2416_cpufreq;
+ 	unsigned int cur = sa11x0_getspeed(0);
 -	struct cpufreq_freqs freqs;
 +	unsigned int new_freq;
- 	int idx, ret, to_dvs = 0;
  
- 	mutex_lock(&cpufreq_lock);
-@@ -237,25 +237,14 @@ static int s3c2416_cpufreq_set_target(struct cpufreq_policy *policy,
- 		goto out;
- 	}
+-	freqs.old = cur;
+-	freqs.new = sa11x0_freq_table[ppcr].frequency;
++	new_freq = sa11x0_freq_table[ppcr].frequency;
  
--	freqs.flags = 0;
--	freqs.old = s3c_freq->is_dvs ? FREQ_DVS
--				     : clk_get_rate(s3c_freq->armclk) / 1000;
--
- 	/* When leavin dvs mode, always switch the armdiv to the hclk rate
- 	 * The S3C2416 has stability issues when switching directly to
- 	 * higher frequencies.
- 	 */
--	freqs.new = (s3c_freq->is_dvs && !to_dvs)
-+	new_freq = (s3c_freq->is_dvs && !to_dvs)
- 				? clk_get_rate(s3c_freq->hclk) / 1000
- 				: s3c_freq->freq_table[index].frequency;
- 
--	pr_debug("cpufreq: Transition %d-%dkHz\n", freqs.old, freqs.new);
--
--	if (!to_dvs && freqs.old == freqs.new)
--		goto out;
--
 -	cpufreq_notify_transition(policy, &freqs, CPUFREQ_PRECHANGE);
 -
- 	if (to_dvs) {
- 		pr_debug("cpufreq: enter dvs\n");
- 		ret = s3c2416_cpufreq_enter_dvs(s3c_freq, idx);
-@@ -263,12 +252,10 @@ static int s3c2416_cpufreq_set_target(struct cpufreq_policy *policy,
- 		pr_debug("cpufreq: leave dvs\n");
- 		ret = s3c2416_cpufreq_leave_dvs(s3c_freq, idx);
- 	} else {
--		pr_debug("cpufreq: change armdiv to %dkHz\n", freqs.new);
--		ret = s3c2416_cpufreq_set_armdiv(s3c_freq, freqs.new);
-+		pr_debug("cpufreq: change armdiv to %dkHz\n", new_freq);
-+		ret = s3c2416_cpufreq_set_armdiv(s3c_freq, new_freq);
- 	}
+-	if (freqs.new > cur)
+-		sa1100_update_dram_timings(cur, freqs.new);
++	if (new_freq > cur)
++		sa1100_update_dram_timings(cur, new_freq);
  
+ 	PPCR = ppcr;
+ 
+-	if (freqs.new < cur)
+-		sa1100_update_dram_timings(cur, freqs.new);
+-
 -	cpufreq_notify_transition(policy, &freqs, CPUFREQ_POSTCHANGE);
--
- out:
- 	mutex_unlock(&cpufreq_lock);
- 
-diff --git a/drivers/cpufreq/s3c64xx-cpufreq.c b/drivers/cpufreq/s3c64xx-cpufreq.c
-index 34ae66b..8b49a06 100644
---- a/drivers/cpufreq/s3c64xx-cpufreq.c
-+++ b/drivers/cpufreq/s3c64xx-cpufreq.c
-@@ -65,54 +65,46 @@ static unsigned int s3c64xx_cpufreq_get_speed(unsigned int cpu)
- static int s3c64xx_cpufreq_set_target(struct cpufreq_policy *policy,
- 				      unsigned int index)
- {
--	int ret;
--	struct cpufreq_freqs freqs;
- 	struct s3c64xx_dvfs *dvfs;
-+	unsigned int old_freq, new_freq;
-+	int ret;
- 
--	freqs.old = clk_get_rate(armclk) / 1000;
--	freqs.new = s3c64xx_freq_table[index].frequency;
--	freqs.flags = 0;
-+	old_freq = clk_get_rate(armclk) / 1000;
-+	new_freq = s3c64xx_freq_table[index].frequency;
- 	dvfs = &s3c64xx_dvfs_table[s3c64xx_freq_table[index].driver_data];
- 
--	pr_debug("Transition %d-%dkHz\n", freqs.old, freqs.new);
--
--	cpufreq_notify_transition(policy, &freqs, CPUFREQ_PRECHANGE);
--
- #ifdef CONFIG_REGULATOR
--	if (vddarm && freqs.new > freqs.old) {
-+	if (vddarm && new_freq > old_freq) {
- 		ret = regulator_set_voltage(vddarm,
- 					    dvfs->vddarm_min,
- 					    dvfs->vddarm_max);
- 		if (ret != 0) {
- 			pr_err("Failed to set VDDARM for %dkHz: %d\n",
--			       freqs.new, ret);
--			freqs.new = freqs.old;
--			goto post_notify;
-+			       new_freq, ret);
-+			return ret;
- 		}
- 	}
- #endif
- 
--	ret = clk_set_rate(armclk, freqs.new * 1000);
-+	ret = clk_set_rate(armclk, new_freq * 1000);
- 	if (ret < 0) {
- 		pr_err("Failed to set rate %dkHz: %d\n",
--		       freqs.new, ret);
--		freqs.new = freqs.old;
-+		       new_freq, ret);
-+		return ret;
- 	}
- 
--post_notify:
--	cpufreq_notify_transition(policy, &freqs, CPUFREQ_POSTCHANGE);
--	if (ret)
--		goto err;
--
- #ifdef CONFIG_REGULATOR
--	if (vddarm && freqs.new < freqs.old) {
-+	if (vddarm && new_freq < old_freq) {
- 		ret = regulator_set_voltage(vddarm,
- 					    dvfs->vddarm_min,
- 					    dvfs->vddarm_max);
- 		if (ret != 0) {
- 			pr_err("Failed to set VDDARM for %dkHz: %d\n",
--			       freqs.new, ret);
--			goto err_clk;
-+			       new_freq, ret);
-+			if (clk_set_rate(armclk, old_freq * 1000) < 0)
-+				pr_err("Failed to restore original clock rate\n");
-+
-+			return ret;
- 		}
- 	}
- #endif
-@@ -121,14 +113,6 @@ post_notify:
- 		 clk_get_rate(armclk) / 1000);
++	if (new_freq < cur)
++		sa1100_update_dram_timings(cur, new_freq);
  
  	return 0;
--
--err_clk:
--	if (clk_set_rate(armclk, freqs.old * 1000) < 0)
--		pr_err("Failed to restore original clock rate\n");
--err:
--	cpufreq_notify_transition(policy, &freqs, CPUFREQ_POSTCHANGE);
--
--	return ret;
  }
+diff --git a/drivers/cpufreq/sa1110-cpufreq.c b/drivers/cpufreq/sa1110-cpufreq.c
+index 55b1818c..2c2b2e6 100644
+--- a/drivers/cpufreq/sa1110-cpufreq.c
++++ b/drivers/cpufreq/sa1110-cpufreq.c
+@@ -232,15 +232,11 @@ sdram_update_refresh(u_int cpu_khz, struct sdram_params *sdram)
+ static int sa1110_target(struct cpufreq_policy *policy, unsigned int ppcr)
+ {
+ 	struct sdram_params *sdram = &sdram_params;
+-	struct cpufreq_freqs freqs;
+ 	struct sdram_info sd;
+ 	unsigned long flags;
+ 	unsigned int unused;
  
- #ifdef CONFIG_REGULATOR
+-	freqs.old = sa11x0_getspeed(0);
+-	freqs.new = sa11x0_freq_table[ppcr].frequency;
+-
+-	sdram_calculate_timing(&sd, freqs.new, sdram);
++	sdram_calculate_timing(&sd, sa11x0_freq_table[ppcr].frequency, sdram);
+ 
+ #if 0
+ 	/*
+@@ -259,8 +255,6 @@ static int sa1110_target(struct cpufreq_policy *policy, unsigned int ppcr)
+ 	sd.mdcas[2] = 0xaaaaaaaa;
+ #endif
+ 
+-	cpufreq_notify_transition(policy, &freqs, CPUFREQ_PRECHANGE);
+-
+ 	/*
+ 	 * The clock could be going away for some time.  Set the SDRAMs
+ 	 * to refresh rapidly (every 64 memory clock cycles).  To get
+@@ -305,9 +299,7 @@ static int sa1110_target(struct cpufreq_policy *policy, unsigned int ppcr)
+ 	/*
+ 	 * Now, return the SDRAM refresh back to normal.
+ 	 */
+-	sdram_update_refresh(freqs.new, sdram);
+-
+-	cpufreq_notify_transition(policy, &freqs, CPUFREQ_POSTCHANGE);
++	sdram_update_refresh(sa11x0_freq_table[ppcr].frequency, sdram);
+ 
+ 	return 0;
+ }
 -- 
 1.7.12.rc2.18.g61b472e
