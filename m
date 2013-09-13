@@ -1,84 +1,102 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 13 Sep 2013 21:16:36 +0200
-Subject: [PATCH] ARM: nomadik: delete FSMC platform data
-Message-ID: <1379099796-15912-1-git-send-email-linus.walleij@linaro.org>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 13 Sep 2013 14:23:29 -0500
+Subject: [PATCH v3] dt: update PSCI binding documentation for v0.2
+In-Reply-To: <20130903095235.GD18206@e106331-lin.cambridge.arm.com>
+References: <1377564633-31638-1-git-send-email-robherring2@gmail.com>
+ <20130903095235.GD18206@e106331-lin.cambridge.arm.com>
+Message-ID: <CAL_JsqJ-SY5MsnbETnK6k4GRHhtgiYztMo+bW7i85A4aWYjrPg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We now have device tree support for setting the NAND timings
-for FSMC from the device tree, so delete the last piece of
-platform data and auxdata.
+On Tue, Sep 3, 2013 at 4:52 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Tue, Aug 27, 2013 at 01:50:33AM +0100, Rob Herring wrote:
+>> From: Rob Herring <rob.herring@calxeda.com>
+>
+> Hi Rob,
+>
+> Sorry for the delay on reviewing this.
+>
+>>
+>> The PSCI spec from ARM has been updated to 0.2 version. Update the
+>> binding document to reflect the spec changes. For the binding, the
+>> major changes are the addition of psci_version, affinity_info,
+>> migrate_info_type, migrate_info_up_cpu, system_reset and system_off
+>> functions. The recommended function ID numbering has also changed.
+>>
+>> This update also defines 32 and 64 bit calling conventions. The calling
+>> convention is defined on a per function ID basis.
+>>
+>> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+>> Cc: Dave Martin <Dave.Martin@arm.com>
+>> Cc: Mark Rutland <mark.rutland@arm.com>
+>> Cc: Ian Campbell <Ian.Campbell@citrix.com>
+>> Cc: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+>> Cc: Marc Zyngier <Marc.Zyngier@arm.com>
+>> Cc: Christoffer Dall <christoffer.dall@linaro.org>,
+>> Cc: Charles Garcia-Tobin <Charles.Garcia-Tobin@arm.com>
+>> Cc: Matt Sealey <neko@bakuhatsu.net>
+>> Cc: devicetree at vger.kernel.org
+>> ---
+>> v3: This version implements Mark's suggested binding with -32 and -64 suffixes.
+>>
+>>  Documentation/devicetree/bindings/arm/psci.txt | 62 +++++++++++++++++++-------
+>>  1 file changed, 46 insertions(+), 16 deletions(-)
+>>
+>> diff --git a/Documentation/devicetree/bindings/arm/psci.txt b/Documentation/devicetree/bindings/arm/psci.txt
+>> index 433afe9..209bb04 100644
+>> --- a/Documentation/devicetree/bindings/arm/psci.txt
+>> +++ b/Documentation/devicetree/bindings/arm/psci.txt
+>> @@ -1,16 +1,17 @@
+>>  * Power State Coordination Interface (PSCI)
+>>
+>>  Firmware implementing the PSCI functions described in ARM document number
+>> -ARM DEN 0022A ("Power State Coordination Interface System Software on ARM
+>> +ARM DEN 0022B ("Power State Coordination Interface System Software on ARM
+>>  processors") can be used by Linux to initiate various CPU-centric power
+>>  operations.
+>>
+>> -Issue A of the specification describes functions for CPU suspend, hotplug
+>> -and migration of secure software.
+>> +Issue B of the specification describes functions for CPU suspend, hotplug,
+>> +migration of secure software, and system level reset and powerdown.
+>>
+>>  Functions are invoked by trapping to the privilege level of the PSCI
+>>  firmware (specified as part of the binding below) and passing arguments
+>> -in a manner similar to that specified by AAPCS:
+>> +as defined in ARM document "SMC Calling Convention" (ARM DEN 0028) in a manner
+>> +similar to that specified by AAPCS:
+>>
+>>        r0             => 32-bit Function ID / return value
+>>       {r1 - r3}       => Parameters
+>> @@ -21,10 +22,10 @@ to #0.
+>>
+>>  Main node required properties:
+>>
+>> - - compatible    : Must be "arm,psci"
+>> + - compatible    : Must contain "arm,psci-0.2" or "arm,psci"
+>>
+>> - - method        : The method of calling the PSCI firmware. Permitted
+>> -                   values are:
+>> + - method        : The method defines the calling convention for the PSCI
+>> +                   firmware. Permitted values are:
+>>
+>>                     "smc" : SMC #0, with the register assignments specified
+>>                          in this binding.
+>> @@ -32,24 +33,53 @@ Main node required properties:
+>>                     "hvc" : HVC #0, with the register assignments specified
+>>                          in this binding.
+>>
+>> + - psci_version  : Function ID for PSCI_VERSION operation. Required for
+>> +                   "arm,psci-0.2" compatible version or later.
+>> +
+>
+> While this seems sensible, I'm not sure that this needs to be mandatory.
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- arch/arm/boot/dts/ste-nomadik-stn8815.dtsi |  1 +
- arch/arm/mach-nomadik/cpu-8815.c           | 22 +---------------------
- 2 files changed, 2 insertions(+), 21 deletions(-)
+It is quite pointless to have at all if we don't make it mandatory. I
+would accept that it is pointless and the compatible string should
+always reflect the version anyway, but ARM added the call and states
+it is mandatory in the PSCI doc. I guess we could have mandatory for
+the firmware to implement, but optional in the DT binding? That seems
+silly though.
 
-diff --git a/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi b/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi
-index 0e543e0..79425e3 100644
---- a/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi
-+++ b/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi
-@@ -653,6 +653,7 @@
- 		reg-names = "fsmc_regs", "nand_data", "nand_addr", "nand_cmd";
- 		clocks = <&hclksmc>;
- 		status = "okay";
-+		timings = /bits/ 8 <0 0 0 0x10 0x0a 0>;
- 
- 		partition at 0 {
- 		label = "X-Loader(NAND)";
-diff --git a/arch/arm/mach-nomadik/cpu-8815.c b/arch/arm/mach-nomadik/cpu-8815.c
-index 7a00506..c6c156e 100644
---- a/arch/arm/mach-nomadik/cpu-8815.c
-+++ b/arch/arm/mach-nomadik/cpu-8815.c
-@@ -31,7 +31,6 @@
- #include <linux/of_gpio.h>
- #include <linux/of_address.h>
- #include <linux/of_platform.h>
--#include <linux/mtd/fsmc.h>
- #include <linux/gpio.h>
- 
- #include <asm/mach/arch.h>
-@@ -145,17 +144,6 @@ static void __init cpu8815_timer_init_of(void)
- 	clocksource_of_init();
- }
- 
--static struct fsmc_nand_timings cpu8815_nand_timings = {
--	.thiz	= 0,
--	.thold	= 0x10,
--	.twait	= 0x0A,
--	.tset	= 0,
--};
--
--static struct fsmc_nand_platform_data cpu8815_nand_data = {
--	.nand_timings = &cpu8815_nand_timings,
--};
--
- /*
-  * The SMSC911x IRQ is connected to a GPIO pin, but the driver expects
-  * to simply request an IRQ passed as a resource. So the GPIO pin needs
-@@ -222,21 +210,13 @@ static int __init cpu8815_mmcsd_init(void)
- }
- device_initcall(cpu8815_mmcsd_init);
- 
--/* This still waits for a device tree enablement patch */
--static struct of_dev_auxdata cpu8815_auxdata_lookup[] __initdata = {
--	OF_DEV_AUXDATA("stericsson,fsmc-nand", NOMADIK_FSMC_BASE,
--		NULL, &cpu8815_nand_data),
--	{ /* sentinel */ },
--};
--
- static void __init cpu8815_init_of(void)
- {
- #ifdef CONFIG_CACHE_L2X0
- 	/* At full speed latency must be >=2, so 0x249 in low bits */
- 	l2x0_of_init(0x00730249, 0xfe000fff);
- #endif
--	of_platform_populate(NULL, of_default_bus_match_table,
--			cpu8815_auxdata_lookup, NULL);
-+	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
- }
- 
- static const char * cpu8815_board_compat[] = {
--- 
-1.8.1.4
+Rob
