@@ -1,88 +1,48 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 13 Sep 2013 14:58:57 +0800
-Subject: [PATCH 1/2] ARM: dts: imx53-qsb: add TVE entry
-In-Reply-To: <1378893068-22235-1-git-send-email-l.stach@pengutronix.de>
-References: <1378893068-22235-1-git-send-email-l.stach@pengutronix.de>
-Message-ID: <20130913065855.GA31147@S2101-09.ap.freescale.net>
+From: B18965@freescale.com (Wang Huan-B18965)
+Date: Fri, 13 Sep 2013 07:07:44 +0000
+Subject: [PATCH v3 0/5] ARM: vf610: Add DCU framebuffer driver for
+ Vybrid VF610 platform
+In-Reply-To: <52270C71.7080805@ti.com>
+References: <1376553714-25922-1-git-send-email-b18965@freescale.com>
+ <81BA6E5E0BC2344391CABCEE22D1B6D83F448E@039-SN1MPN1-002.039d.mgd.msft.net>
+ <81BA6E5E0BC2344391CABCEE22D1B6D8403CB3@039-SN1MPN1-002.039d.mgd.msft.net>
+ <52270C71.7080805@ti.com>
+Message-ID: <81BA6E5E0BC2344391CABCEE22D1B6D842FD6A@039-SN1MPN1-003.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 11, 2013 at 11:51:07AM +0200, Lucas Stach wrote:
-> From: Philipp Zabel <p.zabel@pengutronix.de>
+My comments inline.
+
+> -----Original Message-----
+> From: Tomi Valkeinen [mailto:tomi.valkeinen at ti.com]
+> Sent: Wednesday, September 04, 2013 6:33 PM
+> To: Wang Huan-B18965
+> Cc: plagnioj at jcrosoft.com; linux-fbdev at vger.kernel.org; linux-arm-
+> kernel at lists.infradead.org; Jin Zhengxiong-R64188; Estevam Fabio-R49496;
+> shawn.guo at linaro.org
+> Subject: Re: [PATCH v3 0/5] ARM: vf610: Add DCU framebuffer driver for
+> Vybrid VF610 platform
 > 
-> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
-> ---
->  arch/arm/boot/dts/imx53-qsb.dts | 25 +++++++++++++++++++++++--
->  1 file changed, 23 insertions(+), 2 deletions(-)
+> Hi,
 > 
-> diff --git a/arch/arm/boot/dts/imx53-qsb.dts b/arch/arm/boot/dts/imx53-qsb.dts
-> index 512a1f6..2031ccc 100644
-> --- a/arch/arm/boot/dts/imx53-qsb.dts
-> +++ b/arch/arm/boot/dts/imx53-qsb.dts
-> @@ -156,6 +156,15 @@
->  		};
->  	};
->  
-> +	tve {
-> +		pinctrl_vga_sync_1: vgasync-grp1 {
-> +			fsl,pins = <
-> +				/* VGA_HSYNC, VSYNC with max drive strength */
-> +				MX53_PAD_EIM_OE__IPU_DI1_PIN7     0xe6
-> +				MX53_PAD_EIM_RW__IPU_DI1_PIN8     0xe6
-> +			>;
-> +		};
-> +	};
->  };
->  
->  &uart1 {
-> @@ -263,8 +272,8 @@
->  			};
->  
->  			ldo8_reg: ldo8 {
-> -				regulator-min-microvolt = <1200000>;
-> -				regulator-max-microvolt = <3600000>;
-> +				regulator-min-microvolt = <2750000>;
-> +				regulator-max-microvolt = <2750000>;
-
-Instead of having nothing in commit log, you can explain a little bit
-why the change is needed in there.
-
->  				regulator-always-on;
->  			};
->  
-> @@ -297,6 +306,18 @@
->  	status = "okay";
->  };
->  
-> +&tve {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_vga_sync_1>;
-> +	ddc = <&i2c2>;
-> +	fsl,tve-mode = "vga";
-
-Are these custom properties documented anywhere?  I cannot find the
-device tree bindings document for them.  Anyway, it should be another
-patch to provide the document, if you like.
-
-> +	status = "okay";
-
-Nit: please put 'status' at the bottom of the property list.
-
-> +	dac-supply = <&ldo7_reg>;
-> +
-
-Nit: drop this blank line.
-
-Shawn
-
-> +	fsl,hsync-pin = <7>; /* IPU DI1 PIN7 via EIM_OE */
-> +	fsl,vsync-pin = <8>; /* IPU DI1 PIN8 via EIM_RW */
-> +};
-> +
->  &usbh1 {
->         status = "okay";
->  };
-> -- 
-> 1.8.4.rc3
+> On 03/09/13 11:21, Wang Huan-B18965 wrote:
+> > Hi, Jean-Christophe, Tomi,
+> >
+> >       Could you please help to review these patches?
+> >       Thanks!
 > 
+> There seemed to be some strong opinions that there should be a drm
+> driver for this hardware, instead of an fb driver. So as there seems to
+> be disagreements about this, I'll leave this series to Jean-Christophe,
+> who's the primary maintainer.
+[Alison Wang] 
+
+Thanks for Tomi's comments. 
+
+I agree that we can implement the DRM driver for the DCU. As the bandwidth limitation, I suggest we use the fb driver firstly. On the other hand, the fb driver can meet the application requirement based on this SoC. We'll try to provide the DRM driver when this IP integrated into other SoC. 
+
+Jean-Christophe, Do you have any comments. Thanks.  
+
+
+Best Regards,
+Alison Wang
