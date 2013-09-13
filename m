@@ -1,156 +1,322 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 13 Sep 2013 12:25:08 -0600
-Subject: [PATCH 4/7] ARM: tegra: move resume vector define to irammap.h
+Date: Fri, 13 Sep 2013 12:25:05 -0600
+Subject: [PATCH 1/7] ARM: tegra: remove common.c
 In-Reply-To: <1379096711-26875-1-git-send-email-swarren@wwwdotorg.org>
 References: <1379096711-26875-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <1379096711-26875-5-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <1379096711-26875-2-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Stephen Warren <swarren@nvidia.com>
 
-irammap.h's purpose is to define the layout/usage of IRAM. As such,
-TEGRA_IRAM_CODE_AREA should have been added there rather than iomap.h.
-Move the define, and rename it something more descriptive.
+common.c was create to contain code shared across the various Tegra board
+files. There is now only one board file, tegra.c. So, move the code there.
+One exception is the PMC reboot routine, which moves to pmc.c, and now
+takes advantage of the 'standard' tegra_pmc_readl/writel functions.
 
-Cc: Joseph Lo <josephl@nvidia.com>
 Signed-off-by: Stephen Warren <swarren@nvidia.com>
 ---
- arch/arm/mach-tegra/iomap.h         | 2 --
- arch/arm/mach-tegra/irammap.h       | 6 ++++++
- arch/arm/mach-tegra/pm.c            | 8 ++++----
- arch/arm/mach-tegra/reset.c         | 2 +-
- arch/arm/mach-tegra/sleep-tegra20.S | 5 +++--
- arch/arm/mach-tegra/sleep-tegra30.S | 5 +++--
- 6 files changed, 17 insertions(+), 11 deletions(-)
+ arch/arm/mach-tegra/Makefile |   1 -
+ arch/arm/mach-tegra/board.h  |   6 ---
+ arch/arm/mach-tegra/common.c | 113 -------------------------------------------
+ arch/arm/mach-tegra/pmc.c    |   9 ++++
+ arch/arm/mach-tegra/pmc.h    |   4 ++
+ arch/arm/mach-tegra/tegra.c  |  67 ++++++++++++++++++++++++-
+ 6 files changed, 78 insertions(+), 122 deletions(-)
+ delete mode 100644 arch/arm/mach-tegra/common.c
 
-diff --git a/arch/arm/mach-tegra/iomap.h b/arch/arm/mach-tegra/iomap.h
-index 3f5fa07..7e0c180 100644
---- a/arch/arm/mach-tegra/iomap.h
-+++ b/arch/arm/mach-tegra/iomap.h
-@@ -24,8 +24,6 @@
- #define TEGRA_IRAM_BASE			0x40000000
- #define TEGRA_IRAM_SIZE			SZ_256K
+diff --git a/arch/arm/mach-tegra/Makefile b/arch/arm/mach-tegra/Makefile
+index e7e5f45..97eb48e 100644
+--- a/arch/arm/mach-tegra/Makefile
++++ b/arch/arm/mach-tegra/Makefile
+@@ -1,6 +1,5 @@
+ asflags-y				+= -march=armv7-a
  
--#define TEGRA_IRAM_CODE_AREA		(TEGRA_IRAM_BASE + SZ_4K)
+-obj-y                                   += common.o
+ obj-y                                   += io.o
+ obj-y                                   += irq.o
+ obj-y					+= fuse.o
+diff --git a/arch/arm/mach-tegra/board.h b/arch/arm/mach-tegra/board.h
+index db6810d..7b9a5bd 100644
+--- a/arch/arm/mach-tegra/board.h
++++ b/arch/arm/mach-tegra/board.h
+@@ -25,14 +25,8 @@
+ #include <linux/types.h>
+ #include <linux/reboot.h>
+ 
+-void tegra_assert_system_reset(enum reboot_mode mode, const char *cmd);
 -
- #define TEGRA_HOST1X_BASE		0x50000000
- #define TEGRA_HOST1X_SIZE		0x24000
+-void __init tegra_init_early(void);
+ void __init tegra_map_common_io(void);
+ void __init tegra_init_irq(void);
+-void __init tegra_dt_init_irq(void);
+-
+-void tegra_init_late(void);
  
-diff --git a/arch/arm/mach-tegra/irammap.h b/arch/arm/mach-tegra/irammap.h
-index 501952a..e32e174 100644
---- a/arch/arm/mach-tegra/irammap.h
-+++ b/arch/arm/mach-tegra/irammap.h
-@@ -23,4 +23,10 @@
- #define TEGRA_IRAM_RESET_HANDLER_OFFSET	0
- #define TEGRA_IRAM_RESET_HANDLER_SIZE	SZ_1K
- 
-+/*
-+ * This area is used for LPx resume vector, only while LPx power state is
-+ * active. At other times, the AVP may use this area for arbitrary purposes
-+ */
-+#define TEGRA_IRAM_LPx_RESUME_AREA	(TEGRA_IRAM_BASE + SZ_4K)
-+
- #endif
-diff --git a/arch/arm/mach-tegra/pm.c b/arch/arm/mach-tegra/pm.c
-index ed294a0..36ed88a 100644
---- a/arch/arm/mach-tegra/pm.c
-+++ b/arch/arm/mach-tegra/pm.c
-@@ -263,10 +263,10 @@ static void tegra_suspend_enter_lp1(void)
- 	tegra_pmc_suspend();
- 
- 	/* copy the reset vector & SDRAM shutdown code into IRAM */
--	memcpy(iram_save_addr, IO_ADDRESS(TEGRA_IRAM_CODE_AREA),
--		iram_save_size);
--	memcpy(IO_ADDRESS(TEGRA_IRAM_CODE_AREA), tegra_lp1_iram.start_addr,
-+	memcpy(iram_save_addr, IO_ADDRESS(TEGRA_IRAM_LPx_RESUME_AREA),
- 		iram_save_size);
-+	memcpy(IO_ADDRESS(TEGRA_IRAM_LPx_RESUME_AREA),
-+		tegra_lp1_iram.start_addr, iram_save_size);
- 
- 	*((u32 *)tegra_cpu_lp1_mask) = 1;
+ #ifdef CONFIG_DEBUG_FS
+ int tegra_clk_debugfs_init(void);
+diff --git a/arch/arm/mach-tegra/common.c b/arch/arm/mach-tegra/common.c
+deleted file mode 100644
+index 58dc91c5..0000000
+--- a/arch/arm/mach-tegra/common.c
++++ /dev/null
+@@ -1,113 +0,0 @@
+-/*
+- * arch/arm/mach-tegra/common.c
+- *
+- * Copyright (c) 2013 NVIDIA Corporation. All rights reserved.
+- * Copyright (C) 2010 Google, Inc.
+- *
+- * Author:
+- *	Colin Cross <ccross@android.com>
+- *
+- * This software is licensed under the terms of the GNU General Public
+- * License version 2, as published by the Free Software Foundation, and
+- * may be copied, distributed, and modified under those terms.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- */
+-
+-#include <linux/init.h>
+-#include <linux/io.h>
+-#include <linux/clk.h>
+-#include <linux/delay.h>
+-#include <linux/reboot.h>
+-#include <linux/irqchip.h>
+-
+-#include <asm/hardware/cache-l2x0.h>
+-
+-#include "board.h"
+-#include "common.h"
+-#include "cpuidle.h"
+-#include "fuse.h"
+-#include "iomap.h"
+-#include "irq.h"
+-#include "pmc.h"
+-#include "apbio.h"
+-#include "sleep.h"
+-#include "pm.h"
+-#include "reset.h"
+-
+-/*
+- * Storage for debug-macro.S's state.
+- *
+- * This must be in .data not .bss so that it gets initialized each time the
+- * kernel is loaded. The data is declared here rather than debug-macro.S so
+- * that multiple inclusions of debug-macro.S point at the same data.
+- */
+-u32 tegra_uart_config[4] = {
+-	/* Debug UART initialization required */
+-	1,
+-	/* Debug UART physical address */
+-	0,
+-	/* Debug UART virtual address */
+-	0,
+-	/* Scratch space for debug macro */
+-	0,
+-};
+-
+-#ifdef CONFIG_OF
+-void __init tegra_dt_init_irq(void)
+-{
+-	tegra_pmc_init_irq();
+-	tegra_init_irq();
+-	irqchip_init();
+-	tegra_legacy_irq_syscore_init();
+-}
+-#endif
+-
+-void tegra_assert_system_reset(enum reboot_mode mode, const char *cmd)
+-{
+-	void __iomem *reset = IO_ADDRESS(TEGRA_PMC_BASE + 0);
+-	u32 reg;
+-
+-	reg = readl_relaxed(reset);
+-	reg |= 0x10;
+-	writel_relaxed(reg, reset);
+-}
+-
+-static void __init tegra_init_cache(void)
+-{
+-#ifdef CONFIG_CACHE_L2X0
+-	int ret;
+-	void __iomem *p = IO_ADDRESS(TEGRA_ARM_PERIF_BASE) + 0x3000;
+-	u32 aux_ctrl, cache_type;
+-
+-	cache_type = readl(p + L2X0_CACHE_TYPE);
+-	aux_ctrl = (cache_type & 0x700) << (17-8);
+-	aux_ctrl |= 0x7C400001;
+-
+-	ret = l2x0_of_init(aux_ctrl, 0x8200c3fe);
+-	if (!ret)
+-		l2x0_saved_regs_addr = virt_to_phys(&l2x0_saved_regs);
+-#endif
+-
+-}
+-
+-void __init tegra_init_early(void)
+-{
+-	tegra_cpu_reset_handler_init();
+-	tegra_apb_io_init();
+-	tegra_init_fuse();
+-	tegra_init_cache();
+-	tegra_powergate_init();
+-	tegra_hotplug_init();
+-}
+-
+-void __init tegra_init_late(void)
+-{
+-	tegra_init_suspend();
+-	tegra_cpuidle_init();
+-	tegra_powergate_debugfs_init();
+-}
+diff --git a/arch/arm/mach-tegra/pmc.c b/arch/arm/mach-tegra/pmc.c
+index 7916ff9..93a4dbc 100644
+--- a/arch/arm/mach-tegra/pmc.c
++++ b/arch/arm/mach-tegra/pmc.c
+@@ -166,6 +166,15 @@ int tegra_pmc_cpu_remove_clamping(int cpuid)
+ 	return tegra_pmc_powergate_remove_clamping(id);
  }
-@@ -276,7 +276,7 @@ static void tegra_suspend_exit_lp1(void)
- 	tegra_pmc_resume();
  
- 	/* restore IRAM */
--	memcpy(IO_ADDRESS(TEGRA_IRAM_CODE_AREA), iram_save_addr,
-+	memcpy(IO_ADDRESS(TEGRA_IRAM_LPx_RESUME_AREA), iram_save_addr,
- 		iram_save_size);
- 
- 	*(u32 *)tegra_cpu_lp1_mask = 0;
-diff --git a/arch/arm/mach-tegra/reset.c b/arch/arm/mach-tegra/reset.c
-index fd0bbf8..568f5bb 100644
---- a/arch/arm/mach-tegra/reset.c
-+++ b/arch/arm/mach-tegra/reset.c
-@@ -82,7 +82,7 @@ void __init tegra_cpu_reset_handler_init(void)
- 
++void tegra_pmc_restart(enum reboot_mode mode, const char *cmd)
++{
++	u32 val;
++
++	val = tegra_pmc_readl(0);
++	val |= 0x10;
++	tegra_pmc_writel(val, 0);
++}
++
  #ifdef CONFIG_PM_SLEEP
- 	__tegra_cpu_reset_handler_data[TEGRA_RESET_STARTUP_LP1] =
--		TEGRA_IRAM_CODE_AREA;
-+		TEGRA_IRAM_LPx_RESUME_AREA;
- 	__tegra_cpu_reset_handler_data[TEGRA_RESET_STARTUP_LP2] =
- 		virt_to_phys((void *)tegra_resume);
- #endif
-diff --git a/arch/arm/mach-tegra/sleep-tegra20.S b/arch/arm/mach-tegra/sleep-tegra20.S
-index 5c3bd11..aaaf3ab 100644
---- a/arch/arm/mach-tegra/sleep-tegra20.S
-+++ b/arch/arm/mach-tegra/sleep-tegra20.S
-@@ -25,6 +25,7 @@
- #include <asm/cp15.h>
- #include <asm/cache.h>
+ static void set_power_timers(u32 us_on, u32 us_off, unsigned long rate)
+ {
+diff --git a/arch/arm/mach-tegra/pmc.h b/arch/arm/mach-tegra/pmc.h
+index 4d5f8f3..59e19c34 100644
+--- a/arch/arm/mach-tegra/pmc.h
++++ b/arch/arm/mach-tegra/pmc.h
+@@ -18,6 +18,8 @@
+ #ifndef __MACH_TEGRA_PMC_H
+ #define __MACH_TEGRA_PMC_H
  
-+#include "irammap.h"
- #include "sleep.h"
- #include "flowctrl.h"
++#include <linux/reboot.h>
++
+ enum tegra_suspend_mode {
+ 	TEGRA_SUSPEND_NONE = 0,
+ 	TEGRA_SUSPEND_LP2,	/* CPU voltage off */
+@@ -39,6 +41,8 @@ bool tegra_pmc_cpu_is_powered(int cpuid);
+ int tegra_pmc_cpu_power_on(int cpuid);
+ int tegra_pmc_cpu_remove_clamping(int cpuid);
  
-@@ -235,7 +236,7 @@ ENTRY(tegra20_sleep_core_finish)
- 	mov32	r0, tegra20_tear_down_core
- 	mov32	r1, tegra20_iram_start
- 	sub	r0, r0, r1
--	mov32	r1, TEGRA_IRAM_CODE_AREA
-+	mov32	r1, TEGRA_IRAM_LPx_RESUME_AREA
- 	add	r0, r0, r1
++void tegra_pmc_restart(enum reboot_mode mode, const char *cmd);
++
+ void tegra_pmc_init_irq(void);
+ void tegra_pmc_init(void);
  
- 	mov	pc, r3
-@@ -328,7 +329,7 @@ tegra20_iram_start:
-  * The physical address of tegra_resume expected to be stored in
-  * PMC_SCRATCH41.
-  *
-- * NOTE: THIS *MUST* BE RELOCATED TO TEGRA_IRAM_CODE_AREA.
-+ * NOTE: THIS *MUST* BE RELOCATED TO TEGRA_IRAM_LPx_RESUME_AREA.
-  */
- ENTRY(tegra20_lp1_reset)
- 	/*
-diff --git a/arch/arm/mach-tegra/sleep-tegra30.S b/arch/arm/mach-tegra/sleep-tegra30.S
-index 63fa91b..c6fc15c 100644
---- a/arch/arm/mach-tegra/sleep-tegra30.S
-+++ b/arch/arm/mach-tegra/sleep-tegra30.S
-@@ -20,6 +20,7 @@
- #include <asm/asm-offsets.h>
- #include <asm/cache.h>
+diff --git a/arch/arm/mach-tegra/tegra.c b/arch/arm/mach-tegra/tegra.c
+index 4da271d..40b031c 100644
+--- a/arch/arm/mach-tegra/tegra.c
++++ b/arch/arm/mach-tegra/tegra.c
+@@ -35,17 +35,78 @@
+ #include <linux/usb/tegra_usb_phy.h>
+ #include <linux/clk-provider.h>
+ #include <linux/clk/tegra.h>
++#include <linux/irqchip.h>
  
-+#include "irammap.h"
++#include <asm/hardware/cache-l2x0.h>
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+ #include <asm/mach/time.h>
+ #include <asm/setup.h>
+ 
++#include "apbio.h"
+ #include "board.h"
+ #include "common.h"
++#include "cpuidle.h"
  #include "fuse.h"
- #include "sleep.h"
- #include "flowctrl.h"
-@@ -262,7 +263,7 @@ ENTRY(tegra30_sleep_core_finish)
- 	mov32	r0, tegra30_tear_down_core
- 	mov32	r1, tegra30_iram_start
- 	sub	r0, r0, r1
--	mov32	r1, TEGRA_IRAM_CODE_AREA
-+	mov32	r1, TEGRA_IRAM_LPx_RESUME_AREA
- 	add	r0, r0, r1
+ #include "iomap.h"
++#include "irq.h"
+ #include "pmc.h"
++#include "pm.h"
++#include "reset.h"
++#include "sleep.h"
++
++/*
++ * Storage for debug-macro.S's state.
++ *
++ * This must be in .data not .bss so that it gets initialized each time the
++ * kernel is loaded. The data is declared here rather than debug-macro.S so
++ * that multiple inclusions of debug-macro.S point at the same data.
++ */
++u32 tegra_uart_config[4] = {
++	/* Debug UART initialization required */
++	1,
++	/* Debug UART physical address */
++	0,
++	/* Debug UART virtual address */
++	0,
++	/* Scratch space for debug macro */
++	0,
++};
++
++static void __init tegra_init_cache(void)
++{
++#ifdef CONFIG_CACHE_L2X0
++	int ret;
++	void __iomem *p = IO_ADDRESS(TEGRA_ARM_PERIF_BASE) + 0x3000;
++	u32 aux_ctrl, cache_type;
++
++	cache_type = readl(p + L2X0_CACHE_TYPE);
++	aux_ctrl = (cache_type & 0x700) << (17-8);
++	aux_ctrl |= 0x7C400001;
++
++	ret = l2x0_of_init(aux_ctrl, 0x8200c3fe);
++	if (!ret)
++		l2x0_saved_regs_addr = virt_to_phys(&l2x0_saved_regs);
++#endif
++}
++
++static void __init tegra_init_early(void)
++{
++	tegra_cpu_reset_handler_init();
++	tegra_apb_io_init();
++	tegra_init_fuse();
++	tegra_init_cache();
++	tegra_powergate_init();
++	tegra_hotplug_init();
++}
++
++static void __init tegra_dt_init_irq(void)
++{
++	tegra_pmc_init_irq();
++	tegra_init_irq();
++	irqchip_init();
++	tegra_legacy_irq_syscore_init();
++}
  
- 	mov	pc, r3
-@@ -314,7 +315,7 @@ tegra30_iram_start:
-  * The physical address of tegra_resume expected to be stored in
-  * PMC_SCRATCH41.
-  *
-- * NOTE: THIS *MUST* BE RELOCATED TO TEGRA_IRAM_CODE_AREA.
-+ * NOTE: THIS *MUST* BE RELOCATED TO TEGRA_IRAM_LPx_RESUME_AREA.
-  */
- ENTRY(tegra30_lp1_reset)
- 	/*
+ static void __init tegra_dt_init(void)
+ {
+@@ -107,7 +168,9 @@ static void __init tegra_dt_init_late(void)
+ {
+ 	int i;
+ 
+-	tegra_init_late();
++	tegra_init_suspend();
++	tegra_cpuidle_init();
++	tegra_powergate_debugfs_init();
+ 
+ 	for (i = 0; i < ARRAY_SIZE(board_init_funcs); i++) {
+ 		if (of_machine_is_compatible(board_init_funcs[i].machine)) {
+@@ -132,6 +195,6 @@ DT_MACHINE_START(TEGRA_DT, "NVIDIA Tegra SoC (Flattened Device Tree)")
+ 	.init_time	= tegra_dt_init_time,
+ 	.init_machine	= tegra_dt_init,
+ 	.init_late	= tegra_dt_init_late,
+-	.restart	= tegra_assert_system_reset,
++	.restart	= tegra_pmc_restart,
+ 	.dt_compat	= tegra_dt_board_compat,
+ MACHINE_END
 -- 
 1.8.1.5
