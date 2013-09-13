@@ -1,34 +1,30 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 13 Sep 2013 09:14:06 +0200
-Subject: [PATCH 5/7] staging: media/lirc: switch to use gpiolib
-In-Reply-To: <1378816283-8164-1-git-send-email-linus.walleij@linaro.org>
-References: <1378816283-8164-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <CACRpkdaBeYTchtQn6-QThAv2XWAT=vd=YarHA1TgVZeLoLNfpA@mail.gmail.com>
+Date: Fri, 13 Sep 2013 09:30:35 +0200
+Subject: Inte IOP Xscale updates
+In-Reply-To: <20130910125815.GB3379@blackmetal.musicnaut.iki.fi>
+References: <CACRpkdZU5mVU15AK=m-BRmpizKJJVAR98JKf3Qcgy2ms+HG+Hw@mail.gmail.com>
+ <20130910125815.GB3379@blackmetal.musicnaut.iki.fi>
+Message-ID: <CACRpkdZDcqGcJTJ+dKd_FG2ZFoGDoMtvp479KeBoZ2J9MVVTdA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mauro,
+On Tue, Sep 10, 2013 at 2:58 PM, Aaro Koskinen <aaro.koskinen@iki.fi> wrote:
+> On Tue, Sep 03, 2013 at 02:01:45PM +0200, Linus Walleij wrote:
 
-On Tue, Sep 10, 2013 at 2:31 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
-
-> The lirc serial module has special hooks to work with NSLU2,
-> switch these over to use gpiolib, as that is available on the
-> ixp4 platform.
+>> Can you confirm that you boot-test these machines regularly?
+>>
+>> I am worried that we maintain code that is not used or even working
+>> see.
 >
-> Not even compile tested as there is no way to select this
-> driver from menuconfig on the ixp4 platform.
->
-> Cc: Imre Kaloz <kaloz@openwrt.org>
-> Cc: Krzysztof Halasa <khc@pm.waw.pl>
-> Cc: Alexandre Courbot <acourbot@nvidia.com>
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
-> Hi Greg: I'm seeking an ACK on this patch to take it through
-> the GPIO tree as part of a clean-up attempt to remove custom
-> GPIO APIs.
+> I have N2100/iop32x in use, and I also test mainline kernels regularly on
+> it. You don't see many patches probably because it has been very stable.
+> Not sure where you got the 2010, because from mailing list archives and
+> even from "git log" you can find booting/testing reports even from 2013.
 
-Could you ACK this patch if it looks OK to you?
+Thanks, now I know :-)
+
+Sometimes one has to poke around to get the right answers, and
+now I know who can test patches for this platform.
 
 Yours,
 Linus Walleij
