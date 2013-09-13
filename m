@@ -1,10 +1,10 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 13 Sep 2013 18:30:55 +0530
-Subject: [PATCH 109/228] cpufreq: loongson2: don't initialize part of policy
- that is set by core too
+Date: Fri, 13 Sep 2013 18:30:56 +0530
+Subject: [PATCH 110/228] cpufreq: maple: don't initialize part of policy that
+ is set by core too
 In-Reply-To: <cover.1379063063.git.viresh.kumar@linaro.org>
 References: <cover.1379063063.git.viresh.kumar@linaro.org>
-Message-ID: <ddd065f58c605c87b99f2ac3e9caa54e47c06c7c.1379063063.git.viresh.kumar@linaro.org>
+Message-ID: <60e87dd334e5771e4eed764254e47e7138ef9e58.1379063063.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,24 +14,23 @@ this driver doesn't need to do it. This patch removes such code.
 Most recent of those changes is to call ->get() in the core after calling
 ->init().
 
-Cc: John Crispin <blogic@openwrt.org>
+Cc: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
 Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- drivers/cpufreq/loongson2_cpufreq.c | 2 --
- 1 file changed, 2 deletions(-)
+ drivers/cpufreq/maple-cpufreq.c | 1 -
+ 1 file changed, 1 deletion(-)
 
-diff --git a/drivers/cpufreq/loongson2_cpufreq.c b/drivers/cpufreq/loongson2_cpufreq.c
-index ed7fbe2..dd4f3e4 100644
---- a/drivers/cpufreq/loongson2_cpufreq.c
-+++ b/drivers/cpufreq/loongson2_cpufreq.c
-@@ -131,8 +131,6 @@ static int loongson2_cpufreq_cpu_init(struct cpufreq_policy *policy)
- 		return ret;
- 	}
- 
--	policy->cur = loongson2_cpufreq_get(policy->cpu);
--
- 	return cpufreq_table_validate_and_show(policy,
- 					    &loongson2_clockmod_table[0]);
- }
+diff --git a/drivers/cpufreq/maple-cpufreq.c b/drivers/cpufreq/maple-cpufreq.c
+index b23d1d8..1c0cec1 100644
+--- a/drivers/cpufreq/maple-cpufreq.c
++++ b/drivers/cpufreq/maple-cpufreq.c
+@@ -166,7 +166,6 @@ static unsigned int maple_cpufreq_get_speed(unsigned int cpu)
+ static int maple_cpufreq_cpu_init(struct cpufreq_policy *policy)
+ {
+ 	policy->cpuinfo.transition_latency = 12000;
+-	policy->cur = maple_cpu_freqs[maple_scom_query_freq()].frequency;
+ 	/* secondary CPUs are tied to the primary one by the
+ 	 * cpufreq core if in the secondary policy we tell it that
+ 	 * it actually must be one policy together with all others. */
 -- 
 1.7.12.rc2.18.g61b472e
