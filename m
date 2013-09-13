@@ -1,102 +1,64 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 13 Sep 2013 14:23:29 -0500
-Subject: [PATCH v3] dt: update PSCI binding documentation for v0.2
-In-Reply-To: <20130903095235.GD18206@e106331-lin.cambridge.arm.com>
-References: <1377564633-31638-1-git-send-email-robherring2@gmail.com>
- <20130903095235.GD18206@e106331-lin.cambridge.arm.com>
-Message-ID: <CAL_JsqJ-SY5MsnbETnK6k4GRHhtgiYztMo+bW7i85A4aWYjrPg@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 13 Sep 2013 21:45:51 +0200
+Subject: [PATCH] clk: nomadik: set all timers to use 2.4 MHz TIMCLK
+Message-ID: <1379101551-2722-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 3, 2013 at 4:52 AM, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Tue, Aug 27, 2013 at 01:50:33AM +0100, Rob Herring wrote:
->> From: Rob Herring <rob.herring@calxeda.com>
->
-> Hi Rob,
->
-> Sorry for the delay on reviewing this.
->
->>
->> The PSCI spec from ARM has been updated to 0.2 version. Update the
->> binding document to reflect the spec changes. For the binding, the
->> major changes are the addition of psci_version, affinity_info,
->> migrate_info_type, migrate_info_up_cpu, system_reset and system_off
->> functions. The recommended function ID numbering has also changed.
->>
->> This update also defines 32 and 64 bit calling conventions. The calling
->> convention is defined on a per function ID basis.
->>
->> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
->> Cc: Dave Martin <Dave.Martin@arm.com>
->> Cc: Mark Rutland <mark.rutland@arm.com>
->> Cc: Ian Campbell <Ian.Campbell@citrix.com>
->> Cc: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
->> Cc: Marc Zyngier <Marc.Zyngier@arm.com>
->> Cc: Christoffer Dall <christoffer.dall@linaro.org>,
->> Cc: Charles Garcia-Tobin <Charles.Garcia-Tobin@arm.com>
->> Cc: Matt Sealey <neko@bakuhatsu.net>
->> Cc: devicetree at vger.kernel.org
->> ---
->> v3: This version implements Mark's suggested binding with -32 and -64 suffixes.
->>
->>  Documentation/devicetree/bindings/arm/psci.txt | 62 +++++++++++++++++++-------
->>  1 file changed, 46 insertions(+), 16 deletions(-)
->>
->> diff --git a/Documentation/devicetree/bindings/arm/psci.txt b/Documentation/devicetree/bindings/arm/psci.txt
->> index 433afe9..209bb04 100644
->> --- a/Documentation/devicetree/bindings/arm/psci.txt
->> +++ b/Documentation/devicetree/bindings/arm/psci.txt
->> @@ -1,16 +1,17 @@
->>  * Power State Coordination Interface (PSCI)
->>
->>  Firmware implementing the PSCI functions described in ARM document number
->> -ARM DEN 0022A ("Power State Coordination Interface System Software on ARM
->> +ARM DEN 0022B ("Power State Coordination Interface System Software on ARM
->>  processors") can be used by Linux to initiate various CPU-centric power
->>  operations.
->>
->> -Issue A of the specification describes functions for CPU suspend, hotplug
->> -and migration of secure software.
->> +Issue B of the specification describes functions for CPU suspend, hotplug,
->> +migration of secure software, and system level reset and powerdown.
->>
->>  Functions are invoked by trapping to the privilege level of the PSCI
->>  firmware (specified as part of the binding below) and passing arguments
->> -in a manner similar to that specified by AAPCS:
->> +as defined in ARM document "SMC Calling Convention" (ARM DEN 0028) in a manner
->> +similar to that specified by AAPCS:
->>
->>        r0             => 32-bit Function ID / return value
->>       {r1 - r3}       => Parameters
->> @@ -21,10 +22,10 @@ to #0.
->>
->>  Main node required properties:
->>
->> - - compatible    : Must be "arm,psci"
->> + - compatible    : Must contain "arm,psci-0.2" or "arm,psci"
->>
->> - - method        : The method of calling the PSCI firmware. Permitted
->> -                   values are:
->> + - method        : The method defines the calling convention for the PSCI
->> +                   firmware. Permitted values are:
->>
->>                     "smc" : SMC #0, with the register assignments specified
->>                          in this binding.
->> @@ -32,24 +33,53 @@ Main node required properties:
->>                     "hvc" : HVC #0, with the register assignments specified
->>                          in this binding.
->>
->> + - psci_version  : Function ID for PSCI_VERSION operation. Required for
->> +                   "arm,psci-0.2" compatible version or later.
->> +
->
-> While this seems sensible, I'm not sure that this needs to be mandatory.
+This fixes a regression for the Nomadik on the main system
+timers.
 
-It is quite pointless to have at all if we don't make it mandatory. I
-would accept that it is pointless and the compatible string should
-always reflect the version anyway, but ARM added the call and states
-it is mandatory in the PSCI doc. I guess we could have mandatory for
-the firmware to implement, but optional in the DT binding? That seems
-silly though.
+The Nomadik seemed a bit slow and its heartbeat wasn't looking
+healthy. And it was not strange, because it has been connected
+to the 32768 Hz clock at boot, while being told by the clock driver
+that it was 2.4MHz. Actually connect the TIMCLK to 2.4MHz by
+default as this is what we want for nice scheduling, clocksource
+and clock event.
 
-Rob
+Cc: stable at vger.kernel.org
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ drivers/clk/clk-nomadik.c | 21 +++++++++++++++++++++
+ 1 file changed, 21 insertions(+)
+
+diff --git a/drivers/clk/clk-nomadik.c b/drivers/clk/clk-nomadik.c
+index 51410c2..4d978a3 100644
+--- a/drivers/clk/clk-nomadik.c
++++ b/drivers/clk/clk-nomadik.c
+@@ -27,6 +27,14 @@
+  */
+ 
+ #define SRC_CR			0x00U
++#define SRC_CR_T0_ENSEL		BIT(15)
++#define SRC_CR_T1_ENSEL		BIT(17)
++#define SRC_CR_T2_ENSEL		BIT(19)
++#define SRC_CR_T3_ENSEL		BIT(21)
++#define SRC_CR_T4_ENSEL		BIT(23)
++#define SRC_CR_T5_ENSEL		BIT(25)
++#define SRC_CR_T6_ENSEL		BIT(27)
++#define SRC_CR_T7_ENSEL		BIT(29)
+ #define SRC_XTALCR		0x0CU
+ #define SRC_XTALCR_XTALTIMEN	BIT(20)
+ #define SRC_XTALCR_SXTALDIS	BIT(19)
+@@ -543,6 +551,19 @@ void __init nomadik_clk_init(void)
+ 		       __func__, np->name);
+ 		return;
+ 	}
++
++	/* Set all timers to use the 2.4 MHz TIMCLK */
++	val = readl(src_base + SRC_CR);
++	val |= SRC_CR_T0_ENSEL;
++	val |= SRC_CR_T1_ENSEL;
++	val |= SRC_CR_T2_ENSEL;
++	val |= SRC_CR_T3_ENSEL;
++	val |= SRC_CR_T4_ENSEL;
++	val |= SRC_CR_T5_ENSEL;
++	val |= SRC_CR_T6_ENSEL;
++	val |= SRC_CR_T7_ENSEL;
++	writel(val, src_base + SRC_CR);
++
+ 	val = readl(src_base + SRC_XTALCR);
+ 	pr_info("SXTALO is %s\n",
+ 		(val & SRC_XTALCR_SXTALDIS) ? "disabled" : "enabled");
+-- 
+1.8.1.4
