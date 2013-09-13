@@ -1,10 +1,10 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 13 Sep 2013 18:30:46 +0530
-Subject: [PATCH 100/228] cpufreq: e_powersaver: don't initialize part of
- policy that is set by core too
+Date: Fri, 13 Sep 2013 18:30:47 +0530
+Subject: [PATCH 101/228] cpufreq: elanfreq: don't initialize part of policy
+ that is set by core too
 In-Reply-To: <cover.1379063063.git.viresh.kumar@linaro.org>
 References: <cover.1379063063.git.viresh.kumar@linaro.org>
-Message-ID: <7d15f2a318238d6f93cee5ac92c037fda902898e.1379063063.git.viresh.kumar@linaro.org>
+Message-ID: <f8c2fa4378428196a3141bf9ce7bafadd7aed267.1379063063.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -16,20 +16,20 @@ Most recent of those changes is to call ->get() in the core after calling
 
 Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- drivers/cpufreq/e_powersaver.c | 1 -
+ drivers/cpufreq/elanfreq.c | 1 -
  1 file changed, 1 deletion(-)
 
-diff --git a/drivers/cpufreq/e_powersaver.c b/drivers/cpufreq/e_powersaver.c
-index a8cbbd0..2c11ce3 100644
---- a/drivers/cpufreq/e_powersaver.c
-+++ b/drivers/cpufreq/e_powersaver.c
-@@ -395,7 +395,6 @@ static int eps_cpu_init(struct cpufreq_policy *policy)
- 	}
+diff --git a/drivers/cpufreq/elanfreq.c b/drivers/cpufreq/elanfreq.c
+index fe7053c..d91a645 100644
+--- a/drivers/cpufreq/elanfreq.c
++++ b/drivers/cpufreq/elanfreq.c
+@@ -207,7 +207,6 @@ static int elanfreq_cpu_init(struct cpufreq_policy *policy)
  
- 	policy->cpuinfo.transition_latency = 140000; /* 844mV -> 700mV in ns */
--	policy->cur = fsb * current_multiplier;
+ 	/* cpuinfo and default policy values */
+ 	policy->cpuinfo.transition_latency = CPUFREQ_ETERNAL;
+-	policy->cur = elanfreq_get_cpu_frequency(0);
  
- 	ret = cpufreq_table_validate_and_show(policy, &centaur->freq_table[0]);
- 	if (ret) {
+ 	return cpufreq_table_validate_and_show(policy, elanfreq_table);
+ }
 -- 
 1.7.12.rc2.18.g61b472e
