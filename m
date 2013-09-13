@@ -1,80 +1,84 @@
 From: b29396@freescale.com (Dong Aisheng)
-Date: Fri, 13 Sep 2013 19:11:33 +0800
-Subject: [PATCH v2 4/9] sdhci: sdhci-esdhc-imx: support real clock on and off
- for imx6q
+Date: Fri, 13 Sep 2013 19:11:38 +0800
+Subject: [PATCH v2 9/9] ARM: dts: imx6qdl: add uhs pinctrl state for usdhc3
 In-Reply-To: <1379070698-7344-1-git-send-email-b29396@freescale.com>
 References: <1379070698-7344-1-git-send-email-b29396@freescale.com>
-Message-ID: <1379070698-7344-5-git-send-email-b29396@freescale.com>
+Message-ID: <1379070698-7344-10-git-send-email-b29396@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The signal voltage switch flow requires to shutdown and output
-clock in a specific sequence according to standard host controller
-v3.0 spec. In that timing, the card must really receive clock or not.
-
-However, for i.MX6Q, the uSDHC will not output clock even the clock
-is enabled until there is command or data in transfer on the bus,
-which will then cause singal voltage switch always to fail.
-
-For i.MX6Q, we clear ESDHC_VENDOR_SPEC_FRC_SDCLK_ON bit to let
-controller to gate off clock automatically and set that bit
-to force clock output if clock is on.
-
-This is required by SD3.0 support.
+This is needed for supporting ultra high speed cards like SD3.0 cards.
 
 Signed-off-by: Dong Aisheng <b29396@freescale.com>
 ---
- drivers/mmc/host/sdhci-esdhc-imx.c |   19 +++++++++++++++++--
- 1 files changed, 17 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/imx6qdl-sabreauto.dtsi |    5 ++++-
+ arch/arm/boot/dts/imx6qdl.dtsi           |   30 ++++++++++++++++++++++++++++++
+ 2 files changed, 34 insertions(+), 1 deletions(-)
 
-diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
-index 67eaec9..37fafd7 100644
---- a/drivers/mmc/host/sdhci-esdhc-imx.c
-+++ b/drivers/mmc/host/sdhci-esdhc-imx.c
-@@ -34,6 +34,7 @@
- /* VENDOR SPEC register */
- #define ESDHC_VENDOR_SPEC		0xc0
- #define  ESDHC_VENDOR_SPEC_SDIO_QUIRK	(1 << 1)
-+#define  ESDHC_VENDOR_SPEC_FRC_SDCLK_ON	(1 << 8)
- #define ESDHC_WTMK_LVL			0x44
- #define ESDHC_MIX_CTRL			0x48
- #define  ESDHC_MIX_CTRL_AC23EN		(1 << 7)
-@@ -409,13 +410,20 @@ static inline void esdhc_pltfm_set_clock(struct sdhci_host *host,
- 					 unsigned int clock)
- {
- 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-+	struct pltfm_imx_data *imx_data = pltfm_host->priv;
- 	unsigned int host_clock = clk_get_rate(pltfm_host->clk);
- 	int pre_div = 2;
- 	int div = 1;
--	u32 temp;
-+	u32 temp, val;
+diff --git a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
+index 1cbbc51..ff6f1e8 100644
+--- a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
+@@ -54,6 +54,7 @@
+ 			fsl,pins = <
+ 				MX6QDL_PAD_NANDF_CS2__GPIO6_IO15 0x80000000
+ 				MX6QDL_PAD_SD2_DAT2__GPIO1_IO13  0x80000000
++				MX6QDL_PAD_GPIO_18__SD3_VSELECT 0x17059
+ 			>;
+ 		};
+ 	};
+@@ -74,8 +75,10 @@
+ };
  
--	if (clock == 0)
-+	if (clock == 0) {
-+		if (is_imx6q_usdhc(imx_data)) {
-+			val = readl(host->ioaddr + ESDHC_VENDOR_SPEC);
-+			writel(val & ~ESDHC_VENDOR_SPEC_FRC_SDCLK_ON,
-+					host->ioaddr + ESDHC_VENDOR_SPEC);
-+		}
- 		goto out;
-+	}
+ &usdhc3 {
+-	pinctrl-names = "default";
++	pinctrl-names = "default", "state_100mhz", "state_200mhz";
+ 	pinctrl-0 = <&pinctrl_usdhc3_1>;
++	pinctrl-1 = <&pinctrl_usdhc3_1_100mhz>;
++	pinctrl-2 = <&pinctrl_usdhc3_1_200mhz>;
+ 	cd-gpios = <&gpio6 15 0>;
+ 	wp-gpios = <&gpio1 13 0>;
+ 	status = "okay";
+diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+index ccd55c2..cb17574 100644
+--- a/arch/arm/boot/dts/imx6qdl.dtsi
++++ b/arch/arm/boot/dts/imx6qdl.dtsi
+@@ -1184,6 +1184,36 @@
+ 						>;
+ 					};
  
- 	temp = sdhci_readl(host, ESDHC_SYSTEM_CONTROL);
- 	temp &= ~(ESDHC_CLOCK_IPGEN | ESDHC_CLOCK_HCKEN | ESDHC_CLOCK_PEREN
-@@ -439,6 +447,13 @@ static inline void esdhc_pltfm_set_clock(struct sdhci_host *host,
- 		| (div << ESDHC_DIVIDER_SHIFT)
- 		| (pre_div << ESDHC_PREDIV_SHIFT));
- 	sdhci_writel(host, temp, ESDHC_SYSTEM_CONTROL);
++					pinctrl_usdhc3_1_100mhz: usdhc3grp-1-100mhz { /* 100Mhz */
++						fsl,pins = <
++							MX6QDL_PAD_SD3_CMD__SD3_CMD 0x170B9
++							MX6QDL_PAD_SD3_CLK__SD3_CLK 0x100B9
++							MX6QDL_PAD_SD3_DAT0__SD3_DATA0 0x170B9
++							MX6QDL_PAD_SD3_DAT1__SD3_DATA1 0x170B9
++							MX6QDL_PAD_SD3_DAT2__SD3_DATA2 0x170B9
++							MX6QDL_PAD_SD3_DAT3__SD3_DATA3 0x170B9
++							MX6QDL_PAD_SD3_DAT4__SD3_DATA4 0x170B9
++							MX6QDL_PAD_SD3_DAT5__SD3_DATA5 0x170B9
++							MX6QDL_PAD_SD3_DAT6__SD3_DATA6 0x170B9
++							MX6QDL_PAD_SD3_DAT7__SD3_DATA7 0x170B9
++						>;
++					};
 +
-+	if (is_imx6q_usdhc(imx_data)) {
-+		val = readl(host->ioaddr + ESDHC_VENDOR_SPEC);
-+		writel(val | ESDHC_VENDOR_SPEC_FRC_SDCLK_ON,
-+		host->ioaddr + ESDHC_VENDOR_SPEC);
-+	}
++					pinctrl_usdhc3_1_200mhz: usdhc3grp-1-200mhz { /* 200Mhz */
++						fsl,pins = <
++							MX6QDL_PAD_SD3_CMD__SD3_CMD 0x170F9
++							MX6QDL_PAD_SD3_CLK__SD3_CLK 0x100F9
++							MX6QDL_PAD_SD3_DAT0__SD3_DATA0 0x170F9
++							MX6QDL_PAD_SD3_DAT1__SD3_DATA1 0x170F9
++							MX6QDL_PAD_SD3_DAT2__SD3_DATA2 0x170F9
++							MX6QDL_PAD_SD3_DAT3__SD3_DATA3 0x170F9
++							MX6QDL_PAD_SD3_DAT4__SD3_DATA4 0x170F9
++							MX6QDL_PAD_SD3_DAT5__SD3_DATA5 0x170F9
++							MX6QDL_PAD_SD3_DAT6__SD3_DATA6 0x170F9
++							MX6QDL_PAD_SD3_DAT7__SD3_DATA7 0x170F9
++						>;
++					};
 +
- 	mdelay(1);
- out:
- 	host->clock = clock;
+ 					pinctrl_usdhc3_2: usdhc3grp-2 {
+ 						fsl,pins = <
+ 							MX6QDL_PAD_SD3_CMD__SD3_CMD    0x17059
 -- 
 1.7.1
