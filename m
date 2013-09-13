@@ -1,31 +1,32 @@
 From: sachin.kamat@linaro.org (Sachin Kamat)
-Date: Fri, 13 Sep 2013 14:53:48 +0530
-Subject: [PATCH 06/10] clk: versatile: Staticize clk_sp810_timerclken_of_get
+Date: Fri, 13 Sep 2013 14:53:49 +0530
+Subject: [PATCH 07/10] clk: mvebu: Staticize of_cpu_clk_setup
 In-Reply-To: <1379064232-10261-1-git-send-email-sachin.kamat@linaro.org>
 References: <1379064232-10261-1-git-send-email-sachin.kamat@linaro.org>
-Message-ID: <1379064232-10261-6-git-send-email-sachin.kamat@linaro.org>
+Message-ID: <1379064232-10261-7-git-send-email-sachin.kamat@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-clk_sp810_timerclken_of_get is used only in this file. Make it static.
+'of_cpu_clk_setup' is used only in this file. Make it static.
 
 Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
+Cc: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- drivers/clk/versatile/clk-sp810.c |    2 +-
+ drivers/clk/mvebu/clk-cpu.c |    2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/clk/versatile/clk-sp810.c b/drivers/clk/versatile/clk-sp810.c
-index bf9b15a..c6e86a9 100644
---- a/drivers/clk/versatile/clk-sp810.c
-+++ b/drivers/clk/versatile/clk-sp810.c
-@@ -123,7 +123,7 @@ static const struct clk_ops clk_sp810_timerclken_ops = {
- 	.set_parent = clk_sp810_timerclken_set_parent,
+diff --git a/drivers/clk/mvebu/clk-cpu.c b/drivers/clk/mvebu/clk-cpu.c
+index 1466865..8ebf757 100644
+--- a/drivers/clk/mvebu/clk-cpu.c
++++ b/drivers/clk/mvebu/clk-cpu.c
+@@ -101,7 +101,7 @@ static const struct clk_ops cpu_ops = {
+ 	.set_rate = clk_cpu_set_rate,
  };
  
--struct clk *clk_sp810_timerclken_of_get(struct of_phandle_args *clkspec,
-+static struct clk *clk_sp810_timerclken_of_get(struct of_phandle_args *clkspec,
- 		void *data)
+-void __init of_cpu_clk_setup(struct device_node *node)
++static void __init of_cpu_clk_setup(struct device_node *node)
  {
- 	struct clk_sp810 *sp810 = data;
+ 	struct cpu_clk *cpuclk;
+ 	void __iomem *clock_complex_base = of_iomap(node, 0);
 -- 
 1.7.9.5
