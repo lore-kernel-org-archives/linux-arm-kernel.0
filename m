@@ -1,47 +1,25 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Fri, 13 Sep 2013 07:48:05 -0700
-Subject: [PATCH v2 00/12] CPU idle for Armada XP
-In-Reply-To: <5232F43D.4040404@free-electrons.com> (Gregory CLEMENT's message
- of "Fri, 13 Sep 2013 13:17:17 +0200")
-References: <1379066801-16276-1-git-send-email-gregory.clement@free-electrons.com>
- <20130913110043.GJ19363@lunn.ch> <5232F43D.4040404@free-electrons.com>
-Message-ID: <871u4shj6i.fsf@linaro.org>
+From: cinifr@gmail.com (cinifr)
+Date: Fri, 13 Sep 2013 22:55:07 +0800
+Subject: [PATCH 3/4] Add physical count arch timer support for clocksource
+ in ARMv7.
+In-Reply-To: <523315CD.8010704@arm.com>
+References: <1378968687-8200-1-git-send-email-cinifr@gmail.com>
+ <1378968687-8200-4-git-send-email-cinifr@gmail.com>
+ <20130912112452.GA22013@e106331-lin.cambridge.arm.com>
+ <CAK3cCBwu4somtfc9J1ZDVcC-iYD1qDJwSWzWeOomTqY9tQA2kg@mail.gmail.com>
+ <5231EE43.5090900@arm.com>
+ <CAK3cCBzr8_LTYarZDgPYZY7_-5Qco_Qw+ACi=c2uOrn7MqwkBg@mail.gmail.com>
+ <5232DB49.4050701@arm.com>
+ <CAK3cCBw4EKypLmhf4L5_P3d27QzsrB+ZxUTgF58YhmUhBa00xQ@mail.gmail.com>
+ <523315CD.8010704@arm.com>
+Message-ID: <CAK3cCBwsbsdBoRX3Gnz5KpUVMQk0pnuUD+2WhZscBA+pDaat5g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Gregory CLEMENT <gregory.clement@free-electrons.com> writes:
-
-> On 13/09/2013 13:00, Andrew Lunn wrote:
->> 
->> On Fri, Sep 13, 2013 at 12:06:29PM +0200, Gregory CLEMENT wrote:
->>> Hello,
->>>
->>> This patch set adds the CPU idle support for Armada XP and prepares
->>> the support for Armada 370. This was based on the work of Nadav
->>> Haklai.
->> 
->> Hi Gregory.
->> 
->> Kirkwood has the ability to put the DDR into self refresh mode, which
->> is used as part of the second level idle mode. Does 370/XP have this?
 >
-> Indeed there is a self refresh bit on a DDR related register. I thought
-> this kind of feature is more likely used for suspend to ram.
+> This doesn't change the fact that using the physical timer/counter in a
+> VM is (or can be) horribly expensive, and should be avoided at all cost.
 >
-> We plan to also submit the suspend to ram but not immediately.
->
->> 
->> For XP, with it being SMP, it would be a bit more complex, since you
->> would not want to use it unless all CPUs were idle.
->
-> I wonder how the others SMP ARM SoCs deal with it, I hope this time
-> there will be a framework available and we won't have to create it! ;)
-
-You shouldn't have to invent anything here.
-
-For low-power states that require all CPUs to be idle, we have "coupled"
-CPUidle states (c.f. drivers/cpuidle/coupled.)  OMAP and Tegra are using
-this, but I believe Daniel wants to move away from this, so I'll let him
-elaborate.
-
-Kevin
+I will remove suport phy timer counter patch and try to fix it in
+bootloader.  I agree that is elegant only vct is be used.in kernel
+now.
