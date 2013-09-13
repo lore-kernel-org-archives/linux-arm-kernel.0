@@ -1,69 +1,150 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Fri, 13 Sep 2013 02:26:03 +0200 (CEST)
-Subject: [RFC PATCH 1/4] DRIVERS: IRQCHIP: Add crossbar irqchip driver
-In-Reply-To: <5232457A.8080709@ti.com>
-References: <1379000351-15672-1-git-send-email-r.sricharan@ti.com>
- <1379000351-15672-2-git-send-email-r.sricharan@ti.com>
- <alpine.DEB.2.02.1309122201530.4089@ionos.tec.linutronix.de>
- <523228B5.5070507@ti.com>
- <alpine.DEB.2.02.1309122335440.4089@ionos.tec.linutronix.de>
- <5232457A.8080709@ti.com>
-Message-ID: <alpine.DEB.2.02.1309130138550.4089@ionos.tec.linutronix.de>
+From: emilio@elopez.com.ar (=?UTF-8?q?Emilio=20L=C3=B3pez?=)
+Date: Thu, 12 Sep 2013 21:30:25 -0300
+Subject: [PATCH] memory: add a basic OF-based memory driver
+In-Reply-To: <1378863781-4235-1-git-send-email-emilio@elopez.com.ar>
+References: <1378863781-4235-1-git-send-email-emilio@elopez.com.ar>
+Message-ID: <1379032225-6425-1-git-send-email-emilio@elopez.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 12 Sep 2013, Santosh Shilimkar wrote:
-> On Thursday 12 September 2013 06:22 PM, Thomas Gleixner wrote:
-> > Now the real question is, how that expansion mechanism is supposed to
-> > work. There are two possible scenarios:
-> > 
-> > 1) Expand the number of handled interrupts beyond the GIC capacity:
-> > 
-> >    That requires a mechanism in CROSSBAR to map several CROSSBAR
-> >    interrupts to a particular GIC interrupt and provide a demux
-> >    mechanism to invoke the shared handlers.
-> > 
-> This is not possible in hardware and not supported. Hardware has
-> no notion of muxing multiple IRQ's to generate 1 IRQ or ack etc
-> functionality. Its a simple MUX to tie knots between input and output
-> wires.
+This driver's only job is to claim and ensure the necessary clock
+for memory operation on a DT-powered machine remains enabled.
 
-It's not a MUX. It's a ROUTING mechanism. That's similar to the
-mechanisms which are used by MSI[X]. We assign arbitrary interrupt
-numbers to a device and route them to some underlying limited hardware
-interrupt controller.
+Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
+---
 
-> > 2) Provide a mapping mechanism between possibly 250 interrupt numbers
-> >    and a limitation of a total 160 active interrupts by the underlying
-> >    GIC.
-> > 
-> This is the need and problem we are trying to solve.
+I believe this new patch should resolve all the concerns raised; as
+always, all feedback is welcome :)
 
-Let me summarize:
+Changes from RFC:
+- Move from drivers/of to drivers/memory
+- Make a proper driver instead of using an initcall
+- Binding document for the new "simple-memory-controller"
 
-   - GIC supports up to 160 interrupts
+ .../simple-memory-controller.txt                   | 19 ++++++++
+ drivers/memory/Kconfig                             | 11 +++++
+ drivers/memory/Makefile                            |  1 +
+ drivers/memory/simple-mc.c                         | 57 ++++++++++++++++++++++
+ 4 files changed, 88 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/memory-controllers/simple-memory-controller.txt
+ create mode 100644 drivers/memory/simple-mc.c
 
-   - CROSSBAR supports up to 250 interrupts 
-
-   - CROSSBAR routes up to 160 out of 250 interrupts to the GIC ones
-
-   - Drivers request a CROSSBAR interrupt number which must be mapped
-     to some arbitrary available GIC irq number
-
-So basically the CROSSBAR mechanism is pretty much the same as MSI[X]
-just in a different flavour and with a different set of semantics and
-limitations, i.e. poor mans MSI[X] with a new level of bogosity.
-
-So if CROSSBAR is going to be the new fangled SoC MSI[X] long term
-equivalent then you better provide some infrastructure for that and
-make the drivers ready to use it. Maybe check with the PCI/MSI folks
-to share some of the interfaces.
-
-If that whole thing is another onetime HW designers wet dream, then
-please go back to the limited but completely functional (Who is going
-to use more than 160 peripheral interrupts????) device tree model. I
-really have no interest to support hardware designer brain farts.
-
-Thanks,
-
-	tglx
+diff --git a/Documentation/devicetree/bindings/memory-controllers/simple-memory-controller.txt b/Documentation/devicetree/bindings/memory-controllers/simple-memory-controller.txt
+new file mode 100644
+index 0000000..d37683b
+--- /dev/null
++++ b/Documentation/devicetree/bindings/memory-controllers/simple-memory-controller.txt
+@@ -0,0 +1,19 @@
++Device Tree Clock binding for a simple memory controller.
++
++Required properties:
++- compatible : shall be "simple-memory-controller"
++
++Optional properties:
++- reg        : may contain the register space for the controller. This
++               property is currently ignored by the driver
++- clocks     : may contain a phandle to the clock that is currently being
++               used on the controller. This clock shall remain enabled
++               during system operation.
++
++Example:
++
++mc: mc at 0123000 {
++	compatible = "simple-memory-controller";
++	reg = <0x0123000 0x400>;
++	clocks = <&pll5 1>;
++};
+diff --git a/drivers/memory/Kconfig b/drivers/memory/Kconfig
+index 29a11db..4a6df65 100644
+--- a/drivers/memory/Kconfig
++++ b/drivers/memory/Kconfig
+@@ -50,4 +50,15 @@ config TEGRA30_MC
+ 	  analysis, especially for IOMMU/SMMU(System Memory Management
+ 	  Unit) module.
+ 
++config SIMPLE_MC
++	bool "Simple memory controller"
++	default y
++	depends on OF && COMMON_CLK
++	help
++	  This driver is able to manage a simple memory controller whose
++	  only needs consist of keeping one clock enabled. The
++	  controller must be defined on the device tree as compatible
++	  with "simple-memory-controller"; see the corresponding binding
++	  document for more details.
++
+ endif
+diff --git a/drivers/memory/Makefile b/drivers/memory/Makefile
+index 969d923..e0953e5 100644
+--- a/drivers/memory/Makefile
++++ b/drivers/memory/Makefile
+@@ -9,3 +9,4 @@ obj-$(CONFIG_TI_EMIF)		+= emif.o
+ obj-$(CONFIG_MVEBU_DEVBUS)	+= mvebu-devbus.o
+ obj-$(CONFIG_TEGRA20_MC)	+= tegra20-mc.o
+ obj-$(CONFIG_TEGRA30_MC)	+= tegra30-mc.o
++obj-$(CONFIG_SIMPLE_MC)		+= simple-mc.o
+diff --git a/drivers/memory/simple-mc.c b/drivers/memory/simple-mc.c
+new file mode 100644
+index 0000000..e58371d
+--- /dev/null
++++ b/drivers/memory/simple-mc.c
+@@ -0,0 +1,57 @@
++/*
++ * Simple memory controller driver
++ *
++ * Copyright 2013 Emilio L?pez <emilio@elopez.com.ar>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include <linux/of.h>
++#include <linux/clk.h>
++#include <linux/module.h>
++#include <linux/platform_device.h>
++
++static int simple_mc_probe(struct platform_device *pdev)
++{
++	struct device_node *np = pdev->dev.of_node;
++	struct clk *clk;
++
++	if (!np)
++		return -ENODEV;
++
++	clk = of_clk_get(np, 0);
++	if (!IS_ERR(clk)) {
++		clk_prepare_enable(clk);
++		clk_put(clk);
++	}
++
++	return 0;
++}
++
++static const struct of_device_id simple_mc_of_match[] = {
++	{ .compatible = "simple-memory-controller", },
++	{ /* sentinel */ },
++};
++
++static struct platform_driver simple_mc_driver = {
++	.probe = simple_mc_probe,
++	.driver = {
++		.name = "simple-mc",
++		.owner = THIS_MODULE,
++		.of_match_table = of_match_ptr(simple_mc_of_match),
++	},
++};
++
++module_platform_driver(simple_mc_driver);
++
++MODULE_AUTHOR("Emilio L?pez <emilio@elopez.com.ar>");
++MODULE_DESCRIPTION("Simple memory controller driver");
++MODULE_LICENSE("GPL");
+-- 
+1.8.4
