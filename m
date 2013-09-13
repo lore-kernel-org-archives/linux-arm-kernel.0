@@ -1,49 +1,51 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 13 Sep 2013 13:46:59 +0100
-Subject: [PATCH] arm64: KVM: Increase max VCPUs per-Guest to 8
-In-Reply-To: <1378904552-29347-1-git-send-email-anup.patel@linaro.org>
-References: <1378904552-29347-1-git-send-email-anup.patel@linaro.org>
-Message-ID: <52330943.4090309@arm.com>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Fri, 13 Sep 2013 15:02:45 +0200
+Subject: [PATCH] [PATCH] clocksource: tcb: fix min_delta calculation
+Message-ID: <1379077365-18458-1-git-send-email-mkl@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/09/13 14:02, Anup Patel wrote:
-> Current max VCPUs per-Guest is set to 4 which is preventing
-> us from creating a Guest (or VM) with 8 VCPUs on Host (e.g.
-> X-Gene Storm SOC) with 8 Host CPUs.
-> 
-> The correct value of max VCPUs per-Guest should be same as
-> the max CPUs supported by GICv2 which is 8 hence this patch
-> increases KVM_MAX_VCPUS to 8.
+The commit
 
-If anything, please make it configurable just like we have on 32bit. No
-reason to impose the extra overhead on everyone.
+    77cc982 clocksource: use clockevents_config_and_register() where possible
 
-Thanks,
+switches from manually calculating min_delta_ns (and others) and
+clockevents_register_device() to automatic calculation via
+clockevents_config_and_register(). During this conversation the "+ 1" in
 
-	M.
+    min_delta_ns = clockevent_delta2ns(1, &clkevt.clkevt) + 1;
 
-> Signed-off-by: Anup Patel <anup.patel@linaro.org>
-> Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
-> ---
->  arch/arm64/include/asm/kvm_host.h |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-> index 0859a4d..60ef29e 100644
-> --- a/arch/arm64/include/asm/kvm_host.h
-> +++ b/arch/arm64/include/asm/kvm_host.h
-> @@ -26,7 +26,7 @@
->  #include <asm/kvm_asm.h>
->  #include <asm/kvm_mmio.h>
->  
-> -#define KVM_MAX_VCPUS 4
-> +#define KVM_MAX_VCPUS 8
->  #define KVM_USER_MEM_SLOTS 32
->  #define KVM_PRIVATE_MEM_SLOTS 4
->  #define KVM_COALESCED_MMIO_PAGE_OFFSET 1
-> 
+was lost. This leads to problems when programming clock events, resuling in
+e.g. a sleep(2) sleeping more than 3 seconds. The "+ 1" was added in the
+original code to fix a rounding problem in clockevent_delta2ns(), see
+http://permalink.gmane.org/gmane.linux.kernel/549744 for background
+information.
 
+This patch fixes the problem by increasing the min_delta to "2" ticks.
 
+Cc: Marc Pignat <marc.pignat@hevs.ch>
+Cc: Ronald Wahl <ronald.wahl@raritan.com>
+Acked-by: Shawn Guo <shawn.guo@linaro.org>
+Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
+---
+Changes since v1:
+- Improved description. Thanks to Ronald Wahl.
+
+ drivers/clocksource/tcb_clksrc.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/clocksource/tcb_clksrc.c b/drivers/clocksource/tcb_clksrc.c
+index 8a61872..7cf6dc7 100644
+--- a/drivers/clocksource/tcb_clksrc.c
++++ b/drivers/clocksource/tcb_clksrc.c
+@@ -197,7 +197,7 @@ static void __init setup_clkevents(struct atmel_tc *tc, int clk32k_divisor_idx)
+ 
+ 	clkevt.clkevt.cpumask = cpumask_of(0);
+ 
+-	clockevents_config_and_register(&clkevt.clkevt, 32768, 1, 0xffff);
++	clockevents_config_and_register(&clkevt.clkevt, 32768, 2, 0xffff);
+ 
+ 	setup_irq(irq, &tc_irqaction);
+ }
 -- 
-Jazz is not dead. It just smells funny...
+1.8.4.rc3
