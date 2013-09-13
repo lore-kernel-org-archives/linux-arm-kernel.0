@@ -1,43 +1,29 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 13 Sep 2013 17:26:43 +0100
-Subject: [PATCH 206/228] cpufreq: sa11x0: remove calls to
- cpufreq_notify_transition()
-In-Reply-To: <CAKohpomBdAgciTYnQPn6fKC7iHvuBxFLiK8kCz62q7jRHhXK1A@mail.gmail.com>
-References: <cover.1379063063.git.viresh.kumar@linaro.org>
- <6e2ca86ce948c0bc35f7709baf22672771fcf1e8.1379063063.git.viresh.kumar@linaro.org>
- <20130913155424.GB12758@n2100.arm.linux.org.uk>
- <CAKohpomAj0wDnjdi7XXw=bGsu0LMRrr1SMwdzBsa0GTxGrABoQ@mail.gmail.com>
- <20130913161527.GE12758@n2100.arm.linux.org.uk>
- <CAKohpomBdAgciTYnQPn6fKC7iHvuBxFLiK8kCz62q7jRHhXK1A@mail.gmail.com>
-Message-ID: <20130913162643.GF12758@n2100.arm.linux.org.uk>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 13 Sep 2013 10:33:26 -0600
+Subject: [PATCH] ARM: tegra: throw the unique chip ID into the entropy pool
+In-Reply-To: <1378394938-1551-1-git-send-email-linus.walleij@linaro.org>
+References: <1378394938-1551-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <52333E56.8060204@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 13, 2013 at 09:52:31PM +0530, Viresh Kumar wrote:
-> On 13 September 2013 21:45, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > The patch to which I'm replying removes the above calls.  These calls are
-> > necessary to shutdown various bits of CPU-clock dependent hardware
-> > before changing the CPU clock, and restore them - reconfiguring them
-> > for the new clock rate after the transition has happened.
-> >
-> > So, if you're removing these calls, what replaces them?  I don't see
-> > anything which does without the above set.
-> 
-> The other patch on which you commented about unnecessary read
-> locks being taken:
-> 
-> [PATCH 181/228] cpufreq: move freq change notifications to cpufreq
-> 
-> That calls these notifiers, for all platforms except the ones that have
-> set CPUFREQ_ASYNC_NOTIFICATION, before and after calling
-> ->target_index()..
-> 
-> And so functionally the code is supposed to be the same.. Unless I
-> have done some stupid mistake..
+On 09/05/2013 09:28 AM, Linus Walleij wrote:
+> This adds a hook at common late init to extract the 64 bits of
+> chip-unique data and throw it into the entropy pool to make it
+> more device-unique.
 
-Ah, sorry, read that that test the other way around.  In that case,
-this patch is fine and can have my ack as per the other acks I've
-already given.
+> diff --git a/arch/arm/mach-tegra/common.c b/arch/arm/mach-tegra/common.c
 
-Thanks.
+>  void __init tegra_init_late(void)
+>  {
+> +	tegra_random_init();
+
+Looking at this further, there's already a tegra_init_fuse() call made
+from tegra_init_early(), so rather than adding a second init function
+into the fuse code, I'd rather just augment that function, unless
+there's some reason add_device_randomness() won't work at that time?
+
+If that will work, I'll supply an alternate patch that replaces this,
+since I also want to remove the tegra_chip_uid() function, and need to
+make the add_device_randomness() call not use tegra_chip_uid() on
+Tegra30 or later, since the set of fuses for the chip ID changed radically.
