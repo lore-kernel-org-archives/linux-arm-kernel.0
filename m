@@ -1,51 +1,88 @@
-From: iivanov@mm-sol.com (Ivan T. Ivanov)
-Date: Fri, 13 Sep 2013 09:56:52 +0300
-Subject: [PATCH 1/2] ARM: msm: Add support for MSM8974 Dragonboard
-In-Reply-To: <5231ED31.7080102@codeaurora.org>
-References: <1375743779-24993-1-git-send-email-rvaswani@codeaurora.org>
- <1375780486.2725.7.camel@iivanov-dev.int.mm-sol.com>
- <20130911180006.GA12624@codeaurora.org>
- <1378994706.16481.6.camel@iivanov-dev.int.mm-sol.com>
- <5231ED31.7080102@codeaurora.org>
-Message-ID: <1379055412.16481.7.camel@iivanov-dev.int.mm-sol.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 13 Sep 2013 14:58:57 +0800
+Subject: [PATCH 1/2] ARM: dts: imx53-qsb: add TVE entry
+In-Reply-To: <1378893068-22235-1-git-send-email-l.stach@pengutronix.de>
+References: <1378893068-22235-1-git-send-email-l.stach@pengutronix.de>
+Message-ID: <20130913065855.GA31147@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2013-09-12 at 09:34 -0700, Rohit Vaswani wrote: 
-> On 9/12/2013 7:05 AM, Ivan T. Ivanov wrote:
-> > Hi,
-> >
-> > On Wed, 2013-09-11 at 11:00 -0700, David Brown wrote:
-> >> On Tue, Aug 06, 2013 at 12:14:46PM +0300, Ivan T. Ivanov wrote:
-> >>
-> >>> Attached patch enables earlyprink for this board.
-> >>>
-> >>> [920] booting linux @ 0x8000, ramdisk @ 0x2000000 (1067699), tags/device tree @ 0x1e00000
-> >>> Uncompressing Linux... done, booting the kernel.
-> >>> [    0.000000] Booting Linux on physical CPU 0x0
-> >>> [    0.000000] Linux version 3.11.0-rc4-00003-g7c8394e (iivanov at dev) (gcc version 4.6.3 (GCC) ) #502 SMP PREEMPT Tue Aug 6 12:09:07 EEST3
-> >>> [    0.000000] CPU: ARMv7 Processor [512f06f0] revision 0 (ARMv7), cr=10c5387d
-> >>> [    0.000000] CPU: PIPT / VIPT nonaliasing data cache, PIPT instruction cache
-> >>> [    0.000000] Machine: Qualcomm MSM (Flattened Device Tree), model: Qualcomm MSM8974 Dragonboard
-> >> We'll need to have either Rohit include this in his patch series, or
-> >> you'll have to format this as a valid patch.
-> > I don't have preferences. Rohit could you send this patch
-> > with you changes?
+On Wed, Sep 11, 2013 at 11:51:07AM +0200, Lucas Stach wrote:
+> From: Philipp Zabel <p.zabel@pengutronix.de>
 > 
-> Yep. Will fixup this as part of the initial support.
+> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+> ---
+>  arch/arm/boot/dts/imx53-qsb.dts | 25 +++++++++++++++++++++++--
+>  1 file changed, 23 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/imx53-qsb.dts b/arch/arm/boot/dts/imx53-qsb.dts
+> index 512a1f6..2031ccc 100644
+> --- a/arch/arm/boot/dts/imx53-qsb.dts
+> +++ b/arch/arm/boot/dts/imx53-qsb.dts
+> @@ -156,6 +156,15 @@
+>  		};
+>  	};
+>  
+> +	tve {
+> +		pinctrl_vga_sync_1: vgasync-grp1 {
+> +			fsl,pins = <
+> +				/* VGA_HSYNC, VSYNC with max drive strength */
+> +				MX53_PAD_EIM_OE__IPU_DI1_PIN7     0xe6
+> +				MX53_PAD_EIM_RW__IPU_DI1_PIN8     0xe6
+> +			>;
+> +		};
+> +	};
+>  };
+>  
+>  &uart1 {
+> @@ -263,8 +272,8 @@
+>  			};
+>  
+>  			ldo8_reg: ldo8 {
+> -				regulator-min-microvolt = <1200000>;
+> -				regulator-max-microvolt = <3600000>;
+> +				regulator-min-microvolt = <2750000>;
+> +				regulator-max-microvolt = <2750000>;
 
-Thanks, 
-Ivan
+Instead of having nothing in commit log, you can explain a little bit
+why the change is needed in there.
 
-> > Regards,
-> > Ivan
-> >
-> >> Thanks,
-> >> David
-> >>
-> >
-> 
-> 
-> Thanks,
-> Rohit Vaswani
+>  				regulator-always-on;
+>  			};
+>  
+> @@ -297,6 +306,18 @@
+>  	status = "okay";
+>  };
+>  
+> +&tve {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_vga_sync_1>;
+> +	ddc = <&i2c2>;
+> +	fsl,tve-mode = "vga";
+
+Are these custom properties documented anywhere?  I cannot find the
+device tree bindings document for them.  Anyway, it should be another
+patch to provide the document, if you like.
+
+> +	status = "okay";
+
+Nit: please put 'status' at the bottom of the property list.
+
+> +	dac-supply = <&ldo7_reg>;
+> +
+
+Nit: drop this blank line.
+
+Shawn
+
+> +	fsl,hsync-pin = <7>; /* IPU DI1 PIN7 via EIM_OE */
+> +	fsl,vsync-pin = <8>; /* IPU DI1 PIN8 via EIM_RW */
+> +};
+> +
+>  &usbh1 {
+>         status = "okay";
+>  };
+> -- 
+> 1.8.4.rc3
 > 
