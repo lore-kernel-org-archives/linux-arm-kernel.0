@@ -1,391 +1,46 @@
-From: slapdau@yahoo.com.au (Craig McGeachie)
-Date: Fri, 13 Sep 2013 23:32:40 +1200
-Subject: [RFC PATCH 3/3] Enable BCM2835 mailbox support
-Message-ID: <5232F7D8.6080307@yahoo.com.au>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 13 Sep 2013 12:32:46 +0100
+Subject: [PATCH] drivers: cpuidle: rename ARM big.LITTLE driver config and
+ makefile entries
+Message-ID: <1379071966-26757-1-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Implement BCM2835 CPU thermal sensor support.
+Following the reorganization of CPU idle drivers configurations into an ARM
+specific Kconfig, the existing idle drivers Kconfig entries were renamed and
+moved to the Kconfig.arm file. Makefile entries were updated accordingly.
 
-Signed-off-by: Craig McGeachie <slapdau@yahoo.com.au>
+This patch renames the entries in Kconfig.arm and makefile to make the newly
+added big.LITTLE CPUidle driver compliant with the new naming convention.
+
+Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 ---
+ drivers/cpuidle/Kconfig.arm | 2 +-
+ drivers/cpuidle/Makefile    | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-Beyond the usual reviews of rubbish code, there are two points
-here that I'm looking for feedback on.
-
-First is the placement of the mailbox directory make target in
-drivers/Makefile.  I placed it as early as I did in anticipation of
-implemented a frame buffer driver, which needs mailbox support at
-probe time. Another option would be to initialise the driver at
-architecture initialisation time, but I'm unfamiliar with good
-practice about when to initialise different bits and pieces.
-Especially with generic mailbox support looking kinda new.
-
-Second is the propmsg_ fuctions and related structures. They don't
-belong here.  And the fact that they are is something that would
-count against this being an acceptable patch.  But I don't know
-where to put them.  It's the header file I have trouble with.  I
-don't really know where I can put it.  Multi-architecture support
-rules out arch/arm/mach-bcm2835, and I don't want to place a header
-file that only supports one very specific system into include.
-
----
-diff --git a/arch/arm/boot/dts/bcm2835.dtsi b/arch/arm/boot/dts/bcm2835.dtsi
-index 88855c0..b91cd44 100644
---- a/arch/arm/boot/dts/bcm2835.dtsi
-+++ b/arch/arm/boot/dts/bcm2835.dtsi
-@@ -37,6 +37,10 @@
- 			brcm,channel-nums = <0 1 3 8>;
- 		};
+diff --git a/drivers/cpuidle/Kconfig.arm b/drivers/cpuidle/Kconfig.arm
+index 8e36603..ea0f045 100644
+--- a/drivers/cpuidle/Kconfig.arm
++++ b/drivers/cpuidle/Kconfig.arm
+@@ -27,7 +27,7 @@ config ARM_U8500_CPUIDLE
+ 	help
+ 	  Select this to enable cpuidle for ST-E u8500 processors
  
-+		thermal {
-+			compatible = "brcm,bcm2835-thermal";
-+		};
-+
- 		watchdog {
- 			compatible = "brcm,bcm2835-pm-wdt";
- 			reg = <0x7e100000 0x28>;
-diff --git a/arch/arm/configs/bcm2835_defconfig b/arch/arm/configs/bcm2835_defconfig
-index cc067bc..8bd210c 100644
---- a/arch/arm/configs/bcm2835_defconfig
-+++ b/arch/arm/configs/bcm2835_defconfig
-@@ -67,6 +67,8 @@ CONFIG_SPI=y
- CONFIG_SPI_BCM2835=y
- CONFIG_GPIO_SYSFS=y
- # CONFIG_HWMON is not set
-+CONFIG_THERMAL=y
-+CONFIG_BCM2835_THERMAL=y
- CONFIG_FB=y
- CONFIG_FB_SIMPLE=y
- CONFIG_FRAMEBUFFER_CONSOLE=y
-diff --git a/drivers/Makefile b/drivers/Makefile
-index ab93de8..035114d 100644
---- a/drivers/Makefile
-+++ b/drivers/Makefile
-@@ -15,6 +15,9 @@ obj-y				+= pwm/
- obj-$(CONFIG_PCI)		+= pci/
- obj-$(CONFIG_PARISC)		+= parisc/
- obj-$(CONFIG_RAPIDIO)		+= rapidio/
-+
-+# Mailbox must come before drivers that rely on it
-+obj-$(CONFIG_MAILBOX)		+= mailbox/
- obj-y				+= video/
- obj-y				+= idle/
- 
-@@ -133,7 +136,6 @@ obj-y				+= platform/
- #common clk code
- obj-y				+= clk/
- 
--obj-$(CONFIG_MAILBOX)		+= mailbox/
- obj-$(CONFIG_HWSPINLOCK)	+= hwspinlock/
- obj-$(CONFIG_NFC)		+= nfc/
- obj-$(CONFIG_IOMMU_SUPPORT)	+= iommu/
-diff --git a/drivers/thermal/Kconfig b/drivers/thermal/Kconfig
-index e988c81..2cc29a5 100644
---- a/drivers/thermal/Kconfig
-+++ b/drivers/thermal/Kconfig
-@@ -130,6 +130,15 @@ config DOVE_THERMAL
- 	  Support for the Dove thermal sensor driver in the Linux thermal
- 	  framework.
- 
-+config BCM2835_THERMAL
-+	tristate "Temperature sensor on Broadcom BCM2835 SoC"
-+	depends on ARCH_BCM2835
-+	depends on BCM2835_MBOX
-+	help
-+	  Support for the Broadcom BCM2835 thermal sensor driver in the Linux
-+	  thermal framework.  The BCM2835 has one sensor on chip, with one trip
-+	  point and no cooling devices.
-+
- config DB8500_THERMAL
- 	bool "DB8500 thermal management"
- 	depends on ARCH_U8500
-diff --git a/drivers/thermal/Makefile b/drivers/thermal/Makefile
-index 67184a2..bd9e42c 100644
---- a/drivers/thermal/Makefile
-+++ b/drivers/thermal/Makefile
-@@ -25,3 +25,4 @@ obj-$(CONFIG_DB8500_CPUFREQ_COOLING)	+= db8500_cpufreq_cooling.o
- obj-$(CONFIG_INTEL_POWERCLAMP)	+= intel_powerclamp.o
- obj-$(CONFIG_X86_PKG_TEMP_THERMAL)	+= x86_pkg_temp_thermal.o
- obj-$(CONFIG_TI_SOC_THERMAL)	+= ti-soc-thermal/
-+obj-$(CONFIG_BCM2835_THERMAL)	+= bcm2835-thermal.o
-diff --git a/drivers/thermal/bcm2835-thermal.c b/drivers/thermal/bcm2835-thermal.c
-new file mode 100644
-index 0000000..33d9539
---- /dev/null
-+++ b/drivers/thermal/bcm2835-thermal.c
-@@ -0,0 +1,274 @@
-+/*
-+ *  Copyright (C) 2013 Craig McGeachie
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This device presents the BCM2835 SoC temperature sensor as a thermal
-+ * device.
-+ */
-+
-+
-+#include <linux/kernel.h>
-+#include <linux/module.h>
-+#include <linux/init.h>
-+#include <linux/platform_device.h>
-+#include <linux/device.h>
-+#include <linux/slab.h>
-+#include <linux/thermal.h>
-+#include <linux/dma-mapping.h>
-+#include <linux/mailbox_client.h>
-+#include <linux/mutex.h>
-+
-+#define VC_TAG_GET_TEMP 0x00030006
-+#define VC_TAG_GET_MAX_TEMP 0x0003000A
-+#define VC_SUCCESS 0x80000000
-+
-+struct prop_msg {
-+	u32 msg_size;
-+	u32 code;
-+};
-+
-+struct prop_tag_hdr {
-+	u32 tag_id;
-+	u32 buf_size;
-+	u32 indicator;
-+};
-+
-+struct prop_tmp_tag {
-+	struct prop_tag_hdr hdr;
-+	u32 id;
-+	u32 val;
-+};
-+
-+static void *propmsg_init(void *buf, size_t size)
-+{
-+	u32 num_cells = size >> 2;
-+	if (num_cells < 3)
-+		return 0;
-+	memset(buf, 0, size);
-+	((u32 *)buf)[0] = num_cells - 1;
-+	((u32 *)buf)[num_cells - 1] = 2;
-+	return buf;
-+}
-+
-+static void *propmsg_addtag(void *buf, size_t size, u32 tag_id)
-+{
-+	u32 num_cells = ((size + 3) & -4) >> 2;
-+	u32 last_cell = ((u32 *)buf)[0];
-+	u32 nxt_cell = ((u32 *)buf)[last_cell];
-+	u32 free_cells = last_cell - nxt_cell;
-+	if (free_cells < num_cells || num_cells <= 3) {
-+		return 0;
-+	} else {
-+		void *ret = &((u32 *)buf)[nxt_cell];
-+		((struct prop_tag_hdr *) ret)->tag_id = tag_id;
-+		((struct prop_tag_hdr *) ret)->buf_size = (num_cells - 3) << 2;
-+		((struct prop_tag_hdr *) ret)->indicator = (num_cells - 3) << 2;
-+		((u32 *)buf)[last_cell] = nxt_cell + num_cells;
-+		return ret;
-+	}
-+}
-+
-+static void propmsg_finish(void *buf)
-+{
-+	u32 last_cell = ((u32 *)buf)[0];
-+	u32 nxt_cell = ((u32 *)buf)[last_cell];
-+	((u32 *)buf)[nxt_cell] = 0;
-+	((u32 *)buf)[0] = (nxt_cell + 1) << 2;
-+	((u32 *)buf)[1] = 0;
-+}
-+
-+#if 0
-+
-+static void *propmsg_firsttag(void *msg)
-+{
-+	return ((struct prop_msg *) msg) + 1;
-+}
-+
-+static void *propmsg_nexttag(void *curr)
-+{
-+	u32 tag_size = ((struct prop_tag_hdr *)curr)->buf_size;
-+	void *next_tag = (char *)curr + sizeof(struct prop_tag_hdr) + tag_size;
-+	return ((struct prop_tag_hdr *) next_tag)->tag_id == 0 ? 0 : next_tag;
-+}
-+
-+#endif
-+
-+struct bcm2835_therm {
-+	struct device *dev;
-+	struct thermal_zone_device *thermal_dev;
-+	struct completion comp;
-+	struct mutex lock;
-+};
-+
-+static void bcm2835_rxcb(void *cl_id, void *mssg)
-+{
-+	struct bcm2835_therm *therm = cl_id;
-+	complete(&therm->comp);
-+}
-+
-+static int do_message(struct bcm2835_therm *therm, dma_addr_t msg_handle)
-+{
-+	struct device *dev = therm->dev;
-+	struct ipc_client therm_mbox;
-+	void *channel;
-+	int ret = 0;
-+
-+	memset(&therm_mbox, 0, sizeof(therm_mbox));
-+	therm_mbox.chan_name = "bcm2835:property";
-+	therm_mbox.rxcb = bcm2835_rxcb;
-+	therm_mbox.cl_id = therm;
-+	mutex_lock(&therm->lock);
-+	INIT_COMPLETION(therm->comp);
-+	channel = ipc_request_channel(&therm_mbox);
-+	if (!channel) {
-+		dev_err(dev, "No ipc channel\n");
-+		ret = -EAGAIN;
-+		goto exit;
-+	}
-+	ipc_send_message(channel, (void *) msg_handle);
-+	wait_for_completion(&therm->comp);
-+	ipc_free_channel(channel);
-+exit:
-+	mutex_unlock(&therm->lock);
-+	return ret;
-+}
-+
-+static int bcm2835_get_temp_common(struct thermal_zone_device *thermal_dev,
-+	unsigned long *temp, u32 temp_type)
-+{
-+	struct bcm2835_therm *therm = thermal_dev->devdata;
-+	struct device *dev = therm->dev;
-+	void *buf = 0, *msg;
-+	int msgsize = sizeof(struct prop_msg) + sizeof(struct prop_tmp_tag)
-+		+ sizeof(u32);
-+	dma_addr_t dma_handle;
-+	int alignment = max(16, dma_get_cache_alignment());
-+	struct prop_tmp_tag *tmp_tag;
-+	int ret = 0;
-+
-+	buf = kzalloc(msgsize + alignment, GFP_KERNEL | GFP_DMA);
-+	if (!buf) {
-+		dev_err(dev, "kzalloc failed\n");
-+		ret = -ENOMEM;
-+		goto exit;
-+	}
-+	msg = PTR_ALIGN(buf, alignment);
-+	propmsg_init(msg, msgsize);
-+	tmp_tag = propmsg_addtag(msg, sizeof(struct prop_tmp_tag), temp_type);
-+	BUG_ON(!tmp_tag); /* msgsize should be large enough to ensure success */
-+	propmsg_finish(msg);
-+	dma_handle = dma_map_single(dev, msg, msgsize, DMA_BIDIRECTIONAL);
-+	if (dma_mapping_error(dev, dma_handle)) {
-+		dev_err(dev, "No DMA address\n");
-+		ret = -ENOMEM;
-+		goto exit;
-+	}
-+	print_hex_dump(KERN_DEBUG, "req - ", DUMP_PREFIX_ADDRESS, 16, 4, msg,
-+		msgsize, false);
-+	ret = do_message(therm, dma_handle);
-+	print_hex_dump(KERN_DEBUG, "rep - ", DUMP_PREFIX_ADDRESS, 16, 4, msg,
-+		msgsize, false);
-+	dma_unmap_single(dev, dma_handle, msgsize, DMA_BIDIRECTIONAL);
-+	if (ret)
-+		goto exit;
-+	if (!(tmp_tag->hdr.indicator & VC_SUCCESS)) {
-+		dev_err(dev, "VC request failed 0x%08X\n",
-+			tmp_tag->hdr.indicator);
-+		ret = -EAGAIN;
-+	} else {
-+		*temp = tmp_tag->val;
-+	}
-+exit:
-+	kfree(buf);
-+	return ret;
-+}
-+
-+static int bcm2835_get_temp(struct thermal_zone_device *thermal_dev,
-+	unsigned long *temp)
-+{
-+	return bcm2835_get_temp_common(thermal_dev, temp, VC_TAG_GET_TEMP);
-+}
-+
-+static int bcm2835_get_max_temp(struct thermal_zone_device *thermal_dev,
-+	int trip_num, unsigned long *temp)
-+{
-+	return bcm2835_get_temp_common(thermal_dev, temp, VC_TAG_GET_MAX_TEMP);
-+}
-+
-+static int bcm2835_get_trip_type(struct thermal_zone_device *thermal_dev,
-+	int trip_num, enum thermal_trip_type *trip_type)
-+{
-+	*trip_type = THERMAL_TRIP_HOT;
-+	return 0;
-+}
-+
-+
-+static int bcm2835_get_mode(struct thermal_zone_device *thermal_dev,
-+	enum thermal_device_mode *dev_mode)
-+{
-+	*dev_mode = THERMAL_DEVICE_ENABLED;
-+	return 0;
-+}
-+
-+static struct thermal_zone_device_ops ops  = {
-+	.get_temp = bcm2835_get_temp,
-+	.get_trip_temp = bcm2835_get_max_temp,
-+	.get_trip_type = bcm2835_get_trip_type,
-+	.get_mode = bcm2835_get_mode,
-+};
-+
-+static int bcm2835_thermal_probe(struct platform_device *pdev)
-+{
-+	struct device *dev = &pdev->dev;
-+	struct bcm2835_therm *therm = devm_kzalloc(dev, sizeof(*therm),
-+		GFP_KERNEL);
-+	if (!therm) {
-+		dev_err(dev, "Failed to allocate memory\n");
-+		return -ENOMEM;
-+	}
-+	therm->dev = dev;
-+	mutex_init(&therm->lock);
-+	init_completion(&therm->comp);
-+	therm->thermal_dev = thermal_zone_device_register("bcm2835_thermal", 1,
-+		0, therm, &ops, NULL, 0, 0);
-+	if (IS_ERR(therm->thermal_dev)) {
-+		dev_err(dev, "Unable to register the thermal device");
-+		return PTR_ERR(therm->thermal_dev);
-+	}
-+	platform_set_drvdata(pdev, therm);
-+	dev_info(dev, "%s enabled\n", pdev->name);
-+	return 0;
-+}
-+
-+
-+static int bcm2835_thermal_remove(struct platform_device *pdev)
-+{
-+	struct bcm2835_therm *therm = platform_get_drvdata(pdev);
-+	thermal_zone_device_unregister(therm->thermal_dev);
-+	return 0;
-+}
-+
-+static const struct of_device_id bcm2835_thermal_of_match[] = {
-+	{ .compatible = "brcm,bcm2835-thermal", },
-+	{},
-+};
-+MODULE_DEVICE_TABLE(of, bcm2835_thermal_of_match);
-+
-+static struct platform_driver bcm2835_thermal_driver = {
-+	.driver = {
-+		.name = "bcm2835_thermal",
-+		.owner = THIS_MODULE,
-+		.of_match_table = bcm2835_thermal_of_match,
-+	},
-+	.probe = bcm2835_thermal_probe,
-+	.remove = bcm2835_thermal_remove,
-+};
-+
-+module_platform_driver(bcm2835_thermal_driver);
-+
-+MODULE_AUTHOR("Craig McGeachie");
-+MODULE_DESCRIPTION("BCM2835 thermal driver");
-+MODULE_LICENSE("GPL v2");
+-config CPU_IDLE_BIG_LITTLE
++config ARM_BIG_LITTLE_CPUIDLE
+ 	bool "Support for ARM big.LITTLE processors"
+ 	depends on ARCH_VEXPRESS_TC2_PM
+ 	select ARM_CPU_SUSPEND
+diff --git a/drivers/cpuidle/Makefile b/drivers/cpuidle/Makefile
+index cea5ef5..3c693c2 100644
+--- a/drivers/cpuidle/Makefile
++++ b/drivers/cpuidle/Makefile
+@@ -11,4 +11,4 @@ obj-$(CONFIG_ARM_HIGHBANK_CPUIDLE)	+= cpuidle-calxeda.o
+ obj-$(CONFIG_ARM_KIRKWOOD_CPUIDLE)	+= cpuidle-kirkwood.o
+ obj-$(CONFIG_ARM_ZYNQ_CPUIDLE)		+= cpuidle-zynq.o
+ obj-$(CONFIG_ARM_U8500_CPUIDLE)         += cpuidle-ux500.o
+-obj-$(CONFIG_CPU_IDLE_BIG_LITTLE)	+= cpuidle-big_little.o
++obj-$(CONFIG_ARM_BIG_LITTLE_CPUIDLE)	+= cpuidle-big_little.o
+-- 
+1.8.2.2
