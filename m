@@ -1,33 +1,44 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 13 Sep 2013 10:12:36 -0600
-Subject: [PATCH] crypto: tegra: use kernel entropy instead of ad-hoc
-In-Reply-To: <20130913122318.GD8579@gondor.apana.org.au>
-References: <1378712154-30602-1-git-send-email-linus.walleij@linaro.org>
- <522DF0FC.5080200@wwwdotorg.org> <20130913122318.GD8579@gondor.apana.org.au>
-Message-ID: <52333974.4040404@wwwdotorg.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 13 Sep 2013 17:10:59 +0100
+Subject: [PATCH 106/228] cpufreq: integrator: don't initialize part of
+ policy that is set by core too
+In-Reply-To: <6d8d406ebca886e5147191cc8c333d926ef9eb30.1379063063.git.viresh.kumar@linaro.org>
+References: <cover.1379063063.git.viresh.kumar@linaro.org>
+ <6d8d406ebca886e5147191cc8c333d926ef9eb30.1379063063.git.viresh.kumar@linaro.org>
+Message-ID: <20130913161059.GD12758@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/13/2013 06:23 AM, Herbert Xu wrote:
-> On Mon, Sep 09, 2013 at 10:02:04AM -0600, Stephen Warren wrote:
->> On 09/09/2013 01:35 AM, Linus Walleij wrote:
->>> The way I read the Tegra AES RNG is that it has a homebrew
->>> algorithm for initializing the 128bit RNG using timespec and
->>> the unique chip ID. This looks like reinventing the (square)
->>> wheel, instead just grab 128bits from the kernel entropy pool
->>> where the time and (after another patch) chip unique ID is
->>> already mixed in.
->>>
->>> Incidentally this also gets rid of a rather ugly
->>> cross-dependence on the machine using an extern declaration.
->>
->> This sounds reasonable to me, although I know little about the driver.
->> Varun, can you please comment?
->>
->> Acked-by: Stephen Warren <swarren@nvidia.com>
+On Fri, Sep 13, 2013 at 06:30:52PM +0530, Viresh Kumar wrote:
+> Many common initializations of struct policy are moved to core now and hence
+> this driver doesn't need to do it. This patch removes such code.
 > 
-> Patch applied.  Thanks.
+> Most recent of those changes is to call ->get() in the core after calling
+> ->init().
+> 
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+> ---
+>  drivers/cpufreq/integrator-cpufreq.c | 5 ++---
+>  1 file changed, 2 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/cpufreq/integrator-cpufreq.c b/drivers/cpufreq/integrator-cpufreq.c
+> index 8152a9b..babf3e4 100644
+> --- a/drivers/cpufreq/integrator-cpufreq.c
+> +++ b/drivers/cpufreq/integrator-cpufreq.c
+> @@ -181,10 +181,9 @@ static int integrator_cpufreq_init(struct cpufreq_policy *policy)
+>  {
+>  
+>  	/* set default policy and cpuinfo */
+> -	policy->cpuinfo.max_freq = 160000;
+> -	policy->cpuinfo.min_freq = 12000;
+> +	policy->max = policy->cpuinfo.max_freq = 160000;
+> +	policy->min = policy->cpuinfo.min_freq = 12000;
+>  	policy->cpuinfo.transition_latency = 1000000; /* 1 ms, assumed */
+> -	policy->cur = policy->min = policy->max = integrator_get(policy->cpu);
 
-I'm curious which kernel version it was merged for; it'd be nice to
-remove tegra_chip_uid() from the Tegra tree now since it's unused, but
-that obviously requires this patch in the history.
+This patch actually changes things - the description is misleading.
+Please explain why this change - which results in different values for
+policy->min and policy->max doesn't cause any functional difference.
+
+Thanks.
