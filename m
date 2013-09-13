@@ -1,53 +1,47 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 13 Sep 2013 18:30:04 +0530
-Subject: [PATCH 058/228] cpufreq: at32ap: Use generic cpufreq routines
-In-Reply-To: <cover.1379063063.git.viresh.kumar@linaro.org>
-References: <cover.1379063063.git.viresh.kumar@linaro.org>
-Message-ID: <e2d88ba3fcb0b258675f4cbbff4c84217254435b.1379063063.git.viresh.kumar@linaro.org>
+From: cinifr@gmail.com (cinifr)
+Date: Fri, 13 Sep 2013 21:09:55 +0800
+Subject: [PATCH 3/4] Add physical count arch timer support for clocksource
+ in ARMv7.
+In-Reply-To: <5232DB49.4050701@arm.com>
+References: <1378968687-8200-1-git-send-email-cinifr@gmail.com>
+ <1378968687-8200-4-git-send-email-cinifr@gmail.com>
+ <20130912112452.GA22013@e106331-lin.cambridge.arm.com>
+ <CAK3cCBwu4somtfc9J1ZDVcC-iYD1qDJwSWzWeOomTqY9tQA2kg@mail.gmail.com>
+ <5231EE43.5090900@arm.com>
+ <CAK3cCBzr8_LTYarZDgPYZY7_-5Qco_Qw+ACi=c2uOrn7MqwkBg@mail.gmail.com>
+ <5232DB49.4050701@arm.com>
+Message-ID: <CAK3cCBw4EKypLmhf4L5_P3d27QzsrB+ZxUTgF58YhmUhBa00xQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Most of the CPUFreq drivers do similar things in .exit() and .verify() routines
-and .attr. So its better if we have generic routines for them which can be used
-by cpufreq drivers then.
+> I urge you to read the ARM ARM, and specifically the section dedicated
+> to trapping access to CP15 operations. If you do, you'll quickly notice
+> that you *cannot* trap accesses to the timer subsystem.
+>
+I read it again. The ARMv7 manual said "Is accessible from Non-secure
+PL1 modes only when CNTHCTL.PL1PCTEN is set to 1. When
+CNTHCTL.PL1PCTEN is set to 0, any attempt to access CNTPCT from a
+Non-secure PL1 mode ***generates a Hyp Trap exception***, see Hyp Trap
+exception on page B1-1206" in B8.1.2. but I dont find  a  special hyp
+trap control  for accessing CNTPCT in manual. As you said HSTR cannot
+trap accessing of CP15 c14. What happer when OS access CNTPCT from PL1
+NS=1 mode with CNTHCTL.PL1PCTEN=0 ???  AmI  wrong for understanding
+the manual?
+Thanks.
+BTW: And I fond xen have support to trap accessing   CNTPCT by this
+patch on http://lists.xen.org/archives/html/xen-devel/2012-08/msg00452.html.
 
-This patch uses these generic routines for this driver.
+> All you can do is disable access to the physical timer/counter,
+> resulting in an UNDEF in the *guest*.
+>
+> Additionally, please realise the overhead of trapping is enormous, and
+> that we do try very hard to minimise it. Why do you think we went out of
+> our way to ensure that host and guest would use different timers, always?
 
-Acked-by: Hans-Christian Egtvedt <egtvedt@samfundet.no>
-Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
----
- drivers/cpufreq/at32ap-cpufreq.c | 12 +-----------
- 1 file changed, 1 insertion(+), 11 deletions(-)
+>
+> CNTVOFF can only be setup from either HYP or Secure Monitor mode with
+> SCR.NS == 1, so if you run your kernel in secure mode, it is always best
+> to do it in the bootloader.
+I agree it, Bootloader do  it better.
 
-diff --git a/drivers/cpufreq/at32ap-cpufreq.c b/drivers/cpufreq/at32ap-cpufreq.c
-index 1d19fa5..788f7e7 100644
---- a/drivers/cpufreq/at32ap-cpufreq.c
-+++ b/drivers/cpufreq/at32ap-cpufreq.c
-@@ -24,16 +24,6 @@
- static struct clk *cpuclk;
- static struct cpufreq_frequency_table *freq_table;
- 
--static int at32_verify_speed(struct cpufreq_policy *policy)
--{
--	if (policy->cpu != 0)
--		return -EINVAL;
--
--	cpufreq_verify_within_limits(policy, policy->cpuinfo.min_freq,
--			policy->cpuinfo.max_freq);
--	return 0;
--}
--
- static unsigned int at32_get_speed(unsigned int cpu)
- {
- 	/* No SMP support */
-@@ -152,7 +142,7 @@ out_err:
- static struct cpufreq_driver at32_driver = {
- 	.name		= "at32ap",
- 	.init		= at32_cpufreq_driver_init,
--	.verify		= at32_verify_speed,
-+	.verify		= cpufreq_generic_frequency_table_verify,
- 	.target		= at32_set_target,
- 	.get		= at32_get_speed,
- 	.flags		= CPUFREQ_STICKY,
--- 
-1.7.12.rc2.18.g61b472e
+         Fan
