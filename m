@@ -1,10 +1,10 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 13 Sep 2013 18:32:26 +0530
-Subject: [PATCH 200/228] cpufreq: pasemi: remove calls to
+Date: Fri, 13 Sep 2013 18:32:25 +0530
+Subject: [PATCH 199/228] cpufreq: p4-clockmod: remove calls to
  cpufreq_notify_transition()
 In-Reply-To: <cover.1379063063.git.viresh.kumar@linaro.org>
 References: <cover.1379063063.git.viresh.kumar@linaro.org>
-Message-ID: <e123108bcae9ac51871b6830c7a812163fc2e6a6.1379063063.git.viresh.kumar@linaro.org>
+Message-ID: <9c5d4a95b899267178c9383ca2ce81152f98c824.1379063063.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -28,49 +28,39 @@ frequency change, this one removes it from this driver.
 
 Some related minor cleanups are also done along with it.
 
+Cc: David S. Miller <davem@davemloft.net>
 Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- drivers/cpufreq/pasemi-cpufreq.c | 14 +-------------
- 1 file changed, 1 insertion(+), 13 deletions(-)
+ drivers/cpufreq/p4-clockmod.c | 10 ----------
+ 1 file changed, 10 deletions(-)
 
-diff --git a/drivers/cpufreq/pasemi-cpufreq.c b/drivers/cpufreq/pasemi-cpufreq.c
-index 17424dd..1c33136 100644
---- a/drivers/cpufreq/pasemi-cpufreq.c
-+++ b/drivers/cpufreq/pasemi-cpufreq.c
-@@ -51,8 +51,6 @@
- static void __iomem *sdcpwr_mapbase;
- static void __iomem *sdcasr_mapbase;
+diff --git a/drivers/cpufreq/p4-clockmod.c b/drivers/cpufreq/p4-clockmod.c
+index 3c23053..3d1cba9 100644
+--- a/drivers/cpufreq/p4-clockmod.c
++++ b/drivers/cpufreq/p4-clockmod.c
+@@ -107,15 +107,8 @@ static struct cpufreq_frequency_table p4clockmod_table[] = {
  
--static DEFINE_MUTEX(pas_switch_mutex);
--
- /* Current astate, is used when waking up from power savings on
-  * one core, in case the other core has switched states during
-  * the idle time.
-@@ -242,15 +240,8 @@ static int pas_cpufreq_cpu_exit(struct cpufreq_policy *policy)
- static int pas_cpufreq_target(struct cpufreq_policy *policy,
- 			      unsigned int pas_astate_new)
+ static int cpufreq_p4_target(struct cpufreq_policy *policy, unsigned int index)
  {
 -	struct cpufreq_freqs freqs;
  	int i;
  
--	freqs.old = policy->cur;
--	freqs.new = pas_freqs[pas_astate_new].frequency;
+-	freqs.old = cpufreq_p4_get(policy->cpu);
+-	freqs.new = stock_freq * p4clockmod_table[index].driver_data / 8;
 -
--	mutex_lock(&pas_switch_mutex);
+-	/* notifiers */
 -	cpufreq_notify_transition(policy, &freqs, CPUFREQ_PRECHANGE);
 -
- 	pr_debug("setting frequency for cpu %d to %d kHz, 1/%d of max frequency\n",
- 		 policy->cpu,
- 		 pas_freqs[pas_astate_new].frequency,
-@@ -261,10 +252,7 @@ static int pas_cpufreq_target(struct cpufreq_policy *policy,
- 	for_each_online_cpu(i)
- 		set_astate(i, pas_astate_new);
+ 	/* run on each logical CPU,
+ 	 * see section 13.15.3 of IA32 Intel Architecture Software
+ 	 * Developer's Manual, Volume 3
+@@ -123,9 +116,6 @@ static int cpufreq_p4_target(struct cpufreq_policy *policy, unsigned int index)
+ 	for_each_cpu(i, policy->cpus)
+ 		cpufreq_p4_setdc(i, p4clockmod_table[index].driver_data);
  
+-	/* notifiers */
 -	cpufreq_notify_transition(policy, &freqs, CPUFREQ_POSTCHANGE);
--	mutex_unlock(&pas_switch_mutex);
 -
--	ppc_proc_freq = freqs.new * 1000ul;
-+	ppc_proc_freq = pas_freqs[pas_astate_new].frequency * 1000ul;
  	return 0;
  }
  
