@@ -1,9 +1,9 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 13 Sep 2013 18:30:10 +0530
-Subject: [PATCH 064/228] cpufreq: e_powersaver: Use generic cpufreq routines
+Date: Fri, 13 Sep 2013 18:30:11 +0530
+Subject: [PATCH 065/228] cpufreq: elanfreq: Use generic cpufreq routines
 In-Reply-To: <cover.1379063063.git.viresh.kumar@linaro.org>
 References: <cover.1379063063.git.viresh.kumar@linaro.org>
-Message-ID: <398abf18b914085df814f99fc6d2dabbce0bf890.1379063063.git.viresh.kumar@linaro.org>
+Message-ID: <eed9e518cae1d10130c0a7d49379a816c7ae3b0e.1379063063.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,47 +15,70 @@ This patch uses these generic routines for this driver.
 
 Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- drivers/cpufreq/e_powersaver.c | 15 ++-------------
- 1 file changed, 2 insertions(+), 13 deletions(-)
+ drivers/cpufreq/elanfreq.c | 32 +++-----------------------------
+ 1 file changed, 3 insertions(+), 29 deletions(-)
 
-diff --git a/drivers/cpufreq/e_powersaver.c b/drivers/cpufreq/e_powersaver.c
-index c1b7c99..a8cbbd0 100644
---- a/drivers/cpufreq/e_powersaver.c
-+++ b/drivers/cpufreq/e_powersaver.c
-@@ -198,12 +198,6 @@ static int eps_target(struct cpufreq_policy *policy,
- 	return ret;
- }
+diff --git a/drivers/cpufreq/elanfreq.c b/drivers/cpufreq/elanfreq.c
+index 4000c34..fe7053c 100644
+--- a/drivers/cpufreq/elanfreq.c
++++ b/drivers/cpufreq/elanfreq.c
+@@ -165,19 +165,6 @@ static void elanfreq_set_cpu_state(struct cpufreq_policy *policy,
+ };
  
--static int eps_verify(struct cpufreq_policy *policy)
+ 
+-/**
+- *	elanfreq_validatespeed: test if frequency range is valid
+- *	@policy: the policy to validate
+- *
+- *	This function checks if a given frequency range in kHz is valid
+- *	for the hardware supported by the driver.
+- */
+-
+-static int elanfreq_verify(struct cpufreq_policy *policy)
 -{
--	return cpufreq_frequency_table_verify(policy,
--			&eps_cpu[policy->cpu]->freq_table[0]);
+-	return cpufreq_frequency_table_verify(policy, &elanfreq_table[0]);
 -}
 -
- static int eps_cpu_init(struct cpufreq_policy *policy)
- {
- 	unsigned int i;
-@@ -423,19 +417,14 @@ static int eps_cpu_exit(struct cpufreq_policy *policy)
- 	return 0;
+ static int elanfreq_target(struct cpufreq_policy *policy,
+ 			    unsigned int target_freq,
+ 			    unsigned int relation)
+@@ -226,13 +213,6 @@ static int elanfreq_cpu_init(struct cpufreq_policy *policy)
  }
  
--static struct freq_attr *eps_attr[] = {
+ 
+-static int elanfreq_cpu_exit(struct cpufreq_policy *policy)
+-{
+-	cpufreq_frequency_table_put_attr(policy->cpu);
+-	return 0;
+-}
+-
+-
+ #ifndef MODULE
+ /**
+  * elanfreq_setup - elanfreq command line parameter parsing
+@@ -255,20 +235,14 @@ __setup("elanfreq=", elanfreq_setup);
+ #endif
+ 
+ 
+-static struct freq_attr *elanfreq_attr[] = {
 -	&cpufreq_freq_attr_scaling_available_freqs,
 -	NULL,
 -};
 -
- static struct cpufreq_driver eps_driver = {
--	.verify		= eps_verify,
+-
+ static struct cpufreq_driver elanfreq_driver = {
+ 	.get		= elanfreq_get_cpu_frequency,
+-	.verify		= elanfreq_verify,
 +	.verify		= cpufreq_generic_frequency_table_verify,
- 	.target		= eps_target,
- 	.init		= eps_cpu_init,
- 	.exit		= eps_cpu_exit,
- 	.get		= eps_get,
- 	.name		= "e_powersaver",
--	.attr		= eps_attr,
+ 	.target		= elanfreq_target,
+ 	.init		= elanfreq_cpu_init,
+-	.exit		= elanfreq_cpu_exit,
++	.exit		= cpufreq_generic_exit,
+ 	.name		= "elanfreq",
+-	.attr		= elanfreq_attr,
 +	.attr		= cpufreq_generic_attr,
  };
  
- 
+ static const struct x86_cpu_id elan_id[] = {
 -- 
 1.7.12.rc2.18.g61b472e
