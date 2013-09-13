@@ -1,43 +1,52 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Fri, 13 Sep 2013 15:50:07 -0700
-Subject: [PATCH] arm: Fix build error with context tracking calls
-In-Reply-To: <20130913170331.GA8453@somewhere> (Frederic Weisbecker's message
- of "Fri, 13 Sep 2013 19:03:34 +0200")
-References: <20130908090206.GK25647@n2100.arm.linux.org.uk>
- <522CB0DE.2010102@roeck-us.net>
- <20130909105115.GL25647@n2100.arm.linux.org.uk>
- <522DB86A.8010207@roeck-us.net>
- <alpine.LFD.2.03.1309091023440.20709@syhkavp.arg>
- <20130909160348.GB18975@roeck-us.net>
- <20130909203141.GM25647@n2100.arm.linux.org.uk>
- <20130909210203.GC28416@roeck-us.net>
- <alpine.LFD.2.03.1309091714420.20709@syhkavp.arg>
- <87y574g1fi.fsf@linaro.org> <20130913170331.GA8453@somewhere>
-Message-ID: <87mwnggwv4.fsf@linaro.org>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 13 Sep 2013 16:52:25 -0600
+Subject: [PATCH 211/228] cpufreq: tegra: remove calls to
+ cpufreq_notify_transition()
+In-Reply-To: <69073c98beae28a6a75103dd202ec2a6b8b1a674.1379063063.git.viresh.kumar@linaro.org>
+References: <cover.1379063063.git.viresh.kumar@linaro.org>
+ <69073c98beae28a6a75103dd202ec2a6b8b1a674.1379063063.git.viresh.kumar@linaro.org>
+Message-ID: <52339729.7030309@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Frederic Weisbecker <fweisbec@gmail.com> writes:
+On 09/13/2013 07:02 AM, Viresh Kumar wrote:
+> Most of the drivers do following in their ->target_index() routines:
+> 
+> 	struct cpufreq_freqs freqs;
+> 	freqs.old = old freq...
+> 	freqs.new = new freq...
+> 
+> 	cpufreq_notify_transition(policy, &freqs, CPUFREQ_PRECHANGE);
+> 
+> 	/* Change rate here */
+> 
+> 	cpufreq_notify_transition(policy, &freqs, CPUFREQ_POSTCHANGE);
+> 
+> This is replicated over all cpufreq drivers today and there doesn't exists a
+> good enough reason why this shouldn't be moved to cpufreq core instead.
+> 
+> Earlier patches have added support in cpufreq core to do cpufreq notification on
+> frequency change, this one removes it from this driver.
+> 
+> Some related minor cleanups are also done along with it.
 
-> On Tue, Sep 10, 2013 at 08:07:45AM -0700, Kevin Hilman wrote:
->> Nicolas Pitre <nicolas.pitre@linaro.org> writes:
->> 
->> > Adding Kevin Hilman to the CC as he might be interested as well.
->> 
->> Thanks, I'd already noticed this but was distracted getting arm-soc
->> changes ready for the merge window.  Looking into it now.
->
-> Kevin, can you please try this patch? It built tested fine on ARM
-> and live tested correctly on x86. There should be no problem but
-> just in case.
+> diff --git a/drivers/cpufreq/tegra-cpufreq.c b/drivers/cpufreq/tegra-cpufreq.c
 
-Tested-by: Kevin Hilman <khilman@linaro.org>
+> @@ -121,21 +117,10 @@ static int tegra_update_cpu_speed(struct cpufreq_policy *policy,
+>  	else
+>  		clk_set_rate(emc_clk, 100000000);  /* emc 50Mhz */
+>  
+> -	cpufreq_notify_transition(policy, &freqs, CPUFREQ_PRECHANGE);
+...
+> -	cpufreq_notify_transition(policy, &freqs, CPUFREQ_POSTCHANGE);
 
-Things are back to working again on ARM.  Thanks for the fix, and for
-build testing on ARM.  
+I wonder if this series is bisectable? Perhaps I should just go and read
+the rest of the series, but I presume there's a patch somewhere else
+that adds those two cpufreq_notify_transition() to the cpufreq core.
+Either that happens before this patch (in which case listeners will get
+two notifications each time; perhaps that is safe?), or after this patch
+(in which case with just this patch applied, no notifications will be
+sent until a later patch!
 
-As you noticed to test on ARM, we still have to carry that patch to
-drop that 'depends on 64BIT' in order to build/test this... any more
-thoughts on what the remaining obstacles there are?
-
-Kevin
+Aside from that, all the Tegra-specific patches in this series,
+Acked-by: Stephen Warren <swarren@nvidia.com>
