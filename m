@@ -1,38 +1,41 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 13 Sep 2013 18:31:26 +0530
-Subject: [PATCH 140/228] cpufreq: pmac32: use cpufreq_generic_init() routine
+Date: Fri, 13 Sep 2013 18:31:27 +0530
+Subject: [PATCH 141/228] cpufreq: pmac64: use cpufreq_generic_init() routine
 In-Reply-To: <cover.1379063063.git.viresh.kumar@linaro.org>
 References: <cover.1379063063.git.viresh.kumar@linaro.org>
-Message-ID: <6c271510b5635b33d09b34211ca6e2265932f45c.1379063063.git.viresh.kumar@linaro.org>
+Message-ID: <3c39921134990a55770b0421cf7131916384e8d5.1379063063.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Use generic cpufreq_generic_init() routine instead of replicating the same code
 here.
 
-Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
 Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- drivers/cpufreq/pmac32-cpufreq.c | 7 +------
- 1 file changed, 1 insertion(+), 6 deletions(-)
+ drivers/cpufreq/pmac64-cpufreq.c | 9 +--------
+ 1 file changed, 1 insertion(+), 8 deletions(-)
 
-diff --git a/drivers/cpufreq/pmac32-cpufreq.c b/drivers/cpufreq/pmac32-cpufreq.c
-index 672b7f4..6eac1e2 100644
---- a/drivers/cpufreq/pmac32-cpufreq.c
-+++ b/drivers/cpufreq/pmac32-cpufreq.c
-@@ -392,12 +392,7 @@ static int pmac_cpufreq_target(	struct cpufreq_policy *policy,
+diff --git a/drivers/cpufreq/pmac64-cpufreq.c b/drivers/cpufreq/pmac64-cpufreq.c
+index 79e40c9..b977b9a 100644
+--- a/drivers/cpufreq/pmac64-cpufreq.c
++++ b/drivers/cpufreq/pmac64-cpufreq.c
+@@ -347,16 +347,9 @@ static unsigned int g5_cpufreq_get_speed(unsigned int cpu)
  
- static int pmac_cpufreq_cpu_init(struct cpufreq_policy *policy)
+ static int g5_cpufreq_cpu_init(struct cpufreq_policy *policy)
  {
--	if (policy->cpu != 0)
--		return -ENODEV;
+-	policy->cpuinfo.transition_latency = transition_latency;
+-	/* secondary CPUs are tied to the primary one by the
+-	 * cpufreq core if in the secondary policy we tell it that
+-	 * it actually must be one policy together with all others. */
+-	cpumask_copy(policy->cpus, cpu_online_mask);
 -
--	policy->cpuinfo.transition_latency	= transition_latency;
--
--	return cpufreq_table_validate_and_show(policy, pmac_cpu_freqs);
-+	return cpufreq_generic_init(policy, pmac_cpu_freqs, transition_latency);
+-	return cpufreq_table_validate_and_show(policy, g5_cpu_freqs);
++	return cpufreq_generic_init(policy, g5_cpu_freqs, transition_latency);
  }
  
- static u32 read_gpio(struct device_node *np)
+-
+ static struct cpufreq_driver g5_cpufreq_driver = {
+ 	.name		= "powermac",
+ 	.flags		= CPUFREQ_CONST_LOOPS,
 -- 
 1.7.12.rc2.18.g61b472e
