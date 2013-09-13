@@ -1,32 +1,32 @@
 From: sachin.kamat@linaro.org (Sachin Kamat)
-Date: Fri, 13 Sep 2013 14:53:50 +0530
-Subject: [PATCH 08/10] clk: vt8500: Staticize vtwm_pll_ops
+Date: Fri, 13 Sep 2013 14:53:51 +0530
+Subject: [PATCH 09/10] clk: ux500: Remove extra semicolon
 In-Reply-To: <1379064232-10261-1-git-send-email-sachin.kamat@linaro.org>
 References: <1379064232-10261-1-git-send-email-sachin.kamat@linaro.org>
-Message-ID: <1379064232-10261-8-git-send-email-sachin.kamat@linaro.org>
+Message-ID: <1379064232-10261-9-git-send-email-sachin.kamat@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-'vtwm_pll_ops' is local to this file. Make it static.
+Extra semicolon is redundant. Remove it.
 
 Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
-Cc: Tony Prisk <linux@prisktech.co.nz>
+Cc: Ulf Hansson <ulf.hansson@linaro.org>
 ---
- drivers/clk/clk-vt8500.c |    2 +-
+ drivers/clk/ux500/clk-prcmu.c |    2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/clk/clk-vt8500.c b/drivers/clk/clk-vt8500.c
-index 82306f5..a45e7a6 100644
---- a/drivers/clk/clk-vt8500.c
-+++ b/drivers/clk/clk-vt8500.c
-@@ -620,7 +620,7 @@ static unsigned long vtwm_pll_recalc_rate(struct clk_hw *hw,
- 	return pll_freq;
+diff --git a/drivers/clk/ux500/clk-prcmu.c b/drivers/clk/ux500/clk-prcmu.c
+index 293a288..e2d63bc 100644
+--- a/drivers/clk/ux500/clk-prcmu.c
++++ b/drivers/clk/ux500/clk-prcmu.c
+@@ -36,7 +36,7 @@ static int clk_prcmu_prepare(struct clk_hw *hw)
+ 	if (!ret)
+ 		clk->is_prepared = 1;
+ 
+-	return ret;;
++	return ret;
  }
  
--const struct clk_ops vtwm_pll_ops = {
-+static const struct clk_ops vtwm_pll_ops = {
- 	.round_rate = vtwm_pll_round_rate,
- 	.set_rate = vtwm_pll_set_rate,
- 	.recalc_rate = vtwm_pll_recalc_rate,
+ static void clk_prcmu_unprepare(struct clk_hw *hw)
 -- 
 1.7.9.5
