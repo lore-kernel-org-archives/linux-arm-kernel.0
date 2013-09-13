@@ -1,9 +1,9 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 13 Sep 2013 18:30:13 +0530
-Subject: [PATCH 067/228] cpufreq: ia64-acpi: Use generic cpufreq routines
+Date: Fri, 13 Sep 2013 18:30:16 +0530
+Subject: [PATCH 070/228] cpufreq: longhaul: Use generic cpufreq routines
 In-Reply-To: <cover.1379063063.git.viresh.kumar@linaro.org>
 References: <cover.1379063063.git.viresh.kumar@linaro.org>
-Message-ID: <770e811f81692f1321bd0fb8254f0f4a1b8671ff.1379063063.git.viresh.kumar@linaro.org>
+Message-ID: <44ef88358799992e51a786756e17139fb620cdef.1379063063.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,61 +13,56 @@ by cpufreq drivers then.
 
 This patch uses these generic routines for this driver.
 
-Cc: Tony Luck <tony.luck@intel.com>
 Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- drivers/cpufreq/ia64-acpi-cpufreq.c | 26 ++------------------------
- 1 file changed, 2 insertions(+), 24 deletions(-)
+ drivers/cpufreq/longhaul.c | 23 +++--------------------
+ 1 file changed, 3 insertions(+), 20 deletions(-)
 
-diff --git a/drivers/cpufreq/ia64-acpi-cpufreq.c b/drivers/cpufreq/ia64-acpi-cpufreq.c
-index 6cfad51..b958bdb 100644
---- a/drivers/cpufreq/ia64-acpi-cpufreq.c
-+++ b/drivers/cpufreq/ia64-acpi-cpufreq.c
-@@ -248,22 +248,6 @@ acpi_cpufreq_target (
- 
- 
- static int
--acpi_cpufreq_verify (
--	struct cpufreq_policy   *policy)
--{
--	unsigned int result = 0;
--	struct cpufreq_acpi_io *data = acpi_io_data[policy->cpu];
--
--	pr_debug("acpi_cpufreq_verify\n");
--
--	result = cpufreq_frequency_table_verify(policy,
--			data->freq_table);
--
--	return (result);
--}
--
--
--static int
- acpi_cpufreq_cpu_init (
- 	struct cpufreq_policy   *policy)
- {
-@@ -394,20 +378,14 @@ acpi_cpufreq_cpu_exit (
+diff --git a/drivers/cpufreq/longhaul.c b/drivers/cpufreq/longhaul.c
+index 70b66fd..57d7b02 100644
+--- a/drivers/cpufreq/longhaul.c
++++ b/drivers/cpufreq/longhaul.c
+@@ -625,12 +625,6 @@ static void longhaul_setup_voltagescaling(void)
  }
  
  
--static struct freq_attr* acpi_cpufreq_attr[] = {
+-static int longhaul_verify(struct cpufreq_policy *policy)
+-{
+-	return cpufreq_frequency_table_verify(policy, longhaul_table);
+-}
+-
+-
+ static int longhaul_target(struct cpufreq_policy *policy,
+ 			    unsigned int target_freq, unsigned int relation)
+ {
+@@ -924,25 +918,14 @@ static int longhaul_cpu_init(struct cpufreq_policy *policy)
+ 	return cpufreq_table_validate_and_show(policy, longhaul_table);
+ }
+ 
+-static int longhaul_cpu_exit(struct cpufreq_policy *policy)
+-{
+-	cpufreq_frequency_table_put_attr(policy->cpu);
+-	return 0;
+-}
+-
+-static struct freq_attr *longhaul_attr[] = {
 -	&cpufreq_freq_attr_scaling_available_freqs,
 -	NULL,
 -};
 -
--
- static struct cpufreq_driver acpi_cpufreq_driver = {
--	.verify 	= acpi_cpufreq_verify,
-+	.verify 	= cpufreq_generic_frequency_table_verify,
- 	.target 	= acpi_cpufreq_target,
- 	.get 		= acpi_cpufreq_get,
- 	.init		= acpi_cpufreq_cpu_init,
- 	.exit		= acpi_cpufreq_cpu_exit,
- 	.name		= "acpi-cpufreq",
--	.attr           = acpi_cpufreq_attr,
-+	.attr		= cpufreq_generic_attr,
+ static struct cpufreq_driver longhaul_driver = {
+-	.verify	= longhaul_verify,
++	.verify	= cpufreq_generic_frequency_table_verify,
+ 	.target	= longhaul_target,
+ 	.get	= longhaul_get,
+ 	.init	= longhaul_cpu_init,
+-	.exit	= longhaul_cpu_exit,
++	.exit	= cpufreq_generic_exit,
+ 	.name	= "longhaul",
+-	.attr	= longhaul_attr,
++	.attr	= cpufreq_generic_attr,
  };
  
- 
+ static const struct x86_cpu_id longhaul_id[] = {
 -- 
 1.7.12.rc2.18.g61b472e
