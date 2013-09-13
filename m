@@ -1,34 +1,77 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 13 Sep 2013 11:31:52 +0100
-Subject: [PATCH v2 1/9] i2c: prepare runtime PM support for I2C client
- devices
-In-Reply-To: <20130913101611.GA7393@intel.com>
-References: <1378913560-2752-1-git-send-email-mika.westerberg@linux.intel.com>
- <1378913560-2752-2-git-send-email-mika.westerberg@linux.intel.com>
- <87vc25pvvm.fsf@linaro.org> <20130913065434.GZ7393@intel.com>
- <20130913095950.GA29403@sirena.org.uk>
- <20130913101611.GA7393@intel.com>
-Message-ID: <20130913103152.GE29403@sirena.org.uk>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 13 Sep 2013 12:51:07 +0200
+Subject: [PATCH 0/6] deletion of the Shark machine
+Message-ID: <1379069467-3974-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 13, 2013 at 01:16:11PM +0300, Mika Westerberg wrote:
-> On Fri, Sep 13, 2013 at 10:59:50AM +0100, Mark Brown wrote:
+The RFC series were not met by any protests from active users
+so this is an iteration of the series as sharp material for
+v3.13. After collecting ACKs a pull request will be made to
+the ARM SoC tree.
 
-> > Accessing the bus isn't an issue for I2C outside of ACPI, the power
-> > management of the device is totally disassociated from the bus and the
-> > controller is responsible for ensuring it is available during transfers.
+Linus Walleij (6):
+  ARM: delete mach-shark
+  MAINTAINERS: delete Shark machine entry
+  block: drop dependency on ARCH_SHARK
+  ide: drop dependency on ARCH_SHARK
+  input: i8042: drop dependency on ARCH_SHARK
+  video: drop code for ARCH_SHARK in cyber2000fb
 
-> Yes, but since we want to support ACPI as well, we must make sure that the
-> adapter (and the associated controller) is available when client ->probe()
-> is called.
+ MAINTAINERS                                    |   5 -
+ arch/arm/Kconfig                               |  20 --
+ arch/arm/Makefile                              |   1 -
+ arch/arm/boot/compressed/Makefile              |   4 -
+ arch/arm/boot/compressed/head-shark.S          | 140 -------------
+ arch/arm/boot/compressed/ofw-shark.c           | 260 -------------------------
+ arch/arm/common/Makefile                       |   1 -
+ arch/arm/common/via82c505.c                    |  83 --------
+ arch/arm/configs/shark_defconfig               |  80 --------
+ arch/arm/include/asm/mach/pci.h                |   4 -
+ arch/arm/lib/Makefile                          |   1 -
+ arch/arm/lib/io-shark.c                        |  13 --
+ arch/arm/mach-shark/Makefile                   |  10 -
+ arch/arm/mach-shark/Makefile.boot              |   2 -
+ arch/arm/mach-shark/core.c                     | 146 --------------
+ arch/arm/mach-shark/dma.c                      |  23 ---
+ arch/arm/mach-shark/include/mach/debug-macro.S |  34 ----
+ arch/arm/mach-shark/include/mach/entry-macro.S |  36 ----
+ arch/arm/mach-shark/include/mach/framebuffer.h |  16 --
+ arch/arm/mach-shark/include/mach/hardware.h    |  16 --
+ arch/arm/mach-shark/include/mach/irqs.h        |  13 --
+ arch/arm/mach-shark/include/mach/isa-dma.h     |  13 --
+ arch/arm/mach-shark/include/mach/memory.h      |  26 ---
+ arch/arm/mach-shark/include/mach/timex.h       |   7 -
+ arch/arm/mach-shark/include/mach/uncompress.h  |  50 -----
+ arch/arm/mach-shark/irq.c                      | 108 ----------
+ arch/arm/mach-shark/leds.c                     | 117 -----------
+ arch/arm/mach-shark/pci.c                      |  57 ------
+ drivers/block/Kconfig                          |   2 +-
+ drivers/ide/Kconfig                            |   4 +-
+ drivers/input/serio/Kconfig                    |   2 +-
+ drivers/video/cyber2000fb.c                    |  70 -------
+ 32 files changed, 4 insertions(+), 1360 deletions(-)
+ delete mode 100644 arch/arm/boot/compressed/head-shark.S
+ delete mode 100644 arch/arm/boot/compressed/ofw-shark.c
+ delete mode 100644 arch/arm/common/via82c505.c
+ delete mode 100644 arch/arm/configs/shark_defconfig
+ delete mode 100644 arch/arm/lib/io-shark.c
+ delete mode 100644 arch/arm/mach-shark/Makefile
+ delete mode 100644 arch/arm/mach-shark/Makefile.boot
+ delete mode 100644 arch/arm/mach-shark/core.c
+ delete mode 100644 arch/arm/mach-shark/dma.c
+ delete mode 100644 arch/arm/mach-shark/include/mach/debug-macro.S
+ delete mode 100644 arch/arm/mach-shark/include/mach/entry-macro.S
+ delete mode 100644 arch/arm/mach-shark/include/mach/framebuffer.h
+ delete mode 100644 arch/arm/mach-shark/include/mach/hardware.h
+ delete mode 100644 arch/arm/mach-shark/include/mach/irqs.h
+ delete mode 100644 arch/arm/mach-shark/include/mach/isa-dma.h
+ delete mode 100644 arch/arm/mach-shark/include/mach/memory.h
+ delete mode 100644 arch/arm/mach-shark/include/mach/timex.h
+ delete mode 100644 arch/arm/mach-shark/include/mach/uncompress.h
+ delete mode 100644 arch/arm/mach-shark/irq.c
+ delete mode 100644 arch/arm/mach-shark/leds.c
+ delete mode 100644 arch/arm/mach-shark/pci.c
 
-Right, but this probably needs to be highlighted more since it's a very
-surprising thing for I2C and is causing confusion.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130913/7f900809/attachment.sig>
+-- 
+1.8.3.1
