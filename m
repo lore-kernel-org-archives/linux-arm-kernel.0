@@ -1,129 +1,63 @@
 From: Li.Xiubo@freescale.com (Xiubo Li)
-Date: Fri, 13 Sep 2013 13:58:40 +0800
-Subject: [PATCHv4 2/4] ARM: dts: Add Freescale FTM PWM node for VF610.
+Date: Fri, 13 Sep 2013 13:58:42 +0800
+Subject: [PATCHv4 4/4] Documentation: Add device tree bindings for Freescale
+ FTM PWM.
 In-Reply-To: <1379051922-4930-1-git-send-email-Li.Xiubo@freescale.com>
 References: <1379051922-4930-1-git-send-email-Li.Xiubo@freescale.com>
-Message-ID: <1379051922-4930-3-git-send-email-Li.Xiubo@freescale.com>
+Message-ID: <1379051922-4930-5-git-send-email-Li.Xiubo@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds devicetree node for VF610, and there are 8 channels supported
-by default.
+This adds the Document for Freescale FTM PWM driver under
+Documentation/devicetree/bindings/pwm/.
 
 Signed-off-by: Xiubo Li <Li.Xiubo@freescale.com>
 ---
- arch/arm/boot/dts/vf610.dtsi | 83 +++++++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 82 insertions(+), 1 deletion(-)
+ .../devicetree/bindings/pwm/pwm-fsl-ftm.txt        | 36 ++++++++++++++++++++++
+ 1 file changed, 36 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/pwm/pwm-fsl-ftm.txt
 
-diff --git a/arch/arm/boot/dts/vf610.dtsi b/arch/arm/boot/dts/vf610.dtsi
-index 67d929c..9b200ef 100644
---- a/arch/arm/boot/dts/vf610.dtsi
-+++ b/arch/arm/boot/dts/vf610.dtsi
-@@ -140,6 +140,17 @@
- 				clock-names = "pit";
- 			};
- 
-+			pwm0: pwm at 40038000 {
-+				compatible = "fsl,vf610-ftm-pwm";
-+				#pwm-cells = <3>;
-+				reg = <0x40038000 0x1000>;
-+				clock-names = "ftm0", "ftm0_fix_sel", "ftm0_ext_sel";
-+				clocks = <&clks VF610_CLK_FTM0>,
-+					<&clks VF610_CLK_FTM0_FIX_SEL>,
-+					<&clks VF610_CLK_FTM0_EXT_SEL>;
-+				status = "disabled";
-+			};
+diff --git a/Documentation/devicetree/bindings/pwm/pwm-fsl-ftm.txt b/Documentation/devicetree/bindings/pwm/pwm-fsl-ftm.txt
+new file mode 100644
+index 0000000..e736806
+--- /dev/null
++++ b/Documentation/devicetree/bindings/pwm/pwm-fsl-ftm.txt
+@@ -0,0 +1,36 @@
++Freescale FTM PWM controller
 +
- 			wdog at 4003e000 {
- 				compatible = "fsl,vf610-wdt", "fsl,imx21-wdt";
- 				reg = <0x4003e000 0x1000>;
-@@ -270,16 +281,86 @@
- 				};
- 
- 				pwm0 {
--					pinctrl_pwm0_1: pwm0grp_1 {
-+					pinctrl_pwm0_ch0_active: pwm0grp_ch0_active {
- 						fsl,pins = <
- 						VF610_PAD_PTB0__FTM0_CH0	0x1582
-+						>;
-+					};
-+					pinctrl_pwm0_ch0_idle: pwm0grp_ch0_idle {
-+						fsl,pins = <
-+						VF610_PAD_PTB0__FTM0_CH0	0x0000
-+						>;
-+					};
-+					pinctrl_pwm0_ch1_active: pwm0grp_ch1_active {
-+						fsl,pins = <
- 						VF610_PAD_PTB1__FTM0_CH1	0x1582
-+						>;
-+					};
-+					pinctrl_pwm0_ch1_idle: pwm0grp_ch1_idle {
-+						fsl,pins = <
-+						VF610_PAD_PTB1__FTM0_CH1	0x0000
-+						>;
-+					};
-+					pinctrl_pwm0_ch2_active: pwm0grp_ch2_active {
-+						fsl,pins = <
- 						VF610_PAD_PTB2__FTM0_CH2	0x1582
-+						>;
-+					};
-+					pinctrl_pwm0_ch2_idle: pwm0grp_ch2_idle {
-+						fsl,pins = <
-+						VF610_PAD_PTB2__FTM0_CH2	0x0000
-+						>;
-+					};
-+					pinctrl_pwm0_ch3_active: pwm0grp_ch3_active {
-+						fsl,pins = <
- 						VF610_PAD_PTB3__FTM0_CH3	0x1582
-+						>;
-+					};
-+					pinctrl_pwm0_ch3_idle: pwm0grp_ch3_idle {
-+						fsl,pins = <
-+						VF610_PAD_PTB3__FTM0_CH3	0x0000
-+						>;
-+					};
-+					pinctrl_pwm0_ch4_active: pwm0grp_ch4_active {
-+						fsl,pins = <
-+						VF610_PAD_PTB4__FTM0_CH4	0x1582
-+						>;
-+					};
-+					pinctrl_pwm0_ch4_idle: pwm0grp_ch4_idle {
-+						fsl,pins = <
-+						VF610_PAD_PTB4__FTM0_CH4	0x0000
-+						>;
-+					};
-+					pinctrl_pwm0_ch5_active: pwm0grp_ch5_active {
-+						fsl,pins = <
-+						VF610_PAD_PTB5__FTM0_CH5	0x1582
-+						>;
-+					};
-+					pinctrl_pwm0_ch5_idle: pwm0grp_ch5_idle {
-+						fsl,pins = <
-+						VF610_PAD_PTB5__FTM0_CH5	0x0000
-+						>;
-+					};
-+					pinctrl_pwm0_ch6_active: pwm0grp_ch6_active {
-+						fsl,pins = <
- 						VF610_PAD_PTB6__FTM0_CH6	0x1582
-+						>;
-+					};
-+					pinctrl_pwm0_ch6_idle: pwm0grp_ch6_idle {
-+						fsl,pins = <
-+						VF610_PAD_PTB6__FTM0_CH6	0x0000
-+						>;
-+					};
-+					pinctrl_pwm0_ch7_active: pwm0grp_ch7_active {
-+						fsl,pins = <
- 						VF610_PAD_PTB7__FTM0_CH7	0x1582
- 						>;
- 					};
-+					pinctrl_pwm0_ch7_idle: pwm0grp_ch7_idle {
-+						fsl,pins = <
-+						VF610_PAD_PTB7__FTM0_CH7	0x0000
-+						>;
-+					};
- 				};
- 
- 				qspi0 {
++Required properties:
++- compatible: Should be "fsl,vf610-ftm-pwm"
++- reg: Physical base address and length of the controller's registers
++- #pwm-cells: Should be 3. See pwm.txt in this directory for a description of
++  the cells format.
++- clock-names : Includes the following module clock source entries:
++    "ftm0" (system clock),
++    "ftm0_fix_sel" (fixed frequency clock),
++    "ftm0_ext_sel" (external clock)
++- clocks : Must contain an entry list for entries in clock-names.
++- fsl,pwm-counter-clk: The FTM PWM counter clock source, should be one of the
++  entries in clock-names.
++- For each channel's pinctrl, the "chN-active" and "chN-idle" states should be
++  implemented at the same time.
++
++Example:
++
++pwm0: pwm at 40038000 {
++		compatible = "fsl,vf610-ftm-pwm";
++		reg = <0x40038000 0x1000>;
++		#pwm-cells = <3>;
++		clock-names = "ftm0", "ftm0_fix_sel", "ftm0_ext_sel";
++		clocks = <&clks VF610_CLK_FTM0>,
++			<&clks VF610_CLK_FTM0_FIX_SEL>,
++			<&clks VF610_CLK_FTM0_EXT_SEL>;
++		pinctrl-names = "ch0-active", "ch0-idle", "ch1-active", "ch1-idle",
++		....;
++		pinctrl-0 = <&pinctrl_pwm0_ch0_active>;
++		pinctrl-1 = <&pinctrl_pwm0_ch0_idle>;
++		pinctrl-2 = <&pinctrl_pwm0_ch1_active>;
++		pinctrl-3 = <&pinctrl_pwm0_ch1_idle>;
++		...
++		fsl,pwm-counter-clk = "ftm0_ext_sel";
++};
 -- 
 1.8.0
