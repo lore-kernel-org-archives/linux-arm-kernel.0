@@ -1,10 +1,10 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 13 Sep 2013 18:32:24 +0530
-Subject: [PATCH 198/228] cpufreq: omap: remove calls to
+Date: Fri, 13 Sep 2013 18:32:26 +0530
+Subject: [PATCH 200/228] cpufreq: pasemi: remove calls to
  cpufreq_notify_transition()
 In-Reply-To: <cover.1379063063.git.viresh.kumar@linaro.org>
 References: <cover.1379063063.git.viresh.kumar@linaro.org>
-Message-ID: <460ac80ae0afb99ba681bedcbd3863c0ddae0ea8.1379063063.git.viresh.kumar@linaro.org>
+Message-ID: <e123108bcae9ac51871b6830c7a812163fc2e6a6.1379063063.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -28,96 +28,50 @@ frequency change, this one removes it from this driver.
 
 Some related minor cleanups are also done along with it.
 
-Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
 Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- drivers/cpufreq/omap-cpufreq.c | 39 ++++++++++++++-------------------------
- 1 file changed, 14 insertions(+), 25 deletions(-)
+ drivers/cpufreq/pasemi-cpufreq.c | 14 +-------------
+ 1 file changed, 1 insertion(+), 13 deletions(-)
 
-diff --git a/drivers/cpufreq/omap-cpufreq.c b/drivers/cpufreq/omap-cpufreq.c
-index 0653887..e92d72e 100644
---- a/drivers/cpufreq/omap-cpufreq.c
-+++ b/drivers/cpufreq/omap-cpufreq.c
-@@ -53,15 +53,15 @@ static unsigned int omap_getspeed(unsigned int cpu)
+diff --git a/drivers/cpufreq/pasemi-cpufreq.c b/drivers/cpufreq/pasemi-cpufreq.c
+index 17424dd..1c33136 100644
+--- a/drivers/cpufreq/pasemi-cpufreq.c
++++ b/drivers/cpufreq/pasemi-cpufreq.c
+@@ -51,8 +51,6 @@
+ static void __iomem *sdcpwr_mapbase;
+ static void __iomem *sdcasr_mapbase;
  
- static int omap_target(struct cpufreq_policy *policy, unsigned int index)
+-static DEFINE_MUTEX(pas_switch_mutex);
+-
+ /* Current astate, is used when waking up from power savings on
+  * one core, in case the other core has switched states during
+  * the idle time.
+@@ -242,15 +240,8 @@ static int pas_cpufreq_cpu_exit(struct cpufreq_policy *policy)
+ static int pas_cpufreq_target(struct cpufreq_policy *policy,
+ 			      unsigned int pas_astate_new)
  {
--	int r, ret = 0;
 -	struct cpufreq_freqs freqs;
-+	int r, ret;
- 	struct opp *opp;
- 	unsigned long freq, volt = 0, volt_old = 0, tol = 0;
-+	unsigned int old_freq, new_freq;
+ 	int i;
  
--	freqs.old = omap_getspeed(policy->cpu);
--	freqs.new = freq_table[index].frequency;
-+	old_freq = omap_getspeed(policy->cpu);
-+	new_freq = freq_table[index].frequency;
- 
--	freq = freqs.new * 1000;
-+	freq = new_freq * 1000;
- 	ret = clk_round_rate(mpu_clk, freq);
- 	if (IS_ERR_VALUE(ret)) {
- 		dev_warn(mpu_dev,
-@@ -77,7 +77,7 @@ static int omap_target(struct cpufreq_policy *policy, unsigned int index)
- 		if (IS_ERR(opp)) {
- 			rcu_read_unlock();
- 			dev_err(mpu_dev, "%s: unable to find MPU OPP for %d\n",
--				__func__, freqs.new);
-+				__func__, new_freq);
- 			return -EINVAL;
- 		}
- 		volt = opp_get_voltage(opp);
-@@ -87,43 +87,32 @@ static int omap_target(struct cpufreq_policy *policy, unsigned int index)
- 	}
- 
- 	dev_dbg(mpu_dev, "cpufreq-omap: %u MHz, %ld mV --> %u MHz, %ld mV\n", 
--		freqs.old / 1000, volt_old ? volt_old / 1000 : -1,
--		freqs.new / 1000, volt ? volt / 1000 : -1);
+-	freqs.old = policy->cur;
+-	freqs.new = pas_freqs[pas_astate_new].frequency;
 -
--	/* notifiers */
+-	mutex_lock(&pas_switch_mutex);
 -	cpufreq_notify_transition(policy, &freqs, CPUFREQ_PRECHANGE);
-+		old_freq / 1000, volt_old ? volt_old / 1000 : -1,
-+		new_freq / 1000, volt ? volt / 1000 : -1);
- 
- 	/* scaling up?  scale voltage before frequency */
--	if (mpu_reg && (freqs.new > freqs.old)) {
-+	if (mpu_reg && (new_freq > old_freq)) {
- 		r = regulator_set_voltage(mpu_reg, volt - tol, volt + tol);
- 		if (r < 0) {
- 			dev_warn(mpu_dev, "%s: unable to scale voltage up.\n",
- 				 __func__);
--			freqs.new = freqs.old;
--			goto done;
-+			return r;
- 		}
- 	}
- 
--	ret = clk_set_rate(mpu_clk, freqs.new * 1000);
-+	ret = clk_set_rate(mpu_clk, new_freq * 1000);
- 
- 	/* scaling down?  scale voltage after frequency */
--	if (mpu_reg && (freqs.new < freqs.old)) {
-+	if (mpu_reg && (new_freq < old_freq)) {
- 		r = regulator_set_voltage(mpu_reg, volt - tol, volt + tol);
- 		if (r < 0) {
- 			dev_warn(mpu_dev, "%s: unable to scale voltage down.\n",
- 				 __func__);
--			ret = clk_set_rate(mpu_clk, freqs.old * 1000);
--			freqs.new = freqs.old;
--			goto done;
-+			clk_set_rate(mpu_clk, old_freq * 1000);
-+			return r;
- 		}
- 	}
- 
--	freqs.new = omap_getspeed(policy->cpu);
 -
--done:
--	/* notifiers */
+ 	pr_debug("setting frequency for cpu %d to %d kHz, 1/%d of max frequency\n",
+ 		 policy->cpu,
+ 		 pas_freqs[pas_astate_new].frequency,
+@@ -261,10 +252,7 @@ static int pas_cpufreq_target(struct cpufreq_policy *policy,
+ 	for_each_online_cpu(i)
+ 		set_astate(i, pas_astate_new);
+ 
 -	cpufreq_notify_transition(policy, &freqs, CPUFREQ_POSTCHANGE);
+-	mutex_unlock(&pas_switch_mutex);
 -
- 	return ret;
+-	ppc_proc_freq = freqs.new * 1000ul;
++	ppc_proc_freq = pas_freqs[pas_astate_new].frequency * 1000ul;
+ 	return 0;
  }
  
 -- 
