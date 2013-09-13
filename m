@@ -1,43 +1,71 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 13 Sep 2013 11:04:53 +0100
-Subject: [PATCH 5/5] ARM64: Add support for ILP32 ABI.
-In-Reply-To: <20130913095739.GB10385@arm.com>
-References: <1378762380-13152-1-git-send-email-apinski@cavium.com>
- <1378762380-13152-5-git-send-email-apinski@cavium.com>
- <20130911143102.GA8825@darko.cambridge.arm.com>
- <CA+=Sn1nd3Ym8so_=SP4NC1fjKWn4dNPYvz4OZMo0tLZptF8KVw@mail.gmail.com>
- <20130913094712.GA21859@mudshark.cambridge.arm.com>
- <20130913095739.GB10385@arm.com>
-Message-ID: <20130913100453.GB21859@mudshark.cambridge.arm.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 13 Sep 2013 12:06:33 +0200
+Subject: [PATCH v2 04/12] ARM: mvebu: Remove the unused argument of
+ set_cpu_coherent()
+In-Reply-To: <1379066801-16276-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1379066801-16276-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1379066801-16276-5-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 13, 2013 at 10:57:40AM +0100, Catalin Marinas wrote:
-> On Fri, Sep 13, 2013 at 10:47:12AM +0100, Will Deacon wrote:
-> > On Fri, Sep 13, 2013 at 07:18:48AM +0100, Andrew Pinski wrote:
-> > > On Wed, Sep 11, 2013 at 7:32 AM, Catalin Marinas
-> > > <catalin.marinas@arm.com> wrote:
-> > > > On Mon, Sep 09, 2013 at 10:32:59PM +0100, Andrew Pinski wrote:
-> > > >> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> > > >> index cc64df5..7fdc994 100644
-> > > >> --- a/arch/arm64/Kconfig
-> > > >> +++ b/arch/arm64/Kconfig
-> > > >> @@ -248,7 +248,7 @@ source "fs/Kconfig.binfmt"
-> > > >>
-> > > >>  config COMPAT
-> > > >>         def_bool y
-> > > >> -       depends on ARM64_AARCH32
-> > > >> +       depends on ARM64_AARCH32 || ARM64_ILP32
-> > > >>         select COMPAT_BINFMT_ELF
-> > > >>
-> > > >>  config ARM64_AARCH32
-> > 
-> > (nitpick) We used to have an option like this, called
-> > CONFIG_AARCH32_EMULATION, which I think is clearer than CONFIG_ARM64_AARCH32.
-> 
-> I think avoiding "EMULATION" is better, we don't actually emulate the
-> instruction set ;).
+set_cpu_coherent() took the SMP group ID as parameter. But this
+parameter was never used, and the CPU always use the SMP group 0. So
+we can remove this parameter.
 
-Bah, you suggest something better then!
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
+ arch/arm/mach-mvebu/coherency.c | 4 ++--
+ arch/arm/mach-mvebu/coherency.h | 2 +-
+ arch/arm/mach-mvebu/platsmp.c   | 2 +-
+ 3 files changed, 4 insertions(+), 4 deletions(-)
 
-Will
+diff --git a/arch/arm/mach-mvebu/coherency.c b/arch/arm/mach-mvebu/coherency.c
+index e48518e..a2b6366 100644
+--- a/arch/arm/mach-mvebu/coherency.c
++++ b/arch/arm/mach-mvebu/coherency.c
+@@ -45,7 +45,7 @@ static struct of_device_id of_coherency_table[] = {
+ /* Function defined in coherency_ll.S */
+ int ll_set_cpu_coherent(bool use_virt_addr);
+ 
+-int set_cpu_coherent(int smp_group_id)
++int set_cpu_coherent(void)
+ {
+ 	if (!coherency_base) {
+ 		pr_warn("Can't make current CPU cache coherent.\n");
+@@ -139,7 +139,7 @@ int __init coherency_init(void)
+ 		sync_cache_w(&coherency_phys_base);
+ 		coherency_base = of_iomap(np, 0);
+ 		coherency_cpu_base = of_iomap(np, 1);
+-		set_cpu_coherent(0);
++		set_cpu_coherent();
+ 	}
+ 
+ 	return 0;
+diff --git a/arch/arm/mach-mvebu/coherency.h b/arch/arm/mach-mvebu/coherency.h
+index d4bc067..700376e 100644
+--- a/arch/arm/mach-mvebu/coherency.h
++++ b/arch/arm/mach-mvebu/coherency.h
+@@ -14,7 +14,7 @@
+ #ifndef __MACH_370_XP_COHERENCY_H
+ #define __MACH_370_XP_COHERENCY_H
+ 
+-int set_cpu_coherent(int smp_group_id);
++int set_cpu_coherent(void);
+ int coherency_init(void);
+ 
+ #endif	/* __MACH_370_XP_COHERENCY_H */
+diff --git a/arch/arm/mach-mvebu/platsmp.c b/arch/arm/mach-mvebu/platsmp.c
+index 1b86e03..a0fe97e 100644
+--- a/arch/arm/mach-mvebu/platsmp.c
++++ b/arch/arm/mach-mvebu/platsmp.c
+@@ -102,7 +102,7 @@ void __init armada_xp_smp_prepare_cpus(unsigned int max_cpus)
+ 
+ 	set_secondary_cpus_clock();
+ 	flush_cache_all();
+-	set_cpu_coherent(0);
++	set_cpu_coherent();
+ 
+ 	/*
+ 	 * In order to boot the secondary CPUs we need to ensure
+-- 
+1.8.1.2
