@@ -1,48 +1,38 @@
-From: B18965@freescale.com (Wang Huan-B18965)
-Date: Fri, 13 Sep 2013 07:07:44 +0000
-Subject: [PATCH v3 0/5] ARM: vf610: Add DCU framebuffer driver for
- Vybrid VF610 platform
-In-Reply-To: <52270C71.7080805@ti.com>
-References: <1376553714-25922-1-git-send-email-b18965@freescale.com>
- <81BA6E5E0BC2344391CABCEE22D1B6D83F448E@039-SN1MPN1-002.039d.mgd.msft.net>
- <81BA6E5E0BC2344391CABCEE22D1B6D8403CB3@039-SN1MPN1-002.039d.mgd.msft.net>
- <52270C71.7080805@ti.com>
-Message-ID: <81BA6E5E0BC2344391CABCEE22D1B6D842FD6A@039-SN1MPN1-003.039d.mgd.msft.net>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 13 Sep 2013 09:20:02 +0200
+Subject: [PATCH 21/33] clk: ux500: Add Device Tree support for the PRCC
+ Kernel clock
+In-Reply-To: <20130912145651.GJ11227@lee--X1>
+References: <1370521041-32318-1-git-send-email-lee.jones@linaro.org>
+ <1370521041-32318-22-git-send-email-lee.jones@linaro.org>
+ <CACRpkdY2KOxX=oA7i9GUnzpwRKiK2rXqTBPVpg+zW082f2TJdg@mail.gmail.com>
+ <20130821101448.GJ29850@lee--X1>
+ <CACRpkdYjvFTJAUL6xKxjkVd_v=DHHRkswoB_eq0Npqj5Sw23KQ@mail.gmail.com>
+ <20130822092130.GB22023@lee--X1>
+ <CACRpkdYLJdmhCqXpQ0s5nbxRoFdZ3bLn+hxAhkoGHYfvugc=7A@mail.gmail.com>
+ <20130827082326.GE6152@lee--X1>
+ <CACRpkdYvAfEh6UGa7qR_e9ynj3TkPSM2RKtr7Scw7L3p10AgXA@mail.gmail.com>
+ <20130912145651.GJ11227@lee--X1>
+Message-ID: <CACRpkdbr-Cuz14ZL_AGs4_SgDGQYgbpxQ_NjOakWrpX7gqzssA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-My comments inline.
+On Thu, Sep 12, 2013 at 4:56 PM, Lee Jones <lee.jones@linaro.org> wrote:
+> On Thu, 12 Sep 2013, Linus Walleij wrote:
 
-> -----Original Message-----
-> From: Tomi Valkeinen [mailto:tomi.valkeinen at ti.com]
-> Sent: Wednesday, September 04, 2013 6:33 PM
-> To: Wang Huan-B18965
-> Cc: plagnioj at jcrosoft.com; linux-fbdev at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org; Jin Zhengxiong-R64188; Estevam Fabio-R49496;
-> shawn.guo at linaro.org
-> Subject: Re: [PATCH v3 0/5] ARM: vf610: Add DCU framebuffer driver for
-> Vybrid VF610 platform
-> 
-> Hi,
-> 
-> On 03/09/13 11:21, Wang Huan-B18965 wrote:
-> > Hi, Jean-Christophe, Tomi,
-> >
-> >       Could you please help to review these patches?
-> >       Thanks!
-> 
-> There seemed to be some strong opinions that there should be a drm
-> driver for this hardware, instead of an fb driver. So as there seems to
-> be disagreements about this, I'll leave this series to Jean-Christophe,
-> who's the primary maintainer.
-[Alison Wang] 
+>> But if you still don't like this, let me cook a counter-patch so
+>> I can realized on my own how terribly wrong I am...
+>
+> I'm going to yank all of the clk_register_clkdev() calls out
+> imminently anyway, so all those these hiding bugs will soon become
+> apparent in any case. Why don't I place my 'remove ATAGs' patch-set
+> on top of this one and then finally remove the clk_register_clkdev()s
+> and watch the carnage ensue?
 
-Thanks for Tomi's comments. 
+So that creates problem for me as maintainer if I need to
+pull or revert some of the patches on top of the stack, all of
+a sudden the file looks horrible. That is why I want every step
+to be as clean a cut as possible.
 
-I agree that we can implement the DRM driver for the DCU. As the bandwidth limitation, I suggest we use the fb driver firstly. On the other hand, the fb driver can meet the application requirement based on this SoC. We'll try to provide the DRM driver when this IP integrated into other SoC. 
-
-Jean-Christophe, Do you have any comments. Thanks.  
-
-
-Best Regards,
-Alison Wang
+Yours,
+Linus Walleij
