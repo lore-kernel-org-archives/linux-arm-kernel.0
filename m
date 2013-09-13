@@ -1,93 +1,117 @@
-From: cinifr@gmail.com (cinifr)
-Date: Fri, 13 Sep 2013 21:23:15 +0800
-Subject: [PATCH 0/4] Add smp support for Allwinner A20 and phy arch count
- timer
-In-Reply-To: <20130913112042.GI22013@e106331-lin.cambridge.arm.com>
-References: <1378968687-8200-1-git-send-email-cinifr@gmail.com>
- <20130912143922.GC22013@e106331-lin.cambridge.arm.com>
- <CAK3cCBzQxJqrse-OP-wv81uB26YxHBw_mN2HQD6QVnge5-Kabg@mail.gmail.com>
- <20130913112042.GI22013@e106331-lin.cambridge.arm.com>
-Message-ID: <CAK3cCByVcz8QdTKXGDmmUDOMjTcnoueVZ9qWFpahcOLo0gCLMA@mail.gmail.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Fri, 13 Sep 2013 18:31:57 +0530
+Subject: [PATCH 171/228] cpufreq: pxa: Convert to light weight
+ ->target_index() routine
+In-Reply-To: <cover.1379063063.git.viresh.kumar@linaro.org>
+References: <cover.1379063063.git.viresh.kumar@linaro.org>
+Message-ID: <90a04e89554fc0e07e9354f1bc165c52aaeef2be.1379063063.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13 September 2013 19:20, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Thu, Sep 12, 2013 at 04:46:42PM +0100, cinifr wrote:
->> >You seem to be suggesting a kernel change (using CNTPCT), but also
->> >bootloader changes (setting CNTHCTL.PL1PCTEN) to make this possible at
->> >all. If the bootloader needs to be modified, why can it not be modified
->> >to set CNTVOFF (or to boot the kernel in Hyp where it can set it
->> >itself)?
->>
->> I think kernel should can support both CNTVCT and CNTPCT. Yes, if
->> bootloader have set  CNTVOFF to zero, then CNTVCT is OK, kvm guest
->> using CNTVCT can run more efficient then that using CNTPCT. but if
->> bootloader dont set it, how about kernel booting? I think kernel
->> should try it's best to boot and run ok even bootload dont set any
->> generic timer register including  CNTVOFF  and  CNTHCTL. So i gave a
->> compile options using  CNTPCT. That is only options, If CNTVCT can not
->> working, you have others choice.
->> Of cause, It is best that kerne can select which timer count is used
->> in running time,
->
-> CNTVOFF doesn't need to be zero -- when a guest runs under a hypervisor,
-> CNTVOFF may change across a suspend/resume of a VM (to give the guest
-> the illusion that time wasn't ticking when it wasn't running). All
-> that's required is that all the CPUs have the same CNTVOFF value, and
-> this has been valid for all platforms so far.
->
-> Does CNTVOFF vary between your CPUs, or are they a consistent value
-> (event if it's not zero)?
-Yes, It is vary in A20 CPUS,
+This patch converts existing .target() to newly defined light weight
+.target_index() routine for this driver.
 
-> For ARMv8 systems, CNTVOFF and CNTHCTL reset to an UNDEFINED value, so
-> we cannot rely on the physical timers and counters being available --
-> the firmware and/or hypervisor must set at least one of them for an OS
-> to be able to use the system. The virtual timers and counters are
-> *always* available to PL1/EL1, so our best bet is to use them.
->
-> I'd prefer not to have to have a run-time solution to a problem that can
-> be avoided entirely with a simple modification to the bootloader now.
-I agree it now,
->>
->> >I'm not sure what you mean by selecting which timer to use be reading
->> >the current running mode. We currently decide to use CNTVCT if booted in
->> >PL1, or CNTPCT if booted in Hyp. I assume this isn't the mode you're
->> >referring to?
->> Yep, kernel can run PL1 NS=1, PL1 NS=0, PL2. If kernel can know
->> current running Mode.then kernel can chose which timer is OK in
->> running time. 1: If kernel is runing at PL2 and PL1 NS=0, then CNTPCT
->> is OK in any case even CNTVOFF is not zero and CNTHCTL.PL1PCTEN is
->> zero. 2: if kernel is running at  PL1 NS=1,then kernel maybe should
->> select CNTVCT. But it has risk to using CNTVCT when CNTVOFF is not
->> zero.
->> How to deal with the case CNTHCTL.PL1PCTEN is zero and  CNTVOFF is not
->> zero? current kernel cant using any arch timer incluing   CNTVCT and
->> CNTPCT. with this case, I think kernel should use CNTVCT by other
->> ways: Kernel runing CPUn read CNTVCT and save it to  local variable
->> for example InitVctVALUEn in initialization, then kernel running CPUn
->> read timer later return a value as  ReadTIMERn=CNTVCTn-InitVctVALUEn,
->> This way can run in any  generic timer registe set and in any kernel
->> runing mode. I try to write this patch for new way. But the new way
->> should need more time than old in read timer funcation  because it
->> need more calculate.
->
-> I don't think that would work. You have no way of ensuring that all CPUs
-> read CNTVCT at the same time, so they may record offsets that give them
-> different views of time. Consider the case that CNTVOFF was zero on all
-> CPUs. CPU0 and CPU1 might read CNTVCT at different instants, and CPU1
-> could record its offset as 100 while CPU1 could record its offset as
-> 2000. That would leave CPU1 thinking it's further ahead in time than
-> CPU0, which could break all sorts of things. AFAICS there's no way of
-> telling this apart from each CPU booting with a different CNTVOFF.
+CPUFreq core will call cpufreq_frequency_table_target() before calling this
+routine and will pass index to it.
 
-> As SMP support for this platform is not yet in mainline, and the
-> bootloader can be fixed to set CNTVOFF (as KVM and Xen do for guests),
-> we should get the bootloader to set CNTVOFF to a consistent value across
-> all CPUs.
-Yes, you are right, I will remove phy count timer support patch.and
-try to modify bootloader for fix the problem. Bootloader do it better,
-more simple and more  efficiency.
+Cc: Eric Miao <eric.y.miao@gmail.com>
+Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+---
+ drivers/cpufreq/pxa2xx-cpufreq.c | 13 ++-----------
+ drivers/cpufreq/pxa3xx-cpufreq.c | 17 +++--------------
+ 2 files changed, 5 insertions(+), 25 deletions(-)
 
-Thanks
-         Fan.
+diff --git a/drivers/cpufreq/pxa2xx-cpufreq.c b/drivers/cpufreq/pxa2xx-cpufreq.c
+index 29aca57..183bc13 100644
+--- a/drivers/cpufreq/pxa2xx-cpufreq.c
++++ b/drivers/cpufreq/pxa2xx-cpufreq.c
+@@ -267,14 +267,11 @@ static unsigned int pxa_cpufreq_get(unsigned int cpu)
+ 	return get_clk_frequency_khz(0);
+ }
+ 
+-static int pxa_set_target(struct cpufreq_policy *policy,
+-			  unsigned int target_freq,
+-			  unsigned int relation)
++static int pxa_set_target(struct cpufreq_policy *policy, unsigned int idx)
+ {
+ 	struct cpufreq_frequency_table *pxa_freqs_table;
+ 	pxa_freqs_t *pxa_freq_settings;
+ 	struct cpufreq_freqs freqs;
+-	unsigned int idx;
+ 	unsigned long flags;
+ 	unsigned int new_freq_cpu, new_freq_mem;
+ 	unsigned int unused, preset_mdrefr, postset_mdrefr, cclkcfg;
+@@ -283,12 +280,6 @@ static int pxa_set_target(struct cpufreq_policy *policy,
+ 	/* Get the current policy */
+ 	find_freq_tables(&pxa_freqs_table, &pxa_freq_settings);
+ 
+-	/* Lookup the next frequency */
+-	if (cpufreq_frequency_table_target(policy, pxa_freqs_table,
+-					   target_freq, relation, &idx)) {
+-		return -EINVAL;
+-	}
+-
+ 	new_freq_cpu = pxa_freq_settings[idx].khz;
+ 	new_freq_mem = pxa_freq_settings[idx].membus;
+ 	freqs.old = policy->cur;
+@@ -448,7 +439,7 @@ static int pxa_cpufreq_init(struct cpufreq_policy *policy)
+ 
+ static struct cpufreq_driver pxa_cpufreq_driver = {
+ 	.verify	= cpufreq_generic_frequency_table_verify,
+-	.target	= pxa_set_target,
++	.target_index = pxa_set_target,
+ 	.init	= pxa_cpufreq_init,
+ 	.exit	= cpufreq_generic_exit,
+ 	.get	= pxa_cpufreq_get,
+diff --git a/drivers/cpufreq/pxa3xx-cpufreq.c b/drivers/cpufreq/pxa3xx-cpufreq.c
+index 47fbee4..132e37d 100644
+--- a/drivers/cpufreq/pxa3xx-cpufreq.c
++++ b/drivers/cpufreq/pxa3xx-cpufreq.c
+@@ -155,24 +155,16 @@ static unsigned int pxa3xx_cpufreq_get(unsigned int cpu)
+ 	return pxa3xx_get_clk_frequency_khz(0);
+ }
+ 
+-static int pxa3xx_cpufreq_set(struct cpufreq_policy *policy,
+-			      unsigned int target_freq,
+-			      unsigned int relation)
++static int pxa3xx_cpufreq_set(struct cpufreq_policy *policy, unsigned int index)
+ {
+ 	struct pxa3xx_freq_info *next;
+ 	struct cpufreq_freqs freqs;
+ 	unsigned long flags;
+-	int idx;
+ 
+ 	if (policy->cpu != 0)
+ 		return -EINVAL;
+ 
+-	/* Lookup the next frequency */
+-	if (cpufreq_frequency_table_target(policy, pxa3xx_freqs_table,
+-				target_freq, relation, &idx))
+-		return -EINVAL;
+-
+-	next = &pxa3xx_freqs[idx];
++	next = &pxa3xx_freqs[index];
+ 
+ 	freqs.old = policy->cur;
+ 	freqs.new = next->cpufreq_mhz * 1000;
+@@ -181,9 +173,6 @@ static int pxa3xx_cpufreq_set(struct cpufreq_policy *policy,
+ 			freqs.old / 1000, freqs.new / 1000,
+ 			(freqs.old == freqs.new) ? " (skipped)" : "");
+ 
+-	if (freqs.old == target_freq)
+-		return 0;
+-
+ 	cpufreq_notify_transition(policy, &freqs, CPUFREQ_PRECHANGE);
+ 
+ 	local_irq_save(flags);
+@@ -225,7 +214,7 @@ static int pxa3xx_cpufreq_init(struct cpufreq_policy *policy)
+ 
+ static struct cpufreq_driver pxa3xx_cpufreq_driver = {
+ 	.verify		= cpufreq_generic_frequency_table_verify,
+-	.target		= pxa3xx_cpufreq_set,
++	.target_index	= pxa3xx_cpufreq_set,
+ 	.init		= pxa3xx_cpufreq_init,
+ 	.exit		= cpufreq_generic_exit,
+ 	.get		= pxa3xx_cpufreq_get,
+-- 
+1.7.12.rc2.18.g61b472e
