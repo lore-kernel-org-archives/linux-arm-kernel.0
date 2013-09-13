@@ -1,62 +1,88 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 13 Sep 2013 18:32:44 +0530
-Subject: [PATCH 218/228] cpufreq: dbx500: use cpufreq_generic_get() routine
+Date: Fri, 13 Sep 2013 18:32:47 +0530
+Subject: [PATCH 221/228] cpufreq: loongson2: use cpufreq_generic_get() routine
 In-Reply-To: <cover.1379063063.git.viresh.kumar@linaro.org>
 References: <cover.1379063063.git.viresh.kumar@linaro.org>
-Message-ID: <d447b693596cb56da5973d97127793a17e524646.1379063063.git.viresh.kumar@linaro.org>
+Message-ID: <f5aaff9b7623faf69b6b38884d866619a75ef15f.1379063063.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 We have common infrastructure available with us for getting a CPUs clk rate.
 Lets use it for this driver.
 
-We don't have to find closest frequency in platform specific ->get() routine
-wihch dbx500 driver was doing and hence it can be removed as well.
+We don't need a global variable to hold clock anymore.
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Cc: John Crispin <blogic@openwrt.org>
 Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- drivers/cpufreq/dbx500-cpufreq.c | 19 ++-----------------
- 1 file changed, 2 insertions(+), 17 deletions(-)
+ drivers/cpufreq/loongson2_cpufreq.c | 15 +++++----------
+ 1 file changed, 5 insertions(+), 10 deletions(-)
 
-diff --git a/drivers/cpufreq/dbx500-cpufreq.c b/drivers/cpufreq/dbx500-cpufreq.c
-index 0e67ab9..d83129d 100644
---- a/drivers/cpufreq/dbx500-cpufreq.c
-+++ b/drivers/cpufreq/dbx500-cpufreq.c
-@@ -26,24 +26,9 @@ static int dbx500_cpufreq_target(struct cpufreq_policy *policy,
- 	return clk_set_rate(armss_clk, freq_table[index].frequency * 1000);
+diff --git a/drivers/cpufreq/loongson2_cpufreq.c b/drivers/cpufreq/loongson2_cpufreq.c
+index a436092..b6581ab 100644
+--- a/drivers/cpufreq/loongson2_cpufreq.c
++++ b/drivers/cpufreq/loongson2_cpufreq.c
+@@ -24,8 +24,6 @@
+ 
+ static uint nowait;
+ 
+-static struct clk *cpuclk;
+-
+ static void (*saved_cpu_wait) (void);
+ 
+ static int loongson2_cpu_freq_notifier(struct notifier_block *nb,
+@@ -44,11 +42,6 @@ static int loongson2_cpu_freq_notifier(struct notifier_block *nb,
+ 	return 0;
  }
  
--static unsigned int dbx500_cpufreq_getspeed(unsigned int cpu)
+-static unsigned int loongson2_cpufreq_get(unsigned int cpu)
 -{
--	int i = 0;
--	unsigned long freq = clk_get_rate(armss_clk) / 1000;
--
--	/* The value is rounded to closest frequency in the defined table. */
--	while (freq_table[i + 1].frequency != CPUFREQ_TABLE_END) {
--		if (freq < freq_table[i].frequency +
--		   (freq_table[i + 1].frequency - freq_table[i].frequency) / 2)
--			return freq_table[i].frequency;
--		i++;
--	}
--
--	return freq_table[i].frequency;
+-	return clk_get_rate(cpuclk);
 -}
 -
- static int dbx500_cpufreq_init(struct cpufreq_policy *policy)
- {
-+	policy->clk = armss_clk;
- 	return cpufreq_generic_init(policy, freq_table, 20 * 1000);
+ /*
+  * Here we notify other drivers of the proposed change and the final change.
+  */
+@@ -69,13 +62,14 @@ static int loongson2_cpufreq_target(struct cpufreq_policy *policy,
+ 	set_cpus_allowed_ptr(current, &cpus_allowed);
+ 
+ 	/* setting the cpu frequency */
+-	clk_set_rate(cpuclk, freq);
++	clk_set_rate(policy->clk, freq);
+ 
+ 	return 0;
  }
  
-@@ -51,7 +36,7 @@ static struct cpufreq_driver dbx500_cpufreq_driver = {
- 	.flags  = CPUFREQ_STICKY | CPUFREQ_CONST_LOOPS,
+ static int loongson2_cpufreq_cpu_init(struct cpufreq_policy *policy)
+ {
++	static struct clk *cpuclk;
+ 	int i;
+ 	unsigned long rate;
+ 	int ret;
+@@ -104,13 +98,14 @@ static int loongson2_cpufreq_cpu_init(struct cpufreq_policy *policy)
+ 		return ret;
+ 	}
+ 
++	policy->clk = cpuclk;
+ 	return cpufreq_generic_init(policy, &loongson2_clockmod_table[0], 0);
+ }
+ 
+ static int loongson2_cpufreq_exit(struct cpufreq_policy *policy)
+ {
+ 	cpufreq_frequency_table_put_attr(policy->cpu);
+-	clk_put(cpuclk);
++	clk_put(policy->clk);
+ 	return 0;
+ }
+ 
+@@ -119,7 +114,7 @@ static struct cpufreq_driver loongson2_cpufreq_driver = {
+ 	.init = loongson2_cpufreq_cpu_init,
  	.verify = cpufreq_generic_frequency_table_verify,
- 	.target_index = dbx500_cpufreq_target,
--	.get    = dbx500_cpufreq_getspeed,
-+	.get    = cpufreq_generic_get,
- 	.init   = dbx500_cpufreq_init,
- 	.name   = "DBX500",
- 	.attr   = cpufreq_generic_attr,
+ 	.target_index = loongson2_cpufreq_target,
+-	.get = loongson2_cpufreq_get,
++	.get = cpufreq_generic_get,
+ 	.exit = loongson2_cpufreq_exit,
+ 	.attr = cpufreq_generic_attr,
+ };
 -- 
 1.7.12.rc2.18.g61b472e
