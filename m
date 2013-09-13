@@ -1,47 +1,71 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 13 Sep 2013 16:26:14 -0600
-Subject: [PATCH v2 3/4] cpufreq: tegra: Re-model Tegra cpufreq driver
-In-Reply-To: <1378985091-9447-4-git-send-email-bilhuang@nvidia.com>
-References: <1378985091-9447-1-git-send-email-bilhuang@nvidia.com>
- <1378985091-9447-4-git-send-email-bilhuang@nvidia.com>
-Message-ID: <52339106.4020601@wwwdotorg.org>
+Date: Fri, 13 Sep 2013 16:34:18 -0600
+Subject: [PATCHv4 4/4] Documentation: Add device tree bindings for
+ Freescale FTM PWM.
+In-Reply-To: <1379051922-4930-5-git-send-email-Li.Xiubo@freescale.com>
+References: <1379051922-4930-1-git-send-email-Li.Xiubo@freescale.com>
+ <1379051922-4930-5-git-send-email-Li.Xiubo@freescale.com>
+Message-ID: <523392EA.6050909@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/12/2013 05:24 AM, Bill Huang wrote:
-> Re-model Tegra cpufreq driver to support all Tegra series of SoCs.
-> 
-> * Make tegra-cpufreq.c a generic Tegra cpufreq driver.
-> * Move Tegra20 specific codes into tegra20-cpufreq.c.
-> * Bind Tegra cpufreq dirver with a fake device so defer probe would work
->   when we're going to get regulator in the driver to support voltage
->   scaling (DVFS).
+On 09/12/2013 11:58 PM, Xiubo Li wrote:
+> This adds the Document for Freescale FTM PWM driver under
+> Documentation/devicetree/bindings/pwm/.
 
-> diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
+> diff --git a/Documentation/devicetree/bindings/pwm/pwm-fsl-ftm.txt b/Documentation/devicetree/bindings/pwm/pwm-fsl-ftm.txt
 
-> @@ -232,6 +232,12 @@ config ARM_TEGRA_CPUFREQ
->  	bool "TEGRA CPUFreq support"
->  	depends on ARCH_TEGRA
->  	select CPU_FREQ_TABLE
+> +Required properties:
+
+> +- clock-names : Includes the following module clock source entries:
+> +    "ftm0" (system clock),
+> +    "ftm0_fix_sel" (fixed frequency clock),
+> +    "ftm0_ext_sel" (external clock)
+> +- clocks : Must contain an entry list for entries in clock-names.
+
+s/an entry list/a clock specifier/
+s/for entries/for each entry/
+
+> +- fsl,pwm-counter-clk: The FTM PWM counter clock source, should be one of the
+> +  entries in clock-names.
+
+So the IP block has 3 input clocks, and also a mux to select which one
+to use? That sounds slightly unusual, but possible.
+
+If there is really only 1 clock input to the IP block, and the mux is
+part of some other module, then this binding should have only 1 entry in
+clocks.
+
+> +- For each channel's pinctrl, the "chN-active" and "chN-idle" states should be
+> +  implemented at the same time.
+
+I still don't believe that multiple pinctrl states active at once is
+something that the pinctrl bindings conceptually support. CC+=LinusW, do
+we want to allow this?
+
+Assuming this is allowed, you'd want to write something more like the
+following:
+
+pinctrl-names: Must include "chN-active" and "chN-idle" for each channel
+ID N in range 0..7.
+pinctrl-NNN: One property must exist for each entry in pinctrl-names.
+See ../pinctrl/pinctrl-bindings.txt for details of the property values.
+> +Example:
 > +
-> +config ARM_TEGRA20_CPUFREQ
-> +	bool "NVIDIA TEGRA20"
-> +	depends on ARM_TEGRA_CPUFREQ && ARCH_TEGRA_2x_SOC
->  	default y
->  	help
-> -	  This adds the CPUFreq driver support for TEGRA SOCs.
-> +	  This adds the CPUFreq driver for NVIDIA TEGRA20 SoC.
-> +
-> +	  If in doubt, say N.
-
-This patch removes the following from "config ARM_TEGRA_CPUFREQ":
-
-	default y
-	help
-	  This adds the CPUFreq driver support for TEGRA SOCs.
-
-I think that option should be left unchanged, such that this patch
-*just* adds the new option without changing the existing one. If you do
-that, then you can completely drop patch 4/4.
-
-Other than that, this series looks fine.
+> +pwm0: pwm at 40038000 {
+> +		compatible = "fsl,vf610-ftm-pwm";
+> +		reg = <0x40038000 0x1000>;
+> +		#pwm-cells = <3>;
+> +		clock-names = "ftm0", "ftm0_fix_sel", "ftm0_ext_sel";
+> +		clocks = <&clks VF610_CLK_FTM0>,
+> +			<&clks VF610_CLK_FTM0_FIX_SEL>,
+> +			<&clks VF610_CLK_FTM0_EXT_SEL>;
+> +		pinctrl-names = "ch0-active", "ch0-idle", "ch1-active", "ch1-idle",
+> +		....;
+> +		pinctrl-0 = <&pinctrl_pwm0_ch0_active>;
+> +		pinctrl-1 = <&pinctrl_pwm0_ch0_idle>;
+> +		pinctrl-2 = <&pinctrl_pwm0_ch1_active>;
+> +		pinctrl-3 = <&pinctrl_pwm0_ch1_idle>;
+> +		...
+> +		fsl,pwm-counter-clk = "ftm0_ext_sel";
+> +};
