@@ -1,63 +1,120 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 13 Sep 2013 12:06:39 +0200
-Subject: [PATCH v2 10/12] ARM: mvebu: Set the start address of a CPU in a
- separate function
+Date: Fri, 13 Sep 2013 12:06:34 +0200
+Subject: [PATCH v2 05/12] ARM: mvebu: Make ll_set_cpu_coherent() more
+ configurable
 In-Reply-To: <1379066801-16276-1-git-send-email-gregory.clement@free-electrons.com>
 References: <1379066801-16276-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1379066801-16276-11-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1379066801-16276-6-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Setting the start (or boot) address of A CPU is no more used only
-during SMP bring up, but will also be used by the CPU idle functions
-or later by the CPU hot plug ones.
+ll_set_cpu_coherent does two things to set the coherency for a CPU:
 
-This commit moves it in a separate function and exports it.
+- Adding the CPU to the SMP group 0
+- Enabling the snooping on the CPU
+
+Only the second part is needed when coming back from a CPU Idle. This
+commit allows to choose to do the first part or not.
 
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- arch/arm/mach-mvebu/pmsu.c         | 10 ++++++++--
- include/linux/armada-370-xp-pmsu.h |  1 +
- 2 files changed, 9 insertions(+), 2 deletions(-)
+ arch/arm/mach-mvebu/coherency.c    |  4 ++--
+ arch/arm/mach-mvebu/coherency_ll.S | 30 ++++++++++++++++++------------
+ arch/arm/mach-mvebu/headsmp.S      |  3 +++
+ 3 files changed, 23 insertions(+), 14 deletions(-)
 
-diff --git a/arch/arm/mach-mvebu/pmsu.c b/arch/arm/mach-mvebu/pmsu.c
-index 29ea8c5..5abca96 100644
---- a/arch/arm/mach-mvebu/pmsu.c
-+++ b/arch/arm/mach-mvebu/pmsu.c
-@@ -56,6 +56,13 @@ static struct of_device_id of_pmsu_table[] = {
- 	{ /* end of list */ },
+diff --git a/arch/arm/mach-mvebu/coherency.c b/arch/arm/mach-mvebu/coherency.c
+index a2b6366..2f934f1 100644
+--- a/arch/arm/mach-mvebu/coherency.c
++++ b/arch/arm/mach-mvebu/coherency.c
+@@ -43,7 +43,7 @@ static struct of_device_id of_coherency_table[] = {
  };
  
-+void armada_370_xp_pmsu_set_start_addr(void *start_addr, int hw_cpu)
-+{
-+	writel(virt_to_phys(start_addr), pmsu_mp_base +
-+		PMSU_BOOT_ADDR_REDIRECT_OFFSET(hw_cpu));
-+}
-+EXPORT_SYMBOL_GPL(armada_370_xp_pmsu_set_start_addr);
-+
- #ifdef CONFIG_SMP
- int armada_xp_boot_cpu(unsigned int cpu_id, void *boot_addr)
+ /* Function defined in coherency_ll.S */
+-int ll_set_cpu_coherent(bool use_virt_addr);
++int ll_set_cpu_coherent(bool use_virt_addr, bool use_smp_group);
+ 
+ int set_cpu_coherent(void)
  {
-@@ -68,8 +75,7 @@ int armada_xp_boot_cpu(unsigned int cpu_id, void *boot_addr)
+@@ -53,7 +53,7 @@ int set_cpu_coherent(void)
+ 		return 1;
+ 	}
  
- 	hw_cpu = cpu_logical_map(cpu_id);
+-	return ll_set_cpu_coherent(true);
++	return ll_set_cpu_coherent(true, true);
+ }
  
--	writel(virt_to_phys(boot_addr), pmsu_mp_base +
--			PMSU_BOOT_ADDR_REDIRECT_OFFSET(hw_cpu));
-+	armada_370_xp_pmsu_set_start_addr(boot_addr, hw_cpu);
+ static inline void mvebu_hwcc_sync_io_barrier(void)
+diff --git a/arch/arm/mach-mvebu/coherency_ll.S b/arch/arm/mach-mvebu/coherency_ll.S
+index fc2e6f7..1526b94 100644
+--- a/arch/arm/mach-mvebu/coherency_ll.S
++++ b/arch/arm/mach-mvebu/coherency_ll.S
+@@ -22,7 +22,8 @@
  
- 	/* Release CPU from reset by clearing reset bit*/
- 	reg = readl(pmsu_reset_base + PMSU_RESET_CTL_OFFSET(hw_cpu));
-diff --git a/include/linux/armada-370-xp-pmsu.h b/include/linux/armada-370-xp-pmsu.h
-index 235a40c..e09977b 100644
---- a/include/linux/armada-370-xp-pmsu.h
-+++ b/include/linux/armada-370-xp-pmsu.h
-@@ -14,5 +14,6 @@
- void armada_370_xp_pmsu_enable_l2_powerdown_onidle(void);
- void armada_370_xp_pmsu_idle_prepare(bool deepidle);
- void armada_370_xp_pmsu_idle_restore(void);
-+void armada_370_xp_pmsu_set_start_addr(void *start_addr, int hw_cpu);
+ 	.text
+ /*
+- * r0: if r0==0 => physical addres, else virtual address
++ * r0: Use virtual address if r0 != 0, else physical address
++ * r1: Add CPU to the SMP group if r1 != 0
+  */
+ ENTRY(ll_set_cpu_coherent)
+ 	cmp	r0, #0
+@@ -38,26 +39,31 @@ ENTRY(ll_set_cpu_coherent)
+ 	ldr	r0, [r0]
+ 2:
+ 	/* Create bit by cpu index */
+-	mrc	15, 0, r1, cr0, cr0, 5
+-	and	r1, r1, #15
++	mrc	15, 0, r3, cr0, cr0, 5
++	and	r3, r3, #15
+ 	mov	r2, #(1 << 24)
+-	lsl	r1, r2, r1
++	lsl	r3, r2, r3
++
++	/* If r1=!0 then just enable the snooping */
++	cmp	r1, #0
++	beq	2f
  
- #endif	/* __ARMADA_370_XP__PMSU_H */
+ 	/* Add CPU to SMP group - Atomic */
+-	add	r3, r0, #ARMADA_XP_CFB_CTL_REG_OFFSET
++	add	r1, r0, #ARMADA_XP_CFB_CTL_REG_OFFSET
+ 1:
+-	ldrex	r2, [r3]
+-	orr	r2, r2, r1
+-	strex 	r0, r2, [r3]
++	ldrex	r2, [r1]
++	orr	r2, r2, r3
++	strex 	r0, r2, [r1]
+ 	cmp	r0, #0
+ 	bne 1b
+ 
++2:
+ 	/* Enable coherency on CPU - Atomic */
+-	add	r3, r3, #ARMADA_XP_CFB_CFG_REG_OFFSET
++	add	r1, r1, #ARMADA_XP_CFB_CFG_REG_OFFSET
+ 1:
+-	ldrex	r2, [r3]
+-	orr	r2, r2, r1
+-	strex	r0, r2, [r3]
++	ldrex	r2, [r1]
++	orr	r2, r2, r3
++	strex	r0, r2, [r1]
+ 	cmp	r0, #0
+ 	bne 1b
+ 
+diff --git a/arch/arm/mach-mvebu/headsmp.S b/arch/arm/mach-mvebu/headsmp.S
+index b2c6e95..f2732c8 100644
+--- a/arch/arm/mach-mvebu/headsmp.S
++++ b/arch/arm/mach-mvebu/headsmp.S
+@@ -30,6 +30,9 @@ ENTRY(armada_xp_secondary_startup)
+ 	/* Use physical addrss */
+ 	mov	r0, #0
+ 
++	/* Add CPU to the SMP group*/
++	mov	r1, #1
++
+ 	/* Add CPU to coherency fabric */
+ 	bl	ll_set_cpu_coherent
+ 	b	secondary_startup
 -- 
 1.8.1.2
