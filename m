@@ -1,50 +1,58 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 13 Sep 2013 18:31:15 +0530
-Subject: [PATCH 129/228] cpufreq: cpu0: use cpufreq_generic_init() routine
+Date: Fri, 13 Sep 2013 18:31:16 +0530
+Subject: [PATCH 130/228] cpufreq: cris: use cpufreq_generic_init() routine
 In-Reply-To: <cover.1379063063.git.viresh.kumar@linaro.org>
 References: <cover.1379063063.git.viresh.kumar@linaro.org>
-Message-ID: <5634a2ff3f1e3d0544cc09fbf6dafb4a788ae91e.1379063063.git.viresh.kumar@linaro.org>
+Message-ID: <2b5bec06ece382705b51aaf97f53762ff540639f.1379063063.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Use generic cpufreq_generic_init() routine instead of replicating the same code
 here.
 
-Cc: Shawn Guo <shawn.guo@linaro.org>
+Cc: Jesper Nilsson <jesper.nilsson@axis.com>
+Cc: Mikael Starvik <starvik@axis.com>
+Cc: linux-cris-kernel at axis.com
 Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- drivers/cpufreq/cpufreq-cpu0.c | 19 +------------------
- 1 file changed, 1 insertion(+), 18 deletions(-)
+ drivers/cpufreq/cris-artpec3-cpufreq.c | 6 +-----
+ drivers/cpufreq/cris-etraxfs-cpufreq.c | 5 +----
+ 2 files changed, 2 insertions(+), 9 deletions(-)
 
-diff --git a/drivers/cpufreq/cpufreq-cpu0.c b/drivers/cpufreq/cpufreq-cpu0.c
-index 2486c13..d8756e7 100644
---- a/drivers/cpufreq/cpufreq-cpu0.c
-+++ b/drivers/cpufreq/cpufreq-cpu0.c
-@@ -121,24 +121,7 @@ post_notify:
+diff --git a/drivers/cpufreq/cris-artpec3-cpufreq.c b/drivers/cpufreq/cris-artpec3-cpufreq.c
+index 4d88e4f..05fdc7e 100644
+--- a/drivers/cpufreq/cris-artpec3-cpufreq.c
++++ b/drivers/cpufreq/cris-artpec3-cpufreq.c
+@@ -71,13 +71,9 @@ static int cris_freq_target(struct cpufreq_policy *policy,
  
- static int cpu0_cpufreq_init(struct cpufreq_policy *policy)
+ static int cris_freq_cpu_init(struct cpufreq_policy *policy)
  {
--	int ret;
+-	/* cpuinfo and default policy values */
+-	policy->cpuinfo.transition_latency = 1000000; /* 1ms */
 -
--	ret = cpufreq_table_validate_and_show(policy, freq_table);
--	if (ret) {
--		pr_err("invalid frequency table: %d\n", ret);
--		return ret;
--	}
--
--	policy->cpuinfo.transition_latency = transition_latency;
--
--	/*
--	 * The driver only supports the SMP configuartion where all processors
--	 * share the clock and voltage and clock.  Use cpufreq affected_cpus
--	 * interface to have all CPUs scaled together.
--	 */
--	cpumask_setall(policy->cpus);
--
--	return 0;
-+	return cpufreq_generic_init(policy, freq_table, transition_latency);
+-	return cpufreq_table_validate_and_show(policy, cris_freq_table);
++	return cpufreq_generic_init(policy, cris_freq_table, 1000000);
  }
  
- static struct cpufreq_driver cpu0_cpufreq_driver = {
+-
+ static struct cpufreq_driver cris_freq_driver = {
+ 	.get	= cris_freq_get_cpu_frequency,
+ 	.verify	= cpufreq_generic_frequency_table_verify,
+diff --git a/drivers/cpufreq/cris-etraxfs-cpufreq.c b/drivers/cpufreq/cris-etraxfs-cpufreq.c
+index f7d2d49..fac2b26 100644
+--- a/drivers/cpufreq/cris-etraxfs-cpufreq.c
++++ b/drivers/cpufreq/cris-etraxfs-cpufreq.c
+@@ -70,10 +70,7 @@ static int cris_freq_target(struct cpufreq_policy *policy,
+ 
+ static int cris_freq_cpu_init(struct cpufreq_policy *policy)
+ {
+-	/* cpuinfo and default policy values */
+-	policy->cpuinfo.transition_latency = 1000000;	/* 1ms */
+-
+-	return cpufreq_table_validate_and_show(policy, cris_freq_table);
++	return cpufreq_generic_init(policy, cris_freq_table, 1000000);
+ }
+ 
+ static struct cpufreq_driver cris_freq_driver = {
 -- 
 1.7.12.rc2.18.g61b472e
