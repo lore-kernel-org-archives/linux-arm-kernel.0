@@ -1,9 +1,9 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 13 Sep 2013 18:30:17 +0530
-Subject: [PATCH 071/228] cpufreq: loongson2: Use generic cpufreq routines
+Date: Fri, 13 Sep 2013 18:30:20 +0530
+Subject: [PATCH 074/228] cpufreq: p4-clockmod: Use generic cpufreq routines
 In-Reply-To: <cover.1379063063.git.viresh.kumar@linaro.org>
 References: <cover.1379063063.git.viresh.kumar@linaro.org>
-Message-ID: <55bbc7474119455d56c523b25802984b9dab2b19.1379063063.git.viresh.kumar@linaro.org>
+Message-ID: <362d9c2397b31d84171f9d6cc5b35357f2542199.1379063063.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,50 +13,64 @@ by cpufreq drivers then.
 
 This patch uses these generic routines for this driver.
 
-Cc: John Crispin <blogic@openwrt.org>
+Cc: David S. Miller <davem@davemloft.net>
 Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- drivers/cpufreq/loongson2_cpufreq.c | 15 ++-------------
- 1 file changed, 2 insertions(+), 13 deletions(-)
+ drivers/cpufreq/p4-clockmod.c | 23 +++--------------------
+ 1 file changed, 3 insertions(+), 20 deletions(-)
 
-diff --git a/drivers/cpufreq/loongson2_cpufreq.c b/drivers/cpufreq/loongson2_cpufreq.c
-index cec4e72..ed7fbe2 100644
---- a/drivers/cpufreq/loongson2_cpufreq.c
-+++ b/drivers/cpufreq/loongson2_cpufreq.c
-@@ -137,12 +137,6 @@ static int loongson2_cpufreq_cpu_init(struct cpufreq_policy *policy)
- 					    &loongson2_clockmod_table[0]);
+diff --git a/drivers/cpufreq/p4-clockmod.c b/drivers/cpufreq/p4-clockmod.c
+index 03478bf..4fe6d4c 100644
+--- a/drivers/cpufreq/p4-clockmod.c
++++ b/drivers/cpufreq/p4-clockmod.c
+@@ -140,12 +140,6 @@ static int cpufreq_p4_target(struct cpufreq_policy *policy,
  }
  
--static int loongson2_cpufreq_verify(struct cpufreq_policy *policy)
+ 
+-static int cpufreq_p4_verify(struct cpufreq_policy *policy)
 -{
--	return cpufreq_frequency_table_verify(policy,
--					      &loongson2_clockmod_table[0]);
+-	return cpufreq_frequency_table_verify(policy, &p4clockmod_table[0]);
 -}
 -
- static int loongson2_cpufreq_exit(struct cpufreq_policy *policy)
+-
+ static unsigned int cpufreq_p4_get_frequency(struct cpuinfo_x86 *c)
  {
- 	cpufreq_frequency_table_put_attr(policy->cpu);
-@@ -150,19 +144,14 @@ static int loongson2_cpufreq_exit(struct cpufreq_policy *policy)
- 	return 0;
+ 	if (c->x86 == 0x06) {
+@@ -242,12 +236,6 @@ static int cpufreq_p4_cpu_init(struct cpufreq_policy *policy)
  }
  
--static struct freq_attr *loongson2_table_attr[] = {
+ 
+-static int cpufreq_p4_cpu_exit(struct cpufreq_policy *policy)
+-{
+-	cpufreq_frequency_table_put_attr(policy->cpu);
+-	return 0;
+-}
+-
+ static unsigned int cpufreq_p4_get(unsigned int cpu)
+ {
+ 	u32 l, h;
+@@ -266,19 +254,14 @@ static unsigned int cpufreq_p4_get(unsigned int cpu)
+ 	return stock_freq;
+ }
+ 
+-static struct freq_attr *p4clockmod_attr[] = {
 -	&cpufreq_freq_attr_scaling_available_freqs,
 -	NULL,
 -};
 -
- static struct cpufreq_driver loongson2_cpufreq_driver = {
- 	.name = "loongson2",
- 	.init = loongson2_cpufreq_cpu_init,
--	.verify = loongson2_cpufreq_verify,
-+	.verify = cpufreq_generic_frequency_table_verify,
- 	.target = loongson2_cpufreq_target,
- 	.get = loongson2_cpufreq_get,
- 	.exit = loongson2_cpufreq_exit,
--	.attr = loongson2_table_attr,
-+	.attr = cpufreq_generic_attr,
+ static struct cpufreq_driver p4clockmod_driver = {
+-	.verify		= cpufreq_p4_verify,
++	.verify		= cpufreq_generic_frequency_table_verify,
+ 	.target		= cpufreq_p4_target,
+ 	.init		= cpufreq_p4_cpu_init,
+-	.exit		= cpufreq_p4_cpu_exit,
++	.exit		= cpufreq_generic_exit,
+ 	.get		= cpufreq_p4_get,
+ 	.name		= "p4-clockmod",
+-	.attr		= p4clockmod_attr,
++	.attr		= cpufreq_generic_attr,
  };
  
- static struct platform_device_id platform_device_ids[] = {
+ static const struct x86_cpu_id cpufreq_p4_id[] = {
 -- 
 1.7.12.rc2.18.g61b472e
