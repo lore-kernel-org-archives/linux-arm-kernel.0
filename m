@@ -1,34 +1,47 @@
-From: dinguyen@altera.com (Dinh Nguyen)
-Date: Fri, 13 Sep 2013 17:03:28 -0500
-Subject: [PATCH 05/10] clk: socfpga: Use NULL instead of 0
-In-Reply-To: <1379064232-10261-5-git-send-email-sachin.kamat@linaro.org>
-References: <1379064232-10261-1-git-send-email-sachin.kamat@linaro.org>
- <1379064232-10261-5-git-send-email-sachin.kamat@linaro.org>
-Message-ID: <1379109808.14178.0.camel@linux-builds1>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 13 Sep 2013 16:26:14 -0600
+Subject: [PATCH v2 3/4] cpufreq: tegra: Re-model Tegra cpufreq driver
+In-Reply-To: <1378985091-9447-4-git-send-email-bilhuang@nvidia.com>
+References: <1378985091-9447-1-git-send-email-bilhuang@nvidia.com>
+ <1378985091-9447-4-git-send-email-bilhuang@nvidia.com>
+Message-ID: <52339106.4020601@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2013-09-13 at 14:53 +0530, Sachin Kamat wrote:
-> 'div_reg' is a pointer. Assign NULL instead of 0.
+On 09/12/2013 05:24 AM, Bill Huang wrote:
+> Re-model Tegra cpufreq driver to support all Tegra series of SoCs.
 > 
-> Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
-> Cc: Dinh Nguyen <dinguyen@altera.com>
-> ---
->  drivers/clk/socfpga/clk.c |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/clk/socfpga/clk.c b/drivers/clk/socfpga/clk.c
-> index 5bb848c..454ddc1 100644
-> --- a/drivers/clk/socfpga/clk.c
-> +++ b/drivers/clk/socfpga/clk.c
-> @@ -292,7 +292,7 @@ static void __init socfpga_gate_clk_init(struct device_node *node,
->  		socfpga_clk->shift = div_reg[1];
->  		socfpga_clk->width = div_reg[2];
->  	} else {
-> -		socfpga_clk->div_reg = 0;
-> +		socfpga_clk->div_reg = NULL;
->  	}
->  
->  	of_property_read_string(node, "clock-output-names", &clk_name);
+> * Make tegra-cpufreq.c a generic Tegra cpufreq driver.
+> * Move Tegra20 specific codes into tegra20-cpufreq.c.
+> * Bind Tegra cpufreq dirver with a fake device so defer probe would work
+>   when we're going to get regulator in the driver to support voltage
+>   scaling (DVFS).
 
-Acked-by: Dinh Nguyen <dinguyen@altera.com>
+> diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
+
+> @@ -232,6 +232,12 @@ config ARM_TEGRA_CPUFREQ
+>  	bool "TEGRA CPUFreq support"
+>  	depends on ARCH_TEGRA
+>  	select CPU_FREQ_TABLE
+> +
+> +config ARM_TEGRA20_CPUFREQ
+> +	bool "NVIDIA TEGRA20"
+> +	depends on ARM_TEGRA_CPUFREQ && ARCH_TEGRA_2x_SOC
+>  	default y
+>  	help
+> -	  This adds the CPUFreq driver support for TEGRA SOCs.
+> +	  This adds the CPUFreq driver for NVIDIA TEGRA20 SoC.
+> +
+> +	  If in doubt, say N.
+
+This patch removes the following from "config ARM_TEGRA_CPUFREQ":
+
+	default y
+	help
+	  This adds the CPUFreq driver support for TEGRA SOCs.
+
+I think that option should be left unchanged, such that this patch
+*just* adds the new option without changing the existing one. If you do
+that, then you can completely drop patch 4/4.
+
+Other than that, this series looks fine.
