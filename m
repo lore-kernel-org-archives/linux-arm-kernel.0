@@ -1,9 +1,9 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 13 Sep 2013 18:30:14 +0530
-Subject: [PATCH 068/228] cpufreq: imx6q: Use generic cpufreq routines
+Date: Fri, 13 Sep 2013 18:30:13 +0530
+Subject: [PATCH 067/228] cpufreq: ia64-acpi: Use generic cpufreq routines
 In-Reply-To: <cover.1379063063.git.viresh.kumar@linaro.org>
 References: <cover.1379063063.git.viresh.kumar@linaro.org>
-Message-ID: <e17b8cc8527391f00931a2c84903dba5ca80ee59.1379063063.git.viresh.kumar@linaro.org>
+Message-ID: <770e811f81692f1321bd0fb8254f0f4a1b8671ff.1379063063.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,56 +13,61 @@ by cpufreq drivers then.
 
 This patch uses these generic routines for this driver.
 
-Acked-by: Shawn Guo <shawn.guo@linaro.org>
+Cc: Tony Luck <tony.luck@intel.com>
 Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- drivers/cpufreq/imx6q-cpufreq.c | 22 +++-------------------
- 1 file changed, 3 insertions(+), 19 deletions(-)
+ drivers/cpufreq/ia64-acpi-cpufreq.c | 26 ++------------------------
+ 1 file changed, 2 insertions(+), 24 deletions(-)
 
-diff --git a/drivers/cpufreq/imx6q-cpufreq.c b/drivers/cpufreq/imx6q-cpufreq.c
-index cd9489f..29767bb 100644
---- a/drivers/cpufreq/imx6q-cpufreq.c
-+++ b/drivers/cpufreq/imx6q-cpufreq.c
-@@ -34,11 +34,6 @@ static struct device *cpu_dev;
- static struct cpufreq_frequency_table *freq_table;
- static unsigned int transition_latency;
+diff --git a/drivers/cpufreq/ia64-acpi-cpufreq.c b/drivers/cpufreq/ia64-acpi-cpufreq.c
+index 6cfad51..b958bdb 100644
+--- a/drivers/cpufreq/ia64-acpi-cpufreq.c
++++ b/drivers/cpufreq/ia64-acpi-cpufreq.c
+@@ -248,22 +248,6 @@ acpi_cpufreq_target (
  
--static int imx6q_verify_speed(struct cpufreq_policy *policy)
+ 
+ static int
+-acpi_cpufreq_verify (
+-	struct cpufreq_policy   *policy)
 -{
--	return cpufreq_frequency_table_verify(policy, freq_table);
+-	unsigned int result = 0;
+-	struct cpufreq_acpi_io *data = acpi_io_data[policy->cpu];
+-
+-	pr_debug("acpi_cpufreq_verify\n");
+-
+-	result = cpufreq_frequency_table_verify(policy,
+-			data->freq_table);
+-
+-	return (result);
 -}
 -
- static unsigned int imx6q_get_speed(unsigned int cpu)
+-
+-static int
+ acpi_cpufreq_cpu_init (
+ 	struct cpufreq_policy   *policy)
  {
- 	return clk_get_rate(arm_clk) / 1000;
-@@ -173,25 +168,14 @@ static int imx6q_cpufreq_init(struct cpufreq_policy *policy)
- 	return 0;
+@@ -394,20 +378,14 @@ acpi_cpufreq_cpu_exit (
  }
  
--static int imx6q_cpufreq_exit(struct cpufreq_policy *policy)
--{
--	cpufreq_frequency_table_put_attr(policy->cpu);
--	return 0;
--}
--
--static struct freq_attr *imx6q_cpufreq_attr[] = {
+ 
+-static struct freq_attr* acpi_cpufreq_attr[] = {
 -	&cpufreq_freq_attr_scaling_available_freqs,
 -	NULL,
 -};
 -
- static struct cpufreq_driver imx6q_cpufreq_driver = {
--	.verify = imx6q_verify_speed,
-+	.verify = cpufreq_generic_frequency_table_verify,
- 	.target = imx6q_set_target,
- 	.get = imx6q_get_speed,
- 	.init = imx6q_cpufreq_init,
--	.exit = imx6q_cpufreq_exit,
-+	.exit = cpufreq_generic_exit,
- 	.name = "imx6q-cpufreq",
--	.attr = imx6q_cpufreq_attr,
-+	.attr = cpufreq_generic_attr,
+-
+ static struct cpufreq_driver acpi_cpufreq_driver = {
+-	.verify 	= acpi_cpufreq_verify,
++	.verify 	= cpufreq_generic_frequency_table_verify,
+ 	.target 	= acpi_cpufreq_target,
+ 	.get 		= acpi_cpufreq_get,
+ 	.init		= acpi_cpufreq_cpu_init,
+ 	.exit		= acpi_cpufreq_cpu_exit,
+ 	.name		= "acpi-cpufreq",
+-	.attr           = acpi_cpufreq_attr,
++	.attr		= cpufreq_generic_attr,
  };
  
- static int imx6q_cpufreq_probe(struct platform_device *pdev)
+ 
 -- 
 1.7.12.rc2.18.g61b472e
