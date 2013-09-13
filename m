@@ -1,9 +1,9 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 13 Sep 2013 18:30:30 +0530
-Subject: [PATCH 084/228] cpufreq: sc520: Use generic cpufreq routines
+Date: Fri, 13 Sep 2013 18:30:31 +0530
+Subject: [PATCH 085/228] cpufreq: sh: Use generic cpufreq routines
 In-Reply-To: <cover.1379063063.git.viresh.kumar@linaro.org>
 References: <cover.1379063063.git.viresh.kumar@linaro.org>
-Message-ID: <aea9ef4a040bdab17055c3d4b3d7b230f2d6da3e.1379063063.git.viresh.kumar@linaro.org>
+Message-ID: <74417e54eb4b55ce4c54f24c3c39c2ea1cfde3f1.1379063063.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,57 +13,37 @@ by cpufreq drivers then.
 
 This patch uses these generic routines for this driver.
 
+Cc: Paul Mundt <lethal@linux-sh.org>
+Cc: linux-sh at vger.kernel.org
 Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- drivers/cpufreq/sc520_freq.c | 24 +++---------------------
- 1 file changed, 3 insertions(+), 21 deletions(-)
+ drivers/cpufreq/sh-cpufreq.c | 7 +------
+ 1 file changed, 1 insertion(+), 6 deletions(-)
 
-diff --git a/drivers/cpufreq/sc520_freq.c b/drivers/cpufreq/sc520_freq.c
-index bb9c0de..8556225 100644
---- a/drivers/cpufreq/sc520_freq.c
-+++ b/drivers/cpufreq/sc520_freq.c
-@@ -78,11 +78,6 @@ static void sc520_freq_set_cpu_state(struct cpufreq_policy *policy,
- 	cpufreq_notify_transition(policy, &freqs, CPUFREQ_POSTCHANGE);
- };
- 
--static int sc520_freq_verify(struct cpufreq_policy *policy)
--{
--	return cpufreq_frequency_table_verify(policy, &sc520_freq_table[0]);
--}
--
- static int sc520_freq_target(struct cpufreq_policy *policy,
- 			    unsigned int target_freq,
- 			    unsigned int relation)
-@@ -120,27 +115,14 @@ static int sc520_freq_cpu_init(struct cpufreq_policy *policy)
+diff --git a/drivers/cpufreq/sh-cpufreq.c b/drivers/cpufreq/sh-cpufreq.c
+index f1fb944..c681b86 100644
+--- a/drivers/cpufreq/sh-cpufreq.c
++++ b/drivers/cpufreq/sh-cpufreq.c
+@@ -151,11 +151,6 @@ static int sh_cpufreq_cpu_exit(struct cpufreq_policy *policy)
+ 	return 0;
  }
  
- 
--static int sc520_freq_cpu_exit(struct cpufreq_policy *policy)
--{
--	cpufreq_frequency_table_put_attr(policy->cpu);
--	return 0;
--}
--
--
--static struct freq_attr *sc520_freq_attr[] = {
+-static struct freq_attr *sh_freq_attr[] = {
 -	&cpufreq_freq_attr_scaling_available_freqs,
 -	NULL,
 -};
 -
--
- static struct cpufreq_driver sc520_freq_driver = {
- 	.get	= sc520_freq_get_cpu_frequency,
--	.verify	= sc520_freq_verify,
-+	.verify	= cpufreq_generic_frequency_table_verify,
- 	.target	= sc520_freq_target,
- 	.init	= sc520_freq_cpu_init,
--	.exit	= sc520_freq_cpu_exit,
-+	.exit	= cpufreq_generic_exit,
- 	.name	= "sc520_freq",
--	.attr	= sc520_freq_attr,
-+	.attr	= cpufreq_generic_attr,
+ static struct cpufreq_driver sh_cpufreq_driver = {
+ 	.name		= "sh",
+ 	.get		= sh_cpufreq_get,
+@@ -163,7 +158,7 @@ static struct cpufreq_driver sh_cpufreq_driver = {
+ 	.verify		= sh_cpufreq_verify,
+ 	.init		= sh_cpufreq_cpu_init,
+ 	.exit		= sh_cpufreq_cpu_exit,
+-	.attr		= sh_freq_attr,
++	.attr		= cpufreq_generic_attr,
  };
  
- static const struct x86_cpu_id sc520_ids[] = {
+ static int __init sh_cpufreq_module_init(void)
 -- 
 1.7.12.rc2.18.g61b472e
