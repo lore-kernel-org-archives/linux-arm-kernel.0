@@ -1,10 +1,10 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 13 Sep 2013 18:32:00 +0530
-Subject: [PATCH 174/228] cpufreq: s5pv210: Convert to light weight
+Date: Fri, 13 Sep 2013 18:32:02 +0530
+Subject: [PATCH 176/228] cpufreq: sc520: Convert to light weight
  ->target_index() routine
 In-Reply-To: <cover.1379063063.git.viresh.kumar@linaro.org>
 References: <cover.1379063063.git.viresh.kumar@linaro.org>
-Message-ID: <e135268849e16d1c07bc53e84d212a65d6b0038b.1379063063.git.viresh.kumar@linaro.org>
+Message-ID: <7919f0077e23bcc483596063bb795d8bb0956564.1379063063.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,137 +14,58 @@ This patch converts existing .target() to newly defined light weight
 CPUFreq core will call cpufreq_frequency_table_target() before calling this
 routine and will pass index to it.
 
-This drivers wasn't as straight forward as other ones. It was doing some funny
-stuff to disable driver while going into suspend mode. This part is simplified
-as well to get this converted to ->target_index().
-
-Cc: Kukjin Kim <kgene.kim@samsung.com>
 Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- drivers/cpufreq/s5pv210-cpufreq.c | 54 ++++++++++-----------------------------
- 1 file changed, 14 insertions(+), 40 deletions(-)
+ drivers/cpufreq/sc520_freq.c | 19 ++-----------------
+ 1 file changed, 2 insertions(+), 17 deletions(-)
 
-diff --git a/drivers/cpufreq/s5pv210-cpufreq.c b/drivers/cpufreq/s5pv210-cpufreq.c
-index 600b4f4..5978b94 100644
---- a/drivers/cpufreq/s5pv210-cpufreq.c
-+++ b/drivers/cpufreq/s5pv210-cpufreq.c
-@@ -36,16 +36,7 @@ static DEFINE_MUTEX(set_freq_lock);
- /* Use 800MHz when entering sleep mode */
- #define SLEEP_FREQ	(800 * 1000)
+diff --git a/drivers/cpufreq/sc520_freq.c b/drivers/cpufreq/sc520_freq.c
+index 9047ab1..6c86452 100644
+--- a/drivers/cpufreq/sc520_freq.c
++++ b/drivers/cpufreq/sc520_freq.c
+@@ -53,8 +53,7 @@ static unsigned int sc520_freq_get_cpu_frequency(unsigned int cpu)
+ 	}
+ }
  
--/*
-- * relation has an additional symantics other than the standard of cpufreq
-- * DISALBE_FURTHER_CPUFREQ: disable further access to target
-- * ENABLE_FURTUER_CPUFREQ: enable access to target
-- */
--enum cpufreq_access {
--	DISABLE_FURTHER_CPUFREQ = 0x10,
--	ENABLE_FURTHER_CPUFREQ = 0x20,
+-static void sc520_freq_set_cpu_state(struct cpufreq_policy *policy,
+-		unsigned int state)
++static int sc520_freq_target(struct cpufreq_policy *policy, unsigned int state)
+ {
+ 
+ 	struct cpufreq_freqs	freqs;
+@@ -76,24 +75,10 @@ static void sc520_freq_set_cpu_state(struct cpufreq_policy *policy,
+ 	local_irq_enable();
+ 
+ 	cpufreq_notify_transition(policy, &freqs, CPUFREQ_POSTCHANGE);
 -};
 -
-+/* Tracks if cpu freqency can be updated anymore */
- static bool no_cpufreq_access;
+-static int sc520_freq_target(struct cpufreq_policy *policy,
+-			    unsigned int target_freq,
+-			    unsigned int relation)
+-{
+-	unsigned int newstate = 0;
+-
+-	if (cpufreq_frequency_table_target(policy, sc520_freq_table,
+-				target_freq, relation, &newstate))
+-		return -EINVAL;
+-
+-	sc520_freq_set_cpu_state(policy, newstate);
  
+ 	return 0;
+ }
+ 
+-
  /*
-@@ -182,12 +173,10 @@ static unsigned int s5pv210_getspeed(unsigned int cpu)
- 	return clk_get_rate(cpu_clk) / 1000;
- }
- 
--static int s5pv210_target(struct cpufreq_policy *policy,
--			  unsigned int target_freq,
--			  unsigned int relation)
-+static int s5pv210_target(struct cpufreq_policy *policy, unsigned int index)
- {
- 	unsigned long reg;
--	unsigned int index, priv_index;
-+	unsigned int priv_index;
- 	unsigned int pll_changing = 0;
- 	unsigned int bus_speed_changing = 0;
- 	int arm_volt, int_volt;
-@@ -195,9 +184,6 @@ static int s5pv210_target(struct cpufreq_policy *policy,
- 
- 	mutex_lock(&set_freq_lock);
- 
--	if (relation & ENABLE_FURTHER_CPUFREQ)
--		no_cpufreq_access = false;
--
- 	if (no_cpufreq_access) {
- #ifdef CONFIG_PM_VERBOSE
- 		pr_err("%s:%d denied access to %s as it is disabled"
-@@ -207,27 +193,13 @@ static int s5pv210_target(struct cpufreq_policy *policy,
- 		goto exit;
- 	}
- 
--	if (relation & DISABLE_FURTHER_CPUFREQ)
--		no_cpufreq_access = true;
--
--	relation &= ~(ENABLE_FURTHER_CPUFREQ | DISABLE_FURTHER_CPUFREQ);
--
- 	freqs.old = s5pv210_getspeed(0);
--
--	if (cpufreq_frequency_table_target(policy, s5pv210_freq_table,
--					   target_freq, relation, &index)) {
--		ret = -EINVAL;
--		goto exit;
--	}
--
- 	freqs.new = s5pv210_freq_table[index].frequency;
- 
--	if (freqs.new == freqs.old)
--		goto exit;
--
- 	/* Finding current running level index */
- 	if (cpufreq_frequency_table_target(policy, s5pv210_freq_table,
--					   freqs.old, relation, &priv_index)) {
-+					   freqs.old, CPUFREQ_RELATION_H,
-+					   &priv_index)) {
- 		ret = -EINVAL;
- 		goto exit;
- 	}
-@@ -559,16 +531,18 @@ static int s5pv210_cpufreq_notifier_event(struct notifier_block *this,
- 
- 	switch (event) {
- 	case PM_SUSPEND_PREPARE:
--		ret = cpufreq_driver_target(cpufreq_cpu_get(0), SLEEP_FREQ,
--					    DISABLE_FURTHER_CPUFREQ);
-+		ret = cpufreq_driver_target(cpufreq_cpu_get(0), SLEEP_FREQ, 0);
- 		if (ret < 0)
- 			return NOTIFY_BAD;
- 
-+		/* Disable updation of cpu frequency */
-+		no_cpufreq_access = true;
- 		return NOTIFY_OK;
- 	case PM_POST_RESTORE:
- 	case PM_POST_SUSPEND:
--		cpufreq_driver_target(cpufreq_cpu_get(0), SLEEP_FREQ,
--				      ENABLE_FURTHER_CPUFREQ);
-+		/* Enable updation of cpu frequency */
-+		no_cpufreq_access = false;
-+		cpufreq_driver_target(cpufreq_cpu_get(0), SLEEP_FREQ, 0);
- 
- 		return NOTIFY_OK;
- 	}
-@@ -581,18 +555,18 @@ static int s5pv210_cpufreq_reboot_notifier_event(struct notifier_block *this,
- {
- 	int ret;
- 
--	ret = cpufreq_driver_target(cpufreq_cpu_get(0), SLEEP_FREQ,
--				    DISABLE_FURTHER_CPUFREQ);
-+	ret = cpufreq_driver_target(cpufreq_cpu_get(0), SLEEP_FREQ, 0);
- 	if (ret < 0)
- 		return NOTIFY_BAD;
- 
-+	no_cpufreq_access = true;
- 	return NOTIFY_DONE;
- }
- 
- static struct cpufreq_driver s5pv210_driver = {
- 	.flags		= CPUFREQ_STICKY,
- 	.verify		= cpufreq_generic_frequency_table_verify,
--	.target		= s5pv210_target,
-+	.target_index	= s5pv210_target,
- 	.get		= s5pv210_getspeed,
- 	.init		= s5pv210_cpu_init,
- 	.name		= "s5pv210",
+  *	Module init and exit code
+  */
+@@ -117,7 +102,7 @@ static int sc520_freq_cpu_init(struct cpufreq_policy *policy)
+ static struct cpufreq_driver sc520_freq_driver = {
+ 	.get	= sc520_freq_get_cpu_frequency,
+ 	.verify	= cpufreq_generic_frequency_table_verify,
+-	.target	= sc520_freq_target,
++	.target_index = sc520_freq_target,
+ 	.init	= sc520_freq_cpu_init,
+ 	.exit	= cpufreq_generic_exit,
+ 	.name	= "sc520_freq",
 -- 
 1.7.12.rc2.18.g61b472e
