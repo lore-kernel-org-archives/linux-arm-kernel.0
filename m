@@ -1,96 +1,84 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 13 Sep 2013 12:09:57 -0700
-Subject: [PATCH 2/2] ARM: dts: Fix muxing and regulator for wl12xx on the
- SDIO bus for blaze
-In-Reply-To: <20130913190811.24617.97699.stgit@localhost>
-References: <20130913190811.24617.97699.stgit@localhost>
-Message-ID: <20130913190957.24617.95520.stgit@localhost>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 13 Sep 2013 21:16:36 +0200
+Subject: [PATCH] ARM: nomadik: delete FSMC platform data
+Message-ID: <1379099796-15912-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 76787b3b (ARM: OMAP2+: Remove board-4430sdp.c)
-removed legacy booting in favor of device tree based booting
-for 4430sdp. That caused the WLAN to stop working as the
-related .dts entries fell through the cracks.
+We now have device tree support for setting the NAND timings
+for FSMC from the device tree, so delete the last piece of
+platform data and auxdata.
 
-I don't have the "1283 PG 2.21 connectivity device" on my 4430sdp,
-but the earlier version of this patch was tested by Luciano
-Coelho. This version has left out the input logic for MMC CLK
-line compared to the earlier version as that is not bidirectional,
-and should be safe to do.
-
-Cc: Benoit Cousson <bcousson@baylibre.com>
-Cc: Rajendra Nayak <rnayak@ti.com>
-Cc: Luciano Coelho <luca@coelho.fi>
-Cc: Ruslan Bilovol <ruslan.bilovol@ti.com>
-Cc: devicetree-discuss at lists.ozlabs.org
-Signed-off-by: Tony Lindgren <tony@atomide.com>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm/boot/dts/omap4-sdp.dts |   39 ++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 38 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/ste-nomadik-stn8815.dtsi |  1 +
+ arch/arm/mach-nomadik/cpu-8815.c           | 22 +---------------------
+ 2 files changed, 2 insertions(+), 21 deletions(-)
 
-diff --git a/arch/arm/boot/dts/omap4-sdp.dts b/arch/arm/boot/dts/omap4-sdp.dts
-index 7951b4e..4f78380 100644
---- a/arch/arm/boot/dts/omap4-sdp.dts
-+++ b/arch/arm/boot/dts/omap4-sdp.dts
-@@ -140,6 +140,19 @@
- 			"DMic", "Digital Mic",
- 			"Digital Mic", "Digital Mic1 Bias";
- 	};
-+
-+	/* regulator for wl12xx on sdio5 */
-+	wl12xx_vmmc: wl12xx_vmmc {
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&wl12xx_gpio>;
-+		compatible = "regulator-fixed";
-+		regulator-name = "vwl1271";
-+		regulator-min-microvolt = <1800000>;
-+		regulator-max-microvolt = <1800000>;
-+		gpio = <&gpio2 22 0>;
-+		startup-delay-us = <70000>;
-+		enable-active-high;
-+	};
- };
+diff --git a/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi b/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi
+index 0e543e0..79425e3 100644
+--- a/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi
++++ b/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi
+@@ -653,6 +653,7 @@
+ 		reg-names = "fsmc_regs", "nand_data", "nand_addr", "nand_cmd";
+ 		clocks = <&hclksmc>;
+ 		status = "okay";
++		timings = /bits/ 8 <0 0 0 0x10 0x0a 0>;
  
- &omap4_pmx_wkup {
-@@ -295,6 +308,26 @@
- 			0xf0 (PIN_INPUT_PULLUP | MUX_MODE0)	/* i2c4_sda */
- 		>;
- 	};
-+
-+	/* wl12xx GPIO output for WLAN_EN */
-+	wl12xx_gpio: pinmux_wl12xx_gpio {
-+		pinctrl-single,pins = <
-+			0x3c (PIN_OUTPUT | MUX_MODE3)		/* gpmc_nwp.gpio_54 */
-+		>;
-+	};
-+
-+	/* wl12xx GPIO inputs and SDIO pins */
-+	wl12xx_pins: pinmux_wl12xx_pins {
-+		pinctrl-single,pins = <
-+			0x3a (PIN_INPUT | MUX_MODE3)		/* gpmc_ncs3.gpio_53 */
-+			0x108 (PIN_OUTPUT | MUX_MODE3)		/* sdmmc5_clk.sdmmc5_clk */
-+			0x10a (PIN_INPUT_PULLUP | MUX_MODE3)	/* sdmmc5_cmd.sdmmc5_cmd */
-+			0x10c (PIN_INPUT_PULLUP | MUX_MODE3)	/* sdmmc5_dat0.sdmmc5_dat0 */
-+			0x10e (PIN_INPUT_PULLUP | MUX_MODE3)	/* sdmmc5_dat1.sdmmc5_dat1 */
-+			0x110 (PIN_INPUT_PULLUP | MUX_MODE3)	/* sdmmc5_dat2.sdmmc5_dat2 */
-+			0x112 (PIN_INPUT_PULLUP | MUX_MODE3)	/* sdmmc5_dat3.sdmmc5_dat3 */
-+		>;
-+	};
- };
+ 		partition at 0 {
+ 		label = "X-Loader(NAND)";
+diff --git a/arch/arm/mach-nomadik/cpu-8815.c b/arch/arm/mach-nomadik/cpu-8815.c
+index 7a00506..c6c156e 100644
+--- a/arch/arm/mach-nomadik/cpu-8815.c
++++ b/arch/arm/mach-nomadik/cpu-8815.c
+@@ -31,7 +31,6 @@
+ #include <linux/of_gpio.h>
+ #include <linux/of_address.h>
+ #include <linux/of_platform.h>
+-#include <linux/mtd/fsmc.h>
+ #include <linux/gpio.h>
  
- &i2c1 {
-@@ -420,8 +453,12 @@
- };
+ #include <asm/mach/arch.h>
+@@ -145,17 +144,6 @@ static void __init cpu8815_timer_init_of(void)
+ 	clocksource_of_init();
+ }
  
- &mmc5 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&wl12xx_pins>;
-+	vmmc-supply = <&wl12xx_vmmc>;
-+	non-removable;
- 	bus-width = <4>;
--	ti,non-removable;
-+	cap-power-off-card;
- };
+-static struct fsmc_nand_timings cpu8815_nand_timings = {
+-	.thiz	= 0,
+-	.thold	= 0x10,
+-	.twait	= 0x0A,
+-	.tset	= 0,
+-};
+-
+-static struct fsmc_nand_platform_data cpu8815_nand_data = {
+-	.nand_timings = &cpu8815_nand_timings,
+-};
+-
+ /*
+  * The SMSC911x IRQ is connected to a GPIO pin, but the driver expects
+  * to simply request an IRQ passed as a resource. So the GPIO pin needs
+@@ -222,21 +210,13 @@ static int __init cpu8815_mmcsd_init(void)
+ }
+ device_initcall(cpu8815_mmcsd_init);
  
- &emif1 {
+-/* This still waits for a device tree enablement patch */
+-static struct of_dev_auxdata cpu8815_auxdata_lookup[] __initdata = {
+-	OF_DEV_AUXDATA("stericsson,fsmc-nand", NOMADIK_FSMC_BASE,
+-		NULL, &cpu8815_nand_data),
+-	{ /* sentinel */ },
+-};
+-
+ static void __init cpu8815_init_of(void)
+ {
+ #ifdef CONFIG_CACHE_L2X0
+ 	/* At full speed latency must be >=2, so 0x249 in low bits */
+ 	l2x0_of_init(0x00730249, 0xfe000fff);
+ #endif
+-	of_platform_populate(NULL, of_default_bus_match_table,
+-			cpu8815_auxdata_lookup, NULL);
++	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+ }
+ 
+ static const char * cpu8815_board_compat[] = {
+-- 
+1.8.1.4
