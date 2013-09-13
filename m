@@ -1,771 +1,391 @@
 From: slapdau@yahoo.com.au (Craig McGeachie)
-Date: Fri, 13 Sep 2013 23:32:18 +1200
-Subject: [RFC PATCH 2/3] Enable BCM2835 mailbox support
-Message-ID: <5232F7C2.3070408@yahoo.com.au>
+Date: Fri, 13 Sep 2013 23:32:40 +1200
+Subject: [RFC PATCH 3/3] Enable BCM2835 mailbox support
+Message-ID: <5232F7D8.6080307@yahoo.com.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Reimplement BCM2835 mailbox support as a device registered with the
-general purpose mailbox framework.
+Implement BCM2835 CPU thermal sensor support.
 
 Signed-off-by: Craig McGeachie <slapdau@yahoo.com.au>
 ---
 
-One specific area that I am looking for comment on is the device tree
-design.  I'm not happy with the two attributes for channel numbers
-and names that have to be matched up in terms of number of elements.
-I would prefer something like
+Beyond the usual reviews of rubbish code, there are two points
+here that I'm looking for feedback on.
 
- mailbox {
- 	compatible = "brcm,bcm2835-mbox";
-  	reg = <0x7e00b800 0x400>;
- 	reg = <0x7e00b880 0x40>;
- 	interrupts = <0 1>;
-	#address-cells = <1>;
-	brcm,channel at 0 = {
-		reg = <0>;
-		brcm,channel-name = "power";
-	};
-	[...etc...]
- };
+First is the placement of the mailbox directory make target in
+drivers/Makefile.  I placed it as early as I did in anticipation of
+implemented a frame buffer driver, which needs mailbox support at
+probe time. Another option would be to initialise the driver at
+architecture initialisation time, but I'm unfamiliar with good
+practice about when to initialise different bits and pieces.
+Especially with generic mailbox support looking kinda new.
 
-But I thought that might be too fussy, or too hard for a boot loader to
-populate.
+Second is the propmsg_ fuctions and related structures. They don't
+belong here.  And the fact that they are is something that would
+count against this being an acceptable patch.  But I don't know
+where to put them.  It's the header file I have trouble with.  I
+don't really know where I can put it.  Multi-architecture support
+rules out arch/arm/mach-bcm2835, and I don't want to place a header
+file that only supports one very specific system into include.
 
 ---
-diff --git a/Documentation/devicetree/bindings/mailbox/brcm,bcm2835-mbox.txt b/Documentation/devicetree/bindings/mailbox/brcm,bcm2835-mbox.txt
-index 75dbb89..1779ad4 100644
---- a/Documentation/devicetree/bindings/mailbox/brcm,bcm2835-mbox.txt
-+++ b/Documentation/devicetree/bindings/mailbox/brcm,bcm2835-mbox.txt
-@@ -4,12 +4,19 @@ Required properties:
- 
- - compatible : should be "brcm,bcm2835-mbox"
- - reg : Specifies base physical address and size of the registers.
--- interrupts : the interrupt number
-+- interrupts : the interrupt number. Must be <0 1>, the mailbox interrupt.
-+- brcm,channel-nums : The mailbox channels in use.
-+- brcm,channel-names : list of symbolic channel names for mailbox clients to
-+  use.
-+
-+The number of channel numbers must match the number of channel names.
- 
- Example:
- 
- mailbox {
- 	compatible = "brcm,bcm2835-mbox";
--	reg = <0x7e00b800 0x400>;
-+	reg = <0x7e00b880 0x40>;
- 	interrupts = <0 1>;
-+	brcm,channel-nums = <0 1 3 8>;
-+	brcm,channel-names = "power", "fb", "vchiq", "property";
- };
 diff --git a/arch/arm/boot/dts/bcm2835.dtsi b/arch/arm/boot/dts/bcm2835.dtsi
-index 4fc8a68..88855c0 100644
+index 88855c0..b91cd44 100644
 --- a/arch/arm/boot/dts/bcm2835.dtsi
 +++ b/arch/arm/boot/dts/bcm2835.dtsi
-@@ -33,6 +33,8 @@
- 			compatible = "brcm,bcm2835-mbox";
- 			reg = <0x7e00b880 0x40>;
- 			interrupts = <0 1>;
-+			brcm,channel-names = "power", "fb", "vchiq", "property";
-+			brcm,channel-nums = <0 1 3 8>;
+@@ -37,6 +37,10 @@
+ 			brcm,channel-nums = <0 1 3 8>;
  		};
  
++		thermal {
++			compatible = "brcm,bcm2835-thermal";
++		};
++
  		watchdog {
+ 			compatible = "brcm,bcm2835-pm-wdt";
+ 			reg = <0x7e100000 0x28>;
 diff --git a/arch/arm/configs/bcm2835_defconfig b/arch/arm/configs/bcm2835_defconfig
-index 34e9780..cc067bc 100644
+index cc067bc..8bd210c 100644
 --- a/arch/arm/configs/bcm2835_defconfig
 +++ b/arch/arm/configs/bcm2835_defconfig
-@@ -88,6 +88,8 @@ CONFIG_LEDS_TRIGGER_GPIO=y
- CONFIG_LEDS_TRIGGER_DEFAULT_ON=y
- CONFIG_LEDS_TRIGGER_TRANSIENT=y
- CONFIG_LEDS_TRIGGER_CAMERA=y
-+CONFIG_MAILBOX=y
-+CONFIG_BCM2835_MBOX=y
- # CONFIG_IOMMU_SUPPORT is not set
- CONFIG_EXT2_FS=y
- CONFIG_EXT2_FS_XATTR=y
-@@ -109,20 +111,20 @@ CONFIG_NLS_ASCII=y
- CONFIG_NLS_ISO8859_1=y
- CONFIG_NLS_UTF8=y
- CONFIG_PRINTK_TIME=y
-+CONFIG_BOOT_PRINTK_DELAY=y
-+CONFIG_DYNAMIC_DEBUG=y
-+CONFIG_DEBUG_INFO=y
- # CONFIG_ENABLE_WARN_DEPRECATED is not set
- # CONFIG_ENABLE_MUST_CHECK is not set
- CONFIG_UNUSED_SYMBOLS=y
--CONFIG_LOCKUP_DETECTOR=y
--CONFIG_DEBUG_INFO=y
- CONFIG_DEBUG_MEMORY_INIT=y
--CONFIG_BOOT_PRINTK_DELAY=y
-+CONFIG_LOCKUP_DETECTOR=y
- CONFIG_SCHED_TRACER=y
- CONFIG_STACK_TRACER=y
- CONFIG_FUNCTION_PROFILER=y
--CONFIG_DYNAMIC_DEBUG=y
-+CONFIG_TEST_KSTRTOX=y
- CONFIG_KGDB=y
- CONFIG_KGDB_KDB=y
--CONFIG_TEST_KSTRTOX=y
- CONFIG_STRICT_DEVMEM=y
- CONFIG_DEBUG_LL=y
- CONFIG_EARLY_PRINTK=y
-diff --git a/arch/arm/mach-bcm2835/Makefile b/arch/arm/mach-bcm2835/Makefile
-index 934ab42..4c3892f 100644
---- a/arch/arm/mach-bcm2835/Makefile
-+++ b/arch/arm/mach-bcm2835/Makefile
-@@ -1 +1 @@
--obj-y += bcm2835.o mailbox.o
-+obj-y += bcm2835.o
-diff --git a/arch/arm/mach-bcm2835/mailbox.c b/arch/arm/mach-bcm2835/mailbox.c
-deleted file mode 100644
-index cbc6898..0000000
---- a/arch/arm/mach-bcm2835/mailbox.c
-+++ /dev/null
-@@ -1,278 +0,0 @@
--/*
-- *  Copyright (C) 2010 Broadcom
-- *  Copyright (C) 2013 Lubomir Rintel
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- *
-- * This device provides a mechanism for writing to the mailboxes,
-- * that are shared between the ARM and the VideoCore processor
-- *
-- * Parts of the driver are based on arch/arm/mach-bcm2708/vcio.c file
-- * written by Gray Girling that was obtained from branch "rpi-3.6.y"
-- * of git://github.com/raspberrypi/linux.git as well as documentation
-- * available on the following web site:
-- * https://github.com/raspberrypi/firmware/wiki/Mailbox-property-interface
-- */
--
--#include <linux/module.h>
--#include <linux/completion.h>
--#include <linux/interrupt.h>
--#include <linux/irq.h>
--#include <linux/device.h>
--#include <linux/dma-mapping.h>
--#include <linux/platform_device.h>
--#include <linux/slab.h>
--#include <linux/of_address.h>
--#include <linux/of_irq.h>
--#include <linux/kernel.h>
--
--#define BCM2835_MBOX_TIMEOUT HZ
--
--/* Mailboxes */
--#define ARM_0_MAIL0	0x00
--#define ARM_0_MAIL1	0x20
--
--/* Mailbox registers. We basically only support mailbox 0 & 1. We deliver to
-- * the VC in mailbox 1, it delivers to us in mailbox 0. See BCM2835 ARM
-- * Peripherals section 1.3 for an explanation about the placement of memory
-- * barriers. */
--#define MAIL0_RD	(ARM_0_MAIL0 + 0x00)
--#define MAIL0_STA	(ARM_0_MAIL0 + 0x18)
--#define MAIL0_CNF	(ARM_0_MAIL0 + 0x1C)
--#define MAIL1_WRT	(ARM_0_MAIL1 + 0x00)
--
--/* Read/write Channels. Currently we just need the property one. */
--#define MBOX_CHAN_PROPERTY	8
--#define MBOX_CHAN_COUNT		9
--
--/* Status register: FIFO state. */
--#define ARM_MS_FULL		0x80000000
--#define ARM_MS_EMPTY		0x40000000
--
--/* Configuration register: Enable interrupts. */
--#define ARM_MC_IHAVEDATAIRQEN	0x00000001
--
--#define MBOX_MSG(chan, data28)		(((data28) & ~0xf) | ((chan) & 0xf))
--#define MBOX_CHAN(msg)			((msg) & 0xf)
--#define MBOX_DATA28(msg)		((msg) & ~0xf)
--
--static struct device *bcm2835_mbox_dev;	/* we assume there's only one! */
--
--struct bcm2835_mbox {
--	struct device *dev;
--	void __iomem *regs;
--	struct {
--		u32 msg;
--		struct completion comp;
--		struct mutex lock;
--	} chan[MBOX_CHAN_COUNT];
--};
--
--static irqreturn_t bcm2835_mbox_irq(int irq, void *dev_id)
--{
--	struct bcm2835_mbox *mbox = (struct bcm2835_mbox *)dev_id;
--	struct device *dev = mbox->dev;
--	int ret = IRQ_NONE;
--
--	/* wait for the mailbox FIFO to have some data in it */
--
--	while (!(readl(mbox->regs + MAIL0_STA) & ARM_MS_EMPTY)) {
--		u32 msg = readl(mbox->regs + MAIL0_RD);
--		unsigned int chan = MBOX_CHAN(msg);
--		rmb(); /* Finished last mailbox read. */
--
--		if (chan > MBOX_CHAN_COUNT) {
--			dev_err(dev, "invalid channel (%d)\n", chan);
--			continue;
--		}
--
--		if (mbox->chan[chan].msg) {
--			dev_err(dev, "overflow on channel (%d)\n", chan);
--			continue;
--		}
--
--		mbox->chan[chan].msg = msg;
--		complete(&mbox->chan[chan].comp);
--
--		ret = IRQ_HANDLED;
--	}
--
--	return ret;
--}
--
--/**
-- * bcm2835_mbox_io() - send a message to BCM2835 mailbox and read a reply
-- * @chan:	Channel number
-- * @in28:	Message to send
-- * @out28:	Where to put the response
-- *
-- * Sends a message to the BCM2835 mailbox.
-- *
-- * If the last argument is non-NULL, a response from VideoCore is awaited
-- * for and written to memory pointed to by it.
-- *
-- * The I/O to property mailbox is more conveniently dealt with by using
-- * bcm2835_mbox_property() function.
-- *
-- * Return: 0 in case of success, otherwise an error code
-- */
--
--int bcm2835_mbox_io(unsigned chan, u32 in28, u32 *out28)
--{
--	struct bcm2835_mbox *mbox;
--	int timeout;
--	int ret = 0;
--
--	if (!bcm2835_mbox_dev)
--		return -ENODEV;
--
--	mbox = dev_get_drvdata(bcm2835_mbox_dev);
--
--	device_lock(bcm2835_mbox_dev);
--	/* wait for the mailbox FIFO to have some space in it */
--	while (readl(mbox->regs + MAIL0_STA) & ARM_MS_FULL)
--		cpu_relax();
--	rmb(); /* Finished last mailbox read. */
--
--	mutex_lock(&mbox->chan[chan].lock);
--	INIT_COMPLETION(mbox->chan[chan].comp);
--	wmb(); /* About to write to the mail box. */
--	writel(MBOX_MSG(chan, in28), mbox->regs + MAIL1_WRT);
--	device_unlock(bcm2835_mbox_dev);
--
--	timeout = wait_for_completion_timeout(&mbox->chan[chan].comp,
--						BCM2835_MBOX_TIMEOUT);
--	if (timeout  == 0) {
--		dev_warn(bcm2835_mbox_dev, "Channel %d timeout\n", chan);
--		ret = -ETIMEDOUT;
--		goto out;
--	}
--
--	if (out28 != NULL)
--		*out28 = MBOX_DATA28(mbox->chan[chan].msg);
--
--out:
--	mbox->chan[chan].msg = 0;
--	mutex_unlock(&mbox->chan[chan].lock);
--
--	return ret;
--}
--EXPORT_SYMBOL_GPL(bcm2835_mbox_io);
--
--/**
-- * bcm2835_mbox_property() - Call a BCM2835 Property mailbox service
-- * @mem_bus:	DMA address of message
-- *
-- * Sends a message to the BCM2835 property mailbox and wait for VideoCore to
-- * respond. The message memory should be obtained with dma_alloc_coherent()
-- * and be filled with a properly formatted mailbox message.
-- *
-- * Return: 0 in case of success, otherwise an error code
-- */
--
--int bcm2835_mbox_property(dma_addr_t mem_bus)
--{
--	int ret;
--	int val;
--
--	ret = bcm2835_mbox_io(MBOX_CHAN_PROPERTY, (u32)mem_bus, (u32 *)&val);
--	if (mem_bus != val) {
--		dev_warn(bcm2835_mbox_dev, "Bad response from property mailbox\n");
--		return -EIO;
--	}
--
--	return ret;
--}
--EXPORT_SYMBOL_GPL(bcm2835_mbox_property);
--
--static int bcm2835_mbox_probe(struct platform_device *pdev)
--{
--	struct device *dev = &pdev->dev;
--	struct device_node *np = dev->of_node;
--	struct bcm2835_mbox *mbox;
--	int irq;
--	int ret;
--	int i;
--	struct resource *iomem;
--
--	mbox = devm_kzalloc(dev, sizeof(*mbox), GFP_KERNEL);
--	if (mbox == NULL) {
--		dev_err(dev, "Failed to allocate mailbox memory\n");
--		return -ENOMEM;
--	}
--
--	/* Initialize the channels */
--	for (i = 0; i < MBOX_CHAN_COUNT; i++) {
--		mbox->chan[i].msg = 0;
--		init_completion(&mbox->chan[i].comp);
--		mutex_init(&mbox->chan[i].lock);
--	}
--
--	platform_set_drvdata(pdev, mbox);
--	mbox->dev = dev;
--
--	irq = irq_of_parse_and_map(np, 0);
--	if (irq <= 0) {
--		dev_err(dev, "Can't get IRQ number for mailbox\n");
--		return -ENODEV;
--	}
--	ret = devm_request_irq(dev, irq, bcm2835_mbox_irq, IRQF_SHARED,
--						dev_name(dev), mbox);
--	if (ret) {
--		dev_err(dev, "Failed to register a mailbox IRQ handler\n");
--		return -ENODEV;
--	}
--
--	iomem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
--	mbox->regs = devm_request_and_ioremap(&pdev->dev, iomem);
--	if (!mbox->regs) {
--		dev_err(dev, "Failed to remap mailbox regs\n");
--		return -ENODEV;
--	}
--
--	/* Enable the interrupt on data reception */
--	writel(ARM_MC_IHAVEDATAIRQEN, mbox->regs + MAIL0_CNF);
--
--	dev_info(dev, "Broadcom BCM2835 mailbox IPC");
--	bcm2835_mbox_dev = dev;
--
--	return 0;
--}
--
--static int bcm2835_mbox_remove(struct platform_device *pdev)
--{
--	bcm2835_mbox_dev = NULL;
--	return 0;
--}
--
--static const struct of_device_id bcm2835_mbox_of_match[] = {
--	{ .compatible = "brcm,bcm2835-mbox", },
--	{},
--};
--MODULE_DEVICE_TABLE(of, bcm2835_mbox_of_match);
--
--static struct platform_driver bcm2835_mbox_driver = {
--	.driver = {
--		.name = "bcm2835-mbox",
--		.owner = THIS_MODULE,
--		.of_match_table = bcm2835_mbox_of_match,
--	},
--	.probe		= bcm2835_mbox_probe,
--	.remove		= bcm2835_mbox_remove,
--};
--module_platform_driver(bcm2835_mbox_driver);
--
--/*
--static int __init bcm2835_mbox_init(void)
--{
--	return platform_driver_register(&bcm2835_mbox_driver);
--}
--
--arch_initcall(bcm2835_mbox_init);
--*/
--
--MODULE_AUTHOR("Lubomir Rintel");
--MODULE_DESCRIPTION("BCM2835 mailbox IPC driver");
--MODULE_LICENSE("GPL v2");
-diff --git a/drivers/mailbox/Kconfig b/drivers/mailbox/Kconfig
-index c8b5c13..b8bb414 100644
---- a/drivers/mailbox/Kconfig
-+++ b/drivers/mailbox/Kconfig
-@@ -50,4 +50,13 @@ config OMAP_MBOX_KFIFO_SIZE
- 	  Specify the default size of mailbox's kfifo buffers (bytes).
- 	  This can also be changed at runtime (via the mbox_kfifo_size
- 	  module parameter).
+@@ -67,6 +67,8 @@ CONFIG_SPI=y
+ CONFIG_SPI_BCM2835=y
+ CONFIG_GPIO_SYSFS=y
+ # CONFIG_HWMON is not set
++CONFIG_THERMAL=y
++CONFIG_BCM2835_THERMAL=y
+ CONFIG_FB=y
+ CONFIG_FB_SIMPLE=y
+ CONFIG_FRAMEBUFFER_CONSOLE=y
+diff --git a/drivers/Makefile b/drivers/Makefile
+index ab93de8..035114d 100644
+--- a/drivers/Makefile
++++ b/drivers/Makefile
+@@ -15,6 +15,9 @@ obj-y				+= pwm/
+ obj-$(CONFIG_PCI)		+= pci/
+ obj-$(CONFIG_PARISC)		+= parisc/
+ obj-$(CONFIG_RAPIDIO)		+= rapidio/
 +
-+config BCM2835_MBOX
-+	bool "BCM2835 Mailbox"
++# Mailbox must come before drivers that rely on it
++obj-$(CONFIG_MAILBOX)		+= mailbox/
+ obj-y				+= video/
+ obj-y				+= idle/
+ 
+@@ -133,7 +136,6 @@ obj-y				+= platform/
+ #common clk code
+ obj-y				+= clk/
+ 
+-obj-$(CONFIG_MAILBOX)		+= mailbox/
+ obj-$(CONFIG_HWSPINLOCK)	+= hwspinlock/
+ obj-$(CONFIG_NFC)		+= nfc/
+ obj-$(CONFIG_IOMMU_SUPPORT)	+= iommu/
+diff --git a/drivers/thermal/Kconfig b/drivers/thermal/Kconfig
+index e988c81..2cc29a5 100644
+--- a/drivers/thermal/Kconfig
++++ b/drivers/thermal/Kconfig
+@@ -130,6 +130,15 @@ config DOVE_THERMAL
+ 	  Support for the Dove thermal sensor driver in the Linux thermal
+ 	  framework.
+ 
++config BCM2835_THERMAL
++	tristate "Temperature sensor on Broadcom BCM2835 SoC"
 +	depends on ARCH_BCM2835
++	depends on BCM2835_MBOX
 +	help
-+	  An implementation of the BCM2385 Mailbox.  It is used to invoke
-+	  the services of the Videocore. Say Y here if you want to use the
-+	  BCM2835 Mailbox.
++	  Support for the Broadcom BCM2835 thermal sensor driver in the Linux
++	  thermal framework.  The BCM2835 has one sensor on chip, with one trip
++	  point and no cooling devices.
 +
- endif
-diff --git a/drivers/mailbox/Makefile b/drivers/mailbox/Makefile
-index 2fa343a..a682306 100644
---- a/drivers/mailbox/Makefile
-+++ b/drivers/mailbox/Makefile
-@@ -9,3 +9,4 @@ obj-$(CONFIG_OMAP1_MBOX)	+= mailbox_omap1.o
- mailbox_omap1-objs		:= mailbox-omap1.o
- obj-$(CONFIG_OMAP2PLUS_MBOX)	+= mailbox_omap2.o
- mailbox_omap2-objs		:= mailbox-omap2.o
-+obj-$(CONFIG_BCM2835_MBOX)	+= bcm2835-mbox.o
-diff --git a/drivers/mailbox/bcm2835-mbox.c b/drivers/mailbox/bcm2835-mbox.c
+ config DB8500_THERMAL
+ 	bool "DB8500 thermal management"
+ 	depends on ARCH_U8500
+diff --git a/drivers/thermal/Makefile b/drivers/thermal/Makefile
+index 67184a2..bd9e42c 100644
+--- a/drivers/thermal/Makefile
++++ b/drivers/thermal/Makefile
+@@ -25,3 +25,4 @@ obj-$(CONFIG_DB8500_CPUFREQ_COOLING)	+= db8500_cpufreq_cooling.o
+ obj-$(CONFIG_INTEL_POWERCLAMP)	+= intel_powerclamp.o
+ obj-$(CONFIG_X86_PKG_TEMP_THERMAL)	+= x86_pkg_temp_thermal.o
+ obj-$(CONFIG_TI_SOC_THERMAL)	+= ti-soc-thermal/
++obj-$(CONFIG_BCM2835_THERMAL)	+= bcm2835-thermal.o
+diff --git a/drivers/thermal/bcm2835-thermal.c b/drivers/thermal/bcm2835-thermal.c
 new file mode 100644
-index 0000000..e2b271a
+index 0000000..33d9539
 --- /dev/null
-+++ b/drivers/mailbox/bcm2835-mbox.c
-@@ -0,0 +1,334 @@
++++ b/drivers/thermal/bcm2835-thermal.c
+@@ -0,0 +1,274 @@
 +/*
-+ *  Copyright (C) 2010 Broadcom
-+ *  Copyright (C) 2013 Lubomir Rintel
 + *  Copyright (C) 2013 Craig McGeachie
 + *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License version 2 as
 + * published by the Free Software Foundation.
 + *
-+ * This device provides a mechanism for writing to the mailboxes,
-+ * that are shared between the ARM and the VideoCore processor
-+ *
-+ * Parts of the driver are based on:
-+ *  - arch/arm/mach-bcm2708/vcio.c file written by Gray Girling that was
-+ *    obtained from branch "rpi-3.6.y" of git://github.com/raspberrypi/
-+ *    linux.git
-+ *  - drivers/mailbox/bcm2835-ipc.c by Lubomir Rintel at
-+ *    https://github.com/hackerspace/rpi-linux/blob/lr-raspberry-pi/drivers/
-+ *    mailbox/bcm2835-ipc.c
-+ *  - documentation available on the following web site:
-+ *    https://github.com/raspberrypi/firmware/wiki/Mailbox-property-interface
++ * This device presents the BCM2835 SoC temperature sensor as a thermal
++ * device.
 + */
 +
-+#include <linux/module.h>
-+#include <linux/interrupt.h>
-+#include <linux/irq.h>
-+#include <linux/device.h>
-+#include <linux/dma-mapping.h>
-+#include <linux/platform_device.h>
-+#include <linux/of_address.h>
-+#include <linux/of_irq.h>
++
 +#include <linux/kernel.h>
-+#include <linux/mailbox_controller.h>
-+#include <linux/err.h>
-+#include <linux/spinlock.h>
++#include <linux/module.h>
++#include <linux/init.h>
++#include <linux/platform_device.h>
++#include <linux/device.h>
++#include <linux/slab.h>
++#include <linux/thermal.h>
++#include <linux/dma-mapping.h>
++#include <linux/mailbox_client.h>
++#include <linux/mutex.h>
 +
-+/* Mailboxes */
-+#define ARM_0_MAIL0	0x00
-+#define ARM_0_MAIL1	0x20
++#define VC_TAG_GET_TEMP 0x00030006
++#define VC_TAG_GET_MAX_TEMP 0x0003000A
++#define VC_SUCCESS 0x80000000
 +
-+/* Mailbox registers. We basically only support mailbox 0 & 1. We deliver to
-+ * the VC in mailbox 1, it delivers to us in mailbox 0. See BCM2835 ARM
-+ * Peripherals section 1.3 for an explanation about the placement of memory
-+ * barriers. */
-+#define MAIL0_RD	(ARM_0_MAIL0 + 0x00)
-+#define MAIL0_POL	(ARM_0_MAIL0 + 0x10)
-+#define MAIL0_STA	(ARM_0_MAIL0 + 0x18)
-+#define MAIL0_CNF	(ARM_0_MAIL0 + 0x1C)
-+#define MAIL1_WRT	(ARM_0_MAIL1 + 0x00)
-+
-+#define MBOX_CHAN_COUNT		16
-+
-+/* Status register: FIFO state. */
-+#define ARM_MS_FULL		0x80000000
-+#define ARM_MS_EMPTY		0x40000000
-+
-+/* Configuration register: Enable interrupts. */
-+#define ARM_MC_IHAVEDATAIRQEN	0x00000001
-+
-+#define MBOX_MSG(chan, data28)		(((data28) & ~0xf) | ((chan) & 0xf))
-+#define MBOX_CHAN(msg)			((msg) & 0xf)
-+#define MBOX_DATA28(msg)		((msg) & ~0xf)
-+
-+struct bcm2835_mbox;
-+
-+struct bcm2835_channel {
-+	struct bcm2835_mbox *mbox;
-+	struct ipc_link link;
-+	u32 chan_num;
-+	const char *name;
-+	bool started;
++struct prop_msg {
++	u32 msg_size;
++	u32 code;
 +};
 +
-+struct bcm2835_mbox {
-+	struct platform_device *pdev;
-+	struct device *dev;
-+	void __iomem *regs;
-+	spinlock_t lock;
-+	struct bcm2835_channel *channel[MBOX_CHAN_COUNT];
-+	struct ipc_controller controller;
++struct prop_tag_hdr {
++	u32 tag_id;
++	u32 buf_size;
++	u32 indicator;
 +};
 +
-+#define to_channel(link) container_of(link, struct bcm2835_channel, link)
++struct prop_tmp_tag {
++	struct prop_tag_hdr hdr;
++	u32 id;
++	u32 val;
++};
 +
-+static irqreturn_t bcm2835_mbox_irq(int irq, void *dev_id)
++static void *propmsg_init(void *buf, size_t size)
 +{
-+	struct bcm2835_mbox *mbox = (struct bcm2835_mbox *) dev_id;
-+	struct device *dev = mbox->dev;
-+	while (!(readl(mbox->regs + MAIL0_STA) & ARM_MS_EMPTY)) {
-+		u32 msg = readl(mbox->regs + MAIL0_RD);
-+		unsigned int chan = MBOX_CHAN(msg);
-+
-+		if (!mbox->channel[chan]) {
-+			dev_err(dev, "Unregistered channel %d\n", chan);
-+			continue;
-+		}
-+		if (!mbox->channel[chan]->started) {
-+			dev_err(dev, "Reply on stopped channel %d\n", chan);
-+			continue;
-+		}
-+		dev_dbg(dev, "Reply 0x%08X\n", msg);
-+		ipc_link_received_data(&mbox->channel[chan]->link,
-+			(void *) MBOX_DATA28(msg));
-+	}
-+	rmb(); /* Finished last mailbox read. */
-+	return IRQ_HANDLED;
++	u32 num_cells = size >> 2;
++	if (num_cells < 3)
++		return 0;
++	memset(buf, 0, size);
++	((u32 *)buf)[0] = num_cells - 1;
++	((u32 *)buf)[num_cells - 1] = 2;
++	return buf;
 +}
 +
-+static int bcm2835_send_data(struct ipc_link *link, void *data)
++static void *propmsg_addtag(void *buf, size_t size, u32 tag_id)
 +{
-+	struct bcm2835_channel *chan = to_channel(link);
-+	struct bcm2835_mbox *mbox = chan->mbox;
++	u32 num_cells = ((size + 3) & -4) >> 2;
++	u32 last_cell = ((u32 *)buf)[0];
++	u32 nxt_cell = ((u32 *)buf)[last_cell];
++	u32 free_cells = last_cell - nxt_cell;
++	if (free_cells < num_cells || num_cells <= 3) {
++		return 0;
++	} else {
++		void *ret = &((u32 *)buf)[nxt_cell];
++		((struct prop_tag_hdr *) ret)->tag_id = tag_id;
++		((struct prop_tag_hdr *) ret)->buf_size = (num_cells - 3) << 2;
++		((struct prop_tag_hdr *) ret)->indicator = (num_cells - 3) << 2;
++		((u32 *)buf)[last_cell] = nxt_cell + num_cells;
++		return ret;
++	}
++}
++
++static void propmsg_finish(void *buf)
++{
++	u32 last_cell = ((u32 *)buf)[0];
++	u32 nxt_cell = ((u32 *)buf)[last_cell];
++	((u32 *)buf)[nxt_cell] = 0;
++	((u32 *)buf)[0] = (nxt_cell + 1) << 2;
++	((u32 *)buf)[1] = 0;
++}
++
++#if 0
++
++static void *propmsg_firsttag(void *msg)
++{
++	return ((struct prop_msg *) msg) + 1;
++}
++
++static void *propmsg_nexttag(void *curr)
++{
++	u32 tag_size = ((struct prop_tag_hdr *)curr)->buf_size;
++	void *next_tag = (char *)curr + sizeof(struct prop_tag_hdr) + tag_size;
++	return ((struct prop_tag_hdr *) next_tag)->tag_id == 0 ? 0 : next_tag;
++}
++
++#endif
++
++struct bcm2835_therm {
++	struct device *dev;
++	struct thermal_zone_device *thermal_dev;
++	struct completion comp;
++	struct mutex lock;
++};
++
++static void bcm2835_rxcb(void *cl_id, void *mssg)
++{
++	struct bcm2835_therm *therm = cl_id;
++	complete(&therm->comp);
++}
++
++static int do_message(struct bcm2835_therm *therm, dma_addr_t msg_handle)
++{
++	struct device *dev = therm->dev;
++	struct ipc_client therm_mbox;
++	void *channel;
 +	int ret = 0;
 +
-+	if (!chan->started)
-+		return -ENODEV;
-+	spin_lock(&mbox->lock);
-+	if (readl(mbox->regs + MAIL0_STA) & ARM_MS_FULL) {
-+		rmb(); /* Finished last mailbox read. */
-+		ret = -EBUSY;
-+		goto end;
++	memset(&therm_mbox, 0, sizeof(therm_mbox));
++	therm_mbox.chan_name = "bcm2835:property";
++	therm_mbox.rxcb = bcm2835_rxcb;
++	therm_mbox.cl_id = therm;
++	mutex_lock(&therm->lock);
++	INIT_COMPLETION(therm->comp);
++	channel = ipc_request_channel(&therm_mbox);
++	if (!channel) {
++		dev_err(dev, "No ipc channel\n");
++		ret = -EAGAIN;
++		goto exit;
 +	}
-+	wmb(); /* About to write to the mail box. */
-+	writel(MBOX_MSG(chan->chan_num, (u32) data), mbox->regs + MAIL1_WRT);
-+	dev_dbg(mbox->dev, "Request 0x%08X\n", MBOX_MSG(chan->chan_num,
-+		(u32) data));
-+end:
-+	spin_unlock(&mbox->lock);
++	ipc_send_message(channel, (void *) msg_handle);
++	wait_for_completion(&therm->comp);
++	ipc_free_channel(channel);
++exit:
++	mutex_unlock(&therm->lock);
 +	return ret;
 +}
 +
-+static int bcm2835_startup(struct ipc_link *link, void *params)
++static int bcm2835_get_temp_common(struct thermal_zone_device *thermal_dev,
++	unsigned long *temp, u32 temp_type)
 +{
-+	struct bcm2835_channel *chan = to_channel(link);
-+	chan->started = true;
++	struct bcm2835_therm *therm = thermal_dev->devdata;
++	struct device *dev = therm->dev;
++	void *buf = 0, *msg;
++	int msgsize = sizeof(struct prop_msg) + sizeof(struct prop_tmp_tag)
++		+ sizeof(u32);
++	dma_addr_t dma_handle;
++	int alignment = max(16, dma_get_cache_alignment());
++	struct prop_tmp_tag *tmp_tag;
++	int ret = 0;
++
++	buf = kzalloc(msgsize + alignment, GFP_KERNEL | GFP_DMA);
++	if (!buf) {
++		dev_err(dev, "kzalloc failed\n");
++		ret = -ENOMEM;
++		goto exit;
++	}
++	msg = PTR_ALIGN(buf, alignment);
++	propmsg_init(msg, msgsize);
++	tmp_tag = propmsg_addtag(msg, sizeof(struct prop_tmp_tag), temp_type);
++	BUG_ON(!tmp_tag); /* msgsize should be large enough to ensure success */
++	propmsg_finish(msg);
++	dma_handle = dma_map_single(dev, msg, msgsize, DMA_BIDIRECTIONAL);
++	if (dma_mapping_error(dev, dma_handle)) {
++		dev_err(dev, "No DMA address\n");
++		ret = -ENOMEM;
++		goto exit;
++	}
++	print_hex_dump(KERN_DEBUG, "req - ", DUMP_PREFIX_ADDRESS, 16, 4, msg,
++		msgsize, false);
++	ret = do_message(therm, dma_handle);
++	print_hex_dump(KERN_DEBUG, "rep - ", DUMP_PREFIX_ADDRESS, 16, 4, msg,
++		msgsize, false);
++	dma_unmap_single(dev, dma_handle, msgsize, DMA_BIDIRECTIONAL);
++	if (ret)
++		goto exit;
++	if (!(tmp_tag->hdr.indicator & VC_SUCCESS)) {
++		dev_err(dev, "VC request failed 0x%08X\n",
++			tmp_tag->hdr.indicator);
++		ret = -EAGAIN;
++	} else {
++		*temp = tmp_tag->val;
++	}
++exit:
++	kfree(buf);
++	return ret;
++}
++
++static int bcm2835_get_temp(struct thermal_zone_device *thermal_dev,
++	unsigned long *temp)
++{
++	return bcm2835_get_temp_common(thermal_dev, temp, VC_TAG_GET_TEMP);
++}
++
++static int bcm2835_get_max_temp(struct thermal_zone_device *thermal_dev,
++	int trip_num, unsigned long *temp)
++{
++	return bcm2835_get_temp_common(thermal_dev, temp, VC_TAG_GET_MAX_TEMP);
++}
++
++static int bcm2835_get_trip_type(struct thermal_zone_device *thermal_dev,
++	int trip_num, enum thermal_trip_type *trip_type)
++{
++	*trip_type = THERMAL_TRIP_HOT;
 +	return 0;
 +}
 +
-+static void bcm2835_shutdown(struct ipc_link *link)
++
++static int bcm2835_get_mode(struct thermal_zone_device *thermal_dev,
++	enum thermal_device_mode *dev_mode)
 +{
-+	struct bcm2835_channel *chan = to_channel(link);
-+	chan->started = false;
++	*dev_mode = THERMAL_DEVICE_ENABLED;
++	return 0;
 +}
 +
-+static bool bcm2835_is_ready(struct ipc_link *link)
-+{
-+	struct bcm2835_channel *chan = to_channel(link);
-+	struct bcm2835_mbox *mbox = chan->mbox;
-+	bool ret;
-+
-+	if (!chan->started)
-+		return false;
-+	spin_lock(&mbox->lock);
-+	ret = !(readl(mbox->regs + MAIL0_STA) & ARM_MS_FULL);
-+	rmb();
-+	spin_unlock(&mbox->lock);
-+	return ret;
-+}
-+
-+static struct ipc_link_ops bcm2835_ipc_link_ops = {
-+	.send_data	= bcm2835_send_data,
-+	.startup	= bcm2835_startup,
-+	.shutdown	= bcm2835_shutdown,
-+	.is_ready	= bcm2835_is_ready
++static struct thermal_zone_device_ops ops  = {
++	.get_temp = bcm2835_get_temp,
++	.get_trip_temp = bcm2835_get_max_temp,
++	.get_trip_type = bcm2835_get_trip_type,
++	.get_mode = bcm2835_get_mode,
 +};
 +
-+static int request_mailbox_iomem(struct bcm2835_mbox *mbox)
-+{
-+	struct platform_device *pdev = mbox->pdev;
-+	struct resource *iomem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	dev_dbg(&pdev->dev, "iomem 0x%08X-0x%08X\n", iomem->start, iomem->end);
-+	mbox->regs = devm_ioremap_resource(&pdev->dev, iomem);
-+	dev_dbg(&pdev->dev, "registers at [0x%p]\n", mbox->regs);
-+	if (IS_ERR(mbox->regs)) {
-+		dev_err(&pdev->dev, "Failed to remap mailbox regs\n");
-+		return PTR_ERR(mbox->regs);
-+	}
-+	dev_dbg(&pdev->dev, "iomem registered\n");
-+	return 0;
-+}
-+
-+static int request_mailbox_irq(struct bcm2835_mbox *mbox)
-+{
-+	int ret;
-+	struct device *dev = mbox->dev;
-+	struct device_node *np = dev->of_node;
-+	int irq = irq_of_parse_and_map(np, 0);
-+
-+	if (irq <= 0) {
-+		dev_err(dev, "Can't get IRQ number for mailbox\n");
-+		return -ENODEV;
-+	}
-+	ret = devm_request_irq(dev, irq, bcm2835_mbox_irq, 0, dev_name(dev),
-+		mbox);
-+	if (ret) {
-+		dev_err(dev, "Failed to register a mailbox IRQ handler\n");
-+		return -ENODEV;
-+	}
-+	dev_dbg(dev, "Registered IRQ\n");
-+	return 0;
-+}
-+
-+static int parse_bcm2835_channels(struct bcm2835_mbox *mbox)
-+{
-+	struct device *dev = mbox->dev;
-+	struct device_node *np = dev->of_node;
-+	int chan_cnt, dsize;
-+	unsigned int i, blk_size;
-+	void *channel_blk, *links_blk;
-+
-+	chan_cnt = of_property_count_strings(np, "brcm,channel-names");
-+	if (!chan_cnt) {
-+		dev_err(dev, "No channels defined\n");
-+		return -ENODEV;
-+	}
-+	of_get_property(np, "brcm,channel-nums", &dsize);
-+	if (dsize != sizeof(u32) * chan_cnt) {
-+		dev_err(dev, "Counts of brcm,channel-names and brcm,channel-nums mismatch\n");
-+		return -ENODEV;
-+	}
-+	blk_size = sizeof(struct bcm2835_channel) * chan_cnt +
-+		sizeof(struct ipc_link *) * (chan_cnt + 1);
-+	channel_blk = devm_kzalloc(dev, blk_size, GFP_KERNEL);
-+	if (!channel_blk) {
-+		dev_err(dev, "Failed to alloc ipc_links\n");
-+		return -ENOMEM;
-+	}
-+	links_blk = channel_blk + sizeof(struct bcm2835_channel) * chan_cnt;
-+	mbox->controller.links = (struct ipc_link **) links_blk;
-+	for (i = 0; i != chan_cnt; ++i) {
-+		struct bcm2835_channel *channel =
-+			&((struct bcm2835_channel *)channel_blk)[i];
-+		if (of_property_read_string_index(np, "brcm,channel-names", i,
-+			&channel->name)) {
-+			dev_err(dev, "Channel name index %d read failed\n", i);
-+			return -ENODEV;
-+		}
-+		if (of_property_read_u32_index(np, "brcm,channel-nums", i,
-+			&channel->chan_num)) {
-+			dev_err(dev, "Channel num index %d read failed\n", i);
-+			return -ENODEV;
-+		}
-+		if (channel->chan_num >= MBOX_CHAN_COUNT) {
-+			dev_err(dev, "Channel num %d too big\n",
-+				channel->chan_num);
-+			return -ENODEV;
-+		}
-+		snprintf(channel->link.link_name, 16, channel->name);
-+		channel->mbox = mbox;
-+		mbox->channel[channel->chan_num] = channel;
-+		mbox->controller.links[i] = &channel->link;
-+
-+	}
-+	mbox->controller.links[chan_cnt] = NULL;
-+	dev_dbg(dev, "Channels parsed\n");
-+
-+	return 0;
-+}
-+
-+static int bcm2835_mbox_probe(struct platform_device *pdev)
++static int bcm2835_thermal_probe(struct platform_device *pdev)
 +{
 +	struct device *dev = &pdev->dev;
-+	struct bcm2835_mbox *mbox;
-+	int ret = 0;
-+
-+	dev_dbg(dev, "Probing\n");
-+	mbox = devm_kzalloc(dev, sizeof(*mbox), GFP_KERNEL);
-+	if (mbox == NULL) {
-+		dev_err(dev, "Failed to allocate mailbox memory\n");
-+		ret = -ENOMEM;
-+		goto end;
++	struct bcm2835_therm *therm = devm_kzalloc(dev, sizeof(*therm),
++		GFP_KERNEL);
++	if (!therm) {
++		dev_err(dev, "Failed to allocate memory\n");
++		return -ENOMEM;
 +	}
-+	platform_set_drvdata(pdev, mbox);
-+	mbox->pdev = pdev;
-+	mbox->dev = dev;
-+	spin_lock_init(&mbox->lock);
-+
-+	dev_dbg(dev, "Requesting IRQ\n");
-+	ret = request_mailbox_irq(mbox);
-+	if (ret)
-+		goto end;
-+	dev_dbg(dev, "Requesting iomem\n");
-+	ret = request_mailbox_iomem(mbox);
-+	if (ret)
-+		goto end;
-+
-+	dev_dbg(dev, "Parsing channels\n");
-+	ret = parse_bcm2835_channels(mbox);
-+	if (ret)
-+		goto end;
-+
-+	dev_dbg(dev, "Initialising mailbox controller\n");
-+	snprintf(mbox->controller.controller_name, 16, "bcm2835");
-+	mbox->controller.txdone_poll = true;
-+	mbox->controller.txpoll_period = 5;
-+	mbox->controller.ops = &bcm2835_ipc_link_ops;
-+	ret  = ipc_links_register(&mbox->controller);
-+	if (ret)
-+		goto end;
-+	/* Enable the interrupt on data reception */
-+	writel(ARM_MC_IHAVEDATAIRQEN, mbox->regs + MAIL0_CNF);
-+	dev_info(dev, "mailbox enabled\n");
-+
-+end:
-+	return ret;
-+}
-+
-+static int bcm2835_mbox_remove(struct platform_device *pdev)
-+{
-+	struct bcm2835_mbox *mbox = platform_get_drvdata(pdev);
-+	ipc_links_unregister(&mbox->controller);
++	therm->dev = dev;
++	mutex_init(&therm->lock);
++	init_completion(&therm->comp);
++	therm->thermal_dev = thermal_zone_device_register("bcm2835_thermal", 1,
++		0, therm, &ops, NULL, 0, 0);
++	if (IS_ERR(therm->thermal_dev)) {
++		dev_err(dev, "Unable to register the thermal device");
++		return PTR_ERR(therm->thermal_dev);
++	}
++	platform_set_drvdata(pdev, therm);
++	dev_info(dev, "%s enabled\n", pdev->name);
 +	return 0;
 +}
 +
-+static const struct of_device_id bcm2835_mbox_of_match[] = {
-+	{ .compatible = "brcm,bcm2835-mbox", },
++
++static int bcm2835_thermal_remove(struct platform_device *pdev)
++{
++	struct bcm2835_therm *therm = platform_get_drvdata(pdev);
++	thermal_zone_device_unregister(therm->thermal_dev);
++	return 0;
++}
++
++static const struct of_device_id bcm2835_thermal_of_match[] = {
++	{ .compatible = "brcm,bcm2835-thermal", },
 +	{},
 +};
-+MODULE_DEVICE_TABLE(of, bcm2835_mbox_of_match);
++MODULE_DEVICE_TABLE(of, bcm2835_thermal_of_match);
 +
-+static struct platform_driver bcm2835_mbox_driver = {
++static struct platform_driver bcm2835_thermal_driver = {
 +	.driver = {
-+		.name = "bcm2835-mbox",
++		.name = "bcm2835_thermal",
 +		.owner = THIS_MODULE,
-+		.of_match_table = bcm2835_mbox_of_match,
++		.of_match_table = bcm2835_thermal_of_match,
 +	},
-+	.probe		= bcm2835_mbox_probe,
-+	.remove		= bcm2835_mbox_remove,
++	.probe = bcm2835_thermal_probe,
++	.remove = bcm2835_thermal_remove,
 +};
-+module_platform_driver(bcm2835_mbox_driver);
++
++module_platform_driver(bcm2835_thermal_driver);
 +
 +MODULE_AUTHOR("Craig McGeachie");
-+MODULE_DESCRIPTION("BCM2835 mailbox IPC driver");
++MODULE_DESCRIPTION("BCM2835 thermal driver");
 +MODULE_LICENSE("GPL v2");
