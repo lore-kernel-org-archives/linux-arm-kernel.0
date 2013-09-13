@@ -1,35 +1,39 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 13 Sep 2013 21:52:31 +0530
-Subject: [PATCH 206/228] cpufreq: sa11x0: remove calls to
+Date: Fri, 13 Sep 2013 21:53:58 +0530
+Subject: [PATCH 195/228] cpufreq: kirkwood: remove calls to
  cpufreq_notify_transition()
-In-Reply-To: <20130913161527.GE12758@n2100.arm.linux.org.uk>
+In-Reply-To: <20130913161820.GM19363@lunn.ch>
 References: <cover.1379063063.git.viresh.kumar@linaro.org>
- <6e2ca86ce948c0bc35f7709baf22672771fcf1e8.1379063063.git.viresh.kumar@linaro.org>
- <20130913155424.GB12758@n2100.arm.linux.org.uk>
- <CAKohpomAj0wDnjdi7XXw=bGsu0LMRrr1SMwdzBsa0GTxGrABoQ@mail.gmail.com>
- <20130913161527.GE12758@n2100.arm.linux.org.uk>
-Message-ID: <CAKohpomBdAgciTYnQPn6fKC7iHvuBxFLiK8kCz62q7jRHhXK1A@mail.gmail.com>
+ <0a512914fd48b2d6db685446f88b9a096eff79a1.1379063063.git.viresh.kumar@linaro.org>
+ <20130913161820.GM19363@lunn.ch>
+Message-ID: <CAKohpo=7FbGkq=vQLjoha3yxvKZomsgLdvf+SMYnPt4jsSk67Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13 September 2013 21:45, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> The patch to which I'm replying removes the above calls.  These calls are
-> necessary to shutdown various bits of CPU-clock dependent hardware
-> before changing the CPU clock, and restore them - reconfiguring them
-> for the new clock rate after the transition has happened.
+On 13 September 2013 21:48, Andrew Lunn <andrew@lunn.ch> wrote:
+> On Fri, Sep 13, 2013 at 06:32:21PM +0530, Viresh Kumar wrote:
 >
-> So, if you're removing these calls, what replaces them?  I don't see
-> anything which does without the above set.
+>> -     if (freqs.old != freqs.new) {
+>> -             local_irq_disable();
+>> -
+>> -             /* Disable interrupts to the CPU */
+>> -             reg = readl_relaxed(priv.base);
+>> -             reg |= CPU_SW_INT_BLK;
+>> -             writel_relaxed(reg, priv.base);
+>> -
+>> -             switch (state) {
+>> -             case STATE_CPU_FREQ:
+>> -                     clk_disable(priv.powersave_clk);
+>> -                     break;
+>> -             case STATE_DDR_FREQ:
+>> -                     clk_enable(priv.powersave_clk);
+>> -                     break;
+>> -             }
+>
+> Hi Viresh
+>
+> I see you removed the test that the old and the new frequency are
+> different. Is this guaranteed by the core? Because if not, you can
+> lockup the CPU. The call to cpu_do_idle() will never return.
 
-The other patch on which you commented about unnecessary read
-locks being taken:
-
-[PATCH 181/228] cpufreq: move freq change notifications to cpufreq
-
-That calls these notifiers, for all platforms except the ones that have
-set CPUFREQ_ASYNC_NOTIFICATION, before and after calling
-->target_index()..
-
-And so functionally the code is supposed to be the same.. Unless I
-have done some stupid mistake..
+Yes, that's guaranteed by core: patch 181..
