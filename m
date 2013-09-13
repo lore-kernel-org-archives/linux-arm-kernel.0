@@ -1,34 +1,81 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 13 Sep 2013 15:15:27 +0530
-Subject: [PATCH 02/10] clk: SPEAr: Staticize clk_frac_ops
-In-Reply-To: <1379064232-10261-2-git-send-email-sachin.kamat@linaro.org>
-References: <1379064232-10261-1-git-send-email-sachin.kamat@linaro.org>
- <1379064232-10261-2-git-send-email-sachin.kamat@linaro.org>
-Message-ID: <CAKohpokpi6z5HExPxscF4=7uaxR_ZjAoze=jjgdG=4rjwRabsg@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 13 Sep 2013 10:47:12 +0100
+Subject: [PATCH 5/5] ARM64: Add support for ILP32 ABI.
+In-Reply-To: <CA+=Sn1nd3Ym8so_=SP4NC1fjKWn4dNPYvz4OZMo0tLZptF8KVw@mail.gmail.com>
+References: <1378762380-13152-1-git-send-email-apinski@cavium.com>
+ <1378762380-13152-5-git-send-email-apinski@cavium.com>
+ <20130911143102.GA8825@darko.cambridge.arm.com>
+ <CA+=Sn1nd3Ym8so_=SP4NC1fjKWn4dNPYvz4OZMo0tLZptF8KVw@mail.gmail.com>
+Message-ID: <20130913094712.GA21859@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13 September 2013 14:53, Sachin Kamat <sachin.kamat@linaro.org> wrote:
-> clk_frac_ops is local to this file. Make it static.
->
-> Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
-> Cc: Viresh Kumar <viresh.kumar@linaro.org>
-> ---
->  drivers/clk/spear/clk-frac-synth.c |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/drivers/clk/spear/clk-frac-synth.c b/drivers/clk/spear/clk-frac-synth.c
-> index 958aa3a..dffd4ce 100644
-> --- a/drivers/clk/spear/clk-frac-synth.c
-> +++ b/drivers/clk/spear/clk-frac-synth.c
-> @@ -116,7 +116,7 @@ static int clk_frac_set_rate(struct clk_hw *hw, unsigned long drate,
->         return 0;
->  }
->
-> -struct clk_ops clk_frac_ops = {
-> +static struct clk_ops clk_frac_ops = {
->         .recalc_rate = clk_frac_recalc_rate,
->         .round_rate = clk_frac_round_rate,
->         .set_rate = clk_frac_set_rate,
+On Fri, Sep 13, 2013 at 07:18:48AM +0100, Andrew Pinski wrote:
+> On Wed, Sep 11, 2013 at 7:32 AM, Catalin Marinas
+> <catalin.marinas@arm.com> wrote:
+> > On Mon, Sep 09, 2013 at 10:32:59PM +0100, Andrew Pinski wrote:
+> >> This patch adds full support of the ABI to the ARM64 target.
+> >
+> > This description is too short. Please describe what the ABI is, what are
+> > the commonalities with AArch64 and AArch32, what other non-obvious
+> > things had to be done (like __kernel_long_t being long long). Split this
+> > patch into multiple patches like base syscall handling, signal handling,
+> > pselect6/ppoll, vdso etc. It's too much to review at once.
+> 
+> Ok. I will do so after my vacation next week.
+> 
+> >
+> > On top of these, I would really like to see
+> > Documentation/arm64/ilp32.txt describing the ABI.
+> 
+> No other target does not, not even x86_64 for x32.
 
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+Well, I'm sure they wouldn't mind if you submitted documentation for them
+too.
+
+> > I would also like to know (you can state this in the cover letter) the
+> > level of testing for all 3 types of ABI. I'm worried that at least this
+> > patch breaks the current compat ABI (has LTP reported anything?).
+> 
+> We did test LTP on an earlier version of this patch for all three
+> ABIs, I will make sure that the next version I send out is tested on
+> all three ABIs also.  We also tested ILP32/LP64 on big-endian at the
+> same time which we will continue to do (I should push for our team
+> here to push out the big-endian patches).
+
+We also have some BE patches internally, but obviously they just target LP64
+and AArch32 compat. I'd hope to get these out shortly (the current issue is
+extensive testing, since we don't have much of a BE userspace).
+
+> >> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> >> index cc64df5..7fdc994 100644
+> >> --- a/arch/arm64/Kconfig
+> >> +++ b/arch/arm64/Kconfig
+> >> @@ -248,7 +248,7 @@ source "fs/Kconfig.binfmt"
+> >>
+> >>  config COMPAT
+> >>         def_bool y
+> >> -       depends on ARM64_AARCH32
+> >> +       depends on ARM64_AARCH32 || ARM64_ILP32
+> >>         select COMPAT_BINFMT_ELF
+> >>
+> >>  config ARM64_AARCH32
+
+(nitpick) We used to have an option like this, called
+CONFIG_AARCH32_EMULATION, which I think is clearer than CONFIG_ARM64_AARCH32.
+
+> >> diff --git a/arch/arm64/kernel/vdsoilp32/Makefile b/arch/arm64/kernel/vdsoilp32/Makefile
+> >> new file mode 100644
+> >> index 0000000..ec93f3f
+> >> --- /dev/null
+> >> +++ b/arch/arm64/kernel/vdsoilp32/Makefile
+> >
+> > Could we not keep vdso in the same directory?
+> 
+> I started out that way but "make clean ARCH=arm64" did not clean the
+> vdso files all the time.
+
+Can you elaborate please? I'd much rather we fix broken make rules instead
+of botching around the issue by creating new directories.
+
+Will
