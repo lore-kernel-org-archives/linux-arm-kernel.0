@@ -1,10 +1,10 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 13 Sep 2013 18:32:18 +0530
-Subject: [PATCH 192/228] cpufreq: exynos: remove calls to
+Date: Fri, 13 Sep 2013 18:32:19 +0530
+Subject: [PATCH 193/228] cpufreq: ia64-acpi: remove calls to
  cpufreq_notify_transition()
 In-Reply-To: <cover.1379063063.git.viresh.kumar@linaro.org>
 References: <cover.1379063063.git.viresh.kumar@linaro.org>
-Message-ID: <94a34642c0c66642a7da2ec8c4c147b6fbd0ecf1.1379063063.git.viresh.kumar@linaro.org>
+Message-ID: <b297569ac875e892ac665c9190212f63a5305000.1379063063.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -28,99 +28,60 @@ frequency change, this one removes it from this driver.
 
 Some related minor cleanups are also done along with it.
 
-Cc: Kukjin Kim <kgene.kim@samsung.com>
+Cc: Tony Luck <tony.luck@intel.com>
 Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- drivers/cpufreq/exynos-cpufreq.c | 28 ++++++++--------------------
- 1 file changed, 8 insertions(+), 20 deletions(-)
+ drivers/cpufreq/ia64-acpi-cpufreq.c | 19 -------------------
+ 1 file changed, 19 deletions(-)
 
-diff --git a/drivers/cpufreq/exynos-cpufreq.c b/drivers/cpufreq/exynos-cpufreq.c
-index c178e73..c9ae7e6 100644
---- a/drivers/cpufreq/exynos-cpufreq.c
-+++ b/drivers/cpufreq/exynos-cpufreq.c
-@@ -25,7 +25,6 @@
- static struct exynos_dvfs_info *exynos_info;
+diff --git a/drivers/cpufreq/ia64-acpi-cpufreq.c b/drivers/cpufreq/ia64-acpi-cpufreq.c
+index 4695fa2..53c6ac6 100644
+--- a/drivers/cpufreq/ia64-acpi-cpufreq.c
++++ b/drivers/cpufreq/ia64-acpi-cpufreq.c
+@@ -141,7 +141,6 @@ processor_set_freq (
+ {
+ 	int			ret = 0;
+ 	u32			value = 0;
+-	struct cpufreq_freqs    cpufreq_freqs;
+ 	cpumask_t		saved_mask;
+ 	int			retval;
  
- static struct regulator *arm_regulator;
--static struct cpufreq_freqs freqs;
+@@ -168,13 +167,6 @@ processor_set_freq (
+ 	pr_debug("Transitioning from P%d to P%d\n",
+ 		data->acpi_data.state, state);
  
- static unsigned int locking_frequency;
- static bool frequency_locked;
-@@ -59,18 +58,18 @@ static int exynos_cpufreq_scale(unsigned int target_freq)
- 	struct cpufreq_policy *policy = cpufreq_cpu_get(0);
- 	unsigned int arm_volt, safe_arm_volt = 0;
- 	unsigned int mpll_freq_khz = exynos_info->mpll_freq_khz;
-+	unsigned int old_freq;
- 	int index, old_index;
- 	int ret = 0;
- 
--	freqs.old = policy->cur;
--	freqs.new = target_freq;
-+	old_freq = policy->cur;
- 
+-	/* cpufreq frequency struct */
+-	cpufreq_freqs.old = data->freq_table[data->acpi_data.state].frequency;
+-	cpufreq_freqs.new = data->freq_table[state].frequency;
+-
+-	/* notify cpufreq */
+-	cpufreq_notify_transition(policy, &cpufreq_freqs, CPUFREQ_PRECHANGE);
+-
  	/*
- 	 * The policy max have been changed so that we cannot get proper
- 	 * old_index with cpufreq_frequency_table_target(). Thus, ignore
- 	 * policy and get the index from the raw freqeuncy table.
- 	 */
--	old_index = exynos_cpufreq_get_index(freqs.old);
-+	old_index = exynos_cpufreq_get_index(old_freq);
- 	if (old_index < 0) {
- 		ret = old_index;
- 		goto out;
-@@ -95,17 +94,14 @@ static int exynos_cpufreq_scale(unsigned int target_freq)
- 	}
- 	arm_volt = volt_table[index];
+ 	 * First we write the target state's 'control' value to the
+ 	 * control_register.
+@@ -186,22 +178,11 @@ processor_set_freq (
  
--	cpufreq_notify_transition(policy, &freqs, CPUFREQ_PRECHANGE);
--
- 	/* When the new frequency is higher than current frequency */
--	if ((freqs.new > freqs.old) && !safe_arm_volt) {
-+	if ((target_freq > old_freq) && !safe_arm_volt) {
- 		/* Firstly, voltage up to increase frequency */
- 		ret = regulator_set_voltage(arm_regulator, arm_volt, arm_volt);
- 		if (ret) {
- 			pr_err("%s: failed to set cpu voltage to %d\n",
- 				__func__, arm_volt);
--			freqs.new = freqs.old;
--			goto post_notify;
-+			return ret;
- 		}
+ 	ret = processor_set_pstate(value);
+ 	if (ret) {
+-		unsigned int tmp = cpufreq_freqs.new;
+-		cpufreq_notify_transition(policy, &cpufreq_freqs,
+-				CPUFREQ_POSTCHANGE);
+-		cpufreq_freqs.new = cpufreq_freqs.old;
+-		cpufreq_freqs.old = tmp;
+-		cpufreq_notify_transition(policy, &cpufreq_freqs,
+-				CPUFREQ_PRECHANGE);
+-		cpufreq_notify_transition(policy, &cpufreq_freqs,
+-				CPUFREQ_POSTCHANGE);
+ 		printk(KERN_WARNING "Transition failed with error %d\n", ret);
+ 		retval = -ENODEV;
+ 		goto migrate_end;
  	}
  
-@@ -115,22 +111,15 @@ static int exynos_cpufreq_scale(unsigned int target_freq)
- 		if (ret) {
- 			pr_err("%s: failed to set cpu voltage to %d\n",
- 				__func__, safe_arm_volt);
--			freqs.new = freqs.old;
--			goto post_notify;
-+			return ret;
- 		}
- 	}
- 
- 	exynos_info->set_freq(old_index, index);
- 
--post_notify:
--	cpufreq_notify_transition(policy, &freqs, CPUFREQ_POSTCHANGE);
+-	cpufreq_notify_transition(policy, &cpufreq_freqs, CPUFREQ_POSTCHANGE);
 -
--	if (ret)
--		goto out;
--
- 	/* When the new frequency is lower than current frequency */
--	if ((freqs.new < freqs.old) ||
--	   ((freqs.new > freqs.old) && safe_arm_volt)) {
-+	if ((target_freq < old_freq) ||
-+	   ((target_freq > old_freq) && safe_arm_volt)) {
- 		/* down the voltage after frequency change */
- 		regulator_set_voltage(arm_regulator, arm_volt,
- 				arm_volt);
-@@ -142,7 +131,6 @@ post_notify:
- 	}
+ 	data->acpi_data.state = state;
  
- out:
--
- 	cpufreq_cpu_put(policy);
- 
- 	return ret;
+ 	retval = 0;
 -- 
 1.7.12.rc2.18.g61b472e
