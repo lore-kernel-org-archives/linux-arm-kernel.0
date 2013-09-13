@@ -1,70 +1,73 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 13 Sep 2013 18:29:09 +0530
-Subject: [PATCH 003/228] cpufreq: remove __cpufreq_remove_dev()
+Date: Fri, 13 Sep 2013 18:29:10 +0530
+Subject: [PATCH 004/228] cpufreq: Optimize cpufreq_frequency_table_verify()
 In-Reply-To: <cover.1379063063.git.viresh.kumar@linaro.org>
 References: <cover.1379063063.git.viresh.kumar@linaro.org>
-Message-ID: <9efdaeff9bbdd0f9df3b0edd7b274535708de3dd.1379063063.git.viresh.kumar@linaro.org>
+Message-ID: <7237b6f0cb157cf7989be74c4f1a10750df28b7c.1379063063.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Nobody except cpufreq_remove_dev() is calling __cpufreq_remove_dev() and so we
-don't need separate routines here. Lets merge code from __cpufreq_remove_dev()
-to cpufreq_remove_dev() and get rid of __cpufreq_remove_dev().
+cpufreq_frequency_table_verify() is a bit rewritten here to make it more logical
+and optimal.
+- merge multiple lines for variable declarations together.
+- quit early if any frequency between min/max is found.
+- don't call cpufreq_verify_within_limits() in case any valid freq is found as
+  it is of no use.
+- count renamed as found and made a boolean.
 
-Reviewed-by: Srivatsa S. Bhat <srivatsa.bhat@linux.vnet.ibm.com>
 Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- drivers/cpufreq/cpufreq.c | 26 ++++++++------------------
- 1 file changed, 8 insertions(+), 18 deletions(-)
+ drivers/cpufreq/freq_table.c | 25 +++++++++++++------------
+ 1 file changed, 13 insertions(+), 12 deletions(-)
 
-diff --git a/drivers/cpufreq/cpufreq.c b/drivers/cpufreq/cpufreq.c
-index 6a8cae9..e217d8f 100644
---- a/drivers/cpufreq/cpufreq.c
-+++ b/drivers/cpufreq/cpufreq.c
-@@ -1343,36 +1343,26 @@ static int __cpufreq_remove_dev_finish(struct device *dev,
- }
- 
- /**
-- * __cpufreq_remove_dev - remove a CPU device
-+ * cpufreq_remove_dev - remove a CPU device
-  *
-  * Removes the cpufreq interface for a CPU device.
-  * Caller should already have policy_rwsem in write mode for this CPU.
-  * This routine frees the rwsem before returning.
-  */
--static inline int __cpufreq_remove_dev(struct device *dev,
--				       struct subsys_interface *sif,
--				       bool frozen)
--{
--	int ret;
--
--	ret = __cpufreq_remove_dev_prepare(dev, sif, frozen);
--
--	if (!ret)
--		ret = __cpufreq_remove_dev_finish(dev, sif, frozen);
--
--	return ret;
--}
--
- static int cpufreq_remove_dev(struct device *dev, struct subsys_interface *sif)
+diff --git a/drivers/cpufreq/freq_table.c b/drivers/cpufreq/freq_table.c
+index f111454a..53a2f1a 100644
+--- a/drivers/cpufreq/freq_table.c
++++ b/drivers/cpufreq/freq_table.c
+@@ -54,9 +54,8 @@ EXPORT_SYMBOL_GPL(cpufreq_frequency_table_cpuinfo);
+ int cpufreq_frequency_table_verify(struct cpufreq_policy *policy,
+ 				   struct cpufreq_frequency_table *table)
  {
- 	unsigned int cpu = dev->id;
--	int retval;
-+	int ret;
+-	unsigned int next_larger = ~0;
+-	unsigned int i;
+-	unsigned int count = 0;
++	unsigned int next_larger = ~0, freq, i = 0;
++	bool found = false;
  
- 	if (cpu_is_offline(cpu))
- 		return 0;
+ 	pr_debug("request for verification of policy (%u - %u kHz) for cpu %u\n",
+ 					policy->min, policy->max, policy->cpu);
+@@ -64,21 +63,23 @@ int cpufreq_frequency_table_verify(struct cpufreq_policy *policy,
+ 	cpufreq_verify_within_limits(policy, policy->cpuinfo.min_freq,
+ 				     policy->cpuinfo.max_freq);
  
--	retval = __cpufreq_remove_dev(dev, sif, false);
--	return retval;
-+	ret = __cpufreq_remove_dev_prepare(dev, sif, false);
+-	for (i = 0; (table[i].frequency != CPUFREQ_TABLE_END); i++) {
+-		unsigned int freq = table[i].frequency;
++	for (; freq = table[i].frequency, freq != CPUFREQ_TABLE_END; i++) {
+ 		if (freq == CPUFREQ_ENTRY_INVALID)
+ 			continue;
+-		if ((freq >= policy->min) && (freq <= policy->max))
+-			count++;
+-		else if ((next_larger > freq) && (freq > policy->max))
++		if ((freq >= policy->min) && (freq <= policy->max)) {
++			found = true;
++			break;
++		}
 +
-+	if (!ret)
-+		ret = __cpufreq_remove_dev_finish(dev, sif, false);
-+
-+	return ret;
- }
++		if ((next_larger > freq) && (freq > policy->max))
+ 			next_larger = freq;
+ 	}
  
- static void handle_update(struct work_struct *work)
+-	if (!count)
++	if (!found) {
+ 		policy->max = next_larger;
+-
+-	cpufreq_verify_within_limits(policy, policy->cpuinfo.min_freq,
+-				     policy->cpuinfo.max_freq);
++		cpufreq_verify_within_limits(policy, policy->cpuinfo.min_freq,
++				policy->cpuinfo.max_freq);
++	}
+ 
+ 	pr_debug("verification lead to (%u - %u kHz) for cpu %u\n",
+ 				policy->min, policy->max, policy->cpu);
 -- 
 1.7.12.rc2.18.g61b472e
