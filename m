@@ -1,52 +1,81 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 13 Sep 2013 18:32:46 +0530
-Subject: [PATCH 220/228] cpufreq: imx6q: use cpufreq_generic_get() routine
+Date: Fri, 13 Sep 2013 18:32:49 +0530
+Subject: [PATCH 223/228] cpufreq: ppc: use cpufreq_generic_get() routine
 In-Reply-To: <cover.1379063063.git.viresh.kumar@linaro.org>
 References: <cover.1379063063.git.viresh.kumar@linaro.org>
-Message-ID: <f5cad684acf2949d3cbb70db56c935d3659c1eb7.1379063063.git.viresh.kumar@linaro.org>
+Message-ID: <d4ef38123fd7f811b6185480a7a32f4b508aad54.1379063063.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 We have common infrastructure available with us for getting a CPUs clk rate.
 Lets use it for this driver.
 
-Acked-by: Shawn Guo <shawn.guo@linaro.org>
+We don't need a variable to hold clock anymore in struct cpu_data.
+
 Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- drivers/cpufreq/imx6q-cpufreq.c | 8 ++------
- 1 file changed, 2 insertions(+), 6 deletions(-)
+ drivers/cpufreq/ppc-corenet-cpufreq.c | 17 ++++-------------
+ 1 file changed, 4 insertions(+), 13 deletions(-)
 
-diff --git a/drivers/cpufreq/imx6q-cpufreq.c b/drivers/cpufreq/imx6q-cpufreq.c
-index a3829a0..6993f0d 100644
---- a/drivers/cpufreq/imx6q-cpufreq.c
-+++ b/drivers/cpufreq/imx6q-cpufreq.c
-@@ -34,11 +34,6 @@ static struct device *cpu_dev;
- static struct cpufreq_frequency_table *freq_table;
- static unsigned int transition_latency;
+diff --git a/drivers/cpufreq/ppc-corenet-cpufreq.c b/drivers/cpufreq/ppc-corenet-cpufreq.c
+index 3f7be46..051000f 100644
+--- a/drivers/cpufreq/ppc-corenet-cpufreq.c
++++ b/drivers/cpufreq/ppc-corenet-cpufreq.c
+@@ -24,12 +24,10 @@
  
--static unsigned int imx6q_get_speed(unsigned int cpu)
+ /**
+  * struct cpu_data - per CPU data struct
+- * @clk: the clk of CPU
+  * @parent: the parent node of cpu clock
+  * @table: frequency table
+  */
+ struct cpu_data {
+-	struct clk *clk;
+ 	struct device_node *parent;
+ 	struct cpufreq_frequency_table *table;
+ };
+@@ -81,13 +79,6 @@ static inline const struct cpumask *cpu_core_mask(int cpu)
+ }
+ #endif
+ 
+-static unsigned int corenet_cpufreq_get_speed(unsigned int cpu)
 -{
--	return clk_get_rate(arm_clk) / 1000;
+-	struct cpu_data *data = per_cpu(cpu_data, cpu);
+-
+-	return clk_get_rate(data->clk) / 1000;
 -}
 -
- static int imx6q_set_target(struct cpufreq_policy *policy, unsigned int index)
- {
- 	struct opp *opp;
-@@ -133,13 +128,14 @@ static int imx6q_set_target(struct cpufreq_policy *policy, unsigned int index)
+ /* reduce the duplicated frequencies in frequency table */
+ static void freq_table_redup(struct cpufreq_frequency_table *freq_table,
+ 		int count)
+@@ -158,8 +149,8 @@ static int corenet_cpufreq_cpu_init(struct cpufreq_policy *policy)
+ 		goto err_np;
+ 	}
  
- static int imx6q_cpufreq_init(struct cpufreq_policy *policy)
- {
-+	policy->clk = arm_clk;
- 	return cpufreq_generic_init(policy, freq_table, transition_latency);
+-	data->clk = of_clk_get(np, 0);
+-	if (IS_ERR(data->clk)) {
++	policy->clk = of_clk_get(np, 0);
++	if (IS_ERR(policy->clk)) {
+ 		pr_err("%s: no clock information\n", __func__);
+ 		goto err_nomem2;
+ 	}
+@@ -255,7 +246,7 @@ static int corenet_cpufreq_target(struct cpufreq_policy *policy,
+ 	struct cpu_data *data = per_cpu(cpu_data, policy->cpu);
+ 
+ 	parent = of_clk_get(data->parent, data->table[index].driver_data);
+-	return clk_set_parent(data->clk, parent);
++	return clk_set_parent(policy->clk, parent);
  }
  
- static struct cpufreq_driver imx6q_cpufreq_driver = {
- 	.verify = cpufreq_generic_frequency_table_verify,
- 	.target_index = imx6q_set_target,
--	.get = imx6q_get_speed,
-+	.get = cpufreq_generic_get,
- 	.init = imx6q_cpufreq_init,
- 	.exit = cpufreq_generic_exit,
- 	.name = "imx6q-cpufreq",
+ static struct cpufreq_driver ppc_corenet_cpufreq_driver = {
+@@ -265,7 +256,7 @@ static struct cpufreq_driver ppc_corenet_cpufreq_driver = {
+ 	.exit		= __exit_p(corenet_cpufreq_cpu_exit),
+ 	.verify		= cpufreq_generic_frequency_table_verify,
+ 	.target_index	= corenet_cpufreq_target,
+-	.get		= corenet_cpufreq_get_speed,
++	.get		= cpufreq_generic_get,
+ 	.attr		= cpufreq_generic_attr,
+ };
+ 
 -- 
 1.7.12.rc2.18.g61b472e
