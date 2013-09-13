@@ -1,74 +1,57 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 13 Sep 2013 12:25:05 -0600
-Subject: [PATCH 1/7] ARM: tegra: remove common.c
+Date: Fri, 13 Sep 2013 12:25:07 -0600
+Subject: [PATCH 3/7] ARM: tegra: delete gpio-names.h
 In-Reply-To: <1379096711-26875-1-git-send-email-swarren@wwwdotorg.org>
 References: <1379096711-26875-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <1379096711-26875-2-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <1379096711-26875-4-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Stephen Warren <swarren@nvidia.com>
 
-common.c was create to contain code shared across the various Tegra board
-files. There is now only one board file, tegra.c. So, move the code there.
-One exception is the PMC reboot routine, which moves to pmc.c, and now
-takes advantage of the 'standard' tegra_pmc_readl/writel functions.
+gpio-names.h defines IDs for GPIOs. This information now comes from
+device tree, so delete this stale header. The one remaining use-case is
+board-paz00.c's wifi_rfkill device. Isolate the knowledge of those GPIO
+IDs into that file. Let's hope the values stay valid:-)
 
 Signed-off-by: Stephen Warren <swarren@nvidia.com>
 ---
- arch/arm/mach-tegra/Makefile |   1 -
- arch/arm/mach-tegra/board.h  |   6 ---
- arch/arm/mach-tegra/common.c | 113 -------------------------------------------
- arch/arm/mach-tegra/pmc.c    |   9 ++++
- arch/arm/mach-tegra/pmc.h    |   4 ++
- arch/arm/mach-tegra/tegra.c  |  67 ++++++++++++++++++++++++-
- 6 files changed, 78 insertions(+), 122 deletions(-)
- delete mode 100644 arch/arm/mach-tegra/common.c
+ arch/arm/mach-tegra/board-paz00.c |   5 +-
+ arch/arm/mach-tegra/board-paz00.h |  25 ----
+ arch/arm/mach-tegra/gpio-names.h  | 247 --------------------------------------
+ 3 files changed, 2 insertions(+), 275 deletions(-)
+ delete mode 100644 arch/arm/mach-tegra/board-paz00.h
+ delete mode 100644 arch/arm/mach-tegra/gpio-names.h
 
-diff --git a/arch/arm/mach-tegra/Makefile b/arch/arm/mach-tegra/Makefile
-index e7e5f45..97eb48e 100644
---- a/arch/arm/mach-tegra/Makefile
-+++ b/arch/arm/mach-tegra/Makefile
-@@ -1,6 +1,5 @@
- asflags-y				+= -march=armv7-a
+diff --git a/arch/arm/mach-tegra/board-paz00.c b/arch/arm/mach-tegra/board-paz00.c
+index 740e16f..06f0240 100644
+--- a/arch/arm/mach-tegra/board-paz00.c
++++ b/arch/arm/mach-tegra/board-paz00.c
+@@ -20,12 +20,11 @@
+ #include <linux/platform_device.h>
+ #include <linux/rfkill-gpio.h>
+ #include "board.h"
+-#include "board-paz00.h"
  
--obj-y                                   += common.o
- obj-y                                   += io.o
- obj-y                                   += irq.o
- obj-y					+= fuse.o
-diff --git a/arch/arm/mach-tegra/board.h b/arch/arm/mach-tegra/board.h
-index db6810d..7b9a5bd 100644
---- a/arch/arm/mach-tegra/board.h
-+++ b/arch/arm/mach-tegra/board.h
-@@ -25,14 +25,8 @@
- #include <linux/types.h>
- #include <linux/reboot.h>
+ static struct rfkill_gpio_platform_data wifi_rfkill_platform_data = {
+ 	.name		= "wifi_rfkill",
+-	.reset_gpio	= TEGRA_WIFI_RST,
+-	.shutdown_gpio	= TEGRA_WIFI_PWRN,
++	.reset_gpio	= 25, /* PD1 */
++	.shutdown_gpio	= 85, /* PK5 */
+ 	.type	= RFKILL_TYPE_WLAN,
+ };
  
--void tegra_assert_system_reset(enum reboot_mode mode, const char *cmd);
--
--void __init tegra_init_early(void);
- void __init tegra_map_common_io(void);
- void __init tegra_init_irq(void);
--void __init tegra_dt_init_irq(void);
--
--void tegra_init_late(void);
- 
- #ifdef CONFIG_DEBUG_FS
- int tegra_clk_debugfs_init(void);
-diff --git a/arch/arm/mach-tegra/common.c b/arch/arm/mach-tegra/common.c
+diff --git a/arch/arm/mach-tegra/board-paz00.h b/arch/arm/mach-tegra/board-paz00.h
 deleted file mode 100644
-index 58dc91c5..0000000
---- a/arch/arm/mach-tegra/common.c
+index 25c08ec..0000000
+--- a/arch/arm/mach-tegra/board-paz00.h
 +++ /dev/null
-@@ -1,113 +0,0 @@
+@@ -1,25 +0,0 @@
 -/*
-- * arch/arm/mach-tegra/common.c
+- * arch/arm/mach-tegra/board-paz00.h
 - *
-- * Copyright (c) 2013 NVIDIA Corporation. All rights reserved.
-- * Copyright (C) 2010 Google, Inc.
-- *
-- * Author:
-- *	Colin Cross <ccross@android.com>
+- * Copyright (C) 2010 Marc Dietrich <marvin24@gmx.de>
 - *
 - * This software is licensed under the terms of the GNU General Public
 - * License version 2, as published by the Free Software Foundation, and
@@ -81,242 +64,267 @@ index 58dc91c5..0000000
 - *
 - */
 -
--#include <linux/init.h>
--#include <linux/io.h>
--#include <linux/clk.h>
--#include <linux/delay.h>
--#include <linux/reboot.h>
--#include <linux/irqchip.h>
+-#ifndef _MACH_TEGRA_BOARD_PAZ00_H
+-#define _MACH_TEGRA_BOARD_PAZ00_H
 -
--#include <asm/hardware/cache-l2x0.h>
+-#include "gpio-names.h"
 -
--#include "board.h"
--#include "common.h"
--#include "cpuidle.h"
--#include "fuse.h"
--#include "iomap.h"
--#include "irq.h"
--#include "pmc.h"
--#include "apbio.h"
--#include "sleep.h"
--#include "pm.h"
--#include "reset.h"
+-#define TEGRA_WIFI_PWRN			TEGRA_GPIO_PK5
+-#define TEGRA_WIFI_RST			TEGRA_GPIO_PD1
 -
+-#endif
+diff --git a/arch/arm/mach-tegra/gpio-names.h b/arch/arm/mach-tegra/gpio-names.h
+deleted file mode 100644
+index f28220a..0000000
+--- a/arch/arm/mach-tegra/gpio-names.h
++++ /dev/null
+@@ -1,247 +0,0 @@
 -/*
-- * Storage for debug-macro.S's state.
+- * arch/arm/mach-tegra/include/mach/gpio-names.h
 - *
-- * This must be in .data not .bss so that it gets initialized each time the
-- * kernel is loaded. The data is declared here rather than debug-macro.S so
-- * that multiple inclusions of debug-macro.S point at the same data.
+- * Copyright (c) 2010 Google, Inc
+- *
+- * Author:
+- *	Erik Gilling <konkers@google.com>
+- *
+- * This software is licensed under the terms of the GNU General Public
+- * License version 2, as published by the Free Software Foundation, and
+- * may be copied, distributed, and modified under those terms.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
 - */
--u32 tegra_uart_config[4] = {
--	/* Debug UART initialization required */
--	1,
--	/* Debug UART physical address */
--	0,
--	/* Debug UART virtual address */
--	0,
--	/* Scratch space for debug macro */
--	0,
--};
 -
--#ifdef CONFIG_OF
--void __init tegra_dt_init_irq(void)
--{
--	tegra_pmc_init_irq();
--	tegra_init_irq();
--	irqchip_init();
--	tegra_legacy_irq_syscore_init();
--}
+-#ifndef __MACH_TEGRA_GPIO_NAMES_H
+-#define __MACH_TEGRA_GPIO_NAMES_H
+-
+-#define TEGRA_GPIO_PA0		0
+-#define TEGRA_GPIO_PA1		1
+-#define TEGRA_GPIO_PA2		2
+-#define TEGRA_GPIO_PA3		3
+-#define TEGRA_GPIO_PA4		4
+-#define TEGRA_GPIO_PA5		5
+-#define TEGRA_GPIO_PA6		6
+-#define TEGRA_GPIO_PA7		7
+-#define TEGRA_GPIO_PB0		8
+-#define TEGRA_GPIO_PB1		9
+-#define TEGRA_GPIO_PB2		10
+-#define TEGRA_GPIO_PB3		11
+-#define TEGRA_GPIO_PB4		12
+-#define TEGRA_GPIO_PB5		13
+-#define TEGRA_GPIO_PB6		14
+-#define TEGRA_GPIO_PB7		15
+-#define TEGRA_GPIO_PC0		16
+-#define TEGRA_GPIO_PC1		17
+-#define TEGRA_GPIO_PC2		18
+-#define TEGRA_GPIO_PC3		19
+-#define TEGRA_GPIO_PC4		20
+-#define TEGRA_GPIO_PC5		21
+-#define TEGRA_GPIO_PC6		22
+-#define TEGRA_GPIO_PC7		23
+-#define TEGRA_GPIO_PD0		24
+-#define TEGRA_GPIO_PD1		25
+-#define TEGRA_GPIO_PD2		26
+-#define TEGRA_GPIO_PD3		27
+-#define TEGRA_GPIO_PD4		28
+-#define TEGRA_GPIO_PD5		29
+-#define TEGRA_GPIO_PD6		30
+-#define TEGRA_GPIO_PD7		31
+-#define TEGRA_GPIO_PE0		32
+-#define TEGRA_GPIO_PE1		33
+-#define TEGRA_GPIO_PE2		34
+-#define TEGRA_GPIO_PE3		35
+-#define TEGRA_GPIO_PE4		36
+-#define TEGRA_GPIO_PE5		37
+-#define TEGRA_GPIO_PE6		38
+-#define TEGRA_GPIO_PE7		39
+-#define TEGRA_GPIO_PF0		40
+-#define TEGRA_GPIO_PF1		41
+-#define TEGRA_GPIO_PF2		42
+-#define TEGRA_GPIO_PF3		43
+-#define TEGRA_GPIO_PF4		44
+-#define TEGRA_GPIO_PF5		45
+-#define TEGRA_GPIO_PF6		46
+-#define TEGRA_GPIO_PF7		47
+-#define TEGRA_GPIO_PG0		48
+-#define TEGRA_GPIO_PG1		49
+-#define TEGRA_GPIO_PG2		50
+-#define TEGRA_GPIO_PG3		51
+-#define TEGRA_GPIO_PG4		52
+-#define TEGRA_GPIO_PG5		53
+-#define TEGRA_GPIO_PG6		54
+-#define TEGRA_GPIO_PG7		55
+-#define TEGRA_GPIO_PH0		56
+-#define TEGRA_GPIO_PH1		57
+-#define TEGRA_GPIO_PH2		58
+-#define TEGRA_GPIO_PH3		59
+-#define TEGRA_GPIO_PH4		60
+-#define TEGRA_GPIO_PH5		61
+-#define TEGRA_GPIO_PH6		62
+-#define TEGRA_GPIO_PH7		63
+-#define TEGRA_GPIO_PI0		64
+-#define TEGRA_GPIO_PI1		65
+-#define TEGRA_GPIO_PI2		66
+-#define TEGRA_GPIO_PI3		67
+-#define TEGRA_GPIO_PI4		68
+-#define TEGRA_GPIO_PI5		69
+-#define TEGRA_GPIO_PI6		70
+-#define TEGRA_GPIO_PI7		71
+-#define TEGRA_GPIO_PJ0		72
+-#define TEGRA_GPIO_PJ1		73
+-#define TEGRA_GPIO_PJ2		74
+-#define TEGRA_GPIO_PJ3		75
+-#define TEGRA_GPIO_PJ4		76
+-#define TEGRA_GPIO_PJ5		77
+-#define TEGRA_GPIO_PJ6		78
+-#define TEGRA_GPIO_PJ7		79
+-#define TEGRA_GPIO_PK0		80
+-#define TEGRA_GPIO_PK1		81
+-#define TEGRA_GPIO_PK2		82
+-#define TEGRA_GPIO_PK3		83
+-#define TEGRA_GPIO_PK4		84
+-#define TEGRA_GPIO_PK5		85
+-#define TEGRA_GPIO_PK6		86
+-#define TEGRA_GPIO_PK7		87
+-#define TEGRA_GPIO_PL0		88
+-#define TEGRA_GPIO_PL1		89
+-#define TEGRA_GPIO_PL2		90
+-#define TEGRA_GPIO_PL3		91
+-#define TEGRA_GPIO_PL4		92
+-#define TEGRA_GPIO_PL5		93
+-#define TEGRA_GPIO_PL6		94
+-#define TEGRA_GPIO_PL7		95
+-#define TEGRA_GPIO_PM0		96
+-#define TEGRA_GPIO_PM1		97
+-#define TEGRA_GPIO_PM2		98
+-#define TEGRA_GPIO_PM3		99
+-#define TEGRA_GPIO_PM4		100
+-#define TEGRA_GPIO_PM5		101
+-#define TEGRA_GPIO_PM6		102
+-#define TEGRA_GPIO_PM7		103
+-#define TEGRA_GPIO_PN0		104
+-#define TEGRA_GPIO_PN1		105
+-#define TEGRA_GPIO_PN2		106
+-#define TEGRA_GPIO_PN3		107
+-#define TEGRA_GPIO_PN4		108
+-#define TEGRA_GPIO_PN5		109
+-#define TEGRA_GPIO_PN6		110
+-#define TEGRA_GPIO_PN7		111
+-#define TEGRA_GPIO_PO0		112
+-#define TEGRA_GPIO_PO1		113
+-#define TEGRA_GPIO_PO2		114
+-#define TEGRA_GPIO_PO3		115
+-#define TEGRA_GPIO_PO4		116
+-#define TEGRA_GPIO_PO5		117
+-#define TEGRA_GPIO_PO6		118
+-#define TEGRA_GPIO_PO7		119
+-#define TEGRA_GPIO_PP0		120
+-#define TEGRA_GPIO_PP1		121
+-#define TEGRA_GPIO_PP2		122
+-#define TEGRA_GPIO_PP3		123
+-#define TEGRA_GPIO_PP4		124
+-#define TEGRA_GPIO_PP5		125
+-#define TEGRA_GPIO_PP6		126
+-#define TEGRA_GPIO_PP7		127
+-#define TEGRA_GPIO_PQ0		128
+-#define TEGRA_GPIO_PQ1		129
+-#define TEGRA_GPIO_PQ2		130
+-#define TEGRA_GPIO_PQ3		131
+-#define TEGRA_GPIO_PQ4		132
+-#define TEGRA_GPIO_PQ5		133
+-#define TEGRA_GPIO_PQ6		134
+-#define TEGRA_GPIO_PQ7		135
+-#define TEGRA_GPIO_PR0		136
+-#define TEGRA_GPIO_PR1		137
+-#define TEGRA_GPIO_PR2		138
+-#define TEGRA_GPIO_PR3		139
+-#define TEGRA_GPIO_PR4		140
+-#define TEGRA_GPIO_PR5		141
+-#define TEGRA_GPIO_PR6		142
+-#define TEGRA_GPIO_PR7		143
+-#define TEGRA_GPIO_PS0		144
+-#define TEGRA_GPIO_PS1		145
+-#define TEGRA_GPIO_PS2		146
+-#define TEGRA_GPIO_PS3		147
+-#define TEGRA_GPIO_PS4		148
+-#define TEGRA_GPIO_PS5		149
+-#define TEGRA_GPIO_PS6		150
+-#define TEGRA_GPIO_PS7		151
+-#define TEGRA_GPIO_PT0		152
+-#define TEGRA_GPIO_PT1		153
+-#define TEGRA_GPIO_PT2		154
+-#define TEGRA_GPIO_PT3		155
+-#define TEGRA_GPIO_PT4		156
+-#define TEGRA_GPIO_PT5		157
+-#define TEGRA_GPIO_PT6		158
+-#define TEGRA_GPIO_PT7		159
+-#define TEGRA_GPIO_PU0		160
+-#define TEGRA_GPIO_PU1		161
+-#define TEGRA_GPIO_PU2		162
+-#define TEGRA_GPIO_PU3		163
+-#define TEGRA_GPIO_PU4		164
+-#define TEGRA_GPIO_PU5		165
+-#define TEGRA_GPIO_PU6		166
+-#define TEGRA_GPIO_PU7		167
+-#define TEGRA_GPIO_PV0		168
+-#define TEGRA_GPIO_PV1		169
+-#define TEGRA_GPIO_PV2		170
+-#define TEGRA_GPIO_PV3		171
+-#define TEGRA_GPIO_PV4		172
+-#define TEGRA_GPIO_PV5		173
+-#define TEGRA_GPIO_PV6		174
+-#define TEGRA_GPIO_PV7		175
+-#define TEGRA_GPIO_PW0		176
+-#define TEGRA_GPIO_PW1		177
+-#define TEGRA_GPIO_PW2		178
+-#define TEGRA_GPIO_PW3		179
+-#define TEGRA_GPIO_PW4		180
+-#define TEGRA_GPIO_PW5		181
+-#define TEGRA_GPIO_PW6		182
+-#define TEGRA_GPIO_PW7		183
+-#define TEGRA_GPIO_PX0		184
+-#define TEGRA_GPIO_PX1		185
+-#define TEGRA_GPIO_PX2		186
+-#define TEGRA_GPIO_PX3		187
+-#define TEGRA_GPIO_PX4		188
+-#define TEGRA_GPIO_PX5		189
+-#define TEGRA_GPIO_PX6		190
+-#define TEGRA_GPIO_PX7		191
+-#define TEGRA_GPIO_PY0		192
+-#define TEGRA_GPIO_PY1		193
+-#define TEGRA_GPIO_PY2		194
+-#define TEGRA_GPIO_PY3		195
+-#define TEGRA_GPIO_PY4		196
+-#define TEGRA_GPIO_PY5		197
+-#define TEGRA_GPIO_PY6		198
+-#define TEGRA_GPIO_PY7		199
+-#define TEGRA_GPIO_PZ0		200
+-#define TEGRA_GPIO_PZ1		201
+-#define TEGRA_GPIO_PZ2		202
+-#define TEGRA_GPIO_PZ3		203
+-#define TEGRA_GPIO_PZ4		204
+-#define TEGRA_GPIO_PZ5		205
+-#define TEGRA_GPIO_PZ6		206
+-#define TEGRA_GPIO_PZ7		207
+-#define TEGRA_GPIO_PAA0		208
+-#define TEGRA_GPIO_PAA1		209
+-#define TEGRA_GPIO_PAA2		210
+-#define TEGRA_GPIO_PAA3		211
+-#define TEGRA_GPIO_PAA4		212
+-#define TEGRA_GPIO_PAA5		213
+-#define TEGRA_GPIO_PAA6		214
+-#define TEGRA_GPIO_PAA7		215
+-#define TEGRA_GPIO_PBB0		216
+-#define TEGRA_GPIO_PBB1		217
+-#define TEGRA_GPIO_PBB2		218
+-#define TEGRA_GPIO_PBB3		219
+-#define TEGRA_GPIO_PBB4		220
+-#define TEGRA_GPIO_PBB5		221
+-#define TEGRA_GPIO_PBB6		222
+-#define TEGRA_GPIO_PBB7		223
+-
 -#endif
--
--void tegra_assert_system_reset(enum reboot_mode mode, const char *cmd)
--{
--	void __iomem *reset = IO_ADDRESS(TEGRA_PMC_BASE + 0);
--	u32 reg;
--
--	reg = readl_relaxed(reset);
--	reg |= 0x10;
--	writel_relaxed(reg, reset);
--}
--
--static void __init tegra_init_cache(void)
--{
--#ifdef CONFIG_CACHE_L2X0
--	int ret;
--	void __iomem *p = IO_ADDRESS(TEGRA_ARM_PERIF_BASE) + 0x3000;
--	u32 aux_ctrl, cache_type;
--
--	cache_type = readl(p + L2X0_CACHE_TYPE);
--	aux_ctrl = (cache_type & 0x700) << (17-8);
--	aux_ctrl |= 0x7C400001;
--
--	ret = l2x0_of_init(aux_ctrl, 0x8200c3fe);
--	if (!ret)
--		l2x0_saved_regs_addr = virt_to_phys(&l2x0_saved_regs);
--#endif
--
--}
--
--void __init tegra_init_early(void)
--{
--	tegra_cpu_reset_handler_init();
--	tegra_apb_io_init();
--	tegra_init_fuse();
--	tegra_init_cache();
--	tegra_powergate_init();
--	tegra_hotplug_init();
--}
--
--void __init tegra_init_late(void)
--{
--	tegra_init_suspend();
--	tegra_cpuidle_init();
--	tegra_powergate_debugfs_init();
--}
-diff --git a/arch/arm/mach-tegra/pmc.c b/arch/arm/mach-tegra/pmc.c
-index 7916ff9..93a4dbc 100644
---- a/arch/arm/mach-tegra/pmc.c
-+++ b/arch/arm/mach-tegra/pmc.c
-@@ -166,6 +166,15 @@ int tegra_pmc_cpu_remove_clamping(int cpuid)
- 	return tegra_pmc_powergate_remove_clamping(id);
- }
- 
-+void tegra_pmc_restart(enum reboot_mode mode, const char *cmd)
-+{
-+	u32 val;
-+
-+	val = tegra_pmc_readl(0);
-+	val |= 0x10;
-+	tegra_pmc_writel(val, 0);
-+}
-+
- #ifdef CONFIG_PM_SLEEP
- static void set_power_timers(u32 us_on, u32 us_off, unsigned long rate)
- {
-diff --git a/arch/arm/mach-tegra/pmc.h b/arch/arm/mach-tegra/pmc.h
-index 4d5f8f3..59e19c34 100644
---- a/arch/arm/mach-tegra/pmc.h
-+++ b/arch/arm/mach-tegra/pmc.h
-@@ -18,6 +18,8 @@
- #ifndef __MACH_TEGRA_PMC_H
- #define __MACH_TEGRA_PMC_H
- 
-+#include <linux/reboot.h>
-+
- enum tegra_suspend_mode {
- 	TEGRA_SUSPEND_NONE = 0,
- 	TEGRA_SUSPEND_LP2,	/* CPU voltage off */
-@@ -39,6 +41,8 @@ bool tegra_pmc_cpu_is_powered(int cpuid);
- int tegra_pmc_cpu_power_on(int cpuid);
- int tegra_pmc_cpu_remove_clamping(int cpuid);
- 
-+void tegra_pmc_restart(enum reboot_mode mode, const char *cmd);
-+
- void tegra_pmc_init_irq(void);
- void tegra_pmc_init(void);
- 
-diff --git a/arch/arm/mach-tegra/tegra.c b/arch/arm/mach-tegra/tegra.c
-index 4da271d..40b031c 100644
---- a/arch/arm/mach-tegra/tegra.c
-+++ b/arch/arm/mach-tegra/tegra.c
-@@ -35,17 +35,78 @@
- #include <linux/usb/tegra_usb_phy.h>
- #include <linux/clk-provider.h>
- #include <linux/clk/tegra.h>
-+#include <linux/irqchip.h>
- 
-+#include <asm/hardware/cache-l2x0.h>
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
- #include <asm/mach/time.h>
- #include <asm/setup.h>
- 
-+#include "apbio.h"
- #include "board.h"
- #include "common.h"
-+#include "cpuidle.h"
- #include "fuse.h"
- #include "iomap.h"
-+#include "irq.h"
- #include "pmc.h"
-+#include "pm.h"
-+#include "reset.h"
-+#include "sleep.h"
-+
-+/*
-+ * Storage for debug-macro.S's state.
-+ *
-+ * This must be in .data not .bss so that it gets initialized each time the
-+ * kernel is loaded. The data is declared here rather than debug-macro.S so
-+ * that multiple inclusions of debug-macro.S point at the same data.
-+ */
-+u32 tegra_uart_config[4] = {
-+	/* Debug UART initialization required */
-+	1,
-+	/* Debug UART physical address */
-+	0,
-+	/* Debug UART virtual address */
-+	0,
-+	/* Scratch space for debug macro */
-+	0,
-+};
-+
-+static void __init tegra_init_cache(void)
-+{
-+#ifdef CONFIG_CACHE_L2X0
-+	int ret;
-+	void __iomem *p = IO_ADDRESS(TEGRA_ARM_PERIF_BASE) + 0x3000;
-+	u32 aux_ctrl, cache_type;
-+
-+	cache_type = readl(p + L2X0_CACHE_TYPE);
-+	aux_ctrl = (cache_type & 0x700) << (17-8);
-+	aux_ctrl |= 0x7C400001;
-+
-+	ret = l2x0_of_init(aux_ctrl, 0x8200c3fe);
-+	if (!ret)
-+		l2x0_saved_regs_addr = virt_to_phys(&l2x0_saved_regs);
-+#endif
-+}
-+
-+static void __init tegra_init_early(void)
-+{
-+	tegra_cpu_reset_handler_init();
-+	tegra_apb_io_init();
-+	tegra_init_fuse();
-+	tegra_init_cache();
-+	tegra_powergate_init();
-+	tegra_hotplug_init();
-+}
-+
-+static void __init tegra_dt_init_irq(void)
-+{
-+	tegra_pmc_init_irq();
-+	tegra_init_irq();
-+	irqchip_init();
-+	tegra_legacy_irq_syscore_init();
-+}
- 
- static void __init tegra_dt_init(void)
- {
-@@ -107,7 +168,9 @@ static void __init tegra_dt_init_late(void)
- {
- 	int i;
- 
--	tegra_init_late();
-+	tegra_init_suspend();
-+	tegra_cpuidle_init();
-+	tegra_powergate_debugfs_init();
- 
- 	for (i = 0; i < ARRAY_SIZE(board_init_funcs); i++) {
- 		if (of_machine_is_compatible(board_init_funcs[i].machine)) {
-@@ -132,6 +195,6 @@ DT_MACHINE_START(TEGRA_DT, "NVIDIA Tegra SoC (Flattened Device Tree)")
- 	.init_time	= tegra_dt_init_time,
- 	.init_machine	= tegra_dt_init,
- 	.init_late	= tegra_dt_init_late,
--	.restart	= tegra_assert_system_reset,
-+	.restart	= tegra_pmc_restart,
- 	.dt_compat	= tegra_dt_board_compat,
- MACHINE_END
 -- 
 1.8.1.5
