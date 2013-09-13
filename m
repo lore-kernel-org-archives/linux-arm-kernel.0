@@ -1,213 +1,103 @@
-From: mikedunn@newsguy.com (Mike Dunn)
-Date: Fri, 13 Sep 2013 09:54:41 -0700
-Subject: [PATCH v3] PWM: PXA: add device tree support to PWM driver
-Message-ID: <1379091281-23662-1-git-send-email-mikedunn@newsguy.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 13 Sep 2013 17:57:08 +0100
+Subject: [PATCH 1/2] Documentation: devicetree: arm: cpus/cpu nodes
+ bindings updates
+In-Reply-To: <20130815152238.GF17839@e102568-lin.cambridge.arm.com>
+References: <1376559743-31848-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1376559743-31848-2-git-send-email-lorenzo.pieralisi@arm.com>
+ <520CE665.8060907@gmail.com>
+ <20130815152238.GF17839@e102568-lin.cambridge.arm.com>
+Message-ID: <20130913165708.GC5408@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds device tree support to the PXA's PWM driver.  Only an OF match
-table is added; nothing needs to be extracted from the device tree node.  The
-existing ID table is reused for the match table data.
+Hi Rob, all,
 
-Tested on a Palm Treo 680 (both platform data and DT cases).
+On Thu, Aug 15, 2013 at 04:22:38PM +0100, Lorenzo Pieralisi wrote:
+> [adding Andrew, Gregory and Thomas to check the Marvell compatible names]
+> 
+> On Thu, Aug 15, 2013 at 03:32:05PM +0100, Rob Herring wrote:
+> > On 08/15/2013 04:42 AM, Lorenzo Pieralisi wrote:
+> > > In order to extend the current cpu nodes bindings to newer CPUs
+> > > inclusive of AArch64 and to update support for older ARM CPUs this
+> > > patch updates device tree documentation for the cpu nodes bindings.
+> > > 
+> > > Main changes:
+> > >     - adds 64-bit bindings
+> > >     - define usage of #address-cells
+> > >     - defines behaviour on pre and post v7 uniprocessor systems
+> > >     - adds ARM 11MPcore specific reg property definition
+> > > 
+> > > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> > > ---
+> > >  Documentation/devicetree/bindings/arm/cpus.txt | 424 ++++++++++++++++++++++---
+> > >  1 file changed, 377 insertions(+), 47 deletions(-)
+> > > 
+> > 
+> > The binding looks mostly fine to me.
 
-Signed-off-by: Mike Dunn <mikedunn@newsguy.com>
----
-Changle log:
-v3:
-- remove support for the polarity flag
-- remove per-chip pwm index cell; define custom of_xlate()
-   (now #pwm-cells = <1>)
-- "compatible" strings for all devices added to OF match table
-- various stylistic changes recommended by reviewers
+These bindings have still not received an ACK, and need review by
+Marvell guys in copy for the new compatible strings below.
 
-v2:
-- of_match_table contains only the "pxa250-pwm" compatible string; require one
-  device instance per pwm
-- add Documentation/devicetree/bindings/pwm/pxa-pwm.txt
-- add support for polarity flag in DT and implement set_polarity() method
-  (the treo 680 inverts the signal between pwm out and backlight)
-- return -EINVAL instead of -ENODEV if platform data or DT node not found
-- output dev_info string if platform data missing
-- expanded CC list of patch
+Most importantly, we need to make a decision on the pre v7 uniprocessor
+systems, where MPIDR/CPUID are non-existent and the reg property is a
+pure SW enumeration. Current bindings (ie this patch) define
 
- Documentation/devicetree/bindings/pwm/pxa-pwm.txt | 31 ++++++++++++
- arch/arm/boot/dts/pxa27x.dtsi                     | 24 +++++++++
- drivers/pwm/pwm-pxa.c                             | 62 +++++++++++++++++++++++
- 3 files changed, 117 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/pwm/pxa-pwm.txt
+#address-cells = <0>;
 
-diff --git a/Documentation/devicetree/bindings/pwm/pxa-pwm.txt b/Documentation/devicetree/bindings/pwm/pxa-pwm.txt
-new file mode 100644
-index 0000000..6fcf90c
---- /dev/null
-+++ b/Documentation/devicetree/bindings/pwm/pxa-pwm.txt
-@@ -0,0 +1,31 @@
-+Marvell PWM controller
-+
-+Required properties:
-+- compatible: should be one of:
-+  - "marvell,pxa250-pwm"
-+  - "marvell,pxa270-pwm"
-+  - "marvell,pxa168-pwm"
-+  - "marvell,pxa910-pwm"
-+- reg: physical base address and length of the registers used by the PWM channel
-+  NB: One device instance must be created for each PWM that is used, so the
-+  length covers only the register window for one PWM output, not that of the
-+  entire PWM controller.  Currently length is 0x10 for all supported devices.
-+- #pwm-cells: should be 1.  This cell is used to specify the period in
-+  nanoseconds.  (Because one device instance is created for each PWM output,
-+  the per-chip index is superflous and not used.)
-+
-+Example PWM device node:
-+
-+pwm0: pwm at 40b00000 {
-+	compatible = "marvell,pxa250-pwm";
-+	reg = <0x40b00000 0x10>;
-+	#pwm-cells = <1>;
-+};
-+
-+Example PWM client node:
-+
-+backlight {
-+	compatible = "pwm-backlight";
-+	pwms = <&pwm0 5000000>;
-+	...
-+}
-diff --git a/arch/arm/boot/dts/pxa27x.dtsi b/arch/arm/boot/dts/pxa27x.dtsi
-index d7c5d72..5057c41 100644
---- a/arch/arm/boot/dts/pxa27x.dtsi
-+++ b/arch/arm/boot/dts/pxa27x.dtsi
-@@ -10,5 +10,29 @@
- 			marvell,intc-priority;
- 			marvell,intc-nr-irqs = <34>;
- 		};
-+
-+		pwm0: pwm at 40b00000 {
-+			compatible = "marvell,pxa270-pwm";
-+			reg = <0x40b00000 0x10>;
-+			#pwm-cells = <1>;
-+		};
-+
-+		pwm1: pwm at 40b00010 {
-+			compatible = "marvell,pxa270-pwm";
-+			reg = <0x40b00010 0x10>;
-+			#pwm-cells = <1>;
-+		};
-+
-+		pwm2: pwm at 40c00000 {
-+			compatible = "marvell,pxa270-pwm";
-+			reg = <0x40c00000 0x10>;
-+			#pwm-cells = <1>;
-+		};
-+
-+		pwm3: pwm at 40c00010 {
-+			compatible = "marvell,pxa270-pwm";
-+			reg = <0x40c00010 0x10>;
-+			#pwm-cells = <1>;
-+		};
- 	};
- };
-diff --git a/drivers/pwm/pwm-pxa.c b/drivers/pwm/pwm-pxa.c
-index a4d2164..91b1cff 100644
---- a/drivers/pwm/pwm-pxa.c
-+++ b/drivers/pwm/pwm-pxa.c
-@@ -19,6 +19,7 @@
- #include <linux/clk.h>
- #include <linux/io.h>
- #include <linux/pwm.h>
-+#include <linux/of_device.h>
- 
- #include <asm/div64.h>
- 
-@@ -124,6 +125,59 @@ static struct pwm_ops pxa_pwm_ops = {
- 	.owner = THIS_MODULE,
- };
- 
-+#ifdef CONFIG_OF
-+/*
-+ * Device tree users must create one device instance for each pwm channel.
-+ * Hence we dispense with the HAS_SECONDARY_PWM and "tell" the original driver
-+ * code that this is a single channel pxa25x-pwm.  Currently all devices are
-+ * supported identically.
-+ */
-+static struct of_device_id pwm_of_match[] = {
-+	{ .compatible = "marvell,pxa250-pwm", .data = &pwm_id_table[0]},
-+	{ .compatible = "marvell,pxa270-pwm", .data = &pwm_id_table[0]},
-+	{ .compatible = "marvell,pxa168-pwm", .data = &pwm_id_table[0]},
-+	{ .compatible = "marvell,pxa910-pwm", .data = &pwm_id_table[0]},
-+	{ }
-+};
-+MODULE_DEVICE_TABLE(of, pwm_of_match);
-+
-+static const struct platform_device_id *pxa_pwm_get_id_dt(struct device *dev)
-+{
-+	const struct of_device_id *id = of_match_device(pwm_of_match, dev);
-+	if (id)
-+		return (const struct platform_device_id *)id->data;
-+	else
-+		return NULL;
-+}
-+
-+struct pwm_device *
-+pxa_pwm_of_xlate(struct pwm_chip *pc, const struct of_phandle_args *args)
-+{
-+	struct pwm_device *pwm;
-+
-+	pwm = pwm_request_from_chip(pc, 0, NULL);
-+	if (IS_ERR(pwm))
-+		return pwm;
-+
-+	pwm_set_period(pwm, args->args[0]);
-+
-+	return pwm;
-+}
-+
-+#else  /* !CONFIG_OF */
-+static const struct platform_device_id *pxa_pwm_get_id_dt(struct device *dev)
-+{
-+	dev_err(dev, "missing platform data\n");
-+	return NULL;
-+}
-+
-+struct pwm_device *
-+pxa_pwm_of_xlate(struct pwm_chip *pc, const struct of_phandle_args *args)
-+{
-+	return NULL;
-+}
-+#endif
-+
- static int pwm_probe(struct platform_device *pdev)
- {
- 	const struct platform_device_id *id = platform_get_device_id(pdev);
-@@ -131,6 +185,11 @@ static int pwm_probe(struct platform_device *pdev)
- 	struct resource *r;
- 	int ret = 0;
- 
-+	if (id == NULL)		/* using device tree */
-+		id = pxa_pwm_get_id_dt(&pdev->dev);
-+	if (id == NULL)
-+		return -EINVAL;
-+
- 	pwm = devm_kzalloc(&pdev->dev, sizeof(*pwm), GFP_KERNEL);
- 	if (pwm == NULL) {
- 		dev_err(&pdev->dev, "failed to allocate memory\n");
-@@ -145,6 +204,8 @@ static int pwm_probe(struct platform_device *pdev)
- 	pwm->chip.ops = &pxa_pwm_ops;
- 	pwm->chip.base = -1;
- 	pwm->chip.npwm = (id->driver_data & HAS_SECONDARY_PWM) ? 2 : 1;
-+	pwm->chip.of_xlate = pxa_pwm_of_xlate;
-+	pwm->chip.of_pwm_n_cells = 1;
- 
- 	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	pwm->mmio_base = devm_ioremap_resource(&pdev->dev, r);
-@@ -176,6 +237,7 @@ static struct platform_driver pwm_driver = {
- 	.driver		= {
- 		.name	= "pxa25x-pwm",
- 		.owner	= THIS_MODULE,
-+		.of_match_table	= of_match_ptr(pwm_of_match),
- 	},
- 	.probe		= pwm_probe,
- 	.remove		= pwm_remove,
--- 
-1.8.1.5
+for those processors (and there are a number of dts in the kernel with that
+set-up); Grant and Benjamin had a strong feeling against this choice, I
+have to make a decision on how to proceed, please let me know.
+
+Comments welcome.
+
+Lorenzo
+
+> > 
+> > [snip]
+> > 
+> > > +			    "faraday,fa526"
+> > > +			    "intel,sa110"
+> > > +			    "intel,sa1100"
+> > > +			    "marvell,feroceon"
+> > > +			    "marvell,mohawk"
+> > > +			    "marvell,pj4"
+> > > +			    "marvell,sheeva-v7"
+> > > +			    "marvell,xsc3"
+> > > +			    "marvell,xscale"
+> > 
+> > Better make sure the Marvell folks are happy with these. We don't need
+> > another rename here. I'm too annoyed with all the renames to pay attention.
+> 
+> Ok, I will verify that, I copied maintainers in.
+> 
+> On a side note I have just noticed that last cycle some dts were merged in the
+> kernel with cpu nodes that are not compliant (not picking on anyone,
+> eg am4372.dtsi).
+> Please prevent this from happening from now onwards, really please.
+> 
+> > > +
+> > > +Example 4 (ARM Cortex-A57 64-bit system running OS in AArch64):
+> > > +
+> > 
+> > Going back to my comments that the dtb can't be dependent on the OS,
+> > these 2 examples don't make sense.
+> 
+> Gah, my bad sorry, I missed the examples while removing dependency on the OS
+> from the bindings.
+> 
+> > > +
+> > > +Example 5 (ARM Cortex-A57 64-bit system running OS in AArch32):
+> > 
+> > This example should be removed.
+> 
+> Yes, consider it done, see above.
+> 
+> Thanks,
+> Lorenzo
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
