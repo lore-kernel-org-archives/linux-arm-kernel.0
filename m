@@ -1,31 +1,34 @@
-From: davem@davemloft.net (David Miller)
-Date: Fri, 13 Sep 2013 17:47:11 -0400 (EDT)
-Subject: [PATCH 012/228] cpufreq: sparc: call
- cpufreq_frequency_table_get_attr()
-In-Reply-To: <56edbe14da9944ad026497bc1a0dc4aaa283d506.1379063063.git.viresh.kumar@linaro.org>
-References: <cover.1379063063.git.viresh.kumar@linaro.org>
- <cover.1379063063.git.viresh.kumar@linaro.org>
- <56edbe14da9944ad026497bc1a0dc4aaa283d506.1379063063.git.viresh.kumar@linaro.org>
-Message-ID: <20130913.174711.268706749518726971.davem@davemloft.net>
+From: dinguyen@altera.com (Dinh Nguyen)
+Date: Fri, 13 Sep 2013 17:03:28 -0500
+Subject: [PATCH 05/10] clk: socfpga: Use NULL instead of 0
+In-Reply-To: <1379064232-10261-5-git-send-email-sachin.kamat@linaro.org>
+References: <1379064232-10261-1-git-send-email-sachin.kamat@linaro.org>
+ <1379064232-10261-5-git-send-email-sachin.kamat@linaro.org>
+Message-ID: <1379109808.14178.0.camel@linux-builds1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Viresh Kumar <viresh.kumar@linaro.org>
-Date: Fri, 13 Sep 2013 18:29:18 +0530
-
-> This exposes frequency table of driver to cpufreq core and is required for core
-> to guess what the index for a target frequency is, when it calls
-> cpufreq_frequency_table_target(). And so this driver needs to expose it.
+On Fri, 2013-09-13 at 14:53 +0530, Sachin Kamat wrote:
+> 'div_reg' is a pointer. Assign NULL instead of 0.
 > 
-> Cc: David S. Miller <davem@davemloft.net>
-> Cc: sparclinux at vger.kernel.org
-> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+> Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
+> Cc: Dinh Nguyen <dinguyen@altera.com>
+> ---
+>  drivers/clk/socfpga/clk.c |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/clk/socfpga/clk.c b/drivers/clk/socfpga/clk.c
+> index 5bb848c..454ddc1 100644
+> --- a/drivers/clk/socfpga/clk.c
+> +++ b/drivers/clk/socfpga/clk.c
+> @@ -292,7 +292,7 @@ static void __init socfpga_gate_clk_init(struct device_node *node,
+>  		socfpga_clk->shift = div_reg[1];
+>  		socfpga_clk->width = div_reg[2];
+>  	} else {
+> -		socfpga_clk->div_reg = 0;
+> +		socfpga_clk->div_reg = NULL;
+>  	}
+>  
+>  	of_property_read_string(node, "clock-output-names", &clk_name);
 
-Wait a second, later in this series you add the put_attr() call claiming
-it's a fix.
-
-But you're the one adding the "bug" here.
-
-So if you are going to add a get_attr() call you should be adding the
-necessary put_attr() call in the same patch.  Otherwise this patch
-introduces a bug.
+Acked-by: Dinh Nguyen <dinguyen@altera.com>
