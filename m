@@ -1,10 +1,10 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 13 Sep 2013 18:30:59 +0530
-Subject: [PATCH 113/228] cpufreq: pcc: don't initialize part of policy that is
- set by core too
+Date: Fri, 13 Sep 2013 18:31:00 +0530
+Subject: [PATCH 114/228] cpufreq: pmac: don't initialize part of policy that
+ is set by core too
 In-Reply-To: <cover.1379063063.git.viresh.kumar@linaro.org>
 References: <cover.1379063063.git.viresh.kumar@linaro.org>
-Message-ID: <980fc9e44953ea5b8d13284ae62a8f2c00130453.1379063063.git.viresh.kumar@linaro.org>
+Message-ID: <b9cbb0d716bc4c9ecbbd64546b8282975c869b28.1379063063.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -16,26 +16,33 @@ Most recent of those changes is to call ->get() in the core after calling
 
 Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- drivers/cpufreq/pcc-cpufreq.c | 7 -------
- 1 file changed, 7 deletions(-)
+ drivers/cpufreq/pmac32-cpufreq.c | 1 -
+ drivers/cpufreq/pmac64-cpufreq.c | 1 -
+ 2 files changed, 2 deletions(-)
 
-diff --git a/drivers/cpufreq/pcc-cpufreq.c b/drivers/cpufreq/pcc-cpufreq.c
-index 78787e9..ef66347 100644
---- a/drivers/cpufreq/pcc-cpufreq.c
-+++ b/drivers/cpufreq/pcc-cpufreq.c
-@@ -559,13 +559,6 @@ static int pcc_cpufreq_cpu_init(struct cpufreq_policy *policy)
- 		ioread32(&pcch_hdr->nominal) * 1000;
- 	policy->min = policy->cpuinfo.min_freq =
- 		ioread32(&pcch_hdr->minimum_frequency) * 1000;
--	policy->cur = pcc_get_freq(cpu);
--
--	if (!policy->cur) {
--		pr_debug("init: Unable to get current CPU frequency\n");
--		result = -EINVAL;
--		goto out;
--	}
+diff --git a/drivers/cpufreq/pmac32-cpufreq.c b/drivers/cpufreq/pmac32-cpufreq.c
+index 8715ab9..672b7f4 100644
+--- a/drivers/cpufreq/pmac32-cpufreq.c
++++ b/drivers/cpufreq/pmac32-cpufreq.c
+@@ -396,7 +396,6 @@ static int pmac_cpufreq_cpu_init(struct cpufreq_policy *policy)
+ 		return -ENODEV;
  
- 	pr_debug("init: policy->max is %d, policy->min is %d\n",
- 		policy->max, policy->min);
+ 	policy->cpuinfo.transition_latency	= transition_latency;
+-	policy->cur = cur_freq;
+ 
+ 	return cpufreq_table_validate_and_show(policy, pmac_cpu_freqs);
+ }
+diff --git a/drivers/cpufreq/pmac64-cpufreq.c b/drivers/cpufreq/pmac64-cpufreq.c
+index e853b85..79e40c9 100644
+--- a/drivers/cpufreq/pmac64-cpufreq.c
++++ b/drivers/cpufreq/pmac64-cpufreq.c
+@@ -348,7 +348,6 @@ static unsigned int g5_cpufreq_get_speed(unsigned int cpu)
+ static int g5_cpufreq_cpu_init(struct cpufreq_policy *policy)
+ {
+ 	policy->cpuinfo.transition_latency = transition_latency;
+-	policy->cur = g5_cpu_freqs[g5_query_freq()].frequency;
+ 	/* secondary CPUs are tied to the primary one by the
+ 	 * cpufreq core if in the secondary policy we tell it that
+ 	 * it actually must be one policy together with all others. */
 -- 
 1.7.12.rc2.18.g61b472e
