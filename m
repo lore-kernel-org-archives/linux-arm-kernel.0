@@ -1,66 +1,41 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 13 Sep 2013 17:19:17 +0200
-Subject: [PATCH v2 00/12] CPU idle for Armada XP
-In-Reply-To: <871u4shj6i.fsf@linaro.org>
-References: <1379066801-16276-1-git-send-email-gregory.clement@free-electrons.com>
- <20130913110043.GJ19363@lunn.ch> <5232F43D.4040404@free-electrons.com>
- <871u4shj6i.fsf@linaro.org>
-Message-ID: <52332CF5.8050404@linaro.org>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Fri, 13 Sep 2013 08:23:44 -0700
+Subject: [PATCH] drivers: cpuidle: rename ARM big.LITTLE driver config and
+ makefile entries
+In-Reply-To: <20130913140125.GA2062@e102568-lin.cambridge.arm.com> (Lorenzo
+ Pieralisi's message of "Fri, 13 Sep 2013 15:01:25 +0100")
+References: <1379071966-26757-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <5232FCD4.2070802@free-electrons.com>
+ <20130913140125.GA2062@e102568-lin.cambridge.arm.com>
+Message-ID: <87ppscg2yn.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/13/2013 04:48 PM, Kevin Hilman wrote:
-> Gregory CLEMENT <gregory.clement@free-electrons.com> writes:
-> 
->> On 13/09/2013 13:00, Andrew Lunn wrote:
->>>
->>> On Fri, Sep 13, 2013 at 12:06:29PM +0200, Gregory CLEMENT wrote:
->>>> Hello,
->>>>
->>>> This patch set adds the CPU idle support for Armada XP and prepares
->>>> the support for Armada 370. This was based on the work of Nadav
->>>> Haklai.
->>>
->>> Hi Gregory.
->>>
->>> Kirkwood has the ability to put the DDR into self refresh mode, which
->>> is used as part of the second level idle mode. Does 370/XP have this?
->>
->> Indeed there is a self refresh bit on a DDR related register. I thought
->> this kind of feature is more likely used for suspend to ram.
->>
->> We plan to also submit the suspend to ram but not immediately.
->>
->>>
->>> For XP, with it being SMP, it would be a bit more complex, since you
->>> would not want to use it unless all CPUs were idle.
->>
->> I wonder how the others SMP ARM SoCs deal with it, I hope this time
->> there will be a framework available and we won't have to create it! ;)
-> 
-> You shouldn't have to invent anything here.
-> 
-> For low-power states that require all CPUs to be idle, we have "coupled"
-> CPUidle states (c.f. drivers/cpuidle/coupled.)  OMAP and Tegra are using
-> this, but I believe Daniel wants to move away from this, so I'll let him
-> elaborate.
+Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> writes:
 
-Yes, I would not recommend to use the "coupled" idle states unless you
-have a good reason to do that (eg. only CPU0 can do set the PMU).
+> On Fri, Sep 13, 2013 at 12:53:56PM +0100, Gregory CLEMENT wrote:
+>> Hi Lorenzo,
+>> 
+>> On 13/09/2013 13:32, Lorenzo Pieralisi wrote:
+>> > Following the reorganization of CPU idle drivers configurations into an ARM
+>> > specific Kconfig, the existing idle drivers Kconfig entries were renamed and
+>> > moved to the Kconfig.arm file. Makefile entries were updated accordingly.
+>> > 
+>> > This patch renames the entries in Kconfig.arm and makefile to make the newly
+>> > added big.LITTLE CPUidle driver compliant with the new naming convention.
+>> 
+>> Do you also consider to reorder the entries in alphabetic order?
+>> It should help to reduce the merge conflict.
+>
+> Sure, here it is, thanks for pointing that out.
 
-If the board provides enough mechanisms with the PMSU, there is an
-alternate, lockless, sync algorithm, which can be reused, in the ux500's
-cpuidle driver (c.f. drivers/cpuidle/cpuidle-ux500.c).
+FYI, updated patches deep inside threads are very likely to be missed.
+I saw this because I was looking for it, but would've easily been
+missed.
 
-Otherwise, I recommend to have a look at MCPM (c.f
-drivers/cpuidle/cpuidle-big_little.c).
+Could you resend a v2 with my ack so Daniel can pick up and get it
+merged for v3.12-rc?  Thanks
 
-  -- Daniel
+Acked-by: Kevin Hilman <khilman@linaro.org>
 
-
--- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Kevin
