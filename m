@@ -1,119 +1,48 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 13 Sep 2013 15:51:56 -0500
-Subject: [PATCH 1/2] Documentation: devicetree: arm: cpus/cpu nodes
- bindings updates
-In-Reply-To: <20130913165708.GC5408@e102568-lin.cambridge.arm.com>
-References: <1376559743-31848-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1376559743-31848-2-git-send-email-lorenzo.pieralisi@arm.com>
- <520CE665.8060907@gmail.com>
- <20130815152238.GF17839@e102568-lin.cambridge.arm.com>
- <20130913165708.GC5408@e102568-lin.cambridge.arm.com>
-Message-ID: <52337AEC.9080302@gmail.com>
+From: Robin.Getz@analog.com (Getz, Robin)
+Date: Fri, 13 Sep 2013 20:57:51 +0000
+Subject: [PATCH 27/38] iio: pressure-core: st: Give some indication if
+ device probing was successful
+In-Reply-To: <20130911072955.GG11227@lee--X1>
+References: <1378817379-8238-1-git-send-email-lee.jones@linaro.org>
+ <1378817379-8238-28-git-send-email-lee.jones@linaro.org>
+ <43055af7-991f-4122-b308-a3dcddbbb72a@email.android.com>
+ <20130911071053.GD11227@lee--X1> <52301963.5030006@metafoo.de>
+ <20130911072955.GG11227@lee--X1>
+Message-ID: <FEAE1C531EE4684EBDD22603EC8BE59931CAB11B@NWD2MBX7.ad.analog.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/13/2013 11:57 AM, Lorenzo Pieralisi wrote:
-> Hi Rob, all,
+On Wednesday, September 11, 2013 3:30 AM Lee Jones wrote:
+> On Wed, 11 Sep 2013, Lars-Peter Clausen wrote:
+> > On 09/11/2013 09:10 AM, Lee Jones wrote:
+> > >On Tue, 10 Sep 2013, Jonathan Cameron wrote:
+> > >>Lee Jones <lee.jones@linaro.org> wrote:
+> > Silence means everything is good, a message means there is an error.
+> > If every device that gets probed would spit out a message the log
+> > would be scrolling forever and you wouldn't be able to see the error
+> > messages.
 > 
-> On Thu, Aug 15, 2013 at 04:22:38PM +0100, Lorenzo Pieralisi wrote:
->> [adding Andrew, Gregory and Thomas to check the Marvell compatible names]
->>
->> On Thu, Aug 15, 2013 at 03:32:05PM +0100, Rob Herring wrote:
->>> On 08/15/2013 04:42 AM, Lorenzo Pieralisi wrote:
->>>> In order to extend the current cpu nodes bindings to newer CPUs
->>>> inclusive of AArch64 and to update support for older ARM CPUs this
->>>> patch updates device tree documentation for the cpu nodes bindings.
->>>>
->>>> Main changes:
->>>>     - adds 64-bit bindings
->>>>     - define usage of #address-cells
->>>>     - defines behaviour on pre and post v7 uniprocessor systems
->>>>     - adds ARM 11MPcore specific reg property definition
->>>>
->>>> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
->>>> ---
->>>>  Documentation/devicetree/bindings/arm/cpus.txt | 424 ++++++++++++++++++++++---
->>>>  1 file changed, 377 insertions(+), 47 deletions(-)
->>>>
->>>
->>> The binding looks mostly fine to me.
-> 
-> These bindings have still not received an ACK, and need review by
-> Marvell guys in copy for the new compatible strings below.
+> Only if you print out every regulator, clock, GPIO pin and things of this nature.
+> Key hardware blocks such as; SD, Flash, USB, Eth, HDMI, Audio, UART, GPIO and
+> I2C controllers and Sensors I think deserve a one line "I'm here and working"
+> message.
 
-If you can't get comment, then leave them out if they are not used
-already. If they are used, then tough shit when they want to change.
+In many embedded systems -- there are lots and lots of IIO devices, and I'm not sure 
+I would consider very many "key". It really depends on the board.
 
-> 
-> Most importantly, we need to make a decision on the pre v7 uniprocessor
-> systems, where MPIDR/CPUID are non-existent and the reg property is a
-> pure SW enumeration. Current bindings (ie this patch) define
-> 
-> #address-cells = <0>;
-> 
-> for those processors (and there are a number of dts in the kernel with that
-> set-up); Grant and Benjamin had a strong feeling against this choice, I
-> have to make a decision on how to proceed, please let me know.
+To me it's a matter of boot time. Even memcpy to msgbuf takes time.
+Sometimes unnecessary time.
 
-I agree that we should define #address-cells to 1 and reg will be simply
-0,1,2,etc. in this case.
+> I'll not fight this for too long. This is based my experience as a user. I tried to
+> look at the bootlog for the sensors I'd just enabled and there was nothing. Some
+> of them had probed, some hadn't and there was no clear way to distinguish
+> between them without digging into sysfs.
 
-This change and fixing the example as I pointed out are what I was
-waiting to see.
+echo "working:"
+cat /sys/bus/iio/devices/*/name
 
-Rob
+isn't too much digging. If you really want to do that on your machine - do so in rc.local
 
-> 
-> Comments welcome.
-> 
-> Lorenzo
-> 
->>>
->>> [snip]
->>>
->>>> +			    "faraday,fa526"
->>>> +			    "intel,sa110"
->>>> +			    "intel,sa1100"
->>>> +			    "marvell,feroceon"
->>>> +			    "marvell,mohawk"
->>>> +			    "marvell,pj4"
->>>> +			    "marvell,sheeva-v7"
->>>> +			    "marvell,xsc3"
->>>> +			    "marvell,xscale"
->>>
->>> Better make sure the Marvell folks are happy with these. We don't need
->>> another rename here. I'm too annoyed with all the renames to pay attention.
->>
->> Ok, I will verify that, I copied maintainers in.
->>
->> On a side note I have just noticed that last cycle some dts were merged in the
->> kernel with cpu nodes that are not compliant (not picking on anyone,
->> eg am4372.dtsi).
->> Please prevent this from happening from now onwards, really please.
->>
->>>> +
->>>> +Example 4 (ARM Cortex-A57 64-bit system running OS in AArch64):
->>>> +
->>>
->>> Going back to my comments that the dtb can't be dependent on the OS,
->>> these 2 examples don't make sense.
->>
->> Gah, my bad sorry, I missed the examples while removing dependency on the OS
->> from the bindings.
->>
->>>> +
->>>> +Example 5 (ARM Cortex-A57 64-bit system running OS in AArch32):
->>>
->>> This example should be removed.
->>
->> Yes, consider it done, see above.
->>
->> Thanks,
->> Lorenzo
->>
->> --
->> To unsubscribe from this list: send the line "unsubscribe devicetree" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->>
-> 
+for many other subsystems, it's just not that easy, and printing from the driver is necessary.
+
+-Robin
