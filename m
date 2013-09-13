@@ -1,10 +1,10 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 13 Sep 2013 18:31:08 +0530
-Subject: [PATCH 122/228] cpufreq: sh: don't initialize part of policy that is
- set by core too
+Date: Fri, 13 Sep 2013 18:31:09 +0530
+Subject: [PATCH 123/228] cpufreq: spear: don't initialize part of policy that
+ is set by core too
 In-Reply-To: <cover.1379063063.git.viresh.kumar@linaro.org>
 References: <cover.1379063063.git.viresh.kumar@linaro.org>
-Message-ID: <b7aefeb7f7e756d9608039d58a11ab907096e6e6.1379063063.git.viresh.kumar@linaro.org>
+Message-ID: <4f06a09472f9a4a37dd34ff5c81a12e56121dd11.1379063063.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,25 +14,24 @@ this driver doesn't need to do it. This patch removes such code.
 Most recent of those changes is to call ->get() in the core after calling
 ->init().
 
-Cc: Paul Mundt <lethal@linux-sh.org>
-Cc: linux-sh at vger.kernel.org
+Cc: spear-devel at list.st.com
 Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- drivers/cpufreq/sh-cpufreq.c | 2 --
+ drivers/cpufreq/spear-cpufreq.c | 2 --
  1 file changed, 2 deletions(-)
 
-diff --git a/drivers/cpufreq/sh-cpufreq.c b/drivers/cpufreq/sh-cpufreq.c
-index c681b86..387af12 100644
---- a/drivers/cpufreq/sh-cpufreq.c
-+++ b/drivers/cpufreq/sh-cpufreq.c
-@@ -111,8 +111,6 @@ static int sh_cpufreq_cpu_init(struct cpufreq_policy *policy)
- 		return PTR_ERR(cpuclk);
+diff --git a/drivers/cpufreq/spear-cpufreq.c b/drivers/cpufreq/spear-cpufreq.c
+index e9657e3..aacdb61 100644
+--- a/drivers/cpufreq/spear-cpufreq.c
++++ b/drivers/cpufreq/spear-cpufreq.c
+@@ -180,8 +180,6 @@ static int spear_cpufreq_init(struct cpufreq_policy *policy)
  	}
  
--	policy->cur = sh_cpufreq_get(cpu);
+ 	policy->cpuinfo.transition_latency = spear_cpufreq.transition_latency;
+-	policy->cur = spear_cpufreq_get(0);
 -
- 	freq_table = cpuclk->nr_freqs ? cpuclk->freq_table : NULL;
- 	if (freq_table) {
- 		int result;
+ 	cpumask_setall(policy->cpus);
+ 
+ 	return 0;
 -- 
 1.7.12.rc2.18.g61b472e
