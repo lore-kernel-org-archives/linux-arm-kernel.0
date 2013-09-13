@@ -1,60 +1,40 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 12 Sep 2013 16:04:51 +0100
-Subject: [PATCH v5 11/13] xen: introduce xen_alloc/free_coherent_pages
-In-Reply-To: <alpine.DEB.2.02.1309121541290.32236@kaball.uk.xensource.com>
-References: <20130906155928.GH1946@arm.com>
- <alpine.DEB.2.02.1309061706480.6397@kaball.uk.xensource.com>
- <20130906162018.GJ1946@arm.com>
- <alpine.DEB.2.02.1309061740050.6397@kaball.uk.xensource.com>
- <8492887B-2509-42B5-A5F9-A711C519D912@arm.com>
- <alpine.DEB.2.02.1309091732230.6397@kaball.uk.xensource.com>
- <20130911093646.GA26777@darko.cambridge.arm.com>
- <alpine.DEB.2.02.1309111825210.32236@kaball.uk.xensource.com>
- <20130912135347.GA23425@darko.cambridge.arm.com>
- <alpine.DEB.2.02.1309121541290.32236@kaball.uk.xensource.com>
-Message-ID: <20130912150451.GA25905@darko.cambridge.arm.com>
+From: shijie8@gmail.com (Huang Shijie)
+Date: Thu, 12 Sep 2013 23:14:47 -0400
+Subject: [PATCH v3 0/8] Add the Quadspi driver for vf610-twr
+In-Reply-To: <1378994596.2627.449.camel@shinybook.infradead.org>
+References: <52304BFF.4060007@freescale.com>
+ <20130911113002.GP29403@sirena.org.uk>
+ <523186DF.4070203@freescale.com>
+ <1378982395.2627.416.camel@shinybook.infradead.org>
+ <20980858CB6D3A4BAE95CA194937D5E73EA0EE8B@DBDE04.ent.ti.com>
+ <1378984665.2627.423.camel@shinybook.infradead.org>
+ <20130912114831.GL29403@sirena.org.uk>
+ <1378987323.2627.429.camel@shinybook.infradead.org>
+ <20130912134345.GQ29403@sirena.org.uk>
+ <1378994596.2627.449.camel@shinybook.infradead.org>
+Message-ID: <20130913031444.GB3051@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 12, 2013 at 03:44:50PM +0100, Stefano Stabellini wrote:
-> On Thu, 12 Sep 2013, Catalin Marinas wrote:
-> > On Wed, Sep 11, 2013 at 06:34:17PM +0100, Stefano Stabellini wrote:
-> > > On Wed, 11 Sep 2013, Catalin Marinas wrote:
-> > > >  static inline void set_dma_ops(struct device *dev, struct dma_map_ops *ops)
-> > > >  {
-> > > >  	BUG_ON(!dev);
-> > > > @@ -32,7 +39,7 @@ static inline void set_dma_ops(struct device *dev, struct dma_map_ops *ops)
-> > > >  
-> > > >  static inline int dma_set_mask(struct device *dev, u64 mask)
-> > > >  {
-> > > > -	return get_dma_ops(dev)->set_dma_mask(dev, mask);
-> > > > +	return __get_dma_ops(dev)->set_dma_mask(dev, mask);
-> > > >  }
-> > > >  
-> > > >  #ifdef __arch_page_to_dma
-> > > 
-> > > I don't understand the reason for this change though: shouldn't
-> > > set_dma_mask go via the "default" (whatever that is), like the others?
+On Thu, Sep 12, 2013 at 03:03:16PM +0100, David Woodhouse wrote:
+> On Thu, 2013-09-12 at 14:43 +0100, Mark Brown wrote:
 > > 
-> > Under Xen, this would mean xen_dma_ops->set_dma_mask(). I thought you
-> > want to set the default dma address.
-> > 
-> > I can see why you may want set_dma_mask() for xen_dma_ops but in also
-> > needs to be passed to __get_dma_ops(dev)->set_dma_ops() otherwise the
-> > actual dma_alloc_attrs() will miss the mask (and on arm64 it does
-> > bouncing via swiotlb).
->  
-> xen_dma_ops->set_dma_mask() is implemented by
-> drivers/xen/swiotlb-xen.c:xen_swiotlb_set_dma_mask (provided by this
-> patch series). The function takes care of setting:
 > 
-> *dev->dma_mask = dma_mask;
-> 
-> I think that should be enough to make dma_alloc_attrs happy.
+> So to go back to your question: the commands that it "knows" we are
+> going to send are indeed specific to (one particular type of) SPI NOR
+> flash. But there's nothing on the MTD side which justifies that
+> assumption. Even if you use a different type of SPI NOR flash which uses
+> different opcodes for its commands, this broken scheme will fall over.
 
-I think it would be safer to call __get_dma_ops()->set_dma_mask() in
-case the driver overrides that and does more than dev->dma_mask setting.
-I don't know whether this is the case though.
+Beside the quad-read/ddr-quad-read commands, all the commands needed by
+this driver is common. If we do not enable the quad-read, this driver
+can works with the fast-read mode.
 
--- 
-Catalin
+If we use a different NOR which uses different opcodes
+(different quad-read opcodes ?), i should add a small patch to fix it. 
+
+
+I think i should follow Mark's advice to split out the quad-read code.
+
+thanks
+Huang Shijie
