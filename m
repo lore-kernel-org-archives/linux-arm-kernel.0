@@ -1,94 +1,126 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 13 Sep 2013 08:49:06 -0700
-Subject: [PATCH] memory: add a basic OF-based memory driver
-In-Reply-To: <CAL_JsqJACEtSRaDg0TcYODzhpsHFGa4mFSYa_R3qspypEKH+hQ@mail.gmail.com>
-References: <1378863781-4235-1-git-send-email-emilio@elopez.com.ar>
- <1379032225-6425-1-git-send-email-emilio@elopez.com.ar>
- <CAOesGMiUMniKRLRgGPsimR0bXWQFbx+SL5dUJXOb8t0JfEcHsg@mail.gmail.com>
- <52326ADC.8040703@elopez.com.ar>
- <CAL_JsqJACEtSRaDg0TcYODzhpsHFGa4mFSYa_R3qspypEKH+hQ@mail.gmail.com>
-Message-ID: <CAOesGMj=b5c_1v-nAejUzuOMfx44AHr2=yfoPepHYsh0=t0wOQ@mail.gmail.com>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Fri, 13 Sep 2013 17:53:31 +0200
+Subject: dev->of_node overwrite can cause device loading with different driver
+Message-ID: <20130913155331.GC14456@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 13, 2013 at 7:00 AM, Rob Herring <robherring2@gmail.com> wrote:
-> On Thu, Sep 12, 2013 at 8:31 PM, Emilio L?pez <emilio@elopez.com.ar> wrote:
->> Hi Olof,
->>
->> El 12/09/13 21:57, Olof Johansson escribi?:
->>
->>> On Thu, Sep 12, 2013 at 5:30 PM, Emilio L?pez <emilio@elopez.com.ar>
->>> wrote:
->>>>
->>>> This driver's only job is to claim and ensure the necessary clock
->>>> for memory operation on a DT-powered machine remains enabled.
->>>>
->>>> Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
->>>> ---
->>>>
->>>> I believe this new patch should resolve all the concerns raised; as
->>>> always, all feedback is welcome :)
->>>
->>>
->>> I think you're going about this the wrong way.
->>>
->>> If you have a problem with a clock not staying on, shouldn't you just
->>> marking it appropriately in the clock table instead, making sure it's
->>> initialized with at least one reference to it?
->>
->>
->> If by "the clock table" you mean the tree as handled by the common clock
->> framework, there is no such flag available as of today; see Mike's reply for
->> more information.
->>
->> Personally I feel that if the general case can solve our problems (in this
->> case, having a consumer who prepares and enables the clock), we should avoid
->> adding special cases to the framework.
->>
->>
->>> I believe that is how
->>> some of the other platforms handle this, and it's a lot cleaner than
->>> adding a fake binding and a fake driver just to grab a single clock.
->>
->>
->> The binding doesn't have to be fake; it is actually describing the memory
->> controller hardware:
->>
->> mc: mc at 0123000 {
->>         compatible = "simple-memory-controller";
->>         reg = <0x0123000 0x400>;
->>         clocks = <&pll5 1>;
->> };
->>
->> If one day we get docs and/or have any special features we may need from the
->> controller, we can use something like
->>
->> mc: mc at 0123000 {
->>         compatible = "vendor,awesome-mc", "simple-memory-controller";
->>         reg = <0x0123000 0x400>;
->>         clocks = <&pll5 1>;
->> };
->
-> Better, but this is still wrong. DT describes the hardware. There is
-> no such h/w as a simple-memory-controller. The fact that you have a
-> simple-memory-ctrlr kernel driver is a kernel
-> feature/artifact/limitation. Describe the h/w with a meaningful
-> compatible string and put that string in the simple memory controller
-> driver match table. If someday we have a real driver for said memory
-> controller, then it is only a kernel change to use a different driver.
+Hi,
 
+I ran into a serious problem with overwriting device of_node property as
+it is done in many drivers for ARM. If probing fails in such a
+situation, the device could be loaded with a different driver.
 
-We discussed this over IRC last night -- I still think it makes more
-sense to make the clock driver for sunxi aware of this and just add a
-reference to the clock at init time.
+This is an example situation, based on balbi's tag usb-for-v3.12:
 
-This is never going to differ from board to board (today the clock
-name is the same on all sunxi platforms -- pll5_ddr. And the need will
-likewise be there for all platforms at this time.
+========================================================================
+File drivers/usb/musb/musb_dsps.c:
 
-If and when it changes in the future, we can reevaluate. But this
-doesn't have to be driven by device tree at this time, it seems to
-just make things overly complicated and contrived.
+static int dsps_musb_init(struct musb *musb)
+{
+...
+	musb->xceiv = devm_usb_get_phy_by_phandle(dev, "phys", 0);
+	if (IS_ERR(musb->xceiv))
+		return PTR_ERR(musb->xceiv); <-- This can return -EPROBE_DEFER
+...
+}
+...
+static int dsps_create_musb_pdev(struct dsps_glue *glue,
+		struct platform_device *parent)
+{
+...
+	/* allocate the child platform device */
+	musb = platform_device_alloc("musb-hdrc", PLATFORM_DEVID_AUTO);
+	if (!musb) {
+		dev_err(dev, "failed to allocate musb device\n");
+		return -ENOMEM;
+	}
 
+	musb->dev.parent		= dev;
+	musb->dev.dma_mask		= &musb_dmamask;
+	musb->dev.coherent_dma_mask	= musb_dmamask;
+	musb->dev.of_node		= of_node_get(dn); <-- Overwrites the device of_node
+...
+	ret = platform_device_add(musb);
+...
+}
+static int dsps_probe(struct platform_device *pdev)
+{
+...
+	ret = dsps_create_musb_pdev(glue, pdev);
+...
+}
 
--Olof
+========================================================================
+File drivers/usb/musb/musb_core.c:
+
+static int
+musb_init_controller(struct device *dev, int nIrq, void __iomem *ctrl)
+{
+...
+	status = musb_platform_init(musb); <-- This calls dsps_musb_init
+	if (status < 0)
+		goto fail1;
+...
+	return status;
+
+}
+static int musb_probe(struct platform_device *pdev)
+{
+...
+	return musb_init_controller(dev, irq, base);
+}
+
+========================================================================
+
+musb_dsps is a glue driver that creates a core device in the probe
+function and assigns it's own of_node to the new device.
+Starting@the platform_device_add call, this is the function call
+tree:
+
+platform_device_add()
+
+...
+
+device_attach() in drivers/base/dd.c, which iterates through a list of
+drivers, calls __device_attach() on each of them. The list contains both
+drivers, musb_dsps and musb_core. This is where this example splits into
+two cases:
+
+1. We find the first matching driver, musb_dsps:
+
+        __device_attach()
+          platform_match() /* for the musb_core, detecting a match. */
+          driver_probe_device()
+            really_probe()
+              musb_probe() is called, which returns -EPROBE_DEFER
+
+            /* really_probe drops the return value and makes some cleanups */
+
+2. The error code does not reach the driver list iteration loop. It
+is not supposed to do so because the drivercore tries to find another
+matching driver. Now it tries the musb_dsps driver:
+
+        __device_attach()
+          platform_match()
+            /* succeeds again, because the device has the
+	       of_node from its parent which claims that this
+	       is a musb_dsps device. */
+          driver_probe_device()
+            really_probe()
+              dsps_probe() ... /* from here on it starts from the beginning. */
+
+This recursion continued until the kernel had no memory left. This is a
+special situation but there are many drivers that overwrite the of_node
+property in their probe function. So they can actually match with a
+different driver on the second or third probe attempt.
+
+Regards,
+
+Markus Pargmann
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
