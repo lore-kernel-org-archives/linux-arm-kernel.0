@@ -1,10 +1,10 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 13 Sep 2013 18:32:31 +0530
-Subject: [PATCH 205/228] cpufreq: s5pv210: remove calls to
+Date: Fri, 13 Sep 2013 18:32:35 +0530
+Subject: [PATCH 209/228] cpufreq: SPEAr: remove calls to
  cpufreq_notify_transition()
 In-Reply-To: <cover.1379063063.git.viresh.kumar@linaro.org>
 References: <cover.1379063063.git.viresh.kumar@linaro.org>
-Message-ID: <3542c13d2492d421cf6b157246fe7e16182ed71f.1379063063.git.viresh.kumar@linaro.org>
+Message-ID: <b534df7a33f95a347fb064f41ae3080b2d400933.1379063063.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -28,76 +28,53 @@ frequency change, this one removes it from this driver.
 
 Some related minor cleanups are also done along with it.
 
-Cc: Kukjin Kim <kgene.kim@samsung.com>
+Cc: spear-devel at list.st.com
 Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- drivers/cpufreq/s5pv210-cpufreq.c | 16 ++++++----------
- 1 file changed, 6 insertions(+), 10 deletions(-)
+ drivers/cpufreq/spear-cpufreq.c | 13 +------------
+ 1 file changed, 1 insertion(+), 12 deletions(-)
 
-diff --git a/drivers/cpufreq/s5pv210-cpufreq.c b/drivers/cpufreq/s5pv210-cpufreq.c
-index 5978b94..e3973da 100644
---- a/drivers/cpufreq/s5pv210-cpufreq.c
-+++ b/drivers/cpufreq/s5pv210-cpufreq.c
-@@ -26,7 +26,6 @@
- static struct clk *cpu_clk;
- static struct clk *dmc0_clk;
- static struct clk *dmc1_clk;
--static struct cpufreq_freqs freqs;
- static DEFINE_MUTEX(set_freq_lock);
+diff --git a/drivers/cpufreq/spear-cpufreq.c b/drivers/cpufreq/spear-cpufreq.c
+index 0326040..658cfe7 100644
+--- a/drivers/cpufreq/spear-cpufreq.c
++++ b/drivers/cpufreq/spear-cpufreq.c
+@@ -107,12 +107,10 @@ static int spear1340_set_cpu_rate(struct clk *sys_pclk, unsigned long newfreq)
+ static int spear_cpufreq_target(struct cpufreq_policy *policy,
+ 		unsigned int index)
+ {
+-	struct cpufreq_freqs freqs;
+ 	unsigned long newfreq;
+ 	struct clk *srcclk;
+ 	int ret, mult = 1;
  
- /* APLL M,P,S values for 1G/800Mhz */
-@@ -179,6 +178,7 @@ static int s5pv210_target(struct cpufreq_policy *policy, unsigned int index)
- 	unsigned int priv_index;
- 	unsigned int pll_changing = 0;
- 	unsigned int bus_speed_changing = 0;
-+	unsigned int old_freq, new_freq;
- 	int arm_volt, int_volt;
- 	int ret = 0;
+-	freqs.old = spear_cpufreq_get(0);
+ 	newfreq = spear_cpufreq.freq_tbl[index].frequency * 1000;
  
-@@ -193,12 +193,12 @@ static int s5pv210_target(struct cpufreq_policy *policy, unsigned int index)
- 		goto exit;
+ 	if (of_machine_is_compatible("st,spear1340")) {
+@@ -145,23 +143,14 @@ static int spear_cpufreq_target(struct cpufreq_policy *policy,
+ 		return newfreq;
  	}
  
--	freqs.old = s5pv210_getspeed(0);
--	freqs.new = s5pv210_freq_table[index].frequency;
-+	old_freq = s5pv210_getspeed(0);
-+	new_freq = s5pv210_freq_table[index].frequency;
- 
- 	/* Finding current running level index */
- 	if (cpufreq_frequency_table_target(policy, s5pv210_freq_table,
--					   freqs.old, CPUFREQ_RELATION_H,
-+					   old_freq, CPUFREQ_RELATION_H,
- 					   &priv_index)) {
- 		ret = -EINVAL;
- 		goto exit;
-@@ -207,7 +207,7 @@ static int s5pv210_target(struct cpufreq_policy *policy, unsigned int index)
- 	arm_volt = dvs_conf[index].arm_volt;
- 	int_volt = dvs_conf[index].int_volt;
- 
--	if (freqs.new > freqs.old) {
-+	if (new_freq > old_freq) {
- 		ret = regulator_set_voltage(arm_regulator,
- 				arm_volt, arm_volt_max);
- 		if (ret)
-@@ -219,8 +219,6 @@ static int s5pv210_target(struct cpufreq_policy *policy, unsigned int index)
- 			goto exit;
- 	}
- 
+-	freqs.new = newfreq / 1000;
+-	freqs.new /= mult;
+-
 -	cpufreq_notify_transition(policy, &freqs, CPUFREQ_PRECHANGE);
 -
- 	/* Check if there need to change PLL */
- 	if ((index == L0) || (priv_index == L0))
- 		pll_changing = 1;
-@@ -431,9 +429,7 @@ static int s5pv210_target(struct cpufreq_policy *policy, unsigned int index)
- 		}
- 	}
+ 	if (mult == 2)
+ 		ret = spear1340_set_cpu_rate(srcclk, newfreq);
+ 	else
+ 		ret = clk_set_rate(spear_cpufreq.clk, newfreq);
+ 
+-	/* Get current rate after clk_set_rate, in case of failure */
+-	if (ret) {
++	if (ret)
+ 		pr_err("CPU Freq: cpu clk_set_rate failed: %d\n", ret);
+-		freqs.new = clk_get_rate(spear_cpufreq.clk) / 1000;
+-	}
  
 -	cpufreq_notify_transition(policy, &freqs, CPUFREQ_POSTCHANGE);
--
--	if (freqs.new < freqs.old) {
-+	if (new_freq < old_freq) {
- 		regulator_set_voltage(int_regulator,
- 				int_volt, int_volt_max);
+ 	return ret;
+ }
  
 -- 
 1.7.12.rc2.18.g61b472e
