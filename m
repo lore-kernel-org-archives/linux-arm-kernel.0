@@ -1,54 +1,49 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 13 Sep 2013 20:45:51 +0800
-Subject: [PATCH v4 2/3] ARM: imx6q: Add PCIe bits to GPR syscon definition
-In-Reply-To: <1379065222-7275-3-git-send-email-xobs@kosagi.com>
-References: <1379065222-7275-1-git-send-email-xobs@kosagi.com>
- <1379065222-7275-3-git-send-email-xobs@kosagi.com>
-Message-ID: <20130913124549.GD31147@S2101-09.ap.freescale.net>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 13 Sep 2013 13:46:59 +0100
+Subject: [PATCH] arm64: KVM: Increase max VCPUs per-Guest to 8
+In-Reply-To: <1378904552-29347-1-git-send-email-anup.patel@linaro.org>
+References: <1378904552-29347-1-git-send-email-anup.patel@linaro.org>
+Message-ID: <52330943.4090309@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 13, 2013 at 09:40:21AM +0000, Sean Cross wrote:
-> PCIe requires additional bits be defined for GPR8 and GPR12.
+On 11/09/13 14:02, Anup Patel wrote:
+> Current max VCPUs per-Guest is set to 4 which is preventing
+> us from creating a Guest (or VM) with 8 VCPUs on Host (e.g.
+> X-Gene Storm SOC) with 8 Host CPUs.
 > 
-> Signed-off-by: Sean Cross <xobs@kosagi.com>
+> The correct value of max VCPUs per-Guest should be same as
+> the max CPUs supported by GICv2 which is 8 hence this patch
+> increases KVM_MAX_VCPUS to 8.
+
+If anything, please make it configurable just like we have on 32bit. No
+reason to impose the extra overhead on everyone.
+
+Thanks,
+
+	M.
+
+> Signed-off-by: Anup Patel <anup.patel@linaro.org>
+> Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
 > ---
->  include/linux/mfd/syscon/imx6q-iomuxc-gpr.h |    8 ++++++++
->  1 file changed, 8 insertions(+)
+>  arch/arm64/include/asm/kvm_host.h |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> diff --git a/include/linux/mfd/syscon/imx6q-iomuxc-gpr.h b/include/linux/mfd/syscon/imx6q-iomuxc-gpr.h
-> index b6bdcd6..1bf1fe9 100644
-> --- a/include/linux/mfd/syscon/imx6q-iomuxc-gpr.h
-> +++ b/include/linux/mfd/syscon/imx6q-iomuxc-gpr.h
-> @@ -241,6 +241,12 @@
+> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+> index 0859a4d..60ef29e 100644
+> --- a/arch/arm64/include/asm/kvm_host.h
+> +++ b/arch/arm64/include/asm/kvm_host.h
+> @@ -26,7 +26,7 @@
+>  #include <asm/kvm_asm.h>
+>  #include <asm/kvm_mmio.h>
 >  
->  #define IMX6Q_GPR5_L2_CLK_STOP			BIT(8)
->  
-> +#define IMX6Q_GPR8_TX_DEEMPH_GEN1		(0x3F << 0)
-> +#define IMX6Q_GPR8_TX_DEEMPH_GEN2_3P5DB		(0x3F << 6)
-> +#define IMX6Q_GPR8_TX_DEEMPH_GEN2_6DB		(0x3F << 12)
-> +#define IMX6Q_GPR8_TX_SWING_FULL		(0x7F << 18)
-> +#define IMX6Q_GPR8_TX_SWING_LOW			(0x7F << 25)
-> +
-
-Can you please follow the existing pattern to define the bits from the
-MSB to LSB, and use lowercase for hex values?
-
-Shawn
-
->  #define IMX6Q_GPR9_TZASC2_BYP			BIT(1)
->  #define IMX6Q_GPR9_TZASC1_BYP			BIT(0)
->  
-> @@ -273,7 +279,9 @@
->  #define IMX6Q_GPR12_ARMP_AHB_CLK_EN		BIT(26)
->  #define IMX6Q_GPR12_ARMP_ATB_CLK_EN		BIT(25)
->  #define IMX6Q_GPR12_ARMP_APB_CLK_EN		BIT(24)
-> +#define IMX6Q_GPR12_DEVICE_TYPE			(0xF << 12)
->  #define IMX6Q_GPR12_PCIE_CTL_2			BIT(10)
-> +#define IMX6Q_GPR12_LOS_LEVEL			(0x1F << 4)
->  
->  #define IMX6Q_GPR13_SDMA_STOP_REQ		BIT(30)
->  #define IMX6Q_GPR13_CAN2_STOP_REQ		BIT(29)
-> -- 
-> 1.7.9.5
+> -#define KVM_MAX_VCPUS 4
+> +#define KVM_MAX_VCPUS 8
+>  #define KVM_USER_MEM_SLOTS 32
+>  #define KVM_PRIVATE_MEM_SLOTS 4
+>  #define KVM_COALESCED_MMIO_PAGE_OFFSET 1
 > 
+
+
+-- 
+Jazz is not dead. It just smells funny...
