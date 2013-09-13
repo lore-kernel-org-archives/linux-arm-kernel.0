@@ -1,46 +1,35 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri, 13 Sep 2013 12:32:46 +0100
-Subject: [PATCH] drivers: cpuidle: rename ARM big.LITTLE driver config and
- makefile entries
-Message-ID: <1379071966-26757-1-git-send-email-lorenzo.pieralisi@arm.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Fri, 13 Sep 2013 13:38:10 +0200
+Subject: [PATCH v2 00/12] CPU idle for Armada XP
+In-Reply-To: <5232F43D.4040404@free-electrons.com>
+References: <1379066801-16276-1-git-send-email-gregory.clement@free-electrons.com>
+ <20130913110043.GJ19363@lunn.ch>
+ <5232F43D.4040404@free-electrons.com>
+Message-ID: <20130913113810.GK19363@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Following the reorganization of CPU idle drivers configurations into an ARM
-specific Kconfig, the existing idle drivers Kconfig entries were renamed and
-moved to the Kconfig.arm file. Makefile entries were updated accordingly.
+On Fri, Sep 13, 2013 at 01:17:17PM +0200, Gregory CLEMENT wrote:
+> On 13/09/2013 13:00, Andrew Lunn wrote:
+> > 
+> > On Fri, Sep 13, 2013 at 12:06:29PM +0200, Gregory CLEMENT wrote:
+> >> Hello,
+> >>
+> >> This patch set adds the CPU idle support for Armada XP and prepares
+> >> the support for Armada 370. This was based on the work of Nadav
+> >> Haklai.
+> > 
+> > Hi Gregory.
+> > 
+> > Kirkwood has the ability to put the DDR into self refresh mode, which
+> > is used as part of the second level idle mode. Does 370/XP have this?
+> 
+> Indeed there is a self refresh bit on a DDR related register. I thought
+> this kind of feature is more likely used for suspend to ram.
 
-This patch renames the entries in Kconfig.arm and makefile to make the newly
-added big.LITTLE CPUidle driver compliant with the new naming convention.
+The kirkwood data sheet suggests it is useful if the CPU is idle for a
+few milliseconds. So it sounds like it is a slow transition, but does
+seem to save a bit of power. I guess in a NO_HZ system, it would make
+sense.
 
-Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
----
- drivers/cpuidle/Kconfig.arm | 2 +-
- drivers/cpuidle/Makefile    | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/cpuidle/Kconfig.arm b/drivers/cpuidle/Kconfig.arm
-index 8e36603..ea0f045 100644
---- a/drivers/cpuidle/Kconfig.arm
-+++ b/drivers/cpuidle/Kconfig.arm
-@@ -27,7 +27,7 @@ config ARM_U8500_CPUIDLE
- 	help
- 	  Select this to enable cpuidle for ST-E u8500 processors
- 
--config CPU_IDLE_BIG_LITTLE
-+config ARM_BIG_LITTLE_CPUIDLE
- 	bool "Support for ARM big.LITTLE processors"
- 	depends on ARCH_VEXPRESS_TC2_PM
- 	select ARM_CPU_SUSPEND
-diff --git a/drivers/cpuidle/Makefile b/drivers/cpuidle/Makefile
-index cea5ef5..3c693c2 100644
---- a/drivers/cpuidle/Makefile
-+++ b/drivers/cpuidle/Makefile
-@@ -11,4 +11,4 @@ obj-$(CONFIG_ARM_HIGHBANK_CPUIDLE)	+= cpuidle-calxeda.o
- obj-$(CONFIG_ARM_KIRKWOOD_CPUIDLE)	+= cpuidle-kirkwood.o
- obj-$(CONFIG_ARM_ZYNQ_CPUIDLE)		+= cpuidle-zynq.o
- obj-$(CONFIG_ARM_U8500_CPUIDLE)         += cpuidle-ux500.o
--obj-$(CONFIG_CPU_IDLE_BIG_LITTLE)	+= cpuidle-big_little.o
-+obj-$(CONFIG_ARM_BIG_LITTLE_CPUIDLE)	+= cpuidle-big_little.o
--- 
-1.8.2.2
+	Andrew
