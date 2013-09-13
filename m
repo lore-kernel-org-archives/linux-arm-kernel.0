@@ -1,61 +1,53 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 13 Sep 2013 18:30:35 +0530
-Subject: [PATCH 089/228] cpufreq: tegra: Use generic cpufreq routines
+Date: Fri, 13 Sep 2013 18:30:36 +0530
+Subject: [PATCH 090/228] cpufreq: call cpufreq_driver->get() after calling
+ ->init()
 In-Reply-To: <cover.1379063063.git.viresh.kumar@linaro.org>
 References: <cover.1379063063.git.viresh.kumar@linaro.org>
-Message-ID: <61fa7239e5848bfe69dbc86c09cc0e9bea9451b4.1379063063.git.viresh.kumar@linaro.org>
+Message-ID: <65ceb79aa6cf70ee2ee64f92ffe92e43e8663c4e.1379063063.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Most of the CPUFreq drivers do similar things in .exit() and .verify() routines
-and .attr. So its better if we have generic routines for them which can be used
-by cpufreq drivers then.
+Almost all drivers set policy->cur with current cpu frequency in their ->init()
+part. This can be done for all of them at core level and so they wouldn't need
+to do it.
 
-This patch uses these generic routines for this driver.
+This patch adds supporting code in cpufreq core for calling get() after we have
+called init() for a policy.
 
-Cc: Stephen Warren <swarren@nvidia.com>
 Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- drivers/cpufreq/tegra-cpufreq.c | 14 ++------------
- 1 file changed, 2 insertions(+), 12 deletions(-)
+ drivers/cpufreq/cpufreq.c | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-diff --git a/drivers/cpufreq/tegra-cpufreq.c b/drivers/cpufreq/tegra-cpufreq.c
-index e014077..c36a8e7 100644
---- a/drivers/cpufreq/tegra-cpufreq.c
-+++ b/drivers/cpufreq/tegra-cpufreq.c
-@@ -51,11 +51,6 @@ static unsigned long target_cpu_speed[NUM_CPUS];
- static DEFINE_MUTEX(tegra_cpu_lock);
- static bool is_suspended;
+diff --git a/drivers/cpufreq/cpufreq.c b/drivers/cpufreq/cpufreq.c
+index c7274e6..1e6b602 100644
+--- a/drivers/cpufreq/cpufreq.c
++++ b/drivers/cpufreq/cpufreq.c
+@@ -1081,6 +1081,14 @@ static int __cpufreq_add_dev(struct device *dev, struct subsys_interface *sif,
+ 		goto err_set_policy_cpu;
+ 	}
  
--static int tegra_verify_speed(struct cpufreq_policy *policy)
--{
--	return cpufreq_frequency_table_verify(policy, freq_table);
--}
--
- static unsigned int tegra_getspeed(unsigned int cpu)
- {
- 	unsigned long rate;
-@@ -237,19 +232,14 @@ static int tegra_cpu_exit(struct cpufreq_policy *policy)
- 	return 0;
- }
++	if (cpufreq_driver->get) {
++		policy->cur = cpufreq_driver->get(policy->cpu);
++		if (!policy->cur) {
++			pr_err("%s: ->get() failed\n", __func__);
++			goto err_get_freq;
++		}
++	}
++
+ 	/* related cpus should atleast have policy->cpus */
+ 	cpumask_or(policy->related_cpus, policy->related_cpus, policy->cpus);
  
--static struct freq_attr *tegra_cpufreq_attr[] = {
--	&cpufreq_freq_attr_scaling_available_freqs,
--	NULL,
--};
--
- static struct cpufreq_driver tegra_cpufreq_driver = {
--	.verify		= tegra_verify_speed,
-+	.verify		= cpufreq_generic_frequency_table_verify,
- 	.target		= tegra_target,
- 	.get		= tegra_getspeed,
- 	.init		= tegra_cpu_init,
- 	.exit		= tegra_cpu_exit,
- 	.name		= "tegra",
--	.attr		= tegra_cpufreq_attr,
-+	.attr		= cpufreq_generic_attr,
- };
+@@ -1135,6 +1143,9 @@ err_out_unregister:
+ 		per_cpu(cpufreq_cpu_data, j) = NULL;
+ 	write_unlock_irqrestore(&cpufreq_driver_lock, flags);
  
- static int __init tegra_cpufreq_init(void)
++err_get_freq:
++	if (cpufreq_driver->exit)
++		cpufreq_driver->exit(policy);
+ err_set_policy_cpu:
+ 	cpufreq_policy_free(policy);
+ nomem_out:
 -- 
 1.7.12.rc2.18.g61b472e
