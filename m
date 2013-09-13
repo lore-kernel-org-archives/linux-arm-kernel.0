@@ -1,46 +1,55 @@
-From: aaro.koskinen@iki.fi (Aaro Koskinen)
-Date: Fri, 13 Sep 2013 19:17:10 +0300
-Subject: [PATCH 0/8] IOP GPIO refactoring
-In-Reply-To: <CACRpkdYbHTF0XGu-wLAeaw-nnSTEPh-ej9iizMbojmB8gzvb=Q@mail.gmail.com>
-References: <1378741198-12847-1-git-send-email-linus.walleij@linaro.org>
- <20130910141434.GD3379@blackmetal.musicnaut.iki.fi>
- <CACRpkdYbHTF0XGu-wLAeaw-nnSTEPh-ej9iizMbojmB8gzvb=Q@mail.gmail.com>
-Message-ID: <20130913161710.GA22033@blackmetal.musicnaut.iki.fi>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 13 Sep 2013 17:15:28 +0100
+Subject: [PATCH 206/228] cpufreq: sa11x0: remove calls to
+ cpufreq_notify_transition()
+In-Reply-To: <CAKohpomAj0wDnjdi7XXw=bGsu0LMRrr1SMwdzBsa0GTxGrABoQ@mail.gmail.com>
+References: <cover.1379063063.git.viresh.kumar@linaro.org>
+ <6e2ca86ce948c0bc35f7709baf22672771fcf1e8.1379063063.git.viresh.kumar@linaro.org>
+ <20130913155424.GB12758@n2100.arm.linux.org.uk>
+ <CAKohpomAj0wDnjdi7XXw=bGsu0LMRrr1SMwdzBsa0GTxGrABoQ@mail.gmail.com>
+Message-ID: <20130913161527.GE12758@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Fri, Sep 13, 2013 at 10:15:58AM +0200, Linus Walleij wrote:
-> On Tue, Sep 10, 2013 at 4:14 PM, Aaro Koskinen <aaro.koskinen@iki.fi> wrote:
-> > With patch 6 it starts to crash on first gpio_get_value(), I guess
-> > because gpio-iop platform device is not registered on N2100...?
+On Fri, Sep 13, 2013 at 09:42:23PM +0530, Viresh Kumar wrote:
+> On 13 September 2013 21:24, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > On Fri, Sep 13, 2013 at 06:32:32PM +0530, Viresh Kumar wrote:
+> >> Most of the drivers do following in their ->target_index() routines:
+> >>
+> >>       struct cpufreq_freqs freqs;
+> >>       freqs.old = old freq...
+> >>       freqs.new = new freq...
+> >>
+> >>       cpufreq_notify_transition(policy, &freqs, CPUFREQ_PRECHANGE);
+> >>
+> >>       /* Change rate here */
+> >>
+> >>       cpufreq_notify_transition(policy, &freqs, CPUFREQ_POSTCHANGE);
+> >>
+> >> This is replicated over all cpufreq drivers today and there doesn't exists a
+> >> good enough reason why this shouldn't be moved to cpufreq core instead.
+> >>
+> >> Earlier patches have added support in cpufreq core to do cpufreq notification on
+> >> frequency change, this one removes it from this driver.
+> >>
+> >> Some related minor cleanups are also done along with it.
+> >>
+> >> Cc: Russell King <linux@arm.linux.org.uk>
+> >> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+> >
+> > Shouldn't this patch set CPUFREQ_ASYNC_NOTIFICATION somewhere?
 > 
-> I think I've fixed this with the v2 versions of patches 1-3, you can
-> pull in and test the entire stack on Torvalds HEAD from here:
+> As far as I can see, sa11x0 completes frequency transition from within
+> target() and so it does it synchronously.. And so it doesn't need to set
+> CPUFREQ_ASYNC_NOTIFICATION...
 > 
-> git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-gpio.git iop-cleanup
+> Am I missing something?
 
-It's still crashing. This should be done somewhere in the series:
+The patch to which I'm replying removes the above calls.  These calls are
+necessary to shutdown various bits of CPU-clock dependent hardware
+before changing the CPU clock, and restore them - reconfiguring them
+for the new clock rate after the transition has happened.
 
-diff --git a/arch/arm/mach-iop32x/n2100.c b/arch/arm/mach-iop32x/n2100.c
-index bc40a97..6266f0e 100644
---- a/arch/arm/mach-iop32x/n2100.c
-+++ b/arch/arm/mach-iop32x/n2100.c
-@@ -343,8 +343,14 @@ static int __init n2100_request_gpios(void)
- }
- device_initcall(n2100_request_gpios);
- 
-+static struct resource n2100_gpio_res[] = {
-+	DEFINE_RES_MEM((IOP3XX_PERIPHERAL_PHYS_BASE + 0x07c4), 0x10),
-+};
-+
- static void __init n2100_init_machine(void)
- {
-+	platform_device_register_simple("gpio-iop", 0, n2100_gpio_res,
-+					ARRAY_SIZE(n2100_gpio_res));
- 	platform_device_register(&iop3xx_i2c0_device);
- 	platform_device_register(&n2100_flash_device);
- 	platform_device_register(&n2100_serial_device);
-
-A.
+So, if you're removing these calls, what replaces them?  I don't see
+anything which does without the above set.
