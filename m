@@ -1,10 +1,10 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 13 Sep 2013 18:30:50 +0530
-Subject: [PATCH 104/228] cpufreq: ia64-acpi: don't initialize part of policy
- that is set by core too
+Date: Fri, 13 Sep 2013 18:30:51 +0530
+Subject: [PATCH 105/228] cpufreq: imx6q: don't initialize part of policy that
+ is set by core too
 In-Reply-To: <cover.1379063063.git.viresh.kumar@linaro.org>
 References: <cover.1379063063.git.viresh.kumar@linaro.org>
-Message-ID: <c2ebc42413ca4a8b8d1a20429eeaffadc8bc239e.1379063063.git.viresh.kumar@linaro.org>
+Message-ID: <ee404bd44ef9e3f86300b0f1dd4a9deb9a00e395.1379063063.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,23 +14,23 @@ this driver doesn't need to do it. This patch removes such code.
 Most recent of those changes is to call ->get() in the core after calling
 ->init().
 
-Cc: Tony Luck <tony.luck@intel.com>
+Cc: Shawn Guo <shawn.guo@linaro.org>
 Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- drivers/cpufreq/ia64-acpi-cpufreq.c | 1 -
+ drivers/cpufreq/imx6q-cpufreq.c | 1 -
  1 file changed, 1 deletion(-)
 
-diff --git a/drivers/cpufreq/ia64-acpi-cpufreq.c b/drivers/cpufreq/ia64-acpi-cpufreq.c
-index b958bdb..90c6598 100644
---- a/drivers/cpufreq/ia64-acpi-cpufreq.c
-+++ b/drivers/cpufreq/ia64-acpi-cpufreq.c
-@@ -305,7 +305,6 @@ acpi_cpufreq_cpu_init (
- 			    data->acpi_data.states[i].transition_latency * 1000;
- 		}
+diff --git a/drivers/cpufreq/imx6q-cpufreq.c b/drivers/cpufreq/imx6q-cpufreq.c
+index 29767bb..649547f 100644
+--- a/drivers/cpufreq/imx6q-cpufreq.c
++++ b/drivers/cpufreq/imx6q-cpufreq.c
+@@ -162,7 +162,6 @@ static int imx6q_cpufreq_init(struct cpufreq_policy *policy)
  	}
--	policy->cur = processor_get_freq(data, policy->cpu);
  
- 	/* table init */
- 	for (i = 0; i <= data->acpi_data.state_count; i++)
+ 	policy->cpuinfo.transition_latency = transition_latency;
+-	policy->cur = clk_get_rate(arm_clk) / 1000;
+ 	cpumask_setall(policy->cpus);
+ 
+ 	return 0;
 -- 
 1.7.12.rc2.18.g61b472e
