@@ -1,76 +1,44 @@
-From: anup.patel@linaro.org (Anup Patel)
-Date: Sat, 14 Sep 2013 16:38:37 +0530
-Subject: =?UTF-8?q?=5BPATCH=20v2=204/4=5D=20KVM=3A=20Add=20documentation=20for=20KVM=5FARM=5FPREFERRED=5FTARGET=20ioctl?=
-In-Reply-To: <1379156917-17497-1-git-send-email-anup.patel@linaro.org>
-References: <1379156917-17497-1-git-send-email-anup.patel@linaro.org>
-Message-ID: <1379156917-17497-5-git-send-email-anup.patel@linaro.org>
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Sat, 14 Sep 2013 13:14:40 +0100
+Subject: [PATCH 14/38] iio: accel: st: Append _accel to accelerator sensor
+ device names
+In-Reply-To: <1378817379-8238-15-git-send-email-lee.jones@linaro.org>
+References: <1378817379-8238-1-git-send-email-lee.jones@linaro.org>
+ <1378817379-8238-15-git-send-email-lee.jones@linaro.org>
+Message-ID: <52345330.4050707@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To implement CPU=Host we have added KVM_ARM_PREFERRED_TARGET
-ioctl which provides information to user space required for
-creating VCPU matching underlying Host.
+On 09/10/13 13:49, Lee Jones wrote:
+> Some of ST's sensors are appended with their sensor type and some
+> are not. For consistency we're extending the same naming convention
+> throughout.
+> 
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+Honestly I don't care either way on these, but consistency would definitely
+be good so applied to the togreg branch of iio.git
 
-This patch adds info related to this new KVM_ARM_PREFERRED_TARGET
-ioctl in the KVM API documentation.
-
-Signed-off-by: Anup Patel <anup.patel@linaro.org>
-Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
----
- Documentation/virtual/kvm/api.txt |   26 ++++++++++++++++++++++----
- 1 file changed, 22 insertions(+), 4 deletions(-)
-
-diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
-index ef925ea..85f8026 100644
---- a/Documentation/virtual/kvm/api.txt
-+++ b/Documentation/virtual/kvm/api.txt
-@@ -2303,8 +2303,27 @@ Possible features:
- 	- KVM_ARM_VCPU_EL1_32BIT: Starts the CPU in a 32bit mode.
- 	  Depends on KVM_CAP_ARM_EL1_32BIT (arm64 only).
- 
-+4.83 KVM_ARM_PREFERRED_TARGET
- 
--4.83 KVM_GET_REG_LIST
-+Capability: basic
-+Architectures: arm, arm64
-+Type: vcpu ioctl
-+Parameters: struct struct kvm_vcpu_init (out)
-+Returns: 0 on success; -1 on error
-+Errors:
-+ ?EINVAL: ???no preferred target available for the host
-+
-+This queries KVM for preferred CPU target type which can be emulated 
-+by KVM on underlying host.
-+
-+The ioctl returns struct kvm_vcpu_init instance containing information
-+about preferred CPU target type and optional features available for it. 
-+
-+The information returned by this ioctl can be used to prepare instance
-+of struct kvm_vcpu_init for KVM_ARM_VCPU_INIT ioctl which will result 
-+in VCPU matching underlying host.
-+
-+4.84 KVM_GET_REG_LIST
- 
- Capability: basic
- Architectures: arm, arm64
-@@ -2323,8 +2342,7 @@ struct kvm_reg_list {
- This ioctl returns the guest registers that are supported for the
- KVM_GET_ONE_REG/KVM_SET_ONE_REG calls.
- 
--
--4.84 KVM_ARM_SET_DEVICE_ADDR
-+4.85 KVM_ARM_SET_DEVICE_ADDR
- 
- Capability: KVM_CAP_ARM_SET_DEVICE_ADDR
- Architectures: arm, arm64
-@@ -2362,7 +2380,7 @@ must be called after calling KVM_CREATE_IRQCHIP, but before calling
- KVM_RUN on any of the VCPUs.  Calling this ioctl twice for any of the
- base addresses will return -EEXIST.
- 
--4.85 KVM_PPC_RTAS_DEFINE_TOKEN
-+4.86 KVM_PPC_RTAS_DEFINE_TOKEN
- 
- Capability: KVM_CAP_PPC_RTAS
- Architectures: ppc
--- 
-1.7.9.5
+Thanks,
+> ---
+>  drivers/iio/accel/st_accel.h | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/iio/accel/st_accel.h b/drivers/iio/accel/st_accel.h
+> index c387763..d8d22e5 100644
+> --- a/drivers/iio/accel/st_accel.h
+> +++ b/drivers/iio/accel/st_accel.h
+> @@ -15,11 +15,11 @@
+>  #include <linux/iio/common/st_sensors.h>
+>  
+>  #define LSM303DLHC_ACCEL_DEV_NAME	"lsm303dlhc_accel"
+> -#define LIS3DH_ACCEL_DEV_NAME		"lis3dh"
+> +#define LIS3DH_ACCEL_DEV_NAME		"lis3dh_accel"
+>  #define LSM330D_ACCEL_DEV_NAME		"lsm330d_accel"
+>  #define LSM330DL_ACCEL_DEV_NAME		"lsm330dl_accel"
+>  #define LSM330DLC_ACCEL_DEV_NAME	"lsm330dlc_accel"
+> -#define LIS331DLH_ACCEL_DEV_NAME	"lis331dlh"
+> +#define LIS331DLH_ACCEL_DEV_NAME	"lis331dlh_accel"
+>  #define LSM303DL_ACCEL_DEV_NAME		"lsm303dl_accel"
+>  #define LSM303DLH_ACCEL_DEV_NAME	"lsm303dlh_accel"
+>  #define LSM303DLM_ACCEL_DEV_NAME	"lsm303dlm_accel"
+> 
