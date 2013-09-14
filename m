@@ -1,53 +1,34 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Sun, 15 Sep 2013 13:47:44 +0100
-Subject: [PATCH v2 1/9] i2c: prepare runtime PM support for I2C client
- devices
-In-Reply-To: <20130915064139.GJ7393@intel.com>
-References: <1378913560-2752-1-git-send-email-mika.westerberg@linux.intel.com>
- <1378913560-2752-2-git-send-email-mika.westerberg@linux.intel.com>
- <87vc25pvvm.fsf@linaro.org> <20130913065434.GZ7393@intel.com>
- <87bo3whjz4.fsf@linaro.org> <20130913145022.GC7393@intel.com>
- <20130913173149.GE7393@intel.com> <87ioy4e8bw.fsf@linaro.org>
- <20130915064139.GJ7393@intel.com>
-Message-ID: <20130915124744.GW29403@sirena.org.uk>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 14 Sep 2013 15:32:13 +0100
+Subject: [PATCH] arm: Fix build error with context tracking calls
+In-Reply-To: <20130913170331.GA8453@somewhere>
+References: <522CB0DE.2010102@roeck-us.net>
+ <20130909105115.GL25647@n2100.arm.linux.org.uk>
+ <522DB86A.8010207@roeck-us.net>
+ <alpine.LFD.2.03.1309091023440.20709@syhkavp.arg>
+ <20130909160348.GB18975@roeck-us.net>
+ <20130909203141.GM25647@n2100.arm.linux.org.uk>
+ <20130909210203.GC28416@roeck-us.net>
+ <alpine.LFD.2.03.1309091714420.20709@syhkavp.arg> <87y574g1fi.fsf@linaro.org>
+ <20130913170331.GA8453@somewhere>
+Message-ID: <20130914143213.GN25647@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Sep 15, 2013 at 09:41:39AM +0300, Mika Westerberg wrote:
+On Fri, Sep 13, 2013 at 07:03:34PM +0200, Frederic Weisbecker wrote:
+> diff --git a/kernel/context_tracking.c b/kernel/context_tracking.c
+> index 247091b..859c8df 100644
+> --- a/kernel/context_tracking.c
+> +++ b/kernel/context_tracking.c
+> @@ -51,6 +51,15 @@ void context_tracking_user_enter(void)
+>  	unsigned long flags;
+>  
+>  	/*
+> +	 * Repeat the user_enter() check here because some archs may be calling
+> +	 * this from asm and if no CPU needs context tracking, they shouldn't
+> +	 * go further. We can remove that check here once these archs support the static key
+> +	 * check.
 
-> There's also a less intrusive way of fixing the problem we see with ACPI
-> enabled I2C devices:
-
-> 	1. In I2C core i2c_device_probe() we power on the I2C controller
-> 	and attach the client device to the ACPI power domain. Just like in
-> 	this patch but we don't touch the I2C client device runtime PM.
-
-> 	-> This should allow the existing drivers to keep using whatever
-> 	runtime PM strategy they have chosen.
-
-There should be no explicit need to power on the I2C controller if it's
-implemented the same way the existing ones are - just have it power
-itself on when it is doing a transfer.
-
-> 	2. For ACPI enumerated I2C client devices drivers we need to
-> 	implement the runtime PM in order to save power (otherwise the
-> 	devices will be left powered on).
-
-> and do the same for SPI devices as well.
-
-> Then only thing that changes for non-ACPI devices is that the controller
-> will be powered on during the client device probe (well, and during
-> remove).
-
-> Thoughts?
-
-This is definitely less intrusive than the current proposal, there's one
-ACPI I2C device binding queued for -next after the merge window (rt5640)
-which will need an update.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130915/d4861ca3/attachment.sig>
+The only (minor) comment on this is that the above would fail checkpatch,
+but that's not a good enough reason to respin it if you've already applied
+it IMHO.
