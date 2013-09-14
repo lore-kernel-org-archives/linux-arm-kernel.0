@@ -1,50 +1,47 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Sat, 14 Sep 2013 22:47:02 +0900
-Subject: [PATCH 05/05] ARM: shmobile: Remove shmobile_smp_scu_boot_secondary()
-In-Reply-To: <20130914134616.19258.27110.sendpatchset@w520>
-References: <20130914134616.19258.27110.sendpatchset@w520>
-Message-ID: <20130914134702.19258.11610.sendpatchset@w520>
+From: fweisbec@gmail.com (Frederic Weisbecker)
+Date: Sat, 14 Sep 2013 16:19:23 +0200
+Subject: [PATCH] arm: Fix build error with context tracking calls
+In-Reply-To: <87mwnggwv4.fsf@linaro.org>
+References: <20130909105115.GL25647@n2100.arm.linux.org.uk>
+ <522DB86A.8010207@roeck-us.net>
+ <alpine.LFD.2.03.1309091023440.20709@syhkavp.arg>
+ <20130909160348.GB18975@roeck-us.net>
+ <20130909203141.GM25647@n2100.arm.linux.org.uk>
+ <20130909210203.GC28416@roeck-us.net>
+ <alpine.LFD.2.03.1309091714420.20709@syhkavp.arg>
+ <87y574g1fi.fsf@linaro.org> <20130913170331.GA8453@somewhere>
+ <87mwnggwv4.fsf@linaro.org>
+Message-ID: <20130914141921.GB1718@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm@opensource.se>
+On Fri, Sep 13, 2013 at 03:50:07PM -0700, Kevin Hilman wrote:
+> Frederic Weisbecker <fweisbec@gmail.com> writes:
+> 
+> > On Tue, Sep 10, 2013 at 08:07:45AM -0700, Kevin Hilman wrote:
+> >> Nicolas Pitre <nicolas.pitre@linaro.org> writes:
+> >> 
+> >> > Adding Kevin Hilman to the CC as he might be interested as well.
+> >> 
+> >> Thanks, I'd already noticed this but was distracted getting arm-soc
+> >> changes ready for the merge window.  Looking into it now.
+> >
+> > Kevin, can you please try this patch? It built tested fine on ARM
+> > and live tested correctly on x86. There should be no problem but
+> > just in case.
+> 
+> Tested-by: Kevin Hilman <khilman@linaro.org>
+> 
+> Things are back to working again on ARM.  Thanks for the fix, and for
+> build testing on ARM.  
+> 
+> As you noticed to test on ARM, we still have to carry that patch to
+> drop that 'depends on 64BIT' in order to build/test this... any more
+> thoughts on what the remaining obstacles there are?
 
-Remove shmobile_smp_scu_boot_secondary() since
-it is no longer used. CPU boot vector setup is
-instead handled by CPU notifiers.
+I was mostly fine with your last patchset that enabled that +
+a few stuff to make it working on ARM. There were just a few details
+to polish. But I remember I sent detailed reviews, may be you missed them
+somewhow?
 
-Signed-off-by: Magnus Damm <damm@opensource.se>
----
-
- arch/arm/mach-shmobile/include/mach/common.h |    2 --
- arch/arm/mach-shmobile/platsmp-scu.c         |    8 --------
- 2 files changed, 10 deletions(-)
-
---- 0001/arch/arm/mach-shmobile/include/mach/common.h
-+++ work/arch/arm/mach-shmobile/include/mach/common.h	2013-09-14 19:38:47.000000000 +0900
-@@ -18,8 +18,6 @@ extern int shmobile_smp_cpu_disable(unsi
- extern void shmobile_invalidate_start(void);
- extern void shmobile_boot_scu(void);
- extern void shmobile_smp_scu_prepare_cpus(unsigned int max_cpus);
--extern int shmobile_smp_scu_boot_secondary(unsigned int cpu,
--					   struct task_struct *idle);
- extern void shmobile_smp_scu_cpu_die(unsigned int cpu);
- extern int shmobile_smp_scu_cpu_kill(unsigned int cpu);
- extern void shmobile_smp_apmu_prepare_cpus(unsigned int max_cpus);
---- 0004/arch/arm/mach-shmobile/platsmp-scu.c
-+++ work/arch/arm/mach-shmobile/platsmp-scu.c	2013-09-14 19:39:01.000000000 +0900
-@@ -59,14 +59,6 @@ void __init shmobile_smp_scu_prepare_cpu
- 	register_cpu_notifier(&shmobile_smp_scu_notifier);
- }
- 
--int shmobile_smp_scu_boot_secondary(unsigned int cpu, struct task_struct *idle)
--{
--	/* For this particular CPU register SCU boot vector */
--	shmobile_smp_hook(cpu, virt_to_phys(shmobile_boot_scu),
--			  (unsigned long)shmobile_scu_base);
--	return 0;
--}
--
- #ifdef CONFIG_HOTPLUG_CPU
- void shmobile_smp_scu_cpu_die(unsigned int cpu)
- {
+Thanks.
