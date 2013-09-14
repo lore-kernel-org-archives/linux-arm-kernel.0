@@ -1,60 +1,29 @@
-From: maxime.ripard@free-electrons.com (maxime.ripard at free-electrons.com)
-Date: Sat, 14 Sep 2013 14:05:57 +0200
-Subject: [PATCH 3/4] Add physical count arch timer support for
- clocksource in ARMv7.
-In-Reply-To: <5232DB49.4050701@arm.com>
-References: <1378968687-8200-1-git-send-email-cinifr@gmail.com>
- <1378968687-8200-4-git-send-email-cinifr@gmail.com>
- <20130912112452.GA22013@e106331-lin.cambridge.arm.com>
- <CAK3cCBwu4somtfc9J1ZDVcC-iYD1qDJwSWzWeOomTqY9tQA2kg@mail.gmail.com>
- <5231EE43.5090900@arm.com>
- <CAK3cCBzr8_LTYarZDgPYZY7_-5Qco_Qw+ACi=c2uOrn7MqwkBg@mail.gmail.com>
- <5232DB49.4050701@arm.com>
-Message-ID: <20130914120557.GB2746@lukather>
+From: drjones@redhat.com (Andrew Jones)
+Date: Sat, 14 Sep 2013 14:10:54 +0200
+Subject: [PATCH 1/3] arm: kvm: clamp NR_VCPUS to MAX_VCPUS
+In-Reply-To: <1379160656-28050-1-git-send-email-drjones@redhat.com>
+References: <1379160656-28050-1-git-send-email-drjones@redhat.com>
+Message-ID: <1379160656-28050-2-git-send-email-drjones@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc, Fan,
+Signed-off-by: Andrew Jones <drjones@redhat.com>
+---
+ arch/arm/kvm/arm.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-On Fri, Sep 13, 2013 at 10:30:49AM +0100, Marc Zyngier wrote:
-> On 13/09/13 09:49, cinifr wrote:
-> > On 13 September 2013 00:39, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> > I am   wondering   what is the principle between kernel and bootload?
-> > What should be done in bootloader and what should be done in kernel?
-> > As you said, If kernel boot from hyp,  Kernel can set  CNTVOFF to zero
-> > directly, does we add the code to set CNTVOFF in kernel?  But, if
-> > kernel boot from PL1 NS=0,  Does kernel  need to switch hyp mode to
-> > set  CNTVOFF and return  PL1 NS=0 mode? Or,kernel dont care it because
-> > kernel   believe bootloader have set CNTVOFF  before?
-> 
-> In an ideal world, the bootloader should set CNTVOFF to zero. The fact
-> that the kernel does it too when booted in HYP mode is to preserve
-> itself from from broken bootloaders.
-> 
-> CNTVOFF can only be setup from either HYP or Secure Monitor mode with
-> SCR.NS == 1, so if you run your kernel in secure mode, it is always best
-> to do it in the bootloader.
-
-What would happen exactly if a kernel expects CNTVOFF to be set to 0,
-and that your bootloader don't set it?
-
->From what you're saying, it's will be set by the kernel if it's booted
-in hypervisor mode, but what if it's not?
-
-The ARM documentation says that the CNTVOFF register will hold an
-undefined value, how would that affect the kernel?
-
-Thanks,
-Maxime
-
+diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+index 741f66a2edbd7..9ebf8ac3a12ff 100644
+--- a/arch/arm/kvm/arm.c
++++ b/arch/arm/kvm/arm.c
+@@ -201,7 +201,7 @@ int kvm_dev_ioctl_check_extension(long ext)
+ 		r = 1;
+ 		break;
+ 	case KVM_CAP_NR_VCPUS:
+-		r = num_online_cpus();
++		r = min(num_online_cpus(), KVM_MAX_VCPUS);
+ 		break;
+ 	case KVM_CAP_MAX_VCPUS:
+ 		r = KVM_MAX_VCPUS;
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130914/6c9e137f/attachment.sig>
+1.8.1.4
