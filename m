@@ -1,79 +1,90 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Sat, 14 Sep 2013 04:29:22 +0400
-Subject: [PATCH] ARM: shmobile: Lager: add Micrel KSZ8041 PHY fixup
-Message-ID: <201309140429.23474.sergei.shtylyov@cogentembedded.com>
+From: joelf@ti.com (Joel Fernandes)
+Date: Fri, 13 Sep 2013 19:57:21 -0500
+Subject: [PATCH v3] ARM: EDMA: Fix clearing of unused list for DT DMA
+ resources
+In-Reply-To: <5231903F.7080301@ti.com>
+References: <1378839171-14455-1-git-send-email-joelf@ti.com>
+ <5231903F.7080301@ti.com>
+Message-ID: <5233B471.40603@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently on the Lager board NFS timeouts/delays are seen when booting.  That
-turned out to happen because the SoC's ETH_LINK signal turns on and off after
-each packet.  It is connected to Micrel KSZ8041 PHY's LED0 signal. Ether LEDs
-on the Lager board are named LINK and ACTIVE which corresponds to non-default
-01 setting of the PHY control register 1 bits 14-15. The 'sh_eth' driver resets
-the PHY when opening the network device, so we have to set the mentioned bits
-back to 01 from the default 00 value which causes bouncing of ETH_LINK.  That
-can be achieved using the PHY platform fixup mechanism if we also modify the
-driver to use it..
+On 09/12/2013 04:58 AM, Sekhar Nori wrote:
+> On Wednesday 11 September 2013 12:22 AM, Joel Fernandes wrote:
+>> HWMOD removal for MMC is breaking edma_start as the events are being manually
+>> triggered due to unused channel list not being clear.
+[..]
+> It is better to send one version with all comments fixed. Helps avoid
+> confusion.
 
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Ok, here is the final version with all comments fixed, please apply this one:
 
+--->8---
+From: Joel Fernandes <joelf@ti.com>
+Subject: [PATCH v4] ARM: EDMA: Fix clearing of unused list for DT DMA resources
+
+HWMOD removal for MMC is breaking edma_start as the events are being manually
+triggered due to unused channel list not being clear.
+
+This patch fixes the issue, by reading the "dmas" property from the DT node if
+it exists and clearing the bits in the unused channel list. For this purpose
+we use the of_* helpers to parse the arguments in the dmas phandle list.
+
+Reviewed-by: Sekhar Nori <nsekhar@ti.com>
+Reported-by: Balaji T K <balajitk@ti.com>
+Cc: Pantel Antoniou <panto@antoniou-consulting.com>
+Signed-off-by: Joel Fernandes <joelf@ti.com>
 ---
-This patch is against the recent Linus' tree. Its effect on NFS issue depends
-on the 'sh_eth' driver patch I've posted earlier. 
-Simon, please update your 'master' and/or 'fixes' branches since currently it's
-impossible to apply fixes to your tree.
+Changes since v1, in v2 and v3:
+- Reduced indentation of non-of case by returning from of-case
+- Using of_* helpers for parsing
 
- arch/arm/mach-shmobile/board-lager.c |   27 ++++++++++++++++++++++++++-
- 1 file changed, 26 insertions(+), 1 deletion(-)
+Note:
+This patch should go into the merge window as it is a critical bug fix.
 
-Index: linux/arch/arm/mach-shmobile/board-lager.c
-===================================================================
---- linux.orig/arch/arm/mach-shmobile/board-lager.c
-+++ linux/arch/arm/mach-shmobile/board-lager.c
-@@ -29,6 +29,7 @@
- #include <linux/pinctrl/machine.h>
- #include <linux/platform_data/gpio-rcar.h>
- #include <linux/platform_device.h>
-+#include <linux/phy.h>
- #include <linux/regulator/fixed.h>
- #include <linux/regulator/machine.h>
- #include <linux/sh_eth.h>
-@@ -155,6 +156,30 @@ static void __init lager_add_standard_de
- 					  &ether_pdata, sizeof(ether_pdata));
- }
- 
-+/*
-+ * Ether LEDs on the Lager board are named LINK and ACTIVE which corresponds
-+ * to non-default 01 setting of the Micrel KSZ8041 PHY control register 1 bits
-+ * 14-15. We have to set them back to 01 from the default 00 value each time
-+ * the PHY is reset. It's also important because the PHY's LED0 signal is
-+ * connected to SoC's ETH_LINK signal and in the PHY's default mode it will
-+ * bounce on and off after each packet, which we apparently want to avoid.
-+ */
-+static int lager_ksz8041_fixup(struct phy_device *phydev)
-+{
-+	u16 phyctrl1 = phy_read(phydev, 0x1e);
+ arch/arm/common/edma.c | 23 +++++++++++++++++++++--
+ 1 file changed, 21 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/common/edma.c b/arch/arm/common/edma.c
+index 39ad030..43c7b22 100644
+--- a/arch/arm/common/edma.c
++++ b/arch/arm/common/edma.c
+@@ -560,14 +560,33 @@ static int reserve_contiguous_slots(int ctlr, unsigned int
+id,
+ static int prepare_unused_channel_list(struct device *dev, void *data)
+ {
+ 	struct platform_device *pdev = to_platform_device(dev);
+-	int i, ctlr;
++	int i, count, ctlr;
++	struct of_phandle_args  dma_spec;
+
++	if (dev->of_node) {
++		count = of_property_count_strings(dev->of_node, "dma-names");
++		if (count < 0)
++			return 0;
++		for (i = 0; i < count; i++) {
++			if (of_parse_phandle_with_args(dev->of_node, "dmas",
++						       "#dma-cells", i,
++						       &dma_spec))
++				continue;
 +
-+	phyctrl1 &= ~0xc000;
-+	phyctrl1 |= 0x4000;
-+	return phy_write(phydev, 0x1e, phyctrl1);
-+}
++			ctlr = EDMA_CTLR(dma_spec.args[0]);
++			clear_bit(EDMA_CHAN_SLOT(dma_spec.args[0]),
++				  edma_cc[ctlr]->edma_unused);
++		}
++		return 0;
++	}
 +
-+static void __init lager_init(void)
-+{
-+	lager_add_standard_devices();
-+
-+	phy_register_fixup_for_id("r8a7790-ether-ff:01", lager_ksz8041_fixup);
-+}
-+
- static const char *lager_boards_compat_dt[] __initdata = {
- 	"renesas,lager",
- 	NULL,
-@@ -163,6 +188,6 @@ static const char *lager_boards_compat_d
- DT_MACHINE_START(LAGER_DT, "lager")
- 	.init_early	= r8a7790_init_delay,
- 	.init_time	= r8a7790_timer_init,
--	.init_machine	= lager_add_standard_devices,
-+	.init_machine	= lager_init,
- 	.dt_compat	= lager_boards_compat_dt,
- MACHINE_END
++	/* For non-OF case */
+ 	for (i = 0; i < pdev->num_resources; i++) {
+ 		if ((pdev->resource[i].flags & IORESOURCE_DMA) &&
+ 				(int)pdev->resource[i].start >= 0) {
+ 			ctlr = EDMA_CTLR(pdev->resource[i].start);
+ 			clear_bit(EDMA_CHAN_SLOT(pdev->resource[i].start),
+-					edma_cc[ctlr]->edma_unused);
++				  edma_cc[ctlr]->edma_unused);
+ 		}
+ 	}
+
+-- 
+1.8.1.2
