@@ -1,56 +1,63 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Sat, 14 Sep 2013 10:01:03 +0200
-Subject: [PATCH] clk: si570: Add a driver for SI570 oscillators
-In-Reply-To: <c6755ff6-104d-40fe-a753-0e165cff1e10@AM1EHSMHS004.ehs.local>
-References: <1379033737-30015-1-git-send-email-soren.brinkmann@xilinx.com>
- <1379033737-30015-2-git-send-email-soren.brinkmann@xilinx.com>
- <20130913170005.GB5681@roeck-us.net>
- <c6755ff6-104d-40fe-a753-0e165cff1e10@AM1EHSMHS004.ehs.local>
-Message-ID: <523417BF.7030505@gmail.com>
+From: drjones@redhat.com (Andrew Jones)
+Date: Sat, 14 Sep 2013 10:51:00 +0200
+Subject: [PATCH] arm64: KVM: Increase max VCPUs per-Guest to 8
+In-Reply-To: <52330943.4090309@arm.com>
+References: <1378904552-29347-1-git-send-email-anup.patel@linaro.org>
+ <52330943.4090309@arm.com>
+Message-ID: <20130914085059.GA2596@hawk.usersys.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/13/2013 07:26 PM, S?ren Brinkmann wrote:
-> On Fri, Sep 13, 2013 at 10:00:05AM -0700, Guenter Roeck wrote:
->> On Thu, Sep 12, 2013 at 05:55:37PM -0700, Soren Brinkmann wrote:
->>> Add a driver for SILabs 570, 571, 598, 599 programmable oscillators.
->>> The devices generate low-jitter clock signals and are reprogrammable via
->>> an I2C interface.
->>>
->>> Cc: Guenter Roeck <linux@roeck-us.net>
->>> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
->>> ---
-[...]
->>> diff --git a/drivers/clk/clk-si570.c b/drivers/clk/clk-si570.c
->>> new file mode 100644
->>> index 0000000..960d689
->>> --- /dev/null
->>> +++ b/drivers/clk/clk-si570.c
->>> @@ -0,0 +1,546 @@
-[...]
->>> +	match = of_match_node(clk_si570_of_match, client->dev.of_node);
->>> +	if (!match)
->>> +		return -EINVAL;
->>
->> Seems unusual. Is this really needed ? It precludes the driver from being used
->> in a non-devicetree environment, for example. I would guess that there is a match
->> if client->dev.of_node is set. Otherwise, this code would be needed in every
->> driver supporting devicetree, and I don't recall seeing that.
->>
->>> +	ddata = match->data;
->>> +
->> You should be able to get this information (ie the pointer to si570_device_data)
->> from id->driver_data. That would be more consistent with other i2c devices.
-> I think I copied this approach from the other clk-si... driver. I'll
-> do some research on your suggestion and change it. Could you point me to
-> an example for your proposal?
+On Fri, Sep 13, 2013 at 01:46:59PM +0100, Marc Zyngier wrote:
+> On 11/09/13 14:02, Anup Patel wrote:
+> > Current max VCPUs per-Guest is set to 4 which is preventing
+> > us from creating a Guest (or VM) with 8 VCPUs on Host (e.g.
+> > X-Gene Storm SOC) with 8 Host CPUs.
+> > 
+> > The correct value of max VCPUs per-Guest should be same as
+> > the max CPUs supported by GICv2 which is 8 hence this patch
+> > increases KVM_MAX_VCPUS to 8.
+> 
+> If anything, please make it configurable just like we have on 32bit. No
+> reason to impose the extra overhead on everyone.
 
-Soeren,
+I have a couple patches I've been meaning to post, one of which does
+this. I'll get them posted now.
 
-I sent a patch for the match removal in clk-si5351 [1].
-Mike must have missed it, I will resend soon.
-You can take that as "an example for the proposal" above.
+drew
 
-Sebastian
-
-[1] https://lkml.org/lkml/2013/9/3/484
+> 
+> Thanks,
+> 
+> 	M.
+> 
+> > Signed-off-by: Anup Patel <anup.patel@linaro.org>
+> > Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
+> > ---
+> >  arch/arm64/include/asm/kvm_host.h |    2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> > 
+> > diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+> > index 0859a4d..60ef29e 100644
+> > --- a/arch/arm64/include/asm/kvm_host.h
+> > +++ b/arch/arm64/include/asm/kvm_host.h
+> > @@ -26,7 +26,7 @@
+> >  #include <asm/kvm_asm.h>
+> >  #include <asm/kvm_mmio.h>
+> >  
+> > -#define KVM_MAX_VCPUS 4
+> > +#define KVM_MAX_VCPUS 8
+> >  #define KVM_USER_MEM_SLOTS 32
+> >  #define KVM_PRIVATE_MEM_SLOTS 4
+> >  #define KVM_COALESCED_MMIO_PAGE_OFFSET 1
+> > 
+> 
+> 
+> -- 
+> Jazz is not dead. It just smells funny...
+> 
+> 
+> _______________________________________________
+> kvmarm mailing list
+> kvmarm at lists.cs.columbia.edu
+> https://lists.cs.columbia.edu/cucslists/listinfo/kvmarm
