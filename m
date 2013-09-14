@@ -1,29 +1,21 @@
 From: drjones@redhat.com (Andrew Jones)
-Date: Sat, 14 Sep 2013 14:10:54 +0200
-Subject: [PATCH 1/3] arm: kvm: clamp NR_VCPUS to MAX_VCPUS
-In-Reply-To: <1379160656-28050-1-git-send-email-drjones@redhat.com>
-References: <1379160656-28050-1-git-send-email-drjones@redhat.com>
-Message-ID: <1379160656-28050-2-git-send-email-drjones@redhat.com>
+Date: Sat, 14 Sep 2013 14:10:53 +0200
+Subject: [PATCH 0/3] KVM_MAX_VCPUS related changes
+Message-ID: <1379160656-28050-1-git-send-email-drjones@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Andrew Jones <drjones@redhat.com>
----
- arch/arm/kvm/arm.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Andrew Jones (3):
+  arm: kvm: clamp NR_VCPUS to MAX_VCPUS
+  arm32: kvm: rename CONFIG_KVM_ARM_MAX_VCPUS
+  aarch64: kvm: introduce CONFIG_KVM_MAX_VCPUS
 
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index 741f66a2edbd7..9ebf8ac3a12ff 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -201,7 +201,7 @@ int kvm_dev_ioctl_check_extension(long ext)
- 		r = 1;
- 		break;
- 	case KVM_CAP_NR_VCPUS:
--		r = num_online_cpus();
-+		r = min(num_online_cpus(), KVM_MAX_VCPUS);
- 		break;
- 	case KVM_CAP_MAX_VCPUS:
- 		r = KVM_MAX_VCPUS;
+ arch/arm/include/asm/kvm_host.h   |  4 ++--
+ arch/arm/kvm/Kconfig              |  8 ++++----
+ arch/arm/kvm/arm.c                |  2 +-
+ arch/arm64/include/asm/kvm_host.h |  7 ++++++-
+ arch/arm64/kvm/Kconfig            | 11 +++++++++++
+ 5 files changed, 24 insertions(+), 8 deletions(-)
+
 -- 
 1.8.1.4
