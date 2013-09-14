@@ -1,90 +1,64 @@
-From: joelf@ti.com (Joel Fernandes)
-Date: Fri, 13 Sep 2013 19:57:21 -0500
-Subject: [PATCH v3] ARM: EDMA: Fix clearing of unused list for DT DMA
- resources
-In-Reply-To: <5231903F.7080301@ti.com>
-References: <1378839171-14455-1-git-send-email-joelf@ti.com>
- <5231903F.7080301@ti.com>
-Message-ID: <5233B471.40603@ti.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 13 Sep 2013 20:40:54 -0500
+Subject: [PROPOSAL] ARM/FDT: passing multiple binaries to a kernel
+In-Reply-To: <CACxGe6sOyNNEATsnRdu9=_nPE1q6V4MDaDKvk4QvJiSgq6jXmg@mail.gmail.com>
+References: <52260608.2030202@linaro.org>
+ <CAL_JsqK9PjpScRO8561PhcyKkxhuL4pgMTCh2-UG_ubybJTcCw@mail.gmail.com>
+ <1378284256.17510.60.camel@kazak.uk.xensource.com>
+ <CAL_Jsq+82xfNCD3LmNE6VD1mp4Vzbm-hPPaMjwg9+ab3moXP_w@mail.gmail.com>
+ <CACxGe6sOyNNEATsnRdu9=_nPE1q6V4MDaDKvk4QvJiSgq6jXmg@mail.gmail.com>
+Message-ID: <CAL_JsqKnNHywcR21XhrjFyGs1DjZnbAFybraRKmxNmELLH-qPA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/12/2013 04:58 AM, Sekhar Nori wrote:
-> On Wednesday 11 September 2013 12:22 AM, Joel Fernandes wrote:
->> HWMOD removal for MMC is breaking edma_start as the events are being manually
->> triggered due to unused channel list not being clear.
-[..]
-> It is better to send one version with all comments fixed. Helps avoid
-> confusion.
+On Fri, Sep 13, 2013 at 5:13 AM, Grant Likely <grant.likely@secretlab.ca> wrote:
+> On Wed, Sep 4, 2013 at 5:41 PM, Rob Herring <robherring2@gmail.com> wrote:
+>>> For u-boot Andre has proposed some syntactic sugar over the "fdt"
+>>> command to make boot.scr more trivial to use. We would of course need to
+>>> implement support for using it in the relevant distro tools (but they
+>>> tend to be very distro/machine specific already, e.g. Debian's
+>>> flash-kernel)
+>>
+>> And being machine specific is a PITA. flash-kernel is certainly not
+>> something we want to expand on. There is not much love for boot.scr
+>> either. There is work to address what are not really machine
+>> differences, but largely vendor u-boot differences:
+>>
+>> http://www.mail-archive.com/u-boot at lists.denx.de/msg119025.html
+>>
+>> One option for u-boot which already supports syslinux style menu files
+>> is to adopt the syslinux multiboot parsing support:
+>>
+>> http://www.syslinux.org/wiki/index.php/Doc/mboot
+>
+> Even building it into U-Boot is problematic because it leaves older
+> machines out in the cold. Leif's port of Grub to U-Boot is far more
+> interesting since the distro can now be in control of the code that
+> loads the images and jumps into the kernel/hypervisor.
 
-Ok, here is the final version with all comments fixed, please apply this one:
+Considering there is no distro support for grub on ARM yet, it may be
+more interesting in the long run, but it is not for the short term. So
+there needs to be something that is supportable on both u-boot and
+grub (or any other bootloader).
 
---->8---
-From: Joel Fernandes <joelf@ti.com>
-Subject: [PATCH v4] ARM: EDMA: Fix clearing of unused list for DT DMA resources
+>
+>> We need to back-up and consider what this looks like in the end for
+>> all the pieces and get input from folks on grub, UEFI, and armv8. The
+>> UEFI answer may be this is a grub problem. For armv8, this proposal
+>> does match up well as the kernel boot interface for v8 is DT. Despite
+>> some claims, ACPI will not completely replace DT because of this.
+>
+> Yes, for UEFI it is absolutely an OS loader problem. UEFI provides an
+> API and runtime environment. Grub is in general moving towards a boot
+> menu system and a tool for loading images. Actual booting however
+> should be done by a separate OS loader application. For Linux, this
+> will be an in-kernel UEFI Stub. For Xen I would recommend taking the
+> Linux EFI stub code and doing the same thing. There really isn't a
+> need for a multiboot spec when you can rely on a runtime execution
+> environment for setting things up exactly as you want them.
 
-HWMOD removal for MMC is breaking edma_start as the events are being manually
-triggered due to unused channel list not being clear.
+You've lost me as well. How do you see the flow working with UEFI for
+a user running bare metal OS, installing Xen, and rebooting running
+Xen.
 
-This patch fixes the issue, by reading the "dmas" property from the DT node if
-it exists and clearing the bits in the unused channel list. For this purpose
-we use the of_* helpers to parse the arguments in the dmas phandle list.
-
-Reviewed-by: Sekhar Nori <nsekhar@ti.com>
-Reported-by: Balaji T K <balajitk@ti.com>
-Cc: Pantel Antoniou <panto@antoniou-consulting.com>
-Signed-off-by: Joel Fernandes <joelf@ti.com>
----
-Changes since v1, in v2 and v3:
-- Reduced indentation of non-of case by returning from of-case
-- Using of_* helpers for parsing
-
-Note:
-This patch should go into the merge window as it is a critical bug fix.
-
- arch/arm/common/edma.c | 23 +++++++++++++++++++++--
- 1 file changed, 21 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/common/edma.c b/arch/arm/common/edma.c
-index 39ad030..43c7b22 100644
---- a/arch/arm/common/edma.c
-+++ b/arch/arm/common/edma.c
-@@ -560,14 +560,33 @@ static int reserve_contiguous_slots(int ctlr, unsigned int
-id,
- static int prepare_unused_channel_list(struct device *dev, void *data)
- {
- 	struct platform_device *pdev = to_platform_device(dev);
--	int i, ctlr;
-+	int i, count, ctlr;
-+	struct of_phandle_args  dma_spec;
-
-+	if (dev->of_node) {
-+		count = of_property_count_strings(dev->of_node, "dma-names");
-+		if (count < 0)
-+			return 0;
-+		for (i = 0; i < count; i++) {
-+			if (of_parse_phandle_with_args(dev->of_node, "dmas",
-+						       "#dma-cells", i,
-+						       &dma_spec))
-+				continue;
-+
-+			ctlr = EDMA_CTLR(dma_spec.args[0]);
-+			clear_bit(EDMA_CHAN_SLOT(dma_spec.args[0]),
-+				  edma_cc[ctlr]->edma_unused);
-+		}
-+		return 0;
-+	}
-+
-+	/* For non-OF case */
- 	for (i = 0; i < pdev->num_resources; i++) {
- 		if ((pdev->resource[i].flags & IORESOURCE_DMA) &&
- 				(int)pdev->resource[i].start >= 0) {
- 			ctlr = EDMA_CTLR(pdev->resource[i].start);
- 			clear_bit(EDMA_CHAN_SLOT(pdev->resource[i].start),
--					edma_cc[ctlr]->edma_unused);
-+				  edma_cc[ctlr]->edma_unused);
- 		}
- 	}
-
--- 
-1.8.1.2
+Rob
