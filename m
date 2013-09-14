@@ -1,77 +1,79 @@
-From: preeti@linux.vnet.ibm.com (Preeti U Murthy)
-Date: Sat, 14 Sep 2013 05:53:10 +0530
-Subject: [PATCH 1/2] tick: broadcast: Deny per-cpu clockevents from being
- broadcast sources
-In-Reply-To: <2a29ccc9-6aea-47ca-9306-4f17d7cc2fe4@DB9EHSMHS013.ehs.local>
-References: <1379004640-15117-1-git-send-email-soren.brinkmann@xilinx.com>
- <1379004640-15117-2-git-send-email-soren.brinkmann@xilinx.com>
- <alpine.DEB.2.02.1309122224420.4089@ionos.tec.linutronix.de>
- <5232CC15.8090208@linaro.org>
- <CAM4v1pPQwBfQ3V6M2VGsc-Fh+VhLkQE2JZeoVc=_3kniODNEhA@mail.gmail.com>
- <5232EB72.9050904@linux.vnet.ibm.com>
- <2a29ccc9-6aea-47ca-9306-4f17d7cc2fe4@DB9EHSMHS013.ehs.local>
-Message-ID: <5233AC6E.1040002@linux.vnet.ibm.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Sat, 14 Sep 2013 04:29:22 +0400
+Subject: [PATCH] ARM: shmobile: Lager: add Micrel KSZ8041 PHY fixup
+Message-ID: <201309140429.23474.sergei.shtylyov@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Soren,
+Currently on the Lager board NFS timeouts/delays are seen when booting.  That
+turned out to happen because the SoC's ETH_LINK signal turns on and off after
+each packet.  It is connected to Micrel KSZ8041 PHY's LED0 signal. Ether LEDs
+on the Lager board are named LINK and ACTIVE which corresponds to non-default
+01 setting of the PHY control register 1 bits 14-15. The 'sh_eth' driver resets
+the PHY when opening the network device, so we have to set the mentioned bits
+back to 01 from the default 00 value which causes bouncing of ETH_LINK.  That
+can be achieved using the PHY platform fixup mechanism if we also modify the
+driver to use it..
 
-On 09/13/2013 09:53 PM, S?ren Brinkmann wrote:
-> Hi Preeti,
-> Thanks for the explanation but now I'm a little confused. That's a lot of
-> details and I'm lacking the in depth knowledge to fully understand
-> everything.
-> 
-> Is it correct to say, that your patch series enables per cpu devices to
-> be the broadcast device - for PPC?
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-Not really. We have a pseudo clock device, which is registered as the
-broadcast device. This clock device has all the features of an external
-clock device that the broadcast framework expects from a broadcast
-device like !CLOCK_FEAT_C3STOP & !FEAT_PERCPU that you introduce in your
-patch.
+---
+This patch is against the recent Linus' tree. Its effect on NFS issue depends
+on the 'sh_eth' driver patch I've posted earlier. 
+Simon, please update your 'master' and/or 'fixes' branches since currently it's
+impossible to apply fixes to your tree.
 
-It as though we trick the broadcast framework into believing that we
-have an external device, while in reality the pseudo device is just a dummy.
+ arch/arm/mach-shmobile/board-lager.c |   27 ++++++++++++++++++++++++++-
+ 1 file changed, 26 insertions(+), 1 deletion(-)
 
-So if this is a pseudo device, which gets registered as the broadcast
-device, how do we program it to handle broadcast events? That is where
-the per cpu device steps in. It serves as the clock source to this
-pseudo device. Meaning we program the per cpu device for the next
-broadcast event using a hrtimer framework that we introduce, which calls
-pseudo_dev->event_handler on expiry. This is nothing but the broadcast
-handler.
-
-Therefore we are able to manage broadcast without having to have an
-explicit clock device for the purpose.
-
-> And that would mean, that even though you have a per cpu device, you'd
-> deliberately not set the FEAT_PERCPU flag, because on PPC a per cpu
-> timer is a valid broadcast device?
-
-No we would set the FEAT_PERCPU for the per cpu device on PPC. As I
-mentioned above this is not going to be registered as the broadcast
-device. We would however not set this flag for the pseudo device, that
-we register as the broadcast device.
-
-> 
-> Assuming that is not going into an utterly wrong direction: How would we
-> close on this one? AFAIK, ARM does not have this capability and I guess
-> it won't be added. So, should I go forward with the fix proposed by
-> Thomas? Should we rename the FEAT_PERCPU flag to something else, given
-> that PPC may use per cpu devices for broadcasting and the sole usage of
-> that flag is to prevent such a device from becoming the broadcast device?
-
-You can go ahead with this fix because as explained above, when we
-register a broadcast device we use a pseudo device which has the
-features that the broadcast framework approves. The per cpu device does
-not register itself with the broadcast framework. It merely programs
-itself for the next broadcast event. Hence this fix will not hinder the
-broadcast support on PPC.
-> 
-> 	Thanks,
-> 	S?ren
-> 
-> 
-Regards
-Preeti U Murthy
+Index: linux/arch/arm/mach-shmobile/board-lager.c
+===================================================================
+--- linux.orig/arch/arm/mach-shmobile/board-lager.c
++++ linux/arch/arm/mach-shmobile/board-lager.c
+@@ -29,6 +29,7 @@
+ #include <linux/pinctrl/machine.h>
+ #include <linux/platform_data/gpio-rcar.h>
+ #include <linux/platform_device.h>
++#include <linux/phy.h>
+ #include <linux/regulator/fixed.h>
+ #include <linux/regulator/machine.h>
+ #include <linux/sh_eth.h>
+@@ -155,6 +156,30 @@ static void __init lager_add_standard_de
+ 					  &ether_pdata, sizeof(ether_pdata));
+ }
+ 
++/*
++ * Ether LEDs on the Lager board are named LINK and ACTIVE which corresponds
++ * to non-default 01 setting of the Micrel KSZ8041 PHY control register 1 bits
++ * 14-15. We have to set them back to 01 from the default 00 value each time
++ * the PHY is reset. It's also important because the PHY's LED0 signal is
++ * connected to SoC's ETH_LINK signal and in the PHY's default mode it will
++ * bounce on and off after each packet, which we apparently want to avoid.
++ */
++static int lager_ksz8041_fixup(struct phy_device *phydev)
++{
++	u16 phyctrl1 = phy_read(phydev, 0x1e);
++
++	phyctrl1 &= ~0xc000;
++	phyctrl1 |= 0x4000;
++	return phy_write(phydev, 0x1e, phyctrl1);
++}
++
++static void __init lager_init(void)
++{
++	lager_add_standard_devices();
++
++	phy_register_fixup_for_id("r8a7790-ether-ff:01", lager_ksz8041_fixup);
++}
++
+ static const char *lager_boards_compat_dt[] __initdata = {
+ 	"renesas,lager",
+ 	NULL,
+@@ -163,6 +188,6 @@ static const char *lager_boards_compat_d
+ DT_MACHINE_START(LAGER_DT, "lager")
+ 	.init_early	= r8a7790_init_delay,
+ 	.init_time	= r8a7790_timer_init,
+-	.init_machine	= lager_add_standard_devices,
++	.init_machine	= lager_init,
+ 	.dt_compat	= lager_boards_compat_dt,
+ MACHINE_END
