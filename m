@@ -1,56 +1,84 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Sat, 14 Sep 2013 18:45:23 +0200
-Subject: [RFC PATCH 1/4] pinctrl: at91: fix typos
-In-Reply-To: <1379058333-3286-1-git-send-email-b.brezillon@overkiz.com>
+Date: Sat, 14 Sep 2013 18:49:08 +0200
+Subject: [RFC PATCH 2/4] pinctrl: at91: fix sam9x5 debounce/deglitch
+ functions
+In-Reply-To: <1379058442-3321-1-git-send-email-b.brezillon@overkiz.com>
 References: <1379058213-3245-1-git-send-email-b.brezillon@overkiz.com>
- <1379058333-3286-1-git-send-email-b.brezillon@overkiz.com>
-Message-ID: <20130914164523.GC11420@ns203013.ovh.net>
+ <1379058442-3321-1-git-send-email-b.brezillon@overkiz.com>
+Message-ID: <20130914164908.GD11420@ns203013.ovh.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09:45 Fri 13 Sep     , Boris BREZILLON wrote:
-> Fix AT91_PINCTRL_DEBOUNCE_VAL dt macro typo.
-> Fix at91_pinctrl_mux_ops callback typos.
+On 09:47 Fri 13 Sep     , Boris BREZILLON wrote:
+> Replace at91_mux_get_deglitch with at91_mux_pio3_get_deglitch when using
+> sam9x5 (pio3) IP.
+> at91_mux_get_deglitch only test the activation of the "Input Filter" which
+> may be overloaded by the activation of the "Input Filter Slow Clock" to use
+> the input filter as a debounce filter instead of a deglitch filter.
+> 
+> Fix at91_mux_pio3_get_debounce to test the activation of the Input Filter
+> before testing the activation of the debounce filter (Input Filter Slow
+> Clock depends on Input Filter).
+> 
+> Fix at91_mux_pio3_set_debounce function to avoid disabling the deglitch
+> filter ("Input Filter") when debounce filter is disabled.
 > 
 Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 > Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
 > ---
->  drivers/pinctrl/pinctrl-at91.c     |    6 +++---
->  include/dt-bindings/pinctrl/at91.h |    2 +-
->  2 files changed, 4 insertions(+), 4 deletions(-)
+>  drivers/pinctrl/pinctrl-at91.c |   18 +++++++++++++-----
+>  1 file changed, 13 insertions(+), 5 deletions(-)
 > 
 > diff --git a/drivers/pinctrl/pinctrl-at91.c b/drivers/pinctrl/pinctrl-at91.c
-> index 19afb9a..50b555a 100644
+> index 50b555a..6624bce 100644
 > --- a/drivers/pinctrl/pinctrl-at91.c
 > +++ b/drivers/pinctrl/pinctrl-at91.c
-> @@ -144,11 +144,11 @@ struct at91_pinctrl_mux_ops {
->  	void (*mux_C_periph)(void __iomem *pio, unsigned mask);
->  	void (*mux_D_periph)(void __iomem *pio, unsigned mask);
->  	bool (*get_deglitch)(void __iomem *pio, unsigned pin);
-> -	void (*set_deglitch)(void __iomem *pio, unsigned mask, bool in_on);
-> +	void (*set_deglitch)(void __iomem *pio, unsigned mask, bool is_on);
->  	bool (*get_debounce)(void __iomem *pio, unsigned pin, u32 *div);
-> -	void (*set_debounce)(void __iomem *pio, unsigned mask, bool in_on, u32 div);
-> +	void (*set_debounce)(void __iomem *pio, unsigned mask, bool is_on, u32 div);
->  	bool (*get_pulldown)(void __iomem *pio, unsigned pin);
-> -	void (*set_pulldown)(void __iomem *pio, unsigned mask, bool in_on);
-> +	void (*set_pulldown)(void __iomem *pio, unsigned mask, bool is_on);
->  	bool (*get_schmitt_trig)(void __iomem *pio, unsigned pin);
->  	void (*disable_schmitt_trig)(void __iomem *pio, unsigned mask);
->  	/* irq */
-> diff --git a/include/dt-bindings/pinctrl/at91.h b/include/dt-bindings/pinctrl/at91.h
-> index d7988b4..0fee6ff 100644
-> --- a/include/dt-bindings/pinctrl/at91.h
-> +++ b/include/dt-bindings/pinctrl/at91.h
-> @@ -16,7 +16,7 @@
->  #define AT91_PINCTRL_PULL_DOWN		(1 << 3)
->  #define AT91_PINCTRL_DIS_SCHMIT		(1 << 4)
->  #define AT91_PINCTRL_DEBOUNCE		(1 << 16)
-> -#define AT91_PINCTRL_DEBOUNCE_VA(x)	(x << 17)
-> +#define AT91_PINCTRL_DEBOUNCE_VAL(x)	(x << 17)
+> @@ -417,6 +417,14 @@ static void at91_mux_set_deglitch(void __iomem *pio, unsigned mask, bool is_on)
+>  	__raw_writel(mask, pio + (is_on ? PIO_IFER : PIO_IFDR));
+>  }
 >  
->  #define AT91_PINCTRL_PULL_UP_DEGLITCH	(AT91_PINCTRL_PULL_UP | AT91_PINCTRL_DEGLITCH)
+> +static bool at91_mux_pio3_get_deglitch(void __iomem *pio, unsigned pin)
+> +{
+> +	if ((__raw_readl(pio + PIO_IFSR) >> pin) & 0x1)
+> +		return !((__raw_readl(pio + PIO_IFSCSR) >> pin) & 0x1);
+> +
+> +	return false;
+> +}
+> +
+>  static void at91_mux_pio3_set_deglitch(void __iomem *pio, unsigned mask, bool is_on)
+>  {
+>  	if (is_on)
+> @@ -428,7 +436,8 @@ static bool at91_mux_pio3_get_debounce(void __iomem *pio, unsigned pin, u32 *div
+>  {
+>  	*div = __raw_readl(pio + PIO_SCDR);
 >  
+> -	return (__raw_readl(pio + PIO_IFSCSR) >> pin) & 0x1;
+> +	return ((__raw_readl(pio + PIO_IFSR) >> pin) & 0x1) &&
+> +	       ((__raw_readl(pio + PIO_IFSCSR) >> pin) & 0x1);
+>  }
+>  
+>  static void at91_mux_pio3_set_debounce(void __iomem *pio, unsigned mask,
+> @@ -438,9 +447,8 @@ static void at91_mux_pio3_set_debounce(void __iomem *pio, unsigned mask,
+>  		__raw_writel(mask, pio + PIO_IFSCER);
+>  		__raw_writel(div & PIO_SCDR_DIV, pio + PIO_SCDR);
+>  		__raw_writel(mask, pio + PIO_IFER);
+> -	} else {
+> -		__raw_writel(mask, pio + PIO_IFDR);
+> -	}
+> +	} else
+> +		__raw_writel(mask, pio + PIO_IFSCDR);
+>  }
+>  
+>  static bool at91_mux_pio3_get_pulldown(void __iomem *pio, unsigned pin)
+> @@ -478,7 +486,7 @@ static struct at91_pinctrl_mux_ops at91sam9x5_ops = {
+>  	.mux_B_periph	= at91_mux_pio3_set_B_periph,
+>  	.mux_C_periph	= at91_mux_pio3_set_C_periph,
+>  	.mux_D_periph	= at91_mux_pio3_set_D_periph,
+> -	.get_deglitch	= at91_mux_get_deglitch,
+> +	.get_deglitch	= at91_mux_pio3_get_deglitch,
+>  	.set_deglitch	= at91_mux_pio3_set_deglitch,
+>  	.get_debounce	= at91_mux_pio3_get_debounce,
+>  	.set_debounce	= at91_mux_pio3_set_debounce,
 > -- 
 > 1.7.9.5
 > 
