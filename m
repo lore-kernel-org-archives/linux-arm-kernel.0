@@ -1,11 +1,64 @@
-From: domenico.andreoli@linux.com (Domenico Andreoli)
-Date: Sat, 14 Sep 2013 17:20:33 +0200
-Subject: [PATCH v4 1/4] ARM: bcm4760: Add platform infrastructure
-References: <20130914152032.401907974@gmail.com>
-Message-ID: <20130914152123.491631670@gmail.com>
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Sat, 14 Sep 2013 17:45:47 +0100
+Subject: [PATCH 18/38] iio: sensors-core: st: Allow full-scale to be an
+ optional feature
+In-Reply-To: <1378817379-8238-19-git-send-email-lee.jones@linaro.org>
+References: <1378817379-8238-1-git-send-email-lee.jones@linaro.org>
+ <1378817379-8238-19-git-send-email-lee.jones@linaro.org>
+Message-ID: <523492BB.5070004@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-An embedded and charset-unspecified text was scrubbed...
-Name: arm-bcm476x-add-infrastructure.patch
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130914/1a50166b/attachment.ksh>
+On 09/10/13 13:49, Lee Jones wrote:
+> Some chips either don't support it or fail to provide adequate documentation,
+> so sometimes it's impossible to enable the feature even if it is supported.
+> 
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+Applied to the togreg branch of iio.git
+
+Thanks
+> ---
+>  drivers/iio/common/st_sensors/st_sensors_core.c | 11 +++++++----
+>  drivers/iio/pressure/st_pressure_core.c         |  6 ++++--
+>  2 files changed, 11 insertions(+), 6 deletions(-)
+> 
+> diff --git a/drivers/iio/common/st_sensors/st_sensors_core.c b/drivers/iio/common/st_sensors/st_sensors_core.c
+> index 965ee22..eb261a5 100644
+> --- a/drivers/iio/common/st_sensors/st_sensors_core.c
+> +++ b/drivers/iio/common/st_sensors/st_sensors_core.c
+> @@ -235,10 +235,13 @@ int st_sensors_init_sensor(struct iio_dev *indio_dev,
+>  	if (err < 0)
+>  		goto init_error;
+>  
+> -	err = st_sensors_set_fullscale(indio_dev,
+> -						sdata->current_fullscale->num);
+> -	if (err < 0)
+> -		goto init_error;
+> +	if (sdata->current_fullscale) {
+> +		err = st_sensors_set_fullscale(indio_dev,
+> +					       sdata->current_fullscale->num);
+> +		if (err < 0)
+> +			goto init_error;
+> +	} else
+> +		dev_info(&indio_dev->dev, "Full-scale not possible\n");
+>  
+>  	err = st_sensors_set_odr(indio_dev, sdata->odr);
+>  	if (err < 0)
+> diff --git a/drivers/iio/pressure/st_pressure_core.c b/drivers/iio/pressure/st_pressure_core.c
+> index ceebd3c..16cfbc5 100644
+> --- a/drivers/iio/pressure/st_pressure_core.c
+> +++ b/drivers/iio/pressure/st_pressure_core.c
+> @@ -226,8 +226,10 @@ int st_press_common_probe(struct iio_dev *indio_dev,
+>  	indio_dev->channels = pdata->sensor->ch;
+>  	indio_dev->num_channels = ARRAY_SIZE(st_press_channels);
+>  
+> -	pdata->current_fullscale = (struct st_sensor_fullscale_avl *)
+> -						&pdata->sensor->fs.fs_avl[0];
+> +	if (pdata->sensor->fs.addr != 0)
+> +		pdata->current_fullscale = (struct st_sensor_fullscale_avl *)
+> +			&pdata->sensor->fs.fs_avl[0];
+> +
+>  	pdata->odr = pdata->sensor->odr.odr_avl[0].hz;
+>  
+>  	if (!plat_data)
+> 
