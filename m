@@ -1,34 +1,33 @@
 From: jic23@kernel.org (Jonathan Cameron)
-Date: Sat, 14 Sep 2013 13:09:00 +0100
-Subject: [PATCH 11/38] Documentation: dt: iio: Add binding for LSM303DLH
-In-Reply-To: <1378817379-8238-12-git-send-email-lee.jones@linaro.org>
+Date: Sat, 14 Sep 2013 13:09:18 +0100
+Subject: [PATCH 12/38] Documentation: dt: iio: Add binding for L3G4200D
+In-Reply-To: <1378817379-8238-13-git-send-email-lee.jones@linaro.org>
 References: <1378817379-8238-1-git-send-email-lee.jones@linaro.org>
- <1378817379-8238-12-git-send-email-lee.jones@linaro.org>
-Message-ID: <523451DC.7050607@kernel.org>
+ <1378817379-8238-13-git-send-email-lee.jones@linaro.org>
+Message-ID: <523451EE.7080307@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-add devicetree list cc
-
+Add devicetree list cc
 On 09/10/13 13:49, Lee Jones wrote:
-> LSM303DLH is a Accelerometer Sensor
+> L3G4200D is a Gyroscope Sensor
 > 
 > Signed-off-by: Lee Jones <lee.jones@linaro.org>
 > ---
->  .../devicetree/bindings/iio/accel/lsm303dlh.txt     | 21 +++++++++++++++++++++
+>  .../devicetree/bindings/iio/gyro/l3g4200d.txt       | 21 +++++++++++++++++++++
 >  1 file changed, 21 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/iio/accel/lsm303dlh.txt
+>  create mode 100644 Documentation/devicetree/bindings/iio/gyro/l3g4200d.txt
 > 
-> diff --git a/Documentation/devicetree/bindings/iio/accel/lsm303dlh.txt b/Documentation/devicetree/bindings/iio/accel/lsm303dlh.txt
+> diff --git a/Documentation/devicetree/bindings/iio/gyro/l3g4200d.txt b/Documentation/devicetree/bindings/iio/gyro/l3g4200d.txt
 > new file mode 100644
-> index 0000000..bb59363
+> index 0000000..29baf9d
 > --- /dev/null
-> +++ b/Documentation/devicetree/bindings/iio/accel/lsm303dlh.txt
+> +++ b/Documentation/devicetree/bindings/iio/gyro/l3g4200d.txt
 > @@ -0,0 +1,21 @@
-> +* STMicroelectronics Accelerometer Sensor
+> +* STMicroelectronics Gyroscope Sensor
 > +
 > +Required properties:
-> +  - compatible: Should be "st,lsm303dlh_accel"
+> +  - compatible: Should be "st,l3g4200d_gyro"
 > +  - reg: The I2C address of the sensor
 > +
 > +Optional properties:
@@ -38,9 +37,9 @@ On 09/10/13 13:49, Lee Jones wrote:
 > +Example:
 > +
 > +i2c at 80128000 {
-> +	lsm303dlh_accel at 19 {
-> +		compatible = "st,lsm303dlh_accel";
-> +		reg = <0x19>;
+> +	l3g4200d_gyro at 68 {
+> +		compatible = "st,l3g4200d_gyro";
+> +		reg = <0x68>;
 > +
 > +		vdd-supply = <&ab8500_ldo_aux1_reg>;
 > +		vddio-supply = <&db8500_vsmps2_reg>;
