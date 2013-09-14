@@ -1,57 +1,53 @@
-From: murzin.v@gmail.com (Vladimir Murzin)
-Date: Sat, 14 Sep 2013 09:41:51 +0200
-Subject: [PATCH 211/228] cpufreq: tegra: remove calls to
- cpufreq_notify_transition()
-In-Reply-To: <CAKohpono-J-Ohzdn=pbNK+HhXhJ2Lf-UBM7OPynTgAwxLd4F4A@mail.gmail.com>
-References: <cover.1379063063.git.viresh.kumar@linaro.org>
- <69073c98beae28a6a75103dd202ec2a6b8b1a674.1379063063.git.viresh.kumar@linaro.org>
- <52339729.7030309@wwwdotorg.org>
- <CAKohpono-J-Ohzdn=pbNK+HhXhJ2Lf-UBM7OPynTgAwxLd4F4A@mail.gmail.com>
-Message-ID: <20130914074148.GA1862@hp530>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Sat, 14 Sep 2013 09:49:27 +0200
+Subject: [PATCH 1/2] Documentation: devicetree: arm: cpus/cpu nodes
+ bindings updates
+In-Reply-To: <52337AEC.9080302@gmail.com>
+References: <1376559743-31848-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1376559743-31848-2-git-send-email-lorenzo.pieralisi@arm.com>
+ <520CE665.8060907@gmail.com>
+ <20130815152238.GF17839@e102568-lin.cambridge.arm.com>
+ <20130913165708.GC5408@e102568-lin.cambridge.arm.com>
+ <52337AEC.9080302@gmail.com>
+Message-ID: <20130914074927.GA23705@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 14, 2013 at 09:39:31AM +0530, Viresh Kumar wrote:
-> On 14 September 2013 04:22, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> > I wonder if this series is bisectable? Perhaps I should just go and read
-> > the rest of the series, but I presume there's a patch somewhere else
-> > that adds those two cpufreq_notify_transition() to the cpufreq core.
-> > Either that happens before this patch (in which case listeners will get
-> > two notifications each time; perhaps that is safe?), or after this patch
-> > (in which case with just this patch applied, no notifications will be
-> > sent until a later patch!
+On Fri, Sep 13, 2013 at 03:51:56PM -0500, Rob Herring wrote:
+> On 09/13/2013 11:57 AM, Lorenzo Pieralisi wrote:
+> > Hi Rob, all,
+> > 
+> > On Thu, Aug 15, 2013 at 04:22:38PM +0100, Lorenzo Pieralisi wrote:
+> >> [adding Andrew, Gregory and Thomas to check the Marvell compatible names]
+> >>
+> >> On Thu, Aug 15, 2013 at 03:32:05PM +0100, Rob Herring wrote:
+> >>> On 08/15/2013 04:42 AM, Lorenzo Pieralisi wrote:
+> >>>> In order to extend the current cpu nodes bindings to newer CPUs
+> >>>> inclusive of AArch64 and to update support for older ARM CPUs this
+> >>>> patch updates device tree documentation for the cpu nodes bindings.
+> >>>>
+> >>>> Main changes:
+> >>>>     - adds 64-bit bindings
+> >>>>     - define usage of #address-cells
+> >>>>     - defines behaviour on pre and post v7 uniprocessor systems
+> >>>>     - adds ARM 11MPcore specific reg property definition
+> >>>>
+> >>>> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> >>>> ---
+> >>>>  Documentation/devicetree/bindings/arm/cpus.txt | 424 ++++++++++++++++++++++---
+> >>>>  1 file changed, 377 insertions(+), 47 deletions(-)
+> >>>>
+> >>>
+> >>> The binding looks mostly fine to me.
+> > 
+> > These bindings have still not received an ACK, and need review by
+> > Marvell guys in copy for the new compatible strings below.
 > 
-> Hmm.. Good Catch..
-> 
-> So, yes git bisect would be compilable but not runnable.. As we are
-> already serialized notifications and so two PRE notifications will
-> generate a crash..
-> 
-> But I don't want to get all that in a single patch as that would be:
-> 
->  40 files changed, 192 insertions(+), 623 deletions(-)
-> 
-> And that would be hard to review it..
-> 
-> Any suggestions?
-> 
+> If you can't get comment, then leave them out if they are not used
+> already. If they are used, then tough shit when they want to change.
 
-It reminds me time of removing CONFIG_HOTPLUG and following __dev* attributes.
-At least stats for 48c68c4 "Drivers: video: remove __dev* attributes" is:
+Hi Rob
 
-135 files changed, 1017 insertions(+), 1129 deletions(-)
+We are working on it. Hope to be able to comment soon.
 
-Maybe coccinelle script, which maintainers could run it on their trees, would
-help?
-
-Vladimir
-
-> > Aside from that, all the Tegra-specific patches in this series,
-> > Acked-by: Stephen Warren <swarren@nvidia.com>
-> 
-> Thanks..
-> 
-> _______________________________________________
-> linaro-kernel mailing list
-> linaro-kernel at lists.linaro.org
-> http://lists.linaro.org/mailman/listinfo/linaro-kernel
+   Andrew
