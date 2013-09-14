@@ -1,82 +1,32 @@
 From: pali.rohar@gmail.com (Pali =?utf-8?q?Roh=C3=A1r?=)
-Date: Sat, 14 Sep 2013 11:37:12 +0200
-Subject: [PATCH v4 1/2] ARM: OMAP: Add secure function omap_smc3() which
- calling instruction smc #1
-In-Reply-To: <201309080943.30542@pali>
-References: <20130904124303.GA2369@localhost.localdomain>
- <201309080943.30542@pali>
-Message-ID: <201309141137.13232@pali>
+Date: Sat, 14 Sep 2013 11:38:44 +0200
+Subject: [PATCH 0/4] Add support for charging battery in Nokia RX-51
+In-Reply-To: <1378630239-10006-1-git-send-email-pali.rohar@gmail.com>
+References: <1378630239-10006-1-git-send-email-pali.rohar@gmail.com>
+Message-ID: <201309141138.44950@pali>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 08 September 2013 09:43:29 Pali Roh?r wrote:
-> Here is new version (v4) of omap secure part patch:
+On Sunday 08 September 2013 10:50:35 Pali Roh?r wrote:
+> This patch series finally bringing support for charging
+> battery on Nokia N900 (RX-51) without any proprietary Nokia
+> bits in userspace.
 > 
-> Other secure functions omap_smc1() and omap_smc2() calling
-> instruction smc #0 but Nokia RX-51 board needs to call smc #1
-> for PPA access.
+> Pali Roh?r (4):
+>   usb: musb: Call atomic_notifier_call_chain when status is
+> changed power: isp1704_charger: Fix driver to work with
+> changes introduced in v3.5
+>   power: isp1704_charger: Add callback function set_current
+>   RX-51: Add platform function and data for bq24150a charger
 > 
-> Signed-off-by: Ivaylo Dimitrov <freemangordon@abv.bg>
-> Signed-off-by: Pali Roh?r <pali.rohar@gmail.com>
-> ---
-> diff --git a/arch/arm/mach-omap2/omap-secure.h
-> b/arch/arm/mach-omap2/omap-secure.h index 0e72917..c4586f4
-> 100644
-> --- a/arch/arm/mach-omap2/omap-secure.h
-> +++ b/arch/arm/mach-omap2/omap-secure.h
-> @@ -51,6 +51,7 @@
->  extern u32 omap_secure_dispatcher(u32 idx, u32 flag, u32
-> nargs, u32 arg1, u32 arg2, u32 arg3, u32 arg4);
->  extern u32 omap_smc2(u32 id, u32 falg, u32 pargs);
-> +extern u32 omap_smc3(u32 id, u32 process, u32 flag, u32
-> pargs); extern phys_addr_t
-> omap_secure_ram_mempool_base(void); extern int
-> omap_secure_ram_reserve_memblock(void);
-> 
-> diff --git a/arch/arm/mach-omap2/omap-smc.S
-> b/arch/arm/mach-omap2/omap-smc.S index f6441c1..fd90125
-> 100644
-> --- a/arch/arm/mach-omap2/omap-smc.S
-> +++ b/arch/arm/mach-omap2/omap-smc.S
-> @@ -1,9 +1,11 @@
->  /*
-> - * OMAP44xx secure APIs file.
-> + * OMAP34xx and OMAP44xx secure APIs file.
->   *
->   * Copyright (C) 2010 Texas Instruments, Inc.
->   * Written by Santosh Shilimkar <santosh.shilimkar@ti.com>
->   *
-> + * Copyright (C) 2012 Ivaylo Dimitrov <freemangordon@abv.bg>
-> + * Copyright (C) 2013 Pali Roh?r <pali.rohar@gmail.com>
->   *
->   * This program is free software,you can redistribute it
-> and/or modify * it under the terms of the GNU General Public
-> License version 2 as @@ -54,6 +56,23 @@ ENTRY(omap_smc2)
->  	ldmfd   sp!, {r4-r12, pc}
->  ENDPROC(omap_smc2)
-> 
-> +/**
-> + * u32 omap_smc3(u32 service_id, u32 process_id, u32 flag,
-> u32 pargs) + * Low level common routine for secure HAL and
-> PPA APIs via smc #1 + * r0 - @service_id: Secure Service ID
-> + * r1 - @process_id: Process ID
-> + * r2 - @flag: Flag to indicate the criticality of operation
-> + * r3 - @pargs: Physical address of parameter list
-> + */
-> +ENTRY(omap_smc3)
-> +	stmfd	sp!, {r4-r11, lr}
-> +	mov	r12, r0		@ Copy the secure service ID
-> +	mov	r6, #0xff	@ Indicate new Task call
-> +	dsb			@ Memory Barrier (not sure if needed, copied from
-> omap_smc2) +	smc	#1		@ Call PPA service
-> +	ldmfd	sp!, {r4-r11, pc}
-> +ENDPROC(omap_smc3)
-> +
->  ENTRY(omap_modify_auxcoreboot0)
->  	stmfd   sp!, {r1-r12, lr}
->  	ldr	r12, =0x104
+>  arch/arm/mach-omap2/board-rx51-peripherals.c |   56
+> +++++++++++++- drivers/power/isp1704_charger.c              |
+>  107 ++++++++++++++------------ drivers/usb/musb/omap2430.c  
+>                |    3 + drivers/usb/phy/phy-twl4030-usb.c    
+>        |    2 + include/linux/power/isp1704_charger.h       
+> |    1 + 5 files changed, 117 insertions(+), 52 deletions(-)
 
-Dave, it is ok now?
+Hello, can you review this patch series?
 
 -- 
 Pali Roh?r
@@ -87,4 +37,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 198 bytes
 Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130914/dadfb89f/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130914/5e97a21a/attachment.sig>
