@@ -1,59 +1,56 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Sat, 14 Sep 2013 13:27:25 +0100
-Subject: [PATCH 14/38] iio: accel: st: Append _accel to accelerator sensor
- device names
-In-Reply-To: <52345330.4050707@kernel.org>
-References: <1378817379-8238-1-git-send-email-lee.jones@linaro.org>
- <1378817379-8238-15-git-send-email-lee.jones@linaro.org>
- <52345330.4050707@kernel.org>
-Message-ID: <5234562D.5050803@kernel.org>
+From: anup@brainfault.org (Anup Patel)
+Date: Sat, 14 Sep 2013 17:07:17 +0530
+Subject: [PATCH v2 0/4] Target CPU=Host implementation for KVM ARM/ARM64
+In-Reply-To: <1379156917-17497-1-git-send-email-anup.patel@linaro.org>
+References: <1379156917-17497-1-git-send-email-anup.patel@linaro.org>
+Message-ID: <CAAhSdy1rejL7Ck6VVNUgEy5We_vi6REO9Y3cW8dNGcPToXJtNA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/14/13 13:14, Jonathan Cameron wrote:
-> On 09/10/13 13:49, Lee Jones wrote:
->> Some of ST's sensors are appended with their sensor type and some
->> are not. For consistency we're extending the same naming convention
->> throughout.
->>
->> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> Honestly I don't care either way on these, but consistency would definitely
-> be good so applied to the togreg branch of iio.git
-> 
-> Thanks,
-
-Actually change of plan. I'm going to hold off on these as this an ABI change.
-Iritating though having these as completely inconsistent is, changing this
-will change device identification from userspace which is not a good idea.
-
-Sorry Lee, but we really shouldn't do this. I should have picked up on this
-in the original driver reviews but that's hindsight for you.
-
->> ---
->>  drivers/iio/accel/st_accel.h | 4 ++--
->>  1 file changed, 2 insertions(+), 2 deletions(-)
->>
->> diff --git a/drivers/iio/accel/st_accel.h b/drivers/iio/accel/st_accel.h
->> index c387763..d8d22e5 100644
->> --- a/drivers/iio/accel/st_accel.h
->> +++ b/drivers/iio/accel/st_accel.h
->> @@ -15,11 +15,11 @@
->>  #include <linux/iio/common/st_sensors.h>
->>  
->>  #define LSM303DLHC_ACCEL_DEV_NAME	"lsm303dlhc_accel"
->> -#define LIS3DH_ACCEL_DEV_NAME		"lis3dh"
->> +#define LIS3DH_ACCEL_DEV_NAME		"lis3dh_accel"
->>  #define LSM330D_ACCEL_DEV_NAME		"lsm330d_accel"
->>  #define LSM330DL_ACCEL_DEV_NAME		"lsm330dl_accel"
->>  #define LSM330DLC_ACCEL_DEV_NAME	"lsm330dlc_accel"
->> -#define LIS331DLH_ACCEL_DEV_NAME	"lis331dlh"
->> +#define LIS331DLH_ACCEL_DEV_NAME	"lis331dlh_accel"
->>  #define LSM303DL_ACCEL_DEV_NAME		"lsm303dl_accel"
->>  #define LSM303DLH_ACCEL_DEV_NAME	"lsm303dlh_accel"
->>  #define LSM303DLM_ACCEL_DEV_NAME	"lsm303dlm_accel"
->>
+On Sat, Sep 14, 2013 at 4:38 PM, Anup Patel <anup.patel@linaro.org> wrote:
+> It will be very useful for user space if it has a method of querying
+> VCPU target type matching to underlying Host. We can use such querying
+> mechanism and implement machine models in user space where VCPU target
+> type is always same-as/similar-to underlying Host (i.e. Target CPU=Host).
+>
+> This patch series implements KVM_ARM_PREFERRED_TARGET ioclt for querying
+> VCPU target type matching underlying host. Using this new ioctl we can
+> implement VCPU target CPU=Host in user space (i.e. QEMU/KVMTOOL).
+>
+> Also, it is not mandatory to call KVM_ARM_PREFERRED_TARGET ioctl and the
+> old method of trying all possible target types using KVM_ARM_VCPU_INIT
+> ioctl to initialize VCPU works fine.
+>
+> Anup Patel (4):
+>   ARM: KVM: Implement kvm_vcpu_preferred_target() function
+>   ARM64: KVM: Implement kvm_vcpu_preferred_target() function
+>   ARM/ARM64: KVM: Implement KVM_ARM_PREFERRED_TARGET ioctl
+>   KVM: Add documentation for KVM_ARM_PREFERRED_TARGET ioctl
+>
+>  Documentation/virtual/kvm/api.txt |   26 ++++++++++++++++++++++----
+>  arch/arm/include/asm/kvm_host.h   |    1 +
+>  arch/arm/kvm/arm.c                |   12 ++++++++++++
+>  arch/arm/kvm/guest.c              |   19 +++++++++++++++++++
+>  arch/arm64/include/asm/kvm_host.h |    1 +
+>  arch/arm64/kvm/guest.c            |   20 ++++++++++++++++++++
+>  include/uapi/linux/kvm.h          |    1 +
+>  7 files changed, 76 insertions(+), 4 deletions(-)
+>
 > --
-> To unsubscribe from this list: send the line "unsubscribe linux-iio" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+> 1.7.9.5
+>
+> _______________________________________________
+> kvmarm mailing list
+> kvmarm at lists.cs.columbia.edu
+> https://lists.cs.columbia.edu/cucslists/listinfo/kvmarm
+
+Hi Christoffer,
+
+I forgot to address two of your comments in this patch-series:
+1. Make the IOCTL as VM IOCTL
+2. Return ENODEV instead of EINVAL from IOCTL.
+
+I will take care of the above in v3.
+
+Regards,
+Anup
