@@ -1,48 +1,65 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Sat, 14 Sep 2013 13:09:37 +0100
-Subject: [PATCH 13/38] Documentation: dt: iio: Add binding for LSM303DLH
-In-Reply-To: <1378817379-8238-14-git-send-email-lee.jones@linaro.org>
-References: <1378817379-8238-1-git-send-email-lee.jones@linaro.org>
- <1378817379-8238-14-git-send-email-lee.jones@linaro.org>
-Message-ID: <52345201.6040501@kernel.org>
+From: anup.patel@linaro.org (Anup Patel)
+Date: Sat, 14 Sep 2013 16:38:34 +0530
+Subject: [PATCH v2 1/4] ARM: KVM: Implement kvm_vcpu_preferred_target()
+ function
+In-Reply-To: <1379156917-17497-1-git-send-email-anup.patel@linaro.org>
+References: <1379156917-17497-1-git-send-email-anup.patel@linaro.org>
+Message-ID: <1379156917-17497-2-git-send-email-anup.patel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add devicetree list cc.
-On 09/10/13 13:49, Lee Jones wrote:
-> LSM303DLH is a Magnetometer Sensor
-> 
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> ---
->  .../bindings/iio/magnetometer/lsm303dlh.txt         | 21 +++++++++++++++++++++
->  1 file changed, 21 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/iio/magnetometer/lsm303dlh.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/iio/magnetometer/lsm303dlh.txt b/Documentation/devicetree/bindings/iio/magnetometer/lsm303dlh.txt
-> new file mode 100644
-> index 0000000..5938369
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/iio/magnetometer/lsm303dlh.txt
-> @@ -0,0 +1,21 @@
-> +* STMicroelectronics Magnetometer Sensor
-> +
-> +Required properties:
-> +  - compatible: Should be "st,lsm303dlh_magn"
-> +  - reg: The I2C address of the sensor
-> +
-> +Optional properties:
-> +  - vdd-supply: Phandle to the Vdd supply regulator
-> +  - vddio-supply: Phandle to the Vdd-IO supply regulator
-> +
-> +Example:
-> +
-> +i2c at 80128000 {
-> +	lsm303dlh_magn at 1e {
-> +		compatible = "st,lsm303dlh_magn";
-> +		reg = <0x1e>;
-> +
-> +		vdd-supply = <&ab8500_ldo_aux1_reg>;
-> +		vddio-supply = <&db8500_vsmps2_reg>;
-> +	};
-> +};
-> 
+This patch implements kvm_vcpu_preferred_target() function for
+KVM ARM which will help us implement KVM_ARM_PREFERRED_TARGET ioctl
+for user space.
+
+Signed-off-by: Anup Patel <anup.patel@linaro.org>
+Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
+---
+ arch/arm/kvm/guest.c              |   19 +++++++++++++++++++
+ arch/arm64/include/asm/kvm_host.h |    1 +
+ 2 files changed, 20 insertions(+)
+
+diff --git a/arch/arm/kvm/guest.c b/arch/arm/kvm/guest.c
+index 152d036..dae1e9f 100644
+--- a/arch/arm/kvm/guest.c
++++ b/arch/arm/kvm/guest.c
+@@ -222,6 +222,25 @@ int kvm_vcpu_set_target(struct kvm_vcpu *vcpu,
+ 	return kvm_reset_vcpu(vcpu);
+ }
+ 
++int kvm_vcpu_preferred_target(struct kvm_vcpu_init *init)
++{
++	int target = kvm_target_cpu();
++
++	if (target < 0)
++		return target;
++
++	memset(init, 0, sizeof(*init));
++
++	/* For now, we return all optional features are available
++	 * for preferred target. In future, we might have features
++	 * available based on underlying host.
++	 */
++	init->target = (__u32)target;
++	init->features[0] |= (1 << KVM_ARM_VCPU_POWER_OFF);
++
++	return 0;
++}
++
+ int kvm_arch_vcpu_ioctl_get_fpu(struct kvm_vcpu *vcpu, struct kvm_fpu *fpu)
+ {
+ 	return -EINVAL;
+diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+index f318c43..b609db3 100644
+--- a/arch/arm64/include/asm/kvm_host.h
++++ b/arch/arm64/include/asm/kvm_host.h
+@@ -156,6 +156,7 @@ struct kvm_vcpu_stat {
+ struct kvm_vcpu_init;
+ int kvm_vcpu_set_target(struct kvm_vcpu *vcpu,
+ 			const struct kvm_vcpu_init *init);
++int kvm_vcpu_preferred_target(struct kvm_vcpu_init *init);
+ unsigned long kvm_arm_num_regs(struct kvm_vcpu *vcpu);
+ int kvm_arm_copy_reg_indices(struct kvm_vcpu *vcpu, u64 __user *indices);
+ struct kvm_one_reg;
+-- 
+1.7.9.5
