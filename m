@@ -1,71 +1,35 @@
 From: magnus.damm@gmail.com (Magnus Damm)
-Date: Sat, 14 Sep 2013 22:46:25 +0900
-Subject: [PATCH 01/05] ARM: shmobile: Add CPU notifier based SCU boot vector
- code
+Date: Sat, 14 Sep 2013 22:46:34 +0900
+Subject: [PATCH 02/05] ARM: shmobile: Let sh73a0 rely on SCU CPU notifier
 In-Reply-To: <20130914134616.19258.27110.sendpatchset@w520>
 References: <20130914134616.19258.27110.sendpatchset@w520>
-Message-ID: <20130914134625.19258.10925.sendpatchset@w520>
+Message-ID: <20130914134634.19258.88978.sendpatchset@w520>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Magnus Damm <damm@opensource.se>
 
-Add CPU notifiers for the shared mach-shmobile SCU code
-to allow removal of the shared SCU boot_secondary code.
-
-Regarding notifiers, at CPU_UP_PREPARE time the SMP boot
-vector is initialized so secondary CPU cores can boot.
+Now when CPU notifiers are used for SCU boot vector
+setup shmobile_smp_scu_boot_secondary() is no longer
+needed.
 
 Signed-off-by: Magnus Damm <damm@opensource.se>
 ---
 
- arch/arm/mach-shmobile/platsmp-scu.c |   24 ++++++++++++++++++++++++
- 1 file changed, 24 insertions(+)
+ arch/arm/mach-shmobile/smp-sh73a0.c |    5 -----
+ 1 file changed, 5 deletions(-)
 
---- 0001/arch/arm/mach-shmobile/platsmp-scu.c
-+++ work/arch/arm/mach-shmobile/platsmp-scu.c	2013-09-14 22:15:07.000000000 +0900
-@@ -7,6 +7,7 @@
-  * it under the terms of the GNU General Public License version 2 as
-  * published by the Free Software Foundation.
-  */
-+#include <linux/cpu.h>
- #include <linux/delay.h>
- #include <linux/init.h>
- #include <linux/io.h>
-@@ -16,6 +17,26 @@
- #include <asm/smp_scu.h>
- #include <mach/common.h>
- 
-+static int shmobile_smp_scu_notifier_call(struct notifier_block *nfb,
-+					  unsigned long action, void *hcpu)
-+{
-+	unsigned int cpu = (long)hcpu;
-+
-+	switch (action) {
-+	case CPU_UP_PREPARE:
-+		/* For this particular CPU register SCU SMP boot vector */
-+		shmobile_smp_hook(cpu, virt_to_phys(shmobile_boot_scu),
-+				  (unsigned long)shmobile_scu_base);
-+		break;
-+	};
-+
-+	return NOTIFY_OK;
-+}
-+
-+static struct notifier_block shmobile_smp_scu_notifier = {
-+	.notifier_call = shmobile_smp_scu_notifier_call,
-+};
-+
- void __init shmobile_smp_scu_prepare_cpus(unsigned int max_cpus)
+--- 0001/arch/arm/mach-shmobile/smp-sh73a0.c
++++ work/arch/arm/mach-shmobile/smp-sh73a0.c	2013-09-14 19:28:29.000000000 +0900
+@@ -46,11 +46,6 @@ void __init sh73a0_register_twd(void)
+ static int sh73a0_boot_secondary(unsigned int cpu, struct task_struct *idle)
  {
- 	/* install boot code shared by all CPUs */
-@@ -25,6 +46,9 @@ void __init shmobile_smp_scu_prepare_cpu
- 	/* enable SCU and cache coherency on booting CPU */
- 	scu_enable(shmobile_scu_base);
- 	scu_power_mode(shmobile_scu_base, SCU_PM_NORMAL);
-+
-+	/* Use CPU notifier for reset vector control */
-+	register_cpu_notifier(&shmobile_smp_scu_notifier);
- }
+ 	unsigned int lcpu = cpu_logical_map(cpu);
+-	int ret;
+-
+-	ret = shmobile_smp_scu_boot_secondary(cpu, idle);
+-	if (ret)
+-		return ret;
  
- int shmobile_smp_scu_boot_secondary(unsigned int cpu, struct task_struct *idle)
+ 	if (((__raw_readl(PSTR) >> (4 * lcpu)) & 3) == 3)
+ 		__raw_writel(1 << lcpu, WUPCR);	/* wake up */
