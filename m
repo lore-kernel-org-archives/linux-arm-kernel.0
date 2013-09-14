@@ -1,89 +1,56 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Sat, 14 Sep 2013 18:49:08 +0200
-Subject: [RFC PATCH 2/4] pinctrl: at91: fix sam9x5 debounce/deglitch
- functions
-In-Reply-To: <1379058442-3321-1-git-send-email-b.brezillon@overkiz.com>
-References: <1379058213-3245-1-git-send-email-b.brezillon@overkiz.com>
- <1379058442-3321-1-git-send-email-b.brezillon@overkiz.com>
-Message-ID: <20130914164908.GD11420@ns203013.ovh.net>
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Sat, 14 Sep 2013 18:51:11 +0100
+Subject: [PATCH 32/38] iio: accel-core: st: Move LSM303DLH into correct
+ group
+In-Reply-To: <1378817379-8238-33-git-send-email-lee.jones@linaro.org>
+References: <1378817379-8238-1-git-send-email-lee.jones@linaro.org>
+ <1378817379-8238-33-git-send-email-lee.jones@linaro.org>
+Message-ID: <5234A20F.7040008@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09:47 Fri 13 Sep     , Boris BREZILLON wrote:
-> Replace at91_mux_get_deglitch with at91_mux_pio3_get_deglitch when using
-> sam9x5 (pio3) IP.
-> at91_mux_get_deglitch only test the activation of the "Input Filter" which
-> may be overloaded by the activation of the "Input Filter Slow Clock" to use
-> the input filter as a debounce filter instead of a deglitch filter.
+On 09/10/13 13:49, Lee Jones wrote:
+> The LSM303DLH's WAI (WhoAmI) is 0x33, meaning it should be enabled by
+> Accel Sensor group one. For the device to probe without error, we'll
+> need to ensure it's registered with the correct WAI.
 > 
-> Fix at91_mux_pio3_get_debounce to test the activation of the Input Filter
-> before testing the activation of the debounce filter (Input Filter Slow
-> Clock depends on Input Filter).
-> 
-> Fix at91_mux_pio3_set_debounce function to avoid disabling the deglitch
-> filter ("Input Filter") when debounce filter is disabled.
-> 
-Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+You clearly have a better datasheet than I have as for that part it doesn't even claim to
+have the relevant register to read a who am I from.
+
+Now that datasheet does list odr values as 50, 100, 400 1000 which would put it where it originally
+was in these tables.
+
+http://www.st.com/web/en/resource/technical/document/datasheet/CD00260288.pdf
+
+I haven't checked other elements...
+
+I'm confused but suspect we may need another type entry to deal with this one.
+
 > ---
->  drivers/pinctrl/pinctrl-at91.c |   18 +++++++++++++-----
->  1 file changed, 13 insertions(+), 5 deletions(-)
+>  drivers/iio/accel/st_accel_core.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
 > 
-> diff --git a/drivers/pinctrl/pinctrl-at91.c b/drivers/pinctrl/pinctrl-at91.c
-> index 50b555a..6624bce 100644
-> --- a/drivers/pinctrl/pinctrl-at91.c
-> +++ b/drivers/pinctrl/pinctrl-at91.c
-> @@ -417,6 +417,14 @@ static void at91_mux_set_deglitch(void __iomem *pio, unsigned mask, bool is_on)
->  	__raw_writel(mask, pio + (is_on ? PIO_IFER : PIO_IFDR));
->  }
->  
-> +static bool at91_mux_pio3_get_deglitch(void __iomem *pio, unsigned pin)
-> +{
-> +	if ((__raw_readl(pio + PIO_IFSR) >> pin) & 0x1)
-> +		return !((__raw_readl(pio + PIO_IFSCSR) >> pin) & 0x1);
-> +
-> +	return false;
-> +}
-> +
->  static void at91_mux_pio3_set_deglitch(void __iomem *pio, unsigned mask, bool is_on)
->  {
->  	if (is_on)
-> @@ -428,7 +436,8 @@ static bool at91_mux_pio3_get_debounce(void __iomem *pio, unsigned pin, u32 *div
->  {
->  	*div = __raw_readl(pio + PIO_SCDR);
->  
-> -	return (__raw_readl(pio + PIO_IFSCSR) >> pin) & 0x1;
-> +	return ((__raw_readl(pio + PIO_IFSR) >> pin) & 0x1) &&
-> +	       ((__raw_readl(pio + PIO_IFSCSR) >> pin) & 0x1);
->  }
->  
->  static void at91_mux_pio3_set_debounce(void __iomem *pio, unsigned mask,
-> @@ -438,9 +447,8 @@ static void at91_mux_pio3_set_debounce(void __iomem *pio, unsigned mask,
->  		__raw_writel(mask, pio + PIO_IFSCER);
->  		__raw_writel(div & PIO_SCDR_DIV, pio + PIO_SCDR);
->  		__raw_writel(mask, pio + PIO_IFER);
-> -	} else {
-> -		__raw_writel(mask, pio + PIO_IFDR);
-> -	}
-> +	} else
-> +		__raw_writel(mask, pio + PIO_IFSCDR);
->  }
->  
->  static bool at91_mux_pio3_get_pulldown(void __iomem *pio, unsigned pin)
-> @@ -478,7 +486,7 @@ static struct at91_pinctrl_mux_ops at91sam9x5_ops = {
->  	.mux_B_periph	= at91_mux_pio3_set_B_periph,
->  	.mux_C_periph	= at91_mux_pio3_set_C_periph,
->  	.mux_D_periph	= at91_mux_pio3_set_D_periph,
-> -	.get_deglitch	= at91_mux_get_deglitch,
-> +	.get_deglitch	= at91_mux_pio3_get_deglitch,
->  	.set_deglitch	= at91_mux_pio3_set_deglitch,
->  	.get_debounce	= at91_mux_pio3_get_debounce,
->  	.set_debounce	= at91_mux_pio3_set_debounce,
-> -- 
-> 1.7.9.5
+> diff --git a/drivers/iio/accel/st_accel_core.c b/drivers/iio/accel/st_accel_core.c
+> index ea62291..03a2b6b 100644
+> --- a/drivers/iio/accel/st_accel_core.c
+> +++ b/drivers/iio/accel/st_accel_core.c
+> @@ -170,6 +170,7 @@ static const struct st_sensors st_accel_sensors[] = {
+>  			[2] = LSM330D_ACCEL_DEV_NAME,
+>  			[3] = LSM330DL_ACCEL_DEV_NAME,
+>  			[4] = LSM330DLC_ACCEL_DEV_NAME,
+> +			[5] = LSM303DLH_ACCEL_DEV_NAME,
+>  		},
+>  		.ch = (struct iio_chan_spec *)st_accel_12bit_channels,
+>  		.odr = {
+> @@ -238,8 +239,7 @@ static const struct st_sensors st_accel_sensors[] = {
+>  		.sensors_supported = {
+>  			[0] = LIS331DLH_ACCEL_DEV_NAME,
+>  			[1] = LSM303DL_ACCEL_DEV_NAME,
+> -			[2] = LSM303DLH_ACCEL_DEV_NAME,
+> -			[3] = LSM303DLM_ACCEL_DEV_NAME,
+> +			[2] = LSM303DLM_ACCEL_DEV_NAME,
+>  		},
+>  		.ch = (struct iio_chan_spec *)st_accel_12bit_channels,
+>  		.odr = {
 > 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
