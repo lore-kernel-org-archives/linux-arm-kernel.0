@@ -1,53 +1,56 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Sat, 14 Sep 2013 09:49:27 +0200
-Subject: [PATCH 1/2] Documentation: devicetree: arm: cpus/cpu nodes
- bindings updates
-In-Reply-To: <52337AEC.9080302@gmail.com>
-References: <1376559743-31848-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1376559743-31848-2-git-send-email-lorenzo.pieralisi@arm.com>
- <520CE665.8060907@gmail.com>
- <20130815152238.GF17839@e102568-lin.cambridge.arm.com>
- <20130913165708.GC5408@e102568-lin.cambridge.arm.com>
- <52337AEC.9080302@gmail.com>
-Message-ID: <20130914074927.GA23705@lunn.ch>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Sat, 14 Sep 2013 10:01:03 +0200
+Subject: [PATCH] clk: si570: Add a driver for SI570 oscillators
+In-Reply-To: <c6755ff6-104d-40fe-a753-0e165cff1e10@AM1EHSMHS004.ehs.local>
+References: <1379033737-30015-1-git-send-email-soren.brinkmann@xilinx.com>
+ <1379033737-30015-2-git-send-email-soren.brinkmann@xilinx.com>
+ <20130913170005.GB5681@roeck-us.net>
+ <c6755ff6-104d-40fe-a753-0e165cff1e10@AM1EHSMHS004.ehs.local>
+Message-ID: <523417BF.7030505@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 13, 2013 at 03:51:56PM -0500, Rob Herring wrote:
-> On 09/13/2013 11:57 AM, Lorenzo Pieralisi wrote:
-> > Hi Rob, all,
-> > 
-> > On Thu, Aug 15, 2013 at 04:22:38PM +0100, Lorenzo Pieralisi wrote:
-> >> [adding Andrew, Gregory and Thomas to check the Marvell compatible names]
-> >>
-> >> On Thu, Aug 15, 2013 at 03:32:05PM +0100, Rob Herring wrote:
-> >>> On 08/15/2013 04:42 AM, Lorenzo Pieralisi wrote:
-> >>>> In order to extend the current cpu nodes bindings to newer CPUs
-> >>>> inclusive of AArch64 and to update support for older ARM CPUs this
-> >>>> patch updates device tree documentation for the cpu nodes bindings.
-> >>>>
-> >>>> Main changes:
-> >>>>     - adds 64-bit bindings
-> >>>>     - define usage of #address-cells
-> >>>>     - defines behaviour on pre and post v7 uniprocessor systems
-> >>>>     - adds ARM 11MPcore specific reg property definition
-> >>>>
-> >>>> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> >>>> ---
-> >>>>  Documentation/devicetree/bindings/arm/cpus.txt | 424 ++++++++++++++++++++++---
-> >>>>  1 file changed, 377 insertions(+), 47 deletions(-)
-> >>>>
-> >>>
-> >>> The binding looks mostly fine to me.
-> > 
-> > These bindings have still not received an ACK, and need review by
-> > Marvell guys in copy for the new compatible strings below.
-> 
-> If you can't get comment, then leave them out if they are not used
-> already. If they are used, then tough shit when they want to change.
+On 09/13/2013 07:26 PM, S?ren Brinkmann wrote:
+> On Fri, Sep 13, 2013 at 10:00:05AM -0700, Guenter Roeck wrote:
+>> On Thu, Sep 12, 2013 at 05:55:37PM -0700, Soren Brinkmann wrote:
+>>> Add a driver for SILabs 570, 571, 598, 599 programmable oscillators.
+>>> The devices generate low-jitter clock signals and are reprogrammable via
+>>> an I2C interface.
+>>>
+>>> Cc: Guenter Roeck <linux@roeck-us.net>
+>>> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+>>> ---
+[...]
+>>> diff --git a/drivers/clk/clk-si570.c b/drivers/clk/clk-si570.c
+>>> new file mode 100644
+>>> index 0000000..960d689
+>>> --- /dev/null
+>>> +++ b/drivers/clk/clk-si570.c
+>>> @@ -0,0 +1,546 @@
+[...]
+>>> +	match = of_match_node(clk_si570_of_match, client->dev.of_node);
+>>> +	if (!match)
+>>> +		return -EINVAL;
+>>
+>> Seems unusual. Is this really needed ? It precludes the driver from being used
+>> in a non-devicetree environment, for example. I would guess that there is a match
+>> if client->dev.of_node is set. Otherwise, this code would be needed in every
+>> driver supporting devicetree, and I don't recall seeing that.
+>>
+>>> +	ddata = match->data;
+>>> +
+>> You should be able to get this information (ie the pointer to si570_device_data)
+>> from id->driver_data. That would be more consistent with other i2c devices.
+> I think I copied this approach from the other clk-si... driver. I'll
+> do some research on your suggestion and change it. Could you point me to
+> an example for your proposal?
 
-Hi Rob
+Soeren,
 
-We are working on it. Hope to be able to comment soon.
+I sent a patch for the match removal in clk-si5351 [1].
+Mike must have missed it, I will resend soon.
+You can take that as "an example for the proposal" above.
 
-   Andrew
+Sebastian
+
+[1] https://lkml.org/lkml/2013/9/3/484
