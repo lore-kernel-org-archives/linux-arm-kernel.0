@@ -1,44 +1,71 @@
-From: mingo@kernel.org (Ingo Molnar)
-Date: Sat, 14 Sep 2013 08:02:26 +0200
-Subject: [PATCH] perf tools: Check libunwind for availability of dwarf
- parsing feature
-In-Reply-To: <CAFrcx1nE8GUa59-5TsJxH9+deBLB-vuX2R+b8dxtgFvOX8FC7w@mail.gmail.com>
-References: <1379092121-5981-1-git-send-email-jean.pihet@linaro.org>
- <20130913171503.GC14224@mudshark.cambridge.arm.com>
- <CAFrcx1nE8GUa59-5TsJxH9+deBLB-vuX2R+b8dxtgFvOX8FC7w@mail.gmail.com>
-Message-ID: <20130914060226.GD364@gmail.com>
+From: b.brezillon@overkiz.com (boris brezillon)
+Date: Sat, 14 Sep 2013 09:08:24 +0200
+Subject: [RFC PATCH alt 4/4] pinctrl: at91: rework debounce configuration
+In-Reply-To: <52339479.6030402@wwwdotorg.org>
+References: <1379058213-3245-1-git-send-email-b.brezillon@overkiz.com>
+ <1379058813-3489-1-git-send-email-b.brezillon@overkiz.com>
+ <52339479.6030402@wwwdotorg.org>
+Message-ID: <52340B68.5020505@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hello Stephen,
 
-* Jean Pihet <jean.pihet@linaro.org> wrote:
+Le 14/09/2013 00:40, Stephen Warren a ?crit :
+> On 09/13/2013 01:53 AM, Boris BREZILLON wrote:
+>> AT91 SoCs do not support per pin debounce time configuration.
+>> Instead you have to configure a debounce time which will be used for all
+>> pins of a given bank (PIOA, PIOB, ...).
+>> diff --git a/Documentation/devicetree/bindings/pinctrl/atmel,at91-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/atmel,at91-pinctrl.txt
+>> +Optional properties for iomux controller:
+>> +- atmel,default-debounce-div: array of debounce divisors (one divisor per bank)
+>> +  which describes the debounce timing in use for all pins of a given bank
+>> +  configured with the DEBOUNCE option (see the following description).
+>> +  Debounce timing is obtained with this formula:
+>> +  Tdebounce = 2 * (debouncediv + 1) / Fslowclk
+>> +  with Fslowclk = 32KHz
+>> +
+>>   Required properties for pin configuration node:
+>>   - atmel,pins: 4 integers array, represents a group of pins mux and config
+>>     setting. The format is atmel,pins = <PIN_BANK PIN_BANK_NUM PERIPH CONFIG>.
+>> @@ -91,7 +99,6 @@ DEGLITCH	(1 << 2): indicate this pin need deglitch.
+>>   PULL_DOWN	(1 << 3): indicate this pin need a pull down.
+>>   DIS_SCHMIT	(1 << 4): indicate this pin need to disable schmit trigger.
+>>   DEBOUNCE	(1 << 16): indicate this pin need debounce.
+>> -DEBOUNCE_VAL	(0x3fff << 17): debounce val.
+> This change would break the DT ABI since it removes a feature that's
+> already present.
 
-> Hi Will,
-> 
-> On 13 September 2013 19:15, Will Deacon <will.deacon@arm.com> wrote:
-> > Hi Jean,
-> >
-> > On Fri, Sep 13, 2013 at 06:08:41PM +0100, Jean Pihet wrote:
-> >> The newly added dwarf unwinding feature [1] requires:
-> >> . a recent version (>= 1.1) of libunwind,
-> >> . libunwind to be configured with --enable-debug-frame.
-> >>
-> >> [1] http://www.spinics.net/lists/kernel/msg1598951.html
-> >>
-> >> Add the corresponding API test in the feature check list.
-> >
-> > Any reason not to merge this in with the third patch in original series? I
-> > don't think it's been picked up by anybody yet, so it would make sense to
-> > repost with this fixup after the merge window.
+I missed this point in my cons list.
+This won't be an issue for in kernel DT definitions (nobody is currently 
+using the
+DEBOUCE option), but may be for out-of-tree DT definitions.
+
+> I suppose it's still up to the Atmel maintainers to decide whether this
+> is appropriate, or whether the impact to out-of-tree DT files would be
+> problematic.
 >
-> Yes you are right Will repost with this patch folded into the third 
-> patch, or as a fourth patch. Any preference?
+> Assuming the DT ABI can be broken, I think I'd prefer to do so, rather
+> than take "non-alt" patch 4/4, since a per-pin DEBOUNCE_VAL clearly
+> doesn't correctly model the HW, assuming the patch description is
+> correct. I don't think arguments re: the generic pinconf debounce
+> property hold; if the Linux-specific/internal generic property doesn't
+> apply, the DT binding should not be bent to adjust to it, but should
+> rather still represent the HW itself.
 
-I suspect it should be a separate patch, but _prior_ the patch that makes 
-use of this new facility.
+What about the last point in my list: "reconfigure debounce after startup" ?
 
-That way it's bisection-safe.
+Here is an example that may be problematic:
 
-Thanks,
+Let's say you have one device using multiple configuration of pins 
+("default", "xxx", "yyy").
+The "default" config needs a particular debounce time on a given pin and 
+the "xxx" and "yyy"
+configs need different debounce time on the same pin.
 
-	Ingo
+How would you solve this with this patch approach ?
+
+
+Best Regards,
+
+Boris
