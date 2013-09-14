@@ -1,64 +1,52 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 13 Sep 2013 20:40:54 -0500
-Subject: [PROPOSAL] ARM/FDT: passing multiple binaries to a kernel
-In-Reply-To: <CACxGe6sOyNNEATsnRdu9=_nPE1q6V4MDaDKvk4QvJiSgq6jXmg@mail.gmail.com>
-References: <52260608.2030202@linaro.org>
- <CAL_JsqK9PjpScRO8561PhcyKkxhuL4pgMTCh2-UG_ubybJTcCw@mail.gmail.com>
- <1378284256.17510.60.camel@kazak.uk.xensource.com>
- <CAL_Jsq+82xfNCD3LmNE6VD1mp4Vzbm-hPPaMjwg9+ab3moXP_w@mail.gmail.com>
- <CACxGe6sOyNNEATsnRdu9=_nPE1q6V4MDaDKvk4QvJiSgq6jXmg@mail.gmail.com>
-Message-ID: <CAL_JsqKnNHywcR21XhrjFyGs1DjZnbAFybraRKmxNmELLH-qPA@mail.gmail.com>
+From: bilhuang@nvidia.com (Bill Huang)
+Date: Fri, 13 Sep 2013 19:00:42 -0700
+Subject: [PATCH v2 3/4] cpufreq: tegra: Re-model Tegra cpufreq driver
+In-Reply-To: <52339106.4020601@wwwdotorg.org>
+References: <1378985091-9447-1-git-send-email-bilhuang@nvidia.com>
+ <1378985091-9447-4-git-send-email-bilhuang@nvidia.com>
+ <52339106.4020601@wwwdotorg.org>
+Message-ID: <1379124042.2475.6.camel@bilhuang-vm1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 13, 2013 at 5:13 AM, Grant Likely <grant.likely@secretlab.ca> wrote:
-> On Wed, Sep 4, 2013 at 5:41 PM, Rob Herring <robherring2@gmail.com> wrote:
->>> For u-boot Andre has proposed some syntactic sugar over the "fdt"
->>> command to make boot.scr more trivial to use. We would of course need to
->>> implement support for using it in the relevant distro tools (but they
->>> tend to be very distro/machine specific already, e.g. Debian's
->>> flash-kernel)
->>
->> And being machine specific is a PITA. flash-kernel is certainly not
->> something we want to expand on. There is not much love for boot.scr
->> either. There is work to address what are not really machine
->> differences, but largely vendor u-boot differences:
->>
->> http://www.mail-archive.com/u-boot at lists.denx.de/msg119025.html
->>
->> One option for u-boot which already supports syslinux style menu files
->> is to adopt the syslinux multiboot parsing support:
->>
->> http://www.syslinux.org/wiki/index.php/Doc/mboot
->
-> Even building it into U-Boot is problematic because it leaves older
-> machines out in the cold. Leif's port of Grub to U-Boot is far more
-> interesting since the distro can now be in control of the code that
-> loads the images and jumps into the kernel/hypervisor.
+On Sat, 2013-09-14 at 06:26 +0800, Stephen Warren wrote:
+> On 09/12/2013 05:24 AM, Bill Huang wrote:
+> > Re-model Tegra cpufreq driver to support all Tegra series of SoCs.
+> > 
+> > * Make tegra-cpufreq.c a generic Tegra cpufreq driver.
+> > * Move Tegra20 specific codes into tegra20-cpufreq.c.
+> > * Bind Tegra cpufreq dirver with a fake device so defer probe would work
+> >   when we're going to get regulator in the driver to support voltage
+> >   scaling (DVFS).
+> 
+> > diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
+> 
+> > @@ -232,6 +232,12 @@ config ARM_TEGRA_CPUFREQ
+> >  	bool "TEGRA CPUFreq support"
+> >  	depends on ARCH_TEGRA
+> >  	select CPU_FREQ_TABLE
+> > +
+> > +config ARM_TEGRA20_CPUFREQ
+> > +	bool "NVIDIA TEGRA20"
+> > +	depends on ARM_TEGRA_CPUFREQ && ARCH_TEGRA_2x_SOC
+> >  	default y
+> >  	help
+> > -	  This adds the CPUFreq driver support for TEGRA SOCs.
+> > +	  This adds the CPUFreq driver for NVIDIA TEGRA20 SoC.
+> > +
+> > +	  If in doubt, say N.
+> 
+> This patch removes the following from "config ARM_TEGRA_CPUFREQ":
+> 
+> 	default y
+> 	help
+> 	  This adds the CPUFreq driver support for TEGRA SOCs.
+> 
+> I think that option should be left unchanged, such that this patch
+> *just* adds the new option without changing the existing one. If you do
+> that, then you can completely drop patch 4/4.
 
-Considering there is no distro support for grub on ARM yet, it may be
-more interesting in the long run, but it is not for the short term. So
-there needs to be something that is supportable on both u-boot and
-grub (or any other bootloader).
-
->
->> We need to back-up and consider what this looks like in the end for
->> all the pieces and get input from folks on grub, UEFI, and armv8. The
->> UEFI answer may be this is a grub problem. For armv8, this proposal
->> does match up well as the kernel boot interface for v8 is DT. Despite
->> some claims, ACPI will not completely replace DT because of this.
->
-> Yes, for UEFI it is absolutely an OS loader problem. UEFI provides an
-> API and runtime environment. Grub is in general moving towards a boot
-> menu system and a tool for loading images. Actual booting however
-> should be done by a separate OS loader application. For Linux, this
-> will be an in-kernel UEFI Stub. For Xen I would recommend taking the
-> Linux EFI stub code and doing the same thing. There really isn't a
-> need for a multiboot spec when you can rely on a runtime execution
-> environment for setting things up exactly as you want them.
-
-You've lost me as well. How do you see the flow working with UEFI for
-a user running bare metal OS, installing Xen, and rebooting running
-Xen.
-
-Rob
+Thanks, I'll change and rebase in next version after Viresh's cleanup
+patch series is merged.
+> 
+> Other than that, this series looks fine.
