@@ -1,66 +1,73 @@
 From: jic23@kernel.org (Jonathan Cameron)
-Date: Sat, 14 Sep 2013 18:01:45 +0100
-Subject: [PATCH 22/38] iio: sensors-core: st: Clean-up error handling
- in st_sensors_read_info_raw()
-In-Reply-To: <1378817379-8238-23-git-send-email-lee.jones@linaro.org>
+Date: Sat, 14 Sep 2013 18:07:24 +0100
+Subject: [PATCH 18/38] iio: sensors-core: st: Allow full-scale to be an
+ optional feature
+In-Reply-To: <523492BB.5070004@kernel.org>
 References: <1378817379-8238-1-git-send-email-lee.jones@linaro.org>
- <1378817379-8238-23-git-send-email-lee.jones@linaro.org>
-Message-ID: <52349679.3010103@kernel.org>
+ <1378817379-8238-19-git-send-email-lee.jones@linaro.org>
+ <523492BB.5070004@kernel.org>
+Message-ID: <523497CC.2040407@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/10/13 13:49, Lee Jones wrote:
-> Saving a few lines of code.
+On 09/14/13 17:45, Jonathan Cameron wrote:
+> On 09/10/13 13:49, Lee Jones wrote:
+>> Some chips either don't support it or fail to provide adequate documentation,
+>> so sometimes it's impossible to enable the feature even if it is supported.
+>>
+>> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> Applied to the togreg branch of iio.git
 > 
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-Applied to the togreg branch of iio.git.
-
-To my mind the key thing here is that the error paths were previous
-inconsistent in that all but the last one went via a separate cleanup path
-whereas the last one went straight through.
-
-Now they are consistent and that is more important than saving a few lines of code.
-
-Thanks,
-> ---
->  drivers/iio/common/st_sensors/st_sensors_core.c | 11 ++++-------
->  1 file changed, 4 insertions(+), 7 deletions(-)
-> 
-> diff --git a/drivers/iio/common/st_sensors/st_sensors_core.c b/drivers/iio/common/st_sensors/st_sensors_core.c
-> index 148f0e5..25d4c7e 100644
-> --- a/drivers/iio/common/st_sensors/st_sensors_core.c
-> +++ b/drivers/iio/common/st_sensors/st_sensors_core.c
-> @@ -359,28 +359,25 @@ int st_sensors_read_info_raw(struct iio_dev *indio_dev,
->  	mutex_lock(&indio_dev->mlock);
->  	if (indio_dev->currentmode == INDIO_BUFFER_TRIGGERED) {
->  		err = -EBUSY;
-> -		goto read_error;
-> +		goto out;
->  	} else {
->  		err = st_sensors_set_enable(indio_dev, true);
->  		if (err < 0)
-> -			goto read_error;
-> +			goto out;
->  
->  		msleep((sdata->sensor->bootime * 1000) / sdata->odr);
->  		err = st_sensors_read_axis_data(indio_dev, ch, val);
->  		if (err < 0)
-> -			goto read_error;
-> +			goto out;
->  
->  		*val = *val >> ch->scan_type.shift;
->  
->  		err = st_sensors_set_enable(indio_dev, false);
->  	}
-> +out:
->  	mutex_unlock(&indio_dev->mlock);
->  
->  	return err;
-> -
-> -read_error:
-> -	mutex_unlock(&indio_dev->mlock);
-> -	return err;
->  }
->  EXPORT_SYMBOL(st_sensors_read_info_raw);
->  
+Note that Denis Acked this in v1 and it hasn't changed substantially that I can see.
+Hence you should have added that ack to this reposting.  I nearly missed it.
+> Thanks
+>> ---
+>>  drivers/iio/common/st_sensors/st_sensors_core.c | 11 +++++++----
+>>  drivers/iio/pressure/st_pressure_core.c         |  6 ++++--
+>>  2 files changed, 11 insertions(+), 6 deletions(-)
+>>
+>> diff --git a/drivers/iio/common/st_sensors/st_sensors_core.c b/drivers/iio/common/st_sensors/st_sensors_core.c
+>> index 965ee22..eb261a5 100644
+>> --- a/drivers/iio/common/st_sensors/st_sensors_core.c
+>> +++ b/drivers/iio/common/st_sensors/st_sensors_core.c
+>> @@ -235,10 +235,13 @@ int st_sensors_init_sensor(struct iio_dev *indio_dev,
+>>  	if (err < 0)
+>>  		goto init_error;
+>>  
+>> -	err = st_sensors_set_fullscale(indio_dev,
+>> -						sdata->current_fullscale->num);
+>> -	if (err < 0)
+>> -		goto init_error;
+>> +	if (sdata->current_fullscale) {
+>> +		err = st_sensors_set_fullscale(indio_dev,
+>> +					       sdata->current_fullscale->num);
+>> +		if (err < 0)
+>> +			goto init_error;
+>> +	} else
+>> +		dev_info(&indio_dev->dev, "Full-scale not possible\n");
+>>  
+>>  	err = st_sensors_set_odr(indio_dev, sdata->odr);
+>>  	if (err < 0)
+>> diff --git a/drivers/iio/pressure/st_pressure_core.c b/drivers/iio/pressure/st_pressure_core.c
+>> index ceebd3c..16cfbc5 100644
+>> --- a/drivers/iio/pressure/st_pressure_core.c
+>> +++ b/drivers/iio/pressure/st_pressure_core.c
+>> @@ -226,8 +226,10 @@ int st_press_common_probe(struct iio_dev *indio_dev,
+>>  	indio_dev->channels = pdata->sensor->ch;
+>>  	indio_dev->num_channels = ARRAY_SIZE(st_press_channels);
+>>  
+>> -	pdata->current_fullscale = (struct st_sensor_fullscale_avl *)
+>> -						&pdata->sensor->fs.fs_avl[0];
+>> +	if (pdata->sensor->fs.addr != 0)
+>> +		pdata->current_fullscale = (struct st_sensor_fullscale_avl *)
+>> +			&pdata->sensor->fs.fs_avl[0];
+>> +
+>>  	pdata->odr = pdata->sensor->odr.odr_avl[0].hz;
+>>  
+>>  	if (!plat_data)
+>>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-iio" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 > 
