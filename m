@@ -1,68 +1,60 @@
-From: drjones@redhat.com (Andrew Jones)
-Date: Sat, 14 Sep 2013 13:58:47 +0200
-Subject: [PATCH] arm64: KVM: Increase max VCPUs per-Guest to 8
-In-Reply-To: <52330943.4090309@arm.com>
-References: <1378904552-29347-1-git-send-email-anup.patel@linaro.org>
- <52330943.4090309@arm.com>
-Message-ID: <20130914115847.GB2596@hawk.usersys.redhat.com>
+From: maxime.ripard@free-electrons.com (maxime.ripard at free-electrons.com)
+Date: Sat, 14 Sep 2013 14:05:57 +0200
+Subject: [PATCH 3/4] Add physical count arch timer support for
+ clocksource in ARMv7.
+In-Reply-To: <5232DB49.4050701@arm.com>
+References: <1378968687-8200-1-git-send-email-cinifr@gmail.com>
+ <1378968687-8200-4-git-send-email-cinifr@gmail.com>
+ <20130912112452.GA22013@e106331-lin.cambridge.arm.com>
+ <CAK3cCBwu4somtfc9J1ZDVcC-iYD1qDJwSWzWeOomTqY9tQA2kg@mail.gmail.com>
+ <5231EE43.5090900@arm.com>
+ <CAK3cCBzr8_LTYarZDgPYZY7_-5Qco_Qw+ACi=c2uOrn7MqwkBg@mail.gmail.com>
+ <5232DB49.4050701@arm.com>
+Message-ID: <20130914120557.GB2746@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 13, 2013 at 01:46:59PM +0100, Marc Zyngier wrote:
-> On 11/09/13 14:02, Anup Patel wrote:
-> > Current max VCPUs per-Guest is set to 4 which is preventing
-> > us from creating a Guest (or VM) with 8 VCPUs on Host (e.g.
-> > X-Gene Storm SOC) with 8 Host CPUs.
-> > 
-> > The correct value of max VCPUs per-Guest should be same as
-> > the max CPUs supported by GICv2 which is 8 hence this patch
-> > increases KVM_MAX_VCPUS to 8.
-> 
-> If anything, please make it configurable just like we have on 32bit. No
-> reason to impose the extra overhead on everyone.
+Hi Marc, Fan,
 
-What type of overhead are we talking about? Memory, right? as
-kvm_for_each_vcpu is almost always used when iterating. But Anup says in
-his v2 of this patch "can make things slower". If it's memory, then is so
-much consumed by each vcpu that we shouldn't always set KVM_MAX_VCPUS
-to at least the highest number that current hardware supports? Particularly
-for aarch64 I think we should always be considering multi-platform with the
-kernel configs.
+On Fri, Sep 13, 2013 at 10:30:49AM +0100, Marc Zyngier wrote:
+> On 13/09/13 09:49, cinifr wrote:
+> > On 13 September 2013 00:39, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> > I am   wondering   what is the principle between kernel and bootload?
+> > What should be done in bootloader and what should be done in kernel?
+> > As you said, If kernel boot from hyp,  Kernel can set  CNTVOFF to zero
+> > directly, does we add the code to set CNTVOFF in kernel?  But, if
+> > kernel boot from PL1 NS=0,  Does kernel  need to switch hyp mode to
+> > set  CNTVOFF and return  PL1 NS=0 mode? Or,kernel dont care it because
+> > kernel   believe bootloader have set CNTVOFF  before?
+> 
+> In an ideal world, the bootloader should set CNTVOFF to zero. The fact
+> that the kernel does it too when booted in HYP mode is to preserve
+> itself from from broken bootloaders.
+> 
+> CNTVOFF can only be setup from either HYP or Secure Monitor mode with
+> SCR.NS == 1, so if you run your kernel in secure mode, it is always best
+> to do it in the bootloader.
 
-drew
+What would happen exactly if a kernel expects CNTVOFF to be set to 0,
+and that your bootloader don't set it?
 
-> 
-> Thanks,
-> 
-> 	M.
-> 
-> > Signed-off-by: Anup Patel <anup.patel@linaro.org>
-> > Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
-> > ---
-> >  arch/arm64/include/asm/kvm_host.h |    2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > 
-> > diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-> > index 0859a4d..60ef29e 100644
-> > --- a/arch/arm64/include/asm/kvm_host.h
-> > +++ b/arch/arm64/include/asm/kvm_host.h
-> > @@ -26,7 +26,7 @@
-> >  #include <asm/kvm_asm.h>
-> >  #include <asm/kvm_mmio.h>
-> >  
-> > -#define KVM_MAX_VCPUS 4
-> > +#define KVM_MAX_VCPUS 8
-> >  #define KVM_USER_MEM_SLOTS 32
-> >  #define KVM_PRIVATE_MEM_SLOTS 4
-> >  #define KVM_COALESCED_MMIO_PAGE_OFFSET 1
-> > 
-> 
-> 
-> -- 
-> Jazz is not dead. It just smells funny...
-> 
-> 
-> _______________________________________________
-> kvmarm mailing list
-> kvmarm at lists.cs.columbia.edu
-> https://lists.cs.columbia.edu/cucslists/listinfo/kvmarm
+>From what you're saying, it's will be set by the kernel if it's booted
+in hypervisor mode, but what if it's not?
+
+The ARM documentation says that the CNTVOFF register will hold an
+undefined value, how would that affect the kernel?
+
+Thanks,
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130914/6c9e137f/attachment.sig>
