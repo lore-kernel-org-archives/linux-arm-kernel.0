@@ -1,90 +1,67 @@
 From: jic23@kernel.org (Jonathan Cameron)
-Date: Sat, 14 Sep 2013 17:54:42 +0100
-Subject: [PATCH 20/38] iio: sensors-core: st: Clean-up error handling
- in st_sensors_init_sensor()
-In-Reply-To: <1378817379-8238-21-git-send-email-lee.jones@linaro.org>
+Date: Sat, 14 Sep 2013 17:58:56 +0100
+Subject: [PATCH 21/38] iio: sensors-core: st: Clean-up error handling
+ in st_sensors_read_axis_data()
+In-Reply-To: <1378817379-8238-22-git-send-email-lee.jones@linaro.org>
 References: <1378817379-8238-1-git-send-email-lee.jones@linaro.org>
- <1378817379-8238-21-git-send-email-lee.jones@linaro.org>
-Message-ID: <523494D2.2020808@kernel.org>
+ <1378817379-8238-22-git-send-email-lee.jones@linaro.org>
+Message-ID: <523495D0.1050002@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 09/10/13 13:49, Lee Jones wrote:
-> Strip out all those unnecessary gotos and just return the error right away.
-> 
-> Aids to simplicity and reduces code.
+> Gets rid of those unnecessary gotos.
+
+Unfortunately it introduced a bug whilst it is at it.  Sometimes
+those gotos are necessary and the 'right' way to do things.
 > 
 > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-This is fine except in that it is intertwined with the previous patch.
-
 > ---
->  drivers/iio/common/st_sensors/st_sensors_core.c | 18 +++++++-----------
->  1 file changed, 7 insertions(+), 11 deletions(-)
+>  drivers/iio/common/st_sensors/st_sensors_core.c | 17 +++++++----------
+>  1 file changed, 7 insertions(+), 10 deletions(-)
 > 
 > diff --git a/drivers/iio/common/st_sensors/st_sensors_core.c b/drivers/iio/common/st_sensors/st_sensors_core.c
-> index b86cad2..8c4c54c 100644
+> index 8c4c54c..148f0e5 100644
 > --- a/drivers/iio/common/st_sensors/st_sensors_core.c
 > +++ b/drivers/iio/common/st_sensors/st_sensors_core.c
-> @@ -208,8 +208,7 @@ int st_sensors_set_drdy_int_pin(struct iio_dev *indio_dev,
->  		if (sdata->sensor->drdy_irq.mask_int1 == 0) {
->  			dev_err(&indio_dev->dev,
->  					"DRDY on INT1 not available.\n");
-> -			err = -EINVAL;
-> -			goto init_error;
-> +			return -EINVAL;
->  		}
->  		sdata->drdy_int_pin = 1;
->  		break;
-> @@ -217,15 +216,13 @@ int st_sensors_set_drdy_int_pin(struct iio_dev *indio_dev,
->  		if (sdata->sensor->drdy_irq.mask_int2 == 0) {
->  			dev_err(&indio_dev->dev,
->  					"DRDY on INT2 not available.\n");
-> -			err = -EINVAL;
-> -			goto init_error;
-> +			return -EINVAL;
->  		}
->  		sdata->drdy_int_pin = 2;
->  		break;
->  	default:
->  		dev_err(&indio_dev->dev, "DRDY on pdata not valid.\n");
+> @@ -331,26 +331,23 @@ static int st_sensors_read_axis_data(struct iio_dev *indio_dev,
+>  	unsigned int byte_for_channel = ch->scan_type.storagebits >> 3;
+>  
+>  	outdata = kmalloc(byte_for_channel, GFP_KERNEL);
+> -	if (!outdata) {
 > -		err = -EINVAL;
-> -		goto init_error;
-> +		return -EINVAL;
->  	}
+> -		goto st_sensors_read_axis_data_error;
+> -	}
+> +	if (!outdata)
+> +		return -ENOMEM;
+I agree this change makes complete sense.
 >  
->  	return 0;
-> @@ -244,29 +241,28 @@ int st_sensors_init_sensor(struct iio_dev *indio_dev,
->  
->  	err = st_sensors_set_enable(indio_dev, false);
->  	if (err < 0)
-> -		goto init_error;
+>  	err = sdata->tf->read_multiple_byte(&sdata->tb, sdata->dev,
+>  				ch->address, byte_for_channel,
+>  				outdata, sdata->multiread_bit);
+> -	if (err < 0)
+> -		goto st_sensors_free_memory;
+> +	if (err < 0) {
+> +		kfree(outdata);
 > +		return err;
+> +	}
+I don't like this change as....
 >  
->  	if (sdata->current_fullscale) {
->  		err = st_sensors_set_fullscale(indio_dev,
->  					       sdata->current_fullscale->num);
->  		if (err < 0)
-> -			goto init_error;
-> +			return err;
->  	} else
->  		dev_info(&indio_dev->dev, "Full-scale not possible\n");
+>  	if (byte_for_channel == 2)
+>  		*data = (s16)get_unaligned_le16(outdata);
+>  	else if (byte_for_channel == 3)
+>  		*data = (s32)st_sensors_get_unaligned_le24(outdata);
 >  
->  	err = st_sensors_set_odr(indio_dev, sdata->odr);
->  	if (err < 0)
-> -		goto init_error;
-> +		return err;
->  
->  	/* set BDU */
->  	err = st_sensors_write_data_with_mask(indio_dev,
->  			sdata->sensor->bdu.addr, sdata->sensor->bdu.mask, true);
->  	if (err < 0)
-> -		goto init_error;
-> +		return err;
->  
->  	err = st_sensors_set_axis_enable(indio_dev, ST_SENSORS_ENABLE_ALL_AXIS);
->  
-> -init_error:
->  	return err;
+> -st_sensors_free_memory:
+> -	kfree(outdata);
+you now don't free out data in the case of no error.  This is precisely the case
+where a goto is the correct way to handle things as the free need to occur whether
+or not the error occurs.
+
+> -st_sensors_read_axis_data_error:
+> -	return err;
+> +	return 0;
 >  }
->  EXPORT_SYMBOL(st_sensors_init_sensor);
+>  
+>  int st_sensors_read_info_raw(struct iio_dev *indio_dev,
 > 
