@@ -1,44 +1,90 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Sat, 14 Sep 2013 11:31:25 +0200
-Subject: [PATCH 069/228] cpufreq: kirkwood: Use generic cpufreq routines
-In-Reply-To: <c1cbe4428eb9708c437c9f63e661e6a82260b4cb.1379063063.git.viresh.kumar@linaro.org>
-References: <cover.1379063063.git.viresh.kumar@linaro.org>
- <c1cbe4428eb9708c437c9f63e661e6a82260b4cb.1379063063.git.viresh.kumar@linaro.org>
-Message-ID: <20130914093125.GE23705@lunn.ch>
+From: pali.rohar@gmail.com (Pali =?utf-8?q?Roh=C3=A1r?=)
+Date: Sat, 14 Sep 2013 11:37:12 +0200
+Subject: [PATCH v4 1/2] ARM: OMAP: Add secure function omap_smc3() which
+ calling instruction smc #1
+In-Reply-To: <201309080943.30542@pali>
+References: <20130904124303.GA2369@localhost.localdomain>
+ <201309080943.30542@pali>
+Message-ID: <201309141137.13232@pali>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 13, 2013 at 06:30:15PM +0530, Viresh Kumar wrote:
-> Most of the CPUFreq drivers do similar things in .exit() and .verify() routines
-> and .attr. So its better if we have generic routines for them which can be used
-> by cpufreq drivers then.
+On Sunday 08 September 2013 09:43:29 Pali Roh?r wrote:
+> Here is new version (v4) of omap secure part patch:
 > 
-> This patch uses these generic routines for this driver.
+> Other secure functions omap_smc1() and omap_smc2() calling
+> instruction smc #0 but Nokia RX-51 board needs to call smc #1
+> for PPA access.
 > 
-> Cc: Andrew Lunn <andrew@lunn.ch>
-> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+> Signed-off-by: Ivaylo Dimitrov <freemangordon@abv.bg>
+> Signed-off-by: Pali Roh?r <pali.rohar@gmail.com>
 > ---
->  drivers/cpufreq/kirkwood-cpufreq.c | 22 +++-------------------
->  1 file changed, 3 insertions(+), 19 deletions(-)
+> diff --git a/arch/arm/mach-omap2/omap-secure.h
+> b/arch/arm/mach-omap2/omap-secure.h index 0e72917..c4586f4
+> 100644
+> --- a/arch/arm/mach-omap2/omap-secure.h
+> +++ b/arch/arm/mach-omap2/omap-secure.h
+> @@ -51,6 +51,7 @@
+>  extern u32 omap_secure_dispatcher(u32 idx, u32 flag, u32
+> nargs, u32 arg1, u32 arg2, u32 arg3, u32 arg4);
+>  extern u32 omap_smc2(u32 id, u32 falg, u32 pargs);
+> +extern u32 omap_smc3(u32 id, u32 process, u32 flag, u32
+> pargs); extern phys_addr_t
+> omap_secure_ram_mempool_base(void); extern int
+> omap_secure_ram_reserve_memblock(void);
+> 
+> diff --git a/arch/arm/mach-omap2/omap-smc.S
+> b/arch/arm/mach-omap2/omap-smc.S index f6441c1..fd90125
+> 100644
+> --- a/arch/arm/mach-omap2/omap-smc.S
+> +++ b/arch/arm/mach-omap2/omap-smc.S
+> @@ -1,9 +1,11 @@
+>  /*
+> - * OMAP44xx secure APIs file.
+> + * OMAP34xx and OMAP44xx secure APIs file.
+>   *
+>   * Copyright (C) 2010 Texas Instruments, Inc.
+>   * Written by Santosh Shilimkar <santosh.shilimkar@ti.com>
+>   *
+> + * Copyright (C) 2012 Ivaylo Dimitrov <freemangordon@abv.bg>
+> + * Copyright (C) 2013 Pali Roh?r <pali.rohar@gmail.com>
+>   *
+>   * This program is free software,you can redistribute it
+> and/or modify * it under the terms of the GNU General Public
+> License version 2 as @@ -54,6 +56,23 @@ ENTRY(omap_smc2)
+>  	ldmfd   sp!, {r4-r12, pc}
+>  ENDPROC(omap_smc2)
+> 
+> +/**
+> + * u32 omap_smc3(u32 service_id, u32 process_id, u32 flag,
+> u32 pargs) + * Low level common routine for secure HAL and
+> PPA APIs via smc #1 + * r0 - @service_id: Secure Service ID
+> + * r1 - @process_id: Process ID
+> + * r2 - @flag: Flag to indicate the criticality of operation
+> + * r3 - @pargs: Physical address of parameter list
+> + */
+> +ENTRY(omap_smc3)
+> +	stmfd	sp!, {r4-r11, lr}
+> +	mov	r12, r0		@ Copy the secure service ID
+> +	mov	r6, #0xff	@ Indicate new Task call
+> +	dsb			@ Memory Barrier (not sure if needed, copied from
+> omap_smc2) +	smc	#1		@ Call PPA service
+> +	ldmfd	sp!, {r4-r11, pc}
+> +ENDPROC(omap_smc3)
+> +
+>  ENTRY(omap_modify_auxcoreboot0)
+>  	stmfd   sp!, {r1-r12, lr}
+>  	ldr	r12, =0x104
 
-Hi Viresh
+Dave, it is ok now?
 
-You can add:
-
-Tested-by: Andrew Lunn <andrew@lunn.ch>
-
-to
-
-[PATCH 069/228] cpufreq: kirkwood: Use generic cpufreq routines
-[PATCH 107/228] cpufreq: kirkwood: don't initialize part of policy that is set by core
-[PATCH 161/228] cpufreq: kirkwood: Convert to light weight ->target_index() routine
-[PATCH 195/228] cpufreq: kirkwood: remove calls to cpufreq_notify_transition()
-
-It does however require the patch:
-
-http://www.spinics.net/lists/arm-kernel/msg273378.html
-
-but this is not because of this patch series, it was already broken.
-
-Thanks
-	Andrew
+-- 
+Pali Roh?r
+pali.rohar at gmail.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130914/dadfb89f/attachment.sig>
