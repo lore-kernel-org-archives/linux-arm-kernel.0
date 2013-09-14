@@ -1,67 +1,66 @@
 From: jic23@kernel.org (Jonathan Cameron)
-Date: Sat, 14 Sep 2013 17:58:56 +0100
-Subject: [PATCH 21/38] iio: sensors-core: st: Clean-up error handling
- in st_sensors_read_axis_data()
-In-Reply-To: <1378817379-8238-22-git-send-email-lee.jones@linaro.org>
+Date: Sat, 14 Sep 2013 18:01:45 +0100
+Subject: [PATCH 22/38] iio: sensors-core: st: Clean-up error handling
+ in st_sensors_read_info_raw()
+In-Reply-To: <1378817379-8238-23-git-send-email-lee.jones@linaro.org>
 References: <1378817379-8238-1-git-send-email-lee.jones@linaro.org>
- <1378817379-8238-22-git-send-email-lee.jones@linaro.org>
-Message-ID: <523495D0.1050002@kernel.org>
+ <1378817379-8238-23-git-send-email-lee.jones@linaro.org>
+Message-ID: <52349679.3010103@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 09/10/13 13:49, Lee Jones wrote:
-> Gets rid of those unnecessary gotos.
-
-Unfortunately it introduced a bug whilst it is at it.  Sometimes
-those gotos are necessary and the 'right' way to do things.
+> Saving a few lines of code.
 > 
 > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+Applied to the togreg branch of iio.git.
+
+To my mind the key thing here is that the error paths were previous
+inconsistent in that all but the last one went via a separate cleanup path
+whereas the last one went straight through.
+
+Now they are consistent and that is more important than saving a few lines of code.
+
+Thanks,
 > ---
->  drivers/iio/common/st_sensors/st_sensors_core.c | 17 +++++++----------
->  1 file changed, 7 insertions(+), 10 deletions(-)
+>  drivers/iio/common/st_sensors/st_sensors_core.c | 11 ++++-------
+>  1 file changed, 4 insertions(+), 7 deletions(-)
 > 
 > diff --git a/drivers/iio/common/st_sensors/st_sensors_core.c b/drivers/iio/common/st_sensors/st_sensors_core.c
-> index 8c4c54c..148f0e5 100644
+> index 148f0e5..25d4c7e 100644
 > --- a/drivers/iio/common/st_sensors/st_sensors_core.c
 > +++ b/drivers/iio/common/st_sensors/st_sensors_core.c
-> @@ -331,26 +331,23 @@ static int st_sensors_read_axis_data(struct iio_dev *indio_dev,
->  	unsigned int byte_for_channel = ch->scan_type.storagebits >> 3;
+> @@ -359,28 +359,25 @@ int st_sensors_read_info_raw(struct iio_dev *indio_dev,
+>  	mutex_lock(&indio_dev->mlock);
+>  	if (indio_dev->currentmode == INDIO_BUFFER_TRIGGERED) {
+>  		err = -EBUSY;
+> -		goto read_error;
+> +		goto out;
+>  	} else {
+>  		err = st_sensors_set_enable(indio_dev, true);
+>  		if (err < 0)
+> -			goto read_error;
+> +			goto out;
 >  
->  	outdata = kmalloc(byte_for_channel, GFP_KERNEL);
-> -	if (!outdata) {
-> -		err = -EINVAL;
-> -		goto st_sensors_read_axis_data_error;
-> -	}
-> +	if (!outdata)
-> +		return -ENOMEM;
-I agree this change makes complete sense.
+>  		msleep((sdata->sensor->bootime * 1000) / sdata->odr);
+>  		err = st_sensors_read_axis_data(indio_dev, ch, val);
+>  		if (err < 0)
+> -			goto read_error;
+> +			goto out;
 >  
->  	err = sdata->tf->read_multiple_byte(&sdata->tb, sdata->dev,
->  				ch->address, byte_for_channel,
->  				outdata, sdata->multiread_bit);
-> -	if (err < 0)
-> -		goto st_sensors_free_memory;
-> +	if (err < 0) {
-> +		kfree(outdata);
-> +		return err;
-> +	}
-I don't like this change as....
+>  		*val = *val >> ch->scan_type.shift;
 >  
->  	if (byte_for_channel == 2)
->  		*data = (s16)get_unaligned_le16(outdata);
->  	else if (byte_for_channel == 3)
->  		*data = (s32)st_sensors_get_unaligned_le24(outdata);
+>  		err = st_sensors_set_enable(indio_dev, false);
+>  	}
+> +out:
+>  	mutex_unlock(&indio_dev->mlock);
 >  
-> -st_sensors_free_memory:
-> -	kfree(outdata);
-you now don't free out data in the case of no error.  This is precisely the case
-where a goto is the correct way to handle things as the free need to occur whether
-or not the error occurs.
-
-> -st_sensors_read_axis_data_error:
+>  	return err;
+> -
+> -read_error:
+> -	mutex_unlock(&indio_dev->mlock);
 > -	return err;
-> +	return 0;
 >  }
+>  EXPORT_SYMBOL(st_sensors_read_info_raw);
 >  
->  int st_sensors_read_info_raw(struct iio_dev *indio_dev,
 > 
