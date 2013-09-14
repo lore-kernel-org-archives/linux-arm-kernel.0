@@ -1,63 +1,44 @@
-From: drjones@redhat.com (Andrew Jones)
-Date: Sat, 14 Sep 2013 10:51:00 +0200
-Subject: [PATCH] arm64: KVM: Increase max VCPUs per-Guest to 8
-In-Reply-To: <52330943.4090309@arm.com>
-References: <1378904552-29347-1-git-send-email-anup.patel@linaro.org>
- <52330943.4090309@arm.com>
-Message-ID: <20130914085059.GA2596@hawk.usersys.redhat.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Sat, 14 Sep 2013 11:31:25 +0200
+Subject: [PATCH 069/228] cpufreq: kirkwood: Use generic cpufreq routines
+In-Reply-To: <c1cbe4428eb9708c437c9f63e661e6a82260b4cb.1379063063.git.viresh.kumar@linaro.org>
+References: <cover.1379063063.git.viresh.kumar@linaro.org>
+ <c1cbe4428eb9708c437c9f63e661e6a82260b4cb.1379063063.git.viresh.kumar@linaro.org>
+Message-ID: <20130914093125.GE23705@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 13, 2013 at 01:46:59PM +0100, Marc Zyngier wrote:
-> On 11/09/13 14:02, Anup Patel wrote:
-> > Current max VCPUs per-Guest is set to 4 which is preventing
-> > us from creating a Guest (or VM) with 8 VCPUs on Host (e.g.
-> > X-Gene Storm SOC) with 8 Host CPUs.
-> > 
-> > The correct value of max VCPUs per-Guest should be same as
-> > the max CPUs supported by GICv2 which is 8 hence this patch
-> > increases KVM_MAX_VCPUS to 8.
+On Fri, Sep 13, 2013 at 06:30:15PM +0530, Viresh Kumar wrote:
+> Most of the CPUFreq drivers do similar things in .exit() and .verify() routines
+> and .attr. So its better if we have generic routines for them which can be used
+> by cpufreq drivers then.
 > 
-> If anything, please make it configurable just like we have on 32bit. No
-> reason to impose the extra overhead on everyone.
+> This patch uses these generic routines for this driver.
+> 
+> Cc: Andrew Lunn <andrew@lunn.ch>
+> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+> ---
+>  drivers/cpufreq/kirkwood-cpufreq.c | 22 +++-------------------
+>  1 file changed, 3 insertions(+), 19 deletions(-)
 
-I have a couple patches I've been meaning to post, one of which does
-this. I'll get them posted now.
+Hi Viresh
 
-drew
+You can add:
 
-> 
-> Thanks,
-> 
-> 	M.
-> 
-> > Signed-off-by: Anup Patel <anup.patel@linaro.org>
-> > Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
-> > ---
-> >  arch/arm64/include/asm/kvm_host.h |    2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > 
-> > diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-> > index 0859a4d..60ef29e 100644
-> > --- a/arch/arm64/include/asm/kvm_host.h
-> > +++ b/arch/arm64/include/asm/kvm_host.h
-> > @@ -26,7 +26,7 @@
-> >  #include <asm/kvm_asm.h>
-> >  #include <asm/kvm_mmio.h>
-> >  
-> > -#define KVM_MAX_VCPUS 4
-> > +#define KVM_MAX_VCPUS 8
-> >  #define KVM_USER_MEM_SLOTS 32
-> >  #define KVM_PRIVATE_MEM_SLOTS 4
-> >  #define KVM_COALESCED_MMIO_PAGE_OFFSET 1
-> > 
-> 
-> 
-> -- 
-> Jazz is not dead. It just smells funny...
-> 
-> 
-> _______________________________________________
-> kvmarm mailing list
-> kvmarm at lists.cs.columbia.edu
-> https://lists.cs.columbia.edu/cucslists/listinfo/kvmarm
+Tested-by: Andrew Lunn <andrew@lunn.ch>
+
+to
+
+[PATCH 069/228] cpufreq: kirkwood: Use generic cpufreq routines
+[PATCH 107/228] cpufreq: kirkwood: don't initialize part of policy that is set by core
+[PATCH 161/228] cpufreq: kirkwood: Convert to light weight ->target_index() routine
+[PATCH 195/228] cpufreq: kirkwood: remove calls to cpufreq_notify_transition()
+
+It does however require the patch:
+
+http://www.spinics.net/lists/arm-kernel/msg273378.html
+
+but this is not because of this patch series, it was already broken.
+
+Thanks
+	Andrew
