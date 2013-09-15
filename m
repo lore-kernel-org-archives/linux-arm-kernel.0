@@ -1,179 +1,66 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Sun, 15 Sep 2013 11:50:09 +0100
-Subject: [PATCH 4/6] Staging/iio/adc/touchscreen/MXS: add i.MX23 support
- to the LRADC touchscreen driver
-In-Reply-To: <1378887511-24530-5-git-send-email-jbe@pengutronix.de>
-References: <1378887511-24530-1-git-send-email-jbe@pengutronix.de>
- <1378887511-24530-5-git-send-email-jbe@pengutronix.de>
-Message-ID: <523590E1.6030309@kernel.org>
+From: acourbot@nvidia.com (Alexandre Courbot)
+Date: Sun, 15 Sep 2013 18:40:27 +0900
+Subject: [PATCH v6 4/5] ARM: tegra: set CPU reset handler with firmware op
+In-Reply-To: <1379238028-7960-1-git-send-email-acourbot@nvidia.com>
+References: <1379238028-7960-1-git-send-email-acourbot@nvidia.com>
+Message-ID: <1379238028-7960-5-git-send-email-acourbot@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/11/13 09:18, Juergen Beisert wrote:
-> Distinguish i.MX23 and i.MX28 at runtime and do the same for both SoC at least
-> for the 4 wire touchscreen.
-> 
-> Note: support for the remaining LRADC channels is not tested on an
-> i.MX23 yet.
-An ominous comment. Are you likely to test them soon?
+Use a firmware operation to set the CPU reset handler and only resort to
+doing it ourselves if there is none defined.
 
-Minor code layout comment inline but otherwise I'm just looking for an
-ack from Marek.
-> 
-> Signed-off-by: Juergen Beisert <jbe@pengutronix.de>
-> CC: linux-arm-kernel at lists.infradead.org
-> CC: devel at driverdev.osuosl.org
-> CC: Marek Vasut <marex@denx.de>
-> CC: Fabio Estevam <fabio.estevam@freescale.com>
-> CC: Jonathan Cameron <jic23@cam.ac.uk>
-> ---
->  drivers/staging/iio/adc/mxs-lradc.c | 45 +++++++++++++++++++++++++++++++++----
->  1 file changed, 41 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/staging/iio/adc/mxs-lradc.c b/drivers/staging/iio/adc/mxs-lradc.c
-> index 4317fee..c81b186 100644
-> --- a/drivers/staging/iio/adc/mxs-lradc.c
-> +++ b/drivers/staging/iio/adc/mxs-lradc.c
-> @@ -188,20 +188,33 @@ struct mxs_lradc {
->  # define LRADC_CTRL0_MX28_XNPSW	/* XM */	(1 << 17)
->  # define LRADC_CTRL0_MX28_XPPSW	/* XP */	(1 << 16)
->  
-> +# define LRADC_CTRL0_MX23_TOUCH_DETECT_ENABLE	(1 << 20)
-> +# define LRADC_CTRL0_MX23_YM			(1 << 19)
-> +# define LRADC_CTRL0_MX23_XM			(1 << 18)
-> +# define LRADC_CTRL0_MX23_YP			(1 << 17)
-> +# define LRADC_CTRL0_MX23_XP			(1 << 16)
-> +
->  # define LRADC_CTRL0_MX28_PLATE_MASK \
->  		(LRADC_CTRL0_MX28_TOUCH_DETECT_ENABLE | \
->  		LRADC_CTRL0_MX28_YNNSW | LRADC_CTRL0_MX28_YPNSW | \
->  		LRADC_CTRL0_MX28_YPPSW | LRADC_CTRL0_MX28_XNNSW | \
->  		LRADC_CTRL0_MX28_XNPSW | LRADC_CTRL0_MX28_XPPSW)
->  
-> +# define LRADC_CTRL0_MX23_PLATE_MASK \
-> +		(LRADC_CTRL0_MX23_TOUCH_DETECT_ENABLE | \
-> +		LRADC_CTRL0_MX23_YM | LRADC_CTRL0_MX23_XM | \
-> +		LRADC_CTRL0_MX23_YP | LRADC_CTRL0_MX23_XP)
-> +
->  #define	LRADC_CTRL1				0x10
->  #define	LRADC_CTRL1_TOUCH_DETECT_IRQ_EN		(1 << 24)
->  #define	LRADC_CTRL1_LRADC_IRQ_EN(n)		(1 << ((n) + 16))
->  #define	LRADC_CTRL1_MX28_LRADC_IRQ_EN_MASK	(0x1fff << 16)
-> +#define	LRADC_CTRL1_MX23_LRADC_IRQ_EN_MASK	(0x01ff << 16)
->  #define	LRADC_CTRL1_LRADC_IRQ_EN_OFFSET		16
->  #define	LRADC_CTRL1_TOUCH_DETECT_IRQ		(1 << 8)
->  #define	LRADC_CTRL1_LRADC_IRQ(n)		(1 << (n))
->  #define	LRADC_CTRL1_MX28_LRADC_IRQ_MASK		0x1fff
-> +#define	LRADC_CTRL1_MX23_LRADC_IRQ_MASK		0x01ff
->  #define	LRADC_CTRL1_LRADC_IRQ_OFFSET		0
->  
->  #define	LRADC_CTRL2				0x20
-> @@ -252,36 +265,50 @@ static void mxs_lradc_reg(struct mxs_lradc *lradc, u32 val, u32 reg)
->  
->  static u32 mxs_lradc_plate_mask(struct mxs_lradc *lradc)
->  {
-> +	if (lradc->soc == IMX23_LRADC)
-> +		return LRADC_CTRL0_MX23_PLATE_MASK;
->  	return LRADC_CTRL0_MX28_PLATE_MASK;
->  }
->  
->  static u32 mxs_lradc_irq_en_mask(struct mxs_lradc *lradc)
->  {
-> +	if (lradc->soc == IMX23_LRADC)
-> +		return LRADC_CTRL1_MX23_LRADC_IRQ_EN_MASK;
->  	return LRADC_CTRL1_MX28_LRADC_IRQ_EN_MASK;
->  }
->  
->  static u32 mxs_lradc_irq_mask(struct mxs_lradc *lradc)
->  {
-> +	if (lradc->soc == IMX23_LRADC)
-> +		return LRADC_CTRL1_MX23_LRADC_IRQ_MASK;
->  	return LRADC_CTRL1_MX28_LRADC_IRQ_MASK;
->  }
->  
->  static u32 mxs_lradc_touch_detect_bit(struct mxs_lradc *lradc)
->  {
-> +	if (lradc->soc == IMX23_LRADC)
-> +		return LRADC_CTRL0_MX23_TOUCH_DETECT_ENABLE;
->  	return LRADC_CTRL0_MX28_TOUCH_DETECT_ENABLE;
->  }
->  
->  static u32 mxs_lradc_drive_x_plate(struct mxs_lradc *lradc)
->  {
-> +	if (lradc->soc == IMX23_LRADC)
-> +		return LRADC_CTRL0_MX23_XP | LRADC_CTRL0_MX23_XM;
->  	return LRADC_CTRL0_MX28_XPPSW | LRADC_CTRL0_MX28_XNNSW;
->  }
->  
->  static u32 mxs_lradc_drive_y_plate(struct mxs_lradc *lradc)
->  {
-> +	if (lradc->soc == IMX23_LRADC)
-> +		return LRADC_CTRL0_MX23_YP | LRADC_CTRL0_MX23_YM;
->  	return LRADC_CTRL0_MX28_YPPSW | LRADC_CTRL0_MX28_YNNSW;
->  }
->  
->  static u32 mxs_lradc_drive_pressure(struct mxs_lradc *lradc)
->  {
-> +	if (lradc->soc == IMX23_LRADC)
-> +		return LRADC_CTRL0_MX23_YP | LRADC_CTRL0_MX23_XM;
->  	return LRADC_CTRL0_MX28_YPPSW | LRADC_CTRL0_MX28_XNNSW;
-Whilst it obviously doesn't actually matter, having an else
-in there would make the code more consistent so personally
-I would prefer it to be there.
+This supports the booting of secondary CPUs on devices using a TrustZone
+secure monitor.
 
->  }
->  
-> @@ -319,7 +346,8 @@ static int mxs_lradc_read_raw(struct iio_dev *iio_dev,
->  	 * Virtual channel 0 is always used here as the others are always not
->  	 * used if doing raw sampling.
->  	 */
-> -	mxs_lradc_reg_clear(lradc, LRADC_CTRL1_MX28_LRADC_IRQ_EN_MASK,
-> +	if (lradc->soc == IMX28_LRADC)
-> +		mxs_lradc_reg_clear(lradc, LRADC_CTRL1_MX28_LRADC_IRQ_EN_MASK,
->  			LRADC_CTRL1);
->  	mxs_lradc_reg_clear(lradc, 0xff, LRADC_CTRL0);
->  
-> @@ -767,7 +795,8 @@ static int mxs_lradc_buffer_preenable(struct iio_dev *iio)
->  	if (ret < 0)
->  		goto err_buf;
->  
-> -	mxs_lradc_reg_clear(lradc, LRADC_CTRL1_MX28_LRADC_IRQ_EN_MASK,
-> +	if (lradc->soc == IMX28_LRADC)
-> +		mxs_lradc_reg_clear(lradc, LRADC_CTRL1_MX28_LRADC_IRQ_EN_MASK,
->  							LRADC_CTRL1);
->  	mxs_lradc_reg_clear(lradc, 0xff, LRADC_CTRL0);
->  
-> @@ -805,7 +834,8 @@ static int mxs_lradc_buffer_postdisable(struct iio_dev *iio)
->  					LRADC_DELAY_KICK, LRADC_DELAY(0));
->  
->  	mxs_lradc_reg_clear(lradc, 0xff, LRADC_CTRL0);
-> -	mxs_lradc_reg_clear(lradc, LRADC_CTRL1_MX28_LRADC_IRQ_EN_MASK,
-> +	if (lradc->soc == IMX28_LRADC)
-> +		mxs_lradc_reg_clear(lradc, LRADC_CTRL1_MX28_LRADC_IRQ_EN_MASK,
->  					LRADC_CTRL1);
->  
->  	kfree(lradc->buffer);
-> @@ -909,7 +939,8 @@ static int mxs_lradc_hw_init(struct mxs_lradc *lradc)
->  	mxs_lradc_reg(lradc, 0, LRADC_DELAY(3));
->  
->  	/* Configure the touchscreen type */
-> -	mxs_lradc_reg_clear(lradc, LRADC_CTRL0_MX28_TOUCH_SCREEN_TYPE,
-> +	if (lradc->soc == IMX28_LRADC) {
-> +		mxs_lradc_reg_clear(lradc, LRADC_CTRL0_MX28_TOUCH_SCREEN_TYPE,
->  							LRADC_CTRL0);
->  
->  	if (lradc->use_touchscreen == MXS_LRADC_TOUCHSCREEN_5WIRE)
-> @@ -987,6 +1018,12 @@ static int mxs_lradc_probe(struct platform_device *pdev)
->  		dev_warn(dev, "Unsupported number of touchscreen wires (%d)\n",
->  				ts_wires);
->  
-> +	if ((lradc->soc == IMX23_LRADC) && (ts_wires == 5)) {
-> +		dev_warn(dev, "No support for 5 wire touches on i.MX23\n");
-> +		dev_warn(dev, "Falling back to 4 wire\n");
-> +		ts_wires = 4;
-> +	}
-> +
->  	/* Grab all IRQ sources */
->  	for (i = 0; i < of_cfg->irq_count; i++) {
->  		lradc->irq[i] = platform_get_irq(pdev, i);
-> 
+Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
+Reviewed-by: Tomasz Figa <t.figa@samsung.com>
+Reviewed-by: Stephen Warren <swarren@nvidia.com>
+---
+ arch/arm/mach-tegra/reset.c | 17 ++++++++++++++---
+ 1 file changed, 14 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/mach-tegra/reset.c b/arch/arm/mach-tegra/reset.c
+index 6964117..fc9cf03 100644
+--- a/arch/arm/mach-tegra/reset.c
++++ b/arch/arm/mach-tegra/reset.c
+@@ -21,6 +21,7 @@
+ 
+ #include <asm/cacheflush.h>
+ #include <asm/hardware/cache-l2x0.h>
++#include <asm/firmware.h>
+ 
+ #include "iomap.h"
+ #include "irammap.h"
+@@ -65,6 +66,7 @@ static void __init tegra_cpu_reset_handler_enable(void)
+ 	void __iomem *iram_base = IO_ADDRESS(TEGRA_IRAM_RESET_BASE);
+ 	const u32 reset_address = TEGRA_IRAM_RESET_BASE +
+ 						tegra_cpu_reset_handler_offset;
++	int err;
+ 
+ 	BUG_ON(is_enabled);
+ 	BUG_ON(tegra_cpu_reset_handler_size > TEGRA_IRAM_RESET_HANDLER_SIZE);
+@@ -72,9 +74,18 @@ static void __init tegra_cpu_reset_handler_enable(void)
+ 	memcpy(iram_base, (void *)__tegra_cpu_reset_handler_start,
+ 			tegra_cpu_reset_handler_size);
+ 
+-	tegra_cpu_reset_handler_set(reset_address);
+-
+-	is_enabled = true;
++	err = call_firmware_op(set_cpu_boot_addr, 0, reset_address);
++	switch (err) {
++	case -ENOSYS:
++		tegra_cpu_reset_handler_set(reset_address);
++		/* pass-through */
++	case 0:
++		is_enabled = true;
++		break;
++	default:
++		pr_crit("Cannot set CPU reset handler: %d\n", err);
++		BUG();
++	}
+ }
+ 
+ void __init tegra_cpu_reset_handler_init(void)
+-- 
+1.8.4
