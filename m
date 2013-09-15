@@ -1,65 +1,83 @@
-From: andrea.adami@gmail.com (Andrea Adami)
-Date: Sun, 15 Sep 2013 23:47:17 +0200
-Subject: [PATCH v2] ARM: pxa: sharpsl_param.c: fix invalid memory access
-Message-ID: <1379281637-26854-1-git-send-email-andrea.adami@gmail.com>
+From: eduardo.valentin@ti.com (Eduardo Valentin)
+Date: Sun, 15 Sep 2013 18:02:35 -0400
+Subject: [PATCH 08/16] arm: dts: add omap4 CPU thermal data
+In-Reply-To: <1379282563-14650-1-git-send-email-eduardo.valentin@ti.com>
+References: <1379282563-14650-1-git-send-email-eduardo.valentin@ti.com>
+Message-ID: <1379282563-14650-9-git-send-email-eduardo.valentin@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After commit 72662e01088394577be4a3f14da94cf87bea2591
-ARM: head.S: only include __turn_mmu_on in the initial identity mapping
+This patch changes a dtsi file to contain the thermal data
+for MPU domain on OMAP4 and later SoCs. This data will
+enable the passive cooling with CPUfreq cooling device
+at 100C and the system will do a thermal shutdown at 125C.
 
-Zaurus PXA devices call sharpsl_save_param() during fixup and hang on
-boot because memcpy refers to physical addresses no longer valid if the
-MMU is setup.
-Zaurus collie (SA1100) is unaffected (function is called in init_machine).
+This thermal data can be reused across TI SoC devices.
 
-Signed-off-by: Marko Katic <dromede@gmail.com>
-Signed-off-by: Andrea Adami <andrea.adami@gmail.com>
+Cc: "Beno?t Cousson" <bcousson@baylibre.com>
+Cc: Tony Lindgren <tony@atomide.com>
+Cc: Rob Herring <rob.herring@calxeda.com>
+Cc: Pawel Moll <pawel.moll@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Stephen Warren <swarren@wwwdotorg.org>
+Cc: Ian Campbell <ian.campbell@citrix.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: linux-omap at vger.kernel.org
+Cc: devicetree at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-kernel at vger.kernel.org
+Signed-off-by: Eduardo Valentin <eduardo.valentin@ti.com>
 ---
- arch/arm/common/sharpsl_param.c | 17 ++++++++++++++---
- 1 file changed, 14 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/omap4-cpu-thermal.dtsi | 41 ++++++++++++++++++++++++++++++++
+ 1 file changed, 41 insertions(+)
+ create mode 100644 arch/arm/boot/dts/omap4-cpu-thermal.dtsi
 
-diff --git a/arch/arm/common/sharpsl_param.c b/arch/arm/common/sharpsl_param.c
-index d56c932..ac886f2 100644
---- a/arch/arm/common/sharpsl_param.c
-+++ b/arch/arm/common/sharpsl_param.c
-@@ -23,9 +23,17 @@
-  * them early in the boot process, then pass them to the appropriate drivers.
-  * Not all devices use all parameters but the format is common to all.
-  */
-+
-+/* NOTE:
-+ * Zaurus PXA devices call sharpsl_save_param() during fixup so we need
-+ * to translate the physical address.
-+ * Zaurus collie (SA1100) is unaffected (function is called in init_machine).
+diff --git a/arch/arm/boot/dts/omap4-cpu-thermal.dtsi b/arch/arm/boot/dts/omap4-cpu-thermal.dtsi
+new file mode 100644
+index 0000000..dd69788
+--- /dev/null
++++ b/arch/arm/boot/dts/omap4-cpu-thermal.dtsi
+@@ -0,0 +1,41 @@
++/*
++ * Device Tree Source for OMAP4/5 SoC CPU thermal
++ *
++ * Copyright (C) 2013 Texas Instruments Incorporated - http://www.ti.com/
++ * Contact: Eduardo Valentin <eduardo.valentin@ti.com>
++ *
++ * This file is licensed under the terms of the GNU General Public License
++ * version 2.  This program is licensed "as is" without any warranty of any
++ * kind, whether express or implied.
 + */
 +
- #ifdef CONFIG_ARCH_SA1100
- #define PARAM_BASE	0xe8ffc000
- #else
-+#include <asm/memory.h>
- #define PARAM_BASE	0xa0000a00
- #endif
- #define MAGIC_CHG(a,b,c,d) ( ( d << 24 ) | ( c << 16 )  | ( b << 8 ) | a )
-@@ -41,7 +49,12 @@ EXPORT_SYMBOL(sharpsl_param);
- 
- void sharpsl_save_param(void)
- {
--	memcpy(&sharpsl_param, (void *)PARAM_BASE, sizeof(struct sharpsl_param_info));
-+#ifdef CONFIG_ARCH_SA1100
-+	void *param_start = (void *)PARAM_BASE;
-+#else
-+	void *param_start = phys_to_virt(PARAM_BASE);
-+#endif
-+	memcpy(&sharpsl_param, param_start, sizeof(struct sharpsl_param_info));
- 
- 	if (sharpsl_param.comadj_keyword != COMADJ_MAGIC)
- 		sharpsl_param.comadj=-1;
-@@ -58,5 +71,3 @@ void sharpsl_save_param(void)
- 	if (sharpsl_param.adadj_keyword != AD_MAGIC)
- 		sharpsl_param.adadj=-1;
- }
--
--
++#include <dt-bindings/thermal/thermal.h>
++
++cpu_thermal: cpu_thermal {
++	passive-delay = <250>; /* milliseconds */
++	polling-delay = <1000>; /* milliseconds */
++
++		/* sensor       ID */
++        sensors = <&bandgap     0>;
++
++        trips {
++                cpu_alert0: cpu_alert {
++                        temperature = <100000>; /* milliCelsius */
++                        hysteresis = <2000>; /* milliCelsius */
++                        type = <THERMAL_TRIP_PASSIVE>;
++                };
++                cpu_crit: cpu_crit {
++                        temperature = <125000>; /* milliCelsius */
++                        hysteresis = <2000>; /* milliCelsius */
++                        type = <THERMAL_TRIP_CRITICAL>;
++                };
++        };
++
++	cooling-attachments {
++		attach0 {
++			trip = <&cpu_alert0>;
++			cooling-device =
++				<&cpu0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
++		};
++	};
++};
 -- 
-1.8.1.5
+1.8.2.1.342.gfa7285d
