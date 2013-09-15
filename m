@@ -1,127 +1,104 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Sun, 15 Sep 2013 13:48:00 +0100
-Subject: [PATCH v7 3/4] drivers: of: add initialization code for dma
- reserved memory
-In-Reply-To: <BA65D7E3-8C15-4B44-95E2-E5DC862DDDE0@codeaurora.org>
-References: <1377527959-5080-1-git-send-email-m.szyprowski@samsung.com>
- <1377527959-5080-4-git-send-email-m.szyprowski@samsung.com>
- <20130829224637.D09183E1222@localhost> <52209278.8040106@samsung.com>
- <DAF223EB-C84C-4E82-A24A-ACD0A3A0559F@codeaurora.org>
- <20130909160154.8D7183E0F23@localhost>
- <BA65D7E3-8C15-4B44-95E2-E5DC862DDDE0@codeaurora.org>
-Message-ID: <20130915124800.B6A43C42C62@trevor.secretlab.ca>
+Date: Sun, 15 Sep 2013 13:37:44 +0100
+Subject: [PROPOSAL] ARM/FDT: passing multiple binaries to a kernel
+In-Reply-To: <52260608.2030202@linaro.org>
+References: <52260608.2030202@linaro.org>
+Message-ID: <20130915123744.48AD1C42C2D@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 10 Sep 2013 14:53:29 -0500, Kumar Gala <galak@codeaurora.org> wrote:
+On Tue, 03 Sep 2013 17:53:44 +0200, Andre Przywara <andre.przywara@linaro.org> wrote:
+> Hi,
 > 
-> On Sep 9, 2013, at 11:01 AM, Grant Likely wrote:
+> a normal Linux kernel currently supports reading the start and end 
+> address of a single binary blob via the FDT's /chosen node.
+> This will be interpreted as the location of an initial RAM disk.
 > 
-> > On Fri, 30 Aug 2013 15:26:24 -0500, Kumar Gala <galak@codeaurora.org> wrote:
-> >> On Aug 30, 2013, at 7:39 AM, Marek Szyprowski wrote:
-> >>> On 8/30/2013 12:46 AM, Grant Likely wrote:
-> >>>> On Mon, 26 Aug 2013 16:39:18 +0200, Marek Szyprowski <m.szyprowski@samsung.com> wrote:
-> >>>>> +	- "reserved-memory-region" - compatibility is defined, given
-> >>>>> +	  region is assigned for exclusive usage for by the respective
-> >>>>> +	  devices.
-> >>>> 
-> >>>> BTW, just so you're aware there is already a binding for marking regions
-> >>>> as reserved. It was recently added to arch/powerpc/kernel/prom.c.
-> >>>> Unfortunately it doesn't look like it got documented. Search for
-> >>>> "reserved-ranges". However, I don't think it blocks your work here. That
-> >>>> binding doesn't provide any way for matching devices to reserved ranges.
-> >>>> It is only for telling the kernel "hands of that memory".
-> >>> 
-> >>> ok, good to know.
-> >> 
-> >> So I think the most generic compatible should effectively be the same
-> >> as 'reserved-ranges', ie this region shouldn't be touched by the
-> >> kernel.
-> >> 
-> >> Than we can build on top of that with more specific compatibles.
-> >> 
-> >> I have examples from FSL networking SoCs where we would carve out
-> >> memory for backing storage managed completely by the HW and Linux
-> >> wouldn't need to touch it, however we might have a
-> >> "fsl,qman-backing-store" compat encase we might want some debug code
-> >> in linux to look at the region of memory.
-> >> 
-> >> I've got examples at qualcomm where we have shared data structures in
-> >> specific memory regions between different processors that aren't cache
-> >> coherent, so want the memory not to be marked as cacheable by Linux
-> >> when it accesses it.  Again we'd have a "qcom,smem" prop on top of the
-> >> "reserved-memory-region".
-> > 
-> > I think that is a reasonable approach, and works really well for regions
-> > associated with specific hardware because the hardware driver can be
-> > responsible for wiring it up to CMA or manage the region directly.
-> > Whatever the driver desires to do.
-> > 
-> > It still remains what to do for generic regions that any device can use.
-> > As I've previously said, I don't like calling out "CMA" specifically in
-> > the compatible property because that happens to be a Linux
-> > implementation specific details. Two years from now someone may propose
-> > a new allocator that should take over what used to be handled by CMA
-> > (kind of like how CMA may end up taking over from ION)....
-> > 
-> > Alright, I've thought about it some more and it probably does make sense
-> > to use an additional compatible string. Marek originally suggested
-> > "linux,contiguous-memory-region". I later suggested "shareable-memory-region",
-> > but that's actually a worse name because it doesn't have any reference
-> > to what the region is for (I was fixating on the kernel being able to
-> > use unallocated pages; but that is also an implementation detail). I
-> > exercise my right to change my mind and agree that contiguous is
-> > appropriate here. But instead of calling out the contiguous allocator,
-> > the binding should specifically lay out the usage model for these
-> > regions. I would change the contiguous-memory binding to state the
-> > following:
-> > 	Contiguous-memory is a region of general purpose memory from
-> > 	which large buffers of contiguous memory can be allocated.
-> > 	Contiguous buffers are often used for DMA buffers. The operating
-> > 	system may use the memory for any purpose, but must immediately
-> > 	release the pages if a contiguous buffer is required.
-> > 
-> > So the way I read things, the current proposal would be:
-> > 
-> > The generic form for do-not-touch memory:
-> > 	compatible = "reserved-memory";
-> > - I've dropped '-region' because I think it is redundant
-> > - The kernel will not make use of this memory except for when a driver picks it up
-> > 
-> > For contiguous memory:
-> > 	compatible = "contiguous-memory", "reserved-memory"
+> The Xen hypervisor itself is a kernel, but needs up to _two_ binaries 
+> for proper operation: a Dom0 Linux kernel and it's associated initrd.
+> On x86 this is solved via the multiboot protocol used by the Grub 
+> bootloader, which supports to pass an arbitrary number of binary modules 
+> to any kernel.
 > 
-> Hmm.., what's an example of a generic use of this compatible set that isn't linux/CMA specific?
+> Since in the ARM world we have the versatile device tree, we don't need 
+> to implement the mulitboot protocol.
+> 
+> So I'd like to propose a new binding which denotes binary modules a 
+> kernel can use at it's own discretion.
+> The need is triggered by the Xen hypervisor (which already uses a very 
+> similar scheme), but the approach is deliberately chosen to be as 
+> generic as possible to allow future uses (like passing firmware blobs 
+> for devices or the like).
+> Credits for this go to Ian Campbell, who started something very similar 
+> [1] for the Xen hypervisor. The intention of this proposal is to make 
+> this generic and publicly documented.
+> 
+> Looking forward to any comments!
+> 
+> Thanks,
+> Andre.
+> 
+> [1] 
+> http://xenbits.xen.org/gitweb/?p=xen.git;a=blob;f=docs/misc/arm/device-tree/booting.txt;h=94cd3f18a4e1317a35e1255bf5c6e1e091001d1a;hb=HEAD
+> ----------------------------
+> * Multiple boot modules device tree bindings
+> 
+> Boot loaders wanting to pass multiple additional binaries to a kernel 
+> shall add a node "module" for each binary blob under the /chosen node 
+> with the following properties:
+> 
+> - compatible:
+>      compatible = "boot,module";
+>    A bootloader may add names to more specifically describe the module,
+>    e.g. Xen may use "xen,dom0-kernel" or "xen,dom0-ramdisk".
+>    If possible a kernel should be able to use modules even without a
+>    descriptive naming, by enumerating them in order and using hard-coded
+>    meanings for each module (e.g. first is kernel, second is initrd).
+> 
+> - reg: specifies the base physical address and size of a region in
+>    memory where the bootloader loaded the respective binary data to.
+> 
+> - bootargs:
+>    An optional property describing arguments to use for this module.
+>    Could be a command line or configuration data.
+> 
+> Example:
+> /chosen {
+>      #size-cells = <0x1>;
+>      #address-cells = <0x1>;
+>      module at 0 {
+>          compatible = "xen,linux-zimage", "xen,multiboot-module", 
+> "boot,module";
+>          reg = <0x80000000 0x003dcff8>;
+>          bootargs = "console=hvc0 earlyprintk ro root=/dev/sda1 nosmp";
+>      };
+>      module at 1 {
+>          compatible = "xen,linux-initrd", "xen,multiboot-module", 
+> "boot,module";
+>          reg = <0x08000000 0x00123456>;
+>      };
 
-My point was to decouple it from the Linux specific CMA implementation.
-I was talking to Jesse Barker about a binding for ION regions (which
-should eventually move to CMA). He needs pretty much the same binding.
+The moment you pull in a 'reg' property, your required to property parse
+#size-cells and #address-cells and also 'ranges' which is missing from
+the above. I don't necessarily object to that, but it can be a lot to
+ask for during early boot. It also looks really weird in the chosen
+node. For boot time artifacts like this, I'd rather see a duplication of
+the linux,initrd- pattern. Something like:
 
-> 
-> > For contiguous memory that Linux will use by default if a specific
-> > region isn't specified.
-> > 	compatible = "contiguous-memory", "reserved-memory"
-> > 	linux,default-contiguous-region;
-> > - I stuck with a linux, prefix here because I haven't come up with a
-> >   non-linux way to describe this.
-> > 
-> > Memory that specific hardware can pick up:
-> > 	compatible = "qcom,smem", "reserved-memory"
-> > 
-> > Nodes with a 'size' property and without a 'reg' property need to have a
-> > region allocated and reserved. The allocated region needs to be cached
-> > somewhere. We could create a data structure for tracking the reserved
-> > regions, or could write it in directly. While I shudder at the thought of
-> > modifying the device tree at runtime by the kernel, it might just be the
-> > sanest implementation at this time. I'd like to see what the
-> > implementation looks like. (Since this is potentially controversial, I
-> > would recommend implementing the exact regions in on patch, and add
-> > dynamically allocated regions as a follow-up patch)
-> 
-> curious, what's the example for this situation of not having a 'reg' but having a size?
+/chosen {
+	xen,linux-zimage-start = <0x80000000>;
+	xen,linux-zimage-end = <0x803dcff8>;
+	linux,initrd-start = <0x8000000>;
+	linux,initrd-end = <0x8123456>;
+}
 
-The way it was described to me was to allocate a region, but not care
-where it actually existed in RAM. I don't know how important a
-requirement it is.
+If have two reason for this; consistency and simplicity. Consistent
+because it matches what Linux already uses, and really easy to parse
+without mucking with ranges or #address/size-cells. The assumption is
+that during early boot the system is dealing with a 1:1 mapped physical
+address and there isn't any bus translations that need to be processed.
+
+Question: what is the need for the xen,linux-initrd node? Why can't the
+existing "linux,initrd-*" properties continue to be used?
 
 g.
