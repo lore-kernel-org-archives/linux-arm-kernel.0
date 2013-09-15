@@ -1,55 +1,46 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Sun, 15 Sep 2013 10:36:58 +0200
-Subject: [PATCH 1/2] Documentation: devicetree: arm: cpus/cpu nodes
- bindings updates
-In-Reply-To: <20130913165708.GC5408@e102568-lin.cambridge.arm.com>
-References: <1376559743-31848-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1376559743-31848-2-git-send-email-lorenzo.pieralisi@arm.com>
- <520CE665.8060907@gmail.com>
- <20130815152238.GF17839@e102568-lin.cambridge.arm.com>
- <20130913165708.GC5408@e102568-lin.cambridge.arm.com>
-Message-ID: <20130915083658.GH23705@lunn.ch>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Sun, 15 Sep 2013 11:24:33 +0200
+Subject: [PATCH] ARM: tegra: throw the unique chip ID into the entropy pool
+In-Reply-To: <52333E56.8060204@wwwdotorg.org>
+References: <1378394938-1551-1-git-send-email-linus.walleij@linaro.org>
+ <52333E56.8060204@wwwdotorg.org>
+Message-ID: <CACRpkdYTD4i74U-pAY1eq6FXiBwh-sw9U4N5PobBmpSKiTEVwA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > > > +			    "faraday,fa526"
-> > > > +			    "intel,sa110"
-> > > > +			    "intel,sa1100"
-> > > > +			    "marvell,feroceon"
-> > > > +			    "marvell,mohawk"
-> > > > +			    "marvell,pj4"
-> > > > +			    "marvell,sheeva-v7"
-> > > > +			    "marvell,xsc3"
-> > > > +			    "marvell,xscale"
-> > > 
-> > > Better make sure the Marvell folks are happy with these. We don't need
-> > > another rename here. I'm too annoyed with all the renames to pay attention.
-> > 
-> > Ok, I will verify that, I copied maintainers in.
+On Fri, Sep 13, 2013 at 6:33 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> On 09/05/2013 09:28 AM, Linus Walleij wrote:
+>> This adds a hook at common late init to extract the 64 bits of
+>> chip-unique data and throw it into the entropy pool to make it
+>> more device-unique.
+>
+>> diff --git a/arch/arm/mach-tegra/common.c b/arch/arm/mach-tegra/common.c
+>
+>>  void __init tegra_init_late(void)
+>>  {
+>> +     tegra_random_init();
+>
+> Looking at this further, there's already a tegra_init_fuse() call made
+> from tegra_init_early(), so rather than adding a second init function
+> into the fuse code, I'd rather just augment that function, unless
+> there's some reason add_device_randomness() won't work at that time?
 
-Hi Lorenzo
+This seems to be possible, due to the comment above
+rand_initialize():
 
-Here are the compatibility strings we would like, and a comment about
-which SoCs will/do use them.
+/*
+ * Note that setup_arch() may call add_device_randomness()
+ * long before we get here. This allows seeding of the pools
+ * with some platform dependent data very early in the boot
+ * process.
+(...)
 
-"marvell,feroceon"  - Orion5x
-"marvell,sheeva-v5" - Mv78xx0, Kirkwood
-"marvell,pj4a"      - Dove
-"marvell,pj4b"      - Armada XP, Armada 370, Armada 1500
-"marvell,mohawk"    - Armada 100
+> If that will work, I'll supply an alternate patch that replaces this,
+> since I also want to remove the tegra_chip_uid() function, and need to
+> make the add_device_randomness() call not use tegra_chip_uid() on
+> Tegra30 or later, since the set of fuses for the chip ID changed radically.
 
-"marvell,xscale" & "marvell,xsc3" should be removed.
+Sure, go ahead.
 
-The compatibility strings are not correct, or present in all the
-current <soc>.dtsi files. 
-
-orion5x cpus needs adding.
-mv78xx0 needs adding.
-kirkwood.dtsi needs changing.
-armada-370-xp.dtsi need changing.
-armada-xp-mv*.dtsi needs changing.
-
-We will deal with these in the next cycle.
-
-Thanks
-        Andrew
+Yours,
+Linus Walleij
