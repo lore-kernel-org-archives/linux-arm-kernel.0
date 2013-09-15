@@ -1,102 +1,119 @@
-From: ethan@ethantuttle.com (Ethan Tuttle)
-Date: Sat, 14 Sep 2013 18:05:32 -0700
-Subject: mvneta: oops in __rcu_read_lock on mirabox
-Message-ID: <CACzLR4tTvt+ROEhkXUCQhV6=bPPTX4LFSkWfrEhF+OdM1Jm1Rw@mail.gmail.com>
+From: slapdau@yahoo.com.au (Craig McGeachie)
+Date: Sun, 15 Sep 2013 15:28:23 +1200
+Subject: [RFC PATCH 1/3] Enable BCM2835 mailbox support
+In-Reply-To: <5232F7B7.4070206@yahoo.com.au>
+References: <5232F7B7.4070206@yahoo.com.au>
+Message-ID: <52352957.1070904@yahoo.com.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When I upgraded my mirabox from 3.11-rc4 to 3.11, I started seeing
-oopses while receiving network traffic (see below).  Sending a flood
-ping will trigger the oops within a few minutes.
+On 09/13/2013 11:32 PM, Craig McGeachie wrote:
+> Cherry-picked selection of commits by Lubomir Rintel [1], Suman Anna and
+> Jassi Brar [2] on which to base the implementation.
+> 
+> Signed-off-by: Suman Ana <s-anna@ti.com>
+> Signed-off-by: Jassi Brar <jassisinghbrar@gmail.com>
+> Signed-off-by: Lubomir Rintel <lkundrak@v3.sk>
+> 
+> [1] http://lists.infradead.org/pipermail/linux-rpi-kernel/2013-April/000528.html
+> [2] http://lists.infradead.org/pipermail/linux-rpi-kernel/2013-May/000546.html
 
-The stack looks similar, but not identical to, the one reported
-earlier by Jochen De Smet[1].  In my case the PC is always
-__rcu_read_lock.
+There are two problems with the mailbox framework that I can find.
+The first is in ipc_send_message.  On the BCM2835, the mailbox send
+result doesn't trigger an interrupt, but the pending reply does. When
+ipc_request_channel is called without blocking, the flow of events
+looks like this:
+[    0.521312] req - cf9845c0: 00000020 00000000 00030006 00000008
+[    0.527245] req - cf9845d0: 00000008 00000000 00000000 00000000
+[    0.533248] bcm2835-mbox 2000b880.mailbox: Request 0x0F9845C8
+[    0.539007] bcm2835-mbox 2000b880.mailbox: Reply 0x0F9845C8
+[    0.544582] bcm2835_thermal thermal.1: rxcb #1 @0f9845c0
+[    0.549939] bcm2835-mbox 2000b880.mailbox: Polling
+[    0.554773] bcm2835_thermal thermal.1: txcb #1 @0f9845c0
+[    0.560102] rep - cf9845c0: 00000020 80000000 00030006 00000008
+[    0.566062] rep - cf9845d0: 80000008 00000000 000078da 00000000
 
-A git bisect found a878764 "Merge
-git://git.kernel.org/pub/scm/linux/kernel/git/davem/net" to be the
-first bad commit... interesting, because neither of the merge parents
-produce the oops.  I rebased the net changes onto the other merge
-parent and bisected that series, which identified 702821f "net: revert
-8728c544a9c ("net: dev_pick_tx() fix")" as the first bad commit.
-Indeed, reverting 702821f from 3.11 produces a kernel which stands up
-to a ping flood for hours.
+I've never seen the transmit callback come first.
 
-Each of the times I reproduced this, it was identified as "Unhandled
-prefetch abort: unknown 25 (0x409) at 0xc0036ea0", except once when I
-got "unknown 16 (0x400)".
+When ipc_request_channel is called with blocking, then the best result
+I've had a null pointer causing a kernel panic.  Most of the time, the
+system just deadlocks.  The fix is:
 
-I'm assuming this is an mvneta bug that was exposed by 702821f.
-That's just a guess, and I don't have the skills to debug this any
-further.  In any case, I figured the maintainers would want to know
-about it.
+diff --git a/drivers/mailbox/mailbox.c b/drivers/mailbox/mailbox.c
+index c4ef608..08fae83 100644
+--- a/drivers/mailbox/mailbox.c
++++ b/drivers/mailbox/mailbox.c
+@@ -202,6 +202,7 @@ request_token_t ipc_send_message(void *channel, void *mssg)
+        if (!t)
+                pr_err("Try increasing MBOX_TX_QUEUE_LEN\n");
+ 
++       init_completion(&chan->tx_complete);
+        _msg_submit(chan);
+ 
+        if (chan->txdone_method == TXDONE_BY_POLL)
+@@ -209,7 +210,6 @@ request_token_t ipc_send_message(void *channel, void *mssg)
+ 
+        if (chan->tx_block && chan->active_req) {
+                int ret;
+-               init_completion(&chan->tx_complete);
+                ret = wait_for_completion_timeout(&chan->tx_complete,
+                        chan->tx_tout);
+                if (ret == 0) {
 
-Thanks much,
+When the init_completion is done after the _msg_submit, it might be executed
+after the complete in tx_tick.  And for the BCM2835, it's pretty reliable that
+this will happen. When this happens, the calls are:
+ 1. complete
+ 2. init_completion
+ 3. wait_for_completion_timeout
 
-Ethan
+The complete call is missed.
 
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2013-September/196332.html
+With this fix in place, the flow of events now looks like:
+[    0.521214] req - cf9845c0: 00000020 00000000 00030006 00000008
+[    0.527149] req - cf9845d0: 00000008 00000000 00000000 00000000
+[    0.533149] bcm2835-mbox 2000b880.mailbox: Request 0x0F9845C8
+[    0.538908] bcm2835-mbox 2000b880.mailbox: Reply 0x0F9845C8
+[    0.544482] bcm2835_thermal thermal.1: rxcb #1 @0f9845c0
+[    0.549840] bcm2835-mbox 2000b880.mailbox: Polling
+[    0.554686] rep - cf9845c0: 00000020 80000000 00030006 00000008
+[    0.560648] rep - cf9845d0: 80000008 00000000 0000835c 00000000
 
-Unhandled prefetch abort: unknown 25 (0x409) at 0xc0036ea0
-Internal error: : 409 [#1] PREEMPT SMP ARM
-Modules linked in:
-CPU: 0 PID: 0 Comm: swapper/0 Not tainted 3.11.0-ARCH-00005-gecca798 #31
-task: c074b140 ti: c0740000 task.ti: c0740000
-PC is at __rcu_read_lock+0x1c/0x20
-LR is at __netif_receive_skb_core+0x80/0x6fc
-pc : [<c0036ea0>]    lr : [<c04528d4>]    psr: 60000113
-sp : c0741de8  ip : 5232ad87  fp : ef181800
-r10: c073ede4  r9 : c07494b8  r8 : ef181800
-r7 : 00000000  r6 : 00000001  r5 : ee972b40  r4 : ee972b40
-r3 : c074b140  r2 : 00000001  r1 : 00000042  r0 : 0000ffff
-Flags: nZCv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment kernel
-Control: 10c5387d  Table: 2e8cc019  DAC: 00000015
-Process swapper/0 (pid: 0, stack limit = 0xc0740240)
-Stack: (0xc0741de8 to 0xc0742000)
-1de0:                   00000000 c0741e28 ee972b40 ee972b40 ef300c00 00000067
-1e00: f014f000 ee972b40 ee972b40 ee972b40 ef300c00 00000067 f014f000 00000000
-1e20: ef181800 c0455a70 b685321e 13236156 ee972b40 ee972b40 ef300c00 00000067
-1e40: f014f000 00000003 ee972b40 c04562a8 00000000 ef181c80 f014fce0 c03bd688
-1e60: 00000000 00000000 ef181ccc 00000001 00000001 00000001 c077e190 00000040
-1e80: 00000100 00000000 ef181800 ef181c80 ef300c00 00000000 ef181ccc c03bd860
-1ea0: 00000001 c076ebf8 c03bd7b0 ef181ccc c1363dc0 00000001 0000012c c1363dc8
-1ec0: 00000040 c077d773 c07420c0 c0456018 c074208c 000044fe 0000000c 00000001
-1ee0: c0742090 c0740000 0000000a 3f8bdf7c 00000000 00200000 00000101 c0024368
-1f00: c077e190 c001bc60 00000000 0000000c 00000003 000044fd c02f91ac 00000017
-1f20: 00000000 c0741f78 000003ff c07484c0 561f5811 00000000 00000000 c0024768
-1f40: 00000017 c000e6c0 f0002870 c00579e4 c07a4440 c000851c c00579e4 60000013
-1f60: ffffffff c0741fac c135f4c0 561f5811 00000000 c00118c0 c13629b0 00000000
-1f80: 00000000 00000000 c0740000 c077dd00 c055cc88 c0735450 c135f4c0 561f5811
-1fa0: 00000000 00000000 00000002 c0741fc0 c000e980 c00579e4 60000013 ffffffff
-1fc0: c0740000 c0711a38 ffffffff ffffffff c0711544 00000000 00000000 c0735450
-1fe0: 10c5387d c07484fc c073544c c074c290 00004059 00008074 00000000 00000000
-[<c0036ea0>] (__rcu_read_lock+0x1c/0x20) from [<c04528d4>]
-(__netif_receive_skb_core+0x80/0x6fc)
-[<c04528d4>] (__netif_receive_skb_core+0x80/0x6fc) from [<c0455a70>]
-(netif_receive_skb+0x60/0xb8)
-[<c0455a70>] (netif_receive_skb+0x60/0xb8) from [<c04562a8>]
-(napi_gro_receive+0x48/0x98)
-[<c04562a8>] (napi_gro_receive+0x48/0x98) from [<c03bd688>]
-(mvneta_rx+0x244/0x36c)
-[<c03bd688>] (mvneta_rx+0x244/0x36c) from [<c03bd860>] (mvneta_poll+0xb0/0x15c)
-[<c03bd860>] (mvneta_poll+0xb0/0x15c) from [<c0456018>]
-(net_rx_action+0x70/0x170)
-[<c0456018>] (net_rx_action+0x70/0x170) from [<c0024368>]
-(__do_softirq+0xd4/0x1c8)
-[<c0024368>] (__do_softirq+0xd4/0x1c8) from [<c0024768>] (irq_exit+0x74/0x88)
-[<c0024768>] (irq_exit+0x74/0x88) from [<c000e6c0>] (handle_IRQ+0x68/0x8c)
-[<c000e6c0>] (handle_IRQ+0x68/0x8c) from [<c000851c>]
-(armada_370_xp_handle_irq+0x44/0xa4)
-[<c000851c>] (armada_370_xp_handle_irq+0x44/0xa4) from [<c00118c0>]
-(__irq_svc+0x40/0x70)
-Exception stack(0xc0741f78 to 0xc0741fc0)
-1f60:                                                       c13629b0 00000000
-1f80: 00000000 00000000 c0740000 c077dd00 c055cc88 c0735450 c135f4c0 561f5811
-1fa0: 00000000 00000000 00000002 c0741fc0 c000e980 c00579e4 60000013 ffffffff
-[<c00118c0>] (__irq_svc+0x40/0x70) from [<c00579e4>]
-(cpu_startup_entry+0xb0/0x114)
-[<c00579e4>] (cpu_startup_entry+0xb0/0x114) from [<c0711a38>]
-(start_kernel+0x2c8/0x324)
-Code: e593300c e59321b4 e2822001 e58321b4 (e12fff1e)
----[ end trace 8f21018165664a9e ]---
-Kernel panic - not syncing: Fatal exception in interrupt
+
+Just a comment about this common mailbox API with respect to the BCM2835.
+It makes more sense for the BCM285 to always send messages with a blocking
+transmit. The mailbox send is a single 32 bit IO register shared for all
+channels (the channel number is encoded into the send data). BCM2835
+drivers would only want to use the mailbox API with an effective transmit
+queue depth of 1.  This is fine.  From what I can see, IPC calls via the
+mailbox should be very infrequent. Mostly only to set up some other
+inter-processor communication mechanism, or to query remote processor
+properties at system start or on behalf of a user process.
+
+The second problem is in ipc_request_channel
+
+list_for_each_entry(chan, &con->channels, node) {
+	if (!strcmp(con_name + len + 1, chan->name)
+			&& !chan->assigned) {
+		spin_lock_irqsave(&chan->lock, flags);
+[...snip...]
+		chan->assigned = true;
+[...snip...]
+		spin_unlock_irqrestore(&chan->lock, flags);
+		ret = 1;
+		break;
+	}
+}
+
+I think this is a race condition. I can see no reason why two or more threads
+couldn't proceed through the if condition before the spin lock is acquired.
+If that happens, then after the first thread has claimed the channel by
+setting assigned true and released the spin lock, the second thread will
+proceed, and overwrite the channel state with its own values.  Then wackiness
+ensues.
+
+The fix would be to move the lock acquisition to before the if, but getting
+the unlock correct will become messy.
+
+Cheers,
+Craig.
