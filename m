@@ -1,48 +1,53 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 14 Sep 2013 13:28:09 +0100
-Subject: dev->of_node overwrite can cause device loading with different
- driver
-In-Reply-To: <20130914121729.GA7823@kroah.com>
-References: <20130913155331.GC14456@pengutronix.de>
- <20130913171046.GA26207@kroah.com> <20130914071653.GA26512@pengutronix.de>
- <20130914121729.GA7823@kroah.com>
-Message-ID: <20130914122809.GI12758@n2100.arm.linux.org.uk>
+From: broonie@kernel.org (Mark Brown)
+Date: Sun, 15 Sep 2013 13:47:44 +0100
+Subject: [PATCH v2 1/9] i2c: prepare runtime PM support for I2C client
+ devices
+In-Reply-To: <20130915064139.GJ7393@intel.com>
+References: <1378913560-2752-1-git-send-email-mika.westerberg@linux.intel.com>
+ <1378913560-2752-2-git-send-email-mika.westerberg@linux.intel.com>
+ <87vc25pvvm.fsf@linaro.org> <20130913065434.GZ7393@intel.com>
+ <87bo3whjz4.fsf@linaro.org> <20130913145022.GC7393@intel.com>
+ <20130913173149.GE7393@intel.com> <87ioy4e8bw.fsf@linaro.org>
+ <20130915064139.GJ7393@intel.com>
+Message-ID: <20130915124744.GW29403@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 14, 2013 at 05:17:29AM -0700, Greg Kroah-Hartman wrote:
-> On Sat, Sep 14, 2013 at 09:16:53AM +0200, Markus Pargmann wrote:
-> > 3. We could fix up all drivers that change the of_node. But there are
-> >    ARM DT frameworks that require a device struct as parameter instead
-> >    of a device_node parameter (e.g. soc-generic-dmaengine-pcm). So a
-> >    driver core, initialized by a glue driver with DT bindings, has to
-> >    set dev->of_node to use those frameworks. I think it is strange to
-> >    have such DT framework interfaces if a driver is not supposed to
-> >    overwrite dev->of_node permanently.
-> 
-> How about any driver that does muck with this structure, restore it
-> properly if their probe() function fails?  Yes, you show that this is
-> going to be tricky in some places (i.e. musb), but it makes sense that
-> the burden of fixing this issue would rest on them, as they are the ones
-> causing this problem, right?
+On Sun, Sep 15, 2013 at 09:41:39AM +0300, Mika Westerberg wrote:
 
-It's not about overwriting at all.
+> There's also a less intrusive way of fixing the problem we see with ACPI
+> enabled I2C devices:
 
-It's quite simple:
+> 	1. In I2C core i2c_device_probe() we power on the I2C controller
+> 	and attach the client device to the ACPI power domain. Just like in
+> 	this patch but we don't touch the I2C client device runtime PM.
 
-1. OF creates a platform device and attaches an of_node to it.
-2. This platform device is matched using the data in the of_node structure
-   against one of the MUSB stub drivers.
-3. The MUSB stub driver creates a new platform device, and copies the
-   of_node to it, and registers it.
-4. This new platform device _can_ itself be matched against the stub
-   driver using the of_node structure.  When this happens, go to step
-   2 and repeat 2-4.
+> 	-> This should allow the existing drivers to keep using whatever
+> 	runtime PM strategy they have chosen.
 
-That's where the problem is - it's not about overwriting an existing
-platform device's of_node pointer with something that the driver has
-dreamt up at all.
+There should be no explicit need to power on the I2C controller if it's
+implemented the same way the existing ones are - just have it power
+itself on when it is doing a transfer.
 
-If we're lucky, step 3.5 would be "match against the 'musb-hdrc' driver
-and successfully probe it" which is the only thing that would break
-the above loop.
+> 	2. For ACPI enumerated I2C client devices drivers we need to
+> 	implement the runtime PM in order to save power (otherwise the
+> 	devices will be left powered on).
+
+> and do the same for SPI devices as well.
+
+> Then only thing that changes for non-ACPI devices is that the controller
+> will be powered on during the client device probe (well, and during
+> remove).
+
+> Thoughts?
+
+This is definitely less intrusive than the current proposal, there's one
+ACPI I2C device binding queued for -next after the merge window (rt5640)
+which will need an update.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130915/d4861ca3/attachment.sig>
