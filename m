@@ -1,84 +1,102 @@
-From: emilio@elopez.com.ar (=?UTF-8?q?Emilio=20L=C3=B3pez?=)
-Date: Sat, 14 Sep 2013 21:37:59 -0300
-Subject: [PATCH] clk: composite: .determine_rate support
-Message-ID: <1379205479-26001-1-git-send-email-emilio@elopez.com.ar>
+From: ethan@ethantuttle.com (Ethan Tuttle)
+Date: Sat, 14 Sep 2013 18:05:32 -0700
+Subject: mvneta: oops in __rcu_read_lock on mirabox
+Message-ID: <CACzLR4tTvt+ROEhkXUCQhV6=bPPTX4LFSkWfrEhF+OdM1Jm1Rw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adds .determine_rate support to the composite clock. It will
-use the .determine_rate callback from the rate component if available,
-and fall back on the mux component otherwise. This allows composite
-clocks to enjoy the benefits of automatic clock reparenting.
+When I upgraded my mirabox from 3.11-rc4 to 3.11, I started seeing
+oopses while receiving network traffic (see below).  Sending a flood
+ping will trigger the oops within a few minutes.
 
-Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
----
+The stack looks similar, but not identical to, the one reported
+earlier by Jochen De Smet[1].  In my case the PC is always
+__rcu_read_lock.
 
-Hi Mike,
+A git bisect found a878764 "Merge
+git://git.kernel.org/pub/scm/linux/kernel/git/davem/net" to be the
+first bad commit... interesting, because neither of the merge parents
+produce the oops.  I rebased the net changes onto the other merge
+parent and bisected that series, which identified 702821f "net: revert
+8728c544a9c ("net: dev_pick_tx() fix")" as the first bad commit.
+Indeed, reverting 702821f from 3.11 produces a kernel which stands up
+to a ping flood for hours.
 
-This is a prerequisite patch for the sunxi driver changes that I'll send 
-shortly; I believe you already looked at this diff on IRC and agreed it 
-was sensible, so I hope it can be merged early for the 3.13 cycle 
-(unless someone else has any objections to the patch, that is).
+Each of the times I reproduced this, it was identified as "Unhandled
+prefetch abort: unknown 25 (0x409) at 0xc0036ea0", except once when I
+got "unknown 16 (0x400)".
 
-Cheers,
+I'm assuming this is an mvneta bug that was exposed by 702821f.
+That's just a guess, and I don't have the skills to debug this any
+further.  In any case, I figured the maintainers would want to know
+about it.
 
-Emilio
+Thanks much,
 
- drivers/clk/clk-composite.c | 28 ++++++++++++++++++++++++++++
- 1 file changed, 28 insertions(+)
+Ethan
 
-diff --git a/drivers/clk/clk-composite.c b/drivers/clk/clk-composite.c
-index a33f46f..753d0b7 100644
---- a/drivers/clk/clk-composite.c
-+++ b/drivers/clk/clk-composite.c
-@@ -55,6 +55,30 @@ static unsigned long clk_composite_recalc_rate(struct clk_hw *hw,
- 	return rate_ops->recalc_rate(rate_hw, parent_rate);
- }
- 
-+static long clk_composite_determine_rate(struct clk_hw *hw, unsigned long rate,
-+					unsigned long *best_parent_rate,
-+					struct clk **best_parent_p)
-+{
-+	struct clk_composite *composite = to_clk_composite(hw);
-+	const struct clk_ops *rate_ops = composite->rate_ops;
-+	const struct clk_ops *mux_ops = composite->mux_ops;
-+	struct clk_hw *rate_hw = composite->rate_hw;
-+	struct clk_hw *mux_hw = composite->mux_hw;
-+
-+	if (rate_hw && rate_ops && rate_ops->determine_rate) {
-+		rate_hw->clk = hw->clk;
-+		return rate_ops->determine_rate(rate_hw, rate, best_parent_rate,
-+						best_parent_p);
-+	} else if (mux_hw && mux_ops && mux_ops->determine_rate) {
-+		mux_hw->clk = hw->clk;
-+		return mux_ops->determine_rate(rate_hw, rate, best_parent_rate,
-+					       best_parent_p);
-+	} else {
-+		pr_err("clk: clk_composite_determine_rate function called, but no mux or rate callback set!\n");
-+		return 0;
-+	}
-+}
-+
- static long clk_composite_round_rate(struct clk_hw *hw, unsigned long rate,
- 				  unsigned long *prate)
- {
-@@ -147,6 +171,8 @@ struct clk *clk_register_composite(struct device *dev, const char *name,
- 		composite->mux_ops = mux_ops;
- 		clk_composite_ops->get_parent = clk_composite_get_parent;
- 		clk_composite_ops->set_parent = clk_composite_set_parent;
-+		if (mux_ops->determine_rate)
-+			clk_composite_ops->determine_rate = clk_composite_determine_rate;
- 	}
- 
- 	if (rate_hw && rate_ops) {
-@@ -170,6 +196,8 @@ struct clk *clk_register_composite(struct device *dev, const char *name,
- 		composite->rate_hw = rate_hw;
- 		composite->rate_ops = rate_ops;
- 		clk_composite_ops->recalc_rate = clk_composite_recalc_rate;
-+		if (rate_ops->determine_rate)
-+			clk_composite_ops->determine_rate = clk_composite_determine_rate;
- 	}
- 
- 	if (gate_hw && gate_ops) {
--- 
-1.8.4
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2013-September/196332.html
+
+Unhandled prefetch abort: unknown 25 (0x409) at 0xc0036ea0
+Internal error: : 409 [#1] PREEMPT SMP ARM
+Modules linked in:
+CPU: 0 PID: 0 Comm: swapper/0 Not tainted 3.11.0-ARCH-00005-gecca798 #31
+task: c074b140 ti: c0740000 task.ti: c0740000
+PC is at __rcu_read_lock+0x1c/0x20
+LR is at __netif_receive_skb_core+0x80/0x6fc
+pc : [<c0036ea0>]    lr : [<c04528d4>]    psr: 60000113
+sp : c0741de8  ip : 5232ad87  fp : ef181800
+r10: c073ede4  r9 : c07494b8  r8 : ef181800
+r7 : 00000000  r6 : 00000001  r5 : ee972b40  r4 : ee972b40
+r3 : c074b140  r2 : 00000001  r1 : 00000042  r0 : 0000ffff
+Flags: nZCv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment kernel
+Control: 10c5387d  Table: 2e8cc019  DAC: 00000015
+Process swapper/0 (pid: 0, stack limit = 0xc0740240)
+Stack: (0xc0741de8 to 0xc0742000)
+1de0:                   00000000 c0741e28 ee972b40 ee972b40 ef300c00 00000067
+1e00: f014f000 ee972b40 ee972b40 ee972b40 ef300c00 00000067 f014f000 00000000
+1e20: ef181800 c0455a70 b685321e 13236156 ee972b40 ee972b40 ef300c00 00000067
+1e40: f014f000 00000003 ee972b40 c04562a8 00000000 ef181c80 f014fce0 c03bd688
+1e60: 00000000 00000000 ef181ccc 00000001 00000001 00000001 c077e190 00000040
+1e80: 00000100 00000000 ef181800 ef181c80 ef300c00 00000000 ef181ccc c03bd860
+1ea0: 00000001 c076ebf8 c03bd7b0 ef181ccc c1363dc0 00000001 0000012c c1363dc8
+1ec0: 00000040 c077d773 c07420c0 c0456018 c074208c 000044fe 0000000c 00000001
+1ee0: c0742090 c0740000 0000000a 3f8bdf7c 00000000 00200000 00000101 c0024368
+1f00: c077e190 c001bc60 00000000 0000000c 00000003 000044fd c02f91ac 00000017
+1f20: 00000000 c0741f78 000003ff c07484c0 561f5811 00000000 00000000 c0024768
+1f40: 00000017 c000e6c0 f0002870 c00579e4 c07a4440 c000851c c00579e4 60000013
+1f60: ffffffff c0741fac c135f4c0 561f5811 00000000 c00118c0 c13629b0 00000000
+1f80: 00000000 00000000 c0740000 c077dd00 c055cc88 c0735450 c135f4c0 561f5811
+1fa0: 00000000 00000000 00000002 c0741fc0 c000e980 c00579e4 60000013 ffffffff
+1fc0: c0740000 c0711a38 ffffffff ffffffff c0711544 00000000 00000000 c0735450
+1fe0: 10c5387d c07484fc c073544c c074c290 00004059 00008074 00000000 00000000
+[<c0036ea0>] (__rcu_read_lock+0x1c/0x20) from [<c04528d4>]
+(__netif_receive_skb_core+0x80/0x6fc)
+[<c04528d4>] (__netif_receive_skb_core+0x80/0x6fc) from [<c0455a70>]
+(netif_receive_skb+0x60/0xb8)
+[<c0455a70>] (netif_receive_skb+0x60/0xb8) from [<c04562a8>]
+(napi_gro_receive+0x48/0x98)
+[<c04562a8>] (napi_gro_receive+0x48/0x98) from [<c03bd688>]
+(mvneta_rx+0x244/0x36c)
+[<c03bd688>] (mvneta_rx+0x244/0x36c) from [<c03bd860>] (mvneta_poll+0xb0/0x15c)
+[<c03bd860>] (mvneta_poll+0xb0/0x15c) from [<c0456018>]
+(net_rx_action+0x70/0x170)
+[<c0456018>] (net_rx_action+0x70/0x170) from [<c0024368>]
+(__do_softirq+0xd4/0x1c8)
+[<c0024368>] (__do_softirq+0xd4/0x1c8) from [<c0024768>] (irq_exit+0x74/0x88)
+[<c0024768>] (irq_exit+0x74/0x88) from [<c000e6c0>] (handle_IRQ+0x68/0x8c)
+[<c000e6c0>] (handle_IRQ+0x68/0x8c) from [<c000851c>]
+(armada_370_xp_handle_irq+0x44/0xa4)
+[<c000851c>] (armada_370_xp_handle_irq+0x44/0xa4) from [<c00118c0>]
+(__irq_svc+0x40/0x70)
+Exception stack(0xc0741f78 to 0xc0741fc0)
+1f60:                                                       c13629b0 00000000
+1f80: 00000000 00000000 c0740000 c077dd00 c055cc88 c0735450 c135f4c0 561f5811
+1fa0: 00000000 00000000 00000002 c0741fc0 c000e980 c00579e4 60000013 ffffffff
+[<c00118c0>] (__irq_svc+0x40/0x70) from [<c00579e4>]
+(cpu_startup_entry+0xb0/0x114)
+[<c00579e4>] (cpu_startup_entry+0xb0/0x114) from [<c0711a38>]
+(start_kernel+0x2c8/0x324)
+Code: e593300c e59321b4 e2822001 e58321b4 (e12fff1e)
+---[ end trace 8f21018165664a9e ]---
+Kernel panic - not syncing: Fatal exception in interrupt
