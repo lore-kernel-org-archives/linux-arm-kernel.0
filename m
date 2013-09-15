@@ -1,57 +1,36 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun, 15 Sep 2013 20:03:13 +0200
-Subject: [PATCH v4 1/4] ARM: bcm4760: Add platform infrastructure
-In-Reply-To: <20130914152123.491631670@gmail.com>
+Date: Sun, 15 Sep 2013 20:09:26 +0200
+Subject: [PATCH v4 4/4] ARM: bcm4760: Add restart hook
+In-Reply-To: <20130914152124.317379835@gmail.com>
 References: <20130914152032.401907974@gmail.com>
- <20130914152123.491631670@gmail.com>
-Message-ID: <201309152003.13780.arnd@arndb.de>
+ <20130914152124.317379835@gmail.com>
+Message-ID: <201309152009.26462.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Saturday 14 September 2013, Domenico Andreoli wrote:
-> From: Domenico Andreoli <domenico.andreoli@linux.com>
-> 
-> Platform infrastructure for the Broadcom BCM4760 based ARM11 SoCs.
-> 
-> v4:
-> * added low-level debug PL01X parameters
-> * added clocks to the VICs DT stanzas
-> 
-> v3:
-> * dropped the idea of unconditionally build mach-bcm
-> 
-> v2:
-> * clocks are now configured via DT
-> * uart DT nodes have been renamed and hooked to the proper clock nodes
-> * dropped unneeded config options
-> * dropped misused initialization of system_rev
-> * dropped unneeded early io mapping 
-> * build rule of mach-bcm is moved to separated patch
-> 
-> v1:
-> * initial release
-> 
-> Cc: devicetree at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Acked-by: Jason Cooper <jason@lakedaemon.net>
-> Signed-off-by: Domenico Andreoli <domenico.andreoli@linux.com>
-> ---
-
-Acked-by: Arnd Bergmann <arnd@arndb.de>
-
-Note that normally we put the patch revision history below the '---' line, so it 
-doesn't get included in the git history.
-
 > +
-> +static void __init bcm4760_init(void)
+> +static int __init bcm4760_wdt_init(void)
 > +{
-> +	of_clk_init(NULL);
-> +	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
-> +}
+> +	struct device_node *node;
+> +
+> +	node = of_find_matching_node(NULL, bcm4760_pm_wdt_match);
+> +	if (!node) {
+> +		pr_info("No bcm4760 watchdog node\n");
+> +		return -1;
+> +	}
+> +
+> +	wdt_regs = of_iomap(node, 0);
+> +	of_node_put(node);
 
-With the series that Sebastian Hesselbarth prepared to automatically do
-of_clk_init(NULL), this entire function should go away as well, but I think
-the cleanest way is to handle that in the arm-soc tree during the merge
-of your patches with Sebastian's patches.
+Since this is now in the drivers directory and initialized at regular
+module_init level, I'd ask you to register it as a proper platform_driver
+and move the initialization into the probe() callback. You also need to
+put Wim as the watchdog subsystem maintainer on Cc (I did in this reply)
+and ask him to merge the driver.
+
+I assume that Wim will ask you to add a watchdog_register_device() call
+and a set of watchdog_ops to make this a functional driver. From the
+platform perspective, I don't care, but it is certainly a logical step.
 
 	Arnd
