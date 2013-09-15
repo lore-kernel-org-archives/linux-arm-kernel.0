@@ -1,36 +1,70 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Sun, 15 Sep 2013 13:50:18 +0100
-Subject: [PATCH v7 3/4] drivers: of: add initialization code for dma
- reserved memory
-In-Reply-To: <13185491-534E-4547-8412-5704346EA2DC@codeaurora.org>
-References: <1377527959-5080-1-git-send-email-m.szyprowski@samsung.com>
- <1377527959-5080-4-git-send-email-m.szyprowski@samsung.com>
- <20130829224637.D09183E1222@localhost> <52209278.8040106@samsung.com>
- <DAF223EB-C84C-4E82-A24A-ACD0A3A0559F@codeaurora.org>
- <20130909160154.8D7183E0F23@localhost>
- <13185491-534E-4547-8412-5704346EA2DC@codeaurora.org>
-Message-ID: <20130915125018.D51F0C42C64@trevor.secretlab.ca>
+Date: Sun, 15 Sep 2013 13:40:36 +0100
+Subject: [PATCH 2/2] arm: zynq: Enable arm_global_timer
+In-Reply-To: <1379004640-15117-3-git-send-email-soren.brinkmann@xilinx.com>
+References: <1379004640-15117-1-git-send-email-soren.brinkmann@xilinx.com>
+ <1379004640-15117-3-git-send-email-soren.brinkmann@xilinx.com>
+Message-ID: <20130915124036.A66A8C42C3C@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 12 Sep 2013 13:22:25 -0500, Kumar Gala <galak@codeaurora.org> wrote:
+On Thu, 12 Sep 2013 09:50:40 -0700, Soren Brinkmann <soren.brinkmann@xilinx.com> wrote:
+> Zynq is based on an ARM Cortex-A9 MPCore, which features the
+> arm_global_timer in its SCU. Therefore enable the timer for Zynq.
 > 
-> On Sep 9, 2013, at 11:01 AM, Grant Likely wrote:
+> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+> ---
+>  arch/arm/boot/dts/zynq-7000.dtsi | 8 ++++++++
+>  arch/arm/mach-zynq/Kconfig       | 1 +
+>  2 files changed, 9 insertions(+)
 > 
-> > 
-> > The generic form for do-not-touch memory:
-> > 	compatible = "reserved-memory";
-> > - I've dropped '-region' because I think it is redundant
-> > - The kernel will not make use of this memory except for when a driver picks it up
-> > 
-> > For contiguous memory:
-> > 	compatible = "contiguous-memory", "reserved-memory"
-> 
-> Should the phandle references still be 'memory-region' ?
+> diff --git a/arch/arm/boot/dts/zynq-7000.dtsi b/arch/arm/boot/dts/zynq-7000.dtsi
+> index e32b92b..eaacb39 100644
+> --- a/arch/arm/boot/dts/zynq-7000.dtsi
+> +++ b/arch/arm/boot/dts/zynq-7000.dtsi
+> @@ -92,6 +92,14 @@
+>  			};
+>  		};
+>  
+> +		global_timer: global_timer at f8f00200 {
 
-I would think so.
+Nit: node names and property names use '-' not '_'. Plus the generic
+names principle suggests the node should be names 'timer' not
+'global_timer'. The following would be fine:
 
-It is only redundent in the reserved region node because the binding
-says the node is a child of the "reserved-regions" node.  :-)
+		global_timer: timer at f8f00200 {
+
+(There's a distinction between node names and labels. '_' is fine in
+labels since it doesn't get output into the compiled .dtb.
 
 g.
+
+> +			compatible = "arm,cortex-a9-global-timer";
+> +			reg = <0xf8f00200 0x20>;
+> +			interrupts = <1 11 0x301>;
+> +			interrupt-parent = <&intc>;
+> +			clocks = <&clkc 4>;
+> +		};
+> +
+>  		ttc0: ttc0 at f8001000 {
+>  			interrupt-parent = <&intc>;
+>  			interrupts = < 0 10 4 0 11 4 0 12 4 >;
+> diff --git a/arch/arm/mach-zynq/Kconfig b/arch/arm/mach-zynq/Kconfig
+> index 04f8a4a..6b04260 100644
+> --- a/arch/arm/mach-zynq/Kconfig
+> +++ b/arch/arm/mach-zynq/Kconfig
+> @@ -13,5 +13,6 @@ config ARCH_ZYNQ
+>  	select HAVE_SMP
+>  	select SPARSE_IRQ
+>  	select CADENCE_TTC_TIMER
+> +	select ARM_GLOBAL_TIMER
+>  	help
+>  	  Support for Xilinx Zynq ARM Cortex A9 Platform
+> -- 
+> 1.8.4
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
