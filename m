@@ -1,17 +1,17 @@
 From: eduardo.valentin@ti.com (Eduardo Valentin)
-Date: Sun, 15 Sep 2013 18:02:42 -0400
-Subject: [PATCH 15/16] arm: dts: add omap5 thermal data
+Date: Sun, 15 Sep 2013 18:02:43 -0400
+Subject: [PATCH 16/16] arm: dts: add cooling properties on omap5 cpu node
 In-Reply-To: <1379282563-14650-1-git-send-email-eduardo.valentin@ti.com>
 References: <1379282563-14650-1-git-send-email-eduardo.valentin@ti.com>
-Message-ID: <1379282563-14650-16-git-send-email-eduardo.valentin@ti.com>
+Message-ID: <1379282563-14650-17-git-send-email-eduardo.valentin@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch changes the dtsi entry on omap5 to contain
-the thermal data. This data will enable the passive
-cooling with CPUfreq cooling device at 100C. The
-system will do a thermal shutdown at 125C whenever
-any of its sensors sees this level.
+OMAP5 devices can reach high temperatures and thus
+needs to have cpufreq-cooling on systems running on it.
+
+This patch adds the required cooling device properties
+so that cpufreq-cpu0 driver loads the cooling device.
 
 Cc: "Beno?t Cousson" <bcousson@baylibre.com>
 Cc: Tony Lindgren <tony@atomide.com>
@@ -27,51 +27,22 @@ Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-kernel at vger.kernel.org
 Signed-off-by: Eduardo Valentin <eduardo.valentin@ti.com>
 ---
- arch/arm/boot/dts/omap5.dtsi | 12 ++++++++++--
- 1 file changed, 10 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/omap5.dtsi | 3 +++
+ 1 file changed, 3 insertions(+)
 
 diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
-index 07be2cd..b2ca0cf 100644
+index b2ca0cf..9eb95b7 100644
 --- a/arch/arm/boot/dts/omap5.dtsi
 +++ b/arch/arm/boot/dts/omap5.dtsi
-@@ -33,7 +33,7 @@
- 		#address-cells = <1>;
- 		#size-cells = <0>;
- 
--		cpu at 0 {
-+		cpu0: cpu at 0 {
+@@ -37,6 +37,9 @@
  			device_type = "cpu";
  			compatible = "arm,cortex-a15";
  			reg = <0x0>;
-@@ -45,6 +45,12 @@
- 		};
- 	};
- 
-+	thermal-zones {
-+		#include "omap4-cpu-thermal.dtsi"
-+		#include "omap5-gpu-thermal.dtsi"
-+		#include "omap5-core-thermal.dtsi"
-+	};
 +
- 	timer {
- 		compatible = "arm,armv7-timer";
- 		/* PPI secure/nonsecure IRQ */
-@@ -704,13 +710,15 @@
- 			};
++			/* cooling options */
++			#cooling-cells = <2>; /* min followed by max */
  		};
- 
--		bandgap at 4a0021e0 {
-+		bandgap: bandgap at 4a0021e0 {
- 			reg = <0x4a0021e0 0xc
- 			       0x4a00232c 0xc
- 			       0x4a002380 0x2c
- 			       0x4a0023C0 0x3c>;
- 			interrupts = <GIC_SPI 126 IRQ_TYPE_LEVEL_HIGH>;
- 			compatible = "ti,omap5430-bandgap";
-+
-+			#sensor-cells = <1>;
- 		};
- 	};
- };
+ 		cpu at 1 {
+ 			device_type = "cpu";
 -- 
 1.8.2.1.342.gfa7285d
