@@ -1,23 +1,23 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun, 15 Sep 2013 20:15:12 +0200
-Subject: [PATCH 0/6] deletion of the Shark machine
-In-Reply-To: <1379069467-3974-1-git-send-email-linus.walleij@linaro.org>
-References: <1379069467-3974-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <201309152015.12676.arnd@arndb.de>
+Date: Sun, 15 Sep 2013 20:36:18 +0200
+Subject: [PATCH 1/2] ARM: msm: trout: fix 'pointer from integer' warnings
+In-Reply-To: <5350fa5571d24b68d6bb27959d3ef761ccb95b00.1378771874.git.joshc@codeaurora.org>
+References: <5350fa5571d24b68d6bb27959d3ef761ccb95b00.1378771874.git.joshc@codeaurora.org>
+Message-ID: <201309152036.18373.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 13 September 2013, Linus Walleij wrote:
-> The RFC series were not met by any protests from active users
-> so this is an iteration of the series as sharp material for
-> v3.13. After collecting ACKs a pull request will be made to
-> the ARM SoC tree.
+On Tuesday 10 September 2013, Josh Cartwright wrote:
+> -#define TROUT_GPIO_INT_MASK0_REG            (0x0c)
+> -#define TROUT_GPIO_INT_STAT0_REG            (0x0e)
+> -#define TROUT_GPIO_INT_MASK1_REG            (0x14)
+> -#define TROUT_GPIO_INT_STAT1_REG            (0x10)
+> +#define TROUT_GPIO_INT_MASK0_REG            IOMEM(0x0c)
+> +#define TROUT_GPIO_INT_STAT0_REG            IOMEM(0x0e)
+> +#define TROUT_GPIO_INT_MASK1_REG            IOMEM(0x14)
+> +#define TROUT_GPIO_INT_STAT1_REG            IOMEM(0x10)
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
-
-Note that although you just ask for Acks from the other subsystem maintainers
-here, I think it would be just as well to apply some or all of the patches
-in subsystem trees. Since the code is just going away, there is no requirement
-to do it atomically.
+This is wrong, the values above are offsets from TROUT_CPLD_BASE. Instead you
+need to make that constant an __iomem token and leave these as integers.
 
 	Arnd
