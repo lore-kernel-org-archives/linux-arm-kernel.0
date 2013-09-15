@@ -1,109 +1,105 @@
-From: linux.melwyn@gmail.com (melwyn lobo)
-Date: Sun, 15 Sep 2013 22:40:57 +0900
-Subject: Vexpress config
-In-Reply-To: <CAHSGOuusvazUFFAAraCZmQgXr8LvwdV4zess=KsEMsCtbg0y2A@mail.gmail.com>
-References: <CAHSGOuusvazUFFAAraCZmQgXr8LvwdV4zess=KsEMsCtbg0y2A@mail.gmail.com>
-Message-ID: <CAHSGOus7VsJh+-mpxOWeeyqfsB4jNYiG-vwRirFaJh39c3Heww@mail.gmail.com>
+From: sylvester.nawrocki@gmail.com (Sylwester Nawrocki)
+Date: Sun, 15 Sep 2013 15:48:12 +0200
+Subject: [PATCH v2 1/9] i2c: prepare runtime PM support for I2C client
+ devices
+In-Reply-To: <20130913154013.GD7393@intel.com>
+References: <1378913560-2752-1-git-send-email-mika.westerberg@linux.intel.com>
+ <1378913560-2752-2-git-send-email-mika.westerberg@linux.intel.com>
+ <87vc25pvvm.fsf@linaro.org> <20130913065434.GZ7393@intel.com>
+ <52332BF0.4060605@samsung.com> <20130913154013.GD7393@intel.com>
+Message-ID: <5235BA9C.1090509@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To better clarify the issue. When I boot a single core Cortex-A9 RTSM
-with vexpress_defconfig compiled kernel and kernel command line as
-1.  "earlyprintk console=ttyAMA0,38400n8 mem=512M maxcpus=1"
-2.  "earlyprintk console=ttyAMA0,38400n8 mem=512M maxcpus=0"
-3.  "earlyprintk console=ttyAMA0,38400n8 mem=512M nosmp"
-4.  "earlyprintk console=ttyAMA0,38400n8 mem=512M"
-the kernel throws an OOPS error:
-
-Uncompressing Linux... done, booting the kernel.
-
-Booting Linux on physical CPU 0x0
-Initializing cgroup subsys cpuset
-Linux version 3.10.9 (m.lobo at mcbdhost-Dataserver) (gcc version 4.7.3
-(Sourcery CodeBench Lite 2013.05-24) ) #8 Fri Sep 13 10:43:53 KST 2013
-CPU: ARMv7 Processor [413fc090] revision 0 (ARMv7), cr=10c53c7d
-CPU: PIPT / VIPT nonaliasing data cache, VIPT aliasing instruction cache
-Machine: ARM-Versatile Express
-Truncating memory at 0x80000000 to fit in 32-bit physical address space
-
-bootconsole [earlycon0] enabled
-
-Memory policy: ECC disabled, Data cache writeback
-
-CPU: All CPU(s) started in SVC mode.
-sched_clock: 32 bits at 24MHz, resolution 41ns, wraps every 178956ms
-
-Built 1 zonelists in Zone order, mobility grouping on.  Total pages: 130048
-Kernel command line: earlyprintk console=ttyAMA0,38400n8 mem=512M
-
-PID hash table entries: 2048 (order: 1, 8192 bytes)
-
-Dentry cache hash table entries: 65536 (order: 6, 262144 bytes)
-
-Inode-cache hash table entries: 32768 (order: 5, 131072 bytes)
-
-Memory: 512MB = 512MB total
-Memory: 507668k/507668k available, 16620k reserved, 0K highmem
-
-Virtual kernel memory layout:
-    vector  : 0xffff0000 - 0xffff1000   (   4 kB)
-
-    fixmap  : 0xfff00000 - 0xfffe0000   ( 896 kB)
-    vmalloc : 0xa0800000 - 0xff000000   (1512 MB)
-    lowmem  : 0x80000000 - 0xa0000000   ( 512 MB)
-    modules : 0x7f000000 - 0x80000000   (  16 MB)
-      .text : 0x80008000 - 0x80453bd0   (4399 kB)
-      .init : 0x80454000 - 0x8047bafc   ( 159 kB)
-      .data : 0x8047c000 - 0x804a45e0   ( 162 kB)
-       .bss : 0x804a45e0 - 0x804c4b10   ( 130 kB)
-
-SLUB: HWalign=64, Order=0-3, MinObjects=0, CPUs=1, Nodes=1
-
-NR_IRQS:16 nr_irqs:16 16
-
-Unhandled fault: external abort on non-linefetch (0x1008) at 0xf8201004
-
-Internal error: : 1008 [#1] ARM
-Modules lin
-ked in:
-CPU: 0 PID: 0 Comm: swapper Not tainted 3.10.9 #8
-task: 804862b8 ti: 8047c000 task.ti: 8047c000
-PC is at gic_init_bases+0x98/0x320
-LR is at 0xffffffff
-pc : []    lr : []    psr: 000001d3
-sp : 8047df88  ip : 804843b0  fp : 00000000
-r10: 00000000  r9 : 413fc090  r8 : 00000010
-r7 : f8200100  r6 : 00000000  r5 : 00000010  r4 : f8201000
-r3 : 00000000  r2 : f820
-1000  r1 : 0000001d  r0 : 00000000
-Flags: nzcv  IRQs off  FIQs off  Mode SVC_32  ISA ARM  Segment kernel
-Control: 10c53c7d  Table: 80004059  DAC: 00000015
-Process swapper (pid: 0, stack limit = 0x8047c230)
-Stack: (0x8047df88 to 0x8047e000)
-df80:                   8045acb0 9f804780 f8201000 80473300 ffffffff 808c60c0
-dfa0: 80004059 8045acd0 00000000 00000000 804a4600 8045a808 8045a7f0 804563c8
-dfc0: 00000000 804548cc ffffffff ffffffff 804544f0 00000000 00000000 80473300
-dfe0: 00000000 10c5
-3c7d 80484028 804732fc 8048705c 80008070 00000000 00000000
-[] (gic_init_bases+0x98/0x320) from [] (ct_ca9x4_init_irq+0x54/0x5c)[]
-(ct_ca9x4_init_irq+0x54/0x5c) from [] (v2m_init_irq+0x18/0x1c)
-[] (v2m_init_irq+0x18/0x1c) from [] (init_IRQ+0x28/0x2c)
-[] (init_IRQ+0x28/0x2c) from [] (start_kernel+0x1a4/0x2ec)
-[] (start_kernel+0x1a4/0x2ec) from [] (0x80008070)
-
-Code: 13c5501f 13a08010 10855008 03a08010 (e5942004)
-
----[ end trace 1b75b31a2719ed1c ]---
-Kernel panic - not syncing: Attempted to kill the idle task!
-
-
-Appreciate any pointers.
-Thanks
-
-On Sat, Sep 14, 2013 at 8:15 PM, melwyn lobo <linux.melwyn@gmail.com> wrote:
-> Hi,
-> I need to compile a kernel for ARM RTSM based on Cortex-A9 (single
-> core), RTSM_VE_Cortex-A9x1, device.  Which defconfig should I use ?
-> I think that vexpress_defconfig is for A quad core A9 based Vexpress platform.
+On 09/13/2013 05:40 PM, Mika Westerberg wrote:
+[...]
+>>> The call to pm_runtime_get_noresume() should make sure that the device is
+>>> in active state (at least in state where it can access the bus) if I'm
+>>> understanding this right.
+>>
+>> I can't see how this would happen. How runtime_resume/runtime_suspend
+>> callbacks would get invoked with this code, if, e.g. originally driver called
+>> pm_runtime_enable(), pm_runtime_get_sync(), pm_runtime_put_sync() in probe() ?
 >
-> Thanks
+> The driver callbacks are not called but if the device has been attached to
+> a power domain (like we do with ACPI) the power domain callbacks get called
+> and it brings the "bus" to such state that we are able to access the
+> device. That also was the reason I used _noresume() but didn't look too
+> close the implementation.
+
+OK, but if a client driver assumes default inactive power state it will 
+expect
+its callbacks to get called. Otherwise exisiting code might break. So, e.g.
+in case of s5p-tv it would rather need to be something like:
+
+	pm_runtime_put()
+
+	pm_runtime_get_sync()
+  	sii9234_verify_version()
+  	pm_runtime_put(dev)
+
+>> pm_runtime_get_noresume() merely increments usage counter of a device.
+>> It seems that these changes will break the s5p-tv driver. I might be missing
+>> something though.
+>
+> You are right and Kevin also mentioned this. It should be pm_runtime_get(),
+> if I'm not mistaken.
+
+Note that client drivers usually call pm_runtime_enable() only when it 
+is safe
+to call their driver's runtime PM callbacks. By enabling runtime PM 
+before the
+client's driver has completely initialized we may risk that the 
+callbacks are
+executed with uninitialized data, if I understand things correctly.
+
+>> As Mark pointed out this is currently unwanted behaviour to runtime PM
+>> activate a bus controller device manually in the core for when the client's
+>> probe() is executed, since i2c core will activate the bus controller for when
+>> transfer is being carried out.
+>>
+>> But I can understand this is needed for ACPI and it shouldn't break existing
+>> drivers, that do runtime PM activate the client device in probe().
+>
+> Indeed, we don't want to break anything (and we still need something like
+> this for ACPI).
+>
+>> Now I'm sure this will break power management of the drivers/media/exynos4-is
+>> driver, due to incorrect power sequence (power domain and clocks handling).
+>> I'll try to take care of it in separate patch, as I have some patches pending,
+>> that move most of code from drivers/media/exynos4-is/fimc-is-sensor.c to
+>> drivers/media/i2c/s5k6a3.c.
+>
+> I missed that code when I converted existing users to this method. Sorry
+> about that (I can handle that in the next version).
+>
+> I quickly looked at it and I don't see anything that could break (once
+> converted). What it does is this:
+>
+> 	pm_runtime_no_callbacks(dev);
+> 	pm_runtime_enable(dev);
+>
+> changing that to:
+>
+> 	pm_runtime_no_callbacks(dev);
+> 	pm_runtime_put(dev);
+>
+> shouldn't cause problems AFAICT.
+
+Yes, considering this driver in isolation it should be fine.
+
+However, I observed system suspend issues when the I2C bus controller was
+being activated (which would happen in the I2C core after your changes)
+before some other driver has initialized.
+
+So to ensure things continue to work the "fimc-isp-i2c" driver would need
+to be registered after the "exynos4-fimc-is" driver has initialized. Or the
+"exynos4-fimc-is" would need to call of_platform_populate() to instantiate
+its all children devices as specified in device tree (see arch/arm/boot/dts/
+exynos4x12.dtsi in -next). "simple-bus" would then have to be not listed in
+the compatible property of that top level device. So to avoid regressions
+some additional changes would be needed, outside of this particular I2C
+client driver. I guess this could be avoided by better design of the
+exynos4-is driver right from the beginning. But it's all some times tricky
+when there is some many IP blocks involved and the hardware behaviour/device
+interactions are not always well documented.
