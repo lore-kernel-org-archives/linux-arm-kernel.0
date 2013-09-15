@@ -1,58 +1,39 @@
-From: eduardo.valentin@ti.com (Eduardo Valentin)
-Date: Sun, 15 Sep 2013 18:02:36 -0400
-Subject: [PATCH 09/16] arm: dts: add omap4430 thermal data
-In-Reply-To: <1379282563-14650-1-git-send-email-eduardo.valentin@ti.com>
-References: <1379282563-14650-1-git-send-email-eduardo.valentin@ti.com>
-Message-ID: <1379282563-14650-10-git-send-email-eduardo.valentin@ti.com>
+From: andrea.adami@gmail.com (Andrea Adami)
+Date: Mon, 16 Sep 2013 00:04:42 +0200
+Subject: [PATCH v2] ARM: sa1100: collie.c: fall back to jedec_probe flash
+ detection
+Message-ID: <1379282682-26985-1-git-send-email-andrea.adami@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch changes the dtsi entry on omap4430 to contain
-the thermal data. This data will enable the passive
-cooling with CPUfreq cooling device at 100C and the
-system will do a thermal shutdown at 125C.
+Zaurus collie contains 2 LH28F640BFHE-PTTL90 (64M 4Mx16) and
+at the moment cfi will not detect the collie NOR.
+In the meanwhile we can revert to the jedec-probe map which has been
+fixed with following commit:
 
-Cc: "Beno?t Cousson" <bcousson@baylibre.com>
-Cc: Tony Lindgren <tony@atomide.com>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: linux-omap at vger.kernel.org
-Cc: devicetree-discuss at lists.ozlabs.org
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
-Signed-off-by: Eduardo Valentin <eduardo.valentin@ti.com>
+mtd: jedec_probe: fix LH28F640BF definition
+fe2f4c8e0bf2756b670ee78fa9772613a2ea8495
+
+Somehow this is unsatisfactory because the flash is mounted READ ONLY
+(as from factory, with a RO cramfs)
+
+Signed-off-by: Andrea Adami <andrea.adami@gmail.com>
 ---
- arch/arm/boot/dts/omap443x.dtsi | 10 ++++++++--
- 1 file changed, 8 insertions(+), 2 deletions(-)
+ arch/arm/mach-sa1100/collie.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/omap443x.dtsi b/arch/arm/boot/dts/omap443x.dtsi
-index bcf455e..6987df9 100644
---- a/arch/arm/boot/dts/omap443x.dtsi
-+++ b/arch/arm/boot/dts/omap443x.dtsi
-@@ -12,7 +12,7 @@
+diff --git a/arch/arm/mach-sa1100/collie.c b/arch/arm/mach-sa1100/collie.c
+index 612a456..7fb96eb 100644
+--- a/arch/arm/mach-sa1100/collie.c
++++ b/arch/arm/mach-sa1100/collie.c
+@@ -289,7 +289,7 @@ static void collie_flash_exit(void)
+ }
  
- / {
- 	cpus {
--		cpu at 0 {
-+		cpu0: cpu at 0 {
- 			/* OMAP443x variants OPP50-OPPNT */
- 			operating-points = <
- 				/* kHz    uV */
-@@ -25,9 +25,15 @@
- 		};
- 	};
- 
--	bandgap {
-+	thermal-zones{
-+		#include "omap4-cpu-thermal.dtsi"
-+	};
-+
-+	bandgap: bandgap {
- 		reg = <0x4a002260 0x4
- 		       0x4a00232C 0x4>;
- 		compatible = "ti,omap4430-bandgap";
-+
-+		#sensor-cells = <1>;
- 	};
- };
+ static struct flash_platform_data collie_flash_data = {
+-	.map_name	= "cfi_probe",
++	.map_name	= "jedec_probe",
+ 	.init		= collie_flash_init,
+ 	.set_vpp	= collie_set_vpp,
+ 	.exit		= collie_flash_exit,
 -- 
-1.8.2.1.342.gfa7285d
+1.8.1.5
