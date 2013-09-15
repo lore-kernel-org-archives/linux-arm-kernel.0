@@ -1,76 +1,65 @@
-From: sre@debian.org (Sebastian Reichel)
-Date: Sun, 15 Sep 2013 22:44:13 +0200
-Subject: [RFCv2 0/3] OMAP SSI driver
-Message-ID: <1379277856-24571-1-git-send-email-sre@debian.org>
+From: andrea.adami@gmail.com (Andrea Adami)
+Date: Sun, 15 Sep 2013 23:47:17 +0200
+Subject: [PATCH v2] ARM: pxa: sharpsl_param.c: fix invalid memory access
+Message-ID: <1379281637-26854-1-git-send-email-andrea.adami@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+After commit 72662e01088394577be4a3f14da94cf87bea2591
+ARM: head.S: only include __turn_mmu_on in the initial identity mapping
 
-Here is the second round of the OMAP SSI driver patches.
+Zaurus PXA devices call sharpsl_save_param() during fixup and hang on
+boot because memcpy refers to physical addresses no longer valid if the
+MMU is setup.
+Zaurus collie (SA1100) is unaffected (function is called in init_machine).
 
-In this round I added/fixed:
-- Usage of runtime PM
-  Previously runtime PM was only used to enable/disable the involved
-  clocks. Now the driver makes use of resume/suspend callbacks, which
-  simplified its code (the driver did its own reference counting).
-- Removal of deprecated IRQF_DISABLED flag from irq requests
-- HWMOD: set SSI parent to L4-Core instead of L3
-  I checked the public OMAP3 TRM, which assigns the address space used
-  by the driver as reserved L4-Core address space.
-- HWMOD: removed data, which will be specified via Device Tree
-- Change omap_ssi_port.wktest and omap_ssi_port.wkin_cken from
-  "unsigned int" to "bool"
-- Change omap_ssi_port.wk_refcount from "int" to "unsigned int"
-- Convert __raw_read* to read*_relaxed / write*_relaxed
-- Removal of involved platform and board code
-- Split driver into omap_ssi.c and omap_ssi_port.c
-  This changes helps in making the DT interface cleaner.
-- Creation & Documentation of DT bindings
+Signed-off-by: Marko Katic <dromede@gmail.com>
+Signed-off-by: Andrea Adami <andrea.adami@gmail.com>
+---
+ arch/arm/common/sharpsl_param.c | 17 ++++++++++++++---
+ 1 file changed, 14 insertions(+), 3 deletions(-)
 
-TODO:
-- Central Message Queue
-  I did not yet implement a central message queue in the HSI framework.
-  I would prefer to do this after SSI is working in the mainline kernel,
-  since that makes testing easier.
-- HSI client registration via DT
-  This needs changes in the HSI framework, which currently assumes,
-  that clients are registered via board support code. This is more
-  or less independent of the controller and should be added in an
-  independent patchset IMHO.
-
-Version 1 (*) of the patchset: https://lkml.org/lkml/2013/8/11/67
-
-(*) There have been patchsets send out by Carlos before my RFCv1,
-    see RFCv1 for details.
-
--- Sebastian
-
-Sebastian Reichel (3):
-  ARM: OMAP2+: hwmod-data: Add SSI information
-  ARM: OMAP2+: HSI: Introduce OMAP SSI driver
-  ARM: dts: N900: Add SSI information
-
- Documentation/devicetree/bindings/hsi/omap_ssi.txt |   73 ++
- arch/arm/boot/dts/omap3-n900.dts                   |    8 +
- arch/arm/boot/dts/omap34xx.dtsi                    |   49 +
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c         |   48 +
- drivers/hsi/Kconfig                                |    1 +
- drivers/hsi/Makefile                               |    1 +
- drivers/hsi/controllers/Kconfig                    |   20 +
- drivers/hsi/controllers/Makefile                   |    6 +
- drivers/hsi/controllers/omap_ssi.c                 |  585 +++++++++
- drivers/hsi/controllers/omap_ssi.h                 |  167 +++
- drivers/hsi/controllers/omap_ssi_port.c            | 1346 ++++++++++++++++++++
- drivers/hsi/controllers/omap_ssi_regs.h            |  172 +++
- 12 files changed, 2476 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/hsi/omap_ssi.txt
- create mode 100644 drivers/hsi/controllers/Kconfig
- create mode 100644 drivers/hsi/controllers/Makefile
- create mode 100644 drivers/hsi/controllers/omap_ssi.c
- create mode 100644 drivers/hsi/controllers/omap_ssi.h
- create mode 100644 drivers/hsi/controllers/omap_ssi_port.c
- create mode 100644 drivers/hsi/controllers/omap_ssi_regs.h
-
+diff --git a/arch/arm/common/sharpsl_param.c b/arch/arm/common/sharpsl_param.c
+index d56c932..ac886f2 100644
+--- a/arch/arm/common/sharpsl_param.c
++++ b/arch/arm/common/sharpsl_param.c
+@@ -23,9 +23,17 @@
+  * them early in the boot process, then pass them to the appropriate drivers.
+  * Not all devices use all parameters but the format is common to all.
+  */
++
++/* NOTE:
++ * Zaurus PXA devices call sharpsl_save_param() during fixup so we need
++ * to translate the physical address.
++ * Zaurus collie (SA1100) is unaffected (function is called in init_machine).
++ */
++
+ #ifdef CONFIG_ARCH_SA1100
+ #define PARAM_BASE	0xe8ffc000
+ #else
++#include <asm/memory.h>
+ #define PARAM_BASE	0xa0000a00
+ #endif
+ #define MAGIC_CHG(a,b,c,d) ( ( d << 24 ) | ( c << 16 )  | ( b << 8 ) | a )
+@@ -41,7 +49,12 @@ EXPORT_SYMBOL(sharpsl_param);
+ 
+ void sharpsl_save_param(void)
+ {
+-	memcpy(&sharpsl_param, (void *)PARAM_BASE, sizeof(struct sharpsl_param_info));
++#ifdef CONFIG_ARCH_SA1100
++	void *param_start = (void *)PARAM_BASE;
++#else
++	void *param_start = phys_to_virt(PARAM_BASE);
++#endif
++	memcpy(&sharpsl_param, param_start, sizeof(struct sharpsl_param_info));
+ 
+ 	if (sharpsl_param.comadj_keyword != COMADJ_MAGIC)
+ 		sharpsl_param.comadj=-1;
+@@ -58,5 +71,3 @@ void sharpsl_save_param(void)
+ 	if (sharpsl_param.adadj_keyword != AD_MAGIC)
+ 		sharpsl_param.adadj=-1;
+ }
+-
+-
 -- 
-1.8.4.rc3
+1.8.1.5
