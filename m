@@ -1,43 +1,35 @@
-From: cavokz@gmail.com (Domenico Andreoli)
-Date: Sun, 15 Sep 2013 20:52:21 +0200
-Subject: [PATCH v4 4/4] ARM: bcm4760: Add restart hook
-In-Reply-To: <201309152009.26462.arnd@arndb.de>
-References: <20130914152032.401907974@gmail.com>
- <20130914152124.317379835@gmail.com>
- <201309152009.26462.arnd@arndb.de>
-Message-ID: <20130915185220.GA32054@glitch>
+From: olof@lixom.net (Olof Johansson)
+Date: Sun, 15 Sep 2013 11:52:55 -0700
+Subject: [PATCH 0/6] deletion of the Shark machine
+In-Reply-To: <201309152015.12676.arnd@arndb.de>
+References: <1379069467-3974-1-git-send-email-linus.walleij@linaro.org>
+ <201309152015.12676.arnd@arndb.de>
+Message-ID: <CAOesGMgg8LB862bbEPUiEREAVu4UaGRMJWO_sphvyep1aCqDyA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Sep 15, 2013 at 08:09:26PM +0200, Arnd Bergmann wrote:
-> On Saturday 14 September 2013, Domenico Andreoli wrote:
-> > +
-> > +static int __init bcm4760_wdt_init(void)
-> > +{
-> > +	struct device_node *node;
-> > +
-> > +	node = of_find_matching_node(NULL, bcm4760_pm_wdt_match);
-> > +	if (!node) {
-> > +		pr_info("No bcm4760 watchdog node\n");
-> > +		return -1;
-> > +	}
-> > +
-> > +	wdt_regs = of_iomap(node, 0);
-> > +	of_node_put(node);
-> 
-> Since this is now in the drivers directory and initialized at regular
-> module_init level, I'd ask you to register it as a proper platform_driver
-> and move the initialization into the probe() callback. You also need to
-> put Wim as the watchdog subsystem maintainer on Cc (I did in this reply)
-> and ask him to merge the driver.
-> 
-> I assume that Wim will ask you to add a watchdog_register_device() call
-> and a set of watchdog_ops to make this a functional driver. From the
-> platform perspective, I don't care, but it is certainly a logical step.
+On Sun, Sep 15, 2013 at 11:15 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Friday 13 September 2013, Linus Walleij wrote:
+>> The RFC series were not met by any protests from active users
+>> so this is an iteration of the series as sharp material for
+>> v3.13. After collecting ACKs a pull request will be made to
+>> the ARM SoC tree.
+>
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
+>
+> Note that although you just ask for Acks from the other subsystem maintainers
+> here, I think it would be just as well to apply some or all of the patches
+> in subsystem trees. Since the code is just going away, there is no requirement
+> to do it atomically.
 
-issue here is that there is already a proper watchdog driver, the sp805.
+Agreed, I was thinking about that the other day too. The main reason
+to keep the code together would be in case someone speaks up and nacks
+the platform piece -- if the driver pieces have moved ahead then
+they'd need to be reverted.
 
-so I guess now the task shifts to adding restart hook support to it, right?
+The alternative is to delay the driver patches a bit until the
+platform has been removed. Either way, we can sort it out in case we
+need to do a 180 turnaround. :)
 
-Kind regards,
-Domenico
+
+-Olof
