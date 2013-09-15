@@ -1,42 +1,57 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Sun, 15 Sep 2013 19:32:34 +0200
-Subject: [PATCH v2] drivers: cpuidle: rename ARM big.LITTLE driver config
- and makefile entries
-In-Reply-To: <878uz0e82x.fsf@linaro.org>
-References: <1379086721-5242-1-git-send-email-lorenzo.pieralisi@arm.com>
- <878uz0e82x.fsf@linaro.org>
-Message-ID: <5235EF32.7050302@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sun, 15 Sep 2013 20:03:13 +0200
+Subject: [PATCH v4 1/4] ARM: bcm4760: Add platform infrastructure
+In-Reply-To: <20130914152123.491631670@gmail.com>
+References: <20130914152032.401907974@gmail.com>
+ <20130914152123.491631670@gmail.com>
+Message-ID: <201309152003.13780.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/13/2013 11:16 PM, Kevin Hilman wrote:
-> Daniel,
+On Saturday 14 September 2013, Domenico Andreoli wrote:
+> From: Domenico Andreoli <domenico.andreoli@linux.com>
 > 
-> Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> writes:
+> Platform infrastructure for the Broadcom BCM4760 based ARM11 SoCs.
 > 
->> Following the reorganization of CPU idle drivers configurations into an ARM
->> specific Kconfig, the existing idle drivers Kconfig entries were renamed and
->> moved to the Kconfig.arm file. Makefile entries were updated accordingly.
->>
->> This patch renames the entries in Kconfig.arm and makefile to make the newly
->> added big.LITTLE CPUidle driver compliant with the new naming convention.
->>
->> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
->> Acked-by: Kevin Hilman <khilman@linaro.org>
+> v4:
+> * added low-level debug PL01X parameters
+> * added clocks to the VICs DT stanzas
 > 
-> We picked up this driver originally through arm-soc (with your signoff)
-> because of arch/arm dependencies, but you might as well take this one
-> directly since it's isolated to drivers/cpuidle.
+> v3:
+> * dropped the idea of unconditionally build mach-bcm
 > 
-> Can you queue this up for v3.12-rc please?
+> v2:
+> * clocks are now configured via DT
+> * uart DT nodes have been renamed and hooked to the proper clock nodes
+> * dropped unneeded config options
+> * dropped misused initialization of system_rev
+> * dropped unneeded early io mapping 
+> * build rule of mach-bcm is moved to separated patch
+> 
+> v1:
+> * initial release
+> 
+> Cc: devicetree at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Acked-by: Jason Cooper <jason@lakedaemon.net>
+> Signed-off-by: Domenico Andreoli <domenico.andreoli@linux.com>
+> ---
 
-Yes, sure.
+Acked-by: Arnd Bergmann <arnd@arndb.de>
 
-  -- Daniel
+Note that normally we put the patch revision history below the '---' line, so it 
+doesn't get included in the git history.
 
--- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+> +
+> +static void __init bcm4760_init(void)
+> +{
+> +	of_clk_init(NULL);
+> +	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+> +}
 
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+With the series that Sebastian Hesselbarth prepared to automatically do
+of_clk_init(NULL), this entire function should go away as well, but I think
+the cleanest way is to handle that in the arm-soc tree during the merge
+of your patches with Sebastian's patches.
+
+	Arnd
