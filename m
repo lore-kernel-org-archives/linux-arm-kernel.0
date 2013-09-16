@@ -1,60 +1,64 @@
-From: r64343@freescale.com (Jason Liu)
-Date: Mon, 16 Sep 2013 09:29:03 +0800
-Subject: [PATCH v2 1/1] ARM: imx: i.mx6d/q: disable the double linefill
- feature of PL310
-Message-ID: <1379294943-15664-1-git-send-email-r64343@freescale.com>
+From: chander.kashyap@linaro.org (Chander Kashyap)
+Date: Mon, 16 Sep 2013 11:01:22 +0530
+Subject: [PATCH] irqchip: exynos-combiner: remove hard-coded irq_base value
+Message-ID: <1379309482-19779-1-git-send-email-chander.kashyap@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The L2 cache controller(PL310) version on the i.MX6D/Q is r3p1-50rel0
-The L2 cache controller(PL310) version on the i.MX6DL/SOLO/SL is r3p2
-But according to ARM PL310 errata: 752271
-ID: 752271: Double linefill feature can cause data corruption
-Fault Status: Present in: r3p0, r3p1, r3p1-50rel0. Fixed in r3p2
-Workaround: The only workaround to this erratum is to disable the
-double linefill feature. This is the default behavior.
+Pass '0' in place of hardcoded "irq_base" value as "first_irq" parameter to
+"irq_domain_add_simple" in order to use linear irq domain.
 
-without this patch, you will meet the following error when run the
-memtester application at: http://pyropus.ca/software/memtester/
-
-FAILURE: 0x00100000 != 0x00200000 at offset 0x01365664.
-FAILURE: 0x00100000 != 0x00200000 at offset 0x01365668.
-FAILURE: 0x00100000 != 0x00200000 at offset 0x0136566c.
-FAILURE: 0x00100000 != 0x00200000 at offset 0x01365670.
-FAILURE: 0x00100000 != 0x00200000 at offset 0x01365674.
-FAILURE: 0x00100000 != 0x00200000 at offset 0x01365678.
-
-Signed-off-by: Jason Liu <r64343@freescale.com>
-
+Signed-off-by: Chander Kashyap <chander.kashyap@linaro.org>
 ---
-V2:
-- disable the L2 doulbe linefill explicitly on i.MX6Q by using &= mask
-- using the cpu_is_imx6q() instead of checking through DT
----
- arch/arm/mach-imx/system.c |   11 +++++++++++
- 1 file changed, 11 insertions(+)
+ drivers/irqchip/exynos-combiner.c |   15 +++------------
+ 1 file changed, 3 insertions(+), 12 deletions(-)
 
-diff --git a/arch/arm/mach-imx/system.c b/arch/arm/mach-imx/system.c
-index 64ff37e..80c177c 100644
---- a/arch/arm/mach-imx/system.c
-+++ b/arch/arm/mach-imx/system.c
-@@ -117,6 +117,17 @@ void __init imx_init_l2cache(void)
- 	/* Configure the L2 PREFETCH and POWER registers */
- 	val = readl_relaxed(l2x0_base + L2X0_PREFETCH_CTRL);
- 	val |= 0x70800000;
-+	/*
-+	 * The L2 cache controller(PL310) version on the i.MX6D/Q is r3p1-50rel0
-+	 * The L2 cache controller(PL310) version on the i.MX6DL/SOLO/SL is r3p2
-+	 * But according to ARM PL310 errata: 752271
-+	 * ID: 752271: Double linefill feature can cause data corruption
-+	 * Fault Status: Present in: r3p0, r3p1, r3p1-50rel0. Fixed in r3p2
-+	 * Workaround: The only workaround to this erratum is to disable the
-+	 * double linefill feature. This is the default behavior.
-+	 */
-+	if (cpu_is_imx6q())
-+		val &= ~(1 << 30 | 1 << 23);
- 	writel_relaxed(val, l2x0_base + L2X0_PREFETCH_CTRL);
- 	val = L2X0_DYNAMIC_CLK_GATING_EN | L2X0_STNDBY_MODE_EN;
- 	writel_relaxed(val, l2x0_base + L2X0_POWER_CTRL);
+diff --git a/drivers/irqchip/exynos-combiner.c b/drivers/irqchip/exynos-combiner.c
+index 4c68265..b4ed356 100644
+--- a/drivers/irqchip/exynos-combiner.c
++++ b/drivers/irqchip/exynos-combiner.c
+@@ -206,8 +206,7 @@ static unsigned int combiner_lookup_irq(int group)
+ 
+ static void __init combiner_init(void __iomem *combiner_base,
+ 				 struct device_node *np,
+-				 unsigned int max_nr,
+-				 int irq_base)
++				 unsigned int max_nr)
+ {
+ 	int i, irq;
+ 	unsigned int nr_irq;
+@@ -221,7 +220,7 @@ static void __init combiner_init(void __iomem *combiner_base,
+ 		return;
+ 	}
+ 
+-	combiner_irq_domain = irq_domain_add_simple(np, nr_irq, irq_base,
++	combiner_irq_domain = irq_domain_add_simple(np, nr_irq, 0,
+ 				&combiner_irq_domain_ops, combiner_data);
+ 	if (WARN_ON(!combiner_irq_domain)) {
+ 		pr_warning("%s: irq domain init failed\n", __func__);
+@@ -248,7 +247,6 @@ static int __init combiner_of_init(struct device_node *np,
+ {
+ 	void __iomem *combiner_base;
+ 	unsigned int max_nr = 20;
+-	int irq_base = -1;
+ 
+ 	combiner_base = of_iomap(np, 0);
+ 	if (!combiner_base) {
+@@ -262,14 +260,7 @@ static int __init combiner_of_init(struct device_node *np,
+ 			__func__, max_nr);
+ 	}
+ 
+-	/* 
+-	 * FIXME: This is a hardwired COMBINER_IRQ(0,0). Once all devices
+-	 * get their IRQ from DT, remove this in order to get dynamic
+-	 * allocation.
+-	 */
+-	irq_base = 160;
+-
+-	combiner_init(combiner_base, np, max_nr, irq_base);
++	combiner_init(combiner_base, np, max_nr);
+ 
+ 	return 0;
+ }
 -- 
-1.7.10.4
+1.7.9.5
