@@ -1,44 +1,38 @@
-From: ethan@ethantuttle.com (Ethan Tuttle)
-Date: Mon, 16 Sep 2013 09:35:16 -0700
-Subject: mvneta: oops in __rcu_read_lock on mirabox
-In-Reply-To: <20130916175152.4e013457@skate>
-References: <CACzLR4tTvt+ROEhkXUCQhV6=bPPTX4LFSkWfrEhF+OdM1Jm1Rw@mail.gmail.com>
- <20130915205701.5c61a444@skate> <20130916065047.GH27487@1wt.eu>
- <20130916175152.4e013457@skate>
-Message-ID: <CACzLR4twTNjzU8hK3L1cYUXnEH1ydwY6jnYoOG+9vLB3-4uQ4w@mail.gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 16 Sep 2013 10:36:19 -0600
+Subject: [PATCH 3/3] arm: dts: socfpga: Add support for SD/MMC
+In-Reply-To: <1963011.uUY4o6LRbA@flatron>
+References: <1378740833-4883-1-git-send-email-dinguyen@altera.com>
+ <1378740833-4883-4-git-send-email-dinguyen@altera.com>
+ <522E398F.3080100@wwwdotorg.org> <1963011.uUY4o6LRbA@flatron>
+Message-ID: <52373383.7030601@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 16, 2013 at 8:51 AM, Thomas Petazzoni
-<thomas.petazzoni@free-electrons.com> wrote:
-> Willy, Ethan,
->
-> On Mon, 16 Sep 2013 08:50:47 +0200, Willy Tarreau wrote:
->
->> I'm currently testing on 3.11.1 (which I had here) and am not getting
->> any issue after 50M packets. My kernel is running in thumb mode and
->> without SMP.
->>
->> Ethan, we'll need your config I guess.
->
-> Can both of you also report the U-Boot version you're using, and the
-> SoC revision (it's visible in the U-Boot output).
+On 09/14/2013 06:30 AM, Tomasz Figa wrote:
+...
+> Just as a side note, correct name is Synopsys, not Synopsis. There are
+> multiple places around Documentation/devicetree where this typo is
+> present[1]. Should we consider correcting this or the typo will have
+> to stay?
+> 
+> [1] git grep -i synopsis Documentation/devicetree/
+> Documentation/devicetree/bindings/mmc/exynos-dw-mshc.txt:* Samsung Exynos specific extensions to the Synopsis Designware Mobile
+> Documentation/devicetree/bindings/mmc/exynos-dw-mshc.txt:The Synopsis designware mobile storage host controller is used to interface
+> Documentation/devicetree/bindings/mmc/exynos-dw-mshc.txt:differences between the core Synopsis dw mshc controller properties described
+> Documentation/devicetree/bindings/mmc/exynos-dw-mshc.txt:by synopsis-dw-mshc.txt and the properties used by the Samsung Exynos specific
+> Documentation/devicetree/bindings/mmc/exynos-dw-mshc.txt:extensions to the Synopsis Designware Mobile Storage Host Controller.
+> Documentation/devicetree/bindings/mmc/rockchip-dw-mshc.txt:* Rockchip specific extensions to the Synopsis Designware Mobile
+> Documentation/devicetree/bindings/mmc/rockchip-dw-mshc.txt:The Synopsis designware mobile storage host controller is used to interface
+> Documentation/devicetree/bindings/mmc/rockchip-dw-mshc.txt:differences between the core Synopsis dw mshc controller properties described
+> Documentation/devicetree/bindings/mmc/rockchip-dw-mshc.txt:by synopsis-dw-mshc.txt and the properties used by the Rockchip specific
+> Documentation/devicetree/bindings/mmc/rockchip-dw-mshc.txt:extensions to the Synopsis Designware Mobile Storage Host Controller.
+> Documentation/devicetree/bindings/mmc/synopsis-dw-mshc.txt:* Synopsis Designware Mobile Storage Host Controller
+> Documentation/devicetree/bindings/mmc/synopsis-dw-mshc.txt:The Synopsis designware mobile storage host controller is used to interface
+> Documentation/devicetree/bindings/mmc/synopsis-dw-mshc.txt:properties used by the Synopsis Designware Mobile Storage Host Controller.
+> Documentation/devicetree/bindings/mmc/synopsis-dw-mshc.txt:     - snps,dw-mshc: for controllers compliant with synopsis dw-mshc.
+> Documentation/devicetree/bindings/pci/designware-pcie.txt:* Synopsis Designware PCIe interface
 
-Mine says:
-
-U-Boot 2009.08 (Sep 16 2012 - 22:50:06)Marvell version: 1.1.2 NQ
-SoC:   MV6710 A1
-
-> Maybe Globalscale is
-> shipping Mirabox with a different version of the bootloader, or some
-> hardware difference, that is causing problems? (I'm just speculating
-> here, but another user already reported having issues with his Mirabox,
-> and Russell King analyzed the oops as very likely being hardware
-> problems).
->
-> Thomas
-> --
-> Thomas Petazzoni, Free Electrons
-> Kernel, drivers, real-time and embedded Linux
-> development, consulting, training and support.
-> http://free-electrons.com
+Those typos only appear to exist in free-form text and not in any
+property names/values. As such, they can all easily be fixed without
+impacting any DT content or ABI.
