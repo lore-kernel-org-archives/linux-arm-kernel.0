@@ -1,51 +1,25 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 16 Sep 2013 11:12:49 +0100
-Subject: [PATCH v2 1/9] i2c: prepare runtime PM support for I2C client
- devices
-In-Reply-To: <20130915132823.GL7393@intel.com>
-References: <1378913560-2752-2-git-send-email-mika.westerberg@linux.intel.com>
- <87vc25pvvm.fsf@linaro.org> <20130913065434.GZ7393@intel.com>
- <87bo3whjz4.fsf@linaro.org> <20130913145022.GC7393@intel.com>
- <20130913173149.GE7393@intel.com> <87ioy4e8bw.fsf@linaro.org>
- <20130915064139.GJ7393@intel.com>
- <20130915124744.GW29403@sirena.org.uk>
- <20130915132823.GL7393@intel.com>
-Message-ID: <20130916101249.GX29403@sirena.org.uk>
+From: denis.ciocca@st.com (Denis CIOCCA)
+Date: Mon, 16 Sep 2013 12:18:05 +0200
+Subject: [PATCH 38/38] iio: magn-core: st: Provide support for the
+ LSM303DLH
+In-Reply-To: <20130916100809.GI3999@lee--X1>
+References: <1378817379-8238-1-git-send-email-lee.jones@linaro.org>
+ <1378817379-8238-39-git-send-email-lee.jones@linaro.org>
+ <5234A28D.1030409@kernel.org> <20130916073151.GB3999@lee--X1>
+ <5236D03D.2030506@st.com> <20130916100809.GI3999@lee--X1>
+Message-ID: <5236DADD.3040205@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Sep 15, 2013 at 04:28:24PM +0300, Mika Westerberg wrote:
-> On Sun, Sep 15, 2013 at 01:47:44PM +0100, Mark Brown wrote:
-> > On Sun, Sep 15, 2013 at 09:41:39AM +0300, Mika Westerberg wrote:
+Hi Lee,
 
-> > > 	1. In I2C core i2c_device_probe() we power on the I2C controller
-> > > 	and attach the client device to the ACPI power domain. Just like in
-> > > 	this patch but we don't touch the I2C client device runtime PM.
+> The driver mentions that the first group of sensors have a WAI of 
+> 0x3c: #define ST_MAGN_1_WAI_EXP 0x3c And when I print out the WAI read 
+> from the device: Requested device: lsm303dlh_magn - read WAI: 0x3c I 
+> guess I could have been lied to again by the board's datasheet again 
+> and the attached device isn't actually a LSM303DLH, but how can I tell 
+> for sure? 
+On LSM303DLH you have to read 0x0a 0x0b and 0x0c registers, you have to 
+find 0x48, 0x34 and 0x33. I think in the snowball there is the LSM303DLHC.
 
-> > > 	-> This should allow the existing drivers to keep using whatever
-> > > 	runtime PM strategy they have chosen.
-
-> > There should be no explicit need to power on the I2C controller if it's
-> > implemented the same way the existing ones are - just have it power
-> > itself on when it is doing a transfer.
-
-> The problem is that the ACPI child device can't be in higher power state
-> than its parent (and this is also what the runtime PM expects). If we don't
-> power the I2C controller device before we power on the I2C client device
-> that rule is violated and we get an complaint to the console.
-
-That's definitely an ACPI specific (probably x86 specific ACPI?)
-requirement not a generic one, on some systems it would increase power
-consumption since the controller will need to sit on while the device is
-functioning autonomously.  Even though the controller power consumption
-is going to be minimal the power domain it is in may be relatively
-large.  Can't the power domains for ACPI deal with this requirement, for
-example by making the I2C slave power domains children of the controller
-power domain?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130916/391522eb/attachment.sig>
+Denis
