@@ -1,11 +1,11 @@
 From: marex@denx.de (Marek Vasut)
-Date: Mon, 16 Sep 2013 16:19:55 +0200
-Subject: [PATCH 4/6] Staging/iio/adc/touchscreen/MXS: add i.MX23 support
- to the LRADC touchscreen driver
-In-Reply-To: <201309161014.27482.jbe@pengutronix.de>
+Date: Mon, 16 Sep 2013 16:23:48 +0200
+Subject: [PATCH 5/6] Staging/iio/adc/touchscreen/MXS: add interrupt driven
+ touch detection
+In-Reply-To: <201309161010.22151.jbe@pengutronix.de>
 References: <1378887511-24530-1-git-send-email-jbe@pengutronix.de>
- <523590E1.6030309@kernel.org> <201309161014.27482.jbe@pengutronix.de>
-Message-ID: <201309161619.55333.marex@denx.de>
+ <52359259.8010202@kernel.org> <201309161010.22151.jbe@pengutronix.de>
+Message-ID: <201309161623.48247.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,44 +13,36 @@ Dear J?rgen Beisert,
 
 > Hi Jonathan,
 > 
-> On Sunday 15 September 2013 12:50:09 Jonathan Cameron wrote:
+> On Sunday 15 September 2013 12:56:25 Jonathan Cameron wrote:
 > > On 09/11/13 09:18, Juergen Beisert wrote:
-> > > Distinguish i.MX23 and i.MX28 at runtime and do the same for both SoC
-> > > at least for the 4 wire touchscreen.
+> > > For battery driven systems it is a very bad idea to collect the
+> > > touchscreen data within a kernel busy loop.
 > > > 
-> > > Note: support for the remaining LRADC channels is not tested on an
-> > > i.MX23 yet.
+> > > This change uses the features of the hardware to delay and accumulate
+> > > samples in hardware to avoid a high interrupt and CPU load.
+> > > 
+> > > Note: this is only tested on an i.MX23 SoC yet.
+> > > 
+> > > Signed-off-by: Juergen Beisert <jbe@pengutronix.de>
+> > > CC: linux-arm-kernel at lists.infradead.org
+> > > CC: devel at driverdev.osuosl.org
+> > > CC: Marek Vasut <marex@denx.de>
+> > > CC: Fabio Estevam <fabio.estevam@freescale.com>
+> > > CC: Jonathan Cameron <jic23@cam.ac.uk>
 > > 
-> > An ominous comment. Are you likely to test them soon?
+> > While this driver is placed in IIO within staging at the moment, these
+> > changes are definitely input related.  Hence I have cc'd Dmitry and the
+> > input list.
+> > 
+> > I am personaly a little uncomfortable that we have such a complex bit of
+> > input code sat within an IIO driver but such is life.
 > 
-> Sorry, currently no i.MX28 hardware available. Someone out here with an
-> i.MX28 based system with a touchscreen to test?
+> Maybe an MFD for this ADC unit would be a better way to go? Currently I
+> have a different problem with this driver, because the ADC unit monitors
+> the battery as well. And the charging driver from the power subsystem
+> needs these values to charge the battery in a correct manner.
 
-You mean 23, no? I can test both, I have the DENX EVK as well as both MX23EVK 
-and MX28EVK. Just need to find some more time to do my maintainance rounds, but 
-that should happen this week nonetheless. If I do forget, please ping me again.
-
-> > Minor code layout comment inline but otherwise I'm just looking for an
-> > ack from Marek.
-> > 
-> > > [...]
-> > > 
-> > >  static u32 mxs_lradc_drive_pressure(struct mxs_lradc *lradc)
-> > >  {
-> > > 
-> > > +	if (lradc->soc == IMX23_LRADC)
-> > > +		return LRADC_CTRL0_MX23_YP | LRADC_CTRL0_MX23_XM;
-> > > 
-> > >  	return LRADC_CTRL0_MX28_YPPSW | LRADC_CTRL0_MX28_XNNSW;
-> > 
-> > Whilst it obviously doesn't actually matter, having an else
-> > in there would make the code more consistent so personally
-> > I would prefer it to be there.
-> 
-> I can change it. Anyone here with objections against such a change?
-> 
-> Regards
-> Juergen
+Are you planning to post the power block patches too ?
 
 Best regards,
 Marek Vasut
