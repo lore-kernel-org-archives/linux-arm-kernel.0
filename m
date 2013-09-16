@@ -1,108 +1,155 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 16 Sep 2013 17:02:17 +0100
-Subject: [PATCH 11/20] iio: sensors-core: st: Support sensors which don't have
- a Data Ready pin
+Date: Mon, 16 Sep 2013 17:02:21 +0100
+Subject: [PATCH 15/20] iio: pressure: st: Add support for new LPS001WP
+ pressure sensor
 In-Reply-To: <1379347346-823-1-git-send-email-lee.jones@linaro.org>
 References: <1379347346-823-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1379347346-823-12-git-send-email-lee.jones@linaro.org>
+Message-ID: <1379347346-823-16-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Not all ST's sensors support data ready, so let's make the declaration
-of one conditional.
+Here we use existing practices to introduce support for another
+pressure/temperature sensor, the LPS001WP.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/iio/common/st_sensors/st_sensors_core.c | 33 ++++++++++++++++---------
- drivers/iio/pressure/st_pressure_core.c         |  3 ++-
- 2 files changed, 24 insertions(+), 12 deletions(-)
+ drivers/iio/pressure/st_pressure.h      |  1 +
+ drivers/iio/pressure/st_pressure_core.c | 84 +++++++++++++++++++++++++++++++++
+ drivers/iio/pressure/st_pressure_i2c.c  |  1 +
+ 3 files changed, 86 insertions(+)
 
-diff --git a/drivers/iio/common/st_sensors/st_sensors_core.c b/drivers/iio/common/st_sensors/st_sensors_core.c
-index 793136a..2672630 100644
---- a/drivers/iio/common/st_sensors/st_sensors_core.c
-+++ b/drivers/iio/common/st_sensors/st_sensors_core.c
-@@ -198,21 +198,17 @@ int st_sensors_set_axis_enable(struct iio_dev *indio_dev, u8 axis_enable)
- }
- EXPORT_SYMBOL(st_sensors_set_axis_enable);
+diff --git a/drivers/iio/pressure/st_pressure.h b/drivers/iio/pressure/st_pressure.h
+index b0b6306..049c21a 100644
+--- a/drivers/iio/pressure/st_pressure.h
++++ b/drivers/iio/pressure/st_pressure.h
+@@ -14,6 +14,7 @@
+ #include <linux/types.h>
+ #include <linux/iio/common/st_sensors.h>
  
--int st_sensors_init_sensor(struct iio_dev *indio_dev,
--					struct st_sensors_platform_data *pdata)
-+int st_sensors_set_drdy_int_pin(struct iio_dev *indio_dev,
-+				struct st_sensors_platform_data *pdata)
- {
--	int err;
- 	struct st_sensor_data *sdata = iio_priv(indio_dev);
++#define LPS001WP_PRESS_DEV_NAME		"lps001wp"
+ #define LPS331AP_PRESS_DEV_NAME		"lps331ap"
  
--	mutex_init(&sdata->tb.buf_lock);
--
- 	switch (pdata->drdy_int_pin) {
- 	case 1:
- 		if (sdata->sensor->drdy_irq.mask_int1 == 0) {
- 			dev_err(&indio_dev->dev,
- 					"DRDY on INT1 not available.\n");
--			err = -EINVAL;
--			goto init_error;
-+			return -EINVAL;
- 		}
- 		sdata->drdy_int_pin = 1;
- 		break;
-@@ -220,17 +216,29 @@ int st_sensors_init_sensor(struct iio_dev *indio_dev,
- 		if (sdata->sensor->drdy_irq.mask_int2 == 0) {
- 			dev_err(&indio_dev->dev,
- 					"DRDY on INT2 not available.\n");
--			err = -EINVAL;
--			goto init_error;
-+			return -EINVAL;
- 		}
- 		sdata->drdy_int_pin = 2;
- 		break;
- 	default:
- 		dev_err(&indio_dev->dev, "DRDY on pdata not valid.\n");
--		err = -EINVAL;
--		goto init_error;
-+		return -EINVAL;
- 	}
- 
-+	return 0;
-+}
-+
-+int st_sensors_init_sensor(struct iio_dev *indio_dev,
-+					struct st_sensors_platform_data *pdata)
-+{
-+	struct st_sensor_data *sdata = iio_priv(indio_dev);
-+	int err = 0;
-+
-+	mutex_init(&sdata->tb.buf_lock);
-+
-+	if (pdata)
-+		err = st_sensors_set_drdy_int_pin(indio_dev, pdata);
-+
- 	err = st_sensors_set_enable(indio_dev, false);
- 	if (err < 0)
- 		goto init_error;
-@@ -266,6 +274,9 @@ int st_sensors_set_dataready_irq(struct iio_dev *indio_dev, bool enable)
- 	u8 drdy_mask;
- 	struct st_sensor_data *sdata = iio_priv(indio_dev);
- 
-+	if (!sdata->sensor->drdy_irq.addr)
-+		return 0;
-+
- 	/* Enable/Disable the interrupt generator 1. */
- 	if (sdata->sensor->drdy_irq.ig1.en_addr > 0) {
- 		err = st_sensors_write_data_with_mask(indio_dev,
+ /**
 diff --git a/drivers/iio/pressure/st_pressure_core.c b/drivers/iio/pressure/st_pressure_core.c
-index 93bff9b..3abada2 100644
+index 4539953..e879542 100644
 --- a/drivers/iio/pressure/st_pressure_core.c
 +++ b/drivers/iio/pressure/st_pressure_core.c
-@@ -254,7 +254,8 @@ int st_press_common_probe(struct iio_dev *indio_dev,
+@@ -64,6 +64,21 @@
+ #define ST_PRESS_LPS331AP_OUT_XL_ADDR		0x28
+ #define ST_TEMP_LPS331AP_OUT_L_ADDR		0x2b
  
- 	pdata->odr = pdata->sensor->odr.odr_avl[0].hz;
++/* CUSTOM VALUES FOR LPS001WP SENSOR */
++#define ST_PRESS_LPS001WP_WAI_EXP		0xba
++#define ST_PRESS_LPS001WP_ODR_ADDR		0x20
++#define ST_PRESS_LPS001WP_ODR_MASK		0x30
++#define ST_PRESS_LPS001WP_ODR_AVL_1HZ_VAL	0x01
++#define ST_PRESS_LPS001WP_ODR_AVL_7HZ_VAL	0x02
++#define ST_PRESS_LPS001WP_ODR_AVL_13HZ_VAL	0x03
++#define ST_PRESS_LPS001WP_PW_ADDR		0x20
++#define ST_PRESS_LPS001WP_PW_MASK		0x40
++#define ST_PRESS_LPS001WP_BDU_ADDR		0x20
++#define ST_PRESS_LPS001WP_BDU_MASK		0x04
++#define ST_PRESS_LPS001WP_MULTIREAD_BIT		true
++#define ST_PRESS_LPS001WP_OUT_L_ADDR		0x28
++#define ST_TEMP_LPS001WP_OUT_L_ADDR		0x2a
++
+ static const struct iio_chan_spec st_press_lps331ap_channels[] = {
+ 	{
+ 		.type = IIO_PRESSURE,
+@@ -100,6 +115,40 @@ static const struct iio_chan_spec st_press_lps331ap_channels[] = {
+ 	IIO_CHAN_SOFT_TIMESTAMP(1)
+ };
  
--	if (!plat_data)
-+	/* Some devices don't support a data ready pin. */
-+	if (!plat_data && pdata->sensor->drdy_irq.addr)
- 		plat_data =
- 			(struct st_sensors_platform_data *)&default_press_pdata;
++static const struct iio_chan_spec st_press_lps001wp_channels[] = {
++	{
++		.type = IIO_PRESSURE,
++		.channel2 = IIO_NO_MOD,
++		.address = ST_PRESS_LPS001WP_OUT_L_ADDR,
++		.scan_index = ST_SENSORS_SCAN_X,
++		.scan_type = {
++			.sign = 'u',
++			.realbits = 16,
++			.storagebits = 16,
++			.endianness = IIO_LE,
++		},
++		.info_mask_separate = BIT(IIO_CHAN_INFO_RAW),
++		.modified = 0,
++	},
++	{
++		.type = IIO_TEMP,
++		.channel2 = IIO_NO_MOD,
++		.address = ST_TEMP_LPS001WP_OUT_L_ADDR,
++		.scan_index = -1,
++		.scan_type = {
++			.sign = 'u',
++			.realbits = 16,
++			.storagebits = 16,
++			.endianness = IIO_LE,
++		},
++		.info_mask_separate =
++			BIT(IIO_CHAN_INFO_RAW) |
++			BIT(IIO_CHAN_INFO_OFFSET),
++		.modified = 0,
++	},
++	IIO_CHAN_SOFT_TIMESTAMP(1)
++};
++
+ static const struct st_sensors st_press_sensors[] = {
+ 	{
+ 		.wai = ST_PRESS_LPS331AP_WAI_EXP,
+@@ -148,6 +197,41 @@ static const struct st_sensors st_press_sensors[] = {
+ 		.multi_read_bit = ST_PRESS_LPS331AP_MULTIREAD_BIT,
+ 		.bootime = 2,
+ 	},
++	{
++		.wai = ST_PRESS_LPS001WP_WAI_EXP,
++		.sensors_supported = {
++			[0] = LPS001WP_PRESS_DEV_NAME,
++		},
++		.ch = (struct iio_chan_spec *)st_press_lps001wp_channels,
++		.num_ch = ARRAY_SIZE(st_press_lps001wp_channels),
++		.odr = {
++			.addr = ST_PRESS_LPS001WP_ODR_ADDR,
++			.mask = ST_PRESS_LPS001WP_ODR_MASK,
++			.odr_avl = {
++				{ 1, ST_PRESS_LPS001WP_ODR_AVL_1HZ_VAL, },
++				{ 7, ST_PRESS_LPS001WP_ODR_AVL_7HZ_VAL, },
++				{ 13, ST_PRESS_LPS001WP_ODR_AVL_13HZ_VAL, },
++			},
++		},
++		.pw = {
++			.addr = ST_PRESS_LPS001WP_PW_ADDR,
++			.mask = ST_PRESS_LPS001WP_PW_MASK,
++			.value_on = ST_SENSORS_DEFAULT_POWER_ON_VALUE,
++			.value_off = ST_SENSORS_DEFAULT_POWER_OFF_VALUE,
++		},
++		.fs = {
++			.addr = 0,
++		},
++		.bdu = {
++			.addr = ST_PRESS_LPS001WP_BDU_ADDR,
++			.mask = ST_PRESS_LPS001WP_BDU_MASK,
++		},
++		.drdy_irq = {
++			.addr = 0,
++		},
++		.multi_read_bit = ST_PRESS_LPS001WP_MULTIREAD_BIT,
++		.bootime = 2,
++	},
+ };
  
+ static int st_press_read_raw(struct iio_dev *indio_dev,
+diff --git a/drivers/iio/pressure/st_pressure_i2c.c b/drivers/iio/pressure/st_pressure_i2c.c
+index 08aac5e..51eab7f 100644
+--- a/drivers/iio/pressure/st_pressure_i2c.c
++++ b/drivers/iio/pressure/st_pressure_i2c.c
+@@ -49,6 +49,7 @@ static int st_press_i2c_remove(struct i2c_client *client)
+ }
+ 
+ static const struct i2c_device_id st_press_id_table[] = {
++	{ LPS001WP_PRESS_DEV_NAME },
+ 	{ LPS331AP_PRESS_DEV_NAME },
+ 	{},
+ };
 -- 
 1.8.1.2
