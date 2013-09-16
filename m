@@ -1,103 +1,60 @@
-From: b.brezillon@overkiz.com (boris brezillon)
-Date: Mon, 16 Sep 2013 19:18:37 +0200
-Subject: [RFC PATCH alt 4/4] pinctrl: at91: rework debounce configuration
-In-Reply-To: <523734B2.6050208@wwwdotorg.org>
-References: <1379058213-3245-1-git-send-email-b.brezillon@overkiz.com>
- <1379058813-3489-1-git-send-email-b.brezillon@overkiz.com>
- <52339479.6030402@wwwdotorg.org> <52340B68.5020505@overkiz.com>
- <523734B2.6050208@wwwdotorg.org>
-Message-ID: <52373D6D.4010109@overkiz.com>
+From: ethan@ethantuttle.com (Ethan Tuttle)
+Date: Mon, 16 Sep 2013 10:24:05 -0700
+Subject: mvneta: oops in __rcu_read_lock on mirabox
+In-Reply-To: <20130916164412.GD3188@1wt.eu>
+References: <CACzLR4tTvt+ROEhkXUCQhV6=bPPTX4LFSkWfrEhF+OdM1Jm1Rw@mail.gmail.com>
+ <20130915205701.5c61a444@skate> <20130916065047.GH27487@1wt.eu>
+ <20130916175152.4e013457@skate>
+ <CACzLR4twTNjzU8hK3L1cYUXnEH1ydwY6jnYoOG+9vLB3-4uQ4w@mail.gmail.com>
+ <20130916163937.GC3188@1wt.eu> <20130916164412.GD3188@1wt.eu>
+Message-ID: <CACzLR4ssOPsmYaEh2ohe4HL5j+67keDYnmR4YezNB=aO7Pj5kA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Stephen,
-
-On 16/09/2013 18:41, Stephen Warren wrote:
-> On 09/14/2013 01:08 AM, boris brezillon wrote:
->> Hello Stephen,
+On Mon, Sep 16, 2013 at 9:44 AM, Willy Tarreau <w@1wt.eu> wrote:
+> On Mon, Sep 16, 2013 at 06:39:37PM +0200, Willy Tarreau wrote:
+>> On Mon, Sep 16, 2013 at 09:35:16AM -0700, Ethan Tuttle wrote:
+>> > On Mon, Sep 16, 2013 at 8:51 AM, Thomas Petazzoni
+>> > <thomas.petazzoni@free-electrons.com> wrote:
+>> > > Willy, Ethan,
+>> > >
+>> > > On Mon, 16 Sep 2013 08:50:47 +0200, Willy Tarreau wrote:
+>> > >
+>> > >> I'm currently testing on 3.11.1 (which I had here) and am not getting
+>> > >> any issue after 50M packets. My kernel is running in thumb mode and
+>> > >> without SMP.
+>> > >>
+>> > >> Ethan, we'll need your config I guess.
+>> > >
+>> > > Can both of you also report the U-Boot version you're using, and the
+>> > > SoC revision (it's visible in the U-Boot output).
+>> >
+>> > Mine says:
+>> >
+>> > U-Boot 2009.08 (Sep 16 2012 - 22:50:06)Marvell version: 1.1.2 NQ
+>> > SoC:   MV6710 A1
 >>
->> Le 14/09/2013 00:40, Stephen Warren a ?crit :
->>> On 09/13/2013 01:53 AM, Boris BREZILLON wrote:
->>>> AT91 SoCs do not support per pin debounce time configuration.
->>>> Instead you have to configure a debounce time which will be used for all
->>>> pins of a given bank (PIOA, PIOB, ...).
-> ...
->>>>    Required properties for pin configuration node:
-> ...
->>>> -DEBOUNCE_VAL    (0x3fff << 17): debounce val.
->>> This change would break the DT ABI since it removes a feature that's
->>> already present.
-> ...
->>> I suppose it's still up to the Atmel maintainers to decide whether this
->>> is appropriate, or whether the impact to out-of-tree DT files would be
->>> problematic.
->>>
->>> Assuming the DT ABI can be broken, I think I'd prefer to do so, rather
->>> than take "non-alt" patch 4/4, since a per-pin DEBOUNCE_VAL clearly
->>> doesn't correctly model the HW, assuming the patch description is
->>> correct. I don't think arguments re: the generic pinconf debounce
->>> property hold; if the Linux-specific/internal generic property doesn't
->>> apply, the DT binding should not be bent to adjust to it, but should
->>> rather still represent the HW itself.
->> What about the last point in my list: "reconfigure debounce after
->> startup" ?
+>> I just checked on my old captures and I have the same here, with more
+>> details such as the CPU's revision (Rev 1) :
 >>
->> Here is an example that may be problematic:
->>
->> Let's say you have one device using multiple configuration of pins
->> ("default", "xxx", "yyy").
->> The "default" config needs a particular debounce time on a given pin and
->> the "xxx" and "yyy"
->> configs need different debounce time on the same pin.
->>
->> How would you solve this with this patch approach ?
-> Each state has a different pin configuration node, and hence can specify
-> a different debounce value. This patch has no impact on that (it just
-> changes whether the state-specific node specifies the debounce value in
-> a single standalone property, or encodes it into each entry in the pins
-> property, all within the same node).
-Actually it does: this patch removes the debounce time setting option from
-the pin config description. The only thing you can do is enable or 
-disable the
-debounce filter.
+>>    http://1wt.eu/articles/mirabox-vs-guruplug/
+>
+> BTW Ethan, I don't know if you have already opened your mirabox, but on the
+> link above you'll find settings for trying other frequencies for the CPU. It
+> could be nice to try 1 GHz with L2/DDR @500 instead of 1200/600 to see if the
+> issue remains or not. If it disappears, there's also a working setting with
+> CPU at 1.2G, L2 at 800M and DDR at 400M to help find if CPU, L2 or DDR is the culprit.
+>
+> Willy
+>
 
-The atmel,default-debounce-div property is not part of the pin group (or 
-pin state)
-node, it is a global property you define for the whole pinctrl 
-controller (pinctrl node
-property):
+I have not opened my mirabox - but sure, I'll open it up and try those
+other settings when I get a chance.
 
-pinctrl {
-         atmel,default-debounce-div=<100 /* PIOA div <=> ~3 ms */
-                                                          50   /* PIOB 
-div */
-                                                          ...>;
+Also, you mentioned that you have SMP disabled in your kernel.  It
+looks like it's on in my .config.  Should I run a test with SMP
+disabled?
 
-         function {
-             group {
-                 atmel,pins=<...>;
-             };
-         };
-};
-
-I can get the debounce time option in a separate property (as you're 
-suggesting):
-
-pinctrl {
-     function {
-         group {
-             atmel,debounce=<1000>; /* debounce in usec */
-             atmel,pins=<...>;
-         };
-     };
-};
-
-but it won't solve the primary issue, that is all the pin on a given 
-bank (PIOA1 PIOA2, ...)
-share the same debounce time.
-
-Please tell me if I misunderstood your suggestion.
-
-Best Regards,
-
-Boris
+I'm surprised that nobody else sees this crash given how easy it is
+for me to reproduce.  BTW, the 3.11 kernel I made with 702821f
+reverted has been humming along for days without issue.
