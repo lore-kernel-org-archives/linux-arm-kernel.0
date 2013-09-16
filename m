@@ -1,43 +1,38 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 16 Sep 2013 16:49:08 -0500
-Subject: [PATCH] dts: Fix misspelling of Synopsys
-In-Reply-To: <20130916214544.GA15242@quad.lixom.net>
-References: <1379365068-18539-1-git-send-email-dinguyen@altera.com>
- <20130916214544.GA15242@quad.lixom.net>
-Message-ID: <52377CD4.30308@gmail.com>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Mon, 16 Sep 2013 15:28:18 -0700
+Subject: [PATCH 0/4] nohz/full: drop 64-bit requirement, enable ARM support
+Message-ID: <1379370502-30376-1-git-send-email-khilman@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/16/2013 04:45 PM, Olof Johansson wrote:
-> On Mon, Sep 16, 2013 at 03:57:48PM -0500, dinguyen at altera.com wrote:
->> From: Dinh Nguyen <dinguyen@altera.com>
->>
->> s/Synopsis/Synopsys
->> s/synopsis/synopsys
->>
->> Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
->> Cc: Pavel Machek <pavel@denx.de>
->> CC: Arnd Bergmann <arnd@arndb.de>
->> CC: Olof Johansson <olof@lixom.net>
->> Cc: Rob Herring <rob.herring@calxeda.com>
->> Cc: Pawel Moll <pawel.moll@arm.com>
->> Cc: Mark Rutland <mark.rutland@arm.com>
->> Cc: Stephen Warren <swarren@wwwdotorg.org>
->> Cc: Ian Campbell <ian.campbell@citrix.com>
->> Cc: Chris Ball <cjb@laptop.org>
->> Cc: Jaehoon Chung <jh80.chung@samsung.com>
->> Cc: Seungwon Jeon <tgih.jun@samsung.com>
->> Cc: Tomasz Figa <tomasz.figa@gmail.com>
->> Cc: devicetree at vger.kernel.org
->> Cc: linux-mmc at vger.kernel.org
->> CC: linux-arm-kernel at lists.infradead.org
-> 
-> Acked-by: Olof Johansson <olof@lixom.net>
-> 
-> 
-> Looks like this is best taken through the DT tree, but if they don't have any
-> other fixes we can take it through arm-soc, just let me know.
+As of v3.10, the core ARM arch support is in mainline for NO_HZ_FULL.
+The only remaining part is the removal of the hard-coded Kconfig
+requirement on 64-bit platforms, which I believe can now be removed
+after the nsec granularity cputime was made to work on non 64_BIT
+(c.f. commit 8c23b80e, cputime_nsecs: use math64.h for nsec resolution
+conversion helpers.)
 
-Yes. I'll take it.
+This series makes the final Kconfig changes to bring NO_HZ_FULL
+support to ARM.
 
-Rob
+I will queue up the arch/arm patch for Russell separately once the
+generic changes are accepted.
+
+Applies on today's linus master (commit bdbdfdef57)
+
+Kevin
+
+Kevin Hilman (4):
+  nohz_full: Kconfig: VIRT_CPU_ACCOUNTING_GEN: drop 64-bit requirement
+  nohz_full: Kconfig: drop requrement on 64-bit
+  full_nohz: Kconfig: add HAVE_VIRT_CPU_ACCOUNTING_GEN
+  ARM: Kconfig: allow full nohz CPU accounting
+
+ arch/Kconfig        | 11 +++++++++++
+ arch/arm/Kconfig    |  1 +
+ init/Kconfig        |  3 ++-
+ kernel/time/Kconfig |  2 --
+ 4 files changed, 14 insertions(+), 3 deletions(-)
+
+-- 
+1.8.3
