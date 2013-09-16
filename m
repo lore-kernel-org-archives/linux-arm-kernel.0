@@ -1,98 +1,52 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 16 Sep 2013 10:24:08 -0600
-Subject: [PATCH] media: i2c: adv7343: fix the DT binding properties
-In-Reply-To: <CA+V-a8sVyJ1TrTSiaj8vpaD+f_qJ5Hp287E3HuHJ_pRzzmdAvg@mail.gmail.com>
-References: <1379073471-7244-1-git-send-email-prabhakar.csengg@gmail.com>
- <523395DC.5080009@wwwdotorg.org>
- <CA+V-a8sVyJ1TrTSiaj8vpaD+f_qJ5Hp287E3HuHJ_pRzzmdAvg@mail.gmail.com>
-Message-ID: <523730A8.9060201@wwwdotorg.org>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Mon, 16 Sep 2013 18:24:50 +0200
+Subject: mvneta: oops in __rcu_read_lock on mirabox
+In-Reply-To: <20130916162209.GL12758@n2100.arm.linux.org.uk>
+References: <CACzLR4tTvt+ROEhkXUCQhV6=bPPTX4LFSkWfrEhF+OdM1Jm1Rw@mail.gmail.com>
+ <20130915205701.5c61a444@skate> <20130916065047.GH27487@1wt.eu>
+ <20130916175152.4e013457@skate>
+ <20130916162209.GL12758@n2100.arm.linux.org.uk>
+Message-ID: <20130916182450.639084c6@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/13/2013 11:23 PM, Prabhakar Lad wrote:
-> Hi Stephen,
+Russell,
+
+On Mon, 16 Sep 2013 17:22:09 +0100, Russell King - ARM Linux wrote:
+
+> One seemed to be a single bit error in an instruction inside the kernel
+> image.  The other was what seems to be an impossible abort.
 > 
-> This patch should have been marked as RFC.
+> I still don't see how we could end up with a prefetch abort inside memset()
+> due to the kernel domain being inaccessible, but still be able to get
+> an oops out, especially when we dump out the memory for the faulting
+> instruction by accessing that memory via that apparantly inaccessible
+> domain while running the code which dumps that memory also under this
+> apparantly inaccessible domain.  If the domain containing the kernel
+> really was inaccessible, the system would be completely dead.
 > 
-> Thanks for the review.
+> The only possibilities I can come up with for that is that abort was
+> caused by something spurious happening at the hardware level causing
+> corruption of the instruction TLB (corrupting the domain index stored
+> in the I-TLB) or other CPU control hardware causing it to spuriously
+> generate that fault.
 > 
-> On Sat, Sep 14, 2013 at 4:16 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
->> On 09/13/2013 05:57 AM, Prabhakar Lad wrote:
->>> From: "Lad, Prabhakar" <prabhakar.csengg@gmail.com>
->>>
->>> This patch fixes the DT binding properties of adv7343 decoder.
->>> The pdata which was being read from the DT property, is removed
->>> as this can done internally in the driver using cable detection
->>> register.
->>>
->>> This patch also removes the pdata of ADV7343 which was passed from
->>> DA850 machine.
->>
->>> diff --git a/Documentation/devicetree/bindings/media/i2c/adv7343.txt b/Documentation/devicetree/bindings/media/i2c/adv7343.txt
->>
->>>  Required Properties :
->>>  - compatible: Must be "adi,adv7343"
->>> +- reg: I2C device address.
->>> +- vddio-supply: I/O voltage supply.
->>> +- vddcore-supply: core voltage supply.
->>> +- vaa-supply: Analog power supply.
->>> +- pvdd-supply: PLL power supply.
->>
->> Old DTs won't contain those properties. This breaks the DT ABI if those
->> properties are required. Is that acceptable?
->
-> As of now adv7343 via DT binding is not enabled in any platforms
-> so this wont break any DT ABI.
-
-Well, if the binding has already been written, it technically already is
-an ABI. Perhaps the binding can be fixed if it isn't in use yet, but
-this is definitely not the correct approach to DT.
-
->> If it is, I think we should document that older versions of the binding
->> didn't require those properties, so they may in fact be missing.
->>
->> I note that this patch doesn't actually update the driver to
->> regulator_get() anything. Shouldn't it?
->
-> As of now the driver isn?t enabling/accepting the regulators,
-> so should I add those in DT properties or not ?
-
-The binding should describe the HW, not what the driver does/doesn't yet
-do. I wrote the above because it looked like the driver was broken, not
-to encourage you to remove properties from the binding. How does the
-driver work if it doesn't enable the required regulators though, I
-wonder? I suppose the boards this driver has been tested on all must
-used fixed (non-SW-controlled) regulators.
-
->>>  Optional Properties :
->>> -- adi,power-mode-sleep-mode: on enable the current consumption is reduced to
->>> -                           micro ampere level. All DACs and the internal PLL
->>> -                           circuit are disabled.
->>> -- adi,power-mode-pll-ctrl: PLL and oversampling control. This control allows
->>> -                        internal PLL 1 circuit to be powered down and the
->>> -                        oversampling to be switched off.
->>> -- ad,adv7343-power-mode-dac: array configuring the power on/off DAC's 1..6,
->>> -                           0 = OFF and 1 = ON, Default value when this
->>> -                           property is not specified is <0 0 0 0 0 0>.
->>> -- ad,adv7343-sd-config-dac-out: array configure SD DAC Output's 1 and 2, 0 = OFF
->>> -                              and 1 = ON, Default value when this property is
->>> -                              not specified is <0 0>.
->>
->> At a very quick glance, it's not really clear why those properties are
->> being removed. They seem like HW configuration, so might be fine to put
->> into DT. What replaces these?
+> As the domain field in the page table L1 entries covers bit 8, and the
+> single bit error with the instruction was also bit 8, maybe there's a
+> design weakness on data line bit 8 causing marginal operation.
 > 
-> Yes these were HW configuration but, its now internally handled in
-> the driver.  The 'ad,adv7343-power-mode-dac' property which enabled the
-> DAC's 1..6 , so now in the driver by default all the DAC's are enabled by
-> default and enable unconnected DAC auto power down. Similarly
-> 'ad,adv7343-sd-config-dac-out' property enabled SD DAC's 1..2 but
-> now is enabled by reading the CABLE DETECT register which tells
-> the status of DAC1/2.
+> To add to this, the abort given in this report gives an IFSR value of
+> 0x409, which equates to "Synchronous parity error on memory access"
+> in ARMv7.  The other value (0x400) equates to "TLB conflict abort"
+> which can only happen with LPAE support enabled...  So this is just
+> getting more weird!
 
-OK, that's probably fine for the two properties you mentioned (you
-didn't describe two of them...). Some more discussion on why SW doesn't
-need these options might be useful in the patch description. Note that
-the discussion should be written for software in general (i.e. any OS's
-driver), and not for Linux's specific driver, since DT is not tied to
-any one OS.
+Could this be caused by bitflips in the RAM due to bad timings, or
+overheating or that kind of things?
+
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
