@@ -1,82 +1,57 @@
-From: gleb@redhat.com (Gleb Natapov)
-Date: Mon, 16 Sep 2013 11:32:22 +0300
-Subject: [PATCH 2/3] arm32: kvm: rename CONFIG_KVM_ARM_MAX_VCPUS
-In-Reply-To: <5236BCB7.9080102@arm.com>
-References: <1379160656-28050-1-git-send-email-drjones@redhat.com>
- <1379160656-28050-3-git-send-email-drjones@redhat.com>
- <20130915093002.GX17294@redhat.com> <5236BCB7.9080102@arm.com>
-Message-ID: <20130916083221.GI17294@redhat.com>
+From: jbe@pengutronix.de (=?iso-8859-1?q?J=FCrgen_Beisert?=)
+Date: Mon, 16 Sep 2013 10:38:13 +0200
+Subject: [PATCH 5/6] Staging/iio/adc/touchscreen/MXS: add interrupt driven
+ touch detection
+In-Reply-To: <5235DBEA.7030402@kernel.org>
+References: <1378887511-24530-1-git-send-email-jbe@pengutronix.de>
+ <52359259.8010202@kernel.org> <5235DBEA.7030402@kernel.org>
+Message-ID: <201309161038.13977.jbe@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 16, 2013 at 09:09:27AM +0100, Marc Zyngier wrote:
-> On 15/09/13 10:30, Gleb Natapov wrote:
-> > On Sat, Sep 14, 2013 at 02:10:55PM +0200, Andrew Jones wrote:
-> >> Drop the _ARM_ part of the name. We can then introduce a config option
-> >> like this to aarch64 and other arches using the same name - allowing
-> >> grep to show them all. Also update the help text to describe the option
-> >> more completely.
-> >>
-> >> Signed-off-by: Andrew Jones <drjones@redhat.com>
-> >> ---
-> >>  arch/arm/include/asm/kvm_host.h | 4 ++--
-> >>  arch/arm/kvm/Kconfig            | 8 ++++----
-> >>  2 files changed, 6 insertions(+), 6 deletions(-)
-> >>
-> >> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-> >> index 7d22517d80711..c614d3eb176c6 100644
-> >> --- a/arch/arm/include/asm/kvm_host.h
-> >> +++ b/arch/arm/include/asm/kvm_host.h
-> >> @@ -25,8 +25,8 @@
-> >>  #include <asm/fpstate.h>
-> >>  #include <kvm/arm_arch_timer.h>
-> >>  
-> >> -#if defined(CONFIG_KVM_ARM_MAX_VCPUS)
-> >> -#define KVM_MAX_VCPUS CONFIG_KVM_ARM_MAX_VCPUS
-> >> +#if defined(CONFIG_KVM_MAX_VCPUS)
-> >> +#define KVM_MAX_VCPUS CONFIG_KVM_MAX_VCPUS
-> >>  #else
-> >>  #define KVM_MAX_VCPUS 0
-> >>  #endif
-> >> diff --git a/arch/arm/kvm/Kconfig b/arch/arm/kvm/Kconfig
-> >> index ebf5015508b52..de63bfccb3eb5 100644
-> >> --- a/arch/arm/kvm/Kconfig
-> >> +++ b/arch/arm/kvm/Kconfig
-> >> @@ -40,16 +40,16 @@ config KVM_ARM_HOST
-> >>  	---help---
-> >>  	  Provides host support for ARM processors.
-> >>  
-> >> -config KVM_ARM_MAX_VCPUS
-> >> +config KVM_MAX_VCPUS
-> >>  	int "Number maximum supported virtual CPUs per VM"
-> >>  	depends on KVM_ARM_HOST
-> >>  	default 4
-> >>  	help
-> >>  	  Static number of max supported virtual CPUs per VM.
-> >>  
-> >> -	  If you choose a high number, the vcpu structures will be quite
-> >> -	  large, so only choose a reasonable number that you expect to
-> >> -	  actually use.
-> > I do no see why on ARM vcpu structure size depends on KVM_ARM_MAX_VCPUS.
-> > Can somebody point me to it.
-> 
-> There's a number of indirections, but here you go:
-> arch/arm/include/asm/kvm_host.h:#define KVM_MAX_VCPUS CONFIG_KVM_ARM_MAX_VCPUS
-> 
-> include/kvm/arm_vgic.h:#define VGIC_MAX_CPUS            KVM_MAX_VCPUS
-> 
-> include/kvm/arm_vgic.h:#if (VGIC_MAX_CPUS > 8)
-> include/kvm/arm_vgic.h: } percpu[VGIC_MAX_CPUS];
-> include/kvm/arm_vgic.h: u32 percpu[VGIC_MAX_CPUS][VGIC_NR_PRIVATE_IRQS / 4];
-> include/kvm/arm_vgic.h: u8                      irq_sgi_sources[VGIC_MAX_CPUS][VGIC_NR_SGIS];
-> include/kvm/arm_vgic.h: struct vgic_bitmap      irq_spi_target[VGIC_MAX_CPUS];
-> 
-> Basically, the GIC emulation data structures are sized on the number of VCPUs
-> (as well as the number of supported interrupts).
-> 
-But vgic is per VM though, not per cpu as far as I can see, so the
-overhead is also per VM, no? Is VGIC_MAX_CPUS limit architectural or
-juts an implementation detail?
+Hi Jonathan,
 
---
-			Gleb.
+On Sunday 15 September 2013 18:10:18 Jonathan Cameron wrote:
+> On 09/15/13 11:56, Jonathan Cameron wrote:
+> > On 09/11/13 09:18, Juergen Beisert wrote:
+> >> For battery driven systems it is a very bad idea to collect the
+> >> touchscreen data within a kernel busy loop.
+> >>
+> >> This change uses the features of the hardware to delay and accumulate
+> >> samples in hardware to avoid a high interrupt and CPU load.
+> >>
+> >> Note: this is only tested on an i.MX23 SoC yet.
+> >>
+> >> Signed-off-by: Juergen Beisert <jbe@pengutronix.de>
+> >> CC: linux-arm-kernel at lists.infradead.org
+> >> CC: devel at driverdev.osuosl.org
+> >> CC: Marek Vasut <marex@denx.de>
+> >> CC: Fabio Estevam <fabio.estevam@freescale.com>
+> >> CC: Jonathan Cameron <jic23@cam.ac.uk>
+> >
+> > While this driver is placed in IIO within staging at the moment, these
+> > changes are definitely input related.  Hence I have cc'd Dmitry and the
+> > input list.
+> >
+> > I am personaly a little uncomfortable that we have such a complex bit of
+> > input code sat within an IIO driver but such is life.
+>
+> The logic in here looks reasonable to me. I am far from a specialist in how
+> these touch screens are normally handled though.
+>
+> One thing to note is that you really want to get a proposed device tree
+> spec out asap as that can take longer to review than the driver.  If you
+> are proposing to do that as a future patch, then take into account that
+> you'll need to ensure these are the defaults if it is not specified in the
+> device tree for ever more (which is more painful than hammering out he
+> device tree stuff now!)
+> ...
+
+Will do.
+
+Regards,
+Juergen
+
+-- 
+Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?| Juergen Beisert ? ? ? ? ? ? |
+Linux Solutions for Science and Industry ? ? ?| http://www.pengutronix.de/  |
