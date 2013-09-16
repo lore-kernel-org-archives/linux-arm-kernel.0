@@ -1,47 +1,37 @@
 From: jbe@pengutronix.de (=?iso-8859-1?q?J=FCrgen_Beisert?=)
-Date: Mon, 16 Sep 2013 10:14:27 +0200
-Subject: [PATCH 4/6] Staging/iio/adc/touchscreen/MXS: add i.MX23 support
- to the LRADC touchscreen driver
-In-Reply-To: <523590E1.6030309@kernel.org>
+Date: Mon, 16 Sep 2013 10:17:31 +0200
+Subject: [PATCH 3/6] Staging/iio/adc/touchscreen/MXS: simplify register
+ access
+In-Reply-To: <52358D71.2040905@kernel.org>
 References: <1378887511-24530-1-git-send-email-jbe@pengutronix.de>
- <1378887511-24530-5-git-send-email-jbe@pengutronix.de>
- <523590E1.6030309@kernel.org>
-Message-ID: <201309161014.27482.jbe@pengutronix.de>
+ <1378887511-24530-4-git-send-email-jbe@pengutronix.de>
+ <52358D71.2040905@kernel.org>
+Message-ID: <201309161017.31846.jbe@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Jonathan,
 
-On Sunday 15 September 2013 12:50:09 Jonathan Cameron wrote:
-> On 09/11/13 09:18, Juergen Beisert wrote:
-> > Distinguish i.MX23 and i.MX28 at runtime and do the same for both SoC at
-> > least for the 4 wire touchscreen.
-> >
-> > Note: support for the remaining LRADC channels is not tested on an
-> > i.MX23 yet.
+On Sunday 15 September 2013 12:35:29 Jonathan Cameron wrote:
+> [...]
+> > +static void mxs_lradc_reg_set(struct mxs_lradc *lradc, u32 val, u32 reg)
+> > +{
+> > +	writel(val, lradc->base + reg + STMP_OFFSET_REG_SET);
+> > +}
+> > +
+> > +static void mxs_lradc_reg_clear(struct mxs_lradc *lradc, u32 val, u32 reg)
+> > +{ 
+> > +	writel(val, lradc->base + reg + STMP_OFFSET_REG_CLR);
+> > +}
+> > +
 >
-> An ominous comment. Are you likely to test them soon?
+> mxs_lradc_reg_write might be clearer?
 
-Sorry, currently no i.MX28 hardware available. Someone out here with an i.MX28 
-based system with a touchscreen to test? 
+I would prefer the shorter name. Due to long macro names and long function 
+names the lines in the code below needs more and more line breaks which is 
+IMHO less helpfull to read the code.
 
-> Minor code layout comment inline but otherwise I'm just looking for an
-> ack from Marek.
->
-> > [...]
-> >  static u32 mxs_lradc_drive_pressure(struct mxs_lradc *lradc)
-> >  {
-> > +	if (lradc->soc == IMX23_LRADC)
-> > +		return LRADC_CTRL0_MX23_YP | LRADC_CTRL0_MX23_XM;
-> >  	return LRADC_CTRL0_MX28_YPPSW | LRADC_CTRL0_MX28_XNNSW;
->
-> Whilst it obviously doesn't actually matter, having an else
-> in there would make the code more consistent so personally
-> I would prefer it to be there.
-
-I can change it. Anyone here with objections against such a change?
-
-Regards
+Regards,
 Juergen
 
 -- 
