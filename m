@@ -1,20 +1,110 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 16 Sep 2013 14:14:45 +0800
-Subject: [PATCH v5 3/3] PCI: imx6: Add support for i.MX6 PCIe controller
-In-Reply-To: <1379310497-12362-4-git-send-email-xobs@kosagi.com>
-References: <1379310497-12362-1-git-send-email-xobs@kosagi.com>
- <1379310497-12362-4-git-send-email-xobs@kosagi.com>
-Message-ID: <20130916061444.GG31147@S2101-09.ap.freescale.net>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Mon, 16 Sep 2013 15:22:37 +0900
+Subject: [PATCH v4 3/3] PCI: imx6: Add support for i.MX6 PCIe controller
+In-Reply-To: <1379065222-7275-4-git-send-email-xobs@kosagi.com>
+References: <1379065222-7275-1-git-send-email-xobs@kosagi.com>
+ <1379065222-7275-4-git-send-email-xobs@kosagi.com>
+Message-ID: <000501ceb2a5$2373c260$6a5b4720$%han@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 16, 2013 at 05:48:17AM +0000, Sean Cross wrote:
+On Friday, September 13, 2013 6:40 PM, Sean Cross wrote:
+> 
 > Add support for the PCIe port present on the i.MX6 family of controllers.
 > These use the Synopsis Designware core tied to their own PHY.
 > 
 > Signed-off-by: Sean Cross <xobs@kosagi.com>
 
-Bjorn gave his ACK with asking us to apply the patch via arm-soc tree.
-You should add his ACK into your patch.
+It looks good. :-)
+But, I added some minor comments.
 
-Shawn
+> ---
+>  .../devicetree/bindings/pci/designware-pcie.txt    |    5 +
+>  arch/arm/boot/dts/imx6qdl.dtsi                     |   16 +
+>  arch/arm/mach-imx/Kconfig                          |    2 +
+>  arch/arm/mach-imx/clk-imx6q.c                      |   11 +
+>  drivers/pci/host/Kconfig                           |    6 +
+>  drivers/pci/host/Makefile                          |    1 +
+>  drivers/pci/host/pci-imx6.c                        |  482 ++++++++++++++++++++
+>  7 files changed, 523 insertions(+)
+>  create mode 100644 drivers/pci/host/pci-imx6.c
+
+[.....]
+
+> diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
+> index 679d49a..0a2093c 100644
+> --- a/arch/arm/mach-imx/clk-imx6q.c
+> +++ b/arch/arm/mach-imx/clk-imx6q.c
+> @@ -622,6 +622,17 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
+>  	if (ret)
+>  		pr_warn("failed to set up CLKO: %d\n", ret);
+> 
+> +	/*
+> +	 * All existing boards with PCIe run them off LVDS1
+> +	 */
+> +	if (IS_ENABLED(CONFIG_PCI_IMX6)) {
+> +		clk_set_parent(clk[lvds1_sel], clk[sata_ref]);
+> +		clk_prepare_enable(clk[lvds1_gate]);
+> +		clk_prepare_enable(clk[pcie_ref_125m]);
+> +		clk_prepare_enable(clk[pcie_axi]);
+> +        }
+
+Please use tab instead of spaces.
+
+> +
+> +
+
+Please remove a duplicated line.
+
+[.....]
+
+> +#include <linux/delay.h>
+> +#include <linux/gpio.h>
+> +#include <linux/kernel.h>
+> +#include <linux/module.h>
+> +#include <linux/of_gpio.h>
+> +#include <linux/pci.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/resource.h>
+> +#include <linux/signal.h>
+> +#include <linux/types.h>
+> +#include <linux/regmap.h>
+> +#include <linux/mfd/syscon.h>
+> +#include <linux/mfd/syscon/imx6q-iomuxc-gpr.h>
+
+If possible, please re-order in alphabetical order.
+
+[.....]
+
+> +static void imx6_pcie_host_init(struct pcie_port *pp)
+> +{
+> +	int count = 0;
+> +	struct imx6_pcie *imx6_pcie = to_imx6_pcie(pp);
+> +
+> +	imx6_pcie_assert_core_reset(pp);
+> +
+> +	imx6_pcie_init_phy(pp);
+> +
+> +	imx6_pcie_deassert_core_reset(pp);
+> +
+> +	dw_pcie_setup_rc(pp);
+> +
+> +	regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
+> +			IMX6Q_GPR12_PCIE_CTL_2, 1 << 10);
+> +
+> +	while (!dw_pcie_link_up(pp)) {
+> +		usleep_range(100, 1000);
+> +		count++;
+> +		if (count >= 10) {
+> +			dev_err(pp->dev, "phy link never came up\n");
+> +			dev_dbg(pp->dev,"DEBUG_R0: 0x%08x, DEBUG_R1: 0x%08x\n",
+
+Please insert space between pp->dev, and "DEBUG_R0 in order to fix the following
+checkpatch error.
+
+ERROR: space required after that ',' (ctx:VxV)
+#407: FILE: drivers/pci/host/pci-imx6.c:276:
++                       dev_dbg(pp->dev,"DEBUG_R0: 0x%08x, DEBUG_R1: 0x%08x\n",
+
+Best regards,
+Jingoo Han
