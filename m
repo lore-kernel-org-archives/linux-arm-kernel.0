@@ -1,143 +1,71 @@
-From: jean.pihet@linaro.org (Jean Pihet)
-Date: Mon, 16 Sep 2013 11:17:33 +0200
-Subject: [PATCH 4/4] perf: parse the .debug_frame section in case .eh_frame is
- not present
-In-Reply-To: <1379323053-11458-1-git-send-email-jean.pihet@linaro.org>
-References: <1379323053-11458-1-git-send-email-jean.pihet@linaro.org>
-Message-ID: <1379323053-11458-5-git-send-email-jean.pihet@linaro.org>
+From: denis.ciocca@st.com (Denis CIOCCA)
+Date: Mon, 16 Sep 2013 11:19:19 +0200
+Subject: [PATCH 32/38] iio: accel-core: st: Move LSM303DLH into correct
+ group
+In-Reply-To: <20130916080546.GC3999@lee--X1>
+References: <1378817379-8238-1-git-send-email-lee.jones@linaro.org>
+ <1378817379-8238-33-git-send-email-lee.jones@linaro.org>
+ <5234A20F.7040008@kernel.org> <20130916080546.GC3999@lee--X1>
+Message-ID: <5236CD17.5010901@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On ARM the debug info is not present in the .eh_frame sections but
-in .debug_frame instead, in the dwarf format.
-Use libunwind to load and parse the debug info.
+Hi Lee,
+>> On 09/10/13 13:49, Lee Jones wrote:
+>>> The LSM303DLH's WAI (WhoAmI) is 0x33, meaning it should be enabled by
+>>> Accel Sensor group one. For the device to probe without error, we'll
+>>> need to ensure it's registered with the correct WAI.
+>>>
+>>> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+>> You clearly have a better datasheet than I have as for that part it doesn't even claim to
+>> have the relevant register to read a who am I from.
+>>
+>> Now that datasheet does list odr values as 50, 100, 400 1000 which would put it where it originally
+>> was in these tables.
+>>
+>> http://www.st.com/web/en/resource/technical/document/datasheet/CD00260288.pdf
+>>
+>> I haven't checked other elements...
+>>
+>> I'm confused but suspect we may need another type entry to deal with this one.
+> Hmmm... on initial thought, I don't know how we can handle this one. I
+> assumed the WAIs were a one-stop-shop for device identification. I also
+> thought that they would only match if the functionality and register
+> maps would be the same.
+>
+> I'll touch base with Denis on this, perhaps he can shed some light.
+>
+I've just checked, the WAI is 0x32. It was correct...Are you sure that 
+you use the LSM303DLH?
 
-Dependencies:
- . if present, libunwind >= 1.1 is needed to prevent a segfault when
-   parsing the dwarf info,
- . libunwind needs to be configured with --enable-debug-frame
-   to prevent a linkage error. Note: --enable-debug-frame is automatically
-   selected on ARM).
+Denis
 
-Signed-off-by: Jean Pihet <jean.pihet@linaro.org>
----
- tools/perf/config/Makefile |  2 +-
- tools/perf/util/unwind.c   | 71 +++++++++++++++++++++++++++++++++++-----------
- 2 files changed, 56 insertions(+), 17 deletions(-)
 
-diff --git a/tools/perf/util/unwind.c b/tools/perf/util/unwind.c
-index 2f891f7..429a99c 100644
---- a/tools/perf/util/unwind.c
-+++ b/tools/perf/util/unwind.c
-@@ -39,6 +39,15 @@ UNW_OBJ(dwarf_search_unwind_table) (unw_addr_space_t as,
- 
- #define dwarf_search_unwind_table UNW_OBJ(dwarf_search_unwind_table)
- 
-+extern int
-+UNW_OBJ(dwarf_find_debug_frame) (int found, unw_dyn_info_t *di_debug,
-+				 unw_word_t ip,
-+				 unw_word_t segbase,
-+				 const char *obj_name, unw_word_t start,
-+				 unw_word_t end);
-+
-+#define dwarf_find_debug_frame UNW_OBJ(dwarf_find_debug_frame)
-+
- #define DW_EH_PE_FORMAT_MASK	0x0f	/* format of the encoded value */
- #define DW_EH_PE_APPL_MASK	0x70	/* how the value is to be applied */
- 
-@@ -245,8 +254,9 @@ static int unwind_spec_ehframe(struct dso *dso, struct machine *machine,
- 	return 0;
- }
- 
--static int read_unwind_spec(struct dso *dso, struct machine *machine,
--			    u64 *table_data, u64 *segbase, u64 *fde_count)
-+static int read_unwind_spec_eh_frame(struct dso *dso, struct machine *machine,
-+				     u64 *table_data, u64 *segbase,
-+				     u64 *fde_count)
- {
- 	int ret = -EINVAL, fd;
- 	u64 offset;
-@@ -255,6 +265,7 @@ static int read_unwind_spec(struct dso *dso, struct machine *machine,
- 	if (fd < 0)
- 		return -EINVAL;
- 
-+	/* Check the .eh_frame section for unwinding info */
- 	offset = elf_section_offset(fd, ".eh_frame_hdr");
- 	close(fd);
- 
-@@ -263,10 +274,27 @@ static int read_unwind_spec(struct dso *dso, struct machine *machine,
- 					  table_data, segbase,
- 					  fde_count);
- 
--	/* TODO .debug_frame check if eh_frame_hdr fails */
- 	return ret;
- }
- 
-+static int read_unwind_spec_debug_frame(struct dso *dso,
-+					struct machine *machine, u64 *offset)
-+{
-+	int fd = dso__data_fd(dso, machine);
-+
-+	if (fd < 0)
-+		return -EINVAL;
-+
-+	/* Check the .debug_frame section for unwinding info */
-+	*offset = elf_section_offset(fd, ".debug_frame");
-+	close(fd);
-+
-+	if (*offset)
-+		return 0;
-+
-+	return -EINVAL;
-+}
-+
- static struct map *find_map(unw_word_t ip, struct unwind_info *ui)
- {
- 	struct addr_location al;
-@@ -291,20 +319,31 @@ find_proc_info(unw_addr_space_t as, unw_word_t ip, unw_proc_info_t *pi,
- 
- 	pr_debug("unwind: find_proc_info dso %s\n", map->dso->name);
- 
--	if (read_unwind_spec(map->dso, ui->machine,
--			     &table_data, &segbase, &fde_count))
--		return -EINVAL;
-+	/* Check the .eh_frame section for unwinding info */
-+	if (!read_unwind_spec_eh_frame(map->dso, ui->machine,
-+				       &table_data, &segbase, &fde_count)) {
-+		memset(&di, 0, sizeof(di));
-+		di.format   = UNW_INFO_FORMAT_REMOTE_TABLE;
-+		di.start_ip = map->start;
-+		di.end_ip   = map->end;
-+		di.u.rti.segbase    = map->start + segbase;
-+		di.u.rti.table_data = map->start + table_data;
-+		di.u.rti.table_len  = fde_count * sizeof(struct table_entry)
-+				      / sizeof(unw_word_t);
-+		return dwarf_search_unwind_table(as, ip, &di, pi,
-+						 need_unwind_info, arg);
-+	}
-+
-+	/* Check the .debug_frame section for unwinding info */
-+	if (!read_unwind_spec_debug_frame(map->dso, ui->machine, &segbase)) {
-+		memset(&di, 0, sizeof(di));
-+		dwarf_find_debug_frame(0, &di, ip, 0, map->dso->name,
-+				       map->start, map->end);
-+		return dwarf_search_unwind_table(as, ip, &di, pi,
-+						 need_unwind_info, arg);
-+	}
- 
--	memset(&di, 0, sizeof(di));
--	di.format   = UNW_INFO_FORMAT_REMOTE_TABLE;
--	di.start_ip = map->start;
--	di.end_ip   = map->end;
--	di.u.rti.segbase    = map->start + segbase;
--	di.u.rti.table_data = map->start + table_data;
--	di.u.rti.table_len  = fde_count * sizeof(struct table_entry)
--			      / sizeof(unw_word_t);
--	return dwarf_search_unwind_table(as, ip, &di, pi,
--					 need_unwind_info, arg);
-+	return -EINVAL;
- }
- 
- static int access_fpreg(unw_addr_space_t __maybe_unused as,
--- 
-1.7.11.7
+
+>>> ---
+>>>   drivers/iio/accel/st_accel_core.c | 4 ++--
+>>>   1 file changed, 2 insertions(+), 2 deletions(-)
+>>>
+>>> diff --git a/drivers/iio/accel/st_accel_core.c b/drivers/iio/accel/st_accel_core.c
+>>> index ea62291..03a2b6b 100644
+>>> --- a/drivers/iio/accel/st_accel_core.c
+>>> +++ b/drivers/iio/accel/st_accel_core.c
+>>> @@ -170,6 +170,7 @@ static const struct st_sensors st_accel_sensors[] = {
+>>>   			[2] = LSM330D_ACCEL_DEV_NAME,
+>>>   			[3] = LSM330DL_ACCEL_DEV_NAME,
+>>>   			[4] = LSM330DLC_ACCEL_DEV_NAME,
+>>> +			[5] = LSM303DLH_ACCEL_DEV_NAME,
+>>>   		},
+>>>   		.ch = (struct iio_chan_spec *)st_accel_12bit_channels,
+>>>   		.odr = {
+>>> @@ -238,8 +239,7 @@ static const struct st_sensors st_accel_sensors[] = {
+>>>   		.sensors_supported = {
+>>>   			[0] = LIS331DLH_ACCEL_DEV_NAME,
+>>>   			[1] = LSM303DL_ACCEL_DEV_NAME,
+>>> -			[2] = LSM303DLH_ACCEL_DEV_NAME,
+>>> -			[3] = LSM303DLM_ACCEL_DEV_NAME,
+>>> +			[2] = LSM303DLM_ACCEL_DEV_NAME,
+>>>   		},
+>>>   		.ch = (struct iio_chan_spec *)st_accel_12bit_channels,
+>>>   		.odr = {
+>>>
