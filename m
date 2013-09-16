@@ -1,57 +1,52 @@
-From: jbe@pengutronix.de (=?iso-8859-1?q?J=FCrgen_Beisert?=)
-Date: Mon, 16 Sep 2013 10:38:13 +0200
-Subject: [PATCH 5/6] Staging/iio/adc/touchscreen/MXS: add interrupt driven
- touch detection
-In-Reply-To: <5235DBEA.7030402@kernel.org>
-References: <1378887511-24530-1-git-send-email-jbe@pengutronix.de>
- <52359259.8010202@kernel.org> <5235DBEA.7030402@kernel.org>
-Message-ID: <201309161038.13977.jbe@pengutronix.de>
+From: xobs@kosagi.com (Sean Cross)
+Date: Mon, 16 Sep 2013 08:20:51 +0000
+Subject: [PATCH v6 0/3] Add PCIe support for i.MX6q
+Message-ID: <1379319655-20210-1-git-send-email-xobs@kosagi.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jonathan,
+This patchset adds support for the PCI Express port present on
+the i.MX6 SoC.  The port is based on Synopsis Designware IP with
+a custom PHY.
 
-On Sunday 15 September 2013 18:10:18 Jonathan Cameron wrote:
-> On 09/15/13 11:56, Jonathan Cameron wrote:
-> > On 09/11/13 09:18, Juergen Beisert wrote:
-> >> For battery driven systems it is a very bad idea to collect the
-> >> touchscreen data within a kernel busy loop.
-> >>
-> >> This change uses the features of the hardware to delay and accumulate
-> >> samples in hardware to avoid a high interrupt and CPU load.
-> >>
-> >> Note: this is only tested on an i.MX23 SoC yet.
-> >>
-> >> Signed-off-by: Juergen Beisert <jbe@pengutronix.de>
-> >> CC: linux-arm-kernel at lists.infradead.org
-> >> CC: devel at driverdev.osuosl.org
-> >> CC: Marek Vasut <marex@denx.de>
-> >> CC: Fabio Estevam <fabio.estevam@freescale.com>
-> >> CC: Jonathan Cameron <jic23@cam.ac.uk>
-> >
-> > While this driver is placed in IIO within staging at the moment, these
-> > changes are definitely input related.  Hence I have cc'd Dmitry and the
-> > input list.
-> >
-> > I am personaly a little uncomfortable that we have such a complex bit of
-> > input code sat within an IIO driver but such is life.
->
-> The logic in here looks reasonable to me. I am far from a specialist in how
-> these touch screens are normally handled though.
->
-> One thing to note is that you really want to get a proposed device tree
-> spec out asap as that can take longer to review than the driver.  If you
-> are proposing to do that as a future patch, then take into account that
-> you'll need to ensure these are the defaults if it is not specified in the
-> device tree for ever more (which is more painful than hammering out he
-> device tree stuff now!)
-> ...
+Changes since v5:
+ - Changed "compatible" to "fsl,imx6q-pcie"
+ - Moved clock_prepare_enable calls back into driver
+ - Removed clk lookups for lvds[12]_gate
 
-Will do.
+Changes since v4:
+ - Add an abort exception handler
+ - Fix register ordering in imx6q-iomuxc-gpr.h
+ - Enable sata_ref_100m during clock initialization
+ - Minor changes to lvds[12]_gate definitions
 
-Regards,
-Juergen
+Changes since v3:
+ - Moved clock initialization to board clock file
+ - Reworked memory range layout
+ - Reduced the duration of several sleep calls
+
+Changes since v2:
+ - Reworked source file with Sascha Hauer's suggestions
+
+Changes since v1:
+ - Use the Designware controller code for BAR initialization
+
+Sean Cross (3):
+  ARM: imx: Add LVDS general-purpose clocks to i.MX6Q
+  ARM: imx6q: Add PCIe bits to GPR syscon definition
+  PCI: imx6: Add support for i.MX6 PCIe controller
+
+ .../devicetree/bindings/clock/imx6q-clock.txt      |    4 +
+ .../devicetree/bindings/pci/designware-pcie.txt    |    7 +-
+ arch/arm/boot/dts/imx6qdl.dtsi                     |   16 +
+ arch/arm/mach-imx/Kconfig                          |    2 +
+ arch/arm/mach-imx/clk-imx6q.c                      |   24 +-
+ drivers/pci/host/Kconfig                           |    6 +
+ drivers/pci/host/Makefile                          |    1 +
+ drivers/pci/host/pci-imx6.c                        |  576 ++++++++++++++++++++
+ include/linux/mfd/syscon/imx6q-iomuxc-gpr.h        |    8 +
+ 9 files changed, 642 insertions(+), 2 deletions(-)
+ create mode 100644 drivers/pci/host/pci-imx6.c
 
 -- 
-Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?| Juergen Beisert ? ? ? ? ? ? |
-Linux Solutions for Science and Industry ? ? ?| http://www.pengutronix.de/  |
+1.7.9.5
