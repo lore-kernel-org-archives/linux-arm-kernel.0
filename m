@@ -1,31 +1,35 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Mon, 16 Sep 2013 12:37:09 -0700
-Subject: [PATCH v2 00/12] clk/exynos convert clock IDs to macros
-In-Reply-To: <523716C9.3000204@samsung.com>
-References: <1378462361-13680-1-git-send-email-a.hajda@samsung.com>
- <8412301.YP2zzplWoe@amdc1227>
- <070001ceafa5$d4d81a40$7e884ec0$%kim@samsung.com>
- <523716C9.3000204@samsung.com>
-Message-ID: <20130916193709.27384.86101@quantum>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 16 Sep 2013 13:44:49 -0600
+Subject: [PATCH v3] PWM: PXA: add device tree support to PWM driver
+In-Reply-To: <1379091281-23662-1-git-send-email-mikedunn@newsguy.com>
+References: <1379091281-23662-1-git-send-email-mikedunn@newsguy.com>
+Message-ID: <52375FB1.5050700@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Sylwester Nawrocki (2013-09-16 07:33:45)
-> On 09/12/2013 12:50 PM, Kukjin Kim wrote:
-> > Well...I'm not sure changing to use macro is better or not at this moment...
+On 09/13/2013 10:54 AM, Mike Dunn wrote:
+> This patch adds device tree support to the PXA's PWM driver.  Only an OF match
+> table is added; nothing needs to be extracted from the device tree node.  The
+> existing ID table is reused for the match table data.
 > 
-> I think it is. ;) It's really less error prone to have symbolic names instead
-> of the plain numbers. The clock ids are defined in one place and it is more
-> clear what a clock is by looking at symbolic name. It's especially annoying 
-> to use plain numbers where are are many clock in a single node, like 10 or 
-> more. What are you main concerns with this ?
+> Tested on a Palm Treo 680 (both platform data and DT cases).
 
-I think having the symbolic names is a win for readability.
+> diff --git a/Documentation/devicetree/bindings/pwm/pxa-pwm.txt b/Documentation/devicetree/bindings/pwm/pxa-pwm.txt
 
-Regards,
-Mike
+> +- compatible: should be one of:
+> +  - "marvell,pxa250-pwm"
+> +  - "marvell,pxa270-pwm"
+> +  - "marvell,pxa168-pwm"
+> +  - "marvell,pxa910-pwm"
 
-> 
-> --
-> Regards,
-> Sylwester
+Not just one of, but possible more than one...
+
+> diff --git a/arch/arm/boot/dts/pxa27x.dtsi b/arch/arm/boot/dts/pxa27x.dtsi
+
+> +		pwm0: pwm at 40b00000 {
+> +			compatible = "marvell,pxa270-pwm";
+
+I thought the assertion was that pax270 and pxa250 were both compatible?
+If so, that should be:
+
+		compatible = "marvell,pxa270-pwm", "marvell,pxa250-pwm";
