@@ -1,49 +1,36 @@
 From: jean.pihet@linaro.org (Jean Pihet)
-Date: Mon, 16 Sep 2013 11:17:32 +0200
-Subject: [PATCH 3/4] perf tools: Check libunwind for availability of dwarf
- parsing feature
+Date: Mon, 16 Sep 2013 11:17:33 +0200
+Subject: [PATCH 4/4] perf: parse the .debug_frame section in case .eh_frame is
+ not present
 In-Reply-To: <1379323053-11458-1-git-send-email-jean.pihet@linaro.org>
 References: <1379323053-11458-1-git-send-email-jean.pihet@linaro.org>
-Message-ID: <1379323053-11458-4-git-send-email-jean.pihet@linaro.org>
+Message-ID: <1379323053-11458-5-git-send-email-jean.pihet@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The newly added dwarf unwinding feature [1] requires:
-. a recent version (>= 1.1) of libunwind,
-. libunwind to be configured with --enable-debug-frame.
+On ARM the debug info is not present in the .eh_frame sections but
+in .debug_frame instead, in the dwarf format.
+Use libunwind to load and parse the debug info.
 
-[1] http://www.spinics.net/lists/kernel/msg1598951.html
-
-Add the corresponding API test in the feature check list.
+Dependencies:
+ . if present, libunwind >= 1.1 is needed to prevent a segfault when
+   parsing the dwarf info,
+ . libunwind needs to be configured with --enable-debug-frame
+   to prevent a linkage error. Note: --enable-debug-frame is automatically
+   selected on ARM).
 
 Signed-off-by: Jean Pihet <jean.pihet@linaro.org>
 ---
- tools/perf/config/Makefile          |  2 +-
- tools/perf/config/feature-tests.mak | 11 ++++++++++-
- 2 files changed, 11 insertions(+), 2 deletions(-)
+ tools/perf/config/Makefile |  2 +-
+ tools/perf/util/unwind.c   | 71 +++++++++++++++++++++++++++++++++++-----------
+ 2 files changed, 56 insertions(+), 17 deletions(-)
 
-diff --git a/tools/perf/config/Makefile b/tools/perf/config/Makefile
-index 4b65710..395bc41 100644
---- a/tools/perf/config/Makefile
-+++ b/tools/perf/config/Makefile
-@@ -223,7 +223,7 @@ endif
+diff --git a/tools/perf/util/unwind.c b/tools/perf/util/unwind.c
+index 2f891f7..429a99c 100644
+--- a/tools/perf/util/unwind.c
++++ b/tools/perf/util/unwind.c
+@@ -39,6 +39,15 @@ UNW_OBJ(dwarf_search_unwind_table) (unw_addr_space_t as,
  
- FLAGS_UNWIND=$(LIBUNWIND_CFLAGS) $(CFLAGS) $(LIBUNWIND_LDFLAGS) $(LDFLAGS) $(EXTLIBS) $(LIBUNWIND_LIBS)
- ifneq ($(call try-cc,$(SOURCE_LIBUNWIND),$(FLAGS_UNWIND),libunwind),y)
--  msg := $(warning No libunwind found, disabling post unwind support. Please install libunwind-dev[el] >= 0.99);
-+  msg := $(warning No libunwind found, disabling post unwind support. Please install libunwind-dev[el] >= 1.1);
-   NO_LIBUNWIND := 1
- endif # Libunwind support
- endif # NO_LIBUNWIND
-diff --git a/tools/perf/config/feature-tests.mak b/tools/perf/config/feature-tests.mak
-index 708fb8e..87124d0 100644
---- a/tools/perf/config/feature-tests.mak
-+++ b/tools/perf/config/feature-tests.mak
-@@ -176,14 +176,23 @@ extern int UNW_OBJ(dwarf_search_unwind_table) (unw_addr_space_t as,
-                                       unw_proc_info_t *pi,
-                                       int need_unwind_info, void *arg);
- 
--
  #define dwarf_search_unwind_table UNW_OBJ(dwarf_search_unwind_table)
  
 +extern int
@@ -55,14 +42,102 @@ index 708fb8e..87124d0 100644
 +
 +#define dwarf_find_debug_frame UNW_OBJ(dwarf_find_debug_frame)
 +
- int main(void)
- {
- 	unw_addr_space_t addr_space;
- 	addr_space = unw_create_addr_space(NULL, 0);
- 	unw_init_remote(NULL, addr_space, NULL);
-+	dwarf_find_debug_frame(0, NULL, 0, 0, NULL, 0, 0);
- 	dwarf_search_unwind_table(addr_space, 0, NULL, NULL, 0, NULL);
+ #define DW_EH_PE_FORMAT_MASK	0x0f	/* format of the encoded value */
+ #define DW_EH_PE_APPL_MASK	0x70	/* how the value is to be applied */
+ 
+@@ -245,8 +254,9 @@ static int unwind_spec_ehframe(struct dso *dso, struct machine *machine,
  	return 0;
  }
+ 
+-static int read_unwind_spec(struct dso *dso, struct machine *machine,
+-			    u64 *table_data, u64 *segbase, u64 *fde_count)
++static int read_unwind_spec_eh_frame(struct dso *dso, struct machine *machine,
++				     u64 *table_data, u64 *segbase,
++				     u64 *fde_count)
+ {
+ 	int ret = -EINVAL, fd;
+ 	u64 offset;
+@@ -255,6 +265,7 @@ static int read_unwind_spec(struct dso *dso, struct machine *machine,
+ 	if (fd < 0)
+ 		return -EINVAL;
+ 
++	/* Check the .eh_frame section for unwinding info */
+ 	offset = elf_section_offset(fd, ".eh_frame_hdr");
+ 	close(fd);
+ 
+@@ -263,10 +274,27 @@ static int read_unwind_spec(struct dso *dso, struct machine *machine,
+ 					  table_data, segbase,
+ 					  fde_count);
+ 
+-	/* TODO .debug_frame check if eh_frame_hdr fails */
+ 	return ret;
+ }
+ 
++static int read_unwind_spec_debug_frame(struct dso *dso,
++					struct machine *machine, u64 *offset)
++{
++	int fd = dso__data_fd(dso, machine);
++
++	if (fd < 0)
++		return -EINVAL;
++
++	/* Check the .debug_frame section for unwinding info */
++	*offset = elf_section_offset(fd, ".debug_frame");
++	close(fd);
++
++	if (*offset)
++		return 0;
++
++	return -EINVAL;
++}
++
+ static struct map *find_map(unw_word_t ip, struct unwind_info *ui)
+ {
+ 	struct addr_location al;
+@@ -291,20 +319,31 @@ find_proc_info(unw_addr_space_t as, unw_word_t ip, unw_proc_info_t *pi,
+ 
+ 	pr_debug("unwind: find_proc_info dso %s\n", map->dso->name);
+ 
+-	if (read_unwind_spec(map->dso, ui->machine,
+-			     &table_data, &segbase, &fde_count))
+-		return -EINVAL;
++	/* Check the .eh_frame section for unwinding info */
++	if (!read_unwind_spec_eh_frame(map->dso, ui->machine,
++				       &table_data, &segbase, &fde_count)) {
++		memset(&di, 0, sizeof(di));
++		di.format   = UNW_INFO_FORMAT_REMOTE_TABLE;
++		di.start_ip = map->start;
++		di.end_ip   = map->end;
++		di.u.rti.segbase    = map->start + segbase;
++		di.u.rti.table_data = map->start + table_data;
++		di.u.rti.table_len  = fde_count * sizeof(struct table_entry)
++				      / sizeof(unw_word_t);
++		return dwarf_search_unwind_table(as, ip, &di, pi,
++						 need_unwind_info, arg);
++	}
++
++	/* Check the .debug_frame section for unwinding info */
++	if (!read_unwind_spec_debug_frame(map->dso, ui->machine, &segbase)) {
++		memset(&di, 0, sizeof(di));
++		dwarf_find_debug_frame(0, &di, ip, 0, map->dso->name,
++				       map->start, map->end);
++		return dwarf_search_unwind_table(as, ip, &di, pi,
++						 need_unwind_info, arg);
++	}
+ 
+-	memset(&di, 0, sizeof(di));
+-	di.format   = UNW_INFO_FORMAT_REMOTE_TABLE;
+-	di.start_ip = map->start;
+-	di.end_ip   = map->end;
+-	di.u.rti.segbase    = map->start + segbase;
+-	di.u.rti.table_data = map->start + table_data;
+-	di.u.rti.table_len  = fde_count * sizeof(struct table_entry)
+-			      / sizeof(unw_word_t);
+-	return dwarf_search_unwind_table(as, ip, &di, pi,
+-					 need_unwind_info, arg);
++	return -EINVAL;
+ }
+ 
+ static int access_fpreg(unw_addr_space_t __maybe_unused as,
 -- 
 1.7.11.7
