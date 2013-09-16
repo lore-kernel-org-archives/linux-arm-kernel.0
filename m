@@ -1,43 +1,32 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 16 Sep 2013 10:47:16 +0800
-Subject: [PATCH] ARM: imx: i.mx6d/q: disable the double linefill feature
- of PL310
-In-Reply-To: <1379058532-19843-1-git-send-email-r64343@freescale.com>
-References: <1379058532-19843-1-git-send-email-r64343@freescale.com>
-Message-ID: <20130916024714.GE31147@S2101-09.ap.freescale.net>
+From: B47053@freescale.com (Xiubo Li-B47053)
+Date: Mon, 16 Sep 2013 02:49:06 +0000
+Subject: [PATCHv4 4/4] Documentation: Add device tree bindings for
+ Freescale FTM PWM.
+In-Reply-To: <523392EA.6050909@wwwdotorg.org>
+References: <1379051922-4930-1-git-send-email-Li.Xiubo@freescale.com>
+ <1379051922-4930-5-git-send-email-Li.Xiubo@freescale.com>
+ <523392EA.6050909@wwwdotorg.org>
+Message-ID: <1DD289F6464F0949A2FCA5AA6DC23F82833236@039-SN2MPN1-013.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jason,
-
-On Fri, Sep 13, 2013 at 03:48:52PM +0800, Jason Liu wrote:
-> @@ -116,7 +116,18 @@ void __init imx_init_l2cache(void)
->  
->  	/* Configure the L2 PREFETCH and POWER registers */
->  	val = readl_relaxed(l2x0_base + L2X0_PREFETCH_CTRL);
-> -	val |= 0x70800000;
-> +	val |= 0x30000000;
-> +	/*
-> +	 * The L2 cache controller(PL310) version on the i.MX6D/Q is r3p1-50rel0
-> +	 * The L2 cache controller(PL310) version on the i.MX6DL/SOLO/SL is r3p2
-> +	 * But according to ARM PL310 errata: 752271
-> +	 * ID: 752271: Double linefill feature can cause data corruption
-> +	 * Fault Status: Present in: r3p0, r3p1, r3p1-50rel0. Fixed in r3p2
-> +	 * Workaround: The only workaround to this erratum is to disable the
-> +	 * double linefill feature. This is the default behavior.
-> +	 */
-> +	if (!of_machine_is_compatible("fsl,imx6q"))
-
-Can we use cpu_is_imx6q() here?  I think we may not want to look at
-device tree, if the kernel can figure this out by itself.
-
-Shawn
-
-> +		val |= 0x40800000;
->  	writel_relaxed(val, l2x0_base + L2X0_PREFETCH_CTRL);
->  	val = L2X0_DYNAMIC_CLK_GATING_EN | L2X0_STNDBY_MODE_EN;
->  	writel_relaxed(val, l2x0_base + L2X0_POWER_CTRL);
-> -- 
-> 1.7.10.4
+> > +- fsl,pwm-counter-clk: The FTM PWM counter clock source, should be
+> > +one of the
+> > +  entries in clock-names.
 > 
+> So the IP block has 3 input clocks, and also a mux to select which one to
+> use? That sounds slightly unusual, but possible.
 > 
+> If there is really only 1 clock input to the IP block, and the mux is
+> part of some other module, then this binding should have only 1 entry in
+> clocks.
+> 
+
+Yes, there are 3 input clocks that can be selectable, and the mux is inside the FTM IP block.
+
+
+Thanks.
+
+--
+Best Regard,
+Xiubo
