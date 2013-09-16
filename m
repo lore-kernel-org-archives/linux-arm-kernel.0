@@ -1,78 +1,34 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 16 Sep 2013 09:22:17 +0100
-Subject: [PATCH 21/38] iio: sensors-core: st: Clean-up error handling in
- st_sensors_read_axis_data()
-In-Reply-To: <523495D0.1050002@kernel.org>
-References: <1378817379-8238-1-git-send-email-lee.jones@linaro.org>
- <1378817379-8238-22-git-send-email-lee.jones@linaro.org>
- <523495D0.1050002@kernel.org>
-Message-ID: <20130916082217.GE3999@lee--X1>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 16 Sep 2013 16:31:48 +0800
+Subject: [PATCH v2 1/1] ARM: imx: i.mx6d/q: disable the double linefill
+ feature of PL310
+In-Reply-To: <1379294943-15664-1-git-send-email-r64343@freescale.com>
+References: <1379294943-15664-1-git-send-email-r64343@freescale.com>
+Message-ID: <20130916083146.GI31147@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 14 Sep 2013, Jonathan Cameron wrote:
-
-> On 09/10/13 13:49, Lee Jones wrote:
-> > Gets rid of those unnecessary gotos.
+On Mon, Sep 16, 2013 at 09:29:03AM +0800, Jason Liu wrote:
+> The L2 cache controller(PL310) version on the i.MX6D/Q is r3p1-50rel0
+> The L2 cache controller(PL310) version on the i.MX6DL/SOLO/SL is r3p2
+> But according to ARM PL310 errata: 752271
+> ID: 752271: Double linefill feature can cause data corruption
+> Fault Status: Present in: r3p0, r3p1, r3p1-50rel0. Fixed in r3p2
+> Workaround: The only workaround to this erratum is to disable the
+> double linefill feature. This is the default behavior.
 > 
-> Unfortunately it introduced a bug whilst it is at it.  Sometimes
-> those gotos are necessary and the 'right' way to do things.
-> > 
-> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> > ---
-> >  drivers/iio/common/st_sensors/st_sensors_core.c | 17 +++++++----------
-> >  1 file changed, 7 insertions(+), 10 deletions(-)
-> > 
-> > diff --git a/drivers/iio/common/st_sensors/st_sensors_core.c b/drivers/iio/common/st_sensors/st_sensors_core.c
-> > index 8c4c54c..148f0e5 100644
-> > --- a/drivers/iio/common/st_sensors/st_sensors_core.c
-> > +++ b/drivers/iio/common/st_sensors/st_sensors_core.c
-> > @@ -331,26 +331,23 @@ static int st_sensors_read_axis_data(struct iio_dev *indio_dev,
-> >  	unsigned int byte_for_channel = ch->scan_type.storagebits >> 3;
-> >  
-> >  	outdata = kmalloc(byte_for_channel, GFP_KERNEL);
-> > -	if (!outdata) {
-> > -		err = -EINVAL;
-> > -		goto st_sensors_read_axis_data_error;
-> > -	}
-> > +	if (!outdata)
-> > +		return -ENOMEM;
-> I agree this change makes complete sense.
-> >  
-> >  	err = sdata->tf->read_multiple_byte(&sdata->tb, sdata->dev,
-> >  				ch->address, byte_for_channel,
-> >  				outdata, sdata->multiread_bit);
-> > -	if (err < 0)
-> > -		goto st_sensors_free_memory;
-> > +	if (err < 0) {
-> > +		kfree(outdata);
-> > +		return err;
-> > +	}
-> I don't like this change as....
-> >  
-> >  	if (byte_for_channel == 2)
-> >  		*data = (s16)get_unaligned_le16(outdata);
-> >  	else if (byte_for_channel == 3)
-> >  		*data = (s32)st_sensors_get_unaligned_le24(outdata);
-> >  
-> > -st_sensors_free_memory:
-> > -	kfree(outdata);
-> you now don't free out data in the case of no error.  This is precisely the case
-> where a goto is the correct way to handle things as the free need to occur whether
-> or not the error occurs.
+> without this patch, you will meet the following error when run the
+> memtester application at: http://pyropus.ca/software/memtester/
+> 
+> FAILURE: 0x00100000 != 0x00200000 at offset 0x01365664.
+> FAILURE: 0x00100000 != 0x00200000 at offset 0x01365668.
+> FAILURE: 0x00100000 != 0x00200000 at offset 0x0136566c.
+> FAILURE: 0x00100000 != 0x00200000 at offset 0x01365670.
+> FAILURE: 0x00100000 != 0x00200000 at offset 0x01365674.
+> FAILURE: 0x00100000 != 0x00200000 at offset 0x01365678.
+> 
+> Signed-off-by: Jason Liu <r64343@freescale.com>
 
-Ah, you're quite right. I'll fix up.
+Applied, thanks.
 
-> > -st_sensors_read_axis_data_error:
-> > -	return err;
-> > +	return 0;
-> >  }
-> >  
-> >  int st_sensors_read_info_raw(struct iio_dev *indio_dev,
-> > 
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Shawn
