@@ -1,66 +1,89 @@
 From: jic23@kernel.org (Jonathan Cameron)
-Date: Mon, 16 Sep 2013 16:30:32 +0100
-Subject: [PATCH 5/6] Staging/iio/adc/touchscreen/MXS: add interrupt driven
- touch detection
-In-Reply-To: <201309161010.22151.jbe@pengutronix.de>
-References: <1378887511-24530-1-git-send-email-jbe@pengutronix.de>
- <1378887511-24530-6-git-send-email-jbe@pengutronix.de>
- <52359259.8010202@kernel.org> <201309161010.22151.jbe@pengutronix.de>
-Message-ID: <0fb59809-c835-49b0-bd82-e791db1a9db7@email.android.com>
+Date: Mon, 16 Sep 2013 16:32:14 +0100
+Subject: [PATCH 25/38] iio: pressure-core: st: Allow for number of
+ channels to vary
+In-Reply-To: <20130916081724.GD3999@lee--X1>
+References: <1378817379-8238-1-git-send-email-lee.jones@linaro.org>
+ <1378817379-8238-26-git-send-email-lee.jones@linaro.org>
+ <52349A4E.10401@kernel.org> <20130916081724.GD3999@lee--X1>
+Message-ID: <af83f89d-0d15-473d-8365-40d1fecca728@email.android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-"J?rgen Beisert" <jbe@pengutronix.de> wrote:
->Hi Jonathan,
+Lee Jones <lee.jones@linaro.org> wrote:
+>On Sat, 14 Sep 2013, Jonathan Cameron wrote:
 >
->On Sunday 15 September 2013 12:56:25 Jonathan Cameron wrote:
->> On 09/11/13 09:18, Juergen Beisert wrote:
->> > For battery driven systems it is a very bad idea to collect the
->> > touchscreen data within a kernel busy loop.
->> >
->> > This change uses the features of the hardware to delay and
->accumulate
->> > samples in hardware to avoid a high interrupt and CPU load.
->> >
->> > Note: this is only tested on an i.MX23 SoC yet.
->> >
->> > Signed-off-by: Juergen Beisert <jbe@pengutronix.de>
->> > CC: linux-arm-kernel at lists.infradead.org
->> > CC: devel at driverdev.osuosl.org
->> > CC: Marek Vasut <marex@denx.de>
->> > CC: Fabio Estevam <fabio.estevam@freescale.com>
->> > CC: Jonathan Cameron <jic23@cam.ac.uk>
->>
->> While this driver is placed in IIO within staging at the moment,
->these
->> changes are definitely input related.  Hence I have cc'd Dmitry and
->the
->> input list.
->>
->> I am personaly a little uncomfortable that we have such a complex bit
->of
->> input code sat within an IIO driver but such is life.
+>> On 09/10/13 13:49, Lee Jones wrote:
+>> > At the moment the number of channels specified is dictated by the
+>first
+>> > sensor supported by the driver. As we add support for more sensors
+>this
+>> > is likely to vary. Instead of using the ARRAY_SIZE() of the
+>LPS331AP's
+>> > channel specifier we'll use a new adaptable 'struct st_sensors'
+>element
+>> > instead.
+>> > 
+>> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+>> Applied with Denis ack (again it should have been here)
 >
->Maybe an MFD for this ADC unit would be a better way to go?
-That would be great and is definitely the preferred method.
+>Ah, you're going to take the patches one-by-one?
+>
+>After amending the drivers as per your review I was going to send a
+>final time with all Acks applied. Then, once all maintainer Acks were
+>obtained I was going to send you a pull-request.
+>
+>Perhaps I should have communicated the intent sooner.
+>
+>Future submissions will have all Acks applied in this case.
 
-
- Currently I
->have a 
->different problem with this driver, because the ADC unit monitors the
->battery 
->as well. And the charging driver from the power subsystem needs these
->values 
->to charge the battery in a correct manner.
-
-There is an iio client battery driver as generic_ADC_battery.c but it is currently only doing polled access. Not too hard to add buffered access though ideally we would want a generic way of combining consumers doing polled and interrupt driven accesses.
+Quite a few of this series stood alone just fine so I grabbed them :)
 >
->> [...]
->
->Regards,
->Juergen
+>> > ---
+>> >  drivers/iio/pressure/st_pressure_core.c | 3 ++-
+>> >  include/linux/iio/common/st_sensors.h   | 1 +
+>> >  2 files changed, 3 insertions(+), 1 deletion(-)
+>> > 
+>> > diff --git a/drivers/iio/pressure/st_pressure_core.c
+>b/drivers/iio/pressure/st_pressure_core.c
+>> > index 60c2ee4..3abada2 100644
+>> > --- a/drivers/iio/pressure/st_pressure_core.c
+>> > +++ b/drivers/iio/pressure/st_pressure_core.c
+>> > @@ -107,6 +107,7 @@ static const struct st_sensors
+>st_press_sensors[] = {
+>> >  			[0] = LPS331AP_PRESS_DEV_NAME,
+>> >  		},
+>> >  		.ch = (struct iio_chan_spec *)st_press_lps331ap_channels,
+>> > +		.num_ch = ARRAY_SIZE(st_press_lps331ap_channels),
+>> >  		.odr = {
+>> >  			.addr = ST_PRESS_LPS331AP_ODR_ADDR,
+>> >  			.mask = ST_PRESS_LPS331AP_ODR_MASK,
+>> > @@ -245,7 +246,7 @@ int st_press_common_probe(struct iio_dev
+>*indio_dev,
+>> >  	pdata->num_data_channels = ST_PRESS_NUMBER_DATA_CHANNELS;
+>> >  	pdata->multiread_bit = pdata->sensor->multi_read_bit;
+>> >  	indio_dev->channels = pdata->sensor->ch;
+>> > -	indio_dev->num_channels = ARRAY_SIZE(st_press_lps331ap_channels);
+>> > +	indio_dev->num_channels = pdata->sensor->num_ch;
+>> >  
+>> >  	if (pdata->sensor->fs.addr != 0)
+>> >  		pdata->current_fullscale = (struct st_sensor_fullscale_avl *)
+>> > diff --git a/include/linux/iio/common/st_sensors.h
+>b/include/linux/iio/common/st_sensors.h
+>> > index e51f654..e732fda 100644
+>> > --- a/include/linux/iio/common/st_sensors.h
+>> > +++ b/include/linux/iio/common/st_sensors.h
+>> > @@ -184,6 +184,7 @@ struct st_sensors {
+>> >  	u8 wai;
+>> >  	char sensors_supported[ST_SENSORS_MAX_4WAI][ST_SENSORS_MAX_NAME];
+>> >  	struct iio_chan_spec *ch;
+>> > +	int num_ch;
+>> >  	struct st_sensor_odr odr;
+>> >  	struct st_sensor_power pw;
+>> >  	struct st_sensor_axis enable_axis;
+>> > 
 
 -- 
 Sent from my Android phone with K-9 Mail. Please excuse my brevity.
