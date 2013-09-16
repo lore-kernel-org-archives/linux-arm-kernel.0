@@ -1,38 +1,34 @@
 From: khilman@linaro.org (Kevin Hilman)
-Date: Mon, 16 Sep 2013 15:28:18 -0700
-Subject: [PATCH 0/4] nohz/full: drop 64-bit requirement, enable ARM support
-Message-ID: <1379370502-30376-1-git-send-email-khilman@linaro.org>
+Date: Mon, 16 Sep 2013 15:28:19 -0700
+Subject: [PATCH 1/4] nohz_full: Kconfig: VIRT_CPU_ACCOUNTING_GEN: drop 64-bit
+ requirement
+In-Reply-To: <1379370502-30376-1-git-send-email-khilman@linaro.org>
+References: <1379370502-30376-1-git-send-email-khilman@linaro.org>
+Message-ID: <1379370502-30376-2-git-send-email-khilman@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As of v3.10, the core ARM arch support is in mainline for NO_HZ_FULL.
-The only remaining part is the removal of the hard-coded Kconfig
-requirement on 64-bit platforms, which I believe can now be removed
-after the nsec granularity cputime was made to work on non 64_BIT
-(c.f. commit 8c23b80e, cputime_nsecs: use math64.h for nsec resolution
-conversion helpers.)
+The 64-bit requirement can be removed since the conversion of the nsec
+granularity cputime to work on !64_BIT
 
-This series makes the final Kconfig changes to bring NO_HZ_FULL
-support to ARM.
+Cc: Frederic Weisbecker <fweisbec@gmail.com>
+Signed-off-by: Kevin Hilman <khilman@linaro.org>
+---
+ init/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-I will queue up the arch/arm patch for Russell separately once the
-generic changes are accepted.
-
-Applies on today's linus master (commit bdbdfdef57)
-
-Kevin
-
-Kevin Hilman (4):
-  nohz_full: Kconfig: VIRT_CPU_ACCOUNTING_GEN: drop 64-bit requirement
-  nohz_full: Kconfig: drop requrement on 64-bit
-  full_nohz: Kconfig: add HAVE_VIRT_CPU_ACCOUNTING_GEN
-  ARM: Kconfig: allow full nohz CPU accounting
-
- arch/Kconfig        | 11 +++++++++++
- arch/arm/Kconfig    |  1 +
- init/Kconfig        |  3 ++-
- kernel/time/Kconfig |  2 --
- 4 files changed, 14 insertions(+), 3 deletions(-)
-
+diff --git a/init/Kconfig b/init/Kconfig
+index 18bd9e3..e9cd23b 100644
+--- a/init/Kconfig
++++ b/init/Kconfig
+@@ -354,7 +354,7 @@ config VIRT_CPU_ACCOUNTING_NATIVE
+ 
+ config VIRT_CPU_ACCOUNTING_GEN
+ 	bool "Full dynticks CPU time accounting"
+-	depends on HAVE_CONTEXT_TRACKING && 64BIT
++	depends on HAVE_CONTEXT_TRACKING
+ 	select VIRT_CPU_ACCOUNTING
+ 	select CONTEXT_TRACKING
+ 	help
 -- 
 1.8.3
