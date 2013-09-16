@@ -1,75 +1,40 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 16 Sep 2013 14:38:18 -0700
-Subject: [PATCH 0/2] WLAN regression fixes for omap4 after moving to DT
- based booting
-In-Reply-To: <CAOesGMgzMfxoJpEOXhs8dQrpqavpWxG6_RfXHMEpDnEnOrP7iw@mail.gmail.com>
-References: <20130913190811.24617.97699.stgit@localhost>
- <CAOesGMgzMfxoJpEOXhs8dQrpqavpWxG6_RfXHMEpDnEnOrP7iw@mail.gmail.com>
-Message-ID: <20130916213817.GA5388@atomide.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 16 Sep 2013 14:45:44 -0700
+Subject: [PATCH] dts: Fix misspelling of Synopsys
+In-Reply-To: <1379365068-18539-1-git-send-email-dinguyen@altera.com>
+References: <1379365068-18539-1-git-send-email-dinguyen@altera.com>
+Message-ID: <20130916214544.GA15242@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Olof Johansson <olof@lixom.net> [130913 22:17]:
-> Hi,
+On Mon, Sep 16, 2013 at 03:57:48PM -0500, dinguyen at altera.com wrote:
+> From: Dinh Nguyen <dinguyen@altera.com>
 > 
-> Not related to wlan but with DT conversion; I noticed the following in
-> dmesg on Panda ES with omap2plus_defconfig on current mainline:
+> s/Synopsis/Synopsys
+> s/synopsis/synopsys
 > 
-> [    0.000000] smp_twd: clock not found -2
+> Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
+> Cc: Pavel Machek <pavel@denx.de>
+> CC: Arnd Bergmann <arnd@arndb.de>
+> CC: Olof Johansson <olof@lixom.net>
+> Cc: Rob Herring <rob.herring@calxeda.com>
+> Cc: Pawel Moll <pawel.moll@arm.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Stephen Warren <swarren@wwwdotorg.org>
+> Cc: Ian Campbell <ian.campbell@citrix.com>
+> Cc: Chris Ball <cjb@laptop.org>
+> Cc: Jaehoon Chung <jh80.chung@samsung.com>
+> Cc: Seungwon Jeon <tgih.jun@samsung.com>
+> Cc: Tomasz Figa <tomasz.figa@gmail.com>
+> Cc: devicetree at vger.kernel.org
+> Cc: linux-mmc at vger.kernel.org
+> CC: linux-arm-kernel at lists.infradead.org
 
-That should get fixed for v3.13 when we get the proper DT clocks
-for omap. Currently twd_get_clock() currently does:
-
-	if (np)
-		twd_clk = of_clk_get(np, 0);
-	else
-		twd_clk = clk_get_sys("smp_twd", NULL);
-
-So if fails in the np case right now.
-
-I'd probably wait for v3.13 on this one to avoid adding
-temporary timer workarounds to twd_get_clock() or stuffing
-the clock for the timer by using of_clk_add_provider().
-
-If people feel strongly that we should fix it for v3.12,
-then let me know. Things do work without it, of course the
-local timer is not being used though.
- 
-> and:
-> 
-> [    0.440399] omap-gpmc 50000000.gpmc: error: clk_get
-
-Thanks that's an easy one. I'll queue the following fix.
-
-Regards,
-
-Tony
+Acked-by: Olof Johansson <olof@lixom.net>
 
 
-From: Tony Lindgren <tony@atomide.com>
-Date: Mon, 16 Sep 2013 14:22:31 -0700
-Subject: [PATCH] ARM: OMAP4: Fix clock_get error for GPMC during boot
+Looks like this is best taken through the DT tree, but if they don't have any
+other fixes we can take it through arm-soc, just let me know.
 
-Looks like we still have the legacy clock alias name for
-omap4 GPMC (General Purpose Memory Controller), so let's
-fix it for the device tree naming. There's no need to keep
-the legacy naming as omap4 is DT only nowadays.
 
-Without this fix we get the following error while booting:
-
-[    0.440399] omap-gpmc 50000000.gpmc: error: clk_get
-
-Reported-by: Olof Johansson <olof@lixom.net>
-Signed-off-by: Tony Lindgren <tony@atomide.com>
-
---- a/arch/arm/mach-omap2/cclock44xx_data.c
-+++ b/arch/arm/mach-omap2/cclock44xx_data.c
-@@ -1632,7 +1632,7 @@ static struct omap_clk omap44xx_clks[] = {
- 	CLK(NULL,	"auxclk5_src_ck",		&auxclk5_src_ck),
- 	CLK(NULL,	"auxclk5_ck",			&auxclk5_ck),
- 	CLK(NULL,	"auxclkreq5_ck",		&auxclkreq5_ck),
--	CLK("omap-gpmc",	"fck",			&dummy_ck),
-+	CLK("50000000.gpmc",	"fck",			&dummy_ck),
- 	CLK("omap_i2c.1",	"ick",			&dummy_ck),
- 	CLK("omap_i2c.2",	"ick",			&dummy_ck),
- 	CLK("omap_i2c.3",	"ick",			&dummy_ck),
+-Olof
