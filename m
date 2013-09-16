@@ -1,62 +1,38 @@
 From: khilman@linaro.org (Kevin Hilman)
-Date: Mon, 16 Sep 2013 15:43:48 -0700
-Subject: [PATCH 1/2] sched/nohz: add debugfs control over
- sched_tick_max_deferment
-Message-ID: <1379371429-22214-1-git-send-email-khilman@linaro.org>
+Date: Mon, 16 Sep 2013 15:43:49 -0700
+Subject: [PATCH 2/2] sched/nohz: fix overflow error in
+ scheduler_tick_max_deferment()
+In-Reply-To: <1379371429-22214-1-git-send-email-khilman@linaro.org>
+References: <1379371429-22214-1-git-send-email-khilman@linaro.org>
+Message-ID: <1379371429-22214-2-git-send-email-khilman@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allow debugfs override of sched_tick_max_deferment in order to ease
-finding/fixing the remaining issues with full nohz.
+The conversion of the max deferment from usecs to nsecs can easily
+overflow on platforms where a long is 32-bits.  To fix, cast the usecs
+value to u64 before multiplying by NSECS_PER_USEC.
 
-The value to be written is in jiffies, and -1 means the max deferment
-is disabled (scheduler_tick_max_deferment() returns KTIME_MAX.)
+This was discovered on 32-bit ARM platform when extending the max
+deferment value.
 
 Cc: Frederic Weisbecker <fweisbec@gmail.com>
 Signed-off-by: Kevin Hilman <khilman@linaro.org>
 ---
- kernel/sched/core.c | 16 +++++++++++++++-
- 1 file changed, 15 insertions(+), 1 deletion(-)
+ kernel/sched/core.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/kernel/sched/core.c b/kernel/sched/core.c
-index 5ac63c9..4b1fe3e 100644
+index 4b1fe3e..3d7c80e 100644
 --- a/kernel/sched/core.c
 +++ b/kernel/sched/core.c
-@@ -2175,6 +2175,8 @@ void scheduler_tick(void)
- }
- 
- #ifdef CONFIG_NO_HZ_FULL
-+static u32 sched_tick_max_deferment = HZ;
-+
- /**
-  * scheduler_tick_max_deferment
-  *
-@@ -2193,13 +2195,25 @@ u64 scheduler_tick_max_deferment(void)
- 	struct rq *rq = this_rq();
- 	unsigned long next, now = ACCESS_ONCE(jiffies);
- 
--	next = rq->last_sched_tick + HZ;
-+	if (sched_tick_max_deferment == -1)
-+		return KTIME_MAX;
-+
-+	next = rq->last_sched_tick + sched_tick_max_deferment;
- 
+@@ -2203,7 +2203,7 @@ u64 scheduler_tick_max_deferment(void)
  	if (time_before_eq(next, now))
  		return 0;
  
- 	return jiffies_to_usecs(next - now) * NSEC_PER_USEC;
+-	return jiffies_to_usecs(next - now) * NSEC_PER_USEC;
++	return (u64)jiffies_to_usecs(next - now) * NSEC_PER_USEC;
  }
-+
-+static __init int sched_nohz_full_init_debug(void)
-+{
-+	debugfs_create_u32("sched_tick_max_deferment", 0644, NULL,
-+			   &sched_tick_max_deferment);
-+
-+	return 0;
-+}
-+late_initcall(sched_nohz_full_init_debug);
- #endif
  
- notrace unsigned long get_parent_ip(unsigned long addr)
+ static __init int sched_nohz_full_init_debug(void)
 -- 
 1.8.3
