@@ -1,31 +1,23 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Mon, 16 Sep 2013 10:26:15 -0500
-Subject: [PATCH RFC v3 08/12] ARM: OMAP2+: CM: AM43x clockdomain data
-In-Reply-To: <5dd3b417a32b7d52c7de1e19e69e6100b1ed991b.1379337301.git.afzal@ti.com>
-References: <cover.1379337301.git.afzal@ti.com>
- <5dd3b417a32b7d52c7de1e19e69e6100b1ed991b.1379337301.git.afzal@ti.com>
-Message-ID: <52372317.3000901@ti.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 16 Sep 2013 09:28:22 -0600
+Subject: [PATCH] crypto: tegra: use kernel entropy instead of ad-hoc
+In-Reply-To: <20130913233912.GA16389@gondor.apana.org.au>
+References: <1378712154-30602-1-git-send-email-linus.walleij@linaro.org>
+ <522DF0FC.5080200@wwwdotorg.org> <20130913122318.GD8579@gondor.apana.org.au>
+ <52333974.4040404@wwwdotorg.org> <20130913233912.GA16389@gondor.apana.org.au>
+Message-ID: <52372396.8030707@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/16/2013 08:48 AM, Afzal Mohammed wrote:
-> From: Ambresh K <ambresh@ti.com>
+On 09/13/2013 05:39 PM, Herbert Xu wrote:
+> On Fri, Sep 13, 2013 at 10:12:36AM -0600, Stephen Warren wrote:
+>>
+>> I'm curious which kernel version it was merged for; it'd be nice to
+>> remove tegra_chip_uid() from the Tegra tree now since it's unused, but
+>> that obviously requires this patch in the history.
 > 
-> Add the data file to describe clock domains in AM43x SoC.
-> OMAP4 clockdomain operations is being reused here.
-> 
-> Signed-off-by: Ambresh K <ambresh@ti.com>
-> Signed-off-by: Afzal Mohammed <afzal@ti.com>
-> ---
->  arch/arm/mach-omap2/clockdomain.h           |   2 +
->  arch/arm/mach-omap2/clockdomains43xx_data.c | 199 ++++++++++++++++++++++++++++
->  arch/arm/mach-omap2/cminst44xx.c            |   9 ++
->  3 files changed, 210 insertions(+)
->  create mode 100644 arch/arm/mach-omap2/clockdomains43xx_data.c
+> This is in cryptodev which will be pushed upstream for 3.13.
 
-I suggest we drop this. this can be addressed by Tero's clk series.
-
-
--- 
-Regards,
-Nishanth Menon
+OK, I guess I'll send you the follow-on cleanup patch then. While it
+does touch arch/arm/mach-tegra code, I hope it won't conflict with
+anything else going through the Tegra tree, so should be safe.
