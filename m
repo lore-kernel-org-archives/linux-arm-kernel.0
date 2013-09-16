@@ -1,34 +1,38 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 16 Sep 2013 12:11:18 +0100
-Subject: [PATCH 38/38] iio: magn-core: st: Provide support for the
- LSM303DLH
-In-Reply-To: <5236DADD.3040205@st.com>
-References: <1378817379-8238-1-git-send-email-lee.jones@linaro.org>
- <1378817379-8238-39-git-send-email-lee.jones@linaro.org>
- <5234A28D.1030409@kernel.org> <20130916073151.GB3999@lee--X1>
- <5236D03D.2030506@st.com> <20130916100809.GI3999@lee--X1>
- <5236DADD.3040205@st.com>
-Message-ID: <20130916111118.GM3999@lee--X1>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon, 16 Sep 2013 12:21:02 +0100
+Subject: [PATCH v2 0/2] ARM DT cpus/cpu and topology bindings
+Message-ID: <1379330464-27917-1-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 16 Sep 2013, Denis CIOCCA wrote:
+This is v2 of a previous posting:
 
-> Hi Lee,
-> 
-> > The driver mentions that the first group of sensors have a WAI of 
-> > 0x3c: #define ST_MAGN_1_WAI_EXP 0x3c And when I print out the WAI read 
-> > from the device: Requested device: lsm303dlh_magn - read WAI: 0x3c I 
-> > guess I could have been lied to again by the board's datasheet again 
-> > and the attached device isn't actually a LSM303DLH, but how can I tell 
-> > for sure? 
-> On LSM303DLH you have to read 0x0a 0x0b and 0x0c registers, you have to 
-> find 0x48, 0x34 and 0x33. I think in the snowball there is the LSM303DLHC.
+http://lists.infradead.org/pipermail/linux-arm-kernel/2013-August/192322.html
 
-I'm inclined to agree with you. I'll make the necessary changes.
+- v2 changes
+	- Removed single core cpu-map example
+	- Removed OS dependency from cpus/cpu bindings
+	- Updated Marvell compatible strings
+	- Clarified behaviour on pre ARM v7 uniprocessor systems and updated
+	  examples
+
+This patch resumes DT topology/cpu bindings discussions for ARM that were
+started here:
+
+https://lists.ozlabs.org/pipermail/devicetree-discuss/2013-April/031725.html
+https://lists.ozlabs.org/pipermail/devicetree-discuss/2013-April/032450.html
+
+Comments welcome, thanks,
+Lorenzo
+
+Lorenzo Pieralisi (2):
+  Documentation: devicetree: arm: cpus/cpu nodes bindings updates
+  Documentation: DT: arm: define CPU topology bindings
+
+ Documentation/devicetree/bindings/arm/cpus.txt     | 391 +++++++++++++++--
+ Documentation/devicetree/bindings/arm/topology.txt | 474 +++++++++++++++++++++
+ 2 files changed, 818 insertions(+), 47 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/topology.txt
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+1.8.2.2
