@@ -1,24 +1,39 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Mon, 16 Sep 2013 15:43:36 +0200
-Subject: [PATCH 14/38] iio: accel: st: Append _accel to accelerator sensor
- device names
-In-Reply-To: <20130916133106.GI16984@lee--X1>
-References: <1378817379-8238-1-git-send-email-lee.jones@linaro.org>
- <1378817379-8238-15-git-send-email-lee.jones@linaro.org>
- <52345330.4050707@kernel.org> <20130916133106.GI16984@lee--X1>
-Message-ID: <52370B08.3030709@metafoo.de>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Mon, 16 Sep 2013 06:43:08 -0700
+Subject: [PATCH v7 3/4] drivers: of: add initialization code for dma
+ reserved memory
+In-Reply-To: <1379316344.3721.6.camel@pasglop>
+References: <1377527959-5080-1-git-send-email-m.szyprowski@samsung.com>
+ <1377527959-5080-4-git-send-email-m.szyprowski@samsung.com>
+ <20130829224637.D09183E1222@localhost> <52209278.8040106@samsung.com>
+ <DAF223EB-C84C-4E82-A24A-ACD0A3A0559F@codeaurora.org>
+ <20130909160154.8D7183E0F23@localhost>
+ <5236AF64.80607@samsung.com> <1379316344.3721.6.camel@pasglop>
+Message-ID: <CACxGe6s_JY7GpjXN7gwADV0oE+BnQfJX4AaXTZURumfepa3NiA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/16/2013 03:31 PM, Lee Jones wrote:
->> Honestly I don't care either way on these, but consistency would definitely
->> be good so applied to the togreg branch of iio.git
-> 
-> For clarification, is togreg due for the v3.12 merge window or will be
-> get a settling period in -next?
-> 
+On Mon, Sep 16, 2013 at 12:25 AM, Benjamin Herrenschmidt
+<benh@kernel.crashing.org> wrote:
+> On Mon, 2013-09-16 at 09:12 +0200, Marek Szyprowski wrote:
+>>
+>> Fixing those issues requires further discussion. Frankly, right now I
+>> really have no idea which way should I go. The /reserved-ranges node seems
+>> to be easy to match particular reserved memory region with a given device.
+>> I'm also not really convinced if it makes sense to add a code for finding
+>> and matching a reserved memory region to every device driver, which might
+>> need it. I would really like to get some more feedback on the Ben's
+>> comment.
+>>
+>> In any case, the code will also change significantly, so I assume that the
+>> best, what can be done now is to revert the current version and start from
+>> the scratch with a new, complete proposal.
+>
+> Yes, let's do that. I will try to help. It shouldn't be that a big deal.
 
-Well everything up to the 'iio-for-3.12c' tag will be in v3.12, everything
-else not.
+I think we can get the concerns sorted quickly. I'm at meetings all
+day today in SJC, but I'll take a look at it this evening. I'll be in
+Edinburgh. We're holding an ARM summit at the same time so a bunch of
+affected ARM folks will be there.
 
-- Lars
+g.
