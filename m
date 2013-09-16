@@ -1,47 +1,47 @@
-From: marex@denx.de (Marek Vasut)
-Date: Tue, 17 Sep 2013 01:01:06 +0200
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 16 Sep 2013 17:03:09 -0600
 Subject: [PATCH v3] PWM: PXA: add device tree support to PWM driver
-In-Reply-To: <52375FB1.5050700@wwwdotorg.org>
+In-Reply-To: <201309170101.06640.marex@denx.de>
 References: <1379091281-23662-1-git-send-email-mikedunn@newsguy.com>
- <52375FB1.5050700@wwwdotorg.org>
-Message-ID: <201309170101.06640.marex@denx.de>
+ <52375FB1.5050700@wwwdotorg.org> <201309170101.06640.marex@denx.de>
+Message-ID: <52378E2D.1060002@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Stephen Warren,
+On 09/16/2013 05:01 PM, Marek Vasut wrote:
+> Dear Stephen Warren,
+> 
+>> On 09/13/2013 10:54 AM, Mike Dunn wrote:
+>>> This patch adds device tree support to the PXA's PWM driver.  Only an OF
+>>> match table is added; nothing needs to be extracted from the device tree
+>>> node.  The existing ID table is reused for the match table data.
+>>>
+>>> Tested on a Palm Treo 680 (both platform data and DT cases).
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/pwm/pxa-pwm.txt
+>>> b/Documentation/devicetree/bindings/pwm/pxa-pwm.txt
+>>>
+>>> +- compatible: should be one of:
+>>> +  - "marvell,pxa250-pwm"
+>>> +  - "marvell,pxa270-pwm"
+>>> +  - "marvell,pxa168-pwm"
+>>> +  - "marvell,pxa910-pwm"
+>>
+>> Not just one of, but possible more than one...
+>>
+>>> diff --git a/arch/arm/boot/dts/pxa27x.dtsi
+>>> b/arch/arm/boot/dts/pxa27x.dtsi
+>>>
+>>> +		pwm0: pwm at 40b00000 {
+>>> +			compatible = "marvell,pxa270-pwm";
+>>
+>> I thought the assertion was that pax270 and pxa250 were both compatible?
+>> If so, that should be:
+>>
+>> 		compatible = "marvell,pxa270-pwm", "marvell,pxa250-pwm";
+> 
+> I see what you mean with the compatible strings ... but if we have this 
+> "fallback" compatiblity string, do we also need the table of all chips sporting 
+> the IP block in the driver itself?
 
-> On 09/13/2013 10:54 AM, Mike Dunn wrote:
-> > This patch adds device tree support to the PXA's PWM driver.  Only an OF
-> > match table is added; nothing needs to be extracted from the device tree
-> > node.  The existing ID table is reused for the match table data.
-> > 
-> > Tested on a Palm Treo 680 (both platform data and DT cases).
-> > 
-> > diff --git a/Documentation/devicetree/bindings/pwm/pxa-pwm.txt
-> > b/Documentation/devicetree/bindings/pwm/pxa-pwm.txt
-> > 
-> > +- compatible: should be one of:
-> > +  - "marvell,pxa250-pwm"
-> > +  - "marvell,pxa270-pwm"
-> > +  - "marvell,pxa168-pwm"
-> > +  - "marvell,pxa910-pwm"
-> 
-> Not just one of, but possible more than one...
-> 
-> > diff --git a/arch/arm/boot/dts/pxa27x.dtsi
-> > b/arch/arm/boot/dts/pxa27x.dtsi
-> > 
-> > +		pwm0: pwm at 40b00000 {
-> > +			compatible = "marvell,pxa270-pwm";
-> 
-> I thought the assertion was that pax270 and pxa250 were both compatible?
-> If so, that should be:
-> 
-> 		compatible = "marvell,pxa270-pwm", "marvell,pxa250-pwm";
-
-I see what you mean with the compatible strings ... but if we have this 
-"fallback" compatiblity string, do we also need the table of all chips sporting 
-the IP block in the driver itself?
-
-Best regards,
-Marek Vasut
+I would assume the driver can just support "marvell,pxa250-pwm" for now.
