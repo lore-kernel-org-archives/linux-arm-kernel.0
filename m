@@ -1,604 +1,138 @@
-From: xobs@kosagi.com (Sean Cross)
-Date: Mon, 16 Sep 2013 14:54:32 +0800
-Subject: [PATCH v4 3/3] PCI: imx6: Add support for i.MX6 PCIe controller
-In-Reply-To: <20130916060631.GF31147@S2101-09.ap.freescale.net>
-References: <1379065222-7275-1-git-send-email-xobs@kosagi.com>
- <1379065222-7275-4-git-send-email-xobs@kosagi.com>
- <20130916060631.GF31147@S2101-09.ap.freescale.net>
-Message-ID: <5236AB28.5060708@kosagi.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Mon, 16 Sep 2013 09:12:36 +0200
+Subject: [PATCH v7 3/4] drivers: of: add initialization code for dma
+ reserved memory
+In-Reply-To: <20130909160154.8D7183E0F23@localhost>
+References: <1377527959-5080-1-git-send-email-m.szyprowski@samsung.com>
+ <1377527959-5080-4-git-send-email-m.szyprowski@samsung.com>
+ <20130829224637.D09183E1222@localhost> <52209278.8040106@samsung.com>
+ <DAF223EB-C84C-4E82-A24A-ACD0A3A0559F@codeaurora.org>
+ <20130909160154.8D7183E0F23@localhost>
+Message-ID: <5236AF64.80607@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/9/13 2:06 PM, Shawn Guo wrote:
-> On Fri, Sep 13, 2013 at 09:40:22AM +0000, Sean Cross wrote:
->> Add support for the PCIe port present on the i.MX6 family of controllers.
->> These use the Synopsis Designware core tied to their own PHY.
->>
->> Signed-off-by: Sean Cross <xobs@kosagi.com>
->> ---
->>   .../devicetree/bindings/pci/designware-pcie.txt    |    5 +
->>   arch/arm/boot/dts/imx6qdl.dtsi                     |   16 +
->>   arch/arm/mach-imx/Kconfig                          |    2 +
->>   arch/arm/mach-imx/clk-imx6q.c                      |   11 +
->>   drivers/pci/host/Kconfig                           |    6 +
->>   drivers/pci/host/Makefile                          |    1 +
->>   drivers/pci/host/pci-imx6.c                        |  482 ++++++++++++++++++++
->>   7 files changed, 523 insertions(+)
->>   create mode 100644 drivers/pci/host/pci-imx6.c
->>
->> diff --git a/Documentation/devicetree/bindings/pci/designware-pcie.txt b/Documentation/devicetree/bindings/pci/designware-pcie.txt
->> index eabcb4b..41d8419 100644
->> --- a/Documentation/devicetree/bindings/pci/designware-pcie.txt
->> +++ b/Documentation/devicetree/bindings/pci/designware-pcie.txt
->> @@ -21,6 +21,11 @@ Required properties:
->>   - num-lanes: number of lanes to use
->>   - reset-gpio: gpio pin number of power good signal
->>   
->> +Optional properties for fsl,imx6-pcie
->> +- power-on-gpio: gpio pin number of power-enable signal
->> +- wake-up-gpio: gpio pin number of incoming wakeup signal
->> +- disable-gpio: gpio pin number of outgoing rfkill/endpoint disable signal
->> +
->>   Example:
->>   
->>   SoC specific DT Entry:
->> diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
->> index ccd55c2..ec72271 100644
->> --- a/arch/arm/boot/dts/imx6qdl.dtsi
->> +++ b/arch/arm/boot/dts/imx6qdl.dtsi
->> @@ -116,6 +116,22 @@
->>   			arm,data-latency = <4 2 3>;
->>   		};
->>   
->> +		pcie: pcie at 0x01000000 {
->> +			compatible = "fsl,imx6-pcie", "snps,dw-pcie";
-> We generally use particular SoC name to specify the compatible string.
-> So "fsl,imx6q-pcie" will be more appropriate.
-Any reason to specify imx6q in particular?  It's also present on the 
-imx6d, imx6dl, and imx6s (basically, everything but the imx6sl).
+Hello,
+
+On 9/9/2013 6:01 PM, Grant Likely wrote:
+> On Fri, 30 Aug 2013 15:26:24 -0500, Kumar Gala <galak@codeaurora.org> wrote:
+> > On Aug 30, 2013, at 7:39 AM, Marek Szyprowski wrote:
+> > > On 8/30/2013 12:46 AM, Grant Likely wrote:
+> > >> On Mon, 26 Aug 2013 16:39:18 +0200, Marek Szyprowski <m.szyprowski@samsung.com> wrote:
+> > >> > +	- "reserved-memory-region" - compatibility is defined, given
+> > >> > +	  region is assigned for exclusive usage for by the respective
+> > >> > +	  devices.
+> > >>
+> > >> BTW, just so you're aware there is already a binding for marking regions
+> > >> as reserved. It was recently added to arch/powerpc/kernel/prom.c.
+> > >> Unfortunately it doesn't look like it got documented. Search for
+> > >> "reserved-ranges". However, I don't think it blocks your work here. That
+> > >> binding doesn't provide any way for matching devices to reserved ranges.
+> > >> It is only for telling the kernel "hands of that memory".
+> > >
+> > > ok, good to know.
+> >
+> > So I think the most generic compatible should effectively be the same
+> > as 'reserved-ranges', ie this region shouldn't be touched by the
+> > kernel.
+> >
+> > Than we can build on top of that with more specific compatibles.
+> >
+> > I have examples from FSL networking SoCs where we would carve out
+> > memory for backing storage managed completely by the HW and Linux
+> > wouldn't need to touch it, however we might have a
+> > "fsl,qman-backing-store" compat encase we might want some debug code
+> > in linux to look at the region of memory.
+> >
+> > I've got examples at qualcomm where we have shared data structures in
+> > specific memory regions between different processors that aren't cache
+> > coherent, so want the memory not to be marked as cacheable by Linux
+> > when it accesses it.  Again we'd have a "qcom,smem" prop on top of the
+> > "reserved-memory-region".
 >
->>   	/* Set initial power mode */
->>   	imx6q_set_lpm(WAIT_CLOCKED);
->>   
->> diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
->> index 3d95048..efa24d9 100644
->> --- a/drivers/pci/host/Kconfig
->> +++ b/drivers/pci/host/Kconfig
->> @@ -15,6 +15,12 @@ config PCI_EXYNOS
->>   	select PCIEPORTBUS
->>   	select PCIE_DW
->>   
->> +config PCI_IMX6
->> +	bool "Freescale i.MX6 PCIe controller"
->> +	depends on SOC_IMX6Q
->> +	select PCIEPORTBUS
->> +	select PCIE_DW
->> +
->>   config PCI_TEGRA
->>   	bool "NVIDIA Tegra PCIe controller"
->>   	depends on ARCH_TEGRA
->> diff --git a/drivers/pci/host/Makefile b/drivers/pci/host/Makefile
->> index c9a997b..287d6a0 100644
->> --- a/drivers/pci/host/Makefile
->> +++ b/drivers/pci/host/Makefile
->> @@ -1,4 +1,5 @@
->>   obj-$(CONFIG_PCIE_DW) += pcie-designware.o
->>   obj-$(CONFIG_PCI_EXYNOS) += pci-exynos.o
->> +obj-$(CONFIG_PCI_IMX6) += pci-imx6.o
->>   obj-$(CONFIG_PCI_MVEBU) += pci-mvebu.o
->>   obj-$(CONFIG_PCI_TEGRA) += pci-tegra.o
->> diff --git a/drivers/pci/host/pci-imx6.c b/drivers/pci/host/pci-imx6.c
->> new file mode 100644
->> index 0000000..a3f9053
->> --- /dev/null
->> +++ b/drivers/pci/host/pci-imx6.c
->> @@ -0,0 +1,482 @@
->> +/*
->> + * PCIe host controller driver for Freescale i.MX6 SoCs
->> + *
->> + * Copyright (C) 2013 Kosagi
->> + *		http://www.kosagi.com
->> + *
->> + * Author: Sean Cross <xobs@kosagi.com>
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> + */
->> +
->> +#include <linux/delay.h>
->> +#include <linux/gpio.h>
->> +#include <linux/kernel.h>
->> +#include <linux/module.h>
->> +#include <linux/of_gpio.h>
->> +#include <linux/pci.h>
->> +#include <linux/platform_device.h>
->> +#include <linux/resource.h>
->> +#include <linux/signal.h>
->> +#include <linux/types.h>
->> +#include <linux/regmap.h>
->> +#include <linux/mfd/syscon.h>
->> +#include <linux/mfd/syscon/imx6q-iomuxc-gpr.h>
->> +
->> +#include "pcie-designware.h"
->> +
->> +#define to_imx6_pcie(x)	container_of(x, struct imx6_pcie, pp)
->> +
->> +struct imx6_pcie {
->> +	int			reset_gpio;
->> +	int			power_on_gpio;
->> +	int			wake_up_gpio;
->> +	int			disable_gpio;
->> +	struct pcie_port	pp;
->> +	struct regmap		*iomuxc_gpr;
->> +	void __iomem		*mem_base;
->> +};
->> +
->> +/* PCIe Port Logic registers (memory-mapped) */
->> +#define PL_OFFSET 0x700
->> +#define PCIE_PHY_DEBUG_R0 (PL_OFFSET + 0x28)
->> +#define PCIE_PHY_DEBUG_R1 (PL_OFFSET + 0x2c)
->> +
->> +#define PCIE_PHY_CTRL (PL_OFFSET + 0x114)
->> +#define PCIE_PHY_CTRL_DATA_LOC 0
->> +#define PCIE_PHY_CTRL_CAP_ADR_LOC 16
->> +#define PCIE_PHY_CTRL_CAP_DAT_LOC 17
->> +#define PCIE_PHY_CTRL_WR_LOC 18
->> +#define PCIE_PHY_CTRL_RD_LOC 19
->> +
->> +#define PCIE_PHY_STAT (PL_OFFSET + 0x110)
->> +#define PCIE_PHY_STAT_DATA_LOC 0
->> +#define PCIE_PHY_STAT_ACK_LOC 16
->> +
->> +/* PHY registers (not memory-mapped) */
->> +#define PCIE_PHY_RX_ASIC_OUT 0x100D
->> +
->> +#define PHY_RX_OVRD_IN_LO 0x1005
->> +#define PHY_RX_OVRD_IN_LO_RX_DATA_EN (1<<5)
-> (1 << 5), please.
+> I think that is a reasonable approach, and works really well for regions
+> associated with specific hardware because the hardware driver can be
+> responsible for wiring it up to CMA or manage the region directly.
+> Whatever the driver desires to do.
 >
->> +#define PHY_RX_OVRD_IN_LO_RX_PLL_EN (1<<3)
-> Ditto
+> It still remains what to do for generic regions that any device can use.
+> As I've previously said, I don't like calling out "CMA" specifically in
+> the compatible property because that happens to be a Linux
+> implementation specific details. Two years from now someone may propose
+> a new allocator that should take over what used to be handled by CMA
+> (kind of like how CMA may end up taking over from ION)....
 >
->> +
->> +static int pcie_phy_poll_ack(void __iomem *dbi_base, int exp_val)
->> +{
->> +	u32 val;
->> +	u32 max_iterations = 10;
->> +	u32 wait_counter = 0;
->> +
->> +	do {
->> +		val = readl(dbi_base + PCIE_PHY_STAT);
->> +		val = (val >> PCIE_PHY_STAT_ACK_LOC) & 0x1;
->> +		wait_counter++;
->> +		udelay(1);
->> +	} while ((wait_counter < max_iterations) && (val != exp_val));
->> +
->> +	if (val != exp_val)
->> +		return -ETIMEDOUT;
->> +
->> +	return 0;
->> +}
->> +
->> +static int pcie_phy_wait_ack(void __iomem *dbi_base, int addr)
->> +{
->> +	u32 val;
->> +	int ret;
->> +
->> +	val = addr << PCIE_PHY_CTRL_DATA_LOC;
->> +	writel(val, dbi_base + PCIE_PHY_CTRL);
->> +
->> +	val |= (0x1 << PCIE_PHY_CTRL_CAP_ADR_LOC);
->> +	writel(val, dbi_base + PCIE_PHY_CTRL);
->> +
->> +	ret = pcie_phy_poll_ack(dbi_base, 1);
->> +	if (ret)
->> +		return ret;
->> +
->> +	val = addr << PCIE_PHY_CTRL_DATA_LOC;
->> +	writel(val, dbi_base + PCIE_PHY_CTRL);
->> +
->> +	ret = pcie_phy_poll_ack(dbi_base, 0);
->> +	if (ret)
->> +		return ret;
->> +
->> +	return 0;
->> +}
->> +
->> +/* Read from the 16-bit PCIe PHY control registers (not memory-mapped) */
->> +static int pcie_phy_read(void __iomem *dbi_base, int addr , int *data)
->> +{
->> +	u32 val, phy_ctl;
->> +	int ret;
->> +
->> +	ret = pcie_phy_wait_ack(dbi_base, addr);
->> +	if (ret)
->> +		return ret;
->> +
->> +	/* assert Read signal */
->> +	phy_ctl = 0x1 << PCIE_PHY_CTRL_RD_LOC;
->> +	writel(phy_ctl, dbi_base + PCIE_PHY_CTRL);
->> +
->> +	ret = pcie_phy_poll_ack(dbi_base, 1);
->> +	if (ret)
->> +		return ret;
->> +
->> +	val = readl(dbi_base + PCIE_PHY_STAT);
->> +	*data = (val & (0xffff << PCIE_PHY_STAT_DATA_LOC));
-> One unnecessary parentheses.
+> Alright, I've thought about it some more and it probably does make sense
+> to use an additional compatible string. Marek originally suggested
+> "linux,contiguous-memory-region". I later suggested "shareable-memory-region",
+> but that's actually a worse name because it doesn't have any reference
+> to what the region is for (I was fixating on the kernel being able to
+> use unallocated pages; but that is also an implementation detail). I
+> exercise my right to change my mind and agree that contiguous is
+> appropriate here. But instead of calling out the contiguous allocator,
+> the binding should specifically lay out the usage model for these
+> regions. I would change the contiguous-memory binding to state the
+> following:
+> 	Contiguous-memory is a region of general purpose memory from
+> 	which large buffers of contiguous memory can be allocated.
+> 	Contiguous buffers are often used for DMA buffers. The operating
+> 	system may use the memory for any purpose, but must immediately
+> 	release the pages if a contiguous buffer is required.
 >
->> +
->> +	/* deassert Read signal */
->> +	writel(0x00, dbi_base + PCIE_PHY_CTRL);
->> +
->> +	ret = pcie_phy_poll_ack(dbi_base, 0);
->> +	if (ret)
->> +		return ret;
->> +
->> +	return 0;
->> +}
->> +
->> +static int pcie_phy_write(void __iomem *dbi_base, int addr, int data)
->> +{
->> +	u32 var;
->> +	int ret;
->> +
->> +	/* write addr */
->> +	/* cap addr */
->> +	ret = pcie_phy_wait_ack(dbi_base, addr);
->> +	if (ret)
->> +		return ret;
->> +
->> +	var = data << PCIE_PHY_CTRL_DATA_LOC;
->> +	writel(var, dbi_base + PCIE_PHY_CTRL);
->> +
->> +	/* capture data */
->> +	var |= (0x1 << PCIE_PHY_CTRL_CAP_DAT_LOC);
->> +	writel(var, dbi_base + PCIE_PHY_CTRL);
->> +
->> +	ret = pcie_phy_poll_ack(dbi_base, 1);
->> +	if (ret)
->> +		return ret;
->> +
->> +	/* deassert cap data */
->> +	var = data << PCIE_PHY_CTRL_DATA_LOC;
->> +	writel(var, dbi_base + PCIE_PHY_CTRL);
->> +
->> +	/* wait for ack de-assetion */
->> +	ret = pcie_phy_poll_ack(dbi_base, 0);
->> +	if (ret)
->> +		return ret;
->> +
->> +	/* assert wr signal */
->> +	var = 0x1 << PCIE_PHY_CTRL_WR_LOC;
->> +	writel(var, dbi_base + PCIE_PHY_CTRL);
->> +
->> +	/* wait for ack */
->> +	ret = pcie_phy_poll_ack(dbi_base, 1);
->> +	if (ret)
->> +		return ret;
->> +
->> +	/* deassert wr signal */
->> +	var = data << PCIE_PHY_CTRL_DATA_LOC;
->> +	writel(var, dbi_base + PCIE_PHY_CTRL);
->> +
->> +	/* wait for ack de-assetion */
->> +	ret = pcie_phy_poll_ack(dbi_base, 0);
->> +	if (ret)
->> +		return ret;
->> +
->> +	writel(0x0, dbi_base + PCIE_PHY_CTRL);
->> +
->> +	return 0;
->> +}
->> +
->> +static int imx6_pcie_assert_core_reset(struct pcie_port *pp)
->> +{
->> +	struct imx6_pcie *imx6_pcie = to_imx6_pcie(pp);
-> Nit: have a blank line here.
+> So the way I read things, the current proposal would be:
 >
->> +	regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR1,
->> +			IMX6Q_GPR1_PCIE_TEST_PD, 1 << 18);
->> +	regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
->> +			IMX6Q_GPR12_PCIE_CTL_2, 1 << 10);
->> +	regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR1,
->> +			IMX6Q_GPR1_PCIE_REF_CLK_EN, 0 << 16);
->> +
->> +	gpio_set_value(imx6_pcie->reset_gpio, 0);
->> +	msleep(100);
->> +	gpio_set_value(imx6_pcie->reset_gpio, 1);
->> +
->> +	return 0;
->> +}
->> +
->> +static int imx6_pcie_deassert_core_reset(struct pcie_port *pp)
->> +{
->> +	struct imx6_pcie *imx6_pcie = to_imx6_pcie(pp);
->> +
->> +	if (gpio_is_valid(imx6_pcie->power_on_gpio))
->> +		gpio_set_value(imx6_pcie->power_on_gpio, 1);
->> +
->> +	regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR1,
->> +			IMX6Q_GPR1_PCIE_TEST_PD, 0 << 18);
->> +	regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR1,
->> +			IMX6Q_GPR1_PCIE_REF_CLK_EN, 1 << 16);
->> +
->> +	/* allow the clocks to stabilize */
->> +	usleep_range(100, 200);
->> +
->> +	return 0;
->> +}
->> +
->> +static void imx6_pcie_init_phy(struct pcie_port *pp)
->> +{
->> +	struct imx6_pcie *imx6_pcie = to_imx6_pcie(pp);
->> +
->> +	/* FIXME the field name should be aligned to RM */
-> Why cannot this be fixed right now?
-The FIXME is left over from an earlier incarnation.  I don't think it's 
-relevant anymore.  I'll drop it.
->> +	regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
->> +			IMX6Q_GPR12_PCIE_CTL_2, 0 << 10);
->> +
->> +	/* configure constant input signal to the pcie ctrl and phy */
->> +	regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
->> +			IMX6Q_GPR12_DEVICE_TYPE, PCI_EXP_TYPE_ROOT_PORT << 12);
->> +	regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
->> +			IMX6Q_GPR12_LOS_LEVEL, 9 << 4);
->> +
->> +	regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR8,
->> +			IMX6Q_GPR8_TX_DEEMPH_GEN1, 0 << 0);
->> +	regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR8,
->> +			IMX6Q_GPR8_TX_DEEMPH_GEN2_3P5DB, 0 << 6);
->> +	regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR8,
->> +			IMX6Q_GPR8_TX_DEEMPH_GEN2_6DB, 20 << 12);
->> +	regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR8,
->> +			IMX6Q_GPR8_TX_SWING_FULL, 127 << 18);
->> +	regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR8,
->> +			IMX6Q_GPR8_TX_SWING_LOW, 127 << 25);
->> +}
->> +
->> +static void imx6_pcie_host_init(struct pcie_port *pp)
->> +{
->> +	int count = 0;
->> +	struct imx6_pcie *imx6_pcie = to_imx6_pcie(pp);
->> +
->> +	imx6_pcie_assert_core_reset(pp);
->> +
->> +	imx6_pcie_init_phy(pp);
->> +
->> +	imx6_pcie_deassert_core_reset(pp);
->> +
->> +	dw_pcie_setup_rc(pp);
->> +
->> +	regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
->> +			IMX6Q_GPR12_PCIE_CTL_2, 1 << 10);
->> +
->> +	while (!dw_pcie_link_up(pp)) {
->> +		usleep_range(100, 1000);
->> +		count++;
->> +		if (count >= 10) {
->> +			dev_err(pp->dev, "phy link never came up\n");
->> +			dev_dbg(pp->dev,"DEBUG_R0: 0x%08x, DEBUG_R1: 0x%08x\n",
->> +				readl(pp->dbi_base + PCIE_PHY_DEBUG_R0),
->> +				readl(pp->dbi_base + PCIE_PHY_DEBUG_R1));
->> +			break;
->> +		}
->> +	}
->> +
->> +	return;
->> +}
->> +
->> +static int imx6_pcie_link_up(struct pcie_port *pp)
->> +{
->> +	u32 rc, ltssm, rx_valid, temp;
->> +
->> +	/* link is debug bit 36, debug register 1 starts at bit 32 */
->> +	rc = readl(pp->dbi_base + PCIE_PHY_DEBUG_R1) & (0x1 << (36 - 32));
->> +	if (rc)
->> +		return -EAGAIN;
->> +
->> +	/* From L0, initiate MAC entry to gen2 if EP/RC supports gen2.
->> +	 * Wait 2ms (LTSSM timeout is 24ms, PHY lock is ~5us in gen2).
->> +	 * If (MAC/LTSSM.state == Recovery.RcvrLock)
->> +	 * && (PHY/rx_valid==0) then pulse PHY/rx_reset. Transition
->> +	 * to gen2 is stuck
->> +	 */
-> 	/*
-> 	 * Multiple lines comment
-> 	 * ...
-> 	 */
+> The generic form for do-not-touch memory:
+> 	compatible = "reserved-memory";
+>   - I've dropped '-region' because I think it is redundant
+>   - The kernel will not make use of this memory except for when a driver picks it up
 >
->> +	pcie_phy_read(pp->dbi_base, PCIE_PHY_RX_ASIC_OUT, &rx_valid);
->> +	ltssm = readl(pp->dbi_base + PCIE_PHY_DEBUG_R0) & 0x3F;
->> +
->> +	if (rx_valid & 0x01)
->> +		return 0;
->> +
->> +	if (ltssm != 0x0d)
->> +		return 0;
->> +
->> +	dev_err(pp->dev,
->> +		"transition to gen2 is stuck, reset PHY!\n");
->> +
->> +	pcie_phy_read(pp->dbi_base,
->> +		PHY_RX_OVRD_IN_LO, &temp);
->> +	temp |= (PHY_RX_OVRD_IN_LO_RX_DATA_EN
->> +		| PHY_RX_OVRD_IN_LO_RX_PLL_EN);
->> +	pcie_phy_write(pp->dbi_base,
->> +		PHY_RX_OVRD_IN_LO, temp);
->> +
->> +	usleep_range(2000, 3000);
->> +
->> +	pcie_phy_read(pp->dbi_base,
->> +		PHY_RX_OVRD_IN_LO, &temp);
->> +	temp &= ~(PHY_RX_OVRD_IN_LO_RX_DATA_EN
->> +		| PHY_RX_OVRD_IN_LO_RX_PLL_EN);
->> +	pcie_phy_write(pp->dbi_base,
->> +		PHY_RX_OVRD_IN_LO, temp);
->> +
->> +	return 0;
->> +}
->> +
->> +static struct pcie_host_ops imx6_pcie_host_ops = {
->> +	.link_up = imx6_pcie_link_up,
->> +	.host_init = imx6_pcie_host_init,
->> +};
->> +
->> +static int add_pcie_port(struct pcie_port *pp, struct platform_device *pdev)
-> imx6_pcie_add_port to have the proper namespace?
-I thought this was the style for pci drivers, because
->> +{
->> +	int ret;
->> +
->> +	pp->irq = platform_get_irq(pdev, 0);
->> +	if (!pp->irq) {
->> +		dev_err(&pdev->dev, "failed to get irq\n");
->> +		return -ENODEV;
->> +	}
->> +
->> +	pp->root_bus_nr = -1;
->> +	pp->ops = &imx6_pcie_host_ops;
->> +
->> +	spin_lock_init(&pp->conf_lock);
->> +	ret = dw_pcie_host_init(pp);
->> +	if (ret) {
->> +		dev_err(&pdev->dev, "failed to initialize host\n");
->> +		return ret;
->> +	}
->> +
->> +	return 0;
->> +}
->> +
->> +static int __init imx6_pcie_probe(struct platform_device *pdev)
->> +{
->> +	struct imx6_pcie *imx6_pcie;
->> +	struct pcie_port *pp;
->> +	struct device_node *np = pdev->dev.of_node;
->> +	struct resource *dbi_base;
->> +	int ret;
->> +
->> +	imx6_pcie = devm_kzalloc(&pdev->dev, sizeof(*imx6_pcie),
->> +				GFP_KERNEL);
->> +	if (!imx6_pcie)
->> +		return -ENOMEM;
->> +
->> +	pp = &imx6_pcie->pp;
->> +	pp->dev = &pdev->dev;
->> +
->> +	dbi_base = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->> +	if (!dbi_base) {
->> +		dev_err(&pdev->dev, "dbi_base memory resource not found\n");
->> +		return -ENODEV;
->> +	}
->> +
->> +	pp->dbi_base = devm_request_and_ioremap(&pdev->dev, dbi_base);
->> +	if (IS_ERR(pp->dbi_base)) {
->> +		dev_err(&pdev->dev, "unable to remap dbi_base\n");
->> +		ret = PTR_ERR(pp->dbi_base);
->> +		goto err;
->> +	}
-> See kerneldoc of devm_request_and_ioremap().  I believe that the help
-> already takes care of printing error messages.
-This is a very good catch.  devm_request_and_ioremap() is deprecated and 
-in the process of getting removed.  I'll replace the call and see what's 
-best in terms of error messages.
->> +
->> +	/* Fetch GPIOs */
->> +	imx6_pcie->reset_gpio = of_get_named_gpio(np, "reset-gpio", 0);
->> +	if (gpio_is_valid(imx6_pcie->reset_gpio)) {
->> +		ret = devm_gpio_request_one(&pdev->dev,
->> +					imx6_pcie->reset_gpio,
->> +					GPIOF_OUT_INIT_LOW,
->> +					"PCIe reset");
->> +		if (ret) {
->> +			dev_err(&pdev->dev, "unable to get reset gpio\n");
->> +			goto err;
->> +		}
->> +	}
-> The reset-gpio is not optional but required.  So if we do not have a
-> valid reset-gpio, the probe should fail.  And that's why we can access
-> reset_gpio in imx6_pcie_assert_core_reset() without checking if it's
-> valid.
-That is a very good call.  I'll make the reset-gpio actually required.
->> +
->> +	imx6_pcie->power_on_gpio = of_get_named_gpio(np, "power-on-gpio", 0);
->> +	if (gpio_is_valid(imx6_pcie->power_on_gpio)) {
->> +		ret = devm_gpio_request_one(&pdev->dev,
->> +					imx6_pcie->power_on_gpio,
->> +					GPIOF_OUT_INIT_LOW,
->> +					"PCIe power enable");
->> +		if (ret) {
->> +			dev_err(&pdev->dev, "unable to get power-on gpio\n");
->> +			goto err;
->> +		}
->> +	}
->> +
->> +	imx6_pcie->wake_up_gpio = of_get_named_gpio(np, "wake-up-gpio", 0);
->> +	if (gpio_is_valid(imx6_pcie->wake_up_gpio)) {
->> +		ret = devm_gpio_request_one(&pdev->dev,
->> +					imx6_pcie->wake_up_gpio,
->> +					GPIOF_IN,
->> +					"PCIe wake up");
->> +		if (ret) {
->> +			dev_err(&pdev->dev, "unable to get wake-up gpio\n");
->> +			goto err;
->> +		}
->> +	}
->> +
->> +	imx6_pcie->disable_gpio = of_get_named_gpio(np, "disable-gpio", 0);
->> +	if (gpio_is_valid(imx6_pcie->disable_gpio)) {
->> +		ret = devm_gpio_request_one(&pdev->dev,
->> +					imx6_pcie->disable_gpio,
->> +					GPIOF_OUT_INIT_HIGH,
->> +					"PCIe disable endpoint");
->> +		if (ret) {
->> +			dev_err(&pdev->dev, "unable to get disable-ep gpio\n");
->> +			goto err;
->> +		}
->> +	}
->> +
->> +	/* Grab GPR config register range */
->> +	imx6_pcie->iomuxc_gpr =
->> +		 syscon_regmap_lookup_by_compatible("fsl,imx6q-iomuxc-gpr");
->> +	if (IS_ERR(imx6_pcie->iomuxc_gpr)) {
->> +		dev_err(&pdev->dev, "unable to find iomuxc registers\n");
->> +		ret = PTR_ERR(imx6_pcie->iomuxc_gpr);
->> +		goto err;
->> +	}
->> +
->> +	ret = add_pcie_port(pp, pdev);
->> +	if (ret < 0)
->> +		goto err;
->> +
->> +	platform_set_drvdata(pdev, imx6_pcie);
->> +	return 0;
->> +
->> +err:
->> +	return ret;
->> +}
->> +
->> +static const struct of_device_id imx6_pcie_of_match[] = {
->> +	{ .compatible = "fsl,imx6-pcie", },
->> +	{},
->> +};
->> +MODULE_DEVICE_TABLE(of, imx6_pcie_of_match);
->> +
->> +static struct platform_driver imx6_pcie_driver = {
->> +	.driver = {
->> +		.name	= "imx6-pcie",
->> +		.owner	= THIS_MODULE,
->> +		.of_match_table = of_match_ptr(imx6_pcie_of_match),
->> +	},
->> +};
->> +
->> +/* Freescale PCIe driver does not allow module unload */
->> +
->> +static int __init pcie_init(void)
->> +{
->> +	return platform_driver_probe(&imx6_pcie_driver, imx6_pcie_probe);
->> +}
->> +subsys_initcall(pcie_init);
-> Any reason why it cannot be module_init()?
+> For contiguous memory:
+> 	compatible = "contiguous-memory", "reserved-memory"
 >
-No reason whatsoever.  I'll rename pcie_init to module_init.
+> For contiguous memory that Linux will use by default if a specific
+> region isn't specified.
+> 	compatible = "contiguous-memory", "reserved-memory"
+> 	linux,default-contiguous-region;
+>   - I stuck with a linux, prefix here because I haven't come up with a
+>     non-linux way to describe this.
+>
+> Memory that specific hardware can pick up:
+> 	compatible = "qcom,smem", "reserved-memory"
+>
+> Nodes with a 'size' property and without a 'reg' property need to have a
+> region allocated and reserved. The allocated region needs to be cached
+> somewhere. We could create a data structure for tracking the reserved
+> regions, or could write it in directly. While I shudder at the thought of
+> modifying the device tree at runtime by the kernel, it might just be the
+> sanest implementation at this time. I'd like to see what the
+> implementation looks like. (Since this is potentially controversial, I
+> would recommend implementing the exact regions in on patch, and add
+> dynamically allocated regions as a follow-up patch)
+>
+> As far as proper implementation is concerned, I think it should be
+> explicit in the binding that the kernel should automatically exclude
+> anything under the reserved-memory node, regardless of the compatible
+> value. Merely being a child of the reserved-memory node immediately
+> means that it is a reserved memory region.
+
+It looks that my proposal for the reserved memory nodes causes much more
+controversy than I expected when I've sent a pull request to Linus:
+https://lkml.org/lkml/2013/9/15/151
+http://www.spinics.net/lists/arm-kernel/msg273548.html
+
+Fixing those issues requires further discussion. Frankly, right now I
+really have no idea which way should I go. The /reserved-ranges node seems
+to be easy to match particular reserved memory region with a given device.
+I'm also not really convinced if it makes sense to add a code for finding
+and matching a reserved memory region to every device driver, which might
+need it. I would really like to get some more feedback on the Ben's
+comment.
+
+In any case, the code will also change significantly, so I assume that the
+best, what can be done now is to revert the current version and start from
+the scratch with a new, complete proposal.
+
+Best regards
+-- 
+Marek Szyprowski
+Samsung R&D Institute Poland
