@@ -1,33 +1,52 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 16 Sep 2013 14:22:32 +0200
-Subject: [PATCH] ARM: multi_v7: add HREFv60 to multi_v7 defconfig
-Message-ID: <1379334152-9751-1-git-send-email-linus.walleij@linaro.org>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 16 Sep 2013 07:55:29 -0500
+Subject: [PATCH] memory: add a basic OF-based memory driver
+In-Reply-To: <20130915124325.B1DF2C42C5C@trevor.secretlab.ca>
+References: <1378863781-4235-1-git-send-email-emilio@elopez.com.ar>
+ <1379032225-6425-1-git-send-email-emilio@elopez.com.ar>
+ <CAOesGMiUMniKRLRgGPsimR0bXWQFbx+SL5dUJXOb8t0JfEcHsg@mail.gmail.com>
+ <52326ADC.8040703@elopez.com.ar>
+ <CAL_JsqJACEtSRaDg0TcYODzhpsHFGa4mFSYa_R3qspypEKH+hQ@mail.gmail.com>
+ <CAOesGMj=b5c_1v-nAejUzuOMfx44AHr2=yfoPepHYsh0=t0wOQ@mail.gmail.com>
+ <20130915124325.B1DF2C42C5C@trevor.secretlab.ca>
+Message-ID: <CAL_Jsq+iYJBCKoM7S2wC1PVVM1sktmX6dWDpoKzYAvB7Q7j_8A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is just a standard board for the Ux500, include it in the
-v7 multiplatform defconfig.
+On Sun, Sep 15, 2013 at 7:43 AM, Grant Likely <grant.likely@linaro.org> wrote:
+> On Fri, 13 Sep 2013 08:49:06 -0700, Olof Johansson <olof@lixom.net> wrote:
+>> On Fri, Sep 13, 2013 at 7:00 AM, Rob Herring <robherring2@gmail.com> wrote:
+>> > On Thu, Sep 12, 2013 at 8:31 PM, Emilio L?pez <emilio@elopez.com.ar> wrote:
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
-Hi ARM SoC folks: this makes also my preferred development board
-boot with multi_v7. Please apply this patch directly to fixes
-if you're happy with it.
----
- arch/arm/configs/multi_v7_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+[snip]
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 6e572c6..a333753 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -36,6 +36,7 @@ CONFIG_ARCH_TEGRA_114_SOC=y
- CONFIG_TEGRA_PCI=y
- CONFIG_TEGRA_EMC_SCALING_ENABLE=y
- CONFIG_ARCH_U8500=y
-+CONFIG_MACH_HREFV60=y
- CONFIG_MACH_SNOWBALL=y
- CONFIG_MACH_UX500_DT=y
- CONFIG_ARCH_VEXPRESS=y
--- 
-1.8.3.1
+>> > Better, but this is still wrong. DT describes the hardware. There is
+>> > no such h/w as a simple-memory-controller. The fact that you have a
+>> > simple-memory-ctrlr kernel driver is a kernel
+>> > feature/artifact/limitation. Describe the h/w with a meaningful
+>> > compatible string and put that string in the simple memory controller
+>> > driver match table. If someday we have a real driver for said memory
+>> > controller, then it is only a kernel change to use a different driver.
+>>
+>>
+>> We discussed this over IRC last night -- I still think it makes more
+>> sense to make the clock driver for sunxi aware of this and just add a
+>> reference to the clock at init time.
+>>
+>> This is never going to differ from board to board (today the clock
+>> name is the same on all sunxi platforms -- pll5_ddr. And the need will
+>> likewise be there for all platforms at this time.
+>>
+>> If and when it changes in the future, we can reevaluate. But this
+>> doesn't have to be driven by device tree at this time, it seems to
+>> just make things overly complicated and contrived.
+>
+> I agree. Creating a new platform driver + device tree binding just to
+> claim a clock that must not be disables does not look like the right
+> approach to me either.
+
+Maybe a driver is overkill, but fully describing the h/w would be a
+good thing. Only defining the h/w that Linux currently uses is not a
+good practice (although admittedly hard to avoid).
+
+Rob
