@@ -1,160 +1,78 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Mon, 16 Sep 2013 10:17:25 +0200
-Subject: [PATCH v7 3/4] drivers: of: add initialization code for dma
- reserved memory
-In-Reply-To: <5236AF64.80607@samsung.com>
-References: <1377527959-5080-1-git-send-email-m.szyprowski@samsung.com>
- <1377527959-5080-4-git-send-email-m.szyprowski@samsung.com>
- <20130829224637.D09183E1222@localhost> <52209278.8040106@samsung.com>
- <DAF223EB-C84C-4E82-A24A-ACD0A3A0559F@codeaurora.org>
- <20130909160154.8D7183E0F23@localhost> <5236AF64.80607@samsung.com>
-Message-ID: <5236BE95.3030305@samsung.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 16 Sep 2013 09:22:17 +0100
+Subject: [PATCH 21/38] iio: sensors-core: st: Clean-up error handling in
+ st_sensors_read_axis_data()
+In-Reply-To: <523495D0.1050002@kernel.org>
+References: <1378817379-8238-1-git-send-email-lee.jones@linaro.org>
+ <1378817379-8238-22-git-send-email-lee.jones@linaro.org>
+ <523495D0.1050002@kernel.org>
+Message-ID: <20130916082217.GE3999@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Sat, 14 Sep 2013, Jonathan Cameron wrote:
 
-On 9/16/2013 9:12 AM, Marek Szyprowski wrote:
-> Hello,
->
-> On 9/9/2013 6:01 PM, Grant Likely wrote:
->> On Fri, 30 Aug 2013 15:26:24 -0500, Kumar Gala <galak@codeaurora.org> 
->> wrote:
->> > On Aug 30, 2013, at 7:39 AM, Marek Szyprowski wrote:
->> > > On 8/30/2013 12:46 AM, Grant Likely wrote:
->> > >> On Mon, 26 Aug 2013 16:39:18 +0200, Marek Szyprowski 
->> <m.szyprowski@samsung.com> wrote:
->> > >> > +    - "reserved-memory-region" - compatibility is defined, given
->> > >> > +      region is assigned for exclusive usage for by the 
->> respective
->> > >> > +      devices.
->> > >>
->> > >> BTW, just so you're aware there is already a binding for marking 
->> regions
->> > >> as reserved. It was recently added to arch/powerpc/kernel/prom.c.
->> > >> Unfortunately it doesn't look like it got documented. Search for
->> > >> "reserved-ranges". However, I don't think it blocks your work 
->> here. That
->> > >> binding doesn't provide any way for matching devices to reserved 
->> ranges.
->> > >> It is only for telling the kernel "hands of that memory".
->> > >
->> > > ok, good to know.
->> >
->> > So I think the most generic compatible should effectively be the same
->> > as 'reserved-ranges', ie this region shouldn't be touched by the
->> > kernel.
->> >
->> > Than we can build on top of that with more specific compatibles.
->> >
->> > I have examples from FSL networking SoCs where we would carve out
->> > memory for backing storage managed completely by the HW and Linux
->> > wouldn't need to touch it, however we might have a
->> > "fsl,qman-backing-store" compat encase we might want some debug code
->> > in linux to look at the region of memory.
->> >
->> > I've got examples at qualcomm where we have shared data structures in
->> > specific memory regions between different processors that aren't cache
->> > coherent, so want the memory not to be marked as cacheable by Linux
->> > when it accesses it.  Again we'd have a "qcom,smem" prop on top of the
->> > "reserved-memory-region".
->>
->> I think that is a reasonable approach, and works really well for regions
->> associated with specific hardware because the hardware driver can be
->> responsible for wiring it up to CMA or manage the region directly.
->> Whatever the driver desires to do.
->>
->> It still remains what to do for generic regions that any device can use.
->> As I've previously said, I don't like calling out "CMA" specifically in
->> the compatible property because that happens to be a Linux
->> implementation specific details. Two years from now someone may propose
->> a new allocator that should take over what used to be handled by CMA
->> (kind of like how CMA may end up taking over from ION)....
->>
->> Alright, I've thought about it some more and it probably does make sense
->> to use an additional compatible string. Marek originally suggested
->> "linux,contiguous-memory-region". I later suggested 
->> "shareable-memory-region",
->> but that's actually a worse name because it doesn't have any reference
->> to what the region is for (I was fixating on the kernel being able to
->> use unallocated pages; but that is also an implementation detail). I
->> exercise my right to change my mind and agree that contiguous is
->> appropriate here. But instead of calling out the contiguous allocator,
->> the binding should specifically lay out the usage model for these
->> regions. I would change the contiguous-memory binding to state the
->> following:
->>     Contiguous-memory is a region of general purpose memory from
->>     which large buffers of contiguous memory can be allocated.
->>     Contiguous buffers are often used for DMA buffers. The operating
->>     system may use the memory for any purpose, but must immediately
->>     release the pages if a contiguous buffer is required.
->>
->> So the way I read things, the current proposal would be:
->>
->> The generic form for do-not-touch memory:
->>     compatible = "reserved-memory";
->>   - I've dropped '-region' because I think it is redundant
->>   - The kernel will not make use of this memory except for when a 
->> driver picks it up
->>
->> For contiguous memory:
->>     compatible = "contiguous-memory", "reserved-memory"
->>
->> For contiguous memory that Linux will use by default if a specific
->> region isn't specified.
->>     compatible = "contiguous-memory", "reserved-memory"
->>     linux,default-contiguous-region;
->>   - I stuck with a linux, prefix here because I haven't come up with a
->>     non-linux way to describe this.
->>
->> Memory that specific hardware can pick up:
->>     compatible = "qcom,smem", "reserved-memory"
->>
->> Nodes with a 'size' property and without a 'reg' property need to have a
->> region allocated and reserved. The allocated region needs to be cached
->> somewhere. We could create a data structure for tracking the reserved
->> regions, or could write it in directly. While I shudder at the 
->> thought of
->> modifying the device tree at runtime by the kernel, it might just be the
->> sanest implementation at this time. I'd like to see what the
->> implementation looks like. (Since this is potentially controversial, I
->> would recommend implementing the exact regions in on patch, and add
->> dynamically allocated regions as a follow-up patch)
->>
->> As far as proper implementation is concerned, I think it should be
->> explicit in the binding that the kernel should automatically exclude
->> anything under the reserved-memory node, regardless of the compatible
->> value. Merely being a child of the reserved-memory node immediately
->> means that it is a reserved memory region.
->
-> It looks that my proposal for the reserved memory nodes causes much more
-> controversy than I expected when I've sent a pull request to Linus:
-> https://lkml.org/lkml/2013/9/15/151
-> http://www.spinics.net/lists/arm-kernel/msg273548.html
->
-> Fixing those issues requires further discussion. Frankly, right now I
-> really have no idea which way should I go. The /reserved-ranges node 
-> seems
-> to be easy to match particular reserved memory region with a given 
-> device.
+> On 09/10/13 13:49, Lee Jones wrote:
+> > Gets rid of those unnecessary gotos.
+> 
+> Unfortunately it introduced a bug whilst it is at it.  Sometimes
+> those gotos are necessary and the 'right' way to do things.
+> > 
+> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> > ---
+> >  drivers/iio/common/st_sensors/st_sensors_core.c | 17 +++++++----------
+> >  1 file changed, 7 insertions(+), 10 deletions(-)
+> > 
+> > diff --git a/drivers/iio/common/st_sensors/st_sensors_core.c b/drivers/iio/common/st_sensors/st_sensors_core.c
+> > index 8c4c54c..148f0e5 100644
+> > --- a/drivers/iio/common/st_sensors/st_sensors_core.c
+> > +++ b/drivers/iio/common/st_sensors/st_sensors_core.c
+> > @@ -331,26 +331,23 @@ static int st_sensors_read_axis_data(struct iio_dev *indio_dev,
+> >  	unsigned int byte_for_channel = ch->scan_type.storagebits >> 3;
+> >  
+> >  	outdata = kmalloc(byte_for_channel, GFP_KERNEL);
+> > -	if (!outdata) {
+> > -		err = -EINVAL;
+> > -		goto st_sensors_read_axis_data_error;
+> > -	}
+> > +	if (!outdata)
+> > +		return -ENOMEM;
+> I agree this change makes complete sense.
+> >  
+> >  	err = sdata->tf->read_multiple_byte(&sdata->tb, sdata->dev,
+> >  				ch->address, byte_for_channel,
+> >  				outdata, sdata->multiread_bit);
+> > -	if (err < 0)
+> > -		goto st_sensors_free_memory;
+> > +	if (err < 0) {
+> > +		kfree(outdata);
+> > +		return err;
+> > +	}
+> I don't like this change as....
+> >  
+> >  	if (byte_for_channel == 2)
+> >  		*data = (s16)get_unaligned_le16(outdata);
+> >  	else if (byte_for_channel == 3)
+> >  		*data = (s32)st_sensors_get_unaligned_le24(outdata);
+> >  
+> > -st_sensors_free_memory:
+> > -	kfree(outdata);
+> you now don't free out data in the case of no error.  This is precisely the case
+> where a goto is the correct way to handle things as the free need to occur whether
+> or not the error occurs.
 
-Huh, I've hurried to much. It should be:
+Ah, you're quite right. I'll fix up.
 
-The /reserved-ranges node approach seems to be easy to implement, but it
-makes much harder to to match particular reserved memory region with a given
-device.
+> > -st_sensors_read_axis_data_error:
+> > -	return err;
+> > +	return 0;
+> >  }
+> >  
+> >  int st_sensors_read_info_raw(struct iio_dev *indio_dev,
+> > 
 
-> I'm also not really convinced if it makes sense to add a code for finding
-> and matching a reserved memory region to every device driver, which might
-> need it. I would really like to get some more feedback on the Ben's
-> comment.
->
-> In any case, the code will also change significantly, so I assume that 
-> the
-> best, what can be done now is to revert the current version and start 
-> from
-> the scratch with a new, complete proposal.
-
-Best regards
 -- 
-Marek Szyprowski
-Samsung R&D Institute Poland
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
