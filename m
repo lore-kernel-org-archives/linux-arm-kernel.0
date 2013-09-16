@@ -1,69 +1,53 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Mon, 16 Sep 2013 16:11:35 -0700
-Subject: [PATCH 1/2] mtd: atmel_nand: remove unneeded ifdef CONFIG_OF
-In-Reply-To: <CAOesGMjYUOerSSZvM6VVLQNQP=Dft6CwNELqP9tyT=Hz0-2qLQ@mail.gmail.com>
-References: <1378200028-15415-1-git-send-email-josh.wu@atmel.com>
- <20130911230207.GE4550@ld-irv-0074.broadcom.com>
- <5232DAAD.4020700@atmel.com>
- <20130913182144.GF4550@ld-irv-0074.broadcom.com>
- <CAOesGMjczRxKhDS9W9SZk4ivuxEsn0Mp6j0Xotz+qZgoKO4=xg@mail.gmail.com>
- <CAN8TOE965=_HfK0aqB6oUWF66xXZEdwFR8AL9KcwRmQ0AWmisg@mail.gmail.com>
- <CAOesGMjYUOerSSZvM6VVLQNQP=Dft6CwNELqP9tyT=Hz0-2qLQ@mail.gmail.com>
-Message-ID: <CAN8TOE85D=JOU7f5+p6nTFgbCh0SZa+kfBNWD9rmDPxOZ9aEig@mail.gmail.com>
+From: alexander.tarasikov@gmail.com (Alexander Tarasikov)
+Date: Tue, 17 Sep 2013 03:21:39 +0400
+Subject: RFD on DMA_BIT_MASK and LPAE
+In-Reply-To: <20130916230440.GP12758@n2100.arm.linux.org.uk>
+References: <CAMChaFwWjxUPzqbwXQqkgeaH4gpdanGF80BBvPBzQ+bVxUcL=g@mail.gmail.com>
+ <20130916230440.GP12758@n2100.arm.linux.org.uk>
+Message-ID: <CAMChaFwq-Un37KwR0Mx9E9E5-CC-DJH+EEoJdsMAWC7oqff-Ow@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 16, 2013 at 3:54 PM, Olof Johansson <olof@lixom.net> wrote:
-> On Mon, Sep 16, 2013 at 3:50 PM, Brian Norris
-> <computersforpeace@gmail.com> wrote:
->> On Mon, Sep 16, 2013 at 3:28 PM, Olof Johansson <olof@lixom.net> wrote:
->>> Guys,
->>> Can we please get less fumbling around on this and just merge a fix,
->>> please? You guys have broken the PXA3xx builds for the whole merge
->>> window, while there's been a patch sitting in linux-next with
->>> _exactly_ this contents since August 30, committed by David.
+On Tue, Sep 17, 2013 at 3:04 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Tue, Sep 17, 2013 at 02:52:28AM +0400, Alexander Tarasikov wrote:
+>> Hello, linux hackers!
 >>
->> How about you read the thread you're responding to? This is a
->> different driver, and it is not broken.
+>> I've tried enabling LPAE (for the purpose of using KVM on A15) and have
+>> found out that many drivers break because of the DMA_BIT_MASK. I've found
+>> some patches and a discussion on the mailing list, but have not found what
+>> the final verdict on the problem was.
 >
-> Ah, oops, my apologies. I came across this when searching for the
-> (committed) patch in my mail history and didn't notice the driver name
-> differences. :)
-
-Unacceptable. Humans never make mistakes. ;)
-
->> If you look at the thread for the patch which fixes the actual
->> breakage (in pxa3xx), you will see a plain and clear explanation of
->> the situation.
->>
->> http://lists.infradead.org/pipermail/linux-mtd/2013-September/048595.html
->> http://lists.infradead.org/pipermail/linux-mtd/2013-September/048598.html
->>
->> David has been sufficiently notified, and he is not acting. I have
->> even pinged him on our IRC channel, with no response, although I'm not
->> surprised.
->>
->> (BTW, I assume the "committed by David" is simply because of
->> git-rebase. It doesn't necessarily reflect his acknowledgment of the
->> patch. I can only assume that it was an oversight on his part.)
+> The problem is that Linux insists that system memory will start at physical
+> address zero.
 >
-> That in itself seems broken; if he is pulling code from you he shouldn't rebase.
-
-Well, the repo I commit to (l2-mtd.git) was originally Artem's
-creation and was intended to collect things that had been reviewed,
-allowing David a last chance to review and reject or Sign-Off (or in
-this case, break) patches. We haven't traditionally stuck to the "once
-it's in git, it's permanent" philosophy, and I'm not sure of my
-opinion of it. It may or may not have prevented this error, as I am
-not sure why David left this patch out in the first place.
-
->> Anyway, I don't care if the patch goes in via another tree, as long as
->> this debacle (notably, for the pxa3xx_nand driver, not the atmel_nand
->> driver) is resolved.
+> That is not true on a lot of ARM platforms, especially with LPAE.  This
+> assumption needs to be fixed.
 >
-> Ok. Russell was asking what the status of the fix was as well. I'll
-> queue it up with our current fixes for -rc2.
+> I have a large patch series which I posted a few months back - now that
+> -rc1 is out, I will be re-posting it and if it gets mostly ignored again,
+> I'll drop it into linux-next for more exposure and as a candidiate for
+> merging at the next window.
 
-Sounds good.
+Hello, Russell!
+Thanks for the explanation.
 
-Brian
+>
+> Even with LPAE, even with memory all above the 4GB mark, if you have
+> 32-bit DMA controllers a 32-bit DMA mask should _still_ work.
+
+Does that mean that the of/platform file (which parses the DTS) will
+need no patching
+or that it should set the DMA mask based on what the ARM core supports?
+
+Either way, I hope in some time the vanilla linux will be usable
+across all those new A15
+boards, and you guys have done a fantastic job with migrating to DTS
+and moving the
+code out of arch/arm. In the meantime, I am happy to use the
+vendor-supplied tree
+with custom patches because my proof-of-concept KVM port on OMAP5 is working
+fine.
+
+-- 
+Regards, Alexander
