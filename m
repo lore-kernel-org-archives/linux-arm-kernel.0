@@ -1,64 +1,131 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 16 Sep 2013 18:14:16 +0100
-Subject: mvneta: oops in __rcu_read_lock on mirabox
-In-Reply-To: <20130916182450.639084c6@skate>
-References: <CACzLR4tTvt+ROEhkXUCQhV6=bPPTX4LFSkWfrEhF+OdM1Jm1Rw@mail.gmail.com>
- <20130915205701.5c61a444@skate> <20130916065047.GH27487@1wt.eu>
- <20130916175152.4e013457@skate>
- <20130916162209.GL12758@n2100.arm.linux.org.uk>
- <20130916182450.639084c6@skate>
-Message-ID: <20130916171416.GM12758@n2100.arm.linux.org.uk>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Mon, 16 Sep 2013 18:18:54 +0100
+Subject: [PATCH v3 2/2] ARM: vexpress: Add CLCD Device Tree properties
+In-Reply-To: <1379351934-25415-1-git-send-email-pawel.moll@arm.com>
+References: <1379351934-25415-1-git-send-email-pawel.moll@arm.com>
+Message-ID: <1379351934-25415-2-git-send-email-pawel.moll@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 16, 2013 at 06:24:50PM +0200, Thomas Petazzoni wrote:
-> Could this be caused by bitflips in the RAM due to bad timings, or
-> overheating or that kind of things?
+... for V2M-P1 motherboard CLCD (limited to 640x480 16bpp and using
+dedicated video RAM bank) and for V2P-CA9 (up to 1024x768 16bpp).
 
-Well, the SoC is an Armada 370, which uses Marvell's own Sheeva core.
->From what I understand, this is a CPU designed entirely by Marvell, so
-the interpretation of these codes may not be correct.  This is made
-harder to diagnose in that Marvell is soo secret with their
-documentation; indeed for this CPU there is no information publically
-available (there's only the product briefs).
+Signed-off-by: Pawel Moll <pawel.moll@arm.com>
+---
+ arch/arm/boot/dts/vexpress-v2m-rs1.dtsi | 22 +++++++++++++++++++++-
+ arch/arm/boot/dts/vexpress-v2m.dtsi     | 22 +++++++++++++++++++++-
+ arch/arm/boot/dts/vexpress-v2p-ca9.dts  | 19 +++++++++++++++++++
+ 3 files changed, 61 insertions(+), 2 deletions(-)
 
-Bad timings could certainly cause bitflips, as could poor routing of
-data line D8 (eg, incorrect termination or routing causing reflections
-on the data line - remember that with modern hardware, almost every
-signal is a transmission line).
-
-Marginal or noisy power supplies could also be a problem - for example,
-if the impedance of the power supply connections is too great, it may
-work with some patterns of use but not others.
-
-There's soo many possibilities...
-
-However, if the fault codes above really do equate to what's in the ARMv7
-Architecture Reference Manual, I think we can rule out the routing and
-RAM chips - because a cache parity error points to bit flips in the cache,
-or if there is no cache parity checking implemented, it means something
-is corrupting the state of the SoC - which could be due to bad power
-supplies.
-
-How do we get to the bottom of this?  That's a very good question - one
-which is going to be very difficult to solve.  Ideally, it means working
-with the manufacturer's design team to try and work out what's going on
-at the board level, probably using logic analysers to capture the bus
-activity leading up to the failure.  Also, checking the power supplies
-at the SoC too - checking that they're within correct tolerance and
-checking the amount of noise on them.
-
-I think all we can do at the moment is to wait for further reports to roll
-in and see whether a better pattern emerges.
-
-If you want to try something - and you suspect it may be heat related,
-you could try putting the board inside a container, monitor the temperature
-inside the container, and put it in your freezer!  Just be careful of the
-temperature of the other devices on the board getting too cold though -
-remember, most consumer electronics is only rated for an *operating*
-temperature range of 0?C to 70?C and your freezer will be something like
--20?C - so don't let the ambient temperature inside the container go
-below 0?C!  If the CPU is producing lots of heat though, it may keep the
-container sufficiently warm that that's not a problem.  The theory is
-that by making the ambient 15 to 20?C cooler, you will also lower the
-temperature of the hotter parts by a similar amount.
+diff --git a/arch/arm/boot/dts/vexpress-v2m-rs1.dtsi b/arch/arm/boot/dts/vexpress-v2m-rs1.dtsi
+index ac870fb..8226149 100644
+--- a/arch/arm/boot/dts/vexpress-v2m-rs1.dtsi
++++ b/arch/arm/boot/dts/vexpress-v2m-rs1.dtsi
+@@ -233,6 +233,26 @@
+ 				interrupts = <14>;
+ 				clocks = <&v2m_oscclk1>, <&smbclk>;
+ 				clock-names = "clcdclk", "apb_pclk";
++
++				arm,pl11x,panel-data-pads = <0x300 0x301 0x302 0x303 0x304 0x305 0x306 0x307>,
++							    <0x310 0x311 0x312 0x313 0x314 0x315 0x316 0x317>,
++							    <0x320 0x321 0x322 0x323 0x324 0x325 0x326 0x327>;
++				arm,pl11x,framebuffer-base = <0x18000000 0x00800000>;
++				max-memory-bandwidth = <36864000>; /* Bps, 640x480 at 60 16bpp */
++				display-timings {
++					native-mode = <&v2m_clcd_timing0>;
++					v2m_clcd_timing0: vga {
++						clock-frequency = <25175000>;
++						hactive = <640>;
++						hback-porch = <40>;
++						hfront-porch = <24>;
++						hsync-len = <96>;
++						vactive = <480>;
++						vback-porch = <32>;
++						vfront-porch = <11>;
++						vsync-len = <2>;
++					};
++				};
+ 			};
+ 		};
+ 
+@@ -282,7 +302,7 @@
+ 				/* CLCD clock */
+ 				compatible = "arm,vexpress-osc";
+ 				arm,vexpress-sysreg,func = <1 1>;
+-				freq-range = <23750000 63500000>;
++				freq-range = <23750000 65000000>;
+ 				#clock-cells = <0>;
+ 				clock-output-names = "v2m:oscclk1";
+ 			};
+diff --git a/arch/arm/boot/dts/vexpress-v2m.dtsi b/arch/arm/boot/dts/vexpress-v2m.dtsi
+index f142036..4befe1c 100644
+--- a/arch/arm/boot/dts/vexpress-v2m.dtsi
++++ b/arch/arm/boot/dts/vexpress-v2m.dtsi
+@@ -232,6 +232,26 @@
+ 				interrupts = <14>;
+ 				clocks = <&v2m_oscclk1>, <&smbclk>;
+ 				clock-names = "clcdclk", "apb_pclk";
++
++				arm,pl11x,panel-data-pads = <0x300 0x301 0x302 0x303 0x304 0x305 0x306 0x307>,
++							    <0x310 0x311 0x312 0x313 0x314 0x315 0x316 0x317>,
++							    <0x320 0x321 0x322 0x323 0x324 0x325 0x326 0x327>;
++				arm,pl11x,framebuffer-base = <0x4c000000 0x00800000>;
++				max-memory-bandwidth = <36864000>; /* Bps, 640x480 at 60 16bpp */
++				display-timings {
++					native-mode = <&v2m_clcd_timing0>;
++					v2m_clcd_timing0: vga {
++						clock-frequency = <25175000>;
++						hactive = <640>;
++						hback-porch = <40>;
++						hfront-porch = <24>;
++						hsync-len = <96>;
++						vactive = <480>;
++						vback-porch = <32>;
++						vfront-porch = <11>;
++						vsync-len = <2>;
++					};
++				};
+ 			};
+ 		};
+ 
+@@ -281,7 +301,7 @@
+ 				/* CLCD clock */
+ 				compatible = "arm,vexpress-osc";
+ 				arm,vexpress-sysreg,func = <1 1>;
+-				freq-range = <23750000 63500000>;
++				freq-range = <23750000 65000000>;
+ 				#clock-cells = <0>;
+ 				clock-output-names = "v2m:oscclk1";
+ 			};
+diff --git a/arch/arm/boot/dts/vexpress-v2p-ca9.dts b/arch/arm/boot/dts/vexpress-v2p-ca9.dts
+index 62d9b22..5eb68b8 100644
+--- a/arch/arm/boot/dts/vexpress-v2p-ca9.dts
++++ b/arch/arm/boot/dts/vexpress-v2p-ca9.dts
+@@ -73,6 +73,25 @@
+ 		interrupts = <0 44 4>;
+ 		clocks = <&oscclk1>, <&oscclk2>;
+ 		clock-names = "clcdclk", "apb_pclk";
++
++		arm,pl11x,panel-data-pads = <0x300 0x301 0x302 0x303 0x304 0x305 0x306 0x307>,
++					    <0x310 0x311 0x312 0x313 0x314 0x315 0x316 0x317>,
++					    <0x320 0x321 0x322 0x323 0x324 0x325 0x326 0x327>;
++		max-memory-bandwidth = <94371840>; /* Bps, 1024x768 at 60 16bpp */
++		display-timings {
++			native-mode = <&clcd_timing0>;
++			clcd_timing0: xga {
++				clock-frequency = <63500127>;
++				hactive = <1024>;
++				hback-porch = <152>;
++				hfront-porch = <48>;
++				hsync-len = <104>;
++				vactive = <768>;
++				vback-porch = <23>;
++				vfront-porch = <3>;
++				vsync-len = <4>;
++			};
++		};
+ 	};
+ 
+ 	memory-controller at 100e0000 {
+-- 
+1.8.1.2
