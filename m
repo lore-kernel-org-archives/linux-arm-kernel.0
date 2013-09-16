@@ -1,51 +1,91 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 16 Sep 2013 10:45:16 +0200
-Subject: [PATCH v4 4/4] ARM: bcm4760: Add restart hook
-In-Reply-To: <20130916071821.GA18210@glitch>
-References: <20130914152032.401907974@gmail.com>
- <201309152210.36738.arnd@arndb.de> <20130916071821.GA18210@glitch>
-Message-ID: <201309161045.17069.arnd@arndb.de>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 16 Sep 2013 09:49:03 +0100
+Subject: [PATCH 2/3] arm32: kvm: rename CONFIG_KVM_ARM_MAX_VCPUS
+In-Reply-To: <20130916083221.GI17294@redhat.com>
+References: <1379160656-28050-1-git-send-email-drjones@redhat.com>
+ <1379160656-28050-3-git-send-email-drjones@redhat.com>
+ <20130915093002.GX17294@redhat.com> <5236BCB7.9080102@arm.com>
+ <20130916083221.GI17294@redhat.com>
+Message-ID: <5236C5FF.5060301@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 16 September 2013, Domenico Andreoli wrote:
-> On Sun, Sep 15, 2013 at 10:10:36PM +0200, Arnd Bergmann wrote:
-> > On Sunday 15 September 2013, Domenico Andreoli wrote:
-> > > issue here is that there is already a proper watchdog driver, the sp805.
-> > > 
-> > > so I guess now the task shifts to adding restart hook support to it, right?
-> > 
-> > Yes, correct.
-> > 
-> > There is an interesting question however: we have to deal with the same driver
-> > being used in some machines that need to use it as the only way to reset the
-> > system, as well as the case where you actually want to use some other method.
-> 
-> in a certain sense, there is space for a generic watchdog based restart
-> hook mechanism but the current watchdog ops do not provide the necessary
-> guarantees in atomic context.
+On 16/09/13 09:32, Gleb Natapov wrote:
+> On Mon, Sep 16, 2013 at 09:09:27AM +0100, Marc Zyngier wrote:
+>> On 15/09/13 10:30, Gleb Natapov wrote:
+>>> On Sat, Sep 14, 2013 at 02:10:55PM +0200, Andrew Jones wrote:
+>>>> Drop the _ARM_ part of the name. We can then introduce a config option
+>>>> like this to aarch64 and other arches using the same name - allowing
+>>>> grep to show them all. Also update the help text to describe the option
+>>>> more completely.
+>>>>
+>>>> Signed-off-by: Andrew Jones <drjones@redhat.com>
+>>>> ---
+>>>>  arch/arm/include/asm/kvm_host.h | 4 ++--
+>>>>  arch/arm/kvm/Kconfig            | 8 ++++----
+>>>>  2 files changed, 6 insertions(+), 6 deletions(-)
+>>>>
+>>>> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+>>>> index 7d22517d80711..c614d3eb176c6 100644
+>>>> --- a/arch/arm/include/asm/kvm_host.h
+>>>> +++ b/arch/arm/include/asm/kvm_host.h
+>>>> @@ -25,8 +25,8 @@
+>>>>  #include <asm/fpstate.h>
+>>>>  #include <kvm/arm_arch_timer.h>
+>>>>  
+>>>> -#if defined(CONFIG_KVM_ARM_MAX_VCPUS)
+>>>> -#define KVM_MAX_VCPUS CONFIG_KVM_ARM_MAX_VCPUS
+>>>> +#if defined(CONFIG_KVM_MAX_VCPUS)
+>>>> +#define KVM_MAX_VCPUS CONFIG_KVM_MAX_VCPUS
+>>>>  #else
+>>>>  #define KVM_MAX_VCPUS 0
+>>>>  #endif
+>>>> diff --git a/arch/arm/kvm/Kconfig b/arch/arm/kvm/Kconfig
+>>>> index ebf5015508b52..de63bfccb3eb5 100644
+>>>> --- a/arch/arm/kvm/Kconfig
+>>>> +++ b/arch/arm/kvm/Kconfig
+>>>> @@ -40,16 +40,16 @@ config KVM_ARM_HOST
+>>>>  	---help---
+>>>>  	  Provides host support for ARM processors.
+>>>>  
+>>>> -config KVM_ARM_MAX_VCPUS
+>>>> +config KVM_MAX_VCPUS
+>>>>  	int "Number maximum supported virtual CPUs per VM"
+>>>>  	depends on KVM_ARM_HOST
+>>>>  	default 4
+>>>>  	help
+>>>>  	  Static number of max supported virtual CPUs per VM.
+>>>>  
+>>>> -	  If you choose a high number, the vcpu structures will be quite
+>>>> -	  large, so only choose a reasonable number that you expect to
+>>>> -	  actually use.
+>>> I do no see why on ARM vcpu structure size depends on KVM_ARM_MAX_VCPUS.
+>>> Can somebody point me to it.
+>>
+>> There's a number of indirections, but here you go:
+>> arch/arm/include/asm/kvm_host.h:#define KVM_MAX_VCPUS CONFIG_KVM_ARM_MAX_VCPUS
+>>
+>> include/kvm/arm_vgic.h:#define VGIC_MAX_CPUS            KVM_MAX_VCPUS
+>>
+>> include/kvm/arm_vgic.h:#if (VGIC_MAX_CPUS > 8)
+>> include/kvm/arm_vgic.h: } percpu[VGIC_MAX_CPUS];
+>> include/kvm/arm_vgic.h: u32 percpu[VGIC_MAX_CPUS][VGIC_NR_PRIVATE_IRQS / 4];
+>> include/kvm/arm_vgic.h: u8                      irq_sgi_sources[VGIC_MAX_CPUS][VGIC_NR_SGIS];
+>> include/kvm/arm_vgic.h: struct vgic_bitmap      irq_spi_target[VGIC_MAX_CPUS];
+>>
+>> Basically, the GIC emulation data structures are sized on the number of VCPUs
+>> (as well as the number of supported interrupts).
+>>
+> But vgic is per VM though, not per cpu as far as I can see, so the
+> overhead is also per VM, no? Is VGIC_MAX_CPUS limit architectural or
+> juts an implementation detail?
 
-It sounds like a good idea. I see another problem there, which is that registering
-a restart hook is architecture specific at the moment, so it would also require
-generalizing that, or alternatively keeping watchdog based restart specific to
-ARM and any architecture that adds support in a similar way.
+Indeed, the MAX_VCPU overhead is per VM. The MAX_IRQS overhead is both
+per-vm and per-vcpu.
 
-> > An easy way to handle this would be a boolean device tree property that
-> > tells the driver whether or not to register, but we might want to
-> > come up with a more sophisticated way to have multiple reset handlers
-> > registered an prioritized so we try the "best" one first. Maybe someone
-> > else has an opinion on this. If not, just do the property.
-> 
-> the simplest solution I see is adding a DT option to the sp805 driver so
-> that it registers the restart hook when asked to do so.
-> 
-> need to investigate whether the sp805 DT support is provided by some generic
-> AMBA mechanism or is completely missing.
+The GICv2 architecture has a limit of 8 CPUs - not at all an
+implementation detail. GICv3 remove this limitation.
 
-I think it should just work if you put the right properties into DT: it only
-uses one memory resource (from "reg" property) and one clk (from "clocks"
-property), and those are automatically there for AMBA devices. If the hardware
-does not fill the correct primecell ID, you may have to add a
-"arm,primecell-periphid=<0x00141805>" property.
-
-	Arnd
+	M.
+-- 
+Jazz is not dead. It just smells funny...
