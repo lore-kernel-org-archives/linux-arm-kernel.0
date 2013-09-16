@@ -1,54 +1,23 @@
-From: jbe@pengutronix.de (=?iso-8859-1?q?J=FCrgen_Beisert?=)
-Date: Mon, 16 Sep 2013 16:34:54 +0200
-Subject: [PATCH 5/6] Staging/iio/adc/touchscreen/MXS: add interrupt driven
- touch detection
-In-Reply-To: <201309161623.48247.marex@denx.de>
-References: <1378887511-24530-1-git-send-email-jbe@pengutronix.de>
- <201309161010.22151.jbe@pengutronix.de> <201309161623.48247.marex@denx.de>
-Message-ID: <201309161634.54603.jbe@pengutronix.de>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Mon, 16 Sep 2013 16:33:45 +0200
+Subject: [PATCH v2 00/12] clk/exynos convert clock IDs to macros
+In-Reply-To: <070001ceafa5$d4d81a40$7e884ec0$%kim@samsung.com>
+References: <1378462361-13680-1-git-send-email-a.hajda@samsung.com>
+ <8412301.YP2zzplWoe@amdc1227>
+ <070001ceafa5$d4d81a40$7e884ec0$%kim@samsung.com>
+Message-ID: <523716C9.3000204@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marek,
+On 09/12/2013 12:50 PM, Kukjin Kim wrote:
+> Well...I'm not sure changing to use macro is better or not at this moment...
 
-On Monday 16 September 2013 16:23:48 Marek Vasut wrote:
-> > On Sunday 15 September 2013 12:56:25 Jonathan Cameron wrote:
-> > > On 09/11/13 09:18, Juergen Beisert wrote:
-> > > > For battery driven systems it is a very bad idea to collect the
-> > > > touchscreen data within a kernel busy loop.
-> > > >
-> > > > This change uses the features of the hardware to delay and accumulate
-> > > > samples in hardware to avoid a high interrupt and CPU load.
-> > > >
-> > > > Note: this is only tested on an i.MX23 SoC yet.
-> > > >
-> > > > Signed-off-by: Juergen Beisert <jbe@pengutronix.de>
-> > > > CC: linux-arm-kernel at lists.infradead.org
-> > > > CC: devel at driverdev.osuosl.org
-> > > > CC: Marek Vasut <marex@denx.de>
-> > > > CC: Fabio Estevam <fabio.estevam@freescale.com>
-> > > > CC: Jonathan Cameron <jic23@cam.ac.uk>
-> > >
-> > > While this driver is placed in IIO within staging at the moment, these
-> > > changes are definitely input related.  Hence I have cc'd Dmitry and the
-> > > input list.
-> > >
-> > > I am personaly a little uncomfortable that we have such a complex bit
-> > > of input code sat within an IIO driver but such is life.
-> >
-> > Maybe an MFD for this ADC unit would be a better way to go? Currently I
-> > have a different problem with this driver, because the ADC unit monitors
-> > the battery as well. And the charging driver from the power subsystem
-> > needs these values to charge the battery in a correct manner.
->
-> Are you planning to post the power block patches too ?
+I think it is. ;) It's really less error prone to have symbolic names instead
+of the plain numbers. The clock ids are defined in one place and it is more
+clear what a clock is by looking at symbolic name. It's especially annoying 
+to use plain numbers where are are many clock in a single node, like 10 or 
+more. What are you main concerns with this ?
 
-When they will work: yes. Currently it crashes all the time. The PMIC is a 
-beast...
-
+--
 Regards,
-Juergen
-
--- 
-Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?| Juergen Beisert ? ? ? ? ? ? |
-Linux Solutions for Science and Industry ? ? ?| http://www.pengutronix.de/  |
+Sylwester
