@@ -1,89 +1,112 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 16 Sep 2013 17:02:20 +0100
-Subject: [PATCH 14/20] iio: pressure-core: st: Clean-up probe() function
+Date: Mon, 16 Sep 2013 17:02:22 +0100
+Subject: [PATCH 16/20] iio: pressure-core: st: Provide support for the Vdd
+ power supply
 In-Reply-To: <1379347346-823-1-git-send-email-lee.jones@linaro.org>
 References: <1379347346-823-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1379347346-823-15-git-send-email-lee.jones@linaro.org>
+Message-ID: <1379347346-823-17-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch contains some pretty basic clean-ups in probe() pertaining to
-the simplification of error handling and a couple of readability adaptions.
+The power to some of the sensors are controlled by regulators. In most
+cases these are 'always on', but if not they will fail to work until
+the regulator is enabled using the relevant APIs. This patch allows for
+the Vdd power supply to be specified by either platform data or Device
+Tree.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/iio/pressure/st_pressure_core.c | 28 +++++++++++++++-------------
- 1 file changed, 15 insertions(+), 13 deletions(-)
+ drivers/iio/pressure/st_pressure_core.c | 28 ++++++++++++++++++++++++++++
+ include/linux/iio/common/st_sensors.h   |  3 +++
+ 2 files changed, 31 insertions(+)
 
 diff --git a/drivers/iio/pressure/st_pressure_core.c b/drivers/iio/pressure/st_pressure_core.c
-index 3abada2..4539953 100644
+index e879542..c801c80 100644
 --- a/drivers/iio/pressure/st_pressure_core.c
 +++ b/drivers/iio/pressure/st_pressure_core.c
-@@ -232,21 +232,23 @@ static const struct iio_trigger_ops st_press_trigger_ops = {
+@@ -23,6 +23,7 @@
+ #include <linux/iio/sysfs.h>
+ #include <linux/iio/trigger.h>
+ #include <linux/iio/buffer.h>
++#include <linux/regulator/consumer.h>
+ #include <asm/unaligned.h>
+ 
+ #include <linux/iio/common/st_sensors.h>
+@@ -313,6 +314,29 @@ static const struct iio_trigger_ops st_press_trigger_ops = {
+ #define ST_PRESS_TRIGGER_OPS NULL
+ #endif
+ 
++void st_press_power_enable(struct iio_dev *indio_dev)
++{
++	struct st_sensor_data *pdata = iio_priv(indio_dev);
++	int err;
++
++	/* Regulators not mandatory, but if requested we should enable it. */
++	pdata->vdd = devm_regulator_get_optional(&indio_dev->dev, "vdd");
++	if (!IS_ERR(pdata->vdd)) {
++		err = regulator_enable(pdata->vdd);
++		if (err != 0)
++			dev_warn(&indio_dev->dev,
++				 "Failed to enable specified Vdd supply\n");
++	}
++}
++
++void st_press_power_disable(struct iio_dev *indio_dev)
++{
++	struct st_sensor_data *pdata = iio_priv(indio_dev);
++
++	if (!IS_ERR(pdata->vdd))
++		regulator_disable(pdata->vdd);
++}
++
  int st_press_common_probe(struct iio_dev *indio_dev,
  				struct st_sensors_platform_data *plat_data)
  {
--	int err;
- 	struct st_sensor_data *pdata = iio_priv(indio_dev);
-+	int irq = pdata->get_irq_data_ready(indio_dev);
-+	int err;
- 
+@@ -323,6 +347,8 @@ int st_press_common_probe(struct iio_dev *indio_dev,
  	indio_dev->modes = INDIO_DIRECT_MODE;
  	indio_dev->info = &press_info;
  
- 	err = st_sensors_check_device_support(indio_dev,
--				ARRAY_SIZE(st_press_sensors), st_press_sensors);
-+					      ARRAY_SIZE(st_press_sensors),
-+					      st_press_sensors);
- 	if (err < 0)
--		goto st_press_common_probe_error;
-+		return err;
- 
- 	pdata->num_data_channels = ST_PRESS_NUMBER_DATA_CHANNELS;
--	pdata->multiread_bit = pdata->sensor->multi_read_bit;
--	indio_dev->channels = pdata->sensor->ch;
--	indio_dev->num_channels = pdata->sensor->num_ch;
-+	pdata->multiread_bit     = pdata->sensor->multi_read_bit;
-+	indio_dev->channels      = pdata->sensor->ch;
-+	indio_dev->num_channels  = pdata->sensor->num_ch;
- 
- 	if (pdata->sensor->fs.addr != 0)
- 		pdata->current_fullscale = (struct st_sensor_fullscale_avl *)
-@@ -261,15 +263,15 @@ int st_press_common_probe(struct iio_dev *indio_dev,
- 
- 	err = st_sensors_init_sensor(indio_dev, plat_data);
- 	if (err < 0)
--		goto st_press_common_probe_error;
-+		return err;
- 
--	if (pdata->get_irq_data_ready(indio_dev) > 0) {
-+	if (irq > 0) {
- 		err = st_press_allocate_ring(indio_dev);
- 		if (err < 0)
--			goto st_press_common_probe_error;
-+			return err;
- 
- 		err = st_sensors_allocate_trigger(indio_dev,
--							ST_PRESS_TRIGGER_OPS);
-+						  ST_PRESS_TRIGGER_OPS);
- 		if (err < 0)
- 			goto st_press_probe_trigger_error;
- 	}
-@@ -281,12 +283,12 @@ int st_press_common_probe(struct iio_dev *indio_dev,
- 	return err;
- 
- st_press_device_register_error:
--	if (pdata->get_irq_data_ready(indio_dev) > 0)
-+	if (irq > 0)
- 		st_sensors_deallocate_trigger(indio_dev);
- st_press_probe_trigger_error:
--	if (pdata->get_irq_data_ready(indio_dev) > 0)
-+	if (irq > 0)
- 		st_press_deallocate_ring(indio_dev);
--st_press_common_probe_error:
++	st_press_power_enable(indio_dev);
 +
- 	return err;
- }
- EXPORT_SYMBOL(st_press_common_probe);
+ 	err = st_sensors_check_device_support(indio_dev,
+ 					      ARRAY_SIZE(st_press_sensors),
+ 					      st_press_sensors);
+@@ -381,6 +407,8 @@ void st_press_common_remove(struct iio_dev *indio_dev)
+ {
+ 	struct st_sensor_data *pdata = iio_priv(indio_dev);
+ 
++	st_press_power_disable(indio_dev);
++
+ 	iio_device_unregister(indio_dev);
+ 	if (pdata->get_irq_data_ready(indio_dev) > 0) {
+ 		st_sensors_deallocate_trigger(indio_dev);
+diff --git a/include/linux/iio/common/st_sensors.h b/include/linux/iio/common/st_sensors.h
+index e732fda..968b84e 100644
+--- a/include/linux/iio/common/st_sensors.h
++++ b/include/linux/iio/common/st_sensors.h
+@@ -16,6 +16,7 @@
+ #include <linux/irqreturn.h>
+ #include <linux/iio/trigger.h>
+ #include <linux/bitops.h>
++#include <linux/regulator/consumer.h>
+ 
+ #include <linux/platform_data/st_sensors_pdata.h>
+ 
+@@ -201,6 +202,7 @@ struct st_sensors {
+  * @trig: The trigger in use by the core driver.
+  * @sensor: Pointer to the current sensor struct in use.
+  * @current_fullscale: Maximum range of measure by the sensor.
++ * @vdd: Pointer to sensor's Vdd power supply
+  * @enabled: Status of the sensor (false->off, true->on).
+  * @multiread_bit: Use or not particular bit for [I2C/SPI] multiread.
+  * @buffer_data: Data used by buffer part.
+@@ -216,6 +218,7 @@ struct st_sensor_data {
+ 	struct iio_trigger *trig;
+ 	struct st_sensors *sensor;
+ 	struct st_sensor_fullscale_avl *current_fullscale;
++	struct regulator *vdd;
+ 
+ 	bool enabled;
+ 	bool multiread_bit;
 -- 
 1.8.1.2
