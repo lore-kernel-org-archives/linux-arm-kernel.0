@@ -1,95 +1,70 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 16 Sep 2013 10:50:38 -0600
-Subject: [PATCH v6 1/5] ARM: add basic support for Trusted Foundations
-In-Reply-To: <1379238028-7960-2-git-send-email-acourbot@nvidia.com>
-References: <1379238028-7960-1-git-send-email-acourbot@nvidia.com>
- <1379238028-7960-2-git-send-email-acourbot@nvidia.com>
-Message-ID: <523736DE.1050201@wwwdotorg.org>
+Date: Mon, 16 Sep 2013 10:59:58 -0600
+Subject: [PATCH] clk: si570: Add a driver for SI570 oscillators
+In-Reply-To: <20130916164927.GB21352@roeck-us.net>
+References: <1379033737-30015-1-git-send-email-soren.brinkmann@xilinx.com>
+ <1379033737-30015-2-git-send-email-soren.brinkmann@xilinx.com>
+ <52373314.5070806@wwwdotorg.org> <20130916164927.GB21352@roeck-us.net>
+Message-ID: <5237390E.5070203@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/15/2013 03:40 AM, Alexandre Courbot wrote:
-> Trusted Foundations is a TrustZone-based secure monitor for ARM that
-> can be invoked using the same SMC-based API on all supported
-> platforms. This patch adds initial basic support for Trusted
-> Foundations using the ARM firmware API. Current features are limited
-> to the ability to boot secondary processors.
-> 
-> Note: The API followed by Trusted Foundations does *not* follow the SMC
-> calling conventions. It has nothing to do with PSCI neither and is only
-> relevant to devices that use Trusted Foundations (like most Tegra-based
-> retail devices).
+On 09/16/2013 10:49 AM, Guenter Roeck wrote:
+> On Mon, Sep 16, 2013 at 10:34:28AM -0600, Stephen Warren wrote:
+>> On 09/12/2013 06:55 PM, Soren Brinkmann wrote:
+>>> Add a driver for SILabs 570, 571, 598, 599 programmable oscillators.
+>>> The devices generate low-jitter clock signals and are reprogrammable via
+>>> an I2C interface.
+>>
+>>> diff --git a/Documentation/devicetree/bindings/clock/silabs,si570.txt b/Documentation/devicetree/bindings/clock/silabs,si570.txt
+>>
+>>> +Required properties:
+>>> + - compatible: Shall be one of "silabs,si57x", "silabs,si59x".
+>>> + - reg: I2C device address.
+>>> + - #clock-cells: From common clock bindings: Shall be 0.
+>>> + - factory-fout: Factory set default frequency
+>>
+>> So, there's no way to query this from the device at all? Looking at the
+>> data-sheet, all the frequency generation parameters are in registers,
+>> and the device supports I2C read commands. As such, I'm not convinced
+>> this property is necessary.
+>
+> Unfortunately, the chip does not report the factory setting for fout,
+> so the property is needed. The chip can not be programmed without it.
 
-> diff --git a/arch/arm/firmware/trusted_foundations.c b/arch/arm/firmware/trusted_foundations.c
+So fout is not the default overall output frequency, but rather
+something internal that that feeds into the frequency generation
+process, and the registers in the device only describe that frequency
+generation process, not the frequency that feeds into it?
 
-> +#if IS_ENABLED(CONFIG_OF)
-> +void of_register_trusted_foundations(void)
-> +{
-> +	struct device_node *node;
-> +	struct trusted_foundations_platform_data pdata;
-> +	int err;
-> +
-> +	node = of_find_compatible_node(NULL, NULL, "tl,trusted-foundations");
-> +	if (!node)
-> +		return;
-...
+If so, it might be worth enhancing the binding documentation to briefly
+describe that. Presumably the details are all in the HW documentation,
+but it'd be nice if the binding doc was obviously correct without having
+to fully understand the entire HW documentation.
 
-> diff --git a/arch/arm/include/asm/trusted_foundations.h b/arch/arm/include/asm/trusted_foundations.h
+>>> +Optional properties:
+>>> + - initial-fout: Initial output frequency to set during probe
+>>
+>> "probe" is a Linux-specific concept. This property should be removed. If
+>> the driver is asked to set a specific frequency, it should do so, but I
+>> don't think it should program something pro-actively just because it
+>> starts up.
+>>
+>> If this property is acceptable, it'd be better to describe it more along
+>> the lines of the following:
+>>
+>> initial-fout: The frequency at which the system requires the clock to
+>> operate.
+>
+> It should probably be something like "clock-frequency". In many use cases
+> the programmed frequency is set to a constant frequency at system startup
+> and never changed, similar to other clocks.
 
-> +#if IS_ENABLED(CONFIG_TRUSTED_FOUNDATIONS)
-> +void register_trusted_foundations(struct trusted_foundations_platform_data *pd);
-> +#if IS_ENABLED(CONFIG_OF)
-> +void of_register_trusted_foundations(void);
-> +#endif
+I was going to suggest that too, but re-considered since I think
+clock-frequency is more appropriate for fixed-frequency clocks, rather
+than to specify the value at which a programmable clock generator should
+operate?
 
-I still don't think that's correct.
-
-If TF support is enabled, yet DT support is not enabled, then there is
-no prototype, implementation, or dummy implementation for
-of_register_trusted_foundations(). I think there should be a dummy
-implementation in this case, shouldn't there?
-
-> +
-> +#else /* CONFIG_TRUSTED_FOUNDATIONS */
-> +
-> +#include <linux/printk.h>
-> +#include <linux/of.h>
-> +#include <asm/bug.h>
-> +
-> +static inline void register_trusted_foundations(
-> +				   struct trusted_foundations_platform_data *pd)
-> +{
-> +	panic("No support for Trusted Foundations, stopping...\n");
-> +}
-> +
-> +#if IS_ENABLED(CONFIG_OF)
-> +static inline void of_register_trusted_foundations(void)
-> +{
-> +	/* If we find the target should enable TF but does not support it,
-> +	 * fail as the system won't be able to do much anyway */
-> +	if (of_find_compatible_node(NULL, NULL, "tl,trusted-foundations"))
-> +		register_trusted_foundations(NULL);
-> +}
-> +#else
-> +static inline void of_register_trusted_foundations(void)
-> +{
-> +}
-> +#endif /* CONFIG_OF */
-
-That's more complex than it needs to be; there is a dummy
-of_find_compatible_node() in the !OF case, so you don't need to ifdef
-the implementation of of_register_trusted_foundations(); you just need
-the first implementation here.
-
-> +#endif /* CONFIG_TRUSTED_FOUNDATIONS */
-
-In summary, I think you need:
-
-If TF is enabled, always implement of_register_trusted_foundations() in
-the C file, and rely on of_find_compatible_node() to return NULL if
-!CONFIG_OF.
-
-If TF is not enabled, implement the inline version in the header file,
-and again rely on of_find_compatible_node() to return NULL if !CONFIG_OF.
-
-Unless I'm missing something!
+I don't think we have a good story yet for how to represent
+how-we-want-the-clock-tree-configured, as opposed to representing the HW
+itself (which is what DT should be more about).
