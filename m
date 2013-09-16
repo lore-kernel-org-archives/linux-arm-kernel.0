@@ -1,47 +1,65 @@
-From: w@1wt.eu (Willy Tarreau)
-Date: Mon, 16 Sep 2013 18:44:12 +0200
-Subject: mvneta: oops in __rcu_read_lock on mirabox
-In-Reply-To: <20130916163937.GC3188@1wt.eu>
-References: <CACzLR4tTvt+ROEhkXUCQhV6=bPPTX4LFSkWfrEhF+OdM1Jm1Rw@mail.gmail.com>
- <20130915205701.5c61a444@skate> <20130916065047.GH27487@1wt.eu>
- <20130916175152.4e013457@skate>
- <CACzLR4twTNjzU8hK3L1cYUXnEH1ydwY6jnYoOG+9vLB3-4uQ4w@mail.gmail.com>
- <20130916163937.GC3188@1wt.eu>
-Message-ID: <20130916164412.GD3188@1wt.eu>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Mon, 16 Sep 2013 09:49:27 -0700
+Subject: [PATCH] clk: si570: Add a driver for SI570 oscillators
+In-Reply-To: <52373314.5070806@wwwdotorg.org>
+References: <1379033737-30015-1-git-send-email-soren.brinkmann@xilinx.com>
+ <1379033737-30015-2-git-send-email-soren.brinkmann@xilinx.com>
+ <52373314.5070806@wwwdotorg.org>
+Message-ID: <20130916164927.GB21352@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 16, 2013 at 06:39:37PM +0200, Willy Tarreau wrote:
-> On Mon, Sep 16, 2013 at 09:35:16AM -0700, Ethan Tuttle wrote:
-> > On Mon, Sep 16, 2013 at 8:51 AM, Thomas Petazzoni
-> > <thomas.petazzoni@free-electrons.com> wrote:
-> > > Willy, Ethan,
-> > >
-> > > On Mon, 16 Sep 2013 08:50:47 +0200, Willy Tarreau wrote:
-> > >
-> > >> I'm currently testing on 3.11.1 (which I had here) and am not getting
-> > >> any issue after 50M packets. My kernel is running in thumb mode and
-> > >> without SMP.
-> > >>
-> > >> Ethan, we'll need your config I guess.
-> > >
-> > > Can both of you also report the U-Boot version you're using, and the
-> > > SoC revision (it's visible in the U-Boot output).
-> > 
-> > Mine says:
-> > 
-> > U-Boot 2009.08 (Sep 16 2012 - 22:50:06)Marvell version: 1.1.2 NQ
-> > SoC:   MV6710 A1
+On Mon, Sep 16, 2013 at 10:34:28AM -0600, Stephen Warren wrote:
+> On 09/12/2013 06:55 PM, Soren Brinkmann wrote:
+> > Add a driver for SILabs 570, 571, 598, 599 programmable oscillators.
+> > The devices generate low-jitter clock signals and are reprogrammable via
+> > an I2C interface.
 > 
-> I just checked on my old captures and I have the same here, with more
-> details such as the CPU's revision (Rev 1) :
+> > diff --git a/Documentation/devicetree/bindings/clock/silabs,si570.txt b/Documentation/devicetree/bindings/clock/silabs,si570.txt
 > 
->    http://1wt.eu/articles/mirabox-vs-guruplug/
+> > +Required properties:
+> > + - compatible: Shall be one of "silabs,si57x", "silabs,si59x".
+> > + - reg: I2C device address.
+> > + - #clock-cells: From common clock bindings: Shall be 0.
+> > + - factory-fout: Factory set default frequency
+> 
+> So, there's no way to query this from the device at all? Looking at the
+> data-sheet, all the frequency generation parameters are in registers,
+> and the device supports I2C read commands. As such, I'm not convinced
+> this property is necessary.
+> 
+Unfortunately, the chip does not report the factory setting for fout,
+so the property is needed. The chip can not be programmed without it.
 
-BTW Ethan, I don't know if you have already opened your mirabox, but on the
-link above you'll find settings for trying other frequencies for the CPU. It
-could be nice to try 1 GHz with L2/DDR @500 instead of 1200/600 to see if the
-issue remains or not. If it disappears, there's also a working setting with
-CPU at 1.2G, L2 at 800M and DDR at 400M to help find if CPU, L2 or DDR is the culprit.
+> > +Optional properties:
+> > + - initial-fout: Initial output frequency to set during probe
+> 
+> "probe" is a Linux-specific concept. This property should be removed. If
+> the driver is asked to set a specific frequency, it should do so, but I
+> don't think it should program something pro-actively just because it
+> starts up.
+> 
+> If this property is acceptable, it'd be better to describe it more along
+> the lines of the following:
+> 
+> initial-fout: The frequency at which the system requires the clock to
+> operate.
+> 
+It should probably be something like "clock-frequency". In many use cases
+the programmed frequency is set to a constant frequency at system startup
+and never changed, similar to other clocks.
 
-Willy
+Guenter
+
+> > + - temperature-stability-7ppm: Indicate a device with a temperature stability
+> > +			       of 7ppm
+> > +
+> > +Example:
+> > +	si570: clock-generator at 5d {
+> > +		#clock-cells = <0>;
+> > +		compatible = "silabs,si570";
+> > +		reg = <0x5d>;
+> > +		factory-fout = <156250000>;
+> > +	};
+> 
+> 
