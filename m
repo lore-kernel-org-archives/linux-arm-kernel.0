@@ -1,34 +1,36 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 16 Sep 2013 16:31:48 +0800
-Subject: [PATCH v2 1/1] ARM: imx: i.mx6d/q: disable the double linefill
- feature of PL310
-In-Reply-To: <1379294943-15664-1-git-send-email-r64343@freescale.com>
-References: <1379294943-15664-1-git-send-email-r64343@freescale.com>
-Message-ID: <20130916083146.GI31147@S2101-09.ap.freescale.net>
+From: lars@metafoo.de (Lars-Peter Clausen)
+Date: Mon, 16 Sep 2013 10:33:29 +0200
+Subject: [PATCH 14/38] iio: accel: st: Append _accel to accelerator sensor
+ device names
+In-Reply-To: <5234562D.5050803@kernel.org>
+References: <1378817379-8238-1-git-send-email-lee.jones@linaro.org>
+ <1378817379-8238-15-git-send-email-lee.jones@linaro.org>
+ <52345330.4050707@kernel.org> <5234562D.5050803@kernel.org>
+Message-ID: <5236C259.6050701@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 16, 2013 at 09:29:03AM +0800, Jason Liu wrote:
-> The L2 cache controller(PL310) version on the i.MX6D/Q is r3p1-50rel0
-> The L2 cache controller(PL310) version on the i.MX6DL/SOLO/SL is r3p2
-> But according to ARM PL310 errata: 752271
-> ID: 752271: Double linefill feature can cause data corruption
-> Fault Status: Present in: r3p0, r3p1, r3p1-50rel0. Fixed in r3p2
-> Workaround: The only workaround to this erratum is to disable the
-> double linefill feature. This is the default behavior.
+On 09/14/2013 02:27 PM, Jonathan Cameron wrote:
+> On 09/14/13 13:14, Jonathan Cameron wrote:
+>> On 09/10/13 13:49, Lee Jones wrote:
+>>> Some of ST's sensors are appended with their sensor type and some
+>>> are not. For consistency we're extending the same naming convention
+>>> throughout.
+>>>
+>>> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+>> Honestly I don't care either way on these, but consistency would definitely
+>> be good so applied to the togreg branch of iio.git
+>>
+>> Thanks,
 > 
-> without this patch, you will meet the following error when run the
-> memtester application at: http://pyropus.ca/software/memtester/
+> Actually change of plan. I'm going to hold off on these as this an ABI change.
+> Iritating though having these as completely inconsistent is, changing this
+> will change device identification from userspace which is not a good idea.
 > 
-> FAILURE: 0x00100000 != 0x00200000 at offset 0x01365664.
-> FAILURE: 0x00100000 != 0x00200000 at offset 0x01365668.
-> FAILURE: 0x00100000 != 0x00200000 at offset 0x0136566c.
-> FAILURE: 0x00100000 != 0x00200000 at offset 0x01365670.
-> FAILURE: 0x00100000 != 0x00200000 at offset 0x01365674.
-> FAILURE: 0x00100000 != 0x00200000 at offset 0x01365678.
-> 
-> Signed-off-by: Jason Liu <r64343@freescale.com>
+> Sorry Lee, but we really shouldn't do this. I should have picked up on this
+> in the original driver reviews but that's hindsight for you.
 
-Applied, thanks.
+I think those with the suffix are the ones where you have accel and gyro in
+the same package, the ones without the suffix are pure accelerometers.
 
-Shawn
+- Lars
