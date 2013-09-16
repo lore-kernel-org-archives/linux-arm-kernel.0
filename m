@@ -1,28 +1,45 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 16 Sep 2013 22:01:08 +0200
-Subject: [PATCH v4 4/4] ARM: bcm4760: Add restart hook
-In-Reply-To: <20130916120001.GE401@spo001.leaseweb.com>
-References: <20130914152032.401907974@gmail.com>
- <20130916071821.GA18210@glitch> <20130916120001.GE401@spo001.leaseweb.com>
-Message-ID: <13398230.iOE1HhgZy2@wuerfel>
+From: dinguyen@altera.com (Dinh Nguyen)
+Date: Mon, 16 Sep 2013 15:29:45 -0500
+Subject: [PATCH 3/3] arm: dts: socfpga: Add support for SD/MMC
+In-Reply-To: <52373383.7030601@wwwdotorg.org>
+References: <1378740833-4883-1-git-send-email-dinguyen@altera.com>
+ <1378740833-4883-4-git-send-email-dinguyen@altera.com>
+ <522E398F.3080100@wwwdotorg.org> <1963011.uUY4o6LRbA@flatron>
+ <52373383.7030601@wwwdotorg.org>
+Message-ID: <1379363385.17505.11.camel@linux-builds1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 16 September 2013 14:00:01 Wim Van Sebroeck wrote:
+On Mon, 2013-09-16 at 10:36 -0600, Stephen Warren wrote:
+> On 09/14/2013 06:30 AM, Tomasz Figa wrote:
+> ...
+> > Just as a side note, correct name is Synopsys, not Synopsis. There are
+> > multiple places around Documentation/devicetree where this typo is
+> > present[1]. Should we consider correcting this or the typo will have
+> > to stay?
+
+I can send a patch to fix the typos.
+
+Dinh
+> > 
+> > [1] git grep -i synopsis Documentation/devicetree/
+> > Documentation/devicetree/bindings/mmc/exynos-dw-mshc.txt:* Samsung Exynos specific extensions to the Synopsis Designware Mobile
+> > Documentation/devicetree/bindings/mmc/exynos-dw-mshc.txt:The Synopsis designware mobile storage host controller is used to interface
+> > Documentation/devicetree/bindings/mmc/exynos-dw-mshc.txt:differences between the core Synopsis dw mshc controller properties described
+> > Documentation/devicetree/bindings/mmc/exynos-dw-mshc.txt:by synopsis-dw-mshc.txt and the properties used by the Samsung Exynos specific
+> > Documentation/devicetree/bindings/mmc/exynos-dw-mshc.txt:extensions to the Synopsis Designware Mobile Storage Host Controller.
+> > Documentation/devicetree/bindings/mmc/rockchip-dw-mshc.txt:* Rockchip specific extensions to the Synopsis Designware Mobile
+> > Documentation/devicetree/bindings/mmc/rockchip-dw-mshc.txt:The Synopsis designware mobile storage host controller is used to interface
+> > Documentation/devicetree/bindings/mmc/rockchip-dw-mshc.txt:differences between the core Synopsis dw mshc controller properties described
+> > Documentation/devicetree/bindings/mmc/rockchip-dw-mshc.txt:by synopsis-dw-mshc.txt and the properties used by the Rockchip specific
+> > Documentation/devicetree/bindings/mmc/rockchip-dw-mshc.txt:extensions to the Synopsis Designware Mobile Storage Host Controller.
+> > Documentation/devicetree/bindings/mmc/synopsis-dw-mshc.txt:* Synopsis Designware Mobile Storage Host Controller
+> > Documentation/devicetree/bindings/mmc/synopsis-dw-mshc.txt:The Synopsis designware mobile storage host controller is used to interface
+> > Documentation/devicetree/bindings/mmc/synopsis-dw-mshc.txt:properties used by the Synopsis Designware Mobile Storage Host Controller.
+> > Documentation/devicetree/bindings/mmc/synopsis-dw-mshc.txt:     - snps,dw-mshc: for controllers compliant with synopsis dw-mshc.
+> > Documentation/devicetree/bindings/pci/designware-pcie.txt:* Synopsis Designware PCIe interface
 > 
-> I remember that the Cobalt Devices have no ability to reboot themselves.
-> That's why the driver uses the reboot_notifier for rebooting the device.
-> See drivers/watchdog/alim7101_wdt.c .
-
-Hmm, a notifier seems the wrong approach here, because we really want
-to handle all reboot_notifiers before actually rebooting, and we'd enter
-the wdt driver at a random point in the notifier chain. It probably works
-by chance if the watchdog reboots a second after its notifier is called,
-and all other calls are done as well, but it doesn't seem like a clean
-solution.
-
-> I'll have a look to have an extra ops that adds this functionality in the framework.
-
-Ok, cool. Thanks!
-
-	Arnd
+> Those typos only appear to exist in free-form text and not in any
+> property names/values. As such, they can all easily be fixed without
+> impacting any DT content or ABI.
+> 
