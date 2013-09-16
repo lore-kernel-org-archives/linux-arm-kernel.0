@@ -1,69 +1,28 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 16 Sep 2013 13:52:32 -0600
-Subject: [PATCH v3 1/2] video: ARM CLCD: Add DT support
-In-Reply-To: <1379351934-25415-1-git-send-email-pawel.moll@arm.com>
-References: <1379351934-25415-1-git-send-email-pawel.moll@arm.com>
-Message-ID: <52376180.1090001@wwwdotorg.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 16 Sep 2013 22:01:08 +0200
+Subject: [PATCH v4 4/4] ARM: bcm4760: Add restart hook
+In-Reply-To: <20130916120001.GE401@spo001.leaseweb.com>
+References: <20130914152032.401907974@gmail.com>
+ <20130916071821.GA18210@glitch> <20130916120001.GE401@spo001.leaseweb.com>
+Message-ID: <13398230.iOE1HhgZy2@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/16/2013 11:18 AM, Pawel Moll wrote:
-> This patch adds basic DT bindings for the PL11x CLCD controllers
-> and make their fbdev driver use them (initially only TFT panels
-> are supported).
+On Monday 16 September 2013 14:00:01 Wim Van Sebroeck wrote:
+> 
+> I remember that the Cobalt Devices have no ability to reboot themselves.
+> That's why the driver uses the reboot_notifier for rebooting the device.
+> See drivers/watchdog/alim7101_wdt.c .
 
-> diff --git a/Documentation/devicetree/bindings/video/arm,pl11x.txt b/Documentation/devicetree/bindings/video/arm,pl11x.txt
+Hmm, a notifier seems the wrong approach here, because we really want
+to handle all reboot_notifiers before actually rebooting, and we'd enter
+the wdt driver at a random point in the notifier chain. It probably works
+by chance if the watchdog reboots a second after its notifier is called,
+and all other calls are done as well, but it doesn't seem like a clean
+solution.
 
-> +- interrupts: either a single interrupt specifier representing the
-> +		combined interrupt output (CLCDINTR) or an array of
-> +		four interrupt specifiers for CLCDMBEINTR,
-> +		CLCDVCOMPINTR, CLCDLNBUINTR, CLCDFUFINTR; in the
-> +		latter case interrupt names must be specified
-> +		(see below)
-> +- interrupt-names: when four interrupts are specified, their names:
-> +			"mbe", "vcomp", "lnbu", "fuf"
-> +			must be specified in order respective to the
-> +			interrupt specifiers
+> I'll have a look to have an extra ops that adds this functionality in the framework.
 
-I think the binding should either always use names as the key, or use
-indices in interrupts as the key. Hence, I'd word that more like:
+Ok, cool. Thanks!
 
-- interrupt-names: either the single entry "combined" representing a
-			combined interrupt output (CLCDINTR), or the
-			four entries "mbe", "vcomp", "lnbu", "fuf"
-			representing the individual CLCDMBEINTR,
-			CLCDVCOMPINTR, CLCDLNBUINTR, CLCDFUFINTR
-			interrupts.
-- interrupts: contains an interrupt specifier for each entry in
-		 interrupt-names.
-
-> +- arm,pl11x,panel-data-pads: array of 24 cells, each of them describing
-> +				a function of one of the CLD pads,
-> +				starting from 0 up to 23; each pad can
-> +				be described by one of the following values:
-> +	- 0: reserved (not connected)
-> +	- 0x100-0x107: color upper STN panel data 0 to 7
-...
-
-I assume those are the raw values that go into the HW?
-
-> +				Example sets of values for standard
-> +				panel interfaces:
-> +	- PL110 single colour STN panel:
-> +			<0x107 0x106 0x105 0x104 0x103 0x102 0x101 0x100>,
-> +			<0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0>;
-
-The indentation of the introductory text seems a little odd. Do we
-really need so many examples?
-
-> +Optional properties:
-> +
-> +- arm,pl11x,framebuffer-base: a pair of two values, address and size,
-> +				defining the framebuffer to be used;
-> +				to be used only if it is *not*
-> +				part of normal memory, as described
-> +				in /memory node
-
-If the framebuffer is part of /memory, what happens then? Is the address
-not fixed (so the HW isn't yet set up) and hence a driver should
-allocate it?
+	Arnd
