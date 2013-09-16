@@ -1,32 +1,65 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 16 Sep 2013 09:01:24 -0700
-Subject: [PATCH] ARM: multi_v7_defconfig: enable ARM_ATAG_DTB_COMPAT
-Message-ID: <1379347284-12422-1-git-send-email-olof@lixom.net>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 16 Sep 2013 17:02:07 +0100
+Subject: [PATCH 01/20] ARM: ux500: Remove PrimeCell IDs from Nomadik I2C DT
+ nodes
+In-Reply-To: <1379347346-823-1-git-send-email-lee.jones@linaro.org>
+References: <1379347346-823-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <1379347346-823-2-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Without this, legacy platforms that can boot with a multiplatform
-kernel but that need the DTB to be appended, won't have a way to pass
-firmware-set bootargs to the kernel.
+Turns out that they're actually not required and the driver probes just
+fine without them. The ID is incorrect at the moment anyway. They actually
+currently specify the stn8815.
 
-This is needed to boot multi_v7_defconfig on snowball, for instance.
-
-Signed-off-by: Olof Johansson <olof@lixom.net>
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/configs/multi_v7_defconfig |    1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/boot/dts/ste-dbx5x0.dtsi | 5 -----
+ 1 file changed, 5 deletions(-)
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 6e572c6..aba4ec7 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -46,6 +46,7 @@ CONFIG_ARCH_ZYNQ=y
- CONFIG_SMP=y
- CONFIG_HIGHPTE=y
- CONFIG_ARM_APPENDED_DTB=y
-+CONFIG_ARM_ATAG_DTB_COMPAT=y
- CONFIG_NET=y
- CONFIG_UNIX=y
- CONFIG_INET=y
+diff --git a/arch/arm/boot/dts/ste-dbx5x0.dtsi b/arch/arm/boot/dts/ste-dbx5x0.dtsi
+index a152945..9c01d66 100644
+--- a/arch/arm/boot/dts/ste-dbx5x0.dtsi
++++ b/arch/arm/boot/dts/ste-dbx5x0.dtsi
+@@ -531,7 +531,6 @@
+ 			compatible = "stericsson,db8500-i2c", "st,nomadik-i2c", "arm,primecell";
+ 			reg = <0x80004000 0x1000>;
+ 			interrupts = <0 21 IRQ_TYPE_LEVEL_HIGH>;
+-			arm,primecell-periphid = <0x180024>;
+ 
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+@@ -544,7 +543,6 @@
+ 			compatible = "stericsson,db8500-i2c", "st,nomadik-i2c", "arm,primecell";
+ 			reg = <0x80122000 0x1000>;
+ 			interrupts = <0 22 IRQ_TYPE_LEVEL_HIGH>;
+-			arm,primecell-periphid = <0x180024>;
+ 
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+@@ -557,7 +555,6 @@
+ 			compatible = "stericsson,db8500-i2c", "st,nomadik-i2c", "arm,primecell";
+ 			reg = <0x80128000 0x1000>;
+ 			interrupts = <0 55 IRQ_TYPE_LEVEL_HIGH>;
+-			arm,primecell-periphid = <0x180024>;
+ 
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+@@ -570,7 +567,6 @@
+ 			compatible = "stericsson,db8500-i2c", "st,nomadik-i2c", "arm,primecell";
+ 			reg = <0x80110000 0x1000>;
+ 			interrupts = <0 12 IRQ_TYPE_LEVEL_HIGH>;
+-			arm,primecell-periphid = <0x180024>;
+ 
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+@@ -583,7 +579,6 @@
+ 			compatible = "stericsson,db8500-i2c", "st,nomadik-i2c", "arm,primecell";
+ 			reg = <0x8012a000 0x1000>;
+ 			interrupts = <0 51 IRQ_TYPE_LEVEL_HIGH>;
+-			arm,primecell-periphid = <0x180024>;
+ 
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
 -- 
-1.7.10.4
+1.8.1.2
