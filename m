@@ -1,176 +1,68 @@
 From: jean.pihet@linaro.org (Jean Pihet)
-Date: Mon, 16 Sep 2013 11:17:31 +0200
-Subject: [PATCH 2/4] ARM: perf: wire up perf_regs and unwind support for ARM
+Date: Mon, 16 Sep 2013 11:17:32 +0200
+Subject: [PATCH 3/4] perf tools: Check libunwind for availability of dwarf
+ parsing feature
 In-Reply-To: <1379323053-11458-1-git-send-email-jean.pihet@linaro.org>
 References: <1379323053-11458-1-git-send-email-jean.pihet@linaro.org>
-Message-ID: <1379323053-11458-3-git-send-email-jean.pihet@linaro.org>
+Message-ID: <1379323053-11458-4-git-send-email-jean.pihet@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Will Deacon <will.deacon@arm.com>
+The newly added dwarf unwinding feature [1] requires:
+. a recent version (>= 1.1) of libunwind,
+. libunwind to be configured with --enable-debug-frame.
 
-This patch hooks in the perf_regs and libunwind code for ARM.
+[1] http://www.spinics.net/lists/kernel/msg1598951.html
 
-Signed-off-by: Will Deacon <will.deacon@arm.com>
-Cc: Jean Pihet <jean.pihet@linaro.org>
+Add the corresponding API test in the feature check list.
+
+Signed-off-by: Jean Pihet <jean.pihet@linaro.org>
 ---
- tools/perf/arch/arm/Makefile            |  3 ++
- tools/perf/arch/arm/include/perf_regs.h | 54 +++++++++++++++++++++++++++++++++
- tools/perf/arch/arm/util/unwind.c       | 48 +++++++++++++++++++++++++++++
- tools/perf/config/Makefile              |  7 +++--
- 4 files changed, 110 insertions(+), 2 deletions(-)
- create mode 100644 tools/perf/arch/arm/include/perf_regs.h
- create mode 100644 tools/perf/arch/arm/util/unwind.c
+ tools/perf/config/Makefile          |  2 +-
+ tools/perf/config/feature-tests.mak | 11 ++++++++++-
+ 2 files changed, 11 insertions(+), 2 deletions(-)
 
-diff --git a/tools/perf/arch/arm/Makefile b/tools/perf/arch/arm/Makefile
-index 15130b5..fe9b61e 100644
---- a/tools/perf/arch/arm/Makefile
-+++ b/tools/perf/arch/arm/Makefile
-@@ -2,3 +2,6 @@ ifndef NO_DWARF
- PERF_HAVE_DWARF_REGS := 1
- LIB_OBJS += $(OUTPUT)arch/$(ARCH)/util/dwarf-regs.o
- endif
-+ifndef NO_LIBUNWIND
-+LIB_OBJS += $(OUTPUT)arch/$(ARCH)/util/unwind.o
-+endif
-diff --git a/tools/perf/arch/arm/include/perf_regs.h b/tools/perf/arch/arm/include/perf_regs.h
-new file mode 100644
-index 0000000..2a1cfde
---- /dev/null
-+++ b/tools/perf/arch/arm/include/perf_regs.h
-@@ -0,0 +1,54 @@
-+#ifndef ARCH_PERF_REGS_H
-+#define ARCH_PERF_REGS_H
-+
-+#include <stdlib.h>
-+#include "../../util/types.h"
-+#include <asm/perf_regs.h>
-+
-+#define PERF_REGS_MASK	((1ULL << PERF_REG_ARM_MAX) - 1)
-+#define PERF_REG_IP	PERF_REG_ARM_PC
-+#define PERF_REG_SP	PERF_REG_ARM_SP
-+
-+static inline const char *perf_reg_name(int id)
-+{
-+	switch (id) {
-+	case PERF_REG_ARM_R0:
-+		return "r0";
-+	case PERF_REG_ARM_R1:
-+		return "r1";
-+	case PERF_REG_ARM_R2:
-+		return "r2";
-+	case PERF_REG_ARM_R3:
-+		return "r3";
-+	case PERF_REG_ARM_R4:
-+		return "r4";
-+	case PERF_REG_ARM_R5:
-+		return "r5";
-+	case PERF_REG_ARM_R6:
-+		return "r6";
-+	case PERF_REG_ARM_R7:
-+		return "r7";
-+	case PERF_REG_ARM_R8:
-+		return "r8";
-+	case PERF_REG_ARM_R9:
-+		return "r9";
-+	case PERF_REG_ARM_R10:
-+		return "r10";
-+	case PERF_REG_ARM_FP:
-+		return "fp";
-+	case PERF_REG_ARM_IP:
-+		return "ip";
-+	case PERF_REG_ARM_SP:
-+		return "sp";
-+	case PERF_REG_ARM_LR:
-+		return "lr";
-+	case PERF_REG_ARM_PC:
-+		return "pc";
-+	default:
-+		return NULL;
-+	}
-+
-+	return NULL;
-+}
-+
-+#endif /* ARCH_PERF_REGS_H */
-diff --git a/tools/perf/arch/arm/util/unwind.c b/tools/perf/arch/arm/util/unwind.c
-new file mode 100644
-index 0000000..da3dc95
---- /dev/null
-+++ b/tools/perf/arch/arm/util/unwind.c
-@@ -0,0 +1,48 @@
-+
-+#include <errno.h>
-+#include <libunwind.h>
-+#include "perf_regs.h"
-+#include "../../util/unwind.h"
-+
-+int unwind__arch_reg_id(int regnum)
-+{
-+	switch (regnum) {
-+	case UNW_ARM_R0:
-+		return PERF_REG_ARM_R0;
-+	case UNW_ARM_R1:
-+		return PERF_REG_ARM_R1;
-+	case UNW_ARM_R2:
-+		return PERF_REG_ARM_R2;
-+	case UNW_ARM_R3:
-+		return PERF_REG_ARM_R3;
-+	case UNW_ARM_R4:
-+		return PERF_REG_ARM_R4;
-+	case UNW_ARM_R5:
-+		return PERF_REG_ARM_R5;
-+	case UNW_ARM_R6:
-+		return PERF_REG_ARM_R6;
-+	case UNW_ARM_R7:
-+		return PERF_REG_ARM_R7;
-+	case UNW_ARM_R8:
-+		return PERF_REG_ARM_R8;
-+	case UNW_ARM_R9:
-+		return PERF_REG_ARM_R9;
-+	case UNW_ARM_R10:
-+		return PERF_REG_ARM_R10;
-+	case UNW_ARM_R11:
-+		return PERF_REG_ARM_FP;
-+	case UNW_ARM_R12:
-+		return PERF_REG_ARM_IP;
-+	case UNW_ARM_R13:
-+		return PERF_REG_ARM_SP;
-+	case UNW_ARM_R14:
-+		return PERF_REG_ARM_LR;
-+	case UNW_ARM_R15:
-+		return PERF_REG_ARM_PC;
-+	default:
-+		pr_err("unwind: invalid reg id %d\n", regnum);
-+		return -EINVAL;
-+	}
-+
-+	return -EINVAL;
-+}
 diff --git a/tools/perf/config/Makefile b/tools/perf/config/Makefile
-index 214e17e..4b65710 100644
+index 4b65710..395bc41 100644
 --- a/tools/perf/config/Makefile
 +++ b/tools/perf/config/Makefile
-@@ -29,6 +29,10 @@ ifeq ($(ARCH),x86_64)
-   NO_PERF_REGS := 0
-   LIBUNWIND_LIBS = -lunwind -lunwind-x86_64
- endif
-+ifeq ($(ARCH),arm)
-+  NO_PERF_REGS := 0
-+  LIBUNWIND_LIBS = -lunwind -lunwind-arm
-+endif
+@@ -223,7 +223,7 @@ endif
  
- ifeq ($(NO_PERF_REGS),0)
-   CFLAGS += -DHAVE_PERF_REGS
-@@ -205,8 +209,7 @@ ifeq ($(call try-cc,$(SOURCE_ELF_MMAP),$(FLAGS_LIBELF),-DLIBELF_MMAP),y)
- endif # try-cc
- endif # NO_LIBELF
- 
--# There's only x86 (both 32 and 64) support for CFI unwind so far
--ifneq ($(ARCH),x86)
-+ifeq ($(LIBUNWIND_LIBS),)
+ FLAGS_UNWIND=$(LIBUNWIND_CFLAGS) $(CFLAGS) $(LIBUNWIND_LDFLAGS) $(LDFLAGS) $(EXTLIBS) $(LIBUNWIND_LIBS)
+ ifneq ($(call try-cc,$(SOURCE_LIBUNWIND),$(FLAGS_UNWIND),libunwind),y)
+-  msg := $(warning No libunwind found, disabling post unwind support. Please install libunwind-dev[el] >= 0.99);
++  msg := $(warning No libunwind found, disabling post unwind support. Please install libunwind-dev[el] >= 1.1);
    NO_LIBUNWIND := 1
- endif
+ endif # Libunwind support
+ endif # NO_LIBUNWIND
+diff --git a/tools/perf/config/feature-tests.mak b/tools/perf/config/feature-tests.mak
+index 708fb8e..87124d0 100644
+--- a/tools/perf/config/feature-tests.mak
++++ b/tools/perf/config/feature-tests.mak
+@@ -176,14 +176,23 @@ extern int UNW_OBJ(dwarf_search_unwind_table) (unw_addr_space_t as,
+                                       unw_proc_info_t *pi,
+                                       int need_unwind_info, void *arg);
  
+-
+ #define dwarf_search_unwind_table UNW_OBJ(dwarf_search_unwind_table)
+ 
++extern int
++UNW_OBJ(dwarf_find_debug_frame) (int found, unw_dyn_info_t *di_debug,
++				 unw_word_t ip,
++				 unw_word_t segbase,
++				 const char *obj_name, unw_word_t start,
++				 unw_word_t end);
++
++#define dwarf_find_debug_frame UNW_OBJ(dwarf_find_debug_frame)
++
+ int main(void)
+ {
+ 	unw_addr_space_t addr_space;
+ 	addr_space = unw_create_addr_space(NULL, 0);
+ 	unw_init_remote(NULL, addr_space, NULL);
++	dwarf_find_debug_frame(0, NULL, 0, 0, NULL, 0, 0);
+ 	dwarf_search_unwind_table(addr_space, 0, NULL, NULL, 0, NULL);
+ 	return 0;
+ }
 -- 
 1.7.11.7
