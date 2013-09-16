@@ -1,52 +1,44 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 16 Sep 2013 10:34:28 -0600
-Subject: [PATCH] clk: si570: Add a driver for SI570 oscillators
-In-Reply-To: <1379033737-30015-2-git-send-email-soren.brinkmann@xilinx.com>
-References: <1379033737-30015-1-git-send-email-soren.brinkmann@xilinx.com>
- <1379033737-30015-2-git-send-email-soren.brinkmann@xilinx.com>
-Message-ID: <52373314.5070806@wwwdotorg.org>
+From: ethan@ethantuttle.com (Ethan Tuttle)
+Date: Mon, 16 Sep 2013 09:35:16 -0700
+Subject: mvneta: oops in __rcu_read_lock on mirabox
+In-Reply-To: <20130916175152.4e013457@skate>
+References: <CACzLR4tTvt+ROEhkXUCQhV6=bPPTX4LFSkWfrEhF+OdM1Jm1Rw@mail.gmail.com>
+ <20130915205701.5c61a444@skate> <20130916065047.GH27487@1wt.eu>
+ <20130916175152.4e013457@skate>
+Message-ID: <CACzLR4twTNjzU8hK3L1cYUXnEH1ydwY6jnYoOG+9vLB3-4uQ4w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/12/2013 06:55 PM, Soren Brinkmann wrote:
-> Add a driver for SILabs 570, 571, 598, 599 programmable oscillators.
-> The devices generate low-jitter clock signals and are reprogrammable via
-> an I2C interface.
+On Mon, Sep 16, 2013 at 8:51 AM, Thomas Petazzoni
+<thomas.petazzoni@free-electrons.com> wrote:
+> Willy, Ethan,
+>
+> On Mon, 16 Sep 2013 08:50:47 +0200, Willy Tarreau wrote:
+>
+>> I'm currently testing on 3.11.1 (which I had here) and am not getting
+>> any issue after 50M packets. My kernel is running in thumb mode and
+>> without SMP.
+>>
+>> Ethan, we'll need your config I guess.
+>
+> Can both of you also report the U-Boot version you're using, and the
+> SoC revision (it's visible in the U-Boot output).
 
-> diff --git a/Documentation/devicetree/bindings/clock/silabs,si570.txt b/Documentation/devicetree/bindings/clock/silabs,si570.txt
+Mine says:
 
-> +Required properties:
-> + - compatible: Shall be one of "silabs,si57x", "silabs,si59x".
-> + - reg: I2C device address.
-> + - #clock-cells: From common clock bindings: Shall be 0.
-> + - factory-fout: Factory set default frequency
+U-Boot 2009.08 (Sep 16 2012 - 22:50:06)Marvell version: 1.1.2 NQ
+SoC:   MV6710 A1
 
-So, there's no way to query this from the device at all? Looking at the
-data-sheet, all the frequency generation parameters are in registers,
-and the device supports I2C read commands. As such, I'm not convinced
-this property is necessary.
-
-> +Optional properties:
-> + - initial-fout: Initial output frequency to set during probe
-
-"probe" is a Linux-specific concept. This property should be removed. If
-the driver is asked to set a specific frequency, it should do so, but I
-don't think it should program something pro-actively just because it
-starts up.
-
-If this property is acceptable, it'd be better to describe it more along
-the lines of the following:
-
-initial-fout: The frequency at which the system requires the clock to
-operate.
-
-> + - temperature-stability-7ppm: Indicate a device with a temperature stability
-> +			       of 7ppm
-> +
-> +Example:
-> +	si570: clock-generator at 5d {
-> +		#clock-cells = <0>;
-> +		compatible = "silabs,si570";
-> +		reg = <0x5d>;
-> +		factory-fout = <156250000>;
-> +	};
+> Maybe Globalscale is
+> shipping Mirabox with a different version of the bootloader, or some
+> hardware difference, that is causing problems? (I'm just speculating
+> here, but another user already reported having issues with his Mirabox,
+> and Russell King analyzed the oops as very likely being hardware
+> problems).
+>
+> Thomas
+> --
+> Thomas Petazzoni, Free Electrons
+> Kernel, drivers, real-time and embedded Linux
+> development, consulting, training and support.
+> http://free-electrons.com
