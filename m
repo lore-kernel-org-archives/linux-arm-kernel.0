@@ -1,28 +1,85 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 16 Sep 2013 17:01:48 +0800
-Subject: [PATCH v4 3/3] PCI: imx6: Add support for i.MX6 PCIe controller
-In-Reply-To: <5236AB28.5060708@kosagi.com>
-References: <1379065222-7275-1-git-send-email-xobs@kosagi.com>
- <1379065222-7275-4-git-send-email-xobs@kosagi.com>
- <20130916060631.GF31147@S2101-09.ap.freescale.net>
- <5236AB28.5060708@kosagi.com>
-Message-ID: <20130916090146.GL31147@S2101-09.ap.freescale.net>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon, 16 Sep 2013 10:10:06 +0100
+Subject: [PATCH 2/2] Documentation: DT: arm: define CPU topology bindings
+In-Reply-To: <52337E7F.9010802@gmail.com>
+References: <1376559743-31848-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1376559743-31848-3-git-send-email-lorenzo.pieralisi@arm.com>
+ <52337E7F.9010802@gmail.com>
+Message-ID: <20130916091006.GC22390@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 16, 2013 at 02:54:32PM +0800, Sean Cross wrote:
-> >>@@ -116,6 +116,22 @@
-> >>  			arm,data-latency = <4 2 3>;
-> >>  		};
-> >>+		pcie: pcie at 0x01000000 {
-> >>+			compatible = "fsl,imx6-pcie", "snps,dw-pcie";
-> >We generally use particular SoC name to specify the compatible string.
-> >So "fsl,imx6q-pcie" will be more appropriate.
-> Any reason to specify imx6q in particular?  It's also present on the
-> imx6d, imx6dl, and imx6s (basically, everything but the imx6sl).
+On Fri, Sep 13, 2013 at 10:07:11PM +0100, Rob Herring wrote:
+> On 08/15/2013 04:42 AM, Lorenzo Pieralisi wrote:
+> > The advent of multi-cluster ARM systems requires a mechanism to describe
+> > how in hierarchical terms CPUs are connected in ARM SoCs so that the kernel
+> > can initialize and map resources like IRQs and memory space to specific
+> > group(s) of CPUs.
+> > 
+> > The CPU topology is made up of multiple hierarchy levels whose bottom
+> > layers (aka leaf nodes in device tree syntax) contain links to the HW
+> > CPUs in the system.
+> > 
+> > The topology bindings are generic for both 32-bit and 64-bit systems and
+> > lay the groundwork on top of which affinity schemes can be built.
+> 
+> By affinity schemes, you mean further bindings? Do we need this binding
+> until that point?
 
-The compatible naming is not about coverage but versioning.  We
-generally encode the name of the SoC that firstly integrates the block
-to specify the version.
+Well, further bindings (for HW like perf counters) will rely on these
+topology bindings to build IRQ affinity masks for instance.
 
-Shawn
+I think we should go on and publish these bindings asap so that we can
+rely on them to properly describe topologies for ARM from the beginning.
+
+Current reliance on MPIDR is a leap of faith.
+
+> As is, I don't have much comment.
+
+I take this as positive feedback, or put it another way, that you think
+bindings are sound.
+
+> 
+> [snip]
+> 
+> > +Example 3 (ARM 32-bit, cortex-a8 single core):
+> > +
+> > +cpus {
+> > +	#size-cells = <0>;
+> > +	#address-cells = <1>;
+> > +
+> > +	cpu-map {
+> > +		cluster0 {
+> > +			core0 {
+> > +				cpu = <&CPU0>;
+> > +			};
+> > +		};
+> > +	};
+> 
+> This example seems utterly pointless. I think we should be specific that
+> single core does not contain a cpu-map. I suppose we could have a
+> threaded, single core case, but let's address that if we ever do.
+
+Ok right. We can have a multi cluster system where one cluster is made
+up of a single CPU, then a binding like the one above makes sense.
+I will rule cpu-map out for uniprocessor systems.
+
+Lorenzo
+
+> 
+> Rob
+> 
+> > +
+> > +	CPU0: cpu at 0 {
+> > +		device_type = "cpu";
+> > +		compatible = "arm,cortex-a8";
+> > +		reg = <0x0>;
+> > +	};
+> > +};
+> > +
+> > +===============================================================================
+> > +[1] ARM Linux kernel documentation
+> > +    Documentation/devicetree/bindings/arm/cpus.txt
+> > 
+> 
+> 
