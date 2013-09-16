@@ -1,25 +1,36 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 16 Sep 2013 07:54:18 -0700
-Subject: [PATCH] ARM: multi_v7: add HREFv60 to multi_v7 defconfig
-In-Reply-To: <1379334152-9751-1-git-send-email-linus.walleij@linaro.org>
-References: <1379334152-9751-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <20130916145418.GA7221@quad.lixom.net>
+From: sre@debian.org (Sebastian Reichel)
+Date: Mon, 16 Sep 2013 17:01:47 +0200
+Subject: [RFCv2 3/3] ARM: dts: N900: Add SSI information
+In-Reply-To: <CAAwP0s0e-gYkNA78eQH7x2VJbM1byaisUeqU8YbbeWUbKwsxCQ@mail.gmail.com>
+References: <1379277856-24571-1-git-send-email-sre@debian.org>
+ <1379277856-24571-4-git-send-email-sre@debian.org>
+ <CAAwP0s0e-gYkNA78eQH7x2VJbM1byaisUeqU8YbbeWUbKwsxCQ@mail.gmail.com>
+Message-ID: <20130916150147.GA14047@earth.universe>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 16, 2013 at 02:22:32PM +0200, Linus Walleij wrote:
-> This is just a standard board for the Ux500, include it in the
-> v7 multiplatform defconfig.
+Hi,
+
+> Is the Synchronous Serial Interface (SSI)  only supported by
+> OMAP34xx/OMAP35xx SoC and not by OMAP36xx/OMAP37xx SoC?
 > 
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
-> Hi ARM SoC folks: this makes also my preferred development board
-> boot with multi_v7. Please apply this patch directly to fixes
-> if you're happy with it.
+> I'm asking this since if SSI is supported by both we should add the
+> device nodes in omap3.dtsi instead of omap34xx.dtsi.
+> 
+> I thought that all OMAP3 SoC supported SSI and all OMAP4 SoC supported
+> HSI but I guess I was wrong...
 
-Ho hum. I think the approach we want is to only do DT platforms on
-multi_v7.  You have a series to drop/switch all non-DT platforms coming
-soon though, I think?
+I just do not know. Information about the SSI core is not included
+in the public OMAP TRM. It only lists the memory space as reserved.
 
+Thus I only included it in OMAP34xx, which is used in Nokia N900 and
+must support SSI.
 
--Olof
+-- Sebastian
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130916/f2c6d2d9/attachment-0001.sig>
