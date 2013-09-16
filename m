@@ -1,94 +1,56 @@
 From: marex@denx.de (Marek Vasut)
-Date: Mon, 16 Sep 2013 17:10:15 +0200
-Subject: [PATCH v3] PWM: PXA: add device tree support to PWM driver
-In-Reply-To: <523718D3.4050003@newsguy.com>
-References: <1379091281-23662-1-git-send-email-mikedunn@newsguy.com>
- <201309151607.04244.marex@denx.de> <523718D3.4050003@newsguy.com>
-Message-ID: <201309161710.15800.marex@denx.de>
+Date: Mon, 16 Sep 2013 17:10:36 +0200
+Subject: [PATCH 5/6] Staging/iio/adc/touchscreen/MXS: add interrupt driven
+ touch detection
+In-Reply-To: <201309161634.54603.jbe@pengutronix.de>
+References: <1378887511-24530-1-git-send-email-jbe@pengutronix.de>
+ <201309161623.48247.marex@denx.de> <201309161634.54603.jbe@pengutronix.de>
+Message-ID: <201309161710.36726.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Mike Dunn,
+Dear J?rgen Beisert,
 
-> On 09/15/2013 07:07 AM, Marek Vasut wrote:
-> > Dear Mike Dunn,
+> Hi Marek,
+> 
+> On Monday 16 September 2013 16:23:48 Marek Vasut wrote:
+> > > On Sunday 15 September 2013 12:56:25 Jonathan Cameron wrote:
+> > > > On 09/11/13 09:18, Juergen Beisert wrote:
+> > > > > For battery driven systems it is a very bad idea to collect the
+> > > > > touchscreen data within a kernel busy loop.
+> > > > > 
+> > > > > This change uses the features of the hardware to delay and
+> > > > > accumulate samples in hardware to avoid a high interrupt and CPU
+> > > > > load.
+> > > > > 
+> > > > > Note: this is only tested on an i.MX23 SoC yet.
+> > > > > 
+> > > > > Signed-off-by: Juergen Beisert <jbe@pengutronix.de>
+> > > > > CC: linux-arm-kernel at lists.infradead.org
+> > > > > CC: devel at driverdev.osuosl.org
+> > > > > CC: Marek Vasut <marex@denx.de>
+> > > > > CC: Fabio Estevam <fabio.estevam@freescale.com>
+> > > > > CC: Jonathan Cameron <jic23@cam.ac.uk>
+> > > > 
+> > > > While this driver is placed in IIO within staging at the moment,
+> > > > these changes are definitely input related.  Hence I have cc'd
+> > > > Dmitry and the input list.
+> > > > 
+> > > > I am personaly a little uncomfortable that we have such a complex bit
+> > > > of input code sat within an IIO driver but such is life.
+> > > 
+> > > Maybe an MFD for this ADC unit would be a better way to go? Currently I
+> > > have a different problem with this driver, because the ADC unit
+> > > monitors the battery as well. And the charging driver from the power
+> > > subsystem needs these values to charge the battery in a correct
+> > > manner.
 > > 
-> >> This patch adds device tree support to the PXA's PWM driver.  Only an OF
-> >> match table is added; nothing needs to be extracted from the device tree
-> >> node.  The existing ID table is reused for the match table data.
-> >> 
-> >> Tested on a Palm Treo 680 (both platform data and DT cases).
-> >> 
-> >> Signed-off-by: Mike Dunn <mikedunn@newsguy.com>
-> >> ---
-> >> Changle log:
-> >> v3:
-> >> - remove support for the polarity flag
-> >> - remove per-chip pwm index cell; define custom of_xlate()
-> >> 
-> >>    (now #pwm-cells = <1>)
-> >> 
-> >> - "compatible" strings for all devices added to OF match table
-> >> - various stylistic changes recommended by reviewers
-> >> 
-> >> v2:
-> >> - of_match_table contains only the "pxa250-pwm" compatible string;
-> >> require one device instance per pwm
-> >> - add Documentation/devicetree/bindings/pwm/pxa-pwm.txt
-> >> - add support for polarity flag in DT and implement set_polarity()
-> >> method
-> >> 
-> >>   (the treo 680 inverts the signal between pwm out and backlight)
-> >> 
-> >> - return -EINVAL instead of -ENODEV if platform data or DT node not
-> >> found - output dev_info string if platform data missing
-> >> - expanded CC list of patch
-> >> 
-> >>  Documentation/devicetree/bindings/pwm/pxa-pwm.txt | 31 ++++++++++++
-> >>  arch/arm/boot/dts/pxa27x.dtsi                     | 24 +++++++++
-> >>  drivers/pwm/pwm-pxa.c                             | 62
-> >> 
-> >> +++++++++++++++++++++++ 3 files changed, 117 insertions(+)
-> >> 
-> >>  create mode 100644 Documentation/devicetree/bindings/pwm/pxa-pwm.txt
-> >> 
-> >> diff --git a/Documentation/devicetree/bindings/pwm/pxa-pwm.txt
-> >> b/Documentation/devicetree/bindings/pwm/pxa-pwm.txt new file mode 100644
-> >> index 0000000..6fcf90c
-> >> --- /dev/null
-> >> +++ b/Documentation/devicetree/bindings/pwm/pxa-pwm.txt
-> >> @@ -0,0 +1,31 @@
-> >> +Marvell PWM controller
-> >> +
-> >> +Required properties:
-> >> +- compatible: should be one of:
-> >> +  - "marvell,pxa250-pwm"
-> >> +  - "marvell,pxa270-pwm"
-> >> +  - "marvell,pxa168-pwm"
-> >> +  - "marvell,pxa910-pwm"
-> > 
-> > This really is something I dont quite understand. Why should the driver
-> > list _every_ _single_ existing CPU that contains such PWM block? Is
-> > there any agreement about that? For me, it'd make much more sense to
-> > list only the CPUs where the IP block actually changed in some way, so
-> > that the differences can be discerned that way.
+> > Are you planning to post the power block patches too ?
 > 
-> I believe that this was Stephen's suggestion.
-> 
-> I actually don't object myself.  For the price of a few strings, it
-> - clearly shows which SoCs the driver supports
-> - ensures that any future differences are handled cleanly (e.g., if a hw
-> bug in one is discovered and a work-around is implemented)
-> - keeps thngs clean if support for another processor which does have pwm hw
-> differences is added
-> 
-> Especially the third point... otherwise, you have the case of a somewhat
-> confusing many-to-one mapping of processors to compatible strings.
+> When they will work: yes. Currently it crashes all the time. The PMIC is a
+> beast...
 
-OK, to push it ad-absurdum, shall we not start listing every single revision of 
-the CPU as well ? Like pxa250a0 250a1 etc ? Yes , this many-to-one mapping is 
-something I don't quite understand, that's why I'd love to see a good reasoning 
-from Stephen.
+Full ACK
 
 Best regards,
 Marek Vasut
