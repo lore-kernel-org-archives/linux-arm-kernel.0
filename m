@@ -1,35 +1,33 @@
-From: w@1wt.eu (Willy Tarreau)
-Date: Mon, 16 Sep 2013 19:47:08 +0200
-Subject: mvneta: oops in __rcu_read_lock on mirabox
-In-Reply-To: <CACzLR4ssOPsmYaEh2ohe4HL5j+67keDYnmR4YezNB=aO7Pj5kA@mail.gmail.com>
-References: <CACzLR4tTvt+ROEhkXUCQhV6=bPPTX4LFSkWfrEhF+OdM1Jm1Rw@mail.gmail.com>
- <20130915205701.5c61a444@skate> <20130916065047.GH27487@1wt.eu>
- <20130916175152.4e013457@skate>
- <CACzLR4twTNjzU8hK3L1cYUXnEH1ydwY6jnYoOG+9vLB3-4uQ4w@mail.gmail.com>
- <20130916163937.GC3188@1wt.eu> <20130916164412.GD3188@1wt.eu>
- <CACzLR4ssOPsmYaEh2ohe4HL5j+67keDYnmR4YezNB=aO7Pj5kA@mail.gmail.com>
-Message-ID: <20130916174708.GG3188@1wt.eu>
+From: aaro.koskinen@iki.fi (Aaro Koskinen)
+Date: Mon, 16 Sep 2013 21:10:32 +0300
+Subject: [RFCv2 3/3] ARM: dts: N900: Add SSI information
+In-Reply-To: <20130916150147.GA14047@earth.universe>
+References: <1379277856-24571-1-git-send-email-sre@debian.org>
+ <1379277856-24571-4-git-send-email-sre@debian.org>
+ <CAAwP0s0e-gYkNA78eQH7x2VJbM1byaisUeqU8YbbeWUbKwsxCQ@mail.gmail.com>
+ <20130916150147.GA14047@earth.universe>
+Message-ID: <20130916181032.GB30568@blackmetal.musicnaut.iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 16, 2013 at 10:24:05AM -0700, Ethan Tuttle wrote:
-> I have not opened my mirabox - but sure, I'll open it up and try those
-> other settings when I get a chance.
+Hi,
 
-OK
+On Mon, Sep 16, 2013 at 05:01:47PM +0200, Sebastian Reichel wrote:
+> > Is the Synchronous Serial Interface (SSI)  only supported by
+> > OMAP34xx/OMAP35xx SoC and not by OMAP36xx/OMAP37xx SoC?
+> > 
+> > I'm asking this since if SSI is supported by both we should add the
+> > device nodes in omap3.dtsi instead of omap34xx.dtsi.
+> > 
+> > I thought that all OMAP3 SoC supported SSI and all OMAP4 SoC supported
+> > HSI but I guess I was wrong...
+> 
+> I just do not know. Information about the SSI core is not included
+> in the public OMAP TRM. It only lists the memory space as reserved.
+> 
+> Thus I only included it in OMAP34xx, which is used in Nokia N900 and
+> must support SSI.
 
-> Also, you mentioned that you have SMP disabled in your kernel.  It
-> looks like it's on in my .config.  Should I run a test with SMP
-> disabled?
+I think N9 and N950 (OMAP3630) are using pretty much the same driver.
 
-You may want to try but I wouldn't bet on this.
-
-> I'm surprised that nobody else sees this crash given how easy it is
-> for me to reproduce.  BTW, the 3.11 kernel I made with 702821f
-> reverted has been humming along for days without issue.
-
-I'll have to rebuild with your config and exact 3.11 to test again.
-Can you check the packet rate of your ping flood to give an order of
-magnitude so that we're sure to be in the same conditions ?
-
-Willy
+A.
