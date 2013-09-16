@@ -1,89 +1,41 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Mon, 16 Sep 2013 16:32:14 +0100
-Subject: [PATCH 25/38] iio: pressure-core: st: Allow for number of
- channels to vary
-In-Reply-To: <20130916081724.GD3999@lee--X1>
-References: <1378817379-8238-1-git-send-email-lee.jones@linaro.org>
- <1378817379-8238-26-git-send-email-lee.jones@linaro.org>
- <52349A4E.10401@kernel.org> <20130916081724.GD3999@lee--X1>
-Message-ID: <af83f89d-0d15-473d-8365-40d1fecca728@email.android.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 16 Sep 2013 09:34:19 -0600
+Subject: [PATCH] ARM: tegra: remove tegra_chip_uid()
+Message-ID: <1379345659-9528-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Stephen Warren <swarren@nvidia.com>
 
+Following commit f5b38c5 "crypto: tegra - use kernel entropy instead
+of ad-hoc", this function is no longer used. It's also only accurate
+for Tegra20 and not later SoCs. So, remove it.
 
-Lee Jones <lee.jones@linaro.org> wrote:
->On Sat, 14 Sep 2013, Jonathan Cameron wrote:
->
->> On 09/10/13 13:49, Lee Jones wrote:
->> > At the moment the number of channels specified is dictated by the
->first
->> > sensor supported by the driver. As we add support for more sensors
->this
->> > is likely to vary. Instead of using the ARRAY_SIZE() of the
->LPS331AP's
->> > channel specifier we'll use a new adaptable 'struct st_sensors'
->element
->> > instead.
->> > 
->> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
->> Applied with Denis ack (again it should have been here)
->
->Ah, you're going to take the patches one-by-one?
->
->After amending the drivers as per your review I was going to send a
->final time with all Acks applied. Then, once all maintainer Acks were
->obtained I was going to send you a pull-request.
->
->Perhaps I should have communicated the intent sooner.
->
->Future submissions will have all Acks applied in this case.
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+---
+Herbert, this is a patch for the crypto tree, since it depends on a
+patch to the tegra-aes crypto driver that's in your tree.
 
-Quite a few of this series stood alone just fine so I grabbed them :)
->
->> > ---
->> >  drivers/iio/pressure/st_pressure_core.c | 3 ++-
->> >  include/linux/iio/common/st_sensors.h   | 1 +
->> >  2 files changed, 3 insertions(+), 1 deletion(-)
->> > 
->> > diff --git a/drivers/iio/pressure/st_pressure_core.c
->b/drivers/iio/pressure/st_pressure_core.c
->> > index 60c2ee4..3abada2 100644
->> > --- a/drivers/iio/pressure/st_pressure_core.c
->> > +++ b/drivers/iio/pressure/st_pressure_core.c
->> > @@ -107,6 +107,7 @@ static const struct st_sensors
->st_press_sensors[] = {
->> >  			[0] = LPS331AP_PRESS_DEV_NAME,
->> >  		},
->> >  		.ch = (struct iio_chan_spec *)st_press_lps331ap_channels,
->> > +		.num_ch = ARRAY_SIZE(st_press_lps331ap_channels),
->> >  		.odr = {
->> >  			.addr = ST_PRESS_LPS331AP_ODR_ADDR,
->> >  			.mask = ST_PRESS_LPS331AP_ODR_MASK,
->> > @@ -245,7 +246,7 @@ int st_press_common_probe(struct iio_dev
->*indio_dev,
->> >  	pdata->num_data_channels = ST_PRESS_NUMBER_DATA_CHANNELS;
->> >  	pdata->multiread_bit = pdata->sensor->multi_read_bit;
->> >  	indio_dev->channels = pdata->sensor->ch;
->> > -	indio_dev->num_channels = ARRAY_SIZE(st_press_lps331ap_channels);
->> > +	indio_dev->num_channels = pdata->sensor->num_ch;
->> >  
->> >  	if (pdata->sensor->fs.addr != 0)
->> >  		pdata->current_fullscale = (struct st_sensor_fullscale_avl *)
->> > diff --git a/include/linux/iio/common/st_sensors.h
->b/include/linux/iio/common/st_sensors.h
->> > index e51f654..e732fda 100644
->> > --- a/include/linux/iio/common/st_sensors.h
->> > +++ b/include/linux/iio/common/st_sensors.h
->> > @@ -184,6 +184,7 @@ struct st_sensors {
->> >  	u8 wai;
->> >  	char sensors_supported[ST_SENSORS_MAX_4WAI][ST_SENSORS_MAX_NAME];
->> >  	struct iio_chan_spec *ch;
->> > +	int num_ch;
->> >  	struct st_sensor_odr odr;
->> >  	struct st_sensor_power pw;
->> >  	struct st_sensor_axis enable_axis;
->> > 
+ arch/arm/mach-tegra/fuse.c | 10 ----------
+ 1 file changed, 10 deletions(-)
 
+diff --git a/arch/arm/mach-tegra/fuse.c b/arch/arm/mach-tegra/fuse.c
+index e035cd2..64652b3 100644
+--- a/arch/arm/mach-tegra/fuse.c
++++ b/arch/arm/mach-tegra/fuse.c
+@@ -155,13 +155,3 @@ void tegra_init_fuse(void)
+ 		tegra_sku_id, tegra_cpu_process_id,
+ 		tegra_core_process_id);
+ }
+-
+-unsigned long long tegra_chip_uid(void)
+-{
+-	unsigned long long lo, hi;
+-
+-	lo = tegra_fuse_readl(FUSE_UID_LOW);
+-	hi = tegra_fuse_readl(FUSE_UID_HIGH);
+-	return (hi << 32ull) | lo;
+-}
+-EXPORT_SYMBOL(tegra_chip_uid);
 -- 
-Sent from my Android phone with K-9 Mail. Please excuse my brevity.
+1.8.1.5
