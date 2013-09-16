@@ -1,80 +1,82 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 16 Sep 2013 17:02:25 +0100
-Subject: [PATCH 19/20] iio: gyro-core: st: Clean up error handling in probe()
+Date: Mon, 16 Sep 2013 17:02:23 +0100
+Subject: [PATCH 17/20] iio: pressure-core: st: Provide support for the Vdd_IO
+ power supply
 In-Reply-To: <1379347346-823-1-git-send-email-lee.jones@linaro.org>
 References: <1379347346-823-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1379347346-823-20-git-send-email-lee.jones@linaro.org>
+Message-ID: <1379347346-823-18-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Reduce the amount of those unnecessary goto calls, as in most cases
-we can simply return immediately. We also only call for the IRQ number
-once and use that value throughout.
+The power to some of the sensors are controlled by regulators. In most
+cases these are 'always on', but if not they will fail to work until
+the regulator is enabled using the relevant APIs. This patch allows for
+the Vdd_IO power supply to be specified by either platform data or
+Device Tree.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/iio/gyro/st_gyro_core.c | 19 ++++++++++---------
- 1 file changed, 10 insertions(+), 9 deletions(-)
+ drivers/iio/pressure/st_pressure_core.c | 13 ++++++++++++-
+ include/linux/iio/common/st_sensors.h   |  2 ++
+ 2 files changed, 14 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/iio/gyro/st_gyro_core.c b/drivers/iio/gyro/st_gyro_core.c
-index e13c2b0..9f80817 100644
---- a/drivers/iio/gyro/st_gyro_core.c
-+++ b/drivers/iio/gyro/st_gyro_core.c
-@@ -305,8 +305,9 @@ static const struct iio_trigger_ops st_gyro_trigger_ops = {
- int st_gyro_common_probe(struct iio_dev *indio_dev,
- 					struct st_sensors_platform_data *pdata)
- {
--	int err;
- 	struct st_sensor_data *gdata = iio_priv(indio_dev);
-+	int irq = gdata->get_irq_data_ready(indio_dev);
-+	int err;
+diff --git a/drivers/iio/pressure/st_pressure_core.c b/drivers/iio/pressure/st_pressure_core.c
+index c801c80..e3f3888 100644
+--- a/drivers/iio/pressure/st_pressure_core.c
++++ b/drivers/iio/pressure/st_pressure_core.c
+@@ -319,7 +319,7 @@ void st_press_power_enable(struct iio_dev *indio_dev)
+ 	struct st_sensor_data *pdata = iio_priv(indio_dev);
+ 	int err;
  
- 	indio_dev->modes = INDIO_DIRECT_MODE;
- 	indio_dev->info = &gyro_info;
-@@ -314,7 +315,7 @@ int st_gyro_common_probe(struct iio_dev *indio_dev,
- 	err = st_sensors_check_device_support(indio_dev,
- 				ARRAY_SIZE(st_gyro_sensors), st_gyro_sensors);
- 	if (err < 0)
--		goto st_gyro_common_probe_error;
-+		return err;
- 
- 	gdata->num_data_channels = ST_GYRO_NUMBER_DATA_CHANNELS;
- 	gdata->multiread_bit = gdata->sensor->multi_read_bit;
-@@ -327,12 +328,12 @@ int st_gyro_common_probe(struct iio_dev *indio_dev,
- 
- 	err = st_sensors_init_sensor(indio_dev, pdata);
- 	if (err < 0)
--		goto st_gyro_common_probe_error;
-+		return err;
- 
--	if (gdata->get_irq_data_ready(indio_dev) > 0) {
-+	if (irq > 0) {
- 		err = st_gyro_allocate_ring(indio_dev);
- 		if (err < 0)
--			goto st_gyro_common_probe_error;
-+			return err;
- 
- 		err = st_sensors_allocate_trigger(indio_dev,
- 						  ST_GYRO_TRIGGER_OPS);
-@@ -344,15 +345,15 @@ int st_gyro_common_probe(struct iio_dev *indio_dev,
- 	if (err)
- 		goto st_gyro_device_register_error;
- 
--	return err;
-+	return 0;
- 
- st_gyro_device_register_error:
--	if (gdata->get_irq_data_ready(indio_dev) > 0)
-+	if (irq > 0)
- 		st_sensors_deallocate_trigger(indio_dev);
- st_gyro_probe_trigger_error:
--	if (gdata->get_irq_data_ready(indio_dev) > 0)
-+	if (irq > 0)
- 		st_gyro_deallocate_ring(indio_dev);
--st_gyro_common_probe_error:
+-	/* Regulators not mandatory, but if requested we should enable it. */
++	/* Regulators not mandatory, but if requested we should enable them. */
+ 	pdata->vdd = devm_regulator_get_optional(&indio_dev->dev, "vdd");
+ 	if (!IS_ERR(pdata->vdd)) {
+ 		err = regulator_enable(pdata->vdd);
+@@ -327,6 +327,14 @@ void st_press_power_enable(struct iio_dev *indio_dev)
+ 			dev_warn(&indio_dev->dev,
+ 				 "Failed to enable specified Vdd supply\n");
+ 	}
 +
- 	return err;
++	pdata->vdd_io = devm_regulator_get_optional(&indio_dev->dev, "vddio");
++	if (!IS_ERR(pdata->vdd_io)) {
++		err = regulator_enable(pdata->vdd_io);
++		if (err != 0)
++			dev_warn(&indio_dev->dev,
++				 "Failed to enable specified Vdd_IO supply\n");
++	}
  }
- EXPORT_SYMBOL(st_gyro_common_probe);
+ 
+ void st_press_power_disable(struct iio_dev *indio_dev)
+@@ -335,6 +343,9 @@ void st_press_power_disable(struct iio_dev *indio_dev)
+ 
+ 	if (!IS_ERR(pdata->vdd))
+ 		regulator_disable(pdata->vdd);
++
++	if (!IS_ERR(pdata->vdd_io))
++		regulator_disable(pdata->vdd_io);
+ }
+ 
+ int st_press_common_probe(struct iio_dev *indio_dev,
+diff --git a/include/linux/iio/common/st_sensors.h b/include/linux/iio/common/st_sensors.h
+index 968b84e..3c005eb 100644
+--- a/include/linux/iio/common/st_sensors.h
++++ b/include/linux/iio/common/st_sensors.h
+@@ -203,6 +203,7 @@ struct st_sensors {
+  * @sensor: Pointer to the current sensor struct in use.
+  * @current_fullscale: Maximum range of measure by the sensor.
+  * @vdd: Pointer to sensor's Vdd power supply
++ * @vdd_io: Pointer to sensor's Vdd-IO power supply
+  * @enabled: Status of the sensor (false->off, true->on).
+  * @multiread_bit: Use or not particular bit for [I2C/SPI] multiread.
+  * @buffer_data: Data used by buffer part.
+@@ -219,6 +220,7 @@ struct st_sensor_data {
+ 	struct st_sensors *sensor;
+ 	struct st_sensor_fullscale_avl *current_fullscale;
+ 	struct regulator *vdd;
++	struct regulator *vdd_io;
+ 
+ 	bool enabled;
+ 	bool multiread_bit;
 -- 
 1.8.1.2
