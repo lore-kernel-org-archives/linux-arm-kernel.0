@@ -1,56 +1,31 @@
-From: marex@denx.de (Marek Vasut)
-Date: Mon, 16 Sep 2013 17:10:36 +0200
-Subject: [PATCH 5/6] Staging/iio/adc/touchscreen/MXS: add interrupt driven
- touch detection
-In-Reply-To: <201309161634.54603.jbe@pengutronix.de>
-References: <1378887511-24530-1-git-send-email-jbe@pengutronix.de>
- <201309161623.48247.marex@denx.de> <201309161634.54603.jbe@pengutronix.de>
-Message-ID: <201309161710.36726.marex@denx.de>
+From: nm@ti.com (Nishanth Menon)
+Date: Mon, 16 Sep 2013 10:26:15 -0500
+Subject: [PATCH RFC v3 08/12] ARM: OMAP2+: CM: AM43x clockdomain data
+In-Reply-To: <5dd3b417a32b7d52c7de1e19e69e6100b1ed991b.1379337301.git.afzal@ti.com>
+References: <cover.1379337301.git.afzal@ti.com>
+ <5dd3b417a32b7d52c7de1e19e69e6100b1ed991b.1379337301.git.afzal@ti.com>
+Message-ID: <52372317.3000901@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear J?rgen Beisert,
-
-> Hi Marek,
+On 09/16/2013 08:48 AM, Afzal Mohammed wrote:
+> From: Ambresh K <ambresh@ti.com>
 > 
-> On Monday 16 September 2013 16:23:48 Marek Vasut wrote:
-> > > On Sunday 15 September 2013 12:56:25 Jonathan Cameron wrote:
-> > > > On 09/11/13 09:18, Juergen Beisert wrote:
-> > > > > For battery driven systems it is a very bad idea to collect the
-> > > > > touchscreen data within a kernel busy loop.
-> > > > > 
-> > > > > This change uses the features of the hardware to delay and
-> > > > > accumulate samples in hardware to avoid a high interrupt and CPU
-> > > > > load.
-> > > > > 
-> > > > > Note: this is only tested on an i.MX23 SoC yet.
-> > > > > 
-> > > > > Signed-off-by: Juergen Beisert <jbe@pengutronix.de>
-> > > > > CC: linux-arm-kernel at lists.infradead.org
-> > > > > CC: devel at driverdev.osuosl.org
-> > > > > CC: Marek Vasut <marex@denx.de>
-> > > > > CC: Fabio Estevam <fabio.estevam@freescale.com>
-> > > > > CC: Jonathan Cameron <jic23@cam.ac.uk>
-> > > > 
-> > > > While this driver is placed in IIO within staging at the moment,
-> > > > these changes are definitely input related.  Hence I have cc'd
-> > > > Dmitry and the input list.
-> > > > 
-> > > > I am personaly a little uncomfortable that we have such a complex bit
-> > > > of input code sat within an IIO driver but such is life.
-> > > 
-> > > Maybe an MFD for this ADC unit would be a better way to go? Currently I
-> > > have a different problem with this driver, because the ADC unit
-> > > monitors the battery as well. And the charging driver from the power
-> > > subsystem needs these values to charge the battery in a correct
-> > > manner.
-> > 
-> > Are you planning to post the power block patches too ?
+> Add the data file to describe clock domains in AM43x SoC.
+> OMAP4 clockdomain operations is being reused here.
 > 
-> When they will work: yes. Currently it crashes all the time. The PMIC is a
-> beast...
+> Signed-off-by: Ambresh K <ambresh@ti.com>
+> Signed-off-by: Afzal Mohammed <afzal@ti.com>
+> ---
+>  arch/arm/mach-omap2/clockdomain.h           |   2 +
+>  arch/arm/mach-omap2/clockdomains43xx_data.c | 199 ++++++++++++++++++++++++++++
+>  arch/arm/mach-omap2/cminst44xx.c            |   9 ++
+>  3 files changed, 210 insertions(+)
+>  create mode 100644 arch/arm/mach-omap2/clockdomains43xx_data.c
 
-Full ACK
+I suggest we drop this. this can be addressed by Tero's clk series.
 
-Best regards,
-Marek Vasut
+
+-- 
+Regards,
+Nishanth Menon
