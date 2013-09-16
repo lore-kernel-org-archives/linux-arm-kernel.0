@@ -1,193 +1,135 @@
-From: martinez.javier@gmail.com (Javier Martinez Canillas)
-Date: Mon, 16 Sep 2013 15:05:49 +0200
-Subject: [RFCv2 3/3] ARM: dts: N900: Add SSI information
-In-Reply-To: <1379277856-24571-4-git-send-email-sre@debian.org>
-References: <1379277856-24571-1-git-send-email-sre@debian.org>
- <1379277856-24571-4-git-send-email-sre@debian.org>
-Message-ID: <CAAwP0s0e-gYkNA78eQH7x2VJbM1byaisUeqU8YbbeWUbKwsxCQ@mail.gmail.com>
+From: sandeepa.prabhu@linaro.org (Sandeepa Prabhu)
+Date: Mon, 16 Sep 2013 18:36:52 +0530
+Subject: [RFC PATCH 2/2] Aarch64: KGDB: Add Step debugging support
+In-Reply-To: <20130916113056.GH21320@mudshark.cambridge.arm.com>
+References: <1379321750-907-1-git-send-email-vijay.kilari@gmail.com>
+ <1379321750-907-3-git-send-email-vijay.kilari@gmail.com>
+ <20130916113056.GH21320@mudshark.cambridge.arm.com>
+Message-ID: <CA+b37P1zYuRvVQGjSfMt___12ytZN_fiUJ26XVgxT4CPUm8ZSQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Sep 15, 2013 at 10:44 PM, Sebastian Reichel <sre@debian.org> wrote:
-> Add SSI device tree data for OMAP34xx and Nokia N900.
+On 16 September 2013 17:00, Will Deacon <will.deacon@arm.com> wrote:
+> On Mon, Sep 16, 2013 at 09:55:50AM +0100, vijay.kilari at gmail.com wrote:
+>> From: Vijaya Kumar K <Vijaya.Kumar@caviumnetworks.com>
+>>
+>> Add KGDB software step debugging support for EL1 debug
+>> in Aarch64 mode.
+>>
+>> KGDB registers step debug handler with debug monitor.
+>> On receiving 'step' command from GDB tool, target enables
+>> software step debugging and step address is written to ELR
+>> register. If not step address is received from GDB tool,
+>> target assumes next step address is PC and ERET is
+>> executed as part of exception return.
+>>
+>> ELR register content is protected against context restore in
+>> exception return by checking against Software Step debug
+>> bit MDSCR.SS
+>>
+>> Software Step debugging is disabled when 'continue' command
+>> is received
+>>
+>> Signed-off-by: Vijaya Kumar K <Vijaya.Kumar@caviumnetworks.com>
+>> ---
+>>  arch/arm64/include/asm/debug-monitors.h |    3 +++
+>>  arch/arm64/kernel/debug-monitors.c      |   15 +++++++++++++
+>>  arch/arm64/kernel/entry.S               |    9 +++++++-
+>>  arch/arm64/kernel/kgdb.c                |   36 +++++++++++++++++++++++++++++++
+>>  4 files changed, 62 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm64/include/asm/debug-monitors.h b/arch/arm64/include/asm/debug-monitors.h
+>> index aff3a76..3e4ac0d 100644
+>> --- a/arch/arm64/include/asm/debug-monitors.h
+>> +++ b/arch/arm64/include/asm/debug-monitors.h
+>> @@ -94,6 +94,9 @@ void kernel_enable_single_step(struct pt_regs *regs);
+>>  void kernel_disable_single_step(void);
+>>  int kernel_active_single_step(void);
+>>
+>> +void elr_write(unsigned long elr);
+>> +unsigned long elr_read(void);
+>> +
+>>  #ifdef CONFIG_HAVE_HW_BREAKPOINT
+>>  int reinstall_suspended_bps(struct pt_regs *regs);
+>>  #else
+>> diff --git a/arch/arm64/kernel/debug-monitors.c b/arch/arm64/kernel/debug-monitors.c
+>> index f8b90c0..0408490 100644
+>> --- a/arch/arm64/kernel/debug-monitors.c
+>> +++ b/arch/arm64/kernel/debug-monitors.c
+>> @@ -64,6 +64,21 @@ static u32 mdscr_read(void)
+>>       return mdscr;
+>>  }
+>>
+>> +void elr_write(unsigned long elr)
+>> +{
+>> +     unsigned long flags;
+>> +     local_dbg_save(flags);
+>> +     asm volatile("msr elr_el1, %0" :: "r" (elr));
+I think right way to update step address would be update
+instruction_pointer(regs) from your kgdb handler and "kernel_exit"
+should take care of rest. With this, you don't need to change the low
+level handlers in entry.S/debug-monitors.c) at all.
+>> +     local_dbg_restore(flags);
+>> +}
+>> +
+>> +unsigned long elr_read(void)
+>> +{
+>> +     unsigned long elr;
+>> +     asm volatile("mrs %0, elr_el1" : "=r" (elr));
+>> +     return elr;
+>> +}
 >
-> Signed-off-by: Sebastian Reichel <sre@debian.org>
-> ---
->  Documentation/devicetree/bindings/hsi/omap_ssi.txt | 73 ++++++++++++++++++++++
->  arch/arm/boot/dts/omap3-n900.dts                   |  8 +++
->  arch/arm/boot/dts/omap34xx.dtsi                    | 49 +++++++++++++++
->  3 files changed, 130 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/hsi/omap_ssi.txt
+> What?! Why are you writing the ELR here, instead of setting up the pc in
+> current saved regs?
 >
-> diff --git a/Documentation/devicetree/bindings/hsi/omap_ssi.txt b/Documentation/devicetree/bindings/hsi/omap_ssi.txt
-> new file mode 100644
-> index 0000000..e3597eb
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/hsi/omap_ssi.txt
-> @@ -0,0 +1,73 @@
-> +OMAP SSI controller bindings
-> +
-> +Required properties:
-> +- compatible:          Should be set to the following value
-> +                        ti,omap3-ssi (applicable to OMAP34xx devices)
-> +- ti,hwmods:           Name of the hwmod associated to the controller, which
-> +                       is "ssi".
-> +- reg:                 Contains SSI register address range (base address and
-> +                       length).
-> +- reg-names:           Contains the names of the address ranges. It's
-> +                        expected, that "sys" and "gdd" address ranges are
-> +                       provided.
-> +- interrupts:          Contains the interrupt information for the controller.
-> +- interrupt-names:      Contains the names of the interrupts. It's expected,
-> +                       that "gdd_mpu" is provided.
-> +- ranges               Required as an empty node
-> +- #address-cells       Should be set to <1>
-> +- #size-cells          Should be set to <1>
-> +
-> +Each port is represented as a sub-node of the ti,omap3-ssi device.
-> +
-> +Required Port sub-node properties:
-> +- compatible:          Should be set to the following value
-> +                        ti,omap3-ssi-port (applicable to OMAP34xx devices)
-> +- reg:                 Contains port's register address range (base address
-> +                       and length).
-> +- reg-names:           Contains the names of the address ranges. It's
-> +                        expected, that "tx" and "rx" address ranges are
-> +                       provided.
-> +- interrupt-parent     Should be a phandle for the interrupt controller
-> +- interrupts:          Contains the interrupt information for the port.
-> +- interrupt-names:     Contains the names of the interrupts. It's expected,
-> +                       that "mpu_irq0" and "mpu_irq1" are provided.
-> +- ti,ssi-cawake-gpio:  Defines which GPIO pin is used to signify CAWAKE
-> +                       events for the port. This is an optional board-specific
-> +                       property. If it's missing the port will not be
-> +                       enabled.
-> +
-> +Example for Nokia N900:
-> +
-> +ssi-controller at 48058000 {
-> +       compatible = "ti,omap3-ssi";
-> +       ti,hwmods = "ssi";
-> +
-> +       reg = <0x48058000 0x1000>,
-> +             <0x48059000 0x1000>;
-> +       reg-names = "sys",
-> +                   "gdd";
-> +
-> +       interrupts = <55>;
-> +       interrupt-names = "gdd_mpu";
-> +
-> +       #address-cells = <1>;
-> +       #size-cells = <1>;
-> +       ranges;
-> +
-> +       ssi-port at 0 {
-> +               compatible = "ti,omap3-ssi-port";
-> +
-> +               reg = <0x4805a000 0x800>,
-> +                     <0x4805a800 0x800>;
-> +               reg-names = "tx",
-> +                           "rx";
-> +
-> +               interrupt-parent = <&intc>;
-> +               interrupts = <51>,
-> +                            <52>;
-> +               interrupt-names = "mpu_irq0",
-> +                                 "mpu_irq1";
-> +
-> +               ti,ssi-cawake-gpio = <&gpio5 23 GPIO_ACTIVE_HIGH>; /* 151 */
-> +       }
-> +}
-> diff --git a/arch/arm/boot/dts/omap3-n900.dts b/arch/arm/boot/dts/omap3-n900.dts
-> index 0582356..cc4a3e2 100644
-> --- a/arch/arm/boot/dts/omap3-n900.dts
-> +++ b/arch/arm/boot/dts/omap3-n900.dts
-> @@ -186,6 +186,14 @@
->         power = <50>;
->  };
+>> +
+>>  /*
+>>   * Allow root to disable self-hosted debug from userspace.
+>>   * This is useful if you want to connect an external JTAG debugger.
+>> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+>> index 226be77..23d91f1 100644
+>> --- a/arch/arm64/kernel/entry.S
+>> +++ b/arch/arm64/kernel/entry.S
+>> @@ -100,7 +100,14 @@
+>>       pop     x4, x5
+>>       pop     x6, x7
+>>       pop     x8, x9
+>> -     msr     elr_el1, x21                    // set up the return data
+>> +     .if     \el == 1
+>> +     mrs     x10, mdscr_el1                  // check if step debug is enabled
+>> +     tbnz    x10, #0, 1f
+>> +     msr     elr_el1, x21
+>> +     .else
+>> +     msr     elr_el1, x21                    // set up the return data
+>> +     .endif
+>> +1:
 >
-> +&ssi_port1 {
-> +       ti,ssi-cawake-gpio = <&gpio5 23 GPIO_ACTIVE_HIGH>; /* 151 */
-> +};
-> +
-> +&ssi_port2 {
-> +       status = "disabled";
-> +};
-> +
->  &uart1 {
->         pinctrl-names = "default";
->         pinctrl-0 = <&uart1_pins>;
-> diff --git a/arch/arm/boot/dts/omap34xx.dtsi b/arch/arm/boot/dts/omap34xx.dtsi
-> index 5355d61..393b7a7 100644
-> --- a/arch/arm/boot/dts/omap34xx.dtsi
-> +++ b/arch/arm/boot/dts/omap34xx.dtsi
-> @@ -25,4 +25,53 @@
->                         clock-latency = <300000>; /* From legacy driver */
->                 };
->         };
-> +
-> +       ocp {
-> +               ssi: ssi-controller at 48058000 {
-> +                       compatible = "ti,omap3-ssi";
-> +                       ti,hwmods = "ssi";
-> +
-> +                       reg = <0x48058000 0x1000>,
-> +                             <0x48059000 0x1000>;
-> +                       reg-names = "sys",
-> +                                   "gdd";
-> +
-> +                       interrupts = <55>;
-> +                       interrupt-names = "gdd_mpu";
-> +
-> +                       #address-cells = <1>;
-> +                       #size-cells = <1>;
-> +                       ranges;
-> +
-> +                       ssi_port1: ssi-port at 0 {
-> +                               compatible = "ti,omap3-ssi-port";
-> +
-> +                               reg = <0x4805a000 0x800>,
-> +                                     <0x4805a800 0x800>;
-> +                               reg-names = "tx",
-> +                                           "rx";
-> +
-> +                               interrupt-parent = <&intc>;
-> +                               interrupts = <51>,
-> +                                            <52>;
-> +                               interrupt-names = "mpu_irq0",
-> +                                                 "mpu_irq1";
-> +                       };
-> +
-> +                       ssi_port2: ssi-port at 1 {
-> +                               compatible = "ti,omap3-ssi-port";
-> +
-> +                               reg = <0x4805b000 0x800>,
-> +                                     <0x4805b800 0x800>;
-> +                               reg-names = "tx",
-> +                                           "rx";
-> +
-> +                               interrupt-parent = <&intc>;
-> +                               interrupts = <53>,
-> +                                            <54>;
-> +                               interrupt-names = "mpu_irq0",
-> +                                                 "mpu_irq1";
-> +                       };
-> +               };
-> +       };
->  };
-> --
-> 1.8.4.rc3
-
-Hi Sebastian,
-
-Is the Synchronous Serial Interface (SSI)  only supported by
-OMAP34xx/OMAP35xx SoC and not by OMAP36xx/OMAP37xx SoC?
-
-I'm asking this since if SSI is supported by both we should add the
-device nodes in omap3.dtsi instead of omap34xx.dtsi.
-
-I thought that all OMAP3 SoC supported SSI and all OMAP4 SoC supported
-HSI but I guess I was wrong...
-
-Thanks a lot and best regards,
-Javier
+> This is horrible -- if the pt_regs being restored was set up correctly,
+> you wouldn't need the conditional code.
+>
+>>       msr     spsr_el1, x22
+>>       .if     \el == 0
+>>       msr     sp_el0, x23
+>> diff --git a/arch/arm64/kernel/kgdb.c b/arch/arm64/kernel/kgdb.c
+>> index a3a7712..d5e5884 100644
+>> --- a/arch/arm64/kernel/kgdb.c
+>> +++ b/arch/arm64/kernel/kgdb.c
+>> @@ -164,9 +164,31 @@ int kgdb_arch_handle_exception(int exception_vector, int signo, int err_code,
+>>                       linux_regs->pc += 4;
+>>
+>>               compiled_break = 0;
+>> +
+>> +             /* Disable single step if enabled */
+>> +             if (kernel_active_single_step())
+>> +                     kernel_disable_single_step();
+>> +
+>>               err = 0;
+>>               break;
+>> +     case 's':
+>> +             /*
+>> +              * Update ESR value with step address passed
+>> +              */
+>
+> Well, the comment is wrong, but I don't think you should be doing this anyway :)
+>
+> Will
