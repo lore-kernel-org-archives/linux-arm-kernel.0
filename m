@@ -1,52 +1,29 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 16 Sep 2013 07:55:29 -0500
-Subject: [PATCH] memory: add a basic OF-based memory driver
-In-Reply-To: <20130915124325.B1DF2C42C5C@trevor.secretlab.ca>
-References: <1378863781-4235-1-git-send-email-emilio@elopez.com.ar>
- <1379032225-6425-1-git-send-email-emilio@elopez.com.ar>
- <CAOesGMiUMniKRLRgGPsimR0bXWQFbx+SL5dUJXOb8t0JfEcHsg@mail.gmail.com>
- <52326ADC.8040703@elopez.com.ar>
- <CAL_JsqJACEtSRaDg0TcYODzhpsHFGa4mFSYa_R3qspypEKH+hQ@mail.gmail.com>
- <CAOesGMj=b5c_1v-nAejUzuOMfx44AHr2=yfoPepHYsh0=t0wOQ@mail.gmail.com>
- <20130915124325.B1DF2C42C5C@trevor.secretlab.ca>
-Message-ID: <CAL_Jsq+iYJBCKoM7S2wC1PVVM1sktmX6dWDpoKzYAvB7Q7j_8A@mail.gmail.com>
+From: sandeepa.prabhu@linaro.org (Sandeepa Prabhu)
+Date: Mon, 16 Sep 2013 18:28:18 +0530
+Subject: [RFC PATCH 0/2] Aarch64: KGDB: kernel debugging support
+In-Reply-To: <20130916112355.GF21320@mudshark.cambridge.arm.com>
+References: <1379321750-907-1-git-send-email-vijay.kilari@gmail.com>
+ <20130916112355.GF21320@mudshark.cambridge.arm.com>
+Message-ID: <CA+b37P2dxNou=hxrU6DOHXtjzy5tXFHnrzm9umX5NjFuNyZqUA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Sep 15, 2013 at 7:43 AM, Grant Likely <grant.likely@linaro.org> wrote:
-> On Fri, 13 Sep 2013 08:49:06 -0700, Olof Johansson <olof@lixom.net> wrote:
->> On Fri, Sep 13, 2013 at 7:00 AM, Rob Herring <robherring2@gmail.com> wrote:
->> > On Thu, Sep 12, 2013 at 8:31 PM, Emilio L?pez <emilio@elopez.com.ar> wrote:
-
-[snip]
-
->> > Better, but this is still wrong. DT describes the hardware. There is
->> > no such h/w as a simple-memory-controller. The fact that you have a
->> > simple-memory-ctrlr kernel driver is a kernel
->> > feature/artifact/limitation. Describe the h/w with a meaningful
->> > compatible string and put that string in the simple memory controller
->> > driver match table. If someday we have a real driver for said memory
->> > controller, then it is only a kernel change to use a different driver.
+On 16 September 2013 16:53, Will Deacon <will.deacon@arm.com> wrote:
+> On Mon, Sep 16, 2013 at 09:55:48AM +0100, vijay.kilari at gmail.com wrote:
+>> From: Vijaya Kumar K <Vijaya.Kumar@caviumnetworks.com>
 >>
->>
->> We discussed this over IRC last night -- I still think it makes more
->> sense to make the clock driver for sunxi aware of this and just add a
->> reference to the clock at init time.
->>
->> This is never going to differ from board to board (today the clock
->> name is the same on all sunxi platforms -- pll5_ddr. And the need will
->> likewise be there for all platforms at this time.
->>
->> If and when it changes in the future, we can reevaluate. But this
->> doesn't have to be driven by device tree at this time, it seems to
->> just make things overly complicated and contrived.
+>> Based on the step-handler and break-handler hooks patch
+>> http://lists.infradead.org/pipermail/linux-arm-kernel/2013-August/189510.html
+>> KGDB debugging support is added for EL1 debug in Aarch64 mode
 >
-> I agree. Creating a new platform driver + device tree binding just to
-> claim a clock that must not be disables does not look like the right
-> approach to me either.
+> Please include that patch in your patch series, since it's not currently
+> queued anywhere.
+Vijay,
 
-Maybe a driver is overkill, but fully describing the h/w would be a
-good thing. Only defining the h/w that Linux currently uses is not a
-good practice (although admittedly hard to avoid).
-
-Rob
+My earlier patch
+(http://lists.infradead.org/pipermail/linux-arm-kernel/2013-August/189510.html)
+had review comments and some issues, which I have fixed in Version-2
+of it. You may want to rebase your code with V2.
+~Sandeepa
+>
+> Will
