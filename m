@@ -1,33 +1,25 @@
-From: graeme.gregory@linaro.org (Graeme Gregory)
-Date: Mon, 16 Sep 2013 15:46:16 +0100
-Subject: [PATCH v2 1/9] i2c: prepare runtime PM support for I2C client
- devices
-In-Reply-To: <20130916143811.GP7393@intel.com>
-References: <20130913065434.GZ7393@intel.com> <87bo3whjz4.fsf@linaro.org>
- <20130913145022.GC7393@intel.com> <20130913173149.GE7393@intel.com>
- <87ioy4e8bw.fsf@linaro.org> <20130915064139.GJ7393@intel.com>
- <20130915124744.GW29403@sirena.org.uk>
- <20130915132823.GL7393@intel.com>
- <20130916101249.GX29403@sirena.org.uk>
- <20130916143811.GP7393@intel.com>
-Message-ID: <20130916144616.GM1823@xora-yoga.xora.org.uk>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 16 Sep 2013 07:54:18 -0700
+Subject: [PATCH] ARM: multi_v7: add HREFv60 to multi_v7 defconfig
+In-Reply-To: <1379334152-9751-1-git-send-email-linus.walleij@linaro.org>
+References: <1379334152-9751-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <20130916145418.GA7221@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 16, 2013 at 05:38:12PM +0300, Mika Westerberg wrote:
-> On Mon, Sep 16, 2013 at 11:12:49AM +0100, Mark Brown wrote:
-> > That's definitely an ACPI specific (probably x86 specific ACPI?)
-> > requirement not a generic one, on some systems it would increase power
-> > consumption since the controller will need to sit on while the device is
-> > functioning autonomously.
+On Mon, Sep 16, 2013 at 02:22:32PM +0200, Linus Walleij wrote:
+> This is just a standard board for the Ux500, include it in the
+> v7 multiplatform defconfig.
 > 
-> Yes, the ACPI 5.0 spec says that the device cannot be in higher D-state
-> than its parent. This is not x86 specific, though I'm not sure if this is
-> implemented elsewhere.
-> 
-I do not think this stops the OS fine controlling the power of the device
-though. It is only a mechanism to make sure the tree of D states is vaguely
-sane from the ACPI point of view. What happens in each D state is never
-actually defined in the ACPI spec.
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+> Hi ARM SoC folks: this makes also my preferred development board
+> boot with multi_v7. Please apply this patch directly to fixes
+> if you're happy with it.
 
-Graeme
+Ho hum. I think the approach we want is to only do DT platforms on
+multi_v7.  You have a series to drop/switch all non-DT platforms coming
+soon though, I think?
+
+
+-Olof
