@@ -1,95 +1,51 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 16 Sep 2013 16:44:15 +0800
-Subject: [PATCH v2 9/9] ARM: dts: imx6qdl: add uhs pinctrl state for usdhc3
-In-Reply-To: <1379070698-7344-10-git-send-email-b29396@freescale.com>
-References: <1379070698-7344-1-git-send-email-b29396@freescale.com>
- <1379070698-7344-10-git-send-email-b29396@freescale.com>
-Message-ID: <20130916084413.GK31147@S2101-09.ap.freescale.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 16 Sep 2013 10:45:16 +0200
+Subject: [PATCH v4 4/4] ARM: bcm4760: Add restart hook
+In-Reply-To: <20130916071821.GA18210@glitch>
+References: <20130914152032.401907974@gmail.com>
+ <201309152210.36738.arnd@arndb.de> <20130916071821.GA18210@glitch>
+Message-ID: <201309161045.17069.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 13, 2013 at 07:11:38PM +0800, Dong Aisheng wrote:
-> This is needed for supporting ultra high speed cards like SD3.0 cards.
+On Monday 16 September 2013, Domenico Andreoli wrote:
+> On Sun, Sep 15, 2013 at 10:10:36PM +0200, Arnd Bergmann wrote:
+> > On Sunday 15 September 2013, Domenico Andreoli wrote:
+> > > issue here is that there is already a proper watchdog driver, the sp805.
+> > > 
+> > > so I guess now the task shifts to adding restart hook support to it, right?
+> > 
+> > Yes, correct.
+> > 
+> > There is an interesting question however: we have to deal with the same driver
+> > being used in some machines that need to use it as the only way to reset the
+> > system, as well as the case where you actually want to use some other method.
 > 
-> Signed-off-by: Dong Aisheng <b29396@freescale.com>
-> ---
->  arch/arm/boot/dts/imx6qdl-sabreauto.dtsi |    5 ++++-
->  arch/arm/boot/dts/imx6qdl.dtsi           |   30 ++++++++++++++++++++++++++++++
->  2 files changed, 34 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
-> index 1cbbc51..ff6f1e8 100644
-> --- a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
-> +++ b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
-> @@ -54,6 +54,7 @@
->  			fsl,pins = <
->  				MX6QDL_PAD_NANDF_CS2__GPIO6_IO15 0x80000000
->  				MX6QDL_PAD_SD2_DAT2__GPIO1_IO13  0x80000000
-> +				MX6QDL_PAD_GPIO_18__SD3_VSELECT 0x17059
->  			>;
->  		};
->  	};
-> @@ -74,8 +75,10 @@
->  };
->  
->  &usdhc3 {
-> -	pinctrl-names = "default";
-> +	pinctrl-names = "default", "state_100mhz", "state_200mhz";
->  	pinctrl-0 = <&pinctrl_usdhc3_1>;
-> +	pinctrl-1 = <&pinctrl_usdhc3_1_100mhz>;
-> +	pinctrl-2 = <&pinctrl_usdhc3_1_200mhz>;
->  	cd-gpios = <&gpio6 15 0>;
->  	wp-gpios = <&gpio1 13 0>;
->  	status = "okay";
-> diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
-> index ccd55c2..cb17574 100644
-> --- a/arch/arm/boot/dts/imx6qdl.dtsi
-> +++ b/arch/arm/boot/dts/imx6qdl.dtsi
-> @@ -1184,6 +1184,36 @@
->  						>;
->  					};
->  
-> +					pinctrl_usdhc3_1_100mhz: usdhc3grp-1-100mhz { /* 100Mhz */
-> +						fsl,pins = <
-> +							MX6QDL_PAD_SD3_CMD__SD3_CMD 0x170B9
-> +							MX6QDL_PAD_SD3_CLK__SD3_CLK 0x100B9
-> +							MX6QDL_PAD_SD3_DAT0__SD3_DATA0 0x170B9
-> +							MX6QDL_PAD_SD3_DAT1__SD3_DATA1 0x170B9
-> +							MX6QDL_PAD_SD3_DAT2__SD3_DATA2 0x170B9
-> +							MX6QDL_PAD_SD3_DAT3__SD3_DATA3 0x170B9
-> +							MX6QDL_PAD_SD3_DAT4__SD3_DATA4 0x170B9
-> +							MX6QDL_PAD_SD3_DAT5__SD3_DATA5 0x170B9
-> +							MX6QDL_PAD_SD3_DAT6__SD3_DATA6 0x170B9
-> +							MX6QDL_PAD_SD3_DAT7__SD3_DATA7 0x170B9
+> in a certain sense, there is space for a generic watchdog based restart
+> hook mechanism but the current watchdog ops do not provide the necessary
+> guarantees in atomic context.
 
-I commented in the previous review that we use lowercase for hex values
-in device tree.  It seems that you missed the comment.  Since this patch
-can be applied independently, I just fixed them up and applied it.
+It sounds like a good idea. I see another problem there, which is that registering
+a restart hook is architecture specific at the moment, so it would also require
+generalizing that, or alternatively keeping watchdog based restart specific to
+ARM and any architecture that adds support in a similar way.
 
-Shawn
+> > An easy way to handle this would be a boolean device tree property that
+> > tells the driver whether or not to register, but we might want to
+> > come up with a more sophisticated way to have multiple reset handlers
+> > registered an prioritized so we try the "best" one first. Maybe someone
+> > else has an opinion on this. If not, just do the property.
+> 
+> the simplest solution I see is adding a DT option to the sp805 driver so
+> that it registers the restart hook when asked to do so.
+> 
+> need to investigate whether the sp805 DT support is provided by some generic
+> AMBA mechanism or is completely missing.
 
-> +						>;
-> +					};
-> +
-> +					pinctrl_usdhc3_1_200mhz: usdhc3grp-1-200mhz { /* 200Mhz */
-> +						fsl,pins = <
-> +							MX6QDL_PAD_SD3_CMD__SD3_CMD 0x170F9
-> +							MX6QDL_PAD_SD3_CLK__SD3_CLK 0x100F9
-> +							MX6QDL_PAD_SD3_DAT0__SD3_DATA0 0x170F9
-> +							MX6QDL_PAD_SD3_DAT1__SD3_DATA1 0x170F9
-> +							MX6QDL_PAD_SD3_DAT2__SD3_DATA2 0x170F9
-> +							MX6QDL_PAD_SD3_DAT3__SD3_DATA3 0x170F9
-> +							MX6QDL_PAD_SD3_DAT4__SD3_DATA4 0x170F9
-> +							MX6QDL_PAD_SD3_DAT5__SD3_DATA5 0x170F9
-> +							MX6QDL_PAD_SD3_DAT6__SD3_DATA6 0x170F9
-> +							MX6QDL_PAD_SD3_DAT7__SD3_DATA7 0x170F9
-> +						>;
-> +					};
-> +
->  					pinctrl_usdhc3_2: usdhc3grp-2 {
->  						fsl,pins = <
->  							MX6QDL_PAD_SD3_CMD__SD3_CMD    0x17059
-> -- 
-> 1.7.1
-> 
-> 
+I think it should just work if you put the right properties into DT: it only
+uses one memory resource (from "reg" property) and one clk (from "clocks"
+property), and those are automatically there for AMBA devices. If the hardware
+does not fill the correct primecell ID, you may have to add a
+"arm,primecell-periphid=<0x00141805>" property.
+
+	Arnd
