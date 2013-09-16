@@ -1,65 +1,48 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Mon, 16 Sep 2013 12:14:53 -0700
-Subject: [PATCH] clk: si570: Add a driver for SI570 oscillators
-In-Reply-To: <52374FF7.8040604@wwwdotorg.org>
-References: <1379033737-30015-1-git-send-email-soren.brinkmann@xilinx.com>
- <1379033737-30015-2-git-send-email-soren.brinkmann@xilinx.com>
- <52373314.5070806@wwwdotorg.org>
- <20130916164927.GB21352@roeck-us.net>
- <5237390E.5070203@wwwdotorg.org>
- <20130916173540.GA3481@roeck-us.net>
- <52374FF7.8040604@wwwdotorg.org>
-Message-ID: <20130916191453.GA9023@roeck-us.net>
+From: sre@ring0.de (Sebastian Reichel)
+Date: Mon, 16 Sep 2013 21:27:22 +0200
+Subject: [RFCv2 3/3] ARM: dts: N900: Add SSI information
+In-Reply-To: <20130916181032.GB30568@blackmetal.musicnaut.iki.fi>
+References: <1379277856-24571-1-git-send-email-sre@debian.org>
+ <1379277856-24571-4-git-send-email-sre@debian.org>
+ <CAAwP0s0e-gYkNA78eQH7x2VJbM1byaisUeqU8YbbeWUbKwsxCQ@mail.gmail.com>
+ <20130916150147.GA14047@earth.universe>
+ <20130916181032.GB30568@blackmetal.musicnaut.iki.fi>
+Message-ID: <20130916192722.GB21903@earth.universe>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 16, 2013 at 12:37:43PM -0600, Stephen Warren wrote:
-> On 09/16/2013 11:35 AM, Guenter Roeck wrote:
-> > On Mon, Sep 16, 2013 at 10:59:58AM -0600, Stephen Warren wrote:
-> >> On 09/16/2013 10:49 AM, Guenter Roeck wrote:
-> >>> On Mon, Sep 16, 2013 at 10:34:28AM -0600, Stephen Warren wrote:
-> >>>> On 09/12/2013 06:55 PM, Soren Brinkmann wrote:
-> >>>>> Add a driver for SILabs 570, 571, 598, 599 programmable oscillators.
-> >>>>> The devices generate low-jitter clock signals and are reprogrammable via
-> >>>>> an I2C interface.
-> ...
-> >>>>> +Optional properties:
-> >>>>> + - initial-fout: Initial output frequency to set during probe
-> >>>>
-> >>>> "probe" is a Linux-specific concept. This property should be removed. If
-> >>>> the driver is asked to set a specific frequency, it should do so, but I
-> >>>> don't think it should program something pro-actively just because it
-> >>>> starts up.
-> >>>>
-> >>>> If this property is acceptable, it'd be better to describe it more along
-> >>>> the lines of the following:
-> >>>>
-> >>>> initial-fout: The frequency at which the system requires the clock to
-> >>>> operate.
-> >>>
-> >>> It should probably be something like "clock-frequency". In many use cases
-> >>> the programmed frequency is set to a constant frequency at system startup
-> >>> and never changed, similar to other clocks.
-> >>
-> >> I was going to suggest that too, but re-considered since I think
-> >> clock-frequency is more appropriate for fixed-frequency clocks, rather
-> >> than to specify the value at which a programmable clock generator should
-> >> operate?
-> >>
-> >> I don't think we have a good story yet for how to represent
-> >> how-we-want-the-clock-tree-configured, as opposed to representing the HW
-> >> itself (which is what DT should be more about).
-> >
-> > In many cases the chip _is_ used to generate a fixed frequency, so we will
-> > have to have a means to describe it. That it _can_ be used differently is a
-> > different matter. After all, that is true for many clock generators.
+On Mon, Sep 16, 2013 at 09:10:32PM +0300, Aaro Koskinen wrote:
+> On Mon, Sep 16, 2013 at 05:01:47PM +0200, Sebastian Reichel wrote:
+> > > Is the Synchronous Serial Interface (SSI)  only supported by
+> > > OMAP34xx/OMAP35xx SoC and not by OMAP36xx/OMAP37xx SoC?
+> > > 
+> > > I'm asking this since if SSI is supported by both we should add the
+> > > device nodes in omap3.dtsi instead of omap34xx.dtsi.
+> > > 
+> > > I thought that all OMAP3 SoC supported SSI and all OMAP4 SoC supported
+> > > HSI but I guess I was wrong...
+> > 
+> > I just do not know. Information about the SSI core is not included
+> > in the public OMAP TRM. It only lists the memory space as reserved.
+> > 
+> > Thus I only included it in OMAP34xx, which is used in Nokia N900 and
+> > must support SSI.
 > 
-> Perhaps if clock-frequency is specified, the driver should refuse to
-> provide anything else. If clock-frequency isn't specified, the driver
-> shouldn't touch the HW when it initializes, but should honor any
-> requests that come in from other drivers? That would maintain what I
-> feel is clock-frequency's connection to being a fixed clock.
-> 
-Ok with me, if that is in line with other clock drivers.
+> I think N9 and N950 (OMAP3630) are using pretty much the same driver.
 
-Guenter
+OK. I've checked the N950 kernel from [0] and it uses the same data.
+I will move the data from omap34xx.dtsi to omap3.dtsi in the next
+RFC.
+
+Thanks for the hint.
+
+[0] https://github.com/nemomobile/kernel-adaptation-n950-n9/
+
+-- Sebastian
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130916/ff330637/attachment.sig>
