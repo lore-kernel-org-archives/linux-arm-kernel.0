@@ -1,205 +1,45 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Mon, 16 Sep 2013 08:22:14 +0530
-Subject: [PATCH 2/7] usb: dwc3: adapt dwc3 core to use Generic PHY
- Framework
-In-Reply-To: <5231BF7A.3080104@ti.com>
-References: <1378136591-7463-1-git-send-email-kishon@ti.com>
- <1378136591-7463-3-git-send-email-kishon@ti.com> <5231BF7A.3080104@ti.com>
-Message-ID: <5236725E.2090302@ti.com>
+From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
+Date: Mon, 16 Sep 2013 12:53:18 +1000
+Subject: [PATCH v3 2/2] drivers: dma-contiguous: add initialization from
+ device tree
+In-Reply-To: <CACxGe6uzau+g0gd=hkNYw1zdkfq18zt_m9OEaiJKR6=q1U4rag@mail.gmail.com>
+References: <1372254009-25307-1-git-send-email-m.szyprowski@samsung.com>
+ <1372254009-25307-3-git-send-email-m.szyprowski@samsung.com>
+ <CACxGe6uzau+g0gd=hkNYw1zdkfq18zt_m9OEaiJKR6=q1U4rag@mail.gmail.com>
+Message-ID: <1379299998.4098.74.camel@pasglop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 12 September 2013 06:49 PM, Roger Quadros wrote:
-> On 09/02/2013 06:43 PM, Kishon Vijay Abraham I wrote:
->> Adapted dwc3 core to use the Generic PHY Framework. So for init, exit,
->> power_on and power_off the following APIs are used phy_init(), phy_exit(),
->> phy_power_on() and phy_power_off().
->>
->> However using the old USB phy library wont be removed till the PHYs of all
->> other SoC's using dwc3 core is adapted to the Generic PHY Framework.
->>
->> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
->> ---
->>   Documentation/devicetree/bindings/usb/dwc3.txt |    6 ++-
->>   drivers/usb/dwc3/Kconfig                       |    1 +
->>   drivers/usb/dwc3/core.c                        |   49 ++++++++++++++++++++++++
->>   drivers/usb/dwc3/core.h                        |    7 ++++
->>   4 files changed, 61 insertions(+), 2 deletions(-)
->>
->> diff --git a/Documentation/devicetree/bindings/usb/dwc3.txt b/Documentation/devicetree/bindings/usb/dwc3.txt
->> index e807635..471366d 100644
->> --- a/Documentation/devicetree/bindings/usb/dwc3.txt
->> +++ b/Documentation/devicetree/bindings/usb/dwc3.txt
->> @@ -6,11 +6,13 @@ Required properties:
->>    - compatible: must be "snps,dwc3"
->>    - reg : Address and length of the register set for the device
->>    - interrupts: Interrupts used by the dwc3 controller.
->> +
->> +Optional properties:
->>    - usb-phy : array of phandle for the PHY device.  The first element
->>      in the array is expected to be a handle to the USB2/HS PHY and
->>      the second element is expected to be a handle to the USB3/SS PHY
->> -
->> -Optional properties:
->> + - phys: from the *Generic PHY* bindings
->> + - phy-names: from the *Generic PHY* bindings
->>    - tx-fifo-resize: determines if the FIFO *has* to be reallocated.
->>
->>   This is usually a subnode to DWC3 glue to which it is connected.
->> diff --git a/drivers/usb/dwc3/Kconfig b/drivers/usb/dwc3/Kconfig
->> index cfc16dd..ad7ce83 100644
->> --- a/drivers/usb/dwc3/Kconfig
->> +++ b/drivers/usb/dwc3/Kconfig
->> @@ -3,6 +3,7 @@ config USB_DWC3
->>   	depends on (USB || USB_GADGET) && GENERIC_HARDIRQS && HAS_DMA
->>   	depends on EXTCON
->>   	select USB_PHY
->> +	select GENERIC_PHY
->>   	select USB_XHCI_PLATFORM if USB_SUPPORT && USB_XHCI_HCD
->>   	help
->>   	  Say Y or M here if your system has a Dual Role SuperSpeed
->> diff --git a/drivers/usb/dwc3/core.c b/drivers/usb/dwc3/core.c
->> index 428c29e..485d365 100644
->> --- a/drivers/usb/dwc3/core.c
->> +++ b/drivers/usb/dwc3/core.c
->> @@ -82,6 +82,12 @@ static void dwc3_core_soft_reset(struct dwc3 *dwc)
->>
->>   	usb_phy_init(dwc->usb2_phy);
->>   	usb_phy_init(dwc->usb3_phy);
->> +
->> +	if (dwc->usb2_generic_phy)
->> +		phy_init(dwc->usb2_generic_phy);
->> +	if (dwc->usb3_generic_phy)
->> +		phy_init(dwc->usb3_generic_phy);
->> +
->>   	mdelay(100);
->>
->>   	/* Clear USB3 PHY reset */
->> @@ -343,6 +349,11 @@ static void dwc3_core_exit(struct dwc3 *dwc)
->>   {
->>   	usb_phy_shutdown(dwc->usb2_phy);
->>   	usb_phy_shutdown(dwc->usb3_phy);
->> +
->> +	if (dwc->usb2_generic_phy)
->> +		phy_power_off(dwc->usb2_generic_phy);
->> +	if (dwc->usb3_generic_phy)
->> +		phy_power_off(dwc->usb3_generic_phy);
->>   }
->>
->>   #define DWC3_ALIGN_MASK		(16 - 1)
->> @@ -427,6 +438,23 @@ static int dwc3_probe(struct platform_device *pdev)
->>   		dwc->usb3_phy = devm_usb_get_phy(dev, USB_PHY_TYPE_USB3);
->>   	}
->>
->> +	if (of_property_read_bool(node, "phys") || pdata->has_phy) {
->> +		dwc->usb2_generic_phy = devm_phy_get(dev, "usb2-phy");
->> +		if (IS_ERR(dwc->usb2_generic_phy)) {
->> +			dev_err(dev, "no usb2 phy configured yet");
->> +			return PTR_ERR(dwc->usb2_generic_phy);
->> +		}
->> +
->> +		dwc->usb3_generic_phy = devm_phy_get(dev, "usb3-phy");
->> +		if (IS_ERR(dwc->usb3_generic_phy)) {
->> +			dev_err(dev, "no usb3 phy configured yet");
->> +			return PTR_ERR(dwc->usb3_generic_phy);
->> +		}
->> +	} else {
->> +		dwc->usb2_generic_phy = NULL;
->> +		dwc->usb3_generic_phy = NULL;
->> +	}
->> +
->>   	/* default to superspeed if no maximum_speed passed */
->>   	if (dwc->maximum_speed == USB_SPEED_UNKNOWN)
->>   		dwc->maximum_speed = USB_SPEED_SUPER;
->> @@ -450,6 +478,11 @@ static int dwc3_probe(struct platform_device *pdev)
->>   	usb_phy_set_suspend(dwc->usb2_phy, 0);
->>   	usb_phy_set_suspend(dwc->usb3_phy, 0);
->>
->> +	if (dwc->usb2_generic_phy)
->> +		phy_power_on(dwc->usb2_generic_phy);
->> +	if (dwc->usb3_generic_phy)
->> +		phy_power_on(dwc->usb3_generic_phy);
->> +
->>   	spin_lock_init(&dwc->lock);
->>   	platform_set_drvdata(pdev, dwc);
->>
->> @@ -576,6 +609,11 @@ static int dwc3_remove(struct platform_device *pdev)
->>   	usb_phy_set_suspend(dwc->usb2_phy, 1);
->>   	usb_phy_set_suspend(dwc->usb3_phy, 1);
->>
->> +	if (dwc->usb2_generic_phy)
->
-> if (IS_ERR())
+On Thu, 2013-07-11 at 15:56 +0100, Grant Likely wrote:
 
-I assign NULL to usb2_generic_phy and usb3_generic_phy in case the dts 
-entry doesn't have a *phys* property.
-The IS_ERR of usb2_generic_phy is treated as an error condition and 
-probe will fail.
->
->> +		phy_power_off(dwc->usb2_generic_phy);
->> +	if (dwc->usb3_generic_phy)
->
-> if (IS_ERR())
->
-> here and everywhere else in this patch.
->
->> +		phy_power_off(dwc->usb3_generic_phy);
->> +
->>   	pm_runtime_put(&pdev->dev);
->>   	pm_runtime_disable(&pdev->dev);
->>
->> @@ -673,6 +711,11 @@ static int dwc3_suspend(struct device *dev)
->>   	usb_phy_shutdown(dwc->usb3_phy);
->>   	usb_phy_shutdown(dwc->usb2_phy);
->>
->> +	if (dwc->usb2_generic_phy)
->> +		phy_exit(dwc->usb2_generic_phy);
->> +	if (dwc->usb3_generic_phy)
->> +		phy_exit(dwc->usb3_generic_phy);
->> +
->>   	return 0;
->>   }
->>
->> @@ -683,6 +726,12 @@ static int dwc3_resume(struct device *dev)
->>
->>   	usb_phy_init(dwc->usb3_phy);
->>   	usb_phy_init(dwc->usb2_phy);
->> +
->> +	if (dwc->usb2_generic_phy)
->> +		phy_init(dwc->usb2_generic_phy);
->> +	if (dwc->usb3_generic_phy)
->> +		phy_init(dwc->usb3_generic_phy);
->> +
->>   	msleep(100);
->>
->>   	spin_lock_irqsave(&dwc->lock, flags);
->> diff --git a/drivers/usb/dwc3/core.h b/drivers/usb/dwc3/core.h
->> index f8af8d4..01ec7d7 100644
->> --- a/drivers/usb/dwc3/core.h
->> +++ b/drivers/usb/dwc3/core.h
->> @@ -31,6 +31,8 @@
->>   #include <linux/usb/gadget.h>
->>   #include <linux/usb/otg.h>
->>
->> +#include <linux/phy/phy.h>
->> +
->>   /* Global constants */
->>   #define DWC3_EP0_BOUNCE_SIZE	512
->>   #define DWC3_ENDPOINTS_NUM	32
->> @@ -613,6 +615,8 @@ struct dwc3_scratchpad_array {
->>    * @dr_mode: requested mode of operation
->>    * @usb2_phy: pointer to USB2 PHY
->>    * @usb3_phy: pointer to USB3 PHY
->> + * @usb2_generic_phy: pointer to USB2 PHY
->> + * @usb3_generic_phy: pointer to USB3 PHY
->
-> Why duplicate usbX_phy and usbX_generic_phy? Can't we just have one
-> for each type and call it usbX_phy?
+> > +contiguous-memory {
+> > +
+> > +       (name): region@(base-address) {
+> > +               reg = <(baseaddr) (size)>;
+> > +               (linux,default-contiguous-region);
+> > +               device = <&device_0 &device_1 ...>
+> > +       };
+> > +};
+> 
+> Okay, I've gone and read all of the backlog on the 3 versions of the
+> patch series, and I think I understand the issues. I actually think it
+> was better off to have the regions specified as children of the memory
+> node. I understand the argument about how would firmware know what
+> size the kernel wants and that it would be better to have a kernel
+> parameter to override the default. However, it is also reasonable for
+> the kernel to be provided with a default amount of CMA based on the
+> usage profile of the device. In that regard it is absolutely
+> appropriate to put the CMA region data into the memory node. I don't
+> think /chosen is the right place for that.
 
-There was an already existing phy library in usb which usesusb_phy. 
-There might still be users using the existing usb phy library. Until all 
-the users have completely migrated to the generic PHY framework, this 
-would co-exist.
+Picking up on that old thread after the rant I just posted ... Grant,
+your proposal is all wrong.
 
-Thanks
-Kishon
+First we already had a proposal for reserved memory, which due to the
+complete lack of comment, we actually merged support for in powerpc in
+3.11, second, do NOT make that a child of "memory". See the email I just
+posted today for more details about the breakage in that proposal.
+
+I'm advocating a revert at this stage.
+
+Ben.
