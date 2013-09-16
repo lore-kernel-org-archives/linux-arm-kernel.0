@@ -1,34 +1,24 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 16 Sep 2013 09:32:06 -0400
-Subject: [PATCH v2 1/2] Documentation: devicetree: arm: cpus/cpu nodes
- bindings updates
-In-Reply-To: <1379330464-27917-2-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1379330464-27917-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1379330464-27917-2-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <20130916133206.GF19937@titan.lakedaemon.net>
+From: lars@metafoo.de (Lars-Peter Clausen)
+Date: Mon, 16 Sep 2013 15:43:36 +0200
+Subject: [PATCH 14/38] iio: accel: st: Append _accel to accelerator sensor
+ device names
+In-Reply-To: <20130916133106.GI16984@lee--X1>
+References: <1378817379-8238-1-git-send-email-lee.jones@linaro.org>
+ <1378817379-8238-15-git-send-email-lee.jones@linaro.org>
+ <52345330.4050707@kernel.org> <20130916133106.GI16984@lee--X1>
+Message-ID: <52370B08.3030709@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 16, 2013 at 12:21:03PM +0100, Lorenzo Pieralisi wrote:
-> In order to extend the current cpu nodes bindings to newer CPUs
-> inclusive of AArch64 and to update support for older ARM CPUs this
-> patch updates device tree documentation for the cpu nodes bindings.
+On 09/16/2013 03:31 PM, Lee Jones wrote:
+>> Honestly I don't care either way on these, but consistency would definitely
+>> be good so applied to the togreg branch of iio.git
 > 
-> Main changes:
->     - adds 64-bit bindings
->     - define usage of #address-cells
->     - defines behaviour on pre and post v7 uniprocessor systems
->     - adds ARM 11MPcore specific reg property definition
+> For clarification, is togreg due for the v3.12 merge window or will be
+> get a settling period in -next?
 > 
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> ---
->  Documentation/devicetree/bindings/arm/cpus.txt | 391 ++++++++++++++++++++++---
->  1 file changed, 344 insertions(+), 47 deletions(-)
 
-For the Marvell bits:
+Well everything up to the 'iio-for-3.12c' tag will be in v3.12, everything
+else not.
 
-Acked-by: Jason Cooper <jason@lakedaemon.net>
-
-thx,
-
-Jason.
+- Lars
