@@ -1,91 +1,74 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 16 Sep 2013 09:49:03 +0100
-Subject: [PATCH 2/3] arm32: kvm: rename CONFIG_KVM_ARM_MAX_VCPUS
-In-Reply-To: <20130916083221.GI17294@redhat.com>
-References: <1379160656-28050-1-git-send-email-drjones@redhat.com>
- <1379160656-28050-3-git-send-email-drjones@redhat.com>
- <20130915093002.GX17294@redhat.com> <5236BCB7.9080102@arm.com>
- <20130916083221.GI17294@redhat.com>
-Message-ID: <5236C5FF.5060301@arm.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon, 16 Sep 2013 09:55:28 +0100
+Subject: [PATCH 1/2] Documentation: devicetree: arm: cpus/cpu nodes
+ bindings updates
+In-Reply-To: <52337AEC.9080302@gmail.com>
+References: <1376559743-31848-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1376559743-31848-2-git-send-email-lorenzo.pieralisi@arm.com>
+ <520CE665.8060907@gmail.com>
+ <20130815152238.GF17839@e102568-lin.cambridge.arm.com>
+ <20130913165708.GC5408@e102568-lin.cambridge.arm.com>
+ <52337AEC.9080302@gmail.com>
+Message-ID: <20130916085528.GA22390@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/09/13 09:32, Gleb Natapov wrote:
-> On Mon, Sep 16, 2013 at 09:09:27AM +0100, Marc Zyngier wrote:
->> On 15/09/13 10:30, Gleb Natapov wrote:
->>> On Sat, Sep 14, 2013 at 02:10:55PM +0200, Andrew Jones wrote:
->>>> Drop the _ARM_ part of the name. We can then introduce a config option
->>>> like this to aarch64 and other arches using the same name - allowing
->>>> grep to show them all. Also update the help text to describe the option
->>>> more completely.
->>>>
->>>> Signed-off-by: Andrew Jones <drjones@redhat.com>
->>>> ---
->>>>  arch/arm/include/asm/kvm_host.h | 4 ++--
->>>>  arch/arm/kvm/Kconfig            | 8 ++++----
->>>>  2 files changed, 6 insertions(+), 6 deletions(-)
->>>>
->>>> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
->>>> index 7d22517d80711..c614d3eb176c6 100644
->>>> --- a/arch/arm/include/asm/kvm_host.h
->>>> +++ b/arch/arm/include/asm/kvm_host.h
->>>> @@ -25,8 +25,8 @@
->>>>  #include <asm/fpstate.h>
->>>>  #include <kvm/arm_arch_timer.h>
->>>>  
->>>> -#if defined(CONFIG_KVM_ARM_MAX_VCPUS)
->>>> -#define KVM_MAX_VCPUS CONFIG_KVM_ARM_MAX_VCPUS
->>>> +#if defined(CONFIG_KVM_MAX_VCPUS)
->>>> +#define KVM_MAX_VCPUS CONFIG_KVM_MAX_VCPUS
->>>>  #else
->>>>  #define KVM_MAX_VCPUS 0
->>>>  #endif
->>>> diff --git a/arch/arm/kvm/Kconfig b/arch/arm/kvm/Kconfig
->>>> index ebf5015508b52..de63bfccb3eb5 100644
->>>> --- a/arch/arm/kvm/Kconfig
->>>> +++ b/arch/arm/kvm/Kconfig
->>>> @@ -40,16 +40,16 @@ config KVM_ARM_HOST
->>>>  	---help---
->>>>  	  Provides host support for ARM processors.
->>>>  
->>>> -config KVM_ARM_MAX_VCPUS
->>>> +config KVM_MAX_VCPUS
->>>>  	int "Number maximum supported virtual CPUs per VM"
->>>>  	depends on KVM_ARM_HOST
->>>>  	default 4
->>>>  	help
->>>>  	  Static number of max supported virtual CPUs per VM.
->>>>  
->>>> -	  If you choose a high number, the vcpu structures will be quite
->>>> -	  large, so only choose a reasonable number that you expect to
->>>> -	  actually use.
->>> I do no see why on ARM vcpu structure size depends on KVM_ARM_MAX_VCPUS.
->>> Can somebody point me to it.
->>
->> There's a number of indirections, but here you go:
->> arch/arm/include/asm/kvm_host.h:#define KVM_MAX_VCPUS CONFIG_KVM_ARM_MAX_VCPUS
->>
->> include/kvm/arm_vgic.h:#define VGIC_MAX_CPUS            KVM_MAX_VCPUS
->>
->> include/kvm/arm_vgic.h:#if (VGIC_MAX_CPUS > 8)
->> include/kvm/arm_vgic.h: } percpu[VGIC_MAX_CPUS];
->> include/kvm/arm_vgic.h: u32 percpu[VGIC_MAX_CPUS][VGIC_NR_PRIVATE_IRQS / 4];
->> include/kvm/arm_vgic.h: u8                      irq_sgi_sources[VGIC_MAX_CPUS][VGIC_NR_SGIS];
->> include/kvm/arm_vgic.h: struct vgic_bitmap      irq_spi_target[VGIC_MAX_CPUS];
->>
->> Basically, the GIC emulation data structures are sized on the number of VCPUs
->> (as well as the number of supported interrupts).
->>
-> But vgic is per VM though, not per cpu as far as I can see, so the
-> overhead is also per VM, no? Is VGIC_MAX_CPUS limit architectural or
-> juts an implementation detail?
+On Fri, Sep 13, 2013 at 09:51:56PM +0100, Rob Herring wrote:
+> On 09/13/2013 11:57 AM, Lorenzo Pieralisi wrote:
+> > Hi Rob, all,
+> > 
+> > On Thu, Aug 15, 2013 at 04:22:38PM +0100, Lorenzo Pieralisi wrote:
+> >> [adding Andrew, Gregory and Thomas to check the Marvell compatible names]
+> >>
+> >> On Thu, Aug 15, 2013 at 03:32:05PM +0100, Rob Herring wrote:
+> >>> On 08/15/2013 04:42 AM, Lorenzo Pieralisi wrote:
+> >>>> In order to extend the current cpu nodes bindings to newer CPUs
+> >>>> inclusive of AArch64 and to update support for older ARM CPUs this
+> >>>> patch updates device tree documentation for the cpu nodes bindings.
+> >>>>
+> >>>> Main changes:
+> >>>>     - adds 64-bit bindings
+> >>>>     - define usage of #address-cells
+> >>>>     - defines behaviour on pre and post v7 uniprocessor systems
+> >>>>     - adds ARM 11MPcore specific reg property definition
+> >>>>
+> >>>> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> >>>> ---
+> >>>>  Documentation/devicetree/bindings/arm/cpus.txt | 424 ++++++++++++++++++++++---
+> >>>>  1 file changed, 377 insertions(+), 47 deletions(-)
+> >>>>
+> >>>
+> >>> The binding looks mostly fine to me.
+> > 
+> > These bindings have still not received an ACK, and need review by
+> > Marvell guys in copy for the new compatible strings below.
+> 
+> If you can't get comment, then leave them out if they are not used
+> already. If they are used, then tough shit when they want to change.
+> 
+> > 
+> > Most importantly, we need to make a decision on the pre v7 uniprocessor
+> > systems, where MPIDR/CPUID are non-existent and the reg property is a
+> > pure SW enumeration. Current bindings (ie this patch) define
+> > 
+> > #address-cells = <0>;
+> > 
+> > for those processors (and there are a number of dts in the kernel with that
+> > set-up); Grant and Benjamin had a strong feeling against this choice, I
+> > have to make a decision on how to proceed, please let me know.
+> 
+> I agree that we should define #address-cells to 1 and reg will be simply
+> 0,1,2,etc. in this case.
 
-Indeed, the MAX_VCPU overhead is per VM. The MAX_IRQS overhead is both
-per-vm and per-vcpu.
+Ok, so this means that when these bindings are finally acked and queued
+for merging, there will be a slew of dts in the kernel that will need
+patching (again) and this is likely to ruffle feathers. Honestly I would
+leave this task to platform maintainers, if we all agree.
 
-The GICv2 architecture has a limit of 8 CPUs - not at all an
-implementation detail. GICv3 remove this limitation.
+> This change and fixing the example as I pointed out are what I was
+> waiting to see.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Perfect, given that I got feedback from Andrew, I will be posting a
+final version very soon.
+
+Lorenzo
