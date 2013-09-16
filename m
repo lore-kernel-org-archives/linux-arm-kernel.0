@@ -1,74 +1,42 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 16 Sep 2013 09:55:28 +0100
-Subject: [PATCH 1/2] Documentation: devicetree: arm: cpus/cpu nodes
- bindings updates
-In-Reply-To: <52337AEC.9080302@gmail.com>
-References: <1376559743-31848-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1376559743-31848-2-git-send-email-lorenzo.pieralisi@arm.com>
- <520CE665.8060907@gmail.com>
- <20130815152238.GF17839@e102568-lin.cambridge.arm.com>
- <20130913165708.GC5408@e102568-lin.cambridge.arm.com>
- <52337AEC.9080302@gmail.com>
-Message-ID: <20130916085528.GA22390@e102568-lin.cambridge.arm.com>
+From: vijay.kilari@gmail.com (vijay.kilari at gmail.com)
+Date: Mon, 16 Sep 2013 14:25:48 +0530
+Subject: [RFC PATCH 0/2] Aarch64: KGDB: kernel debugging support
+Message-ID: <1379321750-907-1-git-send-email-vijay.kilari@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 13, 2013 at 09:51:56PM +0100, Rob Herring wrote:
-> On 09/13/2013 11:57 AM, Lorenzo Pieralisi wrote:
-> > Hi Rob, all,
-> > 
-> > On Thu, Aug 15, 2013 at 04:22:38PM +0100, Lorenzo Pieralisi wrote:
-> >> [adding Andrew, Gregory and Thomas to check the Marvell compatible names]
-> >>
-> >> On Thu, Aug 15, 2013 at 03:32:05PM +0100, Rob Herring wrote:
-> >>> On 08/15/2013 04:42 AM, Lorenzo Pieralisi wrote:
-> >>>> In order to extend the current cpu nodes bindings to newer CPUs
-> >>>> inclusive of AArch64 and to update support for older ARM CPUs this
-> >>>> patch updates device tree documentation for the cpu nodes bindings.
-> >>>>
-> >>>> Main changes:
-> >>>>     - adds 64-bit bindings
-> >>>>     - define usage of #address-cells
-> >>>>     - defines behaviour on pre and post v7 uniprocessor systems
-> >>>>     - adds ARM 11MPcore specific reg property definition
-> >>>>
-> >>>> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> >>>> ---
-> >>>>  Documentation/devicetree/bindings/arm/cpus.txt | 424 ++++++++++++++++++++++---
-> >>>>  1 file changed, 377 insertions(+), 47 deletions(-)
-> >>>>
-> >>>
-> >>> The binding looks mostly fine to me.
-> > 
-> > These bindings have still not received an ACK, and need review by
-> > Marvell guys in copy for the new compatible strings below.
-> 
-> If you can't get comment, then leave them out if they are not used
-> already. If they are used, then tough shit when they want to change.
-> 
-> > 
-> > Most importantly, we need to make a decision on the pre v7 uniprocessor
-> > systems, where MPIDR/CPUID are non-existent and the reg property is a
-> > pure SW enumeration. Current bindings (ie this patch) define
-> > 
-> > #address-cells = <0>;
-> > 
-> > for those processors (and there are a number of dts in the kernel with that
-> > set-up); Grant and Benjamin had a strong feeling against this choice, I
-> > have to make a decision on how to proceed, please let me know.
-> 
-> I agree that we should define #address-cells to 1 and reg will be simply
-> 0,1,2,etc. in this case.
+From: Vijaya Kumar K <Vijaya.Kumar@caviumnetworks.com>
 
-Ok, so this means that when these bindings are finally acked and queued
-for merging, there will be a slew of dts in the kernel that will need
-patching (again) and this is likely to ruffle feathers. Honestly I would
-leave this task to platform maintainers, if we all agree.
+Based on the step-handler and break-handler hooks patch
+http://lists.infradead.org/pipermail/linux-arm-kernel/2013-August/189510.html
+KGDB debugging support is added for EL1 debug in Aarch64 mode
 
-> This change and fixing the example as I pointed out are what I was
-> waiting to see.
+With first patch,register layout is updated to be inline with GDB tool.
+Basic GDB connection, break point set/clear and info commands
+are supported except step/next debugging
 
-Perfect, given that I got feedback from Andrew, I will be posting a
-final version very soon.
+With second patch, step/next debugging support is added, where in
+ELR_EL1 is updated to point to the instruction to be stepped and
+stopped.
 
-Lorenzo
+kernel exception handler exit macro in entry.S is update to
+retain ELR value written by KGDB.
+
+Tested with Aarch64 GDB tool chain on simulator
+
+Vijaya Kumar K (2):
+  Aarch64: KGDB: Add Basic KGDB support
+  Aarch64: KGDB: Add Step debugging support
+
+ arch/arm64/include/asm/debug-monitors.h |    3 +
+ arch/arm64/include/asm/kgdb.h           |   61 ++++++
+ arch/arm64/kernel/Makefile              |    1 +
+ arch/arm64/kernel/debug-monitors.c      |   15 ++
+ arch/arm64/kernel/entry.S               |    9 +-
+ arch/arm64/kernel/kgdb.c                |  323 +++++++++++++++++++++++++++++++
+ 6 files changed, 411 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm64/include/asm/kgdb.h
+ create mode 100644 arch/arm64/kernel/kgdb.c
+
+-- 
+1.7.9.5
