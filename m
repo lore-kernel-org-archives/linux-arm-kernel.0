@@ -1,52 +1,242 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 16 Sep 2013 18:24:50 +0200
-Subject: mvneta: oops in __rcu_read_lock on mirabox
-In-Reply-To: <20130916162209.GL12758@n2100.arm.linux.org.uk>
-References: <CACzLR4tTvt+ROEhkXUCQhV6=bPPTX4LFSkWfrEhF+OdM1Jm1Rw@mail.gmail.com>
- <20130915205701.5c61a444@skate> <20130916065047.GH27487@1wt.eu>
- <20130916175152.4e013457@skate>
- <20130916162209.GL12758@n2100.arm.linux.org.uk>
-Message-ID: <20130916182450.639084c6@skate>
+From: joelf@ti.com (Joel Fernandes)
+Date: Mon, 16 Sep 2013 11:26:53 -0500
+Subject: [PATCH v3] ARM: EDMA: Fix clearing of unused list for DT DMA
+ resources
+In-Reply-To: <5236F00B.5040605@ti.com>
+References: <1378839171-14455-1-git-send-email-joelf@ti.com>
+ <5231903F.7080301@ti.com> <5233B471.40603@ti.com> <5236F00B.5040605@ti.com>
+Message-ID: <5237314D.7080102@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell,
-
-On Mon, 16 Sep 2013 17:22:09 +0100, Russell King - ARM Linux wrote:
-
-> One seemed to be a single bit error in an instruction inside the kernel
-> image.  The other was what seems to be an impossible abort.
+On 09/16/2013 06:48 AM, Sekhar Nori wrote:
+> Hi Joel,
 > 
-> I still don't see how we could end up with a prefetch abort inside memset()
-> due to the kernel domain being inaccessible, but still be able to get
-> an oops out, especially when we dump out the memory for the faulting
-> instruction by accessing that memory via that apparantly inaccessible
-> domain while running the code which dumps that memory also under this
-> apparantly inaccessible domain.  If the domain containing the kernel
-> really was inaccessible, the system would be completely dead.
+> On Saturday 14 September 2013 06:27 AM, Joel Fernandes wrote:
+>> From: Joel Fernandes <joelf@ti.com>
+>> Subject: [PATCH v4] ARM: EDMA: Fix clearing of unused list for DT DMA resources
+>>
+>> HWMOD removal for MMC is breaking edma_start as the events are being manually
+>> triggered due to unused channel list not being clear.
+>>
+>> This patch fixes the issue, by reading the "dmas" property from the DT node if
+>> it exists and clearing the bits in the unused channel list. For this purpose
+>> we use the of_* helpers to parse the arguments in the dmas phandle list.
+>>
+>> Reviewed-by: Sekhar Nori <nsekhar@ti.com>
+>> Reported-by: Balaji T K <balajitk@ti.com>
+>> Cc: Pantel Antoniou <panto@antoniou-consulting.com>
+>> Signed-off-by: Joel Fernandes <joelf@ti.com>
+>> ---
+>> Changes since v1, in v2 and v3:
+>> - Reduced indentation of non-of case by returning from of-case
+>> - Using of_* helpers for parsing
+>>
+>> Note:
+>> This patch should go into the merge window as it is a critical bug fix.
 > 
-> The only possibilities I can come up with for that is that abort was
-> caused by something spurious happening at the hardware level causing
-> corruption of the instruction TLB (corrupting the domain index stored
-> in the I-TLB) or other CPU control hardware causing it to spuriously
-> generate that fault.
-> 
-> As the domain field in the page table L1 entries covers bit 8, and the
-> single bit error with the instruction was also bit 8, maybe there's a
-> design weakness on data line bit 8 causing marginal operation.
-> 
-> To add to this, the abort given in this report gives an IFSR value of
-> 0x409, which equates to "Synchronous parity error on memory access"
-> in ARMv7.  The other value (0x400) equates to "TLB conflict abort"
-> which can only happen with LPAE support enabled...  So this is just
-> getting more weird!
+> I still cannot find any users of edma in the device tree sources either
+> in linux-next or linus/master. Why cannot this wait until v3.13?
 
-Could this be caused by bitflips in the RAM due to bad timings, or
-overheating or that kind of things?
+I understand this affects only DT users of EDMA. But I get so many private
+reports of breakage due to this patch not being there that I think it will save
+everyone a lot of pain, specially folks creating integration trees to have this
+patch available by default.
 
-Thomas
+Further, EDMA DT enabling is surely to go in for 3.13, so its best if this is
+applied in advance here.
+
+I feel we shouldn't leave code intentionally broken just because it is not yet
+enabled in DTS, specially when it is about to be enabled in DT. For example, a
+potential problem is MMC/SD file system corruption due to DMA failure.
+
+>>  arch/arm/common/edma.c | 23 +++++++++++++++++++++--
+>>  1 file changed, 21 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/arch/arm/common/edma.c b/arch/arm/common/edma.c
+>> index 39ad030..43c7b22 100644
+>> --- a/arch/arm/common/edma.c
+>> +++ b/arch/arm/common/edma.c
+>> @@ -560,14 +560,33 @@ static int reserve_contiguous_slots(int ctlr, unsigned int
+>> id,
+>>  static int prepare_unused_channel_list(struct device *dev, void *data)
+>>  {
+>>  	struct platform_device *pdev = to_platform_device(dev);
+>> -	int i, ctlr;
+>> +	int i, count, ctlr;
+>> +	struct of_phandle_args  dma_spec;
+>>
+>> +	if (dev->of_node) {
+>> +		count = of_property_count_strings(dev->of_node, "dma-names");
+>> +		if (count < 0)
+>> +			return 0;
+>> +		for (i = 0; i < count; i++) {
+>> +			if (of_parse_phandle_with_args(dev->of_node, "dmas",
+>> +						       "#dma-cells", i,
+>> +						       &dma_spec))
+>> +				continue;
+> 
+> This will break for the case where devices on platform bus use non-EDMA
+> dma controllers like SDMA or CPPI (DRA7x has both EDMA and SDMA on the
+> same chip). You need to do an additional check to make sure the dma
+> controller is indeed EDMA. Something like.
+
+Ok, edma is probed earlier so I could never see any problem.
+Thanks for pointing this out,
+
+Using the below method is more future-proof than using compatible literal
+strings directly. The only problem is the matches table has to be defined
+earlier in the sources. What do you think?
+
+                        if (!of_match_node(edma_of_ids, dma_spec.np) {
+                                of_node_put(dma_spec.np);
+                                continue;
+                        }
+
+
+> 	if(!of_device_is_compatible(dma_spec.np, "ti,edma3"))
+> 		continue;
+> 
+> Don forget to call of_node_put() on dma_spec.np (something that needs to
+> be done even with your current code).
+
+Ok, will do.
+
+
+>> +
+>> +			ctlr = EDMA_CTLR(dma_spec.args[0]);
+>> +			clear_bit(EDMA_CHAN_SLOT(dma_spec.args[0]),
+>> +				  edma_cc[ctlr]->edma_unused);
+> 
+> We don't support the second controller when using DT and the controller
+> number is not really encoded in the argument to edma phandle. So just
+> simplify this to:
+> 
+> 	clear_bit(EDMA_CHAN_SLOT(dma_spec.args[0]), 	
+> 		  edma_cc[0]->edma_unused);
+
+I think let's not make that assumption just incase in the future we support more
+than one EDMA controller for DT-based boot. Is that ok?
+
+> 
+>> +		}
+>> +		return 0;
+>> +	}
+>> +
+>> +	/* For non-OF case */
+>>  	for (i = 0; i < pdev->num_resources; i++) {
+>>  		if ((pdev->resource[i].flags & IORESOURCE_DMA) &&
+>>  				(int)pdev->resource[i].start >= 0) {
+>>  			ctlr = EDMA_CTLR(pdev->resource[i].start);
+>>  			clear_bit(EDMA_CHAN_SLOT(pdev->resource[i].start),
+>> -					edma_cc[ctlr]->edma_unused);
+>> +				  edma_cc[ctlr]->edma_unused);
+> 
+> This is a useful change and I am okay with it happening in this
+> otherwise unrelated patch, but please mention this in changelog.
+
+Below is the updated version (v5), can you check and let me know if you had any
+other comments?
+
+---8<---
+From: Joel Fernandes <joelf@ti.com>
+Subject: [PATCH v5] ARM: EDMA: Fix clearing of unused list for DT DMA resources
+
+HWMOD removal for MMC is breaking edma_start as the events are being manually
+triggered due to unused channel list not being clear.
+
+The above issue is fixed by reading the "dmas" property from the DT node if it
+exists and clearing the bits in the unused channel list if the dma controller
+used by any device is EDMA. For this purpose we use the of_* helpers to parse
+the arguments in the dmas phandle list.
+
+Also introduced is a minor clean up of a checkpatch error in old code.
+
+Reviewed-by: Sekhar Nori <nsekhar@ti.com>
+Reported-by: Balaji T K <balajitk@ti.com>
+Cc: Pantel Antoniou <panto@antoniou-consulting.com>
+Signed-off-by: Joel Fernandes <joelf@ti.com>
+---
+Changes since v4:
+- Using of_node_put on dma_spec's node pointer.
+- Update changelog with minor cleanup information.
+
+Changes since v1, in v2 and v3:
+ - Reduced indentation of non-of case by returning from of-case
+ - Using of_* helpers for parsing
+
+ arch/arm/common/edma.c | 39 ++++++++++++++++++++++++++++++++-------
+ 1 file changed, 32 insertions(+), 7 deletions(-)
+
+diff --git a/arch/arm/common/edma.c b/arch/arm/common/edma.c
+index 117f955..8b5c6ed 100644
+--- a/arch/arm/common/edma.c
++++ b/arch/arm/common/edma.c
+@@ -269,6 +269,11 @@ static const struct edmacc_param dummy_paramset = {
+ 	.ccnt = 1,
+ };
+
++static const struct of_device_id edma_of_ids[] = {
++	{ .compatible = "ti,edma3", },
++	{}
++};
++
+ /*****************************************************************************/
+
+ static void map_dmach_queue(unsigned ctlr, unsigned ch_no,
+@@ -560,14 +565,39 @@ static int reserve_contiguous_slots(int ctlr, unsigned int id,
+ static int prepare_unused_channel_list(struct device *dev, void *data)
+ {
+ 	struct platform_device *pdev = to_platform_device(dev);
+-	int i, ctlr;
++	int i, count, ctlr;
++	struct of_phandle_args  dma_spec;
+
++	if (dev->of_node) {
++		count = of_property_count_strings(dev->of_node, "dma-names");
++		if (count < 0)
++			return 0;
++		for (i = 0; i < count; i++) {
++			if (of_parse_phandle_with_args(dev->of_node, "dmas",
++						       "#dma-cells", i,
++						       &dma_spec))
++				continue;
++
++			if (!of_match_node(edma_of_ids, dma_spec.np)) {
++				of_node_put(dma_spec.np);
++				continue;
++			}
++
++			ctlr = EDMA_CTLR(dma_spec.args[0]);
++			clear_bit(EDMA_CHAN_SLOT(dma_spec.args[0]),
++				  edma_cc[ctlr]->edma_unused);
++			of_node_put(dma_spec.np);
++		}
++		return 0;
++	}
++
++	/* For non-OF case */
+ 	for (i = 0; i < pdev->num_resources; i++) {
+ 		if ((pdev->resource[i].flags & IORESOURCE_DMA) &&
+ 				(int)pdev->resource[i].start >= 0) {
+ 			ctlr = EDMA_CTLR(pdev->resource[i].start);
+ 			clear_bit(EDMA_CHAN_SLOT(pdev->resource[i].start),
+-					edma_cc[ctlr]->edma_unused);
++				  edma_cc[ctlr]->edma_unused);
+ 		}
+ 	}
+
+@@ -1762,11 +1792,6 @@ static int edma_probe(struct platform_device *pdev)
+ 	return 0;
+ }
+
+-static const struct of_device_id edma_of_ids[] = {
+-	{ .compatible = "ti,edma3", },
+-	{}
+-};
+-
+ static struct platform_driver edma_driver = {
+ 	.driver = {
+ 		.name	= "edma",
 -- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+1.8.1.2
