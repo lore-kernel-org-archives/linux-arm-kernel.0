@@ -1,63 +1,57 @@
-From: rvaswani@codeaurora.org (Rohit Vaswani)
-Date: Mon, 16 Sep 2013 11:28:33 -0700
-Subject: [PATCH] ARM: msm: Move msm devicetrees under a Qualcomm dir
-In-Reply-To: <9EA264FE-7621-458D-8333-9340DDBFC4EE@codeaurora.org>
-References: <1379003839-16068-1-git-send-email-galak@codeaurora.org>
- <CAOesGMisWLwYKotGDFPW6PyHJs=_+fohTdC08SGjsv2FXaa7Fg@mail.gmail.com>
- <25E0B143-658E-4CCC-A88A-0AF70FFF33CE@codeaurora.org>
- <CAOesGMhfdvyJ_2AA2e8iO_2e=q7KgpyNbcriPKFw-RLormG6bA@mail.gmail.com>
- <3E38F48E-EE41-4564-84A1-36CF07B08811@codeaurora.org>
- <20130912224737.GA24937@codeaurora.org>
- <9EA264FE-7621-458D-8333-9340DDBFC4EE@codeaurora.org>
-Message-ID: <52374DD1.9040209@codeaurora.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 16 Sep 2013 19:25:01 +0100
+Subject: mvneta: oops in __rcu_read_lock on mirabox
+In-Reply-To: <20130916174514.GF3188@1wt.eu>
+References: <CACzLR4tTvt+ROEhkXUCQhV6=bPPTX4LFSkWfrEhF+OdM1Jm1Rw@mail.gmail.com>
+ <20130915205701.5c61a444@skate> <20130916065047.GH27487@1wt.eu>
+ <20130916175152.4e013457@skate>
+ <20130916162209.GL12758@n2100.arm.linux.org.uk>
+ <20130916182450.639084c6@skate>
+ <20130916171416.GM12758@n2100.arm.linux.org.uk>
+ <20130916174514.GF3188@1wt.eu>
+Message-ID: <20130916182501.GN12758@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9/12/2013 7:05 PM, Kumar Gala wrote:
-> On Sep 12, 2013, at 5:47 PM, David Brown wrote:
->
->> On Thu, Sep 12, 2013 at 12:55:36PM -0500, Kumar Gala wrote:
->>> On Sep 12, 2013, at 12:06 PM, Olof Johansson wrote:
->>>> My original request to please use a common prefix for your product
->>>> families stands. Please prefix with msm-*, or if you have to, qcom-*
->>>> instead, since you guys can't seem to make your mind up on standard
->>>> prefixes (msm, apq, etc).
->>> This is silly, I dont see the reason to go with
->>> qcom-apq<SOC>-<BOARD>.dts and than in the future drop qcom- when we
->>> mostly likely shift to a dir structure.  As engineers we are all too
->>> aware of the lack of sanity in marketing names, but its what we have
->>> so we have to live with it.
->> At least what we'd decided a year or two ago was to call _everything_
->> with an msm* prefix.  If marketing comes up with cute prefixes for
->> things, we would basically ignore them.  So, under that, it should be
->> an msm8074-dragonboard.  Admittedly, it might be a little confusing
->> with the name of the product having the apq in it, but as others have
->> pointed out, I think there is less confusing than not having a common
->> prefix on our MSM products.
->>
->> At least so far, there are no chips where apq vs msm actually
->> distinguishes anything.  In fact, a simple "decoder ring" would point
->> out that the 'apq' usually corresponds with the second digit being a
->> zero.  It doesn't help that we've added an 'mpq' prefix as well.
->>
->> I don't really see how to satisfy all of this other than qcom-apq*, or
->> just continue to use msm*.
+On Mon, Sep 16, 2013 at 07:45:14PM +0200, Willy Tarreau wrote:
+> This board has a really clean routing and placement, chips are very close.
+> That does not rule out the possibility of a lacking termination, but it
+> would probably affect more users.
 
-I think going ahead with what David mentioned  for msm* works if we can 
-be consistent or if we want to explicitly mention apq in the file name, 
-then
-we can rename them to be qcom-msm* or qcom-apq* if people care about the 
-differences between them.
+True - though in your photographs, we can't see the tracking for the
+data bus, because that's all buried in the inner board layers.
+However, there is some evidence in there of trace lengths being matched
+which is a good sign. :)
 
->
-> I think msm has run out of steam, especially as more SoCs come out of Qualcomm that aren't just targeting phones & tablets.
->
-> - k
->
+> On Mon, Sep 16, 2013 at 06:14:16PM +0100, Russell King - ARM Linux wrote:
+> > Marginal or noisy power supplies could also be a problem - for example,
+> > if the impedance of the power supply connections is too great, it may
+> > work with some patterns of use but not others.
+> 
+> We have some margin here, I measured less than 1 Amp to boot and something
+> like 6-700 mA in idle if my memory serves me correctly. The 3A PSU and its
+> thicker-than-average wires seem safe. I think that Globalscale learned a
+> lot from the horrible Guruplug design that all this part needs to be done
+> correctly and they did a very clean job this time.
 
+Not quite the power supply I was referring to - I'm talking about the
+on-board regulators which supply the 3.3V and other lower voltages to
+the SDRAM and SoC - and the quality of their decoupling.  The on-board
+regulators will have a certain degree of "line" noise immunity.
 
-Thanks,
-Rohit Vaswani
+If I had to guess, I'd say C366 is probably the output bulk capacitor on
+the CPU core supply (which comes via BIT7, C273, L1, U19 being the
+switching regulator chip.
 
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum, hosted by The Linux Foundation
+I'd also guess one of C370, C396 or C398 supplies the SDRAM - and of
+those C370 is the most likely - the resistors in the boxes marked K and
+B, and R123 I suspect may be the SDRAM data bus termination (that
+covers R107 to R136), though I only count a total of 30 of those
+connecting to U5 pin 4 - and that point looks _well_ decoupled with lots
+of capacitors (C8-C16, C287 on one side, C7, C246, C247 on the other.)
+The other two?  Maybe R105/106 which are on the underside of the CPU,
+though they're a long way from that well decoupled point.  R137/138?
+They're up by the NAND chip and connect to ground.  Though... if one
+of those is for D8...
+
+Anyway, that's all speculation.
