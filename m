@@ -1,129 +1,107 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 16 Sep 2013 12:30:56 +0100
-Subject: [RFC PATCH 2/2] Aarch64: KGDB: Add Step debugging support
-In-Reply-To: <1379321750-907-3-git-send-email-vijay.kilari@gmail.com>
-References: <1379321750-907-1-git-send-email-vijay.kilari@gmail.com>
- <1379321750-907-3-git-send-email-vijay.kilari@gmail.com>
-Message-ID: <20130916113056.GH21320@mudshark.cambridge.arm.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Mon, 16 Sep 2013 17:18:27 +0530
+Subject: [PATCH v3] ARM: EDMA: Fix clearing of unused list for DT DMA
+ resources
+In-Reply-To: <5233B471.40603@ti.com>
+References: <1378839171-14455-1-git-send-email-joelf@ti.com>
+ <5231903F.7080301@ti.com> <5233B471.40603@ti.com>
+Message-ID: <5236F00B.5040605@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 16, 2013 at 09:55:50AM +0100, vijay.kilari at gmail.com wrote:
-> From: Vijaya Kumar K <Vijaya.Kumar@caviumnetworks.com>
+Hi Joel,
+
+On Saturday 14 September 2013 06:27 AM, Joel Fernandes wrote:
+> From: Joel Fernandes <joelf@ti.com>
+> Subject: [PATCH v4] ARM: EDMA: Fix clearing of unused list for DT DMA resources
 > 
-> Add KGDB software step debugging support for EL1 debug
-> in Aarch64 mode.
+> HWMOD removal for MMC is breaking edma_start as the events are being manually
+> triggered due to unused channel list not being clear.
 > 
-> KGDB registers step debug handler with debug monitor.
-> On receiving 'step' command from GDB tool, target enables
-> software step debugging and step address is written to ELR
-> register. If not step address is received from GDB tool,
-> target assumes next step address is PC and ERET is
-> executed as part of exception return.
+> This patch fixes the issue, by reading the "dmas" property from the DT node if
+> it exists and clearing the bits in the unused channel list. For this purpose
+> we use the of_* helpers to parse the arguments in the dmas phandle list.
 > 
-> ELR register content is protected against context restore in
-> exception return by checking against Software Step debug
-> bit MDSCR.SS
-> 
-> Software Step debugging is disabled when 'continue' command
-> is received
-> 
-> Signed-off-by: Vijaya Kumar K <Vijaya.Kumar@caviumnetworks.com>
+> Reviewed-by: Sekhar Nori <nsekhar@ti.com>
+> Reported-by: Balaji T K <balajitk@ti.com>
+> Cc: Pantel Antoniou <panto@antoniou-consulting.com>
+> Signed-off-by: Joel Fernandes <joelf@ti.com>
 > ---
->  arch/arm64/include/asm/debug-monitors.h |    3 +++
->  arch/arm64/kernel/debug-monitors.c      |   15 +++++++++++++
->  arch/arm64/kernel/entry.S               |    9 +++++++-
->  arch/arm64/kernel/kgdb.c                |   36 +++++++++++++++++++++++++++++++
->  4 files changed, 62 insertions(+), 1 deletion(-)
+> Changes since v1, in v2 and v3:
+> - Reduced indentation of non-of case by returning from of-case
+> - Using of_* helpers for parsing
 > 
-> diff --git a/arch/arm64/include/asm/debug-monitors.h b/arch/arm64/include/asm/debug-monitors.h
-> index aff3a76..3e4ac0d 100644
-> --- a/arch/arm64/include/asm/debug-monitors.h
-> +++ b/arch/arm64/include/asm/debug-monitors.h
-> @@ -94,6 +94,9 @@ void kernel_enable_single_step(struct pt_regs *regs);
->  void kernel_disable_single_step(void);
->  int kernel_active_single_step(void);
->  
-> +void elr_write(unsigned long elr);
-> +unsigned long elr_read(void);
+> Note:
+> This patch should go into the merge window as it is a critical bug fix.
+
+I still cannot find any users of edma in the device tree sources either
+in linux-next or linus/master. Why cannot this wait until v3.13?
+
+> 
+>  arch/arm/common/edma.c | 23 +++++++++++++++++++++--
+>  1 file changed, 21 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/common/edma.c b/arch/arm/common/edma.c
+> index 39ad030..43c7b22 100644
+> --- a/arch/arm/common/edma.c
+> +++ b/arch/arm/common/edma.c
+> @@ -560,14 +560,33 @@ static int reserve_contiguous_slots(int ctlr, unsigned int
+> id,
+>  static int prepare_unused_channel_list(struct device *dev, void *data)
+>  {
+>  	struct platform_device *pdev = to_platform_device(dev);
+> -	int i, ctlr;
+> +	int i, count, ctlr;
+> +	struct of_phandle_args  dma_spec;
+> 
+> +	if (dev->of_node) {
+> +		count = of_property_count_strings(dev->of_node, "dma-names");
+> +		if (count < 0)
+> +			return 0;
+> +		for (i = 0; i < count; i++) {
+> +			if (of_parse_phandle_with_args(dev->of_node, "dmas",
+> +						       "#dma-cells", i,
+> +						       &dma_spec))
+> +				continue;
+
+This will break for the case where devices on platform bus use non-EDMA
+dma controllers like SDMA or CPPI (DRA7x has both EDMA and SDMA on the
+same chip). You need to do an additional check to make sure the dma
+controller is indeed EDMA. Something like.
+
+	if(!of_device_is_compatible(dma_spec.np, "ti,edma3"))
+		continue;
+
+Don forget to call of_node_put() on dma_spec.np (something that needs to
+be done even with your current code).
+
 > +
->  #ifdef CONFIG_HAVE_HW_BREAKPOINT
->  int reinstall_suspended_bps(struct pt_regs *regs);
->  #else
-> diff --git a/arch/arm64/kernel/debug-monitors.c b/arch/arm64/kernel/debug-monitors.c
-> index f8b90c0..0408490 100644
-> --- a/arch/arm64/kernel/debug-monitors.c
-> +++ b/arch/arm64/kernel/debug-monitors.c
-> @@ -64,6 +64,21 @@ static u32 mdscr_read(void)
->  	return mdscr;
->  }
->  
-> +void elr_write(unsigned long elr)
-> +{
-> +	unsigned long flags;
-> +	local_dbg_save(flags);
-> +	asm volatile("msr elr_el1, %0" :: "r" (elr));
-> +	local_dbg_restore(flags);
-> +}
+> +			ctlr = EDMA_CTLR(dma_spec.args[0]);
+> +			clear_bit(EDMA_CHAN_SLOT(dma_spec.args[0]),
+> +				  edma_cc[ctlr]->edma_unused);
+
+We don't support the second controller when using DT and the controller
+number is not really encoded in the argument to edma phandle. So just
+simplify this to:
+
+	clear_bit(EDMA_CHAN_SLOT(dma_spec.args[0]), 	
+		  edma_cc[0]->edma_unused);
+
+> +		}
+> +		return 0;
+> +	}
 > +
-> +unsigned long elr_read(void)
-> +{
-> +	unsigned long elr;
-> +	asm volatile("mrs %0, elr_el1" : "=r" (elr));
-> +	return elr;
-> +}
+> +	/* For non-OF case */
+>  	for (i = 0; i < pdev->num_resources; i++) {
+>  		if ((pdev->resource[i].flags & IORESOURCE_DMA) &&
+>  				(int)pdev->resource[i].start >= 0) {
+>  			ctlr = EDMA_CTLR(pdev->resource[i].start);
+>  			clear_bit(EDMA_CHAN_SLOT(pdev->resource[i].start),
+> -					edma_cc[ctlr]->edma_unused);
+> +				  edma_cc[ctlr]->edma_unused);
 
-What?! Why are you writing the ELR here, instead of setting up the pc in
-current saved regs?
+This is a useful change and I am okay with it happening in this
+otherwise unrelated patch, but please mention this in changelog.
 
-> +
->  /*
->   * Allow root to disable self-hosted debug from userspace.
->   * This is useful if you want to connect an external JTAG debugger.
-> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-> index 226be77..23d91f1 100644
-> --- a/arch/arm64/kernel/entry.S
-> +++ b/arch/arm64/kernel/entry.S
-> @@ -100,7 +100,14 @@
->  	pop	x4, x5
->  	pop	x6, x7
->  	pop	x8, x9
-> -	msr	elr_el1, x21			// set up the return data
-> +	.if     \el == 1
-> +	mrs     x10, mdscr_el1			// check if step debug is enabled
-> +	tbnz    x10, #0, 1f
-> +	msr     elr_el1, x21
-> +	.else
-> +	msr     elr_el1, x21			// set up the return data
-> +	.endif
-> +1:
-
-This is horrible -- if the pt_regs being restored was set up correctly,
-you wouldn't need the conditional code.
-
->  	msr	spsr_el1, x22
->  	.if	\el == 0
->  	msr	sp_el0, x23
-> diff --git a/arch/arm64/kernel/kgdb.c b/arch/arm64/kernel/kgdb.c
-> index a3a7712..d5e5884 100644
-> --- a/arch/arm64/kernel/kgdb.c
-> +++ b/arch/arm64/kernel/kgdb.c
-> @@ -164,9 +164,31 @@ int kgdb_arch_handle_exception(int exception_vector, int signo, int err_code,
->  			linux_regs->pc += 4;
->  
->  		compiled_break = 0;
-> +
-> +		/* Disable single step if enabled */
-> +		if (kernel_active_single_step())
-> +			kernel_disable_single_step();
-> +
->  		err = 0;
->  		break;
-> +	case 's':
-> +		/* 
-> +		 * Update ESR value with step address passed
-> +		 */
-
-Well, the comment is wrong, but I don't think you should be doing this anyway :)
-
-Will
+Thanks,
+Sekhar
