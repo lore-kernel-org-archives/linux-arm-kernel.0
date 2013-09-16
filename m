@@ -1,58 +1,56 @@
 From: marex@denx.de (Marek Vasut)
-Date: Mon, 16 Sep 2013 16:15:40 +0200
-Subject: [PATCH 3/6] Staging/iio/adc/touchscreen/MXS: simplify register
- access
-In-Reply-To: <1378887511-24530-4-git-send-email-jbe@pengutronix.de>
+Date: Mon, 16 Sep 2013 16:19:55 +0200
+Subject: [PATCH 4/6] Staging/iio/adc/touchscreen/MXS: add i.MX23 support
+ to the LRADC touchscreen driver
+In-Reply-To: <201309161014.27482.jbe@pengutronix.de>
 References: <1378887511-24530-1-git-send-email-jbe@pengutronix.de>
- <1378887511-24530-4-git-send-email-jbe@pengutronix.de>
-Message-ID: <201309161615.40751.marex@denx.de>
+ <523590E1.6030309@kernel.org> <201309161014.27482.jbe@pengutronix.de>
+Message-ID: <201309161619.55333.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Juergen Beisert,
+Dear J?rgen Beisert,
 
-> Replace the individual register access by a few shared access function to
-> make the code easier to read and in order to add the i.MX23 SoC in the
-> next step.
+> Hi Jonathan,
 > 
-> Signed-off-by: Juergen Beisert <jbe@pengutronix.de>
-> CC: linux-arm-kernel at lists.infradead.org
-> CC: devel at driverdev.osuosl.org
-> CC: Marek Vasut <marex@denx.de>
-> CC: Fabio Estevam <fabio.estevam@freescale.com>
-> CC: Jonathan Cameron <jic23@cam.ac.uk>
-> ---
->  drivers/staging/iio/adc/mxs-lradc.c | 204
-> +++++++++++++++++++++--------------- 1 file changed, 120 insertions(+), 84
-> deletions(-)
+> On Sunday 15 September 2013 12:50:09 Jonathan Cameron wrote:
+> > On 09/11/13 09:18, Juergen Beisert wrote:
+> > > Distinguish i.MX23 and i.MX28 at runtime and do the same for both SoC
+> > > at least for the 4 wire touchscreen.
+> > > 
+> > > Note: support for the remaining LRADC channels is not tested on an
+> > > i.MX23 yet.
+> > 
+> > An ominous comment. Are you likely to test them soon?
 > 
-> diff --git a/drivers/staging/iio/adc/mxs-lradc.c
-> b/drivers/staging/iio/adc/mxs-lradc.c index 5535fed..4317fee 100644
-> --- a/drivers/staging/iio/adc/mxs-lradc.c
-> +++ b/drivers/staging/iio/adc/mxs-lradc.c
-> @@ -235,6 +235,56 @@ struct mxs_lradc {
->  #define LRADC_RESOLUTION			12
->  #define LRADC_SINGLE_SAMPLE_MASK		((1 << LRADC_RESOLUTION) - 1)
-> 
-> +static void mxs_lradc_reg_set(struct mxs_lradc *lradc, u32 val, u32 reg)
-> +{
-> +	writel(val, lradc->base + reg + STMP_OFFSET_REG_SET);
-> +}
-> +
-> +static void mxs_lradc_reg_clear(struct mxs_lradc *lradc, u32 val, u32 reg)
-> +{
-> +	writel(val, lradc->base + reg + STMP_OFFSET_REG_CLR);
-> +}
-> +
-> +static void mxs_lradc_reg(struct mxs_lradc *lradc, u32 val, u32 reg)
-> +{
-> +	writel(val, lradc->base + reg);
-> +}
+> Sorry, currently no i.MX28 hardware available. Someone out here with an
+> i.MX28 based system with a touchscreen to test?
 
-Idea for later patch: Should we not move these functions to a MXS-specific 
-header _later_ on so other drivers can leverage them too ?
+You mean 23, no? I can test both, I have the DENX EVK as well as both MX23EVK 
+and MX28EVK. Just need to find some more time to do my maintainance rounds, but 
+that should happen this week nonetheless. If I do forget, please ping me again.
 
-[...]
+> > Minor code layout comment inline but otherwise I'm just looking for an
+> > ack from Marek.
+> > 
+> > > [...]
+> > > 
+> > >  static u32 mxs_lradc_drive_pressure(struct mxs_lradc *lradc)
+> > >  {
+> > > 
+> > > +	if (lradc->soc == IMX23_LRADC)
+> > > +		return LRADC_CTRL0_MX23_YP | LRADC_CTRL0_MX23_XM;
+> > > 
+> > >  	return LRADC_CTRL0_MX28_YPPSW | LRADC_CTRL0_MX28_XNNSW;
+> > 
+> > Whilst it obviously doesn't actually matter, having an else
+> > in there would make the code more consistent so personally
+> > I would prefer it to be there.
+> 
+> I can change it. Anyone here with objections against such a change?
+> 
+> Regards
+> Juergen
 
 Best regards,
 Marek Vasut
