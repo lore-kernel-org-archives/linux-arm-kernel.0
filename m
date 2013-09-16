@@ -1,35 +1,23 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 16 Sep 2013 13:44:49 -0600
+Date: Mon, 16 Sep 2013 13:45:31 -0600
 Subject: [PATCH v3] PWM: PXA: add device tree support to PWM driver
-In-Reply-To: <1379091281-23662-1-git-send-email-mikedunn@newsguy.com>
+In-Reply-To: <201309161710.15800.marex@denx.de>
 References: <1379091281-23662-1-git-send-email-mikedunn@newsguy.com>
-Message-ID: <52375FB1.5050700@wwwdotorg.org>
+ <201309151607.04244.marex@denx.de> <523718D3.4050003@newsguy.com>
+ <201309161710.15800.marex@denx.de>
+Message-ID: <52375FDB.8090405@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/13/2013 10:54 AM, Mike Dunn wrote:
-> This patch adds device tree support to the PXA's PWM driver.  Only an OF match
-> table is added; nothing needs to be extracted from the device tree node.  The
-> existing ID table is reused for the match table data.
-> 
-> Tested on a Palm Treo 680 (both platform data and DT cases).
+On 09/16/2013 09:10 AM, Marek Vasut wrote:
+...
+> OK, to push it ad-absurdum, shall we not start listing every single revision of 
+> the CPU as well? Like pxa250a0 250a1 etc ? Yes , this many-to-one mapping is 
 
-> diff --git a/Documentation/devicetree/bindings/pwm/pxa-pwm.txt b/Documentation/devicetree/bindings/pwm/pxa-pwm.txt
+It's not about CPU revisions, it's about revisions of the SoC that
+contain the IP block.
 
-> +- compatible: should be one of:
-> +  - "marvell,pxa250-pwm"
-> +  - "marvell,pxa270-pwm"
-> +  - "marvell,pxa168-pwm"
-> +  - "marvell,pxa910-pwm"
+> something I don't quite understand, that's why I'd love to see a good reasoning 
+> from Stephen.
 
-Not just one of, but possible more than one...
-
-> diff --git a/arch/arm/boot/dts/pxa27x.dtsi b/arch/arm/boot/dts/pxa27x.dtsi
-
-> +		pwm0: pwm at 40b00000 {
-> +			compatible = "marvell,pxa270-pwm";
-
-I thought the assertion was that pax270 and pxa250 were both compatible?
-If so, that should be:
-
-		compatible = "marvell,pxa270-pwm", "marvell,pxa250-pwm";
+Please see the earlier discussions.
