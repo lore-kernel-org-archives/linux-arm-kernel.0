@@ -1,42 +1,31 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 16 Sep 2013 21:28:16 +0200
-Subject: [PATCH v2 1/2] Documentation: devicetree: arm: cpus/cpu nodes
- bindings updates
-In-Reply-To: <1379330464-27917-2-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1379330464-27917-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1379330464-27917-2-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <52375BD0.9030303@free-electrons.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Mon, 16 Sep 2013 12:37:09 -0700
+Subject: [PATCH v2 00/12] clk/exynos convert clock IDs to macros
+In-Reply-To: <523716C9.3000204@samsung.com>
+References: <1378462361-13680-1-git-send-email-a.hajda@samsung.com>
+ <8412301.YP2zzplWoe@amdc1227>
+ <070001ceafa5$d4d81a40$7e884ec0$%kim@samsung.com>
+ <523716C9.3000204@samsung.com>
+Message-ID: <20130916193709.27384.86101@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/09/2013 13:21, Lorenzo Pieralisi wrote:
-> In order to extend the current cpu nodes bindings to newer CPUs
-> inclusive of AArch64 and to update support for older ARM CPUs this
-> patch updates device tree documentation for the cpu nodes bindings.
+Quoting Sylwester Nawrocki (2013-09-16 07:33:45)
+> On 09/12/2013 12:50 PM, Kukjin Kim wrote:
+> > Well...I'm not sure changing to use macro is better or not at this moment...
 > 
-> Main changes:
->     - adds 64-bit bindings
->     - define usage of #address-cells
->     - defines behaviour on pre and post v7 uniprocessor systems
->     - adds ARM 11MPcore specific reg property definition
-> 
+> I think it is. ;) It's really less error prone to have symbolic names instead
+> of the plain numbers. The clock ids are defined in one place and it is more
+> clear what a clock is by looking at symbolic name. It's especially annoying 
+> to use plain numbers where are are many clock in a single node, like 10 or 
+> more. What are you main concerns with this ?
 
-For the Marvell (EBU) related part
-
-Acked-by:Gregory CLEMENT <gregory.clement@free-electrons.com>
-
-I would like to point that pj4b could be split in two flavors:
-pj4b (currently used by Armada 370) and pj4b-mp (currently used
-by Armada XP). The motivation for a such split would be for the errata
-fix which can be different between pj4b and pj4b_mp. As we can
-detect them at runtime, we don't need it from the device tree.
-So we can live with a single pj4b binding.
+I think having the symbolic names is a win for readability.
 
 Regards,
+Mike
 
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+> 
+> --
+> Regards,
+> Sylwester
