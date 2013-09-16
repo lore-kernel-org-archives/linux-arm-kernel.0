@@ -1,80 +1,46 @@
-From: mikedunn@newsguy.com (Mike Dunn)
-Date: Mon, 16 Sep 2013 07:42:27 -0700
-Subject: [PATCH v3] PWM: PXA: add device tree support to PWM driver
-In-Reply-To: <201309151607.04244.marex@denx.de>
-References: <1379091281-23662-1-git-send-email-mikedunn@newsguy.com>
- <201309151607.04244.marex@denx.de>
-Message-ID: <523718D3.4050003@newsguy.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 16 Sep 2013 15:41:21 +0100
+Subject: [PATCH] ARM: multi_v7: add HREFv60 to multi_v7 defconfig
+In-Reply-To: <CAL_Jsq+GDfez+a3EdrEUdZVfj8c8An89NWOW3RCUjvZPf-PrOQ@mail.gmail.com>
+References: <1379334152-9751-1-git-send-email-linus.walleij@linaro.org>
+ <CAL_JsqK=mZJkhyS0pVtvqZSFjO6262xwZuh5Y_VTfuuJk73FuA@mail.gmail.com>
+ <CAL_Jsq+GDfez+a3EdrEUdZVfj8c8An89NWOW3RCUjvZPf-PrOQ@mail.gmail.com>
+Message-ID: <20130916144121.GK12758@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/15/2013 07:07 AM, Marek Vasut wrote:
-> Dear Mike Dunn,
+On Mon, Sep 16, 2013 at 08:15:50AM -0500, Rob Herring wrote:
+> On Mon, Sep 16, 2013 at 8:11 AM, Rob Herring <robherring2@gmail.com> wrote:
+> > On Mon, Sep 16, 2013 at 7:22 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> >> This is just a standard board for the Ux500, include it in the
+> >> v7 multiplatform defconfig.
+> >>
+> >> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> >> ---
+> >> Hi ARM SoC folks: this makes also my preferred development board
+> >> boot with multi_v7. Please apply this patch directly to fixes
+> >> if you're happy with it.
+> >> ---
+> >>  arch/arm/configs/multi_v7_defconfig | 1 +
+> >>  1 file changed, 1 insertion(+)
+> >>
+> >> diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+> >> index 6e572c6..a333753 100644
+> >> --- a/arch/arm/configs/multi_v7_defconfig
+> >> +++ b/arch/arm/configs/multi_v7_defconfig
+> >> @@ -36,6 +36,7 @@ CONFIG_ARCH_TEGRA_114_SOC=y
+> >>  CONFIG_TEGRA_PCI=y
+> >>  CONFIG_TEGRA_EMC_SCALING_ENABLE=y
+> >>  CONFIG_ARCH_U8500=y
+> >> +CONFIG_MACH_HREFV60=y
+> >
+> > This option doesn't seem to actually affect the build in anyway. Same
+> > with snowball. Why not remove them?
 > 
->> This patch adds device tree support to the PXA's PWM driver.  Only an OF
->> match table is added; nothing needs to be extracted from the device tree
->> node.  The existing ID table is reused for the match table data.
->>
->> Tested on a Palm Treo 680 (both platform data and DT cases).
->>
->> Signed-off-by: Mike Dunn <mikedunn@newsguy.com>
->> ---
->> Changle log:
->> v3:
->> - remove support for the polarity flag
->> - remove per-chip pwm index cell; define custom of_xlate()
->>    (now #pwm-cells = <1>)
->> - "compatible" strings for all devices added to OF match table
->> - various stylistic changes recommended by reviewers
->>
->> v2:
->> - of_match_table contains only the "pxa250-pwm" compatible string; require
->> one device instance per pwm
->> - add Documentation/devicetree/bindings/pwm/pxa-pwm.txt
->> - add support for polarity flag in DT and implement set_polarity() method
->>   (the treo 680 inverts the signal between pwm out and backlight)
->> - return -EINVAL instead of -ENODEV if platform data or DT node not found
->> - output dev_info string if platform data missing
->> - expanded CC list of patch
->>
->>  Documentation/devicetree/bindings/pwm/pxa-pwm.txt | 31 ++++++++++++
->>  arch/arm/boot/dts/pxa27x.dtsi                     | 24 +++++++++
->>  drivers/pwm/pwm-pxa.c                             | 62
->> +++++++++++++++++++++++ 3 files changed, 117 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/pwm/pxa-pwm.txt
->>
->> diff --git a/Documentation/devicetree/bindings/pwm/pxa-pwm.txt
->> b/Documentation/devicetree/bindings/pwm/pxa-pwm.txt new file mode 100644
->> index 0000000..6fcf90c
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/pwm/pxa-pwm.txt
->> @@ -0,0 +1,31 @@
->> +Marvell PWM controller
->> +
->> +Required properties:
->> +- compatible: should be one of:
->> +  - "marvell,pxa250-pwm"
->> +  - "marvell,pxa270-pwm"
->> +  - "marvell,pxa168-pwm"
->> +  - "marvell,pxa910-pwm"
-> 
-> This really is something I dont quite understand. Why should the driver list 
-> _every_ _single_ existing CPU that contains such PWM block? Is there any 
-> agreement about that? For me, it'd make much more sense to list only the CPUs 
-> where the IP block actually changed in some way, so that the differences can be 
-> discerned that way.
+> Well, I've already forgotten how mach-types works... So the only
+> difference is a machine desc included or not. Why not just always
+> include all machines.
 
-I believe that this was Stephen's suggestion.
-
-I actually don't object myself.  For the price of a few strings, it
-- clearly shows which SoCs the driver supports
-- ensures that any future differences are handled cleanly (e.g., if a hw bug in
-one is discovered and a work-around is implemented)
-- keeps thngs clean if support for another processor which does have pwm hw
-differences is added
-
-Especially the third point... otherwise, you have the case of a somewhat
-confusing many-to-one mapping of processors to compatible strings.
-
-Thanks,
-Mike
+Looking at arch/arm/mach-ux500/board-mop500.c, the machine_desc will be
+included anyway.  It's more whether machine_is_hrefv60() are defined to
+be constant false or not.
