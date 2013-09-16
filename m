@@ -1,136 +1,95 @@
-From: gautamvivek1987@gmail.com (Vivek Gautam)
-Date: Mon, 16 Sep 2013 14:10:25 +0530
-Subject: [PATCH 1/7] usb: dwc3: get "usb_phy" only if the platform
- indicates the presence of PHY
-In-Reply-To: <5231BD9F.4020105@ti.com>
-References: <1378136591-7463-1-git-send-email-kishon@ti.com>
- <1378136591-7463-2-git-send-email-kishon@ti.com>
- <52319912.8030203@ti.com>
- <CAFp+6iE+xbSWWp2bNc5MRSUrA4Fi6qVU4vhR4+mtZHZGidkMGg@mail.gmail.com>
- <52319FC4.8040703@ti.com>
- <CAFp+6iGzV4auP0AeySen2Qk6wEJM-xsTnQmfwMQDtp2tg1FMkQ@mail.gmail.com>
- <5231BD9F.4020105@ti.com>
-Message-ID: <CAFp+6iG=A5C3VY4sOT0qY10CSzdb2yCv1JVPW00K+MFHjcSqhA@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 16 Sep 2013 16:44:15 +0800
+Subject: [PATCH v2 9/9] ARM: dts: imx6qdl: add uhs pinctrl state for usdhc3
+In-Reply-To: <1379070698-7344-10-git-send-email-b29396@freescale.com>
+References: <1379070698-7344-1-git-send-email-b29396@freescale.com>
+ <1379070698-7344-10-git-send-email-b29396@freescale.com>
+Message-ID: <20130916084413.GK31147@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, Sep 13, 2013 at 07:11:38PM +0800, Dong Aisheng wrote:
+> This is needed for supporting ultra high speed cards like SD3.0 cards.
+> 
+> Signed-off-by: Dong Aisheng <b29396@freescale.com>
+> ---
+>  arch/arm/boot/dts/imx6qdl-sabreauto.dtsi |    5 ++++-
+>  arch/arm/boot/dts/imx6qdl.dtsi           |   30 ++++++++++++++++++++++++++++++
+>  2 files changed, 34 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
+> index 1cbbc51..ff6f1e8 100644
+> --- a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
+> +++ b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
+> @@ -54,6 +54,7 @@
+>  			fsl,pins = <
+>  				MX6QDL_PAD_NANDF_CS2__GPIO6_IO15 0x80000000
+>  				MX6QDL_PAD_SD2_DAT2__GPIO1_IO13  0x80000000
+> +				MX6QDL_PAD_GPIO_18__SD3_VSELECT 0x17059
+>  			>;
+>  		};
+>  	};
+> @@ -74,8 +75,10 @@
+>  };
+>  
+>  &usdhc3 {
+> -	pinctrl-names = "default";
+> +	pinctrl-names = "default", "state_100mhz", "state_200mhz";
+>  	pinctrl-0 = <&pinctrl_usdhc3_1>;
+> +	pinctrl-1 = <&pinctrl_usdhc3_1_100mhz>;
+> +	pinctrl-2 = <&pinctrl_usdhc3_1_200mhz>;
+>  	cd-gpios = <&gpio6 15 0>;
+>  	wp-gpios = <&gpio1 13 0>;
+>  	status = "okay";
+> diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+> index ccd55c2..cb17574 100644
+> --- a/arch/arm/boot/dts/imx6qdl.dtsi
+> +++ b/arch/arm/boot/dts/imx6qdl.dtsi
+> @@ -1184,6 +1184,36 @@
+>  						>;
+>  					};
+>  
+> +					pinctrl_usdhc3_1_100mhz: usdhc3grp-1-100mhz { /* 100Mhz */
+> +						fsl,pins = <
+> +							MX6QDL_PAD_SD3_CMD__SD3_CMD 0x170B9
+> +							MX6QDL_PAD_SD3_CLK__SD3_CLK 0x100B9
+> +							MX6QDL_PAD_SD3_DAT0__SD3_DATA0 0x170B9
+> +							MX6QDL_PAD_SD3_DAT1__SD3_DATA1 0x170B9
+> +							MX6QDL_PAD_SD3_DAT2__SD3_DATA2 0x170B9
+> +							MX6QDL_PAD_SD3_DAT3__SD3_DATA3 0x170B9
+> +							MX6QDL_PAD_SD3_DAT4__SD3_DATA4 0x170B9
+> +							MX6QDL_PAD_SD3_DAT5__SD3_DATA5 0x170B9
+> +							MX6QDL_PAD_SD3_DAT6__SD3_DATA6 0x170B9
+> +							MX6QDL_PAD_SD3_DAT7__SD3_DATA7 0x170B9
 
+I commented in the previous review that we use lowercase for hex values
+in device tree.  It seems that you missed the comment.  Since this patch
+can be applied independently, I just fixed them up and applied it.
 
-On Thu, Sep 12, 2013 at 6:41 PM, Roger Quadros <rogerq@ti.com> wrote:
-> On 09/12/2013 02:26 PM, Vivek Gautam wrote:
->> Hi,
->>
->>
->> On Thu, Sep 12, 2013 at 4:34 PM, Roger Quadros <rogerq@ti.com> wrote:
->>> Hi,
->>>
->>> On 09/12/2013 01:47 PM, Vivek Gautam wrote:
->>>> On Thu, Sep 12, 2013 at 4:06 PM, Roger Quadros <rogerq@ti.com> wrote:
->>>>> Hi Kishon,
->>>>>
->>>>> On 09/02/2013 06:43 PM, Kishon Vijay Abraham I wrote:
->>>>>> There can be systems which does not have a external usb_phy, so get
->>>>>> usb_phy only if usb-phy property is added in the case of dt boot or if
->>>>>> platform_data indicates the presence of PHY. Also remove checking if
->>>>>> return value is -ENXIO since it's now changed to always enable usb_phy layer.
->>>>>>
->>>>>> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
->>>>>> ---
->>>>>>  drivers/usb/dwc3/Kconfig         |    1 +
->>>>>>  drivers/usb/dwc3/core.c          |   60 +++++++++++++++++---------------------
->>>>>>  drivers/usb/dwc3/platform_data.h |    1 +
->>>>>>  3 files changed, 28 insertions(+), 34 deletions(-)
->>>>>>
->>>>>> diff --git a/drivers/usb/dwc3/Kconfig b/drivers/usb/dwc3/Kconfig
->>>>>> index f969ea2..cfc16dd 100644
->>>>>> --- a/drivers/usb/dwc3/Kconfig
->>>>>> +++ b/drivers/usb/dwc3/Kconfig
->>>>>> @@ -2,6 +2,7 @@ config USB_DWC3
->>>>>>       tristate "DesignWare USB3 DRD Core Support"
->>>>>>       depends on (USB || USB_GADGET) && GENERIC_HARDIRQS && HAS_DMA
->>>>>>       depends on EXTCON
->>>>>> +     select USB_PHY
->>>>>>       select USB_XHCI_PLATFORM if USB_SUPPORT && USB_XHCI_HCD
->>>>>>       help
->>>>>>         Say Y or M here if your system has a Dual Role SuperSpeed
->>>>>> diff --git a/drivers/usb/dwc3/core.c b/drivers/usb/dwc3/core.c
->>>>>> index 474162e..428c29e 100644
->>>>>> --- a/drivers/usb/dwc3/core.c
->>>>>> +++ b/drivers/usb/dwc3/core.c
->>>>>> @@ -387,16 +387,38 @@ static int dwc3_probe(struct platform_device *pdev)
->>>>>>       if (node) {
->>>>>>               dwc->maximum_speed = of_usb_get_maximum_speed(node);
->>>>>>
->>>>>> -             dwc->usb2_phy = devm_usb_get_phy_by_phandle(dev, "usb-phy", 0);
->>>>>> -             dwc->usb3_phy = devm_usb_get_phy_by_phandle(dev, "usb-phy", 1);
->>>>>> +             if (of_property_read_bool(node, "usb-phy")) {
->>>>>> +                     dwc->usb2_phy = devm_usb_get_phy_by_phandle(dev,
->>>>>> +                             "usb-phy", 0);
->>>>>> +                     if (IS_ERR(dwc->usb2_phy))
->>>>>> +                             return PTR_ERR(dwc->usb2_phy);
->>>>>> +                     dwc->usb3_phy = devm_usb_get_phy_by_phandle(dev,
->>>>>> +                             "usb-phy", 1);
->>>>>> +                     if (IS_ERR(dwc->usb3_phy))
->>>>>> +                             return PTR_ERR(dwc->usb3_phy);
->>>>>
->>>>> Some DWC3 instances use only usb2_phy. e.g. on DRA7 the 2nd dwc3 instance doesn't use usb3_phy.
->>>>> This needs to be a valid case and driver shouldn't error out.
->>>>
->>>> So, i think adding flexibility to DWC3 to have either
->>>> usb2-phy/usb3-phy or both of them seems to be valid point.
->>>> Any suggestions ?
->>>>
->>>
->>> For high speed operation we need only usb2_phy but for super speed we need both usb2_phy
->>> and usb3_phy.
->>>
->>> Why would a dwc3 controller use only usb3_phy? A USB3.0 interface has to be compatible with
->>> USB2.0 as well, no?
->>
->> True and for that reason we need both UTMI+ interface as well as PIPE3
->> interface, right ?
->> But as also mentioned in the thread:
->> https://lkml.org/lkml/2013/9/12/181, on Samsung exynos5
->> architecturally same block is managing UTMI+ and PIPE3 interfaces,
->> which is handled by phy-samsung-usb3 driver and denoted by "usb3_phy:
->> usbphy at 12100000" node in "arch/arm/boot/dts/exynos5250.dtsi".
->>
->> So on exynos5250, DWC3 really needs just usb3-phy, which is compatible
->> for USB 2.0 as well.
->
-> I'm not familiar with exynos5250 dwc3, but looking at the dts file I can see both usb3_phy
-> and usb2_phy nodes and both are referenced in the dwc3 node.
+Shawn
 
-Right, and that's what we intend to fix.
-Exynos5250 dwc3 is not in the need of both usb2_phy and usb3_phy.
-In fact usb3_phy handle (which is served by phy-samsung-usb3 driver)
-sets up the UTMI+ as well as PIPE3 phy on DWC3.
-I know this looks different from the usual OMAP style of phy for dwc3.
-
-Hi Sylwester,
-  any suggestions here ? As contained in the exynos5250 user manual
-too, there's only one block of PHY handling both UTMI+ and PIPE3
-interfaces, and the set of registers (same base address) also indicate
-one block of PHY. So we have the usb3_phy (phy-samsung-usb3 driver)
-which setup the entire PHY require for DWC3 operation, and thereby we
-__shouldn't__ need usb2_phy (phy-samsung-usb2 driver which actually
-setup the PHY for a separate USB 2.0 controller on exynos5250) for
-DWC3.
-
->
-> The ehci and ohci controllers don't reference any PHY.
-
-ehci-s5p and ohci-exynos are not using devm_usb_get_phy_by_phandle()
-api until now, so they don't need to have the PHY handlers in their
-node.
-
->
-> cheers,
-> -roger
-
-
-
--- 
-Best Regards
-Vivek
+> +						>;
+> +					};
+> +
+> +					pinctrl_usdhc3_1_200mhz: usdhc3grp-1-200mhz { /* 200Mhz */
+> +						fsl,pins = <
+> +							MX6QDL_PAD_SD3_CMD__SD3_CMD 0x170F9
+> +							MX6QDL_PAD_SD3_CLK__SD3_CLK 0x100F9
+> +							MX6QDL_PAD_SD3_DAT0__SD3_DATA0 0x170F9
+> +							MX6QDL_PAD_SD3_DAT1__SD3_DATA1 0x170F9
+> +							MX6QDL_PAD_SD3_DAT2__SD3_DATA2 0x170F9
+> +							MX6QDL_PAD_SD3_DAT3__SD3_DATA3 0x170F9
+> +							MX6QDL_PAD_SD3_DAT4__SD3_DATA4 0x170F9
+> +							MX6QDL_PAD_SD3_DAT5__SD3_DATA5 0x170F9
+> +							MX6QDL_PAD_SD3_DAT6__SD3_DATA6 0x170F9
+> +							MX6QDL_PAD_SD3_DAT7__SD3_DATA7 0x170F9
+> +						>;
+> +					};
+> +
+>  					pinctrl_usdhc3_2: usdhc3grp-2 {
+>  						fsl,pins = <
+>  							MX6QDL_PAD_SD3_CMD__SD3_CMD    0x17059
+> -- 
+> 1.7.1
+> 
+> 
