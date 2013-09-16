@@ -1,72 +1,40 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 16 Sep 2013 09:05:46 +0100
-Subject: [PATCH 32/38] iio: accel-core: st: Move LSM303DLH into correct
- group
-In-Reply-To: <5234A20F.7040008@kernel.org>
-References: <1378817379-8238-1-git-send-email-lee.jones@linaro.org>
- <1378817379-8238-33-git-send-email-lee.jones@linaro.org>
- <5234A20F.7040008@kernel.org>
-Message-ID: <20130916080546.GC3999@lee--X1>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Mon, 16 Sep 2013 11:08:35 +0300
+Subject: [PATCH 6/6] video: drop code for ARCH_SHARK in cyber2000fb
+In-Reply-To: <1379069656-4273-1-git-send-email-linus.walleij@linaro.org>
+References: <1379069656-4273-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <5236BC83.1020406@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 14 Sep 2013, Jonathan Cameron wrote:
+Hi,
 
-> On 09/10/13 13:49, Lee Jones wrote:
-> > The LSM303DLH's WAI (WhoAmI) is 0x33, meaning it should be enabled by
-> > Accel Sensor group one. For the device to probe without error, we'll
-> > need to ensure it's registered with the correct WAI.
-> > 
-> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> You clearly have a better datasheet than I have as for that part it doesn't even claim to
-> have the relevant register to read a who am I from.
+On 13/09/13 13:54, Linus Walleij wrote:
+> The Cyber2000 frame buffer driver contains a block of code solely
+> for the Shark machine. As the machine is deleted, delete this
+> code as well.
 > 
-> Now that datasheet does list odr values as 50, 100, 400 1000 which would put it where it originally
-> was in these tables.
+> Also remove the pointless #ifdef CONFIG_PCI as the Kconfig
+> clearly states PCI as a dependency anyway.
 > 
-> http://www.st.com/web/en/resource/technical/document/datasheet/CD00260288.pdf
-> 
-> I haven't checked other elements...
-> 
-> I'm confused but suspect we may need another type entry to deal with this one.
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
+> Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+> Hi Jean-Christophe/Tomi, I am seeking an ACK to take this through
+> the ARM SoC tree as part of the deletion of the Shark machine.
+> Please do not apply it to your tree.
 
-Hmmm... on initial thought, I don't know how we can handle this one. I
-assumed the WAIs were a one-stop-shop for device identification. I also
-thought that they would only match if the functionality and register
-maps would be the same.
+Acked-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
 
-I'll touch base with Denis on this, perhaps he can shed some light.
+ Tomi
 
-> > ---
-> >  drivers/iio/accel/st_accel_core.c | 4 ++--
-> >  1 file changed, 2 insertions(+), 2 deletions(-)
-> > 
-> > diff --git a/drivers/iio/accel/st_accel_core.c b/drivers/iio/accel/st_accel_core.c
-> > index ea62291..03a2b6b 100644
-> > --- a/drivers/iio/accel/st_accel_core.c
-> > +++ b/drivers/iio/accel/st_accel_core.c
-> > @@ -170,6 +170,7 @@ static const struct st_sensors st_accel_sensors[] = {
-> >  			[2] = LSM330D_ACCEL_DEV_NAME,
-> >  			[3] = LSM330DL_ACCEL_DEV_NAME,
-> >  			[4] = LSM330DLC_ACCEL_DEV_NAME,
-> > +			[5] = LSM303DLH_ACCEL_DEV_NAME,
-> >  		},
-> >  		.ch = (struct iio_chan_spec *)st_accel_12bit_channels,
-> >  		.odr = {
-> > @@ -238,8 +239,7 @@ static const struct st_sensors st_accel_sensors[] = {
-> >  		.sensors_supported = {
-> >  			[0] = LIS331DLH_ACCEL_DEV_NAME,
-> >  			[1] = LSM303DL_ACCEL_DEV_NAME,
-> > -			[2] = LSM303DLH_ACCEL_DEV_NAME,
-> > -			[3] = LSM303DLM_ACCEL_DEV_NAME,
-> > +			[2] = LSM303DLM_ACCEL_DEV_NAME,
-> >  		},
-> >  		.ch = (struct iio_chan_spec *)st_accel_12bit_channels,
-> >  		.odr = {
-> > 
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 901 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130916/eb2a4578/attachment.sig>
