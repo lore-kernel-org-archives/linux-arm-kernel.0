@@ -1,58 +1,83 @@
-From: jbe@pengutronix.de (=?iso-8859-1?q?J=FCrgen_Beisert?=)
-Date: Mon, 16 Sep 2013 11:37:31 +0200
-Subject: [PATCH 5/6] Staging/iio/adc/touchscreen/MXS: add interrupt driven
- touch detection
-In-Reply-To: <201309161010.22151.jbe@pengutronix.de>
-References: <1378887511-24530-1-git-send-email-jbe@pengutronix.de>
- <52359259.8010202@kernel.org> <201309161010.22151.jbe@pengutronix.de>
-Message-ID: <201309161137.31411.jbe@pengutronix.de>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 16 Sep 2013 10:38:12 +0100
+Subject: [PATCH 32/38] iio: accel-core: st: Move LSM303DLH into correct
+ group
+In-Reply-To: <5236CD17.5010901@st.com>
+References: <1378817379-8238-1-git-send-email-lee.jones@linaro.org>
+ <1378817379-8238-33-git-send-email-lee.jones@linaro.org>
+ <5234A20F.7040008@kernel.org> <20130916080546.GC3999@lee--X1>
+ <5236CD17.5010901@st.com>
+Message-ID: <20130916093812.GG3999@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jonathan,
+On Mon, 16 Sep 2013, Denis CIOCCA wrote:
 
-On Monday 16 September 2013 10:10:22 J?rgen Beisert wrote:
-> [...]
-> > While this driver is placed in IIO within staging at the moment, these
-> > changes are definitely input related.  Hence I have cc'd Dmitry and the
-> > input list.
+> Hi Lee,
+> >> On 09/10/13 13:49, Lee Jones wrote:
+> >>> The LSM303DLH's WAI (WhoAmI) is 0x33, meaning it should be enabled by
+> >>> Accel Sensor group one. For the device to probe without error, we'll
+> >>> need to ensure it's registered with the correct WAI.
+> >>>
+> >>> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> >> You clearly have a better datasheet than I have as for that part it doesn't even claim to
+> >> have the relevant register to read a who am I from.
+> >>
+> >> Now that datasheet does list odr values as 50, 100, 400 1000 which would put it where it originally
+> >> was in these tables.
+> >>
+> >> http://www.st.com/web/en/resource/technical/document/datasheet/CD00260288.pdf
+> >>
+> >> I haven't checked other elements...
+> >>
+> >> I'm confused but suspect we may need another type entry to deal with this one.
+> > Hmmm... on initial thought, I don't know how we can handle this one. I
+> > assumed the WAIs were a one-stop-shop for device identification. I also
+> > thought that they would only match if the functionality and register
+> > maps would be the same.
 > >
-> > I am personaly a little uncomfortable that we have such a complex bit of
-> > input code sat within an IIO driver but such is life.
->
-> Maybe an MFD for this ADC unit would be a better way to go? Currently I
-> have a different problem with this driver, because the ADC unit monitors
-> the battery as well. And the charging driver from the power subsystem needs
-> these values to charge the battery in a correct manner.
+> > I'll touch base with Denis on this, perhaps he can shed some light.
+> >
+> I've just checked, the WAI is 0x32. It was correct...Are you sure that 
+> you use the LSM303DLH?
 
-I would suggest:
+That's what the datasheet for the board says. Perhaps it's that that's
+incorrect? Annoyingly, instead of printing the device name on the
+package, ST put some non-Googleable nonsense is there instead
+(probably the serial number).
 
-diff --git a/drivers/staging/iio/TODO b/drivers/staging/iio/TODO
-index 04c2326..c22a0ed 100644
---- a/drivers/staging/iio/TODO
-+++ b/drivers/staging/iio/TODO
-@@ -13,6 +13,17 @@ Would be nice
- 3) Expand device set. Lots of other maxim adc's have very
-    similar interfaces.
- 
-+MXS LRADC driver:
-+This is a classic MFD device as it combines the following subdevices
-+ - touchscreen controller (input subsystem related device)
-+ - general purpose ADC channels
-+ - battery voltage monitor (power subsystem related device)
-+ - die temperature monitor (thermal management)
-+
-+At least the battery voltage and die temperature feature is required in-kernel
-+by a driver of the SoC's battery charging unit to avoid any damage to the
-+silicon and the battery.
-+
- TSL2561
- Would be nice
- 1) Open question of userspace vs kernel space balance when
+Nevertheless, I'll revert the patch and work something else out.
 
-Regards,
-Juergen
+> >>> ---
+> >>>   drivers/iio/accel/st_accel_core.c | 4 ++--
+> >>>   1 file changed, 2 insertions(+), 2 deletions(-)
+> >>>
+> >>> diff --git a/drivers/iio/accel/st_accel_core.c b/drivers/iio/accel/st_accel_core.c
+> >>> index ea62291..03a2b6b 100644
+> >>> --- a/drivers/iio/accel/st_accel_core.c
+> >>> +++ b/drivers/iio/accel/st_accel_core.c
+> >>> @@ -170,6 +170,7 @@ static const struct st_sensors st_accel_sensors[] = {
+> >>>   			[2] = LSM330D_ACCEL_DEV_NAME,
+> >>>   			[3] = LSM330DL_ACCEL_DEV_NAME,
+> >>>   			[4] = LSM330DLC_ACCEL_DEV_NAME,
+> >>> +			[5] = LSM303DLH_ACCEL_DEV_NAME,
+> >>>   		},
+> >>>   		.ch = (struct iio_chan_spec *)st_accel_12bit_channels,
+> >>>   		.odr = {
+> >>> @@ -238,8 +239,7 @@ static const struct st_sensors st_accel_sensors[] = {
+> >>>   		.sensors_supported = {
+> >>>   			[0] = LIS331DLH_ACCEL_DEV_NAME,
+> >>>   			[1] = LSM303DL_ACCEL_DEV_NAME,
+> >>> -			[2] = LSM303DLH_ACCEL_DEV_NAME,
+> >>> -			[3] = LSM303DLM_ACCEL_DEV_NAME,
+> >>> +			[2] = LSM303DLM_ACCEL_DEV_NAME,
+> >>>   		},
+> >>>   		.ch = (struct iio_chan_spec *)st_accel_12bit_channels,
+> >>>   		.odr = {
+> >>>
 
 -- 
-Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?| Juergen Beisert ? ? ? ? ? ? |
-Linux Solutions for Science and Industry ? ? ?| http://www.pengutronix.de/  |
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
