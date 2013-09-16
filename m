@@ -1,41 +1,34 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 16 Sep 2013 09:34:19 -0600
-Subject: [PATCH] ARM: tegra: remove tegra_chip_uid()
-Message-ID: <1379345659-9528-1-git-send-email-swarren@wwwdotorg.org>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Mon, 16 Sep 2013 17:51:52 +0200
+Subject: mvneta: oops in __rcu_read_lock on mirabox
+In-Reply-To: <20130916065047.GH27487@1wt.eu>
+References: <CACzLR4tTvt+ROEhkXUCQhV6=bPPTX4LFSkWfrEhF+OdM1Jm1Rw@mail.gmail.com>
+ <20130915205701.5c61a444@skate> <20130916065047.GH27487@1wt.eu>
+Message-ID: <20130916175152.4e013457@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stephen Warren <swarren@nvidia.com>
+Willy, Ethan,
 
-Following commit f5b38c5 "crypto: tegra - use kernel entropy instead
-of ad-hoc", this function is no longer used. It's also only accurate
-for Tegra20 and not later SoCs. So, remove it.
+On Mon, 16 Sep 2013 08:50:47 +0200, Willy Tarreau wrote:
 
-Signed-off-by: Stephen Warren <swarren@nvidia.com>
----
-Herbert, this is a patch for the crypto tree, since it depends on a
-patch to the tegra-aes crypto driver that's in your tree.
+> I'm currently testing on 3.11.1 (which I had here) and am not getting
+> any issue after 50M packets. My kernel is running in thumb mode and
+> without SMP.
+> 
+> Ethan, we'll need your config I guess.
 
- arch/arm/mach-tegra/fuse.c | 10 ----------
- 1 file changed, 10 deletions(-)
+Can both of you also report the U-Boot version you're using, and the
+SoC revision (it's visible in the U-Boot output). Maybe Globalscale is
+shipping Mirabox with a different version of the bootloader, or some
+hardware difference, that is causing problems? (I'm just speculating
+here, but another user already reported having issues with his Mirabox,
+and Russell King analyzed the oops as very likely being hardware
+problems).
 
-diff --git a/arch/arm/mach-tegra/fuse.c b/arch/arm/mach-tegra/fuse.c
-index e035cd2..64652b3 100644
---- a/arch/arm/mach-tegra/fuse.c
-+++ b/arch/arm/mach-tegra/fuse.c
-@@ -155,13 +155,3 @@ void tegra_init_fuse(void)
- 		tegra_sku_id, tegra_cpu_process_id,
- 		tegra_core_process_id);
- }
--
--unsigned long long tegra_chip_uid(void)
--{
--	unsigned long long lo, hi;
--
--	lo = tegra_fuse_readl(FUSE_UID_LOW);
--	hi = tegra_fuse_readl(FUSE_UID_HIGH);
--	return (hi << 32ull) | lo;
--}
--EXPORT_SYMBOL(tegra_chip_uid);
+Thomas
 -- 
-1.8.1.5
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
