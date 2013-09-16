@@ -1,71 +1,37 @@
 From: denis.ciocca@st.com (Denis CIOCCA)
-Date: Mon, 16 Sep 2013 11:19:19 +0200
-Subject: [PATCH 32/38] iio: accel-core: st: Move LSM303DLH into correct
- group
-In-Reply-To: <20130916080546.GC3999@lee--X1>
+Date: Mon, 16 Sep 2013 11:21:12 +0200
+Subject: [PATCH 14/38] iio: accel: st: Append _accel to accelerator
+ sensor device names
+In-Reply-To: <5236C259.6050701@metafoo.de>
 References: <1378817379-8238-1-git-send-email-lee.jones@linaro.org>
- <1378817379-8238-33-git-send-email-lee.jones@linaro.org>
- <5234A20F.7040008@kernel.org> <20130916080546.GC3999@lee--X1>
-Message-ID: <5236CD17.5010901@st.com>
+ <1378817379-8238-15-git-send-email-lee.jones@linaro.org>
+ <52345330.4050707@kernel.org> <5234562D.5050803@kernel.org>
+ <5236C259.6050701@metafoo.de>
+Message-ID: <5236CD88.10809@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lee,
->> On 09/10/13 13:49, Lee Jones wrote:
->>> The LSM303DLH's WAI (WhoAmI) is 0x33, meaning it should be enabled by
->>> Accel Sensor group one. For the device to probe without error, we'll
->>> need to ensure it's registered with the correct WAI.
+Hi Lars,
+> On 09/14/2013 02:27 PM, Jonathan Cameron wrote:
+>> On 09/14/13 13:14, Jonathan Cameron wrote:
+>>> On 09/10/13 13:49, Lee Jones wrote:
+>>>> Some of ST's sensors are appended with their sensor type and some
+>>>> are not. For consistency we're extending the same naming convention
+>>>> throughout.
+>>>>
+>>>> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+>>> Honestly I don't care either way on these, but consistency would definitely
+>>> be good so applied to the togreg branch of iio.git
 >>>
->>> Signed-off-by: Lee Jones <lee.jones@linaro.org>
->> You clearly have a better datasheet than I have as for that part it doesn't even claim to
->> have the relevant register to read a who am I from.
+>>> Thanks,
+>> Actually change of plan. I'm going to hold off on these as this an ABI change.
+>> Iritating though having these as completely inconsistent is, changing this
+>> will change device identification from userspace which is not a good idea.
 >>
->> Now that datasheet does list odr values as 50, 100, 400 1000 which would put it where it originally
->> was in these tables.
->>
->> http://www.st.com/web/en/resource/technical/document/datasheet/CD00260288.pdf
->>
->> I haven't checked other elements...
->>
->> I'm confused but suspect we may need another type entry to deal with this one.
-> Hmmm... on initial thought, I don't know how we can handle this one. I
-> assumed the WAIs were a one-stop-shop for device identification. I also
-> thought that they would only match if the functionality and register
-> maps would be the same.
->
-> I'll touch base with Denis on this, perhaps he can shed some light.
->
-I've just checked, the WAI is 0x32. It was correct...Are you sure that 
-you use the LSM303DLH?
+>> Sorry Lee, but we really shouldn't do this. I should have picked up on this
+>> in the original driver reviews but that's hindsight for you.
+> I think those with the suffix are the ones where you have accel and gyro in
+> the same package, the ones without the suffix are pure accelerometers.
+Yes You are right. I've used this kind of logic... What do you think about?
 
 Denis
-
-
-
->>> ---
->>>   drivers/iio/accel/st_accel_core.c | 4 ++--
->>>   1 file changed, 2 insertions(+), 2 deletions(-)
->>>
->>> diff --git a/drivers/iio/accel/st_accel_core.c b/drivers/iio/accel/st_accel_core.c
->>> index ea62291..03a2b6b 100644
->>> --- a/drivers/iio/accel/st_accel_core.c
->>> +++ b/drivers/iio/accel/st_accel_core.c
->>> @@ -170,6 +170,7 @@ static const struct st_sensors st_accel_sensors[] = {
->>>   			[2] = LSM330D_ACCEL_DEV_NAME,
->>>   			[3] = LSM330DL_ACCEL_DEV_NAME,
->>>   			[4] = LSM330DLC_ACCEL_DEV_NAME,
->>> +			[5] = LSM303DLH_ACCEL_DEV_NAME,
->>>   		},
->>>   		.ch = (struct iio_chan_spec *)st_accel_12bit_channels,
->>>   		.odr = {
->>> @@ -238,8 +239,7 @@ static const struct st_sensors st_accel_sensors[] = {
->>>   		.sensors_supported = {
->>>   			[0] = LIS331DLH_ACCEL_DEV_NAME,
->>>   			[1] = LSM303DL_ACCEL_DEV_NAME,
->>> -			[2] = LSM303DLH_ACCEL_DEV_NAME,
->>> -			[3] = LSM303DLM_ACCEL_DEV_NAME,
->>> +			[2] = LSM303DLM_ACCEL_DEV_NAME,
->>>   		},
->>>   		.ch = (struct iio_chan_spec *)st_accel_12bit_channels,
->>>   		.odr = {
->>>
