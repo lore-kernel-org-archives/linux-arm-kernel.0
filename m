@@ -1,25 +1,40 @@
-From: denis.ciocca@st.com (Denis CIOCCA)
-Date: Mon, 16 Sep 2013 12:18:05 +0200
-Subject: [PATCH 38/38] iio: magn-core: st: Provide support for the
- LSM303DLH
-In-Reply-To: <20130916100809.GI3999@lee--X1>
-References: <1378817379-8238-1-git-send-email-lee.jones@linaro.org>
- <1378817379-8238-39-git-send-email-lee.jones@linaro.org>
- <5234A28D.1030409@kernel.org> <20130916073151.GB3999@lee--X1>
- <5236D03D.2030506@st.com> <20130916100809.GI3999@lee--X1>
-Message-ID: <5236DADD.3040205@st.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 16 Sep 2013 11:19:12 +0100
+Subject: [PATCH v3 0/8] Add the Quadspi driver for vf610-twr
+In-Reply-To: <52366F97.5030402@freescale.com>
+References: <522D3B79.3060707@freescale.com> <52318953.6090405@freescale.com>
+ <1378979431.2627.402.camel@shinybook.infradead.org>
+ <20130913025827.GA3051@gmail.com>
+ <1378999322.4210.95.camel@i7.infradead.org>
+ <20130913041208.GD3051@gmail.com>
+ <20130912205644.GW29403@sirena.org.uk>
+ <52329AD3.2050608@freescale.com>
+ <20130913102127.GD29403@sirena.org.uk>
+ <52366F97.5030402@freescale.com>
+Message-ID: <20130916101912.GY29403@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lee,
+On Mon, Sep 16, 2013 at 10:40:23AM +0800, Huang Shijie wrote:
+> ? 2013?09?13? 18:21, Mark Brown ??:
+> > You will need to create them.
 
-> The driver mentions that the first group of sensors have a WAI of 
-> 0x3c: #define ST_MAGN_1_WAI_EXP 0x3c And when I print out the WAI read 
-> from the device: Requested device: lsm303dlh_magn - read WAI: 0x3c I 
-> guess I could have been lied to again by the board's datasheet again 
-> and the attached device isn't actually a LSM303DLH, but how can I tell 
-> for sure? 
-On LSM303DLH you have to read 0x0a 0x0b and 0x0c registers, you have to 
-find 0x48, 0x34 and 0x33. I think in the snowball there is the LSM303DLHC.
+> thanks. I will try to do it if i have to do.
 
-Denis
+> I just wonder : what other SPI controller driver would like if the
+> controllers is going to support the
+> quad-read ?
+
+I would expect that most controllers would look just the same as they do
+now except for the additional ability to do quad transfers - it'd just
+get told that some transfers should use more data lines.
+
+With this controller it looks like even for normal SPI transfers it's
+going to work better knowing that it's doing flash operations.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130916/09b3896c/attachment.sig>
