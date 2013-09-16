@@ -1,34 +1,47 @@
-From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Mon, 16 Sep 2013 17:25:44 +1000
-Subject: [PATCH v7 3/4] drivers: of: add initialization code for dma
- reserved memory
-In-Reply-To: <5236AF64.80607@samsung.com>
-References: <1377527959-5080-1-git-send-email-m.szyprowski@samsung.com>
- <1377527959-5080-4-git-send-email-m.szyprowski@samsung.com>
- <20130829224637.D09183E1222@localhost> <52209278.8040106@samsung.com>
- <DAF223EB-C84C-4E82-A24A-ACD0A3A0559F@codeaurora.org>
- <20130909160154.8D7183E0F23@localhost> <5236AF64.80607@samsung.com>
-Message-ID: <1379316344.3721.6.camel@pasglop>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 16 Sep 2013 08:31:51 +0100
+Subject: [PATCH 38/38] iio: magn-core: st: Provide support for the
+ LSM303DLH
+In-Reply-To: <5234A28D.1030409@kernel.org>
+References: <1378817379-8238-1-git-send-email-lee.jones@linaro.org>
+ <1378817379-8238-39-git-send-email-lee.jones@linaro.org>
+ <5234A28D.1030409@kernel.org>
+Message-ID: <20130916073151.GB3999@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2013-09-16 at 09:12 +0200, Marek Szyprowski wrote:
-> 
-> Fixing those issues requires further discussion. Frankly, right now I
-> really have no idea which way should I go. The /reserved-ranges node seems
-> to be easy to match particular reserved memory region with a given device.
-> I'm also not really convinced if it makes sense to add a code for finding
-> and matching a reserved memory region to every device driver, which might
-> need it. I would really like to get some more feedback on the Ben's
-> comment.
-> 
-> In any case, the code will also change significantly, so I assume that the
-> best, what can be done now is to revert the current version and start from
-> the scratch with a new, complete proposal.
+On Sat, 14 Sep 2013, Jonathan Cameron wrote:
 
-Yes, let's do that. I will try to help. It shouldn't be that a big deal.
+> On 09/10/13 13:49, Lee Jones wrote:
+> > Trivial patch adding the LSM303DLH to the list of already supported
+> > Magnetometer Sensors.
+> > 
+> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> err.
 
-Worst case, how many of us will meet physically next month in Edinburgh ?
+?
 
-Cheers,
-Ben.
+> > index 12e7e79..b2e2917 100644
+> > --- a/drivers/iio/magnetometer/st_magn_core.c
+> > +++ b/drivers/iio/magnetometer/st_magn_core.c
+> > @@ -151,7 +151,8 @@ static const struct st_sensors st_magn_sensors[] = {
+> >  		.wai = ST_MAGN_1_WAI_EXP,
+> >  		.sensors_supported = {
+> >  			[0] = LSM303DLHC_MAGN_DEV_NAME,
+> > -			[1] = LSM303DLM_MAGN_DEV_NAME,
+> > +			[1] = LSM303DLH_MAGN_DEV_NAME,
+> > +			[0] = LSM303DLM_MAGN_DEV_NAME,
+> [2]?
+
+Yes, good spot, thanks.
+
+> >  		},
+> >  		.ch = (struct iio_chan_spec *)st_magn_16bit_channels,
+> >  		.odr = {
+> > 
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
