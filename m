@@ -1,36 +1,33 @@
-From: alexander.tarasikov@gmail.com (Alexander Tarasikov)
-Date: Tue, 17 Sep 2013 02:56:30 +0400
-Subject: RFD on DMA_BIT_MASK and LPAE
-Message-ID: <CAMChaFyeY9+gQDqHTgHxUC95gUnLstyvpekNdactq=rs76pHiw@mail.gmail.com>
+From: marex@denx.de (Marek Vasut)
+Date: Tue, 17 Sep 2013 01:00:09 +0200
+Subject: [PATCH v3] PWM: PXA: add device tree support to PWM driver
+In-Reply-To: <52375FDB.8090405@wwwdotorg.org>
+References: <1379091281-23662-1-git-send-email-mikedunn@newsguy.com>
+ <201309161710.15800.marex@denx.de> <52375FDB.8090405@wwwdotorg.org>
+Message-ID: <201309170100.09282.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello, linux hackers!
+Dear Stephen Warren,
 
-I've tried enabling LPAE (for the purpose of using KVM on A15) and
-have found out that many drivers break because of the DMA_BIT_MASK.
-I've found some patches and a discussion on the mailing list, but have
-not found what the final verdict on the problem was.
+> On 09/16/2013 09:10 AM, Marek Vasut wrote:
+> ...
+> 
+> > OK, to push it ad-absurdum, shall we not start listing every single
+> > revision of the CPU as well? Like pxa250a0 250a1 etc ? Yes , this
+> > many-to-one mapping is
+> 
+> It's not about CPU revisions, it's about revisions of the SoC that
+> contain the IP block.
 
-What is the proposed solution to fixing the DMA stuff? Currently, I've
-hacked the of/platform and all omap drivers to use a 64-bit mask and
-that made my board boot, but this will surely break the devices that
-are not 64-bit-dma-capable.
+But that doesn't matter if the IP block is the same in all of them.
 
-Do you think it is a good idea to define a generic initializer macro
-like the following (probably not, but my question is whether it is
-possible to somehow fix the situation so that we can boot with and
-without LPAE without falling into tons of idfeffery)?
+> > something I don't quite understand, that's why I'd love to see a good
+> > reasoning from Stephen.
+> 
+> Please see the earlier discussions.
 
-+#ifdef CONFIG_ARCH_PHYS_ADDR_T_64BIT
-+#define DMA_BIT_MASK_FULL DMA_BIT_MASK(64)
-+#else
-+#define DMA_BIT_MASK_FULL DMA_BIT_MASK(32)
-+#endif
+I did, so I must really be slow or something.
 
-P.S. I am extremely sorry for sending the email separately to rmk and
-mailing list, my web client accidentially enabled HTML in mail and it
-was not delivered from the first attempt.
-
--- 
-Regards, Alexander
+Best regards,
+Marek Vasut
