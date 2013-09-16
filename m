@@ -1,49 +1,62 @@
-From: tgih.jun@samsung.com (Seungwon Jeon)
-Date: Tue, 17 Sep 2013 07:35:55 +0900
-Subject: [PATCH] dts: Fix misspelling of Synopsys
-In-Reply-To: <52377CD4.30308@gmail.com>
-References: <1379365068-18539-1-git-send-email-dinguyen@altera.com>
- <20130916214544.GA15242@quad.lixom.net> <52377CD4.30308@gmail.com>
-Message-ID: <000701ceb32d$1bcb4690$5361d3b0$%jun@samsung.com>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Mon, 16 Sep 2013 15:43:48 -0700
+Subject: [PATCH 1/2] sched/nohz: add debugfs control over
+ sched_tick_max_deferment
+Message-ID: <1379371429-22214-1-git-send-email-khilman@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, September 17, 2013, Rob Herring wrote:
-> On 09/16/2013 04:45 PM, Olof Johansson wrote:
-> > On Mon, Sep 16, 2013 at 03:57:48PM -0500, dinguyen at altera.com wrote:
-> >> From: Dinh Nguyen <dinguyen@altera.com>
-> >>
-> >> s/Synopsis/Synopsys
-> >> s/synopsis/synopsys
-> >>
-> >> Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
-> >> Cc: Pavel Machek <pavel@denx.de>
-> >> CC: Arnd Bergmann <arnd@arndb.de>
-> >> CC: Olof Johansson <olof@lixom.net>
-> >> Cc: Rob Herring <rob.herring@calxeda.com>
-> >> Cc: Pawel Moll <pawel.moll@arm.com>
-> >> Cc: Mark Rutland <mark.rutland@arm.com>
-> >> Cc: Stephen Warren <swarren@wwwdotorg.org>
-> >> Cc: Ian Campbell <ian.campbell@citrix.com>
-> >> Cc: Chris Ball <cjb@laptop.org>
-> >> Cc: Jaehoon Chung <jh80.chung@samsung.com>
-> >> Cc: Seungwon Jeon <tgih.jun@samsung.com>
-> >> Cc: Tomasz Figa <tomasz.figa@gmail.com>
-> >> Cc: devicetree at vger.kernel.org
-> >> Cc: linux-mmc at vger.kernel.org
-> >> CC: linux-arm-kernel at lists.infradead.org
-> >
-> > Acked-by: Olof Johansson <olof@lixom.net>
-> >
-> >
-> > Looks like this is best taken through the DT tree, but if they don't have any
-> > other fixes we can take it through arm-soc, just let me know.
-> 
-> Yes. I'll take it.
-Rob, thanks for taking.
+Allow debugfs override of sched_tick_max_deferment in order to ease
+finding/fixing the remaining issues with full nohz.
 
-Acked-by: Seungwon Jeon <tgih.jun@samsung.com>
+The value to be written is in jiffies, and -1 means the max deferment
+is disabled (scheduler_tick_max_deferment() returns KTIME_MAX.)
 
+Cc: Frederic Weisbecker <fweisbec@gmail.com>
+Signed-off-by: Kevin Hilman <khilman@linaro.org>
+---
+ kernel/sched/core.c | 16 +++++++++++++++-
+ 1 file changed, 15 insertions(+), 1 deletion(-)
 
-Thanks,
-Seungwon Jeon
+diff --git a/kernel/sched/core.c b/kernel/sched/core.c
+index 5ac63c9..4b1fe3e 100644
+--- a/kernel/sched/core.c
++++ b/kernel/sched/core.c
+@@ -2175,6 +2175,8 @@ void scheduler_tick(void)
+ }
+ 
+ #ifdef CONFIG_NO_HZ_FULL
++static u32 sched_tick_max_deferment = HZ;
++
+ /**
+  * scheduler_tick_max_deferment
+  *
+@@ -2193,13 +2195,25 @@ u64 scheduler_tick_max_deferment(void)
+ 	struct rq *rq = this_rq();
+ 	unsigned long next, now = ACCESS_ONCE(jiffies);
+ 
+-	next = rq->last_sched_tick + HZ;
++	if (sched_tick_max_deferment == -1)
++		return KTIME_MAX;
++
++	next = rq->last_sched_tick + sched_tick_max_deferment;
+ 
+ 	if (time_before_eq(next, now))
+ 		return 0;
+ 
+ 	return jiffies_to_usecs(next - now) * NSEC_PER_USEC;
+ }
++
++static __init int sched_nohz_full_init_debug(void)
++{
++	debugfs_create_u32("sched_tick_max_deferment", 0644, NULL,
++			   &sched_tick_max_deferment);
++
++	return 0;
++}
++late_initcall(sched_nohz_full_init_debug);
+ #endif
+ 
+ notrace unsigned long get_parent_ip(unsigned long addr)
+-- 
+1.8.3
