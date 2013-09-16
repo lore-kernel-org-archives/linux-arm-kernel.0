@@ -1,37 +1,22 @@
-From: denis.ciocca@st.com (Denis CIOCCA)
-Date: Mon, 16 Sep 2013 11:21:12 +0200
-Subject: [PATCH 14/38] iio: accel: st: Append _accel to accelerator
- sensor device names
-In-Reply-To: <5236C259.6050701@metafoo.de>
-References: <1378817379-8238-1-git-send-email-lee.jones@linaro.org>
- <1378817379-8238-15-git-send-email-lee.jones@linaro.org>
- <52345330.4050707@kernel.org> <5234562D.5050803@kernel.org>
- <5236C259.6050701@metafoo.de>
-Message-ID: <5236CD88.10809@st.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 16 Sep 2013 17:24:45 +0800
+Subject: [PATCH] ARM: dts: imx6q: fix the wrong offset of the Pad Mux
+ register
+In-Reply-To: <1379322165-2511-1-git-send-email-b32955@freescale.com>
+References: <1379322165-2511-1-git-send-email-b32955@freescale.com>
+Message-ID: <20130916092444.GN31147@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lars,
-> On 09/14/2013 02:27 PM, Jonathan Cameron wrote:
->> On 09/14/13 13:14, Jonathan Cameron wrote:
->>> On 09/10/13 13:49, Lee Jones wrote:
->>>> Some of ST's sensors are appended with their sensor type and some
->>>> are not. For consistency we're extending the same naming convention
->>>> throughout.
->>>>
->>>> Signed-off-by: Lee Jones <lee.jones@linaro.org>
->>> Honestly I don't care either way on these, but consistency would definitely
->>> be good so applied to the togreg branch of iio.git
->>>
->>> Thanks,
->> Actually change of plan. I'm going to hold off on these as this an ABI change.
->> Iritating though having these as completely inconsistent is, changing this
->> will change device identification from userspace which is not a good idea.
->>
->> Sorry Lee, but we really shouldn't do this. I should have picked up on this
->> in the original driver reviews but that's hindsight for you.
-> I think those with the suffix are the ones where you have accel and gyro in
-> the same package, the ones without the suffix are pure accelerometers.
-Yes You are right. I've used this kind of logic... What do you think about?
+On Mon, Sep 16, 2013 at 05:02:45PM +0800, Huang Shijie wrote:
+> The patch "0b7a76a ARM: dts: imx6q{dl}: add DTE pads for uart"
+> adds the DTE pads for uart. For PAD_EIM_D29, the offset of the
+> Pad Mux register should be 0x0c8, not 0x0c4.
+> 
+> This patch fixes it.
+> 
+> Signed-off-by: Huang Shijie <b32955@freescale.com>
 
-Denis
+Applied, thanks.
+
+Shawn
