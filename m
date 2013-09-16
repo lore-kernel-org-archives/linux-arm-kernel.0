@@ -1,44 +1,43 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 16 Sep 2013 11:25:01 +0200
-Subject: [PATCH v6 3/3] PCI: imx6: Add support for i.MX6 PCIe controller
-In-Reply-To: <1379319655-20210-4-git-send-email-xobs@kosagi.com>
-References: <1379319655-20210-1-git-send-email-xobs@kosagi.com>
- <1379319655-20210-4-git-send-email-xobs@kosagi.com>
-Message-ID: <20130916092501.GY30088@pengutronix.de>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Mon, 16 Sep 2013 10:25:15 +0100
+Subject: Vexpress config
+In-Reply-To: <CAHSGOus7VsJh+-mpxOWeeyqfsB4jNYiG-vwRirFaJh39c3Heww@mail.gmail.com>
+References: <CAHSGOuusvazUFFAAraCZmQgXr8LvwdV4zess=KsEMsCtbg0y2A@mail.gmail.com>
+ <CAHSGOus7VsJh+-mpxOWeeyqfsB4jNYiG-vwRirFaJh39c3Heww@mail.gmail.com>
+Message-ID: <1379323515.3998.12.camel@hornet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 16, 2013 at 08:20:54AM +0000, Sean Cross wrote:
-> Add support for the PCIe port present on the i.MX6 family of controllers.
-> These use the Synopsis Designware core tied to their own PHY.
+On Sun, 2013-09-15 at 14:40 +0100, melwyn lobo wrote:
+> To better clarify the issue. When I boot a single core Cortex-A9 RTSM
+> with vexpress_defconfig compiled kernel and kernel command line as
+> 1.  "earlyprintk console=ttyAMA0,38400n8 mem=512M maxcpus=1"
+> 2.  "earlyprintk console=ttyAMA0,38400n8 mem=512M maxcpus=0"
+> 3.  "earlyprintk console=ttyAMA0,38400n8 mem=512M nosmp"
+> 4.  "earlyprintk console=ttyAMA0,38400n8 mem=512M"
+> the kernel throws an OOPS error:
 > 
-> +static int pcie_phy_poll_ack(void __iomem *dbi_base, int exp_val)
-> +{
-> +	u32 val;
-> +	u32 max_iterations = 10;
-> +	u32 wait_counter = 0;
-> +
-> +	do {
-> +		val = readl(dbi_base + PCIE_PHY_STAT);
-> +		val = (val >> PCIE_PHY_STAT_ACK_LOC) & 0x1;
-> +		wait_counter++;
-> +
-> +		if (val == exp_val)
-> +			return 0;
-> +
-> +		udelay(1);
-> +	} while ((wait_counter < max_iterations) && (val != exp_val));
+> Uncompressing Linux... done, booting the kernel.
+> 
+> Booting Linux on physical CPU 0x0
+> Initializing cgroup subsys cpuset
+> Linux version 3.10.9 (m.lobo at mcbdhost-Dataserver) (gcc version 4.7.3
+> (Sourcery CodeBench Lite 2013.05-24) ) #8 Fri Sep 13 10:43:53 KST 2013
+> CPU: ARMv7 Processor [413fc090] revision 0 (ARMv7), cr=10c53c7d
+> CPU: PIPT / VIPT nonaliasing data cache, VIPT aliasing instruction cache
+> Machine: ARM-Versatile Express
 
-The test for val != exp_val is unnecessary now of course.
+The Cortex-A9 RTSM is not an equivalent of the V2P-CA9 CoreTile, so you
+have to boot your kernel with a relevant Device Tree. You'll find them
+here: http://linux-arm.org/git?p=arm-dts.git;a=tree;f=fast_models
 
-With this and the devm_clk_get Shawn mentioned:
+Now, the question is how do you actually boot the kernel? Can you cope
+with the DTB? Linaro's boot wrapper
+https://git.linaro.org/gitweb?p=arm/models/boot-wrapper.git can handle
+DTBs, however you'll need some extra patches to get it working on A9.
+Contact its maintainer (peter.maydel at linaro.org) if you were planning to
+use it.
 
-Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
+Good luck!
 
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Pawel
