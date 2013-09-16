@@ -1,60 +1,38 @@
-From: ethan@ethantuttle.com (Ethan Tuttle)
-Date: Mon, 16 Sep 2013 10:24:05 -0700
-Subject: mvneta: oops in __rcu_read_lock on mirabox
-In-Reply-To: <20130916164412.GD3188@1wt.eu>
-References: <CACzLR4tTvt+ROEhkXUCQhV6=bPPTX4LFSkWfrEhF+OdM1Jm1Rw@mail.gmail.com>
- <20130915205701.5c61a444@skate> <20130916065047.GH27487@1wt.eu>
- <20130916175152.4e013457@skate>
- <CACzLR4twTNjzU8hK3L1cYUXnEH1ydwY6jnYoOG+9vLB3-4uQ4w@mail.gmail.com>
- <20130916163937.GC3188@1wt.eu> <20130916164412.GD3188@1wt.eu>
-Message-ID: <CACzLR4ssOPsmYaEh2ohe4HL5j+67keDYnmR4YezNB=aO7Pj5kA@mail.gmail.com>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Mon, 16 Sep 2013 19:25:41 +0200
+Subject: [RFCv2 3/3] ARM: dts: N900: Add SSI information
+In-Reply-To: <20130916150147.GA14047@earth.universe>
+References: <1379277856-24571-1-git-send-email-sre@debian.org>
+ <1379277856-24571-4-git-send-email-sre@debian.org>
+ <CAAwP0s0e-gYkNA78eQH7x2VJbM1byaisUeqU8YbbeWUbKwsxCQ@mail.gmail.com>
+ <20130916150147.GA14047@earth.universe>
+Message-ID: <CABxcv==p02u8goDGJHFW0HtoPetxsRk+nmujnTqNDcGuVY0+mg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 16, 2013 at 9:44 AM, Willy Tarreau <w@1wt.eu> wrote:
-> On Mon, Sep 16, 2013 at 06:39:37PM +0200, Willy Tarreau wrote:
->> On Mon, Sep 16, 2013 at 09:35:16AM -0700, Ethan Tuttle wrote:
->> > On Mon, Sep 16, 2013 at 8:51 AM, Thomas Petazzoni
->> > <thomas.petazzoni@free-electrons.com> wrote:
->> > > Willy, Ethan,
->> > >
->> > > On Mon, 16 Sep 2013 08:50:47 +0200, Willy Tarreau wrote:
->> > >
->> > >> I'm currently testing on 3.11.1 (which I had here) and am not getting
->> > >> any issue after 50M packets. My kernel is running in thumb mode and
->> > >> without SMP.
->> > >>
->> > >> Ethan, we'll need your config I guess.
->> > >
->> > > Can both of you also report the U-Boot version you're using, and the
->> > > SoC revision (it's visible in the U-Boot output).
->> >
->> > Mine says:
->> >
->> > U-Boot 2009.08 (Sep 16 2012 - 22:50:06)Marvell version: 1.1.2 NQ
->> > SoC:   MV6710 A1
+On Mon, Sep 16, 2013 at 5:01 PM, Sebastian Reichel <sre@debian.org> wrote:
+> Hi,
+>
+>> Is the Synchronous Serial Interface (SSI)  only supported by
+>> OMAP34xx/OMAP35xx SoC and not by OMAP36xx/OMAP37xx SoC?
 >>
->> I just checked on my old captures and I have the same here, with more
->> details such as the CPU's revision (Rev 1) :
+>> I'm asking this since if SSI is supported by both we should add the
+>> device nodes in omap3.dtsi instead of omap34xx.dtsi.
 >>
->>    http://1wt.eu/articles/mirabox-vs-guruplug/
+>> I thought that all OMAP3 SoC supported SSI and all OMAP4 SoC supported
+>> HSI but I guess I was wrong...
 >
-> BTW Ethan, I don't know if you have already opened your mirabox, but on the
-> link above you'll find settings for trying other frequencies for the CPU. It
-> could be nice to try 1 GHz with L2/DDR @500 instead of 1200/600 to see if the
-> issue remains or not. If it disappears, there's also a working setting with
-> CPU at 1.2G, L2 at 800M and DDR at 400M to help find if CPU, L2 or DDR is the culprit.
+> I just do not know. Information about the SSI core is not included
+> in the public OMAP TRM. It only lists the memory space as reserved.
 >
-> Willy
+> Thus I only included it in OMAP34xx, which is used in Nokia N900 and
+> must support SSI.
 >
 
-I have not opened my mirabox - but sure, I'll open it up and try those
-other settings when I get a chance.
+I see... hopefully someone from TI can shed some light on this.
 
-Also, you mentioned that you have SMP disabled in your kernel.  It
-looks like it's on in my .config.  Should I run a test with SMP
-disabled?
+> -- Sebastian
+>
 
-I'm surprised that nobody else sees this crash given how easy it is
-for me to reproduce.  BTW, the 3.11 kernel I made with 702821f
-reverted has been humming along for days without issue.
+Best regards,
+Javier
