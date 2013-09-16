@@ -1,39 +1,55 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Mon, 16 Sep 2013 17:02:45 +0800
-Subject: [PATCH] ARM: dts: imx6q: fix the wrong offset of the Pad Mux register
-Message-ID: <1379322165-2511-1-git-send-email-b32955@freescale.com>
+From: jean.pihet@linaro.org (Jean Pihet)
+Date: Mon, 16 Sep 2013 11:17:29 +0200
+Subject: [PATCH v2 0/4] perf: parse the dwarf backtrace info from .debug_frame
+ section
+Message-ID: <1379323053-11458-1-git-send-email-jean.pihet@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch "0b7a76a ARM: dts: imx6q{dl}: add DTE pads for uart"
-adds the DTE pads for uart. For PAD_EIM_D29, the offset of the
-Pad Mux register should be 0x0c8, not 0x0c4.
+On ARM the debug info is not present in the .eh_frame sections but
+in .debug_frame instead, in dwarf format.
 
-This patch fixes it.
+This patch set uses libunwind to load and parse the dwarf debug info from
+the .debug_frame section if no .eh_frame_hdr section is found; also it
+sets the hooks in the perf_regs and libunwind code for ARMv7.
 
-Signed-off-by: Huang Shijie <b32955@freescale.com>
----
+Dependencies:
+ . if present, libunwind >= 1.1 is needed to prevent a segfault when
+   parsing the dwarf info,
+ . libunwind needs to be configured with --enable-debug-frame
+   to prevent a linkage error. Note: --enable-debug-frame is automatically
+   selected on ARM).
 
-sorry, I feel shamed for this mistake.
+The generated perf has been tested on ARMv7 (OMAP4, Marvell Armada XP) and
+x86_64, using the following commands:
+ perf record -g [dwarf] -- <binary>
+ perf report --sort symbol --call-graph --stdio
 
----
- arch/arm/boot/dts/imx6q-pinfunc.h |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx6q-pinfunc.h b/arch/arm/boot/dts/imx6q-pinfunc.h
-index c0e38a4..9bbe82b 100644
---- a/arch/arm/boot/dts/imx6q-pinfunc.h
-+++ b/arch/arm/boot/dts/imx6q-pinfunc.h
-@@ -207,8 +207,8 @@
- #define MX6QDL_PAD_EIM_D29__ECSPI4_SS0              0x0c8 0x3dc 0x824 0x2 0x1
- #define MX6QDL_PAD_EIM_D29__UART2_RTS_B             0x0c8 0x3dc 0x924 0x4 0x1
- #define MX6QDL_PAD_EIM_D29__UART2_CTS_B             0x0c8 0x3dc 0x000 0x4 0x0
--#define MX6QDL_PAD_EIM_D29__UART2_DTE_RTS_B         0x0c4 0x3dc 0x000 0x4 0x0
--#define MX6QDL_PAD_EIM_D29__UART2_DTE_CTS_B         0x0c4 0x3dc 0x924 0x4 0x1
-+#define MX6QDL_PAD_EIM_D29__UART2_DTE_RTS_B         0x0c8 0x3dc 0x000 0x4 0x0
-+#define MX6QDL_PAD_EIM_D29__UART2_DTE_CTS_B         0x0c8 0x3dc 0x924 0x4 0x1
- #define MX6QDL_PAD_EIM_D29__GPIO3_IO29              0x0c8 0x3dc 0x000 0x5 0x0
- #define MX6QDL_PAD_EIM_D29__IPU2_CSI1_VSYNC         0x0c8 0x3dc 0x8e4 0x6 0x0
- #define MX6QDL_PAD_EIM_D29__IPU1_DI0_PIN14          0x0c8 0x3dc 0x000 0x7 0x0
+Jean Pihet (2):
+  perf tools: Check libunwind for availability of dwarf parsing feature
+  perf: parse the .debug_frame section in case .eh_frame is not present
+
+Will Deacon (2):
+  ARM: perf: add support for perf registers API
+  ARM: perf: wire up perf_regs and unwind support for ARM
+
+ arch/arm/Kconfig                        |  2 +
+ arch/arm/include/uapi/asm/Kbuild        |  1 +
+ arch/arm/include/uapi/asm/perf_regs.h   | 23 +++++++++++
+ arch/arm/kernel/Makefile                |  1 +
+ arch/arm/kernel/perf_regs.c             | 30 ++++++++++++++
+ tools/perf/arch/arm/Makefile            |  3 ++
+ tools/perf/arch/arm/include/perf_regs.h | 54 +++++++++++++++++++++++++
+ tools/perf/arch/arm/util/unwind.c       | 48 ++++++++++++++++++++++
+ tools/perf/config/Makefile              |  7 +++-
+ tools/perf/config/feature-tests.mak     | 11 ++++-
+ tools/perf/util/unwind.c                | 71 +++++++++++++++++++++++++--------
+ 11 files changed, 232 insertions(+), 19 deletions(-)
+ create mode 100644 arch/arm/include/uapi/asm/perf_regs.h
+ create mode 100644 arch/arm/kernel/perf_regs.c
+ create mode 100644 tools/perf/arch/arm/include/perf_regs.h
+ create mode 100644 tools/perf/arch/arm/util/unwind.c
+
 -- 
-1.7.1
+1.7.11.7
