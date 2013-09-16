@@ -1,40 +1,51 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Mon, 16 Sep 2013 11:08:35 +0300
-Subject: [PATCH 6/6] video: drop code for ARCH_SHARK in cyber2000fb
-In-Reply-To: <1379069656-4273-1-git-send-email-linus.walleij@linaro.org>
-References: <1379069656-4273-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <5236BC83.1020406@ti.com>
+From: jbe@pengutronix.de (=?iso-8859-1?q?J=FCrgen_Beisert?=)
+Date: Mon, 16 Sep 2013 10:10:22 +0200
+Subject: [PATCH 5/6] Staging/iio/adc/touchscreen/MXS: add interrupt driven
+ touch detection
+In-Reply-To: <52359259.8010202@kernel.org>
+References: <1378887511-24530-1-git-send-email-jbe@pengutronix.de>
+ <1378887511-24530-6-git-send-email-jbe@pengutronix.de>
+ <52359259.8010202@kernel.org>
+Message-ID: <201309161010.22151.jbe@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Jonathan,
 
-On 13/09/13 13:54, Linus Walleij wrote:
-> The Cyber2000 frame buffer driver contains a block of code solely
-> for the Shark machine. As the machine is deleted, delete this
-> code as well.
-> 
-> Also remove the pointless #ifdef CONFIG_PCI as the Kconfig
-> clearly states PCI as a dependency anyway.
-> 
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
-> Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
-> Hi Jean-Christophe/Tomi, I am seeking an ACK to take this through
-> the ARM SoC tree as part of the deletion of the Shark machine.
-> Please do not apply it to your tree.
+On Sunday 15 September 2013 12:56:25 Jonathan Cameron wrote:
+> On 09/11/13 09:18, Juergen Beisert wrote:
+> > For battery driven systems it is a very bad idea to collect the
+> > touchscreen data within a kernel busy loop.
+> >
+> > This change uses the features of the hardware to delay and accumulate
+> > samples in hardware to avoid a high interrupt and CPU load.
+> >
+> > Note: this is only tested on an i.MX23 SoC yet.
+> >
+> > Signed-off-by: Juergen Beisert <jbe@pengutronix.de>
+> > CC: linux-arm-kernel at lists.infradead.org
+> > CC: devel at driverdev.osuosl.org
+> > CC: Marek Vasut <marex@denx.de>
+> > CC: Fabio Estevam <fabio.estevam@freescale.com>
+> > CC: Jonathan Cameron <jic23@cam.ac.uk>
+>
+> While this driver is placed in IIO within staging at the moment, these
+> changes are definitely input related.  Hence I have cc'd Dmitry and the
+> input list.
+>
+> I am personaly a little uncomfortable that we have such a complex bit of
+> input code sat within an IIO driver but such is life.
 
-Acked-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
+Maybe an MFD for this ADC unit would be a better way to go? Currently I have a 
+different problem with this driver, because the ADC unit monitors the battery 
+as well. And the charging driver from the power subsystem needs these values 
+to charge the battery in a correct manner.
 
- Tomi
+> [...]
 
+Regards,
+Juergen
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 901 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130916/eb2a4578/attachment.sig>
+-- 
+Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?| Juergen Beisert ? ? ? ? ? ? |
+Linux Solutions for Science and Industry ? ? ?| http://www.pengutronix.de/  |
