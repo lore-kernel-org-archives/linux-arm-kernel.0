@@ -1,14 +1,16 @@
 From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Mon, 16 Sep 2013 12:53:18 +1000
+Date: Mon, 16 Sep 2013 12:58:26 +1000
 Subject: [PATCH v3 2/2] drivers: dma-contiguous: add initialization from
  device tree
 In-Reply-To: <CACxGe6uzau+g0gd=hkNYw1zdkfq18zt_m9OEaiJKR6=q1U4rag@mail.gmail.com>
 References: <1372254009-25307-1-git-send-email-m.szyprowski@samsung.com>
  <1372254009-25307-3-git-send-email-m.szyprowski@samsung.com>
  <CACxGe6uzau+g0gd=hkNYw1zdkfq18zt_m9OEaiJKR6=q1U4rag@mail.gmail.com>
-Message-ID: <1379299998.4098.74.camel@pasglop>
+Message-ID: <1379300306.4098.79.camel@pasglop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
+
+[resent to the right list this time around]
 
 On Thu, 2013-07-11 at 15:56 +0100, Grant Likely wrote:
 
