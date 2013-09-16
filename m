@@ -1,98 +1,59 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 16 Sep 2013 14:23:37 +0800
-Subject: [PATCH v5 1/3] ARM: imx: Add LVDS general-purpose clocks to i.MX6Q
-In-Reply-To: <1379310497-12362-2-git-send-email-xobs@kosagi.com>
-References: <1379310497-12362-1-git-send-email-xobs@kosagi.com>
- <1379310497-12362-2-git-send-email-xobs@kosagi.com>
-Message-ID: <20130916062335.GH31147@S2101-09.ap.freescale.net>
+From: w@1wt.eu (Willy Tarreau)
+Date: Mon, 16 Sep 2013 08:50:47 +0200
+Subject: mvneta: oops in __rcu_read_lock on mirabox
+In-Reply-To: <20130915205701.5c61a444@skate>
+References: <CACzLR4tTvt+ROEhkXUCQhV6=bPPTX4LFSkWfrEhF+OdM1Jm1Rw@mail.gmail.com>
+ <20130915205701.5c61a444@skate>
+Message-ID: <20130916065047.GH27487@1wt.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 16, 2013 at 05:48:15AM +0000, Sean Cross wrote:
-> The i.MX6 has two general-purpose LVDS clocks that can be driven
-> from a variety of sources.  This patch adds a mux and a gate for
-> both of these clocks.
-> 
-> Signed-off-by: Sean Cross <xobs@kosagi.com>
-> ---
->  .../devicetree/bindings/clock/imx6q-clock.txt      |    4 ++++
->  arch/arm/mach-imx/clk-imx6q.c                      |   22 +++++++++++++++++++-
->  2 files changed, 25 insertions(+), 1 deletion(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/clock/imx6q-clock.txt b/Documentation/devicetree/bindings/clock/imx6q-clock.txt
-> index 5a90a72..35e82c7 100644
-> --- a/Documentation/devicetree/bindings/clock/imx6q-clock.txt
-> +++ b/Documentation/devicetree/bindings/clock/imx6q-clock.txt
-> @@ -215,6 +215,10 @@ clocks and IDs.
->  	cko2      		200
->  	cko      		201
->  	vdoa      		202
-> +	lvds1_sel		203
-> +	lvds2_sel		204
-> +	lvds1_gate		205
-> +	lvds2_gate		206
->  
->  Examples:
->  
-> diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
-> index 9181a24..971356b 100644
-> --- a/arch/arm/mach-imx/clk-imx6q.c
-> +++ b/arch/arm/mach-imx/clk-imx6q.c
-> @@ -217,6 +217,11 @@ static const char *cko2_sels[] = {
->  	"uart_serial", "spdif", "asrc", "hsi_tx",
->  };
->  static const char *cko_sels[] = { "cko1", "cko2", };
-> +static const char *lvds_sels[] = {
-> +	"dummy", "dummy", "dummy", "dummy", "dummy", "dummy",
-> +	"pll4_audio", "pll5_video", "pll8_mlb", "enet_ref",
-> +	"pcie_ref", "sata_ref",
-> +};
->  
->  enum mx6q_clks {
->  	dummy, ckil, ckih, osc, pll2_pfd0_352m, pll2_pfd1_594m, pll2_pfd2_396m,
-> @@ -251,7 +256,8 @@ enum mx6q_clks {
->  	ssi2_ipg, ssi3_ipg, rom, usbphy1, usbphy2, ldb_di0_div_3_5, ldb_di1_div_3_5,
->  	sata_ref, sata_ref_100m, pcie_ref, pcie_ref_125m, enet_ref, usbphy1_gate,
->  	usbphy2_gate, pll4_post_div, pll5_post_div, pll5_video_div, eim_slow,
-> -	spdif, cko2_sel, cko2_podf, cko2, cko, vdoa, clk_max
-> +	spdif, cko2_sel, cko2_podf, cko2, cko, vdoa,
-> +	lvds1_sel, lvds2_sel, lvds1_gate, lvds2_gate, clk_max
->  };
->  
->  static struct clk *clk[clk_max];
-> @@ -342,6 +348,18 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
->  			base + 0xe0, 0, 2, 0, clk_enet_ref_table,
->  			&imx_ccm_lock);
->  
-> +	clk[lvds1_sel] = imx_clk_mux("lvds1_sel", base + 0x160, 0, 5, lvds_sels, ARRAY_SIZE(lvds_sels));
-> +	clk[lvds2_sel] = imx_clk_mux("lvds2_sel", base + 0x160, 5, 5, lvds_sels, ARRAY_SIZE(lvds_sels));
-> +
-> +	/*
-> +	 * lvds1_gate and lvds2_gate are pseudo-gates.  Both can be
-> +	 * independently configured as clock inputs or outputs.  We treat
-> +	 * the "output_enable" bit as a gate, even though it's really just
-> +	 * enabling clock output.
-> +	 */
-> +	clk[lvds1_gate] = imx_clk_gate("lvds1_gate", "dummy", base + 0x160, 10);
-> +	clk[lvds2_gate] = imx_clk_gate("lvds2_gate", "dummy", base + 0x160, 11);
-> +
->  	/*                                name              parent_name        reg       idx */
->  	clk[pll2_pfd0_352m] = imx_clk_pfd("pll2_pfd0_352m", "pll2_bus",     base + 0x100, 0);
->  	clk[pll2_pfd1_594m] = imx_clk_pfd("pll2_pfd1_594m", "pll2_bus",     base + 0x100, 1);
-> @@ -569,6 +587,8 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
->  	clk_register_clkdev(clk[cko1_sel], "cko1_sel", NULL);
->  	clk_register_clkdev(clk[ahb], "ahb", NULL);
->  	clk_register_clkdev(clk[cko1], "cko1", NULL);
-> +	clk_register_clkdev(clk[lvds1_gate], "lvds1_gate", NULL);
-> +	clk_register_clkdev(clk[lvds2_gate], "lvds2_gate", NULL);
+Hi Thomas,
 
-Again, I do not think you need these clk lookups.
-
-Shawn
-
->  	clk_register_clkdev(clk[arm], NULL, "cpu0");
->  	clk_register_clkdev(clk[pll4_post_div], "pll4_post_div", NULL);
->  	clk_register_clkdev(clk[pll4_audio], "pll4_audio", NULL);
-> -- 
-> 1.7.9.5
+On Sun, Sep 15, 2013 at 08:57:01PM +0200, Thomas Petazzoni wrote:
+> Hello Ethan,
 > 
+> On Sat, 14 Sep 2013 18:05:32 -0700, Ethan Tuttle wrote:
+> > When I upgraded my mirabox from 3.11-rc4 to 3.11, I started seeing
+> > oopses while receiving network traffic (see below).  Sending a flood
+> > ping will trigger the oops within a few minutes.
+> > 
+> > The stack looks similar, but not identical to, the one reported
+> > earlier by Jochen De Smet[1].  In my case the PC is always
+> > __rcu_read_lock.
+> > 
+> > A git bisect found a878764 "Merge
+> > git://git.kernel.org/pub/scm/linux/kernel/git/davem/net" to be the
+> > first bad commit... interesting, because neither of the merge parents
+> > produce the oops.  I rebased the net changes onto the other merge
+> > parent and bisected that series, which identified 702821f "net: revert
+> > 8728c544a9c ("net: dev_pick_tx() fix")" as the first bad commit.
+> > Indeed, reverting 702821f from 3.11 produces a kernel which stands up
+> > to a ping flood for hours.
+> > 
+> > Each of the times I reproduced this, it was identified as "Unhandled
+> > prefetch abort: unknown 25 (0x409) at 0xc0036ea0", except once when I
+> > got "unknown 16 (0x400)".
+> > 
+> > I'm assuming this is an mvneta bug that was exposed by 702821f.
+> > That's just a guess, and I don't have the skills to debug this any
+> > further.  In any case, I figured the maintainers would want to know
+> > about it.
+> 
+> Thanks a lot for the report and the detailed investigation.
+> Unfortunately, I don't have Armada 370 hardware with me this week, so
+> I'm unable to test and reproduce the issue.
+> 
+> However, I've added a bunch of Armada 370 people/maintainers in Cc,
+> hopefully they can at least try to reproduce and confirm that reverting
+> this patch makes the problem go away, which would confirm that we
+> should look for a bug in the mvneta driver around this problem.
+
+I'm currently testing on 3.11.1 (which I had here) and am not getting
+any issue after 50M packets. My kernel is running in thumb mode and
+without SMP.
+
+Ethan, we'll need your config I guess.
+
+Thanks,
+Willy
