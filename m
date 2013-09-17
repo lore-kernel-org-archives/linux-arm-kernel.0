@@ -1,33 +1,67 @@
-From: pavel@denx.de (Pavel Machek)
-Date: Tue, 17 Sep 2013 23:55:44 +0200
-Subject: [RESEND PATCHv3 1/2] clocksource: dw_apb_timer: Move timer
- defines to header file.
-In-Reply-To: <alpine.DEB.2.02.1309172337570.4089@ionos.tec.linutronix.de>
-References: <1377744796-22175-1-git-send-email-dinguyen@altera.com>
- <1379434447.24347.0.camel@linux-builds1>
- <alpine.DEB.2.02.1309172337570.4089@ionos.tec.linutronix.de>
-Message-ID: <20130917215544.GB23937@amd.pavel.ucw.cz>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Tue, 17 Sep 2013 15:57:49 -0600
+Subject: Commit breaks strace: ARM: entry: allow ARM-private syscalls to be
+ restarted
+Message-ID: <20130917215749.GA11109@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue 2013-09-17 23:45:11, Thomas Gleixner wrote:
-> On Tue, 17 Sep 2013, Dinh Nguyen wrote:
-> 
-> > On Wed, 2013-08-28 at 21:53 -0500, Dinh Nguyen wrote:
-> > > From: Dinh Nguyen <dinguyen@altera.com>
-> > > 
-> > > Move all dw_apb_timer defines to include/linux/dw_apb_timer.h.
-> 
-> That's describing WHAT the patch does not WHY. I can see the WHAT part
-> without that pointless changelog.
+Hi Will,
 
-read_sched_clock() in dw_apb_timer_of.c accesses the same hardware as
-dw_apb_timer.c, therefore it benefits from #define's that describe the
-hardware. IOW 1/2 is neccessary for 2/2, but it can compile/work
-indepedently.
+I was just testing v3.12-rc1 (on kirkwood) and noticed that strace is
+not working:
 
-Thanks,
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+$ strace /bin/ls
+mmap2(0xb6f79000, 9552, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_ANONYMOUS, -1, 0) = 0xb6f79000
+close(3)                                = 0
+mmap2(NULL, 4096, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0xb6fad000
+set_tls(0xb6fad4c0, 0xb6fadb98, 0xb6fb1050, 0xb6fad4c0, 0xb6fb1050) = -1 ENOSYS (Function not implemented)
+writev(2, [{"cannot set up thread-local stora"..., 36}, {"unknown error", 13}, {"\n", 1}], 3cannot set up thread-local storage: unknown error
+) = 50
+exit_group(127)                         = ?
++++ exited with 127 +++
+
+I determined that reverting your commit below makes strace work again.
+I've tested 3.10.12 and it is OK.
+
+This happens with the latest git head for strace, as well as the 4.7
+release.
+
+Hopefully you can cook up a fix :)
+
+Regards,
+Jason
+
+commit 377747c40657eb35ad98a56439606d96a928425a
+Author: Will Deacon <will.deacon@arm.com>
+Date:   Mon May 13 19:16:34 2013 +0100
+
+    ARM: entry: allow ARM-private syscalls to be restarted
+    
+    System calls will only be restarted after signal handling if they (a)
+    return an error code indicating that a restart is required and (b) have
+    `why' set to a non-zero value, to indicate that the signal interrupted
+    them.
+    
+    This patch leaves `why' set to a non-zero value for ARM-private syscalls
+    , and only zeroes it for syscalls that are not implemented.
+    
+    Signed-off-by: Will Deacon <will.deacon@arm.com>
+
+diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
+index 94104bf..74ad15d1 100644
+--- a/arch/arm/kernel/entry-common.S
++++ b/arch/arm/kernel/entry-common.S
+@@ -442,10 +442,10 @@ local_restart:
+        ldrcc   pc, [tbl, scno, lsl #2]         @ call sys_* routine
+ 
+        add     r1, sp, #S_OFF
+-2:     mov     why, #0                         @ no longer a real syscall
+        cmp     scno, #(__ARM_NR_BASE - __NR_SYSCALL_BASE)
+        eor     r0, scno, #__NR_SYSCALL_BASE    @ put OS number back
+-       bcs     arm_syscall     
++       bcs     arm_syscall
++2:     mov     why, #0                         @ no longer a real syscall
+        b       sys_ni_syscall                  @ not private func
+ 
+ #if defined(CONFIG_OABI_COMPAT) || !defined(CONFIG_AEABI)
