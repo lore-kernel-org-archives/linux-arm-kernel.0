@@ -1,196 +1,45 @@
-From: steve.capper@linaro.org (Steve Capper)
-Date: Tue, 17 Sep 2013 10:33:49 +0100
-Subject: [RFC V2] ARM: mm: make UACCESS_WITH_MEMCPY huge page aware
-Message-ID: <1379410429-3372-1-git-send-email-steve.capper@linaro.org>
+From: srinivas.kandagatla@st.com (Srinivas KANDAGATLA)
+Date: Tue, 17 Sep 2013 10:27:41 +0100
+Subject: [PATCH 2/2] ARM: multi_v7_defconfig: Fix STi support
+In-Reply-To: <1379410003-9911-1-git-send-email-srinivas.kandagatla@st.com>
+References: <1379410003-9911-1-git-send-email-srinivas.kandagatla@st.com>
+Message-ID: <1379410061-10020-1-git-send-email-srinivas.kandagatla@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The memory pinning code in uaccess_with_memcpy.c does not check
-for HugeTLB or THP pmds, and will enter an infinite loop should
-a __copy_to_user or __clear_user occur against a huge page.
+From: Srinivas Kandagatla <srinivas.kandagatla@st.com>
 
-This patch adds detection code for huge pages to pin_page_for_write.
-As this code can be executed in a fast path it refers to the actual
-pmds rather than the vma. If a HugeTLB or THP is found (they have
-the same pmd representation on ARM), the page table spinlock is
-taken to prevent modification whilst the page is pinned.
+This patch adds ST serial driver (st-asc) and ICPLUS ethernet PHY to
+multi_v7_defconfig. All STi based SOCs use this as ST-ASC as default
+serial console, and most of the STi SOC based boards have ICPLUS
+external ethernet PHY. These two options makes the system boot with nfs
+root and console.
 
-On ARM, huge pages are only represented as pmds, thus no huge pud
-checks are performed. (For huge puds one would lock the page table
-in a similar manner as in the pmd case).
-
-Two helper functions are introduced; pmd_thp_or_huge will check
-whether or not a page is huge or transparent huge (which have the
-same pmd layout on ARM), and pmd_hugewillfault will detect whether
-or not a page fault will occur on write to the page.
-
-Changes since first RFC:
-   * The page mask is widened for hugepages to reduce the number
-     of potential locks/unlocks.
-     (A knobbled /dev/zero with its latency reduction chunks
-      removed shows a 2x data rate boost with hugepages backing:
-      dd if=/dev/zero of=/dev/null bs=10M count=1024 )
-
-Signed-off-by: Steve Capper <steve.capper@linaro.org>
+Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@st.com>
 ---
- arch/arm/include/asm/pgtable-3level.h |  3 ++
- arch/arm/lib/uaccess_with_memcpy.c    | 57 ++++++++++++++++++++++++++++++-----
- 2 files changed, 52 insertions(+), 8 deletions(-)
+ arch/arm/configs/multi_v7_defconfig |    3 +++
+ 1 files changed, 3 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/include/asm/pgtable-3level.h b/arch/arm/include/asm/pgtable-3level.h
-index 5689c18..39c54cf 100644
---- a/arch/arm/include/asm/pgtable-3level.h
-+++ b/arch/arm/include/asm/pgtable-3level.h
-@@ -206,6 +206,9 @@ static inline pmd_t *pmd_offset(pud_t *pud, unsigned long addr)
- #define __HAVE_ARCH_PMD_WRITE
- #define pmd_write(pmd)		(!(pmd_val(pmd) & PMD_SECT_RDONLY))
- 
-+#define pmd_hugewillfault(pmd)	(!pmd_young(pmd) || !pmd_write(pmd))
-+#define pmd_thp_or_huge(pmd)	(pmd_huge(pmd) || pmd_trans_huge(pmd))
-+
- #ifdef CONFIG_TRANSPARENT_HUGEPAGE
- #define pmd_trans_huge(pmd)	(pmd_val(pmd) && !(pmd_val(pmd) & PMD_TABLE_BIT))
- #define pmd_trans_splitting(pmd) (pmd_val(pmd) & PMD_SECT_SPLITTING)
-diff --git a/arch/arm/lib/uaccess_with_memcpy.c b/arch/arm/lib/uaccess_with_memcpy.c
-index 025f742..78756db 100644
---- a/arch/arm/lib/uaccess_with_memcpy.c
-+++ b/arch/arm/lib/uaccess_with_memcpy.c
-@@ -18,11 +18,13 @@
- #include <linux/hardirq.h> /* for in_atomic() */
- #include <linux/gfp.h>
- #include <linux/highmem.h>
-+#include <linux/hugetlb.h>
- #include <asm/current.h>
- #include <asm/page.h>
- 
- static int
--pin_page_for_write(const void __user *_addr, pte_t **ptep, spinlock_t **ptlp)
-+pin_page_for_write(const void __user *_addr, pte_t **ptep, spinlock_t **ptlp,
-+			unsigned long *page_mask)
- {
- 	unsigned long addr = (unsigned long)_addr;
- 	pgd_t *pgd;
-@@ -40,7 +42,36 @@ pin_page_for_write(const void __user *_addr, pte_t **ptep, spinlock_t **ptlp)
- 		return 0;
- 
- 	pmd = pmd_offset(pud, addr);
--	if (unlikely(pmd_none(*pmd) || pmd_bad(*pmd)))
-+	if (unlikely(pmd_none(*pmd)))
-+		return 0;
-+
-+	/*
-+	 * A pmd can be bad if it refers to a HugeTLB or THP page.
-+	 *
-+	 * Both THP and HugeTLB pages have the same pmd layout
-+	 * and should not be manipulated by the pte functions.
-+	 *
-+	 * Lock the page table for the destination and check
-+	 * to see that it's still huge and whether or not we will
-+	 * need to fault on write, or if we have a splitting THP.
-+	 */
-+	if (unlikely(pmd_thp_or_huge(*pmd))) {
-+		ptl = &current->mm->page_table_lock;
-+		spin_lock(ptl);
-+		if (unlikely(!pmd_thp_or_huge(*pmd)
-+			|| pmd_hugewillfault(*pmd)
-+			|| pmd_trans_splitting(*pmd))) {
-+			spin_unlock(ptl);
-+			return 0;
-+		}
-+
-+		*ptep = NULL;
-+		*ptlp = ptl;
-+		*page_mask = HPAGE_MASK;
-+		return 1;
-+	}
-+
-+	if (unlikely(pmd_bad(*pmd)))
- 		return 0;
- 
- 	pte = pte_offset_map_lock(current->mm, pmd, addr, &ptl);
-@@ -52,6 +83,7 @@ pin_page_for_write(const void __user *_addr, pte_t **ptep, spinlock_t **ptlp)
- 
- 	*ptep = pte;
- 	*ptlp = ptl;
-+	*page_mask = PAGE_MASK;
- 
- 	return 1;
- }
-@@ -60,6 +92,7 @@ static unsigned long noinline
- __copy_to_user_memcpy(void __user *to, const void *from, unsigned long n)
- {
- 	int atomic;
-+	unsigned long page_mask;
- 
- 	if (unlikely(segment_eq(get_fs(), KERNEL_DS))) {
- 		memcpy((void *)to, from, n);
-@@ -76,7 +109,7 @@ __copy_to_user_memcpy(void __user *to, const void *from, unsigned long n)
- 		spinlock_t *ptl;
- 		int tocopy;
- 
--		while (!pin_page_for_write(to, &pte, &ptl)) {
-+		while (!pin_page_for_write(to, &pte, &ptl, &page_mask)) {
- 			if (!atomic)
- 				up_read(&current->mm->mmap_sem);
- 			if (__put_user(0, (char __user *)to))
-@@ -85,7 +118,7 @@ __copy_to_user_memcpy(void __user *to, const void *from, unsigned long n)
- 				down_read(&current->mm->mmap_sem);
- 		}
- 
--		tocopy = (~(unsigned long)to & ~PAGE_MASK) + 1;
-+		tocopy = (~(unsigned long)to & ~page_mask) + 1;
- 		if (tocopy > n)
- 			tocopy = n;
- 
-@@ -94,7 +127,10 @@ __copy_to_user_memcpy(void __user *to, const void *from, unsigned long n)
- 		from += tocopy;
- 		n -= tocopy;
- 
--		pte_unmap_unlock(pte, ptl);
-+		if (pte)
-+			pte_unmap_unlock(pte, ptl);
-+		else
-+			spin_unlock(ptl);
- 	}
- 	if (!atomic)
- 		up_read(&current->mm->mmap_sem);
-@@ -121,6 +157,8 @@ __copy_to_user(void __user *to, const void *from, unsigned long n)
- static unsigned long noinline
- __clear_user_memset(void __user *addr, unsigned long n)
- {
-+	unsigned long page_mask;
-+
- 	if (unlikely(segment_eq(get_fs(), KERNEL_DS))) {
- 		memset((void *)addr, 0, n);
- 		return 0;
-@@ -132,14 +170,14 @@ __clear_user_memset(void __user *addr, unsigned long n)
- 		spinlock_t *ptl;
- 		int tocopy;
- 
--		while (!pin_page_for_write(addr, &pte, &ptl)) {
-+		while (!pin_page_for_write(addr, &pte, &ptl, &page_mask)) {
- 			up_read(&current->mm->mmap_sem);
- 			if (__put_user(0, (char __user *)addr))
- 				goto out;
- 			down_read(&current->mm->mmap_sem);
- 		}
- 
--		tocopy = (~(unsigned long)addr & ~PAGE_MASK) + 1;
-+		tocopy = (~(unsigned long)addr & ~page_mask) + 1;
- 		if (tocopy > n)
- 			tocopy = n;
- 
-@@ -147,7 +185,10 @@ __clear_user_memset(void __user *addr, unsigned long n)
- 		addr += tocopy;
- 		n -= tocopy;
- 
--		pte_unmap_unlock(pte, ptl);
-+		if (pte)
-+			pte_unmap_unlock(pte, ptl);
-+		else
-+			spin_unlock(ptl);
- 	}
- 	up_read(&current->mm->mmap_sem);
- 
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index 6e572c6..49bec9c 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -65,6 +65,7 @@ CONFIG_NET_CALXEDA_XGMAC=y
+ CONFIG_KS8851=y
+ CONFIG_SMSC911X=y
+ CONFIG_STMMAC_ETH=y
++CONFIG_ICPLUS_PHY=y
+ CONFIG_MDIO_SUN4I=y
+ CONFIG_KEYBOARD_SPEAR=y
+ CONFIG_SERIO_AMBAKMI=y
+@@ -87,6 +88,8 @@ CONFIG_SERIAL_XILINX_PS_UART=y
+ CONFIG_SERIAL_XILINX_PS_UART_CONSOLE=y
+ CONFIG_SERIAL_FSL_LPUART=y
+ CONFIG_SERIAL_FSL_LPUART_CONSOLE=y
++CONFIG_SERIAL_ST_ASC=y
++CONFIG_SERIAL_ST_ASC_CONSOLE=y
+ CONFIG_I2C_DESIGNWARE_PLATFORM=y
+ CONFIG_I2C_SIRF=y
+ CONFIG_I2C_TEGRA=y
 -- 
-1.8.1.4
+1.7.6.5
