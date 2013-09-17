@@ -1,33 +1,43 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 17 Sep 2013 16:29:24 -0700
-Subject: [PATCH] ARM: OMAP: fix return value check in
- omap_device_build_from_dt()
-In-Reply-To: <87r4dg6lj2.fsf@linaro.org>
-References: <CAPgLHd_E8wht4q5c9=TjUTwXxysjbbX+HnZyYe2KJU=w79cK4w@mail.gmail.com>
- <20130821071901.GR7656@atomide.com> <87r4dg6lj2.fsf@linaro.org>
-Message-ID: <20130917232924.GN9994@atomide.com>
+Date: Tue, 17 Sep 2013 16:40:22 -0700
+Subject: ARM: OMAP2: Make MACH_OMAP3EVM select NOP_USB_XCEIV
+In-Reply-To: <20130904133850.GC12834@hansolo.jdub.homelinux.org>
+References: <20130904133850.GC12834@hansolo.jdub.homelinux.org>
+Message-ID: <20130917234021.GO9994@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Kevin Hilman <khilman@linaro.org> [130826 17:17]:
-> Tony Lindgren <tony@atomide.com> writes:
+* Josh Boyer <jwboyer@redhat.com> [130904 06:46]:
+> The board-omap3evm.c file unconditionally calls usb_nop_xceiv_register but
+> doesn't ensure this is built-in.  This can lead to build failures like:
 > 
-> > Kevin,
-> >
-> > * Wei Yongjun <weiyj.lk@gmail.com> [130704 06:48]:
-> >> From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
-> >> 
-> >> In case of error, the function omap_device_alloc() returns ERR_PTR()
-> >> and never returns NULL. The NULL test in the return value check
-> >> should be replaced with IS_ERR().
-> >
-> > Looks like this is still pending, care to take this?
+> arch/arm/mach-omap2/built-in.o: In function `omap3_evm_init':
+> linux-3.12.0-0.rc0.git2.1.fc21.armv7hl/arch/arm/mach-omap2/board-omap3evm.c:686: undefined reference to `usb_nop_xceiv_register'
+> make: *** [vmlinux] Error 1
 > 
-> Acked-by: Kevin Hilman <khilman@linaro.org>
+> Make MACH_OMAP3EVM select NOP_USB_XCEIV to avoid this.
 > 
-> Looks fine to me, since I don't have anything else in the queue, feel
-> free to queue up for fixes-non-critical.
+> Signed-off-by: Josh Boyer <jwboyer@fedoraproject.org>
+> ---
+>  arch/arm/mach-omap2/Kconfig | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
+> index 3eed000..3350389 100644
+> --- a/arch/arm/mach-omap2/Kconfig
+> +++ b/arch/arm/mach-omap2/Kconfig
+> @@ -258,6 +258,7 @@ config MACH_OMAP3EVM
+>  	depends on ARCH_OMAP3
+>  	default y
+>  	select OMAP_PACKAGE_CBB
+> +	select NOP_USB_XCEIV
+>  
+>  config MACH_OMAP3517EVM
+>  	bool "OMAP3517/ AM3517 EVM board"
 
-Applying into omap-for-v3.12/fixes thanks.
+I think we should rather have the code in board-omap3evm.c
+to be ifdef CONFIG_NOP_USB_XCEIV as it's a selectable option.
+
+Regards,
 
 Tony
