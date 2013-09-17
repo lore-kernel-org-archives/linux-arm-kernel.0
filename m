@@ -1,109 +1,100 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 17 Sep 2013 10:11:34 -0600
-Subject: [PATCH] MAINTAINERS: Tegra updates, and driver ownership
-Message-ID: <1379434294-10128-1-git-send-email-swarren@wwwdotorg.org>
+From: dinguyen@altera.com (Dinh Nguyen)
+Date: Tue, 17 Sep 2013 11:14:07 -0500
+Subject: [RESEND PATCHv3 1/2] clocksource: dw_apb_timer: Move timer
+ defines to header file.
+In-Reply-To: <1377744796-22175-1-git-send-email-dinguyen@altera.com>
+References: <1377744796-22175-1-git-send-email-dinguyen@altera.com>
+Message-ID: <1379434447.24347.0.camel@linux-builds1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stephen Warren <swarren@nvidia.com>
+On Wed, 2013-08-28 at 21:53 -0500, Dinh Nguyen wrote:
+> From: Dinh Nguyen <dinguyen@altera.com>
+> 
+> Move all dw_apb_timer defines to include/linux/dw_apb_timer.h.
+> 
+> Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
+> CC: Rob Herring <rob.herring@calxeda.com>
+> CC: Arnd Bergmann <arnd@arndb.de>
+> Cc: Olof Johansson <olof@lixom.net>
+> CC: Jamie Iles <jamie@jamieiles.com>
+> Cc: John Stultz <john.stultz@linaro.org>
+> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+> Cc: Thomas Gleixner <tglx@linutronix.de>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Cc: Pavel Machek <pavel@denx.de>
+> Cc: Heiko Stuebner <heiko@sntech.de>
+> Cc: linux-arm-kernel at lists.infradead.org
+> 
+> v2:
+> - Remove the defines in dw_apb_timer.c
+> ---
+>  drivers/clocksource/dw_apb_timer.c |   19 -------------------
+>  include/linux/dw_apb_timer.h       |   19 +++++++++++++++++++
+>  2 files changed, 19 insertions(+), 19 deletions(-)
+> 
+> diff --git a/drivers/clocksource/dw_apb_timer.c b/drivers/clocksource/dw_apb_timer.c
+> index e54ca10..c3a8f52 100644
+> --- a/drivers/clocksource/dw_apb_timer.c
+> +++ b/drivers/clocksource/dw_apb_timer.c
+> @@ -18,25 +18,6 @@
+>  #include <linux/io.h>
+>  #include <linux/slab.h>
+>  
+> -#define APBT_MIN_PERIOD			4
+> -#define APBT_MIN_DELTA_USEC		200
+> -
+> -#define APBTMR_N_LOAD_COUNT		0x00
+> -#define APBTMR_N_CURRENT_VALUE		0x04
+> -#define APBTMR_N_CONTROL		0x08
+> -#define APBTMR_N_EOI			0x0c
+> -#define APBTMR_N_INT_STATUS		0x10
+> -
+> -#define APBTMRS_INT_STATUS		0xa0
+> -#define APBTMRS_EOI			0xa4
+> -#define APBTMRS_RAW_INT_STATUS		0xa8
+> -#define APBTMRS_COMP_VERSION		0xac
+> -
+> -#define APBTMR_CONTROL_ENABLE		(1 << 0)
+> -/* 1: periodic, 0:free running. */
+> -#define APBTMR_CONTROL_MODE_PERIODIC	(1 << 1)
+> -#define APBTMR_CONTROL_INT		(1 << 2)
+> -
+>  static inline struct dw_apb_clock_event_device *
+>  ced_to_dw_apb_ced(struct clock_event_device *evt)
+>  {
+> diff --git a/include/linux/dw_apb_timer.h b/include/linux/dw_apb_timer.h
+> index 1f79b20..1d2b949 100644
+> --- a/include/linux/dw_apb_timer.h
+> +++ b/include/linux/dw_apb_timer.h
+> @@ -19,6 +19,25 @@
+>  
+>  #define APBTMRS_REG_SIZE       0x14
+>  
+> +#define APBT_MIN_PERIOD                 4
+> +#define APBT_MIN_DELTA_USEC             200
+> +
+> +#define APBTMR_N_LOAD_COUNT             0x00
+> +#define APBTMR_N_CURRENT_VALUE          0x04
+> +#define APBTMR_N_CONTROL                0x08
+> +#define APBTMR_N_EOI                    0x0c
+> +#define APBTMR_N_INT_STATUS             0x10
+> +
+> +#define APBTMRS_INT_STATUS              0xa0
+> +#define APBTMRS_EOI                     0xa4
+> +#define APBTMRS_RAW_INT_STATUS          0xa8
+> +#define APBTMRS_COMP_VERSION            0xac
+> +
+> +#define APBTMR_CONTROL_ENABLE           (1 << 0)
+> +/* 1: periodic, 0:free running. */
+> +#define APBTMR_CONTROL_MODE_PERIODIC    (1 << 1)
+> +#define APBTMR_CONTROL_INT              (1 << 2)
+> +
+>  struct dw_apb_timer {
+>  	void __iomem				*base;
+>  	unsigned long				freq;
 
-Overhaul of MAINTAINERS for Tegra. This adds Thierry as a Tegra core
-maintainer, and adds specific entries for most individual Tegra-specific
-device drivers, pointing at relevant people. The tegradrm section is
-updated to be Supported since Thierry is now employed to work on this.
+Ping? This patch series has sat idle for 2-weeks now.
 
-Signed-off-by: Stephen Warren <swarren@nvidia.com>
-Acked-by: Thierry Reding <treding@nvidia.com>
----
- MAINTAINERS | 62 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++--
- 1 file changed, 60 insertions(+), 2 deletions(-)
-
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 81415f6..75397a1 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -2802,7 +2802,7 @@ M:	Terje Bergstr?m <tbergstrom@nvidia.com>
- L:	dri-devel at lists.freedesktop.org
- L:	linux-tegra at vger.kernel.org
- T:	git git://anongit.freedesktop.org/tegra/linux.git
--S:	Maintained
-+S:	Supported
- F:	drivers/gpu/host1x/
- F:	include/uapi/drm/tegra_drm.h
- F:	Documentation/devicetree/bindings/gpu/nvidia,tegra20-host1x.txt
-@@ -8269,14 +8269,72 @@ L:	linux-media at vger.kernel.org
- S:	Maintained
- F:	drivers/media/rc/ttusbir.c
- 
--TEGRA SUPPORT
-+TEGRA ARCHITECTURE SUPPORT
- M:	Stephen Warren <swarren@wwwdotorg.org>
-+M:	Thierry Reding <thierry.reding@gmail.com>
- L:	linux-tegra at vger.kernel.org
- Q:	http://patchwork.ozlabs.org/project/linux-tegra/list/
- T:	git git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-tegra.git
- S:	Supported
- N:	[^a-z]tegra
- 
-+TEGRA ASOC DRIVER
-+M:	Stephen Warren <swarren@wwwdotorg.org>
-+S:	Supported
-+F:	sound/soc/tegra/
-+
-+TEGRA CLOCK DRIVER
-+M:	Peter De Schrijver <pdeschrijver@nvidia.com>
-+M:	Prashant Gaikwad <pgaikwad@nvidia.com>
-+S:	Supported
-+F:	drivers/clk/tegra/
-+
-+TEGRA DMA DRIVER
-+M:	Laxman Dewangan <ldewangan@nvidia.com>
-+S:	Supported
-+F:	drivers/dma/tegra20-apb-dma.c
-+
-+TEGRA GPIO DRIVER
-+M:	Stephen Warren <swarren@wwwdotorg.org>
-+S:	Supported
-+F:	drivers/gpio/gpio-tegra.c
-+
-+TEGRA I2C DRIVER
-+M:	Laxman Dewangan <ldewangan@nvidia.com>
-+S:	Supported
-+F:	drivers/i2c/busses/i2c-tegra.c
-+
-+TEGRA IOMMU DRIVERS
-+M:	Hiroshi Doyu <hdoyu@nvidia.com>
-+S:	Supported
-+F:	drivers/iommu/tegra*
-+
-+TEGRA KBC DRIVER
-+M:	Rakesh Iyer <riyer@nvidia.com>
-+M:	Laxman Dewangan <ldewangan@nvidia.com>
-+S:	Supported
-+F:	drivers/input/keyboard/tegra-kbc.c
-+
-+TEGRA PINCTRL DRIVER
-+M:	Stephen Warren <swarren@wwwdotorg.org>
-+S:	Supported
-+F:	drivers/pinctrl/pinctrl-tegra*
-+
-+TEGRA PWM DRIVER
-+M:	Thierry Reding <thierry.reding@gmail.com>
-+S:	Supported
-+F:	drivers/pwm/pwm-tegra.c
-+
-+TEGRA SERIAL DRIVER
-+M:	Laxman Dewangan <ldewangan@nvidia.com>
-+S:	Supported
-+F:	drivers/tty/serial/serial-tegra.c
-+
-+TEGRA SPI DRIVER
-+M:	Laxman Dewangan <ldewangan@nvidia.com>
-+S:	Supported
-+F:	drivers/spi/spi-tegra*
-+
- TEHUTI ETHERNET DRIVER
- M:	Andy Gospodarek <andy@greyhouse.net>
- L:	netdev at vger.kernel.org
--- 
-1.8.1.5
+Thanks,
+Dinh
