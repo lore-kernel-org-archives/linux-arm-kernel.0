@@ -1,103 +1,46 @@
-From: gnurou@gmail.com (Alexandre Courbot)
-Date: Tue, 17 Sep 2013 12:28:53 +0900
-Subject: [PATCH v6 1/5] ARM: add basic support for Trusted Foundations
-In-Reply-To: <523736DE.1050201@wwwdotorg.org>
-References: <1379238028-7960-1-git-send-email-acourbot@nvidia.com>
- <1379238028-7960-2-git-send-email-acourbot@nvidia.com>
- <523736DE.1050201@wwwdotorg.org>
-Message-ID: <CAAVeFuJgtF1xWHfF4gN+WbOBpL93pFdX7AR1ccu1imvoi9XZXg@mail.gmail.com>
+From: ethan@ethantuttle.com (Ethan Tuttle)
+Date: Mon, 16 Sep 2013 20:43:19 -0700
+Subject: mvneta: oops in __rcu_read_lock on mirabox
+In-Reply-To: <20130916182807.GO12758@n2100.arm.linux.org.uk>
+References: <CACzLR4tTvt+ROEhkXUCQhV6=bPPTX4LFSkWfrEhF+OdM1Jm1Rw@mail.gmail.com>
+ <20130915205701.5c61a444@skate> <20130916065047.GH27487@1wt.eu>
+ <20130916175152.4e013457@skate>
+ <CACzLR4twTNjzU8hK3L1cYUXnEH1ydwY6jnYoOG+9vLB3-4uQ4w@mail.gmail.com>
+ <20130916163937.GC3188@1wt.eu> <20130916164412.GD3188@1wt.eu>
+ <CACzLR4ssOPsmYaEh2ohe4HL5j+67keDYnmR4YezNB=aO7Pj5kA@mail.gmail.com>
+ <20130916174708.GG3188@1wt.eu>
+ <20130916182807.GO12758@n2100.arm.linux.org.uk>
+Message-ID: <CACzLR4suLD90p=sEhB-qg1u35t66zKfrGQref1jX42fEfu3D8g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 17, 2013 at 1:50 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> On 09/15/2013 03:40 AM, Alexandre Courbot wrote:
->> Trusted Foundations is a TrustZone-based secure monitor for ARM that
->> can be invoked using the same SMC-based API on all supported
->> platforms. This patch adds initial basic support for Trusted
->> Foundations using the ARM firmware API. Current features are limited
->> to the ability to boot secondary processors.
->>
->> Note: The API followed by Trusted Foundations does *not* follow the SMC
->> calling conventions. It has nothing to do with PSCI neither and is only
->> relevant to devices that use Trusted Foundations (like most Tegra-based
->> retail devices).
->
->> diff --git a/arch/arm/firmware/trusted_foundations.c b/arch/arm/firmware/trusted_foundations.c
->
->> +#if IS_ENABLED(CONFIG_OF)
->> +void of_register_trusted_foundations(void)
->> +{
->> +     struct device_node *node;
->> +     struct trusted_foundations_platform_data pdata;
->> +     int err;
->> +
->> +     node = of_find_compatible_node(NULL, NULL, "tl,trusted-foundations");
->> +     if (!node)
->> +             return;
-> ...
->
->> diff --git a/arch/arm/include/asm/trusted_foundations.h b/arch/arm/include/asm/trusted_foundations.h
->
->> +#if IS_ENABLED(CONFIG_TRUSTED_FOUNDATIONS)
->> +void register_trusted_foundations(struct trusted_foundations_platform_data *pd);
->> +#if IS_ENABLED(CONFIG_OF)
->> +void of_register_trusted_foundations(void);
->> +#endif
->
-> I still don't think that's correct.
->
-> If TF support is enabled, yet DT support is not enabled, then there is
-> no prototype, implementation, or dummy implementation for
-> of_register_trusted_foundations(). I think there should be a dummy
-> implementation in this case, shouldn't there?
->
->> +
->> +#else /* CONFIG_TRUSTED_FOUNDATIONS */
->> +
->> +#include <linux/printk.h>
->> +#include <linux/of.h>
->> +#include <asm/bug.h>
->> +
->> +static inline void register_trusted_foundations(
->> +                                struct trusted_foundations_platform_data *pd)
->> +{
->> +     panic("No support for Trusted Foundations, stopping...\n");
->> +}
->> +
->> +#if IS_ENABLED(CONFIG_OF)
->> +static inline void of_register_trusted_foundations(void)
->> +{
->> +     /* If we find the target should enable TF but does not support it,
->> +      * fail as the system won't be able to do much anyway */
->> +     if (of_find_compatible_node(NULL, NULL, "tl,trusted-foundations"))
->> +             register_trusted_foundations(NULL);
->> +}
->> +#else
->> +static inline void of_register_trusted_foundations(void)
->> +{
->> +}
->> +#endif /* CONFIG_OF */
->
-> That's more complex than it needs to be; there is a dummy
-> of_find_compatible_node() in the !OF case, so you don't need to ifdef
-> the implementation of of_register_trusted_foundations(); you just need
-> the first implementation here.
->
->> +#endif /* CONFIG_TRUSTED_FOUNDATIONS */
->
-> In summary, I think you need:
->
-> If TF is enabled, always implement of_register_trusted_foundations() in
-> the C file, and rely on of_find_compatible_node() to return NULL if
-> !CONFIG_OF.
->
-> If TF is not enabled, implement the inline version in the header file,
-> and again rely on of_find_compatible_node() to return NULL if !CONFIG_OF.
+I just built 3.11.1 with the posted config and got the usual crash in
+about 2 minutes with a ping flood.
 
-Indeed, all your points are correct, and I've clearly been negligent
-here. Sorry about that.
+The kernel image is available here:
 
-Will have to submit a v7, but hopefully we can get the acks that we
-need (Russel?) on this version.
+https://www.dropbox.com/s/cqkqop3jjb1stk3/uImage-dtb.armada-370-mirabox
 
-Alex.
+The md5 is 05f350a193c6c60d9dac40bea810bbdd.  You may notice the
+version string reveals a patch on top of 3.11.1, this is just a
+makefile patch to "Build a uImage with dtb already appended".
+
+Tcpdump captured about 2,800 icmp packets per second while the ping
+flood was running.
+
+Hope this helps!  If Willy wants to share a kernel image I'll see if I
+can crash it :)
+
+Thanks,
+
+Ethan
+
+On Mon, Sep 16, 2013 at 11:28 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Mon, Sep 16, 2013 at 07:47:08PM +0200, Willy Tarreau wrote:
+>> I'll have to rebuild with your config and exact 3.11 to test again.
+>> Can you check the packet rate of your ping flood to give an order of
+>> magnitude so that we're sure to be in the same conditions ?
+>
+> Also, try swapping kernel binaries between yourselves, so that you can
+> be sure you're running the exact same kernel on different hardware.
