@@ -1,37 +1,41 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Tue, 17 Sep 2013 10:02:04 +0200
-Subject: [PATCH 09/10] clk: ux500: Remove extra semicolon
-In-Reply-To: <1379064232-10261-9-git-send-email-sachin.kamat@linaro.org>
-References: <1379064232-10261-1-git-send-email-sachin.kamat@linaro.org>
- <1379064232-10261-9-git-send-email-sachin.kamat@linaro.org>
-Message-ID: <CAPDyKFpHM8jxwRV_k0T3Fid3KsjoRdyLLqVhxenM2gGrneUUCQ@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 17 Sep 2013 09:03:39 +0100
+Subject: [PATCH] ARM: ux500: disable outer cache debug
+In-Reply-To: <20130916190829.GA12524@quad.lixom.net>
+References: <1379334124-9703-1-git-send-email-linus.walleij@linaro.org>
+ <20130916190829.GA12524@quad.lixom.net>
+Message-ID: <20130917080339.GR16984@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13 September 2013 11:23, Sachin Kamat <sachin.kamat@linaro.org> wrote:
-> Extra semicolon is redundant. Remove it.
->
-> Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
-> Cc: Ulf Hansson <ulf.hansson@linaro.org>
-> ---
->  drivers/clk/ux500/clk-prcmu.c |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/drivers/clk/ux500/clk-prcmu.c b/drivers/clk/ux500/clk-prcmu.c
-> index 293a288..e2d63bc 100644
-> --- a/drivers/clk/ux500/clk-prcmu.c
-> +++ b/drivers/clk/ux500/clk-prcmu.c
-> @@ -36,7 +36,7 @@ static int clk_prcmu_prepare(struct clk_hw *hw)
->         if (!ret)
->                 clk->is_prepared = 1;
->
-> -       return ret;;
-> +       return ret;
->  }
->
->  static void clk_prcmu_unprepare(struct clk_hw *hw)
-> --
-> 1.7.9.5
->
+On Mon, 16 Sep 2013, Olof Johansson wrote:
 
-Acked-by: Ulf Hansson <ulf.hansson@linaro.org>
+> On Mon, Sep 16, 2013 at 02:22:04PM +0200, Linus Walleij wrote:
+> > This fixes a multiplatform regression on the Ux500.
+> > 
+> > When compiling the Ux500 platforms in multiplatform configurations
+> > both PL310_ERRATA_588369 and PL310_ERRATA_727915 would crash the
+> > platform when trying to launch the init process.
+> > 
+> > The Ux500 cannot access the debug registers of the PL310, it will
+> > just crash if you try this. So disable this by setting the debug
+> > callback to NULL when initializing the l2x0 on this platform.
+> > 
+> > Cc: Lee Jones <lee.jones@linaro.org>
+> > Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> > ---
+> > Hi ARM SoC folks: this (hopefully) fixes the bug that made
+> > Snowball (and other Ux500) not boot properly on multi_v7.
+> > Please apply this patch directly to your fixes branch if you're
+> > happy with it.
+> 
+> Thanks, applied. As mentioned elsewhere, this plus the DTB_COMPAT config
+> change makes multi_v7_defconfig bootable on snowball.
+
+\o/
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
