@@ -1,61 +1,116 @@
-From: w@1wt.eu (Willy Tarreau)
-Date: Tue, 17 Sep 2013 08:01:11 +0200
-Subject: mvneta: oops in __rcu_read_lock on mirabox
-In-Reply-To: <CACzLR4suLD90p=sEhB-qg1u35t66zKfrGQref1jX42fEfu3D8g@mail.gmail.com>
-References: <20130915205701.5c61a444@skate> <20130916065047.GH27487@1wt.eu>
- <20130916175152.4e013457@skate>
- <CACzLR4twTNjzU8hK3L1cYUXnEH1ydwY6jnYoOG+9vLB3-4uQ4w@mail.gmail.com>
- <20130916163937.GC3188@1wt.eu> <20130916164412.GD3188@1wt.eu>
- <CACzLR4ssOPsmYaEh2ohe4HL5j+67keDYnmR4YezNB=aO7Pj5kA@mail.gmail.com>
- <20130916174708.GG3188@1wt.eu>
- <20130916182807.GO12758@n2100.arm.linux.org.uk>
- <CACzLR4suLD90p=sEhB-qg1u35t66zKfrGQref1jX42fEfu3D8g@mail.gmail.com>
-Message-ID: <20130917060111.GB9325@1wt.eu>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Tue, 17 Sep 2013 11:35:59 +0530
+Subject: [PATCH v3] ARM: EDMA: Fix clearing of unused list for DT DMA
+ resources
+In-Reply-To: <5237EAF3.70505@ti.com>
+References: <1378839171-14455-1-git-send-email-joelf@ti.com>
+ <5231903F.7080301@ti.com> <5233B471.40603@ti.com> <5236F00B.5040605@ti.com>
+ <5237314D.7080102@ti.com> <5237E3C3.8050602@ti.com> <5237EAF3.70505@ti.com>
+Message-ID: <5237F147.1020302@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ethan,
-
-On Mon, Sep 16, 2013 at 08:43:19PM -0700, Ethan Tuttle wrote:
-> I just built 3.11.1 with the posted config and got the usual crash in
-> about 2 minutes with a ping flood.
+On Tuesday 17 September 2013 11:08 AM, Joel Fernandes wrote:
+> On 09/17/2013 12:08 AM, Sekhar Nori wrote:
+> [..]
+>>>> I still cannot find any users of edma in the device tree sources either
+>>>> in linux-next or linus/master. Why cannot this wait until v3.13?
+>>>
+>>> I understand this affects only DT users of EDMA. But I get so many private
+>>> reports of breakage due to this patch not being there that I think it will save
+>>> everyone a lot of pain, specially folks creating integration trees to have this
+>>> patch available by default.
+>>
+>> Well, I do agree that the current DT support for EDMA is incomplete
+>> without this patch even if there are no in-kernel users of it. I will
+>> try sending this for the next -rc if we get to the final version in time
+>> and after that its upto the upstreams to take it.
 > 
-> The kernel image is available here:
+> Ok, except for the one minor nit below my last scissor patch is good to go.
 > 
-> https://www.dropbox.com/s/cqkqop3jjb1stk3/uImage-dtb.armada-370-mirabox
+>>>>> +
+>>>>> +			ctlr = EDMA_CTLR(dma_spec.args[0]);
+>>>>> +			clear_bit(EDMA_CHAN_SLOT(dma_spec.args[0]),
+>>>>> +				  edma_cc[ctlr]->edma_unused);
+>>>>
+>>>> We don't support the second controller when using DT and the controller
+>>>> number is not really encoded in the argument to edma phandle. So just
+>>>> simplify this to:
+>>>>
+>>>> 	clear_bit(EDMA_CHAN_SLOT(dma_spec.args[0]), 	
+>>>> 		  edma_cc[0]->edma_unused);
+>>>
+>>> I think let's not make that assumption just incase in the future we support more
+>>> than one EDMA controller for DT-based boot. Is that ok?
+>>
+>> We don't write future proof code in that _hope_ that it will get used
+>> someday.  In fact this will confuse the reader into wondering if support
+>> for second channel controller is present or not as the code will send
+> 
+> Nope I don't agree with this at all.. EDMA CC ctrl will not be hardcoded. We
+> need to write future-proof code to make sure sudden regressions don't pop up
+> when say a second EDMA CC is introduced.. further edma_cc[ctrl] pattern is used
 
-OK thank you. Unfortunately I can't boot it here as my only rootfs is
-a squashfs and it is not enabled in this kernel.
+I am not sure why you call this a regression. There is no support for
+second channel controller. If someone wants to add that support there is
+a lot to worry about than just these two lines of code. So, no, there
+wont be "sudden regressions that pop up" like you say. Look at the probe
+routine. There is no way the second CC is going to get probed.
 
-> The md5 is 05f350a193c6c60d9dac40bea810bbdd.  You may notice the
-> version string reveals a patch on top of 3.11.1, this is just a
-> makefile patch to "Build a uImage with dtb already appended".
+> all through out the code so what you're asking to do doesn't make much sense in
+> this context. There's no reason to break out of this pattern. It actually will
+> confuse the reader more.
 
-Interesting one, I was not aware of it, I'll probably add it to my
-trees to stop relying on build scripts.
+Thats because that code is also used for existing platform data based
+approach. If you are adding code paths which just get exercised with DT,
+no point referring to the second channel controller since that does not
+exist.
 
-> Tcpdump captured about 2,800 icmp packets per second while the ping
-> flood was running.
+> 
+> Second controller can be present in future. I don't want to come back to change
+> the code when we introduce more than 1 CC which is possible in the future.
 
-OK I've been running mine at this exact rate as well (2803 pps) for
-11 minutes now. I disabled icmp_ratelimit to ensure that I got as
-many responses as requests. No problem so far.
+You *will* have to come back and change the code to support the second
+channel controller. That is true with or without this patch. So lets
+stop arguing like the second channel controller support is only blocked
+because of these two lines of code.
 
-> Hope this helps!  If Willy wants to share a kernel image I'll see if I
-> can crash it :)
+> 
+>> mixed messages. In short, we aim for consistency with situation today,
+>> not tomorrow.
+> 
+> What you're asking to do infact breaks consistency with the rest of the code.
 
-I've put my working images here :
+Well, ideally we support second CC even with DT to be consistent all
+around. Since that has not happened, I don't want the code to pretend
+that it it supports the second channel controller with DT that too only
+in parts of code.
 
-    http://1wt.eu/ethan-kernel/
+> 
+>>
+>> Besides, I can bet that when second CC support does get added, it is
+>> very unlikely that the CC number is get encoded into channel number when
+>> using DT.
+> 
+> Even if it is not encoded, the data structure for edma_cc is an array and what
+> you're asking is to hardcode the controller number to 0 always. No way I'm going
+> to hard code controller number to a single value.
 
-One is done with my config, the other one with your config in which
-I added support for squashfs and blk_dev_ram that I'm using to boot
-a rootfs loaded in memory by the boot loader.
+You are missing the point. Look at the code. You are extracting
+controller number from dma_spec.args[0] which is directly the value
+present in DT. The binding today does not specify that the value be
+encoded with controller number. So I will have not have code that
+interprets it that way.
 
-I can't make it fail either. I'm really starting to suspect a hardware
-issue...
+The code follows from bindings, not the other way around.
 
-Next step should be that you test both kernels to be sure.
+> 
+> Different topic but anyway why wouldn't ctrl number be encoded in the channel?
+> That's clean, and saves variables and extra structures. Better use of the
+> integer bitmap making up the Ctrl and channel number of small ranges.
 
-Cheers,
-Willy
+Lets have this discussion when you update the bindings to support the
+second controller.
+
+Thanks,
+Sekhar
