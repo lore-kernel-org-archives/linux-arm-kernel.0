@@ -1,41 +1,80 @@
-From: dinguyen@altera.com (dinguyen at altera.com)
-Date: Tue, 17 Sep 2013 11:31:26 -0500
-Subject: [PATCH 2/2] arm: socfpga: Remove check for "reg" property in
- socfpga_clk_init
-In-Reply-To: <1379435486-25981-1-git-send-email-dinguyen@altera.com>
-References: <1379435486-25981-1-git-send-email-dinguyen@altera.com>
-Message-ID: <1379435486-25981-2-git-send-email-dinguyen@altera.com>
+From: kim.phillips@linaro.org (Kim Phillips)
+Date: Tue, 17 Sep 2013 11:31:53 -0500
+Subject: [PATCH] i2c: s3c2410: fix clk_disable/clk_unprepare warnings
+Message-ID: <20130917113153.41b0305d6892170ba8e1ecf7@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dinh Nguyen <dinguyen@altera.com>
+commit d16933b33914a6dff38a4ecbe8edce44a17898e8 "i2c: s3c2410: Move
+location of clk_prepare_enable() call in probe function" refactored
+clk_enable and clk_disable calls yet neglected to remove the
+clk_disable_unprepare call in the module's remove().
 
-The function socfpga_clk_init() can support clocks that do not have a divider
-register, but a fixed-divider that can be read from DTS. Therefore, the "reg"
-property is not a failing condition for socfpga_clk_init().
+It helps remove warnings on an arndale during unbind:
 
-Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
-Cc: Mike Turquette <mturquette@linaro.org>
-Cc: Sachin Kamat <sachin.kamat@linaro.org>
-Cc: linux-arm-kernel at lists.infradead.org
+echo 12c90000.i2c > /sys/bus/platform/devices/12c90000.i2c/driver/unbind
+
+------------[ cut here ]------------
+WARNING: CPU: 0 PID: 2548 at drivers/clk/clk.c:842 clk_disable+0x18/0x24()
+Modules linked in:
+CPU: 0 PID: 2548 Comm: bash Not tainted 3.11.0-next-20130916-00003-gf4bddbc #6
+[<c0014d48>] (unwind_backtrace+0x0/0xf8) from [<c00117d0>] (show_stack+0x10/0x14)
+[<c00117d0>] (show_stack+0x10/0x14) from [<c0361be8>] (dump_stack+0x6c/0xac)
+[<c0361be8>] (dump_stack+0x6c/0xac) from [<c001d864>] (warn_slowpath_common+0x64/0x88)
+[<c001d864>] (warn_slowpath_common+0x64/0x88) from [<c001d8a4>] (warn_slowpath_null+0x1c/0x24)
+[<c001d8a4>] (warn_slowpath_null+0x1c/0x24) from [<c02c4a64>] (clk_disable+0x18/0x24)
+[<c02c4a64>] (clk_disable+0x18/0x24) from [<c028d0b0>] (s3c24xx_i2c_remove+0x28/0x70)
+[<c028d0b0>] (s3c24xx_i2c_remove+0x28/0x70) from [<c0217a10>] (platform_drv_remove+0x18/0x1c)
+[<c0217a10>] (platform_drv_remove+0x18/0x1c) from [<c0216358>] (__device_release_driver+0x58/0xb4)
+[<c0216358>] (__device_release_driver+0x58/0xb4) from [<c02163d0>] (device_release_driver+0x1c/0x28)
+[<c02163d0>] (device_release_driver+0x1c/0x28) from [<c02153c0>] (unbind_store+0x58/0x90)
+[<c02153c0>] (unbind_store+0x58/0x90) from [<c0214c90>] (drv_attr_store+0x20/0x2c)
+[<c0214c90>] (drv_attr_store+0x20/0x2c) from [<c01032c0>] (sysfs_write_file+0x168/0x198)
+[<c01032c0>] (sysfs_write_file+0x168/0x198) from [<c00ae1c0>] (vfs_write+0xb0/0x194)
+[<c00ae1c0>] (vfs_write+0xb0/0x194) from [<c00ae594>] (SyS_write+0x3c/0x70)
+[<c00ae594>] (SyS_write+0x3c/0x70) from [<c000e3e0>] (ret_fast_syscall+0x0/0x30)
+---[ end trace 4c9f9403066f57a6 ]---
+------------[ cut here ]------------
+WARNING: CPU: 0 PID: 2548 at drivers/clk/clk.c:751 clk_unprepare+0x14/0x1c()
+Modules linked in:
+CPU: 0 PID: 2548 Comm: bash Tainted: G        W    3.11.0-next-20130916-00003-gf4bddbc #6
+[<c0014d48>] (unwind_backtrace+0x0/0xf8) from [<c00117d0>] (show_stack+0x10/0x14)
+[<c00117d0>] (show_stack+0x10/0x14) from [<c0361be8>] (dump_stack+0x6c/0xac)
+[<c0361be8>] (dump_stack+0x6c/0xac) from [<c001d864>] (warn_slowpath_common+0x64/0x88)
+[<c001d864>] (warn_slowpath_common+0x64/0x88) from [<c001d8a4>] (warn_slowpath_null+0x1c/0x24)
+[<c001d8a4>] (warn_slowpath_null+0x1c/0x24) from [<c02c5834>] (clk_unprepare+0x14/0x1c)
+[<c02c5834>] (clk_unprepare+0x14/0x1c) from [<c028d0b8>] (s3c24xx_i2c_remove+0x30/0x70)
+[<c028d0b8>] (s3c24xx_i2c_remove+0x30/0x70) from [<c0217a10>] (platform_drv_remove+0x18/0x1c)
+[<c0217a10>] (platform_drv_remove+0x18/0x1c) from [<c0216358>] (__device_release_driver+0x58/0xb4)
+[<c0216358>] (__device_release_driver+0x58/0xb4) from [<c02163d0>] (device_release_driver+0x1c/0x28)
+[<c02163d0>] (device_release_driver+0x1c/0x28) from [<c02153c0>] (unbind_store+0x58/0x90)
+[<c02153c0>] (unbind_store+0x58/0x90) from [<c0214c90>] (drv_attr_store+0x20/0x2c)
+[<c0214c90>] (drv_attr_store+0x20/0x2c) from [<c01032c0>] (sysfs_write_file+0x168/0x198)
+[<c01032c0>] (sysfs_write_file+0x168/0x198) from [<c00ae1c0>] (vfs_write+0xb0/0x194)
+[<c00ae1c0>] (vfs_write+0xb0/0x194) from [<c00ae594>] (SyS_write+0x3c/0x70)
+[<c00ae594>] (SyS_write+0x3c/0x70) from [<c000e3e0>] (ret_fast_syscall+0x0/0x30)
+---[ end trace 4c9f9403066f57a7 ]---
+
+Cc: Ben Dooks <ben-linux@fluff.org>
+Cc: Kukjin Kim <kgene.kim@samsung.com>
+Cc: Wolfram Sang <wsa@the-dreams.de>
+Signed-off-by: Kim Phillips <kim.phillips@linaro.org>
 ---
- drivers/clk/socfpga/clk.c |    4 +---
- 1 file changed, 1 insertion(+), 3 deletions(-)
+ drivers/i2c/busses/i2c-s3c2410.c | 2 --
+ 1 file changed, 2 deletions(-)
 
-diff --git a/drivers/clk/socfpga/clk.c b/drivers/clk/socfpga/clk.c
-index 81dd31a..c378489 100644
---- a/drivers/clk/socfpga/clk.c
-+++ b/drivers/clk/socfpga/clk.c
-@@ -121,9 +121,7 @@ static __init struct clk *socfpga_clk_init(struct device_node *node,
- 	int rc;
- 	u32 fixed_div;
+diff --git a/drivers/i2c/busses/i2c-s3c2410.c b/drivers/i2c/busses/i2c-s3c2410.c
+index 3535f3c..3747b9b 100644
+--- a/drivers/i2c/busses/i2c-s3c2410.c
++++ b/drivers/i2c/busses/i2c-s3c2410.c
+@@ -1178,8 +1178,6 @@ static int s3c24xx_i2c_remove(struct platform_device *pdev)
  
--	rc = of_property_read_u32(node, "reg", &reg);
--	if (WARN_ON(rc))
--		return NULL;
-+	of_property_read_u32(node, "reg", &reg);
+ 	i2c_del_adapter(&i2c->adap);
  
- 	socfpga_clk = kzalloc(sizeof(*socfpga_clk), GFP_KERNEL);
- 	if (WARN_ON(!socfpga_clk))
+-	clk_disable_unprepare(i2c->clk);
+-
+ 	if (pdev->dev.of_node && IS_ERR(i2c->pctrl))
+ 		s3c24xx_i2c_dt_gpio_free(i2c);
+ 
 -- 
-1.7.9.5
+1.8.4
