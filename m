@@ -1,40 +1,61 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Tue, 17 Sep 2013 15:16:52 -0300
-Subject: mvebu: Armada XP doesn't boot in v3.12-rc1
-In-Reply-To: <20130917180957.GI19937@titan.lakedaemon.net>
-References: <20130917173502.GA4231@localhost>
- <20130917180957.GI19937@titan.lakedaemon.net>
-Message-ID: <20130917181650.GB4231@localhost>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Tue, 17 Sep 2013 12:17:42 -0600
+Subject: [PATCH] arm: Kirkwood - Remove kirkwood_setup_wins and rely on
+ the DT binding
+In-Reply-To: <20130917200301.66e8ccb9@skate>
+References: <20130916224743.GA18349@obsidianresearch.com>
+ <20130917133206.GB2488@localhost>
+ <20130917153619.GA14098@obsidianresearch.com>
+ <20130917200301.66e8ccb9@skate>
+Message-ID: <20130917181742.GA4182@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 17, 2013 at 02:09:57PM -0400, Jason Cooper wrote:
-> On Tue, Sep 17, 2013 at 02:35:03PM -0300, Ezequiel Garcia wrote:
-[...]
+On Tue, Sep 17, 2013 at 08:03:01PM +0200, Thomas Petazzoni wrote:
+> Dear Jason Gunthorpe,
 > 
-> > FWIW, CONFIG_HAVE_ARM_ARCH_TIMER=y is also needed or the board freezes,
-> > but that's another problem which I'm currently investigating.
+> On Tue, 17 Sep 2013 09:36:19 -0600, Jason Gunthorpe wrote:
 > 
-> Sounds like we just need a select, is there something more to it?
+> > Since they are all the same I'll respin the patch and add the ranges
+> > to the kirkwood.dtsi and remove it from all the board files, (which is
+> > where I started, but then saw that board files had a ranges
+> > already)
 > 
+> In Armada 370/XP land, we've decided to always put the ranges in the
+> per-board .dts file. The reason is that sometimes, a board needs to
+> add
 
-I've no idea!
+Yes, I recall you talking about this, that is why initially just went
+adding to the existing mbus ranges in the board files.
 
-Let me spend some time bisecting the problem and see if we can come
-up with something smarter.
+However, is that really still the case? Now that PEX uses a difference
+scheme it seems they all washed out to be the same.
 
-I'm not sure, but I can't see why a non architected timer kernel wouldn't work.
+All the armada-370 boards in mainline seem to be the same today.
 
-Let's add Stephen Boyd in Cc, in case he has some idea.
-Stephen: when v3.12-rc1 boots with CONFIG_HAVE_ARM_ARCH_TIMER=n (the
-default) the kernel freezes at the typical:
+armada-xp looks the same as well, except that armada-xp-axpwifiap.dts
+is missing MBUS_ID(0x01, 0x2f), but it looks like it would be harmless
+to add, even though it is not used.
 
-  l2x0: 32 ways, CACHE_ID 0x00000100, AUX_CTRL 0x1a69ef12, Cache size: 2048 kB
-  sched_clock: 32 bits at 100 Hz, resolution 10000000ns, wraps every 4294967286ms
-  Console: colour dummy device 80x30
-  Calibrating delay loop...
+> A better solution would be to have a += operator in the DT language,
 
--- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+Agree
+
+> but until that exists, we thought that pushing the ranges property down
+> to the .dts file was the least horrible solution.
+
+I think we can get away with doing it the other way for kirkwood,
+here are my reasons:
+ - Kirkwood is mature now, the DT is basically complete, we shouldn't
+   need to churn the ranges in the dtsi much, if at all.
+ - There are 31 kirkwood dts files, and none of them need a ranges
+   different from the default
+ - Kirkwood has more than enough mbus windows, we don't need to be
+   stingy with them
+ - The board files were already sort of like this, but a big chunk
+   of the 31 boards were missing ranges entirely.
+
+Basically, no board file has a ranges, only the kirkwood.dtsi has a
+ranges.
+
+Jason
