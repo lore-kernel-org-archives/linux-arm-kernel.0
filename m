@@ -1,60 +1,123 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Tue, 17 Sep 2013 13:13:42 -0600
-Subject: [PATCH] bus: mvebu-mbus: Fix optional pcie-mem/io-aperture
- properties
-In-Reply-To: <20130917210503.1ea8cdd9@skate>
-References: <20130917183853.GC21230@obsidianresearch.com>
- <20130917210503.1ea8cdd9@skate>
-Message-ID: <20130917191342.GA4354@obsidianresearch.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 17 Sep 2013 20:13:19 +0100
+Subject: [PATCH v3 0/8] Add the Quadspi driver for vf610-twr
+In-Reply-To: <20130917150548.GE14747@book.gsilab.sittig.org>
+References: <20130912205644.GW29403@sirena.org.uk>
+ <52329AD3.2050608@freescale.com>
+ <20130913102127.GD29403@sirena.org.uk>
+ <52366F97.5030402@freescale.com>
+ <20130916101912.GY29403@sirena.org.uk>
+ <5236DD17.5090203@freescale.com>
+ <20130916110634.GC29403@sirena.org.uk>
+ <5237BB01.3080700@freescale.com>
+ <20130917105142.GO21013@sirena.org.uk>
+ <20130917150548.GE14747@book.gsilab.sittig.org>
+Message-ID: <20130917191318.GJ21013@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 17, 2013 at 09:05:03PM +0200, Thomas Petazzoni wrote:
-> Dear Jason Gunthorpe,
-> 
-> On Tue, 17 Sep 2013 12:38:53 -0600, Jason Gunthorpe wrote:
-> > If the property was not specified then then the returned resource
-> > had a resource_size(..) == 1, rather than 0. The PCI-E driver checks
-> > for 0 so it blindly continues on with a corrupted resource.
-> > 
-> > Signed-off-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
-> >  drivers/bus/mvebu-mbus.c | 2 ++
-> >  1 file changed, 2 insertions(+)
-> > 
-> > diff --git a/drivers/bus/mvebu-mbus.c b/drivers/bus/mvebu-mbus.c
-> > index 19ab6ff..7a66203 100644
-> > +++ b/drivers/bus/mvebu-mbus.c
-> > @@ -866,6 +866,8 @@ static void __init mvebu_mbus_get_pcie_resources(struct device_node *np,
-> >  	 */
-> >  	memset(mem, 0, sizeof(struct resource));
-> >  	memset(io, 0, sizeof(struct resource));
-> > +	mem->end--;
-> > +	io->end--;
-> >  
-> >  	ret = of_property_read_u32_array(np, "pcie-mem-aperture", reg, ARRAY_SIZE(reg));
-> >  	if (!ret) {
-> 
-> This seems a little bit nasty, isn't it? 
+On Tue, Sep 17, 2013 at 05:05:48PM +0200, Gerhard Sittig wrote:
 
-Well, I'm not 100% sure, but AFAICT that is how struct resources
-should be used. The start/end address are inclusive, so the resource
-(start=0,end=0) describes 1 byte at address 0.
+Please consider writing smaller, more focused e-mails - I suspect quite
+a few people have tl;dred this...
 
-The only way to get a 0 sized resource is (start=0,end=-1)
+> On Tue, Sep 17, 2013 at 11:51 +0100, Mark Brown wrote:
 
-Before I did this I checked other user of resource_size and found
-tests to zero, so the above seems to be correct..
+> > This is what the delay_usecs field in the spi_transfer struct is for,
+> > the flash code should be using that to ensure that the minimum delay
+> > requirement is met.
 
-Eg a quick grep shows:
- arch/powerpc/kernel/pci-common.c: pcibios_fixup_bridge
+> Not quite.  You talk about 'delay_usecs' which is about letting
+> time pass by between partial transfers.  The "dummies" mentioned
+> here in this thread are "bit times with _clock pulses_" that get
+> inserted between transfers with single and multiple data lines.
 
-                if (pci_has_flag(PCI_REASSIGN_ALL_RSRC)) {
-                        res->flags |= IORESOURCE_UNSET;
-                        res->start = 0;
-                        res->end = -1;
-                        continue;
-                }
+So just a normal transfer then...
 
-Do you see something different?
+> Compare this with M25P opcodes READ 0x03 vs FAST_READ 0x0b, where
+> the latter "communicates" a dummy byte before real data is
+> returned.  So far (AFAICS) those dummy bit cycles always were
+> multiples of 8 bits, i.e. complete bytes.  So they could be done
+> with bitbang as well as get simulated with "traditional" SPI
+> transfers by just sending another byte without looking at the
+> received data.
 
-Jason
+It's not even being simulated really, it's just a transfer - lots of
+devices have some dead space during their transfers to allow the device
+time to react.  Doing it for less than a byte is an interesting design
+choice to say the least but doesn't seem hard to deal with.
+
+> which is why the flash chip's capability alone does not suffice
+> to enable the use of such an optional feature.  And users or
+> admins may want to control the use of optional features for
+> development, or diagnostics, or compatibility, or whatever
+> reason.
+
+There's a reason why there's a DT property (or platform data) that needs
+to be set when registering the flash device.  I don't think
+administrative runtime control of this stuff is a terribly useful thing
+though, either the hardware works or it doesn't.
+
+> [ generic support for enhanced SPI communication ]
+
+> And the datasheet had "sequence diagrams" (section 4.2.1) which
+> one may use to check whether those "phases" in the course of
+> communicating "a command" can get expressed by means of the SPI
+> message submission API (struct spi_message, and struct
+> spi_transfer).  Currently "use DDR", "use single/dual/quad data
+> lines", "append dummy _bits_" appear to be missing, but might get
+> added similar to the existing "control the CS line".
+
+Dual and quad support is already present upstrem.  I don't know what DDR
+is.
+
+> - make SPI masters (controller drivers) support those optional
+>   additional features _if_ the hardware supports it (read: do
+>   nothing for existing drivers, and only add optional support to
+>   new drivers)
+
+No, I imagine some existing devices support this stuff - the bitbang
+driver trivally does for example, if with questionable utility - and 
+most systems will be able to bitbang a few extra cycles on the clock
+line if they have to.
+
+> - announce the SPI master's optional support for enhanced
+>   features (do we have such a query API already? or is this
+>   another leap in quality for SPI?  I think bit order and SPI
+>   modes 0-3 may already get matched but are not explicitly
+>   queried)
+> - make SPI slave drivers optionally query those master
+>   capabilities (plus other sources of configuration information)
+>   before they may adjust the SPI messages which they create and
+>   emit (which again is to do nothing for all SPI slaves, except
+>   for another translation layer in those MTD drivers which happen
+>   to use SPI for communication to the chip)
+
+Things like quad support that depend on the board need to be enabled by
+the board anyway.  For everything else we should follow the existing
+approach of advertising capabilites in the master structure.
+
+> [ potential "LUT" optimization, implementation details ]
+
+AFAICT the big issue with the LUTs in this controller is that they are
+expensive to reprogram so things are going to work better if there is a
+small set of known operations that will happen repeatedly.  Otherwise
+walking the transfer list at runtime isn't too hard.
+
+> There's a question whether an SPI master's
+> .transfer_one_message() callback (or common code which dispatches
+> messages to SPI controllers) should actively reject messages
+> which require features that aren't supported by the controller.
+> Or whether these flags need to tell "required, reject if not met"
+> and "optional, please use if available" apart.
+
+This stuff gets checked already, more or less.  We could probably add
+more checks but it's not been a big issue, by the time you're erroring
+out it's too late anyway.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130917/c9e399e4/attachment.sig>
