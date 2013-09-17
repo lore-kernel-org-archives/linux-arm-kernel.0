@@ -1,89 +1,315 @@
 From: Russ.Dill@ti.com (Russ Dill)
-Date: Tue, 17 Sep 2013 05:43:29 -0700
-Subject: [RFC PATCH 03/11] misc: SRAM: Add option to map SRAM to allow code
- execution
+Date: Tue, 17 Sep 2013 05:43:32 -0700
+Subject: [RFC PATCH 06/11] ARM: PIE: Add position independent executable
+ embedding to ARM
 In-Reply-To: <1379421817-15759-1-git-send-email-Russ.Dill@ti.com>
 References: <1379421817-15759-1-git-send-email-Russ.Dill@ti.com>
-Message-ID: <1379421817-15759-4-git-send-email-Russ.Dill@ti.com>
+Message-ID: <1379421817-15759-7-git-send-email-Russ.Dill@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is necessary for platforms that use SRAM to execute suspend/resume stubs.
+Add support to ARM for embedding PIEs into the kernel, loading them into
+genalloc pools (such as SRAM) and executing them. Support for ARM means
+performing R_ARM_RELATIVE fixups within the .rel.dyn section.
 
 Signed-off-by: Russ Dill <Russ.Dill@ti.com>
 ---
- Documentation/devicetree/bindings/misc/sram.txt |  4 ++++
- drivers/misc/sram.c                             | 13 ++++++++++++-
- include/linux/platform_data/sram.h              |  8 ++++++++
- 3 files changed, 24 insertions(+), 1 deletion(-)
- create mode 100644 include/linux/platform_data/sram.h
+ arch/arm/Kconfig              |  1 +
+ arch/arm/Makefile             |  5 +++
+ arch/arm/include/asm/elf.h    |  1 +
+ arch/arm/kernel/.gitignore    |  1 +
+ arch/arm/kernel/Makefile      |  4 ++-
+ arch/arm/kernel/pie.c         | 83 +++++++++++++++++++++++++++++++++++++++++++
+ arch/arm/kernel/pie.lds.S     | 40 +++++++++++++++++++++
+ arch/arm/kernel/vmlinux.lds.S |  2 ++
+ arch/arm/libpie/.gitignore    |  3 ++
+ arch/arm/libpie/Makefile      | 32 +++++++++++++++++
+ arch/arm/libpie/empty.S       | 12 +++++++
+ 11 files changed, 183 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/kernel/pie.c
+ create mode 100644 arch/arm/kernel/pie.lds.S
+ create mode 100644 arch/arm/libpie/.gitignore
+ create mode 100644 arch/arm/libpie/Makefile
+ create mode 100644 arch/arm/libpie/empty.S
 
-diff --git a/Documentation/devicetree/bindings/misc/sram.txt b/Documentation/devicetree/bindings/misc/sram.txt
-index 4d0a00e..4fa9af3 100644
---- a/Documentation/devicetree/bindings/misc/sram.txt
-+++ b/Documentation/devicetree/bindings/misc/sram.txt
-@@ -8,6 +8,10 @@ Required properties:
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 43594d5..de7b7603 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -49,6 +49,7 @@ config ARM
+ 	select HAVE_MEMBLOCK
+ 	select HAVE_OPROFILE if (HAVE_PERF_EVENTS)
+ 	select HAVE_PERF_EVENTS
++	select HAVE_PIE
+ 	select HAVE_REGS_AND_STACK_ACCESS_API
+ 	select HAVE_SYSCALL_TRACEPOINTS
+ 	select HAVE_UID16
+diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+index 6fd2cea..a673d36 100644
+--- a/arch/arm/Makefile
++++ b/arch/arm/Makefile
+@@ -128,6 +128,8 @@ KBUILD_AFLAGS	+=$(CFLAGS_ABI) $(AFLAGS_ISA) $(arch-y) $(tune-y) -include asm/uni
  
- - reg : SRAM iomem address range
+ CHECKFLAGS	+= -D__arm__
  
-+Optional properties:
++OBJCOPY_OUTPUT_FORMAT := elf32-littlearm
 +
-+- map-exec: Map range to allow code execution
+ #Default value
+ head-y		:= arch/arm/kernel/head$(MMUEXT).o
+ textofs-y	:= 0x00008000
+@@ -273,6 +275,9 @@ drivers-$(CONFIG_OPROFILE)      += arch/arm/oprofile/
+ 
+ libs-y				:= arch/arm/lib/ $(libs-y)
+ 
++PIE_LDS				:= arch/arm/kernel/pie.lds
++libpie-$(CONFIG_PIE)		+= arch/arm/libpie/
 +
- Example:
+ # Default target when executing plain make
+ ifeq ($(CONFIG_XIP_KERNEL),y)
+ KBUILD_IMAGE := xipImage
+diff --git a/arch/arm/include/asm/elf.h b/arch/arm/include/asm/elf.h
+index 56211f2..a8d036b 100644
+--- a/arch/arm/include/asm/elf.h
++++ b/arch/arm/include/asm/elf.h
+@@ -50,6 +50,7 @@ typedef struct user_fp elf_fpregset_t;
+ #define R_ARM_NONE		0
+ #define R_ARM_PC24		1
+ #define R_ARM_ABS32		2
++#define R_ARM_RELATIVE		23
+ #define R_ARM_CALL		28
+ #define R_ARM_JUMP24		29
+ #define R_ARM_V4BX		40
+diff --git a/arch/arm/kernel/.gitignore b/arch/arm/kernel/.gitignore
+index c5f676c..a055a48 100644
+--- a/arch/arm/kernel/.gitignore
++++ b/arch/arm/kernel/.gitignore
+@@ -1 +1,2 @@
+ vmlinux.lds
++pie.lds
+diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
+index 86d10dd..652312e 100644
+--- a/arch/arm/kernel/Makefile
++++ b/arch/arm/kernel/Makefile
+@@ -96,4 +96,6 @@ obj-y				+= psci.o
+ obj-$(CONFIG_SMP)		+= psci_smp.o
+ endif
  
- sram: sram at 5c000000 {
-diff --git a/drivers/misc/sram.c b/drivers/misc/sram.c
-index d87cc91..baa5008 100644
---- a/drivers/misc/sram.c
-+++ b/drivers/misc/sram.c
-@@ -28,6 +28,7 @@
- #include <linux/slab.h>
- #include <linux/spinlock.h>
- #include <linux/genalloc.h>
-+#include <linux/platform_data/sram.h>
- 
- #define SRAM_GRANULARITY	32
- 
-@@ -38,14 +39,24 @@ struct sram_dev {
- 
- static int sram_probe(struct platform_device *pdev)
- {
-+	struct sram_platform_data *pdata = pdev->dev.platform_data;
- 	void __iomem *virt_base;
- 	struct sram_dev *sram;
- 	struct resource *res;
- 	unsigned long size;
-+	bool map_exec = false;
- 	int ret;
- 
-+	if (of_get_property(pdev->dev.of_node, "map-exec", NULL))
-+		map_exec = true;
-+	if (pdata && pdata->map_exec)
-+		map_exec |= true;
+-extra-y := $(head-y) vmlinux.lds
++obj-$(CONFIG_PIE)		+= pie.o
 +
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
--	virt_base = devm_ioremap_resource(&pdev->dev, res);
-+	if (map_exec)
-+		virt_base = devm_ioremap_exec_resource(&pdev->dev, res);
-+	else
-+		virt_base = devm_ioremap_resource(&pdev->dev, res);
- 	if (IS_ERR(virt_base))
- 		return PTR_ERR(virt_base);
- 
-diff --git a/include/linux/platform_data/sram.h b/include/linux/platform_data/sram.h
++extra-y := $(head-y) vmlinux.lds pie.lds
+diff --git a/arch/arm/kernel/pie.c b/arch/arm/kernel/pie.c
 new file mode 100644
-index 0000000..8f5c4ba
+index 0000000..5dff5d6
 --- /dev/null
-+++ b/include/linux/platform_data/sram.h
-@@ -0,0 +1,8 @@
-+#ifndef _LINUX_SRAM_H
-+#define _LINUX_SRAM_H
++++ b/arch/arm/kernel/pie.c
+@@ -0,0 +1,83 @@
++/*
++ * Copyright 2013 Texas Instruments, Inc.
++ *	Russ Dill <russ.dill@ti.com>
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms and conditions of the GNU General Public License,
++ * version 2, as published by the Free Software Foundation.
++ */
 +
-+struct sram_platform_data {
-+	bool map_exec;
++#include <linux/kernel.h>
++#include <linux/pie.h>
++#include <linux/elf.h>
++
++#include <asm/elf.h>
++
++extern char __pie_rel_dyn_start[];
++extern char __pie_rel_dyn_end[];
++extern char __pie_tail_offset[];
++
++struct arm_pie_tail {
++	int count;
++	uintptr_t offset[0];
 +};
 +
-+#endif
++int pie_arch_fill_tail(void *tail, void *common_start, void *common_end,
++			void *overlay_start, void *code_start, void *code_end)
++{
++	Elf32_Rel *rel;
++	int records;
++	int i;
++	struct arm_pie_tail *pie_tail = tail;
++	int count;
++
++	rel = (Elf32_Rel *) __pie_rel_dyn_start;
++	records = (__pie_rel_dyn_end - __pie_rel_dyn_start) /
++						sizeof(*rel);
++
++	count = 0;
++	for (i = 0; i < records; i++, rel++) {
++		void *kern_off;
++		if (ELF32_R_TYPE(rel->r_info) != R_ARM_RELATIVE)
++			return -ENOEXEC;
++
++		/* Adjust offset to match area in kernel */
++		kern_off = common_start + rel->r_offset;
++
++		if (kern_off >= common_start && kern_off < code_end) {
++			if (tail)
++				pie_tail->offset[count] = rel->r_offset;
++			count++;
++		} else if (kern_off >= code_start && kern_off < code_end) {
++			if (tail)
++				pie_tail->offset[count] = rel->r_offset -
++						(code_start - overlay_start);
++			count++;
++		}
++	}
++
++	if (tail)
++		pie_tail->count = count;
++
++	return count * sizeof(uintptr_t) + sizeof(*pie_tail);
++}
++EXPORT_SYMBOL_GPL(pie_arch_fill_tail);
++
++/*
++ * R_ARM_RELATIVE: B(S) + A
++ * B(S) - Addressing origin of the output segment defining the symbol S.
++ * A - Addend for the relocation.
++ */
++int pie_arch_fixup(struct pie_chunk *chunk, void *base, void *tail,
++						unsigned long offset)
++{
++	struct arm_pie_tail *pie_tail = tail;
++	int i;
++
++	/* Perform relocation fixups for given offset */
++	for (i = 0; i < pie_tail->count; i++)
++		*((uintptr_t *) (pie_tail->offset[i] + base)) += offset;
++
++	return 0;
++}
++EXPORT_SYMBOL_GPL(pie_arch_fixup);
+diff --git a/arch/arm/kernel/pie.lds.S b/arch/arm/kernel/pie.lds.S
+new file mode 100644
+index 0000000..4fd5ac5
+--- /dev/null
++++ b/arch/arm/kernel/pie.lds.S
+@@ -0,0 +1,40 @@
++/*
++ * ld script to make ARM PIEs
++ * taken from the ARM vmlinux.lds.S version by Russ Dill <russ.dill@ti.com.
++ */
++
++#include <asm-generic/pie.lds.h>
++
++OUTPUT_ARCH(arm)
++
++SECTIONS
++{
++	. = 0x0;
++
++	PIE_COMMON_START
++	.got.plt : {
++		*(.got)
++		*(.got.plt)
++	}
++	.text : {
++		PIE_TEXT_TEXT
++	}
++	PIE_COMMON_END
++
++	PIE_OVERLAY_START
++	OVERLAY : NOCROSSREFS {
++	}
++	PIE_OVERLAY_SEND
++
++	__pie_rel_dyn_start : {
++		VMLINUX_SYMBOL(__pie_rel_dyn_start) = .;
++	}
++	.rel.dyn : {
++		KEEP(*(.rel*))
++	}
++	__pie_rel_dyn_end : {
++		VMLINUX_SYMBOL(__pie_rel_dyn_end) = .;
++	}
++
++	PIE_DISCARDS
++}
+diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
+index 7bcee5c..8c11235 100644
+--- a/arch/arm/kernel/vmlinux.lds.S
++++ b/arch/arm/kernel/vmlinux.lds.S
+@@ -77,6 +77,8 @@ SECTIONS
+ #ifndef CONFIG_SMP_ON_UP
+ 		*(.alt.smp.init)
+ #endif
++		*(.pie.*)
++		*(.ARM.exidx.pie.*.text)
+ 		*(.discard)
+ 		*(.discard.*)
+ 	}
+diff --git a/arch/arm/libpie/.gitignore b/arch/arm/libpie/.gitignore
+new file mode 100644
+index 0000000..02e3cd5
+--- /dev/null
++++ b/arch/arm/libpie/.gitignore
+@@ -0,0 +1,3 @@
++lib1funcs.S
++ashldi3.S
++string.c
+diff --git a/arch/arm/libpie/Makefile b/arch/arm/libpie/Makefile
+new file mode 100644
+index 0000000..5662e99
+--- /dev/null
++++ b/arch/arm/libpie/Makefile
+@@ -0,0 +1,32 @@
++#
++# linux/arch/arm/libpie/Makefile
++#
++ccflags-y	:= -fpic -mno-single-pic-base -fno-builtin
++
++obj-y		:= empty.o
++obj-y		+= lib1funcs.o ashldi3.o string.o
++
++# string library code (-Os is enforced to keep it much smaller)
++string = $(obj)/string.o
++CFLAGS_string.o := -Os
++
++$(obj)/string.c: $(srctree)/arch/$(SRCARCH)/boot/compressed/string.c
++	$(call cmd,shipped)
++
++# For __aeabi_uidivmod
++lib1funcs = $(obj)/lib1funcs.o
++
++$(obj)/lib1funcs.S: $(srctree)/arch/$(SRCARCH)/lib/lib1funcs.S
++	$(call cmd,shipped)
++
++# For __aeabi_llsl
++ashldi3 = $(obj)/ashldi3.o
++
++$(obj)/ashldi3.S: $(srctree)/arch/$(SRCARCH)/lib/ashldi3.S
++	$(call cmd,shipped)
++
++$(obj)/libpie.o: $(string) $(lib1funcs) $(ashldi3) $(addprefix $(obj)/,$(OBJS))
++	$(call if_changed,ld)
++
++# Make sure files are removed during clean
++extra-y		+= string.c lib1funcs.S ashldi3.S
+diff --git a/arch/arm/libpie/empty.S b/arch/arm/libpie/empty.S
+new file mode 100644
+index 0000000..2416862
+--- /dev/null
++++ b/arch/arm/libpie/empty.S
+@@ -0,0 +1,12 @@
++#include <linux/linkage.h>
++
++ENTRY(__div0)
++ENTRY(__aeabi_unwind_cpp_pr0)
++ENTRY(__aeabi_unwind_cpp_pr1)
++ENTRY(__aeabi_unwind_cpp_pr2)
++	mov	pc, lr
++ENDPROC(__div0)
++ENDPROC(__aeabi_unwind_cpp_pr0)
++ENDPROC(__aeabi_unwind_cpp_pr1)
++ENDPROC(__aeabi_unwind_cpp_pr2)
++
 -- 
 1.8.3.2
