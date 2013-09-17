@@ -1,67 +1,65 @@
-From: bcousson@baylibre.com (Benoit Cousson)
-Date: Tue, 17 Sep 2013 15:30:23 +0200
-Subject: [PATCH v4 0/2] ARM: dts: Beaglebone MMC fixes
-In-Reply-To: <1379010935-25943-1-git-send-email-koen@dominion.thruhere.net>
-References: <1379010935-25943-1-git-send-email-koen@dominion.thruhere.net>
-Message-ID: <5238596F.9080806@baylibre.com>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Tue, 17 Sep 2013 10:32:07 -0300
+Subject: [PATCH] arm: Kirkwood - Remove kirkwood_setup_wins and rely on
+ the DT binding
+In-Reply-To: <20130916224743.GA18349@obsidianresearch.com>
+References: <20130916224743.GA18349@obsidianresearch.com>
+Message-ID: <20130917133206.GB2488@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Koen,
+Jason,
 
-On 12/09/2013 20:35, Koen Kooi wrote:
-> Here are two patches to fix MMC on beaglebone, one fixes card detect on BBW,
-> the other adds the eMMC entry for BBB and its fixed regulator. After that mmc1
-> gets a nice speed boost by moving to 4-bit mode and LED triggers get assigned.
->
-> This series depends on:
->
-> http://comments.gmane.org/gmane.linux.kernel.stable/63648
-> https://lkml.org/lkml/2013/9/10/454
-> http://comments.gmane.org/gmane.linux.kernel.mmc/22381
+For some reason that I can't recall, the prefered style for commit logs is:
 
-I've just applied it on top of Joel's one.
+[PATCH] ARM: kirkwood: Remove kirkwood_setup_wins and rely on the DT
+binding
 
-Thanks,
-Benoit
+(Yes, I know, it's just stupid nit...)
 
->
-> Or as git-cherry would put it:
->
-> [koen at rrMBP patches]$ git cherry -v
-> + 564fc88cc64387af5312e2abd8019c75a13223b2 ARM: OMAP2+: am335x-bone*: add DT for BeagleBone Black
-> + e5133ed98acc1c3e01c370b851041a8ca629cd15 ARM: EDMA: Fix clearing of unused list for DT DMA resources
-> + ac71bb58605d3bdd5d14af770a639fb3ff11c612 ARM: dts: add AM33XX EDMA support
-> + 31a8270a299c57c7de7510f44d9dc36fd1787243 ARM: dts: add AM33XX SPI DMA support
-> + 4fa0a4cb9ea17da30cf43085c03e5ec1361a4fc2 ARM: dts: add AM33XX MMC support and documentation
-> + 0553f50bd45f019a0cc11050e2f20bddbf07dfe0 ARM: dts: am335x-bone: add CD for mmc1
-> + 7d64f765630a2921a63b82f93f9959a6de37f29d ARM: dts: am335x-boneblack: add eMMC DT entry
-> + dc96cd4003e2668d8ec7e7fe19e402e97a198f81 ARM: dts: am335x-bone-common: switch mmc1 to 4-bit mode
-> + f8262e78830cda56c936724549ba9f04dddde312 ARM: dts: am335x-bone-common: add cpu0 and mmc1 triggers
->
-> Also available as a git branch at https://github.com/koenkooi/linux/commits/mainline
->
-> Changes since v3:
-> 	Addressed Nishants nitpicks for commit messages
-> 	Addressed Russ' comments about moving LDO3 for mmc1 out of the common dtsi
->
-> Changes since v2:
-> 	Missing pinmux entries for eMMC added
->
-> Changes since v1:
-> 	Removed ti,non-removable entry from eMMC node, see http://marc.info/?l=linux-arm-kernel&m=137889435710552&w=2
+On Mon, Sep 16, 2013 at 04:47:43PM -0600, Jason Gunthorpe wrote:
+> kirkwood_setup_wins is the last manual caller of mbus in kirkwood, don't
+> call it for DT boards and rely on the board having a mbus node with
+> a proper ranges property to setup these windows.
+> 
+> This makes the DT self consistent, since the physical address of the
+> NAND and CRYPTO are both referenced internally. The arbitary Linux
+> constants KIRKWOOD_NAND_MEM_PHYS_BASE and KIRKWOOD_SRAM_PHYS_BASE
+> no longer have to match the DT values.
+> 
+> Signed-off-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
 > ---
->
-> Alexander Holler (1):
->    arm: bone: dts: add CD for mmc1
->
-> Koen Kooi (3):
->    am335x-boneblack: add eMMC DT entry
->    ARM: am335x-bone-common: switch mmc1 to 4-bit mode
->    ARM: dts: am335x-bone-common: add cpu0 and mmc1 triggers
->
->   arch/arm/boot/dts/am335x-bone-common.dtsi | 39 +++++++++++++++++++++++++++++++
->   arch/arm/boot/dts/am335x-bone.dts         |  1 -
->   arch/arm/boot/dts/am335x-boneblack.dts    | 14 +++++++++++
->   3 files changed, 53 insertions(+), 1 deletion(-)
->
+>  arch/arm/boot/dts/kirkwood-db-88f6281.dts              | 5 ++++-
+>  arch/arm/boot/dts/kirkwood-db-88f6282.dts              | 5 ++++-
+>  arch/arm/boot/dts/kirkwood-iconnect.dts                | 5 ++++-
+>  arch/arm/boot/dts/kirkwood-mplcec4.dts                 | 5 ++++-
+>  arch/arm/boot/dts/kirkwood-netgear_readynas_duo_v2.dts | 5 ++++-
+>  arch/arm/boot/dts/kirkwood-nsa310.dts                  | 5 ++++-
+>  arch/arm/boot/dts/kirkwood-ts219-6282.dts              | 5 ++++-
+>  arch/arm/mach-kirkwood/board-dt.c                      | 1 -
+>  8 files changed, 28 insertions(+), 8 deletions(-)
+> 
+
+I'm trying to figure out why you're changing just these and not
+all of the kirkwood device tree files, but I really can't.
+
+Grep says these contain a nand node:
+
+arch/arm/boot/dts/kirkwood-dockstar.dts
+arch/arm/boot/dts/kirkwood-goflexnet.dts
+arch/arm/boot/dts/kirkwood-guruplug-server-plus.dts
+arch/arm/boot/dts/kirkwood-ib62x0.dts
+arch/arm/boot/dts/kirkwood-iconnect.dts
+arch/arm/boot/dts/kirkwood-iomega_ix2_200.dts
+arch/arm/boot/dts/kirkwood-km_kirkwood.dts
+arch/arm/boot/dts/kirkwood-mplcec4.dts
+arch/arm/boot/dts/kirkwood-netgear_readynas_duo_v2.dts
+arch/arm/boot/dts/kirkwood-nsa310.dts
+arch/arm/boot/dts/kirkwood-openblocks_a6.dts
+arch/arm/boot/dts/kirkwood-topkick.dts
+
+Am I missing something obvious?
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
