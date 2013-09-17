@@ -1,38 +1,28 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Tue, 17 Sep 2013 03:25:25 +0200
-Subject: [PATCH v2 1/9] i2c: prepare runtime PM support for I2C client
- devices
-In-Reply-To: <20130916233111.GB21013@sirena.org.uk>
-References: <1378913560-2752-1-git-send-email-mika.westerberg@linux.intel.com>
- <1861747.RtS0ZLgUUN@vostro.rjw.lan> <20130916233111.GB21013@sirena.org.uk>
-Message-ID: <1820315.QOOAzSjac3@vostro.rjw.lan>
+From: b32955@freescale.com (Huang Shijie)
+Date: Tue, 17 Sep 2013 10:14:25 +0800
+Subject: [PATCH v3 0/8] Add the Quadspi driver for vf610-twr
+In-Reply-To: <20130916110634.GC29403@sirena.org.uk>
+References: <1378979431.2627.402.camel@shinybook.infradead.org>
+ <20130913025827.GA3051@gmail.com> <1378999322.4210.95.camel@i7.infradead.org>
+ <20130913041208.GD3051@gmail.com> <20130912205644.GW29403@sirena.org.uk>
+ <52329AD3.2050608@freescale.com> <20130913102127.GD29403@sirena.org.uk>
+ <52366F97.5030402@freescale.com> <20130916101912.GY29403@sirena.org.uk>
+ <5236DD17.5090203@freescale.com> <20130916110634.GC29403@sirena.org.uk>
+Message-ID: <5237BB01.3080700@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, September 17, 2013 12:31:11 AM Mark Brown wrote:
-> On Mon, Sep 16, 2013 at 09:07:07PM +0200, Rafael J. Wysocki wrote:
-> 
-> > That may be left to the client driver altogether.  I mean, if the client wants
-> > the controller to be powered up, it should just call
-> > pm_runtime_get_sync(controller device) at a suitable place (and then do the
-> > corresponding _put when the controller is not necessary anu more) from its
-> > ->probe() callback.
-> 
-> It shouldn't even need to do that, it should just be able to rely on the
-> controller to power itself up when asked to do work.   This is how the
-> existing implementations are done - the controller power management is
-> totally transparent to the slave.
-
-If both the I2C client and I2C controller have corresponding objects in the
-ACPI namespace and the client's object is a child of the controller's object,
-then in order to power up the client we need to power up the controller even
-if no transactions are going to be carried out.  That's what the spec simply
-requires us to do in that case.
-
-Thanks,
-Rafael
+? 2013?09?16? 19:06, Mark Brown ??:
+> I don't know what you mean by "the dummy".
+Please see the datasheet of the NOR:
+www.spansion.com/Support/Datasheets/S25FL128S_256S_00.pdf
 
 
--- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+Please see the page 100, the Quad I/O Read, the figure 10.37 shows
+the dummy.
+
+The dummy is just a delay in a command sequence.
+The dummy maybe only several clock cycles, less then 8 bit.
+
+thanks
+Huang Shijie
