@@ -1,57 +1,68 @@
-From: john.stultz@linaro.org (John Stultz)
-Date: Tue, 17 Sep 2013 11:29:10 -0700
-Subject: [RFC][PATCH] rtc: rtc-pl031: Set wakeup flag prior to registering
- rtcdev
-Message-ID: <1379442550-24860-1-git-send-email-john.stultz@linaro.org>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 17 Sep 2013 14:34:12 -0400 (EDT)
+Subject: [PATCH v2] ARM: fix Thumb-2 bug in AES assembler code
+In-Reply-To: <1379438195-6911-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1379438195-6911-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <alpine.LFD.2.03.1309171429580.20709@syhkavp.arg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In some recent testing, I noticed the CLOCK_REALTIME_ALARM clockid
-wasn't functioning on my vexpress qemu environment. Looking into it
-I noticed the pl031 rtc driver doesn't set the wakeup flag on the
-device until after registering the device with the RTC subsystem.
+On Tue, 17 Sep 2013, Ard Biesheuvel wrote:
 
-This causes the alarmtimer subsystem to not see the pl031 driver
-as a valid backing device, and that resuls in alarm clockids
-getting ENOTSUPP errors.
+> Patch 638591c enabled building the AES assembler code in Thumb2 mode.
+> However, this code used arithmetic involving PC rather than adr{l}
+> instructions to generate PC-relative references to the lookup tables,
+> and this break in Thumb mode due to the different PC offset.
+> 
+> Use adr instructions instead.
+> 
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+> 
+> v2:
+> - use 'adr' instruction rather than explicit PC arithmetic
+> - move the tables around so they are in range for 'adr' in each mode
+> 
+>  arch/arm/crypto/aes-armv4.S | 388 ++++++++++++++++++++++----------------------
+>  1 file changed, 193 insertions(+), 195 deletions(-)
 
-Thus be sure to set the wakeup flag on the device prior to
-registering the rtcdev so the pl031 rtc driver can be used as
-the backing alarmtimer device.
+No no no.  NAK.
 
-Let me know if you have any feedback or objections to this.
-If it looks ok, I'll queue it for 3.13. I suspect there 
-may be other RTC drivers with the same problem.
+This makes the patch completely unreviewable.  And unacceptable for 
+inclusion into the stable tree.
 
-Cc: Linus Walleij <linus.walleij@linaro.org>
-Cc: Alessandro Zummo <a.zummo@towertech.it>
-Cc: "Jon Medhurst (Tixy)" <tixy@linaro.org>
-Cc: linux-arm-kernel at lists.infradead.org
-Signed-off-by: John Stultz <john.stultz@linaro.org>
----
- drivers/rtc/rtc-pl031.c | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+Also, why do you have to move tables around?
 
-diff --git a/drivers/rtc/rtc-pl031.c b/drivers/rtc/rtc-pl031.c
-index 0f0609b..e3b2571 100644
---- a/drivers/rtc/rtc-pl031.c
-+++ b/drivers/rtc/rtc-pl031.c
-@@ -371,6 +371,7 @@ static int pl031_probe(struct amba_device *adev, const struct amba_id *id)
- 		}
- 	}
- 
-+	device_init_wakeup(&adev->dev, 1);
- 	ldata->rtc = rtc_device_register("pl031", &adev->dev, ops,
- 					THIS_MODULE);
- 	if (IS_ERR(ldata->rtc)) {
-@@ -384,8 +385,6 @@ static int pl031_probe(struct amba_device *adev, const struct amba_id *id)
- 		goto out_no_irq;
- 	}
- 
--	device_init_wakeup(&adev->dev, 1);
--
- 	return 0;
- 
- out_no_irq:
--- 
-1.8.1.2
+Isn't the following sufficient to fix the issue?
+
+diff --git a/arch/arm/crypto/aes-armv4.S b/arch/arm/crypto/aes-armv4.S
+index 19d6cd6f29..3a14ea8fe9 100644
+--- a/arch/arm/crypto/aes-armv4.S
++++ b/arch/arm/crypto/aes-armv4.S
+@@ -148,7 +148,7 @@ AES_Te:
+ @ 		 const AES_KEY *key) {
+ .align	5
+ ENTRY(AES_encrypt)
+-	sub	r3,pc,#8		@ AES_encrypt
++	adr	r3,AES_encrypt
+ 	stmdb   sp!,{r1,r4-r12,lr}
+ 	mov	r12,r0		@ inp
+ 	mov	r11,r2
+@@ -381,7 +381,7 @@ _armv4_AES_encrypt:
+ .align	5
+ ENTRY(private_AES_set_encrypt_key)
+ _armv4_AES_set_encrypt_key:
+-	sub	r3,pc,#8		@ AES_set_encrypt_key
++	adr	r3,_armv4_AES_set_encrypt_key
+ 	teq	r0,#0
+ 	moveq	r0,#-1
+ 	beq	.Labrt
+@@ -843,7 +843,7 @@ AES_Td:
+ @ 		 const AES_KEY *key) {
+ .align	5
+ ENTRY(AES_decrypt)
+-	sub	r3,pc,#8		@ AES_decrypt
++	adr	r3,AES_decrypt
+ 	stmdb   sp!,{r1,r4-r12,lr}
+ 	mov	r12,r0		@ inp
+ 	mov	r11,r2
