@@ -1,63 +1,109 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Wed, 18 Sep 2013 01:20:25 +0200 (CEST)
-Subject: [PATCH] clockevents: Sanitize ticks to nsec conversion
-In-Reply-To: <5238D6BE.6040603@pengutronix.de>
-References: <1379077365-18458-1-git-send-email-mkl@pengutronix.de>
- <20130917095600.GJ26819@ludovic.desroches@atmel.com>
- <20130917100417.GQ12758@n2100.arm.linux.org.uk>
- <alpine.DEB.2.02.1309171210450.4089@ionos.tec.linutronix.de>
- <20130917130153.GL26819@ludovic.desroches@atmel.com>
- <alpine.DEB.2.02.1309172228400.4089@ionos.tec.linutronix.de>
- <5238D6BE.6040603@pengutronix.de>
-Message-ID: <alpine.DEB.2.02.1309180045480.4089@ionos.tec.linutronix.de>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 17 Sep 2013 16:24:17 -0700
+Subject: [PATCH v2 2/2] RX-51: ARM errata 430973 workaround
+In-Reply-To: <1373461145-9812-3-git-send-email-pali.rohar@gmail.com>
+References: <1362044548-5398-1-git-send-email-pali.rohar@gmail.com>
+ <1373461145-9812-1-git-send-email-pali.rohar@gmail.com>
+ <1373461145-9812-3-git-send-email-pali.rohar@gmail.com>
+Message-ID: <20130917232417.GK9994@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 18 Sep 2013, Marc Kleine-Budde wrote:
-> On 09/17/2013 11:15 PM, Thomas Gleixner wrote:
-> > Marc Kleine-Budde pointed out, that commit 77cc982 "clocksource: use
-> > clockevents_config_and_register() where possible" caused a regression
-> > for some of the converted subarchs.
-> > 
-> > The reason is, that the clockevents core code converts the minimal
-> > hardware tick delta to a nanosecond value for core internal
-> > usage. This conversion is affected by integer math rounding loss, so
-> > the backwards conversion to hardware ticks will likely result in a
-> > value which is less than the configured hardware limitation. The
-> > affected subarchs used their own workaround (SIGH!) which got lost in
-> > the conversion.
-> > 
-> > Now instead of fixing the underlying core code problem, Marcs patch
-> > tried to work around the core code issue by increasing the minimal
-> > tick delta at clockevents registration time so the resulting limit in
-> > the core code backwards conversion did not violate the hardware
-> > limits. More SIGH!
-> 
-> It was not easy getting your attention with this problem :)
+* Pali Roh?r <pali.rohar@gmail.com> [130710 06:06]:
+> --- a/arch/arm/mach-omap2/board-rx51.c
+> +++ b/arch/arm/mach-omap2/board-rx51.c
 
-A really hard to understand and solve problem! Obviously you are a
-great fan of John Stultz famous "Math is hard, lets go shopping!"
-line.
+This file will be gone as soon as we're moving to device
+tree based booting. So let's do this in more future proof
+way.
 
-Why on earth do you need my attention to fix at least the simple
-rounding issue in the core code?
+> +/**
+> + * rx51_secure_dispatcher: Routine to dispatch secure PPA API calls
+> + * @idx: The PPA API index
+> + * @process: Process ID
+> + * @flag: The flag indicating criticality of operation
+> + * @nargs: Number of valid arguments out of four.
+> + * @arg1, arg2, arg3 args4: Parameters passed to secure API
+> + *
+> + * Return the non-zero error value on failure.
+> + */
+> +static u32 rx51_secure_dispatcher(u32 idx, u32 process, u32 flag, u32 nargs,
+> +			   u32 arg1, u32 arg2, u32 arg3, u32 arg4)
+> +{
+> +	u32 ret;
+> +	u32 param[5];
+> +
+> +	param[0] = nargs+1; /* RX-51 needs number of arguments + 1 */
+> +	param[1] = arg1;
+> +	param[2] = arg2;
+> +	param[3] = arg3;
+> +	param[4] = arg4;
+> +
+> +	/*
+> +	 * Secure API needs physical address
+> +	 * pointer for the parameters
+> +	 */
+> +	local_irq_disable();
+> +	local_fiq_disable();
+> +	flush_cache_all();
+> +	outer_clean_range(__pa(param), __pa(param + 5));
+> +	ret = omap_smc3(idx, process, flag, __pa(param));
+> +	flush_cache_all();
+> +	local_fiq_enable();
+> +	local_irq_enable();
+> +
+> +	return ret;
+> +}
 
-You could have sent the "clk += evt->mult - 1:" patch directly to
-Linus without even cc'ing me.
+I think this used to be in omap-secure.c, and then made rx51
+specific.. But since board-rx51.c is going away, let's move
+this function to omap-secure.c.
 
-It's not rocket science, really. When I responded with the while(1)
-loop patch today in the morning it was just because I did not have a
-second to think about the correct fix for this, but the reason WHY
-this happened was entirely clear in a split second after reading
-Russells reply.
+> + * rx51_secure_update_aux_cr: Routine to modify the contents of Auxiliary Control Register
+> + *  @set_bits: bits to set in ACR
+> + *  @clr_bits: bits to clear in ACR
+> + *
+> + * Return the non-zero error value on failure.
+> +*/
+> +static u32 rx51_secure_update_aux_cr(u32 set_bits, u32 clear_bits)
+> +{
+> +	u32 acr;
+> +
+> +	/* Read ACR */
+> +	asm volatile ("mrc p15, 0, %0, c1, c0, 1" : "=r" (acr));
+> +	acr &= ~clear_bits;
+> +	acr |= set_bits;
+> +
+> +	return rx51_secure_dispatcher(RX51_PPA_WRITE_ACR,
+> +				      0,
+> +				      FLAG_START_CRITICAL,
+> +				      1, acr, 0, 0, 0);
+> +}
 
-The upper bounds issue tooks a few minutes more, but it's not rocket
-science either.
+This too.
 
-Sorry, I can understand the need for a second opinion on a weird race
-condition problem, but tracking down an obvious simple math issue to
-the point and fixing it... SIGH!
+>  static void __init rx51_init(void)
+>  {
+>  	struct omap_sdrc_params *sdrc_params;
+> @@ -105,6 +175,14 @@ static void __init rx51_init(void)
+>  	rx51_peripherals_init();
+>  	rx51_camera_init();
+>  
+> +	if (omap_type() == OMAP2_DEVICE_TYPE_SEC) {
+> +#ifdef CONFIG_ARM_ERRATA_430973
+> +		pr_info("RX-51: Enabling ARM errata 430973 workaround\n");
+> +		/* set IBE to 1 */
+> +		rx51_secure_update_aux_cr(BIT(6), 0);
+> +#endif
+> +	}
+> +
+>  	/* Ensure SDRC pins are mux'd for self-refresh */
+>  	omap_mux_init_signal("sdrc_cke0", OMAP_PIN_OUTPUT);
+>  	omap_mux_init_signal("sdrc_cke1", OMAP_PIN_OUTPUT);
 
-Thanks,
+Then this can be called both from board-generic.c based on the
+compatible flag, and board-rx51.c for now.
 
-	tglx
+Regards,
+
+Tony
