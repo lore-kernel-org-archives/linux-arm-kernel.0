@@ -1,48 +1,50 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Tue, 17 Sep 2013 13:20:50 -0600
-Subject: [PATCH 2/3] ARM: kirkwood: Move the crypto node under the mbus
- node
-In-Reply-To: <5238A609.30302@gmail.com>
-References: <20130917184309.GE21230@obsidianresearch.com>
- <5238A609.30302@gmail.com>
-Message-ID: <20130917192050.GA4067@obsidianresearch.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 17 Sep 2013 21:22:42 +0200
+Subject: [PATCH] bus: mvebu-mbus: Fix optional pcie-mem/io-aperture
+ properties
+In-Reply-To: <20130917191342.GA4354@obsidianresearch.com>
+References: <20130917183853.GC21230@obsidianresearch.com>
+ <20130917210503.1ea8cdd9@skate>
+ <20130917191342.GA4354@obsidianresearch.com>
+Message-ID: <20130917212242.5c306871@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 17, 2013 at 08:57:13PM +0200, Sebastian Hesselbarth wrote:
-> On 09/17/2013 08:43 PM, Jason Gunthorpe wrote:
-> >There should be no nodes that are not children of the mbus. Move
-> >the crypto node under the mbus.
-> >
-> >Signed-off-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
-> >  arch/arm/boot/dts/kirkwood.dtsi | 23 +++++++++++------------
-> >  1 file changed, 11 insertions(+), 12 deletions(-)
+Dear Jason Gunthorpe,
+
+On Tue, 17 Sep 2013 13:13:42 -0600, Jason Gunthorpe wrote:
+
+> Well, I'm not 100% sure, but AFAICT that is how struct resources
+> should be used. The start/end address are inclusive, so the resource
+> (start=0,end=0) describes 1 byte at address 0.
 > 
-> I'd prefer not to move crypto out of internal regs. It is IP located
-> in internal registers. 
+> The only way to get a 0 sized resource is (start=0,end=-1)
 
-Well, that isn't entirely right. Internal registers isn't an IP block,
-it is yet another internal bus. MBUS is bridged to the (presumably low
-speed) internal registers bus, and then the internal registers bus is
-routed to IP block.
+So in the ideal world, we would have a resource_init(&res) that would
+set start=0 and end=-1 or something like that.
 
-There is a page in the manual that describes each of the IP blocks
-hanging off the internal registers bus.
+> Before I did this I checked other user of resource_size and found
+> tests to zero, so the above seems to be correct..
+> 
+> Eg a quick grep shows:
+>  arch/powerpc/kernel/pci-common.c: pcibios_fixup_bridge
+> 
+>                 if (pci_has_flag(PCI_REASSIGN_ALL_RSRC)) {
+>                         res->flags |= IORESOURCE_UNSET;
+>                         res->start = 0;
+>                         res->end = -1;
+>                         continue;
+>                 }
+> 
+> Do you see something different?
 
-The crypto IP block has connections to two busses. One to MBUS and one
-to internal-regs bus. The sram is dual ported (mbus and IP both access
-it), it is an integral part of the crypto IP.
+Well, apparently what you did is the commonly adopted way. Maybe just
+add a comment in the code above those two lines to explain what may
+seem a little strange initially?
 
-So, I think the current binding is fine, and this change makes it very
-clear that it is a single IP block with connections to two of the
-internal busses.
-
-Certainly is is cleaner than contaminating the internal bus node's
-decode ranges with addresses that are not decoded by the MBUS to
-internal bus bridge.
-
-Anyhow, I don't want to churn the DT binding for crypto, we are
-supposed to be trying to keep these things stable and there is no
-functional change or bug fix in splitting the node into two.
-
-Jason
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
