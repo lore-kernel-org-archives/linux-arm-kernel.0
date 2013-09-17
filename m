@@ -1,56 +1,31 @@
-From: mikedunn@newsguy.com (Mike Dunn)
-Date: Tue, 17 Sep 2013 07:07:25 -0700
-Subject: [PATCH v3] PWM: PXA: add device tree support to PWM driver
-In-Reply-To: <52375FB1.5050700@wwwdotorg.org>
-References: <1379091281-23662-1-git-send-email-mikedunn@newsguy.com>
- <52375FB1.5050700@wwwdotorg.org>
-Message-ID: <5238621D.3050504@newsguy.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 17 Sep 2013 16:23:51 +0200
+Subject: [RFC PATCH 04/11] asm-generic: fncpy: Add function copying macros
+In-Reply-To: <1379421817-15759-5-git-send-email-Russ.Dill@ti.com>
+References: <1379421817-15759-1-git-send-email-Russ.Dill@ti.com>
+ <1379421817-15759-5-git-send-email-Russ.Dill@ti.com>
+Message-ID: <CAMuHMdVT-hhJnww64mFa6nubHrHk-ZHuoe9GwGgBCEA2G0B2Bg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/16/2013 12:44 PM, Stephen Warren wrote:
-> On 09/13/2013 10:54 AM, Mike Dunn wrote:
->> This patch adds device tree support to the PXA's PWM driver.  Only an OF match
->> table is added; nothing needs to be extracted from the device tree node.  The
->> existing ID table is reused for the match table data.
->>
->> Tested on a Palm Treo 680 (both platform data and DT cases).
-> 
->> diff --git a/Documentation/devicetree/bindings/pwm/pxa-pwm.txt b/Documentation/devicetree/bindings/pwm/pxa-pwm.txt
-> 
->> +- compatible: should be one of:
->> +  - "marvell,pxa250-pwm"
->> +  - "marvell,pxa270-pwm"
->> +  - "marvell,pxa168-pwm"
->> +  - "marvell,pxa910-pwm"
-> 
-> Not just one of, but possible more than one...
+On Tue, Sep 17, 2013 at 2:43 PM, Russ Dill <Russ.Dill@ti.com> wrote:
+> +++ b/arch/alpha/include/asm/fncpy.h
+> @@ -0,0 +1 @@
+> +#include <asm-generic/fncpy.h>
 
+Please add
 
-So the phrasing should be "compatible: should be among:" ?
+    generic-y += fncpy.h
 
+to arch/<arch>/include/asm/Kbuild instead.
 
-> 
->> diff --git a/arch/arm/boot/dts/pxa27x.dtsi b/arch/arm/boot/dts/pxa27x.dtsi
-> 
->> +		pwm0: pwm at 40b00000 {
->> +			compatible = "marvell,pxa270-pwm";
-> 
-> I thought the assertion was that pax270 and pxa250 were both compatible?
-> If so, that should be:
-> 
-> 		compatible = "marvell,pxa270-pwm", "marvell,pxa250-pwm";
+Gr{oetje,eeting}s,
 
+                        Geert
 
-Indeed.  Currently, they are all the same.  By that logic, shouldn't it be
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
-compatible = "marvell,pxa250-pwm", "marvell,pxa270-pwm", "marvell,pxa168-pwm",
-"marvell,pxa910-pwm";
-
-I am admittedly fuzzy on device tree, but this is starting to seem strange.
-
-Anyway, I'll defer to your judgement and resubmit if you can give me precise
-guidance on the above.  Thanks again for the review.
-
-Thanks,
-Mike
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
