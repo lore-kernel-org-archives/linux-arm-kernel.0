@@ -1,70 +1,34 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 17 Sep 2013 22:42:08 +0100
-Subject: [PATCH 2/3] arm32: kvm: rename CONFIG_KVM_ARM_MAX_VCPUS
-In-Reply-To: <1379160656-28050-3-git-send-email-drjones@redhat.com>
-References: <1379160656-28050-1-git-send-email-drjones@redhat.com>
- <1379160656-28050-3-git-send-email-drjones@redhat.com>
-Message-ID: <20130917214208.GK7623@lvm>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Tue, 17 Sep 2013 23:45:11 +0200 (CEST)
+Subject: [RESEND PATCHv3 1/2] clocksource: dw_apb_timer: Move timer
+ defines to header file.
+In-Reply-To: <1379434447.24347.0.camel@linux-builds1>
+References: <1377744796-22175-1-git-send-email-dinguyen@altera.com>
+ <1379434447.24347.0.camel@linux-builds1>
+Message-ID: <alpine.DEB.2.02.1309172337570.4089@ionos.tec.linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 14, 2013 at 02:10:55PM +0200, Andrew Jones wrote:
-> Drop the _ARM_ part of the name. We can then introduce a config option
-> like this to aarch64 and other arches using the same name - allowing
-> grep to show them all. Also update the help text to describe the option
-> more completely.
+On Tue, 17 Sep 2013, Dinh Nguyen wrote:
+
+> On Wed, 2013-08-28 at 21:53 -0500, Dinh Nguyen wrote:
+> > From: Dinh Nguyen <dinguyen@altera.com>
+> > 
+> > Move all dw_apb_timer defines to include/linux/dw_apb_timer.h.
+
+That's describing WHAT the patch does not WHY. I can see the WHAT part
+without that pointless changelog.
+
 > 
-> Signed-off-by: Andrew Jones <drjones@redhat.com>
-> ---
->  arch/arm/include/asm/kvm_host.h | 4 ++--
->  arch/arm/kvm/Kconfig            | 8 ++++----
->  2 files changed, 6 insertions(+), 6 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-> index 7d22517d80711..c614d3eb176c6 100644
-> --- a/arch/arm/include/asm/kvm_host.h
-> +++ b/arch/arm/include/asm/kvm_host.h
-> @@ -25,8 +25,8 @@
->  #include <asm/fpstate.h>
->  #include <kvm/arm_arch_timer.h>
->  
-> -#if defined(CONFIG_KVM_ARM_MAX_VCPUS)
-> -#define KVM_MAX_VCPUS CONFIG_KVM_ARM_MAX_VCPUS
-> +#if defined(CONFIG_KVM_MAX_VCPUS)
-> +#define KVM_MAX_VCPUS CONFIG_KVM_MAX_VCPUS
->  #else
->  #define KVM_MAX_VCPUS 0
->  #endif
-> diff --git a/arch/arm/kvm/Kconfig b/arch/arm/kvm/Kconfig
-> index ebf5015508b52..de63bfccb3eb5 100644
-> --- a/arch/arm/kvm/Kconfig
-> +++ b/arch/arm/kvm/Kconfig
-> @@ -40,16 +40,16 @@ config KVM_ARM_HOST
->  	---help---
->  	  Provides host support for ARM processors.
->  
-> -config KVM_ARM_MAX_VCPUS
-> +config KVM_MAX_VCPUS
->  	int "Number maximum supported virtual CPUs per VM"
->  	depends on KVM_ARM_HOST
->  	default 4
->  	help
->  	  Static number of max supported virtual CPUs per VM.
->  
-> -	  If you choose a high number, the vcpu structures will be quite
-> -	  large, so only choose a reasonable number that you expect to
-> -	  actually use.
-> +	  The default is set to the highest number of vcpus that
-> +	  current hardware supports. Set to a lower number to save
-> +	  some resources. Set to a higher number to test scalability.
+> Ping? This patch series has sat idle for 2-weeks now.
 
-Consider rephrasing the "Set to a lower number..." sentence to something
-like "Choosing a lower number decreases the size of the VM data
-structure.".
+So what?
 
-Also, please rephrase or get rid of the "Set to a higher number to test
-scalability." sentence; you increase this value to be able to be able to
-run more VCPUs (for whatever reason).
+Sending non urgent (i.e. bug fixes, regression fixes etc.) patches at
+the beginning of the merge window begs for a 2 weeks delay. Well
+documented procedure...
 
--- 
-Christoffer
+
+Thanks,
+
+	tglx
