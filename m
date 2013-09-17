@@ -1,80 +1,57 @@
-From: kim.phillips@linaro.org (Kim Phillips)
-Date: Tue, 17 Sep 2013 11:31:53 -0500
-Subject: [PATCH] i2c: s3c2410: fix clk_disable/clk_unprepare warnings
-Message-ID: <20130917113153.41b0305d6892170ba8e1ecf7@linaro.org>
+From: dinguyen@altera.com (dinguyen at altera.com)
+Date: Tue, 17 Sep 2013 11:32:21 -0500
+Subject: [PATCH 2/2] arm: socfpga: Remove socfpga_init_clocks
+In-Reply-To: <1379435541-26338-1-git-send-email-dinguyen@altera.com>
+References: <1379435541-26338-1-git-send-email-dinguyen@altera.com>
+Message-ID: <1379435541-26338-2-git-send-email-dinguyen@altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-commit d16933b33914a6dff38a4ecbe8edce44a17898e8 "i2c: s3c2410: Move
-location of clk_prepare_enable() call in probe function" refactored
-clk_enable and clk_disable calls yet neglected to remove the
-clk_disable_unprepare call in the module's remove().
+From: Dinh Nguyen <dinguyen@altera.com>
 
-It helps remove warnings on an arndale during unbind:
+The smp_twd clock can be represented in DTS, so there is no need for
+socfpga_init_clocks().
 
-echo 12c90000.i2c > /sys/bus/platform/devices/12c90000.i2c/driver/unbind
-
-------------[ cut here ]------------
-WARNING: CPU: 0 PID: 2548 at drivers/clk/clk.c:842 clk_disable+0x18/0x24()
-Modules linked in:
-CPU: 0 PID: 2548 Comm: bash Not tainted 3.11.0-next-20130916-00003-gf4bddbc #6
-[<c0014d48>] (unwind_backtrace+0x0/0xf8) from [<c00117d0>] (show_stack+0x10/0x14)
-[<c00117d0>] (show_stack+0x10/0x14) from [<c0361be8>] (dump_stack+0x6c/0xac)
-[<c0361be8>] (dump_stack+0x6c/0xac) from [<c001d864>] (warn_slowpath_common+0x64/0x88)
-[<c001d864>] (warn_slowpath_common+0x64/0x88) from [<c001d8a4>] (warn_slowpath_null+0x1c/0x24)
-[<c001d8a4>] (warn_slowpath_null+0x1c/0x24) from [<c02c4a64>] (clk_disable+0x18/0x24)
-[<c02c4a64>] (clk_disable+0x18/0x24) from [<c028d0b0>] (s3c24xx_i2c_remove+0x28/0x70)
-[<c028d0b0>] (s3c24xx_i2c_remove+0x28/0x70) from [<c0217a10>] (platform_drv_remove+0x18/0x1c)
-[<c0217a10>] (platform_drv_remove+0x18/0x1c) from [<c0216358>] (__device_release_driver+0x58/0xb4)
-[<c0216358>] (__device_release_driver+0x58/0xb4) from [<c02163d0>] (device_release_driver+0x1c/0x28)
-[<c02163d0>] (device_release_driver+0x1c/0x28) from [<c02153c0>] (unbind_store+0x58/0x90)
-[<c02153c0>] (unbind_store+0x58/0x90) from [<c0214c90>] (drv_attr_store+0x20/0x2c)
-[<c0214c90>] (drv_attr_store+0x20/0x2c) from [<c01032c0>] (sysfs_write_file+0x168/0x198)
-[<c01032c0>] (sysfs_write_file+0x168/0x198) from [<c00ae1c0>] (vfs_write+0xb0/0x194)
-[<c00ae1c0>] (vfs_write+0xb0/0x194) from [<c00ae594>] (SyS_write+0x3c/0x70)
-[<c00ae594>] (SyS_write+0x3c/0x70) from [<c000e3e0>] (ret_fast_syscall+0x0/0x30)
----[ end trace 4c9f9403066f57a6 ]---
-------------[ cut here ]------------
-WARNING: CPU: 0 PID: 2548 at drivers/clk/clk.c:751 clk_unprepare+0x14/0x1c()
-Modules linked in:
-CPU: 0 PID: 2548 Comm: bash Tainted: G        W    3.11.0-next-20130916-00003-gf4bddbc #6
-[<c0014d48>] (unwind_backtrace+0x0/0xf8) from [<c00117d0>] (show_stack+0x10/0x14)
-[<c00117d0>] (show_stack+0x10/0x14) from [<c0361be8>] (dump_stack+0x6c/0xac)
-[<c0361be8>] (dump_stack+0x6c/0xac) from [<c001d864>] (warn_slowpath_common+0x64/0x88)
-[<c001d864>] (warn_slowpath_common+0x64/0x88) from [<c001d8a4>] (warn_slowpath_null+0x1c/0x24)
-[<c001d8a4>] (warn_slowpath_null+0x1c/0x24) from [<c02c5834>] (clk_unprepare+0x14/0x1c)
-[<c02c5834>] (clk_unprepare+0x14/0x1c) from [<c028d0b8>] (s3c24xx_i2c_remove+0x30/0x70)
-[<c028d0b8>] (s3c24xx_i2c_remove+0x30/0x70) from [<c0217a10>] (platform_drv_remove+0x18/0x1c)
-[<c0217a10>] (platform_drv_remove+0x18/0x1c) from [<c0216358>] (__device_release_driver+0x58/0xb4)
-[<c0216358>] (__device_release_driver+0x58/0xb4) from [<c02163d0>] (device_release_driver+0x1c/0x28)
-[<c02163d0>] (device_release_driver+0x1c/0x28) from [<c02153c0>] (unbind_store+0x58/0x90)
-[<c02153c0>] (unbind_store+0x58/0x90) from [<c0214c90>] (drv_attr_store+0x20/0x2c)
-[<c0214c90>] (drv_attr_store+0x20/0x2c) from [<c01032c0>] (sysfs_write_file+0x168/0x198)
-[<c01032c0>] (sysfs_write_file+0x168/0x198) from [<c00ae1c0>] (vfs_write+0xb0/0x194)
-[<c00ae1c0>] (vfs_write+0xb0/0x194) from [<c00ae594>] (SyS_write+0x3c/0x70)
-[<c00ae594>] (SyS_write+0x3c/0x70) from [<c000e3e0>] (ret_fast_syscall+0x0/0x30)
----[ end trace 4c9f9403066f57a7 ]---
-
-Cc: Ben Dooks <ben-linux@fluff.org>
-Cc: Kukjin Kim <kgene.kim@samsung.com>
-Cc: Wolfram Sang <wsa@the-dreams.de>
-Signed-off-by: Kim Phillips <kim.phillips@linaro.org>
+Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
+CC: Arnd Bergmann <arnd@arndb.de>
+Cc: Olof Johansson <olof@lixom.net>
+Cc: Mike Turquette <mturquette@linaro.org>
+Cc: linux-arm-kernel at lists.infradead.org
 ---
- drivers/i2c/busses/i2c-s3c2410.c | 2 --
- 1 file changed, 2 deletions(-)
+ arch/arm/mach-socfpga/socfpga.c |    1 -
+ drivers/clk/socfpga/clk.c       |   11 -----------
+ 2 files changed, 12 deletions(-)
 
-diff --git a/drivers/i2c/busses/i2c-s3c2410.c b/drivers/i2c/busses/i2c-s3c2410.c
-index 3535f3c..3747b9b 100644
---- a/drivers/i2c/busses/i2c-s3c2410.c
-+++ b/drivers/i2c/busses/i2c-s3c2410.c
-@@ -1178,8 +1178,6 @@ static int s3c24xx_i2c_remove(struct platform_device *pdev)
+diff --git a/arch/arm/mach-socfpga/socfpga.c b/arch/arm/mach-socfpga/socfpga.c
+index bfce964..5314fc2 100644
+--- a/arch/arm/mach-socfpga/socfpga.c
++++ b/arch/arm/mach-socfpga/socfpga.c
+@@ -108,7 +108,6 @@ static void __init socfpga_cyclone5_init(void)
+ 	l2x0_of_init(0, ~0UL);
+ 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+ 	of_clk_init(NULL);
+-	socfpga_init_clocks();
+ }
  
- 	i2c_del_adapter(&i2c->adap);
- 
--	clk_disable_unprepare(i2c->clk);
+ static const char *altera_dt_match[] = {
+diff --git a/drivers/clk/socfpga/clk.c b/drivers/clk/socfpga/clk.c
+index c378489..24580b7 100644
+--- a/drivers/clk/socfpga/clk.c
++++ b/drivers/clk/socfpga/clk.c
+@@ -333,14 +333,3 @@ static void __init socfpga_gate_init(struct device_node *node)
+ 	socfpga_gate_clk_init(node, &gateclk_ops);
+ }
+ CLK_OF_DECLARE(socfpga_gate, "altr,socfpga-gate-clk", socfpga_gate_init);
 -
- 	if (pdev->dev.of_node && IS_ERR(i2c->pctrl))
- 		s3c24xx_i2c_dt_gpio_free(i2c);
- 
+-void __init socfpga_init_clocks(void)
+-{
+-	struct clk *clk;
+-	int ret;
+-
+-	clk = clk_register_fixed_factor(NULL, "smp_twd", "mpuclk", 0, 1, 4);
+-	ret = clk_register_clkdev(clk, NULL, "smp_twd");
+-	if (ret)
+-		pr_err("smp_twd alias not registered\n");
+-}
 -- 
-1.8.4
+1.7.9.5
