@@ -1,60 +1,58 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 17 Sep 2013 18:15:19 +0200
-Subject: [PATCH] ARM: fix Thumb-2 bug in AES assembler code
-Message-ID: <1379434519-23299-1-git-send-email-ard.biesheuvel@linaro.org>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 17 Sep 2013 10:17:23 -0600
+Subject: [PATCH v3] PWM: PXA: add device tree support to PWM driver
+In-Reply-To: <5238621D.3050504@newsguy.com>
+References: <1379091281-23662-1-git-send-email-mikedunn@newsguy.com>
+ <52375FB1.5050700@wwwdotorg.org> <5238621D.3050504@newsguy.com>
+Message-ID: <52388093.2000401@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Patch 638591c enabled building the AES assembler code in Thumb2 mode.
-However, this code uses arithmetic involving PC rather than adr{l}
-instructions to generate PC-relative references to the lookup tables,
-and this needs to take into account the different PC offset when
-running in Thumb mode.
+On 09/17/2013 08:07 AM, Mike Dunn wrote:
+> On 09/16/2013 12:44 PM, Stephen Warren wrote:
+>> On 09/13/2013 10:54 AM, Mike Dunn wrote:
+>>> This patch adds device tree support to the PXA's PWM driver.  Only an OF match
+>>> table is added; nothing needs to be extracted from the device tree node.  The
+>>> existing ID table is reused for the match table data.
+>>>
+>>> Tested on a Palm Treo 680 (both platform data and DT cases).
+>>
+>>> diff --git a/Documentation/devicetree/bindings/pwm/pxa-pwm.txt b/Documentation/devicetree/bindings/pwm/pxa-pwm.txt
+>>
+>>> +- compatible: should be one of:
+>>> +  - "marvell,pxa250-pwm"
+>>> +  - "marvell,pxa270-pwm"
+>>> +  - "marvell,pxa168-pwm"
+>>> +  - "marvell,pxa910-pwm"
+>>
+>> Not just one of, but possible more than one...
+> 
+> So the phrasing should be "compatible: should be among:" ?
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
-
-This needs cc to stable for 3.10/3.11 as well.
+I think I've seen "One or more of".
 
 
- arch/arm/crypto/aes-armv4.S | 11 +++++++----
- 1 file changed, 7 insertions(+), 4 deletions(-)
+>>> diff --git a/arch/arm/boot/dts/pxa27x.dtsi b/arch/arm/boot/dts/pxa27x.dtsi
+>>
+>>> +		pwm0: pwm at 40b00000 {
+>>> +			compatible = "marvell,pxa270-pwm";
+>>
+>> I thought the assertion was that pax270 and pxa250 were both compatible?
+>> If so, that should be:
+>>
+>> 		compatible = "marvell,pxa270-pwm", "marvell,pxa250-pwm";
+> 
+> 
+> Indeed.  Currently, they are all the same.  By that logic, shouldn't it be
+> 
+> compatible = "marvell,pxa250-pwm", "marvell,pxa270-pwm", "marvell,pxa168-pwm",
+> "marvell,pxa910-pwm";
 
-diff --git a/arch/arm/crypto/aes-armv4.S b/arch/arm/crypto/aes-armv4.S
-index 19d6cd6..33c30ab 100644
---- a/arch/arm/crypto/aes-armv4.S
-+++ b/arch/arm/crypto/aes-armv4.S
-@@ -148,7 +148,8 @@ AES_Te:
- @ 		 const AES_KEY *key) {
- .align	5
- ENTRY(AES_encrypt)
--	sub	r3,pc,#8		@ AES_encrypt
-+ARM(	sub	r3,pc,#8	)	@ AES_encrypt
-+THUMB(	sub	r3,pc,#4	)
- 	stmdb   sp!,{r1,r4-r12,lr}
- 	mov	r12,r0		@ inp
- 	mov	r11,r2
-@@ -381,7 +382,8 @@ _armv4_AES_encrypt:
- .align	5
- ENTRY(private_AES_set_encrypt_key)
- _armv4_AES_set_encrypt_key:
--	sub	r3,pc,#8		@ AES_set_encrypt_key
-+ARM(	sub	r3,pc,#8	)	@ AES_set_encrypt_key
-+THUMB(	sub	r3,pc,#4	)
- 	teq	r0,#0
- 	moveq	r0,#-1
- 	beq	.Labrt
-@@ -843,8 +845,9 @@ AES_Td:
- @ 		 const AES_KEY *key) {
- .align	5
- ENTRY(AES_decrypt)
--	sub	r3,pc,#8		@ AES_decrypt
--	stmdb   sp!,{r1,r4-r12,lr}
-+ARM(	sub	r3,pc,#8	)	@ AES_decrypt
-+THUMB(	sub	r3,pc,#4	)
-+		stmdb   sp!,{r1,r4-r12,lr}
- 	mov	r12,r0		@ inp
- 	mov	r11,r2
- 	sub	r10,r3,#AES_decrypt-AES_Td		@ Td
--- 
-1.8.1.2
+compatible should include:
+
+* The exact HW model (so the driver knows exactly which HW is present in
+order to enable any bug quirks).
+* The "first" HW model this HW is compatible with, since this is what
+the driver will bind to (ignoring the possibility of bug quirks).
+
+So, you don't need to include all the values, just two in this case.
