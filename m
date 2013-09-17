@@ -1,70 +1,186 @@
 From: m.grzeschik@pengutronix.de (Michael Grzeschik)
-Date: Tue, 17 Sep 2013 15:56:06 +0200
-Subject: [[PATCH] 1/3] dma: imx-dma: fix slow path issue in prep_dma_cyclic
+Date: Tue, 17 Sep 2013 15:56:07 +0200
+Subject: [[PATCH] 2/3] dma: imx-dma: fix lockdep issue between irqhandler and
+ tasklet
 In-Reply-To: <1379426168-31989-1-git-send-email-m.grzeschik@pengutronix.de>
 References: <1379426168-31989-1-git-send-email-m.grzeschik@pengutronix.de>
-Message-ID: <1379426168-31989-2-git-send-email-m.grzeschik@pengutronix.de>
+Message-ID: <1379426168-31989-3-git-send-email-m.grzeschik@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When perparing cyclic_dma buffers by the sound layer, it will dump the
-following lockdep trace. The leading snd_pcm_action_single get called
-with read_lock_irq called. To fix this, we change the kcalloc call from
-GFP_KERNEL to GFP_ATOMIC.
+The tasklet and irqhandler are using spin_lock while other routines are
+using spin_lock_irqsave/restore. This leads to lockdep issues as
+described bellow. This patch is changing the code to use
+spinlock_irq_save/restore in both code pathes.
 
-jARNING: at kernel/lockdep.c:2740 lockdep_trace_alloc+0xcc/0x114()
-DEBUG_LOCKS_WARN_ON(irqs_disabled_flags(flags))
-Modules linked in:
-CPU: 0 PID: 832 Comm: aplay Not tainted 3.11.0-20130823+ #903
-Backtrace:
-[<c000b98c>] (dump_backtrace+0x0/0x10c) from [<c000bb28>] (show_stack+0x18/0x1c)
- r6:c004c090 r5:00000009 r4:c2e0bd18 r3:00404000
-[<c000bb10>] (show_stack+0x0/0x1c) from [<c02f397c>] (dump_stack+0x20/0x28)
-[<c02f395c>] (dump_stack+0x0/0x28) from [<c001531c>] (warn_slowpath_common+0x54/0x70)
-[<c00152c8>] (warn_slowpath_common+0x0/0x70) from [<c00153dc>] (warn_slowpath_fmt+0x38/0x40)
- r8:00004000 r7:a3b90000 r6:000080d0 r5:60000093 r4:c2e0a000 r3:00000009
-[<c00153a4>] (warn_slowpath_fmt+0x0/0x40) from [<c004c090>] (lockdep_trace_alloc+0xcc/0x114)
- r3:c03955d8 r2:c03907db
-[<c004bfc4>] (lockdep_trace_alloc+0x0/0x114) from [<c008f16c>] (__kmalloc+0x34/0x118)
- r6:000080d0 r5:c3800120 r4:000080d0 r3:c040a0f8
-[<c008f138>] (__kmalloc+0x0/0x118) from [<c019c95c>] (imxdma_prep_dma_cyclic+0x64/0x168)
- r7:a3b90000 r6:00000004 r5:c39d8420 r4:c3847150
-[<c019c8f8>] (imxdma_prep_dma_cyclic+0x0/0x168) from [<c024618c>] (snd_dmaengine_pcm_trigger+0xa8/0x160)
-[<c02460e4>] (snd_dmaengine_pcm_trigger+0x0/0x160) from [<c0241fa8>] (soc_pcm_trigger+0x90/0xb4)
- r8:c058c7b0 r7:c3b8140c r6:c39da560 r5:00000001 r4:c3b81000
-[<c0241f18>] (soc_pcm_trigger+0x0/0xb4) from [<c022ece4>] (snd_pcm_do_start+0x2c/0x38)
- r7:00000000 r6:00000003 r5:c058c7b0 r4:c3b81000
-[<c022ecb8>] (snd_pcm_do_start+0x0/0x38) from [<c022e958>] (snd_pcm_action_single+0x40/0x6c)
-[<c022e918>] (snd_pcm_action_single+0x0/0x6c) from [<c022ea64>] (snd_pcm_action_lock_irq+0x7c/0x9c)
- r7:00000003 r6:c3b810f0 r5:c3b810f0 r4:c3b81000
-[<c022e9e8>] (snd_pcm_action_lock_irq+0x0/0x9c) from [<c023009c>] (snd_pcm_common_ioctl1+0x7f8/0xfd0)
- r8:c3b7f888 r7:005407b8 r6:c2c991c0 r5:c3b81000 r4:c3b81000 r3:00004142
-[<c022f8a4>] (snd_pcm_common_ioctl1+0x0/0xfd0) from [<c023117c>] (snd_pcm_playback_ioctl1+0x464/0x488)
-[<c0230d18>] (snd_pcm_playback_ioctl1+0x0/0x488) from [<c02311d4>] (snd_pcm_playback_ioctl+0x34/0x40)
- r8:c3b7f888 r7:00004142 r6:00000004 r5:c2c991c0 r4:005407b8
-[<c02311a0>] (snd_pcm_playback_ioctl+0x0/0x40) from [<c00a14a4>] (vfs_ioctl+0x30/0x44)
-[<c00a1474>] (vfs_ioctl+0x0/0x44) from [<c00a1fe8>] (do_vfs_ioctl+0x55c/0x5c0)
-[<c00a1a8c>] (do_vfs_ioctl+0x0/0x5c0) from [<c00a208c>] (SyS_ioctl+0x40/0x68)
-[<c00a204c>] (SyS_ioctl+0x0/0x68) from [<c0009380>] (ret_fast_syscall+0x0/0x44)
- r8:c0009544 r7:00000036 r6:bedeaa58 r5:00000000 r4:000000c0
+As imxdma_xfer_desc always gets called with spin_lock_irqsave lock held,
+this patch also removes the spare call inside the routine to avoid
+double locking.
+
+[  403.358162] =================================
+[  403.362549] [ INFO: inconsistent lock state ]
+[  403.366945] 3.10.0-20130823+ #904 Not tainted
+[  403.371331] ---------------------------------
+[  403.375721] inconsistent {IN-HARDIRQ-W} -> {HARDIRQ-ON-W} usage.
+[  403.381769] swapper/0 [HC0[0]:SC1[1]:HE1:SE0] takes:
+[  403.386762]  (&(&imxdma->lock)->rlock){?.-...}, at: [<c019d77c>] imxdma_tasklet+0x20/0x134
+[  403.395201] {IN-HARDIRQ-W} state was registered at:
+[  403.400108]   [<c004b264>] mark_lock+0x2a0/0x6b4
+[  403.404798]   [<c004d7c8>] __lock_acquire+0x650/0x1a64
+[  403.410004]   [<c004f15c>] lock_acquire+0x94/0xa8
+[  403.414773]   [<c02f74e4>] _raw_spin_lock+0x54/0x8c
+[  403.419720]   [<c019d094>] dma_irq_handler+0x78/0x254
+[  403.424845]   [<c0061124>] handle_irq_event_percpu+0x38/0x1b4
+[  403.430670]   [<c00612e4>] handle_irq_event+0x44/0x64
+[  403.435789]   [<c0063a70>] handle_level_irq+0xd8/0xf0
+[  403.440903]   [<c0060a20>] generic_handle_irq+0x28/0x38
+[  403.446194]   [<c0009cc4>] handle_IRQ+0x68/0x8c
+[  403.450789]   [<c0008714>] avic_handle_irq+0x3c/0x48
+[  403.455811]   [<c0008f84>] __irq_svc+0x44/0x74
+[  403.460314]   [<c0040b04>] cpu_startup_entry+0x88/0xf4
+[  403.465525]   [<c02f00d0>] rest_init+0xb8/0xe0
+[  403.470045]   [<c03e07dc>] start_kernel+0x28c/0x2d4
+[  403.474986]   [<a0008040>] 0xa0008040
+[  403.478709] irq event stamp: 50854
+[  403.482140] hardirqs last  enabled at (50854): [<c001c6b8>] tasklet_action+0x38/0xdc
+[  403.489954] hardirqs last disabled at (50853): [<c001c6a0>] tasklet_action+0x20/0xdc
+[  403.497761] softirqs last  enabled at (50850): [<c001bc64>] _local_bh_enable+0x14/0x18
+[  403.505741] softirqs last disabled at (50851): [<c001c268>] irq_exit+0x88/0xdc
+[  403.513026]
+[  403.513026] other info that might help us debug this:
+[  403.519593]  Possible unsafe locking scenario:
+[  403.519593]
+[  403.525548]        CPU0
+[  403.528020]        ----
+[  403.530491]   lock(&(&imxdma->lock)->rlock);
+[  403.534828]   <Interrupt>
+[  403.537474]     lock(&(&imxdma->lock)->rlock);
+[  403.541983]
+[  403.541983]  *** DEADLOCK ***
+[  403.541983]
+[  403.547951] no locks held by swapper/0.
+[  403.551813]
+[  403.551813] stack backtrace:
+[  403.556222] CPU: 0 PID: 0 Comm: swapper Not tainted 3.10.0-20130823+ #904
+[  403.563039] Backtrace:
+[  403.565581] [<c000b98c>] (dump_backtrace+0x0/0x10c) from [<c000bb28>] (show_stack+0x18/0x1c)
+[  403.574054]  r6:00000000 r5:c05c51d8 r4:c040bd58 r3:00200000
+[  403.579872] [<c000bb10>] (show_stack+0x0/0x1c) from [<c02f398c>] (dump_stack+0x20/0x28)
+[  403.587955] [<c02f396c>] (dump_stack+0x0/0x28) from [<c02f29c8>] (print_usage_bug.part.28+0x224/0x28c)
+[  403.597340] [<c02f27a4>] (print_usage_bug.part.28+0x0/0x28c) from [<c004b404>] (mark_lock+0x440/0x6b4)
+[  403.606682]  r8:c004a41c r7:00000000 r6:c040bd58 r5:c040c040 r4:00000002
+[  403.613566] [<c004afc4>] (mark_lock+0x0/0x6b4) from [<c004d844>] (__lock_acquire+0x6cc/0x1a64)
+[  403.622244] [<c004d178>] (__lock_acquire+0x0/0x1a64) from [<c004f15c>] (lock_acquire+0x94/0xa8)
+[  403.631010] [<c004f0c8>] (lock_acquire+0x0/0xa8) from [<c02f74e4>] (_raw_spin_lock+0x54/0x8c)
+[  403.639614] [<c02f7490>] (_raw_spin_lock+0x0/0x8c) from [<c019d77c>] (imxdma_tasklet+0x20/0x134)
+[  403.648434]  r6:c3847010 r5:c040e890 r4:c38470d4
+[  403.653194] [<c019d75c>] (imxdma_tasklet+0x0/0x134) from [<c001c70c>] (tasklet_action+0x8c/0xdc)
+[  403.662013]  r8:c0599160 r7:00000000 r6:00000000 r5:c040e890 r4:c3847114 r3:c019d75c
+[  403.670042] [<c001c680>] (tasklet_action+0x0/0xdc) from [<c001bd4c>] (__do_softirq+0xe4/0x1f0)
+[  403.678687]  r7:00000101 r6:c0402000 r5:c059919c r4:00000001
+[  403.684498] [<c001bc68>] (__do_softirq+0x0/0x1f0) from [<c001c268>] (irq_exit+0x88/0xdc)
+[  403.692652] [<c001c1e0>] (irq_exit+0x0/0xdc) from [<c0009cc8>] (handle_IRQ+0x6c/0x8c)
+[  403.700514]  r4:00000030 r3:00000110
+[  403.704192] [<c0009c5c>] (handle_IRQ+0x0/0x8c) from [<c0008714>] (avic_handle_irq+0x3c/0x48)
+[  403.712664]  r5:c0403f28 r4:c0593ebc
+[  403.716343] [<c00086d8>] (avic_handle_irq+0x0/0x48) from [<c0008f84>] (__irq_svc+0x44/0x74)
+[  403.724733] Exception stack(0xc0403f28 to 0xc0403f70)
+[  403.729841] 3f20:                   00000001 00000004 00000000 20000013 c0402000 c04104a8
+[  403.738078] 3f40: 00000002 c0b69620 a0004000 41069264 a03fb5f4 c0403f7c c0403f40 c0403f70
+[  403.746301] 3f60: c004b92c c0009e74 20000013 ffffffff
+[  403.751383]  r6:ffffffff r5:20000013 r4:c0009e74 r3:c004b92c
+[  403.757210] [<c0009e30>] (arch_cpu_idle+0x0/0x4c) from [<c0040b04>] (cpu_startup_entry+0x88/0xf4)
+[  403.766161] [<c0040a7c>] (cpu_startup_entry+0x0/0xf4) from [<c02f00d0>] (rest_init+0xb8/0xe0)
+[  403.774753] [<c02f0018>] (rest_init+0x0/0xe0) from [<c03e07dc>] (start_kernel+0x28c/0x2d4)
+[  403.783051]  r6:c03fc484 r5:ffffffff r4:c040a0e0
+[  403.787797] [<c03e0550>] (start_kernel+0x0/0x2d4) from [<a0008040>] (0xa0008040)
 
 Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
 ---
- drivers/dma/imx-dma.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/dma/imx-dma.c | 19 ++++++++-----------
+ 1 file changed, 8 insertions(+), 11 deletions(-)
 
 diff --git a/drivers/dma/imx-dma.c b/drivers/dma/imx-dma.c
-index 78f8ca5..442af61 100644
+index 442af61..247aa7c 100644
 --- a/drivers/dma/imx-dma.c
 +++ b/drivers/dma/imx-dma.c
-@@ -883,7 +883,7 @@ static struct dma_async_tx_descriptor *imxdma_prep_dma_cyclic(
- 	kfree(imxdmac->sg_list);
+@@ -437,17 +437,18 @@ static void dma_irq_handle_channel(struct imxdma_channel *imxdmac)
+ 	struct imxdma_engine *imxdma = imxdmac->imxdma;
+ 	int chno = imxdmac->channel;
+ 	struct imxdma_desc *desc;
++	unsigned long flags;
  
- 	imxdmac->sg_list = kcalloc(periods + 1,
--			sizeof(struct scatterlist), GFP_KERNEL);
-+			sizeof(struct scatterlist), GFP_ATOMIC);
- 	if (!imxdmac->sg_list)
- 		return NULL;
+-	spin_lock(&imxdma->lock);
++	spin_lock_irqsave(&imxdma->lock, flags);
+ 	if (list_empty(&imxdmac->ld_active)) {
+-		spin_unlock(&imxdma->lock);
++		spin_unlock_irqrestore(&imxdma->lock, flags);
+ 		goto out;
+ 	}
  
+ 	desc = list_first_entry(&imxdmac->ld_active,
+ 				struct imxdma_desc,
+ 				node);
+-	spin_unlock(&imxdma->lock);
++	spin_unlock_irqrestore(&imxdma->lock, flags);
+ 
+ 	if (desc->sg) {
+ 		u32 tmp;
+@@ -519,7 +520,6 @@ static int imxdma_xfer_desc(struct imxdma_desc *d)
+ {
+ 	struct imxdma_channel *imxdmac = to_imxdma_chan(d->desc.chan);
+ 	struct imxdma_engine *imxdma = imxdmac->imxdma;
+-	unsigned long flags;
+ 	int slot = -1;
+ 	int i;
+ 
+@@ -527,7 +527,6 @@ static int imxdma_xfer_desc(struct imxdma_desc *d)
+ 	switch (d->type) {
+ 	case IMXDMA_DESC_INTERLEAVED:
+ 		/* Try to get a free 2D slot */
+-		spin_lock_irqsave(&imxdma->lock, flags);
+ 		for (i = 0; i < IMX_DMA_2D_SLOTS; i++) {
+ 			if ((imxdma->slots_2d[i].count > 0) &&
+ 			((imxdma->slots_2d[i].xsr != d->x) ||
+@@ -537,10 +536,8 @@ static int imxdma_xfer_desc(struct imxdma_desc *d)
+ 			slot = i;
+ 			break;
+ 		}
+-		if (slot < 0) {
+-			spin_unlock_irqrestore(&imxdma->lock, flags);
++		if (slot < 0)
+ 			return -EBUSY;
+-		}
+ 
+ 		imxdma->slots_2d[slot].xsr = d->x;
+ 		imxdma->slots_2d[slot].ysr = d->y;
+@@ -549,7 +546,6 @@ static int imxdma_xfer_desc(struct imxdma_desc *d)
+ 
+ 		imxdmac->slot_2d = slot;
+ 		imxdmac->enabled_2d = true;
+-		spin_unlock_irqrestore(&imxdma->lock, flags);
+ 
+ 		if (slot == IMX_DMA_2D_SLOT_A) {
+ 			d->config_mem &= ~CCR_MSEL_B;
+@@ -625,8 +621,9 @@ static void imxdma_tasklet(unsigned long data)
+ 	struct imxdma_channel *imxdmac = (void *)data;
+ 	struct imxdma_engine *imxdma = imxdmac->imxdma;
+ 	struct imxdma_desc *desc;
++	unsigned long flags;
+ 
+-	spin_lock(&imxdma->lock);
++	spin_lock_irqsave(&imxdma->lock, flags);
+ 
+ 	if (list_empty(&imxdmac->ld_active)) {
+ 		/* Someone might have called terminate all */
+@@ -663,7 +660,7 @@ static void imxdma_tasklet(unsigned long data)
+ 				 __func__, imxdmac->channel);
+ 	}
+ out:
+-	spin_unlock(&imxdma->lock);
++	spin_unlock_irqrestore(&imxdma->lock, flags);
+ }
+ 
+ static int imxdma_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
 -- 
 1.8.4.rc3
