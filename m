@@ -1,60 +1,46 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 17 Sep 2013 10:48:59 -0500
-Subject: [PATCH 1/4] usb: musb: Call atomic_notifier_call_chain when
- status is changed
-In-Reply-To: <1378630239-10006-2-git-send-email-pali.rohar@gmail.com>
-References: <1378630239-10006-1-git-send-email-pali.rohar@gmail.com>
- <1378630239-10006-2-git-send-email-pali.rohar@gmail.com>
-Message-ID: <20130917154859.GK15645@radagast>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Tue, 17 Sep 2013 10:51:43 -0500
+Subject: [PATCH] ARM: msm: Rename msm devicetrees to have standard 'qcom'
+ prefix
+Message-ID: <1379433103-23995-1-git-send-email-galak@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Sep 08, 2013 at 10:50:36AM +0200, Pali Roh?r wrote:
-> More power supply drivers depends on vbus events and without it they not
-> working. Power supply drivers using usb_register_notifier, so to deliver
-> events it is needed to call atomic_notifier_call_chain.
-> 
-> So without atomic notifier power supply driver isp1704 not retrieving
-> vbus status and reporting bogus values to userspace and also to board
-> platform data functions. Without proper data charger drivers trying to
-> charge battery also when charger is disconnected or do not start charging
-> when wallcharger connects.
-> 
-> Atomic notifier in musb driver was used before v3.5 and was replaced with
-> omap mailbox. This patch adding atomic_notifier_call_chain call from
-> function omap_musb_set_mailbox.
-> 
-> Signed-off-by: Pali Roh?r <pali.rohar@gmail.com>
-> ---
->  drivers/usb/musb/omap2430.c       |    3 +++
->  drivers/usb/phy/phy-twl4030-usb.c |    2 ++
->  2 files changed, 5 insertions(+)
-> 
-> diff --git a/drivers/usb/musb/omap2430.c b/drivers/usb/musb/omap2430.c
-> index f44e8b5..5c40252 100644
-> --- a/drivers/usb/musb/omap2430.c
-> +++ b/drivers/usb/musb/omap2430.c
-> @@ -305,6 +305,9 @@ static void omap_musb_set_mailbox(struct omap2430_glue *glue)
->  	default:
->  		dev_dbg(dev, "ID float\n");
->  	}
-> +
-> +	atomic_notifier_call_chain(&musb->xceiv->notifier,
-> +			musb->xceiv->last_event, NULL);
+Use a standard 'qcom' prefix to denotate device trees meant for Qualcomm
+based processors.
 
-let's add a wrapper for this:
+Signed-off-by: Kumar Gala <galak@codeaurora.org>
+---
+ arch/arm/boot/dts/Makefile                                    | 4 ++--
+ arch/arm/boot/dts/{msm8660-surf.dts => qcom-msm8660-surf.dts} | 0
+ arch/arm/boot/dts/{msm8960-cdp.dts => qcom-msm8960-cdp.dts}   | 0
+ 3 files changed, 2 insertions(+), 2 deletions(-)
+ rename arch/arm/boot/dts/{msm8660-surf.dts => qcom-msm8660-surf.dts} (100%)
+ rename arch/arm/boot/dts/{msm8960-cdp.dts => qcom-msm8960-cdp.dts} (100%)
 
-static inline int usb_phy_notify(struct usb phy *x, unsigned val, void *v)
-{
-	return atomic_notifier_call_chain(&x->notifier, val, v);
-}
-
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index cc0f1fb..b437846 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -101,8 +101,8 @@ dtb-$(CONFIG_ARCH_KIRKWOOD) += kirkwood-cloudbox.dtb \
+ 	kirkwood-ts219-6282.dtb \
+ 	kirkwood-openblocks_a6.dtb
+ dtb-$(CONFIG_ARCH_MARCO) += marco-evb.dtb
+-dtb-$(CONFIG_ARCH_MSM) += msm8660-surf.dtb \
+-	msm8960-cdp.dtb
++dtb-$(CONFIG_ARCH_MSM) += qcom-msm8660-surf.dtb \
++	qcom-msm8960-cdp.dtb
+ dtb-$(CONFIG_ARCH_MVEBU) += armada-370-db.dtb \
+ 	armada-370-mirabox.dtb \
+ 	armada-370-netgear-rn102.dtb \
+diff --git a/arch/arm/boot/dts/msm8660-surf.dts b/arch/arm/boot/dts/qcom-msm8660-surf.dts
+similarity index 100%
+rename from arch/arm/boot/dts/msm8660-surf.dts
+rename to arch/arm/boot/dts/qcom-msm8660-surf.dts
+diff --git a/arch/arm/boot/dts/msm8960-cdp.dts b/arch/arm/boot/dts/qcom-msm8960-cdp.dts
+similarity index 100%
+rename from arch/arm/boot/dts/msm8960-cdp.dts
+rename to arch/arm/boot/dts/qcom-msm8960-cdp.dts
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130917/df17f742/attachment-0001.sig>
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
