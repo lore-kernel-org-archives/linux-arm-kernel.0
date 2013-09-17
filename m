@@ -1,46 +1,37 @@
-From: ethan@ethantuttle.com (Ethan Tuttle)
-Date: Mon, 16 Sep 2013 20:43:19 -0700
-Subject: mvneta: oops in __rcu_read_lock on mirabox
-In-Reply-To: <20130916182807.GO12758@n2100.arm.linux.org.uk>
-References: <CACzLR4tTvt+ROEhkXUCQhV6=bPPTX4LFSkWfrEhF+OdM1Jm1Rw@mail.gmail.com>
- <20130915205701.5c61a444@skate> <20130916065047.GH27487@1wt.eu>
- <20130916175152.4e013457@skate>
- <CACzLR4twTNjzU8hK3L1cYUXnEH1ydwY6jnYoOG+9vLB3-4uQ4w@mail.gmail.com>
- <20130916163937.GC3188@1wt.eu> <20130916164412.GD3188@1wt.eu>
- <CACzLR4ssOPsmYaEh2ohe4HL5j+67keDYnmR4YezNB=aO7Pj5kA@mail.gmail.com>
- <20130916174708.GG3188@1wt.eu>
- <20130916182807.GO12758@n2100.arm.linux.org.uk>
-Message-ID: <CACzLR4suLD90p=sEhB-qg1u35t66zKfrGQref1jX42fEfu3D8g@mail.gmail.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Mon, 16 Sep 2013 22:47:13 -0500
+Subject: [PATCH] ARM: kvm: rename cpu_reset to avoid name clash
+In-Reply-To: <CAOesGMiGaM=s85iKHPXd9eBiL1vy3SVws+KR0ToxPpZeiisscg@mail.gmail.com>
+References: <1378938461-10835-1-git-send-email-olof@lixom.net>
+ <CAOesGMjum0TSyudXiZtXHOGX4R7dBAhjUpoYnwjTcfD1MMpTxw@mail.gmail.com>
+ <20130912015002.GO9860@cbox>
+ <CAOesGMiGaM=s85iKHPXd9eBiL1vy3SVws+KR0ToxPpZeiisscg@mail.gmail.com>
+Message-ID: <CAMJs5B9NW6cDuG-xwYucP8rONn0MdEtwTm5R2p=aBE4Q3EHNOg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I just built 3.11.1 with the posted config and got the usual crash in
-about 2 minutes with a ping flood.
-
-The kernel image is available here:
-
-https://www.dropbox.com/s/cqkqop3jjb1stk3/uImage-dtb.armada-370-mirabox
-
-The md5 is 05f350a193c6c60d9dac40bea810bbdd.  You may notice the
-version string reveals a patch on top of 3.11.1, this is just a
-makefile patch to "Build a uImage with dtb already appended".
-
-Tcpdump captured about 2,800 icmp packets per second while the ping
-flood was running.
-
-Hope this helps!  If Willy wants to share a kernel image I'll see if I
-can crash it :)
-
-Thanks,
-
-Ethan
-
-On Mon, Sep 16, 2013 at 11:28 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Mon, Sep 16, 2013 at 07:47:08PM +0200, Willy Tarreau wrote:
->> I'll have to rebuild with your config and exact 3.11 to test again.
->> Can you check the packet rate of your ping flood to give an order of
->> magnitude so that we're sure to be in the same conditions ?
+On 16 September 2013 19:41, Olof Johansson <olof@lixom.net> wrote:
+> Hi,
 >
-> Also, try swapping kernel binaries between yourselves, so that you can
-> be sure you're running the exact same kernel on different hardware.
+> On Wed, Sep 11, 2013 at 6:50 PM, Christoffer Dall
+> <christoffer.dall@linaro.org> wrote:
+>> On Wed, Sep 11, 2013 at 03:39:26PM -0700, Olof Johansson wrote:
+>>> On Wed, Sep 11, 2013 at 3:27 PM, Olof Johansson <olof@lixom.net> wrote:
+>>> > cpu_reset is already #defined in <asm/proc-fns.h> as processor.reset,
+>>> > so it expands here and causes problems.
+>>> >
+>>> > Signed-off-by: Olof Johansson <olof@lixom.net>
+>>>
+>>> I just noticed this is broken on 3.10 too, so if/when applying feel free to add:
+>>>
+>>> Cc: <stable@vger.kernel.org> # 3.10+
+>>>
+>> Thanks for the fix, applied.
+>
+> I haven't seen this hit linux-next yet?
+>
+I was waiting for kvm/next to move to 3.12-rc1 and base the patch for
+kvm-arm-next off there, but I pushed this to kvm-arm-next now and it
+should land in linux-next as soon as they update.
+
+-Christoffer
