@@ -1,68 +1,31 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 17 Sep 2013 14:34:12 -0400 (EDT)
-Subject: [PATCH v2] ARM: fix Thumb-2 bug in AES assembler code
-In-Reply-To: <1379438195-6911-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1379438195-6911-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <alpine.LFD.2.03.1309171429580.20709@syhkavp.arg>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Tue, 17 Sep 2013 12:38:53 -0600
+Subject: [PATCH] bus: mvebu-mbus: Fix optional pcie-mem/io-aperture properties
+Message-ID: <20130917183853.GC21230@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 17 Sep 2013, Ard Biesheuvel wrote:
+If the property was not specified then then the returned resource
+had a resource_size(..) == 1, rather than 0. The PCI-E driver checks
+for 0 so it blindly continues on with a corrupted resource.
 
-> Patch 638591c enabled building the AES assembler code in Thumb2 mode.
-> However, this code used arithmetic involving PC rather than adr{l}
-> instructions to generate PC-relative references to the lookup tables,
-> and this break in Thumb mode due to the different PC offset.
-> 
-> Use adr instructions instead.
-> 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
-> 
-> v2:
-> - use 'adr' instruction rather than explicit PC arithmetic
-> - move the tables around so they are in range for 'adr' in each mode
-> 
->  arch/arm/crypto/aes-armv4.S | 388 ++++++++++++++++++++++----------------------
->  1 file changed, 193 insertions(+), 195 deletions(-)
+Signed-off-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
+---
+ drivers/bus/mvebu-mbus.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-No no no.  NAK.
-
-This makes the patch completely unreviewable.  And unacceptable for 
-inclusion into the stable tree.
-
-Also, why do you have to move tables around?
-
-Isn't the following sufficient to fix the issue?
-
-diff --git a/arch/arm/crypto/aes-armv4.S b/arch/arm/crypto/aes-armv4.S
-index 19d6cd6f29..3a14ea8fe9 100644
---- a/arch/arm/crypto/aes-armv4.S
-+++ b/arch/arm/crypto/aes-armv4.S
-@@ -148,7 +148,7 @@ AES_Te:
- @ 		 const AES_KEY *key) {
- .align	5
- ENTRY(AES_encrypt)
--	sub	r3,pc,#8		@ AES_encrypt
-+	adr	r3,AES_encrypt
- 	stmdb   sp!,{r1,r4-r12,lr}
- 	mov	r12,r0		@ inp
- 	mov	r11,r2
-@@ -381,7 +381,7 @@ _armv4_AES_encrypt:
- .align	5
- ENTRY(private_AES_set_encrypt_key)
- _armv4_AES_set_encrypt_key:
--	sub	r3,pc,#8		@ AES_set_encrypt_key
-+	adr	r3,_armv4_AES_set_encrypt_key
- 	teq	r0,#0
- 	moveq	r0,#-1
- 	beq	.Labrt
-@@ -843,7 +843,7 @@ AES_Td:
- @ 		 const AES_KEY *key) {
- .align	5
- ENTRY(AES_decrypt)
--	sub	r3,pc,#8		@ AES_decrypt
-+	adr	r3,AES_decrypt
- 	stmdb   sp!,{r1,r4-r12,lr}
- 	mov	r12,r0		@ inp
- 	mov	r11,r2
+diff --git a/drivers/bus/mvebu-mbus.c b/drivers/bus/mvebu-mbus.c
+index 19ab6ff..7a66203 100644
+--- a/drivers/bus/mvebu-mbus.c
++++ b/drivers/bus/mvebu-mbus.c
+@@ -866,6 +866,8 @@ static void __init mvebu_mbus_get_pcie_resources(struct device_node *np,
+ 	 */
+ 	memset(mem, 0, sizeof(struct resource));
+ 	memset(io, 0, sizeof(struct resource));
++	mem->end--;
++	io->end--;
+ 
+ 	ret = of_property_read_u32_array(np, "pcie-mem-aperture", reg, ARRAY_SIZE(reg));
+ 	if (!ret) {
+-- 
+1.8.1.2
