@@ -1,97 +1,53 @@
-From: pali.rohar@gmail.com (Pali =?utf-8?q?Roh=C3=A1r?=)
-Date: Tue, 17 Sep 2013 18:05:15 +0200
-Subject: [PATCH 1/4] usb: musb: Call atomic_notifier_call_chain when
- status is changed
-In-Reply-To: <20130917154917.GL15645@radagast>
-References: <1378630239-10006-1-git-send-email-pali.rohar@gmail.com>
- <1378630239-10006-2-git-send-email-pali.rohar@gmail.com>
- <20130917154917.GL15645@radagast>
-Message-ID: <201309171805.15460@pali>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 17 Sep 2013 09:09:36 -0700
+Subject: [PATCHv6 01/45] CLK: TI: Add DPLL clock support
+In-Reply-To: <1377782197-10611-2-git-send-email-t-kristo@ti.com>
+References: <1377782197-10611-1-git-send-email-t-kristo@ti.com>
+ <1377782197-10611-2-git-send-email-t-kristo@ti.com>
+Message-ID: <20130917160936.GB9994@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 17 September 2013 17:48:59 you wrote:
-> On Sun, Sep 08, 2013 at 10:50:36AM +0200, Pali Roh?r wrote:
-> > More power supply drivers depends on vbus events and without
-> > it they not working. Power supply drivers using
-> > usb_register_notifier, so to deliver events it is needed to
-> > call atomic_notifier_call_chain.
-> > 
-> > So without atomic notifier power supply driver isp1704 not
-> > retrieving vbus status and reporting bogus values to
-> > userspace and also to board platform data functions.
-> > Without proper data charger drivers trying to charge
-> > battery also when charger is disconnected or do not start
-> > charging when wallcharger connects.
-> > 
-> > Atomic notifier in musb driver was used before v3.5 and was
-> > replaced with omap mailbox. This patch adding
-> > atomic_notifier_call_chain call from function
-> > omap_musb_set_mailbox.
-> > 
-> > Signed-off-by: Pali Roh?r <pali.rohar@gmail.com>
-> > ---
-> > 
-> >  drivers/usb/musb/omap2430.c       |    3 +++
-> >  drivers/usb/phy/phy-twl4030-usb.c |    2 ++
-> >  2 files changed, 5 insertions(+)
-> > 
-> > diff --git a/drivers/usb/musb/omap2430.c
-> > b/drivers/usb/musb/omap2430.c index f44e8b5..5c40252 100644
-> > --- a/drivers/usb/musb/omap2430.c
-> > +++ b/drivers/usb/musb/omap2430.c
-> > @@ -305,6 +305,9 @@ static void omap_musb_set_mailbox(struct
-> > omap2430_glue *glue)
-> > 
-> >  	default:
-> >  		dev_dbg(dev, "ID float\n");
-> >  	
-> >  	}
-> > 
-> > +
-> > +	atomic_notifier_call_chain(&musb->xceiv->notifier,
-> > +			musb->xceiv->last_event, NULL);
-> 
-> let's add a wrapper for this:
-> 
-> static inline int usb_phy_notify(struct usb phy *x, unsigned
-> val, void *v) {
-> 	return atomic_notifier_call_chain(&x->notifier, val, v);
-> }
+* Tero Kristo <t-kristo@ti.com> [130829 06:24]:
+> The OMAP clock driver now supports DPLL clock type. This patch also
+> adds support for DT DPLL nodes.
+...
 
-Where to add this wrapper? To omap2430.c? or some include file?
+> +- reg-names : array of the register names for controlling the device, sorted
+> +  in the same order as the reg property.
+> +	"control" - contains the control register base address
+> +        "idlest" - contains the idle status register base address
+> +        "autoidle" - contains the autoidle register base address
+> +        "mult-div1" - contains the multiplier / divider register base address
 
-On Tuesday 17 September 2013 17:49:17 Felipe Balbi wrote:
-> On Sun, Sep 08, 2013 at 10:50:36AM +0200, Pali Roh?r wrote:
-> > diff --git a/drivers/usb/phy/phy-twl4030-usb.c
-> > b/drivers/usb/phy/phy-twl4030-usb.c index 8f78d2d..efe6155
-> > 100644
-> > --- a/drivers/usb/phy/phy-twl4030-usb.c
-> > +++ b/drivers/usb/phy/phy-twl4030-usb.c
-> > @@ -705,6 +705,8 @@ static int twl4030_usb_probe(struct
-> > platform_device *pdev)
-> > 
-> >  	if (device_create_file(&pdev->dev, &dev_attr_vbus))
-> >  	
-> >  		dev_warn(&pdev->dev, "could not create sysfs file\n");
-> > 
-> > +	ATOMIC_INIT_NOTIFIER_HEAD(&twl->phy.notifier);
-> 
-> BTW, this is a bugfix, send separately.
+FYI, looks like there's some tab vs spaces issue with the
+formatting above.
 
-What to send separately?
+> +Examples:
+> +	dpll_core_ck: dpll_core_ck at 44e00490 {
+> +		#clock-cells = <0>;
+> +		compatible = "ti,omap4-dpll-core-clock";
+> +		clocks = <&sys_clkin_ck>, <&sys_clkin_ck>;
+> +		reg = <0x44e00490 0x4>, <0x44e0045c 0x4>, <0x0 0x4>,
+> +				<0x44e00468 0x4>;
+> +		reg-names = "control", "idlest", "autoidle", "mult-div1";
+> +	};
+> +
+> +	dpll2_ck: dpll2_ck at 48004004 {
+> +		#clock-cells = <0>;
+> +		compatible = "ti,omap3-dpll-clock";
+> +		clocks = <&sys_ck>, <&dpll2_fck>;
+> +		ti,modes = <0xa2>;
+> +		reg = <0x48004004 0x4>, <0x48004024 0x4>, <0x48004034 0x4>,
+> +			<0x48004040 0x4>;
+> +		reg-names = "control", "idlest", "autoidle", "mult-div1";
+> +		ti,clkdm-name = "dpll2_clkdm";
+> +	};
 
-This full patch 1/4 is bugfix. And I did not understand what you 
-want. Maybe it could be easier for you to apply this small 3+2 
-lines patch how you need.
+Do you need the reg-names at all? You may be able to do that
+automatically in the driver based on the compatible flags if
+you only have few different types.
 
--- 
-Pali Roh?r
-pali.rohar at gmail.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130917/b9164414/attachment.sig>
+Regards,
+
+Tony
