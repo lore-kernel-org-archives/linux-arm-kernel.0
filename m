@@ -1,82 +1,107 @@
-From: B35083@freescale.com (Lu Jingchang-B35083)
-Date: Tue, 17 Sep 2013 07:37:48 +0000
-Subject: [PATCH 3/3] dma: Add Freescale eDMA engine driver support
-In-Reply-To: <20130917045359.GN17188@intel.com>
-References: <1378374799-16357-1-git-send-email-b35083@freescale.com>
- <20130917045359.GN17188@intel.com>
-Message-ID: <B56CDBE15CE27145A4B77D2D24263E85223E0C@039-SN1MPN1-003.039d.mgd.msft.net>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Tue, 17 Sep 2013 12:31:34 +0530
+Subject: [PATCH 1/3] dmaengine: pl330: Set residue in tx_status callback.
+In-Reply-To: <1378879685-5352-2-git-send-email-padma.v@samsung.com>
+References: <1378879685-5352-1-git-send-email-padma.v@samsung.com>
+ <1378879685-5352-2-git-send-email-padma.v@samsung.com>
+Message-ID: <20130917070134.GR17188@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-> -----Original Message-----
-> From: Vinod Koul [mailto:vinod.koul at intel.com]
-> Sent: Tuesday, September 17, 2013 12:54 PM
-> To: Lu Jingchang-B35083
-> Cc: djbw at fb.com; shawn.guo at linaro.org; linux-kernel at vger.kernel.org;
-> linux-arm-kernel at lists.infradead.org; devicetree at vger.kernel.org; Wang
-> Huan-B18965
-> Subject: Re: [PATCH 3/3] dma: Add Freescale eDMA engine driver support
+On Wed, Sep 11, 2013 at 11:38:03AM +0530, Padmavathi Venna wrote:
+> From: Dylan Reid <dgreid@chromium.org>
 > 
-> I need ACK from DT maintainers on the above parts
-Should I cc this to one of the DT maintainers? Thanks.
-
+> Fill txstate.residue with the amount of bytes remaining in the current
+> transfer if the transfer is not complete.  This will be of particular
+> use to i2s DMA transfers, providing more accurate hw_ptr values to ASoC.
 > 
-> > +static int fsl_edma_control(struct dma_chan *chan, enum dma_ctrl_cmd
-> cmd,
-> > +		unsigned long arg)
-> > +{
-> > +	struct fsl_edma_chan *fsl_chan = to_fsl_edma_chan(chan);
-> > +	struct dma_slave_config *cfg = (void *)arg;
-> > +
-> > +	switch (cmd) {
-> > +	case DMA_TERMINATE_ALL:
-> > +		fsl_edma_disable_request(fsl_chan);
-> > +		fsl_chan->edesc = NULL;
-> you need to hold the lock here to prevent race here!
-Thanks, I will fix this in the next version of the patch.
-
+> Signed-off-by: Dylan Reid <dgreid@chromium.org>
+> Reviewed-by: Olof Johansson <olofj@chromium.org>
+> Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
+> ---
+>  drivers/dma/pl330.c |   55 ++++++++++++++++++++++++++++++++++++++++++++++++++-
+>  1 files changed, 54 insertions(+), 1 deletions(-)
 > 
-> > +		vchan_free_chan_resources(&fsl_chan->vchan);
-> > +		return 0;
-> > +
-> > +	case DMA_SLAVE_CONFIG:
-> > +		fsl_chan->fsc.dir = cfg->direction;
-> > +		if (cfg->direction == DMA_DEV_TO_MEM) {
-> > +			fsl_chan->fsc.dev_addr = cfg->src_addr;
-> > +			fsl_chan->fsc.addr_width = cfg->src_addr_width;
-> > +			fsl_chan->fsc.burst = cfg->src_maxburst;
-> > +			fsl_chan->fsc.attr = fsl_edma_get_tcd_attr(cfg-
-> >src_addr_width);
-> > +		} else if (cfg->direction == DMA_MEM_TO_DEV) {
-> > +			fsl_chan->fsc.dev_addr = cfg->dst_addr;
-> > +			fsl_chan->fsc.addr_width = cfg->dst_addr_width;
-> > +			fsl_chan->fsc.burst = cfg->dst_maxburst;
-> > +			fsl_chan->fsc.attr = fsl_edma_get_tcd_attr(cfg-
-> >dst_addr_width);
-> > +		} else {
-> > +			return -EINVAL;
-> > +		}
-> > +
-> > +		if (!cfg->slave_id) {
-> > +			return -EINVAL;
-> should you check for this first, you wrote the channel with config above
-> and now
-> returning error?
-Yes, the slave id should be checked first, thanks!
+> diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
+> index 593827b..7ab9136 100644
+> --- a/drivers/dma/pl330.c
+> +++ b/drivers/dma/pl330.c
+> @@ -2476,11 +2476,64 @@ static void pl330_free_chan_resources(struct dma_chan *chan)
+>  	spin_unlock_irqrestore(&pch->lock, flags);
+>  }
+>  
+> +static inline int
+> +pl330_src_addr_in_desc(struct dma_pl330_desc *desc, unsigned int sar)
+> +{
+> +	return ((desc->px.src_addr <= sar) &&
+> +		(sar <= (desc->px.src_addr + desc->px.bytes)));
+> +}
+> +
+> +static inline int
+> +pl330_dst_addr_in_desc(struct dma_pl330_desc *desc, unsigned int dar)
+> +{
+> +	return ((desc->px.dst_addr <= dar) &&
+> +		(dar <= (desc->px.dst_addr + desc->px.bytes)));
+> +}
+> +
+> +static unsigned int pl330_tx_residue(struct dma_chan *chan)
+> +{
+> +	struct dma_pl330_chan *pch = to_pchan(chan);
+> +	void __iomem *regs = pch->dmac->pif.base;
+> +	struct pl330_thread *thrd = pch->pl330_chid;
+> +	struct dma_pl330_desc *desc;
+> +	unsigned int sar, dar;
+> +	unsigned int residue = 0;
+> +	unsigned long flags;
+> +
+> +	sar = readl(regs + SA(thrd->id));
+> +	dar = readl(regs + DA(thrd->id));
+> +
+> +	spin_lock_irqsave(&pch->lock, flags);
+> +
+> +	/* Find the desc related to the current buffer. */
+> +	list_for_each_entry(desc, &pch->work_list, node) {
+> +		if (desc->rqcfg.src_inc && pl330_src_addr_in_desc(desc, sar)) {
+> +			residue = desc->px.bytes - (sar - desc->px.src_addr);
+> +			goto found_unlock;
+> +		}
+> +		if (desc->rqcfg.dst_inc && pl330_dst_addr_in_desc(desc, dar)) {
+> +			residue = desc->px.bytes - (dar - desc->px.dst_addr);
+> +			goto found_unlock;
+> +		}
+> +	}
+> +
+> +found_unlock:
+> +	spin_unlock_irqrestore(&pch->lock, flags);
+> +
+> +	return residue;
+> +}
+> +
+>  static enum dma_status
+>  pl330_tx_status(struct dma_chan *chan, dma_cookie_t cookie,
+>  		 struct dma_tx_state *txstate)
+>  {
+> -	return dma_cookie_status(chan, cookie, txstate);
+> +	enum dma_status ret;
+> +
+> +	ret = dma_cookie_status(chan, cookie, txstate);
+> +	if (ret != DMA_SUCCESS) /* Not complete, check amount left. */
+if will return DMA_IN_PROGRESS for two cases
+a) when the descriptor is in queue
+b) when the descriptor is submitted and running
 
-> > +	spin_lock_irqsave(&fsl_chan->vchan.lock, flags);
-> > +	vdesc = vchan_find_desc(&fsl_chan->vchan, cookie);
-> > +	if (fsl_chan->edesc && cookie == fsl_chan->edesc->vdesc.tx.cookie)
-> > +		txstate->residue = fsl_edma_desc_residue(fsl_chan, vdesc, 1);
-> why not use true/false for the last bool arg?
-Thanks, I will use true/false instead.
+You need to take different paths for these two cases. For former just return residue
+as complete size of descriptor. For latter you cna read sar/dar and check
+remaining bytes in sg_list.
 
+Hint: use the cookie values to find the state
 
+> +		dma_set_residue(txstate, pl330_tx_residue(chan));
+> +
+> +	return ret;
+>  }
+>  
+>  static void pl330_issue_pending(struct dma_chan *chan)
 
-
-
-
-Best Regards,
-Jingchang
+~Vinod
+-- 
