@@ -1,203 +1,89 @@
 From: Russ.Dill@ti.com (Russ Dill)
-Date: Tue, 17 Sep 2013 05:43:28 -0700
-Subject: [RFC PATCH 02/11] lib: devres: Add exec versions of
- devm_ioremap_resource and friends
+Date: Tue, 17 Sep 2013 05:43:29 -0700
+Subject: [RFC PATCH 03/11] misc: SRAM: Add option to map SRAM to allow code
+ execution
 In-Reply-To: <1379421817-15759-1-git-send-email-Russ.Dill@ti.com>
 References: <1379421817-15759-1-git-send-email-Russ.Dill@ti.com>
-Message-ID: <1379421817-15759-3-git-send-email-Russ.Dill@ti.com>
+Message-ID: <1379421817-15759-4-git-send-email-Russ.Dill@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that there is an _exec version of ioremap, add devm support for it.
+This is necessary for platforms that use SRAM to execute suspend/resume stubs.
 
 Signed-off-by: Russ Dill <Russ.Dill@ti.com>
 ---
- include/linux/device.h | 17 ++++++++-
- include/linux/io.h     |  4 +++
- lib/devres.c           | 97 ++++++++++++++++++++++++++++++++++++++++++++++++--
- 3 files changed, 114 insertions(+), 4 deletions(-)
+ Documentation/devicetree/bindings/misc/sram.txt |  4 ++++
+ drivers/misc/sram.c                             | 13 ++++++++++++-
+ include/linux/platform_data/sram.h              |  8 ++++++++
+ 3 files changed, 24 insertions(+), 1 deletion(-)
+ create mode 100644 include/linux/platform_data/sram.h
 
-diff --git a/include/linux/device.h b/include/linux/device.h
-index 22b546a..204180a 100644
---- a/include/linux/device.h
-+++ b/include/linux/device.h
-@@ -596,10 +596,25 @@ extern int devres_release_group(struct device *dev, void *id);
- extern void *devm_kzalloc(struct device *dev, size_t size, gfp_t gfp);
- extern void devm_kfree(struct device *dev, void *p);
+diff --git a/Documentation/devicetree/bindings/misc/sram.txt b/Documentation/devicetree/bindings/misc/sram.txt
+index 4d0a00e..4fa9af3 100644
+--- a/Documentation/devicetree/bindings/misc/sram.txt
++++ b/Documentation/devicetree/bindings/misc/sram.txt
+@@ -8,6 +8,10 @@ Required properties:
  
--void __iomem *devm_ioremap_resource(struct device *dev, struct resource *res);
-+void __iomem *__devm_ioremap_resource(struct device *dev, struct resource *res,
-+				     bool exec);
-+static inline void __iomem *devm_ioremap_resource(struct device *dev,
-+						  struct resource *res)
-+{
-+	return __devm_ioremap_resource(dev, res, false);
-+}
- void __iomem *devm_request_and_ioremap(struct device *dev,
- 			struct resource *res);
+ - reg : SRAM iomem address range
  
-+static inline void __iomem *devm_ioremap_exec_resource(struct device *dev,
-+						       struct resource *res)
-+{
-+	return __devm_ioremap_resource(dev, res, true);
-+}
++Optional properties:
 +
-+void __iomem *devm_request_and_ioremap_exec(struct device *dev,
-+			struct resource *res);
++- map-exec: Map range to allow code execution
 +
- /* allows to add/remove a custom action to devres stack */
- int devm_add_action(struct device *dev, void (*action)(void *), void *data);
- void devm_remove_action(struct device *dev, void (*action)(void *), void *data);
-diff --git a/include/linux/io.h b/include/linux/io.h
-index f4f42fa..582b207 100644
---- a/include/linux/io.h
-+++ b/include/linux/io.h
-@@ -62,6 +62,10 @@ void __iomem *devm_ioremap(struct device *dev, resource_size_t offset,
- 			    unsigned long size);
- void __iomem *devm_ioremap_nocache(struct device *dev, resource_size_t offset,
- 				    unsigned long size);
-+void __iomem *devm_ioremap_exec(struct device *dev, resource_size_t offset,
-+			    unsigned long size);
-+void __iomem *devm_ioremap_exec_nocache(struct device *dev, resource_size_t offset,
-+				    unsigned long size);
- void devm_iounmap(struct device *dev, void __iomem *addr);
- int check_signature(const volatile void __iomem *io_addr,
- 			const unsigned char *signature, int length);
-diff --git a/lib/devres.c b/lib/devres.c
-index 8235331..06cafe5 100644
---- a/lib/devres.c
-+++ b/lib/devres.c
-@@ -72,6 +72,64 @@ void __iomem *devm_ioremap_nocache(struct device *dev, resource_size_t offset,
- EXPORT_SYMBOL(devm_ioremap_nocache);
+ Example:
  
- /**
-+ * devm_ioremap_exec - Managed ioremap_exec()
-+ * @dev: Generic device to remap IO address for
-+ * @offset: BUS offset to map
-+ * @size: Size of map
-+ *
-+ * Managed ioremap_exec().  Map is automatically unmapped on driver detach.
-+ */
-+void __iomem *devm_ioremap_exec(struct device *dev, resource_size_t offset,
-+				unsigned long size)
-+{
-+	void __iomem **ptr, *addr;
-+
-+	ptr = devres_alloc(devm_ioremap_release, sizeof(*ptr), GFP_KERNEL);
-+	if (!ptr)
-+		return NULL;
-+
-+	addr = ioremap_exec(offset, size);
-+	if (addr) {
-+		*ptr = addr;
-+		devres_add(dev, ptr);
-+	} else
-+		devres_free(ptr);
-+
-+	return addr;
-+}
-+EXPORT_SYMBOL(devm_ioremap_exec);
-+
-+/**
-+ * devm_ioremap_exec_nocache - Managed ioremap_exec_nocache()
-+ * @dev: Generic device to remap IO address for
-+ * @offset: BUS offset to map
-+ * @size: Size of map
-+ *
-+ * Managed ioremap_exec_nocache().  Map is automatically unmapped on driver
-+ * detach.
-+ */
-+void __iomem *devm_ioremap_exec_nocache(struct device *dev,
-+					resource_size_t offset,
-+					unsigned long size)
-+{
-+	void __iomem **ptr, *addr;
-+
-+	ptr = devres_alloc(devm_ioremap_release, sizeof(*ptr), GFP_KERNEL);
-+	if (!ptr)
-+		return NULL;
-+
-+	addr = ioremap_exec_nocache(offset, size);
-+	if (addr) {
-+		*ptr = addr;
-+		devres_add(dev, ptr);
-+	} else
-+		devres_free(ptr);
-+
-+	return addr;
-+}
-+EXPORT_SYMBOL(devm_ioremap_exec_nocache);
-+
-+/**
-  * devm_iounmap - Managed iounmap()
-  * @dev: Generic device to unmap for
-  * @addr: Address to unmap
-@@ -104,7 +162,8 @@ EXPORT_SYMBOL(devm_iounmap);
-  *	if (IS_ERR(base))
-  *		return PTR_ERR(base);
-  */
--void __iomem *devm_ioremap_resource(struct device *dev, struct resource *res)
-+void __iomem *__devm_ioremap_resource(struct device *dev, struct resource *res,
-+				      bool exec)
+ sram: sram at 5c000000 {
+diff --git a/drivers/misc/sram.c b/drivers/misc/sram.c
+index d87cc91..baa5008 100644
+--- a/drivers/misc/sram.c
++++ b/drivers/misc/sram.c
+@@ -28,6 +28,7 @@
+ #include <linux/slab.h>
+ #include <linux/spinlock.h>
+ #include <linux/genalloc.h>
++#include <linux/platform_data/sram.h>
+ 
+ #define SRAM_GRANULARITY	32
+ 
+@@ -38,14 +39,24 @@ struct sram_dev {
+ 
+ static int sram_probe(struct platform_device *pdev)
  {
- 	resource_size_t size;
- 	const char *name;
-@@ -125,7 +184,11 @@ void __iomem *devm_ioremap_resource(struct device *dev, struct resource *res)
- 		return ERR_PTR(-EBUSY);
- 	}
++	struct sram_platform_data *pdata = pdev->dev.platform_data;
+ 	void __iomem *virt_base;
+ 	struct sram_dev *sram;
+ 	struct resource *res;
+ 	unsigned long size;
++	bool map_exec = false;
+ 	int ret;
  
--	if (res->flags & IORESOURCE_CACHEABLE)
-+	if (exec && res->flags & IORESOURCE_CACHEABLE)
-+		dest_ptr = devm_ioremap_exec(dev, res->start, size);
-+	else if (exec)
-+		dest_ptr = devm_ioremap_exec_nocache(dev, res->start, size);
-+	else if (res->flags & IORESOURCE_CACHEABLE)
- 		dest_ptr = devm_ioremap(dev, res->start, size);
- 	else
- 		dest_ptr = devm_ioremap_nocache(dev, res->start, size);
-@@ -138,7 +201,7 @@ void __iomem *devm_ioremap_resource(struct device *dev, struct resource *res)
- 
- 	return dest_ptr;
- }
--EXPORT_SYMBOL(devm_ioremap_resource);
-+EXPORT_SYMBOL(__devm_ioremap_resource);
- 
- /**
-  * devm_request_and_ioremap() - Check, request region, and ioremap resource
-@@ -168,6 +231,34 @@ void __iomem *devm_request_and_ioremap(struct device *device,
- }
- EXPORT_SYMBOL(devm_request_and_ioremap);
- 
-+/**
-+ * devm_request_and_ioremap_exec() - Check, request region, and ioremap resource
-+ * @dev: Generic device to handle the resource for
-+ * @res: resource to be handled
-+ *
-+ * Takes all necessary steps to ioremap a mem resource. Uses managed device, so
-+ * everything is undone on driver detach. Checks arguments, so you can feed
-+ * it the result from e.g. platform_get_resource() directly. Returns the
-+ * remapped pointer or NULL on error. Usage example:
-+ *
-+ *	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+ *	base = devm_request_and_ioremap_exec(&pdev->dev, res);
-+ *	if (!base)
-+ *		return -EADDRNOTAVAIL;
-+ */
-+void __iomem *devm_request_and_ioremap_exec(struct device *device,
-+					    struct resource *res)
-+{
-+	void __iomem *dest_ptr;
++	if (of_get_property(pdev->dev.of_node, "map-exec", NULL))
++		map_exec = true;
++	if (pdata && pdata->map_exec)
++		map_exec |= true;
 +
-+	dest_ptr = devm_ioremap_exec_resource(device, res);
-+	if (IS_ERR(dest_ptr))
-+		return NULL;
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+-	virt_base = devm_ioremap_resource(&pdev->dev, res);
++	if (map_exec)
++		virt_base = devm_ioremap_exec_resource(&pdev->dev, res);
++	else
++		virt_base = devm_ioremap_resource(&pdev->dev, res);
+ 	if (IS_ERR(virt_base))
+ 		return PTR_ERR(virt_base);
+ 
+diff --git a/include/linux/platform_data/sram.h b/include/linux/platform_data/sram.h
+new file mode 100644
+index 0000000..8f5c4ba
+--- /dev/null
++++ b/include/linux/platform_data/sram.h
+@@ -0,0 +1,8 @@
++#ifndef _LINUX_SRAM_H
++#define _LINUX_SRAM_H
 +
-+	return dest_ptr;
-+}
-+EXPORT_SYMBOL(devm_request_and_ioremap_exec);
++struct sram_platform_data {
++	bool map_exec;
++};
 +
- #ifdef CONFIG_HAS_IOPORT
- /*
-  * Generic iomap devres
++#endif
 -- 
 1.8.3.2
