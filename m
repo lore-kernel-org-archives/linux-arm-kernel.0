@@ -1,109 +1,49 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 17 Sep 2013 16:24:17 -0700
-Subject: [PATCH v2 2/2] RX-51: ARM errata 430973 workaround
-In-Reply-To: <1373461145-9812-3-git-send-email-pali.rohar@gmail.com>
-References: <1362044548-5398-1-git-send-email-pali.rohar@gmail.com>
- <1373461145-9812-1-git-send-email-pali.rohar@gmail.com>
- <1373461145-9812-3-git-send-email-pali.rohar@gmail.com>
-Message-ID: <20130917232417.GK9994@atomide.com>
+Date: Tue, 17 Sep 2013 16:29:19 -0700
+Subject: [PATCH] ARM: mach-omap2: gpmc: Fix warning when CONFIG_ARM_LPAE=y
+In-Reply-To: <87y57tx6g6.fsf@linaro.org>
+References: <1377131523-19392-1-git-send-email-festevam@gmail.com>
+ <87y57tx6g6.fsf@linaro.org>
+Message-ID: <20130917232918.GM9994@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Pali Roh?r <pali.rohar@gmail.com> [130710 06:06]:
-> --- a/arch/arm/mach-omap2/board-rx51.c
-> +++ b/arch/arm/mach-omap2/board-rx51.c
+* Kevin Hilman <khilman@linaro.org> [130822 05:27]:
+> Fabio Estevam <festevam@gmail.com> writes:
+> 
+> > From: Fabio Estevam <fabio.estevam@freescale.com>
+> >
+> > When CONFIG_ARM_LPAE=y the following build warning is generated:
+> >
+> > arch/arm/mach-omap2/gpmc.c:1495:4: warning: format '%x' expects argument of type 'unsigned int', but argument 4 has type 'resource_size_t' [-Wformat]
+> >
+> > According to Documentation/printk-formats.txt '%pa' can be used to properly
+> > print 'resource_size_t'.
+> >
+> > Reported-by: Kevin Hilman <khilman@linaro.org>
+> > Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> 
+> Acked-by: Kevin Hilman <khilman@linaro.org>
 
-This file will be gone as soon as we're moving to device
-tree based booting. So let's do this in more future proof
-way.
-
-> +/**
-> + * rx51_secure_dispatcher: Routine to dispatch secure PPA API calls
-> + * @idx: The PPA API index
-> + * @process: Process ID
-> + * @flag: The flag indicating criticality of operation
-> + * @nargs: Number of valid arguments out of four.
-> + * @arg1, arg2, arg3 args4: Parameters passed to secure API
-> + *
-> + * Return the non-zero error value on failure.
-> + */
-> +static u32 rx51_secure_dispatcher(u32 idx, u32 process, u32 flag, u32 nargs,
-> +			   u32 arg1, u32 arg2, u32 arg3, u32 arg4)
-> +{
-> +	u32 ret;
-> +	u32 param[5];
-> +
-> +	param[0] = nargs+1; /* RX-51 needs number of arguments + 1 */
-> +	param[1] = arg1;
-> +	param[2] = arg2;
-> +	param[3] = arg3;
-> +	param[4] = arg4;
-> +
-> +	/*
-> +	 * Secure API needs physical address
-> +	 * pointer for the parameters
-> +	 */
-> +	local_irq_disable();
-> +	local_fiq_disable();
-> +	flush_cache_all();
-> +	outer_clean_range(__pa(param), __pa(param + 5));
-> +	ret = omap_smc3(idx, process, flag, __pa(param));
-> +	flush_cache_all();
-> +	local_fiq_enable();
-> +	local_irq_enable();
-> +
-> +	return ret;
-> +}
-
-I think this used to be in omap-secure.c, and then made rx51
-specific.. But since board-rx51.c is going away, let's move
-this function to omap-secure.c.
-
-> + * rx51_secure_update_aux_cr: Routine to modify the contents of Auxiliary Control Register
-> + *  @set_bits: bits to set in ACR
-> + *  @clr_bits: bits to clear in ACR
-> + *
-> + * Return the non-zero error value on failure.
-> +*/
-> +static u32 rx51_secure_update_aux_cr(u32 set_bits, u32 clear_bits)
-> +{
-> +	u32 acr;
-> +
-> +	/* Read ACR */
-> +	asm volatile ("mrc p15, 0, %0, c1, c0, 1" : "=r" (acr));
-> +	acr &= ~clear_bits;
-> +	acr |= set_bits;
-> +
-> +	return rx51_secure_dispatcher(RX51_PPA_WRITE_ACR,
-> +				      0,
-> +				      FLAG_START_CRITICAL,
-> +				      1, acr, 0, 0, 0);
-> +}
-
-This too.
-
->  static void __init rx51_init(void)
->  {
->  	struct omap_sdrc_params *sdrc_params;
-> @@ -105,6 +175,14 @@ static void __init rx51_init(void)
->  	rx51_peripherals_init();
->  	rx51_camera_init();
->  
-> +	if (omap_type() == OMAP2_DEVICE_TYPE_SEC) {
-> +#ifdef CONFIG_ARM_ERRATA_430973
-> +		pr_info("RX-51: Enabling ARM errata 430973 workaround\n");
-> +		/* set IBE to 1 */
-> +		rx51_secure_update_aux_cr(BIT(6), 0);
-> +#endif
-> +	}
-> +
->  	/* Ensure SDRC pins are mux'd for self-refresh */
->  	omap_mux_init_signal("sdrc_cke0", OMAP_PIN_OUTPUT);
->  	omap_mux_init_signal("sdrc_cke1", OMAP_PIN_OUTPUT);
-
-Then this can be called both from board-generic.c based on the
-compatible flag, and board-rx51.c for now.
-
-Regards,
+Thanks applying into omap-for-v3.12/fixes.
 
 Tony
+ 
+> > ---
+> >  arch/arm/mach-omap2/gpmc.c | 4 ++--
+> >  1 file changed, 2 insertions(+), 2 deletions(-)
+> >
+> > diff --git a/arch/arm/mach-omap2/gpmc.c b/arch/arm/mach-omap2/gpmc.c
+> > index f3fdd6a..ad6da1d 100644
+> > --- a/arch/arm/mach-omap2/gpmc.c
+> > +++ b/arch/arm/mach-omap2/gpmc.c
+> > @@ -1491,8 +1491,8 @@ static int gpmc_probe_generic_child(struct platform_device *pdev,
+> >  	 */
+> >  	ret = gpmc_cs_remap(cs, res.start);
+> >  	if (ret < 0) {
+> > -		dev_err(&pdev->dev, "cannot remap GPMC CS %d to 0x%x\n",
+> > -			cs, res.start);
+> > +		dev_err(&pdev->dev, "cannot remap GPMC CS %d to %pa\n",
+> > +			cs, &res.start);
+> >  		goto err;
+> >  	}
