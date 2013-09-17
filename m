@@ -1,186 +1,56 @@
-From: m.grzeschik@pengutronix.de (Michael Grzeschik)
-Date: Tue, 17 Sep 2013 15:56:07 +0200
-Subject: [[PATCH] 2/3] dma: imx-dma: fix lockdep issue between irqhandler and
- tasklet
-In-Reply-To: <1379426168-31989-1-git-send-email-m.grzeschik@pengutronix.de>
-References: <1379426168-31989-1-git-send-email-m.grzeschik@pengutronix.de>
-Message-ID: <1379426168-31989-3-git-send-email-m.grzeschik@pengutronix.de>
+From: mikedunn@newsguy.com (Mike Dunn)
+Date: Tue, 17 Sep 2013 07:07:25 -0700
+Subject: [PATCH v3] PWM: PXA: add device tree support to PWM driver
+In-Reply-To: <52375FB1.5050700@wwwdotorg.org>
+References: <1379091281-23662-1-git-send-email-mikedunn@newsguy.com>
+ <52375FB1.5050700@wwwdotorg.org>
+Message-ID: <5238621D.3050504@newsguy.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The tasklet and irqhandler are using spin_lock while other routines are
-using spin_lock_irqsave/restore. This leads to lockdep issues as
-described bellow. This patch is changing the code to use
-spinlock_irq_save/restore in both code pathes.
+On 09/16/2013 12:44 PM, Stephen Warren wrote:
+> On 09/13/2013 10:54 AM, Mike Dunn wrote:
+>> This patch adds device tree support to the PXA's PWM driver.  Only an OF match
+>> table is added; nothing needs to be extracted from the device tree node.  The
+>> existing ID table is reused for the match table data.
+>>
+>> Tested on a Palm Treo 680 (both platform data and DT cases).
+> 
+>> diff --git a/Documentation/devicetree/bindings/pwm/pxa-pwm.txt b/Documentation/devicetree/bindings/pwm/pxa-pwm.txt
+> 
+>> +- compatible: should be one of:
+>> +  - "marvell,pxa250-pwm"
+>> +  - "marvell,pxa270-pwm"
+>> +  - "marvell,pxa168-pwm"
+>> +  - "marvell,pxa910-pwm"
+> 
+> Not just one of, but possible more than one...
 
-As imxdma_xfer_desc always gets called with spin_lock_irqsave lock held,
-this patch also removes the spare call inside the routine to avoid
-double locking.
 
-[  403.358162] =================================
-[  403.362549] [ INFO: inconsistent lock state ]
-[  403.366945] 3.10.0-20130823+ #904 Not tainted
-[  403.371331] ---------------------------------
-[  403.375721] inconsistent {IN-HARDIRQ-W} -> {HARDIRQ-ON-W} usage.
-[  403.381769] swapper/0 [HC0[0]:SC1[1]:HE1:SE0] takes:
-[  403.386762]  (&(&imxdma->lock)->rlock){?.-...}, at: [<c019d77c>] imxdma_tasklet+0x20/0x134
-[  403.395201] {IN-HARDIRQ-W} state was registered at:
-[  403.400108]   [<c004b264>] mark_lock+0x2a0/0x6b4
-[  403.404798]   [<c004d7c8>] __lock_acquire+0x650/0x1a64
-[  403.410004]   [<c004f15c>] lock_acquire+0x94/0xa8
-[  403.414773]   [<c02f74e4>] _raw_spin_lock+0x54/0x8c
-[  403.419720]   [<c019d094>] dma_irq_handler+0x78/0x254
-[  403.424845]   [<c0061124>] handle_irq_event_percpu+0x38/0x1b4
-[  403.430670]   [<c00612e4>] handle_irq_event+0x44/0x64
-[  403.435789]   [<c0063a70>] handle_level_irq+0xd8/0xf0
-[  403.440903]   [<c0060a20>] generic_handle_irq+0x28/0x38
-[  403.446194]   [<c0009cc4>] handle_IRQ+0x68/0x8c
-[  403.450789]   [<c0008714>] avic_handle_irq+0x3c/0x48
-[  403.455811]   [<c0008f84>] __irq_svc+0x44/0x74
-[  403.460314]   [<c0040b04>] cpu_startup_entry+0x88/0xf4
-[  403.465525]   [<c02f00d0>] rest_init+0xb8/0xe0
-[  403.470045]   [<c03e07dc>] start_kernel+0x28c/0x2d4
-[  403.474986]   [<a0008040>] 0xa0008040
-[  403.478709] irq event stamp: 50854
-[  403.482140] hardirqs last  enabled at (50854): [<c001c6b8>] tasklet_action+0x38/0xdc
-[  403.489954] hardirqs last disabled at (50853): [<c001c6a0>] tasklet_action+0x20/0xdc
-[  403.497761] softirqs last  enabled at (50850): [<c001bc64>] _local_bh_enable+0x14/0x18
-[  403.505741] softirqs last disabled at (50851): [<c001c268>] irq_exit+0x88/0xdc
-[  403.513026]
-[  403.513026] other info that might help us debug this:
-[  403.519593]  Possible unsafe locking scenario:
-[  403.519593]
-[  403.525548]        CPU0
-[  403.528020]        ----
-[  403.530491]   lock(&(&imxdma->lock)->rlock);
-[  403.534828]   <Interrupt>
-[  403.537474]     lock(&(&imxdma->lock)->rlock);
-[  403.541983]
-[  403.541983]  *** DEADLOCK ***
-[  403.541983]
-[  403.547951] no locks held by swapper/0.
-[  403.551813]
-[  403.551813] stack backtrace:
-[  403.556222] CPU: 0 PID: 0 Comm: swapper Not tainted 3.10.0-20130823+ #904
-[  403.563039] Backtrace:
-[  403.565581] [<c000b98c>] (dump_backtrace+0x0/0x10c) from [<c000bb28>] (show_stack+0x18/0x1c)
-[  403.574054]  r6:00000000 r5:c05c51d8 r4:c040bd58 r3:00200000
-[  403.579872] [<c000bb10>] (show_stack+0x0/0x1c) from [<c02f398c>] (dump_stack+0x20/0x28)
-[  403.587955] [<c02f396c>] (dump_stack+0x0/0x28) from [<c02f29c8>] (print_usage_bug.part.28+0x224/0x28c)
-[  403.597340] [<c02f27a4>] (print_usage_bug.part.28+0x0/0x28c) from [<c004b404>] (mark_lock+0x440/0x6b4)
-[  403.606682]  r8:c004a41c r7:00000000 r6:c040bd58 r5:c040c040 r4:00000002
-[  403.613566] [<c004afc4>] (mark_lock+0x0/0x6b4) from [<c004d844>] (__lock_acquire+0x6cc/0x1a64)
-[  403.622244] [<c004d178>] (__lock_acquire+0x0/0x1a64) from [<c004f15c>] (lock_acquire+0x94/0xa8)
-[  403.631010] [<c004f0c8>] (lock_acquire+0x0/0xa8) from [<c02f74e4>] (_raw_spin_lock+0x54/0x8c)
-[  403.639614] [<c02f7490>] (_raw_spin_lock+0x0/0x8c) from [<c019d77c>] (imxdma_tasklet+0x20/0x134)
-[  403.648434]  r6:c3847010 r5:c040e890 r4:c38470d4
-[  403.653194] [<c019d75c>] (imxdma_tasklet+0x0/0x134) from [<c001c70c>] (tasklet_action+0x8c/0xdc)
-[  403.662013]  r8:c0599160 r7:00000000 r6:00000000 r5:c040e890 r4:c3847114 r3:c019d75c
-[  403.670042] [<c001c680>] (tasklet_action+0x0/0xdc) from [<c001bd4c>] (__do_softirq+0xe4/0x1f0)
-[  403.678687]  r7:00000101 r6:c0402000 r5:c059919c r4:00000001
-[  403.684498] [<c001bc68>] (__do_softirq+0x0/0x1f0) from [<c001c268>] (irq_exit+0x88/0xdc)
-[  403.692652] [<c001c1e0>] (irq_exit+0x0/0xdc) from [<c0009cc8>] (handle_IRQ+0x6c/0x8c)
-[  403.700514]  r4:00000030 r3:00000110
-[  403.704192] [<c0009c5c>] (handle_IRQ+0x0/0x8c) from [<c0008714>] (avic_handle_irq+0x3c/0x48)
-[  403.712664]  r5:c0403f28 r4:c0593ebc
-[  403.716343] [<c00086d8>] (avic_handle_irq+0x0/0x48) from [<c0008f84>] (__irq_svc+0x44/0x74)
-[  403.724733] Exception stack(0xc0403f28 to 0xc0403f70)
-[  403.729841] 3f20:                   00000001 00000004 00000000 20000013 c0402000 c04104a8
-[  403.738078] 3f40: 00000002 c0b69620 a0004000 41069264 a03fb5f4 c0403f7c c0403f40 c0403f70
-[  403.746301] 3f60: c004b92c c0009e74 20000013 ffffffff
-[  403.751383]  r6:ffffffff r5:20000013 r4:c0009e74 r3:c004b92c
-[  403.757210] [<c0009e30>] (arch_cpu_idle+0x0/0x4c) from [<c0040b04>] (cpu_startup_entry+0x88/0xf4)
-[  403.766161] [<c0040a7c>] (cpu_startup_entry+0x0/0xf4) from [<c02f00d0>] (rest_init+0xb8/0xe0)
-[  403.774753] [<c02f0018>] (rest_init+0x0/0xe0) from [<c03e07dc>] (start_kernel+0x28c/0x2d4)
-[  403.783051]  r6:c03fc484 r5:ffffffff r4:c040a0e0
-[  403.787797] [<c03e0550>] (start_kernel+0x0/0x2d4) from [<a0008040>] (0xa0008040)
+So the phrasing should be "compatible: should be among:" ?
 
-Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
----
- drivers/dma/imx-dma.c | 19 ++++++++-----------
- 1 file changed, 8 insertions(+), 11 deletions(-)
 
-diff --git a/drivers/dma/imx-dma.c b/drivers/dma/imx-dma.c
-index 442af61..247aa7c 100644
---- a/drivers/dma/imx-dma.c
-+++ b/drivers/dma/imx-dma.c
-@@ -437,17 +437,18 @@ static void dma_irq_handle_channel(struct imxdma_channel *imxdmac)
- 	struct imxdma_engine *imxdma = imxdmac->imxdma;
- 	int chno = imxdmac->channel;
- 	struct imxdma_desc *desc;
-+	unsigned long flags;
- 
--	spin_lock(&imxdma->lock);
-+	spin_lock_irqsave(&imxdma->lock, flags);
- 	if (list_empty(&imxdmac->ld_active)) {
--		spin_unlock(&imxdma->lock);
-+		spin_unlock_irqrestore(&imxdma->lock, flags);
- 		goto out;
- 	}
- 
- 	desc = list_first_entry(&imxdmac->ld_active,
- 				struct imxdma_desc,
- 				node);
--	spin_unlock(&imxdma->lock);
-+	spin_unlock_irqrestore(&imxdma->lock, flags);
- 
- 	if (desc->sg) {
- 		u32 tmp;
-@@ -519,7 +520,6 @@ static int imxdma_xfer_desc(struct imxdma_desc *d)
- {
- 	struct imxdma_channel *imxdmac = to_imxdma_chan(d->desc.chan);
- 	struct imxdma_engine *imxdma = imxdmac->imxdma;
--	unsigned long flags;
- 	int slot = -1;
- 	int i;
- 
-@@ -527,7 +527,6 @@ static int imxdma_xfer_desc(struct imxdma_desc *d)
- 	switch (d->type) {
- 	case IMXDMA_DESC_INTERLEAVED:
- 		/* Try to get a free 2D slot */
--		spin_lock_irqsave(&imxdma->lock, flags);
- 		for (i = 0; i < IMX_DMA_2D_SLOTS; i++) {
- 			if ((imxdma->slots_2d[i].count > 0) &&
- 			((imxdma->slots_2d[i].xsr != d->x) ||
-@@ -537,10 +536,8 @@ static int imxdma_xfer_desc(struct imxdma_desc *d)
- 			slot = i;
- 			break;
- 		}
--		if (slot < 0) {
--			spin_unlock_irqrestore(&imxdma->lock, flags);
-+		if (slot < 0)
- 			return -EBUSY;
--		}
- 
- 		imxdma->slots_2d[slot].xsr = d->x;
- 		imxdma->slots_2d[slot].ysr = d->y;
-@@ -549,7 +546,6 @@ static int imxdma_xfer_desc(struct imxdma_desc *d)
- 
- 		imxdmac->slot_2d = slot;
- 		imxdmac->enabled_2d = true;
--		spin_unlock_irqrestore(&imxdma->lock, flags);
- 
- 		if (slot == IMX_DMA_2D_SLOT_A) {
- 			d->config_mem &= ~CCR_MSEL_B;
-@@ -625,8 +621,9 @@ static void imxdma_tasklet(unsigned long data)
- 	struct imxdma_channel *imxdmac = (void *)data;
- 	struct imxdma_engine *imxdma = imxdmac->imxdma;
- 	struct imxdma_desc *desc;
-+	unsigned long flags;
- 
--	spin_lock(&imxdma->lock);
-+	spin_lock_irqsave(&imxdma->lock, flags);
- 
- 	if (list_empty(&imxdmac->ld_active)) {
- 		/* Someone might have called terminate all */
-@@ -663,7 +660,7 @@ static void imxdma_tasklet(unsigned long data)
- 				 __func__, imxdmac->channel);
- 	}
- out:
--	spin_unlock(&imxdma->lock);
-+	spin_unlock_irqrestore(&imxdma->lock, flags);
- }
- 
- static int imxdma_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
--- 
-1.8.4.rc3
+> 
+>> diff --git a/arch/arm/boot/dts/pxa27x.dtsi b/arch/arm/boot/dts/pxa27x.dtsi
+> 
+>> +		pwm0: pwm at 40b00000 {
+>> +			compatible = "marvell,pxa270-pwm";
+> 
+> I thought the assertion was that pax270 and pxa250 were both compatible?
+> If so, that should be:
+> 
+> 		compatible = "marvell,pxa270-pwm", "marvell,pxa250-pwm";
+
+
+Indeed.  Currently, they are all the same.  By that logic, shouldn't it be
+
+compatible = "marvell,pxa250-pwm", "marvell,pxa270-pwm", "marvell,pxa168-pwm",
+"marvell,pxa910-pwm";
+
+I am admittedly fuzzy on device tree, but this is starting to seem strange.
+
+Anyway, I'll defer to your judgement and resubmit if you can give me precise
+guidance on the above.  Thanks again for the review.
+
+Thanks,
+Mike
