@@ -1,73 +1,43 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 17 Sep 2013 10:41:07 -0500
-Subject: [PATCH v11 0/8] PHY framework
-In-Reply-To: <5226F5E2.5010409@ti.com>
-References: <1377063973-22044-1-git-send-email-kishon@ti.com>
- <521B0E79.6060506@ti.com> <20130827192059.GZ3005@radagast>
- <5225FF63.6080608@ti.com> <20130903155030.GA21525@kroah.com>
- <5226F5E2.5010409@ti.com>
-Message-ID: <20130917154107.GH15645@radagast>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 17 Sep 2013 08:43:31 -0700
+Subject: [PATCH v4 1/2] ARM: OMAP: Add secure function omap_smc3()
+ which calling instruction smc #1
+In-Reply-To: <20130916171023.GA17477@localhost.localdomain>
+References: <20130916171023.GA17477@localhost.localdomain>
+Message-ID: <20130917154331.GA9994@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 04, 2013 at 02:27:06PM +0530, Kishon Vijay Abraham I wrote:
-> On Tuesday 03 September 2013 09:20 PM, Greg KH wrote:
-> > On Tue, Sep 03, 2013 at 08:55:23PM +0530, Kishon Vijay Abraham I wrote:
-> >> Hi Greg,
-> >>
-> >> On Wednesday 28 August 2013 12:50 AM, Felipe Balbi wrote:
-> >>> Hi,
-> >>>
-> >>> On Mon, Aug 26, 2013 at 01:44:49PM +0530, Kishon Vijay Abraham I wrote:
-> >>>> On Wednesday 21 August 2013 11:16 AM, Kishon Vijay Abraham I wrote:
-> >>>>> Added a generic PHY framework that provides a set of APIs for the PHY drivers
-> >>>>> to create/destroy a PHY and APIs for the PHY users to obtain a reference to
-> >>>>> the PHY with or without using phandle.
-> >>>>>
-> >>>>> This framework will be of use only to devices that uses external PHY (PHY
-> >>>>> functionality is not embedded within the controller).
-> >>>>>
-> >>>>> The intention of creating this framework is to bring the phy drivers spread
-> >>>>> all over the Linux kernel to drivers/phy to increase code re-use and to
-> >>>>> increase code maintainability.
-> >>>>>
-> >>>>> Comments to make PHY as bus wasn't done because PHY devices can be part of
-> >>>>> other bus and making a same device attached to multiple bus leads to bad
-> >>>>> design.
-> >>>>>
-> >>>>> If the PHY driver has to send notification on connect/disconnect, the PHY
-> >>>>> driver should make use of the extcon framework. Using this susbsystem
-> >>>>> to use extcon framwork will have to be analysed.
-> >>>>>
-> >>>>> You can find this patch series @
-> >>>>> git://git.kernel.org/pub/scm/linux/kernel/git/kishon/linux-phy.git testing
-> >>>>
-> >>>> Looks like there are not further comments on this series. Can you take this in
-> >>>> your misc tree?
-> >>>
-> >>> Do you want me to queue these for you ? There are quite a few users for
-> >>> this framework already and I know of at least 2 others which will show
-> >>> up for v3.13.
-> >>
-> >> Can you queue this patch series? There are quite a few users already for this
-> >> framework.
+* Dave Martin <Dave.Martin@arm.com> [130916 10:18]:
+> On Sat, Sep 14, 2013 at 10:37:12AM +0100, Pali Roh?r wrote:
+> > On Sunday 08 September 2013 09:43:29 Pali Roh?r wrote:
+> > > + */
+> > > +ENTRY(omap_smc3)
+> > > +	stmfd	sp!, {r4-r11, lr}
+> > > +	mov	r12, r0		@ Copy the secure service ID
+> > > +	mov	r6, #0xff	@ Indicate new Task call
+> > > +	dsb			@ Memory Barrier (not sure if needed, copied from
+> > > omap_smc2) +	smc	#1		@ Call PPA service
+> > > +	ldmfd	sp!, {r4-r11, pc}
+> > > +ENDPROC(omap_smc3)
+> > > +
+> > >  ENTRY(omap_modify_auxcoreboot0)
+> > >  	stmfd   sp!, {r1-r12, lr}
+> > >  	ldr	r12, =0x104
 > > 
-> > It will have to wait for 3.13 as the merge window for new features has
-> > been closed for a week or so.  Sorry, I'll queue this up after 3.12-rc1
-> > is out.
+> > Dave, it is ok now?
 > 
-> Alright, thanks.
+> Yes, that's sufficient to warn people to stop and think (at least, if
+> someone copy-pastes it, they will likely highlight the possible error by
+> copy-pasting the comment too).  Thanks.
+> 
+> Acked-by: Dave Martin <Dave.Martin@arm.com>
 
-Just a gentle ping on this one...
+Have you guys checked how this works with the recently posted
+"[PATCH v6 0/5] ARM: support for Trusted Foundations secure monitor"
+series?
 
-cheers
+Regards,
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130917/3deed190/attachment.sig>
+Tony
+ 
