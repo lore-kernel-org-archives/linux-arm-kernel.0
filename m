@@ -1,33 +1,35 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 17 Sep 2013 11:51:42 +0100
-Subject: [PATCH v3 0/8] Add the Quadspi driver for vf610-twr
-In-Reply-To: <5237BB01.3080700@freescale.com>
-References: <1378999322.4210.95.camel@i7.infradead.org>
- <20130913041208.GD3051@gmail.com>
- <20130912205644.GW29403@sirena.org.uk>
- <52329AD3.2050608@freescale.com>
- <20130913102127.GD29403@sirena.org.uk>
- <52366F97.5030402@freescale.com>
- <20130916101912.GY29403@sirena.org.uk>
- <5236DD17.5090203@freescale.com>
- <20130916110634.GC29403@sirena.org.uk>
- <5237BB01.3080700@freescale.com>
-Message-ID: <20130917105142.GO21013@sirena.org.uk>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Tue, 17 Sep 2013 13:07:37 +0200
+Subject: [PATCH v2 1/9] i2c: prepare runtime PM support for I2C client
+ devices
+In-Reply-To: <20130916084708.GN7393@intel.com>
+References: <1378913560-2752-1-git-send-email-mika.westerberg@linux.intel.com>
+ <1378913560-2752-2-git-send-email-mika.westerberg@linux.intel.com>
+ <87vc25pvvm.fsf@linaro.org> <20130913065434.GZ7393@intel.com>
+ <52332BF0.4060605@samsung.com> <20130913154013.GD7393@intel.com>
+ <5235BA9C.1090509@gmail.com> <20130916084708.GN7393@intel.com>
+Message-ID: <523837F9.1020204@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 17, 2013 at 10:14:25AM +0800, Huang Shijie wrote:
+On 09/16/2013 10:47 AM, Mika Westerberg wrote:
+> I'm actually thinking that it is probably better now if we don't touch the
+> client runtime PM at all in the I2C core.
+> 
+> I proposed a less intrusive solution in this same thread where we power the
+> I2C controller briefly at the client ->probe() (In order to have all the
+> ACPI power resources etc. and the controller on) and let the client driver
+> handle their own runtime PM as they do currently.
+> 
+> Do you think that would work better wrt. fimc-isp-i2c driver?
 
-> The dummy is just a delay in a command sequence.
-> The dummy maybe only several clock cycles, less then 8 bit.
-
-This is what the delay_usecs field in the spi_transfer struct is for,
-the flash code should be using that to ensure that the minimum delay
-requirement is met.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130917/51efd757/attachment.sig>
+That would be no different for this particular driver, as long as the 
+I2C bus controller is activated right before the I2C client's probe().
+ 
+In general I would expect such additional device activation not to be 
+harmful. For that particular driver I'm going to prepare patches to 
+ensure that the I2C bus controller device and its driver is registered 
+only when a driver it depends on has initialized. This should have been 
+ensured right from the beginning. So don't need to worry about this 
+particular case. I'm just not sure what other devices could be similarly
+affected.
