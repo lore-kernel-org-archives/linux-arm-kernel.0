@@ -1,52 +1,36 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 17 Sep 2013 20:58:09 +0200
-Subject: [PATCH] arm: Kirkwood - Remove kirkwood_setup_wins and rely on
- the DT binding
-In-Reply-To: <20130917181742.GA4182@obsidianresearch.com>
-References: <20130916224743.GA18349@obsidianresearch.com>
- <20130917133206.GB2488@localhost>
- <20130917153619.GA14098@obsidianresearch.com>
- <20130917200301.66e8ccb9@skate>
- <20130917181742.GA4182@obsidianresearch.com>
-Message-ID: <20130917205809.6e883b13@skate>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Tue, 17 Sep 2013 12:01:45 -0700
+Subject: [PATCH 2/7] input: misc: ixp4-beeper: switch to use gpiolib
+In-Reply-To: <1379061102-22279-1-git-send-email-linus.walleij@linaro.org>
+References: <1379061102-22279-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <20130917190144.GB6894@core.coreip.homeip.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Jason Gunthorpe,
-
-On Tue, 17 Sep 2013 12:17:42 -0600, Jason Gunthorpe wrote:
-
-> Yes, I recall you talking about this, that is why initially just went
-> adding to the existing mbus ranges in the board files.
+On Fri, Sep 13, 2013 at 10:31:42AM +0200, Linus Walleij wrote:
+> The platform using this beeper has support for gpiolib, so there
+> is no point to use the custom gpio_line* API. A strange ambiguity
+> where a line was first set as input and then driven high was
+> solved by first driving the line high as output and then switch
+> it to input.
 > 
-> However, is that really still the case? Now that PEX uses a difference
-> scheme it seems they all washed out to be the same.
+> Cc: Imre Kaloz <kaloz@openwrt.org>
+> Cc: Krzysztof Halasa <khc@pm.waw.pl>
+> Cc: Alexandre Courbot <acourbot@nvidia.com>
+> Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 
-No, some boards have a NOR flash that requires a dedicated window, some
-do not have a NOR flash.
+Acked-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
 
-> > but until that exists, we thought that pushing the ranges property down
-> > to the .dts file was the least horrible solution.
-> 
-> I think we can get away with doing it the other way for kirkwood,
-> here are my reasons:
->  - Kirkwood is mature now, the DT is basically complete, we shouldn't
->    need to churn the ranges in the dtsi much, if at all.
->  - There are 31 kirkwood dts files, and none of them need a ranges
->    different from the default
->  - Kirkwood has more than enough mbus windows, we don't need to be
->    stingy with them
->  - The board files were already sort of like this, but a big chunk
->    of the 31 boards were missing ranges entirely.
-> 
-> Basically, no board file has a ranges, only the kirkwood.dtsi has a
-> ranges.
+> ---
+> Hi Dmitry, requesting an ACK for this to take it through the
+> GPIO tree as part of an IXP4 clean-up attempt.
 
-Right, true that for Kirkwood this probably stands.
+Sorry for the delay, I missed the fact that you wanted an ask and not
+merge and was waiting for rc1 to be cut...
 
-Thomas
+Thanks.
+
 -- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Dmitry
