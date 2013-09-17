@@ -1,93 +1,198 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Tue, 17 Sep 2013 23:15:20 +0200 (CEST)
-Subject: [PATCH] clockevents: Sanitize ticks to nsec conversion
-In-Reply-To: <20130917130153.GL26819@ludovic.desroches@atmel.com>
-References: <1379077365-18458-1-git-send-email-mkl@pengutronix.de>
- <20130917095600.GJ26819@ludovic.desroches@atmel.com>
- <20130917100417.GQ12758@n2100.arm.linux.org.uk>
- <alpine.DEB.2.02.1309171210450.4089@ionos.tec.linutronix.de>
- <20130917130153.GL26819@ludovic.desroches@atmel.com>
-Message-ID: <alpine.DEB.2.02.1309172228400.4089@ionos.tec.linutronix.de>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Tue, 17 Sep 2013 23:38:44 +0200
+Subject: [PATCH v2 1/9] i2c: prepare runtime PM support for I2C client
+ devices
+In-Reply-To: <20130917110021.GU7393@intel.com>
+References: <1378913560-2752-1-git-send-email-mika.westerberg@linux.intel.com>
+ <1861747.RtS0ZLgUUN@vostro.rjw.lan> <20130917110021.GU7393@intel.com>
+Message-ID: <4065873.t6fMJPXtCW@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marc Kleine-Budde pointed out, that commit 77cc982 "clocksource: use
-clockevents_config_and_register() where possible" caused a regression
-for some of the converted subarchs.
+On Tuesday, September 17, 2013 02:00:22 PM Mika Westerberg wrote:
+> On Mon, Sep 16, 2013 at 09:07:07PM +0200, Rafael J. Wysocki wrote:
+> > On Monday, September 16, 2013 11:47:08 AM Mika Westerberg wrote:
+> > > On Sun, Sep 15, 2013 at 03:48:12PM +0200, Sylwester Nawrocki wrote:
+> > > > On 09/13/2013 05:40 PM, Mika Westerberg wrote:
+> > > > [...]
+> > > > >>>The call to pm_runtime_get_noresume() should make sure that the device is
+> > > > >>>in active state (at least in state where it can access the bus) if I'm
+> > > > >>>understanding this right.
+> > > > >>
+> > > > >>I can't see how this would happen. How runtime_resume/runtime_suspend
+> > > > >>callbacks would get invoked with this code, if, e.g. originally driver called
+> > > > >>pm_runtime_enable(), pm_runtime_get_sync(), pm_runtime_put_sync() in probe() ?
+> > > > >
+> > > > >The driver callbacks are not called but if the device has been attached to
+> > > > >a power domain (like we do with ACPI) the power domain callbacks get called
+> > > > >and it brings the "bus" to such state that we are able to access the
+> > > > >device. That also was the reason I used _noresume() but didn't look too
+> > > > >close the implementation.
+> > > > 
+> > > > OK, but if a client driver assumes default inactive power state it
+> > > > will expect
+> > > > its callbacks to get called. Otherwise exisiting code might break. So, e.g.
+> > > > in case of s5p-tv it would rather need to be something like:
+> > > > 
+> > > > 	pm_runtime_put()
+> > > > 
+> > > > 	pm_runtime_get_sync()
+> > > >  	sii9234_verify_version()
+> > > >  	pm_runtime_put(dev)
+> > > 
+> > > Yes, or even call directly its runtime_resume callback to bring the device
+> > > to the active state.
+> > > 
+> > > > >>pm_runtime_get_noresume() merely increments usage counter of a device.
+> > > > >>It seems that these changes will break the s5p-tv driver. I might be missing
+> > > > >>something though.
+> > > > >
+> > > > >You are right and Kevin also mentioned this. It should be pm_runtime_get(),
+> > > > >if I'm not mistaken.
+> > > > 
+> > > > Note that client drivers usually call pm_runtime_enable() only when
+> > > > it is safe
+> > > > to call their driver's runtime PM callbacks. By enabling runtime PM
+> > > > before the
+> > > > client's driver has completely initialized we may risk that the
+> > > > callbacks are
+> > > > executed with uninitialized data, if I understand things correctly.
+> > > 
+> > > I think that calling pm_runtime_enable() on behalf of the client driver
+> > > shouldn't cause any problems. There is no PM events queued for that device
+> > > yet (and we have prevented that from happening when we called
+> > > _get_noresume() for the device).
+> > 
+> > That only is the case if the device in RPM_ACTIVE when we enable runtime PM for
+> > it.  If it is RPM_SUSPENDED at that point, it still is possible that the resume
+> > callback will be executed then.
+> 
+> OK, thanks for the clarification.
+> 
+> > > Only when the client driver calls _put() things start to happen and at that
+> > > phase the runtime PM hooks should be usable.
+> > > 
+> > > > >>As Mark pointed out this is currently unwanted behaviour to runtime PM
+> > > > >>activate a bus controller device manually in the core for when the client's
+> > > > >>probe() is executed, since i2c core will activate the bus controller for when
+> > > > >>transfer is being carried out.
+> > > > >>
+> > > > >>But I can understand this is needed for ACPI and it shouldn't break existing
+> > > > >>drivers, that do runtime PM activate the client device in probe().
+> > > > >
+> > > > >Indeed, we don't want to break anything (and we still need something like
+> > > > >this for ACPI).
+> > > > >
+> > > > >>Now I'm sure this will break power management of the drivers/media/exynos4-is
+> > > > >>driver, due to incorrect power sequence (power domain and clocks handling).
+> > > > >>I'll try to take care of it in separate patch, as I have some patches pending,
+> > > > >>that move most of code from drivers/media/exynos4-is/fimc-is-sensor.c to
+> > > > >>drivers/media/i2c/s5k6a3.c.
+> > > > >
+> > > > >I missed that code when I converted existing users to this method. Sorry
+> > > > >about that (I can handle that in the next version).
+> > > > >
+> > > > >I quickly looked at it and I don't see anything that could break (once
+> > > > >converted). What it does is this:
+> > > > >
+> > > > >	pm_runtime_no_callbacks(dev);
+> > > > >	pm_runtime_enable(dev);
+> > > > >
+> > > > >changing that to:
+> > > > >
+> > > > >	pm_runtime_no_callbacks(dev);
+> > > > >	pm_runtime_put(dev);
+> > > > >
+> > > > >shouldn't cause problems AFAICT.
+> > > > 
+> > > > Yes, considering this driver in isolation it should be fine.
+> > > > 
+> > > > However, I observed system suspend issues when the I2C bus controller was
+> > > > being activated (which would happen in the I2C core after your changes)
+> > > > before some other driver has initialized.
+> > > > 
+> > > > So to ensure things continue to work the "fimc-isp-i2c" driver would need
+> > > > to be registered after the "exynos4-fimc-is" driver has initialized. Or the
+> > > > "exynos4-fimc-is" would need to call of_platform_populate() to instantiate
+> > > > its all children devices as specified in device tree (see arch/arm/boot/dts/
+> > > > exynos4x12.dtsi in -next). "simple-bus" would then have to be not listed in
+> > > > the compatible property of that top level device. So to avoid regressions
+> > > > some additional changes would be needed, outside of this particular I2C
+> > > > client driver. I guess this could be avoided by better design of the
+> > > > exynos4-is driver right from the beginning. But it's all some times tricky
+> > > > when there is some many IP blocks involved and the hardware behaviour/device
+> > > > interactions are not always well documented.
+> > > 
+> > > OK.
+> > > 
+> > > I'm actually thinking that it is probably better now if we don't touch the
+> > > client runtime PM at all in the I2C core.
+> > > 
+> > > I proposed a less intrusive solution in this same thread where we power the
+> > > I2C controller briefly at the client ->probe() (In order to have all the
+> > > ACPI power resources etc. and the controller on) and let the client driver
+> > > handle their own runtime PM as they do currently.
+> > 
+> > I'm not sure if the I2C core needs to power up the controller at the probe time.
+> > That may be left to the client driver altogether.  I mean, if the client wants
+> > the controller to be powered up, it should just call
+> > pm_runtime_get_sync(controller device) at a suitable place (and then do the
+> > corresponding _put when the controller is not necessary anu more) from its
+> > ->probe() callback.
+> > 
+> > Or the core can just check if the device is in the ACPI PM domain and power up
+> > the controller if that's the case.  However, that may not match the case when
+> > the I2C client is not a direct descendant of the controller (it may just use
+> > an I2C resource pointing to the controller via a namespace path).
+> 
+> I sure hope we don't have to deal with such devices.
+> 
+> What if we make runtime PM enabled for the I2C adapter device only in case
+> of ACPI enumerated devices? That way runtime PM itself keeps the adapter
+> powered on when it has any active kids so we don't violate the ACPI spec,
+> and still let non-ACPI systems to use I2C as they do today.
+> 
+> Then we could do something like:
+> 
+> static int i2c_device_probe(struct device *dev)
+> {
+> 	...
+> 	/*
+> 	 * Make sure that the adapter is powered on when the client is
+> 	 * probed.
+> 	 *
+> 	 * Note that this is no-op on non-ACPI systems as runtime PM for
+> 	 * the adapter is not enabled.
+> 	 */
+> 	pm_runtime_get_sync(&client->adapter->dev);
+>         acpi_dev_pm_attach(&client->dev, true);
 
-The reason is, that the clockevents core code converts the minimal
-hardware tick delta to a nanosecond value for core internal
-usage. This conversion is affected by integer math rounding loss, so
-the backwards conversion to hardware ticks will likely result in a
-value which is less than the configured hardware limitation. The
-affected subarchs used their own workaround (SIGH!) which got lost in
-the conversion.
+I would make the code indicate the ACPI special case, like:
 
-Now instead of fixing the underlying core code problem, Marcs patch
-tried to work around the core code issue by increasing the minimal
-tick delta at clockevents registration time so the resulting limit in
-the core code backwards conversion did not violate the hardware
-limits. More SIGH!
+	if (ACPI_HANDLE(&client->dev)) {
+		/* Power up the controller, if necessary, to follow the ACPI spec. */
+		pm_runtime_get_sync(&client->adapter->dev);
+		acpi_dev_pm_attach(&client->dev, true);
+	}
 
-The solution for the issue at hand is simple: adding evt->mult - 1 to
-the shifted value before the integer divison in the core conversion
-function takes care of it.
+> 
+>         status = driver->probe(client, i2c_match_id(driver->id_table, client));
+> 	if (status) {
+> 		...
+> 
 
-Though looking closer at the details of that function reveals another
-bogosity: The upper bounds check is broken as well. Checking for a
-resulting "clc" value greater than KTIME_MAX after the conversion is
-pointless. The conversion does:
+and of course you need to do the corresponding pm_runtime_put() for the
+controller somewhere.
 
-      u64 clc = (latch << evt->shift) / evt->mult;
+And because ACPI_HANDLE() is simply false for CONFIG_ACPI unset, that would
+cover that case too.
 
-So there is no sanity check for (latch << evt->shift) exceeding the
-64bit boundary. The latch argument is "unsigned long", so on a 64bit
-arch the handed in argument could easily lead to an unnoticed shift
-overflow. With the above rounding fix applied the calculation before
-the divison is:
+> and enable runtime PM only when we find that there are ACPI I2C devices
+> behind the controller and they are power manageable.
 
-       u64 clc = (latch << evt->shift) + evt->mult - 1;
+We need to power up the controller regardless of whether or not the child
+devices are power manageable.  If a client device we want to access has an
+ACPI handle, the controller has to be in D0 at that point.
 
-Now we can easily verify whether the whole equation fits into the
-64bit boundary. Shifting the "clc" result back by evt->shift MUST
-result in "latch". If that's not the case, we have a clear indicator
-for boundary violation and can limit "clc" to (1 << 63) - 1 before the
-divison by evt->mult. The resulting nsec * evt->mult in the
-programming path will therefor always be in the 64bit boundary.
-
-Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
----
-diff --git a/kernel/time/clockevents.c b/kernel/time/clockevents.c
-index 38959c8..4fc4826 100644
---- a/kernel/time/clockevents.c
-+++ b/kernel/time/clockevents.c
-@@ -49,13 +49,25 @@ u64 clockevent_delta2ns(unsigned long latch, struct clock_event_device *evt)
- 		WARN_ON(1);
- 	}
- 
-+	/*
-+	 * Prevent integer rounding loss, otherwise the backward
-+	 * conversion from nsec to ticks could result in a value less
-+	 * than evt->min_delta_ticks.
-+	 */
-+	clc += evt->mult - 1;
-+
-+	/*
-+	 * Upper bound sanity check. If the backwards conversion is
-+	 * not equal latch, we know that the above (shift + rounding
-+	 * correction) exceeded the 64 bit boundary.
-+	 */
-+	if ((clc >> evt->shift) != (u64)latch)
-+		clc = ((u64)1 << 63) - 1;
-+
- 	do_div(clc, evt->mult);
--	if (clc < 1000)
--		clc = 1000;
--	if (clc > KTIME_MAX)
--		clc = KTIME_MAX;
- 
--	return clc;
-+	/* Deltas less than 1usec are pointless noise */
-+	return clc > 1000 ? clc : 1000;
- }
- EXPORT_SYMBOL_GPL(clockevent_delta2ns);
+Thanks,
+Rafael
