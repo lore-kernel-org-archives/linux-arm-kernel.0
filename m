@@ -1,99 +1,75 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Tue, 17 Sep 2013 15:01:54 +0200
-Subject: [PATCH] [PATCH] clocksource: tcb: fix min_delta calculation
-In-Reply-To: <alpine.DEB.2.02.1309171210450.4089@ionos.tec.linutronix.de>
-References: <1379077365-18458-1-git-send-email-mkl@pengutronix.de>
- <20130917095600.GJ26819@ludovic.desroches@atmel.com>
- <20130917100417.GQ12758@n2100.arm.linux.org.uk>
- <alpine.DEB.2.02.1309171210450.4089@ionos.tec.linutronix.de>
-Message-ID: <20130917130153.GL26819@ludovic.desroches@atmel.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Tue, 17 Sep 2013 06:08:48 -0700
+Subject: [PATCH] clk: si570: Add a driver for SI570 oscillators
+In-Reply-To: <52380BD5.8080105@gmail.com>
+References: <1379033737-30015-1-git-send-email-soren.brinkmann@xilinx.com>
+ <1379033737-30015-2-git-send-email-soren.brinkmann@xilinx.com>
+ <52373314.5070806@wwwdotorg.org> <20130916164927.GB21352@roeck-us.net>
+ <5237390E.5070203@wwwdotorg.org> <20130916173540.GA3481@roeck-us.net>
+ <52374FF7.8040604@wwwdotorg.org> <52380BD5.8080105@gmail.com>
+Message-ID: <52385460.4000908@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 17, 2013 at 01:26:56PM +0200, Thomas Gleixner wrote:
-> On Tue, 17 Sep 2013, Russell King - ARM Linux wrote:
-> 
-> > On Tue, Sep 17, 2013 at 11:56:00AM +0200, Ludovic Desroches wrote:
-> > > Any reason to not do this:
-> > > 
-> > > --- a/drivers/clocksource/tcb_clksrc.c
-> > > +++ b/drivers/clocksource/tcb_clksrc.c
-> > > @@ -144,6 +144,9 @@ static void tc_mode(enum clock_event_mode m, struct
-> > > clock_event_device *d)
-> > >  
-> > >  static int tc_next_event(unsigned long delta, struct clock_event_device
-> > > *d)
-> > >  {
-> > > +       if (delta < d->min_delta_ticks)
-> > > +               delta = d->min_delta_ticks;
-> > > +
-> > >         __raw_writel(delta, tcaddr + ATMEL_TC_REG(2, RC));
-> > >  
-> > >         /* go go gadget! */
-> > > 
-> > > Then we can keep the same min_delta.
-> > 
-> > You really should not play such games in your set_next_event() code - if
-> > the interval is not supported, you should return -ETIME so that the core
-> > code knows about it and can adjust things to suit.  If you're getting
-> > deltas which are too small for the hardware, that'll either be because
-> > the bounds are wrong, or there's a bug in the core code.
-> 
-> The core code does:
-> 
-> int clockevents_program_event(struct clock_event_device *dev, ktime_t expires,
->                               bool force)
-> {
-> ....
-> 
->         delta = min(delta, (int64_t) dev->max_delta_ns);
->         delta = max(delta, (int64_t) dev->min_delta_ns);
-> 
->         clc = ((unsigned long long) delta * dev->mult) >> dev->shift;
->         rc = dev->set_next_event((unsigned long) clc, dev);
-> 
-> } 
-> 
-> So, the min_delta in timer ticks is set to 1 and converted by the core
-> to nsecs for various reasons. This is where the rounding problem comes
-> into play.
-> 
-> The patch below should fix that.
+On 09/17/2013 12:59 AM, Sebastian Hesselbarth wrote:
+> On 09/16/2013 08:37 PM, Stephen Warren wrote:
+>> On 09/16/2013 11:35 AM, Guenter Roeck wrote:
+>>> On Mon, Sep 16, 2013 at 10:59:58AM -0600, Stephen Warren wrote:
+>>>> On 09/16/2013 10:49 AM, Guenter Roeck wrote:
+>>>>> On Mon, Sep 16, 2013 at 10:34:28AM -0600, Stephen Warren wrote:
+>>>>>> On 09/12/2013 06:55 PM, Soren Brinkmann wrote:
+>>>>>>> Add a driver for SILabs 570, 571, 598, 599 programmable oscillators.
+>>>>>>> The devices generate low-jitter clock signals and are reprogrammable via
+>>>>>>> an I2C interface.
+>> ...
+>>>>>>> +Optional properties:
+>>>>>>> + - initial-fout: Initial output frequency to set during probe
+>>>>>>
+>>>>>> "probe" is a Linux-specific concept. This property should be removed. If
+>>>>>> the driver is asked to set a specific frequency, it should do so, but I
+>>>>>> don't think it should program something pro-actively just because it
+>>>>>> starts up.
+>>>>>>
+>>>>>> If this property is acceptable, it'd be better to describe it more along
+>>>>>> the lines of the following:
+>>>>>>
+>>>>>> initial-fout: The frequency at which the system requires the clock to
+>>>>>> operate.
+>>>>>
+>>>>> It should probably be something like "clock-frequency". In many use cases
+>>>>> the programmed frequency is set to a constant frequency at system startup
+>>>>> and never changed, similar to other clocks.
+>>>>
+>>>> I was going to suggest that too, but re-considered since I think
+>>>> clock-frequency is more appropriate for fixed-frequency clocks, rather
+>>>> than to specify the value at which a programmable clock generator should
+>>>> operate?
+>>>>
+>>>> I don't think we have a good story yet for how to represent
+>>>> how-we-want-the-clock-tree-configured, as opposed to representing the HW
+>>>> itself (which is what DT should be more about).
+>>>
+>>> In many cases the chip _is_ used to generate a fixed frequency, so we will
+>>> have to have a means to describe it. That it _can_ be used differently is a
+>>> different matter. After all, that is true for many clock generators.
+>>
+>> Perhaps if clock-frequency is specified, the driver should refuse to
+>> provide anything else. If clock-frequency isn't specified, the driver
+>> shouldn't touch the HW when it initializes, but should honor any
+>> requests that come in from other drivers? That would maintain what I
+>> feel is clock-frequency's connection to being a fixed clock.
+>
+> For the clk-si5351 programmable clock driver in mainline, it already
+> uses "clock-frequency" for initial clock setup but allows to set it
+> later on. IMHO that is ok, because from a initial point-of-view, an
+> initial frequency is fixed. As soon as the driver takes over, the user
+> is free to do whatever he wants and should not be limited by DT.
+>
+> But if we vote against that approach, we should probably also modifiy
+> clk-si5351 accordingly.
+>
 
-Yes it works with s/dev/evt.
+Not me; I am fine either way. Howeber, if there is a use case requiring both
+it should be permitted, and if you ask me to vote I'll vote for being permissive.
 
-Thanks
-
-> 
-> Thanks,
-> 
-> 	tglx
-> ----
-> diff --git a/kernel/time/clockevents.c b/kernel/time/clockevents.c
-> index 38959c8..41b7a30 100644
-> --- a/kernel/time/clockevents.c
-> +++ b/kernel/time/clockevents.c
-> @@ -42,7 +42,7 @@ struct ce_unbind {
->   */
->  u64 clockevent_delta2ns(unsigned long latch, struct clock_event_device *evt)
->  {
-> -	u64 clc = (u64) latch << evt->shift;
-> +	u64 tmp, clc = (u64) latch << evt->shift;
->  
->  	if (unlikely(!evt->mult)) {
->  		evt->mult = 1;
-> @@ -52,6 +52,14 @@ u64 clockevent_delta2ns(unsigned long latch, struct clock_event_device *evt)
->  	do_div(clc, evt->mult);
->  	if (clc < 1000)
->  		clc = 1000;
-> +
-> +	/* Avoid rounding artifacts */
-> +	tmp = (clc * dev->mult) >> dev->shift;
-> +	while (tmp < (u64) dev->min_delta_ticks) {
-> +		clc += 1000;
-> +		tmp = (clc * dev->mult) >> dev->shift;
-> +	}
-> +
->  	if (clc > KTIME_MAX)
->  		clc = KTIME_MAX;
->  
+Guenter
