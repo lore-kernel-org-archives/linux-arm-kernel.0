@@ -1,104 +1,50 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 17 Sep 2013 14:09:35 -0400 (EDT)
-Subject: [PATCH v3 5/6] ARM: atomics: prefetch the destination word for
- write prior to strex
-In-Reply-To: <1379424578-7477-6-git-send-email-will.deacon@arm.com>
-References: <1379424578-7477-1-git-send-email-will.deacon@arm.com>
- <1379424578-7477-6-git-send-email-will.deacon@arm.com>
-Message-ID: <alpine.LFD.2.03.1309171407510.20709@syhkavp.arg>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 17 Sep 2013 14:09:57 -0400
+Subject: mvebu: Armada XP doesn't boot in v3.12-rc1
+In-Reply-To: <20130917173502.GA4231@localhost>
+References: <20130917173502.GA4231@localhost>
+Message-ID: <20130917180957.GI19937@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 17 Sep 2013, Will Deacon wrote:
+Ezequiel!
 
-> The cost of changing a cacheline from shared to exclusive state can be
-> significant, especially when this is triggered by an exclusive store,
-> since it may result in having to retry the transaction.
+On Tue, Sep 17, 2013 at 02:35:03PM -0300, Ezequiel Garcia wrote:
+> Armada XP boards are not booting in v3.12-rc1.
 > 
-> This patch prefixes our atomic access implementations with pldw
-> instructions (on CPUs which support them) to try and grab the line in
-> exclusive state from the start. Only the barrier-less functions are
-> updated, since memory barriers can limit the usefulness of prefetching
-> data.
+> These two patches, which are already in linux-mvebu/mvebu/dt,
+> are needed to fix the problem:
 > 
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> commit 585b136b73696ac37c9614b4b3d8fa0407adcdf1
+> Author: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> Date:   Tue Aug 20 12:45:51 2013 -0300
+> 
+>     ARM: mvebu: Add clock properties to Armada XP timer node
+> 
+> commit d36fd447d5e2d0993a8ec34afc26fc449ac1e2f3
+> Author: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> Date:   Tue Aug 20 12:45:50 2013 -0300
+> 
+>     ARM: mvebu: Add the reference 25 MHz fixed-clock to Armada XP
 
-Acked-by: Nicolas Pitre <nico@linaro.org>
+Yes, I saw that tglx sent a late pull for corresponding driver changes.
+I'll move these two over to mvebu/fixes shortly.
 
-By the way, did you measure significant performance improvements with 
-those patches?
+> FWIW, CONFIG_HAVE_ARM_ARCH_TIMER=y is also needed or the board freezes,
+> but that's another problem which I'm currently investigating.
 
+Sounds like we just need a select, is there something more to it?
 
-> ---
->  arch/arm/include/asm/atomic.h | 7 +++++++
->  1 file changed, 7 insertions(+)
-> 
-> diff --git a/arch/arm/include/asm/atomic.h b/arch/arm/include/asm/atomic.h
-> index da1c77d..55ffc3b 100644
-> --- a/arch/arm/include/asm/atomic.h
-> +++ b/arch/arm/include/asm/atomic.h
-> @@ -12,6 +12,7 @@
->  #define __ASM_ARM_ATOMIC_H
->  
->  #include <linux/compiler.h>
-> +#include <linux/prefetch.h>
->  #include <linux/types.h>
->  #include <linux/irqflags.h>
->  #include <asm/barrier.h>
-> @@ -41,6 +42,7 @@ static inline void atomic_add(int i, atomic_t *v)
->  	unsigned long tmp;
->  	int result;
->  
-> +	prefetchw(&v->counter);
->  	__asm__ __volatile__("@ atomic_add\n"
->  "1:	ldrex	%0, [%3]\n"
->  "	add	%0, %0, %4\n"
-> @@ -79,6 +81,7 @@ static inline void atomic_sub(int i, atomic_t *v)
->  	unsigned long tmp;
->  	int result;
->  
-> +	prefetchw(&v->counter);
->  	__asm__ __volatile__("@ atomic_sub\n"
->  "1:	ldrex	%0, [%3]\n"
->  "	sub	%0, %0, %4\n"
-> @@ -138,6 +141,7 @@ static inline void atomic_clear_mask(unsigned long mask, unsigned long *addr)
->  {
->  	unsigned long tmp, tmp2;
->  
-> +	prefetchw(addr);
->  	__asm__ __volatile__("@ atomic_clear_mask\n"
->  "1:	ldrex	%0, [%3]\n"
->  "	bic	%0, %0, %4\n"
-> @@ -283,6 +287,7 @@ static inline void atomic64_set(atomic64_t *v, u64 i)
->  {
->  	u64 tmp;
->  
-> +	prefetchw(&v->counter);
->  	__asm__ __volatile__("@ atomic64_set\n"
->  "1:	ldrexd	%0, %H0, [%2]\n"
->  "	strexd	%0, %3, %H3, [%2]\n"
-> @@ -299,6 +304,7 @@ static inline void atomic64_add(u64 i, atomic64_t *v)
->  	u64 result;
->  	unsigned long tmp;
->  
-> +	prefetchw(&v->counter);
->  	__asm__ __volatile__("@ atomic64_add\n"
->  "1:	ldrexd	%0, %H0, [%3]\n"
->  "	adds	%0, %0, %4\n"
-> @@ -339,6 +345,7 @@ static inline void atomic64_sub(u64 i, atomic64_t *v)
->  	u64 result;
->  	unsigned long tmp;
->  
-> +	prefetchw(&v->counter);
->  	__asm__ __volatile__("@ atomic64_sub\n"
->  "1:	ldrexd	%0, %H0, [%3]\n"
->  "	subs	%0, %0, %4\n"
-> -- 
-> 1.8.2.2
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+Please send a patch as soon as you have it nailed down.  I'd like the
+two changes above and this patch to spend a few days in -next before I
+send the pull.
+
+> Can you push the above two to be included in v3.12-rc1 or do you need
+> anything else from me?
+
+Nope, confirmation of boards failing to boot is all I need to move these
+over for v3.12.
+
+thx,
+
+Jason.
