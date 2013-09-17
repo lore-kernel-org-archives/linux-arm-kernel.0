@@ -1,73 +1,99 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 17 Sep 2013 08:01:36 -0500
-Subject: [PATCH 18/28] of: create default early_init_dt_add_memory_arch
-In-Reply-To: <DDB72C85-45A3-40FC-9108-7B56F6C5BC5B@arm.com>
-References: <1379372965-22359-1-git-send-email-robherring2@gmail.com>
- <1379372965-22359-19-git-send-email-robherring2@gmail.com>
- <DDB72C85-45A3-40FC-9108-7B56F6C5BC5B@arm.com>
-Message-ID: <CAL_Jsq+Tt7N-sMPTBKLU565YezK81mN0KcqdtNTQFU5vhBeOUQ@mail.gmail.com>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Tue, 17 Sep 2013 15:01:54 +0200
+Subject: [PATCH] [PATCH] clocksource: tcb: fix min_delta calculation
+In-Reply-To: <alpine.DEB.2.02.1309171210450.4089@ionos.tec.linutronix.de>
+References: <1379077365-18458-1-git-send-email-mkl@pengutronix.de>
+ <20130917095600.GJ26819@ludovic.desroches@atmel.com>
+ <20130917100417.GQ12758@n2100.arm.linux.org.uk>
+ <alpine.DEB.2.02.1309171210450.4089@ionos.tec.linutronix.de>
+Message-ID: <20130917130153.GL26819@ludovic.desroches@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 17, 2013 at 3:46 AM, Catalin Marinas
-<catalin.marinas@arm.com> wrote:
-> On 17 Sep 2013, at 00:09, Rob Herring <robherring2@gmail.com> wrote:
->> --- a/arch/arm64/kernel/setup.c
->> +++ b/arch/arm64/kernel/setup.c
->> @@ -147,24 +147,6 @@ static void __init setup_machine_fdt(phys_addr_t dt_phys)
->>       pr_info("Machine: %s\n", machine_name);
->> }
->>
->> -void __init early_init_dt_add_memory_arch(u64 base, u64 size)
->> -{
->> -     base &= PAGE_MASK;
->> -     size &= PAGE_MASK;
->> -     if (base + size < PHYS_OFFSET) {
->> -             pr_warning("Ignoring memory block 0x%llx - 0x%llx\n",
->> -                        base, base + size);
->> -             return;
->> -     }
->> -     if (base < PHYS_OFFSET) {
->> -             pr_warning("Ignoring memory range 0x%llx - 0x%llx\n",
->> -                        base, PHYS_OFFSET);
->> -             size -= PHYS_OFFSET - base;
->> -             base = PHYS_OFFSET;
->> -     }
->> -     memblock_add(base, size);
->> -}
->> -
->> /*
->>  * Limit the memory size that was specified via FDT.
->>  */
->
-> ...
->
->> --- a/drivers/of/fdt.c
->> +++ b/drivers/of/fdt.c
->> @@ -688,6 +688,17 @@ u64 __init dt_mem_next_cell(int s, __be32 **cellp)
->>       return of_read_number(p, s);
->> }
->>
->> +void __init __weak early_init_dt_add_memory_arch(u64 base, u64 size)
->> +{
->> +#ifdef CONFIG_HAVE_MEMBLOCK
->> +     base &= PAGE_MASK;
->> +     size &= PAGE_MASK;
->> +     memblock_add(base, size);
->> +#else
->> +     pr_err("%s: ignoring memory (%llx, %llx)\n", __func__, base, size);
->> +#endif
->> +}
->
-> Are the arm64 changes equivalent here?  There are some safety checks to
-> cope with the kernel being loaded at a higher offset than the
-> recommended one (PHYS_OFFSET calculated automatically).
+On Tue, Sep 17, 2013 at 01:26:56PM +0200, Thomas Gleixner wrote:
+> On Tue, 17 Sep 2013, Russell King - ARM Linux wrote:
+> 
+> > On Tue, Sep 17, 2013 at 11:56:00AM +0200, Ludovic Desroches wrote:
+> > > Any reason to not do this:
+> > > 
+> > > --- a/drivers/clocksource/tcb_clksrc.c
+> > > +++ b/drivers/clocksource/tcb_clksrc.c
+> > > @@ -144,6 +144,9 @@ static void tc_mode(enum clock_event_mode m, struct
+> > > clock_event_device *d)
+> > >  
+> > >  static int tc_next_event(unsigned long delta, struct clock_event_device
+> > > *d)
+> > >  {
+> > > +       if (delta < d->min_delta_ticks)
+> > > +               delta = d->min_delta_ticks;
+> > > +
+> > >         __raw_writel(delta, tcaddr + ATMEL_TC_REG(2, RC));
+> > >  
+> > >         /* go go gadget! */
+> > > 
+> > > Then we can keep the same min_delta.
+> > 
+> > You really should not play such games in your set_next_event() code - if
+> > the interval is not supported, you should return -ETIME so that the core
+> > code knows about it and can adjust things to suit.  If you're getting
+> > deltas which are too small for the hardware, that'll either be because
+> > the bounds are wrong, or there's a bug in the core code.
+> 
+> The core code does:
+> 
+> int clockevents_program_event(struct clock_event_device *dev, ktime_t expires,
+>                               bool force)
+> {
+> ....
+> 
+>         delta = min(delta, (int64_t) dev->max_delta_ns);
+>         delta = max(delta, (int64_t) dev->min_delta_ns);
+> 
+>         clc = ((unsigned long long) delta * dev->mult) >> dev->shift;
+>         rc = dev->set_next_event((unsigned long) clc, dev);
+> 
+> } 
+> 
+> So, the min_delta in timer ticks is set to 1 and converted by the core
+> to nsecs for various reasons. This is where the rounding problem comes
+> into play.
+> 
+> The patch below should fix that.
 
-I tried to keep that, but PHYS_OFFSET is not universally defined. My
-reasoning is this range checking is hardly specific to an
-architecture. Perhaps if memory always starts at 0 you don't need it.
-If arm64 really needs these checks, then all architectures do.
+Yes it works with s/dev/evt.
 
-Perhaps "__virt_to_phys(PAGE_OFFSET)" instead of PHYS_OFFSET would work for all?
+Thanks
 
-Rob
+> 
+> Thanks,
+> 
+> 	tglx
+> ----
+> diff --git a/kernel/time/clockevents.c b/kernel/time/clockevents.c
+> index 38959c8..41b7a30 100644
+> --- a/kernel/time/clockevents.c
+> +++ b/kernel/time/clockevents.c
+> @@ -42,7 +42,7 @@ struct ce_unbind {
+>   */
+>  u64 clockevent_delta2ns(unsigned long latch, struct clock_event_device *evt)
+>  {
+> -	u64 clc = (u64) latch << evt->shift;
+> +	u64 tmp, clc = (u64) latch << evt->shift;
+>  
+>  	if (unlikely(!evt->mult)) {
+>  		evt->mult = 1;
+> @@ -52,6 +52,14 @@ u64 clockevent_delta2ns(unsigned long latch, struct clock_event_device *evt)
+>  	do_div(clc, evt->mult);
+>  	if (clc < 1000)
+>  		clc = 1000;
+> +
+> +	/* Avoid rounding artifacts */
+> +	tmp = (clc * dev->mult) >> dev->shift;
+> +	while (tmp < (u64) dev->min_delta_ticks) {
+> +		clc += 1000;
+> +		tmp = (clc * dev->mult) >> dev->shift;
+> +	}
+> +
+>  	if (clc > KTIME_MAX)
+>  		clc = KTIME_MAX;
+>  
