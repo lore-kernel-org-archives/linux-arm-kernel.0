@@ -1,23 +1,47 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 17 Sep 2013 23:03:23 +0100
-Subject: [PATCH] ARM: bcm: Add DEBUG_LL console support
-In-Reply-To: <1379455187-5812-1-git-send-email-csd@broadcom.com>
-References: <1379455187-5812-1-git-send-email-csd@broadcom.com>
-Message-ID: <20130917220323.GS12758@n2100.arm.linux.org.uk>
+From: dinguyen@altera.com (Dinh Nguyen)
+Date: Tue, 17 Sep 2013 17:12:47 -0500
+Subject: [RESEND PATCHv3 1/2] clocksource: dw_apb_timer: Move timer
+ defines to header file.
+In-Reply-To: <alpine.DEB.2.02.1309172337570.4089@ionos.tec.linutronix.de>
+References: <1377744796-22175-1-git-send-email-dinguyen@altera.com>
+ <1379434447.24347.0.camel@linux-builds1>
+ <alpine.DEB.2.02.1309172337570.4089@ionos.tec.linutronix.de>
+Message-ID: <1379455967.14195.3.camel@linux-builds1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 17, 2013 at 02:59:47PM -0700, Christian Daudt wrote:
-> This patch adds low level debug uart support to Broadcom
->  mobile based SOCs.
+On Tue, 2013-09-17 at 23:45 +0200, Thomas Gleixner wrote:
+> On Tue, 17 Sep 2013, Dinh Nguyen wrote:
 > 
-> Signed-off-by: Christian Daudt <csd@broadcom.com>
-> Reviewed-by: James King <jamesk@broadcom.com>
+> > On Wed, 2013-08-28 at 21:53 -0500, Dinh Nguyen wrote:
+> > > From: Dinh Nguyen <dinguyen@altera.com>
+> > > 
+> > > Move all dw_apb_timer defines to include/linux/dw_apb_timer.h.
+> 
+> That's describing WHAT the patch does not WHY. I can see the WHAT part
+> without that pointless changelog.
 
-Unfortunately, your patch is out of date.
+Will fix..
+> 
+> > 
+> > Ping? This patch series has sat idle for 2-weeks now.
+> 
+> So what?
+> 
+> Sending non urgent (i.e. bug fixes, regression fixes etc.) patches at
+> the beginning of the merge window begs for a 2 weeks delay. Well
+> documented procedure...
 
-Please have a look at v3.12-rc1's debugging infrastructure.  You should
-not need to add any .S file(s) for 8250 based ports, and in fact,
-8250_32.S is gone.  It's now all done through Kconfig for these ports.
+Sorry, but it was just a friendly ping...didn't mean to imply any
+urgency. The original patch was sent on 8/21, so patch has been around
+for ~4 weeks..
 
-Thanks.
+Thanks for the review.
+
+Dinh
+> 
+> 
+> Thanks,
+> 
+> 	tglx
+> 
