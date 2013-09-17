@@ -1,31 +1,37 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 17 Sep 2013 16:23:51 +0200
-Subject: [RFC PATCH 04/11] asm-generic: fncpy: Add function copying macros
-In-Reply-To: <1379421817-15759-5-git-send-email-Russ.Dill@ti.com>
-References: <1379421817-15759-1-git-send-email-Russ.Dill@ti.com>
- <1379421817-15759-5-git-send-email-Russ.Dill@ti.com>
-Message-ID: <CAMuHMdVT-hhJnww64mFa6nubHrHk-ZHuoe9GwGgBCEA2G0B2Bg@mail.gmail.com>
+From: afzal@ti.com (Afzal Mohammed)
+Date: Tue, 17 Sep 2013 20:01:09 +0530
+Subject: [PATCH RFC v3 08/12] ARM: OMAP2+: CM: AM43x clockdomain data
+In-Reply-To: <52372317.3000901@ti.com>
+References: <cover.1379337301.git.afzal@ti.com>
+ <5dd3b417a32b7d52c7de1e19e69e6100b1ed991b.1379337301.git.afzal@ti.com>
+ <52372317.3000901@ti.com>
+Message-ID: <523867AD.9080905@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 17, 2013 at 2:43 PM, Russ Dill <Russ.Dill@ti.com> wrote:
-> +++ b/arch/alpha/include/asm/fncpy.h
-> @@ -0,0 +1 @@
-> +#include <asm-generic/fncpy.h>
+Hi Nishant,
 
-Please add
+On Monday 16 September 2013 08:56 PM, Nishanth Menon wrote:
+> On 09/16/2013 08:48 AM, Afzal Mohammed wrote:
 
-    generic-y += fncpy.h
+>> From: Ambresh K <ambresh@ti.com>
+>>
+>> Add the data file to describe clock domains in AM43x SoC.
+>> OMAP4 clockdomain operations is being reused here.
+>>
+>> Signed-off-by: Ambresh K <ambresh@ti.com>
+>> Signed-off-by: Afzal Mohammed <afzal@ti.com>
+>> ---
+>>  arch/arm/mach-omap2/clockdomain.h           |   2 +
+>>  arch/arm/mach-omap2/clockdomains43xx_data.c | 199 ++++++++++++++++++++++++++++
+>>  arch/arm/mach-omap2/cminst44xx.c            |   9 ++
+>>  3 files changed, 210 insertions(+)
+>>  create mode 100644 arch/arm/mach-omap2/clockdomains43xx_data.c
+> 
+> I suggest we drop this. this can be addressed by Tero's clk series.
 
-to arch/<arch>/include/asm/Kbuild instead.
+Probably you misunderstood clock domain data as clock data, as Tero's
+series does not take care of clock domain data, we would require this.
 
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Regards
+Afzal
