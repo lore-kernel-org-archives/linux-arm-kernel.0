@@ -1,69 +1,39 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 17 Sep 2013 12:35:48 -0400 (EDT)
-Subject: [PATCH] ARM: fix Thumb-2 bug in AES assembler code
-In-Reply-To: <1379434519-23299-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1379434519-23299-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <alpine.LFD.2.03.1309171234120.20709@syhkavp.arg>
+From: fabio.estevam@freescale.com (Fabio Estevam)
+Date: Tue, 17 Sep 2013 13:46:23 -0300
+Subject: [PATCH] ARM: dts: imx6qdl-sabresd: SDHC ports are 8 bit-wide
+Message-ID: <1379436383-29428-1-git-send-email-fabio.estevam@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 17 Sep 2013, Ard Biesheuvel wrote:
+On imx6qdl-sabresd the SDHC2 and SDHC3 are 8 bit-wide, so pass the bus-width
+property to reflect that.
 
-> Patch 638591c enabled building the AES assembler code in Thumb2 mode.
-> However, this code uses arithmetic involving PC rather than adr{l}
-> instructions to generate PC-relative references to the lookup tables,
-> and this needs to take into account the different PC offset when
-> running in Thumb mode.
+Otherwise the mmc driver will operate with the default bus-width value of 4.
 
-Wouldn't it be better to fix this using adr instead?
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/boot/dts/imx6qdl-sabresd.dtsi | 2 ++
+ 1 file changed, 2 insertions(+)
 
-
-> 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
-> 
-> This needs cc to stable for 3.10/3.11 as well.
-> 
-> 
->  arch/arm/crypto/aes-armv4.S | 11 +++++++----
->  1 file changed, 7 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm/crypto/aes-armv4.S b/arch/arm/crypto/aes-armv4.S
-> index 19d6cd6..33c30ab 100644
-> --- a/arch/arm/crypto/aes-armv4.S
-> +++ b/arch/arm/crypto/aes-armv4.S
-> @@ -148,7 +148,8 @@ AES_Te:
->  @ 		 const AES_KEY *key) {
->  .align	5
->  ENTRY(AES_encrypt)
-> -	sub	r3,pc,#8		@ AES_encrypt
-> +ARM(	sub	r3,pc,#8	)	@ AES_encrypt
-> +THUMB(	sub	r3,pc,#4	)
->  	stmdb   sp!,{r1,r4-r12,lr}
->  	mov	r12,r0		@ inp
->  	mov	r11,r2
-> @@ -381,7 +382,8 @@ _armv4_AES_encrypt:
->  .align	5
->  ENTRY(private_AES_set_encrypt_key)
->  _armv4_AES_set_encrypt_key:
-> -	sub	r3,pc,#8		@ AES_set_encrypt_key
-> +ARM(	sub	r3,pc,#8	)	@ AES_set_encrypt_key
-> +THUMB(	sub	r3,pc,#4	)
->  	teq	r0,#0
->  	moveq	r0,#-1
->  	beq	.Labrt
-> @@ -843,8 +845,9 @@ AES_Td:
->  @ 		 const AES_KEY *key) {
->  .align	5
->  ENTRY(AES_decrypt)
-> -	sub	r3,pc,#8		@ AES_decrypt
-> -	stmdb   sp!,{r1,r4-r12,lr}
-> +ARM(	sub	r3,pc,#8	)	@ AES_decrypt
-> +THUMB(	sub	r3,pc,#4	)
-> +		stmdb   sp!,{r1,r4-r12,lr}
->  	mov	r12,r0		@ inp
->  	mov	r11,r2
->  	sub	r10,r3,#AES_decrypt-AES_Td		@ Td
-> -- 
-> 1.8.1.2
-> 
+diff --git a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
+index 39eafc2..64e454b 100644
+--- a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
+@@ -229,6 +229,7 @@
+ &usdhc2 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_usdhc2_1>;
++	bus-width = <8>;
+ 	cd-gpios = <&gpio2 2 0>;
+ 	wp-gpios = <&gpio2 3 0>;
+ 	status = "okay";
+@@ -237,6 +238,7 @@
+ &usdhc3 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_usdhc3_1>;
++	bus-width = <8>;
+ 	cd-gpios = <&gpio2 0 0>;
+ 	wp-gpios = <&gpio2 1 0>;
+ 	status = "okay";
+-- 
+1.8.1.2
