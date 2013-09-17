@@ -1,71 +1,80 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Tue, 17 Sep 2013 17:36:39 +0100
-Subject: [PATCH v3 1/2] video: ARM CLCD: Add DT support
-In-Reply-To: <52376180.1090001@wwwdotorg.org>
-References: <1379351934-25415-1-git-send-email-pawel.moll@arm.com>
- <52376180.1090001@wwwdotorg.org>
-Message-ID: <1379435799.9205.16.camel@hornet>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 17 Sep 2013 18:41:04 +0200
+Subject: [PATCH] ARM: fix Thumb-2 bug in AES assembler code
+In-Reply-To: <alpine.LFD.2.03.1309171234120.20709@syhkavp.arg>
+References: <1379434519-23299-1-git-send-email-ard.biesheuvel@linaro.org>
+ <alpine.LFD.2.03.1309171234120.20709@syhkavp.arg>
+Message-ID: <CAKv+Gu9z32WHi88di0ar0C-=Se-ni_0KqQsqvon9FmVr91PQvQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2013-09-16 at 20:52 +0100, Stephen Warren wrote:
-> I think the binding should either always use names as the key, or use
-> indices in interrupts as the key. Hence, I'd word that more like:
-> 
-> - interrupt-names: either the single entry "combined" representing a
-> 			combined interrupt output (CLCDINTR), or the
-> 			four entries "mbe", "vcomp", "lnbu", "fuf"
-> 			representing the individual CLCDMBEINTR,
-> 			CLCDVCOMPINTR, CLCDLNBUINTR, CLCDFUFINTR
-> 			interrupts.
-> - interrupts: contains an interrupt specifier for each entry in
-> 		 interrupt-names.
+On 17 September 2013 18:35, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+> On Tue, 17 Sep 2013, Ard Biesheuvel wrote:
+>
+>> Patch 638591c enabled building the AES assembler code in Thumb2 mode.
+>> However, this code uses arithmetic involving PC rather than adr{l}
+>> instructions to generate PC-relative references to the lookup tables,
+>> and this needs to take into account the different PC offset when
+>> running in Thumb mode.
+>
+> Wouldn't it be better to fix this using adr instead?
+>
 
-Cool, works for me.
+Excellent point. I am just being overly cautious perhaps, but my idea
+was to stay as close as possible to the original.
+Let me check if it builds with adr (no adrl in thumb), if so I will respin.
 
-> > +- arm,pl11x,panel-data-pads: array of 24 cells, each of them describing
-> > +				a function of one of the CLD pads,
-> > +				starting from 0 up to 23; each pad can
-> > +				be described by one of the following values:
-> > +	- 0: reserved (not connected)
-> > +	- 0x100-0x107: color upper STN panel data 0 to 7
-> ...
-> 
-> I assume those are the raw values that go into the HW?
-> 
-> > +				Example sets of values for standard
-> > +				panel interfaces:
-> > +	- PL110 single colour STN panel:
-> > +			<0x107 0x106 0x105 0x104 0x103 0x102 0x101 0x100>,
-> > +			<0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0>;
-> 
-> The indentation of the introductory text seems a little odd. 
+-- 
+Ard.
 
-It follows the first paragraph of this property description. But I may
-re-format all this stuff. Really looking forward some the formal
-syntax :-)
 
-> Do we really need so many examples?
-
-They cover all standard cases. If I was to write a tree for a new
-platform not knowing anything about CLCD, I think I'd appreciate this
-and don't believe this extra kB or two is a problem. Do you?
-
-> > +Optional properties:
-> > +
-> > +- arm,pl11x,framebuffer-base: a pair of two values, address and size,
-> > +				defining the framebuffer to be used;
-> > +				to be used only if it is *not*
-> > +				part of normal memory, as described
-> > +				in /memory node
-> 
-> If the framebuffer is part of /memory, what happens then? Is the address
-> not fixed (so the HW isn't yet set up) and hence a driver should
-> allocate it?
-
-Yes, if it wants to display anything :-) And as this is a normal and
-expected behaviour, I don't think it deserves a note in the
-documentation. I'm open to any suggestions that would make the wording
-above emphasize the "weirdness" of situations requiring the property.
-
-Pawe?
+>
+>>
+>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>> ---
+>>
+>> This needs cc to stable for 3.10/3.11 as well.
+>>
+>>
+>>  arch/arm/crypto/aes-armv4.S | 11 +++++++----
+>>  1 file changed, 7 insertions(+), 4 deletions(-)
+>>
+>> diff --git a/arch/arm/crypto/aes-armv4.S b/arch/arm/crypto/aes-armv4.S
+>> index 19d6cd6..33c30ab 100644
+>> --- a/arch/arm/crypto/aes-armv4.S
+>> +++ b/arch/arm/crypto/aes-armv4.S
+>> @@ -148,7 +148,8 @@ AES_Te:
+>>  @             const AES_KEY *key) {
+>>  .align       5
+>>  ENTRY(AES_encrypt)
+>> -     sub     r3,pc,#8                @ AES_encrypt
+>> +ARM( sub     r3,pc,#8        )       @ AES_encrypt
+>> +THUMB(       sub     r3,pc,#4        )
+>>       stmdb   sp!,{r1,r4-r12,lr}
+>>       mov     r12,r0          @ inp
+>>       mov     r11,r2
+>> @@ -381,7 +382,8 @@ _armv4_AES_encrypt:
+>>  .align       5
+>>  ENTRY(private_AES_set_encrypt_key)
+>>  _armv4_AES_set_encrypt_key:
+>> -     sub     r3,pc,#8                @ AES_set_encrypt_key
+>> +ARM( sub     r3,pc,#8        )       @ AES_set_encrypt_key
+>> +THUMB(       sub     r3,pc,#4        )
+>>       teq     r0,#0
+>>       moveq   r0,#-1
+>>       beq     .Labrt
+>> @@ -843,8 +845,9 @@ AES_Td:
+>>  @             const AES_KEY *key) {
+>>  .align       5
+>>  ENTRY(AES_decrypt)
+>> -     sub     r3,pc,#8                @ AES_decrypt
+>> -     stmdb   sp!,{r1,r4-r12,lr}
+>> +ARM( sub     r3,pc,#8        )       @ AES_decrypt
+>> +THUMB(       sub     r3,pc,#4        )
+>> +             stmdb   sp!,{r1,r4-r12,lr}
+>>       mov     r12,r0          @ inp
+>>       mov     r11,r2
+>>       sub     r10,r3,#AES_decrypt-AES_Td              @ Td
+>> --
+>> 1.8.1.2
+>>
