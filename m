@@ -1,63 +1,22 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 17 Sep 2013 09:46:52 +0100
-Subject: [PATCH 18/28] of: create default early_init_dt_add_memory_arch
-In-Reply-To: <1379372965-22359-19-git-send-email-robherring2@gmail.com>
+Date: Tue, 17 Sep 2013 09:50:04 +0100
+Subject: [PATCH 20/28] arm64: set initrd_start/initrd_end for fdt scan
+In-Reply-To: <1379372965-22359-21-git-send-email-robherring2@gmail.com>
 References: <1379372965-22359-1-git-send-email-robherring2@gmail.com>
- <1379372965-22359-19-git-send-email-robherring2@gmail.com>
-Message-ID: <DDB72C85-45A3-40FC-9108-7B56F6C5BC5B@arm.com>
+ <1379372965-22359-21-git-send-email-robherring2@gmail.com>
+Message-ID: <8639E68F-4CCB-4E34-82BF-18EDA98BB978@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 17 Sep 2013, at 00:09, Rob Herring <robherring2@gmail.com> wrote:
-> --- a/arch/arm64/kernel/setup.c
-> +++ b/arch/arm64/kernel/setup.c
-> @@ -147,24 +147,6 @@ static void __init setup_machine_fdt(phys_addr_t dt_phys)
-> 	pr_info("Machine: %s\n", machine_name);
-> }
+> From: Rob Herring <rob.herring@calxeda.com>
 > 
-> -void __init early_init_dt_add_memory_arch(u64 base, u64 size)
-> -{
-> -	base &= PAGE_MASK;
-> -	size &= PAGE_MASK;
-> -	if (base + size < PHYS_OFFSET) {
-> -		pr_warning("Ignoring memory block 0x%llx - 0x%llx\n",
-> -			   base, base + size);
-> -		return;
-> -	}
-> -	if (base < PHYS_OFFSET) {
-> -		pr_warning("Ignoring memory range 0x%llx - 0x%llx\n",
-> -			   base, PHYS_OFFSET);
-> -		size -= PHYS_OFFSET - base;
-> -		base = PHYS_OFFSET;
-> -	}
-> -	memblock_add(base, size);
-> -}
-> -
-> /*
->  * Limit the memory size that was specified via FDT.
->  */
-
-...
-
-> --- a/drivers/of/fdt.c
-> +++ b/drivers/of/fdt.c
-> @@ -688,6 +688,17 @@ u64 __init dt_mem_next_cell(int s, __be32 **cellp)
-> 	return of_read_number(p, s);
-> }
+> In order to unify the initrd scanning for DT across architectures, make
+> arm64 use initrd_start and initrd_end instead of the physical addresses.
 > 
-> +void __init __weak early_init_dt_add_memory_arch(u64 base, u64 size)
-> +{
-> +#ifdef CONFIG_HAVE_MEMBLOCK
-> +	base &= PAGE_MASK;
-> +	size &= PAGE_MASK;
-> +	memblock_add(base, size);
-> +#else
-> +	pr_err("%s: ignoring memory (%llx, %llx)\n", __func__, base, size);
-> +#endif
-> +}
+> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: linux-arm-kernel at lists.infradead.org
 
-Are the arm64 changes equivalent here?  There are some safety checks to
-cope with the kernel being loaded at a higher offset than the
-recommended one (PHYS_OFFSET calculated automatically).
-
-Catalin
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
