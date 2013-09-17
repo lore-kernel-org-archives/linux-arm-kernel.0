@@ -1,937 +1,1277 @@
 From: Russ.Dill@ti.com (Russ Dill)
-Date: Tue, 17 Sep 2013 05:43:31 -0700
-Subject: [RFC PATCH 05/11] PIE: Support embedding position independent
- executables
+Date: Tue, 17 Sep 2013 05:43:37 -0700
+Subject: [RFC PATCH 11/11] ARM: OMAP2+: AM33XX: Basic suspend resume support
 In-Reply-To: <1379421817-15759-1-git-send-email-Russ.Dill@ti.com>
 References: <1379421817-15759-1-git-send-email-Russ.Dill@ti.com>
-Message-ID: <1379421817-15759-6-git-send-email-Russ.Dill@ti.com>
+Message-ID: <1379421817-15759-12-git-send-email-Russ.Dill@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adds support for embedding PIEs into the kernel, loading them
-into genalloc sections, performing necessary relocations, and running code
-from them. This allows platforms that need to run code from SRAM, such
-an during suspend/resume, to develop that code in C instead of assembly.
+From: Vaibhav Bedia <vaibhav.bedia@ti.com>
 
-Functions and data for each PIE should be grouped into sections with the
-__pie(<group>) and __pie_data(<group>) macros respectively. Any symbols or
-functions that are to be accessed from outside the PIE should be marked with
-EXPORT_PIE_SYMBOL(<sym>). For example:
+AM335x supports various low power modes as documented
+in section 8.1.4.3 of the AM335x TRM which is available
+@ http://www.ti.com/litv/pdf/spruh73f
 
-static struct ddr_timings xyz_timings __pie_data(platformxyz) = {
-	[...]
-};
+DeepSleep0 mode offers the lowest power mode with limited
+wakeup sources without a system reboot and is mapped as
+the suspend state in the kernel. In this state, MPU and
+PER domains are turned off with the internal RAM held in
+retention to facilitate resume process. As part of the boot
+process, the assembly code is copied over to OCMCRAM using
+the OMAP SRAM code.
 
-void __pie(platformxyz) xyz_ddr_on(void *addr)
-{
-	[...]
-}
-EXPORT_PIE_SYMBOL(xyz_ddr_on);
+AM335x has a Cortex-M3 (WKUP_M3) which assists the MPU
+in DeepSleep0 entry and exit. WKUP_M3 takes care of the
+clockdomain and powerdomain transitions based on the
+intended low power state. MPU needs to load the appropriate
+WKUP_M3 binary onto the WKUP_M3 memory space before it can
+leverage any of the PM features like DeepSleep.
 
-While the kernel can access exported symbols from the PIE, the PIE cannot
-access symbols from the kernel, but can access data from the kernel and
-call functions in the kernel so long as addresses are passed into the PIE.
+The IPC mechanism between MPU and WKUP_M3 uses a mailbox
+sub-module and 8 IPC registers in the Control module. MPU
+uses the assigned Mailbox for issuing an interrupt to
+WKUP_M3 which then goes and checks the IPC registers for
+the payload. WKUP_M3 has the ability to trigger on interrupt
+to MPU by executing the "sev" instruction.
 
-PIEs are loaded from the kernel into a genalloc pool with pie_load_sections.
-pie_load_sections allocates space within the pool, copies the neccesary
-code/data, and performs any necessary relocations. A chunk identifier is
-returned for removing the PIE from the pool, and for translating symbols.
+In the current implementation when the suspend process
+is initiated MPU interrupts the WKUP_M3 to let it know about
+the intent of entering DeepSleep0 and waits for an ACK. When
+the ACK is received MPU continues with its suspend process
+to suspend all the drivers and then jumps to assembly in
+OCMC RAM. The assembly code puts the PLLs in bypass, puts the
+external RAM in self-refresh mode and then finally execute the
+WFI instruction. Execution of the WFI instruction triggers another
+interrupt to the WKUP_M3 which then continues wiht the power down
+sequence wherein the clockdomain and powerdomain transition takes
+place. As part of the sleep sequence, WKUP_M3 unmasks the interrupt
+lines for the wakeup sources. WFI execution on WKUP_M3 causes the
+hardware to disable the main oscillator of the SoC.
 
-Because the PIEs are dynamically relocated, special accessors must be used
-to access PIE symbols from kernel code:
+When a wakeup event occurs, WKUP_M3 starts the power-up
+sequence by switching on the power domains and finally
+enabling the clock to MPU. Since the MPU gets powered down
+as part of the sleep sequence in the resume path ROM code
+starts executing. The ROM code detects a wakeup from sleep
+and then jumps to the resume location in OCMC which was
+populated in one of the IPC registers as part of the suspend
+sequence.
 
-- kern_to_pie(chunk, ptr):   Translate a PIE symbol to the virtual address
-                             it is loaded into within the pool.
+The low level code in OCMC relocks the PLLs, enables access
+to external RAM and then jumps to the cpu_resume code of
+the kernel to finish the resume process.
 
-- fn_to_pie(chunk, ptr):     Same as above, but for function pointers.
-
-- sram_to_phys(chunk, addr): Translate a virtual address within a loaded PIE
-                             to a physical address.
-
-Loading a PIE involves three main steps. First a set of common functions to
-cover built-ins emitted by gcc (memcpy, memmove, etc) is copied into the pool.
-Then the actual PIE code and data is copied into the pool. Because the PIE
-code is contained within an overlay with other PIEs, offsets to the common
-functions are maintained. Finally, relocations are performed as necessary.
-
+Signed-off-by: Vaibhav Bedia <vaibhav.bedia@ti.com>
+Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
 Signed-off-by: Russ Dill <Russ.Dill@ti.com>
+Cc: Tony Lingren <tony@atomide.com>
+Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Cc: Benoit Cousson <benoit.cousson@linaro.org>
+Cc: Paul Walmsley <paul@pwsan.com>
+Cc: Kevin Hilman <khilman@linaro.org>
 ---
- Documentation/pie.txt             | 167 ++++++++++++++++++++++++++++++++
- Makefile                          |  17 +++-
- include/asm-generic/pie.lds.h     |  82 ++++++++++++++++
- include/asm-generic/vmlinux.lds.h |   1 +
- include/linux/pie.h               | 196 ++++++++++++++++++++++++++++++++++++++
- lib/Kconfig                       |  14 +++
- lib/Makefile                      |   2 +
- lib/pie.c                         | 138 +++++++++++++++++++++++++++
- pie/.gitignore                    |   3 +
- pie/Makefile                      |  85 +++++++++++++++++
- scripts/link-vmlinux.sh           |  11 ++-
- 11 files changed, 711 insertions(+), 5 deletions(-)
- create mode 100644 Documentation/pie.txt
- create mode 100644 include/asm-generic/pie.lds.h
- create mode 100644 include/linux/pie.h
- create mode 100644 lib/pie.c
- create mode 100644 pie/.gitignore
- create mode 100644 pie/Makefile
+ arch/arm/mach-omap2/Kconfig         |   7 +-
+ arch/arm/mach-omap2/Makefile        |   2 +
+ arch/arm/mach-omap2/board-generic.c |   1 +
+ arch/arm/mach-omap2/common.h        |  10 +
+ arch/arm/mach-omap2/io.c            |   5 +
+ arch/arm/mach-omap2/pm.c            |   3 +-
+ arch/arm/mach-omap2/pm33xx.c        | 486 ++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-omap2/pm33xx.h        |  68 +++++
+ arch/arm/mach-omap2/sleep33xx.c     | 314 +++++++++++++++++++++++
+ arch/arm/mach-omap2/wkup_m3.c       | 183 ++++++++++++++
+ 10 files changed, 1076 insertions(+), 3 deletions(-)
+ create mode 100644 arch/arm/mach-omap2/pm33xx.c
+ create mode 100644 arch/arm/mach-omap2/pm33xx.h
+ create mode 100644 arch/arm/mach-omap2/sleep33xx.c
+ create mode 100644 arch/arm/mach-omap2/wkup_m3.c
 
-diff --git a/Documentation/pie.txt b/Documentation/pie.txt
-new file mode 100644
-index 0000000..54a1646
---- /dev/null
-+++ b/Documentation/pie.txt
-@@ -0,0 +1,167 @@
-+Position Independent Executables (PIEs)
-+=======================================
-+
-+About
-+=====
-+
-+The PIE framework is designed to allow normal C code from the kernel to be
-+embedded into the kernel, loaded at arbirary addresses, and executed.
-+
-+A PIE is a position independent executable is a piece of self contained code
-+that can be relocated to any address. Before the code is run, a simple list
-+of offset based relocations has to be performed.
-+
-+Copyright 2013 Texas Instruments, Inc
-+	Russ Dill <russ.dill@ti.com>
-+
-+Motivation
-+==========
-+
-+Without the PIE framework, the only way to support platforms that require
-+code loaded to and run from arbitrary addresses was to write the code in
-+assembly. For example, a platform may have suspend/resume steps that
-+disable/enable SDRAM and must be run from on chip SRAM.
-+
-+In addition to the SRAM virtual address not being known at compile time
-+for device tree platforms, the code must often run with the MMU enabled or
-+disabled (physical vs virtual address).
-+
-+Design
-+======
-+
-+The PIE code is separated into two main pieces. libpie satifies various
-+function calls emitted by gcc. The kernel contains only one copy of libpie
-+but whenever a PIE is loaded, a copy of libpie is copied along with the PIE
-+code. The second piece is the PIE code and data marked with special PIE
-+sections. At build time, libpie and the PIE sections are collected together
-+into a single PIE executable:
-+
-+	+---------------------------------------+
-+	| __pie_common_start			|
-+	|	<libpie>			|
-+	| __pie_common_end			|
-+	+---------------------------------------+
-+	| __pie_overlay_start			|
-+	| +-----------------------------+	|
-+	| | __pie_groupxyz_start	|	|
-+	| |   <groupxyz functions/data>	|	|
-+	| | __pie_groupxyz_end		|	|
-+	| +-----------------------------+	|
-+	| | __pie_groupabc_start	|	|
-+	| |   <groupabc functions/data>	|	|
-+	| | __pie_groupabc_end		|	|
-+	| +-----------------------------+	|
-+	| | __pie_groupijk_start	|	|
-+	| |   <groupijk functions/data>	|	|
-+	| | __pie_groupijk_end		|	|
-+	| +-----------------------------+	|
-+	| __pie_overlay_end			|
-+	+---------------------------------------+
-+	| <Architecture specific relocations>	|
-+	+---------------------------------------+
-+
-+The PIE executable is then embedded into the kernel. Symbols are exported
-+from the PIE executable and passed back into the kernel at link time. When
-+the PIE is loaded, the memory layout then looks like the following:
-+
-+	+---------------------------------------+
-+	| <libpie>				|
-+	+---------------------------------------+
-+	| <groupabc_functions/data>		|
-+	+---------------------------------------+
-+	| Tail (Arch specific data/relocations	|
-+	+---------------------------------------+
-+
-+The architecture specific code is responsible for reading the relocations
-+and performing the necessary fixups.
-+
-+Marking code/data
-+=================
-+
-+Marking code and data for inclusing into a PIE group is done with the PIE
-+section markers, __pie(<group>) and __pie_data(<group>). Any symbols that
-+will be used outside of the PIE must be exported with EXPORT_PIE_SYMBOL:
-+
-+    static struct ddr_timings xyz_timings __pie_data(platformxyz) = {
-+    	[...]
-+    };
-+    
-+    void __pie(platformxyz) xyz_ddr_on(void *addr)
-+    {
-+    	[...]
-+    }
-+    EXPORT_PIE_SYMBOL(xyz_ddr_on);
-+
-+Loading PIEs
-+============
-+
-+PIEs can be loaded into a genalloc pool (such as one backed by SRAM). The
-+following functions are provided:
-+
-+ - pie_load_sections(pool, <group>)
-+ - pie_load_sections_phys(pool, <group>)
-+ - pie_free(chunk)
-+
-+pie_load_sections/pie_load_sections_phys load a PIE section group into the
-+given pool. Any necessary fixups are peformed and a chunk identifier is
-+returned. The first variant performs fixups such that the code can be run
-+with the current address layout. The second (phys) variant performs fixups
-+such that the code can be executed with the MMU disabled.
-+
-+The pie_free function unloads a PIE from a pool.
-+
-+Utilizing PIEs
-+==============
-+
-+In order to translate between symbols and addresses within a loaded PIE, the
-+following macros/functions are provided:
-+
-+ - kern_to_pie(chunk, sym)
-+ - fn_to_pie(chunk, fn)
-+ - pie_to_phys(chunk, addr)
-+
-+All three take as the first argument the chunk returned by pie_load_sections.
-+Data symbols can be translated with kern_to_pie. The macro is made so that
-+the type returned is the type passed:
-+
-+   kern_to_pie(chunk, xyz_struct_ptr)->foo = 15;
-+   *kern_to_pie(chunk, &xyz_flags) = XYZ_DO_THE_THING;
-+
-+Because certain architectures require special handling of function pointers,
-+a special varaint is provided:
-+
-+   ret = fn_to_pie(chunk, &xyz_ddr_on)(addr);
-+   fnptr = fn_to_pie(chunk, &abc_fn);
-+
-+In the case that a PIE has been configured to run with the MMU disabled,
-+physical addresses can be translated with pie_to_phys. For instance, if
-+the resume ROM jumps to a given physical address:
-+
-+   trampoline = fn_to_pie(chunk, resume_trampoline);
-+   writel(pie_to_phys(chunk, trampoline), XYZ_RESUME_ADDR_REG);
-+
-+On the Fly Fixup
-+================
-+
-+The tail portion of the PIE can be used to store data necessary to perform
-+on the fly fixups. This is necessary for code that needs to run from
-+different address spaces at different times. Any on the fly fixup support
-+is architecture specific.
-+
-+Architecture Requirements
-+=========================
-+
-+Individual architectures must implement two functions:
-+
-+pie_arch_fill_tail - This function examines the architecture specific
-+relocation entries and copies the ones necessary for the given PIE.
-+
-+pie_arch_fixup - This function performs fixups of the PIE code based
-+on the tail data generated above.
-+
-+pie.lds - A linker script for the PIE executable must be provided.
-+include/asm-generic/pie.lds.S provides a template.
-+
-+libpie.o - The architecture must also provide a library of functions that
-+gcc may expect as a built-in, such as memcpy, memmove, etc. The list of
-+functions is architecture specific.
-diff --git a/Makefile b/Makefile
-index fe8204b..4791a0f 100644
---- a/Makefile
-+++ b/Makefile
-@@ -396,7 +396,7 @@ export KBUILD_CFLAGS CFLAGS_KERNEL CFLAGS_MODULE CFLAGS_GCOV
- export KBUILD_AFLAGS AFLAGS_KERNEL AFLAGS_MODULE
- export KBUILD_AFLAGS_MODULE KBUILD_CFLAGS_MODULE KBUILD_LDFLAGS_MODULE
- export KBUILD_AFLAGS_KERNEL KBUILD_CFLAGS_KERNEL
--export KBUILD_ARFLAGS
-+export KBUILD_ARFLAGS OBJCOPY_OUTPUT_FORMAT
+diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
+index 3eed000..ef3fe40 100644
+--- a/arch/arm/mach-omap2/Kconfig
++++ b/arch/arm/mach-omap2/Kconfig
+@@ -67,11 +67,14 @@ config SOC_OMAP5
+ config SOC_AM33XX
+ 	bool "AM33XX support"
+ 	depends on ARCH_MULTI_V7
+-	select ARCH_OMAP2PLUS
++	default y
+ 	select ARM_CPU_SUSPEND if PM
++	select COMMON_CLK
+ 	select CPU_V7
++	select MAILBOX if PM
+ 	select MULTI_IRQ_HANDLER
+-	select COMMON_CLK
++	select OMAP_MBOX_FWK if PM
++	select OMAP2PLUS_MBOX if PM
  
- # When compiling out-of-tree modules, put MODVERDIR in the module
- # tree rather than in the kernel tree. The kernel tree might
-@@ -682,6 +682,10 @@ ifeq ($(CONFIG_STRIP_ASM_SYMS),y)
- LDFLAGS_vmlinux	+= $(call ld-option, -X,)
+ config SOC_AM43XX
+ 	bool "TI AM43x"
+diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
+index d4f6715..42442c4 100644
+--- a/arch/arm/mach-omap2/Makefile
++++ b/arch/arm/mach-omap2/Makefile
+@@ -87,6 +87,7 @@ obj-$(CONFIG_ARCH_OMAP2)		+= sleep24xx.o
+ obj-$(CONFIG_ARCH_OMAP3)		+= pm34xx.o sleep34xx.o
+ obj-$(CONFIG_ARCH_OMAP4)		+= pm44xx.o omap-mpuss-lowpower.o
+ obj-$(CONFIG_SOC_OMAP5)			+= omap-mpuss-lowpower.o
++obj-$(CONFIG_SOC_AM33XX)		+= pm33xx.o sleep33xx.o wkup_m3.o
+ obj-$(CONFIG_PM_DEBUG)			+= pm-debug.o
+ 
+ obj-$(CONFIG_POWER_AVS_OMAP)		+= sr_device.o
+@@ -94,6 +95,7 @@ obj-$(CONFIG_POWER_AVS_OMAP_CLASS3)    += smartreflex-class3.o
+ 
+ AFLAGS_sleep24xx.o			:=-Wa,-march=armv6
+ AFLAGS_sleep34xx.o			:=-Wa,-march=armv7-a$(plus_sec)
++CFLAGS_sleep33xx.o			:=-march=armv7-a
+ 
  endif
  
-+ifeq ($(CONFIG_PIE),y)
-+LDFLAGS_vmlinux += --just-symbols=pie/pie.syms
-+endif
-+
- # Default kernel image to build when no specific target is given.
- # KBUILD_IMAGE may be overruled on the command line or
- # set in the environment
-@@ -737,13 +741,15 @@ core-y		+= kernel/ mm/ fs/ ipc/ security/ crypto/ block/
+diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
+index aed750c..3f2d6a7 100644
+--- a/arch/arm/mach-omap2/board-generic.c
++++ b/arch/arm/mach-omap2/board-generic.c
+@@ -159,6 +159,7 @@ DT_MACHINE_START(AM33XX_DT, "Generic AM33XX (Flattened Device Tree)")
+ 	.reserve	= am33xx_reserve,
+ 	.map_io		= am33xx_map_io,
+ 	.init_early	= am33xx_init_early,
++	.init_late	= am33xx_init_late,
+ 	.init_irq	= omap_intc_of_init,
+ 	.handle_irq	= omap3_intc_handle_irq,
+ 	.init_machine	= omap_generic_init,
+diff --git a/arch/arm/mach-omap2/common.h b/arch/arm/mach-omap2/common.h
+index 6b8ef74..80bf0da 100644
+--- a/arch/arm/mach-omap2/common.h
++++ b/arch/arm/mach-omap2/common.h
+@@ -69,6 +69,15 @@ static inline int omap4_pm_init(void)
+ }
+ #endif
  
- vmlinux-dirs	:= $(patsubst %/,%,$(filter %/, $(init-y) $(init-m) \
- 		     $(core-y) $(core-m) $(drivers-y) $(drivers-m) \
--		     $(net-y) $(net-m) $(libs-y) $(libs-m)))
-+		     $(net-y) $(net-m) $(libs-y) $(libs-m) $(libpie-y)))
++#if defined(CONFIG_PM) && defined(CONFIG_SOC_AM33XX)
++int am33xx_pm_init(void);
++#else
++static inline int am33xx_pm_init(void)
++{
++	return 0;
++}
++#endif
++
+ #ifdef CONFIG_OMAP_MUX
+ int omap_mux_late_init(void);
+ #else
+@@ -107,6 +116,7 @@ void omap2430_init_late(void);
+ void omap3430_init_late(void);
+ void omap35xx_init_late(void);
+ void omap3630_init_late(void);
++void am33xx_init_late(void);
+ void am35xx_init_late(void);
+ void ti81xx_init_late(void);
+ int omap2_common_pm_late_init(void);
+diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
+index 11583a6d..fca216d 100644
+--- a/arch/arm/mach-omap2/io.c
++++ b/arch/arm/mach-omap2/io.c
+@@ -567,6 +567,11 @@ void __init am33xx_init_early(void)
+ 	omap_hwmod_init_postsetup();
+ 	omap_clk_init = am33xx_clk_init;
+ }
++
++void __init am33xx_init_late(void)
++{
++	am33xx_pm_init();
++}
+ #endif
  
- vmlinux-alldirs	:= $(sort $(vmlinux-dirs) $(patsubst %/,%,$(filter %/, \
- 		     $(init-n) $(init-) \
- 		     $(core-n) $(core-) $(drivers-n) $(drivers-) \
- 		     $(net-n)  $(net-)  $(libs-n)    $(libs-))))
- 
-+pie-$(CONFIG_PIE) := pie/
-+
- init-y		:= $(patsubst %/, %/built-in.o, $(init-y))
- core-y		:= $(patsubst %/, %/built-in.o, $(core-y))
- drivers-y	:= $(patsubst %/, %/built-in.o, $(drivers-y))
-@@ -751,16 +757,21 @@ net-y		:= $(patsubst %/, %/built-in.o, $(net-y))
- libs-y1		:= $(patsubst %/, %/lib.a, $(libs-y))
- libs-y2		:= $(patsubst %/, %/built-in.o, $(libs-y))
- libs-y		:= $(libs-y1) $(libs-y2)
-+pie-y		:= $(patsubst %/, %/built-in.o, $(pie-y))
-+libpie-y	:= $(patsubst %/, %/built-in.o, $(libpie-y))
- 
- # Externally visible symbols (used by link-vmlinux.sh)
- export KBUILD_VMLINUX_INIT := $(head-y) $(init-y)
- export KBUILD_VMLINUX_MAIN := $(core-y) $(libs-y) $(drivers-y) $(net-y)
-+export KBUILD_VMLINUX_PIE  := $(pie-y)
-+export KBUILD_LIBPIE       := $(libpie-y)
-+export KBUILD_PIE_LDS      := $(PIE_LDS)
- export KBUILD_LDS          := arch/$(SRCARCH)/kernel/vmlinux.lds
- export LDFLAGS_vmlinux
- # used by scripts/pacmage/Makefile
- export KBUILD_ALLDIRS := $(sort $(filter-out arch/%,$(vmlinux-alldirs)) arch Documentation include samples scripts tools virt)
- 
--vmlinux-deps := $(KBUILD_LDS) $(KBUILD_VMLINUX_INIT) $(KBUILD_VMLINUX_MAIN)
-+vmlinux-deps := $(KBUILD_LDS) $(KBUILD_PIE_LDS) $(KBUILD_VMLINUX_INIT) $(KBUILD_VMLINUX_MAIN) $(KBUILD_VMLINUX_PIE)
- 
- # Final link of vmlinux
-       cmd_link-vmlinux = $(CONFIG_SHELL) $< $(LD) $(LDFLAGS) $(LDFLAGS_vmlinux)
-diff --git a/include/asm-generic/pie.lds.h b/include/asm-generic/pie.lds.h
-new file mode 100644
-index 0000000..2f8d20e
---- /dev/null
-+++ b/include/asm-generic/pie.lds.h
-@@ -0,0 +1,82 @@
-+/*
-+ * Helper macros to support writing architecture specific
-+ * pie linker scripts.
-+ *
-+ * A minimal linker scripts has following content:
-+ * [This is a sample, architectures may have special requiriements]
-+ *
-+ * OUTPUT_FORMAT(...)
-+ * OUTPUT_ARCH(...)
-+ * SECTIONS
-+ * {
-+ *	. = 0x0;
-+ *
-+ *	PIE_COMMON_START
-+ *	.text {
-+ *		PIE_TEXT_TEXT
-+ *	}
-+ *	PIE_COMMON_END
-+ *
-+ *	PIE_OVERLAY_START
-+ *	OVERLAY : NOCROSSREFS {
-+ *		PIE_OVERLAY_SECTION(am33xx)
-+ *		PIE_OVERLAY_SECTION(am347x)
-+ *		[...]
-+ *	}
-+ *	PIE_OVERLAY_END
-+ *
-+ *	PIE_DISCARDS		// must be the last
-+ * }
-+ */
-+
-+#include <asm-generic/vmlinux.lds.h>
-+
-+#define PIE_COMMON_START						\
-+	__pie_common_start : {						\
-+		VMLINUX_SYMBOL(__pie_common_start) = .;			\
-+	}
-+
-+#define PIE_COMMON_END							\
-+	__pie_common_end : {						\
-+		VMLINUX_SYMBOL(__pie_common_end) = .;			\
-+	}
-+
-+#define PIE_OVERLAY_START						\
-+	__pie_overlay_start : {						\
-+		VMLINUX_SYMBOL(__pie_overlay_start) = .;		\
-+	}
-+
-+#define PIE_OVERLAY_END							\
-+	__pie_overlay_end : {						\
-+		VMLINUX_SYMBOL(__pie_overlay_end) = .;			\
-+	}
-+
-+#define PIE_TEXT_TEXT							\
-+	KEEP(*(.pie.text))
-+
-+#define PIE_OVERLAY_SECTION(name)					\
-+	.pie.##name {							\
-+		KEEP(*(.pie.##name##.*))				\
-+		VMLINUX_SYMBOL(__pie_##name##_start) =			\
-+				LOADADDR(.pie.##name##);		\
-+		VMLINUX_SYMBOL(__pie_##name##_end) =			\
-+				LOADADDR(.pie.##name##) +		\
-+				SIZEOF(.pie.##name##);			\
-+	}
-+
-+#define PIE_DISCARDS							\
-+	/DISCARD/ : {							\
-+	*(.dynsym)							\
-+	*(.dynstr*)							\
-+	*(.dynamic*)							\
-+	*(.plt*)							\
-+	*(.interp*)							\
-+	*(.gnu*) 							\
-+	*(.hash)							\
-+	*(.comment)							\
-+	*(.bss*)							\
-+	*(.data)							\
-+	*(.discard)							\
-+	*(.discard.*)							\
-+	}
-+
-diff --git a/include/asm-generic/vmlinux.lds.h b/include/asm-generic/vmlinux.lds.h
-index 69732d2..5a21cfe 100644
---- a/include/asm-generic/vmlinux.lds.h
-+++ b/include/asm-generic/vmlinux.lds.h
-@@ -666,6 +666,7 @@
- 	EXIT_CALL							\
- 	*(.discard)							\
- 	*(.discard.*)							\
-+	*(.pie.*)							\
+ #ifdef CONFIG_SOC_AM43XX
+diff --git a/arch/arm/mach-omap2/pm.c b/arch/arm/mach-omap2/pm.c
+index e742118..f8bd883 100644
+--- a/arch/arm/mach-omap2/pm.c
++++ b/arch/arm/mach-omap2/pm.c
+@@ -305,7 +305,8 @@ int __init omap2_common_pm_late_init(void)
  	}
  
- /**
-diff --git a/include/linux/pie.h b/include/linux/pie.h
+ #ifdef CONFIG_SUSPEND
+-	suspend_set_ops(&omap_pm_ops);
++	if (!soc_is_am33xx())
++		suspend_set_ops(&omap_pm_ops);
+ #endif
+ 
+ 	return 0;
+diff --git a/arch/arm/mach-omap2/pm33xx.c b/arch/arm/mach-omap2/pm33xx.c
 new file mode 100644
-index 0000000..66450c1
+index 0000000..11d3173
 --- /dev/null
-+++ b/include/linux/pie.h
-@@ -0,0 +1,196 @@
++++ b/arch/arm/mach-omap2/pm33xx.c
+@@ -0,0 +1,486 @@
 +/*
-+ * Copyright 2013 Texas Instruments, Inc.
-+ *      Russ Dill <russ.dill@ti.com>
++ * AM33XX Power Management Routines
 + *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms and conditions of the GNU General Public License,
-+ * version 2, as published by the Free Software Foundation.
-+ */
-+
-+#ifndef _LINUX_PIE_H
-+#define _LINUX_PIE_H
-+
-+#include <linux/kernel.h>
-+#include <linux/err.h>
-+
-+#include <asm/fncpy.h>
-+#include <asm/bug.h>
-+
-+struct gen_pool;
-+struct pie_chunk;
-+
-+/**
-+ * pie_arch_fixup - arch specific fixups of copied PIE code
-+ * @chunk:	identifier to be used with kern_to_pie/pie_to_phys
-+ * @base:	virtual address of start of copied PIE section
-+ * @tail:	virtual address of tail data in copied PIE
-+ * @offset:	offset to apply to relocation entries.
++ * Copyright (C) 2012 Texas Instruments Incorporated - http://www.ti.com/
++ * Vaibhav Bedia <vaibhav.bedia@ti.com>
 + *
-+ * When this code is done executing, it should be possible to jump to code
-+ * so long as it is located at the given offset.
-+ */
-+extern int pie_arch_fixup(struct pie_chunk *chunk, void *base, void *tail,
-+							unsigned long offset);
-+
-+/**
-+ * pie_arch_fill_tail - arch specific tail information for copied PIE
-+ * @tail:		virtual address of tail data in copied PIE to be filled
-+ * @common_start:	virtual address of common code within kernel data
-+ * @common_end:		virtual end address of common code within kernel data
-+ * @overlay_start:	virtual address of first overlay within kernel data
-+ * @code_start:		virtual address of this overlay within kernel data
-+ * @code_end:		virtual end address of this overlay within kernel data
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License as
++ * published by the Free Software Foundation version 2.
 + *
-+ * Fill tail data with data necessary to for pie_arch_fixup to perform
-+ * relocations. If tail is NULL, do not update data, but still calculate
-+ * the number of bytes required.
-+ *
-+ * Returns number of bytes required/used for tail on success, -EERROR otherwise.
-+ */
-+extern int pie_arch_fill_tail(void *tail, void *common_start, void *common_end,
-+			void *overlay_start, void *code_start, void *code_end);
-+
-+#ifdef CONFIG_PIE
-+
-+/**
-+ * __pie_load_data - load and fixup PIE code from kernel data
-+ * @pool:	pool to allocate memory from and copy code into
-+ * @start:	virtual start address in kernel of chunk specific code
-+ * @end:	virtual end address in kernel of chunk specific code
-+ * @phys:	%true to fixup to physical address of destination, %false to
-+ *		fixup to virtual address of destination
-+ *
-+ * Returns 0 on success, -EERROR otherwise
-+ */
-+extern struct pie_chunk *__pie_load_data(struct gen_pool *pool,
-+				void *start, void *end, bool phys);
-+
-+/**
-+ * pie_to_phys - translate a virtual PIE address into a physical one
-+ * @chunk:	identifier returned by pie_load_sections
-+ * @addr:	virtual address within pie chunk
-+ *
-+ * Returns physical address on success, -1 otherwise
-+ */
-+extern phys_addr_t pie_to_phys(struct pie_chunk *chunk, unsigned long addr);
-+
-+extern void __iomem *__kern_to_pie(struct pie_chunk *chunk, void *ptr);
-+
-+/**
-+ * pie_free - free the pool space used by an pie chunk
-+ * @chunk:	identifier returned by pie_load_sections
-+ */
-+extern void pie_free(struct pie_chunk *chunk);
-+
-+#define __pie_load_sections(pool, name, phys) ({			\
-+	extern char __pie_##name##_start[];				\
-+	extern char __pie_##name##_end[];				\
-+									\
-+	__pie_load_data(pool, __pie_##name##_start,			\
-+					__pie_##name##_end, phys);	\
-+})
-+
-+/*
-+ * Required for any symbol within an PIE section that is referenced by the
-+ * kernel
-+ */
-+#define EXPORT_PIE_SYMBOL(sym)		extern typeof(sym) sym __weak
-+
-+/* For marking data and functions that should be part of a PIE */
-+#define __pie(name)	__attribute__ ((__section__(".pie." #name ".text")))
-+#define __pie_data(name) __attribute__ ((__section__(".pie." #name ".data")))
-+
-+#else
-+
-+static inline struct pie_chunk *__pie_load_data(struct gen_pool *pool,
-+					void *start, void *end, bool phys)
-+{
-+	return ERR_PTR(-EINVAL);
-+}
-+
-+static inline phys_addr_t pie_to_phys(struct pie_chunk *chunk,
-+						unsigned long addr)
-+{
-+	return -1;
-+}
-+
-+static inline void __iomem *__kern_to_pie(struct pie_chunk *chunk, void *ptr)
-+{
-+	return NULL;
-+}
-+
-+static inline void pie_free(struct pie_chunk *chunk)
-+{
-+}
-+
-+#define __pie_load_sections(pool, name, phys) ({ ERR_PTR(-EINVAL); })
-+
-+#define EXPORT_PIE_SYMBOL(sym)
-+
-+#define __pie(name)
-+#define __pie_data(name)
-+
-+#endif
-+
-+/**
-+ * pie_load_sections - load and fixup sections associated with the given name
-+ * @pool:	pool to allocate memory from and copy code into
-+ *		fixup to virtual address of destination
-+ * @name:	the name given to __pie() and __pie_data() when marking
-+ *		data and code
-+ *
-+ * Returns 0 on success, -EERROR otherwise
-+ */
-+#define pie_load_sections(pool, name) ({				\
-+	__pie_load_sections(pool, name, false);				\
-+})
-+
-+/**
-+ * pie_load_sections_phys - load and fixup sections associated with the given
-+ * name for execution with the MMU off
-+ *
-+ * @pool:	pool to allocate memory from and copy code into
-+ *		fixup to virtual address of destination
-+ * @name:	the name given to __pie() and __pie_data() when marking
-+ *		data and code
-+ *
-+ * Returns 0 on success, -EERROR otherwise
-+ */
-+#define pie_load_sections_phys(pool, name) ({				\
-+	__pie_load_sections(pool, name, true);				\
-+})
-+
-+/**
-+ * kern_to_pie - convert a kernel symbol to the virtual address of where
-+ * that symbol is loaded into the given PIE chunk.
-+ *
-+ * @chunk:	identifier returned by pie_load_sections
-+ * @p:		symbol to convert
-+ *
-+ * Return type is the same as type passed
-+ */
-+#define kern_to_pie(chunk, p) ({					\
-+	void *__ptr = (void *) (p);					\
-+	typeof(p) __result = (typeof(p)) __kern_to_pie(chunk, __ptr);	\
-+	__result;							\
-+})
-+
-+/**
-+ * kern_to_fn - convert a kernel function symbol to the virtual address of where
-+ * that symbol is loaded into the given PIE chunk
-+ *
-+ * @chunk:	identifier returned by pie_load_sections
-+ * @p:		function to convert
-+ *
-+ * Return type is the same as type passed
-+ */
-+#define fn_to_pie(chunk, funcp) ({					\
-+	uintptr_t __kern_addr, __pie_addr;				\
-+									\
-+	__kern_addr = fnptr_to_addr(funcp);				\
-+	__pie_addr = kern_to_pie(chunk, __kern_addr);			\
-+									\
-+	fnptr_translate(funcp, __pie_addr);				\
-+})
-+
-+#endif
-diff --git a/lib/Kconfig b/lib/Kconfig
-index 71d9f81..d47df14 100644
---- a/lib/Kconfig
-+++ b/lib/Kconfig
-@@ -353,6 +353,20 @@ config DQL
- config NLATTR
- 	bool
- 
-+config HAVE_PIE
-+        bool
-+        help
-+          See Documentation/pie.txt for details.
-+
-+config PIE
-+	bool "Embedded position independant executables"
-+	depends on HAVE_PIE
-+	help
-+	  This option adds support for embedding position indepentant (PIE)
-+	  executables into the kernel. The PIEs can then be copied into
-+	  genalloc regions such as SRAM and executed. Some platforms require
-+	  this for suspend/resume support.
-+
- #
- # Generic 64-bit atomic support is selected if needed
- #
-diff --git a/lib/Makefile b/lib/Makefile
-index 7baccfd..2b6123d 100644
---- a/lib/Makefile
-+++ b/lib/Makefile
-@@ -145,6 +145,8 @@ obj-$(CONFIG_GENERIC_NET_UTILS) += net_utils.o
- 
- obj-$(CONFIG_STMP_DEVICE) += stmp_device.o
- 
-+obj-$(CONFIG_PIE) += pie.o
-+
- libfdt_files = fdt.o fdt_ro.o fdt_wip.o fdt_rw.o fdt_sw.o fdt_strerror.o
- $(foreach file, $(libfdt_files), \
- 	$(eval CFLAGS_$(file) = -I$(src)/../scripts/dtc/libfdt))
-diff --git a/lib/pie.c b/lib/pie.c
-new file mode 100644
-index 0000000..c0190dd
---- /dev/null
-+++ b/lib/pie.c
-@@ -0,0 +1,138 @@
-+/*
-+ * Copyright 2013 Texas Instruments, Inc.
-+ *	Russ Dill <russ.dill@ti.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms and conditions of the GNU General Public License,
-+ * version 2, as published by the Free Software Foundation.
++ * This program is distributed "as is" WITHOUT ANY WARRANTY of any
++ * kind, whether express or implied; without even the implied warranty
++ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
 + */
 +
 +#include <linux/kernel.h>
-+#include <linux/slab.h>
++#include <linux/init.h>
++#include <linux/cpu.h>
 +#include <linux/err.h>
++#include <linux/firmware.h>
 +#include <linux/io.h>
-+#include <linux/genalloc.h>
++#include <linux/platform_device.h>
++#include <linux/sched.h>
++#include <linux/suspend.h>
++#include <linux/completion.h>
++#include <linux/module.h>
++#include <linux/interrupt.h>
++#include <linux/ti_emif.h>
 +#include <linux/pie.h>
-+#include <asm/cacheflush.h>
++#include <linux/genalloc.h>
++#include <linux/omap-mailbox.h>
 +
-+struct pie_chunk {
-+	struct gen_pool *pool;
-+	unsigned long addr;
-+	size_t sz;
++#include <asm/suspend.h>
++#include <asm/proc-fns.h>
++#include <asm/sizes.h>
++#include <asm/fncpy.h>
++#include <asm/system_misc.h>
++
++#include "pm.h"
++#include "cm33xx.h"
++#include "pm33xx.h"
++#include "control.h"
++#include "common.h"
++#include "clockdomain.h"
++#include "powerdomain.h"
++#include "omap_hwmod.h"
++#include "omap_device.h"
++#include "soc.h"
++
++static unsigned long am33xx_mem_type;
++static void __iomem *am33xx_emif_base;
++static struct pie_chunk *am33xx_pie_chunk;
++static struct powerdomain *cefuse_pwrdm, *gfx_pwrdm, *per_pwrdm, *mpu_pwrdm;
++static struct clockdomain *gfx_l4ls_clkdm;
++
++struct wakeup_src wakeups[] = {
++	{.irq_nr = 35,	.src = "USB0_PHY"},
++	{.irq_nr = 36,	.src = "USB1_PHY"},
++	{.irq_nr = 40,	.src = "I2C0"},
++	{.irq_nr = 41,	.src = "RTC Timer"},
++	{.irq_nr = 42,	.src = "RTC Alarm"},
++	{.irq_nr = 43,	.src = "Timer0"},
++	{.irq_nr = 44,	.src = "Timer1"},
++	{.irq_nr = 45,	.src = "UART"},
++	{.irq_nr = 46,	.src = "GPIO0"},
++	{.irq_nr = 48,	.src = "MPU_WAKE"},
++	{.irq_nr = 49,	.src = "WDT0"},
++	{.irq_nr = 50,	.src = "WDT1"},
++	{.irq_nr = 51,	.src = "ADC_TSC"},
 +};
 +
-+extern char __pie_common_start[];
-+extern char __pie_common_end[];
-+extern char __pie_overlay_start[];
++struct forced_standby_module am33xx_mod[] = {
++	{.oh_name = "usb_otg_hs"},
++	{.oh_name = "tptc0"},
++	{.oh_name = "tptc1"},
++	{.oh_name = "tptc2"},
++	{.oh_name = "cpgmac0"},
++};
 +
-+int __weak pie_arch_fill_tail(void *tail, void *common_start, void *common_end,
-+			void *overlay_start, void *code_start, void *code_end)
++static struct am33xx_pm_context *am33xx_pm;
++
++static DECLARE_COMPLETION(am33xx_pm_sync);
++
++#ifdef CONFIG_SUSPEND
++
++static int am33xx_pm_suspend(void)
++{
++	int i, j, ret = 0;
++
++	int status = 0;
++	struct platform_device *pdev;
++	struct omap_device *od;
++
++	/*
++	 * By default the following IPs do not have MSTANDBY asserted
++	 * which is necessary for PER domain transition. If the drivers
++	 * are not compiled into the kernel HWMOD code will not change the
++	 * state of the IPs if the IP was not never enabled. To ensure
++	 * that there no issues with or without the drivers being compiled
++	 * in the kernel, we forcefully put these IPs to idle.
++	 */
++	for (i = 0; i < ARRAY_SIZE(am33xx_mod); i++) {
++		pdev = to_platform_device(am33xx_mod[i].dev);
++		od = to_omap_device(pdev);
++		if (od->_driver_status != BUS_NOTIFY_BOUND_DRIVER) {
++			omap_device_enable_hwmods(od);
++			omap_device_idle_hwmods(od);
++		}
++	}
++
++	/* Try to put GFX to sleep */
++	omap_set_pwrdm_state(gfx_pwrdm, PWRDM_POWER_OFF);
++	ret = cpu_suspend(am33xx_mem_type, am33xx_suspend);
++
++	status = pwrdm_read_prev_pwrst(gfx_pwrdm);
++	if (status != PWRDM_POWER_OFF)
++		pr_err("PM: GFX domain did not transition\n");
++	else
++		pr_info("PM: GFX domain entered low power state\n");
++
++	/*
++	 * BUG: GFX_L4LS clock domain needs to be woken up to
++	 * ensure thet L4LS clock domain does not get stuck in transition
++	 * If that happens L3 module does not get disabled, thereby leading
++	 * to PER power domain transition failing
++	 */
++	clkdm_wakeup(gfx_l4ls_clkdm);
++	clkdm_sleep(gfx_l4ls_clkdm);
++
++	if (ret) {
++		pr_err("PM: Kernel suspend failure\n");
++	} else {
++		i = am33xx_pm_status();
++		switch (i) {
++		case 0:
++			pr_info("PM: Successfully put all powerdomains to target state\n");
++
++			/*
++			 * The PRCM registers on AM335x do not contain previous state
++			 * information like those present on OMAP4 so we must manually
++			 * indicate transition so state counters are properly incremented
++			 */
++			pwrdm_post_transition(mpu_pwrdm);
++			pwrdm_post_transition(per_pwrdm);
++			break;
++		case 1:
++			pr_err("PM: Could not transition all powerdomains to target state\n");
++			ret = -1;
++			break;
++		default:
++			pr_err("PM: CM3 returned unknown result :(\nStatus = %d\n", i);
++			ret = -1;
++		}
++
++		/* print the wakeup reason */
++		i = am33xx_pm_wake_src();
++		for (j = 0; j < ARRAY_SIZE(wakeups); j++) {
++			if (wakeups[j].irq_nr == i) {
++				pr_info("PM: Wakeup source %s\n", wakeups[j].src);
++				break;
++			}
++		}
++
++		if (j == ARRAY_SIZE(wakeups))
++			pr_info("PM: Unknown wakeup source %d!\n", i);
++	}
++
++	return ret;
++}
++
++static int am33xx_pm_enter(suspend_state_t suspend_state)
++{
++	int ret = 0;
++
++	switch (suspend_state) {
++	case PM_SUSPEND_STANDBY:
++	case PM_SUSPEND_MEM:
++		ret = am33xx_pm_suspend();
++		break;
++	default:
++		ret = -EINVAL;
++	}
++
++	return ret;
++}
++
++/* returns the error code from msg_send - 0 for success, failure otherwise */
++static int am33xx_ping_wkup_m3(void)
++{
++	int ret = 0;
++
++	/*
++	 * Write a dummy message to the mailbox in order to trigger the RX
++	 * interrupt to alert the M3 that data is available in the IPC
++	 * registers.
++	 */
++	ret = omap_mbox_msg_send(am33xx_pm->mbox, 0xABCDABCD);
++
++	return ret;
++}
++
++static void am33xx_m3_state_machine_reset(void)
++{
++	int i;
++
++	am33xx_pm->ipc.sleep_mode = IPC_CMD_RESET;
++
++	am33xx_pm_ipc_cmd(&am33xx_pm->ipc);
++
++	am33xx_pm->state = M3_STATE_MSG_FOR_RESET;
++
++	pr_info("PM: Sending message for resetting M3 state machine\n");
++
++	if (!am33xx_ping_wkup_m3()) {
++		i = wait_for_completion_timeout(&am33xx_pm_sync,
++					msecs_to_jiffies(500));
++		if (WARN(i == 0, "PM: MPU<->CM3 sync failure\n"))
++			am33xx_pm->state = M3_STATE_UNKNOWN;
++	} else {
++		pr_warn("PM: Unable to ping CM3\n");
++	}
++}
++
++static int am33xx_pm_begin(suspend_state_t state)
++{
++	int i;
++
++	cpu_idle_poll_ctrl(true);
++
++	am33xx_pm->ipc.sleep_mode	= IPC_CMD_DS0;
++	am33xx_pm->ipc.param1		= DS_IPC_DEFAULT;
++	am33xx_pm->ipc.param2		= DS_IPC_DEFAULT;
++
++	am33xx_pm_ipc_cmd(&am33xx_pm->ipc);
++
++	am33xx_pm->state = M3_STATE_MSG_FOR_LP;
++
++	pr_info("PM: Sending message for entering DeepSleep mode\n");
++
++	if (!am33xx_ping_wkup_m3()) {
++		i = wait_for_completion_timeout(&am33xx_pm_sync,
++					msecs_to_jiffies(500));
++		if (WARN(i == 0, "PM: MPU<->CM3 sync failure\n"))
++			return -1;
++	} else {
++		pr_warn("PM: Unable to ping CM3\n");
++	}
++
++	return 0;
++}
++
++static void am33xx_pm_end(void)
++{
++	am33xx_m3_state_machine_reset();
++
++	cpu_idle_poll_ctrl(false);
++
++	return;
++}
++
++static struct platform_suspend_ops am33xx_pm_ops = {
++	.begin		= am33xx_pm_begin,
++	.end		= am33xx_pm_end,
++	.enter		= am33xx_pm_enter,
++};
++
++/*
++ * Dummy notifier for the mailbox
++ */
++
++static int wkup_mbox_msg(struct notifier_block *self, unsigned long len,
++		void *msg)
 +{
 +	return 0;
 +}
 +
-+int __weak pie_arch_fixup(struct pie_chunk *chunk, void *base, void *tail,
-+							unsigned long offset)
++static struct notifier_block wkup_mbox_notifier = {
++	.notifier_call = wkup_mbox_msg,
++};
++
++void am33xx_txev_handler(void)
 +{
++	switch (am33xx_pm->state) {
++	case M3_STATE_RESET:
++		am33xx_pm->state = M3_STATE_INITED;
++		am33xx_pm->ver = am33xx_pm_version_get();
++		if (am33xx_pm->ver == M3_VERSION_UNKNOWN ||
++			am33xx_pm->ver < M3_BASELINE_VERSION) {
++			pr_warn("PM: CM3 Firmware Version %x not supported\n",
++						am33xx_pm->ver);
++		} else {
++			pr_info("PM: CM3 Firmware Version = 0x%x\n",
++						am33xx_pm->ver);
++			am33xx_pm_ops.valid = suspend_valid_only_mem;
++		}
++		break;
++	case M3_STATE_MSG_FOR_RESET:
++		am33xx_pm->state = M3_STATE_INITED;
++		complete(&am33xx_pm_sync);
++		break;
++	case M3_STATE_MSG_FOR_LP:
++		complete(&am33xx_pm_sync);
++		break;
++	case M3_STATE_UNKNOWN:
++		pr_warn("PM: Unknown CM3 State\n");
++	}
++
++	return;
++}
++
++static void am33xx_pm_firmware_cb(const struct firmware *fw, void *context)
++{
++	struct am33xx_pm_context *am33xx_pm = context;
++	int ret = 0;
++	unsigned long pie_trampoline;
++
++	/* no firmware found */
++	if (!fw) {
++		pr_err("PM: request_firmware failed\n");
++		return;
++	}
++
++	wkup_m3_copy_code(fw->data, fw->size);
++
++	wkup_m3_register_txev_handler(am33xx_txev_handler);
++
++	pr_info("PM: Copied the M3 firmware to UMEM\n");
++
++	/*
++	 * Invalidate M3 firmware version before hardreset.
++	 * Write invalid version in lower 4 nibbles of parameter
++	 * register (ipc_regs + 0x8).
++	 */
++	am33xx_pm_version_clear();
++
++	am33xx_pm->state = M3_STATE_RESET;
++
++	ret = wkup_m3_prepare();
++	if (ret) {
++		pr_err("PM: Could not prepare WKUP_M3\n");
++		return;
++	}
++
++	/* Physical resume address to be used by ROM code */
++	pie_trampoline = (long) fn_to_pie(am33xx_pie_chunk,
++				&am33xx_resume_trampoline);
++	am33xx_pm->ipc.resume_addr = pie_to_phys(am33xx_pie_chunk,
++				pie_trampoline);
++
++	am33xx_pm->mbox = omap_mbox_get("wkup_m3", &wkup_mbox_notifier);
++
++	if (IS_ERR(am33xx_pm->mbox)) {
++		ret = -EBUSY;
++		pr_err("PM: IPC Request for A8->M3 Channel failed!\n");
++		return;
++	} else {
++		suspend_set_ops(&am33xx_pm_ops);
++	}
++
++	return;
++}
++
++#endif /* CONFIG_SUSPEND */
++
++static int __init am33xx_map_emif(void)
++{
++	am33xx_emif_base = ioremap(AM33XX_EMIF_BASE, SZ_32K);
++
++	if (!am33xx_emif_base)
++		return -ENOMEM;
++
 +	return 0;
 +}
 +
-+struct pie_chunk *__pie_load_data(struct gen_pool *pool, void *code_start,
-+					void *code_end, bool phys)
++static int __init am33xx_pie_chunk_init(void)
 +{
-+	struct pie_chunk *chunk;
-+	unsigned long offset;
++	struct device_node *np;
++	struct gen_pool *pool;
++
++	np = of_find_compatible_node(NULL, NULL, "ti,omap3-mpu");
++	if (!np)
++		return -ENOENT;
++
++	pool = of_get_named_gen_pool(np, "sram", 0);
++	if (!pool)
++		return -ENOENT;
++
++	am33xx_pie_chunk = pie_load_sections(pool, am33xx);
++	if (!IS_ERR(am33xx_pie_chunk))
++		am33xx_pie_init(am33xx_pie_chunk, am33xx_emif_base,
++					am33xx_dram_sync);
++
++	return PTR_RET(am33xx_pie_chunk);
++}
++
++int __init am33xx_pm_init(void)
++{
 +	int ret;
-+	char *tail;
-+	size_t common_sz;
-+	size_t code_sz;
-+	size_t tail_sz;
++	u32 temp;
++	struct device_node *np;
++	int i;
 +
-+	/* Calculate the tail size */
-+	ret = pie_arch_fill_tail(NULL, __pie_common_start, __pie_common_end,
-+				__pie_overlay_start, code_start, code_end);
-+	if (ret < 0)
++	if (!soc_is_am33xx())
++		return -ENODEV;
++
++	pr_info("Power Management for AM33XX family\n");
++
++	/*
++	 * By default the following IPs do not have MSTANDBY asserted
++	 * which is necessary for PER domain transition. If the drivers
++	 * are not compiled into the kernel HWMOD code will not change the
++	 * state of the IPs if the IP was not never enabled
++	 */
++	for (i = 0; i < ARRAY_SIZE(am33xx_mod); i++)
++		am33xx_mod[i].dev = omap_device_get_by_hwmod_name(am33xx_mod[i].oh_name);
++
++	gfx_pwrdm = pwrdm_lookup("gfx_pwrdm");
++	per_pwrdm = pwrdm_lookup("per_pwrdm");
++	mpu_pwrdm = pwrdm_lookup("mpu_pwrdm");
++
++	gfx_l4ls_clkdm = clkdm_lookup("gfx_l4ls_gfx_clkdm");
++
++	if ((!gfx_pwrdm) || (!per_pwrdm) || (!mpu_pwrdm) || (!gfx_l4ls_clkdm)) {
++		ret = -ENODEV;
 +		goto err;
-+	tail_sz = ret;
++	}
 +
-+	chunk = kzalloc(sizeof(*chunk), GFP_KERNEL);
-+	if (!chunk) {
++	am33xx_pm = kzalloc(sizeof(*am33xx_pm), GFP_KERNEL);
++	if (!am33xx_pm) {
++		pr_err("Memory allocation failed\n");
 +		ret = -ENOMEM;
 +		goto err;
 +	}
 +
-+	common_sz = __pie_overlay_start - __pie_common_start;
-+	code_sz = code_end - code_start;
++	ret = am33xx_map_emif();
++	if (ret) {
++		pr_err("PM: Could not ioremap EMIF\n");
++		goto err;
++	}
++	/* Determine Memory Type */
++	temp = readl(am33xx_emif_base + EMIF_SDRAM_CONFIG);
++	temp = (temp & SDRAM_TYPE_MASK) >> SDRAM_TYPE_SHIFT;
++	/* Parameters to pass to aseembly code */
++	am33xx_mem_type = temp;
++	am33xx_pm->ipc.param3 = temp;
 +
-+	chunk->pool = pool;
-+	chunk->sz = common_sz + code_sz + tail_sz;
-+
-+	chunk->addr = gen_pool_alloc(pool, chunk->sz);
-+	if (!chunk->addr) {
-+		ret = -ENOMEM;
-+		goto err_free;
++	np = of_find_compatible_node(NULL, NULL, "ti,am3353-wkup-m3");
++	if (np) {
++		if (of_find_property(np, "ti,needs_vtt_toggle", NULL) &&
++		    (!(of_property_read_u32(np, "vtt-gpio-pin",
++							&temp)))) {
++			if (temp >= 0 && temp <= 31)
++				am33xx_pm->ipc.param3 |=
++					((1 << VTT_STAT_SHIFT) |
++					(temp << VTT_GPIO_PIN_SHIFT));
++		}
 +	}
 +
-+	/* Copy common code/data */
-+	tail = (char *) chunk->addr;
-+	memcpy(tail, __pie_common_start, common_sz);
-+	tail += common_sz;
++	ret = am33xx_pie_chunk_init();
++	if (ret) {
++		pr_err("PM: Could not load suspend/resume code into SRAM\n");
++		goto err;
++	}
 +
-+	/* Copy chunk specific code/data */
-+	memcpy(tail, code_start, code_sz);
-+	tail += code_sz;
++	(void) clkdm_for_each(omap_pm_clkdms_setup, NULL);
 +
-+	/* Fill in tail data */
-+	ret = pie_arch_fill_tail(tail, __pie_common_start, __pie_common_end,
-+				__pie_overlay_start, code_start, code_end);
-+	if (ret < 0)
-+		goto err_alloc;
-+
-+	/* Calculate initial offset */
-+	if (phys)
-+		offset = gen_pool_virt_to_phys(pool, chunk->addr);
++	/* CEFUSE domain can be turned off post bootup */
++	cefuse_pwrdm = pwrdm_lookup("cefuse_pwrdm");
++	if (cefuse_pwrdm)
++		omap_set_pwrdm_state(cefuse_pwrdm, PWRDM_POWER_OFF);
 +	else
-+		offset = chunk->addr;
++		pr_err("PM: Failed to get cefuse_pwrdm\n");
 +
-+	/* Perform arch specific code fixups */
-+	ret = pie_arch_fixup(chunk, (void *) chunk->addr, tail, offset);
-+	if (ret < 0)
-+		goto err_alloc;
++#ifdef CONFIG_SUSPEND
++	pr_info("PM: Trying to load am335x-pm-firmware.bin");
 +
-+	flush_icache_range(chunk->addr, chunk->addr + chunk->sz);
++	/* We don't want to delay boot */
++	request_firmware_nowait(THIS_MODULE, 0, "am335x-pm-firmware.bin",
++				NULL, GFP_KERNEL, am33xx_pm,
++				am33xx_pm_firmware_cb);
++#endif /* CONFIG_SUSPEND */
 +
-+	return chunk;
-+
-+err_alloc:
-+	gen_pool_free(chunk->pool, chunk->addr, chunk->sz);
-+
-+err_free:
-+	kfree(chunk);
 +err:
-+	return ERR_PTR(ret);
++	return ret;
 +}
-+EXPORT_SYMBOL_GPL(__pie_load_data);
-+
-+phys_addr_t pie_to_phys(struct pie_chunk *chunk, unsigned long addr)
-+{
-+	return gen_pool_virt_to_phys(chunk->pool, addr);
-+}
-+EXPORT_SYMBOL_GPL(pie_to_phys);
-+
-+void __iomem *__kern_to_pie(struct pie_chunk *chunk, void *ptr)
-+{
-+	uintptr_t offset = (uintptr_t) ptr;
-+	offset -= (uintptr_t) __pie_common_start;
-+	if (offset >= chunk->sz)
-+		return NULL;
-+	else
-+		return (void *) (chunk->addr + offset);
-+}
-+EXPORT_SYMBOL_GPL(__kern_to_pie);
-+
-+void pie_free(struct pie_chunk *chunk)
-+{
-+	gen_pool_free(chunk->pool, chunk->addr, chunk->sz);
-+	kfree(chunk);
-+}
-+EXPORT_SYMBOL_GPL(pie_free);
-diff --git a/pie/.gitignore b/pie/.gitignore
+diff --git a/arch/arm/mach-omap2/pm33xx.h b/arch/arm/mach-omap2/pm33xx.h
 new file mode 100644
-index 0000000..4f29803
+index 0000000..b470fa5
 --- /dev/null
-+++ b/pie/.gitignore
-@@ -0,0 +1,3 @@
-+*.syms
-+pie.lds
-+pie.lds.S
-diff --git a/pie/Makefile b/pie/Makefile
++++ b/arch/arm/mach-omap2/pm33xx.h
+@@ -0,0 +1,68 @@
++/*
++ * AM33XX Power Management Routines
++ *
++ * Copyright (C) 2012 Texas Instruments Inc.
++ * Vaibhav Bedia <vaibhav.bedia@ti.com>
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License as
++ * published by the Free Software Foundation version 2.
++ *
++ * This program is distributed "as is" WITHOUT ANY WARRANTY of any
++ * kind, whether express or implied; without even the implied warranty
++ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++#ifndef __ARCH_ARM_MACH_OMAP2_PM33XX_H
++#define __ARCH_ARM_MACH_OMAP2_PM33XX_H
++
++#include <linux/kernel.h>
++
++#include "control.h"
++
++struct am33xx_pm_context {
++	struct am33xx_ipc_data	ipc;
++	struct firmware		*firmware;
++	struct omap_mbox	*mbox;
++	u8			state;
++	u32			ver;
++};
++
++struct wakeup_src {
++	int irq_nr;
++	char src[10];
++};
++
++struct forced_standby_module {
++	char oh_name[15];
++	struct device *dev;
++};
++
++struct pie_chunk;
++
++int wkup_m3_copy_code(const u8 *data, size_t size);
++int wkup_m3_prepare(void);
++void wkup_m3_register_txev_handler(void (*txev_handler)(void));
++int am33xx_suspend(long unsigned int flags);
++void am33xx_resume_trampoline(void);
++void am33xx_pie_init(struct pie_chunk *chunk, void __iomem *emif_base,
++				void __iomem *dram_sync);
++
++#define	IPC_CMD_DS0			0x4
++#define IPC_CMD_RESET                   0xe
++#define DS_IPC_DEFAULT			0xffffffff
++#define M3_VERSION_UNKNOWN		0x0000ffff
++#define M3_BASELINE_VERSION		0x21
++
++#define M3_STATE_UNKNOWN		0
++#define M3_STATE_RESET			1
++#define M3_STATE_INITED			2
++#define M3_STATE_MSG_FOR_LP		3
++#define M3_STATE_MSG_FOR_RESET		4
++
++#define AM33XX_OCMC_END			0x40310000
++#define AM33XX_EMIF_BASE		0x4C000000
++
++#define MEM_TYPE_DDR2		2
++
++#endif
+diff --git a/arch/arm/mach-omap2/sleep33xx.c b/arch/arm/mach-omap2/sleep33xx.c
 new file mode 100644
-index 0000000..9afed70
+index 0000000..2a4322c
 --- /dev/null
-+++ b/pie/Makefile
-@@ -0,0 +1,85 @@
-+#
-+# linux/pie/Makefile
-+#
-+# Copyright 2013 Texas Instruments, Inc.
-+#      Russ Dill <russ.dill@ti.com>
-+#
-+# This program is free software; you can redistribute it and/or modify it
-+# under the terms and conditions of the GNU General Public License,
-+# version 2, as published by the Free Software Foundation.
-+#
++++ b/arch/arm/mach-omap2/sleep33xx.c
+@@ -0,0 +1,314 @@
++/*
++ * AM33XX Power Management Routines
++ *
++ * Copyright (C) 2012 Texas Instruments Incorporated - http://www.ti.com/
++ * Vaibhav Bedia <vaibhav.bedia@ti.com>
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License as
++ * published by the Free Software Foundation version 2.
++ *
++ * This program is distributed "as is" WITHOUT ANY WARRANTY of any
++ * kind, whether express or implied; without even the implied warranty
++ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++#include <linux/kernel.h>
++#include <linux/io.h>
++#include <linux/ti_emif.h>
++#include <linux/platform_data/emif_plat.h>
++#include <linux/pie.h>
 +
-+obj-y		:= pie.bin.o
++#include <asm/suspend.h>
++#include <asm/cp15.h>
++#include <asm/pie.h>
 +
-+# Report unresolved symbol references
-+ldflags-y	+= --no-undefined
-+# Delete all temporary local symbols
-+ldflags-y	+= -X
++#include "pm33xx.h"
++#include "cm33xx.h"
++#include "cm-regbits-33xx.h"
++#include "omap_hwmod.h"
 +
-+# Reset objcopy flags, ARM puts "-O binary" here
-+OBJCOPYFLAGS	=
++#define CLKCTRL_IDLEST_FUNCTIONAL	0x0
++#define CLKCTRL_IDLEST_DISABLED		0x3
 +
-+# Reference gcc builtins for use in PIE with __pie_
-+$(obj)/pie_rename.syms: $(KBUILD_LIBPIE)
-+	@$(NM) $^ | awk '{if ($$3) print $$3,"__pie_"$$3}' > $@
++struct emif_regs {
++	u32 sdcfg;
++	u32 ref_ctrl;
++	u32 timing1;
++	u32 timing2;
++	u32 timing3;
++	u32 pmcr;
++	u32 pmcr_shdw;
++	u32 zqcfg;
++	u32 rd_lat;
++};
 +
-+# For weakening the links to the original gcc builtins
-+$(obj)/pie_weaken.syms: $(KBUILD_LIBPIE)
-+	@$(NM) $^ | awk '{if ($$3) print "__pie_"$$3}' > $@
++extern int call_with_stack(int (*fn)(void *), void *arg, void *sp);
++extern void v7_flush_dcache_all(void);
 +
-+# For embedding address of the symbols copied from the PIE into the kernel
-+$(obj)/pie.syms: $(obj)/pie.elf
-+	@$(NM) $^ | awk '{if ($$3 && $$2 == toupper($$2)) print $$3,"=","0x"$$1" + _binary_pie_pie_bin_start;"}' > $@
++void (*__abs_v7_flush_dcache_all)(void) __pie_data(am33xx);
++char sram_stack[1024] __pie_data(am33xx);
++void __noreturn (*__cpu_resume_phys)(void) __pie_data(am33xx);
++void __iomem *emif_virt_base __pie_data(am33xx);
++void __iomem *dram_sync_addr __pie_data(am33xx);
 +
-+# Collect together the libpie objects
-+LDFLAGS_libpie_stage1.o += -r
++EXPORT_PIE_SYMBOL(__abs_v7_flush_dcache_all);
++EXPORT_PIE_SYMBOL(sram_stack);
++EXPORT_PIE_SYMBOL(__cpu_resume_phys);
++EXPORT_PIE_SYMBOL(emif_virt_base);
++EXPORT_PIE_SYMBOL(dram_sync_addr);
 +
-+$(obj)/libpie_stage1.o: $(KBUILD_LIBPIE)
-+	$(call if_changed,ld)
++static struct emif_regs emif_regs __pie_data(am33xx);
++static void __iomem *emif_base __pie_data(am33xx);
++static u32 mem_type __pie_data(am33xx);
++static u32 cm_offset __pie_data(am33xx);
 +
-+# Rename the libpie gcc builtins with a __pie_ prefix
-+OBJCOPYFLAGS_libpie_stage2.o += --redefine-syms=$(obj)/pie_rename.syms
-+OBJCOPYFLAGS_libpie_stage2.o += --rename-section .text=.pie.text
++static struct pie_chunk *am33xx_chunk;
 +
-+$(obj)/libpie_stage2.o: $(obj)/libpie_stage1.o
-+	$(call if_changed,objcopy)
++static inline void flush_dcache_all(void)
++{
++	__asm__ __volatile__("" : : : "r0", "r1", "r2", "r3", "r4", "r5",
++				"r5", "r6", "r7", "r9", "r10", "r11");
++	__abs_v7_flush_dcache_all();
++}
 +
-+# Generate a version of vmlinux.o with weakened and rename references to gcc
-+# builtins.
-+OBJCOPYFLAGS_pie_stage1.o += --weaken-symbols=$(obj)/pie_weaken.syms
-+OBJCOPYFLAGS_pie_stage1.o += --redefine-syms=$(obj)/pie_rename.syms
++static u32 __pie(am33xx) emif_read(u16 idx)
++{
++	return __raw_readl(emif_base + idx);
++}
 +
-+$(obj)/pie_stage1.o: $(obj)/../vmlinux.o $(obj)/pie_rename.syms $(obj)/pie_weaken.syms
-+	$(call if_changed,objcopy)
++static void __pie(am33xx) emif_write(u32 val, u16 idx)
++{
++	__raw_writel(val, emif_base + idx);
++}
 +
-+# Drop in the PIE versions instead
-+LDFLAGS_pie_stage2.o += -r
-+# Allow the _GLOBAL_OFFSET_TABLE to redefine
-+LDFLAGS_pie_stage2.o += --defsym=_GLOBAL_OFFSET_TABLE_=_GLOBAL_OFFSET_TABLE_
++static inline void am33xx_wkup_write(u32 val, void __iomem *reg)
++{
++	__raw_writel(val, reg + cm_offset);
++}
 +
-+$(obj)/pie_stage2.o: $(obj)/pie_stage1.o $(obj)/libpie_stage2.o
-+	$(call if_changed,ld)
++static inline u32 am33xx_wkup_read(void __iomem *reg)
++{
++	return __raw_readl(reg + cm_offset);
++}
 +
-+# Drop everything but the pie sections
-+OBJCOPYFLAGS_pie_stage3.o += -j ".pie.*"
++static void __pie(am33xx) am33xx_module_set(u16 mode, void __iomem *reg)
++{
++	u32 val = am33xx_wkup_read(reg) & ~AM33XX_MODULEMODE_MASK;
++	am33xx_wkup_write(val | mode, reg);
++}
 +
-+$(obj)/pie_stage3.o: $(obj)/pie_stage2.o
-+	$(call if_changed,objcopy)
++static void __pie(am33xx) am33xx_module_disable(void __iomem *reg)
++{
++	am33xx_module_set(0, reg);
++}
 +
-+# Create the position independant executable
-+LDFLAGS_pie.elf += -T $(KBUILD_PIE_LDS) --pie --gc-sections
++static void __pie(am33xx) am33xx_module_disable_wait(void __iomem *reg)
++{
++	u32 val;
++	am33xx_module_disable(reg);
++	do {
++		val = am33xx_wkup_read(reg) & AM33XX_IDLEST_MASK;
++		val >>= AM33XX_IDLEST_SHIFT;
++	} while (val != CLKCTRL_IDLEST_DISABLED);
++}
 +
-+$(obj)/pie.elf: $(obj)/pie_stage3.o $(KBUILD_PIE_LDS)
-+	$(call if_changed,ld)
++static void __pie(am33xx) am33xx_module_enable(void __iomem *reg)
++{
++	am33xx_module_set(MODULEMODE_SWCTRL, reg);
++}
 +
-+# Create binary data for the kernel
-+OBJCOPYFLAGS_pie.bin += -O binary
++static void __pie(am33xx) am33xx_module_enable_wait(void __iomem *reg)
++{
++	u32 val;
++	am33xx_module_enable(reg);
++	do {
++		val = am33xx_wkup_read(reg) & AM33XX_IDLEST_MASK;
++		val >>= AM33XX_IDLEST_SHIFT;
++	} while (val != CLKCTRL_IDLEST_FUNCTIONAL);
++}
 +
-+$(obj)/pie.bin: $(obj)/pie.elf $(obj)/pie.syms
-+	$(call if_changed,objcopy)
++static void __pie(am33xx) noinline am33xx_enable_sr(void)
++{
++	u32 val;
 +
-+# Import the data into the kernel
-+OBJCOPYFLAGS_pie.bin.o += -B $(ARCH) -I binary -O $(OBJCOPY_OUTPUT_FORMAT)
++	emif_regs.sdcfg = emif_read(EMIF_SDRAM_CONFIG);
++	val = emif_read(EMIF_POWER_MANAGEMENT_CONTROL);
++	val &= ~SR_TIM_MASK;
++	val |= 0xa << SR_TIM_SHIFT;
++	emif_write(val, EMIF_POWER_MANAGEMENT_CONTROL);
++	emif_write(val, EMIF_POWER_MANAGEMENT_CTRL_SHDW);
 +
-+$(obj)/pie.bin.o: $(obj)/pie.bin
-+	$(call if_changed,objcopy)
-diff --git a/scripts/link-vmlinux.sh b/scripts/link-vmlinux.sh
-index 0149949..8cf4971 100644
---- a/scripts/link-vmlinux.sh
-+++ b/scripts/link-vmlinux.sh
-@@ -55,12 +55,16 @@ vmlinux_link()
- 	if [ "${SRCARCH}" != "um" ]; then
- 		${LD} ${LDFLAGS} ${LDFLAGS_vmlinux} -o ${2}                  \
- 			-T ${lds} ${KBUILD_VMLINUX_INIT}                     \
--			--start-group ${KBUILD_VMLINUX_MAIN} --end-group ${1}
-+			--start-group					     \
-+				${KBUILD_VMLINUX_MAIN}			     \
-+				${KBUILD_VMLINUX_PIE}			     \
-+			--end-group ${1}
- 	else
- 		${CC} ${CFLAGS_vmlinux} -o ${2}                              \
- 			-Wl,-T,${lds} ${KBUILD_VMLINUX_INIT}                 \
- 			-Wl,--start-group                                    \
- 				 ${KBUILD_VMLINUX_MAIN}                      \
-+				 ${KBUILD_VMLINUX_PIE}                       \
- 			-Wl,--end-group                                      \
- 			-lutil ${1}
- 		rm -f linux
-@@ -143,10 +147,13 @@ esac
- #link vmlinux.o
- info LD vmlinux.o
- modpost_link vmlinux.o
--
- # modpost vmlinux.o to check for section mismatches
- ${MAKE} -f "${srctree}/scripts/Makefile.modpost" vmlinux.o
- 
-+if [ -n "${CONFIG_PIE}" ]; then
-+	${MAKE} -f "${srctree}/scripts/Makefile.build" obj=pie
-+fi
++	__raw_readl(dram_sync_addr);
++	val &= ~LP_MODE_MASK;
++	val |= EMIF_LP_MODE_SELF_REFRESH << LP_MODE_SHIFT;
++	emif_write(val, EMIF_POWER_MANAGEMENT_CONTROL);
++}
 +
- # Update version
- info GEN .version
- if [ ! -r .version ]; then
++static void __pie(am33xx) noinline am33xx_disable_sr(void)
++{
++	u32 val;
++
++	val = emif_read(EMIF_POWER_MANAGEMENT_CONTROL);
++	val &= ~LP_MODE_MASK;
++	val |= EMIF_LP_MODE_DISABLE << LP_MODE_SHIFT;
++	emif_write(val, EMIF_POWER_MANAGEMENT_CONTROL);
++	emif_write(val, EMIF_POWER_MANAGEMENT_CTRL_SHDW);
++
++	/*
++	 * A write to SDRAM CONFIG register triggers
++	 * an init sequence and hence it must be done
++	 * at the end for DDR2
++	 */
++	emif_write(emif_regs.sdcfg, EMIF_SDRAM_CONFIG);
++}
++
++static void __pie(am33xx) noinline am33xx_emif_save(void)
++{
++	emif_regs.ref_ctrl = emif_read(EMIF_SDRAM_REFRESH_CONTROL);
++	emif_regs.timing1 = emif_read(EMIF_SDRAM_TIMING_1);
++	emif_regs.timing2 = emif_read(EMIF_SDRAM_TIMING_2);
++	emif_regs.timing3 = emif_read(EMIF_SDRAM_TIMING_3);
++	emif_regs.pmcr = emif_read(EMIF_POWER_MANAGEMENT_CONTROL);
++	emif_regs.pmcr_shdw = emif_read(EMIF_POWER_MANAGEMENT_CTRL_SHDW);
++	emif_regs.zqcfg = emif_read(EMIF_SDRAM_OUTPUT_IMPEDANCE_CALIBRATION_CONFIG);
++	emif_regs.rd_lat = emif_read(EMIF_DDR_PHY_CTRL_1);
++}
++
++static void __pie(am33xx) noinline am33xx_emif_restore(void)
++{
++	emif_write(emif_regs.rd_lat, EMIF_DDR_PHY_CTRL_1);
++	emif_write(emif_regs.rd_lat, EMIF_DDR_PHY_CTRL_1_SHDW);
++	emif_write(emif_regs.timing1, EMIF_SDRAM_TIMING_1);
++	emif_write(emif_regs.timing1, EMIF_SDRAM_TIMING_1_SHDW);
++	emif_write(emif_regs.timing2, EMIF_SDRAM_TIMING_2);
++	emif_write(emif_regs.timing2, EMIF_SDRAM_TIMING_2_SHDW);
++	emif_write(emif_regs.timing3, EMIF_SDRAM_TIMING_3);
++	emif_write(emif_regs.timing3, EMIF_SDRAM_TIMING_3_SHDW);
++	emif_write(emif_regs.ref_ctrl, EMIF_SDRAM_REFRESH_CONTROL);
++	emif_write(emif_regs.ref_ctrl, EMIF_SDRAM_REFRESH_CTRL_SHDW);
++	emif_write(emif_regs.pmcr, EMIF_POWER_MANAGEMENT_CONTROL);
++	emif_write(emif_regs.pmcr_shdw, EMIF_POWER_MANAGEMENT_CTRL_SHDW);
++	/*
++	 * Output impedence calib needed only for DDR3
++	 * but since the initial state of this will be
++	 * disabled for DDR2 no harm in restoring the
++	 * old configuration
++	 */
++	emif_write(emif_regs.zqcfg, EMIF_SDRAM_OUTPUT_IMPEDANCE_CALIBRATION_CONFIG);
++
++	/* Write to SDRAM_CONFIG only for DDR2 */
++	if (mem_type == MEM_TYPE_DDR2)
++		emif_write(emif_regs.sdcfg, EMIF_SDRAM_CONFIG);
++}
++
++int __pie(am33xx) am33xx_wfi_sram(void *data)
++{
++	mem_type = (unsigned long) data;
++	emif_base = emif_virt_base;
++	cm_offset = 0;
++
++	/*
++	 * Flush all data from the L1 data cache before disabling
++	 * SCTLR.C bit.
++	 */
++	flush_dcache_all();
++	/*
++	 * Clear the SCTLR.C bit to prevent further data cache
++	 * allocation. Clearing SCTLR.C would make all the data
++	 * accesses strongly ordered and would not hit the cache.
++	 */
++	set_cr(get_cr() & ~CR_C);
++	/*
++	 * Invalidate L1 data cache. Even though only invalidate is
++	 * necessary exported flush API is used here. Doing clean
++	 * on already clean cache would be almost NOP.
++	 */
++	flush_dcache_all();
++
++	am33xx_emif_save();
++	am33xx_enable_sr();
++
++	am33xx_module_disable_wait(AM33XX_CM_PER_EMIF_CLKCTRL);
++
++	/*
++	 * For the MPU WFI to be registered as an interrupt
++	 * to WKUP_M3, MPU_CLKCTRL.MODULEMODE needs to be set
++	 * to DISABLED
++	 */
++	am33xx_module_disable(AM33XX_CM_MPU_MPU_CLKCTRL);
++
++	__asm__ __volatile__ (
++		/*
++		 * Execute an ISB instruction to ensure that all of the
++		 * CP15 register changes have been committed.
++		 */
++		"isb\n\t"
++		/*
++		 * Execute a barrier instruction to ensure that all cache,
++		 * TLB and branch predictor maintenance operations issued
++		 * have completed.
++		 */
++		"dsb\n\t"
++		"dmb\n\t"
++		/*
++		 * Execute a WFI instruction and wait until the
++		 * STANDBYWFI output is asserted to indicate that the
++		 * CPU is in idle and low power state. CPU can specualatively
++		 * prefetch the instructions so add NOPs after WFI. Thirteen
++		 * NOPs as per Cortex-A8 pipeline.
++		 */
++		"wfi\n\t"
++		".rept 13\n\t"
++		"nop\n\t"
++		".endr" : : : "memory");
++
++	/* We come here in case of an abort due to a late interrupt */
++
++	am33xx_module_enable(AM33XX_CM_MPU_MPU_CLKCTRL);
++
++	am33xx_module_enable_wait(AM33XX_CM_PER_EMIF_CLKCTRL);
++	am33xx_disable_sr();
++	/* Set SCTLR.C bit to allow data cache allocation */
++	set_cr(get_cr() | CR_C);
++
++	/* Let the suspend code know about the abort */
++	return 1;
++}
++EXPORT_PIE_SYMBOL(am33xx_wfi_sram);
++
++int am33xx_suspend(long unsigned int mem_type)
++{
++	pie_relocate_from_kern(am33xx_chunk);
++	return call_with_stack(fn_to_pie(am33xx_chunk, &am33xx_wfi_sram),
++			(void *) mem_type,
++			kern_to_pie(am33xx_chunk, (char *) sram_stack) +
++				sizeof(sram_stack));
++}
++
++static void __pie(am33xx) __noreturn noinline am33xx_resume(void)
++{
++	emif_base = (void *) AM33XX_EMIF_BASE;
++	/* Undo the offset built into the register defines */
++	cm_offset = -AM33XX_L4_WK_IO_OFFSET;
++
++	am33xx_module_enable_wait(AM33XX_CM_PER_EMIF_CLKCTRL);
++	am33xx_emif_restore();
++
++	/* We are back. Branch to the common CPU resume routine */
++	__cpu_resume_phys();
++}
++
++ARM_PIE_RESUME(am33xx, am33xx_resume, sram_stack + ARRAY_SIZE(sram_stack));
++
++void am33xx_pie_init(struct pie_chunk *chunk, void __iomem *emif_base,
++						void __iomem *dram_sync)
++{
++	am33xx_chunk = chunk;
++
++	*kern_to_pie(chunk, &__abs_v7_flush_dcache_all) = v7_flush_dcache_all;
++	*kern_to_pie(chunk, &__cpu_resume_phys) =
++					(void *) virt_to_phys(cpu_resume);
++	*kern_to_pie(chunk, &emif_virt_base) = emif_base;
++	*kern_to_pie(chunk, &dram_sync_addr) = dram_sync;
++}
+diff --git a/arch/arm/mach-omap2/wkup_m3.c b/arch/arm/mach-omap2/wkup_m3.c
+new file mode 100644
+index 0000000..8eaa7f3
+--- /dev/null
++++ b/arch/arm/mach-omap2/wkup_m3.c
+@@ -0,0 +1,183 @@
++/*
++ * AM33XX Power Management Routines
++ *
++ * Copyright (C) 2012 Texas Instruments Incorporated - http://www.ti.com/
++ * Vaibhav Bedia <vaibhav.bedia@ti.com>
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License as
++ * published by the Free Software Foundation version 2.
++ *
++ * This program is distributed "as is" WITHOUT ANY WARRANTY of any
++ * kind, whether express or implied; without even the implied warranty
++ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include <linux/kernel.h>
++#include <linux/init.h>
++#include <linux/slab.h>
++#include <linux/cpu.h>
++#include <linux/err.h>
++#include <linux/firmware.h>
++#include <linux/io.h>
++#include <linux/platform_device.h>
++#include <linux/pm_runtime.h>
++#include <linux/module.h>
++#include <linux/interrupt.h>
++#include <linux/of.h>
++
++#include "pm33xx.h"
++#include "control.h"
++#include "omap_device.h"
++#include "soc.h"
++
++struct wkup_m3_context {
++	struct device	*dev;
++	void __iomem	*code;
++	void (*txev_handler)(void);
++};
++
++struct wkup_m3_context *wkup_m3;
++
++int wkup_m3_copy_code(const u8 *data, size_t size)
++{
++	if (size > SZ_16K)
++		return -ENOMEM;
++
++	memcpy_toio(wkup_m3->code, data, size);
++
++	return 0;
++}
++
++
++void wkup_m3_register_txev_handler(void (*txev_handler)(void))
++{
++	wkup_m3->txev_handler = txev_handler;
++}
++
++/* have platforms do what they want in atomic context over here? */
++static irqreturn_t wkup_m3_txev_handler(int irq, void *unused)
++{
++	am33xx_txev_eoi();
++
++	/* callback to be executed in atomic context */
++	/* return 0 implies IRQ_HANDLED else IRQ_NONE */
++	wkup_m3->txev_handler();
++
++	am33xx_txev_enable();
++
++	return IRQ_HANDLED;
++}
++
++int wkup_m3_prepare(void)
++{
++	struct platform_device *pdev = to_platform_device(wkup_m3->dev);
++
++	/* check that the code is loaded */
++	omap_device_deassert_hardreset(pdev, "wkup_m3");
++
++	return 0;
++}
++
++static int wkup_m3_probe(struct platform_device *pdev)
++{
++	int irq, ret = 0;
++	struct resource *mem;
++
++	pm_runtime_enable(&pdev->dev);
++
++	ret = pm_runtime_get_sync(&pdev->dev);
++	if (IS_ERR_VALUE(ret)) {
++		dev_err(&pdev->dev, "pm_runtime_get_sync() failed\n");
++		return ret;
++	}
++
++	irq = platform_get_irq(pdev, 0);
++	if (!irq) {
++		dev_err(wkup_m3->dev, "no irq resource\n");
++		ret = -ENXIO;
++		goto err;
++	}
++
++	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	if (!mem) {
++		dev_err(wkup_m3->dev, "no memory resource\n");
++		ret = -ENXIO;
++		goto err;
++	}
++
++	wkup_m3 = kzalloc(sizeof(*wkup_m3), GFP_KERNEL);
++	if (!wkup_m3) {
++		pr_err("Memory allocation failed\n");
++		ret = -ENOMEM;
++		goto err;
++	}
++
++	wkup_m3->dev = &pdev->dev;
++
++	wkup_m3->code = devm_request_and_ioremap(wkup_m3->dev, mem);
++	if (!wkup_m3->code) {
++		dev_err(wkup_m3->dev, "could not ioremap\n");
++		ret = -EADDRNOTAVAIL;
++		goto err;
++	}
++
++	ret = devm_request_irq(wkup_m3->dev, irq, wkup_m3_txev_handler,
++		  IRQF_DISABLED, "wkup_m3_txev", NULL);
++	if (ret) {
++		dev_err(wkup_m3->dev, "request_irq failed\n");
++		goto err;
++	}
++
++err:
++	return ret;
++}
++
++static int wkup_m3_remove(struct platform_device *pdev)
++{
++	return 0;
++}
++
++static struct of_device_id wkup_m3_dt_ids[] = {
++	{ .compatible = "ti,am3353-wkup-m3" },
++	{ }
++};
++MODULE_DEVICE_TABLE(of, wkup_m3_dt_ids);
++
++static int wkup_m3_rpm_suspend(struct device *dev)
++{
++	return -EBUSY;
++}
++
++static int wkup_m3_rpm_resume(struct device *dev)
++{
++	return 0;
++}
++
++static const struct dev_pm_ops wkup_m3_ops = {
++	SET_RUNTIME_PM_OPS(wkup_m3_rpm_suspend, wkup_m3_rpm_resume, NULL)
++};
++
++static struct platform_driver wkup_m3_driver = {
++	.probe		= wkup_m3_probe,
++	.remove		= wkup_m3_remove,
++	.driver		= {
++		.name	= "wkup_m3",
++		.owner	= THIS_MODULE,
++		.of_match_table = of_match_ptr(wkup_m3_dt_ids),
++		.pm	= &wkup_m3_ops,
++	},
++};
++
++static __init int wkup_m3_init(void)
++{
++	return platform_driver_register(&wkup_m3_driver);
++}
++
++static __exit void wkup_m3_exit(void)
++{
++	platform_driver_unregister(&wkup_m3_driver);
++}
++omap_postcore_initcall(wkup_m3_init);
++module_exit(wkup_m3_exit);
 -- 
 1.8.3.2
