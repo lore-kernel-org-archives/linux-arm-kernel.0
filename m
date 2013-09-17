@@ -1,110 +1,107 @@
-From: pali.rohar@gmail.com (Pali =?utf-8?q?Roh=C3=A1r?=)
-Date: Tue, 17 Sep 2013 21:28:42 +0200
-Subject: [PATCH 1/4] usb: musb: Call atomic_notifier_call_chain when
- status is changed
-In-Reply-To: <20130917160835.GS15645@radagast>
-References: <1378630239-10006-1-git-send-email-pali.rohar@gmail.com>
- <201309171805.15460@pali> <20130917160835.GS15645@radagast>
-Message-ID: <201309172128.42514@pali>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Tue, 17 Sep 2013 12:29:19 -0700
+Subject: [PATCH v2] mtd: atmel_nand: use the common function to get ecc
+ info
+In-Reply-To: <1379066537-29505-1-git-send-email-josh.wu@atmel.com>
+References: <1379066537-29505-1-git-send-email-josh.wu@atmel.com>
+Message-ID: <20130917192919.GO4550@ld-irv-0074.broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 17 September 2013 18:08:35 Felipe Balbi wrote:
-> On Tue, Sep 17, 2013 at 06:05:15PM +0200, Pali Roh?r wrote:
-> > On Tuesday 17 September 2013 17:48:59 you wrote:
-> > > On Sun, Sep 08, 2013 at 10:50:36AM +0200, Pali Roh?r wrote:
-> > > > More power supply drivers depends on vbus events and
-> > > > without it they not working. Power supply drivers using
-> > > > usb_register_notifier, so to deliver events it is
-> > > > needed to call atomic_notifier_call_chain.
-> > > > 
-> > > > So without atomic notifier power supply driver isp1704
-> > > > not retrieving vbus status and reporting bogus values
-> > > > to userspace and also to board platform data functions.
-> > > > Without proper data charger drivers trying to charge
-> > > > battery also when charger is disconnected or do not
-> > > > start charging when wallcharger connects.
-> > > > 
-> > > > Atomic notifier in musb driver was used before v3.5 and
-> > > > was replaced with omap mailbox. This patch adding
-> > > > atomic_notifier_call_chain call from function
-> > > > omap_musb_set_mailbox.
-> > > > 
-> > > > Signed-off-by: Pali Roh?r <pali.rohar@gmail.com>
-> > > > ---
-> > > > 
-> > > >  drivers/usb/musb/omap2430.c       |    3 +++
-> > > >  drivers/usb/phy/phy-twl4030-usb.c |    2 ++
-> > > >  2 files changed, 5 insertions(+)
-> > > > 
-> > > > diff --git a/drivers/usb/musb/omap2430.c
-> > > > b/drivers/usb/musb/omap2430.c index f44e8b5..5c40252
-> > > > 100644 --- a/drivers/usb/musb/omap2430.c
-> > > > +++ b/drivers/usb/musb/omap2430.c
-> > > > @@ -305,6 +305,9 @@ static void
-> > > > omap_musb_set_mailbox(struct omap2430_glue *glue)
-> > > > 
-> > > >  	default:
-> > > >  		dev_dbg(dev, "ID float\n");
-> > > >  	
-> > > >  	}
-> > > > 
-> > > > +
-> > > > +	atomic_notifier_call_chain(&musb->xceiv->notifier,
-> > > > +			musb->xceiv->last_event, NULL);
-> > > 
-> > > let's add a wrapper for this:
-> > > 
-> > > static inline int usb_phy_notify(struct usb phy *x,
-> > > unsigned val, void *v) {
-> > > 
-> > > 	return atomic_notifier_call_chain(&x->notifier, val, v);
-> > > 
-> > > }
-> > 
-> > Where to add this wrapper? To omap2430.c? or some include
-> > file?
-> 
-> <linux/usb/phy.h>
-> 
-> > On Tuesday 17 September 2013 17:49:17 Felipe Balbi wrote:
-> > > On Sun, Sep 08, 2013 at 10:50:36AM +0200, Pali Roh?r wrote:
-> > > > diff --git a/drivers/usb/phy/phy-twl4030-usb.c
-> > > > b/drivers/usb/phy/phy-twl4030-usb.c index
-> > > > 8f78d2d..efe6155 100644
-> > > > --- a/drivers/usb/phy/phy-twl4030-usb.c
-> > > > +++ b/drivers/usb/phy/phy-twl4030-usb.c
-> > > > @@ -705,6 +705,8 @@ static int twl4030_usb_probe(struct
-> > > > platform_device *pdev)
-> > > > 
-> > > >  	if (device_create_file(&pdev->dev, &dev_attr_vbus))
-> > > >  	
-> > > >  		dev_warn(&pdev->dev, "could not create sysfs
-> > > >  		file\n");
-> > > > 
-> > > > +	ATOMIC_INIT_NOTIFIER_HEAD(&twl->phy.notifier);
-> > > 
-> > > BTW, this is a bugfix, send separately.
-> > 
-> > What to send separately?
-> > 
-> > This full patch 1/4 is bugfix. And I did not understand what
-> > you want. Maybe it could be easier for you to apply this
-> > small 3+2 lines patch how you need.
-> 
-> This hunk here (initializaing notifier head) is a separate bug
-> fix and needs its own patch.
+Hi Josh,
 
-So will you do that? Or it is needed to resend this one line hunk 
-again in new email again?
+On Fri, Sep 13, 2013 at 06:02:17PM +0800, Josh Wu wrote:
+> Atmel nand will check ONFI ecc information when config the PMECC parameters.
+> Since commit: 10c86babfb
+>   (mtd: get the ECC info from the parameter page for ONFI nand)
+> 
+> introduced the ecc_strength_ds & ecc_step_ds and initialized them during
+> ONFI detecting.
+> So we can use them directly and remove our own get_onfi_ecc_param function.
+> 
+> Signed-off-by: Josh Wu <josh.wu@atmel.com>
+> ---
+> v1 --> v2:
+>   1. updated the refered commit id as it is changed when merged in mainline.
+>   2. refined the commit message
+> 
+>  drivers/mtd/nand/atmel_nand.c |   36 ++++--------------------------------
+>  1 file changed, 4 insertions(+), 32 deletions(-)
+> 
+> diff --git a/drivers/mtd/nand/atmel_nand.c b/drivers/mtd/nand/atmel_nand.c
+> index 060feea..6502247 100644
+> --- a/drivers/mtd/nand/atmel_nand.c
+> +++ b/drivers/mtd/nand/atmel_nand.c
+> @@ -1062,30 +1062,6 @@ static void atmel_pmecc_core_init(struct mtd_info *mtd)
+>  }
+>  
+>  /*
+> - * Get ECC requirement in ONFI parameters, returns -1 if ONFI
+> - * parameters is not supported.
+> - * return 0 if success to get the ECC requirement.
+> - */
+> -static int get_onfi_ecc_param(struct nand_chip *chip,
+> -		int *ecc_bits, int *sector_size)
+> -{
+> -	*ecc_bits = *sector_size = 0;
+> -
+> -	if (chip->onfi_params.ecc_bits == 0xff)
+> -		/* TODO: the sector_size and ecc_bits need to be find in
+> -		 * extended ecc parameter, currently we don't support it.
+> -		 */
+> -		return -1;
+> -
+> -	*ecc_bits = chip->onfi_params.ecc_bits;
+> -
+> -	/* The default sector size (ecc codeword size) is 512 */
+> -	*sector_size = 512;
+> -
+> -	return 0;
+> -}
+> -
+> -/*
+>   * Get ecc requirement from ONFI parameters ecc requirement.
+>   * If pmecc-cap, pmecc-sector-size in DTS are not specified, this function
+>   * will set them according to ONFI ecc requirement. Otherwise, use the
+> @@ -1096,19 +1072,15 @@ static int pmecc_choose_ecc(struct atmel_nand_host *host,
+>  		int *cap, int *sector_size)
+>  {
+>  	/* Get ECC requirement from ONFI parameters */
+> -	*cap = *sector_size = 0;
+>  	if (host->nand_chip.onfi_version) {
+> -		if (!get_onfi_ecc_param(&host->nand_chip, cap, sector_size))
+> -			dev_info(host->dev, "ONFI params, minimum required ECC: %d bits in %d bytes\n",
+> +		*cap = host->nand_chip.ecc_strength_ds;
+> +		*sector_size = host->nand_chip.ecc_step_ds;
 
--- 
-Pali Roh?r
-pali.rohar at gmail.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130917/2aec70d8/attachment.sig>
+The nand_chip.ecc_{strength,step}_ds values are no longer specific to
+ONFI; they may be included in the full-ID table as well. So this might
+be better written as:
+
+	if (host->nand_chip.ecc_strength_ds) {
+		*cap = host->nand_chip.ecc_strength_ds;
+		*sector_size = host->nand_chip.ecc_step_ds;
+		// ...
+	}
+
+> +		dev_info(host->dev, "ONFI params, minimum required ECC: %d bits in %d bytes\n",
+>  				*cap, *sector_size);
+> -		else
+> -			dev_info(host->dev, "NAND chip ECC reqirement is in Extended ONFI parameter, we don't support yet.\n");
+>  	} else {
+> -		dev_info(host->dev, "NAND chip is not ONFI compliant, assume ecc_bits is 2 in 512 bytes");
+> -	}
+> -	if (*cap == 0 && *sector_size == 0) {
+>  		*cap = 2;
+>  		*sector_size = 512;
+> +		dev_info(host->dev, "NAND chip is not ONFI compliant, assume ecc_bits is 2 in 512 bytes");
+
+You would also want to change this message to longer be about ONFI.
+Maybe "cannot detect minimum ECC requirements; assuming 2-bit correction
+per 512 bytes"?
+
+>  	}
+>  
+>  	/* If dts file doesn't specify then use the one in ONFI parameters */
+
+Brian
