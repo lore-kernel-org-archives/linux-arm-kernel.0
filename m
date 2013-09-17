@@ -1,53 +1,73 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Tue, 17 Sep 2013 09:36:19 -0600
-Subject: [PATCH] arm: Kirkwood - Remove kirkwood_setup_wins and rely on
- the DT binding
-In-Reply-To: <20130917133206.GB2488@localhost>
-References: <20130916224743.GA18349@obsidianresearch.com>
- <20130917133206.GB2488@localhost>
-Message-ID: <20130917153619.GA14098@obsidianresearch.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 17 Sep 2013 10:41:07 -0500
+Subject: [PATCH v11 0/8] PHY framework
+In-Reply-To: <5226F5E2.5010409@ti.com>
+References: <1377063973-22044-1-git-send-email-kishon@ti.com>
+ <521B0E79.6060506@ti.com> <20130827192059.GZ3005@radagast>
+ <5225FF63.6080608@ti.com> <20130903155030.GA21525@kroah.com>
+ <5226F5E2.5010409@ti.com>
+Message-ID: <20130917154107.GH15645@radagast>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 17, 2013 at 10:32:07AM -0300, Ezequiel Garcia wrote:
-
-> On Mon, Sep 16, 2013 at 04:47:43PM -0600, Jason Gunthorpe wrote:
-> > kirkwood_setup_wins is the last manual caller of mbus in kirkwood, don't
-> > call it for DT boards and rely on the board having a mbus node with
-> > a proper ranges property to setup these windows.
+On Wed, Sep 04, 2013 at 02:27:06PM +0530, Kishon Vijay Abraham I wrote:
+> On Tuesday 03 September 2013 09:20 PM, Greg KH wrote:
+> > On Tue, Sep 03, 2013 at 08:55:23PM +0530, Kishon Vijay Abraham I wrote:
+> >> Hi Greg,
+> >>
+> >> On Wednesday 28 August 2013 12:50 AM, Felipe Balbi wrote:
+> >>> Hi,
+> >>>
+> >>> On Mon, Aug 26, 2013 at 01:44:49PM +0530, Kishon Vijay Abraham I wrote:
+> >>>> On Wednesday 21 August 2013 11:16 AM, Kishon Vijay Abraham I wrote:
+> >>>>> Added a generic PHY framework that provides a set of APIs for the PHY drivers
+> >>>>> to create/destroy a PHY and APIs for the PHY users to obtain a reference to
+> >>>>> the PHY with or without using phandle.
+> >>>>>
+> >>>>> This framework will be of use only to devices that uses external PHY (PHY
+> >>>>> functionality is not embedded within the controller).
+> >>>>>
+> >>>>> The intention of creating this framework is to bring the phy drivers spread
+> >>>>> all over the Linux kernel to drivers/phy to increase code re-use and to
+> >>>>> increase code maintainability.
+> >>>>>
+> >>>>> Comments to make PHY as bus wasn't done because PHY devices can be part of
+> >>>>> other bus and making a same device attached to multiple bus leads to bad
+> >>>>> design.
+> >>>>>
+> >>>>> If the PHY driver has to send notification on connect/disconnect, the PHY
+> >>>>> driver should make use of the extcon framework. Using this susbsystem
+> >>>>> to use extcon framwork will have to be analysed.
+> >>>>>
+> >>>>> You can find this patch series @
+> >>>>> git://git.kernel.org/pub/scm/linux/kernel/git/kishon/linux-phy.git testing
+> >>>>
+> >>>> Looks like there are not further comments on this series. Can you take this in
+> >>>> your misc tree?
+> >>>
+> >>> Do you want me to queue these for you ? There are quite a few users for
+> >>> this framework already and I know of at least 2 others which will show
+> >>> up for v3.13.
+> >>
+> >> Can you queue this patch series? There are quite a few users already for this
+> >> framework.
 > > 
-> > This makes the DT self consistent, since the physical address of the
-> > NAND and CRYPTO are both referenced internally. The arbitary Linux
-> > constants KIRKWOOD_NAND_MEM_PHYS_BASE and KIRKWOOD_SRAM_PHYS_BASE
-> > no longer have to match the DT values.
-> > 
-> > Signed-off-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
-> >  arch/arm/boot/dts/kirkwood-db-88f6281.dts              | 5 ++++-
-> >  arch/arm/boot/dts/kirkwood-db-88f6282.dts              | 5 ++++-
-> >  arch/arm/boot/dts/kirkwood-iconnect.dts                | 5 ++++-
-> >  arch/arm/boot/dts/kirkwood-mplcec4.dts                 | 5 ++++-
-> >  arch/arm/boot/dts/kirkwood-netgear_readynas_duo_v2.dts | 5 ++++-
-> >  arch/arm/boot/dts/kirkwood-nsa310.dts                  | 5 ++++-
-> >  arch/arm/boot/dts/kirkwood-ts219-6282.dts              | 5 ++++-
-> >  arch/arm/mach-kirkwood/board-dt.c                      | 1 -
-> >  8 files changed, 28 insertions(+), 8 deletions(-)
-> > 
+> > It will have to wait for 3.13 as the merge window for new features has
+> > been closed for a week or so.  Sorry, I'll queue this up after 3.12-rc1
+> > is out.
 > 
-> I'm trying to figure out why you're changing just these and not
-> all of the kirkwood device tree files, but I really can't.
+> Alright, thanks.
 
-These were the ones that had a pre-existing mbus ranges line, which I
-thought was the whole set of boards.
+Just a gentle ping on this one...
 
-> Am I missing something obvious?
+cheers
 
-No, I didn't realize that you had only added mbus ranges to boards
-that had PCI, every board needs a ranges for proper use of the
-binding...
-
-Since they are all the same I'll respin the patch and add the ranges to
-the kirkwood.dtsi and remove it from all the board files, (which is
-where I started, but then saw that board files had a ranges
-already)
-
-Jason
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130917/3deed190/attachment.sig>
