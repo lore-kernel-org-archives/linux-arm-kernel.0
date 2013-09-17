@@ -1,50 +1,40 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 17 Sep 2013 14:09:57 -0400
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Tue, 17 Sep 2013 15:16:52 -0300
 Subject: mvebu: Armada XP doesn't boot in v3.12-rc1
-In-Reply-To: <20130917173502.GA4231@localhost>
+In-Reply-To: <20130917180957.GI19937@titan.lakedaemon.net>
 References: <20130917173502.GA4231@localhost>
-Message-ID: <20130917180957.GI19937@titan.lakedaemon.net>
+ <20130917180957.GI19937@titan.lakedaemon.net>
+Message-ID: <20130917181650.GB4231@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ezequiel!
-
-On Tue, Sep 17, 2013 at 02:35:03PM -0300, Ezequiel Garcia wrote:
-> Armada XP boards are not booting in v3.12-rc1.
+On Tue, Sep 17, 2013 at 02:09:57PM -0400, Jason Cooper wrote:
+> On Tue, Sep 17, 2013 at 02:35:03PM -0300, Ezequiel Garcia wrote:
+[...]
 > 
-> These two patches, which are already in linux-mvebu/mvebu/dt,
-> are needed to fix the problem:
+> > FWIW, CONFIG_HAVE_ARM_ARCH_TIMER=y is also needed or the board freezes,
+> > but that's another problem which I'm currently investigating.
 > 
-> commit 585b136b73696ac37c9614b4b3d8fa0407adcdf1
-> Author: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> Date:   Tue Aug 20 12:45:51 2013 -0300
+> Sounds like we just need a select, is there something more to it?
 > 
->     ARM: mvebu: Add clock properties to Armada XP timer node
-> 
-> commit d36fd447d5e2d0993a8ec34afc26fc449ac1e2f3
-> Author: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> Date:   Tue Aug 20 12:45:50 2013 -0300
-> 
->     ARM: mvebu: Add the reference 25 MHz fixed-clock to Armada XP
 
-Yes, I saw that tglx sent a late pull for corresponding driver changes.
-I'll move these two over to mvebu/fixes shortly.
+I've no idea!
 
-> FWIW, CONFIG_HAVE_ARM_ARCH_TIMER=y is also needed or the board freezes,
-> but that's another problem which I'm currently investigating.
+Let me spend some time bisecting the problem and see if we can come
+up with something smarter.
 
-Sounds like we just need a select, is there something more to it?
+I'm not sure, but I can't see why a non architected timer kernel wouldn't work.
 
-Please send a patch as soon as you have it nailed down.  I'd like the
-two changes above and this patch to spend a few days in -next before I
-send the pull.
+Let's add Stephen Boyd in Cc, in case he has some idea.
+Stephen: when v3.12-rc1 boots with CONFIG_HAVE_ARM_ARCH_TIMER=n (the
+default) the kernel freezes at the typical:
 
-> Can you push the above two to be included in v3.12-rc1 or do you need
-> anything else from me?
+  l2x0: 32 ways, CACHE_ID 0x00000100, AUX_CTRL 0x1a69ef12, Cache size: 2048 kB
+  sched_clock: 32 bits at 100 Hz, resolution 10000000ns, wraps every 4294967286ms
+  Console: colour dummy device 80x30
+  Calibrating delay loop...
 
-Nope, confirmation of boards failing to boot is all I need to move these
-over for v3.12.
-
-thx,
-
-Jason.
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
