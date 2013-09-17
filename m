@@ -1,40 +1,50 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Wed, 18 Sep 2013 00:14:13 +0200 (CEST)
-Subject: [RESEND PATCHv3 1/2] clocksource: dw_apb_timer: Move timer
- defines to header file.
-In-Reply-To: <20130917215544.GB23937@amd.pavel.ucw.cz>
-References: <1377744796-22175-1-git-send-email-dinguyen@altera.com>
- <1379434447.24347.0.camel@linux-builds1>
- <alpine.DEB.2.02.1309172337570.4089@ionos.tec.linutronix.de>
- <20130917215544.GB23937@amd.pavel.ucw.cz>
-Message-ID: <alpine.DEB.2.02.1309172359320.4089@ionos.tec.linutronix.de>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Wed, 18 Sep 2013 00:25:02 +0200
+Subject: [PATCH] clockevents: Sanitize ticks to nsec conversion
+In-Reply-To: <alpine.DEB.2.02.1309172228400.4089@ionos.tec.linutronix.de>
+References: <1379077365-18458-1-git-send-email-mkl@pengutronix.de>
+ <20130917095600.GJ26819@ludovic.desroches@atmel.com>
+ <20130917100417.GQ12758@n2100.arm.linux.org.uk>
+ <alpine.DEB.2.02.1309171210450.4089@ionos.tec.linutronix.de>
+ <20130917130153.GL26819@ludovic.desroches@atmel.com>
+ <alpine.DEB.2.02.1309172228400.4089@ionos.tec.linutronix.de>
+Message-ID: <5238D6BE.6040603@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Pavel,
-
-On Tue, 17 Sep 2013, Pavel Machek wrote:
-> On Tue 2013-09-17 23:45:11, Thomas Gleixner wrote:
-> > On Tue, 17 Sep 2013, Dinh Nguyen wrote:
-> > 
-> > > On Wed, 2013-08-28 at 21:53 -0500, Dinh Nguyen wrote:
-> > > > From: Dinh Nguyen <dinguyen@altera.com>
-> > > > 
-> > > > Move all dw_apb_timer defines to include/linux/dw_apb_timer.h.
-> > 
-> > That's describing WHAT the patch does not WHY. I can see the WHAT part
-> > without that pointless changelog.
+On 09/17/2013 11:15 PM, Thomas Gleixner wrote:
+> Marc Kleine-Budde pointed out, that commit 77cc982 "clocksource: use
+> clockevents_config_and_register() where possible" caused a regression
+> for some of the converted subarchs.
 > 
-> read_sched_clock() in dw_apb_timer_of.c accesses the same hardware as
-> dw_apb_timer.c, therefore it benefits from #define's that describe the
-> hardware. IOW 1/2 is neccessary for 2/2, but it can compile/work
-> indepedently.
+> The reason is, that the clockevents core code converts the minimal
+> hardware tick delta to a nanosecond value for core internal
+> usage. This conversion is affected by integer math rounding loss, so
+> the backwards conversion to hardware ticks will likely result in a
+> value which is less than the configured hardware limitation. The
+> affected subarchs used their own workaround (SIGH!) which got lost in
+> the conversion.
+> 
+> Now instead of fixing the underlying core code problem, Marcs patch
+> tried to work around the core code issue by increasing the minimal
+> tick delta at clockevents registration time so the resulting limit in
+> the core code backwards conversion did not violate the hardware
+> limits. More SIGH!
 
-I'm really capable of figuring that out myself. But that's not the
-point. I want patch submitters to explain in the changelog WHY they
-are doing a change not WHAT they are doing, because that's (mostly)
-obvious from the patch itself.
+It was not easy getting your attention with this problem :)
 
-So thanks for your well meant, but completely superfluous explanation.
+Marc
 
-	tglx
+-- 
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 259 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130918/6569f9f6/attachment.sig>
