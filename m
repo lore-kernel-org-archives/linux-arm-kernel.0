@@ -1,38 +1,38 @@
 From: dinguyen@altera.com (dinguyen at altera.com)
-Date: Tue, 17 Sep 2013 11:21:40 -0500
-Subject: [PATCH] arm: socfpga: Enable ARM_TWD for socfpga
-Message-ID: <1379434900-24947-1-git-send-email-dinguyen@altera.com>
+Date: Tue, 17 Sep 2013 11:23:05 -0500
+Subject: [PATCH] arm: socfpga: Fix incorrect sdmmc clock name
+Message-ID: <1379434985-25294-1-git-send-email-dinguyen@altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Dinh Nguyen <dinguyen@altera.com>
 
-Update Kconfig to enable TWD.
+The SD/MMC clock is named "sdmmc_clk", and NOT "mmc_clk". Because of this,
+the SD driver was getting the incorrect clock value. This prevented the
+SD driver from initializing correctly.
 
 Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
-Reviewed-by: Pavel Machek <pavel@denx.de>
+Cc: Mike Turquette <mturquette@linaro.org>
 CC: Arnd Bergmann <arnd@arndb.de>
 CC: Olof Johansson <olof@lixom.net>
 Cc: Pavel Machek <pavel@denx.de>
 Cc: linux-arm-kernel at lists.infradead.org
 ---
-v2:
-- Remove condition of LOCAL_TIMERS for ARM_TWD
----
- arch/arm/mach-socfpga/Kconfig |    1 +
- 1 file changed, 1 insertion(+)
+ drivers/clk/socfpga/clk.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-socfpga/Kconfig b/arch/arm/mach-socfpga/Kconfig
-index dd86db4..dae9400 100644
---- a/arch/arm/mach-socfpga/Kconfig
-+++ b/arch/arm/mach-socfpga/Kconfig
-@@ -11,6 +11,7 @@ config ARCH_SOCFPGA
- 	select GENERIC_CLOCKEVENTS
- 	select GPIO_PL061 if GPIOLIB
- 	select HAVE_ARM_SCU
-+	select HAVE_ARM_TWD
- 	select HAVE_SMP
- 	select MFD_SYSCON
- 	select SPARSE_IRQ
+diff --git a/drivers/clk/socfpga/clk.c b/drivers/clk/socfpga/clk.c
+index 5bb848c..81dd31a 100644
+--- a/drivers/clk/socfpga/clk.c
++++ b/drivers/clk/socfpga/clk.c
+@@ -49,7 +49,7 @@
+ #define SOCFPGA_L4_SP_CLK		"l4_sp_clk"
+ #define SOCFPGA_NAND_CLK		"nand_clk"
+ #define SOCFPGA_NAND_X_CLK		"nand_x_clk"
+-#define SOCFPGA_MMC_CLK			"mmc_clk"
++#define SOCFPGA_MMC_CLK			"sdmmc_clk"
+ #define SOCFPGA_DB_CLK			"gpio_db_clk"
+ 
+ #define div_mask(width)	((1 << (width)) - 1)
 -- 
 1.7.9.5
