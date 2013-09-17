@@ -1,28 +1,103 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Tue, 17 Sep 2013 10:14:25 +0800
-Subject: [PATCH v3 0/8] Add the Quadspi driver for vf610-twr
-In-Reply-To: <20130916110634.GC29403@sirena.org.uk>
-References: <1378979431.2627.402.camel@shinybook.infradead.org>
- <20130913025827.GA3051@gmail.com> <1378999322.4210.95.camel@i7.infradead.org>
- <20130913041208.GD3051@gmail.com> <20130912205644.GW29403@sirena.org.uk>
- <52329AD3.2050608@freescale.com> <20130913102127.GD29403@sirena.org.uk>
- <52366F97.5030402@freescale.com> <20130916101912.GY29403@sirena.org.uk>
- <5236DD17.5090203@freescale.com> <20130916110634.GC29403@sirena.org.uk>
-Message-ID: <5237BB01.3080700@freescale.com>
+From: gnurou@gmail.com (Alexandre Courbot)
+Date: Tue, 17 Sep 2013 12:28:53 +0900
+Subject: [PATCH v6 1/5] ARM: add basic support for Trusted Foundations
+In-Reply-To: <523736DE.1050201@wwwdotorg.org>
+References: <1379238028-7960-1-git-send-email-acourbot@nvidia.com>
+ <1379238028-7960-2-git-send-email-acourbot@nvidia.com>
+ <523736DE.1050201@wwwdotorg.org>
+Message-ID: <CAAVeFuJgtF1xWHfF4gN+WbOBpL93pFdX7AR1ccu1imvoi9XZXg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2013?09?16? 19:06, Mark Brown ??:
-> I don't know what you mean by "the dummy".
-Please see the datasheet of the NOR:
-www.spansion.com/Support/Datasheets/S25FL128S_256S_00.pdf
+On Tue, Sep 17, 2013 at 1:50 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> On 09/15/2013 03:40 AM, Alexandre Courbot wrote:
+>> Trusted Foundations is a TrustZone-based secure monitor for ARM that
+>> can be invoked using the same SMC-based API on all supported
+>> platforms. This patch adds initial basic support for Trusted
+>> Foundations using the ARM firmware API. Current features are limited
+>> to the ability to boot secondary processors.
+>>
+>> Note: The API followed by Trusted Foundations does *not* follow the SMC
+>> calling conventions. It has nothing to do with PSCI neither and is only
+>> relevant to devices that use Trusted Foundations (like most Tegra-based
+>> retail devices).
+>
+>> diff --git a/arch/arm/firmware/trusted_foundations.c b/arch/arm/firmware/trusted_foundations.c
+>
+>> +#if IS_ENABLED(CONFIG_OF)
+>> +void of_register_trusted_foundations(void)
+>> +{
+>> +     struct device_node *node;
+>> +     struct trusted_foundations_platform_data pdata;
+>> +     int err;
+>> +
+>> +     node = of_find_compatible_node(NULL, NULL, "tl,trusted-foundations");
+>> +     if (!node)
+>> +             return;
+> ...
+>
+>> diff --git a/arch/arm/include/asm/trusted_foundations.h b/arch/arm/include/asm/trusted_foundations.h
+>
+>> +#if IS_ENABLED(CONFIG_TRUSTED_FOUNDATIONS)
+>> +void register_trusted_foundations(struct trusted_foundations_platform_data *pd);
+>> +#if IS_ENABLED(CONFIG_OF)
+>> +void of_register_trusted_foundations(void);
+>> +#endif
+>
+> I still don't think that's correct.
+>
+> If TF support is enabled, yet DT support is not enabled, then there is
+> no prototype, implementation, or dummy implementation for
+> of_register_trusted_foundations(). I think there should be a dummy
+> implementation in this case, shouldn't there?
+>
+>> +
+>> +#else /* CONFIG_TRUSTED_FOUNDATIONS */
+>> +
+>> +#include <linux/printk.h>
+>> +#include <linux/of.h>
+>> +#include <asm/bug.h>
+>> +
+>> +static inline void register_trusted_foundations(
+>> +                                struct trusted_foundations_platform_data *pd)
+>> +{
+>> +     panic("No support for Trusted Foundations, stopping...\n");
+>> +}
+>> +
+>> +#if IS_ENABLED(CONFIG_OF)
+>> +static inline void of_register_trusted_foundations(void)
+>> +{
+>> +     /* If we find the target should enable TF but does not support it,
+>> +      * fail as the system won't be able to do much anyway */
+>> +     if (of_find_compatible_node(NULL, NULL, "tl,trusted-foundations"))
+>> +             register_trusted_foundations(NULL);
+>> +}
+>> +#else
+>> +static inline void of_register_trusted_foundations(void)
+>> +{
+>> +}
+>> +#endif /* CONFIG_OF */
+>
+> That's more complex than it needs to be; there is a dummy
+> of_find_compatible_node() in the !OF case, so you don't need to ifdef
+> the implementation of of_register_trusted_foundations(); you just need
+> the first implementation here.
+>
+>> +#endif /* CONFIG_TRUSTED_FOUNDATIONS */
+>
+> In summary, I think you need:
+>
+> If TF is enabled, always implement of_register_trusted_foundations() in
+> the C file, and rely on of_find_compatible_node() to return NULL if
+> !CONFIG_OF.
+>
+> If TF is not enabled, implement the inline version in the header file,
+> and again rely on of_find_compatible_node() to return NULL if !CONFIG_OF.
 
+Indeed, all your points are correct, and I've clearly been negligent
+here. Sorry about that.
 
-Please see the page 100, the Quad I/O Read, the figure 10.37 shows
-the dummy.
+Will have to submit a v7, but hopefully we can get the acks that we
+need (Russel?) on this version.
 
-The dummy is just a delay in a command sequence.
-The dummy maybe only several clock cycles, less then 8 bit.
-
-thanks
-Huang Shijie
+Alex.
