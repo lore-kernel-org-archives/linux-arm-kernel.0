@@ -1,32 +1,37 @@
-From: B35083@freescale.com (Lu Jingchang-B35083)
-Date: Tue, 17 Sep 2013 08:08:46 +0000
-Subject: [PATCH 3/3] dma: Add Freescale eDMA engine driver support
-In-Reply-To: <20130917045359.GN17188@intel.com>
-References: <1378374799-16357-1-git-send-email-b35083@freescale.com>
- <20130917045359.GN17188@intel.com>
-Message-ID: <B56CDBE15CE27145A4B77D2D24263E85223E21@039-SN1MPN1-003.039d.mgd.msft.net>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Tue, 17 Sep 2013 10:02:04 +0200
+Subject: [PATCH 09/10] clk: ux500: Remove extra semicolon
+In-Reply-To: <1379064232-10261-9-git-send-email-sachin.kamat@linaro.org>
+References: <1379064232-10261-1-git-send-email-sachin.kamat@linaro.org>
+ <1379064232-10261-9-git-send-email-sachin.kamat@linaro.org>
+Message-ID: <CAPDyKFpHM8jxwRV_k0T3Fid3KsjoRdyLLqVhxenM2gGrneUUCQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Vinod Koul [mailto:vinod.koul at intel.com]
-> Sent: Tuesday, September 17, 2013 12:54 PM
-> To: Lu Jingchang-B35083
-> Cc: djbw at fb.com; shawn.guo at linaro.org; linux-kernel at vger.kernel.org;
-> linux-arm-kernel at lists.infradead.org; devicetree at vger.kernel.org; Wang
-> Huan-B18965
-> Subject: Re: [PATCH 3/3] dma: Add Freescale eDMA engine driver support
-> > +	case DMA_PAUSE:
-> > +		if (fsl_chan->edesc)
-> > +			fsl_edma_disable_request(fsl_chan);
-> racy here too...
-It only set the channel HW register, no list is handled, 
-is lock needed here? Thanks!
+On 13 September 2013 11:23, Sachin Kamat <sachin.kamat@linaro.org> wrote:
+> Extra semicolon is redundant. Remove it.
+>
+> Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
+> Cc: Ulf Hansson <ulf.hansson@linaro.org>
+> ---
+>  drivers/clk/ux500/clk-prcmu.c |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/drivers/clk/ux500/clk-prcmu.c b/drivers/clk/ux500/clk-prcmu.c
+> index 293a288..e2d63bc 100644
+> --- a/drivers/clk/ux500/clk-prcmu.c
+> +++ b/drivers/clk/ux500/clk-prcmu.c
+> @@ -36,7 +36,7 @@ static int clk_prcmu_prepare(struct clk_hw *hw)
+>         if (!ret)
+>                 clk->is_prepared = 1;
+>
+> -       return ret;;
+> +       return ret;
+>  }
+>
+>  static void clk_prcmu_unprepare(struct clk_hw *hw)
+> --
+> 1.7.9.5
+>
 
-
-
-
-
-
-Best Regards,
-Jingchang
+Acked-by: Ulf Hansson <ulf.hansson@linaro.org>
