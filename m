@@ -1,43 +1,32 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 17 Sep 2013 09:05:17 +0100
-Subject: [PATCH 14/38] iio: accel: st: Append _accel to accelerator
- sensor device names
-In-Reply-To: <5237593F.5010405@kernel.org>
-References: <1378817379-8238-1-git-send-email-lee.jones@linaro.org>
- <1378817379-8238-15-git-send-email-lee.jones@linaro.org>
- <52345330.4050707@kernel.org> <20130916133106.GI16984@lee--X1>
- <52370B08.3030709@metafoo.de> <5237593F.5010405@kernel.org>
-Message-ID: <20130917080517.GS16984@lee--X1>
+From: B35083@freescale.com (Lu Jingchang-B35083)
+Date: Tue, 17 Sep 2013 08:08:46 +0000
+Subject: [PATCH 3/3] dma: Add Freescale eDMA engine driver support
+In-Reply-To: <20130917045359.GN17188@intel.com>
+References: <1378374799-16357-1-git-send-email-b35083@freescale.com>
+ <20130917045359.GN17188@intel.com>
+Message-ID: <B56CDBE15CE27145A4B77D2D24263E85223E21@039-SN1MPN1-003.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 16 Sep 2013, Jonathan Cameron wrote:
+> -----Original Message-----
+> From: Vinod Koul [mailto:vinod.koul at intel.com]
+> Sent: Tuesday, September 17, 2013 12:54 PM
+> To: Lu Jingchang-B35083
+> Cc: djbw at fb.com; shawn.guo at linaro.org; linux-kernel at vger.kernel.org;
+> linux-arm-kernel at lists.infradead.org; devicetree at vger.kernel.org; Wang
+> Huan-B18965
+> Subject: Re: [PATCH 3/3] dma: Add Freescale eDMA engine driver support
+> > +	case DMA_PAUSE:
+> > +		if (fsl_chan->edesc)
+> > +			fsl_edma_disable_request(fsl_chan);
+> racy here too...
+It only set the channel HW register, no list is handled, 
+is lock needed here? Thanks!
 
-> On 09/16/13 14:43, Lars-Peter Clausen wrote:
-> > On 09/16/2013 03:31 PM, Lee Jones wrote:
-> >>> Honestly I don't care either way on these, but consistency would definitely
-> >>> be good so applied to the togreg branch of iio.git
-> >>
-> >> For clarification, is togreg due for the v3.12 merge window or will be
-> >> get a settling period in -next?
-> >>
-> > 
-> > Well everything up to the 'iio-for-3.12c' tag will be in v3.12, everything
-> > else not.
-> > 
-> > - Lars
-> > 
-> Yes.  At the moment IIO is routed through Greg KHs staging tree.  His merge
-> window closes 1 week before Linus opens the main one (when Greg can figure
-> out what Linus is intending!)  Hence I close the IIO one whenever I manage
-> to get a last pull request in before that.
-> 
-> Hence all 3.13 for the current togreg branch.
 
-Perfect, thanks both of you.
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+
+
+
+Best Regards,
+Jingchang
