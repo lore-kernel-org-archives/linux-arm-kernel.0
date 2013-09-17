@@ -1,46 +1,46 @@
 From: galak@codeaurora.org (Kumar Gala)
-Date: Tue, 17 Sep 2013 10:51:43 -0500
-Subject: [PATCH] ARM: msm: Rename msm devicetrees to have standard 'qcom'
- prefix
-Message-ID: <1379433103-23995-1-git-send-email-galak@codeaurora.org>
+Date: Tue, 17 Sep 2013 10:52:02 -0500
+Subject: [PATCH] ARM: msm: Move msm devicetrees under a Qualcomm dir
+In-Reply-To: <CAOesGMgCvnuX918pt6vT0_QsHdfJ8b813iu2tXRHvdpL8GZ3dg@mail.gmail.com>
+References: <1379003839-16068-1-git-send-email-galak@codeaurora.org>
+ <CAOesGMisWLwYKotGDFPW6PyHJs=_+fohTdC08SGjsv2FXaa7Fg@mail.gmail.com>
+ <25E0B143-658E-4CCC-A88A-0AF70FFF33CE@codeaurora.org>
+ <CAOesGMhfdvyJ_2AA2e8iO_2e=q7KgpyNbcriPKFw-RLormG6bA@mail.gmail.com>
+ <3E38F48E-EE41-4564-84A1-36CF07B08811@codeaurora.org>
+ <20130912224737.GA24937@codeaurora.org>
+ <9EA264FE-7621-458D-8333-9340DDBFC4EE@codeaurora.org>
+ <52374DD1.9040209@codeaurora.org>
+ <AEBF64D7-5359-4E37-8263-B81209620192@codeaurora.org>
+ <CAOesGMgCvnuX918pt6vT0_QsHdfJ8b813iu2tXRHvdpL8GZ3dg@mail.gmail.com>
+Message-ID: <0618B96B-2F6C-4D67-9D32-0B74E898496F@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use a standard 'qcom' prefix to denotate device trees meant for Qualcomm
-based processors.
 
-Signed-off-by: Kumar Gala <galak@codeaurora.org>
----
- arch/arm/boot/dts/Makefile                                    | 4 ++--
- arch/arm/boot/dts/{msm8660-surf.dts => qcom-msm8660-surf.dts} | 0
- arch/arm/boot/dts/{msm8960-cdp.dts => qcom-msm8960-cdp.dts}   | 0
- 3 files changed, 2 insertions(+), 2 deletions(-)
- rename arch/arm/boot/dts/{msm8660-surf.dts => qcom-msm8660-surf.dts} (100%)
- rename arch/arm/boot/dts/{msm8960-cdp.dts => qcom-msm8960-cdp.dts} (100%)
+On Sep 16, 2013, at 1:50 PM, Olof Johansson wrote:
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index cc0f1fb..b437846 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -101,8 +101,8 @@ dtb-$(CONFIG_ARCH_KIRKWOOD) += kirkwood-cloudbox.dtb \
- 	kirkwood-ts219-6282.dtb \
- 	kirkwood-openblocks_a6.dtb
- dtb-$(CONFIG_ARCH_MARCO) += marco-evb.dtb
--dtb-$(CONFIG_ARCH_MSM) += msm8660-surf.dtb \
--	msm8960-cdp.dtb
-+dtb-$(CONFIG_ARCH_MSM) += qcom-msm8660-surf.dtb \
-+	qcom-msm8960-cdp.dtb
- dtb-$(CONFIG_ARCH_MVEBU) += armada-370-db.dtb \
- 	armada-370-mirabox.dtb \
- 	armada-370-netgear-rn102.dtb \
-diff --git a/arch/arm/boot/dts/msm8660-surf.dts b/arch/arm/boot/dts/qcom-msm8660-surf.dts
-similarity index 100%
-rename from arch/arm/boot/dts/msm8660-surf.dts
-rename to arch/arm/boot/dts/qcom-msm8660-surf.dts
-diff --git a/arch/arm/boot/dts/msm8960-cdp.dts b/arch/arm/boot/dts/qcom-msm8960-cdp.dts
-similarity index 100%
-rename from arch/arm/boot/dts/msm8960-cdp.dts
-rename to arch/arm/boot/dts/qcom-msm8960-cdp.dts
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+> On Mon, Sep 16, 2013 at 11:46 AM, Kumar Gala <galak@codeaurora.org> wrote:
+> 
+>> I think the two options are either:
+>> 
+>> qcom-msm*, qcom-apq*, etc
+>> 
+>> or
+>> 
+>> qcom/msm-*, qcom/apq*, etc
+>> 
+>> I'm guessing we'll end up without the dir and in the future have:
+>> 
+>> qcom/qcom-msm-*, qcom/qcom-apq-*
+>> 
+>> Olof???
+> 
+> 
+> When you create the dir, you can go from qcom-msm-* to qcom/msm-*, but
+> still produce qcom-msm-*.dtb as the build output. We care about
+> keeping the DTB name stable, not DTS. As long as they just conform to
+> those two patterns it's easy to handle through makefile targets.
+
+Sounds good, Rohit let's go ahead with qcom-msm-*, qcom-apq-*.
+
+- k
