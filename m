@@ -1,72 +1,83 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 17 Sep 2013 22:06:01 +0100
-Subject: [PATCH v2 2/4] ARM64: KVM: Implement kvm_vcpu_preferred_target()
- function
-In-Reply-To: <1379156917-17497-3-git-send-email-anup.patel@linaro.org>
+Date: Tue, 17 Sep 2013 22:08:29 +0100
+Subject: [PATCH v2 4/4] KVM: Add documentation for
+ KVM_ARM_PREFERRED_TARGET ioctl
+In-Reply-To: <1379156917-17497-5-git-send-email-anup.patel@linaro.org>
 References: <1379156917-17497-1-git-send-email-anup.patel@linaro.org>
- <1379156917-17497-3-git-send-email-anup.patel@linaro.org>
-Message-ID: <20130917210601.GF7623@lvm>
+ <1379156917-17497-5-git-send-email-anup.patel@linaro.org>
+Message-ID: <20130917210829.GG7623@lvm>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 14, 2013 at 04:38:35PM +0530, Anup Patel wrote:
-> This patch implements kvm_vcpu_preferred_target() function for
-> KVM ARM64 which will help us implement KVM_ARM_PREFERRED_TARGET
-> ioctl for user space.
+On Sat, Sep 14, 2013 at 04:38:37PM +0530, Anup Patel wrote:
+> To implement CPU=Host we have added KVM_ARM_PREFERRED_TARGET
+> ioctl which provides information to user space required for
+> creating VCPU matching underlying Host.
+> 
+> This patch adds info related to this new KVM_ARM_PREFERRED_TARGET
+> ioctl in the KVM API documentation.
 > 
 > Signed-off-by: Anup Patel <anup.patel@linaro.org>
 > Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
 > ---
->  arch/arm/include/asm/kvm_host.h |    1 +
->  arch/arm64/kvm/guest.c          |   20 ++++++++++++++++++++
->  2 files changed, 21 insertions(+)
+>  Documentation/virtual/kvm/api.txt |   26 ++++++++++++++++++++++----
+>  1 file changed, 22 insertions(+), 4 deletions(-)
 > 
-> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-> index 7d22517..76f3c19 100644
-> --- a/arch/arm/include/asm/kvm_host.h
-> +++ b/arch/arm/include/asm/kvm_host.h
-> @@ -154,6 +154,7 @@ struct kvm_vcpu_stat {
->  struct kvm_vcpu_init;
->  int kvm_vcpu_set_target(struct kvm_vcpu *vcpu,
->  			const struct kvm_vcpu_init *init);
-> +int kvm_vcpu_preferred_target(struct kvm_vcpu_init *init);
->  unsigned long kvm_arm_num_regs(struct kvm_vcpu *vcpu);
->  int kvm_arm_copy_reg_indices(struct kvm_vcpu *vcpu, u64 __user *indices);
->  struct kvm_one_reg;
-> diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
-> index d7bf7d6..f8eb062 100644
-> --- a/arch/arm64/kvm/guest.c
-> +++ b/arch/arm64/kvm/guest.c
-> @@ -254,6 +254,26 @@ int kvm_vcpu_set_target(struct kvm_vcpu *vcpu,
->  	return kvm_reset_vcpu(vcpu);
->  }
+> diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
+> index ef925ea..85f8026 100644
+> --- a/Documentation/virtual/kvm/api.txt
+> +++ b/Documentation/virtual/kvm/api.txt
+> @@ -2303,8 +2303,27 @@ Possible features:
+>  	- KVM_ARM_VCPU_EL1_32BIT: Starts the CPU in a 32bit mode.
+>  	  Depends on KVM_CAP_ARM_EL1_32BIT (arm64 only).
 >  
-> +int kvm_vcpu_preferred_target(struct kvm_vcpu_init *init)
-> +{
-> +	int target = kvm_target_cpu();
+> +4.83 KVM_ARM_PREFERRED_TARGET
+>  
+> -4.83 KVM_GET_REG_LIST
+> +Capability: basic
+> +Architectures: arm, arm64
+> +Type: vcpu ioctl
+> +Parameters: struct struct kvm_vcpu_init (out)
+> +Returns: 0 on success; -1 on error
+> +Errors:
+> + ?EINVAL: ???no preferred target available for the host
 > +
-> +	if (target < 0)
-> +		return target;
+> +This queries KVM for preferred CPU target type which can be emulated 
+> +by KVM on underlying host.
 > +
-> +	memset(init, 0, sizeof(*init));
+> +The ioctl returns struct kvm_vcpu_init instance containing information
+> +about preferred CPU target type and optional features available for it. 
 > +
-> +	/* For now, we return all optional features are available
-> +	 * for preferred target. In future, we might have features
-> +	 * available based on underlying host.
-> +	 */
+> +The information returned by this ioctl can be used to prepare instance
+> +of struct kvm_vcpu_init for KVM_ARM_VCPU_INIT ioctl which will result 
+> +in VCPU matching underlying host.
 
-same here, with comment formatting
+nit: you have some trailing white space here
 
-> +	init->target = (__u32)target;
-> +	init->features[0] |= (1 << KVM_ARM_VCPU_POWER_OFF);
-> +	init->features[0] |= (1 << KVM_ARM_VCPU_EL1_32BIT);
 > +
-> +	return 0;
-> +}
-> +
->  int kvm_arch_vcpu_ioctl_get_fpu(struct kvm_vcpu *vcpu, struct kvm_fpu *fpu)
->  {
->  	return -EINVAL;
+> +4.84 KVM_GET_REG_LIST
+>  
+>  Capability: basic
+>  Architectures: arm, arm64
+> @@ -2323,8 +2342,7 @@ struct kvm_reg_list {
+>  This ioctl returns the guest registers that are supported for the
+>  KVM_GET_ONE_REG/KVM_SET_ONE_REG calls.
+>  
+> -
+> -4.84 KVM_ARM_SET_DEVICE_ADDR
+> +4.85 KVM_ARM_SET_DEVICE_ADDR
+>  
+>  Capability: KVM_CAP_ARM_SET_DEVICE_ADDR
+>  Architectures: arm, arm64
+> @@ -2362,7 +2380,7 @@ must be called after calling KVM_CREATE_IRQCHIP, but before calling
+>  KVM_RUN on any of the VCPUs.  Calling this ioctl twice for any of the
+>  base addresses will return -EEXIST.
+>  
+> -4.85 KVM_PPC_RTAS_DEFINE_TOKEN
+> +4.86 KVM_PPC_RTAS_DEFINE_TOKEN
+>  
+>  Capability: KVM_CAP_PPC_RTAS
+>  Architectures: ppc
 > -- 
 > 1.7.9.5
 > 
