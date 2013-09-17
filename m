@@ -1,69 +1,32 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 17 Sep 2013 22:34:28 +0100
-Subject: [PATCH 3/3] aarch64: kvm: introduce CONFIG_KVM_MAX_VCPUS
-In-Reply-To: <1379160656-28050-4-git-send-email-drjones@redhat.com>
-References: <1379160656-28050-1-git-send-email-drjones@redhat.com>
- <1379160656-28050-4-git-send-email-drjones@redhat.com>
-Message-ID: <20130917213428.GJ7623@lvm>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 17 Sep 2013 15:34:49 -0600
+Subject: [PATCH v3 1/2] video: ARM CLCD: Add DT support
+In-Reply-To: <1379436716.9205.25.camel@hornet>
+References: <1379351934-25415-1-git-send-email-pawel.moll@arm.com>
+ <52376180.1090001@wwwdotorg.org> <1379435799.9205.16.camel@hornet>
+ <1379436716.9205.25.camel@hornet>
+Message-ID: <5238CAF9.6040400@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 14, 2013 at 02:10:56PM +0200, Andrew Jones wrote:
-> Take CONFIG_KVM_MAX_VCPUS from arm32, but set the default to 8.
+On 09/17/2013 10:51 AM, Pawel Moll wrote:
+> Uh, sorry, missed one...
 > 
-> Signed-off-by: Andrew Jones <drjones@redhat.com>
-> ---
->  arch/arm64/include/asm/kvm_host.h |  7 ++++++-
->  arch/arm64/kvm/Kconfig            | 11 +++++++++++
->  2 files changed, 17 insertions(+), 1 deletion(-)
+> On Tue, 2013-09-17 at 17:36 +0100, Pawel Moll wrote:
+>> On Mon, 2013-09-16 at 20:52 +0100, Stephen Warren wrote:
+>>>> +- arm,pl11x,panel-data-pads: array of 24 cells, each of them describing
+>>>> +				a function of one of the CLD pads,
+>>>> +				starting from 0 up to 23; each pad can
+>>>> +				be described by one of the following values:
+>>>> +	- 0: reserved (not connected)
+>>>> +	- 0x100-0x107: color upper STN panel data 0 to 7
+>>> ...
+>>>
+>>> I assume those are the raw values that go into the HW?
 > 
-> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-> index 0859a4ddd1e7d..d1af8c49a5ca4 100644
-> --- a/arch/arm64/include/asm/kvm_host.h
-> +++ b/arch/arm64/include/asm/kvm_host.h
-> @@ -26,7 +26,12 @@
->  #include <asm/kvm_asm.h>
->  #include <asm/kvm_mmio.h>
->  
-> -#define KVM_MAX_VCPUS 4
-> +#if defined(CONFIG_KVM_MAX_VCPUS)
-> +#define KVM_MAX_VCPUS CONFIG_KVM_MAX_VCPUS
-> +#else
-> +#define KVM_MAX_VCPUS 0
-> +#endif
-> +
->  #define KVM_USER_MEM_SLOTS 32
->  #define KVM_PRIVATE_MEM_SLOTS 4
->  #define KVM_COALESCED_MMIO_PAGE_OFFSET 1
-> diff --git a/arch/arm64/kvm/Kconfig b/arch/arm64/kvm/Kconfig
-> index 21e90820bd23c..c9924b02e84f7 100644
-> --- a/arch/arm64/kvm/Kconfig
-> +++ b/arch/arm64/kvm/Kconfig
-> @@ -35,6 +35,17 @@ config KVM_ARM_HOST
->  	---help---
->  	  Provides host support for ARM processors.
->  
-> +config KVM_MAX_VCPUS
-> +	int "Number maximum supported virtual CPUs per VM"
-> +	depends on KVM_ARM_HOST
-> +	default 8
+> No, they can be considered "labels", defining the way pads are used
+> (wired). Then, basing on this information, the driver is configuring the
+> cell, eg. selecting STN or TFT mode (thus switching the output between
+> panel formatter and raw RGB data source).
 
-That data structure gets really big with 8 max vcpus.  I think we should
-keep this at 4 for now, a quad-core VM is quite reasonable for now.
-
-> +	help
-> +	  Static number of max supported virtual CPUs per VM.
-> +
-> +	  The default is set to the highest number of vcpus that
-> +	  current hardware supports. Set to a lower number to save
-> +	  some resources. Set to a higher number to test scalability.
-> +
->  config KVM_ARM_VGIC
->  	bool
->  	depends on KVM_ARM_HOST && OF
-> -- 
-> 1.8.1.4
-> 
-
--- 
-Christoffer
+Oh, why not just use the raw values from the HW registers for this?
