@@ -1,38 +1,60 @@
 From: dinguyen@altera.com (dinguyen at altera.com)
-Date: Tue, 17 Sep 2013 11:23:05 -0500
-Subject: [PATCH] arm: socfpga: Fix incorrect sdmmc clock name
-Message-ID: <1379434985-25294-1-git-send-email-dinguyen@altera.com>
+Date: Tue, 17 Sep 2013 11:31:25 -0500
+Subject: [PATCH 1/2] arm: dts: socfpga: Change some types of gate-clk type to
+ periph-clk type
+Message-ID: <1379435486-25981-1-git-send-email-dinguyen@altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Dinh Nguyen <dinguyen@altera.com>
 
-The SD/MMC clock is named "sdmmc_clk", and NOT "mmc_clk". Because of this,
-the SD driver was getting the incorrect clock value. This prevented the
-SD driver from initializing correctly.
+Some of the clocks that were designated gate-clk did not have a gate, so
+change those clocks to be of periph-clk type.
 
 Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
+Cc: Rob Herring <rob.herring@calxeda.com>
+Cc: Pawel Moll <pawel.moll@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Stephen Warren <swarren@wwwdotorg.org>
+Cc: Ian Campbell <ian.campbell@citrix.com>
 Cc: Mike Turquette <mturquette@linaro.org>
-CC: Arnd Bergmann <arnd@arndb.de>
-CC: Olof Johansson <olof@lixom.net>
-Cc: Pavel Machek <pavel@denx.de>
-Cc: linux-arm-kernel at lists.infradead.org
+Cc: devicetree at vger.kernel.org
+CC: linux-arm-kernel at lists.infradead.org
 ---
- drivers/clk/socfpga/clk.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/socfpga.dtsi |    7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/clk/socfpga/clk.c b/drivers/clk/socfpga/clk.c
-index 5bb848c..81dd31a 100644
---- a/drivers/clk/socfpga/clk.c
-+++ b/drivers/clk/socfpga/clk.c
-@@ -49,7 +49,7 @@
- #define SOCFPGA_L4_SP_CLK		"l4_sp_clk"
- #define SOCFPGA_NAND_CLK		"nand_clk"
- #define SOCFPGA_NAND_X_CLK		"nand_x_clk"
--#define SOCFPGA_MMC_CLK			"mmc_clk"
-+#define SOCFPGA_MMC_CLK			"sdmmc_clk"
- #define SOCFPGA_DB_CLK			"gpio_db_clk"
+diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
+index 1ee6079..acd6c3a 100644
+--- a/arch/arm/boot/dts/socfpga.dtsi
++++ b/arch/arm/boot/dts/socfpga.dtsi
+@@ -245,14 +245,14 @@
  
- #define div_mask(width)	((1 << (width)) - 1)
+ 				mpu_periph_clk: mpu_periph_clk {
+ 					#clock-cells = <0>;
+-					compatible = "altr,socfpga-gate-clk";
++					compatible = "altr,socfpga-perip-clk";
+ 					clocks = <&mpuclk>;
+ 					fixed-divider = <4>;
+ 					};
+ 
+ 				mpu_l2_ram_clk: mpu_l2_ram_clk {
+ 					#clock-cells = <0>;
+-					compatible = "altr,socfpga-gate-clk";
++					compatible = "altr,socfpga-perip-clk";
+ 					clocks = <&mpuclk>;
+ 					fixed-divider = <2>;
+ 					};
+@@ -266,8 +266,9 @@
+ 
+ 				l3_main_clk: l3_main_clk {
+ 					#clock-cells = <0>;
+-					compatible = "altr,socfpga-gate-clk";
++					compatible = "altr,socfpga-perip-clk";
+ 					clocks = <&mainclk>;
++					fixed-divider = <1>;
+ 					};
+ 
+ 				l3_mp_clk: l3_mp_clk {
 -- 
 1.7.9.5
