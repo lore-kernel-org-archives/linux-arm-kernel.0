@@ -1,39 +1,46 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Tue, 17 Sep 2013 14:35:03 -0300
-Subject: mvebu: Armada XP doesn't boot in v3.12-rc1
-Message-ID: <20130917173502.GA4231@localhost>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 17 Sep 2013 20:03:01 +0200
+Subject: [PATCH] arm: Kirkwood - Remove kirkwood_setup_wins and rely on
+ the DT binding
+In-Reply-To: <20130917153619.GA14098@obsidianresearch.com>
+References: <20130916224743.GA18349@obsidianresearch.com>
+ <20130917133206.GB2488@localhost>
+ <20130917153619.GA14098@obsidianresearch.com>
+Message-ID: <20130917200301.66e8ccb9@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jason,
+Dear Jason Gunthorpe,
 
-Armada XP boards are not booting in v3.12-rc1.
+On Tue, 17 Sep 2013 09:36:19 -0600, Jason Gunthorpe wrote:
 
-These two patches, which are already in linux-mvebu/mvebu/dt,
-are needed to fix the problem:
+> Since they are all the same I'll respin the patch and add the ranges
+> to the kirkwood.dtsi and remove it from all the board files, (which is
+> where I started, but then saw that board files had a ranges
+> already)
 
-commit 585b136b73696ac37c9614b4b3d8fa0407adcdf1
-Author: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-Date:   Tue Aug 20 12:45:51 2013 -0300
+In Armada 370/XP land, we've decided to always put the ranges in the
+per-board .dts file. The reason is that sometimes, a board needs to add
+an additional range (like for a NOR device for example), and
+unfortunately, the existing DT language doesn't allow "extending"
+a 'ranges' property defined at the .dtsi level by an additional entry
+added at the .dts level.
 
-    ARM: mvebu: Add clock properties to Armada XP timer node
+This has lead to problems in Armada 370/XP land, where we were
+overloading the ranges property for some boards in the .dts, then added
+a new range in the .dtsi, and forgot to propagate this change to
+the .dts files. To avoid this, we've decided to have the ranges
+property always in the .dts files.
 
-commit d36fd447d5e2d0993a8ec34afc26fc449ac1e2f3
-Author: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-Date:   Tue Aug 20 12:45:50 2013 -0300
+A better solution would be to have a += operator in the DT language,
+but until that exists, we thought that pushing the ranges property down
+to the .dts file was the least horrible solution.
 
-    ARM: mvebu: Add the reference 25 MHz fixed-clock to Armada XP
+Best regards,
 
----
-
-FWIW, CONFIG_HAVE_ARM_ARCH_TIMER=y is also needed or the board freezes,
-but that's another problem which I'm currently investigating.
-
-Can you push the above two to be included in v3.12-rc1 or do you need
-anything else from me?
-
-Thanks and sorry for the crap,
+Thomas
 -- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
 http://free-electrons.com
