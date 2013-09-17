@@ -1,60 +1,89 @@
 From: pali.rohar@gmail.com (Pali =?utf-8?q?Roh=C3=A1r?=)
-Date: Tue, 17 Sep 2013 17:53:23 +0200
-Subject: [PATCH v4 1/2] ARM: OMAP: Add secure function omap_smc3() which
- calling instruction smc #1
-In-Reply-To: <20130917154331.GA9994@atomide.com>
-References: <20130916171023.GA17477@localhost.localdomain>
- <20130917154331.GA9994@atomide.com>
-Message-ID: <201309171753.24433@pali>
+Date: Tue, 17 Sep 2013 18:05:15 +0200
+Subject: [PATCH 1/4] usb: musb: Call atomic_notifier_call_chain when
+ status is changed
+In-Reply-To: <20130917154917.GL15645@radagast>
+References: <1378630239-10006-1-git-send-email-pali.rohar@gmail.com>
+ <1378630239-10006-2-git-send-email-pali.rohar@gmail.com>
+ <20130917154917.GL15645@radagast>
+Message-ID: <201309171805.15460@pali>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 17 September 2013 17:43:31 Tony Lindgren wrote:
-> * Dave Martin <Dave.Martin@arm.com> [130916 10:18]:
-> > On Sat, Sep 14, 2013 at 10:37:12AM +0100, Pali Roh?r wrote:
-> > > On Sunday 08 September 2013 09:43:29 Pali Roh?r wrote:
-> > > > + */
-> > > > +ENTRY(omap_smc3)
-> > > > +	stmfd	sp!, {r4-r11, lr}
-> > > > +	mov	r12, r0		@ Copy the secure service ID
-> > > > +	mov	r6, #0xff	@ Indicate new Task call
-> > > > +	dsb			@ Memory Barrier (not sure if needed, copied
-> > > > from omap_smc2) +	smc	#1		@ Call PPA service
-> > > > +	ldmfd	sp!, {r4-r11, pc}
-> > > > +ENDPROC(omap_smc3)
-> > > > +
-> > > > 
-> > > >  ENTRY(omap_modify_auxcoreboot0)
-> > > >  
-> > > >  	stmfd   sp!, {r1-r12, lr}
-> > > >  	ldr	r12, =0x104
-> > > 
-> > > Dave, it is ok now?
+On Tuesday 17 September 2013 17:48:59 you wrote:
+> On Sun, Sep 08, 2013 at 10:50:36AM +0200, Pali Roh?r wrote:
+> > More power supply drivers depends on vbus events and without
+> > it they not working. Power supply drivers using
+> > usb_register_notifier, so to deliver events it is needed to
+> > call atomic_notifier_call_chain.
 > > 
-> > Yes, that's sufficient to warn people to stop and think (at
-> > least, if someone copy-pastes it, they will likely
-> > highlight the possible error by copy-pasting the comment
-> > too).  Thanks.
+> > So without atomic notifier power supply driver isp1704 not
+> > retrieving vbus status and reporting bogus values to
+> > userspace and also to board platform data functions.
+> > Without proper data charger drivers trying to charge
+> > battery also when charger is disconnected or do not start
+> > charging when wallcharger connects.
 > > 
-> > Acked-by: Dave Martin <Dave.Martin@arm.com>
+> > Atomic notifier in musb driver was used before v3.5 and was
+> > replaced with omap mailbox. This patch adding
+> > atomic_notifier_call_chain call from function
+> > omap_musb_set_mailbox.
+> > 
+> > Signed-off-by: Pali Roh?r <pali.rohar@gmail.com>
+> > ---
+> > 
+> >  drivers/usb/musb/omap2430.c       |    3 +++
+> >  drivers/usb/phy/phy-twl4030-usb.c |    2 ++
+> >  2 files changed, 5 insertions(+)
+> > 
+> > diff --git a/drivers/usb/musb/omap2430.c
+> > b/drivers/usb/musb/omap2430.c index f44e8b5..5c40252 100644
+> > --- a/drivers/usb/musb/omap2430.c
+> > +++ b/drivers/usb/musb/omap2430.c
+> > @@ -305,6 +305,9 @@ static void omap_musb_set_mailbox(struct
+> > omap2430_glue *glue)
+> > 
+> >  	default:
+> >  		dev_dbg(dev, "ID float\n");
+> >  	
+> >  	}
+> > 
+> > +
+> > +	atomic_notifier_call_chain(&musb->xceiv->notifier,
+> > +			musb->xceiv->last_event, NULL);
 > 
-> Have you guys checked how this works with the recently posted
-> "[PATCH v6 0/5] ARM: support for Trusted Foundations secure
-> monitor" series?
+> let's add a wrapper for this:
 > 
-> Regards,
+> static inline int usb_phy_notify(struct usb phy *x, unsigned
+> val, void *v) {
+> 	return atomic_notifier_call_chain(&x->notifier, val, v);
+> }
+
+Where to add this wrapper? To omap2430.c? or some include file?
+
+On Tuesday 17 September 2013 17:49:17 Felipe Balbi wrote:
+> On Sun, Sep 08, 2013 at 10:50:36AM +0200, Pali Roh?r wrote:
+> > diff --git a/drivers/usb/phy/phy-twl4030-usb.c
+> > b/drivers/usb/phy/phy-twl4030-usb.c index 8f78d2d..efe6155
+> > 100644
+> > --- a/drivers/usb/phy/phy-twl4030-usb.c
+> > +++ b/drivers/usb/phy/phy-twl4030-usb.c
+> > @@ -705,6 +705,8 @@ static int twl4030_usb_probe(struct
+> > platform_device *pdev)
+> > 
+> >  	if (device_create_file(&pdev->dev, &dev_attr_vbus))
+> >  	
+> >  		dev_warn(&pdev->dev, "could not create sysfs file\n");
+> > 
+> > +	ATOMIC_INIT_NOTIFIER_HEAD(&twl->phy.notifier);
 > 
-> Tony
+> BTW, this is a bugfix, send separately.
 
-Hello,
+What to send separately?
 
-this code looks like some Tegra and "Trusted Foundations" 
-specific. There is Note: The API followed by Trusted Foundations 
-does *not* follow the SMC calling conventions.  Also code calling 
-smc #0 instruction, so in my opinion for rx51 it is useless.
-
-Tony, can you include this two rx51 secure patches (patch v4 1/2 
-and patch v2 2/2)? Or is there some any other problem?
+This full patch 1/4 is bugfix. And I did not understand what you 
+want. Maybe it could be easier for you to apply this small 3+2 
+lines patch how you need.
 
 -- 
 Pali Roh?r
@@ -65,4 +94,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 198 bytes
 Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130917/9e7d55e4/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130917/b9164414/attachment.sig>
