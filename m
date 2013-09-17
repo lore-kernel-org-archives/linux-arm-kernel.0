@@ -1,50 +1,53 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 17 Sep 2013 21:22:42 +0200
-Subject: [PATCH] bus: mvebu-mbus: Fix optional pcie-mem/io-aperture
- properties
-In-Reply-To: <20130917191342.GA4354@obsidianresearch.com>
-References: <20130917183853.GC21230@obsidianresearch.com>
- <20130917210503.1ea8cdd9@skate>
- <20130917191342.GA4354@obsidianresearch.com>
-Message-ID: <20130917212242.5c306871@skate>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 17 Sep 2013 13:26:58 -0600
+Subject: [PATCH v3] PWM: PXA: add device tree support to PWM driver
+In-Reply-To: <5238A5C2.4080902@newsguy.com>
+References: <1379091281-23662-1-git-send-email-mikedunn@newsguy.com>
+ <52375FB1.5050700@wwwdotorg.org> <5238621D.3050504@newsguy.com>
+ <52388093.2000401@wwwdotorg.org> <5238A5C2.4080902@newsguy.com>
+Message-ID: <5238AD02.7050703@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Jason Gunthorpe,
+On 09/17/2013 12:56 PM, Mike Dunn wrote:
+> On 09/17/2013 09:17 AM, Stephen Warren wrote:
+>> On 09/17/2013 08:07 AM, Mike Dunn wrote:
+>>> On 09/16/2013 12:44 PM, Stephen Warren wrote:
+>>>> On 09/13/2013 10:54 AM, Mike Dunn wrote:
+>>>>> This patch adds device tree support to the PXA's PWM driver.  Only an OF match
+>>>>> table is added; nothing needs to be extracted from the device tree node.  The
+>>>>> existing ID table is reused for the match table data.
+>>>>>
+>>>>> Tested on a Palm Treo 680 (both platform data and DT cases).
 
-On Tue, 17 Sep 2013 13:13:42 -0600, Jason Gunthorpe wrote:
-
-> Well, I'm not 100% sure, but AFAICT that is how struct resources
-> should be used. The start/end address are inclusive, so the resource
-> (start=0,end=0) describes 1 byte at address 0.
+>>>>> diff --git a/arch/arm/boot/dts/pxa27x.dtsi b/arch/arm/boot/dts/pxa27x.dtsi
+>>>>
+>>>>> +		pwm0: pwm at 40b00000 {
+>>>>> +			compatible = "marvell,pxa270-pwm";
+>>>>
+>>>> I thought the assertion was that pax270 and pxa250 were both compatible?
+>>>> If so, that should be:
+>>>>
+>>>> 		compatible = "marvell,pxa270-pwm", "marvell,pxa250-pwm";
+>>>
+>>>
+>>> Indeed.  Currently, they are all the same.  By that logic, shouldn't it be
+>>>
+>>> compatible = "marvell,pxa250-pwm", "marvell,pxa270-pwm", "marvell,pxa168-pwm",
+>>> "marvell,pxa910-pwm";
+>>
+>> compatible should include:
+>>
+>> * The exact HW model (so the driver knows exactly which HW is present in
+>> order to enable any bug quirks).
+>> * The "first" HW model this HW is compatible with, since this is what
+>> the driver will bind to (ignoring the possibility of bug quirks).
+>>
+>> So, you don't need to include all the values, just two in this case.
 > 
-> The only way to get a 0 sized resource is (start=0,end=-1)
+> I think I see...  and hypothetically, if the the driver must know that it is a
+> pxa270 in order for it to function correctly due to (hypothetical) hardware
+> differences, then only the first compatible string should appear?
 
-So in the ideal world, we would have a resource_init(&res) that would
-set start=0 and end=-1 or something like that.
-
-> Before I did this I checked other user of resource_size and found
-> tests to zero, so the above seems to be correct..
-> 
-> Eg a quick grep shows:
->  arch/powerpc/kernel/pci-common.c: pcibios_fixup_bridge
-> 
->                 if (pci_has_flag(PCI_REASSIGN_ALL_RSRC)) {
->                         res->flags |= IORESOURCE_UNSET;
->                         res->start = 0;
->                         res->end = -1;
->                         continue;
->                 }
-> 
-> Do you see something different?
-
-Well, apparently what you did is the commonly adopted way. Maybe just
-add a comment in the code above those two lines to explain what may
-seem a little strange initially?
-
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Yes, if the 250 and 270 HW were actually different, then you'd only
+include one or the other compatible values in the property.
