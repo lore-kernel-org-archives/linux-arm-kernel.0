@@ -1,92 +1,187 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Tue, 17 Sep 2013 13:26:56 +0200 (CEST)
-Subject: [PATCH] [PATCH] clocksource: tcb: fix min_delta calculation
-In-Reply-To: <20130917100417.GQ12758@n2100.arm.linux.org.uk>
-References: <1379077365-18458-1-git-send-email-mkl@pengutronix.de>
- <20130917095600.GJ26819@ludovic.desroches@atmel.com>
- <20130917100417.GQ12758@n2100.arm.linux.org.uk>
-Message-ID: <alpine.DEB.2.02.1309171210450.4089@ionos.tec.linutronix.de>
+From: inki.dae@samsung.com (Inki Dae)
+Date: Tue, 17 Sep 2013 21:23:34 +0900
+Subject: [PATCH v9 0/2] Introduce buffer synchronization framework
+Message-ID: <1379420616-9194-1-git-send-email-inki.dae@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 17 Sep 2013, Russell King - ARM Linux wrote:
+Hi all,
 
-> On Tue, Sep 17, 2013 at 11:56:00AM +0200, Ludovic Desroches wrote:
-> > Any reason to not do this:
-> > 
-> > --- a/drivers/clocksource/tcb_clksrc.c
-> > +++ b/drivers/clocksource/tcb_clksrc.c
-> > @@ -144,6 +144,9 @@ static void tc_mode(enum clock_event_mode m, struct
-> > clock_event_device *d)
-> >  
-> >  static int tc_next_event(unsigned long delta, struct clock_event_device
-> > *d)
-> >  {
-> > +       if (delta < d->min_delta_ticks)
-> > +               delta = d->min_delta_ticks;
-> > +
-> >         __raw_writel(delta, tcaddr + ATMEL_TC_REG(2, RC));
-> >  
-> >         /* go go gadget! */
-> > 
-> > Then we can keep the same min_delta.
-> 
-> You really should not play such games in your set_next_event() code - if
-> the interval is not supported, you should return -ETIME so that the core
-> code knows about it and can adjust things to suit.  If you're getting
-> deltas which are too small for the hardware, that'll either be because
-> the bounds are wrong, or there's a bug in the core code.
+This patch set introduces a buffer synchronization framework based
+on DMA BUF[1] and based on ww-mutexes[2] for lock mechanism, and is
+rebased on linux-3.12-rc1
 
-The core code does:
+The purpose of this framework is to provide not only buffer access
+control to CPU and CPU, and CPU and DMA, and DMA and DMA but also
+easy-to-use interfaces for device drivers and user application.
+In addtion, this patch set suggests a way for enhancing performance.
 
-int clockevents_program_event(struct clock_event_device *dev, ktime_t expires,
-                              bool force)
-{
-....
+Changelog v9:
+- Delete only one sync object matched at DEL_OBJ_FROM_RSV macro.
+- Fix memory leak issue at dmabuf_sync_single_lock()
 
-        delta = min(delta, (int64_t) dev->max_delta_ns);
-        delta = max(delta, (int64_t) dev->min_delta_ns);
+Changelog v8:
+Consider the write-and-then-read ordering pointed out by David Herrmann,
+- The ordering issue means that a task don't take a lock to the dmabuf
+  so this task would be stalled even though this task requested a lock to
+  the dmabuf between other task unlocked and tries to lock the dmabuf
+  again. For this, we have added a wait event mechanism using only generic
+  APIs, wait_event_timeout and wake_up functions.
 
-        clc = ((unsigned long long) delta * dev->mult) >> dev->shift;
-        rc = dev->set_next_event((unsigned long) clc, dev);
+  The below is how to handle the ordering issue using this mechanism:
+  1. Check if there is a sync object added prior to current task's one.
+  2. If exists, it unlocks the dmabuf so that other task can take a lock
+     to the dmabuf first.
+  3. Wait for the wake up event from other task: current task will be
+     waked up when other task unlocks the dmabuf.
+  4. Take a lock to the dmabuf again.
+- Code cleanups.
 
-} 
+Changelog v7:
+Fix things pointed out by Konrad Rzeszutek Wilk,
+- Use EXPORT_SYMBOL_GPL instead of EXPORT_SYMBOL.
+- Make sure to unlock and unreference all dmabuf objects
+  when dmabuf_sync_fini() is called.
+- Add more comments.
+- Code cleanups.
 
-So, the min_delta in timer ticks is set to 1 and converted by the core
-to nsecs for various reasons. This is where the rounding problem comes
-into play.
+Changelog v6:
+- Fix sync lock to multiple reads.
+- Add select system call support.
+  . Wake up poll_wait when a dmabuf is unlocked.
+- Remove unnecessary the use of mutex lock.
+- Add private backend ops callbacks.
+  . This ops has one callback for device drivers to clean up their
+    sync object resource when the sync object is freed. For this,
+    device drivers should implement the free callback properly.
+- Update document file.
 
-The patch below should fix that.
+Changelog v5:
+- Rmove a dependence on reservation_object: the reservation_object is used
+  to hook up to ttm and dma-buf for easy sharing of reservations across
+  devices. However, the dmabuf sync can be used for all dma devices; v4l2
+  and drm based drivers, so doesn't need the reservation_object anymore.
+  With regared to this, it adds 'void *sync' to dma_buf structure.
+- All patches are rebased on mainline, Linux v3.10.
+
+Changelog v4:
+- Add user side interface for buffer synchronization mechanism and update
+  descriptions related to the user side interface.
+
+Changelog v3:
+- remove cache operation relevant codes and update document file.
+
+Changelog v2:
+- use atomic_add_unless to avoid potential bug.
+- add a macro for checking valid access type.
+- code clean.
+
+For generic user mode interface, we have used fcntl and select system
+call[3]. As you know, user application sees a buffer object as a dma-buf
+file descriptor. So fcntl() call with the file descriptor means to lock
+some buffer region being managed by the dma-buf object. And select() call
+means to wait for the completion of CPU or DMA access to the dma-buf
+without locking. For more detail, you can refer to the dma-buf-sync.txt
+in Documentation/
+
+There are some cases user-space process needs this buffer synchronization
+framework. One of which is to primarily enhance GPU rendering performance
+in case that 3D app draws somthing in a buffer using CPU, and other process
+composes the buffer with its own backbuffer using GPU.
+
+In case of 3D app, the app calls glFlush to submit 3d commands to GPU driver
+instead of glFinish for more performance. The reason, we call glFlush, is
+that glFinish blocks caller's task until the execution of the 3d commands is
+completed. So that makes GPU and CPU more idle. As a result, 3d rendering
+performance with glFinish is quite lower than glFlush.
+
+However, the use of glFlush has one issue that the the buffer shared with
+GPU could be broken when CPU accesses the buffer just after glFlush because
+CPU cannot be aware of the completion of GPU access to the buffer.
+Of course, the app can be aware of that time using eglWaitGL but this function
+is valid only in case of the same context.
+
+The below summarizes how app's window is displayed on Tizen[4] platform:
+1. X client requests a window buffer to Xorg.
+2. X client draws something in the window buffer using CPU.
+3. X client requests SWAP to Xorg.
+4. Xorg notifies a damage event to Composite Manager.
+5. Composite Manager gets the window buffer (front buffer) through
+   DRI2GetBuffers.
+6. Composite Manager composes the window buffer and its own back buffer
+   using GPU. At this time, eglSwapBuffers is called: internally, 3d
+   commands are flushed to gpu driver.
+7. Composite Manager requests SWAP to Xorg.
+8. Xorg performs drm page flip. At this time, the window buffer is
+   displayed on screen.
+
+Web app based on HTML5 also has the same issue. Web browser and Web app
+are different process. The Web app can draw something in its own buffer using
+CPU, and then the Web Browser can compose the buffer with its own back buffer.
+
+Thus, in such cases, a shared buffer could be broken as one process draws
+something in a buffer using CPU, when other process composes the buffer with
+its own buffer using GPU without any locking mechanism. That is why we need
+user land locking interface, fcntl system call.
+
+And last one is a deferred page flip issue. This issue is that a window
+buffer rendered can be displayed on screen in about 32ms in worst case:
+assume that the gpu rendering is completed within 16ms.
+That can be incurred when compositing a pixmap buffer with a window buffer
+using GPU and when vsync is just started. At this time, Xorg waits for
+a vblank event to get a window buffer so 3d rendering will be delayed
+up to about 16ms. As a result, the window buffer would be displayed in
+about two vsyncs (about 32ms) and in turn, that would show slow
+responsiveness.
+
+For this, we could enhance the responsiveness with locking mechanism: skipping
+one vblank wait. I guess Android, Chrome OS, and other platforms are using
+their own locking mechanisms with similar reason; Android sync driver, KDS, and
+DMA fence.
+
+The below shows the deferred page flip issue in worst case:
+
+               |------------ <- vsync signal
+               |<------ DRI2GetBuffers
+               |
+               |
+               |
+               |------------ <- vsync signal
+               |<------ Request gpu rendering
+          time |
+               |
+               |<------ Request page flip (deferred)
+               |------------ <- vsync signal
+               |<------ Displayed on screen
+               |
+               |
+               |
+               |------------ <- vsync signal
 
 Thanks,
+Inki Dae
 
-	tglx
-----
-diff --git a/kernel/time/clockevents.c b/kernel/time/clockevents.c
-index 38959c8..41b7a30 100644
---- a/kernel/time/clockevents.c
-+++ b/kernel/time/clockevents.c
-@@ -42,7 +42,7 @@ struct ce_unbind {
-  */
- u64 clockevent_delta2ns(unsigned long latch, struct clock_event_device *evt)
- {
--	u64 clc = (u64) latch << evt->shift;
-+	u64 tmp, clc = (u64) latch << evt->shift;
- 
- 	if (unlikely(!evt->mult)) {
- 		evt->mult = 1;
-@@ -52,6 +52,14 @@ u64 clockevent_delta2ns(unsigned long latch, struct clock_event_device *evt)
- 	do_div(clc, evt->mult);
- 	if (clc < 1000)
- 		clc = 1000;
-+
-+	/* Avoid rounding artifacts */
-+	tmp = (clc * dev->mult) >> dev->shift;
-+	while (tmp < (u64) dev->min_delta_ticks) {
-+		clc += 1000;
-+		tmp = (clc * dev->mult) >> dev->shift;
-+	}
-+
- 	if (clc > KTIME_MAX)
- 		clc = KTIME_MAX;
- 
+References:
+[1] http://lwn.net/Articles/470339/
+[2] https://patchwork.kernel.org/patch/2625361/
+[3] http://linux.die.net/man/2/fcntl
+[4] https://www.tizen.org/
+
+Inki Dae (2):
+  dmabuf-sync: Add a buffer synchronization framework
+  dma-buf: Add user interfaces for dmabuf sync support
+
+ Documentation/dma-buf-sync.txt |  286 ++++++++++++
+ drivers/base/Kconfig           |    7 +
+ drivers/base/Makefile          |    1 +
+ drivers/base/dma-buf.c         |   86 ++++
+ drivers/base/dmabuf-sync.c     |  951 ++++++++++++++++++++++++++++++++++++++++
+ include/linux/dma-buf.h        |   16 +
+ include/linux/dmabuf-sync.h    |  257 +++++++++++
+ 7 files changed, 1604 insertions(+)
+ create mode 100644 Documentation/dma-buf-sync.txt
+ create mode 100644 drivers/base/dmabuf-sync.c
+ create mode 100644 include/linux/dmabuf-sync.h
+
+-- 
+1.7.9.5
