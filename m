@@ -1,42 +1,49 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 17 Sep 2013 14:26:22 +0200
-Subject: [RFC PATCH 1/4] DRIVERS: IRQCHIP: Add crossbar irqchip driver
-In-Reply-To: <alpine.DEB.2.02.1309131142540.4089@ionos.tec.linutronix.de>
-References: <1379000351-15672-1-git-send-email-r.sricharan@ti.com>
- <1379000351-15672-2-git-send-email-r.sricharan@ti.com>
- <alpine.DEB.2.02.1309122201530.4089@ionos.tec.linutronix.de>
- <523228B5.5070507@ti.com>
- <alpine.DEB.2.02.1309122335440.4089@ionos.tec.linutronix.de>
- <5232457A.8080709@ti.com>
- <alpine.DEB.2.02.1309130138550.4089@ionos.tec.linutronix.de>
- <52326D6B.2010003@ti.com>
- <alpine.DEB.2.02.1309131142540.4089@ionos.tec.linutronix.de>
-Message-ID: <CACRpkdYzaoZUunoNDNirV5Bt-G6p-avFV8A=iznDKjK2biqwrw@mail.gmail.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Tue, 17 Sep 2013 14:37:27 +0200
+Subject: [PATCH] irqchip: exynos-combiner: remove hard-coded irq_base value
+In-Reply-To: <1379309482-19779-1-git-send-email-chander.kashyap@linaro.org>
+References: <1379309482-19779-1-git-send-email-chander.kashyap@linaro.org>
+Message-ID: <2060959.cLD86Prq58@amdc1227>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 13, 2013 at 4:24 PM, Thomas Gleixner <tglx@linutronix.de> wrote:
+Hi Chander,
 
-> So why can't you make use of irq domains and have the whole routing
-> business implemented sanely?
->
-> What's needed is in gic_init_bases():
->
->        if (of_property_read(node, "routable_irqs", &nr_routable_irqs) {
->           irq_domain_add_legacy(nr_gic_irqs);
->        } else {
->           irq_domain_add_legacy(nr_per_cpu_irqs);
->           irq_domain_add_linear(nr_routable_irqs);
->        }
->
-> Now that separate domain has an xlate function which grabs a free GIC
-> irq from a bitmap and returns the hardware irq number in the gic
-> space. The map/unmap callbacks take care of setting up / tearing down
-> the route in the crossbar.
+On Monday 16 of September 2013 11:01:22 Chander Kashyap wrote:
+> Pass '0' in place of hardcoded "irq_base" value as "first_irq" parameter
+> to "irq_domain_add_simple" in order to use linear irq domain.
+> 
+> Signed-off-by: Chander Kashyap <chander.kashyap@linaro.org>
+> ---
+>  drivers/irqchip/exynos-combiner.c |   15 +++------------
+>  1 file changed, 3 insertions(+), 12 deletions(-)
+> 
+> diff --git a/drivers/irqchip/exynos-combiner.c
+> b/drivers/irqchip/exynos-combiner.c index 4c68265..b4ed356 100644
+> --- a/drivers/irqchip/exynos-combiner.c
+> +++ b/drivers/irqchip/exynos-combiner.c
+> @@ -206,8 +206,7 @@ static unsigned int combiner_lookup_irq(int group)
+> 
+>  static void __init combiner_init(void __iomem *combiner_base,
+>  				 struct device_node *np,
+> -				 unsigned int max_nr,
+> -				 int irq_base)
+> +				 unsigned int max_nr)
+>  {
+>  	int i, irq;
+>  	unsigned int nr_irq;
+> @@ -221,7 +220,7 @@ static void __init combiner_init(void __iomem
+> *combiner_base, return;
+>  	}
+> 
+> -	combiner_irq_domain = irq_domain_add_simple(np, nr_irq, irq_base,
+> +	combiner_irq_domain = irq_domain_add_simple(np, nr_irq, 0,
+>  				&combiner_irq_domain_ops, combiner_data);
 
-This is obviously the right approach, it's exactly what .map should do
-the only special thing here being that we have hardware to perform
-the mapping ... bah why didn't I realize this :-(
+I believe you can safely go with calling irq_domain_add_linear() directly 
+here.
 
-Yours,
-Linus Walleij
+Otherwise the patch looks good.
+
+Best regards,
+Tomasz
