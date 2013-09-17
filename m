@@ -1,31 +1,32 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 17 Sep 2013 00:31:11 +0100
-Subject: [PATCH v2 1/9] i2c: prepare runtime PM support for I2C client
- devices
-In-Reply-To: <1861747.RtS0ZLgUUN@vostro.rjw.lan>
-References: <1378913560-2752-1-git-send-email-mika.westerberg@linux.intel.com>
- <5235BA9C.1090509@gmail.com> <20130916084708.GN7393@intel.com>
- <1861747.RtS0ZLgUUN@vostro.rjw.lan>
-Message-ID: <20130916233111.GB21013@sirena.org.uk>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 16 Sep 2013 17:41:06 -0700
+Subject: [PATCH] ARM: kvm: rename cpu_reset to avoid name clash
+In-Reply-To: <20130912015002.GO9860@cbox>
+References: <1378938461-10835-1-git-send-email-olof@lixom.net>
+ <CAOesGMjum0TSyudXiZtXHOGX4R7dBAhjUpoYnwjTcfD1MMpTxw@mail.gmail.com>
+ <20130912015002.GO9860@cbox>
+Message-ID: <CAOesGMiGaM=s85iKHPXd9eBiL1vy3SVws+KR0ToxPpZeiisscg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 16, 2013 at 09:07:07PM +0200, Rafael J. Wysocki wrote:
+Hi,
 
-> That may be left to the client driver altogether.  I mean, if the client wants
-> the controller to be powered up, it should just call
-> pm_runtime_get_sync(controller device) at a suitable place (and then do the
-> corresponding _put when the controller is not necessary anu more) from its
-> ->probe() callback.
+On Wed, Sep 11, 2013 at 6:50 PM, Christoffer Dall
+<christoffer.dall@linaro.org> wrote:
+> On Wed, Sep 11, 2013 at 03:39:26PM -0700, Olof Johansson wrote:
+>> On Wed, Sep 11, 2013 at 3:27 PM, Olof Johansson <olof@lixom.net> wrote:
+>> > cpu_reset is already #defined in <asm/proc-fns.h> as processor.reset,
+>> > so it expands here and causes problems.
+>> >
+>> > Signed-off-by: Olof Johansson <olof@lixom.net>
+>>
+>> I just noticed this is broken on 3.10 too, so if/when applying feel free to add:
+>>
+>> Cc: <stable@vger.kernel.org> # 3.10+
+>>
+> Thanks for the fix, applied.
 
-It shouldn't even need to do that, it should just be able to rely on the
-controller to power itself up when asked to do work.   This is how the
-existing implementations are done - the controller power management is
-totally transparent to the slave.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130917/74953111/attachment-0001.sig>
+I haven't seen this hit linux-next yet?
+
+
+-Olof
