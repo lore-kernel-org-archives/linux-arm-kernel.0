@@ -1,60 +1,41 @@
 From: dinguyen@altera.com (dinguyen at altera.com)
-Date: Tue, 17 Sep 2013 11:31:25 -0500
-Subject: [PATCH 1/2] arm: dts: socfpga: Change some types of gate-clk type to
- periph-clk type
-Message-ID: <1379435486-25981-1-git-send-email-dinguyen@altera.com>
+Date: Tue, 17 Sep 2013 11:31:26 -0500
+Subject: [PATCH 2/2] arm: socfpga: Remove check for "reg" property in
+ socfpga_clk_init
+In-Reply-To: <1379435486-25981-1-git-send-email-dinguyen@altera.com>
+References: <1379435486-25981-1-git-send-email-dinguyen@altera.com>
+Message-ID: <1379435486-25981-2-git-send-email-dinguyen@altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Dinh Nguyen <dinguyen@altera.com>
 
-Some of the clocks that were designated gate-clk did not have a gate, so
-change those clocks to be of periph-clk type.
+The function socfpga_clk_init() can support clocks that do not have a divider
+register, but a fixed-divider that can be read from DTS. Therefore, the "reg"
+property is not a failing condition for socfpga_clk_init().
 
 Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
-Cc: Rob Herring <rob.herring@calxeda.com>
-Cc: Pawel Moll <pawel.moll@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Stephen Warren <swarren@wwwdotorg.org>
-Cc: Ian Campbell <ian.campbell@citrix.com>
 Cc: Mike Turquette <mturquette@linaro.org>
-Cc: devicetree at vger.kernel.org
-CC: linux-arm-kernel at lists.infradead.org
+Cc: Sachin Kamat <sachin.kamat@linaro.org>
+Cc: linux-arm-kernel at lists.infradead.org
 ---
- arch/arm/boot/dts/socfpga.dtsi |    7 ++++---
- 1 file changed, 4 insertions(+), 3 deletions(-)
+ drivers/clk/socfpga/clk.c |    4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
-index 1ee6079..acd6c3a 100644
---- a/arch/arm/boot/dts/socfpga.dtsi
-+++ b/arch/arm/boot/dts/socfpga.dtsi
-@@ -245,14 +245,14 @@
+diff --git a/drivers/clk/socfpga/clk.c b/drivers/clk/socfpga/clk.c
+index 81dd31a..c378489 100644
+--- a/drivers/clk/socfpga/clk.c
++++ b/drivers/clk/socfpga/clk.c
+@@ -121,9 +121,7 @@ static __init struct clk *socfpga_clk_init(struct device_node *node,
+ 	int rc;
+ 	u32 fixed_div;
  
- 				mpu_periph_clk: mpu_periph_clk {
- 					#clock-cells = <0>;
--					compatible = "altr,socfpga-gate-clk";
-+					compatible = "altr,socfpga-perip-clk";
- 					clocks = <&mpuclk>;
- 					fixed-divider = <4>;
- 					};
+-	rc = of_property_read_u32(node, "reg", &reg);
+-	if (WARN_ON(rc))
+-		return NULL;
++	of_property_read_u32(node, "reg", &reg);
  
- 				mpu_l2_ram_clk: mpu_l2_ram_clk {
- 					#clock-cells = <0>;
--					compatible = "altr,socfpga-gate-clk";
-+					compatible = "altr,socfpga-perip-clk";
- 					clocks = <&mpuclk>;
- 					fixed-divider = <2>;
- 					};
-@@ -266,8 +266,9 @@
- 
- 				l3_main_clk: l3_main_clk {
- 					#clock-cells = <0>;
--					compatible = "altr,socfpga-gate-clk";
-+					compatible = "altr,socfpga-perip-clk";
- 					clocks = <&mainclk>;
-+					fixed-divider = <1>;
- 					};
- 
- 				l3_mp_clk: l3_mp_clk {
+ 	socfpga_clk = kzalloc(sizeof(*socfpga_clk), GFP_KERNEL);
+ 	if (WARN_ON(!socfpga_clk))
 -- 
 1.7.9.5
