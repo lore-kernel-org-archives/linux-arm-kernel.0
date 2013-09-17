@@ -1,85 +1,69 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 17 Sep 2013 23:34:07 +0200
-Subject: [PATCH v2] ARM: fix Thumb-2 bug in AES assembler code
-In-Reply-To: <alpine.LFD.2.03.1309171429580.20709@syhkavp.arg>
-References: <1379438195-6911-1-git-send-email-ard.biesheuvel@linaro.org>
- <alpine.LFD.2.03.1309171429580.20709@syhkavp.arg>
-Message-ID: <CAKv+Gu8pgc6tu=8B9qFQe1ndm89_OyAeGHCu=L4F2Gm9xAsYyA@mail.gmail.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 17 Sep 2013 22:34:28 +0100
+Subject: [PATCH 3/3] aarch64: kvm: introduce CONFIG_KVM_MAX_VCPUS
+In-Reply-To: <1379160656-28050-4-git-send-email-drjones@redhat.com>
+References: <1379160656-28050-1-git-send-email-drjones@redhat.com>
+ <1379160656-28050-4-git-send-email-drjones@redhat.com>
+Message-ID: <20130917213428.GJ7623@lvm>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17 September 2013 20:34, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
-> On Tue, 17 Sep 2013, Ard Biesheuvel wrote:
->
->> Patch 638591c enabled building the AES assembler code in Thumb2 mode.
->> However, this code used arithmetic involving PC rather than adr{l}
->> instructions to generate PC-relative references to the lookup tables,
->> and this break in Thumb mode due to the different PC offset.
->>
->> Use adr instructions instead.
->>
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> ---
->>
->> v2:
->> - use 'adr' instruction rather than explicit PC arithmetic
->> - move the tables around so they are in range for 'adr' in each mode
->>
->>  arch/arm/crypto/aes-armv4.S | 388 ++++++++++++++++++++++----------------------
->>  1 file changed, 193 insertions(+), 195 deletions(-)
->
-> No no no.  NAK.
->
-> This makes the patch completely unreviewable.  And unacceptable for
-> inclusion into the stable tree.
->
-> Also, why do you have to move tables around?
->
+On Sat, Sep 14, 2013 at 02:10:56PM +0200, Andrew Jones wrote:
+> Take CONFIG_KVM_MAX_VCPUS from arm32, but set the default to 8.
+> 
+> Signed-off-by: Andrew Jones <drjones@redhat.com>
+> ---
+>  arch/arm64/include/asm/kvm_host.h |  7 ++++++-
+>  arch/arm64/kvm/Kconfig            | 11 +++++++++++
+>  2 files changed, 17 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+> index 0859a4ddd1e7d..d1af8c49a5ca4 100644
+> --- a/arch/arm64/include/asm/kvm_host.h
+> +++ b/arch/arm64/include/asm/kvm_host.h
+> @@ -26,7 +26,12 @@
+>  #include <asm/kvm_asm.h>
+>  #include <asm/kvm_mmio.h>
+>  
+> -#define KVM_MAX_VCPUS 4
+> +#if defined(CONFIG_KVM_MAX_VCPUS)
+> +#define KVM_MAX_VCPUS CONFIG_KVM_MAX_VCPUS
+> +#else
+> +#define KVM_MAX_VCPUS 0
+> +#endif
+> +
+>  #define KVM_USER_MEM_SLOTS 32
+>  #define KVM_PRIVATE_MEM_SLOTS 4
+>  #define KVM_COALESCED_MMIO_PAGE_OFFSET 1
+> diff --git a/arch/arm64/kvm/Kconfig b/arch/arm64/kvm/Kconfig
+> index 21e90820bd23c..c9924b02e84f7 100644
+> --- a/arch/arm64/kvm/Kconfig
+> +++ b/arch/arm64/kvm/Kconfig
+> @@ -35,6 +35,17 @@ config KVM_ARM_HOST
+>  	---help---
+>  	  Provides host support for ARM processors.
+>  
+> +config KVM_MAX_VCPUS
+> +	int "Number maximum supported virtual CPUs per VM"
+> +	depends on KVM_ARM_HOST
+> +	default 8
 
-Well, my approach was to remove all the PC related arithmetic, but
-loading the address of the table itself using adr doesn't work in ARM
-as it's too far away, and adrl doesn't exist in Thumb.
+That data structure gets really big with 8 max vcpus.  I think we should
+keep this at 4 for now, a quad-core VM is quite reasonable for now.
 
-> Isn't the following sufficient to fix the issue?
->
+> +	help
+> +	  Static number of max supported virtual CPUs per VM.
+> +
+> +	  The default is set to the highest number of vcpus that
+> +	  current hardware supports. Set to a lower number to save
+> +	  some resources. Set to a higher number to test scalability.
+> +
+>  config KVM_ARM_VGIC
+>  	bool
+>  	depends on KVM_ARM_HOST && OF
+> -- 
+> 1.8.1.4
+> 
 
-Yes, this is obviously much less obtrusive, so much better.
-Should I respin my patch or should we just paste your diff into the
-patch system?
-(I will test it properly first, of course)
-
-Regards,
-Ard.
-
-
-> diff --git a/arch/arm/crypto/aes-armv4.S b/arch/arm/crypto/aes-armv4.S
-> index 19d6cd6f29..3a14ea8fe9 100644
-> --- a/arch/arm/crypto/aes-armv4.S
-> +++ b/arch/arm/crypto/aes-armv4.S
-> @@ -148,7 +148,7 @@ AES_Te:
->  @               const AES_KEY *key) {
->  .align 5
->  ENTRY(AES_encrypt)
-> -       sub     r3,pc,#8                @ AES_encrypt
-> +       adr     r3,AES_encrypt
->         stmdb   sp!,{r1,r4-r12,lr}
->         mov     r12,r0          @ inp
->         mov     r11,r2
-> @@ -381,7 +381,7 @@ _armv4_AES_encrypt:
->  .align 5
->  ENTRY(private_AES_set_encrypt_key)
->  _armv4_AES_set_encrypt_key:
-> -       sub     r3,pc,#8                @ AES_set_encrypt_key
-> +       adr     r3,_armv4_AES_set_encrypt_key
->         teq     r0,#0
->         moveq   r0,#-1
->         beq     .Labrt
-> @@ -843,7 +843,7 @@ AES_Td:
->  @               const AES_KEY *key) {
->  .align 5
->  ENTRY(AES_decrypt)
-> -       sub     r3,pc,#8                @ AES_decrypt
-> +       adr     r3,AES_decrypt
->         stmdb   sp!,{r1,r4-r12,lr}
->         mov     r12,r0          @ inp
->         mov     r11,r2
+-- 
+Christoffer
