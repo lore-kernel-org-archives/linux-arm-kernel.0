@@ -1,80 +1,29 @@
-From: dinguyen@altera.com (dinguyen at altera.com)
-Date: Tue, 17 Sep 2013 17:02:41 -0500
-Subject: [PATCHv4 2/2] clocksource: dw_apb_timer_of: Fix read_sched_clock
-In-Reply-To: <1379455361-13882-1-git-send-email-dinguyen@altera.com>
-References: <1379455361-13882-1-git-send-email-dinguyen@altera.com>
-Message-ID: <1379455361-13882-2-git-send-email-dinguyen@altera.com>
+From: csd@broadcom.com (Christian Daudt)
+Date: Tue, 17 Sep 2013 15:04:54 -0700
+Subject: [PATCH] ARM: bcm: Add DEBUG_LL console support
+In-Reply-To: <20130917220323.GS12758@n2100.arm.linux.org.uk>
+References: <1379455187-5812-1-git-send-email-csd@broadcom.com>
+ <20130917220323.GS12758@n2100.arm.linux.org.uk>
+Message-ID: <5238D206.9030701@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dinh Nguyen <dinguyen@altera.com>
+On 13-09-17 03:03 PM, Russell King - ARM Linux wrote:
+> On Tue, Sep 17, 2013 at 02:59:47PM -0700, Christian Daudt wrote:
+>> This patch adds low level debug uart support to Broadcom
+>>   mobile based SOCs.
+>>
+>> Signed-off-by: Christian Daudt <csd@broadcom.com>
+>> Reviewed-by: James King <jamesk@broadcom.com>
+> Unfortunately, your patch is out of date.
+>
+> Please have a look at v3.12-rc1's debugging infrastructure.  You should
+> not need to add any .S file(s) for 8250 based ports, and in fact,
+> 8250_32.S is gone.  It's now all done through Kconfig for these ports.
+>
+> Thanks.
+>
+Oops. Ok, I last rebased it against -11-rc4. I'll rework it for 12-rc1 then.
 
-The read_sched_clock should return the ~value because the clock is a
-countdown implementation. read_sched_clock() should be the same as
-__apbt_read_clocksource().
-
-If a separate timer for the sched_clock exist, then read_sched_clock()
-will return an incorrect value. The (sched_io_base + 0x4) needs to be in
-the function for both cases.
-
-Maintain backwards compatibility for "dw-apb-timer-sp" and
-"dw-apb-timer-osc".
-
-Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
-Acked-by: Jamie Iles <jamie@jamieiles.com>
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
-CC: Rob Herring <rob.herring@calxeda.com>
-CC: Arnd Bergmann <arnd@arndb.de>
-Cc: Olof Johansson <olof@lixom.net>
-Cc: John Stultz <john.stultz@linaro.org>
-Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: Pavel Machek <pavel@denx.de>
-Cc: Heiko Stuebner <heiko@sntech.de>
-Cc: linux-arm-kernel at lists.infradead.org
----
-v3:
-- Use APBTMR_N_CURRENT_VALUE define in read_sched_clock()
-    
-v2:
-- Maintain backwards compatibility for "dw-apb-timer-sp" and
-"dw-apb-timer-osc".
-
- drivers/clocksource/dw_apb_timer_of.c |    9 +++++----
- 1 file changed, 5 insertions(+), 4 deletions(-)
-
-diff --git a/drivers/clocksource/dw_apb_timer_of.c b/drivers/clocksource/dw_apb_timer_of.c
-index 4cbae4f..01c1238 100644
---- a/drivers/clocksource/dw_apb_timer_of.c
-+++ b/drivers/clocksource/dw_apb_timer_of.c
-@@ -102,18 +102,17 @@ static void add_clocksource(struct device_node *source_timer)
- 	 * timer is found. sched_io_base then points to the current_value
- 	 * register of the clocksource timer.
- 	 */
--	sched_io_base = iobase + 0x04;
-+	sched_io_base = iobase;
- 	sched_rate = rate;
- }
- 
- static u32 read_sched_clock(void)
- {
--	return __raw_readl(sched_io_base);
-+	return ~__raw_readl(sched_io_base + APBTMR_N_CURRENT_VALUE);
- }
- 
- static const struct of_device_id sptimer_ids[] __initconst = {
- 	{ .compatible = "picochip,pc3x2-rtc" },
--	{ .compatible = "snps,dw-apb-timer-sp" },
- 	{ /* Sentinel */ },
- };
- 
-@@ -153,4 +152,6 @@ static void __init dw_apb_timer_init(struct device_node *timer)
- 	num_called++;
- }
- CLOCKSOURCE_OF_DECLARE(pc3x2_timer, "picochip,pc3x2-timer", dw_apb_timer_init);
--CLOCKSOURCE_OF_DECLARE(apb_timer, "snps,dw-apb-timer-osc", dw_apb_timer_init);
-+CLOCKSOURCE_OF_DECLARE(apb_timer_osc, "snps,dw-apb-timer-osc", dw_apb_timer_init);
-+CLOCKSOURCE_OF_DECLARE(apb_timer_sp, "snps,dw-apb-timer-sp", dw_apb_timer_init);
-+CLOCKSOURCE_OF_DECLARE(apb_timer, "snps,dw-apb-timer", dw_apb_timer_init);
--- 
-1.7.9.5
+  Thanks,
+    csd
