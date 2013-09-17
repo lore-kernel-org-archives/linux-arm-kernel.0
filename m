@@ -1,39 +1,40 @@
-From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Tue, 17 Sep 2013 13:46:23 -0300
-Subject: [PATCH] ARM: dts: imx6qdl-sabresd: SDHC ports are 8 bit-wide
-Message-ID: <1379436383-29428-1-git-send-email-fabio.estevam@freescale.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Tue, 17 Sep 2013 11:47:13 -0500
+Subject: [PATCH] ARM: dts: DRA7: provide arch-timer frequenecy parameter
+Message-ID: <1379436433-24914-1-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On imx6qdl-sabresd the SDHC2 and SDHC3 are 8 bit-wide, so pass the bus-width
-property to reflect that.
+CNTFREQ isn't pre-programmed on DRA7 just like O5, so provide the
+same. Without a valid value arch_timer_init results in div0 crash.
+Providing the same is a safer alternative.
 
-Otherwise the mmc driver will operate with the default bus-width value of 4.
+Cc: R Sricharan <r.sricharan@ti.com>
+Cc: Rajendra Nayak <rnayak@ti.com>
+Cc: Sourav Poddar <sourav.poddar@ti.com>
+Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+Signed-off-by: Nishanth Menon <nm@ti.com>
 ---
- arch/arm/boot/dts/imx6qdl-sabresd.dtsi | 2 ++
- 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-index 39eafc2..64e454b 100644
---- a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-@@ -229,6 +229,7 @@
- &usdhc2 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_usdhc2_1>;
-+	bus-width = <8>;
- 	cd-gpios = <&gpio2 2 0>;
- 	wp-gpios = <&gpio2 3 0>;
- 	status = "okay";
-@@ -237,6 +238,7 @@
- &usdhc3 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_usdhc3_1>;
-+	bus-width = <8>;
- 	cd-gpios = <&gpio2 0 0>;
- 	wp-gpios = <&gpio2 1 0>;
- 	status = "okay";
+Based on Benoit's for_3.13/dts branch. 
+http://git.kernel.org/cgit/linux/kernel/git/bcousson/linux-omap-dt.git/log/?h=for_3.13/dts
+Without this patch, div0 error occurs(seen on 3.12-rc1 tag): http://pastebin.com/B2sDauS9
+
+ arch/arm/boot/dts/dra7.dtsi |    1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
+index c01ef76..b478beb 100644
+--- a/arch/arm/boot/dts/dra7.dtsi
++++ b/arch/arm/boot/dts/dra7.dtsi
+@@ -50,6 +50,7 @@
+ 			     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
+ 			     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
+ 			     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>;
++		clock-frequency = <6144000>;
+ 	};
+ 
+ 	gic: interrupt-controller at 48211000 {
 -- 
-1.8.1.2
+1.7.9.5
