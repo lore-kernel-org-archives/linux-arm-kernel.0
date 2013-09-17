@@ -1,92 +1,48 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Tue, 17 Sep 2013 12:02:02 -0700
-Subject: [PATCH 3/7 v2] input: misc: ixp4-beeper: use gpiolib strictly
-In-Reply-To: <1379061160-22361-1-git-send-email-linus.walleij@linaro.org>
-References: <1379061160-22361-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <20130917190202.GC6894@core.coreip.homeip.net>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 17 Sep 2013 21:05:03 +0200
+Subject: [PATCH] bus: mvebu-mbus: Fix optional pcie-mem/io-aperture
+ properties
+In-Reply-To: <20130917183853.GC21230@obsidianresearch.com>
+References: <20130917183853.GC21230@obsidianresearch.com>
+Message-ID: <20130917210503.1ea8cdd9@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 13, 2013 at 10:32:40AM +0200, Linus Walleij wrote:
-> Request and free the GPIO line used for the beeper properly.
-> Then use the gpiolib API to flip the output of the GPIO pin
-> instead of relying on hacks to poke the register bits.
+Dear Jason Gunthorpe,
+
+On Tue, 17 Sep 2013 12:38:53 -0600, Jason Gunthorpe wrote:
+> If the property was not specified then then the returned resource
+> had a resource_size(..) == 1, rather than 0. The PCI-E driver checks
+> for 0 so it blindly continues on with a corrupted resource.
 > 
-> Cc: Imre Kaloz <kaloz@openwrt.org>
-> Cc: Krzysztof Halasa <khc@pm.waw.pl>
-> Cc: Alexandre Courbot <acourbot@nvidia.com>
-> Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com>
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-
-Acked-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
-
+> Signed-off-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
 > ---
-> Hi Dmitry, requesting an ACK for this to take it through the
-> GPIO tree as part of an IXP4 clean-up attempt.
+>  drivers/bus/mvebu-mbus.c | 2 ++
+>  1 file changed, 2 insertions(+)
 > 
-> ChangeLog v1->v2:
-> - Invert using the bang ! instead of XOR ~
-> ---
->  drivers/input/misc/ixp4xx-beeper.c | 13 +++++++++++--
->  1 file changed, 11 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/input/misc/ixp4xx-beeper.c b/drivers/input/misc/ixp4xx-beeper.c
-> index f14afd0..17ccba8 100644
-> --- a/drivers/input/misc/ixp4xx-beeper.c
-> +++ b/drivers/input/misc/ixp4xx-beeper.c
-> @@ -76,11 +76,13 @@ static int ixp4xx_spkr_event(struct input_dev *dev, unsigned int type, unsigned
+> diff --git a/drivers/bus/mvebu-mbus.c b/drivers/bus/mvebu-mbus.c
+> index 19ab6ff..7a66203 100644
+> --- a/drivers/bus/mvebu-mbus.c
+> +++ b/drivers/bus/mvebu-mbus.c
+> @@ -866,6 +866,8 @@ static void __init mvebu_mbus_get_pcie_resources(struct device_node *np,
+>  	 */
+>  	memset(mem, 0, sizeof(struct resource));
+>  	memset(io, 0, sizeof(struct resource));
+> +	mem->end--;
+> +	io->end--;
 >  
->  static irqreturn_t ixp4xx_spkr_interrupt(int irq, void *dev_id)
->  {
-> +	unsigned int pin = (unsigned int) dev_id;
-> +
->  	/* clear interrupt */
->  	*IXP4XX_OSST = IXP4XX_OSST_TIMER_2_PEND;
->  
->  	/* flip the beeper output */
-> -	*IXP4XX_GPIO_GPOUTR ^= (1 << (unsigned int) dev_id);
-> +	gpio_set_value(pin, !gpio_get_value(pin));
->  
->  	return IRQ_HANDLED;
->  }
-> @@ -108,11 +110,15 @@ static int ixp4xx_spkr_probe(struct platform_device *dev)
->  	input_dev->sndbit[0] = BIT_MASK(SND_BELL) | BIT_MASK(SND_TONE);
->  	input_dev->event = ixp4xx_spkr_event;
->  
-> +	err = gpio_request(dev->id, "ixp4-beeper");
-> +	if (err)
-> +		goto err_free_device;
-> +
->  	err = request_irq(IRQ_IXP4XX_TIMER2, &ixp4xx_spkr_interrupt,
->  			  IRQF_NO_SUSPEND, "ixp4xx-beeper",
->  			  (void *) dev->id);
->  	if (err)
-> -		goto err_free_device;
-> +		goto err_free_gpio;
->  
->  	err = input_register_device(input_dev);
->  	if (err)
-> @@ -124,6 +130,8 @@ static int ixp4xx_spkr_probe(struct platform_device *dev)
->  
->   err_free_irq:
->  	free_irq(IRQ_IXP4XX_TIMER2, (void *)dev->id);
-> + err_free_gpio:
-> +	gpio_free(dev->id);
->   err_free_device:
->  	input_free_device(input_dev);
->  
-> @@ -142,6 +150,7 @@ static int ixp4xx_spkr_remove(struct platform_device *dev)
->  	ixp4xx_spkr_control(pin, 0);
->  
->  	free_irq(IRQ_IXP4XX_TIMER2, (void *)dev->id);
-> +	gpio_free(dev->id);
->  
->  	return 0;
->  }
-> -- 
-> 1.8.3.1
-> 
+>  	ret = of_property_read_u32_array(np, "pcie-mem-aperture", reg, ARRAY_SIZE(reg));
+>  	if (!ret) {
 
+This seems a little bit nasty, isn't it? Can't we instead teach the
+PCIe driver to be a little bit smarter when testing if those resources
+are valid or not?
+
+Thanks!
+
+Thomas
 -- 
-Dmitry
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
