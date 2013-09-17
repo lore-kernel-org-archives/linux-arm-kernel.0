@@ -1,55 +1,70 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 17 Sep 2013 15:38:49 -0600
-Subject: [PATCH v3 1/2] video: ARM CLCD: Add DT support
-In-Reply-To: <1379435799.9205.16.camel@hornet>
-References: <1379351934-25415-1-git-send-email-pawel.moll@arm.com>
- <52376180.1090001@wwwdotorg.org> <1379435799.9205.16.camel@hornet>
-Message-ID: <5238CBE9.2060800@wwwdotorg.org>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 17 Sep 2013 22:42:08 +0100
+Subject: [PATCH 2/3] arm32: kvm: rename CONFIG_KVM_ARM_MAX_VCPUS
+In-Reply-To: <1379160656-28050-3-git-send-email-drjones@redhat.com>
+References: <1379160656-28050-1-git-send-email-drjones@redhat.com>
+ <1379160656-28050-3-git-send-email-drjones@redhat.com>
+Message-ID: <20130917214208.GK7623@lvm>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/17/2013 10:36 AM, Pawel Moll wrote:
-> On Mon, 2013-09-16 at 20:52 +0100, Stephen Warren wrote:
->> I think the binding should either always use names as the key, or use
->> indices in interrupts as the key. Hence, I'd word that more like:
-
->> Do we really need so many examples?
+On Sat, Sep 14, 2013 at 02:10:55PM +0200, Andrew Jones wrote:
+> Drop the _ARM_ part of the name. We can then introduce a config option
+> like this to aarch64 and other arches using the same name - allowing
+> grep to show them all. Also update the help text to describe the option
+> more completely.
 > 
-> They cover all standard cases. If I was to write a tree for a new
-> platform not knowing anything about CLCD, I think I'd appreciate this
-> and don't believe this extra kB or two is a problem. Do you?
-
-I guess it's not a problem. It's just unusual.
-
->>> +Optional properties:
->>> +
->>> +- arm,pl11x,framebuffer-base: a pair of two values, address and size,
->>> +				defining the framebuffer to be used;
->>> +				to be used only if it is *not*
->>> +				part of normal memory, as described
->>> +				in /memory node
->>
->> If the framebuffer is part of /memory, what happens then? Is the address
->> not fixed (so the HW isn't yet set up) and hence a driver should
->> allocate it?
+> Signed-off-by: Andrew Jones <drjones@redhat.com>
+> ---
+>  arch/arm/include/asm/kvm_host.h | 4 ++--
+>  arch/arm/kvm/Kconfig            | 8 ++++----
+>  2 files changed, 6 insertions(+), 6 deletions(-)
 > 
-> Yes, if it wants to display anything :-) And as this is a normal and
-> expected behaviour, I don't think it deserves a note in the
-> documentation. I'm open to any suggestions that would make the wording
-> above emphasize the "weirdness" of situations requiring the property.
+> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+> index 7d22517d80711..c614d3eb176c6 100644
+> --- a/arch/arm/include/asm/kvm_host.h
+> +++ b/arch/arm/include/asm/kvm_host.h
+> @@ -25,8 +25,8 @@
+>  #include <asm/fpstate.h>
+>  #include <kvm/arm_arch_timer.h>
+>  
+> -#if defined(CONFIG_KVM_ARM_MAX_VCPUS)
+> -#define KVM_MAX_VCPUS CONFIG_KVM_ARM_MAX_VCPUS
+> +#if defined(CONFIG_KVM_MAX_VCPUS)
+> +#define KVM_MAX_VCPUS CONFIG_KVM_MAX_VCPUS
+>  #else
+>  #define KVM_MAX_VCPUS 0
+>  #endif
+> diff --git a/arch/arm/kvm/Kconfig b/arch/arm/kvm/Kconfig
+> index ebf5015508b52..de63bfccb3eb5 100644
+> --- a/arch/arm/kvm/Kconfig
+> +++ b/arch/arm/kvm/Kconfig
+> @@ -40,16 +40,16 @@ config KVM_ARM_HOST
+>  	---help---
+>  	  Provides host support for ARM processors.
+>  
+> -config KVM_ARM_MAX_VCPUS
+> +config KVM_MAX_VCPUS
+>  	int "Number maximum supported virtual CPUs per VM"
+>  	depends on KVM_ARM_HOST
+>  	default 4
+>  	help
+>  	  Static number of max supported virtual CPUs per VM.
+>  
+> -	  If you choose a high number, the vcpu structures will be quite
+> -	  large, so only choose a reasonable number that you expect to
+> -	  actually use.
+> +	  The default is set to the highest number of vcpus that
+> +	  current hardware supports. Set to a lower number to save
+> +	  some resources. Set to a higher number to test scalability.
 
-Perhaps:
+Consider rephrasing the "Set to a lower number..." sentence to something
+like "Choosing a lower number decreases the size of the VM data
+structure.".
 
-A pair of two values, address and size, defining the framebuffer to be
-used. If not present, the framebuffer may be located anywhere in memory.
+Also, please rephrase or get rid of the "Set to a higher number to test
+scalability." sentence; you increase this value to be able to be able to
+run more VCPUs (for whatever reason).
 
-Or, is this intended to represent where the HW is already scanning out
-from? If so, then perhaps:
-
-A pair of two values, address and size, defining the location of the
-framebuffer that the controller is currently configured to display. If
-not present, the controller may or may not already be active.
-
-(although presumably if the controller is already active, then the
-address can simply be read out of the HW register, so there's no need
-for a DT property).
+-- 
+Christoffer
