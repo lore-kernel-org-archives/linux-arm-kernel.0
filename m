@@ -1,88 +1,59 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 18 Sep 2013 15:24:51 +0200
-Subject: [PATCH v2 09/10] of/i2c: Resolve interrupt references at probe time
-In-Reply-To: <1379510692-32435-1-git-send-email-treding@nvidia.com>
-References: <1379510692-32435-1-git-send-email-treding@nvidia.com>
-Message-ID: <1379510692-32435-10-git-send-email-treding@nvidia.com>
+From: john.stultz@linaro.org (John Stultz)
+Date: Wed, 18 Sep 2013 08:25:00 -0500
+Subject: [RFC][PATCH] rtc: rtc-pl031: Set wakeup flag prior to registering
+ rtcdev
+In-Reply-To: <CACRpkdY-6eUWG6CWpBMi=yy2m158xwsF4h48yqZNzvBe_LW14Q@mail.gmail.com>
+References: <1379442550-24860-1-git-send-email-john.stultz@linaro.org>
+ <CACRpkdY-6eUWG6CWpBMi=yy2m158xwsF4h48yqZNzvBe_LW14Q@mail.gmail.com>
+Message-ID: <CALAqxLXtBj_DhiDr=BcU__E8g+FyeDGP+ZJjh0Mp+rrFZ6cJUw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Instead of resolving interrupt references at device creation time, delay
-resolution until probe time. At device creation time, there is nothing
-that can be done if an interrupt parent isn't ready yet, and the device
-will end up with an invalid interrupt number (0).
+On Wed, Sep 18, 2013 at 6:30 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
+>
+> On Tue, Sep 17, 2013 at 8:29 PM, John Stultz <john.stultz@linaro.org> wrote:
+>
+> > In some recent testing, I noticed the CLOCK_REALTIME_ALARM clockid
+> > wasn't functioning on my vexpress qemu environment. Looking into it
+> > I noticed the pl031 rtc driver doesn't set the wakeup flag on the
+> > device until after registering the device with the RTC subsystem.
+> >
+> > This causes the alarmtimer subsystem to not see the pl031 driver
+> > as a valid backing device, and that resuls in alarm clockids
+> > getting ENOTSUPP errors.
+> >
+> > Thus be sure to set the wakeup flag on the device prior to
+> > registering the rtcdev so the pl031 rtc driver can be used as
+> > the backing alarmtimer device.
+> >
+> > Let me know if you have any feedback or objections to this.
+> > If it looks ok, I'll queue it for 3.13. I suspect there
+> > may be other RTC drivers with the same problem.
+> >
+> > Cc: Linus Walleij <linus.walleij@linaro.org>
+> > Cc: Alessandro Zummo <a.zummo@towertech.it>
+> > Cc: "Jon Medhurst (Tixy)" <tixy@linaro.org>
+> > Cc: linux-arm-kernel at lists.infradead.org
+> > Signed-off-by: John Stultz <john.stultz@linaro.org>
+>
+> Makes perfect sense. I have only tested the driver from regular
+> userspace using ioctl()s. Is these a simple way to test
+> an alarmtimer on a barebones system?
 
-If the interrupt reference is resolved at probe time, the device's probe
-can be deferred, so that it's interrupt resolution can be retried after
-more devices (possibly including its interrupt parent) have been probed.
+The easiest way is to try to read CLOCK_REALTIME_ALARM which will only
+function if there's a backing rtc.
 
-However, individual drivers shouldn't be required to do that themselves,
-over and over again, so this commit implements this functionality within
-the I2C core.
+I've got some further timekeeping tests here that will test timers etc
+on the _ALARM clockids:
+https://github.com/johnstultz-work/timetests
 
-Signed-off-by: Thierry Reding <treding@nvidia.com>
----
-Changes in v2:
-- use __irq_of_parse_and_map() instead of of_irq_get()
 
- drivers/i2c/i2c-core.c | 24 ++++++++++++++++++++++--
- 1 file changed, 22 insertions(+), 2 deletions(-)
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+>
+> Are you sure this should not be for -rc:s and stable?
 
-diff --git a/drivers/i2c/i2c-core.c b/drivers/i2c/i2c-core.c
-index 29d3f04..5b4f289 100644
---- a/drivers/i2c/i2c-core.c
-+++ b/drivers/i2c/i2c-core.c
-@@ -236,6 +236,22 @@ int i2c_recover_bus(struct i2c_adapter *adap)
- 	return adap->bus_recovery_info->recover_bus(adap);
- }
- 
-+static int of_i2c_probe(struct i2c_client *client)
-+{
-+	struct device_node *np = client->dev.of_node;
-+	int ret;
-+
-+	/* skip if the device node specifies no interrupts */
-+	if (of_get_property(np, "interrupts", NULL)) {
-+		ret = __irq_of_parse_and_map(client->dev.of_node, 0,
-+					     &client->irq);
-+		if (ret)
-+			return ret;
-+	}
-+
-+	return 0;
-+}
-+
- static int i2c_device_probe(struct device *dev)
- {
- 	struct i2c_client	*client = i2c_verify_client(dev);
-@@ -254,6 +270,12 @@ static int i2c_device_probe(struct device *dev)
- 					client->flags & I2C_CLIENT_WAKE);
- 	dev_dbg(dev, "probe\n");
- 
-+	if (IS_ENABLED(CONFIG_OF) && dev->of_node) {
-+		status = of_i2c_probe(client);
-+		if (status)
-+			return status;
-+	}
-+
- 	status = driver->probe(client, i2c_match_id(driver->id_table, client));
- 	if (status) {
- 		client->driver = NULL;
-@@ -1002,7 +1024,6 @@ static void of_i2c_register_devices(struct i2c_adapter *adap)
- 			continue;
- 		}
- 
--		info.irq = irq_of_parse_and_map(node, 0);
- 		info.of_node = of_node_get(node);
- 		info.archdata = &dev_ad;
- 
-@@ -1016,7 +1037,6 @@ static void of_i2c_register_devices(struct i2c_adapter *adap)
- 			dev_err(&adap->dev, "of_i2c: Failure registering %s\n",
- 				node->full_name);
- 			of_node_put(node);
--			irq_dispose_mapping(info.irq);
- 			continue;
- 		}
- 	}
--- 
-1.8.4
+Its not a regression (never worked before), so I don't think so,
+unless someone finds the functionality critical for long-term kernels.
+
+thanks
+-john
