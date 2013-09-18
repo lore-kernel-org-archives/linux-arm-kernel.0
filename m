@@ -1,53 +1,41 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Wed, 18 Sep 2013 11:25:39 -0500
-Subject: [PATCH 1/4] usb: musb: Call atomic_notifier_call_chain when
- status is changed
-In-Reply-To: <20130918143537.GA4914@amd.pavel.ucw.cz>
-References: <1378630239-10006-1-git-send-email-pali.rohar@gmail.com>
- <201309172128.42514@pali> <20130918014942.GD19817@radagast>
- <201309181020.15245@pali>
- <CAAwP0s1Ou7Nrq7GhnHX71TFCrTFg=nqUh+GsAJhN8DjZGsF4QQ@mail.gmail.com>
- <20130918133025.GB2953@amd.pavel.ucw.cz>
- <CAAwP0s0nGthkm9Bp1ug23Rtz6-sbR60FFTSfd-Cj9wKMU0RBEA@mail.gmail.com>
- <20130918142203.GD3748@amd.pavel.ucw.cz>
- <20130918143537.GA4914@amd.pavel.ucw.cz>
-Message-ID: <20130918162539.GK21559@radagast>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 18 Sep 2013 18:35:49 +0200
+Subject: mvneta: oops in __rcu_read_lock on mirabox
+In-Reply-To: <CACzLR4t2ABZdRk40VUhLtDKXX2PQiSVoQZQ4coQkNkvETnY6Rw@mail.gmail.com>
+References: <20130915205701.5c61a444@skate> <20130916065047.GH27487@1wt.eu>
+ <20130916175152.4e013457@skate>
+ <CACzLR4twTNjzU8hK3L1cYUXnEH1ydwY6jnYoOG+9vLB3-4uQ4w@mail.gmail.com>
+ <20130916163937.GC3188@1wt.eu> <20130916164412.GD3188@1wt.eu>
+ <CACzLR4ssOPsmYaEh2ohe4HL5j+67keDYnmR4YezNB=aO7Pj5kA@mail.gmail.com>
+ <20130916174708.GG3188@1wt.eu>
+ <20130916182807.GO12758@n2100.arm.linux.org.uk>
+ <CACzLR4suLD90p=sEhB-qg1u35t66zKfrGQref1jX42fEfu3D8g@mail.gmail.com>
+ <20130917060111.GB9325@1wt.eu>
+ <CACzLR4t2ABZdRk40VUhLtDKXX2PQiSVoQZQ4coQkNkvETnY6Rw@mail.gmail.com>
+Message-ID: <20130918183549.3e7b8f4c@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Dear Ethan Tuttle,
 
-On Wed, Sep 18, 2013 at 04:35:37PM +0200, Pavel Machek wrote:
-> Hi!
+On Tue, 17 Sep 2013 23:30:56 -0700, Ethan Tuttle wrote:
+> On Mon, Sep 16, 2013 at 11:01 PM, Willy Tarreau <w@1wt.eu> wrote:
+> > Next step should be that you test both kernels to be sure.
 > 
-> > > gave feedback. If the sender doesn't want to take his feedback into
-> > > account and prefer to send pretty insulting emails instead that is his
-> > > choice but I would say that is this not the greatest approach to get
-> > > your code merged (to say the least).
-> > 
-> > Clearly not. But Pali found bug in code Felipe should
-> > maintain. Instead of "thank you for bug report, I applied this one
-> > line of your code to fix it", Pali got "new patch, new email" for his
-> > efforts. That is how you train dogs, not how you should treat kernel
-> > contributors.
-> > 
-> > Now, it is possible that Felipe just has problems with english, as he
-> > called me piece of wood in https://lkml.org/lkml/2013/9/17/476 , but
-> > he appears more arogant than usual over email.
-> 
-> Actually he called me "piece of wood with garbage in it". I guess I
-> have right to be offended. I'm baby in the next email. Hmm.
+> Thanks for the kernel images, Willy.  I'm still experimenting but
+> initial results are strange: I haven't seen a crash from the -ethan
+> image you provided, nor by a kernel with that config that I built
+> myself.  The config is only different from my crashing config by a few
+> options.  So perhaps some combination of options prevents the crash.
+> I'll see if I can narrow it down.
 
-what a baby. Grow up dude, just grow up. I said your commit log has
-garbage which shouldn't be there (there was a typo you're instead of
-your).
+A toolchain generating some crappy code maybe? Ethan, Willy, comparing
+your toolchain (compiler version, origin of the toolchain) could be
+interesting.
 
+Thomas
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130918/d419425d/attachment.sig>
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
