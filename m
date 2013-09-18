@@ -1,59 +1,43 @@
-From: john.stultz@linaro.org (John Stultz)
-Date: Wed, 18 Sep 2013 08:25:00 -0500
-Subject: [RFC][PATCH] rtc: rtc-pl031: Set wakeup flag prior to registering
- rtcdev
-In-Reply-To: <CACRpkdY-6eUWG6CWpBMi=yy2m158xwsF4h48yqZNzvBe_LW14Q@mail.gmail.com>
-References: <1379442550-24860-1-git-send-email-john.stultz@linaro.org>
- <CACRpkdY-6eUWG6CWpBMi=yy2m158xwsF4h48yqZNzvBe_LW14Q@mail.gmail.com>
-Message-ID: <CALAqxLXtBj_DhiDr=BcU__E8g+FyeDGP+ZJjh0Mp+rrFZ6cJUw@mail.gmail.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Wed, 18 Sep 2013 15:30:25 +0200
+Subject: [PATCH 1/4] usb: musb: Call atomic_notifier_call_chain when
+ status is changed
+In-Reply-To: <CAAwP0s1Ou7Nrq7GhnHX71TFCrTFg=nqUh+GsAJhN8DjZGsF4QQ@mail.gmail.com>
+References: <1378630239-10006-1-git-send-email-pali.rohar@gmail.com>
+ <201309172128.42514@pali> <20130918014942.GD19817@radagast>
+ <201309181020.15245@pali>
+ <CAAwP0s1Ou7Nrq7GhnHX71TFCrTFg=nqUh+GsAJhN8DjZGsF4QQ@mail.gmail.com>
+Message-ID: <20130918133025.GB2953@amd.pavel.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 18, 2013 at 6:30 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
->
-> On Tue, Sep 17, 2013 at 8:29 PM, John Stultz <john.stultz@linaro.org> wrote:
->
-> > In some recent testing, I noticed the CLOCK_REALTIME_ALARM clockid
-> > wasn't functioning on my vexpress qemu environment. Looking into it
-> > I noticed the pl031 rtc driver doesn't set the wakeup flag on the
-> > device until after registering the device with the RTC subsystem.
+Hi!
+
+> >> > So will you do that? Or it is needed to resend this one line
+> >> > hunk again in new email again?
+> >>
+> >> new patch, new email
 > >
-> > This causes the alarmtimer subsystem to not see the pl031 driver
-> > as a valid backing device, and that resuls in alarm clockids
-> > getting ENOTSUPP errors.
+> > Guys, WHY ARE YOU SO STUPID AND ARROGANT?
 > >
-> > Thus be sure to set the wakeup flag on the device prior to
-> > registering the rtcdev so the pl031 rtc driver can be used as
-> > the backing alarmtimer device.
-> >
-> > Let me know if you have any feedback or objections to this.
-> > If it looks ok, I'll queue it for 3.13. I suspect there
-> > may be other RTC drivers with the same problem.
-> >
-> > Cc: Linus Walleij <linus.walleij@linaro.org>
-> > Cc: Alessandro Zummo <a.zummo@towertech.it>
-> > Cc: "Jon Medhurst (Tixy)" <tixy@linaro.org>
-> > Cc: linux-arm-kernel at lists.infradead.org
-> > Signed-off-by: John Stultz <john.stultz@linaro.org>
->
-> Makes perfect sense. I have only tested the driver from regular
-> userspace using ioctl()s. Is these a simple way to test
-> an alarmtimer on a barebones system?
+> > Sorry but, need to copy full isolated patch/hunk from one mail to
+> > another is hassling. So what you want from me? Do all those non
+> > sense working only because yesterday you had bad day? Or what?
+...
+> 
+> Hi Pali,
+> 
+> There is no need to be rude.
+> 
+> Felipe asked you to do the split since he believes that the notifier
+> chain call for musb xceiv and the twl->phy notifier head init should
+> be done in two separate patches.
 
-The easiest way is to try to read CLOCK_REALTIME_ALARM which will only
-function if there's a backing rtc.
+Actually, there is need to be rude, because Felipe fails to act as
+maintainer. Instead of fixing bugs in his code, he bounces bugfix
+patches, points people to random READMEs and wastes everyones time.
+									Pavel
 
-I've got some further timekeeping tests here that will test timers etc
-on the _ALARM clockids:
-https://github.com/johnstultz-work/timetests
-
-
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
->
-> Are you sure this should not be for -rc:s and stable?
-
-Its not a regression (never worked before), so I don't think so,
-unless someone finds the functionality critical for long-term kernels.
-
-thanks
--john
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
