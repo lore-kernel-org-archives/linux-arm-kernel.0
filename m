@@ -1,110 +1,149 @@
 From: magnus.damm@gmail.com (Magnus Damm)
-Date: Thu, 19 Sep 2013 05:11:20 +0900
-Subject: [PATCH 02/03] ARM: shmobile: r7s72100 SCIF support
+Date: Thu, 19 Sep 2013 05:11:29 +0900
+Subject: [PATCH 03/03] ARM: shmobile: Genmai support
 In-Reply-To: <20130918201101.6319.97667.sendpatchset@w520>
 References: <20130918201101.6319.97667.sendpatchset@w520>
-Message-ID: <20130918201120.6319.59533.sendpatchset@w520>
+Message-ID: <20130918201129.6319.80740.sendpatchset@w520>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Magnus Damm <damm@opensource.se>
 
-Add SCIF serial port support to the r7s72100 SoC by
-adding platform devices for SCIF0 -> SCIF7 together with
-clock bindings. DT device description is excluded at
-this point since such bindings are still under
-development.
+Genmai base board support making use of 128 MiB of memory,
+the r7s7211 SoC with the SCIF2 serial port and CA9 core.
 
 Signed-off-by: Magnus Damm <damm@opensource.se>
 ---
 
- arch/arm/mach-shmobile/clock-r7s72100.c        |    8 ++++
- arch/arm/mach-shmobile/include/mach/r7s72100.h |    1 
- arch/arm/mach-shmobile/setup-r7s72100.c        |   45 ++++++++++++++++++++++++
- 3 files changed, 54 insertions(+)
+ arch/arm/boot/dts/Makefile            |    1 
+ arch/arm/boot/dts/r7s72100-genmai.dts |   31 +++++++++++++++++++++++
+ arch/arm/mach-shmobile/Kconfig        |    5 +++
+ arch/arm/mach-shmobile/Makefile       |    1 
+ arch/arm/mach-shmobile/Makefile.boot  |    1 
+ arch/arm/mach-shmobile/board-genmai.c |   43 +++++++++++++++++++++++++++++++++
+ 6 files changed, 82 insertions(+)
 
---- 0002/arch/arm/mach-shmobile/clock-r7s72100.c
-+++ work/arch/arm/mach-shmobile/clock-r7s72100.c	2013-09-19 03:47:24.000000000 +0900
-@@ -170,6 +170,14 @@ static struct clk_lookup lookups[] = {
- 	CLKDEV_CON_ID("cpu_clk", &div4_clks[DIV4_I]),
+--- 0001/arch/arm/boot/dts/Makefile
++++ work/arch/arm/boot/dts/Makefile	2013-09-19 03:47:59.000000000 +0900
+@@ -184,6 +184,7 @@ dtb-$(CONFIG_ARCH_U8500) += snowball.dtb
+ dtb-$(CONFIG_ARCH_S3C24XX) += s3c2416-smdk2416.dtb
+ dtb-$(CONFIG_ARCH_SHMOBILE) += emev2-kzm9d.dtb \
+ 	emev2-kzm9d-reference.dtb \
++	r7s72100-genmai.dtb \
+ 	r8a7740-armadillo800eva.dtb \
+ 	r8a7778-bockw.dtb \
+ 	r8a7778-bockw-reference.dtb \
+--- /dev/null
++++ work/arch/arm/boot/dts/r7s72100-genmai.dts	2013-09-19 03:47:59.000000000 +0900
+@@ -0,0 +1,31 @@
++/*
++ * Device Tree Source for the Genmai board
++ *
++ * Copyright (C) 2013 Renesas Solutions Corp.
++ *
++ * This file is licensed under the terms of the GNU General Public License
++ * version 2.  This program is licensed "as is" without any warranty of any
++ * kind, whether express or implied.
++ */
++
++/dts-v1/;
++/include/ "r7s72100.dtsi"
++
++/ {
++	model = "Genmai";
++	compatible = "renesas,genmai", "renesas,r7s72100";
++
++	chosen {
++		bootargs = "console=ttySC2,115200 ignore_loglevel rw root=/dev/nfs ip=dhcp";
++	};
++
++	memory {
++		device_type = "memory";
++		reg = <0x08000000 0x08000000>;
++	};
++
++	lbsc {
++		#address-cells = <1>;
++		#size-cells = <1>;
++	};
++};
+--- 0002/arch/arm/mach-shmobile/Kconfig
++++ work/arch/arm/mach-shmobile/Kconfig	2013-09-19 03:47:59.000000000 +0900
+@@ -189,6 +189,11 @@ config MACH_BOCKW_REFERENCE
  
- 	/* MSTP clocks */
-+	CLKDEV_ICK_ID("sci_fck", "sh-sci.0", &mstp_clks[MSTP47]),
-+	CLKDEV_ICK_ID("sci_fck", "sh-sci.1", &mstp_clks[MSTP46]),
-+	CLKDEV_ICK_ID("sci_fck", "sh-sci.2", &mstp_clks[MSTP45]),
-+	CLKDEV_ICK_ID("sci_fck", "sh-sci.3", &mstp_clks[MSTP44]),
-+	CLKDEV_ICK_ID("sci_fck", "sh-sci.4", &mstp_clks[MSTP43]),
-+	CLKDEV_ICK_ID("sci_fck", "sh-sci.5", &mstp_clks[MSTP42]),
-+	CLKDEV_ICK_ID("sci_fck", "sh-sci.6", &mstp_clks[MSTP41]),
-+	CLKDEV_ICK_ID("sci_fck", "sh-sci.7", &mstp_clks[MSTP40]),
- };
+ 	   This is intended to aid developers
  
- void __init r7s72100_clock_init(void)
---- 0002/arch/arm/mach-shmobile/include/mach/r7s72100.h
-+++ work/arch/arm/mach-shmobile/include/mach/r7s72100.h	2013-09-19 03:47:24.000000000 +0900
-@@ -1,6 +1,7 @@
- #ifndef __ASM_R7S72100_H__
- #define __ASM_R7S72100_H__
- 
-+void r7s72100_add_dt_devices(void);
- void r7s72100_clock_init(void);
- void r7s72100_init_early(void);
- 
---- 0002/arch/arm/mach-shmobile/setup-r7s72100.c
-+++ work/arch/arm/mach-shmobile/setup-r7s72100.c	2013-09-19 04:11:07.000000000 +0900
-@@ -21,10 +21,55 @@
- #include <linux/irq.h>
- #include <linux/kernel.h>
- #include <linux/of_platform.h>
-+#include <linux/serial_sci.h>
- #include <mach/common.h>
-+#include <mach/irqs.h>
- #include <mach/r7s72100.h>
- #include <asm/mach/arch.h>
- 
-+#define SCIF_DATA(index, baseaddr, irq)					\
-+[index] = {								\
-+	.type		= PORT_SCIF,					\
-+	.regtype	= SCIx_SH2_SCIF_FIFODATA_REGTYPE,		\
-+	.flags		= UPF_BOOT_AUTOCONF | UPF_IOREMAP,		\
-+	.scbrr_algo_id	= SCBRR_ALGO_2,					\
-+	.scscr		= SCSCR_RIE | SCSCR_TIE | SCSCR_RE | SCSCR_TE |	\
-+			  SCSCR_REIE,					\
-+	.mapbase	= baseaddr,					\
-+	.irqs		= { irq + 1, irq + 2, irq + 3, irq },		\
++config MACH_GENMAI
++	bool "Genmai board"
++	depends on ARCH_R7S72100
++	select USE_OF
++
+ config MACH_MARZEN
+ 	bool "MARZEN board"
+ 	depends on ARCH_R8A7779
+--- 0002/arch/arm/mach-shmobile/Makefile
++++ work/arch/arm/mach-shmobile/Makefile	2013-09-19 03:47:59.000000000 +0900
+@@ -58,6 +58,7 @@ obj-$(CONFIG_MACH_APE6EVM_REFERENCE)	+=
+ obj-$(CONFIG_MACH_MACKEREL)	+= board-mackerel.o
+ obj-$(CONFIG_MACH_BOCKW)	+= board-bockw.o
+ obj-$(CONFIG_MACH_BOCKW_REFERENCE)	+= board-bockw-reference.o
++obj-$(CONFIG_MACH_GENMAI)	+= board-genmai.o
+ obj-$(CONFIG_MACH_MARZEN)	+= board-marzen.o
+ obj-$(CONFIG_MACH_MARZEN_REFERENCE)	+= board-marzen-reference.o
+ obj-$(CONFIG_MACH_LAGER)	+= board-lager.o
+--- 0001/arch/arm/mach-shmobile/Makefile.boot
++++ work/arch/arm/mach-shmobile/Makefile.boot	2013-09-19 03:47:59.000000000 +0900
+@@ -6,6 +6,7 @@ loadaddr-$(CONFIG_MACH_ARMADILLO800EVA)
+ loadaddr-$(CONFIG_MACH_ARMADILLO800EVA_REFERENCE) += 0x40008000
+ loadaddr-$(CONFIG_MACH_BOCKW) += 0x60008000
+ loadaddr-$(CONFIG_MACH_BOCKW_REFERENCE) += 0x60008000
++loadaddr-$(CONFIG_MACH_GENMAI) += 0x8008000
+ loadaddr-$(CONFIG_MACH_KOELSCH) += 0x40008000
+ loadaddr-$(CONFIG_MACH_KZM9D) += 0x40008000
+ loadaddr-$(CONFIG_MACH_KZM9D_REFERENCE) += 0x40008000
+--- /dev/null
++++ work/arch/arm/mach-shmobile/board-genmai.c	2013-09-19 03:47:59.000000000 +0900
+@@ -0,0 +1,43 @@
++/*
++ * Genmai board support
++ *
++ * Copyright (C) 2013  Renesas Solutions Corp.
++ * Copyright (C) 2013  Magnus Damm
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; version 2 of the License.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
++ */
++
++#include <linux/kernel.h>
++#include <linux/platform_device.h>
++#include <mach/common.h>
++#include <mach/r7s72100.h>
++#include <asm/mach-types.h>
++#include <asm/mach/arch.h>
++
++static void __init genmai_add_standard_devices(void)
++{
++	r7s72100_clock_init();
++	r7s72100_add_dt_devices();
 +}
 +
-+enum { SCIF0, SCIF1, SCIF2, SCIF3, SCIF4, SCIF5, SCIF6, SCIF7 };
-+
-+static const struct plat_sci_port scif[] __initconst = {
-+	SCIF_DATA(SCIF0, 0xe8007000, gic_iid(221)), /* SCIF0 */
-+	SCIF_DATA(SCIF1, 0xe8007800, gic_iid(225)), /* SCIF1 */
-+	SCIF_DATA(SCIF2, 0xe8008000, gic_iid(229)), /* SCIF2 */
-+	SCIF_DATA(SCIF3, 0xe8008800, gic_iid(233)), /* SCIF3 */
-+	SCIF_DATA(SCIF4, 0xe8009000, gic_iid(237)), /* SCIF4 */
-+	SCIF_DATA(SCIF5, 0xe8009800, gic_iid(241)), /* SCIF5 */
-+	SCIF_DATA(SCIF6, 0xe800a000, gic_iid(245)), /* SCIF6 */
-+	SCIF_DATA(SCIF7, 0xe800a800, gic_iid(249)), /* SCIF7 */
++static const char * const genmai_boards_compat_dt[] __initconst = {
++	"renesas,genmai",
++	NULL,
 +};
 +
-+static inline void r7s72100_register_scif(int idx)
-+{
-+	platform_device_register_data(&platform_bus, "sh-sci", idx, &scif[idx],
-+				      sizeof(struct plat_sci_port));
-+}
-+
-+void __init r7s72100_add_dt_devices(void)
-+{
-+	r7s72100_register_scif(SCIF0);
-+	r7s72100_register_scif(SCIF1);
-+	r7s72100_register_scif(SCIF2);
-+	r7s72100_register_scif(SCIF3);
-+	r7s72100_register_scif(SCIF4);
-+	r7s72100_register_scif(SCIF5);
-+	r7s72100_register_scif(SCIF6);
-+	r7s72100_register_scif(SCIF7);
-+}
-+
- void __init r7s72100_init_early(void)
- {
- 	shmobile_setup_delay(400, 1, 3); /* Cortex-A9 @ 400MHz */
++DT_MACHINE_START(GENMAI_DT, "genmai")
++	.init_early	= r7s72100_init_early,
++	.init_machine	= genmai_add_standard_devices,
++	.dt_compat	= genmai_boards_compat_dt,
++MACHINE_END
