@@ -1,87 +1,71 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 18 Sep 2013 10:18:17 -0700
-Subject: [PATCH v2 2/2] RX-51: ARM errata 430973 workaround
-In-Reply-To: <201309181033.24965@pali>
-References: <1362044548-5398-1-git-send-email-pali.rohar@gmail.com>
- <1373461145-9812-3-git-send-email-pali.rohar@gmail.com>
- <20130917232417.GK9994@atomide.com> <201309181033.24965@pali>
-Message-ID: <20130918171816.GT9994@atomide.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 18 Sep 2013 10:20:00 -0700
+Subject: [PATCH 01/04] ARM: shmobile: Initial r8a7791 SoC support
+In-Reply-To: <CANqRtoQ0dnG6HwjJSrK8+Qt8wvJhqsJHxgj-LGvnJvS0KT81nw@mail.gmail.com>
+References: <20130904034525.12546.24775.sendpatchset@w520>
+ <20130904034557.12546.97503.sendpatchset@w520>
+ <CACRpkdb7QkqCmTMua1yJNJxSAWff=0f6a2SWkf6K9SqbW0BOVg@mail.gmail.com>
+ <CANqRtoQzLKk3EKcm=EiZCg73fgDBZ1xjPi_6fH_PsGdkr6w5sA@mail.gmail.com>
+ <CACRpkdZGLR3=UZ7f-9r02Gea2hTomp+6+bz0BDQOvk9zRHTxxw@mail.gmail.com>
+ <CANqRtoQ0dnG6HwjJSrK8+Qt8wvJhqsJHxgj-LGvnJvS0KT81nw@mail.gmail.com>
+Message-ID: <20130918172000.GA27340@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Pali Roh?r <pali.rohar@gmail.com> [130918 01:41]:
+Hi,
+
+Coming across this somewhat old email thread, apologies for the delay in
+response.
+
+On Mon, Sep 09, 2013 at 05:05:18PM +0900, Magnus Damm wrote:
+> On Mon, Sep 9, 2013 at 4:45 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> > On Mon, Sep 9, 2013 at 9:21 AM, Magnus Damm <magnus.damm@gmail.com> wrote:
+> >
+> >> Fortunately there are plans to convert several mach-shmobile SoCs to
+> >> common clocks over the next 6 months. As you know, we spent much time
+> >> and efforts converting to pinctrl last two 6 month periods, and now we
+> >> will be targeting common clocks.
+> >
+> > I trust you on this, it's not for me to decide but for the ARM SoC
+> > maintainers. I think Arnd basically said at one point that it is OK
+> > to add some new cruft as long as you remove more old cruft at
+> > the same time, so I guess you will have to make an argument that
+> > this is happening.
 > 
-> I'm not very happy. I sent this patch 6 months ago and only now 
-> you commented that needs rework again. This patch is needed 
-> because all thumb-2 userspace binaries crashing. I want to have
-> working support for Nokia N900 and not always rebasing and 
-> changing patches. Also DT still not working on N900 (file contains 
-> only small subset of devices as in board files plus it is not in 
-> stable kernel) so I do not want to switch to DT. I need something 
-> which is working and not something new non-working. I belive that 
-> you and other kernel guys do not remove all n900 board files until 
-> every one line will be rewritten to DT and tested that everything 
-> working. And from this and other conversation it looks for me 
-> that you are going to do that. So please clarify what you want to 
-> do (and when) with board-rx51-* files. Aftethat I can decide what 
-> to do in future.
+> Yeah, I agree. I hope to discuss this in person later this Autumn.
+> 
+> >> There are several incremental patches available for r8a7791, but since
+> >> this is a new and rare platform it won't be the first SoC we convert
+> >> to common clocks. So CCF development will happen on r8a7791, but it
+> >> won't be the first platform.
+> >
+> > This is pretty much the inverse argument of the usual stance of
+> > the ARM SoC tree - usually we ask that new platforms should use
+> > new frameworks. I do understand it from a practical point of view,
+> > that new SoCs only exist in few prototypes.
+> 
+> I suppose negotiation has to happen on some level, and I appreciate
+> the higher level give-and-take approach that Arnd has been taking. At
+> this time though, apart from common clocks, extended DT support and
+> multiplatform I'm not so sure what desired cleanup-wise.
 
-Sorry if there's been some going back and forth with the patches,
-I think pretty much everybody wants n900 support in the mainline.
+We have definitely been OK with new code going in together with cleanups,
+but I think we're reaching a point where there's a lot of new code going
+in on shmobile platforms now, and we've had some growing pains on the
+platform for it -- conflicts with other maintainer trees because they have
+picked up board file changes, etc.
 
-It's obvious that we're moving everything to be devicetree only
-as discussed on the mailing lists over past few years. For most
-drivers it's already working, and we can still initialize platform
-data too for the legacy devices until they have bindings, so it
-should not be too intrusive except for the configuration changes
-to use appended DTB or a chained bootloader with DTB support.
+I think much of this wouldn't be a problem if the conversions to
+DT/multiplatform was completed, so it would be great if the conversion
+could be given priority on the Renesas side, especially given the rate
+of new additions as of late -- I think we're seeing new SoCs almost
+every release cycle as of late.
 
-> For now I see this situation something like: I wrote patches, 
-> send them to ML and after half of year maintainer politely 
-> rejected them becuase my patches not using new uber cool 
-> technology with still not working and also was not available half 
-> year ago. What happen if I find another time to rework this patch 
-> and send it again in next 2 or 5 months?
+So, bottom line: I'm not going to refuse taking this new platform,
+but you're close to the limits and please try to prioritize finishing
+conversion.  In particular since all this "new legacy code" you're adding
+will all have to be converted soon -- in some cases it might be better
+to wait with adding it until after conversion.
 
-Hmm hasn't there been pending comments until recently on your
-patches?
 
-It seems that with the changes I suggested your patches should
-work for both legacy booting and DT based booting, so maybe just
-try to update them over next few weeks, let's say by -rc3 rather
-than wait 2 to 5 months? :) No need to test them currently on
-the DT based booting if you don't have that set up, just move
-the code out of the board-*.c file.
- 
-> Tony, if you did not have time for review this patch months ago 
-> or you found it only today - no problem, I understand it. But 
-> what I need to know is what will happen with board-rx51-* files 
-> (and when?) You can see that DT does not have definitions of all 
-> n900 hw parts (plus it is not in last 3.11 kernel!) which means 
-> that DT is not usable for me and other n900 people. This also 
-> means that I cannot rewrite my patches for DT and test if they 
-> working.
-
-I usually stop looking at new code around -rc4 and concentrate
-on fixes until -rc1 or so. So there can be easily one month
-delays on reviewing stuff depending on where we are with the
-current merge window or -rc cycle, sorry if that's annoying.
-
-The .dts files will be separate from the kernel soonish, so
-that's not be a show stopper. Just like all the board specific
-.config files are separate from the kernel already. Too bad our
-.dts changes did not get merged for v3.12 because of conflicts
-with other branches, but hey, they should be independent from the
-kernel anyways.
-
-The board files will be going away as soon as things are working
-with DT. We've been pretty much only applying fixes to them for
-quite some time now. For the timeline, the earliest we'll be able
-to remove the board-*.c files and platform data is for v3.13
-assuming the PM dependencies get sorted out before that. Making
-omap3 DT only is going remove about 25k LOC, so that's a good
-reason for doing that.
-
-Cheers,
-
-Tony
+-Olof
