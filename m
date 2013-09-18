@@ -1,109 +1,68 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Wed, 18 Sep 2013 19:53:45 +0200
-Subject: [PATCH 12/26] ARM: exynos: remove custom .init_time hook
+Date: Wed, 18 Sep 2013 19:53:57 +0200
+Subject: [PATCH 24/26] ARM: tegra: remove custom .init_time hook
 In-Reply-To: <1379526839-14798-1-git-send-email-sebastian.hesselbarth@gmail.com>
 References: <1379526839-14798-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1379526839-14798-13-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1379526839-14798-25-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 With arch/arm calling of_clk_init(NULL) from time_init(), we can now
-remove custom .init_time hooks. While at it, also remove some now
-redundant includes.
+remove custom .init_time hooks.
 
 Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 ---
 Cc: Olof Johansson <olof@lixom.net>
 Cc: Arnd Bergmann <arnd@arndb.de>
 Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Kukjin Kim <kgene.kim@samsung.com>
+Cc: Stephen Warren <swarren@wwwdotorg.org>
 Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-samsung-soc at vger.kernel.org
+Cc: linux-tegra at vger.kernel.org
 Cc: linux-kernel at vger.kernel.org
 ---
- arch/arm/mach-exynos/common.c          |    8 --------
- arch/arm/mach-exynos/common.h          |    1 -
- arch/arm/mach-exynos/mach-exynos4-dt.c |    2 --
- arch/arm/mach-exynos/mach-exynos5-dt.c |    2 --
- 4 files changed, 13 deletions(-)
+ arch/arm/mach-tegra/tegra.c |    9 ---------
+ 1 file changed, 9 deletions(-)
 
-diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-exynos/common.c
-index ba95e5d..a4e7ba8 100644
---- a/arch/arm/mach-exynos/common.c
-+++ b/arch/arm/mach-exynos/common.c
-@@ -26,8 +26,6 @@
- #include <linux/export.h>
- #include <linux/irqdomain.h>
- #include <linux/of_address.h>
--#include <linux/clocksource.h>
--#include <linux/clk-provider.h>
- #include <linux/irqchip/arm-gic.h>
- #include <linux/irqchip/chained_irq.h>
+diff --git a/arch/arm/mach-tegra/tegra.c b/arch/arm/mach-tegra/tegra.c
+index 4da271d..2e21928 100644
+--- a/arch/arm/mach-tegra/tegra.c
++++ b/arch/arm/mach-tegra/tegra.c
+@@ -16,7 +16,6 @@
+  *
+  */
  
-@@ -367,12 +365,6 @@ static void __init exynos5_map_io(void)
- 		iotable_init(exynos5250_iodesc, ARRAY_SIZE(exynos5250_iodesc));
+-#include <linux/clocksource.h>
+ #include <linux/kernel.h>
+ #include <linux/init.h>
+ #include <linux/platform_device.h>
+@@ -33,7 +32,6 @@
+ #include <linux/slab.h>
+ #include <linux/sys_soc.h>
+ #include <linux/usb/tegra_usb_phy.h>
+-#include <linux/clk-provider.h>
+ #include <linux/clk/tegra.h>
+ 
+ #include <asm/mach-types.h>
+@@ -84,12 +82,6 @@ out:
+ 	of_platform_populate(NULL, of_default_bus_match_table, NULL, parent);
  }
  
--void __init exynos_init_time(void)
+-static void __init tegra_dt_init_time(void)
 -{
 -	of_clk_init(NULL);
 -	clocksource_of_init();
 -}
 -
- struct bus_type exynos_subsys = {
- 	.name		= "exynos-core",
- 	.dev_name	= "exynos-core",
-diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-exynos/common.h
-index 8646a14..f0fa205 100644
---- a/arch/arm/mach-exynos/common.h
-+++ b/arch/arm/mach-exynos/common.h
-@@ -16,7 +16,6 @@
- #include <linux/of.h>
- 
- void mct_init(void __iomem *base, int irq_g0, int irq_l0, int irq_l1);
--void exynos_init_time(void);
- 
- struct map_desc;
- void exynos_init_io(void);
-diff --git a/arch/arm/mach-exynos/mach-exynos4-dt.c b/arch/arm/mach-exynos/mach-exynos4-dt.c
-index 0099c6c..6858d73 100644
---- a/arch/arm/mach-exynos/mach-exynos4-dt.c
-+++ b/arch/arm/mach-exynos/mach-exynos4-dt.c
-@@ -16,7 +16,6 @@
- #include <linux/of_fdt.h>
- #include <linux/serial_core.h>
- #include <linux/memblock.h>
--#include <linux/clocksource.h>
- 
- #include <asm/mach/arch.h>
- #include <plat/mfc.h>
-@@ -54,7 +53,6 @@ DT_MACHINE_START(EXYNOS4210_DT, "Samsung Exynos4 (Flattened Device Tree)")
- 	.init_early	= exynos_firmware_init,
- 	.init_machine	= exynos4_dt_machine_init,
- 	.init_late	= exynos_init_late,
--	.init_time	= exynos_init_time,
- 	.dt_compat	= exynos4_dt_compat,
- 	.restart        = exynos4_restart,
- 	.reserve	= exynos4_reserve,
-diff --git a/arch/arm/mach-exynos/mach-exynos5-dt.c b/arch/arm/mach-exynos/mach-exynos5-dt.c
-index f874b77..bac2105 100644
---- a/arch/arm/mach-exynos/mach-exynos5-dt.c
-+++ b/arch/arm/mach-exynos/mach-exynos5-dt.c
-@@ -13,7 +13,6 @@
- #include <linux/of_fdt.h>
- #include <linux/memblock.h>
- #include <linux/io.h>
--#include <linux/clocksource.h>
- 
- #include <asm/mach/arch.h>
- #include <mach/regs-pmu.h>
-@@ -76,7 +75,6 @@ DT_MACHINE_START(EXYNOS5_DT, "SAMSUNG EXYNOS5 (Flattened Device Tree)")
- 	.map_io		= exynos_init_io,
- 	.init_machine	= exynos5_dt_machine_init,
- 	.init_late	= exynos_init_late,
--	.init_time	= exynos_init_time,
- 	.dt_compat	= exynos5_dt_compat,
- 	.restart        = exynos5_restart,
- 	.reserve	= exynos5_reserve,
+ static void __init paz00_init(void)
+ {
+ 	if (IS_ENABLED(CONFIG_ARCH_TEGRA_2x_SOC))
+@@ -129,7 +121,6 @@ DT_MACHINE_START(TEGRA_DT, "NVIDIA Tegra SoC (Flattened Device Tree)")
+ 	.smp		= smp_ops(tegra_smp_ops),
+ 	.init_early	= tegra_init_early,
+ 	.init_irq	= tegra_dt_init_irq,
+-	.init_time	= tegra_dt_init_time,
+ 	.init_machine	= tegra_dt_init,
+ 	.init_late	= tegra_dt_init_late,
+ 	.restart	= tegra_assert_system_reset,
 -- 
 1.7.10.4
