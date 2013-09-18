@@ -1,181 +1,45 @@
-From: pali.rohar@gmail.com (Pali =?utf-8?q?Roh=C3=A1r?=)
-Date: Wed, 18 Sep 2013 21:22:01 +0200
-Subject: [PATCH v3 2/2] RX-51: ARM errata 430973 workaround
-In-Reply-To: <20130917232417.GK9994@atomide.com>
-References: <1362044548-5398-1-git-send-email-pali.rohar@gmail.com>
- <1373461145-9812-3-git-send-email-pali.rohar@gmail.com>
- <20130917232417.GK9994@atomide.com>
-Message-ID: <201309182122.01570@pali>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 18 Sep 2013 12:23:31 -0700
+Subject: [RFCv2 2/3] ARM: OMAP2+: HSI: Introduce OMAP SSI driver
+In-Reply-To: <1379277856-24571-3-git-send-email-sre@debian.org>
+References: <1379277856-24571-1-git-send-email-sre@debian.org>
+ <1379277856-24571-3-git-send-email-sre@debian.org>
+Message-ID: <20130918192331.GD9994@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Tony,
+* Sebastian Reichel <sre@debian.org> [130915 13:56]:
+> This patch adds an OMAP SSI driver to the HSI framework.
 
-here is new v3 patch. I just only moved functions rx51_secure_dispatcher and
-rx51_secure_update_aux_cr to omap-secure.c and added header to omap-secure.h
-Because I only moved two functions to other source file I tested only compilation.
-It is OK now?
+Thanks for working on this.
+ 
+> +config OMAP_SSI
+> +	tristate "OMAP SSI hardware driver"
+> +	depends on ARCH_OMAP && HSI
+> +	default n
+> +	---help---
+> +	  SSI is a legacy version of HSI. It is usually used to connect
+> +	  an application engine with a cellular modem.
+> +	  If you say Y here, you will enable the OMAP SSI hardware driver.
 
-diff --git a/arch/arm/mach-omap2/board-rx51.c b/arch/arm/mach-omap2/board-rx51.c
-index 773510556..db168c9 100644
---- a/arch/arm/mach-omap2/board-rx51.c
-+++ b/arch/arm/mach-omap2/board-rx51.c
-@@ -2,6 +2,8 @@
-  * Board support file for Nokia N900 (aka RX-51).
-  *
-  * Copyright (C) 2007, 2008 Nokia
-+ * Copyright (C) 2012 Ivaylo Dimitrov <freemangordon@abv.bg>
-+ * Copyright (C) 2013 Pali Roh?r <pali.rohar@gmail.com>
-  *
-  * This program is free software; you can redistribute it and/or modify
-  * it under the terms of the GNU General Public License version 2 as
-@@ -31,7 +33,9 @@
- #include "mux.h"
- #include "gpmc.h"
- #include "pm.h"
-+#include "soc.h"
- #include "sdram-nokia.h"
-+#include "omap-secure.h"
- 
- #define RX51_GPIO_SLEEP_IND 162
- 
-@@ -103,6 +107,14 @@ static void __init rx51_init(void)
- 	usb_musb_init(&musb_board_data);
- 	rx51_peripherals_init();
- 
-+	if (omap_type() == OMAP2_DEVICE_TYPE_SEC) {
-+#ifdef CONFIG_ARM_ERRATA_430973
-+		pr_info("RX-51: Enabling ARM errata 430973 workaround\n");
-+		/* set IBE to 1 */
-+		rx51_secure_update_aux_cr(BIT(6), 0);
-+#endif
-+	}
-+
- 	/* Ensure SDRC pins are mux'd for self-refresh */
- 	omap_mux_init_signal("sdrc_cke0", OMAP_PIN_OUTPUT);
- 	omap_mux_init_signal("sdrc_cke1", OMAP_PIN_OUTPUT);
-diff --git a/arch/arm/mach-omap2/omap-secure.c b/arch/arm/mach-omap2/omap-secure.c
-index b970440..eba74cf 100644
---- a/arch/arm/mach-omap2/omap-secure.c
-+++ b/arch/arm/mach-omap2/omap-secure.c
-@@ -3,6 +3,8 @@
-  *
-  * Copyright (C) 2011 Texas Instruments, Inc.
-  *	Santosh Shilimkar <santosh.shilimkar@ti.com>
-+ * Copyright (C) 2012 Ivaylo Dimitrov <freemangordon@abv.bg>
-+ * Copyright (C) 2013 Pali Roh?r <pali.rohar@gmail.com>
-  *
-  *
-  * This program is free software,you can redistribute it and/or modify
-@@ -70,3 +72,63 @@ phys_addr_t omap_secure_ram_mempool_base(void)
- {
- 	return omap_secure_memblock_base;
- }
-+
-+/**
-+ * rx51_secure_dispatcher: Routine to dispatch secure PPA API calls
-+ * @idx: The PPA API index
-+ * @process: Process ID
-+ * @flag: The flag indicating criticality of operation
-+ * @nargs: Number of valid arguments out of four.
-+ * @arg1, arg2, arg3 args4: Parameters passed to secure API
-+ *
-+ * Return the non-zero error value on failure.
-+ */
-+u32 rx51_secure_dispatcher(u32 idx, u32 process, u32 flag, u32 nargs,
-+			   u32 arg1, u32 arg2, u32 arg3, u32 arg4)
-+{
-+	u32 ret;
-+	u32 param[5];
-+
-+	param[0] = nargs+1; /* RX-51 needs number of arguments + 1 */
-+	param[1] = arg1;
-+	param[2] = arg2;
-+	param[3] = arg3;
-+	param[4] = arg4;
-+
-+	/*
-+	 * Secure API needs physical address
-+	 * pointer for the parameters
-+	 */
-+	local_irq_disable();
-+	local_fiq_disable();
-+	flush_cache_all();
-+	outer_clean_range(__pa(param), __pa(param + 5));
-+	ret = omap_smc3(idx, process, flag, __pa(param));
-+	flush_cache_all();
-+	local_fiq_enable();
-+	local_irq_enable();
-+
-+	return ret;
-+}
-+
-+/**
-+ * rx51_secure_update_aux_cr: Routine to modify the contents of Auxiliary Control Register
-+ *  @set_bits: bits to set in ACR
-+ *  @clr_bits: bits to clear in ACR
-+ *
-+ * Return the non-zero error value on failure.
-+*/
-+u32 rx51_secure_update_aux_cr(u32 set_bits, u32 clear_bits)
-+{
-+	u32 acr;
-+
-+	/* Read ACR */
-+	asm volatile ("mrc p15, 0, %0, c1, c0, 1" : "=r" (acr));
-+	acr &= ~clear_bits;
-+	acr |= set_bits;
-+
-+	return rx51_secure_dispatcher(RX51_PPA_WRITE_ACR,
-+				      0,
-+				      FLAG_START_CRITICAL,
-+				      1, acr, 0, 0, 0);
-+}
-diff --git a/arch/arm/mach-omap2/omap-secure.h b/arch/arm/mach-omap2/omap-secure.h
-index c4586f4..51b59c6 100644
---- a/arch/arm/mach-omap2/omap-secure.h
-+++ b/arch/arm/mach-omap2/omap-secure.h
-@@ -3,6 +3,8 @@
-  *
-  * Copyright (C) 2011 Texas Instruments, Inc.
-  *	Santosh Shilimkar <santosh.shilimkar@ti.com>
-+ * Copyright (C) 2012 Ivaylo Dimitrov <freemangordon@abv.bg>
-+ * Copyright (C) 2013 Pali Roh?r <pali.rohar@gmail.com>
-  *
-  * This program is free software; you can redistribute it and/or modify
-  * it under the terms of the GNU General Public License version 2 as
-@@ -46,6 +48,11 @@
- #define OMAP4_PPA_L2_POR_INDEX		0x23
- #define OMAP4_PPA_CPU_ACTRL_SMP_INDEX	0x25
- 
-+/* Secure RX-51 PPA (Primary Protected Application) APIs */
-+#define RX51_PPA_HWRNG			29
-+#define RX51_PPA_L2_INVAL		40
-+#define RX51_PPA_WRITE_ACR		42
-+
- #ifndef __ASSEMBLER__
- 
- extern u32 omap_secure_dispatcher(u32 idx, u32 flag, u32 nargs,
-@@ -55,6 +62,10 @@ extern u32 omap_smc3(u32 id, u32 process, u32 flag, u32 pargs);
- extern phys_addr_t omap_secure_ram_mempool_base(void);
- extern int omap_secure_ram_reserve_memblock(void);
- 
-+extern u32 rx51_secure_dispatcher(u32 idx, u32 process, u32 flag, u32 nargs,
-+				  u32 arg1, u32 arg2, u32 arg3, u32 arg4);
-+extern u32 rx51_secure_update_aux_cr(u32 set_bits, u32 clear_bits);
-+
- #ifdef CONFIG_OMAP4_ERRATA_I688
- extern int omap_barrier_reserve_memblock(void);
- #else
+You can drop the "default n" line here, it's the default.
 
+> +/* TODO: HACK: define omap_pm_get_dev_context_loss_count, because it is defined
+> + * in arch/arm/mach-omap2/omap-pm.h and thus not available via #include */
+> +int omap_pm_get_dev_context_loss_count(struct device *dev);
 
--- 
-Pali Roh?r
-pali.rohar at gmail.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130918/9da07aa7/attachment.sig>
+You can drop this and related calls completely and rely on some
+SSI configuration registers instead to detect if context was lost.
+
+The reason for that is that the context loss count should be
+implemented in Linux generic way if needed at all and we can leave
+out a dependency to that.
+
+If there's a chance that the context is only partially lost,
+then of course something else is needed. So far I have not
+hit that issue for MMC or serial at least, but you'd have to
+test this with off-idle to verify it.
+
+Regards,
+
+Tony
