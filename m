@@ -1,98 +1,44 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Wed, 18 Sep 2013 21:52:14 +0200
-Subject: [PATCH 00/26] ARM: provide common arch init for DT clocks
-In-Reply-To: <20130918194711.GR19937@titan.lakedaemon.net>
-References: <1379526839-14798-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <20130918194711.GR19937@titan.lakedaemon.net>
-Message-ID: <523A046E.6040804@gmail.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Wed, 18 Sep 2013 15:01:15 -0500
+Subject: [PATCH] Renesas clocksource fixes for v3.12
+Message-ID: <1379534476-10901-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/18/2013 09:47 PM, Jason Cooper wrote:
-> On Wed, Sep 18, 2013 at 07:53:33PM +0200, Sebastian Hesselbarth wrote:
-> ...
->> Sebastian Hesselbarth (26):
->>    ARM: nomadik: move mtu setup to clocksource init
->>    clk: nomadik: move src init out of nomadik_clk_init
->>    clk: nomadik: declare OF clock provider
->>    clk: prima2: declare OF clock provider
->>    ARM: socfgpa: prepare for arch-wide .init_time callback
->>    clk: sunxi: declare OF clock provider
->>    clk: vt8500: parse pmc_base from clock driver
->>    ARM: vt8500: prepare for arch-wide .init_time callback
->>    ARM: call of_clk_init from default time_init handler
->>    ARM: bcm2835: remove custom .init_time hook
->>    ARM: dove: remove custom .init_time hook
->>    ARM: exynos: remove custom .init_time hook
->>    ARM: highbank: remove custom .init_time hook
->>    ARM: imx: remove custom .init_time hook
->>    ARM: kirkwood: remove custom .init_time hook
->>    ARM: mxs: remove custom .init_time hook
->>    ARM: nomadik: remove custom .init_time hook
->>    ARM: nspire: remove custom .init_time hook
->>    ARM: prima2: remove custom .init_time hook
->>    ARM: rockchip: remove custom .init_time hook
->>    ARM: socfpga: remove custom .init_time hook
->>    ARM: sti: remove custom .init_time hook
->>    ARM: sunxi: remove custom .init_time hook
->>    ARM: tegra: remove custom .init_time hook
->>    ARM: vexpress: remove custom .init_time hook
->>    ARM: vt8500: remove custom .init_time hook
->>
->>   arch/arm/kernel/time.c                    |   27 ++---
->>   arch/arm/mach-bcm2835/bcm2835.c           |    2 -
->>   arch/arm/mach-dove/board-dt.c             |   11 --
->>   arch/arm/mach-exynos/common.c             |    8 --
->>   arch/arm/mach-exynos/common.h             |    1 -
->>   arch/arm/mach-exynos/mach-exynos4-dt.c    |    2 -
->>   arch/arm/mach-exynos/mach-exynos5-dt.c    |    2 -
->>   arch/arm/mach-highbank/highbank.c         |   23 ++---
->>   arch/arm/mach-imx/clk-imx51-imx53.c       |   29 ++----
->>   arch/arm/mach-imx/common.h                |    4 -
->>   arch/arm/mach-imx/imx51-dt.c              |    6 --
->>   arch/arm/mach-imx/mach-imx53.c            |    6 --
->>   arch/arm/mach-imx/mach-imx6q.c            |   14 +--
->>   arch/arm/mach-imx/mach-imx6sl.c           |    7 --
->>   arch/arm/mach-imx/mach-vf610.c            |    9 --
->>   arch/arm/mach-kirkwood/board-dt.c         |    8 --
->>   arch/arm/mach-mxs/mach-mxs.c              |   13 ---
->>   arch/arm/mach-nomadik/cpu-8815.c          |   36 -------
->>   arch/arm/mach-nspire/nspire.c             |    9 --
->>   arch/arm/mach-prima2/common.c             |   11 --
->>   arch/arm/mach-prima2/common.h             |    1 -
->>   arch/arm/mach-rockchip/rockchip.c         |    9 --
->>   arch/arm/mach-socfpga/socfpga.c           |    2 -
->>   arch/arm/mach-sti/board-dt.c              |   10 +-
->>   arch/arm/mach-sunxi/sunxi.c               |   10 --
->>   arch/arm/mach-tegra/tegra.c               |    9 --
->>   arch/arm/mach-vexpress/v2m.c              |   14 +--
->>   arch/arm/mach-vt8500/common.h             |   24 -----
->>   arch/arm/mach-vt8500/vt8500.c             |    6 --
->>   drivers/clk/clk-bcm2835.c                 |    8 --
->>   drivers/clk/clk-highbank.c                |   10 +-
->>   drivers/clk/clk-nomadik.c                 |  161 ++++++++++++++---------------
->>   drivers/clk/clk-prima2.c                  |   29 ++----
->>   drivers/clk/clk-vt8500.c                  |   31 ++++--
->>   drivers/clk/mxs/clk-imx23.c               |   15 +--
->>   drivers/clk/mxs/clk-imx28.c               |   16 +--
->>   drivers/clk/sunxi/clk-sunxi.c             |   11 +-
->>   drivers/clocksource/nomadik-mtu.c         |   11 ++
->>   include/linux/clk/mxs.h                   |    2 -
->>   include/linux/clk/sunxi.h                 |   22 ----
->>   include/linux/platform_data/clk-nomadik.h |    2 -
->>   41 files changed, 182 insertions(+), 449 deletions(-)
->>   delete mode 100644 arch/arm/mach-vt8500/common.h
->>   delete mode 100644 include/linux/clk/sunxi.h
->>   delete mode 100644 include/linux/platform_data/clk-nomadik.h
->
-> How would you like to handle this series?
+Hi Daniel,
 
-Jason,
+please consider this clocksource fix for v3.12.
 
-honestly I don't really know, yet. I was hoping for Arnd and Olof
-decide on that. Maybe they also create a topic branch up to where
-arch-wide of_clk_init is introduced. Then each removal patch can
-go through the independent sub-trees. There may be more machs
-introduced before, that can then also depend on the common branch.
+This pull request is based on renesas-clocksource-for-v3.12
+which I believe you have previously pulled.
 
-Sebastian
+
+The following changes since commit 172705f8a40b6e72c53f8cceda079504ed71c4e0:
+
+  clocksource: em_sti: Convert to devm_* managed helpers (2013-08-05 10:47:10 +0900)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-clocksource-fixes-for-v3.12
+
+for you to fetch changes up to 7b096b40c9d3d2abb6bb747dd148c50c076c2e89:
+
+  clocksource: em_sti: Set cpu_possible_mask to fix SMP broadcast (2013-09-05 14:47:53 +0900)
+
+----------------------------------------------------------------
+Renesas clocksource fixes for v3.12
+
+* em_sti: Set cpu_possible_mask to fix SMP broadcast
+
+  This resolves a regression introduced by
+  f7db706 ("ARM: 7674/1: smp: Avoid dummy clockevent being preferred over
+  real hardware clock-event").
+
+  This problem has been present since v3.9-rc4.
+
+----------------------------------------------------------------
+Magnus Damm (1):
+      clocksource: em_sti: Set cpu_possible_mask to fix SMP broadcast
+
+ drivers/clocksource/em_sti.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
