@@ -1,170 +1,67 @@
-From: pali.rohar@gmail.com (Pali =?utf-8?q?Roh=C3=A1r?=)
-Date: Wed, 18 Sep 2013 10:20:14 +0200
-Subject: [PATCH 1/4] usb: musb: Call atomic_notifier_call_chain when
- status is changed
-In-Reply-To: <20130918014942.GD19817@radagast>
-References: <1378630239-10006-1-git-send-email-pali.rohar@gmail.com>
- <201309172128.42514@pali> <20130918014942.GD19817@radagast>
-Message-ID: <201309181020.15245@pali>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Wed, 18 Sep 2013 10:31:55 +0200
+Subject: dev->of_node overwrite can cause device loading with different
+ driver
+In-Reply-To: <20130914122809.GI12758@n2100.arm.linux.org.uk>
+References: <20130913155331.GC14456@pengutronix.de>
+ <20130913171046.GA26207@kroah.com>
+ <20130914071653.GA26512@pengutronix.de>
+ <20130914121729.GA7823@kroah.com>
+ <20130914122809.GI12758@n2100.arm.linux.org.uk>
+Message-ID: <20130918083155.GB10126@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 18 September 2013 03:49:42 Felipe Balbi wrote:
-> On Tue, Sep 17, 2013 at 09:28:42PM +0200, Pali Roh?r wrote:
-> > On Tuesday 17 September 2013 18:08:35 Felipe Balbi wrote:
-> > > On Tue, Sep 17, 2013 at 06:05:15PM +0200, Pali Roh?r wrote:
-> > > > On Tuesday 17 September 2013 17:48:59 you wrote:
-> > > > > On Sun, Sep 08, 2013 at 10:50:36AM +0200, Pali Roh?r wrote:
-> > > > > > More power supply drivers depends on vbus events and
-> > > > > > without it they not working. Power supply drivers
-> > > > > > using usb_register_notifier, so to deliver events
-> > > > > > it is needed to call atomic_notifier_call_chain.
-> > > > > > 
-> > > > > > So without atomic notifier power supply driver
-> > > > > > isp1704 not retrieving vbus status and reporting
-> > > > > > bogus values to userspace and also to board
-> > > > > > platform data functions. Without proper data
-> > > > > > charger drivers trying to charge battery also when
-> > > > > > charger is disconnected or do not start charging
-> > > > > > when wallcharger connects.
-> > > > > > 
-> > > > > > Atomic notifier in musb driver was used before v3.5
-> > > > > > and was replaced with omap mailbox. This patch
-> > > > > > adding atomic_notifier_call_chain call from
-> > > > > > function omap_musb_set_mailbox.
-> > > > > > 
-> > > > > > Signed-off-by: Pali Roh?r <pali.rohar@gmail.com>
-> > > > > > ---
-> > > > > > 
-> > > > > >  drivers/usb/musb/omap2430.c       |    3 +++
-> > > > > >  drivers/usb/phy/phy-twl4030-usb.c |    2 ++
-> > > > > >  2 files changed, 5 insertions(+)
-> > > > > > 
-> > > > > > diff --git a/drivers/usb/musb/omap2430.c
-> > > > > > b/drivers/usb/musb/omap2430.c index f44e8b5..5c40252
-> > > > > > 100644 --- a/drivers/usb/musb/omap2430.c
-> > > > > > +++ b/drivers/usb/musb/omap2430.c
-> > > > > > @@ -305,6 +305,9 @@ static void
-> > > > > > omap_musb_set_mailbox(struct omap2430_glue *glue)
-> > > > > > 
-> > > > > >  	default:
-> > > > > >  		dev_dbg(dev, "ID float\n");
-> > > > > >  	
-> > > > > >  	}
-> > > > > > 
-> > > > > > +
-> > > > > > +	atomic_notifier_call_chain(&musb->xceiv->notifier,
-> > > > > > +			musb->xceiv->last_event, NULL);
-> > > > > 
-> > > > > let's add a wrapper for this:
-> > > > > 
-> > > > > static inline int usb_phy_notify(struct usb phy *x,
-> > > > > unsigned val, void *v) {
-> > > > > 
-> > > > > 	return atomic_notifier_call_chain(&x->notifier, val,
-> > > > > 	v);
-> > > > > 
-> > > > > }
-> > > > 
-> > > > Where to add this wrapper? To omap2430.c? or some
-> > > > include file?
-> > > 
-> > > <linux/usb/phy.h>
-> > > 
-> > > > On Tuesday 17 September 2013 17:49:17 Felipe Balbi wrote:
-> > > > > On Sun, Sep 08, 2013 at 10:50:36AM +0200, Pali Roh?r wrote:
-> > > > > > diff --git a/drivers/usb/phy/phy-twl4030-usb.c
-> > > > > > b/drivers/usb/phy/phy-twl4030-usb.c index
-> > > > > > 8f78d2d..efe6155 100644
-> > > > > > --- a/drivers/usb/phy/phy-twl4030-usb.c
-> > > > > > +++ b/drivers/usb/phy/phy-twl4030-usb.c
-> > > > > > @@ -705,6 +705,8 @@ static int
-> > > > > > twl4030_usb_probe(struct platform_device *pdev)
-> > > > > > 
-> > > > > >  	if (device_create_file(&pdev->dev,
-> > > > > >  	&dev_attr_vbus))
-> > > > > >  	
-> > > > > >  		dev_warn(&pdev->dev, "could not create sysfs
-> > > > > >  		file\n");
-> > > > > > 
-> > > > > > +	ATOMIC_INIT_NOTIFIER_HEAD(&twl->phy.notifier);
-> > > > > 
-> > > > > BTW, this is a bugfix, send separately.
-> > > > 
-> > > > What to send separately?
-> > > > 
-> > > > This full patch 1/4 is bugfix. And I did not understand
-> > > > what you want. Maybe it could be easier for you to
-> > > > apply this small 3+2 lines patch how you need.
-> > > 
-> > > This hunk here (initializaing notifier head) is a separate
-> > > bug fix and needs its own patch.
+On Sat, Sep 14, 2013 at 01:28:09PM +0100, Russell King - ARM Linux wrote:
+> On Sat, Sep 14, 2013 at 05:17:29AM -0700, Greg Kroah-Hartman wrote:
+> > On Sat, Sep 14, 2013 at 09:16:53AM +0200, Markus Pargmann wrote:
+> > > 3. We could fix up all drivers that change the of_node. But there are
+> > >    ARM DT frameworks that require a device struct as parameter instead
+> > >    of a device_node parameter (e.g. soc-generic-dmaengine-pcm). So a
+> > >    driver core, initialized by a glue driver with DT bindings, has to
+> > >    set dev->of_node to use those frameworks. I think it is strange to
+> > >    have such DT framework interfaces if a driver is not supposed to
+> > >    overwrite dev->of_node permanently.
 > > 
-> > So will you do that? Or it is needed to resend this one line
-> > hunk again in new email again?
+> > How about any driver that does muck with this structure, restore it
+> > properly if their probe() function fails?  Yes, you show that this is
+> > going to be tricky in some places (i.e. musb), but it makes sense that
+> > the burden of fixing this issue would rest on them, as they are the ones
+> > causing this problem, right?
 > 
-> new patch, new email
+> It's not about overwriting at all.
 
-Guys, WHY ARE YOU SO STUPID AND ARROGANT?
+musb does not overwrite of_node, but other drivers do, e.g. USB chipidea
+core driver which uses its parent of_node. When probe fails in this
+case, we could end up with similar issues.
 
-Sorry but, need to copy full isolated patch/hunk from one mail to
-another is hassling. So what you want from me? Do all those non
-sense working only because yesterday you had bad day? Or what?
+Regards,
 
-Everything needed with described information was in first mail.
-Also second hunk has full isolated "git diff" output, so it is for
-you really big problem to copy it? Or you did not see that patch?
+Markus
 
-I really did not understand what you wanted from me.
-
-============================
-==== BEGINNING OF PATCH ====
-============================
-
-This is bugfix and sending this patch separately from all other patches.
-This patch is visibly isolated from all others and could be readable also
-by disabled people. For other handicapped people I suggest to increase
-font size and other text settings in program which view this patch.
-For visually impaired people I suggest to use some text-to-speech software.
-
-This is small 2 lines patch, diff starting after next visible break.
-
-This patch initializing notifier head in tw4030 usb code which is missing.
-Initialization code is needed for using any atomic_notifier_* functions.
-
-Signed-off-by: Pali Roh?r <pali.rohar@gmail.com>
-
-===========================
-==== BEGINNING OF DIFF ====
-===========================
-
-diff --git a/drivers/usb/phy/phy-twl4030-usb.c b/drivers/usb/phy/phy-twl4030-usb.c
-index 8f78d2d..efe6155 100644
---- a/drivers/usb/phy/phy-twl4030-usb.c
-+++ b/drivers/usb/phy/phy-twl4030-usb.c
-@@ -705,6 +705,8 @@ static int twl4030_usb_probe(struct platform_device *pdev)
- 	if (device_create_file(&pdev->dev, &dev_attr_vbus))
- 		dev_warn(&pdev->dev, "could not create sysfs file\n");
- 
-+	ATOMIC_INIT_NOTIFIER_HEAD(&twl->phy.notifier);
-+
- 	/* Our job is to use irqs and status from the power module
- 	 * to keep the transceiver disabled when nothing's connected.
- 	 *
-
-======================
-==== END OF PATCH ====
-======================
-
-PS: This is end of email and patch is above ^^^^
+> 
+> It's quite simple:
+> 
+> 1. OF creates a platform device and attaches an of_node to it.
+> 2. This platform device is matched using the data in the of_node structure
+>    against one of the MUSB stub drivers.
+> 3. The MUSB stub driver creates a new platform device, and copies the
+>    of_node to it, and registers it.
+> 4. This new platform device _can_ itself be matched against the stub
+>    driver using the of_node structure.  When this happens, go to step
+>    2 and repeat 2-4.
+> 
+> That's where the problem is - it's not about overwriting an existing
+> platform device's of_node pointer with something that the driver has
+> dreamt up at all.
+> 
+> If we're lucky, step 3.5 would be "match against the 'musb-hdrc' driver
+> and successfully probe it" which is the only thing that would break
+> the above loop.
+> 
 
 -- 
-Pali Roh?r
-pali.rohar at gmail.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130918/9c5970c0/attachment.sig>
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
