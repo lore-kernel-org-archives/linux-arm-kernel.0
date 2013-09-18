@@ -1,49 +1,51 @@
-From: pali.rohar@gmail.com (Pali =?utf-8?q?Roh=C3=A1r?=)
-Date: Wed, 18 Sep 2013 18:43:49 +0200
-Subject: [PATCH 1/4] usb: musb: Call atomic_notifier_call_chain when
- status is changed
-In-Reply-To: <20130918163649.GL21559@radagast>
-References: <1378630239-10006-1-git-send-email-pali.rohar@gmail.com>
- <201309181756.12782@pali> <20130918163649.GL21559@radagast>
-Message-ID: <201309181843.49850@pali>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 18 Sep 2013 18:45:09 +0200
+Subject: [PATCH] arm: mvebu: use the main timer as clock source from DT
+In-Reply-To: <1379519624-4267-1-git-send-email-jean.pihet@linaro.org>
+References: <1379519624-4267-1-git-send-email-jean.pihet@linaro.org>
+Message-ID: <20130918184509.0ad0a5be@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 18 September 2013 18:36:49 Felipe Balbi wrote:
-> On Wed, Sep 18, 2013 at 05:56:12PM +0200, Pali Roh?r wrote:
-> > On Wednesday 18 September 2013 15:57:13 Javier Martinez
-> > Canillas
-> > 
-> > wrote:
-> > > to split the patch in two since the patch was solving
-> > > two separate issues
-> > 
-> > My patch does not solving *two* issues. It is *one*
-> > regression and both parts of patch are needed for fixing
-> > it. Read commit message again. It does not make sense to
-> > split patch fixing kernel regression into more one line
-> > patches - or please clarify why.
+Dear Jean Pihet,
+
+On Wed, 18 Sep 2013 17:53:44 +0200, Jean Pihet wrote:
+> This commit:
+>   573145f08c2b92c45498468afbbba909f6ce6135
+>   clocksource: armada-370-xp: Use CLOCKSOURCE_OF_DECLARE
 > 
-> issue 1) twl4030-usb.c doesn't initialize atomic notifier head
-> issue 2) musb doesn't call notifier chain
+> replaced a call to the driver's timer initialization by a call to
+> clocksource_of_init(). However, it failed to select CONFIG_CLKSRC_OF.
 > 
-> do you need a drawing ?
+> Fix this by selecting CONFIG_CLKSRC_OF for Armada370/XP machines.
+> Without this change the kernel is stuck at: 'Calibrating delay
+> loop...'.
+> 
+> Signed-off-by: Jean Pihet <jean.pihet@linaro.org>
+> Acked-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> ---
+>  arch/arm/mach-mvebu/Kconfig | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm/mach-mvebu/Kconfig b/arch/arm/mach-mvebu/Kconfig
+> index 9eb63d7..25e6c00 100644
+> --- a/arch/arm/mach-mvebu/Kconfig
+> +++ b/arch/arm/mach-mvebu/Kconfig
+> @@ -26,6 +26,7 @@ config MACH_ARMADA_370_XP
+>  	select HAVE_SMP
+>  	select CACHE_L2X0
+>  	select CPU_PJ4B
+> +	select CLKSRC_OF
 
-Regression 1) power supply drivers not working since v3.5
+I disagree. This should go to drivers/clocksource/Kconfig, because it's
+the clocksource driver that uses CLOCKSOURCE_OF_DECLARE. See what is
+already done in drivers/clocksource/Kconfig for other drivers.
 
-Look at firsts emails.
+Thanks,
 
-
-Do you really have problem to do what *you* need with 1 line 
-patch which I sent? Or what what you want?
-
+Thomas
 -- 
-Pali Roh?r
-pali.rohar at gmail.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130918/7f96b2a0/attachment.sig>
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
