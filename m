@@ -1,9 +1,9 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Wed, 18 Sep 2013 19:53:52 +0200
-Subject: [PATCH 19/26] ARM: prima2: remove custom .init_time hook
+Date: Wed, 18 Sep 2013 19:53:56 +0200
+Subject: [PATCH 23/26] ARM: sunxi: remove custom .init_time hook
 In-Reply-To: <1379526839-14798-1-git-send-email-sebastian.hesselbarth@gmail.com>
 References: <1379526839-14798-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1379526839-14798-20-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1379526839-14798-24-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,63 +14,45 @@ Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 ---
 Cc: Olof Johansson <olof@lixom.net>
 Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Barry Song <baohua.song@csr.com>
+Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
 Cc: Russell King <linux@arm.linux.org.uk>
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-kernel at vger.kernel.org
 ---
- arch/arm/mach-prima2/common.c |   11 -----------
- 1 file changed, 11 deletions(-)
+ arch/arm/mach-sunxi/sunxi.c |    8 --------
+ 1 file changed, 8 deletions(-)
 
-diff --git a/arch/arm/mach-prima2/common.c b/arch/arm/mach-prima2/common.c
-index 9b7663d..d49aff7 100644
---- a/arch/arm/mach-prima2/common.c
-+++ b/arch/arm/mach-prima2/common.c
-@@ -6,8 +6,6 @@
-  * Licensed under GPLv2 or later.
+diff --git a/arch/arm/mach-sunxi/sunxi.c b/arch/arm/mach-sunxi/sunxi.c
+index e5a6975..90dda62 100644
+--- a/arch/arm/mach-sunxi/sunxi.c
++++ b/arch/arm/mach-sunxi/sunxi.c
+@@ -10,7 +10,6 @@
+  * warranty of any kind, whether express or implied.
   */
  
--#include <linux/clk-provider.h>
 -#include <linux/clocksource.h>
- #include <linux/init.h>
+ #include <linux/delay.h>
  #include <linux/kernel.h>
- #include <asm/sizes.h>
-@@ -22,12 +20,6 @@ void __init sirfsoc_init_late(void)
- 	sirfsoc_pm_init();
+ #include <linux/init.h>
+@@ -114,12 +113,6 @@ static void sunxi_setup_restart(void)
+ 	arm_pm_restart = of_id->data;
  }
  
--static __init void sirfsoc_init_time(void)
+-static void __init sunxi_timer_init(void)
 -{
 -	of_clk_init(NULL);
 -	clocksource_of_init();
 -}
 -
- static __init void sirfsoc_map_io(void)
+ static void __init sunxi_dt_init(void)
  {
- 	sirfsoc_map_lluart();
-@@ -43,7 +35,6 @@ static const char *atlas6_dt_match[] __initdata = {
- DT_MACHINE_START(ATLAS6_DT, "Generic ATLAS6 (Flattened Device Tree)")
- 	/* Maintainer: Barry Song <baohua.song@csr.com> */
- 	.map_io         = sirfsoc_map_io,
--	.init_time	= sirfsoc_init_time,
- 	.init_late	= sirfsoc_init_late,
- 	.dt_compat      = atlas6_dt_match,
- 	.restart	= sirfsoc_restart,
-@@ -59,7 +50,6 @@ static const char *prima2_dt_match[] __initdata = {
- DT_MACHINE_START(PRIMA2_DT, "Generic PRIMA2 (Flattened Device Tree)")
- 	/* Maintainer: Barry Song <baohua.song@csr.com> */
- 	.map_io         = sirfsoc_map_io,
--	.init_time	= sirfsoc_init_time,
- 	.dma_zone_size	= SZ_256M,
- 	.init_late	= sirfsoc_init_late,
- 	.dt_compat      = prima2_dt_match,
-@@ -77,7 +67,6 @@ DT_MACHINE_START(MARCO_DT, "Generic MARCO (Flattened Device Tree)")
- 	/* Maintainer: Barry Song <baohua.song@csr.com> */
- 	.smp            = smp_ops(sirfsoc_smp_ops),
- 	.map_io         = sirfsoc_map_io,
--	.init_time	= sirfsoc_init_time,
- 	.init_late	= sirfsoc_init_late,
- 	.dt_compat      = marco_dt_match,
- 	.restart	= sirfsoc_restart,
+ 	sunxi_setup_restart();
+@@ -138,6 +131,5 @@ static const char * const sunxi_board_dt_compat[] = {
+ 
+ DT_MACHINE_START(SUNXI_DT, "Allwinner A1X (Device Tree)")
+ 	.init_machine	= sunxi_dt_init,
+-	.init_time	= sunxi_timer_init,
+ 	.dt_compat	= sunxi_board_dt_compat,
+ MACHINE_END
 -- 
 1.7.10.4
