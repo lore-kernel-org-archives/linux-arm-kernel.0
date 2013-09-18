@@ -1,32 +1,52 @@
-From: pali.rohar@gmail.com (Pali =?utf-8?q?Roh=C3=A1r?=)
-Date: Wed, 18 Sep 2013 17:56:12 +0200
-Subject: [PATCH 1/4] usb: musb: Call atomic_notifier_call_chain when
- status is changed
-In-Reply-To: <CAAwP0s0nGthkm9Bp1ug23Rtz6-sbR60FFTSfd-Cj9wKMU0RBEA@mail.gmail.com>
-References: <1378630239-10006-1-git-send-email-pali.rohar@gmail.com>
- <20130918133025.GB2953@amd.pavel.ucw.cz>
- <CAAwP0s0nGthkm9Bp1ug23Rtz6-sbR60FFTSfd-Cj9wKMU0RBEA@mail.gmail.com>
-Message-ID: <201309181756.12782@pali>
+From: Sudeep.KarkadaNagesha@arm.com (Sudeep KarkadaNagesha)
+Date: Wed, 18 Sep 2013 17:07:20 +0100
+Subject: [PATCH RFC 0/3] ARM: cacheinfo support
+Message-ID: <1379520443-13857-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 18 September 2013 15:57:13 Javier Martinez Canillas 
-wrote:
-> to split the patch in two since the patch was solving
-> two separate issues
+From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
 
-My patch does not solving *two* issues. It is *one* regression 
-and both parts of patch are needed for fixing it. Read commit 
-message again. It does not make sense to split patch fixing kernel 
-regression into more one line patches - or please clarify why.
+Hi,
+
+This series adds cacheinfo support for ARM. The implementation is based on
+x86. However it depends on device tree for cache hierarcy. On non-DT
+platforms, first level caches are per-cpu while higher level caches are
+assumed system-wide.
+
+Few things I would like to get clarified:
+1. Should the populating cacheinfo and sysfs be decoupled completely ?
+   i.e. do we need to populate cache data on hotplug path or just once
+   during the boot on all cpus will suffice ?
+
+2. Does it make sense to unify sysfs part of implementation across different
+   architecture(arm and x86) ? I don't see a reason not to, but I see some
+   custom/arch specific sysfs entries(e.g. AMD L3 cache partitioning feature).
+   So I would like to get the feedback.
+
+Also this series depends on of_find_next_cache_node which is moved from PPC
+to common DT code[1]
+
+Regards,
+Sudeep
+
+[1] https://lists.ozlabs.org/pipermail/linuxppc-dev/2013-September/111381.html
+
+Sudeep KarkadaNagesha (3):
+  ARM: kernel: add support for cpu cache information
+  ARM: kernel: add outer cache support for cacheinfo implementation
+  ARM: kernel: support cpu cache information interface to userspace via
+    sysfs
+
+ arch/arm/include/asm/outercache.h |  13 +
+ arch/arm/kernel/Makefile          |   1 +
+ arch/arm/kernel/cacheinfo.c       | 687 ++++++++++++++++++++++++++++++++++++++
+ arch/arm/mm/Kconfig               |  13 +
+ arch/arm/mm/cache-l2x0.c          |  14 +
+ arch/arm/mm/cache-tauros2.c       |  35 ++
+ arch/arm/mm/cache-xsc3l2.c        |  15 +
+ 7 files changed, 778 insertions(+)
+ create mode 100644 arch/arm/kernel/cacheinfo.c
 
 -- 
-Pali Roh?r
-pali.rohar at gmail.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130918/e9dbd364/attachment.sig>
+1.8.1.2
