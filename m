@@ -1,41 +1,53 @@
-From: pwalmsley@nvidia.com (Paul Walmsley)
-Date: Wed, 18 Sep 2013 09:23:19 -0700
-Subject: Tegra baseline test results for v3.12-rc1
-Message-ID: <A4DCC42E2B5835498682FCB0A8F9F873378C267FFD@HQMAIL04.nvidia.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Wed, 18 Sep 2013 11:25:39 -0500
+Subject: [PATCH 1/4] usb: musb: Call atomic_notifier_call_chain when
+ status is changed
+In-Reply-To: <20130918143537.GA4914@amd.pavel.ucw.cz>
+References: <1378630239-10006-1-git-send-email-pali.rohar@gmail.com>
+ <201309172128.42514@pali> <20130918014942.GD19817@radagast>
+ <201309181020.15245@pali>
+ <CAAwP0s1Ou7Nrq7GhnHX71TFCrTFg=nqUh+GsAJhN8DjZGsF4QQ@mail.gmail.com>
+ <20130918133025.GB2953@amd.pavel.ucw.cz>
+ <CAAwP0s0nGthkm9Bp1ug23Rtz6-sbR60FFTSfd-Cj9wKMU0RBEA@mail.gmail.com>
+ <20130918142203.GD3748@amd.pavel.ucw.cz>
+ <20130918143537.GA4914@amd.pavel.ucw.cz>
+Message-ID: <20130918162539.GK21559@radagast>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
-Here are some basic Tegra test results for Linux v3.12-rc1.
-Logs and other details at:
+On Wed, Sep 18, 2013 at 04:35:37PM +0200, Pavel Machek wrote:
+> Hi!
+> 
+> > > gave feedback. If the sender doesn't want to take his feedback into
+> > > account and prefer to send pretty insulting emails instead that is his
+> > > choice but I would say that is this not the greatest approach to get
+> > > your code merged (to say the least).
+> > 
+> > Clearly not. But Pali found bug in code Felipe should
+> > maintain. Instead of "thank you for bug report, I applied this one
+> > line of your code to fix it", Pali got "new patch, new email" for his
+> > efforts. That is how you train dogs, not how you should treat kernel
+> > contributors.
+> > 
+> > Now, it is possible that Felipe just has problems with english, as he
+> > called me piece of wood in https://lkml.org/lkml/2013/9/17/476 , but
+> > he appears more arogant than usual over email.
+> 
+> Actually he called me "piece of wood with garbage in it". I guess I
+> have right to be offended. I'm baby in the next email. Hmm.
 
-    http://nvt.pwsan.com/pub/linux/testlogs/test_v3.12-rc1/20130916143118/
+what a baby. Grow up dude, just grow up. I said your commit log has
+garbage which shouldn't be there (there was a typo you're instead of
+your).
 
-
-Test summary
-------------
-
-Build: zImage:
-    Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
-
-Boot to userspace: multi_v7_defconfig:
-    Pass: ( 2/ 2): tegra114-dalmore-headless, tegra30-beaver
-
-Boot to userspace: tegra_defconfig:
-    Pass: ( 2/ 2): tegra114-dalmore-headless, tegra30-beaver
-
-
-vmlinux object size
-(delta in bytes from test_v3.11-rc7 (d8dfad3876e4386666b759da3c833d62fb8b2267)):
-   text     data      bss    total  kernel
- -89208   +10000     -416   -79624  multi_v7_defconfig
-+299303    +7244    +1484  +308031  tegra_defconfig
-
-
-Boot-time memory difference
-(delta in bytes from test_v3.11-rc7 (d8dfad3876e4386666b759da3c833d62fb8b2267))
-    avail    rsrvd     high    freed                board              kconfig                  dtb
-        .        .        .        . tegra114-dalmore-hea   multi_v7_defconfig     tegra114-dalmore
-    -324k     324k        .        . tegra114-dalmore-hea      tegra_defconfig     tegra114-dalmore
-    -324k     324k        .        .       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
-    -592k     592k        .       8k       tegra30-beaver      tegra_defconfig       tegra30-beaver
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130918/d419425d/attachment.sig>
