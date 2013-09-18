@@ -1,39 +1,169 @@
-From: michael.opdenacker@free-electrons.com (Michael Opdenacker)
-Date: Wed, 18 Sep 2013 13:52:25 +0200
-Subject: [PATCH] ARM: STi: remove unused Kconfig parameters
-In-Reply-To: <523949A1.7080600@st.com>
-References: <1379474622-4715-1-git-send-email-michael.opdenacker@free-electrons.com>
- <523949A1.7080600@st.com>
-Message-ID: <523993F9.6000705@free-electrons.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 18 Sep 2013 13:00:12 +0100
+Subject: [PATCH 3/4] ARM: STi: Supply I2C configuration to STiH415 SoC
+In-Reply-To: <1379498483-4236-4-git-send-email-maxime.coquelin@st.com>
+References: <1379498483-4236-1-git-send-email-maxime.coquelin@st.com>
+ <1379498483-4236-4-git-send-email-maxime.coquelin@st.com>
+Message-ID: <20130918120012.GE16984@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Srini
+On Wed, 18 Sep 2013, Maxime COQUELIN wrote:
 
-On 09/18/2013 08:35 AM, Srinivas KANDAGATLA wrote:
-> Hi Michael.
-> On 18/09/13 04:23, Michael Opdenacker wrote:
->> This patch proposes to remove the 'SOC_STIH415' and 'SOC_STIH416'
->> parameters, which are used nowhere else in the source code
->> and Makefiles.
->>
->> Will they be needed in code that hasn't been submitted yet?
-> Yes, we will be using it in future patches, for something like reset
-> controller.
-> Also I am planning to use in dts/Makefiles so that we can build dtbs for
-> only selected SOC.
->
-> Thanks,
-> srini
-Thanks for your reply. That's fine for me if you have plans to use these
-parameters.
+> This patch supplies I2C configuration to STiH415 SoC.
+> 
+> Cc: Srinivas Kandagatla <srinivas.kandagatla@st.com>
+> Signed-off-by: Maxime Coquelin <maxime.coquelin@st.com>
+> ---
+>  arch/arm/boot/dts/stih415-pinctrl.dtsi |   36 ++++++++++++++++++++
+>  arch/arm/boot/dts/stih415.dtsi         |   57 ++++++++++++++++++++++++++++++++
+>  2 files changed, 93 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/stih415-pinctrl.dtsi b/arch/arm/boot/dts/stih415-pinctrl.dtsi
+> index 1d322b2..e56449d 100644
+> --- a/arch/arm/boot/dts/stih415-pinctrl.dtsi
+> +++ b/arch/arm/boot/dts/stih415-pinctrl.dtsi
+> @@ -86,6 +86,24 @@
+>  					};
+>  				};
+>  			};
+> +
+> +			sbc_i2c0 {
+> +				pinctrl_sbc_i2c0_default: sbc_i2c0-default {
+> +					st,pins {
+> +						sda = <&PIO4 6 ALT1 BIDIR>;
+> +						scl = <&PIO4 5 ALT1 BIDIR>;
+> +					};
+> +				};
+> +			};
+> +
+> +			sbc_i2c1 {
+> +				pinctrl_sbc_i2c1_default: sbc_i2c1-default {
+> +					st,pins {
+> +						sda = <&PIO3 2 ALT2 BIDIR>;
+> +						scl = <&PIO3 1 ALT2 BIDIR>;
+> +					};
+> +				};
+> +			};
+>  		};
+>  
+>  		pin-controller-front {
+> @@ -143,6 +161,24 @@
+>  				reg		= <0x7000 0x100>;
+>  				st,bank-name	= "PIO12";
+>  			};
+> +
+> +			i2c0 {
+> +				pinctrl_i2c0_default: i2c0-default {
+> +					st,pins {
+> +						sda = <&PIO9 3 ALT1 BIDIR>;
+> +						scl = <&PIO9 2 ALT1 BIDIR>;
+> +					};
+> +				};
+> +			};
+> +
+> +			i2c1 {
+> +				pinctrl_i2c1_default: i2c1-default {
+> +					st,pins {
+> +						sda = <&PIO12 1 ALT1 BIDIR>;
+> +						scl = <&PIO12 0 ALT1 BIDIR>;
+> +					};
+> +				};
+> +			};
+>  		};
+>  
+>  		pin-controller-rear {
+> diff --git a/arch/arm/boot/dts/stih415.dtsi b/arch/arm/boot/dts/stih415.dtsi
+> index 74ab8de..643ae1c 100644
+> --- a/arch/arm/boot/dts/stih415.dtsi
+> +++ b/arch/arm/boot/dts/stih415.dtsi
+> @@ -9,6 +9,7 @@
+>  #include "stih41x.dtsi"
+>  #include "stih415-clock.dtsi"
+>  #include "stih415-pinctrl.dtsi"
+> +#include <dt-bindings/interrupt-controller/arm-gic.h>
+>  / {
+>  
+>  	L2: cache-controller {
+> @@ -83,5 +84,61 @@
+>  			pinctrl-names 	= "default";
+>  			pinctrl-0	= <&pinctrl_sbc_serial1>;
+>  		};
+> +
+> +		i2c0: i2c at fed40000{
 
-Cheers,
+Space before the '{'.
 
-Michael.
+> +			compatible	= "st,comms-i2c";
+> +			status		= "disabled";
+
+Consider putting the node status at the bottom.
+
+> +			reg		= <0xfed40000 0x110>;
+> +			interrupts	=  <GIC_SPI 187 IRQ_TYPE_EDGE_RISING>;
+> +			clocks		= <&CLKS_ICN_REG_0>;
+> +			clock-frequency = <400000>;
+> +			pinctrl-names	= "default";
+> +			pinctrl-0	= <&pinctrl_i2c0_default>;
+> +			st,glitches;
+> +			st,glitch-clk	= <500>;
+> +			st,glitch-dat	= <500>;
+> +		};
+> +
+> +		i2c1: i2c at fed41000{
+
+Same here and throughout.
+
+> +			compatible	= "st,comms-i2c";
+> +			status		= "disabled";
+
+Same here and throughout.
+
+> +			reg		= <0xfed41000 0x110>;
+> +			interrupts	=  <GIC_SPI 188 IRQ_TYPE_EDGE_RISING>;
+> +			clocks		= <&CLKS_ICN_REG_0>;
+> +			clock-frequency = <400000>;
+> +			pinctrl-names	= "default";
+> +			pinctrl-0	= <&pinctrl_i2c1_default>;
+> +			st,glitches;
+> +			st,glitch-clk	= <500>;
+> +			st,glitch-dat	= <500>;
+> +		};
+> +
+> +		sbc_i2c0: i2c at fe540000{
+> +			compatible	= "st,comms-i2c";
+> +			status		= "disabled";
+> +			reg		= <0xfe540000 0x110>;
+> +			interrupts	=  <GIC_SPI 206 IRQ_TYPE_EDGE_RISING>;
+> +			clocks		= <&CLK_SYSIN>;
+> +			clock-frequency = <400000>;
+> +			pinctrl-names	= "default";
+> +			pinctrl-0	= <&pinctrl_sbc_i2c0_default>;
+> +			st,glitches;
+> +			st,glitch-clk	= <500>;
+> +			st,glitch-dat	= <500>;
+> +		};
+> +
+> +		sbc_i2c1: i2c at fe541000{
+> +			compatible	= "st,comms-i2c";
+> +			status		= "disabled";
+> +			reg		= <0xfe541000 0x110>;
+> +			interrupts	=  <GIC_SPI 207 IRQ_TYPE_EDGE_RISING>;
+> +			clocks		= <&CLK_SYSIN>;
+> +			clock-frequency = <400000>;
+> +			pinctrl-names	= "default";
+> +			pinctrl-0	= <&pinctrl_sbc_i2c1_default>;
+> +			st,glitches;
+> +			st,glitch-clk	= <500>;
+> +			st,glitch-dat	= <500>;
+> +		};
+>  	};
+>  };
+
+Is this odd tabbing just the result of the patch format?
 
 -- 
-Michael Opdenacker, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
-+33 484 258 098
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
