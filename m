@@ -1,47 +1,180 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Tue, 17 Sep 2013 22:48:48 -0500
-Subject: [PATCH v7 3/4] drivers: of: add initialization code for dma
- reserved memory
-In-Reply-To: <CACxGe6s_JY7GpjXN7gwADV0oE+BnQfJX4AaXTZURumfepa3NiA@mail.gmail.com>
-References: <1377527959-5080-1-git-send-email-m.szyprowski@samsung.com>
- <1377527959-5080-4-git-send-email-m.szyprowski@samsung.com>
- <20130829224637.D09183E1222@localhost> <52209278.8040106@samsung.com>
- <DAF223EB-C84C-4E82-A24A-ACD0A3A0559F@codeaurora.org>
- <20130909160154.8D7183E0F23@localhost> <5236AF64.80607@samsung.com>
- <1379316344.3721.6.camel@pasglop>
- <CACxGe6s_JY7GpjXN7gwADV0oE+BnQfJX4AaXTZURumfepa3NiA@mail.gmail.com>
-Message-ID: <20130918034848.A8E76C42CF4@trevor.secretlab.ca>
+Date: Tue, 17 Sep 2013 23:29:23 -0500
+Subject: [RFC PATCHv2 3/4] of: provide a binding for fixed link PHYs
+In-Reply-To: <1378480701-12908-4-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1378480701-12908-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1378480701-12908-4-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20130918042923.5D845C42CF7@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 16 Sep 2013 06:43:08 -0700, Grant Likely <grant.likely@secretlab.ca> wrote:
-> On Mon, Sep 16, 2013 at 12:25 AM, Benjamin Herrenschmidt
-> <benh@kernel.crashing.org> wrote:
-> > On Mon, 2013-09-16 at 09:12 +0200, Marek Szyprowski wrote:
-> >>
-> >> Fixing those issues requires further discussion. Frankly, right now I
-> >> really have no idea which way should I go. The /reserved-ranges node seems
-> >> to be easy to match particular reserved memory region with a given device.
-> >> I'm also not really convinced if it makes sense to add a code for finding
-> >> and matching a reserved memory region to every device driver, which might
-> >> need it. I would really like to get some more feedback on the Ben's
-> >> comment.
-> >>
-> >> In any case, the code will also change significantly, so I assume that the
-> >> best, what can be done now is to revert the current version and start from
-> >> the scratch with a new, complete proposal.
-> >
-> > Yes, let's do that. I will try to help. It shouldn't be that a big deal.
+On Fri,  6 Sep 2013 17:18:20 +0200, Thomas Petazzoni <thomas.petazzoni@free-electrons.com> wrote:
+> Some Ethernet MACs have a "fixed link", and are not connected to a
+> normal MDIO-managed PHY device. For those situations, a Device Tree
+> binding allows to describe a "fixed link" using a special PHY node.
 > 
-> I think we can get the concerns sorted quickly. I'm at meetings all
-> day today in SJC, but I'll take a look at it this evening. I'll be in
-> Edinburgh. We're holding an ARM summit at the same time so a bunch of
-> affected ARM folks will be there.
+> This patch adds:
+> 
+>  * A documentation for the fixed PHY Device Tree binding.
+> 
+>  * An of_phy_is_fixed_link() function that an Ethernet driver can call
+>    on its PHY phandle to find out whether it's a fixed link PHY or
+>    not. It should typically be used to know if
+>    of_phy_register_fixed_link() should be called.
+> 
+>  * An of_phy_register_fixed_link() function that instantiates the
+>    fixed PHY into the PHY subsystem, so that when the driver calls
+>    of_phy_connect(), the PHY device associated to the OF node will be
+>    found.
+> 
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 
-After reading through the entirety of the other thread, I think this can
-be fixed. My preference would be to fix in now rather than waiting
-another cycle. If you haven't sent the revert yet then please hold off
-for a bit (I can't tell at the moment since I'm currently on an airplane
-and I didn't update my tree before leaving the ground).
+Hi Thomas,
+
+The implemenation in this series looks like it is in good shape, so I'll
+restrict my comments to be binding...
+
+> ---
+>  .../devicetree/bindings/net/fixed-link.txt         | 34 ++++++++++++++++++++++
+>  drivers/of/of_mdio.c                               | 24 +++++++++++++++
+>  include/linux/of_mdio.h                            | 15 ++++++++++
+>  3 files changed, 73 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/net/fixed-link.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/net/fixed-link.txt b/Documentation/devicetree/bindings/net/fixed-link.txt
+> new file mode 100644
+> index 0000000..9f2a1a50
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/net/fixed-link.txt
+> @@ -0,0 +1,34 @@
+> +Fixed link Device Tree binding
+> +------------------------------
+> +
+> +Some Ethernet MACs have a "fixed link", and are not connected to a
+> +normal MDIO-managed PHY device. For those situations, a Device Tree
+> +binding allows to describe a "fixed link".
+> +
+> +Such a fixed link situation is described by creating a PHY node as a
+> +sub-node of an Ethernet device, with the following properties:
+> +
+> +* 'fixed-link' (boolean, mandatory), to indicate that this PHY is a
+> +  fixed link PHY.
+> +* 'speed' (integer, mandatory), to indicate the link speed. Accepted
+> +  values are 10, 100 and 1000
+> +* 'full-duplex' (boolean, optional), to indicate that full duplex is
+> +  used. When absent, half duplex is assumed.
+> +* 'pause' (boolean, optional), to indicate that pause should be
+> +  enabled.
+> +* 'asym-pause' (boolean, optional), to indicate that asym_pause should
+> +  be enabled.
+
+I understand what you're trying to do here, but it causes a troublesome
+leakage of implementation detail into the binding, making the whole
+thing look very odd. This binding tries to make a fixed link look
+exactly like a real PHY even to the point of including a phandle to the
+phy. But having a phandle to a node which is *always* a direct child of
+the MAC node is redundant and a rather looney. Yes, doing it that way
+makes it easy for of_phy_find_device() to be transparent for fixed link,
+but that should *not* drive bindings, especially when that makes the
+binding really rather weird.
+
+Second, this new binding doesn't provide anything over and above the
+existing fixed-link binding. It may not be pretty, but it is
+estabilshed.
+
+That said, I do agree that the current Linux implementation is not good
+because it cannot handle a fixed-link property transparently. That's a
+deficiency in the Linux implementation and it should be fixed.
+of_phy_connect() currently requires the phy phandle to be passed in.
+Part of the reason it was done this way is that some drivers connect to
+multiple 'phys'. A soulition could be to make the phy handle optional.
+If it is empty then go looking for either a phy-device or fixed-link
+property. Otherwise use the provided node.
 
 g.
+
+> +
+> +Example:
+> +
+> +ethernet at 0 {
+> +	...
+> +	phy = <&phy0>;
+> +	phy0: phy at 0 {
+> +	      fixed-link;
+> +	      speed = <1000>;
+> +	      full-duplex;
+> +	};
+> +	...
+> +};
+> +
+> diff --git a/drivers/of/of_mdio.c b/drivers/of/of_mdio.c
+> index d5a57a9..0507f8f 100644
+> --- a/drivers/of/of_mdio.c
+> +++ b/drivers/of/of_mdio.c
+> @@ -14,6 +14,7 @@
+>  #include <linux/netdevice.h>
+>  #include <linux/err.h>
+>  #include <linux/phy.h>
+> +#include <linux/phy_fixed.h>
+>  #include <linux/of.h>
+>  #include <linux/of_irq.h>
+>  #include <linux/of_mdio.h>
+> @@ -247,3 +248,26 @@ struct phy_device *of_phy_connect_fixed_link(struct net_device *dev,
+>  	return IS_ERR(phy) ? NULL : phy;
+>  }
+>  EXPORT_SYMBOL(of_phy_connect_fixed_link);
+> +
+> +#if defined(CONFIG_FIXED_PHY)
+> +bool of_phy_is_fixed_link(struct device_node *np)
+> +{
+> +	return of_property_read_bool(np, "fixed-link");
+> +}
+> +EXPORT_SYMBOL(of_phy_is_fixed_link);
+> +
+> +int of_phy_register_fixed_link(struct device_node *np)
+> +{
+> +	struct fixed_phy_status status = {};
+> +
+> +	status.link = 1;
+> +	status.duplex = of_property_read_bool(np, "full-duplex");
+> +	if (of_property_read_u32(np, "speed", &status.speed))
+> +		return -EINVAL;
+> +	status.pause = of_property_read_bool(np, "pause");
+> +	status.asym_pause = of_property_read_bool(np, "asym-pause");
+> +
+> +	return fixed_phy_register(PHY_POLL, &status, np);
+> +}
+> +EXPORT_SYMBOL(of_phy_register_fixed_link);
+> +#endif
+> diff --git a/include/linux/of_mdio.h b/include/linux/of_mdio.h
+> index 8163107..2f535ee 100644
+> --- a/include/linux/of_mdio.h
+> +++ b/include/linux/of_mdio.h
+> @@ -57,4 +57,19 @@ static inline struct mii_bus *of_mdio_find_bus(struct device_node *mdio_np)
+>  }
+>  #endif /* CONFIG_OF */
+>  
+> +#if defined(CONFIG_OF) && defined(CONFIG_FIXED_PHY)
+> +extern int of_phy_register_fixed_link(struct device_node *np);
+> +extern bool of_phy_is_fixed_link(struct device_node *np);
+> +#else
+> +static inline int of_phy_register_fixed_link(struct device_node *np)
+> +{
+> +	return -ENOSYS;
+> +}
+> +static inline bool of_phy_is_fixed_link(struct device_node *np)
+> +{
+> +	return false;
+> +}
+> +#endif
+> +
+> +
+>  #endif /* __LINUX_OF_MDIO_H */
+> -- 
+> 1.8.1.2
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
