@@ -1,47 +1,20 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 18 Sep 2013 17:12:45 +0100
-Subject: [PATCH] ARM: entry: fix tracing of ARM-private syscalls
-Message-ID: <1379520765-20778-1-git-send-email-will.deacon@arm.com>
+From: ldewangan@nvidia.com (Laxman Dewangan)
+Date: Wed, 18 Sep 2013 22:08:54 +0530
+Subject: [PATCH REPOST] ARM: tegra: use dt-binding header for key code
+In-Reply-To: <5239C6AC.10403@nvidia.com>
+References: <1379510552-23401-1-git-send-email-ldewangan@nvidia.com>
+ <5239C6AC.10403@nvidia.com>
+Message-ID: <5239D71E.3040005@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 377747c40657 ("ARM: entry: allow ARM-private syscalls to be
-restarted") reworked the low-level syscall dispatcher to allow
-restarting of ARM-private syscalls. Unfortunately, this relocated the
-label used to dispatch a private syscall from the trace path, so that
-the invocation would be bypassed altogether!
-
-This causes applications to fail under strace as soon as they rely on
-a private syscall (e.g. set_tls):
-
-  set_tls(0xb6fad4c0, 0xb6fadb98, 0xb6fb1050, 0xb6fad4c0, 0xb6fb1050)
-      = -1 ENOSYS (Function not implemented)
-
-This patch fixes the label so that we correctly dispatch private
-syscalls from the trace path.
-
-Reported-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm/kernel/entry-common.S | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
-index 74ad15d1..bc6bd96 100644
---- a/arch/arm/kernel/entry-common.S
-+++ b/arch/arm/kernel/entry-common.S
-@@ -442,10 +442,10 @@ local_restart:
- 	ldrcc	pc, [tbl, scno, lsl #2]		@ call sys_* routine
- 
- 	add	r1, sp, #S_OFF
--	cmp	scno, #(__ARM_NR_BASE - __NR_SYSCALL_BASE)
-+2:	cmp	scno, #(__ARM_NR_BASE - __NR_SYSCALL_BASE)
- 	eor	r0, scno, #__NR_SYSCALL_BASE	@ put OS number back
- 	bcs	arm_syscall
--2:	mov	why, #0				@ no longer a real syscall
-+	mov	why, #0				@ no longer a real syscall
- 	b	sys_ni_syscall			@ not private func
- 
- #if defined(CONFIG_OABI_COMPAT) || !defined(CONFIG_AEABI)
--- 
-1.8.2.2
+On Wednesday 18 September 2013 08:58 PM, Stephen Warren wrote:
+> On 09/18/2013 07:22 AM, Laxman Dewangan wrote:
+>> In place of hardcoding the key code in DTS file and comment the
+>> key code as side notes, use the key code macro defines in the
+>> dt-bindings/input/input.h directly.
+> I can apply this, but aren't there many other Tegra DT files that need
+> conversion too?
+Yes, I am planning to this in next few days. I will post different 
+patches for different boards.
+If it is fine to you, it can be applied this patch.
