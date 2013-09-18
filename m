@@ -1,108 +1,80 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Wed, 18 Sep 2013 19:53:34 +0200
-Subject: [PATCH 01/26] ARM: nomadik: move mtu setup to clocksource init
+Date: Wed, 18 Sep 2013 19:53:40 +0200
+Subject: [PATCH 07/26] clk: vt8500: parse pmc_base from clock driver
 In-Reply-To: <1379526839-14798-1-git-send-email-sebastian.hesselbarth@gmail.com>
 References: <1379526839-14798-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1379526839-14798-2-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1379526839-14798-8-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-MTU timer initialization is stuffed into .init_time callback, while
-cpu8815_timer_init_of again maps addresses from the same device node.
-Therefore, this patch moves mtu setup from to clocksource init.
+Currently, clock providers for vt8500 depend on machine_init providing
+pmc_base address before calling of_clk_init. With upcoming arch-wide
+.time_init calling of_clk_init, we should make clock providers independent
+of mach code. This adds a pmc_base parsing helper to current clock provider
+that gets called if there is no pmc_base set, yet.
 
 Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 ---
 Cc: Olof Johansson <olof@lixom.net>
 Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Alessandro Rubini <rubini@unipv.it>
-Cc: Linus Walleij <linus.walleij@linaro.org>
-Cc: STEricsson <STEricsson_nomadik_linux@list.st.com>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: Tony Prisk <linux@prisktech.co.nz>
+Cc: Mike Turquette <mturquette@linaro.org>
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-kernel at vger.kernel.org
 ---
- arch/arm/mach-nomadik/cpu-8815.c  |   26 --------------------------
- drivers/clocksource/nomadik-mtu.c |   11 +++++++++++
- 2 files changed, 11 insertions(+), 26 deletions(-)
+ drivers/clk/clk-vt8500.c |   21 +++++++++++++++++++++
+ 1 file changed, 21 insertions(+)
 
-diff --git a/arch/arm/mach-nomadik/cpu-8815.c b/arch/arm/mach-nomadik/cpu-8815.c
-index 13e0df9..0fcb149 100644
---- a/arch/arm/mach-nomadik/cpu-8815.c
-+++ b/arch/arm/mach-nomadik/cpu-8815.c
-@@ -113,36 +113,10 @@ static void cpu8815_restart(enum reboot_mode mode, const char *cmd)
- 	writel(1, srcbase + 0x18);
- }
+diff --git a/drivers/clk/clk-vt8500.c b/drivers/clk/clk-vt8500.c
+index 82306f5..a5ee01c 100644
+--- a/drivers/clk/clk-vt8500.c
++++ b/drivers/clk/clk-vt8500.c
+@@ -15,11 +15,14 @@
  
--/* Initial value for SRC control register: all timers use MXTAL/8 source */
--#define SRC_CR_INIT_MASK	0x00007fff
--#define SRC_CR_INIT_VAL		0x2aaa8000
--
- static void __init cpu8815_timer_init_of(void)
- {
--	struct device_node *mtu;
--	void __iomem *base;
--	int irq;
--	u32 src_cr;
--
- 	/* We need this to be up now */
- 	nomadik_clk_init();
--
--	mtu = of_find_node_by_path("/mtu at 101e2000");
--	if (!mtu)
--		return;
--	base = of_iomap(mtu, 0);
--	if (WARN_ON(!base))
--		return;
--	irq = irq_of_parse_and_map(mtu, 0);
--
--	pr_info("Remapped MTU @ %p, irq: %d\n", base, irq);
--
--	/* Configure timer sources in "system reset controller" ctrl reg */
--	src_cr = readl(base);
--	src_cr &= SRC_CR_INIT_MASK;
--	src_cr |= SRC_CR_INIT_VAL;
--	writel(src_cr, base);
--
- 	clocksource_of_init();
- }
+ #include <linux/io.h>
+ #include <linux/of.h>
++#include <linux/of_address.h>
+ #include <linux/slab.h>
+ #include <linux/bitops.h>
+ #include <linux/clkdev.h>
+ #include <linux/clk-provider.h>
  
-diff --git a/drivers/clocksource/nomadik-mtu.c b/drivers/clocksource/nomadik-mtu.c
-index 1b74bea..b9f97ba 100644
---- a/drivers/clocksource/nomadik-mtu.c
-+++ b/drivers/clocksource/nomadik-mtu.c
-@@ -257,12 +257,17 @@ void __init nmdk_timer_init(void __iomem *base, int irq)
- 	__nmdk_timer_init(base, irq, pclk0, clk0);
- }
- 
-+/* Initial value for SRC control register: all timers use MXTAL/8 source */
-+#define SRC_CR_INIT_MASK	0x00007fff
-+#define SRC_CR_INIT_VAL		0x2aaa8000
++#define LEGACY_PMC_BASE		0xD8130000
 +
- static void __init nmdk_timer_of_init(struct device_node *node)
- {
- 	struct clk *pclk;
- 	struct clk *clk;
- 	void __iomem *base;
- 	int irq;
-+	u32 src_cr;
+ /* All clocks share the same lock as none can be changed concurrently */
+ static DEFINE_SPINLOCK(_lock);
  
- 	base = of_iomap(node, 0);
- 	if (!base)
-@@ -280,6 +285,12 @@ static void __init nmdk_timer_of_init(struct device_node *node)
- 	if (irq <= 0)
- 		panic("Can't parse IRQ");
+@@ -626,6 +629,21 @@ const struct clk_ops vtwm_pll_ops = {
+ 	.recalc_rate = vtwm_pll_recalc_rate,
+ };
  
-+	/* Configure timer sources in "system reset controller" ctrl reg */
-+	src_cr = readl(base);
-+	src_cr &= SRC_CR_INIT_MASK;
-+	src_cr |= SRC_CR_INIT_VAL;
-+	writel(src_cr, base);
++static __init void vtwm_set_pmc_base(void)
++{
++	struct device_node *np =
++		of_find_compatible_node(NULL, NULL, "via,vt8500-pmc");
 +
- 	__nmdk_timer_init(base, irq, pclk, clk);
- }
- CLOCKSOURCE_OF_DECLARE(nomadik_mtu, "st,nomadik-mtu",
++	if (np)
++		pmc_base = of_iomap(np, 0);
++	else
++		pmc_base = ioremap(LEGACY_PMC_BASE, 0x1000);
++	of_node_put(np);
++
++	if (!pmc_base)
++		pr_err("%s:of_iomap(pmc) failed\n", __func__);
++}
++
+ static __init void vtwm_pll_clk_init(struct device_node *node, int pll_type)
+ {
+ 	u32 reg;
+@@ -636,6 +654,9 @@ static __init void vtwm_pll_clk_init(struct device_node *node, int pll_type)
+ 	struct clk_init_data init;
+ 	int rc;
+ 
++	if (!pmc_base)
++		vtwm_set_pmc_base();
++
+ 	rc = of_property_read_u32(node, "reg", &reg);
+ 	if (WARN_ON(rc))
+ 		return;
 -- 
 1.7.10.4
