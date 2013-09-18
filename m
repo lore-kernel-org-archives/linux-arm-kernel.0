@@ -1,46 +1,53 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 18 Sep 2013 13:53:48 -0700
-Subject: [PATCH] ARM: shmobile: Allow build of the MTU2 timer driver
-In-Reply-To: <20130918195000.6075.25025.sendpatchset@w520>
-References: <20130918195000.6075.25025.sendpatchset@w520>
-Message-ID: <CAOesGMhJmFQwcmUzwoVvA3yBjZVLYj0x9fwCpr_kvTWoWc2qew@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 18 Sep 2013 13:59:02 -0700
+Subject: [GIT PULL 1/2] omap fixes against v3.12-rc1
+Message-ID: <pull-1379537942-109201>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The following changes since commit 272b98c6455f00884f0350f775c5342358ebb73f:
 
+  Linux 3.12-rc1 (2013-09-16 16:17:51 -0400)
 
-On Wed, Sep 18, 2013 at 12:50 PM, Magnus Damm <magnus.damm@gmail.com> wrote:
-> From: Magnus Damm <damm@opensource.se>
->
-> Include MTU2 in the list of timer drivers that may
-> be used on mach-shmobile. This driver has previously
-> only been used by the SH architecture. With this patch
-> the MTU2 joins TMU and CMT as timer drivers that may be
-> used on ARM or SH.
->
-> Signed-off-by: Magnus Damm <damm@opensource.se>
-> ---
->
->  arch/arm/mach-shmobile/Kconfig |    6 ++++++
->  1 file changed, 6 insertions(+)
->
-> --- 0004/arch/arm/mach-shmobile/Kconfig
-> +++ work/arch/arm/mach-shmobile/Kconfig 2013-09-19 04:17:55.000000000 +0900
-> @@ -314,6 +314,12 @@ config SH_TIMER_CMT
->         help
->           This enables build of the CMT timer driver.
->
-> +config SH_TIMER_MTU2
-> +       bool "MTU2 timer driver"
-> +       default y
-> +       help
-> +         This enables build of the MTU2 timer driver.
+are available in the git repository at:
 
-It's odd to have the config entry in arch/arm/ when the driver is in
-drivers/clocksource. I think this entry should be moved to
-drivers/clocksource/Kconfig for that reason (with appropriate
-dependencies).
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.12/fixes-signed
 
+for you to fetch changes up to e942cc06e2d183975dd47d8da9e569316cb870ea:
 
--Olof
+  ARM: OMAP2+: mux: fix trivial typo in name (2013-09-18 12:02:01 -0700)
+
+----------------------------------------------------------------
+omap fixes for build warnings and cpuidle, and
+a few trivial typo fixes.
+
+----------------------------------------------------------------
+Anoop Thomas Mathew (1):
+      ARM: OMAP4 SMP: Corrected a typo fucntions to functions
+
+Fabio Estevam (1):
+      ARM: mach-omap2: gpmc: Fix warning when CONFIG_ARM_LPAE=y
+
+Jingoo Han (1):
+      mailbox: remove unnecessary platform_set_drvdata()
+
+Phil Carmody (1):
+      ARM: OMAP2+: mux: fix trivial typo in name
+
+Tony Lindgren (1):
+      ARM: OMAP4: Fix clock_get error for GPMC during boot
+
+Vladimir Murzin (1):
+      ARM: OMAP4: cpuidle: fix: call cpu_cluster_pm_exit conditionally
+
+Wei Yongjun (1):
+      ARM: OMAP: fix return value check in omap_device_build_from_dt()
+
+ arch/arm/mach-omap2/cclock44xx_data.c | 2 +-
+ arch/arm/mach-omap2/cpuidle44xx.c     | 2 +-
+ arch/arm/mach-omap2/gpmc.c            | 4 ++--
+ arch/arm/mach-omap2/mux34xx.c         | 2 +-
+ arch/arm/mach-omap2/omap-smp.c        | 2 +-
+ arch/arm/mach-omap2/omap_device.c     | 2 +-
+ drivers/mailbox/mailbox-omap2.c       | 1 -
+ 7 files changed, 7 insertions(+), 8 deletions(-)
