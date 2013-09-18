@@ -1,132 +1,98 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Wed, 18 Sep 2013 09:31:24 -0400
-Subject: [PATCH] ARM: OMAP5/DRA7: realtime_counter: Configure CNTFRQ
- register
-In-Reply-To: <1379503416-26318-1-git-send-email-r.sricharan@ti.com>
-References: <1379503416-26318-1-git-send-email-r.sricharan@ti.com>
-Message-ID: <5239AB2C.1090201@ti.com>
+From: Dave.Martin@arm.com (Dave P Martin)
+Date: Wed, 18 Sep 2013 14:32:25 +0100
+Subject: [PATCH] ARM: fix Thumb-2 bug in AES assembler code
+In-Reply-To: <CAKv+Gu9z32WHi88di0ar0C-=Se-ni_0KqQsqvon9FmVr91PQvQ@mail.gmail.com>
+References: <1379434519-23299-1-git-send-email-ard.biesheuvel@linaro.org>
+ <alpine.LFD.2.03.1309171234120.20709@syhkavp.arg>
+ <CAKv+Gu9z32WHi88di0ar0C-=Se-ni_0KqQsqvon9FmVr91PQvQ@mail.gmail.com>
+Message-ID: <20130918133225.GA779@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 18 September 2013 07:23 AM, Sricharan R wrote:
-> The realtime counter called master counter, produces the count
-> used by the private timer peripherals in the MPU_CLUSTER. The
-> CNTFRQ per cpu register is used to denote the frequency of the counter.
-> Currently the frequency value is passed from the
-> DT file, but this is not scalable when we have other non-DT guest
-> OS. This register must be set to the right value by the
-> host OS, as this will be propagated to the guests as well.
+On Tue, Sep 17, 2013 at 05:41:04PM +0100, Ard Biesheuvel wrote:
+> On 17 September 2013 18:35, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+> > On Tue, 17 Sep 2013, Ard Biesheuvel wrote:
+> >
+> >> Patch 638591c enabled building the AES assembler code in Thumb2 mode.
+> >> However, this code uses arithmetic involving PC rather than adr{l}
+> >> instructions to generate PC-relative references to the lookup tables,
+> >> and this needs to take into account the different PC offset when
+> >> running in Thumb mode.
+> >
+> > Wouldn't it be better to fix this using adr instead?
+> >
 > 
-Its not host OS but ROM code/secure code. Host OS is not
-ideal place to set it up.
+> Excellent point. I am just being overly cautious perhaps, but my idea
+> was to stay as close as possible to the original.
+> Let me check if it builds with adr (no adrl in thumb), if so I will respin.
 
-> More discussions and the reason for adding this in a non-DT
-> way can be seen from below.
-> http://www.mail-archive.com/linux-omap at vger.kernel.org/msg93832.html
+Explicit references to PC are often wrong (or at least, unless you Know
+What You're Doing)
+
+<shameless plug>
+
+There's discussion of some of these issues here:
+
+https://wiki.ubuntu.com/ARM/Thumb2PortingHowto
+
+</shameless plug>
+
+Cheers
+---Dave
+
 > 
-> So configuring this secure register for all the cpus here.
+> -- 
+> Ard.
 > 
-> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Cc: Nishanth Menon <nm@ti.com>
-> Cc: Rajendra Nayak <rnayak@ti.com>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Tony Lindgren <tony@atomide.com>
-> Signed-off-by: Sricharan R <r.sricharan@ti.com>
-> ---
->  arch/arm/mach-omap2/omap-secure.h |    2 ++
->  arch/arm/mach-omap2/omap-smp.c    |    9 +++++++++
->  arch/arm/mach-omap2/timer.c       |    6 ++++++
->  3 files changed, 17 insertions(+)
 > 
-> diff --git a/arch/arm/mach-omap2/omap-secure.h b/arch/arm/mach-omap2/omap-secure.h
-> index a171a5a..4de9a00 100644
-> --- a/arch/arm/mach-omap2/omap-secure.h
-> +++ b/arch/arm/mach-omap2/omap-secure.h
-> @@ -51,6 +51,8 @@
->  
->  #define OMAP5_MON_AMBA_IF_INDEX		0x108
->  
-> +#define OMAP5_DRA7_MON_SET_CNTFRQ_INDEX	0x109
-> +
-Nice. Looks like OMAP5 ES2.0 addition which I missed.
-
->  /* Secure PPA(Primary Protected Application) APIs */
->  #define OMAP4_PPA_L2_POR_INDEX		0x23
->  #define OMAP4_PPA_CPU_ACTRL_SMP_INDEX	0x25
-> diff --git a/arch/arm/mach-omap2/omap-smp.c b/arch/arm/mach-omap2/omap-smp.c
-> index 98a1146..00873b4 100644
-> --- a/arch/arm/mach-omap2/omap-smp.c
-> +++ b/arch/arm/mach-omap2/omap-smp.c
-> @@ -41,6 +41,8 @@
->  
->  u16 pm44xx_errata;
->  
-> +extern unsigned long arch_timer_freq;
-> +
->  /* SCU base address */
->  static void __iomem *scu_base;
->  
-> @@ -66,6 +68,13 @@ static void __cpuinit omap4_secondary_init(unsigned int cpu)
->  							4, 0, 0, 0, 0, 0);
->  
->  	/*
-> +	 * Configure the CNTFRQ register for the secondary cpu's which
-> +	 * indicates the frequency of the cpu local timers.
-> +	 */
-> +	if (soc_is_omap54xx() || soc_is_dra7xx())
-CNTFREQ programming was not supported on OMAP5 ES1.0 and that was one
-of the reason this parameter came into picture. So you need to skip
-the ES1.0 here. 
-
-> +		omap_smc1(OMAP5_DRA7_MON_SET_CNTFRQ_INDEX, arch_timer_freq);
-> +
-> +	/*
->  	 * Synchronise with the boot thread.
->  	 */
->  	spin_lock(&boot_lock);
-> diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
-> index fd9238d..2c499f3 100644
-> --- a/arch/arm/mach-omap2/timer.c
-> +++ b/arch/arm/mach-omap2/timer.c
-> @@ -55,6 +55,7 @@
->  #include "soc.h"
->  #include "common.h"
->  #include "powerdomain.h"
-> +#include "omap-secure.h"
->  
->  #define REALTIME_COUNTER_BASE				0x48243200
->  #define INCREMENTER_NUMERATOR_OFFSET			0x10
-> @@ -65,6 +66,7 @@
->  
->  static struct omap_dm_timer clkev;
->  static struct clock_event_device clockevent_gpt;
-> +unsigned long arch_timer_freq;
->  
->  static irqreturn_t omap2_gp_timer_interrupt(int irq, void *dev_id)
->  {
-> @@ -546,7 +548,11 @@ static void __init realtime_counter_init(void)
->  	reg |= den;
->  	__raw_writel(reg, base + INCREMENTER_DENUMERATOR_RELOAD_OFFSET);
->  
-> +	arch_timer_freq = (rate / den) * num;
-> +
->  	iounmap(base);
-> +
-> +	omap_smc1(OMAP5_DRA7_MON_SET_CNTFRQ_INDEX, arch_timer_freq);
-
-Few problems with this approach..
-
-1. CNTFREQ needs to be programmed on all CPUs. Even though arch-timer
-code uses boot-cpu now thats not safe for guest which can start on
-secondary CPUs. So please update this in secondary boot path as well.
-
-2. When you power cycle CPU, you will loose the value of this register
-so you need to reprogram them on every CPU power up. Both DRA and OMAP5
-doesn't support that part yet but do remember to patch that when
-such support gets added.
-
-Can you please fix above comments and repost. I will ack that then.
-
-Regards,
-Santosh
+> >
+> >>
+> >> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> >> ---
+> >>
+> >> This needs cc to stable for 3.10/3.11 as well.
+> >>
+> >>
+> >>  arch/arm/crypto/aes-armv4.S | 11 +++++++----
+> >>  1 file changed, 7 insertions(+), 4 deletions(-)
+> >>
+> >> diff --git a/arch/arm/crypto/aes-armv4.S b/arch/arm/crypto/aes-armv4.S
+> >> index 19d6cd6..33c30ab 100644
+> >> --- a/arch/arm/crypto/aes-armv4.S
+> >> +++ b/arch/arm/crypto/aes-armv4.S
+> >> @@ -148,7 +148,8 @@ AES_Te:
+> >>  @             const AES_KEY *key) {
+> >>  .align       5
+> >>  ENTRY(AES_encrypt)
+> >> -     sub     r3,pc,#8                @ AES_encrypt
+> >> +ARM( sub     r3,pc,#8        )       @ AES_encrypt
+> >> +THUMB(       sub     r3,pc,#4        )
+> >>       stmdb   sp!,{r1,r4-r12,lr}
+> >>       mov     r12,r0          @ inp
+> >>       mov     r11,r2
+> >> @@ -381,7 +382,8 @@ _armv4_AES_encrypt:
+> >>  .align       5
+> >>  ENTRY(private_AES_set_encrypt_key)
+> >>  _armv4_AES_set_encrypt_key:
+> >> -     sub     r3,pc,#8                @ AES_set_encrypt_key
+> >> +ARM( sub     r3,pc,#8        )       @ AES_set_encrypt_key
+> >> +THUMB(       sub     r3,pc,#4        )
+> >>       teq     r0,#0
+> >>       moveq   r0,#-1
+> >>       beq     .Labrt
+> >> @@ -843,8 +845,9 @@ AES_Td:
+> >>  @             const AES_KEY *key) {
+> >>  .align       5
+> >>  ENTRY(AES_decrypt)
+> >> -     sub     r3,pc,#8                @ AES_decrypt
+> >> -     stmdb   sp!,{r1,r4-r12,lr}
+> >> +ARM( sub     r3,pc,#8        )       @ AES_decrypt
+> >> +THUMB(       sub     r3,pc,#4        )
+> >> +             stmdb   sp!,{r1,r4-r12,lr}
+> >>       mov     r12,r0          @ inp
+> >>       mov     r11,r2
+> >>       sub     r10,r3,#AES_decrypt-AES_Td              @ Td
+> >> --
+> >> 1.8.1.2
+> >>
+> 
