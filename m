@@ -1,29 +1,72 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Wed, 18 Sep 2013 10:07:45 -0400
-Subject: [PATCH] ARM: OMAP5: id: Remove ES1.0 support
-In-Reply-To: <1379513142-11125-1-git-send-email-nm@ti.com>
-References: <5239AE35.8030406@ti.com>
- <1379513142-11125-1-git-send-email-nm@ti.com>
-Message-ID: <5239B3B1.5000004@ti.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Wed, 18 Sep 2013 16:22:03 +0200
+Subject: [PATCH 1/4] usb: musb: Call atomic_notifier_call_chain when
+ status is changed
+In-Reply-To: <CAAwP0s0nGthkm9Bp1ug23Rtz6-sbR60FFTSfd-Cj9wKMU0RBEA@mail.gmail.com>
+References: <1378630239-10006-1-git-send-email-pali.rohar@gmail.com>
+ <201309172128.42514@pali> <20130918014942.GD19817@radagast>
+ <201309181020.15245@pali>
+ <CAAwP0s1Ou7Nrq7GhnHX71TFCrTFg=nqUh+GsAJhN8DjZGsF4QQ@mail.gmail.com>
+ <20130918133025.GB2953@amd.pavel.ucw.cz>
+ <CAAwP0s0nGthkm9Bp1ug23Rtz6-sbR60FFTSfd-Cj9wKMU0RBEA@mail.gmail.com>
+Message-ID: <20130918142203.GD3748@amd.pavel.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 18 September 2013 10:05 AM, Nishanth Menon wrote:
-> OMAP5 ES1.0 was intended as a test chip and has major register level
-> differences w.r.t ES2.0 revision of the chip. All register defines,
-> dts support has been solely added for ES2.0 version of the chip.
-> Further, all ES1.0 chips and platforms are supposed to have been
-> removed from circulation. Hence, there is no need to further retain
-> any resemblence of ES1.0 support in id detection code.
+Hi!
+
+> >> >> > So will you do that? Or it is needed to resend this one line
+> >> >> > hunk again in new email again?
+> >> >>
+> >> >> new patch, new email
+> >> >
+> >> > Guys, WHY ARE YOU SO STUPID AND ARROGANT?
+> >> >
+> >> > Sorry but, need to copy full isolated patch/hunk from one mail to
+> >> > another is hassling. So what you want from me? Do all those non
+> >> > sense working only because yesterday you had bad day? Or what?
+...
+> > Actually, there is need to be rude, because Felipe fails to act as
+> > maintainer. Instead of fixing bugs in his code, he bounces bugfix
+> > patches, points people to random READMEs and wastes everyones time.
 > 
-> Remove the omap_revision handling and BUG() instead to prevent folks
-> who mistakenly try an older unsupported chip and report bogus errors.
+> I don't know what are you talking about (if that happened in another
+> thread then I need more context). Felipe is not bouncing any bugfix
+
+Take a look here:
+
+https://lkml.org/lkml/2013/9/17/286
+
+I clearly state that patch can not be tested as required for "proper"
+submission, but offer patch anyway. I get irrelevant boilerplate on
+patch format.
+
+> but just asked to split the patch in two since the patch was solving
+> two separate issues so is way better to have it in two separate
+> patches for the reasons I explained before.
 > 
-> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Signed-off-by: Nishanth Menon <nm@ti.com>
-> ---
-> ref: http://marc.info/?l=linux-omap&m=137951198232339&w=2
-> based on 3.12-rc1 tag
-> 
-That was quick ...
-Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> So, as far as I can tell Felipe did exactly what I would expect from a
+> maintainer. He took the time to review the patches sent to him and
+
+I'd expect maintainer to, well, maintain code. It means actually
+fixing bugs in his code, when he's pointed at them.
+
+> gave feedback. If the sender doesn't want to take his feedback into
+> account and prefer to send pretty insulting emails instead that is his
+> choice but I would say that is this not the greatest approach to get
+> your code merged (to say the least).
+
+Clearly not. But Pali found bug in code Felipe should
+maintain. Instead of "thank you for bug report, I applied this one
+line of your code to fix it", Pali got "new patch, new email" for his
+efforts. That is how you train dogs, not how you should treat kernel
+contributors.
+
+Now, it is possible that Felipe just has problems with english, as he
+called me piece of wood in https://lkml.org/lkml/2013/9/17/476 , but
+he appears more arogant than usual over email.
+
+								Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
