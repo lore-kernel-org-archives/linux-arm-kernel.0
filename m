@@ -1,59 +1,16 @@
-From: r.sricharan@ti.com (Sricharan R)
-Date: Wed, 18 Sep 2013 20:55:21 +0530
-Subject: [RFC PATCH 1/4] DRIVERS: IRQCHIP: Add crossbar irqchip driver
-In-Reply-To: <5239B010.8080605@ti.com>
-References: <1379000351-15672-1-git-send-email-r.sricharan@ti.com>
- <1379000351-15672-2-git-send-email-r.sricharan@ti.com>
- <alpine.DEB.2.02.1309122201530.4089@ionos.tec.linutronix.de>
- <523228B5.5070507@ti.com>
- <alpine.DEB.2.02.1309122335440.4089@ionos.tec.linutronix.de>
- <5232457A.8080709@ti.com>
- <alpine.DEB.2.02.1309130138550.4089@ionos.tec.linutronix.de>
- <52326D6B.2010003@ti.com>
- <alpine.DEB.2.02.1309131142540.4089@ionos.tec.linutronix.de>
- <CACRpkdYzaoZUunoNDNirV5Bt-G6p-avFV8A=iznDKjK2biqwrw@mail.gmail.com>
- <5239B010.8080605@ti.com>
-Message-ID: <5239C5E1.4060807@ti.com>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Wed, 18 Sep 2013 09:28:44 -0600
+Subject: [PATCH REPOST] ARM: tegra: use dt-binding header for key code
+In-Reply-To: <1379510552-23401-1-git-send-email-ldewangan@nvidia.com>
+References: <1379510552-23401-1-git-send-email-ldewangan@nvidia.com>
+Message-ID: <5239C6AC.10403@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 18 September 2013 07:22 PM, Sricharan R wrote:
-> Hi Thomas,
->
-> On Tuesday 17 September 2013 05:56 PM, Linus Walleij wrote:
->> On Fri, Sep 13, 2013 at 4:24 PM, Thomas Gleixner <tglx@linutronix.de> wrote:
->>
->>> So why can't you make use of irq domains and have the whole routing
->>> business implemented sanely?
->>>
->>> What's needed is in gic_init_bases():
->>> irq
->>>        if (of_property_read(node, "routable_irqs", &nr_routable_irqs) {
->>>           irq_domain_add_legacy(nr_gic_irqs);
->>>        } else {
->>>           irq_domain_add_legacy(nr_per_cpu_irqs);
->>>           irq_domain_add_linear(nr_routable_irqs);
->>>        }
->>>
->>> Now that separate domain has an xlate function which grabs a free GIC
->>> irq from a bitmap and returns the hardware irq number in the gic
->>> space. The map/unmap callbacks take care of setting up / tearing down
->>> the route in the crossbar.
->> This is obviously the right approach, it's exactly what .map should do
->> the only special thing here being that we have hardware to perform
->> the mapping ... bah why didn't I realize this :-(
->>
->> Yours,
->> Linus Walleij
-> Thanks for the suggestion.
->
-> So as i understand this, this implies using the GIC domain itself and
->  add the support for dynamically routable irqs (like crossbar) with in the
-> GIC driver itself right ?
-  Please ignore this. So the question was more of how to implement the
-  call outs in the case of routable irqs from map/ unmap callbacks.
- I will look more here and come back.
+On 09/18/2013 07:22 AM, Laxman Dewangan wrote:
+> In place of hardcoding the key code in DTS file and comment the
+> key code as side notes, use the key code macro defines in the
+> dt-bindings/input/input.h directly.
 
-Regards,
- Sricharan
- 
+I can apply this, but aren't there many other Tegra DT files that need
+conversion too?
