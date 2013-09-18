@@ -1,37 +1,44 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Wed, 18 Sep 2013 15:23:29 -0500
-Subject: [PATCHv6 00/13] MSI support for Marvell EBU PCIe driver
-In-Reply-To: <1375828754.12557.70.camel@pasglop>
-References: <1375363516-2620-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130806201000.3e97c63b@skate> <1375828754.12557.70.camel@pasglop>
-Message-ID: <20130918202329.81368C42CF3@trevor.secretlab.ca>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Wed, 18 Sep 2013 13:41:01 -0700
+Subject: [PATCH] clk: si570: Add a driver for SI570 oscillators
+In-Reply-To: <52387FC9.1080905@wwwdotorg.org>
+References: <1379033737-30015-1-git-send-email-soren.brinkmann@xilinx.com>
+ <1379033737-30015-2-git-send-email-soren.brinkmann@xilinx.com>
+ <52373314.5070806@wwwdotorg.org>
+ <20130916164927.GB21352@roeck-us.net>
+ <5237390E.5070203@wwwdotorg.org>
+ <20130916173540.GA3481@roeck-us.net>
+ <52374FF7.8040604@wwwdotorg.org> <52380BD5.8080105@gmail.com>
+ <52387FC9.1080905@wwwdotorg.org>
+Message-ID: <3551eb15-319d-4304-b213-2b0d9672419b@AM1EHSMHS019.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 07 Aug 2013 08:39:14 +1000, Benjamin Herrenschmidt <benh@kernel.crashing.org> wrote:
-> On Tue, 2013-08-06 at 20:10 +0200, Thomas Petazzoni wrote:
-> > Benjamin, Thomas,
+On Tue, Sep 17, 2013 at 10:14:01AM -0600, Stephen Warren wrote:
+> On 09/17/2013 01:59 AM, Sebastian Hesselbarth wrote:
+> > On 09/16/2013 08:37 PM, Stephen Warren wrote:
+> ...
+> >> Perhaps if clock-frequency is specified, the driver should refuse to
+> >> provide anything else. If clock-frequency isn't specified, the driver
+> >> shouldn't touch the HW when it initializes, but should honor any
+> >> requests that come in from other drivers? That would maintain what I
+> >> feel is clock-frequency's connection to being a fixed clock.
 > > 
-> > This patch set has been around for two months now, and I would really
-> > like to see it merged. Your ACKs are the only ones missing to merge the
-> > whole thing.
+> > For the clk-si5351 programmable clock driver in mainline, it already
+> > uses "clock-frequency" for initial clock setup but allows to set it
+> > later on. IMHO that is ok, because from a initial point-of-view, an
+> > initial frequency is fixed. As soon as the driver takes over, the user
+> > is free to do whatever he wants and should not be limited by DT.
 > > 
-> > Would you mind having a look at:
-> > 
-> >  * Patches 4, 5, 6, 7 for Benjamin as the irqdomain maintainer.
+> > But if we vote against that approach, we should probably also modifiy
+> > clk-si5351 accordingly.
 > 
-> Ah sorry, I wasn't aware you were actually waiting for my acks, I didn't
-> read the whole thread, my bad. I'm not irqdomain maintainer btw. I wrote
-> the original powerpc implementation but since then it has been taken
-> over by Grant and others. But I can certainly comment :-)
+> I suppose that approach isn't unreasonable. So, if there's precedent for
+> it, this driver may as well follow it.
 
-When I moved the code I put both your name and mine in the maintainer
-file. When I resigned from irq_domain maintainership that left you as
-the maintainer by default. :-)
+All right, this sounds the most flexible to me and requires the least
+changes as well :).
+I think all I have to change for v2 in regards of this, is to rename the
+property to 'clock-frequency'. I'll do that and send out v2 later today.
 
-I would /like/ to keep maintaining the code, but as evidenced by my
-complete lack of activity on this thread, I don't have the bandwidth
-anymore. I'll comment on things whenever I can, but I'm unfortunately
-very limited in what I can do.  :-(
-
-g.
+	S?ren
