@@ -1,122 +1,79 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Wed, 18 Sep 2013 19:53:46 +0200
-Subject: [PATCH 13/26] ARM: highbank: remove custom .init_time hook
+Date: Wed, 18 Sep 2013 19:53:58 +0200
+Subject: [PATCH 25/26] ARM: vexpress: remove custom .init_time hook
 In-Reply-To: <1379526839-14798-1-git-send-email-sebastian.hesselbarth@gmail.com>
 References: <1379526839-14798-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1379526839-14798-14-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1379526839-14798-26-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 With arch/arm calling of_clk_init(NULL) from time_init(), we can now
-remove custom .init_time hooks. Highbank clock provider need a reference
-to system registers, as a workaround current clk driver maps those
-independent of arch code now.
+remove custom .init_time hooks. The call to versatile_sched_clock_init
+is moved to .init_early instead, were it is also for non-DT boards.
 
 Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-Acked-by: Rob Herring <rob.herring@calxeda.com>
-Acked-by: Mike Turquette <mturquette@linaro.org>
+Tested-by: Jon Medhurst (Tixy) <tixy@linaro.org>
 ---
 Cc: Olof Johansson <olof@lixom.net>
 Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Rob Herring <rob.herring@calxeda.com>
 Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Mike Turquette <mturquette@linaro.org>
+Cc: Pawel Moll <pawel.moll@arm.com>
+Cc: Jon Medhurst (Tixy) <tixy@linaro.org>
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-kernel at vger.kernel.org
 ---
- arch/arm/mach-highbank/highbank.c |   23 +++++++----------------
- drivers/clk/clk-highbank.c        |   10 +++++++---
- 2 files changed, 14 insertions(+), 19 deletions(-)
+ arch/arm/mach-vexpress/v2m.c |   14 +-------------
+ 1 file changed, 1 insertion(+), 13 deletions(-)
 
-diff --git a/arch/arm/mach-highbank/highbank.c b/arch/arm/mach-highbank/highbank.c
-index 8e63ccd..e6d6eac 100644
---- a/arch/arm/mach-highbank/highbank.c
-+++ b/arch/arm/mach-highbank/highbank.c
-@@ -24,7 +24,6 @@
- #include <linux/of_platform.h>
- #include <linux/of_address.h>
+diff --git a/arch/arm/mach-vexpress/v2m.c b/arch/arm/mach-vexpress/v2m.c
+index 95a469e..4f8b8cb 100644
+--- a/arch/arm/mach-vexpress/v2m.c
++++ b/arch/arm/mach-vexpress/v2m.c
+@@ -1,12 +1,10 @@
+ /*
+  * Versatile Express V2M Motherboard Support
+  */
+-#include <linux/clocksource.h>
+ #include <linux/device.h>
  #include <linux/amba/bus.h>
+ #include <linux/amba/mmci.h>
+ #include <linux/io.h>
+-#include <linux/clocksource.h>
+ #include <linux/smp.h>
+ #include <linux/init.h>
+ #include <linux/of_address.h>
+@@ -22,7 +20,6 @@
+ #include <linux/regulator/fixed.h>
+ #include <linux/regulator/machine.h>
+ #include <linux/vexpress.h>
 -#include <linux/clk-provider.h>
+ #include <linux/clkdev.h>
  
- #include <asm/cacheflush.h>
- #include <asm/cputype.h>
-@@ -83,20 +82,6 @@ static void __init highbank_init_irq(void)
+ #include <asm/mach-types.h>
+@@ -422,16 +419,8 @@ void __init v2m_dt_init_early(void)
+ 			pr_warning("vexpress: DT HBI (%x) is not matching "
+ 					"hardware (%x)!\n", dt_hbi, hbi);
  	}
- }
- 
--static void __init highbank_timer_init(void)
--{
--	struct device_node *np;
--
--	/* Map system registers */
--	np = of_find_compatible_node(NULL, NULL, "calxeda,hb-sregs");
--	sregs_base = of_iomap(np, 0);
--	WARN_ON(!sregs_base);
--
--	of_clk_init(NULL);
--
--	clocksource_of_init();
 -}
 -
- static void highbank_power_off(void)
- {
- 	highbank_set_pwr_shutdown();
-@@ -155,6 +140,13 @@ static struct notifier_block highbank_platform_nb = {
+-static void __init v2m_dt_timer_init(void)
+-{
+-	of_clk_init(NULL);
  
- static void __init highbank_init(void)
- {
-+	struct device_node *np;
-+
-+	/* Map system registers */
-+	np = of_find_compatible_node(NULL, NULL, "calxeda,hb-sregs");
-+	sregs_base = of_iomap(np, 0);
-+	WARN_ON(!sregs_base);
-+
- 	pm_power_off = highbank_power_off;
- 	highbank_pm_init();
- 
-@@ -176,7 +168,6 @@ DT_MACHINE_START(HIGHBANK, "Highbank")
- #endif
- 	.smp		= smp_ops(highbank_smp_ops),
- 	.init_irq	= highbank_init_irq,
--	.init_time	= highbank_timer_init,
- 	.init_machine	= highbank_init,
- 	.dt_compat	= highbank_match,
- 	.restart	= highbank_restart,
-diff --git a/drivers/clk/clk-highbank.c b/drivers/clk/clk-highbank.c
-index 2e08cb0..2e7e9d9 100644
---- a/drivers/clk/clk-highbank.c
-+++ b/drivers/clk/clk-highbank.c
-@@ -20,8 +20,7 @@
- #include <linux/clk-provider.h>
- #include <linux/io.h>
- #include <linux/of.h>
+-	clocksource_of_init();
 -
--extern void __iomem *sregs_base;
-+#include <linux/of_address.h>
+-	versatile_sched_clock_init(vexpress_get_24mhz_clock_base(),
+-				24000000);
++	versatile_sched_clock_init(vexpress_get_24mhz_clock_base(), 24000000);
+ }
  
- #define HB_PLL_LOCK_500		0x20000000
- #define HB_PLL_LOCK		0x10000000
-@@ -280,6 +279,7 @@ static __init struct clk *hb_clk_init(struct device_node *node, const struct clk
- 	const char *clk_name = node->name;
- 	const char *parent_name;
- 	struct clk_init_data init;
-+	struct device_node *srnp;
- 	int rc;
- 
- 	rc = of_property_read_u32(node, "reg", &reg);
-@@ -290,7 +290,11 @@ static __init struct clk *hb_clk_init(struct device_node *node, const struct clk
- 	if (WARN_ON(!hb_clk))
- 		return NULL;
- 
--	hb_clk->reg = sregs_base + reg;
-+	/* Map system registers */
-+	srnp = of_find_compatible_node(NULL, NULL, "calxeda,hb-sregs");
-+	hb_clk->reg = of_iomap(srnp, 0);
-+	BUG_ON(!hb_clk->reg);
-+	hb_clk->reg += reg;
- 
- 	of_property_read_string(node, "clock-output-names", &clk_name);
- 
+ static const struct of_device_id v2m_dt_bus_match[] __initconst = {
+@@ -458,6 +447,5 @@ DT_MACHINE_START(VEXPRESS_DT, "ARM-Versatile Express")
+ 	.smp_init	= smp_init_ops(vexpress_smp_init_ops),
+ 	.map_io		= v2m_dt_map_io,
+ 	.init_early	= v2m_dt_init_early,
+-	.init_time	= v2m_dt_timer_init,
+ 	.init_machine	= v2m_dt_init,
+ MACHINE_END
 -- 
 1.7.10.4
