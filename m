@@ -1,31 +1,51 @@
 From: ldewangan@nvidia.com (Laxman Dewangan)
-Date: Wed, 18 Sep 2013 18:37:21 +0530
-Subject: [PATCH 1/2] ARM: tegra: enable PALMAS_PINCTRL config
-Message-ID: <1379509642-19227-1-git-send-email-ldewangan@nvidia.com>
+Date: Wed, 18 Sep 2013 18:37:22 +0530
+Subject: [PATCH V2 2/2] ARM: tegra: add palmas pincontrol to Dalmore device
+ tree
+In-Reply-To: <1379509642-19227-1-git-send-email-ldewangan@nvidia.com>
+References: <1379509642-19227-1-git-send-email-ldewangan@nvidia.com>
+Message-ID: <1379509642-19227-2-git-send-email-ldewangan@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-PALMAS PMIC is used on Dalmore platform. Enable the pincontrol
-driver for Palmas to configure pins of Palmas on desired state.
+Add Palmas pincontrol to Dalmore device tree and make following
+configuration as default:
+- Disable DVFS1 and DVFS2.
+- Set GPIO6 to gpio mode.
 
 Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
 ---
-Reposting as the patch sent earlier was miss the merge date.
+changes from V1:
+- Renames the node name to pinmux as suggested on patch V1.
+- Not sure that this will create the issue with other node having same
+  name as pinmux in top of the dts file.
 
- arch/arm/configs/tegra_defconfig |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+ arch/arm/boot/dts/tegra114-dalmore.dts |   13 +++++++++++++
+ 1 files changed, 13 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/configs/tegra_defconfig b/arch/arm/configs/tegra_defconfig
-index bb16a04..3be2122 100644
---- a/arch/arm/configs/tegra_defconfig
-+++ b/arch/arm/configs/tegra_defconfig
-@@ -130,6 +130,7 @@ CONFIG_SPI=y
- CONFIG_SPI_TEGRA114=y
- CONFIG_SPI_TEGRA20_SFLASH=y
- CONFIG_SPI_TEGRA20_SLINK=y
-+CONFIG_PINCTRL_PALMAS=y
- CONFIG_GPIO_PCA953X_IRQ=y
- CONFIG_GPIO_PALMAS=y
- CONFIG_GPIO_TPS6586X=y
+diff --git a/arch/arm/boot/dts/tegra114-dalmore.dts b/arch/arm/boot/dts/tegra114-dalmore.dts
+index 6023028..dc5cdd7 100644
+--- a/arch/arm/boot/dts/tegra114-dalmore.dts
++++ b/arch/arm/boot/dts/tegra114-dalmore.dts
+@@ -1011,6 +1011,19 @@
+ 				interrupt-parent = <&palmas>;
+ 				interrupts = <8 0>;
+ 			};
++
++			pinmux {
++				compatible = "ti,tps65913-pinctrl";
++				pinctrl-names = "default";
++				pinctrl-0 = <&palmas_default>;
++
++				palmas_default: pinmux {
++					pin_gpio6 {
++						pins = "gpio6";
++						function = "gpio";
++					};
++				};
++			};
+ 		};
+ 	};
+ 
 -- 
 1.7.1.1
