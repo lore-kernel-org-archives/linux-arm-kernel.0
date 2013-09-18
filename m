@@ -1,57 +1,54 @@
-From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
-Date: Wed, 18 Sep 2013 10:49:19 +0200
-Subject: dev->of_node overwrite can cause device loading with different
- driver
-In-Reply-To: <20130918083155.GB10126@pengutronix.de>
-References: <20130913155331.GC14456@pengutronix.de>
- <20130913171046.GA26207@kroah.com>
- <20130914071653.GA26512@pengutronix.de>
- <20130914121729.GA7823@kroah.com>
- <20130914122809.GI12758@n2100.arm.linux.org.uk>
- <20130918083155.GB10126@pengutronix.de>
-Message-ID: <21049.26895.978512.36292@ipc1.ka-ro>
+From: khalasa@piap.pl (Krzysztof =?utf-8?Q?Ha=C5=82asa?=)
+Date: Wed, 18 Sep 2013 10:54:19 +0200
+Subject: BUG: sleeping function called from invalid context at
+ arch/arm/mm/fault.c:301
+Message-ID: <m3mwnaa4sk.fsf@t19.piap.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-Markus Pargmann writes:
-> On Sat, Sep 14, 2013 at 01:28:09PM +0100, Russell King - ARM Linux wrote:
-> > On Sat, Sep 14, 2013 at 05:17:29AM -0700, Greg Kroah-Hartman wrote:
-> > > On Sat, Sep 14, 2013 at 09:16:53AM +0200, Markus Pargmann wrote:
-> > > > 3. We could fix up all drivers that change the of_node. But there are
-> > > >    ARM DT frameworks that require a device struct as parameter instead
-> > > >    of a device_node parameter (e.g. soc-generic-dmaengine-pcm). So a
-> > > >    driver core, initialized by a glue driver with DT bindings, has to
-> > > >    set dev->of_node to use those frameworks. I think it is strange to
-> > > >    have such DT framework interfaces if a driver is not supposed to
-> > > >    overwrite dev->of_node permanently.
-> > > 
-> > > How about any driver that does muck with this structure, restore it
-> > > properly if their probe() function fails?  Yes, you show that this is
-> > > going to be tricky in some places (i.e. musb), but it makes sense that
-> > > the burden of fixing this issue would rest on them, as they are the ones
-> > > causing this problem, right?
-> > 
-> > It's not about overwriting at all.
-> 
-> musb does not overwrite of_node, but other drivers do, e.g. USB chipidea
-> core driver which uses its parent of_node. When probe fails in this
-> case, we could end up with similar issues.
-> 
-This has already been fixed in commit:
-e98b44e9 usb: chipidea: prevent endless loop registering platform_devices when probe fails
-in linux-next
+ipx435, v3.11, the card hw has gone wild (another issue) and generates
+data abort on register access in ISR. The issue here is the warning in
+do_page_fault(), is it normal?
 
+just got this:
 
-Lothar Wa?mann
--- 
-___________________________________________________________
+# rmmod solo6x10
+BUG: sleeping function called from invalid context at arch/arm/mm/fault.c:301
+in_atomic(): 0, irqs_disabled(): 128, pid: 303, name: rmmod
+3 locks held by rmmod/303:
+ #0:  (&__lockdep_no_validate__){......}, at: [<c0134ce4>] driver_detach+0x44/0xb8
+ #1:  (&__lockdep_no_validate__){......}, at: [<c0134cf0>] driver_detach+0x50/0xb8
+ #2:  (&mm->mmap_sem){++++++}, at: [<c000f210>] do_page_fault+0x68/0x294
+irq event stamp: 5962
+hardirqs last  enabled at (5961): [<c0273b4c>] _raw_spin_unlock_irqrestore+0x30/0x5c
+hardirqs last disabled at (5962): [<c005afb8>] __free_irq+0x150/0x1d0
+softirqs last  enabled at (0): [<c00149d4>] copy_process.part.64+0x27c/0xd4c
+softirqs last disabled at (0): [<  (null)>]   (null)
+CPU: 0 PID: 303 Comm: rmmod Tainted: G         C   3.11.0+ #51
+[<c000db48>] (unwind_backtrace+0x0/0xf0) from [<c000b59c>] (show_stack+0x10/0x14)
+[<c000b59c>] (show_stack+0x10/0x14) from [<c000f37c>] (do_page_fault+0x1d4/0x294)
+[<c000f37c>] (do_page_fault+0x1d4/0x294) from [<c0008364>] (do_DataAbort+0x34/0x9c)
+[<c0008364>] (do_DataAbort+0x34/0x9c) from [<c000bf9c>] (__dabt_svc+0x3c/0x60)
+Exception stack(0xc6ad3e50 to 0xc6ad3e98)
+3e40:                                     0000001c c78fa000 0000174a c8ca0000
+3e60: c6b2a3c0 c78fa000 c78fa000 20000013 0000001c c6ad2000 a0000013 00000000
+3e80: 0000000e c6ad3e98 c005afc8 bf04be98 20000093 ffffffff
+[<c000bf9c>] (__dabt_svc+0x3c/0x60) from [<bf04be98>] (solo_isr+0x10/0x200 [solo6x10])
+[<bf04be98>] (solo_isr+0x10/0x200 [solo6x10]) from [<c005afc8>] (__free_irq+0x160/0x1d0)
+[<c005afc8>] (__free_irq+0x160/0x1d0) from [<c005b078>] (free_irq+0x40/0x84)
+[<c005b078>] (free_irq+0x40/0x84) from [<bf04b0e0>] (free_solo_dev+0xdc/0xe4 [solo6x10])
+[<bf04b0e0>] (free_solo_dev+0xdc/0xe4 [solo6x10]) from [<c0110d70>] (pci_device_remove+0x38/0xac)
+[<c0110d70>] (pci_device_remove+0x38/0xac) from [<c0134544>] (__device_release_driver+0x70/0xd0)
+[<c0134544>] (__device_release_driver+0x70/0xd0) from [<c0134d54>] (driver_detach+0xb4/0xb8)
+[<c0134d54>] (driver_detach+0xb4/0xb8) from [<c0134370>] (bus_remove_driver+0x7c/0xc4)
+[<c0134370>] (bus_remove_driver+0x7c/0xc4) from [<c0110ebc>] (pci_unregister_driver+0x14/0x74)
+[<c0110ebc>] (pci_unregister_driver+0x14/0x74) from [<c005705c>] (SyS_delete_module+0x170/0x248)
+[<c005705c>] (SyS_delete_module+0x170/0x248) from [<c0009040>] (ret_fast_syscall+0x0/0x44)
 
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+--
+Krzysztof Halasa
 
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+Research Institute for Automation and Measurements PIAP
+Al. Jerozolimskie 202, 02-486 Warsaw, Poland
