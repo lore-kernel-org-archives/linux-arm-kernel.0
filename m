@@ -1,67 +1,161 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Wed, 18 Sep 2013 10:31:55 +0200
-Subject: dev->of_node overwrite can cause device loading with different
- driver
-In-Reply-To: <20130914122809.GI12758@n2100.arm.linux.org.uk>
-References: <20130913155331.GC14456@pengutronix.de>
- <20130913171046.GA26207@kroah.com>
- <20130914071653.GA26512@pengutronix.de>
- <20130914121729.GA7823@kroah.com>
- <20130914122809.GI12758@n2100.arm.linux.org.uk>
-Message-ID: <20130918083155.GB10126@pengutronix.de>
+From: pali.rohar@gmail.com (Pali =?utf-8?q?Roh=C3=A1r?=)
+Date: Wed, 18 Sep 2013 10:33:24 +0200
+Subject: [PATCH v2 2/2] RX-51: ARM errata 430973 workaround
+In-Reply-To: <20130917232417.GK9994@atomide.com>
+References: <1362044548-5398-1-git-send-email-pali.rohar@gmail.com>
+ <1373461145-9812-3-git-send-email-pali.rohar@gmail.com>
+ <20130917232417.GK9994@atomide.com>
+Message-ID: <201309181033.24965@pali>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 14, 2013 at 01:28:09PM +0100, Russell King - ARM Linux wrote:
-> On Sat, Sep 14, 2013 at 05:17:29AM -0700, Greg Kroah-Hartman wrote:
-> > On Sat, Sep 14, 2013 at 09:16:53AM +0200, Markus Pargmann wrote:
-> > > 3. We could fix up all drivers that change the of_node. But there are
-> > >    ARM DT frameworks that require a device struct as parameter instead
-> > >    of a device_node parameter (e.g. soc-generic-dmaengine-pcm). So a
-> > >    driver core, initialized by a glue driver with DT bindings, has to
-> > >    set dev->of_node to use those frameworks. I think it is strange to
-> > >    have such DT framework interfaces if a driver is not supposed to
-> > >    overwrite dev->of_node permanently.
+On Wednesday 18 September 2013 01:24:17 Tony Lindgren wrote:
+> * Pali Roh?r <pali.rohar@gmail.com> [130710 06:06]:
+> > --- a/arch/arm/mach-omap2/board-rx51.c
+> > +++ b/arch/arm/mach-omap2/board-rx51.c
+> 
+> This file will be gone as soon as we're moving to device
+> tree based booting. So let's do this in more future proof
+> way.
+> 
+> > +/**
+> > + * rx51_secure_dispatcher: Routine to dispatch secure PPA
+> > API calls + * @idx: The PPA API index
+> > + * @process: Process ID
+> > + * @flag: The flag indicating criticality of operation
+> > + * @nargs: Number of valid arguments out of four.
+> > + * @arg1, arg2, arg3 args4: Parameters passed to secure API
+> > + *
+> > + * Return the non-zero error value on failure.
+> > + */
+> > +static u32 rx51_secure_dispatcher(u32 idx, u32 process, u32
+> > flag, u32 nargs, +			   u32 arg1, u32 arg2, u32 arg3, u32
+> > arg4)
+> > +{
+> > +	u32 ret;
+> > +	u32 param[5];
+> > +
+> > +	param[0] = nargs+1; /* RX-51 needs number of arguments + 
+1
+> > */ +	param[1] = arg1;
+> > +	param[2] = arg2;
+> > +	param[3] = arg3;
+> > +	param[4] = arg4;
+> > +
+> > +	/*
+> > +	 * Secure API needs physical address
+> > +	 * pointer for the parameters
+> > +	 */
+> > +	local_irq_disable();
+> > +	local_fiq_disable();
+> > +	flush_cache_all();
+> > +	outer_clean_range(__pa(param), __pa(param + 5));
+> > +	ret = omap_smc3(idx, process, flag, __pa(param));
+> > +	flush_cache_all();
+> > +	local_fiq_enable();
+> > +	local_irq_enable();
+> > +
+> > +	return ret;
+> > +}
+> 
+> I think this used to be in omap-secure.c, and then made rx51
+> specific.. But since board-rx51.c is going away, let's move
+> this function to omap-secure.c.
+> 
+> > + * rx51_secure_update_aux_cr: Routine to modify the
+> > contents of Auxiliary Control Register + *  @set_bits: bits
+> > to set in ACR
+> > + *  @clr_bits: bits to clear in ACR
+> > + *
+> > + * Return the non-zero error value on failure.
+> > +*/
+> > +static u32 rx51_secure_update_aux_cr(u32 set_bits, u32
+> > clear_bits) +{
+> > +	u32 acr;
+> > +
+> > +	/* Read ACR */
+> > +	asm volatile ("mrc p15, 0, %0, c1, c0, 1" : "=r" (acr));
+> > +	acr &= ~clear_bits;
+> > +	acr |= set_bits;
+> > +
+> > +	return rx51_secure_dispatcher(RX51_PPA_WRITE_ACR,
+> > +				      0,
+> > +				      FLAG_START_CRITICAL,
+> > +				      1, acr, 0, 0, 0);
+> > +}
+> 
+> This too.
+> 
+> >  static void __init rx51_init(void)
+> >  {
+> >  
+> >  	struct omap_sdrc_params *sdrc_params;
 > > 
-> > How about any driver that does muck with this structure, restore it
-> > properly if their probe() function fails?  Yes, you show that this is
-> > going to be tricky in some places (i.e. musb), but it makes sense that
-> > the burden of fixing this issue would rest on them, as they are the ones
-> > causing this problem, right?
+> > @@ -105,6 +175,14 @@ static void __init rx51_init(void)
+> > 
+> >  	rx51_peripherals_init();
+> >  	rx51_camera_init();
+> > 
+> > +	if (omap_type() == OMAP2_DEVICE_TYPE_SEC) {
+> > +#ifdef CONFIG_ARM_ERRATA_430973
+> > +		pr_info("RX-51: Enabling ARM errata 430973
+> > workaround\n"); +		/* set IBE to 1 */
+> > +		rx51_secure_update_aux_cr(BIT(6), 0);
+> > +#endif
+> > +	}
+> > +
+> > 
+> >  	/* Ensure SDRC pins are mux'd for self-refresh */
+> >  	omap_mux_init_signal("sdrc_cke0", OMAP_PIN_OUTPUT);
+> >  	omap_mux_init_signal("sdrc_cke1", OMAP_PIN_OUTPUT);
 > 
-> It's not about overwriting at all.
+> Then this can be called both from board-generic.c based on the
+> compatible flag, and board-rx51.c for now.
+> 
+> Regards,
+> 
+> Tony
 
-musb does not overwrite of_node, but other drivers do, e.g. USB chipidea
-core driver which uses its parent of_node. When probe fails in this
-case, we could end up with similar issues.
+Hi Tony,
 
-Regards,
+I'm not very happy. I sent this patch 6 months ago and only now 
+you commented that needs rework again. This patch is needed 
+because all thumb-2 userspace binaries crashing. I want to have
+working support for Nokia N900 and not always rebasing and 
+changing patches. Also DT still not working on N900 (file contains 
+only small subset of devices as in board files plus it is not in 
+stable kernel) so I do not want to switch to DT. I need something 
+which is working and not something new non-working. I belive that 
+you and other kernel guys do not remove all n900 board files until 
+every one line will be rewritten to DT and tested that everything 
+working. And from this and other conversation it looks for me 
+that you are going to do that. So please clarify what you want to 
+do (and when) with board-rx51-* files. Aftethat I can decide what 
+to do in future.
 
-Markus
+For now I see this situation something like: I wrote patches, 
+send them to ML and after half of year maintainer politely 
+rejected them becuase my patches not using new uber cool 
+technology with still not working and also was not available half 
+year ago. What happen if I find another time to rework this patch 
+and send it again in next 2 or 5 months?
 
-> 
-> It's quite simple:
-> 
-> 1. OF creates a platform device and attaches an of_node to it.
-> 2. This platform device is matched using the data in the of_node structure
->    against one of the MUSB stub drivers.
-> 3. The MUSB stub driver creates a new platform device, and copies the
->    of_node to it, and registers it.
-> 4. This new platform device _can_ itself be matched against the stub
->    driver using the of_node structure.  When this happens, go to step
->    2 and repeat 2-4.
-> 
-> That's where the problem is - it's not about overwriting an existing
-> platform device's of_node pointer with something that the driver has
-> dreamt up at all.
-> 
-> If we're lucky, step 3.5 would be "match against the 'musb-hdrc' driver
-> and successfully probe it" which is the only thing that would break
-> the above loop.
-> 
+Tony, if you did not have time for review this patch months ago 
+or you found it only today - no problem, I understand it. But 
+what I need to know is what will happen with board-rx51-* files 
+(and when?) You can see that DT does not have definitions of all 
+n900 hw parts (plus it is not in last 3.11 kernel!) which means 
+that DT is not usable for me and other n900 people. This also 
+means that I cannot rewrite my patches for DT and test if they 
+working.
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Pali Roh?r
+pali.rohar at gmail.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130918/573a27bd/attachment-0001.sig>
