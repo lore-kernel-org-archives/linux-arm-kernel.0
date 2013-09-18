@@ -1,48 +1,37 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 18 Sep 2013 10:50:03 +0100
-Subject: Commit breaks strace: ARM: entry: allow ARM-private syscalls to
- be restarted
-In-Reply-To: <20130918091748.GA1783@mudshark.cambridge.arm.com>
-References: <20130917215749.GA11109@obsidianresearch.com>
- <20130918091748.GA1783@mudshark.cambridge.arm.com>
-Message-ID: <20130918095003.GB1783@mudshark.cambridge.arm.com>
+Date: Wed, 18 Sep 2013 10:54:46 +0100
+Subject: [PATCH v3 5/6] ARM: atomics: prefetch the destination word for
+ write prior to strex
+In-Reply-To: <alpine.LFD.2.03.1309171407510.20709@syhkavp.arg>
+References: <1379424578-7477-1-git-send-email-will.deacon@arm.com>
+ <1379424578-7477-6-git-send-email-will.deacon@arm.com>
+ <alpine.LFD.2.03.1309171407510.20709@syhkavp.arg>
+Message-ID: <20130918095445.GC1783@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 18, 2013 at 10:17:48AM +0100, Will Deacon wrote:
-> On Tue, Sep 17, 2013 at 10:57:49PM +0100, Jason Gunthorpe wrote:
-> > This happens with the latest git head for strace, as well as the 4.7
-> > release.
-> > 
-> > Hopefully you can cook up a fix :)
+On Tue, Sep 17, 2013 at 07:09:35PM +0100, Nicolas Pitre wrote:
+> On Tue, 17 Sep 2013, Will Deacon wrote:
 > 
-> I'll take a look today, thanks.
+> > The cost of changing a cacheline from shared to exclusive state can be
+> > significant, especially when this is triggered by an exclusive store,
+> > since it may result in having to retry the transaction.
+> > 
+> > This patch prefixes our atomic access implementations with pldw
+> > instructions (on CPUs which support them) to try and grab the line in
+> > exclusive state from the start. Only the barrier-less functions are
+> > updated, since memory barriers can limit the usefulness of prefetching
+> > data.
+> > 
+> > Signed-off-by: Will Deacon <will.deacon@arm.com>
+> 
+> Acked-by: Nicolas Pitre <nico@linaro.org>
 
-Ok, looks like the backwards branch to the syscall dispatching logic from
-the trace entry is busted. Can you try the patch below please?
+Thanks, Nicolas.
 
-I might also take a look at unifying the function prototypes for arm_syscall
-and syscall_trace_enter, since it should help us remove some of the argument
-shuffling in the trace path.
+> By the way, did you measure significant performance improvements with 
+> those patches?
+
+Yep. Latest version shows around a 3% hackbench boost with -rc1 on my TC2.
 
 Will
-
---->8
-
-diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
-index 74ad15d1..bc6bd96 100644
---- a/arch/arm/kernel/entry-common.S
-+++ b/arch/arm/kernel/entry-common.S
-@@ -442,10 +442,10 @@ local_restart:
-        ldrcc   pc, [tbl, scno, lsl #2]         @ call sys_* routine
- 
-        add     r1, sp, #S_OFF
--       cmp     scno, #(__ARM_NR_BASE - __NR_SYSCALL_BASE)
-+2:     cmp     scno, #(__ARM_NR_BASE - __NR_SYSCALL_BASE)
-        eor     r0, scno, #__NR_SYSCALL_BASE    @ put OS number back
-        bcs     arm_syscall
--2:     mov     why, #0                         @ no longer a real syscall
-+       mov     why, #0                         @ no longer a real syscall
-        b       sys_ni_syscall                  @ not private func
- 
- #if defined(CONFIG_OABI_COMPAT) || !defined(CONFIG_AEABI)
