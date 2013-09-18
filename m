@@ -1,111 +1,93 @@
 From: Sudeep.KarkadaNagesha@arm.com (Sudeep KarkadaNagesha)
-Date: Wed, 18 Sep 2013 12:05:05 +0100
-Subject: [PATCH v6 RESEND 4/5] drivers: clocksource: add support for ARM
- architected timer event stream
+Date: Wed, 18 Sep 2013 12:05:06 +0100
+Subject: [PATCH v6 RESEND 5/5] drivers: clocksource: add CPU PM notifier for
+ ARM architected timer
 In-Reply-To: <1379502306-12911-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
 References: <1379502306-12911-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
-Message-ID: <1379502306-12911-5-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+Message-ID: <1379502306-12911-6-git-send-email-Sudeep.KarkadaNagesha@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Will Deacon <will.deacon@arm.com>
+From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
 
-The ARM architected timer can generate events (used for waking up
-CPUs executing the wfe instruction) at a frequency represented as a
-power-of-2 divisor of the clock rate.
+Few control settings done in architected timer as part of initialisation
+can be lost when CPU enters deeper power states. They need to be
+restored when the CPU is (warm)reset again.
 
-An event stream might be used:
-- To implement wfe-based timeouts for userspace locking implementations.
-- To impose a timeout on a wfe for safeguarding against any programming
-  error in case an expected event is not generated.
+This patch adds CPU PM notifiers to save the counter control register
+when entering low power modes and restore it when CPU exits low power.
 
-This patch computes the event stream frequency aiming for a period
-of 100us between events. It uses ARM/ARM64 specific backends to configure
-and enable the event stream.
-
-Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
-[sudeep: moving ARM/ARM64 changes into separate patches
-         and adding Kconfig option]
+Reviewed-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Reviewed-by: Will Deacon <will.deacon@arm.com>
 Signed-off-by: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
 ---
- drivers/clocksource/Kconfig          | 15 +++++++++++++++
- drivers/clocksource/arm_arch_timer.c | 15 +++++++++++++++
- include/clocksource/arm_arch_timer.h |  2 ++
- 3 files changed, 32 insertions(+)
+ drivers/clocksource/arm_arch_timer.c | 34 ++++++++++++++++++++++++++++++++++
+ 1 file changed, 34 insertions(+)
 
-diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
-index 41c6946..559d803 100644
---- a/drivers/clocksource/Kconfig
-+++ b/drivers/clocksource/Kconfig
-@@ -74,6 +74,21 @@ config ARM_ARCH_TIMER
- 	bool
- 	select CLKSRC_OF if OF
- 
-+config ARM_ARCH_TIMER_EVTSTREAM
-+	bool "Support for ARM architected timer event stream generation"
-+	default y if ARM_ARCH_TIMER
-+	help
-+	  This option enables support for event stream generation based on
-+	  the ARM architected timer. It is used for waking up CPUs executing
-+	  the wfe instruction at a frequency represented as a power-of-2
-+	  divisor of the clock rate.
-+	  The main use of the event stream is wfe-based timeouts of userspace
-+	  locking implementations. It might also be useful for imposing timeout
-+	  on wfe to safeguard against any programming errors in case an expected
-+	  event is not generated.
-+	  This must be disabled for hardware validation purposes to detect any
-+	  hardware anomalies of missing events.
-+
- config ARM_GLOBAL_TIMER
- 	bool
- 	select CLKSRC_OF if OF
 diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-index fbd9ccd..105f8ff 100644
+index 105f8ff..9338f1a 100644
 --- a/drivers/clocksource/arm_arch_timer.c
 +++ b/drivers/clocksource/arm_arch_timer.c
-@@ -294,6 +294,19 @@ static void __arch_timer_setup(unsigned type,
- 	clockevents_config_and_register(clk, arch_timer_rate, 0xf, 0x7fffffff);
- }
+@@ -13,6 +13,7 @@
+ #include <linux/device.h>
+ #include <linux/smp.h>
+ #include <linux/cpu.h>
++#include <linux/cpu_pm.h>
+ #include <linux/clockchips.h>
+ #include <linux/interrupt.h>
+ #include <linux/of_irq.h>
+@@ -475,6 +476,33 @@ static struct notifier_block arch_timer_cpu_nb = {
+ 	.notifier_call = arch_timer_cpu_notify,
+ };
  
-+static void arch_timer_configure_evtstream(void)
++#ifdef CONFIG_CPU_PM
++static unsigned int saved_cntkctl;
++static int arch_timer_cpu_pm_notify(struct notifier_block *self,
++				    unsigned long action, void *hcpu)
 +{
-+	int evt_stream_div, pos;
-+
-+	/* Find the closest power of two to the divisor */
-+	evt_stream_div = arch_timer_rate / ARCH_TIMER_EVT_STREAM_FREQ;
-+	pos = fls(evt_stream_div);
-+	if (pos > 1 && !(evt_stream_div & (1 << (pos - 2))))
-+		pos--;
-+	/* enable event stream */
-+	arch_timer_evtstrm_enable(min(pos, 15));
++	if (action == CPU_PM_ENTER)
++		saved_cntkctl = arch_timer_get_cntkctl();
++	else if (action == CPU_PM_ENTER_FAILED || action == CPU_PM_EXIT)
++		arch_timer_set_cntkctl(saved_cntkctl);
++	return NOTIFY_OK;
 +}
 +
- static int arch_timer_setup(struct clock_event_device *clk)
++static struct notifier_block arch_timer_cpu_pm_notifier = {
++	.notifier_call = arch_timer_cpu_pm_notify,
++};
++
++static int __init arch_timer_cpu_pm_init(void)
++{
++	return cpu_pm_register_notifier(&arch_timer_cpu_pm_notifier);
++}
++#else
++static int __init arch_timer_cpu_pm_init(void)
++{
++	return 0;
++}
++#endif
++
+ static int __init arch_timer_register(void)
  {
- 	__arch_timer_setup(ARCH_CP15_TIMER, clk);
-@@ -307,6 +320,8 @@ static int arch_timer_setup(struct clock_event_device *clk)
- 	}
+ 	int err;
+@@ -514,11 +542,17 @@ static int __init arch_timer_register(void)
+ 	if (err)
+ 		goto out_free_irq;
  
- 	arch_counter_set_user_access();
-+	if (IS_ENABLED(CONFIG_ARM_ARCH_TIMER_EVTSTREAM))
-+		arch_timer_configure_evtstream();
++	err = arch_timer_cpu_pm_init();
++	if (err)
++		goto out_unreg_notify;
++
+ 	/* Immediately configure the timer on the boot CPU */
+ 	arch_timer_setup(this_cpu_ptr(arch_timer_evt));
  
  	return 0;
- }
-diff --git a/include/clocksource/arm_arch_timer.h b/include/clocksource/arm_arch_timer.h
-index 8707dae..6d26b40 100644
---- a/include/clocksource/arm_arch_timer.h
-+++ b/include/clocksource/arm_arch_timer.h
-@@ -41,6 +41,8 @@ enum arch_timer_reg {
- #define ARCH_TIMER_USR_VT_ACCESS_EN	(1 << 8) /* virtual timer registers */
- #define ARCH_TIMER_USR_PT_ACCESS_EN	(1 << 9) /* physical timer registers */
  
-+#define ARCH_TIMER_EVT_STREAM_FREQ	10000	/* 100us */
-+
- #ifdef CONFIG_ARM_ARCH_TIMER
- 
- extern u32 arch_timer_get_rate(void);
++out_unreg_notify:
++	unregister_cpu_notifier(&arch_timer_cpu_nb);
+ out_free_irq:
+ 	if (arch_timer_use_virtual)
+ 		free_percpu_irq(arch_timer_ppi[VIRT_PPI], arch_timer_evt);
 -- 
 1.8.1.2
