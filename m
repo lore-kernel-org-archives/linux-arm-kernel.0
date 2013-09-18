@@ -1,76 +1,68 @@
 From: rogerq@ti.com (Roger Quadros)
-Date: Wed, 18 Sep 2013 15:48:55 +0300
-Subject: [PATCH v7 03/10] usb: phy: omap-usb2: Don't use omap_get_control_dev()
+Date: Wed, 18 Sep 2013 15:48:58 +0300
+Subject: [PATCH v7 06/10] ARM: dts: omap4: update omap-control-usb nodes
 In-Reply-To: <1379508542-22389-1-git-send-email-rogerq@ti.com>
 References: <1379508542-22389-1-git-send-email-rogerq@ti.com>
-Message-ID: <1379508542-22389-4-git-send-email-rogerq@ti.com>
+Message-ID: <1379508542-22389-7-git-send-email-rogerq@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-omap_get_control_dev() is being deprecated as it doesn't support
-multiple instances. As control device is present only from OMAP4
-onwards which supports DT only, we use phandles to get the
-reference to the control device.
+Split otghs_ctrl and USB2 PHY power-down into separate
+omap-control-usb nodes. Get rid of "ti,type" property.
 
-As we don't support non-DT boot, we just bail out on probe
-if device node is not present.
+Also get rid of "ti,has-mailbox" property from usb_otg_hs
+node and provide the ctrl-module phandle.
 
+CC: Benoit Cousson <bcousson@baylibre.com>
 Signed-off-by: Roger Quadros <rogerq@ti.com>
 ---
- drivers/usb/phy/phy-omap-usb2.c |   26 ++++++++++++++++++++------
- 1 files changed, 20 insertions(+), 6 deletions(-)
+ arch/arm/boot/dts/omap4.dtsi |   20 ++++++++++++--------
+ 1 files changed, 12 insertions(+), 8 deletions(-)
 
-diff --git a/drivers/usb/phy/phy-omap-usb2.c b/drivers/usb/phy/phy-omap-usb2.c
-index d266861..e7d4790 100644
---- a/drivers/usb/phy/phy-omap-usb2.c
-+++ b/drivers/usb/phy/phy-omap-usb2.c
-@@ -28,6 +28,7 @@
- #include <linux/pm_runtime.h>
- #include <linux/delay.h>
- #include <linux/usb/omap_control_usb.h>
-+#include <linux/of_platform.h>
+diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
+index 22d9f2b..ca6400d 100644
+--- a/arch/arm/boot/dts/omap4.dtsi
++++ b/arch/arm/boot/dts/omap4.dtsi
+@@ -519,7 +519,7 @@
+ 			usb2_phy: usb2phy at 4a0ad080 {
+ 				compatible = "ti,omap-usb2";
+ 				reg = <0x4a0ad080 0x58>;
+-				ctrl-module = <&omap_control_usb>;
++				ctrl-module = <&omap_control_usb2phy>;
+ 			};
+ 		};
  
- /**
-  * omap_usb2_set_comparator - links the comparator present in the sytem with
-@@ -120,8 +121,14 @@ static int omap_usb2_suspend(struct usb_phy *x, int suspend)
+@@ -643,12 +643,16 @@
+ 			};
+ 		};
  
- static int omap_usb2_probe(struct platform_device *pdev)
- {
--	struct omap_usb			*phy;
--	struct usb_otg			*otg;
-+	struct omap_usb	*phy;
-+	struct usb_otg *otg;
-+	struct device_node *node = pdev->dev.of_node;
-+	struct device_node *control_node;
-+	struct platform_device *control_pdev;
+-		omap_control_usb: omap-control-usb at 4a002300 {
+-			compatible = "ti,omap-control-usb";
+-			reg = <0x4a002300 0x4>,
+-			      <0x4a00233c 0x4>;
+-			reg-names = "control_dev_conf", "otghs_control";
+-			ti,type = <1>;
++		omap_control_usb2phy: control-phy at 4a002300 {
++			compatible = "ti,control-phy-usb2";
++			reg = <0x4a002300 0x4>;
++			reg-names = "power";
++		};
 +
-+	if (!node)
-+		return -EINVAL;
++		omap_control_usbotg: control-phy at 4a00233c {
++			compatible = "ti,control-phy-otghs";
++			reg = <0x4a00233c 0x4>;
++			reg-names = "otghs_control";
+ 		};
  
- 	phy = devm_kzalloc(&pdev->dev, sizeof(*phy), GFP_KERNEL);
- 	if (!phy) {
-@@ -143,11 +150,18 @@ static int omap_usb2_probe(struct platform_device *pdev)
- 	phy->phy.otg		= otg;
- 	phy->phy.type		= USB_PHY_TYPE_USB2;
- 
--	phy->control_dev = omap_get_control_dev();
--	if (IS_ERR(phy->control_dev)) {
--		dev_dbg(&pdev->dev, "Failed to get control device\n");
--		return -ENODEV;
-+	control_node = of_parse_phandle(node, "ctrl-module", 0);
-+	if (!control_node) {
-+		dev_err(&pdev->dev, "Failed to get control device phandle\n");
-+		return -EINVAL;
- 	}
-+	control_pdev = of_find_device_by_node(control_node);
-+	if (!control_pdev) {
-+		dev_err(&pdev->dev, "Failed to get control device\n");
-+		return -EINVAL;
-+	}
-+
-+	phy->control_dev = &control_pdev->dev;
- 
- 	phy->is_suspended	= 1;
- 	omap_control_usb_phy_power(phy->control_dev, 0);
+ 		usb_otg_hs: usb_otg_hs at 4a0ab000 {
+@@ -661,7 +665,7 @@
+ 			multipoint = <1>;
+ 			num-eps = <16>;
+ 			ram-bits = <12>;
+-			ti,has-mailbox;
++			ctrl-module = <&omap_control_usbotg>;
+ 		};
+ 	};
+ };
 -- 
 1.7.4.1
