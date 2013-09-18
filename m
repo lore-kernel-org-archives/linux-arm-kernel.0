@@ -1,100 +1,61 @@
-From: josh.wu@atmel.com (Josh Wu)
-Date: Wed, 18 Sep 2013 13:58:48 +0800
-Subject: [PATCH v3] mtd: atmel_nand: use minimum ecc requirements of nand:
- ecc_{strength, step}_ds
-Message-ID: <1379483928-18253-1-git-send-email-josh.wu@atmel.com>
+From: grant.likely@linaro.org (Grant Likely)
+Date: Tue, 17 Sep 2013 22:36:29 -0500
+Subject: [PATCH 19/28] arm: set initrd_start/initrd_end for fdt scan
+In-Reply-To: <1379372965-22359-20-git-send-email-robherring2@gmail.com>
+References: <1379372965-22359-1-git-send-email-robherring2@gmail.com>
+ <1379372965-22359-20-git-send-email-robherring2@gmail.com>
+Message-ID: <20130918033629.0D236C42C83@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since ecc_{strength,step}_ds is introduced in nand_chip structure for
-minimum ecc requirements. So we can use them directly and remove our
-own get_onfi_ecc_param function.
+On Mon, 16 Sep 2013 18:09:15 -0500, Rob Herring <robherring2@gmail.com> wrote:
+> From: Rob Herring <rob.herring@calxeda.com>
+> 
+> In order to unify the initrd scanning for DT across architectures, make
+> arm set initrd_start and initrd_end instead of the physical addresses.
+> This is aligned with all other architectures.
+> 
+> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: linux-arm-kernel at lists.infradead.org
 
-Signed-off-by: Josh Wu <josh.wu@atmel.com>
----
-v2 --> v3:
-  1. since ecc_{strength,step}_ds is non ONFI specific remove the check code:
-        'if (host->nand_chip.onfi_version)'
-     use 'if (host->nand_chip.ecc_strength_ds)' instead.
-  2. refined the commit message and change the comment since now we are not
-     ONFI specific.
+Acked-by: Grant Likely <grant.likely@linaro.org>
 
-v1 --> v2:
-  1. updated the refered commit id as it is changed when merged in mainline.
-  2. refined the commit message
-
- drivers/mtd/nand/atmel_nand.c |   46 ++++++++---------------------------------
- 1 file changed, 9 insertions(+), 37 deletions(-)
-
-diff --git a/drivers/mtd/nand/atmel_nand.c b/drivers/mtd/nand/atmel_nand.c
-index 5a5d457..46e8794 100644
---- a/drivers/mtd/nand/atmel_nand.c
-+++ b/drivers/mtd/nand/atmel_nand.c
-@@ -1062,56 +1062,28 @@ static void atmel_pmecc_core_init(struct mtd_info *mtd)
- }
- 
- /*
-- * Get ECC requirement in ONFI parameters, returns -1 if ONFI
-- * parameters is not supported.
-- * return 0 if success to get the ECC requirement.
-- */
--static int get_onfi_ecc_param(struct nand_chip *chip,
--		int *ecc_bits, int *sector_size)
--{
--	*ecc_bits = *sector_size = 0;
--
--	if (chip->onfi_params.ecc_bits == 0xff)
--		/* TODO: the sector_size and ecc_bits need to be find in
--		 * extended ecc parameter, currently we don't support it.
--		 */
--		return -1;
--
--	*ecc_bits = chip->onfi_params.ecc_bits;
--
--	/* The default sector size (ecc codeword size) is 512 */
--	*sector_size = 512;
--
--	return 0;
--}
--
--/*
-- * Get ecc requirement from ONFI parameters ecc requirement.
-+ * Get minimum ecc requirements from NAND.
-  * If pmecc-cap, pmecc-sector-size in DTS are not specified, this function
-- * will set them according to ONFI ecc requirement. Otherwise, use the
-+ * will set them according to minimum ecc requirement. Otherwise, use the
-  * value in DTS file.
-  * return 0 if success. otherwise return error code.
-  */
- static int pmecc_choose_ecc(struct atmel_nand_host *host,
- 		int *cap, int *sector_size)
- {
--	/* Get ECC requirement from ONFI parameters */
--	*cap = *sector_size = 0;
--	if (host->nand_chip.onfi_version) {
--		if (!get_onfi_ecc_param(&host->nand_chip, cap, sector_size))
--			dev_info(host->dev, "ONFI params, minimum required ECC: %d bits in %d bytes\n",
-+	/* Get minimum ECC requirements */
-+	if (host->nand_chip.ecc_strength_ds) {
-+		*cap = host->nand_chip.ecc_strength_ds;
-+		*sector_size = host->nand_chip.ecc_step_ds;
-+		dev_info(host->dev, "minimum ECC requirements: %d bits in %d bytes\n",
- 				*cap, *sector_size);
--		else
--			dev_info(host->dev, "NAND chip ECC reqirement is in Extended ONFI parameter, we don't support yet.\n");
- 	} else {
--		dev_info(host->dev, "NAND chip is not ONFI compliant, assume ecc_bits is 2 in 512 bytes");
--	}
--	if (*cap == 0 && *sector_size == 0) {
- 		*cap = 2;
- 		*sector_size = 512;
-+		dev_info(host->dev, "cannot detect minimum ECC requirements, assume 2-bit correction per 512 bytes");
- 	}
- 
--	/* If dts file doesn't specify then use the one in ONFI parameters */
-+	/* If dts file doesn't specify then use the NAND's minimum ecc parameters */
- 	if (host->pmecc_corr_cap == 0) {
- 		/* use the most fitable ecc bits (the near bigger one ) */
- 		if (*cap <= 2)
--- 
-1.7.9.5
+> ---
+>  arch/arm/mm/init.c | 11 ++++++++---
+>  1 file changed, 8 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+> index febaee7..9eeb1cd 100644
+> --- a/arch/arm/mm/init.c
+> +++ b/arch/arm/mm/init.c
+> @@ -77,11 +77,11 @@ static int __init parse_tag_initrd2(const struct tag *tag)
+>  
+>  __tagtable(ATAG_INITRD2, parse_tag_initrd2);
+>  
+> -#ifdef CONFIG_OF_FLATTREE
+> +#if defined(CONFIG_OF_FLATTREE) && defined(CONFIG_BLK_DEV_INITRD)
+>  void __init early_init_dt_setup_initrd_arch(u64 start, u64 end)
+>  {
+> -	phys_initrd_start = start;
+> -	phys_initrd_size = end - start;
+> +	initrd_start = (unsigned long)__va(start);
+> +	initrd_end = (unsigned long)__va(end);
+>  }
+>  #endif /* CONFIG_OF_FLATTREE */
+>  
+> @@ -351,6 +351,11 @@ void __init arm_memblock_init(struct meminfo *mi,
+>  	memblock_reserve(__pa(_stext), _end - _stext);
+>  #endif
+>  #ifdef CONFIG_BLK_DEV_INITRD
+> +	/* FDT scan will populate initrd_start */
+> +	if (initrd_start) {
+> +		phys_initrd_start = __virt_to_phys(initrd_start);
+> +		phys_initrd_size = initrd_end - initrd_start;
+> +	}
+>  	if (phys_initrd_size &&
+>  	    !memblock_is_region_memory(phys_initrd_start, phys_initrd_size)) {
+>  		pr_err("INITRD: 0x%08llx+0x%08lx is not a memory region - disabling initrd\n",
+> -- 
+> 1.8.1.2
+> 
