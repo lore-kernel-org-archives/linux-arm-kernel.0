@@ -1,72 +1,39 @@
 From: pavel@ucw.cz (Pavel Machek)
-Date: Wed, 18 Sep 2013 16:22:03 +0200
+Date: Wed, 18 Sep 2013 16:35:37 +0200
 Subject: [PATCH 1/4] usb: musb: Call atomic_notifier_call_chain when
  status is changed
-In-Reply-To: <CAAwP0s0nGthkm9Bp1ug23Rtz6-sbR60FFTSfd-Cj9wKMU0RBEA@mail.gmail.com>
+In-Reply-To: <20130918142203.GD3748@amd.pavel.ucw.cz>
 References: <1378630239-10006-1-git-send-email-pali.rohar@gmail.com>
  <201309172128.42514@pali> <20130918014942.GD19817@radagast>
  <201309181020.15245@pali>
  <CAAwP0s1Ou7Nrq7GhnHX71TFCrTFg=nqUh+GsAJhN8DjZGsF4QQ@mail.gmail.com>
  <20130918133025.GB2953@amd.pavel.ucw.cz>
  <CAAwP0s0nGthkm9Bp1ug23Rtz6-sbR60FFTSfd-Cj9wKMU0RBEA@mail.gmail.com>
-Message-ID: <20130918142203.GD3748@amd.pavel.ucw.cz>
+ <20130918142203.GD3748@amd.pavel.ucw.cz>
+Message-ID: <20130918143537.GA4914@amd.pavel.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi!
 
-> >> >> > So will you do that? Or it is needed to resend this one line
-> >> >> > hunk again in new email again?
-> >> >>
-> >> >> new patch, new email
-> >> >
-> >> > Guys, WHY ARE YOU SO STUPID AND ARROGANT?
-> >> >
-> >> > Sorry but, need to copy full isolated patch/hunk from one mail to
-> >> > another is hassling. So what you want from me? Do all those non
-> >> > sense working only because yesterday you had bad day? Or what?
-...
-> > Actually, there is need to be rude, because Felipe fails to act as
-> > maintainer. Instead of fixing bugs in his code, he bounces bugfix
-> > patches, points people to random READMEs and wastes everyones time.
+> > gave feedback. If the sender doesn't want to take his feedback into
+> > account and prefer to send pretty insulting emails instead that is his
+> > choice but I would say that is this not the greatest approach to get
+> > your code merged (to say the least).
 > 
-> I don't know what are you talking about (if that happened in another
-> thread then I need more context). Felipe is not bouncing any bugfix
-
-Take a look here:
-
-https://lkml.org/lkml/2013/9/17/286
-
-I clearly state that patch can not be tested as required for "proper"
-submission, but offer patch anyway. I get irrelevant boilerplate on
-patch format.
-
-> but just asked to split the patch in two since the patch was solving
-> two separate issues so is way better to have it in two separate
-> patches for the reasons I explained before.
+> Clearly not. But Pali found bug in code Felipe should
+> maintain. Instead of "thank you for bug report, I applied this one
+> line of your code to fix it", Pali got "new patch, new email" for his
+> efforts. That is how you train dogs, not how you should treat kernel
+> contributors.
 > 
-> So, as far as I can tell Felipe did exactly what I would expect from a
-> maintainer. He took the time to review the patches sent to him and
+> Now, it is possible that Felipe just has problems with english, as he
+> called me piece of wood in https://lkml.org/lkml/2013/9/17/476 , but
+> he appears more arogant than usual over email.
 
-I'd expect maintainer to, well, maintain code. It means actually
-fixing bugs in his code, when he's pointed at them.
-
-> gave feedback. If the sender doesn't want to take his feedback into
-> account and prefer to send pretty insulting emails instead that is his
-> choice but I would say that is this not the greatest approach to get
-> your code merged (to say the least).
-
-Clearly not. But Pali found bug in code Felipe should
-maintain. Instead of "thank you for bug report, I applied this one
-line of your code to fix it", Pali got "new patch, new email" for his
-efforts. That is how you train dogs, not how you should treat kernel
-contributors.
-
-Now, it is possible that Felipe just has problems with english, as he
-called me piece of wood in https://lkml.org/lkml/2013/9/17/476 , but
-he appears more arogant than usual over email.
-
-								Pavel
+Actually he called me "piece of wood with garbage in it". I guess I
+have right to be offended. I'm baby in the next email. Hmm.
+									Pavel
 -- 
 (english) http://www.livejournal.com/~pavelmachek
 (cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
