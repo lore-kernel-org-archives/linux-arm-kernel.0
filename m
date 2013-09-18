@@ -1,99 +1,39 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 18 Sep 2013 12:40:32 +0100
-Subject: [PATCH 4/4] ARM: STi: Add I2C config to B2000 and B2020 boards
-In-Reply-To: <1379498483-4236-5-git-send-email-maxime.coquelin@st.com>
-References: <1379498483-4236-1-git-send-email-maxime.coquelin@st.com>
- <1379498483-4236-5-git-send-email-maxime.coquelin@st.com>
-Message-ID: <20130918114032.GD16984@lee--X1>
+From: michael.opdenacker@free-electrons.com (Michael Opdenacker)
+Date: Wed, 18 Sep 2013 13:52:25 +0200
+Subject: [PATCH] ARM: STi: remove unused Kconfig parameters
+In-Reply-To: <523949A1.7080600@st.com>
+References: <1379474622-4715-1-git-send-email-michael.opdenacker@free-electrons.com>
+ <523949A1.7080600@st.com>
+Message-ID: <523993F9.6000705@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 18 Sep 2013, Maxime COQUELIN wrote:
+Hi Srini
 
-> This patch supplies I2C configuration to B2000 and B2020
-> based on either STiH415 or STiH416 SoCs.
-> 
-> Cc: Srinivas Kandagatla <srinivas.kandagatla@st.com>
-> Signed-off-by: Maxime Coquelin <maxime.coquelin@st.com>
-> ---
->  arch/arm/boot/dts/stih41x-b2000.dtsi |    7 +++++++
->  arch/arm/boot/dts/stih41x-b2020.dtsi |   20 ++++++++++++++++++++
->  2 files changed, 27 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/stih41x-b2000.dtsi b/arch/arm/boot/dts/stih41x-b2000.dtsi
-> index 8e694d2..346cc4bc 100644
-> --- a/arch/arm/boot/dts/stih41x-b2000.dtsi
-> +++ b/arch/arm/boot/dts/stih41x-b2000.dtsi
-> @@ -37,5 +37,12 @@
->  			};
->  		};
->  
-> +		/* HDMI Tx I2C */
-> +		i2c1: i2c at fed41000{
+On 09/18/2013 08:35 AM, Srinivas KANDAGATLA wrote:
+> Hi Michael.
+> On 18/09/13 04:23, Michael Opdenacker wrote:
+>> This patch proposes to remove the 'SOC_STIH415' and 'SOC_STIH416'
+>> parameters, which are used nowhere else in the source code
+>> and Makefiles.
+>>
+>> Will they be needed in code that hasn't been submitted yet?
+> Yes, we will be using it in future patches, for something like reset
+> controller.
+> Also I am planning to use in dts/Makefiles so that we can build dtbs for
+> only selected SOC.
+>
+> Thanks,
+> srini
+Thanks for your reply. That's fine for me if you have plans to use these
+parameters.
 
-nit: Space before the '{'
+Cheers,
 
-> +			status = "okay";
-
-Consider enabling the node at the bottom.
-
-> +
-> +			/* HDMI V1.3a supports Standard mode only */
-> +			clock-frequency = <100000>;
-> +		};
->  	};
->  };
-> diff --git a/arch/arm/boot/dts/stih41x-b2020.dtsi b/arch/arm/boot/dts/stih41x-b2020.dtsi
-> index 133e181..10b98da 100644
-> --- a/arch/arm/boot/dts/stih41x-b2020.dtsi
-> +++ b/arch/arm/boot/dts/stih41x-b2020.dtsi
-> @@ -38,5 +38,25 @@
->  				default-state = "off";
->  			};
->  		};
-> +
-> +		i2c0: i2c at fed40000{
-
-As above.
-
-> +			status = "okay";
-> +		};
-> +
-> +		/* HDMI Tx I2C */
-> +		i2c1: i2c at fed41000{
-
-As above.
-
-> +			status = "okay";
-
-As above.
-
-> +			/* HDMI V1.3a supports Standard mode only */
-> +			clock-frequency = <100000>;
-> +		};
-> +
-> +		sbc_i2c0: i2c at fe540000{
-
-As above.
-
-> +			status = "okay";
-> +		};
-> +
-> +		sbc_i2c1: i2c at fe541000{
-
-Are these nodes referenced by phandle at all?
-
-If not, consider dropping the <lable>:s
-
-> +			status = "okay";
-> +		};
->  	};
->  };
-
-Odd tabbing here.
+Michael.
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Michael Opdenacker, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
++33 484 258 098
