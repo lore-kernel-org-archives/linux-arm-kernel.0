@@ -1,68 +1,65 @@
 From: rogerq@ti.com (Roger Quadros)
-Date: Wed, 18 Sep 2013 15:48:58 +0300
-Subject: [PATCH v7 06/10] ARM: dts: omap4: update omap-control-usb nodes
+Date: Wed, 18 Sep 2013 15:49:00 +0300
+Subject: [PATCH v7 08/10] ARM: dts: omap5: update omap-control-usb node
 In-Reply-To: <1379508542-22389-1-git-send-email-rogerq@ti.com>
 References: <1379508542-22389-1-git-send-email-rogerq@ti.com>
-Message-ID: <1379508542-22389-7-git-send-email-rogerq@ti.com>
+Message-ID: <1379508542-22389-9-git-send-email-rogerq@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Split otghs_ctrl and USB2 PHY power-down into separate
-omap-control-usb nodes. Get rid of "ti,type" property.
-
-Also get rid of "ti,has-mailbox" property from usb_otg_hs
-node and provide the ctrl-module phandle.
+Split USB2 PHY and USB3 PHY into separate omap-control-usb
+nodes. Get rid of "ti,type" property.
 
 CC: Benoit Cousson <bcousson@baylibre.com>
 Signed-off-by: Roger Quadros <rogerq@ti.com>
 ---
- arch/arm/boot/dts/omap4.dtsi |   20 ++++++++++++--------
+ arch/arm/boot/dts/omap5.dtsi |   20 ++++++++++++--------
  1 files changed, 12 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
-index 22d9f2b..ca6400d 100644
---- a/arch/arm/boot/dts/omap4.dtsi
-+++ b/arch/arm/boot/dts/omap4.dtsi
-@@ -519,7 +519,7 @@
- 			usb2_phy: usb2phy at 4a0ad080 {
- 				compatible = "ti,omap-usb2";
- 				reg = <0x4a0ad080 0x58>;
--				ctrl-module = <&omap_control_usb>;
-+				ctrl-module = <&omap_control_usb2phy>;
- 			};
- 		};
- 
-@@ -643,12 +643,16 @@
- 			};
+diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
+index 07be2cd..e69cc57 100644
+--- a/arch/arm/boot/dts/omap5.dtsi
++++ b/arch/arm/boot/dts/omap5.dtsi
+@@ -626,12 +626,16 @@
+ 			hw-caps-temp-alert;
  		};
  
 -		omap_control_usb: omap-control-usb at 4a002300 {
 -			compatible = "ti,omap-control-usb";
 -			reg = <0x4a002300 0x4>,
--			      <0x4a00233c 0x4>;
--			reg-names = "control_dev_conf", "otghs_control";
--			ti,type = <1>;
+-			      <0x4a002370 0x4>;
+-			reg-names = "control_dev_conf", "phy_power_usb";
+-			ti,type = <2>;
 +		omap_control_usb2phy: control-phy at 4a002300 {
 +			compatible = "ti,control-phy-usb2";
 +			reg = <0x4a002300 0x4>;
 +			reg-names = "power";
 +		};
 +
-+		omap_control_usbotg: control-phy at 4a00233c {
-+			compatible = "ti,control-phy-otghs";
-+			reg = <0x4a00233c 0x4>;
-+			reg-names = "otghs_control";
++		omap_control_usb3phy: control-phy at 4a002370 {
++			compatible = "ti,control-phy-pipe3";
++			reg = <0x4a002370 0x4>;
++			reg-names = "power";
  		};
  
- 		usb_otg_hs: usb_otg_hs at 4a0ab000 {
+ 		omap_dwc3 at 4a020000 {
 @@ -661,7 +665,7 @@
- 			multipoint = <1>;
- 			num-eps = <16>;
- 			ram-bits = <12>;
--			ti,has-mailbox;
-+			ctrl-module = <&omap_control_usbotg>;
+ 			usb2_phy: usb2phy at 4a084000 {
+ 				compatible = "ti,omap-usb2";
+ 				reg = <0x4a084000 0x7c>;
+-				ctrl-module = <&omap_control_usb>;
++				ctrl-module = <&omap_control_usb2phy>;
+ 			};
+ 
+ 			usb3_phy: usb3phy at 4a084400 {
+@@ -670,7 +674,7 @@
+ 				      <0x4a084800 0x64>,
+ 				      <0x4a084c00 0x40>;
+ 				reg-names = "phy_rx", "phy_tx", "pll_ctrl";
+-				ctrl-module = <&omap_control_usb>;
++				ctrl-module = <&omap_control_usb3phy>;
+ 			};
  		};
- 	};
- };
+ 
 -- 
 1.7.4.1
