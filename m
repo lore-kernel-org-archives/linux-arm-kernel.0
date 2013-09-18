@@ -1,125 +1,114 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 18 Sep 2013 17:34:24 +0200
-Subject: [PATCH v2] ARM: new platform for Energy Micro's EFM32 Cortex-M3
- SoCs
-In-Reply-To: <201309172245.25367.arnd@arndb.de>
-References: <1379447884-14025-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <201309172245.25367.arnd@arndb.de>
-Message-ID: <20130918153424.GR24802@pengutronix.de>
+From: r.sricharan@ti.com (Sricharan R)
+Date: Wed, 18 Sep 2013 21:04:30 +0530
+Subject: [PATCH V2] ARM: OMAP5/DRA7: realtime_counter: Configure CNTFRQ
+ register
+Message-ID: <1379518470-28387-1-git-send-email-r.sricharan@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+The realtime counter called master counter, produces the count
+used by the private timer peripherals in the MPU_CLUSTER. The
+CNTFRQ per cpu register is used to denote the frequency of the counter.
+Currently the frequency value is passed from the
+DT file, but this is not scalable when we have other non-DT guest
+OS. This register must be set to the right value by the
+secure rom code. Setting this register helps in propagating the right
+frequency value across OSes.
 
-On Tue, Sep 17, 2013 at 10:45:25PM +0200, Arnd Bergmann wrote:
-> On Tuesday 17 September 2013, Uwe Kleine-K?nig wrote:
-> >  arch/arm/Kconfig                               |  16 +++-
-> >  arch/arm/Kconfig.debug                         |  16 ++++
-> >  arch/arm/Makefile                              |   1 +
-> >  arch/arm/configs/efm32_defconfig               | 104 +++++++++++++++++++++++++
-> >  arch/arm/mach-efm32/Makefile                   |   1 +
-> >  arch/arm/mach-efm32/Makefile.boot              |   2 +
-> >  arch/arm/mach-efm32/cmu.h                      |  15 ++++
-> >  arch/arm/mach-efm32/common.c                   |  19 +++++
-> >  arch/arm/mach-efm32/common.h                   |   1 +
-> >  arch/arm/mach-efm32/dtmachine.c                |  31 ++++++++
-> >  arch/arm/mach-efm32/include/mach/debug-macro.S |  48 ++++++++++++
-> >  arch/arm/mach-efm32/include/mach/entry-macro.S |   5 ++
-> >  arch/arm/mach-efm32/include/mach/io.h          |   6 ++
-> >  arch/arm/mach-efm32/include/mach/irqs.h        |   6 ++
-> >  arch/arm/mach-efm32/include/mach/timex.h       |   7 ++
-> 
-> You should be able to add NOMMU platforms in combination with
-> CONFIG_MULTIPLATFORM now, which gets rid of most of these files.
-in next ARCH_MULTIPLATFORM still depends on MMU. What am I missing?
+More discussions and the reason for adding this in a non-DT
+way can be seen from below.
+http://www.mail-archive.com/linux-omap at vger.kernel.org/msg93832.html
+
+So configuring this secure register for all the cpus here.
+
+Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Cc: Nishanth Menon <nm@ti.com>
+Cc: Rajendra Nayak <rnayak@ti.com>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Tony Lindgren <tony@atomide.com>
+Signed-off-by: Sricharan R <r.sricharan@ti.com>
+Tested-by: Nishanth Menon <nm@ti.com>
+Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+---
+ [V2] Updated commit log
+
+ arch/arm/mach-omap2/omap-secure.h |    2 ++
+ arch/arm/mach-omap2/omap-smp.c    |    9 +++++++++
+ arch/arm/mach-omap2/timer.c       |    6 ++++++
+ 3 files changed, 17 insertions(+)
+
+diff --git a/arch/arm/mach-omap2/omap-secure.h b/arch/arm/mach-omap2/omap-secure.h
+index a171a5a..4de9a00 100644
+--- a/arch/arm/mach-omap2/omap-secure.h
++++ b/arch/arm/mach-omap2/omap-secure.h
+@@ -51,6 +51,8 @@
  
-> > diff --git a/arch/arm/mach-efm32/Makefile b/arch/arm/mach-efm32/Makefile
-> > new file mode 100644
-> > index 0000000..081f45a
-> > --- /dev/null
-> > +++ b/arch/arm/mach-efm32/Makefile
-> > @@ -0,0 +1 @@
-> > +obj-y += common.o dtmachine.o
-> 
-> Just merge the two files into one.
-ok.
-
-> > +
-> > +void __init efm32_init_time(void)
-> > +{
-> > +	of_clk_init(NULL);
-> > +	clocksource_of_init();
-> > +}
-> 
-> When Sebastian Hesselbarth's patches for of_clk_init() are merged,
-> this function can go away.
-Do you have a link?
-
-> > +static void __init efm32_init(void)
-> > +{
-> > +	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
-> > +}
-> > +
-> 
-> And this one is already unnecessary.
-fine.
-
-> > +static const char *const efm32gg_compat[] __initconst = {
-> > +	"efm32,dk3750",
-> > +	NULL
-> > +};
-> > +
-> > +DT_MACHINE_START(EFM32DT, "EFM32 (Device Tree Support)")
-> > +	.init_irq = irqchip_init,
-> 
-> Same for irqchip_init, which is the default when omitted.
-ok.
-
-> 
-> > diff --git a/arch/arm/mach-efm32/include/mach/debug-macro.S b/arch/arm/mach-efm32/include/mach/debug-macro.S
-> > new file mode 100644
-> > index 0000000..c58915c
-> > --- /dev/null
-> > +++ b/arch/arm/mach-efm32/include/mach/debug-macro.S
-> 
-> Please move this to arch/arm/include/debug/ like the other such
-> implementations.
-I don't mind, but I thought this is only for devices that are expected
-to be available on >1 platform.
+ #define OMAP5_MON_AMBA_IF_INDEX		0x108
  
-> > diff --git a/arch/arm/mach-efm32/include/mach/entry-macro.S b/arch/arm/mach-efm32/include/mach/entry-macro.S
-> > new file mode 100644
-> > index 0000000..f0c0f7d
-> > --- /dev/null
-> > +++ b/arch/arm/mach-efm32/include/mach/entry-macro.S
-> > @@ -0,0 +1,5 @@
-> > +		.macro	get_irqnr_preamble, base, tmp
-> > +		.endm
-> > +
-> > +		.macro	arch_ret_to_user, tmp1, tmp2
-> > +		.endm
-> 
-> And use set_handle_irq() to register a handler from your irqchip driver
-> to get rid of this one.
-ISTR that I tried that, but I don't remember the details. I will retry.
++#define OMAP5_DRA7_MON_SET_CNTFRQ_INDEX	0x109
++
+ /* Secure PPA(Primary Protected Application) APIs */
+ #define OMAP4_PPA_L2_POR_INDEX		0x23
+ #define OMAP4_PPA_CPU_ACTRL_SMP_INDEX	0x25
+diff --git a/arch/arm/mach-omap2/omap-smp.c b/arch/arm/mach-omap2/omap-smp.c
+index 98a1146..00873b4 100644
+--- a/arch/arm/mach-omap2/omap-smp.c
++++ b/arch/arm/mach-omap2/omap-smp.c
+@@ -41,6 +41,8 @@
  
-> > --- /dev/null
-> > +++ b/arch/arm/mach-efm32/include/mach/irqs.h
-> > @@ -0,0 +1,6 @@
-> > +#ifndef __MACH_IRQS_H__
-> > +#define __MACH_IRQS_H__
-> > +
-> > +#define NR_IRQS			82
-> > +
-> > +#endif /* __MACH_IRQS_H__ */
-> 
-> This should not be needed if you have the proper IRQ domain support,
-> which I think you do.
-OK.
-
-Thanks for your comments
-Uwe
-
+ u16 pm44xx_errata;
+ 
++extern unsigned long arch_timer_freq;
++
+ /* SCU base address */
+ static void __iomem *scu_base;
+ 
+@@ -66,6 +68,13 @@ static void __cpuinit omap4_secondary_init(unsigned int cpu)
+ 							4, 0, 0, 0, 0, 0);
+ 
+ 	/*
++	 * Configure the CNTFRQ register for the secondary cpu's which
++	 * indicates the frequency of the cpu local timers.
++	 */
++	if (soc_is_omap54xx() || soc_is_dra7xx())
++		omap_smc1(OMAP5_DRA7_MON_SET_CNTFRQ_INDEX, arch_timer_freq);
++
++	/*
+ 	 * Synchronise with the boot thread.
+ 	 */
+ 	spin_lock(&boot_lock);
+diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
+index fd9238d..2c499f3 100644
+--- a/arch/arm/mach-omap2/timer.c
++++ b/arch/arm/mach-omap2/timer.c
+@@ -55,6 +55,7 @@
+ #include "soc.h"
+ #include "common.h"
+ #include "powerdomain.h"
++#include "omap-secure.h"
+ 
+ #define REALTIME_COUNTER_BASE				0x48243200
+ #define INCREMENTER_NUMERATOR_OFFSET			0x10
+@@ -65,6 +66,7 @@
+ 
+ static struct omap_dm_timer clkev;
+ static struct clock_event_device clockevent_gpt;
++unsigned long arch_timer_freq;
+ 
+ static irqreturn_t omap2_gp_timer_interrupt(int irq, void *dev_id)
+ {
+@@ -546,7 +548,11 @@ static void __init realtime_counter_init(void)
+ 	reg |= den;
+ 	__raw_writel(reg, base + INCREMENTER_DENUMERATOR_RELOAD_OFFSET);
+ 
++	arch_timer_freq = (rate / den) * num;
++
+ 	iounmap(base);
++
++	omap_smc1(OMAP5_DRA7_MON_SET_CNTFRQ_INDEX, arch_timer_freq);
+ }
+ #else
+ static inline void __init realtime_counter_init(void)
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+1.7.9.5
