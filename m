@@ -1,36 +1,75 @@
-From: josh.wu@atmel.com (Josh Wu)
-Date: Wed, 18 Sep 2013 11:31:20 +0800
-Subject: [PATCH v2 2/2] mtd: atmel_nand: add MODULE_DEVICE_TABLE for nfc driver
-In-Reply-To: <1379475080-14984-1-git-send-email-josh.wu@atmel.com>
-References: <1379475080-14984-1-git-send-email-josh.wu@atmel.com>
-Message-ID: <1379475080-14984-2-git-send-email-josh.wu@atmel.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Tue, 17 Sep 2013 21:16:43 -0700
+Subject: question about clk notifier in common clock tree
+In-Reply-To: <CAAXpJNvPvqr9+Zu1dUMssa0oorEH7Yc=so93i0UJjdNXKyh45A@mail.gmail.com>
+References: <CAAXpJNvPvqr9+Zu1dUMssa0oorEH7Yc=so93i0UJjdNXKyh45A@mail.gmail.com>
+Message-ID: <CAPtuhTgvOca7V0a4+fEEBX2ad-FzPQWyuu7zBBNkhaja7rgUGA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch also add a const keyword for the of_device_id of nfc.
+On Tue, Sep 17, 2013 at 7:17 PM, zhoujie wu <zhoujiewu@gmail.com> wrote:
+> Hi Mike,
+>
+> Now in our platform, we are using clk notifer to adjust voltage before
+> clock rate change or after rate change.
+>
+> But for some clock modules, it even have to adjust voltage when clock
+> enable and disable.
+> For example, when it is working(clock enabled), it requires voltage
+> 1.2V. When it finished its work, it could release it's voltage
+> requirement.
+> Do you think if it is ok we also send out notifier in __clk_prepare
+> and __clk_unprepare as below?
 
-Signed-off-by: Josh Wu <josh.wu@atmel.com>
-Acked-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
----
- drivers/mtd/nand/atmel_nand.c |    3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+This has come up in the past and my position has been that run-time PM
+should enable regulators when turning on a module or device. One
+question: what is the regulator consumer in your case? Is it the clock
+consuming the regulator or is the device/module consuming the
+regulator? Usually it is the device and not the actual clock that
+needs the regulator to be enabled before it can be used and this is
+best left up to runtime PM.
 
-diff --git a/drivers/mtd/nand/atmel_nand.c b/drivers/mtd/nand/atmel_nand.c
-index 72c2611..5a5d457 100644
---- a/drivers/mtd/nand/atmel_nand.c
-+++ b/drivers/mtd/nand/atmel_nand.c
-@@ -2244,10 +2244,11 @@ static int atmel_nand_nfc_probe(struct platform_device *pdev)
- 	return 0;
- }
- 
--static struct of_device_id atmel_nand_nfc_match[] = {
-+static const struct of_device_id atmel_nand_nfc_match[] = {
- 	{ .compatible = "atmel,sama5d3-nfc" },
- 	{ /* sentinel */ }
- };
-+MODULE_DEVICE_TABLE(of, atmel_nand_nfc_match);
- 
- static struct platform_driver atmel_nand_nfc_driver = {
- 	.driver = {
--- 
-1.7.9.5
+Regards,
+Mike
+
+>
+> Thanks.
+>
+> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+> index 54a191c..2f64f1e 100644
+> --- a/drivers/clk/clk.c
+> +++ b/drivers/clk/clk.c
+> @@ -34,6 +34,9 @@ static HLIST_HEAD(clk_root_list);
+>  static HLIST_HEAD(clk_orphan_list);
+>  static LIST_HEAD(clk_notifier_list);
+>
+> +static int __clk_notify(struct clk *clk, unsigned long msg,
+> + unsigned long old_rate, unsigned long new_rate);
+> +
+>  /***           locking             ***/
+>  static void clk_prepare_lock(void)
+>  {
+> @@ -697,6 +700,9 @@ void __clk_unprepare(struct clk *clk)
+>   if (clk->ops->unprepare)
+>   clk->ops->unprepare(clk->hw);
+>
+> + /* send out notifier for dvfs */
+> + __clk_notify(clk, POST_RATE_CHANGE, clk->rate, 0);
+> +
+>   __clk_unprepare(clk->parent);
+>  }
+>
+> @@ -738,6 +744,9 @@ int __clk_prepare(struct clk *clk)
+>   return ret;
+>   }
+>   }
+> +
+> + /* send out notifier for dvfs */
+> + __clk_notify(clk, PRE_RATE_CHANGE, 0, clk->rate);
+>   }
+>
+>   clk->prepare_count++;
+>
+>
+> --
+> Zhoujie Wu
