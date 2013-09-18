@@ -1,65 +1,90 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Wed, 18 Sep 2013 11:07:10 -0400
-Subject: [RFC PATCH 1/4] DRIVERS: IRQCHIP: Add crossbar irqchip driver
-In-Reply-To: <52332772.5040203@ti.com>
-References: <1379000351-15672-1-git-send-email-r.sricharan@ti.com>
- <1379000351-15672-2-git-send-email-r.sricharan@ti.com>
- <alpine.DEB.2.02.1309122201530.4089@ionos.tec.linutronix.de>
- <523228B5.5070507@ti.com>
- <alpine.DEB.2.02.1309122335440.4089@ionos.tec.linutronix.de>
- <5232457A.8080709@ti.com>
- <alpine.DEB.2.02.1309130138550.4089@ionos.tec.linutronix.de>
- <52326D6B.2010003@ti.com>
- <alpine.DEB.2.02.1309131142540.4089@ionos.tec.linutronix.de>
- <52332772.5040203@ti.com>
-Message-ID: <5239C19E.1090609@ti.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 18 Sep 2013 17:09:58 +0200
+Subject: [PATCH] clockevents: Sanitize ticks to nsec conversion
+In-Reply-To: <alpine.DEB.2.02.1309181058470.4089@ionos.tec.linutronix.de>
+References: <1379077365-18458-1-git-send-email-mkl@pengutronix.de>
+ <20130917095600.GJ26819@ludovic.desroches@atmel.com>
+ <20130917100417.GQ12758@n2100.arm.linux.org.uk>
+ <alpine.DEB.2.02.1309171210450.4089@ionos.tec.linutronix.de>
+ <20130917130153.GL26819@ludovic.desroches@atmel.com>
+ <alpine.DEB.2.02.1309172228400.4089@ionos.tec.linutronix.de>
+ <20130918085627.GN24802@pengutronix.de>
+ <alpine.DEB.2.02.1309181058470.4089@ionos.tec.linutronix.de>
+Message-ID: <20130918150958.GO24802@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thomas,
+Hello Thomas,
 
-On Friday 13 September 2013 10:55 AM, Santosh Shilimkar wrote:
-> On Friday 13 September 2013 10:24 AM, Thomas Gleixner wrote:
-
-[...]
-
->> Before you dig into MSI, lets talk about irq domains first.
->>
->> GIC implements a legacy irq domain, i.e. a linear domain of all
->> possible GIC interrupts with a 1:1 mapping.
->>
->> So why can't you make use of irq domains and have the whole routing
->> business implemented sanely?
->>
->> What's needed is in gic_init_bases():
->>
->>        if (of_property_read(node, "routable_irqs", &nr_routable_irqs) {
->>        	  irq_domain_add_legacy(nr_gic_irqs);
->>        } else {
->>        	  irq_domain_add_legacy(nr_per_cpu_irqs);
->> 	  irq_domain_add_linear(nr_routable_irqs);
->>        }
->>
->> Now that separate domain has an xlate function which grabs a free GIC
->> irq from a bitmap and returns the hardware irq number in the gic
->> space. The map/unmap callbacks take care of setting up / tearing down
->> the route in the crossbar.
->>
->> Thoughts?
->>
-> This sounds pretty good idea. We will explore above option.
-> Thanks Thomas.
+On Wed, Sep 18, 2013 at 11:38:07AM +0200, Thomas Gleixner wrote:
+> On Wed, 18 Sep 2013, Uwe Kleine-K?nig wrote:
+> > > Now we can easily verify whether the whole equation fits into the
+> > > 64bit boundary. Shifting the "clc" result back by evt->shift MUST
+> > > result in "latch". If that's not the case, we have a clear indicator
+> > But this is only the case if evt->mult is <= (1 << evt->shift). Is this
+> > always given?
 > 
-After further looking into this, the irqdomain approach lets us
-setup the map only once during the init. This is similar to
-the earlier approach of cross-bar driver where at probe time
-the router was setup.  The whole debate started with the fact
-that we shouldn't fix the irq mapping at probe and should
-dynamically change the mapping based on [request/free]_irq()
-to be able to maximize the use of the IP.
+> Crap, no. It's only true for device frequency <= 1GHz. Good catch!
+> 
+> > Is it more sensible to adjust dev->max_delta_ns once at register time
+> > and so save the often recurrent overflow check in
+> > clockevents_program_event?
+> 
+> Which overflow check are you talking about?
+> 
+> There is only the boundary check:
+> 
+>         delta = min(delta, (int64_t) dev->max_delta_ns);
+>         delta = max(delta, (int64_t) dev->min_delta_ns);
+> 
+> Which sensible adjustment at register time is going to remove that?
+My idea was that wouldn't need to add
 
-Since we have agreed now to move ahead with irdomain, i thought
-of mentioning it here.
+	if ((clc >> evt->shift) != (u64)latch)
+		...
 
-Regards,
-Santosh
+to clockevent_delta2ns (not clockevents_program_event as I wrote) if
+dev->max_delta_ns was small enough. So max_delta_ns would be the minimum
+of the hardware limit and the value to prevent an overflow. Not sure any
+more that this works though.
+
+> > Another doubt I have is: You changed clockevent_delta2ns to round up now
+> > unconditionally. For the numbers on at91 that doesn't matter, but I
+> > wonder if there are situations that make the timer core violate the
+> > max_delta_ticks condition now.
+> 
+> And how so? The + (mult - 1) ensures, that the conversion back to
+> ticks results in the same value as latch. So how should it violate
+> the max boundary?
+That is wrong:
+With max_delta_ticks << shift = n * mult - k for k in [0 .. mult-1] and
+an integer n:
+
+	  (max_delta_ns * mult) >> shift
+	= ((((max_delta_ticks << shift) + mult - 1) / mult) * mult) >> shift
+	= (((n * mult - k + mult - 1) / mult) * mult) >> shift
+	= n * mult >> shift
+	= ((max_delta_ticks << shift) + k) >> shift
+	= max_delta_ticks + (k >> shift)
+
+k >> shift is only known to be zero if mult <= 1 << shift (i.e. the same
+condition as above where your 64bit overflow detection is wrong). So
+this can result in values > max_delta_ticks.
+
+> Math is hard, right?
+Yes, if it involves integer division and overflow handling it's hard to
+come up with correct solutions during shopping. ;-)
+ 
+> > > for boundary violation and can limit "clc" to (1 << 63) - 1 before the
+> > Where does this magic constant come from?
+> 
+> Rolling my magic hex dice gave me that.
+Wow, how many sides does your dice have? Couldn't it have choosen
+(u64)-1 for improved results?
+
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
