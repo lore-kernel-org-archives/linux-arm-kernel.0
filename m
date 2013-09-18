@@ -1,355 +1,110 @@
 From: magnus.damm@gmail.com (Magnus Damm)
-Date: Thu, 19 Sep 2013 05:11:11 +0900
-Subject: [PATCH 01/03] ARM: shmobile: Initial r7s72100 SoC support
+Date: Thu, 19 Sep 2013 05:11:20 +0900
+Subject: [PATCH 02/03] ARM: shmobile: r7s72100 SCIF support
 In-Reply-To: <20130918201101.6319.97667.sendpatchset@w520>
 References: <20130918201101.6319.97667.sendpatchset@w520>
-Message-ID: <20130918201111.6319.33340.sendpatchset@w520>
+Message-ID: <20130918201120.6319.59533.sendpatchset@w520>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Magnus Damm <damm@opensource.se>
 
-Add initial support for the r7272100 SoC including:
- - Single Cortex-A9 CPU Core
- - GIC
-
-No static virtual mappings are used, all the components
-make use of ioremap(). DT_MACHINE_START is still wrapped
-in CONFIG_USE_OF to match other mach-shmobile code.
+Add SCIF serial port support to the r7s72100 SoC by
+adding platform devices for SCIF0 -> SCIF7 together with
+clock bindings. DT device description is excluded at
+this point since such bindings are still under
+development.
 
 Signed-off-by: Magnus Damm <damm@opensource.se>
 ---
 
- arch/arm/boot/dts/r7s72100.dtsi                |   36 ++++
- arch/arm/mach-shmobile/Kconfig                 |    6 
- arch/arm/mach-shmobile/Makefile                |    2 
- arch/arm/mach-shmobile/clock-r7s72100.c        |  194 ++++++++++++++++++++++++
- arch/arm/mach-shmobile/include/mach/r7s72100.h |    7 
- arch/arm/mach-shmobile/setup-r7s72100.c        |   43 +++++
- 6 files changed, 288 insertions(+)
+ arch/arm/mach-shmobile/clock-r7s72100.c        |    8 ++++
+ arch/arm/mach-shmobile/include/mach/r7s72100.h |    1 
+ arch/arm/mach-shmobile/setup-r7s72100.c        |   45 ++++++++++++++++++++++++
+ 3 files changed, 54 insertions(+)
 
---- /dev/null
-+++ work/arch/arm/boot/dts/r7s72100.dtsi	2013-09-19 03:07:43.000000000 +0900
-@@ -0,0 +1,36 @@
-+/*
-+ * Device Tree Source for the r7s72100 SoC
-+ *
-+ * Copyright (C) 2013 Renesas Solutions Corp.
-+ *
-+ * This file is licensed under the terms of the GNU General Public License
-+ * version 2.  This program is licensed "as is" without any warranty of any
-+ * kind, whether express or implied.
-+ */
-+
-+/ {
-+	compatible = "renesas,r7s72100";
-+	interrupt-parent = <&gic>;
-+	#address-cells = <1>;
-+	#size-cells = <1>;
-+
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		cpu at 0 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a9";
-+			reg = <0>;
-+		};
-+	};
-+
-+	gic: interrupt-controller at e8201000 {
-+		compatible = "arm,cortex-a9-gic";
-+		#interrupt-cells = <3>;
-+		#address-cells = <0>;
-+		interrupt-controller;
-+		reg = <0xe8201000 0x1000>,
-+			<0xe8202000 0x1000>;
-+	};
-+};
---- 0001/arch/arm/mach-shmobile/Kconfig
-+++ work/arch/arm/mach-shmobile/Kconfig	2013-09-18 10:39:56.000000000 +0900
-@@ -113,6 +113,12 @@ config ARCH_EMEV2
- 	select ARM_GIC
- 	select CPU_V7
+--- 0002/arch/arm/mach-shmobile/clock-r7s72100.c
++++ work/arch/arm/mach-shmobile/clock-r7s72100.c	2013-09-19 03:47:24.000000000 +0900
+@@ -170,6 +170,14 @@ static struct clk_lookup lookups[] = {
+ 	CLKDEV_CON_ID("cpu_clk", &div4_clks[DIV4_I]),
  
-+config ARCH_R7S72100
-+	bool "RZ/A1H (R7S72100)"
-+	select ARM_GIC
-+	select CPU_V7
-+	select SH_CLK_CPG
-+
- comment "SH-Mobile Board Type"
+ 	/* MSTP clocks */
++	CLKDEV_ICK_ID("sci_fck", "sh-sci.0", &mstp_clks[MSTP47]),
++	CLKDEV_ICK_ID("sci_fck", "sh-sci.1", &mstp_clks[MSTP46]),
++	CLKDEV_ICK_ID("sci_fck", "sh-sci.2", &mstp_clks[MSTP45]),
++	CLKDEV_ICK_ID("sci_fck", "sh-sci.3", &mstp_clks[MSTP44]),
++	CLKDEV_ICK_ID("sci_fck", "sh-sci.4", &mstp_clks[MSTP43]),
++	CLKDEV_ICK_ID("sci_fck", "sh-sci.5", &mstp_clks[MSTP42]),
++	CLKDEV_ICK_ID("sci_fck", "sh-sci.6", &mstp_clks[MSTP41]),
++	CLKDEV_ICK_ID("sci_fck", "sh-sci.7", &mstp_clks[MSTP40]),
+ };
  
- config MACH_APE6EVM
---- 0001/arch/arm/mach-shmobile/Makefile
-+++ work/arch/arm/mach-shmobile/Makefile	2013-09-18 10:39:56.000000000 +0900
-@@ -17,6 +17,7 @@ obj-$(CONFIG_ARCH_R8A7779)	+= setup-r8a7
- obj-$(CONFIG_ARCH_R8A7790)	+= setup-r8a7790.o
- obj-$(CONFIG_ARCH_R8A7791)	+= setup-r8a7791.o
- obj-$(CONFIG_ARCH_EMEV2)	+= setup-emev2.o
-+obj-$(CONFIG_ARCH_R7S72100)	+= setup-r7s72100.o
+ void __init r7s72100_clock_init(void)
+--- 0002/arch/arm/mach-shmobile/include/mach/r7s72100.h
++++ work/arch/arm/mach-shmobile/include/mach/r7s72100.h	2013-09-19 03:47:24.000000000 +0900
+@@ -1,6 +1,7 @@
+ #ifndef __ASM_R7S72100_H__
+ #define __ASM_R7S72100_H__
  
- # Clock objects
- ifndef CONFIG_COMMON_CLK
-@@ -30,6 +31,7 @@ obj-$(CONFIG_ARCH_R8A7779)	+= clock-r8a7
- obj-$(CONFIG_ARCH_R8A7790)	+= clock-r8a7790.o
- obj-$(CONFIG_ARCH_R8A7791)	+= clock-r8a7791.o
- obj-$(CONFIG_ARCH_EMEV2)	+= clock-emev2.o
-+obj-$(CONFIG_ARCH_R7S72100)	+= clock-r7s72100.o
- endif
++void r7s72100_add_dt_devices(void);
+ void r7s72100_clock_init(void);
+ void r7s72100_init_early(void);
  
- # SMP objects
---- /dev/null
-+++ work/arch/arm/mach-shmobile/clock-r7s72100.c	2013-09-19 03:06:00.000000000 +0900
-@@ -0,0 +1,194 @@
-+/*
-+ * r7a72100 clock framework support
-+ *
-+ * Copyright (C) 2013  Renesas Solutions Corp.
-+ * Copyright (C) 2012  Phil Edworthy
-+ * Copyright (C) 2011  Magnus Damm
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; version 2 of the License.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+#include <linux/init.h>
-+#include <linux/kernel.h>
-+#include <linux/io.h>
-+#include <linux/sh_clk.h>
-+#include <linux/clkdev.h>
-+#include <mach/common.h>
-+#include <mach/r7s72100.h>
-+
-+/* registers */
-+#define FRQCR		0xfcfe0010
-+#define FRQCR2		0xfcfe0014
-+#define STBCR3		0xfcfe0420
-+#define STBCR4		0xfcfe0424
-+
-+#define PLL_RATE 30
-+
-+static struct clk_mapping cpg_mapping = {
-+	.phys	= 0xfcfe0000,
-+	.len	= 0x1000,
-+};
-+
-+/* Fixed 32 KHz root clock for RTC */
-+static struct clk r_clk = {
-+	.rate           = 32768,
-+};
-+
-+/*
-+ * Default rate for the root input clock, reset this with clk_set_rate()
-+ * from the platform code.
-+ */
-+static struct clk extal_clk = {
-+	.rate		= 13330000,
-+	.mapping	= &cpg_mapping,
-+};
-+
-+static unsigned long pll_recalc(struct clk *clk)
-+{
-+	return clk->parent->rate * PLL_RATE;
+--- 0002/arch/arm/mach-shmobile/setup-r7s72100.c
++++ work/arch/arm/mach-shmobile/setup-r7s72100.c	2013-09-19 04:11:07.000000000 +0900
+@@ -21,10 +21,55 @@
+ #include <linux/irq.h>
+ #include <linux/kernel.h>
+ #include <linux/of_platform.h>
++#include <linux/serial_sci.h>
+ #include <mach/common.h>
++#include <mach/irqs.h>
+ #include <mach/r7s72100.h>
+ #include <asm/mach/arch.h>
+ 
++#define SCIF_DATA(index, baseaddr, irq)					\
++[index] = {								\
++	.type		= PORT_SCIF,					\
++	.regtype	= SCIx_SH2_SCIF_FIFODATA_REGTYPE,		\
++	.flags		= UPF_BOOT_AUTOCONF | UPF_IOREMAP,		\
++	.scbrr_algo_id	= SCBRR_ALGO_2,					\
++	.scscr		= SCSCR_RIE | SCSCR_TIE | SCSCR_RE | SCSCR_TE |	\
++			  SCSCR_REIE,					\
++	.mapbase	= baseaddr,					\
++	.irqs		= { irq + 1, irq + 2, irq + 3, irq },		\
 +}
 +
-+static struct sh_clk_ops pll_clk_ops = {
-+	.recalc		= pll_recalc,
++enum { SCIF0, SCIF1, SCIF2, SCIF3, SCIF4, SCIF5, SCIF6, SCIF7 };
++
++static const struct plat_sci_port scif[] __initconst = {
++	SCIF_DATA(SCIF0, 0xe8007000, gic_iid(221)), /* SCIF0 */
++	SCIF_DATA(SCIF1, 0xe8007800, gic_iid(225)), /* SCIF1 */
++	SCIF_DATA(SCIF2, 0xe8008000, gic_iid(229)), /* SCIF2 */
++	SCIF_DATA(SCIF3, 0xe8008800, gic_iid(233)), /* SCIF3 */
++	SCIF_DATA(SCIF4, 0xe8009000, gic_iid(237)), /* SCIF4 */
++	SCIF_DATA(SCIF5, 0xe8009800, gic_iid(241)), /* SCIF5 */
++	SCIF_DATA(SCIF6, 0xe800a000, gic_iid(245)), /* SCIF6 */
++	SCIF_DATA(SCIF7, 0xe800a800, gic_iid(249)), /* SCIF7 */
 +};
 +
-+static struct clk pll_clk = {
-+	.ops		= &pll_clk_ops,
-+	.parent		= &extal_clk,
-+	.flags		= CLK_ENABLE_ON_INIT,
-+};
-+
-+static unsigned long bus_recalc(struct clk *clk)
++static inline void r7s72100_register_scif(int idx)
 +{
-+	return clk->parent->rate * 2 / 3;
++	platform_device_register_data(&platform_bus, "sh-sci", idx, &scif[idx],
++				      sizeof(struct plat_sci_port));
 +}
 +
-+static struct sh_clk_ops bus_clk_ops = {
-+	.recalc		= bus_recalc,
-+};
-+
-+static struct clk bus_clk = {
-+	.ops		= &bus_clk_ops,
-+	.parent		= &pll_clk,
-+	.flags		= CLK_ENABLE_ON_INIT,
-+};
-+
-+static unsigned long peripheral0_recalc(struct clk *clk)
++void __init r7s72100_add_dt_devices(void)
 +{
-+	return clk->parent->rate / 12;
++	r7s72100_register_scif(SCIF0);
++	r7s72100_register_scif(SCIF1);
++	r7s72100_register_scif(SCIF2);
++	r7s72100_register_scif(SCIF3);
++	r7s72100_register_scif(SCIF4);
++	r7s72100_register_scif(SCIF5);
++	r7s72100_register_scif(SCIF6);
++	r7s72100_register_scif(SCIF7);
 +}
 +
-+static struct sh_clk_ops peripheral0_clk_ops = {
-+	.recalc		= peripheral0_recalc,
-+};
-+
-+static struct clk peripheral0_clk = {
-+	.ops		= &peripheral0_clk_ops,
-+	.parent		= &pll_clk,
-+	.flags		= CLK_ENABLE_ON_INIT,
-+};
-+
-+static unsigned long peripheral1_recalc(struct clk *clk)
-+{
-+	return clk->parent->rate / 6;
-+}
-+
-+static struct sh_clk_ops peripheral1_clk_ops = {
-+	.recalc		= peripheral1_recalc,
-+};
-+
-+static struct clk peripheral1_clk = {
-+	.ops		= &peripheral1_clk_ops,
-+	.parent		= &pll_clk,
-+	.flags		= CLK_ENABLE_ON_INIT,
-+};
-+
-+struct clk *main_clks[] = {
-+	&r_clk,
-+	&extal_clk,
-+	&pll_clk,
-+	&bus_clk,
-+	&peripheral0_clk,
-+	&peripheral1_clk,
-+};
-+
-+static int div2[] = { 1, 3, 0, 3 }; /* 1, 2/3, reserve, 1/3 */
-+static int multipliers[] = { 1, 2, 1, 1 };
-+
-+static struct clk_div_mult_table div4_div_mult_table = {
-+	.divisors = div2,
-+	.nr_divisors = ARRAY_SIZE(div2),
-+	.multipliers = multipliers,
-+	.nr_multipliers = ARRAY_SIZE(multipliers),
-+};
-+
-+static struct clk_div4_table div4_table = {
-+	.div_mult_table = &div4_div_mult_table,
-+};
-+
-+enum { DIV4_I,
-+	DIV4_NR };
-+
-+#define DIV4(_reg, _bit, _mask, _flags) \
-+	SH_CLK_DIV4(&pll_clk, _reg, _bit, _mask, _flags)
-+
-+/* The mask field specifies the div2 entries that are valid */
-+struct clk div4_clks[DIV4_NR] = {
-+	[DIV4_I]  = DIV4(FRQCR, 8, 0xB, CLK_ENABLE_REG_16BIT
-+					| CLK_ENABLE_ON_INIT),
-+};
-+
-+enum { MSTP47, MSTP46, MSTP45, MSTP44, MSTP43, MSTP42, MSTP41, MSTP40,
-+	MSTP33,	MSTP_NR };
-+
-+static struct clk mstp_clks[MSTP_NR] = {
-+	[MSTP47] = SH_CLK_MSTP8(&peripheral1_clk, STBCR4, 7, 0), /* SCIF0 */
-+	[MSTP46] = SH_CLK_MSTP8(&peripheral1_clk, STBCR4, 6, 0), /* SCIF1 */
-+	[MSTP45] = SH_CLK_MSTP8(&peripheral1_clk, STBCR4, 5, 0), /* SCIF2 */
-+	[MSTP44] = SH_CLK_MSTP8(&peripheral1_clk, STBCR4, 4, 0), /* SCIF3 */
-+	[MSTP43] = SH_CLK_MSTP8(&peripheral1_clk, STBCR4, 3, 0), /* SCIF4 */
-+	[MSTP42] = SH_CLK_MSTP8(&peripheral1_clk, STBCR4, 2, 0), /* SCIF5 */
-+	[MSTP41] = SH_CLK_MSTP8(&peripheral1_clk, STBCR4, 1, 0), /* SCIF6 */
-+	[MSTP40] = SH_CLK_MSTP8(&peripheral1_clk, STBCR4, 0, 0), /* SCIF7 */
-+	[MSTP33] = SH_CLK_MSTP8(&peripheral0_clk, STBCR3, 3, 0), /* MTU2 */
-+};
-+
-+static struct clk_lookup lookups[] = {
-+	/* main clocks */
-+	CLKDEV_CON_ID("rclk", &r_clk),
-+	CLKDEV_CON_ID("extal", &extal_clk),
-+	CLKDEV_CON_ID("pll_clk", &pll_clk),
-+	CLKDEV_CON_ID("peripheral_clk", &peripheral1_clk),
-+
-+	/* DIV4 clocks */
-+	CLKDEV_CON_ID("cpu_clk", &div4_clks[DIV4_I]),
-+
-+	/* MSTP clocks */
-+};
-+
-+void __init r7s72100_clock_init(void)
-+{
-+	int k, ret = 0;
-+
-+	for (k = 0; !ret && (k < ARRAY_SIZE(main_clks)); k++)
-+		ret = clk_register(main_clks[k]);
-+
-+	clkdev_add_table(lookups, ARRAY_SIZE(lookups));
-+
-+	if (!ret)
-+		ret = sh_clk_div4_register(div4_clks, DIV4_NR, &div4_table);
-+
-+	if (!ret)
-+		ret = sh_clk_mstp_register(mstp_clks, MSTP_NR);
-+
-+	if (!ret)
-+		shmobile_clk_init();
-+	else
-+		panic("failed to setup rza1 clocks\n");
-+}
---- /dev/null
-+++ work/arch/arm/mach-shmobile/include/mach/r7s72100.h	2013-09-19 03:10:08.000000000 +0900
-@@ -0,0 +1,7 @@
-+#ifndef __ASM_R7S72100_H__
-+#define __ASM_R7S72100_H__
-+
-+void r7s72100_clock_init(void);
-+void r7s72100_init_early(void);
-+
-+#endif /* __ASM_R7S72100_H__ */
---- /dev/null
-+++ work/arch/arm/mach-shmobile/setup-r7s72100.c	2013-09-19 03:10:08.000000000 +0900
-@@ -0,0 +1,43 @@
-+/*
-+ * r7s72100 processor support
-+ *
-+ * Copyright (C) 2013  Renesas Solutions Corp.
-+ * Copyright (C) 2013  Magnus Damm
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; version 2 of the License.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
-+ */
-+
-+#include <linux/irq.h>
-+#include <linux/kernel.h>
-+#include <linux/of_platform.h>
-+#include <mach/common.h>
-+#include <mach/r7s72100.h>
-+#include <asm/mach/arch.h>
-+
-+void __init r7s72100_init_early(void)
-+{
-+	shmobile_setup_delay(400, 1, 3); /* Cortex-A9 @ 400MHz */
-+}
-+
-+#ifdef CONFIG_USE_OF
-+static const char *r7s72100_boards_compat_dt[] __initdata = {
-+	"renesas,r7s72100",
-+	NULL,
-+};
-+
-+DT_MACHINE_START(R7S72100_DT, "Generic R7S72100 (Flattened Device Tree)")
-+	.init_early	= r7s72100_init_early,
-+	.dt_compat	= r7s72100_boards_compat_dt,
-+MACHINE_END
-+#endif /* CONFIG_USE_OF */
+ void __init r7s72100_init_early(void)
+ {
+ 	shmobile_setup_delay(400, 1, 3); /* Cortex-A9 @ 400MHz */
