@@ -1,82 +1,53 @@
-From: eballetbo@gmail.com (Enric Balletbo Serra)
-Date: Wed, 18 Sep 2013 12:24:12 +0200
-Subject: [GIT PULL] ARM: DTS: Fix OMAP bugs for 3.12-rc
-In-Reply-To: <52397523.4050209@baylibre.com>
-References: <52397523.4050209@baylibre.com>
-Message-ID: <CAFqH_52=NOZLHX4VZRMkUFpmJQJZ6egNZsckMJ=+QjVXO1=ofg@mail.gmail.com>
+From: pavel@denx.de (Pavel Machek)
+Date: Wed, 18 Sep 2013 12:49:53 +0200
+Subject: [RESEND PATCHv3 1/2] clocksource: dw_apb_timer: Move timer
+ defines to header file.
+In-Reply-To: <alpine.DEB.2.02.1309172359320.4089@ionos.tec.linutronix.de>
+References: <1377744796-22175-1-git-send-email-dinguyen@altera.com>
+ <1379434447.24347.0.camel@linux-builds1>
+ <alpine.DEB.2.02.1309172337570.4089@ionos.tec.linutronix.de>
+ <20130917215544.GB23937@amd.pavel.ucw.cz>
+ <alpine.DEB.2.02.1309172359320.4089@ionos.tec.linutronix.de>
+Message-ID: <20130918104953.GA31735@amd.pavel.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Benoit,
+Hi!
 
+> > > > > From: Dinh Nguyen <dinguyen@altera.com>
+> > > > > 
+> > > > > Move all dw_apb_timer defines to include/linux/dw_apb_timer.h.
+> > > 
+> > > That's describing WHAT the patch does not WHY. I can see the WHAT part
+> > > without that pointless changelog.
+> > 
+> > read_sched_clock() in dw_apb_timer_of.c accesses the same hardware as
+> > dw_apb_timer.c, therefore it benefits from #define's that describe the
+> > hardware. IOW 1/2 is neccessary for 2/2, but it can compile/work
+> > indepedently.
+> 
+> I'm really capable of figuring that out myself. But that's not the
+> point. I want patch submitters to explain in the changelog WHY they
+> are doing a change not WHAT they are doing, because that's (mostly)
+> obvious from the patch itself.
 
-2013/9/18 Benoit Cousson <bcousson@baylibre.com>:
-> Hi Tony,
->
-> Please pull few fixes for OMAP DTS.
->
-> Thanks,
-> Benoit
->
->
->
-> The following changes since commit 272b98c6455f00884f0350f775c5342358ebb73f:
->
->   Linux 3.12-rc1 (2013-09-16 16:17:51 -0400)
->
-> are available in the git repository at:
->
->   git://git.kernel.org/pub/scm/linux/kernel/git/bcousson/linux-omap-dt.git tags/for_3.12-rc2/dts_signed
->
-> for you to fetch changes up to 775d2418f309052641d94c896f73dc779cf7ba1b:
->
->   ARM: dts: Fix muxing and regulator for wl12xx on the SDIO bus for blaze (2013-09-18 11:14:42 +0200)
->
-> ----------------------------------------------------------------
-> Fix BBB LDO voltage to avoid HDMI destruction
-> Fix OMAP5 wrong attribute
-> Fix typo in beagle xM strings
->
-> ----------------------------------------------------------------
-> Felipe Balbi (2):
->       ARM: dts: OMAP5: fix reg property size
->       ARM: dts: OMAP5: fix ocp2scp DTS data
->
-> Koen Kooi (1):
->       ARM: dts: am335x-bone*: add DT for BeagleBone Black
->
-> Robert Nelson (1):
->       ARM: dts: omap3-beagle-xm: fix string error in compatible property
->
-> Tony Lindgren (2):
->       ARM: dts: Fix muxing and regulator for wl12xx on the SDIO bus for pandaboard
->       ARM: dts: Fix muxing and regulator for wl12xx on the SDIO bus for blaze
->
->  arch/arm/boot/dts/Makefile                |   1 +
->  arch/arm/boot/dts/am335x-bone-common.dtsi | 262 ++++++++++++++++++++++++++++++
->  arch/arm/boot/dts/am335x-bone.dts         | 256 +----------------------------
->  arch/arm/boot/dts/am335x-boneblack.dts    |  17 ++
->  arch/arm/boot/dts/omap3-beagle-xm.dts     |   2 +-
->  arch/arm/boot/dts/omap4-panda-common.dtsi |  46 +++++-
->  arch/arm/boot/dts/omap4-sdp.dts           |  39 ++++-
->  arch/arm/boot/dts/omap5.dtsi              |   7 +-
->  8 files changed, 369 insertions(+), 261 deletions(-)
->  create mode 100644 arch/arm/boot/dts/am335x-bone-common.dtsi
->  create mode 100644 arch/arm/boot/dts/am335x-boneblack.dts
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+But the end result is that anything takes months to do...
 
-On July 5th, I sent the following patch
+We already have the dw_apb_timer issues merged in your tree, then it
+got dropped in merge conflict, then you dislike the changelog, and now
+you notice devicetree uglyness that we did not introduce.
 
-    http://www.spinics.net/lists/linux-omap/msg96935.html
+Yes, dw_apb_timer code is not exactly clean, but if we have to wait
+month before you lecture us how to write changelogs, we will not get
+anywhere... discussion why the DT was done that way is forgotten by
+now.
 
-and on Sep 10th I sent the same patch rebased with upstream and Acked
-by Javier. I consider this patch as a fix, as is required to make the
-sound work on IGEP boards but it's not included in this pull request.
-Maybe you forget it due your email change. Can you consider adding
-this patch, at least, in your next pull request? Thanks in advance.
+Because just now, we are running in circles (and time does not work on
+socfpga for second major release).
 
-Merci beaucoup,
-    Enric
+Regards,
+
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
