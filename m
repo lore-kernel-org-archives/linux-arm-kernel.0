@@ -1,161 +1,153 @@
-From: pali.rohar@gmail.com (Pali =?utf-8?q?Roh=C3=A1r?=)
-Date: Wed, 18 Sep 2013 10:33:24 +0200
-Subject: [PATCH v2 2/2] RX-51: ARM errata 430973 workaround
-In-Reply-To: <20130917232417.GK9994@atomide.com>
-References: <1362044548-5398-1-git-send-email-pali.rohar@gmail.com>
- <1373461145-9812-3-git-send-email-pali.rohar@gmail.com>
- <20130917232417.GK9994@atomide.com>
-Message-ID: <201309181033.24965@pali>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Wed, 18 Sep 2013 10:43:36 +0200
+Subject: dev->of_node overwrite can cause device loading with different
+ driver
+In-Reply-To: <20130914112056.GH12758@n2100.arm.linux.org.uk>
+References: <20130913155331.GC14456@pengutronix.de>
+ <20130913171046.GA26207@kroah.com>
+ <20130914071653.GA26512@pengutronix.de>
+ <20130914112056.GH12758@n2100.arm.linux.org.uk>
+Message-ID: <20130918084336.GC10126@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 18 September 2013 01:24:17 Tony Lindgren wrote:
-> * Pali Roh?r <pali.rohar@gmail.com> [130710 06:06]:
-> > --- a/arch/arm/mach-omap2/board-rx51.c
-> > +++ b/arch/arm/mach-omap2/board-rx51.c
-> 
-> This file will be gone as soon as we're moving to device
-> tree based booting. So let's do this in more future proof
-> way.
-> 
-> > +/**
-> > + * rx51_secure_dispatcher: Routine to dispatch secure PPA
-> > API calls + * @idx: The PPA API index
-> > + * @process: Process ID
-> > + * @flag: The flag indicating criticality of operation
-> > + * @nargs: Number of valid arguments out of four.
-> > + * @arg1, arg2, arg3 args4: Parameters passed to secure API
-> > + *
-> > + * Return the non-zero error value on failure.
-> > + */
-> > +static u32 rx51_secure_dispatcher(u32 idx, u32 process, u32
-> > flag, u32 nargs, +			   u32 arg1, u32 arg2, u32 arg3, u32
-> > arg4)
-> > +{
-> > +	u32 ret;
-> > +	u32 param[5];
-> > +
-> > +	param[0] = nargs+1; /* RX-51 needs number of arguments + 
-1
-> > */ +	param[1] = arg1;
-> > +	param[2] = arg2;
-> > +	param[3] = arg3;
-> > +	param[4] = arg4;
-> > +
-> > +	/*
-> > +	 * Secure API needs physical address
-> > +	 * pointer for the parameters
-> > +	 */
-> > +	local_irq_disable();
-> > +	local_fiq_disable();
-> > +	flush_cache_all();
-> > +	outer_clean_range(__pa(param), __pa(param + 5));
-> > +	ret = omap_smc3(idx, process, flag, __pa(param));
-> > +	flush_cache_all();
-> > +	local_fiq_enable();
-> > +	local_irq_enable();
-> > +
-> > +	return ret;
-> > +}
-> 
-> I think this used to be in omap-secure.c, and then made rx51
-> specific.. But since board-rx51.c is going away, let's move
-> this function to omap-secure.c.
-> 
-> > + * rx51_secure_update_aux_cr: Routine to modify the
-> > contents of Auxiliary Control Register + *  @set_bits: bits
-> > to set in ACR
-> > + *  @clr_bits: bits to clear in ACR
-> > + *
-> > + * Return the non-zero error value on failure.
-> > +*/
-> > +static u32 rx51_secure_update_aux_cr(u32 set_bits, u32
-> > clear_bits) +{
-> > +	u32 acr;
-> > +
-> > +	/* Read ACR */
-> > +	asm volatile ("mrc p15, 0, %0, c1, c0, 1" : "=r" (acr));
-> > +	acr &= ~clear_bits;
-> > +	acr |= set_bits;
-> > +
-> > +	return rx51_secure_dispatcher(RX51_PPA_WRITE_ACR,
-> > +				      0,
-> > +				      FLAG_START_CRITICAL,
-> > +				      1, acr, 0, 0, 0);
-> > +}
-> 
-> This too.
-> 
-> >  static void __init rx51_init(void)
-> >  {
-> >  
-> >  	struct omap_sdrc_params *sdrc_params;
+On Sat, Sep 14, 2013 at 12:20:56PM +0100, Russell King - ARM Linux wrote:
+> On Sat, Sep 14, 2013 at 09:16:53AM +0200, Markus Pargmann wrote:
+> > I think there are three options to solve this:
 > > 
-> > @@ -105,6 +175,14 @@ static void __init rx51_init(void)
-> > 
-> >  	rx51_peripherals_init();
-> >  	rx51_camera_init();
-> > 
-> > +	if (omap_type() == OMAP2_DEVICE_TYPE_SEC) {
-> > +#ifdef CONFIG_ARM_ERRATA_430973
-> > +		pr_info("RX-51: Enabling ARM errata 430973
-> > workaround\n"); +		/* set IBE to 1 */
-> > +		rx51_secure_update_aux_cr(BIT(6), 0);
-> > +#endif
-> > +	}
-> > +
-> > 
-> >  	/* Ensure SDRC pins are mux'd for self-refresh */
-> >  	omap_mux_init_signal("sdrc_cke0", OMAP_PIN_OUTPUT);
-> >  	omap_mux_init_signal("sdrc_cke1", OMAP_PIN_OUTPUT);
+> > 1. Break out of the driver list iteration loop as soon as a driver probe
+> >    function fails. This way there is no possibility for another driver
+> >    to be probed with a device struct that was changed by the first
+> >    driver. But it would remove the support to fall back to
+> >    another driver for a device. I am not aware of any device that is
+> >    supported by multiple drivers.
 > 
-> Then this can be called both from board-generic.c based on the
-> compatible flag, and board-rx51.c for now.
+> What if the incorrect driver (the one which created this platform device)
+> is the one which was matched first?
+
+Yes that would lead to the same recursion. But I think it is better to
+assign the of_node within driver probe which wouldn't be a problem for
+(1), e.g. by using dev->parent or by passing the of_node via
+platform data.
+
 > 
-> Regards,
+> > 2. We could restore the device struct completely or partially (only
+> >    of_node) after a probe failure. This would avoid driver probes with
+> >    unclean device structs, but introduces some overhead.
 > 
-> Tony
+> I don't think it's about changing an existing device structure.  The
+> problem is more to do with this:
+> 
+> - We have a platform device with an associated of_node.
+> - The of_node is used to match it to its device driver.
+> - This device driver spawns a new platform device, and copies the
+>   of_node to the new platform device (so that the _intended_ driver
+>   can get access to the DT properties)
+> - The DD layer tries to match this new platform device with a driver,
+>   and _can_ match this new platform device against the device driver
+>   which created it due to the of_node matching.
+> 
+> There's two solutions here:
+> 
+> 1. get rid of this yucky "lets spawn a new device" stuff - if you
+>    actually work out what's going on with MUSB and its use of this
+>    platform device, it's _really_ horrid, and that's putting it
+>    mildly.  Let's call the device being probed, devA, and briefly:
+> 
+> 	new_dev = platform_device_alloc();
+> 
+> 	devA->platform_data = glue
+> 	glue->dev = devA
+> 	glue->musb = new_dev
+> 	new_dev->parent = devA
+> 
+> 	set_drvdata(devA, glue)
+> 
+> 	platform_device_add(new_dev);
+> 
+>    musb->controller is the new device, callbacks into this layer do:
+> 
+> 	glue = get_drvdata(musb->controller->parent)
+> 
+>    that's not too bad, because this is accessing devA's driver data
+>    from within its owning driver... until you find this:
+> 
+> 	musb = glue_to_musb(glue)
+> 
+>    which is defined as:
+> 
+> 	#define glue_to_musb(g)         platform_get_drvdata(g->musb)
+> 
+>    glue->musb is the _child_ platform device, and we're accessing the
+>    child's driver data here.
+> 
+>    This seems to me to be a layering violation, and also rather racy when
+>    you consider that glue_to_musb() gets used from workqueue contexts
+>    (and I don't see a flush_workqueue() call in these stub drivers.)
+>    What if the new platform device gets unbound just before the workqueue
+>    fires?
+> 
+>    Another thing to note here is that platform_device_add_data() takes a
+>    copy of the data - in the case of omap2430, this is kzalloc'd but
+>    is pointlessly kept around until this driver is removed (via the devm_
+>    mechanisms.)
+> 
+>    The last thing I don't like in these drivers is this:
+> 
+>         memset(musb_resources, 0x00, sizeof(*musb_resources) *
+>                         ARRAY_SIZE(musb_resources));
+> 
+>         musb_resources[0].name = pdev->resource[0].name;
+>         musb_resources[0].start = pdev->resource[0].start;
+>         musb_resources[0].end = pdev->resource[0].end;
+>         musb_resources[0].flags = pdev->resource[0].flags;
+> 
+>         musb_resources[1].name = pdev->resource[1].name;
+>         musb_resources[1].start = pdev->resource[1].start;
+>         musb_resources[1].end = pdev->resource[1].end;
+>         musb_resources[1].flags = pdev->resource[1].flags;
+> 
+>         musb_resources[2].name = pdev->resource[2].name;
+>         musb_resources[2].start = pdev->resource[2].start;
+>         musb_resources[2].end = pdev->resource[2].end;
+>         musb_resources[2].flags = pdev->resource[2].flags;
+> 
+>         ret = platform_device_add_resources(musb, musb_resources,
+>                         ARRAY_SIZE(musb_resources));
+> 
+>    A little knowledge of the driver model will reveal that the above
+>    is utterly pointless - and can be simplified to:
+> 
+> 	ret = platform_device_add_resources(musb, pdev->resource,
+> 					    pdev->num_resources);
+> 
+>    as platform_device_add_resources() copies the passed resource
+>    structures via kmemdup() already.  There's no reason for this
+>    device driver to make its own copy of the resources just to have
+>    them re-copied.  It's also a lot safer in case fewer than three
+>    resources are supplied.  It's also a lot less hastle if additional
+>    resources are added (like what's happened recently to these drivers.)
+> 
+> 2. don't pass the of_node via the platform_device, but as part of
+>    the platform device's data.
+> 
+> Is there any reason why musb isn't implemented as a library which these
+> stub drivers can hook into?
+> 
+> I'd much prefer (1), because it gets rid of the horrid dma_mask stuff in
+> these drivers, turning it more into a "conventional" driver.
+> 
 
-Hi Tony,
+I also prefer your first solution. But as a quick fix for all drivers
+with similar of_node usage, I prefer the mentioned of_node cleanup at
+the end of the probe function.
 
-I'm not very happy. I sent this patch 6 months ago and only now 
-you commented that needs rework again. This patch is needed 
-because all thumb-2 userspace binaries crashing. I want to have
-working support for Nokia N900 and not always rebasing and 
-changing patches. Also DT still not working on N900 (file contains 
-only small subset of devices as in board files plus it is not in 
-stable kernel) so I do not want to switch to DT. I need something 
-which is working and not something new non-working. I belive that 
-you and other kernel guys do not remove all n900 board files until 
-every one line will be rewritten to DT and tested that everything 
-working. And from this and other conversation it looks for me 
-that you are going to do that. So please clarify what you want to 
-do (and when) with board-rx51-* files. Aftethat I can decide what 
-to do in future.
+Regards,
 
-For now I see this situation something like: I wrote patches, 
-send them to ML and after half of year maintainer politely 
-rejected them becuase my patches not using new uber cool 
-technology with still not working and also was not available half 
-year ago. What happen if I find another time to rework this patch 
-and send it again in next 2 or 5 months?
-
-Tony, if you did not have time for review this patch months ago 
-or you found it only today - no problem, I understand it. But 
-what I need to know is what will happen with board-rx51-* files 
-(and when?) You can see that DT does not have definitions of all 
-n900 hw parts (plus it is not in last 3.11 kernel!) which means 
-that DT is not usable for me and other n900 people. This also 
-means that I cannot rewrite my patches for DT and test if they 
-working.
+Markus Pargmann
 
 -- 
-Pali Roh?r
-pali.rohar at gmail.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130918/573a27bd/attachment-0001.sig>
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
