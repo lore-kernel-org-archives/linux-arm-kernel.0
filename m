@@ -1,161 +1,170 @@
-From: khalasa@piap.pl (Krzysztof =?utf-8?Q?Ha=C5=82asa?=)
-Date: Wed, 18 Sep 2013 09:40:48 +0200
-Subject: [PATCH] IXP4xx: Fix DMA masks.
-Message-ID: <m3r4cma873.fsf@t19.piap.pl>
+From: pali.rohar@gmail.com (Pali =?utf-8?q?Roh=C3=A1r?=)
+Date: Wed, 18 Sep 2013 10:20:14 +0200
+Subject: [PATCH 1/4] usb: musb: Call atomic_notifier_call_chain when
+ status is changed
+In-Reply-To: <20130918014942.GD19817@radagast>
+References: <1378630239-10006-1-git-send-email-pali.rohar@gmail.com>
+ <201309172128.42514@pali> <20130918014942.GD19817@radagast>
+Message-ID: <201309181020.15245@pali>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now, devices will have 32-bit default DMA masks (0xFFFFFFFF) as per DMA API.
+On Wednesday 18 September 2013 03:49:42 Felipe Balbi wrote:
+> On Tue, Sep 17, 2013 at 09:28:42PM +0200, Pali Roh?r wrote:
+> > On Tuesday 17 September 2013 18:08:35 Felipe Balbi wrote:
+> > > On Tue, Sep 17, 2013 at 06:05:15PM +0200, Pali Roh?r wrote:
+> > > > On Tuesday 17 September 2013 17:48:59 you wrote:
+> > > > > On Sun, Sep 08, 2013 at 10:50:36AM +0200, Pali Roh?r wrote:
+> > > > > > More power supply drivers depends on vbus events and
+> > > > > > without it they not working. Power supply drivers
+> > > > > > using usb_register_notifier, so to deliver events
+> > > > > > it is needed to call atomic_notifier_call_chain.
+> > > > > > 
+> > > > > > So without atomic notifier power supply driver
+> > > > > > isp1704 not retrieving vbus status and reporting
+> > > > > > bogus values to userspace and also to board
+> > > > > > platform data functions. Without proper data
+> > > > > > charger drivers trying to charge battery also when
+> > > > > > charger is disconnected or do not start charging
+> > > > > > when wallcharger connects.
+> > > > > > 
+> > > > > > Atomic notifier in musb driver was used before v3.5
+> > > > > > and was replaced with omap mailbox. This patch
+> > > > > > adding atomic_notifier_call_chain call from
+> > > > > > function omap_musb_set_mailbox.
+> > > > > > 
+> > > > > > Signed-off-by: Pali Roh?r <pali.rohar@gmail.com>
+> > > > > > ---
+> > > > > > 
+> > > > > >  drivers/usb/musb/omap2430.c       |    3 +++
+> > > > > >  drivers/usb/phy/phy-twl4030-usb.c |    2 ++
+> > > > > >  2 files changed, 5 insertions(+)
+> > > > > > 
+> > > > > > diff --git a/drivers/usb/musb/omap2430.c
+> > > > > > b/drivers/usb/musb/omap2430.c index f44e8b5..5c40252
+> > > > > > 100644 --- a/drivers/usb/musb/omap2430.c
+> > > > > > +++ b/drivers/usb/musb/omap2430.c
+> > > > > > @@ -305,6 +305,9 @@ static void
+> > > > > > omap_musb_set_mailbox(struct omap2430_glue *glue)
+> > > > > > 
+> > > > > >  	default:
+> > > > > >  		dev_dbg(dev, "ID float\n");
+> > > > > >  	
+> > > > > >  	}
+> > > > > > 
+> > > > > > +
+> > > > > > +	atomic_notifier_call_chain(&musb->xceiv->notifier,
+> > > > > > +			musb->xceiv->last_event, NULL);
+> > > > > 
+> > > > > let's add a wrapper for this:
+> > > > > 
+> > > > > static inline int usb_phy_notify(struct usb phy *x,
+> > > > > unsigned val, void *v) {
+> > > > > 
+> > > > > 	return atomic_notifier_call_chain(&x->notifier, val,
+> > > > > 	v);
+> > > > > 
+> > > > > }
+> > > > 
+> > > > Where to add this wrapper? To omap2430.c? or some
+> > > > include file?
+> > > 
+> > > <linux/usb/phy.h>
+> > > 
+> > > > On Tuesday 17 September 2013 17:49:17 Felipe Balbi wrote:
+> > > > > On Sun, Sep 08, 2013 at 10:50:36AM +0200, Pali Roh?r wrote:
+> > > > > > diff --git a/drivers/usb/phy/phy-twl4030-usb.c
+> > > > > > b/drivers/usb/phy/phy-twl4030-usb.c index
+> > > > > > 8f78d2d..efe6155 100644
+> > > > > > --- a/drivers/usb/phy/phy-twl4030-usb.c
+> > > > > > +++ b/drivers/usb/phy/phy-twl4030-usb.c
+> > > > > > @@ -705,6 +705,8 @@ static int
+> > > > > > twl4030_usb_probe(struct platform_device *pdev)
+> > > > > > 
+> > > > > >  	if (device_create_file(&pdev->dev,
+> > > > > >  	&dev_attr_vbus))
+> > > > > >  	
+> > > > > >  		dev_warn(&pdev->dev, "could not create sysfs
+> > > > > >  		file\n");
+> > > > > > 
+> > > > > > +	ATOMIC_INIT_NOTIFIER_HEAD(&twl->phy.notifier);
+> > > > > 
+> > > > > BTW, this is a bugfix, send separately.
+> > > > 
+> > > > What to send separately?
+> > > > 
+> > > > This full patch 1/4 is bugfix. And I did not understand
+> > > > what you want. Maybe it could be easier for you to
+> > > > apply this small 3+2 lines patch how you need.
+> > > 
+> > > This hunk here (initializaing notifier head) is a separate
+> > > bug fix and needs its own patch.
+> > 
+> > So will you do that? Or it is needed to resend this one line
+> > hunk again in new email again?
+> 
+> new patch, new email
 
-Signed-off-by: Krzysztof Ha?asa <khalasa@piap.pl>
+Guys, WHY ARE YOU SO STUPID AND ARROGANT?
 
-diff --git a/arch/arm/mach-ixp4xx/common-pci.c b/arch/arm/mach-ixp4xx/common-pci.c
-index 3dcf479..fbd4a23 100644
---- a/arch/arm/mach-ixp4xx/common-pci.c
-+++ b/arch/arm/mach-ixp4xx/common-pci.c
-@@ -301,32 +301,6 @@ static int abort_handler(unsigned long addr, unsigned int fsr, struct pt_regs *r
- }
+Sorry but, need to copy full isolated patch/hunk from one mail to
+another is hassling. So what you want from me? Do all those non
+sense working only because yesterday you had bad day? Or what?
+
+Everything needed with described information was in first mail.
+Also second hunk has full isolated "git diff" output, so it is for
+you really big problem to copy it? Or you did not see that patch?
+
+I really did not understand what you wanted from me.
+
+============================
+==== BEGINNING OF PATCH ====
+============================
+
+This is bugfix and sending this patch separately from all other patches.
+This patch is visibly isolated from all others and could be readable also
+by disabled people. For other handicapped people I suggest to increase
+font size and other text settings in program which view this patch.
+For visually impaired people I suggest to use some text-to-speech software.
+
+This is small 2 lines patch, diff starting after next visible break.
+
+This patch initializing notifier head in tw4030 usb code which is missing.
+Initialization code is needed for using any atomic_notifier_* functions.
+
+Signed-off-by: Pali Roh?r <pali.rohar@gmail.com>
+
+===========================
+==== BEGINNING OF DIFF ====
+===========================
+
+diff --git a/drivers/usb/phy/phy-twl4030-usb.c b/drivers/usb/phy/phy-twl4030-usb.c
+index 8f78d2d..efe6155 100644
+--- a/drivers/usb/phy/phy-twl4030-usb.c
++++ b/drivers/usb/phy/phy-twl4030-usb.c
+@@ -705,6 +705,8 @@ static int twl4030_usb_probe(struct platform_device *pdev)
+ 	if (device_create_file(&pdev->dev, &dev_attr_vbus))
+ 		dev_warn(&pdev->dev, "could not create sysfs file\n");
  
- 
--static int ixp4xx_needs_bounce(struct device *dev, dma_addr_t dma_addr, size_t size)
--{
--	return (dma_addr + size) >= SZ_64M;
--}
--
--/*
-- * Setup DMA mask to 64MB on PCI devices. Ignore all other devices.
-- */
--static int ixp4xx_pci_platform_notify(struct device *dev)
--{
--	if(dev->bus == &pci_bus_type) {
--		*dev->dma_mask =  SZ_64M - 1;
--		dev->coherent_dma_mask = SZ_64M - 1;
--		dmabounce_register_dev(dev, 2048, 4096, ixp4xx_needs_bounce);
--	}
--	return 0;
--}
--
--static int ixp4xx_pci_platform_notify_remove(struct device *dev)
--{
--	if(dev->bus == &pci_bus_type) {
--		dmabounce_unregister_dev(dev);
--	}
--	return 0;
--}
--
- void __init ixp4xx_pci_preinit(void)
- {
- #ifdef CONFIG_IXP4XX_INDIRECT_PCI
-@@ -446,20 +420,8 @@ int ixp4xx_setup(int nr, struct pci_sys_data *sys)
- 	pci_add_resource_offset(&sys->resources, &res[0], sys->io_offset);
- 	pci_add_resource_offset(&sys->resources, &res[1], sys->mem_offset);
- 
--	platform_notify = ixp4xx_pci_platform_notify;
--	platform_notify_remove = ixp4xx_pci_platform_notify_remove;
--
- 	return 1;
- }
- 
--int dma_set_coherent_mask(struct device *dev, u64 mask)
--{
--	if (mask >= SZ_64M - 1)
--		return 0;
--
--	return -EIO;
--}
--
- EXPORT_SYMBOL(ixp4xx_pci_read);
- EXPORT_SYMBOL(ixp4xx_pci_write);
--EXPORT_SYMBOL(dma_set_coherent_mask);
-diff --git a/arch/arm/mach-ixp4xx/common.c b/arch/arm/mach-ixp4xx/common.c
-index 5327dec..780517a 100644
---- a/arch/arm/mach-ixp4xx/common.c
-+++ b/arch/arm/mach-ixp4xx/common.c
-@@ -30,8 +30,8 @@
- #include <linux/export.h>
- #include <linux/gpio.h>
- #include <linux/cpu.h>
-+#include <linux/pci.h>
- #include <linux/sched_clock.h>
--
- #include <mach/udc.h>
- #include <mach/hardware.h>
- #include <mach/io.h>
-@@ -40,7 +40,6 @@
- #include <asm/page.h>
- #include <asm/irq.h>
- #include <asm/system_misc.h>
--
- #include <asm/mach/map.h>
- #include <asm/mach/irq.h>
- #include <asm/mach/time.h>
-@@ -551,6 +550,49 @@ void ixp4xx_restart(enum reboot_mode mode, const char *cmd)
- 	}
- }
- 
-+#ifdef CONFIG_PCI
-+static int ixp4xx_needs_bounce(struct device *dev, dma_addr_t dma_addr, size_t size)
-+{
-+	return (dma_addr + size) >= SZ_64M;
-+}
++	ATOMIC_INIT_NOTIFIER_HEAD(&twl->phy.notifier);
 +
-+static int ixp4xx_platform_notify_remove(struct device *dev)
-+{
-+	if (dev->bus == &pci_bus_type)
-+		dmabounce_unregister_dev(dev);
-+
-+	return 0;
-+}
-+#endif
-+
-+/*
-+ * Setup DMA mask to 64MB on PCI devices and 4 GB on all other things.
-+ */
-+static int ixp4xx_platform_notify(struct device *dev)
-+{
-+#ifdef CONFIG_PCI
-+	if (dev->bus == &pci_bus_type) {
-+		dev->coherent_dma_mask = DMA_BIT_MASK(28); /* 64 MB */
-+		dmabounce_register_dev(dev, 2048, 4096, ixp4xx_needs_bounce);
-+	} else
-+#endif
-+		dev->coherent_dma_mask = DMA_BIT_MASK(32);
-+
-+	dev->dma_mask = &dev->coherent_dma_mask;
-+	return 0;
-+}
-+
-+int dma_set_coherent_mask(struct device *dev, u64 mask)
-+{
-+	if ((mask & DMA_BIT_MASK(28)) == DMA_BIT_MASK(28)) {
-+		dev->coherent_dma_mask = mask;
-+		return 0;
-+	}
-+
-+	return -EIO;
-+}
-+EXPORT_SYMBOL(dma_set_coherent_mask);
-+
- #ifdef CONFIG_IXP4XX_INDIRECT_PCI
- /*
-  * In the case of using indirect PCI, we simply return the actual PCI
-@@ -573,12 +615,16 @@ static void ixp4xx_iounmap(void __iomem *addr)
- 	if (!is_pci_memory((__force u32)addr))
- 		__iounmap(addr);
- }
-+#endif
- 
- void __init ixp4xx_init_early(void)
- {
-+	platform_notify = ixp4xx_platform_notify;
-+#ifdef CONFIG_PCI
-+	platform_notify_remove = ixp4xx_platform_notify_remove;
-+#endif
-+#ifdef CONFIG_IXP4XX_INDIRECT_PCI
- 	arch_ioremap_caller = ixp4xx_ioremap_caller;
- 	arch_iounmap = ixp4xx_iounmap;
--}
--#else
--void __init ixp4xx_init_early(void) {}
- #endif
-+}
+ 	/* Our job is to use irqs and status from the power module
+ 	 * to keep the transceiver disabled when nothing's connected.
+ 	 *
+
+======================
+==== END OF PATCH ====
+======================
+
+PS: This is end of email and patch is above ^^^^
+
+-- 
+Pali Roh?r
+pali.rohar at gmail.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130918/9c5970c0/attachment.sig>
