@@ -1,54 +1,120 @@
-From: khalasa@piap.pl (Krzysztof =?utf-8?Q?Ha=C5=82asa?=)
-Date: Wed, 18 Sep 2013 10:54:19 +0200
-Subject: BUG: sleeping function called from invalid context at
- arch/arm/mm/fault.c:301
-Message-ID: <m3mwnaa4sk.fsf@t19.piap.pl>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 18 Sep 2013 10:56:27 +0200
+Subject: [PATCH] clockevents: Sanitize ticks to nsec conversion
+In-Reply-To: <alpine.DEB.2.02.1309172228400.4089@ionos.tec.linutronix.de>
+References: <1379077365-18458-1-git-send-email-mkl@pengutronix.de>
+ <20130917095600.GJ26819@ludovic.desroches@atmel.com>
+ <20130917100417.GQ12758@n2100.arm.linux.org.uk>
+ <alpine.DEB.2.02.1309171210450.4089@ionos.tec.linutronix.de>
+ <20130917130153.GL26819@ludovic.desroches@atmel.com>
+ <alpine.DEB.2.02.1309172228400.4089@ionos.tec.linutronix.de>
+Message-ID: <20130918085627.GN24802@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hello Thomas,
 
-ipx435, v3.11, the card hw has gone wild (another issue) and generates
-data abort on register access in ISR. The issue here is the warning in
-do_page_fault(), is it normal?
+On Tue, Sep 17, 2013 at 11:15:20PM +0200, Thomas Gleixner wrote:
+> Marc Kleine-Budde pointed out, that commit 77cc982 "clocksource: use
+> clockevents_config_and_register() where possible" caused a regression
+> for some of the converted subarchs.
+> 
+> The reason is, that the clockevents core code converts the minimal
+> hardware tick delta to a nanosecond value for core internal
+> usage. This conversion is affected by integer math rounding loss, so
+> the backwards conversion to hardware ticks will likely result in a
+> value which is less than the configured hardware limitation. The
+> affected subarchs used their own workaround (SIGH!) which got lost in
+> the conversion.
+> 
+> Now instead of fixing the underlying core code problem, Marcs patch
+s/Marcs/Marc's/
 
-just got this:
+> tried to work around the core code issue by increasing the minimal
+> tick delta at clockevents registration time so the resulting limit in
+> the core code backwards conversion did not violate the hardware
+> limits. More SIGH!
+> 
+> The solution for the issue at hand is simple: adding evt->mult - 1 to
+> the shifted value before the integer divison in the core conversion
+> function takes care of it.
+> 
+> Though looking closer at the details of that function reveals another
+> bogosity: The upper bounds check is broken as well. Checking for a
+> resulting "clc" value greater than KTIME_MAX after the conversion is
+> pointless. The conversion does:
+> 
+>       u64 clc = (latch << evt->shift) / evt->mult;
+> 
+> So there is no sanity check for (latch << evt->shift) exceeding the
+> 64bit boundary. The latch argument is "unsigned long", so on a 64bit
+> arch the handed in argument could easily lead to an unnoticed shift
+> overflow. With the above rounding fix applied the calculation before
+> the divison is:
+> 
+>        u64 clc = (latch << evt->shift) + evt->mult - 1;
+> 
+> Now we can easily verify whether the whole equation fits into the
+> 64bit boundary. Shifting the "clc" result back by evt->shift MUST
+> result in "latch". If that's not the case, we have a clear indicator
+But this is only the case if evt->mult is <= (1 << evt->shift). Is this
+always given?
+Is it more sensible to adjust dev->max_delta_ns once at register time
+and so save the often recurrent overflow check in
+clockevents_program_event?
 
-# rmmod solo6x10
-BUG: sleeping function called from invalid context at arch/arm/mm/fault.c:301
-in_atomic(): 0, irqs_disabled(): 128, pid: 303, name: rmmod
-3 locks held by rmmod/303:
- #0:  (&__lockdep_no_validate__){......}, at: [<c0134ce4>] driver_detach+0x44/0xb8
- #1:  (&__lockdep_no_validate__){......}, at: [<c0134cf0>] driver_detach+0x50/0xb8
- #2:  (&mm->mmap_sem){++++++}, at: [<c000f210>] do_page_fault+0x68/0x294
-irq event stamp: 5962
-hardirqs last  enabled at (5961): [<c0273b4c>] _raw_spin_unlock_irqrestore+0x30/0x5c
-hardirqs last disabled at (5962): [<c005afb8>] __free_irq+0x150/0x1d0
-softirqs last  enabled at (0): [<c00149d4>] copy_process.part.64+0x27c/0xd4c
-softirqs last disabled at (0): [<  (null)>]   (null)
-CPU: 0 PID: 303 Comm: rmmod Tainted: G         C   3.11.0+ #51
-[<c000db48>] (unwind_backtrace+0x0/0xf0) from [<c000b59c>] (show_stack+0x10/0x14)
-[<c000b59c>] (show_stack+0x10/0x14) from [<c000f37c>] (do_page_fault+0x1d4/0x294)
-[<c000f37c>] (do_page_fault+0x1d4/0x294) from [<c0008364>] (do_DataAbort+0x34/0x9c)
-[<c0008364>] (do_DataAbort+0x34/0x9c) from [<c000bf9c>] (__dabt_svc+0x3c/0x60)
-Exception stack(0xc6ad3e50 to 0xc6ad3e98)
-3e40:                                     0000001c c78fa000 0000174a c8ca0000
-3e60: c6b2a3c0 c78fa000 c78fa000 20000013 0000001c c6ad2000 a0000013 00000000
-3e80: 0000000e c6ad3e98 c005afc8 bf04be98 20000093 ffffffff
-[<c000bf9c>] (__dabt_svc+0x3c/0x60) from [<bf04be98>] (solo_isr+0x10/0x200 [solo6x10])
-[<bf04be98>] (solo_isr+0x10/0x200 [solo6x10]) from [<c005afc8>] (__free_irq+0x160/0x1d0)
-[<c005afc8>] (__free_irq+0x160/0x1d0) from [<c005b078>] (free_irq+0x40/0x84)
-[<c005b078>] (free_irq+0x40/0x84) from [<bf04b0e0>] (free_solo_dev+0xdc/0xe4 [solo6x10])
-[<bf04b0e0>] (free_solo_dev+0xdc/0xe4 [solo6x10]) from [<c0110d70>] (pci_device_remove+0x38/0xac)
-[<c0110d70>] (pci_device_remove+0x38/0xac) from [<c0134544>] (__device_release_driver+0x70/0xd0)
-[<c0134544>] (__device_release_driver+0x70/0xd0) from [<c0134d54>] (driver_detach+0xb4/0xb8)
-[<c0134d54>] (driver_detach+0xb4/0xb8) from [<c0134370>] (bus_remove_driver+0x7c/0xc4)
-[<c0134370>] (bus_remove_driver+0x7c/0xc4) from [<c0110ebc>] (pci_unregister_driver+0x14/0x74)
-[<c0110ebc>] (pci_unregister_driver+0x14/0x74) from [<c005705c>] (SyS_delete_module+0x170/0x248)
-[<c005705c>] (SyS_delete_module+0x170/0x248) from [<c0009040>] (ret_fast_syscall+0x0/0x44)
+Another doubt I have is: You changed clockevent_delta2ns to round up now
+unconditionally. For the numbers on at91 that doesn't matter, but I
+wonder if there are situations that make the timer core violate the
+max_delta_ticks condition now.
 
---
-Krzysztof Halasa
+> for boundary violation and can limit "clc" to (1 << 63) - 1 before the
+Where does this magic constant come from?
 
-Research Institute for Automation and Measurements PIAP
-Al. Jerozolimskie 202, 02-486 Warsaw, Poland
+Best regards
+Uwe
+
+> divison by evt->mult. The resulting nsec * evt->mult in the
+> programming path will therefor always be in the 64bit boundary.
+> 
+> Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
+> ---
+> diff --git a/kernel/time/clockevents.c b/kernel/time/clockevents.c
+> index 38959c8..4fc4826 100644
+> --- a/kernel/time/clockevents.c
+> +++ b/kernel/time/clockevents.c
+> @@ -49,13 +49,25 @@ u64 clockevent_delta2ns(unsigned long latch, struct clock_event_device *evt)
+>  		WARN_ON(1);
+>  	}
+>  
+> +	/*
+> +	 * Prevent integer rounding loss, otherwise the backward
+> +	 * conversion from nsec to ticks could result in a value less
+> +	 * than evt->min_delta_ticks.
+> +	 */
+> +	clc += evt->mult - 1;
+> +
+> +	/*
+> +	 * Upper bound sanity check. If the backwards conversion is
+> +	 * not equal latch, we know that the above (shift + rounding
+> +	 * correction) exceeded the 64 bit boundary.
+> +	 */
+> +	if ((clc >> evt->shift) != (u64)latch)
+> +		clc = ((u64)1 << 63) - 1;
+> +
+>  	do_div(clc, evt->mult);
+> -	if (clc < 1000)
+> -		clc = 1000;
+> -	if (clc > KTIME_MAX)
+> -		clc = KTIME_MAX;
+>  
+> -	return clc;
+> +	/* Deltas less than 1usec are pointless noise */
+> +	return clc > 1000 ? clc : 1000;
+>  }
+>  EXPORT_SYMBOL_GPL(clockevent_delta2ns);
+> 
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
