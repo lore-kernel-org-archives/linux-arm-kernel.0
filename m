@@ -1,36 +1,31 @@
-From: csd@broadcom.com (Christian Daudt)
-Date: Wed, 18 Sep 2013 15:53:35 -0700
-Subject: [PATCH 06/22] ARM: dts: bcm281xx: Remove '0x's from
- BCM11351 DTS file
-In-Reply-To: <20130812135439.GF13851@lee--X1>
-References: <1374490361-25769-1-git-send-email-lee.jones@linaro.org>
- <1374490361-25769-6-git-send-email-lee.jones@linaro.org>
- <51EDAC90.6010108@broadcom.com> <20130723075309.GE26801@laptop>
- <CAGFynZ-+UoML32ecX4nSGAaFJXqQpdq+D8j7GqJSKhxsE7w=9A@mail.gmail.com>
- <20130812135439.GF13851@lee--X1>
-Message-ID: <523A2EEF.3070406@broadcom.com>
+From: joe@perches.com (Joe Perches)
+Date: Wed, 18 Sep 2013 16:02:41 -0700
+Subject: [PATCH v2] clk: si570: Add a driver for SI570 oscillators
+In-Reply-To: <1379544219-23579-1-git-send-email-soren.brinkmann@xilinx.com>
+References: <1379544219-23579-1-git-send-email-soren.brinkmann@xilinx.com>
+Message-ID: <1379545361.1787.87.camel@joe-AO722>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13-08-12 06:54 AM, Lee Jones wrote:
-> On Thu, 08 Aug 2013, Christian Daudt wrote:
->
->> Hi Lee,
->>   I had to change some of the lines in the dts files you modified, so
->> I've added your mods. This patch:
->> https://lkml.org/lkml/2013/8/8/477
->>
->> includes your changes to bcm11351.dtsi and bcm11351-brt.dts. Not sure
->> where your patch is at this point, but I just wanted to point that
->> out.
-> I haven't done anything with that patch yet, but I'd prefer they
-> stayed separate to be honest. If you make your changes and ensure
-> they're in an upstream tree (and let me know which one), I'll rebase
-> my patches on top of that tree.
+On Wed, 2013-09-18 at 15:43 -0700, Soren Brinkmann wrote:
+> Add a driver for SILabs 570, 571, 598, 599 programmable oscillators.
+> The devices generate low-jitter clock signals and are reprogrammable via
+> an I2C interface.
+[]
+> v2:
+[]
+>  - use 10000 as MIN and MAX value in usleep_range
+[]
+> diff --git a/drivers/clk/clk-si570.c b/drivers/clk/clk-si570.c
+[]
+> +static int si570_set_frequency(struct clk_si570 *data, unsigned long frequency)
+> +{
+[]
+> +	/* Applying a new frequency can take up to 10ms */
+> +	usleep_range(10000, 10000);
 
-These changes are in 3.12-rc1 now:
-https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=d7358f845645c588aff84ac6b476a17d3eec75fa
+Generally it's nicer to have an actual range for usleep_range.
 
-
-  thanks,
-    csd
+Is there a bit you could periodically poll to see
+if the new frequency has been set or is stable so
+that a 10ms delay isn't always used?
