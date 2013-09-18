@@ -1,31 +1,49 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 18 Sep 2013 11:40:14 -0500
-Subject: [PATCH 0/4] ARM: sun7i: Enable the I2C support for the A20
-In-Reply-To: <1378891805-28957-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1378891805-28957-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <20130918164014.GD2972@lukather>
+From: pali.rohar@gmail.com (Pali =?utf-8?q?Roh=C3=A1r?=)
+Date: Wed, 18 Sep 2013 18:43:49 +0200
+Subject: [PATCH 1/4] usb: musb: Call atomic_notifier_call_chain when
+ status is changed
+In-Reply-To: <20130918163649.GL21559@radagast>
+References: <1378630239-10006-1-git-send-email-pali.rohar@gmail.com>
+ <201309181756.12782@pali> <20130918163649.GL21559@radagast>
+Message-ID: <201309181843.49850@pali>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 11, 2013 at 11:30:01AM +0200, Maxime Ripard wrote:
-> Hi everyone,
+On Wednesday 18 September 2013 18:36:49 Felipe Balbi wrote:
+> On Wed, Sep 18, 2013 at 05:56:12PM +0200, Pali Roh?r wrote:
+> > On Wednesday 18 September 2013 15:57:13 Javier Martinez
+> > Canillas
+> > 
+> > wrote:
+> > > to split the patch in two since the patch was solving
+> > > two separate issues
+> > 
+> > My patch does not solving *two* issues. It is *one*
+> > regression and both parts of patch are needed for fixing
+> > it. Read commit message again. It does not make sense to
+> > split patch fixing kernel regression into more one line
+> > patches - or please clarify why.
 > 
-> This patchset enables the support for the I2C IP found in the Allwinner A20.
-> Since it's basically the same IP than the one found in the other Allwinner
-> SoCs, it's just a matter of enabling it in the device tree.
+> issue 1) twl4030-usb.c doesn't initialize atomic notifier head
+> issue 2) musb doesn't call notifier chain
+> 
+> do you need a drawing ?
 
-Merged into sunxi/dt-for-3.13
+Regression 1) power supply drivers not working since v3.5
 
-Maxime
+Look at firsts emails.
+
+
+Do you really have problem to do what *you* need with 1 line 
+patch which I sent? Or what what you want?
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Pali Roh?r
+pali.rohar at gmail.com
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130918/81326b50/attachment.sig>
+Size: 198 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130918/7f96b2a0/attachment.sig>
