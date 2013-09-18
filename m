@@ -1,56 +1,59 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Wed, 18 Sep 2013 11:38:07 +0200 (CEST)
-Subject: [PATCH] clockevents: Sanitize ticks to nsec conversion
-In-Reply-To: <20130918085627.GN24802@pengutronix.de>
-References: <1379077365-18458-1-git-send-email-mkl@pengutronix.de>
- <20130917095600.GJ26819@ludovic.desroches@atmel.com>
- <20130917100417.GQ12758@n2100.arm.linux.org.uk>
- <alpine.DEB.2.02.1309171210450.4089@ionos.tec.linutronix.de>
- <20130917130153.GL26819@ludovic.desroches@atmel.com>
- <alpine.DEB.2.02.1309172228400.4089@ionos.tec.linutronix.de>
- <20130918085627.GN24802@pengutronix.de>
-Message-ID: <alpine.DEB.2.02.1309181058470.4089@ionos.tec.linutronix.de>
+From: bcousson@baylibre.com (Benoit Cousson)
+Date: Wed, 18 Sep 2013 11:40:51 +0200
+Subject: [GIT PULL] ARM: DTS: Fix OMAP bugs for 3.12-rc
+Message-ID: <52397523.4050209@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 18 Sep 2013, Uwe Kleine-K?nig wrote:
-> > Now we can easily verify whether the whole equation fits into the
-> > 64bit boundary. Shifting the "clc" result back by evt->shift MUST
-> > result in "latch". If that's not the case, we have a clear indicator
-> But this is only the case if evt->mult is <= (1 << evt->shift). Is this
-> always given?
+Hi Tony,
 
-Crap, no. It's only true for device frequency <= 1GHz. Good catch!
-
-> Is it more sensible to adjust dev->max_delta_ns once at register time
-> and so save the often recurrent overflow check in
-> clockevents_program_event?
-
-Which overflow check are you talking about?
-
-There is only the boundary check:
-
-        delta = min(delta, (int64_t) dev->max_delta_ns);
-        delta = max(delta, (int64_t) dev->min_delta_ns);
-
-Which sensible adjustment at register time is going to remove that?
-
-> Another doubt I have is: You changed clockevent_delta2ns to round up now
-> unconditionally. For the numbers on at91 that doesn't matter, but I
-> wonder if there are situations that make the timer core violate the
-> max_delta_ticks condition now.
-
-And how so? The + (mult - 1) ensures, that the conversion back to
-ticks results in the same value as latch. So how should it violate
-the max boundary?
-
-Math is hard, right?
- 
-> > for boundary violation and can limit "clc" to (1 << 63) - 1 before the
-> Where does this magic constant come from?
-
-Rolling my magic hex dice gave me that.
+Please pull few fixes for OMAP DTS.
 
 Thanks,
+Benoit
 
-	tglx
+
+
+The following changes since commit 272b98c6455f00884f0350f775c5342358ebb73f:
+
+  Linux 3.12-rc1 (2013-09-16 16:17:51 -0400)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/bcousson/linux-omap-dt.git tags/for_3.12-rc2/dts_signed
+
+for you to fetch changes up to 775d2418f309052641d94c896f73dc779cf7ba1b:
+
+  ARM: dts: Fix muxing and regulator for wl12xx on the SDIO bus for blaze (2013-09-18 11:14:42 +0200)
+
+----------------------------------------------------------------
+Fix BBB LDO voltage to avoid HDMI destruction
+Fix OMAP5 wrong attribute
+Fix typo in beagle xM strings
+
+----------------------------------------------------------------
+Felipe Balbi (2):
+      ARM: dts: OMAP5: fix reg property size
+      ARM: dts: OMAP5: fix ocp2scp DTS data
+
+Koen Kooi (1):
+      ARM: dts: am335x-bone*: add DT for BeagleBone Black
+
+Robert Nelson (1):
+      ARM: dts: omap3-beagle-xm: fix string error in compatible property
+
+Tony Lindgren (2):
+      ARM: dts: Fix muxing and regulator for wl12xx on the SDIO bus for pandaboard
+      ARM: dts: Fix muxing and regulator for wl12xx on the SDIO bus for blaze
+
+ arch/arm/boot/dts/Makefile                |   1 +
+ arch/arm/boot/dts/am335x-bone-common.dtsi | 262 ++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/am335x-bone.dts         | 256 +----------------------------
+ arch/arm/boot/dts/am335x-boneblack.dts    |  17 ++
+ arch/arm/boot/dts/omap3-beagle-xm.dts     |   2 +-
+ arch/arm/boot/dts/omap4-panda-common.dtsi |  46 +++++-
+ arch/arm/boot/dts/omap4-sdp.dts           |  39 ++++-
+ arch/arm/boot/dts/omap5.dtsi              |   7 +-
+ 8 files changed, 369 insertions(+), 261 deletions(-)
+ create mode 100644 arch/arm/boot/dts/am335x-bone-common.dtsi
+ create mode 100644 arch/arm/boot/dts/am335x-boneblack.dts
