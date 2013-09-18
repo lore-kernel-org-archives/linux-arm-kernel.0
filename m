@@ -1,60 +1,51 @@
-From: zhoujiewu@gmail.com (zhoujie wu)
-Date: Wed, 18 Sep 2013 10:17:42 +0800
-Subject: question about clk notifier in common clock tree
-Message-ID: <CAAXpJNvPvqr9+Zu1dUMssa0oorEH7Yc=so93i0UJjdNXKyh45A@mail.gmail.com>
+From: michael.opdenacker@free-electrons.com (Michael Opdenacker)
+Date: Wed, 18 Sep 2013 05:23:42 +0200
+Subject: [PATCH] ARM: STi: remove unused Kconfig parameters
+Message-ID: <1379474622-4715-1-git-send-email-michael.opdenacker@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
+This patch proposes to remove the 'SOC_STIH415' and 'SOC_STIH416'
+parameters, which are used nowhere else in the source code
+and Makefiles.
 
-Now in our platform, we are using clk notifer to adjust voltage before
-clock rate change or after rate change.
+Will they be needed in code that hasn't been submitted yet?
 
-But for some clock modules, it even have to adjust voltage when clock
-enable and disable.
-For example, when it is working(clock enabled), it requires voltage
-1.2V. When it finished its work, it could release it's voltage
-requirement.
-Do you think if it is ok we also send out notifier in __clk_prepare
-and __clk_unprepare as below?
+Signed-off-by: Michael Opdenacker <michael.opdenacker@free-electrons.com>
+---
+ arch/arm/mach-sti/Kconfig | 23 -----------------------
+ 1 file changed, 23 deletions(-)
 
-Thanks.
-
-diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index 54a191c..2f64f1e 100644
---- a/drivers/clk/clk.c
-+++ b/drivers/clk/clk.c
-@@ -34,6 +34,9 @@ static HLIST_HEAD(clk_root_list);
- static HLIST_HEAD(clk_orphan_list);
- static LIST_HEAD(clk_notifier_list);
-
-+static int __clk_notify(struct clk *clk, unsigned long msg,
-+ unsigned long old_rate, unsigned long new_rate);
-+
- /***           locking             ***/
- static void clk_prepare_lock(void)
- {
-@@ -697,6 +700,9 @@ void __clk_unprepare(struct clk *clk)
-  if (clk->ops->unprepare)
-  clk->ops->unprepare(clk->hw);
-
-+ /* send out notifier for dvfs */
-+ __clk_notify(clk, POST_RATE_CHANGE, clk->rate, 0);
-+
-  __clk_unprepare(clk->parent);
- }
-
-@@ -738,6 +744,9 @@ int __clk_prepare(struct clk *clk)
-  return ret;
-  }
-  }
-+
-+ /* send out notifier for dvfs */
-+ __clk_notify(clk, PRE_RATE_CHANGE, 0, clk->rate);
-  }
-
-  clk->prepare_count++;
-
-
---
-Zhoujie Wu
+diff --git a/arch/arm/mach-sti/Kconfig b/arch/arm/mach-sti/Kconfig
+index 835833e..bef1a9f 100644
+--- a/arch/arm/mach-sti/Kconfig
++++ b/arch/arm/mach-sti/Kconfig
+@@ -21,26 +21,3 @@ menuconfig ARCH_STI
+ 	  for discovery
+ 	  More information at Documentation/arm/STiH41x and
+ 	  at Documentation/devicetree
+-
+-
+-if ARCH_STI
+-
+-config SOC_STIH415
+-	bool "STiH415 STMicroelectronics Consumer Electronics family"
+-	default y
+-	help
+-	  This enables support for STMicroelectronics Digital Consumer
+-	  Electronics family StiH415 parts, primarily targetted at set-top-box
+-	  and other digital audio/video applications using Flattned Device
+-	  Trees.
+-
+-config SOC_STIH416
+-	bool "STiH416 STMicroelectronics Consumer Electronics family"
+-	default y
+-	help
+-	  This enables support for STMicroelectronics Digital Consumer
+-	  Electronics family StiH416 parts, primarily targetted at set-top-box
+-	  and other digital audio/video applications using Flattened Device
+-	  Trees.
+-
+-endif
+-- 
+1.8.1.2
