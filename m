@@ -1,31 +1,31 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 18 Sep 2013 13:13:57 +0100
-Subject: [PATCH v2 00/41] Enable common clock with Device Tree on ux500
- platforms
-Message-ID: <1379506478-16625-1-git-send-email-lee.jones@linaro.org>
+Date: Wed, 18 Sep 2013 13:14:30 +0100
+Subject: [PATCH 33/41] ARM: ux500: Remove AUXDATA relating to UART clock-name
+ bindings
+In-Reply-To: <1379506478-16625-1-git-send-email-lee.jones@linaro.org>
+References: <1379506478-16625-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <1379506478-16625-34-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After this patchset has been applied, we can request clocks directly
-from Device Tree without using any AUXDATA device-name hacks. We also
-take care to remove all of those at the end of the set.
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ arch/arm/mach-ux500/cpu-db8500.c | 3 ---
+ 1 file changed, 3 deletions(-)
 
-Most of the code is the same as the previous submission, but on Linus'
-request we are starting with a new DT:ed clk_init() function instead
-of converting the old one into dual purpose, the to DT only.
-
- arch/arm/boot/dts/dbx5x0.dtsi           | 124 ++++++++++++++++++++++++++-
- arch/arm/boot/dts/snowball.dts          |   3 +-
- arch/arm/mach-ux500/cpu-db8500.c        |  41 ++-------
- arch/arm/mach-ux500/cpu.c               |  14 +++-
- arch/arm/mach-ux500/timer.c             |   4 +-
- drivers/clk/ux500/Makefile              |   1 +
- drivers/clk/ux500/u8500_of_clk.c        | 558 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- drivers/clk/ux500/u8540_clk.c           |   2 +-
- drivers/mfd/db8500-prcmu.c              |   1 -
- drivers/mfd/dbx500-prcmu-regs.h         |   1 -
- drivers/usb/musb/ux500.c                |   2 +-
- include/dt-bindings/mfd/dbx500-prcmu.h  |  83 ++++++++++++++++++
- include/linux/mfd/dbx500-prcmu.h        |  70 +---------------
- include/linux/platform_data/clk-ux500.h |   3 +
- 14 files changed, 796 insertions(+), 111 deletions(-)
+diff --git a/arch/arm/mach-ux500/cpu-db8500.c b/arch/arm/mach-ux500/cpu-db8500.c
+index a5e89af..44e656d 100644
+--- a/arch/arm/mach-ux500/cpu-db8500.c
++++ b/arch/arm/mach-ux500/cpu-db8500.c
+@@ -219,9 +219,6 @@ static struct of_dev_auxdata u8500_auxdata_lookup[] __initdata = {
+ 	/* Requires call-back bindings. */
+ 	OF_DEV_AUXDATA("arm,cortex-a9-pmu", 0, "arm-pmu", &db8500_pmu_platdata),
+ 	/* Requires DMA bindings. */
+-	OF_DEV_AUXDATA("arm,pl011", 0x80120000, "uart0", NULL),
+-	OF_DEV_AUXDATA("arm,pl011", 0x80121000, "uart1", NULL),
+-	OF_DEV_AUXDATA("arm,pl011", 0x80007000, "uart2", NULL),
+ 	OF_DEV_AUXDATA("arm,pl022", 0x80002000, "ssp0",  &ssp0_plat),
+ 	OF_DEV_AUXDATA("arm,pl18x", 0x80126000, "sdi0",  &mop500_sdi0_data),
+ 	OF_DEV_AUXDATA("arm,pl18x", 0x80118000, "sdi1",  &mop500_sdi1_data),
+-- 
+1.8.1.2
