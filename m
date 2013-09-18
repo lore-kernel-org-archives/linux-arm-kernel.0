@@ -1,161 +1,166 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 18 Sep 2013 13:03:40 +0100
-Subject: [PATCH 2/4] ARM: STi: Supply I2C configuration to STiH416 SoC
-In-Reply-To: <1379498483-4236-3-git-send-email-maxime.coquelin@st.com>
-References: <1379498483-4236-1-git-send-email-maxime.coquelin@st.com>
- <1379498483-4236-3-git-send-email-maxime.coquelin@st.com>
-Message-ID: <20130918120340.GF16984@lee--X1>
+Date: Wed, 18 Sep 2013 13:13:58 +0100
+Subject: [PATCH 01/41] mfd: dbx500-prcmu: Correctly reorder PRCMU clock
+ identifiers
+In-Reply-To: <1379506478-16625-1-git-send-email-lee.jones@linaro.org>
+References: <1379506478-16625-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <1379506478-16625-2-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> This patch supplies I2C configuration to STiH416 SoC.
-> 
-> Cc: Srinivas Kandagatla <srinivas.kandagatla@st.com>
-> Signed-off-by: Maxime Coquelin <maxime.coquelin@st.com>
-> ---
->  arch/arm/boot/dts/stih416-pinctrl.dtsi |   35 ++++++++++++++++++++
->  arch/arm/boot/dts/stih416.dtsi         |   57 ++++++++++++++++++++++++++++++++
->  2 files changed, 92 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/stih416-pinctrl.dtsi b/arch/arm/boot/dts/stih416-pinctrl.dtsi
+... as stipulated by the Hardware Specification document.
 
-I genuinely don't know the answer to this question, but are these
-nodes identical to the ones you've just put in the stih415 DTSI file?
-If so, I think it will be worth creating a stih41x DTSI rather than
-duplicating lots of stuff unnecessarily.
+Acked-by: Samuel Ortiz <sameo@linux.intel.com>
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ include/linux/mfd/dbx500-prcmu.h | 135 ++++++++++++++++++++-------------------
+ 1 file changed, 71 insertions(+), 64 deletions(-)
 
-> index 0f246c9..b29ff4b 100644
-> --- a/arch/arm/boot/dts/stih416-pinctrl.dtsi
-> +++ b/arch/arm/boot/dts/stih416-pinctrl.dtsi
-> @@ -97,6 +97,24 @@
->  					};
->  				};
->  			};
-> +
-> +			sbc_i2c0 {
-> +				pinctrl_sbc_i2c0_default: sbc_i2c0-default {
-> +					st,pins {
-> +						sda = <&PIO4 6 ALT1 BIDIR>;
-> +						scl = <&PIO4 5 ALT1 BIDIR>;
-> +					};
-> +				};
-> +			};
-> +
-> +			sbc_i2c1 {
-> +				pinctrl_sbc_i2c1_default: sbc_i2c1-default {
-> +					st,pins {
-> +						sda = <&PIO3 2 ALT2 BIDIR>;
-> +						scl = <&PIO3 1 ALT2 BIDIR>;
-> +					};
-> +				};
-> +			};
->  		};
->  
->  		pin-controller-front {
-> @@ -175,6 +193,23 @@
->  				};
->  			};
->  
-> +			i2c0 {
-> +				pinctrl_i2c0_default: i2c0-default {
-> +					st,pins {
-> +						sda = <&PIO9 3 ALT1 BIDIR>;
-> +						scl = <&PIO9 2 ALT1 BIDIR>;
-> +					};
-> +				};
-> +			};
-> +
-> +			i2c1 {
-> +				pinctrl_i2c1_default: i2c1-default {
-> +					st,pins {
-> +						sda = <&PIO12 1 ALT1 BIDIR>;
-> +						scl = <&PIO12 0 ALT1 BIDIR>;
-> +					};
-> +				};
-> +			};
->  		};
->  
->  		pin-controller-rear {
-> diff --git a/arch/arm/boot/dts/stih416.dtsi b/arch/arm/boot/dts/stih416.dtsi
-> index 1a0326e..8856470 100644
-> --- a/arch/arm/boot/dts/stih416.dtsi
-> +++ b/arch/arm/boot/dts/stih416.dtsi
-> @@ -9,6 +9,7 @@
->  #include "stih41x.dtsi"
->  #include "stih416-clock.dtsi"
->  #include "stih416-pinctrl.dtsi"
-> +#include <dt-bindings/interrupt-controller/arm-gic.h>
->  / {
->  	L2: cache-controller {
->  		compatible = "arm,pl310-cache";
-> @@ -92,5 +93,61 @@
->  			pinctrl-0 	= <&pinctrl_sbc_serial1>;
->  			clocks          = <&CLK_SYSIN>;
->  		};
-> +
-> +		i2c0: i2c at fed40000{
-
-Same issues here. I assume most of this is copy paste.
-
-> +			compatible	= "st,comms-i2c";
-> +			status		= "disabled";
-> +			reg		= <0xfed40000 0x110>;
-> +			interrupts	=  <GIC_SPI 187 IRQ_TYPE_EDGE_RISING>;
-> +			clocks		= <&CLK_S_ICN_REG_0>;
-> +			clock-frequency = <400000>;
-> +			pinctrl-names	= "default";
-> +			pinctrl-0	= <&pinctrl_i2c0_default>;
-> +			st,glitches;
-> +			st,glitch-clk	= <500>;
-> +			st,glitch-dat	= <500>;
-> +		};
-> +
-> +		i2c1: i2c at fed41000{
-> +			compatible	= "st,comms-i2c";
-> +			status		= "disabled";
-> +			reg		= <0xfed41000 0x110>;
-> +			interrupts	=  <GIC_SPI 188 IRQ_TYPE_EDGE_RISING>;
-> +			clocks		= <&CLK_S_ICN_REG_0>;
-> +			clock-frequency = <400000>;
-> +			pinctrl-names	= "default";
-> +			pinctrl-0	= <&pinctrl_i2c1_default>;
-> +			st,glitches;
-> +			st,glitch-clk	= <500>;
-> +			st,glitch-dat	= <500>;
-> +		};
-> +
-> +		sbc_i2c0: i2c at fe540000{
-> +			compatible	= "st,comms-i2c";
-> +			status		= "disabled";
-> +			reg		= <0xfe540000 0x110>;
-> +			interrupts	=  <GIC_SPI 206 IRQ_TYPE_EDGE_RISING>;
-> +			clocks		= <&CLK_SYSIN>;
-> +			clock-frequency = <400000>;
-> +			pinctrl-names	= "default";
-> +			pinctrl-0	= <&pinctrl_sbc_i2c0_default>;
-> +			st,glitches;
-> +			st,glitch-clk	= <500>;
-> +			st,glitch-dat	= <500>;
-> +		};
-> +
-> +		sbc_i2c1: i2c at fe541000{
-> +			compatible	= "st,comms-i2c";
-> +			status		= "disabled";
-> +			reg		= <0xfe541000 0x110>;
-> +			interrupts	=  <GIC_SPI 207 IRQ_TYPE_EDGE_RISING>;
-> +			clocks		= <&CLK_SYSIN>;
-> +			clock-frequency = <400000>;
-> +			pinctrl-names	= "default";
-> +			pinctrl-0	= <&pinctrl_sbc_i2c1_default>;
-> +			st,glitches;
-> +			st,glitch-clk	= <500>;
-> +			st,glitch-dat	= <500>;
-> +		};
->  	};
->  };
-
+diff --git a/include/linux/mfd/dbx500-prcmu.h b/include/linux/mfd/dbx500-prcmu.h
+index ca0790f..87667d4 100644
+--- a/include/linux/mfd/dbx500-prcmu.h
++++ b/include/linux/mfd/dbx500-prcmu.h
+@@ -97,70 +97,77 @@ enum prcmu_wakeup_index {
+ /*
+  * Clock identifiers.
+  */
+-enum prcmu_clock {
+-	PRCMU_SGACLK,
+-	PRCMU_UARTCLK,
+-	PRCMU_MSP02CLK,
+-	PRCMU_MSP1CLK,
+-	PRCMU_I2CCLK,
+-	PRCMU_SDMMCCLK,
+-	PRCMU_SPARE1CLK,
+-	PRCMU_SLIMCLK,
+-	PRCMU_PER1CLK,
+-	PRCMU_PER2CLK,
+-	PRCMU_PER3CLK,
+-	PRCMU_PER5CLK,
+-	PRCMU_PER6CLK,
+-	PRCMU_PER7CLK,
+-	PRCMU_LCDCLK,
+-	PRCMU_BMLCLK,
+-	PRCMU_HSITXCLK,
+-	PRCMU_HSIRXCLK,
+-	PRCMU_HDMICLK,
+-	PRCMU_APEATCLK,
+-	PRCMU_APETRACECLK,
+-	PRCMU_MCDECLK,
+-	PRCMU_IPI2CCLK,
+-	PRCMU_DSIALTCLK,
+-	PRCMU_DMACLK,
+-	PRCMU_B2R2CLK,
+-	PRCMU_TVCLK,
+-	PRCMU_SSPCLK,
+-	PRCMU_RNGCLK,
+-	PRCMU_UICCCLK,
+-	PRCMU_PWMCLK,
+-	PRCMU_IRDACLK,
+-	PRCMU_IRRCCLK,
+-	PRCMU_SIACLK,
+-	PRCMU_SVACLK,
+-	PRCMU_ACLK,
+-	PRCMU_HVACLK, /* Ux540 only */
+-	PRCMU_G1CLK, /* Ux540 only */
+-	PRCMU_SDMMCHCLK,
+-	PRCMU_CAMCLK,
+-	PRCMU_BML8580CLK,
+-	PRCMU_NUM_REG_CLOCKS,
+-	PRCMU_SYSCLK = PRCMU_NUM_REG_CLOCKS,
+-	PRCMU_CDCLK,
+-	PRCMU_TIMCLK,
+-	PRCMU_PLLSOC0,
+-	PRCMU_PLLSOC1,
+-	PRCMU_ARMSS,
+-	PRCMU_PLLDDR,
+-	PRCMU_PLLDSI,
+-	PRCMU_DSI0CLK,
+-	PRCMU_DSI1CLK,
+-	PRCMU_DSI0ESCCLK,
+-	PRCMU_DSI1ESCCLK,
+-	PRCMU_DSI2ESCCLK,
+-	/* LCD DSI PLL - Ux540 only */
+-	PRCMU_PLLDSI_LCD,
+-	PRCMU_DSI0CLK_LCD,
+-	PRCMU_DSI1CLK_LCD,
+-	PRCMU_DSI0ESCCLK_LCD,
+-	PRCMU_DSI1ESCCLK_LCD,
+-	PRCMU_DSI2ESCCLK_LCD,
+-};
++#define ARMCLK			0
++#define PRCMU_ACLK		1
++#define PRCMU_SVAMMCSPCLK 	2
++#define PRCMU_SDMMCHCLK 	2  /* DBx540 only. */
++#define PRCMU_SIACLK 		3
++#define PRCMU_SIAMMDSPCLK 	3  /* DBx540 only. */
++#define PRCMU_SGACLK 		4
++#define PRCMU_UARTCLK 		5
++#define PRCMU_MSP02CLK 		6
++#define PRCMU_MSP1CLK 		7
++#define PRCMU_I2CCLK 		8
++#define PRCMU_SDMMCCLK 		9
++#define PRCMU_SLIMCLK 		10
++#define PRCMU_CAMCLK 		10 /* DBx540 only. */
++#define PRCMU_PER1CLK 		11
++#define PRCMU_PER2CLK 		12
++#define PRCMU_PER3CLK 		13
++#define PRCMU_PER5CLK 		14
++#define PRCMU_PER6CLK 		15
++#define PRCMU_PER7CLK 		16
++#define PRCMU_LCDCLK 		17
++#define PRCMU_BMLCLK 		18
++#define PRCMU_HSITXCLK 		19
++#define PRCMU_HSIRXCLK 		20
++#define PRCMU_HDMICLK		21
++#define PRCMU_APEATCLK 		22
++#define PRCMU_APETRACECLK 	23
++#define PRCMU_MCDECLK  	 	24
++#define PRCMU_IPI2CCLK  	25
++#define PRCMU_DSIALTCLK  	26
++#define PRCMU_DMACLK  	 	27
++#define PRCMU_B2R2CLK  	 	28
++#define PRCMU_TVCLK  	 	29
++#define SPARE_UNIPROCLK  	30
++#define PRCMU_SSPCLK  	 	31
++#define PRCMU_RNGCLK  	 	32
++#define PRCMU_UICCCLK  	 	33
++#define PRCMU_G1CLK             34 /* DBx540 only. */
++#define PRCMU_HVACLK            35 /* DBx540 only. */
++#define PRCMU_SPARE1CLK	 	36
++#define PRCMU_SPARE2CLK	 	37
++
++#define PRCMU_NUM_REG_CLOCKS  	38
++
++#define PRCMU_RTCCLK  	 	PRCMU_NUM_REG_CLOCKS
++#define PRCMU_SYSCLK  	 	39
++#define PRCMU_CDCLK  	 	40
++#define PRCMU_TIMCLK  	 	41
++#define PRCMU_PLLSOC0  	 	42
++#define PRCMU_PLLSOC1  	 	43
++#define PRCMU_ARMSS  	 	44
++#define PRCMU_PLLDDR  	 	45
++#define PRCMU_BML8580CLK        46
++
++/* DSI Clocks */
++#define PRCMU_PLLDSI  	 	47
++#define PRCMU_DSI0CLK 	  	48
++#define PRCMU_DSI1CLK  	 	49
++#define PRCMU_DSI0ESCCLK  	50
++#define PRCMU_DSI1ESCCLK  	51
++#define PRCMU_DSI2ESCCLK  	52
++
++/* LCD DSI PLL - Ux540 only */
++#define PRCMU_PLLDSI_LCD        53
++#define PRCMU_DSI0CLK_LCD       54
++#define PRCMU_DSI1CLK_LCD       55
++#define PRCMU_DSI0ESCCLK_LCD    56
++#define PRCMU_DSI1ESCCLK_LCD    57
++#define PRCMU_DSI2ESCCLK_LCD    58
++
++#define PRCMU_NUM_CLKS  	59
+ 
+ /**
+  * enum prcmu_wdog_id - PRCMU watchdog IDs
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+1.8.1.2
