@@ -1,78 +1,61 @@
-From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
-Date: Wed, 18 Sep 2013 13:32:31 +0200
-Subject: [PATCHv4 2/2] clocksource: dw_apb_timer_of: Fix read_sched_clock
-In-Reply-To: <20130918110159.GA32005@amd.pavel.ucw.cz>
-References: <1379455361-13882-1-git-send-email-dinguyen@altera.com>
- <alpine.DEB.2.02.1309180030060.4089@ionos.tec.linutronix.de>
- <20130918110159.GA32005@amd.pavel.ucw.cz>
-Message-ID: <201309181332.31561.heiko@sntech.de>
+From: r.sricharan@ti.com (Sricharan R)
+Date: Wed, 18 Sep 2013 17:03:27 +0530
+Subject: [PATCH V2] ARM: dts: DRA7: provide arch-timer frequenecy parameter
+In-Reply-To: <1379437288-10831-1-git-send-email-nm@ti.com>
+References: <5238899D.60903@ti.com>
+ <1379437288-10831-1-git-send-email-nm@ti.com>
+Message-ID: <52398F87.6090108@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, 18. September 2013, 13:01:59 schrieb Pavel Machek:
-> On Wed 2013-09-18 00:42:36, Thomas Gleixner wrote:
-> > On Tue, 17 Sep 2013, dinguyen at altera.com wrote:
-> And now we can't get the code fixed so that it at least works on our
-> hardware, because, guess what, you noticed upstream merged the gem
-> below, and you don't like it?
-> 
-> > static int num_called;
-> > static void __init dw_apb_timer_init(struct device_node *timer)
-> > {
-> > 
-> >         switch (num_called) {
-> >         
-> >         case 0:
-> >                 pr_debug("%s: found clockevent timer\n", __func__);
-> >                 add_clockevent(timer);
-> >                 of_node_put(timer);
-> >                 break;
-> >         
-> >         case 1:
-> >                 pr_debug("%s: found clocksource timer\n", __func__);
-> >                 add_clocksource(timer);
-> >                 of_node_put(timer);
-> >                 init_sched_clock();
-> >                 break;
-> >         
-> >         default:
-> >                 break;
-> >         
-> >         }
-> >         
-> >         num_called++;
-> > 
-> > }
-> > 
-> > So if you can use different nodes for clockevent and clocksource, why
-> > is that supposed to be dependent on the ordering? That's not how DT is
-> > supposed to be used. DT provides a clear description of the hardware,
-> > not some ordering dependent magic amended by utterly useless pr_debug()
-> > constructs.
-> 
-> You already had non-ugly version in your tree.
-> 
-> Alternatively, tell us what you want done. These boards have 2 to 4
-> identical timers, that can serve as both clockevent and
-> clocksource. We'd like to use one as clockevent and one as
-> clocksource.
+Hi,
 
-I would also be interested in the "right" way to do this.
+On Tuesday 17 September 2013 10:31 PM, Nishanth Menon wrote:
+> CNTFREQ isn't pre-programmed on DRA7 just like O5, so provide the
+> timer frequency via DT. Without a valid value arch_timer_init results
+> in div0 crash.
+>
+> Cc: R Sricharan <r.sricharan@ti.com>
+> Cc: Rajendra Nayak <rnayak@ti.com>
+> Cc: Sourav Poddar <sourav.poddar@ti.com>
+>
+> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Signed-off-by: Nishanth Menon <nm@ti.com>
+> ---
+>
+> Based on Benoit's for_3.13/dts branch. 
+> http://git.kernel.org/cgit/linux/kernel/git/bcousson/linux-omap-dt.git/log/?h=for_3.13/dts
+>
+> Crash log: http://pastebin.com/B2sDauS9
+>
+> V2: commit message update
+> V1: https://patchwork.kernel.org/patch/2903261/
+>
+>  arch/arm/boot/dts/dra7.dtsi |    1 +
+>  1 file changed, 1 insertion(+)
+>
+> diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
+> index c98997b..71c2749 100644
+> --- a/arch/arm/boot/dts/dra7.dtsi
+> +++ b/arch/arm/boot/dts/dra7.dtsi
+> @@ -50,6 +50,7 @@
+>  			     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
+>  			     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
+>  			     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>;
+> +		clock-frequency = <6144000>;
+>  	};
+>  
+>  	gic: interrupt-controller at 48211000 {
+This is not the right way to pass the frequency. In fact, initially the frequency value was present
+when the dts was added, but had to revert it back based on the feedbacks. Please refer below.
+  
 
-As Pavel already said, the hardware is identical for all N separate timer 
-blocks, so as the DT should be describing the hardware only, there is no way 
-to specifiy one for the clockevent and another for the clocksource there.
-
-At first I kept using the non-standard init which required it being called from 
-platform code, but got the request to convert the driver to use 
-CLOCKSOURCE_OF_DECLARE to remove the need for separate call.
-
-As you will know CLOCKSOURCE_OF_DECLARE calls the init function for each found 
-dt node for a matching device, resulting in N calls to dw_apb_timer_init.
-So my solution was to just grab the first one as clockevent and second one as 
-clocksource.
-
-Therefore I'm all ears for how to solve this in a better way :-)
+http://www.mail-archive.com/linux-omap at vger.kernel.org/msg93832.html
 
 
-Heiko
+Also posted the below patch to fix this,
+
+    http://marc.info/?l=linux-omap&m=137950345528918&w=2
+
+Regards,
+ Sricharan
