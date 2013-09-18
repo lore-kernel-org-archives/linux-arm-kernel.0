@@ -1,44 +1,34 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Wed, 18 Sep 2013 13:41:01 -0700
-Subject: [PATCH] clk: si570: Add a driver for SI570 oscillators
-In-Reply-To: <52387FC9.1080905@wwwdotorg.org>
-References: <1379033737-30015-1-git-send-email-soren.brinkmann@xilinx.com>
- <1379033737-30015-2-git-send-email-soren.brinkmann@xilinx.com>
- <52373314.5070806@wwwdotorg.org>
- <20130916164927.GB21352@roeck-us.net>
- <5237390E.5070203@wwwdotorg.org>
- <20130916173540.GA3481@roeck-us.net>
- <52374FF7.8040604@wwwdotorg.org> <52380BD5.8080105@gmail.com>
- <52387FC9.1080905@wwwdotorg.org>
-Message-ID: <3551eb15-319d-4304-b213-2b0d9672419b@AM1EHSMHS019.ehs.local>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 18 Sep 2013 14:45:41 -0600
+Subject: [PATCH 00/26] ARM: provide common arch init for DT clocks
+In-Reply-To: <523A046E.6040804@gmail.com>
+References: <1379526839-14798-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20130918194711.GR19937@titan.lakedaemon.net> <523A046E.6040804@gmail.com>
+Message-ID: <523A10F5.7090009@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 17, 2013 at 10:14:01AM -0600, Stephen Warren wrote:
-> On 09/17/2013 01:59 AM, Sebastian Hesselbarth wrote:
-> > On 09/16/2013 08:37 PM, Stephen Warren wrote:
-> ...
-> >> Perhaps if clock-frequency is specified, the driver should refuse to
-> >> provide anything else. If clock-frequency isn't specified, the driver
-> >> shouldn't touch the HW when it initializes, but should honor any
-> >> requests that come in from other drivers? That would maintain what I
-> >> feel is clock-frequency's connection to being a fixed clock.
-> > 
-> > For the clk-si5351 programmable clock driver in mainline, it already
-> > uses "clock-frequency" for initial clock setup but allows to set it
-> > later on. IMHO that is ok, because from a initial point-of-view, an
-> > initial frequency is fixed. As soon as the driver takes over, the user
-> > is free to do whatever he wants and should not be limited by DT.
-> > 
-> > But if we vote against that approach, we should probably also modifiy
-> > clk-si5351 accordingly.
+On 09/18/2013 01:52 PM, Sebastian Hesselbarth wrote:
+> On 09/18/2013 09:47 PM, Jason Cooper wrote:
+>> On Wed, Sep 18, 2013 at 07:53:33PM +0200, Sebastian Hesselbarth wrote:
+>> ...
+>>> Sebastian Hesselbarth (26):
+>>>    ARM: nomadik: move mtu setup to clocksource init
+...
+>>
+>> How would you like to handle this series?
 > 
-> I suppose that approach isn't unreasonable. So, if there's precedent for
-> it, this driver may as well follow it.
+> Jason,
+> 
+> honestly I don't really know, yet. I was hoping for Arnd and Olof
+> decide on that. Maybe they also create a topic branch up to where
+> arch-wide of_clk_init is introduced. Then each removal patch can
+> go through the independent sub-trees. There may be more machs
+> introduced before, that can then also depend on the common branch.
 
-All right, this sounds the most flexible to me and requires the least
-changes as well :).
-I think all I have to change for v2 in regards of this, is to rename the
-property to 'clock-frequency'. I'll do that and send out v2 later today.
-
-	S?ren
+Oh, I was assuming you'd just take the whole thing through one tree,
+likely in arm-soc. That's why I created the topic branch for the Tegra
+PMIC patch that's a dependency of this... However, I guess if you just
+merge the core into a topic branch in arm-soc and everyone merges it
+back, that's fine. I assume the Tegra topic branch I created won't be
+necessary in that case.
