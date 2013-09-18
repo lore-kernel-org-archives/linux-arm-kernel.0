@@ -1,7 +1,9 @@
 From: soren.brinkmann@xilinx.com (Soren Brinkmann)
-Date: Wed, 18 Sep 2013 15:43:38 -0700
+Date: Wed, 18 Sep 2013 15:43:39 -0700
 Subject: [PATCH v2] clk: si570: Add a driver for SI570 oscillators
-Message-ID: <1379544219-23579-1-git-send-email-soren.brinkmann@xilinx.com>
+In-Reply-To: <1379544219-23579-1-git-send-email-soren.brinkmann@xilinx.com>
+References: <1379544219-23579-1-git-send-email-soren.brinkmann@xilinx.com>
+Message-ID: <1379544219-23579-2-git-send-email-soren.brinkmann@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
