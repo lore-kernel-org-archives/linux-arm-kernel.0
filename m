@@ -1,25 +1,59 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 18 Sep 2013 08:17:03 -0700
-Subject: [PATCH] ARM: u300: hide submenus
-In-Reply-To: <1379509732-25228-1-git-send-email-linus.walleij@linaro.org>
-References: <1379509732-25228-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <20130918151703.GA23543@quad.lixom.net>
+From: r.sricharan@ti.com (Sricharan R)
+Date: Wed, 18 Sep 2013 20:55:21 +0530
+Subject: [RFC PATCH 1/4] DRIVERS: IRQCHIP: Add crossbar irqchip driver
+In-Reply-To: <5239B010.8080605@ti.com>
+References: <1379000351-15672-1-git-send-email-r.sricharan@ti.com>
+ <1379000351-15672-2-git-send-email-r.sricharan@ti.com>
+ <alpine.DEB.2.02.1309122201530.4089@ionos.tec.linutronix.de>
+ <523228B5.5070507@ti.com>
+ <alpine.DEB.2.02.1309122335440.4089@ionos.tec.linutronix.de>
+ <5232457A.8080709@ti.com>
+ <alpine.DEB.2.02.1309130138550.4089@ionos.tec.linutronix.de>
+ <52326D6B.2010003@ti.com>
+ <alpine.DEB.2.02.1309131142540.4089@ionos.tec.linutronix.de>
+ <CACRpkdYzaoZUunoNDNirV5Bt-G6p-avFV8A=iznDKjK2biqwrw@mail.gmail.com>
+ <5239B010.8080605@ti.com>
+Message-ID: <5239C5E1.4060807@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 18, 2013 at 03:08:52PM +0200, Linus Walleij wrote:
-> Right now the U300 submenus are showcased for everyone even if
-> we're not on v5 multiplatforms. Hide this in the multiplatform
-> configuration properly.
-> 
-> Cc: arm at kernel.org
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
-> ARM SoC folks: I don't know if you feel this is a fix or not,
-> feel free to apply it on your fixes if you like, else I'll carry
-> it for a U300 pull request later.
+On Wednesday 18 September 2013 07:22 PM, Sricharan R wrote:
+> Hi Thomas,
+>
+> On Tuesday 17 September 2013 05:56 PM, Linus Walleij wrote:
+>> On Fri, Sep 13, 2013 at 4:24 PM, Thomas Gleixner <tglx@linutronix.de> wrote:
+>>
+>>> So why can't you make use of irq domains and have the whole routing
+>>> business implemented sanely?
+>>>
+>>> What's needed is in gic_init_bases():
+>>> irq
+>>>        if (of_property_read(node, "routable_irqs", &nr_routable_irqs) {
+>>>           irq_domain_add_legacy(nr_gic_irqs);
+>>>        } else {
+>>>           irq_domain_add_legacy(nr_per_cpu_irqs);
+>>>           irq_domain_add_linear(nr_routable_irqs);
+>>>        }
+>>>
+>>> Now that separate domain has an xlate function which grabs a free GIC
+>>> irq from a bitmap and returns the hardware irq number in the gic
+>>> space. The map/unmap callbacks take care of setting up / tearing down
+>>> the route in the crossbar.
+>> This is obviously the right approach, it's exactly what .map should do
+>> the only special thing here being that we have hardware to perform
+>> the mapping ... bah why didn't I realize this :-(
+>>
+>> Yours,
+>> Linus Walleij
+> Thanks for the suggestion.
+>
+> So as i understand this, this implies using the GIC domain itself and
+>  add the support for dynamically routable irqs (like crossbar) with in the
+> GIC driver itself right ?
+  Please ignore this. So the question was more of how to implement the
+  call outs in the case of routable irqs from map/ unmap callbacks.
+ I will look more here and come back.
 
-We're early enough in the -rcs that this is OK, I'd say. Applied.
-
-
--Olof
+Regards,
+ Sricharan
+ 
