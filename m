@@ -1,80 +1,86 @@
-From: pavel@denx.de (Pavel Machek)
-Date: Wed, 18 Sep 2013 13:01:59 +0200
-Subject: [PATCHv4 2/2] clocksource: dw_apb_timer_of: Fix read_sched_clock
-In-Reply-To: <alpine.DEB.2.02.1309180030060.4089@ionos.tec.linutronix.de>
-References: <1379455361-13882-1-git-send-email-dinguyen@altera.com>
- <1379455361-13882-2-git-send-email-dinguyen@altera.com>
- <alpine.DEB.2.02.1309180030060.4089@ionos.tec.linutronix.de>
-Message-ID: <20130918110159.GA32005@amd.pavel.ucw.cz>
+From: Sudeep.KarkadaNagesha@arm.com (Sudeep KarkadaNagesha)
+Date: Wed, 18 Sep 2013 12:05:01 +0100
+Subject: [PATCH v6 RESEND 0/5] ARM/ARM64 architected timer updates
+Message-ID: <1379502306-12911-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed 2013-09-18 00:42:36, Thomas Gleixner wrote:
-> On Tue, 17 Sep 2013, dinguyen at altera.com wrote: 
-> 
-> > read_sched_clock() should be the same as __apbt_read_clocksource().
-> 
-> So why is it using a separate function in the first place?
+From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
 
+Hi Olof/Kevin,
 
-> > If a separate timer for the sched_clock exist, then read_sched_clock()
-> > will return an incorrect value. The (sched_io_base + 0x4) needs to be in
-> > the function for both cases.
-> 
-> It really took me some time to understand the "separate timer" part of
-> the above explanation. Though that made me look at the actual
-> implementation and I have to say, that this abuse of the device tree
-> is really a unique masterpiece:
-
-Well. We did a patch to fix timers on socfpga. You merged it. Then it
-clashed with Heiko Stubner's work. Our version was dropped, his
-version contained this code you complain about.
-
-_I also complained about that
-code_. http://www.spinics.net/lists/arm-kernel/msg252732.html . Seems
-it was merged anyway. (2 months ago.)
-
-And now we can't get the code fixed so that it at least works on our
-hardware, because, guess what, you noticed upstream merged the gem
-below, and you don't like it?
-
-> static int num_called;
-> static void __init dw_apb_timer_init(struct device_node *timer)
-> {
->         switch (num_called) {
->         case 0:
->                 pr_debug("%s: found clockevent timer\n", __func__);
->                 add_clockevent(timer);
->                 of_node_put(timer);
->                 break;
->         case 1:
->                 pr_debug("%s: found clocksource timer\n", __func__);
->                 add_clocksource(timer);
->                 of_node_put(timer);
->                 init_sched_clock();
->                 break;
->         default:
->                 break;
->         }
-> 
->         num_called++;
-> }
-> 
-> So if you can use different nodes for clockevent and clocksource, why
-> is that supposed to be dependent on the ordering? That's not how DT is
-> supposed to be used. DT provides a clear description of the hardware,
-> not some ordering dependent magic amended by utterly useless pr_debug()
-> constructs.
-
-You already had non-ugly version in your tree.
-
-Alternatively, tell us what you want done. These boards have 2 to 4
-identical timers, that can serve as both clockevent and
-clocksource. We'd like to use one as clockevent and one as
-clocksource. 
+I am reposting this series as suggested by Olof[1]. This is reviewed and
+acked by Will and Catalin. Daniel needs Ack from arm-soc maintainers
+to take these through his tree. Can you review this ?
 
 Regards,
-									Pavel
+Sudeep
+[1] http://www.spinics.net/lists/arm-kernel/msg270926.html
+-----------
+
+This patch series adds support to configure the rate and enable the
+event stream for architected timer. The event streams can be used to
+impose a timeout on a wfe, to safeguard against any programming error
+in case an expected event is not generated or even to implement
+wfe-based timeouts for userspace locking implementations. This feature
+can be disabled(enabled by default).
+
+Since the timer control register is reset to zero on warm boot, CPU
+PM notifier is added to save and restore the value.
+
+Changes v5->v6:
+1. Disabling event stream by default on boot and enable it
+   only if CONFIG_ARM_ARCH_TIMER_EVTSTREAM=y
+   This removes runtime configuration of timer event stream.
+2. Moved COMPAT_ELF_HWCAP_DEFAULT to arch/arm64/kernel/setup.c
+
+Changes v4->v5:
+1. Removed compat_dyn_elf_hwcap and used just compat_elf_hwcap as per
+   Catalin's suggestion
+2. Instead of resetting event stream in CPU PM callbacks, saving and
+   restoring counter control register now.
+
+Changes v3->v4:
+1. Added a config option to en/disable the timer event stream feature.
+   Due to this the ordering of the patches as well as some cosmetic
+   code changes are done.( So dropped previous reviewed-by tags)
+2. Removed exporting compat_dyn_elf_hwcap as there are no modules
+   requiring it for now.
+
+Changes v2->v3:
+1. Moved ARM and ARM64 changes into separate patches
+2. Added native hwcaps definations(ARM/ARM64) and compat-specific
+   definitions(ARM64) to the users for the event stream feature. 
+
+Changes v1->v2:
+1. Saved event stream divider value on cold reset path and re-used it
+   in CPU PM notifier instead of calculating every time.
+2. Rebased on v3.11-rc2(to avoid conflicts with __cpuinit* deletion)
+3. Dropped "ARM/ARM64: arch_timer: remove __cpuinit attribute for
+   arch_counter_set_user_access"(already done as part of __cpuinit*
+   deletion)
+
+Sudeep KarkadaNagesha (4):
+  ARM/ARM64: arch_timer: add macros for bits in control register
+  ARM: arch_timer: add support to configure and enable event stream
+  ARM64: arch_timer: add support to configure and enable event stream
+  drivers: clocksource: add CPU PM notifier for ARM architected timer
+
+Will Deacon (1):
+  drivers: clocksource: add support for ARM architected timer event
+    stream
+
+ arch/arm/include/asm/arch_timer.h    | 36 ++++++++++++++++++++++----
+ arch/arm/include/uapi/asm/hwcap.h    |  1 +
+ arch/arm/kernel/setup.c              |  1 +
+ arch/arm64/include/asm/arch_timer.h  | 42 ++++++++++++++++++++++++++-----
+ arch/arm64/include/asm/hwcap.h       | 11 ++++----
+ arch/arm64/include/uapi/asm/hwcap.h  |  1 +
+ arch/arm64/kernel/setup.c            | 11 ++++++++
+ drivers/clocksource/Kconfig          | 15 +++++++++++
+ drivers/clocksource/arm_arch_timer.c | 49 ++++++++++++++++++++++++++++++++++++
+ include/clocksource/arm_arch_timer.h | 10 ++++++++
+ 10 files changed, 161 insertions(+), 16 deletions(-)
+
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+1.8.1.2
