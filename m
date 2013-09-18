@@ -1,121 +1,56 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Wed, 18 Sep 2013 10:21:11 +0100
-Subject: [RFC PATCHv2 3/4] of: provide a binding for fixed link PHYs
-In-Reply-To: <20130918042923.5D845C42CF7@trevor.secretlab.ca>
-References: <1378480701-12908-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1378480701-12908-4-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130918042923.5D845C42CF7@trevor.secretlab.ca>
-Message-ID: <CAGVrzcbVTenhVC4tQznJFqVpO08ruxLyy1ZiLmw6Bu1=3zbGZg@mail.gmail.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Wed, 18 Sep 2013 11:38:07 +0200 (CEST)
+Subject: [PATCH] clockevents: Sanitize ticks to nsec conversion
+In-Reply-To: <20130918085627.GN24802@pengutronix.de>
+References: <1379077365-18458-1-git-send-email-mkl@pengutronix.de>
+ <20130917095600.GJ26819@ludovic.desroches@atmel.com>
+ <20130917100417.GQ12758@n2100.arm.linux.org.uk>
+ <alpine.DEB.2.02.1309171210450.4089@ionos.tec.linutronix.de>
+ <20130917130153.GL26819@ludovic.desroches@atmel.com>
+ <alpine.DEB.2.02.1309172228400.4089@ionos.tec.linutronix.de>
+ <20130918085627.GN24802@pengutronix.de>
+Message-ID: <alpine.DEB.2.02.1309181058470.4089@ionos.tec.linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Wed, 18 Sep 2013, Uwe Kleine-K?nig wrote:
+> > Now we can easily verify whether the whole equation fits into the
+> > 64bit boundary. Shifting the "clc" result back by evt->shift MUST
+> > result in "latch". If that's not the case, we have a clear indicator
+> But this is only the case if evt->mult is <= (1 << evt->shift). Is this
+> always given?
 
-2013/9/18 Grant Likely <grant.likely@secretlab.ca>:
-> On Fri,  6 Sep 2013 17:18:20 +0200, Thomas Petazzoni <thomas.petazzoni@free-electrons.com> wrote:
->> Some Ethernet MACs have a "fixed link", and are not connected to a
->> normal MDIO-managed PHY device. For those situations, a Device Tree
->> binding allows to describe a "fixed link" using a special PHY node.
->>
->> This patch adds:
->>
->>  * A documentation for the fixed PHY Device Tree binding.
->>
->>  * An of_phy_is_fixed_link() function that an Ethernet driver can call
->>    on its PHY phandle to find out whether it's a fixed link PHY or
->>    not. It should typically be used to know if
->>    of_phy_register_fixed_link() should be called.
->>
->>  * An of_phy_register_fixed_link() function that instantiates the
->>    fixed PHY into the PHY subsystem, so that when the driver calls
->>    of_phy_connect(), the PHY device associated to the OF node will be
->>    found.
->>
->> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
->
-> Hi Thomas,
->
-> The implemenation in this series looks like it is in good shape, so I'll
-> restrict my comments to be binding...
->
->> ---
->>  .../devicetree/bindings/net/fixed-link.txt         | 34 ++++++++++++++++++++++
->>  drivers/of/of_mdio.c                               | 24 +++++++++++++++
->>  include/linux/of_mdio.h                            | 15 ++++++++++
->>  3 files changed, 73 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/net/fixed-link.txt
->>
->> diff --git a/Documentation/devicetree/bindings/net/fixed-link.txt b/Documentation/devicetree/bindings/net/fixed-link.txt
->> new file mode 100644
->> index 0000000..9f2a1a50
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/net/fixed-link.txt
->> @@ -0,0 +1,34 @@
->> +Fixed link Device Tree binding
->> +------------------------------
->> +
->> +Some Ethernet MACs have a "fixed link", and are not connected to a
->> +normal MDIO-managed PHY device. For those situations, a Device Tree
->> +binding allows to describe a "fixed link".
->> +
->> +Such a fixed link situation is described by creating a PHY node as a
->> +sub-node of an Ethernet device, with the following properties:
->> +
->> +* 'fixed-link' (boolean, mandatory), to indicate that this PHY is a
->> +  fixed link PHY.
->> +* 'speed' (integer, mandatory), to indicate the link speed. Accepted
->> +  values are 10, 100 and 1000
->> +* 'full-duplex' (boolean, optional), to indicate that full duplex is
->> +  used. When absent, half duplex is assumed.
->> +* 'pause' (boolean, optional), to indicate that pause should be
->> +  enabled.
->> +* 'asym-pause' (boolean, optional), to indicate that asym_pause should
->> +  be enabled.
->
-> I understand what you're trying to do here, but it causes a troublesome
-> leakage of implementation detail into the binding, making the whole
-> thing look very odd. This binding tries to make a fixed link look
-> exactly like a real PHY even to the point of including a phandle to the
-> phy. But having a phandle to a node which is *always* a direct child of
-> the MAC node is redundant and a rather looney. Yes, doing it that way
-> makes it easy for of_phy_find_device() to be transparent for fixed link,
-> but that should *not* drive bindings, especially when that makes the
-> binding really rather weird.
+Crap, no. It's only true for device frequency <= 1GHz. Good catch!
 
-This is not exactly true in the sense that the "new" binding just
-re-shuffles the properties representation into something that is
-clearer and more extendible but there is not much difference in the
-semantics.
+> Is it more sensible to adjust dev->max_delta_ns once at register time
+> and so save the often recurrent overflow check in
+> clockevents_program_event?
 
->
-> Second, this new binding doesn't provide anything over and above the
-> existing fixed-link binding. It may not be pretty, but it is
-> estabilshed.
+Which overflow check are you talking about?
 
-In fact it does, the old one is obscure and not easily extendable
-because we rely on an integer array to represent the various
-properties, so at least this new one makes it easy to extend the
-binding to support a possibly new fixed-link property. Being able to
-deprecate a fundamentaly badly designed binding should still be a
-prerogative, software is flexible and can deal with both with little
-cost.
+There is only the boundary check:
 
->
-> That said, I do agree that the current Linux implementation is not good
-> because it cannot handle a fixed-link property transparently. That's a
-> deficiency in the Linux implementation and it should be fixed.
-> of_phy_connect() currently requires the phy phandle to be passed in.
-> Part of the reason it was done this way is that some drivers connect to
-> multiple 'phys'. A soulition could be to make the phy handle optional.
-> If it is empty then go looking for either a phy-device or fixed-link
-> property. Otherwise use the provided node.
+        delta = min(delta, (int64_t) dev->max_delta_ns);
+        delta = max(delta, (int64_t) dev->min_delta_ns);
 
-I do not quite follow you on this one, and I fear we might be leaking
-some Linux probing heuristic into Device Tree bindings by implicitely
-saying "not including a PHY phandle means connecting to a fixed-PHY
-link." This would also dramatically change the current behavior for
-most drivers where they might refuse probing if no corresponding PHY
-device node is present and they are not designed to connect to a fixed
-PHY one.
--- 
-Florian
+Which sensible adjustment at register time is going to remove that?
+
+> Another doubt I have is: You changed clockevent_delta2ns to round up now
+> unconditionally. For the numbers on at91 that doesn't matter, but I
+> wonder if there are situations that make the timer core violate the
+> max_delta_ticks condition now.
+
+And how so? The + (mult - 1) ensures, that the conversion back to
+ticks results in the same value as latch. So how should it violate
+the max boundary?
+
+Math is hard, right?
+ 
+> > for boundary violation and can limit "clc" to (1 << 63) - 1 before the
+> Where does this magic constant come from?
+
+Rolling my magic hex dice gave me that.
+
+Thanks,
+
+	tglx
