@@ -1,45 +1,55 @@
-From: w@1wt.eu (Willy Tarreau)
-Date: Wed, 18 Sep 2013 18:49:48 +0200
-Subject: mvneta: oops in __rcu_read_lock on mirabox
-In-Reply-To: <20130918183549.3e7b8f4c@skate>
-References: <CACzLR4twTNjzU8hK3L1cYUXnEH1ydwY6jnYoOG+9vLB3-4uQ4w@mail.gmail.com>
- <20130916163937.GC3188@1wt.eu> <20130916164412.GD3188@1wt.eu>
- <CACzLR4ssOPsmYaEh2ohe4HL5j+67keDYnmR4YezNB=aO7Pj5kA@mail.gmail.com>
- <20130916174708.GG3188@1wt.eu>
- <20130916182807.GO12758@n2100.arm.linux.org.uk>
- <CACzLR4suLD90p=sEhB-qg1u35t66zKfrGQref1jX42fEfu3D8g@mail.gmail.com>
- <20130917060111.GB9325@1wt.eu>
- <CACzLR4t2ABZdRk40VUhLtDKXX2PQiSVoQZQ4coQkNkvETnY6Rw@mail.gmail.com>
- <20130918183549.3e7b8f4c@skate>
-Message-ID: <20130918164948.GA18754@1wt.eu>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Wed, 18 Sep 2013 12:54:01 -0400
+Subject: [PATCH] arm: mvebu: use the main timer as clock source from DT
+In-Reply-To: <20130918184509.0ad0a5be@skate>
+References: <1379519624-4267-1-git-send-email-jean.pihet@linaro.org>
+ <20130918184509.0ad0a5be@skate>
+Message-ID: <20130918165401.GO19937@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 18, 2013 at 06:35:49PM +0200, Thomas Petazzoni wrote:
-> Dear Ethan Tuttle,
+On Wed, Sep 18, 2013 at 06:45:09PM +0200, Thomas Petazzoni wrote:
+> Dear Jean Pihet,
 > 
-> On Tue, 17 Sep 2013 23:30:56 -0700, Ethan Tuttle wrote:
-> > On Mon, Sep 16, 2013 at 11:01 PM, Willy Tarreau <w@1wt.eu> wrote:
-> > > Next step should be that you test both kernels to be sure.
+> On Wed, 18 Sep 2013 17:53:44 +0200, Jean Pihet wrote:
+> > This commit:
+> >   573145f08c2b92c45498468afbbba909f6ce6135
+> >   clocksource: armada-370-xp: Use CLOCKSOURCE_OF_DECLARE
 > > 
-> > Thanks for the kernel images, Willy.  I'm still experimenting but
-> > initial results are strange: I haven't seen a crash from the -ethan
-> > image you provided, nor by a kernel with that config that I built
-> > myself.  The config is only different from my crashing config by a few
-> > options.  So perhaps some combination of options prevents the crash.
-> > I'll see if I can narrow it down.
+> > replaced a call to the driver's timer initialization by a call to
+> > clocksource_of_init(). However, it failed to select CONFIG_CLKSRC_OF.
+> > 
+> > Fix this by selecting CONFIG_CLKSRC_OF for Armada370/XP machines.
+> > Without this change the kernel is stuck at: 'Calibrating delay
+> > loop...'.
+> > 
+> > Signed-off-by: Jean Pihet <jean.pihet@linaro.org>
+> > Acked-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> > ---
+> >  arch/arm/mach-mvebu/Kconfig | 1 +
+> >  1 file changed, 1 insertion(+)
+> > 
+> > diff --git a/arch/arm/mach-mvebu/Kconfig b/arch/arm/mach-mvebu/Kconfig
+> > index 9eb63d7..25e6c00 100644
+> > --- a/arch/arm/mach-mvebu/Kconfig
+> > +++ b/arch/arm/mach-mvebu/Kconfig
+> > @@ -26,6 +26,7 @@ config MACH_ARMADA_370_XP
+> >  	select HAVE_SMP
+> >  	select CACHE_L2X0
+> >  	select CPU_PJ4B
+> > +	select CLKSRC_OF
 > 
-> A toolchain generating some crappy code maybe? Ethan, Willy, comparing
-> your toolchain (compiler version, origin of the toolchain) could be
-> interesting.
+> I disagree. This should go to drivers/clocksource/Kconfig, because it's
+> the clocksource driver that uses CLOCKSOURCE_OF_DECLARE. See what is
+> already done in drivers/clocksource/Kconfig for other drivers.
 
-I thought about this but it looks suspicious, I don't see why the toolchain
-would produce random bitflips.
+Ack.  I missed the 'select ARMADA_370_XP_TIMER' for this block since it
+was outside the context.
 
-My toolchain is a linaro 4.7 gcc into which I have added support for a
-"pj4b" CPU target which is essentially the same as cortex-a9 plus support
-for the IDIV instruction in thumb mode.
+Jean, please fix this up and resubmit to Daniel Lezcano.
 
-But I can send it to Ethan if that helps.
+I'll drop this version from my tree.
 
-Willy
+thx,
+
+Jason.
