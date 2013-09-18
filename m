@@ -1,66 +1,62 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Wed, 18 Sep 2013 15:01:00 +0200
-Subject: [PATCH RFC 1/2] PM / Hibernate: use name_to_dev_t to parse resume
-In-Reply-To: <20130917205021.20736.5257@capellas-linux>
-References: <1377114413-8521-1-git-send-email-sebastian.capella@linaro.org>
- <1377114413-8521-2-git-send-email-sebastian.capella@linaro.org>
- <20130825153811.GA4795@amd.pavel.ucw.cz>
- <20130826174050.16429.7419@capellas-linux>
- <20130830113533.GA7226@amd.pavel.ucw.cz>
- <20130830184230.28518.71814@capellas-linux>
- <20130917205021.20736.5257@capellas-linux>
-Message-ID: <20130918130100.GB2467@amd.pavel.ucw.cz>
+From: ldewangan@nvidia.com (Laxman Dewangan)
+Date: Wed, 18 Sep 2013 18:52:32 +0530
+Subject: [PATCH REPOST] ARM: tegra: use dt-binding header for key code
+Message-ID: <1379510552-23401-1-git-send-email-ldewangan@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue 2013-09-17 13:50:21, Sebastian Capella wrote:
-> Quoting Sebastian Capella (2013-08-30 11:42:30)
-> > Quoting Pavel Machek (2013-08-30 04:35:33)
-> > > On Mon 2013-08-26 10:40:50, Sebastian Capella wrote:
-> > > > Quoting Pavel Machek (2013-08-25 08:38:11)
-> > > > > Is the allocation actually neccessary? At the very least this should
-> > > > > test for NULL...
-> > > > 
-> > > > name_to_dev_t expects a non-const name, but the buffer passed in
-> > > > is const.  I also am removing the '\n' if found at the end of the
-> > > > string which would violate the const.
-> > > 
-> > > Fix name_to_dev_t, then. No need to do memory allocation just to work
-> > > around const.
-> > > 
-> > Hi Pavel,
-> > 
-> > The issue is really Removing the \n from the user space input.  The
-> > flow is:
-> > const input buf -> copy to work buffer, remove newline -> name_to_dev_t
-> > 
-> >   ssize_t resume_store(..., const char *buf, size_t n)
-> >   // copy buf, strip off trailing newline, pass to name_to_dev_t
-> >   dev_t name_to_dev_t(char *name)
-> > 
-> > The const in the restore_store buffer comes from the function type of the
-> > store member of the kobj_attribute.  I don't believe this should be changed.
-> > 
-> > Currently, name_to_dev_t will fail in some cases if a trailing \n is present.
-> > Is it more appropriate to handle stripping the newline in the store
-> > function rather than modifying name_to_dev_t to clean it up?
-> > 
-> > It seems logical for name_to_dev_t to take a const name parameter as
-> > there should be no reason to modify the name buffer passed to it.
-> > I'll be happy to make a patch to do this, but without hardening
-> > name_to_dev_t against trailing newlines, it would not be neccesary for
-> > this problem.
-> > 
-> > Thanks for your time and comments!
-> > 
-> 
-> Hi Pavel,
-> 
-> Do you have any more feedback regarding leaving the strndup?
+In place of hardcoding the key code in DTS file and comment the
+key code as side notes, use the key code macro defines in the
+dt-bindings/input/input.h directly.
 
-I think you should modify name_to_dev_t, then. Doing memory allocation
-just to work around \n limitation is ugly.
-									Pavel
+Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
+---
+Reposting this patch as it was sent earlier when merge window was closed.
+
+ arch/arm/boot/dts/tegra114-dalmore.dts |    9 +++++----
+ 1 files changed, 5 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/boot/dts/tegra114-dalmore.dts b/arch/arm/boot/dts/tegra114-dalmore.dts
+index 6023028..05a3aae 100644
+--- a/arch/arm/boot/dts/tegra114-dalmore.dts
++++ b/arch/arm/boot/dts/tegra114-dalmore.dts
+@@ -1,5 +1,6 @@
+ /dts-v1/;
+ 
++#include <dt-bindings/input/input.h>
+ #include "tegra114.dtsi"
+ 
+ / {
+@@ -1081,26 +1082,26 @@
+ 		home {
+ 			label = "Home";
+ 			gpios = <&gpio TEGRA_GPIO(I, 5) GPIO_ACTIVE_LOW>;
+-			linux,code = <102>; /* KEY_HOME */
++			linux,code = <KEY_HOME>;
+ 		};
+ 
+ 		power {
+ 			label = "Power";
+ 			gpios = <&gpio TEGRA_GPIO(Q, 0) GPIO_ACTIVE_LOW>;
+-			linux,code = <116>; /* KEY_POWER */
++			linux,code = <KEY_POWER>;
+ 			gpio-key,wakeup;
+ 		};
+ 
+ 		volume_down {
+ 			label = "Volume Down";
+ 			gpios = <&gpio TEGRA_GPIO(R, 1) GPIO_ACTIVE_LOW>;
+-			linux,code = <114>; /* KEY_VOLUMEDOWN */
++			linux,code = <KEY_VOLUMEDOWN>;
+ 		};
+ 
+ 		volume_up {
+ 			label = "Volume Up";
+ 			gpios = <&gpio TEGRA_GPIO(R, 2) GPIO_ACTIVE_LOW>;
+-			linux,code = <115>; /* KEY_VOLUMEUP */
++			linux,code = <KEY_VOLUMEUP>;
+ 		};
+ 	};
+ 
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+1.7.1.1
