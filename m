@@ -1,62 +1,64 @@
-From: sebastian.capella@linaro.org (Sebastian Capella)
-Date: Wed, 18 Sep 2013 16:29:02 -0700
-Subject: [PATCH v3 RFT 2/2] PM / Hibernate: use name_to_dev_t to parse resume
-In-Reply-To: <1379546942-22344-1-git-send-email-sebastian.capella@linaro.org>
-References: <1379546942-22344-1-git-send-email-sebastian.capella@linaro.org>
-Message-ID: <1379546942-22344-3-git-send-email-sebastian.capella@linaro.org>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Wed, 18 Sep 2013 16:32:59 -0700
+Subject: [PATCH v2] clk: si570: Add a driver for SI570 oscillators
+In-Reply-To: <1379546336.1787.95.camel@joe-AO722>
+References: <1379544219-23579-1-git-send-email-soren.brinkmann@xilinx.com>
+ <1379545361.1787.87.camel@joe-AO722>
+ <0da25c5c-660c-4836-8179-6e7c51fd0d9f@CO9EHSMHS005.ehs.local>
+ <1379546336.1787.95.camel@joe-AO722>
+Message-ID: <1119f60e-99dd-45f8-8d91-2b0fa8b7f03b@DB8EHSMHS027.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the name_to_dev_t call to parse the device name echo'd to
-to /sys/power/resume.  This imitates the method used in hibernate.c
-in software_resume, and allows the resume partition to be specified
-using other equivalent device formats as well.  By allowing
-/sys/debug/resume to accept the same syntax as the resume=device
-parameter, we can parse the resume=device in the init script and
-use the resume device directly from the kernel command line.
+On Wed, Sep 18, 2013 at 04:18:56PM -0700, Joe Perches wrote:
+> On Wed, 2013-09-18 at 16:09 -0700, S?ren Brinkmann wrote:
+> > On Wed, Sep 18, 2013 at 04:02:41PM -0700, Joe Perches wrote:
+> > > On Wed, 2013-09-18 at 15:43 -0700, Soren Brinkmann wrote:
+> > > > Add a driver for SILabs 570, 571, 598, 599 programmable oscillators.
+> > > > The devices generate low-jitter clock signals and are reprogrammable via
+> > > > an I2C interface.
+> > > []
+> > > > v2:
+> > > []
+> > > >  - use 10000 as MIN and MAX value in usleep_range
+> > > []
+> > > > diff --git a/drivers/clk/clk-si570.c b/drivers/clk/clk-si570.c
+> > > []
+> > > > +static int si570_set_frequency(struct clk_si570 *data, unsigned long frequency)
+> > > > +{
+> > > []
+> > > > +	/* Applying a new frequency can take up to 10ms */
+> > > > +	usleep_range(10000, 10000);
+> > > 
+> > > Generally it's nicer to have an actual range for usleep_range.
+> > Well, as I said in the discussion with Guenther. I'm flexible and nobody
+> > objected when I said to make both equal. A real range doesn't make sense
+> > here though, but I don't know what's common practice for cases like
+> > this.
+> 
+> udelay is normal, but I guess you don't need atomic context.
+After checkpatch correcting me a few times I went with what
+Documentation/timers/timers-howto.txt suggests. But yes, then we have
+this situation, that I want to sleep 10ms, but not longer using a
+*_range function. I guess it is very application specific whether a
+longer delay here is acceptable or not.
 
-Signed-off-by: Sebastian Capella <sebastian.capella@linaro.org>
-Cc: Len Brown <len.brown@intel.com>
-Cc: Pavel Machek <pavel@ucw.cz>
-Cc: "Rafael J. Wysocki" <rjw@sisk.pl>
----
- kernel/power/hibernate.c |   15 ++++-----------
- 1 file changed, 4 insertions(+), 11 deletions(-)
+>  
+> > > Is there a bit you could periodically poll to see
+> > > if the new frequency has been set or is stable so
+> > > that a 10ms delay isn't always used?
+> 
+> > Unfortunately not.
+> 
+> Thanks.  I suppose I should read the datasheets before asking.
+> 
+> http://www.silabs.com/Support%20Documents/TechnicalDocs/si570.pdf
+> (page 12)
+> 
+> Anyway, perhaps si570_set_frequency_small needs a delay too.'
+> 
+> The 570 datasheet says it needs a 100uS delay.
+You're right. I'll add a delay there as well. The 'rang' question
+applies here as well.
 
-diff --git a/kernel/power/hibernate.c b/kernel/power/hibernate.c
-index b26f5f1..8b253c2 100644
---- a/kernel/power/hibernate.c
-+++ b/kernel/power/hibernate.c
-@@ -971,16 +971,11 @@ static ssize_t resume_show(struct kobject *kobj, struct kobj_attribute *attr,
- static ssize_t resume_store(struct kobject *kobj, struct kobj_attribute *attr,
- 			    const char *buf, size_t n)
- {
--	unsigned int maj, min;
- 	dev_t res;
--	int ret = -EINVAL;
- 
--	if (sscanf(buf, "%u:%u", &maj, &min) != 2)
--		goto out;
--
--	res = MKDEV(maj,min);
--	if (maj != MAJOR(res) || min != MINOR(res))
--		goto out;
-+	res = name_to_dev_t(buf);
-+	if (res == 0)
-+		return -EINVAL;
- 
- 	lock_system_sleep();
- 	swsusp_resume_device = res;
-@@ -988,9 +983,7 @@ static ssize_t resume_store(struct kobject *kobj, struct kobj_attribute *attr,
- 	printk(KERN_INFO "PM: Starting manual resume from disk\n");
- 	noresume = 0;
- 	software_resume();
--	ret = n;
-- out:
--	return ret;
-+	return n;
- }
- 
- power_attr(resume);
--- 
-1.7.9.5
+	S?ren
