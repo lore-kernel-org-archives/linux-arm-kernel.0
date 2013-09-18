@@ -1,167 +1,63 @@
-From: maxime.coquelin@st.com (Maxime COQUELIN)
-Date: Wed, 18 Sep 2013 14:38:21 +0200
-Subject: [PATCH 3/4] ARM: STi: Supply I2C configuration to STiH415 SoC
-References: <1379498483-4236-1-git-send-email-maxime.coquelin@st.com>
- <1379498483-4236-4-git-send-email-maxime.coquelin@st.com>
- <20130918120012.GE16984@lee--X1>
-Message-ID: <84625B87D65BCF478CC1E9C886A4C314DEF1BD9577@SAFEX1MAIL4.st.com>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Wed, 18 Sep 2013 09:39:59 -0300
+Subject: mvebu: Armada XP doesn't boot in v3.12-rc1
+In-Reply-To: <20130917180957.GI19937@titan.lakedaemon.net>
+References: <20130917173502.GA4231@localhost>
+ <20130917180957.GI19937@titan.lakedaemon.net>
+Message-ID: <20130918123958.GB2563@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/18/2013 02:00 PM, Lee Jones wrote:
-> On Wed, 18 Sep 2013, Maxime COQUELIN wrote:
->
->> This patch supplies I2C configuration to STiH415 SoC.
->>
->> Cc: Srinivas Kandagatla <srinivas.kandagatla@st.com>
->> Signed-off-by: Maxime Coquelin <maxime.coquelin@st.com>
->> ---
->>  arch/arm/boot/dts/stih415-pinctrl.dtsi |   36 ++++++++++++++++++++
->>  arch/arm/boot/dts/stih415.dtsi         |   57 ++++++++++++++++++++++++++++++++
->>  2 files changed, 93 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/stih415-pinctrl.dtsi b/arch/arm/boot/dts/stih415-pinctrl.dtsi
->> index 1d322b2..e56449d 100644
->> --- a/arch/arm/boot/dts/stih415-pinctrl.dtsi
->> +++ b/arch/arm/boot/dts/stih415-pinctrl.dtsi
->> @@ -86,6 +86,24 @@
->>  					};
->>  				};
->>  			};
->> +
->> +			sbc_i2c0 {
->> +				pinctrl_sbc_i2c0_default: sbc_i2c0-default {
->> +					st,pins {
->> +						sda = <&PIO4 6 ALT1 BIDIR>;
->> +						scl = <&PIO4 5 ALT1 BIDIR>;
->> +					};
->> +				};
->> +			};
->> +
->> +			sbc_i2c1 {
->> +				pinctrl_sbc_i2c1_default: sbc_i2c1-default {
->> +					st,pins {
->> +						sda = <&PIO3 2 ALT2 BIDIR>;
->> +						scl = <&PIO3 1 ALT2 BIDIR>;
->> +					};
->> +				};
->> +			};
->>  		};
->>  
->>  		pin-controller-front {
->> @@ -143,6 +161,24 @@
->>  				reg		= <0x7000 0x100>;
->>  				st,bank-name	= "PIO12";
->>  			};
->> +
->> +			i2c0 {
->> +				pinctrl_i2c0_default: i2c0-default {
->> +					st,pins {
->> +						sda = <&PIO9 3 ALT1 BIDIR>;
->> +						scl = <&PIO9 2 ALT1 BIDIR>;
->> +					};
->> +				};
->> +			};
->> +
->> +			i2c1 {
->> +				pinctrl_i2c1_default: i2c1-default {
->> +					st,pins {
->> +						sda = <&PIO12 1 ALT1 BIDIR>;
->> +						scl = <&PIO12 0 ALT1 BIDIR>;
->> +					};
->> +				};
->> +			};
->>  		};
->>  
->>  		pin-controller-rear {
->> diff --git a/arch/arm/boot/dts/stih415.dtsi b/arch/arm/boot/dts/stih415.dtsi
->> index 74ab8de..643ae1c 100644
->> --- a/arch/arm/boot/dts/stih415.dtsi
->> +++ b/arch/arm/boot/dts/stih415.dtsi
->> @@ -9,6 +9,7 @@
->>  #include "stih41x.dtsi"
->>  #include "stih415-clock.dtsi"
->>  #include "stih415-pinctrl.dtsi"
->> +#include <dt-bindings/interrupt-controller/arm-gic.h>
->>  / {
->>  
->>  	L2: cache-controller {
->> @@ -83,5 +84,61 @@
->>  			pinctrl-names 	= "default";
->>  			pinctrl-0	= <&pinctrl_sbc_serial1>;
->>  		};
->> +
->> +		i2c0: i2c at fed40000{
-> Space before the '{'.
-It will be fixed in next series
->
->> +			compatible	= "st,comms-i2c";
->> +			status		= "disabled";
-> Consider putting the node status at the bottom.
-Ok.
->
->> +			reg		= <0xfed40000 0x110>;
->> +			interrupts	=  <GIC_SPI 187 IRQ_TYPE_EDGE_RISING>;
->> +			clocks		= <&CLKS_ICN_REG_0>;
->> +			clock-frequency = <400000>;
->> +			pinctrl-names	= "default";
->> +			pinctrl-0	= <&pinctrl_i2c0_default>;
->> +			st,glitches;
->> +			st,glitch-clk	= <500>;
->> +			st,glitch-dat	= <500>;
->> +		};
->> +
->> +		i2c1: i2c at fed41000{
-> Same here and throughout.
-Ok.
->
->> +			compatible	= "st,comms-i2c";
->> +			status		= "disabled";
-> Same here and throughout.
-Ok.
->
->> +			reg		= <0xfed41000 0x110>;
->> +			interrupts	=  <GIC_SPI 188 IRQ_TYPE_EDGE_RISING>;
->> +			clocks		= <&CLKS_ICN_REG_0>;
->> +			clock-frequency = <400000>;
->> +			pinctrl-names	= "default";
->> +			pinctrl-0	= <&pinctrl_i2c1_default>;
->> +			st,glitches;
->> +			st,glitch-clk	= <500>;
->> +			st,glitch-dat	= <500>;
->> +		};
->> +
->> +		sbc_i2c0: i2c at fe540000{
->> +			compatible	= "st,comms-i2c";
->> +			status		= "disabled";
->> +			reg		= <0xfe540000 0x110>;
->> +			interrupts	=  <GIC_SPI 206 IRQ_TYPE_EDGE_RISING>;
->> +			clocks		= <&CLK_SYSIN>;
->> +			clock-frequency = <400000>;
->> +			pinctrl-names	= "default";
->> +			pinctrl-0	= <&pinctrl_sbc_i2c0_default>;
->> +			st,glitches;
->> +			st,glitch-clk	= <500>;
->> +			st,glitch-dat	= <500>;
->> +		};
->> +
->> +		sbc_i2c1: i2c at fe541000{
->> +			compatible	= "st,comms-i2c";
->> +			status		= "disabled";
->> +			reg		= <0xfe541000 0x110>;
->> +			interrupts	=  <GIC_SPI 207 IRQ_TYPE_EDGE_RISING>;
->> +			clocks		= <&CLK_SYSIN>;
->> +			clock-frequency = <400000>;
->> +			pinctrl-names	= "default";
->> +			pinctrl-0	= <&pinctrl_sbc_i2c1_default>;
->> +			st,glitches;
->> +			st,glitch-clk	= <500>;
->> +			st,glitch-dat	= <500>;
->> +		};
->>  	};
->>  };
-> Is this odd tabbing just the result of the patch format?
-This is just the result of the patch format.
+Hi Jason,
+
+On Tue, Sep 17, 2013 at 02:09:57PM -0400, Jason Cooper wrote:
+> On Tue, Sep 17, 2013 at 02:35:03PM -0300, Ezequiel Garcia wrote:
+> > Armada XP boards are not booting in v3.12-rc1.
+> > 
+> > These two patches, which are already in linux-mvebu/mvebu/dt,
+> > are needed to fix the problem:
+> > 
+> > commit 585b136b73696ac37c9614b4b3d8fa0407adcdf1
+> > Author: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> > Date:   Tue Aug 20 12:45:51 2013 -0300
+> > 
+> >     ARM: mvebu: Add clock properties to Armada XP timer node
+> > 
+> > commit d36fd447d5e2d0993a8ec34afc26fc449ac1e2f3
+> > Author: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> > Date:   Tue Aug 20 12:45:50 2013 -0300
+> > 
+> >     ARM: mvebu: Add the reference 25 MHz fixed-clock to Armada XP
+> 
+> Yes, I saw that tglx sent a late pull for corresponding driver changes.
+> I'll move these two over to mvebu/fixes shortly.
+> 
+> > FWIW, CONFIG_HAVE_ARM_ARCH_TIMER=y is also needed or the board freezes,
+> > but that's another problem which I'm currently investigating.
+> 
+> Sounds like we just need a select, is there something more to it?
+> 
+> Please send a patch as soon as you have it nailed down.  I'd like the
+> two changes above and this patch to spend a few days in -next before I
+> send the pull.
+> 
+
+We've nailed it down (Jean Pihet did, actually). The problem was
+introduced by the patch adding clocksource_of_init() to initialize
+the timer, but missing a CONFIG_CLKSRC_OF option selection.
+
+The offending commit is:
+
+commit 573145f08c2b92c45498468afbbba909f6ce6135
+Author: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+Date:   Tue Aug 13 11:43:12 2013 -0300
+
+    clocksource: armada-370-xp: Use CLOCKSOURCE_OF_DECLARE
+
+Jean already has a patch and will send it later today.
 
 Regards,
-Maxime
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
