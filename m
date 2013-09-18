@@ -1,63 +1,94 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Wed, 18 Sep 2013 09:39:59 -0300
-Subject: mvebu: Armada XP doesn't boot in v3.12-rc1
-In-Reply-To: <20130917180957.GI19937@titan.lakedaemon.net>
-References: <20130917173502.GA4231@localhost>
- <20130917180957.GI19937@titan.lakedaemon.net>
-Message-ID: <20130918123958.GB2563@localhost>
+From: bcousson@baylibre.com (Benoit Cousson)
+Date: Wed, 18 Sep 2013 14:41:54 +0200
+Subject: [GIT PULL] ARM: DTS: Fix OMAP bugs for 3.12-rc
+In-Reply-To: <CAFqH_52=NOZLHX4VZRMkUFpmJQJZ6egNZsckMJ=+QjVXO1=ofg@mail.gmail.com>
+References: <52397523.4050209@baylibre.com>
+ <CAFqH_52=NOZLHX4VZRMkUFpmJQJZ6egNZsckMJ=+QjVXO1=ofg@mail.gmail.com>
+Message-ID: <52399F92.7040504@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jason,
+Hi Enric
 
-On Tue, Sep 17, 2013 at 02:09:57PM -0400, Jason Cooper wrote:
-> On Tue, Sep 17, 2013 at 02:35:03PM -0300, Ezequiel Garcia wrote:
-> > Armada XP boards are not booting in v3.12-rc1.
-> > 
-> > These two patches, which are already in linux-mvebu/mvebu/dt,
-> > are needed to fix the problem:
-> > 
-> > commit 585b136b73696ac37c9614b4b3d8fa0407adcdf1
-> > Author: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> > Date:   Tue Aug 20 12:45:51 2013 -0300
-> > 
-> >     ARM: mvebu: Add clock properties to Armada XP timer node
-> > 
-> > commit d36fd447d5e2d0993a8ec34afc26fc449ac1e2f3
-> > Author: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> > Date:   Tue Aug 20 12:45:50 2013 -0300
-> > 
-> >     ARM: mvebu: Add the reference 25 MHz fixed-clock to Armada XP
-> 
-> Yes, I saw that tglx sent a late pull for corresponding driver changes.
-> I'll move these two over to mvebu/fixes shortly.
-> 
-> > FWIW, CONFIG_HAVE_ARM_ARCH_TIMER=y is also needed or the board freezes,
-> > but that's another problem which I'm currently investigating.
-> 
-> Sounds like we just need a select, is there something more to it?
-> 
-> Please send a patch as soon as you have it nailed down.  I'd like the
-> two changes above and this patch to spend a few days in -next before I
-> send the pull.
-> 
+On 18/09/2013 12:24, Enric Balletbo Serra wrote:
+> Hi Benoit,
+>
+>
+> 2013/9/18 Benoit Cousson <bcousson@baylibre.com>:
+>> Hi Tony,
+>>
+>> Please pull few fixes for OMAP DTS.
+>>
+>> Thanks,
+>> Benoit
+>>
+>>
+>>
+>> The following changes since commit 272b98c6455f00884f0350f775c5342358ebb73f:
+>>
+>>    Linux 3.12-rc1 (2013-09-16 16:17:51 -0400)
+>>
+>> are available in the git repository at:
+>>
+>>    git://git.kernel.org/pub/scm/linux/kernel/git/bcousson/linux-omap-dt.git tags/for_3.12-rc2/dts_signed
+>>
+>> for you to fetch changes up to 775d2418f309052641d94c896f73dc779cf7ba1b:
+>>
+>>    ARM: dts: Fix muxing and regulator for wl12xx on the SDIO bus for blaze (2013-09-18 11:14:42 +0200)
+>>
+>> ----------------------------------------------------------------
+>> Fix BBB LDO voltage to avoid HDMI destruction
+>> Fix OMAP5 wrong attribute
+>> Fix typo in beagle xM strings
+>>
+>> ----------------------------------------------------------------
+>> Felipe Balbi (2):
+>>        ARM: dts: OMAP5: fix reg property size
+>>        ARM: dts: OMAP5: fix ocp2scp DTS data
+>>
+>> Koen Kooi (1):
+>>        ARM: dts: am335x-bone*: add DT for BeagleBone Black
+>>
+>> Robert Nelson (1):
+>>        ARM: dts: omap3-beagle-xm: fix string error in compatible property
+>>
+>> Tony Lindgren (2):
+>>        ARM: dts: Fix muxing and regulator for wl12xx on the SDIO bus for pandaboard
+>>        ARM: dts: Fix muxing and regulator for wl12xx on the SDIO bus for blaze
+>>
+>>   arch/arm/boot/dts/Makefile                |   1 +
+>>   arch/arm/boot/dts/am335x-bone-common.dtsi | 262 ++++++++++++++++++++++++++++++
+>>   arch/arm/boot/dts/am335x-bone.dts         | 256 +----------------------------
+>>   arch/arm/boot/dts/am335x-boneblack.dts    |  17 ++
+>>   arch/arm/boot/dts/omap3-beagle-xm.dts     |   2 +-
+>>   arch/arm/boot/dts/omap4-panda-common.dtsi |  46 +++++-
+>>   arch/arm/boot/dts/omap4-sdp.dts           |  39 ++++-
+>>   arch/arm/boot/dts/omap5.dtsi              |   7 +-
+>>   8 files changed, 369 insertions(+), 261 deletions(-)
+>>   create mode 100644 arch/arm/boot/dts/am335x-bone-common.dtsi
+>>   create mode 100644 arch/arm/boot/dts/am335x-boneblack.dts
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>
+> On July 5th, I sent the following patch
+>
+>      http://www.spinics.net/lists/linux-omap/msg96935.html
+>
+> and on Sep 10th I sent the same patch rebased with upstream and Acked
+> by Javier. I consider this patch as a fix, as is required to make the
+> sound work on IGEP boards but it's not included in this pull request.
+> Maybe you forget it due your email change. Can you consider adding
+> this patch, at least, in your next pull request? Thanks in advance.
 
-We've nailed it down (Jean Pihet did, actually). The problem was
-introduced by the patch adding clocksource_of_init() to initialize
-the timer, but missing a CONFIG_CLKSRC_OF option selection.
+Sorry I missed it, and will send an updated pull-request in five minutes 
+from now... If you do not see anything from me after 6 minutes you can 
+complain.
 
-The offending commit is:
+> Merci beaucoup,
 
-commit 573145f08c2b92c45498468afbbba909f6ce6135
-Author: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-Date:   Tue Aug 13 11:43:12 2013 -0300
-
-    clocksource: armada-370-xp: Use CLOCKSOURCE_OF_DECLARE
-
-Jean already has a patch and will send it later today.
+De rien.
 
 Regards,
--- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+Benoit
