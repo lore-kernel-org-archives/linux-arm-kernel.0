@@ -1,52 +1,79 @@
 From: pavel@denx.de (Pavel Machek)
-Date: Wed, 18 Sep 2013 12:49:53 +0200
-Subject: [RESEND PATCHv3 1/2] clocksource: dw_apb_timer: Move timer
- defines to header file.
-In-Reply-To: <alpine.DEB.2.02.1309172359320.4089@ionos.tec.linutronix.de>
-References: <1377744796-22175-1-git-send-email-dinguyen@altera.com>
- <1379434447.24347.0.camel@linux-builds1>
- <alpine.DEB.2.02.1309172337570.4089@ionos.tec.linutronix.de>
- <20130917215544.GB23937@amd.pavel.ucw.cz>
- <alpine.DEB.2.02.1309172359320.4089@ionos.tec.linutronix.de>
-Message-ID: <20130918104953.GA31735@amd.pavel.ucw.cz>
+Date: Wed, 18 Sep 2013 13:01:59 +0200
+Subject: [PATCHv4 2/2] clocksource: dw_apb_timer_of: Fix read_sched_clock
+In-Reply-To: <alpine.DEB.2.02.1309180030060.4089@ionos.tec.linutronix.de>
+References: <1379455361-13882-1-git-send-email-dinguyen@altera.com>
+ <1379455361-13882-2-git-send-email-dinguyen@altera.com>
+ <alpine.DEB.2.02.1309180030060.4089@ionos.tec.linutronix.de>
+Message-ID: <20130918110159.GA32005@amd.pavel.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
-
-> > > > > From: Dinh Nguyen <dinguyen@altera.com>
-> > > > > 
-> > > > > Move all dw_apb_timer defines to include/linux/dw_apb_timer.h.
-> > > 
-> > > That's describing WHAT the patch does not WHY. I can see the WHAT part
-> > > without that pointless changelog.
-> > 
-> > read_sched_clock() in dw_apb_timer_of.c accesses the same hardware as
-> > dw_apb_timer.c, therefore it benefits from #define's that describe the
-> > hardware. IOW 1/2 is neccessary for 2/2, but it can compile/work
-> > indepedently.
+On Wed 2013-09-18 00:42:36, Thomas Gleixner wrote:
+> On Tue, 17 Sep 2013, dinguyen at altera.com wrote: 
 > 
-> I'm really capable of figuring that out myself. But that's not the
-> point. I want patch submitters to explain in the changelog WHY they
-> are doing a change not WHAT they are doing, because that's (mostly)
-> obvious from the patch itself.
+> > read_sched_clock() should be the same as __apbt_read_clocksource().
+> 
+> So why is it using a separate function in the first place?
 
-But the end result is that anything takes months to do...
 
-We already have the dw_apb_timer issues merged in your tree, then it
-got dropped in merge conflict, then you dislike the changelog, and now
-you notice devicetree uglyness that we did not introduce.
+> > If a separate timer for the sched_clock exist, then read_sched_clock()
+> > will return an incorrect value. The (sched_io_base + 0x4) needs to be in
+> > the function for both cases.
+> 
+> It really took me some time to understand the "separate timer" part of
+> the above explanation. Though that made me look at the actual
+> implementation and I have to say, that this abuse of the device tree
+> is really a unique masterpiece:
 
-Yes, dw_apb_timer code is not exactly clean, but if we have to wait
-month before you lecture us how to write changelogs, we will not get
-anywhere... discussion why the DT was done that way is forgotten by
-now.
+Well. We did a patch to fix timers on socfpga. You merged it. Then it
+clashed with Heiko Stubner's work. Our version was dropped, his
+version contained this code you complain about.
 
-Because just now, we are running in circles (and time does not work on
-socfpga for second major release).
+_I also complained about that
+code_. http://www.spinics.net/lists/arm-kernel/msg252732.html . Seems
+it was merged anyway. (2 months ago.)
+
+And now we can't get the code fixed so that it at least works on our
+hardware, because, guess what, you noticed upstream merged the gem
+below, and you don't like it?
+
+> static int num_called;
+> static void __init dw_apb_timer_init(struct device_node *timer)
+> {
+>         switch (num_called) {
+>         case 0:
+>                 pr_debug("%s: found clockevent timer\n", __func__);
+>                 add_clockevent(timer);
+>                 of_node_put(timer);
+>                 break;
+>         case 1:
+>                 pr_debug("%s: found clocksource timer\n", __func__);
+>                 add_clocksource(timer);
+>                 of_node_put(timer);
+>                 init_sched_clock();
+>                 break;
+>         default:
+>                 break;
+>         }
+> 
+>         num_called++;
+> }
+> 
+> So if you can use different nodes for clockevent and clocksource, why
+> is that supposed to be dependent on the ordering? That's not how DT is
+> supposed to be used. DT provides a clear description of the hardware,
+> not some ordering dependent magic amended by utterly useless pr_debug()
+> constructs.
+
+You already had non-ugly version in your tree.
+
+Alternatively, tell us what you want done. These boards have 2 to 4
+identical timers, that can serve as both clockevent and
+clocksource. We'd like to use one as clockevent and one as
+clocksource. 
 
 Regards,
-
 									Pavel
 -- 
 (english) http://www.livejournal.com/~pavelmachek
