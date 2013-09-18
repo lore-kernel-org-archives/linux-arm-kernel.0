@@ -1,35 +1,51 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 18 Sep 2013 13:14:17 +0100
-Subject: [PATCH 20/41] ARM: ux500: Don't attempt to enable the Nomadik System
- Timer twice
+Date: Wed, 18 Sep 2013 13:14:25 +0100
+Subject: [PATCH 28/41] clk: ux500: Add Device Tree support for the RTC clock
 In-Reply-To: <1379506478-16625-1-git-send-email-lee.jones@linaro.org>
 References: <1379506478-16625-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1379506478-16625-21-git-send-email-lee.jones@linaro.org>
+Message-ID: <1379506478-16625-29-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When booting with DT enabled we already call clocksource_of_init(),
-which in turn calls the OF version of nmdk_timer_init().
+This patch enables the RTC fixed frequency clock to be specified from
+Device Tree via phandles to the "rtc32k-clock" node.
 
+Acked-by: Mike Turquette <mturquette@linaro.org>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/mach-ux500/timer.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/clk/ux500/u8500_of_clk.c | 7 +++++--
+ 1 file changed, 5 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-ux500/timer.c b/arch/arm/mach-ux500/timer.c
-index b6bd0ef..05a4ff7 100644
---- a/arch/arm/mach-ux500/timer.c
-+++ b/arch/arm/mach-ux500/timer.c
-@@ -97,8 +97,8 @@ dt_fail:
- 	 * sched_clock with higher rating then MTU since is always-on.
- 	 *
- 	 */
--
--	nmdk_timer_init(mtu_timer_base, IRQ_MTU0);
-+	if (!of_have_populated_dt())
-+		nmdk_timer_init(mtu_timer_base, IRQ_MTU0);
- 	clksrc_dbx500_prcmu_init(prcmu_timer_base);
- 	ux500_twd_init();
+diff --git a/drivers/clk/ux500/u8500_of_clk.c b/drivers/clk/ux500/u8500_of_clk.c
+index 4fcafd0..fc647cf 100644
+--- a/drivers/clk/ux500/u8500_of_clk.c
++++ b/drivers/clk/ux500/u8500_of_clk.c
+@@ -60,7 +60,7 @@ void u8500_of_clk_init(u32 clkrst1_base, u32 clkrst2_base, u32 clkrst3_base,
+ 	struct device_node *np = NULL;
+ 	struct device_node *child = NULL;
+ 	const char *sgaclk_parent = NULL;
+-	struct clk *clk;
++	struct clk *clk, *rtc_clk;
+ 
+ 	if (of_have_populated_dt())
+ 		np = of_find_matching_node(NULL, u8500_clk_of_match);
+@@ -84,7 +84,7 @@ void u8500_of_clk_init(u32 clkrst1_base, u32 clkrst2_base, u32 clkrst3_base,
+ 
+ 	/* FIXME: Add sys, ulp and int clocks here. */
+ 
+-	clk = clk_register_fixed_rate(NULL, "rtc32k", "NULL",
++	rtc_clk = clk_register_fixed_rate(NULL, "rtc32k", "NULL",
+ 				CLK_IS_ROOT|CLK_IGNORE_UNUSED,
+ 				32768);
+ 
+@@ -548,5 +548,8 @@ void u8500_of_clk_init(u32 clkrst1_base, u32 clkrst2_base, u32 clkrst3_base,
+ 
+ 		if (!of_node_cmp(child->name, "prcc-kernel-clock"))
+ 			of_clk_add_provider(child, ux500_twocell_get, prcc_kclk);
++
++		if (!of_node_cmp(child->name, "rtc32k-clock"))
++			of_clk_add_provider(child, of_clk_src_simple_get, rtc_clk);
+ 	}
  }
 -- 
 1.8.1.2
