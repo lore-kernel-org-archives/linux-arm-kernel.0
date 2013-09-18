@@ -1,57 +1,59 @@
-From: srinivas.kandagatla@st.com (Srinivas KANDAGATLA)
-Date: Wed, 18 Sep 2013 13:57:06 +0100
-Subject: [PATCH 2/4] ARM: STi: Supply I2C configuration to STiH416 SoC
-In-Reply-To: <84625B87D65BCF478CC1E9C886A4C314DEF1BD9578@SAFEX1MAIL4.st.com>
-References: <1379498483-4236-1-git-send-email-maxime.coquelin@st.com>
- <1379498483-4236-3-git-send-email-maxime.coquelin@st.com>
- <20130918120340.GF16984@lee--X1>
- <84625B87D65BCF478CC1E9C886A4C314DEF1BD9578@SAFEX1MAIL4.st.com>
-Message-ID: <5239A322.5010004@st.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Wed, 18 Sep 2013 09:23:31 -0400
+Subject: [PATCH V2] ARM: dts: DRA7: provide arch-timer frequenecy parameter
+In-Reply-To: <52398F87.6090108@ti.com>
+References: <5238899D.60903@ti.com>
+ <1379437288-10831-1-git-send-email-nm@ti.com> <52398F87.6090108@ti.com>
+Message-ID: <5239A953.3040900@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/09/13 13:46, Maxime COQUELIN wrote:
-> On 09/18/2013 02:03 PM, Lee Jones wrote:
->>> >> This patch supplies I2C configuration to STiH416 SoC.
->>> >>
->>> >> Cc: Srinivas Kandagatla <srinivas.kandagatla@st.com>
->>> >> Signed-off-by: Maxime Coquelin <maxime.coquelin@st.com>
->>> >> ---
->>> >>  arch/arm/boot/dts/stih416-pinctrl.dtsi |   35 ++++++++++++++++++++
->>> >>  arch/arm/boot/dts/stih416.dtsi         |   57 ++++++++++++++++++++++++++++++++
->>> >>  2 files changed, 92 insertions(+)
->>> >>
->>> >> diff --git a/arch/arm/boot/dts/stih416-pinctrl.dtsi b/arch/arm/boot/dts/stih416-pinctrl.dtsi
->> > I genuinely don't know the answer to this question, but are these
->> > nodes identical to the ones you've just put in the stih415 DTSI file?
->> > If so, I think it will be worth creating a stih41x DTSI rather than
->> > duplicating lots of stuff unnecessarily.
-> There are close to be identical indeed.
-> For the clocks and pinctrl, the references names are the same, but they are
-> pointing on different nodes, as STiH415 and STiH416 have their own
-> clocks and pinctrl dtsi files.
+On Wednesday 18 September 2013 07:33 AM, Sricharan R wrote:
+> Hi,
 > 
-> Srini, what is opinion about this?
+> On Tuesday 17 September 2013 10:31 PM, Nishanth Menon wrote:
+>> CNTFREQ isn't pre-programmed on DRA7 just like O5, so provide the
+>> timer frequency via DT. Without a valid value arch_timer_init results
+>> in div0 crash.
+>>
+>> Cc: R Sricharan <r.sricharan@ti.com>
+>> Cc: Rajendra Nayak <rnayak@ti.com>
+>> Cc: Sourav Poddar <sourav.poddar@ti.com>
+>>
+>> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>> Signed-off-by: Nishanth Menon <nm@ti.com>
+>> ---
+>>
+>> Based on Benoit's for_3.13/dts branch. 
+>> http://git.kernel.org/cgit/linux/kernel/git/bcousson/linux-omap-dt.git/log/?h=for_3.13/dts
+>>
+>> Crash log: http://pastebin.com/B2sDauS9
+>>
+>> V2: commit message update
+>> V1: https://patchwork.kernel.org/patch/2903261/
+>>
+>>  arch/arm/boot/dts/dra7.dtsi |    1 +
+>>  1 file changed, 1 insertion(+)
+>>
+>> diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
+>> index c98997b..71c2749 100644
+>> --- a/arch/arm/boot/dts/dra7.dtsi
+>> +++ b/arch/arm/boot/dts/dra7.dtsi
+>> @@ -50,6 +50,7 @@
+>>  			     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
+>>  			     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
+>>  			     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>;
+>> +		clock-frequency = <6144000>;
+>>  	};
+>>  
+>>  	gic: interrupt-controller at 48211000 {
+> This is not the right way to pass the frequency. In fact, initially the frequency value was present
+> when the dts was added, but had to revert it back based on the feedbacks. Please refer below.
+> 
+There is nothing wrong in this method as well except the guest DT needs to
+be updated and that is bothersome.
+Ofcourse if there is an option setting up the CNTFREQ directly is the option.
 
-There is already a stih41x.dtsi file, but I don't think it is the right
-place for the pinctrl nodes there.
-
-Am not OK with the idea of common pinctrl nodes for STiH415 and STiH416
-for two reasons.
-
-1> If we common up the pinctrl nodes, it will be very difficult to
-accommodate new pinctrls layout which is not guaranteed to be in same
-layout in future SOCs.
-
-2> The retiming values in the pinctrl nodes tend to change as per SOC,
-so it will be difficult to manage it if we common it up.
-
-Am sure we can come up with a dt layout which can reduce duplication,
-but we have to be careful here not to lose the flexiblity to accommodate
-new picntrl layouts, new retimings values based on SOC.
-
-
-thanks,
-srini
-
->> >
+Regards,
+Santosh
+  
