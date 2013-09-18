@@ -1,64 +1,25 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 18 Sep 2013 13:59:02 -0700
-Subject: [GIT PULL 2/2] omap dt fixes against v3.12-rc1
-In-Reply-To: <pull-1379537942-109201>
-Message-ID: <mailman.3.1379537982.1056.linux-arm-kernel@lists.infradead.org>
+From: khc@pm.waw.pl (Krzysztof Halasa)
+Date: Wed, 18 Sep 2013 23:00:13 +0200
+Subject: BUG: sleeping function called from invalid context at
+ arch/arm/mm/fault.c:301
+In-Reply-To: <20130918150730.GU12758@n2100.arm.linux.org.uk> (Russell King's
+ message of "Wed, 18 Sep 2013 16:07:30 +0100")
+References: <m3mwnaa4sk.fsf@t19.piap.pl>
+ <20130918094117.GT12758@n2100.arm.linux.org.uk>
+ <m3ioxy9tck.fsf@t19.piap.pl>
+ <20130918150730.GU12758@n2100.arm.linux.org.uk>
+Message-ID: <m361txu9pe.fsf@intrepid.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 272b98c6455f00884f0350f775c5342358ebb73f:
+Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
 
-  Linux 3.12-rc1 (2013-09-16 16:17:51 -0400)
+> So, in order to find buggy drivers, the IRQ layer will call a shared
+> interrupt handler immediately upon registration, and also upon freeing.
 
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.12/fixes-dt-signed
-
-for you to fetch changes up to 45bea1d39a956619881315e20bdf52c8a702be03:
-
-  Merge tag 'for_3.12-rc2/dts_signed' of git://git.kernel.org/pub/scm/linux/kernel/git/bcousson/linux-omap-dt into omap-for-v3.12/fixes-dt (2013-09-18 12:50:45 -0700)
-
-----------------------------------------------------------------
-
-omap device tree changes that are needed to fix
-regressions and avoid electrical issues on beaglebone black.
-
-Via Benoit Cousson <bcousson@baylibre.com>:
-
-Fix BBB LDO voltage to avoid HDMI destruction
-Fix OMAP5 wrong attribute
-Fix typo in beagle xM strings
-Fix missing pinmux and regulator for OMAP4 wifi
-Fix missing pinmux for igep headset
-
-----------------------------------------------------------------
-Enric Balletbo i Serra (1):
-      ARM: dts: igep00x0: Add pinmux configuration for MCBSP2
-
-Felipe Balbi (2):
-      ARM: dts: OMAP5: fix reg property size
-      ARM: dts: OMAP5: fix ocp2scp DTS data
-
-Koen Kooi (1):
-      ARM: dts: am335x-bone*: add DT for BeagleBone Black
-
-Robert Nelson (1):
-      ARM: dts: omap3-beagle-xm: fix string error in compatible property
-
-Tony Lindgren (3):
-      ARM: dts: Fix muxing and regulator for wl12xx on the SDIO bus for pandaboard
-      ARM: dts: Fix muxing and regulator for wl12xx on the SDIO bus for blaze
-      Merge tag 'for_3.12-rc2/dts_signed' of git://git.kernel.org/.../bcousson/linux-omap-dt into omap-for-v3.12/fixes-dt
-
- arch/arm/boot/dts/Makefile                |   1 +
- arch/arm/boot/dts/am335x-bone-common.dtsi | 262 ++++++++++++++++++++++++++++++
- arch/arm/boot/dts/am335x-bone.dts         | 256 +----------------------------
- arch/arm/boot/dts/am335x-boneblack.dts    |  17 ++
- arch/arm/boot/dts/omap3-beagle-xm.dts     |   2 +-
- arch/arm/boot/dts/omap3-igep.dtsi         |  14 ++
- arch/arm/boot/dts/omap4-panda-common.dtsi |  46 +++++-
- arch/arm/boot/dts/omap4-sdp.dts           |  39 ++++-
- arch/arm/boot/dts/omap5.dtsi              |   7 +-
- 9 files changed, 383 insertions(+), 261 deletions(-)
- create mode 100644 arch/arm/boot/dts/am335x-bone-common.dtsi
- create mode 100644 arch/arm/boot/dts/am335x-boneblack.dts
+Nice, didn't know about that. I will have to check why the bug didn't
+manifest itself earlier and/or later (I did rmmod many times and it
+fired just once, just after I cut video signal from the camera -
+solo6x10 is a audio/video grabber and compressor).
+-- 
+Krzysztof Halasa
