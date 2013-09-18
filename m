@@ -1,62 +1,56 @@
-From: ldewangan@nvidia.com (Laxman Dewangan)
-Date: Wed, 18 Sep 2013 18:52:32 +0530
-Subject: [PATCH REPOST] ARM: tegra: use dt-binding header for key code
-Message-ID: <1379510552-23401-1-git-send-email-ldewangan@nvidia.com>
+From: khalasa@piap.pl (Krzysztof =?utf-8?Q?Ha=C5=82asa?=)
+Date: Wed, 18 Sep 2013 15:01:31 +0200
+Subject: BUG: sleeping function called from invalid context at
+ arch/arm/mm/fault.c:301
+In-Reply-To: <20130918094117.GT12758@n2100.arm.linux.org.uk> (Russell King's
+ message of "Wed, 18 Sep 2013 10:41:17 +0100")
+References: <m3mwnaa4sk.fsf@t19.piap.pl>
+ <20130918094117.GT12758@n2100.arm.linux.org.uk>
+Message-ID: <m3ioxy9tck.fsf@t19.piap.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In place of hardcoding the key code in DTS file and comment the
-key code as side notes, use the key code macro defines in the
-dt-bindings/input/input.h directly.
+Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
 
-Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
----
-Reposting this patch as it was sent earlier when merge window was closed.
+>> ipx435, v3.11, the card hw has gone wild (another issue) and generates
+>> data abort on register access in ISR. The issue here is the warning in
+>> do_page_fault(), is it normal?
+>
+> It is normal if the data abort gets caused from a non-atomic context.
 
- arch/arm/boot/dts/tegra114-dalmore.dts |    9 +++++----
- 1 files changed, 5 insertions(+), 4 deletions(-)
+Hmm, the ISR should be an atomic context...
 
-diff --git a/arch/arm/boot/dts/tegra114-dalmore.dts b/arch/arm/boot/dts/tegra114-dalmore.dts
-index 6023028..05a3aae 100644
---- a/arch/arm/boot/dts/tegra114-dalmore.dts
-+++ b/arch/arm/boot/dts/tegra114-dalmore.dts
-@@ -1,5 +1,6 @@
- /dts-v1/;
- 
-+#include <dt-bindings/input/input.h>
- #include "tegra114.dtsi"
- 
- / {
-@@ -1081,26 +1082,26 @@
- 		home {
- 			label = "Home";
- 			gpios = <&gpio TEGRA_GPIO(I, 5) GPIO_ACTIVE_LOW>;
--			linux,code = <102>; /* KEY_HOME */
-+			linux,code = <KEY_HOME>;
- 		};
- 
- 		power {
- 			label = "Power";
- 			gpios = <&gpio TEGRA_GPIO(Q, 0) GPIO_ACTIVE_LOW>;
--			linux,code = <116>; /* KEY_POWER */
-+			linux,code = <KEY_POWER>;
- 			gpio-key,wakeup;
- 		};
- 
- 		volume_down {
- 			label = "Volume Down";
- 			gpios = <&gpio TEGRA_GPIO(R, 1) GPIO_ACTIVE_LOW>;
--			linux,code = <114>; /* KEY_VOLUMEDOWN */
-+			linux,code = <KEY_VOLUMEDOWN>;
- 		};
- 
- 		volume_up {
- 			label = "Volume Up";
- 			gpios = <&gpio TEGRA_GPIO(R, 2) GPIO_ACTIVE_LOW>;
--			linux,code = <115>; /* KEY_VOLUMEUP */
-+			linux,code = <KEY_VOLUMEUP>;
- 		};
- 	};
- 
+#define in_atomic()     ((preempt_count() & ~PREEMPT_ACTIVE) != 0)
+
+I think a hardware IRQ is supposed to add_preempt_count() via
+irq_enter() -> __irq_enter()? How could in_atomic() return 0?
+A delayed, imprecise abort?
+
+> The real question is what is solo_isr() doing causing a data abort
+> in the first place.
+
+Right.
+
+> I suspect it's this great bit of coding in free_solo_dev():
+
+		/* Now cleanup the PCI device */
+		solo_irq_off(solo_dev, ~0);
+		pci_iounmap(pdev, solo_dev->reg_base);
+		if (pdev->irq)
+			free_irq(pdev->irq, solo_dev);
+
+solo_irq_off() tries to disable IRQ by masking the hw line but I guess
+there may be some time window in which a problem may show up.
+Anyway, there is no reason to unmap registers before free_irq().
+
+> Yep, we try to read from memory we've just unmapped.
+
+> It's a driver bug.  Please report this to the driver authors.
+
+Right (that's a "staging" driver and I better fix it myself).
+Thanks.
 -- 
-1.7.1.1
+Krzysztof Halasa
+
+Research Institute for Automation and Measurements PIAP
+Al. Jerozolimskie 202, 02-486 Warsaw, Poland
