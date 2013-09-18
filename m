@@ -1,44 +1,55 @@
 From: soren.brinkmann@xilinx.com (Soren Brinkmann)
-Date: Wed, 18 Sep 2013 11:48:37 -0700
-Subject: [PATCH v2 3/4] tick: broadcast: Deny per-cpu clockevents from being
- broadcast sources
+Date: Wed, 18 Sep 2013 11:48:38 -0700
+Subject: [PATCH v2 4/4] arm: zynq: Enable arm_global_timer
 In-Reply-To: <1379530118-22813-1-git-send-email-soren.brinkmann@xilinx.com>
 References: <1379530118-22813-1-git-send-email-soren.brinkmann@xilinx.com>
-Message-ID: <1379530118-22813-4-git-send-email-soren.brinkmann@xilinx.com>
+Message-ID: <1379530118-22813-5-git-send-email-soren.brinkmann@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On most ARM systems the per-cpu clockevents are truly per-cpu in
-the sense that they can't be controlled on any other CPU besides
-the CPU that they interrupt. If one of these clockevents were to
-become a broadcast source we will run into a lot of trouble
-because the broadcast source is enabled on the first CPU to go
-into deep idle (if that CPU suffers from FEAT_C3_STOP) and that
-could be a different CPU than what the clockevent is interrupting
-(or even worse the CPU that the clockevent interrupts could be
-offline).
-
-Theoretically it's possible to support per-cpu clockevents as the
-broadcast source but so far we haven't needed this and supporting
-it is rather complicated. Let's just deny the possibility for now
-until this becomes a reality (let's hope it never does!).
+Zynq is based on an ARM Cortex-A9 MPCore, which features the
+arm_global_timer in its SCU. Therefore enable the timer for Zynq.
 
 Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 ---
- kernel/time/tick-broadcast.c | 1 +
- 1 file changed, 1 insertion(+)
+v2:
+ - rename DT node: global_timer at ... => timer at ...
+ - add Daniel's ACK
+---
+ arch/arm/boot/dts/zynq-7000.dtsi | 8 ++++++++
+ arch/arm/mach-zynq/Kconfig       | 1 +
+ 2 files changed, 9 insertions(+)
 
-diff --git a/kernel/time/tick-broadcast.c b/kernel/time/tick-broadcast.c
-index 218bcb5..9532690 100644
---- a/kernel/time/tick-broadcast.c
-+++ b/kernel/time/tick-broadcast.c
-@@ -70,6 +70,7 @@ static bool tick_check_broadcast_device(struct clock_event_device *curdev,
- 					struct clock_event_device *newdev)
- {
- 	if ((newdev->features & CLOCK_EVT_FEAT_DUMMY) ||
-+	    (newdev->features & CLOCK_EVT_FEAT_PERCPU) ||
- 	    (newdev->features & CLOCK_EVT_FEAT_C3STOP))
- 		return false;
+diff --git a/arch/arm/boot/dts/zynq-7000.dtsi b/arch/arm/boot/dts/zynq-7000.dtsi
+index e32b92b..e7f73b2 100644
+--- a/arch/arm/boot/dts/zynq-7000.dtsi
++++ b/arch/arm/boot/dts/zynq-7000.dtsi
+@@ -92,6 +92,14 @@
+ 			};
+ 		};
  
++		global_timer: timer at f8f00200 {
++			compatible = "arm,cortex-a9-global-timer";
++			reg = <0xf8f00200 0x20>;
++			interrupts = <1 11 0x301>;
++			interrupt-parent = <&intc>;
++			clocks = <&clkc 4>;
++		};
++
+ 		ttc0: ttc0 at f8001000 {
+ 			interrupt-parent = <&intc>;
+ 			interrupts = < 0 10 4 0 11 4 0 12 4 >;
+diff --git a/arch/arm/mach-zynq/Kconfig b/arch/arm/mach-zynq/Kconfig
+index 04f8a4a..6b04260 100644
+--- a/arch/arm/mach-zynq/Kconfig
++++ b/arch/arm/mach-zynq/Kconfig
+@@ -13,5 +13,6 @@ config ARCH_ZYNQ
+ 	select HAVE_SMP
+ 	select SPARSE_IRQ
+ 	select CADENCE_TTC_TIMER
++	select ARM_GLOBAL_TIMER
+ 	help
+ 	  Support for Xilinx Zynq ARM Cortex A9 Platform
 -- 
 1.8.4
