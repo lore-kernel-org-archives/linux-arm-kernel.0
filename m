@@ -1,34 +1,45 @@
-From: bcousson@baylibre.com (Benoit Cousson)
-Date: Wed, 18 Sep 2013 11:04:32 +0200
-Subject: [PATCH 1/2] ARM: dts: Fix muxing and regulator for wl12xx on
- the SDIO bus for pandaboard
-In-Reply-To: <20130918000203.GS9994@atomide.com>
-References: <20130913190811.24617.97699.stgit@localhost>
- <20130913190953.24617.46506.stgit@localhost>
- <1379399214.4223.123.camel@porter.coelho.fi>
- <1379399290.4223.124.camel@porter.coelho.fi>
- <20130918000203.GS9994@atomide.com>
-Message-ID: <52396CA0.6030100@baylibre.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 18 Sep 2013 10:17:49 +0100
+Subject: Commit breaks strace: ARM: entry: allow ARM-private syscalls to
+ be restarted
+In-Reply-To: <20130917215749.GA11109@obsidianresearch.com>
+References: <20130917215749.GA11109@obsidianresearch.com>
+Message-ID: <20130918091748.GA1783@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+On Tue, Sep 17, 2013 at 10:57:49PM +0100, Jason Gunthorpe wrote:
+> Hi Will,
 
-On 18/09/2013 02:02, Tony Lindgren wrote:
-> * Luca Coelho <luca@coelho.fi> [130916 23:35]:
->> On Tue, 2013-09-17 at 09:26 +0300, Luca Coelho wrote:
->>> Both patches look good to me, though I didn't have the time to retest
->>> them.
->>
->> Actually I don't even have a Blaze device anymore, so I can't really
->> test the second patch. :(
->
-> OK no problem, I've tested it on panda es.
+Hi Jason,
 
-Do we have someone out-there that still own a Blaze?
+> I was just testing v3.12-rc1 (on kirkwood) and noticed that strace is
+> not working:
 
-Anyway, I'm about to send a DTS fix branch for -rc2, so I'll include 
-these two patches.
+Thanks for the report!
 
-Thanks,
-Benoit
+> $ strace /bin/ls
+> mmap2(0xb6f79000, 9552, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_ANONYMOUS, -1, 0) = 0xb6f79000
+> close(3)                                = 0
+> mmap2(NULL, 4096, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0xb6fad000
+> set_tls(0xb6fad4c0, 0xb6fadb98, 0xb6fb1050, 0xb6fad4c0, 0xb6fb1050) = -1 ENOSYS (Function not implemented)
+> writev(2, [{"cannot set up thread-local stora"..., 36}, {"unknown error", 13}, {"\n", 1}], 3cannot set up thread-local storage: unknown error
+> ) = 50
+> exit_group(127)                         = ?
+> +++ exited with 127 +++
+> 
+> I determined that reverting your commit below makes strace work again.
+> I've tested 3.10.12 and it is OK.
+
+Hmm, so if you don't run with strace, does `/bin/ls' work as expected? From
+the trace above, it seems that set_tls is failing rather than anything in
+strace (unless of course, the trace is just plain wrong).
+
+> This happens with the latest git head for strace, as well as the 4.7
+> release.
+> 
+> Hopefully you can cook up a fix :)
+
+I'll take a look today, thanks.
+
+Will
