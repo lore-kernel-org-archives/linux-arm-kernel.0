@@ -1,60 +1,36 @@
-From: gleb@redhat.com (Gleb Natapov)
-Date: Wed, 18 Sep 2013 09:21:55 +0300
-Subject: [PATCH 3/3] aarch64: kvm: introduce CONFIG_KVM_MAX_VCPUS
-In-Reply-To: <20130917213428.GJ7623@lvm>
-References: <1379160656-28050-1-git-send-email-drjones@redhat.com>
- <1379160656-28050-4-git-send-email-drjones@redhat.com>
- <20130917213428.GJ7623@lvm>
-Message-ID: <20130918062155.GF5657@redhat.com>
+From: ethan@ethantuttle.com (Ethan Tuttle)
+Date: Tue, 17 Sep 2013 23:30:56 -0700
+Subject: mvneta: oops in __rcu_read_lock on mirabox
+In-Reply-To: <20130917060111.GB9325@1wt.eu>
+References: <20130915205701.5c61a444@skate> <20130916065047.GH27487@1wt.eu>
+ <20130916175152.4e013457@skate>
+ <CACzLR4twTNjzU8hK3L1cYUXnEH1ydwY6jnYoOG+9vLB3-4uQ4w@mail.gmail.com>
+ <20130916163937.GC3188@1wt.eu> <20130916164412.GD3188@1wt.eu>
+ <CACzLR4ssOPsmYaEh2ohe4HL5j+67keDYnmR4YezNB=aO7Pj5kA@mail.gmail.com>
+ <20130916174708.GG3188@1wt.eu>
+ <20130916182807.GO12758@n2100.arm.linux.org.uk>
+ <CACzLR4suLD90p=sEhB-qg1u35t66zKfrGQref1jX42fEfu3D8g@mail.gmail.com>
+ <20130917060111.GB9325@1wt.eu>
+Message-ID: <CACzLR4t2ABZdRk40VUhLtDKXX2PQiSVoQZQ4coQkNkvETnY6Rw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 17, 2013 at 10:34:28PM +0100, Christoffer Dall wrote:
-> On Sat, Sep 14, 2013 at 02:10:56PM +0200, Andrew Jones wrote:
-> > Take CONFIG_KVM_MAX_VCPUS from arm32, but set the default to 8.
-> > 
-> > Signed-off-by: Andrew Jones <drjones@redhat.com>
-> > ---
-> >  arch/arm64/include/asm/kvm_host.h |  7 ++++++-
-> >  arch/arm64/kvm/Kconfig            | 11 +++++++++++
-> >  2 files changed, 17 insertions(+), 1 deletion(-)
-> > 
-> > diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-> > index 0859a4ddd1e7d..d1af8c49a5ca4 100644
-> > --- a/arch/arm64/include/asm/kvm_host.h
-> > +++ b/arch/arm64/include/asm/kvm_host.h
-> > @@ -26,7 +26,12 @@
-> >  #include <asm/kvm_asm.h>
-> >  #include <asm/kvm_mmio.h>
-> >  
-> > -#define KVM_MAX_VCPUS 4
-> > +#if defined(CONFIG_KVM_MAX_VCPUS)
-> > +#define KVM_MAX_VCPUS CONFIG_KVM_MAX_VCPUS
-> > +#else
-> > +#define KVM_MAX_VCPUS 0
-> > +#endif
-> > +
-> >  #define KVM_USER_MEM_SLOTS 32
-> >  #define KVM_PRIVATE_MEM_SLOTS 4
-> >  #define KVM_COALESCED_MMIO_PAGE_OFFSET 1
-> > diff --git a/arch/arm64/kvm/Kconfig b/arch/arm64/kvm/Kconfig
-> > index 21e90820bd23c..c9924b02e84f7 100644
-> > --- a/arch/arm64/kvm/Kconfig
-> > +++ b/arch/arm64/kvm/Kconfig
-> > @@ -35,6 +35,17 @@ config KVM_ARM_HOST
-> >  	---help---
-> >  	  Provides host support for ARM processors.
-> >  
-> > +config KVM_MAX_VCPUS
-> > +	int "Number maximum supported virtual CPUs per VM"
-> > +	depends on KVM_ARM_HOST
-> > +	default 8
-> 
-> That data structure gets really big with 8 max vcpus.  I think we should
-> keep this at 4 for now, a quad-core VM is quite reasonable for now.
-> 
-Which data structure? vgic? IIRC with 8 vcpus it will be something like
-500 bytes bigger then it is now.
+On Mon, Sep 16, 2013 at 11:01 PM, Willy Tarreau <w@1wt.eu> wrote:
+> Next step should be that you test both kernels to be sure.
 
---
-			Gleb.
+Thanks for the kernel images, Willy.  I'm still experimenting but
+initial results are strange: I haven't seen a crash from the -ethan
+image you provided, nor by a kernel with that config that I built
+myself.  The config is only different from my crashing config by a few
+options.  So perhaps some combination of options prevents the crash.
+I'll see if I can narrow it down.
+
+For a moment I thought I found a likely culprit: all along I've been
+loading my kernel in to 0x02000000 in uboot, while the stock uboot env
+(and Willy) uses 0x6400000.  But I've seen at least one
+__rcu_read_lock oops since switching to 0x6400000.  So I guess I can
+rule that out.
+
+Thanks,
+
+Ethan
