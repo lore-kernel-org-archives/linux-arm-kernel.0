@@ -1,36 +1,72 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 18 Sep 2013 16:07:30 +0100
-Subject: BUG: sleeping function called from invalid context at
- arch/arm/mm/fault.c:301
-In-Reply-To: <m3ioxy9tck.fsf@t19.piap.pl>
-References: <m3mwnaa4sk.fsf@t19.piap.pl>
- <20130918094117.GT12758@n2100.arm.linux.org.uk> <m3ioxy9tck.fsf@t19.piap.pl>
-Message-ID: <20130918150730.GU12758@n2100.arm.linux.org.uk>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 18 Sep 2013 10:09:40 -0500
+Subject: [PATCH 18/28] of: create default early_init_dt_add_memory_arch
+In-Reply-To: <20130918033358.51CA1C42C9E@trevor.secretlab.ca>
+References: <1379372965-22359-1-git-send-email-robherring2@gmail.com>
+ <1379372965-22359-19-git-send-email-robherring2@gmail.com>
+ <20130918033358.51CA1C42C9E@trevor.secretlab.ca>
+Message-ID: <CAL_JsqKkhPt0hMKvdh+71WN9ERTRvzJKXO9ZV076ks-XGxbn4A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 18, 2013 at 03:01:31PM +0200, Krzysztof Ha?asa wrote:
-> Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
-> > I suspect it's this great bit of coding in free_solo_dev():
-> 
-> 		/* Now cleanup the PCI device */
-> 		solo_irq_off(solo_dev, ~0);
-> 		pci_iounmap(pdev, solo_dev->reg_base);
-> 		if (pdev->irq)
-> 			free_irq(pdev->irq, solo_dev);
-> 
-> solo_irq_off() tries to disable IRQ by masking the hw line but I guess
-> there may be some time window in which a problem may show up.
-> Anyway, there is no reason to unmap registers before free_irq().
+On Tue, Sep 17, 2013 at 10:33 PM, Grant Likely <grant.likely@linaro.org> wrote:
+> On Mon, 16 Sep 2013 18:09:14 -0500, Rob Herring <robherring2@gmail.com> wrote:
+>> From: Rob Herring <rob.herring@calxeda.com>
+>>
+>> Create a weak version of early_init_dt_add_memory_arch which uses
+>> memblock or is an empty function when memblock is not enabled. This
+>> will unify all architectures except ones with custom memory bank
+>> structs.
+>
+> Two comments below, but otherwise:
+>
+> Acked-by: Grant Likely <grant.likely@linaro.org>
+>
+>> diff --git a/drivers/of/fdt.c b/drivers/of/fdt.c
+>> index 0714dd4..a9dce7a 100644
+>> --- a/drivers/of/fdt.c
+>> +++ b/drivers/of/fdt.c
+>> @@ -688,6 +688,17 @@ u64 __init dt_mem_next_cell(int s, __be32 **cellp)
+>>       return of_read_number(p, s);
+>>  }
+>>
+>> +void __init __weak early_init_dt_add_memory_arch(u64 base, u64 size)
+>> +{
+>> +#ifdef CONFIG_HAVE_MEMBLOCK
+>> +     base &= PAGE_MASK;
+>> +     size &= PAGE_MASK;
+>> +     memblock_add(base, size);
+>> +#else
+>> +     pr_err("%s: ignoring memory (%llx, %llx)\n", __func__, base, size);
+>> +#endif
+>> +}
+>> +
+>
+> Can you do it this way instead:
+>
+> #ifdef CONFIG_HAVE_MEMBLOCK
+> void __init __weak early_init_dt_add_memory_arch(u64 base, u64 size)
+> {
+>         base &= PAGE_MASK;
+>         size &= PAGE_MASK;
+>         memblock_add(base, size);
+> }
+> #endif
+>
+> If the platform doesn't provide an early_init_dt_add_memory_arch()
+> function and it doesn't have a memblock implementation, then the build
+> should outright fail. I don't see a scenario where we would want to
+> successfully build the kernel without a working add memory function.
 
-Except that it's part of debugging shared interrupts.
+metag and x86 both have empty functions. I guess they get memory from
+a different boot interface.
 
-Remember, any driver which is still hooked into the IRQ handling subsystem
-with a shared interrupt can still receive an interrupt at any moment due
-to another device on that shared interrupt line raising its request.
+Rob
 
-So, in order to find buggy drivers, the IRQ layer will call a shared
-interrupt handler immediately upon registration, and also upon freeing.
-
-So, it's not a spurious IRQ, it's an attempt by the IRQ layer to find
-buggy drivers, and it's done exactly that.  It's working as designed.
+>
+> Also, can you group this function with the common __weak
+> early_init_dt_alloc_memory_arch() implementation? It would be good to
+> group all the memblock specific functions together.
+>
+> g.
+>
