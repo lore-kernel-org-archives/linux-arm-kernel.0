@@ -1,31 +1,41 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 18 Sep 2013 12:18:39 -0400
-Subject: [PATCH] arm: mvebu: use the main timer as clock source from DT
-In-Reply-To: <1379519624-4267-1-git-send-email-jean.pihet@linaro.org>
-References: <1379519624-4267-1-git-send-email-jean.pihet@linaro.org>
-Message-ID: <20130918161839.GN19937@titan.lakedaemon.net>
+From: pwalmsley@nvidia.com (Paul Walmsley)
+Date: Wed, 18 Sep 2013 09:23:19 -0700
+Subject: Tegra baseline test results for v3.12-rc1
+Message-ID: <A4DCC42E2B5835498682FCB0A8F9F873378C267FFD@HQMAIL04.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 18, 2013 at 05:53:44PM +0200, Jean Pihet wrote:
-> This commit:
->   573145f08c2b92c45498468afbbba909f6ce6135
->   clocksource: armada-370-xp: Use CLOCKSOURCE_OF_DECLARE
-> 
-> replaced a call to the driver's timer initialization by a call to
-> clocksource_of_init(). However, it failed to select CONFIG_CLKSRC_OF.
-> 
-> Fix this by selecting CONFIG_CLKSRC_OF for Armada370/XP machines.
-> Without this change the kernel is stuck at: 'Calibrating delay loop...'.
-> 
-> Signed-off-by: Jean Pihet <jean.pihet@linaro.org>
-> Acked-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> ---
->  arch/arm/mach-mvebu/Kconfig | 1 +
->  1 file changed, 1 insertion(+)
 
-Applied to mvebu/fixes
+Here are some basic Tegra test results for Linux v3.12-rc1.
+Logs and other details at:
 
-thx,
+    http://nvt.pwsan.com/pub/linux/testlogs/test_v3.12-rc1/20130916143118/
 
-Jason.
+
+Test summary
+------------
+
+Build: zImage:
+    Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
+
+Boot to userspace: multi_v7_defconfig:
+    Pass: ( 2/ 2): tegra114-dalmore-headless, tegra30-beaver
+
+Boot to userspace: tegra_defconfig:
+    Pass: ( 2/ 2): tegra114-dalmore-headless, tegra30-beaver
+
+
+vmlinux object size
+(delta in bytes from test_v3.11-rc7 (d8dfad3876e4386666b759da3c833d62fb8b2267)):
+   text     data      bss    total  kernel
+ -89208   +10000     -416   -79624  multi_v7_defconfig
++299303    +7244    +1484  +308031  tegra_defconfig
+
+
+Boot-time memory difference
+(delta in bytes from test_v3.11-rc7 (d8dfad3876e4386666b759da3c833d62fb8b2267))
+    avail    rsrvd     high    freed                board              kconfig                  dtb
+        .        .        .        . tegra114-dalmore-hea   multi_v7_defconfig     tegra114-dalmore
+    -324k     324k        .        . tegra114-dalmore-hea      tegra_defconfig     tegra114-dalmore
+    -324k     324k        .        .       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
+    -592k     592k        .       8k       tegra30-beaver      tegra_defconfig       tegra30-beaver
