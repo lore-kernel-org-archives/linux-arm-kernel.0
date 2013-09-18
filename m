@@ -1,44 +1,45 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 18 Sep 2013 15:01:15 -0500
-Subject: [PATCH] Renesas clocksource fixes for v3.12
-Message-ID: <1379534476-10901-1-git-send-email-horms+renesas@verge.net.au>
+Date: Wed, 18 Sep 2013 15:01:16 -0500
+Subject: [PATCH] clocksource: em_sti: Set cpu_possible_mask to fix SMP
+ broadcast
+In-Reply-To: <1379534476-10901-1-git-send-email-horms+renesas@verge.net.au>
+References: <1379534476-10901-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1379534476-10901-2-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
+From: Magnus Damm <damm@opensource.se>
 
-please consider this clocksource fix for v3.12.
+Update the STI driver by setting cpu_possible_mask to make EMEV2
+SMP work as expected together with the ARM broadcast timer.
 
-This pull request is based on renesas-clocksource-for-v3.12
-which I believe you have previously pulled.
+This breakage was introduced by:
 
+f7db706 ARM: 7674/1: smp: Avoid dummy clockevent being preferred over real hardware clock-event
 
-The following changes since commit 172705f8a40b6e72c53f8cceda079504ed71c4e0:
+Without this fix SMP operation is broken on EMEV2 since no
+broadcast timer interrupts trigger on the secondary CPU cores.
 
-  clocksource: em_sti: Convert to devm_* managed helpers (2013-08-05 10:47:10 +0900)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-clocksource-fixes-for-v3.12
-
-for you to fetch changes up to 7b096b40c9d3d2abb6bb747dd148c50c076c2e89:
-
-  clocksource: em_sti: Set cpu_possible_mask to fix SMP broadcast (2013-09-05 14:47:53 +0900)
-
-----------------------------------------------------------------
-Renesas clocksource fixes for v3.12
-
-* em_sti: Set cpu_possible_mask to fix SMP broadcast
-
-  This resolves a regression introduced by
-  f7db706 ("ARM: 7674/1: smp: Avoid dummy clockevent being preferred over
-  real hardware clock-event").
-
-  This problem has been present since v3.9-rc4.
-
-----------------------------------------------------------------
-Magnus Damm (1):
-      clocksource: em_sti: Set cpu_possible_mask to fix SMP broadcast
-
+Signed-off-by: Magnus Damm <damm@opensource.se>
+Tested-by: Simon Horman <horms+renesas@verge.net.au>
+Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
  drivers/clocksource/em_sti.c | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/clocksource/em_sti.c b/drivers/clocksource/em_sti.c
+index b9c81b7..3a5909c 100644
+--- a/drivers/clocksource/em_sti.c
++++ b/drivers/clocksource/em_sti.c
+@@ -301,7 +301,7 @@ static void em_sti_register_clockevent(struct em_sti_priv *p)
+ 	ced->name = dev_name(&p->pdev->dev);
+ 	ced->features = CLOCK_EVT_FEAT_ONESHOT;
+ 	ced->rating = 200;
+-	ced->cpumask = cpumask_of(0);
++	ced->cpumask = cpu_possible_mask;
+ 	ced->set_next_event = em_sti_clock_event_next;
+ 	ced->set_mode = em_sti_clock_event_mode;
+ 
+-- 
+1.8.4
