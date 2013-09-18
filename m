@@ -1,61 +1,99 @@
-From: r.sricharan@ti.com (Sricharan R)
-Date: Wed, 18 Sep 2013 17:03:27 +0530
-Subject: [PATCH V2] ARM: dts: DRA7: provide arch-timer frequenecy parameter
-In-Reply-To: <1379437288-10831-1-git-send-email-nm@ti.com>
-References: <5238899D.60903@ti.com>
- <1379437288-10831-1-git-send-email-nm@ti.com>
-Message-ID: <52398F87.6090108@ti.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 18 Sep 2013 12:40:32 +0100
+Subject: [PATCH 4/4] ARM: STi: Add I2C config to B2000 and B2020 boards
+In-Reply-To: <1379498483-4236-5-git-send-email-maxime.coquelin@st.com>
+References: <1379498483-4236-1-git-send-email-maxime.coquelin@st.com>
+ <1379498483-4236-5-git-send-email-maxime.coquelin@st.com>
+Message-ID: <20130918114032.GD16984@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, 18 Sep 2013, Maxime COQUELIN wrote:
 
-On Tuesday 17 September 2013 10:31 PM, Nishanth Menon wrote:
-> CNTFREQ isn't pre-programmed on DRA7 just like O5, so provide the
-> timer frequency via DT. Without a valid value arch_timer_init results
-> in div0 crash.
->
-> Cc: R Sricharan <r.sricharan@ti.com>
-> Cc: Rajendra Nayak <rnayak@ti.com>
-> Cc: Sourav Poddar <sourav.poddar@ti.com>
->
-> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Signed-off-by: Nishanth Menon <nm@ti.com>
+> This patch supplies I2C configuration to B2000 and B2020
+> based on either STiH415 or STiH416 SoCs.
+> 
+> Cc: Srinivas Kandagatla <srinivas.kandagatla@st.com>
+> Signed-off-by: Maxime Coquelin <maxime.coquelin@st.com>
 > ---
->
-> Based on Benoit's for_3.13/dts branch. 
-> http://git.kernel.org/cgit/linux/kernel/git/bcousson/linux-omap-dt.git/log/?h=for_3.13/dts
->
-> Crash log: http://pastebin.com/B2sDauS9
->
-> V2: commit message update
-> V1: https://patchwork.kernel.org/patch/2903261/
->
->  arch/arm/boot/dts/dra7.dtsi |    1 +
->  1 file changed, 1 insertion(+)
->
-> diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
-> index c98997b..71c2749 100644
-> --- a/arch/arm/boot/dts/dra7.dtsi
-> +++ b/arch/arm/boot/dts/dra7.dtsi
-> @@ -50,6 +50,7 @@
->  			     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
->  			     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
->  			     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>;
-> +		clock-frequency = <6144000>;
->  	};
+>  arch/arm/boot/dts/stih41x-b2000.dtsi |    7 +++++++
+>  arch/arm/boot/dts/stih41x-b2020.dtsi |   20 ++++++++++++++++++++
+>  2 files changed, 27 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/stih41x-b2000.dtsi b/arch/arm/boot/dts/stih41x-b2000.dtsi
+> index 8e694d2..346cc4bc 100644
+> --- a/arch/arm/boot/dts/stih41x-b2000.dtsi
+> +++ b/arch/arm/boot/dts/stih41x-b2000.dtsi
+> @@ -37,5 +37,12 @@
+>  			};
+>  		};
 >  
->  	gic: interrupt-controller at 48211000 {
-This is not the right way to pass the frequency. In fact, initially the frequency value was present
-when the dts was added, but had to revert it back based on the feedbacks. Please refer below.
-  
+> +		/* HDMI Tx I2C */
+> +		i2c1: i2c at fed41000{
 
-http://www.mail-archive.com/linux-omap at vger.kernel.org/msg93832.html
+nit: Space before the '{'
 
+> +			status = "okay";
 
-Also posted the below patch to fix this,
+Consider enabling the node at the bottom.
 
-    http://marc.info/?l=linux-omap&m=137950345528918&w=2
+> +
+> +			/* HDMI V1.3a supports Standard mode only */
+> +			clock-frequency = <100000>;
+> +		};
+>  	};
+>  };
+> diff --git a/arch/arm/boot/dts/stih41x-b2020.dtsi b/arch/arm/boot/dts/stih41x-b2020.dtsi
+> index 133e181..10b98da 100644
+> --- a/arch/arm/boot/dts/stih41x-b2020.dtsi
+> +++ b/arch/arm/boot/dts/stih41x-b2020.dtsi
+> @@ -38,5 +38,25 @@
+>  				default-state = "off";
+>  			};
+>  		};
+> +
+> +		i2c0: i2c at fed40000{
 
-Regards,
- Sricharan
+As above.
+
+> +			status = "okay";
+> +		};
+> +
+> +		/* HDMI Tx I2C */
+> +		i2c1: i2c at fed41000{
+
+As above.
+
+> +			status = "okay";
+
+As above.
+
+> +			/* HDMI V1.3a supports Standard mode only */
+> +			clock-frequency = <100000>;
+> +		};
+> +
+> +		sbc_i2c0: i2c at fe540000{
+
+As above.
+
+> +			status = "okay";
+> +		};
+> +
+> +		sbc_i2c1: i2c at fe541000{
+
+Are these nodes referenced by phandle at all?
+
+If not, consider dropping the <lable>:s
+
+> +			status = "okay";
+> +		};
+>  	};
+>  };
+
+Odd tabbing here.
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
