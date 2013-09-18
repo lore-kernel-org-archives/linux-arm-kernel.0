@@ -1,121 +1,133 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Wed, 18 Sep 2013 19:53:37 +0200
-Subject: [PATCH 04/26] clk: prima2: declare OF clock provider
+Date: Wed, 18 Sep 2013 19:53:41 +0200
+Subject: [PATCH 08/26] ARM: vt8500: prepare for arch-wide .init_time callback
 In-Reply-To: <1379526839-14798-1-git-send-email-sebastian.hesselbarth@gmail.com>
 References: <1379526839-14798-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1379526839-14798-5-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1379526839-14798-9-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Common clock framework allows to register clock providers to get called
-on of_clk_init() by using CLK_OF_DECLARE. This converts prima2 clock
-provider to make use of it and get rid of the mach specific clk init
-call.
+Current vt8500 board init calls of_clk_init() from vtwm_clk_init. To allow
+consolidation of DT driven .time_init, move of_clock_init() to a temporary
+.time_init callback that will be removed when arch-wide callback is available.
+With previous pmc_base parsing helper for vt8500 clock providers, we can also
+safely remove the call to vtwm_clk_init() and get rid of some includes.
 
 Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 ---
 Cc: Olof Johansson <olof@lixom.net>
 Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Barry Song <baohua.song@csr.com>
+Cc: Tony Prisk <linux@prisktech.co.nz>
 Cc: Russell King <linux@arm.linux.org.uk>
 Cc: Mike Turquette <mturquette@linaro.org>
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-kernel at vger.kernel.org
 ---
- arch/arm/mach-prima2/common.c |    4 ++--
- arch/arm/mach-prima2/common.h |    1 -
- drivers/clk/clk-prima2.c      |   29 ++++++-----------------------
- 3 files changed, 8 insertions(+), 26 deletions(-)
+ arch/arm/mach-vt8500/common.h |   24 ------------------------
+ arch/arm/mach-vt8500/vt8500.c |   13 ++++++++-----
+ drivers/clk/clk-vt8500.c      |   10 ----------
+ 3 files changed, 8 insertions(+), 39 deletions(-)
+ delete mode 100644 arch/arm/mach-vt8500/common.h
 
-diff --git a/arch/arm/mach-prima2/common.c b/arch/arm/mach-prima2/common.c
-index e110b6d..9b7663d 100644
---- a/arch/arm/mach-prima2/common.c
-+++ b/arch/arm/mach-prima2/common.c
-@@ -6,6 +6,7 @@
-  * Licensed under GPLv2 or later.
+diff --git a/arch/arm/mach-vt8500/common.h b/arch/arm/mach-vt8500/common.h
+deleted file mode 100644
+index 087787a..0000000
+--- a/arch/arm/mach-vt8500/common.h
++++ /dev/null
+@@ -1,24 +0,0 @@
+-/* linux/arch/arm/mach-vt8500/dt_common.h
+- *
+- * Copyright (C) 2012 Tony Prisk <linux@prisktech.co.nz>
+- *
+- * This software is licensed under the terms of the GNU General Public
+- * License version 2, as published by the Free Software Foundation, and
+- * may be copied, distributed, and modified under those terms.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- */
+-
+-#ifndef __ARCH_ARM_MACH_VT8500_DT_COMMON_H
+-#define __ARCH_ARM_MACH_VT8500_DT_COMMON_H
+-
+-#include <linux/of.h>
+-
+-/* defined in drivers/clk/clk-vt8500.c */
+-void __init vtwm_clk_init(void __iomem *pmc_base);
+-
+-#endif
+diff --git a/arch/arm/mach-vt8500/vt8500.c b/arch/arm/mach-vt8500/vt8500.c
+index eefaa60..5041563 100644
+--- a/arch/arm/mach-vt8500/vt8500.c
++++ b/arch/arm/mach-vt8500/vt8500.c
+@@ -18,6 +18,7 @@
+  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
   */
  
 +#include <linux/clk-provider.h>
  #include <linux/clocksource.h>
- #include <linux/init.h>
- #include <linux/kernel.h>
-@@ -23,8 +24,7 @@ void __init sirfsoc_init_late(void)
+ #include <linux/io.h>
+ #include <linux/pm.h>
+@@ -33,8 +34,6 @@
+ #include <linux/of_irq.h>
+ #include <linux/of_platform.h>
  
- static __init void sirfsoc_init_time(void)
- {
--	/* initialize clocking early, we want to set the OS timer */
--	sirfsoc_of_clk_init();
+-#include "common.h"
+-
+ #define LEGACY_GPIO_BASE	0xD8110000
+ #define LEGACY_PMC_BASE		0xD8130000
+ 
+@@ -75,6 +74,12 @@ static void vt8500_power_off(void)
+ 	asm("mcr%? p15, 0, %0, c7, c0, 4" : : "r" (0));
+ }
+ 
++static void __init vt8500_init_time(void)
++{
 +	of_clk_init(NULL);
- 	clocksource_of_init();
- }
- 
-diff --git a/arch/arm/mach-prima2/common.h b/arch/arm/mach-prima2/common.h
-index a630485..4b76806 100644
---- a/arch/arm/mach-prima2/common.h
-+++ b/arch/arm/mach-prima2/common.h
-@@ -23,7 +23,6 @@ extern void sirfsoc_secondary_startup(void);
- extern void sirfsoc_cpu_die(unsigned int cpu);
- 
- extern void __init sirfsoc_of_irq_init(void);
--extern void __init sirfsoc_of_clk_init(void);
- extern void sirfsoc_restart(enum reboot_mode, const char *);
- extern asmlinkage void __exception_irq_entry sirfsoc_handle_irq(struct pt_regs *regs);
- 
-diff --git a/drivers/clk/clk-prima2.c b/drivers/clk/clk-prima2.c
-index 5ab95f1..6c15e33 100644
---- a/drivers/clk/clk-prima2.c
-+++ b/drivers/clk/clk-prima2.c
-@@ -1015,16 +1015,6 @@ static struct clk_std clk_usb1 = {
- 	},
- };
- 
--static struct of_device_id clkc_ids[] = {
--	{ .compatible = "sirf,prima2-clkc" },
--	{},
--};
--
--static struct of_device_id rsc_ids[] = {
--	{ .compatible = "sirf,prima2-rsc" },
--	{},
--};
--
- enum prima2_clk_index {
- 	/* 0    1     2      3      4      5      6       7         8      9 */
- 	rtc,    osc,   pll1,  pll2,  pll3,  mem,   sys,   security, dsp,   gps,
-@@ -1082,24 +1072,16 @@ static struct clk_hw *prima2_clk_hw_array[maxclk] __initdata = {
- static struct clk *prima2_clks[maxclk];
- static struct clk_onecell_data clk_data;
- 
--void __init sirfsoc_of_clk_init(void)
-+static void __init sirfsoc_clk_init(struct device_node *np)
++	clocksource_of_init();
++}
++
+ void __init vt8500_init(void)
  {
--	struct device_node *np;
-+	struct device_node *rscnp;
- 	int i;
+ 	struct device_node *np;
+@@ -162,8 +167,6 @@ void __init vt8500_init(void)
+ 	else
+ 		pr_err("%s: PMC Hibernation register could not be remapped, not enabling power off!\n", __func__);
  
--	np = of_find_matching_node(NULL, rsc_ids);
--	if (!np)
--		panic("unable to find compatible rsc node in dtb\n");
+-	vtwm_clk_init(pmc_base);
 -
--	sirfsoc_rsc_vbase = of_iomap(np, 0);
-+	rscnp = of_find_compatible_node(NULL, NULL, "sirf,prima2-rsc");
-+	sirfsoc_rsc_vbase = of_iomap(rscnp, 0);
- 	if (!sirfsoc_rsc_vbase)
- 		panic("unable to map rsc registers\n");
--
--	of_node_put(np);
--
--	np = of_find_matching_node(NULL, clkc_ids);
--	if (!np)
--		return;
-+	of_node_put(rscnp);
- 
- 	sirfsoc_clk_vbase = of_iomap(np, 0);
- 	if (!sirfsoc_clk_vbase)
-@@ -1124,3 +1106,4 @@ void __init sirfsoc_of_clk_init(void)
- 
- 	of_clk_add_provider(np, of_clk_src_onecell_get, &clk_data);
+ 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
  }
-+CLK_OF_DECLARE(sirfsoc_clk, "sirf,prima2-clkc", sirfsoc_clk_init);
+ 
+@@ -180,7 +183,7 @@ DT_MACHINE_START(WMT_DT, "VIA/Wondermedia SoC (Device Tree Support)")
+ 	.dt_compat	= vt8500_dt_compat,
+ 	.map_io		= vt8500_map_io,
+ 	.init_machine	= vt8500_init,
+-	.init_time	= clocksource_of_init,
++	.init_time	= vt8500_init_time,
+ 	.restart	= vt8500_restart,
+ MACHINE_END
+ 
+diff --git a/drivers/clk/clk-vt8500.c b/drivers/clk/clk-vt8500.c
+index a5ee01c..88212d7 100644
+--- a/drivers/clk/clk-vt8500.c
++++ b/drivers/clk/clk-vt8500.c
+@@ -715,13 +715,3 @@ static void __init wm8850_pll_init(struct device_node *node)
+ 	vtwm_pll_clk_init(node, PLL_TYPE_WM8850);
+ }
+ CLK_OF_DECLARE(wm8850_pll, "wm,wm8850-pll-clock", wm8850_pll_init);
+-
+-void __init vtwm_clk_init(void __iomem *base)
+-{
+-	if (!base)
+-		return;
+-
+-	pmc_base = base;
+-
+-	of_clk_init(NULL);
+-}
 -- 
 1.7.10.4
