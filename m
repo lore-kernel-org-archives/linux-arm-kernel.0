@@ -1,114 +1,89 @@
-From: r.sricharan@ti.com (Sricharan R)
-Date: Wed, 18 Sep 2013 21:04:30 +0530
-Subject: [PATCH V2] ARM: OMAP5/DRA7: realtime_counter: Configure CNTFRQ
- register
-Message-ID: <1379518470-28387-1-git-send-email-r.sricharan@ti.com>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Wed, 18 Sep 2013 09:34:55 -0600
+Subject: [PATCH 3/3] ARM: kirkwood: Move the nand node under the mbus node
+In-Reply-To: <20130918122910.GA2563@localhost>
+References: <20130917184433.GF21230@obsidianresearch.com>
+ <20130918122910.GA2563@localhost>
+Message-ID: <20130918153455.GA18122@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The realtime counter called master counter, produces the count
-used by the private timer peripherals in the MPU_CLUSTER. The
-CNTFRQ per cpu register is used to denote the frequency of the counter.
-Currently the frequency value is passed from the
-DT file, but this is not scalable when we have other non-DT guest
-OS. This register must be set to the right value by the
-secure rom code. Setting this register helps in propagating the right
-frequency value across OSes.
+On Wed, Sep 18, 2013 at 09:29:11AM -0300, Ezequiel Garcia wrote:
+> Hi Jason,
+> 
+> On Tue, Sep 17, 2013 at 12:44:33PM -0600, Jason Gunthorpe wrote:
+> > There should be no nodes that are not children of the mbus. Move
+> > the nand node under the mbus, and rework the board .dts files
+> > to use an & reference to the nand node.
 
-More discussions and the reason for adding this in a non-DT
-way can be seen from below.
-http://www.mail-archive.com/linux-omap at vger.kernel.org/msg93832.html
+> Thanks for taking the time to do this. However, notice this may
+> be not the accurate way of representing NAND in DT. 
 
-So configuring this secure register for all the cpus here.
+These patches (nand and crypto) are just intended to fix the current
+use of the mbus driver in the kirkwood boards, not fix the small
+problems in the other drivers :)
 
-Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Cc: Nishanth Menon <nm@ti.com>
-Cc: Rajendra Nayak <rnayak@ti.com>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Tony Lindgren <tony@atomide.com>
-Signed-off-by: Sricharan R <r.sricharan@ti.com>
-Tested-by: Nishanth Menon <nm@ti.com>
-Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
----
- [V2] Updated commit log
+> The kirkwood specification has a NAND Flash Registers section which
+> speaks about registers and they seem to match (to some extent) the
+> MVEBU's Device Bus.
 
- arch/arm/mach-omap2/omap-secure.h |    2 ++
- arch/arm/mach-omap2/omap-smp.c    |    9 +++++++++
- arch/arm/mach-omap2/timer.c       |    6 ++++++
- 3 files changed, 17 insertions(+)
+Yes, the NAND IP is dual ported like crypto and has a register block
+on the internal-regs block that controls the interface timing. The
+driver should bind to this block and it should write to it.
 
-diff --git a/arch/arm/mach-omap2/omap-secure.h b/arch/arm/mach-omap2/omap-secure.h
-index a171a5a..4de9a00 100644
---- a/arch/arm/mach-omap2/omap-secure.h
-+++ b/arch/arm/mach-omap2/omap-secure.h
-@@ -51,6 +51,8 @@
- 
- #define OMAP5_MON_AMBA_IF_INDEX		0x108
- 
-+#define OMAP5_DRA7_MON_SET_CNTFRQ_INDEX	0x109
-+
- /* Secure PPA(Primary Protected Application) APIs */
- #define OMAP4_PPA_L2_POR_INDEX		0x23
- #define OMAP4_PPA_CPU_ACTRL_SMP_INDEX	0x25
-diff --git a/arch/arm/mach-omap2/omap-smp.c b/arch/arm/mach-omap2/omap-smp.c
-index 98a1146..00873b4 100644
---- a/arch/arm/mach-omap2/omap-smp.c
-+++ b/arch/arm/mach-omap2/omap-smp.c
-@@ -41,6 +41,8 @@
- 
- u16 pm44xx_errata;
- 
-+extern unsigned long arch_timer_freq;
-+
- /* SCU base address */
- static void __iomem *scu_base;
- 
-@@ -66,6 +68,13 @@ static void __cpuinit omap4_secondary_init(unsigned int cpu)
- 							4, 0, 0, 0, 0, 0);
- 
- 	/*
-+	 * Configure the CNTFRQ register for the secondary cpu's which
-+	 * indicates the frequency of the cpu local timers.
-+	 */
-+	if (soc_is_omap54xx() || soc_is_dra7xx())
-+		omap_smc1(OMAP5_DRA7_MON_SET_CNTFRQ_INDEX, arch_timer_freq);
-+
-+	/*
- 	 * Synchronise with the boot thread.
- 	 */
- 	spin_lock(&boot_lock);
-diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
-index fd9238d..2c499f3 100644
---- a/arch/arm/mach-omap2/timer.c
-+++ b/arch/arm/mach-omap2/timer.c
-@@ -55,6 +55,7 @@
- #include "soc.h"
- #include "common.h"
- #include "powerdomain.h"
-+#include "omap-secure.h"
- 
- #define REALTIME_COUNTER_BASE				0x48243200
- #define INCREMENTER_NUMERATOR_OFFSET			0x10
-@@ -65,6 +66,7 @@
- 
- static struct omap_dm_timer clkev;
- static struct clock_event_device clockevent_gpt;
-+unsigned long arch_timer_freq;
- 
- static irqreturn_t omap2_gp_timer_interrupt(int irq, void *dev_id)
- {
-@@ -546,7 +548,11 @@ static void __init realtime_counter_init(void)
- 	reg |= den;
- 	__raw_writel(reg, base + INCREMENTER_DENUMERATOR_RELOAD_OFFSET);
- 
-+	arch_timer_freq = (rate / den) * num;
-+
- 	iounmap(base);
-+
-+	omap_smc1(OMAP5_DRA7_MON_SET_CNTFRQ_INDEX, arch_timer_freq);
- }
- #else
- static inline void __init realtime_counter_init(void)
--- 
-1.7.9.5
+However, it is not like devbus. devbus is a generic bus that can
+connect to a wide range of devices we already have in the kernel, and
+the bus timing configuration cannot be auto-detected. This is why you
+need the 'mvebu-devbus' node. That node sets up the bus and then
+allows a Linux generic child driver to bind to it.
+
+NAND is not a generic bus, the NAND driver is the final consumer.
+
+Further, the NAND driver itself should determine the bus timing in a
+NAND specific way by following the ONFI defined auto detection
+method, probably with some help from the MTD layer. That is to say,
+determining the timing parmeters is intimately entangled with NAND
+itself and should not be separated.
+
+So, there is no need for a mvebu-devbus node with NAND, and the
+orion-nand driver should be improved. As things are now the driver
+relies on the firmware to set the correct interface timing and doesn't
+touch anything.
+
+> I haven't had time to investigate this any further and that's why
+> NAND hasn't been moved yet.
+
+Moving the block and improving the orion driver don't need to be
+linked. The new location for the nand block doesn't preclude anything
+:)
+
+FWIW, my ideal NAND binding would look something like this:
+
+               nand: nand at 012f {
+                       compatible = "marvell,orion-nand";
+                       #address-cells = <1>;
+                       #size-cells = <1>;
+                       reg = <MBUS_ID(0x01, 0x2f) 0 0x400
+                              MBUS_ID(0xf0, 0x01)  ......>; // control regs
+		       /* Clock frequency that is divided down to
+		          generate timings */
+                       clocks = <&gate_clk 7>; 
+		       
+		       /* One of these two, if read-gpio is specified
+		          then chip-delay is not used, and the driver
+		          waits for the flash to raise the RDY# pin to
+		          indicate command completion */
+                       chip-delay = <25>;
+		       ready-gpio = <&gpio ...>;
+
+		       // Indicate that the board cannot support faster timings
+		       onfi-disabled-timings = <...>;
+
+                       cle = <0>;
+                       ale = <1>;
+                       bank-width = <1>;
+                       /* partition map  ... */
+                       status = "disabled";
+               };
+
+Jason
