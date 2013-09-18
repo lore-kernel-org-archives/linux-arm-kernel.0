@@ -1,59 +1,38 @@
-From: bcousson@baylibre.com (Benoit Cousson)
-Date: Wed, 18 Sep 2013 11:40:51 +0200
-Subject: [GIT PULL] ARM: DTS: Fix OMAP bugs for 3.12-rc
-Message-ID: <52397523.4050209@baylibre.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 18 Sep 2013 10:41:17 +0100
+Subject: BUG: sleeping function called from invalid context at
+ arch/arm/mm/fault.c:301
+In-Reply-To: <m3mwnaa4sk.fsf@t19.piap.pl>
+References: <m3mwnaa4sk.fsf@t19.piap.pl>
+Message-ID: <20130918094117.GT12758@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+On Wed, Sep 18, 2013 at 10:54:19AM +0200, Krzysztof Ha?asa wrote:
+> ipx435, v3.11, the card hw has gone wild (another issue) and generates
+> data abort on register access in ISR. The issue here is the warning in
+> do_page_fault(), is it normal?
 
-Please pull few fixes for OMAP DTS.
+It is normal if the data abort gets caused from a non-atomic context.
+The real question is what is solo_isr() doing causing a data abort
+in the first place.
 
-Thanks,
-Benoit
+I suspect it's this great bit of coding in free_solo_dev():
 
+                pci_iounmap(pdev, solo_dev->reg_base);
+                if (pdev->irq)
+                        free_irq(pdev->irq, solo_dev);
 
+So, what happens if you receive an IRQ (possibly shared by other PCI
+devices) but you've unmapped the registers?
 
-The following changes since commit 272b98c6455f00884f0350f775c5342358ebb73f:
+        status = solo_reg_read(solo_dev, SOLO_IRQ_STAT);
+        if (!status)
+                return IRQ_NONE;
 
-  Linux 3.12-rc1 (2013-09-16 16:17:51 -0400)
+where solo_reg_read() does this:
+        ret = readl(solo_dev->reg_base + reg);
 
-are available in the git repository at:
+Yep, we try to read from memory we've just unmapped.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/bcousson/linux-omap-dt.git tags/for_3.12-rc2/dts_signed
-
-for you to fetch changes up to 775d2418f309052641d94c896f73dc779cf7ba1b:
-
-  ARM: dts: Fix muxing and regulator for wl12xx on the SDIO bus for blaze (2013-09-18 11:14:42 +0200)
-
-----------------------------------------------------------------
-Fix BBB LDO voltage to avoid HDMI destruction
-Fix OMAP5 wrong attribute
-Fix typo in beagle xM strings
-
-----------------------------------------------------------------
-Felipe Balbi (2):
-      ARM: dts: OMAP5: fix reg property size
-      ARM: dts: OMAP5: fix ocp2scp DTS data
-
-Koen Kooi (1):
-      ARM: dts: am335x-bone*: add DT for BeagleBone Black
-
-Robert Nelson (1):
-      ARM: dts: omap3-beagle-xm: fix string error in compatible property
-
-Tony Lindgren (2):
-      ARM: dts: Fix muxing and regulator for wl12xx on the SDIO bus for pandaboard
-      ARM: dts: Fix muxing and regulator for wl12xx on the SDIO bus for blaze
-
- arch/arm/boot/dts/Makefile                |   1 +
- arch/arm/boot/dts/am335x-bone-common.dtsi | 262 ++++++++++++++++++++++++++++++
- arch/arm/boot/dts/am335x-bone.dts         | 256 +----------------------------
- arch/arm/boot/dts/am335x-boneblack.dts    |  17 ++
- arch/arm/boot/dts/omap3-beagle-xm.dts     |   2 +-
- arch/arm/boot/dts/omap4-panda-common.dtsi |  46 +++++-
- arch/arm/boot/dts/omap4-sdp.dts           |  39 ++++-
- arch/arm/boot/dts/omap5.dtsi              |   7 +-
- 8 files changed, 369 insertions(+), 261 deletions(-)
- create mode 100644 arch/arm/boot/dts/am335x-bone-common.dtsi
- create mode 100644 arch/arm/boot/dts/am335x-boneblack.dts
+It's a driver bug.  Please report this to the driver authors.
