@@ -1,367 +1,276 @@
 From: Sudeep.KarkadaNagesha@arm.com (Sudeep KarkadaNagesha)
-Date: Wed, 18 Sep 2013 17:07:23 +0100
-Subject: [PATCH RFC 3/3] ARM: kernel: support cpu cache information interface
- to userspace via sysfs
+Date: Wed, 18 Sep 2013 17:07:22 +0100
+Subject: [PATCH RFC 2/3] ARM: kernel: add outer cache support for cacheinfo
+ implementation
 In-Reply-To: <1379520443-13857-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
 References: <1379520443-13857-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
-Message-ID: <1379520443-13857-4-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+Message-ID: <1379520443-13857-3-git-send-email-Sudeep.KarkadaNagesha@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
 
-This patch adds initial support for providing processor cache information
-to userspace through sysfs interface. This is based on x86 implementation
-and hence the interface is intended to be fully compatible.
+In order to support outer cache in the cacheinfo infrastructure, a new
+function 'get_info' is added to outer_cache_fns. This function is used
+to get the outer cache information namely: line size, number of ways of
+associativity and number of sets.
 
-A per-cpu array of cache information maintained is used mainly for
-sysfs-related book keeping.
+This patch adds 'get_info' supports to all L2 cache implementations on
+ARM except Marvell's Feroceon L2 cache.
 
 Signed-off-by: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
 ---
- arch/arm/kernel/cacheinfo.c | 316 ++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 316 insertions(+)
+ arch/arm/include/asm/outercache.h | 13 +++++++++++++
+ arch/arm/kernel/cacheinfo.c       | 21 ++++++++++++++++++++-
+ arch/arm/mm/cache-l2x0.c          | 14 ++++++++++++++
+ arch/arm/mm/cache-tauros2.c       | 35 +++++++++++++++++++++++++++++++++++
+ arch/arm/mm/cache-xsc3l2.c        | 15 +++++++++++++++
+ 5 files changed, 97 insertions(+), 1 deletion(-)
 
+diff --git a/arch/arm/include/asm/outercache.h b/arch/arm/include/asm/outercache.h
+index f94784f..1471ff2 100644
+--- a/arch/arm/include/asm/outercache.h
++++ b/arch/arm/include/asm/outercache.h
+@@ -23,7 +23,14 @@
+ 
+ #include <linux/types.h>
+ 
++struct outer_cache_info {
++	unsigned int num_ways;
++	unsigned int num_sets;
++	unsigned int line_size;
++};
++
+ struct outer_cache_fns {
++	void (*get_info)(struct outer_cache_info *info);
+ 	void (*inv_range)(unsigned long, unsigned long);
+ 	void (*clean_range)(unsigned long, unsigned long);
+ 	void (*flush_range)(unsigned long, unsigned long);
+@@ -41,6 +48,11 @@ extern struct outer_cache_fns outer_cache;
+ 
+ #ifdef CONFIG_OUTER_CACHE
+ 
++static inline void outer_get_info(struct outer_cache_info *info)
++{
++	if (outer_cache.get_info)
++		outer_cache.get_info(info);
++}
+ static inline void outer_inv_range(phys_addr_t start, phys_addr_t end)
+ {
+ 	if (outer_cache.inv_range)
+@@ -83,6 +95,7 @@ static inline void outer_resume(void)
+ 
+ #else
+ 
++static inline void outer_get_info(struct outer_cache_info *info) { }
+ static inline void outer_inv_range(phys_addr_t start, phys_addr_t end)
+ { }
+ static inline void outer_clean_range(phys_addr_t start, phys_addr_t end)
 diff --git a/arch/arm/kernel/cacheinfo.c b/arch/arm/kernel/cacheinfo.c
-index 631f070..4cd97f3 100644
+index b8cb00f..631f070 100644
 --- a/arch/arm/kernel/cacheinfo.c
 +++ b/arch/arm/kernel/cacheinfo.c
-@@ -1,5 +1,7 @@
- /*
-  *  ARM cacheinfo support
-+ *  - Processor cache information interface to userspace via sysfs
-+ *  - Based on intel cacheinfo implementation
-  *
-  *  Copyright (C) 2013 ARM Ltd.
-  *  All Rights Reserved
-@@ -14,10 +16,12 @@
- #include <linux/cpu.h>
- #include <linux/device.h>
- #include <linux/init.h>
-+#include <linux/kobject.h>
- #include <linux/of.h>
- #include <linux/sched.h>
+@@ -19,6 +19,7 @@
  #include <linux/slab.h>
  #include <linux/smp.h>
-+#include <linux/sysfs.h>
  
- #include <asm/outercache.h>
++#include <asm/outercache.h>
  #include <asm/processor.h>
-@@ -369,3 +373,315 @@ static void free_cache_attributes(unsigned int cpu)
- 	kfree(per_cpu_cacheinfo(cpu));
- 	per_cpu_cacheinfo(cpu) = NULL;
+ 
+ enum cache_type {
+@@ -288,6 +289,21 @@ static void init_cache_level(unsigned int cpu)
+ 	} while (++level <= MAX_CACHE_LEVEL);
+ 	cache_levels(cpu) = level - 1;
+ 	cache_leaves(cpu) = leaves;
++	if (IS_ENABLED(CONFIG_OUTER_CACHE) && outer_cache.get_info)
++		cache_levels(cpu)++, cache_leaves(cpu)++;
++}
++
++static void __outer_cache_info_init(struct cache_info *this_leaf)
++{
++	struct outer_cache_info info;
++
++	outer_get_info(&info);
++
++	this_leaf->type = CACHE_TYPE_UNIFIED;/* record it as Unified */
++	this_leaf->ways_of_associativity = info.num_ways;
++	this_leaf->number_of_sets = info.num_sets;
++	this_leaf->coherency_line_size = info.line_size;
++	this_leaf->size = info.num_ways * info.num_sets * info.line_size;
+ }
+ 
+ static void cpu_cache_info_init(unsigned int cpu, enum cache_type type,
+@@ -297,7 +313,10 @@ static void cpu_cache_info_init(unsigned int cpu, enum cache_type type,
+ 
+ 	this_leaf = CPU_CACHEINFO_IDX(cpu, index);
+ 	this_leaf->info.level = level;
+-	__cpu_cache_info_init(type, &this_leaf->info);
++	if (type == CACHE_TYPE_NOCACHE)	/* must be outer cache */
++		__outer_cache_info_init(&this_leaf->info);
++	else
++		__cpu_cache_info_init(type, &this_leaf->info);
+ }
+ 
+ static void init_cache_leaves(unsigned int cpu)
+diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+index 447da6f..6f0d1fc 100644
+--- a/arch/arm/mm/cache-l2x0.c
++++ b/arch/arm/mm/cache-l2x0.c
+@@ -182,6 +182,15 @@ static void l2x0_inv_all(void)
+ 	raw_spin_unlock_irqrestore(&l2x0_lock, flags);
+ }
+ 
++static void l2x0_getinfo(struct outer_cache_info *info)
++{
++	if (!info)
++		return;
++	info->num_ways = get_count_order(l2x0_way_mask);
++	info->line_size = CACHE_LINE_SIZE;
++	info->num_sets = l2x0_size / (info->num_ways * CACHE_LINE_SIZE);
++}
++
+ static void l2x0_inv_range(unsigned long start, unsigned long end)
+ {
+ 	void __iomem *base = l2x0_base;
+@@ -415,6 +424,7 @@ void __init l2x0_init(void __iomem *base, u32 aux_val, u32 aux_mask)
+ 		outer_cache.flush_all = l2x0_flush_all;
+ 		outer_cache.inv_all = l2x0_inv_all;
+ 		outer_cache.disable = l2x0_disable;
++		outer_cache.get_info = l2x0_getinfo;
+ 	}
+ 
+ 	pr_info("%s cache controller enabled\n", type);
+@@ -865,6 +875,7 @@ static const struct l2x0_of_data pl310_data = {
+ 		.flush_all   = l2x0_flush_all,
+ 		.inv_all     = l2x0_inv_all,
+ 		.disable     = l2x0_disable,
++		.get_info    = l2x0_getinfo,
+ 	},
+ };
+ 
+@@ -880,6 +891,7 @@ static const struct l2x0_of_data l2x0_data = {
+ 		.flush_all   = l2x0_flush_all,
+ 		.inv_all     = l2x0_inv_all,
+ 		.disable     = l2x0_disable,
++		.get_info    = l2x0_getinfo,
+ 	},
+ };
+ 
+@@ -895,6 +907,7 @@ static const struct l2x0_of_data aurora_with_outer_data = {
+ 		.flush_all   = l2x0_flush_all,
+ 		.inv_all     = l2x0_inv_all,
+ 		.disable     = l2x0_disable,
++		.get_info    = l2x0_getinfo,
+ 	},
+ };
+ 
+@@ -918,6 +931,7 @@ static const struct l2x0_of_data bcm_l2x0_data = {
+ 		.flush_all   = l2x0_flush_all,
+ 		.inv_all     = l2x0_inv_all,
+ 		.disable     = l2x0_disable,
++		.get_info    = l2x0_getinfo,
+ 	},
+ };
+ 
+diff --git a/arch/arm/mm/cache-tauros2.c b/arch/arm/mm/cache-tauros2.c
+index 1be0f4e..3a43401 100644
+--- a/arch/arm/mm/cache-tauros2.c
++++ b/arch/arm/mm/cache-tauros2.c
+@@ -60,6 +60,7 @@ static inline void tauros2_inv_pa(unsigned long addr)
+  * noninclusive.
+  */
+ #define CACHE_LINE_SIZE		32
++#define CACHE_LINE_SHIFT	5
+ 
+ static void tauros2_inv_range(unsigned long start, unsigned long end)
+ {
+@@ -131,6 +132,38 @@ static void tauros2_resume(void)
+ 	"mcr	p15, 0, %0, c1, c0, 0 @Enable L2 Cache\n\t"
+ 	: : "r" (0x0));
  }
 +
-+#ifdef CONFIG_SYSFS
++/*
++ *  +----------------------------------------+
++ *  | 11 10 9  8 | 7  6  5  4  3 | 2 |  1  0 |
++ *  +----------------------------------------+
++ *  |  way size  | associativity | - |line_sz|
++ *  +----------------------------------------+
++ */
++#define L2CTR_ASSOCIAT_SHIFT	3
++#define L2CTR_ASSOCIAT_MASK	0x1F
++#define L2CTR_WAYSIZE_SHIFT	8
++#define L2CTR_WAYSIZE_MASK	0xF
++#define CACHE_WAY_PER_SET(l2ctr)	\
++	(((l2_ctr) >> L2CTR_ASSOCIAT_SHIFT) & L2CTR_ASSOCIAT_MASK)
++#define CACHE_WAY_SIZE(l2ctr)		\
++	(8192 << (((l2ctr) >> L2CTR_WAYSIZE_SHIFT) & L2CTR_WAYSIZE_MASK))
++#define CACHE_SET_SIZE(l2ctr)	(CACHE_WAY_SIZE(l2ctr) >> CACHE_LINE_SHIFT)
 +
-+struct cache_attr {
-+	struct attribute attr;
-+	 ssize_t(*show) (struct cpu_cacheinfo *, char *, unsigned int);
-+	 ssize_t(*store) (struct cpu_cacheinfo *, const char *, size_t count,
-+			  unsigned int);
-+};
-+
-+/* pointer to kobject for cpuX/cache */
-+static DEFINE_PER_CPU(struct kobject *, ci_cache_kobject);
-+#define per_cpu_cache_kobject(cpu)     (per_cpu(ci_cache_kobject, cpu))
-+
-+struct index_kobject {
-+	struct kobject kobj;
-+	unsigned int cpu;
-+	unsigned short index;
-+};
-+
-+static cpumask_t cache_dev_map;
-+
-+/* pointer to array of kobjects for cpuX/cache/indexY */
-+static DEFINE_PER_CPU(struct index_kobject *, ci_index_kobject);
-+#define per_cpu_index_kobject(cpu)     (per_cpu(ci_index_kobject, cpu))
-+#define INDEX_KOBJECT_PTR(cpu, idx)    (&((per_cpu_index_kobject(cpu))[idx]))
-+
-+#define show_one_plus(file_name, object)				\
-+static ssize_t show_##file_name(struct cpu_cacheinfo *this_leaf,	\
-+				char *buf, unsigned int cpu)	    \
-+{								      \
-+	return sprintf(buf, "%lu\n", (unsigned long)this_leaf->object); \
-+}
-+
-+show_one_plus(level, info.level);
-+show_one_plus(coherency_line_size, info.coherency_line_size);
-+show_one_plus(ways_of_associativity, info.ways_of_associativity);
-+show_one_plus(number_of_sets, info.number_of_sets);
-+
-+static ssize_t show_size(struct cpu_cacheinfo *this_leaf, char *buf,
-+			 unsigned int cpu)
++static void tauros2_getinfo(struct outer_cache_info *info)
 +{
-+	return sprintf(buf, "%dK\n", this_leaf->info.size / 1024);
-+}
++	unsigned int l2_ctr;
 +
-+static ssize_t show_shared_cpu_map_func(struct cpu_cacheinfo *this_leaf,
-+					int type, char *buf)
-+{
-+	ptrdiff_t len = PTR_ALIGN(buf + PAGE_SIZE - 1, PAGE_SIZE) - buf;
-+	int n = 0;
-+
-+	if (len > 1) {
-+		const struct cpumask *mask = &this_leaf->shared_cpu_map;
-+		n = type ?
-+		    cpulist_scnprintf(buf, len - 2, mask) :
-+		    cpumask_scnprintf(buf, len - 2, mask);
-+		buf[n++] = '\n';
-+		buf[n] = '\0';
-+	}
-+	return n;
-+}
-+
-+static inline ssize_t show_shared_cpu_map(struct cpu_cacheinfo *leaf, char *buf,
-+					  unsigned int cpu)
-+{
-+	return show_shared_cpu_map_func(leaf, 0, buf);
-+}
-+
-+static inline ssize_t show_shared_cpu_list(struct cpu_cacheinfo *leaf,
-+					   char *buf, unsigned int cpu)
-+{
-+	return show_shared_cpu_map_func(leaf, 1, buf);
-+}
-+
-+static ssize_t show_type(struct cpu_cacheinfo *this_leaf, char *buf,
-+			 unsigned int cpu)
-+{
-+	switch (this_leaf->info.type) {
-+	case CACHE_TYPE_DATA:
-+		return sprintf(buf, "Data\n");
-+	case CACHE_TYPE_INST:
-+		return sprintf(buf, "Instruction\n");
-+	case CACHE_TYPE_UNIFIED:
-+		return sprintf(buf, "Unified\n");
-+	default:
-+		return sprintf(buf, "Unknown\n");
-+	}
-+}
-+
-+#define to_object(k)   container_of(k, struct index_kobject, kobj)
-+#define to_attr(a)     container_of(a, struct cache_attr, attr)
-+
-+#define define_one_ro(_name) \
-+static struct cache_attr _name = \
-+	__ATTR(_name, 0444, show_##_name, NULL)
-+
-+define_one_ro(level);
-+define_one_ro(type);
-+define_one_ro(coherency_line_size);
-+define_one_ro(ways_of_associativity);
-+define_one_ro(number_of_sets);
-+define_one_ro(size);
-+define_one_ro(shared_cpu_map);
-+define_one_ro(shared_cpu_list);
-+
-+static struct attribute *default_attrs[] = {
-+	&type.attr,
-+	&level.attr,
-+	&coherency_line_size.attr,
-+	&ways_of_associativity.attr,
-+	&number_of_sets.attr,
-+	&size.attr,
-+	&shared_cpu_map.attr,
-+	&shared_cpu_list.attr,
-+	NULL
-+};
-+
-+static ssize_t show(struct kobject *kobj, struct attribute *attr, char *buf)
-+{
-+	struct cache_attr *fattr = to_attr(attr);
-+	struct index_kobject *this_leaf = to_object(kobj);
-+	ssize_t ret;
-+
-+	ret = fattr->show ?
-+	    fattr->show(CPU_CACHEINFO_IDX(this_leaf->cpu, this_leaf->index),
-+			buf, this_leaf->cpu) : 0;
-+	return ret;
-+}
-+
-+static ssize_t store(struct kobject *kobj, struct attribute *attr,
-+		     const char *buf, size_t count)
-+{
-+	struct cache_attr *fattr = to_attr(attr);
-+	struct index_kobject *leaf_ptr = to_object(kobj);
-+	ssize_t ret;
-+
-+	ret = fattr->store ?
-+	    fattr->store(CPU_CACHEINFO_IDX(leaf_ptr->cpu, leaf_ptr->index),
-+			 buf, count, leaf_ptr->cpu) : 0;
-+	return ret;
-+}
-+
-+static const struct sysfs_ops sysfs_ops = {
-+	.show = show,
-+	.store = store,
-+};
-+
-+static struct kobj_type ktype_cache = {
-+	.sysfs_ops = &sysfs_ops,
-+	.default_attrs = default_attrs,
-+};
-+
-+static struct kobj_type ktype_percpu_entry = {
-+	.sysfs_ops = &sysfs_ops,
-+};
-+
-+static void cpu_cache_sysfs_exit(unsigned int cpu)
-+{
-+	kfree(per_cpu_cache_kobject(cpu));
-+	kfree(per_cpu_index_kobject(cpu));
-+	per_cpu_cache_kobject(cpu) = NULL;
-+	per_cpu_index_kobject(cpu) = NULL;
-+}
-+
-+static int cpu_cache_sysfs_init(unsigned int cpu)
-+{
-+	if (per_cpu_cacheinfo(cpu) == NULL)
-+		return -ENOENT;
-+
-+	/* Allocate all required memory */
-+	per_cpu_cache_kobject(cpu) =
-+	    kzalloc(sizeof(struct kobject), GFP_KERNEL);
-+	if (unlikely(per_cpu_cache_kobject(cpu) == NULL))
-+		goto err_out;
-+
-+	per_cpu_index_kobject(cpu) =
-+	    kzalloc(sizeof(struct index_kobject) * cache_leaves(cpu),
-+		    GFP_KERNEL);
-+	if (unlikely(per_cpu_index_kobject(cpu) == NULL))
-+		goto err_out;
-+
-+	return 0;
-+
-+err_out:
-+	cpu_cache_sysfs_exit(cpu);
-+	return -ENOMEM;
-+}
-+
-+static void _detect_cache_attributes(void *_retval)
-+{
-+	int cpu = smp_processor_id();
-+	*(int *)_retval = detect_cache_attributes(cpu);
-+}
-+
-+/* Add/Remove cache interface for CPU device */
-+static int cache_add_dev(struct device *dev)
-+{
-+	unsigned int cpu = dev->id;
-+	unsigned long i, j;
-+	struct index_kobject *this_object;
-+	int retval;
-+
-+	smp_call_function_single(cpu, _detect_cache_attributes, &retval, true);
-+	if (retval) {
-+		pr_err("error populating cacheinfo..cpu%d\n", cpu);
-+		return retval;
-+	}
-+	retval = cpu_cache_sysfs_init(cpu);
-+	if (unlikely(retval < 0))
-+		return retval;
-+
-+	retval = kobject_init_and_add(per_cpu_cache_kobject(cpu),
-+				      &ktype_percpu_entry,
-+				      &dev->kobj, "%s", "cache");
-+	if (retval < 0) {
-+		cpu_cache_sysfs_exit(cpu);
-+		return retval;
-+	}
-+
-+	for (i = 0; i < cache_leaves(cpu); i++) {
-+		this_object = INDEX_KOBJECT_PTR(cpu, i);
-+		this_object->cpu = cpu;
-+		this_object->index = i;
-+
-+		retval = kobject_init_and_add(&(this_object->kobj),
-+					      &ktype_cache,
-+					      per_cpu_cache_kobject(cpu),
-+					      "index%1lu", i);
-+		if (unlikely(retval)) {
-+			for (j = 0; j < i; j++)
-+				kobject_put(&(INDEX_KOBJECT_PTR(cpu, j)->kobj));
-+			kobject_put(per_cpu_cache_kobject(cpu));
-+			cpu_cache_sysfs_exit(cpu);
-+			return retval;
-+		}
-+		kobject_uevent(&(this_object->kobj), KOBJ_ADD);
-+	}
-+	cpumask_set_cpu(cpu, &cache_dev_map);
-+
-+	kobject_uevent(per_cpu_cache_kobject(cpu), KOBJ_ADD);
-+	return 0;
-+}
-+
-+static void cache_remove_dev(struct device *dev)
-+{
-+	unsigned int cpu = dev->id;
-+	unsigned long i;
-+
-+	if (!cpumask_test_cpu(cpu, &cache_dev_map))
++	if (!info)
 +		return;
-+	cpumask_clear_cpu(cpu, &cache_dev_map);
 +
-+	for (i = 0; i < cache_leaves(cpu); i++)
-+		kobject_put(&(INDEX_KOBJECT_PTR(cpu, i)->kobj));
-+	kobject_put(per_cpu_cache_kobject(cpu));
-+	cpu_cache_sysfs_exit(cpu);
++	__asm__("mrc p15, 1, %0, c0, c0, 1" : "=r" (l2_ctr));
 +
-+	free_cache_attributes(cpu);
++	info->line_size = CACHE_LINE_SIZE;
++	info->num_ways = CACHE_WAY_PER_SET(l2_ctr);
++	info->num_sets = CACHE_SET_SIZE(l2_ctr);
 +}
 +
-+static int cacheinfo_cpu_callback(struct notifier_block *nfb,
-+				  unsigned long action, void *hcpu)
+ #endif
+ 
+ static inline u32 __init read_extra_features(void)
+@@ -226,6 +259,7 @@ static void __init tauros2_internal_init(unsigned int features)
+ 		outer_cache.flush_range = tauros2_flush_range;
+ 		outer_cache.disable = tauros2_disable;
+ 		outer_cache.resume = tauros2_resume;
++		outer_cache.get_info = tauros2_getinfo;
+ 	}
+ #endif
+ 
+@@ -253,6 +287,7 @@ static void __init tauros2_internal_init(unsigned int features)
+ 		outer_cache.flush_range = tauros2_flush_range;
+ 		outer_cache.disable = tauros2_disable;
+ 		outer_cache.resume = tauros2_resume;
++		outer_cache.get_info = tauros2_getinfo;
+ 	}
+ #endif
+ 
+diff --git a/arch/arm/mm/cache-xsc3l2.c b/arch/arm/mm/cache-xsc3l2.c
+index 6c3edeb..353c642 100644
+--- a/arch/arm/mm/cache-xsc3l2.c
++++ b/arch/arm/mm/cache-xsc3l2.c
+@@ -201,6 +201,20 @@ static void xsc3_l2_flush_range(unsigned long start, unsigned long end)
+ 	dsb();
+ }
+ 
++static void xsc3_l2_getinfo(struct outer_cache_info *info)
 +{
-+	unsigned int cpu = (unsigned long)hcpu;
-+	struct device *dev = get_cpu_device(cpu);
-+	int ret;
++	unsigned long l2ctype;
 +
-+	switch (action) {
-+	case CPU_ONLINE:
-+	case CPU_ONLINE_FROZEN:
-+		ret = cache_add_dev(dev);
-+		if (ret)
-+			/* must not fail so can't use NOTIFY_BAD */
-+			return NOTIFY_STOP;
-+		break;
-+	case CPU_DEAD:
-+	case CPU_DEAD_FROZEN:
-+		cache_remove_dev(dev);
-+		break;
-+	}
-+	return NOTIFY_OK;
++	if (!info)
++		return;
++
++	__asm__("mrc p15, 1, %0, c0, c0, 1" : "=r" (l2ctype));
++
++	info->num_ways = CACHE_WAY_PER_SET;
++	info->line_size = CACHE_LINE_SIZE;
++	info->num_sets = CACHE_SET_SIZE(l2ctype);
 +}
 +
-+static struct notifier_block cacheinfo_cpu_notifier = {
-+	.notifier_call = cacheinfo_cpu_callback,
-+};
-+
-+static int __init cache_info_init(void)
-+{
-+	int cpu;
-+
-+	for_each_online_cpu(cpu) {
-+		int ret;
-+		struct device *dev = get_cpu_device(cpu);
-+		if (!dev) {
-+			pr_err("No cpu device for CPU %d..skipping\n", cpu);
-+			return -ENODEV;
-+		}
-+
-+		ret = cache_add_dev(dev);
-+		if (ret) {
-+			pr_err("error populating cacheinfo..cpu%d\n", cpu);
-+			return ret;
-+		}
-+	}
-+	register_hotcpu_notifier(&cacheinfo_cpu_notifier);
-+	return 0;
-+}
-+
-+device_initcall(cache_info_init);
-+
-+#endif /* CONFIG_SYSFS */
+ static int __init xsc3_l2_init(void)
+ {
+ 	if (!cpu_is_xsc3() || !xsc3_l2_present())
+@@ -213,6 +227,7 @@ static int __init xsc3_l2_init(void)
+ 		outer_cache.inv_range = xsc3_l2_inv_range;
+ 		outer_cache.clean_range = xsc3_l2_clean_range;
+ 		outer_cache.flush_range = xsc3_l2_flush_range;
++		outer_cache.get_info    = xsc3_l2_getinfo;
+ 	}
+ 
+ 	return 0;
 -- 
 1.8.1.2
