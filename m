@@ -1,29 +1,30 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 18 Sep 2013 13:14:34 +0100
-Subject: [PATCH 37/41] ARM: ux500: Remove AUXDATA relating to Ethernet
- clock-name bindings
+Date: Wed, 18 Sep 2013 13:14:15 +0100
+Subject: [PATCH 18/41] ARM: ux500: Supply the TWD Timer clock lookup to the
+ DBX500 DT
 In-Reply-To: <1379506478-16625-1-git-send-email-lee.jones@linaro.org>
 References: <1379506478-16625-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1379506478-16625-38-git-send-email-lee.jones@linaro.org>
+Message-ID: <1379506478-16625-19-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/mach-ux500/cpu-db8500.c | 1 -
- 1 file changed, 1 deletion(-)
+ arch/arm/boot/dts/dbx5x0.dtsi | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/mach-ux500/cpu-db8500.c b/arch/arm/mach-ux500/cpu-db8500.c
-index 7e32c7b..689d3a8 100644
---- a/arch/arm/mach-ux500/cpu-db8500.c
-+++ b/arch/arm/mach-ux500/cpu-db8500.c
-@@ -235,7 +235,6 @@ static struct of_dev_auxdata u8500_auxdata_lookup[] __initdata = {
- 	/* Requires clock name bindings. */
- 	OF_DEV_AUXDATA("stericsson,db8500-prcmu", 0x80157000, "db8500-prcmu",
- 			&db8500_prcmu_pdata),
--	OF_DEV_AUXDATA("smsc,lan9115", 0x50000000, "smsc911x.0", NULL),
- 	OF_DEV_AUXDATA("stericsson,ux500-cryp", 0xa03cb000, "cryp1", NULL),
- 	OF_DEV_AUXDATA("stericsson,ux500-hash", 0xa03c2000, "hash1", NULL),
- 	OF_DEV_AUXDATA("stericsson,snd-soc-mop500", 0, "snd-soc-mop500.0",
+diff --git a/arch/arm/boot/dts/dbx5x0.dtsi b/arch/arm/boot/dts/dbx5x0.dtsi
+index 9adc4e5..5c3ff94 100644
+--- a/arch/arm/boot/dts/dbx5x0.dtsi
++++ b/arch/arm/boot/dts/dbx5x0.dtsi
+@@ -71,6 +71,8 @@
+ 			compatible = "arm,cortex-a9-twd-timer";
+ 			reg = <0xa0410600 0x20>;
+ 			interrupts = <1 13 0x304>; /* IRQ level high per-CPU */
++
++			clocks = <&smp_twd_clk>;
+ 		};
+ 
+ 		rtc at 80154000 {
 -- 
 1.8.1.2
