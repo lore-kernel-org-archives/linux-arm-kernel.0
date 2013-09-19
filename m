@@ -1,136 +1,46 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 19 Sep 2013 19:40:48 +0200
-Subject: [PATCH] phy/micrel: Add suspend/resume support to Micrel PHYs
-Message-ID: <1379612448-20805-1-git-send-email-nicolas.ferre@atmel.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 19 Sep 2013 10:48:58 -0700
+Subject: [GIT PULL] DaVinci fixes for v3.12-rc
+In-Reply-To: <523AD060.8000504@ti.com>
+References: <523AD060.8000504@ti.com>
+Message-ID: <CAOesGMg_L-0kqY2oexV=WY4mEWpCQdAej_h8QGxrtCgC=xSijg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Patrice Vilchez <patrice.vilchez@atmel.com>
+Hi Sekhar,
 
-All supported Micrel PHYs implement the standard "power down" bit 11 of BMCR,
-so this patch adds support using the generic genphy_{suspend,resume} functions.
+On Thu, Sep 19, 2013 at 3:22 AM, Sekhar Nori <nsekhar@ti.com> wrote:
+> The following changes since commit 272b98c6455f00884f0350f775c5342358ebb73f:
+>
+>   Linux 3.12-rc1 (2013-09-16 16:17:51 -0400)
+>
+> are available in the git repository at:
+>
+>   git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-fixes-for-v3.12-rc2
+>
+> for you to fetch changes up to caf9269f883bf0d5b83384efb96e2aa572d1d013:
+>
+>   ARM: edma: dt: create unused channel list (2013-09-19 15:13:32 +0530)
+>
+> ----------------------------------------------------------------
+> DaVinci fixes for v3.12-rc2
+> ---------------------------
+>
+> This pull request includes:
+>
+> 1) A patch to fix build breakage with DEBUG_LL
+> 2) A patch to quell a build-time warning.
+> 3) A patch to complete the DT support for EDMA. Without
+>    this patch, the DT support for EDMA cannot be used.
+>    There are no in-tree DT users of EDMA currently but
+>    nevertheless the patch fixes a previously incomplete
+>    implementation.
 
-Signed-off-by: Patrice Vilchez <patrice.vilchez@atmel.com>
-[b.brezillon at overkiz.com: adapt to newer kernel and generalize to other phys]
-Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
-[nicolas.ferre at atmel.com: commit message modification]
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-Cc: David J. Choi <david.choi@micrel.com>
----
- drivers/net/phy/micrel.c | 24 ++++++++++++++++++++++++
- 1 file changed, 24 insertions(+)
+Finishing incomplete work is not a fix, especially if the users aren't
+in-tree. The other patches are just fine to include though.
 
-diff --git a/drivers/net/phy/micrel.c b/drivers/net/phy/micrel.c
-index c31aad0..3ae28f4 100644
---- a/drivers/net/phy/micrel.c
-+++ b/drivers/net/phy/micrel.c
-@@ -287,6 +287,8 @@ static struct phy_driver ksphy_driver[] = {
- 	.read_status	= genphy_read_status,
- 	.ack_interrupt	= kszphy_ack_interrupt,
- 	.config_intr	= ks8737_config_intr,
-+	.suspend	= genphy_suspend,
-+	.resume		= genphy_resume,
- 	.driver		= { .owner = THIS_MODULE,},
- }, {
- 	.phy_id		= PHY_ID_KSZ8021,
-@@ -300,6 +302,8 @@ static struct phy_driver ksphy_driver[] = {
- 	.read_status	= genphy_read_status,
- 	.ack_interrupt	= kszphy_ack_interrupt,
- 	.config_intr	= kszphy_config_intr,
-+	.suspend	= genphy_suspend,
-+	.resume		= genphy_resume,
- 	.driver		= { .owner = THIS_MODULE,},
- }, {
- 	.phy_id		= PHY_ID_KSZ8031,
-@@ -313,6 +317,8 @@ static struct phy_driver ksphy_driver[] = {
- 	.read_status	= genphy_read_status,
- 	.ack_interrupt	= kszphy_ack_interrupt,
- 	.config_intr	= kszphy_config_intr,
-+	.suspend	= genphy_suspend,
-+	.resume		= genphy_resume,
- 	.driver		= { .owner = THIS_MODULE,},
- }, {
- 	.phy_id		= PHY_ID_KSZ8041,
-@@ -326,6 +332,8 @@ static struct phy_driver ksphy_driver[] = {
- 	.read_status	= genphy_read_status,
- 	.ack_interrupt	= kszphy_ack_interrupt,
- 	.config_intr	= kszphy_config_intr,
-+	.suspend	= genphy_suspend,
-+	.resume		= genphy_resume,
- 	.driver		= { .owner = THIS_MODULE,},
- }, {
- 	.phy_id		= PHY_ID_KSZ8051,
-@@ -339,6 +347,8 @@ static struct phy_driver ksphy_driver[] = {
- 	.read_status	= genphy_read_status,
- 	.ack_interrupt	= kszphy_ack_interrupt,
- 	.config_intr	= kszphy_config_intr,
-+	.suspend	= genphy_suspend,
-+	.resume		= genphy_resume,
- 	.driver		= { .owner = THIS_MODULE,},
- }, {
- 	.phy_id		= PHY_ID_KSZ8001,
-@@ -351,6 +361,8 @@ static struct phy_driver ksphy_driver[] = {
- 	.read_status	= genphy_read_status,
- 	.ack_interrupt	= kszphy_ack_interrupt,
- 	.config_intr	= kszphy_config_intr,
-+	.suspend	= genphy_suspend,
-+	.resume		= genphy_resume,
- 	.driver		= { .owner = THIS_MODULE,},
- }, {
- 	.phy_id		= PHY_ID_KSZ8081,
-@@ -363,6 +375,8 @@ static struct phy_driver ksphy_driver[] = {
- 	.read_status	= genphy_read_status,
- 	.ack_interrupt	= kszphy_ack_interrupt,
- 	.config_intr	= kszphy_config_intr,
-+	.suspend	= genphy_suspend,
-+	.resume		= genphy_resume,
- 	.driver		= { .owner = THIS_MODULE,},
- }, {
- 	.phy_id		= PHY_ID_KSZ8061,
-@@ -375,6 +389,8 @@ static struct phy_driver ksphy_driver[] = {
- 	.read_status	= genphy_read_status,
- 	.ack_interrupt	= kszphy_ack_interrupt,
- 	.config_intr	= kszphy_config_intr,
-+	.suspend	= genphy_suspend,
-+	.resume		= genphy_resume,
- 	.driver		= { .owner = THIS_MODULE,},
- }, {
- 	.phy_id		= PHY_ID_KSZ9021,
-@@ -387,6 +403,8 @@ static struct phy_driver ksphy_driver[] = {
- 	.read_status	= genphy_read_status,
- 	.ack_interrupt	= kszphy_ack_interrupt,
- 	.config_intr	= ksz9021_config_intr,
-+	.suspend	= genphy_suspend,
-+	.resume		= genphy_resume,
- 	.driver		= { .owner = THIS_MODULE, },
- }, {
- 	.phy_id		= PHY_ID_KSZ9031,
-@@ -400,6 +418,8 @@ static struct phy_driver ksphy_driver[] = {
- 	.read_status	= genphy_read_status,
- 	.ack_interrupt	= kszphy_ack_interrupt,
- 	.config_intr	= ksz9021_config_intr,
-+	.suspend	= genphy_suspend,
-+	.resume		= genphy_resume,
- 	.driver		= { .owner = THIS_MODULE, },
- }, {
- 	.phy_id		= PHY_ID_KSZ8873MLL,
-@@ -410,6 +430,8 @@ static struct phy_driver ksphy_driver[] = {
- 	.config_init	= kszphy_config_init,
- 	.config_aneg	= ksz8873mll_config_aneg,
- 	.read_status	= ksz8873mll_read_status,
-+	.suspend	= genphy_suspend,
-+	.resume		= genphy_resume,
- 	.driver		= { .owner = THIS_MODULE, },
- }, {
- 	.phy_id		= PHY_ID_KSZ886X,
-@@ -420,6 +442,8 @@ static struct phy_driver ksphy_driver[] = {
- 	.config_init	= kszphy_config_init,
- 	.config_aneg	= genphy_config_aneg,
- 	.read_status	= genphy_read_status,
-+	.suspend	= genphy_suspend,
-+	.resume		= genphy_resume,
- 	.driver		= { .owner = THIS_MODULE, },
- } };
- 
--- 
-1.8.2.2
+Want to rebuild the branch (and stage the EDMA work for 3.13), or
+should I pick the patches into branches at our end? Your choice.
+
+
+-Olof
