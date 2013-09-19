@@ -1,81 +1,86 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Fri, 20 Sep 2013 00:11:38 +0100
-Subject: [PATCH 39/51] DMA-API: others: use dma_set_coherent_mask()
+Date: Thu, 19 Sep 2013 22:47:01 +0100
+Subject: [PATCH 22/51] DMA-API: amba: get rid of separate dma_mask
 In-Reply-To: <20130919212235.GD12758@n2100.arm.linux.org.uk>
 References: <20130919212235.GD12758@n2100.arm.linux.org.uk>
-Message-ID: <E1VMnNq-0007s4-HN@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1VMm3x-0007hp-Lv@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The correct way for a driver to specify the coherent DMA mask is
-not to directly access the field in the struct device, but to use
-dma_set_coherent_mask().  Only arch and bus code should access this
-member directly.
-
-Convert all direct write accesses to using the correct API.
+AMBA Primecell devices always treat streaming and coherent DMA exactly
+the same, so there's no point in having the masks separated.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/ata/pata_ixp4xx_cf.c             |    5 ++++-
- drivers/gpu/drm/exynos/exynos_drm_drv.c  |    6 +++++-
- drivers/gpu/drm/omapdrm/omap_dmm_tiler.c |    5 +++--
- 3 files changed, 12 insertions(+), 4 deletions(-)
+ drivers/amba/bus.c       |    6 +-----
+ drivers/of/platform.c    |    3 ---
+ include/linux/amba/bus.h |    2 --
+ 3 files changed, 1 insertions(+), 10 deletions(-)
 
-diff --git a/drivers/ata/pata_ixp4xx_cf.c b/drivers/ata/pata_ixp4xx_cf.c
-index 1ec53f8..ddf470c 100644
---- a/drivers/ata/pata_ixp4xx_cf.c
-+++ b/drivers/ata/pata_ixp4xx_cf.c
-@@ -144,6 +144,7 @@ static int ixp4xx_pata_probe(struct platform_device *pdev)
- 	struct ata_host *host;
- 	struct ata_port *ap;
- 	struct ixp4xx_pata_data *data = dev_get_platdata(&pdev->dev);
-+	int ret;
+diff --git a/drivers/amba/bus.c b/drivers/amba/bus.c
+index c670727..c4876ac 100644
+--- a/drivers/amba/bus.c
++++ b/drivers/amba/bus.c
+@@ -552,7 +552,6 @@ amba_aphb_device_add(struct device *parent, const char *name,
+ 	if (!dev)
+ 		return ERR_PTR(-ENOMEM);
  
- 	cs0 = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	cs1 = platform_get_resource(pdev, IORESOURCE_MEM, 1);
-@@ -157,7 +158,9 @@ static int ixp4xx_pata_probe(struct platform_device *pdev)
- 		return -ENOMEM;
- 
- 	/* acquire resources and fill host */
--	pdev->dev.coherent_dma_mask = DMA_BIT_MASK(32);
-+	ret = dma_set_coherent_mask(&pdev->dev, DMA_BIT_MASK(32));
-+	if (ret)
-+		return ret;
- 
- 	data->cs0 = devm_ioremap(&pdev->dev, cs0->start, 0x1000);
- 	data->cs1 = devm_ioremap(&pdev->dev, cs1->start, 0x1000);
-diff --git a/drivers/gpu/drm/exynos/exynos_drm_drv.c b/drivers/gpu/drm/exynos/exynos_drm_drv.c
-index bb82ef7..81192d0 100644
---- a/drivers/gpu/drm/exynos/exynos_drm_drv.c
-+++ b/drivers/gpu/drm/exynos/exynos_drm_drv.c
-@@ -286,7 +286,11 @@ static struct drm_driver exynos_drm_driver = {
- 
- static int exynos_drm_platform_probe(struct platform_device *pdev)
- {
--	pdev->dev.coherent_dma_mask = DMA_BIT_MASK(32);
-+	int ret;
-+
-+	ret = dma_set_coherent_mask(&pdev->dev, DMA_BIT_MASK(32));
-+	if (ret)
-+		return ret;
- 
- 	return drm_platform_init(&exynos_drm_driver, pdev);
+-	dev->dma_mask = dma_mask;
+ 	dev->dev.coherent_dma_mask = dma_mask;
+ 	dev->irq[0] = irq1;
+ 	dev->irq[1] = irq2;
+@@ -619,7 +618,7 @@ static void amba_device_initialize(struct amba_device *dev, const char *name)
+ 		dev_set_name(&dev->dev, "%s", name);
+ 	dev->dev.release = amba_device_release;
+ 	dev->dev.bus = &amba_bustype;
+-	dev->dev.dma_mask = &dev->dma_mask;
++	dev->dev.dma_mask = &dev->dev.coherent_dma_mask;
+ 	dev->res.name = dev_name(&dev->dev);
  }
-diff --git a/drivers/gpu/drm/omapdrm/omap_dmm_tiler.c b/drivers/gpu/drm/omapdrm/omap_dmm_tiler.c
-index acf6678..701c4c1 100644
---- a/drivers/gpu/drm/omapdrm/omap_dmm_tiler.c
-+++ b/drivers/gpu/drm/omapdrm/omap_dmm_tiler.c
-@@ -664,8 +664,9 @@ static int omap_dmm_probe(struct platform_device *dev)
- 	}
  
- 	/* set dma mask for device */
--	/* NOTE: this is a workaround for the hwmod not initializing properly */
--	dev->dev.coherent_dma_mask = DMA_BIT_MASK(32);
-+	ret = dma_set_coherent_mask(&dev->dev, DMA_BIT_MASK(32));
-+	if (ret)
-+		goto fail;
+@@ -663,9 +662,6 @@ int amba_device_register(struct amba_device *dev, struct resource *parent)
+ 	amba_device_initialize(dev, dev->dev.init_name);
+ 	dev->dev.init_name = NULL;
  
- 	omap_dmm->dummy_pa = page_to_phys(omap_dmm->dummy_page);
+-	if (!dev->dev.coherent_dma_mask && dev->dma_mask)
+-		dev_warn(&dev->dev, "coherent dma mask is unset\n");
+-
+ 	return amba_device_add(dev, parent);
+ }
  
+diff --git a/drivers/of/platform.c b/drivers/of/platform.c
+index 9b439ac..54382ba 100644
+--- a/drivers/of/platform.c
++++ b/drivers/of/platform.c
+@@ -284,9 +284,6 @@ static struct amba_device *of_amba_device_create(struct device_node *node,
+ 	else
+ 		of_device_make_bus_id(&dev->dev);
+ 
+-	/* setup amba-specific device info */
+-	dev->dma_mask = ~0;
+-
+ 	/* Allow the HW Peripheral ID to be overridden */
+ 	prop = of_get_property(node, "arm,primecell-periphid", NULL);
+ 	if (prop)
+diff --git a/include/linux/amba/bus.h b/include/linux/amba/bus.h
+index 43ec7e2..682df0e 100644
+--- a/include/linux/amba/bus.h
++++ b/include/linux/amba/bus.h
+@@ -30,7 +30,6 @@ struct amba_device {
+ 	struct device		dev;
+ 	struct resource		res;
+ 	struct clk		*pclk;
+-	u64			dma_mask;
+ 	unsigned int		periphid;
+ 	unsigned int		irq[AMBA_NR_IRQS];
+ };
+@@ -131,7 +130,6 @@ struct amba_device name##_device = {				\
+ struct amba_device name##_device = {				\
+ 	.dev = __AMBA_DEV(busid, data, ~0ULL),			\
+ 	.res = DEFINE_RES_MEM(base, SZ_4K),			\
+-	.dma_mask = ~0ULL,					\
+ 	.irq = irqs,						\
+ 	.periphid = id,						\
+ }
 -- 
 1.7.4.4
