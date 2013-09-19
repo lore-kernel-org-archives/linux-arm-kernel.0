@@ -1,40 +1,97 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Fri, 20 Sep 2013 00:42:06 +0100
-Subject: [PATCH 49/51] ARM: 7796/1: scsi: Use dma_max_pfn(dev) helper for
- bounce_limit calculations
+Date: Fri, 20 Sep 2013 00:13:38 +0100
+Subject: [PATCH 41/51] DMA-API: crypto: remove last references to 'static
+ struct device *dev'
 In-Reply-To: <20130919212235.GD12758@n2100.arm.linux.org.uk>
 References: <20130919212235.GD12758@n2100.arm.linux.org.uk>
-Message-ID: <E1VMnrK-0002Dw-Vk@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1VMnPm-0007sP-Px@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Santosh Shilimkar <santosh.shilimkar@ti.com>
-
-DMA bounce limit is the maximum direct DMA'able memory beyond which
-bounce buffers has to be used to perform dma operations. SCSI driver
-relies on dma_mask but its calculation is based on max_*pfn which
-don't have uniform meaning across architectures. So make use of
-dma_max_pfn() which is expected to return the DMAable maximum pfn
-value across architectures.
-
-Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/scsi/scsi_lib.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+ drivers/crypto/ixp4xx_crypto.c |   13 ++++++++-----
+ 1 files changed, 8 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/scsi/scsi_lib.c b/drivers/scsi/scsi_lib.c
-index d1549b7..7bd7f0d 100644
---- a/drivers/scsi/scsi_lib.c
-+++ b/drivers/scsi/scsi_lib.c
-@@ -1684,7 +1684,7 @@ u64 scsi_calculate_bounce_limit(struct Scsi_Host *shost)
+diff --git a/drivers/crypto/ixp4xx_crypto.c b/drivers/crypto/ixp4xx_crypto.c
+index 8306185..214357e 100644
+--- a/drivers/crypto/ixp4xx_crypto.c
++++ b/drivers/crypto/ixp4xx_crypto.c
+@@ -221,7 +221,6 @@ static int support_aes = 1;
+ #define DRIVER_NAME "ixp4xx_crypto"
  
- 	host_dev = scsi_get_device(shost);
- 	if (host_dev && host_dev->dma_mask)
--		bounce_limit = *host_dev->dma_mask;
-+		bounce_limit = dma_max_pfn(host_dev) << PAGE_SHIFT;
+ static struct platform_device *pdev;
+-static struct device *dev;
  
- 	return bounce_limit;
+ static inline dma_addr_t crypt_virt2phys(struct crypt_ctl *virt)
+ {
+@@ -250,6 +249,7 @@ static inline const struct ix_hash_algo *ix_hash(struct crypto_tfm *tfm)
+ 
+ static int setup_crypt_desc(void)
+ {
++	struct device *dev = &pdev->dev;
+ 	BUILD_BUG_ON(sizeof(struct crypt_ctl) != 64);
+ 	crypt_virt = dma_alloc_coherent(dev,
+ 			NPE_QLEN * sizeof(struct crypt_ctl),
+@@ -350,6 +350,7 @@ static void finish_scattered_hmac(struct crypt_ctl *crypt)
+ 
+ static void one_packet(dma_addr_t phys)
+ {
++	struct device *dev = &pdev->dev;
+ 	struct crypt_ctl *crypt;
+ 	struct ixp_ctx *ctx;
+ 	int failed;
+@@ -419,7 +420,7 @@ static void crypto_done_action(unsigned long arg)
+ 	tasklet_schedule(&crypto_done_tasklet);
  }
+ 
+-static int init_ixp_crypto(void)
++static int init_ixp_crypto(struct device *dev)
+ {
+ 	int ret = -ENODEV;
+ 	u32 msg[2] = { 0, 0 };
+@@ -506,7 +507,7 @@ static int init_ixp_crypto(void)
+ 	return ret;
+ }
+ 
+-static void release_ixp_crypto(void)
++static void release_ixp_crypto(struct device *dev)
+ {
+ 	qmgr_disable_irq(RECV_QID);
+ 	tasklet_kill(&crypto_done_tasklet);
+@@ -873,6 +874,7 @@ static int ablk_perform(struct ablkcipher_request *req, int encrypt)
+ 	enum dma_data_direction src_direction = DMA_BIDIRECTIONAL;
+ 	struct ablk_ctx *req_ctx = ablkcipher_request_ctx(req);
+ 	struct buffer_desc src_hook;
++	struct device *dev = &pdev->dev;
+ 	gfp_t flags = req->base.flags & CRYPTO_TFM_REQ_MAY_SLEEP ?
+ 				GFP_KERNEL : GFP_ATOMIC;
+ 
+@@ -997,6 +999,7 @@ static int aead_perform(struct aead_request *req, int encrypt,
+ 	unsigned int cryptlen;
+ 	struct buffer_desc *buf, src_hook;
+ 	struct aead_ctx *req_ctx = aead_request_ctx(req);
++	struct device *dev = &pdev->dev;
+ 	gfp_t flags = req->base.flags & CRYPTO_TFM_REQ_MAY_SLEEP ?
+ 				GFP_KERNEL : GFP_ATOMIC;
+ 
+@@ -1426,7 +1429,7 @@ static int __init ixp_module_init(void)
+ 	spin_lock_init(&desc_lock);
+ 	spin_lock_init(&emerg_lock);
+ 
+-	err = init_ixp_crypto();
++	err = init_ixp_crypto(&pdev->dev);
+ 	if (err) {
+ 		platform_device_unregister(pdev);
+ 		return err;
+@@ -1492,7 +1495,7 @@ static void __exit ixp_module_exit(void)
+ 		if (ixp4xx_algos[i].registered)
+ 			crypto_unregister_alg(&ixp4xx_algos[i].crypto);
+ 	}
+-	release_ixp_crypto();
++	release_ixp_crypto(&pdev->dev);
+ 	platform_device_unregister(pdev);
+ }
+ 
 -- 
 1.7.4.4
