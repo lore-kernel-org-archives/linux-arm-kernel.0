@@ -1,55 +1,60 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Fri, 20 Sep 2013 00:40:06 +0100
-Subject: [PATCH 47/51] ARM: 7794/1: block: Rename parameter dma_mask to
- max_addr for blk_queue_bounce_limit()
+Date: Fri, 20 Sep 2013 00:17:39 +0100
+Subject: [PATCH 45/51] DMA-API: firmware/google/gsmi.c: avoid direct access
+ to DMA masks
 In-Reply-To: <20130919212235.GD12758@n2100.arm.linux.org.uk>
 References: <20130919212235.GD12758@n2100.arm.linux.org.uk>
-Message-ID: <E1VMnpO-0001Kt-E7@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1VMnTf-0007ss-9q@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Santosh Shilimkar <santosh.shilimkar@ti.com>
+This driver doesn't need to directly access DMA masks if it uses the
+platform_device_register_full() API rather than
+platform_device_register_simple() - the former function can initialize
+the DMA mask appropriately.
 
-The blk_queue_bounce_limit() API parameter 'dma_mask' is actually the
-maximum address the device can handle rather than a dma_mask. Rename
-it accordingly to avoid it being interpreted as dma_mask.
-
-No functional change.
-
-The idea is to fix the bad assumptions about dma_mask wherever it could
-be miss-interpreted.
-
-Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- block/blk-settings.c |    8 ++++----
- 1 files changed, 4 insertions(+), 4 deletions(-)
+ drivers/firmware/google/gsmi.c |   13 ++++++++-----
+ 1 files changed, 8 insertions(+), 5 deletions(-)
 
-diff --git a/block/blk-settings.c b/block/blk-settings.c
-index c50ecf0..026c151 100644
---- a/block/blk-settings.c
-+++ b/block/blk-settings.c
-@@ -195,17 +195,17 @@ EXPORT_SYMBOL(blk_queue_make_request);
- /**
-  * blk_queue_bounce_limit - set bounce buffer limit for queue
-  * @q: the request queue for the device
-- * @dma_mask: the maximum address the device can handle
-+ * @max_addr: the maximum address the device can handle
-  *
-  * Description:
-  *    Different hardware can have different requirements as to what pages
-  *    it can do I/O directly to. A low level driver can call
-  *    blk_queue_bounce_limit to have lower memory pages allocated as bounce
-- *    buffers for doing I/O to pages residing above @dma_mask.
-+ *    buffers for doing I/O to pages residing above @max_addr.
-  **/
--void blk_queue_bounce_limit(struct request_queue *q, u64 dma_mask)
-+void blk_queue_bounce_limit(struct request_queue *q, u64 max_addr)
- {
--	unsigned long b_pfn = dma_mask >> PAGE_SHIFT;
-+	unsigned long b_pfn = max_addr >> PAGE_SHIFT;
- 	int dma = 0;
+diff --git a/drivers/firmware/google/gsmi.c b/drivers/firmware/google/gsmi.c
+index 6eb535f..e5a67b2 100644
+--- a/drivers/firmware/google/gsmi.c
++++ b/drivers/firmware/google/gsmi.c
+@@ -764,6 +764,13 @@ static __init int gsmi_system_valid(void)
+ static struct kobject *gsmi_kobj;
+ static struct efivars efivars;
  
- 	q->bounce_gfp = GFP_NOIO;
++static const struct platform_device_info gsmi_dev_info = {
++	.name		= "gsmi",
++	.id		= -1,
++	/* SMI callbacks require 32bit addresses */
++	.dma_mask	= DMA_BIT_MASK(32),
++};
++
+ static __init int gsmi_init(void)
+ {
+ 	unsigned long flags;
+@@ -776,7 +783,7 @@ static __init int gsmi_init(void)
+ 	gsmi_dev.smi_cmd = acpi_gbl_FADT.smi_command;
+ 
+ 	/* register device */
+-	gsmi_dev.pdev = platform_device_register_simple("gsmi", -1, NULL, 0);
++	gsmi_dev.pdev = platform_device_register_full(&gsmi_dev_info);
+ 	if (IS_ERR(gsmi_dev.pdev)) {
+ 		printk(KERN_ERR "gsmi: unable to register platform device\n");
+ 		return PTR_ERR(gsmi_dev.pdev);
+@@ -785,10 +792,6 @@ static __init int gsmi_init(void)
+ 	/* SMI access needs to be serialized */
+ 	spin_lock_init(&gsmi_dev.lock);
+ 
+-	/* SMI callbacks require 32bit addresses */
+-	gsmi_dev.pdev->dev.coherent_dma_mask = DMA_BIT_MASK(32);
+-	gsmi_dev.pdev->dev.dma_mask =
+-		&gsmi_dev.pdev->dev.coherent_dma_mask;
+ 	ret = -ENOMEM;
+ 	gsmi_dev.dma_pool = dma_pool_create("gsmi", &gsmi_dev.pdev->dev,
+ 					     GSMI_BUF_SIZE, GSMI_BUF_ALIGN, 0);
 -- 
 1.7.4.4
