@@ -1,36 +1,47 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Thu, 19 Sep 2013 22:51:02 +0100
-Subject: [PATCH 26/51] DMA-API: usb: ohci-sa1111: add a note about DMA masks
+Date: Thu, 19 Sep 2013 22:52:02 +0100
+Subject: [PATCH 27/51] DMA-API: provide a helper to setup DMA masks
 In-Reply-To: <20130919212235.GD12758@n2100.arm.linux.org.uk>
 References: <20130919212235.GD12758@n2100.arm.linux.org.uk>
-Message-ID: <E1VMm7q-0007iO-68@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1VMm8o-0007iV-Ac@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a comment to explain why this driver doesn't call any of the DMA
-API dma_set_mask() functions.
+Many drivers contain code such as:
+
+	dev->dma_mask = &dev->coherent_dma_mask;
+	dev->coherent_dma_mask = MASK;
+
+Let's move this pattern out of drivers and have the DMA API provide a
+helper for it.  This helper uses dma_set_mask_and_coherent() to allow
+platform issues to be properly dealt with via dma_set_mask()/
+dma_is_supported().
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/usb/host/ohci-sa1111.c |    6 ++++++
- 1 files changed, 6 insertions(+), 0 deletions(-)
+ include/linux/dma-mapping.h |   10 ++++++++++
+ 1 files changed, 10 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/usb/host/ohci-sa1111.c b/drivers/usb/host/ohci-sa1111.c
-index 17b2a7d..aa9e127 100644
---- a/drivers/usb/host/ohci-sa1111.c
-+++ b/drivers/usb/host/ohci-sa1111.c
-@@ -185,6 +185,12 @@ static int ohci_hcd_sa1111_probe(struct sa1111_dev *dev)
- 	if (usb_disabled())
- 		return -ENODEV;
+diff --git a/include/linux/dma-mapping.h b/include/linux/dma-mapping.h
+index ec951f9..27d1421 100644
+--- a/include/linux/dma-mapping.h
++++ b/include/linux/dma-mapping.h
+@@ -111,6 +111,16 @@ static inline int dma_set_mask_and_coherent(struct device *dev, u64 mask)
+ 	return rc;
+ }
  
-+	/*
-+	 * We don't call dma_set_mask_and_coherent() here because the
-+	 * DMA mask has already been appropraitely setup by the core
-+	 * SA-1111 bus code (which includes bug workarounds.)
-+	 */
++/*
++ * Similar to the above, except it deals with the case where the device
++ * does not have dev->dma_mask appropriately setup.
++ */
++static inline int dma_coerce_mask_and_coherent(struct device *dev, u64 mask)
++{
++	dev->dma_mask = &dev->coherent_dma_mask;
++	return dma_set_mask_and_coherent(dev, mask);
++}
 +
- 	hcd = usb_create_hcd(&ohci_sa1111_hc_driver, &dev->dev, "sa1111");
- 	if (!hcd)
- 		return -ENOMEM;
+ extern u64 dma_get_required_mask(struct device *dev);
+ 
+ static inline unsigned int dma_get_max_seg_size(struct device *dev)
 -- 
 1.7.4.4
