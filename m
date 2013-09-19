@@ -1,97 +1,81 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Fri, 20 Sep 2013 00:13:38 +0100
-Subject: [PATCH 41/51] DMA-API: crypto: remove last references to 'static
- struct device *dev'
+Date: Fri, 20 Sep 2013 00:11:38 +0100
+Subject: [PATCH 39/51] DMA-API: others: use dma_set_coherent_mask()
 In-Reply-To: <20130919212235.GD12758@n2100.arm.linux.org.uk>
 References: <20130919212235.GD12758@n2100.arm.linux.org.uk>
-Message-ID: <E1VMnPm-0007sP-Px@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1VMnNq-0007s4-HN@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The correct way for a driver to specify the coherent DMA mask is
+not to directly access the field in the struct device, but to use
+dma_set_coherent_mask().  Only arch and bus code should access this
+member directly.
+
+Convert all direct write accesses to using the correct API.
+
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/crypto/ixp4xx_crypto.c |   13 ++++++++-----
- 1 files changed, 8 insertions(+), 5 deletions(-)
+ drivers/ata/pata_ixp4xx_cf.c             |    5 ++++-
+ drivers/gpu/drm/exynos/exynos_drm_drv.c  |    6 +++++-
+ drivers/gpu/drm/omapdrm/omap_dmm_tiler.c |    5 +++--
+ 3 files changed, 12 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/crypto/ixp4xx_crypto.c b/drivers/crypto/ixp4xx_crypto.c
-index 8306185..214357e 100644
---- a/drivers/crypto/ixp4xx_crypto.c
-+++ b/drivers/crypto/ixp4xx_crypto.c
-@@ -221,7 +221,6 @@ static int support_aes = 1;
- #define DRIVER_NAME "ixp4xx_crypto"
+diff --git a/drivers/ata/pata_ixp4xx_cf.c b/drivers/ata/pata_ixp4xx_cf.c
+index 1ec53f8..ddf470c 100644
+--- a/drivers/ata/pata_ixp4xx_cf.c
++++ b/drivers/ata/pata_ixp4xx_cf.c
+@@ -144,6 +144,7 @@ static int ixp4xx_pata_probe(struct platform_device *pdev)
+ 	struct ata_host *host;
+ 	struct ata_port *ap;
+ 	struct ixp4xx_pata_data *data = dev_get_platdata(&pdev->dev);
++	int ret;
  
- static struct platform_device *pdev;
--static struct device *dev;
+ 	cs0 = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	cs1 = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+@@ -157,7 +158,9 @@ static int ixp4xx_pata_probe(struct platform_device *pdev)
+ 		return -ENOMEM;
  
- static inline dma_addr_t crypt_virt2phys(struct crypt_ctl *virt)
+ 	/* acquire resources and fill host */
+-	pdev->dev.coherent_dma_mask = DMA_BIT_MASK(32);
++	ret = dma_set_coherent_mask(&pdev->dev, DMA_BIT_MASK(32));
++	if (ret)
++		return ret;
+ 
+ 	data->cs0 = devm_ioremap(&pdev->dev, cs0->start, 0x1000);
+ 	data->cs1 = devm_ioremap(&pdev->dev, cs1->start, 0x1000);
+diff --git a/drivers/gpu/drm/exynos/exynos_drm_drv.c b/drivers/gpu/drm/exynos/exynos_drm_drv.c
+index bb82ef7..81192d0 100644
+--- a/drivers/gpu/drm/exynos/exynos_drm_drv.c
++++ b/drivers/gpu/drm/exynos/exynos_drm_drv.c
+@@ -286,7 +286,11 @@ static struct drm_driver exynos_drm_driver = {
+ 
+ static int exynos_drm_platform_probe(struct platform_device *pdev)
  {
-@@ -250,6 +249,7 @@ static inline const struct ix_hash_algo *ix_hash(struct crypto_tfm *tfm)
+-	pdev->dev.coherent_dma_mask = DMA_BIT_MASK(32);
++	int ret;
++
++	ret = dma_set_coherent_mask(&pdev->dev, DMA_BIT_MASK(32));
++	if (ret)
++		return ret;
  
- static int setup_crypt_desc(void)
- {
-+	struct device *dev = &pdev->dev;
- 	BUILD_BUG_ON(sizeof(struct crypt_ctl) != 64);
- 	crypt_virt = dma_alloc_coherent(dev,
- 			NPE_QLEN * sizeof(struct crypt_ctl),
-@@ -350,6 +350,7 @@ static void finish_scattered_hmac(struct crypt_ctl *crypt)
- 
- static void one_packet(dma_addr_t phys)
- {
-+	struct device *dev = &pdev->dev;
- 	struct crypt_ctl *crypt;
- 	struct ixp_ctx *ctx;
- 	int failed;
-@@ -419,7 +420,7 @@ static void crypto_done_action(unsigned long arg)
- 	tasklet_schedule(&crypto_done_tasklet);
+ 	return drm_platform_init(&exynos_drm_driver, pdev);
  }
- 
--static int init_ixp_crypto(void)
-+static int init_ixp_crypto(struct device *dev)
- {
- 	int ret = -ENODEV;
- 	u32 msg[2] = { 0, 0 };
-@@ -506,7 +507,7 @@ static int init_ixp_crypto(void)
- 	return ret;
- }
- 
--static void release_ixp_crypto(void)
-+static void release_ixp_crypto(struct device *dev)
- {
- 	qmgr_disable_irq(RECV_QID);
- 	tasklet_kill(&crypto_done_tasklet);
-@@ -873,6 +874,7 @@ static int ablk_perform(struct ablkcipher_request *req, int encrypt)
- 	enum dma_data_direction src_direction = DMA_BIDIRECTIONAL;
- 	struct ablk_ctx *req_ctx = ablkcipher_request_ctx(req);
- 	struct buffer_desc src_hook;
-+	struct device *dev = &pdev->dev;
- 	gfp_t flags = req->base.flags & CRYPTO_TFM_REQ_MAY_SLEEP ?
- 				GFP_KERNEL : GFP_ATOMIC;
- 
-@@ -997,6 +999,7 @@ static int aead_perform(struct aead_request *req, int encrypt,
- 	unsigned int cryptlen;
- 	struct buffer_desc *buf, src_hook;
- 	struct aead_ctx *req_ctx = aead_request_ctx(req);
-+	struct device *dev = &pdev->dev;
- 	gfp_t flags = req->base.flags & CRYPTO_TFM_REQ_MAY_SLEEP ?
- 				GFP_KERNEL : GFP_ATOMIC;
- 
-@@ -1426,7 +1429,7 @@ static int __init ixp_module_init(void)
- 	spin_lock_init(&desc_lock);
- 	spin_lock_init(&emerg_lock);
- 
--	err = init_ixp_crypto();
-+	err = init_ixp_crypto(&pdev->dev);
- 	if (err) {
- 		platform_device_unregister(pdev);
- 		return err;
-@@ -1492,7 +1495,7 @@ static void __exit ixp_module_exit(void)
- 		if (ixp4xx_algos[i].registered)
- 			crypto_unregister_alg(&ixp4xx_algos[i].crypto);
+diff --git a/drivers/gpu/drm/omapdrm/omap_dmm_tiler.c b/drivers/gpu/drm/omapdrm/omap_dmm_tiler.c
+index acf6678..701c4c1 100644
+--- a/drivers/gpu/drm/omapdrm/omap_dmm_tiler.c
++++ b/drivers/gpu/drm/omapdrm/omap_dmm_tiler.c
+@@ -664,8 +664,9 @@ static int omap_dmm_probe(struct platform_device *dev)
  	}
--	release_ixp_crypto();
-+	release_ixp_crypto(&pdev->dev);
- 	platform_device_unregister(pdev);
- }
+ 
+ 	/* set dma mask for device */
+-	/* NOTE: this is a workaround for the hwmod not initializing properly */
+-	dev->dev.coherent_dma_mask = DMA_BIT_MASK(32);
++	ret = dma_set_coherent_mask(&dev->dev, DMA_BIT_MASK(32));
++	if (ret)
++		goto fail;
+ 
+ 	omap_dmm->dummy_pa = page_to_phys(omap_dmm->dummy_page);
  
 -- 
 1.7.4.4
