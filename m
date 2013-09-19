@@ -1,42 +1,71 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 19 Sep 2013 11:33:03 +0100
-Subject: [PATCH 06/22] ARM: dts: bcm281xx: Remove '0x's from BCM11351 DTS
- file
-In-Reply-To: <523A2EEF.3070406@broadcom.com>
-References: <1374490361-25769-1-git-send-email-lee.jones@linaro.org>
- <1374490361-25769-6-git-send-email-lee.jones@linaro.org>
- <51EDAC90.6010108@broadcom.com> <20130723075309.GE26801@laptop>
- <CAGFynZ-+UoML32ecX4nSGAaFJXqQpdq+D8j7GqJSKhxsE7w=9A@mail.gmail.com>
- <20130812135439.GF13851@lee--X1> <523A2EEF.3070406@broadcom.com>
-Message-ID: <20130919103303.GC22389@lee--X1>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 19 Sep 2013 11:40:28 +0100
+Subject: [PATCH] ASoC: generic: Add generic DT based simple codec
+In-Reply-To: <20130919105437.75e0f0a3@armhf>
+References: <20130919105437.75e0f0a3@armhf>
+Message-ID: <20130919104028.GI21013@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 18 Sep 2013, Christian Daudt wrote:
+On Thu, Sep 19, 2013 at 10:54:37AM +0200, Jean-Francois Moine wrote:
+> This patch adds a simple sound codec which is described by the DT.
+> This codec may be used when no specific codec action is needed.
 
-> On 13-08-12 06:54 AM, Lee Jones wrote:
-> >On Thu, 08 Aug 2013, Christian Daudt wrote:
-> >
-> >>Hi Lee,
-> >>  I had to change some of the lines in the dts files you modified, so
-> >>I've added your mods. This patch:
-> >>https://lkml.org/lkml/2013/8/8/477
-> >>
-> >>includes your changes to bcm11351.dtsi and bcm11351-brt.dts. Not sure
-> >>where your patch is at this point, but I just wanted to point that
-> >>out.
-> >I haven't done anything with that patch yet, but I'd prefer they
-> >stayed separate to be honest. If you make your changes and ensure
-> >they're in an upstream tree (and let me know which one), I'll rebase
-> >my patches on top of that tree.
-> 
-> These changes are in 3.12-rc1 now:
-> https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=d7358f845645c588aff84ac6b476a17d3eec75fa
+Hrm.  I'm generally not enthusiastic about this sort of thing because it
+requires every user of the device to understand the capabilities of the
+device instead of being able to just say they have a device of type X -
+it seems better to type the data in once in a driver and then reference
+it.  That said...
 
-Not even so much as a Reviewed-by:, nice!
+> +Child 'capture' and 'playback' required properties:
+> +- stream-name: name of the stream
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+What does this mean in the binding?
+
+> +Formats:
+> +	"s8"
+> +	"u8"
+
+I'd cut this down to just the PCM formats for now - many of the formats
+you list there aren't terribly well defined even within ALSA, I don't
+think some of them have ever been used at all.  A binding document
+should really document what things mean as well.
+
+> +Rates:
+> +	5512
+> +	8000
+
+This shouldn't be a list of defined rates, it should allow any number,
+and it should support ranges since while some devices do enumerate
+specific rates simpler devices often just support a continuous range of
+rates.
+
+> --- a/sound/soc/generic/Kconfig
+> +++ b/sound/soc/generic/Kconfig
+
+CODEC drivers should go in codecs.
+
+> +#define DRV_NAME "simple-codec"
+
+Just write the string in the one place where it is used.
+
+> +static char *format_tb[] = {
+> +	"s8", "u8", "s16_le", "s16_be",
+> +	"u16_le", "u16_be", "s24_le", "s24_be",
+> +	"u24_le", "u24_be", "s32_le", "s32_be",
+> +	"u32_le", "u32_be", "float_le", "float_be",
+> +
+> +	"float64_le", "float64_be", "iec958_subframe_le", "iec958_subframe_be",
+> +	"mu_law", "a_law", "ima_adpcm", "mpeg",
+> +	"gsm", "", "", "",
+> +	"", "", "", "special",
+
+This seems a bit obscure and fragile - an explicit lookup table would be
+better I think.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130919/01798a1f/attachment.sig>
