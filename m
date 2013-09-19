@@ -1,58 +1,61 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 19 Sep 2013 14:19:26 +0200
-Subject: [PATCH v2] ARM: new platform for Energy Micro's EFM32 Cortex-M3
- SoCs
-In-Reply-To: <523AE162.3040100@gmail.com>
-References: <1379447884-14025-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <201309172245.25367.arnd@arndb.de>
- <20130918153424.GR24802@pengutronix.de>
- <201309191328.12717.arnd@arndb.de> <523AE162.3040100@gmail.com>
-Message-ID: <20130919121926.GT24802@pengutronix.de>
+From: jbe@pengutronix.de (Juergen Beisert)
+Date: Thu, 19 Sep 2013 14:22:42 +0200
+Subject: [PATCHv5] staging/iio/adc: change the MXS touchscreen driver
+ implementation
+Message-ID: <1379593369-22010-1-git-send-email-jbe@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+The following series replaces the current busy loop touchscreen implementation
+for i.MX28/i.MX23 SoCs by a fully interrupt driven implementation.
 
-On Thu, Sep 19, 2013 at 01:34:58PM +0200, Sebastian Hesselbarth wrote:
-> On 09/19/13 13:28, Arnd Bergmann wrote:
-> >On Wednesday 18 September 2013, Uwe Kleine-K?nig wrote:
-> >>On Tue, Sep 17, 2013 at 10:45:25PM +0200, Arnd Bergmann wrote:
-> >>>On Tuesday 17 September 2013, Uwe Kleine-K?nig wrote:
-> [...]
-> >>>>+
-> >>>>+void __init efm32_init_time(void)
-> >>>>+{
-> >>>>+	of_clk_init(NULL);
-> >>>>+	clocksource_of_init();
-> >>>>+}
-> >>>
-> >>>When Sebastian Hesselbarth's patches for of_clk_init() are merged,
-> >>>this function can go away.
-> >>Do you have a link?
-> >
-> >http://lmgtfy.com/?q=hesselbarth+of_clk_init ;-)
-Hmm, I checked my linux-arm-kernel mailbox and failed to find the
-series. Not reproducable though. Thanks.
+Since i.MX23 and i.MX28 silicon differs, the existing implementation can
+be used for the i.MX28 SoC only.
 
-> >
-> >I've put Sebastian on Cc, I guess he can comment on the status of his
-> >patches, so we can come up with a plan for dealing with the dependency
-> >here.
-> 
-> Patch set has been sent yesterday, still waiting for ACK's.
-> 
-> Olof already mentioned to (a) take it in arm-soc early and (b) have
-> a topic branch to depend on.
-> 
-> I guess I will prepare that topic branch and Olof can take it (or fall
-> back to creating it on his own, if I fail to do it right).
-I assume that means that it's expected to land in 3.13, and my efm32
-patch at least not earlier. So please tell me when there is a branch to
-depend on.
+So, the first two patches of this series move the i.MX28 specific definitions
+out of the way. The third patch simplifies the register access to make it easier
+to add the i.MX23 support. Then the i.MX23 specific definitions are added, also
+the code to distinguish both SoCs at run-time.
+Up to here the existing touchscreen driver will now run on an i.MX23 Soc as well.
 
-Thanks
-Uwe
+When the i.MX23 SoC is running from battery it seems not to be a good idea to
+run a busy loop to detect touches and their location. The fourth patch adds a
+fully interrupt driven implementation which makes use of the built-in delay
+and multiple sample features of the touchscreen controller. This will reduce
+the interrupt load to a minimum.
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+The next to last patch in this series just removes the existing busy loop
+implementation.
+
+The last patch adds a devicetree bindings proposal (to be discussed).
+
+Some restrictions/questions:
+
+- the touchscreen part is yet tested on i.MX23 SoC only
+- has someone a good idea how to implement a reliable pressure measurement if
+  the resistances of the touchscreen's plates are unknown?
+
+Changes since v4:
+
+- honor Jonathan's comments about function names
+- honor Dmitry's comments about workqueue canceling and interrupts
+- adding devicetree bindings proposal
+
+Changes since v3:
+
+- split adding register access functions and i.MX23 support into two patches
+
+Changes since v2:
+
+- useless debug output removed
+
+Changes since v1:
+
+- adding register access functions to make the existing code more readable
+- adding some functions to distinguish the SoCs at run-time to avoid if-else
+  contructs whenever differences in the register layout between i.MX23 and
+  i.MX28 must be handled
+
+Comments are welcome.
+
+Juergen
