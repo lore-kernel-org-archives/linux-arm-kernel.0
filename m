@@ -1,38 +1,29 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 19 Sep 2013 15:12:42 -0700
-Subject: [GIT PULL] ARM: SoC fixes for 3.12-rc
-In-Reply-To: <1379626776.753.164.camel@shinybook.infradead.org>
-References: <20130919194752.GA19975@quad.lixom.net>
- <1379626776.753.164.camel@shinybook.infradead.org>
-Message-ID: <CAOesGMg3EPrEcaJ4cqhCzK+54CNXa+xN3gEMoBnsBmgW67DKHA@mail.gmail.com>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Thu, 19 Sep 2013 15:41:54 -0700
+Subject: [PATCH v3] mtd: atmel_nand: use minimum ecc requirements of
+ nand: ecc_{strength,step}_ds
+In-Reply-To: <20130918214225.GP4550@ld-irv-0074.broadcom.com>
+References: <1379483928-18253-1-git-send-email-josh.wu@atmel.com>
+ <20130918214225.GP4550@ld-irv-0074.broadcom.com>
+Message-ID: <20130919224154.GT4550@ld-irv-0074.broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 19, 2013 at 2:39 PM, Woodhouse, David
-<david.woodhouse@intel.com> wrote:
-> On Thu, 2013-09-19 at 12:47 -0700, Olof Johansson wrote:
->>
->> - A fix for build breakage in the MTD subsystem for some PXA devices.
->>   David Woodhouse has this patch in his for-next branch but has not been
->>   responding to our requests to send it up so here it is.
->>   I should have amended the commit message to describe the build failure for
->>   CONFIG_OF=n setups, but forgot and now it's down in the stack of commits.
->
-> Thanks for pulling that in. Apologies for the screwup.
+On Wed, Sep 18, 2013 at 02:42:25PM -0700, Brian Norris wrote:
+> On Wed, Sep 18, 2013 at 01:58:48PM +0800, Josh Wu wrote:
+> > Since ecc_{strength,step}_ds is introduced in nand_chip structure for
+> > minimum ecc requirements. So we can use them directly and remove our
+> > own get_onfi_ecc_param function.
+> > 
+> > Signed-off-by: Josh Wu <josh.wu@atmel.com>
+...
+> I'll just apply the appended diff, to address these small comments and
+> to shorten the messages a little (they are a bit verbose and are over 80
+> characters). It's still not under 80, but it's more reasonable.
+> 
+> Let me know if you have any objections, or else I'll push this to
+> l2-mtd.git.
 
-No worries. You're a busy guy these days.
+Pushed to l2-mtd.git. Thanks!
 
-> We were were working on a better way to fix the litter of #ifdef
-> CONFIG_OF which wasn't ready for the merge window so I just left this
-> one out since it *appeared* to be entirely cosmetic.
-
-Yeah, the real bug is a missing stub function in the #else case, but
-if the ifdef is all going away there's no point in adding it.
-
-The ifdeffery around the match tables is something that Mark Brown
-brought up yesterday as well. With ACPI_PTR() and of_match_ptr() we at
-least don't need the ifdefs in the struct device, but we do still need
-it for the match tables.
-
-
--Olof
+Brian
