@@ -1,29 +1,39 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Fri, 20 Sep 2013 07:16:52 -0500
-Subject: [PATCH 39/51] DMA-API: others: use dma_set_coherent_mask()
-In-Reply-To: <E1VMnNq-0007s4-HN@rmk-PC.arm.linux.org.uk>
+From: rmk+kernel@arm.linux.org.uk (Russell King)
+Date: Thu, 19 Sep 2013 22:59:03 +0100
+Subject: [PATCH 34/51] DMA-API: net: octeon: use dma_coerce_mask_and_coherent()
+In-Reply-To: <20130919212235.GD12758@n2100.arm.linux.org.uk>
 References: <20130919212235.GD12758@n2100.arm.linux.org.uk>
- <E1VMnNq-0007s4-HN@rmk-PC.arm.linux.org.uk>
-Message-ID: <20130920121652.GA7630@mtj.dyndns.org>
+Message-ID: <E1VMmFb-0007jO-50@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 20, 2013 at 12:11:38AM +0100, Russell King wrote:
-> The correct way for a driver to specify the coherent DMA mask is
-> not to directly access the field in the struct device, but to use
-> dma_set_coherent_mask().  Only arch and bus code should access this
-> member directly.
-> 
-> Convert all direct write accesses to using the correct API.
-> 
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+The code sequence:
+	pdev->dev.coherent_dma_mask = DMA_BIT_MASK(64);
+	pdev->dev.dma_mask = &pdev->dev.coherent_dma_mask;
+bypasses the architectures check on the DMA mask.  It can be replaced
+with dma_coerce_mask_and_coherent(), avoiding the direct initialization
+of this mask.
 
-Acked-by: Tejun Heo <tj@kernel.org>
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ drivers/net/ethernet/octeon/octeon_mgmt.c |    5 +++--
+ 1 files changed, 3 insertions(+), 2 deletions(-)
 
-The patch is pretty widely spread.  I don't mind how it gets routed
-but what's the plan?
-
-Thanks.
-
+diff --git a/drivers/net/ethernet/octeon/octeon_mgmt.c b/drivers/net/ethernet/octeon/octeon_mgmt.c
+index 622aa75..2006a07 100644
+--- a/drivers/net/ethernet/octeon/octeon_mgmt.c
++++ b/drivers/net/ethernet/octeon/octeon_mgmt.c
+@@ -1552,8 +1552,9 @@ static int octeon_mgmt_probe(struct platform_device *pdev)
+ 
+ 	p->phy_np = of_parse_phandle(pdev->dev.of_node, "phy-handle", 0);
+ 
+-	pdev->dev.coherent_dma_mask = DMA_BIT_MASK(64);
+-	pdev->dev.dma_mask = &pdev->dev.coherent_dma_mask;
++	result = dma_coerce_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(64));
++	if (result)
++		goto err;
+ 
+ 	netif_carrier_off(netdev);
+ 	result = register_netdev(netdev);
 -- 
-tejun
+1.7.4.4
