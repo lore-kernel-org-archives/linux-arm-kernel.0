@@ -1,98 +1,77 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Thu, 19 Sep 2013 18:11:09 +0400
-Subject: [RFC PATCH 15/15] arm: dts: dra7: add sata node
-In-Reply-To: <1379597059-15405-1-git-send-email-rogerq@ti.com>
-References: <1379595943-14622-1-git-send-email-rogerq@ti.com>
- <1379597059-15405-1-git-send-email-rogerq@ti.com>
-Message-ID: <523B05FD.7020200@cogentembedded.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 19 Sep 2013 15:15:46 +0100
+Subject: [PATCH v3 2/4] ARM64: KVM: Implement kvm_vcpu_preferred_target()
+ function
+In-Reply-To: <1379596302-21522-3-git-send-email-anup.patel@linaro.org>
+References: <1379596302-21522-1-git-send-email-anup.patel@linaro.org>
+ <1379596302-21522-3-git-send-email-anup.patel@linaro.org>
+Message-ID: <523B0712.1020705@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
-
-On 09/19/2013 05:24 PM, Roger Quadros wrote:
-
-> From: Balaji T K <balajitk@ti.com>
-
-> Add support for sata controller.
-
-> [Roger Q] Clean up.
-
-> CC: Benoit Cousson <bcousson@baylibre.com>
-> Signed-off-by: Balaji T K <balajitk@ti.com>
-> Signed-off-by: Roger Quadros <rogerq@ti.com>
+On 19/09/13 14:11, Anup Patel wrote:
+> This patch implements kvm_vcpu_preferred_target() function for
+> KVM ARM64 which will help us implement KVM_ARM_PREFERRED_TARGET
+> ioctl for user space.
+> 
+> Signed-off-by: Anup Patel <anup.patel@linaro.org>
+> Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
 > ---
->   arch/arm/boot/dts/dra7.dtsi |   49 +++++++++++++++++++++++++++++++++++++++++++
->   1 files changed, 49 insertions(+), 0 deletions(-)
+>  arch/arm/include/asm/kvm_host.h |    1 +
 
-> diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
-> index ce9a0f0..545545d 100644
-> --- a/arch/arm/boot/dts/dra7.dtsi
-> +++ b/arch/arm/boot/dts/dra7.dtsi
-> @@ -426,6 +426,55 @@
->   			dma-names = "tx", "rx";
->   		};
->
-> +		omap_control_sata: control-phy at 4a002374 {
-> +			compatible = "ti,control-phy-pipe3";
-> +			reg = <0x4a002374 0x4>;
-> +			reg-names = "power";
-> +			clocks = <&sys_clkin1>;
-> +			clock-names = "sysclk";
-> +		};
+This hunk belongs to patch #1, and the similar hunk in #1 belongs here.
+
+	M.
+
+>  arch/arm64/kvm/guest.c          |   21 +++++++++++++++++++++
+>  2 files changed, 22 insertions(+)
+> 
+> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+> index 7d22517..76f3c19 100644
+> --- a/arch/arm/include/asm/kvm_host.h
+> +++ b/arch/arm/include/asm/kvm_host.h
+> @@ -154,6 +154,7 @@ struct kvm_vcpu_stat {
+>  struct kvm_vcpu_init;
+>  int kvm_vcpu_set_target(struct kvm_vcpu *vcpu,
+>  			const struct kvm_vcpu_init *init);
+> +int kvm_vcpu_preferred_target(struct kvm_vcpu_init *init);
+>  unsigned long kvm_arm_num_regs(struct kvm_vcpu *vcpu);
+>  int kvm_arm_copy_reg_indices(struct kvm_vcpu *vcpu, u64 __user *indices);
+>  struct kvm_one_reg;
+> diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
+> index d7bf7d6..4da7882 100644
+> --- a/arch/arm64/kvm/guest.c
+> +++ b/arch/arm64/kvm/guest.c
+> @@ -254,6 +254,27 @@ int kvm_vcpu_set_target(struct kvm_vcpu *vcpu,
+>  	return kvm_reset_vcpu(vcpu);
+>  }
+>  
+> +int kvm_vcpu_preferred_target(struct kvm_vcpu_init *init)
+> +{
+> +	int target = kvm_target_cpu();
 > +
-> +		ocp2scp3: ocp2scp3 at 4a090000 {
-> +			compatible = "ti,omap-ocp2scp";
-> +			#address-cells = <1>;
-> +			#size-cells = <1>;
-> +			ranges;
-> +			ti,hwmods = "ocp2scp3";
-> +			reg = <0x4a090000 0x1f>; /* ocp2scp3 */
-> +			reg-names = "ocp2scp3";
-> +			sata_phy: sataphy at 4A096000 {
-
-    It's better to name the PHY nodes uniformly after already standard 
-"ethernet-phy" and your "control-phy".
-
-> +				compatible = "ti,phy-pipe3-sata";
-> +				reg = <0x4A096000 0x80>, /* phy_rx */
-> +				      <0x4A096400 0x64>, /* phy_tx */
-> +				      <0x4A096800 0x40>; /* pll_ctrl */
-> +				reg-names = "phy_rx", "phy_tx", "pll_ctrl";
-> +				ctrl-module = <&omap_control_sata>;
-> +				clocks = <&sata_ref_clk>,
-> +					 <&sys_clkin1>;
-> +				clock-names = "optclk", "sysclk";
-> +				#phy-cells = <0>;
-> +			};
-> +		};
+> +	if (target < 0)
+> +		return -ENODEV;
 > +
-> +		sata: sata at 4a141100 {
-> +			compatible = "ti,sata";
-> +			ti,hwmods = "sata";
-> +			reg = <0x4a141100 0x7>;
-> +			#address-cells = <1>;
-> +			#size-cells = <1>;
-> +			ranges;
-> +			dwc-ahci at 4a140000 {
+> +	memset(init, 0, sizeof(*init));
+> +
+> +	/* 
+> +	 * For now, we return all optional features are available
+> +	 * for preferred target. In future, we might have features
+> +	 * available based on underlying host.
+> +	 */
+> +	init->target = (__u32)target;
+> +	init->features[0] |= (1 << KVM_ARM_VCPU_POWER_OFF);
+> +	init->features[0] |= (1 << KVM_ARM_VCPU_EL1_32BIT);
+> +
+> +	return 0;
+> +}
+> +
+>  int kvm_arch_vcpu_ioctl_get_fpu(struct kvm_vcpu *vcpu, struct kvm_fpu *fpu)
+>  {
+>  	return -EINVAL;
+> 
 
-    Hm, ePAPR spec. [1] says that "the name of a node should be somewhat 
-generic, reflecting the function of the device and not its precise programming 
-model", so it looks like the name should be "sata" as well. I'm a bit at a 
-loss here, not sure why you had to use the nested device nodes.
 
-> +				  compatible = "snps,dwc-ahci";
-> +				  reg = <0x4a140000 0x1100>;
-> +				  interrupts = <0 54 0x4>;
-> +				  phys = <&sata_phy>;
-
-    Hm, it's the third PHY related generic property I'm encountering. First, 
-there was "phy-handle", then "phy", now "phys"... Seems like a bit too much. :-)
-
-> +				  phy-names = "sata-phy";
-> +				  clocks = <&sata_ref_clk>;
-> +				  clock-names = "optclk";
-> +			};
-> +		};
-
-[1] http://www.power.org/resources/downloads/Power_ePAPR_APPROVED_v1.0.pdf
+-- 
+Jazz is not dead. It just smells funny...
