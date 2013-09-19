@@ -1,103 +1,211 @@
-From: sylvester.nawrocki@gmail.com (Sylwester Nawrocki)
-Date: Thu, 19 Sep 2013 21:49:30 +0200
-Subject: [PATCH] media: i2c: adv7343: fix the DT binding properties
-In-Reply-To: <CA+V-a8vY-qsdUoUUH=3HOg-UAZZPujOLPHFC_udNWFtksgzRRA@mail.gmail.com>
-References: <1379073471-7244-1-git-send-email-prabhakar.csengg@gmail.com>
- <523395DC.5080009@wwwdotorg.org>
- <CA+V-a8sVyJ1TrTSiaj8vpaD+f_qJ5Hp287E3HuHJ_pRzzmdAvg@mail.gmail.com>
- <523730A8.9060201@wwwdotorg.org>
- <CA+V-a8vY-qsdUoUUH=3HOg-UAZZPujOLPHFC_udNWFtksgzRRA@mail.gmail.com>
-Message-ID: <523B554A.2030701@gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 19 Sep 2013 22:03:43 +0200
+Subject: [PATCH] clockevents: Sanitize ticks to nsec conversion
+In-Reply-To: <alpine.DEB.2.02.1309191629040.4089@ionos.tec.linutronix.de>
+References: <20130917130153.GL26819@ludovic.desroches@atmel.com>
+ <alpine.DEB.2.02.1309172228400.4089@ionos.tec.linutronix.de>
+ <20130918085627.GN24802@pengutronix.de>
+ <alpine.DEB.2.02.1309181058470.4089@ionos.tec.linutronix.de>
+ <20130918150958.GO24802@pengutronix.de>
+ <alpine.DEB.2.02.1309182201000.4089@ionos.tec.linutronix.de>
+ <20130919100239.GS24802@pengutronix.de>
+ <alpine.DEB.2.02.1309191207460.4089@ionos.tec.linutronix.de>
+ <20130919124805.GU24802@pengutronix.de>
+ <alpine.DEB.2.02.1309191629040.4089@ionos.tec.linutronix.de>
+Message-ID: <20130919200343.GV24802@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/19/2013 06:06 PM, Prabhakar Lad wrote:
-> On Mon, Sep 16, 2013 at 9:54 PM, Stephen Warren<swarren@wwwdotorg.org>  wrote:
->> On 09/13/2013 11:23 PM, Prabhakar Lad wrote:
->>> On Sat, Sep 14, 2013 at 4:16 AM, Stephen Warren<swarren@wwwdotorg.org>  wrote:
->>>> On 09/13/2013 05:57 AM, Prabhakar Lad wrote:
->>>>> From: "Lad, Prabhakar"<prabhakar.csengg@gmail.com>
->>>>>
->>>>> This patch fixes the DT binding properties of adv7343 decoder.
->>>>> The pdata which was being read from the DT property, is removed
->>>>> as this can done internally in the driver using cable detection
->>>>> register.
->>>>>
->>>>> This patch also removes the pdata of ADV7343 which was passed from
->>>>> DA850 machine.
->>>>
->>>>> diff --git a/Documentation/devicetree/bindings/media/i2c/adv7343.txt b/Documentation/devicetree/bindings/media/i2c/adv7343.txt
->>>>
->>>>>   Required Properties :
->>>>>   - compatible: Must be "adi,adv7343"
->>>>> +- reg: I2C device address.
->>>>> +- vddio-supply: I/O voltage supply.
->>>>> +- vddcore-supply: core voltage supply.
->>>>> +- vaa-supply: Analog power supply.
->>>>> +- pvdd-supply: PLL power supply.
->>>>
->>>> Old DTs won't contain those properties. This breaks the DT ABI if those
->>>> properties are required. Is that acceptable?
->>>
->>> As of now adv7343 via DT binding is not enabled in any platforms
->>> so this wont break any DT ABI.
->>
->> Well, if the binding has already been written, it technically already is
->> an ABI. Perhaps the binding can be fixed if it isn't in use yet, but
->> this is definitely not the correct approach to DT.
+Hi Thomas,
 
-The binding got merged for 3.12-rc1 and the intention of this patch was
-to correct that binding. There we some issues like mismatch between names
-of properties documented and used in the driver.
+On Thu, Sep 19, 2013 at 04:30:37PM +0200, Thomas Gleixner wrote:
+> Marc Kleine-Budde pointed out, that commit 77cc982 "clocksource: use
+> clockevents_config_and_register() where possible" caused a regression
+> for some of the converted subarchs.
+> 
+> The reason is, that the clockevents core code converts the minimal
+> hardware tick delta to a nanosecond value for core internal
+> usage. This conversion is affected by integer math rounding loss, so
+> the backwards conversion to hardware ticks will likely result in a
+> value which is less than the configured hardware limitation. The
+> affected subarchs used their own workaround (SIGH!) which got lost in
+> the conversion.
+> 
+> The solution for the issue at hand is simple: adding evt->mult - 1 to
+> the shifted value before the integer divison in the core conversion
+> function takes care of it. But this only works for the case where for
+> the scaled math mult/shift pair "mult <= 1 << shift" is true. For the
+> case where "mult > 1 << shift" we can apply the rounding add only for
+> the minimum delta value to make sure that the backward conversion is
+> not less than the given hardware limit. For the upper bound we need to
+> omit the rounding add, because the backwards conversion is always
+> larger than the original latch value. That would violate the upper
+> bound of the hardware device.
+> 
+> Though looking closer at the details of that function reveals another
+> bogosity: The upper bounds check is broken as well. Checking for a
+> resulting "clc" value greater than KTIME_MAX after the conversion is
+> pointless. The conversion does:
+> 
+>       u64 clc = (latch << evt->shift) / evt->mult;
+> 
+> So there is no sanity check for (latch << evt->shift) exceeding the
+> 64bit boundary. The latch argument is "unsigned long", so on a 64bit
+> arch the handed in argument could easily lead to an unnoticed shift
+> overflow. With the above rounding fix applied the calculation before
+> the divison is:
+> 
+>        u64 clc = (latch << evt->shift) + evt->mult - 1;
+> 
+> So we need to make sure, that neither the shift nor the rounding add
+> is overflowing the u64 boundary.
+> 
+> Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
+> Cc: Russell King - ARM Linux <linux@arm.linux.org.uk>
+> Cc: Marc Kleine-Budde <mkl@pengutronix.de>
+> Cc: nicolas.ferre at atmel.com
+> Cc: Marc Pignat <marc.pignat@hevs.ch>
+> Cc: john.stultz at linaro.org
+> Cc: kernel at pengutronix.de
+> Cc: Ronald Wahl <ronald.wahl@raritan.com>
+> Cc: LAK <linux-arm-kernel@lists.infradead.org>
+> Cc: u.kleine-koenig at pengutronix.de
+> Cc: Ludovic Desroches <ludovic.desroches@atmel.com>
+> 
+> ---
+>  kernel/time/clockevents.c |   64 +++++++++++++++++++++++++++++++++++-----------
+>  1 file changed, 49 insertions(+), 15 deletions(-)
+> 
+> Index: linux-2.6/kernel/time/clockevents.c
+> ===================================================================
+> --- linux-2.6.orig/kernel/time/clockevents.c
+> +++ linux-2.6/kernel/time/clockevents.c
+> @@ -33,29 +33,63 @@ struct ce_unbind {
+>  	int res;
+>  };
+>  
+> -/**
+> - * clockevents_delta2ns - Convert a latch value (device ticks) to nanoseconds
+> - * @latch:	value to convert
+> - * @evt:	pointer to clock event device descriptor
+> - *
+> - * Math helper, returns latch value converted to nanoseconds (bound checked)
+> - */
+> -u64 clockevent_delta2ns(unsigned long latch, struct clock_event_device *evt)
+> +static u64 cev_delta2ns(unsigned long latch, struct clock_event_device *evt,
+> +			bool ismax)
+>  {
+>  	u64 clc = (u64) latch << evt->shift;
+> +	u64 rnd = (u64) evt->mult - 1;
+>  
+>  	if (unlikely(!evt->mult)) {
+>  		evt->mult = 1;
+>  		WARN_ON(1);
+>  	}
+I suggest to move the assignment to rnd below this if block as it
+changes mult.
 
-After Mark's suggestion Prabhakar removed some properties and the platform
-data usage altogether. IMHO there should be only minimal changes in that
-"fixup" patch, i.e. no platform data usage should be removed. Perhaps it
-is fine since that's just code removal. I guess it is better to do this
-sort of cleanup for the next kernel release.
+>  
+> +	/*
+> +	 * Upper bound sanity check. If the backwards conversion is
+> +	 * not equal latch, we know that the above shift overflowed.
+> +	 */
+> +	if (clc >> evt->shift) != (u64)latch)
+You didn't compile test, did you? Also the cast on the rhs isn't needed.
 
-Also I believe the argument of backward compatibility shouldn't really be
-considered here. The $subject patch is supposed to correct the binding
-before it becomes and ABI.
+> +		clc = ~0ULL;
+> +
+> +	/*
+> +	 * Scaled math oddities:
+> +	 *
+> +	 * For mult <= (1 << shift) we can safely add mult - 1 to
+> +	 * prevent integer rounding loss. So the backwards conversion
+It doesn't prevent inexactness to add mult - 1. It (only) asserts that
+the ns2delta(delta2ns(latch)) >= latch instead of ... <= latch when not
+doing it.
 
->>>> If it is, I think we should document that older versions of the binding
->>>> didn't require those properties, so they may in fact be missing.
->>>>
->>>> I note that this patch doesn't actually update the driver to
->>>> regulator_get() anything. Shouldn't it?
->>>
->>> As of now the driver isn?t enabling/accepting the regulators,
->>> so should I add those in DT properties or not ?
->>
->> The binding should describe the HW, not what the driver does/doesn't yet
->> do. I wrote the above because it looked like the driver was broken, not
->> to encourage you to remove properties from the binding.
-> OK
->
->> How does the
->> driver work if it doesn't enable the required regulators though, I
->> wonder? I suppose the boards this driver has been tested on all must
->> used fixed (non-SW-controlled) regulators.
->>
-> on all the boards on which this decoder is connected the power to it
-> is provided by static circuit and not by regulators, So for this how would
-> you suggest to add the DT nodes for regulators ?
+> +	 * from nsec to device ticks will be correct.
+> +	 *
+> +	 * For mult > (1 << shift), i.e. device frequency is > 1GHz we
+> +	 * need to be careful. Adding mult - 1 will result in a value
+> +	 * which when converted back to device ticks will be larger
+s/will/can/
 
-I believe the regulator DT properties should be made optional. Since some
-(actually all upstream) boards don't bother with software controlled
-regulators. We might have specified them and have defined relevant fixed
-regulator(s) in DT. But I doubt it is sensible, given that it may never
-happen in practice the regulators are required to be controlled by software
-through the regulators API. Such devices can often be put in a low power
-mode by a write to one of the registers, where their supply current is at
-uA level. Looking at the datasheet ADV7343 has SLEEP_MODE in which its
-typical current consumption is 5 uA.
+> +	 * than latch by (mult / (1 << shift)) - 1. For the min_delta
+s/by/by up to/
 
-That said the chip could be supplied from shared voltage regulators and
-the driver would then have to properly request and enable the regulators.
+> +	 * calculation we still want to apply this in order to stay
+> +	 * above the minimum device ticks limit. For the upper limit
+> +	 * we would end up with a latch value larger than the upper
+> +	 * limit of the device, so we omit the add to stay below the
+> +	 * device upper boundary.
+> +	 *
+> +	 * Also omit the add if it would overflow the u64 boundary.
+> +	 */
+> +	if ((~0ULL - clc > rnd) &&
+> +	    (!ismax || evt->mult <= (1U << evt->shift)))
+> +		clc += rnd;
+I would expect that
 
-Anyway I'm inclined to make the regulator properties optional.
+	if (!ismax)
+		if (~0ULL - clc > rnd)
+			clc += rnd;
+		else
+			clc = ~0ULL;
 
---
-Thanks,
-Sylwester
+is enough (and a tad more exact in the presence of an overflow). I have
+to think about that though.
+
+> +
+>  	do_div(clc, evt->mult);
+> -	if (clc < 1000)
+> -		clc = 1000;
+> -	if (clc > KTIME_MAX)
+> -		clc = KTIME_MAX;
+>  
+> -	return clc;
+> +	/* Deltas less than 1usec are pointless noise */
+> +	return clc > 1000 ? clc : 1000;
+> +}
+> +
+> +/**
+> + * clockevents_delta2ns - Convert a latch value (device ticks) to nanoseconds
+> + * @latch:	value to convert
+> + * @evt:	pointer to clock event device descriptor
+> + *
+> + * Math helper, returns latch value converted to nanoseconds (bound checked)
+> + */
+> +u64 clockevent_delta2ns(unsigned long latch, struct clock_event_device *evt)
+> +{
+> +	return cev_delta2ns(latch, evt, false);
+Hmm, I wonder if you need to be more clever in the general case. So you
+still may return a value > max_delta_ticks here if latch is big enough.
+But see below ...
+
+>  }
+>  EXPORT_SYMBOL_GPL(clockevent_delta2ns);
+>  
+> @@ -380,8 +414,8 @@ void clockevents_config(struct clock_eve
+>  		sec = 600;
+>  
+>  	clockevents_calc_mult_shift(dev, freq, sec);
+> -	dev->min_delta_ns = clockevent_delta2ns(dev->min_delta_ticks, dev);
+> -	dev->max_delta_ns = clockevent_delta2ns(dev->max_delta_ticks, dev);
+> +	dev->min_delta_ns = cev_delta2ns(dev->min_delta_ticks, dev, false);
+> +	dev->max_delta_ns = cev_delta2ns(dev->max_delta_ticks, dev, true);
+Another improvement that came to my mind just now. For min_delta_ns you
+want to assert that it results in a value >= min_delta_ticks when
+converted back. For max_delta_ns you want ... value <= max_delta_ticks.
+What about the values in between? They for sure should land in
+[min_delta_ticks ... max_delta_ticks] when converted back and ideally
+should be most exact. The latter part would mean to add (rnd / 2)
+instead of rnd. I don't know yet how that would behave@the borders of
+the [min_delta_ns ... max_delta_ns] interval, but I think you still need
+to special-case that.
+
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
