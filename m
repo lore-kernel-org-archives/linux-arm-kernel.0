@@ -1,7 +1,7 @@
 From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 19 Sep 2013 19:39:29 +0200
+Date: Thu, 19 Sep 2013 19:40:48 +0200
 Subject: [PATCH] phy/micrel: Add suspend/resume support to Micrel PHYs
-Message-ID: <1379612369-20692-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <1379612448-20805-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
