@@ -1,59 +1,151 @@
-From: khc@pm.waw.pl (Krzysztof Halasa)
-Date: Thu, 19 Sep 2013 20:27:18 +0200
-Subject: [PATCH] IXP4xx: Add Gateworks Cambria support.
-In-Reply-To: <20130919160309-31798@mutt-kz> (Luka Perkov's message of "Thu, 19
- Sep 2013 18:03:09 +0200")
-References: <m3vc1ya9fw.fsf@t19.piap.pl> <20130919160309-31798@mutt-kz>
-Message-ID: <m3a9j8wttl.fsf@intrepid.localdomain>
+From: kim.phillips@linaro.org (Kim Phillips)
+Date: Thu, 19 Sep 2013 11:29:28 -0700
+Subject: [PATCH linux-stable-3.10.y] ARM: KVM: Fix 64-bit coprocessor handling
+Message-ID: <20130919112928.9ce56f1a150c276a8070747e@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Luka,
+From: Christoffer Dall <christoffer.dall@linaro.org>
 
-Luka Perkov <luka@openwrt.org> writes:
+commit 240e99cbd00aa541b572480e3ea7ecb0d480bc79 upstream.
 
-> I was unable to bring up serial console with your patch. I was using
-> latest OpenWrt trunk for rootfs, did you use the same?
+Fixes booting a guest OS on a v3.10 host kernel.
 
-No, I use a different, custom initramfs.
+Without this, on an arndale board, qemu bails with:
 
-> drivers/rtc/hctosys.c: unable to open rtc device (rtc0)
-> IP-Config: Failed to open eth0
-> IP-Config: Failed to open eth1
-> IP-Config: No network devices available
-> Warning: unable to open an initial console.
+Initial read of kernel register state failed
+kvm_init_vcpu failed: Invalid argument
 
-Perhaps it wants the network console instead?
-Are you using "console=ttyS0,115200" or something alike?
-Or a /dev filesystem problems maybe?
+Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+Signed-off-by: Kim Phillips <kim.phillips@linaro.org>
+Cc: Gleb Natapov <gleb@redhat.com>
+Cc: Paolo Bonzini <pbonzini@redhat.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Jonghwan Choi <jhbird.choi@samsung.com>
+Cc: kvmarm at lists.cs.columbia.edu
+Cc: kvm at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-kernel at vger.kernel.org
+Cc: <stable@vger.kernel.org> # 3.10.x
+---
+resumbission of:
 
-> I'm no expert on licenses but shouldn't here at least be GPLv2 since the
-> file originated from OpenWrt support for this board which is GPLv2.
+https://lkml.org/lkml/2013/8/23/50
 
-Of course the license is GPLv2, every Linux kernel file (except maybe
-some firmware and non-copyrightable code) is so licensed. See the file
-"COPYING"
+albeit with perhaps a better rationale than 'looks like it should be in
+the 3.10-stable tree'.
 
->> +static struct i2c_board_info __initdata cambria_i2c_board_info[] = {
->> +	{
->> +		I2C_BOARD_INFO("ad7418", 0x28),
->> +	},
->> +	{
->> +		I2C_BOARD_INFO("24c08", 0x50),
->> +		.platform_data	= &cambria_eeprom_info,
->> +	},
->> +};
->
-> I couldn't test this because of the console issue but in OpenWrt sources
-> the value is 0x51 and not 0x50. Did you change it by accident?
+ arch/arm/kvm/coproc.c     | 26 +++++++++++++++++++-------
+ arch/arm/kvm/coproc.h     |  3 +++
+ arch/arm/kvm/coproc_a15.c |  6 +++++-
+ 3 files changed, 27 insertions(+), 8 deletions(-)
 
-Not really, the board simply has 24C08 at 0x50. OpenWRT does a trick with
-offsets here, you can't really have a 24C08 at 0x51 (possible addresses
-for most chips are 0x50 and 0x54). I just did it the straight way and it
-works fine.
-
-> Also, shouldn't arch/arm/configs/ixp4xx_defconfig be updated too?
-
-Well, probably.
+diff --git a/arch/arm/kvm/coproc.c b/arch/arm/kvm/coproc.c
+index 4a51990..db9cf69 100644
+--- a/arch/arm/kvm/coproc.c
++++ b/arch/arm/kvm/coproc.c
+@@ -146,7 +146,11 @@ static bool pm_fake(struct kvm_vcpu *vcpu,
+ #define access_pmintenclr pm_fake
+ 
+ /* Architected CP15 registers.
+- * Important: Must be sorted ascending by CRn, CRM, Op1, Op2
++ * CRn denotes the primary register number, but is copied to the CRm in the
++ * user space API for 64-bit register access in line with the terminology used
++ * in the ARM ARM.
++ * Important: Must be sorted ascending by CRn, CRM, Op1, Op2 and with 64-bit
++ *            registers preceding 32-bit ones.
+  */
+ static const struct coproc_reg cp15_regs[] = {
+ 	/* CSSELR: swapped by interrupt.S. */
+@@ -154,8 +158,8 @@ static const struct coproc_reg cp15_regs[] = {
+ 			NULL, reset_unknown, c0_CSSELR },
+ 
+ 	/* TTBR0/TTBR1: swapped by interrupt.S. */
+-	{ CRm( 2), Op1( 0), is64, NULL, reset_unknown64, c2_TTBR0 },
+-	{ CRm( 2), Op1( 1), is64, NULL, reset_unknown64, c2_TTBR1 },
++	{ CRm64( 2), Op1( 0), is64, NULL, reset_unknown64, c2_TTBR0 },
++	{ CRm64( 2), Op1( 1), is64, NULL, reset_unknown64, c2_TTBR1 },
+ 
+ 	/* TTBCR: swapped by interrupt.S. */
+ 	{ CRn( 2), CRm( 0), Op1( 0), Op2( 2), is32,
+@@ -182,7 +186,7 @@ static const struct coproc_reg cp15_regs[] = {
+ 			NULL, reset_unknown, c6_IFAR },
+ 
+ 	/* PAR swapped by interrupt.S */
+-	{ CRn( 7), Op1( 0), is64, NULL, reset_unknown64, c7_PAR },
++	{ CRm64( 7), Op1( 0), is64, NULL, reset_unknown64, c7_PAR },
+ 
+ 	/*
+ 	 * DC{C,I,CI}SW operations:
+@@ -399,12 +403,13 @@ static bool index_to_params(u64 id, struct coproc_params *params)
+ 			      | KVM_REG_ARM_OPC1_MASK))
+ 			return false;
+ 		params->is_64bit = true;
+-		params->CRm = ((id & KVM_REG_ARM_CRM_MASK)
++		/* CRm to CRn: see cp15_to_index for details */
++		params->CRn = ((id & KVM_REG_ARM_CRM_MASK)
+ 			       >> KVM_REG_ARM_CRM_SHIFT);
+ 		params->Op1 = ((id & KVM_REG_ARM_OPC1_MASK)
+ 			       >> KVM_REG_ARM_OPC1_SHIFT);
+ 		params->Op2 = 0;
+-		params->CRn = 0;
++		params->CRm = 0;
+ 		return true;
+ 	default:
+ 		return false;
+@@ -898,7 +903,14 @@ static u64 cp15_to_index(const struct coproc_reg *reg)
+ 	if (reg->is_64) {
+ 		val |= KVM_REG_SIZE_U64;
+ 		val |= (reg->Op1 << KVM_REG_ARM_OPC1_SHIFT);
+-		val |= (reg->CRm << KVM_REG_ARM_CRM_SHIFT);
++		/*
++		 * CRn always denotes the primary coproc. reg. nr. for the
++		 * in-kernel representation, but the user space API uses the
++		 * CRm for the encoding, because it is modelled after the
++		 * MRRC/MCRR instructions: see the ARM ARM rev. c page
++		 * B3-1445
++		 */
++		val |= (reg->CRn << KVM_REG_ARM_CRM_SHIFT);
+ 	} else {
+ 		val |= KVM_REG_SIZE_U32;
+ 		val |= (reg->Op1 << KVM_REG_ARM_OPC1_SHIFT);
+diff --git a/arch/arm/kvm/coproc.h b/arch/arm/kvm/coproc.h
+index b7301d3..0461d5c 100644
+--- a/arch/arm/kvm/coproc.h
++++ b/arch/arm/kvm/coproc.h
+@@ -135,6 +135,8 @@ static inline int cmp_reg(const struct coproc_reg *i1,
+ 		return -1;
+ 	if (i1->CRn != i2->CRn)
+ 		return i1->CRn - i2->CRn;
++	if (i1->is_64 != i2->is_64)
++		return i2->is_64 - i1->is_64;
+ 	if (i1->CRm != i2->CRm)
+ 		return i1->CRm - i2->CRm;
+ 	if (i1->Op1 != i2->Op1)
+@@ -145,6 +147,7 @@ static inline int cmp_reg(const struct coproc_reg *i1,
+ 
+ #define CRn(_x)		.CRn = _x
+ #define CRm(_x) 	.CRm = _x
++#define CRm64(_x)       .CRn = _x, .CRm = 0
+ #define Op1(_x) 	.Op1 = _x
+ #define Op2(_x) 	.Op2 = _x
+ #define is64		.is_64 = true
+diff --git a/arch/arm/kvm/coproc_a15.c b/arch/arm/kvm/coproc_a15.c
+index 685063a..cf93472 100644
+--- a/arch/arm/kvm/coproc_a15.c
++++ b/arch/arm/kvm/coproc_a15.c
+@@ -114,7 +114,11 @@ static bool access_l2ectlr(struct kvm_vcpu *vcpu,
+ 
+ /*
+  * A15-specific CP15 registers.
+- * Important: Must be sorted ascending by CRn, CRM, Op1, Op2
++ * CRn denotes the primary register number, but is copied to the CRm in the
++ * user space API for 64-bit register access in line with the terminology used
++ * in the ARM ARM.
++ * Important: Must be sorted ascending by CRn, CRM, Op1, Op2 and with 64-bit
++ *            registers preceding 32-bit ones.
+  */
+ static const struct coproc_reg a15_regs[] = {
+ 	/* MPIDR: we use VMPIDR for guest access. */
 -- 
-Krzysztof Halasa
+1.8.4
