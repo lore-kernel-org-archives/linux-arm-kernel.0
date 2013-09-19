@@ -1,36 +1,50 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Thu, 19 Sep 2013 22:49:01 +0100
-Subject: [PATCH 24/51] DMA-API: dma: pl330: add dma_set_mask_and_coherent()
- call
+Date: Thu, 19 Sep 2013 22:36:00 +0100
+Subject: [PATCH 11/51] DMA-API: net: emulex/benet: replace
+ dma_set_mask()+dma_set_coherent_mask() with new helper
 In-Reply-To: <20130919212235.GD12758@n2100.arm.linux.org.uk>
 References: <20130919212235.GD12758@n2100.arm.linux.org.uk>
-Message-ID: <E1VMm5t-0007i5-V7@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1VMltI-0007gK-2r@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The DMA API requires drivers to call the appropriate dma_set_mask()
-functions before doing any DMA mapping.  Add this required call to
-the AMBA PL08x driver.
+Replace the following sequence:
+
+	dma_set_mask(dev, mask);
+	dma_set_coherent_mask(dev, mask);
+
+with a call to the new helper dma_set_mask_and_coherent().
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/dma/pl330.c |    4 ++++
- 1 files changed, 4 insertions(+), 0 deletions(-)
+ drivers/net/ethernet/emulex/benet/be_main.c |   12 ++----------
+ 1 files changed, 2 insertions(+), 10 deletions(-)
 
-diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
-index a562d24..df8b10f 100644
---- a/drivers/dma/pl330.c
-+++ b/drivers/dma/pl330.c
-@@ -2903,6 +2903,10 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
+diff --git a/drivers/net/ethernet/emulex/benet/be_main.c b/drivers/net/ethernet/emulex/benet/be_main.c
+index 3224d28..2084151 100644
+--- a/drivers/net/ethernet/emulex/benet/be_main.c
++++ b/drivers/net/ethernet/emulex/benet/be_main.c
+@@ -4335,19 +4335,11 @@ static int be_probe(struct pci_dev *pdev, const struct pci_device_id *pdev_id)
+ 	adapter->netdev = netdev;
+ 	SET_NETDEV_DEV(netdev, &pdev->dev);
  
- 	pdat = dev_get_platdata(&adev->dev);
- 
-+	ret = dma_set_mask_and_coherent(&adev->dev, DMA_BIT_MASK(32));
-+	if (ret)
-+		return ret;
-+
- 	/* Allocate a new DMAC and its Channels */
- 	pdmac = devm_kzalloc(&adev->dev, sizeof(*pdmac), GFP_KERNEL);
- 	if (!pdmac) {
+-	status = dma_set_mask(&pdev->dev, DMA_BIT_MASK(64));
++	status = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(64));
+ 	if (!status) {
+-		status = dma_set_coherent_mask(&pdev->dev, DMA_BIT_MASK(64));
+-		if (status < 0) {
+-			dev_err(&pdev->dev, "dma_set_coherent_mask failed\n");
+-			goto free_netdev;
+-		}
+ 		netdev->features |= NETIF_F_HIGHDMA;
+ 	} else {
+-		status = dma_set_mask(&pdev->dev, DMA_BIT_MASK(32));
+-		if (!status)
+-			status = dma_set_coherent_mask(&pdev->dev,
+-						       DMA_BIT_MASK(32));
++		status = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(32));
+ 		if (status) {
+ 			dev_err(&pdev->dev, "Could not set PCI DMA Mask\n");
+ 			goto free_netdev;
 -- 
 1.7.4.4
