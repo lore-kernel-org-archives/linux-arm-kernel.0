@@ -1,67 +1,38 @@
-From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Thu, 19 Sep 2013 22:31:59 +0100
-Subject: [PATCH 07/51] DMA-API: net: intel/ixgbe: fix 32-bit DMA mask handling
-In-Reply-To: <20130919212235.GD12758@n2100.arm.linux.org.uk>
-References: <20130919212235.GD12758@n2100.arm.linux.org.uk>
-Message-ID: <E1VMlpP-0007fp-IC@rmk-PC.arm.linux.org.uk>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Thu, 19 Sep 2013 15:57:40 -0700
+Subject: [GIT PULL] ARM: SoC fixes for 3.12-rc
+In-Reply-To: <1379626776.753.164.camel@shinybook.infradead.org>
+References: <20130919194752.GA19975@quad.lixom.net>
+ <1379626776.753.164.camel@shinybook.infradead.org>
+Message-ID: <CAN8TOE8j=oosn-5hAdqoTPcuW-sGvDAHd_nK6BZfJpxMwwpisQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The fallback to 32-bit DMA mask is rather odd:
-	if (!dma_set_mask(&pdev->dev, DMA_BIT_MASK(64)) &&
-	    !dma_set_coherent_mask(&pdev->dev, DMA_BIT_MASK(64))) {
-		pci_using_dac = 1;
-	} else {
-		err = dma_set_mask(&pdev->dev, DMA_BIT_MASK(32));
-		if (err) {
-			err = dma_set_coherent_mask(&pdev->dev,
-						    DMA_BIT_MASK(32));
-			if (err) {
-				dev_err(&pdev->dev,
-					"No usable DMA configuration, aborting\n");
-				goto err_dma;
-			}
-		}
-		pci_using_dac = 0;
-	}
-This means we only set the coherent DMA mask in the fallback path if
-the DMA mask set failed, which is silly.  This fixes it to set the
-coherent DMA mask only if dma_set_mask() succeeded, and to error out
-if either fails.
+On Thu, Sep 19, 2013 at 2:39 PM, Woodhouse, David
+<david.woodhouse@intel.com> wrote:
+> On Thu, 2013-09-19 at 12:47 -0700, Olof Johansson wrote:
+>>
+>> - A fix for build breakage in the MTD subsystem for some PXA devices.
+>>   David Woodhouse has this patch in his for-next branch but has not been
+>>   responding to our requests to send it up so here it is.
+>>   I should have amended the commit message to describe the build failure for
+>>   CONFIG_OF=n setups, but forgot and now it's down in the stack of commits.
+>
+> Thanks for pulling that in. Apologies for the screwup.
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- drivers/net/ethernet/intel/ixgbe/ixgbe_main.c |   15 +++++----------
- 1 files changed, 5 insertions(+), 10 deletions(-)
+Speaking of such process issues: there's an outstanding patch for a
+(small) memory leak that was introduced in the nand_base.c ONFI code
+in 3.12-rc1. Can I expect you to attend to these sort of -rcX (where X
+> 1) issues? Or should I send Linus the patch myself? I don't really
+want it to wait around until 3.13-rc1 to go to -stable.
 
-diff --git a/drivers/net/ethernet/intel/ixgbe/ixgbe_main.c b/drivers/net/ethernet/intel/ixgbe/ixgbe_main.c
-index 7aba452..b1dc844 100644
---- a/drivers/net/ethernet/intel/ixgbe/ixgbe_main.c
-+++ b/drivers/net/ethernet/intel/ixgbe/ixgbe_main.c
-@@ -7475,19 +7475,14 @@ static int ixgbe_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
- 	if (err)
- 		return err;
- 
--	if (!dma_set_mask(&pdev->dev, DMA_BIT_MASK(64)) &&
--	    !dma_set_coherent_mask(&pdev->dev, DMA_BIT_MASK(64))) {
-+	if (!dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(64))) {
- 		pci_using_dac = 1;
- 	} else {
--		err = dma_set_mask(&pdev->dev, DMA_BIT_MASK(32));
-+		err = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(32));
- 		if (err) {
--			err = dma_set_coherent_mask(&pdev->dev,
--						    DMA_BIT_MASK(32));
--			if (err) {
--				dev_err(&pdev->dev,
--					"No usable DMA configuration, aborting\n");
--				goto err_dma;
--			}
-+			dev_err(&pdev->dev,
-+				"No usable DMA configuration, aborting\n");
-+			goto err_dma;
- 		}
- 		pci_using_dac = 0;
- 	}
--- 
-1.7.4.4
+It's in l2-mtd.git (will need cherry-picked out of there) and ready
+for the next linux-next:
+
+commit b2bdf43fcc1d440d8f4e1d5c8c59bf2ca76204df
+Author: Brian Norris <computersforpeace@gmail.com>
+Date:   Mon Sep 16 17:59:20 2013 -0700
+
+    mtd: nand: fix memory leak in ONFI extended parameter page
+
+Brian
