@@ -1,50 +1,190 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 19 Sep 2013 11:46:39 +0100
-Subject: [GIT PULL] Removeal of 0x's from DT address spaces
-Message-ID: <20130919104639.GD22389@lee--X1>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Thu, 19 Sep 2013 12:47:36 +0200
+Subject: [PATCH RESEND] clk: si5351: remove variant from platform_data
+Message-ID: <523AD648.7000802@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi ARM-SoC,
+Commit 9807362bfe1748d9bb48eecb9261f1b1aaafea1c
+   "clk: si5351: declare all device IDs for module loading"
+removed the common i2c_device_id and introduced new ones for each variant
+of the clock generator. Instead of exploiting that information in the 
+driver,
+it still depends on platform_data passing the chips .variant.
 
-This is the remainder of a patchset that's been on the MLs for quite a
-while now. It's a simple set which removes the unecessary '0x's from
-device node headers i.e. s/dev at 0xaaaaaaaa/dev at aaaaaaaa/. Most of the
-patches have been taken in by individual maintainers and this is
-what's left.
+This removes the now redundant .variant from the platform_data and puts 
+it in
+i2c_device_id's .driver_data instead.
 
-The following changes since commit 272b98c6455f00884f0350f775c5342358ebb73f:
+Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+---
+Cc: Mike Turquette <mturquette@linaro.org>
+Cc: Jason Cooper <jason@lakedaemon.net>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-kernel at vger.kernel.org
+---
+  drivers/clk/clk-si5351.c             |   28 ++++++++++++----------------
+  drivers/clk/clk-si5351.h             |   14 ++++++++++++++
+  include/linux/platform_data/si5351.h |   16 ----------------
+  3 files changed, 26 insertions(+), 32 deletions(-)
 
-  Linux 3.12-rc1 (2013-09-16 16:17:51 -0400)
-
-are available in the git repository at:
-
-  git://git.linaro.org/people/ljones/linux-3.0-ux500.git tb-0x-removeal
-
-for you to fetch changes up to 5621ed85635680def9bbf75c107b20bb913f14bb:
-
-  ARM: SPEAr3xx: DT: Remove '0x's from Spear 320 DTS file (2013-09-19 11:36:20 +0100)
-
-----------------------------------------------------------------
-Lee Jones (5):
-      ARM: ux500: Remove '0x's from HREF v60+ DTS file
-      ARM: at91: dt: Remove '0x's from Animeo IP DTS file
-      ARM: SPEAr3xx: DT: Remove '0x's from Spear 300 DTS file
-      ARM: SPEAr3xx: DT: Remove '0x's from Spear 310 DTS file
-      ARM: SPEAr3xx: DT: Remove '0x's from Spear 320 DTS file
-
- arch/arm/boot/dts/animeo_ip.dts       | 2 +-
- arch/arm/boot/dts/spear300.dtsi       | 2 +-
- arch/arm/boot/dts/spear310.dtsi       | 2 +-
- arch/arm/boot/dts/spear320.dtsi       | 2 +-
- arch/arm/boot/dts/ste-hrefv60plus.dts | 2 +-
- 5 files changed, 5 insertions(+), 5 deletions(-)
-
-Kind regards,
-Lee
-
+diff --git a/drivers/clk/clk-si5351.c b/drivers/clk/clk-si5351.c
+index c50e837..b95aa09 100644
+--- a/drivers/clk/clk-si5351.c
++++ b/drivers/clk/clk-si5351.c
+@@ -1111,11 +1111,11 @@ static const struct of_device_id si5351_dt_ids[] = {
+  };
+  MODULE_DEVICE_TABLE(of, si5351_dt_ids);
+  -static int si5351_dt_parse(struct i2c_client *client)
++static int si5351_dt_parse(struct i2c_client *client,
++			   enum si5351_variant variant)
+  {
+  	struct device_node *child, *np = client->dev.of_node;
+  	struct si5351_platform_data *pdata;
+-	const struct of_device_id *match;
+  	struct property *prop;
+  	const __be32 *p;
+  	int num = 0;
+@@ -1124,15 +1124,10 @@ static int si5351_dt_parse(struct i2c_client 
+*client)
+  	if (np == NULL)
+  		return 0;
+  -	match = of_match_node(si5351_dt_ids, np);
+-	if (match == NULL)
+-		return -EINVAL;
+-
+  	pdata = devm_kzalloc(&client->dev, sizeof(*pdata), GFP_KERNEL);
+  	if (!pdata)
+  		return -ENOMEM;
+  -	pdata->variant = (enum si5351_variant)match->data;
+  	pdata->clk_xtal = of_clk_get(np, 0);
+  	if (!IS_ERR(pdata->clk_xtal))
+  		clk_put(pdata->clk_xtal);
+@@ -1163,7 +1158,7 @@ static int si5351_dt_parse(struct i2c_client *client)
+  			pdata->pll_src[num] = SI5351_PLL_SRC_XTAL;
+  			break;
+  		case 1:
+-			if (pdata->variant != SI5351_VARIANT_C) {
++			if (variant != SI5351_VARIANT_C) {
+  				dev_err(&client->dev,
+  					"invalid parent %d for pll %d\n",
+  					val, num);
+@@ -1187,7 +1182,7 @@ static int si5351_dt_parse(struct i2c_client *client)
+  		}
+   		if (num >= 8 ||
+-		    (pdata->variant == SI5351_VARIANT_A3 && num >= 3)) {
++		    (variant == SI5351_VARIANT_A3 && num >= 3)) {
+  			dev_err(&client->dev, "invalid clkout %d\n", num);
+  			return -EINVAL;
+  		}
+@@ -1226,7 +1221,7 @@ static int si5351_dt_parse(struct i2c_client *client)
+  					SI5351_CLKOUT_SRC_XTAL;
+  				break;
+  			case 3:
+-				if (pdata->variant != SI5351_VARIANT_C) {
++				if (variant != SI5351_VARIANT_C) {
+  					dev_err(&client->dev,
+  						"invalid parent %d for clkout %d\n",
+  						val, num);
+@@ -1307,6 +1302,7 @@ static int si5351_dt_parse(struct i2c_client *client)
+  static int si5351_i2c_probe(struct i2c_client *client,
+  			    const struct i2c_device_id *id)
+  {
++	enum si5351_variant variant = (enum si5351_variant)id->driver_data;
+  	struct si5351_platform_data *pdata;
+  	struct si5351_driver_data *drvdata;
+  	struct clk_init_data init;
+@@ -1315,7 +1311,7 @@ static int si5351_i2c_probe(struct i2c_client *client,
+  	u8 num_parents, num_clocks;
+  	int ret, n;
+  -	ret = si5351_dt_parse(client);
++	ret = si5351_dt_parse(client, variant);
+  	if (ret)
+  		return ret;
+  @@ -1331,7 +1327,7 @@ static int si5351_i2c_probe(struct i2c_client 
+*client,
+   	i2c_set_clientdata(client, drvdata);
+  	drvdata->client = client;
+-	drvdata->variant = pdata->variant;
++	drvdata->variant = variant;
+  	drvdata->pxtal = pdata->clk_xtal;
+  	drvdata->pclkin = pdata->clk_clkin;
+  @@ -1568,10 +1564,10 @@ static int si5351_i2c_probe(struct i2c_client 
+*client,
+  }
+   static const struct i2c_device_id si5351_i2c_ids[] = {
+-	{ "si5351a", 0 },
+-	{ "si5351a-msop", 0 },
+-	{ "si5351b", 0 },
+-	{ "si5351c", 0 },
++	{ "si5351a", SI5351_VARIANT_A },
++	{ "si5351a-msop", SI5351_VARIANT_A3 },
++	{ "si5351b", SI5351_VARIANT_B },
++	{ "si5351c", SI5351_VARIANT_C },
+  	{ }
+  };
+  MODULE_DEVICE_TABLE(i2c, si5351_i2c_ids);
+diff --git a/drivers/clk/clk-si5351.h b/drivers/clk/clk-si5351.h
+index c0dbf26..4d0746b 100644
+--- a/drivers/clk/clk-si5351.h
++++ b/drivers/clk/clk-si5351.h
+@@ -153,4 +153,18 @@
+  #define  SI5351_XTAL_ENABLE			(1<<6)
+  #define  SI5351_MULTISYNTH_ENABLE		(1<<4)
+  +/**
++ * enum si5351_variant - SiLabs Si5351 chip variant
++ * @SI5351_VARIANT_A: Si5351A (8 output clocks, XTAL input)
++ * @SI5351_VARIANT_A3: Si5351A MSOP10 (3 output clocks, XTAL input)
++ * @SI5351_VARIANT_B: Si5351B (8 output clocks, XTAL/VXCO input)
++ * @SI5351_VARIANT_C: Si5351C (8 output clocks, XTAL/CLKIN input)
++ */
++enum si5351_variant {
++	SI5351_VARIANT_A = 1,
++	SI5351_VARIANT_A3 = 2,
++	SI5351_VARIANT_B = 3,
++	SI5351_VARIANT_C = 4,
++};
++
+  #endif
+diff --git a/include/linux/platform_data/si5351.h 
+b/include/linux/platform_data/si5351.h
+index 5433439..a947ab8 100644
+--- a/include/linux/platform_data/si5351.h
++++ b/include/linux/platform_data/si5351.h
+@@ -8,20 +8,6 @@
+  struct clk;
+   /**
+- * enum si5351_variant - SiLabs Si5351 chip variant
+- * @SI5351_VARIANT_A: Si5351A (8 output clocks, XTAL input)
+- * @SI5351_VARIANT_A3: Si5351A MSOP10 (3 output clocks, XTAL input)
+- * @SI5351_VARIANT_B: Si5351B (8 output clocks, XTAL/VXCO input)
+- * @SI5351_VARIANT_C: Si5351C (8 output clocks, XTAL/CLKIN input)
+- */
+-enum si5351_variant {
+-	SI5351_VARIANT_A = 1,
+-	SI5351_VARIANT_A3 = 2,
+-	SI5351_VARIANT_B = 3,
+-	SI5351_VARIANT_C = 4,
+-};
+-
+-/**
+   * enum si5351_pll_src - Si5351 pll clock source
+   * @SI5351_PLL_SRC_DEFAULT: default, do not change eeprom config
+   * @SI5351_PLL_SRC_XTAL: pll source clock is XTAL input
+@@ -115,14 +101,12 @@ struct si5351_clkout_config {
+   /**
+   * struct si5351_platform_data - Platform data for the Si5351 clock driver
+- * @variant: Si5351 chip variant
+   * @clk_xtal: xtal input clock
+   * @clk_clkin: clkin input clock
+   * @pll_src: array of pll source clock setting
+   * @clkout: array of clkout configuration
+   */
+  struct si5351_platform_data {
+-	enum si5351_variant variant;
+  	struct clk *clk_xtal;
+  	struct clk *clk_clkin;
+  	enum si5351_pll_src pll_src[2];
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+1.7.10.4
