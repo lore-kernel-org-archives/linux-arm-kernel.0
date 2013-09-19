@@ -1,60 +1,66 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 19 Sep 2013 08:36:52 +0200
-Subject: [RFC PATCHv2 3/4] of: provide a binding for fixed link PHYs
-In-Reply-To: <20130918150031.D9034C42CDF@trevor.secretlab.ca>
-References: <1378480701-12908-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1378480701-12908-4-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130918042923.5D845C42CF7@trevor.secretlab.ca>
- <CAGVrzcbVTenhVC4tQznJFqVpO08ruxLyy1ZiLmw6Bu1=3zbGZg@mail.gmail.com>
- <20130918150031.D9034C42CDF@trevor.secretlab.ca>
-Message-ID: <20130919063652.GQ30088@pengutronix.de>
+From: maxime.coquelin@st.com (Maxime COQUELIN)
+Date: Thu, 19 Sep 2013 09:16:27 +0200
+Subject: [PATCH 2/4] ARM: STi: Supply I2C configuration to STiH416 SoC
+References: <1379498483-4236-1-git-send-email-maxime.coquelin@st.com>
+ <1379498483-4236-3-git-send-email-maxime.coquelin@st.com>
+ <20130918120340.GF16984@lee--X1>
+ <84625B87D65BCF478CC1E9C886A4C314DEF1BD9578@SAFEX1MAIL4.st.com>
+ <5239A322.5010004@st.com>
+Message-ID: <84625B87D65BCF478CC1E9C886A4C314DEF1BD9579@SAFEX1MAIL4.st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 18, 2013 at 10:00:31AM -0500, Grant Likely wrote:
-> On Wed, 18 Sep 2013 10:21:11 +0100, Florian Fainelli <f.fainelli@gmail.com> wrote:
-> > >
-> > > I understand what you're trying to do here, but it causes a troublesome
-> > > leakage of implementation detail into the binding, making the whole
-> > > thing look very odd. This binding tries to make a fixed link look
-> > > exactly like a real PHY even to the point of including a phandle to the
-> > > phy. But having a phandle to a node which is *always* a direct child of
-> > > the MAC node is redundant and a rather looney. Yes, doing it that way
-> > > makes it easy for of_phy_find_device() to be transparent for fixed link,
-> > > but that should *not* drive bindings, especially when that makes the
-> > > binding really rather weird.
-> > 
-> > This is not exactly true in the sense that the "new" binding just
-> > re-shuffles the properties representation into something that is
-> > clearer and more extendible but there is not much difference in the
-> > semantics.
-> 
-> That's not my point in the above paragraph. My point is a binding that
-> consists of a phandle to a node that is always a direct child is goofy
-> and wrong.
+Hi Srini,
 
-It's not necessarily a direct child. Most of these fixed links are really
-ethernet switches. These are (mostly) i2c devices which are under their
-corresponding i2c bus node. Using a phandle from the ethernet MAC to
-the port of a switch not only provides the link information, but also the
-information to which port of the switch the MAC is connected.
+On 09/18/2013 03:17 PM, Srinivas KANDAGATLA wrote:
+> On 18/09/13 13:46, Maxime COQUELIN wrote:
+>> On 09/18/2013 02:03 PM, Lee Jones wrote:
+>>>>>> This patch supplies I2C configuration to STiH416 SoC.
+>>>>>>
+>>>>>> Cc: Srinivas Kandagatla <srinivas.kandagatla@st.com>
+>>>>>> Signed-off-by: Maxime Coquelin <maxime.coquelin@st.com>
+>>>>>> ---
+>>>>>>  arch/arm/boot/dts/stih416-pinctrl.dtsi |   35 ++++++++++++++++++++
+>>>>>>  arch/arm/boot/dts/stih416.dtsi         |   57 ++++++++++++++++++++++++++++++++
+>>>>>>  2 files changed, 92 insertions(+)
+>>>>>>
+>>>>>> diff --git a/arch/arm/boot/dts/stih416-pinctrl.dtsi b/arch/arm/boot/dts/stih416-pinctrl.dtsi
+>>>> I genuinely don't know the answer to this question, but are these
+>>>> nodes identical to the ones you've just put in the stih415 DTSI file?
+>>>> If so, I think it will be worth creating a stih41x DTSI rather than
+>>>> duplicating lots of stuff unnecessarily.
+>> There are close to be identical indeed.
+>> For the clocks and pinctrl, the references names are the same, but they are
+>> pointing on different nodes, as STiH415 and STiH416 have their own
+>> clocks and pinctrl dtsi files.
+>>
+>> Srini, what is opinion about this?
+> There is already a stih41x.dtsi file, but I don't think it is the right
+> place for the pinctrl nodes there.
+>
+> Am not OK with the idea of common pinctrl nodes for STiH415 and STiH416
+> for two reasons.
+>
+> 1> If we common up the pinctrl nodes, it will be very difficult to
+> accommodate new pinctrls layout which is not guaranteed to be in same
+> layout in future SOCs.
+>
+> 2> The retiming values in the pinctrl nodes tend to change as per SOC,
+> so it will be difficult to manage it if we common it up.
+>
+> Am sure we can come up with a dt layout which can reduce duplication,
+> but we have to be careful here not to lose the flexiblity to accommodate
+> new picntrl layouts, new retimings values based on SOC.
+Ok. What do you think of declaring the i2c nodes inside the stih41x.dtsi
+file,
+and overload them with the pinctrl and clock properties in the stih416
+and stih415 dtsi files?
 
-Another situation is that some SoCs have a MDIO bus external to the MAC
-and possibly shared for multiple ethernet MACs. This also requires a
-phandle from the MAC to the MDIO bus.
-
-So we have the situation that we need a phandle from the MAC to something
-that provides a link. For consistency it would be good to always use a
-phandle instead of having an inflexible 'fixed-link' property.
-
-You're right, the binding doesn't provide anything new, but I think it
-straightens things up for the future.
-
-Sascha
-
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Regards,
+Maxime
+>
+>
+> thanks,
+> srini
+>
+>
