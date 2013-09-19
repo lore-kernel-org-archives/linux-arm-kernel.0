@@ -1,52 +1,66 @@
-From: jbe@pengutronix.de (=?utf-8?q?J=C3=BCrgen_Beisert?=)
-Date: Thu, 19 Sep 2013 14:49:37 +0200
-Subject: [PATCH 5/6] Staging/iio/adc/touchscreen/MXS: add interrupt driven
- touch detection
-In-Reply-To: <0fb59809-c835-49b0-bd82-e791db1a9db7@email.android.com>
-References: <1378887511-24530-1-git-send-email-jbe@pengutronix.de>
- <201309161010.22151.jbe@pengutronix.de>
- <0fb59809-c835-49b0-bd82-e791db1a9db7@email.android.com>
-Message-ID: <201309191449.37274.jbe@pengutronix.de>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 19 Sep 2013 14:58:54 +0200
+Subject: [PATCH] at91: serial: sam9g25: add usart3 to dtsi
+In-Reply-To: <1379594016-9408-1-git-send-email-jiri.prchal@aksignal.cz>
+References: <1379594016-9408-1-git-send-email-jiri.prchal@aksignal.cz>
+Message-ID: <523AF50E.7020509@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jonathan,
+On 19/09/2013 14:33, Jiri Prchal :
+> Hope it should be in g25 because not all x5 socs have usart3.
 
-On Monday 16 September 2013 17:30:32 Jonathan Cameron wrote:
-> >On Sunday 15 September 2013 12:56:25 Jonathan Cameron wrote:
-> >> On 09/11/13 09:18, Juergen Beisert wrote:
-> >> > For battery driven systems it is a very bad idea to collect the
-> >> > touchscreen data within a kernel busy loop.
-> >> >
-> >> > This change uses the features of the hardware to delay and
-> >> > accumulate samples in hardware to avoid a high interrupt and CPU load.
-> >> >
-> >> > Note: this is only tested on an i.MX23 SoC yet.
-> >> >
-> >> > Signed-off-by: Juergen Beisert <jbe@pengutronix.de>
-> >> > CC: linux-arm-kernel at lists.infradead.org
-> >> > CC: devel at driverdev.osuosl.org
-> >> > CC: Marek Vasut <marex@denx.de>
-> >> > CC: Fabio Estevam <fabio.estevam@freescale.com>
-> >> > CC: Jonathan Cameron <jic23@cam.ac.uk>
-> >>
-> >> While this driver is placed in IIO within staging at the moment,
-> >> these changes are definitely input related.  Hence I have cc'd Dmitry and
-> >> the input list.
-> >>
-> >> I am personaly a little uncomfortable that we have such a complex bit
-> >> of input code sat within an IIO driver but such is life.
-> >
-> > Maybe an MFD for this ADC unit would be a better way to go?
+Well there is a pending rework of these optional peripherals for sam9x5 
+series. So we may end-up with this usart3 declaration in a separated 
+file that will be included in both sam9g25 and sam9x25 product 
+descriptions (together with the already existing pinctrl declaration 
+that resides in at91sam9x5.dtsi).
+
+So, I keep your code and will try to make sure that it is included 
+during the move to that model. If you do not see it appearing, please 
+remind us then...
+
+Thanks a lot, bye,
+
+> Signed-off-by: Jiri Prchal <jiri.prchal@aksignal.cz>
+> ---
+>   arch/arm/boot/dts/at91sam9g25.dtsi |   14 ++++++++++++++
+>   1 file changed, 14 insertions(+)
 >
-> That would be great and is definitely the preferred method.
+> diff --git a/arch/arm/boot/dts/at91sam9g25.dtsi b/arch/arm/boot/dts/at91sam9g25.dtsi
+> index b4ec6fe..ba0966f 100644
+> --- a/arch/arm/boot/dts/at91sam9g25.dtsi
+> +++ b/arch/arm/boot/dts/at91sam9g25.dtsi
+> @@ -12,6 +12,10 @@
+>   	model = "Atmel AT91SAM9G25 SoC";
+>   	compatible = "atmel,at91sam9g25", "atmel,at91sam9x5";
+>
+> +	aliases {
+> +		serial4 = &usart3;
+> +	};
+> +
+>   	ahb {
+>   		apb {
+>   			pinctrl at fffff400 {
+> @@ -23,6 +27,16 @@
+>   				       0x003fffff 0x003f8000 0x00000000  /* pioD */
+>   				      >;
+>   			};
+> +
+> +			usart3: serial at f8028000 {
+> +				compatible = "atmel,at91sam9260-usart";
+> +				reg = <0xf8028000 0x200>;
+> +				interrupts = <8 IRQ_TYPE_LEVEL_HIGH 5>;
+> +				pinctrl-names = "default";
+> +				pinctrl-0 = <&pinctrl_usart3>;
+> +				status = "disabled";
+> +			};
+> +
+>   		};
+>   	};
+>   };
+>
 
-Cannot continue to convert the driver into an MFD device. The project does not 
-give me the time to do so.
-
-Regards,
-Juergen
 
 -- 
-Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?| Juergen Beisert ? ? ? ? ? ? |
-Linux Solutions for Science and Industry ? ? ?| http://www.pengutronix.de/  |
+Nicolas Ferre
