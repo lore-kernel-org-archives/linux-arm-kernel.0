@@ -1,38 +1,52 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Thu, 19 Sep 2013 11:49:57 +0200
-Subject: [PATCH] ASoC: kirkwood: fix loss of external clock at probe time
-Message-ID: <20130919114957.1fede091@armhf>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Thu, 19 Sep 2013 11:57:11 +0200
+Subject: 3.12-rc1: no longer compiles for Nokia n900 (omap based)
+In-Reply-To: <20130919093627.GB24866@mudshark.cambridge.arm.com>
+References: <20130919093002.GA23806@amd.pavel.ucw.cz>
+ <20130919093627.GB24866@mudshark.cambridge.arm.com>
+Message-ID: <20130919095711.GA19346@amd.pavel.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-At probe time, when the clock driver is not yet initialized, the
-external clock of the kirkwood sound device will not be usable.
+On Thu 2013-09-19 10:36:28, Will Deacon wrote:
+> On Thu, Sep 19, 2013 at 10:30:02AM +0100, Pavel Machek wrote:
+> > Hi!
+> > 
+> > I get:
+> > 
+> >   CC      arch/arm/kernel/machine_kexec.o
+> > /tmp/ccCFXeXG.s: Assembler messages:
+> > /tmp/ccCFXeXG.s:217: Error: garbage following instruction -- `dsb
+> > nshst'
+> > /tmp/ccCFXeXG.s:225: Error: garbage following instruction -- `dsb nsh'
+> > make[1]: *** [arch/arm/kernel/suspend.o] Error 1
+> > make[1]: *** Waiting for unfinished jobs....
+> > 
+> > pavel at amd:/data/l/linux-n900$ arm-linux-gnueabi-gcc --version
+> > arm-linux-gnueabi-gcc (Debian 4.3.5-4) 4.3.5
+> > 
+> > Minimum required gcc is 3.2, so I'm safe.
+> 
+> Please check your binutils. >= 2.22 has been reported to work.
 
-This patch fixes this problem defering the device probe.
+pavel at amd:/data/l/linux-good$ arm-linux-gnueabi-ld --version
+GNU ld (GNU Binutils for Debian) 2.20.1.20100303
+Copyright 2009 Free Software Foundation, Inc.
+This program is free software; you may redistribute it under the terms
+of
+the GNU General Public License version 3 or (at your option) a later
+version.
+This program has absolutely no warranty.
 
-Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
----
- sound/soc/kirkwood/kirkwood-i2s.c | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+but
 
-diff --git a/sound/soc/kirkwood/kirkwood-i2s.c b/sound/soc/kirkwood/kirkwood-i2s.c
-index 0f3d73d..14f32d9 100644
---- a/sound/soc/kirkwood/kirkwood-i2s.c
-+++ b/sound/soc/kirkwood/kirkwood-i2s.c
-@@ -496,7 +496,10 @@ static int kirkwood_i2s_dev_probe(struct platform_device *pdev)
- 		return err;
- 
- 	priv->extclk = devm_clk_get(&pdev->dev, "extclk");
--	if (!IS_ERR(priv->extclk)) {
-+	if (IS_ERR(priv->extclk)) {
-+		if (np && of_property_match_string(np, "clock-names", "extclk") >= 0)
-+			return -EPROBE_DEFER;
-+	} else {
- 		if (priv->extclk == priv->clk) {
- 			devm_clk_put(&pdev->dev, priv->extclk);
- 			priv->extclk = ERR_PTR(-EINVAL);
+Documentation/Changes:
+o  binutils               2.12                    # ld -v
 
+Can the code be fixed so that binutils 2.12 still work?
 
+Thanks,
+									Pavel
 -- 
-Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
-Jef		|		http://moinejf.free.fr/
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
