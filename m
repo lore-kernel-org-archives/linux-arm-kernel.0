@@ -1,60 +1,21 @@
-From: heiko@sntech.de (Heiko =?utf-8?q?St=C3=BCbner?=)
-Date: Thu, 19 Sep 2013 10:40:09 +0200
-Subject: [PATCH 20/26] ARM: rockchip: remove custom .init_time hook
-In-Reply-To: <1379526839-14798-21-git-send-email-sebastian.hesselbarth@gmail.com>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Thu, 19 Sep 2013 16:45:23 +0800
+Subject: [PATCH 04/26] clk: prima2: declare OF clock provider
+In-Reply-To: <1379526839-14798-5-git-send-email-sebastian.hesselbarth@gmail.com>
 References: <1379526839-14798-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1379526839-14798-21-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <201309191040.10683.heiko@sntech.de>
+ <1379526839-14798-5-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <CAGsJ_4xC_g1C-pGQGrcLOBhKLSMG3D8369DRPoFgNZhKqs-aTQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, 18. September 2013, 19:53:53 schrieb Sebastian Hesselbarth:
-> With arch/arm calling of_clk_init(NULL) from time_init(), we can now
-> remove custom .init_time hooks.
-> 
-> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> @@ -1124,3 +1106,4 @@ void __init sirfsoc_of_clk_init(void)
+>
+>         of_clk_add_provider(np, of_clk_src_onecell_get, &clk_data);
+>  }
+> +CLK_OF_DECLARE(sirfsoc_clk, "sirf,prima2-clkc", sirfsoc_clk_init);
 
-Acked-by: Heiko Stuebner <heiko@sntech.de>
+hi Sebastian,
+what if the driver is compatible with multiple clk controllers and we
+want to add another compatible string here except "sirf,prima2-clkc"?
 
-
-> ---
-> Cc: Olof Johansson <olof@lixom.net>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Heiko Stuebner <heiko@sntech.de>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-kernel at vger.kernel.org
-> ---
->  arch/arm/mach-rockchip/rockchip.c |    9 ---------
->  1 file changed, 9 deletions(-)
-> 
-> diff --git a/arch/arm/mach-rockchip/rockchip.c
-> b/arch/arm/mach-rockchip/rockchip.c index 724d2d8..82c0b07 100644
-> --- a/arch/arm/mach-rockchip/rockchip.c
-> +++ b/arch/arm/mach-rockchip/rockchip.c
-> @@ -19,18 +19,10 @@
->  #include <linux/init.h>
->  #include <linux/of_platform.h>
->  #include <linux/irqchip.h>
-> -#include <linux/dw_apb_timer.h>
-> -#include <linux/clk-provider.h>
->  #include <asm/mach/arch.h>
->  #include <asm/mach/map.h>
->  #include <asm/hardware/cache-l2x0.h>
-> 
-> -static void __init rockchip_timer_init(void)
-> -{
-> -	of_clk_init(NULL);
-> -	clocksource_of_init();
-> -}
-> -
->  static void __init rockchip_dt_init(void)
->  {
->  	l2x0_of_init(0, ~0UL);
-> @@ -47,6 +39,5 @@ static const char * const rockchip_board_dt_compat[] = {
-> 
->  DT_MACHINE_START(ROCKCHIP_DT, "Rockchip Cortex-A9 (Device Tree)")
->  	.init_machine	= rockchip_dt_init,
-> -	.init_time	= rockchip_timer_init,
->  	.dt_compat	= rockchip_board_dt_compat,
->  MACHINE_END
+-barry
