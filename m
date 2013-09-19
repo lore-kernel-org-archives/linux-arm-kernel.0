@@ -1,10 +1,10 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Thu, 19 Sep 2013 22:33:59 +0100
-Subject: [PATCH 09/51] DMA-API: net: broadcom/b44: replace
+Date: Thu, 19 Sep 2013 22:39:00 +0100
+Subject: [PATCH 14/51] DMA-API: net: b43: replace
  dma_set_mask()+dma_set_coherent_mask() with new helper
 In-Reply-To: <20130919212235.GD12758@n2100.arm.linux.org.uk>
 References: <20130919212235.GD12758@n2100.arm.linux.org.uk>
-Message-ID: <E1VMlrL-0007g2-QQ@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1VMlwC-0007gl-Ez@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -17,22 +17,28 @@ with a call to the new helper dma_set_mask_and_coherent().
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/net/ethernet/broadcom/b44.c |    3 +--
- 1 files changed, 1 insertions(+), 2 deletions(-)
+ drivers/net/wireless/b43/dma.c |    9 +++------
+ 1 files changed, 3 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/net/ethernet/broadcom/b44.c b/drivers/net/ethernet/broadcom/b44.c
-index 9b017d9..b4d2018 100644
---- a/drivers/net/ethernet/broadcom/b44.c
-+++ b/drivers/net/ethernet/broadcom/b44.c
-@@ -2183,8 +2183,7 @@ static int b44_init_one(struct ssb_device *sdev,
- 		goto err_out_free_dev;
- 	}
- 
--	if (dma_set_mask(sdev->dma_dev, DMA_BIT_MASK(30)) ||
--	    dma_set_coherent_mask(sdev->dma_dev, DMA_BIT_MASK(30))) {
-+	if (dma_set_mask_and_coherent(sdev->dma_dev, DMA_BIT_MASK(30))) {
- 		dev_err(sdev->dev,
- 			"Required 30BIT DMA mask unsupported by the system\n");
- 		goto err_out_powerdown;
+diff --git a/drivers/net/wireless/b43/dma.c b/drivers/net/wireless/b43/dma.c
+index c51d2dc..1d7982a 100644
+--- a/drivers/net/wireless/b43/dma.c
++++ b/drivers/net/wireless/b43/dma.c
+@@ -1065,12 +1065,9 @@ static int b43_dma_set_mask(struct b43_wldev *dev, u64 mask)
+ 	/* Try to set the DMA mask. If it fails, try falling back to a
+ 	 * lower mask, as we can always also support a lower one. */
+ 	while (1) {
+-		err = dma_set_mask(dev->dev->dma_dev, mask);
+-		if (!err) {
+-			err = dma_set_coherent_mask(dev->dev->dma_dev, mask);
+-			if (!err)
+-				break;
+-		}
++		err = dma_set_mask_and_coherent(dev->dev->dma_dev, mask);
++		if (!err)
++			break;
+ 		if (mask == DMA_BIT_MASK(64)) {
+ 			mask = DMA_BIT_MASK(32);
+ 			fallback = true;
 -- 
 1.7.4.4
