@@ -1,209 +1,53 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Thu, 19 Sep 2013 09:01:01 -0700
-Subject: [PATCH v2] clk: si570: Add a driver for SI570 oscillators
-In-Reply-To: <20130919131712.GB24088@roeck-us.net>
-References: <1379544219-23579-1-git-send-email-soren.brinkmann@xilinx.com>
- <20130919131712.GB24088@roeck-us.net>
-Message-ID: <6401b71c-8c18-4735-8b40-9692cd788336@VA3EHSMHS037.ehs.local>
+From: luka@openwrt.org (Luka Perkov)
+Date: Thu, 19 Sep 2013 18:03:09 +0200
+Subject: [PATCH] IXP4xx: Add Gateworks Cambria support.
+In-Reply-To: <m3vc1ya9fw.fsf@t19.piap.pl>
+References: <m3vc1ya9fw.fsf@t19.piap.pl>
+Message-ID: <20130919160309-31798@mutt-kz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 19, 2013 at 06:17:12AM -0700, Guenter Roeck wrote:
-> On Wed, Sep 18, 2013 at 03:43:38PM -0700, Soren Brinkmann wrote:
-> > Add a driver for SILabs 570, 571, 598, 599 programmable oscillators.
-> > The devices generate low-jitter clock signals and are reprogrammable via
-> > an I2C interface.
-> > 
-> > Cc: Guenter Roeck <linux@roeck-us.net>
-> > Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
-> > ---
-> > v2:
-> >  - document clock-output-names in bindings documentation
-> >  - don't use wildcards in compatibility string
-> >  - change Kconfig entry to "... 570 and compatible devices"
-> >  - change some indentation flaws
-> >  - use 10000 as MIN and MAX value in usleep_range
-> >  - fail probe() if 'factory-fout' is not provided in DT
-> >    - default factory fout #defines removed
-> >  - use i2c driver_data instead of OF data
-> >    - remove some related structs and data
-> >  - rename DT property 'initial-fout' => 'clock-frequency' (like si5351
-> >    driver)
-> >  - add some more details regarding the 'factory-fout' DT property
-> > 
-> >  .../devicetree/bindings/clock/silabs,si570.txt     |  38 ++
-> >  drivers/clk/Kconfig                                |  10 +
-> >  drivers/clk/Makefile                               |   1 +
-> >  drivers/clk/clk-si570.c                            | 517 +++++++++++++++++++++
-> >  4 files changed, 566 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/clock/silabs,si570.txt
-> >  create mode 100644 drivers/clk/clk-si570.c
-> > 
-[...]
-> > diff --git a/drivers/clk/clk-si570.c b/drivers/clk/clk-si570.c
-> > new file mode 100644
-> > index 0000000..c20dfce
-> > --- /dev/null
-> > +++ b/drivers/clk/clk-si570.c
-[...]
-> > +static unsigned long si570_recalc_rate(struct clk_hw *hw,
-> > +		unsigned long parent_rate)
-> > +{
-> > +	int err;
-> > +	u64 rfreq, rate;
-> > +	unsigned int n1, hs_div;
-> > +	struct clk_si570 *data = to_clk_si570(hw);
-> > +
-> > +	err = si570_get_divs(data, &rfreq, &n1, &hs_div);
-> > +	if (err) {
-> > +		dev_err(&data->i2c_client->dev, "unable to recalc rate\n");
-> 
-> [ Not really helpful that you can not return an error here ]
-IIUC, the CCF does not really support error reporting for this function. I
-think a return value of recalc_rate is always interpreted as frequency.
-Hence, I decided to take the last point of certainty and return the last
-known frequency.
+Hi Krzysztof,
 
-> 
-> > +		return data->frequency;
-> > +	}
-> > +
-> > +	rfreq = div_u64(rfreq, hs_div * n1);
-> > +	rate = (data->fxtal * rfreq) >> 28;
-> > +
-> > +	return rate;
-> > +}
-[...]
-> > +static int si570_set_rate(struct clk_hw *hw, unsigned long rate,
-> > +		unsigned long parent_rate)
-> > +{
-> > +	struct clk_si570 *data = to_clk_si570(hw);
-> > +	struct i2c_client *client = data->i2c_client;
-> > +	int err;
-> > +
-> > +	if (rate < SI570_MIN_FREQ || rate > data->max_freq) {
-> > +		dev_warn(&client->dev,
-> > +			"requested frequency %lu Hz is out of range\n", rate);
-> 
-> Shouldn't this be dev_err ?
-You're probably right. I'll change this.
+it's great that you have decided to push upstream support for this
+board.
 
-> 
-> > +		return -EINVAL;
-> > +	}
-[...]
-> > +static int si570_probe(struct i2c_client *client,
-> > +		const struct i2c_device_id *id)
-> > +{
-> > +	struct clk_si570 *data;
-> > +	struct clk_init_data init;
-> > +	struct clk *clk;
-> > +	u32 initial_fout, factory_fout;
-> > +	int err;
-> > +
-> > +	data = devm_kzalloc(&client->dev, sizeof(*data), GFP_KERNEL);
-> > +	if (!data)
-> > +		return -ENOMEM;
-> > +
-> > +	init.ops = &si570_clk_ops;
-> > +	init.flags = CLK_IS_ROOT;
-> > +	init.num_parents = 0;
-> > +	data->hw.init = &init;
-> > +	data->max_freq = id->driver_data;
-> > +	data->i2c_client = client;
-> > +
-> > +	if (of_property_read_bool(client->dev.of_node,
-> > +				"temperature-stability-7ppm"))
-> > +		data->div_offset = SI570_DIV_OFFSET_7PPM;
-> > +
-> Just noticed that you dropped platform data support. Doesn't matter much for me
-> right now, but in my previous company we used the chip on an x86 system which
-> does not support devicetree. Would be nice to keep it and derive platform data
-> from devicetree data if provided, like other drivers do it.
-I'll look into this. The issue I have with that is, I can hardly test it
-since we only use this on Zynq which uses DT. So, I'd rather prefer to
-not include it unless somebody volunteers to test it.
+I was unable to bring up serial console with your patch. I was using
+latest OpenWrt trunk for rootfs, did you use the same?
 
-> The 7ppm option is only relevant for si570/si751 and not supported on
-> si598/si599. You should mention that in the bindings document and check for it.
-Right, I'll add a note in the doc. And ignore it for devices this does
-not apply.
+drivers/rtc/hctosys.c: unable to open rtc device (rtc0)
+IP-Config: Failed to open eth0
+IP-Config: Failed to open eth1
+IP-Config: No network devices available
+Warning: unable to open an initial console.
+Freeing unused kernel memory: 4124K (c0427000 - c082e000)
+procd: Console is alive
 
-> Even better would be if it can be auto-detected; in that case you would not need
-> the property at all. Unfortunately I don't have access to a chip, so I have
-> no idea if that is possible and can not check it myself either.
-I didn't see any way to detect this during runtime. And we don't have
-such a device either.
+On Wed, Sep 18, 2013 at 09:13:55AM +0200, Krzysztof Ha?asa wrote:
+> --- /dev/null
+> +++ b/arch/arm/mach-ixp4xx/cambria.c
+> @@ -0,0 +1,245 @@
+> +/*
+> + * Gateworks Cambria GW2350 platform support
+> + * Portions based on OpenWRT.
+> + */
 
-> 
-> > +	if (of_property_read_string(client->dev.of_node, "clock-output-names",
-> > +			&init.name))
-> > +		init.name = client->dev.of_node->name;
-> > +
-> > +	err = of_property_read_u32(client->dev.of_node, "factory-fout",
-> > +			&factory_fout);
-> > +	if (err) {
-> > +		dev_err(&client->dev, "'factory-fout' property missing\n");
-> > +		return err;
-> > +	}
-> > +
-> > +	data->regmap = devm_regmap_init_i2c(client, &si570_regmap_config);
-> > +	if (IS_ERR(data->regmap)) {
-> > +		dev_err(&client->dev, "failed to allocate register map\n");
-> > +		return PTR_ERR(data->regmap);
-> > +	}
-> > +
-> > +	i2c_set_clientdata(client, data);
-> > +	err = si570_get_defaults(data, factory_fout);
-> > +	if (err)
-> > +		return err;
-> > +
-> > +	clk = devm_clk_register(&client->dev, &data->hw);
-> > +	if (IS_ERR(clk)) {
-> > +		dev_err(&client->dev, "clock registration failed\n");
-> > +		return PTR_ERR(clk);
-> > +	}
-> > +	err = of_clk_add_provider(client->dev.of_node, of_clk_src_simple_get,
-> > +			clk);
-> > +	if (err) {
-> > +		dev_err(&client->dev, "unable to add clk provider\n");
-> > +		return err;
-> > +	}
-> > +
-> > +	/*
-> > +	 * Read the requested initial fout from either platform data or the
-> > +	 * device tree
-> > +	 */
-> 
-> But you don't do anything with platform data.
-copy&paste error. I'll remove it.
+I'm no expert on licenses but shouldn't here at least be GPLv2 since the
+file originated from OpenWrt support for this board which is GPLv2.
 
-> 
-> > +	if (!of_property_read_u32(client->dev.of_node, "clock-frequency",
-> > +				&initial_fout)) {
-> > +		err = clk_set_rate(clk, initial_fout);
-> > +		if (err)
-> > +			dev_warn(&client->dev,
-> > +					"unable to set initial output frequency %u: %d\n",
-> > +					initial_fout, err);
-> 
-> No bailout ?
-> 
-> Also it seems that this generates two error messages, once in the code which
-> experiences the error and once here.
-I remove the message here.
+> +static struct i2c_board_info __initdata cambria_i2c_board_info[] = {
+> +	{
+> +		I2C_BOARD_INFO("ad7418", 0x28),
+> +	},
+> +	{
+> +		I2C_BOARD_INFO("24c08", 0x50),
+> +		.platform_data	= &cambria_eeprom_info,
+> +	},
+> +};
 
-> 
-> Maybe it would be better to just bail out and return the error.
-> After all, something is seriously wrong and the system won't operate
-> as specified.
-I do more think of a spurious error (typo in DT prop giving an f out of
-range,...)  and a driver actually controlling this clock generator later.
-In that case later calls to clk_set_rate() might succeed and everything's
-fine or the driver can handle the error. In case of using this device as
-a fixed clock, bailing out here might make more sense though. I'd prefer
-leaving it like this.
+I couldn't test this because of the console issue but in OpenWrt sources
+the value is 0x51 and not 0x50. Did you change it by accident?
 
+Also, shouldn't arch/arm/configs/ixp4xx_defconfig be updated too?
 
-	Thanks,
-	S?ren
+Luka
