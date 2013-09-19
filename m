@@ -1,41 +1,97 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Thu, 19 Sep 2013 22:58:03 +0100
-Subject: [PATCH 33/51] DMA-API: net: nxp/lpc_eth: use
- dma_coerce_mask_and_coherent()
+Date: Fri, 20 Sep 2013 00:12:38 +0100
+Subject: [PATCH 40/51] DMA-API: crypto: fix ixp4xx crypto platform device
+ support
 In-Reply-To: <20130919212235.GD12758@n2100.arm.linux.org.uk>
 References: <20130919212235.GD12758@n2100.arm.linux.org.uk>
-Message-ID: <E1VMmEd-0007jF-19@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1VMnOo-0007sC-Li@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The code sequence:
-	pldat->pdev->dev.coherent_dma_mask = 0xFFFFFFFF;
-	pldat->pdev->dev.dma_mask = &pldat->pdev->dev.coherent_dma_mask;
-bypasses the architectures check on the DMA mask.  It can be replaced
-with dma_coerce_mask_and_coherent(), avoiding the direct initialization
-of this mask.
+Don't statically allocate struct device's in modules, and shut the
+warning up with an empty release() function.  There's a reason that
+warning is there and that's not for people to hide in this way.  It's
+there to persuade people to use the correct APIs to allocate platform
+devices.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/net/ethernet/nxp/lpc_eth.c |    6 ++++--
- 1 files changed, 4 insertions(+), 2 deletions(-)
+ drivers/crypto/ixp4xx_crypto.c |   37 +++++++++++++++++--------------------
+ 1 files changed, 17 insertions(+), 20 deletions(-)
 
-diff --git a/drivers/net/ethernet/nxp/lpc_eth.c b/drivers/net/ethernet/nxp/lpc_eth.c
-index a061b93..ba3ca18 100644
---- a/drivers/net/ethernet/nxp/lpc_eth.c
-+++ b/drivers/net/ethernet/nxp/lpc_eth.c
-@@ -1399,8 +1399,10 @@ static int lpc_eth_drv_probe(struct platform_device *pdev)
- 	}
+diff --git a/drivers/crypto/ixp4xx_crypto.c b/drivers/crypto/ixp4xx_crypto.c
+index 21180d6..8306185 100644
+--- a/drivers/crypto/ixp4xx_crypto.c
++++ b/drivers/crypto/ixp4xx_crypto.c
+@@ -218,23 +218,10 @@ static dma_addr_t crypt_phys;
  
- 	if (pldat->dma_buff_base_v == 0) {
--		pldat->pdev->dev.coherent_dma_mask = 0xFFFFFFFF;
--		pldat->pdev->dev.dma_mask = &pldat->pdev->dev.coherent_dma_mask;
-+		ret = dma_coerce_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(32));
-+		if (ret)
-+			goto err_out_free_irq;
+ static int support_aes = 1;
+ 
+-static void dev_release(struct device *dev)
+-{
+-	return;
+-}
+-
+ #define DRIVER_NAME "ixp4xx_crypto"
+-static struct platform_device pseudo_dev = {
+-	.name = DRIVER_NAME,
+-	.id   = 0,
+-	.num_resources = 0,
+-	.dev  = {
+-		.coherent_dma_mask = DMA_BIT_MASK(32),
+-		.release = dev_release,
+-	}
+-};
+ 
+-static struct device *dev = &pseudo_dev.dev;
++static struct platform_device *pdev;
++static struct device *dev;
+ 
+ static inline dma_addr_t crypt_virt2phys(struct crypt_ctl *virt)
+ {
+@@ -1418,20 +1405,30 @@ static struct ixp_alg ixp4xx_algos[] = {
+ } };
+ 
+ #define IXP_POSTFIX "-ixp4xx"
 +
- 		pldat->dma_buff_size = PAGE_ALIGN(pldat->dma_buff_size);
++static const struct platform_device_info ixp_dev_info __initdata = {
++	.name		= DRIVER_NAME,
++	.id		= 0,
++	.dma_mask	= DMA_BIT_MASK(32),
++};
++
+ static int __init ixp_module_init(void)
+ {
+ 	int num = ARRAY_SIZE(ixp4xx_algos);
+-	int i,err ;
++	int i, err ;
  
- 		/* Allocate a chunk of memory for the DMA ethernet buffers
+-	if (platform_device_register(&pseudo_dev))
+-		return -ENODEV;
++	pdev = platform_device_register_full(&ixp_dev_info);
++	if (IS_ERR(pdev))
++		return PTR_ERR(pdev);
++
++	dev = &pdev->dev;
+ 
+ 	spin_lock_init(&desc_lock);
+ 	spin_lock_init(&emerg_lock);
+ 
+ 	err = init_ixp_crypto();
+ 	if (err) {
+-		platform_device_unregister(&pseudo_dev);
++		platform_device_unregister(pdev);
+ 		return err;
+ 	}
+ 	for (i=0; i< num; i++) {
+@@ -1496,7 +1493,7 @@ static void __exit ixp_module_exit(void)
+ 			crypto_unregister_alg(&ixp4xx_algos[i].crypto);
+ 	}
+ 	release_ixp_crypto();
+-	platform_device_unregister(&pseudo_dev);
++	platform_device_unregister(pdev);
+ }
+ 
+ module_init(ixp_module_init);
 -- 
 1.7.4.4
