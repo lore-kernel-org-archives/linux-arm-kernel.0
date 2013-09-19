@@ -1,34 +1,34 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Thu, 19 Sep 2013 11:20:43 +0200
-Subject: [PATCH] ASoc: kirkwood: Extend the min and max number of bytes per
- period
-Message-ID: <20130919112043.5ad16147@armhf>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Thu, 19 Sep 2013 11:30:02 +0200
+Subject: 3.12-rc1: no longer compiles for Nokia n900 (omap based)
+Message-ID: <20130919093002.GA23806@amd.pavel.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch extends the min and max number of bytes per period.
-It mainly permits to reduce the sound delay in MIDI real-time playing.
+Hi!
 
-Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
----
- sound/soc/kirkwood/kirkwood.h | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+I get:
 
-diff --git a/sound/soc/kirkwood/kirkwood.h b/sound/soc/kirkwood/kirkwood.h
-index f8e1ccc..bf23afb 100644
---- a/sound/soc/kirkwood/kirkwood.h
-+++ b/sound/soc/kirkwood/kirkwood.h
-@@ -123,8 +123,8 @@
- /* need to find where they come from               */
- #define KIRKWOOD_SND_MIN_PERIODS		8
- #define KIRKWOOD_SND_MAX_PERIODS		16
--#define KIRKWOOD_SND_MIN_PERIOD_BYTES		0x4000
--#define KIRKWOOD_SND_MAX_PERIOD_BYTES		0x4000
-+#define KIRKWOOD_SND_MIN_PERIOD_BYTES		0x800
-+#define KIRKWOOD_SND_MAX_PERIOD_BYTES		0x8000
- #define KIRKWOOD_SND_MAX_BUFFER_BYTES		(KIRKWOOD_SND_MAX_PERIOD_BYTES \
- 						 * KIRKWOOD_SND_MAX_PERIODS)
- 
+  CC      arch/arm/kernel/machine_kexec.o
+/tmp/ccCFXeXG.s: Assembler messages:
+/tmp/ccCFXeXG.s:217: Error: garbage following instruction -- `dsb
+nshst'
+/tmp/ccCFXeXG.s:225: Error: garbage following instruction -- `dsb nsh'
+make[1]: *** [arch/arm/kernel/suspend.o] Error 1
+make[1]: *** Waiting for unfinished jobs....
+
+pavel at amd:/data/l/linux-n900$ arm-linux-gnueabi-gcc --version
+arm-linux-gnueabi-gcc (Debian 4.3.5-4) 4.3.5
+
+Minimum required gcc is 3.2, so I'm safe.
+
+I suspect
+
+commit 62cbbc42e0019aff6310259f275ae812463f8836
+Author: Will Deacon <will.deacon@arm.com>
+Date:   Thu May 23 18:43:58 2013 +0100
+
+								Pavel
 -- 
-Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
-Jef		|		http://moinejf.free.fr/
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
