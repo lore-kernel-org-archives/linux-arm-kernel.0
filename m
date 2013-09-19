@@ -1,23 +1,71 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Thu, 19 Sep 2013 14:34:00 +0100
-Subject: [PATCH 25/26] ARM: vexpress: remove custom .init_time hook
-In-Reply-To: <1379526839-14798-26-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1379526839-14798-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1379526839-14798-26-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1379597640.3347.18.camel@hornet>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 19 Sep 2013 15:38:04 +0200
+Subject: [PATCH][RESEND] ARM: at91: remove IRQF_DISABLED
+In-Reply-To: <1378270479-24628-1-git-send-email-michael.opdenacker@free-electrons.com>
+References: <1378270479-24628-1-git-send-email-michael.opdenacker@free-electrons.com>
+Message-ID: <523AFE3C.7050907@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2013-09-18 at 18:53 +0100, Sebastian Hesselbarth wrote:
-> With arch/arm calling of_clk_init(NULL) from time_init(), we can now
-> remove custom .init_time hooks. The call to versatile_sched_clock_init
-> is moved to .init_early instead, were it is also for non-DT boards.
-> 
-> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> Tested-by: Jon Medhurst (Tixy) <tixy@linaro.org>
+On 04/09/2013 06:54, Michael Opdenacker :
+> This flag is a NOOP since 2.6.36 and can be removed.
+>
+> This is an update for 3.11 of a patch already sent for 3.10
+>
+> Signed-off-by: Michael Opdenacker <michael.opdenacker@free-electrons.com>
 
-Acked-by: Pawel Moll <pawel.moll@arm.com>
+Thanks Michael, I stacked it on at91-3.12-fixes as I guess it can be 
+accepted for this kernel release.
 
-Thanks!
+Bye,
 
-Pawel
+> ---
+>   arch/arm/mach-at91/at91rm9200_time.c  | 2 +-
+>   arch/arm/mach-at91/at91sam926x_time.c | 2 +-
+>   arch/arm/mach-at91/at91x40_time.c     | 2 +-
+>   3 files changed, 3 insertions(+), 3 deletions(-)
+>
+> diff --git a/arch/arm/mach-at91/at91rm9200_time.c b/arch/arm/mach-at91/at91rm9200_time.c
+> index 180b302..f607deb 100644
+> --- a/arch/arm/mach-at91/at91rm9200_time.c
+> +++ b/arch/arm/mach-at91/at91rm9200_time.c
+> @@ -93,7 +93,7 @@ static irqreturn_t at91rm9200_timer_interrupt(int irq, void *dev_id)
+>
+>   static struct irqaction at91rm9200_timer_irq = {
+>   	.name		= "at91_tick",
+> -	.flags		= IRQF_SHARED | IRQF_DISABLED | IRQF_TIMER | IRQF_IRQPOLL,
+> +	.flags		= IRQF_SHARED | IRQF_TIMER | IRQF_IRQPOLL,
+>   	.handler	= at91rm9200_timer_interrupt,
+>   	.irq		= NR_IRQS_LEGACY + AT91_ID_SYS,
+>   };
+> diff --git a/arch/arm/mach-at91/at91sam926x_time.c b/arch/arm/mach-at91/at91sam926x_time.c
+> index 3a4bc2e..bb39232 100644
+> --- a/arch/arm/mach-at91/at91sam926x_time.c
+> +++ b/arch/arm/mach-at91/at91sam926x_time.c
+> @@ -171,7 +171,7 @@ static irqreturn_t at91sam926x_pit_interrupt(int irq, void *dev_id)
+>
+>   static struct irqaction at91sam926x_pit_irq = {
+>   	.name		= "at91_tick",
+> -	.flags		= IRQF_SHARED | IRQF_DISABLED | IRQF_TIMER | IRQF_IRQPOLL,
+> +	.flags		= IRQF_SHARED | IRQF_TIMER | IRQF_IRQPOLL,
+>   	.handler	= at91sam926x_pit_interrupt,
+>   	.irq		= NR_IRQS_LEGACY + AT91_ID_SYS,
+>   };
+> diff --git a/arch/arm/mach-at91/at91x40_time.c b/arch/arm/mach-at91/at91x40_time.c
+> index 2919eba..c0e637a 100644
+> --- a/arch/arm/mach-at91/at91x40_time.c
+> +++ b/arch/arm/mach-at91/at91x40_time.c
+> @@ -57,7 +57,7 @@ static irqreturn_t at91x40_timer_interrupt(int irq, void *dev_id)
+>
+>   static struct irqaction at91x40_timer_irq = {
+>   	.name		= "at91_tick",
+> -	.flags		= IRQF_DISABLED | IRQF_TIMER,
+> +	.flags		= IRQF_TIMER,
+>   	.handler	= at91x40_timer_interrupt
+>   };
+>
+>
+
+
+-- 
+Nicolas Ferre
