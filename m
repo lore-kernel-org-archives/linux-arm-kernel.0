@@ -1,190 +1,30 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Thu, 19 Sep 2013 12:47:36 +0200
-Subject: [PATCH RESEND] clk: si5351: remove variant from platform_data
-Message-ID: <523AD648.7000802@gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 19 Sep 2013 12:06:42 +0100
+Subject: [PATCH] ASoC: kirkwood: fix loss of external clock at probe time
+In-Reply-To: <20130919114957.1fede091@armhf>
+References: <20130919114957.1fede091@armhf>
+Message-ID: <20130919110642.GK21013@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 9807362bfe1748d9bb48eecb9261f1b1aaafea1c
-   "clk: si5351: declare all device IDs for module loading"
-removed the common i2c_device_id and introduced new ones for each variant
-of the clock generator. Instead of exploiting that information in the 
-driver,
-it still depends on platform_data passing the chips .variant.
+On Thu, Sep 19, 2013 at 11:49:57AM +0200, Jean-Francois Moine wrote:
 
-This removes the now redundant .variant from the platform_data and puts 
-it in
-i2c_device_id's .driver_data instead.
+>  	priv->extclk = devm_clk_get(&pdev->dev, "extclk");
+> -	if (!IS_ERR(priv->extclk)) {
+> +	if (IS_ERR(priv->extclk)) {
+> +		if (np && of_property_match_string(np, "clock-names", "extclk") >= 0)
+> +			return -EPROBE_DEFER;
+> +	} else {
 
-Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
----
-Cc: Mike Turquette <mturquette@linaro.org>
-Cc: Jason Cooper <jason@lakedaemon.net>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
----
-  drivers/clk/clk-si5351.c             |   28 ++++++++++++----------------
-  drivers/clk/clk-si5351.h             |   14 ++++++++++++++
-  include/linux/platform_data/si5351.h |   16 ----------------
-  3 files changed, 26 insertions(+), 32 deletions(-)
-
-diff --git a/drivers/clk/clk-si5351.c b/drivers/clk/clk-si5351.c
-index c50e837..b95aa09 100644
---- a/drivers/clk/clk-si5351.c
-+++ b/drivers/clk/clk-si5351.c
-@@ -1111,11 +1111,11 @@ static const struct of_device_id si5351_dt_ids[] = {
-  };
-  MODULE_DEVICE_TABLE(of, si5351_dt_ids);
-  -static int si5351_dt_parse(struct i2c_client *client)
-+static int si5351_dt_parse(struct i2c_client *client,
-+			   enum si5351_variant variant)
-  {
-  	struct device_node *child, *np = client->dev.of_node;
-  	struct si5351_platform_data *pdata;
--	const struct of_device_id *match;
-  	struct property *prop;
-  	const __be32 *p;
-  	int num = 0;
-@@ -1124,15 +1124,10 @@ static int si5351_dt_parse(struct i2c_client 
-*client)
-  	if (np == NULL)
-  		return 0;
-  -	match = of_match_node(si5351_dt_ids, np);
--	if (match == NULL)
--		return -EINVAL;
--
-  	pdata = devm_kzalloc(&client->dev, sizeof(*pdata), GFP_KERNEL);
-  	if (!pdata)
-  		return -ENOMEM;
-  -	pdata->variant = (enum si5351_variant)match->data;
-  	pdata->clk_xtal = of_clk_get(np, 0);
-  	if (!IS_ERR(pdata->clk_xtal))
-  		clk_put(pdata->clk_xtal);
-@@ -1163,7 +1158,7 @@ static int si5351_dt_parse(struct i2c_client *client)
-  			pdata->pll_src[num] = SI5351_PLL_SRC_XTAL;
-  			break;
-  		case 1:
--			if (pdata->variant != SI5351_VARIANT_C) {
-+			if (variant != SI5351_VARIANT_C) {
-  				dev_err(&client->dev,
-  					"invalid parent %d for pll %d\n",
-  					val, num);
-@@ -1187,7 +1182,7 @@ static int si5351_dt_parse(struct i2c_client *client)
-  		}
-   		if (num >= 8 ||
--		    (pdata->variant == SI5351_VARIANT_A3 && num >= 3)) {
-+		    (variant == SI5351_VARIANT_A3 && num >= 3)) {
-  			dev_err(&client->dev, "invalid clkout %d\n", num);
-  			return -EINVAL;
-  		}
-@@ -1226,7 +1221,7 @@ static int si5351_dt_parse(struct i2c_client *client)
-  					SI5351_CLKOUT_SRC_XTAL;
-  				break;
-  			case 3:
--				if (pdata->variant != SI5351_VARIANT_C) {
-+				if (variant != SI5351_VARIANT_C) {
-  					dev_err(&client->dev,
-  						"invalid parent %d for clkout %d\n",
-  						val, num);
-@@ -1307,6 +1302,7 @@ static int si5351_dt_parse(struct i2c_client *client)
-  static int si5351_i2c_probe(struct i2c_client *client,
-  			    const struct i2c_device_id *id)
-  {
-+	enum si5351_variant variant = (enum si5351_variant)id->driver_data;
-  	struct si5351_platform_data *pdata;
-  	struct si5351_driver_data *drvdata;
-  	struct clk_init_data init;
-@@ -1315,7 +1311,7 @@ static int si5351_i2c_probe(struct i2c_client *client,
-  	u8 num_parents, num_clocks;
-  	int ret, n;
-  -	ret = si5351_dt_parse(client);
-+	ret = si5351_dt_parse(client, variant);
-  	if (ret)
-  		return ret;
-  @@ -1331,7 +1327,7 @@ static int si5351_i2c_probe(struct i2c_client 
-*client,
-   	i2c_set_clientdata(client, drvdata);
-  	drvdata->client = client;
--	drvdata->variant = pdata->variant;
-+	drvdata->variant = variant;
-  	drvdata->pxtal = pdata->clk_xtal;
-  	drvdata->pclkin = pdata->clk_clkin;
-  @@ -1568,10 +1564,10 @@ static int si5351_i2c_probe(struct i2c_client 
-*client,
-  }
-   static const struct i2c_device_id si5351_i2c_ids[] = {
--	{ "si5351a", 0 },
--	{ "si5351a-msop", 0 },
--	{ "si5351b", 0 },
--	{ "si5351c", 0 },
-+	{ "si5351a", SI5351_VARIANT_A },
-+	{ "si5351a-msop", SI5351_VARIANT_A3 },
-+	{ "si5351b", SI5351_VARIANT_B },
-+	{ "si5351c", SI5351_VARIANT_C },
-  	{ }
-  };
-  MODULE_DEVICE_TABLE(i2c, si5351_i2c_ids);
-diff --git a/drivers/clk/clk-si5351.h b/drivers/clk/clk-si5351.h
-index c0dbf26..4d0746b 100644
---- a/drivers/clk/clk-si5351.h
-+++ b/drivers/clk/clk-si5351.h
-@@ -153,4 +153,18 @@
-  #define  SI5351_XTAL_ENABLE			(1<<6)
-  #define  SI5351_MULTISYNTH_ENABLE		(1<<4)
-  +/**
-+ * enum si5351_variant - SiLabs Si5351 chip variant
-+ * @SI5351_VARIANT_A: Si5351A (8 output clocks, XTAL input)
-+ * @SI5351_VARIANT_A3: Si5351A MSOP10 (3 output clocks, XTAL input)
-+ * @SI5351_VARIANT_B: Si5351B (8 output clocks, XTAL/VXCO input)
-+ * @SI5351_VARIANT_C: Si5351C (8 output clocks, XTAL/CLKIN input)
-+ */
-+enum si5351_variant {
-+	SI5351_VARIANT_A = 1,
-+	SI5351_VARIANT_A3 = 2,
-+	SI5351_VARIANT_B = 3,
-+	SI5351_VARIANT_C = 4,
-+};
-+
-  #endif
-diff --git a/include/linux/platform_data/si5351.h 
-b/include/linux/platform_data/si5351.h
-index 5433439..a947ab8 100644
---- a/include/linux/platform_data/si5351.h
-+++ b/include/linux/platform_data/si5351.h
-@@ -8,20 +8,6 @@
-  struct clk;
-   /**
-- * enum si5351_variant - SiLabs Si5351 chip variant
-- * @SI5351_VARIANT_A: Si5351A (8 output clocks, XTAL input)
-- * @SI5351_VARIANT_A3: Si5351A MSOP10 (3 output clocks, XTAL input)
-- * @SI5351_VARIANT_B: Si5351B (8 output clocks, XTAL/VXCO input)
-- * @SI5351_VARIANT_C: Si5351C (8 output clocks, XTAL/CLKIN input)
-- */
--enum si5351_variant {
--	SI5351_VARIANT_A = 1,
--	SI5351_VARIANT_A3 = 2,
--	SI5351_VARIANT_B = 3,
--	SI5351_VARIANT_C = 4,
--};
--
--/**
-   * enum si5351_pll_src - Si5351 pll clock source
-   * @SI5351_PLL_SRC_DEFAULT: default, do not change eeprom config
-   * @SI5351_PLL_SRC_XTAL: pll source clock is XTAL input
-@@ -115,14 +101,12 @@ struct si5351_clkout_config {
-   /**
-   * struct si5351_platform_data - Platform data for the Si5351 clock driver
-- * @variant: Si5351 chip variant
-   * @clk_xtal: xtal input clock
-   * @clk_clkin: clkin input clock
-   * @pll_src: array of pll source clock setting
-   * @clkout: array of clkout configuration
-   */
-  struct si5351_platform_data {
--	enum si5351_variant variant;
-  	struct clk *clk_xtal;
-  	struct clk *clk_clkin;
-  	enum si5351_pll_src pll_src[2];
--- 
-1.7.10.4
+This one really does seem like something the clock API ought to be
+doing, either as standard or with a separate helper - essentially every
+driver ought to be doing this for robustness.  Doing it on general
+failures is more tricky but in the specific case where we know the clock
+should be present but we don't have the driver loaded yet.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130919/91152073/attachment.sig>
