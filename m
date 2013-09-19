@@ -1,60 +1,32 @@
 From: rogerq@ti.com (Roger Quadros)
-Date: Thu, 19 Sep 2013 16:05:34 +0300
-Subject: [RFC PATCH 06/15] phy: omap-pipe3: update compatibility string and DT
- binding
+Date: Thu, 19 Sep 2013 16:05:35 +0300
+Subject: [RFC PATCH 07/15] ARM: dts: omap5: Update usb3phy node
 In-Reply-To: <1379595943-14622-1-git-send-email-rogerq@ti.com>
 References: <1379595943-14622-1-git-send-email-rogerq@ti.com>
-Message-ID: <1379595943-14622-7-git-send-email-rogerq@ti.com>
+Message-ID: <1379595943-14622-8-git-send-email-rogerq@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Improve compatibility string format to "ti,phy-pipe3-<type>"
-where <type> can be "usb3" or "sata". Remove "pcie" type
-as it is not yet supported due to missing DPLL data.
+Update compatible property for usb3phy node.
 
+CC: Benoit Cousson <bcousson@baylibre.com>
 Signed-off-by: Roger Quadros <rogerq@ti.com>
 ---
- Documentation/devicetree/bindings/phy/omap-phy.txt |    3 +--
- drivers/phy/phy-omap-pipe3.c                       |    8 ++------
- 2 files changed, 3 insertions(+), 8 deletions(-)
+ arch/arm/boot/dts/omap5.dtsi |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/phy/omap-phy.txt b/Documentation/devicetree/bindings/phy/omap-phy.txt
-index cf45b01..8e09ad3 100644
---- a/Documentation/devicetree/bindings/phy/omap-phy.txt
-+++ b/Documentation/devicetree/bindings/phy/omap-phy.txt
-@@ -47,8 +47,7 @@ usb2phy at 4a0ad080 {
- OMAP PIPE3 PHY
+diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
+index 97f361a..06aa665 100644
+--- a/arch/arm/boot/dts/omap5.dtsi
++++ b/arch/arm/boot/dts/omap5.dtsi
+@@ -671,7 +671,7 @@
+ 			};
  
- Required properties:
-- - compatible: Should be "ti,omap-usb3", "ti,omap-pipe3", "ti,omap-sata"
--   or "ti,omap-pcie"
-+ - compatible: Should be "ti,phy-pipe3-usb3" or "ti,phy-pipe3-sata"
-  - reg : Address and length of the register set for the device.
-  - reg-names: The names of the register addresses corresponding to the registers
-    filled in "reg".
-diff --git a/drivers/phy/phy-omap-pipe3.c b/drivers/phy/phy-omap-pipe3.c
-index 19d1664..67eeaeb 100644
---- a/drivers/phy/phy-omap-pipe3.c
-+++ b/drivers/phy/phy-omap-pipe3.c
-@@ -219,17 +219,13 @@ static struct phy_ops ops = {
- #ifdef CONFIG_OF
- static const struct of_device_id omap_pipe3_id_table[] = {
- 	{
--		.compatible = "ti,omap-pipe3",
-+		.compatible = "ti,phy-pipe3-usb3",
- 		.data = dpll_map_usb,
- 	},
- 	{
--		.compatible = "ti,omap-sata",
-+		.compatible = "ti,phy-pipe3-sata",
- 		.data = dpll_map_sata,
- 	},
--	{
--		.compatible = "ti,omap-usb3",
--		.data = dpll_map_usb,
--	},
- 	{},
- };
- MODULE_DEVICE_TABLE(of, omap_pipe3_id_table);
+ 			usb3_phy: usb3phy at 4a084400 {
+-				compatible = "ti,omap-usb3";
++				compatible = "ti,phy-pipe3-usb3";
+ 				reg = <0x4a084400 0x80>,
+ 				      <0x4a084800 0x64>,
+ 				      <0x4a084c00 0x40>;
 -- 
 1.7.4.1
