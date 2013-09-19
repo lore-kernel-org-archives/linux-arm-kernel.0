@@ -1,72 +1,151 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 19 Sep 2013 20:20:08 +0100
-Subject: [PATCH v3 1/4] ARM: KVM: Implement kvm_vcpu_preferred_target()
- function
-In-Reply-To: <523B09EA.9050408@arm.com>
-References: <1379596302-21522-1-git-send-email-anup.patel@linaro.org>
- <1379596302-21522-2-git-send-email-anup.patel@linaro.org>
- <523B09EA.9050408@arm.com>
-Message-ID: <20130919192008.GL7623@lvm>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 19 Sep 2013 12:47:52 -0700
+Subject: [GIT PULL] ARM: SoC fixes for 3.12-rc
+Message-ID: <20130919194752.GA19975@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 19, 2013 at 03:27:54PM +0100, Marc Zyngier wrote:
-> On 19/09/13 14:11, Anup Patel wrote:
-> > This patch implements kvm_vcpu_preferred_target() function for
-> > KVM ARM which will help us implement KVM_ARM_PREFERRED_TARGET ioctl
-> > for user space.
-> > 
-> > Signed-off-by: Anup Patel <anup.patel@linaro.org>
-> > Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
-> > ---
-> >  arch/arm/kvm/guest.c              |   20 ++++++++++++++++++++
-> >  arch/arm64/include/asm/kvm_host.h |    1 +
-> >  2 files changed, 21 insertions(+)
-> > 
-> > diff --git a/arch/arm/kvm/guest.c b/arch/arm/kvm/guest.c
-> > index 152d036..b407e6c 100644
-> > --- a/arch/arm/kvm/guest.c
-> > +++ b/arch/arm/kvm/guest.c
-> > @@ -222,6 +222,26 @@ int kvm_vcpu_set_target(struct kvm_vcpu *vcpu,
-> >  	return kvm_reset_vcpu(vcpu);
-> >  }
-> >  
-> > +int kvm_vcpu_preferred_target(struct kvm_vcpu_init *init)
-> > +{
-> > +	int target = kvm_target_cpu();
-> > +
-> > +	if (target < 0)
-> > +		return -ENODEV;
-> > +
-> > +	memset(init, 0, sizeof(*init));
-> > +
-> > +	/* 
-> > +	 * For now, we return all optional features are available
-> > +	 * for preferred target. In future, we might have features
-> > +	 * available based on underlying host.
-> > +	 */
-> > +	init->target = (__u32)target;
-> > +	init->features[0] |= (1 << KVM_ARM_VCPU_POWER_OFF);
-> 
-> I'm in two minds about this feature reporting. I see they serve a
-> purpose, but they also duplicate capabilities, which is the standard way
-> to advertise what KVM can do.
-> 
-> It means we end up having to sync two reporting mechanism, and I feel
-> this is in general a bad idea.
-> 
-> Furthermore, KVM_ARM_VCPU_POWER_OFF is hardly a feature of the HW, but
-> rather a firmware emulation thing.
-> 
-> Peter, Christoffer: Thoughts?
-> 
-I wanted to return the full kvm_vcpu_init instead of just a target int,
-so we did not have to come up with yet another ioctl if we need to
-return more information about the capabilities of the host CPU in the
-future.
+Hi Linus,
 
-But perhaps we can formulate the API, to say only the (currently empty)
-following list of features can only be enabled if the corresponding bit
-is enabled, or something along those lines.
+The following changes since commit 272b98c6455f00884f0350f775c5342358ebb73f:
 
--Christoffer
+  Linux 3.12-rc1 (2013-09-16 16:17:51 -0400)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/fixes-for-linus
+
+for you to fetch changes up to 660e1c2f47f51f5b03ea7f63fa11f000e0240bda:
+
+  Merge tag 'omap-for-v3.12/fixes-dt-signed' of git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap into fixes (2013-09-18 14:01:39 -0700)
+
+----------------------------------------------------------------
+
+ARM: SoC fixes for 3.12-rc
+
+A set of fixes for ARM platforms for 3.12. Among them:
+
+- A fix for build breakage in the MTD subsystem for some PXA devices.
+  David Woodhouse has this patch in his for-next branch but has not been
+  responding to our requests to send it up so here it is.
+  I should have amended the commit message to describe the build failure for
+  CONFIG_OF=n setups, but forgot and now it's down in the stack of commits.
+
+- Added device-tree for the BeagleBone Black. Turns out people have been
+  using the older "regualar" bone DT for the newer boards, and there's
+  risk of damaging hardware that way.
+
+- Misc DT and regular fixes for OMAP.
+
+- Fix to make the ST-Ericsson "snowball" boards boot with
+  multi_v7_defconfig, and enable one of the ST-E reference boards on the
+  same config.
+
+- Kconfig cleanup for u300 to hide submenus when the platform isn't
+  enabled.
+
+- Enable ARM_ATAG_DTB_COMPAT to let firmware override command
+  line when booting with an appended devicetree on non-DT-enabled
+  firmware (needed to boot snowball).
+
+----------------------------------------------------------------
+Andrea Adami (1):
+      ARM: sa1100: collie.c: fall back to jedec_probe flash detection
+
+Anoop Thomas Mathew (1):
+      ARM: OMAP4 SMP: Corrected a typo fucntions to functions
+
+Arnaud Patard (1):
+      ARM: imx51.dtsi: fix PATA device clock
+
+Enric Balletbo i Serra (1):
+      ARM: dts: igep00x0: Add pinmux configuration for MCBSP2
+
+Ezequiel Garcia (1):
+      mtd: nand: pxa3xx: Remove unneeded ifdef CONFIG_OF
+
+Fabio Estevam (2):
+      ARM: mach-imx: clk-imx51-imx53: Fix 'spdif1_pred' clock registration
+      ARM: mach-omap2: gpmc: Fix warning when CONFIG_ARM_LPAE=y
+
+Felipe Balbi (2):
+      ARM: dts: OMAP5: fix reg property size
+      ARM: dts: OMAP5: fix ocp2scp DTS data
+
+Gwenhael Goavec-Merou (1):
+      ARM: imx27.dtsi: fix CSPI PER clock id
+
+Huang Shijie (1):
+      ARM: dts: imx6q: fix the wrong offset of the Pad Mux register
+
+Jason Liu (1):
+      ARM: imx: i.mx6d/q: disable the double linefill feature of PL310
+
+Jingoo Han (1):
+      mailbox: remove unnecessary platform_set_drvdata()
+
+Koen Kooi (1):
+      ARM: dts: am335x-bone*: add DT for BeagleBone Black
+
+Linus Walleij (3):
+      ARM: ux500: disable outer cache debug
+      ARM: u300: hide submenus
+      ARM: multi_v7: add HREFv60 to multi_v7 defconfig
+
+Olof Johansson (4):
+      ARM: multi_v7_defconfig: enable ARM_ATAG_DTB_COMPAT
+      Merge tag 'imx-fixes-3.12' of git://git.linaro.org/people/shawnguo/linux-2.6 into fixes
+      Merge tag 'omap-for-v3.12/fixes-signed' of git://git.kernel.org/.../tmlind/linux-omap into fixes
+      Merge tag 'omap-for-v3.12/fixes-dt-signed' of git://git.kernel.org/.../tmlind/linux-omap into fixes
+
+Phil Carmody (1):
+      ARM: OMAP2+: mux: fix trivial typo in name
+
+Robert Nelson (1):
+      ARM: dts: omap3-beagle-xm: fix string error in compatible property
+
+Shawn Guo (1):
+      ARM: imx: initialize clk_init_data.flags for clk-fixup-mux
+
+Tony Lindgren (4):
+      ARM: dts: Fix muxing and regulator for wl12xx on the SDIO bus for pandaboard
+      ARM: dts: Fix muxing and regulator for wl12xx on the SDIO bus for blaze
+      ARM: OMAP4: Fix clock_get error for GPMC during boot
+      Merge tag 'for_3.12-rc2/dts_signed' of git://git.kernel.org/.../bcousson/linux-omap-dt into omap-for-v3.12/fixes-dt
+
+Vladimir Murzin (1):
+      ARM: OMAP4: cpuidle: fix: call cpu_cluster_pm_exit conditionally
+
+Wei Yongjun (1):
+      ARM: OMAP: fix return value check in omap_device_build_from_dt()
+
+ arch/arm/boot/dts/Makefile                |   1 +
+ arch/arm/boot/dts/am335x-bone-common.dtsi | 262 ++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/am335x-bone.dts         | 256 +----------------------------
+ arch/arm/boot/dts/am335x-boneblack.dts    |  17 ++
+ arch/arm/boot/dts/imx27.dtsi              |   6 +-
+ arch/arm/boot/dts/imx51.dtsi              |   2 +-
+ arch/arm/boot/dts/imx6q-pinfunc.h         |   4 +-
+ arch/arm/boot/dts/omap3-beagle-xm.dts     |   2 +-
+ arch/arm/boot/dts/omap3-igep.dtsi         |  14 ++
+ arch/arm/boot/dts/omap4-panda-common.dtsi |  46 +++++-
+ arch/arm/boot/dts/omap4-sdp.dts           |  39 ++++-
+ arch/arm/boot/dts/omap5.dtsi              |   7 +-
+ arch/arm/configs/multi_v7_defconfig       |   2 +
+ arch/arm/mach-imx/clk-fixup-mux.c         |   1 +
+ arch/arm/mach-imx/clk-imx51-imx53.c       |   2 +-
+ arch/arm/mach-imx/system.c                |  11 ++
+ arch/arm/mach-omap2/cclock44xx_data.c     |   2 +-
+ arch/arm/mach-omap2/cpuidle44xx.c         |   2 +-
+ arch/arm/mach-omap2/gpmc.c                |   4 +-
+ arch/arm/mach-omap2/mux34xx.c             |   2 +-
+ arch/arm/mach-omap2/omap-smp.c            |   2 +-
+ arch/arm/mach-omap2/omap_device.c         |   2 +-
+ arch/arm/mach-sa1100/collie.c             |   2 +-
+ arch/arm/mach-u300/Kconfig                |  10 +-
+ arch/arm/mach-ux500/cache-l2x0.c          |   1 +
+ drivers/mailbox/mailbox-omap2.c           |   1 -
+ drivers/mtd/nand/pxa3xx_nand.c            |   7 -
+ 27 files changed, 418 insertions(+), 289 deletions(-)
+ create mode 100644 arch/arm/boot/dts/am335x-bone-common.dtsi
+ create mode 100644 arch/arm/boot/dts/am335x-boneblack.dts
