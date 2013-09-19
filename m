@@ -1,32 +1,38 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 19 Sep 2013 13:03:48 +0100
-Subject: [PATCH 0/2] Fixes for STi SOCs
-In-Reply-To: <1379410003-9911-1-git-send-email-srinivas.kandagatla@st.com>
-References: <1379410003-9911-1-git-send-email-srinivas.kandagatla@st.com>
-Message-ID: <20130919120348.GH22389@lee--X1>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Thu, 19 Sep 2013 14:06:17 +0200
+Subject: [PATCH 0/2] pwm: atmel-tcb: config fixes
+In-Reply-To: <1379516720-23289-1-git-send-email-b.brezillon@overkiz.com>
+References: <1379516720-23289-1-git-send-email-b.brezillon@overkiz.com>
+Message-ID: <20130919120616.GG10852@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Hi Arnd/Olof, 
+On Wed, Sep 18, 2013 at 05:05:20PM +0200, Boris BREZILLON wrote:
+> Hello,
 > 
-> These two are very minor fixes for STi SOCs.
-> One of the fix is a typo and other is to add two new options to
-> multi_v7_defconfig to get STi SOC based boards boot with nfs root with serial
-> console.
-
-If these are accepted, it would be a massive help to get them into
-v3.12.
-
-> Srinivas Kandagatla (2):
->   ARM: STi: OF: Fix a typo in pincfg header
->   ARM: multi_v7_defconfig: Fix STi support
+> This patch series fix 2 bugs regarding the pwm configuration:
+>  - the clock source of the timer channel is never applied
+>  - the maximum time that can be represented when using the slow clock may be
+>    wrong if the tc block provide a 32 bits width counter
 > 
->  arch/arm/boot/dts/st-pincfg.h       |    2 +-
->  arch/arm/configs/multi_v7_defconfig |    3 +++
->  2 files changed, 4 insertions(+), 1 deletions(-)
+> Best Regards,
+> 
+> Boris
+> 
+> Boris BREZILLON (2):
+>   pwm: atmel-tcb: add missing clk source config
+>   pwm: atmel-tcb: fix max time computation for slow clk source
+> 
+>  drivers/pwm/pwm-atmel-tcb.c |    4 +++-
+>  1 file changed, 3 insertions(+), 1 deletion(-)
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Both applied, with Nicolas' Acked-by.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130919/1fd00ce6/attachment-0001.sig>
