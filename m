@@ -1,66 +1,40 @@
-From: maxime.coquelin@st.com (Maxime COQUELIN)
-Date: Thu, 19 Sep 2013 09:16:27 +0200
-Subject: [PATCH 2/4] ARM: STi: Supply I2C configuration to STiH416 SoC
-References: <1379498483-4236-1-git-send-email-maxime.coquelin@st.com>
- <1379498483-4236-3-git-send-email-maxime.coquelin@st.com>
- <20130918120340.GF16984@lee--X1>
- <84625B87D65BCF478CC1E9C886A4C314DEF1BD9578@SAFEX1MAIL4.st.com>
- <5239A322.5010004@st.com>
-Message-ID: <84625B87D65BCF478CC1E9C886A4C314DEF1BD9579@SAFEX1MAIL4.st.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 19 Sep 2013 09:24:17 +0200
+Subject: [PATCH 1/2] pwm: atmel-tcb: add missing clk source config
+In-Reply-To: <1379516765-23342-1-git-send-email-b.brezillon@overkiz.com>
+References: <1379516720-23289-1-git-send-email-b.brezillon@overkiz.com>
+ <1379516765-23342-1-git-send-email-b.brezillon@overkiz.com>
+Message-ID: <523AA6A1.4070000@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Srini,
+On 18/09/2013 17:06, Boris BREZILLON :
+> Clock source changes are never applied to the CMR register.
+> This may lead to wrong period/duty cycle configuration.
+>
+> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
 
-On 09/18/2013 03:17 PM, Srinivas KANDAGATLA wrote:
-> On 18/09/13 13:46, Maxime COQUELIN wrote:
->> On 09/18/2013 02:03 PM, Lee Jones wrote:
->>>>>> This patch supplies I2C configuration to STiH416 SoC.
->>>>>>
->>>>>> Cc: Srinivas Kandagatla <srinivas.kandagatla@st.com>
->>>>>> Signed-off-by: Maxime Coquelin <maxime.coquelin@st.com>
->>>>>> ---
->>>>>>  arch/arm/boot/dts/stih416-pinctrl.dtsi |   35 ++++++++++++++++++++
->>>>>>  arch/arm/boot/dts/stih416.dtsi         |   57 ++++++++++++++++++++++++++++++++
->>>>>>  2 files changed, 92 insertions(+)
->>>>>>
->>>>>> diff --git a/arch/arm/boot/dts/stih416-pinctrl.dtsi b/arch/arm/boot/dts/stih416-pinctrl.dtsi
->>>> I genuinely don't know the answer to this question, but are these
->>>> nodes identical to the ones you've just put in the stih415 DTSI file?
->>>> If so, I think it will be worth creating a stih41x DTSI rather than
->>>> duplicating lots of stuff unnecessarily.
->> There are close to be identical indeed.
->> For the clocks and pinctrl, the references names are the same, but they are
->> pointing on different nodes, as STiH415 and STiH416 have their own
->> clocks and pinctrl dtsi files.
->>
->> Srini, what is opinion about this?
-> There is already a stih41x.dtsi file, but I don't think it is the right
-> place for the pinctrl nodes there.
->
-> Am not OK with the idea of common pinctrl nodes for STiH415 and STiH416
-> for two reasons.
->
-> 1> If we common up the pinctrl nodes, it will be very difficult to
-> accommodate new pinctrls layout which is not guaranteed to be in same
-> layout in future SOCs.
->
-> 2> The retiming values in the pinctrl nodes tend to change as per SOC,
-> so it will be difficult to manage it if we common it up.
->
-> Am sure we can come up with a dt layout which can reduce duplication,
-> but we have to be careful here not to lose the flexiblity to accommodate
-> new picntrl layouts, new retimings values based on SOC.
-Ok. What do you think of declaring the i2c nodes inside the stih41x.dtsi
-file,
-and overload them with the pinctrl and clock properties in the stih416
-and stih415 dtsi files?
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-Regards,
-Maxime
+> ---
+>   drivers/pwm/pwm-atmel-tcb.c |    2 ++
+>   1 file changed, 2 insertions(+)
 >
+> diff --git a/drivers/pwm/pwm-atmel-tcb.c b/drivers/pwm/pwm-atmel-tcb.c
+> index ba6ce01..0266969 100644
+> --- a/drivers/pwm/pwm-atmel-tcb.c
+> +++ b/drivers/pwm/pwm-atmel-tcb.c
+> @@ -249,6 +249,8 @@ static int atmel_tcb_pwm_enable(struct pwm_chip *chip, struct pwm_device *pwm)
+>   		}
+>   	}
 >
-> thanks,
-> srini
+> +	cmr |= (tcbpwm->div & ATMEL_TC_TCCLKS);
+> +
+>   	__raw_writel(cmr, regs + ATMEL_TC_REG(group, CMR));
 >
+>   	if (index == 0)
 >
+
+
+-- 
+Nicolas Ferre
