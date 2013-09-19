@@ -1,85 +1,83 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Thu, 19 Sep 2013 11:05:12 -0700
-Subject: [PATCH v2] clk: si570: Add a driver for SI570 oscillators
-In-Reply-To: <1379544219-23579-1-git-send-email-soren.brinkmann@xilinx.com>
-References: <1379544219-23579-1-git-send-email-soren.brinkmann@xilinx.com>
-Message-ID: <20130919180512.5246.73360@quantum>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 19 Sep 2013 19:05:40 +0100
+Subject: [PATCH] ASoC: generic: Add generic DT based simple codec
+In-Reply-To: <20130919193403.30ac5764@armhf>
+References: <20130919105437.75e0f0a3@armhf>
+ <20130919104028.GI21013@sirena.org.uk>
+ <20130919193403.30ac5764@armhf>
+Message-ID: <20130919180540.GH21013@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Soren Brinkmann (2013-09-18 15:43:38)
-> diff --git a/Documentation/devicetree/bindings/clock/silabs,si570.txt b/Documentation/devicetree/bindings/clock/silabs,si570.txt
-> new file mode 100644
-> index 0000000..7ab5c8b
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/clock/silabs,si570.txt
-> @@ -0,0 +1,38 @@
-> +Binding for Silicon Labs 570, 571, 598 and 599 programmable
-> +I2C clock generators.
-> +
-> +Reference
-> +This binding uses the common clock binding[1]. Details about the devices can be
-> +found in the data sheets[2][3].
-> +
-> +[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
-> +[2] Si570/571 Data Sheet
-> +    http://www.silabs.com/Support%20Documents/TechnicalDocs/si570.pdf
-> +[3] Si598/599 Data Sheet
-> +    http://www.silabs.com/Support%20Documents/TechnicalDocs/si598-99.pdf
-> +
-> +Required properties:
-> + - compatible: Shall be one of "silabs,si570", "silabs,si571",
-> +                              "silabs,si598", "silabs,si599"
-> + - reg: I2C device address.
-> + - #clock-cells: From common clock bindings: Shall be 0.
-> + - factory-fout: Factory set default frequency. This frequency is part specific.
-> +                The correct frequency for the part used has to be provided in
-> +                order to generate the correct output frequencies. For more
-> +                details, please refer to the data sheet.
-> +
-> +Optional properties:
-> + - clock-output-names: From common clock bindings. Recommended to be "si570".
-> + - clock-frequency: Output frequency to generate. This defines the output
-> +                   frequency set during boot. It can be reprogrammed during
-> +                   runtime using the common clock framework.
-> + - temperature-stability-7ppm: Indicate a device with a temperature stability
-> +                              of 7ppm
+On Thu, Sep 19, 2013 at 07:34:03PM +0200, Jean-Francois Moine wrote:
 
-Some DT binding bike-shedding:
+> Well, first, the codecs hdmi and dmic have no DT support.
+> Then, from the Cubox point of vue, the codec hdmi offers playback
+> and capture while the Cubox has only playback (via the tda998x HDMI
+> transmitter), and, also, the codec spdif transmitter has a lot of
+> sample rates while the Dove audio device supports only 44.1, 48 and 96
+> kHz.
 
-Should this be "temperature-stability-ppm = <7>;" ? Do you think that
-this value might change in the future?
+All those restrictions should be constrained by either the machine
+binding or the driver for the SoC side though.  I do see why you might
+want this, I'm just a bit ambivalent about the merits.
 
-> diff --git a/drivers/clk/clk-si570.c b/drivers/clk/clk-si570.c
-> new file mode 100644
-> index 0000000..c20dfce
-> --- /dev/null
-> +++ b/drivers/clk/clk-si570.c
-> @@ -0,0 +1,517 @@
-<snip>
-> +static bool si570_regmap_is_volatile(struct device *dev, unsigned int reg)
-> +{
-> +       switch (reg) {
-> +       case 135:
-> +               return true;
-> +       default:
-> +               return false;
-> +       }
-> +}
-> +
-> +static bool si570_regmap_is_writeable(struct device *dev, unsigned int reg)
-> +{
-> +       switch (reg) {
-> +       case 7 ... 18:
-> +       case 135:
-> +       case 137:
-> +               return true;
-> +       default:
-> +               return false;
-> +       }
-> +}
+> So, instead of adding new hdmi and spdif_transmitter codecs,
+> I thought it could be useful to have a generic codec with DT support.
 
-Should magic numbers above be symbolic constants?
+> On the other hand, as the first use of this codec is for the Cubox,
+> an other solution could be to have the codec included in the kirkwood
+> driver (declared by DT as either i2s or s/pdif). This would simplify
+> the use or not of s/pdif in this driver.
 
-Regards,
-Mike
+That'd work too.
+
+> > > +Child 'capture' and 'playback' required properties:
+> > > +- stream-name: name of the stream
+
+> > What does this mean in the binding?
+
+> Indeed, the stream name could be implicit (either "Playback" or
+> "Capture"), but, as the users are aware of it, a more friendly
+> name is nicer ("S/PDIF Playback").
+
+So you need to say that it's for display purposes.
+
+> I have no idea about which format is used or not, and there is no
+> explanation about their meanings in the uapi (but I can search them..).
+
+> Otherwise, for Dove, we need at least "s16_le", "s24_le" and "s32_le"
+> and, perhaps, "iec958_subframe_le" and "iec958_subframe_be".
+
+> So, what do you think should be the format set?
+
+PCM plus IEC seems fine, it's more the more obscure formats that ring
+alarm bells.
+
+> > > +Rates:
+> > > +	5512
+> > > +	8000
+
+> > This shouldn't be a list of defined rates, it should allow any number,
+> > and it should support ranges since while some devices do enumerate
+> > specific rates simpler devices often just support a continuous range of
+> > rates.
+
+> There cannot be any number because the rates are coded by discrete
+> values in a bitmap.
+
+Not quite - _KNOT and _CONTINUOUS are options in that bitmap...  in
+any case this would be a Linux implementation thing.
+
+> For the continuous range, I was thinking about the value '0' followed
+> by the min and max rates. Have you any other syntax in mind?
+
+That'd probably work, not sure if there's a more idiomatic way of doing
+that in DT though.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130919/2ddd1c55/attachment-0001.sig>
