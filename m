@@ -1,34 +1,38 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Fri, 20 Sep 2013 07:18:34 -0500
-Subject: [PATCH 39/51] DMA-API: others: use dma_set_coherent_mask()
-In-Reply-To: <20130920121652.GA7630@mtj.dyndns.org>
+From: rmk+kernel@arm.linux.org.uk (Russell King)
+Date: Thu, 19 Sep 2013 22:33:59 +0100
+Subject: [PATCH 09/51] DMA-API: net: broadcom/b44: replace
+ dma_set_mask()+dma_set_coherent_mask() with new helper
+In-Reply-To: <20130919212235.GD12758@n2100.arm.linux.org.uk>
 References: <20130919212235.GD12758@n2100.arm.linux.org.uk>
- <E1VMnNq-0007s4-HN@rmk-PC.arm.linux.org.uk>
- <20130920121652.GA7630@mtj.dyndns.org>
-Message-ID: <20130920121834.GB7630@mtj.dyndns.org>
+Message-ID: <E1VMlrL-0007g2-QQ@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 20, 2013 at 07:16:52AM -0500, Tejun Heo wrote:
-> On Fri, Sep 20, 2013 at 12:11:38AM +0100, Russell King wrote:
-> > The correct way for a driver to specify the coherent DMA mask is
-> > not to directly access the field in the struct device, but to use
-> > dma_set_coherent_mask().  Only arch and bus code should access this
-> > member directly.
-> > 
-> > Convert all direct write accesses to using the correct API.
-> > 
-> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> 
-> Acked-by: Tejun Heo <tj@kernel.org>
-> 
-> The patch is pretty widely spread.  I don't mind how it gets routed
-> but what's the plan?
+Replace the following sequence:
 
-Hmm... maybe hte pata_ixp4xx_cf.c part should be moved to the one
-which updates pata_octeon_cf.c?
+	dma_set_mask(dev, mask);
+	dma_set_coherent_mask(dev, mask);
 
-Thanks.
+with a call to the new helper dma_set_mask_and_coherent().
 
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ drivers/net/ethernet/broadcom/b44.c |    3 +--
+ 1 files changed, 1 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/net/ethernet/broadcom/b44.c b/drivers/net/ethernet/broadcom/b44.c
+index 9b017d9..b4d2018 100644
+--- a/drivers/net/ethernet/broadcom/b44.c
++++ b/drivers/net/ethernet/broadcom/b44.c
+@@ -2183,8 +2183,7 @@ static int b44_init_one(struct ssb_device *sdev,
+ 		goto err_out_free_dev;
+ 	}
+ 
+-	if (dma_set_mask(sdev->dma_dev, DMA_BIT_MASK(30)) ||
+-	    dma_set_coherent_mask(sdev->dma_dev, DMA_BIT_MASK(30))) {
++	if (dma_set_mask_and_coherent(sdev->dma_dev, DMA_BIT_MASK(30))) {
+ 		dev_err(sdev->dev,
+ 			"Required 30BIT DMA mask unsupported by the system\n");
+ 		goto err_out_powerdown;
 -- 
-tejun
+1.7.4.4
