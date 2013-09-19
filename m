@@ -1,66 +1,96 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 19 Sep 2013 14:58:54 +0200
-Subject: [PATCH] at91: serial: sam9g25: add usart3 to dtsi
-In-Reply-To: <1379594016-9408-1-git-send-email-jiri.prchal@aksignal.cz>
-References: <1379594016-9408-1-git-send-email-jiri.prchal@aksignal.cz>
-Message-ID: <523AF50E.7020509@atmel.com>
+From: srinivas.kandagatla@st.com (Srinivas KANDAGATLA)
+Date: Thu, 19 Sep 2013 13:59:52 +0100
+Subject: [PATCH 2/4] ARM: STi: Supply I2C configuration to STiH416 SoC
+In-Reply-To: <84625B87D65BCF478CC1E9C886A4C314DEF1BD9579@SAFEX1MAIL4.st.com>
+References: <1379498483-4236-1-git-send-email-maxime.coquelin@st.com>
+ <1379498483-4236-3-git-send-email-maxime.coquelin@st.com>
+ <20130918120340.GF16984@lee--X1>
+ <84625B87D65BCF478CC1E9C886A4C314DEF1BD9578@SAFEX1MAIL4.st.com>
+ <5239A322.5010004@st.com>
+ <84625B87D65BCF478CC1E9C886A4C314DEF1BD9579@SAFEX1MAIL4.st.com>
+Message-ID: <523AF548.30400@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/09/2013 14:33, Jiri Prchal :
-> Hope it should be in g25 because not all x5 socs have usart3.
+On 19/09/13 08:16, Maxime COQUELIN wrote:
+> Hi Srini,
+> 
+> On 09/18/2013 03:17 PM, Srinivas KANDAGATLA wrote:
+>> On 18/09/13 13:46, Maxime COQUELIN wrote:
+>>> On 09/18/2013 02:03 PM, Lee Jones wrote:
+>>>>>>> This patch supplies I2C configuration to STiH416 SoC.
+>>>>>>>
+>>>>>>> Cc: Srinivas Kandagatla <srinivas.kandagatla@st.com>
+>>>>>>> Signed-off-by: Maxime Coquelin <maxime.coquelin@st.com>
+>>>>>>> ---
+>>>>>>>  arch/arm/boot/dts/stih416-pinctrl.dtsi |   35 ++++++++++++++++++++
+>>>>>>>  arch/arm/boot/dts/stih416.dtsi         |   57 ++++++++++++++++++++++++++++++++
+>>>>>>>  2 files changed, 92 insertions(+)
+>>>>>>>
+>>>>>>> diff --git a/arch/arm/boot/dts/stih416-pinctrl.dtsi b/arch/arm/boot/dts/stih416-pinctrl.dtsi
+>>>>> I genuinely don't know the answer to this question, but are these
+>>>>> nodes identical to the ones you've just put in the stih415 DTSI file?
+>>>>> If so, I think it will be worth creating a stih41x DTSI rather than
+>>>>> duplicating lots of stuff unnecessarily.
+>>> There are close to be identical indeed.
+>>> For the clocks and pinctrl, the references names are the same, but they are
+>>> pointing on different nodes, as STiH415 and STiH416 have their own
+>>> clocks and pinctrl dtsi files.
+>>>
+>>> Srini, what is opinion about this?
+>> There is already a stih41x.dtsi file, but I don't think it is the right
+>> place for the pinctrl nodes there.
+>>
+>> Am not OK with the idea of common pinctrl nodes for STiH415 and STiH416
+>> for two reasons.
+>>
+>> 1> If we common up the pinctrl nodes, it will be very difficult to
+>> accommodate new pinctrls layout which is not guaranteed to be in same
+>> layout in future SOCs.
+>>
+>> 2> The retiming values in the pinctrl nodes tend to change as per SOC,
+>> so it will be difficult to manage it if we common it up.
+>>
+>> Am sure we can come up with a dt layout which can reduce duplication,
+>> but we have to be careful here not to lose the flexiblity to accommodate
+>> new picntrl layouts, new retimings values based on SOC.
+> Ok. What do you think of declaring the i2c nodes inside the stih41x.dtsi
+> file,
+> and overload them with the pinctrl and clock properties in the stih416
+> and stih415 dtsi files?
+Am not very comfortable with this idea.
 
-Well there is a pending rework of these optional peripherals for sam9x5 
-series. So we may end-up with this usart3 declaration in a separated 
-file that will be included in both sam9g25 and sam9x25 product 
-descriptions (together with the already existing pinctrl declaration 
-that resides in at91sam9x5.dtsi).
+As there is no guarantee that the interrupt number/memory map and the
+i2c numbering will be same in future SOCs or other IPs.
 
-So, I keep your code and will try to make sure that it is included 
-during the move to that model. If you do not see it appearing, please 
-remind us then...
+You might be already aware that the number of i2cs on each SOC are
+different as example on STiH415 we have 10 SSCs and on STiH416 we have
+11 SSCs. So, At what point you decide that which devices/IPs should be
+in stih41x and which should in stih415/Stih416?
 
-Thanks a lot, bye,
+Each i2c node will save around 5 lines if we common it up, but if the
+interrupt number or map changes this difference will be negligible.
 
-> Signed-off-by: Jiri Prchal <jiri.prchal@aksignal.cz>
-> ---
->   arch/arm/boot/dts/at91sam9g25.dtsi |   14 ++++++++++++++
->   1 file changed, 14 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/at91sam9g25.dtsi b/arch/arm/boot/dts/at91sam9g25.dtsi
-> index b4ec6fe..ba0966f 100644
-> --- a/arch/arm/boot/dts/at91sam9g25.dtsi
-> +++ b/arch/arm/boot/dts/at91sam9g25.dtsi
-> @@ -12,6 +12,10 @@
->   	model = "Atmel AT91SAM9G25 SoC";
->   	compatible = "atmel,at91sam9g25", "atmel,at91sam9x5";
->
-> +	aliases {
-> +		serial4 = &usart3;
-> +	};
-> +
->   	ahb {
->   		apb {
->   			pinctrl at fffff400 {
-> @@ -23,6 +27,16 @@
->   				       0x003fffff 0x003f8000 0x00000000  /* pioD */
->   				      >;
->   			};
-> +
-> +			usart3: serial at f8028000 {
-> +				compatible = "atmel,at91sam9260-usart";
-> +				reg = <0xf8028000 0x200>;
-> +				interrupts = <8 IRQ_TYPE_LEVEL_HIGH 5>;
-> +				pinctrl-names = "default";
-> +				pinctrl-0 = <&pinctrl_usart3>;
-> +				status = "disabled";
-> +			};
-> +
->   		};
->   	};
->   };
->
+Common up at this level and mixing un-common ones in stih415.dtsi or
+stih416.dtsi will add confusion to readers as the information is split
+at multiple places.
+
+IMO the common up idea sounds good but reduces the readability and has
+no effect on final dtb size.
+
+Thanks,
+srini
 
 
--- 
-Nicolas Ferre
+> 
+> Regards,
+> Maxime
+>>
+>>
+>> thanks,
+>> srini
+>>
+>>
+> 
+> 
+> 
