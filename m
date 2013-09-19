@@ -1,96 +1,116 @@
-From: srinivas.kandagatla@st.com (Srinivas KANDAGATLA)
-Date: Thu, 19 Sep 2013 13:59:52 +0100
-Subject: [PATCH 2/4] ARM: STi: Supply I2C configuration to STiH416 SoC
-In-Reply-To: <84625B87D65BCF478CC1E9C886A4C314DEF1BD9579@SAFEX1MAIL4.st.com>
-References: <1379498483-4236-1-git-send-email-maxime.coquelin@st.com>
- <1379498483-4236-3-git-send-email-maxime.coquelin@st.com>
- <20130918120340.GF16984@lee--X1>
- <84625B87D65BCF478CC1E9C886A4C314DEF1BD9578@SAFEX1MAIL4.st.com>
- <5239A322.5010004@st.com>
- <84625B87D65BCF478CC1E9C886A4C314DEF1BD9579@SAFEX1MAIL4.st.com>
-Message-ID: <523AF548.30400@st.com>
+From: rogerq@ti.com (Roger Quadros)
+Date: Thu, 19 Sep 2013 16:05:28 +0300
+Subject: [RFC PATCH 00/15] Add SATA support for TI OMAP5 and DRA7 SoCs
+Message-ID: <1379595943-14622-1-git-send-email-rogerq@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/09/13 08:16, Maxime COQUELIN wrote:
-> Hi Srini,
-> 
-> On 09/18/2013 03:17 PM, Srinivas KANDAGATLA wrote:
->> On 18/09/13 13:46, Maxime COQUELIN wrote:
->>> On 09/18/2013 02:03 PM, Lee Jones wrote:
->>>>>>> This patch supplies I2C configuration to STiH416 SoC.
->>>>>>>
->>>>>>> Cc: Srinivas Kandagatla <srinivas.kandagatla@st.com>
->>>>>>> Signed-off-by: Maxime Coquelin <maxime.coquelin@st.com>
->>>>>>> ---
->>>>>>>  arch/arm/boot/dts/stih416-pinctrl.dtsi |   35 ++++++++++++++++++++
->>>>>>>  arch/arm/boot/dts/stih416.dtsi         |   57 ++++++++++++++++++++++++++++++++
->>>>>>>  2 files changed, 92 insertions(+)
->>>>>>>
->>>>>>> diff --git a/arch/arm/boot/dts/stih416-pinctrl.dtsi b/arch/arm/boot/dts/stih416-pinctrl.dtsi
->>>>> I genuinely don't know the answer to this question, but are these
->>>>> nodes identical to the ones you've just put in the stih415 DTSI file?
->>>>> If so, I think it will be worth creating a stih41x DTSI rather than
->>>>> duplicating lots of stuff unnecessarily.
->>> There are close to be identical indeed.
->>> For the clocks and pinctrl, the references names are the same, but they are
->>> pointing on different nodes, as STiH415 and STiH416 have their own
->>> clocks and pinctrl dtsi files.
->>>
->>> Srini, what is opinion about this?
->> There is already a stih41x.dtsi file, but I don't think it is the right
->> place for the pinctrl nodes there.
->>
->> Am not OK with the idea of common pinctrl nodes for STiH415 and STiH416
->> for two reasons.
->>
->> 1> If we common up the pinctrl nodes, it will be very difficult to
->> accommodate new pinctrls layout which is not guaranteed to be in same
->> layout in future SOCs.
->>
->> 2> The retiming values in the pinctrl nodes tend to change as per SOC,
->> so it will be difficult to manage it if we common it up.
->>
->> Am sure we can come up with a dt layout which can reduce duplication,
->> but we have to be careful here not to lose the flexiblity to accommodate
->> new picntrl layouts, new retimings values based on SOC.
-> Ok. What do you think of declaring the i2c nodes inside the stih41x.dtsi
-> file,
-> and overload them with the pinctrl and clock properties in the stih416
-> and stih415 dtsi files?
-Am not very comfortable with this idea.
+Hi,
 
-As there is no guarantee that the interrupt number/memory map and the
-i2c numbering will be same in future SOCs or other IPs.
+This series adds SATA controller support for the Texas Instruments
+OMAP5 and DRA7 platforms.
 
-You might be already aware that the number of i2cs on each SOC are
-different as example on STiH415 we have 10 SSCs and on STiH416 we have
-11 SSCs. So, At what point you decide that which devices/IPs should be
-in stih41x and which should in stih415/Stih416?
+As the SATA controller is compatible with AHCI, we use the ahci_platform
+driver and just provide the glue logic.
 
-Each i2c node will save around 5 lines if we common it up, but if the
-interrupt number or map changes this difference will be negligible.
+The AHCI controller is enclosed within a TI specific Wrapper that controls
+the controller power mode. Patch 9 adds a driver for this wrapper.
 
-Common up at this level and mixing un-common ones in stih415.dtsi or
-stih416.dtsi will add confusion to readers as the information is split
-at multiple places.
+The controller is linked to a SATA (PIPE3) PHY, which needs to be clocked
+and powered up before it can be used. We do that with the help of the
+generic PHY framework [2] in Patch 8.
 
-IMO the common up idea sounds good but reduces the readability and has
-no effect on final dtb size.
+Patches 1 to 7 adapt the the PHY driver to the Generic PHY framework.
 
-Thanks,
-srini
+Patches 9 to 15 provide platform adaptation code for OMAP5 and DRA7.
 
+Patches are based on v3.12-rc1 with the following patches on top
+[1] - omap control usb multiple instance support
+      http://article.gmane.org/gmane.linux.ports.arm.kernel/267587
+      git://github.com/rogerq/linux.git usb-control-module
 
-> 
-> Regards,
-> Maxime
->>
->>
->> thanks,
->> srini
->>
->>
-> 
-> 
-> 
+[2] - Generic PHY framework
+      git://git.kernel.org/pub/scm/linux/kernel/git/kishon/linux-phy.git testing
+
+[3] - Clock DT support
+      git://gitorious.org/~kristo/omap-pm/omap-pm-work.git mainline-3.11-rc3-omap-dt-clks-v5
+
+[4] - PHY framework mis cleanup
+      https://lkml.org/lkml/2013/9/2/313
+
+NOTE: [2], [3] and [4] will cause merge conflicts and need to be resolved manually.
+A merged tree is available for reference/testing at
+
+git://github.com/rogerq/linux.git ti-3.12-sata
+
+Tested on omap5-uevm and dra7-evm with Gen2 SATA hard drive.
+
+Known issues:
+- Gen3 SATA SSD does not work due to some issue with PHY speed negotiation.
+
+cheers,
+-roger
+
+---
+Balaji T K (3):
+  ata: ahci_platform: Manage SATA PHY
+  arm: dts: omap5: add sata node
+  arm: dts: dra7: add sata node
+
+Benoit Cousson (1):
+  arm: omap5: hwmod: add missing ocp2scp hwmod data
+
+Keshava Munegowda (1):
+  ARM: omap5: hwmod: Add ocp2scp3 and sata hwmods
+
+Kishon Vijay Abraham I (2):
+  phy: rename struct omap_control_usb to struct omap_control_phy
+  phy: omap-pipe3: use generic clock names
+
+Nikhil Devshatwar (1):
+  ARM: DRA7: hwmod: Add ocp2scp3 and sata hwmods
+
+Roger Quadros (7):
+  phy: omap-control: Update DT binding information
+  ARM: dts: omap5: Add clocks to usb3_phy node
+  phy: omap-pipe3: Add SATA DPLL support
+  phy: omap-pipe3: update compatibility string and DT binding
+  ARM: dts: omap5: Update usb3phy node
+  ata: ti_sata: Add Texas Instruments SATA Wrapper driver
+  ARM: dts: omap5: add ocp2scp1 address resource
+
+ .../devicetree/bindings/ata/ahci-platform.txt      |    2 +-
+ Documentation/devicetree/bindings/ata/ti-sata.txt  |   31 ++
+ Documentation/devicetree/bindings/phy/omap-phy.txt |   26 ++-
+ Documentation/devicetree/bindings/usb/omap-usb.txt |   23 --
+ arch/arm/boot/dts/dra7.dtsi                        |   49 ++++
+ arch/arm/boot/dts/omap5.dtsi                       |   56 ++++-
+ arch/arm/mach-omap2/omap_hwmod_54xx_data.c         |  117 ++++++++
+ arch/arm/mach-omap2/omap_hwmod_7xx_data.c          |   40 +++-
+ drivers/ata/Kconfig                                |    8 +
+ drivers/ata/Makefile                               |    1 +
+ drivers/ata/ahci.h                                 |    2 +
+ drivers/ata/ahci_platform.c                        |   31 ++-
+ drivers/ata/sata_ti.c                              |  160 +++++++++++
+ drivers/phy/Kconfig                                |   14 +-
+ drivers/phy/Makefile                               |    1 +
+ drivers/phy/phy-omap-control.c                     |  300 ++++++++++++++++++++
+ drivers/phy/phy-omap-pipe3.c                       |  157 ++++++-----
+ drivers/phy/phy-omap-usb2.c                        |    9 +-
+ drivers/usb/musb/omap2430.c                        |    2 +-
+ drivers/usb/phy/Kconfig                            |   10 -
+ drivers/usb/phy/Makefile                           |    1 -
+ drivers/usb/phy/phy-omap-control.c                 |  300 --------------------
+ include/linux/phy/omap_control_phy.h               |   83 ++++++
+ include/linux/phy/omap_pipe3.h                     |    6 +
+ include/linux/usb/omap_control_usb.h               |   83 ------
+ 25 files changed, 1013 insertions(+), 499 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/ata/ti-sata.txt
+ create mode 100644 drivers/ata/sata_ti.c
+ create mode 100644 drivers/phy/phy-omap-control.c
+ delete mode 100644 drivers/usb/phy/phy-omap-control.c
+ create mode 100644 include/linux/phy/omap_control_phy.h
+ delete mode 100644 include/linux/usb/omap_control_usb.h
+
+-- 
+1.7.4.1
