@@ -1,151 +1,103 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 19 Sep 2013 12:47:52 -0700
-Subject: [GIT PULL] ARM: SoC fixes for 3.12-rc
-Message-ID: <20130919194752.GA19975@quad.lixom.net>
+From: sylvester.nawrocki@gmail.com (Sylwester Nawrocki)
+Date: Thu, 19 Sep 2013 21:49:30 +0200
+Subject: [PATCH] media: i2c: adv7343: fix the DT binding properties
+In-Reply-To: <CA+V-a8vY-qsdUoUUH=3HOg-UAZZPujOLPHFC_udNWFtksgzRRA@mail.gmail.com>
+References: <1379073471-7244-1-git-send-email-prabhakar.csengg@gmail.com>
+ <523395DC.5080009@wwwdotorg.org>
+ <CA+V-a8sVyJ1TrTSiaj8vpaD+f_qJ5Hp287E3HuHJ_pRzzmdAvg@mail.gmail.com>
+ <523730A8.9060201@wwwdotorg.org>
+ <CA+V-a8vY-qsdUoUUH=3HOg-UAZZPujOLPHFC_udNWFtksgzRRA@mail.gmail.com>
+Message-ID: <523B554A.2030701@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On 09/19/2013 06:06 PM, Prabhakar Lad wrote:
+> On Mon, Sep 16, 2013 at 9:54 PM, Stephen Warren<swarren@wwwdotorg.org>  wrote:
+>> On 09/13/2013 11:23 PM, Prabhakar Lad wrote:
+>>> On Sat, Sep 14, 2013 at 4:16 AM, Stephen Warren<swarren@wwwdotorg.org>  wrote:
+>>>> On 09/13/2013 05:57 AM, Prabhakar Lad wrote:
+>>>>> From: "Lad, Prabhakar"<prabhakar.csengg@gmail.com>
+>>>>>
+>>>>> This patch fixes the DT binding properties of adv7343 decoder.
+>>>>> The pdata which was being read from the DT property, is removed
+>>>>> as this can done internally in the driver using cable detection
+>>>>> register.
+>>>>>
+>>>>> This patch also removes the pdata of ADV7343 which was passed from
+>>>>> DA850 machine.
+>>>>
+>>>>> diff --git a/Documentation/devicetree/bindings/media/i2c/adv7343.txt b/Documentation/devicetree/bindings/media/i2c/adv7343.txt
+>>>>
+>>>>>   Required Properties :
+>>>>>   - compatible: Must be "adi,adv7343"
+>>>>> +- reg: I2C device address.
+>>>>> +- vddio-supply: I/O voltage supply.
+>>>>> +- vddcore-supply: core voltage supply.
+>>>>> +- vaa-supply: Analog power supply.
+>>>>> +- pvdd-supply: PLL power supply.
+>>>>
+>>>> Old DTs won't contain those properties. This breaks the DT ABI if those
+>>>> properties are required. Is that acceptable?
+>>>
+>>> As of now adv7343 via DT binding is not enabled in any platforms
+>>> so this wont break any DT ABI.
+>>
+>> Well, if the binding has already been written, it technically already is
+>> an ABI. Perhaps the binding can be fixed if it isn't in use yet, but
+>> this is definitely not the correct approach to DT.
 
-The following changes since commit 272b98c6455f00884f0350f775c5342358ebb73f:
+The binding got merged for 3.12-rc1 and the intention of this patch was
+to correct that binding. There we some issues like mismatch between names
+of properties documented and used in the driver.
 
-  Linux 3.12-rc1 (2013-09-16 16:17:51 -0400)
+After Mark's suggestion Prabhakar removed some properties and the platform
+data usage altogether. IMHO there should be only minimal changes in that
+"fixup" patch, i.e. no platform data usage should be removed. Perhaps it
+is fine since that's just code removal. I guess it is better to do this
+sort of cleanup for the next kernel release.
 
-are available in the git repository at:
+Also I believe the argument of backward compatibility shouldn't really be
+considered here. The $subject patch is supposed to correct the binding
+before it becomes and ABI.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/fixes-for-linus
+>>>> If it is, I think we should document that older versions of the binding
+>>>> didn't require those properties, so they may in fact be missing.
+>>>>
+>>>> I note that this patch doesn't actually update the driver to
+>>>> regulator_get() anything. Shouldn't it?
+>>>
+>>> As of now the driver isn?t enabling/accepting the regulators,
+>>> so should I add those in DT properties or not ?
+>>
+>> The binding should describe the HW, not what the driver does/doesn't yet
+>> do. I wrote the above because it looked like the driver was broken, not
+>> to encourage you to remove properties from the binding.
+> OK
+>
+>> How does the
+>> driver work if it doesn't enable the required regulators though, I
+>> wonder? I suppose the boards this driver has been tested on all must
+>> used fixed (non-SW-controlled) regulators.
+>>
+> on all the boards on which this decoder is connected the power to it
+> is provided by static circuit and not by regulators, So for this how would
+> you suggest to add the DT nodes for regulators ?
 
-for you to fetch changes up to 660e1c2f47f51f5b03ea7f63fa11f000e0240bda:
+I believe the regulator DT properties should be made optional. Since some
+(actually all upstream) boards don't bother with software controlled
+regulators. We might have specified them and have defined relevant fixed
+regulator(s) in DT. But I doubt it is sensible, given that it may never
+happen in practice the regulators are required to be controlled by software
+through the regulators API. Such devices can often be put in a low power
+mode by a write to one of the registers, where their supply current is at
+uA level. Looking at the datasheet ADV7343 has SLEEP_MODE in which its
+typical current consumption is 5 uA.
 
-  Merge tag 'omap-for-v3.12/fixes-dt-signed' of git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap into fixes (2013-09-18 14:01:39 -0700)
+That said the chip could be supplied from shared voltage regulators and
+the driver would then have to properly request and enable the regulators.
 
-----------------------------------------------------------------
+Anyway I'm inclined to make the regulator properties optional.
 
-ARM: SoC fixes for 3.12-rc
-
-A set of fixes for ARM platforms for 3.12. Among them:
-
-- A fix for build breakage in the MTD subsystem for some PXA devices.
-  David Woodhouse has this patch in his for-next branch but has not been
-  responding to our requests to send it up so here it is.
-  I should have amended the commit message to describe the build failure for
-  CONFIG_OF=n setups, but forgot and now it's down in the stack of commits.
-
-- Added device-tree for the BeagleBone Black. Turns out people have been
-  using the older "regualar" bone DT for the newer boards, and there's
-  risk of damaging hardware that way.
-
-- Misc DT and regular fixes for OMAP.
-
-- Fix to make the ST-Ericsson "snowball" boards boot with
-  multi_v7_defconfig, and enable one of the ST-E reference boards on the
-  same config.
-
-- Kconfig cleanup for u300 to hide submenus when the platform isn't
-  enabled.
-
-- Enable ARM_ATAG_DTB_COMPAT to let firmware override command
-  line when booting with an appended devicetree on non-DT-enabled
-  firmware (needed to boot snowball).
-
-----------------------------------------------------------------
-Andrea Adami (1):
-      ARM: sa1100: collie.c: fall back to jedec_probe flash detection
-
-Anoop Thomas Mathew (1):
-      ARM: OMAP4 SMP: Corrected a typo fucntions to functions
-
-Arnaud Patard (1):
-      ARM: imx51.dtsi: fix PATA device clock
-
-Enric Balletbo i Serra (1):
-      ARM: dts: igep00x0: Add pinmux configuration for MCBSP2
-
-Ezequiel Garcia (1):
-      mtd: nand: pxa3xx: Remove unneeded ifdef CONFIG_OF
-
-Fabio Estevam (2):
-      ARM: mach-imx: clk-imx51-imx53: Fix 'spdif1_pred' clock registration
-      ARM: mach-omap2: gpmc: Fix warning when CONFIG_ARM_LPAE=y
-
-Felipe Balbi (2):
-      ARM: dts: OMAP5: fix reg property size
-      ARM: dts: OMAP5: fix ocp2scp DTS data
-
-Gwenhael Goavec-Merou (1):
-      ARM: imx27.dtsi: fix CSPI PER clock id
-
-Huang Shijie (1):
-      ARM: dts: imx6q: fix the wrong offset of the Pad Mux register
-
-Jason Liu (1):
-      ARM: imx: i.mx6d/q: disable the double linefill feature of PL310
-
-Jingoo Han (1):
-      mailbox: remove unnecessary platform_set_drvdata()
-
-Koen Kooi (1):
-      ARM: dts: am335x-bone*: add DT for BeagleBone Black
-
-Linus Walleij (3):
-      ARM: ux500: disable outer cache debug
-      ARM: u300: hide submenus
-      ARM: multi_v7: add HREFv60 to multi_v7 defconfig
-
-Olof Johansson (4):
-      ARM: multi_v7_defconfig: enable ARM_ATAG_DTB_COMPAT
-      Merge tag 'imx-fixes-3.12' of git://git.linaro.org/people/shawnguo/linux-2.6 into fixes
-      Merge tag 'omap-for-v3.12/fixes-signed' of git://git.kernel.org/.../tmlind/linux-omap into fixes
-      Merge tag 'omap-for-v3.12/fixes-dt-signed' of git://git.kernel.org/.../tmlind/linux-omap into fixes
-
-Phil Carmody (1):
-      ARM: OMAP2+: mux: fix trivial typo in name
-
-Robert Nelson (1):
-      ARM: dts: omap3-beagle-xm: fix string error in compatible property
-
-Shawn Guo (1):
-      ARM: imx: initialize clk_init_data.flags for clk-fixup-mux
-
-Tony Lindgren (4):
-      ARM: dts: Fix muxing and regulator for wl12xx on the SDIO bus for pandaboard
-      ARM: dts: Fix muxing and regulator for wl12xx on the SDIO bus for blaze
-      ARM: OMAP4: Fix clock_get error for GPMC during boot
-      Merge tag 'for_3.12-rc2/dts_signed' of git://git.kernel.org/.../bcousson/linux-omap-dt into omap-for-v3.12/fixes-dt
-
-Vladimir Murzin (1):
-      ARM: OMAP4: cpuidle: fix: call cpu_cluster_pm_exit conditionally
-
-Wei Yongjun (1):
-      ARM: OMAP: fix return value check in omap_device_build_from_dt()
-
- arch/arm/boot/dts/Makefile                |   1 +
- arch/arm/boot/dts/am335x-bone-common.dtsi | 262 ++++++++++++++++++++++++++++++
- arch/arm/boot/dts/am335x-bone.dts         | 256 +----------------------------
- arch/arm/boot/dts/am335x-boneblack.dts    |  17 ++
- arch/arm/boot/dts/imx27.dtsi              |   6 +-
- arch/arm/boot/dts/imx51.dtsi              |   2 +-
- arch/arm/boot/dts/imx6q-pinfunc.h         |   4 +-
- arch/arm/boot/dts/omap3-beagle-xm.dts     |   2 +-
- arch/arm/boot/dts/omap3-igep.dtsi         |  14 ++
- arch/arm/boot/dts/omap4-panda-common.dtsi |  46 +++++-
- arch/arm/boot/dts/omap4-sdp.dts           |  39 ++++-
- arch/arm/boot/dts/omap5.dtsi              |   7 +-
- arch/arm/configs/multi_v7_defconfig       |   2 +
- arch/arm/mach-imx/clk-fixup-mux.c         |   1 +
- arch/arm/mach-imx/clk-imx51-imx53.c       |   2 +-
- arch/arm/mach-imx/system.c                |  11 ++
- arch/arm/mach-omap2/cclock44xx_data.c     |   2 +-
- arch/arm/mach-omap2/cpuidle44xx.c         |   2 +-
- arch/arm/mach-omap2/gpmc.c                |   4 +-
- arch/arm/mach-omap2/mux34xx.c             |   2 +-
- arch/arm/mach-omap2/omap-smp.c            |   2 +-
- arch/arm/mach-omap2/omap_device.c         |   2 +-
- arch/arm/mach-sa1100/collie.c             |   2 +-
- arch/arm/mach-u300/Kconfig                |  10 +-
- arch/arm/mach-ux500/cache-l2x0.c          |   1 +
- drivers/mailbox/mailbox-omap2.c           |   1 -
- drivers/mtd/nand/pxa3xx_nand.c            |   7 -
- 27 files changed, 418 insertions(+), 289 deletions(-)
- create mode 100644 arch/arm/boot/dts/am335x-bone-common.dtsi
- create mode 100644 arch/arm/boot/dts/am335x-boneblack.dts
+--
+Thanks,
+Sylwester
