@@ -1,55 +1,91 @@
-From: david.woodhouse@intel.com (Woodhouse, David)
-Date: Thu, 19 Sep 2013 23:19:19 +0000
-Subject: [GIT PULL] ARM: SoC fixes for 3.12-rc
-In-Reply-To: <CAN8TOE8j=oosn-5hAdqoTPcuW-sGvDAHd_nK6BZfJpxMwwpisQ@mail.gmail.com>
-References: <20130919194752.GA19975@quad.lixom.net>
- <1379626776.753.164.camel@shinybook.infradead.org>
- <CAN8TOE8j=oosn-5hAdqoTPcuW-sGvDAHd_nK6BZfJpxMwwpisQ@mail.gmail.com>
-Message-ID: <1379632757.12963.4.camel@shinybook.infradead.org>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 19 Sep 2013 14:20:30 -0700
+Subject: [PATCH] ARM: shmobile: Lager: add Micrel KSZ8041 PHY fixup
+In-Reply-To: <201309140429.23474.sergei.shtylyov@cogentembedded.com>
+References: <201309140429.23474.sergei.shtylyov@cogentembedded.com>
+Message-ID: <20130919212030.GK2918@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2013-09-19 at 15:57 -0700, Brian Norris wrote:
-> On Thu, Sep 19, 2013 at 2:39 PM, Woodhouse, David
-> <david.woodhouse@intel.com> wrote:
-> > On Thu, 2013-09-19 at 12:47 -0700, Olof Johansson wrote:
-> >>
-> >> - A fix for build breakage in the MTD subsystem for some PXA devices.
-> >>   David Woodhouse has this patch in his for-next branch but has not been
-> >>   responding to our requests to send it up so here it is.
-> >>   I should have amended the commit message to describe the build failure for
-> >>   CONFIG_OF=n setups, but forgot and now it's down in the stack of commits.
-> >
-> > Thanks for pulling that in. Apologies for the screwup.
+On Sat, Sep 14, 2013 at 04:29:22AM +0400, Sergei Shtylyov wrote:
+> Currently on the Lager board NFS timeouts/delays are seen when booting.  That
+> turned out to happen because the SoC's ETH_LINK signal turns on and off after
+> each packet.  It is connected to Micrel KSZ8041 PHY's LED0 signal. Ether LEDs
+> on the Lager board are named LINK and ACTIVE which corresponds to non-default
+> 01 setting of the PHY control register 1 bits 14-15. The 'sh_eth' driver resets
+> the PHY when opening the network device, so we have to set the mentioned bits
+> back to 01 from the default 00 value which causes bouncing of ETH_LINK.  That
+> can be achieved using the PHY platform fixup mechanism if we also modify the
+> driver to use it..
 > 
-> Speaking of such process issues: there's an outstanding patch for a
-> (small) memory leak that was introduced in the nand_base.c ONFI code
-> in 3.12-rc1. Can I expect you to attend to these sort of -rcX (where X
-> > 1) issues? Or should I send Linus the patch myself? I don't really
-> want it to wait around until 3.13-rc1 to go to -stable.
+> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> 
+> ---
+> This patch is against the recent Linus' tree. Its effect on NFS issue depends
+> on the 'sh_eth' driver patch I've posted earlier. 
+> Simon, please update your 'master' and/or 'fixes' branches since currently it's
+> impossible to apply fixes to your tree.
 
-I'm aware of it, and will get to it shortly. Was going to round it up
-along with the one that Olof just sent, either some time this week at
-Plumbers or when I get home.
+Now that rc-1 is out I plan to rebase my tree.
+But as I am travelling this week it will have to wait until next week.
 
-If you want to stick it in the linux-mtd.git tree before that and send
-Linus a pull request, I have no objection.
-
-Does that m25p80 'fix 4 byte addressing' fix for Micron not also want to
-go in?
-
--- 
-                   Sent with MeeGo's ActiveSync support.
-
-David Woodhouse                            Open Source Technology Centre
-David.Woodhouse at intel.com                              Intel Corporation
-
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: smime.p7s
-Type: application/x-pkcs7-signature
-Size: 4370 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130919/0d2e9c80/attachment-0001.bin>
+> 
+>  arch/arm/mach-shmobile/board-lager.c |   27 ++++++++++++++++++++++++++-
+>  1 file changed, 26 insertions(+), 1 deletion(-)
+> 
+> Index: linux/arch/arm/mach-shmobile/board-lager.c
+> ===================================================================
+> --- linux.orig/arch/arm/mach-shmobile/board-lager.c
+> +++ linux/arch/arm/mach-shmobile/board-lager.c
+> @@ -29,6 +29,7 @@
+>  #include <linux/pinctrl/machine.h>
+>  #include <linux/platform_data/gpio-rcar.h>
+>  #include <linux/platform_device.h>
+> +#include <linux/phy.h>
+>  #include <linux/regulator/fixed.h>
+>  #include <linux/regulator/machine.h>
+>  #include <linux/sh_eth.h>
+> @@ -155,6 +156,30 @@ static void __init lager_add_standard_de
+>  					  &ether_pdata, sizeof(ether_pdata));
+>  }
+>  
+> +/*
+> + * Ether LEDs on the Lager board are named LINK and ACTIVE which corresponds
+> + * to non-default 01 setting of the Micrel KSZ8041 PHY control register 1 bits
+> + * 14-15. We have to set them back to 01 from the default 00 value each time
+> + * the PHY is reset. It's also important because the PHY's LED0 signal is
+> + * connected to SoC's ETH_LINK signal and in the PHY's default mode it will
+> + * bounce on and off after each packet, which we apparently want to avoid.
+> + */
+> +static int lager_ksz8041_fixup(struct phy_device *phydev)
+> +{
+> +	u16 phyctrl1 = phy_read(phydev, 0x1e);
+> +
+> +	phyctrl1 &= ~0xc000;
+> +	phyctrl1 |= 0x4000;
+> +	return phy_write(phydev, 0x1e, phyctrl1);
+> +}
+> +
+> +static void __init lager_init(void)
+> +{
+> +	lager_add_standard_devices();
+> +
+> +	phy_register_fixup_for_id("r8a7790-ether-ff:01", lager_ksz8041_fixup);
+> +}
+> +
+>  static const char *lager_boards_compat_dt[] __initdata = {
+>  	"renesas,lager",
+>  	NULL,
+> @@ -163,6 +188,6 @@ static const char *lager_boards_compat_d
+>  DT_MACHINE_START(LAGER_DT, "lager")
+>  	.init_early	= r8a7790_init_delay,
+>  	.init_time	= r8a7790_timer_init,
+> -	.init_machine	= lager_add_standard_devices,
+> +	.init_machine	= lager_init,
+>  	.dt_compat	= lager_boards_compat_dt,
+>  MACHINE_END
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
