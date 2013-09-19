@@ -1,54 +1,69 @@
-From: matt.porter@linaro.org (Matt Porter)
-Date: Thu, 19 Sep 2013 13:18:26 -0400
-Subject: [PATCH] ARM: dts: bcm11351: Use GIC/IRQ defines for sdio interrupts
-Message-ID: <1379611106-18338-1-git-send-email-matt.porter@linaro.org>
+From: luca@coelho.fi (Luca Coelho)
+Date: Thu, 19 Sep 2013 20:21:32 +0300
+Subject: [PATCH 1/2] ARM: dts: Fix muxing and regulator for wl12xx on
+ the SDIO bus for pandaboard
+In-Reply-To: <20130919145344.GM9994@atomide.com>
+References: <20130913190811.24617.97699.stgit@localhost>
+ <20130913190953.24617.46506.stgit@localhost>
+ <1379399214.4223.123.camel@porter.coelho.fi>
+ <1379399290.4223.124.camel@porter.coelho.fi>
+ <20130918000203.GS9994@atomide.com> <52396CA0.6030100@baylibre.com>
+ <20130918175158.GW9994@atomide.com> <20130918234726.GL9994@atomide.com>
+ <1379569391.4223.148.camel@porter.coelho.fi>
+ <20130919145344.GM9994@atomide.com>
+Message-ID: <1379611292.4223.160.camel@porter.coelho.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Trivial patch to make use of GIC/IRQ defines on the bcm11351 sdio
-interrupt properties.
+On Thu, 2013-09-19 at 07:53 -0700, Tony Lindgren wrote:
+> * Luca Coelho <luca@coelho.fi> [130918 22:50]:
+> > On Wed, 2013-09-18 at 16:47 -0700, Tony Lindgren wrote:
+> > > * Tony Lindgren <tony@atomide.com> [130918 11:00]:
+> > > > * Benoit Cousson <bcousson@baylibre.com> [130918 02:12]:
+> > > > > Hi Tony,
+> > > > > 
+> > > > > On 18/09/2013 02:02, Tony Lindgren wrote:
+> > > > > >* Luca Coelho <luca@coelho.fi> [130916 23:35]:
+> > > > > >>On Tue, 2013-09-17 at 09:26 +0300, Luca Coelho wrote:
+> > > > > >>>Both patches look good to me, though I didn't have the time to retest
+> > > > > >>>them.
+> > > > > >>
+> > > > > >>Actually I don't even have a Blaze device anymore, so I can't really
+> > > > > >>test the second patch. :(
+> > > > > >
+> > > > > >OK no problem, I've tested it on panda es.
+> > > > > 
+> > > > > Do we have someone out-there that still own a Blaze?
+> > > > > 
+> > > > > Anyway, I'm about to send a DTS fix branch for -rc2, so I'll include
+> > > > > these two patches.
+> > > > 
+> > > > OK yes good please do pick them up, I'll drop them from my
+> > > > not-yet-pushed-out omap-for-v3.12/fixes.
+> > > 
+> > > Hmm looks like there's also some new regression in the
+> > > wl12xx driver:
+> > > 
+> > > # iwconfig wlan0
+> > > wlan0     no wireless extensions.
+> > > 
+> > > My test script was just doing:
+> > > 
+> > > # iw dev wlan0 scan
+> > > 
+> > > And that works fine. Luca, any ideas?
+> > 
+> > Have you compiled WEXT support in your kernel? iwconfig uses the
+> > (deprecated) Wireless Extensions API.  iw uses the current nl80211 API.
+> > 
+> > If you want to use iwconfig and friends you need to enable
+> > CONFIG_CFG80211_WEXT.
+> 
+> OK thanks, I don't need to use iwconfig. Looks like the default
+> changed in commit 10bab00af (cfg80211: deprecate CFG80211_WEXT).
 
-Signed-off-by: Matt Porter <matt.porter@linaro.org>
----
- arch/arm/boot/dts/bcm11351.dtsi | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+Yeah, it's not enabled by default anymore.  And it was more than about
+time! ;)
 
-diff --git a/arch/arm/boot/dts/bcm11351.dtsi b/arch/arm/boot/dts/bcm11351.dtsi
-index 05a5aab..5fc64ab 100644
---- a/arch/arm/boot/dts/bcm11351.dtsi
-+++ b/arch/arm/boot/dts/bcm11351.dtsi
-@@ -71,28 +71,28 @@
- 	sdio1: sdio at 3f180000 {
- 		compatible = "brcm,kona-sdhci";
- 		reg = <0x3f180000 0x10000>;
--		interrupts = <0x0 77 0x4>;
-+		interrupts = <GIC_SPI 77 IRQ_TYPE_LEVEL_HIGH>;
- 		status = "disabled";
- 	};
- 
- 	sdio2: sdio at 3f190000 {
- 		compatible = "brcm,kona-sdhci";
- 		reg = <0x3f190000 0x10000>;
--		interrupts = <0x0 76 0x4>;
-+		interrupts = <GIC_SPI 76 IRQ_TYPE_LEVEL_HIGH>;
- 		status = "disabled";
- 	};
- 
- 	sdio3: sdio at 3f1a0000 {
- 		compatible = "brcm,kona-sdhci";
- 		reg = <0x3f1a0000 0x10000>;
--		interrupts = <0x0 74 0x4>;
-+		interrupts = <GIC_SPI 74 IRQ_TYPE_LEVEL_HIGH>;
- 		status = "disabled";
- 	};
- 
- 	sdio4: sdio at 3f1b0000 {
- 		compatible = "brcm,kona-sdhci";
- 		reg = <0x3f1b0000 0x10000>;
--		interrupts = <0x0 73 0x4>;
-+		interrupts = <GIC_SPI 73 IRQ_TYPE_LEVEL_HIGH>;
- 		status = "disabled";
- 	};
- 
--- 
-1.8.4
+--
+Luca.
