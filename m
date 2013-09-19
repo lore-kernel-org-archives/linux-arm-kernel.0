@@ -1,43 +1,32 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Thu, 19 Sep 2013 13:34:58 +0200
-Subject: [PATCH v2] ARM: new platform for Energy Micro's EFM32 Cortex-M3
- SoCs
-In-Reply-To: <201309191328.12717.arnd@arndb.de>
-References: <1379447884-14025-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <201309172245.25367.arnd@arndb.de> <20130918153424.GR24802@pengutronix.de>
- <201309191328.12717.arnd@arndb.de>
-Message-ID: <523AE162.3040100@gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 19 Sep 2013 13:03:48 +0100
+Subject: [PATCH 0/2] Fixes for STi SOCs
+In-Reply-To: <1379410003-9911-1-git-send-email-srinivas.kandagatla@st.com>
+References: <1379410003-9911-1-git-send-email-srinivas.kandagatla@st.com>
+Message-ID: <20130919120348.GH22389@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/19/13 13:28, Arnd Bergmann wrote:
-> On Wednesday 18 September 2013, Uwe Kleine-K?nig wrote:
->> On Tue, Sep 17, 2013 at 10:45:25PM +0200, Arnd Bergmann wrote:
->>> On Tuesday 17 September 2013, Uwe Kleine-K?nig wrote:
-[...]
->>>> +
->>>> +void __init efm32_init_time(void)
->>>> +{
->>>> +	of_clk_init(NULL);
->>>> +	clocksource_of_init();
->>>> +}
->>>
->>> When Sebastian Hesselbarth's patches for of_clk_init() are merged,
->>> this function can go away.
->> Do you have a link?
->
-> http://lmgtfy.com/?q=hesselbarth+of_clk_init ;-)
->
-> I've put Sebastian on Cc, I guess he can comment on the status of his
-> patches, so we can come up with a plan for dealing with the dependency
-> here.
+> Hi Arnd/Olof, 
+> 
+> These two are very minor fixes for STi SOCs.
+> One of the fix is a typo and other is to add two new options to
+> multi_v7_defconfig to get STi SOC based boards boot with nfs root with serial
+> console.
 
-Patch set has been sent yesterday, still waiting for ACK's.
+If these are accepted, it would be a massive help to get them into
+v3.12.
 
-Olof already mentioned to (a) take it in arm-soc early and (b) have
-a topic branch to depend on.
+> Srinivas Kandagatla (2):
+>   ARM: STi: OF: Fix a typo in pincfg header
+>   ARM: multi_v7_defconfig: Fix STi support
+> 
+>  arch/arm/boot/dts/st-pincfg.h       |    2 +-
+>  arch/arm/configs/multi_v7_defconfig |    3 +++
+>  2 files changed, 4 insertions(+), 1 deletions(-)
 
-I guess I will prepare that topic branch and Olof can take it (or fall
-back to creating it on his own, if I fail to do it right).
-
-Sebastian
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
