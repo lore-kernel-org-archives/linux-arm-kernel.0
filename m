@@ -1,61 +1,46 @@
 From: jbe@pengutronix.de (Juergen Beisert)
-Date: Thu, 19 Sep 2013 14:22:42 +0200
-Subject: [PATCHv5] staging/iio/adc: change the MXS touchscreen driver
- implementation
-Message-ID: <1379593369-22010-1-git-send-email-jbe@pengutronix.de>
+Date: Thu, 19 Sep 2013 14:22:43 +0200
+Subject: [PATCH 1/7] Staging/iio/adc/touchscreen/MXS: distinguish i.MX23's and
+ i.MX28's LRADC
+In-Reply-To: <1379593369-22010-1-git-send-email-jbe@pengutronix.de>
+References: <1379593369-22010-1-git-send-email-jbe@pengutronix.de>
+Message-ID: <1379593369-22010-2-git-send-email-jbe@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following series replaces the current busy loop touchscreen implementation
-for i.MX28/i.MX23 SoCs by a fully interrupt driven implementation.
+The LRADC units in i.MX23 and i.MX28 differ and we need to distinguish both
+SoC variants in order to make the touchscreen work on i.MX23
 
-Since i.MX23 and i.MX28 silicon differs, the existing implementation can
-be used for the i.MX28 SoC only.
+Signed-off-by: Juergen Beisert <jbe@pengutronix.de>
+CC: linux-arm-kernel at lists.infradead.org
+CC: devel at driverdev.osuosl.org
+CC: Marek Vasut <marex@denx.de>
+CC: Fabio Estevam <fabio.estevam@freescale.com>
+CC: Jonathan Cameron <jic23@cam.ac.uk>
+---
+ drivers/staging/iio/adc/mxs-lradc.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
-So, the first two patches of this series move the i.MX28 specific definitions
-out of the way. The third patch simplifies the register access to make it easier
-to add the i.MX23 support. Then the i.MX23 specific definitions are added, also
-the code to distinguish both SoCs at run-time.
-Up to here the existing touchscreen driver will now run on an i.MX23 Soc as well.
-
-When the i.MX23 SoC is running from battery it seems not to be a good idea to
-run a busy loop to detect touches and their location. The fourth patch adds a
-fully interrupt driven implementation which makes use of the built-in delay
-and multiple sample features of the touchscreen controller. This will reduce
-the interrupt load to a minimum.
-
-The next to last patch in this series just removes the existing busy loop
-implementation.
-
-The last patch adds a devicetree bindings proposal (to be discussed).
-
-Some restrictions/questions:
-
-- the touchscreen part is yet tested on i.MX23 SoC only
-- has someone a good idea how to implement a reliable pressure measurement if
-  the resistances of the touchscreen's plates are unknown?
-
-Changes since v4:
-
-- honor Jonathan's comments about function names
-- honor Dmitry's comments about workqueue canceling and interrupts
-- adding devicetree bindings proposal
-
-Changes since v3:
-
-- split adding register access functions and i.MX23 support into two patches
-
-Changes since v2:
-
-- useless debug output removed
-
-Changes since v1:
-
-- adding register access functions to make the existing code more readable
-- adding some functions to distinguish the SoCs at run-time to avoid if-else
-  contructs whenever differences in the register layout between i.MX23 and
-  i.MX28 must be handled
-
-Comments are welcome.
-
-Juergen
+diff --git a/drivers/staging/iio/adc/mxs-lradc.c b/drivers/staging/iio/adc/mxs-lradc.c
+index a08c173..dffca90 100644
+--- a/drivers/staging/iio/adc/mxs-lradc.c
++++ b/drivers/staging/iio/adc/mxs-lradc.c
+@@ -174,6 +174,8 @@ struct mxs_lradc {
+ 
+ 	struct input_dev	*ts_input;
+ 	struct work_struct	ts_work;
++
++	enum mxs_lradc_id	soc;
+ };
+ 
+ #define	LRADC_CTRL0				0x00
+@@ -920,6 +922,7 @@ static int mxs_lradc_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	lradc = iio_priv(iio);
++	lradc->soc = (enum mxs_lradc_id)of_id->data;
+ 
+ 	/* Grab the memory area */
+ 	iores = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+-- 
+1.8.4.rc3
