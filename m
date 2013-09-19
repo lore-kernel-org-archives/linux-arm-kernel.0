@@ -1,59 +1,50 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 19 Sep 2013 18:09:10 -0700
-Subject: [PATCH] ARM: tegra_defconfig: enable CONFIG_ARM_APPENDED_DTB
-In-Reply-To: <CAKCjkJbavWtWBxvKqpesmJfcKTUCpbsM_xL0JfS49vOpkZ8AUw@mail.gmail.com>
-References: <1379638594-28888-1-git-send-email-olof@lixom.net>
- <CAKCjkJbavWtWBxvKqpesmJfcKTUCpbsM_xL0JfS49vOpkZ8AUw@mail.gmail.com>
-Message-ID: <CAOesGMjP+QMyuLCykg0nW4yWwmnNtoyzf7nK2dPAWuqcpfp5OA@mail.gmail.com>
+From: rmk+kernel@arm.linux.org.uk (Russell King)
+Date: Thu, 19 Sep 2013 23:00:03 +0100
+Subject: [PATCH 35/51] DMA-API: parport: parport_pc.c: use
+ dma_coerce_mask_and_coherent()
+In-Reply-To: <20130919212235.GD12758@n2100.arm.linux.org.uk>
+References: <20130919212235.GD12758@n2100.arm.linux.org.uk>
+Message-ID: <E1VMmGZ-0007jU-99@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-They do? The hardware I have came with a very old u-boot. Got a link
-to the newer one?
+The code sequence:
+	dev->coherent_dma_mask = DMA_BIT_MASK(24);
+	dev->dma_mask = &dev->coherent_dma_mask;
+bypasses the architectures check on the DMA mask.  It can be replaced
+with dma_coerce_mask_and_coherent(), avoiding the direct initialization
+of this mask.
 
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ drivers/parport/parport_pc.c |    8 ++++++--
+ 1 files changed, 6 insertions(+), 2 deletions(-)
 
--Olof
-
-On Thu, Sep 19, 2013 at 5:59 PM, Steev Klimaszewski
-<steev@pwnieexpress.com> wrote:
-> CompuLab provide a u-boot that supports dtb, and afaik, it's supported
-> in mainline u-boot as well.
->
-> On Thu, Sep 19, 2013 at 7:56 PM, Olof Johansson <olof@lixom.net> wrote:
->> This is needed on TrimSlice, since the u-boot on that hardware is too old
->> to support native device tree booting. Same for any device that currently
->> run fastboot, but none of that hardware is supported in mainline today;
->> or at least there are modern u-boot ports for it.
->>
->> Signed-off-by: Olof Johansson <olof@lixom.net>
->> ---
->>  arch/arm/configs/tegra_defconfig |    2 ++
->>  1 file changed, 2 insertions(+)
->>
->> diff --git a/arch/arm/configs/tegra_defconfig b/arch/arm/configs/tegra_defconfig
->> index ea042e8..b694a09 100644
->> --- a/arch/arm/configs/tegra_defconfig
->> +++ b/arch/arm/configs/tegra_defconfig
->> @@ -39,6 +39,8 @@ CONFIG_AEABI=y
->>  CONFIG_HIGHMEM=y
->>  CONFIG_ZBOOT_ROM_TEXT=0x0
->>  CONFIG_ZBOOT_ROM_BSS=0x0
->> +CONFIG_ARM_APPENDED_DTB=y
->> +CONFIG_ARM_ATAG_DTB_COMPAT=y
->>  CONFIG_KEXEC=y
->>  CONFIG_CPU_FREQ=y
->>  CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND=y
->> --
->> 1.7.10.4
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
-> --
-> This e-mail and any attachments are for the sole use of the intended
-> recipients(s) and may be confidential. Use of any Pwnie Express product
-> signifies your agreement to the Rapid Focus Security EULA<http://pwnieexpress.com/pdfs/RFSEULA.pdf>and is subject to export controls under the U.S. Commerce Department's
-> Export Administration Regulations ("EAR").
+diff --git a/drivers/parport/parport_pc.c b/drivers/parport/parport_pc.c
+index 903e128..9637615 100644
+--- a/drivers/parport/parport_pc.c
++++ b/drivers/parport/parport_pc.c
+@@ -2004,6 +2004,7 @@ struct parport *parport_pc_probe_port(unsigned long int base,
+ 	struct resource	*ECR_res = NULL;
+ 	struct resource	*EPP_res = NULL;
+ 	struct platform_device *pdev = NULL;
++	int ret;
+ 
+ 	if (!dev) {
+ 		/* We need a physical device to attach to, but none was
+@@ -2014,8 +2015,11 @@ struct parport *parport_pc_probe_port(unsigned long int base,
+ 			return NULL;
+ 		dev = &pdev->dev;
+ 
+-		dev->coherent_dma_mask = DMA_BIT_MASK(24);
+-		dev->dma_mask = &dev->coherent_dma_mask;
++		ret = dma_coerce_mask_and_coherent(dev, DMA_BIT_MASK(24));
++		if (ret) {
++			dev_err(dev, "Unable to set coherent dma mask: disabling DMA\n");
++			dma = PARPORT_DMA_NONE;
++		}
+ 	}
+ 
+ 	ops = kmalloc(sizeof(struct parport_operations), GFP_KERNEL);
+-- 
+1.7.4.4
