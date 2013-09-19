@@ -1,29 +1,68 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Thu, 19 Sep 2013 15:41:54 -0700
-Subject: [PATCH v3] mtd: atmel_nand: use minimum ecc requirements of
- nand: ecc_{strength,step}_ds
-In-Reply-To: <20130918214225.GP4550@ld-irv-0074.broadcom.com>
-References: <1379483928-18253-1-git-send-email-josh.wu@atmel.com>
- <20130918214225.GP4550@ld-irv-0074.broadcom.com>
-Message-ID: <20130919224154.GT4550@ld-irv-0074.broadcom.com>
+From: rmk+kernel@arm.linux.org.uk (Russell King)
+Date: Thu, 19 Sep 2013 22:32:59 +0100
+Subject: [PATCH 08/51] DMA-API: net: intel/ixgbevf: fix 32-bit DMA mask
+ handling
+In-Reply-To: <20130919212235.GD12758@n2100.arm.linux.org.uk>
+References: <20130919212235.GD12758@n2100.arm.linux.org.uk>
+Message-ID: <E1VMlqN-0007fw-MQ@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 18, 2013 at 02:42:25PM -0700, Brian Norris wrote:
-> On Wed, Sep 18, 2013 at 01:58:48PM +0800, Josh Wu wrote:
-> > Since ecc_{strength,step}_ds is introduced in nand_chip structure for
-> > minimum ecc requirements. So we can use them directly and remove our
-> > own get_onfi_ecc_param function.
-> > 
-> > Signed-off-by: Josh Wu <josh.wu@atmel.com>
-...
-> I'll just apply the appended diff, to address these small comments and
-> to shorten the messages a little (they are a bit verbose and are over 80
-> characters). It's still not under 80, but it's more reasonable.
-> 
-> Let me know if you have any objections, or else I'll push this to
-> l2-mtd.git.
+The fallback to 32-bit DMA mask is rather odd:
+	if (!dma_set_mask(&pdev->dev, DMA_BIT_MASK(64)) &&
+	    !dma_set_coherent_mask(&pdev->dev, DMA_BIT_MASK(64))) {
+		pci_using_dac = 1;
+	} else {
+		err = dma_set_mask(&pdev->dev, DMA_BIT_MASK(32));
+		if (err) {
+			err = dma_set_coherent_mask(&pdev->dev,
+						    DMA_BIT_MASK(32));
+			if (err) {
+				dev_err(&pdev->dev, "No usable DMA "
+					"configuration, aborting\n");
+				goto err_dma;
+			}
+		}
+		pci_using_dac = 0;
+	}
+This means we only set the coherent DMA mask in the fallback path if
+the DMA mask set failed, which is silly.  This fixes it to set the
+coherent DMA mask only if dma_set_mask() succeeded, and to error out
+if either fails.
 
-Pushed to l2-mtd.git. Thanks!
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ drivers/net/ethernet/intel/ixgbevf/ixgbevf_main.c |   15 +++++----------
+ 1 files changed, 5 insertions(+), 10 deletions(-)
 
-Brian
+diff --git a/drivers/net/ethernet/intel/ixgbevf/ixgbevf_main.c b/drivers/net/ethernet/intel/ixgbevf/ixgbevf_main.c
+index 59a62bb..e34c2da 100644
+--- a/drivers/net/ethernet/intel/ixgbevf/ixgbevf_main.c
++++ b/drivers/net/ethernet/intel/ixgbevf/ixgbevf_main.c
+@@ -3326,19 +3326,14 @@ static int ixgbevf_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
+ 	if (err)
+ 		return err;
+ 
+-	if (!dma_set_mask(&pdev->dev, DMA_BIT_MASK(64)) &&
+-	    !dma_set_coherent_mask(&pdev->dev, DMA_BIT_MASK(64))) {
++	if (!dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(64))) {
+ 		pci_using_dac = 1;
+ 	} else {
+-		err = dma_set_mask(&pdev->dev, DMA_BIT_MASK(32));
++		err = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(32));
+ 		if (err) {
+-			err = dma_set_coherent_mask(&pdev->dev,
+-						    DMA_BIT_MASK(32));
+-			if (err) {
+-				dev_err(&pdev->dev, "No usable DMA "
+-					"configuration, aborting\n");
+-				goto err_dma;
+-			}
++			dev_err(&pdev->dev, "No usable DMA "
++				"configuration, aborting\n");
++			goto err_dma;
+ 		}
+ 		pci_using_dac = 0;
+ 	}
+-- 
+1.7.4.4
