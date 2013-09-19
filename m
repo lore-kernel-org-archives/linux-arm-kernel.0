@@ -1,41 +1,60 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 19 Sep 2013 09:24:52 +0200
-Subject: [PATCH 2/2] pwm: atmel-tcb: fix max time computation for slow
- clk source
-In-Reply-To: <1379516781-23379-1-git-send-email-b.brezillon@overkiz.com>
-References: <1379516720-23289-1-git-send-email-b.brezillon@overkiz.com>
- <1379516781-23379-1-git-send-email-b.brezillon@overkiz.com>
-Message-ID: <523AA6C4.6000305@atmel.com>
+From: heiko@sntech.de (Heiko =?utf-8?q?St=C3=BCbner?=)
+Date: Thu, 19 Sep 2013 10:40:09 +0200
+Subject: [PATCH 20/26] ARM: rockchip: remove custom .init_time hook
+In-Reply-To: <1379526839-14798-21-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1379526839-14798-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1379526839-14798-21-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <201309191040.10683.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/09/2013 17:06, Boris BREZILLON :
-> Use the the tcb counter width to compute the maximum time that can be
-> represented using the slow clock source instead of the static 16 bit width.
->
-> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
+Am Mittwoch, 18. September 2013, 19:53:53 schrieb Sebastian Hesselbarth:
+> With arch/arm calling of_clk_init(NULL) from time_init(), we can now
+> remove custom .init_time hooks.
+> 
+> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Acked-by: Heiko Stuebner <heiko@sntech.de>
+
 
 > ---
->   drivers/pwm/pwm-atmel-tcb.c |    2 +-
->   1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/drivers/pwm/pwm-atmel-tcb.c b/drivers/pwm/pwm-atmel-tcb.c
-> index 0266969..f3dcd02 100644
-> --- a/drivers/pwm/pwm-atmel-tcb.c
-> +++ b/drivers/pwm/pwm-atmel-tcb.c
-> @@ -307,7 +307,7 @@ static int atmel_tcb_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
->   		i = slowclk;
->   		rate = 32768;
->   		min = div_u64(NSEC_PER_SEC, rate);
-> -		max = min << 16;
-> +		max = min << tc->tcb_config->counter_width;
->
->   		/* If period is too big return ERANGE error */
->   		if (max < period_ns)
->
-
-
--- 
-Nicolas Ferre
+> Cc: Olof Johansson <olof@lixom.net>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Heiko Stuebner <heiko@sntech.de>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-kernel at vger.kernel.org
+> ---
+>  arch/arm/mach-rockchip/rockchip.c |    9 ---------
+>  1 file changed, 9 deletions(-)
+> 
+> diff --git a/arch/arm/mach-rockchip/rockchip.c
+> b/arch/arm/mach-rockchip/rockchip.c index 724d2d8..82c0b07 100644
+> --- a/arch/arm/mach-rockchip/rockchip.c
+> +++ b/arch/arm/mach-rockchip/rockchip.c
+> @@ -19,18 +19,10 @@
+>  #include <linux/init.h>
+>  #include <linux/of_platform.h>
+>  #include <linux/irqchip.h>
+> -#include <linux/dw_apb_timer.h>
+> -#include <linux/clk-provider.h>
+>  #include <asm/mach/arch.h>
+>  #include <asm/mach/map.h>
+>  #include <asm/hardware/cache-l2x0.h>
+> 
+> -static void __init rockchip_timer_init(void)
+> -{
+> -	of_clk_init(NULL);
+> -	clocksource_of_init();
+> -}
+> -
+>  static void __init rockchip_dt_init(void)
+>  {
+>  	l2x0_of_init(0, ~0UL);
+> @@ -47,6 +39,5 @@ static const char * const rockchip_board_dt_compat[] = {
+> 
+>  DT_MACHINE_START(ROCKCHIP_DT, "Rockchip Cortex-A9 (Device Tree)")
+>  	.init_machine	= rockchip_dt_init,
+> -	.init_time	= rockchip_timer_init,
+>  	.dt_compat	= rockchip_board_dt_compat,
+>  MACHINE_END
