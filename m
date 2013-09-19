@@ -1,100 +1,35 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Thu, 19 Sep 2013 16:23:55 +0300
-Subject: [RFC PATCH 13/15] arm: dts: omap5: add sata node
-In-Reply-To: <1379595943-14622-1-git-send-email-rogerq@ti.com>
-References: <1379595943-14622-1-git-send-email-rogerq@ti.com>
-Message-ID: <1379597035-15331-1-git-send-email-rogerq@ti.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 19 Sep 2013 15:24:35 +0200
+Subject: [PATCH] ARM: at91: at91sam9x5: set default mmc[01] pinctrl-names
+Message-ID: <1379597075-3748-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Balaji T K <balajitk@ti.com>
-
-Add support for sata.
-
-[Roger Q] Clean up.
-
-CC: Benoit Cousson <bcousson@baylibre.com>
-Signed-off-by: Balaji T K <balajitk@ti.com>
-Signed-off-by: Roger Quadros <rogerq@ti.com>
+Reported-by: Jiri Prchal <jiri.prchal@aksignal.cz>
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 ---
- arch/arm/boot/dts/omap5.dtsi |   51 +++++++++++++++++++++++++++++++++++++++++-
- 1 files changed, 50 insertions(+), 1 deletions(-)
+ arch/arm/boot/dts/at91sam9x5.dtsi | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
-index 8a88a94..a79ccb7 100644
---- a/arch/arm/boot/dts/omap5.dtsi
-+++ b/arch/arm/boot/dts/omap5.dtsi
-@@ -434,6 +434,53 @@
- 			dma-names = "tx", "rx";
- 		};
- 
-+		omap_control_sata: control-phy at 4a002374 {
-+			compatible = "ti,control-phy-pipe3";
-+			reg = <0x4a002374 0x4>;
-+			reg-names = "power";
-+			clocks = <&sys_clkin>;
-+			clock-names = "sysclk";
-+		};
-+
-+		ocp2scp3: ocp2scp3 at 4a090000 {
-+			compatible = "ti,omap-ocp2scp";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			ranges;
-+			ti,hwmods = "ocp2scp3";
-+			reg = <0x4a090000 0x1f>; /* ocp2scp3 */
-+			reg-names = "ocp2scp3";
-+			sata_phy: sataphy at 4A096000 {
-+				compatible = "ti,phy-pipe3-sata";
-+				reg = <0x4A096000 0x80>, /* phy_rx */
-+				      <0x4A096400 0x64>, /* phy_tx */
-+				      <0x4A096800 0x40>; /* pll_ctrl */
-+				reg-names = "phy_rx", "phy_tx", "pll_ctrl";
-+				ctrl-module = <&omap_control_sata>;
-+				clocks = <&sys_clkin>;
-+				clock-names = "sysclk";
-+				#phy-cells = <0>;
-+			};
-+		};
-+
-+		sata: sata at 4a141100 {
-+			compatible = "ti,sata";
-+			ti,hwmods = "sata";
-+			reg = <0x4a141100 0x7>;
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			ranges;
-+			dwc-ahci at 4a140000 {
-+				  compatible = "snps,dwc-ahci";
-+				  reg = <0x4a140000 0x1100>;
-+				  interrupts = <GIC_SPI 54 IRQ_TYPE_LEVEL_HIGH>;
-+				  phys = <&sata_phy>;
-+				  phy-names = "sata-phy";
-+				  clocks = <&sata_ref_clk>;
-+				  clock-names = "optclk";
-+			};
-+		};
-+
- 		keypad: keypad at 4ae1c000 {
- 			compatible = "ti,omap4-keypad";
- 			reg = <0x4ae1c000 0x400>;
-@@ -636,6 +683,8 @@
- 			compatible = "ti,control-phy-pipe3";
- 			reg = <0x4a002370 0x4>;
- 			reg-names = "power";
-+			clocks = <&sys_clkin>;
-+			clock-names = "sysclk";
- 		};
- 
- 		omap_dwc3 at 4a020000 {
-@@ -657,7 +706,7 @@
- 			};
- 		};
- 
--		ocp2scp {
-+		ocp2scp1: ocp2scp1 at 4a080000 {
- 			compatible = "ti,omap-ocp2scp";
- 			#address-cells = <1>;
- 			#size-cells = <1>;
+diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
+index c68486e..e74dc15 100644
+--- a/arch/arm/boot/dts/at91sam9x5.dtsi
++++ b/arch/arm/boot/dts/at91sam9x5.dtsi
+@@ -556,6 +556,7 @@
+ 				interrupts = <12 IRQ_TYPE_LEVEL_HIGH 0>;
+ 				dmas = <&dma0 1 AT91_DMA_CFG_PER_ID(0)>;
+ 				dma-names = "rxtx";
++				pinctrl-names = "default";
+ 				#address-cells = <1>;
+ 				#size-cells = <0>;
+ 				status = "disabled";
+@@ -567,6 +568,7 @@
+ 				interrupts = <26 IRQ_TYPE_LEVEL_HIGH 0>;
+ 				dmas = <&dma1 1 AT91_DMA_CFG_PER_ID(0)>;
+ 				dma-names = "rxtx";
++				pinctrl-names = "default";
+ 				#address-cells = <1>;
+ 				#size-cells = <0>;
+ 				status = "disabled";
 -- 
-1.7.4.1
+1.8.2.2
