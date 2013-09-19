@@ -1,76 +1,52 @@
-From: anup.patel@linaro.org (Anup Patel)
-Date: Thu, 19 Sep 2013 18:41:41 +0530
-Subject: =?UTF-8?q?=5BPATCH=20v3=204/4=5D=20KVM=3A=20Add=20documentation=20for=20KVM=5FARM=5FPREFERRED=5FTARGET=20ioctl?=
-In-Reply-To: <1379596302-21522-1-git-send-email-anup.patel@linaro.org>
-References: <1379596302-21522-1-git-send-email-anup.patel@linaro.org>
-Message-ID: <1379596302-21522-5-git-send-email-anup.patel@linaro.org>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Thu, 19 Sep 2013 15:12:34 +0200 (CEST)
+Subject: [PATCH] clockevents: Sanitize ticks to nsec conversion
+In-Reply-To: <20130919124805.GU24802@pengutronix.de>
+References: <20130917100417.GQ12758@n2100.arm.linux.org.uk>
+ <alpine.DEB.2.02.1309171210450.4089@ionos.tec.linutronix.de>
+ <20130917130153.GL26819@ludovic.desroches@atmel.com>
+ <alpine.DEB.2.02.1309172228400.4089@ionos.tec.linutronix.de>
+ <20130918085627.GN24802@pengutronix.de>
+ <alpine.DEB.2.02.1309181058470.4089@ionos.tec.linutronix.de>
+ <20130918150958.GO24802@pengutronix.de>
+ <alpine.DEB.2.02.1309182201000.4089@ionos.tec.linutronix.de>
+ <20130919100239.GS24802@pengutronix.de>
+ <alpine.DEB.2.02.1309191207460.4089@ionos.tec.linutronix.de>
+ <20130919124805.GU24802@pengutronix.de>
+Message-ID: <alpine.DEB.2.02.1309191500280.4089@ionos.tec.linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To implement CPU=Host we have added KVM_ARM_PREFERRED_TARGET
-vm ioctl which provides information to user space required for
-creating VCPU matching underlying Host.
+On Thu, 19 Sep 2013, Uwe Kleine-K?nig wrote:
+> On Thu, Sep 19, 2013 at 12:15:10PM +0200, Thomas Gleixner wrote:
+> > On Thu, 19 Sep 2013, Uwe Kleine-K?nig wrote:
+> > > On Thu, Sep 19, 2013 at 12:01:25AM +0200, Thomas Gleixner wrote:
+> > > > Versus the 64bit overflow check, we need to be even more careful. We
+> > > > need to check for overflowing (1 << 63) - 1 (i.e. the max positive
+> > > > value which fits into a s64). See clockevents_program_event().
+> > > 
+> > > That is because you interpret times < 0 as in the past, right? But note
+> > > that the interim result we're talking about here is still to be divided
+> > > by evt->mult. So assuming mult > 1, that check is too strict unless you
+> > > move it below the do_div in clockevent_delta2ns. For sure it makes sense
+> > > to use the same value for a and b in the handling:
+> > 
+> > No, it's not too strict.
+> > 
+> >     nsec = (latch << shift) / mult;
+> > 
+> > Now the backwards conversion does:
+> > 
+> >     latch = (nsec * mult) >> shift;
+> >
+> > So we want nsec * mult to be in the positive range of s64. Which
+> > means, that latch << shift must be in that range as well.
+> The backwards conversion is in clockevents_program_event(), right? There
+> is:
+> 
+> 	clc = ((unsigned long long) delta * dev->mult) >> dev->shift;
+> 
+> So I don't see a problem if nsec * mult overflows (1 << 63) - 1 as long
+> as it still fits into an unsigned long long (i.e. a 64 bit value).
 
-This patch adds info related to this new KVM_ARM_PREFERRED_TARGET
-vm ioctl in the KVM API documentation.
-
-Signed-off-by: Anup Patel <anup.patel@linaro.org>
-Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
----
- Documentation/virtual/kvm/api.txt |   26 ++++++++++++++++++++++----
- 1 file changed, 22 insertions(+), 4 deletions(-)
-
-diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
-index 858aecf..d513cc5 100644
---- a/Documentation/virtual/kvm/api.txt
-+++ b/Documentation/virtual/kvm/api.txt
-@@ -2303,8 +2303,27 @@ Possible features:
- 	- KVM_ARM_VCPU_EL1_32BIT: Starts the CPU in a 32bit mode.
- 	  Depends on KVM_CAP_ARM_EL1_32BIT (arm64 only).
- 
-+4.83 KVM_ARM_PREFERRED_TARGET
- 
--4.83 KVM_GET_REG_LIST
-+Capability: basic
-+Architectures: arm, arm64
-+Type: vm ioctl
-+Parameters: struct struct kvm_vcpu_init (out)
-+Returns: 0 on success; -1 on error
-+Errors:
-+ ?ENODEV: ???no preferred target available for the host
-+
-+This queries KVM for preferred CPU target type which can be emulated
-+by KVM on underlying host.
-+
-+The ioctl returns struct kvm_vcpu_init instance containing information
-+about preferred CPU target type and optional features available for it.
-+
-+The information returned by this ioctl can be used to prepare instance
-+of struct kvm_vcpu_init for KVM_ARM_VCPU_INIT ioctl which will result
-+in VCPU matching underlying host.
-+
-+4.84 KVM_GET_REG_LIST
- 
- Capability: basic
- Architectures: arm, arm64
-@@ -2323,8 +2342,7 @@ struct kvm_reg_list {
- This ioctl returns the guest registers that are supported for the
- KVM_GET_ONE_REG/KVM_SET_ONE_REG calls.
- 
--
--4.84 KVM_ARM_SET_DEVICE_ADDR
-+4.85 KVM_ARM_SET_DEVICE_ADDR
- 
- Capability: KVM_CAP_ARM_SET_DEVICE_ADDR
- Architectures: arm, arm64
-@@ -2362,7 +2380,7 @@ must be called after calling KVM_CREATE_IRQCHIP, but before calling
- KVM_RUN on any of the VCPUs.  Calling this ioctl twice for any of the
- base addresses will return -EEXIST.
- 
--4.85 KVM_PPC_RTAS_DEFINE_TOKEN
-+4.86 KVM_PPC_RTAS_DEFINE_TOKEN
- 
- Capability: KVM_CAP_PPC_RTAS
- Architectures: ppc
--- 
-1.7.9.5
+Right. It doesn't matter.
