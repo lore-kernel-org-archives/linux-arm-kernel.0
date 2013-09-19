@@ -1,66 +1,145 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Thu, 19 Sep 2013 14:15:35 -0700
-Subject: [PATCH v2] clk: si570: Add a driver for SI570 oscillators
-In-Reply-To: <20130919180512.5246.73360@quantum>
-References: <1379544219-23579-1-git-send-email-soren.brinkmann@xilinx.com>
- <20130919180512.5246.73360@quantum>
-Message-ID: <20130919211535.GB11537@roeck-us.net>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 19 Sep 2013 16:24:28 -0500
+Subject: [PATCH v4] dt: update PSCI binding documentation for v0.2
+Message-ID: <1379625868-5395-1-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 19, 2013 at 11:05:12AM -0700, Mike Turquette wrote:
-> Quoting Soren Brinkmann (2013-09-18 15:43:38)
-> > diff --git a/Documentation/devicetree/bindings/clock/silabs,si570.txt b/Documentation/devicetree/bindings/clock/silabs,si570.txt
-> > new file mode 100644
-> > index 0000000..7ab5c8b
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/clock/silabs,si570.txt
-> > @@ -0,0 +1,38 @@
-> > +Binding for Silicon Labs 570, 571, 598 and 599 programmable
-> > +I2C clock generators.
-> > +
-> > +Reference
-> > +This binding uses the common clock binding[1]. Details about the devices can be
-> > +found in the data sheets[2][3].
-> > +
-> > +[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
-> > +[2] Si570/571 Data Sheet
-> > +    http://www.silabs.com/Support%20Documents/TechnicalDocs/si570.pdf
-> > +[3] Si598/599 Data Sheet
-> > +    http://www.silabs.com/Support%20Documents/TechnicalDocs/si598-99.pdf
-> > +
-> > +Required properties:
-> > + - compatible: Shall be one of "silabs,si570", "silabs,si571",
-> > +                              "silabs,si598", "silabs,si599"
-> > + - reg: I2C device address.
-> > + - #clock-cells: From common clock bindings: Shall be 0.
-> > + - factory-fout: Factory set default frequency. This frequency is part specific.
-> > +                The correct frequency for the part used has to be provided in
-> > +                order to generate the correct output frequencies. For more
-> > +                details, please refer to the data sheet.
-> > +
-> > +Optional properties:
-> > + - clock-output-names: From common clock bindings. Recommended to be "si570".
-> > + - clock-frequency: Output frequency to generate. This defines the output
-> > +                   frequency set during boot. It can be reprogrammed during
-> > +                   runtime using the common clock framework.
-> > + - temperature-stability-7ppm: Indicate a device with a temperature stability
-> > +                              of 7ppm
-> 
-> Some DT binding bike-shedding:
-> 
-> Should this be "temperature-stability-ppm = <7>;" ? Do you think that
-> this value might change in the future?
-> 
-Valid values are 7, 20, and 50 as far as I know. Problem is that the value is
-not used directly, but only to hint that a specific set of registers shall be
-used.
+From: Rob Herring <rob.herring@calxeda.com>
 
-Given that, it may in fact be better to use an explicit number. Even though the
-two register sets are specified by <7> in one case and <20,50> in the other
-today, there may at some point be yet another value which might use the 7 ppm
-register set or the 20/50 ppm register set ... or yet another register set.
-An explicit number would cover all future accuracy ranges, not just the
-existing ones.
+The PSCI spec from ARM has been updated to 0.2 version. Update the
+binding document to reflect the spec changes. For the binding, the
+major changes are the addition of psci_version, affinity_info,
+migrate_info_type, migrate_info_up_cpu, system_reset and system_off
+functions. The recommended function ID numbering has also changed.
 
-Guenter
+This update also defines 32 and 64 bit calling conventions. The calling
+convention is defined on a per function ID basis.
+
+Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+Cc: Dave Martin <Dave.Martin@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Ian Campbell <Ian.Campbell@citrix.com>
+Cc: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+Cc: Marc Zyngier <Marc.Zyngier@arm.com>
+Cc: Christoffer Dall <christoffer.dall@linaro.org>,
+Cc: Charles Garcia-Tobin <Charles.Garcia-Tobin@arm.com>
+Cc: Matt Sealey <neko@bakuhatsu.net>
+Cc: devicetree at vger.kernel.org
+---
+v4: Reword last paragraph concerning calling convention used for
+functions without -32 or -64 suffix.
+
+v3: This version implements Mark's suggested binding with -32 and -64
+ suffixes.
+
+ Documentation/devicetree/bindings/arm/psci.txt | 64 +++++++++++++++++++-------
+ 1 file changed, 48 insertions(+), 16 deletions(-)
+
+diff --git a/Documentation/devicetree/bindings/arm/psci.txt b/Documentation/devicetree/bindings/arm/psci.txt
+index 433afe9..8675ec2 100644
+--- a/Documentation/devicetree/bindings/arm/psci.txt
++++ b/Documentation/devicetree/bindings/arm/psci.txt
+@@ -1,16 +1,17 @@
+ * Power State Coordination Interface (PSCI)
+ 
+ Firmware implementing the PSCI functions described in ARM document number
+-ARM DEN 0022A ("Power State Coordination Interface System Software on ARM
++ARM DEN 0022B ("Power State Coordination Interface System Software on ARM
+ processors") can be used by Linux to initiate various CPU-centric power
+ operations.
+ 
+-Issue A of the specification describes functions for CPU suspend, hotplug
+-and migration of secure software.
++Issue B of the specification describes functions for CPU suspend, hotplug,
++migration of secure software, and system level reset and powerdown.
+ 
+ Functions are invoked by trapping to the privilege level of the PSCI
+ firmware (specified as part of the binding below) and passing arguments
+-in a manner similar to that specified by AAPCS:
++as defined in ARM document "SMC Calling Convention" (ARM DEN 0028) in a manner
++similar to that specified by AAPCS:
+ 
+ 	 r0		=> 32-bit Function ID / return value
+ 	{r1 - r3}	=> Parameters
+@@ -21,10 +22,10 @@ to #0.
+ 
+ Main node required properties:
+ 
+- - compatible    : Must be "arm,psci"
++ - compatible    : Must contain "arm,psci-0.2" or "arm,psci"
+ 
+- - method        : The method of calling the PSCI firmware. Permitted
+-                   values are:
++ - method        : The method defines the calling convention for the PSCI
++                   firmware. Permitted values are:
+ 
+                    "smc" : SMC #0, with the register assignments specified
+ 		           in this binding.
+@@ -32,24 +33,55 @@ Main node required properties:
+                    "hvc" : HVC #0, with the register assignments specified
+ 		           in this binding.
+ 
++ - psci_version  : Function ID for PSCI_VERSION operation. Required for
++                   "arm,psci-0.2" compatible version or later.
++
+ Main node optional properties:
+ 
+- - cpu_suspend   : Function ID for CPU_SUSPEND operation
++ - cpu_suspend[-<32|64]   : Function ID for CPU_SUSPEND operation
++
++ - cpu_off                : Function ID for CPU_OFF operation
++
++ - cpu_on[-<32|64]        : Function ID for CPU_ON operation
++
++ - affinity_info[-<32|64] : Function ID for AFFINITY_INFO operation
+ 
+- - cpu_off       : Function ID for CPU_OFF operation
++ - migrate[-<32|64]       : Function ID for MIGRATE operation
+ 
+- - cpu_on        : Function ID for CPU_ON operation
++ - migrate_info_type      : Function ID for MIGRATE_INFO_TYPE operation
+ 
+- - migrate       : Function ID for MIGRATE operation
++ - migrate_info_up_cpu[-<32|64] : Function ID for MIGRATE_INFO_UP_CPU operation
+ 
++ - system_reset           : Function ID for SYSTEM_RESET operation
++
++ - system_off             : Function ID for SYSTEM_OFF operation
++
++Some functions have have separate IDs for 32-bit and 64-bit calling
++conventions. These separate function IDs are described with function names with
++"-64" and "-32" suffixes (e.g. cpu_on-64). Where a function name does not have
++a suffix, the ID may be used with either calling convention depending on the
++CPU state -- AArch32 callers should use the 32-bit calling convention, and
++AArch64 callers should use the 64-bit calling convention.
+ 
+ Example:
+ 
+ 	psci {
+-		compatible	= "arm,psci";
++		compatible	= "arm,psci-0.2";
+ 		method		= "smc";
+-		cpu_suspend	= <0x95c10000>;
+-		cpu_off		= <0x95c10001>;
+-		cpu_on		= <0x95c10002>;
+-		migrate		= <0x95c10003>;
++		psci_version	= <0x84000000>;
++		cpu_suspend-32	= <0x84000001>;
++		cpu_suspend-64	= <0xc4000001>;
++		cpu_off		= <0x84000002>;
++		cpu_on-32	= <0x84000003>;
++		cpu_on-64	= <0xc4000003>;
++		affinity_info-32 = <0x84000004>;
++		affinity_info-64 = <0xc4000004>;
++		migrate-32	= <0x84000005>;
++		migrate-64	= <0xc4000005>;
++		migrate_info_type = <0x84000006>;
++		migrate_info_up_cpu-32 = <0x84000007>;
++		migrate_info_up_cpu-64 = <0xc4000007>;
++		system_off	= <0x84000008>;
++		system_reset	= <0x84000009>;
+ 	};
++
+-- 
+1.8.1.2
