@@ -1,92 +1,209 @@
-From: anup@brainfault.org (Anup Patel)
-Date: Thu, 19 Sep 2013 21:21:56 +0530
-Subject: [PATCH v3 2/4] ARM64: KVM: Implement kvm_vcpu_preferred_target()
- function
-In-Reply-To: <523B0712.1020705@arm.com>
-References: <1379596302-21522-1-git-send-email-anup.patel@linaro.org>
- <1379596302-21522-3-git-send-email-anup.patel@linaro.org>
- <523B0712.1020705@arm.com>
-Message-ID: <CAAhSdy3gXujEGKXt4h0APJcrzkaTzYGate1=MnN8nK2eQb5oZQ@mail.gmail.com>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Thu, 19 Sep 2013 09:01:01 -0700
+Subject: [PATCH v2] clk: si570: Add a driver for SI570 oscillators
+In-Reply-To: <20130919131712.GB24088@roeck-us.net>
+References: <1379544219-23579-1-git-send-email-soren.brinkmann@xilinx.com>
+ <20130919131712.GB24088@roeck-us.net>
+Message-ID: <6401b71c-8c18-4735-8b40-9692cd788336@VA3EHSMHS037.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 19, 2013 at 7:45 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> On 19/09/13 14:11, Anup Patel wrote:
->> This patch implements kvm_vcpu_preferred_target() function for
->> KVM ARM64 which will help us implement KVM_ARM_PREFERRED_TARGET
->> ioctl for user space.
->>
->> Signed-off-by: Anup Patel <anup.patel@linaro.org>
->> Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
->> ---
->>  arch/arm/include/asm/kvm_host.h |    1 +
->
-> This hunk belongs to patch #1, and the similar hunk in #1 belongs here.
+On Thu, Sep 19, 2013 at 06:17:12AM -0700, Guenter Roeck wrote:
+> On Wed, Sep 18, 2013 at 03:43:38PM -0700, Soren Brinkmann wrote:
+> > Add a driver for SILabs 570, 571, 598, 599 programmable oscillators.
+> > The devices generate low-jitter clock signals and are reprogrammable via
+> > an I2C interface.
+> > 
+> > Cc: Guenter Roeck <linux@roeck-us.net>
+> > Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+> > ---
+> > v2:
+> >  - document clock-output-names in bindings documentation
+> >  - don't use wildcards in compatibility string
+> >  - change Kconfig entry to "... 570 and compatible devices"
+> >  - change some indentation flaws
+> >  - use 10000 as MIN and MAX value in usleep_range
+> >  - fail probe() if 'factory-fout' is not provided in DT
+> >    - default factory fout #defines removed
+> >  - use i2c driver_data instead of OF data
+> >    - remove some related structs and data
+> >  - rename DT property 'initial-fout' => 'clock-frequency' (like si5351
+> >    driver)
+> >  - add some more details regarding the 'factory-fout' DT property
+> > 
+> >  .../devicetree/bindings/clock/silabs,si570.txt     |  38 ++
+> >  drivers/clk/Kconfig                                |  10 +
+> >  drivers/clk/Makefile                               |   1 +
+> >  drivers/clk/clk-si570.c                            | 517 +++++++++++++++++++++
+> >  4 files changed, 566 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/clock/silabs,si570.txt
+> >  create mode 100644 drivers/clk/clk-si570.c
+> > 
+[...]
+> > diff --git a/drivers/clk/clk-si570.c b/drivers/clk/clk-si570.c
+> > new file mode 100644
+> > index 0000000..c20dfce
+> > --- /dev/null
+> > +++ b/drivers/clk/clk-si570.c
+[...]
+> > +static unsigned long si570_recalc_rate(struct clk_hw *hw,
+> > +		unsigned long parent_rate)
+> > +{
+> > +	int err;
+> > +	u64 rfreq, rate;
+> > +	unsigned int n1, hs_div;
+> > +	struct clk_si570 *data = to_clk_si570(hw);
+> > +
+> > +	err = si570_get_divs(data, &rfreq, &n1, &hs_div);
+> > +	if (err) {
+> > +		dev_err(&data->i2c_client->dev, "unable to recalc rate\n");
+> 
+> [ Not really helpful that you can not return an error here ]
+IIUC, the CCF does not really support error reporting for this function. I
+think a return value of recalc_rate is always interpreted as frequency.
+Hence, I decided to take the last point of certainty and return the last
+known frequency.
 
-UHH, How did I miss this one !!!
+> 
+> > +		return data->frequency;
+> > +	}
+> > +
+> > +	rfreq = div_u64(rfreq, hs_div * n1);
+> > +	rate = (data->fxtal * rfreq) >> 28;
+> > +
+> > +	return rate;
+> > +}
+[...]
+> > +static int si570_set_rate(struct clk_hw *hw, unsigned long rate,
+> > +		unsigned long parent_rate)
+> > +{
+> > +	struct clk_si570 *data = to_clk_si570(hw);
+> > +	struct i2c_client *client = data->i2c_client;
+> > +	int err;
+> > +
+> > +	if (rate < SI570_MIN_FREQ || rate > data->max_freq) {
+> > +		dev_warn(&client->dev,
+> > +			"requested frequency %lu Hz is out of range\n", rate);
+> 
+> Shouldn't this be dev_err ?
+You're probably right. I'll change this.
 
-Thanks for pointing.
+> 
+> > +		return -EINVAL;
+> > +	}
+[...]
+> > +static int si570_probe(struct i2c_client *client,
+> > +		const struct i2c_device_id *id)
+> > +{
+> > +	struct clk_si570 *data;
+> > +	struct clk_init_data init;
+> > +	struct clk *clk;
+> > +	u32 initial_fout, factory_fout;
+> > +	int err;
+> > +
+> > +	data = devm_kzalloc(&client->dev, sizeof(*data), GFP_KERNEL);
+> > +	if (!data)
+> > +		return -ENOMEM;
+> > +
+> > +	init.ops = &si570_clk_ops;
+> > +	init.flags = CLK_IS_ROOT;
+> > +	init.num_parents = 0;
+> > +	data->hw.init = &init;
+> > +	data->max_freq = id->driver_data;
+> > +	data->i2c_client = client;
+> > +
+> > +	if (of_property_read_bool(client->dev.of_node,
+> > +				"temperature-stability-7ppm"))
+> > +		data->div_offset = SI570_DIV_OFFSET_7PPM;
+> > +
+> Just noticed that you dropped platform data support. Doesn't matter much for me
+> right now, but in my previous company we used the chip on an x86 system which
+> does not support devicetree. Would be nice to keep it and derive platform data
+> from devicetree data if provided, like other drivers do it.
+I'll look into this. The issue I have with that is, I can hardly test it
+since we only use this on Zynq which uses DT. So, I'd rather prefer to
+not include it unless somebody volunteers to test it.
 
---Anup
+> The 7ppm option is only relevant for si570/si751 and not supported on
+> si598/si599. You should mention that in the bindings document and check for it.
+Right, I'll add a note in the doc. And ignore it for devices this does
+not apply.
 
->
->         M.
->
->>  arch/arm64/kvm/guest.c          |   21 +++++++++++++++++++++
->>  2 files changed, 22 insertions(+)
->>
->> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
->> index 7d22517..76f3c19 100644
->> --- a/arch/arm/include/asm/kvm_host.h
->> +++ b/arch/arm/include/asm/kvm_host.h
->> @@ -154,6 +154,7 @@ struct kvm_vcpu_stat {
->>  struct kvm_vcpu_init;
->>  int kvm_vcpu_set_target(struct kvm_vcpu *vcpu,
->>                       const struct kvm_vcpu_init *init);
->> +int kvm_vcpu_preferred_target(struct kvm_vcpu_init *init);
->>  unsigned long kvm_arm_num_regs(struct kvm_vcpu *vcpu);
->>  int kvm_arm_copy_reg_indices(struct kvm_vcpu *vcpu, u64 __user *indices);
->>  struct kvm_one_reg;
->> diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
->> index d7bf7d6..4da7882 100644
->> --- a/arch/arm64/kvm/guest.c
->> +++ b/arch/arm64/kvm/guest.c
->> @@ -254,6 +254,27 @@ int kvm_vcpu_set_target(struct kvm_vcpu *vcpu,
->>       return kvm_reset_vcpu(vcpu);
->>  }
->>
->> +int kvm_vcpu_preferred_target(struct kvm_vcpu_init *init)
->> +{
->> +     int target = kvm_target_cpu();
->> +
->> +     if (target < 0)
->> +             return -ENODEV;
->> +
->> +     memset(init, 0, sizeof(*init));
->> +
->> +     /*
->> +      * For now, we return all optional features are available
->> +      * for preferred target. In future, we might have features
->> +      * available based on underlying host.
->> +      */
->> +     init->target = (__u32)target;
->> +     init->features[0] |= (1 << KVM_ARM_VCPU_POWER_OFF);
->> +     init->features[0] |= (1 << KVM_ARM_VCPU_EL1_32BIT);
->> +
->> +     return 0;
->> +}
->> +
->>  int kvm_arch_vcpu_ioctl_get_fpu(struct kvm_vcpu *vcpu, struct kvm_fpu *fpu)
->>  {
->>       return -EINVAL;
->>
->
->
-> --
-> Jazz is not dead. It just smells funny...
->
->
-> _______________________________________________
-> kvmarm mailing list
-> kvmarm at lists.cs.columbia.edu
-> https://lists.cs.columbia.edu/cucslists/listinfo/kvmarm
+> Even better would be if it can be auto-detected; in that case you would not need
+> the property at all. Unfortunately I don't have access to a chip, so I have
+> no idea if that is possible and can not check it myself either.
+I didn't see any way to detect this during runtime. And we don't have
+such a device either.
+
+> 
+> > +	if (of_property_read_string(client->dev.of_node, "clock-output-names",
+> > +			&init.name))
+> > +		init.name = client->dev.of_node->name;
+> > +
+> > +	err = of_property_read_u32(client->dev.of_node, "factory-fout",
+> > +			&factory_fout);
+> > +	if (err) {
+> > +		dev_err(&client->dev, "'factory-fout' property missing\n");
+> > +		return err;
+> > +	}
+> > +
+> > +	data->regmap = devm_regmap_init_i2c(client, &si570_regmap_config);
+> > +	if (IS_ERR(data->regmap)) {
+> > +		dev_err(&client->dev, "failed to allocate register map\n");
+> > +		return PTR_ERR(data->regmap);
+> > +	}
+> > +
+> > +	i2c_set_clientdata(client, data);
+> > +	err = si570_get_defaults(data, factory_fout);
+> > +	if (err)
+> > +		return err;
+> > +
+> > +	clk = devm_clk_register(&client->dev, &data->hw);
+> > +	if (IS_ERR(clk)) {
+> > +		dev_err(&client->dev, "clock registration failed\n");
+> > +		return PTR_ERR(clk);
+> > +	}
+> > +	err = of_clk_add_provider(client->dev.of_node, of_clk_src_simple_get,
+> > +			clk);
+> > +	if (err) {
+> > +		dev_err(&client->dev, "unable to add clk provider\n");
+> > +		return err;
+> > +	}
+> > +
+> > +	/*
+> > +	 * Read the requested initial fout from either platform data or the
+> > +	 * device tree
+> > +	 */
+> 
+> But you don't do anything with platform data.
+copy&paste error. I'll remove it.
+
+> 
+> > +	if (!of_property_read_u32(client->dev.of_node, "clock-frequency",
+> > +				&initial_fout)) {
+> > +		err = clk_set_rate(clk, initial_fout);
+> > +		if (err)
+> > +			dev_warn(&client->dev,
+> > +					"unable to set initial output frequency %u: %d\n",
+> > +					initial_fout, err);
+> 
+> No bailout ?
+> 
+> Also it seems that this generates two error messages, once in the code which
+> experiences the error and once here.
+I remove the message here.
+
+> 
+> Maybe it would be better to just bail out and return the error.
+> After all, something is seriously wrong and the system won't operate
+> as specified.
+I do more think of a spurious error (typo in DT prop giving an f out of
+range,...)  and a driver actually controlling this clock generator later.
+In that case later calls to clk_set_rate() might succeed and everything's
+fine or the driver can handle the error. In case of using this device as
+a fixed clock, bailing out here might make more sense though. I'd prefer
+leaving it like this.
+
+
+	Thanks,
+	S?ren
