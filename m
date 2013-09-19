@@ -1,154 +1,259 @@
 From: rogerq@ti.com (Roger Quadros)
-Date: Thu, 19 Sep 2013 16:05:36 +0300
-Subject: [RFC PATCH 08/15] ata: ahci_platform: Manage SATA PHY
+Date: Thu, 19 Sep 2013 16:05:37 +0300
+Subject: [RFC PATCH 09/15] ata: ti_sata: Add Texas Instruments SATA Wrapper
+ driver
 In-Reply-To: <1379595943-14622-1-git-send-email-rogerq@ti.com>
 References: <1379595943-14622-1-git-send-email-rogerq@ti.com>
-Message-ID: <1379595943-14622-9-git-send-email-rogerq@ti.com>
+Message-ID: <1379595943-14622-10-git-send-email-rogerq@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Balaji T K <balajitk@ti.com>
-
-Some platforms have a PHY hooked up to the
-SATA controller. The PHY needs to be initialized
-and powered up for SATA to work. We do that
-using the PHY framework.
-
-[Roger Q] Cleaned up.
+Texas Instruments SoCs like OMAP5 and DRA7 contain a SATA wrapper
+around the AHCI SATA core. This driver will manage that.
 
 CC: Tejun Heo <tj@kernel.org>
-Signed-off-by: Balaji T K <balajitk@ti.com>
 Signed-off-by: Roger Quadros <rogerq@ti.com>
 ---
- .../devicetree/bindings/ata/ahci-platform.txt      |    2 +-
- drivers/ata/Kconfig                                |    1 +
- drivers/ata/ahci.h                                 |    2 +
- drivers/ata/ahci_platform.c                        |   31 +++++++++++++++++++-
- 4 files changed, 34 insertions(+), 2 deletions(-)
+ Documentation/devicetree/bindings/ata/ti-sata.txt |   31 ++++
+ drivers/ata/Kconfig                               |    7 +
+ drivers/ata/Makefile                              |    1 +
+ drivers/ata/sata_ti.c                             |  160 +++++++++++++++++++++
+ 4 files changed, 199 insertions(+), 0 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/ata/ti-sata.txt
+ create mode 100644 drivers/ata/sata_ti.c
 
-diff --git a/Documentation/devicetree/bindings/ata/ahci-platform.txt b/Documentation/devicetree/bindings/ata/ahci-platform.txt
-index 89de156..c6c549a 100644
---- a/Documentation/devicetree/bindings/ata/ahci-platform.txt
-+++ b/Documentation/devicetree/bindings/ata/ahci-platform.txt
-@@ -4,7 +4,7 @@ SATA nodes are defined to describe on-chip Serial ATA controllers.
- Each SATA controller should have its own node.
- 
- Required properties:
--- compatible        : compatible list, contains "snps,spear-ahci"
-+- compatible        : compatible list, contains "snps,spear-ahci" or "snps,dwc-ahci"
- - interrupts        : <interrupt mapping for SATA IRQ>
- - reg               : <registers mapping>
- 
+diff --git a/Documentation/devicetree/bindings/ata/ti-sata.txt b/Documentation/devicetree/bindings/ata/ti-sata.txt
+new file mode 100644
+index 0000000..bf0ea3b
+--- /dev/null
++++ b/Documentation/devicetree/bindings/ata/ti-sata.txt
+@@ -0,0 +1,31 @@
++* Texas Instruments SATA Controller Wrapper
++
++Required properties:
++- compatible	: "ti,sata"
++- ti,hwmods	: "sata"
++- reg		: Register mapping
++- #address-cells: <1>
++- #size-cells	: <1>
++- ranges	: allows valid translation between child's address space and parent's
++		  address space.
++- Must contain at least one child node for the SATA controller core
++
++Example:
++
++	sata: sata at 4a141100 {
++		compatible = "ti,sata";
++		ti,hwmods = "sata";
++		reg = <0x4a141100 0x7>;
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges;
++		dwc-ahci at 4a140000 {
++			compatible = "snps,dwc-ahci";
++			reg = <0x4a140000 0x1100>;
++			interrupts = <GIC_SPI 54 IRQ_TYPE_LEVEL_HIGH>;
++			phys = <&sata_phy>;
++			phy-names = "sata-phy";
++			clocks = <&sata_ref_clk>;
++			clock-names = "optclk";
++		};
++	};
 diff --git a/drivers/ata/Kconfig b/drivers/ata/Kconfig
-index 4e73772..a53ef27 100644
+index a53ef27..a3de4d2 100644
 --- a/drivers/ata/Kconfig
 +++ b/drivers/ata/Kconfig
-@@ -91,6 +91,7 @@ config SATA_AHCI
+@@ -138,6 +138,13 @@ config SATA_SIL24
  
- config SATA_AHCI_PLATFORM
- 	tristate "Platform AHCI SATA support"
-+	select GENERIC_PHY
- 	help
- 	  This option enables support for Platform AHCI Serial ATA
- 	  controllers.
-diff --git a/drivers/ata/ahci.h b/drivers/ata/ahci.h
-index 1145637..94484cb 100644
---- a/drivers/ata/ahci.h
-+++ b/drivers/ata/ahci.h
-@@ -37,6 +37,7 @@
+ 	  If unsure, say N.
  
- #include <linux/clk.h>
- #include <linux/libata.h>
-+#include <linux/phy/phy.h>
++config SATA_TI
++	tristate "Texas Instruments SATA Wrapper driver"
++	depends on ARCH_OMAP
++	help
++	  This options enables SATA Wrapper driver for Texas Instruments SoCs.
++	  It is found on OMAP5 and DRA7.
++
+ config ATA_SFF
+ 	bool "ATA SFF support (for legacy IDE and PATA)"
+ 	default y
+diff --git a/drivers/ata/Makefile b/drivers/ata/Makefile
+index 46518c6..673ba5e 100644
+--- a/drivers/ata/Makefile
++++ b/drivers/ata/Makefile
+@@ -11,6 +11,7 @@ obj-$(CONFIG_SATA_SIL24)	+= sata_sil24.o
+ obj-$(CONFIG_SATA_DWC)		+= sata_dwc_460ex.o
+ obj-$(CONFIG_SATA_HIGHBANK)	+= sata_highbank.o libahci.o
+ obj-$(CONFIG_AHCI_IMX)		+= ahci_imx.o
++obj-$(CONFIG_SATA_TI)		+= sata_ti.o
  
- /* Enclosure Management Control */
- #define EM_CTRL_MSG_TYPE              0x000f0000
-@@ -322,6 +323,7 @@ struct ahci_host_priv {
- 	u32			em_buf_sz;	/* EM buffer size in byte */
- 	u32			em_msg_type;	/* EM message type */
- 	struct clk		*clk;		/* Only for platforms supporting clk */
-+	struct phy		*phy;		/* If platforms use phy */
- 	void			*plat_data;	/* Other platform data */
- };
- 
-diff --git a/drivers/ata/ahci_platform.c b/drivers/ata/ahci_platform.c
-index 2daaee0..f812ffa 100644
---- a/drivers/ata/ahci_platform.c
-+++ b/drivers/ata/ahci_platform.c
-@@ -23,6 +23,7 @@
- #include <linux/platform_device.h>
- #include <linux/libata.h>
- #include <linux/ahci_platform.h>
-+#include <linux/phy/phy.h>
- #include "ahci.h"
- 
- static void ahci_host_stop(struct ata_host *host);
-@@ -141,16 +142,32 @@ static int ahci_probe(struct platform_device *pdev)
- 		}
- 	}
- 
-+	hpriv->phy = devm_phy_get(dev, "sata-phy");
-+	if (IS_ERR(hpriv->phy)) {
-+		dev_err(dev, "can't get phy\n");
-+		/* return only if -EPROBE_DEFER */
-+		if (PTR_ERR(hpriv->phy) == -EPROBE_DEFER) {
-+			rc = -EPROBE_DEFER;
-+			goto disable_unprepare_clk;
-+		}
+ # SFF w/ custom DMA
+ obj-$(CONFIG_PDC_ADMA)		+= pdc_adma.o
+diff --git a/drivers/ata/sata_ti.c b/drivers/ata/sata_ti.c
+new file mode 100644
+index 0000000..0b9093d
+--- /dev/null
++++ b/drivers/ata/sata_ti.c
+@@ -0,0 +1,160 @@
++/**
++ * sata-ti.c - Texas Instruments Specific SATA Glue layer
++ *
++ * Copyright (C) 2013 Texas Instruments Incorporated - http://www.ti.com
++ *
++ * Authors: Roger Quadros <rogerq@ti.com>
++ *
++ * This program is free software: you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2  of
++ * the License as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include <linux/module.h>
++#include <linux/kernel.h>
++#include <linux/slab.h>
++#include <linux/platform_device.h>
++#include <linux/ioport.h>
++#include <linux/io.h>
++#include <linux/pm_runtime.h>
++#include <linux/of.h>
++#include <linux/of_platform.h>
++
++/*
++ * All these registers belong to OMAP's Wrapper around the
++ * DesignWare SATA Core.
++ */
++
++#define SATA_SYSCONFIG				0x0000
++#define SATA_CDRLOCK				0x0004
++
++struct ti_sata {
++	struct device *dev;
++	void __iomem *base;
++};
++
++static int ti_sata_probe(struct platform_device *pdev)
++{
++	struct device_node *np = pdev->dev.of_node;
++	struct device *dev = &pdev->dev;
++	struct ti_sata *sata;
++	struct resource *res;
++	void __iomem *base;
++	int ret;
++
++	if (!np) {
++		dev_err(dev, "device node not found\n");
++		return -EINVAL;
 +	}
 +
- 	/*
- 	 * Some platforms might need to prepare for mmio region access,
- 	 * which could be done in the following init call. So, the mmio
- 	 * region shouldn't be accessed before init (if provided) has
- 	 * returned successfully.
- 	 */
++	sata = devm_kzalloc(dev, sizeof(*sata), GFP_KERNEL);
++	if (!sata)
++		return -ENOMEM;
 +
-+	if (!(IS_ERR(hpriv->phy))) {
-+		phy_init(hpriv->phy);
-+		phy_power_on(hpriv->phy);
++	platform_set_drvdata(pdev, sata);
++
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	if (!res) {
++		dev_err(dev, "missing memory base resource\n");
++		return -EINVAL;
 +	}
 +
- 	if (pdata && pdata->init) {
- 		rc = pdata->init(dev, hpriv->mmio);
- 		if (rc)
--			goto disable_unprepare_clk;
-+			goto disable_phy;
- 	}
- 
- 	ahci_save_initial_config(dev, hpriv,
-@@ -220,6 +237,12 @@ static int ahci_probe(struct platform_device *pdev)
- pdata_exit:
- 	if (pdata && pdata->exit)
- 		pdata->exit(dev);
-+disable_phy:
-+	if (!IS_ERR(hpriv->phy)) {
-+		phy_power_off(hpriv->phy);
-+		phy_exit(hpriv->phy);
++	base = devm_ioremap_resource(dev, res);
++	if (IS_ERR(base))
++		return PTR_ERR(base);
++
++	sata->dev = dev;
++	sata->base = base;
++
++	pm_runtime_enable(dev);
++	ret = pm_runtime_get_sync(dev);
++	if (ret < 0) {
++		dev_err(dev, "pm_runtime_get_sync failed with err %d\n",
++									ret);
++		goto runtime_disable;
 +	}
 +
- disable_unprepare_clk:
- 	if (!IS_ERR(hpriv->clk))
- 		clk_disable_unprepare(hpriv->clk);
-@@ -238,6 +261,11 @@ static void ahci_host_stop(struct ata_host *host)
- 	if (pdata && pdata->exit)
- 		pdata->exit(dev);
- 
-+	if (!IS_ERR(hpriv->phy)) {
-+		phy_power_off(hpriv->phy);
-+		phy_exit(hpriv->phy);
++	ret = of_platform_populate(np, NULL, NULL, dev);
++	if (ret) {
++		dev_err(&pdev->dev, "failed to create TI SATA children\n");
++		goto runtime_put;
 +	}
 +
- 	if (!IS_ERR(hpriv->clk)) {
- 		clk_disable_unprepare(hpriv->clk);
- 		clk_put(hpriv->clk);
-@@ -328,6 +356,7 @@ static SIMPLE_DEV_PM_OPS(ahci_pm_ops, ahci_suspend, ahci_resume);
- static const struct of_device_id ahci_of_match[] = {
- 	{ .compatible = "snps,spear-ahci", },
- 	{ .compatible = "snps,exynos5440-ahci", },
-+	{ .compatible = "snps,dwc-ahci", },
- 	{},
- };
- MODULE_DEVICE_TABLE(of, ahci_of_match);
++	return 0;
++
++runtime_put:
++	pm_runtime_put_sync(dev);
++
++runtime_disable:
++	pm_runtime_disable(dev);
++
++	return ret;
++}
++
++static int ti_sata_remove_child(struct device *dev, void *c)
++{
++	struct platform_device *pdev = to_platform_device(dev);
++
++	platform_device_unregister(pdev);
++
++	return 0;
++}
++
++static int ti_sata_remove(struct platform_device *pdev)
++{
++	pm_runtime_put_sync(&pdev->dev);
++	pm_runtime_disable(&pdev->dev);
++	device_for_each_child(&pdev->dev, NULL, ti_sata_remove_child);
++
++	return 0;
++}
++
++static const struct of_device_id of_ti_sata_match[] = {
++	{
++		.compatible =	"ti,sata"
++	},
++	{ },
++};
++MODULE_DEVICE_TABLE(of, of_ti_sata_match);
++
++#ifdef CONFIG_PM
++
++static int ti_sata_resume(struct device *dev)
++{
++	pm_runtime_disable(dev);
++	pm_runtime_set_active(dev);
++	pm_runtime_enable(dev);
++
++	return 0;
++}
++
++static const struct dev_pm_ops ti_sata_dev_pm_ops = {
++	.resume = ti_sata_resume,
++};
++
++#define DEV_PM_OPS	(&ti_sata_dev_pm_ops)
++#else
++#define DEV_PM_OPS	NULL
++#endif /* CONFIG_PM */
++
++static struct platform_driver ti_sata_driver = {
++	.probe		= ti_sata_probe,
++	.remove		= ti_sata_remove,
++	.driver		= {
++		.name	= "ti-sata",
++		.of_match_table	= of_ti_sata_match,
++		.pm	= DEV_PM_OPS,
++	},
++};
++
++module_platform_driver(ti_sata_driver);
++
++MODULE_ALIAS("platform:ti-sata");
++MODULE_AUTHOR("Roger Quadros <rogerq@ti.com>");
++MODULE_LICENSE("GPL v2");
++MODULE_DESCRIPTION("TI SATA Glue Layer");
 -- 
 1.7.4.1
