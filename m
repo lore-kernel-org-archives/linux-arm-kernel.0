@@ -1,60 +1,60 @@
-From: luca@coelho.fi (Luca Coelho)
-Date: Thu, 19 Sep 2013 08:43:11 +0300
-Subject: [PATCH 1/2] ARM: dts: Fix muxing and regulator for wl12xx on
- the SDIO bus for pandaboard
-In-Reply-To: <20130918234726.GL9994@atomide.com>
-References: <20130913190811.24617.97699.stgit@localhost>
- <20130913190953.24617.46506.stgit@localhost>
- <1379399214.4223.123.camel@porter.coelho.fi>
- <1379399290.4223.124.camel@porter.coelho.fi>
- <20130918000203.GS9994@atomide.com> <52396CA0.6030100@baylibre.com>
- <20130918175158.GW9994@atomide.com> <20130918234726.GL9994@atomide.com>
-Message-ID: <1379569391.4223.148.camel@porter.coelho.fi>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 19 Sep 2013 08:36:52 +0200
+Subject: [RFC PATCHv2 3/4] of: provide a binding for fixed link PHYs
+In-Reply-To: <20130918150031.D9034C42CDF@trevor.secretlab.ca>
+References: <1378480701-12908-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1378480701-12908-4-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20130918042923.5D845C42CF7@trevor.secretlab.ca>
+ <CAGVrzcbVTenhVC4tQznJFqVpO08ruxLyy1ZiLmw6Bu1=3zbGZg@mail.gmail.com>
+ <20130918150031.D9034C42CDF@trevor.secretlab.ca>
+Message-ID: <20130919063652.GQ30088@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2013-09-18 at 16:47 -0700, Tony Lindgren wrote:
-> * Tony Lindgren <tony@atomide.com> [130918 11:00]:
-> > * Benoit Cousson <bcousson@baylibre.com> [130918 02:12]:
-> > > Hi Tony,
-> > > 
-> > > On 18/09/2013 02:02, Tony Lindgren wrote:
-> > > >* Luca Coelho <luca@coelho.fi> [130916 23:35]:
-> > > >>On Tue, 2013-09-17 at 09:26 +0300, Luca Coelho wrote:
-> > > >>>Both patches look good to me, though I didn't have the time to retest
-> > > >>>them.
-> > > >>
-> > > >>Actually I don't even have a Blaze device anymore, so I can't really
-> > > >>test the second patch. :(
-> > > >
-> > > >OK no problem, I've tested it on panda es.
-> > > 
-> > > Do we have someone out-there that still own a Blaze?
-> > > 
-> > > Anyway, I'm about to send a DTS fix branch for -rc2, so I'll include
-> > > these two patches.
+On Wed, Sep 18, 2013 at 10:00:31AM -0500, Grant Likely wrote:
+> On Wed, 18 Sep 2013 10:21:11 +0100, Florian Fainelli <f.fainelli@gmail.com> wrote:
+> > >
+> > > I understand what you're trying to do here, but it causes a troublesome
+> > > leakage of implementation detail into the binding, making the whole
+> > > thing look very odd. This binding tries to make a fixed link look
+> > > exactly like a real PHY even to the point of including a phandle to the
+> > > phy. But having a phandle to a node which is *always* a direct child of
+> > > the MAC node is redundant and a rather looney. Yes, doing it that way
+> > > makes it easy for of_phy_find_device() to be transparent for fixed link,
+> > > but that should *not* drive bindings, especially when that makes the
+> > > binding really rather weird.
 > > 
-> > OK yes good please do pick them up, I'll drop them from my
-> > not-yet-pushed-out omap-for-v3.12/fixes.
+> > This is not exactly true in the sense that the "new" binding just
+> > re-shuffles the properties representation into something that is
+> > clearer and more extendible but there is not much difference in the
+> > semantics.
 > 
-> Hmm looks like there's also some new regression in the
-> wl12xx driver:
-> 
-> # iwconfig wlan0
-> wlan0     no wireless extensions.
-> 
-> My test script was just doing:
-> 
-> # iw dev wlan0 scan
-> 
-> And that works fine. Luca, any ideas?
+> That's not my point in the above paragraph. My point is a binding that
+> consists of a phandle to a node that is always a direct child is goofy
+> and wrong.
 
-Have you compiled WEXT support in your kernel? iwconfig uses the
-(deprecated) Wireless Extensions API.  iw uses the current nl80211 API.
+It's not necessarily a direct child. Most of these fixed links are really
+ethernet switches. These are (mostly) i2c devices which are under their
+corresponding i2c bus node. Using a phandle from the ethernet MAC to
+the port of a switch not only provides the link information, but also the
+information to which port of the switch the MAC is connected.
 
-If you want to use iwconfig and friends you need to enable
-CONFIG_CFG80211_WEXT.
+Another situation is that some SoCs have a MDIO bus external to the MAC
+and possibly shared for multiple ethernet MACs. This also requires a
+phandle from the MAC to the MDIO bus.
 
---
-Cheers,
-Luca.
+So we have the situation that we need a phandle from the MAC to something
+that provides a link. For consistency it would be good to always use a
+phandle instead of having an inflexible 'fixed-link' property.
+
+You're right, the binding doesn't provide anything new, but I think it
+straightens things up for the future.
+
+Sascha
+
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
