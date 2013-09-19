@@ -1,169 +1,221 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Thu, 19 Sep 2013 09:44:38 -0700
-Subject: [PATCH v2] clk: si570: Add a driver for SI570 oscillators
-In-Reply-To: <6401b71c-8c18-4735-8b40-9692cd788336@VA3EHSMHS037.ehs.local>
-References: <1379544219-23579-1-git-send-email-soren.brinkmann@xilinx.com>
- <20130919131712.GB24088@roeck-us.net>
- <6401b71c-8c18-4735-8b40-9692cd788336@VA3EHSMHS037.ehs.local>
-Message-ID: <20130919164438.GA7461@roeck-us.net>
+From: mikedunn@newsguy.com (Mike Dunn)
+Date: Thu, 19 Sep 2013 09:53:31 -0700
+Subject: [PATCH v4] PWM: PXA: add device tree support to PWM driver
+In-Reply-To: <20130919122807.GH10852@ulmo>
+References: <1379519982-7618-1-git-send-email-mikedunn@newsguy.com>
+ <20130919122807.GH10852@ulmo>
+Message-ID: <523B2C0B.4050204@newsguy.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 19, 2013 at 09:01:01AM -0700, S?ren Brinkmann wrote:
-> On Thu, Sep 19, 2013 at 06:17:12AM -0700, Guenter Roeck wrote:
-> > On Wed, Sep 18, 2013 at 03:43:38PM -0700, Soren Brinkmann wrote:
-> > > Add a driver for SILabs 570, 571, 598, 599 programmable oscillators.
-> > > The devices generate low-jitter clock signals and are reprogrammable via
-> > > an I2C interface.
-> > > 
-
-[...]
-> > > +static unsigned long si570_recalc_rate(struct clk_hw *hw,
-> > > +		unsigned long parent_rate)
-> > > +{
-> > > +	int err;
-> > > +	u64 rfreq, rate;
-> > > +	unsigned int n1, hs_div;
-> > > +	struct clk_si570 *data = to_clk_si570(hw);
-> > > +
-> > > +	err = si570_get_divs(data, &rfreq, &n1, &hs_div);
-> > > +	if (err) {
-> > > +		dev_err(&data->i2c_client->dev, "unable to recalc rate\n");
-> > 
-> > [ Not really helpful that you can not return an error here ]
-> IIUC, the CCF does not really support error reporting for this function. I
-> think a return value of recalc_rate is always interpreted as frequency.
-> Hence, I decided to take the last point of certainty and return the last
-> known frequency.
+On 09/19/2013 05:28 AM, Thierry Reding wrote:
+> On Wed, Sep 18, 2013 at 08:59:42AM -0700, Mike Dunn wrote:
+> [...]
+>> Only an OF match table is added;
+> [...]
 > 
-Yes, I wasn't complaining about you, but about the clock infrastructure.
+> That's no longer true. You also add a custom .of_xlate() function.
 
-[...]
 
-> > > +static int si570_probe(struct i2c_client *client,
-> > > +		const struct i2c_device_id *id)
-> > > +{
-> > > +	struct clk_si570 *data;
-> > > +	struct clk_init_data init;
-> > > +	struct clk *clk;
-> > > +	u32 initial_fout, factory_fout;
-> > > +	int err;
-> > > +
-> > > +	data = devm_kzalloc(&client->dev, sizeof(*data), GFP_KERNEL);
-> > > +	if (!data)
-> > > +		return -ENOMEM;
-> > > +
-> > > +	init.ops = &si570_clk_ops;
-> > > +	init.flags = CLK_IS_ROOT;
-> > > +	init.num_parents = 0;
-> > > +	data->hw.init = &init;
-> > > +	data->max_freq = id->driver_data;
-> > > +	data->i2c_client = client;
-> > > +
-> > > +	if (of_property_read_bool(client->dev.of_node,
-> > > +				"temperature-stability-7ppm"))
-> > > +		data->div_offset = SI570_DIV_OFFSET_7PPM;
-> > > +
-> > Just noticed that you dropped platform data support. Doesn't matter much for me
-> > right now, but in my previous company we used the chip on an x86 system which
-> > does not support devicetree. Would be nice to keep it and derive platform data
-> > from devicetree data if provided, like other drivers do it.
-> I'll look into this. The issue I have with that is, I can hardly test it
-> since we only use this on Zynq which uses DT. So, I'd rather prefer to
-> not include it unless somebody volunteers to test it.
-> 
-Fair enough. I can not test it myself anymore, and my previous employer
-now has a strict non-contributions-to-linux policy, so I guess they won't
-test it either or at least not publish any test results. Leave it out.
+Is it acceptable to re-word the commit message in susbequent versions?
 
-> > The 7ppm option is only relevant for si570/si751 and not supported on
-> > si598/si599. You should mention that in the bindings document and check for it.
-> Right, I'll add a note in the doc. And ignore it for devices this does
-> not apply.
-> 
-I would bail out, but that is your call.
 
-> > Even better would be if it can be auto-detected; in that case you would not need
-> > the property at all. Unfortunately I don't have access to a chip, so I have
-> > no idea if that is possible and can not check it myself either.
-> I didn't see any way to detect this during runtime. And we don't have
-> such a device either.
 > 
-Check what the registers return when reading. But yes, you would need access to
-the various devices to be sure that the detection works. Wonder if SiLabs
-provides samples ... this one would be really nice to have, because it would
-enable us to drop the extra property.
+>> diff --git a/Documentation/devicetree/bindings/pwm/pxa-pwm.txt b/Documentation/devicetree/bindings/pwm/pxa-pwm.txt
+> [...]
+>> +Required properties:
+>> +- compatible: should be one or more of:
+>> +  - "marvell,pxa250-pwm"
+>> +  - "marvell,pxa270-pwm"
+>> +  - "marvell,pxa168-pwm"
+>> +  - "marvell,pxa910-pwm"
+>> +- reg: physical base address and length of the registers used by the PWM channel
+>> +  NB: One device instance must be created for each PWM that is used, so the
+> 
+> Nit: "NB:" looks like it starts a new property. Perhaps something like:
+> 
+> 	"Note that one device node must be present for each PWM ..."
+> 
+> would be less confusing to the eye.
 
-> > 
-> > > +	if (of_property_read_string(client->dev.of_node, "clock-output-names",
-> > > +			&init.name))
-> > > +		init.name = client->dev.of_node->name;
-> > > +
-> > > +	err = of_property_read_u32(client->dev.of_node, "factory-fout",
-> > > +			&factory_fout);
-> > > +	if (err) {
-> > > +		dev_err(&client->dev, "'factory-fout' property missing\n");
-> > > +		return err;
-> > > +	}
-> > > +
-> > > +	data->regmap = devm_regmap_init_i2c(client, &si570_regmap_config);
-> > > +	if (IS_ERR(data->regmap)) {
-> > > +		dev_err(&client->dev, "failed to allocate register map\n");
-> > > +		return PTR_ERR(data->regmap);
-> > > +	}
-> > > +
-> > > +	i2c_set_clientdata(client, data);
-> > > +	err = si570_get_defaults(data, factory_fout);
-> > > +	if (err)
-> > > +		return err;
-> > > +
-> > > +	clk = devm_clk_register(&client->dev, &data->hw);
-> > > +	if (IS_ERR(clk)) {
-> > > +		dev_err(&client->dev, "clock registration failed\n");
-> > > +		return PTR_ERR(clk);
-> > > +	}
-> > > +	err = of_clk_add_provider(client->dev.of_node, of_clk_src_simple_get,
-> > > +			clk);
-> > > +	if (err) {
-> > > +		dev_err(&client->dev, "unable to add clk provider\n");
-> > > +		return err;
-> > > +	}
-> > > +
-> > > +	/*
-> > > +	 * Read the requested initial fout from either platform data or the
-> > > +	 * device tree
-> > > +	 */
-> > 
-> > But you don't do anything with platform data.
-> copy&paste error. I'll remove it.
-> 
-> > 
-> > > +	if (!of_property_read_u32(client->dev.of_node, "clock-frequency",
-> > > +				&initial_fout)) {
-> > > +		err = clk_set_rate(clk, initial_fout);
-> > > +		if (err)
-> > > +			dev_warn(&client->dev,
-> > > +					"unable to set initial output frequency %u: %d\n",
-> > > +					initial_fout, err);
-> > 
-> > No bailout ?
-> > 
-> > Also it seems that this generates two error messages, once in the code which
-> > experiences the error and once here.
-> I remove the message here.
-> 
-> > 
-> > Maybe it would be better to just bail out and return the error.
-> > After all, something is seriously wrong and the system won't operate
-> > as specified.
-> I do more think of a spurious error (typo in DT prop giving an f out of
-> range,...)  and a driver actually controlling this clock generator later.
-> In that case later calls to clk_set_rate() might succeed and everything's
-> fine or the driver can handle the error. In case of using this device as
-> a fixed clock, bailing out here might make more sense though. I'd prefer
-> leaving it like this.
-> 
-A typo in dt data isn't really a spurious error, and it would be easy to fix.
-I would suggest to bail out; this ensures that the devicetree data is correct.
 
-Guenter
+Yes, good point.  I like clarity myself.
+
+
+> 
+>> +  length covers only the register window for one PWM output, not that of the
+>> +  entire PWM controller.  Currently length is 0x10 for all supported devices.
+> 
+> So that again confuses me. If the controller really is one or two PWM
+> channels, and four PWM channels, as given in the pxa27x.dtsi, are in
+> fact two controllers (not four) then I wonder if this really is the
+> correct binding for it.
+> 
+> That said, Stephen seems to be okay with it, and I'll yield to his
+> authority on the matter.
+> 
+>> +- #pwm-cells: should be 1.  This cell is used to specify the period in
+> 
+> Nit: "Should be 1." It's a sentence and therefore should start with a
+> capital letter.
+
+
+OK
+
+
+> 
+>> +  nanoseconds.  (Because one device instance is created for each PWM output,
+>> +  the per-chip index is superflous and not used.)
+> 
+> I'd omit the parentheses (and their content). The description of the
+> cell is plenty specific about what it should contain. No need to list
+> what it shouldn't contain.
+
+
+OK.
+
+
+> 
+>> diff --git a/arch/arm/boot/dts/pxa27x.dtsi b/arch/arm/boot/dts/pxa27x.dtsi
+> 
+> I think this belongs in a separate patch so it can go through the
+> arm-soc tree.
+
+
+Is there anyone else or another list that should be CC'd in this case?  Thanks.
+
+
+> 
+>> diff --git a/drivers/pwm/pwm-pxa.c b/drivers/pwm/pwm-pxa.c
+> [...]
+>> +#ifdef CONFIG_OF
+>> +/*
+>> + * Device tree users must create one device instance for each pwm channel.
+>> + * Hence we dispense with the HAS_SECONDARY_PWM and "tell" the original driver
+>> + * code that this is a single channel pxa25x-pwm.  Currently all devices are
+>> + * supported identically.
+>> + */
+>> +static struct of_device_id pwm_of_match[] = {
+>> +	{ .compatible = "marvell,pxa250-pwm", .data = &pwm_id_table[0]},
+>> +	{ .compatible = "marvell,pxa270-pwm", .data = &pwm_id_table[0]},
+>> +	{ .compatible = "marvell,pxa168-pwm", .data = &pwm_id_table[0]},
+>> +	{ .compatible = "marvell,pxa910-pwm", .data = &pwm_id_table[0]},
+>> +	{ }
+>> +};
+>> +MODULE_DEVICE_TABLE(of, pwm_of_match);
+>> +
+>> +static const struct platform_device_id *pxa_pwm_get_id_dt(struct device *dev)
+>> +{
+>> +	const struct of_device_id *id = of_match_device(pwm_of_match, dev);
+>> +	if (id)
+>> +		return (const struct platform_device_id *)id->data;
+> 
+> Is that cast really necessary? id->data is const void *, so shouldn't
+> need a cast.
+
+
+You're right.
+
+
+> 
+>> +	else
+>> +		return NULL;
+> 
+> Perhaps "return id ? id->data : NULL;"?
+
+
+OK
+
+
+> 
+>> +struct pwm_device *
+>> +pxa_pwm_of_xlate(struct pwm_chip *pc, const struct of_phandle_args *args)
+> 
+> Should be static.
+
+
+Oops, yes.
+
+
+> 
+>> +{
+>> +	struct pwm_device *pwm;
+>> +
+> 
+> You probably want to check that pc->of_pwm_n_cells at least 1 here.
+
+
+Well OK, but I didn't bother because it's explicitly set to one elsewhere in
+this source file.
+
+
+> 
+>> +	pwm = pwm_request_from_chip(pc, 0, NULL);
+>> +	if (IS_ERR(pwm))
+>> +		return pwm;
+>> +
+>> +	pwm_set_period(pwm, args->args[0]);
+>> +
+>> +	return pwm;
+>> +}
+>> +
+>> +#else  /* !CONFIG_OF */
+>> +static const struct platform_device_id *pxa_pwm_get_id_dt(struct device *dev)
+>> +{
+>> +	dev_err(dev, "missing platform data\n");
+>> +	return NULL;
+>> +}
+>> +
+>> +struct pwm_device *
+>> +pxa_pwm_of_xlate(struct pwm_chip *pc, const struct of_phandle_args *args)
+>> +{
+>> +	return NULL;
+>> +}
+>> +#endif
+> 
+> I prefer not to have these dummy implementations for static functions.
+> See below...
+> 
+>>  static int pwm_probe(struct platform_device *pdev)
+>>  {
+>>  	const struct platform_device_id *id = platform_get_device_id(pdev);
+>> @@ -131,6 +185,11 @@ static int pwm_probe(struct platform_device *pdev)
+>>  	struct resource *r;
+>>  	int ret = 0;
+>>  
+>> +	if (id == NULL)		/* using device tree */
+>> +		id = pxa_pwm_get_id_dt(&pdev->dev);
+> 
+> This could be replaced with:
+> 
+> 	if (IS_ENABLED(CONFIG_OF) && id == NULL)
+> 		id = pxa_pwm_get_id_dt(&pdev->dev);
+> 
+> And pxa_pwm_get_id_dt() can be unconditionally defined. The compiler
+> will automatically remove it for !OF because it is never used. Also the
+> comment can then be dropped since the code is already explicit.
+> 
+>>  	pwm = devm_kzalloc(&pdev->dev, sizeof(*pwm), GFP_KERNEL);
+>>  	if (pwm == NULL) {
+>>  		dev_err(&pdev->dev, "failed to allocate memory\n");
+>> @@ -145,6 +204,8 @@ static int pwm_probe(struct platform_device *pdev)
+>>  	pwm->chip.ops = &pxa_pwm_ops;
+>>  	pwm->chip.base = -1;
+>>  	pwm->chip.npwm = (id->driver_data & HAS_SECONDARY_PWM) ? 2 : 1;
+>> +	pwm->chip.of_xlate = pxa_pwm_of_xlate;
+>> +	pwm->chip.of_pwm_n_cells = 1;
+> 
+> Similarly if you write this as:
+> 
+> 	if (IS_ENABLED(CONFIG_OF)) {
+> 		pwm->chip.of_xlate = pxa_pwm_of_xlate;
+> 		pwm->chip.of_pwm_n_cells = 1;
+> 	}
+> 
+> Then the only thing that needs #ifdef CONFIG_OF protection will be the
+> OF match table.
+
+
+Yes, much better.  Thanks again Thierry.
+
+Mike
