@@ -1,6 +1,7 @@
-From: maxime.coquelin@st.com (Maxime COQUELIN)
-Date: Thu, 19 Sep 2013 17:22:30 +0200
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 19 Sep 2013 16:32:37 +0100
 Subject: [PATCH 2/4] ARM: STi: Supply I2C configuration to STiH416 SoC
+In-Reply-To: <84625B87D65BCF478CC1E9C886A4C314DEF1BD957D@SAFEX1MAIL4.st.com>
 References: <1379498483-4236-1-git-send-email-maxime.coquelin@st.com>
  <1379498483-4236-3-git-send-email-maxime.coquelin@st.com>
  <20130918120340.GF16984@lee--X1>
@@ -8,101 +9,47 @@ References: <1379498483-4236-1-git-send-email-maxime.coquelin@st.com>
  <5239A322.5010004@st.com>
  <84625B87D65BCF478CC1E9C886A4C314DEF1BD9579@SAFEX1MAIL4.st.com>
  <523AF548.30400@st.com>
-Message-ID: <84625B87D65BCF478CC1E9C886A4C314DEF1BD957D@SAFEX1MAIL4.st.com>
+ <84625B87D65BCF478CC1E9C886A4C314DEF1BD957D@SAFEX1MAIL4.st.com>
+Message-ID: <20130919153237.GA7071@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/19/2013 03:01 PM, Srinivas KANDAGATLA wrote:
-> On 19/09/13 08:16, Maxime COQUELIN wrote:
->> Hi Srini,
->>
->> On 09/18/2013 03:17 PM, Srinivas KANDAGATLA wrote:
->>> On 18/09/13 13:46, Maxime COQUELIN wrote:
->>>> On 09/18/2013 02:03 PM, Lee Jones wrote:
->>>>>>>> This patch supplies I2C configuration to STiH416 SoC.
->>>>>>>>
->>>>>>>> Cc: Srinivas Kandagatla <srinivas.kandagatla@st.com>
->>>>>>>> Signed-off-by: Maxime Coquelin <maxime.coquelin@st.com>
->>>>>>>> ---
->>>>>>>>  arch/arm/boot/dts/stih416-pinctrl.dtsi |   35 ++++++++++++++++++++
->>>>>>>>  arch/arm/boot/dts/stih416.dtsi         |   57 ++++++++++++++++++++++++++++++++
->>>>>>>>  2 files changed, 92 insertions(+)
->>>>>>>>
->>>>>>>> diff --git a/arch/arm/boot/dts/stih416-pinctrl.dtsi b/arch/arm/boot/dts/stih416-pinctrl.dtsi
->>>>>> I genuinely don't know the answer to this question, but are these
->>>>>> nodes identical to the ones you've just put in the stih415 DTSI file?
->>>>>> If so, I think it will be worth creating a stih41x DTSI rather than
->>>>>> duplicating lots of stuff unnecessarily.
->>>> There are close to be identical indeed.
->>>> For the clocks and pinctrl, the references names are the same, but they are
->>>> pointing on different nodes, as STiH415 and STiH416 have their own
->>>> clocks and pinctrl dtsi files.
->>>>
->>>> Srini, what is opinion about this?
->>> There is already a stih41x.dtsi file, but I don't think it is the right
->>> place for the pinctrl nodes there.
->>>
->>> Am not OK with the idea of common pinctrl nodes for STiH415 and STiH416
->>> for two reasons.
->>>
->>> 1> If we common up the pinctrl nodes, it will be very difficult to
->>> accommodate new pinctrls layout which is not guaranteed to be in same
->>> layout in future SOCs.
->>>
->>> 2> The retiming values in the pinctrl nodes tend to change as per SOC,
->>> so it will be difficult to manage it if we common it up.
->>>
->>> Am sure we can come up with a dt layout which can reduce duplication,
->>> but we have to be careful here not to lose the flexiblity to accommodate
->>> new picntrl layouts, new retimings values based on SOC.
->> Ok. What do you think of declaring the i2c nodes inside the stih41x.dtsi
->> file,
->> and overload them with the pinctrl and clock properties in the stih416
->> and stih415 dtsi files?
-> Am not very comfortable with this idea.
->
-> As there is no guarantee that the interrupt number/memory map and the
-> i2c numbering will be same in future SOCs or other IPs.
->
-> You might be already aware that the number of i2cs on each SOC are
-> different as example on STiH415 we have 10 SSCs and on STiH416 we have
-> 11 SSCs. So, At what point you decide that which devices/IPs should be
-> in stih41x and which should in stih415/Stih416?
-Yes, I know there is one more SSC on STiH416.
+> > Am not very comfortable with this idea.
+> >
+> > As there is no guarantee that the interrupt number/memory map and the
+> > i2c numbering will be same in future SOCs or other IPs.
+> >
+> > You might be already aware that the number of i2cs on each SOC are
+> > different as example on STiH415 we have 10 SSCs and on STiH416 we have
+> > 11 SSCs. So, At what point you decide that which devices/IPs should be
+> > in stih41x and which should in stih415/Stih416?
+> Yes, I know there is one more SSC on STiH416.
+> 
+> On one hand, this could add some confusion. But on the other hand,
+> someone who will need to activate a SSP will know which one he has
+> to activate.
+> 
+> > Each i2c node will save around 5 lines if we common it up, but if the
+> > interrupt number or map changes this difference will be negligible.
+> >
+> > Common up at this level and mixing un-common ones in stih415.dtsi or
+> > stih416.dtsi will add confusion to readers as the information is split
+> > at multiple places.
+> I agree it will be messy if one part of the node declared at one place,
+> and the rest at another place.
+> >
+> > IMO the common up idea sounds good but reduces the readability and has
+> > no effect on final dtb size.
+> 
+> Fair enough. Lee, are you ok with keeping it as is?
 
-On one hand, this could add some confusion. But on the other hand,
-someone who will need to activate a SSP will know which one he has
-to activate.
+To be honest I haven't taken a look at the layout of the dts[i] files
+yet, so I can't really comment. Srini knows then better than anyone,
+so if he says it doesn't make sense, then I'm happy to take his word
+for it.
 
->
-> Each i2c node will save around 5 lines if we common it up, but if the
-> interrupt number or map changes this difference will be negligible.
->
-> Common up at this level and mixing un-common ones in stih415.dtsi or
-> stih416.dtsi will add confusion to readers as the information is split
-> at multiple places.
-I agree it will be messy if one part of the node declared at one place,
-and the rest at another place.
->
-> IMO the common up idea sounds good but reduces the readability and has
-> no effect on final dtb size.
-
-Fair enough. Lee, are you ok with keeping it as is?
-
-Thanks,
-Maxime
->
-> Thanks,
-> srini
->
->
->> Regards,
->> Maxime
->>>
->>> thanks,
->>> srini
->>>
->>>
->>
->>
->
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
