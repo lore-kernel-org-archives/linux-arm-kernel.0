@@ -1,45 +1,47 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Thu, 19 Sep 2013 12:15:10 +0200 (CEST)
-Subject: [PATCH] clockevents: Sanitize ticks to nsec conversion
-In-Reply-To: <20130919100239.GS24802@pengutronix.de>
-References: <1379077365-18458-1-git-send-email-mkl@pengutronix.de>
- <20130917095600.GJ26819@ludovic.desroches@atmel.com>
- <20130917100417.GQ12758@n2100.arm.linux.org.uk>
- <alpine.DEB.2.02.1309171210450.4089@ionos.tec.linutronix.de>
- <20130917130153.GL26819@ludovic.desroches@atmel.com>
- <alpine.DEB.2.02.1309172228400.4089@ionos.tec.linutronix.de>
- <20130918085627.GN24802@pengutronix.de>
- <alpine.DEB.2.02.1309181058470.4089@ionos.tec.linutronix.de>
- <20130918150958.GO24802@pengutronix.de>
- <alpine.DEB.2.02.1309182201000.4089@ionos.tec.linutronix.de>
- <20130919100239.GS24802@pengutronix.de>
-Message-ID: <alpine.DEB.2.02.1309191207460.4089@ionos.tec.linutronix.de>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Thu, 19 Sep 2013 15:52:24 +0530
+Subject: [GIT PULL] DaVinci fixes for v3.12-rc
+Message-ID: <523AD060.8000504@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 19 Sep 2013, Uwe Kleine-K?nig wrote:
-> On Thu, Sep 19, 2013 at 12:01:25AM +0200, Thomas Gleixner wrote:
-> > Versus the 64bit overflow check, we need to be even more careful. We
-> > need to check for overflowing (1 << 63) - 1 (i.e. the max positive
-> > value which fits into a s64). See clockevents_program_event().
-> 
-> That is because you interpret times < 0 as in the past, right? But note
-> that the interim result we're talking about here is still to be divided
-> by evt->mult. So assuming mult > 1, that check is too strict unless you
-> move it below the do_div in clockevent_delta2ns. For sure it makes sense
-> to use the same value for a and b in the handling:
+The following changes since commit 272b98c6455f00884f0350f775c5342358ebb73f:
 
-No, it's not too strict.
+  Linux 3.12-rc1 (2013-09-16 16:17:51 -0400)
 
-    nsec = (latch << shift) / mult;
+are available in the git repository at:
 
-Now the backwards conversion does:
+  git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-fixes-for-v3.12-rc2
 
-    latch = (nsec * mult) >> shift;
- 
-So we want nsec * mult to be in the positive range of s64. Which
-means, that latch << shift must be in that range as well.
+for you to fetch changes up to caf9269f883bf0d5b83384efb96e2aa572d1d013:
 
-Thanks,
+  ARM: edma: dt: create unused channel list (2013-09-19 15:13:32 +0530)
 
-	tglx
+----------------------------------------------------------------
+DaVinci fixes for v3.12-rc2
+---------------------------
+
+This pull request includes:
+
+1) A patch to fix build breakage with DEBUG_LL
+2) A patch to quell a build-time warning.
+3) A patch to complete the DT support for EDMA. Without
+   this patch, the DT support for EDMA cannot be used.
+   There are no in-tree DT users of EDMA currently but
+   nevertheless the patch fixes a previously incomplete
+   implementation.
+
+----------------------------------------------------------------
+Brian Norris (1):
+      ARM: davinci: dm365 evm: fix unused variable warning
+
+Joel Fernandes (1):
+      ARM: edma: dt: create unused channel list
+
+Sekhar Nori (1):
+      ARM: davinci: fix build breakage with DEBUG_LL
+
+ arch/arm/common/edma.c                      |   39 ++++++++++++++++++++++-----
+ arch/arm/mach-davinci/board-dm365-evm.c     |    2 +-
+ arch/arm/mach-davinci/include/mach/serial.h |    4 +--
+ 3 files changed, 35 insertions(+), 10 deletions(-)
