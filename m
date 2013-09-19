@@ -1,68 +1,48 @@
 From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 19 Sep 2013 15:38:04 +0200
-Subject: [PATCH][RESEND] ARM: at91: remove IRQF_DISABLED
-In-Reply-To: <1378270479-24628-1-git-send-email-michael.opdenacker@free-electrons.com>
-References: <1378270479-24628-1-git-send-email-michael.opdenacker@free-electrons.com>
-Message-ID: <523AFE3C.7050907@atmel.com>
+Date: Thu, 19 Sep 2013 16:05:51 +0200
+Subject: [PATCH] ARM: at91/at91-pinctrl documentation: add missing sam9x5
+ compatible string
+In-Reply-To: <521CBE58.9060402@atmel.com>
+References: <1377609965-22154-1-git-send-email-b.brezillon@overkiz.com>
+ <521CBE58.9060402@atmel.com>
+Message-ID: <523B04BF.80209@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/09/2013 06:54, Michael Opdenacker :
-> This flag is a NOOP since 2.6.36 and can be removed.
+On 27/08/2013 16:57, Nicolas Ferre :
+> On 27/08/2013 15:26, Boris BREZILLON :
+>> Add missing "atmel,at91sam9x5-pinctrl" compatible string to the
+>> documentation.
+>>
+>> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
 >
-> This is an update for 3.11 of a patch already sent for 3.10
->
-> Signed-off-by: Michael Opdenacker <michael.opdenacker@free-electrons.com>
+> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-Thanks Michael, I stacked it on at91-3.12-fixes as I guess it can be 
-accepted for this kernel release.
+Linus, it seems that you were not in copy of the original email.
 
-Bye,
+Anyway, do you want that I re-send to you or you can pick it on patchwork?
 
-> ---
->   arch/arm/mach-at91/at91rm9200_time.c  | 2 +-
->   arch/arm/mach-at91/at91sam926x_time.c | 2 +-
->   arch/arm/mach-at91/at91x40_time.c     | 2 +-
->   3 files changed, 3 insertions(+), 3 deletions(-)
->
-> diff --git a/arch/arm/mach-at91/at91rm9200_time.c b/arch/arm/mach-at91/at91rm9200_time.c
-> index 180b302..f607deb 100644
-> --- a/arch/arm/mach-at91/at91rm9200_time.c
-> +++ b/arch/arm/mach-at91/at91rm9200_time.c
-> @@ -93,7 +93,7 @@ static irqreturn_t at91rm9200_timer_interrupt(int irq, void *dev_id)
->
->   static struct irqaction at91rm9200_timer_irq = {
->   	.name		= "at91_tick",
-> -	.flags		= IRQF_SHARED | IRQF_DISABLED | IRQF_TIMER | IRQF_IRQPOLL,
-> +	.flags		= IRQF_SHARED | IRQF_TIMER | IRQF_IRQPOLL,
->   	.handler	= at91rm9200_timer_interrupt,
->   	.irq		= NR_IRQS_LEGACY + AT91_ID_SYS,
->   };
-> diff --git a/arch/arm/mach-at91/at91sam926x_time.c b/arch/arm/mach-at91/at91sam926x_time.c
-> index 3a4bc2e..bb39232 100644
-> --- a/arch/arm/mach-at91/at91sam926x_time.c
-> +++ b/arch/arm/mach-at91/at91sam926x_time.c
-> @@ -171,7 +171,7 @@ static irqreturn_t at91sam926x_pit_interrupt(int irq, void *dev_id)
->
->   static struct irqaction at91sam926x_pit_irq = {
->   	.name		= "at91_tick",
-> -	.flags		= IRQF_SHARED | IRQF_DISABLED | IRQF_TIMER | IRQF_IRQPOLL,
-> +	.flags		= IRQF_SHARED | IRQF_TIMER | IRQF_IRQPOLL,
->   	.handler	= at91sam926x_pit_interrupt,
->   	.irq		= NR_IRQS_LEGACY + AT91_ID_SYS,
->   };
-> diff --git a/arch/arm/mach-at91/at91x40_time.c b/arch/arm/mach-at91/at91x40_time.c
-> index 2919eba..c0e637a 100644
-> --- a/arch/arm/mach-at91/at91x40_time.c
-> +++ b/arch/arm/mach-at91/at91x40_time.c
-> @@ -57,7 +57,7 @@ static irqreturn_t at91x40_timer_interrupt(int irq, void *dev_id)
->
->   static struct irqaction at91x40_timer_irq = {
->   	.name		= "at91_tick",
-> -	.flags		= IRQF_DISABLED | IRQF_TIMER,
-> +	.flags		= IRQF_TIMER,
->   	.handler	= at91x40_timer_interrupt
->   };
+Here it is:
+https://patchwork.kernel.org/patch/2850188/
+
+>> ---
+>>    .../bindings/pinctrl/atmel,at91-pinctrl.txt        |    2 +-
+>>    1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/Documentation/devicetree/bindings/pinctrl/atmel,at91-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/atmel,at91-pinctrl.txt
+>> index 648d60e..cf7c7bc 100644
+>> --- a/Documentation/devicetree/bindings/pinctrl/atmel,at91-pinctrl.txt
+>> +++ b/Documentation/devicetree/bindings/pinctrl/atmel,at91-pinctrl.txt
+>> @@ -18,7 +18,7 @@ mode) this pin can work on and the 'config' configures various pad settings
+>>    such as pull-up, multi drive, etc.
+>>
+>>    Required properties for iomux controller:
+>> -- compatible: "atmel,at91rm9200-pinctrl"
+>> +- compatible: "atmel,at91rm9200-pinctrl" or "atmel,at91sam9x5-pinctrl"
+>>    - atmel,mux-mask: array of mask (periph per bank) to describe if a pin can be
+>>      configured in this periph mode. All the periph and bank need to be describe.
+>>
+>>
 >
 >
 
