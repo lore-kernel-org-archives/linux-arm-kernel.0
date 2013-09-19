@@ -1,58 +1,114 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 19 Sep 2013 15:21:12 +0200
-Subject: [PATCH] at91: mmc: fix missing pinctrl in dt
-In-Reply-To: <1379411857-18516-2-git-send-email-jiri.prchal@aksignal.cz>
-References: <1379411857-18516-1-git-send-email-jiri.prchal@aksignal.cz>
- <1379411857-18516-2-git-send-email-jiri.prchal@aksignal.cz>
-Message-ID: <523AFA48.80606@atmel.com>
+From: rogerq@ti.com (Roger Quadros)
+Date: Thu, 19 Sep 2013 16:22:27 +0300
+Subject: [RFC PATCH 10/15] ARM: omap5: hwmod: Add ocp2scp3 and sata hwmods
+In-Reply-To: <1379595943-14622-1-git-send-email-rogerq@ti.com>
+References: <1379595943-14622-1-git-send-email-rogerq@ti.com>
+Message-ID: <1379596947-15213-1-git-send-email-rogerq@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/09/2013 11:57, Jiri Prchal :
-> This patch adds pinctrl to soc dtsi file.
->
-> Signed-off-by: Jiri Prchal <jiri.prchal@aksignal.cz>
+From: Keshava Munegowda <keshava_mgowda@ti.com>
 
+Create hwmods for ocp2scp3 and sata modules.
 
-Jiri,
+[Roger Q] Clean up.
 
-I will rework your patch by splitting the two lines. This will allow us 
-to be consistent with other AT91 SoC/boards Device Tree descriptions.
+CC: Benoit Cousson <bcousson@baylibre.com>
+Signed-off-by: Balaji T K <balajitk@ti.com>
+Signed-off-by: Roger Quadros <rogerq@ti.com>
+---
+ arch/arm/mach-omap2/omap_hwmod_54xx_data.c |   72 ++++++++++++++++++++++++++++
+ 1 files changed, 72 insertions(+), 0 deletions(-)
 
-+		pinctrl-names = "default";
-
-This one is going in the SoC file, like you did.
-
-+		pinctrl-0 = <&pinctrl_mmc0_slot0_clk_cmd_dat0>;
-
-This one is under the responsibility of the board itself. The reason 
-behind this is that the dat0 line can be multiplexed on another pin.
-
-So, if you need a particular pinctrl configuration on the board side, 
-please send another patch for this addition.
-
-Thanks bye,
-
-
-> ---
->   arch/arm/boot/dts/at91sam9x5.dtsi |    2 ++
->   1 file changed, 2 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
-> index cf78ac0..c5d26b0 100644
-> --- a/arch/arm/boot/dts/at91sam9x5.dtsi
-> +++ b/arch/arm/boot/dts/at91sam9x5.dtsi
-> @@ -556,6 +556,8 @@
->   				interrupts = <12 IRQ_TYPE_LEVEL_HIGH 0>;
->   				dmas = <&dma0 1 AT91_DMA_CFG_PER_ID(0)>;
->   				dma-names = "rxtx";
-> +				pinctrl-names = "default";
-> +				pinctrl-0 = <&pinctrl_mmc0_slot0_clk_cmd_dat0>;
->   				#address-cells = <1>;
->   				#size-cells = <0>;
->   				status = "disabled";
->
-
-
+diff --git a/arch/arm/mach-omap2/omap_hwmod_54xx_data.c b/arch/arm/mach-omap2/omap_hwmod_54xx_data.c
+index 3dae6b9..2b698b8 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_54xx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_54xx_data.c
+@@ -1545,6 +1545,76 @@ static struct omap_hwmod omap54xx_wd_timer2_hwmod = {
+ 	},
+ };
+ 
++/*
++ * 'ocp2scp' class
++ * bridge to transform ocp interface protocol to scp (serial control port)
++ * protocol
++ */
++/* ocp2scp3 */
++static struct omap_hwmod omap54xx_ocp2scp3_hwmod;
++/* l4_cfg -> ocp2scp3 */
++static struct omap_hwmod_ocp_if omap54xx_l4_cfg__ocp2scp3 = {
++	.master		= &omap54xx_l4_cfg_hwmod,
++	.slave		= &omap54xx_ocp2scp3_hwmod,
++	.clk		= "l4_root_clk_div",
++	.user		= OCP_USER_MPU | OCP_USER_SDMA,
++};
++
++static struct omap_hwmod omap54xx_ocp2scp3_hwmod = {
++	.name		= "ocp2scp3",
++	.class		= &omap54xx_ocp2scp_hwmod_class,
++	.clkdm_name	= "l3init_clkdm",
++	.prcm = {
++		.omap4 = {
++			.clkctrl_offs = OMAP54XX_CM_L3INIT_OCP2SCP3_CLKCTRL_OFFSET,
++			.context_offs = OMAP54XX_RM_L3INIT_OCP2SCP3_CONTEXT_OFFSET,
++			.modulemode   = MODULEMODE_HWCTRL,
++		},
++	},
++};
++
++/*
++ * 'sata' class
++ * sata:  serial ata interface  gen2 compliant   ( 1 rx/ 1 tx)
++ */
++
++static struct omap_hwmod_class_sysconfig omap54xx_sata_sysc = {
++	.sysc_offs	= 0x0000,
++	.sysc_flags	= (SYSC_HAS_MIDLEMODE | SYSC_HAS_SIDLEMODE),
++	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART |
++			   SIDLE_SMART_WKUP | MSTANDBY_FORCE | MSTANDBY_NO |
++			   MSTANDBY_SMART | MSTANDBY_SMART_WKUP),
++	.sysc_fields	= &omap_hwmod_sysc_type2,
++};
++
++static struct omap_hwmod_class omap54xx_sata_hwmod_class = {
++	.name	= "sata",
++	.sysc	= &omap54xx_sata_sysc,
++};
++
++/* sata */
++static struct omap_hwmod omap54xx_sata_hwmod = {
++	.name		= "sata",
++	.class		= &omap54xx_sata_hwmod_class,
++	.clkdm_name	= "l3init_clkdm",
++	.flags		= HWMOD_SWSUP_SIDLE | HWMOD_SWSUP_MSTANDBY,
++	.main_clk	= "func_48m_fclk",
++	.prcm = {
++		.omap4 = {
++			.clkctrl_offs = OMAP54XX_CM_L3INIT_SATA_CLKCTRL_OFFSET,
++			.context_offs = OMAP54XX_RM_L3INIT_SATA_CONTEXT_OFFSET,
++			.modulemode   = MODULEMODE_SWCTRL,
++		},
++	},
++};
++
++/* l4_cfg -> sata */
++static struct omap_hwmod_ocp_if omap54xx_l4_cfg__sata = {
++	.master		= &omap54xx_l4_cfg_hwmod,
++	.slave		= &omap54xx_sata_hwmod,
++	.clk		= "l3_iclk_div",
++	.user		= OCP_USER_MPU | OCP_USER_SDMA,
++};
+ 
+ /*
+  * Interfaces
+@@ -2192,6 +2262,8 @@ static struct omap_hwmod_ocp_if *omap54xx_hwmod_ocp_ifs[] __initdata = {
+ 	&omap54xx_l4_per__uart6,
+ 	&omap54xx_l4_cfg__usb_otg_ss,
+ 	&omap54xx_l4_wkup__wd_timer2,
++	&omap54xx_l4_cfg__ocp2scp3,
++	&omap54xx_l4_cfg__sata,
+ 	NULL,
+ };
+ 
 -- 
-Nicolas Ferre
+1.7.4.1
