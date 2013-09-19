@@ -1,69 +1,111 @@
-From: luca@coelho.fi (Luca Coelho)
-Date: Thu, 19 Sep 2013 20:21:32 +0300
-Subject: [PATCH 1/2] ARM: dts: Fix muxing and regulator for wl12xx on
- the SDIO bus for pandaboard
-In-Reply-To: <20130919145344.GM9994@atomide.com>
-References: <20130913190811.24617.97699.stgit@localhost>
- <20130913190953.24617.46506.stgit@localhost>
- <1379399214.4223.123.camel@porter.coelho.fi>
- <1379399290.4223.124.camel@porter.coelho.fi>
- <20130918000203.GS9994@atomide.com> <52396CA0.6030100@baylibre.com>
- <20130918175158.GW9994@atomide.com> <20130918234726.GL9994@atomide.com>
- <1379569391.4223.148.camel@porter.coelho.fi>
- <20130919145344.GM9994@atomide.com>
-Message-ID: <1379611292.4223.160.camel@porter.coelho.fi>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Thu, 19 Sep 2013 19:34:03 +0200
+Subject: [PATCH] ASoC: generic: Add generic DT based simple codec
+In-Reply-To: <20130919104028.GI21013@sirena.org.uk>
+References: <20130919105437.75e0f0a3@armhf>
+ <20130919104028.GI21013@sirena.org.uk>
+Message-ID: <20130919193403.30ac5764@armhf>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2013-09-19 at 07:53 -0700, Tony Lindgren wrote:
-> * Luca Coelho <luca@coelho.fi> [130918 22:50]:
-> > On Wed, 2013-09-18 at 16:47 -0700, Tony Lindgren wrote:
-> > > * Tony Lindgren <tony@atomide.com> [130918 11:00]:
-> > > > * Benoit Cousson <bcousson@baylibre.com> [130918 02:12]:
-> > > > > Hi Tony,
-> > > > > 
-> > > > > On 18/09/2013 02:02, Tony Lindgren wrote:
-> > > > > >* Luca Coelho <luca@coelho.fi> [130916 23:35]:
-> > > > > >>On Tue, 2013-09-17 at 09:26 +0300, Luca Coelho wrote:
-> > > > > >>>Both patches look good to me, though I didn't have the time to retest
-> > > > > >>>them.
-> > > > > >>
-> > > > > >>Actually I don't even have a Blaze device anymore, so I can't really
-> > > > > >>test the second patch. :(
-> > > > > >
-> > > > > >OK no problem, I've tested it on panda es.
-> > > > > 
-> > > > > Do we have someone out-there that still own a Blaze?
-> > > > > 
-> > > > > Anyway, I'm about to send a DTS fix branch for -rc2, so I'll include
-> > > > > these two patches.
-> > > > 
-> > > > OK yes good please do pick them up, I'll drop them from my
-> > > > not-yet-pushed-out omap-for-v3.12/fixes.
-> > > 
-> > > Hmm looks like there's also some new regression in the
-> > > wl12xx driver:
-> > > 
-> > > # iwconfig wlan0
-> > > wlan0     no wireless extensions.
-> > > 
-> > > My test script was just doing:
-> > > 
-> > > # iw dev wlan0 scan
-> > > 
-> > > And that works fine. Luca, any ideas?
-> > 
-> > Have you compiled WEXT support in your kernel? iwconfig uses the
-> > (deprecated) Wireless Extensions API.  iw uses the current nl80211 API.
-> > 
-> > If you want to use iwconfig and friends you need to enable
-> > CONFIG_CFG80211_WEXT.
+On Thu, 19 Sep 2013 11:40:28 +0100
+Mark Brown <broonie@kernel.org> wrote:
+
+> On Thu, Sep 19, 2013 at 10:54:37AM +0200, Jean-Francois Moine wrote:
+> > This patch adds a simple sound codec which is described by the DT.
+> > This codec may be used when no specific codec action is needed.
 > 
-> OK thanks, I don't need to use iwconfig. Looks like the default
-> changed in commit 10bab00af (cfg80211: deprecate CFG80211_WEXT).
+> Hrm.  I'm generally not enthusiastic about this sort of thing because it
+> requires every user of the device to understand the capabilities of the
+> device instead of being able to just say they have a device of type X -
+> it seems better to type the data in once in a driver and then reference
+> it.  That said...
 
-Yeah, it's not enabled by default anymore.  And it was more than about
-time! ;)
+Well, first, the codecs hdmi and dmic have no DT support.
+Then, from the Cubox point of vue, the codec hdmi offers playback
+and capture while the Cubox has only playback (via the tda998x HDMI
+transmitter), and, also, the codec spdif transmitter has a lot of
+sample rates while the Dove audio device supports only 44.1, 48 and 96
+kHz.
 
---
-Luca.
+So, instead of adding new hdmi and spdif_transmitter codecs,
+I thought it could be useful to have a generic codec with DT support.
+
+On the other hand, as the first use of this codec is for the Cubox,
+an other solution could be to have the codec included in the kirkwood
+driver (declared by DT as either i2s or s/pdif). This would simplify
+the use or not of s/pdif in this driver.
+
+> > +Child 'capture' and 'playback' required properties:
+> > +- stream-name: name of the stream
+> 
+> What does this mean in the binding?
+
+Indeed, the stream name could be implicit (either "Playback" or
+"Capture"), but, as the users are aware of it, a more friendly
+name is nicer ("S/PDIF Playback").
+
+> > +Formats:
+> > +	"s8"
+> > +	"u8"
+> 
+> I'd cut this down to just the PCM formats for now - many of the formats
+> you list there aren't terribly well defined even within ALSA, I don't
+> think some of them have ever been used at all.  A binding document
+> should really document what things mean as well.
+
+I have no idea about which format is used or not, and there is no
+explanation about their meanings in the uapi (but I can search them..).
+
+Otherwise, for Dove, we need at least "s16_le", "s24_le" and "s32_le"
+and, perhaps, "iec958_subframe_le" and "iec958_subframe_be".
+
+So, what do you think should be the format set?
+
+> > +Rates:
+> > +	5512
+> > +	8000
+> 
+> This shouldn't be a list of defined rates, it should allow any number,
+> and it should support ranges since while some devices do enumerate
+> specific rates simpler devices often just support a continuous range of
+> rates.
+
+There cannot be any number because the rates are coded by discrete
+values in a bitmap.
+
+For the continuous range, I was thinking about the value '0' followed
+by the min and max rates. Have you any other syntax in mind?
+
+> > --- a/sound/soc/generic/Kconfig
+> > +++ b/sound/soc/generic/Kconfig
+> 
+> CODEC drivers should go in codecs.
+
+OK.
+
+> > +#define DRV_NAME "simple-codec"
+> 
+> Just write the string in the one place where it is used.
+
+OK.
+
+> > +static char *format_tb[] = {
+> > +	"s8", "u8", "s16_le", "s16_be",
+> > +	"u16_le", "u16_be", "s24_le", "s24_be",
+> > +	"u24_le", "u24_be", "s32_le", "s32_be",
+> > +	"u32_le", "u32_be", "float_le", "float_be",
+> > +
+> > +	"float64_le", "float64_be", "iec958_subframe_le", "iec958_subframe_be",
+> > +	"mu_law", "a_law", "ima_adpcm", "mpeg",
+> > +	"gsm", "", "", "",
+> > +	"", "", "", "special",
+> 
+> This seems a bit obscure and fragile - an explicit lookup table would be
+> better I think.
+
+OK.
+
+-- 
+Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
+Jef		|		http://moinejf.free.fr/
