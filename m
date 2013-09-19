@@ -1,177 +1,449 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Thu, 19 Sep 2013 14:28:08 +0200
-Subject: [PATCH v4] PWM: PXA: add device tree support to PWM driver
-In-Reply-To: <1379519982-7618-1-git-send-email-mikedunn@newsguy.com>
-References: <1379519982-7618-1-git-send-email-mikedunn@newsguy.com>
-Message-ID: <20130919122807.GH10852@ulmo>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 19 Sep 2013 13:31:03 +0100
+Subject: [PATCH 22/41] clk: ux500: Copy u8500_clk_init() ready for DT
+ enablement
+In-Reply-To: <1379506478-16625-23-git-send-email-lee.jones@linaro.org>
+References: <1379506478-16625-1-git-send-email-lee.jones@linaro.org>
+ <1379506478-16625-23-git-send-email-lee.jones@linaro.org>
+Message-ID: <20130919123103.GJ22389@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 18, 2013 at 08:59:42AM -0700, Mike Dunn wrote:
-[...]
-> Only an OF match table is added;
-[...]
+Hi Mike,
 
-That's no longer true. You also add a custom .of_xlate() function.
+Sorry for top, posting.
 
-> diff --git a/Documentation/devicetree/bindings/pwm/pxa-pwm.txt b/Documentation/devicetree/bindings/pwm/pxa-pwm.txt
-[...]
-> +Required properties:
-> +- compatible: should be one or more of:
-> +  - "marvell,pxa250-pwm"
-> +  - "marvell,pxa270-pwm"
-> +  - "marvell,pxa168-pwm"
-> +  - "marvell,pxa910-pwm"
-> +- reg: physical base address and length of the registers used by the PWM channel
-> +  NB: One device instance must be created for each PWM that is used, so the
+This one requires your attention, thanks.
 
-Nit: "NB:" looks like it starts a new property. Perhaps something like:
-
-	"Note that one device node must be present for each PWM ..."
-
-would be less confusing to the eye.
-
-> +  length covers only the register window for one PWM output, not that of the
-> +  entire PWM controller.  Currently length is 0x10 for all supported devices.
-
-So that again confuses me. If the controller really is one or two PWM
-channels, and four PWM channels, as given in the pxa27x.dtsi, are in
-fact two controllers (not four) then I wonder if this really is the
-correct binding for it.
-
-That said, Stephen seems to be okay with it, and I'll yield to his
-authority on the matter.
-
-> +- #pwm-cells: should be 1.  This cell is used to specify the period in
-
-Nit: "Should be 1." It's a sentence and therefore should start with a
-capital letter.
-
-> +  nanoseconds.  (Because one device instance is created for each PWM output,
-> +  the per-chip index is superflous and not used.)
-
-I'd omit the parentheses (and their content). The description of the
-cell is plenty specific about what it should contain. No need to list
-what it shouldn't contain.
-
-> diff --git a/arch/arm/boot/dts/pxa27x.dtsi b/arch/arm/boot/dts/pxa27x.dtsi
-
-I think this belongs in a separate patch so it can go through the
-arm-soc tree.
-
-> diff --git a/drivers/pwm/pwm-pxa.c b/drivers/pwm/pwm-pxa.c
-[...]
-> +#ifdef CONFIG_OF
-> +/*
-> + * Device tree users must create one device instance for each pwm channel.
-> + * Hence we dispense with the HAS_SECONDARY_PWM and "tell" the original driver
-> + * code that this is a single channel pxa25x-pwm.  Currently all devices are
-> + * supported identically.
-> + */
-> +static struct of_device_id pwm_of_match[] = {
-> +	{ .compatible = "marvell,pxa250-pwm", .data = &pwm_id_table[0]},
-> +	{ .compatible = "marvell,pxa270-pwm", .data = &pwm_id_table[0]},
-> +	{ .compatible = "marvell,pxa168-pwm", .data = &pwm_id_table[0]},
-> +	{ .compatible = "marvell,pxa910-pwm", .data = &pwm_id_table[0]},
-> +	{ }
-> +};
-> +MODULE_DEVICE_TABLE(of, pwm_of_match);
-> +
-> +static const struct platform_device_id *pxa_pwm_get_id_dt(struct device *dev)
-> +{
-> +	const struct of_device_id *id = of_match_device(pwm_of_match, dev);
-> +	if (id)
-> +		return (const struct platform_device_id *)id->data;
-
-Is that cast really necessary? id->data is const void *, so shouldn't
-need a cast.
-
-> +	else
-> +		return NULL;
-
-Perhaps "return id ? id->data : NULL;"?
-
-> +struct pwm_device *
-> +pxa_pwm_of_xlate(struct pwm_chip *pc, const struct of_phandle_args *args)
-
-Should be static.
-
-> +{
-> +	struct pwm_device *pwm;
-> +
-
-You probably want to check that pc->of_pwm_n_cells at least 1 here.
-
-> +	pwm = pwm_request_from_chip(pc, 0, NULL);
-> +	if (IS_ERR(pwm))
-> +		return pwm;
-> +
-> +	pwm_set_period(pwm, args->args[0]);
-> +
-> +	return pwm;
-> +}
-> +
-> +#else  /* !CONFIG_OF */
-> +static const struct platform_device_id *pxa_pwm_get_id_dt(struct device *dev)
-> +{
-> +	dev_err(dev, "missing platform data\n");
-> +	return NULL;
-> +}
-> +
-> +struct pwm_device *
-> +pxa_pwm_of_xlate(struct pwm_chip *pc, const struct of_phandle_args *args)
-> +{
-> +	return NULL;
-> +}
-> +#endif
-
-I prefer not to have these dummy implementations for static functions.
-See below...
-
->  static int pwm_probe(struct platform_device *pdev)
->  {
->  	const struct platform_device_id *id = platform_get_device_id(pdev);
-> @@ -131,6 +185,11 @@ static int pwm_probe(struct platform_device *pdev)
->  	struct resource *r;
->  	int ret = 0;
+> Here we're using the old clock initialisation function as a template.
+> It's necessary to remove all of the clk_register_clkdev() calls as
+> they don't make sense when booting with Device Tree.
+> 
+> Cc: Mike Turquette <mturquette@linaro.org>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>  drivers/clk/ux500/Makefile              |   1 +
+>  drivers/clk/ux500/u8500_of_clk.c        | 381 ++++++++++++++++++++++++++++++++
+>  include/linux/platform_data/clk-ux500.h |   3 +
+>  3 files changed, 385 insertions(+)
+>  create mode 100644 drivers/clk/ux500/u8500_of_clk.c
+> 
+> diff --git a/drivers/clk/ux500/Makefile b/drivers/clk/ux500/Makefile
+> index c6a806e..521483f 100644
+> --- a/drivers/clk/ux500/Makefile
+> +++ b/drivers/clk/ux500/Makefile
+> @@ -8,6 +8,7 @@ obj-y += clk-prcmu.o
+>  obj-y += clk-sysctrl.o
 >  
-> +	if (id == NULL)		/* using device tree */
-> +		id = pxa_pwm_get_id_dt(&pdev->dev);
+>  # Clock definitions
+> +obj-y += u8500_of_clk.o
+>  obj-y += u8500_clk.o
+>  obj-y += u9540_clk.o
+>  obj-y += u8540_clk.o
+> diff --git a/drivers/clk/ux500/u8500_of_clk.c b/drivers/clk/ux500/u8500_of_clk.c
+> new file mode 100644
+> index 0000000..ceebce6
+> --- /dev/null
+> +++ b/drivers/clk/ux500/u8500_of_clk.c
+> @@ -0,0 +1,381 @@
+> +/*
+> + * Clock definitions for u8500 platform.
+> + *
+> + * Copyright (C) 2012 ST-Ericsson SA
+> + * Author: Ulf Hansson <ulf.hansson@linaro.org>
+> + *
+> + * License terms: GNU General Public License (GPL) version 2
+> + */
+> +
+> +#include <linux/clk.h>
+> +#include <linux/clkdev.h>
+> +#include <linux/clk-provider.h>
+> +#include <linux/mfd/dbx500-prcmu.h>
+> +#include <linux/platform_data/clk-ux500.h>
+> +#include "clk.h"
+> +
+> +void u8500_of_clk_init(u32 clkrst1_base, u32 clkrst2_base, u32 clkrst3_base,
+> +		       u32 clkrst5_base, u32 clkrst6_base)
+> +{
+> +	struct prcmu_fw_version *fw_version;
+> +	const char *sgaclk_parent = NULL;
+> +	struct clk *clk;
+> +
+> +	/* Clock sources */
+> +	clk = clk_reg_prcmu_gate("soc0_pll", NULL, PRCMU_PLLSOC0,
+> +				CLK_IS_ROOT|CLK_IGNORE_UNUSED);
+> +
+> +	clk = clk_reg_prcmu_gate("soc1_pll", NULL, PRCMU_PLLSOC1,
+> +				CLK_IS_ROOT|CLK_IGNORE_UNUSED);
+> +
+> +	clk = clk_reg_prcmu_gate("ddr_pll", NULL, PRCMU_PLLDDR,
+> +				CLK_IS_ROOT|CLK_IGNORE_UNUSED);
+> +
+> +	/* FIXME: Add sys, ulp and int clocks here. */
+> +
+> +	clk = clk_register_fixed_rate(NULL, "rtc32k", "NULL",
+> +				CLK_IS_ROOT|CLK_IGNORE_UNUSED,
+> +				32768);
+> +
+> +	/* PRCMU clocks */
+> +	fw_version = prcmu_get_fw_version();
+> +	if (fw_version != NULL) {
+> +		switch (fw_version->project) {
+> +		case PRCMU_FW_PROJECT_U8500_C2:
+> +		case PRCMU_FW_PROJECT_U8520:
+> +		case PRCMU_FW_PROJECT_U8420:
+> +			sgaclk_parent = "soc0_pll";
+> +			break;
+> +		default:
+> +			break;
+> +		}
+> +	}
+> +
+> +	if (sgaclk_parent)
+> +		clk = clk_reg_prcmu_gate("sgclk", sgaclk_parent,
+> +					PRCMU_SGACLK, 0);
+> +	else
+> +		clk = clk_reg_prcmu_gate("sgclk", NULL,
+> +					PRCMU_SGACLK, CLK_IS_ROOT);
+> +
+> +	clk = clk_reg_prcmu_gate("uartclk", NULL, PRCMU_UARTCLK, CLK_IS_ROOT);
+> +
+> +	clk = clk_reg_prcmu_gate("msp02clk", NULL, PRCMU_MSP02CLK, CLK_IS_ROOT);
+> +
+> +	clk = clk_reg_prcmu_gate("msp1clk", NULL, PRCMU_MSP1CLK, CLK_IS_ROOT);
+> +
+> +	clk = clk_reg_prcmu_gate("i2cclk", NULL, PRCMU_I2CCLK, CLK_IS_ROOT);
+> +
+> +	clk = clk_reg_prcmu_gate("slimclk", NULL, PRCMU_SLIMCLK, CLK_IS_ROOT);
+> +
+> +	clk = clk_reg_prcmu_gate("per1clk", NULL, PRCMU_PER1CLK, CLK_IS_ROOT);
+> +
+> +	clk = clk_reg_prcmu_gate("per2clk", NULL, PRCMU_PER2CLK, CLK_IS_ROOT);
+> +
+> +	clk = clk_reg_prcmu_gate("per3clk", NULL, PRCMU_PER3CLK, CLK_IS_ROOT);
+> +
+> +	clk = clk_reg_prcmu_gate("per5clk", NULL, PRCMU_PER5CLK, CLK_IS_ROOT);
+> +
+> +	clk = clk_reg_prcmu_gate("per6clk", NULL, PRCMU_PER6CLK, CLK_IS_ROOT);
+> +
+> +	clk = clk_reg_prcmu_gate("per7clk", NULL, PRCMU_PER7CLK, CLK_IS_ROOT);
+> +
+> +	clk = clk_reg_prcmu_scalable("lcdclk", NULL, PRCMU_LCDCLK, 0,
+> +				CLK_IS_ROOT|CLK_SET_RATE_GATE);
+> +
+> +	clk = clk_reg_prcmu_opp_gate("bmlclk", NULL, PRCMU_BMLCLK, CLK_IS_ROOT);
+> +
+> +	clk = clk_reg_prcmu_scalable("hsitxclk", NULL, PRCMU_HSITXCLK, 0,
+> +				CLK_IS_ROOT|CLK_SET_RATE_GATE);
+> +
+> +	clk = clk_reg_prcmu_scalable("hsirxclk", NULL, PRCMU_HSIRXCLK, 0,
+> +				CLK_IS_ROOT|CLK_SET_RATE_GATE);
+> +
+> +	clk = clk_reg_prcmu_scalable("hdmiclk", NULL, PRCMU_HDMICLK, 0,
+> +				CLK_IS_ROOT|CLK_SET_RATE_GATE);
+> +
+> +	clk = clk_reg_prcmu_gate("apeatclk", NULL, PRCMU_APEATCLK, CLK_IS_ROOT);
+> +
+> +	clk = clk_reg_prcmu_gate("apetraceclk", NULL, PRCMU_APETRACECLK,
+> +				CLK_IS_ROOT);
+> +
+> +	clk = clk_reg_prcmu_gate("mcdeclk", NULL, PRCMU_MCDECLK, CLK_IS_ROOT);
+> +
+> +	clk = clk_reg_prcmu_opp_gate("ipi2cclk", NULL, PRCMU_IPI2CCLK,
+> +				CLK_IS_ROOT);
+> +
+> +	clk = clk_reg_prcmu_gate("dsialtclk", NULL, PRCMU_DSIALTCLK,
+> +				CLK_IS_ROOT);
+> +
+> +	clk = clk_reg_prcmu_gate("dmaclk", NULL, PRCMU_DMACLK, CLK_IS_ROOT);
+> +
+> +	clk = clk_reg_prcmu_gate("b2r2clk", NULL, PRCMU_B2R2CLK, CLK_IS_ROOT);
+> +
+> +	clk = clk_reg_prcmu_scalable("tvclk", NULL, PRCMU_TVCLK, 0,
+> +				CLK_IS_ROOT|CLK_SET_RATE_GATE);
+> +
+> +	clk = clk_reg_prcmu_gate("sspclk", NULL, PRCMU_SSPCLK, CLK_IS_ROOT);
+> +
+> +	clk = clk_reg_prcmu_gate("rngclk", NULL, PRCMU_RNGCLK, CLK_IS_ROOT);
+> +
+> +	clk = clk_reg_prcmu_gate("uiccclk", NULL, PRCMU_UICCCLK, CLK_IS_ROOT);
+> +
+> +	clk = clk_reg_prcmu_gate("timclk", NULL, PRCMU_TIMCLK, CLK_IS_ROOT);
+> +
+> +	clk = clk_reg_prcmu_opp_volt_scalable("sdmmcclk", NULL, PRCMU_SDMMCCLK,
+> +					100000000,
+> +					CLK_IS_ROOT|CLK_SET_RATE_GATE);
+> +
+> +	clk = clk_reg_prcmu_scalable("dsi_pll", "hdmiclk",
+> +				PRCMU_PLLDSI, 0, CLK_SET_RATE_GATE);
+> +
+> +
+> +	clk = clk_reg_prcmu_scalable("dsi0clk", "dsi_pll",
+> +				PRCMU_DSI0CLK, 0, CLK_SET_RATE_GATE);
+> +
+> +	clk = clk_reg_prcmu_scalable("dsi1clk", "dsi_pll",
+> +				PRCMU_DSI1CLK, 0, CLK_SET_RATE_GATE);
+> +
+> +	clk = clk_reg_prcmu_scalable("dsi0escclk", "tvclk",
+> +				PRCMU_DSI0ESCCLK, 0, CLK_SET_RATE_GATE);
+> +
+> +	clk = clk_reg_prcmu_scalable("dsi1escclk", "tvclk",
+> +				PRCMU_DSI1ESCCLK, 0, CLK_SET_RATE_GATE);
+> +
+> +	clk = clk_reg_prcmu_scalable("dsi2escclk", "tvclk",
+> +				PRCMU_DSI2ESCCLK, 0, CLK_SET_RATE_GATE);
+> +
+> +	clk = clk_reg_prcmu_scalable_rate("armss", NULL,
+> +				PRCMU_ARMSS, 0, CLK_IS_ROOT|CLK_IGNORE_UNUSED);
+> +
+> +	clk = clk_register_fixed_factor(NULL, "smp_twd", "armss",
+> +				CLK_IGNORE_UNUSED, 1, 2);
+> +
+> +	/*
+> +	 * FIXME: Add special handled PRCMU clocks here:
+> +	 * 1. clkout0yuv, use PRCMU as parent + need regulator + pinctrl.
+> +	 * 2. ab9540_clkout1yuv, see clkout0yuv
+> +	 */
+> +
+> +	/* PRCC P-clocks */
+> +	clk = clk_reg_prcc_pclk("p1_pclk0", "per1clk", clkrst1_base,
+> +				BIT(0), 0);
+> +
+> +	clk = clk_reg_prcc_pclk("p1_pclk1", "per1clk", clkrst1_base,
+> +				BIT(1), 0);
+> +
+> +	clk = clk_reg_prcc_pclk("p1_pclk2", "per1clk", clkrst1_base,
+> +				BIT(2), 0);
+> +
+> +	clk = clk_reg_prcc_pclk("p1_pclk3", "per1clk", clkrst1_base,
+> +				BIT(3), 0);
+> +
+> +	clk = clk_reg_prcc_pclk("p1_pclk4", "per1clk", clkrst1_base,
+> +				BIT(4), 0);
+> +
+> +	clk = clk_reg_prcc_pclk("p1_pclk5", "per1clk", clkrst1_base,
+> +				BIT(5), 0);
+> +
+> +	clk = clk_reg_prcc_pclk("p1_pclk6", "per1clk", clkrst1_base,
+> +				BIT(6), 0);
+> +
+> +	clk = clk_reg_prcc_pclk("p1_pclk7", "per1clk", clkrst1_base,
+> +				BIT(7), 0);
+> +
+> +	clk = clk_reg_prcc_pclk("p1_pclk8", "per1clk", clkrst1_base,
+> +				BIT(8), 0);
+> +
+> +	clk = clk_reg_prcc_pclk("p1_pclk9", "per1clk", clkrst1_base,
+> +				BIT(9), 0);
+> +
+> +	clk = clk_reg_prcc_pclk("p1_pclk10", "per1clk", clkrst1_base,
+> +				BIT(10), 0);
+> +
+> +	clk = clk_reg_prcc_pclk("p1_pclk11", "per1clk", clkrst1_base,
+> +				BIT(11), 0);
+> +
+> +	clk = clk_reg_prcc_pclk("p2_pclk0", "per2clk", clkrst2_base,
+> +				BIT(0), 0);
+> +
+> +	clk = clk_reg_prcc_pclk("p2_pclk1", "per2clk", clkrst2_base,
+> +				BIT(1), 0);
+> +
+> +	clk = clk_reg_prcc_pclk("p2_pclk2", "per2clk", clkrst2_base,
+> +				BIT(2), 0);
+> +
+> +	clk = clk_reg_prcc_pclk("p2_pclk3", "per2clk", clkrst2_base,
+> +				BIT(3), 0);
+> +
+> +	clk = clk_reg_prcc_pclk("p2_pclk4", "per2clk", clkrst2_base,
+> +				BIT(4), 0);
+> +
+> +	clk = clk_reg_prcc_pclk("p2_pclk5", "per2clk", clkrst2_base,
+> +				BIT(5), 0);
+> +
+> +	clk = clk_reg_prcc_pclk("p2_pclk6", "per2clk", clkrst2_base,
+> +				BIT(6), 0);
+> +
+> +	clk = clk_reg_prcc_pclk("p2_pclk7", "per2clk", clkrst2_base,
+> +				BIT(7), 0);
+> +
+> +	clk = clk_reg_prcc_pclk("p2_pclk8", "per2clk", clkrst2_base,
+> +				BIT(8), 0);
+> +
+> +	clk = clk_reg_prcc_pclk("p2_pclk9", "per2clk", clkrst2_base,
+> +				BIT(9), 0);
+> +
+> +	clk = clk_reg_prcc_pclk("p2_pclk10", "per2clk", clkrst2_base,
+> +				BIT(10), 0);
+> +
+> +	clk = clk_reg_prcc_pclk("p2_pclk11", "per2clk", clkrst2_base,
+> +				BIT(11), 0);
+> +
+> +	clk = clk_reg_prcc_pclk("p2_pclk12", "per2clk", clkrst2_base,
+> +				BIT(12), 0);
+> +
+> +	clk = clk_reg_prcc_pclk("p3_pclk0", "per3clk", clkrst3_base,
+> +				BIT(0), 0);
+> +
+> +	clk = clk_reg_prcc_pclk("p3_pclk1", "per3clk", clkrst3_base,
+> +				BIT(1), 0);
+> +
+> +	clk = clk_reg_prcc_pclk("p3_pclk2", "per3clk", clkrst3_base,
+> +				BIT(2), 0);
+> +
+> +	clk = clk_reg_prcc_pclk("p3_pclk3", "per3clk", clkrst3_base,
+> +				BIT(3), 0);
+> +
+> +	clk = clk_reg_prcc_pclk("p3_pclk4", "per3clk", clkrst3_base,
+> +				BIT(4), 0);
+> +
+> +	clk = clk_reg_prcc_pclk("p3_pclk5", "per3clk", clkrst3_base,
+> +				BIT(5), 0);
+> +
+> +	clk = clk_reg_prcc_pclk("p3_pclk6", "per3clk", clkrst3_base,
+> +				BIT(6), 0);
+> +
+> +	clk = clk_reg_prcc_pclk("p3_pclk7", "per3clk", clkrst3_base,
+> +				BIT(7), 0);
+> +
+> +	clk = clk_reg_prcc_pclk("p3_pclk8", "per3clk", clkrst3_base,
+> +				BIT(8), 0);
+> +
+> +	clk = clk_reg_prcc_pclk("p5_pclk0", "per5clk", clkrst5_base,
+> +				BIT(0), 0);
+> +
+> +	clk = clk_reg_prcc_pclk("p5_pclk1", "per5clk", clkrst5_base,
+> +				BIT(1), 0);
+> +
+> +	clk = clk_reg_prcc_pclk("p6_pclk0", "per6clk", clkrst6_base,
+> +				BIT(0), 0);
+> +
+> +	clk = clk_reg_prcc_pclk("p6_pclk1", "per6clk", clkrst6_base,
+> +				BIT(1), 0);
+> +
+> +	clk = clk_reg_prcc_pclk("p6_pclk2", "per6clk", clkrst6_base,
+> +				BIT(2), 0);
+> +
+> +	clk = clk_reg_prcc_pclk("p6_pclk3", "per6clk", clkrst6_base,
+> +				BIT(3), 0);
+> +
+> +	clk = clk_reg_prcc_pclk("p6_pclk4", "per6clk", clkrst6_base,
+> +				BIT(4), 0);
+> +
+> +	clk = clk_reg_prcc_pclk("p6_pclk5", "per6clk", clkrst6_base,
+> +				BIT(5), 0);
+> +
+> +	clk = clk_reg_prcc_pclk("p6_pclk6", "per6clk", clkrst6_base,
+> +				BIT(6), 0);
+> +
+> +	clk = clk_reg_prcc_pclk("p6_pclk7", "per6clk", clkrst6_base,
+> +				BIT(7), 0);
+> +
+> +	/* PRCC K-clocks
+> +	 *
+> +	 * FIXME: Some drivers requires PERPIH[n| to be automatically enabled
+> +	 * by enabling just the K-clock, even if it is not a valid parent to
+> +	 * the K-clock. Until drivers get fixed we might need some kind of
+> +	 * "parent muxed join".
+> +	 */
+> +
+> +	/* Periph1 */
+> +	clk = clk_reg_prcc_kclk("p1_uart0_kclk", "uartclk",
+> +			clkrst1_base, BIT(0), CLK_SET_RATE_GATE);
+> +
+> +	clk = clk_reg_prcc_kclk("p1_uart1_kclk", "uartclk",
+> +			clkrst1_base, BIT(1), CLK_SET_RATE_GATE);
+> +
+> +	clk = clk_reg_prcc_kclk("p1_i2c1_kclk", "i2cclk",
+> +			clkrst1_base, BIT(2), CLK_SET_RATE_GATE);
+> +
+> +	clk = clk_reg_prcc_kclk("p1_msp0_kclk", "msp02clk",
+> +			clkrst1_base, BIT(3), CLK_SET_RATE_GATE);
+> +
+> +	clk = clk_reg_prcc_kclk("p1_msp1_kclk", "msp1clk",
+> +			clkrst1_base, BIT(4), CLK_SET_RATE_GATE);
+> +
+> +	clk = clk_reg_prcc_kclk("p1_sdi0_kclk", "sdmmcclk",
+> +			clkrst1_base, BIT(5), CLK_SET_RATE_GATE);
+> +
+> +	clk = clk_reg_prcc_kclk("p1_i2c2_kclk", "i2cclk",
+> +			clkrst1_base, BIT(6), CLK_SET_RATE_GATE);
+> +
+> +	clk = clk_reg_prcc_kclk("p1_slimbus0_kclk", "slimclk",
+> +			clkrst1_base, BIT(8), CLK_SET_RATE_GATE);
+> +
+> +	clk = clk_reg_prcc_kclk("p1_i2c4_kclk", "i2cclk",
+> +			clkrst1_base, BIT(9), CLK_SET_RATE_GATE);
+> +
+> +	clk = clk_reg_prcc_kclk("p1_msp3_kclk", "msp1clk",
+> +			clkrst1_base, BIT(10), CLK_SET_RATE_GATE);
+> +
+> +	/* Periph2 */
+> +	clk = clk_reg_prcc_kclk("p2_i2c3_kclk", "i2cclk",
+> +			clkrst2_base, BIT(0), CLK_SET_RATE_GATE);
+> +
+> +	clk = clk_reg_prcc_kclk("p2_sdi4_kclk", "sdmmcclk",
+> +			clkrst2_base, BIT(2), CLK_SET_RATE_GATE);
+> +
+> +	clk = clk_reg_prcc_kclk("p2_msp2_kclk", "msp02clk",
+> +			clkrst2_base, BIT(3), CLK_SET_RATE_GATE);
+> +
+> +	clk = clk_reg_prcc_kclk("p2_sdi1_kclk", "sdmmcclk",
+> +			clkrst2_base, BIT(4), CLK_SET_RATE_GATE);
+> +
+> +	clk = clk_reg_prcc_kclk("p2_sdi3_kclk", "sdmmcclk",
+> +			clkrst2_base, BIT(5), CLK_SET_RATE_GATE);
+> +
+> +	/* Note that rate is received from parent. */
+> +	clk = clk_reg_prcc_kclk("p2_ssirx_kclk", "hsirxclk",
+> +			clkrst2_base, BIT(6),
+> +			CLK_SET_RATE_GATE|CLK_SET_RATE_PARENT);
+> +	clk = clk_reg_prcc_kclk("p2_ssitx_kclk", "hsitxclk",
+> +			clkrst2_base, BIT(7),
+> +			CLK_SET_RATE_GATE|CLK_SET_RATE_PARENT);
+> +
+> +	/* Periph3 */
+> +	clk = clk_reg_prcc_kclk("p3_ssp0_kclk", "sspclk",
+> +			clkrst3_base, BIT(1), CLK_SET_RATE_GATE);
+> +
+> +	clk = clk_reg_prcc_kclk("p3_ssp1_kclk", "sspclk",
+> +			clkrst3_base, BIT(2), CLK_SET_RATE_GATE);
+> +
+> +	clk = clk_reg_prcc_kclk("p3_i2c0_kclk", "i2cclk",
+> +			clkrst3_base, BIT(3), CLK_SET_RATE_GATE);
+> +
+> +	clk = clk_reg_prcc_kclk("p3_sdi2_kclk", "sdmmcclk",
+> +			clkrst3_base, BIT(4), CLK_SET_RATE_GATE);
+> +
+> +	clk = clk_reg_prcc_kclk("p3_ske_kclk", "rtc32k",
+> +			clkrst3_base, BIT(5), CLK_SET_RATE_GATE);
+> +
+> +	clk = clk_reg_prcc_kclk("p3_uart2_kclk", "uartclk",
+> +			clkrst3_base, BIT(6), CLK_SET_RATE_GATE);
+> +
+> +	clk = clk_reg_prcc_kclk("p3_sdi5_kclk", "sdmmcclk",
+> +			clkrst3_base, BIT(7), CLK_SET_RATE_GATE);
+> +
+> +	/* Periph6 */
+> +	clk = clk_reg_prcc_kclk("p3_rng_kclk", "rngclk",
+> +			clkrst6_base, BIT(0), CLK_SET_RATE_GATE);
+> +}
+> diff --git a/include/linux/platform_data/clk-ux500.h b/include/linux/platform_data/clk-ux500.h
+> index 9d98f3a..97baf83 100644
+> --- a/include/linux/platform_data/clk-ux500.h
+> +++ b/include/linux/platform_data/clk-ux500.h
+> @@ -10,6 +10,9 @@
+>  #ifndef __CLK_UX500_H
+>  #define __CLK_UX500_H
+>  
+> +void u8500_of_clk_init(u32 clkrst1_base, u32 clkrst2_base, u32 clkrst3_base,
+> +		       u32 clkrst5_base, u32 clkrst6_base);
+> +
+>  void u8500_clk_init(u32 clkrst1_base, u32 clkrst2_base, u32 clkrst3_base,
+>  		    u32 clkrst5_base, u32 clkrst6_base);
+>  void u9540_clk_init(u32 clkrst1_base, u32 clkrst2_base, u32 clkrst3_base,
 
-This could be replaced with:
-
-	if (IS_ENABLED(CONFIG_OF) && id == NULL)
-		id = pxa_pwm_get_id_dt(&pdev->dev);
-
-And pxa_pwm_get_id_dt() can be unconditionally defined. The compiler
-will automatically remove it for !OF because it is never used. Also the
-comment can then be dropped since the code is already explicit.
-
->  	pwm = devm_kzalloc(&pdev->dev, sizeof(*pwm), GFP_KERNEL);
->  	if (pwm == NULL) {
->  		dev_err(&pdev->dev, "failed to allocate memory\n");
-> @@ -145,6 +204,8 @@ static int pwm_probe(struct platform_device *pdev)
->  	pwm->chip.ops = &pxa_pwm_ops;
->  	pwm->chip.base = -1;
->  	pwm->chip.npwm = (id->driver_data & HAS_SECONDARY_PWM) ? 2 : 1;
-> +	pwm->chip.of_xlate = pxa_pwm_of_xlate;
-> +	pwm->chip.of_pwm_n_cells = 1;
-
-Similarly if you write this as:
-
-	if (IS_ENABLED(CONFIG_OF)) {
-		pwm->chip.of_xlate = pxa_pwm_of_xlate;
-		pwm->chip.of_pwm_n_cells = 1;
-	}
-
-Then the only thing that needs #ifdef CONFIG_OF protection will be the
-OF match table.
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130919/d80723d9/attachment-0001.sig>
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
