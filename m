@@ -1,64 +1,54 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Thu, 19 Sep 2013 12:12:44 -0500
-Subject: [PATCH] ARM: dts: am335x-boneblack: move fixed regulator to board
- level
-Message-ID: <1379610764-758-1-git-send-email-nm@ti.com>
+From: matt.porter@linaro.org (Matt Porter)
+Date: Thu, 19 Sep 2013 13:18:26 -0400
+Subject: [PATCH] ARM: dts: bcm11351: Use GIC/IRQ defines for sdio interrupts
+Message-ID: <1379611106-18338-1-git-send-email-matt.porter@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-3.3V fixed regulator does not belong to TPS node - as a result
-the fixed regulator is never probed and MMC is continually deferred due
-to lack of regulator.
+Trivial patch to make use of GIC/IRQ defines on the bcm11351 sdio
+interrupt properties.
 
-Move the fixed regulator to be at root of platform.
-
-Signed-off-by: Nishanth Menon <nm@ti.com>
+Signed-off-by: Matt Porter <matt.porter@linaro.org>
 ---
+ arch/arm/boot/dts/bcm11351.dtsi | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-Based on: (benoit's for_3.13/dts branch)
-https://git.kernel.org/cgit/linux/kernel/git/bcousson/linux-omap-dt.git/log/?h=for_3.13/dts
- +
-https://patchwork.kernel.org/patch/2902711/
-
-Test Log:
-before: http://pastebin.com/UuCsBg2d
-After: http://pastebin.com/149FWujf
-notice how "vmmcsd_fixed: 3300 mV " does not appear in the log before the patch.
-
- arch/arm/boot/dts/am335x-bone-common.dtsi |   14 +++++++-------
- 1 file changed, 7 insertions(+), 7 deletions(-)
-
-diff --git a/arch/arm/boot/dts/am335x-bone-common.dtsi b/arch/arm/boot/dts/am335x-bone-common.dtsi
-index 56361ce..fe2742e 100644
---- a/arch/arm/boot/dts/am335x-bone-common.dtsi
-+++ b/arch/arm/boot/dts/am335x-bone-common.dtsi
-@@ -215,6 +215,13 @@
- 			default-state = "off";
- 		};
+diff --git a/arch/arm/boot/dts/bcm11351.dtsi b/arch/arm/boot/dts/bcm11351.dtsi
+index 05a5aab..5fc64ab 100644
+--- a/arch/arm/boot/dts/bcm11351.dtsi
++++ b/arch/arm/boot/dts/bcm11351.dtsi
+@@ -71,28 +71,28 @@
+ 	sdio1: sdio at 3f180000 {
+ 		compatible = "brcm,kona-sdhci";
+ 		reg = <0x3f180000 0x10000>;
+-		interrupts = <0x0 77 0x4>;
++		interrupts = <GIC_SPI 77 IRQ_TYPE_LEVEL_HIGH>;
+ 		status = "disabled";
  	};
-+
-+	vmmcsd_fixed: fixedregulator at 0 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "vmmcsd_fixed";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+	};
- };
  
- /include/ "tps65217.dtsi"
-@@ -259,13 +266,6 @@
- 			regulator-always-on;
- 		};
+ 	sdio2: sdio at 3f190000 {
+ 		compatible = "brcm,kona-sdhci";
+ 		reg = <0x3f190000 0x10000>;
+-		interrupts = <0x0 76 0x4>;
++		interrupts = <GIC_SPI 76 IRQ_TYPE_LEVEL_HIGH>;
+ 		status = "disabled";
  	};
--
--	vmmcsd_fixed: fixedregulator at 0 {
--		compatible = "regulator-fixed";
--		regulator-name = "vmmcsd_fixed";
--		regulator-min-microvolt = <3300000>;
--		regulator-max-microvolt = <3300000>;
--	};
- };
  
- &cpsw_emac0 {
+ 	sdio3: sdio at 3f1a0000 {
+ 		compatible = "brcm,kona-sdhci";
+ 		reg = <0x3f1a0000 0x10000>;
+-		interrupts = <0x0 74 0x4>;
++		interrupts = <GIC_SPI 74 IRQ_TYPE_LEVEL_HIGH>;
+ 		status = "disabled";
+ 	};
+ 
+ 	sdio4: sdio at 3f1b0000 {
+ 		compatible = "brcm,kona-sdhci";
+ 		reg = <0x3f1b0000 0x10000>;
+-		interrupts = <0x0 73 0x4>;
++		interrupts = <GIC_SPI 73 IRQ_TYPE_LEVEL_HIGH>;
+ 		status = "disabled";
+ 	};
+ 
 -- 
-1.7.9.5
+1.8.4
