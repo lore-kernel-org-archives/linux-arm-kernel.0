@@ -1,211 +1,42 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 19 Sep 2013 22:03:43 +0200
-Subject: [PATCH] clockevents: Sanitize ticks to nsec conversion
-In-Reply-To: <alpine.DEB.2.02.1309191629040.4089@ionos.tec.linutronix.de>
-References: <20130917130153.GL26819@ludovic.desroches@atmel.com>
- <alpine.DEB.2.02.1309172228400.4089@ionos.tec.linutronix.de>
- <20130918085627.GN24802@pengutronix.de>
- <alpine.DEB.2.02.1309181058470.4089@ionos.tec.linutronix.de>
- <20130918150958.GO24802@pengutronix.de>
- <alpine.DEB.2.02.1309182201000.4089@ionos.tec.linutronix.de>
- <20130919100239.GS24802@pengutronix.de>
- <alpine.DEB.2.02.1309191207460.4089@ionos.tec.linutronix.de>
- <20130919124805.GU24802@pengutronix.de>
- <alpine.DEB.2.02.1309191629040.4089@ionos.tec.linutronix.de>
-Message-ID: <20130919200343.GV24802@pengutronix.de>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Thu, 19 Sep 2013 13:49:31 -0700
+Subject: [PATCH v6 1/5] ARM: add basic support for Trusted Foundations
+In-Reply-To: <1379238028-7960-2-git-send-email-acourbot@nvidia.com> (Alexandre
+ Courbot's message of "Sun, 15 Sep 2013 18:40:24 +0900")
+References: <1379238028-7960-1-git-send-email-acourbot@nvidia.com>
+ <1379238028-7960-2-git-send-email-acourbot@nvidia.com>
+Message-ID: <87d2o4edus.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+Alexandre Courbot <acourbot@nvidia.com> writes:
 
-On Thu, Sep 19, 2013 at 04:30:37PM +0200, Thomas Gleixner wrote:
-> Marc Kleine-Budde pointed out, that commit 77cc982 "clocksource: use
-> clockevents_config_and_register() where possible" caused a regression
-> for some of the converted subarchs.
-> 
-> The reason is, that the clockevents core code converts the minimal
-> hardware tick delta to a nanosecond value for core internal
-> usage. This conversion is affected by integer math rounding loss, so
-> the backwards conversion to hardware ticks will likely result in a
-> value which is less than the configured hardware limitation. The
-> affected subarchs used their own workaround (SIGH!) which got lost in
-> the conversion.
-> 
-> The solution for the issue at hand is simple: adding evt->mult - 1 to
-> the shifted value before the integer divison in the core conversion
-> function takes care of it. But this only works for the case where for
-> the scaled math mult/shift pair "mult <= 1 << shift" is true. For the
-> case where "mult > 1 << shift" we can apply the rounding add only for
-> the minimum delta value to make sure that the backward conversion is
-> not less than the given hardware limit. For the upper bound we need to
-> omit the rounding add, because the backwards conversion is always
-> larger than the original latch value. That would violate the upper
-> bound of the hardware device.
-> 
-> Though looking closer at the details of that function reveals another
-> bogosity: The upper bounds check is broken as well. Checking for a
-> resulting "clc" value greater than KTIME_MAX after the conversion is
-> pointless. The conversion does:
-> 
->       u64 clc = (latch << evt->shift) / evt->mult;
-> 
-> So there is no sanity check for (latch << evt->shift) exceeding the
-> 64bit boundary. The latch argument is "unsigned long", so on a 64bit
-> arch the handed in argument could easily lead to an unnoticed shift
-> overflow. With the above rounding fix applied the calculation before
-> the divison is:
-> 
->        u64 clc = (latch << evt->shift) + evt->mult - 1;
-> 
-> So we need to make sure, that neither the shift nor the rounding add
-> is overflowing the u64 boundary.
-> 
-> Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
-> Cc: Russell King - ARM Linux <linux@arm.linux.org.uk>
-> Cc: Marc Kleine-Budde <mkl@pengutronix.de>
-> Cc: nicolas.ferre at atmel.com
-> Cc: Marc Pignat <marc.pignat@hevs.ch>
-> Cc: john.stultz at linaro.org
-> Cc: kernel at pengutronix.de
-> Cc: Ronald Wahl <ronald.wahl@raritan.com>
-> Cc: LAK <linux-arm-kernel@lists.infradead.org>
-> Cc: u.kleine-koenig at pengutronix.de
-> Cc: Ludovic Desroches <ludovic.desroches@atmel.com>
-> 
-> ---
->  kernel/time/clockevents.c |   64 +++++++++++++++++++++++++++++++++++-----------
->  1 file changed, 49 insertions(+), 15 deletions(-)
-> 
-> Index: linux-2.6/kernel/time/clockevents.c
-> ===================================================================
-> --- linux-2.6.orig/kernel/time/clockevents.c
-> +++ linux-2.6/kernel/time/clockevents.c
-> @@ -33,29 +33,63 @@ struct ce_unbind {
->  	int res;
->  };
->  
-> -/**
-> - * clockevents_delta2ns - Convert a latch value (device ticks) to nanoseconds
-> - * @latch:	value to convert
-> - * @evt:	pointer to clock event device descriptor
-> - *
-> - * Math helper, returns latch value converted to nanoseconds (bound checked)
-> - */
-> -u64 clockevent_delta2ns(unsigned long latch, struct clock_event_device *evt)
-> +static u64 cev_delta2ns(unsigned long latch, struct clock_event_device *evt,
-> +			bool ismax)
->  {
->  	u64 clc = (u64) latch << evt->shift;
-> +	u64 rnd = (u64) evt->mult - 1;
->  
->  	if (unlikely(!evt->mult)) {
->  		evt->mult = 1;
->  		WARN_ON(1);
->  	}
-I suggest to move the assignment to rnd below this if block as it
-changes mult.
+> Trusted Foundations is a TrustZone-based secure monitor for ARM that
+> can be invoked using the same SMC-based API on all supported
+> platforms. This patch adds initial basic support for Trusted
+> Foundations using the ARM firmware API. Current features are limited
+> to the ability to boot secondary processors.
 
->  
-> +	/*
-> +	 * Upper bound sanity check. If the backwards conversion is
-> +	 * not equal latch, we know that the above shift overflowed.
-> +	 */
-> +	if (clc >> evt->shift) != (u64)latch)
-You didn't compile test, did you? Also the cast on the rhs isn't needed.
+[...]
 
-> +		clc = ~0ULL;
-> +
-> +	/*
-> +	 * Scaled math oddities:
-> +	 *
-> +	 * For mult <= (1 << shift) we can safely add mult - 1 to
-> +	 * prevent integer rounding loss. So the backwards conversion
-It doesn't prevent inexactness to add mult - 1. It (only) asserts that
-the ns2delta(delta2ns(latch)) >= latch instead of ... <= latch when not
-doing it.
-
-> +	 * from nsec to device ticks will be correct.
-> +	 *
-> +	 * For mult > (1 << shift), i.e. device frequency is > 1GHz we
-> +	 * need to be careful. Adding mult - 1 will result in a value
-> +	 * which when converted back to device ticks will be larger
-s/will/can/
-
-> +	 * than latch by (mult / (1 << shift)) - 1. For the min_delta
-s/by/by up to/
-
-> +	 * calculation we still want to apply this in order to stay
-> +	 * above the minimum device ticks limit. For the upper limit
-> +	 * we would end up with a latch value larger than the upper
-> +	 * limit of the device, so we omit the add to stay below the
-> +	 * device upper boundary.
-> +	 *
-> +	 * Also omit the add if it would overflow the u64 boundary.
-> +	 */
-> +	if ((~0ULL - clc > rnd) &&
-> +	    (!ismax || evt->mult <= (1U << evt->shift)))
-> +		clc += rnd;
-I would expect that
-
-	if (!ismax)
-		if (~0ULL - clc > rnd)
-			clc += rnd;
-		else
-			clc = ~0ULL;
-
-is enough (and a tad more exact in the presence of an overflow). I have
-to think about that though.
-
-> +
->  	do_div(clc, evt->mult);
-> -	if (clc < 1000)
-> -		clc = 1000;
-> -	if (clc > KTIME_MAX)
-> -		clc = KTIME_MAX;
->  
-> -	return clc;
-> +	/* Deltas less than 1usec are pointless noise */
-> +	return clc > 1000 ? clc : 1000;
-> +}
-> +
-> +/**
-> + * clockevents_delta2ns - Convert a latch value (device ticks) to nanoseconds
-> + * @latch:	value to convert
-> + * @evt:	pointer to clock event device descriptor
-> + *
-> + * Math helper, returns latch value converted to nanoseconds (bound checked)
-> + */
-> +u64 clockevent_delta2ns(unsigned long latch, struct clock_event_device *evt)
+> +#if IS_ENABLED(CONFIG_OF)
+> +void of_register_trusted_foundations(void)
 > +{
-> +	return cev_delta2ns(latch, evt, false);
-Hmm, I wonder if you need to be more clever in the general case. So you
-still may return a value > max_delta_ticks here if latch is big enough.
-But see below ...
+> +	struct device_node *node;
+> +	struct trusted_foundations_platform_data pdata;
+> +	int err;
+> +
+> +	node = of_find_compatible_node(NULL, NULL, "tl,trusted-foundations");
+> +	if (!node)
+> +		return;
+> +
+> +	err = of_property_read_u32(node, "version-major", &pdata.version_major);
+> +	if (err != 0)
+> +		panic("Trusted Foundation: missing version-major property\n");
 
->  }
->  EXPORT_SYMBOL_GPL(clockevent_delta2ns);
->  
-> @@ -380,8 +414,8 @@ void clockevents_config(struct clock_eve
->  		sec = 600;
->  
->  	clockevents_calc_mult_shift(dev, freq, sec);
-> -	dev->min_delta_ns = clockevent_delta2ns(dev->min_delta_ticks, dev);
-> -	dev->max_delta_ns = clockevent_delta2ns(dev->max_delta_ticks, dev);
-> +	dev->min_delta_ns = cev_delta2ns(dev->min_delta_ticks, dev, false);
-> +	dev->max_delta_ns = cev_delta2ns(dev->max_delta_ticks, dev, true);
-Another improvement that came to my mind just now. For min_delta_ns you
-want to assert that it results in a value >= min_delta_ticks when
-converted back. For max_delta_ns you want ... value <= max_delta_ticks.
-What about the values in between? They for sure should land in
-[min_delta_ticks ... max_delta_ticks] when converted back and ideally
-should be most exact. The latter part would mean to add (rnd / 2)
-instead of rnd. I don't know yet how that would behave@the borders of
-the [min_delta_ns ... max_delta_ns] interval, but I think you still need
-to special-case that.
+Do really need to panic() the whole kernel for a missing property?
+Surely this can more gracefully recover, or assume some defaults?  
 
-Best regards
-Uwe
+Same comment for the other uses of panic() in this patch.
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Kevin
