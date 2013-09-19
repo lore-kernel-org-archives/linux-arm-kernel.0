@@ -1,44 +1,41 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Thu, 19 Sep 2013 22:39:00 +0100
-Subject: [PATCH 14/51] DMA-API: net: b43: replace
- dma_set_mask()+dma_set_coherent_mask() with new helper
+Date: Thu, 19 Sep 2013 22:58:03 +0100
+Subject: [PATCH 33/51] DMA-API: net: nxp/lpc_eth: use
+ dma_coerce_mask_and_coherent()
 In-Reply-To: <20130919212235.GD12758@n2100.arm.linux.org.uk>
 References: <20130919212235.GD12758@n2100.arm.linux.org.uk>
-Message-ID: <E1VMlwC-0007gl-Ez@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1VMmEd-0007jF-19@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replace the following sequence:
-
-	dma_set_mask(dev, mask);
-	dma_set_coherent_mask(dev, mask);
-
-with a call to the new helper dma_set_mask_and_coherent().
+The code sequence:
+	pldat->pdev->dev.coherent_dma_mask = 0xFFFFFFFF;
+	pldat->pdev->dev.dma_mask = &pldat->pdev->dev.coherent_dma_mask;
+bypasses the architectures check on the DMA mask.  It can be replaced
+with dma_coerce_mask_and_coherent(), avoiding the direct initialization
+of this mask.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/net/wireless/b43/dma.c |    9 +++------
- 1 files changed, 3 insertions(+), 6 deletions(-)
+ drivers/net/ethernet/nxp/lpc_eth.c |    6 ++++--
+ 1 files changed, 4 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/net/wireless/b43/dma.c b/drivers/net/wireless/b43/dma.c
-index c51d2dc..1d7982a 100644
---- a/drivers/net/wireless/b43/dma.c
-+++ b/drivers/net/wireless/b43/dma.c
-@@ -1065,12 +1065,9 @@ static int b43_dma_set_mask(struct b43_wldev *dev, u64 mask)
- 	/* Try to set the DMA mask. If it fails, try falling back to a
- 	 * lower mask, as we can always also support a lower one. */
- 	while (1) {
--		err = dma_set_mask(dev->dev->dma_dev, mask);
--		if (!err) {
--			err = dma_set_coherent_mask(dev->dev->dma_dev, mask);
--			if (!err)
--				break;
--		}
-+		err = dma_set_mask_and_coherent(dev->dev->dma_dev, mask);
-+		if (!err)
-+			break;
- 		if (mask == DMA_BIT_MASK(64)) {
- 			mask = DMA_BIT_MASK(32);
- 			fallback = true;
+diff --git a/drivers/net/ethernet/nxp/lpc_eth.c b/drivers/net/ethernet/nxp/lpc_eth.c
+index a061b93..ba3ca18 100644
+--- a/drivers/net/ethernet/nxp/lpc_eth.c
++++ b/drivers/net/ethernet/nxp/lpc_eth.c
+@@ -1399,8 +1399,10 @@ static int lpc_eth_drv_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	if (pldat->dma_buff_base_v == 0) {
+-		pldat->pdev->dev.coherent_dma_mask = 0xFFFFFFFF;
+-		pldat->pdev->dev.dma_mask = &pldat->pdev->dev.coherent_dma_mask;
++		ret = dma_coerce_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(32));
++		if (ret)
++			goto err_out_free_irq;
++
+ 		pldat->dma_buff_size = PAGE_ALIGN(pldat->dma_buff_size);
+ 
+ 		/* Allocate a chunk of memory for the DMA ethernet buffers
 -- 
 1.7.4.4
