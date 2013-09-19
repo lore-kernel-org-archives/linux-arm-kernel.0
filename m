@@ -1,84 +1,59 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Thu, 19 Sep 2013 16:24:19 +0300
-Subject: [RFC PATCH 15/15] arm: dts: dra7: add sata node
-In-Reply-To: <1379595943-14622-1-git-send-email-rogerq@ti.com>
-References: <1379595943-14622-1-git-send-email-rogerq@ti.com>
-Message-ID: <1379597059-15405-1-git-send-email-rogerq@ti.com>
+From: jiri.prchal@aksignal.cz (=?UTF-8?B?SmnFmcOtIFByY2hhbA==?=)
+Date: Thu, 19 Sep 2013 15:24:54 +0200
+Subject: [PATCH] at91: mmc: fix missing pinctrl in dt
+In-Reply-To: <523AFA48.80606@atmel.com>
+References: <1379411857-18516-1-git-send-email-jiri.prchal@aksignal.cz>
+ <1379411857-18516-2-git-send-email-jiri.prchal@aksignal.cz>
+ <523AFA48.80606@atmel.com>
+Message-ID: <523AFB26.9030701@aksignal.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Balaji T K <balajitk@ti.com>
+OK.
 
-Add support for sata controller.
-
-[Roger Q] Clean up.
-
-CC: Benoit Cousson <bcousson@baylibre.com>
-Signed-off-by: Balaji T K <balajitk@ti.com>
-Signed-off-by: Roger Quadros <rogerq@ti.com>
----
- arch/arm/boot/dts/dra7.dtsi |   49 +++++++++++++++++++++++++++++++++++++++++++
- 1 files changed, 49 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
-index ce9a0f0..545545d 100644
---- a/arch/arm/boot/dts/dra7.dtsi
-+++ b/arch/arm/boot/dts/dra7.dtsi
-@@ -426,6 +426,55 @@
- 			dma-names = "tx", "rx";
- 		};
- 
-+		omap_control_sata: control-phy at 4a002374 {
-+			compatible = "ti,control-phy-pipe3";
-+			reg = <0x4a002374 0x4>;
-+			reg-names = "power";
-+			clocks = <&sys_clkin1>;
-+			clock-names = "sysclk";
-+		};
-+
-+		ocp2scp3: ocp2scp3 at 4a090000 {
-+			compatible = "ti,omap-ocp2scp";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			ranges;
-+			ti,hwmods = "ocp2scp3";
-+			reg = <0x4a090000 0x1f>; /* ocp2scp3 */
-+			reg-names = "ocp2scp3";
-+			sata_phy: sataphy at 4A096000 {
-+				compatible = "ti,phy-pipe3-sata";
-+				reg = <0x4A096000 0x80>, /* phy_rx */
-+				      <0x4A096400 0x64>, /* phy_tx */
-+				      <0x4A096800 0x40>; /* pll_ctrl */
-+				reg-names = "phy_rx", "phy_tx", "pll_ctrl";
-+				ctrl-module = <&omap_control_sata>;
-+				clocks = <&sata_ref_clk>,
-+					 <&sys_clkin1>;
-+				clock-names = "optclk", "sysclk";
-+				#phy-cells = <0>;
-+			};
-+		};
-+
-+		sata: sata at 4a141100 {
-+			compatible = "ti,sata";
-+			ti,hwmods = "sata";
-+			reg = <0x4a141100 0x7>;
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			ranges;
-+			dwc-ahci at 4a140000 {
-+				  compatible = "snps,dwc-ahci";
-+				  reg = <0x4a140000 0x1100>;
-+				  interrupts = <0 54 0x4>;
-+				  phys = <&sata_phy>;
-+				  phy-names = "sata-phy";
-+				  clocks = <&sata_ref_clk>;
-+				  clock-names = "optclk";
-+			};
-+		};
-+
-+
- 		mcspi1: spi at 48098000 {
- 			compatible = "ti,omap4-mcspi";
- 			reg = <0x48098000 0x200>;
--- 
-1.7.4.1
+Dne 19.9.2013 15:21, Nicolas Ferre napsal(a):
+> On 17/09/2013 11:57, Jiri Prchal :
+>> This patch adds pinctrl to soc dtsi file.
+>>
+>> Signed-off-by: Jiri Prchal <jiri.prchal@aksignal.cz>
+>
+>
+> Jiri,
+>
+> I will rework your patch by splitting the two lines. This will allow us to be consistent with other AT91 SoC/boards
+> Device Tree descriptions.
+>
+> +        pinctrl-names = "default";
+>
+> This one is going in the SoC file, like you did.
+>
+> +        pinctrl-0 = <&pinctrl_mmc0_slot0_clk_cmd_dat0>;
+>
+> This one is under the responsibility of the board itself. The reason behind this is that the dat0 line can be
+> multiplexed on another pin.
+>
+> So, if you need a particular pinctrl configuration on the board side, please send another patch for this addition.
+>
+> Thanks bye,
+>
+>
+>> ---
+>>   arch/arm/boot/dts/at91sam9x5.dtsi |    2 ++
+>>   1 file changed, 2 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
+>> index cf78ac0..c5d26b0 100644
+>> --- a/arch/arm/boot/dts/at91sam9x5.dtsi
+>> +++ b/arch/arm/boot/dts/at91sam9x5.dtsi
+>> @@ -556,6 +556,8 @@
+>>                   interrupts = <12 IRQ_TYPE_LEVEL_HIGH 0>;
+>>                   dmas = <&dma0 1 AT91_DMA_CFG_PER_ID(0)>;
+>>                   dma-names = "rxtx";
+>> +                pinctrl-names = "default";
+>> +                pinctrl-0 = <&pinctrl_mmc0_slot0_clk_cmd_dat0>;
+>>                   #address-cells = <1>;
+>>                   #size-cells = <0>;
+>>                   status = "disabled";
+>>
+>
+>
