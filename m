@@ -1,48 +1,83 @@
-From: jiri.prchal@aksignal.cz (Jiri Prchal)
-Date: Thu, 19 Sep 2013 14:33:36 +0200
-Subject: [PATCH] at91: serial: sam9g25: add usart3 to dtsi
-Message-ID: <1379594016-9408-1-git-send-email-jiri.prchal@aksignal.cz>
+From: matt.porter@linaro.org (Matt Porter)
+Date: Thu, 19 Sep 2013 08:40:44 -0400
+Subject: [PATCH] ARM: dts: add initial VF610 Cosmic/Cosmic+ board support
+Message-ID: <1379594444-11268-1-git-send-email-matt.porter@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hope it should be in g25 because not all x5 socs have usart3.
+Add initial PHYTEC VF610 Cosmic/Cosmic+ board support with
+UART and FEC enabled.
 
-Signed-off-by: Jiri Prchal <jiri.prchal@aksignal.cz>
+Signed-off-by: Matt Porter <matt.porter@linaro.org>
 ---
- arch/arm/boot/dts/at91sam9g25.dtsi |   14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+ arch/arm/boot/dts/Makefile         |  1 +
+ arch/arm/boot/dts/vf610-cosmic.dts | 46 ++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 47 insertions(+)
+ create mode 100644 arch/arm/boot/dts/vf610-cosmic.dts
 
-diff --git a/arch/arm/boot/dts/at91sam9g25.dtsi b/arch/arm/boot/dts/at91sam9g25.dtsi
-index b4ec6fe..ba0966f 100644
---- a/arch/arm/boot/dts/at91sam9g25.dtsi
-+++ b/arch/arm/boot/dts/at91sam9g25.dtsi
-@@ -12,6 +12,10 @@
- 	model = "Atmel AT91SAM9G25 SoC";
- 	compatible = "atmel,at91sam9g25", "atmel,at91sam9x5";
- 
-+	aliases {
-+		serial4 = &usart3;
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index cc0f1fb..b0d6156 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -142,6 +142,7 @@ dtb-$(CONFIG_ARCH_MXC) += \
+ 	imx6q-sbc6x.dtb \
+ 	imx6q-wandboard.dtb \
+ 	imx6sl-evk.dtb \
++	vf610-cosmic.dtb \
+ 	vf610-twr.dtb
+ dtb-$(CONFIG_ARCH_MXS) += imx23-evk.dtb \
+ 	imx23-olinuxino.dtb \
+diff --git a/arch/arm/boot/dts/vf610-cosmic.dts b/arch/arm/boot/dts/vf610-cosmic.dts
+new file mode 100644
+index 0000000..c3bd4d4f
+--- /dev/null
++++ b/arch/arm/boot/dts/vf610-cosmic.dts
+@@ -0,0 +1,46 @@
++/*
++ * Copyright 2013 Freescale Semiconductor, Inc.
++ * Copyright 2013 Linaro Limited
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ */
++
++/dts-v1/;
++#include "vf610.dtsi"
++
++/ {
++	model = "PHYTEC Cosmic/Cosmic+ Board";
++	compatible = "phytec,vf610-cosmic", "fsl,vf610";
++
++	chosen {
++		bootargs = "console=ttyLP1,115200";
 +	};
 +
- 	ahb {
- 		apb {
- 			pinctrl at fffff400 {
-@@ -23,6 +27,16 @@
- 				       0x003fffff 0x003f8000 0x00000000  /* pioD */
- 				      >;
- 			};
++	memory {
++		reg = <0x80000000 0x10000000>;
++	};
 +
-+			usart3: serial at f8028000 {
-+				compatible = "atmel,at91sam9260-usart";
-+				reg = <0xf8028000 0x200>;
-+				interrupts = <8 IRQ_TYPE_LEVEL_HIGH 5>;
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_usart3>;
-+				status = "disabled";
-+			};
++	clocks {
++		enet_ext {
++			compatible = "fixed-clock";
++			clock-frequency = <50000000>;
++		};
++	};
 +
- 		};
- 	};
- };
++};
++
++&uart1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_uart1_1>;
++	status = "okay";
++};
++
++&fec1 {
++	phy-mode = "rmii";
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_fec1_1>;
++	status = "okay";
++};
 -- 
-1.7.9.5
+1.8.4
