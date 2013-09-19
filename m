@@ -1,107 +1,31 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 19 Sep 2013 12:02:39 +0200
-Subject: [PATCH] clockevents: Sanitize ticks to nsec conversion
-In-Reply-To: <alpine.DEB.2.02.1309182201000.4089@ionos.tec.linutronix.de>
-References: <1379077365-18458-1-git-send-email-mkl@pengutronix.de>
- <20130917095600.GJ26819@ludovic.desroches@atmel.com>
- <20130917100417.GQ12758@n2100.arm.linux.org.uk>
- <alpine.DEB.2.02.1309171210450.4089@ionos.tec.linutronix.de>
- <20130917130153.GL26819@ludovic.desroches@atmel.com>
- <alpine.DEB.2.02.1309172228400.4089@ionos.tec.linutronix.de>
- <20130918085627.GN24802@pengutronix.de>
- <alpine.DEB.2.02.1309181058470.4089@ionos.tec.linutronix.de>
- <20130918150958.GO24802@pengutronix.de>
- <alpine.DEB.2.02.1309182201000.4089@ionos.tec.linutronix.de>
-Message-ID: <20130919100239.GS24802@pengutronix.de>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Thu, 19 Sep 2013 12:10:34 +0200
+Subject: [PATCH v3 RFT 1/2] init/do_mounts.c: ignore final \n in
+ name_to_dev_t
+In-Reply-To: <1379546942-22344-2-git-send-email-sebastian.capella@linaro.org>
+References: <1379546942-22344-1-git-send-email-sebastian.capella@linaro.org>
+ <1379546942-22344-2-git-send-email-sebastian.capella@linaro.org>
+Message-ID: <20130919101034.GD19346@amd.pavel.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Thomas,
-
-On Thu, Sep 19, 2013 at 12:01:25AM +0200, Thomas Gleixner wrote:
-> On Wed, 18 Sep 2013, Uwe Kleine-K?nig wrote:
-> > On Wed, Sep 18, 2013 at 11:38:07AM +0200, Thomas Gleixner wrote:
-> > > On Wed, 18 Sep 2013, Uwe Kleine-K?nig wrote:
-> > > > Another doubt I have is: You changed clockevent_delta2ns to round up now
-> > > > unconditionally. For the numbers on at91 that doesn't matter, but I
-> > > > wonder if there are situations that make the timer core violate the
-> > > > max_delta_ticks condition now.
-> > > 
-> > > And how so? The + (mult - 1) ensures, that the conversion back to
-> > > ticks results in the same value as latch. So how should it violate
-> > > the max boundary?
-> > That is wrong:
-> > With max_delta_ticks << shift = n * mult - k for k in [0 .. mult-1] and
-> > an integer n:
-> > 
-> > 	  (max_delta_ns * mult) >> shift
-> > 	= ((((max_delta_ticks << shift) + mult - 1) / mult) * mult) >> shift
-> > 	= (((n * mult - k + mult - 1) / mult) * mult) >> shift
-> > 	= n * mult >> shift
-> > 	= ((max_delta_ticks << shift) + k) >> shift
-> > 	= max_delta_ticks + (k >> shift)
-> > 
-> > k >> shift is only known to be zero if mult <= 1 << shift (i.e. the same
-> > condition as above where your 64bit overflow detection is wrong). So
-> > this can result in values > max_delta_ticks.
+On Wed 2013-09-18 16:29:01, Sebastian Capella wrote:
+> Enhance name_to_dev_t to handle trailing newline characters
+> on device paths.  Some inputs to name_to_dev_t may come from
+> userspace where oftentimes a '\n' is appended to the path.
+> Added const to the name buffer in both the function
+> declaration and the prototype to reflect input buffer
+> handling.
 > 
-> Right, should have waited for coffee actually activating the right
-> brain cells.
+> By handling trailing newlines in name_to_dev_t, userspace
+> buffers may be directly passed to name_to_dev_t without
+> modification.
 > 
-> So the rounding thing works nicely for mult <= (1 << sft). For the
-> other cases the conversion is wrong by (mult / (1 << sft)) - 1. So for
-> a 3 GHz clock it's off by 2. That's not an issue for the min value,
-> but for the max value it might overflow the hardware limit. Not a real
-> functional issue as we'd just get a pointless short interrupt, but for
-> correctness reasons and for the sake of NOHZ we need to fix that.
-Well, you're assuming here that this is how the hardware reacts. Might
-be worse. But we're on the same side here, it should be fixed.
- 
-> There is no real correct solution for these cases, which will result
-> in a correct backwards conversion. We could validate against the max
-> delta ticks in program_event, but that adds another boundary check to
-> the hotpath so I rather want to avoid it.
-> 
-> The simple solution is to check for the following in the conversion
-> routine:
-> 
->     if (latch == dev->min_delta_ticks || dev->mult <= (1 << dev->sft))
->        clc += mult - 1
-I didn't do the necessary math, but I wouldn't be surprised if you'd
-need to check for
+> Signed-off-by: Sebastian Capella <sebastian.capella@linaro.org>
+> Cc: Pavel Machek <pavel@ucw.cz>
 
-	latch <= dev->min_delta_ticks + n
-
-for some non-negative n.
-
-Another simple solution is to apply the uprounding only for
-min_delta_ticks -> min_delta_ns conversion, but not for the
-max_delta_ticks -> max_delta_ns conversion. For the first you have to
-guarantee not to yield lower values so round up, for the latter you must
-not pass on bigger values so round down.
- 
-> That ensures, that we never violate the lower boundary independent of
-> the mult/sft relation. For the max_delta_ticks conversion in the "mult
-> > (1 << sft)" case we end up with a slightly smaller value, but well
-> inside the boundaries and close enough to the hardware limitations.
-Yeah, probably it's not worth to calculate the optimal value (actually
-for both limits). Anyhow, I will check that on my next shopping tour :-)
- 
-> Versus the 64bit overflow check, we need to be even more careful. We
-> need to check for overflowing (1 << 63) - 1 (i.e. the max positive
-> value which fits into a s64). See clockevents_program_event().
-That is because you interpret times < 0 as in the past, right? But note
-that the interim result we're talking about here is still to be divided
-by evt->mult. So assuming mult > 1, that check is too strict unless you
-move it below the do_div in clockevent_delta2ns. For sure it makes sense
-to use the same value for a and b in the handling:
-
-	if (calculatedval overflows a)
-		calculatedval = b
-
-Best regards
-Uwe
+Reviewed-by: Pavel Machek <pavel@ucw.cz>
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
