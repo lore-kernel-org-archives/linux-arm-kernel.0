@@ -1,51 +1,38 @@
 From: nm@ti.com (Nishanth Menon)
-Date: Fri, 20 Sep 2013 14:10:03 -0500
-Subject: [RFC PATCH] ARM: OMAP3630: Add generic machine descriptor
-In-Reply-To: <20130920174228.GK18721@radagast>
-References: <1379693332-10585-1-git-send-email-nm@ti.com>
- <CAOesGMj6G7LeYUJsGpZHxKOjiNrk+1U55QFqcQyTb6_Co+n4zQ@mail.gmail.com>
- <20130920162329.GC18721@radagast>
- <CAOesGMiru=RUHS4XKLL=DC+hxtAJqtcjgd5hPbaccnAfEZ3y0g@mail.gmail.com>
- <20130920174228.GK18721@radagast>
-Message-ID: <523C9D8B.2000701@ti.com>
+Date: Fri, 20 Sep 2013 14:11:32 -0500
+Subject: [PATCH 1/1] ARM: dts: am335x-bone-common: correct mux mode for
+ mmc1_cmd
+In-Reply-To: <1379698696-21945-1-git-send-email-balajitk@ti.com>
+References: <1379698696-21945-1-git-send-email-balajitk@ti.com>
+Message-ID: <523C9DE4.6040109@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/20/2013 12:42 PM, Felipe Balbi wrote:
-> Hi,
+On 09/20/2013 12:38 PM, Balaji T K wrote:
+> correct mux mode for mmc1_cmd to detect eMMC on bone-black
 > 
-> On Fri, Sep 20, 2013 at 10:16:48AM -0700, Olof Johansson wrote:
->>> On Fri, Sep 20, 2013 at 09:19:02AM -0700, Olof Johansson wrote:
->>>> On Fri, Sep 20, 2013 at 9:08 AM, Nishanth Menon <nm@ti.com> wrote:
->>>>> An alternative approach may be to (for all SoCs):
->>>>> 1. define every SoC entry - ti,omap3430 ti,omap3630...
->>>>> 2. have a generic omap3_init which uses "if (of_machine_is_compatible("ti,omap3630"))"
->>>>> to invoke the appropriate omap3xxx_init_early.
->>>>
->>>> Yes, this would be better, but you can do add a DT_MACHINE as in this
->>>> patch but have ti,omap3630 as the dt_compat table. Then there's no
->>>> need to add runtime checks.
->>>
->>> I was going to reply that adding of_machine_is_compatible("ti,omap3630")
->>> would help in some situations, but guess it's already tainted ;-)
->>
->> Oh, if it's just a few checks, then by all means go down that route. I
->> didn't look at the code to see how much it would be.
->>
->> But if a new DT_MACHINE is added, then it should definitely be based
->> on ti,omap3630 instead of listing all the boards.
-This was more in the direction I was hoping to go.
-
+> Signed-off-by: Balaji T K <balajitk@ti.com>
+> ---
+>  arch/arm/boot/dts/am335x-bone-common.dtsi |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
 > 
-> the idea was to CPU compatible property to conditionally enable known
-> erratas workarounds. In some cases, Revision register can't be trusted,
-> so instead of creating per-errata DT properties (since that'd be
-> describing the SW, in a way), I thought of using
-> of_machine_is_compatible() checks, but that assumes CPU compatible is
-> "correct".
-I think the quirk handling is part of what Tony is attempting, and the
-definition of these might help, I think..
-
+> diff --git a/arch/arm/boot/dts/am335x-bone-common.dtsi b/arch/arm/boot/dts/am335x-bone-common.dtsi
+> index 56361ce..90ab56c 100644
+> --- a/arch/arm/boot/dts/am335x-bone-common.dtsi
+> +++ b/arch/arm/boot/dts/am335x-bone-common.dtsi
+> @@ -117,7 +117,7 @@
+>  		emmc_pins: pinmux_emmc_pins {
+>  			pinctrl-single,pins = <
+>  				0x80 (PIN_INPUT_PULLUP | MUX_MODE2) /* gpmc_csn1.mmc1_clk */
+> -				0x84 (PIN_INPUT_PULLUP | MUX_MODE1) /* gpmc_csn2.mmc1_cmd */
+> +				0x84 (PIN_INPUT_PULLUP | MUX_MODE2) /* gpmc_csn2.mmc1_cmd */
+>  				0x00 (PIN_INPUT_PULLUP | MUX_MODE1) /* gpmc_ad0.mmc1_dat0 */
+>  				0x04 (PIN_INPUT_PULLUP | MUX_MODE1) /* gpmc_ad1.mmc1_dat1 */
+>  				0x08 (PIN_INPUT_PULLUP | MUX_MODE1) /* gpmc_ad2.mmc1_dat2 */
+> 
+is'nt this a common change? why is it "black only"? if it is so, then
+the pinmux should probably be spun off outside bone-common.dtsi into
+boneblack.dtsi perhaps?
 
 -- 
 Regards,
