@@ -1,70 +1,89 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 20 Sep 2013 20:46:47 +0200
-Subject: [PATCH 0/4] ARM: NEON based fast(er) AES in CBC/CTR/XTS modes
-Message-ID: <1379702811-8025-1-git-send-email-ard.biesheuvel@linaro.org>
+Date: Fri, 20 Sep 2013 20:46:50 +0200
+Subject: [PATCH 3/4] ARM: move AES typedefs and function prototypes to
+ separate header
+In-Reply-To: <1379702811-8025-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1379702811-8025-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1379702811-8025-4-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This implementation of the AES algorithm gives around 45% speedup on Cortex-A15
-for CTR mode and for XTS in encryption mode. Both CBC and XTS in decryption mode
-are slightly faster (5 - 10% on Cortex-A15). [As CBC in encryption mode can only
-be performed sequentially, there is no speedup in this case.]
+Put the struct definitions for AES keys and the asm function prototypes in a
+separate header and export the asm functions from the module.
+This allows other drivers to use them directly.
 
-Unlike the core AES cipher (on which this module also depends), this algorithm
-uses bit slicing to process up to 8 blocks in parallel in constant time. This
-algorithm does not rely on any lookup tables so it is believed to be
-invulnerable to cache timing attacks.
-
-The core code has been adopted from the OpenSSL project (in collaboration
-with the original author, on cc). For ease of maintenance, this version is
-identical to the upstream OpenSSL code, i.e., all modifications that were
-required to make it suitable for inclusion into the kernel have already been
-merged upstream.
-
-This code passes the builtin test 'modprobe tcrypt.ko mode=10' in both ARM and
-Thumb-2 modes.
-
-Note to reviewers:
-Reviewing the file aesbs-core.S may be a bit overwhelming, so if there are any
-questions or concerns, please refer to the link below. This is the original Perl
-script that gets called by OpenSSL's build system during their build to generate
-the .S file on the fly. [In the case of OpenSSL, this is used in some cases to
-target different assemblers or ABIs]. This arrangement is not suitable (or 
-required) for the kernel, so I have taken the generated .S file instead.
-
-http://git.openssl.org/gitweb/?p=openssl.git;f=crypto/aes/asm/bsaes-armv7.pl;a=blob
-
-
-Note to integrators:
-While this implementation is significantly faster, especially in CTR mode, it is
-unclear whether the net impact on power efficiency is favorable or not, so
-please refrain from making any assumptions to that effect.
-
-
-Ard Biesheuvel (4):
-  crypto: create generic version of ablk_helper
-  ARM: pull in <asm/simd.h> from asm-generic
-  ARM: move AES typedefs and function prototypes to separate header
-  ARM: add support for bit sliced AES using NEON instructions
-
- arch/arm/crypto/Makefile     |    6 +-
- arch/arm/crypto/aes_glue.c   |   22 +-
- arch/arm/crypto/aes_glue.h   |   19 +
- arch/arm/crypto/aesbs-core.S | 2603 ++++++++++++++++++++++++++++++++++++++++++
- arch/arm/crypto/aesbs-glue.c |  449 ++++++++
- arch/arm/include/asm/Kbuild  |    1 +
- crypto/Kconfig               |   20 +
- crypto/Makefile              |    1 +
- crypto/ablk_helper.c         |  150 +++
- include/asm-generic/simd.h   |   14 +
- include/crypto/ablk_helper.h |   31 +
- 11 files changed, 3298 insertions(+), 18 deletions(-)
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ arch/arm/crypto/aes_glue.c | 22 ++++++----------------
+ arch/arm/crypto/aes_glue.h | 19 +++++++++++++++++++
+ 2 files changed, 25 insertions(+), 16 deletions(-)
  create mode 100644 arch/arm/crypto/aes_glue.h
- create mode 100644 arch/arm/crypto/aesbs-core.S
- create mode 100644 arch/arm/crypto/aesbs-glue.c
- create mode 100644 crypto/ablk_helper.c
- create mode 100644 include/asm-generic/simd.h
- create mode 100644 include/crypto/ablk_helper.h
 
+diff --git a/arch/arm/crypto/aes_glue.c b/arch/arm/crypto/aes_glue.c
+index 59f7877..3003fa1 100644
+--- a/arch/arm/crypto/aes_glue.c
++++ b/arch/arm/crypto/aes_glue.c
+@@ -6,22 +6,12 @@
+ #include <linux/crypto.h>
+ #include <crypto/aes.h>
+ 
+-#define AES_MAXNR 14
++#include "aes_glue.h"
+ 
+-typedef struct {
+-	unsigned int rd_key[4 *(AES_MAXNR + 1)];
+-	int rounds;
+-} AES_KEY;
+-
+-struct AES_CTX {
+-	AES_KEY enc_key;
+-	AES_KEY dec_key;
+-};
+-
+-asmlinkage void AES_encrypt(const u8 *in, u8 *out, AES_KEY *ctx);
+-asmlinkage void AES_decrypt(const u8 *in, u8 *out, AES_KEY *ctx);
+-asmlinkage int private_AES_set_decrypt_key(const unsigned char *userKey, const int bits, AES_KEY *key);
+-asmlinkage int private_AES_set_encrypt_key(const unsigned char *userKey, const int bits, AES_KEY *key);
++EXPORT_SYMBOL(AES_encrypt);
++EXPORT_SYMBOL(AES_decrypt);
++EXPORT_SYMBOL(private_AES_set_encrypt_key);
++EXPORT_SYMBOL(private_AES_set_decrypt_key);
+ 
+ static void aes_encrypt(struct crypto_tfm *tfm, u8 *dst, const u8 *src)
+ {
+@@ -81,7 +71,7 @@ static struct crypto_alg aes_alg = {
+ 		.cipher	= {
+ 			.cia_min_keysize	= AES_MIN_KEY_SIZE,
+ 			.cia_max_keysize	= AES_MAX_KEY_SIZE,
+-			.cia_setkey			= aes_set_key,
++			.cia_setkey		= aes_set_key,
+ 			.cia_encrypt		= aes_encrypt,
+ 			.cia_decrypt		= aes_decrypt
+ 		}
+diff --git a/arch/arm/crypto/aes_glue.h b/arch/arm/crypto/aes_glue.h
+new file mode 100644
+index 0000000..cca3e51
+--- /dev/null
++++ b/arch/arm/crypto/aes_glue.h
+@@ -0,0 +1,19 @@
++
++#define AES_MAXNR 14
++
++struct AES_KEY {
++	unsigned int rd_key[4 * (AES_MAXNR + 1)];
++	int rounds;
++};
++
++struct AES_CTX {
++	struct AES_KEY enc_key;
++	struct AES_KEY dec_key;
++};
++
++asmlinkage void AES_encrypt(const u8 *in, u8 *out, struct AES_KEY *ctx);
++asmlinkage void AES_decrypt(const u8 *in, u8 *out, struct AES_KEY *ctx);
++asmlinkage int private_AES_set_decrypt_key(const unsigned char *userKey,
++					   const int bits, struct AES_KEY *key);
++asmlinkage int private_AES_set_encrypt_key(const unsigned char *userKey,
++					   const int bits, struct AES_KEY *key);
 -- 
 1.8.1.2
