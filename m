@@ -1,26 +1,25 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 20 Sep 2013 20:36:57 +0200
-Subject: [PATCH/RESEND 1/2] gpio: rcar: Remove #gpio-range-cells DT
- property usage
-In-Reply-To: <1378907462-19247-2-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-References: <1378907462-19247-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1378907462-19247-2-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <CACRpkdZ4EaUVgYoMP6VMefZgE1T--5hh18RzupQLnbd0KpveAA@mail.gmail.com>
+From: davem@davemloft.net (David Miller)
+Date: Fri, 20 Sep 2013 14:42:53 -0400 (EDT)
+Subject: [PATCH] phy/micrel: Add suspend/resume support to Micrel PHYs
+In-Reply-To: <1379612448-20805-1-git-send-email-nicolas.ferre@atmel.com>
+References: <1379612448-20805-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <20130920.144253.977721727117411814.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 11, 2013 at 3:51 PM, Laurent Pinchart
-<laurent.pinchart+renesas@ideasonboard.com> wrote:
+From: Nicolas Ferre <nicolas.ferre@atmel.com>
+Date: Thu, 19 Sep 2013 19:40:48 +0200
 
-> Commit a1bc260bb5f5d95da854be7898202d788e94448d ("gpio: clean up
-> gpio-ranges documentation") deprecated the #gpio-range-cells property.
-> Replace its usage with a hardcoded value in the gpio-rcar driver.
->
-> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+> From: Patrice Vilchez <patrice.vilchez@atmel.com>
+> 
+> All supported Micrel PHYs implement the standard "power down" bit 11 of BMCR,
+> so this patch adds support using the generic genphy_{suspend,resume} functions.
+> 
+> Signed-off-by: Patrice Vilchez <patrice.vilchez@atmel.com>
+> [b.brezillon at overkiz.com: adapt to newer kernel and generalize to other phys]
+> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
+> [nicolas.ferre at atmel.com: commit message modification]
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> Cc: David J. Choi <david.choi@micrel.com>
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
-
-Simon please take the whole set into the SH tree.
-
-Yours,
-Linus Walleij
+Applied to net-next
