@@ -1,58 +1,52 @@
-From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Fri, 20 Sep 2013 00:15:39 +0100
-Subject: [PATCH 43/51] DMA-API: dma: edma.c: no need to explicitly initialize
- DMA masks
-In-Reply-To: <20130919212235.GD12758@n2100.arm.linux.org.uk>
-References: <20130919212235.GD12758@n2100.arm.linux.org.uk>
-Message-ID: <E1VMnRj-0007sg-1Z@rmk-PC.arm.linux.org.uk>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Thu, 19 Sep 2013 17:44:57 -0700
+Subject: [GIT PULL] ARM: SoC fixes for 3.12-rc
+In-Reply-To: <1379632757.12963.4.camel@shinybook.infradead.org>
+References: <20130919194752.GA19975@quad.lixom.net>
+ <1379626776.753.164.camel@shinybook.infradead.org>
+ <CAN8TOE8j=oosn-5hAdqoTPcuW-sGvDAHd_nK6BZfJpxMwwpisQ@mail.gmail.com>
+ <1379632757.12963.4.camel@shinybook.infradead.org>
+Message-ID: <CAN8TOE8Xf9fv9zyY6wof3b9QhqgV=s-cK4V4D6n+Gw4HgacT0g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-register_platform_device_full() can setup the DMA mask provided the
-appropriate member is set in struct platform_device_info.  So lets
-make that be the case.  This avoids a direct reference to the DMA
-masks by this driver.
+On Thu, Sep 19, 2013 at 4:19 PM, Woodhouse, David
+<david.woodhouse@intel.com> wrote:
+> On Thu, 2013-09-19 at 15:57 -0700, Brian Norris wrote:
+>> On Thu, Sep 19, 2013 at 2:39 PM, Woodhouse, David
+>> <david.woodhouse@intel.com> wrote:
+>> > On Thu, 2013-09-19 at 12:47 -0700, Olof Johansson wrote:
+>> >>
+>> >> - A fix for build breakage in the MTD subsystem for some PXA devices.
+>> >>   David Woodhouse has this patch in his for-next branch but has not been
+>> >>   responding to our requests to send it up so here it is.
+>> >>   I should have amended the commit message to describe the build failure for
+>> >>   CONFIG_OF=n setups, but forgot and now it's down in the stack of commits.
+>> >
+>> > Thanks for pulling that in. Apologies for the screwup.
+>>
+>> Speaking of such process issues: there's an outstanding patch for a
+>> (small) memory leak that was introduced in the nand_base.c ONFI code
+>> in 3.12-rc1. Can I expect you to attend to these sort of -rcX (where X
+>> > 1) issues? Or should I send Linus the patch myself? I don't really
+>> want it to wait around until 3.13-rc1 to go to -stable.
+>
+> I'm aware of it, and will get to it shortly. Was going to round it up
+> along with the one that Olof just sent, either some time this week at
+> Plumbers or when I get home.
+>
+> If you want to stick it in the linux-mtd.git tree before that and send
+> Linus a pull request, I have no objection.
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- drivers/dma/edma.c |    6 ++----
- 1 files changed, 2 insertions(+), 4 deletions(-)
+If you're up to it, then you can take it. I'll take it myself if I
+feel it's getting too late. The problem is just when I can't
+differentiate your quiet awareness from oblivion (or obliviousness?).
 
-diff --git a/drivers/dma/edma.c b/drivers/dma/edma.c
-index ff50ff4..7f9fe30 100644
---- a/drivers/dma/edma.c
-+++ b/drivers/dma/edma.c
-@@ -702,11 +702,13 @@ static struct platform_device *pdev0, *pdev1;
- static const struct platform_device_info edma_dev_info0 = {
- 	.name = "edma-dma-engine",
- 	.id = 0,
-+	.dma_mask = DMA_BIT_MASK(32),
- };
- 
- static const struct platform_device_info edma_dev_info1 = {
- 	.name = "edma-dma-engine",
- 	.id = 1,
-+	.dma_mask = DMA_BIT_MASK(32),
- };
- 
- static int edma_init(void)
-@@ -720,8 +722,6 @@ static int edma_init(void)
- 			ret = PTR_ERR(pdev0);
- 			goto out;
- 		}
--		pdev0->dev.dma_mask = &pdev0->dev.coherent_dma_mask;
--		pdev0->dev.coherent_dma_mask = DMA_BIT_MASK(32);
- 	}
- 
- 	if (EDMA_CTLRS == 2) {
-@@ -731,8 +731,6 @@ static int edma_init(void)
- 			platform_device_unregister(pdev0);
- 			ret = PTR_ERR(pdev1);
- 		}
--		pdev1->dev.dma_mask = &pdev1->dev.coherent_dma_mask;
--		pdev1->dev.coherent_dma_mask = DMA_BIT_MASK(32);
- 	}
- 
- out:
--- 
-1.7.4.4
+> Does that m25p80 'fix 4 byte addressing' fix for Micron not also want to
+> go in?
+
+I suppose the m25p80 one can go in as well. It's not so much a bugfix
+as augmenting my original patch to support more devices. But it is
+safe enough.
+
+Brian
