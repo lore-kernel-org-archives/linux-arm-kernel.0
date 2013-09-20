@@ -1,61 +1,38 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 19 Sep 2013 21:36:51 -0700
-Subject: [PATCH v4] dt: update PSCI binding documentation for v0.2
-In-Reply-To: <1379625868-5395-1-git-send-email-robherring2@gmail.com>
-References: <1379625868-5395-1-git-send-email-robherring2@gmail.com>
-Message-ID: <CAOesGMjNhYTfPOr5NPEC9GWym-nuFE0hX_6+LW9bTv_E3iXbcQ@mail.gmail.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Fri, 20 Sep 2013 10:17:59 +0530
+Subject: [GIT PULL v2] DaVinci fixes for v3.12-rc2
+Message-ID: <523BD37F.2010203@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The following changes since commit 272b98c6455f00884f0350f775c5342358ebb73f:
 
-Just a quick drive-by. Sorry, I don't know the history of previous
-review cycles.
+  Linux 3.12-rc1 (2013-09-16 16:17:51 -0400)
 
+are available in the git repository at:
 
-On Thu, Sep 19, 2013 at 2:24 PM, Rob Herring <robherring2@gmail.com> wrote:
+  git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-fixes-for-v3.12-rc2-v2
 
->  Main node optional properties:
->
-> - - cpu_suspend   : Function ID for CPU_SUSPEND operation
-> + - cpu_suspend[-<32|64]   : Function ID for CPU_SUSPEND operation
-> +
-> + - cpu_off                : Function ID for CPU_OFF operation
-> +
-> + - cpu_on[-<32|64]        : Function ID for CPU_ON operation
-> +
-> + - affinity_info[-<32|64] : Function ID for AFFINITY_INFO operation
->
-> - - cpu_off       : Function ID for CPU_OFF operation
-> + - migrate[-<32|64]       : Function ID for MIGRATE operation
->
-> - - cpu_on        : Function ID for CPU_ON operation
-> + - migrate_info_type      : Function ID for MIGRATE_INFO_TYPE operation
->
-> - - migrate       : Function ID for MIGRATE operation
-> + - migrate_info_up_cpu[-<32|64] : Function ID for MIGRATE_INFO_UP_CPU operation
->
-> + - system_reset           : Function ID for SYSTEM_RESET operation
-> +
-> + - system_off             : Function ID for SYSTEM_OFF operation
+for you to fetch changes up to 016b9eb0c52ed7349ffdb42b4e51c93ad1f5d90a:
 
-All of these should use dashes instead of underscores.
+  ARM: davinci: dm365 evm: fix unused variable warning (2013-09-19 14:56:03 +0530)
 
-I also wonder if it would be better to move them into a subnode to
-keep the namespace a bit cleaner.
+----------------------------------------------------------------
+DaVinci fixes for v3.12-rc2
+---------------------------
 
-> +Some functions have have separate IDs for 32-bit and 64-bit calling
-> +conventions. These separate function IDs are described with function names with
-> +"-64" and "-32" suffixes (e.g. cpu_on-64). Where a function name does not have
-> +a suffix, the ID may be used with either calling convention depending on the
-> +CPU state -- AArch32 callers should use the 32-bit calling convention, and
-> +AArch64 callers should use the 64-bit calling convention.
+This pull request includes:
 
-Why not just make them a possible two-element property with <32 64>,
-or if only one element, same on both? Seems cleaner.
+1) A patch to fix build breakage with DEBUG_LL
+2) A patch to quell a build-time warning.
 
+----------------------------------------------------------------
+Brian Norris (1):
+      ARM: davinci: dm365 evm: fix unused variable warning
 
+Sekhar Nori (1):
+      ARM: davinci: fix build breakage with DEBUG_LL
 
-
-
--Olof
+ arch/arm/mach-davinci/board-dm365-evm.c     |    2 +-
+ arch/arm/mach-davinci/include/mach/serial.h |    4 ++--
+ 2 files changed, 3 insertions(+), 3 deletions(-)
