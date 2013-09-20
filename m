@@ -1,47 +1,22 @@
-From: bhutchings@solarflare.com (Ben Hutchings)
-Date: Fri, 20 Sep 2013 02:21:37 +0100
-Subject: [PATCH 01/51] DMA-API: provide a helper to set both DMA and
- coherent DMA masks
-In-Reply-To: <E1VMlja-0007fA-HU@rmk-PC.arm.linux.org.uk>
-References: <20130919212235.GD12758@n2100.arm.linux.org.uk>
- <E1VMlja-0007fA-HU@rmk-PC.arm.linux.org.uk>
-Message-ID: <1379640097.2500.4.camel@bwh-desktop.uk.level5networks.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 19 Sep 2013 19:35:11 -0600
+Subject: [PATCH] ARM: tegra_defconfig: enable CONFIG_ARM_APPENDED_DTB
+In-Reply-To: <CAOesGMjP+QMyuLCykg0nW4yWwmnNtoyzf7nK2dPAWuqcpfp5OA@mail.gmail.com>
+References: <1379638594-28888-1-git-send-email-olof@lixom.net>
+ <CAKCjkJbavWtWBxvKqpesmJfcKTUCpbsM_xL0JfS49vOpkZ8AUw@mail.gmail.com>
+ <CAOesGMjP+QMyuLCykg0nW4yWwmnNtoyzf7nK2dPAWuqcpfp5OA@mail.gmail.com>
+Message-ID: <523BA64F.1050607@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2013-09-19 at 22:25 +0100, Russell King wrote:
-> Provide a helper to set both the DMA and coherent DMA masks to the
-> same value - this avoids duplicated code in a number of drivers,
-> sometimes with buggy error handling, and also allows us identify
-> which drivers do things differently.
-> 
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> ---
->  Documentation/DMA-API-HOWTO.txt |   37 ++++++++++++++++++++++---------------
->  Documentation/DMA-API.txt       |    8 ++++++++
->  include/linux/dma-mapping.h     |   14 ++++++++++++++
->  3 files changed, 44 insertions(+), 15 deletions(-)
-> 
-> diff --git a/Documentation/DMA-API-HOWTO.txt b/Documentation/DMA-API-HOWTO.txt
-> index 14129f1..5e98303 100644
-> --- a/Documentation/DMA-API-HOWTO.txt
-> +++ b/Documentation/DMA-API-HOWTO.txt
-[...]
-> -dma_set_coherent_mask() will always be able to set the same or a
-> -smaller mask as dma_set_mask(). However for the rare case that a
-> +The coherent coherent mask will always be able to set the same or a
-> +smaller mask as the streaming mask. However for the rare case that a
-[...]
+On 09/19/2013 07:09 PM, Olof Johansson wrote:
+> They do? The hardware I have came with a very old u-boot. Got a link
+> to the newer one?
 
-The new wording doesn't make sense; a mask doesn't set itself.  I would
-suggest:
+Mainline U-Boot runs nicely on the TrimSlice. Missing functionality
+includes PCIe Ethernet and HDMI, but everything else works fine IIRC.
+You can flash it using:
 
-"The coherent mask can always be set to the same or a smaller mask than
-the streaming mask."
+https://github.com/NVIDIA/tegra-uboot-flasher-scripts
 
-Ben.
-
--- 
-Ben Hutchings, Staff Engineer, Solarflare
-Not speaking for my employer; that's the marketing department's job.
-They asked us to note that Solarflare product names are trademarked.
+(read README-developer.txt first, then README-user.txt)
