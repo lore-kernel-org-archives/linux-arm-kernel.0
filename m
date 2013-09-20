@@ -1,75 +1,58 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 20 Sep 2013 22:18:20 +0200
-Subject: [PATCH 8/8] ARM: plat-iop: pass physical base for GPIO
-Message-ID: <1379708300-8129-1-git-send-email-linus.walleij@linaro.org>
+From: andrea.adami@gmail.com (Andrea Adami)
+Date: Fri, 20 Sep 2013 22:35:26 +0200
+Subject: [PATCH v4] sharpsl_param.c: ARM: pxa: fix invalid memory access
+Message-ID: <1379709326-2988-1-git-send-email-andrea.adami@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This alters the IOP platforms to pass a physical base for their
-GPIO blocks and alters the driver to remap it when probing
-instead of relying on the virtual addresses to be used.
+After commit 72662e01088394577be4a3f14da94cf87bea2591
+ARM: head.S: only include __turn_mmu_on in the initial identity mapping
 
-Cc: Aaro Koskinen <aaro.koskinen@iki.fi>
-Cc: Lennert Buytenhek <kernel@wantstofly.org>
-Cc: Dan Williams <dan.j.williams@intel.com>
-Cc: Mikael Pettersson <mikpe@it.uu.se>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+Zaurus PXA devices call sharpsl_save_param() during fixup and hang on
+boot because memcpy refers to physical addresses no longer valid if the
+MMU is setup.
+Zaurus collie (SA1100) is unaffected (function is called in init_machine).
+
+The code was making assumptions and for PXA the virtual address
+should have been used before.
+
+Signed-off-by: Marko Katic <dromede@gmail.com>
+Signed-off-by: Andrea Adami <andrea.adami@gmail.com>
 ---
- arch/arm/mach-iop32x/gpio-iop32x.h | 2 +-
- arch/arm/mach-iop33x/iq80331.c     | 2 +-
- arch/arm/mach-iop33x/iq80332.c     | 2 +-
- drivers/gpio/gpio-iop.c            | 2 +-
- 4 files changed, 4 insertions(+), 4 deletions(-)
+ arch/arm/common/sharpsl_param.c | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-iop32x/gpio-iop32x.h b/arch/arm/mach-iop32x/gpio-iop32x.h
-index b8710a6..3c7309c 100644
---- a/arch/arm/mach-iop32x/gpio-iop32x.h
-+++ b/arch/arm/mach-iop32x/gpio-iop32x.h
-@@ -1,5 +1,5 @@
- static struct resource iop32x_gpio_res[] = {
--	DEFINE_RES_MEM((IOP3XX_PERIPHERAL_VIRT_BASE + 0x07c4), 0x10),
-+	DEFINE_RES_MEM((IOP3XX_PERIPHERAL_PHYS_BASE + 0x07c4), 0x10),
- };
+diff --git a/arch/arm/common/sharpsl_param.c b/arch/arm/common/sharpsl_param.c
+index d56c932..3490549 100644
+--- a/arch/arm/common/sharpsl_param.c
++++ b/arch/arm/common/sharpsl_param.c
+@@ -15,6 +15,7 @@
+ #include <linux/module.h>
+ #include <linux/string.h>
+ #include <asm/mach/sharpsl_param.h>
++#include <asm/memory.h>
  
- static inline void register_iop32x_gpio(void)
-diff --git a/arch/arm/mach-iop33x/iq80331.c b/arch/arm/mach-iop33x/iq80331.c
-index 25741c4..e2cb65c 100644
---- a/arch/arm/mach-iop33x/iq80331.c
-+++ b/arch/arm/mach-iop33x/iq80331.c
-@@ -123,7 +123,7 @@ static struct platform_device iq80331_flash_device = {
- };
+ /*
+  * Certain hardware parameters determined at the time of device manufacture,
+@@ -25,8 +26,10 @@
+  */
+ #ifdef CONFIG_ARCH_SA1100
+ #define PARAM_BASE	0xe8ffc000
++#define param_start(x)	(void *)(x)
+ #else
+ #define PARAM_BASE	0xa0000a00
++#define param_start(x)	__va(x)
+ #endif
+ #define MAGIC_CHG(a,b,c,d) ( ( d << 24 ) | ( c << 16 )  | ( b << 8 ) | a )
  
- static struct resource iq80331_gpio_res[] = {
--	DEFINE_RES_MEM((IOP3XX_PERIPHERAL_VIRT_BASE + 0x1780), 0x10),
-+	DEFINE_RES_MEM((IOP3XX_PERIPHERAL_PHYS_BASE + 0x1780), 0x10),
- };
+@@ -41,7 +44,7 @@ EXPORT_SYMBOL(sharpsl_param);
  
- static void __init iq80331_init_machine(void)
-diff --git a/arch/arm/mach-iop33x/iq80332.c b/arch/arm/mach-iop33x/iq80332.c
-index a3b56e1..0b6269d 100644
---- a/arch/arm/mach-iop33x/iq80332.c
-+++ b/arch/arm/mach-iop33x/iq80332.c
-@@ -123,7 +123,7 @@ static struct platform_device iq80332_flash_device = {
- };
+ void sharpsl_save_param(void)
+ {
+-	memcpy(&sharpsl_param, (void *)PARAM_BASE, sizeof(struct sharpsl_param_info));
++	memcpy(&sharpsl_param, param_start(PARAM_BASE), sizeof(struct sharpsl_param_info));
  
- static struct resource iq80332_gpio_res[] = {
--	DEFINE_RES_MEM((IOP3XX_PERIPHERAL_VIRT_BASE + 0x1780), 0x10),
-+	DEFINE_RES_MEM((IOP3XX_PERIPHERAL_PHYS_BASE + 0x1780), 0x10),
- };
- 
- static void __init iq80332_init_machine(void)
-diff --git a/drivers/gpio/gpio-iop.c b/drivers/gpio/gpio-iop.c
-index 0d991d7..c22a61b 100644
---- a/drivers/gpio/gpio-iop.c
-+++ b/drivers/gpio/gpio-iop.c
-@@ -110,7 +110,7 @@ static int iop3xx_gpio_probe(struct platform_device *pdev)
- 	struct resource *res;
- 
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
--	base = (void *) res->start;
-+	base = devm_ioremap_resource(&pdev->dev, res);
- 
- 	return gpiochip_add(&iop3xx_chip);
- }
+ 	if (sharpsl_param.comadj_keyword != COMADJ_MAGIC)
+ 		sharpsl_param.comadj=-1;
 -- 
-1.8.3.1
+1.8.1.5
