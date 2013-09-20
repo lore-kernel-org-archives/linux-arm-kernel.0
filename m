@@ -1,48 +1,45 @@
-From: jeffrey.t.kirsher@intel.com (Jeff Kirsher)
-Date: Fri, 20 Sep 2013 12:51:39 -0700
-Subject: [PATCH 08/51] DMA-API: net: intel/ixgbevf: fix 32-bit DMA mask
- handling
-In-Reply-To: <E1VMlqN-0007fw-MQ@rmk-PC.arm.linux.org.uk>
-References: <20130919212235.GD12758@n2100.arm.linux.org.uk>
- <E1VMlqN-0007fw-MQ@rmk-PC.arm.linux.org.uk>
-Message-ID: <1379706699.1972.14.camel@jtkirshe-mobl>
+From: robertcnelson@gmail.com (robertcnelson)
+Date: Fri, 20 Sep 2013 14:52:16 -0500
+Subject: [PATCH] ARM: dts: omap3-beagle-xm: enable pullup for dvi on twl_gpio
+Message-ID: <1379706736-4041-1-git-send-email-robertcnelson@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2013-09-19 at 22:32 +0100, Russell King wrote:
-> The fallback to 32-bit DMA mask is rather odd:
->         if (!dma_set_mask(&pdev->dev, DMA_BIT_MASK(64)) &&
->             !dma_set_coherent_mask(&pdev->dev, DMA_BIT_MASK(64))) {
->                 pci_using_dac = 1;
->         } else {
->                 err = dma_set_mask(&pdev->dev, DMA_BIT_MASK(32));
->                 if (err) {
->                         err = dma_set_coherent_mask(&pdev->dev,
->                                                     DMA_BIT_MASK(32));
->                         if (err) {
->                                 dev_err(&pdev->dev, "No usable DMA "
->                                         "configuration, aborting\n");
->                                 goto err_dma;
->                         }
->                 }
->                 pci_using_dac = 0;
->         }
-> This means we only set the coherent DMA mask in the fallback path if
-> the DMA mask set failed, which is silly.  This fixes it to set the
-> coherent DMA mask only if dma_set_mask() succeeded, and to error out
-> if either fails.
-> 
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> ---
->  drivers/net/ethernet/intel/ixgbevf/ixgbevf_main.c |   15
-> +++++----------
->  1 files changed, 5 insertions(+), 10 deletions(-)
+From: Robert Nelson <robertcnelson@gmail.com>
 
-Acked-by: Jeff Kirsher <jeffrey.t.kirsher@intel.com>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130920/08826e2c/attachment-0001.sig>
+This fixes some video sync issues seen with KVM equipment on bootup, with
+omapdrm/kms by making sure the TFP410 is powered up, via pulling up GPIO2 on
+the twl4030.
+
+https://groups.google.com/d/msg/beagleboard/Wk9SLuw-EvY/oCxJcAHufAMJ
+
+Signed-off-by: Robert Nelson <robertcnelson@gmail.com>
+---
+ arch/arm/boot/dts/omap3-beagle-xm.dts | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/boot/dts/omap3-beagle-xm.dts b/arch/arm/boot/dts/omap3-beagle-xm.dts
+index 0c514dc..c48778f 100644
+--- a/arch/arm/boot/dts/omap3-beagle-xm.dts
++++ b/arch/arm/boot/dts/omap3-beagle-xm.dts
+@@ -131,14 +131,14 @@
+ 
+ &twl_gpio {
+ 	ti,use-leds;
+-	/* pullups: BIT(1) */
+-	ti,pullups = <0x000002>;
++	/* pullups: BIT(1), BIT(2) */
++	ti,pullups = <0x000006>;
+ 	/*
+ 	 * pulldowns:
+-	 * BIT(2), BIT(6), BIT(7), BIT(8), BIT(13)
++	 * BIT(6), BIT(7), BIT(8), BIT(13)
+ 	 * BIT(15), BIT(16), BIT(17)
+ 	 */
+-	ti,pulldowns = <0x03a1c4>;
++	ti,pulldowns = <0x03a1c0>;
+ };
+ 
+ &usb_otg_hs {
+-- 
+1.8.4.rc3
