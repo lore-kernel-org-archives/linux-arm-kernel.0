@@ -1,32 +1,32 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 20 Sep 2013 21:28:02 +0200
-Subject: [PATCH 5/7] staging: media/lirc: switch to use gpiolib
-In-Reply-To: <m3d2ocvrx7.fsf@intrepid.localdomain>
-References: <1378816283-8164-1-git-send-email-linus.walleij@linaro.org>
- <m3d2ocvrx7.fsf@intrepid.localdomain>
-Message-ID: <CACRpkda5x78wMVm=vOB4_Bb8hsa6Sumfv0CANPBtOdHq1LxDYw@mail.gmail.com>
+From: jeffrey.t.kirsher@intel.com (Jeff Kirsher)
+Date: Fri, 20 Sep 2013 12:45:55 -0700
+Subject: [PATCH 12/51] DMA-API: net: intel/e1000: replace
+ dma_set_mask()+dma_set_coherent_mask() with new helper
+In-Reply-To: <E1VMluG-0007gV-6y@rmk-PC.arm.linux.org.uk>
+References: <20130919212235.GD12758@n2100.arm.linux.org.uk>
+ <E1VMluG-0007gV-6y@rmk-PC.arm.linux.org.uk>
+Message-ID: <1379706355.1972.8.camel@jtkirshe-mobl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 13, 2013 at 2:15 PM, Krzysztof Halasa <khc@pm.waw.pl> wrote:
+On Thu, 2013-09-19 at 22:37 +0100, Russell King wrote:
+> Replace the following sequence:
+> 
+>         dma_set_mask(dev, mask);
+>         dma_set_coherent_mask(dev, mask);
+> 
+> with a call to the new helper dma_set_mask_and_coherent().
+> 
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> ---
+>  drivers/net/ethernet/intel/e1000/e1000_main.c |    9 ++-------
+>  1 files changed, 2 insertions(+), 7 deletions(-)
 
-> Linus Walleij <linus.walleij@linaro.org> writes:
->
->> +++ b/drivers/staging/media/lirc/lirc_serial.c
->> @@ -839,6 +839,16 @@ static int lirc_serial_probe(struct platform_device *dev)
->>  {
->>       int i, nlow, nhigh, result;
->>
->> +#ifdef CONFIG_LIRC_SERIAL_NSLU2
->> +     /* This GPIO is used for a LED on the NSLU2 */
->> +     result = devm_gpio_request(dev, NSLU2_LED_GRN, "lirc-serial");
->
-> Will this succeed with the LED driver already loaded? Should the user
-> unload it first?
-
-Hm if this driver should use this as a LED it needs to register
-a trigger for that GPIO LED instead. A GPIO can not be used by
-two consumers at the same time...
-
-Yours,
-Linus Walleij
+Acked-by: Jeff Kirsher <jeffrey.t.kirsher@intel.com>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130920/d9b04c0f/attachment.sig>
