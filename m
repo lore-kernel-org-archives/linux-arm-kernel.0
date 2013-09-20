@@ -1,39 +1,58 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 20 Sep 2013 09:37:25 +0200
-Subject: [PATCH] phy/micrel: Add suspend/resume support to Micrel PHYs
-In-Reply-To: <20130919.140829.372011462903870193.davem@davemloft.net>
-References: <1379612448-20805-1-git-send-email-nicolas.ferre@atmel.com>
- <20130919.140829.372011462903870193.davem@davemloft.net>
-Message-ID: <523BFB35.6030509@atmel.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Fri, 20 Sep 2013 09:58:20 +0200
+Subject: [PATCH v4] PWM: PXA: add device tree support to PWM driver
+In-Reply-To: <523B2C0B.4050204@newsguy.com>
+References: <1379519982-7618-1-git-send-email-mikedunn@newsguy.com>
+ <20130919122807.GH10852@ulmo> <523B2C0B.4050204@newsguy.com>
+Message-ID: <20130920075819.GC8575@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/09/2013 20:08, David Miller :
-> From: Nicolas Ferre <nicolas.ferre@atmel.com>
-> Date: Thu, 19 Sep 2013 19:40:48 +0200
->
->> From: Patrice Vilchez <patrice.vilchez@atmel.com>
->>
->> All supported Micrel PHYs implement the standard "power down" bit 11 of BMCR,
->> so this patch adds support using the generic genphy_{suspend,resume} functions.
->>
->> Signed-off-by: Patrice Vilchez <patrice.vilchez@atmel.com>
->> [b.brezillon at overkiz.com: adapt to newer kernel and generalize to other phys]
->> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
->> [nicolas.ferre at atmel.com: commit message modification]
->> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
->> Cc: David J. Choi <david.choi@micrel.com>
->
-> What's the difference between this patch and the one you sent 60
-> seconds beforehand?
+On Thu, Sep 19, 2013 at 09:53:31AM -0700, Mike Dunn wrote:
+> On 09/19/2013 05:28 AM, Thierry Reding wrote:
+> > On Wed, Sep 18, 2013 at 08:59:42AM -0700, Mike Dunn wrote:
+> > [...]
+> >> Only an OF match table is added;
+> > [...]
+> > 
+> > That's no longer true. You also add a custom .of_xlate() function.
+> 
+> 
+> Is it acceptable to re-word the commit message in susbequent versions?
 
-No difference, just the addition of Boris in the CC list.
-He was missing in the previous one despite his presence in the 
-"Signed-off-by" tag. I tried to stop "git send-email" before it can 
-complete but I hit "Ctrl-c" too late it seems...
+Yes, of course. The commit message should be an accurate description of
+the patch. If as a result of review the patch changes in ways that make
+the commit message wrong, then it must be updated as well.
 
-Sorry for the noise.
+> >> diff --git a/arch/arm/boot/dts/pxa27x.dtsi b/arch/arm/boot/dts/pxa27x.dtsi
+> > 
+> > I think this belongs in a separate patch so it can go through the
+> > arm-soc tree.
+> 
+> 
+> Is there anyone else or another list that should be CC'd in this case?  Thanks.
 
-Bye,
--- 
-Nicolas Ferre
+Well, the PXA maintainers would be the most likely to take the dtsi
+change through their tree. Usually the mach trees are merged into
+arm-soc, which then goes into Linus' tree.
+
+> >> +{
+> >> +	struct pwm_device *pwm;
+> >> +
+> > 
+> > You probably want to check that pc->of_pwm_n_cells at least 1 here.
+> 
+> 
+> Well OK, but I didn't bother because it's explicitly set to one elsewhere in
+> this source file.
+
+Okay, nevermind. It's probably fine as is.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130920/a168bd46/attachment.sig>
