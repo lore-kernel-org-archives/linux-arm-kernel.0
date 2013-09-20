@@ -1,80 +1,39 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Fri, 20 Sep 2013 23:37:00 +0200
-Subject: [PATCH v2 01/26] ARM: nomadik: remove mtu initalization from
- .init_time
-In-Reply-To: <1379526839-14798-2-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1379526839-14798-2-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1379713020-7287-1-git-send-email-sebastian.hesselbarth@gmail.com>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Fri, 20 Sep 2013 14:53:08 -0700
+Subject: [PATCH v4] clk: si570: Add a driver for SI570 oscillators
+In-Reply-To: <20130920181529.GA31173@roeck-us.net>
+References: <1379698757-25232-1-git-send-email-soren.brinkmann@xilinx.com>
+ <20130920181529.GA31173@roeck-us.net>
+Message-ID: <65b27409-d70f-41d2-ace5-9c3fe65ec24d@CO9EHSMHS003.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Nomadik clock initialization is properly done in clk-nomadik since
-patch "clk: nomadik: set all timers to use 2.4 MHz TIMCLK".
-Therefore, this patch removes now redundant mtu initialization from
-.init_time callback.
+On Fri, Sep 20, 2013 at 11:15:29AM -0700, Guenter Roeck wrote:
+> On Fri, Sep 20, 2013 at 10:39:17AM -0700, Soren Brinkmann wrote:
+[...]
+> > diff --git a/drivers/clk/clk-si570.c b/drivers/clk/clk-si570.c
+> > new file mode 100644
+> > index 0000000..13c2091
+> > --- /dev/null
+> > +++ b/drivers/clk/clk-si570.c
+[...]
+> > +static int si570_probe(struct i2c_client *client,
+[...]
+> > +	/* Read the requested initial output frequency from device tree */
+> > +	if (!of_property_read_u32(client->dev.of_node, "clock-frequency",
+> > +				&initial_fout)) {
+> > +		err = clk_set_rate(clk, initial_fout);
+> > +		if (err) {
+> > +			of_clk_del_provider(client->dev.of_node);
+> > +			clk_unregister(data->hw.clk);
+> 
+> Is that needed ? I would have thought it isn't because you use a devm_ function
+> to register it.
+> 
+> Not that I understand the clk code, but getting clk from the registration
+> function and unregistering hw.clk (without seting it) sems a bit odd.
+> Is it well defined that you have to unregister hw.clk ?
+You're absolutely right. I'll remove all calls to clk_unregister().
+Thanks for finding that one.
 
-Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
----
-Changelog:
-v1->v2:
-- adapt to clk-nomadik changes and just remove mtu init (Suggested by
-  Linus Walleij
-- reword commit message and description accordingly
-
-Cc: Olof Johansson <olof@lixom.net>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Alessandro Rubini <rubini@unipv.it>
-Cc: Linus Walleij <linus.walleij@linaro.org>
-Cc: STEricsson <STEricsson_nomadik_linux@list.st.com>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
----
- arch/arm/mach-nomadik/cpu-8815.c |   26 --------------------------
- 1 file changed, 26 deletions(-)
-
-diff --git a/arch/arm/mach-nomadik/cpu-8815.c b/arch/arm/mach-nomadik/cpu-8815.c
-index 13e0df9..0fcb149 100644
---- a/arch/arm/mach-nomadik/cpu-8815.c
-+++ b/arch/arm/mach-nomadik/cpu-8815.c
-@@ -113,36 +113,10 @@ static void cpu8815_restart(enum reboot_mode mode, const char *cmd)
- 	writel(1, srcbase + 0x18);
- }
- 
--/* Initial value for SRC control register: all timers use MXTAL/8 source */
--#define SRC_CR_INIT_MASK	0x00007fff
--#define SRC_CR_INIT_VAL		0x2aaa8000
--
- static void __init cpu8815_timer_init_of(void)
- {
--	struct device_node *mtu;
--	void __iomem *base;
--	int irq;
--	u32 src_cr;
--
- 	/* We need this to be up now */
- 	nomadik_clk_init();
--
--	mtu = of_find_node_by_path("/mtu at 101e2000");
--	if (!mtu)
--		return;
--	base = of_iomap(mtu, 0);
--	if (WARN_ON(!base))
--		return;
--	irq = irq_of_parse_and_map(mtu, 0);
--
--	pr_info("Remapped MTU @ %p, irq: %d\n", base, irq);
--
--	/* Configure timer sources in "system reset controller" ctrl reg */
--	src_cr = readl(base);
--	src_cr &= SRC_CR_INIT_MASK;
--	src_cr |= SRC_CR_INIT_VAL;
--	writel(src_cr, base);
--
- 	clocksource_of_init();
- }
- 
--- 
-1.7.10.4
+	S?ren
