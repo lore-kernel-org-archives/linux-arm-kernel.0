@@ -1,46 +1,57 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Fri, 20 Sep 2013 12:22:04 +0300
-Subject: [RFC PATCH 12/15] ARM: dts: omap5: add ocp2scp1 address resource
-In-Reply-To: <523B0782.7050501@cogentembedded.com>
-References: <1379595943-14622-1-git-send-email-rogerq@ti.com>
- <1379597019-15294-1-git-send-email-rogerq@ti.com>
- <523B0782.7050501@cogentembedded.com>
-Message-ID: <523C13BC.10400@ti.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Fri, 20 Sep 2013 11:52:32 +0200
+Subject: [PATCH] media: i2c: adv7343: fix the DT binding properties
+In-Reply-To: <CA+V-a8s3PYr7qem6m8au0E7N2Xb_gD37_8uLcdXZjeHppBaC6g@mail.gmail.com>
+References: <1379073471-7244-1-git-send-email-prabhakar.csengg@gmail.com>
+ <523395DC.5080009@wwwdotorg.org>
+ <CA+V-a8sVyJ1TrTSiaj8vpaD+f_qJ5Hp287E3HuHJ_pRzzmdAvg@mail.gmail.com>
+ <523730A8.9060201@wwwdotorg.org>
+ <CA+V-a8vY-qsdUoUUH=3HOg-UAZZPujOLPHFC_udNWFtksgzRRA@mail.gmail.com>
+ <523B554A.2030701@gmail.com>
+ <CA+V-a8s3PYr7qem6m8au0E7N2Xb_gD37_8uLcdXZjeHppBaC6g@mail.gmail.com>
+Message-ID: <523C1AE0.9020603@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Prabhakar,
 
-On 09/19/2013 05:17 PM, Sergei Shtylyov wrote:
-> On 09/19/2013 05:23 PM, Roger Quadros wrote:
+On 09/20/2013 10:11 AM, Prabhakar Lad wrote:
+> OK I will, just send out a fix up patch which fixes the mismatch between
+> names for the rc-cycle, and later send out a patch which removes the
+> platform data usage for next release with proper DT bindings.
+
+I think the binding need to be fully corrected now, I just meant to not
+touch the board file, i.e. leave non-dt support unchanged.
+
+> I'm OK with making regulator properties as optional, But still it would
+> change the meaning of what DT is, we know that the VDD/VDD_IO .. etc
+> pins are required properties (but still making them as optional) :-(
 > 
->> Add OCP2SCP1 module address space.
+> I think there might several devices where this situation may arise so
+> just thinking of a alternative solution.
 > 
->> CC: Benoit Cousson <bcousson@baylibre.com>
->> Signed-off-by: Roger Quadros <rogerq@ti.com>
->> ---
->>   arch/arm/boot/dts/omap5.dtsi |    1 +
->>   1 files changed, 1 insertions(+), 0 deletions(-)
-> 
->> diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
->> index 06aa665..8a88a94 100644
->> --- a/arch/arm/boot/dts/omap5.dtsi
->> +++ b/arch/arm/boot/dts/omap5.dtsi
->> @@ -663,6 +663,7 @@
->>               #size-cells = <1>;
->>               ranges;
->>               ti,hwmods = "ocp2scp1";
->> +            reg = <0x4a080000 0x1f>;
-> 
->    Are you sure length is not 0x20?
+> say we have property 'software-regulator' which takes true/false(0/1)
+> If set to true we make the regulators as required property or else we
+> assume it is handled and ignore it ?
 
-Actually there are just 4 of 32-bit registers with the last one
-starting at 0x18, so I think length should be 0x1c.
+I don't think this is a good idea. You would have to add a similar platform 
+data flag for non-dt, it doesn't sound right. I can see two options here: 
 
-I copied 0x1f from omap4.dtsi. Looks like that is wrong as well.
-But it is harmless as nobody else is using that address.
+1. Make the regulator properties mandatory and, e.g. define a fixed 
+   voltage GPIO regulator in DT with an empty 'gpio' property. Then
+   pass a phandle to that regulator in the adv7343 *-supply properties.
+   For non-dt similarly a fixed voltage regulator(s) and voltage 
+   supplies  would need to be defined in the board files.
 
-I'll fix this to 0x1c in next rev.
+2. Make the properties optional and use (devm_)regulator_get_optional()
+   calls in the driver (a recently added function). I must admit I don't 
+   fully understand description of this function, it currently looks 
+   pretty much same as (devm_)regulator_get(). Thus the driver would 
+   need to be handling regulator supplies only when non ERR_PTR() is 
+   returned from regulator_get_optional() and otherwise assume a non 
+   critical error. There is already quite a few example occurrences of 
+   regulator_get_optional() usage.
 
-cheers,
--roger
+--
+Regards,
+Sylwester
