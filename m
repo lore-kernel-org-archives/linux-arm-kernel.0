@@ -1,30 +1,23 @@
-From: balajitk@ti.com (Balaji T K)
-Date: Fri, 20 Sep 2013 23:08:16 +0530
-Subject: [PATCH 1/1] ARM: dts: am335x-bone-common: correct mux mode for
- mmc1_cmd
-Message-ID: <1379698696-21945-1-git-send-email-balajitk@ti.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 20 Sep 2013 10:38:52 -0700
+Subject: [GIT PULL v2] DaVinci fixes for v3.12-rc2
+In-Reply-To: <523BD37F.2010203@ti.com>
+References: <523BD37F.2010203@ti.com>
+Message-ID: <CAOesGMg2EEWsf2zs6e-3NMdJr-j-a3w+M4KU6bBFu7Yyj076qA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-correct mux mode for mmc1_cmd to detect eMMC on bone-black
+On Thu, Sep 19, 2013 at 9:47 PM, Sekhar Nori <nsekhar@ti.com> wrote:
+> The following changes since commit 272b98c6455f00884f0350f775c5342358ebb73f:
+>
+>   Linux 3.12-rc1 (2013-09-16 16:17:51 -0400)
+>
+> are available in the git repository at:
+>
+>   git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-fixes-for-v3.12-rc2-v2
 
-Signed-off-by: Balaji T K <balajitk@ti.com>
----
- arch/arm/boot/dts/am335x-bone-common.dtsi |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/boot/dts/am335x-bone-common.dtsi b/arch/arm/boot/dts/am335x-bone-common.dtsi
-index 56361ce..90ab56c 100644
---- a/arch/arm/boot/dts/am335x-bone-common.dtsi
-+++ b/arch/arm/boot/dts/am335x-bone-common.dtsi
-@@ -117,7 +117,7 @@
- 		emmc_pins: pinmux_emmc_pins {
- 			pinctrl-single,pins = <
- 				0x80 (PIN_INPUT_PULLUP | MUX_MODE2) /* gpmc_csn1.mmc1_clk */
--				0x84 (PIN_INPUT_PULLUP | MUX_MODE1) /* gpmc_csn2.mmc1_cmd */
-+				0x84 (PIN_INPUT_PULLUP | MUX_MODE2) /* gpmc_csn2.mmc1_cmd */
- 				0x00 (PIN_INPUT_PULLUP | MUX_MODE1) /* gpmc_ad0.mmc1_dat0 */
- 				0x04 (PIN_INPUT_PULLUP | MUX_MODE1) /* gpmc_ad1.mmc1_dat1 */
- 				0x08 (PIN_INPUT_PULLUP | MUX_MODE1) /* gpmc_ad2.mmc1_dat2 */
--- 
-1.7.5.4
+Pulled, thanks!
+
+
+-Olof
