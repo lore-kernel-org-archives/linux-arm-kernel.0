@@ -1,23 +1,32 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 20 Sep 2013 09:19:02 -0700
-Subject: [RFC PATCH] ARM: OMAP3630: Add generic machine descriptor
-In-Reply-To: <1379693332-10585-1-git-send-email-nm@ti.com>
-References: <1379693332-10585-1-git-send-email-nm@ti.com>
-Message-ID: <CAOesGMj6G7LeYUJsGpZHxKOjiNrk+1U55QFqcQyTb6_Co+n4zQ@mail.gmail.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Fri, 20 Sep 2013 11:21:54 -0500
+Subject: [PATCH] ARM: dts: am335x-boneblack: move fixed regulator to
+ board level
+In-Reply-To: <1379610764-758-1-git-send-email-nm@ti.com>
+References: <1379610764-758-1-git-send-email-nm@ti.com>
+Message-ID: <20130920162154.GB18721@radagast>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Sep 19, 2013 at 12:12:44PM -0500, Nishanth Menon wrote:
+> 3.3V fixed regulator does not belong to TPS node - as a result
+> the fixed regulator is never probed and MMC is continually deferred due
+> to lack of regulator.
+> 
+> Move the fixed regulator to be at root of platform.
+> 
+> Signed-off-by: Nishanth Menon <nm@ti.com>
 
-On Fri, Sep 20, 2013 at 9:08 AM, Nishanth Menon <nm@ti.com> wrote:
-> An alternative approach may be to (for all SoCs):
-> 1. define every SoC entry - ti,omap3430 ti,omap3630...
-> 2. have a generic omap3_init which uses "if (of_machine_is_compatible("ti,omap3630"))"
-> to invoke the appropriate omap3xxx_init_early.
+Tested-by: Felipe Balbi <balbi@ti.com>
 
-Yes, this would be better, but you can do add a DT_MACHINE as in this
-patch but have ti,omap3630 as the dt_compat table. Then there's no
-need to add runtime checks.
+I boot tested this on my BBB.
 
-
--Olof
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130920/d67cbab2/attachment-0001.sig>
