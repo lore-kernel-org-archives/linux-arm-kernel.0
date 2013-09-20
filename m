@@ -1,49 +1,39 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 20 Sep 2013 09:30:37 +0200
-Subject: [PATCH] ARM: tegra_defconfig: enable CONFIG_ARM_APPENDED_DTB
-In-Reply-To: <523BABB2.4090200@wwwdotorg.org>
-References: <1379638594-28888-1-git-send-email-olof@lixom.net>
- <CAKCjkJbavWtWBxvKqpesmJfcKTUCpbsM_xL0JfS49vOpkZ8AUw@mail.gmail.com>
- <CAOesGMjP+QMyuLCykg0nW4yWwmnNtoyzf7nK2dPAWuqcpfp5OA@mail.gmail.com>
- <523BA64F.1050607@wwwdotorg.org>
- <CAOesGMh8NE7h=BH2sPrG4eE3Vbv0Q5+hCj52gi0072phtjcghw@mail.gmail.com>
- <523BABB2.4090200@wwwdotorg.org>
-Message-ID: <20130920073036.GA8575@ulmo>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 20 Sep 2013 09:37:25 +0200
+Subject: [PATCH] phy/micrel: Add suspend/resume support to Micrel PHYs
+In-Reply-To: <20130919.140829.372011462903870193.davem@davemloft.net>
+References: <1379612448-20805-1-git-send-email-nicolas.ferre@atmel.com>
+ <20130919.140829.372011462903870193.davem@davemloft.net>
+Message-ID: <523BFB35.6030509@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 19, 2013 at 07:58:10PM -0600, Stephen Warren wrote:
-> On 09/19/2013 07:39 PM, Olof Johansson wrote:
-> > On Thu, Sep 19, 2013 at 6:35 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> >> On 09/19/2013 07:09 PM, Olof Johansson wrote:
-> >>> They do? The hardware I have came with a very old u-boot. Got a link
-> >>> to the newer one?
-> >>
-> >> Mainline U-Boot runs nicely on the TrimSlice. Missing functionality
-> >> includes PCIe Ethernet and HDMI, but everything else works fine IIRC.
-> >> You can flash it using:
-> >>
-> >> https://github.com/NVIDIA/tegra-uboot-flasher-scripts
-> >>
-> >> (read README-developer.txt first, then README-user.txt)
-> > 
-> > Oh great. Unfortunately lack of PCI-e makes it hard to network boot
-> > (unless I add a redundant usb-ethernet adapter on it). Hmm.
-> 
-> I think Thierry was looking into PCIe, although I don't think it's
-> working yet. I always just use USB even on TrimSlice since it's easier
-> to move the USB connector than the network connector when switching
-> machines:-) PCIe works in Linux now though, as of v3.12-rc1.
+On 19/09/2013 20:08, David Miller :
+> From: Nicolas Ferre <nicolas.ferre@atmel.com>
+> Date: Thu, 19 Sep 2013 19:40:48 +0200
+>
+>> From: Patrice Vilchez <patrice.vilchez@atmel.com>
+>>
+>> All supported Micrel PHYs implement the standard "power down" bit 11 of BMCR,
+>> so this patch adds support using the generic genphy_{suspend,resume} functions.
+>>
+>> Signed-off-by: Patrice Vilchez <patrice.vilchez@atmel.com>
+>> [b.brezillon at overkiz.com: adapt to newer kernel and generalize to other phys]
+>> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
+>> [nicolas.ferre at atmel.com: commit message modification]
+>> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+>> Cc: David J. Choi <david.choi@micrel.com>
+>
+> What's the difference between this patch and the one you sent 60
+> seconds beforehand?
 
-I have a local branch that makes it work at least on Beaver, but it
-causes the kernel PCIe to fail for reasons that I haven't tracked down
-yet.
+No difference, just the addition of Boris in the CC list.
+He was missing in the previous one despite his presence in the 
+"Signed-off-by" tag. I tried to stop "git send-email" before it can 
+complete but I hit "Ctrl-c" too late it seems...
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130920/4e88cc2f/attachment.sig>
+Sorry for the noise.
+
+Bye,
+-- 
+Nicolas Ferre
