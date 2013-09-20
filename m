@@ -1,110 +1,142 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 20 Sep 2013 10:38:17 -0700
-Subject: [PATCH 2/4] ARM: OMAP2+: Add quirk support for legacy platform data
- init
+Date: Fri, 20 Sep 2013 10:38:21 -0700
+Subject: [PATCH 4/4] ARM: OMAP2+: Use pdata quirks for wl12xx legacy init
 In-Reply-To: <20130920173310.2584.24522.stgit@localhost>
 References: <20130920173310.2584.24522.stgit@localhost>
-Message-ID: <20130920173817.2584.55941.stgit@localhost>
+Message-ID: <20130920173821.2584.1124.stgit@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We want to drop the board-*.c files but keep things working.
-Let's make it a bit easier to support legacy platform data
-init with quirks. This also keeps board-generic.c clean from
-board specific hacks.
-
-For now, the quirks table is empty, that is populated
-in the later patches.
+Let's use the platform data quirk support for wl12xx
+and move the board specific code out of devices.c.
 
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/mach-omap2/Makefile        |    2 +-
- arch/arm/mach-omap2/board-generic.c |    1 +
- arch/arm/mach-omap2/common.h        |    2 ++
- arch/arm/mach-omap2/pdata-quirks.c  |   39 +++++++++++++++++++++++++++++++++++
- 4 files changed, 43 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/mach-omap2/pdata-quirks.c
+ arch/arm/mach-omap2/devices.c      |   38 ------------------------------------
+ arch/arm/mach-omap2/pdata-quirks.c |   31 +++++++++++++++++++++++++++++
+ 2 files changed, 31 insertions(+), 38 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
-index afb457c..f8d4a1b 100644
---- a/arch/arm/mach-omap2/Makefile
-+++ b/arch/arm/mach-omap2/Makefile
-@@ -233,7 +233,7 @@ obj-y					+= drm.o
- endif
+diff --git a/arch/arm/mach-omap2/devices.c b/arch/arm/mach-omap2/devices.c
+index 5c5315b..5336c75 100644
+--- a/arch/arm/mach-omap2/devices.c
++++ b/arch/arm/mach-omap2/devices.c
+@@ -19,7 +19,6 @@
+ #include <linux/of.h>
+ #include <linux/pinctrl/machine.h>
+ #include <linux/platform_data/omap4-keypad.h>
+-#include <linux/wl12xx.h>
+ #include <linux/platform_data/mailbox-omap.h>
  
- # Specific board support
--obj-$(CONFIG_MACH_OMAP_GENERIC)		+= board-generic.o
-+obj-$(CONFIG_MACH_OMAP_GENERIC)		+= board-generic.o pdata-quirks.o
- obj-$(CONFIG_MACH_OMAP_H4)		+= board-h4.o
- obj-$(CONFIG_MACH_OMAP_2430SDP)		+= board-2430sdp.o
- obj-$(CONFIG_MACH_OMAP3_BEAGLE)		+= board-omap3beagle.o
-diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
-index 39c7838..022b0df 100644
---- a/arch/arm/mach-omap2/board-generic.c
-+++ b/arch/arm/mach-omap2/board-generic.c
-@@ -56,6 +56,7 @@ static void __init omap_generic_init(void)
- 	omap_sdrc_init(NULL, NULL);
- 
- 	of_platform_populate(NULL, omap_dt_match_table, NULL, NULL);
-+	pdata_quirks_init();
- 
- 	/*
- 	 * HACK: call display setup code for selected boards to enable omapdss.
-diff --git a/arch/arm/mach-omap2/common.h b/arch/arm/mach-omap2/common.h
-index 4a5684b..fd059e0 100644
---- a/arch/arm/mach-omap2/common.h
-+++ b/arch/arm/mach-omap2/common.h
-@@ -288,6 +288,8 @@ static inline void omap4_cpu_resume(void)
- 
+ #include <asm/mach-types.h>
+@@ -475,40 +474,6 @@ static void omap_init_vout(void)
+ static inline void omap_init_vout(void) {}
  #endif
  
-+void pdata_quirks_init(void);
-+
- struct omap_sdrc_params;
- extern void omap_sdrc_init(struct omap_sdrc_params *sdrc_cs0,
- 				      struct omap_sdrc_params *sdrc_cs1);
+-#if IS_ENABLED(CONFIG_WL12XX)
+-
+-static struct wl12xx_platform_data wl12xx __initdata;
+-
+-void __init omap_init_wl12xx_of(void)
+-{
+-	int ret;
+-
+-	if (!of_have_populated_dt())
+-		return;
+-
+-	if (of_machine_is_compatible("ti,omap4-sdp")) {
+-		wl12xx.board_ref_clock = WL12XX_REFCLOCK_26;
+-		wl12xx.board_tcxo_clock = WL12XX_TCXOCLOCK_26;
+-		wl12xx.irq = gpio_to_irq(53);
+-	} else if (of_machine_is_compatible("ti,omap4-panda")) {
+-		wl12xx.board_ref_clock = WL12XX_REFCLOCK_38;
+-		wl12xx.irq = gpio_to_irq(53);
+-	} else {
+-		return;
+-	}
+-
+-	ret = wl12xx_set_platform_data(&wl12xx);
+-	if (ret) {
+-		pr_err("error setting wl12xx data: %d\n", ret);
+-		return;
+-	}
+-}
+-#else
+-static inline void omap_init_wl12xx_of(void)
+-{
+-}
+-#endif
+-
+ /*-------------------------------------------------------------------------*/
+ 
+ static int __init omap2_init_devices(void)
+@@ -531,9 +496,6 @@ static int __init omap2_init_devices(void)
+ 		omap_init_sham();
+ 		omap_init_aes();
+ 		omap_init_rng();
+-	} else {
+-		/* These can be removed when bindings are done */
+-		omap_init_wl12xx_of();
+ 	}
+ 	omap_init_sti();
+ 	omap_init_vout();
 diff --git a/arch/arm/mach-omap2/pdata-quirks.c b/arch/arm/mach-omap2/pdata-quirks.c
-new file mode 100644
-index 0000000..e605199
---- /dev/null
+index 648d957..52b4bc3 100644
+--- a/arch/arm/mach-omap2/pdata-quirks.c
 +++ b/arch/arm/mach-omap2/pdata-quirks.c
-@@ -0,0 +1,39 @@
-+/*
-+ * Legacy platform_data quirks
-+ *
-+ * Copyright (C) 2013 Texas Instruments
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+#include <linux/clk.h>
-+#include <linux/init.h>
-+#include <linux/kernel.h>
+@@ -8,8 +8,10 @@
+  * published by the Free Software Foundation.
+  */
+ #include <linux/clk.h>
++#include <linux/gpio.h>
+ #include <linux/init.h>
+ #include <linux/kernel.h>
++#include <linux/wl12xx.h>
+ 
+ #include "common.h"
+ #include "common-board-devices.h"
+@@ -34,16 +36,45 @@ static void __init __used legacy_init_ehci_clk(char *clkname)
+ 		       __func__, clkname, ret);
+ }
+ 
++#if IS_ENABLED(CONFIG_WL12XX)
 +
-+#include "common.h"
-+#include "common-board-devices.h"
-+#include "dss-common.h"
++static struct wl12xx_platform_data wl12xx __initdata;
 +
-+struct pdata_init {
-+	const char *compatible;
-+	void (*fn)(void);
-+};
-+
-+static struct pdata_init pdata_quirks[] __initdata = {
-+	{ /* sentinel */ },
-+};
-+
-+void __init pdata_quirks_init(void)
++static void __init __used legacy_init_wl12xx(unsigned ref_clock,
++					     unsigned tcxo_clock,
++					     int gpio)
 +{
-+	struct pdata_init *quirks = pdata_quirks;
++	int res;
 +
-+	while (quirks->compatible) {
-+		if (of_machine_is_compatible(quirks->compatible)) {
-+			if (quirks->fn)
-+				quirks->fn();
-+			break;
-+		}
-+		quirks++;
++	wl12xx.board_ref_clock = ref_clock;
++	wl12xx.board_tcxo_clock = tcxo_clock;
++	wl12xx.irq = gpio_to_irq(gpio);
++
++	res = wl12xx_set_platform_data(&wl12xx);
++	if (res) {
++		pr_err("error setting wl12xx data: %d\n", res);
++		return;
 +	}
 +}
++#else
++static inline void omap_init_wl12xx_of(void)
++{
++}
++#endif
++
+ #ifdef CONFIG_ARCH_OMAP4
+ static void __init omap4_sdp_legacy_init(void)
+ {
+ 	omap_4430sdp_display_init_of();
++	legacy_init_wl12xx(WL12XX_REFCLOCK_26,
++			   WL12XX_TCXOCLOCK_26, 53);
+ }
+ 
+ static void __init omap4_panda_legacy_init(void)
+ {
+ 	omap4_panda_display_init_of();
+ 	legacy_init_ehci_clk("auxclk3_ck");
++	legacy_init_wl12xx(WL12XX_REFCLOCK_38, 0, 53);
+ }
+ #endif
+ 
