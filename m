@@ -1,37 +1,48 @@
-From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Thu, 19 Sep 2013 22:48:01 +0100
-Subject: [PATCH 23/51] DMA-API: dma: pl08x: add dma_set_mask_and_coherent()
- call
-In-Reply-To: <20130919212235.GD12758@n2100.arm.linux.org.uk>
-References: <20130919212235.GD12758@n2100.arm.linux.org.uk>
-Message-ID: <E1VMm4v-0007hz-RC@rmk-PC.arm.linux.org.uk>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 20 Sep 2013 16:04:41 +0100
+Subject: [PATCH] ARM: dts: Update arch timer node with clock frequency
+In-Reply-To: <523C61CB.2050607@codeaurora.org>
+References: <1379499113-20342-1-git-send-email-yuvaraj.cd@samsung.com>
+ <20130918102319.GF26737@e106331-lin.cambridge.arm.com>
+ <CAKuRcOLfRwJohWMhc=QMew87SXtBmkPUJwW7UzNry_gFuC-81Q@mail.gmail.com>
+ <523C048C.10303@arm.com> <523C61CB.2050607@codeaurora.org>
+Message-ID: <523C6409.7080600@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The DMA API requires drivers to call the appropriate dma_set_mask()
-functions before doing any DMA mapping.  Add this required call to
-the AMBA PL08x driver.
+On 20/09/13 15:55, Christopher Covington wrote:
+> On 09/20/2013 04:17 AM, Marc Zyngier wrote:
+>> On 20/09/13 05:57, Yuvaraj Kumar wrote:
+>>> Resending it as it bounced from kernel mailing group
+>>>
+>>> On Wed, Sep 18, 2013 at 3:53 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+>>>> [adding lakml]
+>>>>
+>>>> On Wed, Sep 18, 2013 at 11:11:53AM +0100, Yuvaraj Kumar C D wrote:
+>>>>> Without the "clock-frequency" property in arch timer node, could able
+>>>>> to see the below crash dump.
+>>>>
+>>>> Why does this cause the below crash specifically? What is CNTFRQ reading
+>>>> as?
+>>> Return value of arch_timer_get_cntfrq() is 0
+>>>>
+>>>> Your firmware or bootloader should set CNTFRQ -- setting the
+>>>> clock-frequency is a work-around for buggy firmware/bootloaders that
+>>>> should be avoided as far as possible.
+>>> Why kernel should depend on bootloader/firmware  to set CNTFRQ? Any
+>>> specific reasons?
+>>
+>> Because the kernel can't set it if running non-secure. Only secure mode
+>> can do this (see the ARM ARM for details).
+> 
+> What software outside the kernel actually reads the CNTFRQ and why?
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- drivers/dma/amba-pl08x.c |    5 +++++
- 1 files changed, 5 insertions(+), 0 deletions(-)
+Your favourite virtual machine does, for the same reason the host kernel
+does. And as you can't guess the frequency from userspace, you cannot
+specify it in the guest's DT, getting whatever random number sits in CNTFRQ.
 
-diff --git a/drivers/dma/amba-pl08x.c b/drivers/dma/amba-pl08x.c
-index fce46c5..e51a983 100644
---- a/drivers/dma/amba-pl08x.c
-+++ b/drivers/dma/amba-pl08x.c
-@@ -2055,6 +2055,11 @@ static int pl08x_probe(struct amba_device *adev, const struct amba_id *id)
- 	if (ret)
- 		return ret;
- 
-+	/* Ensure that we can do DMA */
-+	ret = dma_set_mask_and_coherent(&adev->dev, DMA_BIT_MASK(32));
-+	if (ret)
-+		goto out_no_pl08x;
-+
- 	/* Create the driver state holder */
- 	pl08x = kzalloc(sizeof(*pl08x), GFP_KERNEL);
- 	if (!pl08x) {
+As you would expect, things don't go smoothly when that happens.
+
+	M.
 -- 
-1.7.4.4
+Jazz is not dead. It just smells funny...
