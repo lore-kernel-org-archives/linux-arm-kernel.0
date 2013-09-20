@@ -1,38 +1,46 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 20 Sep 2013 14:49:38 +0100
-Subject: [PATCH 42/51] DMA-API: usb: musb: use
- platform_device_register_full() to avoid directly messing with dma
- masks
-In-Reply-To: <20130920131125.GO26101@radagast>
+Date: Fri, 20 Sep 2013 15:00:18 +0100
+Subject: [PATCH 39/51] DMA-API: others: use dma_set_coherent_mask()
+In-Reply-To: <20130920121652.GA7630@mtj.dyndns.org>
 References: <20130919212235.GD12758@n2100.arm.linux.org.uk>
- <E1VMnQk-0007sX-Ty@rmk-PC.arm.linux.org.uk> <20130920131125.GO26101@radagast>
-Message-ID: <20130920134938.GO25647@n2100.arm.linux.org.uk>
+ <E1VMnNq-0007s4-HN@rmk-PC.arm.linux.org.uk>
+ <20130920121652.GA7630@mtj.dyndns.org>
+Message-ID: <20130920140018.GP25647@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 20, 2013 at 08:11:25AM -0500, Felipe Balbi wrote:
-> Hi,
-> 
-> On Fri, Sep 20, 2013 at 12:14:38AM +0100, Russell King wrote:
-> > Use platform_device_register_full() for those drivers which can, to
-> > avoid messing directly with DMA masks.  This can only be done when
-> > the driver does not need to access the allocated musb platform device
-> > from within its callbacks, which may be called during the musb
-> > device probing.
+On Fri, Sep 20, 2013 at 07:16:52AM -0500, Tejun Heo wrote:
+> On Fri, Sep 20, 2013 at 12:11:38AM +0100, Russell King wrote:
+> > The correct way for a driver to specify the coherent DMA mask is
+> > not to directly access the field in the struct device, but to use
+> > dma_set_coherent_mask().  Only arch and bus code should access this
+> > member directly.
+> > 
+> > Convert all direct write accesses to using the correct API.
 > > 
 > > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 > 
-> you want me to carry this one through my tree or you prefer getting my
-> Acked-by ? Either way works for me:
+> Acked-by: Tejun Heo <tj@kernel.org>
 > 
-> Acked-by: Felipe Balbi <balbi@ti.com>
-> 
-> there's also the third option of me setting up a branch with only this
-> patch and we both merge it, that'd also work.
+> The patch is pretty widely spread.  I don't mind how it gets routed
+> but what's the plan?
 
-I think this patch is sufficiently stand-alone that it should be fine
-if you want to take it through your tree.  That may be better in the
-long run to avoid conflicts with this patch and any future work in
-this area during this cycle.
+The plan is... I'm going to try and avoid going through the hell of
+re-posting this patch series to all the recipients another time...
+(It's taken some 17 hours and lots of hand holding to get this patch
+set out without exim jumping off a cliff into deep OOM - soo deep that
+even the OOM killer doesn't run and the CPU is 100% idle because
+every single process stuck in an uninterruptible sleep waiting for
+every other process to free some memory - ouch!)
 
-Thanks.
+I know that dealing with this patch set will be a problem due to how
+widespread this is, but much of the driver level changes come down to
+depending on a couple of patches.  One solution would be if I published
+a branch with just the dependencies in, which subsystem maintainers
+could pull, and then apply the appropriate patches on top.
+
+Another would be if subsystem maintainers are happy that I carry them,
+I can add the acks, and then later on towards the end of the cycle,
+provide a branch subsystem maintainers could pull.
+
+Or... if you can think of something easier...
