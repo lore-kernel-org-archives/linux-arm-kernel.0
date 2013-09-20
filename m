@@ -1,33 +1,49 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 20 Sep 2013 12:44:00 +0530
-Subject: [PATCH 1/3] PM / OPP: rename functions to dev_pm_opp*
-In-Reply-To: <1379624632-17356-2-git-send-email-nm@ti.com>
-References: <1379624632-17356-1-git-send-email-nm@ti.com>
- <1379624632-17356-2-git-send-email-nm@ti.com>
-Message-ID: <CAKohpoku7n6b2dDKD=+3DqG4pHtmWoeXZnAt3EoFRp+rNFofYA@mail.gmail.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Fri, 20 Sep 2013 09:30:37 +0200
+Subject: [PATCH] ARM: tegra_defconfig: enable CONFIG_ARM_APPENDED_DTB
+In-Reply-To: <523BABB2.4090200@wwwdotorg.org>
+References: <1379638594-28888-1-git-send-email-olof@lixom.net>
+ <CAKCjkJbavWtWBxvKqpesmJfcKTUCpbsM_xL0JfS49vOpkZ8AUw@mail.gmail.com>
+ <CAOesGMjP+QMyuLCykg0nW4yWwmnNtoyzf7nK2dPAWuqcpfp5OA@mail.gmail.com>
+ <523BA64F.1050607@wwwdotorg.org>
+ <CAOesGMh8NE7h=BH2sPrG4eE3Vbv0Q5+hCj52gi0072phtjcghw@mail.gmail.com>
+ <523BABB2.4090200@wwwdotorg.org>
+Message-ID: <20130920073036.GA8575@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20 September 2013 02:33, Nishanth Menon <nm@ti.com> wrote:
-> opp_get_opp_count
-> opp_find_freq_exact
-> opp_init_cpufreq_table
-> opp_free_cpufreq_table
+On Thu, Sep 19, 2013 at 07:58:10PM -0600, Stephen Warren wrote:
+> On 09/19/2013 07:39 PM, Olof Johansson wrote:
+> > On Thu, Sep 19, 2013 at 6:35 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> >> On 09/19/2013 07:09 PM, Olof Johansson wrote:
+> >>> They do? The hardware I have came with a very old u-boot. Got a link
+> >>> to the newer one?
+> >>
+> >> Mainline U-Boot runs nicely on the TrimSlice. Missing functionality
+> >> includes PCIe Ethernet and HDMI, but everything else works fine IIRC.
+> >> You can flash it using:
+> >>
+> >> https://github.com/NVIDIA/tegra-uboot-flasher-scripts
+> >>
+> >> (read README-developer.txt first, then README-user.txt)
+> > 
+> > Oh great. Unfortunately lack of PCI-e makes it hard to network boot
+> > (unless I add a redundant usb-ethernet adapter on it). Hmm.
+> 
+> I think Thierry was looking into PCIe, although I don't think it's
+> working yet. I always just use USB even on TrimSlice since it's easier
+> to move the USB connector than the network connector when switching
+> machines:-) PCIe works in Linux now though, as of v3.12-rc1.
 
-The only problem I see is that routines names for few of them are getting
-really long now.. Otherwise not much I could find...
+I have a local branch that makes it work at least on Beaver, but it
+causes the kernel PCIe to fail for reasons that I haven't tracked down
+yet.
 
-Though you had following changes, which you could have avoided in this
-hard to review patchset:
-
-diff --git a/drivers/base/power/opp.c b/drivers/base/power/opp.c
-        new_opp = [-kzalloc(sizeof(struct
-opp),-]{+kzalloc(sizeof(*new_opp),+} GFP_KERNEL);
-        new_opp = [-kmalloc(sizeof(struct
-opp),-]{+kmalloc(sizeof(*new_opp),+} GFP_KERNEL);
-
-It is almost impossible to catch these with naked eyes for such long
-patches.. I took help of --word-diff though :)
-
-If no one else sees these as problems then feel free to add my:
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130920/4e88cc2f/attachment.sig>
