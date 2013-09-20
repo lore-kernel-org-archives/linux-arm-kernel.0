@@ -1,34 +1,30 @@
-From: markus.mayer@linaro.org (Markus Mayer)
-Date: Fri, 20 Sep 2013 16:29:58 -0700
-Subject: [PATCH] ARM: dts: bcm281xx: Add change disk GPIO
-Message-ID: <1379719798-18444-1-git-send-email-markus.mayer@linaro.org>
+From: aaro.koskinen@iki.fi (Aaro Koskinen)
+Date: Sat, 21 Sep 2013 02:40:14 +0300
+Subject: [PATCH] ARM: DTS: omap3-devkit8000.dts: fix a typo
+Message-ID: <1379720414-14960-1-git-send-email-aaro.koskinen@iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Register GPIO 14 as change disk interrupt for the SD card slot.
+"gpmc,sync-clki-ps" is not defined/documented, it should be
+"gpmc,sync-clk-ps" instead.
 
-Signed-off-by: Markus Mayer <markus.mayer@linaro.org>
+Signed-off-by: Aaro Koskinen <aaro.koskinen@iki.fi>
 ---
+ arch/arm/boot/dts/omap3-devkit8000.dts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-This patch depends on [PATCH v9 3/3] ARM: bcm281xx: Add device node for
-the GPIO controller
-(http://lists.infradead.org/pipermail/linux-arm-kernel/2013-September/197399.html)
-and should therefore likely go into Christian's tree.
-
- arch/arm/boot/dts/bcm11351.dtsi |    1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm/boot/dts/bcm11351.dtsi b/arch/arm/boot/dts/bcm11351.dtsi
-index 05a5aab..d384ed5 100644
---- a/arch/arm/boot/dts/bcm11351.dtsi
-+++ b/arch/arm/boot/dts/bcm11351.dtsi
-@@ -93,6 +93,7 @@
- 		compatible = "brcm,kona-sdhci";
- 		reg = <0x3f1b0000 0x10000>;
- 		interrupts = <0x0 73 0x4>;
-+		cd-gpios = <&gpio 14 0>;
- 		status = "disabled";
- 	};
+diff --git a/arch/arm/boot/dts/omap3-devkit8000.dts b/arch/arm/boot/dts/omap3-devkit8000.dts
+index 7ef2827..4665421 100644
+--- a/arch/arm/boot/dts/omap3-devkit8000.dts
++++ b/arch/arm/boot/dts/omap3-devkit8000.dts
+@@ -125,7 +125,7 @@
+ 		nand-bus-width = <16>;
  
+ 		gpmc,device-nand;
+-		gpmc,sync-clki-ps = <0>;
++		gpmc,sync-clk-ps = <0>;
+ 		gpmc,cs-on-ns = <0>;
+ 		gpmc,cs-rd-off-ns = <44>;
+ 		gpmc,cs-wr-off-ns = <44>;
 -- 
-1.7.9.5
+1.8.4.rc3
