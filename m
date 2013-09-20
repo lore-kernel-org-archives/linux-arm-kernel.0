@@ -1,97 +1,62 @@
-From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Fri, 20 Sep 2013 00:12:38 +0100
-Subject: [PATCH 40/51] DMA-API: crypto: fix ixp4xx crypto platform device
- support
-In-Reply-To: <20130919212235.GD12758@n2100.arm.linux.org.uk>
-References: <20130919212235.GD12758@n2100.arm.linux.org.uk>
-Message-ID: <E1VMnOo-0007sC-Li@rmk-PC.arm.linux.org.uk>
+From: nm@ti.com (Nishanth Menon)
+Date: Fri, 20 Sep 2013 07:38:08 -0500
+Subject: [PATCH 1/3] PM / OPP: rename functions to dev_pm_opp*
+In-Reply-To: <CAKohpoku7n6b2dDKD=+3DqG4pHtmWoeXZnAt3EoFRp+rNFofYA@mail.gmail.com>
+References: <1379624632-17356-1-git-send-email-nm@ti.com>
+ <1379624632-17356-2-git-send-email-nm@ti.com>
+ <CAKohpoku7n6b2dDKD=+3DqG4pHtmWoeXZnAt3EoFRp+rNFofYA@mail.gmail.com>
+Message-ID: <20130920123808.GA22176@kahuna>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Don't statically allocate struct device's in modules, and shut the
-warning up with an empty release() function.  There's a reason that
-warning is there and that's not for people to hide in this way.  It's
-there to persuade people to use the correct APIs to allocate platform
-devices.
+On 12:44-20130920, Viresh Kumar wrote:
+> On 20 September 2013 02:33, Nishanth Menon <nm@ti.com> wrote:
+> > opp_get_opp_count
+> > opp_find_freq_exact
+> > opp_init_cpufreq_table
+> > opp_free_cpufreq_table
+> 
+> The only problem I see is that routines names for few of them are getting
+> really long now.. Otherwise not much I could find...
+I am open to suggestions if any one feels we can improve this better.
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- drivers/crypto/ixp4xx_crypto.c |   37 +++++++++++++++++--------------------
- 1 files changed, 17 insertions(+), 20 deletions(-)
+> 
+> Though you had following changes, which you could have avoided in this
+> hard to review patchset:
+> 
+> diff --git a/drivers/base/power/opp.c b/drivers/base/power/opp.c
+>         new_opp = [-kzalloc(sizeof(struct
+> opp),-]{+kzalloc(sizeof(*new_opp),+} GFP_KERNEL);
+>         new_opp = [-kmalloc(sizeof(struct
+> opp),-]{+kmalloc(sizeof(*new_opp),+} GFP_KERNEL);
+> 
+> It is almost impossible to catch these with naked eyes for such long
+> patches.. I took help of --word-diff though :)
+I believe that change was from Patch #2[1]
+yes, you are right, I had squashed this patch in to squelch checkpatch
+warnings:
+CHECK: Prefer kzalloc(sizeof(*new_opp)...) over kzalloc(sizeof(struct
+		       dev_pm_opp)...)
+#177: FILE: drivers/base/power/opp.c:406:
++	new_opp = kzalloc(sizeof(struct dev_pm_opp), GFP_KERNEL);
 
-diff --git a/drivers/crypto/ixp4xx_crypto.c b/drivers/crypto/ixp4xx_crypto.c
-index 21180d6..8306185 100644
---- a/drivers/crypto/ixp4xx_crypto.c
-+++ b/drivers/crypto/ixp4xx_crypto.c
-@@ -218,23 +218,10 @@ static dma_addr_t crypt_phys;
- 
- static int support_aes = 1;
- 
--static void dev_release(struct device *dev)
--{
--	return;
--}
--
- #define DRIVER_NAME "ixp4xx_crypto"
--static struct platform_device pseudo_dev = {
--	.name = DRIVER_NAME,
--	.id   = 0,
--	.num_resources = 0,
--	.dev  = {
--		.coherent_dma_mask = DMA_BIT_MASK(32),
--		.release = dev_release,
--	}
--};
- 
--static struct device *dev = &pseudo_dev.dev;
-+static struct platform_device *pdev;
-+static struct device *dev;
- 
- static inline dma_addr_t crypt_virt2phys(struct crypt_ctl *virt)
- {
-@@ -1418,20 +1405,30 @@ static struct ixp_alg ixp4xx_algos[] = {
- } };
- 
- #define IXP_POSTFIX "-ixp4xx"
-+
-+static const struct platform_device_info ixp_dev_info __initdata = {
-+	.name		= DRIVER_NAME,
-+	.id		= 0,
-+	.dma_mask	= DMA_BIT_MASK(32),
-+};
-+
- static int __init ixp_module_init(void)
- {
- 	int num = ARRAY_SIZE(ixp4xx_algos);
--	int i,err ;
-+	int i, err ;
- 
--	if (platform_device_register(&pseudo_dev))
--		return -ENODEV;
-+	pdev = platform_device_register_full(&ixp_dev_info);
-+	if (IS_ERR(pdev))
-+		return PTR_ERR(pdev);
-+
-+	dev = &pdev->dev;
- 
- 	spin_lock_init(&desc_lock);
- 	spin_lock_init(&emerg_lock);
- 
- 	err = init_ixp_crypto();
- 	if (err) {
--		platform_device_unregister(&pseudo_dev);
-+		platform_device_unregister(pdev);
- 		return err;
- 	}
- 	for (i=0; i< num; i++) {
-@@ -1496,7 +1493,7 @@ static void __exit ixp_module_exit(void)
- 			crypto_unregister_alg(&ixp4xx_algos[i].crypto);
- 	}
- 	release_ixp_crypto();
--	platform_device_unregister(&pseudo_dev);
-+	platform_device_unregister(pdev);
- }
- 
- module_init(ixp_module_init);
+CHECK: Prefer kmalloc(sizeof(*new_opp)...) over kmalloc(sizeof(struct
+		       dev_pm_opp)...)
+#191: FILE: drivers/base/power/opp.c:495:
++	new_opp = kmalloc(sizeof(struct dev_pm_opp), GFP_KERNEL);
+
+
+I had added a comment:
+" Minor checkpatch warning fixes as a result of this change was fixed as
+well."
+
+Would you suggest I split the change off to a separate patch or improve
+ the comment a little more?
+> 
+> If no one else sees these as problems then feel free to add my:
+> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+
+[1] https://patchwork.kernel.org/patch/2913551/
 -- 
-1.7.4.4
+Regards,
+Nishanth Menon
