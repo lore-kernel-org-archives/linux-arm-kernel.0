@@ -1,82 +1,48 @@
-From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Thu, 19 Sep 2013 23:03:03 +0100
-Subject: [PATCH 38/51] DMA-API: staging: use dma_set_coherent_mask()
-In-Reply-To: <20130919212235.GD12758@n2100.arm.linux.org.uk>
-References: <20130919212235.GD12758@n2100.arm.linux.org.uk>
-Message-ID: <E1VMmJT-0007kZ-Kw@rmk-PC.arm.linux.org.uk>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 20 Sep 2013 14:05:46 +0100
+Subject: [GIT PULL] arm64 fixes for 3.12
+Message-ID: <20130920130538.GA32098@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The correct way for a driver to specify the coherent DMA mask is
-not to directly access the field in the struct device, but to use
-dma_set_coherent_mask().  Only arch and bus code should access this
-member directly.
+Hi Linus,
 
-Convert all direct write accesses to using the correct API.
+Please pull the arm64 fixes below for 3.12-rc. Thanks.
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- drivers/staging/dwc2/platform.c        |    5 +++--
- drivers/staging/imx-drm/imx-drm-core.c |    8 ++++++--
- drivers/staging/imx-drm/ipuv3-crtc.c   |    4 +++-
- 3 files changed, 12 insertions(+), 5 deletions(-)
+The following changes since commit 272b98c6455f00884f0350f775c5342358ebb73f:
 
-diff --git a/drivers/staging/dwc2/platform.c b/drivers/staging/dwc2/platform.c
-index 44cce2f..1d68c49 100644
---- a/drivers/staging/dwc2/platform.c
-+++ b/drivers/staging/dwc2/platform.c
-@@ -100,8 +100,9 @@ static int dwc2_driver_probe(struct platform_device *dev)
- 	 */
- 	if (!dev->dev.dma_mask)
- 		dev->dev.dma_mask = &dev->dev.coherent_dma_mask;
--	if (!dev->dev.coherent_dma_mask)
--		dev->dev.coherent_dma_mask = DMA_BIT_MASK(32);
-+	retval = dma_set_coherent_mask(&dev->dev, DMA_BIT_MASK(32));
-+	if (retval)
-+		return retval;
- 
- 	irq = platform_get_irq(dev, 0);
- 	if (irq < 0) {
-diff --git a/drivers/staging/imx-drm/imx-drm-core.c b/drivers/staging/imx-drm/imx-drm-core.c
-index 47c5888..847f430 100644
---- a/drivers/staging/imx-drm/imx-drm-core.c
-+++ b/drivers/staging/imx-drm/imx-drm-core.c
-@@ -805,6 +805,12 @@ static struct drm_driver imx_drm_driver = {
- 
- static int imx_drm_platform_probe(struct platform_device *pdev)
- {
-+	int ret;
-+
-+	ret = dma_set_coherent_mask(&pdev->dev, DMA_BIT_MASK(32));
-+	if (ret)
-+		return ret;
-+
- 	imx_drm_device->dev = &pdev->dev;
- 
- 	return drm_platform_init(&imx_drm_driver, pdev);
-@@ -847,8 +853,6 @@ static int __init imx_drm_init(void)
- 		goto err_pdev;
- 	}
- 
--	imx_drm_pdev->dev.coherent_dma_mask = DMA_BIT_MASK(32),
--
- 	ret = platform_driver_register(&imx_drm_pdrv);
- 	if (ret)
- 		goto err_pdrv;
-diff --git a/drivers/staging/imx-drm/ipuv3-crtc.c b/drivers/staging/imx-drm/ipuv3-crtc.c
-index 6fd37a7..9e73e8d 100644
---- a/drivers/staging/imx-drm/ipuv3-crtc.c
-+++ b/drivers/staging/imx-drm/ipuv3-crtc.c
-@@ -523,7 +523,9 @@ static int ipu_drm_probe(struct platform_device *pdev)
- 	if (!pdata)
- 		return -EINVAL;
- 
--	pdev->dev.coherent_dma_mask = DMA_BIT_MASK(32);
-+	ret = dma_set_coherent_mask(&pdev->dev, DMA_BIT_MASK(32));
-+	if (ret)
-+		return ret;
- 
- 	ipu_crtc = devm_kzalloc(&pdev->dev, sizeof(*ipu_crtc), GFP_KERNEL);
- 	if (!ipu_crtc)
+  Linux 3.12-rc1 (2013-09-16 16:17:51 -0400)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/cmarinas/linux-aarch64.git tags/arm64-stable
+
+for you to fetch changes up to 25804e6a96681d5d2142058948e218999e4f547c:
+
+  arm64: Widen hwcap to be 64 bit (2013-09-20 09:56:07 +0100)
+
+----------------------------------------------------------------
+- Compat register fault reporting fix
+- Documentation clarification on tagged pointers
+- hwcap widened to 64-bit (user space already reading it as 64-bit)
+
+----------------------------------------------------------------
+Catalin Marinas (2):
+      arm64: Make do_bad_area() function static
+      arm64: Correctly report LR and SP for compat tasks
+
+Steve Capper (1):
+      arm64: Widen hwcap to be 64 bit
+
+Will Deacon (1):
+      arm64: documentation: tighten up tagged pointer documentation
+
+ Documentation/arm64/tagged-pointers.txt | 14 +++++++-------
+ arch/arm64/include/asm/hwcap.h          |  2 +-
+ arch/arm64/kernel/process.c             | 21 ++++++++++++++++-----
+ arch/arm64/kernel/setup.c               |  2 +-
+ arch/arm64/mm/fault.c                   |  2 +-
+ 5 files changed, 26 insertions(+), 15 deletions(-)
+
 -- 
-1.7.4.4
+Catalin
