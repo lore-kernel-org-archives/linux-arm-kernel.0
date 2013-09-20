@@ -1,23 +1,24 @@
-From: aaro.koskinen@iki.fi (Aaro Koskinen)
-Date: Fri, 20 Sep 2013 23:58:15 +0300
-Subject: [PATCH 0/8] IOP GPIO refactoring take 2
-In-Reply-To: <1379708226-7802-1-git-send-email-linus.walleij@linaro.org>
-References: <1379708226-7802-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <20130920205815.GF30568@blackmetal.musicnaut.iki.fi>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 20 Sep 2013 22:59:46 +0200
+Subject: [PATCH 22/41] clk: ux500: Copy u8500_clk_init() ready for DT
+ enablement
+In-Reply-To: <1379506478-16625-23-git-send-email-lee.jones@linaro.org>
+References: <1379506478-16625-1-git-send-email-lee.jones@linaro.org>
+ <1379506478-16625-23-git-send-email-lee.jones@linaro.org>
+Message-ID: <CACRpkdZ+kg8VEMZ6gy6CG=YK0Ycj-Ud-UuRohzKgE4UW_VUMjg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Sep 18, 2013 at 2:14 PM, Lee Jones <lee.jones@linaro.org> wrote:
 
-On Fri, Sep 20, 2013 at 10:17:06PM +0200, Linus Walleij wrote:
-> Testing and ACKing appreciated.
+> Here we're using the old clock initialisation function as a template.
+> It's necessary to remove all of the clk_register_clkdev() calls as
+> they don't make sense when booting with Device Tree.
+>
+> Cc: Mike Turquette <mturquette@linaro.org>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
-I think it looks good now. I applied the patches 1-8 on top of 3.12-rc1,
-and Thecus N2100 boots fine and pressing the power button restarts the
-system as expected. So for the whole series:
+I *really* like the looks of this! Mike can we have your ACK on this?
 
-Tested-by: Aaro Koskinen <aaro.koskinen@iki.fi>
-
-Thanks,
-
-A.
+Yours,
+Linus Walleij
