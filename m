@@ -1,143 +1,38 @@
-From: pali.rohar@gmail.com (Pali =?utf-8?q?Roh=C3=A1r?=)
-Date: Fri, 20 Sep 2013 21:22:06 +0200
-Subject: [PATCH 4/4] RX-51: Add platform function and data for bq24150a
- charger
-In-Reply-To: <1378630239-10006-5-git-send-email-pali.rohar@gmail.com>
-References: <1378630239-10006-1-git-send-email-pali.rohar@gmail.com>
- <1378630239-10006-5-git-send-email-pali.rohar@gmail.com>
-Message-ID: <201309202122.06327@pali>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 20 Sep 2013 21:24:12 +0200
+Subject: [PATCH 5/7] staging: media/lirc: switch to use gpiolib
+In-Reply-To: <CACRpkdaBeYTchtQn6-QThAv2XWAT=vd=YarHA1TgVZeLoLNfpA@mail.gmail.com>
+References: <1378816283-8164-1-git-send-email-linus.walleij@linaro.org>
+ <CACRpkdaBeYTchtQn6-QThAv2XWAT=vd=YarHA1TgVZeLoLNfpA@mail.gmail.com>
+Message-ID: <CACRpkdb9vdaJsURFx0-P_G-quGGm5Uwdn9_Bqy0QVtRZ7_g2qg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 08 September 2013 10:50:39 Pali Roh?r wrote:
-> This patch will register bq24150a charger in RX-51 board data.
-> Patch also adding platform function between isp1704 and
-> bq2415x drivers for detecting charger type.
-> 
-> So finally charging battery on Nokia N900 (RX-51) working
-> automatically without any proprietary Nokia bits in userspace.
-> 
-> Signed-off-by: Pali Roh?r <pali.rohar@gmail.com>
-> ---
->  arch/arm/mach-omap2/board-rx51-peripherals.c |   56
-> +++++++++++++++++++++++++- 1 file changed, 55 insertions(+),
-> 1 deletion(-)
-> 
-> diff --git a/arch/arm/mach-omap2/board-rx51-peripherals.c
-> b/arch/arm/mach-omap2/board-rx51-peripherals.c index
-> 9c2dd10..a993ffe 100644
-> --- a/arch/arm/mach-omap2/board-rx51-peripherals.c
-> +++ b/arch/arm/mach-omap2/board-rx51-peripherals.c
-> @@ -25,6 +25,7 @@
->  #include <linux/gpio_keys.h>
->  #include <linux/mmc/host.h>
->  #include <linux/power/isp1704_charger.h>
-> +#include <linux/power/bq2415x_charger.h>
->  #include <linux/platform_data/spi-omap2-mcspi.h>
->  #include <linux/platform_data/mtd-onenand-omap2.h>
-> 
-> @@ -270,6 +271,44 @@ static struct platform_device
-> rx51_battery_device = { .id	= -1,
->  };
-> 
-> +static enum bq2415x_mode rx51_charger_mode =
-> BQ2415X_MODE_OFF; +static void *rx51_charger_hook_data;
-> +static void (*rx51_charger_hook)(enum bq2415x_mode mode, void
-> *data); +
-> +static int rx51_charger_set_hook(
-> +		void (*hook)(enum bq2415x_mode mode, void *data), void
-> *data) +{
-> +	rx51_charger_hook = hook;
-> +	rx51_charger_hook_data = data;
-> +	if (rx51_charger_hook)
-> +		rx51_charger_hook(rx51_charger_mode,
-> rx51_charger_hook_data); +	return 1;
-> +}
-> +
-> +static void rx51_charger_set_current(int mA)
-> +{
-> +	enum bq2415x_mode mode;
-> +
-> +	pr_info("RX-51: Charger current limit is %d mA\n", mA);
-> +
-> +	if (mA == 0)
-> +		mode = BQ2415X_MODE_OFF;
-> +	else if (mA < 500)
-> +		mode = BQ2415X_MODE_NONE;
-> +	else if (mA < 1800)
-> +		mode = BQ2415X_MODE_HOST_CHARGER;
-> +	else
-> +		mode = BQ2415X_MODE_DEDICATED_CHARGER;
-> +
-> +	if (rx51_charger_mode == mode)
-> +		return;
-> +
-> +	rx51_charger_mode = mode;
-> +
-> +	if (rx51_charger_hook)
-> +		rx51_charger_hook(rx51_charger_mode,
-> rx51_charger_hook_data); +}
-> +
->  static void rx51_charger_set_power(bool on)
->  {
->  	gpio_set_value(RX51_USB_TRANSCEIVER_RST_GPIO, on);
-> @@ -277,6 +316,7 @@ static void rx51_charger_set_power(bool
-> on)
-> 
->  static struct isp1704_charger_data rx51_charger_data = {
->  	.set_power	= rx51_charger_set_power,
-> +	.set_current	= rx51_charger_set_current,
->  };
-> 
->  static struct platform_device rx51_charger_device = {
-> @@ -1017,6 +1057,16 @@ static struct aic3x_pdata
-> rx51_aic3x_data2 = { .gpio_reset = 60,
->  };
-> 
-> +static struct bq2415x_platform_data
-> rx51_bq24150a_platform_data = { +	.current_limit = 100,			
-/*
-> mA */
-> +	.weak_battery_voltage = 3400,		/* mV */
-> +	.battery_regulation_voltage = 4200,	/* mV */
-> +	.charge_current = 650,			/* mA */
-> +	.termination_current = 100,		/* mA */
-> +	.resistor_sense = 68,			/* m ohm */
-> +	.set_mode_hook = &rx51_charger_set_hook,
-> +};
-> +
->  static struct i2c_board_info __initdata
-> rx51_peripherals_i2c_board_info_2[] = { {
->  		I2C_BOARD_INFO("tlv320aic3x", 0x18),
-> @@ -1044,7 +1094,11 @@ static struct i2c_board_info __initdata
-> rx51_peripherals_i2c_board_info_2[] = { {
->  		I2C_BOARD_INFO("tpa6130a2", 0x60),
->  		.platform_data = &rx51_tpa6130a2_data,
-> -	}
-> +	},
-> +	{
-> +		I2C_BOARD_INFO("bq24150a", 0x6b),
-> +		.platform_data = &rx51_bq24150a_platform_data,
-> +	},
->  };
-> 
->  static struct i2c_board_info __initdata
-> rx51_peripherals_i2c_board_info_3[] = {
+On Fri, Sep 13, 2013 at 9:14 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> Hi Mauro,
+>
+> On Tue, Sep 10, 2013 at 2:31 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+>
+>> The lirc serial module has special hooks to work with NSLU2,
+>> switch these over to use gpiolib, as that is available on the
+>> ixp4 platform.
+>>
+>> Not even compile tested as there is no way to select this
+>> driver from menuconfig on the ixp4 platform.
+>>
+>> Cc: Imre Kaloz <kaloz@openwrt.org>
+>> Cc: Krzysztof Halasa <khc@pm.waw.pl>
+>> Cc: Alexandre Courbot <acourbot@nvidia.com>
+>> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+>> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+>> ---
+>> Hi Greg: I'm seeking an ACK on this patch to take it through
+>> the GPIO tree as part of a clean-up attempt to remove custom
+>> GPIO APIs.
+>
+> Could you ACK this patch if it looks OK to you?
 
-Tony, can you look and review this board patch?
+Mauro, ping on this.
 
-I think that this patch series it the most important for Nokia 
-N900, because it finally bringing charging support. And without 
-charging battery it very hard to use phone which has power supply 
-only from battery.
-
--- 
-Pali Roh?r
-pali.rohar at gmail.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130920/f25e367a/attachment.sig>
+Yours,
+Linus Walleij
