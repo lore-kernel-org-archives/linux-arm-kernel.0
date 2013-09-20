@@ -1,44 +1,45 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 20 Sep 2013 09:17:16 +0100
-Subject: [PATCH] ARM: dts: Update arch timer node with clock frequency
-In-Reply-To: <CAKuRcOLfRwJohWMhc=QMew87SXtBmkPUJwW7UzNry_gFuC-81Q@mail.gmail.com>
-References: <1379499113-20342-1-git-send-email-yuvaraj.cd@samsung.com>
- <20130918102319.GF26737@e106331-lin.cambridge.arm.com>
- <CAKuRcOLfRwJohWMhc=QMew87SXtBmkPUJwW7UzNry_gFuC-81Q@mail.gmail.com>
-Message-ID: <523C048C.10303@arm.com>
+From: khalasa@piap.pl (Krzysztof =?utf-8?Q?Ha=C5=82asa?=)
+Date: Fri, 20 Sep 2013 10:40:10 +0200
+Subject: [PATCH] IXP4xx: Add Gateworks Cambria support.
+In-Reply-To: <op.w3oex8sc2s3iss@ecaz> (Imre Kaloz's message of "Thu, 19 Sep
+ 2013 22:52:46 +0200")
+References: <m3vc1ya9fw.fsf@t19.piap.pl> <op.w3oex8sc2s3iss@ecaz>
+Message-ID: <m37gebanth.fsf@t19.piap.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/09/13 05:57, Yuvaraj Kumar wrote:
-> Resending it as it bounced from kernel mailing group
-> 
-> On Wed, Sep 18, 2013 at 3:53 PM, Mark Rutland <mark.rutland@arm.com> wrote:
->> [adding lakml]
->>
->> On Wed, Sep 18, 2013 at 11:11:53AM +0100, Yuvaraj Kumar C D wrote:
->>> Without the "clock-frequency" property in arch timer node, could able
->>> to see the below crash dump.
->>
->> Why does this cause the below crash specifically? What is CNTFRQ reading
->> as?
-> Return value of arch_timer_get_cntfrq() is 0
->>
->> Your firmware or bootloader should set CNTFRQ -- setting the
->> clock-frequency is a work-around for buggy firmware/bootloaders that
->> should be avoided as far as possible.
-> Why kernel should depend on bootloader/firmware  to set CNTFRQ? Any
-> specific reasons?
+"Imre Kaloz" <kaloz@openwrt.org> writes:
 
-Because the kernel can't set it if running non-secure. Only secure mode
-can do this (see the ARM ARM for details).
+> This file seems to miss both the copyright from the code it's based on
+> as well as most of the additional support that one has.
+> So what's the point?
 
-> Should'nt be indepenedent each other(kernel and bootloader/firmware)?
+I have the smaller Cambria (GW2350), not the bigger one which is also
+supported by OpenWRT. I'm not going to blindly pick up the OpenWRT code
+for which I don't have the hw and which I can't really test nor
+maintain.
+The file contains information that it's partially based on OpenWRT, is it
+now a bad idea to pick up fragments from one GPLv2 project (OpenWRT) and
+include them in another GPLv2 project (Linux kernel)? Isn't it what
+OpenWRT does (in the opposite direction)? Aren't all the boards (in this
+particular case) based on Avila and IXDP425, the devel platform?
 
-In my book, the firmware is responsible for setting up the platform in a
-sane state. Leaving CNTFRQ in its UNKNOWN reset state is a bug, and your
-firmware should program it on each CPU. Same goes for CNTVOFF, which
-should be set to a common value (preferably zero).
+The code doesn't carry any copyright headers maybe because in my country
+they aren't required, maybe because it's a trivial board support code
+which is mostly a list of devices and I didn't bother, and it doesn't
+have OpenWRT copyright because it's not a version from OpenWRT (while
+its parts are, as prominently stated). For precisely the same reason I
+list myself as the platform maintainer, I don't feel authorized to put
+somebody else here.
 
-	M.
+But I have an idea. I would be pleased if you submit and maintain (in
+the official Linux, not OpenWRT) your own version instead. It would be
+great if you also include Ubiquity RouterStation Pro (ATH79) and
+Gateworks Laguna (CNS3xxx). Those boards are supported for a long time
+by OpenWRT (at least there is support code there) and I'm personally
+using them with (stock) Linux.
 -- 
-Jazz is not dead. It just smells funny...
+Krzysztof Halasa
+
+Research Institute for Automation and Measurements PIAP
+Al. Jerozolimskie 202, 02-486 Warsaw, Poland
