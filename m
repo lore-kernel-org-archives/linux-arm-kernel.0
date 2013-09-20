@@ -1,40 +1,29 @@
-From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Thu, 19 Sep 2013 22:57:02 +0100
-Subject: [PATCH 32/51] DMA-API: mmc: sdhci-acpi: use
- dma_coerce_mask_and_coherent()
-In-Reply-To: <20130919212235.GD12758@n2100.arm.linux.org.uk>
+From: tj@kernel.org (Tejun Heo)
+Date: Fri, 20 Sep 2013 07:16:52 -0500
+Subject: [PATCH 39/51] DMA-API: others: use dma_set_coherent_mask()
+In-Reply-To: <E1VMnNq-0007s4-HN@rmk-PC.arm.linux.org.uk>
 References: <20130919212235.GD12758@n2100.arm.linux.org.uk>
-Message-ID: <E1VMmDe-0007j6-Tj@rmk-PC.arm.linux.org.uk>
+ <E1VMnNq-0007s4-HN@rmk-PC.arm.linux.org.uk>
+Message-ID: <20130920121652.GA7630@mtj.dyndns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The code sequence:
-	dev->dma_mask = &dev->coherent_dma_mask;
-	dev->coherent_dma_mask = dma_mask;
-bypasses the architectures check on the DMA mask.  It can be replaced
-with dma_coerce_mask_and_coherent(), avoiding the direct initialization
-of this mask.
+On Fri, Sep 20, 2013 at 12:11:38AM +0100, Russell King wrote:
+> The correct way for a driver to specify the coherent DMA mask is
+> not to directly access the field in the struct device, but to use
+> dma_set_coherent_mask().  Only arch and bus code should access this
+> member directly.
+> 
+> Convert all direct write accesses to using the correct API.
+> 
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- drivers/mmc/host/sdhci-acpi.c |    5 +++--
- 1 files changed, 3 insertions(+), 2 deletions(-)
+Acked-by: Tejun Heo <tj@kernel.org>
 
-diff --git a/drivers/mmc/host/sdhci-acpi.c b/drivers/mmc/host/sdhci-acpi.c
-index cdd4ce0..ef19874 100644
---- a/drivers/mmc/host/sdhci-acpi.c
-+++ b/drivers/mmc/host/sdhci-acpi.c
-@@ -310,8 +310,9 @@ static int sdhci_acpi_probe(struct platform_device *pdev)
- 			dma_mask = DMA_BIT_MASK(32);
- 		}
- 
--		dev->dma_mask = &dev->coherent_dma_mask;
--		dev->coherent_dma_mask = dma_mask;
-+		err = dma_coerce_mask_and_coherent(dev, dma_mask);
-+		if (err)
-+			goto err_free;
- 	}
- 
- 	if (c->slot) {
+The patch is pretty widely spread.  I don't mind how it gets routed
+but what's the plan?
+
+Thanks.
+
 -- 
-1.7.4.4
+tejun
