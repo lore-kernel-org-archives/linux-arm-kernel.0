@@ -1,38 +1,36 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 20 Sep 2013 22:21:05 +0530
-Subject: [PATCH 1/3] PM / OPP: rename functions to dev_pm_opp*
-In-Reply-To: <20130920123808.GA22176@kahuna>
-References: <1379624632-17356-1-git-send-email-nm@ti.com>
- <1379624632-17356-2-git-send-email-nm@ti.com>
- <CAKohpoku7n6b2dDKD=+3DqG4pHtmWoeXZnAt3EoFRp+rNFofYA@mail.gmail.com>
- <20130920123808.GA22176@kahuna>
-Message-ID: <CAKohpoktS4ZSQAeKvu3hdVsKkzcbKFvHvR2=wCA3qeB6moPphA@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 20 Sep 2013 10:16:48 -0700
+Subject: [RFC PATCH] ARM: OMAP3630: Add generic machine descriptor
+In-Reply-To: <20130920162329.GC18721@radagast>
+References: <1379693332-10585-1-git-send-email-nm@ti.com>
+ <CAOesGMj6G7LeYUJsGpZHxKOjiNrk+1U55QFqcQyTb6_Co+n4zQ@mail.gmail.com>
+ <20130920162329.GC18721@radagast>
+Message-ID: <CAOesGMiru=RUHS4XKLL=DC+hxtAJqtcjgd5hPbaccnAfEZ3y0g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20 September 2013 18:08, Nishanth Menon <nm@ti.com> wrote:
+On Fri, Sep 20, 2013 at 9:23 AM, Felipe Balbi <balbi@ti.com> wrote:
+> Hi,
+>
+> On Fri, Sep 20, 2013 at 09:19:02AM -0700, Olof Johansson wrote:
+>> On Fri, Sep 20, 2013 at 9:08 AM, Nishanth Menon <nm@ti.com> wrote:
+>> > An alternative approach may be to (for all SoCs):
+>> > 1. define every SoC entry - ti,omap3430 ti,omap3630...
+>> > 2. have a generic omap3_init which uses "if (of_machine_is_compatible("ti,omap3630"))"
+>> > to invoke the appropriate omap3xxx_init_early.
+>>
+>> Yes, this would be better, but you can do add a DT_MACHINE as in this
+>> patch but have ti,omap3630 as the dt_compat table. Then there's no
+>> need to add runtime checks.
+>
+> I was going to reply that adding of_machine_is_compatible("ti,omap3630")
+> would help in some situations, but guess it's already tainted ;-)
 
-> I am open to suggestions if any one feels we can improve this better.
+Oh, if it's just a few checks, then by all means go down that route. I
+didn't look at the code to see how much it would be.
 
-I didn't really had one.. I thought of pm_opp** instead of dev_pm_opp**
-though..
+But if a new DT_MACHINE is added, then it should definitely be based
+on ti,omap3630 instead of listing all the boards.
 
-> I believe that change was from Patch #2[1]
 
-Yeah.. I just replied on a single patch :)
-
-> yes, you are right, I had squashed this patch in to squelch checkpatch
-> warnings:
-
-I see..
-
-> I had added a comment:
-> " Minor checkpatch warning fixes as a result of this change was fixed as
-> well."
-
-I really missed that..
-
-> Would you suggest I split the change off to a separate patch or improve
->  the comment a little more?
-
-don't really know, maybe leave those as is and let checkpatch warn you..
+-Olof
