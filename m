@@ -1,13 +1,39 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Fri, 20 Sep 2013 10:16:47 -0700
-Subject: [PATCH v3] clk: si570: Add a driver for SI570 oscillators
-In-Reply-To: <1379695005-5391-1-git-send-email-soren.brinkmann@xilinx.com>
-References: <1379695005-5391-1-git-send-email-soren.brinkmann@xilinx.com>
-Message-ID: <c7d7caa7-1ce8-4b79-a149-865321e28f59@VA3EHSMHS020.ehs.local>
+From: heiko@sntech.de (Heiko =?utf-8?q?St=C3=BCbner?=)
+Date: Fri, 20 Sep 2013 19:26:27 +0200
+Subject: [PATCH 24/51] DMA-API: dma: pl330: add
+ dma_set_mask_and_coherent() call
+In-Reply-To: <E1VMm5t-0007i5-V7@rmk-PC.arm.linux.org.uk>
+References: <20130919212235.GD12758@n2100.arm.linux.org.uk>
+ <E1VMm5t-0007i5-V7@rmk-PC.arm.linux.org.uk>
+Message-ID: <201309201926.29084.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ignore this one. There is and if statement missing when handling an
-error. Don't know how that slipped through. Sorry.
+Am Donnerstag, 19. September 2013, 23:49:01 schrieb Russell King:
+> The DMA API requires drivers to call the appropriate dma_set_mask()
+> functions before doing any DMA mapping.  Add this required call to
+> the AMBA PL08x driver.
+			^--- copy and paste error - should of course be PL330
 
-	S?ren
+
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> ---
+>  drivers/dma/pl330.c |    4 ++++
+>  1 files changed, 4 insertions(+), 0 deletions(-)
+> 
+> diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
+> index a562d24..df8b10f 100644
+> --- a/drivers/dma/pl330.c
+> +++ b/drivers/dma/pl330.c
+> @@ -2903,6 +2903,10 @@ pl330_probe(struct amba_device *adev, const struct
+> amba_id *id)
+> 
+>  	pdat = dev_get_platdata(&adev->dev);
+> 
+> +	ret = dma_set_mask_and_coherent(&adev->dev, DMA_BIT_MASK(32));
+> +	if (ret)
+> +		return ret;
+> +
+>  	/* Allocate a new DMAC and its Channels */
+>  	pdmac = devm_kzalloc(&adev->dev, sizeof(*pdmac), GFP_KERNEL);
+>  	if (!pdmac) {
