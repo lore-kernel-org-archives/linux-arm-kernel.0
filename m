@@ -1,46 +1,33 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 20 Sep 2013 15:00:18 +0100
-Subject: [PATCH 39/51] DMA-API: others: use dma_set_coherent_mask()
-In-Reply-To: <20130920121652.GA7630@mtj.dyndns.org>
+Date: Fri, 20 Sep 2013 15:12:44 +0100
+Subject: [PATCH 01/51] DMA-API: provide a helper to set both DMA and
+ coherent DMA masks
+In-Reply-To: <1379640097.2500.4.camel@bwh-desktop.uk.level5networks.com>
 References: <20130919212235.GD12758@n2100.arm.linux.org.uk>
- <E1VMnNq-0007s4-HN@rmk-PC.arm.linux.org.uk>
- <20130920121652.GA7630@mtj.dyndns.org>
-Message-ID: <20130920140018.GP25647@n2100.arm.linux.org.uk>
+ <E1VMlja-0007fA-HU@rmk-PC.arm.linux.org.uk>
+ <1379640097.2500.4.camel@bwh-desktop.uk.level5networks.com>
+Message-ID: <20130920141244.GQ25647@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 20, 2013 at 07:16:52AM -0500, Tejun Heo wrote:
-> On Fri, Sep 20, 2013 at 12:11:38AM +0100, Russell King wrote:
-> > The correct way for a driver to specify the coherent DMA mask is
-> > not to directly access the field in the struct device, but to use
-> > dma_set_coherent_mask().  Only arch and bus code should access this
-> > member directly.
-> > 
-> > Convert all direct write accesses to using the correct API.
-> > 
-> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+On Fri, Sep 20, 2013 at 02:21:37AM +0100, Ben Hutchings wrote:
+> On Thu, 2013-09-19 at 22:25 +0100, Russell King wrote:
+> [...]
+> > -dma_set_coherent_mask() will always be able to set the same or a
+> > -smaller mask as dma_set_mask(). However for the rare case that a
+> > +The coherent coherent mask will always be able to set the same or a
+> > +smaller mask as the streaming mask. However for the rare case that a
+> [...]
 > 
-> Acked-by: Tejun Heo <tj@kernel.org>
+> The new wording doesn't make sense; a mask doesn't set itself.  I would
+> suggest:
 > 
-> The patch is pretty widely spread.  I don't mind how it gets routed
-> but what's the plan?
+> "The coherent mask can always be set to the same or a smaller mask than
+> the streaming mask."
 
-The plan is... I'm going to try and avoid going through the hell of
-re-posting this patch series to all the recipients another time...
-(It's taken some 17 hours and lots of hand holding to get this patch
-set out without exim jumping off a cliff into deep OOM - soo deep that
-even the OOM killer doesn't run and the CPU is 100% idle because
-every single process stuck in an uninterruptible sleep waiting for
-every other process to free some memory - ouch!)
+Yes, the original sentence is not particularly good, but I think even
+your modified version can be interpreted as "a mask setting itself"
+for all the same reasons that the original can be (which mask does "same"
+refer to?)
 
-I know that dealing with this patch set will be a problem due to how
-widespread this is, but much of the driver level changes come down to
-depending on a couple of patches.  One solution would be if I published
-a branch with just the dependencies in, which subsystem maintainers
-could pull, and then apply the appropriate patches on top.
-
-Another would be if subsystem maintainers are happy that I carry them,
-I can add the acks, and then later on towards the end of the cycle,
-provide a branch subsystem maintainers could pull.
-
-Or... if you can think of something easier...
+Even so, I prefer your version.  Thanks. :)
