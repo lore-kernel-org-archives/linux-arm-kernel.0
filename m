@@ -1,34 +1,68 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 19 Sep 2013 19:58:10 -0600
-Subject: [PATCH] ARM: tegra_defconfig: enable CONFIG_ARM_APPENDED_DTB
-In-Reply-To: <CAOesGMh8NE7h=BH2sPrG4eE3Vbv0Q5+hCj52gi0072phtjcghw@mail.gmail.com>
-References: <1379638594-28888-1-git-send-email-olof@lixom.net>
- <CAKCjkJbavWtWBxvKqpesmJfcKTUCpbsM_xL0JfS49vOpkZ8AUw@mail.gmail.com>
- <CAOesGMjP+QMyuLCykg0nW4yWwmnNtoyzf7nK2dPAWuqcpfp5OA@mail.gmail.com>
- <523BA64F.1050607@wwwdotorg.org>
- <CAOesGMh8NE7h=BH2sPrG4eE3Vbv0Q5+hCj52gi0072phtjcghw@mail.gmail.com>
-Message-ID: <523BABB2.4090200@wwwdotorg.org>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Thu, 19 Sep 2013 23:46:13 -0400
+Subject: [GIT PULL] ARM: mvebu: fixes for v3.12
+Message-ID: <20130920034613.GB11119@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/19/2013 07:39 PM, Olof Johansson wrote:
-> On Thu, Sep 19, 2013 at 6:35 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
->> On 09/19/2013 07:09 PM, Olof Johansson wrote:
->>> They do? The hardware I have came with a very old u-boot. Got a link
->>> to the newer one?
->>
->> Mainline U-Boot runs nicely on the TrimSlice. Missing functionality
->> includes PCIe Ethernet and HDMI, but everything else works fine IIRC.
->> You can flash it using:
->>
->> https://github.com/NVIDIA/tegra-uboot-flasher-scripts
->>
->> (read README-developer.txt first, then README-user.txt)
-> 
-> Oh great. Unfortunately lack of PCI-e makes it hard to network boot
-> (unless I add a redundant usb-ethernet adapter on it). Hmm.
+Guys,
 
-I think Thierry was looking into PCIe, although I don't think it's
-working yet. I always just use USB even on TrimSlice since it's easier
-to move the USB connector than the network connector when switching
-machines:-) PCIe works in Linux now though, as of v3.12-rc1.
+We have a relatively long list of fixes this time around.  The two
+of_node_put()'s were left over from before the merge window (part of
+mvebu/fixes-non-critical).
+
+The two for the Armada XP clocks are to fix booting v3.12-rc1 since the
+corresponding driver changes were merged at the last minute.  These were
+originally part of mvebu/dt for v3.12, but have since become fixes.
+
+The other two just cropped up since v3.12-rc1 dropped.
+
+thx,
+
+Jason.
+
+The following changes since commit 272b98c6455f00884f0350f775c5342358ebb73f:
+
+  Linux 3.12-rc1 (2013-09-16 16:17:51 -0400)
+
+are available in the git repository at:
+
+  git://git.infradead.org/linux-mvebu.git tags/fixes-3.12
+
+for you to fetch changes up to ddf7e399024aa908573a08d6339cefa6253b83db:
+
+  ARM: kirkwood: Fix address of second XOR engine (2013-09-20 03:16:20 +0000)
+
+----------------------------------------------------------------
+mvebu fixes for v3.12
+
+ - mvebu
+    - fix reference leaks by adding of_node_put()
+    - update Armada XP DT clock properties to restore booting
+
+ - kirkwood
+    - add missing reg property for cpu at 0
+    - fix typo in address of second XOR engine
+
+----------------------------------------------------------------
+Andrew Lunn (1):
+      ARM: Kirkwood: Add missing DT reg property to cpu at 0
+
+Ezequiel Garcia (2):
+      ARM: mvebu: Add the reference 25 MHz fixed-clock to Armada XP
+      ARM: mvebu: Add clock properties to Armada XP timer node
+
+Jisheng Zhang (2):
+      ARM: mvebu: add missing of_node_put() to fix reference leak
+      bus: mvebu: add missing of_node_put() to fix reference leak
+
+Quentin Armitage (1):
+      ARM: kirkwood: Fix address of second XOR engine
+
+ arch/arm/boot/dts/armada-xp.dtsi        | 11 +++++++++++
+ arch/arm/boot/dts/kirkwood.dtsi         |  3 ++-
+ arch/arm/mach-mvebu/coherency.c         |  8 +++++++-
+ arch/arm/mach-mvebu/pmsu.c              |  1 +
+ arch/arm/mach-mvebu/system-controller.c |  1 +
+ drivers/bus/mvebu-mbus.c                |  6 +++++-
+ 6 files changed, 27 insertions(+), 3 deletions(-)
