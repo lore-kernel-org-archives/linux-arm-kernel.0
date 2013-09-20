@@ -1,39 +1,33 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Fri, 20 Sep 2013 14:11:32 -0500
-Subject: [PATCH 1/1] ARM: dts: am335x-bone-common: correct mux mode for
- mmc1_cmd
-In-Reply-To: <1379698696-21945-1-git-send-email-balajitk@ti.com>
-References: <1379698696-21945-1-git-send-email-balajitk@ti.com>
-Message-ID: <523C9DE4.6040109@ti.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Fri, 20 Sep 2013 15:12:10 -0400 (EDT)
+Subject: [PATCH 0/4] ARM: NEON based fast(er) AES in CBC/CTR/XTS modes
+In-Reply-To: <1379702811-8025-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1379702811-8025-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <alpine.LFD.2.03.1309201501010.312@syhkavp.arg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/20/2013 12:38 PM, Balaji T K wrote:
-> correct mux mode for mmc1_cmd to detect eMMC on bone-black
-> 
-> Signed-off-by: Balaji T K <balajitk@ti.com>
-> ---
->  arch/arm/boot/dts/am335x-bone-common.dtsi |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/am335x-bone-common.dtsi b/arch/arm/boot/dts/am335x-bone-common.dtsi
-> index 56361ce..90ab56c 100644
-> --- a/arch/arm/boot/dts/am335x-bone-common.dtsi
-> +++ b/arch/arm/boot/dts/am335x-bone-common.dtsi
-> @@ -117,7 +117,7 @@
->  		emmc_pins: pinmux_emmc_pins {
->  			pinctrl-single,pins = <
->  				0x80 (PIN_INPUT_PULLUP | MUX_MODE2) /* gpmc_csn1.mmc1_clk */
-> -				0x84 (PIN_INPUT_PULLUP | MUX_MODE1) /* gpmc_csn2.mmc1_cmd */
-> +				0x84 (PIN_INPUT_PULLUP | MUX_MODE2) /* gpmc_csn2.mmc1_cmd */
->  				0x00 (PIN_INPUT_PULLUP | MUX_MODE1) /* gpmc_ad0.mmc1_dat0 */
->  				0x04 (PIN_INPUT_PULLUP | MUX_MODE1) /* gpmc_ad1.mmc1_dat1 */
->  				0x08 (PIN_INPUT_PULLUP | MUX_MODE1) /* gpmc_ad2.mmc1_dat2 */
-> 
-is'nt this a common change? why is it "black only"? if it is so, then
-the pinmux should probably be spun off outside bone-common.dtsi into
-boneblack.dtsi perhaps?
+On Fri, 20 Sep 2013, Ard Biesheuvel wrote:
 
--- 
-Regards,
-Nishanth Menon
+> Note to reviewers:
+> Reviewing the file aesbs-core.S may be a bit overwhelming, so if there are any
+> questions or concerns, please refer to the link below. This is the original Perl
+> script that gets called by OpenSSL's build system during their build to generate
+> the .S file on the fly. [In the case of OpenSSL, this is used in some cases to
+> target different assemblers or ABIs]. This arrangement is not suitable (or 
+> required) for the kernel, so I have taken the generated .S file instead.
+> 
+> http://git.openssl.org/gitweb/?p=openssl.git;f=crypto/aes/asm/bsaes-armv7.pl;a=blob
+
+You should probably capture this reference in the code, or at least in 
+the commit log for the corresponding patch.
+
+> Note to integrators:
+> While this implementation is significantly faster, especially in CTR mode, it is
+> unclear whether the net impact on power efficiency is favorable or not, so
+> please refrain from making any assumptions to that effect.
+
+That definitively should be mentioned in the commit log for patch #4.
+
+
+Nicolas
