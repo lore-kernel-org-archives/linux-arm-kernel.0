@@ -1,60 +1,47 @@
-From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Fri, 20 Sep 2013 00:17:39 +0100
-Subject: [PATCH 45/51] DMA-API: firmware/google/gsmi.c: avoid direct access
- to DMA masks
-In-Reply-To: <20130919212235.GD12758@n2100.arm.linux.org.uk>
+From: bhutchings@solarflare.com (Ben Hutchings)
+Date: Fri, 20 Sep 2013 02:21:37 +0100
+Subject: [PATCH 01/51] DMA-API: provide a helper to set both DMA and
+ coherent DMA masks
+In-Reply-To: <E1VMlja-0007fA-HU@rmk-PC.arm.linux.org.uk>
 References: <20130919212235.GD12758@n2100.arm.linux.org.uk>
-Message-ID: <E1VMnTf-0007ss-9q@rmk-PC.arm.linux.org.uk>
+ <E1VMlja-0007fA-HU@rmk-PC.arm.linux.org.uk>
+Message-ID: <1379640097.2500.4.camel@bwh-desktop.uk.level5networks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This driver doesn't need to directly access DMA masks if it uses the
-platform_device_register_full() API rather than
-platform_device_register_simple() - the former function can initialize
-the DMA mask appropriately.
+On Thu, 2013-09-19 at 22:25 +0100, Russell King wrote:
+> Provide a helper to set both the DMA and coherent DMA masks to the
+> same value - this avoids duplicated code in a number of drivers,
+> sometimes with buggy error handling, and also allows us identify
+> which drivers do things differently.
+> 
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> ---
+>  Documentation/DMA-API-HOWTO.txt |   37 ++++++++++++++++++++++---------------
+>  Documentation/DMA-API.txt       |    8 ++++++++
+>  include/linux/dma-mapping.h     |   14 ++++++++++++++
+>  3 files changed, 44 insertions(+), 15 deletions(-)
+> 
+> diff --git a/Documentation/DMA-API-HOWTO.txt b/Documentation/DMA-API-HOWTO.txt
+> index 14129f1..5e98303 100644
+> --- a/Documentation/DMA-API-HOWTO.txt
+> +++ b/Documentation/DMA-API-HOWTO.txt
+[...]
+> -dma_set_coherent_mask() will always be able to set the same or a
+> -smaller mask as dma_set_mask(). However for the rare case that a
+> +The coherent coherent mask will always be able to set the same or a
+> +smaller mask as the streaming mask. However for the rare case that a
+[...]
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- drivers/firmware/google/gsmi.c |   13 ++++++++-----
- 1 files changed, 8 insertions(+), 5 deletions(-)
+The new wording doesn't make sense; a mask doesn't set itself.  I would
+suggest:
 
-diff --git a/drivers/firmware/google/gsmi.c b/drivers/firmware/google/gsmi.c
-index 6eb535f..e5a67b2 100644
---- a/drivers/firmware/google/gsmi.c
-+++ b/drivers/firmware/google/gsmi.c
-@@ -764,6 +764,13 @@ static __init int gsmi_system_valid(void)
- static struct kobject *gsmi_kobj;
- static struct efivars efivars;
- 
-+static const struct platform_device_info gsmi_dev_info = {
-+	.name		= "gsmi",
-+	.id		= -1,
-+	/* SMI callbacks require 32bit addresses */
-+	.dma_mask	= DMA_BIT_MASK(32),
-+};
-+
- static __init int gsmi_init(void)
- {
- 	unsigned long flags;
-@@ -776,7 +783,7 @@ static __init int gsmi_init(void)
- 	gsmi_dev.smi_cmd = acpi_gbl_FADT.smi_command;
- 
- 	/* register device */
--	gsmi_dev.pdev = platform_device_register_simple("gsmi", -1, NULL, 0);
-+	gsmi_dev.pdev = platform_device_register_full(&gsmi_dev_info);
- 	if (IS_ERR(gsmi_dev.pdev)) {
- 		printk(KERN_ERR "gsmi: unable to register platform device\n");
- 		return PTR_ERR(gsmi_dev.pdev);
-@@ -785,10 +792,6 @@ static __init int gsmi_init(void)
- 	/* SMI access needs to be serialized */
- 	spin_lock_init(&gsmi_dev.lock);
- 
--	/* SMI callbacks require 32bit addresses */
--	gsmi_dev.pdev->dev.coherent_dma_mask = DMA_BIT_MASK(32);
--	gsmi_dev.pdev->dev.dma_mask =
--		&gsmi_dev.pdev->dev.coherent_dma_mask;
- 	ret = -ENOMEM;
- 	gsmi_dev.dma_pool = dma_pool_create("gsmi", &gsmi_dev.pdev->dev,
- 					     GSMI_BUF_SIZE, GSMI_BUF_ALIGN, 0);
+"The coherent mask can always be set to the same or a smaller mask than
+the streaming mask."
+
+Ben.
+
 -- 
-1.7.4.4
+Ben Hutchings, Staff Engineer, Solarflare
+Not speaking for my employer; that's the marketing department's job.
+They asked us to note that Solarflare product names are trademarked.
