@@ -1,60 +1,126 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Fri, 20 Sep 2013 13:04:27 +0300
-Subject: [PATCH v3 0/5] ARM: vf610: Add DCU framebuffer driver for Vybrid
- VF610 platform
-In-Reply-To: <81BA6E5E0BC2344391CABCEE22D1B6D842FD6A@039-SN1MPN1-003.039d.mgd.msft.net>
-References: <1376553714-25922-1-git-send-email-b18965@freescale.com>
- <81BA6E5E0BC2344391CABCEE22D1B6D83F448E@039-SN1MPN1-002.039d.mgd.msft.net>
- <81BA6E5E0BC2344391CABCEE22D1B6D8403CB3@039-SN1MPN1-002.039d.mgd.msft.net>
- <52270C71.7080805@ti.com>
- <81BA6E5E0BC2344391CABCEE22D1B6D842FD6A@039-SN1MPN1-003.039d.mgd.msft.net>
-Message-ID: <523C1DAB.60808@ti.com>
+From: rogerq@ti.com (Roger Quadros)
+Date: Fri, 20 Sep 2013 13:19:54 +0300
+Subject: [RFC PATCH 15/15] arm: dts: dra7: add sata node
+In-Reply-To: <523B05FD.7020200@cogentembedded.com>
+References: <1379595943-14622-1-git-send-email-rogerq@ti.com>
+ <1379597059-15405-1-git-send-email-rogerq@ti.com>
+ <523B05FD.7020200@cogentembedded.com>
+Message-ID: <523C214A.30406@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/09/13 10:07, Wang Huan-B18965 wrote:
-> My comments inline.
-> 
->> -----Original Message----- From: Tomi Valkeinen
->> [mailto:tomi.valkeinen at ti.com] Sent: Wednesday, September 04, 2013
->> 6:33 PM To: Wang Huan-B18965 Cc: plagnioj at jcrosoft.com;
->> linux-fbdev at vger.kernel.org; linux-arm- kernel at lists.infradead.org;
->> Jin Zhengxiong-R64188; Estevam Fabio-R49496; shawn.guo at linaro.org 
->> Subject: Re: [PATCH v3 0/5] ARM: vf610: Add DCU framebuffer driver
->> for Vybrid VF610 platform
->> 
->> Hi,
->> 
->> On 03/09/13 11:21, Wang Huan-B18965 wrote:
->>> Hi, Jean-Christophe, Tomi,
->>> 
->>> Could you please help to review these patches? Thanks!
->> 
->> There seemed to be some strong opinions that there should be a drm 
->> driver for this hardware, instead of an fb driver. So as there
->> seems to be disagreements about this, I'll leave this series to
->> Jean-Christophe, who's the primary maintainer.
-> [Alison Wang]
-> 
-> Thanks for Tomi's comments.
-> 
-> I agree that we can implement the DRM driver for the DCU. As the
-> bandwidth limitation, I suggest we use the fb driver firstly. On the
-> other hand, the fb driver can meet the application requirement based
-> on this SoC. We'll try to provide the DRM driver when this IP
-> integrated into other SoC.
+Hi,
 
-If you plan to move to DRM driver anyway, I would strongly suggest
-merging only the DRM driver. If we merge the fb driver, and a bit later
-the DRM driver for the same hardware, we'll have two drivers of which
-the other is already deprecated.
+On 09/19/2013 05:11 PM, Sergei Shtylyov wrote:
+> Hello.
+> 
+> On 09/19/2013 05:24 PM, Roger Quadros wrote:
+> 
+>> From: Balaji T K <balajitk@ti.com>
+> 
+>> Add support for sata controller.
+> 
+>> [Roger Q] Clean up.
+> 
+>> CC: Benoit Cousson <bcousson@baylibre.com>
+>> Signed-off-by: Balaji T K <balajitk@ti.com>
+>> Signed-off-by: Roger Quadros <rogerq@ti.com>
+>> ---
+>>   arch/arm/boot/dts/dra7.dtsi |   49 +++++++++++++++++++++++++++++++++++++++++++
+>>   1 files changed, 49 insertions(+), 0 deletions(-)
+> 
+>> diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
+>> index ce9a0f0..545545d 100644
+>> --- a/arch/arm/boot/dts/dra7.dtsi
+>> +++ b/arch/arm/boot/dts/dra7.dtsi
+>> @@ -426,6 +426,55 @@
+>>               dma-names = "tx", "rx";
+>>           };
+>>
+>> +        omap_control_sata: control-phy at 4a002374 {
+>> +            compatible = "ti,control-phy-pipe3";
+>> +            reg = <0x4a002374 0x4>;
+>> +            reg-names = "power";
+>> +            clocks = <&sys_clkin1>;
+>> +            clock-names = "sysclk";
+>> +        };
+>> +
+>> +        ocp2scp3: ocp2scp3 at 4a090000 {
+>> +            compatible = "ti,omap-ocp2scp";
+>> +            #address-cells = <1>;
+>> +            #size-cells = <1>;
+>> +            ranges;
+>> +            ti,hwmods = "ocp2scp3";
+>> +            reg = <0x4a090000 0x1f>; /* ocp2scp3 */
+>> +            reg-names = "ocp2scp3";
+>> +            sata_phy: sataphy at 4A096000 {
+> 
+>    It's better to name the PHY nodes uniformly after already standard "ethernet-phy" and your "control-phy".
 
- Tomi
+OK. will fix it to sata-phy.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 901 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130920/3c8b5632/attachment.sig>
+> 
+>> +                compatible = "ti,phy-pipe3-sata";
+>> +                reg = <0x4A096000 0x80>, /* phy_rx */
+>> +                      <0x4A096400 0x64>, /* phy_tx */
+>> +                      <0x4A096800 0x40>; /* pll_ctrl */
+>> +                reg-names = "phy_rx", "phy_tx", "pll_ctrl";
+>> +                ctrl-module = <&omap_control_sata>;
+>> +                clocks = <&sata_ref_clk>,
+>> +                     <&sys_clkin1>;
+>> +                clock-names = "optclk", "sysclk";
+>> +                #phy-cells = <0>;
+>> +            };
+>> +        };
+>> +
+>> +        sata: sata at 4a141100 {
+>> +            compatible = "ti,sata";
+>> +            ti,hwmods = "sata";
+>> +            reg = <0x4a141100 0x7>;
+>> +            #address-cells = <1>;
+>> +            #size-cells = <1>;
+>> +            ranges;
+>> +            dwc-ahci at 4a140000 {
+> 
+>    Hm, ePAPR spec. [1] says that "the name of a node should be somewhat generic, reflecting the function of the device and not its precise programming model", so it looks like the name should be "sata" as well. I'm a bit at a loss here, not sure why you had to use the nested device nodes.
+> 
+
+ok. will fix it to sata.
+I've nested it because the wrapper registers are not part of the AHCI sata controller.
+They are TI specific registers for power management. 
+Similar setup is on the USB controller. Please see omap_dwc3 node.
+
+But if you have better idea, please let me know.
+
+>> +                  compatible = "snps,dwc-ahci";
+>> +                  reg = <0x4a140000 0x1100>;
+>> +                  interrupts = <0 54 0x4>;
+>> +                  phys = <&sata_phy>;
+> 
+>    Hm, it's the third PHY related generic property I'm encountering. First, there was "phy-handle", then "phy", now "phys"... Seems like a bit too much. :-)
+
+I'm afraid but this is how the designers have made it.
+
+1) control-phy-pipe3 is that part of the PHY which sits in control module space and is different
+from the sata-phy space and hence needs a different node. If it were to me, I would just put this
+resource in sata-phy node, but there was a discussion about this earlier to do it otherwise [1].
+
+2) sata-phy (sataphy) is the actual SATA PHY device.
+
+3) phys is just a reference to the sata_phy and is used via the generic PHY framework.
+It is upto the sata driver to power up/down the phy.
+
+> 
+>> +                  phy-names = "sata-phy";
+>> +                  clocks = <&sata_ref_clk>;
+>> +                  clock-names = "optclk";
+>> +            };
+>> +        };
+> 
+> [1] http://www.power.org/resources/downloads/Power_ePAPR_APPROVED_v1.0.pdf
+> 
+
+cheers,
+-roger
+
+[1] - https://lkml.org/lkml/2012/9/10/399
