@@ -1,38 +1,32 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 20 Sep 2013 21:24:12 +0200
+Date: Fri, 20 Sep 2013 21:28:02 +0200
 Subject: [PATCH 5/7] staging: media/lirc: switch to use gpiolib
-In-Reply-To: <CACRpkdaBeYTchtQn6-QThAv2XWAT=vd=YarHA1TgVZeLoLNfpA@mail.gmail.com>
+In-Reply-To: <m3d2ocvrx7.fsf@intrepid.localdomain>
 References: <1378816283-8164-1-git-send-email-linus.walleij@linaro.org>
- <CACRpkdaBeYTchtQn6-QThAv2XWAT=vd=YarHA1TgVZeLoLNfpA@mail.gmail.com>
-Message-ID: <CACRpkdb9vdaJsURFx0-P_G-quGGm5Uwdn9_Bqy0QVtRZ7_g2qg@mail.gmail.com>
+ <m3d2ocvrx7.fsf@intrepid.localdomain>
+Message-ID: <CACRpkda5x78wMVm=vOB4_Bb8hsa6Sumfv0CANPBtOdHq1LxDYw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 13, 2013 at 9:14 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> Hi Mauro,
->
-> On Tue, Sep 10, 2013 at 2:31 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
->
->> The lirc serial module has special hooks to work with NSLU2,
->> switch these over to use gpiolib, as that is available on the
->> ixp4 platform.
->>
->> Not even compile tested as there is no way to select this
->> driver from menuconfig on the ixp4 platform.
->>
->> Cc: Imre Kaloz <kaloz@openwrt.org>
->> Cc: Krzysztof Halasa <khc@pm.waw.pl>
->> Cc: Alexandre Courbot <acourbot@nvidia.com>
->> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
->> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
->> ---
->> Hi Greg: I'm seeking an ACK on this patch to take it through
->> the GPIO tree as part of a clean-up attempt to remove custom
->> GPIO APIs.
->
-> Could you ACK this patch if it looks OK to you?
+On Fri, Sep 13, 2013 at 2:15 PM, Krzysztof Halasa <khc@pm.waw.pl> wrote:
 
-Mauro, ping on this.
+> Linus Walleij <linus.walleij@linaro.org> writes:
+>
+>> +++ b/drivers/staging/media/lirc/lirc_serial.c
+>> @@ -839,6 +839,16 @@ static int lirc_serial_probe(struct platform_device *dev)
+>>  {
+>>       int i, nlow, nhigh, result;
+>>
+>> +#ifdef CONFIG_LIRC_SERIAL_NSLU2
+>> +     /* This GPIO is used for a LED on the NSLU2 */
+>> +     result = devm_gpio_request(dev, NSLU2_LED_GRN, "lirc-serial");
+>
+> Will this succeed with the LED driver already loaded? Should the user
+> unload it first?
+
+Hm if this driver should use this as a LED it needs to register
+a trigger for that GPIO LED instead. A GPIO can not be used by
+two consumers at the same time...
 
 Yours,
 Linus Walleij
