@@ -1,27 +1,23 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 20 Sep 2013 22:55:33 +0200
-Subject: [PATCH 03/26] clk: nomadik: declare OF clock provider
-In-Reply-To: <1379526839-14798-4-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1379526839-14798-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1379526839-14798-4-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <CACRpkdax_csU5xMUzi-ut+g0Q2Ko8uKvb+dS9=MudouEJgJBMw@mail.gmail.com>
+From: aaro.koskinen@iki.fi (Aaro Koskinen)
+Date: Fri, 20 Sep 2013 23:58:15 +0300
+Subject: [PATCH 0/8] IOP GPIO refactoring take 2
+In-Reply-To: <1379708226-7802-1-git-send-email-linus.walleij@linaro.org>
+References: <1379708226-7802-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <20130920205815.GF30568@blackmetal.musicnaut.iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 18, 2013 at 7:53 PM, Sebastian Hesselbarth
-<sebastian.hesselbarth@gmail.com> wrote:
+Hi,
 
-> Common clock framework allows to register clock providers to get called
-> on of_clk_init() by using CLK_OF_DECLARE. This converts nomadik clock
-> provider to make use of it and get rid of the mach specific clk init
-> call. As clocks require system reset controller base address to be
-> initialized each clock driver checks src_base and calls new
-> nomadik_src_init if required.
->
-> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+On Fri, Sep 20, 2013 at 10:17:06PM +0200, Linus Walleij wrote:
+> Testing and ACKing appreciated.
 
-Looks like a good idea!
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+I think it looks good now. I applied the patches 1-8 on top of 3.12-rc1,
+and Thecus N2100 boots fine and pressing the power button restarts the
+system as expected. So for the whole series:
 
-Yours,
-Linus Walleij
+Tested-by: Aaro Koskinen <aaro.koskinen@iki.fi>
+
+Thanks,
+
+A.
