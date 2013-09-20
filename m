@@ -1,46 +1,41 @@
-From: holler@ahsoftware.de (Alexander Holler)
-Date: Fri, 20 Sep 2013 19:45:59 +0200
-Subject: [GIT PULL] DaVinci fixes for v3.12-rc
-In-Reply-To: <CAOesGMi4z_wVVe6GfyWQ+7OApH0pHJe3ak90smJtf4nyJbu14A@mail.gmail.com>
-References: <523AD060.8000504@ti.com>
- <CAOesGMg_L-0kqY2oexV=WY4mEWpCQdAej_h8QGxrtCgC=xSijg@mail.gmail.com>
- <523BE5CA.3010601@ahsoftware.de>
- <CAOesGMi4z_wVVe6GfyWQ+7OApH0pHJe3ak90smJtf4nyJbu14A@mail.gmail.com>
-Message-ID: <523C89D7.4090006@ahsoftware.de>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Fri, 20 Sep 2013 13:58:27 -0400
+Subject: [GIT PULL] ARM: mvebu: fixes for v3.12
+In-Reply-To: <CAOesGMi769sEAuf9SaZV_3+HPetDnv-wTb=Ckm1+YxzbZobPGA@mail.gmail.com>
+References: <20130920034613.GB11119@titan.lakedaemon.net>
+ <CAOesGMi769sEAuf9SaZV_3+HPetDnv-wTb=Ckm1+YxzbZobPGA@mail.gmail.com>
+Message-ID: <20130920175827.GC11119@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 20.09.2013 19:40, schrieb Olof Johansson:
-> Hi,
->
-> On Thu, Sep 19, 2013 at 11:06 PM, Alexander Holler <holler@ahsoftware.de> wrote:
->> Am 19.09.2013 19:48, schrieb Olof Johansson:
->>> Hi Sekhar,
->>>
->>> On Thu, Sep 19, 2013 at 3:22 AM, Sekhar Nori <nsekhar@ti.com> wrote:
->>>> The following changes since commit 272b98c6455f00884f0350f775c5342358ebb73f:
->> ...
->>
->>>> 3) A patch to complete the DT support for EDMA. Without
->>>>     this patch, the DT support for EDMA cannot be used.
->>>>     There are no in-tree DT users of EDMA currently but
->>>>     nevertheless the patch fixes a previously incomplete
->>>>     implementation.
->>>
->>> Finishing incomplete work is not a fix, especially if the users aren't
->>> in-tree. The other patches are just fine to include though.
->>
->> It fixes problems for all people which are not using the provided DT's
->> but using edma in their own DT. So I don't understand your arguing as DT
->> got introduced to not only support in-tree configs. It clearly fixes
->> problems.
->
-> Right, that was the smaller part of the argument. The bigger is:
-> Completing a feature is not a fix. If the whole feature didn't make it
-> in for a release, then the rest goes into the next release.
+On Fri, Sep 20, 2013 at 10:36:32AM -0700, Olof Johansson wrote:
+> On Thu, Sep 19, 2013 at 8:46 PM, Jason Cooper <jason@lakedaemon.net> wrote:
+> > Guys,
+> >
+> > We have a relatively long list of fixes this time around.  The two
+> > of_node_put()'s were left over from before the merge window (part of
+> > mvebu/fixes-non-critical).
+> >
+> > The two for the Armada XP clocks are to fix booting v3.12-rc1 since the
+> > corresponding driver changes were merged at the last minute.  These were
+> > originally part of mvebu/dt for v3.12, but have since become fixes.
+> >
+> > The other two just cropped up since v3.12-rc1 dropped.
+> 
+> 
+> Pulled, thanks.
+> 
+> I noticed a couple of the patches had conflict messages in the patch
+> description. They're sometimes useful on merges but less so on patches
+> (likely just from needing fixups when cherry-picked?). Not a big deal,
+> but something to keep in mind in the future.
 
-Bureaucrazy at it's best.
+Yes, I left them in because I was moving them from one merge window to
+another and decided to err on the side of 'more info is better' in case
+a bisect came across them.
 
-Regards,
+I can leave them out as well.  I have no strong opinion on it.
 
-Alexander Holler
+thx,
+
+Jason.
