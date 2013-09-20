@@ -1,45 +1,39 @@
-From: robertcnelson@gmail.com (robertcnelson)
-Date: Fri, 20 Sep 2013 14:52:16 -0500
-Subject: [PATCH] ARM: dts: omap3-beagle-xm: enable pullup for dvi on twl_gpio
-Message-ID: <1379706736-4041-1-git-send-email-robertcnelson@gmail.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Fri, 20 Sep 2013 21:57:44 +0200
+Subject: [PATCH/RESEND 1/2] gpio: rcar: Remove #gpio-range-cells DT
+ property usage
+In-Reply-To: <20130920190614.GF22321@verge.net.au>
+References: <1378907462-19247-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <CACRpkdZ4EaUVgYoMP6VMefZgE1T--5hh18RzupQLnbd0KpveAA@mail.gmail.com>
+ <20130920190614.GF22321@verge.net.au>
+Message-ID: <1566063.hFmS6D0Ff2@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Robert Nelson <robertcnelson@gmail.com>
+Hi Simon,
 
-This fixes some video sync issues seen with KVM equipment on bootup, with
-omapdrm/kms by making sure the TFP410 is powered up, via pulling up GPIO2 on
-the twl4030.
+On Friday 20 September 2013 12:06:14 Simon Horman wrote:
+> On Fri, Sep 20, 2013 at 08:36:57PM +0200, Linus Walleij wrote:
+> > On Wed, Sep 11, 2013 at 3:51 PM, Laurent Pinchart
+> > 
+> > <laurent.pinchart+renesas@ideasonboard.com> wrote:
+> > > Commit a1bc260bb5f5d95da854be7898202d788e94448d ("gpio: clean up
+> > > gpio-ranges documentation") deprecated the #gpio-range-cells property.
+> > > Replace its usage with a hardcoded value in the gpio-rcar driver.
+> > > 
+> > > Signed-off-by: Laurent Pinchart
+> > > <laurent.pinchart+renesas@ideasonboard.com>
+> > 
+> > Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> > 
+> > Simon please take the whole set into the SH tree.
+> 
+> Thanks, will do.
 
-https://groups.google.com/d/msg/beagleboard/Wk9SLuw-EvY/oCxJcAHufAMJ
+Just a quick reminder that the two patches are v3.12 fixes. Would you like me 
+to send you a pull request ?
 
-Signed-off-by: Robert Nelson <robertcnelson@gmail.com>
----
- arch/arm/boot/dts/omap3-beagle-xm.dts | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
-
-diff --git a/arch/arm/boot/dts/omap3-beagle-xm.dts b/arch/arm/boot/dts/omap3-beagle-xm.dts
-index 0c514dc..c48778f 100644
---- a/arch/arm/boot/dts/omap3-beagle-xm.dts
-+++ b/arch/arm/boot/dts/omap3-beagle-xm.dts
-@@ -131,14 +131,14 @@
- 
- &twl_gpio {
- 	ti,use-leds;
--	/* pullups: BIT(1) */
--	ti,pullups = <0x000002>;
-+	/* pullups: BIT(1), BIT(2) */
-+	ti,pullups = <0x000006>;
- 	/*
- 	 * pulldowns:
--	 * BIT(2), BIT(6), BIT(7), BIT(8), BIT(13)
-+	 * BIT(6), BIT(7), BIT(8), BIT(13)
- 	 * BIT(15), BIT(16), BIT(17)
- 	 */
--	ti,pulldowns = <0x03a1c4>;
-+	ti,pulldowns = <0x03a1c0>;
- };
- 
- &usb_otg_hs {
 -- 
-1.8.4.rc3
+Regards,
+
+Laurent Pinchart
