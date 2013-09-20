@@ -1,15 +1,15 @@
 From: jeffrey.t.kirsher@intel.com (Jeff Kirsher)
-Date: Fri, 20 Sep 2013 12:48:19 -0700
-Subject: [PATCH 03/51] DMA-API: net: intel/e1000e: fix 32-bit DMA mask
+Date: Fri, 20 Sep 2013 12:49:04 -0700
+Subject: [PATCH 04/51] DMA-API: net: intel/igb: fix 32-bit DMA mask
  handling
-In-Reply-To: <E1VMllX-0007fP-33@rmk-PC.arm.linux.org.uk>
+In-Reply-To: <E1VMlmV-0007fU-75@rmk-PC.arm.linux.org.uk>
 References: <20130919212235.GD12758@n2100.arm.linux.org.uk>
- <E1VMllX-0007fP-33@rmk-PC.arm.linux.org.uk>
-Message-ID: <1379706499.1972.9.camel@jtkirshe-mobl>
+ <E1VMlmV-0007fU-75@rmk-PC.arm.linux.org.uk>
+Message-ID: <1379706544.1972.10.camel@jtkirshe-mobl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2013-09-19 at 22:27 +0100, Russell King wrote:
+On Thu, 2013-09-19 at 22:28 +0100, Russell King wrote:
 > The fallback to 32-bit DMA mask is rather odd:
 >         err = dma_set_mask(&pdev->dev, DMA_BIT_MASK(64));
 >         if (!err) {
@@ -37,7 +37,7 @@ On Thu, 2013-09-19 at 22:27 +0100, Russell King wrote:
 > 
 > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 > ---
->  drivers/net/ethernet/intel/e1000e/netdev.c |   18 ++++++------------
+>  drivers/net/ethernet/intel/igb/igb_main.c |   18 ++++++------------
 >  1 files changed, 6 insertions(+), 12 deletions(-)
 
 Acked-by: Jeff Kirsher <jeffrey.t.kirsher@intel.com>
@@ -47,4 +47,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130920/c0096d10/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130920/68c0ab06/attachment.sig>
