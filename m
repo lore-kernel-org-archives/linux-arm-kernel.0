@@ -1,48 +1,52 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 20 Sep 2013 16:04:41 +0100
-Subject: [PATCH] ARM: dts: Update arch timer node with clock frequency
-In-Reply-To: <523C61CB.2050607@codeaurora.org>
-References: <1379499113-20342-1-git-send-email-yuvaraj.cd@samsung.com>
- <20130918102319.GF26737@e106331-lin.cambridge.arm.com>
- <CAKuRcOLfRwJohWMhc=QMew87SXtBmkPUJwW7UzNry_gFuC-81Q@mail.gmail.com>
- <523C048C.10303@arm.com> <523C61CB.2050607@codeaurora.org>
-Message-ID: <523C6409.7080600@arm.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Fri, 20 Sep 2013 10:15:52 -0500
+Subject: [PATCH 42/51] DMA-API: usb: musb: use
+ platform_device_register_full() to avoid directly messing with dma masks
+In-Reply-To: <20130920134938.GO25647@n2100.arm.linux.org.uk>
+References: <20130919212235.GD12758@n2100.arm.linux.org.uk>
+ <E1VMnQk-0007sX-Ty@rmk-PC.arm.linux.org.uk>
+ <20130920131125.GO26101@radagast>
+ <20130920134938.GO25647@n2100.arm.linux.org.uk>
+Message-ID: <20130920151552.GQ26101@radagast>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/09/13 15:55, Christopher Covington wrote:
-> On 09/20/2013 04:17 AM, Marc Zyngier wrote:
->> On 20/09/13 05:57, Yuvaraj Kumar wrote:
->>> Resending it as it bounced from kernel mailing group
->>>
->>> On Wed, Sep 18, 2013 at 3:53 PM, Mark Rutland <mark.rutland@arm.com> wrote:
->>>> [adding lakml]
->>>>
->>>> On Wed, Sep 18, 2013 at 11:11:53AM +0100, Yuvaraj Kumar C D wrote:
->>>>> Without the "clock-frequency" property in arch timer node, could able
->>>>> to see the below crash dump.
->>>>
->>>> Why does this cause the below crash specifically? What is CNTFRQ reading
->>>> as?
->>> Return value of arch_timer_get_cntfrq() is 0
->>>>
->>>> Your firmware or bootloader should set CNTFRQ -- setting the
->>>> clock-frequency is a work-around for buggy firmware/bootloaders that
->>>> should be avoided as far as possible.
->>> Why kernel should depend on bootloader/firmware  to set CNTFRQ? Any
->>> specific reasons?
->>
->> Because the kernel can't set it if running non-secure. Only secure mode
->> can do this (see the ARM ARM for details).
+Hi,
+
+On Fri, Sep 20, 2013 at 02:49:38PM +0100, Russell King - ARM Linux wrote:
+> On Fri, Sep 20, 2013 at 08:11:25AM -0500, Felipe Balbi wrote:
+> > Hi,
+> > 
+> > On Fri, Sep 20, 2013 at 12:14:38AM +0100, Russell King wrote:
+> > > Use platform_device_register_full() for those drivers which can, to
+> > > avoid messing directly with DMA masks.  This can only be done when
+> > > the driver does not need to access the allocated musb platform device
+> > > from within its callbacks, which may be called during the musb
+> > > device probing.
+> > > 
+> > > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> > 
+> > you want me to carry this one through my tree or you prefer getting my
+> > Acked-by ? Either way works for me:
+> > 
+> > Acked-by: Felipe Balbi <balbi@ti.com>
+> > 
+> > there's also the third option of me setting up a branch with only this
+> > patch and we both merge it, that'd also work.
 > 
-> What software outside the kernel actually reads the CNTFRQ and why?
+> I think this patch is sufficiently stand-alone that it should be fine
+> if you want to take it through your tree.  That may be better in the
+> long run to avoid conflicts with this patch and any future work in
+> this area during this cycle.
 
-Your favourite virtual machine does, for the same reason the host kernel
-does. And as you can't guess the frequency from userspace, you cannot
-specify it in the guest's DT, getting whatever random number sits in CNTFRQ.
+awesome, i'll take this one early next week.
 
-As you would expect, things don't go smoothly when that happens.
-
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130920/77a49f82/attachment.sig>
