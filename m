@@ -1,132 +1,330 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Fri, 20 Sep 2013 11:56:27 +0200 (CEST)
-Subject: [PATCH] clockevents: Sanitize ticks to nsec conversion
-In-Reply-To: <20130919200343.GV24802@pengutronix.de>
-References: <20130917130153.GL26819@ludovic.desroches@atmel.com>
- <alpine.DEB.2.02.1309172228400.4089@ionos.tec.linutronix.de>
- <20130918085627.GN24802@pengutronix.de>
- <alpine.DEB.2.02.1309181058470.4089@ionos.tec.linutronix.de>
- <20130918150958.GO24802@pengutronix.de>
- <alpine.DEB.2.02.1309182201000.4089@ionos.tec.linutronix.de>
- <20130919100239.GS24802@pengutronix.de>
- <alpine.DEB.2.02.1309191207460.4089@ionos.tec.linutronix.de>
- <20130919124805.GU24802@pengutronix.de>
- <alpine.DEB.2.02.1309191629040.4089@ionos.tec.linutronix.de>
- <20130919200343.GV24802@pengutronix.de>
-Message-ID: <alpine.DEB.2.02.1309201127400.4089@ionos.tec.linutronix.de>
+From: r.sricharan@ti.com (Sricharan R)
+Date: Fri, 20 Sep 2013 15:29:25 +0530
+Subject: [RFC PATCH 1/4] DRIVERS: IRQCHIP: Add crossbar irqchip driver
+In-Reply-To: <20130920085830.GF17453@e106331-lin.cambridge.arm.com>
+References: <1379000351-15672-1-git-send-email-r.sricharan@ti.com>
+ <1379000351-15672-2-git-send-email-r.sricharan@ti.com>
+ <20130920085830.GF17453@e106331-lin.cambridge.arm.com>
+Message-ID: <523C1C7D.1060407@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 19 Sep 2013, Uwe Kleine-K?nig wrote:
-> > +     u64 rnd = (u64) evt->mult - 1;
-> >  
-> >       if (unlikely(!evt->mult)) {
-> >               evt->mult = 1;
-> >               WARN_ON(1);
-> >       }
-> I suggest to move the assignment to rnd below this if block as it
-> changes mult. 
+Hi Mark,
 
-True.
+On Friday 20 September 2013 02:28 PM, Mark Rutland wrote:
+> Hi,
+>
+> I have a few comments, mostly on the DT binding and parsing.
+>
+ Thanks for the review. The idea of seeing the crossbar as a new IRQCHIP
+ itself did not go and the latest direction on this was to handle it inside the GIC.
 
->  
-> +     /*
-> +      * Upper bound sanity check. If the backwards conversion is
-> +      * not equal latch, we know that the above shift overflowed.
-> +      */
-> +     if (clc >> evt->shift) != (u64)latch)
-You didn't compile test, did you? Also the cast on the rhs isn't needed.
+  http://www.spinics.net/lists/linux-omap/msg97085.html
+  I am working on that now.
 
-I did. I just missed to refresh the patch before sending it :)
+  I would have agreed with most of the comments below, otherwise.
 
-> > +	 * For mult <= (1 << shift) we can safely add mult - 1 to
-> > +	 * prevent integer rounding loss. So the backwards conversion
-> It doesn't prevent inexactness to add mult - 1. It (only) asserts that
-> the ns2delta(delta2ns(latch)) >= latch instead of ... <= latch when not
-> doing it.
-
-For mult <= 1 << shift the conversion is always ending up with the
-same latch value.
- 
-> > +	 * from nsec to device ticks will be correct.
-> > +	 *
-> > +	 * For mult > (1 << shift), i.e. device frequency is > 1GHz we
-> > +	 * need to be careful. Adding mult - 1 will result in a value
-> > +	 * which when converted back to device ticks will be larger
-> s/will/can/
-
-No, it will always be larger.
-
-> > +	 * than latch by (mult / (1 << shift)) - 1. For the min_delta
-> s/by/by up to/
-> 
-> > +	 * calculation we still want to apply this in order to stay
-> > +	 * above the minimum device ticks limit. For the upper limit
-> > +	 * we would end up with a latch value larger than the upper
-> > +	 * limit of the device, so we omit the add to stay below the
-> > +	 * device upper boundary.
-> > +	 *
-> > +	 * Also omit the add if it would overflow the u64 boundary.
-> > +	 */
-> > +	if ((~0ULL - clc > rnd) &&
-> > +	    (!ismax || evt->mult <= (1U << evt->shift)))
-> > +		clc += rnd;
-> I would expect that
-> 
-> 	if (!ismax)
-> 		if (~0ULL - clc > rnd)
-> 			clc += rnd;
-> 		else
-> 			clc = ~0ULL;
-> 
-> is enough (and a tad more exact in the presence of an overflow). I have
-> to think about that though.
-
-Errm.
-
-1) We cannot add if we'd overflow
-
-2) For mult <= 1 << shift it's always correct
-
-3) for mult > 1 << shift we only apply it to the min value not the max
- 
-> >  	clockevents_calc_mult_shift(dev, freq, sec);
-> > -	dev->min_delta_ns = clockevent_delta2ns(dev->min_delta_ticks, dev);
-> > -	dev->max_delta_ns = clockevent_delta2ns(dev->max_delta_ticks, dev);
-> > +	dev->min_delta_ns = cev_delta2ns(dev->min_delta_ticks, dev, false);
-> > +	dev->max_delta_ns = cev_delta2ns(dev->max_delta_ticks, dev, true);
-> Another improvement that came to my mind just now. For min_delta_ns you
-> want to assert that it results in a value >= min_delta_ticks when
-> converted back. For max_delta_ns you want ... value <= max_delta_ticks.
-> What about the values in between? They for sure should land in
-> [min_delta_ticks ... max_delta_ticks] when converted back and ideally
-> should be most exact. The latter part would mean to add (rnd / 2)
-> instead of rnd. I don't know yet how that would behave at the borders of
-> the [min_delta_ns ... max_delta_ns] interval, but I think you still need
-> to special-case that.
-
-Again:
-
-1) For mult <= 1 << shift the backwards conversion is always the same as
-   the input value.
-
-2) For mult > 1 << shift the backwards conversion of the min value is
-   always > than the input value. And the backwards conversion of the
-   max value is always < than the input value.
-
-The values between that are completely uninteresting as the
-program_events code always converts from nsec to device ticks.
-
-We clamp the delta between min_ns and max_ns. So due to the above any
-
-   min_ns <= delta <= max_ns
-
-will after conversion fulfil 
-
-   min_tick <= delta_tick <= max_tick
-
-So what are you going to improve? Either the math works or it does not.
-
-Thanks,
-
-	tglx
+>> diff --git a/Documentation/devicetree/bindings/arm/omap/irq-crossbar.txt b/Documentation/devicetree/bindings/arm/omap/irq-crossbar.txt
+>> new file mode 100644
+>> index 0000000..5d465cf
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/arm/omap/irq-crossbar.txt
+>> @@ -0,0 +1,39 @@
+>> +* IRQ CROSSBAR
+>> +
+>> +Some socs have a large number of interrupts requests to service
+>> +the needs of its many peripherals and subsystems. All of the
+>> +interrupt lines from the subsystems are not needed at the same
+>> +time, so they have to be muxed to the irq-controller appropriately.
+>> +In such places a interrupt controllers are preceded by an CROSSBAR
+>> +that provides flexibility in muxing the device requests to the controller
+>> +inputs.
+>> +
+>> +Required properties:
+>> +- compatible : Should be "irq-crossbar"
+> Missing vendor prefix, this should be something like "ti,irq-crossbar".
+> Does this have a more specific name than CROSSBAR that can be used to
+> qualify it?
+ yes, ti,irq-crossbar. Not sure if it can be called as anything
+ generically apart from crossbar .
+>> +- interrupt-parent: phandle to crossbar's interrupt parent.
+>> +- interrupt-controller: Identifies the node as an interrupt controller.
+>> +- interrupt-cells: Should be the same value as the interrupt parent.
+> That doesn't make sense. The crossbar driver is necessarily interpreting
+> these cells in a way the parent won't (as it supports more interrupts).
+> What are the meaning of these cells?
+ These properties were added so that the DT code identifies this as a
+ interrupt controller and map the children's irq in to this domain and
+ to map the free irqs allocated in this driver to its parent.
+>> +- reg: Base address and the size of the crossbar registers.
+>> +- max-crossbar-lines: Total number of input lines of the crossbar.
+>> +- max-irqs: Total number of irqs available at the interrupt controller.
+> Is this the maximum number of interrupts targeting the parent interrupt
+> controller? Starting at what number, ending at what number? Can this
+> have gaps?
+>
+> Is this a shortcut so in the GIC case you don't have to describe up to
+> 160 interrupts? I can see why you don't want to, but there's a big loss
+> of generality here...
+>
+ Yes, this was the maximum irqs available at the parent.
+ The gaps was not considered here because it was mentioned
+ used the below property irqs-reserved.
+>> +- reg-size: size of the crossbar registers.
+> As in the size of all the registers (the size component of reg)?
+>
+> Or is this the size of each individual register? Does that apply to all
+> registers or only a subset of them?
+>
+> What units are these in, bytes?
+>
+> What are valid sizes?
+>
+> Is this really that configurable?
+ This was meant to describe the size a individual register and applied to
+ all. This was used to choose the API's to write. But yes some more
+ description could be made here.
+>> +- irqs-reserved: List of the reserved irq lines that are not muxed using
+>> +                crossbar. These interrupt lines are reserved in the soc,
+>> +                so crossbar bar driver should not consider them as free
+>> +                lines.
+> Are these reserved inputs lines, or outputs to the parent interrupt
+> controller?
+>
+> What is the format of each entry in this list?
+>
+> The example seems to be a different format to the parent interrupt
+> controller (which per your binding also defined the crossbar's interrupt
+> format). While <0 1 2> is a valid interrupt per the GIC binding (SPI 0
+> edge-triggered both ways), <3 5 6>, <131 132 139>, and <140 . .> are
+> not.
+ These were parent's input lines that were not muxed from crossbar
+ but directly connected from peripherals, so the driver should not
+consider it as a free line while allocating a irq. This property was meant to
+ interpreted only in this driver.
+>> +
+>> +Examples:
+>> +               crossbar_mpu: @4a020000 {
+>> +                       compatible = "irq-crossbar";
+>> +                       interrupt-parent = <&gic>;
+>> +                       interrupt-controller;
+>> +                       #interrupt-cells = <3>;
+>> +                       reg = <0x4a002a48 0x130>;
+>> +                       max-crossbar-lines = <512>;
+>> +                       max-irqs = <160>;
+>> +                       reg-size = <2>;
+>> +                       irqs-reserved = <0 1 2 3 5 6 131 132 139 140>;
+>> +                       #address-cells = <1>;
+>> +                       #size-cells = <1>;
+> Why are there #address-cells and #size cells? This has no children, and
+> this affects any interrupt-map property (as the parent unit address now
+> must be a single cell, that isn't going to be used).
+>
+> [...]
+ yes, they could have been dropped and simply inherit from parent.
+>> +static int crossbar_set_affinity(struct irq_data *d,
+>> +                                const struct cpumask *mask_val,
+>> +                                bool force)
+>> +{
+>> +       struct irq_chip *chip;
+>> +       struct irq_data *data;
+>> +       int ret = 0;
+>> +
+>> +       crossbar_to_irq_chip_data(d->hwirq, &chip, &data);
+>> +
+>> +       if (chip->irq_set_affinity)
+>> +               ret = chip->irq_set_affinity(data, mask_val, force);
+>> +
+>> +       return ret;
+> So if our parent chip can't set affinity, we pretend it can?
+>
+> irq_set_affinity in kernel/irq/manage.c returns -EINVAL if an irqchip
+> doesn't have irq_set_affinity.
+>
+ Yes the return value should be corrected for the other case.
+>> +/*
+>> + * Request and free are already called in atomic contexts
+>> + */
+>> +unsigned int crossbar_request_irq(struct irq_data *d)
+>> +{
+>> +       int cb_no = d->hwirq;
+>> +       int virq = allocate_free_irq(cb_no);
+>> +       void *irq = &cb->crossbar_map[cb_no].hwirq;
+>> +       int err;
+>> +
+>> +       err = request_threaded_irq(virq, crossbar_irq, NULL,
+>> +                                  0, "CROSSBAR", irq);
+>> +       if (err)
+>> +               pr_err("\n request_irq failed for crossbar %d", cb_no);
+> Why does the print begin with a newline rather than ending with one?
+>
+ yes, should be in the end.
+>> +
+>> +       return 0;
+>> +}
+> [...]
+>
+>> +static int crossbar_domain_xlate(struct irq_domain *d,
+>> +                                struct device_node *controller,
+>> +                                const u32 *intspec, unsigned int intsize,
+>> +                                unsigned long *out_hwirq,
+>> +                                unsigned int *out_type)
+>> +{
+>> +       int i, cb_no;
+>> +       u32 *cb_intspec = kzalloc(intsize * sizeof(int), GFP_KERNEL);
+>> +
+>> +       if (!cb_intspec)
+>> +               return -ENOMEM;
+>> +
+>> +       cb_no = intspec[1];
+> So #interrupt-cells must be at least <2>. You should sanity check
+> intsize >= 2 before this line or you'll perform an illegal array access.
+>
+ yes, that was missing.
+>> +
+>> +       if (WARN_ON(intsize < 1))
+>> +               return -EINVAL;
+> This sanity check is both wrong and too late, as mentioned above.
+>
+>> +
+>> +       cb->crossbar_map[cb_no].intspec = cb_intspec;
+>> +
+>> +       /*
+>> +        * Free irq is allocated and mapped during request_irq
+>> +        * So just save the interrupt properties here
+>> +        */
+>> +       for (i = 0; i < intsize; i++)
+>> +               cb->crossbar_map[cb_no].intspec[i] = intspec[i];
+>> +
+>> +       cb->crossbar_map[cb_no].intspec_size = intsize;
+>> +       *out_hwirq = intspec[1];
+>> +       *out_type = IRQ_TYPE_NONE;
+>> +
+>> +       return 0;
+>> +}
+>> +
+>> +const struct irq_domain_ops crossbar_domain_ops = {
+>> +       .map = crossbar_domain_map,
+>> +       .xlate = crossbar_domain_xlate
+>> +};
+>> +
+>> +static int __init crossbar_of_init(struct device_node *node,
+>> +                                  struct device_node *parent)
+>> +{
+>> +       int i, size, max, reserved = 0;
+>> +       const __be32 *irqsr;
+>> +
+>> +       if (!parent) {
+>> +               pr_err("\n interrupt-parent is missing");
+> Another odd newline.
+ correct.
+>> +               return -ENODEV;
+>> +       }
+>> +
+>> +       cb = kzalloc(sizeof(struct cb_device *), GFP_KERNEL);
+>> +
+>> +       if (!cb)
+>> +               return -ENOMEM;
+>> +
+>> +       cb->irqp = parent;
+>> +
+>> +       cb->crossbar_base = of_iomap(node, 0);
+>> +       if (!cb->crossbar_base)
+>> +               return -ENOMEM;
+> Leaking allocated cb here.
+ Agree here and other leaks mentioned below, free is missing.
+>> +
+>> +       of_property_read_u32(node, "max-crossbar-lines", &max);
+>> +       cb->crossbar_map = kzalloc(max * sizeof(struct pirqs *), GFP_KERNEL);
+>> +
+>> +       if (!cb->crossbar_map)
+>> +               return -ENOMEM;
+> Leaking cb and cb->crossbar_base mapping.
+>
+>> +
+>> +       cb->domain = irq_domain_add_linear(node, max,
+>> +                                      &crossbar_domain_ops, NULL);
+>> +
+>> +       if (!cb->domain) {
+>> +               pr_err("Couldn't register an IRQ domain\n");
+>> +               return -ENODEV;
+>> +       }
+> Leaking cb, cb->crossbar_base, and cb->crossbar_map here.
+>
+>> +
+>> +       of_property_read_u32(node, "max-irqs", &max);
+>> +       cb->irq_map = kzalloc(max * sizeof(int), GFP_KERNEL);
+>> +       if (!cb->irq_map)
+>> +               return -ENOMEM;
+> Leaking cb, cb->crossbar_base, cb->crossbar_map, and cb->domain.
+>
+>> +
+>> +       cb->int_max = max;
+>> +
+>> +       for (i = 0; i < max; i++)
+>> +               cb->irq_map[i] = IRQ_FREE;
+>> +
+>> +       /* Get and mark reserved irqs */
+>> +       irqsr = of_get_property(node, "irqs-reserved", &size);
+>> +       size /= sizeof(int);
+> The entries will be __be32, not int.
+>
+>> +
+>> +       for (i = 0; i < size; i++)
+>> +               cb->irq_map[be32_to_cpup(irqsr + i)] = 0;
+> No sanity check on array bounds?
+>
+> What about a dt that has something like:
+>
+> 	irqs-reserved = <0x0 0xcccccccc 0xffffffff>;
+>
+> It's clearly wrong, and we can detect that rather than bringing down the
+> kernel...
+ yes, sanity check was required here.
+>> +
+>> +       cb->register_offsets = kzalloc(max * sizeof(int), GFP_KERNEL);
+>> +       if (!cb->register_offsets)
+>> +               return -ENOMEM;
+> Leaking cb, cb->crossbar_base, cb->crossbar_map, cb->domain, and
+> cb->irq_map here.
+>
+>> +
+>> +       of_property_read_u32(node, "reg-size", &size);
+> Sanity check?
+>
+>> +
+>> +       /*
+>> +        * Register offsets are not linear because of the
+>> +        * reserved irqs. so find and store the offsets once.
+>> +        */
+>> +       for (i = 0; i < max; i++) {
+>> +               if (!cb->irq_map[i])
+>> +                       continue;
+>> +
+>> +               cb->register_offsets[i] = reserved;
+>> +               reserved += size;
+>> +       }
+>> +
+>> +       switch (size) {
+>> +       case 1:
+>> +               cb->write = crossbar_writeb;
+>> +               break;
+>> +       case 2:
+>> +               cb->write = crossbar_writew;
+>> +               break;
+>> +       case 4:
+>> +               cb->write = crossbar_writel;
+>> +               break;
+>> +       default:
+>> +               break;
+> Perform cleanup and return -EINVAL here?
+ correct.
+>> +       }
+>> +
+>> +       return 0;
+>> +}
+>> +IRQCHIP_DECLARE(crossbar, "crossbar-irqchip", crossbar_of_init);
+>> --
+>> 1.7.9.5
+ Regards,
+ Sricharan
