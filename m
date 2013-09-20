@@ -1,58 +1,28 @@
-From: andrea.adami@gmail.com (Andrea Adami)
-Date: Fri, 20 Sep 2013 22:35:26 +0200
-Subject: [PATCH v4] sharpsl_param.c: ARM: pxa: fix invalid memory access
-Message-ID: <1379709326-2988-1-git-send-email-andrea.adami@gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 20 Sep 2013 22:41:15 +0200
+Subject: [PATCH 30/41] usb: musb: ux500: Don't supply a con_id when
+ requesting the clock
+In-Reply-To: <1379506478-16625-31-git-send-email-lee.jones@linaro.org>
+References: <1379506478-16625-1-git-send-email-lee.jones@linaro.org>
+ <1379506478-16625-31-git-send-email-lee.jones@linaro.org>
+Message-ID: <CACRpkdb01+MCUY1zaoTJ_o5yqaZFNJMH91kc4F6mMu+Oyg--Vg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After commit 72662e01088394577be4a3f14da94cf87bea2591
-ARM: head.S: only include __turn_mmu_on in the initial identity mapping
+On Wed, Sep 18, 2013 at 2:14 PM, Lee Jones <lee.jones@linaro.org> wrote:
 
-Zaurus PXA devices call sharpsl_save_param() during fixup and hang on
-boot because memcpy refers to physical addresses no longer valid if the
-MMU is setup.
-Zaurus collie (SA1100) is unaffected (function is called in init_machine).
+> If we supply a con_id then the clock framework will search for that name
+> in MUSB's Device Tree node for the 'clock-names' property. If it's absent
+> the clock request will fail. However, if we don't supply the con_id then
+> clk_get() will call into clk_sys() which will use the device name to
+> search for the appropriate clock, which is much more natural than forcing
+> 'usb'.
+>
+> Cc: Felipe Balbi <balbi@ti.com>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
-The code was making assumptions and for PXA the virtual address
-should have been used before.
+Looks fine to me, Felipe can we have your ACK on this so I can take
+this with the rest of the clock stuff through ARM SoC?
 
-Signed-off-by: Marko Katic <dromede@gmail.com>
-Signed-off-by: Andrea Adami <andrea.adami@gmail.com>
----
- arch/arm/common/sharpsl_param.c | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/common/sharpsl_param.c b/arch/arm/common/sharpsl_param.c
-index d56c932..3490549 100644
---- a/arch/arm/common/sharpsl_param.c
-+++ b/arch/arm/common/sharpsl_param.c
-@@ -15,6 +15,7 @@
- #include <linux/module.h>
- #include <linux/string.h>
- #include <asm/mach/sharpsl_param.h>
-+#include <asm/memory.h>
- 
- /*
-  * Certain hardware parameters determined at the time of device manufacture,
-@@ -25,8 +26,10 @@
-  */
- #ifdef CONFIG_ARCH_SA1100
- #define PARAM_BASE	0xe8ffc000
-+#define param_start(x)	(void *)(x)
- #else
- #define PARAM_BASE	0xa0000a00
-+#define param_start(x)	__va(x)
- #endif
- #define MAGIC_CHG(a,b,c,d) ( ( d << 24 ) | ( c << 16 )  | ( b << 8 ) | a )
- 
-@@ -41,7 +44,7 @@ EXPORT_SYMBOL(sharpsl_param);
- 
- void sharpsl_save_param(void)
- {
--	memcpy(&sharpsl_param, (void *)PARAM_BASE, sizeof(struct sharpsl_param_info));
-+	memcpy(&sharpsl_param, param_start(PARAM_BASE), sizeof(struct sharpsl_param_info));
- 
- 	if (sharpsl_param.comadj_keyword != COMADJ_MAGIC)
- 		sharpsl_param.comadj=-1;
--- 
-1.8.1.5
+Yours,
+Linus Walleij
