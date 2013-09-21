@@ -1,75 +1,59 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sat, 21 Sep 2013 09:11:46 -0500
-Subject: [PATCH 2/2] ARM: sunxi: Simplify restart setup code
-In-Reply-To: <1379772706-7028-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1379772706-7028-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1379772706-7028-2-git-send-email-maxime.ripard@free-electrons.com>
+From: sre@ring0.de (Sebastian Reichel)
+Date: Sat, 21 Sep 2013 16:16:16 +0200
+Subject: [PATCH v2 0/9] wilink: add device tree support
+In-Reply-To: <20130921122718.GA4431@amd.pavel.ucw.cz>
+References: <1372776948-24840-1-git-send-email-coelho@ti.com>
+ <CANOLnOPBHesTiV61zpQ_QS9c7E91K50EnbMnGhvgaViuA_3=Bw@mail.gmail.com>
+ <1372859132.21065.111.camel@cumari.coelho.fi>
+ <20130921122718.GA4431@amd.pavel.ucw.cz>
+Message-ID: <20130921141614.GA21383@earth.universe>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we have different machine definitions for different SoCs, we
-can remove the DT lookup to get the restart hook we should be using, and
-hardcode it in the machine definition instead.
+On Sat, Sep 21, 2013 at 02:27:18PM +0200, Pavel Machek wrote:
+> Hi!
+> 
+> > > > This is a follow-up on a previous patch set that had a smaller
+> > > > audience.  This time, I added the lists and people who were involved
+> > > > in the review of the bindings documentation, since most of my changes
+> > > > in v2 are coming from discussions there.
+> > > >
+> > > > This patch series adds device tree support to the wlcore_sdio driver,
+> > > > which is used by WiLink6, WiLink7 and WiLink8.
+> > > 
+> > > Could you perhaps consider doing device tree conversion for wl1251
+> > > too? With the knowledge you have from working on this series, it would
+> > > be much easier for you to do it than for someone else, and I don't
+> > > have much hope someone will do it at all. It's WiLink series chip
+> > > after all. Without this pandora and N900 are going to lose wifi
+> > > support after the switch to dt-only kernel.
+> > 
+> > Unfortunately I don't have much time to work on wl1251.  I think it
+> > wouldn't be too difficult to do though, so patches are welcome. ;)
+> > 
+> > Maybe you could try to make this change and I could support you if
+> > needed?
+> > 
+> > 
+> > > I can offer you my help testing things on pandora and I'm sure someone
+> > > here could try it on N900.
+> > 
+> > I could try it on the N900, if it is still bootable easily with the
+> > mainline. ;)
+> 
+> 3.11 should be bootable on mainline, including device tree and
+> video. (But excluding some other stuff, like MMC.)
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- arch/arm/mach-sunxi/sunxi.c | 13 +++++--------
- 1 file changed, 5 insertions(+), 8 deletions(-)
+I got external MMC (=> ?SD) working with some small modifications of
+the omap3-n900.dts file. I have not yet tried internal MMC, since
+its not important for me at the moment, but I guess its also just a
+small change in the dts file.
 
-diff --git a/arch/arm/mach-sunxi/sunxi.c b/arch/arm/mach-sunxi/sunxi.c
-index e0641dd..f184f6c 100644
---- a/arch/arm/mach-sunxi/sunxi.c
-+++ b/arch/arm/mach-sunxi/sunxi.c
-@@ -93,14 +93,13 @@ static void sun6i_restart(enum reboot_mode mode, const char *cmd)
- }
- 
- static struct of_device_id sunxi_restart_ids[] = {
--	{ .compatible = "allwinner,sun4i-wdt", .data = sun4i_restart },
--	{ .compatible = "allwinner,sun6i-wdt", .data = sun6i_restart },
-+	{ .compatible = "allwinner,sun4i-wdt" },
-+	{ .compatible = "allwinner,sun6i-wdt" },
- 	{ /*sentinel*/ }
- };
- 
- static void sunxi_setup_restart(void)
- {
--	const struct of_device_id *of_id;
- 	struct device_node *np;
- 
- 	np = of_find_matching_node(NULL, sunxi_restart_ids);
-@@ -109,11 +108,6 @@ static void sunxi_setup_restart(void)
- 
- 	wdt_base = of_iomap(np, 0);
- 	WARN(!wdt_base, "failed to map watchdog base address");
--
--	of_id = of_match_node(sunxi_restart_ids, np);
--	WARN(!of_id, "restart function not available");
--
--	arm_pm_restart = of_id->data;
- }
- 
- static void __init sunxi_timer_init(void)
-@@ -140,6 +134,7 @@ DT_MACHINE_START(SUNXI_DT, "Allwinner A1X (Device Tree)")
- 	.init_machine	= sunxi_dt_init,
- 	.init_time	= sunxi_timer_init,
- 	.dt_compat	= sunxi_board_dt_compat,
-+	.restart	= sun4i_restart,
- MACHINE_END
- 
- static const char * const sun6i_board_dt_compat[] = {
-@@ -151,6 +146,7 @@ DT_MACHINE_START(SUN6I_DT, "Allwinner sun6i (A31) Family")
- 	.init_machine	= sunxi_dt_init,
- 	.init_time	= sunxi_timer_init,
- 	.dt_compat	= sun6i_board_dt_compat,
-+	.restart	= sun6i_restart,
- MACHINE_END
- 
- static const char * const sun7i_board_dt_compat[] = {
-@@ -162,4 +158,5 @@ DT_MACHINE_START(SUN7I_DT, "Allwinner sun7i (A20) Family")
- 	.init_machine	= sunxi_dt_init,
- 	.init_time	= sunxi_timer_init,
- 	.dt_compat	= sun7i_board_dt_compat,
-+	.restart	= sun4i_restart,
- MACHINE_END
--- 
-1.8.4
+-- Sebastian
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130921/a6c98946/attachment.sig>
