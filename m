@@ -1,206 +1,91 @@
-From: laurent.pinchart+renesas@ideasonboard.com (Laurent Pinchart)
-Date: Sat, 21 Sep 2013 20:39:49 +0200
-Subject: [PATCH v6] gpio: pcf857x: Add OF support
-Message-ID: <1379788789-19801-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+From: bcm@fixthebug.org (Christian Daudt)
+Date: Sat, 21 Sep 2013 12:16:30 -0700
+Subject: [PATCH] rename ARCH_BCM to ARCH_BCM_MOBILE
+In-Reply-To: <CAOesGMjViyCa+FhNmrESc+WmnW+=wzsqBpj=jHeuCyobAmMojg@mail.gmail.com>
+References: <1379718260-24349-1-git-send-email-csd@broadcom.com>
+ <CAOesGMjViyCa+FhNmrESc+WmnW+=wzsqBpj=jHeuCyobAmMojg@mail.gmail.com>
+Message-ID: <CAEPRUYq_btMrBeyUtoCVA69yRpc3kn-zpuykUdp9zRxZ0kERDg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add DT bindings for the pcf857x-compatible chips and parse the device
-tree node in the driver.
+[plain-text resend]
+On Fri, Sep 20, 2013 at 5:23 PM, Olof Johansson <olof@lixom.net> wrote:
+>
+> On Fri, Sep 20, 2013 at 4:04 PM, Christian Daudt <csd@broadcom.com> wrote:
+> > Currently ARCH_BCM has been used for Broadcom
+> > Mobile V7 based SoCs. In order to allow other Broadcom
+> > SoCs to also use mach-bcm directory and files, this patch
+> > renames the original ARCH_BCM to ARCH_BCM_MOBILE, and
+> > uses ARCH_BCM to define any Broadcom chip residing
+> > in mach-bcm directory.
+> >
+> > Signed-off-by: Christian Daudt <csd@broadcom.com>
+> >
+> > diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> > index cc0f1fb..dd00e22 100644
+> > --- a/arch/arm/boot/dts/Makefile
+> > +++ b/arch/arm/boot/dts/Makefile
+> > @@ -42,8 +42,6 @@ dtb-$(CONFIG_ARCH_AT91)       += sama5d34ek.dtb
+> >  dtb-$(CONFIG_ARCH_AT91)        += sama5d35ek.dtb
+> >
+> >  dtb-$(CONFIG_ARCH_BCM2835) += bcm2835-rpi-b.dtb
+> > -dtb-$(CONFIG_ARCH_BCM) += bcm11351-brt.dtb \
+> > -       bcm28155-ap.dtb
+> >  dtb-$(CONFIG_ARCH_DAVINCI) += da850-enbw-cmc.dtb \
+> >         da850-evm.dtb
+> >  dtb-$(CONFIG_ARCH_DOVE) += dove-cm-a510.dtb \
+> > @@ -101,6 +99,8 @@ dtb-$(CONFIG_ARCH_KIRKWOOD) += kirkwood-cloudbox.dtb \
+> >         kirkwood-ts219-6282.dtb \
+> >         kirkwood-openblocks_a6.dtb
+> >  dtb-$(CONFIG_ARCH_MARCO) += marco-evb.dtb
+> > +dtb-$(CONFIG_ARCH_BCM_MOBILE) += bcm11351-brt.dtb \
+> > +       bcm28155-ap.dtb
+>
+> This reordering looks off. The entries should be alphabetically
+> ordered, so if anything it should move up above BCM2835.
 
-Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
----
- .../devicetree/bindings/gpio/gpio-pcf857x.txt      | 71 ++++++++++++++++++++++
- drivers/gpio/gpio-pcf857x.c                        | 44 +++++++++++---
- 2 files changed, 107 insertions(+), 8 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/gpio/gpio-pcf857x.txt
+Heh. I started the rename with ARCH_MOBiLE_BCM and later renamed to
+ARCH_BCM_MOBILE. Forgot to move it up to reflect the change in
+ordering. Fixed.
 
-Changes since v5:
+>
+>
+>
+> > diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
+> > index 704d6d3..4207ab4 100644
+> > --- a/drivers/clocksource/Makefile
+> > +++ b/drivers/clocksource/Makefile
+> > @@ -25,7 +25,7 @@ obj-$(CONFIG_SUN4I_TIMER)     += sun4i_timer.o
+> >  obj-$(CONFIG_ARCH_TEGRA)       += tegra20_timer.o
+> >  obj-$(CONFIG_VT8500_TIMER)     += vt8500_timer.o
+> >  obj-$(CONFIG_ARCH_NSPIRE)      += zevio-timer.o
+> > -obj-$(CONFIG_ARCH_BCM)         += bcm_kona_timer.o
+> > +obj-$(CONFIG_ARCH_BCM_MOBILE)  += bcm_kona_timer.o
+> >  obj-$(CONFIG_CADENCE_TTC_TIMER)        += cadence_ttc_timer.o
+> >  obj-$(CONFIG_CLKSRC_EXYNOS_MCT)        += exynos_mct.o
+> >  obj-$(CONFIG_CLKSRC_SAMSUNG_PWM)       += samsung_pwm_timer.o
+> > diff --git a/drivers/mmc/host/Kconfig b/drivers/mmc/host/Kconfig
+> > index 7fc5099..7e89650 100644
+> > --- a/drivers/mmc/host/Kconfig
+> > +++ b/drivers/mmc/host/Kconfig
+> > @@ -251,7 +251,7 @@ config MMC_SDHCI_S3C_DMA
+> >
+> >  config MMC_SDHCI_BCM_KONA
+> >         tristate "SDHCI support on Broadcom KONA platform"
+> > -       depends on ARCH_BCM
+> > +       depends on ARCH_BCM_MOBILE
+> >         select MMC_SDHCI_PLTFM
+> >         help
+> >           This selects the Broadcom Kona Secure Digital Host Controller
+>
+> Since nothing breaks (i.e. ARCH_BCM is still there, and will be
+> enabled for any ARCH_BCM_MOBILE platform), the above two can go
+> through the corresponding subsystem trees as separate patches.
+>
+I was thinking of doing that, but it will actually break if the
+changes to drivers show up before the changes to mach-bcm because the
+drivers will no longer be compiled. I'll split it and keep the
+nag-ometer set to high to ensure their inclusion then...
 
-- Renamed pin to line in the DT bindings documentation
-- Renamed pins-initial-states DT property to lines-initial-states
-
-Changes since v4:
-
-- Don't try to get ngpio from of_device_id data, we already get it from
-  i2c_device_id
-
-Changes since v3:
-
-- Get rid of the #ifdef CONFIG_OF in the probe function
-- Give DT node priority over platform data
-
-Changes since v2:
-
-- Replace mention about interrupts software configuration in DT bindings
-  documentation with an explanation of the hardware configuration.
-
-diff --git a/Documentation/devicetree/bindings/gpio/gpio-pcf857x.txt b/Documentation/devicetree/bindings/gpio/gpio-pcf857x.txt
-new file mode 100644
-index 0000000..d63194a
---- /dev/null
-+++ b/Documentation/devicetree/bindings/gpio/gpio-pcf857x.txt
-@@ -0,0 +1,71 @@
-+* PCF857x-compatible I/O expanders
-+
-+The PCF857x-compatible chips have "quasi-bidirectional" I/O lines that can be
-+driven high by a pull-up current source or driven low to ground. This combines
-+the direction and output level into a single bit per line, which can't be read
-+back. We can't actually know at initialization time whether a line is configured
-+(a) as output and driving the signal low/high, or (b) as input and reporting a
-+low/high value, without knowing the last value written since the chip came out
-+of reset (if any). The only reliable solution for setting up line direction is
-+thus to do it explicitly.
-+
-+Required Properties:
-+
-+  - compatible: should be one of the following.
-+    - "maxim,max7328": For the Maxim MAX7378
-+    - "maxim,max7329": For the Maxim MAX7329
-+    - "nxp,pca8574": For the NXP PCA8574
-+    - "nxp,pca8575": For the NXP PCA8575
-+    - "nxp,pca9670": For the NXP PCA9670
-+    - "nxp,pca9671": For the NXP PCA9671
-+    - "nxp,pca9672": For the NXP PCA9672
-+    - "nxp,pca9673": For the NXP PCA9673
-+    - "nxp,pca9674": For the NXP PCA9674
-+    - "nxp,pca9675": For the NXP PCA9675
-+    - "nxp,pcf8574": For the NXP PCF8574
-+    - "nxp,pcf8574a": For the NXP PCF8574A
-+    - "nxp,pcf8575": For the NXP PCF8575
-+    - "ti,tca9554": For the TI TCA9554
-+
-+  - reg: I2C slave address.
-+
-+  - gpio-controller: Marks the device node as a gpio controller.
-+  - #gpio-cells: Should be 2. The first cell is the GPIO number and the second
-+    cell specifies GPIO flags, as defined in <dt-bindings/gpio/gpio.h>. Only the
-+    GPIO_ACTIVE_HIGH and GPIO_ACTIVE_LOW flags are supported.
-+
-+Optional Properties:
-+
-+  - lines-initial-states: Bitmask that specifies the initial state of each
-+  line. When a bit is set to zero, the corresponding line will be initialized to
-+  the input (pulled-up) state. When the  bit is set to one, the line will be
-+  initialized the the low-level output state. If the property is not specified
-+  all lines will be initialized to the input state.
-+
-+  The I/O expander can detect input state changes, and thus optionally act as
-+  an interrupt controller. When the expander interrupt line is connected all the
-+  following properties must be set. For more information please see the
-+  interrupt controller device tree bindings documentation available at
-+  Documentation/devicetree/bindings/interrupt-controller/interrupts.txt.
-+
-+  - interrupt-controller: Identifies the node as an interrupt controller.
-+  - #interrupt-cells: Number of cells to encode an interrupt source, shall be 2.
-+  - interrupt-parent: phandle of the parent interrupt controller.
-+  - interrupts: Interrupt specifier for the controllers interrupt.
-+
-+
-+Please refer to gpio.txt in this directory for details of the common GPIO
-+bindings used by client devices.
-+
-+Example: PCF8575 I/O expander node
-+
-+	pcf8575: gpio at 20 {
-+		compatible = "nxp,pcf8575";
-+		reg = <0x20>;
-+		interrupt-parent = <&irqpin2>;
-+		interrupts = <3 0>;
-+		gpio-controller;
-+		#gpio-cells = <2>;
-+		interrupt-controller;
-+		#interrupt-cells = <2>;
-+	};
-diff --git a/drivers/gpio/gpio-pcf857x.c b/drivers/gpio/gpio-pcf857x.c
-index 54725a6..1535686 100644
---- a/drivers/gpio/gpio-pcf857x.c
-+++ b/drivers/gpio/gpio-pcf857x.c
-@@ -26,6 +26,8 @@
- #include <linux/irqdomain.h>
- #include <linux/kernel.h>
- #include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/of_device.h>
- #include <linux/slab.h>
- #include <linux/spinlock.h>
- 
-@@ -49,6 +51,27 @@ static const struct i2c_device_id pcf857x_id[] = {
- };
- MODULE_DEVICE_TABLE(i2c, pcf857x_id);
- 
-+#ifdef CONFIG_OF
-+static const struct of_device_id pcf857x_of_table[] = {
-+	{ .compatible = "nxp,pcf8574" },
-+	{ .compatible = "nxp,pcf8574a" },
-+	{ .compatible = "nxp,pca8574" },
-+	{ .compatible = "nxp,pca9670" },
-+	{ .compatible = "nxp,pca9672" },
-+	{ .compatible = "nxp,pca9674" },
-+	{ .compatible = "nxp,pcf8575" },
-+	{ .compatible = "nxp,pca8575" },
-+	{ .compatible = "nxp,pca9671" },
-+	{ .compatible = "nxp,pca9673" },
-+	{ .compatible = "nxp,pca9675" },
-+	{ .compatible = "maxim,max7328" },
-+	{ .compatible = "maxim,max7329" },
-+	{ .compatible = "ti,tca9554" },
-+	{ }
-+};
-+MODULE_DEVICE_TABLE(of, pcf857x_of_table);
-+#endif
-+
- /*
-  * The pcf857x, pca857x, and pca967x chips only expose one read and one
-  * write register.  Writing a "one" bit (to match the reset state) lets
-@@ -260,14 +283,18 @@ fail:
- static int pcf857x_probe(struct i2c_client *client,
- 			 const struct i2c_device_id *id)
- {
--	struct pcf857x_platform_data	*pdata;
-+	struct pcf857x_platform_data	*pdata = dev_get_platdata(&client->dev);
-+	struct device_node		*np = client->dev.of_node;
- 	struct pcf857x			*gpio;
-+	unsigned int			n_latch = 0;
- 	int				status;
- 
--	pdata = dev_get_platdata(&client->dev);
--	if (!pdata) {
-+	if (IS_ENABLED(CONFIG_OF) && np)
-+		of_property_read_u32(np, "lines-initial-states", &n_latch);
-+	else if (pdata)
-+		n_latch = pdata->n_latch;
-+	else
- 		dev_dbg(&client->dev, "no platform data\n");
--	}
- 
- 	/* Allocate, initialize, and register this gpio_chip. */
- 	gpio = devm_kzalloc(&client->dev, sizeof(*gpio), GFP_KERNEL);
-@@ -360,11 +387,11 @@ static int pcf857x_probe(struct i2c_client *client,
- 	 * may cause transient glitching since it can't know the last value
- 	 * written (some pins may need to be driven low).
- 	 *
--	 * Using pdata->n_latch avoids that trouble.  When left initialized
--	 * to zero, our software copy of the "latch" then matches the chip's
--	 * all-ones reset state.  Otherwise it flags pins to be driven low.
-+	 * Using n_latch avoids that trouble.  When left initialized to zero,
-+	 * our software copy of the "latch" then matches the chip's all-ones
-+	 * reset state.  Otherwise it flags pins to be driven low.
- 	 */
--	gpio->out = pdata ? ~pdata->n_latch : ~0;
-+	gpio->out = ~n_latch;
- 	gpio->status = gpio->out;
- 
- 	status = gpiochip_add(&gpio->chip);
-@@ -426,6 +453,7 @@ static struct i2c_driver pcf857x_driver = {
- 	.driver = {
- 		.name	= "pcf857x",
- 		.owner	= THIS_MODULE,
-+		.of_match_table = of_match_ptr(pcf857x_of_table),
- 	},
- 	.probe	= pcf857x_probe,
- 	.remove	= pcf857x_remove,
--- 
-Regards,
-
-Laurent Pinchart
+ Thanks,
+   csd
