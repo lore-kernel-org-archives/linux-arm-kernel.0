@@ -1,36 +1,33 @@
 From: emilio@elopez.com.ar (=?UTF-8?q?Emilio=20L=C3=B3pez?=)
-Date: Fri, 20 Sep 2013 22:03:09 -0300
-Subject: [PATCH 0/3] sunxi clock fixes
-Message-ID: <1379725392-30202-1-git-send-email-emilio@elopez.com.ar>
+Date: Fri, 20 Sep 2013 22:03:10 -0300
+Subject: [PATCH 1/3] clk: sunxi: factors: fix off-by-one masks
+In-Reply-To: <1379725392-30202-1-git-send-email-emilio@elopez.com.ar>
+References: <1379725392-30202-1-git-send-email-emilio@elopez.com.ar>
+Message-ID: <1379725392-30202-2-git-send-email-emilio@elopez.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The previous code would generate one bit too long masks, and was
+needlessly complicated. This patch replaces it by simpler code that can
+generate the masks correctly.
 
-This small series contains two bug fixes and a patch to solve the issue
-of accidental clock gating, as discussed earlier on my RFC patch, "of: 
-add a basic memory driver".
+Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
+---
+ drivers/clk/sunxi/clk-factors.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-I believe the two first patches should go into -rcN, although I have not
-noticed any issues so far coming from the bugs themselves.
-
-The third patch should be a no-op for now, and I'd like to have it
-merged before these clocks actually appear on the driver; in this way
-they will never be gated accidentally, and it remains bisectable. I will 
-be sending PLL5/6 support patches in short order.
-
-Cheers,
-
-Emilio
-
-Emilio L?pez (3):
-  clk: sunxi: factors: fix off-by-one masks
-  clk: sunxi: factors: clear variables before using them
-  clk: sunxi: protect core clocks from accidental shutdown
-
- drivers/clk/sunxi/clk-factors.c |  4 ++--
- drivers/clk/sunxi/clk-sunxi.c   | 28 ++++++++++++++++++++++++++++
- 2 files changed, 30 insertions(+), 2 deletions(-)
-
+diff --git a/drivers/clk/sunxi/clk-factors.c b/drivers/clk/sunxi/clk-factors.c
+index 88523f9..5687ac9 100644
+--- a/drivers/clk/sunxi/clk-factors.c
++++ b/drivers/clk/sunxi/clk-factors.c
+@@ -40,7 +40,7 @@ struct clk_factors {
+ 
+ #define to_clk_factors(_hw) container_of(_hw, struct clk_factors, hw)
+ 
+-#define SETMASK(len, pos)		(((-1U) >> (31-len))  << (pos))
++#define SETMASK(len, pos)		(((1U << (len)) - 1) << (pos))
+ #define CLRMASK(len, pos)		(~(SETMASK(len, pos)))
+ #define FACTOR_GET(bit, len, reg)	(((reg) & SETMASK(len, bit)) >> (bit))
+ 
 -- 
 1.8.4
