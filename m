@@ -1,41 +1,34 @@
-From: pali.rohar@gmail.com (Pali =?utf-8?q?Roh=C3=A1r?=)
-Date: Sat, 21 Sep 2013 15:42:37 +0200
-Subject: [PATCH 0/4] Add support for charging battery in Nokia RX-51
-In-Reply-To: <1378630239-10006-1-git-send-email-pali.rohar@gmail.com>
-References: <1378630239-10006-1-git-send-email-pali.rohar@gmail.com>
-Message-ID: <201309211542.38033@pali>
+From: aaro.koskinen@iki.fi (Aaro Koskinen)
+Date: Sat, 21 Sep 2013 16:45:39 +0300
+Subject: [PATCH 0/3] ARM: OMAP: convert N950/N9 to DT
+Message-ID: <1379771142-29087-1-git-send-email-aaro.koskinen@iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 08 September 2013 10:50:35 Pali Roh?r wrote:
-> This patch series finally bringing support for charging
-> battery on Nokia N900 (RX-51) without any proprietary Nokia
-> bits in userspace.
-> 
-> Pali Roh?r (4):
->   usb: musb: Call atomic_notifier_call_chain when status is
-> changed power: isp1704_charger: Fix driver to work with
-> changes introduced in v3.5
->   power: isp1704_charger: Add callback function set_current
->   RX-51: Add platform function and data for bq24150a charger
-> 
->  arch/arm/mach-omap2/board-rx51-peripherals.c |   56
-> +++++++++++++- drivers/power/isp1704_charger.c              |
->  107 ++++++++++++++------------ drivers/usb/musb/omap2430.c  
->                |    3 + drivers/usb/phy/phy-twl4030-usb.c    
->        |    2 + include/linux/power/isp1704_charger.h       
-> |    1 + 5 files changed, 117 insertions(+), 52 deletions(-)
+Hi,
 
-Anton, can you review this patch series, specially power supply 
-code (changes to isp1704_charger.c driver)?
+This adds DTS for N950/N9 and removes the legacy board file. However,
+I guess the HACK in patch 1 needs to be solved somehow before we can
+do this...
+
+Aaro Koskinen (3):
+  ARM: OMAP2: HACK: hardcode hsmmc2 input clock source for N950/N9
+  ARM: dts: add minimal DT support for Nokia N950 & N9 phones
+  ARM: OMAP2: delete board-rm680
+
+ arch/arm/boot/dts/Makefile           |   2 +
+ arch/arm/boot/dts/omap3-n9.dts       |  18 ++++
+ arch/arm/boot/dts/omap3-n950-n9.dtsi | 172 +++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/omap3-n950.dts     |  18 ++++
+ arch/arm/mach-omap2/Kconfig          |   7 --
+ arch/arm/mach-omap2/Makefile         |   1 -
+ arch/arm/mach-omap2/board-generic.c  |  15 +++
+ arch/arm/mach-omap2/board-rm680.c    | 167 ----------------------------------
+ 8 files changed, 225 insertions(+), 175 deletions(-)
+ create mode 100644 arch/arm/boot/dts/omap3-n9.dts
+ create mode 100644 arch/arm/boot/dts/omap3-n950-n9.dtsi
+ create mode 100644 arch/arm/boot/dts/omap3-n950.dts
+ delete mode 100644 arch/arm/mach-omap2/board-rm680.c
 
 -- 
-Pali Roh?r
-pali.rohar at gmail.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130921/ac95098d/attachment.sig>
+1.8.4.rc3
