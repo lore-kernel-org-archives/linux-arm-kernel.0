@@ -1,39 +1,27 @@
 From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Sat, 21 Sep 2013 17:18:14 +0200
-Subject: [PATCH 6/6] ARM: dts: exynos5420: add sclk_pcm_in to audss clock
- controller
-In-Reply-To: <1379711637-5226-6-git-send-email-abrestic@chromium.org>
+Date: Sat, 21 Sep 2013 17:19:01 +0200
+Subject: [PATCH 3/6] clk: exynos5250: add clock ID for div_pcm0
+In-Reply-To: <1379711637-5226-3-git-send-email-abrestic@chromium.org>
 References: <1379711637-5226-1-git-send-email-abrestic@chromium.org>
- <1379711637-5226-6-git-send-email-abrestic@chromium.org>
-Message-ID: <9260897.NJpGqJ1JKi@flatron>
+ <1379711637-5226-3-git-send-email-abrestic@chromium.org>
+Message-ID: <3865571.vRPq0Or7Pr@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Andrew,
 
-On Friday 20 of September 2013 14:13:57 Andrew Bresticker wrote:
-> The parent of sclk_pcm in the AudioSS block is sclk_maupcm0.
+On Friday 20 of September 2013 14:13:54 Andrew Bresticker wrote:
+> There is no gate for the PCM clock input to the AudioSS block, so
+> the parent of sclk_pcm is div_pcm0.  Add a clock ID for it so that
+> we can reference it in device trees.
 > 
 > Signed-off-by: Andrew Bresticker <abrestic@chromium.org>
 > ---
->  arch/arm/boot/dts/exynos5420.dtsi | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/exynos5420.dtsi
-> b/arch/arm/boot/dts/exynos5420.dtsi index d537cd7..339ab93 100644
-> --- a/arch/arm/boot/dts/exynos5420.dtsi
-> +++ b/arch/arm/boot/dts/exynos5420.dtsi
-> @@ -72,8 +72,8 @@
->  		compatible = "samsung,exynos5420-audss-clock";
->  		reg = <0x03810000 0x0C>;
->  		#clock-cells = <1>;
-> -		clocks = <&clock 148>;
-> -		clock-names = "sclk_audio";
-> +		clocks = <&clock 148>, <&clock 149>;
-> +		clock-names = "sclk_audio", "sclk_pcm_in";
+>  Documentation/devicetree/bindings/clock/exynos5250-clock.txt | 1 +
+>  drivers/clk/samsung/clk-exynos5250.c                         | 4 ++--
+>  2 files changed, 3 insertions(+), 2 deletions(-)
 
-Same note as for Exynos 5250. I think it would be more reasonable to 
-specify all the input clocks here.
+Reviewed-by: Tomasz Figa <t.figa@samsung.com>
 
 Best regards,
 Tomasz
