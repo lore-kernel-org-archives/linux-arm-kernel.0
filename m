@@ -1,124 +1,83 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Sat, 21 Sep 2013 14:07:25 +0100
-Subject: [PATCH 11/20] iio: sensors-core: st: Support sensors which don't
- have a Data Ready pin
-In-Reply-To: <523D9649.4080409@kernel.org>
-References: <1379347346-823-1-git-send-email-lee.jones@linaro.org>
- <1379347346-823-12-git-send-email-lee.jones@linaro.org>
- <523D9649.4080409@kernel.org>
-Message-ID: <523D9A0D.50306@kernel.org>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Sat, 21 Sep 2013 14:22:26 +0200
+Subject: [PATCH 11/26] ARM: dove: remove custom .init_time hook
+In-Reply-To: <1379526839-14798-12-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1379526839-14798-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1379526839-14798-12-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <20130921122226.GB31180@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/21/13 13:51, Jonathan Cameron wrote:
-> On 09/16/13 17:02, Lee Jones wrote:
->> Not all ST's sensors support data ready, so let's make the declaration
->> of one conditional.
->>
->> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> Applied to the togreg branch of iio.git
+On Wed, Sep 18, 2013 at 07:53:44PM +0200, Sebastian Hesselbarth wrote:
+> With arch/arm calling of_clk_init(NULL) from time_init(), we can now
+> remove custom .init_time hooks. While at it, also remove some obsolete
+> includes.
 > 
-> Thanks Lee
-Having done some extra build tests, noticed that
-for st_snesors_set_drdy_int_pin should be static.
+> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> ---
+> Cc: Olof Johansson <olof@lixom.net>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Jason Cooper <jason@lakedaemon.net>
+> Cc: Andrew Lunn <andrew@lunn.ch>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-kernel at vger.kernel.org
+> ---
+>  arch/arm/mach-dove/board-dt.c |   11 -----------
+>  1 file changed, 11 deletions(-)
 
-Fixed up and push out to the togreg branch of iio.git
+Hi Sebastian
 
->> ---
->>  drivers/iio/common/st_sensors/st_sensors_core.c | 33 ++++++++++++++++---------
->>  drivers/iio/pressure/st_pressure_core.c         |  3 ++-
->>  2 files changed, 24 insertions(+), 12 deletions(-)
->>
->> diff --git a/drivers/iio/common/st_sensors/st_sensors_core.c b/drivers/iio/common/st_sensors/st_sensors_core.c
->> index 793136a..2672630 100644
->> --- a/drivers/iio/common/st_sensors/st_sensors_core.c
->> +++ b/drivers/iio/common/st_sensors/st_sensors_core.c
->> @@ -198,21 +198,17 @@ int st_sensors_set_axis_enable(struct iio_dev *indio_dev, u8 axis_enable)
->>  }
->>  EXPORT_SYMBOL(st_sensors_set_axis_enable);
->>  
->> -int st_sensors_init_sensor(struct iio_dev *indio_dev,
->> -					struct st_sensors_platform_data *pdata)
->> +int st_sensors_set_drdy_int_pin(struct iio_dev *indio_dev,
->> +				struct st_sensors_platform_data *pdata)
->>  {
->> -	int err;
->>  	struct st_sensor_data *sdata = iio_priv(indio_dev);
->>  
->> -	mutex_init(&sdata->tb.buf_lock);
->> -
->>  	switch (pdata->drdy_int_pin) {
->>  	case 1:
->>  		if (sdata->sensor->drdy_irq.mask_int1 == 0) {
->>  			dev_err(&indio_dev->dev,
->>  					"DRDY on INT1 not available.\n");
->> -			err = -EINVAL;
->> -			goto init_error;
->> +			return -EINVAL;
->>  		}
->>  		sdata->drdy_int_pin = 1;
->>  		break;
->> @@ -220,17 +216,29 @@ int st_sensors_init_sensor(struct iio_dev *indio_dev,
->>  		if (sdata->sensor->drdy_irq.mask_int2 == 0) {
->>  			dev_err(&indio_dev->dev,
->>  					"DRDY on INT2 not available.\n");
->> -			err = -EINVAL;
->> -			goto init_error;
->> +			return -EINVAL;
->>  		}
->>  		sdata->drdy_int_pin = 2;
->>  		break;
->>  	default:
->>  		dev_err(&indio_dev->dev, "DRDY on pdata not valid.\n");
->> -		err = -EINVAL;
->> -		goto init_error;
->> +		return -EINVAL;
->>  	}
->>  
->> +	return 0;
->> +}
->> +
->> +int st_sensors_init_sensor(struct iio_dev *indio_dev,
->> +					struct st_sensors_platform_data *pdata)
->> +{
->> +	struct st_sensor_data *sdata = iio_priv(indio_dev);
->> +	int err = 0;
->> +
->> +	mutex_init(&sdata->tb.buf_lock);
->> +
->> +	if (pdata)
->> +		err = st_sensors_set_drdy_int_pin(indio_dev, pdata);
->> +
->>  	err = st_sensors_set_enable(indio_dev, false);
->>  	if (err < 0)
->>  		goto init_error;
->> @@ -266,6 +274,9 @@ int st_sensors_set_dataready_irq(struct iio_dev *indio_dev, bool enable)
->>  	u8 drdy_mask;
->>  	struct st_sensor_data *sdata = iio_priv(indio_dev);
->>  
->> +	if (!sdata->sensor->drdy_irq.addr)
->> +		return 0;
->> +
->>  	/* Enable/Disable the interrupt generator 1. */
->>  	if (sdata->sensor->drdy_irq.ig1.en_addr > 0) {
->>  		err = st_sensors_write_data_with_mask(indio_dev,
->> diff --git a/drivers/iio/pressure/st_pressure_core.c b/drivers/iio/pressure/st_pressure_core.c
->> index 93bff9b..3abada2 100644
->> --- a/drivers/iio/pressure/st_pressure_core.c
->> +++ b/drivers/iio/pressure/st_pressure_core.c
->> @@ -254,7 +254,8 @@ int st_press_common_probe(struct iio_dev *indio_dev,
->>  
->>  	pdata->odr = pdata->sensor->odr.odr_avl[0].hz;
->>  
->> -	if (!plat_data)
->> +	/* Some devices don't support a data ready pin. */
->> +	if (!plat_data && pdata->sensor->drdy_irq.addr)
->>  		plat_data =
->>  			(struct st_sensors_platform_data *)&default_press_pdata;
->>  
->>
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-iio" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Boot tested on cubox.
+
+Tested-by: Andrew Lunn <andrew@lunn.ch>
+
+	   Andrew
+
+> 
+> diff --git a/arch/arm/mach-dove/board-dt.c b/arch/arm/mach-dove/board-dt.c
+> index 49f72a8..ddb8663 100644
+> --- a/arch/arm/mach-dove/board-dt.c
+> +++ b/arch/arm/mach-dove/board-dt.c
+> @@ -10,17 +10,13 @@
+>  
+>  #include <linux/init.h>
+>  #include <linux/clk-provider.h>
+> -#include <linux/clocksource.h>
+> -#include <linux/irqchip.h>
+>  #include <linux/of.h>
+>  #include <linux/of_platform.h>
+> -#include <linux/platform_data/usb-ehci-orion.h>
+>  #include <asm/hardware/cache-tauros2.h>
+>  #include <asm/mach/arch.h>
+>  #include <mach/dove.h>
+>  #include <mach/pm.h>
+>  #include <plat/common.h>
+> -#include <plat/irq.h>
+>  #include "common.h"
+>  
+>  /*
+> @@ -45,12 +41,6 @@ static void __init dove_legacy_clk_init(void)
+>  			 of_clk_get_from_provider(&clkspec));
+>  }
+>  
+> -static void __init dove_dt_time_init(void)
+> -{
+> -	of_clk_init(NULL);
+> -	clocksource_of_init();
+> -}
+> -
+>  static void __init dove_dt_init_early(void)
+>  {
+>  	mvebu_mbus_init("marvell,dove-mbus",
+> @@ -84,7 +74,6 @@ static const char * const dove_dt_board_compat[] = {
+>  DT_MACHINE_START(DOVE_DT, "Marvell Dove (Flattened Device Tree)")
+>  	.map_io		= dove_map_io,
+>  	.init_early	= dove_dt_init_early,
+> -	.init_time	= dove_dt_time_init,
+>  	.init_machine	= dove_dt_init,
+>  	.restart	= dove_restart,
+>  	.dt_compat	= dove_dt_board_compat,
+> -- 
+> 1.7.10.4
 > 
