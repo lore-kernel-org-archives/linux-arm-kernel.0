@@ -1,49 +1,94 @@
 From: jic23@kernel.org (Jonathan Cameron)
-Date: Sat, 21 Sep 2013 13:52:00 +0100
-Subject: [PATCH 13/20] iio: sensors-core: st: Clean-up error handling
- in st_sensors_read_axis_data()
-In-Reply-To: <1379347346-823-14-git-send-email-lee.jones@linaro.org>
+Date: Sat, 21 Sep 2013 13:52:18 +0100
+Subject: [PATCH 14/20] iio: pressure-core: st: Clean-up probe() function
+In-Reply-To: <1379347346-823-15-git-send-email-lee.jones@linaro.org>
 References: <1379347346-823-1-git-send-email-lee.jones@linaro.org>
- <1379347346-823-14-git-send-email-lee.jones@linaro.org>
-Message-ID: <523D9670.5090107@kernel.org>
+ <1379347346-823-15-git-send-email-lee.jones@linaro.org>
+Message-ID: <523D9682.5060808@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 09/16/13 17:02, Lee Jones wrote:
-> Gets rid of those unnecessary gotos.
+> This patch contains some pretty basic clean-ups in probe() pertaining to
+> the simplification of error handling and a couple of readability adaptions.
 > 
 > Signed-off-by: Lee Jones <lee.jones@linaro.org>
 Applied to the togreg branch of iio.git
 
-Thanks Lee.
+Thanks Lee,
+
 > ---
->  drivers/iio/common/st_sensors/st_sensors_core.c | 8 +++-----
->  1 file changed, 3 insertions(+), 5 deletions(-)
+>  drivers/iio/pressure/st_pressure_core.c | 28 +++++++++++++++-------------
+>  1 file changed, 15 insertions(+), 13 deletions(-)
 > 
-> diff --git a/drivers/iio/common/st_sensors/st_sensors_core.c b/drivers/iio/common/st_sensors/st_sensors_core.c
-> index c5fbe58..76e573b 100644
-> --- a/drivers/iio/common/st_sensors/st_sensors_core.c
-> +++ b/drivers/iio/common/st_sensors/st_sensors_core.c
-> @@ -331,10 +331,8 @@ static int st_sensors_read_axis_data(struct iio_dev *indio_dev,
->  	unsigned int byte_for_channel = ch->scan_type.storagebits >> 3;
+> diff --git a/drivers/iio/pressure/st_pressure_core.c b/drivers/iio/pressure/st_pressure_core.c
+> index 3abada2..4539953 100644
+> --- a/drivers/iio/pressure/st_pressure_core.c
+> +++ b/drivers/iio/pressure/st_pressure_core.c
+> @@ -232,21 +232,23 @@ static const struct iio_trigger_ops st_press_trigger_ops = {
+>  int st_press_common_probe(struct iio_dev *indio_dev,
+>  				struct st_sensors_platform_data *plat_data)
+>  {
+> -	int err;
+>  	struct st_sensor_data *pdata = iio_priv(indio_dev);
+> +	int irq = pdata->get_irq_data_ready(indio_dev);
+> +	int err;
 >  
->  	outdata = kmalloc(byte_for_channel, GFP_KERNEL);
-> -	if (!outdata) {
-> -		err = -EINVAL;
-> -		goto st_sensors_read_axis_data_error;
-> -	}
-> +	if (!outdata)
-> +		return -ENOMEM;
+>  	indio_dev->modes = INDIO_DIRECT_MODE;
+>  	indio_dev->info = &press_info;
 >  
->  	err = sdata->tf->read_multiple_byte(&sdata->tb, sdata->dev,
->  				ch->address, byte_for_channel,
-> @@ -349,7 +347,7 @@ static int st_sensors_read_axis_data(struct iio_dev *indio_dev,
+>  	err = st_sensors_check_device_support(indio_dev,
+> -				ARRAY_SIZE(st_press_sensors), st_press_sensors);
+> +					      ARRAY_SIZE(st_press_sensors),
+> +					      st_press_sensors);
+>  	if (err < 0)
+> -		goto st_press_common_probe_error;
+> +		return err;
 >  
->  st_sensors_free_memory:
->  	kfree(outdata);
-> -st_sensors_read_axis_data_error:
+>  	pdata->num_data_channels = ST_PRESS_NUMBER_DATA_CHANNELS;
+> -	pdata->multiread_bit = pdata->sensor->multi_read_bit;
+> -	indio_dev->channels = pdata->sensor->ch;
+> -	indio_dev->num_channels = pdata->sensor->num_ch;
+> +	pdata->multiread_bit     = pdata->sensor->multi_read_bit;
+> +	indio_dev->channels      = pdata->sensor->ch;
+> +	indio_dev->num_channels  = pdata->sensor->num_ch;
+>  
+>  	if (pdata->sensor->fs.addr != 0)
+>  		pdata->current_fullscale = (struct st_sensor_fullscale_avl *)
+> @@ -261,15 +263,15 @@ int st_press_common_probe(struct iio_dev *indio_dev,
+>  
+>  	err = st_sensors_init_sensor(indio_dev, plat_data);
+>  	if (err < 0)
+> -		goto st_press_common_probe_error;
+> +		return err;
+>  
+> -	if (pdata->get_irq_data_ready(indio_dev) > 0) {
+> +	if (irq > 0) {
+>  		err = st_press_allocate_ring(indio_dev);
+>  		if (err < 0)
+> -			goto st_press_common_probe_error;
+> +			return err;
+>  
+>  		err = st_sensors_allocate_trigger(indio_dev,
+> -							ST_PRESS_TRIGGER_OPS);
+> +						  ST_PRESS_TRIGGER_OPS);
+>  		if (err < 0)
+>  			goto st_press_probe_trigger_error;
+>  	}
+> @@ -281,12 +283,12 @@ int st_press_common_probe(struct iio_dev *indio_dev,
+>  	return err;
+>  
+>  st_press_device_register_error:
+> -	if (pdata->get_irq_data_ready(indio_dev) > 0)
+> +	if (irq > 0)
+>  		st_sensors_deallocate_trigger(indio_dev);
+>  st_press_probe_trigger_error:
+> -	if (pdata->get_irq_data_ready(indio_dev) > 0)
+> +	if (irq > 0)
+>  		st_press_deallocate_ring(indio_dev);
+> -st_press_common_probe_error:
 > +
 >  	return err;
 >  }
->  
+>  EXPORT_SYMBOL(st_press_common_probe);
 > 
