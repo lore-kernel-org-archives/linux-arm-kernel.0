@@ -1,112 +1,63 @@
 From: jic23@kernel.org (Jonathan Cameron)
-Date: Sat, 21 Sep 2013 13:51:21 +0100
-Subject: [PATCH 11/20] iio: sensors-core: st: Support sensors which don't
- have a Data Ready pin
-In-Reply-To: <1379347346-823-12-git-send-email-lee.jones@linaro.org>
+Date: Sat, 21 Sep 2013 13:51:43 +0100
+Subject: [PATCH 12/20] iio: sensors-core: st: Clean-up error handling
+ in st_sensors_init_sensor()
+In-Reply-To: <1379347346-823-13-git-send-email-lee.jones@linaro.org>
 References: <1379347346-823-1-git-send-email-lee.jones@linaro.org>
- <1379347346-823-12-git-send-email-lee.jones@linaro.org>
-Message-ID: <523D9649.4080409@kernel.org>
+ <1379347346-823-13-git-send-email-lee.jones@linaro.org>
+Message-ID: <523D965F.2040606@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 09/16/13 17:02, Lee Jones wrote:
-> Not all ST's sensors support data ready, so let's make the declaration
-> of one conditional.
+> Strip out all those unnecessary gotos and just return the error right away.
+> 
+> Aids to simplicity and reduces code.
 > 
 > Signed-off-by: Lee Jones <lee.jones@linaro.org>
 Applied to the togreg branch of iio.git
 
-Thanks Lee
+Thanks
 > ---
->  drivers/iio/common/st_sensors/st_sensors_core.c | 33 ++++++++++++++++---------
->  drivers/iio/pressure/st_pressure_core.c         |  3 ++-
->  2 files changed, 24 insertions(+), 12 deletions(-)
+>  drivers/iio/common/st_sensors/st_sensors_core.c | 9 ++++-----
+>  1 file changed, 4 insertions(+), 5 deletions(-)
 > 
 > diff --git a/drivers/iio/common/st_sensors/st_sensors_core.c b/drivers/iio/common/st_sensors/st_sensors_core.c
-> index 793136a..2672630 100644
+> index 2672630..c5fbe58 100644
 > --- a/drivers/iio/common/st_sensors/st_sensors_core.c
 > +++ b/drivers/iio/common/st_sensors/st_sensors_core.c
-> @@ -198,21 +198,17 @@ int st_sensors_set_axis_enable(struct iio_dev *indio_dev, u8 axis_enable)
->  }
->  EXPORT_SYMBOL(st_sensors_set_axis_enable);
+> @@ -241,29 +241,28 @@ int st_sensors_init_sensor(struct iio_dev *indio_dev,
 >  
-> -int st_sensors_init_sensor(struct iio_dev *indio_dev,
-> -					struct st_sensors_platform_data *pdata)
-> +int st_sensors_set_drdy_int_pin(struct iio_dev *indio_dev,
-> +				struct st_sensors_platform_data *pdata)
->  {
-> -	int err;
->  	struct st_sensor_data *sdata = iio_priv(indio_dev);
->  
-> -	mutex_init(&sdata->tb.buf_lock);
-> -
->  	switch (pdata->drdy_int_pin) {
->  	case 1:
->  		if (sdata->sensor->drdy_irq.mask_int1 == 0) {
->  			dev_err(&indio_dev->dev,
->  					"DRDY on INT1 not available.\n");
-> -			err = -EINVAL;
-> -			goto init_error;
-> +			return -EINVAL;
->  		}
->  		sdata->drdy_int_pin = 1;
->  		break;
-> @@ -220,17 +216,29 @@ int st_sensors_init_sensor(struct iio_dev *indio_dev,
->  		if (sdata->sensor->drdy_irq.mask_int2 == 0) {
->  			dev_err(&indio_dev->dev,
->  					"DRDY on INT2 not available.\n");
-> -			err = -EINVAL;
-> -			goto init_error;
-> +			return -EINVAL;
->  		}
->  		sdata->drdy_int_pin = 2;
->  		break;
->  	default:
->  		dev_err(&indio_dev->dev, "DRDY on pdata not valid.\n");
-> -		err = -EINVAL;
-> -		goto init_error;
-> +		return -EINVAL;
->  	}
->  
-> +	return 0;
-> +}
-> +
-> +int st_sensors_init_sensor(struct iio_dev *indio_dev,
-> +					struct st_sensors_platform_data *pdata)
-> +{
-> +	struct st_sensor_data *sdata = iio_priv(indio_dev);
-> +	int err = 0;
-> +
-> +	mutex_init(&sdata->tb.buf_lock);
-> +
-> +	if (pdata)
-> +		err = st_sensors_set_drdy_int_pin(indio_dev, pdata);
-> +
 >  	err = st_sensors_set_enable(indio_dev, false);
 >  	if (err < 0)
->  		goto init_error;
-> @@ -266,6 +274,9 @@ int st_sensors_set_dataready_irq(struct iio_dev *indio_dev, bool enable)
->  	u8 drdy_mask;
->  	struct st_sensor_data *sdata = iio_priv(indio_dev);
+> -		goto init_error;
+> +		return err;
 >  
-> +	if (!sdata->sensor->drdy_irq.addr)
-> +		return 0;
-> +
->  	/* Enable/Disable the interrupt generator 1. */
->  	if (sdata->sensor->drdy_irq.ig1.en_addr > 0) {
->  		err = st_sensors_write_data_with_mask(indio_dev,
-> diff --git a/drivers/iio/pressure/st_pressure_core.c b/drivers/iio/pressure/st_pressure_core.c
-> index 93bff9b..3abada2 100644
-> --- a/drivers/iio/pressure/st_pressure_core.c
-> +++ b/drivers/iio/pressure/st_pressure_core.c
-> @@ -254,7 +254,8 @@ int st_press_common_probe(struct iio_dev *indio_dev,
+>  	if (sdata->current_fullscale) {
+>  		err = st_sensors_set_fullscale(indio_dev,
+>  					       sdata->current_fullscale->num);
+>  		if (err < 0)
+> -			goto init_error;
+> +			return err;
+>  	} else
+>  		dev_info(&indio_dev->dev, "Full-scale not possible\n");
 >  
->  	pdata->odr = pdata->sensor->odr.odr_avl[0].hz;
+>  	err = st_sensors_set_odr(indio_dev, sdata->odr);
+>  	if (err < 0)
+> -		goto init_error;
+> +		return err;
 >  
-> -	if (!plat_data)
-> +	/* Some devices don't support a data ready pin. */
-> +	if (!plat_data && pdata->sensor->drdy_irq.addr)
->  		plat_data =
->  			(struct st_sensors_platform_data *)&default_press_pdata;
+>  	/* set BDU */
+>  	err = st_sensors_write_data_with_mask(indio_dev,
+>  			sdata->sensor->bdu.addr, sdata->sensor->bdu.mask, true);
+>  	if (err < 0)
+> -		goto init_error;
+> +		return err;
 >  
+>  	err = st_sensors_set_axis_enable(indio_dev, ST_SENSORS_ENABLE_ALL_AXIS);
+>  
+> -init_error:
+>  	return err;
+>  }
+>  EXPORT_SYMBOL(st_sensors_init_sensor);
 > 
