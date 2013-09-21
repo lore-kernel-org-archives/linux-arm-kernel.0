@@ -1,192 +1,206 @@
-From: m.krawczuk@partner.samsung.com (Mateusz Krawczuk)
-Date: Sat, 21 Sep 2013 19:42:22 +0200
-Subject: [PATCH v4 3/3] ARM: s5pv210: Migrate clock handling to Common Clock
- Framework
-In-Reply-To: <1379785342-25107-1-git-send-email-m.krawczuk@partner.samsung.com>
-References: <1379785342-25107-1-git-send-email-m.krawczuk@partner.samsung.com>
-Message-ID: <1379785342-25107-4-git-send-email-m.krawczuk@partner.samsung.com>
+From: laurent.pinchart+renesas@ideasonboard.com (Laurent Pinchart)
+Date: Sat, 21 Sep 2013 20:39:49 +0200
+Subject: [PATCH v6] gpio: pcf857x: Add OF support
+Message-ID: <1379788789-19801-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch migrates the s5pv210 platform to use new clock driver
-using Common Clock Framework.
+Add DT bindings for the pcf857x-compatible chips and parse the device
+tree node in the driver.
 
-Signed-off-by: Mateusz Krawczuk <m.krawczuk@partner.samsung.com>
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 ---
- arch/arm/mach-s5pv210/Kconfig         |  9 +++++++++
- arch/arm/mach-s5pv210/Makefile        |  4 ++--
- arch/arm/mach-s5pv210/common.c        | 17 +++++++++++++++++
- arch/arm/mach-s5pv210/common.h        | 10 ++++++++++
- arch/arm/mach-s5pv210/mach-goni.c     |  2 +-
- arch/arm/mach-s5pv210/mach-smdkv210.c |  2 +-
- arch/arm/plat-samsung/Kconfig         |  2 +-
- 7 files changed, 41 insertions(+), 5 deletions(-)
+ .../devicetree/bindings/gpio/gpio-pcf857x.txt      | 71 ++++++++++++++++++++++
+ drivers/gpio/gpio-pcf857x.c                        | 44 +++++++++++---
+ 2 files changed, 107 insertions(+), 8 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/gpio/gpio-pcf857x.txt
 
-diff --git a/arch/arm/mach-s5pv210/Kconfig b/arch/arm/mach-s5pv210/Kconfig
-index caaedaf..abad41f 100644
---- a/arch/arm/mach-s5pv210/Kconfig
-+++ b/arch/arm/mach-s5pv210/Kconfig
-@@ -11,6 +11,7 @@ if ARCH_S5PV210
- 
- config CPU_S5PV210
- 	bool
-+	select S5P_CLOCK if !COMMON_CLK
- 	select S5P_EXT_INT
- 	select S5P_PM if PM
- 	select S5P_SLEEP if PM
-@@ -69,6 +70,14 @@ config S5PV210_SETUP_USB_PHY
- 	help
- 	  Common setup code for USB PHY controller
- 
-+config COMMON_CLK_S5PV210
-+	bool "Common Clock Framework support"
-+	default y
-+	select COMMON_CLK
-+	help
-+	  Enable this option to use new clock driver
-+	  based on Common Clock Framework.
+Changes since v5:
+
+- Renamed pin to line in the DT bindings documentation
+- Renamed pins-initial-states DT property to lines-initial-states
+
+Changes since v4:
+
+- Don't try to get ngpio from of_device_id data, we already get it from
+  i2c_device_id
+
+Changes since v3:
+
+- Get rid of the #ifdef CONFIG_OF in the probe function
+- Give DT node priority over platform data
+
+Changes since v2:
+
+- Replace mention about interrupts software configuration in DT bindings
+  documentation with an explanation of the hardware configuration.
+
+diff --git a/Documentation/devicetree/bindings/gpio/gpio-pcf857x.txt b/Documentation/devicetree/bindings/gpio/gpio-pcf857x.txt
+new file mode 100644
+index 0000000..d63194a
+--- /dev/null
++++ b/Documentation/devicetree/bindings/gpio/gpio-pcf857x.txt
+@@ -0,0 +1,71 @@
++* PCF857x-compatible I/O expanders
 +
- menu "S5PC110 Machines"
- 
- config MACH_AQUILA
-diff --git a/arch/arm/mach-s5pv210/Makefile b/arch/arm/mach-s5pv210/Makefile
-index 1c4e419..0c67fe2 100644
---- a/arch/arm/mach-s5pv210/Makefile
-+++ b/arch/arm/mach-s5pv210/Makefile
-@@ -12,8 +12,8 @@ obj-				:=
- 
- # Core
- 
--obj-y				+= common.o clock.o
--
-+obj-y					+= common.o
-+obj-$(CONFIG_S5P_CLOCK)			+= clock.o
- obj-$(CONFIG_PM)		+= pm.o
- 
- obj-y				+= dma.o
-diff --git a/arch/arm/mach-s5pv210/common.c b/arch/arm/mach-s5pv210/common.c
-index 26027a2..48ce5f8 100644
---- a/arch/arm/mach-s5pv210/common.c
-+++ b/arch/arm/mach-s5pv210/common.c
-@@ -24,6 +24,7 @@
- #include <linux/sched.h>
- #include <linux/dma-mapping.h>
- #include <linux/serial_core.h>
++The PCF857x-compatible chips have "quasi-bidirectional" I/O lines that can be
++driven high by a pull-up current source or driven low to ground. This combines
++the direction and output level into a single bit per line, which can't be read
++back. We can't actually know at initialization time whether a line is configured
++(a) as output and driving the signal low/high, or (b) as input and reporting a
++low/high value, without knowing the last value written since the chip came out
++of reset (if any). The only reliable solution for setting up line direction is
++thus to do it explicitly.
++
++Required Properties:
++
++  - compatible: should be one of the following.
++    - "maxim,max7328": For the Maxim MAX7378
++    - "maxim,max7329": For the Maxim MAX7329
++    - "nxp,pca8574": For the NXP PCA8574
++    - "nxp,pca8575": For the NXP PCA8575
++    - "nxp,pca9670": For the NXP PCA9670
++    - "nxp,pca9671": For the NXP PCA9671
++    - "nxp,pca9672": For the NXP PCA9672
++    - "nxp,pca9673": For the NXP PCA9673
++    - "nxp,pca9674": For the NXP PCA9674
++    - "nxp,pca9675": For the NXP PCA9675
++    - "nxp,pcf8574": For the NXP PCF8574
++    - "nxp,pcf8574a": For the NXP PCF8574A
++    - "nxp,pcf8575": For the NXP PCF8575
++    - "ti,tca9554": For the TI TCA9554
++
++  - reg: I2C slave address.
++
++  - gpio-controller: Marks the device node as a gpio controller.
++  - #gpio-cells: Should be 2. The first cell is the GPIO number and the second
++    cell specifies GPIO flags, as defined in <dt-bindings/gpio/gpio.h>. Only the
++    GPIO_ACTIVE_HIGH and GPIO_ACTIVE_LOW flags are supported.
++
++Optional Properties:
++
++  - lines-initial-states: Bitmask that specifies the initial state of each
++  line. When a bit is set to zero, the corresponding line will be initialized to
++  the input (pulled-up) state. When the  bit is set to one, the line will be
++  initialized the the low-level output state. If the property is not specified
++  all lines will be initialized to the input state.
++
++  The I/O expander can detect input state changes, and thus optionally act as
++  an interrupt controller. When the expander interrupt line is connected all the
++  following properties must be set. For more information please see the
++  interrupt controller device tree bindings documentation available at
++  Documentation/devicetree/bindings/interrupt-controller/interrupts.txt.
++
++  - interrupt-controller: Identifies the node as an interrupt controller.
++  - #interrupt-cells: Number of cells to encode an interrupt source, shall be 2.
++  - interrupt-parent: phandle of the parent interrupt controller.
++  - interrupts: Interrupt specifier for the controllers interrupt.
++
++
++Please refer to gpio.txt in this directory for details of the common GPIO
++bindings used by client devices.
++
++Example: PCF8575 I/O expander node
++
++	pcf8575: gpio at 20 {
++		compatible = "nxp,pcf8575";
++		reg = <0x20>;
++		interrupt-parent = <&irqpin2>;
++		interrupts = <3 0>;
++		gpio-controller;
++		#gpio-cells = <2>;
++		interrupt-controller;
++		#interrupt-cells = <2>;
++	};
+diff --git a/drivers/gpio/gpio-pcf857x.c b/drivers/gpio/gpio-pcf857x.c
+index 54725a6..1535686 100644
+--- a/drivers/gpio/gpio-pcf857x.c
++++ b/drivers/gpio/gpio-pcf857x.c
+@@ -26,6 +26,8 @@
+ #include <linux/irqdomain.h>
+ #include <linux/kernel.h>
+ #include <linux/module.h>
 +#include <linux/of.h>
++#include <linux/of_device.h>
+ #include <linux/slab.h>
+ #include <linux/spinlock.h>
  
- #include <asm/proc-fns.h>
- #include <asm/mach/arch.h>
-@@ -34,7 +35,13 @@
- #include <mach/regs-clock.h>
+@@ -49,6 +51,27 @@ static const struct i2c_device_id pcf857x_id[] = {
+ };
+ MODULE_DEVICE_TABLE(i2c, pcf857x_id);
  
- #include <plat/cpu.h>
-+
-+#ifdef CONFIG_S5P_CLOCK
- #include <plat/clock.h>
-+#else
-+#include <linux/clk-provider.h>
++#ifdef CONFIG_OF
++static const struct of_device_id pcf857x_of_table[] = {
++	{ .compatible = "nxp,pcf8574" },
++	{ .compatible = "nxp,pcf8574a" },
++	{ .compatible = "nxp,pca8574" },
++	{ .compatible = "nxp,pca9670" },
++	{ .compatible = "nxp,pca9672" },
++	{ .compatible = "nxp,pca9674" },
++	{ .compatible = "nxp,pcf8575" },
++	{ .compatible = "nxp,pca8575" },
++	{ .compatible = "nxp,pca9671" },
++	{ .compatible = "nxp,pca9673" },
++	{ .compatible = "nxp,pca9675" },
++	{ .compatible = "maxim,max7328" },
++	{ .compatible = "maxim,max7329" },
++	{ .compatible = "ti,tca9554" },
++	{ }
++};
++MODULE_DEVICE_TABLE(of, pcf857x_of_table);
 +#endif
 +
- #include <plat/devs.h>
- #include <plat/sdhci.h>
- #include <plat/adc-core.h>
-@@ -50,6 +57,9 @@
- 
- #include "common.h"
- 
-+/* External clock frequency */
-+static unsigned long xusbxti_f;
-+
- static const char name_s5pv210[] = "S5PV210/S5PC110";
- 
- static struct cpu_table cpu_ids[] __initdata = {
-@@ -229,12 +239,16 @@ void __init s5pv210_map_io(void)
- 
- void __init s5pv210_init_clocks(int xtal)
+ /*
+  * The pcf857x, pca857x, and pca967x chips only expose one read and one
+  * write register.  Writing a "one" bit (to match the reset state) lets
+@@ -260,14 +283,18 @@ fail:
+ static int pcf857x_probe(struct i2c_client *client,
+ 			 const struct i2c_device_id *id)
  {
-+#ifdef CONFIG_S5P_CLOCK
- 	printk(KERN_DEBUG "%s: initializing clocks\n", __func__);
+-	struct pcf857x_platform_data	*pdata;
++	struct pcf857x_platform_data	*pdata = dev_get_platdata(&client->dev);
++	struct device_node		*np = client->dev.of_node;
+ 	struct pcf857x			*gpio;
++	unsigned int			n_latch = 0;
+ 	int				status;
  
- 	s3c24xx_register_baseclocks(xtal);
- 	s5p_register_clocks(xtal);
- 	s5pv210_register_clocks();
- 	s5pv210_setup_clocks();
-+#else
-+	xusbxti_f = xtal;
-+#endif
- }
+-	pdata = dev_get_platdata(&client->dev);
+-	if (!pdata) {
++	if (IS_ENABLED(CONFIG_OF) && np)
++		of_property_read_u32(np, "lines-initial-states", &n_latch);
++	else if (pdata)
++		n_latch = pdata->n_latch;
++	else
+ 		dev_dbg(&client->dev, "no platform data\n");
+-	}
  
- void __init s5pv210_init_irq(void)
-@@ -248,6 +262,9 @@ void __init s5pv210_init_irq(void)
- 	vic[3] = ~0;
+ 	/* Allocate, initialize, and register this gpio_chip. */
+ 	gpio = devm_kzalloc(&client->dev, sizeof(*gpio), GFP_KERNEL);
+@@ -360,11 +387,11 @@ static int pcf857x_probe(struct i2c_client *client,
+ 	 * may cause transient glitching since it can't know the last value
+ 	 * written (some pins may need to be driven low).
+ 	 *
+-	 * Using pdata->n_latch avoids that trouble.  When left initialized
+-	 * to zero, our software copy of the "latch" then matches the chip's
+-	 * all-ones reset state.  Otherwise it flags pins to be driven low.
++	 * Using n_latch avoids that trouble.  When left initialized to zero,
++	 * our software copy of the "latch" then matches the chip's all-ones
++	 * reset state.  Otherwise it flags pins to be driven low.
+ 	 */
+-	gpio->out = pdata ? ~pdata->n_latch : ~0;
++	gpio->out = ~n_latch;
+ 	gpio->status = gpio->out;
  
- 	s5p_init_irq(vic, ARRAY_SIZE(vic));
-+
-+	if (!of_have_populated_dt())
-+		s5pv210_clk_init(NULL, 0, xusbxti_f, S3C_VA_SYS);
- }
- 
- struct bus_type s5pv210_subsys = {
-diff --git a/arch/arm/mach-s5pv210/common.h b/arch/arm/mach-s5pv210/common.h
-index fe1beb5..cf3136a 100644
---- a/arch/arm/mach-s5pv210/common.h
-+++ b/arch/arm/mach-s5pv210/common.h
-@@ -14,6 +14,16 @@
- 
- #include <linux/reboot.h>
- 
-+#ifdef CONFIG_COMMON_CLK_S5PV210
-+void s5pv210_clk_init(struct device_node *np,
-+			    unsigned long xxti_f, unsigned long xusbxti_f,
-+			    void __iomem *reg_base);
-+#else
-+static inline void s5pv210_clk_init(struct device_node *np,
-+			    unsigned long xxti_f, unsigned long xusbxti_f,
-+			    void __iomem *reg_base) {}
-+#endif
-+
- void s5pv210_init_io(struct map_desc *mach_desc, int size);
- void s5pv210_init_irq(void);
- 
-diff --git a/arch/arm/mach-s5pv210/mach-goni.c b/arch/arm/mach-s5pv210/mach-goni.c
-index 282d714..4c9681b 100644
---- a/arch/arm/mach-s5pv210/mach-goni.c
-+++ b/arch/arm/mach-s5pv210/mach-goni.c
-@@ -966,7 +966,7 @@ static void __init goni_sound_init(void)
- static void __init goni_map_io(void)
- {
- 	s5pv210_init_io(NULL, 0);
--	s3c24xx_init_clocks(clk_xusbxti.rate);
-+	s3c24xx_init_clocks(24000000);
- 	s3c24xx_init_uarts(goni_uartcfgs, ARRAY_SIZE(goni_uartcfgs));
- 	samsung_set_timer_source(SAMSUNG_PWM3, SAMSUNG_PWM4);
- }
-diff --git a/arch/arm/mach-s5pv210/mach-smdkv210.c b/arch/arm/mach-s5pv210/mach-smdkv210.c
-index 6d72bb99..f13aa99 100644
---- a/arch/arm/mach-s5pv210/mach-smdkv210.c
-+++ b/arch/arm/mach-s5pv210/mach-smdkv210.c
-@@ -284,7 +284,7 @@ static struct platform_pwm_backlight_data smdkv210_bl_data = {
- static void __init smdkv210_map_io(void)
- {
- 	s5pv210_init_io(NULL, 0);
--	s3c24xx_init_clocks(clk_xusbxti.rate);
-+	s3c24xx_init_clocks(24000000);
- 	s3c24xx_init_uarts(smdkv210_uartcfgs, ARRAY_SIZE(smdkv210_uartcfgs));
- 	samsung_set_timer_source(SAMSUNG_PWM2, SAMSUNG_PWM4);
- }
-diff --git a/arch/arm/plat-samsung/Kconfig b/arch/arm/plat-samsung/Kconfig
-index 7dfba93..2a98613 100644
---- a/arch/arm/plat-samsung/Kconfig
-+++ b/arch/arm/plat-samsung/Kconfig
-@@ -91,7 +91,7 @@ config SAMSUNG_CLKSRC
- 	  used by newer systems such as the S3C64XX.
- 
- config S5P_CLOCK
--	def_bool (ARCH_S5P64X0 || ARCH_S5PC100 || ARCH_S5PV210)
-+	def_bool (ARCH_S5P64X0 || ARCH_S5PC100)
- 	help
- 	  Support common clock part for ARCH_S5P and ARCH_EXYNOS SoCs
- 
+ 	status = gpiochip_add(&gpio->chip);
+@@ -426,6 +453,7 @@ static struct i2c_driver pcf857x_driver = {
+ 	.driver = {
+ 		.name	= "pcf857x",
+ 		.owner	= THIS_MODULE,
++		.of_match_table = of_match_ptr(pcf857x_of_table),
+ 	},
+ 	.probe	= pcf857x_probe,
+ 	.remove	= pcf857x_remove,
 -- 
-1.8.1.2
+Regards,
+
+Laurent Pinchart
