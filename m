@@ -1,37 +1,36 @@
 From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Sat, 21 Sep 2013 17:13:21 +0200
-Subject: [PATCH 4/6] ARM: dts: exynos5250: add sclk_pcm_in to audss clock
- controller
-In-Reply-To: <1379711637-5226-4-git-send-email-abrestic@chromium.org>
+Date: Sat, 21 Sep 2013 17:17:28 +0200
+Subject: [PATCH 5/6] clk: exynos-audss: add support for Exynos 5420
+In-Reply-To: <1379711637-5226-5-git-send-email-abrestic@chromium.org>
 References: <1379711637-5226-1-git-send-email-abrestic@chromium.org>
- <1379711637-5226-4-git-send-email-abrestic@chromium.org>
-Message-ID: <1544025.3hYklZrZrS@flatron>
+ <1379711637-5226-5-git-send-email-abrestic@chromium.org>
+Message-ID: <1407151.hAbz8S9ABE@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Andrew,
 
-On Friday 20 of September 2013 14:13:55 Andrew Bresticker wrote:
-> The parent of sclk_pcm in the AudioSS block is div_pcm0.
+On Friday 20 of September 2013 14:13:56 Andrew Bresticker wrote:
+> The AudioSS block on Exynos 5420 has an additional clock gate for the
+> ADMA bus clock.
 > 
 > Signed-off-by: Andrew Bresticker <abrestic@chromium.org>
 > ---
->  arch/arm/boot/dts/exynos5250.dtsi | 2 ++
->  1 file changed, 2 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/exynos5250.dtsi
-> b/arch/arm/boot/dts/exynos5250.dtsi index 7d7cc77..bedc7a8 100644
-> --- a/arch/arm/boot/dts/exynos5250.dtsi
-> +++ b/arch/arm/boot/dts/exynos5250.dtsi
-> @@ -88,6 +88,8 @@
->  		compatible = "samsung,exynos5250-audss-clock";
->  		reg = <0x03810000 0x0C>;
->  		#clock-cells = <1>;
-> +		clocks = <&clock 160>;
-> +		clock-names = "sclk_pcm_in";
+>  Documentation/devicetree/bindings/clock/clk-exynos-audss.txt | 7
+> +++++-- drivers/clk/samsung/clk-exynos-audss.c                       |
+> 8 ++++++++ include/dt-bindings/clk/exynos-audss-clk.h                  
+> | 3 ++- 3 files changed, 15 insertions(+), 3 deletions(-)
+[snip]
+> +	if (of_device_is_compatible(pdev->dev.of_node,
+> +					"samsung,exynos5420-audss-clock")) 
+{
 
-IMHO it would be reasonable to explicitly specify all the input clocks 
-here.
+I don't really like using such string based conditions in the code, but I 
+guess it's just a matter of preference.
+
+I'd introduce an enum to represent supported variants and put them into 
+the OF match table or maybe even a struct that would have a bool named 
+has_adma_clock, true for Exynos5420 variant.
 
 Best regards,
 Tomasz
