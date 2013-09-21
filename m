@@ -1,56 +1,37 @@
 From: moinejf@free.fr (Jean-Francois Moine)
-Date: Sat, 21 Sep 2013 12:00:06 +0200
-Subject: [PATCH v2 1/2] ASoC: kirkwood: clk: probe defer when clock not yet
- ready
-Message-ID: <20130921120006.47b00fe7@armhf>
+Date: Sat, 21 Sep 2013 12:00:36 +0200
+Subject: [PATCH v2 2/2] ASoC: kirkwood: fix loss of external clock at probe
+ time
+Message-ID: <20130921120036.5730dbfd@armhf>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-At probe time, a clock device may not be ready when some other device
-wants to use it. 
+At probe time, when the clock driver is not yet initialized, the
+external clock of the kirkwood sound device will not be usable.
 
-This patch lets the functions clk_get/devm_clk_get return a probe defer
-when the clock is defined in the DT but not yet available.
+This patch fixes this problem defering the device probe.
 
 Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
 ---
- drivers/clk/clk.c    | 2 +-
- drivers/clk/clkdev.c | 9 +++++++--
- 2 files changed, 8 insertions(+), 3 deletions(-)
+ sound/soc/kirkwood/kirkwood-i2s.c | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index a004769..582abc8 100644
---- a/drivers/clk/clk.c
-+++ b/drivers/clk/clk.c
-@@ -2181,7 +2181,7 @@ EXPORT_SYMBOL_GPL(of_clk_del_provider);
- struct clk *of_clk_get_from_provider(struct of_phandle_args *clkspec)
- {
- 	struct of_clk_provider *provider;
--	struct clk *clk = ERR_PTR(-ENOENT);
-+	struct clk *clk = ERR_PTR(-EPROBE_DEFER);
+diff --git a/sound/soc/kirkwood/kirkwood-i2s.c b/sound/soc/kirkwood/kirkwood-i2s.c
+index 0f3d73d..14f32d9 100644
+--- a/sound/soc/kirkwood/kirkwood-i2s.c
++++ b/sound/soc/kirkwood/kirkwood-i2s.c
+@@ -496,7 +496,10 @@ static int kirkwood_i2s_dev_probe(struct platform_device *pdev)
+ 		return err;
  
- 	/* Check if we have such a provider in our array */
- 	mutex_lock(&of_clk_lock);
-diff --git a/drivers/clk/clkdev.c b/drivers/clk/clkdev.c
-index 442a313..f8b28d9 100644
---- a/drivers/clk/clkdev.c
-+++ b/drivers/clk/clkdev.c
-@@ -157,8 +157,13 @@ struct clk *clk_get(struct device *dev, const char *con_id)
- 
- 	if (dev) {
- 		clk = of_clk_get_by_name(dev->of_node, con_id);
--		if (!IS_ERR(clk) && __clk_get(clk))
--			return clk;
-+		if (!IS_ERR(clk)) {
-+			if (__clk_get(clk))
-+				return clk;
-+		} else {
-+			if (PTR_ERR(clk) == -EPROBE_DEFER)
-+				return clk;
-+		}
- 	}
- 
- 	return clk_get_sys(dev_id, con_id);
+ 	priv->extclk = devm_clk_get(&pdev->dev, "extclk");
+-	if (!IS_ERR(priv->extclk)) {
++	if (IS_ERR(priv->extclk)) {
++		if (PTR_ERR(priv->extclk) == -EPROBE_DEFER)
++			return -EPROBE_DEFER;
++	} else {
+ 		if (priv->extclk == priv->clk) {
+ 			devm_clk_put(&pdev->dev, priv->extclk);
+ 			priv->extclk = ERR_PTR(-EINVAL);
 
 
 -- 
