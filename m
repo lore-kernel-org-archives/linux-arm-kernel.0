@@ -1,37 +1,26 @@
-From: cinifr@gmail.com (Fan Rong)
-Date: Sat, 21 Sep 2013 21:05:16 +0800
-Subject: [PATCH 3/3] Add arch count timer node in dts for Allwinner A20(sunxi
- 7i).
-In-Reply-To: <1379768716-11672-1-git-send-email-cinifr@gmail.com>
-References: <1379768716-11672-1-git-send-email-cinifr@gmail.com>
-Message-ID: <1379768716-11672-4-git-send-email-cinifr@gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Sat, 21 Sep 2013 14:36:46 +0100
+Subject: [PATCH v2 2/2] ASoC: kirkwood: fix loss of external clock at
+ probe time
+In-Reply-To: <20130921120036.5730dbfd@armhf>
+References: <20130921120036.5730dbfd@armhf>
+Message-ID: <20130921133646.GV21013@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Fan Rong <cinifr@gmail.com>
----
- arch/arm/boot/dts/sun7i-a20.dtsi | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+On Sat, Sep 21, 2013 at 12:00:36PM +0200, Jean-Francois Moine wrote:
+> At probe time, when the clock driver is not yet initialized, the
+> external clock of the kirkwood sound device will not be usable.
+> 
+> This patch fixes this problem defering the device probe.
 
-diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
-index f745e0b..76b8c3f 100644
---- a/arch/arm/boot/dts/sun7i-a20.dtsi
-+++ b/arch/arm/boot/dts/sun7i-a20.dtsi
-@@ -312,5 +312,15 @@
- 			#interrupt-cells = <3>;
- 			interrupts = <1 9 0xf04>;
- 		};
-+
-+		timer {
-+			compatible ="arm,armv7-timer";
-+			interrupts = <1 13 0x308>,
-+				     <1 14 0x308>,
-+				     <1 11 0x308>,
-+				     <1 10 0x308>;
-+			clock-frequency = <24000000>;
-+		};
-+
- 	};
- };
--- 
-1.8.1.2
+Applied, thanks.  It won't do anything without a version of patch 1 but
+there's no build time dependency and it seems like we should get a fix
+into the core for the unspecified vs unregistered problem.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130921/a2041cbe/attachment.sig>
