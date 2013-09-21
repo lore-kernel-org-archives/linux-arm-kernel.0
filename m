@@ -1,214 +1,705 @@
-From: manjunath.goudar@linaro.org (Manjunath Goudar)
-Date: Sat, 21 Sep 2013 16:44:42 +0530
-Subject: [PATCH V2] USB: EHCI: make ehci-w90X900 a separate driver
-In-Reply-To: <1372347109-5563-1-git-send-email-manjunath.goudar@linaro.org>
-References: <1372347109-5563-1-git-send-email-manjunath.goudar@linaro.org>
-Message-ID: <1379762082-389-1-git-send-email-manjunath.goudar@linaro.org>
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Sat, 21 Sep 2013 13:36:33 +0100
+Subject: [PATCH 5/7] Staging/iio/adc/touchscreen/MXS: add interrupt driven
+ touch detection
+In-Reply-To: <1379593369-22010-6-git-send-email-jbe@pengutronix.de>
+References: <1379593369-22010-1-git-send-email-jbe@pengutronix.de>
+ <1379593369-22010-6-git-send-email-jbe@pengutronix.de>
+Message-ID: <523D92D1.8090506@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Separate the W90X900(W90P910) on-chip host controller driver from
-ehci-hcd host code so that it can be built as a separate driver module.
-This work is part of enabling multi-platform kernels on ARM;
-however, note that other changes are still needed before W90X900(W90P910)
-can be booted with a multi-platform kernel
+On 09/19/13 13:22, Juergen Beisert wrote:
+> For battery driven systems it is a very bad idea to collect the touchscreen
+> data within a kernel busy loop.
+> 
+> This change uses the features of the hardware to delay and accumulate samples in
+> hardware to avoid a high interrupt and CPU load.
+> 
+> Note: this is only tested on an i.MX23 SoC yet.
+> 
+> Signed-off-by: Juergen Beisert <jbe@pengutronix.de>
+> CC: linux-arm-kernel at lists.infradead.org
+> CC: devel at driverdev.osuosl.org
+> CC: Marek Vasut <marex@denx.de>
+> CC: Fabio Estevam <fabio.estevam@freescale.com>
+> CC: Jonathan Cameron <jic23@cam.ac.uk>
 
-and an ehci driver that only works on one of them.
+Please repost with Dmitry Torokhov and the linux input list cc'd.
 
-With the infrastructure added by Alan Stern in patch 3e0232039
-"USB: EHCI: prepare to make ehci-hcd a library module", we can
-avoid this problem by turning a bus glue into a separate
-module, as we do here for the w90X900 bus glue.
+Whilst this looks fine to me, it is definitely an input patch even if
+the code resides in iio.
 
-This patch is rebased on greghk/usb-next 3.12 rc1.
+Also, I'm not going to take this series until we have confirmation from Marek
+or someone else that we aren't introducing regressions into the i.MX23 support.
 
-Signed-off-by: Manjunath Goudar <manjunath.goudar@linaro.org>
-Signed-off-by: Deepak Saxena <dsaxena@linaro.org>
-Acked-by: Arnd Bergmann <arnd@arndb.de>
-Acked-by: Wan ZongShun <mcuos.com@gmail.com>
-Acked-by: Alan Stern <stern@rowland.harvard.edu>
-Cc: Greg KH <greg@kroah.com>
-Cc: linux-usb at vger.kernel.org
-Cc: linux-kernel at vger.kernel.org
-
-V1->V2:
--Arranged  #include's in alphabetical order.
--Replaced "w90p910" by "w90x900" because it is supports
- all series of w90x900.
----
- drivers/usb/host/Kconfig        |    2 +-
- drivers/usb/host/Makefile       |    1 +
- drivers/usb/host/ehci-hcd.c     |    5 ---
- drivers/usb/host/ehci-w90x900.c |   89 ++++++++++++++++-----------------------
- 4 files changed, 39 insertions(+), 58 deletions(-)
-
-diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
-index 8ea1afc..4e298a4 100644
---- a/drivers/usb/host/Kconfig
-+++ b/drivers/usb/host/Kconfig
-@@ -224,7 +224,7 @@ config USB_EHCI_MV
- 	  on-chip EHCI USB controller" for those.
- 
- config USB_W90X900_EHCI
--	bool "W90X900(W90P910) EHCI support"
-+	tristate "W90X900(W90P910) EHCI support"
- 	depends on ARCH_W90X900
- 	---help---
- 		Enables support for the W90X900 USB controller
-diff --git a/drivers/usb/host/Makefile b/drivers/usb/host/Makefile
-index 8fcb8da..0b9fdee 100644
---- a/drivers/usb/host/Makefile
-+++ b/drivers/usb/host/Makefile
-@@ -38,6 +38,7 @@ obj-$(CONFIG_USB_EHCI_S5P)	+= ehci-s5p.o
- obj-$(CONFIG_USB_EHCI_HCD_AT91) += ehci-atmel.o
- obj-$(CONFIG_USB_EHCI_MSM)	+= ehci-msm.o
- obj-$(CONFIG_USB_EHCI_TEGRA)	+= ehci-tegra.o
-+obj-$(CONFIG_USB_W90X900_EHCI)	+= ehci-w90x900.o
- 
- obj-$(CONFIG_USB_OXU210HP_HCD)	+= oxu210hp-hcd.o
- obj-$(CONFIG_USB_ISP116X_HCD)	+= isp116x-hcd.o
-diff --git a/drivers/usb/host/ehci-hcd.c b/drivers/usb/host/ehci-hcd.c
-index 5d6022f..3e3ca83 100644
---- a/drivers/usb/host/ehci-hcd.c
-+++ b/drivers/usb/host/ehci-hcd.c
-@@ -1238,11 +1238,6 @@ MODULE_LICENSE ("GPL");
- #define XILINX_OF_PLATFORM_DRIVER	ehci_hcd_xilinx_of_driver
- #endif
- 
--#ifdef CONFIG_USB_W90X900_EHCI
--#include "ehci-w90x900.c"
--#define	PLATFORM_DRIVER		ehci_hcd_w90x900_driver
--#endif
--
- #ifdef CONFIG_USB_OCTEON_EHCI
- #include "ehci-octeon.c"
- #define PLATFORM_DRIVER		ehci_octeon_driver
-diff --git a/drivers/usb/host/ehci-w90x900.c b/drivers/usb/host/ehci-w90x900.c
-index 1c370df..cdad843 100644
---- a/drivers/usb/host/ehci-w90x900.c
-+++ b/drivers/usb/host/ehci-w90x900.c
-@@ -11,13 +11,28 @@
-  *
-  */
- 
-+#include <linux/dma-mapping.h>
-+#include <linux/io.h>
-+#include <linux/kernel.h>
-+#include <linux/module.h>
-+#include <linux/of.h>
- #include <linux/platform_device.h>
-+#include <linux/usb.h>
-+#include <linux/usb/hcd.h>
-+
-+#include "ehci.h"
- 
- /* enable phy0 and phy1 for w90p910 */
- #define	ENPHY		(0x01<<8)
- #define PHY0_CTR	(0xA4)
- #define PHY1_CTR	(0xA8)
- 
-+#define DRIVER_DESC "EHCI w90x900 driver"
-+
-+static const char hcd_name[] = "ehci-w90x900 ";
-+
-+static struct hc_driver __read_mostly ehci_w90x900_hc_driver;
-+
- static int usb_w90x900_probe(const struct hc_driver *driver,
- 		      struct platform_device *pdev)
- {
-@@ -90,8 +105,8 @@ err1:
- 	return retval;
- }
- 
--static
--void usb_w90x900_remove(struct usb_hcd *hcd, struct platform_device *pdev)
-+static void usb_w90x900_remove(struct usb_hcd *hcd,
-+			struct platform_device *pdev)
- {
- 	usb_remove_hcd(hcd);
- 	iounmap(hcd->regs);
-@@ -99,54 +114,6 @@ void usb_w90x900_remove(struct usb_hcd *hcd, struct platform_device *pdev)
- 	usb_put_hcd(hcd);
- }
- 
--static const struct hc_driver ehci_w90x900_hc_driver = {
--	.description = hcd_name,
--	.product_desc = "Nuvoton w90x900 EHCI Host Controller",
--	.hcd_priv_size = sizeof(struct ehci_hcd),
--
--	/*
--	 * generic hardware linkage
--	 */
--	.irq = ehci_irq,
--	.flags = HCD_USB2|HCD_MEMORY|HCD_BH,
--
--	/*
--	 * basic lifecycle operations
--	 */
--	.reset = ehci_setup,
--	.start = ehci_run,
--
--	.stop = ehci_stop,
--	.shutdown = ehci_shutdown,
--
--	/*
--	 * managing i/o requests and associated device resources
--	 */
--	.urb_enqueue = ehci_urb_enqueue,
--	.urb_dequeue = ehci_urb_dequeue,
--	.endpoint_disable = ehci_endpoint_disable,
--	.endpoint_reset = ehci_endpoint_reset,
--
--	/*
--	 * scheduling support
--	 */
--	.get_frame_number = ehci_get_frame,
--
--	/*
--	 * root hub support
--	 */
--	.hub_status_data = ehci_hub_status_data,
--	.hub_control = ehci_hub_control,
--#ifdef	CONFIG_PM
--	.bus_suspend = ehci_bus_suspend,
--	.bus_resume = ehci_bus_resume,
--#endif
--	.relinquish_port	= ehci_relinquish_port,
--	.port_handed_over	= ehci_port_handed_over,
--
--	.clear_tt_buffer_complete = ehci_clear_tt_buffer_complete,
--};
--
- static int ehci_w90x900_probe(struct platform_device *pdev)
- {
- 	if (usb_disabled())
-@@ -173,7 +140,25 @@ static struct platform_driver ehci_hcd_w90x900_driver = {
- 	},
- };
- 
-+static int __init ehci_w90X900_init(void)
-+{
-+	if (usb_disabled())
-+		return -ENODEV;
-+
-+	pr_info("%s: " DRIVER_DESC "\n", hcd_name);
-+
-+	ehci_init_driver(&ehci_w90x900_hc_driver, NULL);
-+	return platform_driver_register(&ehci_hcd_w90x900_driver);
-+}
-+module_init(ehci_w90X900_init);
-+
-+static void __exit ehci_w90X900_cleanup(void)
-+{
-+	platform_driver_unregister(&ehci_hcd_w90x900_driver);
-+}
-+module_exit(ehci_w90X900_cleanup);
-+
-+MODULE_DESCRIPTION(DRIVER_DESC);
- MODULE_AUTHOR("Wan ZongShun <mcuos.com@gmail.com>");
--MODULE_DESCRIPTION("w90p910 usb ehci driver!");
--MODULE_LICENSE("GPL");
- MODULE_ALIAS("platform:w90p910-ehci");
-+MODULE_LICENSE("GPL v2");
--- 
-1.7.9.5
+> ---
+>  drivers/staging/iio/adc/mxs-lradc.c | 532 ++++++++++++++++++++++++++++++++----
+>  1 file changed, 476 insertions(+), 56 deletions(-)
+> 
+> diff --git a/drivers/staging/iio/adc/mxs-lradc.c b/drivers/staging/iio/adc/mxs-lradc.c
+> index c70c31f..9f3f367 100644
+> --- a/drivers/staging/iio/adc/mxs-lradc.c
+> +++ b/drivers/staging/iio/adc/mxs-lradc.c
+> @@ -129,6 +129,17 @@ enum mxs_lradc_ts {
+>  	MXS_LRADC_TOUCHSCREEN_5WIRE,
+>  };
+>  
+> +/*
+> + * Touchscreen handling
+> + */
+> +enum lradc_ts_plate {
+> +	LRADC_TOUCH = 0,
+> +	LRADC_SAMPLE_X,
+> +	LRADC_SAMPLE_Y,
+> +	LRADC_SAMPLE_PRESSURE,
+> +	LRADC_SAMPLE_VALID,
+> +};
+> +
+>  struct mxs_lradc {
+>  	struct device		*dev;
+>  	void __iomem		*base;
+> @@ -169,13 +180,25 @@ struct mxs_lradc {
+>  #define CHAN_MASK_TOUCHSCREEN_4WIRE	(0xf << 2)
+>  #define CHAN_MASK_TOUCHSCREEN_5WIRE	(0x1f << 2)
+>  	enum mxs_lradc_ts	use_touchscreen;
+> -	bool			stop_touchscreen;
+>  	bool			use_touchbutton;
+>  
+>  	struct input_dev	*ts_input;
+>  	struct work_struct	ts_work;
+>  
+>  	enum mxs_lradc_id	soc;
+> +	enum lradc_ts_plate	cur_plate; /* statemachine */
+> +	bool			ts_valid;
+> +	unsigned		ts_x_pos;
+> +	unsigned		ts_y_pos;
+> +	unsigned		ts_pressure;
+> +
+> +	/* handle touchscreen's physical behaviour */
+> +	/* samples per coordinate */
+> +	unsigned		over_sample_cnt;
+> +	/* time clocks between samples */
+> +	unsigned		over_sample_delay;
+> +	/* time in clocks to wait after the plates where switched */
+> +	unsigned		settling_delay;
+>  };
+>  
+>  #define	LRADC_CTRL0				0x00
+> @@ -227,19 +250,33 @@ struct mxs_lradc {
+>  #define	LRADC_CH_ACCUMULATE			(1 << 29)
+>  #define	LRADC_CH_NUM_SAMPLES_MASK		(0x1f << 24)
+>  #define	LRADC_CH_NUM_SAMPLES_OFFSET		24
+> +#define	LRADC_CH_NUM_SAMPLES(x) \
+> +				((x) << LRADC_CH_NUM_SAMPLES_OFFSET)
+>  #define	LRADC_CH_VALUE_MASK			0x3ffff
+>  #define	LRADC_CH_VALUE_OFFSET			0
+>  
+>  #define	LRADC_DELAY(n)				(0xd0 + (0x10 * (n)))
+>  #define	LRADC_DELAY_TRIGGER_LRADCS_MASK		(0xff << 24)
+>  #define	LRADC_DELAY_TRIGGER_LRADCS_OFFSET	24
+> +#define	LRADC_DELAY_TRIGGER(x) \
+> +				(((x) << LRADC_DELAY_TRIGGER_LRADCS_OFFSET) & \
+> +				LRADC_DELAY_TRIGGER_LRADCS_MASK)
+>  #define	LRADC_DELAY_KICK			(1 << 20)
+>  #define	LRADC_DELAY_TRIGGER_DELAYS_MASK		(0xf << 16)
+>  #define	LRADC_DELAY_TRIGGER_DELAYS_OFFSET	16
+> +#define	LRADC_DELAY_TRIGGER_DELAYS(x) \
+> +				(((x) << LRADC_DELAY_TRIGGER_DELAYS_OFFSET) & \
+> +				LRADC_DELAY_TRIGGER_DELAYS_MASK)
+>  #define	LRADC_DELAY_LOOP_COUNT_MASK		(0x1f << 11)
+>  #define	LRADC_DELAY_LOOP_COUNT_OFFSET		11
+> +#define	LRADC_DELAY_LOOP(x) \
+> +				(((x) << LRADC_DELAY_LOOP_COUNT_OFFSET) & \
+> +				LRADC_DELAY_LOOP_COUNT_MASK)
+>  #define	LRADC_DELAY_DELAY_MASK			0x7ff
+>  #define	LRADC_DELAY_DELAY_OFFSET		0
+> +#define	LRADC_DELAY_DELAY(x) \
+> +				(((x) << LRADC_DELAY_DELAY_OFFSET) & \
+> +				LRADC_DELAY_DELAY_MASK)
+>  
+>  #define	LRADC_CTRL4				0x140
+>  #define	LRADC_CTRL4_LRADCSELECT_MASK(n)		(0xf << ((n) * 4))
+> @@ -319,6 +356,404 @@ static u32 mxs_lradc_drive_pressure(struct mxs_lradc *lradc)
+>  		return LRADC_CTRL0_MX28_YPPSW | LRADC_CTRL0_MX28_XNNSW;
+>  }
+>  
+> +static bool mxs_lradc_check_touch_event(struct mxs_lradc *lradc)
+> +{
+> +	return !!(readl(lradc->base + LRADC_STATUS) &
+> +					LRADC_STATUS_TOUCH_DETECT_RAW);
+> +}
+> +
+> +static void mxs_lradc_setup_ts_channel(struct mxs_lradc *lradc, unsigned ch)
+> +{
+> +	/*
+> +	 * prepare for oversampling conversion
+> +	 *
+> +	 * from the datasheet:
+> +	 * "The ACCUMULATE bit in the appropriate channel register
+> +	 * HW_LRADC_CHn must be set to 1 if NUM_SAMPLES is greater then 0;
+> +	 * otherwise, the IRQs will not fire."
+> +	 */
+> +	mxs_lradc_reg_wrt(lradc, LRADC_CH_ACCUMULATE |
+> +			LRADC_CH_NUM_SAMPLES(lradc->over_sample_cnt - 1),
+> +			LRADC_CH(ch));
+> +
+> +	/* from the datasheet:
+> +	 * "Software must clear this register in preparation for a
+> +	 * multi-cycle accumulation.
+> +	 */
+> +	mxs_lradc_reg_clear(lradc, LRADC_CH_VALUE_MASK, LRADC_CH(ch));
+> +
+> +	/* prepare the delay/loop unit according to the oversampling count */
+> +	mxs_lradc_reg_wrt(lradc, LRADC_DELAY_TRIGGER(1 << ch) |
+> +		LRADC_DELAY_TRIGGER_DELAYS(0) |
+> +		LRADC_DELAY_LOOP(lradc->over_sample_cnt - 1) |
+> +		LRADC_DELAY_DELAY(lradc->over_sample_delay - 1),
+> +			LRADC_DELAY(3));
+> +
+> +	mxs_lradc_reg_clear(lradc, LRADC_CTRL1_LRADC_IRQ(2) |
+> +			LRADC_CTRL1_LRADC_IRQ(3) | LRADC_CTRL1_LRADC_IRQ(4) |
+> +			LRADC_CTRL1_LRADC_IRQ(5), LRADC_CTRL1);
+> +
+> +	/* wake us again, when the complete conversion is done */
+> +	mxs_lradc_reg_set(lradc, LRADC_CTRL1_LRADC_IRQ_EN(ch), LRADC_CTRL1);
+> +	/*
+> +	 * after changing the touchscreen plates setting
+> +	 * the signals need some initial time to settle. Start the
+> +	 * SoC's delay unit and start the conversion later
+> +	 * and automatically.
+> +	 */
+> +	mxs_lradc_reg_wrt(lradc, LRADC_DELAY_TRIGGER(0) | /* don't trigger ADC */
+> +		LRADC_DELAY_TRIGGER_DELAYS(1 << 3) | /* trigger DELAY unit#3 */
+> +		LRADC_DELAY_KICK |
+> +		LRADC_DELAY_DELAY(lradc->settling_delay),
+> +			LRADC_DELAY(2));
+> +}
+> +
+> +/*
+> + * Pressure detection is special:
+> + * We want to do both required measurements for the pressure detection in
+> + * one turn. Use the hardware features to chain both conversions and let the
+> + * hardware report one interrupt if both conversions are done
+> + */
+> +static void mxs_lradc_setup_ts_pressure(struct mxs_lradc *lradc, unsigned ch1,
+> +							unsigned ch2)
+> +{
+> +	u32 reg;
+> +
+> +	/*
+> +	 * prepare for oversampling conversion
+> +	 *
+> +	 * from the datasheet:
+> +	 * "The ACCUMULATE bit in the appropriate channel register
+> +	 * HW_LRADC_CHn must be set to 1 if NUM_SAMPLES is greater then 0;
+> +	 * otherwise, the IRQs will not fire."
+> +	 */
+> +	reg = LRADC_CH_ACCUMULATE |
+> +		LRADC_CH_NUM_SAMPLES(lradc->over_sample_cnt - 1);
+> +	mxs_lradc_reg_wrt(lradc, reg, LRADC_CH(ch1));
+> +	mxs_lradc_reg_wrt(lradc, reg, LRADC_CH(ch2));
+> +
+> +	/* from the datasheet:
+> +	 * "Software must clear this register in preparation for a
+> +	 * multi-cycle accumulation.
+> +	 */
+> +	mxs_lradc_reg_clear(lradc, LRADC_CH_VALUE_MASK, LRADC_CH(ch1));
+> +	mxs_lradc_reg_clear(lradc, LRADC_CH_VALUE_MASK, LRADC_CH(ch2));
+> +
+> +	/* prepare the delay/loop unit according to the oversampling count */
+> +	mxs_lradc_reg_wrt(lradc, LRADC_DELAY_TRIGGER(1 << ch1) |
+> +		LRADC_DELAY_TRIGGER(1 << ch2) | /* start both channels */
+> +		LRADC_DELAY_TRIGGER_DELAYS(0) |
+> +		LRADC_DELAY_LOOP(lradc->over_sample_cnt - 1) |
+> +		LRADC_DELAY_DELAY(lradc->over_sample_delay - 1),
+> +					LRADC_DELAY(3));
+> +
+> +	mxs_lradc_reg_clear(lradc, LRADC_CTRL1_LRADC_IRQ(2) |
+> +			LRADC_CTRL1_LRADC_IRQ(3) | LRADC_CTRL1_LRADC_IRQ(4) |
+> +			LRADC_CTRL1_LRADC_IRQ(5), LRADC_CTRL1);
+> +
+> +	/* wake us again, when the conversions are done */
+> +	mxs_lradc_reg_set(lradc, LRADC_CTRL1_LRADC_IRQ_EN(ch2), LRADC_CTRL1);
+> +	/*
+> +	 * after changing the touchscreen plates setting
+> +	 * the signals need some initial time to settle. Start the
+> +	 * SoC's delay unit and start the conversion later
+> +	 * and automatically.
+> +	 */
+> +	mxs_lradc_reg_wrt(lradc, LRADC_DELAY_TRIGGER(0) | /* don't trigger ADC */
+> +		LRADC_DELAY_TRIGGER_DELAYS(1 << 3) | /* trigger DELAY unit#3 */
+> +		LRADC_DELAY_KICK |
+> +		LRADC_DELAY_DELAY(lradc->settling_delay), LRADC_DELAY(2));
+> +}
+> +
+> +static unsigned mxs_lradc_read_raw_channel(struct mxs_lradc *lradc,
+> +							unsigned channel)
+> +{
+> +	u32 reg;
+> +	unsigned num_samples, val;
+> +
+> +	reg = readl(lradc->base + LRADC_CH(channel));
+> +	if (reg & LRADC_CH_ACCUMULATE)
+> +		num_samples = lradc->over_sample_cnt;
+> +	else
+> +		num_samples = 1;
+> +
+> +	val = (reg & LRADC_CH_VALUE_MASK) >> LRADC_CH_VALUE_OFFSET;
+> +	return val / num_samples;
+> +}
+> +
+> +static unsigned mxs_lradc_read_ts_pressure(struct mxs_lradc *lradc,
+> +						unsigned ch1, unsigned ch2)
+> +{
+> +	u32 reg, mask;
+> +	unsigned pressure, m1, m2;
+> +
+> +	mask = LRADC_CTRL1_LRADC_IRQ(ch1) | LRADC_CTRL1_LRADC_IRQ(ch2);
+> +	reg = readl(lradc->base + LRADC_CTRL1) & mask;
+> +
+> +	while (reg != mask) {
+> +		reg = readl(lradc->base + LRADC_CTRL1) & mask;
+> +		dev_dbg(lradc->dev, "One channel is still busy: %X\n", reg);
+> +	}
+> +
+> +	m1 = mxs_lradc_read_raw_channel(lradc, ch1);
+> +	m2 = mxs_lradc_read_raw_channel(lradc, ch2);
+> +
+> +	if (m2 == 0) {
+> +		dev_warn(lradc->dev, "Cannot calculate pressure\n");
+> +		return 1 << (LRADC_RESOLUTION - 1);
+> +	}
+> +
+> +	/* simply scale the value from 0 ... max ADC resolution */
+> +	pressure = m1;
+> +	pressure *= (1 << LRADC_RESOLUTION);
+> +	pressure /= m2;
+> +
+> +	dev_dbg(lradc->dev, "Pressure = %u\n", pressure);
+> +	return pressure;
+> +}
+> +
+> +#define TS_CH_XP 2
+> +#define TS_CH_YP 3
+> +#define TS_CH_XM 4
+> +#define TS_CH_YM 5
+> +
+> +static int mxs_lradc_read_ts_channel(struct mxs_lradc *lradc)
+> +{
+> +	u32 reg;
+> +	int val;
+> +
+> +	reg = readl(lradc->base + LRADC_CTRL1);
+> +
+> +	/* only channels 3 to 5 are of interest here */
+> +	if (reg & LRADC_CTRL1_LRADC_IRQ(TS_CH_YP)) {
+> +		mxs_lradc_reg_clear(lradc, LRADC_CTRL1_LRADC_IRQ_EN(TS_CH_YP) |
+> +			LRADC_CTRL1_LRADC_IRQ(TS_CH_YP), LRADC_CTRL1);
+> +		val = mxs_lradc_read_raw_channel(lradc, TS_CH_YP);
+> +	} else if (reg & LRADC_CTRL1_LRADC_IRQ(TS_CH_XM)) {
+> +		mxs_lradc_reg_clear(lradc, LRADC_CTRL1_LRADC_IRQ_EN(TS_CH_XM) |
+> +			LRADC_CTRL1_LRADC_IRQ(TS_CH_XM), LRADC_CTRL1);
+> +		val = mxs_lradc_read_raw_channel(lradc, TS_CH_XM);
+> +	} else if (reg & LRADC_CTRL1_LRADC_IRQ(TS_CH_YM)) {
+> +		mxs_lradc_reg_clear(lradc, LRADC_CTRL1_LRADC_IRQ_EN(TS_CH_YM) |
+> +			LRADC_CTRL1_LRADC_IRQ(TS_CH_YM), LRADC_CTRL1);
+> +		val = mxs_lradc_read_raw_channel(lradc, TS_CH_YM);
+> +	} else {
+> +		return -EIO;
+> +	}
+> +
+> +	mxs_lradc_reg_wrt(lradc, 0, LRADC_DELAY(2));
+> +	mxs_lradc_reg_wrt(lradc, 0, LRADC_DELAY(3));
+> +
+> +	return val;
+> +}
+> +
+> +/*
+> + * YP(open)--+-------------+
+> + *           |             |--+
+> + *           |             |  |
+> + *    YM(-)--+-------------+  |
+> + *             +--------------+
+> + *             |              |
+> + *         XP(weak+)        XM(open)
+> + *
+> + * "weak+" means 200k Ohm VDDIO
+> + * (-) means GND
+> + */
+> +static void mxs_lradc_setup_touch_detection(struct mxs_lradc *lradc)
+> +{
+> +	/*
+> +	 * In order to detect a touch event the 'touch detect enable' bit
+> +	 * enables:
+> +	 *  - a weak pullup to the X+ connector
+> +	 *  - a strong ground at the Y- connector
+> +	 */
+> +	mxs_lradc_reg_clear(lradc, mxs_lradc_plate_mask(lradc), LRADC_CTRL0);
+> +	mxs_lradc_reg_set(lradc, mxs_lradc_touch_detect_bit(lradc),
+> +				LRADC_CTRL0);
+> +}
+> +
+> +/*
+> + * YP(meas)--+-------------+
+> + *           |             |--+
+> + *           |             |  |
+> + * YM(open)--+-------------+  |
+> + *             +--------------+
+> + *             |              |
+> + *           XP(+)          XM(-)
+> + *
+> + * (+) means here 1.85 V
+> + * (-) means here GND
+> + */
+> +static void mxs_lradc_prepare_x_pos(struct mxs_lradc *lradc)
+> +{
+> +	mxs_lradc_reg_clear(lradc, mxs_lradc_plate_mask(lradc), LRADC_CTRL0);
+> +	mxs_lradc_reg_set(lradc, mxs_lradc_drive_x_plate(lradc), LRADC_CTRL0);
+> +
+> +	lradc->cur_plate = LRADC_SAMPLE_X;
+> +	mxs_lradc_setup_ts_channel(lradc, TS_CH_YP);
+> +}
+> +
+> +/*
+> + *   YP(+)--+-------------+
+> + *          |             |--+
+> + *          |             |  |
+> + *   YM(-)--+-------------+  |
+> + *            +--------------+
+> + *            |              |
+> + *         XP(open)        XM(meas)
+> + *
+> + * (+) means here 1.85 V
+> + * (-) means here GND
+> + */
+> +static void mxs_lradc_prepare_y_pos(struct mxs_lradc *lradc)
+> +{
+> +	mxs_lradc_reg_clear(lradc, mxs_lradc_plate_mask(lradc), LRADC_CTRL0);
+> +	mxs_lradc_reg_set(lradc, mxs_lradc_drive_y_plate(lradc), LRADC_CTRL0);
+> +
+> +	lradc->cur_plate = LRADC_SAMPLE_Y;
+> +	mxs_lradc_setup_ts_channel(lradc, TS_CH_XM);
+> +}
+> +
+> +/*
+> + *    YP(+)--+-------------+
+> + *           |             |--+
+> + *           |             |  |
+> + * YM(meas)--+-------------+  |
+> + *             +--------------+
+> + *             |              |
+> + *          XP(meas)        XM(-)
+> + *
+> + * (+) means here 1.85 V
+> + * (-) means here GND
+> + */
+> +static void mxs_lradc_prepare_pressure(struct mxs_lradc *lradc)
+> +{
+> +	mxs_lradc_reg_clear(lradc, mxs_lradc_plate_mask(lradc), LRADC_CTRL0);
+> +	mxs_lradc_reg_set(lradc, mxs_lradc_drive_pressure(lradc), LRADC_CTRL0);
+> +
+> +	lradc->cur_plate = LRADC_SAMPLE_PRESSURE;
+> +	mxs_lradc_setup_ts_pressure(lradc, TS_CH_XP, TS_CH_YM);
+> +}
+> +
+> +static void mxs_lradc_enable_touch_detection(struct mxs_lradc *lradc)
+> +{
+> +	mxs_lradc_setup_touch_detection(lradc);
+> +
+> +	lradc->cur_plate = LRADC_TOUCH;
+> +	mxs_lradc_reg_clear(lradc, LRADC_CTRL1_TOUCH_DETECT_IRQ |
+> +				LRADC_CTRL1_TOUCH_DETECT_IRQ_EN, LRADC_CTRL1);
+> +	mxs_lradc_reg_set(lradc, LRADC_CTRL1_TOUCH_DETECT_IRQ_EN, LRADC_CTRL1);
+> +}
+> +
+> +static void mxs_lradc_report_ts_event(struct mxs_lradc *lradc)
+> +{
+> +	input_report_abs(lradc->ts_input, ABS_X, lradc->ts_x_pos);
+> +	input_report_abs(lradc->ts_input, ABS_Y, lradc->ts_y_pos);
+> +	input_report_abs(lradc->ts_input, ABS_PRESSURE, lradc->ts_pressure);
+> +	input_report_key(lradc->ts_input, BTN_TOUCH, 1);
+> +	input_sync(lradc->ts_input);
+> +}
+> +
+> +static void mxs_lradc_complete_touch_event(struct mxs_lradc *lradc)
+> +{
+> +	mxs_lradc_setup_touch_detection(lradc);
+> +	lradc->cur_plate = LRADC_SAMPLE_VALID;
+> +	/*
+> +	 * start a dummy conversion to burn time to settle the signals
+> +	 * note: we are not interested in the conversion's value
+> +	 */
+> +	mxs_lradc_reg_wrt(lradc, 0, LRADC_CH(5));
+> +	mxs_lradc_reg_clear(lradc, LRADC_CTRL1_LRADC_IRQ(5), LRADC_CTRL1);
+> +	mxs_lradc_reg_set(lradc, LRADC_CTRL1_LRADC_IRQ_EN(5), LRADC_CTRL1);
+> +	mxs_lradc_reg_wrt(lradc, LRADC_DELAY_TRIGGER(1 << 5) |
+> +		LRADC_DELAY_KICK | LRADC_DELAY_DELAY(10), /* waste 5 ms */
+> +			LRADC_DELAY(2));
+> +}
+> +
+> +/*
+> + * in order to avoid false measurements, report only samples where
+> + * the surface is still touched after the position measurement
+> + */
+> +static void mxs_lradc_finish_touch_event(struct mxs_lradc *lradc, bool valid)
+> +{
+> +	/* if it is still touched, report the sample */
+> +	if (valid && mxs_lradc_check_touch_event(lradc)) {
+> +		lradc->ts_valid = true;
+> +		mxs_lradc_report_ts_event(lradc);
+> +	}
+> +
+> +	/* if it is even still touched, continue with the next measurement */
+> +	if (mxs_lradc_check_touch_event(lradc)) {
+> +		mxs_lradc_prepare_y_pos(lradc);
+> +		return;
+> +	}
+> +
+> +	if (lradc->ts_valid) {
+> +		/* signal the release */
+> +		lradc->ts_valid = false;
+> +		input_report_key(lradc->ts_input, BTN_TOUCH, 0);
+> +		input_sync(lradc->ts_input);
+> +	}
+> +
+> +	/* if it is released, wait for the next touch via IRQ */
+> +	mxs_lradc_reg_clear(lradc, LRADC_CTRL1_TOUCH_DETECT_IRQ, LRADC_CTRL1);
+> +	mxs_lradc_reg_set(lradc, LRADC_CTRL1_TOUCH_DETECT_IRQ_EN, LRADC_CTRL1);
+> +}
+> +
+> +/* touchscreen's state machine */
+> +static void mxs_lradc_handle_touch(struct mxs_lradc *lradc)
+> +{
+> +	int val;
+> +
+> +	switch (lradc->cur_plate) {
+> +	case LRADC_TOUCH:
+> +		/*
+> +		 * start with the Y-pos, because it uses nearly the same plate
+> +		 * settings like the touch detection
+> +		 */
+> +		if (mxs_lradc_check_touch_event(lradc)) {
+> +			mxs_lradc_reg_clear(lradc,
+> +					LRADC_CTRL1_TOUCH_DETECT_IRQ_EN,
+> +					LRADC_CTRL1);
+> +			mxs_lradc_prepare_y_pos(lradc);
+> +		}
+> +		mxs_lradc_reg_clear(lradc, LRADC_CTRL1_TOUCH_DETECT_IRQ,
+> +					LRADC_CTRL1);
+> +		return;
+> +
+> +	case LRADC_SAMPLE_Y:
+> +		val = mxs_lradc_read_ts_channel(lradc);
+> +		if (val < 0) {
+> +			mxs_lradc_enable_touch_detection(lradc); /* re-start */
+> +			return;
+> +		}
+> +		lradc->ts_y_pos = val;
+> +		mxs_lradc_prepare_x_pos(lradc);
+> +		return;
+> +
+> +	case LRADC_SAMPLE_X:
+> +		val = mxs_lradc_read_ts_channel(lradc);
+> +		if (val < 0) {
+> +			mxs_lradc_enable_touch_detection(lradc); /* re-start */
+> +			return;
+> +		}
+> +		lradc->ts_x_pos = val;
+> +		mxs_lradc_prepare_pressure(lradc);
+> +		return;
+> +
+> +	case LRADC_SAMPLE_PRESSURE:
+> +		lradc->ts_pressure =
+> +			mxs_lradc_read_ts_pressure(lradc, TS_CH_XP, TS_CH_YM);
+> +		mxs_lradc_complete_touch_event(lradc);
+> +		return;
+> +
+> +	case LRADC_SAMPLE_VALID:
+> +		val = mxs_lradc_read_ts_channel(lradc); /* ignore the value */
+> +		mxs_lradc_finish_touch_event(lradc, 1);
+> +		break;
+> +	}
+> +}
+> +
+>  /*
+>   * Raw I/O operations
+>   */
+> @@ -392,15 +827,6 @@ static const struct iio_info mxs_lradc_iio_info = {
+>  	.read_raw		= mxs_lradc_read_raw,
+>  };
+>  
+> -/*
+> - * Touchscreen handling
+> - */
+> -enum lradc_ts_plate {
+> -	LRADC_SAMPLE_X,
+> -	LRADC_SAMPLE_Y,
+> -	LRADC_SAMPLE_PRESSURE,
+> -};
+> -
+>  static int mxs_lradc_ts_touched(struct mxs_lradc *lradc)
+>  {
+>  	uint32_t reg;
+> @@ -558,10 +984,6 @@ static void mxs_lradc_ts_work(struct work_struct *ts_work)
+>  	input_report_key(lradc->ts_input, BTN_TOUCH, 0);
+>  	input_sync(lradc->ts_input);
+>  
+> -	/* Do not restart the TS IRQ if the driver is shutting down. */
+> -	if (lradc->stop_touchscreen)
+> -		return;
+> -
+>  	/* Restart the touchscreen interrupts. */
+>  	mxs_lradc_reg_clear(lradc, LRADC_CTRL1_TOUCH_DETECT_IRQ, LRADC_CTRL1);
+>  	mxs_lradc_reg_set(lradc, LRADC_CTRL1_TOUCH_DETECT_IRQ_EN, LRADC_CTRL1);
+> @@ -571,36 +993,29 @@ static int mxs_lradc_ts_open(struct input_dev *dev)
+>  {
+>  	struct mxs_lradc *lradc = input_get_drvdata(dev);
+>  
+> -	/* The touchscreen is starting. */
+> -	lradc->stop_touchscreen = false;
+> -
+>  	/* Enable the touch-detect circuitry. */
+> -	mxs_lradc_reg_set(lradc, mxs_lradc_touch_detect_bit(lradc),
+> -						LRADC_CTRL0);
+> -
+> -	/* Enable the touch-detect IRQ. */
+> -	mxs_lradc_reg_set(lradc, LRADC_CTRL1_TOUCH_DETECT_IRQ_EN, LRADC_CTRL1);
+> +	mxs_lradc_enable_touch_detection(lradc);
+>  
+>  	return 0;
+>  }
+>  
+> -static void mxs_lradc_ts_close(struct input_dev *dev)
+> +static void mxs_lradc_disable_ts(struct mxs_lradc *lradc)
+>  {
+> -	struct mxs_lradc *lradc = input_get_drvdata(dev);
+> -
+> -	/* Indicate the touchscreen is stopping. */
+> -	lradc->stop_touchscreen = true;
+> -	mb();
+> +	/* stop all interrupts from firing */
+> +	mxs_lradc_reg_clear(lradc, LRADC_CTRL1_TOUCH_DETECT_IRQ_EN |
+> +		LRADC_CTRL1_LRADC_IRQ_EN(2) | LRADC_CTRL1_LRADC_IRQ_EN(3) |
+> +		LRADC_CTRL1_LRADC_IRQ_EN(4) | LRADC_CTRL1_LRADC_IRQ_EN(5),
+> +		LRADC_CTRL1);
+>  
+> -	/* Wait until touchscreen thread finishes any possible remnants. */
+> -	cancel_work_sync(&lradc->ts_work);
+> +	/* Power-down touchscreen touch-detect circuitry. */
+> +	mxs_lradc_reg_clear(lradc, mxs_lradc_plate_mask(lradc), LRADC_CTRL0);
+> +}
+>  
+> -	/* Disable touchscreen touch-detect IRQ. */
+> -	mxs_lradc_reg_clear(lradc, LRADC_CTRL1_TOUCH_DETECT_IRQ_EN,
+> -						LRADC_CTRL1);
+> +static void mxs_lradc_ts_close(struct input_dev *dev)
+> +{
+> +	struct mxs_lradc *lradc = input_get_drvdata(dev);
+>  
+> -	/* Power-down touchscreen touch-detect circuitry. */
+> -	mxs_lradc_reg_clear(lradc, mxs_lradc_touch_detect_bit(lradc), LRADC_CTRL0);
+> +	mxs_lradc_disable_ts(lradc);
+>  }
+>  
+>  static int mxs_lradc_ts_register(struct mxs_lradc *lradc)
+> @@ -646,8 +1061,7 @@ static void mxs_lradc_ts_unregister(struct mxs_lradc *lradc)
+>  	if (!lradc->use_touchscreen)
+>  		return;
+>  
+> -	cancel_work_sync(&lradc->ts_work);
+> -
+> +	mxs_lradc_disable_ts(lradc);
+>  	input_unregister_device(lradc->ts_input);
+>  }
+>  
+> @@ -660,30 +1074,23 @@ static irqreturn_t mxs_lradc_handle_irq(int irq, void *data)
+>  	struct mxs_lradc *lradc = iio_priv(iio);
+>  	unsigned long reg = readl(lradc->base + LRADC_CTRL1);
+>  	const uint32_t ts_irq_mask =
+> -		LRADC_CTRL1_TOUCH_DETECT_IRQ_EN |
+> -		LRADC_CTRL1_TOUCH_DETECT_IRQ;
+> +		LRADC_CTRL1_TOUCH_DETECT_IRQ |
+> +		LRADC_CTRL1_LRADC_IRQ(2) |
+> +		LRADC_CTRL1_LRADC_IRQ(3) |
+> +		LRADC_CTRL1_LRADC_IRQ(4) |
+> +		LRADC_CTRL1_LRADC_IRQ(5);
+>  
+>  	if (!(reg & mxs_lradc_irq_mask(lradc)))
+>  		return IRQ_NONE;
+>  
+> -	/*
+> -	 * Touchscreen IRQ handling code has priority and therefore
+> -	 * is placed here. In case touchscreen IRQ arrives, disable
+> -	 * it ASAP
+> -	 */
+> -	if (reg & LRADC_CTRL1_TOUCH_DETECT_IRQ) {
+> -		mxs_lradc_reg_clear(lradc, ts_irq_mask, LRADC_CTRL1);
+> -		if (!lradc->stop_touchscreen)
+> -			schedule_work(&lradc->ts_work);
+> -	}
+> +	if (lradc->use_touchscreen && (reg & ts_irq_mask))
+> +		mxs_lradc_handle_touch(lradc);
+>  
+>  	if (iio_buffer_enabled(iio))
+>  		iio_trigger_poll(iio->trig, iio_get_time_ns());
+>  	else if (reg & LRADC_CTRL1_LRADC_IRQ(0))
+>  		complete(&lradc->completion);
+>  
+> -	mxs_lradc_reg_clear(lradc, reg & mxs_lradc_irq_mask(lradc), LRADC_CTRL1);
+> -
+>  	return IRQ_HANDLED;
+>  }
+>  
+> @@ -978,6 +1385,17 @@ static const struct of_device_id mxs_lradc_dt_ids[] = {
+>  };
+>  MODULE_DEVICE_TABLE(of, mxs_lradc_dt_ids);
+>  
+> +static int mxs_lradc_probe_touchscreen(struct mxs_lradc *lradc,
+> +						struct device_node *lradc_node)
+> +{
+> +	/* TODO retrieve from device tree */
+> +	lradc->over_sample_cnt = 4;
+> +	lradc->over_sample_delay = 2;
+> +	lradc->settling_delay = 10;
+> +
+> +	return 0;
+> +}
+> +
+>  static int mxs_lradc_probe(struct platform_device *pdev)
+>  {
+>  	const struct of_device_id *of_id =
+> @@ -990,7 +1408,7 @@ static int mxs_lradc_probe(struct platform_device *pdev)
+>  	struct iio_dev *iio;
+>  	struct resource *iores;
+>  	uint32_t ts_wires = 0;
+> -	int ret = 0;
+> +	int ret = 0, touch_ret;
+>  	int i;
+>  
+>  	/* Allocate the IIO device. */
+> @@ -1010,7 +1428,7 @@ static int mxs_lradc_probe(struct platform_device *pdev)
+>  	if (IS_ERR(lradc->base))
+>  		return PTR_ERR(lradc->base);
+>  
+> -	INIT_WORK(&lradc->ts_work, mxs_lradc_ts_work);
+> +	touch_ret = mxs_lradc_probe_touchscreen(lradc, node);
+>  
+>  	/* Check if touchscreen is enabled in DT. */
+>  	ret = of_property_read_u32(node, "fsl,lradc-touchscreen-wires",
+> @@ -1073,9 +1491,11 @@ static int mxs_lradc_probe(struct platform_device *pdev)
+>  		goto err_dev;
+>  
+>  	/* Register the touchscreen input device. */
+> -	ret = mxs_lradc_ts_register(lradc);
+> -	if (ret)
+> -		goto err_dev;
+> +	if (touch_ret == 0) {
+> +		ret = mxs_lradc_ts_register(lradc);
+> +		if (ret)
+> +			goto err_dev;
+> +	}
+>  
+>  	/* Register IIO device. */
+>  	ret = iio_device_register(iio);
+> 
