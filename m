@@ -1,11 +1,11 @@
 From: jic23@kernel.org (Jonathan Cameron)
-Date: Sat, 21 Sep 2013 13:56:26 +0100
-Subject: [PATCH 18/20] iio: accel-core: st: Clean up error handling in
+Date: Sat, 21 Sep 2013 13:57:06 +0100
+Subject: [PATCH 19/20] iio: gyro-core: st: Clean up error handling in
  probe()
-In-Reply-To: <1379347346-823-19-git-send-email-lee.jones@linaro.org>
+In-Reply-To: <1379347346-823-20-git-send-email-lee.jones@linaro.org>
 References: <1379347346-823-1-git-send-email-lee.jones@linaro.org>
- <1379347346-823-19-git-send-email-lee.jones@linaro.org>
-Message-ID: <523D977A.2010302@kernel.org>
+ <1379347346-823-20-git-send-email-lee.jones@linaro.org>
+Message-ID: <523D97A2.8090800@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -19,67 +19,67 @@ Applied to the togreg branch of iio.git
 
 Thanks,
 > ---
->  drivers/iio/accel/st_accel_core.c | 19 ++++++++++---------
+>  drivers/iio/gyro/st_gyro_core.c | 19 ++++++++++---------
 >  1 file changed, 10 insertions(+), 9 deletions(-)
 > 
-> diff --git a/drivers/iio/accel/st_accel_core.c b/drivers/iio/accel/st_accel_core.c
-> index 1458343..97172dd 100644
-> --- a/drivers/iio/accel/st_accel_core.c
-> +++ b/drivers/iio/accel/st_accel_core.c
-> @@ -452,8 +452,9 @@ static const struct iio_trigger_ops st_accel_trigger_ops = {
->  int st_accel_common_probe(struct iio_dev *indio_dev,
->  				struct st_sensors_platform_data *plat_data)
+> diff --git a/drivers/iio/gyro/st_gyro_core.c b/drivers/iio/gyro/st_gyro_core.c
+> index e13c2b0..9f80817 100644
+> --- a/drivers/iio/gyro/st_gyro_core.c
+> +++ b/drivers/iio/gyro/st_gyro_core.c
+> @@ -305,8 +305,9 @@ static const struct iio_trigger_ops st_gyro_trigger_ops = {
+>  int st_gyro_common_probe(struct iio_dev *indio_dev,
+>  					struct st_sensors_platform_data *pdata)
 >  {
 > -	int err;
->  	struct st_sensor_data *adata = iio_priv(indio_dev);
-> +	int irq = adata->get_irq_data_ready(indio_dev);
+>  	struct st_sensor_data *gdata = iio_priv(indio_dev);
+> +	int irq = gdata->get_irq_data_ready(indio_dev);
 > +	int err;
 >  
 >  	indio_dev->modes = INDIO_DIRECT_MODE;
->  	indio_dev->info = &accel_info;
-> @@ -461,7 +462,7 @@ int st_accel_common_probe(struct iio_dev *indio_dev,
+>  	indio_dev->info = &gyro_info;
+> @@ -314,7 +315,7 @@ int st_gyro_common_probe(struct iio_dev *indio_dev,
 >  	err = st_sensors_check_device_support(indio_dev,
->  				ARRAY_SIZE(st_accel_sensors), st_accel_sensors);
+>  				ARRAY_SIZE(st_gyro_sensors), st_gyro_sensors);
 >  	if (err < 0)
-> -		goto st_accel_common_probe_error;
+> -		goto st_gyro_common_probe_error;
 > +		return err;
 >  
->  	adata->num_data_channels = ST_ACCEL_NUMBER_DATA_CHANNELS;
->  	adata->multiread_bit = adata->sensor->multi_read_bit;
-> @@ -478,12 +479,12 @@ int st_accel_common_probe(struct iio_dev *indio_dev,
+>  	gdata->num_data_channels = ST_GYRO_NUMBER_DATA_CHANNELS;
+>  	gdata->multiread_bit = gdata->sensor->multi_read_bit;
+> @@ -327,12 +328,12 @@ int st_gyro_common_probe(struct iio_dev *indio_dev,
 >  
->  	err = st_sensors_init_sensor(indio_dev, plat_data);
+>  	err = st_sensors_init_sensor(indio_dev, pdata);
 >  	if (err < 0)
-> -		goto st_accel_common_probe_error;
+> -		goto st_gyro_common_probe_error;
 > +		return err;
 >  
-> -	if (adata->get_irq_data_ready(indio_dev) > 0) {
+> -	if (gdata->get_irq_data_ready(indio_dev) > 0) {
 > +	if (irq > 0) {
->  		err = st_accel_allocate_ring(indio_dev);
+>  		err = st_gyro_allocate_ring(indio_dev);
 >  		if (err < 0)
-> -			goto st_accel_common_probe_error;
+> -			goto st_gyro_common_probe_error;
 > +			return err;
 >  
 >  		err = st_sensors_allocate_trigger(indio_dev,
->  						 ST_ACCEL_TRIGGER_OPS);
-> @@ -495,15 +496,15 @@ int st_accel_common_probe(struct iio_dev *indio_dev,
+>  						  ST_GYRO_TRIGGER_OPS);
+> @@ -344,15 +345,15 @@ int st_gyro_common_probe(struct iio_dev *indio_dev,
 >  	if (err)
->  		goto st_accel_device_register_error;
+>  		goto st_gyro_device_register_error;
 >  
 > -	return err;
 > +	return 0;
 >  
->  st_accel_device_register_error:
-> -	if (adata->get_irq_data_ready(indio_dev) > 0)
+>  st_gyro_device_register_error:
+> -	if (gdata->get_irq_data_ready(indio_dev) > 0)
 > +	if (irq > 0)
 >  		st_sensors_deallocate_trigger(indio_dev);
->  st_accel_probe_trigger_error:
-> -	if (adata->get_irq_data_ready(indio_dev) > 0)
+>  st_gyro_probe_trigger_error:
+> -	if (gdata->get_irq_data_ready(indio_dev) > 0)
 > +	if (irq > 0)
->  		st_accel_deallocate_ring(indio_dev);
-> -st_accel_common_probe_error:
+>  		st_gyro_deallocate_ring(indio_dev);
+> -st_gyro_common_probe_error:
 > +
 >  	return err;
 >  }
->  EXPORT_SYMBOL(st_accel_common_probe);
+>  EXPORT_SYMBOL(st_gyro_common_probe);
 > 
