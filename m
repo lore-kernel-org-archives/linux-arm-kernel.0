@@ -1,82 +1,36 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 20 Sep 2013 17:23:39 -0700
-Subject: [PATCH] rename ARCH_BCM to ARCH_BCM_MOBILE
-In-Reply-To: <1379718260-24349-1-git-send-email-csd@broadcom.com>
-References: <1379718260-24349-1-git-send-email-csd@broadcom.com>
-Message-ID: <CAOesGMjViyCa+FhNmrESc+WmnW+=wzsqBpj=jHeuCyobAmMojg@mail.gmail.com>
+From: emilio@elopez.com.ar (=?UTF-8?q?Emilio=20L=C3=B3pez?=)
+Date: Fri, 20 Sep 2013 22:03:09 -0300
+Subject: [PATCH 0/3] sunxi clock fixes
+Message-ID: <1379725392-30202-1-git-send-email-emilio@elopez.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 20, 2013 at 4:04 PM, Christian Daudt <csd@broadcom.com> wrote:
-> Currently ARCH_BCM has been used for Broadcom
-> Mobile V7 based SoCs. In order to allow other Broadcom
-> SoCs to also use mach-bcm directory and files, this patch
-> renames the original ARCH_BCM to ARCH_BCM_MOBILE, and
-> uses ARCH_BCM to define any Broadcom chip residing
-> in mach-bcm directory.
->
-> Signed-off-by: Christian Daudt <csd@broadcom.com>
->
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index cc0f1fb..dd00e22 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -42,8 +42,6 @@ dtb-$(CONFIG_ARCH_AT91)       += sama5d34ek.dtb
->  dtb-$(CONFIG_ARCH_AT91)        += sama5d35ek.dtb
->
->  dtb-$(CONFIG_ARCH_BCM2835) += bcm2835-rpi-b.dtb
-> -dtb-$(CONFIG_ARCH_BCM) += bcm11351-brt.dtb \
-> -       bcm28155-ap.dtb
->  dtb-$(CONFIG_ARCH_DAVINCI) += da850-enbw-cmc.dtb \
->         da850-evm.dtb
->  dtb-$(CONFIG_ARCH_DOVE) += dove-cm-a510.dtb \
-> @@ -101,6 +99,8 @@ dtb-$(CONFIG_ARCH_KIRKWOOD) += kirkwood-cloudbox.dtb \
->         kirkwood-ts219-6282.dtb \
->         kirkwood-openblocks_a6.dtb
->  dtb-$(CONFIG_ARCH_MARCO) += marco-evb.dtb
-> +dtb-$(CONFIG_ARCH_BCM_MOBILE) += bcm11351-brt.dtb \
-> +       bcm28155-ap.dtb
+Hi,
 
-This reordering looks off. The entries should be alphabetically
-ordered, so if anything it should move up above BCM2835.
+This small series contains two bug fixes and a patch to solve the issue
+of accidental clock gating, as discussed earlier on my RFC patch, "of: 
+add a basic memory driver".
 
+I believe the two first patches should go into -rcN, although I have not
+noticed any issues so far coming from the bugs themselves.
 
-> diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
-> index 704d6d3..4207ab4 100644
-> --- a/drivers/clocksource/Makefile
-> +++ b/drivers/clocksource/Makefile
-> @@ -25,7 +25,7 @@ obj-$(CONFIG_SUN4I_TIMER)     += sun4i_timer.o
->  obj-$(CONFIG_ARCH_TEGRA)       += tegra20_timer.o
->  obj-$(CONFIG_VT8500_TIMER)     += vt8500_timer.o
->  obj-$(CONFIG_ARCH_NSPIRE)      += zevio-timer.o
-> -obj-$(CONFIG_ARCH_BCM)         += bcm_kona_timer.o
-> +obj-$(CONFIG_ARCH_BCM_MOBILE)  += bcm_kona_timer.o
->  obj-$(CONFIG_CADENCE_TTC_TIMER)        += cadence_ttc_timer.o
->  obj-$(CONFIG_CLKSRC_EXYNOS_MCT)        += exynos_mct.o
->  obj-$(CONFIG_CLKSRC_SAMSUNG_PWM)       += samsung_pwm_timer.o
-> diff --git a/drivers/mmc/host/Kconfig b/drivers/mmc/host/Kconfig
-> index 7fc5099..7e89650 100644
-> --- a/drivers/mmc/host/Kconfig
-> +++ b/drivers/mmc/host/Kconfig
-> @@ -251,7 +251,7 @@ config MMC_SDHCI_S3C_DMA
->
->  config MMC_SDHCI_BCM_KONA
->         tristate "SDHCI support on Broadcom KONA platform"
-> -       depends on ARCH_BCM
-> +       depends on ARCH_BCM_MOBILE
->         select MMC_SDHCI_PLTFM
->         help
->           This selects the Broadcom Kona Secure Digital Host Controller
+The third patch should be a no-op for now, and I'd like to have it
+merged before these clocks actually appear on the driver; in this way
+they will never be gated accidentally, and it remains bisectable. I will 
+be sending PLL5/6 support patches in short order.
 
-Since nothing breaks (i.e. ARCH_BCM is still there, and will be
-enabled for any ARCH_BCM_MOBILE platform), the above two can go
-through the corresponding subsystem trees as separate patches.
+Cheers,
 
+Emilio
 
-With the above fixed:
+Emilio L?pez (3):
+  clk: sunxi: factors: fix off-by-one masks
+  clk: sunxi: factors: clear variables before using them
+  clk: sunxi: protect core clocks from accidental shutdown
 
-Acked-by: Olof Johansson <olof@lixom.net>
+ drivers/clk/sunxi/clk-factors.c |  4 ++--
+ drivers/clk/sunxi/clk-sunxi.c   | 28 ++++++++++++++++++++++++++++
+ 2 files changed, 30 insertions(+), 2 deletions(-)
 
-
-
--Olof
+-- 
+1.8.4
