@@ -1,54 +1,88 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 21 Sep 2013 11:12:21 +0100
-Subject: [PATCH v2 1/2] ASoC: kirkwood: clk: probe defer when clock not
- yet ready
-In-Reply-To: <20130921120006.47b00fe7@armhf>
-References: <20130921120006.47b00fe7@armhf>
-Message-ID: <20130921101221.GH12758@n2100.arm.linux.org.uk>
+Date: Sat, 21 Sep 2013 11:42:02 +0100
+Subject: [PATCH] OMAP/serial: Fix division by zero exception on 3M+
+ baud rates
+In-Reply-To: <20130921074344.GA15524@inertiallabs-linux64>
+References: <20130921074344.GA15524@inertiallabs-linux64>
+Message-ID: <20130921104202.GR25647@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 21, 2013 at 12:00:06PM +0200, Jean-Francois Moine wrote:
-> diff --git a/drivers/clk/clkdev.c b/drivers/clk/clkdev.c
-> index 442a313..f8b28d9 100644
-> --- a/drivers/clk/clkdev.c
-> +++ b/drivers/clk/clkdev.c
-> @@ -157,8 +157,13 @@ struct clk *clk_get(struct device *dev, const char *con_id)
->  
->  	if (dev) {
->  		clk = of_clk_get_by_name(dev->of_node, con_id);
-> -		if (!IS_ERR(clk) && __clk_get(clk))
-> -			return clk;
-> +		if (!IS_ERR(clk)) {
-> +			if (__clk_get(clk))
-> +				return clk;
-> +		} else {
-> +			if (PTR_ERR(clk) == -EPROBE_DEFER)
-> +				return clk;
-> +		}
+On Sat, Sep 21, 2013 at 03:43:44AM -0400, Alexey Pelykh wrote:
+> diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
+> index 816d1a2..808a880 100644
+> --- a/drivers/tty/serial/omap-serial.c
+> +++ b/drivers/tty/serial/omap-serial.c
+> @@ -240,8 +240,8 @@ serial_omap_baud_is_mode16(struct uart_port *port, unsigned int baud)
+>  {
+>  	unsigned int n13 = port->uartclk / (13 * baud);
+>  	unsigned int n16 = port->uartclk / (16 * baud);
+> -	int baudAbsDiff13 = baud - (port->uartclk / (13 * n13));
+> -	int baudAbsDiff16 = baud - (port->uartclk / (16 * n16));
+> +	int baudAbsDiff13 = n13 ? (baud - (port->uartclk / (13 * n13))) : INT_MAX;
+> +	int baudAbsDiff16 = n16 ? (baud - (port->uartclk / (16 * n16))) : INT_MAX;
+>  	if(baudAbsDiff13 < 0)
+>  		baudAbsDiff13 = -baudAbsDiff13;
+>  	if(baudAbsDiff16 < 0)
 
-Thanks for patching this file and bringing this code to my attention.
-The original is fscked.  Calling __clk_get() outside of any lock is
-a serious bug and leads to races.
+So, this code is trying to work out whether it's better to use a prescaler
+of 13 or 16?  In which case, the above code is rather buggy in many ways.
+Let's take an example - what if port->uartclk is 19MHz?
 
-Also, a failing __clk_get() probably should not drop through to
-clk_get_sys(), but should instead do this:
+n13 = 19M / 13 * 115200 = 1
+n16 = 19M / 16 * 115200 = 1
+baudAbsDiff13 = 115200 - (19M / 13 * 1) = 115200 - 146153 = -30953 -> 30953
+baudAbsDiff16 = 115200 - (19M / 16 * 1) = 115200 - 118750 = -3550 -> 3350
 
-		if (!IS_ERR(clk)) {
-			if (!__clk_get(clk))
-				clk = ERR_PTR(-ENOENT);
-			return clk;
-		}
+return (baudAbsDiff13 > baudAbsDiff16); -> 1
 
-since a _found_ clock but one which can't be used (due to the module
-going away) is not a reason to drop through to clk_get_sys().
+That seems like it's right.
 
-Which means your change should look like this:
+Now, what if it's 18MHz?
 
-		if (!IS_ERR(clk)) {
-			if (!__clk_get(clk))
-				clk = ERR_PTR(-ENOENT);
-			return clk;
-		}
-		if (PTR_ERR(clk) == -EPROBE_DEFER)
-			return clk;
+n13 = 18M / 13 * 115200 = 1
+n16 = 18M / 16 * 115200 = 0
+baudAbsDiff13 = 115200 - (18M / 13 * 1) = 115200 - 146153 = -23261 -> 23261
+baudAbsDiff16 = 115200 - (18M / 16 * 0) = 115200 - 118750 = INT_MAX
+
+return (baudAbsDiff13 > baudAbsDiff16); -> 0
+
+Now, consider the question: with a 18MHz clock, which produces a more
+accurate 115200 baud rate - a prescaler of 16 or 13?  Let's go back to
+the math.
+
+	115200 * 13 => 1497600
+	115200 * 16 => 1843200
+
+So, choosing a prescaler of 16 will give a slower baud rate, but it's
+a lot closer to 115200 than using the prescaler of 13.  Yet, the code
+will select the latter.
+
+I'd suggest that this code gets rewritten to do "what it says on the tin"
+a bit better:
+
+	unsigned n13 = DIV_ROUND_CLOSEST(port->uartclk, 13 * baud);
+	unsigned n16 = DIV_ROUND_CLOSEST(port->uartclk, 16 * baud);
+	int delta_clk_13 = 13 * baud * n13 - port->uartclk;
+	int delta_clk_16 = 16 * baud * n16 - port->uartclk;
+
+	if (delta_clk_13 < 0)
+		delta_clk_13 = -delta_clk_13;
+	if (delta_clk_16 < 0)
+		delta_clk_16 = -delta_clk_16;
+
+	return delta_clk_13 > delta_clk_16;
+
+Note that baud will never be larger than port->uartclk / 13, so n13
+will always be greater than 1.  n16 may be zero though, and in this
+case, at the point of the test, delta_clk_16 becomes much larger than
+delta_clk_13, so the above calculation returns false, meaning we
+correctly use a prescaler of 13.
+
+Not only does this avoid the problem with the divider being zero, but
+it also selects the prescaler which gives us the closest baud rate to
+the one which is being requested.
+
+Finally, serial_omap_get_divisor should also use DIV_ROUND_CLOSEST() -
+or for extra points, integrate this into serial_omap_get_divisor(),
+and have it also return the prescaler too.
