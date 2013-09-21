@@ -1,43 +1,32 @@
-From: peter.senna@gmail.com (Peter Senna Tschudin)
-Date: Sun, 22 Sep 2013 00:27:33 +0200
-Subject: [PATCH 01/19] arm: Change variable type to bool
-Message-ID: <1379802471-30252-1-git-send-email-peter.senna@gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Sat, 21 Sep 2013 17:49:00 -0500
+Subject: [PATCH 1/3] Add smp support for Allwinner A20(sunxi 7i).
+In-Reply-To: <CAK3cCByL3nD5pMdDwAkxOE8pP0HQEWthD1HUPJ70VeprNpLzBA@mail.gmail.com>
+References: <1379768716-11672-1-git-send-email-cinifr@gmail.com>
+ <1379768716-11672-2-git-send-email-cinifr@gmail.com>
+ <20130921140059.GA2779@lukather>
+ <CAK3cCByL3nD5pMdDwAkxOE8pP0HQEWthD1HUPJ70VeprNpLzBA@mail.gmail.com>
+Message-ID: <20130921224900.GF2779@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The variable pll_overclock is only assigned the values true and false.
-Change its type to bool.
+On Sun, Sep 22, 2013 at 12:49:45AM +0800, cinifr wrote:
+> Thanks. I have modify my patch as you said.
+> It is in attachments. Maybe I remail the new patch?
 
-The simplified semantic patch that find this problem is as
-follows (http://coccinelle.lip6.fr/):
+Yes, remail the whole serie and change the prefix to PATCHv3 (you can
+use the --subject-prefix option of git format-patch to do so).
 
-@exists@
-type T;
-identifier b;
-@@
-- T
-+ bool
-  b = ...;
-  ... when any
-  b = \(true\|false\)
+Maxime
 
-Signed-off-by: Peter Senna Tschudin <peter.senna@gmail.com>
----
- arch/arm/mach-at91/clock.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/mach-at91/clock.c b/arch/arm/mach-at91/clock.c
-index 6b2630a..936480d 100644
---- a/arch/arm/mach-at91/clock.c
-+++ b/arch/arm/mach-at91/clock.c
-@@ -749,7 +749,7 @@ static int __init at91_pmc_init(unsigned long main_clock)
- {
- 	unsigned tmp, freq, mckr;
- 	int i;
--	int pll_overclock = false;
-+	bool pll_overclock = false;
- 
- 	/*
- 	 * When the bootloader initialized the main oscillator correctly,
 -- 
-1.8.3.1
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130921/0e6c08de/attachment.sig>
