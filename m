@@ -1,20 +1,73 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 21 Sep 2013 21:00:00 +0100
-Subject: [PATCH 24/51] DMA-API: dma: pl330: add
- dma_set_mask_and_coherent() call
-In-Reply-To: <201309201926.29084.heiko@sntech.de>
-References: <20130919212235.GD12758@n2100.arm.linux.org.uk>
- <E1VMm5t-0007i5-V7@rmk-PC.arm.linux.org.uk>
- <201309201926.29084.heiko@sntech.de>
-Message-ID: <20130921200000.GS25647@n2100.arm.linux.org.uk>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Sat, 21 Sep 2013 22:27:53 +0200
+Subject: [PATCH 15/26] ARM: kirkwood: remove custom .init_time hook
+In-Reply-To: <1379526839-14798-16-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1379526839-14798-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1379526839-14798-16-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <20130921202753.GB735@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 20, 2013 at 07:26:27PM +0200, Heiko St?bner wrote:
-> Am Donnerstag, 19. September 2013, 23:49:01 schrieb Russell King:
-> > The DMA API requires drivers to call the appropriate dma_set_mask()
-> > functions before doing any DMA mapping.  Add this required call to
-> > the AMBA PL08x driver.
-> 			^--- copy and paste error - should of course be PL330
+On Wed, Sep 18, 2013 at 07:53:48PM +0200, Sebastian Hesselbarth wrote:
+> With arch/arm calling of_clk_init(NULL) from time_init(), we can now
+> remove custom .init_time hooks.
+> 
+> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> ---
+> Cc: Olof Johansson <olof@lixom.net>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Jason Cooper <jason@lakedaemon.net>
+> Cc: Andrew Lunn <andrew@lunn.ch>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-kernel at vger.kernel.org
+> ---
+>  arch/arm/mach-kirkwood/board-dt.c |    8 --------
+>  1 file changed, 8 deletions(-)
 
-Fixed, thanks.
+
+Hi Sebastian
+
+Boot tested on a Kirkwood Topkick.
+
+Tested-by: Andrew Lunn <andrew@lunn.ch>
+
+	   Andrew
+
+> 
+> diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
+> index 82d3ad8..a32a3e5 100644
+> --- a/arch/arm/mach-kirkwood/board-dt.c
+> +++ b/arch/arm/mach-kirkwood/board-dt.c
+> @@ -15,7 +15,6 @@
+>  #include <linux/of.h>
+>  #include <linux/of_platform.h>
+>  #include <linux/clk-provider.h>
+> -#include <linux/clocksource.h>
+>  #include <linux/dma-mapping.h>
+>  #include <linux/irqchip.h>
+>  #include <linux/kexec.h>
+> @@ -66,12 +65,6 @@ static void __init kirkwood_legacy_clk_init(void)
+>  	clk_prepare_enable(clk);
+>  }
+>  
+> -static void __init kirkwood_dt_time_init(void)
+> -{
+> -	of_clk_init(NULL);
+> -	clocksource_of_init();
+> -}
+> -
+>  static void __init kirkwood_dt_init_early(void)
+>  {
+>  	mvebu_mbus_init("marvell,kirkwood-mbus",
+> @@ -122,7 +115,6 @@ DT_MACHINE_START(KIRKWOOD_DT, "Marvell Kirkwood (Flattened Device Tree)")
+>  	/* Maintainer: Jason Cooper <jason@lakedaemon.net> */
+>  	.map_io		= kirkwood_map_io,
+>  	.init_early	= kirkwood_dt_init_early,
+> -	.init_time	= kirkwood_dt_time_init,
+>  	.init_machine	= kirkwood_dt_init,
+>  	.restart	= kirkwood_restart,
+>  	.dt_compat	= kirkwood_dt_board_compat,
+> -- 
+> 1.7.10.4
+> 
