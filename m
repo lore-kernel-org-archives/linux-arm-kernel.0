@@ -1,516 +1,214 @@
 From: manjunath.goudar@linaro.org (Manjunath Goudar)
-Date: Sat, 21 Sep 2013 16:38:46 +0530
-Subject: [PATCH V5 9/9] USB: OHCI: make ohci-pxa27x a separate driver
-In-Reply-To: <1379761727-10656-1-git-send-email-manjunath.goudar@linaro.org>
-References: <1370585013-12809-1-git-send-email-manjunath.goudar@linaro.org>
- <1379761727-10656-1-git-send-email-manjunath.goudar@linaro.org>
-Message-ID: <1379761727-10656-10-git-send-email-manjunath.goudar@linaro.org>
+Date: Sat, 21 Sep 2013 16:44:42 +0530
+Subject: [PATCH V2] USB: EHCI: make ehci-w90X900 a separate driver
+In-Reply-To: <1372347109-5563-1-git-send-email-manjunath.goudar@linaro.org>
+References: <1372347109-5563-1-git-send-email-manjunath.goudar@linaro.org>
+Message-ID: <1379762082-389-1-git-send-email-manjunath.goudar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Separate the  OHCI pxa27x/pxa3xx host controller driver from
-ohci-hcd host code so that it can be built as a separate driver
-module. This work is part of enabling multi-platform kernels on
-ARM.
+Separate the W90X900(W90P910) on-chip host controller driver from
+ehci-hcd host code so that it can be built as a separate driver module.
+This work is part of enabling multi-platform kernels on ARM;
+however, note that other changes are still needed before W90X900(W90P910)
+can be booted with a multi-platform kernel
+
+and an ehci driver that only works on one of them.
+
+With the infrastructure added by Alan Stern in patch 3e0232039
+"USB: EHCI: prepare to make ehci-hcd a library module", we can
+avoid this problem by turning a bus glue into a separate
+module, as we do here for the w90X900 bus glue.
+
+This patch is rebased on greghk/usb-next 3.12 rc1.
 
 Signed-off-by: Manjunath Goudar <manjunath.goudar@linaro.org>
 Signed-off-by: Deepak Saxena <dsaxena@linaro.org>
+Acked-by: Arnd Bergmann <arnd@arndb.de>
+Acked-by: Wan ZongShun <mcuos.com@gmail.com>
 Acked-by: Alan Stern <stern@rowland.harvard.edu>
-Cc: Arnd Bergmann <arnd@arndb.de>
 Cc: Greg KH <greg@kroah.com>
 Cc: linux-usb at vger.kernel.org
-
-V2->V3:
- -Rewrite the macro definition of to_pxa27x_ohci.
- -clk_put() function has been called before usb_put_hcd().
+Cc: linux-kernel at vger.kernel.org
 
 V1->V2:
- -Changed ohci_hcd and pxa27x_ohci struct variable names.
-    1 ohci_hcd struct variable name is ohci.
-    2 pxa27x_ohci struct variable name is pxa_ohci.
+-Arranged  #include's in alphabetical order.
+-Replaced "w90p910" by "w90x900" because it is supports
+ all series of w90x900.
 ---
- drivers/usb/host/Kconfig       |    8 ++
- drivers/usb/host/Makefile      |    1 +
- drivers/usb/host/ohci-hcd.c    |    5 -
- drivers/usb/host/ohci-pxa27x.c |  240 +++++++++++++++++-----------------------
- 4 files changed, 113 insertions(+), 141 deletions(-)
+ drivers/usb/host/Kconfig        |    2 +-
+ drivers/usb/host/Makefile       |    1 +
+ drivers/usb/host/ehci-hcd.c     |    5 ---
+ drivers/usb/host/ehci-w90x900.c |   89 ++++++++++++++++-----------------------
+ 4 files changed, 39 insertions(+), 58 deletions(-)
 
 diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
-index 8e31c98..8ea1afc 100644
+index 8ea1afc..4e298a4 100644
 --- a/drivers/usb/host/Kconfig
 +++ b/drivers/usb/host/Kconfig
-@@ -406,6 +406,14 @@ config USB_OHCI_HCD_EP93XX
- 	  Enables support for the on-chip OHCI controller on
- 	  EP93XX chips.
+@@ -224,7 +224,7 @@ config USB_EHCI_MV
+ 	  on-chip EHCI USB controller" for those.
  
-+config USB_OHCI_HCD_PXA27X
-+	tristate "Support for PXA27X/PXA3XX on-chip OHCI USB controller"
-+	depends on USB_OHCI_HCD && (PXA27x || PXA3xx)
-+	default y
-+	---help---
-+	  Enables support for the on-chip OHCI controller on
-+	  PXA27x/PXA3xx chips.
-+
- config USB_OHCI_HCD_AT91
-         tristate "Support for Atmel on-chip OHCI USB controller"
-         depends on USB_OHCI_HCD && ARCH_AT91
+ config USB_W90X900_EHCI
+-	bool "W90X900(W90P910) EHCI support"
++	tristate "W90X900(W90P910) EHCI support"
+ 	depends on ARCH_W90X900
+ 	---help---
+ 		Enables support for the W90X900 USB controller
 diff --git a/drivers/usb/host/Makefile b/drivers/usb/host/Makefile
-index 02f9cd2..8fcb8da 100644
+index 8fcb8da..0b9fdee 100644
 --- a/drivers/usb/host/Makefile
 +++ b/drivers/usb/host/Makefile
-@@ -54,6 +54,7 @@ obj-$(CONFIG_USB_OHCI_HCD_AT91)	+= ohci-at91.o
- obj-$(CONFIG_USB_OHCI_HCD_S3C2410)	+= ohci-s3c2410.o
- obj-$(CONFIG_USB_OHCI_HCD_LPC32XX)	+= ohci-nxp.o
- obj-$(CONFIG_USB_OHCI_HCD_EP93XX)	+= ohci-ep93xx.o
-+obj-$(CONFIG_USB_OHCI_HCD_PXA27X)	+= ohci-pxa27x.o
+@@ -38,6 +38,7 @@ obj-$(CONFIG_USB_EHCI_S5P)	+= ehci-s5p.o
+ obj-$(CONFIG_USB_EHCI_HCD_AT91) += ehci-atmel.o
+ obj-$(CONFIG_USB_EHCI_MSM)	+= ehci-msm.o
+ obj-$(CONFIG_USB_EHCI_TEGRA)	+= ehci-tegra.o
++obj-$(CONFIG_USB_W90X900_EHCI)	+= ehci-w90x900.o
  
- obj-$(CONFIG_USB_UHCI_HCD)	+= uhci-hcd.o
- obj-$(CONFIG_USB_FHCI_HCD)	+= fhci.o
-diff --git a/drivers/usb/host/ohci-hcd.c b/drivers/usb/host/ohci-hcd.c
-index 2ee3171..c6fff6e 100644
---- a/drivers/usb/host/ohci-hcd.c
-+++ b/drivers/usb/host/ohci-hcd.c
-@@ -1177,11 +1177,6 @@ MODULE_LICENSE ("GPL");
- #define SA1111_DRIVER		ohci_hcd_sa1111_driver
+ obj-$(CONFIG_USB_OXU210HP_HCD)	+= oxu210hp-hcd.o
+ obj-$(CONFIG_USB_ISP116X_HCD)	+= isp116x-hcd.o
+diff --git a/drivers/usb/host/ehci-hcd.c b/drivers/usb/host/ehci-hcd.c
+index 5d6022f..3e3ca83 100644
+--- a/drivers/usb/host/ehci-hcd.c
++++ b/drivers/usb/host/ehci-hcd.c
+@@ -1238,11 +1238,6 @@ MODULE_LICENSE ("GPL");
+ #define XILINX_OF_PLATFORM_DRIVER	ehci_hcd_xilinx_of_driver
  #endif
  
--#if defined(CONFIG_PXA27x) || defined(CONFIG_PXA3xx)
--#include "ohci-pxa27x.c"
--#define PLATFORM_DRIVER		ohci_hcd_pxa27x_driver
+-#ifdef CONFIG_USB_W90X900_EHCI
+-#include "ehci-w90x900.c"
+-#define	PLATFORM_DRIVER		ehci_hcd_w90x900_driver
 -#endif
 -
- #ifdef CONFIG_ARCH_DAVINCI_DA8XX
- #include "ohci-da8xx.c"
- #define DAVINCI_PLATFORM_DRIVER	ohci_hcd_da8xx_driver
-diff --git a/drivers/usb/host/ohci-pxa27x.c b/drivers/usb/host/ohci-pxa27x.c
-index 93371a2..c1b1fa3 100644
---- a/drivers/usb/host/ohci-pxa27x.c
-+++ b/drivers/usb/host/ohci-pxa27x.c
-@@ -19,15 +19,26 @@
-  * This file is licenced under the GPL.
+ #ifdef CONFIG_USB_OCTEON_EHCI
+ #include "ehci-octeon.c"
+ #define PLATFORM_DRIVER		ehci_octeon_driver
+diff --git a/drivers/usb/host/ehci-w90x900.c b/drivers/usb/host/ehci-w90x900.c
+index 1c370df..cdad843 100644
+--- a/drivers/usb/host/ehci-w90x900.c
++++ b/drivers/usb/host/ehci-w90x900.c
+@@ -11,13 +11,28 @@
+  *
   */
  
--#include <linux/device.h>
--#include <linux/signal.h>
--#include <linux/platform_device.h>
- #include <linux/clk.h>
-+#include <linux/device.h>
++#include <linux/dma-mapping.h>
 +#include <linux/io.h>
 +#include <linux/kernel.h>
 +#include <linux/module.h>
- #include <linux/of_platform.h>
- #include <linux/of_gpio.h>
--#include <mach/hardware.h>
- #include <linux/platform_data/usb-ohci-pxa27x.h>
- #include <linux/platform_data/usb-pxa3xx-ulpi.h>
-+#include <linux/platform_device.h>
-+#include <linux/signal.h>
++#include <linux/of.h>
+ #include <linux/platform_device.h>
 +#include <linux/usb.h>
 +#include <linux/usb/hcd.h>
-+#include <linux/usb/otg.h>
 +
-+#include <mach/hardware.h>
++#include "ehci.h"
+ 
+ /* enable phy0 and phy1 for w90p910 */
+ #define	ENPHY		(0x01<<8)
+ #define PHY0_CTR	(0xA4)
+ #define PHY1_CTR	(0xA8)
+ 
++#define DRIVER_DESC "EHCI w90x900 driver"
 +
-+#include "ohci.h"
++static const char hcd_name[] = "ehci-w90x900 ";
 +
-+#define DRIVER_DESC "OHCI PXA27x/PXA3x driver"
- 
- /*
-  * UHC: USB Host Controller (OHCI-like) register definitions
-@@ -101,16 +112,16 @@
- 
- #define PXA_UHC_MAX_PORTNUM    3
- 
--struct pxa27x_ohci {
--	/* must be 1st member here for hcd_to_ohci() to work */
--	struct ohci_hcd ohci;
-+static const char hcd_name[] = "ohci-pxa27x";
- 
--	struct device	*dev;
-+static struct hc_driver __read_mostly ohci_pxa27x_hc_driver;
++static struct hc_driver __read_mostly ehci_w90x900_hc_driver;
 +
-+struct pxa27x_ohci {
- 	struct clk	*clk;
- 	void __iomem	*mmio_base;
- };
- 
--#define to_pxa27x_ohci(hcd)	(struct pxa27x_ohci *)hcd_to_ohci(hcd)
-+#define to_pxa27x_ohci(hcd)	(struct pxa27x_ohci *)(hcd_to_ohci(hcd)->priv)
- 
- /*
-   PMM_NPS_MODE -- PMM Non-power switching mode
-@@ -122,10 +133,10 @@ struct pxa27x_ohci {
-   PMM_PERPORT_MODE -- PMM per port switching mode
-       Ports are powered individually.
-  */
--static int pxa27x_ohci_select_pmm(struct pxa27x_ohci *ohci, int mode)
-+static int pxa27x_ohci_select_pmm(struct pxa27x_ohci *pxa_ohci, int mode)
+ static int usb_w90x900_probe(const struct hc_driver *driver,
+ 		      struct platform_device *pdev)
  {
--	uint32_t uhcrhda = __raw_readl(ohci->mmio_base + UHCRHDA);
--	uint32_t uhcrhdb = __raw_readl(ohci->mmio_base + UHCRHDB);
-+	uint32_t uhcrhda = __raw_readl(pxa_ohci->mmio_base + UHCRHDA);
-+	uint32_t uhcrhdb = __raw_readl(pxa_ohci->mmio_base + UHCRHDB);
- 
- 	switch (mode) {
- 	case PMM_NPS_MODE:
-@@ -149,20 +160,18 @@ static int pxa27x_ohci_select_pmm(struct pxa27x_ohci *ohci, int mode)
- 		uhcrhda |= RH_A_NPS;
- 	}
- 
--	__raw_writel(uhcrhda, ohci->mmio_base + UHCRHDA);
--	__raw_writel(uhcrhdb, ohci->mmio_base + UHCRHDB);
-+	__raw_writel(uhcrhda, pxa_ohci->mmio_base + UHCRHDA);
-+	__raw_writel(uhcrhdb, pxa_ohci->mmio_base + UHCRHDB);
- 	return 0;
+@@ -90,8 +105,8 @@ err1:
+ 	return retval;
  }
  
--extern int usb_disabled(void);
--
- /*-------------------------------------------------------------------------*/
- 
--static inline void pxa27x_setup_hc(struct pxa27x_ohci *ohci,
-+static inline void pxa27x_setup_hc(struct pxa27x_ohci *pxa_ohci,
- 				   struct pxaohci_platform_data *inf)
+-static
+-void usb_w90x900_remove(struct usb_hcd *hcd, struct platform_device *pdev)
++static void usb_w90x900_remove(struct usb_hcd *hcd,
++			struct platform_device *pdev)
  {
--	uint32_t uhchr = __raw_readl(ohci->mmio_base + UHCHR);
--	uint32_t uhcrhda = __raw_readl(ohci->mmio_base + UHCRHDA);
-+	uint32_t uhchr = __raw_readl(pxa_ohci->mmio_base + UHCHR);
-+	uint32_t uhcrhda = __raw_readl(pxa_ohci->mmio_base + UHCRHDA);
- 
- 	if (inf->flags & ENABLE_PORT1)
- 		uhchr &= ~UHCHR_SSEP1;
-@@ -194,17 +203,17 @@ static inline void pxa27x_setup_hc(struct pxa27x_ohci *ohci,
- 		uhcrhda |= UHCRHDA_POTPGT(inf->power_on_delay / 2);
- 	}
- 
--	__raw_writel(uhchr, ohci->mmio_base + UHCHR);
--	__raw_writel(uhcrhda, ohci->mmio_base + UHCRHDA);
-+	__raw_writel(uhchr, pxa_ohci->mmio_base + UHCHR);
-+	__raw_writel(uhcrhda, pxa_ohci->mmio_base + UHCRHDA);
- }
- 
--static inline void pxa27x_reset_hc(struct pxa27x_ohci *ohci)
-+static inline void pxa27x_reset_hc(struct pxa27x_ohci *pxa_ohci)
- {
--	uint32_t uhchr = __raw_readl(ohci->mmio_base + UHCHR);
-+	uint32_t uhchr = __raw_readl(pxa_ohci->mmio_base + UHCHR);
- 
--	__raw_writel(uhchr | UHCHR_FHR, ohci->mmio_base + UHCHR);
-+	__raw_writel(uhchr | UHCHR_FHR, pxa_ohci->mmio_base + UHCHR);
- 	udelay(11);
--	__raw_writel(uhchr & ~UHCHR_FHR, ohci->mmio_base + UHCHR);
-+	__raw_writel(uhchr & ~UHCHR_FHR, pxa_ohci->mmio_base + UHCHR);
- }
- 
- #ifdef CONFIG_PXA27x
-@@ -213,25 +222,26 @@ extern void pxa27x_clear_otgph(void);
- #define pxa27x_clear_otgph()	do {} while (0)
- #endif
- 
--static int pxa27x_start_hc(struct pxa27x_ohci *ohci, struct device *dev)
-+static int pxa27x_start_hc(struct pxa27x_ohci *pxa_ohci, struct device *dev)
- {
- 	int retval = 0;
- 	struct pxaohci_platform_data *inf;
- 	uint32_t uhchr;
-+	struct usb_hcd *hcd = dev_get_drvdata(dev);
- 
- 	inf = dev_get_platdata(dev);
- 
--	clk_prepare_enable(ohci->clk);
-+	clk_prepare_enable(pxa_ohci->clk);
- 
--	pxa27x_reset_hc(ohci);
-+	pxa27x_reset_hc(pxa_ohci);
- 
--	uhchr = __raw_readl(ohci->mmio_base + UHCHR) | UHCHR_FSBIR;
--	__raw_writel(uhchr, ohci->mmio_base + UHCHR);
-+	uhchr = __raw_readl(pxa_ohci->mmio_base + UHCHR) | UHCHR_FSBIR;
-+	__raw_writel(uhchr, pxa_ohci->mmio_base + UHCHR);
- 
--	while (__raw_readl(ohci->mmio_base + UHCHR) & UHCHR_FSBIR)
-+	while (__raw_readl(pxa_ohci->mmio_base + UHCHR) & UHCHR_FSBIR)
- 		cpu_relax();
- 
--	pxa27x_setup_hc(ohci, inf);
-+	pxa27x_setup_hc(pxa_ohci, inf);
- 
- 	if (inf->init)
- 		retval = inf->init(dev);
-@@ -240,38 +250,39 @@ static int pxa27x_start_hc(struct pxa27x_ohci *ohci, struct device *dev)
- 		return retval;
- 
- 	if (cpu_is_pxa3xx())
--		pxa3xx_u2d_start_hc(&ohci_to_hcd(&ohci->ohci)->self);
-+		pxa3xx_u2d_start_hc(&hcd->self);
- 
--	uhchr = __raw_readl(ohci->mmio_base + UHCHR) & ~UHCHR_SSE;
--	__raw_writel(uhchr, ohci->mmio_base + UHCHR);
--	__raw_writel(UHCHIE_UPRIE | UHCHIE_RWIE, ohci->mmio_base + UHCHIE);
-+	uhchr = __raw_readl(pxa_ohci->mmio_base + UHCHR) & ~UHCHR_SSE;
-+	__raw_writel(uhchr, pxa_ohci->mmio_base + UHCHR);
-+	__raw_writel(UHCHIE_UPRIE | UHCHIE_RWIE, pxa_ohci->mmio_base + UHCHIE);
- 
- 	/* Clear any OTG Pin Hold */
- 	pxa27x_clear_otgph();
- 	return 0;
- }
- 
--static void pxa27x_stop_hc(struct pxa27x_ohci *ohci, struct device *dev)
-+static void pxa27x_stop_hc(struct pxa27x_ohci *pxa_ohci, struct device *dev)
- {
- 	struct pxaohci_platform_data *inf;
-+	struct usb_hcd *hcd = dev_get_drvdata(dev);
- 	uint32_t uhccoms;
- 
- 	inf = dev_get_platdata(dev);
- 
- 	if (cpu_is_pxa3xx())
--		pxa3xx_u2d_stop_hc(&ohci_to_hcd(&ohci->ohci)->self);
-+		pxa3xx_u2d_stop_hc(&hcd->self);
- 
- 	if (inf->exit)
- 		inf->exit(dev);
- 
--	pxa27x_reset_hc(ohci);
-+	pxa27x_reset_hc(pxa_ohci);
- 
- 	/* Host Controller Reset */
--	uhccoms = __raw_readl(ohci->mmio_base + UHCCOMS) | 0x01;
--	__raw_writel(uhccoms, ohci->mmio_base + UHCCOMS);
-+	uhccoms = __raw_readl(pxa_ohci->mmio_base + UHCCOMS) | 0x01;
-+	__raw_writel(uhccoms, pxa_ohci->mmio_base + UHCCOMS);
- 	udelay(10);
- 
--	clk_disable_unprepare(ohci->clk);
-+	clk_disable_unprepare(pxa_ohci->clk);
- }
- 
- #ifdef CONFIG_OF
-@@ -356,7 +367,8 @@ int usb_hcd_pxa27x_probe (const struct hc_driver *driver, struct platform_device
- 	int retval, irq;
- 	struct usb_hcd *hcd;
- 	struct pxaohci_platform_data *inf;
--	struct pxa27x_ohci *ohci;
-+	struct pxa27x_ohci *pxa_ohci;
-+	struct ohci_hcd *ohci;
- 	struct resource *r;
- 	struct clk *usb_clk;
- 
-@@ -409,29 +421,31 @@ int usb_hcd_pxa27x_probe (const struct hc_driver *driver, struct platform_device
- 	}
- 
- 	/* initialize "struct pxa27x_ohci" */
--	ohci = (struct pxa27x_ohci *)hcd_to_ohci(hcd);
--	ohci->dev = &pdev->dev;
--	ohci->clk = usb_clk;
--	ohci->mmio_base = (void __iomem *)hcd->regs;
-+	pxa_ohci = to_pxa27x_ohci(hcd);
-+	pxa_ohci->clk = usb_clk;
-+	pxa_ohci->mmio_base = (void __iomem *)hcd->regs;
- 
--	if ((retval = pxa27x_start_hc(ohci, &pdev->dev)) < 0) {
-+	retval = pxa27x_start_hc(pxa_ohci, &pdev->dev);
-+	if (retval < 0) {
- 		pr_debug("pxa27x_start_hc failed");
- 		goto err3;
- 	}
- 
- 	/* Select Power Management Mode */
--	pxa27x_ohci_select_pmm(ohci, inf->port_mode);
-+	pxa27x_ohci_select_pmm(pxa_ohci, inf->port_mode);
- 
- 	if (inf->power_budget)
- 		hcd->power_budget = inf->power_budget;
- 
--	ohci_hcd_init(hcd_to_ohci(hcd));
-+	/* The value of NDP in roothub_a is incorrect on this hardware */
-+	ohci = hcd_to_ohci(hcd);
-+	ohci->num_ports = 3;
- 
- 	retval = usb_add_hcd(hcd, irq, 0);
- 	if (retval == 0)
- 		return retval;
- 
--	pxa27x_stop_hc(ohci, &pdev->dev);
-+	pxa27x_stop_hc(pxa_ohci, &pdev->dev);
-  err3:
- 	iounmap(hcd->regs);
-  err2:
-@@ -459,88 +473,18 @@ int usb_hcd_pxa27x_probe (const struct hc_driver *driver, struct platform_device
-  */
- void usb_hcd_pxa27x_remove (struct usb_hcd *hcd, struct platform_device *pdev)
- {
--	struct pxa27x_ohci *ohci = to_pxa27x_ohci(hcd);
-+	struct pxa27x_ohci *pxa_ohci = to_pxa27x_ohci(hcd);
- 
  	usb_remove_hcd(hcd);
--	pxa27x_stop_hc(ohci, &pdev->dev);
-+	pxa27x_stop_hc(pxa_ohci, &pdev->dev);
  	iounmap(hcd->regs);
- 	release_mem_region(hcd->rsrc_start, hcd->rsrc_len);
-+	clk_put(pxa_ohci->clk);
+@@ -99,54 +114,6 @@ void usb_w90x900_remove(struct usb_hcd *hcd, struct platform_device *pdev)
  	usb_put_hcd(hcd);
--	clk_put(ohci->clk);
--}
--
--/*-------------------------------------------------------------------------*/
--
--static int
--ohci_pxa27x_start (struct usb_hcd *hcd)
--{
--	struct ohci_hcd	*ohci = hcd_to_ohci (hcd);
--	int		ret;
--
--	ohci_dbg (ohci, "ohci_pxa27x_start, ohci:%p", ohci);
--
--	/* The value of NDP in roothub_a is incorrect on this hardware */
--	ohci->num_ports = 3;
--
--	if ((ret = ohci_init(ohci)) < 0)
--		return ret;
--
--	if ((ret = ohci_run (ohci)) < 0) {
--		dev_err(hcd->self.controller, "can't start %s",
--			hcd->self.bus_name);
--		ohci_stop (hcd);
--		return ret;
--	}
--
--	return 0;
  }
  
- /*-------------------------------------------------------------------------*/
- 
--static const struct hc_driver ohci_pxa27x_hc_driver = {
--	.description =		hcd_name,
--	.product_desc =		"PXA27x OHCI",
--	.hcd_priv_size =	sizeof(struct pxa27x_ohci),
+-static const struct hc_driver ehci_w90x900_hc_driver = {
+-	.description = hcd_name,
+-	.product_desc = "Nuvoton w90x900 EHCI Host Controller",
+-	.hcd_priv_size = sizeof(struct ehci_hcd),
 -
 -	/*
 -	 * generic hardware linkage
 -	 */
--	.irq =			ohci_irq,
--	.flags =		HCD_USB11 | HCD_MEMORY,
+-	.irq = ehci_irq,
+-	.flags = HCD_USB2|HCD_MEMORY|HCD_BH,
 -
 -	/*
 -	 * basic lifecycle operations
 -	 */
--	.start =		ohci_pxa27x_start,
--	.stop =			ohci_stop,
--	.shutdown =		ohci_shutdown,
+-	.reset = ehci_setup,
+-	.start = ehci_run,
+-
+-	.stop = ehci_stop,
+-	.shutdown = ehci_shutdown,
 -
 -	/*
 -	 * managing i/o requests and associated device resources
 -	 */
--	.urb_enqueue =		ohci_urb_enqueue,
--	.urb_dequeue =		ohci_urb_dequeue,
--	.endpoint_disable =	ohci_endpoint_disable,
+-	.urb_enqueue = ehci_urb_enqueue,
+-	.urb_dequeue = ehci_urb_dequeue,
+-	.endpoint_disable = ehci_endpoint_disable,
+-	.endpoint_reset = ehci_endpoint_reset,
 -
 -	/*
 -	 * scheduling support
 -	 */
--	.get_frame_number =	ohci_get_frame,
+-	.get_frame_number = ehci_get_frame,
 -
 -	/*
 -	 * root hub support
 -	 */
--	.hub_status_data =	ohci_hub_status_data,
--	.hub_control =		ohci_hub_control,
--#ifdef  CONFIG_PM
--	.bus_suspend =		ohci_bus_suspend,
--	.bus_resume =		ohci_bus_resume,
+-	.hub_status_data = ehci_hub_status_data,
+-	.hub_control = ehci_hub_control,
+-#ifdef	CONFIG_PM
+-	.bus_suspend = ehci_bus_suspend,
+-	.bus_resume = ehci_bus_resume,
 -#endif
--	.start_port_reset =	ohci_start_port_reset,
+-	.relinquish_port	= ehci_relinquish_port,
+-	.port_handed_over	= ehci_port_handed_over,
+-
+-	.clear_tt_buffer_complete = ehci_clear_tt_buffer_complete,
 -};
 -
--/*-------------------------------------------------------------------------*/
--
- static int ohci_hcd_pxa27x_drv_probe(struct platform_device *pdev)
+ static int ehci_w90x900_probe(struct platform_device *pdev)
  {
- 	pr_debug ("In ohci_hcd_pxa27x_drv_probe");
-@@ -563,32 +507,35 @@ static int ohci_hcd_pxa27x_drv_remove(struct platform_device *pdev)
- static int ohci_hcd_pxa27x_drv_suspend(struct device *dev)
- {
- 	struct usb_hcd *hcd = dev_get_drvdata(dev);
--	struct pxa27x_ohci *ohci = to_pxa27x_ohci(hcd);
-+	struct pxa27x_ohci *pxa_ohci = to_pxa27x_ohci(hcd);
-+	struct ohci_hcd *ohci = hcd_to_ohci(hcd);
- 
--	if (time_before(jiffies, ohci->ohci.next_statechange))
-+	if (time_before(jiffies, ohci->next_statechange))
- 		msleep(5);
--	ohci->ohci.next_statechange = jiffies;
-+	ohci->next_statechange = jiffies;
- 
--	pxa27x_stop_hc(ohci, dev);
-+	pxa27x_stop_hc(pxa_ohci, dev);
- 	return 0;
- }
- 
- static int ohci_hcd_pxa27x_drv_resume(struct device *dev)
- {
- 	struct usb_hcd *hcd = dev_get_drvdata(dev);
--	struct pxa27x_ohci *ohci = to_pxa27x_ohci(hcd);
-+	struct pxa27x_ohci *pxa_ohci = to_pxa27x_ohci(hcd);
- 	struct pxaohci_platform_data *inf = dev_get_platdata(dev);
-+	struct ohci_hcd *ohci = hcd_to_ohci(hcd);
- 	int status;
- 
--	if (time_before(jiffies, ohci->ohci.next_statechange))
-+	if (time_before(jiffies, ohci->next_statechange))
- 		msleep(5);
--	ohci->ohci.next_statechange = jiffies;
-+	ohci->next_statechange = jiffies;
- 
--	if ((status = pxa27x_start_hc(ohci, dev)) < 0)
-+	status = pxa27x_start_hc(pxa_ohci, dev);
-+	if (status < 0)
- 		return status;
- 
- 	/* Select Power Management Mode */
--	pxa27x_ohci_select_pmm(ohci, inf->port_mode);
-+	pxa27x_ohci_select_pmm(pxa_ohci, inf->port_mode);
- 
- 	ohci_resume(hcd, false);
- 	return 0;
-@@ -600,9 +547,6 @@ static const struct dev_pm_ops ohci_hcd_pxa27x_pm_ops = {
- };
- #endif
- 
--/* work with hotplug and coldplug */
--MODULE_ALIAS("platform:pxa27x-ohci");
--
- static struct platform_driver ohci_hcd_pxa27x_driver = {
- 	.probe		= ohci_hcd_pxa27x_drv_probe,
- 	.remove		= ohci_hcd_pxa27x_drv_remove,
-@@ -617,3 +561,27 @@ static struct platform_driver ohci_hcd_pxa27x_driver = {
+ 	if (usb_disabled())
+@@ -173,7 +140,25 @@ static struct platform_driver ehci_hcd_w90x900_driver = {
  	},
  };
  
-+static const struct ohci_driver_overrides pxa27x_overrides __initconst = {
-+	.extra_priv_size =      sizeof(struct pxa27x_ohci),
-+};
-+
-+static int __init ohci_pxa27x_init(void)
++static int __init ehci_w90X900_init(void)
 +{
 +	if (usb_disabled())
 +		return -ENODEV;
 +
 +	pr_info("%s: " DRIVER_DESC "\n", hcd_name);
-+	ohci_init_driver(&ohci_pxa27x_hc_driver, &pxa27x_overrides);
-+	return platform_driver_register(&ohci_hcd_pxa27x_driver);
-+}
-+module_init(ohci_pxa27x_init);
 +
-+static void __exit ohci_pxa27x_cleanup(void)
-+{
-+	platform_driver_unregister(&ohci_hcd_pxa27x_driver);
++	ehci_init_driver(&ehci_w90x900_hc_driver, NULL);
++	return platform_driver_register(&ehci_hcd_w90x900_driver);
 +}
-+module_exit(ohci_pxa27x_cleanup);
++module_init(ehci_w90X900_init);
++
++static void __exit ehci_w90X900_cleanup(void)
++{
++	platform_driver_unregister(&ehci_hcd_w90x900_driver);
++}
++module_exit(ehci_w90X900_cleanup);
 +
 +MODULE_DESCRIPTION(DRIVER_DESC);
-+MODULE_LICENSE("GPL");
-+MODULE_ALIAS("platform:pxa27x-ohci");
+ MODULE_AUTHOR("Wan ZongShun <mcuos.com@gmail.com>");
+-MODULE_DESCRIPTION("w90p910 usb ehci driver!");
+-MODULE_LICENSE("GPL");
+ MODULE_ALIAS("platform:w90p910-ehci");
++MODULE_LICENSE("GPL v2");
 -- 
 1.7.9.5
