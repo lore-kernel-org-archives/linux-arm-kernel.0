@@ -1,36 +1,50 @@
-From: gang.chen@asianux.com (Chen Gang)
-Date: Sat, 21 Sep 2013 19:06:47 +0800
-Subject: [PATCH] ARM: include: asm: atomic.h: use type cast 's64' for the
- return value of atomic64_add_return().
-Message-ID: <523D7DC7.8030603@asianux.com>
+From: manjunath.goudar@linaro.org (Manjunath Goudar)
+Date: Sat, 21 Sep 2013 16:38:37 +0530
+Subject: [PATCH V5 0/9]  USB: OHCI: more bus glues as separate modules
+In-Reply-To: <1370585013-12809-1-git-send-email-manjunath.goudar@linaro.org>
+References: <1370585013-12809-1-git-send-email-manjunath.goudar@linaro.org>
+Message-ID: <1379761727-10656-1-git-send-email-manjunath.goudar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The return value of atomic64_add_return() is u64 which never less than
-zero, so need type cast 's64' for comparing in atomic64_add_negative().
-
-The related error: (allmodconfig for S5PV210, with "EXTRA_CFLAGS=-W"):
-
-  kernel/events/core.c:5404:2: warning: comparison of unsigned expression < 0 is always false [-Wtype-limits]
-
-
-Signed-off-by: Chen Gang <gang.chen@asianux.com>
----
- arch/arm/include/asm/atomic.h |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/include/asm/atomic.h b/arch/arm/include/asm/atomic.h
-index da1c77d..8cf005d 100644
---- a/arch/arm/include/asm/atomic.h
-+++ b/arch/arm/include/asm/atomic.h
-@@ -475,7 +475,7 @@ static inline int atomic64_add_unless(atomic64_t *v, u64 a, u64 u)
- 	return ret;
- }
+These patches are for separating the SOC On-Chip ohci host controller
+from ohci-hcd host code and making per SOC driver module similar to EHCI 
+module available in the kernel. This work is part of enabling multi-platform 
+kernel on ARM.
  
--#define atomic64_add_negative(a, v)	(atomic64_add_return((a), (v)) < 0)
-+#define atomic64_add_negative(a, v)	((s64)atomic64_add_return((a), (v)) < 0)
- #define atomic64_inc(v)			atomic64_add(1LL, (v))
- #define atomic64_inc_return(v)		atomic64_add_return(1LL, (v))
- #define atomic64_inc_and_test(v)	(atomic64_inc_return(v) == 0)
+Before I was sending three different ohci patch set as below.
+ 1. Six series patch set is having exynos, omap, omap3, spear, at91 and s3c2410.
+ 2. ohci-nxp a separate driver patch.
+ 3. Two series patch set is having ep93xx and pxa27x.
+In this patch set all three previous ohci series have been combined into single 
+series as all these patches are related to OHCI.
+
+This patch series is rebased on greghk/usb-next 3.12 rc1. 
+
+Manjunath Goudar (9):
+  USB: OHCI: make ohci-exynos a separate driver
+  USB: OHCI: make ohci-omap a separate driver
+  USB: OHCI: make ohci-omap3 a separate driver
+  USB: OHCI: make ohci-spear a separate driver
+  USB: OHCI: make ohci-at91 a separate driver
+  USB: OHCI: make ohci-s3c2410 a separate driver
+  USB: OHCI: make ohci-nxp a separate driver
+  USB: OHCI: make ohci-ep93xx a separate driver
+  USB: OHCI: make ohci-pxa27x a separate driver
+
+ drivers/usb/host/Kconfig        |   56 ++++++++-
+ drivers/usb/host/Makefile       |    9 ++
+ drivers/usb/host/ohci-at91.c    |  156 ++++++++++++-------------
+ drivers/usb/host/ohci-ep93xx.c  |   72 +++++-------
+ drivers/usb/host/ohci-exynos.c  |  167 +++++++++++----------------
+ drivers/usb/host/ohci-hcd.c     |  149 ------------------------
+ drivers/usb/host/ohci-nxp.c     |  123 ++++++++------------
+ drivers/usb/host/ohci-omap.c    |  156 +++++++++----------------
+ drivers/usb/host/ohci-omap3.c   |  118 +++++++------------
+ drivers/usb/host/ohci-pxa27x.c  |  240 +++++++++++++++++----------------------
+ drivers/usb/host/ohci-s3c2410.c |  128 ++++++++++-----------
+ drivers/usb/host/ohci-spear.c   |  140 +++++++++--------------
+ 12 files changed, 587 insertions(+), 927 deletions(-)
+
 -- 
-1.7.7.6
+1.7.9.5
