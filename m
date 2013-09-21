@@ -1,39 +1,54 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Sat, 21 Sep 2013 12:00:36 +0200
-Subject: [PATCH v2 2/2] ASoC: kirkwood: fix loss of external clock at probe
- time
-Message-ID: <20130921120036.5730dbfd@armhf>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 21 Sep 2013 11:12:21 +0100
+Subject: [PATCH v2 1/2] ASoC: kirkwood: clk: probe defer when clock not
+ yet ready
+In-Reply-To: <20130921120006.47b00fe7@armhf>
+References: <20130921120006.47b00fe7@armhf>
+Message-ID: <20130921101221.GH12758@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-At probe time, when the clock driver is not yet initialized, the
-external clock of the kirkwood sound device will not be usable.
+On Sat, Sep 21, 2013 at 12:00:06PM +0200, Jean-Francois Moine wrote:
+> diff --git a/drivers/clk/clkdev.c b/drivers/clk/clkdev.c
+> index 442a313..f8b28d9 100644
+> --- a/drivers/clk/clkdev.c
+> +++ b/drivers/clk/clkdev.c
+> @@ -157,8 +157,13 @@ struct clk *clk_get(struct device *dev, const char *con_id)
+>  
+>  	if (dev) {
+>  		clk = of_clk_get_by_name(dev->of_node, con_id);
+> -		if (!IS_ERR(clk) && __clk_get(clk))
+> -			return clk;
+> +		if (!IS_ERR(clk)) {
+> +			if (__clk_get(clk))
+> +				return clk;
+> +		} else {
+> +			if (PTR_ERR(clk) == -EPROBE_DEFER)
+> +				return clk;
+> +		}
 
-This patch fixes this problem defering the device probe.
+Thanks for patching this file and bringing this code to my attention.
+The original is fscked.  Calling __clk_get() outside of any lock is
+a serious bug and leads to races.
 
-Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
----
- sound/soc/kirkwood/kirkwood-i2s.c | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+Also, a failing __clk_get() probably should not drop through to
+clk_get_sys(), but should instead do this:
 
-diff --git a/sound/soc/kirkwood/kirkwood-i2s.c b/sound/soc/kirkwood/kirkwood-i2s.c
-index 0f3d73d..14f32d9 100644
---- a/sound/soc/kirkwood/kirkwood-i2s.c
-+++ b/sound/soc/kirkwood/kirkwood-i2s.c
-@@ -496,7 +496,10 @@ static int kirkwood_i2s_dev_probe(struct platform_device *pdev)
- 		return err;
- 
- 	priv->extclk = devm_clk_get(&pdev->dev, "extclk");
--	if (!IS_ERR(priv->extclk)) {
-+	if (IS_ERR(priv->extclk)) {
-+		if (PTR_ERR(priv->extclk) == -EPROBE_DEFER)
-+			return -EPROBE_DEFER;
-+	} else {
- 		if (priv->extclk == priv->clk) {
- 			devm_clk_put(&pdev->dev, priv->extclk);
- 			priv->extclk = ERR_PTR(-EINVAL);
+		if (!IS_ERR(clk)) {
+			if (!__clk_get(clk))
+				clk = ERR_PTR(-ENOENT);
+			return clk;
+		}
 
+since a _found_ clock but one which can't be used (due to the module
+going away) is not a reason to drop through to clk_get_sys().
 
--- 
-Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
-Jef		|		http://moinejf.free.fr/
+Which means your change should look like this:
+
+		if (!IS_ERR(clk)) {
+			if (!__clk_get(clk))
+				clk = ERR_PTR(-ENOENT);
+			return clk;
+		}
+		if (PTR_ERR(clk) == -EPROBE_DEFER)
+			return clk;
