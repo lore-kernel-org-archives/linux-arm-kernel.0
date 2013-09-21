@@ -1,26 +1,87 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Sat, 21 Sep 2013 14:36:46 +0100
-Subject: [PATCH v2 2/2] ASoC: kirkwood: fix loss of external clock at
- probe time
-In-Reply-To: <20130921120036.5730dbfd@armhf>
-References: <20130921120036.5730dbfd@armhf>
-Message-ID: <20130921133646.GV21013@sirena.org.uk>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 21 Sep 2013 14:31:42 +0100
+Subject: [PATCH 1/3] Add smp support for Allwinner A20(sunxi 7i).
+In-Reply-To: <1379768716-11672-2-git-send-email-cinifr@gmail.com>
+References: <1379768716-11672-1-git-send-email-cinifr@gmail.com>
+ <1379768716-11672-2-git-send-email-cinifr@gmail.com>
+Message-ID: <20130921133141.GL12758@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 21, 2013 at 12:00:36PM +0200, Jean-Francois Moine wrote:
-> At probe time, when the clock driver is not yet initialized, the
-> external clock of the kirkwood sound device will not be usable.
-> 
-> This patch fixes this problem defering the device probe.
+On Sat, Sep 21, 2013 at 09:05:14PM +0800, Fan Rong wrote:
+> @@ -0,0 +1,12 @@
+> +#include <linux/linkage.h>
+> +#include <linux/init.h>
+> +
+> +        .section ".text.head", "ax"
 
-Applied, thanks.  It won't do anything without a version of patch 1 but
-there's no build time dependency and it seems like we should get a fix
-into the core for the unspecified vs unregistered problem.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130921/a2041cbe/attachment.sig>
+Please use a tab instead of 8 spaces.
+
+> +	__CPUINIT
+
+__CPUINIT has been removed.
+
+> +
+> +ENTRY(sun7i_secondary_startup)
+> +	msr	cpsr_fsxc, #0xd3
+> +	mov r0, #0
+> +	ldr r1, =0xffffffff
+
+You don't  need to set r0 nor r1 here.
+
+> +	b       secondary_startup
+> +ENDPROC(sun7i_secondary_startup)
+> diff --git a/arch/arm/mach-sunxi/platform.h b/arch/arm/mach-sunxi/platform.h
+> new file mode 100644
+> index 0000000..7e127c9
+> --- /dev/null
+> +++ b/arch/arm/mach-sunxi/platform.h
+> @@ -0,0 +1,347 @@
+> +/*
+> + * arch/arm/plat-sunxi/include/plat/platform.h
+> + *
+> + * (C) Copyright 2007-2012
+> + * Allwinner Technology Co., Ltd. <www.allwinnertech.com>
+> + * Benn Huang <benn@allwinnertech.com>
+> + *
+> + * This program is free software; you can redistribute it and/or
+> + * modify it under the terms of the GNU General Public License as
+> + * published by the Free Software Foundation; either version 2 of
+> + * the License, or (at your option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	 See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program; if not, write to the Free Software
+> + * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
+> + * MA 02111-1307 USA
+
+Just the first paragraph is sufficient.  Also are you sure you want the
+"or any later version"?  The kernel is predominantly a GPLv2 only project.
+
+What are the origins of this file - do you have the ability to change this?
+
+> +	/* step3: clear power-off gating */
+> +	pwr_reg = readl(sunxi7i_cc_base + AW_CPU1_PWROFF_REG);
+> +	pwr_reg &= ~(1);
+
+I think I've said this before.  The parens around '1' are not required.
+What do you think you gain by having the additional parens?
+
+> +	writel(pwr_reg, sunxi7i_cc_base + AW_CPU1_PWROFF_REG);
+> +	mdelay(1);
+> +
+> +	/* step4: de-assert core reset */
+> +	writel(3, sunxi7i_cc_base + CPUX_RESET_CTL(cpu));
+> +
+> +	/* step5: assert DBGPWRDUP signal */
+> +	pwr_reg = readl(sunxi7i_cc_base + AW_CPUCFG_DBGCTL1);
+> +	pwr_reg |= (1<<cpu);
+
+The parens around 1<<cpu are not required.  What do you think you gain
+by having them?  Coding style also suggests placing a space before and
+after the "<<" operation as well.  Again, I've said this in my previous
+review.
