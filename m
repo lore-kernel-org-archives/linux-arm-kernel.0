@@ -1,73 +1,43 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Sat, 21 Sep 2013 22:27:53 +0200
-Subject: [PATCH 15/26] ARM: kirkwood: remove custom .init_time hook
-In-Reply-To: <1379526839-14798-16-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1379526839-14798-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1379526839-14798-16-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <20130921202753.GB735@lunn.ch>
+From: peter.senna@gmail.com (Peter Senna Tschudin)
+Date: Sun, 22 Sep 2013 00:27:33 +0200
+Subject: [PATCH 01/19] arm: Change variable type to bool
+Message-ID: <1379802471-30252-1-git-send-email-peter.senna@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 18, 2013 at 07:53:48PM +0200, Sebastian Hesselbarth wrote:
-> With arch/arm calling of_clk_init(NULL) from time_init(), we can now
-> remove custom .init_time hooks.
-> 
-> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> ---
-> Cc: Olof Johansson <olof@lixom.net>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Jason Cooper <jason@lakedaemon.net>
-> Cc: Andrew Lunn <andrew@lunn.ch>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-kernel at vger.kernel.org
-> ---
->  arch/arm/mach-kirkwood/board-dt.c |    8 --------
->  1 file changed, 8 deletions(-)
+The variable pll_overclock is only assigned the values true and false.
+Change its type to bool.
 
+The simplified semantic patch that find this problem is as
+follows (http://coccinelle.lip6.fr/):
 
-Hi Sebastian
+@exists@
+type T;
+identifier b;
+@@
+- T
++ bool
+  b = ...;
+  ... when any
+  b = \(true\|false\)
 
-Boot tested on a Kirkwood Topkick.
+Signed-off-by: Peter Senna Tschudin <peter.senna@gmail.com>
+---
+ arch/arm/mach-at91/clock.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Tested-by: Andrew Lunn <andrew@lunn.ch>
-
-	   Andrew
-
-> 
-> diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
-> index 82d3ad8..a32a3e5 100644
-> --- a/arch/arm/mach-kirkwood/board-dt.c
-> +++ b/arch/arm/mach-kirkwood/board-dt.c
-> @@ -15,7 +15,6 @@
->  #include <linux/of.h>
->  #include <linux/of_platform.h>
->  #include <linux/clk-provider.h>
-> -#include <linux/clocksource.h>
->  #include <linux/dma-mapping.h>
->  #include <linux/irqchip.h>
->  #include <linux/kexec.h>
-> @@ -66,12 +65,6 @@ static void __init kirkwood_legacy_clk_init(void)
->  	clk_prepare_enable(clk);
->  }
->  
-> -static void __init kirkwood_dt_time_init(void)
-> -{
-> -	of_clk_init(NULL);
-> -	clocksource_of_init();
-> -}
-> -
->  static void __init kirkwood_dt_init_early(void)
->  {
->  	mvebu_mbus_init("marvell,kirkwood-mbus",
-> @@ -122,7 +115,6 @@ DT_MACHINE_START(KIRKWOOD_DT, "Marvell Kirkwood (Flattened Device Tree)")
->  	/* Maintainer: Jason Cooper <jason@lakedaemon.net> */
->  	.map_io		= kirkwood_map_io,
->  	.init_early	= kirkwood_dt_init_early,
-> -	.init_time	= kirkwood_dt_time_init,
->  	.init_machine	= kirkwood_dt_init,
->  	.restart	= kirkwood_restart,
->  	.dt_compat	= kirkwood_dt_board_compat,
-> -- 
-> 1.7.10.4
-> 
+diff --git a/arch/arm/mach-at91/clock.c b/arch/arm/mach-at91/clock.c
+index 6b2630a..936480d 100644
+--- a/arch/arm/mach-at91/clock.c
++++ b/arch/arm/mach-at91/clock.c
+@@ -749,7 +749,7 @@ static int __init at91_pmc_init(unsigned long main_clock)
+ {
+ 	unsigned tmp, freq, mckr;
+ 	int i;
+-	int pll_overclock = false;
++	bool pll_overclock = false;
+ 
+ 	/*
+ 	 * When the bootloader initialized the main oscillator correctly,
+-- 
+1.8.3.1
