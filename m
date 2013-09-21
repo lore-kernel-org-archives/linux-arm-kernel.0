@@ -1,27 +1,36 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 21 Sep 2013 11:51:52 +0100
-Subject: [PATCH v2 1/2] ASoC: kirkwood: clk: probe defer when clock not
- yet ready
-In-Reply-To: <20130921104734.GJ12758@n2100.arm.linux.org.uk>
-References: <20130921120006.47b00fe7@armhf>
- <20130921104734.GJ12758@n2100.arm.linux.org.uk>
-Message-ID: <20130921105151.GK12758@n2100.arm.linux.org.uk>
+From: gang.chen@asianux.com (Chen Gang)
+Date: Sat, 21 Sep 2013 19:06:47 +0800
+Subject: [PATCH] ARM: include: asm: atomic.h: use type cast 's64' for the
+ return value of atomic64_add_return().
+Message-ID: <523D7DC7.8030603@asianux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 21, 2013 at 11:47:34AM +0100, Russell King - ARM Linux wrote:
-> Another comment.  This is broken - it will never fall through if a
-> 'dev' is given, because of_clk_get_by_name() will always return an
-> -EPROBE_DEFER error pointer in that case.
-> 
-> So this approach is unworkable.
+The return value of atomic64_add_return() is u64 which never less than
+zero, so need type cast 's64' for comparing in atomic64_add_negative().
 
-And another comment:
+The related error: (allmodconfig for S5PV210, with "EXTRA_CFLAGS=-W"):
 
-This whole approach is broken - while Mark is correct that we should
-find a way to return -EPROBE_DEFER if a clock is specified, the solution
-here does not allow that - it will return -EPROBE_DEFER whenever the
-clock is not found _or_ is not specified.
+  kernel/events/core.c:5404:2: warning: comparison of unsigned expression < 0 is always false [-Wtype-limits]
 
-This has the effect of making the external clock *non*optional for the
-kirkwood-i2s driver, which is also completely broken.
+
+Signed-off-by: Chen Gang <gang.chen@asianux.com>
+---
+ arch/arm/include/asm/atomic.h |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/include/asm/atomic.h b/arch/arm/include/asm/atomic.h
+index da1c77d..8cf005d 100644
+--- a/arch/arm/include/asm/atomic.h
++++ b/arch/arm/include/asm/atomic.h
+@@ -475,7 +475,7 @@ static inline int atomic64_add_unless(atomic64_t *v, u64 a, u64 u)
+ 	return ret;
+ }
+ 
+-#define atomic64_add_negative(a, v)	(atomic64_add_return((a), (v)) < 0)
++#define atomic64_add_negative(a, v)	((s64)atomic64_add_return((a), (v)) < 0)
+ #define atomic64_inc(v)			atomic64_add(1LL, (v))
+ #define atomic64_inc_return(v)		atomic64_add_return(1LL, (v))
+ #define atomic64_inc_and_test(v)	(atomic64_inc_return(v) == 0)
+-- 
+1.7.7.6
