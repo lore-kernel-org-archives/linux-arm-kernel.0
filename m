@@ -1,117 +1,36 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Sat, 21 Sep 2013 19:06:24 +0200
-Subject: [PATCH v2 1/2] ASoC: kirkwood: clk: probe defer when clock not
- yet ready
-In-Reply-To: <20130921104734.GJ12758@n2100.arm.linux.org.uk>
-References: <20130921120006.47b00fe7@armhf>
- <20130921104734.GJ12758@n2100.arm.linux.org.uk>
-Message-ID: <20130921190624.1435c26b@armhf>
+From: horms@verge.net.au (Simon Horman)
+Date: Sat, 21 Sep 2013 10:14:05 -0700
+Subject: [PATCH] ARM: shmobile: Lager: add Micrel KSZ8041 PHY fixup
+In-Reply-To: <201309140429.23474.sergei.shtylyov@cogentembedded.com>
+References: <201309140429.23474.sergei.shtylyov@cogentembedded.com>
+Message-ID: <20130921171400.GA3181@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 21 Sep 2013 11:47:34 +0100
-Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
-
-> On Sat, Sep 21, 2013 at 12:00:06PM +0200, Jean-Francois Moine wrote:
-> > diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-> > index a004769..582abc8 100644
-> > --- a/drivers/clk/clk.c
-> > +++ b/drivers/clk/clk.c
-> > @@ -2181,7 +2181,7 @@ EXPORT_SYMBOL_GPL(of_clk_del_provider);
-> >  struct clk *of_clk_get_from_provider(struct of_phandle_args *clkspec)
-> >  {
-> >  	struct of_clk_provider *provider;
-> > -	struct clk *clk = ERR_PTR(-ENOENT);
-> > +	struct clk *clk = ERR_PTR(-EPROBE_DEFER);
-> >  
-> >  	/* Check if we have such a provider in our array */
-> >  	mutex_lock(&of_clk_lock);
-> > diff --git a/drivers/clk/clkdev.c b/drivers/clk/clkdev.c
-> > index 442a313..f8b28d9 100644
-> > --- a/drivers/clk/clkdev.c
-> > +++ b/drivers/clk/clkdev.c
-> > @@ -157,8 +157,13 @@ struct clk *clk_get(struct device *dev, const char *con_id)
-> >  
-> >  	if (dev) {
-> >  		clk = of_clk_get_by_name(dev->of_node, con_id);
-> > -		if (!IS_ERR(clk) && __clk_get(clk))
-> > -			return clk;
-> > +		if (!IS_ERR(clk)) {
-> > +			if (__clk_get(clk))
-> > +				return clk;
-> > +		} else {
-> > +			if (PTR_ERR(clk) == -EPROBE_DEFER)
-> > +				return clk;
-> > +		}
+On Sat, Sep 14, 2013 at 04:29:22AM +0400, Sergei Shtylyov wrote:
+> Currently on the Lager board NFS timeouts/delays are seen when booting.  That
+> turned out to happen because the SoC's ETH_LINK signal turns on and off after
+> each packet.  It is connected to Micrel KSZ8041 PHY's LED0 signal. Ether LEDs
+> on the Lager board are named LINK and ACTIVE which corresponds to non-default
+> 01 setting of the PHY control register 1 bits 14-15. The 'sh_eth' driver resets
+> the PHY when opening the network device, so we have to set the mentioned bits
+> back to 01 from the default 00 value which causes bouncing of ETH_LINK.  That
+> can be achieved using the PHY platform fixup mechanism if we also modify the
+> driver to use it..
 > 
-> Another comment.  This is broken - it will never fall through if a
-> 'dev' is given, because of_clk_get_by_name() will always return an
-> -EPROBE_DEFER error pointer in that case.
+> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 > 
-> So this approach is unworkable.
-
-> And another comment:
+> ---
+> This patch is against the recent Linus' tree. Its effect on NFS issue depends
+> on the 'sh_eth' driver patch I've posted earlier. 
+> Simon, please update your 'master' and/or 'fixes' branches since currently it's
+> impossible to apply fixes to your tree.
 > 
-> This whole approach is broken - while Mark is correct that we should
-> find a way to return -EPROBE_DEFER if a clock is specified, the solution
-> here does not allow that - it will return -EPROBE_DEFER whenever the
-> clock is not found _or_ is not specified.
-> 
-> This has the effect of making the external clock *non*optional for the
-> kirkwood-i2s driver, which is also completely broken.
+>  arch/arm/mach-shmobile/board-lager.c |   27 ++++++++++++++++++++++++++-
+>  1 file changed, 26 insertions(+), 1 deletion(-)
 
-It works fine for me (I tried both cases, with and without the external
-clock).
+Thanks, I have rebased my tree and applied this change to
+the fixes-for-v3.12 branch.
 
-The scheme is as follows:
-
-- kirkwood-i2s kirkwood_i2s_dev_probe() calls:
-
-	priv->extclk = &pdev->dev, "extclk");
-
-- devm_clk_get() calls:
-
-	clk = clk_get(dev, id);
-
-- clk_get() does:
-
-	if (dev)			// this is the case
-		clk = of_clk_get_by_name(dev->of_node, con_id);
-
-- of_clk_get_by_name() does:
-
-	if (name)			// this is the case
-		index = of_property_match_string(np, "clock-names", name);
-
-  Here, if the external clock is declared in the DT, index is >= 0.
-  If there is no externel clock in the DT, index is < 0.
-
-	clk = of_clk_get(np, index);
- 	if (!IS_ERR(clk))
-		break;
-	else if (name && index >= 0) {
-		pr_err("ERROR: could not get clock %s:%s(%i)\n",
- 			np->full_name, name ? name : "", index);  
- 		return clk;
- 	}
-
-- If the index is < 0, of_clk_get() immediately returns -EINVAL.
-
-  So, kirkwood-i2s knows there is no external clock. DONE.
-
-- otherwise, if the index is >= 0 (the external clock is declared in
-  the DT), of_clk_get() gets the phandle (of_parse_phandle_with_args())
-  and gets the clock (of_clk_get_from_provider()).
-
-  This last function returns either the clock (device initialized),
-  a -EPROBE_DEFER error (clock not yet initialized) or some other
-  error (bad DT or clock error).
-
-  So, kirkwood-i2s knows there is a declared external clock and it acts
-  according to the return code (accept, defer or ignore). DONE.
-
-Did I miss something?
-
--- 
-Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
-Jef		|		http://moinejf.free.fr/
+And I will push the new tree either in the next
+half hour or some time next week - I have to jump on a plane shortly.
