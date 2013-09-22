@@ -1,452 +1,271 @@
-From: voice.shen@atmel.com (Bo Shen)
-Date: Sun, 22 Sep 2013 16:05:01 +0800
-Subject: [PATCH v3] PWM: at91: add Atmel PWM controller driver
-Message-ID: <1379837101-2165-1-git-send-email-voice.shen@atmel.com>
+From: jussi.kivilinna@iki.fi (Jussi Kivilinna)
+Date: Sun, 22 Sep 2013 13:05:22 +0300
+Subject: [PATCH 1/4] crypto: create generic version of ablk_helper
+In-Reply-To: <1379702811-8025-2-git-send-email-ard.biesheuvel@linaro.org>
+References: <1379702811-8025-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1379702811-8025-2-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <523EC0E2.4040307@iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add Atmel PWM controller driver based on PWM framework.
+On 20.09.2013 21:46, Ard Biesheuvel wrote:
+> Create a generic version of ablk_helper so it can be reused
+> by other architectures.
+> 
+> Acked-by: Jussi Kivilinna <jussi.kivilinna@iki.fi>
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-This is the basic function implementation of Atmel PWM controller.
-It can work with PWM based led and backlight.
+Why resent this patch here when this was in the earlier patchset?
+ http://marc.info/?l=linux-crypto-vger&m=137966378813818&w=2
 
-Signed-off-by: Bo Shen <voice.shen@atmel.com>
----
-Changes in v3:
-  - change compatible string from "atmel,sama5-pwm" to "atmel,sama5d3-pwm"
-  - Add PWM led example in binding documentation
-  - Using micro replace hard code
+-Jussi
 
-Changes in v2:
-  - Address the comments from Thierry Reding
-
- .../devicetree/bindings/pwm/atmel-pwm.txt          |   41 +++
- drivers/pwm/Kconfig                                |    9 +
- drivers/pwm/Makefile                               |    1 +
- drivers/pwm/pwm-atmel.c                            |  335 ++++++++++++++++++++
- 4 files changed, 386 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/pwm/atmel-pwm.txt
- create mode 100644 drivers/pwm/pwm-atmel.c
-
-diff --git a/Documentation/devicetree/bindings/pwm/atmel-pwm.txt b/Documentation/devicetree/bindings/pwm/atmel-pwm.txt
-new file mode 100644
-index 0000000..1c1a5fa
---- /dev/null
-+++ b/Documentation/devicetree/bindings/pwm/atmel-pwm.txt
-@@ -0,0 +1,41 @@
-+Atmel PWM controller
-+
-+Required properties:
-+  - compatible: should be one of:
-+    - "atmel,at91sam9rl-pwm"
-+    - "atmel,sama5d3-pwm"
-+  - reg: physical base address and length of the controller's registers
-+  - #pwm-cells: Should be 3. See pwm.txt in this directory for a
-+    description of the cells format
-+
-+Example:
-+
-+	pwm0: pwm at f8034000 {
-+		compatible = "atmel,at91sam9rl-pwm";
-+		reg = <0xf8034000 0x400>;
-+		#pwm-cells = <3>;
-+	};
-+
-+The following the pwm led based example:
-+
-+	pwm0: pwm at f8034000 {
-+		compatible = "atmel,at91sam9rl-pwm";
-+		reg = <0xf8034000 0x400>;
-+		#pwm-cells = <3>;
-+	};
-+
-+	pwdleds {
-+		compatible = "pwm-leds";
-+
-+		d1 {
-+			label = "d1";
-+			pwms = <&pwm0 3 5000 0>
-+			max-brightness = <255>;
-+		};
-+
-+		d2 {
-+			label = "d2";
-+			pwms = <&pwm0 1 5000 1>
-+			max-brightness = <255>;
-+		};
-+	};
-diff --git a/drivers/pwm/Kconfig b/drivers/pwm/Kconfig
-index 75840b5..54237b9 100644
---- a/drivers/pwm/Kconfig
-+++ b/drivers/pwm/Kconfig
-@@ -41,6 +41,15 @@ config PWM_AB8500
- 	  To compile this driver as a module, choose M here: the module
- 	  will be called pwm-ab8500.
- 
-+config PWM_ATMEL
-+	tristate "Atmel PWM support"
-+	depends on ARCH_AT91
-+	help
-+	  Generic PWM framework driver for Atmel SoC.
-+
-+	  To compile this driver as a module, choose M here: the module
-+	  will be called pwm-atmel.
-+
- config PWM_ATMEL_TCB
- 	tristate "Atmel TC Block PWM support"
- 	depends on ATMEL_TCLIB && OF
-diff --git a/drivers/pwm/Makefile b/drivers/pwm/Makefile
-index 77a8c18..5b193f8 100644
---- a/drivers/pwm/Makefile
-+++ b/drivers/pwm/Makefile
-@@ -1,6 +1,7 @@
- obj-$(CONFIG_PWM)		+= core.o
- obj-$(CONFIG_PWM_SYSFS)		+= sysfs.o
- obj-$(CONFIG_PWM_AB8500)	+= pwm-ab8500.o
-+obj-$(CONFIG_PWM_ATMEL)		+= pwm-atmel.o
- obj-$(CONFIG_PWM_ATMEL_TCB)	+= pwm-atmel-tcb.o
- obj-$(CONFIG_PWM_BFIN)		+= pwm-bfin.o
- obj-$(CONFIG_PWM_IMX)		+= pwm-imx.o
-diff --git a/drivers/pwm/pwm-atmel.c b/drivers/pwm/pwm-atmel.c
-new file mode 100644
-index 0000000..9c86dfe
---- /dev/null
-+++ b/drivers/pwm/pwm-atmel.c
-@@ -0,0 +1,335 @@
-+/*
-+ * Driver for Atmel Pulse Width Modulation Controller
-+ *
-+ * Copyright (C) 2013 Atmel Corporation
-+ *		 Bo Shen <voice.shen@atmel.com>
-+ *
-+ * Licensed under GPLv2.
-+ */
-+
-+#include <linux/clk.h>
-+#include <linux/err.h>
-+#include <linux/io.h>
-+#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/of_device.h>
-+#include <linux/platform_device.h>
-+#include <linux/pwm.h>
-+#include <linux/slab.h>
-+
-+/* The following is global registers for PWM controller */
-+#define PWM_ENA			0x04
-+#define PWM_DIS			0x08
-+#define PWM_SR			0x0C
-+/* bit field in SR */
-+#define PWM_SR_ALL_CH_ON	0x0F
-+
-+/* The following register is PWM channel related registers */
-+#define PWM_CH_REG_OFFSET	0x200
-+
-+#define PWM_CMR			0x0
-+/* bit field in CMR */
-+#define PWM_CMR_CPOL		(1 << 9)
-+#define PWM_CMR_UPD_CDTY	(1 << 10)
-+
-+/* The following registers for PWM v1 */
-+#define PWMv1_CDTY		0x04
-+#define PWMv1_CPRD		0x08
-+#define PWMv1_CUPD		0x10
-+
-+/* The following registers for PWM v2 */
-+#define PWMv2_CDTY		0x04
-+#define PWMv2_CDTYUPD		0x08
-+#define PWMv2_CPRD		0x0C
-+#define PWMv2_CPRDUPD		0x10
-+
-+/* max value for duty and period */
-+/*
-+ * Although the duty and period register is 32 bit,
-+ * however only the LSB 16 bits are significant.
-+ */
-+#define PWM_MAX_DTY		0xFFFF
-+#define PWM_MAX_PRD		0xFFFF
-+#define PRD_MAX_PRES		10
-+
-+struct atmel_pwm_chip {
-+	struct pwm_chip chip;
-+	struct clk *clk;
-+	void __iomem *base;
-+
-+	void (*config)(struct pwm_chip *chip, struct pwm_device *pwm,
-+		       int dty, int prd);
-+};
-+
-+static inline struct atmel_pwm_chip *to_atmel_pwm_chip(struct pwm_chip *chip)
-+{
-+	return container_of(chip, struct atmel_pwm_chip, chip);
-+}
-+
-+static inline u32 atmel_pwm_readl(struct atmel_pwm_chip *chip,
-+				  unsigned long offset)
-+{
-+	return readl(chip->base + offset);
-+}
-+
-+static inline void atmel_pwm_writel(struct atmel_pwm_chip *chip,
-+				    unsigned long offset, unsigned long val)
-+{
-+	writel(val, chip->base + offset);
-+}
-+
-+static inline u32 atmel_pwm_ch_readl(struct atmel_pwm_chip *chip,
-+				     unsigned int ch, unsigned long offset)
-+{
-+	return readl(chip->base + PWM_CH_REG_OFFSET + ch * 0x20 + offset);
-+}
-+
-+static inline void atmel_pwm_ch_writel(struct atmel_pwm_chip *chip,
-+				       unsigned int ch, unsigned long offset,
-+				       unsigned long val)
-+{
-+	writel(val, chip->base + PWM_CH_REG_OFFSET + ch * 0x20 + offset);
-+}
-+
-+static int atmel_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
-+		int duty_ns, int period_ns)
-+{
-+	struct atmel_pwm_chip *atmel_pwm = to_atmel_pwm_chip(chip);
-+	unsigned long clk_rate, prd, dty;
-+	unsigned long long val, div;
-+	int ret, pres = 0;
-+
-+	clk_rate = clk_get_rate(atmel_pwm->clk);
-+	div = clk_rate;
-+
-+	/* Calculate the period cycles */
-+	while (div > PWM_MAX_PRD) {
-+		div = clk_rate / (1 << pres);
-+		div = div * period_ns;
-+		/* 1/Hz = 100000000 ns */
-+		do_div(div, 1000000000);
-+
-+		if (pres++ > PRD_MAX_PRES) {
-+			pr_err("PRES is bigger than maximum pre-scaler\n");
-+			return -EINVAL;
-+		}
-+	}
-+
-+	/* Calculate the duty cycles */
-+	prd = div;
-+	div *= duty_ns;
-+	do_div(div, period_ns);
-+	dty = div;
-+
-+	ret = clk_enable(atmel_pwm->clk);
-+	if (ret) {
-+		pr_err("Failed to enable pwm clock\n");
-+		return ret;
-+	}
-+
-+	atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWM_CMR, pres);
-+	atmel_pwm->config(chip, pwm, dty, prd);
-+
-+	/* Check whether need to disable clock */
-+	val = atmel_pwm_readl(atmel_pwm, PWM_SR);
-+	if ((val & PWM_SR_ALL_CH_ON) == 0)
-+		clk_disable(atmel_pwm->clk);
-+
-+	return 0;
-+}
-+
-+static void atmel_pwm_config_v1(struct pwm_chip *chip, struct pwm_device *pwm,
-+				int dty, int prd)
-+{
-+	struct atmel_pwm_chip *atmel_pwm = to_atmel_pwm_chip(chip);
-+	unsigned int val;
-+
-+	/*
-+	 * If the PWM channel is disabled, write value to duty and period
-+	 * registers directly.
-+	 * If the PWM channel is enabled, using the update register, it needs
-+	 * to set bit 10 of CMR to 0
-+	 */
-+	if (test_bit(PWMF_ENABLED, &pwm->flags)) {
-+		atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWMv1_CUPD, dty);
-+
-+		val = atmel_pwm_ch_readl(atmel_pwm, pwm->hwpwm, PWM_CMR);
-+		val &= ~PWM_CMR_UPD_CDTY;
-+		atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWM_CMR, val);
-+	} else {
-+		atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWMv1_CDTY, dty);
-+		atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWMv1_CPRD, prd);
-+	}
-+}
-+
-+static void atmel_pwm_config_v2(struct pwm_chip *chip, struct pwm_device *pwm,
-+				int dty, int prd)
-+{
-+	struct atmel_pwm_chip *atmel_pwm = to_atmel_pwm_chip(chip);
-+
-+	/*
-+	 * If the PWM channel is disabled, write value to duty and period
-+	 * registers directly.
-+	 * If the PWM channel is enabled, using the duty update register to
-+	 * update the value.
-+	 */
-+	if (test_bit(PWMF_ENABLED, &pwm->flags)) {
-+		atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWMv2_CDTYUPD, dty);
-+	} else {
-+		atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWMv2_CDTY, dty);
-+		atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWMv2_CPRD, prd);
-+	}
-+}
-+
-+static int atmel_pwm_set_polarity(struct pwm_chip *chip, struct pwm_device *pwm,
-+		enum pwm_polarity polarity)
-+{
-+	struct atmel_pwm_chip *atmel_pwm = to_atmel_pwm_chip(chip);
-+	u32 val = 0;
-+	int ret;
-+
-+	ret = clk_enable(atmel_pwm->clk);
-+	if (ret) {
-+		pr_err("failed to enable pwm clock\n");
-+		return ret;
-+	}
-+
-+	if (polarity == PWM_POLARITY_NORMAL)
-+		val &= ~PWM_CMR_CPOL;
-+	else
-+		val |= PWM_CMR_CPOL;
-+
-+	atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWM_CMR, val);
-+
-+	clk_disable(atmel_pwm->clk);
-+
-+	return 0;
-+}
-+
-+static int atmel_pwm_enable(struct pwm_chip *chip, struct pwm_device *pwm)
-+{
-+	struct atmel_pwm_chip *atmel_pwm = to_atmel_pwm_chip(chip);
-+
-+	clk_prepare_enable(atmel_pwm->clk);
-+
-+	atmel_pwm_writel(atmel_pwm, PWM_ENA, 1 << pwm->hwpwm);
-+
-+	return 0;
-+}
-+
-+static void atmel_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
-+{
-+	struct atmel_pwm_chip *atmel_pwm = to_atmel_pwm_chip(chip);
-+	u32 val;
-+
-+	atmel_pwm_writel(atmel_pwm, PWM_DIS, 1 << pwm->hwpwm);
-+
-+	val = atmel_pwm_readl(atmel_pwm, PWM_SR);
-+	if ((val & PWM_SR_ALL_CH_ON) == 0)
-+		clk_disable(atmel_pwm->clk);
-+}
-+
-+static const struct pwm_ops atmel_pwm_ops = {
-+	.config = atmel_pwm_config,
-+	.set_polarity = atmel_pwm_set_polarity,
-+	.enable = atmel_pwm_enable,
-+	.disable = atmel_pwm_disable,
-+	.owner = THIS_MODULE,
-+};
-+
-+struct atmel_pwm_data {
-+	void (*config)(struct pwm_chip *chip, struct pwm_device *pwm,
-+		       int dty, int prd);
-+};
-+
-+static const struct atmel_pwm_data atmel_pwm_data_v1 = {
-+	.config = atmel_pwm_config_v1,
-+};
-+
-+static const struct atmel_pwm_data atmel_pwm_data_v2 = {
-+	.config = atmel_pwm_config_v2,
-+};
-+
-+#ifdef CONFIG_OF
-+static const struct of_device_id atmel_pwm_dt_ids[] = {
-+	{
-+		.compatible = "atmel,at91sam9rl-pwm",
-+		.data = &atmel_pwm_data_v1,
-+	}, {
-+		.compatible = "atmel,sama5d3-pwm",
-+		.data = &atmel_pwm_data_v2,
-+	}, {
-+		/* sentinel */
-+	},
-+};
-+MODULE_DEVICE_TABLE(of, atmel_pwm_dt_ids);
-+#endif
-+
-+static int atmel_pwm_probe(struct platform_device *pdev)
-+{
-+	const struct of_device_id *of_id =
-+		of_match_device(atmel_pwm_dt_ids, &pdev->dev);
-+	const struct atmel_pwm_data *data;
-+	struct atmel_pwm_chip *atmel_pwm;
-+	struct resource *res;
-+	int ret;
-+
-+	atmel_pwm = devm_kzalloc(&pdev->dev, sizeof(*atmel_pwm), GFP_KERNEL);
-+	if (!atmel_pwm)
-+		return -ENOMEM;
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	if (!res)
-+		return -ENODEV;
-+
-+	atmel_pwm->base = devm_ioremap_resource(&pdev->dev, res);
-+
-+	atmel_pwm->clk = devm_clk_get(&pdev->dev, NULL);
-+	if (IS_ERR(atmel_pwm->clk))
-+		return PTR_ERR(atmel_pwm->clk);
-+	clk_prepare(atmel_pwm->clk);
-+
-+	atmel_pwm->chip.dev = &pdev->dev;
-+	atmel_pwm->chip.ops = &atmel_pwm_ops;
-+	atmel_pwm->chip.of_xlate = of_pwm_xlate_with_flags;
-+	atmel_pwm->chip.of_pwm_n_cells = 3;
-+	atmel_pwm->chip.base = -1;
-+	atmel_pwm->chip.npwm = 4;
-+
-+	data = of_id->data;
-+	atmel_pwm->config = data->config;
-+
-+	ret = pwmchip_add(&atmel_pwm->chip);
-+	if (ret < 0) {
-+		dev_err(&pdev->dev, "failed to add pwm chip %d\n", ret);
-+		return ret;
-+	}
-+
-+	platform_set_drvdata(pdev, atmel_pwm);
-+
-+	return 0;
-+}
-+
-+static int atmel_pwm_remove(struct platform_device *pdev)
-+{
-+	struct atmel_pwm_chip *atmel_pwm = platform_get_drvdata(pdev);
-+
-+	clk_unprepare(atmel_pwm->clk);
-+
-+	return pwmchip_remove(&atmel_pwm->chip);
-+}
-+
-+static struct platform_driver atmel_pwm_driver = {
-+	.driver = {
-+		.name = "atmel-pwm",
-+		.of_match_table = of_match_ptr(atmel_pwm_dt_ids),
-+	},
-+	.probe = atmel_pwm_probe,
-+	.remove = atmel_pwm_remove,
-+};
-+module_platform_driver(atmel_pwm_driver);
-+
-+MODULE_ALIAS("platform:atmel-pwm");
-+MODULE_AUTHOR("Bo Shen <voice.shen@atmel.com>");
-+MODULE_DESCRIPTION("Atmel PWM driver");
-+MODULE_LICENSE("GPL v2");
--- 
-1.7.9.5
+> ---
+>  crypto/Kconfig               |   4 ++
+>  crypto/Makefile              |   1 +
+>  crypto/ablk_helper.c         | 150 +++++++++++++++++++++++++++++++++++++++++++
+>  include/asm-generic/simd.h   |  14 ++++
+>  include/crypto/ablk_helper.h |  31 +++++++++
+>  5 files changed, 200 insertions(+)
+>  create mode 100644 crypto/ablk_helper.c
+>  create mode 100644 include/asm-generic/simd.h
+>  create mode 100644 include/crypto/ablk_helper.h
+> 
+> diff --git a/crypto/Kconfig b/crypto/Kconfig
+> index 69ce573..8179ae6 100644
+> --- a/crypto/Kconfig
+> +++ b/crypto/Kconfig
+> @@ -179,6 +179,10 @@ config CRYPTO_ABLK_HELPER_X86
+>  	depends on X86
+>  	select CRYPTO_CRYPTD
+>  
+> +config CRYPTO_ABLK_HELPER
+> +	tristate
+> +	select CRYPTO_CRYPTD
+> +
+>  config CRYPTO_GLUE_HELPER_X86
+>  	tristate
+>  	depends on X86
+> diff --git a/crypto/Makefile b/crypto/Makefile
+> index 80019ba..5e1bdb1 100644
+> --- a/crypto/Makefile
+> +++ b/crypto/Makefile
+> @@ -104,3 +104,4 @@ obj-$(CONFIG_CRYPTO_USER_API_SKCIPHER) += algif_skcipher.o
+>  obj-$(CONFIG_XOR_BLOCKS) += xor.o
+>  obj-$(CONFIG_ASYNC_CORE) += async_tx/
+>  obj-$(CONFIG_ASYMMETRIC_KEY_TYPE) += asymmetric_keys/
+> +obj-$(CONFIG_CRYPTO_ABLK_HELPER) += ablk_helper.o
+> diff --git a/crypto/ablk_helper.c b/crypto/ablk_helper.c
+> new file mode 100644
+> index 0000000..62568b1
+> --- /dev/null
+> +++ b/crypto/ablk_helper.c
+> @@ -0,0 +1,150 @@
+> +/*
+> + * Shared async block cipher helpers
+> + *
+> + * Copyright (c) 2012 Jussi Kivilinna <jussi.kivilinna@mbnet.fi>
+> + *
+> + * Based on aesni-intel_glue.c by:
+> + *  Copyright (C) 2008, Intel Corp.
+> + *    Author: Huang Ying <ying.huang@intel.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program; if not, write to the Free Software
+> + * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307
+> + * USA
+> + *
+> + */
+> +
+> +#include <linux/kernel.h>
+> +#include <linux/crypto.h>
+> +#include <linux/init.h>
+> +#include <linux/module.h>
+> +#include <linux/hardirq.h>
+> +#include <crypto/algapi.h>
+> +#include <crypto/cryptd.h>
+> +#include <crypto/ablk_helper.h>
+> +#include <asm/simd.h>
+> +
+> +int ablk_set_key(struct crypto_ablkcipher *tfm, const u8 *key,
+> +		 unsigned int key_len)
+> +{
+> +	struct async_helper_ctx *ctx = crypto_ablkcipher_ctx(tfm);
+> +	struct crypto_ablkcipher *child = &ctx->cryptd_tfm->base;
+> +	int err;
+> +
+> +	crypto_ablkcipher_clear_flags(child, CRYPTO_TFM_REQ_MASK);
+> +	crypto_ablkcipher_set_flags(child, crypto_ablkcipher_get_flags(tfm)
+> +				    & CRYPTO_TFM_REQ_MASK);
+> +	err = crypto_ablkcipher_setkey(child, key, key_len);
+> +	crypto_ablkcipher_set_flags(tfm, crypto_ablkcipher_get_flags(child)
+> +				    & CRYPTO_TFM_RES_MASK);
+> +	return err;
+> +}
+> +EXPORT_SYMBOL_GPL(ablk_set_key);
+> +
+> +int __ablk_encrypt(struct ablkcipher_request *req)
+> +{
+> +	struct crypto_ablkcipher *tfm = crypto_ablkcipher_reqtfm(req);
+> +	struct async_helper_ctx *ctx = crypto_ablkcipher_ctx(tfm);
+> +	struct blkcipher_desc desc;
+> +
+> +	desc.tfm = cryptd_ablkcipher_child(ctx->cryptd_tfm);
+> +	desc.info = req->info;
+> +	desc.flags = 0;
+> +
+> +	return crypto_blkcipher_crt(desc.tfm)->encrypt(
+> +		&desc, req->dst, req->src, req->nbytes);
+> +}
+> +EXPORT_SYMBOL_GPL(__ablk_encrypt);
+> +
+> +int ablk_encrypt(struct ablkcipher_request *req)
+> +{
+> +	struct crypto_ablkcipher *tfm = crypto_ablkcipher_reqtfm(req);
+> +	struct async_helper_ctx *ctx = crypto_ablkcipher_ctx(tfm);
+> +
+> +	if (!may_use_simd()) {
+> +		struct ablkcipher_request *cryptd_req =
+> +			ablkcipher_request_ctx(req);
+> +
+> +		memcpy(cryptd_req, req, sizeof(*req));
+> +		ablkcipher_request_set_tfm(cryptd_req, &ctx->cryptd_tfm->base);
+> +
+> +		return crypto_ablkcipher_encrypt(cryptd_req);
+> +	} else {
+> +		return __ablk_encrypt(req);
+> +	}
+> +}
+> +EXPORT_SYMBOL_GPL(ablk_encrypt);
+> +
+> +int ablk_decrypt(struct ablkcipher_request *req)
+> +{
+> +	struct crypto_ablkcipher *tfm = crypto_ablkcipher_reqtfm(req);
+> +	struct async_helper_ctx *ctx = crypto_ablkcipher_ctx(tfm);
+> +
+> +	if (!may_use_simd()) {
+> +		struct ablkcipher_request *cryptd_req =
+> +			ablkcipher_request_ctx(req);
+> +
+> +		memcpy(cryptd_req, req, sizeof(*req));
+> +		ablkcipher_request_set_tfm(cryptd_req, &ctx->cryptd_tfm->base);
+> +
+> +		return crypto_ablkcipher_decrypt(cryptd_req);
+> +	} else {
+> +		struct blkcipher_desc desc;
+> +
+> +		desc.tfm = cryptd_ablkcipher_child(ctx->cryptd_tfm);
+> +		desc.info = req->info;
+> +		desc.flags = 0;
+> +
+> +		return crypto_blkcipher_crt(desc.tfm)->decrypt(
+> +			&desc, req->dst, req->src, req->nbytes);
+> +	}
+> +}
+> +EXPORT_SYMBOL_GPL(ablk_decrypt);
+> +
+> +void ablk_exit(struct crypto_tfm *tfm)
+> +{
+> +	struct async_helper_ctx *ctx = crypto_tfm_ctx(tfm);
+> +
+> +	cryptd_free_ablkcipher(ctx->cryptd_tfm);
+> +}
+> +EXPORT_SYMBOL_GPL(ablk_exit);
+> +
+> +int ablk_init_common(struct crypto_tfm *tfm, const char *drv_name)
+> +{
+> +	struct async_helper_ctx *ctx = crypto_tfm_ctx(tfm);
+> +	struct cryptd_ablkcipher *cryptd_tfm;
+> +
+> +	cryptd_tfm = cryptd_alloc_ablkcipher(drv_name, 0, 0);
+> +	if (IS_ERR(cryptd_tfm))
+> +		return PTR_ERR(cryptd_tfm);
+> +
+> +	ctx->cryptd_tfm = cryptd_tfm;
+> +	tfm->crt_ablkcipher.reqsize = sizeof(struct ablkcipher_request) +
+> +		crypto_ablkcipher_reqsize(&cryptd_tfm->base);
+> +
+> +	return 0;
+> +}
+> +EXPORT_SYMBOL_GPL(ablk_init_common);
+> +
+> +int ablk_init(struct crypto_tfm *tfm)
+> +{
+> +	char drv_name[CRYPTO_MAX_ALG_NAME];
+> +
+> +	snprintf(drv_name, sizeof(drv_name), "__driver-%s",
+> +					crypto_tfm_alg_driver_name(tfm));
+> +
+> +	return ablk_init_common(tfm, drv_name);
+> +}
+> +EXPORT_SYMBOL_GPL(ablk_init);
+> +
+> +MODULE_LICENSE("GPL");
+> diff --git a/include/asm-generic/simd.h b/include/asm-generic/simd.h
+> new file mode 100644
+> index 0000000..f57eb7b
+> --- /dev/null
+> +++ b/include/asm-generic/simd.h
+> @@ -0,0 +1,14 @@
+> +
+> +#include <linux/hardirq.h>
+> +
+> +/*
+> + * may_use_simd - whether it is allowable at this time to issue SIMD
+> + *                instructions or access the SIMD register file
+> + *
+> + * As architectures typically don't preserve the SIMD register file when
+> + * taking an interrupt, !in_interrupt() should be a reasonable default.
+> + */
+> +static __must_check inline bool may_use_simd(void)
+> +{
+> +	return !in_interrupt();
+> +}
+> diff --git a/include/crypto/ablk_helper.h b/include/crypto/ablk_helper.h
+> new file mode 100644
+> index 0000000..4f93df5
+> --- /dev/null
+> +++ b/include/crypto/ablk_helper.h
+> @@ -0,0 +1,31 @@
+> +/*
+> + * Shared async block cipher helpers
+> + */
+> +
+> +#ifndef _CRYPTO_ABLK_HELPER_H
+> +#define _CRYPTO_ABLK_HELPER_H
+> +
+> +#include <linux/crypto.h>
+> +#include <linux/kernel.h>
+> +#include <crypto/cryptd.h>
+> +
+> +struct async_helper_ctx {
+> +	struct cryptd_ablkcipher *cryptd_tfm;
+> +};
+> +
+> +int ablk_set_key(struct crypto_ablkcipher *tfm, const u8 *key,
+> +			unsigned int key_len);
+> +
+> +int __ablk_encrypt(struct ablkcipher_request *req);
+> +
+> +int ablk_encrypt(struct ablkcipher_request *req);
+> +
+> +int ablk_decrypt(struct ablkcipher_request *req);
+> +
+> +void ablk_exit(struct crypto_tfm *tfm);
+> +
+> +int ablk_init_common(struct crypto_tfm *tfm, const char *drv_name);
+> +
+> +int ablk_init(struct crypto_tfm *tfm);
+> +
+> +#endif /* _CRYPTO_ABLK_HELPER_H */
+> 
