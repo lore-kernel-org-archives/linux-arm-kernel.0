@@ -1,47 +1,32 @@
-From: fweisbec@gmail.com (Frederic Weisbecker)
-Date: Sun, 22 Sep 2013 11:59:35 -0500
-Subject: [PATCH] arm: Fix build error with context tracking calls
-In-Reply-To: <20130914143213.GN25647@n2100.arm.linux.org.uk>
-References: <522CB0DE.2010102@roeck-us.net>
- <20130909105115.GL25647@n2100.arm.linux.org.uk>
- <522DB86A.8010207@roeck-us.net>
- <alpine.LFD.2.03.1309091023440.20709@syhkavp.arg>
- <20130909160348.GB18975@roeck-us.net>
- <20130909203141.GM25647@n2100.arm.linux.org.uk>
- <20130909210203.GC28416@roeck-us.net>
- <alpine.LFD.2.03.1309091714420.20709@syhkavp.arg>
- <87y574g1fi.fsf@linaro.org> <20130913170331.GA8453@somewhere>
- <20130914143213.GN25647@n2100.arm.linux.org.uk>
-Message-ID: <CAFTL4hzccoaUinQ37bpbqXDv-bbNkuww8FURQMwD_zEb9RqSMA@mail.gmail.com>
+From: tj@kernel.org (Tejun Heo)
+Date: Sun, 22 Sep 2013 12:58:17 -0400
+Subject: [RFC PATCH 08/15] ata: ahci_platform: Manage SATA PHY
+In-Reply-To: <1379595943-14622-9-git-send-email-rogerq@ti.com>
+References: <1379595943-14622-1-git-send-email-rogerq@ti.com>
+ <1379595943-14622-9-git-send-email-rogerq@ti.com>
+Message-ID: <20130922165817.GD30946@htj.dyndns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/9/14, Russell King - ARM Linux <linux@arm.linux.org.uk>:
-> On Fri, Sep 13, 2013 at 07:03:34PM +0200, Frederic Weisbecker wrote:
->> diff --git a/kernel/context_tracking.c b/kernel/context_tracking.c
->> index 247091b..859c8df 100644
->> --- a/kernel/context_tracking.c
->> +++ b/kernel/context_tracking.c
->> @@ -51,6 +51,15 @@ void context_tracking_user_enter(void)
->>  	unsigned long flags;
->>
->>  	/*
->> +	 * Repeat the user_enter() check here because some archs may be calling
->> +	 * this from asm and if no CPU needs context tracking, they shouldn't
->> +	 * go further. We can remove that check here once these archs support
->> the static key
->> +	 * check.
->
-> The only (minor) comment on this is that the above would fail checkpatch,
-> but that's not a good enough reason to respin it if you've already applied
-> it IMHO.
->
+On Thu, Sep 19, 2013 at 04:05:36PM +0300, Roger Quadros wrote:
+> From: Balaji T K <balajitk@ti.com>
+> 
+> Some platforms have a PHY hooked up to the
+> SATA controller. The PHY needs to be initialized
+> and powered up for SATA to work. We do that
+> using the PHY framework.
+> 
+> [Roger Q] Cleaned up.
+> 
+> CC: Tejun Heo <tj@kernel.org>
+> Signed-off-by: Balaji T K <balajitk@ti.com>
+> Signed-off-by: Roger Quadros <rogerq@ti.com>
 
-Ah I haven't yet pushed that patch anywhere so I can definetly fix
-that. Thanks for the review. BTW, I initially first thought this fix
-could go through your tree but if you prefer I can push it through
-Ingo to the context tracking bits.
+Looks okay to me although I don't know whether everyone using
+ahci_platform would be happy with requiring phy.  Sergei, does this
+look good to you?
 
-Just tell me either way.
+Thanks.
 
-Thanks!
+-- 
+tejun
