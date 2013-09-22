@@ -1,33 +1,46 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Sun, 22 Sep 2013 12:24:37 +0200
-Subject: [PATCH v3 0/5] kernel mode NEON support
-In-Reply-To: <20130922101155.GP12758@n2100.arm.linux.org.uk>
-References: <1373321521-15485-1-git-send-email-ard.biesheuvel@linaro.org>
- <20130922101155.GP12758@n2100.arm.linux.org.uk>
-Message-ID: <EE9C6CC6-FB18-483F-9AC7-66FD40E2BA77@linaro.org>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Sun, 22 Sep 2013 18:37:59 +0800
+Subject: [PATCH 04/26] clk: prima2: declare OF clock provider
+In-Reply-To: <523EDEB0.1060601@gmail.com>
+References: <1379526839-14798-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1379526839-14798-5-git-send-email-sebastian.hesselbarth@gmail.com>
+ <CAGsJ_4xC_g1C-pGQGrcLOBhKLSMG3D8369DRPoFgNZhKqs-aTQ@mail.gmail.com>
+ <523ABA7A.50305@gmail.com> <523EDEB0.1060601@gmail.com>
+Message-ID: <CAGsJ_4yPcM4YM_i-JMCoDeRb5zKWJyNEt+jnMJ6LqoF5gC3KhA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+2013/9/22 Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>:
+> On 09/19/2013 10:48 AM, Sebastian Hesselbarth wrote:
+>>
+>> On 09/19/13 10:45, Barry Song wrote:
+>>>>
+>>>> @@ -1124,3 +1106,4 @@ void __init sirfsoc_of_clk_init(void)
+>>>>
+>>>>          of_clk_add_provider(np, of_clk_src_onecell_get, &clk_data);
+>>>>   }
+>>>> +CLK_OF_DECLARE(sirfsoc_clk, "sirf,prima2-clkc", sirfsoc_clk_init);
+>>>
+>>>
+>>> hi Sebastian,
+>>> what if the driver is compatible with multiple clk controllers and we
+>>> want to add another compatible string here except "sirf,prima2-clkc"?
+>>>
+>>> -barry
+>>>
+>>
+>> Just add
+>> CLK_OF_DECLARE(other_fancy_clk, "sirf,different-compatible",
+>> sirfsoc_clk_init);
+>
+>
+> Barry, BTW, do I get your Acked-By for this and the corresponding
+> removal patch?
 
+Sebastian, would you wait for a while as i need to merge them and make a test.
 
-> On 22 sep. 2013, at 12:11, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
-> 
->> On Mon, Jul 08, 2013 at 11:11:56PM +0100, Ard Biesheuvel wrote:
->> This is version 3 of the kernel mode NEON patch set.
-> 
-> I've noticed some of the randconfigs are failing due to trying to mix
-> VFP and FPA objects together, which causes the linker to complain.
-> 
-> I thought about adding -Wa,-mfpu=softvfp, but this overrides your
-> -mfpu=neon resulting in the neon code failing to build.  -mfpu=softvfp
-> doesn't work because GCC and binutils don't take the same -mfpu=
-> option names (GCC rejects softvfp, whereas the assembler accepts it.)
-> 
-> This only happens when AEABI is not selected, so I think the only
-> solution to this is to make KERNEL_MODE_NEON depend on AEABI - and
-> this is what I've committed to my tree today.
+>
+> Sebastian
+>
 
-This makes perfect sense, especially as neon code may assume an 8 byte aligned stack, which i suppose is not guaranteed when !AEABI.
-
-Regards,
-Ard.
+-barry
