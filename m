@@ -1,56 +1,37 @@
-From: jussi.kivilinna@iki.fi (Jussi Kivilinna)
-Date: Sun, 22 Sep 2013 14:12:07 +0300
-Subject: [PATCH 4/4] ARM: add support for bit sliced AES using NEON
- instructions
-In-Reply-To: <1379702811-8025-5-git-send-email-ard.biesheuvel@linaro.org>
-References: <1379702811-8025-1-git-send-email-ard.biesheuvel@linaro.org>
- <1379702811-8025-5-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <523ED087.7050006@iki.fi>
+From: horms@verge.net.au (Simon Horman)
+Date: Sun, 22 Sep 2013 21:04:48 +0900
+Subject: [PATCH/RESEND 1/2] gpio: rcar: Remove #gpio-range-cells DT
+ property usage
+In-Reply-To: <1566063.hFmS6D0Ff2@avalon>
+References: <1378907462-19247-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <CACRpkdZ4EaUVgYoMP6VMefZgE1T--5hh18RzupQLnbd0KpveAA@mail.gmail.com>
+ <20130920190614.GF22321@verge.net.au> <1566063.hFmS6D0Ff2@avalon>
+Message-ID: <20130922120446.GB8941@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20.09.2013 21:46, Ard Biesheuvel wrote:
-> This implementation of the AES algorithm gives around 45% speedup on Cortex-A15
-> for CTR mode and for XTS in encryption mode. Both CBC and XTS in decryption mode
-> are slightly faster (5 - 10% on Cortex-A15). [As CBC in encryption mode can only
-> be performed sequentially, there is no speedup in this case.]
+On Fri, Sep 20, 2013 at 09:57:44PM +0200, Laurent Pinchart wrote:
+> Hi Simon,
 > 
-> Unlike the core AES cipher (on which this module also depends), this algorithm
-> uses bit slicing to process up to 8 blocks in parallel in constant time. This
-> algorithm does not rely on any lookup tables so it is believed to be
-> invulnerable to cache timing attacks.
+> On Friday 20 September 2013 12:06:14 Simon Horman wrote:
+> > On Fri, Sep 20, 2013 at 08:36:57PM +0200, Linus Walleij wrote:
+> > > On Wed, Sep 11, 2013 at 3:51 PM, Laurent Pinchart
+> > > 
+> > > <laurent.pinchart+renesas@ideasonboard.com> wrote:
+> > > > Commit a1bc260bb5f5d95da854be7898202d788e94448d ("gpio: clean up
+> > > > gpio-ranges documentation") deprecated the #gpio-range-cells property.
+> > > > Replace its usage with a hardcoded value in the gpio-rcar driver.
+> > > > 
+> > > > Signed-off-by: Laurent Pinchart
+> > > > <laurent.pinchart+renesas@ideasonboard.com>
+> > > 
+> > > Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> > > 
+> > > Simon please take the whole set into the SH tree.
+> > 
+> > Thanks, will do.
 > 
-> The core code has been adopted from the OpenSSL project (in collaboration
-> with the original author, on cc). For ease of maintenance, this version is
-> identical to the upstream OpenSSL code, i.e., all modifications that were
-> required to make it suitable for inclusion into the kernel have already been
-> merged upstream.
-> 
-> Cc: Andy Polyakov <appro@openssl.org>
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
-[..snip..]
-> +	bcc	.Ldec_done
-> +	@ multiplication by 0x0e
+> Just a quick reminder that the two patches are v3.12 fixes. Would you like me 
+> to send you a pull request ?
 
-Decryption can probably be made faster by implementing InvMixColumns slightly
-differently. Instead of implementing inverse MixColumns matrix directly, use
-preprocessing step, followed by MixColumns as described in section "4.1.3
-Decryption" of "The Design of Rijndael: AES - The Advanced Encryption Standard"
-(J. Daemen, V. Rijmen / 2002).
-
-In short, the MixColumns and InvMixColumns matrixes have following relation:
- | 0e 0b 0d 09 |   | 02 03 01 01 |   | 05 00 04 00 |
- | 09 0e 0b 0d | = | 01 02 03 01 | x | 00 05 00 04 |
- | 0d 09 0e 0b |   | 01 01 02 03 |   | 04 00 05 00 |
- | 0b 0d 09 0e |   | 03 01 01 02 |   | 00 04 00 05 |
-
-Bit-sliced implementation of the 05-00-04-00 matrix much shorter than 0e-0b-0d-09
-matrix, so even when combined with MixColumns total instruction count for
-InvMixColumns implemented this way should be nearly half of current.
-
-Check [1] for implementation of this on AVX instruction set.
-
--Jussi
-
-[1] https://github.com/jkivilin/supercop-blockciphers/blob/beyond_master/crypto_stream/aes128ctr/avx/aes_asm_bitslice_avx.S#L234
+Thanks, that would be very helpful.
