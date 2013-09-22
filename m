@@ -1,46 +1,56 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Sun, 22 Sep 2013 18:37:59 +0800
-Subject: [PATCH 04/26] clk: prima2: declare OF clock provider
-In-Reply-To: <523EDEB0.1060601@gmail.com>
-References: <1379526839-14798-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1379526839-14798-5-git-send-email-sebastian.hesselbarth@gmail.com>
- <CAGsJ_4xC_g1C-pGQGrcLOBhKLSMG3D8369DRPoFgNZhKqs-aTQ@mail.gmail.com>
- <523ABA7A.50305@gmail.com> <523EDEB0.1060601@gmail.com>
-Message-ID: <CAGsJ_4yPcM4YM_i-JMCoDeRb5zKWJyNEt+jnMJ6LqoF5gC3KhA@mail.gmail.com>
+From: jussi.kivilinna@iki.fi (Jussi Kivilinna)
+Date: Sun, 22 Sep 2013 14:12:07 +0300
+Subject: [PATCH 4/4] ARM: add support for bit sliced AES using NEON
+ instructions
+In-Reply-To: <1379702811-8025-5-git-send-email-ard.biesheuvel@linaro.org>
+References: <1379702811-8025-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1379702811-8025-5-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <523ED087.7050006@iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/9/22 Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>:
-> On 09/19/2013 10:48 AM, Sebastian Hesselbarth wrote:
->>
->> On 09/19/13 10:45, Barry Song wrote:
->>>>
->>>> @@ -1124,3 +1106,4 @@ void __init sirfsoc_of_clk_init(void)
->>>>
->>>>          of_clk_add_provider(np, of_clk_src_onecell_get, &clk_data);
->>>>   }
->>>> +CLK_OF_DECLARE(sirfsoc_clk, "sirf,prima2-clkc", sirfsoc_clk_init);
->>>
->>>
->>> hi Sebastian,
->>> what if the driver is compatible with multiple clk controllers and we
->>> want to add another compatible string here except "sirf,prima2-clkc"?
->>>
->>> -barry
->>>
->>
->> Just add
->> CLK_OF_DECLARE(other_fancy_clk, "sirf,different-compatible",
->> sirfsoc_clk_init);
->
->
-> Barry, BTW, do I get your Acked-By for this and the corresponding
-> removal patch?
+On 20.09.2013 21:46, Ard Biesheuvel wrote:
+> This implementation of the AES algorithm gives around 45% speedup on Cortex-A15
+> for CTR mode and for XTS in encryption mode. Both CBC and XTS in decryption mode
+> are slightly faster (5 - 10% on Cortex-A15). [As CBC in encryption mode can only
+> be performed sequentially, there is no speedup in this case.]
+> 
+> Unlike the core AES cipher (on which this module also depends), this algorithm
+> uses bit slicing to process up to 8 blocks in parallel in constant time. This
+> algorithm does not rely on any lookup tables so it is believed to be
+> invulnerable to cache timing attacks.
+> 
+> The core code has been adopted from the OpenSSL project (in collaboration
+> with the original author, on cc). For ease of maintenance, this version is
+> identical to the upstream OpenSSL code, i.e., all modifications that were
+> required to make it suitable for inclusion into the kernel have already been
+> merged upstream.
+> 
+> Cc: Andy Polyakov <appro@openssl.org>
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+[..snip..]
+> +	bcc	.Ldec_done
+> +	@ multiplication by 0x0e
 
-Sebastian, would you wait for a while as i need to merge them and make a test.
+Decryption can probably be made faster by implementing InvMixColumns slightly
+differently. Instead of implementing inverse MixColumns matrix directly, use
+preprocessing step, followed by MixColumns as described in section "4.1.3
+Decryption" of "The Design of Rijndael: AES - The Advanced Encryption Standard"
+(J. Daemen, V. Rijmen / 2002).
 
->
-> Sebastian
->
+In short, the MixColumns and InvMixColumns matrixes have following relation:
+ | 0e 0b 0d 09 |   | 02 03 01 01 |   | 05 00 04 00 |
+ | 09 0e 0b 0d | = | 01 02 03 01 | x | 00 05 00 04 |
+ | 0d 09 0e 0b |   | 01 01 02 03 |   | 04 00 05 00 |
+ | 0b 0d 09 0e |   | 03 01 01 02 |   | 00 04 00 05 |
 
--barry
+Bit-sliced implementation of the 05-00-04-00 matrix much shorter than 0e-0b-0d-09
+matrix, so even when combined with MixColumns total instruction count for
+InvMixColumns implemented this way should be nearly half of current.
+
+Check [1] for implementation of this on AVX instruction set.
+
+-Jussi
+
+[1] https://github.com/jkivilin/supercop-blockciphers/blob/beyond_master/crypto_stream/aes128ctr/avx/aes_asm_bitslice_avx.S#L234
