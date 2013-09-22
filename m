@@ -1,89 +1,39 @@
-From: eranpublic@yahoo.com (Eran Ben-Avi)
-Date: Sun, 22 Sep 2013 07:52:30 -0700 (PDT)
-Subject: [PATCH] ARM: l2x0: protect outer_cache_fns.sync pointer assignment
- with OUTER_CACHE_SYNC
-Message-ID: <1379861550.88310.YahooMailNeo@web161601.mail.bf1.yahoo.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Sun, 22 Sep 2013 13:16:38 -0300
+Subject: mxsfb on i.MX28 uses bypassed ref_xtal 24MHz clock for LCD
+In-Reply-To: <523C529F.4000300@digi.com>
+References: <5196375A.1070308@digi.com>
+	<523C529F.4000300@digi.com>
+Message-ID: <CAOMZO5Ds-HmFYua7A1j7BiMVjUipGzddmatnOpo1NORCVYLUWQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Hector,
 
+On Fri, Sep 20, 2013 at 10:50 AM, Hector Palacios
+<hector.palacios@digi.com> wrote:
 
-Outer cache sync pointer function should be assigned only if OUTER_CACHE_SYNC
-config option was selected, otherwise pointer is not valid.
+> --- a/drivers/clk/mxs/clk-imx28.c
+> +++ b/drivers/clk/mxs/clk-imx28.c
+> @@ -246,6 +246,12 @@ int __init mx28_clocks_init(void)
+>         clk_data.clk_num = ARRAY_SIZE(clks);
+>         of_clk_add_provider(np, of_clk_src_onecell_get, &clk_data);
+>
+> +       /*
+> +        * Select PLL as the parent source of lcdif_sel clk to have a finer
+> +        * granularity when calculating the LCD pixelclock
+> +        */
+> +       clk_set_parent(clks[lcdif_sel], clks[ref_pix]);
+> +
+>         clk_register_clkdev(clks[enet_out], NULL, "enet_out");
+>
+>         for (i = 0; i < ARRAY_SIZE(clks_init_on); i++)
+>
+>
+> Without this, the pixelclock can only be a power of two divisor of 24MHz,
+> and I need a 20MHz signal, otherwise I see bad pixels in true color images
+> on my LCD.
 
-Signed-off-by: Eran Ben-Avi <benavi@marvell.com>
----
-?arch/arm/mm/cache-l2x0.c |?? 12 ++++++++++++
-?1 file changed, 12 insertions(+)
+When you submit this patch, you can add:
 
-diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-index 447da6f..d358573 100644
---- a/arch/arm/mm/cache-l2x0.c
-+++ b/arch/arm/mm/cache-l2x0.c
-@@ -128,6 +128,7 @@ static inline void l2x0_flush_line(unsigned long addr)
-?}
-?#endif
-?
-+#ifdef CONFIG_OUTER_CACHE_SYNC
-?static void l2x0_cache_sync(void)
-?{
-???? unsigned long flags;
-@@ -136,6 +137,7 @@ static void l2x0_cache_sync(void)
-???? cache_sync();
-???? raw_spin_unlock_irqrestore(&l2x0_lock, flags);
-?}
-+#endif
-?
-?static void __l2x0_flush_all(void)
-?{
-@@ -411,7 +413,9 @@ void __init l2x0_init(void __iomem *base, u32 aux_val, u32 aux_mask)
-???? ??? outer_cache.inv_range = l2x0_inv_range;
-???? ??? outer_cache.clean_range = l2x0_clean_range;
-???? ??? outer_cache.flush_range = l2x0_flush_range;
-+#ifdef CONFIG_OUTER_CACHE_SYNC
-???? ??? outer_cache.sync = l2x0_cache_sync;
-+#endif
-???? ??? outer_cache.flush_all = l2x0_flush_all;
-???? ??? outer_cache.inv_all = l2x0_inv_all;
-???? ??? outer_cache.disable = l2x0_disable;
-@@ -861,7 +865,9 @@ static const struct l2x0_of_data pl310_data = {
-???? ??? .inv_range?? = l2x0_inv_range,
-???? ??? .clean_range = l2x0_clean_range,
-???? ??? .flush_range = l2x0_flush_range,
-+#ifdef CONFIG_OUTER_CACHE_SYNC
-???? ??? .sync??????? = l2x0_cache_sync,
-+#endif
-???? ??? .flush_all?? = l2x0_flush_all,
-???? ??? .inv_all???? = l2x0_inv_all,
-???? ??? .disable???? = l2x0_disable,
-@@ -876,7 +882,9 @@ static const struct l2x0_of_data l2x0_data = {
-???? ??? .inv_range?? = l2x0_inv_range,
-???? ??? .clean_range = l2x0_clean_range,
-???? ??? .flush_range = l2x0_flush_range,
-+#ifdef CONFIG_OUTER_CACHE_SYNC
-???? ??? .sync??????? = l2x0_cache_sync,
-+#endif
-???? ??? .flush_all?? = l2x0_flush_all,
-???? ??? .inv_all???? = l2x0_inv_all,
-???? ??? .disable???? = l2x0_disable,
-@@ -891,7 +899,9 @@ static const struct l2x0_of_data aurora_with_outer_data = {
-???? ??? .inv_range?? = aurora_inv_range,
-???? ??? .clean_range = aurora_clean_range,
-???? ??? .flush_range = aurora_flush_range,
-+#ifdef CONFIG_OUTER_CACHE_SYNC
-???? ??? .sync??????? = l2x0_cache_sync,
-+#endif
-???? ??? .flush_all?? = l2x0_flush_all,
-???? ??? .inv_all???? = l2x0_inv_all,
-???? ??? .disable???? = l2x0_disable,
-@@ -914,7 +924,9 @@ static const struct l2x0_of_data bcm_l2x0_data = {
-???? ??? .inv_range?? = bcm_inv_range,
-???? ??? .clean_range = bcm_clean_range,
-???? ??? .flush_range = bcm_flush_range,
-+#ifdef CONFIG_OUTER_CACHE_SYNC
-???? ??? .sync??????? = l2x0_cache_sync,
-+#endif
-???? ??? .flush_all?? = l2x0_flush_all,
-???? ??? .inv_all???? = l2x0_inv_all,
-???? ??? .disable???? = l2x0_disable,
--- 
+Tested-by: Fabio Estevam <fabio.estevam@freescale.com>
