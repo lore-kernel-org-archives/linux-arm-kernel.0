@@ -1,39 +1,33 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Sun, 22 Sep 2013 14:20:28 +0200
-Subject: [PATCH 11/26] ARM: dove: remove custom .init_time hook
-In-Reply-To: <20130921122226.GB31180@lunn.ch>
-References: <1379526839-14798-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1379526839-14798-12-git-send-email-sebastian.hesselbarth@gmail.com>
- <20130921122226.GB31180@lunn.ch>
-Message-ID: <523EE08C.60309@gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Sun, 22 Sep 2013 12:24:37 +0200
+Subject: [PATCH v3 0/5] kernel mode NEON support
+In-Reply-To: <20130922101155.GP12758@n2100.arm.linux.org.uk>
+References: <1373321521-15485-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20130922101155.GP12758@n2100.arm.linux.org.uk>
+Message-ID: <EE9C6CC6-FB18-483F-9AC7-66FD40E2BA77@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/21/2013 02:22 PM, Andrew Lunn wrote:
-> On Wed, Sep 18, 2013 at 07:53:44PM +0200, Sebastian Hesselbarth wrote:
->> With arch/arm calling of_clk_init(NULL) from time_init(), we can now
->> remove custom .init_time hooks. While at it, also remove some obsolete
->> includes.
->>
->> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
->> ---
->> Cc: Olof Johansson <olof@lixom.net>
->> Cc: Arnd Bergmann <arnd@arndb.de>
->> Cc: Jason Cooper <jason@lakedaemon.net>
->> Cc: Andrew Lunn <andrew@lunn.ch>
->> Cc: Russell King <linux@arm.linux.org.uk>
->> Cc: linux-arm-kernel at lists.infradead.org
->> Cc: linux-kernel at vger.kernel.org
->> ---
->>   arch/arm/mach-dove/board-dt.c |   11 -----------
->>   1 file changed, 11 deletions(-)
-[...]
-> Boot tested on cubox.
->
-> Tested-by: Andrew Lunn <andrew@lunn.ch>
 
-Thanks Andrew!
 
-Aren't you giving any Acks for dove/kirkwood anymore?
+> On 22 sep. 2013, at 12:11, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+> 
+>> On Mon, Jul 08, 2013 at 11:11:56PM +0100, Ard Biesheuvel wrote:
+>> This is version 3 of the kernel mode NEON patch set.
+> 
+> I've noticed some of the randconfigs are failing due to trying to mix
+> VFP and FPA objects together, which causes the linker to complain.
+> 
+> I thought about adding -Wa,-mfpu=softvfp, but this overrides your
+> -mfpu=neon resulting in the neon code failing to build.  -mfpu=softvfp
+> doesn't work because GCC and binutils don't take the same -mfpu=
+> option names (GCC rejects softvfp, whereas the assembler accepts it.)
+> 
+> This only happens when AEABI is not selected, so I think the only
+> solution to this is to make KERNEL_MODE_NEON depend on AEABI - and
+> this is what I've committed to my tree today.
 
-Sebastian
+This makes perfect sense, especially as neon code may assume an 8 byte aligned stack, which i suppose is not guaranteed when !AEABI.
+
+Regards,
+Ard.
