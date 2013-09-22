@@ -1,21 +1,22 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Sun, 22 Sep 2013 06:42:35 +0530
-Subject: [PATCH v4 2/3] Cpufreq: s5pv210 cpufreq fixes for CCF
-In-Reply-To: <1379785342-25107-3-git-send-email-m.krawczuk@partner.samsung.com>
-References: <1379785342-25107-1-git-send-email-m.krawczuk@partner.samsung.com>
- <1379785342-25107-3-git-send-email-m.krawczuk@partner.samsung.com>
-Message-ID: <CAKohpokEF_+d_G0LX76JK_dNBtYtAKPznWbDcwLen4pgQTOt6w@mail.gmail.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Sat, 21 Sep 2013 19:31:04 -0700
+Subject: [PATCH v5] clk: si570: Add a driver for SI570 oscillators
+In-Reply-To: <1379806839-13762-1-git-send-email-soren.brinkmann@xilinx.com>
+References: <1379806839-13762-1-git-send-email-soren.brinkmann@xilinx.com>
+Message-ID: <523E5668.2000201@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21 September 2013 23:12, Mateusz Krawczuk
-<m.krawczuk@partner.samsung.com> wrote:
-> Use common clock framework api to get clock.
+On 09/21/2013 04:40 PM, Soren Brinkmann wrote:
+> Add a driver for SILabs 570, 571, 598, 599 programmable oscillators.
+> The devices generate low-jitter clock signals and are reprogrammable via
+> an I2C interface.
 >
-> Signed-off-by: Mateusz Krawczuk <m.krawczuk@partner.samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> ---
->  drivers/cpufreq/s5pv210-cpufreq.c | 6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
+> Cc: Guenter Roeck <linux@roeck-us.net>
+> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
 
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+Looks good to me. Thanks a lot for picking this up.
+
+Reviewed-by: Guenter Roeck <linux@roeck-us.net>
+
+Guenter
