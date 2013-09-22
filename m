@@ -1,37 +1,25 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Sun, 22 Sep 2013 21:04:48 +0900
-Subject: [PATCH/RESEND 1/2] gpio: rcar: Remove #gpio-range-cells DT
- property usage
-In-Reply-To: <1566063.hFmS6D0Ff2@avalon>
-References: <1378907462-19247-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <CACRpkdZ4EaUVgYoMP6VMefZgE1T--5hh18RzupQLnbd0KpveAA@mail.gmail.com>
- <20130920190614.GF22321@verge.net.au> <1566063.hFmS6D0Ff2@avalon>
-Message-ID: <20130922120446.GB8941@verge.net.au>
+From: cinifr@gmail.com (Fan Rong)
+Date: Sun, 22 Sep 2013 20:21:25 +0800
+Subject: [PATCH V3: Add Smp support for Allwinner A20. 0/3] 
+Message-ID: <1379852488-32147-1-git-send-email-cinifr@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 20, 2013 at 09:57:44PM +0200, Laurent Pinchart wrote:
-> Hi Simon,
-> 
-> On Friday 20 September 2013 12:06:14 Simon Horman wrote:
-> > On Fri, Sep 20, 2013 at 08:36:57PM +0200, Linus Walleij wrote:
-> > > On Wed, Sep 11, 2013 at 3:51 PM, Laurent Pinchart
-> > > 
-> > > <laurent.pinchart+renesas@ideasonboard.com> wrote:
-> > > > Commit a1bc260bb5f5d95da854be7898202d788e94448d ("gpio: clean up
-> > > > gpio-ranges documentation") deprecated the #gpio-range-cells property.
-> > > > Replace its usage with a hardcoded value in the gpio-rcar driver.
-> > > > 
-> > > > Signed-off-by: Laurent Pinchart
-> > > > <laurent.pinchart+renesas@ideasonboard.com>
-> > > 
-> > > Acked-by: Linus Walleij <linus.walleij@linaro.org>
-> > > 
-> > > Simon please take the whole set into the SH tree.
-> > 
-> > Thanks, will do.
-> 
-> Just a quick reminder that the two patches are v3.12 fixes. Would you like me 
-> to send you a pull request ?
+This is the version3 patch. It delete platform.h and delete some code in platsmp.c that's not necessary. The patchs add smp support for Allwinner A20. It add cpu register node and arch timer node in dts for smp booting. SMP need arch timer as clocksource, It does use virtual counter timer and does not use physical counter timer, so bootloader ***must*** set CNTVOFF register for a20 before kernel booting. I have add support set CNTVOFF register for uboot, if you want to test it in a20 board, you need update uboot. Thanks for advice of Mark Rutland, Marc Zyngier, Ian Campbell, Russell King and Maxime Ripard.
 
-Thanks, that would be very helpful.
+Fan Rong (3):
+  Add smp support for Allwinner A20(sunxi 7i).
+  Add cpuconfig nodes in dts for smp configure.
+  add arch count timer node in dts for Allwinner A20(sunxi 7i).
+
+ arch/arm/boot/dts/sun7i-a20.dtsi | 19 ++++++++-
+ arch/arm/mach-sunxi/Makefile     |  2 +
+ arch/arm/mach-sunxi/headsmp.S    | 17 ++++++++
+ arch/arm/mach-sunxi/platsmp.c    | 86 ++++++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-sunxi/sunxi.c      | 31 +++++++++++++++
+ 5 files changed, 153 insertions(+), 2 deletions(-)
+ create mode 100644 arch/arm/mach-sunxi/headsmp.S
+ create mode 100644 arch/arm/mach-sunxi/platsmp.c
+
+-- 
+1.8.1.2
