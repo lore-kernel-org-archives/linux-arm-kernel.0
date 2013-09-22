@@ -1,160 +1,47 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Sun, 22 Sep 2013 18:46:22 +0200
-Subject: [PATCH v2 03/26] clk: nomadik: declare OF clock provider
-In-Reply-To: <1379526839-14798-4-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1379526839-14798-4-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1379868382-2877-1-git-send-email-sebastian.hesselbarth@gmail.com>
+From: fweisbec@gmail.com (Frederic Weisbecker)
+Date: Sun, 22 Sep 2013 11:59:35 -0500
+Subject: [PATCH] arm: Fix build error with context tracking calls
+In-Reply-To: <20130914143213.GN25647@n2100.arm.linux.org.uk>
+References: <522CB0DE.2010102@roeck-us.net>
+ <20130909105115.GL25647@n2100.arm.linux.org.uk>
+ <522DB86A.8010207@roeck-us.net>
+ <alpine.LFD.2.03.1309091023440.20709@syhkavp.arg>
+ <20130909160348.GB18975@roeck-us.net>
+ <20130909203141.GM25647@n2100.arm.linux.org.uk>
+ <20130909210203.GC28416@roeck-us.net>
+ <alpine.LFD.2.03.1309091714420.20709@syhkavp.arg>
+ <87y574g1fi.fsf@linaro.org> <20130913170331.GA8453@somewhere>
+ <20130914143213.GN25647@n2100.arm.linux.org.uk>
+Message-ID: <CAFTL4hzccoaUinQ37bpbqXDv-bbNkuww8FURQMwD_zEb9RqSMA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Common clock framework allows to register clock providers to get called
-on of_clk_init() by using CLK_OF_DECLARE. This converts nomadik clock
-provider to make use of it and get rid of the mach specific clk init
-call. As clocks require system reset controller base address to be
-initialized each clock driver checks src_base and calls new
-nomadik_src_init if required.
+2013/9/14, Russell King - ARM Linux <linux@arm.linux.org.uk>:
+> On Fri, Sep 13, 2013 at 07:03:34PM +0200, Frederic Weisbecker wrote:
+>> diff --git a/kernel/context_tracking.c b/kernel/context_tracking.c
+>> index 247091b..859c8df 100644
+>> --- a/kernel/context_tracking.c
+>> +++ b/kernel/context_tracking.c
+>> @@ -51,6 +51,15 @@ void context_tracking_user_enter(void)
+>>  	unsigned long flags;
+>>
+>>  	/*
+>> +	 * Repeat the user_enter() check here because some archs may be calling
+>> +	 * this from asm and if no CPU needs context tracking, they shouldn't
+>> +	 * go further. We can remove that check here once these archs support
+>> the static key
+>> +	 * check.
+>
+> The only (minor) comment on this is that the above would fail checkpatch,
+> but that's not a good enough reason to respin it if you've already applied
+> it IMHO.
+>
 
-Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
----
-Changelog:
-v1->v2:
-- adapt to clk-nomadik changes
+Ah I haven't yet pushed that patch anywhere so I can definetly fix
+that. Thanks for the review. BTW, I initially first thought this fix
+could go through your tree but if you prefer I can push it through
+Ingo to the context tracking bits.
 
-Cc: Olof Johansson <olof@lixom.net>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Alessandro Rubini <rubini@unipv.it>
-Cc: Linus Walleij <linus.walleij@linaro.org>
-Cc: STEricsson <STEricsson_nomadik_linux@list.st.com>
-Cc: Mike Turquette <mturquette@linaro.org>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
----
- arch/arm/mach-nomadik/cpu-8815.c          |    5 ++--
- drivers/clk/clk-nomadik.c                 |   45 ++++++++++-------------------
- include/linux/platform_data/clk-nomadik.h |    2 --
- 3 files changed, 17 insertions(+), 35 deletions(-)
- delete mode 100644 include/linux/platform_data/clk-nomadik.h
+Just tell me either way.
 
-diff --git a/arch/arm/mach-nomadik/cpu-8815.c b/arch/arm/mach-nomadik/cpu-8815.c
-index 0fcb149..2be38a0 100644
---- a/arch/arm/mach-nomadik/cpu-8815.c
-+++ b/arch/arm/mach-nomadik/cpu-8815.c
-@@ -25,7 +25,7 @@
- #include <linux/slab.h>
- #include <linux/irq.h>
- #include <linux/dma-mapping.h>
--#include <linux/platform_data/clk-nomadik.h>
-+#include <linux/clk-provider.h>
- #include <linux/clocksource.h>
- #include <linux/of_irq.h>
- #include <linux/of_gpio.h>
-@@ -115,8 +115,7 @@ static void cpu8815_restart(enum reboot_mode mode, const char *cmd)
- 
- static void __init cpu8815_timer_init_of(void)
- {
--	/* We need this to be up now */
--	nomadik_clk_init();
-+	of_clk_init(NULL);
- 	clocksource_of_init();
- }
- 
-diff --git a/drivers/clk/clk-nomadik.c b/drivers/clk/clk-nomadik.c
-index 06b29c26..ce2d6b3 100644
---- a/drivers/clk/clk-nomadik.c
-+++ b/drivers/clk/clk-nomadik.c
-@@ -512,6 +512,9 @@ static void __init of_nomadik_pll_setup(struct device_node *np)
- 	const char *parent_name;
- 	u32 pll_id;
- 
-+	if (!src_base)
-+		nomadik_src_init();
-+
- 	if (of_property_read_u32(np, "pll-id", &pll_id)) {
- 		pr_err("%s: PLL \"%s\" missing pll-id property\n",
- 			__func__, clk_name);
-@@ -522,6 +525,8 @@ static void __init of_nomadik_pll_setup(struct device_node *np)
- 	if (!IS_ERR(clk))
- 		of_clk_add_provider(np, of_clk_src_simple_get, clk);
- }
-+CLK_OF_DECLARE(nomadik_pll_clk,
-+	"st,nomadik-pll-clock", of_nomadik_pll_setup);
- 
- static void __init of_nomadik_hclk_setup(struct device_node *np)
- {
-@@ -529,6 +534,9 @@ static void __init of_nomadik_hclk_setup(struct device_node *np)
- 	const char *clk_name = np->name;
- 	const char *parent_name;
- 
-+	if (!src_base)
-+		nomadik_src_init();
-+
- 	parent_name = of_clk_get_parent_name(np, 0);
- 	/*
- 	 * The HCLK divides PLL1 with 1 (passthru), 2, 3 or 4.
-@@ -541,6 +549,8 @@ static void __init of_nomadik_hclk_setup(struct device_node *np)
- 	if (!IS_ERR(clk))
- 		of_clk_add_provider(np, of_clk_src_simple_get, clk);
- }
-+CLK_OF_DECLARE(nomadik_hclk_clk,
-+	"st,nomadik-hclk-clock", of_nomadik_hclk_setup);
- 
- static void __init of_nomadik_src_clk_setup(struct device_node *np)
- {
-@@ -549,6 +559,9 @@ static void __init of_nomadik_src_clk_setup(struct device_node *np)
- 	const char *parent_name;
- 	u32 clk_id;
- 
-+	if (!src_base)
-+		nomadik_src_init();
-+
- 	if (of_property_read_u32(np, "clock-id", &clk_id)) {
- 		pr_err("%s: SRC clock \"%s\" missing clock-id property\n",
- 			__func__, clk_name);
-@@ -559,33 +572,5 @@ static void __init of_nomadik_src_clk_setup(struct device_node *np)
- 	if (!IS_ERR(clk))
- 		of_clk_add_provider(np, of_clk_src_simple_get, clk);
- }
--
--static const struct of_device_id nomadik_src_clk_match[] __initconst = {
--	{
--		.compatible = "fixed-clock",
--		.data = of_fixed_clk_setup,
--	},
--	{
--		.compatible = "fixed-factor-clock",
--		.data = of_fixed_factor_clk_setup,
--	},
--	{
--		.compatible = "st,nomadik-pll-clock",
--		.data = of_nomadik_pll_setup,
--	},
--	{
--		.compatible = "st,nomadik-hclk-clock",
--		.data = of_nomadik_hclk_setup,
--	},
--	{
--		.compatible = "st,nomadik-src-clock",
--		.data = of_nomadik_src_clk_setup,
--	},
--	{ /* sentinel */ }
--};
--
--void __init nomadik_clk_init(void)
--{
--	nomadik_src_init();
--	of_clk_init(nomadik_src_clk_match);
--}
-+CLK_OF_DECLARE(nomadik_src_clk,
-+	"st,nomadik-src-clock", of_nomadik_src_clk_setup);
-diff --git a/include/linux/platform_data/clk-nomadik.h b/include/linux/platform_data/clk-nomadik.h
-deleted file mode 100644
-index 5713c87..0000000
---- a/include/linux/platform_data/clk-nomadik.h
-+++ /dev/null
-@@ -1,2 +0,0 @@
--/* Minimal platform data header */
--void nomadik_clk_init(void);
--- 
-1.7.10.4
+Thanks!
