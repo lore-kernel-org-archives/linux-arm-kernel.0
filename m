@@ -1,41 +1,47 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 23 Sep 2013 13:52:44 -0600
-Subject: [PATCH v3 1/2] video: ARM CLCD: Add DT support
-In-Reply-To: <20130923164302.GW12758@n2100.arm.linux.org.uk>
-References: <1379351934-25415-1-git-send-email-pawel.moll@arm.com>
- <52376180.1090001@wwwdotorg.org> <1379435799.9205.16.camel@hornet>
- <5238CBE9.2060800@wwwdotorg.org> <1379522363.9244.12.camel@hornet>
- <52406646.709@wwwdotorg.org> <20130923160640.GT12758@n2100.arm.linux.org.uk>
- <52406C97.3010800@wwwdotorg.org>
- <20130923164302.GW12758@n2100.arm.linux.org.uk>
-Message-ID: <52409C0C.1000406@wwwdotorg.org>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 23 Sep 2013 12:59:44 -0700
+Subject: [PATCH] ARM: kvm: rename cpu_reset to avoid name clash
+In-Reply-To: <CAMJs5B9NW6cDuG-xwYucP8rONn0MdEtwTm5R2p=aBE4Q3EHNOg@mail.gmail.com>
+References: <1378938461-10835-1-git-send-email-olof@lixom.net>
+ <CAOesGMjum0TSyudXiZtXHOGX4R7dBAhjUpoYnwjTcfD1MMpTxw@mail.gmail.com>
+ <20130912015002.GO9860@cbox>
+ <CAOesGMiGaM=s85iKHPXd9eBiL1vy3SVws+KR0ToxPpZeiisscg@mail.gmail.com>
+ <CAMJs5B9NW6cDuG-xwYucP8rONn0MdEtwTm5R2p=aBE4Q3EHNOg@mail.gmail.com>
+Message-ID: <CAOesGMhPHaZ7tOshbvU1M87nshTOVqU7-+1AvOmARzKUDN6syw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/23/2013 10:43 AM, Russell King - ARM Linux wrote:
-> On Mon, Sep 23, 2013 at 10:30:15AM -0600, Stephen Warren wrote:
->> On 09/23/2013 10:06 AM, Russell King - ARM Linux wrote:
->>> On Mon, Sep 23, 2013 at 10:03:18AM -0600, Stephen Warren wrote:
->>>> It sounds like you could just put LCDControl & 0x2e in the DT rather
->>>> than using values such as 0x100..0x107, which don't appear to match the
->>>> register format you mentioned above.
->>>
->>> No.  Platforms which route the outputs to something like VGA or HDMI can
->>> change the framebuffer format.  Your suggestions is far too restrictive.
->>
->> Surely the DT should describe the HW setup only. Usually, a particular
->> HW setup can support multiple different framebuffer formats. Hence, the
->> DT wouldn't/shouldn't imply anything about the framebuffer format, but
->> simply which wires are connected to the LCD.
-> 
-> Quite, and putting the contents of the LCDControl register - even just
-> bits 5 and 3-1 results in you having to modify the DT and reboot the
-> kernel just to change the framebuffer format.  That's why I'm objecting
-> to your comment.
+Hi Christoffer,
 
-Oh, so these particular registers define both the output signal muxing
-for the pins and the FB data format? If so, yes it's not correct to put
-the register values into DT. I assumed that the HW would have a separate
-representation of those two concepts, in different registers or at least
-different fields in the same register. If not, there is indeed no choice
-but to make up some arbitrary values to represent just the pinmuxing :-(
+On Mon, Sep 16, 2013 at 8:47 PM, Christoffer Dall
+<christoffer.dall@linaro.org> wrote:
+> On 16 September 2013 19:41, Olof Johansson <olof@lixom.net> wrote:
+>> Hi,
+>>
+>> On Wed, Sep 11, 2013 at 6:50 PM, Christoffer Dall
+>> <christoffer.dall@linaro.org> wrote:
+>>> On Wed, Sep 11, 2013 at 03:39:26PM -0700, Olof Johansson wrote:
+>>>> On Wed, Sep 11, 2013 at 3:27 PM, Olof Johansson <olof@lixom.net> wrote:
+>>>> > cpu_reset is already #defined in <asm/proc-fns.h> as processor.reset,
+>>>> > so it expands here and causes problems.
+>>>> >
+>>>> > Signed-off-by: Olof Johansson <olof@lixom.net>
+>>>>
+>>>> I just noticed this is broken on 3.10 too, so if/when applying feel free to add:
+>>>>
+>>>> Cc: <stable@vger.kernel.org> # 3.10+
+>>>>
+>>> Thanks for the fix, applied.
+>>
+>> I haven't seen this hit linux-next yet?
+>>
+> I was waiting for kvm/next to move to 3.12-rc1 and base the patch for
+> kvm-arm-next off there, but I pushed this to kvm-arm-next now and it
+> should land in linux-next as soon as they update.
+
+Another week has passed, and -next and mainline are both still broken.
+Can we please see a fix in mainline and -next within the next few
+days?
+
+
+-Olof
