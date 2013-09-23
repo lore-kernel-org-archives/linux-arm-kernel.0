@@ -1,55 +1,50 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 23 Sep 2013 12:22:31 -0600
-Subject: [PATCH 07/12] clk: tegra: move audio clk to common file
-In-Reply-To: <1379515331-19427-8-git-send-email-pdeschrijver@nvidia.com>
-References: <1379515331-19427-1-git-send-email-pdeschrijver@nvidia.com>
- <1379515331-19427-8-git-send-email-pdeschrijver@nvidia.com>
-Message-ID: <524086E7.3020903@wwwdotorg.org>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Mon, 23 Sep 2013 14:27:39 -0400 (EDT)
+Subject: [PATCH 36/51] DMA-API: usb: use dma_set_coherent_mask()
+In-Reply-To: <E1VMmHX-0007jq-Cj@rmk-PC.arm.linux.org.uk>
+Message-ID: <Pine.LNX.4.44L0.1309231418030.1348-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/18/2013 08:40 AM, Peter De Schrijver wrote:
-> Move audio clocks and PLLA initialization to a common file so it can be used by
-> multiple Tegra SoCs.
+On Thu, 19 Sep 2013, Russell King wrote:
 
-> diff --git a/drivers/clk/tegra/clk-tegra-audio.c b/drivers/clk/tegra/clk-tegra-audio.c
+> The correct way for a driver to specify the coherent DMA mask is
+> not to directly access the field in the struct device, but to use
+> dma_set_coherent_mask().  Only arch and bus code should access this
+> member directly.
+> 
+> Convert all direct write accesses to using the correct API.
+> 
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 
-> +static struct div_nmp pllp_nmp = {
-> +	.divm_shift = 0,
-> +	.divm_width = 5,
-> +	.divn_shift = 8,
-> +	.divn_width = 10,
-> +	.divp_shift = 20,
-> +	.divp_width = 3,
-> +};
-> +
-> +static struct tegra_clk_pll_freq_table pll_a_freq_table[] = {
-> +	{9600000, 282240000, 147, 5, 0, 4},
-> +	{9600000, 368640000, 192, 5, 0, 4},
-> +	{9600000, 240000000, 200, 8, 0, 8},
-> +
-> +	{28800000, 282240000, 245, 25, 0, 8},
-> +	{28800000, 368640000, 320, 25, 0, 8},
-> +	{28800000, 240000000, 200, 24, 0, 8},
-> +	{0, 0, 0, 0, 0, 0},
-> +};
-> +
-> +static struct tegra_clk_pll_params pll_a_params = {
-> +	.input_min = 2000000,
-> +	.input_max = 31000000,
-> +	.cf_min = 1000000,
-> +	.cf_max = 6000000,
-> +	.vco_min = 200000000,
-> +	.vco_max = 700000000,
-> +	.base_reg = PLLA_BASE,
-> +	.misc_reg = PLLA_MISC,
-> +	.lock_mask = PLL_BASE_LOCK,
-> +	.lock_enable_bit_idx = PLL_MISC_LOCK_ENABLE,
-> +	.lock_delay = 300,
-> +	.div_nmp = &pllp_nmp,
-> +};
+> diff --git a/drivers/usb/host/ehci-platform.c b/drivers/usb/host/ehci-platform.c
+> index f6b790c..5b0cd2d 100644
+> --- a/drivers/usb/host/ehci-platform.c
+> +++ b/drivers/usb/host/ehci-platform.c
 
-I'm not convinced any of those tables are common across SoCs. In fact, I
-can see definite differences in those tables between the 3 SoCs we
-already have upstream... How will this be handled once you've enhanced
-this series to handle all supported SoCs?
+> @@ -91,8 +91,9 @@ static int ehci_platform_probe(struct platform_device *dev)
+>  		dev->dev.platform_data = &ehci_platform_defaults;
+>  	if (!dev->dev.dma_mask)
+>  		dev->dev.dma_mask = &dev->dev.coherent_dma_mask;
+> -	if (!dev->dev.coherent_dma_mask)
+> -		dev->dev.coherent_dma_mask = DMA_BIT_MASK(32);
+> +	err = dma_set_coherent_mask(&dev->dev, DMA_BIT_MASK(32));
+> +	if (err)
+> +		return err;
+>  
+>  	pdata = dev_get_platdata(&dev->dev);
+
+ehci-platform.c is a generic file, intended for use by multiple
+platforms.  Is it not possible that on some platforms, the arch or bus
+code may already have initialized the DMA masks?  Isn't something like 
+this (i.e., DMA bindings) planned for Device Tree?
+
+By eliminating the tests above and calling dma_set_coherent_mask or
+dma_coerce_mask_and_coherent unconditionally, this patch (and the next)
+would overwrite those initial settings.
+
+I don't know to what extent the same may be true for the other,
+platform-specific, drivers changed by this patch.  But it's something 
+to be aware of.
+
+Alan Stern
