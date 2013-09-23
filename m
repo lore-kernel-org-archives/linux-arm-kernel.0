@@ -1,108 +1,145 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Mon, 23 Sep 2013 11:24:12 +0300
-Subject: [RFC PATCH 15/15] arm: dts: dra7: add sata node
-In-Reply-To: <523F3AE4.5050709@cogentembedded.com>
-References: <1379595943-14622-1-git-send-email-rogerq@ti.com>
- <1379597059-15405-1-git-send-email-rogerq@ti.com>
- <523B05FD.7020200@cogentembedded.com> <523C214A.30406@ti.com>
- <523F3AE4.5050709@cogentembedded.com>
-Message-ID: <523FFAAC.3050907@ti.com>
+From: srinivas.kandagatla@st.com (Srinivas KANDAGATLA)
+Date: Mon, 23 Sep 2013 09:22:10 +0100
+Subject: [PATCH] ARM: STi: Add cpu hotplug support
+Message-ID: <1379924530-26319-1-git-send-email-srinivas.kandagatla@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/22/2013 09:45 PM, Sergei Shtylyov wrote:
-> On 09/20/2013 02:19 PM, Roger Quadros wrote:
-> 
->>>> From: Balaji T K <balajitk@ti.com>
-> 
->>>> Add support for sata controller.
-> 
->>>> [Roger Q] Clean up.
-> 
->>>> CC: Benoit Cousson <bcousson@baylibre.com>
->>>> Signed-off-by: Balaji T K <balajitk@ti.com>
->>>> Signed-off-by: Roger Quadros <rogerq@ti.com>
->>>> ---
->>>>    arch/arm/boot/dts/dra7.dtsi |   49 +++++++++++++++++++++++++++++++++++++++++++
->>>>    1 files changed, 49 insertions(+), 0 deletions(-)
-> 
->>>> diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
->>>> index ce9a0f0..545545d 100644
->>>> --- a/arch/arm/boot/dts/dra7.dtsi
->>>> +++ b/arch/arm/boot/dts/dra7.dtsi
->>>> @@ -426,6 +426,55 @@
-> [...]
-> 
->>>> +        sata: sata at 4a141100 {
->>>> +            compatible = "ti,sata";
->>>> +            ti,hwmods = "sata";
->>>> +            reg = <0x4a141100 0x7>;
-> 
->    Not 0x8 BTW?
+From: Srinivas Kandagatla <srinivas.kandagatla@st.com>
 
-You are right. Two 32 bit registers are used.
-However, in the instance summary, the reference manual says 256 bytes.
-So I think we should use 0x100.
+This patch adds cpu hotplug support to STi series SoCs. This code is
+cloned from arch/arm/mach-realview/hotplug.c.
 
-> 
->>>> +            #address-cells = <1>;
->>>> +            #size-cells = <1>;
->>>> +            ranges;
->>>> +            dwc-ahci at 4a140000 {
-> 
->>>     Hm, ePAPR spec. [1] says that "the name of a node should be somewhat generic, reflecting the function of the device and not its precise programming model", so it looks like the name should be "sata" as well. I'm a bit at a loss here, not sure why you had to use the nested device nodes.
-> 
->> ok. will fix it to sata.
->> I've nested it because the wrapper registers are not part of the AHCI sata controller.
->> They are TI specific registers for power management.
->> Similar setup is on the USB controller. Please see omap_dwc3 node.
-> 
->> But if you have better idea, please let me know.
-> 
->     Don't know, it seems to me that you're over-complicating it by using the nested nodes. You could just have AHCI regs as a first tuple of the "regs" prop, and PM regs as a second tuple.
-> 
+STiH415 and STiH416 SOCs do not have power control lines wired up to
+each core, so all we can do is to put the core into WFI for hotplug
+support.
 
-Yes that is possible, and in fact it was that way in Balaji's original code.
-However in that case, won't TI specific handling be need to be done in the ahci_platform driver?
+Tested on B2000 and B2020 boards with STiH415 and STiH416.
 
-As of now, that is limited to using pm_runtime to enable/disable the hardware module so it is generic enough.
-However in the future it would mean reading/writing to the TI wrapper register. If this can be done in ahci_platform
-driver then I don't see any issue and can combine the 2 nodes.
+Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@st.com>
+---
+ arch/arm/mach-sti/platsmp.c |  100 +++++++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 100 insertions(+), 0 deletions(-)
 
->>>> +                  compatible = "snps,dwc-ahci";
->>>> +                  reg = <0x4a140000 0x1100>;
->>>> +                  interrupts = <0 54 0x4>;
->>>> +                  phys = <&sata_phy>;
-> 
->>>     Hm, it's the third PHY related generic property I'm encountering. First, there was "phy-handle", then "phy", now "phys"... Seems like a bit too much. :-)
-> 
->> I'm afraid but this is how the designers have made it.
-> 
->> 1) control-phy-pipe3 is that part of the PHY which sits in control module space and is different
->> from the sata-phy space and hence needs a different node. If it were to me, I would just put this
->> resource in sata-phy node, but there was a discussion about this earlier to do it otherwise [1].
-> 
->> 2) sata-phy (sataphy) is the actual SATA PHY device.
-> 
->> 3) phys is just a reference to the sata_phy and is used via the generic PHY framework.
->> It is upto the sata driver to power up/down the phy.
-> 
->    I understand that it's a reference but why have 3 variants of such phandle containing prop? Is it really possible for a device to have multiple PHYs? Well, remembering our customer's USB, it's indeed possible, however, there 2 PHYs out of 3 are not software controllable...
-> 
-
-If I understand right, are you asking that we don't need "phy-names" property if there can be only one PHY?
-I too think it is redundant. Maybe the PHY framework should be modified to allow users to use phy_get() whithout
-any phy name string. In such case it should return the first PHY. 
-Kishon, any thoughts?
-
->>>> +                  phy-names = "sata-phy";
->>>> +                  clocks = <&sata_ref_clk>;
->>>> +                  clock-names = "optclk";
->>>> +            };
->>>> +        };
-> 
->>> [1] http://www.power.org/resources/downloads/Power_ePAPR_APPROVED_v1.0.pdf
-> 
-
-cheers,
--roger
+diff --git a/arch/arm/mach-sti/platsmp.c b/arch/arm/mach-sti/platsmp.c
+index dce50d9..cdf9e2c 100644
+--- a/arch/arm/mach-sti/platsmp.c
++++ b/arch/arm/mach-sti/platsmp.c
+@@ -24,6 +24,7 @@
+ #include <asm/cacheflush.h>
+ #include <asm/smp_plat.h>
+ #include <asm/smp_scu.h>
++#include <asm/cp15.h>
+ 
+ #include "smp.h"
+ 
+@@ -110,8 +111,107 @@ void __init sti_smp_prepare_cpus(unsigned int max_cpus)
+ 	}
+ }
+ 
++#ifdef CONFIG_HOTPLUG_CPU
++
++static inline void cpu_enter_lowpower(void)
++{
++	unsigned int v;
++
++	flush_cache_louis();
++	asm volatile(
++	"	mcr	p15, 0, %1, c7, c5, 0\n"
++	"	dsb\n"
++	/*
++	 * Turn off coherency
++	 */
++	"	mrc	p15, 0, %0, c1, c0, 1\n"
++	"	bic	%0, %0, #0x40\n"
++	"	mcr	p15, 0, %0, c1, c0, 1\n"
++	"	mrc	p15, 0, %0, c1, c0, 0\n"
++	"	bic	%0, %0, %2\n"
++	"	mcr	p15, 0, %0, c1, c0, 0\n"
++	  : "=&r" (v)
++	  : "r" (0), "Ir" (CR_C)
++	  : "cc");
++}
++
++static inline void cpu_leave_lowpower(void)
++{
++	unsigned int v;
++
++	asm volatile(
++	"	mrc	p15, 0, %0, c1, c0, 0\n"
++	"	orr	%0, %0, %1\n"
++	"	mcr	p15, 0, %0, c1, c0, 0\n"
++	"	mrc	p15, 0, %0, c1, c0, 1\n"
++	"	orr	%0, %0, #0x40\n"
++	"	mcr	p15, 0, %0, c1, c0, 1\n"
++	  : "=&r" (v)
++	  : "Ir" (CR_C)
++	  : "cc");
++}
++
++static inline void platform_do_lowpower(unsigned int cpu, int *spurious)
++{
++	/*
++	 * there is no power-control hardware on this platform, so all
++	 * we can do is put the core into WFI; this is safe as the calling
++	 * code will have already disabled interrupts
++	 */
++	for (;;) {
++		dsb();
++		wfi();
++
++		if (pen_release == cpu_logical_map(cpu)) {
++			/*
++			 * OK, proper wakeup, we're done
++			 */
++			break;
++		}
++
++		/*
++		 * Getting here, means that we have come out of WFI without
++		 * having been woken up - this shouldn't happen
++		 *
++		 * Just note it happening - when we're woken, we can report
++		 * its occurrence.
++		 */
++		(*spurious)++;
++	}
++}
++
++/*
++ * platform-specific code to shutdown a CPU
++ *
++ * Called with IRQs disabled
++ */
++void __ref sti_cpu_die(unsigned int cpu)
++{
++	int spurious = 0;
++
++	/*
++	 * we're ready for shutdown now, so do it
++	 */
++	cpu_enter_lowpower();
++	platform_do_lowpower(cpu, &spurious);
++
++	/*
++	 * bring this CPU back into the world of cache
++	 * coherency, and then restore interrupts
++	 */
++	cpu_leave_lowpower();
++
++	if (spurious)
++		pr_warn("CPU%u: %u spurious wakeup calls\n", cpu, spurious);
++}
++
++#endif /* CONFIG_HOTPLUG_CPU */
++
+ struct smp_operations __initdata sti_smp_ops = {
+ 	.smp_prepare_cpus	= sti_smp_prepare_cpus,
+ 	.smp_secondary_init	= sti_secondary_init,
+ 	.smp_boot_secondary	= sti_boot_secondary,
++#ifdef CONFIG_HOTPLUG_CPU
++	.cpu_die		= sti_cpu_die,
++#endif
+ };
+-- 
+1.7.6.5
