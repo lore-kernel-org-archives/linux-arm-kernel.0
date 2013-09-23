@@ -1,59 +1,15 @@
-From: tim.kryger@linaro.org (Tim Kryger)
-Date: Mon, 23 Sep 2013 10:49:57 -0700
-Subject: [PATCH] ARM: DT: Add missing UARTs for bcm11351 (bcm281xx)
-Message-ID: <1379958597-8554-1-git-send-email-tim.kryger@linaro.org>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 23 Sep 2013 11:52:24 -0600
+Subject: [PATCH 03/12] clk: tegra: Add TEGRA_PERIPH_NO_DIV flag
+In-Reply-To: <1379515331-19427-4-git-send-email-pdeschrijver@nvidia.com>
+References: <1379515331-19427-1-git-send-email-pdeschrijver@nvidia.com>
+ <1379515331-19427-4-git-send-email-pdeschrijver@nvidia.com>
+Message-ID: <52407FD8.3020509@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds in three more UARTs that were not declared earlier.
+On 09/18/2013 08:40 AM, Peter De Schrijver wrote:
+> This flag indicates the peripheral clock does not have a divider. It will
+> simply the initialization tables and avoids some very similar code.
 
-Signed-off-by: Tim Kryger <tim.kryger@linaro.org>
-Reviewed-by: Markus Mayer <markus.mayer@linaro.org>
-Reviewed-by: Matt Porter <matt.porter@linaro.org>
----
- arch/arm/boot/dts/bcm11351.dtsi | 30 ++++++++++++++++++++++++++++++
- 1 file changed, 30 insertions(+)
-
-diff --git a/arch/arm/boot/dts/bcm11351.dtsi b/arch/arm/boot/dts/bcm11351.dtsi
-index 05a5aab..98e6bc0 100644
---- a/arch/arm/boot/dts/bcm11351.dtsi
-+++ b/arch/arm/boot/dts/bcm11351.dtsi
-@@ -49,6 +49,36 @@
- 		reg-io-width = <4>;
- 	};
- 
-+	uart at 3e001000 {
-+		compatible = "brcm,bcm11351-dw-apb-uart", "snps,dw-apb-uart";
-+		status = "disabled";
-+		reg = <0x3e001000 0x1000>;
-+		clock-frequency = <13000000>;
-+		interrupts = <GIC_SPI 66 IRQ_TYPE_LEVEL_HIGH>;
-+		reg-shift = <2>;
-+		reg-io-width = <4>;
-+	};
-+
-+	uart at 3e002000 {
-+		compatible = "brcm,bcm11351-dw-apb-uart", "snps,dw-apb-uart";
-+		status = "disabled";
-+		reg = <0x3e002000 0x1000>;
-+		clock-frequency = <13000000>;
-+		interrupts = <GIC_SPI 65 IRQ_TYPE_LEVEL_HIGH>;
-+		reg-shift = <2>;
-+		reg-io-width = <4>;
-+	};
-+
-+	uart at 3e003000 {
-+		compatible = "brcm,bcm11351-dw-apb-uart", "snps,dw-apb-uart";
-+		status = "disabled";
-+		reg = <0x3e003000 0x1000>;
-+		clock-frequency = <13000000>;
-+		interrupts = <GIC_SPI 64 IRQ_TYPE_LEVEL_HIGH>;
-+		reg-shift = <2>;
-+		reg-io-width = <4>;
-+	};
-+
- 	L2: l2-cache {
- 		compatible = "brcm,bcm11351-a2-pl310-cache";
- 		reg = <0x3ff20000 0x1000>;
--- 
-1.8.0.1
+s/simply/simplify/
