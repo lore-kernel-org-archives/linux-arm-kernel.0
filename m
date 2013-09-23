@@ -1,44 +1,27 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Sun, 22 Sep 2013 20:37:23 -0700
-Subject: [PATCH 1/3] Add smp support for Allwinner A20(sunxi 7i).
-In-Reply-To: <20130921140059.GA2779@lukather>
-References: <1379768716-11672-1-git-send-email-cinifr@gmail.com>
- <1379768716-11672-2-git-send-email-cinifr@gmail.com>
- <20130921140059.GA2779@lukather>
-Message-ID: <523FB773.4050408@roeck-us.net>
+From: sachin.kamat@linaro.org (Sachin Kamat)
+Date: Mon, 23 Sep 2013 09:22:23 +0530
+Subject: [PATCH v5 0/4] media: s5p-tv: clean-up and fixes
+In-Reply-To: <1379775649-6331-1-git-send-email-m.krawczuk@partner.samsung.com>
+References: <1379775649-6331-1-git-send-email-m.krawczuk@partner.samsung.com>
+Message-ID: <CAK9yfHw2LZmKjMd7Auz=hWeRMkvoOUEVEZknpg3OJcWhqo4Rtw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/21/2013 07:00 AM, Maxime Ripard wrote:
+Hi Mateusz,
 
-[ ... ]
+On 21 September 2013 20:30, Mateusz Krawczuk
+<m.krawczuk@partner.samsung.com> wrote:
+> This patch series add restoring previous vpll rate after driver offs stream
+> or recives error.
+> It also replace mxr_info, mxr_dbg, mxr_warn and mxr_err macro
+> by generic solution.
 
->> +	/* assert cpu core reset */
->> +	writel(0, sunxi7i_cc_base + CPUX_RESET_CTL(cpu));
->> +	/* L1RSTDISABLE hold low */
->> +	pwr_reg = readl(sunxi7i_cc_base + AW_CPUCFG_GENCTL);
->> +	pwr_reg &= ~(1<<cpu);
->> +	writel(pwr_reg, sunxi7i_cc_base + AW_CPUCFG_GENCTL);
->> +	/* DBGPWRDUP hold low */
->> +	pwr_reg = readl(sunxi7i_cc_base + AW_CPUCFG_DBGCTL1);
->> +	pwr_reg &= ~(1<<cpu);
->
-> Use BIT(cpu) here. And you should run scripts/checkpatch.pl on your
-> patches before sending them.
->
+It is a good practice to include revision history of the changes in
+the patch set. This will help reviewers
+check if the changes previously suggested have been incorporated or
+not and to identify any new changes introduced by the author.
 
-For the record:
 
-$ scripts/checkpatch.pl --strict allwinner.patch
-total: 0 errors, 0 warnings, 0 checks, 527 lines checked
-
-allwinner.patch has no obvious style problems and is ready for submission.
-
-This is on top of "v3.12-rc1-336-gd8524ae".
-
-checkpatch.pl does not complain as long as the number of spaces before
-and after an operator is the same. There is a patch pending to change
-this with the --strict option, but it will still not complain in 'normal'
-operation.
-
-Guenter
+-- 
+With warm regards,
+Sachin
