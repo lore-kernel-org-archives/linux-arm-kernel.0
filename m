@@ -1,38 +1,29 @@
-From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
-Date: Mon, 23 Sep 2013 15:40:18 +0200
-Subject: [PATCHv5] staging/iio/adc: change the MXS touchscreen driver
- implementation
-In-Reply-To: <201309231524.38008.jbe@pengutronix.de>
-References: <1379593369-22010-1-git-send-email-jbe@pengutronix.de>
- <201309231235.56309.jbe@pengutronix.de>
- <21056.12306.714098.398250@ipc1.ka-ro>
- <201309231524.38008.jbe@pengutronix.de>
-Message-ID: <21056.17602.24566.144289@ipc1.ka-ro>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 23 Sep 2013 14:50:42 +0100
+Subject: [PATCH] spi: s3c64xx: Add missing compatibles
+In-Reply-To: <1379929545-27517-1-git-send-email-m.krawczuk@partner.samsung.com>
+References: <1379929545-27517-1-git-send-email-m.krawczuk@partner.samsung.com>
+Message-ID: <20130923135042.GH21013@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, Sep 23, 2013 at 11:45:45AM +0200, Mateusz Krawczuk wrote:
+> Add compatibles for s3c6410, s5pc100 and s5pc110/s5pv210 boards.
 
-J?rgen Beisert writes:
-> The i.MX28 manual says the LRADC delay unit is driven by a 2 kHz clock, but 
-> does not say what kind of clock it is (or is derived from). I guess now, this 
-> clock isn't enabled and thus the delay unit can't work. At least on the 
-> MX28EVK. On your TX28 platform the clock seems enabled and the delay unit can 
-> do its job and drive the state machine.
->
-The i.MX28 Ref Manual states in chapter 38.5.14 LRADC Scheduling Delay:
-| This counter operates on a 2KHz clock derived from crystal clock.
-Thus the clock should always be enabled.
+>  static const struct of_device_id s3c64xx_spi_dt_match[] = {
+> +	{ .compatible = "samsung,s3c2443-spi",
+> +			.data = (void *)&s3c2443_spi_port_config,
+> +	},
+> +	{ .compatible = "samsung,s3c6410-spi",
+> +			.data = (void *)&s3c6410_spi_port_config,
+> +	},
 
-
-Lothar Wa?mann
--- 
-___________________________________________________________
-
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+This is missing s3c6400 and at least one other s3c24xx I think.  They
+can be added later though so applied, thanks.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130923/40003e57/attachment.sig>
