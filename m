@@ -1,57 +1,87 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon, 23 Sep 2013 22:05:05 +0100
-Subject: [PATCH] ARM: kvm: rename cpu_reset to avoid name clash
-In-Reply-To: <20130923203042.GY12758@n2100.arm.linux.org.uk>
-References: <1378938461-10835-1-git-send-email-olof@lixom.net>
- <CAOesGMjum0TSyudXiZtXHOGX4R7dBAhjUpoYnwjTcfD1MMpTxw@mail.gmail.com>
- <20130912015002.GO9860@cbox>
- <CAOesGMiGaM=s85iKHPXd9eBiL1vy3SVws+KR0ToxPpZeiisscg@mail.gmail.com>
- <CAMJs5B9NW6cDuG-xwYucP8rONn0MdEtwTm5R2p=aBE4Q3EHNOg@mail.gmail.com>
- <CAOesGMhPHaZ7tOshbvU1M87nshTOVqU7-+1AvOmARzKUDN6syw@mail.gmail.com>
- <20130923203042.GY12758@n2100.arm.linux.org.uk>
-Message-ID: <20130923210505.GI19043@lvm>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 23 Sep 2013 15:06:54 -0600
+Subject: [PATCH 1/4] i2c: busses: i2c-st: Add ST I2C controller
+In-Reply-To: <1379498483-4236-2-git-send-email-maxime.coquelin@st.com>
+References: <1379498483-4236-1-git-send-email-maxime.coquelin@st.com>
+ <1379498483-4236-2-git-send-email-maxime.coquelin@st.com>
+Message-ID: <5240AD6E.4090905@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 23, 2013 at 09:30:42PM +0100, Russell King - ARM Linux wrote:
-> On Mon, Sep 23, 2013 at 12:59:44PM -0700, Olof Johansson wrote:
-> > Hi Christoffer,
-> > 
-> > On Mon, Sep 16, 2013 at 8:47 PM, Christoffer Dall
-> > <christoffer.dall@linaro.org> wrote:
-> > > On 16 September 2013 19:41, Olof Johansson <olof@lixom.net> wrote:
-> > >> Hi,
-> > >>
-> > >> On Wed, Sep 11, 2013 at 6:50 PM, Christoffer Dall
-> > >> <christoffer.dall@linaro.org> wrote:
-> > >>> On Wed, Sep 11, 2013 at 03:39:26PM -0700, Olof Johansson wrote:
-> > >>>> On Wed, Sep 11, 2013 at 3:27 PM, Olof Johansson <olof@lixom.net> wrote:
-> > >>>> > cpu_reset is already #defined in <asm/proc-fns.h> as processor.reset,
-> > >>>> > so it expands here and causes problems.
-> > >>>> >
-> > >>>> > Signed-off-by: Olof Johansson <olof@lixom.net>
-> > >>>>
-> > >>>> I just noticed this is broken on 3.10 too, so if/when applying feel free to add:
-> > >>>>
-> > >>>> Cc: <stable@vger.kernel.org> # 3.10+
-> > >>>>
-> > >>> Thanks for the fix, applied.
-> > >>
-> > >> I haven't seen this hit linux-next yet?
-> > >>
-> > > I was waiting for kvm/next to move to 3.12-rc1 and base the patch for
-> > > kvm-arm-next off there, but I pushed this to kvm-arm-next now and it
-> > > should land in linux-next as soon as they update.
-> > 
-> > Another week has passed, and -next and mainline are both still broken.
-> > Can we please see a fix in mainline and -next within the next few
-> > days?
+On 09/18/2013 04:01 AM, Maxime COQUELIN wrote:
+> This patch adds support to SSC (Synchronous Serial Controller)
+> I2C driver. This IP also supports SPI protocol, but this is not
+> the aim of this driver.
 > 
-> I'm getting failing builds too, which will only stop once it hits
-> mainline.
+> This IP is embedded in all ST SoCs for Set-top box platorms, and
+> supports I2C Standard and Fast modes.
 
-Apologies about this, apparently linux-next doesn't pull in my tree despite
-e-mail confirmation that it did.  I was away last week for LPC, but I'll
-make sure this lands upstream ASAP.
+> diff --git a/Documentation/devicetree/bindings/i2c/i2c-st.txt b/Documentation/devicetree/bindings/i2c/i2c-st.txt
 
--Christoffer
+> +I2C for ST platforms
+
+If the HW block supports both I2C and SPI, the DT binding ought to
+support that too. It's be best to create a single DT binding that
+represents the IP block, and include a property that indicates whether
+the device should operate in I2C or SPI mode.
+
+I suppose you could reasonably define different compatible values for
+those two cases. However, the binding should be titled something more
+like "ST SSC binding, for I2C mode operation" and "ST SSC binding, for
+SPI mode operation", rather than "I2C for ST platforms", since the HW
+includes an SSC block, not an I2C block.
+
+> +Required properties :
+> +- compatible : Must be "st,comms-i2c"
+> +- reg : Offset and length of the register set for the device
+> +- interrupts : the interrupt number
+
+It's an interrupt specifier, not an interrupt number. The format is
+defined by the interrupt controller, not this binding.
+
+> +- clocks : phandle to the I2C clock source
+
+What about clock-names?
+
+> +Recommended (non-standard) properties :
+
+Usually you'd just say "Optional properties:", or perhaps "Recommended
+properties:". I don't think adding "(non-standard)" serves any purpose.
+
+> +- clock-frequency : Desired I2C bus clock frequency in Hz. Otherwise
+> +  the default 100 kHz frequency will be used. As only Normal and Fast modes
+> +  are supported, possible values are 100000 and 400000.
+> +
+> +Optional (non-standard) properties:
+
+Same here.
+
+> +- st,glitches : Enable timing glitch suppression support.
+
+That property name doesn't really convey the "enables" that appears in
+the property description to me...
+
+> +- st,glitch-clk : SCL line timinig glitch suppression value in ns.
+> +- st,glitch-dat : SDA line timinig glitch suppression value in ns.
+
+s/timinig/timing/
+
+> +- st,hw-glitches : Enable filter glitch suppression support.
+> +- st,hw-glitch-clk : SCL line filter glitch suppression value in us.
+> +- st,hw-glitch-dat : SDA line filter glitch suppression value in us.
+
+Those sound more like runtime configuration rather than HW description.
+Can you rephrase the descriptions (and property names) more along the
+lines of HW properties? Perhaps e.g.:
+
+st,needs-glitch-suppression: The board design needs timing glitch
+suppression enabled to operate reliably.
+
+st,min-scl-pulse-width: The minimum valid SCL pulse width that is
+allowed through the deglitch circuit. In units of ns.
+
+(I just made up those descriptions to give a feel for the flavor of
+description that I expect. They likely need some adjustment to reflect
+whatever they're actually intended to represent in HW).
+
+What is the difference between "glitch" and "hw-glitch"?
