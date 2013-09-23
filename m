@@ -1,86 +1,62 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Mon, 23 Sep 2013 20:19:26 +0100
-Subject: [PATCH 17/20] iio: pressure-core: st: Provide support for the
- Vdd_IO power supply
-In-Reply-To: <1379347346-823-18-git-send-email-lee.jones@linaro.org>
-References: <1379347346-823-1-git-send-email-lee.jones@linaro.org>
- <1379347346-823-18-git-send-email-lee.jones@linaro.org>
-Message-ID: <5240943E.5080707@kernel.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 23 Sep 2013 21:19:17 +0300
+Subject: [PATCH 1/3] Add smp support for Allwinner A20(sunxi 7i).
+In-Reply-To: <523FB773.4050408@roeck-us.net>
+References: <1379768716-11672-1-git-send-email-cinifr@gmail.com>
+ <1379768716-11672-2-git-send-email-cinifr@gmail.com>
+ <20130921140059.GA2779@lukather> <523FB773.4050408@roeck-us.net>
+Message-ID: <20130923181917.GS2779@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/16/13 17:02, Lee Jones wrote:
-> The power to some of the sensors are controlled by regulators. In most
-> cases these are 'always on', but if not they will fail to work until
-> the regulator is enabled using the relevant APIs. This patch allows for
-> the Vdd_IO power supply to be specified by either platform data or
-> Device Tree.
-> 
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-Applied to the togreg branch of iio.git
+Hi Guenter,
 
-Thanks - just the DT patches to go once that discussion is cleanly finished.
-> ---
->  drivers/iio/pressure/st_pressure_core.c | 13 ++++++++++++-
->  include/linux/iio/common/st_sensors.h   |  2 ++
->  2 files changed, 14 insertions(+), 1 deletion(-)
+On Sun, Sep 22, 2013 at 08:37:23PM -0700, Guenter Roeck wrote:
+> On 09/21/2013 07:00 AM, Maxime Ripard wrote:
 > 
-> diff --git a/drivers/iio/pressure/st_pressure_core.c b/drivers/iio/pressure/st_pressure_core.c
-> index c801c80..e3f3888 100644
-> --- a/drivers/iio/pressure/st_pressure_core.c
-> +++ b/drivers/iio/pressure/st_pressure_core.c
-> @@ -319,7 +319,7 @@ void st_press_power_enable(struct iio_dev *indio_dev)
->  	struct st_sensor_data *pdata = iio_priv(indio_dev);
->  	int err;
->  
-> -	/* Regulators not mandatory, but if requested we should enable it. */
-> +	/* Regulators not mandatory, but if requested we should enable them. */
->  	pdata->vdd = devm_regulator_get_optional(&indio_dev->dev, "vdd");
->  	if (!IS_ERR(pdata->vdd)) {
->  		err = regulator_enable(pdata->vdd);
-> @@ -327,6 +327,14 @@ void st_press_power_enable(struct iio_dev *indio_dev)
->  			dev_warn(&indio_dev->dev,
->  				 "Failed to enable specified Vdd supply\n");
->  	}
-> +
-> +	pdata->vdd_io = devm_regulator_get_optional(&indio_dev->dev, "vddio");
-> +	if (!IS_ERR(pdata->vdd_io)) {
-> +		err = regulator_enable(pdata->vdd_io);
-> +		if (err != 0)
-> +			dev_warn(&indio_dev->dev,
-> +				 "Failed to enable specified Vdd_IO supply\n");
-> +	}
->  }
->  
->  void st_press_power_disable(struct iio_dev *indio_dev)
-> @@ -335,6 +343,9 @@ void st_press_power_disable(struct iio_dev *indio_dev)
->  
->  	if (!IS_ERR(pdata->vdd))
->  		regulator_disable(pdata->vdd);
-> +
-> +	if (!IS_ERR(pdata->vdd_io))
-> +		regulator_disable(pdata->vdd_io);
->  }
->  
->  int st_press_common_probe(struct iio_dev *indio_dev,
-> diff --git a/include/linux/iio/common/st_sensors.h b/include/linux/iio/common/st_sensors.h
-> index 968b84e..3c005eb 100644
-> --- a/include/linux/iio/common/st_sensors.h
-> +++ b/include/linux/iio/common/st_sensors.h
-> @@ -203,6 +203,7 @@ struct st_sensors {
->   * @sensor: Pointer to the current sensor struct in use.
->   * @current_fullscale: Maximum range of measure by the sensor.
->   * @vdd: Pointer to sensor's Vdd power supply
-> + * @vdd_io: Pointer to sensor's Vdd-IO power supply
->   * @enabled: Status of the sensor (false->off, true->on).
->   * @multiread_bit: Use or not particular bit for [I2C/SPI] multiread.
->   * @buffer_data: Data used by buffer part.
-> @@ -219,6 +220,7 @@ struct st_sensor_data {
->  	struct st_sensors *sensor;
->  	struct st_sensor_fullscale_avl *current_fullscale;
->  	struct regulator *vdd;
-> +	struct regulator *vdd_io;
->  
->  	bool enabled;
->  	bool multiread_bit;
+> [ ... ]
 > 
+> >>+	/* assert cpu core reset */
+> >>+	writel(0, sunxi7i_cc_base + CPUX_RESET_CTL(cpu));
+> >>+	/* L1RSTDISABLE hold low */
+> >>+	pwr_reg = readl(sunxi7i_cc_base + AW_CPUCFG_GENCTL);
+> >>+	pwr_reg &= ~(1<<cpu);
+> >>+	writel(pwr_reg, sunxi7i_cc_base + AW_CPUCFG_GENCTL);
+> >>+	/* DBGPWRDUP hold low */
+> >>+	pwr_reg = readl(sunxi7i_cc_base + AW_CPUCFG_DBGCTL1);
+> >>+	pwr_reg &= ~(1<<cpu);
+> >
+> >Use BIT(cpu) here. And you should run scripts/checkpatch.pl on your
+> >patches before sending them.
+> >
+> 
+> For the record:
+> 
+> $ scripts/checkpatch.pl --strict allwinner.patch
+> total: 0 errors, 0 warnings, 0 checks, 527 lines checked
+> 
+> allwinner.patch has no obvious style problems and is ready for submission.
+> 
+> This is on top of "v3.12-rc1-336-gd8524ae".
+> 
+> checkpatch.pl does not complain as long as the number of spaces before
+> and after an operator is the same. There is a patch pending to change
+> this with the --strict option, but it will still not complain in 'normal'
+> operation.
+
+Hmmm, ok. Somehow, I was convinced that it was triggering a warning.
+Thanks for the heads up :)
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130923/c7dcb961/attachment.sig>
