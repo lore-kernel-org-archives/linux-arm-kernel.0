@@ -1,67 +1,90 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 23 Sep 2013 10:38:43 -0700
-Subject: [PATCH 1/3] ARM: OMAP2: HACK: hardcode hsmmc2 input clock
- source for N950/N9
-In-Reply-To: <1379771142-29087-2-git-send-email-aaro.koskinen@iki.fi>
-References: <1379771142-29087-1-git-send-email-aaro.koskinen@iki.fi>
- <1379771142-29087-2-git-send-email-aaro.koskinen@iki.fi>
-Message-ID: <20130923173843.GI2684@atomide.com>
+From: joe@perches.com (Joe Perches)
+Date: Mon, 23 Sep 2013 10:44:42 -0700
+Subject: [PATCH v5 1/4] media: s5p-tv: Replace mxr_ macro by default dev_
+In-Reply-To: <13162989.WhfDRzW6dg@amdc1032>
+References: <1379775649-6331-1-git-send-email-m.krawczuk@partner.samsung.com>
+ <1379775649-6331-2-git-send-email-m.krawczuk@partner.samsung.com>
+ <52405519.3020504@samsung.com> <13162989.WhfDRzW6dg@amdc1032>
+Message-ID: <1379958282.3575.31.camel@joe-AO722>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Aaro Koskinen <aaro.koskinen@iki.fi> [130921 06:56]:
-> Without this the eMMC (root file system) cannot be used on N950/N9.
-> Any ideas for a proper solution?
-> 
-> Signed-off-by: Aaro Koskinen <aaro.koskinen@iki.fi>
-> ---
->  arch/arm/mach-omap2/board-generic.c | 15 +++++++++++++++
->  1 file changed, 15 insertions(+)
-> 
-> diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
-> index 39c7838..8be49b3 100644
-> --- a/arch/arm/mach-omap2/board-generic.c
-> +++ b/arch/arm/mach-omap2/board-generic.c
-> @@ -20,6 +20,7 @@
->  #include <asm/mach/arch.h>
->  
->  #include "common.h"
-> +#include "control.h"
->  #include "common-board-devices.h"
->  #include "dss-common.h"
->  
-> @@ -51,12 +52,26 @@ static void __init legacy_init_ehci_clk(char *clkname)
->  	}
->  }
->  
-> +static void __init hsmmc2_input_clk(void)
-> +{
-> +	u32 reg;
-> +
-> +	reg = omap_ctrl_readl(OMAP343X_CONTROL_DEVCONF1);
-> +	reg |= OMAP2_MMCSDIO2ADPCLKISEL;
-> +	omap_ctrl_writel(reg, OMAP343X_CONTROL_DEVCONF1);
-> +}
-> +
->  static void __init omap_generic_init(void)
->  {
->  	omap_sdrc_init(NULL, NULL);
->  
->  	of_platform_populate(NULL, omap_dt_match_table, NULL, NULL);
->  
-> +	/* HACK: Configure the MMC input clock source on N950/N9. */
-> +	if (of_machine_is_compatible("nokia,omap3-n950") ||
-> +	    of_machine_is_compatible("nokia,omap3-n9"))
-> +		hsmmc2_input_clk();
-> +
->  	/*
->  	 * HACK: call display setup code for selected boards to enable omapdss.
->  	 * This will be removed when omapdss supports DT.
-> 
+On Mon, 2013-09-23 at 17:48 +0200, Bartlomiej Zolnierkiewicz wrote:
+> On Monday, September 23, 2013 04:50:01 PM Tomasz Stanislawski wrote:
+> > May I ask what is the rationale for this patch?
+> > To reduce a few lines of code?
+> This patch makes source code more generic-like and easier to follow (mxd_r*
+> macros currently only obfuscate the code and make them harder to read for
+> everybody, maybe besides the original driver author ;). Removal of few
+> superfluous lines of code is just a bonus.
 
-Can you please update this patch on the quirks series I posted
-few days ago?
+I don't see any significant issue with this change.
+Using generic mechanisms is good.
 
-Regards,
+Few trivial nits:
 
-Tony
+I'd remove the trailing periods from some of the messages
+at the same time.
+
+Function tracing is better done by the function tracing
+mechanism built in to the kernel.  Removing the
+	dev_dbg(dev, "%s: enter\n", __func__)
+lines would be good too.
+
+Maybe look at the message levels of more of these
+logging messages and determine which are actually
+useful and what is mostly noise and should be dev_dbg
+or deleted altogether.
+
+> > > diff --git a/drivers/media/platform/s5p-tv/mixer_drv.c b/drivers/media/platform/s5p-tv/mixer_drv.c
+
+> > > @@ -59,7 +59,7 @@ void mxr_streamer_get(struct mxr_device *mdev)
+> > >  {
+> > >  	mutex_lock(&mdev->mutex);
+> > >  	++mdev->n_streamer;
+> > > -	mxr_dbg(mdev, "%s(%d)\n", __func__, mdev->n_streamer);
+> > > +	dev_dbg(mdev->dev, "%s(%d)\n", __func__, mdev->n_streamer);
+
+not too useful
+
+[]
+
+> > > @@ -159,42 +159,42 @@ static int mxr_acquire_plat_resources(struct mxr_device *mdev,
+> > >  
+> > >  	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "mxr");
+> > >  	if (res == NULL) {
+> > > -		mxr_err(mdev, "get memory resource failed.\n");
+> > > +		dev_err(mdev->dev, "get memory resource failed.\n");
+
+		dev_err(mdev->dev, "get memory resource failed\n");
+etc... because of:
+
+> > > @@ -252,27 +252,27 @@ static int mxr_acquire_clocks(struct mxr_device *mdev)
+> > >  
+> > >  	res->mixer = clk_get(dev, "mixer");
+> > >  	if (IS_ERR(res->mixer)) {
+> > > -		mxr_err(mdev, "failed to get clock 'mixer'\n");
+> > > +		dev_err(mdev->dev, "failed to get clock 'mixer'\n");
+
+Mixed use of messages with/without periods.
+
+> > > @@ -295,13 +295,13 @@ static int mxr_acquire_resources(struct mxr_device *mdev,
+> > >  	if (ret)
+> > >  		goto fail_plat;
+> > >  
+> > > -	mxr_info(mdev, "resources acquired\n");
+> > > +	dev_info(mdev->dev, "resources acquired\n");
+
+This isn't really a useful message so I'd convert it
+to dev_dbg
+
+> > > @@ -391,7 +391,6 @@ static int mxr_probe(struct platform_device *pdev)
+> > >  	struct mxr_device *mdev;
+> > >  	int ret;
+> > >  
+> > > -	/* mdev does not exist yet so no mxr_dbg is used */
+> > >  	dev_info(dev, "probe start\n");
+
+Same with a lot of these...
+
+Maybe in a separate patch.
