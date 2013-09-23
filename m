@@ -1,41 +1,44 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 23 Sep 2013 09:34:04 -0300
-Subject: [PATCH] clk: mxs: source LCD clock from PLL instead of from
- ref_xtal
-In-Reply-To: <1379922623-4875-1-git-send-email-hector.palacios@digi.com>
-References: <1379922623-4875-1-git-send-email-hector.palacios@digi.com>
-Message-ID: <CAOMZO5C7Ce_KSmh+6Xqh+9s6TFASGkz2Ybsfea67TRGf_vROgQ@mail.gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 23 Sep 2013 14:34:34 +0200
+Subject: [PATCH 37/51] DMA-API: usb: use new dma_coerce_mask_and_coherent()
+In-Reply-To: <E1VMmIV-0007jw-Gq@rmk-PC.arm.linux.org.uk>
+References: <20130919212235.GD12758@n2100.arm.linux.org.uk>
+ <E1VMmIV-0007jw-Gq@rmk-PC.arm.linux.org.uk>
+Message-ID: <5240355A.9010609@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 23, 2013 at 4:50 AM, Hector Palacios
-<hector.palacios@digi.com> wrote:
-> The lcd clock hierarchy is as follows:
->
->     ref_clk (24MHz)-----\
->                          +--+ lcdif_sel (MUX type)
->     frac1_clk (480Mhz)--/   |
->                             \--+ lcdif_div (DIV type)
->                                |
->                                \-- lcdif (GATE type)
->
-> The mxsfb driver retrieves the 'lcdif_div' clock from the DT, but the
-> 'lcdif_sel' is by default sourced from 'ref_clk' which is a fixed 24MHz.
-> This means the pixel clock can only be 24MHz or a power-of-two divisor
-> of that frequency (12, 6, 3...) which is a very poor divisor granularity.
->
-> Since the driver doesn't know about the different clocks that can
-> source its clk parent from, we must select the PLL (480MHz) to be the
-> parent during the general clocks initialization. This allows for much
-> better divisor granularity and for more accurate frequencies for LCD
-> displays.
->
-> Signed-off-by: Hector Palacios <hector.palacios@digi.com>
-> Tested-by: Fabio Estevam <fabio.estevam@freescale.com>
-> CC: Maxime Rippard <maxime.ripard@free-electrons.com>
-> CC: Marek Vasut <marex@denx.de>
-> CC: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> CC: Gwenhael Goavec-Merou <gwenhael.goavec-merou@armadeus.com>
+On 20/09/2013 00:02, Russell King :
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> ---
+>   drivers/usb/chipidea/ci_hdrc_imx.c |    4 +---
+>   drivers/usb/dwc3/dwc3-exynos.c     |    4 +---
+>   drivers/usb/host/ehci-atmel.c      |    4 +---
 
-You added a lot of people on Cc, but you missed the clk maintaner
-(Mike Turquette) :-)
+For Atmel driver:
+
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+
+[..]
+
+> diff --git a/drivers/usb/host/ehci-atmel.c b/drivers/usb/host/ehci-atmel.c
+> index 5831a88..8e7323e 100644
+> --- a/drivers/usb/host/ehci-atmel.c
+> +++ b/drivers/usb/host/ehci-atmel.c
+> @@ -90,9 +90,7 @@ static int ehci_atmel_drv_probe(struct platform_device *pdev)
+>   	 * Since shared usb code relies on it, set it here for now.
+>   	 * Once we have dma capability bindings this can go away.
+>   	 */
+> -	if (!pdev->dev.dma_mask)
+> -		pdev->dev.dma_mask = &pdev->dev.coherent_dma_mask;
+> -	retval = dma_set_coherent_mask(&pdev->dev, DMA_BIT_MASK(32));
+> +	retval = dma_coerce_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(32));
+>   	if (retval)
+>   		goto fail_create_hcd;
+>
+
+[..]
+
+Thanks Russell,
+-- 
+Nicolas Ferre
