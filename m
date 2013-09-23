@@ -1,32 +1,31 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 23 Sep 2013 20:06:08 +0300
-Subject: [PATCH V3: Add Smp support for Allwinner A20. 3/3] add arch
- count timer node in dts for Allwinner A20(sunxi 7i).
-In-Reply-To: <1379852488-32147-4-git-send-email-cinifr@gmail.com>
-References: <1379852488-32147-1-git-send-email-cinifr@gmail.com>
- <1379852488-32147-4-git-send-email-cinifr@gmail.com>
-Message-ID: <20130923170608.GQ2779@lukather>
+From: bcm@fixthebug.org (Christian Daudt)
+Date: Mon, 23 Sep 2013 10:20:32 -0700
+Subject: [PATCH v2 0/4] ARCH_BCM rename
+Message-ID: <1379956836-5866-1-git-send-email-bcm@fixthebug.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fang,
+Rename ARCH_BCM to ARCH_BCM_MOBILE. Currently only the 
+Broadcom mobile SoCs reside in the mach-bcm directory and are 
+chosen by the ARCH_BCM config option.
+ This patchset changes so that ARCH_BCM becomes a menu select
+for Broadcom ARM SoCs. ARCH_BCM_MOBILE is created to signify 
+the (multiplatform) Mobile SoCs.
 
-On Sun, Sep 22, 2013 at 08:21:28PM +0800, Fan Rong wrote:
-> Signed-off-by: Fan Rong <cinifr@gmail.com>
+Christian Daudt (4):
+  rename ARCH_BCM to ARCH_BCM_MOBILE (mach-bcm)
+  rename ARCH_BCM to ARCH_BCM_MOBILE (clocksource)
+  rename ARCH_BCM to ARCH_BCM_MOBILE (mmc)
+  rename ARCH_BCM to ARCH_BCM_MOBILE (dt)
 
-Please be more verbose here, especially on the consequences it has.
-
-Thanks,
-Maxime
+ arch/arm/boot/dts/Makefile          |    4 ++--
+ arch/arm/configs/bcm_defconfig      |    1 +
+ arch/arm/configs/multi_v7_defconfig |    1 +
+ arch/arm/mach-bcm/Kconfig           |   20 ++++++++++++++++++--
+ arch/arm/mach-bcm/Makefile          |    2 +-
+ drivers/clocksource/Makefile        |    2 +-
+ drivers/mmc/host/Kconfig            |    2 +-
+ 7 files changed, 25 insertions(+), 7 deletions(-)
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130923/57cf6741/attachment-0001.sig>
+1.7.10.4
