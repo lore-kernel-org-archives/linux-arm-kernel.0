@@ -1,47 +1,59 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 23 Sep 2013 14:21:51 +0100
-Subject: [RFC V2] ARM: mm: make UACCESS_WITH_MEMCPY huge page aware
-In-Reply-To: <20130923131923.GA7233@linaro.org>
-References: <1379410429-3372-1-git-send-email-steve.capper@linaro.org>
- <20130923131923.GA7233@linaro.org>
-Message-ID: <20130923132151.GS12758@n2100.arm.linux.org.uk>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Mon, 23 Sep 2013 09:32:05 -0400
+Subject: [PATCH 11/26] ARM: dove: remove custom .init_time hook
+In-Reply-To: <20130923091036.GE4999@lunn.ch>
+References: <1379526839-14798-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1379526839-14798-12-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20130921122226.GB31180@lunn.ch> <523EE08C.60309@gmail.com>
+ <20130923091036.GE4999@lunn.ch>
+Message-ID: <20130923133205.GF11119@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 23, 2013 at 02:19:24PM +0100, Steve Capper wrote:
-> On Tue, Sep 17, 2013 at 10:33:49AM +0100, Steve Capper wrote:
-> > The memory pinning code in uaccess_with_memcpy.c does not check
-> > for HugeTLB or THP pmds, and will enter an infinite loop should
-> > a __copy_to_user or __clear_user occur against a huge page.
+On Mon, Sep 23, 2013 at 11:10:36AM +0200, Andrew Lunn wrote:
+> On Sun, Sep 22, 2013 at 02:20:28PM +0200, Sebastian Hesselbarth wrote:
+> > On 09/21/2013 02:22 PM, Andrew Lunn wrote:
+> > >On Wed, Sep 18, 2013 at 07:53:44PM +0200, Sebastian Hesselbarth wrote:
+> > >>With arch/arm calling of_clk_init(NULL) from time_init(), we can now
+> > >>remove custom .init_time hooks. While at it, also remove some obsolete
+> > >>includes.
+> > >>
+> > >>Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> > >>---
+> > >>Cc: Olof Johansson <olof@lixom.net>
+> > >>Cc: Arnd Bergmann <arnd@arndb.de>
+> > >>Cc: Jason Cooper <jason@lakedaemon.net>
+> > >>Cc: Andrew Lunn <andrew@lunn.ch>
+> > >>Cc: Russell King <linux@arm.linux.org.uk>
+> > >>Cc: linux-arm-kernel at lists.infradead.org
+> > >>Cc: linux-kernel at vger.kernel.org
+> > >>---
+> > >>  arch/arm/mach-dove/board-dt.c |   11 -----------
+> > >>  1 file changed, 11 deletions(-)
+> > [...]
+> > >Boot tested on cubox.
+> > >
+> > >Tested-by: Andrew Lunn <andrew@lunn.ch>
 > > 
-> > This patch adds detection code for huge pages to pin_page_for_write.
-> > As this code can be executed in a fast path it refers to the actual
-> > pmds rather than the vma. If a HugeTLB or THP is found (they have
-> > the same pmd representation on ARM), the page table spinlock is
-> > taken to prevent modification whilst the page is pinned.
+> > Thanks Andrew!
 > > 
-> > On ARM, huge pages are only represented as pmds, thus no huge pud
-> > checks are performed. (For huge puds one would lock the page table
-> > in a similar manner as in the pmd case).
-> > 
-> > Two helper functions are introduced; pmd_thp_or_huge will check
-> > whether or not a page is huge or transparent huge (which have the
-> > same pmd layout on ARM), and pmd_hugewillfault will detect whether
-> > or not a page fault will occur on write to the page.
-> > 
-> > Changes since first RFC:
-> >    * The page mask is widened for hugepages to reduce the number
-> >      of potential locks/unlocks.
-> >      (A knobbled /dev/zero with its latency reduction chunks
-> >       removed shows a 2x data rate boost with hugepages backing:
-> >       dd if=/dev/zero of=/dev/null bs=10M count=1024 )
-> > 
-> > Signed-off-by: Steve Capper <steve.capper@linaro.org>
-> > ---
+> > Aren't you giving any Acks for dove/kirkwood anymore?
 > 
-> A ping to see if anyone had any questions/comments/flames :-)?
+> Hi Sebastian
 > 
-> Should it go into the patch system?
+> In my opinion, a Tested-by: has more weight than an Acked-by. I could
+> of given you an Acked-by in about 60 seconds, given the simplicity of
+> the patch. It took a lot more effort to get your tree, build it, fix
+> my binutils, since it was the first 3.12 tree i had tried and my
+> binutils was too old, and boot it.
 
-IIRC Nicolas wrote the original support, so he should probably be Cc'd with
-this patch.
+I would even go so far as to say that a Tested-by: from a maintainer
+carries an implied Ack.  ;-)
+
+And, just for the record,
+
+Acked-by: Jason Cooper <jason@lakedaemon.net>
+
+thx,
+
+Jason.
