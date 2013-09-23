@@ -1,60 +1,24 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 23 Sep 2013 22:49:35 +0200
-Subject: at91sam9263 not booting on 3.12-rc1
-Message-ID: <5240A95F.8000604@linaro.org>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 23 Sep 2013 14:55:50 -0600
+Subject: [PATCH 1/4] i2c: busses: i2c-st: Add ST I2C controller
+In-Reply-To: <5239A0ED.6010606@st.com>
+References: <1379498483-4236-1-git-send-email-maxime.coquelin@st.com>
+ <1379498483-4236-2-git-send-email-maxime.coquelin@st.com>
+ <5239A0ED.6010606@st.com>
+Message-ID: <5240AAD6.7050002@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 09/18/2013 06:47 AM, Gabriel FERNANDEZ wrote:
+> On 18/09/2013 12:01, Maxime COQUELIN wrote:
+>> This patch adds support to SSC (Synchronous Serial Controller)
+>> I2C driver. This IP also supports SPI protocol, but this is not
+>> the aim of this driver.
+>>
+>> This IP is embedded in all ST SoCs for Set-top box platorms, and
+>> supports I2C Standard and Fast modes.
+> ... [entire patch quoted for a one-line comment] ...
 
-Hi all,
-
-I am trying to boot a 3.12-rc1 kernel on a calao USB-sam9263 (used
-default sam9263 config file) but the board hangs at the message:
-
-"Uncompressing Linux... done, booting the kernel."
-
-After git bisecting, the commit preventing the board to boot is:
-
---------------------
-
-commit ef1ab239c0c7de29072577bc8a39859074603948
-Author: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-Date:   Fri May 24 06:52:06 2013 +0800
-
-    ARM: at91: drop non DT: Calao USB-A96x
-
-    as now we have full DT support of those board
-
-    Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-    Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-
-----------------------
-
-So I enabled the CONFIG_USE_OF, the dtb are correctly generated.
-
-I tried to boot again, specifying the dtb address with bootm.
-
-tftp 0x20000000 /var/lib/tftpboot/at91/arch/arm/boot/usb_a9263.dtb
-
-tftp 0x21000000 /var/lib/tftpboot/at91/arch/arm/boot/uImage
-
-bootm 0x21000000 - 0x20000000
-
-but without success.
-
-I am wondering what I could be doing wrong ...
-
-Any help would be appreciate.
-
-  -- Daniel
-
-
-ps: u-boot is "U-Boot 2010.09 (Oct 27 2010 - 12:28:54)"
-
-
--- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Please trim down the patch so you only quote relevant lines. Quoting the
+entire patch for a 1-line comment makes people wast time searching for
+your reply.
