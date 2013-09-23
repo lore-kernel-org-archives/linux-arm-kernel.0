@@ -1,233 +1,116 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 23 Sep 2013 21:17:07 +0300
-Subject: [PATCH V3: Add Smp support for Allwinner A20. 1/3] Add smp
- support for Allwinner A20(sunxi 7i).
-In-Reply-To: <1379852488-32147-2-git-send-email-cinifr@gmail.com>
-References: <1379852488-32147-1-git-send-email-cinifr@gmail.com>
- <1379852488-32147-2-git-send-email-cinifr@gmail.com>
-Message-ID: <20130923181707.GR2779@lukather>
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Mon, 23 Sep 2013 20:18:33 +0100
+Subject: [PATCH 16/20] iio: pressure-core: st: Provide support for the
+ Vdd power supply
+In-Reply-To: <1379347346-823-17-git-send-email-lee.jones@linaro.org>
+References: <1379347346-823-1-git-send-email-lee.jones@linaro.org>
+ <1379347346-823-17-git-send-email-lee.jones@linaro.org>
+Message-ID: <52409409.6080306@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fang,
-
-On Sun, Sep 22, 2013 at 08:21:26PM +0800, Fan Rong wrote:
-> Signed-off-by: Fan Rong <cinifr@gmail.com>
-> ---
->  arch/arm/mach-sunxi/Makefile  |  2 +
->  arch/arm/mach-sunxi/headsmp.S | 17 +++++++++
->  arch/arm/mach-sunxi/platsmp.c | 86 +++++++++++++++++++++++++++++++++++++++++++
->  arch/arm/mach-sunxi/sunxi.c   | 31 ++++++++++++++++
->  4 files changed, 136 insertions(+)
->  create mode 100644 arch/arm/mach-sunxi/headsmp.S
->  create mode 100644 arch/arm/mach-sunxi/platsmp.c
+On 09/16/13 17:02, Lee Jones wrote:
+> The power to some of the sensors are controlled by regulators. In most
+> cases these are 'always on', but if not they will fail to work until
+> the regulator is enabled using the relevant APIs. This patch allows for
+> the Vdd power supply to be specified by either platform data or Device
+> Tree.
 > 
-> diff --git a/arch/arm/mach-sunxi/Makefile b/arch/arm/mach-sunxi/Makefile
-> index 93bebfc..d7f1ef4 100644
-> --- a/arch/arm/mach-sunxi/Makefile
-> +++ b/arch/arm/mach-sunxi/Makefile
-> @@ -1 +1,3 @@
->  obj-$(CONFIG_ARCH_SUNXI) += sunxi.o
-> +obj-$(CONFIG_ARCH_SUNXI) += platsmp.o
-> +obj-$(CONFIG_ARCH_SUNXI) += headsmp.o
-> diff --git a/arch/arm/mach-sunxi/headsmp.S b/arch/arm/mach-sunxi/headsmp.S
-> new file mode 100644
-> index 0000000..5899399
-> --- /dev/null
-> +++ b/arch/arm/mach-sunxi/headsmp.S
-> @@ -0,0 +1,17 @@
-> +/*
-> + * SMP support for A20
-> + *
-> + *  Copyright (C) 2013 Fan Rong <cinifr@gmail.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +#include <linux/linkage.h>
-> +#include <linux/init.h>
-> +
-> +.section ".text.head", "ax" ENTRY(sun7i_secondary_startup)
-> +msr cpsr_fsxc,
-> +#0xd3
-> +b secondary_startup ENDPROC(sun7i_secondary_startup)
-> diff --git a/arch/arm/mach-sunxi/platsmp.c b/arch/arm/mach-sunxi/platsmp.c
-> new file mode 100644
-> index 0000000..5e3e994
-> --- /dev/null
-> +++ b/arch/arm/mach-sunxi/platsmp.c
-> @@ -0,0 +1,86 @@
-> +/*
-> + *  linux/arch/arm/mach-sun7i/platsmp.c
-> + *
-> + *  Copyright (C) 2013 Fan Rong <cinifr@gmail.com>
-> + *  All Rights Reserved
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +#include <linux/init.h>
-> +#include <linux/errno.h>
-> +#include <linux/smp.h>
-> +#include <linux/io.h>
-> +#include <linux/delay.h>
-> +#include <linux/smp.h>
-> +
-> +extern void __iomem *sunxi7i_cc_base;
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
-Please use sun7i here as well.
+Applied to the togreg branch of iio.git with a static in front of each of the functions.
 
-> +void sun7i_secondary_startup(void);
-> +
-> +/*
-> + * CPUCFG
-> + */
-> +#define SUN7I_CPUCFG_BOOTADDR	0x01a4
-> +
-> +#define SUN7I_CPUCFG_GENCTL	0x0184
-> +#define SUN7I_CPUCFG_DBGCTL0	0x01e0
-> +#define SUN7I_CPUCFG_DBGCTL1	0x01e4
-> +
-> +#define SUN7I_CPU1_PWR_CLAMP	0x01b0
-> +#define SUN7I_CPU1_PWROFF_REG	0x01b4
-> +#define SUN7I_CPUX_RESET_CTL(x)	(0x40 + (x)*0x40)
-> +
-> +static int sun7i_boot_secondary(unsigned int cpu, struct task_struct *idle)
+> ---
+>  drivers/iio/pressure/st_pressure_core.c | 28 ++++++++++++++++++++++++++++
+>  include/linux/iio/common/st_sensors.h   |  3 +++
+>  2 files changed, 31 insertions(+)
+> 
+> diff --git a/drivers/iio/pressure/st_pressure_core.c b/drivers/iio/pressure/st_pressure_core.c
+> index e879542..c801c80 100644
+> --- a/drivers/iio/pressure/st_pressure_core.c
+> +++ b/drivers/iio/pressure/st_pressure_core.c
+> @@ -23,6 +23,7 @@
+>  #include <linux/iio/sysfs.h>
+>  #include <linux/iio/trigger.h>
+>  #include <linux/iio/buffer.h>
+> +#include <linux/regulator/consumer.h>
+>  #include <asm/unaligned.h>
+>  
+>  #include <linux/iio/common/st_sensors.h>
+> @@ -313,6 +314,29 @@ static const struct iio_trigger_ops st_press_trigger_ops = {
+>  #define ST_PRESS_TRIGGER_OPS NULL
+>  #endif
+>  
+> +void st_press_power_enable(struct iio_dev *indio_dev)
 > +{
-> +	long paddr;
-> +	uint32_t pwr_reg;
-> +	uint32_t j = 0xff << 1;
-> +	if (!sunxi7i_cc_base) {
-> +		pr_debug("error map cpu configure\n");
-> +		return -ENOSYS;
+> +	struct st_sensor_data *pdata = iio_priv(indio_dev);
+> +	int err;
+> +
+> +	/* Regulators not mandatory, but if requested we should enable it. */
+> +	pdata->vdd = devm_regulator_get_optional(&indio_dev->dev, "vdd");
+> +	if (!IS_ERR(pdata->vdd)) {
+> +		err = regulator_enable(pdata->vdd);
+> +		if (err != 0)
+> +			dev_warn(&indio_dev->dev,
+> +				 "Failed to enable specified Vdd supply\n");
 > +	}
-> +	/* Set boot addr */
-> +	paddr = virt_to_phys(sun7i_secondary_startup);
-> +	writel(paddr, sunxi7i_cc_base + SUN7I_CPUCFG_BOOTADDR);
-> +
-> +	/* Assert cpu core reset */
-> +	writel(0, sunxi7i_cc_base + SUN7I_CPUX_RESET_CTL(cpu));
-> +
-> +	/* Ensure CPU reset also invalidates L1 caches */
-> +	pwr_reg = readl(sunxi7i_cc_base + SUN7I_CPUCFG_GENCTL);
-> +	pwr_reg &= ~ BIT(cpu);
-> +	writel(pwr_reg, sunxi7i_cc_base + SUN7I_CPUCFG_GENCTL);
-> +
-> +	/* DBGPWRDUP hold low */
-> +	pwr_reg = readl(sunxi7i_cc_base + SUN7I_CPUCFG_DBGCTL1);
-> +	pwr_reg &= ~ BIT(cpu);
-> +	writel(pwr_reg, sunxi7i_cc_base + SUN7I_CPUCFG_DBGCTL1);
-> +
-> +	/* Ramp up power to CPU1 */
-> +	do {
-> +		writel(j, sunxi7i_cc_base + SUN7I_CPU1_PWR_CLAMP);
-> +		j = j >> 1;
-> +	} while (j != 0);
-> +
-> +	mdelay(10);
-> +
-> +	pwr_reg = readl(sunxi7i_cc_base + SUN7I_CPU1_PWROFF_REG);
-> +	pwr_reg &= ~1;
-> +	writel(pwr_reg, sunxi7i_cc_base + SUN7I_CPU1_PWROFF_REG);
-> +	mdelay(1);
-> +
-> +	/* Release CPU reset */
-> +	writel(3, sunxi7i_cc_base + SUN7I_CPUX_RESET_CTL(cpu));
-> +
-> +	/* Unlock CPU */
-> +	pwr_reg = readl(sunxi7i_cc_base + SUN7I_CPUCFG_DBGCTL1);
-> +	pwr_reg |= BIT(cpu);
-> +	writel(pwr_reg, sunxi7i_cc_base + SUN7I_CPUCFG_DBGCTL1);
-> +
-> +	return 0;
 > +}
 > +
-> +struct smp_operations sun7i_smp_ops __initdata = {
-> +	.smp_boot_secondary = sun7i_boot_secondary,
-> +};
-> diff --git a/arch/arm/mach-sunxi/sunxi.c b/arch/arm/mach-sunxi/sunxi.c
-> index e79fb34..a692350 100644
-> --- a/arch/arm/mach-sunxi/sunxi.c
-> +++ b/arch/arm/mach-sunxi/sunxi.c
-> @@ -26,6 +26,8 @@
->  #include <asm/mach/map.h>
->  #include <asm/system_misc.h>
->  
-> +extern struct smp_operations sun7i_smp_ops;
-> +
->  #define SUN4I_WATCHDOG_CTRL_REG		0x00
->  #define SUN4I_WATCHDOG_CTRL_RESTART		BIT(0)
->  #define SUN4I_WATCHDOG_MODE_REG		0x04
-> @@ -42,6 +44,14 @@
->  #define SUN6I_WATCHDOG1_MODE_ENABLE		BIT(0)
->  
->  static void __iomem *wdt_base;
-> +/*
-> + * CPU Configure module support
-> + * 1: Software reset for smp cpus
-> + * 2: Configure for smp cpus including boot.
-> + * 3: Three 64-bit idle counters and two 64-bit common counters
-> + * it is needed for smp cpus
-> + */
-> +void __iomem *sunxi7i_cc_base; /*CPU Configure Base*/
->  
->  static void sun4i_restart(enum reboot_mode mode, const char *cmd)
->  {
-> @@ -98,6 +108,11 @@ static struct of_device_id sunxi_restart_ids[] = {
->  	{ /*sentinel*/ }
->  };
->  
-> +static struct of_device_id sunxi_cc_ids[] = {
-> +	{ .compatible = "allwinner,sun7i-a20-cpuconfig"},
-> +	{ /*sentinel*/ }
-> +};
-> +
->  static void sunxi_setup_restart(void)
->  {
->  	const struct of_device_id *of_id;
-> @@ -138,7 +153,23 @@ static const char * const sunxi_board_dt_compat[] = {
->  	NULL,
->  };
->  
-> +static int __init sunxi_init_cpuconfig_map(void)
+> +void st_press_power_disable(struct iio_dev *indio_dev)
 > +{
-> +	struct device_node *np;
+> +	struct st_sensor_data *pdata = iio_priv(indio_dev);
 > +
-> +	np = of_find_matching_node(NULL, sunxi_cc_ids);
-> +	if (WARN(!np, "unable to setup cup configure"))
-> +		return -ENOSYS;
-> +	sunxi7i_cc_base = of_iomap(np, 0);
-> +	if (WARN(!sunxi7i_cc_base, "failed to map cup configure base address"))
-> +		return -ENOSYS;
-> +	return 0;
+> +	if (!IS_ERR(pdata->vdd))
+> +		regulator_disable(pdata->vdd);
 > +}
 > +
-> +early_initcall(sunxi_init_cpuconfig_map);
-
-You still haven't said why you don't want to use smp_init_cpus there.
-
+>  int st_press_common_probe(struct iio_dev *indio_dev,
+>  				struct st_sensors_platform_data *plat_data)
+>  {
+> @@ -323,6 +347,8 @@ int st_press_common_probe(struct iio_dev *indio_dev,
+>  	indio_dev->modes = INDIO_DIRECT_MODE;
+>  	indio_dev->info = &press_info;
+>  
+> +	st_press_power_enable(indio_dev);
 > +
->  DT_MACHINE_START(SUNXI_DT, "Allwinner A1X (Device Tree)")
-> +	.smp	= smp_ops(sun7i_smp_ops),
-
-Please align the "=" with the rest of the structure, and please rebase
-on top of my "ARM: sunxi: Split out the DT machines for sun6i and sun7i"
-patch.
-
-Thanks a lot,
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130923/fd08c702/attachment-0001.sig>
+>  	err = st_sensors_check_device_support(indio_dev,
+>  					      ARRAY_SIZE(st_press_sensors),
+>  					      st_press_sensors);
+> @@ -381,6 +407,8 @@ void st_press_common_remove(struct iio_dev *indio_dev)
+>  {
+>  	struct st_sensor_data *pdata = iio_priv(indio_dev);
+>  
+> +	st_press_power_disable(indio_dev);
+> +
+>  	iio_device_unregister(indio_dev);
+>  	if (pdata->get_irq_data_ready(indio_dev) > 0) {
+>  		st_sensors_deallocate_trigger(indio_dev);
+> diff --git a/include/linux/iio/common/st_sensors.h b/include/linux/iio/common/st_sensors.h
+> index e732fda..968b84e 100644
+> --- a/include/linux/iio/common/st_sensors.h
+> +++ b/include/linux/iio/common/st_sensors.h
+> @@ -16,6 +16,7 @@
+>  #include <linux/irqreturn.h>
+>  #include <linux/iio/trigger.h>
+>  #include <linux/bitops.h>
+> +#include <linux/regulator/consumer.h>
+>  
+>  #include <linux/platform_data/st_sensors_pdata.h>
+>  
+> @@ -201,6 +202,7 @@ struct st_sensors {
+>   * @trig: The trigger in use by the core driver.
+>   * @sensor: Pointer to the current sensor struct in use.
+>   * @current_fullscale: Maximum range of measure by the sensor.
+> + * @vdd: Pointer to sensor's Vdd power supply
+>   * @enabled: Status of the sensor (false->off, true->on).
+>   * @multiread_bit: Use or not particular bit for [I2C/SPI] multiread.
+>   * @buffer_data: Data used by buffer part.
+> @@ -216,6 +218,7 @@ struct st_sensor_data {
+>  	struct iio_trigger *trig;
+>  	struct st_sensors *sensor;
+>  	struct st_sensor_fullscale_avl *current_fullscale;
+> +	struct regulator *vdd;
+>  
+>  	bool enabled;
+>  	bool multiread_bit;
+> 
