@@ -1,49 +1,43 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Mon, 23 Sep 2013 18:01:14 +0200
-Subject: [PATCH] ARM: EXYNOS: fix PL330 MDMA1 address in DT for Universal
- C210 board
-In-Reply-To: <8667689.9TcYbn9cHO@amdc1032>
-References: <8667689.9TcYbn9cHO@amdc1032>
-Message-ID: <5328103.I4Op9muCR3@amdc1032>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 23 Sep 2013 10:03:18 -0600
+Subject: [PATCH v3 1/2] video: ARM CLCD: Add DT support
+In-Reply-To: <1379522363.9244.12.camel@hornet>
+References: <1379351934-25415-1-git-send-email-pawel.moll@arm.com>
+ <52376180.1090001@wwwdotorg.org> <1379435799.9205.16.camel@hornet>
+ <5238CBE9.2060800@wwwdotorg.org> <1379522363.9244.12.camel@hornet>
+Message-ID: <52406646.709@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-Hi Kukjin,
-
-Could you please apply this patch?
-
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
-
-On Tuesday, August 20, 2013 01:22:45 PM Bartlomiej Zolnierkiewicz wrote:
-> Revision 0 of Exynos4210 SoC (used on Universal C210 board) requires
-> 'secure' PL330 MDMA1 address (0x12840000) instead of 'non-secure' one
-> (0x12850000). Fix it by overriding the default PL330 MDMA1 address in
-> exynos4210-universal_c210.dts.
+On 09/18/2013 10:39 AM, Pawel Moll wrote:
+> On Tue, 2013-09-17 at 22:34 +0100, Stephen Warren wrote:
+>>> On Tue, 2013-09-17 at 17:36 +0100, Pawel Moll wrote:
+>>>> On Mon, 2013-09-16 at 20:52 +0100, Stephen Warren wrote:
+>>>>>> +- arm,pl11x,panel-data-pads: array of 24 cells, each of them describing
+>>>>>> +				a function of one of the CLD pads,
+>>>>>> +				starting from 0 up to 23; each pad can
+>>>>>> +				be described by one of the following values:
+>>>>>> +	- 0: reserved (not connected)
+>>>>>> +	- 0x100-0x107: color upper STN panel data 0 to 7
+>>>>> ...
+>>>>>
+>>>>> I assume those are the raw values that go into the HW?
+>>>
+>>> No, they can be considered "labels", defining the way pads are used
+>>> (wired). Then, basing on this information, the driver is configuring the
+>>> cell, eg. selecting STN or TFT mode (thus switching the output between
+>>> panel formatter and raw RGB data source).
+>>
+>> Oh, why not just use the raw values from the HW registers for this?
 > 
-> This is a Device Tree (DT) version of commit 91280e7 ("ARM: EXYNOS:
-> PL330 MDMA1 fix for revision 0 of Exynos4210 SOC") and fixes recent
-> regression caused by conversion to DT-only setup on ARM EXYNOS.
-> 
-> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> ---
->  arch/arm/boot/dts/exynos4210-universal_c210.dts | 4 ++++
->  1 file changed, 4 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/exynos4210-universal_c210.dts b/arch/arm/boot/dts/exynos4210-universal_c210.dts
-> index 889cdad..d2e3f5f 100644
-> --- a/arch/arm/boot/dts/exynos4210-universal_c210.dts
-> +++ b/arch/arm/boot/dts/exynos4210-universal_c210.dts
-> @@ -350,3 +350,7 @@
->  		status = "okay";
->  	};
->  };
-> +
-> +&mdma1 {
-> +	reg = <0x12840000 0x1000>;
-> +};
+> How do you mean? Based on the the way the "LCD data" lines are wired up,
+> the driver has to decide whether to select STN (LCDControl &= ~(1<<5))
+> or TFT mode (LCDControl |= 1<<5), then figures out what memory pixel
+> formats are possible (based on this will set LCDControl[3..1] in
+> runtime, depending on the mode selected by the user). There isn't a
+> separate register as such configuring output pads. It's just the way
+> they can used depends on the way they're wired up.
+
+It sounds like you could just put LCDControl & 0x2e in the DT rather
+than using values such as 0x100..0x107, which don't appear to match the
+register format you mentioned above.
