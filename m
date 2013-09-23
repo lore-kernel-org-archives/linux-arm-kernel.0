@@ -1,100 +1,54 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 23 Sep 2013 19:42:26 +0100
-Subject: [PATCH 36/51] DMA-API: usb: use dma_set_coherent_mask()
-In-Reply-To: <Pine.LNX.4.44L0.1309231418030.1348-100000@iolanthe.rowland.org>
-References: <E1VMmHX-0007jq-Cj@rmk-PC.arm.linux.org.uk>
- <Pine.LNX.4.44L0.1309231418030.1348-100000@iolanthe.rowland.org>
-Message-ID: <20130923184226.GU25647@n2100.arm.linux.org.uk>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Mon, 23 Sep 2013 11:56:13 -0700
+Subject: [PATCH 1/3] Add smp support for Allwinner A20(sunxi 7i).
+In-Reply-To: <20130923181917.GS2779@lukather>
+References: <1379768716-11672-1-git-send-email-cinifr@gmail.com>
+ <1379768716-11672-2-git-send-email-cinifr@gmail.com>
+ <20130921140059.GA2779@lukather> <523FB773.4050408@roeck-us.net>
+ <20130923181917.GS2779@lukather>
+Message-ID: <20130923185613.GA30198@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 23, 2013 at 02:27:39PM -0400, Alan Stern wrote:
-> On Thu, 19 Sep 2013, Russell King wrote:
+On Mon, Sep 23, 2013 at 09:19:17PM +0300, Maxime Ripard wrote:
+> Hi Guenter,
 > 
-> > The correct way for a driver to specify the coherent DMA mask is
-> > not to directly access the field in the struct device, but to use
-> > dma_set_coherent_mask().  Only arch and bus code should access this
-> > member directly.
+> On Sun, Sep 22, 2013 at 08:37:23PM -0700, Guenter Roeck wrote:
+> > On 09/21/2013 07:00 AM, Maxime Ripard wrote:
 > > 
-> > Convert all direct write accesses to using the correct API.
+> > [ ... ]
 > > 
-> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> > >>+	/* assert cpu core reset */
+> > >>+	writel(0, sunxi7i_cc_base + CPUX_RESET_CTL(cpu));
+> > >>+	/* L1RSTDISABLE hold low */
+> > >>+	pwr_reg = readl(sunxi7i_cc_base + AW_CPUCFG_GENCTL);
+> > >>+	pwr_reg &= ~(1<<cpu);
+> > >>+	writel(pwr_reg, sunxi7i_cc_base + AW_CPUCFG_GENCTL);
+> > >>+	/* DBGPWRDUP hold low */
+> > >>+	pwr_reg = readl(sunxi7i_cc_base + AW_CPUCFG_DBGCTL1);
+> > >>+	pwr_reg &= ~(1<<cpu);
+> > >
+> > >Use BIT(cpu) here. And you should run scripts/checkpatch.pl on your
+> > >patches before sending them.
+> > >
+> > 
+> > For the record:
+> > 
+> > $ scripts/checkpatch.pl --strict allwinner.patch
+> > total: 0 errors, 0 warnings, 0 checks, 527 lines checked
+> > 
+> > allwinner.patch has no obvious style problems and is ready for submission.
+> > 
+> > This is on top of "v3.12-rc1-336-gd8524ae".
+> > 
+> > checkpatch.pl does not complain as long as the number of spaces before
+> > and after an operator is the same. There is a patch pending to change
+> > this with the --strict option, but it will still not complain in 'normal'
+> > operation.
 > 
-> > diff --git a/drivers/usb/host/ehci-platform.c b/drivers/usb/host/ehci-platform.c
-> > index f6b790c..5b0cd2d 100644
-> > --- a/drivers/usb/host/ehci-platform.c
-> > +++ b/drivers/usb/host/ehci-platform.c
+> Hmmm, ok. Somehow, I was convinced that it was triggering a warning.
+> Thanks for the heads up :)
 > 
-> > @@ -91,8 +91,9 @@ static int ehci_platform_probe(struct platform_device *dev)
-> >  		dev->dev.platform_data = &ehci_platform_defaults;
-> >  	if (!dev->dev.dma_mask)
-> >  		dev->dev.dma_mask = &dev->dev.coherent_dma_mask;
-> > -	if (!dev->dev.coherent_dma_mask)
-> > -		dev->dev.coherent_dma_mask = DMA_BIT_MASK(32);
-> > +	err = dma_set_coherent_mask(&dev->dev, DMA_BIT_MASK(32));
-> > +	if (err)
-> > +		return err;
-> >  
-> >  	pdata = dev_get_platdata(&dev->dev);
-> 
-> ehci-platform.c is a generic file, intended for use by multiple
-> platforms.  Is it not possible that on some platforms, the arch or bus
-> code may already have initialized the DMA masks?  Isn't something like 
-> this (i.e., DMA bindings) planned for Device Tree?
-> 
-> By eliminating the tests above and calling dma_set_coherent_mask or
-> dma_coerce_mask_and_coherent unconditionally, this patch (and the next)
-> would overwrite those initial settings.
-> 
-> I don't know to what extent the same may be true for the other,
-> platform-specific, drivers changed by this patch.  But it's something 
-> to be aware of.
+Yes, me too until I realized that it doesn't :(.
 
-Please check the DMA API documentation:
-
-=====
-For correct operation, you must interrogate the kernel in your device
-probe routine to see if the DMA controller on the machine can properly
-support the DMA addressing limitation your device has.  It is good
-style to do this even if your device holds the default setting,
-because this shows that you did think about these issues wrt. your
-device.
-
-The query is performed via a call to dma_set_mask():
-
-        int dma_set_mask(struct device *dev, u64 mask);
-
-The query for consistent allocations is performed via a call to
-dma_set_coherent_mask():
-
-        int dma_set_coherent_mask(struct device *dev, u64 mask);
-=====
-
-So, All drivers which use DMA are supposed to issue the appropriate
-calls to check the DMA masks before they perform DMA, even if the
-"default" is correct.
-
-And yes, this is all part of sorting out the DT mess - we should
-start not from the current mess (which is really totally haphazard)
-but from the well established position of how the DMA API _should_
-be used.  What that means is that all drivers should be issuing
-these calls as appropriate today.
-
-The default mask setup when the device is created is just that -
-it's a default mask, and it should not be used to decide anything
-about the device.  That's something which the driver should compute
-on its own accord and then inform the various other layers via the
-appropriate call.
-
-Remember, on PCI, even when we have 64-bit, we do not declare PCI
-devices with a 64-bit DMA mask: that's up to PCI device drivers to
-_try_ to set a 64-bit DMA mask, which when successful _allows_ them
-to use 64-bit DMA.  If it fails, they have to only use 32-bit.  If
-they want a smaller mask, the _driver_ has to set the smaller mask,
-not the device creating code.
-
-The reason we're into this (particularly on ARM) is that we got lazy
-because we could get by with declaring a DMA mask at device creation
-time, since all devices were statically declared.  Now it's time to
-get rid of those old lazy ways and start doing things correctly and
-to the requirements of the APIs.
+Guenter
