@@ -1,33 +1,36 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Mon, 23 Sep 2013 16:59:09 +0300
-Subject: [RFC PATCH 08/15] ata: ahci_platform: Manage SATA PHY
-In-Reply-To: <52403B4F.3070406@cogentembedded.com>
-References: <1379595943-14622-1-git-send-email-rogerq@ti.com>
- <1379595943-14622-9-git-send-email-rogerq@ti.com>
- <20130922165817.GD30946@htj.dyndns.org> <523F35E4.6050707@cogentembedded.com>
- <20130922215107.GD27616@mtj.dyndns.org> <523FEFC2.801@ti.com>
- <52403B4F.3070406@cogentembedded.com>
-Message-ID: <5240492D.6060204@ti.com>
+From: jbe@pengutronix.de (=?utf-8?q?J=C3=BCrgen_Beisert?=)
+Date: Mon, 23 Sep 2013 16:05:03 +0200
+Subject: [PATCHv5] staging/iio/adc: change the MXS touchscreen driver
+ implementation
+In-Reply-To: <21056.17602.24566.144289@ipc1.ka-ro>
+References: <1379593369-22010-1-git-send-email-jbe@pengutronix.de>
+ <201309231524.38008.jbe@pengutronix.de> <21056.17602.24566.144289@ipc1.ka-ro>
+Message-ID: <201309231605.03860.jbe@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/23/2013 03:59 PM, Sergei Shtylyov wrote:
-> Hello.
-> 
-> On 23-09-2013 11:37, Roger Quadros wrote:
-> 
->>>>     Not sure why you asked -- I'm not using this driver, neither I'm
-> 
->>> Well, you have better grip of what's going on in the embedded world
->>> than me.  I'm mostly curious whether adding dependency on PHY is okay.
-> 
->> There is no hard dependency on presence of PHY. The driver will continue
->> as usual if devm_phy_get() fails.
->> I hope selecting GENERIC_PHY in Kconfig is not an issue.
-> 
->    Selecting in the AHCI_PLATFORM section? It seems I have overlooked it. No, I don't think it's a good idea. The generic PHY functions seem to be stubbed when GENERIC_PHY=n.
-> 
-OK I will remove the select then.
+Hi Lothar,
 
-cheers,
--roger
+On Monday 23 September 2013 15:40:18 Lothar Wa?mann wrote:
+> J?rgen Beisert writes:
+> > The i.MX28 manual says the LRADC delay unit is driven by a 2 kHz clock,
+> > but does not say what kind of clock it is (or is derived from). I guess
+> > now, this clock isn't enabled and thus the delay unit can't work. At
+> > least on the MX28EVK. On your TX28 platform the clock seems enabled and
+> > the delay unit can do its job and drive the state machine.
+>
+> The i.MX28 Ref Manual states in chapter 38.5.14 LRADC Scheduling Delay:
+> | This counter operates on a 2KHz clock derived from crystal clock.
+>
+> Thus the clock should always be enabled.
+
+But it isn't always on. I have now added the correct clock_get() call to the 
+LRADC driver and the touchscreen works again on the MX28EVK. New patch series 
+will follow. Same is required for i.MX23.
+
+Regards,
+Juergen
+
+-- 
+Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?| Juergen Beisert ? ? ? ? ? ? |
+Linux Solutions for Science and Industry ? ? ?| http://www.pengutronix.de/  |
