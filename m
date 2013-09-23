@@ -1,34 +1,62 @@
-From: jbe@pengutronix.de (=?iso-8859-1?q?J=FCrgen_Beisert?=)
-Date: Mon, 23 Sep 2013 13:57:54 +0200
-Subject: [PATCHv5] staging/iio/adc: change the MXS touchscreen driver
- implementation
-In-Reply-To: <201309231236.27554.marex@denx.de>
-References: <1379593369-22010-1-git-send-email-jbe@pengutronix.de>
- <201309231235.56309.jbe@pengutronix.de> <201309231236.27554.marex@denx.de>
-Message-ID: <201309231357.54137.jbe@pengutronix.de>
+From: chander.kashyap@linaro.org (Chander Kashyap)
+Date: Mon, 23 Sep 2013 17:30:37 +0530
+Subject: [PATCH] irqchip: exynos-combiner: remove hard-coded irq_base value
+In-Reply-To: <2060959.cLD86Prq58@amdc1227>
+References: <1379309482-19779-1-git-send-email-chander.kashyap@linaro.org>
+ <2060959.cLD86Prq58@amdc1227>
+Message-ID: <CANuQgHErO4VmjNfM4dB-zMq7=6kUxAUgUcsTXeD0sG4K9S0qhg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marek,
-
-On Monday 23 September 2013 12:36:27 Marek Vasut wrote:
-> > [...]
-> > I also found an MX28EVK with a touchscreen here and: yes it does not work
-> > with the modified driver. But now I'm confused, because of Lothar's
-> > statement about the TX28 platform.
-> >
-> > @Lothar: What kernel revision did you use? I had to go back to 3.9 to get
-> > a working kernel on the MX28EVK. More recent vanilla kernels stop working
-> > (MMC and network fail here).
+On 17 September 2013 18:07, Tomasz Figa <t.figa@samsung.com> wrote:
+> Hi Chander,
 >
-> Can you fix the SD and Network or at least show the fail log ?
+> On Monday 16 of September 2013 11:01:22 Chander Kashyap wrote:
+>> Pass '0' in place of hardcoded "irq_base" value as "first_irq" parameter
+>> to "irq_domain_add_simple" in order to use linear irq domain.
+>>
+>> Signed-off-by: Chander Kashyap <chander.kashyap@linaro.org>
+>> ---
+>>  drivers/irqchip/exynos-combiner.c |   15 +++------------
+>>  1 file changed, 3 insertions(+), 12 deletions(-)
+>>
+>> diff --git a/drivers/irqchip/exynos-combiner.c
+>> b/drivers/irqchip/exynos-combiner.c index 4c68265..b4ed356 100644
+>> --- a/drivers/irqchip/exynos-combiner.c
+>> +++ b/drivers/irqchip/exynos-combiner.c
+>> @@ -206,8 +206,7 @@ static unsigned int combiner_lookup_irq(int group)
+>>
+>>  static void __init combiner_init(void __iomem *combiner_base,
+>>                                struct device_node *np,
+>> -                              unsigned int max_nr,
+>> -                              int irq_base)
+>> +                              unsigned int max_nr)
+>>  {
+>>       int i, irq;
+>>       unsigned int nr_irq;
+>> @@ -221,7 +220,7 @@ static void __init combiner_init(void __iomem
+>> *combiner_base, return;
+>>       }
+>>
+>> -     combiner_irq_domain = irq_domain_add_simple(np, nr_irq, irq_base,
+>> +     combiner_irq_domain = irq_domain_add_simple(np, nr_irq, 0,
+>>                               &combiner_irq_domain_ops, combiner_data);
+>
+> I believe you can safely go with calling irq_domain_add_linear() directly
+> here.
 
-Arrgh. My fault. I used the wrong devicetree. (imx28-m28evk.dt instead of 
-imx28-evk.dtb). I still need more coffee...
+Yes, I will replace the call and resend the patch.
 
-Regards,
-Juergen
+thanks
+>
+> Otherwise the patch looks good.
+>
+> Best regards,
+> Tomasz
+>
+
+
 
 -- 
-Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?| Juergen Beisert ? ? ? ? ? ? |
-Linux Solutions for Science and Industry ? ? ?| http://www.pengutronix.de/  |
+with warm regards,
+Chander Kashyap
