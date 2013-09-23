@@ -1,83 +1,60 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Mon, 23 Sep 2013 19:17:56 -0400
-Subject: [PATCH 13/13] ARM: bL_switcher: Add query interface to discover CPU
- affinities
-In-Reply-To: <1379978276-31241-1-git-send-email-nicolas.pitre@linaro.org>
-References: <1379978276-31241-1-git-send-email-nicolas.pitre@linaro.org>
-Message-ID: <1379978276-31241-14-git-send-email-nicolas.pitre@linaro.org>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 24 Sep 2013 00:26:48 +0100
+Subject: [PATCH] ASoC: generic: Add generic DT based simple codec
+In-Reply-To: <5240B07C.6080404@wwwdotorg.org>
+References: <20130919105437.75e0f0a3@armhf>
+ <5240B07C.6080404@wwwdotorg.org>
+Message-ID: <20130923232648.GL21013@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dave Martin <dave.martin@linaro.org>
+On Mon, Sep 23, 2013 at 03:19:56PM -0600, Stephen Warren wrote:
+> On 09/19/2013 02:54 AM, Jean-Francois Moine wrote:
 
-When the switcher is active, there is no straightforward way to
-figure out which logical CPU a given physical CPU maps to.
+> > +Required properties:
+> > +- compatible: should be "linux,simple-codec".
 
-This patch provides a function
-bL_switcher_get_logical_index(mpidr), which is analogous to
-get_logical_index().
+> We shouldn't have any Linux-specific bindings. It might be reasonable to
+> define a binding for a "simple CODEC", but there's no reason it should
+> be Linux-specific.
 
-This function returns the logical CPU on which the specified
-physical CPU is grouped (or -EINVAL if unknown).
-If the switcher is inactive or not present, -EUNATCH is returned instead.
+What's the vendor prefix to use then?  The same thought did occur to me
+but I wasn't sure what to suggest instead.
 
-Signed-off-by: Dave Martin <dave.martin@linaro.org>
-Signed-off-by: Nicolas Pitre <nico@linaro.org>
----
- arch/arm/common/bL_switcher.c      | 20 ++++++++++++++++++++
- arch/arm/include/asm/bL_switcher.h |  2 ++
- 2 files changed, 22 insertions(+)
+> > +- dai-name: name of the codec
 
-diff --git a/arch/arm/common/bL_switcher.c b/arch/arm/common/bL_switcher.c
-index f4878a3604..63bbc4f705 100644
---- a/arch/arm/common/bL_switcher.c
-+++ b/arch/arm/common/bL_switcher.c
-@@ -532,6 +532,26 @@ static int bL_switcher_halve_cpus(void)
- 	return 0;
- }
- 
-+/* Determine the logical CPU a given physical CPU is grouped on. */
-+int bL_switcher_get_logical_index(u32 mpidr)
-+{
-+	int cpu;
-+
-+	if (!bL_switcher_active)
-+		return -EUNATCH;
-+
-+	mpidr &= MPIDR_HWID_BITMASK;
-+	for_each_online_cpu(cpu) {
-+		int pairing = bL_switcher_cpu_pairing[cpu];
-+		if (pairing == -1)
-+			continue;
-+		if ((mpidr == cpu_logical_map(cpu)) ||
-+		    (mpidr == cpu_logical_map(pairing)))
-+			return cpu;
-+	}
-+	return -EINVAL;
-+}
-+
- static void bL_switcher_trace_trigger_cpu(void *__always_unused info)
- {
- 	trace_cpu_migrate_current(get_ns(), read_mpidr());
-diff --git a/arch/arm/include/asm/bL_switcher.h b/arch/arm/include/asm/bL_switcher.h
-index 8ada5a885c..1714800fa1 100644
---- a/arch/arm/include/asm/bL_switcher.h
-+++ b/arch/arm/include/asm/bL_switcher.h
-@@ -55,6 +55,7 @@ bool bL_switcher_get_enabled(void);
- void bL_switcher_put_enabled(void);
- 
- int bL_switcher_trace_trigger(void);
-+int bL_switcher_get_logical_index(u32 mpidr);
- 
- #else
- static inline int bL_switcher_register_notifier(struct notifier_block *nb)
-@@ -70,6 +71,7 @@ static inline int bL_switcher_unregister_notifier(struct notifier_block *nb)
- static inline bool bL_switcher_get_enabled(void) { return false; }
- static inline void bL_switcher_put_enabled(void) { }
- static inline int bL_switcher_trace_trigger(void) { return 0; }
-+static inline int bL_switcher_get_logical_index(u32 mpidr) { return -EUNATCH; }
- #endif /* CONFIG_BL_SWITCHER */
- 
- #endif
--- 
-1.8.4.98.gb022869
+> That should be internal to the driver; it's Linux-specific.
+
+I do think it's reasonable to define a name for display purposes however
+this binding doesn't say that, I did say something to that effect
+already IIRC.
+
+> > +Formats:
+> > +	"s8"
+> > +	"u8"
+
+> I think the binding should specify on-the-wire formats, not in-memory
+> formats. For example, if this binding is used to represent an I2S CODEC,
+> it's more important to know whether it supports left-justified,
+> right-justified, DSP mode, etc., and the max number of bits (or perhaps
+> a list of supported numbers of bits) per channel in each case.
+
+I didn't query this myself since my expecation with this is that the
+rest of the wire format properties will come from the binding that pulls
+this together into a card (since this will need to be set at that level
+for other CODECs which are more flexible) so I saw this as providing
+additional information which would normally not be fixed at that level.
+Arguably this could be pushed up there too, though it's not normal to
+fix the word size.
+
+We should really be defining things like signed and unsigned as well as
+the bits per word since they do make a difference, though in practice
+you very rarely see anything except unsigned and some of the formats
+listed don't seem to have ever even been used in Linux.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130924/72fe0e20/attachment.sig>
