@@ -1,24 +1,57 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 23 Sep 2013 14:55:50 -0600
-Subject: [PATCH 1/4] i2c: busses: i2c-st: Add ST I2C controller
-In-Reply-To: <5239A0ED.6010606@st.com>
-References: <1379498483-4236-1-git-send-email-maxime.coquelin@st.com>
- <1379498483-4236-2-git-send-email-maxime.coquelin@st.com>
- <5239A0ED.6010606@st.com>
-Message-ID: <5240AAD6.7050002@wwwdotorg.org>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Mon, 23 Sep 2013 22:05:05 +0100
+Subject: [PATCH] ARM: kvm: rename cpu_reset to avoid name clash
+In-Reply-To: <20130923203042.GY12758@n2100.arm.linux.org.uk>
+References: <1378938461-10835-1-git-send-email-olof@lixom.net>
+ <CAOesGMjum0TSyudXiZtXHOGX4R7dBAhjUpoYnwjTcfD1MMpTxw@mail.gmail.com>
+ <20130912015002.GO9860@cbox>
+ <CAOesGMiGaM=s85iKHPXd9eBiL1vy3SVws+KR0ToxPpZeiisscg@mail.gmail.com>
+ <CAMJs5B9NW6cDuG-xwYucP8rONn0MdEtwTm5R2p=aBE4Q3EHNOg@mail.gmail.com>
+ <CAOesGMhPHaZ7tOshbvU1M87nshTOVqU7-+1AvOmARzKUDN6syw@mail.gmail.com>
+ <20130923203042.GY12758@n2100.arm.linux.org.uk>
+Message-ID: <20130923210505.GI19043@lvm>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/18/2013 06:47 AM, Gabriel FERNANDEZ wrote:
-> On 18/09/2013 12:01, Maxime COQUELIN wrote:
->> This patch adds support to SSC (Synchronous Serial Controller)
->> I2C driver. This IP also supports SPI protocol, but this is not
->> the aim of this driver.
->>
->> This IP is embedded in all ST SoCs for Set-top box platorms, and
->> supports I2C Standard and Fast modes.
-> ... [entire patch quoted for a one-line comment] ...
+On Mon, Sep 23, 2013 at 09:30:42PM +0100, Russell King - ARM Linux wrote:
+> On Mon, Sep 23, 2013 at 12:59:44PM -0700, Olof Johansson wrote:
+> > Hi Christoffer,
+> > 
+> > On Mon, Sep 16, 2013 at 8:47 PM, Christoffer Dall
+> > <christoffer.dall@linaro.org> wrote:
+> > > On 16 September 2013 19:41, Olof Johansson <olof@lixom.net> wrote:
+> > >> Hi,
+> > >>
+> > >> On Wed, Sep 11, 2013 at 6:50 PM, Christoffer Dall
+> > >> <christoffer.dall@linaro.org> wrote:
+> > >>> On Wed, Sep 11, 2013 at 03:39:26PM -0700, Olof Johansson wrote:
+> > >>>> On Wed, Sep 11, 2013 at 3:27 PM, Olof Johansson <olof@lixom.net> wrote:
+> > >>>> > cpu_reset is already #defined in <asm/proc-fns.h> as processor.reset,
+> > >>>> > so it expands here and causes problems.
+> > >>>> >
+> > >>>> > Signed-off-by: Olof Johansson <olof@lixom.net>
+> > >>>>
+> > >>>> I just noticed this is broken on 3.10 too, so if/when applying feel free to add:
+> > >>>>
+> > >>>> Cc: <stable@vger.kernel.org> # 3.10+
+> > >>>>
+> > >>> Thanks for the fix, applied.
+> > >>
+> > >> I haven't seen this hit linux-next yet?
+> > >>
+> > > I was waiting for kvm/next to move to 3.12-rc1 and base the patch for
+> > > kvm-arm-next off there, but I pushed this to kvm-arm-next now and it
+> > > should land in linux-next as soon as they update.
+> > 
+> > Another week has passed, and -next and mainline are both still broken.
+> > Can we please see a fix in mainline and -next within the next few
+> > days?
+> 
+> I'm getting failing builds too, which will only stop once it hits
+> mainline.
 
-Please trim down the patch so you only quote relevant lines. Quoting the
-entire patch for a 1-line comment makes people wast time searching for
-your reply.
+Apologies about this, apparently linux-next doesn't pull in my tree despite
+e-mail confirmation that it did.  I was away last week for LPC, but I'll
+make sure this lands upstream ASAP.
+
+-Christoffer
