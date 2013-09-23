@@ -1,111 +1,44 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 23 Sep 2013 03:02:08 +0000 (UTC)
-Subject: OMAP baseline test results for v3.12-rc1
-Message-ID: <alpine.DEB.2.02.1309230255320.18475@utopia.booyaka.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Sun, 22 Sep 2013 20:37:23 -0700
+Subject: [PATCH 1/3] Add smp support for Allwinner A20(sunxi 7i).
+In-Reply-To: <20130921140059.GA2779@lukather>
+References: <1379768716-11672-1-git-send-email-cinifr@gmail.com>
+ <1379768716-11672-2-git-send-email-cinifr@gmail.com>
+ <20130921140059.GA2779@lukather>
+Message-ID: <523FB773.4050408@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 09/21/2013 07:00 AM, Maxime Ripard wrote:
 
-Here are some basic OMAP test results for Linux v3.12-rc1.
-Logs and other details at:
+[ ... ]
 
-    http://www.pwsan.com/omap/testlogs/test_v3.12-rc1/20130922202452/
+>> +	/* assert cpu core reset */
+>> +	writel(0, sunxi7i_cc_base + CPUX_RESET_CTL(cpu));
+>> +	/* L1RSTDISABLE hold low */
+>> +	pwr_reg = readl(sunxi7i_cc_base + AW_CPUCFG_GENCTL);
+>> +	pwr_reg &= ~(1<<cpu);
+>> +	writel(pwr_reg, sunxi7i_cc_base + AW_CPUCFG_GENCTL);
+>> +	/* DBGPWRDUP hold low */
+>> +	pwr_reg = readl(sunxi7i_cc_base + AW_CPUCFG_DBGCTL1);
+>> +	pwr_reg &= ~(1<<cpu);
+>
+> Use BIT(cpu) here. And you should run scripts/checkpatch.pl on your
+> patches before sending them.
+>
 
+For the record:
 
-Test summary
-------------
+$ scripts/checkpatch.pl --strict allwinner.patch
+total: 0 errors, 0 warnings, 0 checks, 527 lines checked
 
-Build: zImage:
-    Pass ( 2/ 2): omap2plus_defconfig, omap2plus_defconfig_am33xx_only
+allwinner.patch has no obvious style problems and is ready for submission.
 
-Build: uImage+dtb:
-    Pass ( 3/ 3): omap2plus_defconfig_am33xx_only/am335x-bone,
-		  omap2plus_defconfig/omap4-panda,
-		  omap2plus_defconfig/omap4-panda-es
+This is on top of "v3.12-rc1-336-gd8524ae".
 
-Build: uImage:
-    Pass (14/14): omap1_defconfig, omap1_defconfig_1510innovator_only,
-		  omap1_defconfig_5912osk_only, omap2plus_defconfig,
-		  omap2plus_defconfig_2430sdp_only,
-		  omap2plus_defconfig_cpupm, omap2plus_defconfig_no_pm,
-		  omap2plus_defconfig_n800_only_a,
-		  omap2plus_defconfig_n800_multi_omap2xxx,
-		  omap2plus_defconfig_omap2_4_only,
-		  omap2plus_defconfig_omap3_4_only,
-		  rmk_omap3430_ldp_allnoconfig,
-		  rmk_omap3430_ldp_oldconfig,
-		  rmk_omap4430_sdp_allnoconfig
+checkpatch.pl does not complain as long as the number of spaces before
+and after an operator is the same. There is a patch pending to change
+this with the --strict option, but it will still not complain in 'normal'
+operation.
 
-Boot to userspace:
-    skip ( 1/ 1): 5912osk
-    Pass (11/11): 2430sdp, 3517evm, 3530es3beagle, 3730beaglexm,
-		  37xxevm, 4430es2panda, 4460pandaes, am335xbone,
-		  am335xbonelt, cmt3517, 4460varsomom
-
-PM: chip retention via suspend:
-    FAIL ( 3/ 7): 2430sdp, 4430es2panda, 4460varsomom
-    Pass ( 4/ 7): 3530es3beagle, 3730beaglexm, 37xxevm, 4460pandaes
-
-PM: chip retention via dynamic idle:
-    FAIL ( 4/ 7): 2430sdp, 4430es2panda, 4460pandaes, 4460varsomom
-    Pass ( 3/ 7): 3530es3beagle, 3730beaglexm, 37xxevm
-
-PM: chip off except CORE via suspend:
-    Pass ( 1/ 1): 3730beaglexm
-
-PM: chip off except CORE via dynamic idle:
-    Pass ( 1/ 1): 3730beaglexm
-
-PM: chip off via suspend:
-    FAIL ( 3/ 5): 4430es2panda, 4460pandaes, 4460varsomom
-    Pass ( 2/ 5): 3530es3beagle, 37xxevm
-
-PM: chip off via dynamic idle:
-    FAIL ( 3/ 5): 4430es2panda, 4460pandaes, 4460varsomom
-    Pass ( 2/ 5): 3530es3beagle, 37xxevm
-
-
-vmlinux object size
-(delta in bytes from test_v3.11 (6e4664525b1db28f8c4e1130957f70a94c19213e)):
-   text     data      bss    total  kernel
- +39515    +1500      +56   +41071  omap1_defconfig
- +37048    +1436      +56   +38540  omap1_defconfig_1510innovator_only
- +38579    +1500      +88   +40167  omap1_defconfig_5912osk_only
-+237402   +47344     +760  +285506  omap2plus_defconfig
--245280   -65736    -8488  -319504  omap2plus_defconfig_2430sdp_only
-+241222   +47120     +696  +289038  omap2plus_defconfig_cpupm
-+3314252  +272060  +5365880  +8952192  omap2plus_defconfig_n800_multi_omap2xxx
-+3282652  +234764  +5365840  +8883256  omap2plus_defconfig_n800_only_a
-+242382   +49736     +824  +292942  omap2plus_defconfig_no_pm
-+305085   +99792    +4408  +409285  omap2plus_defconfig_omap2_4_only
-+292422   +98536    +3960  +394918  omap2plus_defconfig_omap3_4_only
- +34044     -452    +2524   +36116  rmk_omap3430_ldp_allnoconfig
- +42173     +412    -1152   +41433  rmk_omap3430_ldp_oldconfig
- +33264    +1892     -732   +34424  rmk_omap4430_sdp_allnoconfig
-
-The large deltas associated with the N800 configs are due to a switchover 
-to seedconfig-generated Kconfigs - the name changed.  Something is not 
-right with the 2430sdp_only config; that should show a size increase 
-similar to the other OMAP2 kconfigs - will look into it.
-
-
-Boot-time memory difference
-(delta in bytes from test_v3.11 (6e4664525b1db28f8c4e1130957f70a94c19213e))
-  avail  rsrvd   high  freed  board          kconfig
- 16376k -16376k      .      .  2420n800       omap2plus_defconfig_n800_only_a
-  -280k   280k      .    12k  2430sdp        omap2plus_defconfig
-  -280k   280k      .    12k  3517evm        omap2plus_defconfig
-  -280k   280k      .    12k  3530es3beagle  omap2plus_defconfig
-  -280k   280k      .    12k  3730beaglexm   omap2plus_defconfig
-  -280k   280k      .    12k  37xxevm        omap2plus_defconfig
-  -276k   276k      .    12k  4430es2panda   omap2plus_defconfig
-  -276k   276k      .    12k  4460pandaes    omap2plus_defconfig
-    24k   -24k      .   -32k  am335xbone     omap2plus_defconfig_am33xx_only
-  -288k   288k      .    12k  am335xbonelt   omap2plus_defconfig_am33xx_only
-
-The 16MB difference in the N800 boot memory usage is caused by disabling 
-CMA in the config here.
-
-Nice job everyone - this is the first -rc1 in a while where it looks like 
-there's no need to run around trying to deal with post-merge window boot 
-regressions.
+Guenter
