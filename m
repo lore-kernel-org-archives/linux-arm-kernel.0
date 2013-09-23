@@ -1,36 +1,43 @@
-From: jbe@pengutronix.de (=?utf-8?q?J=C3=BCrgen_Beisert?=)
-Date: Mon, 23 Sep 2013 16:05:03 +0200
-Subject: [PATCHv5] staging/iio/adc: change the MXS touchscreen driver
- implementation
-In-Reply-To: <21056.17602.24566.144289@ipc1.ka-ro>
-References: <1379593369-22010-1-git-send-email-jbe@pengutronix.de>
- <201309231524.38008.jbe@pengutronix.de> <21056.17602.24566.144289@ipc1.ka-ro>
-Message-ID: <201309231605.03860.jbe@pengutronix.de>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Mon, 23 Sep 2013 16:03:48 +0200
+Subject: [PATCH] spi: s3c64xx: Add missing compatibles
+In-Reply-To: <20130923135042.GH21013@sirena.org.uk>
+References: <1379929545-27517-1-git-send-email-m.krawczuk@partner.samsung.com>
+ <20130923135042.GH21013@sirena.org.uk>
+Message-ID: <1668307.AS5AU6asQx@amdc1227>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lothar,
+Hi Mark,
 
-On Monday 23 September 2013 15:40:18 Lothar Wa?mann wrote:
-> J?rgen Beisert writes:
-> > The i.MX28 manual says the LRADC delay unit is driven by a 2 kHz clock,
-> > but does not say what kind of clock it is (or is derived from). I guess
-> > now, this clock isn't enabled and thus the delay unit can't work. At
-> > least on the MX28EVK. On your TX28 platform the clock seems enabled and
-> > the delay unit can do its job and drive the state machine.
->
-> The i.MX28 Ref Manual states in chapter 38.5.14 LRADC Scheduling Delay:
-> | This counter operates on a 2KHz clock derived from crystal clock.
->
-> Thus the clock should always be enabled.
+On Monday 23 of September 2013 14:50:42 Mark Brown wrote:
+> On Mon, Sep 23, 2013 at 11:45:45AM +0200, Mateusz Krawczuk wrote:
+> > Add compatibles for s3c6410, s5pc100 and s5pc110/s5pv210 boards.
+> 
+> >  static const struct of_device_id s3c64xx_spi_dt_match[] = {
+> > +	{ .compatible = "samsung,s3c2443-spi",
+> > +			.data = (void *)&s3c2443_spi_port_config,
+> > +	},
+> > +	{ .compatible = "samsung,s3c6410-spi",
+> > +			.data = (void *)&s3c6410_spi_port_config,
+> > +	},
+> 
+> This is missing s3c6400 and at least one other s3c24xx I think.  They
+> can be added later though so applied, thanks.
 
-But it isn't always on. I have now added the correct clock_get() call to the 
-LRADC driver and the touchscreen works again on the MX28EVK. New patch series 
-will follow. Same is required for i.MX23.
+I think after this patch the table lists all the SoC variants supported
+by the driver, at least it's what I can tell from a quick look at
+s3c64xx_spi_driver_ids[] array.
 
-Regards,
-Juergen
+The compatible for S3C64xx should be probably called "samsung,s3c6400",
+though, as it's the first SoC with this variant.
 
--- 
-Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?| Juergen Beisert ? ? ? ? ? ? |
-Linux Solutions for Science and Industry ? ? ?| http://www.pengutronix.de/  |
+Best regards,
+Tomasz
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130923/df3ed896/attachment.sig>
