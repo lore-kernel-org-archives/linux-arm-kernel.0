@@ -1,67 +1,34 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Mon, 23 Sep 2013 13:50:51 +0200
-Subject: [PATCH] media: i2c: adv7343: fix the DT binding properties
-In-Reply-To: <CA+V-a8u5_rhxTgkVgCbtmGpaZCt2ciu4vABW4t80aSp7csttnw@mail.gmail.com>
-References: <1379073471-7244-1-git-send-email-prabhakar.csengg@gmail.com>
- <523C1AE0.9020603@samsung.com>
- <CA+V-a8u5_rhxTgkVgCbtmGpaZCt2ciu4vABW4t80aSp7csttnw@mail.gmail.com>
-Message-ID: <3002978.Cb6jL1xtkE@avalon>
+From: jbe@pengutronix.de (=?iso-8859-1?q?J=FCrgen_Beisert?=)
+Date: Mon, 23 Sep 2013 13:57:54 +0200
+Subject: [PATCHv5] staging/iio/adc: change the MXS touchscreen driver
+ implementation
+In-Reply-To: <201309231236.27554.marex@denx.de>
+References: <1379593369-22010-1-git-send-email-jbe@pengutronix.de>
+ <201309231235.56309.jbe@pengutronix.de> <201309231236.27554.marex@denx.de>
+Message-ID: <201309231357.54137.jbe@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 23 September 2013 08:18:52 Prabhakar Lad wrote:
-> On Fri, Sep 20, 2013 at 3:22 PM, Sylwester Nawrocki wrote:
-> > On 09/20/2013 10:11 AM, Prabhakar Lad wrote:
-> >> OK I will, just send out a fix up patch which fixes the mismatch between
-> >> names for the rc-cycle, and later send out a patch which removes the
-> >> platform data usage for next release with proper DT bindings.
-> > 
-> > I think the binding need to be fully corrected now, I just meant to not
-> > touch the board file, i.e. leave non-dt support unchanged.
-> 
-> Ok
-> 
-> >> I'm OK with making regulator properties as optional, But still it would
-> >> change the meaning of what DT is, we know that the VDD/VDD_IO .. etc
-> >> pins are required properties (but still making them as optional) :-(
-> >> 
-> >> I think there might several devices where this situation may arise so
-> >> just thinking of a alternative solution.
-> >> 
-> >> say we have property 'software-regulator' which takes true/false(0/1)
-> >> If set to true we make the regulators as required property or else we
-> >> assume it is handled and ignore it ?
-> > 
-> > I don't think this is a good idea. You would have to add a similar
-> > platform data flag for non-dt, it doesn't sound right. I can see two
-> > options here:
-> > 
-> > 1. Make the regulator properties mandatory and, e.g. define a fixed
-> >    voltage GPIO regulator in DT with an empty 'gpio' property. Then
-> >    pass a phandle to that regulator in the adv7343 *-supply properties.
-> >    For non-dt similarly a fixed voltage regulator(s) and voltage
-> >    supplies  would need to be defined in the board files.
-> > 
-> > 2. Make the properties optional and use (devm_)regulator_get_optional()
-> >    calls in the driver (a recently added function). I must admit I don't
-> >    fully understand description of this function, it currently looks
-> >    pretty much same as (devm_)regulator_get(). Thus the driver would
-> >    need to be handling regulator supplies only when non ERR_PTR() is
-> >    returned from regulator_get_optional() and otherwise assume a non
-> >    critical error. There is already quite a few example occurrences of
-> >    regulator_get_optional() usage.
-> 
-> Thanks for pointing it I'll choose option 2 and post the patch.
+Hi Marek,
 
-Isn't regulator_get_optional() intended for devices that can have supplies 
-unconnected in normal use ? The ADV7343 supplies are mandatory from a hardware 
-point of view, so I think we should use regulator_get(). Otherwise the driver 
-won't be able to tell the difference between a regulator that isn't present 
-yet (for instance because the regulator device/driver hasn't been probed yet), 
-which should result in deferred probing, and an always-on regulator that has 
-been left out.
+On Monday 23 September 2013 12:36:27 Marek Vasut wrote:
+> > [...]
+> > I also found an MX28EVK with a touchscreen here and: yes it does not work
+> > with the modified driver. But now I'm confused, because of Lothar's
+> > statement about the TX28 platform.
+> >
+> > @Lothar: What kernel revision did you use? I had to go back to 3.9 to get
+> > a working kernel on the MX28EVK. More recent vanilla kernels stop working
+> > (MMC and network fail here).
+>
+> Can you fix the SD and Network or at least show the fail log ?
+
+Arrgh. My fault. I used the wrong devicetree. (imx28-m28evk.dt instead of 
+imx28-evk.dtb). I still need more coffee...
+
+Regards,
+Juergen
 
 -- 
-Regards,
-
-Laurent Pinchart
+Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?| Juergen Beisert ? ? ? ? ? ? |
+Linux Solutions for Science and Industry ? ? ?| http://www.pengutronix.de/  |
