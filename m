@@ -1,47 +1,47 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 23 Sep 2013 16:11:19 -0700
-Subject: [PATCH 4/4] RX-51: Add platform function and data for bq24150a
- charger
-In-Reply-To: <20130923204714.GB22995@earth.universe>
-References: <1378630239-10006-1-git-send-email-pali.rohar@gmail.com>
- <201309232116.19161@pali> <20130923200008.GA21808@earth.universe>
- <201309232206.47391@pali> <20130923204714.GB22995@earth.universe>
-Message-ID: <20130923231119.GK2684@atomide.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Mon, 23 Sep 2013 19:17:43 -0400
+Subject: [PATCH 00/13] second batch of b.L switcher patches
+Message-ID: <1379978276-31241-1-git-send-email-nicolas.pitre@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Sebastian Reichel <sre@ring0.de> [130923 13:55]:
-> On Mon, Sep 23, 2013 at 10:06:46PM +0200, Pali Roh?r wrote:
-> > On Monday 23 September 2013 22:00:09 Sebastian Reichel wrote:
-> > > On Mon, Sep 23, 2013 at 09:16:18PM +0200, Pali Roh?r wrote:
-> > > > It is not as simple as it looks. This is reason why I
-> > > > submited this patch long time after I submited bq2415x
-> > > > driver.
-> > > > 
-> > > > Problem is that for rx51 is needed specific function which
-> > > > connect to two drivers (bq2415x and isp1704) plus it call
-> > > > specific rx51 board functions.
-> > > > 
-> > > > Something which cannot be in DT (unless DT support C/ASM
-> > > > code).
-> > > 
-> > > mh could isp1704 driver expose the data via the regulator
-> > > framework?
-> > 
-> > No, isp1704 is power supply driver and export data via power 
-> > supply (sysfs) interface. It is not regulator but charger driver.
-> 
-> well it does not charge the battery directly, but just provides a
-> power line with 5 Volt and a specified amount of current to the
-> system, doesn't it?
-> 
-> From my POV this is a candiate for the regulator framework:
-> 
-> https://www.kernel.org/doc/Documentation/power/regulator/overview.txt
+The first batch of patches was posted here:
 
-Yes I think we should be able handle that rail with the
-regulator framework.
+  http://news.gmane.org/group/gmane.linux.ports.arm.kernel/thread=253942
 
-Regards,
+They're now merged in RMK's devel-stable branch and also available via
+the linux-next tree.
 
-Tony
+So here's the second set of patches towards a fully functional and
+production quality switcher solution, establishing a landmark to compare
+against for any scheduler based solution meant to eventually surpass the
+switcher in the mainline kernel.
+
+Those patches are also available here:
+
+  git://git.linaro.org/people/nico/linux iks
+
+This set is divided in 3 groups:
+
+Patches 1 to 3 are needed for proper interaction and synchronization with
+the cpufreq companion driver that will be posted separately.
+
+Patches 4 to 9 are providing significant switch latency and efficiency
+improvements and are purely for optimization purposes.
+
+Patches 10 to 13 are for switch event tracing.
+
+Here's the diffstat:
+
+ arch/arm/common/bL_switcher.c            | 264 ++++++++++++++++++++++---
+ arch/arm/common/mcpm_entry.c             |  12 ++
+ arch/arm/common/mcpm_head.S              |  16 +-
+ arch/arm/include/asm/bL_switcher.h       |  62 +++++-
+ arch/arm/include/asm/hardirq.h           |   2 +-
+ arch/arm/include/asm/mcpm.h              |   8 +
+ arch/arm/include/asm/smp.h               |   2 +
+ arch/arm/kernel/smp.c                    |  21 ++
+ drivers/irqchip/irq-gic.c                |  43 ++++
+ include/linux/irqchip/arm-gic.h          |   2 +
+ include/trace/events/power_cpu_migrate.h |  67 +++++++
+ 11 files changed, 471 insertions(+), 28 deletions(-)
