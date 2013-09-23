@@ -1,44 +1,42 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 23 Sep 2013 14:34:34 +0200
-Subject: [PATCH 37/51] DMA-API: usb: use new dma_coerce_mask_and_coherent()
-In-Reply-To: <E1VMmIV-0007jw-Gq@rmk-PC.arm.linux.org.uk>
-References: <20130919212235.GD12758@n2100.arm.linux.org.uk>
- <E1VMmIV-0007jw-Gq@rmk-PC.arm.linux.org.uk>
-Message-ID: <5240355A.9010609@atmel.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Mon, 23 Sep 2013 14:34:54 +0200
+Subject: [PATCH] ARM: EXYNOS: remove CONFIG_MACH_EXYNOS[4,5]_DT config
+ options
+In-Reply-To: <1732670.G7NvXXJtxF@amdc1032>
+References: <3809234.0NkWBIjRC9@amdc1032> <2298139.uMOnikAvfC@amdc1227>
+ <1732670.G7NvXXJtxF@amdc1032>
+Message-ID: <1773131.OsQeaPpRlR@amdc1227>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/09/2013 00:02, Russell King :
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> ---
->   drivers/usb/chipidea/ci_hdrc_imx.c |    4 +---
->   drivers/usb/dwc3/dwc3-exynos.c     |    4 +---
->   drivers/usb/host/ehci-atmel.c      |    4 +---
+On Monday 23 of September 2013 12:23:51 Bartlomiej Zolnierkiewicz wrote:
+> Hi Tomek,
+> 
+> On Tuesday, September 17, 2013 12:45:21 PM Tomasz Figa wrote:
+> > Hi Bart,
+[snip]
+> > > +	select ARM_AMBA
+> > > +	select CLKSRC_OF
+> > > +	select CLKSRC_SAMSUNG_PWM if CPU_EXYNOS4210
+> > > +	select CPU_EXYNOS4210
+> > 
+> > The line above shows the brokenness of current layout of Exynos Kconfig
+> > options. You need to select some SoC in SAMSUNG EXYNOS4, because
+> > otherwise the build will fail if user doesn't select at least one of
+> > Exynos4 SoCs.
+> > 
+> > Instead, I would hide the ARCH_EXYNOS4 and ARCH_EXYNOS4 options and
+> > select them from entries of particular SoCs, i.e. ARCH_EXYNOS4 would
+> > be selected by CPU_EXYNOS4210, SOC_EXYNOS4212 and SOC_EXYNOS4412,
+> > ARCH_EXYNOS5 by SOC_EXYNOS5250 and SOC_EXYNOS5420 and so on.
+> 
+> This is a good idea but I think that it is better to address it later in
+> an incremental patch (which I will also do unless someone beats me to
+> it).
 
-For Atmel driver:
+OK, sounds good. I take your word for it. ;)
 
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Acked-by: Tomasz Figa <t.figa@samsung.com>
 
-[..]
-
-> diff --git a/drivers/usb/host/ehci-atmel.c b/drivers/usb/host/ehci-atmel.c
-> index 5831a88..8e7323e 100644
-> --- a/drivers/usb/host/ehci-atmel.c
-> +++ b/drivers/usb/host/ehci-atmel.c
-> @@ -90,9 +90,7 @@ static int ehci_atmel_drv_probe(struct platform_device *pdev)
->   	 * Since shared usb code relies on it, set it here for now.
->   	 * Once we have dma capability bindings this can go away.
->   	 */
-> -	if (!pdev->dev.dma_mask)
-> -		pdev->dev.dma_mask = &pdev->dev.coherent_dma_mask;
-> -	retval = dma_set_coherent_mask(&pdev->dev, DMA_BIT_MASK(32));
-> +	retval = dma_coerce_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(32));
->   	if (retval)
->   		goto fail_create_hcd;
->
-
-[..]
-
-Thanks Russell,
--- 
-Nicolas Ferre
+Best regards,
+Tomasz
