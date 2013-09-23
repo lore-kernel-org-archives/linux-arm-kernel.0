@@ -1,88 +1,17 @@
-From: matt.porter@linaro.org (Matt Porter)
-Date: Mon, 23 Sep 2013 11:14:44 -0400
-Subject: [PATCH v2] ARM: dts: add initial VF610 Cosmic/Cosmic+ board support
-Message-ID: <1379949284-19936-1-git-send-email-matt.porter@linaro.org>
+From: fabio.estevam@freescale.com (Fabio Estevam)
+Date: Mon, 23 Sep 2013 12:13:03 -0300
+Subject: [PATCH 1/9] Staging/iio/adc/touchscreen/MXS: add proper clock
+ handling
+In-Reply-To: <1379946998-23041-2-git-send-email-jbe@pengutronix.de>
+References: <1379946998-23041-1-git-send-email-jbe@pengutronix.de>
+ <1379946998-23041-2-git-send-email-jbe@pengutronix.de>
+Message-ID: <52405A7F.1050801@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add initial PHYTEC VF610 Cosmic/Cosmic+ board support with
-UART and FEC enabled.
+On 09/23/2013 11:36 AM, Juergen Beisert wrote:
 
-Signed-off-by: Matt Porter <matt.porter@linaro.org>
----
-Changes since v1:
-	- Add #clocks to the enet clock to comply with fixed-clock binding
-	- Peripheral nodes in alphabetical order
+> +	lradc->clk = devm_clk_get(&pdev->dev, NULL);
+> +	clk_prepare_enable(lradc->clk);
 
- arch/arm/boot/dts/Makefile         |  1 +
- arch/arm/boot/dts/vf610-cosmic.dts | 47 ++++++++++++++++++++++++++++++++++++++
- 2 files changed, 48 insertions(+)
- create mode 100644 arch/arm/boot/dts/vf610-cosmic.dts
-
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index cc0f1fb..b0d6156 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -142,6 +142,7 @@ dtb-$(CONFIG_ARCH_MXC) += \
- 	imx6q-sbc6x.dtb \
- 	imx6q-wandboard.dtb \
- 	imx6sl-evk.dtb \
-+	vf610-cosmic.dtb \
- 	vf610-twr.dtb
- dtb-$(CONFIG_ARCH_MXS) += imx23-evk.dtb \
- 	imx23-olinuxino.dtb \
-diff --git a/arch/arm/boot/dts/vf610-cosmic.dts b/arch/arm/boot/dts/vf610-cosmic.dts
-new file mode 100644
-index 0000000..c42e4f9
---- /dev/null
-+++ b/arch/arm/boot/dts/vf610-cosmic.dts
-@@ -0,0 +1,47 @@
-+/*
-+ * Copyright 2013 Freescale Semiconductor, Inc.
-+ * Copyright 2013 Linaro Limited
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ */
-+
-+/dts-v1/;
-+#include "vf610.dtsi"
-+
-+/ {
-+	model = "PHYTEC Cosmic/Cosmic+ Board";
-+	compatible = "phytec,vf610-cosmic", "fsl,vf610";
-+
-+	chosen {
-+		bootargs = "console=ttyLP1,115200";
-+	};
-+
-+	memory {
-+		reg = <0x80000000 0x10000000>;
-+	};
-+
-+	clocks {
-+		enet_ext {
-+			compatible = "fixed-clock";
-+			#clock-cells = <0>;
-+			clock-frequency = <50000000>;
-+		};
-+	};
-+
-+};
-+
-+&fec1 {
-+	phy-mode = "rmii";
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_fec1_1>;
-+	status = "okay";
-+};
-+
-+&uart1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart1_1>;
-+	status = "okay";
-+};
--- 
-1.8.4
+clk_prepare_enable() may fail, so better check its return value.
