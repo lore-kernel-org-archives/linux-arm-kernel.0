@@ -1,15 +1,31 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 23 Sep 2013 11:52:24 -0600
-Subject: [PATCH 03/12] clk: tegra: Add TEGRA_PERIPH_NO_DIV flag
-In-Reply-To: <1379515331-19427-4-git-send-email-pdeschrijver@nvidia.com>
-References: <1379515331-19427-1-git-send-email-pdeschrijver@nvidia.com>
- <1379515331-19427-4-git-send-email-pdeschrijver@nvidia.com>
-Message-ID: <52407FD8.3020509@wwwdotorg.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 23 Sep 2013 20:01:18 +0200
+Subject: [PATCH v6] gpio: pcf857x: Add OF support
+In-Reply-To: <1379788789-19801-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+References: <1379788789-19801-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <CACRpkdbipy4RwrxbbB5NUO=MkZ0+gJwXHVRZMb+Mc5e6WTYiaQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/18/2013 08:40 AM, Peter De Schrijver wrote:
-> This flag indicates the peripheral clock does not have a divider. It will
-> simply the initialization tables and avoids some very similar code.
+On Sat, Sep 21, 2013 at 8:39 PM, Laurent Pinchart
+<laurent.pinchart+renesas@ideasonboard.com> wrote:
 
-s/simply/simplify/
+> Add DT bindings for the pcf857x-compatible chips and parse the device
+> tree node in the driver.
+>
+> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+> ---
+>  .../devicetree/bindings/gpio/gpio-pcf857x.txt      | 71 ++++++++++++++++++++++
+>  drivers/gpio/gpio-pcf857x.c                        | 44 +++++++++++---
+>  2 files changed, 107 insertions(+), 8 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/gpio/gpio-pcf857x.txt
+>
+> Changes since v5:
+>
+> - Renamed pin to line in the DT bindings documentation
+> - Renamed pins-initial-states DT property to lines-initial-states
+
+I can't see any problem with this so patch applied.
+
+Yours,
+Linus Walleij
