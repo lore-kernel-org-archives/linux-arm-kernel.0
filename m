@@ -1,30 +1,62 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Mon, 23 Sep 2013 10:37:38 +0300
-Subject: [RFC PATCH 08/15] ata: ahci_platform: Manage SATA PHY
-In-Reply-To: <20130922215107.GD27616@mtj.dyndns.org>
-References: <1379595943-14622-1-git-send-email-rogerq@ti.com>
- <1379595943-14622-9-git-send-email-rogerq@ti.com>
- <20130922165817.GD30946@htj.dyndns.org> <523F35E4.6050707@cogentembedded.com>
- <20130922215107.GD27616@mtj.dyndns.org>
-Message-ID: <523FEFC2.801@ti.com>
+From: jbe@pengutronix.de (=?iso-8859-1?q?J=FCrgen_Beisert?=)
+Date: Mon, 23 Sep 2013 09:42:29 +0200
+Subject: [PATCH 7/7] Staging/iio/adc/touchscreen/MXS: provide devicetree
+ adaption
+In-Reply-To: <523D943D.705@kernel.org>
+References: <1379593369-22010-1-git-send-email-jbe@pengutronix.de>
+ <1379593369-22010-8-git-send-email-jbe@pengutronix.de>
+ <523D943D.705@kernel.org>
+Message-ID: <201309230942.29417.jbe@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tejun,
+Hi Jonathan,
 
-On 09/23/2013 12:51 AM, Tejun Heo wrote:
-> Hello,
-> 
-> On Sun, Sep 22, 2013 at 10:24:36PM +0400, Sergei Shtylyov wrote:
->>    Not sure why you asked -- I'm not using this driver, neither I'm
-> 
-> Well, you have better grip of what's going on in the embedded world
-> than me.  I'm mostly curious whether adding dependency on PHY is okay.
-> 
+On Saturday 21 September 2013 14:42:37 Jonathan Cameron wrote:
+> The device tree list has moved, so I've changed the cc.
+>
+> Few comments inline.  Basically I'd go for longer more
+> descriptive names when the abreviation isn't a really
+> well known common one.
+>
+> Note I'm not all that familiar with device tree conventions
+> so may be barking up the wrong tree ;)
+>
+> > [...]
+> > @@ -9,13 +10,38 @@ Optional properties:
+> >  - fsl,lradc-touchscreen-wires: Number of wires used to connect the
+> > touchscreen to LRADC. Valid value is either 4 or 5. If this property is
+> > not present, then the touchscreen is -                              
+> > disabled.
+>
+> Do we want that lradc prefix on these other properties?
 
-There is no hard dependency on presence of PHY. The driver will continue
-as usual if devm_phy_get() fails.
-I hope selecting GENERIC_PHY in Kconfig is not an issue.
+The question is, if we want to keep it. This is the currently used binding.
 
-cheers,
--roger
+> > +                               disabled. 5 wires is valid for i.MX28 SoC only.
+> > +- fsl,ave-ctrl: number of samples per direction to calculate an average value.
+> > +                Allowed value is 1 ... 31, default is 4 
+>
+> This naming seems less than informative, what about fsl,average_num_samples
+> of average_count (ave isn't all that obvious an abrevaition of average).
+
+I used already existing names from
+"Documentation/devicetree/bindings/input/touchscreen/stmpe.txt".
+
+> > +- fsl,ave-delay: delay between consecutive samples. Allowed value is
+> > +                 1 ... 2047. It is used if 'fsl,ave-ctrl' > 1, counts at
+> > +                 2 kHz and its default is 2 (= 1 ms)
+>
+> fsl,average_intersample_delay (I assume any limit of device tree property
+> names is longer than that?)
+
+If the parameter description in "Documentation/devicetree/bindings" is useful,
+we don't need long parameter names. If there is no useful parameter
+description, we will need long names ;)
+
+Regards,
+Juergen
+
+-- 
+Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?| Juergen Beisert ? ? ? ? ? ? |
+Linux Solutions for Science and Industry ? ? ?| http://www.pengutronix.de/  |
