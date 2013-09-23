@@ -1,174 +1,43 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 23 Sep 2013 23:41:05 +0200
-Subject: [PATCH 08/10] pwm-backlight: Use new enable_gpio field
-In-Reply-To: <1379972467-11243-1-git-send-email-treding@nvidia.com>
-References: <1379972467-11243-1-git-send-email-treding@nvidia.com>
-Message-ID: <1379972467-11243-9-git-send-email-treding@nvidia.com>
+From: dagriego@gmail.com (dagriego)
+Date: Mon, 23 Sep 2013 15:05:56 -0700
+Subject: Corrupted registers in return from system call 2.6.31
+Message-ID: <CAKgB9L_gMQCmNH-oLBCepB7JsEAcayf9nzar_qzDhx5MhvtYDw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make use of the new enable_gpio field and allow it to be set from DT as
-well. Now that all legacy users of platform data have been converted to
-initialize this field to an invalid value, it is safe to use the field
-from the driver.
+Hi,
+I'm troubleshooting an issue on a Marvell MV78XX0 processor board that
+is running the 2.6.31 kernel (patches applied from MontaVista and
+Marvell) and I wanted to know if anyone may have seen anything
+similar?
 
-Signed-off-by: Thierry Reding <treding@nvidia.com>
----
- .../bindings/video/backlight/pwm-backlight.txt     |  3 ++
- drivers/video/backlight/pwm_bl.c                   | 54 +++++++++++++++++++---
- 2 files changed, 50 insertions(+), 7 deletions(-)
+What was first seen was random processes (sshd, rsync, snmpd)
+segfaulting with a data abort.  This issue does not occur very
+frequently (couple times a week).  After some investigation we've
+instrumented the kernel to save the registers when entering and
+exiting the kernel, and here are the results:
 
-diff --git a/Documentation/devicetree/bindings/video/backlight/pwm-backlight.txt b/Documentation/devicetree/bindings/video/backlight/pwm-backlight.txt
-index 1e4fc72..052eb03 100644
---- a/Documentation/devicetree/bindings/video/backlight/pwm-backlight.txt
-+++ b/Documentation/devicetree/bindings/video/backlight/pwm-backlight.txt
-@@ -14,6 +14,7 @@ Required properties:
- Optional properties:
-   - pwm-names: a list of names for the PWM devices specified in the
-                "pwms" property (see PWM binding[0])
-+  - enable-gpios: a list of GPIOs to enable and disable the backlight
- 
- [0]: Documentation/devicetree/bindings/pwm/pwm.txt
- 
-@@ -25,4 +26,6 @@ Example:
- 
- 		brightness-levels = <0 4 8 16 32 64 128 255>;
- 		default-brightness-level = <6>;
-+
-+		enable-gpios = <&gpio 58 0>;
- 	};
-diff --git a/drivers/video/backlight/pwm_bl.c b/drivers/video/backlight/pwm_bl.c
-index 8a49b30..506810c 100644
---- a/drivers/video/backlight/pwm_bl.c
-+++ b/drivers/video/backlight/pwm_bl.c
-@@ -10,6 +10,8 @@
-  * published by the Free Software Foundation.
-  */
- 
-+#include <linux/gpio.h>
-+#include <linux/of_gpio.h>
- #include <linux/module.h>
- #include <linux/kernel.h>
- #include <linux/init.h>
-@@ -27,6 +29,8 @@ struct pwm_bl_data {
- 	unsigned int		period;
- 	unsigned int		lth_brightness;
- 	unsigned int		*levels;
-+	int			enable_gpio;
-+	unsigned long		enable_gpio_flags;
- 	int			(*notify)(struct device *,
- 					  int brightness);
- 	void			(*notify_after)(struct device *,
-@@ -51,12 +55,27 @@ static void pwm_backlight_power_on(struct pwm_bl_data *pb, int brightness,
- 		     pb->lth_brightness;
- 
- 	pwm_config(pb->pwm, duty_cycle, pb->period);
-+
-+	if (gpio_is_valid(pb->enable_gpio)) {
-+		if (pb->enable_gpio_flags & PWM_BACKLIGHT_GPIO_ACTIVE_LOW)
-+			gpio_set_value(pb->enable_gpio, 0);
-+		else
-+			gpio_set_value(pb->enable_gpio, 1);
-+	}
-+
- 	pwm_enable(pb->pwm);
- }
- 
- static void pwm_backlight_power_off(struct pwm_bl_data *pb)
- {
- 	pwm_disable(pb->pwm);
-+
-+	if (gpio_is_valid(pb->enable_gpio)) {
-+		if (pb->enable_gpio_flags & PWM_BACKLIGHT_GPIO_ACTIVE_LOW)
-+			gpio_set_value(pb->enable_gpio, 1);
-+		else
-+			gpio_set_value(pb->enable_gpio, 0);
-+	}
- }
- 
- static int pwm_backlight_update_status(struct backlight_device *bl)
-@@ -108,6 +127,7 @@ static int pwm_backlight_parse_dt(struct device *dev,
- 				  struct platform_pwm_backlight_data *data)
- {
- 	struct device_node *node = dev->of_node;
-+	enum of_gpio_flags flags;
- 	struct property *prop;
- 	int length;
- 	u32 value;
-@@ -148,11 +168,10 @@ static int pwm_backlight_parse_dt(struct device *dev,
- 		data->max_brightness--;
- 	}
- 
--	/*
--	 * TODO: Most users of this driver use a number of GPIOs to control
--	 *       backlight power. Support for specifying these needs to be
--	 *       added.
--	 */
-+	data->enable_gpio = of_get_named_gpio_flags(node, "enable-gpios", 0,
-+						    &flags);
-+	if (gpio_is_valid(data->enable_gpio) && (flags & OF_GPIO_ACTIVE_LOW))
-+		data->enable_gpio_flags |= PWM_BACKLIGHT_GPIO_ACTIVE_LOW;
- 
- 	return 0;
- }
-@@ -210,12 +229,30 @@ static int pwm_backlight_probe(struct platform_device *pdev)
- 	} else
- 		max = data->max_brightness;
- 
-+	pb->enable_gpio = data->enable_gpio;
-+	pb->enable_gpio_flags = data->enable_gpio_flags;
- 	pb->notify = data->notify;
- 	pb->notify_after = data->notify_after;
- 	pb->check_fb = data->check_fb;
- 	pb->exit = data->exit;
- 	pb->dev = &pdev->dev;
- 
-+	if (gpio_is_valid(pb->enable_gpio)) {
-+		unsigned long flags;
-+
-+		if (pb->enable_gpio_flags & PWM_BACKLIGHT_GPIO_ACTIVE_LOW)
-+			flags = GPIOF_OUT_INIT_HIGH;
-+		else
-+			flags = GPIOF_OUT_INIT_LOW;
-+
-+		ret = gpio_request_one(pb->enable_gpio, flags, "enable");
-+		if (ret < 0) {
-+			dev_err(&pdev->dev, "failed to request GPIO#%d: %d\n",
-+				pb->enable_gpio, ret);
-+			goto err_alloc;
-+		}
-+	}
-+
- 	pb->pwm = devm_pwm_get(&pdev->dev, NULL);
- 	if (IS_ERR(pb->pwm)) {
- 		dev_err(&pdev->dev, "unable to request PWM, trying legacy API\n");
-@@ -224,7 +261,7 @@ static int pwm_backlight_probe(struct platform_device *pdev)
- 		if (IS_ERR(pb->pwm)) {
- 			dev_err(&pdev->dev, "unable to request legacy PWM\n");
- 			ret = PTR_ERR(pb->pwm);
--			goto err_alloc;
-+			goto err_gpio;
- 		}
- 	}
- 
-@@ -249,7 +286,7 @@ static int pwm_backlight_probe(struct platform_device *pdev)
- 	if (IS_ERR(bl)) {
- 		dev_err(&pdev->dev, "failed to register backlight\n");
- 		ret = PTR_ERR(bl);
--		goto err_alloc;
-+		goto err_gpio;
- 	}
- 
- 	if (data->dft_brightness > data->max_brightness) {
-@@ -265,6 +302,9 @@ static int pwm_backlight_probe(struct platform_device *pdev)
- 	platform_set_drvdata(pdev, bl);
- 	return 0;
- 
-+err_gpio:
-+	if (gpio_is_valid(pb->enable_gpio))
-+		gpio_free(pb->enable_gpio);
- err_alloc:
- 	if (data->exit)
- 		data->exit(&pdev->dev);
--- 
-1.8.4
+When Saved : Before Restoration
+r4 = 0xba2c5680   0xb750d680
+r5 = 0xb750d680   0xb76969a0
+r6 = 0xb7479b40   0xb74796c0
+r7 = 0xba237820   0xb7479b40
+r8 = 0x00000000   0x00000000
+r9 = 0xb7554000   0xb770c000
+sl = 0xba3d8000   0xb7554000
+fp = 0xba3d9a6c   0xb7555a6c
+sp = 0xba3d99b0   0xb75559b0
+pc = 0x803217fc   0x803217fc
+e1 = 0x00000000   0x00000000
+e2 = 0x00000000   0x00000000
+
+Note that ftraces of the kernel showed the failing process going into
+the kernel via the syscall interface, being interrupted by the timer
+and other device's ISRs, and finally being scheduled to complete some
+time later (usually after giving some other processes an opportunity
+to run).
+
+It would also be helpful to get suggestions on how to isolate or
+reproduce this issues more frequently since it is still very rare.
+Cheers,
+-David
