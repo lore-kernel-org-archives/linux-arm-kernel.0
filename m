@@ -1,42 +1,40 @@
-From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
-Date: Mon, 23 Sep 2013 11:25:08 +0200
-Subject: [PATCHv5] staging/iio/adc: change the MXS touchscreen driver
- implementation
-In-Reply-To: <201309230955.58828.jbe@pengutronix.de>
-References: <1379593369-22010-1-git-send-email-jbe@pengutronix.de>
- <201309230155.04914.marex@denx.de>
- <201309230955.58828.jbe@pengutronix.de>
-Message-ID: <21056.2292.381138.583291@ipc1.ka-ro>
+From: m.krawczuk@partner.samsung.com (Mateusz Krawczuk)
+Date: Mon, 23 Sep 2013 11:45:45 +0200
+Subject: [PATCH] spi: s3c64xx: Add missing compatibles
+Message-ID: <1379929545-27517-1-git-send-email-m.krawczuk@partner.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Add compatibles for s3c6410, s5pc100 and s5pc110/s5pv210 boards.
 
-J?rgen Beisert writes:
-> Hi Marek,
-> 
-> Seems the very first touch detection does not work. A colleague just told me, 
-> we have an i.MX28 based hardware here and maybe a touchscreen from a different 
-> platform which maybe can be used with the i.MX28 platform. Stay tuned...
-> 
-> > btw. the touchscreen connection on M28EVK is pretty much the same as on
-> > MX28EVK.
-> 
-> I think the touchscreen connection on MX28EVK is exactly the same as on 
-> MX28EVK! ;) (/me needs more coffee as well)
-> 
-Just tested the touchscreen driver on our TX28 module and I could not
-find any problems.
+Signed-off-by: Mateusz Krawczuk <m.krawczuk@partner.samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
+ drivers/spi/spi-s3c64xx.c | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-
-Lothar Wa?mann
+diff --git a/drivers/spi/spi-s3c64xx.c b/drivers/spi/spi-s3c64xx.c
+index 8bed27a..84cc6ac 100644
+--- a/drivers/spi/spi-s3c64xx.c
++++ b/drivers/spi/spi-s3c64xx.c
+@@ -1612,6 +1612,18 @@ static struct platform_device_id s3c64xx_spi_driver_ids[] = {
+ };
+ 
+ static const struct of_device_id s3c64xx_spi_dt_match[] = {
++	{ .compatible = "samsung,s3c2443-spi",
++			.data = (void *)&s3c2443_spi_port_config,
++	},
++	{ .compatible = "samsung,s3c6410-spi",
++			.data = (void *)&s3c6410_spi_port_config,
++	},
++	{ .compatible = "samsung,s5pc100-spi",
++			.data = (void *)&s5pc100_spi_port_config,
++	},
++	{ .compatible = "samsung,s5pv210-spi",
++			.data = (void *)&s5pv210_spi_port_config,
++	},
+ 	{ .compatible = "samsung,exynos4210-spi",
+ 			.data = (void *)&exynos4_spi_port_config,
+ 	},
 -- 
-___________________________________________________________
-
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+1.8.1.2
