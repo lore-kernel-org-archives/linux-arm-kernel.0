@@ -1,46 +1,52 @@
-From: steve.capper@linaro.org (Steve Capper)
-Date: Mon, 23 Sep 2013 14:19:24 +0100
-Subject: [RFC V2] ARM: mm: make UACCESS_WITH_MEMCPY huge page aware
-In-Reply-To: <1379410429-3372-1-git-send-email-steve.capper@linaro.org>
-References: <1379410429-3372-1-git-send-email-steve.capper@linaro.org>
-Message-ID: <20130923131923.GA7233@linaro.org>
+From: jbe@pengutronix.de (=?utf-8?q?J=C3=BCrgen_Beisert?=)
+Date: Mon, 23 Sep 2013 15:24:37 +0200
+Subject: [PATCHv5] staging/iio/adc: change the MXS touchscreen driver
+ implementation
+In-Reply-To: <21056.12306.714098.398250@ipc1.ka-ro>
+References: <1379593369-22010-1-git-send-email-jbe@pengutronix.de>
+ <201309231235.56309.jbe@pengutronix.de>
+ <21056.12306.714098.398250@ipc1.ka-ro>
+Message-ID: <201309231524.38008.jbe@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 17, 2013 at 10:33:49AM +0100, Steve Capper wrote:
-> The memory pinning code in uaccess_with_memcpy.c does not check
-> for HugeTLB or THP pmds, and will enter an infinite loop should
-> a __copy_to_user or __clear_user occur against a huge page.
-> 
-> This patch adds detection code for huge pages to pin_page_for_write.
-> As this code can be executed in a fast path it refers to the actual
-> pmds rather than the vma. If a HugeTLB or THP is found (they have
-> the same pmd representation on ARM), the page table spinlock is
-> taken to prevent modification whilst the page is pinned.
-> 
-> On ARM, huge pages are only represented as pmds, thus no huge pud
-> checks are performed. (For huge puds one would lock the page table
-> in a similar manner as in the pmd case).
-> 
-> Two helper functions are introduced; pmd_thp_or_huge will check
-> whether or not a page is huge or transparent huge (which have the
-> same pmd layout on ARM), and pmd_hugewillfault will detect whether
-> or not a page fault will occur on write to the page.
-> 
-> Changes since first RFC:
->    * The page mask is widened for hugepages to reduce the number
->      of potential locks/unlocks.
->      (A knobbled /dev/zero with its latency reduction chunks
->       removed shows a 2x data rate boost with hugepages backing:
->       dd if=/dev/zero of=/dev/null bs=10M count=1024 )
-> 
-> Signed-off-by: Steve Capper <steve.capper@linaro.org>
-> ---
+Hi Lothar,
 
-A ping to see if anyone had any questions/comments/flames :-)?
+On Monday 23 September 2013 14:12:02 Lothar Wa?mann wrote:
+> [...]
+> > @Lothar: What kernel revision did you use? I had to go back to 3.9 to get
+> > a
+>
+> Current linux-next (3.12-rc1).
 
-Should it go into the patch system?
+Okay.
 
-Thanks,
+> > working kernel on the MX28EVK. More recent vanilla kernels stop working
+> > (MMC and network fail here).
+>
+> I'm seeing some messages:
+> |mxs-mmc 80010000.ssp: dummy supplies not allowed
+> |fec 800f0000.ethernet: dummy supplies not allowed
+
+It was my fault. I'm also working with 3.12-rc1 now.
+
+> But without any apparent consequences. Maybe that's a problem with the
+> MX28EVK?
+
+It seems the LRADC delay feature does not work. The touch detection interrupt 
+happens and the driver switches to the Y plate measurement, arms the LRADC 
+delay unit ... and nothing more happens. The LRADC delay unit should start a 
+conversion on ADC channel 4. But it does not. Never.
+
+The i.MX28 manual says the LRADC delay unit is driven by a 2 kHz clock, but 
+does not say what kind of clock it is (or is derived from). I guess now, this 
+clock isn't enabled and thus the delay unit can't work. At least on the 
+MX28EVK. On your TX28 platform the clock seems enabled and the delay unit can 
+do its job and drive the state machine.
+
+Regards,
+Juergen
+
 -- 
-Steve 
+Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?| Juergen Beisert ? ? ? ? ? ? |
+Linux Solutions for Science and Industry ? ? ?| http://www.pengutronix.de/  |
