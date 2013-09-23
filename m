@@ -1,92 +1,49 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 23 Sep 2013 14:35:35 -0600
-Subject: [RFCv2 3/3] ARM: dts: N900: Add SSI information
-In-Reply-To: <1379277856-24571-4-git-send-email-sre@debian.org>
-References: <1379277856-24571-1-git-send-email-sre@debian.org>
- <1379277856-24571-4-git-send-email-sre@debian.org>
-Message-ID: <5240A617.1010208@wwwdotorg.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 23 Sep 2013 21:30:42 +0100
+Subject: [PATCH] ARM: kvm: rename cpu_reset to avoid name clash
+In-Reply-To: <CAOesGMhPHaZ7tOshbvU1M87nshTOVqU7-+1AvOmARzKUDN6syw@mail.gmail.com>
+References: <1378938461-10835-1-git-send-email-olof@lixom.net>
+ <CAOesGMjum0TSyudXiZtXHOGX4R7dBAhjUpoYnwjTcfD1MMpTxw@mail.gmail.com>
+ <20130912015002.GO9860@cbox>
+ <CAOesGMiGaM=s85iKHPXd9eBiL1vy3SVws+KR0ToxPpZeiisscg@mail.gmail.com>
+ <CAMJs5B9NW6cDuG-xwYucP8rONn0MdEtwTm5R2p=aBE4Q3EHNOg@mail.gmail.com>
+ <CAOesGMhPHaZ7tOshbvU1M87nshTOVqU7-+1AvOmARzKUDN6syw@mail.gmail.com>
+Message-ID: <20130923203042.GY12758@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/15/2013 02:44 PM, Sebastian Reichel wrote:
-> Add SSI device tree data for OMAP34xx and Nokia N900.
+On Mon, Sep 23, 2013 at 12:59:44PM -0700, Olof Johansson wrote:
+> Hi Christoffer,
+> 
+> On Mon, Sep 16, 2013 at 8:47 PM, Christoffer Dall
+> <christoffer.dall@linaro.org> wrote:
+> > On 16 September 2013 19:41, Olof Johansson <olof@lixom.net> wrote:
+> >> Hi,
+> >>
+> >> On Wed, Sep 11, 2013 at 6:50 PM, Christoffer Dall
+> >> <christoffer.dall@linaro.org> wrote:
+> >>> On Wed, Sep 11, 2013 at 03:39:26PM -0700, Olof Johansson wrote:
+> >>>> On Wed, Sep 11, 2013 at 3:27 PM, Olof Johansson <olof@lixom.net> wrote:
+> >>>> > cpu_reset is already #defined in <asm/proc-fns.h> as processor.reset,
+> >>>> > so it expands here and causes problems.
+> >>>> >
+> >>>> > Signed-off-by: Olof Johansson <olof@lixom.net>
+> >>>>
+> >>>> I just noticed this is broken on 3.10 too, so if/when applying feel free to add:
+> >>>>
+> >>>> Cc: <stable@vger.kernel.org> # 3.10+
+> >>>>
+> >>> Thanks for the fix, applied.
+> >>
+> >> I haven't seen this hit linux-next yet?
+> >>
+> > I was waiting for kvm/next to move to 3.12-rc1 and base the patch for
+> > kvm-arm-next off there, but I pushed this to kvm-arm-next now and it
+> > should land in linux-next as soon as they update.
+> 
+> Another week has passed, and -next and mainline are both still broken.
+> Can we please see a fix in mainline and -next within the next few
+> days?
 
-What is an "SSI" device, ...
-
-> diff --git a/Documentation/devicetree/bindings/hsi/omap_ssi.txt b/Documentation/devicetree/bindings/hsi/omap_ssi.txt
-
-... and what is the "HSI" subsystem?
-
-> +OMAP SSI controller bindings
-> +
-> +Required properties:
-> +- compatible:		Should be set to the following value
-> +                        ti,omap3-ssi (applicable to OMAP34xx devices)
-
-I think that'd be better phrased as:
-
-	Should include "ti,omap3-ssi".
-
-The binding should not preclude other compatibel values being present
-(e.g. a SoC-specific compatible value, to allow SoC-specific quirks to
-be enabled later).
-
-> +- ti,hwmods:		Name of the hwmod associated to the controller, which
-> +			is "ssi".
-
-I don't think we should add any more of that, for new bindings.
-
-> +- reg:			Contains SSI register address range (base address and
-> +			length).
-> +- reg-names:		Contains the names of the address ranges. It's
-> +                        expected, that "sys" and "gdd" address ranges are
-> +			provided.
-
-Why two entries in reg-names but only one in reg?
-
-I think it'd be better to write:
-
-reg-names:	Contains the values "sys" and "gdd".
-reg:		Contains a register specifier for each entry in
-		reg-names.
-
-A similar re-ordering/-wording would apply to interrupts/interrupt-names.
-
-> +- ranges		Required as an empty node
-
-s/node/property/
-
-Why must ranges be empty? As long as the content correctly represents
-the bus setup, why does the content matter at all. How about:
-
-ranges		Represents the bus address mapping between the main
-		controller node and the child nodes below.
-
-> +Each port is represented as a sub-node of the ti,omap3-ssi device.
-> +
-> +Required Port sub-node properties:
-> +- compatible:		Should be set to the following value
-> +                        ti,omap3-ssi-port (applicable to OMAP34xx devices)
-
-Hmm. Is it really the case that there is 1 controller with n ports? Are
-the ports really dependent upon some shared resource? Couldn't the ports
-be represented as separate top-level SSI controllers?
-
-> +- interrupts:		Contains the interrupt information for the port.
-> +- interrupt-names:	Contains the names of the interrupts. It's expected,
-> +			that "mpu_irq0" and "mpu_irq1" are provided.
-
-What exactly are those interrupts? "MPU" sounds like an external
-micro-controller/processor...
-
-> +- ti,ssi-cawake-gpio:	Defines which GPIO pin is used to signify CAWAKE
-> +			events for the port. This is an optional board-specific
-> +			property. If it's missing the port will not be
-> +			enabled.
-
-That also sounds like something that's a higher-level protocol, rather
-than whatever low-level transport "SSI" implements. Should this be part
-of a child node that represents the device attached to the SSI controller?
-
-Does the SSI controller (or its ports) not need any clocks, resets,
-regulators, ...?
+I'm getting failing builds too, which will only stop once it hits
+mainline.
