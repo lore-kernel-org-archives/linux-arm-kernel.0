@@ -1,48 +1,60 @@
-From: sre@ring0.de (Sebastian Reichel)
-Date: Mon, 23 Sep 2013 22:47:15 +0200
-Subject: [PATCH 4/4] RX-51: Add platform function and data for bq24150a
- charger
-In-Reply-To: <201309232206.47391@pali>
-References: <1378630239-10006-1-git-send-email-pali.rohar@gmail.com>
- <201309232116.19161@pali> <20130923200008.GA21808@earth.universe>
- <201309232206.47391@pali>
-Message-ID: <20130923204714.GB22995@earth.universe>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Mon, 23 Sep 2013 22:49:35 +0200
+Subject: at91sam9263 not booting on 3.12-rc1
+Message-ID: <5240A95F.8000604@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 23, 2013 at 10:06:46PM +0200, Pali Roh?r wrote:
-> On Monday 23 September 2013 22:00:09 Sebastian Reichel wrote:
-> > On Mon, Sep 23, 2013 at 09:16:18PM +0200, Pali Roh?r wrote:
-> > > It is not as simple as it looks. This is reason why I
-> > > submited this patch long time after I submited bq2415x
-> > > driver.
-> > > 
-> > > Problem is that for rx51 is needed specific function which
-> > > connect to two drivers (bq2415x and isp1704) plus it call
-> > > specific rx51 board functions.
-> > > 
-> > > Something which cannot be in DT (unless DT support C/ASM
-> > > code).
-> > 
-> > mh could isp1704 driver expose the data via the regulator
-> > framework?
-> 
-> No, isp1704 is power supply driver and export data via power 
-> supply (sysfs) interface. It is not regulator but charger driver.
 
-well it does not charge the battery directly, but just provides a
-power line with 5 Volt and a specified amount of current to the
-system, doesn't it?
+Hi all,
 
->From my POV this is a candiate for the regulator framework:
+I am trying to boot a 3.12-rc1 kernel on a calao USB-sam9263 (used
+default sam9263 config file) but the board hangs at the message:
 
-https://www.kernel.org/doc/Documentation/power/regulator/overview.txt
+"Uncompressing Linux... done, booting the kernel."
 
--- Sebastian
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130923/458b2b62/attachment.sig>
+After git bisecting, the commit preventing the board to boot is:
+
+--------------------
+
+commit ef1ab239c0c7de29072577bc8a39859074603948
+Author: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+Date:   Fri May 24 06:52:06 2013 +0800
+
+    ARM: at91: drop non DT: Calao USB-A96x
+
+    as now we have full DT support of those board
+
+    Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+    Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+
+----------------------
+
+So I enabled the CONFIG_USE_OF, the dtb are correctly generated.
+
+I tried to boot again, specifying the dtb address with bootm.
+
+tftp 0x20000000 /var/lib/tftpboot/at91/arch/arm/boot/usb_a9263.dtb
+
+tftp 0x21000000 /var/lib/tftpboot/at91/arch/arm/boot/uImage
+
+bootm 0x21000000 - 0x20000000
+
+but without success.
+
+I am wondering what I could be doing wrong ...
+
+Any help would be appreciate.
+
+  -- Daniel
+
+
+ps: u-boot is "U-Boot 2010.09 (Oct 27 2010 - 12:28:54)"
+
+
+-- 
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
