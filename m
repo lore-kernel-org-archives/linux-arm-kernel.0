@@ -1,96 +1,105 @@
 From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Mon, 23 Sep 2013 19:17:47 -0400
-Subject: [PATCH 04/13] ARM: bL_switcher: synchronize the outbound with the
- inbound
+Date: Mon, 23 Sep 2013 19:17:48 -0400
+Subject: [PATCH 05/13] ARM: SMP: basic IPI triggered completion support
 In-Reply-To: <1379978276-31241-1-git-send-email-nicolas.pitre@linaro.org>
 References: <1379978276-31241-1-git-send-email-nicolas.pitre@linaro.org>
-Message-ID: <1379978276-31241-5-git-send-email-nicolas.pitre@linaro.org>
+Message-ID: <1379978276-31241-6-git-send-email-nicolas.pitre@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Let's wait for the inbound CPU to come up and snoop some of the outbound
-CPU cache before bringing the outbound CPU down.  That should be more
-efficient than going down right away.
+We need a mechanism to let an inbound CPU signal that it is alive before
+even getting into the kernel environment i.e. from early assembly code.
+Using an IPI is the simplest way to achieve that.
 
-Possible improvements might involve some monitoring of the CCI event
-counters.
+This adds some basic infrastructure to register a struct completion
+pointer to be "completed" when the dedicated IPI for this task is
+received.
 
 Signed-off-by: Nicolas Pitre <nico@linaro.org>
 ---
- arch/arm/common/bL_switcher.c | 24 ++++++++++++++++++++++--
- 1 file changed, 22 insertions(+), 2 deletions(-)
+ arch/arm/include/asm/hardirq.h |  2 +-
+ arch/arm/include/asm/smp.h     |  2 ++
+ arch/arm/kernel/smp.c          | 21 +++++++++++++++++++++
+ 3 files changed, 24 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/common/bL_switcher.c b/arch/arm/common/bL_switcher.c
-index 34316be404..aab7c12748 100644
---- a/arch/arm/common/bL_switcher.c
-+++ b/arch/arm/common/bL_switcher.c
-@@ -55,9 +55,10 @@ static int read_mpidr(void)
-  * bL switcher core code.
-  */
+diff --git a/arch/arm/include/asm/hardirq.h b/arch/arm/include/asm/hardirq.h
+index 2740c2a2df..3d7351c844 100644
+--- a/arch/arm/include/asm/hardirq.h
++++ b/arch/arm/include/asm/hardirq.h
+@@ -5,7 +5,7 @@
+ #include <linux/threads.h>
+ #include <asm/irq.h>
  
--static void bL_do_switch(void *_unused)
-+static void bL_do_switch(void *_arg)
- {
- 	unsigned ib_mpidr, ib_cpu, ib_cluster;
-+	long volatile handshake, **handshake_ptr = _arg;
+-#define NR_IPI	6
++#define NR_IPI	7
  
- 	pr_debug("%s\n", __func__);
+ typedef struct {
+ 	unsigned int __softirq_pending;
+diff --git a/arch/arm/include/asm/smp.h b/arch/arm/include/asm/smp.h
+index a8cae71cac..22a3b9b5d4 100644
+--- a/arch/arm/include/asm/smp.h
++++ b/arch/arm/include/asm/smp.h
+@@ -84,6 +84,8 @@ extern void arch_send_call_function_single_ipi(int cpu);
+ extern void arch_send_call_function_ipi_mask(const struct cpumask *mask);
+ extern void arch_send_wakeup_ipi_mask(const struct cpumask *mask);
  
-@@ -65,6 +66,13 @@ static void bL_do_switch(void *_unused)
- 	ib_cpu = MPIDR_AFFINITY_LEVEL(ib_mpidr, 0);
- 	ib_cluster = MPIDR_AFFINITY_LEVEL(ib_mpidr, 1);
- 
-+	/* Advertise our handshake location */
-+	if (handshake_ptr) {
-+		handshake = 0;
-+		*handshake_ptr = &handshake;
-+	} else
-+		handshake = -1;
++extern int register_ipi_completion(struct completion *completion, int cpu);
 +
+ struct smp_operations {
+ #ifdef CONFIG_SMP
  	/*
- 	 * Our state has been saved at this point.  Let's release our
- 	 * inbound CPU.
-@@ -83,6 +91,14 @@ static void bL_do_switch(void *_unused)
- 	 * we have none.
- 	 */
+diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+index 72024ea8a3..7d80a549ca 100644
+--- a/arch/arm/kernel/smp.c
++++ b/arch/arm/kernel/smp.c
+@@ -66,6 +66,7 @@ enum ipi_msg_type {
+ 	IPI_CALL_FUNC,
+ 	IPI_CALL_FUNC_SINGLE,
+ 	IPI_CPU_STOP,
++	IPI_COMPLETION,
+ };
  
-+	/*
-+	 * Let's wait until our inbound is alive.
-+	 */
-+	while (!handshake) {
-+		wfe();
-+		smp_mb();
-+	}
+ static DECLARE_COMPLETION(cpu_running);
+@@ -456,6 +457,7 @@ static const char *ipi_types[NR_IPI] = {
+ 	S(IPI_CALL_FUNC, "Function call interrupts"),
+ 	S(IPI_CALL_FUNC_SINGLE, "Single function call interrupts"),
+ 	S(IPI_CPU_STOP, "CPU stop interrupts"),
++	S(IPI_COMPLETION, "completion interrupts"),
+ };
+ 
+ void show_ipi_list(struct seq_file *p, int prec)
+@@ -515,6 +517,19 @@ static void ipi_cpu_stop(unsigned int cpu)
+ 		cpu_relax();
+ }
+ 
++static DEFINE_PER_CPU(struct completion *, cpu_completion);
 +
- 	/* Let's put ourself down. */
- 	mcpm_cpu_power_down();
- 
-@@ -130,6 +146,7 @@ static int bL_switch_to(unsigned int new_cluster_id)
- 	unsigned int ob_mpidr, ob_cpu, ob_cluster, ib_mpidr, ib_cpu, ib_cluster;
- 	struct tick_device *tdev;
- 	enum clock_event_mode tdev_mode;
-+	long volatile *handshake_ptr;
- 	int ret;
- 
- 	this_cpu = smp_processor_id();
-@@ -198,7 +215,7 @@ static int bL_switch_to(unsigned int new_cluster_id)
- 	cpu_logical_map(that_cpu) = ob_mpidr;
- 
- 	/* Let's do the actual CPU switch. */
--	ret = cpu_suspend(0, bL_switchpoint);
-+	ret = cpu_suspend((unsigned long)&handshake_ptr, bL_switchpoint);
- 	if (ret > 0)
- 		panic("%s: cpu_suspend() returned %d\n", __func__, ret);
- 
-@@ -220,6 +237,9 @@ static int bL_switch_to(unsigned int new_cluster_id)
- 	local_fiq_enable();
- 	local_irq_enable();
- 
-+	*handshake_ptr = 1;
-+	dsb_sev();
++int register_ipi_completion(struct completion *completion, int cpu)
++{
++	per_cpu(cpu_completion, cpu) = completion;
++	return IPI_COMPLETION;
++}
 +
- 	if (ret)
- 		pr_err("%s exiting with error %d\n", __func__, ret);
- 	return ret;
++static void ipi_complete(unsigned int cpu)
++{
++	complete(per_cpu(cpu_completion, cpu));
++}
++
+ /*
+  * Main handler for inter-processor interrupts
+  */
+@@ -565,6 +580,12 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
+ 		irq_exit();
+ 		break;
+ 
++	case IPI_COMPLETION:
++		irq_enter();
++		ipi_complete(cpu);
++		irq_exit();
++		break;
++
+ 	default:
+ 		printk(KERN_CRIT "CPU%u: Unknown IPI message 0x%x\n",
+ 		       cpu, ipinr);
 -- 
 1.8.4.98.gb022869
