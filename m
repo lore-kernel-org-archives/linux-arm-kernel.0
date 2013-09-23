@@ -1,172 +1,89 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 23 Sep 2013 23:41:02 +0200
-Subject: [PATCH 05/10] ARM: SAMSUNG: Initialize PWM backlight enable_gpio field
-In-Reply-To: <1379972467-11243-1-git-send-email-treding@nvidia.com>
-References: <1379972467-11243-1-git-send-email-treding@nvidia.com>
-Message-ID: <1379972467-11243-6-git-send-email-treding@nvidia.com>
+Date: Mon, 23 Sep 2013 23:40:57 +0200
+Subject: [PATCH 00/10] pwm-backlight: Add GPIO and power supply support
+Message-ID: <1379972467-11243-1-git-send-email-treding@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The GPIO API defines 0 as being a valid GPIO number, so this field needs
-to be initialized explicitly.
+This series adds the ability to specify a GPIO and a power supply to
+enable a backlight.
 
-Signed-off-by: Thierry Reding <treding@nvidia.com>
----
- arch/arm/mach-s3c24xx/mach-h1940.c    | 1 +
- arch/arm/mach-s3c24xx/mach-rx1950.c   | 1 +
- arch/arm/mach-s3c64xx/mach-crag6410.c | 1 +
- arch/arm/mach-s3c64xx/mach-hmt.c      | 1 +
- arch/arm/mach-s3c64xx/mach-smartq.c   | 1 +
- arch/arm/mach-s3c64xx/mach-smdk6410.c | 1 +
- arch/arm/mach-s5p64x0/mach-smdk6440.c | 1 +
- arch/arm/mach-s5p64x0/mach-smdk6450.c | 1 +
- arch/arm/mach-s5pc100/mach-smdkc100.c | 1 +
- arch/arm/mach-s5pv210/mach-smdkv210.c | 1 +
- arch/arm/plat-samsung/dev-backlight.c | 5 +++++
- 11 files changed, 15 insertions(+)
+Patch 1 refactors the power on and power off sequences into separate
+functions in preparation for subsequent patches.
 
-diff --git a/arch/arm/mach-s3c24xx/mach-h1940.c b/arch/arm/mach-s3c24xx/mach-h1940.c
-index 74dd479..952b6a0 100644
---- a/arch/arm/mach-s3c24xx/mach-h1940.c
-+++ b/arch/arm/mach-s3c24xx/mach-h1940.c
-@@ -504,6 +504,7 @@ static struct platform_pwm_backlight_data backlight_data = {
- 	.dft_brightness = 50,
- 	/* tcnt = 0x31 */
- 	.pwm_period_ns  = 36296,
-+	.enable_gpio    = -1,
- 	.init           = h1940_backlight_init,
- 	.notify		= h1940_backlight_notify,
- 	.exit           = h1940_backlight_exit,
-diff --git a/arch/arm/mach-s3c24xx/mach-rx1950.c b/arch/arm/mach-s3c24xx/mach-rx1950.c
-index 206b1f7..034b7fe 100644
---- a/arch/arm/mach-s3c24xx/mach-rx1950.c
-+++ b/arch/arm/mach-s3c24xx/mach-rx1950.c
-@@ -522,6 +522,7 @@ static struct platform_pwm_backlight_data rx1950_backlight_data = {
- 	.max_brightness = 24,
- 	.dft_brightness = 4,
- 	.pwm_period_ns = 48000,
-+	.enable_gpio = -1,
- 	.init = rx1950_backlight_init,
- 	.notify = rx1950_backlight_notify,
- 	.exit = rx1950_backlight_exit,
-diff --git a/arch/arm/mach-s3c64xx/mach-crag6410.c b/arch/arm/mach-s3c64xx/mach-crag6410.c
-index 1a911df..b319bf9 100644
---- a/arch/arm/mach-s3c64xx/mach-crag6410.c
-+++ b/arch/arm/mach-s3c64xx/mach-crag6410.c
-@@ -114,6 +114,7 @@ static struct platform_pwm_backlight_data crag6410_backlight_data = {
- 	.max_brightness	= 1000,
- 	.dft_brightness	= 600,
- 	.pwm_period_ns	= 100000,	/* about 1kHz */
-+	.enable_gpio	= -1,
- };
- 
- static struct platform_device crag6410_backlight_device = {
-diff --git a/arch/arm/mach-s3c64xx/mach-hmt.c b/arch/arm/mach-s3c64xx/mach-hmt.c
-index e806404..614a03a 100644
---- a/arch/arm/mach-s3c64xx/mach-hmt.c
-+++ b/arch/arm/mach-s3c64xx/mach-hmt.c
-@@ -114,6 +114,7 @@ static struct platform_pwm_backlight_data hmt_backlight_data = {
- 	.max_brightness	= 100 * 256,
- 	.dft_brightness	= 40 * 256,
- 	.pwm_period_ns	= 1000000000 / (100 * 256 * 20),
-+	.enable_gpio	= -1,
- 	.init		= hmt_bl_init,
- 	.notify		= hmt_bl_notify,
- 	.exit		= hmt_bl_exit,
-diff --git a/arch/arm/mach-s3c64xx/mach-smartq.c b/arch/arm/mach-s3c64xx/mach-smartq.c
-index 0f47237..a6b338f 100644
---- a/arch/arm/mach-s3c64xx/mach-smartq.c
-+++ b/arch/arm/mach-s3c64xx/mach-smartq.c
-@@ -151,6 +151,7 @@ static struct platform_pwm_backlight_data smartq_backlight_data = {
- 	.max_brightness	= 1000,
- 	.dft_brightness	= 600,
- 	.pwm_period_ns	= 1000000000 / (1000 * 20),
-+	.enable_gpio	= -1,
- 	.init		= smartq_bl_init,
- };
- 
-diff --git a/arch/arm/mach-s3c64xx/mach-smdk6410.c b/arch/arm/mach-s3c64xx/mach-smdk6410.c
-index 2a7b32c..d5ea938 100644
---- a/arch/arm/mach-s3c64xx/mach-smdk6410.c
-+++ b/arch/arm/mach-s3c64xx/mach-smdk6410.c
-@@ -625,6 +625,7 @@ static struct samsung_bl_gpio_info smdk6410_bl_gpio_info = {
- 
- static struct platform_pwm_backlight_data smdk6410_bl_data = {
- 	.pwm_id = 1,
-+	.enable_gpio = -1,
- };
- 
- static struct s3c_hsotg_plat smdk6410_hsotg_pdata;
-diff --git a/arch/arm/mach-s5p64x0/mach-smdk6440.c b/arch/arm/mach-s5p64x0/mach-smdk6440.c
-index 0b00304..9efdcc0 100644
---- a/arch/arm/mach-s5p64x0/mach-smdk6440.c
-+++ b/arch/arm/mach-s5p64x0/mach-smdk6440.c
-@@ -223,6 +223,7 @@ static struct samsung_bl_gpio_info smdk6440_bl_gpio_info = {
- 
- static struct platform_pwm_backlight_data smdk6440_bl_data = {
- 	.pwm_id = 1,
-+	.enable_gpio = -1,
- };
- 
- static void __init smdk6440_map_io(void)
-diff --git a/arch/arm/mach-s5p64x0/mach-smdk6450.c b/arch/arm/mach-s5p64x0/mach-smdk6450.c
-index 5949296..c3cacc0 100644
---- a/arch/arm/mach-s5p64x0/mach-smdk6450.c
-+++ b/arch/arm/mach-s5p64x0/mach-smdk6450.c
-@@ -242,6 +242,7 @@ static struct samsung_bl_gpio_info smdk6450_bl_gpio_info = {
- 
- static struct platform_pwm_backlight_data smdk6450_bl_data = {
- 	.pwm_id = 1,
-+	.enable_gpio = -1,
- };
- 
- static void __init smdk6450_map_io(void)
-diff --git a/arch/arm/mach-s5pc100/mach-smdkc100.c b/arch/arm/mach-s5pc100/mach-smdkc100.c
-index 7c57a22..9e256b9 100644
---- a/arch/arm/mach-s5pc100/mach-smdkc100.c
-+++ b/arch/arm/mach-s5pc100/mach-smdkc100.c
-@@ -216,6 +216,7 @@ static struct samsung_bl_gpio_info smdkc100_bl_gpio_info = {
- 
- static struct platform_pwm_backlight_data smdkc100_bl_data = {
- 	.pwm_id = 0,
-+	.enable_gpio = -1,
- };
- 
- static void __init smdkc100_map_io(void)
-diff --git a/arch/arm/mach-s5pv210/mach-smdkv210.c b/arch/arm/mach-s5pv210/mach-smdkv210.c
-index 6d72bb99..f52cc15 100644
---- a/arch/arm/mach-s5pv210/mach-smdkv210.c
-+++ b/arch/arm/mach-s5pv210/mach-smdkv210.c
-@@ -279,6 +279,7 @@ static struct samsung_bl_gpio_info smdkv210_bl_gpio_info = {
- static struct platform_pwm_backlight_data smdkv210_bl_data = {
- 	.pwm_id = 3,
- 	.pwm_period_ns = 1000,
-+	.enable_gpio = -1,
- };
- 
- static void __init smdkv210_map_io(void)
-diff --git a/arch/arm/plat-samsung/dev-backlight.c b/arch/arm/plat-samsung/dev-backlight.c
-index d51f956..80e7450 100644
---- a/arch/arm/plat-samsung/dev-backlight.c
-+++ b/arch/arm/plat-samsung/dev-backlight.c
-@@ -70,6 +70,7 @@ static struct samsung_bl_drvdata samsung_dfl_bl_data __initdata = {
- 		.max_brightness = 255,
- 		.dft_brightness = 255,
- 		.pwm_period_ns  = 78770,
-+		.enable_gpio    = -1,
- 		.init           = samsung_bl_init,
- 		.exit           = samsung_bl_exit,
- 	},
-@@ -121,6 +122,10 @@ void __init samsung_bl_set(struct samsung_bl_gpio_info *gpio_info,
- 		samsung_bl_data->lth_brightness = bl_data->lth_brightness;
- 	if (bl_data->pwm_period_ns)
- 		samsung_bl_data->pwm_period_ns = bl_data->pwm_period_ns;
-+	if (bl_data->enable_gpio)
-+		samsung_bl_data->enable_gpio = bl_data->enable_gpio;
-+	if (bl_data->enable_gpio_flags)
-+		samsung_bl_data->enable_gpio_flags = bl_data->enable_gpio_flags;
- 	if (bl_data->init)
- 		samsung_bl_data->init = bl_data->init;
- 	if (bl_data->notify)
+Patch 2 adds an optional GPIO to enable a backlight. This patch only
+includes the field within the platform data so that it can be properly
+setup before actually being put to use.
+
+Patches 3 to 7 convert all users of the pwm-backlight driver to use the
+new field. For most of them, this just initializes the field to -1,
+marking the field as unused.
+
+Patch 8 uses the new field within the pwm-backlight driver and at the
+same time allows it to be parsed from device tree.
+
+Patch 9 implements support for an optional power supply. This relies on
+the regulator core to return a dummy regulator when no supply has been
+otherwise setup so the driver doesn't have to handle that specially nor
+require all users to be updated.
+
+Patch 10 adds a way to keep a backlight turned off at boot. This is
+useful when hooking up a backlight with a subsystem such as DRM which
+has more explicit semantics as to when a backlight should be turned on.
+
+Due to the dependencies within the series, I propose to take all these
+patches through the PWM tree, so I'll need acks from OMAP, PXA, Samsung,
+shmobile and Unicore32 maintainers.
+
+Thierry
+
+Thierry Reding (10):
+  pwm-backlight: Refactor backlight power on/off
+  pwm-backlight: Add optional enable GPIO
+  ARM: OMAP: Initialize PWM backlight enable_gpio field
+  ARM: pxa: Initialize PWM backlight enable_gpio field
+  ARM: SAMSUNG: Initialize PWM backlight enable_gpio field
+  ARM: shmobile: Initialize PWM backlight enable_gpio field
+  unicore32: Initialize PWM backlight enable_gpio field
+  pwm-backlight: Use new enable_gpio field
+  pwm-backlight: Use an optional power supply
+  pwm-backlight: Allow backlight to remain disabled on boot
+
+ .../bindings/video/backlight/pwm-backlight.txt     |   6 +
+ arch/arm/mach-omap2/board-zoom-peripherals.c       |   1 +
+ arch/arm/mach-pxa/cm-x300.c                        |   1 +
+ arch/arm/mach-pxa/colibri-pxa270-income.c          |   1 +
+ arch/arm/mach-pxa/ezx.c                            |   1 +
+ arch/arm/mach-pxa/hx4700.c                         |   1 +
+ arch/arm/mach-pxa/lpd270.c                         |   1 +
+ arch/arm/mach-pxa/magician.c                       |   1 +
+ arch/arm/mach-pxa/mainstone.c                      |   1 +
+ arch/arm/mach-pxa/mioa701.c                        |   1 +
+ arch/arm/mach-pxa/palm27x.c                        |   1 +
+ arch/arm/mach-pxa/palmtc.c                         |  35 +----
+ arch/arm/mach-pxa/palmte2.c                        |   1 +
+ arch/arm/mach-pxa/pcm990-baseboard.c               |   1 +
+ arch/arm/mach-pxa/raumfeld.c                       |   1 +
+ arch/arm/mach-pxa/tavorevb.c                       |   2 +
+ arch/arm/mach-pxa/viper.c                          |   1 +
+ arch/arm/mach-pxa/z2.c                             |   2 +
+ arch/arm/mach-pxa/zylonite.c                       |   1 +
+ arch/arm/mach-s3c24xx/mach-h1940.c                 |   1 +
+ arch/arm/mach-s3c24xx/mach-rx1950.c                |   1 +
+ arch/arm/mach-s3c64xx/mach-crag6410.c              |   1 +
+ arch/arm/mach-s3c64xx/mach-hmt.c                   |   1 +
+ arch/arm/mach-s3c64xx/mach-smartq.c                |   1 +
+ arch/arm/mach-s3c64xx/mach-smdk6410.c              |   1 +
+ arch/arm/mach-s5p64x0/mach-smdk6440.c              |   1 +
+ arch/arm/mach-s5p64x0/mach-smdk6450.c              |   1 +
+ arch/arm/mach-s5pc100/mach-smdkc100.c              |   1 +
+ arch/arm/mach-s5pv210/mach-smdkv210.c              |   1 +
+ arch/arm/mach-shmobile/board-armadillo800eva.c     |   1 +
+ arch/arm/plat-samsung/dev-backlight.c              |   5 +
+ arch/unicore32/kernel/puv3-nb0916.c                |   1 +
+ drivers/video/backlight/pwm_bl.c                   | 142 ++++++++++++++++-----
+ include/linux/pwm_backlight.h                      |   7 +
+ 34 files changed, 162 insertions(+), 64 deletions(-)
+
 -- 
 1.8.4
