@@ -1,24 +1,41 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Mon, 23 Sep 2013 08:48:16 +0200
-Subject: [PATCH] i2c: s3c2410: fix clk_disable/clk_unprepare warnings
-In-Reply-To: <20130917113153.41b0305d6892170ba8e1ecf7@linaro.org>
-References: <20130917113153.41b0305d6892170ba8e1ecf7@linaro.org>
-Message-ID: <20130923064816.GA3051@katana>
+From: B35083@freescale.com (Lu Jingchang-B35083)
+Date: Mon, 23 Sep 2013 06:56:37 +0000
+Subject: [PATCH 3/3] dma: Add Freescale eDMA engine driver support
+In-Reply-To: <20130923042549.GC17188@intel.com>
+References: <1378374799-16357-1-git-send-email-b35083@freescale.com>
+ <20130917045359.GN17188@intel.com>
+ <B56CDBE15CE27145A4B77D2D24263E85223E21@039-SN1MPN1-003.039d.mgd.msft.net>
+ <20130923042549.GC17188@intel.com>
+Message-ID: <B56CDBE15CE27145A4B77D2D24263E852260F9@039-SN1MPN1-003.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 17, 2013 at 11:31:53AM -0500, Kim Phillips wrote:
-> commit d16933b33914a6dff38a4ecbe8edce44a17898e8 "i2c: s3c2410: Move
-> location of clk_prepare_enable() call in probe function" refactored
-> clk_enable and clk_disable calls yet neglected to remove the
-> clk_disable_unprepare call in the module's remove().
 
-Applied to for-current, thanks!
+> -----Original Message-----
+> From: Vinod Koul [mailto:vinod.koul at intel.com]
+> Sent: Monday, September 23, 2013 12:26 PM
+> To: Lu Jingchang-B35083
+> Cc: djbw at fb.com; shawn.guo at linaro.org; linux-kernel at vger.kernel.org;
+> linux-arm-kernel at lists.infradead.org; devicetree at vger.kernel.org
+> Subject: Re: [PATCH 3/3] dma: Add Freescale eDMA engine driver support
+> 
+> On Tue, Sep 17, 2013 at 08:08:46AM +0000, Lu Jingchang-B35083 wrote:
+> > > > +	case DMA_PAUSE:
+> > > > +		if (fsl_chan->edesc)
+> > > > +			fsl_edma_disable_request(fsl_chan);
+> > > racy here too...
+> > It only set the channel HW register, no list is handled,
+> > is lock needed here? Thanks!
+> well thats the point while you are terminating the current trasnaction
+> can
+> complete and then start another one. You want to try and prevent these
+> case
+> also. Here you are neither locking the HW access nor the the list, so its
+> juts
+> waiting to crash!
+Thanks! I have sent out the new v6 patch last week with holding lock here,
+Could you please help review it?
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130923/a0e675ae/attachment-0001.sig>
+
+Best Regards,
+Jingchang
