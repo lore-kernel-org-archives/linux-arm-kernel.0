@@ -1,83 +1,140 @@
 From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Mon, 23 Sep 2013 19:17:50 -0400
-Subject: [PATCH 07/13] ARM: GIC: function to retrieve the physical address of
- the SGIR
+Date: Mon, 23 Sep 2013 19:17:44 -0400
+Subject: [PATCH 01/13] ARM: bL_switcher: Add synchronous enable/disable
+ interface
 In-Reply-To: <1379978276-31241-1-git-send-email-nicolas.pitre@linaro.org>
 References: <1379978276-31241-1-git-send-email-nicolas.pitre@linaro.org>
-Message-ID: <1379978276-31241-8-git-send-email-nicolas.pitre@linaro.org>
+Message-ID: <1379978276-31241-2-git-send-email-nicolas.pitre@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to have early assembly code signal other CPUs in the system,
-we need to get the physical address for the SGIR register used to
-send IPIs.  Because the register will be used with a precomputed CPU
-interface ID number, there is no need for any locking in the assembly
-code where this register is written to.
+From: Dave Martin <dave.martin@linaro.org>
 
+Some subsystems will need to know for sure whether the switcher is
+enabled or disabled during certain critical regions.
+
+This patch provides a simple mutex-based mechanism to discover
+whether the switcher is enabled and temporarily lock out further
+enable/disable:
+
+  * bL_switcher_get_enabled() returns true iff the switcher is
+    enabled and temporarily inhibits enable/disable.
+
+  * bL_switcher_put_enabled() permits enable/disable of the switcher
+    again after a previous call to bL_switcher_get_enabled().
+
+Signed-off-by: Dave Martin <dave.martin@linaro.org>
 Signed-off-by: Nicolas Pitre <nico@linaro.org>
 ---
- drivers/irqchip/irq-gic.c       | 29 +++++++++++++++++++++++++++++
- include/linux/irqchip/arm-gic.h |  1 +
- 2 files changed, 30 insertions(+)
+ arch/arm/common/bL_switcher.c      | 27 +++++++++++++++++++++++++--
+ arch/arm/include/asm/bL_switcher.h |  3 +++
+ 2 files changed, 28 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
-index 6365b59181..09fdf3d574 100644
---- a/drivers/irqchip/irq-gic.c
-+++ b/drivers/irqchip/irq-gic.c
-@@ -769,6 +769,33 @@ void gic_migrate_target(unsigned int new_cpu_id)
- 		}
+diff --git a/arch/arm/common/bL_switcher.c b/arch/arm/common/bL_switcher.c
+index 335ff76d4c..7d98629aa4 100644
+--- a/arch/arm/common/bL_switcher.c
++++ b/arch/arm/common/bL_switcher.c
+@@ -23,6 +23,7 @@
+ #include <linux/hrtimer.h>
+ #include <linux/tick.h>
+ #include <linux/mm.h>
++#include <linux/mutex.h>
+ #include <linux/string.h>
+ #include <linux/sysfs.h>
+ #include <linux/irqchip/arm-gic.h>
+@@ -302,6 +303,7 @@ EXPORT_SYMBOL_GPL(bL_switch_request);
+  * Activation and configuration code.
+  */
+ 
++static DEFINE_MUTEX(bL_switcher_activation_lock);
+ static unsigned int bL_switcher_active;
+ static unsigned int bL_switcher_cpu_original_cluster[NR_CPUS];
+ static cpumask_t bL_switcher_removed_logical_cpus;
+@@ -413,9 +415,11 @@ static int bL_switcher_enable(void)
+ {
+ 	int cpu, ret;
+ 
++	mutex_lock(&bL_switcher_activation_lock);
+ 	cpu_hotplug_driver_lock();
+ 	if (bL_switcher_active) {
+ 		cpu_hotplug_driver_unlock();
++		mutex_unlock(&bL_switcher_activation_lock);
+ 		return 0;
  	}
+ 
+@@ -424,6 +428,7 @@ static int bL_switcher_enable(void)
+ 	ret = bL_switcher_halve_cpus();
+ 	if (ret) {
+ 		cpu_hotplug_driver_unlock();
++		mutex_unlock(&bL_switcher_activation_lock);
+ 		return ret;
+ 	}
+ 
+@@ -436,9 +441,10 @@ static int bL_switcher_enable(void)
+ 	}
+ 
+ 	bL_switcher_active = 1;
+-	cpu_hotplug_driver_unlock();
+-
+ 	pr_info("big.LITTLE switcher initialized\n");
++
++	cpu_hotplug_driver_unlock();
++	mutex_unlock(&bL_switcher_activation_lock);
+ 	return 0;
  }
-+
-+/*
-+ * gic_get_sgir_physaddr - get the physical address for the SGI register
-+ *
-+ * REturn the physical address of the SGI register to be used
-+ * by some early assembly code when the kernel is not yet available.
-+ */
-+static unsigned long gic_dist_physaddr;
-+
-+unsigned long gic_get_sgir_physaddr(void)
+ 
+@@ -450,9 +456,11 @@ static void bL_switcher_disable(void)
+ 	struct bL_thread *t;
+ 	struct task_struct *task;
+ 
++	mutex_lock(&bL_switcher_activation_lock);
+ 	cpu_hotplug_driver_lock();
+ 	if (!bL_switcher_active) {
+ 		cpu_hotplug_driver_unlock();
++		mutex_unlock(&bL_switcher_activation_lock);
+ 		return;
+ 	}
+ 	bL_switcher_active = 0;
+@@ -497,6 +505,7 @@ static void bL_switcher_disable(void)
+ 
+ 	bL_switcher_restore_cpus();
+ 	cpu_hotplug_driver_unlock();
++	mutex_unlock(&bL_switcher_activation_lock);
+ }
+ 
+ static ssize_t bL_switcher_active_show(struct kobject *kobj,
+@@ -554,6 +563,20 @@ static int __init bL_switcher_sysfs_init(void)
+ 
+ #endif  /* CONFIG_SYSFS */
+ 
++bool bL_switcher_get_enabled(void)
 +{
-+	if (!gic_dist_physaddr)
-+		return 0;
-+	return gic_dist_physaddr + GIC_DIST_SOFTINT;
-+}
++	mutex_lock(&bL_switcher_activation_lock);
 +
-+void __init gic_init_physaddr(struct device_node *node)
++	return bL_switcher_active;
++}
++EXPORT_SYMBOL_GPL(bL_switcher_get_enabled);
++
++void bL_switcher_put_enabled(void)
 +{
-+	struct resource res;
-+	if (of_address_to_resource(node, 0, &res) == 0) {
-+		gic_dist_physaddr = res.start;
-+		pr_info("GIC physical location is %#lx\n", gic_dist_physaddr);
-+	}
++	mutex_unlock(&bL_switcher_activation_lock);
 +}
++EXPORT_SYMBOL_GPL(bL_switcher_put_enabled);
 +
-+#else
-+#define gic_init_physaddr(node)  do { } while (0)
+ /*
+  * Veto any CPU hotplug operation on those CPUs we've removed
+  * while the switcher is active.
+diff --git a/arch/arm/include/asm/bL_switcher.h b/arch/arm/include/asm/bL_switcher.h
+index e0c0bba70b..05d7c4cb94 100644
+--- a/arch/arm/include/asm/bL_switcher.h
++++ b/arch/arm/include/asm/bL_switcher.h
+@@ -14,4 +14,7 @@
+ 
+ int bL_switch_request(unsigned int cpu, unsigned int new_cluster_id);
+ 
++bool bL_switcher_get_enabled(void);
++void bL_switcher_put_enabled(void);
++
  #endif
- 
- static int gic_irq_domain_map(struct irq_domain *d, unsigned int irq,
-@@ -952,6 +979,8 @@ int __init gic_of_init(struct device_node *node, struct device_node *parent)
- 		percpu_offset = 0;
- 
- 	gic_init_bases(gic_cnt, -1, dist_base, cpu_base, percpu_offset, node);
-+	if (!gic_cnt)
-+		gic_init_physaddr(node);
- 
- 	if (parent) {
- 		irq = irq_of_parse_and_map(node, 0);
-diff --git a/include/linux/irqchip/arm-gic.h b/include/linux/irqchip/arm-gic.h
-index 46544e381b..dc30835099 100644
---- a/include/linux/irqchip/arm-gic.h
-+++ b/include/linux/irqchip/arm-gic.h
-@@ -78,6 +78,7 @@ static inline void gic_init(unsigned int nr, int start,
- 
- int gic_get_cpu_id(unsigned int cpu);
- void gic_migrate_target(unsigned int new_cpu_id);
-+unsigned long gic_get_sgir_physaddr(void);
- 
- #endif /* __ASSEMBLY */
- 
 -- 
 1.8.4.98.gb022869
