@@ -1,58 +1,53 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Mon, 23 Sep 2013 14:28:33 +0200
-Subject: [PATCH v4 0/3] ARM: S5PV210: move to common clk framework
-In-Reply-To: <1379785342-25107-1-git-send-email-m.krawczuk@partner.samsung.com>
-References: <1379785342-25107-1-git-send-email-m.krawczuk@partner.samsung.com>
-Message-ID: <1533271.F4sWn2BdKU@amdc1227>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 23 Sep 2013 14:30:48 +0200
+Subject: [PATCH 36/51] DMA-API: usb: use dma_set_coherent_mask()
+In-Reply-To: <E1VMmHX-0007jq-Cj@rmk-PC.arm.linux.org.uk>
+References: <20130919212235.GD12758@n2100.arm.linux.org.uk>
+ <E1VMmHX-0007jq-Cj@rmk-PC.arm.linux.org.uk>
+Message-ID: <52403478.6010305@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mateusz,
+On 20/09/2013 00:01, Russell King :
+> The correct way for a driver to specify the coherent DMA mask is
+> not to directly access the field in the struct device, but to use
+> dma_set_coherent_mask().  Only arch and bus code should access this
+> member directly.
+>
+> Convert all direct write accesses to using the correct API.
+>
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> ---
+>   drivers/usb/chipidea/ci_hdrc_imx.c |    5 +++--
+>   drivers/usb/dwc3/dwc3-exynos.c     |    5 +++--
+>   drivers/usb/gadget/lpc32xx_udc.c   |    4 +++-
+>   drivers/usb/host/ehci-atmel.c      |    5 +++--
 
-On Saturday 21 of September 2013 19:42:19 Mateusz Krawczuk wrote:
-> This patch series is the new s5pv210 clock implementation
-> (using common clk framework).
-> 
-> This implementation is compatible with device tree definition and board
-> files.
-> 
-> This patch series is based on linux-next and has been tested on goni and
-> aquila
-> boards using board file.
-> 
-> Since v3:
-> 
-> Replace s5pv210_clk_register_finpll, by creating mux finpll
-> with xusbxti and xxti as parrents.
-> 
-> Mateusz Krawczuk (3):
->   clk: samsung: Add clock driver for s5pc110/s5pv210
->   Cpufreq: s5pv210 cpufreq fixes for CCF
->   ARM: s5pv210: Migrate clock handling to Common Clock Framework
-> 
->  .../bindings/clock/samsung,s5pv210-clock.txt       |  75 +++
->  arch/arm/mach-s5pv210/Kconfig                      |   9 +
->  arch/arm/mach-s5pv210/Makefile                     |   4 +-
->  arch/arm/mach-s5pv210/common.c                     |  17 +
->  arch/arm/mach-s5pv210/common.h                     |  10 +
->  arch/arm/mach-s5pv210/mach-goni.c                  |   2 +-
->  arch/arm/mach-s5pv210/mach-smdkv210.c              |   2 +-
->  arch/arm/plat-samsung/Kconfig                      |   2 +-
->  drivers/clk/samsung/Makefile                       |   3 +
->  drivers/clk/samsung/clk-s5pv210.c                  | 673
-> +++++++++++++++++++++ drivers/cpufreq/s5pv210-cpufreq.c                 
-> |   6 +-
->  include/dt-bindings/clock/samsung,s5pv210-clock.h  | 224 +++++++
->  12 files changed, 1019 insertions(+), 8 deletions(-)
->  create mode 100644
-> Documentation/devicetree/bindings/clock/samsung,s5pv210-clock.txt create
-> mode 100644 drivers/clk/samsung/clk-s5pv210.c
->  create mode 100644 include/dt-bindings/clock/samsung,s5pv210-clock.h
+For Atmel driver:
 
-Very nice work. I hope we will be able to finally move S5PV210 to Device 
-Tree for 3.13 and drop all the legacy code.
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-Acked-by: Tomasz Figa <t.figa@samsung.com>
+[..]
 
-Best regards,
-Tomasz
+> diff --git a/drivers/usb/host/ehci-atmel.c b/drivers/usb/host/ehci-atmel.c
+> index 3b645ff..5831a88 100644
+> --- a/drivers/usb/host/ehci-atmel.c
+> +++ b/drivers/usb/host/ehci-atmel.c
+> @@ -92,8 +92,9 @@ static int ehci_atmel_drv_probe(struct platform_device *pdev)
+>   	 */
+>   	if (!pdev->dev.dma_mask)
+>   		pdev->dev.dma_mask = &pdev->dev.coherent_dma_mask;
+> -	if (!pdev->dev.coherent_dma_mask)
+> -		pdev->dev.coherent_dma_mask = DMA_BIT_MASK(32);
+> +	retval = dma_set_coherent_mask(&pdev->dev, DMA_BIT_MASK(32));
+> +	if (retval)
+> +		goto fail_create_hcd;
+>
+>   	hcd = usb_create_hcd(driver, &pdev->dev, dev_name(&pdev->dev));
+>   	if (!hcd) {
+
+[..]
+
+Thanks,
+-- 
+Nicolas Ferre
