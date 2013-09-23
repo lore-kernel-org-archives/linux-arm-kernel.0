@@ -1,42 +1,48 @@
 From: t.figa@samsung.com (Tomasz Figa)
-Date: Mon, 23 Sep 2013 14:34:54 +0200
-Subject: [PATCH] ARM: EXYNOS: remove CONFIG_MACH_EXYNOS[4,5]_DT config
- options
-In-Reply-To: <1732670.G7NvXXJtxF@amdc1032>
-References: <3809234.0NkWBIjRC9@amdc1032> <2298139.uMOnikAvfC@amdc1227>
- <1732670.G7NvXXJtxF@amdc1032>
-Message-ID: <1773131.OsQeaPpRlR@amdc1227>
+Date: Mon, 23 Sep 2013 14:37:22 +0200
+Subject: [PATCH] DT: if dt is available don't use s3c_arch_init
+In-Reply-To: <1379931289-29384-1-git-send-email-m.krawczuk@partner.samsung.com>
+References: <1379931289-29384-1-git-send-email-m.krawczuk@partner.samsung.com>
+Message-ID: <2025079.MVbFYJdokX@amdc1227>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 23 of September 2013 12:23:51 Bartlomiej Zolnierkiewicz wrote:
-> Hi Tomek,
-> 
-> On Tuesday, September 17, 2013 12:45:21 PM Tomasz Figa wrote:
-> > Hi Bart,
-[snip]
-> > > +	select ARM_AMBA
-> > > +	select CLKSRC_OF
-> > > +	select CLKSRC_SAMSUNG_PWM if CPU_EXYNOS4210
-> > > +	select CPU_EXYNOS4210
-> > 
-> > The line above shows the brokenness of current layout of Exynos Kconfig
-> > options. You need to select some SoC in SAMSUNG EXYNOS4, because
-> > otherwise the build will fail if user doesn't select at least one of
-> > Exynos4 SoCs.
-> > 
-> > Instead, I would hide the ARCH_EXYNOS4 and ARCH_EXYNOS4 options and
-> > select them from entries of particular SoCs, i.e. ARCH_EXYNOS4 would
-> > be selected by CPU_EXYNOS4210, SOC_EXYNOS4212 and SOC_EXYNOS4412,
-> > ARCH_EXYNOS5 by SOC_EXYNOS5250 and SOC_EXYNOS5420 and so on.
-> 
-> This is a good idea but I think that it is better to address it later in
-> an incremental patch (which I will also do unless someone beats me to
-> it).
+Hi Mateusz,
 
-OK, sounds good. I take your word for it. ;)
+On Monday 23 of September 2013 12:14:49 Mateusz Krawczuk wrote:
+> It prevents from executing platform code, when booting from device tree.
+> 
+> Signed-off-by: Mateusz Krawczuk <m.krawczuk@partner.samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> ---
+>  arch/arm/plat-samsung/init.c | 3 +++
+>  1 file changed, 3 insertions(+)
+> 
+> diff --git a/arch/arm/plat-samsung/init.c b/arch/arm/plat-samsung/init.c
+> index aa9511b..0ace02d 100644
+> --- a/arch/arm/plat-samsung/init.c
+> +++ b/arch/arm/plat-samsung/init.c
+> @@ -20,6 +20,7 @@
+>  #include <linux/module.h>
+>  #include <linux/interrupt.h>
+>  #include <linux/ioport.h>
+> +#include <linux/of.h>
+>  #include <linux/serial_core.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/of.h>
+> @@ -152,6 +153,8 @@ static int __init s3c_arch_init(void)
+>  {
+>  	int ret;
+> 
+> +	if (of_have_populated_dt())
+> +		return 0;
 
-Acked-by: Tomasz Figa <t.figa@samsung.com>
+I'm not sure if this is the correct thing to do here (note platforms that 
+still want this initialization to be handled, even when booting with DT).
+
+The DT case is already handled several lines below in if (cpu == NULL) 
+check and if your platform requires this initialization not to happen you 
+should assure it has cpu == NULL.
 
 Best regards,
 Tomasz
