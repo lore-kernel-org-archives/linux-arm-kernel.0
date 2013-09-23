@@ -1,90 +1,57 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon, 23 Sep 2013 16:31:06 +0100
-Subject: [PATCH v3 1/4] ARM: KVM: Implement kvm_vcpu_preferred_target()
- function
-In-Reply-To: <CAAhSdy04eNBeVMtGR+GE_hsE66KG--wFyLU5szFXFeXehgzSaw@mail.gmail.com>
-References: <1379596302-21522-1-git-send-email-anup.patel@linaro.org>
- <1379596302-21522-2-git-send-email-anup.patel@linaro.org>
- <523B09EA.9050408@arm.com> <20130919192008.GL7623@lvm>
- <CAAhSdy04eNBeVMtGR+GE_hsE66KG--wFyLU5szFXFeXehgzSaw@mail.gmail.com>
-Message-ID: <20130923153106.GD19043@lvm>
+From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
+Date: Mon, 23 Sep 2013 17:30:18 +0200
+Subject: [PATCH 1/9] Staging/iio/adc/touchscreen/MXS: add proper clock
+ handling
+In-Reply-To: <1379946998-23041-2-git-send-email-jbe@pengutronix.de>
+References: <1379946998-23041-1-git-send-email-jbe@pengutronix.de>
+ <1379946998-23041-2-git-send-email-jbe@pengutronix.de>
+Message-ID: <21056.24202.312851.105281@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 23, 2013 at 01:35:20PM +0530, Anup Patel wrote:
-> Hi Christoffer/Marc,
-> 
-> On Fri, Sep 20, 2013 at 12:50 AM, Christoffer Dall
-> <christoffer.dall@linaro.org> wrote:
-> > On Thu, Sep 19, 2013 at 03:27:54PM +0100, Marc Zyngier wrote:
-> >> On 19/09/13 14:11, Anup Patel wrote:
-> >> > This patch implements kvm_vcpu_preferred_target() function for
-> >> > KVM ARM which will help us implement KVM_ARM_PREFERRED_TARGET ioctl
-> >> > for user space.
-> >> >
-> >> > Signed-off-by: Anup Patel <anup.patel@linaro.org>
-> >> > Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
-> >> > ---
-> >> >  arch/arm/kvm/guest.c              |   20 ++++++++++++++++++++
-> >> >  arch/arm64/include/asm/kvm_host.h |    1 +
-> >> >  2 files changed, 21 insertions(+)
-> >> >
-> >> > diff --git a/arch/arm/kvm/guest.c b/arch/arm/kvm/guest.c
-> >> > index 152d036..b407e6c 100644
-> >> > --- a/arch/arm/kvm/guest.c
-> >> > +++ b/arch/arm/kvm/guest.c
-> >> > @@ -222,6 +222,26 @@ int kvm_vcpu_set_target(struct kvm_vcpu *vcpu,
-> >> >     return kvm_reset_vcpu(vcpu);
-> >> >  }
-> >> >
-> >> > +int kvm_vcpu_preferred_target(struct kvm_vcpu_init *init)
-> >> > +{
-> >> > +   int target = kvm_target_cpu();
-> >> > +
-> >> > +   if (target < 0)
-> >> > +           return -ENODEV;
-> >> > +
-> >> > +   memset(init, 0, sizeof(*init));
-> >> > +
-> >> > +   /*
-> >> > +    * For now, we return all optional features are available
-> >> > +    * for preferred target. In future, we might have features
-> >> > +    * available based on underlying host.
-> >> > +    */
-> >> > +   init->target = (__u32)target;
-> >> > +   init->features[0] |= (1 << KVM_ARM_VCPU_POWER_OFF);
-> >>
-> >> I'm in two minds about this feature reporting. I see they serve a
-> >> purpose, but they also duplicate capabilities, which is the standard way
-> >> to advertise what KVM can do.
-> >>
-> >> It means we end up having to sync two reporting mechanism, and I feel
-> >> this is in general a bad idea.
-> >>
-> >> Furthermore, KVM_ARM_VCPU_POWER_OFF is hardly a feature of the HW, but
-> >> rather a firmware emulation thing.
-> >>
-> >> Peter, Christoffer: Thoughts?
-> >>
-> > I wanted to return the full kvm_vcpu_init instead of just a target int,
-> > so we did not have to come up with yet another ioctl if we need to
-> > return more information about the capabilities of the host CPU in the
-> > future.
-> >
-> > But perhaps we can formulate the API, to say only the (currently empty)
-> > following list of features can only be enabled if the corresponding bit
-> > is enabled, or something along those lines.
-> >
-> > -Christoffer
-> > _______________________________________________
-> > kvmarm mailing list
-> > kvmarm at lists.cs.columbia.edu
-> > https://lists.cs.columbia.edu/cucslists/listinfo/kvmarm
-> 
-> Do we stick with current implementation of returning struct kvm_vcpu_init ?
-> OR
-> Do we return struct kvm_vcpu_init with all features set to zero ?
-> 
-Let's give Marc a day or two to respond to this one ;)
+Hi,
 
--Christoffer
+Juergen Beisert writes:
+> diff --git a/drivers/staging/iio/adc/mxs-lradc.c b/drivers/staging/iio/adc/mxs-lradc.c
+> index a08c173..00b61ac 100644
+> --- a/drivers/staging/iio/adc/mxs-lradc.c
+> +++ b/drivers/staging/iio/adc/mxs-lradc.c
+> @@ -35,6 +35,7 @@
+>  #include <linux/completion.h>
+>  #include <linux/delay.h>
+>  #include <linux/input.h>
+> +#include <linux/clk.h>
+>  
+>  #include <linux/iio/iio.h>
+>  #include <linux/iio/buffer.h>
+> @@ -134,6 +135,8 @@ struct mxs_lradc {
+>  	void __iomem		*base;
+>  	int			irq[13];
+>  
+> +	struct clk		*clk;
+> +
+>  	uint32_t		*buffer;
+>  	struct iio_trigger	*trig;
+>  
+> @@ -928,6 +931,9 @@ static int mxs_lradc_probe(struct platform_device *pdev)
+>  	if (IS_ERR(lradc->base))
+>  		return PTR_ERR(lradc->base);
+>  
+> +	lradc->clk = devm_clk_get(&pdev->dev, NULL);
+> +	clk_prepare_enable(lradc->clk);
+> +
+Wouldn't it make sense to enable the clock only when the device is
+opened to save power while not actually in use?
+
+
+Lothar Wa?mann
+-- 
+___________________________________________________________
+
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
