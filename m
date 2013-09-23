@@ -1,65 +1,111 @@
-From: prabhakar.csengg@gmail.com (Prabhakar Lad)
-Date: Mon, 23 Sep 2013 08:18:52 +0530
-Subject: [PATCH] media: i2c: adv7343: fix the DT binding properties
-In-Reply-To: <523C1AE0.9020603@samsung.com>
-References: <1379073471-7244-1-git-send-email-prabhakar.csengg@gmail.com>
- <523395DC.5080009@wwwdotorg.org>
- <CA+V-a8sVyJ1TrTSiaj8vpaD+f_qJ5Hp287E3HuHJ_pRzzmdAvg@mail.gmail.com>
- <523730A8.9060201@wwwdotorg.org>
- <CA+V-a8vY-qsdUoUUH=3HOg-UAZZPujOLPHFC_udNWFtksgzRRA@mail.gmail.com>
- <523B554A.2030701@gmail.com>
- <CA+V-a8s3PYr7qem6m8au0E7N2Xb_gD37_8uLcdXZjeHppBaC6g@mail.gmail.com>
- <523C1AE0.9020603@samsung.com>
-Message-ID: <CA+V-a8u5_rhxTgkVgCbtmGpaZCt2ciu4vABW4t80aSp7csttnw@mail.gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Mon, 23 Sep 2013 03:02:08 +0000 (UTC)
+Subject: OMAP baseline test results for v3.12-rc1
+Message-ID: <alpine.DEB.2.02.1309230255320.18475@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sylwester,
 
-On Fri, Sep 20, 2013 at 3:22 PM, Sylwester Nawrocki
-<s.nawrocki@samsung.com> wrote:
-> Hi Prabhakar,
->
-> On 09/20/2013 10:11 AM, Prabhakar Lad wrote:
->> OK I will, just send out a fix up patch which fixes the mismatch between
->> names for the rc-cycle, and later send out a patch which removes the
->> platform data usage for next release with proper DT bindings.
->
-> I think the binding need to be fully corrected now, I just meant to not
-> touch the board file, i.e. leave non-dt support unchanged.
->
-Ok
+Here are some basic OMAP test results for Linux v3.12-rc1.
+Logs and other details at:
 
->> I'm OK with making regulator properties as optional, But still it would
->> change the meaning of what DT is, we know that the VDD/VDD_IO .. etc
->> pins are required properties (but still making them as optional) :-(
->>
->> I think there might several devices where this situation may arise so
->> just thinking of a alternative solution.
->>
->> say we have property 'software-regulator' which takes true/false(0/1)
->> If set to true we make the regulators as required property or else we
->> assume it is handled and ignore it ?
->
-> I don't think this is a good idea. You would have to add a similar platform
-> data flag for non-dt, it doesn't sound right. I can see two options here:
->
-> 1. Make the regulator properties mandatory and, e.g. define a fixed
->    voltage GPIO regulator in DT with an empty 'gpio' property. Then
->    pass a phandle to that regulator in the adv7343 *-supply properties.
->    For non-dt similarly a fixed voltage regulator(s) and voltage
->    supplies  would need to be defined in the board files.
->
-> 2. Make the properties optional and use (devm_)regulator_get_optional()
->    calls in the driver (a recently added function). I must admit I don't
->    fully understand description of this function, it currently looks
->    pretty much same as (devm_)regulator_get(). Thus the driver would
->    need to be handling regulator supplies only when non ERR_PTR() is
->    returned from regulator_get_optional() and otherwise assume a non
->    critical error. There is already quite a few example occurrences of
->    regulator_get_optional() usage.
->
-Thanks for pointing it I'll choose option 2 and post the patch.
+    http://www.pwsan.com/omap/testlogs/test_v3.12-rc1/20130922202452/
 
-Regards,
---Prabhakar Lad
+
+Test summary
+------------
+
+Build: zImage:
+    Pass ( 2/ 2): omap2plus_defconfig, omap2plus_defconfig_am33xx_only
+
+Build: uImage+dtb:
+    Pass ( 3/ 3): omap2plus_defconfig_am33xx_only/am335x-bone,
+		  omap2plus_defconfig/omap4-panda,
+		  omap2plus_defconfig/omap4-panda-es
+
+Build: uImage:
+    Pass (14/14): omap1_defconfig, omap1_defconfig_1510innovator_only,
+		  omap1_defconfig_5912osk_only, omap2plus_defconfig,
+		  omap2plus_defconfig_2430sdp_only,
+		  omap2plus_defconfig_cpupm, omap2plus_defconfig_no_pm,
+		  omap2plus_defconfig_n800_only_a,
+		  omap2plus_defconfig_n800_multi_omap2xxx,
+		  omap2plus_defconfig_omap2_4_only,
+		  omap2plus_defconfig_omap3_4_only,
+		  rmk_omap3430_ldp_allnoconfig,
+		  rmk_omap3430_ldp_oldconfig,
+		  rmk_omap4430_sdp_allnoconfig
+
+Boot to userspace:
+    skip ( 1/ 1): 5912osk
+    Pass (11/11): 2430sdp, 3517evm, 3530es3beagle, 3730beaglexm,
+		  37xxevm, 4430es2panda, 4460pandaes, am335xbone,
+		  am335xbonelt, cmt3517, 4460varsomom
+
+PM: chip retention via suspend:
+    FAIL ( 3/ 7): 2430sdp, 4430es2panda, 4460varsomom
+    Pass ( 4/ 7): 3530es3beagle, 3730beaglexm, 37xxevm, 4460pandaes
+
+PM: chip retention via dynamic idle:
+    FAIL ( 4/ 7): 2430sdp, 4430es2panda, 4460pandaes, 4460varsomom
+    Pass ( 3/ 7): 3530es3beagle, 3730beaglexm, 37xxevm
+
+PM: chip off except CORE via suspend:
+    Pass ( 1/ 1): 3730beaglexm
+
+PM: chip off except CORE via dynamic idle:
+    Pass ( 1/ 1): 3730beaglexm
+
+PM: chip off via suspend:
+    FAIL ( 3/ 5): 4430es2panda, 4460pandaes, 4460varsomom
+    Pass ( 2/ 5): 3530es3beagle, 37xxevm
+
+PM: chip off via dynamic idle:
+    FAIL ( 3/ 5): 4430es2panda, 4460pandaes, 4460varsomom
+    Pass ( 2/ 5): 3530es3beagle, 37xxevm
+
+
+vmlinux object size
+(delta in bytes from test_v3.11 (6e4664525b1db28f8c4e1130957f70a94c19213e)):
+   text     data      bss    total  kernel
+ +39515    +1500      +56   +41071  omap1_defconfig
+ +37048    +1436      +56   +38540  omap1_defconfig_1510innovator_only
+ +38579    +1500      +88   +40167  omap1_defconfig_5912osk_only
++237402   +47344     +760  +285506  omap2plus_defconfig
+-245280   -65736    -8488  -319504  omap2plus_defconfig_2430sdp_only
++241222   +47120     +696  +289038  omap2plus_defconfig_cpupm
++3314252  +272060  +5365880  +8952192  omap2plus_defconfig_n800_multi_omap2xxx
++3282652  +234764  +5365840  +8883256  omap2plus_defconfig_n800_only_a
++242382   +49736     +824  +292942  omap2plus_defconfig_no_pm
++305085   +99792    +4408  +409285  omap2plus_defconfig_omap2_4_only
++292422   +98536    +3960  +394918  omap2plus_defconfig_omap3_4_only
+ +34044     -452    +2524   +36116  rmk_omap3430_ldp_allnoconfig
+ +42173     +412    -1152   +41433  rmk_omap3430_ldp_oldconfig
+ +33264    +1892     -732   +34424  rmk_omap4430_sdp_allnoconfig
+
+The large deltas associated with the N800 configs are due to a switchover 
+to seedconfig-generated Kconfigs - the name changed.  Something is not 
+right with the 2430sdp_only config; that should show a size increase 
+similar to the other OMAP2 kconfigs - will look into it.
+
+
+Boot-time memory difference
+(delta in bytes from test_v3.11 (6e4664525b1db28f8c4e1130957f70a94c19213e))
+  avail  rsrvd   high  freed  board          kconfig
+ 16376k -16376k      .      .  2420n800       omap2plus_defconfig_n800_only_a
+  -280k   280k      .    12k  2430sdp        omap2plus_defconfig
+  -280k   280k      .    12k  3517evm        omap2plus_defconfig
+  -280k   280k      .    12k  3530es3beagle  omap2plus_defconfig
+  -280k   280k      .    12k  3730beaglexm   omap2plus_defconfig
+  -280k   280k      .    12k  37xxevm        omap2plus_defconfig
+  -276k   276k      .    12k  4430es2panda   omap2plus_defconfig
+  -276k   276k      .    12k  4460pandaes    omap2plus_defconfig
+    24k   -24k      .   -32k  am335xbone     omap2plus_defconfig_am33xx_only
+  -288k   288k      .    12k  am335xbonelt   omap2plus_defconfig_am33xx_only
+
+The 16MB difference in the N800 boot memory usage is caused by disabling 
+CMA in the config here.
+
+Nice job everyone - this is the first -rc1 in a while where it looks like 
+there's no need to run around trying to deal with post-merge window boot 
+regressions.
