@@ -1,133 +1,70 @@
-From: dinguyen@altera.com (dinguyen at altera.com)
-Date: Mon, 23 Sep 2013 17:35:59 -0500
-Subject: [PATCHv2 2/3] mmc: dw_mmc-socfpga: Clean up SOCFPGA platform specific
- functionality
-In-Reply-To: <1379975760-18084-1-git-send-email-dinguyen@altera.com>
-References: <1379975760-18084-1-git-send-email-dinguyen@altera.com>
-Message-ID: <1379975760-18084-2-git-send-email-dinguyen@altera.com>
+From: sylvester.nawrocki@gmail.com (Sylwester Nawrocki)
+Date: Tue, 24 Sep 2013 00:50:29 +0200
+Subject: [PATCH 1/6] clk: exynos-audss: convert to platform device
+In-Reply-To: <CAL1qeaGjUTrfDaAr1rgsgDaZscjaV7tqi3Jd_-zo2sMtCCFSAQ@mail.gmail.com>
+References: <1379711637-5226-1-git-send-email-abrestic@chromium.org>
+ <1530327.jvk44KuFQA@flatron>
+ <CAL1qeaGjUTrfDaAr1rgsgDaZscjaV7tqi3Jd_-zo2sMtCCFSAQ@mail.gmail.com>
+Message-ID: <5240C5B5.4090702@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dinh Nguyen <dinguyen@altera.com>
+Hi,
 
-The SDR timing registers for the SD/MMC IP block for SOCFPGA is located
-in the system manager. This system manager IP block is located outside of
-the SD IP block itself. Therefore, the function to set the SDR timing
-register should be in the platform specific code so that the SD driver can
-be autonomous of any future System Manager changes.
+On 09/23/2013 11:25 PM, Andrew Bresticker wrote:
+>>> +static int exynos_audss_clk_remove(struct platform_device *pdev)
+>>> +{
+>>> +     of_clk_del_provider(pdev->dev.of_node);
+>>> +
+>>> +     return 0;
+>>>   }
+>>
+>> Don't we need to unregister all the registered clocks in remove? This also
+>> leads to another question: Do we even need removal support for this
+>> driver?
+>
+> Agreed - I don't think we should support removal of this device, but
+> it looks like __device_release_driver() just ignores the lack of a
+> remove callback or the return value from remove.  I suppose we could
+> just yell that removal is not supported if it is ever attempted.
 
-Also, there is no need for "altr,dw-mshc-ciu-div" as the driver can get
-the value of the CIU clock from the common clock API.
+That might be a good idea, without proper remove() method deferred
+probing will also not work. I'd assume there should be only, e.g.
+WARN() in the remove() callback or it should be properly implemented,
+with clk_unregister() call for each currently registered clock.
 
-Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
-Cc: Pavel Machek <pavel@denx.de>
-CC: Arnd Bergmann <arnd@arndb.de>
-CC: Olof Johansson <olof@lixom.net>
-Cc: Rob Herring <rob.herring@calxeda.com>
-Cc: Pawel Moll <pawel.moll@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Stephen Warren <swarren@wwwdotorg.org>
-Cc: Ian Campbell <ian.campbell@citrix.com>
-Cc: Chris Ball <cjb@laptop.org>
-Cc: Jaehoon Chung <jh80.chung@samsung.com>
-Cc: Seungwon Jeon <tgih.jun@samsung.com>
-Cc: devicetree at vger.kernel.org
-Cc: linux-mmc at vger.kernel.org
-CC: linux-arm-kernel at lists.infradead.org
----
-v2:
-- Let the mmc driver walk the DTB to get the SDR values
----
----
- drivers/mmc/host/dw_mmc-socfpga.c |   38 +++++++++----------------------------
- 1 file changed, 9 insertions(+), 29 deletions(-)
+Note that clk_unregister() is currently not implemented and removal
+of this driver cannot be properly supported at the moment anyway.
 
-diff --git a/drivers/mmc/host/dw_mmc-socfpga.c b/drivers/mmc/host/dw_mmc-socfpga.c
-index 14b5961..3be2e2a 100644
---- a/drivers/mmc/host/dw_mmc-socfpga.c
-+++ b/drivers/mmc/host/dw_mmc-socfpga.c
-@@ -24,16 +24,12 @@
- #include "dw_mmc.h"
- #include "dw_mmc-pltfm.h"
- 
--#define SYSMGR_SDMMCGRP_CTRL_OFFSET		0x108
--#define DRV_CLK_PHASE_SHIFT_SEL_MASK	0x7
--#define SYSMGR_SDMMC_CTRL_SET(smplsel, drvsel)          \
--	((((smplsel) & 0x7) << 3) | (((drvsel) & 0x7) << 0))
-+extern void socfpga_sysmgr_set_dwmmc_drvsel_smpsel(u32 drvsel, u32 smplsel);
- 
- /* SOCFPGA implementation specific driver private data */
- struct dw_mci_socfpga_priv_data {
--	u8	ciu_div; /* card interface unit divisor */
--	u32	hs_timing; /* bitmask for CIU clock phase shift */
--	struct regmap   *sysreg; /* regmap for system manager register */
-+	u32     drvsel; /*Phase shift for the Drive clock, or tx mode.*/
-+	u32	smplsel; /*Phase shift for the Sample clock, or rx mode.*/
- };
- 
- static int dw_mci_socfpga_priv_init(struct dw_mci *host)
-@@ -45,14 +41,7 @@ static int dw_mci_socfpga_priv_init(struct dw_mci *host)
- 		dev_err(host->dev, "mem alloc failed for private data\n");
- 		return -ENOMEM;
- 	}
--
--	priv->sysreg = syscon_regmap_lookup_by_compatible("altr,sys-mgr");
--	if (IS_ERR(priv->sysreg)) {
--		dev_err(host->dev, "regmap for altr,sys-mgr lookup failed.\n");
--		return PTR_ERR(priv->sysreg);
--	}
- 	host->priv = priv;
--
- 	return 0;
- }
- 
-@@ -61,20 +50,15 @@ static int dw_mci_socfpga_setup_clock(struct dw_mci *host)
- 	struct dw_mci_socfpga_priv_data *priv = host->priv;
- 
- 	clk_disable_unprepare(host->ciu_clk);
--	regmap_write(priv->sysreg, SYSMGR_SDMMCGRP_CTRL_OFFSET,
--		priv->hs_timing);
-+	socfpga_sysmgr_set_dwmmc_drvsel_smpsel(priv->drvsel, priv->smplsel);
- 	clk_prepare_enable(host->ciu_clk);
- 
--	host->bus_hz /= (priv->ciu_div + 1);
- 	return 0;
- }
- 
- static void dw_mci_socfpga_prepare_command(struct dw_mci *host, u32 *cmdr)
- {
--	struct dw_mci_socfpga_priv_data *priv = host->priv;
--
--	if (priv->hs_timing & DRV_CLK_PHASE_SHIFT_SEL_MASK)
--		*cmdr |= SDMMC_CMD_USE_HOLD_REG;
-+	*cmdr |= SDMMC_CMD_USE_HOLD_REG;
- }
- 
- static int dw_mci_socfpga_parse_dt(struct dw_mci *host)
-@@ -82,20 +66,16 @@ static int dw_mci_socfpga_parse_dt(struct dw_mci *host)
- 	struct dw_mci_socfpga_priv_data *priv = host->priv;
- 	struct device_node *np = host->dev->of_node;
- 	u32 timing[2];
--	u32 div = 0;
- 	int ret;
- 
--	ret = of_property_read_u32(np, "altr,dw-mshc-ciu-div", &div);
--	if (ret)
--		dev_info(host->dev, "No dw-mshc-ciu-div specified, assuming 1");
--	priv->ciu_div = div;
--
- 	ret = of_property_read_u32_array(np,
--			"altr,dw-mshc-sdr-timing", timing, 2);
-+		"samsung,dw-mshc-sdr-timing", timing, 2);
- 	if (ret)
- 		return ret;
- 
--	priv->hs_timing = SYSMGR_SDMMC_CTRL_SET(timing[0], timing[1]);
-+	priv->drvsel = timing[0];
-+	priv->smplsel = timing[1];
-+
- 	return 0;
- }
- 
--- 
-1.7.9.5
+Not sure what's more appropriate, it's probably better to add
+clk_unregister() calls. This would be effectively a dead code though,
+as long as core_initcall is used.
+
+>>> +static int __init exynos_audss_clk_init(void)
+>>> +{
+>>> +     return platform_driver_register(&exynos_audss_clk_driver);
+>>> +}
+>>> +core_initcall(exynos_audss_clk_init);
+>>
+>> Does it need to be core_initcall? Drivers depending on clocks provided by
+>> this driver should be able to defer probing if they are probed before this
+>> driver.
+>
+> Unfortunately there are a couple of issues with making this a module_initcall:
+>      1. On the Exynos5420, the AudioSS block provides the apb_pclk gate
+> for the ADMA bus, which is probed at postcore_initcall time and does
+> not support deferred probing, and
+>      2. the common clock framework doesn't differentiate between the
+> clock not being specified at all and the clock being specified, but
+> the provider not being registered yet (i.e. the case where probe
+> deferral would be appropriate) - it just returns ENOENT in both cases.
+
+AFAICS this shouldn't be difficult to improve. I guess it has not been
+properly addressed so far because there is currently no properly working
+modular clock provider drivers, using the common clock framework, yet.
+Unless someone bits me to it, I might have a look at that, as I also found
+it a bit it inconvenient.
+
+--
+Regards,
+Sylwester
