@@ -1,75 +1,72 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 23 Sep 2013 15:33:10 -0600
-Subject: [PATCH] media: i2c: adv7343: fix the DT binding properties
-In-Reply-To: <3002978.Cb6jL1xtkE@avalon>
-References: <1379073471-7244-1-git-send-email-prabhakar.csengg@gmail.com>
- <523C1AE0.9020603@samsung.com>
- <CA+V-a8u5_rhxTgkVgCbtmGpaZCt2ciu4vABW4t80aSp7csttnw@mail.gmail.com>
- <3002978.Cb6jL1xtkE@avalon>
-Message-ID: <5240B396.2010705@wwwdotorg.org>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 23 Sep 2013 16:35:51 -0500
+Subject: [PATCH] TTY: hvc_dcc: probe for a JTAG connection before
+ registering
+In-Reply-To: <5240AE43.6070708@canonical.com>
+References: <1379968234-23373-1-git-send-email-robherring2@gmail.com>
+ <5240AE43.6070708@canonical.com>
+Message-ID: <5240B437.9090201@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/23/2013 05:50 AM, Laurent Pinchart wrote:
-> On Monday 23 September 2013 08:18:52 Prabhakar Lad wrote:
->> On Fri, Sep 20, 2013 at 3:22 PM, Sylwester Nawrocki wrote:
->>> On 09/20/2013 10:11 AM, Prabhakar Lad wrote:
->>>> OK I will, just send out a fix up patch which fixes the mismatch between
->>>> names for the rc-cycle, and later send out a patch which removes the
->>>> platform data usage for next release with proper DT bindings.
->>>
->>> I think the binding need to be fully corrected now, I just meant to not
->>> touch the board file, i.e. leave non-dt support unchanged.
+On 09/23/2013 04:10 PM, Tim Gardner wrote:
+> On 09/23/2013 01:30 PM, Rob Herring wrote:
+>> From: Rob Herring <rob.herring@calxeda.com>
 >>
->> Ok
+>> Enabling the ARM DCC console and using without a JTAG connection will
+>> simply hang the system. Since distros like to turn on all options, this
+>> is a reoccurring problem to debug. We can do better by checking if
+>> anything is attached and handling characters. There is no way to probe
+>> this, so send a newline and check that it is handled.
 >>
->>>> I'm OK with making regulator properties as optional, But still it would
->>>> change the meaning of what DT is, we know that the VDD/VDD_IO .. etc
->>>> pins are required properties (but still making them as optional) :-(
->>>>
->>>> I think there might several devices where this situation may arise so
->>>> just thinking of a alternative solution.
->>>>
->>>> say we have property 'software-regulator' which takes true/false(0/1)
->>>> If set to true we make the regulators as required property or else we
->>>> assume it is handled and ignore it ?
->>>
->>> I don't think this is a good idea. You would have to add a similar
->>> platform data flag for non-dt, it doesn't sound right. I can see two
->>> options here:
->>>
->>> 1. Make the regulator properties mandatory and, e.g. define a fixed
->>>    voltage GPIO regulator in DT with an empty 'gpio' property. Then
->>>    pass a phandle to that regulator in the adv7343 *-supply properties.
->>>    For non-dt similarly a fixed voltage regulator(s) and voltage
->>>    supplies  would need to be defined in the board files.
->>>
->>> 2. Make the properties optional and use (devm_)regulator_get_optional()
->>>    calls in the driver (a recently added function). I must admit I don't
->>>    fully understand description of this function, it currently looks
->>>    pretty much same as (devm_)regulator_get(). Thus the driver would
->>>    need to be handling regulator supplies only when non ERR_PTR() is
->>>    returned from regulator_get_optional() and otherwise assume a non
->>>    critical error. There is already quite a few example occurrences of
->>>    regulator_get_optional() usage.
+>> Cc: Paolo Pisati <paolo.pisati@canonical.com>
+>> Cc: Tim Gardner <tim.gardner@canonical.com>
+>> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+>> Cc: Jiri Slaby <jslaby@suse.cz>
+>> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+>> ---
+>>  drivers/tty/hvc/hvc_dcc.c | 21 +++++++++++++++++++++
+>>  1 file changed, 21 insertions(+)
 >>
->> Thanks for pointing it I'll choose option 2 and post the patch.
+>> diff --git a/drivers/tty/hvc/hvc_dcc.c b/drivers/tty/hvc/hvc_dcc.c
+>> index 44fbeba..44c8aff 100644
+>> --- a/drivers/tty/hvc/hvc_dcc.c
+>> +++ b/drivers/tty/hvc/hvc_dcc.c
+>> @@ -86,6 +86,21 @@ static int hvc_dcc_get_chars(uint32_t vt, char *buf, int count)
+>>  	return i;
+>>  }
+>>  
+>> +static bool hvc_dcc_check(void)
+>> +{
+>> +	unsigned long time = jiffies;
+>> +
+>> +	/* Write a test character to check if it is handled */
+>> +	__dcc_putchar('\n');
+>> +
+>> +	while (jiffies < time + (HZ / 10)) {
+>> +		if (!(__dcc_getstatus() & DCC_STATUS_TX))
+>> +			return true;
+>> +	}
 > 
-> Isn't regulator_get_optional() intended for devices that can have supplies 
-> unconnected in normal use ?
+> I think you should use one of the jiffies time comparison functions, e.g.,
+> 
+> 	time = jiffies + (HZ / 10);
+> 	while (time_before(jiffies,time) {
+> 		...
+> 	}
 
-I believe so, yes.
+Yes.
 
-> The ADV7343 supplies are mandatory from a hardware 
-> point of view, so I think we should use regulator_get(). Otherwise the driver 
-> won't be able to tell the difference between a regulator that isn't present 
-> yet (for instance because the regulator device/driver hasn't been probed yet), 
-> which should result in deferred probing, and an always-on regulator that has 
-> been left out.
+> 
+> What is the possibility that __dcc_getstatus() will return garbage if no
+> JTAG is connected ? In that event you're likely to get a false positive
+> on DCC_STATUS_TX.
 
-So I think you want to make the supply properties mandatory in DT (since
-some form of supply is mandatory in HW), yet make the driver support
-broken DTs which don't have those properties, by error-checking the
-return value from regulator_get(). You might want to put a note into DT
-saying that a previous version of the binding didn't require those
-supply properties, so they may be missing from older DTs.
+That probably would not be architecturally compliant. The status bits
+are cleared by JTAG reading the read side of the register. If the bit
+stays set, we'll return false. If the bit is always clear, then we
+wouldn't hang in the first place and should be fine. If you get random
+values, then I'm sorry and good luck. You are still no worse off than
+before this patch.
+
+Rob
