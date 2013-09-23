@@ -1,102 +1,87 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Mon, 23 Sep 2013 09:54:30 +0200
-Subject: [PATCH v2 09/26] ARM: call of_clk_init from default time_init handler
-In-Reply-To: <1379526839-14798-10-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1379526839-14798-10-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1379922870-2325-1-git-send-email-sebastian.hesselbarth@gmail.com>
+From: anup@brainfault.org (Anup Patel)
+Date: Mon, 23 Sep 2013 13:35:20 +0530
+Subject: [PATCH v3 1/4] ARM: KVM: Implement kvm_vcpu_preferred_target()
+ function
+In-Reply-To: <20130919192008.GL7623@lvm>
+References: <1379596302-21522-1-git-send-email-anup.patel@linaro.org>
+ <1379596302-21522-2-git-send-email-anup.patel@linaro.org>
+ <523B09EA.9050408@arm.com> <20130919192008.GL7623@lvm>
+Message-ID: <CAAhSdy04eNBeVMtGR+GE_hsE66KG--wFyLU5szFXFeXehgzSaw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Most DT ARM machs require common clock providers initialized before timers.
-Currently, arch/arm machs use .init_time to call of_clk_init right before
-clocksource_of_init. This prevents to remove that callback and use the default
-one instead.
+Hi Christoffer/Marc,
 
-This patch adds a call to of_clk_init() to the default .init_time callback
-for COMMON_CLK enabled machs to allow to remove custom callbacks where applicable.
-While at it, also reorder includes alphabetically.
+On Fri, Sep 20, 2013 at 12:50 AM, Christoffer Dall
+<christoffer.dall@linaro.org> wrote:
+> On Thu, Sep 19, 2013 at 03:27:54PM +0100, Marc Zyngier wrote:
+>> On 19/09/13 14:11, Anup Patel wrote:
+>> > This patch implements kvm_vcpu_preferred_target() function for
+>> > KVM ARM which will help us implement KVM_ARM_PREFERRED_TARGET ioctl
+>> > for user space.
+>> >
+>> > Signed-off-by: Anup Patel <anup.patel@linaro.org>
+>> > Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
+>> > ---
+>> >  arch/arm/kvm/guest.c              |   20 ++++++++++++++++++++
+>> >  arch/arm64/include/asm/kvm_host.h |    1 +
+>> >  2 files changed, 21 insertions(+)
+>> >
+>> > diff --git a/arch/arm/kvm/guest.c b/arch/arm/kvm/guest.c
+>> > index 152d036..b407e6c 100644
+>> > --- a/arch/arm/kvm/guest.c
+>> > +++ b/arch/arm/kvm/guest.c
+>> > @@ -222,6 +222,26 @@ int kvm_vcpu_set_target(struct kvm_vcpu *vcpu,
+>> >     return kvm_reset_vcpu(vcpu);
+>> >  }
+>> >
+>> > +int kvm_vcpu_preferred_target(struct kvm_vcpu_init *init)
+>> > +{
+>> > +   int target = kvm_target_cpu();
+>> > +
+>> > +   if (target < 0)
+>> > +           return -ENODEV;
+>> > +
+>> > +   memset(init, 0, sizeof(*init));
+>> > +
+>> > +   /*
+>> > +    * For now, we return all optional features are available
+>> > +    * for preferred target. In future, we might have features
+>> > +    * available based on underlying host.
+>> > +    */
+>> > +   init->target = (__u32)target;
+>> > +   init->features[0] |= (1 << KVM_ARM_VCPU_POWER_OFF);
+>>
+>> I'm in two minds about this feature reporting. I see they serve a
+>> purpose, but they also duplicate capabilities, which is the standard way
+>> to advertise what KVM can do.
+>>
+>> It means we end up having to sync two reporting mechanism, and I feel
+>> this is in general a bad idea.
+>>
+>> Furthermore, KVM_ARM_VCPU_POWER_OFF is hardly a feature of the HW, but
+>> rather a firmware emulation thing.
+>>
+>> Peter, Christoffer: Thoughts?
+>>
+> I wanted to return the full kvm_vcpu_init instead of just a target int,
+> so we did not have to come up with yet another ioctl if we need to
+> return more information about the capabilities of the host CPU in the
+> future.
+>
+> But perhaps we can formulate the API, to say only the (currently empty)
+> following list of features can only be enabled if the corresponding bit
+> is enabled, or something along those lines.
+>
+> -Christoffer
+> _______________________________________________
+> kvmarm mailing list
+> kvmarm at lists.cs.columbia.edu
+> https://lists.cs.columbia.edu/cucslists/listinfo/kvmarm
 
-Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
----
-Changelog:
-v1->v2:
-- protect call to of_clk_init which is only available for COMMON_CLK to
-  not break !COMMON_CLK machs. (Reported by Olof Johanssen)
-RFCv2->v1:
-- only call of_clk_init(NULL) when no custom .init_time is set
-  (Suggested by Soeren Brinkmann)
-RFCv1->RFCv2:
-- reorder includes alphabetically
+Do we stick with current implementation of returning struct kvm_vcpu_init ?
+OR
+Do we return struct kvm_vcpu_init with all features set to zero ?
 
-Cc: Olof Johansson <olof@lixom.net>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: STEricsson <STEricsson_nomadik_linux@list.st.com>
-Cc: linux-tegra at vger.kernel.org
-Cc: linux-rpi-kernel at lists.infradead.org
-Cc: linux-samsung-soc at vger.kernel.org
-Cc: kernel at stlinux.com
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
----
- arch/arm/kernel/time.c |   29 +++++++++++++++++------------
- 1 file changed, 17 insertions(+), 12 deletions(-)
-
-diff --git a/arch/arm/kernel/time.c b/arch/arm/kernel/time.c
-index 98aee32..829a96d 100644
---- a/arch/arm/kernel/time.c
-+++ b/arch/arm/kernel/time.c
-@@ -11,25 +11,26 @@
-  *  This file contains the ARM-specific time handling details:
-  *  reading the RTC at bootup, etc...
-  */
-+#include <linux/clk-provider.h>
-+#include <linux/clocksource.h>
-+#include <linux/errno.h>
- #include <linux/export.h>
--#include <linux/kernel.h>
--#include <linux/interrupt.h>
--#include <linux/time.h>
- #include <linux/init.h>
-+#include <linux/interrupt.h>
-+#include <linux/irq.h>
-+#include <linux/kernel.h>
-+#include <linux/profile.h>
- #include <linux/sched.h>
-+#include <linux/sched_clock.h>
- #include <linux/smp.h>
-+#include <linux/time.h>
- #include <linux/timex.h>
--#include <linux/errno.h>
--#include <linux/profile.h>
- #include <linux/timer.h>
--#include <linux/clocksource.h>
--#include <linux/irq.h>
--#include <linux/sched_clock.h>
- 
--#include <asm/thread_info.h>
--#include <asm/stacktrace.h>
- #include <asm/mach/arch.h>
- #include <asm/mach/time.h>
-+#include <asm/stacktrace.h>
-+#include <asm/thread_info.h>
- 
- #if defined(CONFIG_RTC_DRV_CMOS) || defined(CONFIG_RTC_DRV_CMOS_MODULE) || \
-     defined(CONFIG_NVRAM) || defined(CONFIG_NVRAM_MODULE)
-@@ -116,8 +117,12 @@ int __init register_persistent_clock(clock_access_fn read_boot,
- 
- void __init time_init(void)
- {
--	if (machine_desc->init_time)
-+	if (machine_desc->init_time) {
- 		machine_desc->init_time();
--	else
-+	} else {
-+#ifdef CONFIG_COMMON_CLK
-+		of_clk_init(NULL);
-+#endif
- 		clocksource_of_init();
-+	}
- }
--- 
-1.7.10.4
+Regards,
+Anup
