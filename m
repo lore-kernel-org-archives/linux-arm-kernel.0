@@ -1,62 +1,135 @@
-From: jbe@pengutronix.de (=?iso-8859-1?q?J=FCrgen_Beisert?=)
-Date: Mon, 23 Sep 2013 09:42:29 +0200
-Subject: [PATCH 7/7] Staging/iio/adc/touchscreen/MXS: provide devicetree
- adaption
-In-Reply-To: <523D943D.705@kernel.org>
-References: <1379593369-22010-1-git-send-email-jbe@pengutronix.de>
- <1379593369-22010-8-git-send-email-jbe@pengutronix.de>
- <523D943D.705@kernel.org>
-Message-ID: <201309230942.29417.jbe@pengutronix.de>
+From: rogerq@ti.com (Roger Quadros)
+Date: Mon, 23 Sep 2013 10:42:45 +0300
+Subject: [RFC PATCH 08/15] ata: ahci_platform: Manage SATA PHY
+In-Reply-To: <523F3567.80303@cogentembedded.com>
+References: <1379595943-14622-1-git-send-email-rogerq@ti.com>
+ <1379595943-14622-9-git-send-email-rogerq@ti.com>
+ <523F3567.80303@cogentembedded.com>
+Message-ID: <523FF0F5.50504@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jonathan,
+Hi,
 
-On Saturday 21 September 2013 14:42:37 Jonathan Cameron wrote:
-> The device tree list has moved, so I've changed the cc.
->
-> Few comments inline.  Basically I'd go for longer more
-> descriptive names when the abreviation isn't a really
-> well known common one.
->
-> Note I'm not all that familiar with device tree conventions
-> so may be barking up the wrong tree ;)
->
-> > [...]
-> > @@ -9,13 +10,38 @@ Optional properties:
-> >  - fsl,lradc-touchscreen-wires: Number of wires used to connect the
-> > touchscreen to LRADC. Valid value is either 4 or 5. If this property is
-> > not present, then the touchscreen is -                              
-> > disabled.
->
-> Do we want that lradc prefix on these other properties?
+On 09/22/2013 09:22 PM, Sergei Shtylyov wrote:
+> Hello.
+> 
+> On 09/19/2013 05:05 PM, Roger Quadros wrote:
+> 
+>> From: Balaji T K <balajitk@ti.com>
+> 
+>> Some platforms have a PHY hooked up to the
+>> SATA controller. The PHY needs to be initialized
+>> and powered up for SATA to work. We do that
+>> using the PHY framework.
+> 
+>> [Roger Q] Cleaned up.
+> 
+>> CC: Tejun Heo <tj@kernel.org>
+>> Signed-off-by: Balaji T K <balajitk@ti.com>
+>> Signed-off-by: Roger Quadros <rogerq@ti.com>
+> [...]
+> 
+>> diff --git a/drivers/ata/ahci.h b/drivers/ata/ahci.h
+>> index 1145637..94484cb 100644
+>> --- a/drivers/ata/ahci.h
+>> +++ b/drivers/ata/ahci.h
+>> @@ -37,6 +37,7 @@
+>>
+>>   #include <linux/clk.h>
+>>   #include <linux/libata.h>
+>> +#include <linux/phy/phy.h>
+> 
+> struct phy;
+> 
+> should suffice.
+> 
+>> @@ -322,6 +323,7 @@ struct ahci_host_priv {
+>>       u32            em_buf_sz;    /* EM buffer size in byte */
+>>       u32            em_msg_type;    /* EM message type */
+>>       struct clk        *clk;        /* Only for platforms supporting clk */
+>> +    struct phy        *phy;        /* If platforms use phy */
+>>       void            *plat_data;    /* Other platform data */
+>>   };
+>>
+>> diff --git a/drivers/ata/ahci_platform.c b/drivers/ata/ahci_platform.c
+>> index 2daaee0..f812ffa 100644
+>> --- a/drivers/ata/ahci_platform.c
+>> +++ b/drivers/ata/ahci_platform.c
+>> @@ -23,6 +23,7 @@
+>>   #include <linux/platform_device.h>
+>>   #include <linux/libata.h>
+>>   #include <linux/ahci_platform.h>
+>> +#include <linux/phy/phy.h>
+> 
+>    Why include it from both ahci.h and here?
+> 
+OK. will move it to just .c file.
 
-The question is, if we want to keep it. This is the currently used binding.
+>>   #include "ahci.h"
+>>
+>>   static void ahci_host_stop(struct ata_host *host);
+>> @@ -141,16 +142,32 @@ static int ahci_probe(struct platform_device *pdev)
+>>           }
+>>       }
+>>
+>> +    hpriv->phy = devm_phy_get(dev, "sata-phy");
+>> +    if (IS_ERR(hpriv->phy)) {
+>> +        dev_err(dev, "can't get phy\n");
+> 
+>    Don't think it's a good idea to complain about missing PHY when the driver doesn't even use it.
 
-> > +                               disabled. 5 wires is valid for i.MX28 SoC only.
-> > +- fsl,ave-ctrl: number of samples per direction to calculate an average value.
-> > +                Allowed value is 1 ... 31, default is 4 
->
-> This naming seems less than informative, what about fsl,average_num_samples
-> of average_count (ave isn't all that obvious an abrevaition of average).
+OK. will change it to dev_dbg() instead.
+> 
+>> +        /* return only if -EPROBE_DEFER */
+>> +        if (PTR_ERR(hpriv->phy) == -EPROBE_DEFER) {
+>> +            rc = -EPROBE_DEFER;
+>> +            goto disable_unprepare_clk;
+>> +        }
+>> +    }
+>> +
+>>       /*
+>>        * Some platforms might need to prepare for mmio region access,
+>>        * which could be done in the following init call. So, the mmio
+>>        * region shouldn't be accessed before init (if provided) has
+>>        * returned successfully.
+>>        */
+>> +
+>> +    if (!(IS_ERR(hpriv->phy))) {
+> 
+>    () not needed around IS_ERR() invocation.
 
-I used already existing names from
-"Documentation/devicetree/bindings/input/touchscreen/stmpe.txt".
+OK.
 
-> > +- fsl,ave-delay: delay between consecutive samples. Allowed value is
-> > +                 1 ... 2047. It is used if 'fsl,ave-ctrl' > 1, counts at
-> > +                 2 kHz and its default is 2 (= 1 ms)
->
-> fsl,average_intersample_delay (I assume any limit of device tree property
-> names is longer than that?)
+> 
+>> +        phy_init(hpriv->phy);
+>> +        phy_power_on(hpriv->phy);
+>> +    }
+>> +
+> 
+>    I think this is misplaced, i.e. it should precede the comment.
+> 
 
-If the parameter description in "Documentation/devicetree/bindings" is useful,
-we don't need long parameter names. If there is no useful parameter
-description, we will need long names ;)
+OK.
 
-Regards,
-Juergen
+>>       if (pdata && pdata->init) {
+>>           rc = pdata->init(dev, hpriv->mmio);
+>>           if (rc)
+>> -            goto disable_unprepare_clk;
+>> +            goto disable_phy;
+>>       }
+>>
+>>       ahci_save_initial_config(dev, hpriv,
+> [...]
+>> @@ -328,6 +356,7 @@ static SIMPLE_DEV_PM_OPS(ahci_pm_ops, ahci_suspend, ahci_resume);
+>>   static const struct of_device_id ahci_of_match[] = {
+>>       { .compatible = "snps,spear-ahci", },
+>>       { .compatible = "snps,exynos5440-ahci", },
+>> +    { .compatible = "snps,dwc-ahci", },
+> 
+>    Looks like the binding documentation is incomplete -- it doesn't list "snps,exynos5440-ahci"...
 
--- 
-Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?| Juergen Beisert ? ? ? ? ? ? |
-Linux Solutions for Science and Industry ? ? ?| http://www.pengutronix.de/  |
+OK, I'll update it. Thanks for review.
+
+cheers,
+-roger
