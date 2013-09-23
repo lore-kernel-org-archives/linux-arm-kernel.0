@@ -1,48 +1,42 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 23 Sep 2013 11:10:36 +0200
-Subject: [PATCH 11/26] ARM: dove: remove custom .init_time hook
-In-Reply-To: <523EE08C.60309@gmail.com>
-References: <1379526839-14798-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1379526839-14798-12-git-send-email-sebastian.hesselbarth@gmail.com>
- <20130921122226.GB31180@lunn.ch> <523EE08C.60309@gmail.com>
-Message-ID: <20130923091036.GE4999@lunn.ch>
+From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
+Date: Mon, 23 Sep 2013 11:25:08 +0200
+Subject: [PATCHv5] staging/iio/adc: change the MXS touchscreen driver
+ implementation
+In-Reply-To: <201309230955.58828.jbe@pengutronix.de>
+References: <1379593369-22010-1-git-send-email-jbe@pengutronix.de>
+ <201309230155.04914.marex@denx.de>
+ <201309230955.58828.jbe@pengutronix.de>
+Message-ID: <21056.2292.381138.583291@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Sep 22, 2013 at 02:20:28PM +0200, Sebastian Hesselbarth wrote:
-> On 09/21/2013 02:22 PM, Andrew Lunn wrote:
-> >On Wed, Sep 18, 2013 at 07:53:44PM +0200, Sebastian Hesselbarth wrote:
-> >>With arch/arm calling of_clk_init(NULL) from time_init(), we can now
-> >>remove custom .init_time hooks. While at it, also remove some obsolete
-> >>includes.
-> >>
-> >>Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> >>---
-> >>Cc: Olof Johansson <olof@lixom.net>
-> >>Cc: Arnd Bergmann <arnd@arndb.de>
-> >>Cc: Jason Cooper <jason@lakedaemon.net>
-> >>Cc: Andrew Lunn <andrew@lunn.ch>
-> >>Cc: Russell King <linux@arm.linux.org.uk>
-> >>Cc: linux-arm-kernel at lists.infradead.org
-> >>Cc: linux-kernel at vger.kernel.org
-> >>---
-> >>  arch/arm/mach-dove/board-dt.c |   11 -----------
-> >>  1 file changed, 11 deletions(-)
-> [...]
-> >Boot tested on cubox.
-> >
-> >Tested-by: Andrew Lunn <andrew@lunn.ch>
+Hi,
+
+J?rgen Beisert writes:
+> Hi Marek,
 > 
-> Thanks Andrew!
+> Seems the very first touch detection does not work. A colleague just told me, 
+> we have an i.MX28 based hardware here and maybe a touchscreen from a different 
+> platform which maybe can be used with the i.MX28 platform. Stay tuned...
 > 
-> Aren't you giving any Acks for dove/kirkwood anymore?
+> > btw. the touchscreen connection on M28EVK is pretty much the same as on
+> > MX28EVK.
+> 
+> I think the touchscreen connection on MX28EVK is exactly the same as on 
+> MX28EVK! ;) (/me needs more coffee as well)
+> 
+Just tested the touchscreen driver on our TX28 module and I could not
+find any problems.
 
-Hi Sebastian
 
-In my opinion, a Tested-by: has more weight than an Acked-by. I could
-of given you an Acked-by in about 60 seconds, given the simplicity of
-the patch. It took a lot more effort to get your tree, build it, fix
-my binutils, since it was the first 3.12 tree i had tried and my
-binutils was too old, and boot it.
+Lothar Wa?mann
+-- 
+___________________________________________________________
 
-	 Andrew
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
