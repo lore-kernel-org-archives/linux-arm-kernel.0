@@ -1,60 +1,30 @@
-From: pwalmsley@nvidia.com (Paul Walmsley)
-Date: Mon, 23 Sep 2013 07:26:32 +0000 (UTC)
-Subject: Tegra baseline test results for v3.12-rc1
-In-Reply-To: <CAOesGMjAQZMUdC9ZoGhX=zEA3HCky1zwE0-B6fNAJubqO9bVzw@mail.gmail.com>
-References: <A4DCC42E2B5835498682FCB0A8F9F873378C267FFD@HQMAIL04.nvidia.com>
- <CAOesGMjAQZMUdC9ZoGhX=zEA3HCky1zwE0-B6fNAJubqO9bVzw@mail.gmail.com>
-Message-ID: <alpine.DEB.2.02.1309230703090.18475@utopia.booyaka.com>
+From: rogerq@ti.com (Roger Quadros)
+Date: Mon, 23 Sep 2013 10:37:38 +0300
+Subject: [RFC PATCH 08/15] ata: ahci_platform: Manage SATA PHY
+In-Reply-To: <20130922215107.GD27616@mtj.dyndns.org>
+References: <1379595943-14622-1-git-send-email-rogerq@ti.com>
+ <1379595943-14622-9-git-send-email-rogerq@ti.com>
+ <20130922165817.GD30946@htj.dyndns.org> <523F35E4.6050707@cogentembedded.com>
+ <20130922215107.GD27616@mtj.dyndns.org>
+Message-ID: <523FEFC2.801@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+Hi Tejun,
 
-On Wed, 18 Sep 2013, Olof Johansson wrote:
-
-> On Wed, Sep 18, 2013 at 9:23 AM, Paul Walmsley <pwalmsley@nvidia.com> wrote:
+On 09/23/2013 12:51 AM, Tejun Heo wrote:
+> Hello,
 > 
-> > vmlinux object size
-> > (delta in bytes from test_v3.11-rc7 (d8dfad3876e4386666b759da3c833d62fb8b2267)):
-> >    text     data      bss    total  kernel
-> >  -89208   +10000     -416   -79624  multi_v7_defconfig
-> > +299303    +7244    +1484  +308031  tegra_defconfig
-> >
-> >
-> > Boot-time memory difference
-> > (delta in bytes from test_v3.11-rc7 (d8dfad3876e4386666b759da3c833d62fb8b2267))
-> >     avail    rsrvd     high    freed                board              kconfig                  dtb
-> >         .        .        .        . tegra114-dalmore-hea   multi_v7_defconfig     tegra114-dalmore
-> >     -324k     324k        .        . tegra114-dalmore-hea      tegra_defconfig     tegra114-dalmore
-> >     -324k     324k        .        .       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
-> >     -592k     592k        .       8k       tegra30-beaver      tegra_defconfig       tegra30-beaver
+> On Sun, Sep 22, 2013 at 10:24:36PM +0400, Sergei Shtylyov wrote:
+>>    Not sure why you asked -- I'm not using this driver, neither I'm
 > 
-> Hm. These deltas are huge. :(  It would be interesting to know where
-> they come from.
+> Well, you have better grip of what's going on in the embedded world
+> than me.  I'm mostly curious whether adding dependency on PHY is okay.
+> 
 
-In terms of the vmlinux object size deltas, if one compares with OMAP 
-v3.11 -> v3.12-rc1:
+There is no hard dependency on presence of PHY. The driver will continue
+as usual if devm_phy_get() fails.
+I hope selecting GENERIC_PHY in Kconfig is not an issue.
 
-  http://marc.info/?l=linux-omap&m=137990533109727&w=2
-
-it appears that the 308KB tegra_defconfig delta is pretty close. 
-
-As a historical observation, the past several -rc1s have seen considerable 
-vmlinux size increases.  The Tegra data here doesn't go back very far yet, 
-but here's the OMAP data:
-
-+158KB: http://www.pwsan.com/omap/testlogs/test_v3.11-rc1/20130721020309/build/size.txt
-+105KB: http://www.pwsan.com/omap/testlogs/test_v3.10-rc1/20130518212204/build/size.txt
-+235KB: http://www.pwsan.com/omap/testlogs/test_v3.9-rc1/20130312100243/build/size.txt
-+195KB: http://www.pwsan.com/omap/testlogs/test_v3.8-rc1/20121228031713/build/size.txt
- +63KB: http://www.pwsan.com/omap/testlogs/test_v3.7-rc1/20121017205513/build/size.txt
-
-...
-
-Regarding the boot-time memory differences, the ~300KB deltas look about 
-right, but the 0KB and the ~600KB deltas seem incorrect.  Something is 
-probably wrong with some of the scripts here.  Will follow up on that 
-this week.
-
-
-- Paul
+cheers,
+-roger
