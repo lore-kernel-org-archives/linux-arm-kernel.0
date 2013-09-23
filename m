@@ -1,109 +1,67 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 23 Sep 2013 12:37:55 +0100
-Subject: [alsa-devel] [PATCH 43/51] DMA-API: dma: edma.c: no need to
- explicitly initialize DMA masks
-In-Reply-To: <20130923102533.GI17188@intel.com>
-References: <20130919212235.GD12758@n2100.arm.linux.org.uk>
- <E1VMnRj-0007sg-1Z@rmk-PC.arm.linux.org.uk>
- <20130923102533.GI17188@intel.com>
-Message-ID: <20130923113755.GT25647@n2100.arm.linux.org.uk>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Mon, 23 Sep 2013 13:50:51 +0200
+Subject: [PATCH] media: i2c: adv7343: fix the DT binding properties
+In-Reply-To: <CA+V-a8u5_rhxTgkVgCbtmGpaZCt2ciu4vABW4t80aSp7csttnw@mail.gmail.com>
+References: <1379073471-7244-1-git-send-email-prabhakar.csengg@gmail.com>
+ <523C1AE0.9020603@samsung.com>
+ <CA+V-a8u5_rhxTgkVgCbtmGpaZCt2ciu4vABW4t80aSp7csttnw@mail.gmail.com>
+Message-ID: <3002978.Cb6jL1xtkE@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 23, 2013 at 03:55:33PM +0530, Vinod Koul wrote:
-> On Fri, Sep 20, 2013 at 12:15:39AM +0100, Russell King wrote:
-> > register_platform_device_full() can setup the DMA mask provided the
-> > appropriate member is set in struct platform_device_info.  So lets
-> > make that be the case.  This avoids a direct reference to the DMA
-> > masks by this driver.
+On Monday 23 September 2013 08:18:52 Prabhakar Lad wrote:
+> On Fri, Sep 20, 2013 at 3:22 PM, Sylwester Nawrocki wrote:
+> > On 09/20/2013 10:11 AM, Prabhakar Lad wrote:
+> >> OK I will, just send out a fix up patch which fixes the mismatch between
+> >> names for the rc-cycle, and later send out a patch which removes the
+> >> platform data usage for next release with proper DT bindings.
 > > 
-> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> Acked-by: Vinod Koul <vinod.koul@intel.com>
+> > I think the binding need to be fully corrected now, I just meant to not
+> > touch the board file, i.e. leave non-dt support unchanged.
 > 
-> This also brings me question that should we force the driver to use the
-> dma_set_mask_and_coherent() API or they have below flexiblity too?
+> Ok
+> 
+> >> I'm OK with making regulator properties as optional, But still it would
+> >> change the meaning of what DT is, we know that the VDD/VDD_IO .. etc
+> >> pins are required properties (but still making them as optional) :-(
+> >> 
+> >> I think there might several devices where this situation may arise so
+> >> just thinking of a alternative solution.
+> >> 
+> >> say we have property 'software-regulator' which takes true/false(0/1)
+> >> If set to true we make the regulators as required property or else we
+> >> assume it is handled and ignore it ?
+> > 
+> > I don't think this is a good idea. You would have to add a similar
+> > platform data flag for non-dt, it doesn't sound right. I can see two
+> > options here:
+> > 
+> > 1. Make the regulator properties mandatory and, e.g. define a fixed
+> >    voltage GPIO regulator in DT with an empty 'gpio' property. Then
+> >    pass a phandle to that regulator in the adv7343 *-supply properties.
+> >    For non-dt similarly a fixed voltage regulator(s) and voltage
+> >    supplies  would need to be defined in the board files.
+> > 
+> > 2. Make the properties optional and use (devm_)regulator_get_optional()
+> >    calls in the driver (a recently added function). I must admit I don't
+> >    fully understand description of this function, it currently looks
+> >    pretty much same as (devm_)regulator_get(). Thus the driver would
+> >    need to be handling regulator supplies only when non ERR_PTR() is
+> >    returned from regulator_get_optional() and otherwise assume a non
+> >    critical error. There is already quite a few example occurrences of
+> >    regulator_get_optional() usage.
+> 
+> Thanks for pointing it I'll choose option 2 and post the patch.
 
-There's two issues here:
-1. dma_set_mask_and_coherent() will only work if dev->dma_mask points at
-   some storage for the mask.  This needs to have .dma_mask in the
-   platform_device_info initialised.
+Isn't regulator_get_optional() intended for devices that can have supplies 
+unconnected in normal use ? The ADV7343 supplies are mandatory from a hardware 
+point of view, so I think we should use regulator_get(). Otherwise the driver 
+won't be able to tell the difference between a regulator that isn't present 
+yet (for instance because the regulator device/driver hasn't been probed yet), 
+which should result in deferred probing, and an always-on regulator that has 
+been left out.
 
-2. Yes, this driver should also be calling the appropriate DMA mask setting
-   functions in addition to having the mask initialized at device creation
-   time.
-
-Here's a replacement patch, though maybe it would be better to roll all
-the additions of dma_set_mask_and_coherent() in drivers/dma into one
-patch?  In other words, combine the addition of this with these two
-patches:
-
-	dma: pl330: add dma_set_mask_and_coherent() call
-	dma: pl08x: add dma_set_mask_and_coherent() call
-
-8<=====
-From: Russell King <rmk+kernel@arm.linux.org.uk>
-Subject: [PATCH] DMA-API: dma: edma.c: no need to explicitly initialize DMA
- masks
-
-register_platform_device_full() can setup the DMA mask provided the
-appropriate member is set in struct platform_device_info.  So lets
-make that be the case.  This avoids a direct reference to the DMA
-masks by this driver.
-
-While here, add the dma_set_mask_and_coherent() call which the DMA API
-requires DMA-using drivers to call.
-
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- drivers/dma/edma.c |   10 ++++++----
- 1 files changed, 6 insertions(+), 4 deletions(-)
-
-diff --git a/drivers/dma/edma.c b/drivers/dma/edma.c
-index ff50ff4..fd5e48c 100644
---- a/drivers/dma/edma.c
-+++ b/drivers/dma/edma.c
-@@ -631,6 +631,10 @@ static int edma_probe(struct platform_device *pdev)
- 	struct edma_cc *ecc;
- 	int ret;
- 
-+	ret = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(32));
-+	if (ret)
-+		return ret;
-+
- 	ecc = devm_kzalloc(&pdev->dev, sizeof(*ecc), GFP_KERNEL);
- 	if (!ecc) {
- 		dev_err(&pdev->dev, "Can't allocate controller\n");
-@@ -702,11 +706,13 @@ static struct platform_device *pdev0, *pdev1;
- static const struct platform_device_info edma_dev_info0 = {
- 	.name = "edma-dma-engine",
- 	.id = 0,
-+	.dma_mask = DMA_BIT_MASK(32),
- };
- 
- static const struct platform_device_info edma_dev_info1 = {
- 	.name = "edma-dma-engine",
- 	.id = 1,
-+	.dma_mask = DMA_BIT_MASK(32),
- };
- 
- static int edma_init(void)
-@@ -720,8 +726,6 @@ static int edma_init(void)
- 			ret = PTR_ERR(pdev0);
- 			goto out;
- 		}
--		pdev0->dev.dma_mask = &pdev0->dev.coherent_dma_mask;
--		pdev0->dev.coherent_dma_mask = DMA_BIT_MASK(32);
- 	}
- 
- 	if (EDMA_CTLRS == 2) {
-@@ -731,8 +735,6 @@ static int edma_init(void)
- 			platform_device_unregister(pdev0);
- 			ret = PTR_ERR(pdev1);
- 		}
--		pdev1->dev.dma_mask = &pdev1->dev.coherent_dma_mask;
--		pdev1->dev.coherent_dma_mask = DMA_BIT_MASK(32);
- 	}
- 
- out:
 -- 
-1.7.4.4
+Regards,
+
+Laurent Pinchart
