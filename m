@@ -1,60 +1,159 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 24 Sep 2013 00:26:48 +0100
-Subject: [PATCH] ASoC: generic: Add generic DT based simple codec
-In-Reply-To: <5240B07C.6080404@wwwdotorg.org>
-References: <20130919105437.75e0f0a3@armhf>
- <5240B07C.6080404@wwwdotorg.org>
-Message-ID: <20130923232648.GL21013@sirena.org.uk>
+From: sre@debian.org (Sebastian Reichel)
+Date: Tue, 24 Sep 2013 01:46:56 +0200
+Subject: [RFCv2 3/3] ARM: dts: N900: Add SSI information
+In-Reply-To: <5240A617.1010208@wwwdotorg.org>
+References: <1379277856-24571-1-git-send-email-sre@debian.org>
+ <1379277856-24571-4-git-send-email-sre@debian.org>
+ <5240A617.1010208@wwwdotorg.org>
+Message-ID: <20130923234656.GB24781@earth.universe>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 23, 2013 at 03:19:56PM -0600, Stephen Warren wrote:
-> On 09/19/2013 02:54 AM, Jean-Francois Moine wrote:
+Hi,
 
+On Mon, Sep 23, 2013 at 02:35:35PM -0600, Stephen Warren wrote:
+> On 09/15/2013 02:44 PM, Sebastian Reichel wrote:
+> > Add SSI device tree data for OMAP34xx and Nokia N900.
+> 
+> What is an "SSI" device, ...
+
+Synchronous Serial Interface (SSI), which is an interface from
+the OMAP3 for modem connection. It's a legacy variant of
+High-speed Synchronous Serial Interface (HSI). This in turn
+is a standard from MIPI:
+
+http://www.mipi.org/specifications/high-speed-synchronous-serial-interface-hsi
+
+> 
+> > diff --git a/Documentation/devicetree/bindings/hsi/omap_ssi.txt b/Documentation/devicetree/bindings/hsi/omap_ssi.txt
+> 
+> ... and what is the "HSI" subsystem?
+
+A framework for HSI devices living in drivers/hsi.
+
+> > +OMAP SSI controller bindings
+> > +
 > > +Required properties:
-> > +- compatible: should be "linux,simple-codec".
+> > +- compatible:		Should be set to the following value
+> > +                        ti,omap3-ssi (applicable to OMAP34xx devices)
+> 
+> I think that'd be better phrased as:
+> 
+> 	Should include "ti,omap3-ssi".
+> 
+> The binding should not preclude other compatibel values being present
+> (e.g. a SoC-specific compatible value, to allow SoC-specific quirks to
+> be enabled later).
 
-> We shouldn't have any Linux-specific bindings. It might be reasonable to
-> define a binding for a "simple CODEC", but there's no reason it should
-> be Linux-specific.
+Right. Will be fixed in the next RFC.
 
-What's the vendor prefix to use then?  The same thought did occur to me
-but I wasn't sure what to suggest instead.
+> > +- ti,hwmods:		Name of the hwmod associated to the controller, which
+> > +			is "ssi".
+> 
+> I don't think we should add any more of that, for new bindings.
 
-> > +- dai-name: name of the codec
+That basically means not adding new drivers until hwmod is completly
+removed, since no new drivers not using DT are accepted anymore.
 
-> That should be internal to the driver; it's Linux-specific.
+hwmod still holds some information, which are not yet mapped to DT.
 
-I do think it's reasonable to define a name for display purposes however
-this binding doesn't say that, I did say something to that effect
-already IIRC.
+> > +- reg:			Contains SSI register address range (base address and
+> > +			length).
+> > +- reg-names:		Contains the names of the address ranges. It's
+> > +                        expected, that "sys" and "gdd" address ranges are
+> > +			provided.
+> 
+> Why two entries in reg-names but only one in reg?
+> 
+> I think it'd be better to write:
+> 
+> reg-names:	Contains the values "sys" and "gdd".
+> reg:		Contains a register specifier for each entry in
+> 		reg-names.
+> 
+> A similar re-ordering/-wording would apply to interrupts/interrupt-names.
 
-> > +Formats:
-> > +	"s8"
-> > +	"u8"
+OK. Will be fixed in the next RFC.
 
-> I think the binding should specify on-the-wire formats, not in-memory
-> formats. For example, if this binding is used to represent an I2S CODEC,
-> it's more important to know whether it supports left-justified,
-> right-justified, DSP mode, etc., and the max number of bits (or perhaps
-> a list of supported numbers of bits) per channel in each case.
+> > +- ranges		Required as an empty node
+> 
+> s/node/property/
+> 
+> Why must ranges be empty? As long as the content correctly represents
+> the bus setup, why does the content matter at all. How about:
+> 
+> ranges		Represents the bus address mapping between the main
+> 		controller node and the child nodes below.
 
-I didn't query this myself since my expecation with this is that the
-rest of the wire format properties will come from the binding that pulls
-this together into a card (since this will need to be set at that level
-for other CODECs which are more flexible) so I saw this as providing
-additional information which would normally not be fixed at that level.
-Arguably this could be pushed up there too, though it's not normal to
-fix the word size.
+OK. Will be fixed in the next RFC.
 
-We should really be defining things like signed and unsigned as well as
-the bits per word since they do make a difference, though in practice
-you very rarely see anything except unsigned and some of the formats
-listed don't seem to have ever even been used in Linux.
+> > +Each port is represented as a sub-node of the ti,omap3-ssi device.
+> > +
+> > +Required Port sub-node properties:
+> > +- compatible:		Should be set to the following value
+> > +                        ti,omap3-ssi-port (applicable to OMAP34xx devices)
+> 
+> Hmm. Is it really the case that there is 1 controller with n ports?
+
+Yes with n=2.
+
+> Are the ports really dependent upon some shared resource?
+
+Yes and runtime power management.
+
+> Couldn't the ports be represented as separate top-level SSI
+> controllers?
+
+Maybe with some phandles. The current layout is cleaner IMHO.
+The ports are part of the controller and actually most boards
+only use one of them.
+
+In the original driver only the controller hat platform data
+with memory areas called "port1_rx" etc.
+
+> > +- interrupts:		Contains the interrupt information for the port.
+> > +- interrupt-names:	Contains the names of the interrupts. It's expected,
+> > +			that "mpu_irq0" and "mpu_irq1" are provided.
+> 
+> What exactly are those interrupts? "MPU" sounds like an external
+> micro-controller/processor...
+> 
+> > +- ti,ssi-cawake-gpio:	Defines which GPIO pin is used to signify CAWAKE
+> > +			events for the port. This is an optional board-specific
+> > +			property. If it's missing the port will not be
+> > +			enabled.
+> 
+> That also sounds like something that's a higher-level protocol, rather
+> than whatever low-level transport "SSI" implements. Should this be part
+> of a child node that represents the device attached to the SSI controller?
+
+Both the interrupts and the cawake-gpio are used as irqs for
+starting data transfers. As far as I understand it none of
+them are specific to the attached device.
+
+NOTE: I do not have documentation for the chip. I just ported the
+old patch from Carlos Chinea (who developed the initial driver for
+Nokia) to the new kernel frameworks, since I want to use the
+modem of my Nokia N900.
+
+> Does the SSI controller (or its ports) not need any clocks, resets,
+> regulators, ...?
+
+The only other stuff needed is taken care of by hwmod, which can
+be seen in this patch:
+
+https://lkml.org/lkml/2013/9/15/97
+
+As far as I understand it, this kind of information is not yet
+supported by DT on OMAP boards. On the other hand new OMAP drivers
+are not allowed to add further board code, so temporarily the
+ti,hwmod hack must be used.
+
+-- Sebastian
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130924/72fe0e20/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130924/38525852/attachment-0001.sig>
