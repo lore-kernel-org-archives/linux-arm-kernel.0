@@ -1,39 +1,38 @@
 From: m.krawczuk@partner.samsung.com (Mateusz Krawczuk)
-Date: Mon, 23 Sep 2013 12:13:42 +0200
-Subject: [PATCH] DT: S5P: If detected device tree skip irq init
-Message-ID: <1379931222-29307-1-git-send-email-m.krawczuk@partner.samsung.com>
+Date: Mon, 23 Sep 2013 12:14:49 +0200
+Subject: [PATCH] DT: if dt is available don't use s3c_arch_init
+Message-ID: <1379931289-29384-1-git-send-email-m.krawczuk@partner.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It prevents from executing code already called by device tree.
+It prevents from executing platform code, when booting from device tree.
 
 Signed-off-by: Mateusz Krawczuk <m.krawczuk@partner.samsung.com>
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- arch/arm/plat-samsung/s5p-irq-eint.c | 4 ++++
- 1 file changed, 4 insertions(+)
+ arch/arm/plat-samsung/init.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/arch/arm/plat-samsung/s5p-irq-eint.c b/arch/arm/plat-samsung/s5p-irq-eint.c
-index faa6516..ebee4dc 100644
---- a/arch/arm/plat-samsung/s5p-irq-eint.c
-+++ b/arch/arm/plat-samsung/s5p-irq-eint.c
-@@ -16,6 +16,7 @@
- #include <linux/device.h>
- #include <linux/gpio.h>
- #include <linux/irqchip/arm-vic.h>
+diff --git a/arch/arm/plat-samsung/init.c b/arch/arm/plat-samsung/init.c
+index aa9511b..0ace02d 100644
+--- a/arch/arm/plat-samsung/init.c
++++ b/arch/arm/plat-samsung/init.c
+@@ -20,6 +20,7 @@
+ #include <linux/module.h>
+ #include <linux/interrupt.h>
+ #include <linux/ioport.h>
 +#include <linux/of.h>
- 
- #include <plat/regs-irqtype.h>
- 
-@@ -202,6 +203,9 @@ static int __init s5p_init_irq_eint(void)
+ #include <linux/serial_core.h>
+ #include <linux/platform_device.h>
+ #include <linux/of.h>
+@@ -152,6 +153,8 @@ static int __init s3c_arch_init(void)
  {
- 	int irq;
+ 	int ret;
  
 +	if (of_have_populated_dt())
-+		return -ENODEV;
-+
- 	for (irq = IRQ_EINT(0); irq <= IRQ_EINT(15); irq++)
- 		irq_set_chip(irq, &s5p_irq_vic_eint);
++		return 0;
+ 	// do the correct init for cpu
  
+ 	if (cpu == NULL) {
 -- 
 1.8.1.2
