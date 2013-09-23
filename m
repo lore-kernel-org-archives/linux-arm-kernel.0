@@ -1,476 +1,106 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 23 Sep 2013 17:38:55 +0200
-Subject: [PATCH v3] PWM: at91: add Atmel PWM controller driver
-In-Reply-To: <1379837101-2165-1-git-send-email-voice.shen@atmel.com>
-References: <1379837101-2165-1-git-send-email-voice.shen@atmel.com>
-Message-ID: <5240608F.4090900@atmel.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 23 Sep 2013 16:44:01 +0100
+Subject: [PATCH v3 1/4] ARM: KVM: Implement kvm_vcpu_preferred_target()
+ function
+In-Reply-To: <20130923153106.GD19043@lvm>
+References: <1379596302-21522-1-git-send-email-anup.patel@linaro.org>
+ <1379596302-21522-2-git-send-email-anup.patel@linaro.org>
+ <523B09EA.9050408@arm.com> <20130919192008.GL7623@lvm>
+ <CAAhSdy04eNBeVMtGR+GE_hsE66KG--wFyLU5szFXFeXehgzSaw@mail.gmail.com>
+ <20130923153106.GD19043@lvm>
+Message-ID: <524061C1.8080607@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22/09/2013 10:05, Bo Shen :
-> Add Atmel PWM controller driver based on PWM framework.
->
-> This is the basic function implementation of Atmel PWM controller.
-> It can work with PWM based led and backlight.
->
-> Signed-off-by: Bo Shen <voice.shen@atmel.com>
-> ---
-> Changes in v3:
->    - change compatible string from "atmel,sama5-pwm" to "atmel,sama5d3-pwm"
->    - Add PWM led example in binding documentation
->    - Using micro replace hard code
->
-> Changes in v2:
->    - Address the comments from Thierry Reding
->
->   .../devicetree/bindings/pwm/atmel-pwm.txt          |   41 +++
->   drivers/pwm/Kconfig                                |    9 +
->   drivers/pwm/Makefile                               |    1 +
->   drivers/pwm/pwm-atmel.c                            |  335 ++++++++++++++++++++
->   4 files changed, 386 insertions(+)
->   create mode 100644 Documentation/devicetree/bindings/pwm/atmel-pwm.txt
->   create mode 100644 drivers/pwm/pwm-atmel.c
->
-> diff --git a/Documentation/devicetree/bindings/pwm/atmel-pwm.txt b/Documentation/devicetree/bindings/pwm/atmel-pwm.txt
-> new file mode 100644
-> index 0000000..1c1a5fa
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/pwm/atmel-pwm.txt
-> @@ -0,0 +1,41 @@
-> +Atmel PWM controller
-> +
-> +Required properties:
-> +  - compatible: should be one of:
-> +    - "atmel,at91sam9rl-pwm"
-> +    - "atmel,sama5d3-pwm"
-> +  - reg: physical base address and length of the controller's registers
-> +  - #pwm-cells: Should be 3. See pwm.txt in this directory for a
-> +    description of the cells format
-> +
-> +Example:
-> +
-> +	pwm0: pwm at f8034000 {
-> +		compatible = "atmel,at91sam9rl-pwm";
-> +		reg = <0xf8034000 0x400>;
-> +		#pwm-cells = <3>;
-> +	};
-> +
-> +The following the pwm led based example:
-> +
-> +	pwm0: pwm at f8034000 {
-> +		compatible = "atmel,at91sam9rl-pwm";
-> +		reg = <0xf8034000 0x400>;
-> +		#pwm-cells = <3>;
-> +	};
-> +
-> +	pwdleds {
-> +		compatible = "pwm-leds";
-> +
-> +		d1 {
-> +			label = "d1";
-> +			pwms = <&pwm0 3 5000 0>
-> +			max-brightness = <255>;
-> +		};
-> +
-> +		d2 {
-> +			label = "d2";
-> +			pwms = <&pwm0 1 5000 1>
-> +			max-brightness = <255>;
-> +		};
-> +	};
-> diff --git a/drivers/pwm/Kconfig b/drivers/pwm/Kconfig
-> index 75840b5..54237b9 100644
-> --- a/drivers/pwm/Kconfig
-> +++ b/drivers/pwm/Kconfig
-> @@ -41,6 +41,15 @@ config PWM_AB8500
->   	  To compile this driver as a module, choose M here: the module
->   	  will be called pwm-ab8500.
->
-> +config PWM_ATMEL
-> +	tristate "Atmel PWM support"
-> +	depends on ARCH_AT91
-> +	help
-> +	  Generic PWM framework driver for Atmel SoC.
-> +
-> +	  To compile this driver as a module, choose M here: the module
-> +	  will be called pwm-atmel.
-> +
->   config PWM_ATMEL_TCB
->   	tristate "Atmel TC Block PWM support"
->   	depends on ATMEL_TCLIB && OF
-> diff --git a/drivers/pwm/Makefile b/drivers/pwm/Makefile
-> index 77a8c18..5b193f8 100644
-> --- a/drivers/pwm/Makefile
-> +++ b/drivers/pwm/Makefile
-> @@ -1,6 +1,7 @@
->   obj-$(CONFIG_PWM)		+= core.o
->   obj-$(CONFIG_PWM_SYSFS)		+= sysfs.o
->   obj-$(CONFIG_PWM_AB8500)	+= pwm-ab8500.o
-> +obj-$(CONFIG_PWM_ATMEL)		+= pwm-atmel.o
->   obj-$(CONFIG_PWM_ATMEL_TCB)	+= pwm-atmel-tcb.o
->   obj-$(CONFIG_PWM_BFIN)		+= pwm-bfin.o
->   obj-$(CONFIG_PWM_IMX)		+= pwm-imx.o
-> diff --git a/drivers/pwm/pwm-atmel.c b/drivers/pwm/pwm-atmel.c
-> new file mode 100644
-> index 0000000..9c86dfe
-> --- /dev/null
-> +++ b/drivers/pwm/pwm-atmel.c
-> @@ -0,0 +1,335 @@
-> +/*
-> + * Driver for Atmel Pulse Width Modulation Controller
-> + *
-> + * Copyright (C) 2013 Atmel Corporation
-> + *		 Bo Shen <voice.shen@atmel.com>
-> + *
-> + * Licensed under GPLv2.
-> + */
-> +
-> +#include <linux/clk.h>
-> +#include <linux/err.h>
-> +#include <linux/io.h>
-> +#include <linux/module.h>
-> +#include <linux/of.h>
-> +#include <linux/of_device.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/pwm.h>
-> +#include <linux/slab.h>
-> +
-> +/* The following is global registers for PWM controller */
-> +#define PWM_ENA			0x04
-> +#define PWM_DIS			0x08
-> +#define PWM_SR			0x0C
-> +/* bit field in SR */
-> +#define PWM_SR_ALL_CH_ON	0x0F
-> +
-> +/* The following register is PWM channel related registers */
-> +#define PWM_CH_REG_OFFSET	0x200
-> +
-> +#define PWM_CMR			0x0
-> +/* bit field in CMR */
-> +#define PWM_CMR_CPOL		(1 << 9)
-> +#define PWM_CMR_UPD_CDTY	(1 << 10)
-> +
-> +/* The following registers for PWM v1 */
-> +#define PWMv1_CDTY		0x04
-> +#define PWMv1_CPRD		0x08
-> +#define PWMv1_CUPD		0x10
-> +
-> +/* The following registers for PWM v2 */
-> +#define PWMv2_CDTY		0x04
-> +#define PWMv2_CDTYUPD		0x08
-> +#define PWMv2_CPRD		0x0C
-> +#define PWMv2_CPRDUPD		0x10
-> +
-> +/* max value for duty and period */
-> +/*
-> + * Although the duty and period register is 32 bit,
-> + * however only the LSB 16 bits are significant.
-> + */
-> +#define PWM_MAX_DTY		0xFFFF
-> +#define PWM_MAX_PRD		0xFFFF
-> +#define PRD_MAX_PRES		10
-> +
-> +struct atmel_pwm_chip {
-> +	struct pwm_chip chip;
-> +	struct clk *clk;
-> +	void __iomem *base;
-> +
-> +	void (*config)(struct pwm_chip *chip, struct pwm_device *pwm,
-> +		       int dty, int prd);
-> +};
-> +
-> +static inline struct atmel_pwm_chip *to_atmel_pwm_chip(struct pwm_chip *chip)
-> +{
-> +	return container_of(chip, struct atmel_pwm_chip, chip);
-> +}
-> +
-> +static inline u32 atmel_pwm_readl(struct atmel_pwm_chip *chip,
-> +				  unsigned long offset)
-> +{
-> +	return readl(chip->base + offset);
-> +}
-> +
-> +static inline void atmel_pwm_writel(struct atmel_pwm_chip *chip,
-> +				    unsigned long offset, unsigned long val)
-> +{
-> +	writel(val, chip->base + offset);
-> +}
-> +
-> +static inline u32 atmel_pwm_ch_readl(struct atmel_pwm_chip *chip,
-> +				     unsigned int ch, unsigned long offset)
-> +{
-> +	return readl(chip->base + PWM_CH_REG_OFFSET + ch * 0x20 + offset);
+On 23/09/13 16:31, Christoffer Dall wrote:
+> On Mon, Sep 23, 2013 at 01:35:20PM +0530, Anup Patel wrote:
+>> Hi Christoffer/Marc,
+>>
+>> On Fri, Sep 20, 2013 at 12:50 AM, Christoffer Dall
+>> <christoffer.dall@linaro.org> wrote:
+>>> On Thu, Sep 19, 2013 at 03:27:54PM +0100, Marc Zyngier wrote:
+>>>> On 19/09/13 14:11, Anup Patel wrote:
+>>>>> This patch implements kvm_vcpu_preferred_target() function for
+>>>>> KVM ARM which will help us implement KVM_ARM_PREFERRED_TARGET ioctl
+>>>>> for user space.
+>>>>>
+>>>>> Signed-off-by: Anup Patel <anup.patel@linaro.org>
+>>>>> Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
+>>>>> ---
+>>>>>  arch/arm/kvm/guest.c              |   20 ++++++++++++++++++++
+>>>>>  arch/arm64/include/asm/kvm_host.h |    1 +
+>>>>>  2 files changed, 21 insertions(+)
+>>>>>
+>>>>> diff --git a/arch/arm/kvm/guest.c b/arch/arm/kvm/guest.c
+>>>>> index 152d036..b407e6c 100644
+>>>>> --- a/arch/arm/kvm/guest.c
+>>>>> +++ b/arch/arm/kvm/guest.c
+>>>>> @@ -222,6 +222,26 @@ int kvm_vcpu_set_target(struct kvm_vcpu *vcpu,
+>>>>>     return kvm_reset_vcpu(vcpu);
+>>>>>  }
+>>>>>
+>>>>> +int kvm_vcpu_preferred_target(struct kvm_vcpu_init *init)
+>>>>> +{
+>>>>> +   int target = kvm_target_cpu();
+>>>>> +
+>>>>> +   if (target < 0)
+>>>>> +           return -ENODEV;
+>>>>> +
+>>>>> +   memset(init, 0, sizeof(*init));
+>>>>> +
+>>>>> +   /*
+>>>>> +    * For now, we return all optional features are available
+>>>>> +    * for preferred target. In future, we might have features
+>>>>> +    * available based on underlying host.
+>>>>> +    */
+>>>>> +   init->target = (__u32)target;
+>>>>> +   init->features[0] |= (1 << KVM_ARM_VCPU_POWER_OFF);
+>>>>
+>>>> I'm in two minds about this feature reporting. I see they serve a
+>>>> purpose, but they also duplicate capabilities, which is the standard way
+>>>> to advertise what KVM can do.
+>>>>
+>>>> It means we end up having to sync two reporting mechanism, and I feel
+>>>> this is in general a bad idea.
+>>>>
+>>>> Furthermore, KVM_ARM_VCPU_POWER_OFF is hardly a feature of the HW, but
+>>>> rather a firmware emulation thing.
+>>>>
+>>>> Peter, Christoffer: Thoughts?
+>>>>
+>>> I wanted to return the full kvm_vcpu_init instead of just a target int,
+>>> so we did not have to come up with yet another ioctl if we need to
+>>> return more information about the capabilities of the host CPU in the
+>>> future.
+>>>
+>>> But perhaps we can formulate the API, to say only the (currently empty)
+>>> following list of features can only be enabled if the corresponding bit
+>>> is enabled, or something along those lines.
+>>>
+>>> -Christoffer
+>>> _______________________________________________
+>>> kvmarm mailing list
+>>> kvmarm at lists.cs.columbia.edu
+>>> https://lists.cs.columbia.edu/cucslists/listinfo/kvmarm
+>>
+>> Do we stick with current implementation of returning struct kvm_vcpu_init ?
+>> OR
+>> Do we return struct kvm_vcpu_init with all features set to zero ?
+>>
+> Let's give Marc a day or two to respond to this one ;)
 
-Well, even for this 0x20 constant, if it makes senses, it could be good 
-to define it as well...
+Are you implying I'm getting slow? ;-)
 
+To answer Anup's question, I would tend to be cautious, and not expose
+things for which we already have another API in place. So far, we've
+stuck with the KVM approach of having a capability bit for each feature
+we enable, and I'm quite happy with that.
 
-> +}
-> +
-> +static inline void atmel_pwm_ch_writel(struct atmel_pwm_chip *chip,
-> +				       unsigned int ch, unsigned long offset,
-> +				       unsigned long val)
-> +{
-> +	writel(val, chip->base + PWM_CH_REG_OFFSET + ch * 0x20 + offset);
+So I'm in favour of Christoffer's proposal to return an empty feature
+set, and start adding stuff if/when the need arises.
 
-Ditto.
+Cheers,
 
-> +}
-> +
-> +static int atmel_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
-> +		int duty_ns, int period_ns)
-> +{
-> +	struct atmel_pwm_chip *atmel_pwm = to_atmel_pwm_chip(chip);
-> +	unsigned long clk_rate, prd, dty;
-> +	unsigned long long val, div;
-> +	int ret, pres = 0;
-> +
-> +	clk_rate = clk_get_rate(atmel_pwm->clk);
-> +	div = clk_rate;
-> +
-> +	/* Calculate the period cycles */
-> +	while (div > PWM_MAX_PRD) {
-> +		div = clk_rate / (1 << pres);
-> +		div = div * period_ns;
-> +		/* 1/Hz = 100000000 ns */
-> +		do_div(div, 1000000000);
-> +
-> +		if (pres++ > PRD_MAX_PRES) {
-> +			pr_err("PRES is bigger than maximum pre-scaler\n");
-> +			return -EINVAL;
-> +		}
-> +	}
-> +
-> +	/* Calculate the duty cycles */
-> +	prd = div;
-> +	div *= duty_ns;
-> +	do_div(div, period_ns);
-> +	dty = div;
-> +
-> +	ret = clk_enable(atmel_pwm->clk);
-> +	if (ret) {
-> +		pr_err("Failed to enable pwm clock\n");
-> +		return ret;
-> +	}
-> +
-> +	atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWM_CMR, pres);
-> +	atmel_pwm->config(chip, pwm, dty, prd);
-> +
-> +	/* Check whether need to disable clock */
-> +	val = atmel_pwm_readl(atmel_pwm, PWM_SR);
-> +	if ((val & PWM_SR_ALL_CH_ON) == 0)
-> +		clk_disable(atmel_pwm->clk);
-> +
-> +	return 0;
-> +}
-> +
-> +static void atmel_pwm_config_v1(struct pwm_chip *chip, struct pwm_device *pwm,
-> +				int dty, int prd)
-> +{
-> +	struct atmel_pwm_chip *atmel_pwm = to_atmel_pwm_chip(chip);
-> +	unsigned int val;
-> +
-> +	/*
-> +	 * If the PWM channel is disabled, write value to duty and period
-> +	 * registers directly.
-> +	 * If the PWM channel is enabled, using the update register, it needs
-> +	 * to set bit 10 of CMR to 0
-> +	 */
-> +	if (test_bit(PWMF_ENABLED, &pwm->flags)) {
-> +		atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWMv1_CUPD, dty);
-> +
-> +		val = atmel_pwm_ch_readl(atmel_pwm, pwm->hwpwm, PWM_CMR);
-> +		val &= ~PWM_CMR_UPD_CDTY;
-> +		atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWM_CMR, val);
-> +	} else {
-> +		atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWMv1_CDTY, dty);
-> +		atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWMv1_CPRD, prd);
-> +	}
-> +}
-> +
-> +static void atmel_pwm_config_v2(struct pwm_chip *chip, struct pwm_device *pwm,
-> +				int dty, int prd)
-> +{
-> +	struct atmel_pwm_chip *atmel_pwm = to_atmel_pwm_chip(chip);
-> +
-> +	/*
-> +	 * If the PWM channel is disabled, write value to duty and period
-> +	 * registers directly.
-> +	 * If the PWM channel is enabled, using the duty update register to
-> +	 * update the value.
-> +	 */
-> +	if (test_bit(PWMF_ENABLED, &pwm->flags)) {
-> +		atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWMv2_CDTYUPD, dty);
-> +	} else {
-> +		atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWMv2_CDTY, dty);
-> +		atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWMv2_CPRD, prd);
-> +	}
-> +}
-> +
-> +static int atmel_pwm_set_polarity(struct pwm_chip *chip, struct pwm_device *pwm,
-> +		enum pwm_polarity polarity)
-> +{
-> +	struct atmel_pwm_chip *atmel_pwm = to_atmel_pwm_chip(chip);
-> +	u32 val = 0;
-> +	int ret;
-> +
-> +	ret = clk_enable(atmel_pwm->clk);
-> +	if (ret) {
-> +		pr_err("failed to enable pwm clock\n");
-> +		return ret;
-> +	}
-> +
-> +	if (polarity == PWM_POLARITY_NORMAL)
-> +		val &= ~PWM_CMR_CPOL;
-> +	else
-> +		val |= PWM_CMR_CPOL;
-> +
-> +	atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWM_CMR, val);
-> +
-> +	clk_disable(atmel_pwm->clk);
-> +
-> +	return 0;
-> +}
-> +
-> +static int atmel_pwm_enable(struct pwm_chip *chip, struct pwm_device *pwm)
-> +{
-> +	struct atmel_pwm_chip *atmel_pwm = to_atmel_pwm_chip(chip);
-> +
-> +	clk_prepare_enable(atmel_pwm->clk);
-
-I am not sure that "prepare" is needed here as it is done in probe 
-function. Please check.
-
-Anyway, whichever the function is, the return code shall be tested.
-
-> +
-> +	atmel_pwm_writel(atmel_pwm, PWM_ENA, 1 << pwm->hwpwm);
-> +
-> +	return 0;
-> +}
-> +
-> +static void atmel_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
-> +{
-> +	struct atmel_pwm_chip *atmel_pwm = to_atmel_pwm_chip(chip);
-> +	u32 val;
-> +
-> +	atmel_pwm_writel(atmel_pwm, PWM_DIS, 1 << pwm->hwpwm);
-> +
-> +	val = atmel_pwm_readl(atmel_pwm, PWM_SR);
-> +	if ((val & PWM_SR_ALL_CH_ON) == 0)
-> +		clk_disable(atmel_pwm->clk);
-> +}
-> +
-> +static const struct pwm_ops atmel_pwm_ops = {
-> +	.config = atmel_pwm_config,
-> +	.set_polarity = atmel_pwm_set_polarity,
-> +	.enable = atmel_pwm_enable,
-> +	.disable = atmel_pwm_disable,
-> +	.owner = THIS_MODULE,
-> +};
-> +
-> +struct atmel_pwm_data {
-> +	void (*config)(struct pwm_chip *chip, struct pwm_device *pwm,
-> +		       int dty, int prd);
-> +};
-> +
-> +static const struct atmel_pwm_data atmel_pwm_data_v1 = {
-> +	.config = atmel_pwm_config_v1,
-> +};
-> +
-> +static const struct atmel_pwm_data atmel_pwm_data_v2 = {
-> +	.config = atmel_pwm_config_v2,
-> +};
-> +
-> +#ifdef CONFIG_OF
-> +static const struct of_device_id atmel_pwm_dt_ids[] = {
-> +	{
-> +		.compatible = "atmel,at91sam9rl-pwm",
-> +		.data = &atmel_pwm_data_v1,
-> +	}, {
-> +		.compatible = "atmel,sama5d3-pwm",
-> +		.data = &atmel_pwm_data_v2,
-> +	}, {
-> +		/* sentinel */
-> +	},
-> +};
-> +MODULE_DEVICE_TABLE(of, atmel_pwm_dt_ids);
-> +#endif
-> +
-> +static int atmel_pwm_probe(struct platform_device *pdev)
-> +{
-> +	const struct of_device_id *of_id =
-> +		of_match_device(atmel_pwm_dt_ids, &pdev->dev);
-> +	const struct atmel_pwm_data *data;
-> +	struct atmel_pwm_chip *atmel_pwm;
-> +	struct resource *res;
-> +	int ret;
-> +
-> +	atmel_pwm = devm_kzalloc(&pdev->dev, sizeof(*atmel_pwm), GFP_KERNEL);
-> +	if (!atmel_pwm)
-> +		return -ENOMEM;
-> +
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	if (!res)
-> +		return -ENODEV;
-> +
-> +	atmel_pwm->base = devm_ioremap_resource(&pdev->dev, res);
-> +
-> +	atmel_pwm->clk = devm_clk_get(&pdev->dev, NULL);
-> +	if (IS_ERR(atmel_pwm->clk))
-> +		return PTR_ERR(atmel_pwm->clk);
-> +	clk_prepare(atmel_pwm->clk);
-
-I think that clk_prepare() can fail and return an error code: please 
-check this (even if on at91 it can't fail for the moment).
-
-> +
-> +	atmel_pwm->chip.dev = &pdev->dev;
-> +	atmel_pwm->chip.ops = &atmel_pwm_ops;
-> +	atmel_pwm->chip.of_xlate = of_pwm_xlate_with_flags;
-> +	atmel_pwm->chip.of_pwm_n_cells = 3;
-> +	atmel_pwm->chip.base = -1;
-> +	atmel_pwm->chip.npwm = 4;
-> +
-> +	data = of_id->data;
-> +	atmel_pwm->config = data->config;
-> +
-> +	ret = pwmchip_add(&atmel_pwm->chip);
-> +	if (ret < 0) {
-> +		dev_err(&pdev->dev, "failed to add pwm chip %d\n", ret);
-> +		return ret;
-> +	}
-> +
-> +	platform_set_drvdata(pdev, atmel_pwm);
-> +
-> +	return 0;
-> +}
-> +
-> +static int atmel_pwm_remove(struct platform_device *pdev)
-> +{
-> +	struct atmel_pwm_chip *atmel_pwm = platform_get_drvdata(pdev);
-> +
-> +	clk_unprepare(atmel_pwm->clk);
-> +
-> +	return pwmchip_remove(&atmel_pwm->chip);
-> +}
-> +
-> +static struct platform_driver atmel_pwm_driver = {
-> +	.driver = {
-> +		.name = "atmel-pwm",
-> +		.of_match_table = of_match_ptr(atmel_pwm_dt_ids),
-> +	},
-> +	.probe = atmel_pwm_probe,
-> +	.remove = atmel_pwm_remove,
-> +};
-> +module_platform_driver(atmel_pwm_driver);
-> +
-> +MODULE_ALIAS("platform:atmel-pwm");
-> +MODULE_AUTHOR("Bo Shen <voice.shen@atmel.com>");
-> +MODULE_DESCRIPTION("Atmel PWM driver");
-> +MODULE_LICENSE("GPL v2");
->
-
-
+	M.
 -- 
-Nicolas Ferre
+Jazz is not dead. It just smells funny...
