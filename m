@@ -1,57 +1,19 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Mon, 23 Sep 2013 18:13:10 +0200
-Subject: [PATCH] video: mmp: drop needless devm cleanup
-In-Reply-To: <1379951159-8294-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1379951159-8294-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <1379952790-13202-1-git-send-email-u.kleine-koenig@pengutronix.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 23 Sep 2013 17:06:40 +0100
+Subject: [PATCH v3 1/2] video: ARM CLCD: Add DT support
+In-Reply-To: <52406646.709@wwwdotorg.org>
+References: <1379351934-25415-1-git-send-email-pawel.moll@arm.com>
+ <52376180.1090001@wwwdotorg.org> <1379435799.9205.16.camel@hornet>
+ <5238CBE9.2060800@wwwdotorg.org> <1379522363.9244.12.camel@hornet>
+ <52406646.709@wwwdotorg.org>
+Message-ID: <20130923160640.GT12758@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The nice thing about devm_* is that the driver doesn't need to free the
-resources but the driver core takes care about that. This also
-simplifies the error path quite a bit and removes the wrong check for a
-clock pointer being NULL.
+On Mon, Sep 23, 2013 at 10:03:18AM -0600, Stephen Warren wrote:
+> It sounds like you could just put LCDControl & 0x2e in the DT rather
+> than using values such as 0x100..0x107, which don't appear to match the
+> register format you mentioned above.
 
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
- drivers/video/mmp/hw/mmp_ctrl.c | 17 ++---------------
- 1 file changed, 2 insertions(+), 15 deletions(-)
-
-diff --git a/drivers/video/mmp/hw/mmp_ctrl.c b/drivers/video/mmp/hw/mmp_ctrl.c
-index 75dca19..6ac7552 100644
---- a/drivers/video/mmp/hw/mmp_ctrl.c
-+++ b/drivers/video/mmp/hw/mmp_ctrl.c
-@@ -514,7 +514,7 @@ static int mmphw_probe(struct platform_device *pdev)
- 	if (IS_ERR(ctrl->clk)) {
- 		dev_err(ctrl->dev, "unable to get clk %s\n", mi->clk_name);
- 		ret = -ENOENT;
--		goto failed_get_clk;
-+		goto failed;
- 	}
- 	clk_prepare_enable(ctrl->clk);
- 
-@@ -551,21 +551,8 @@ failed_path_init:
- 		path_deinit(path_plat);
- 	}
- 
--	if (ctrl->clk) {
--		devm_clk_put(ctrl->dev, ctrl->clk);
--		clk_disable_unprepare(ctrl->clk);
--	}
--failed_get_clk:
--	devm_free_irq(ctrl->dev, ctrl->irq, ctrl);
-+	clk_disable_unprepare(ctrl->clk);
- failed:
--	if (ctrl) {
--		if (ctrl->reg_base)
--			devm_iounmap(ctrl->dev, ctrl->reg_base);
--		devm_release_mem_region(ctrl->dev, res->start,
--				resource_size(res));
--		devm_kfree(ctrl->dev, ctrl);
--	}
--
- 	dev_err(&pdev->dev, "device init failed\n");
- 
- 	return ret;
--- 
-1.8.4.rc3
+No.  Platforms which route the outputs to something like VGA or HDMI can
+change the framebuffer format.  Your suggestions is far too restrictive.
