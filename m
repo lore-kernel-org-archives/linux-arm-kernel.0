@@ -1,14 +1,15 @@
 From: jbe@pengutronix.de (Juergen Beisert)
-Date: Mon, 23 Sep 2013 16:36:37 +0200
-Subject: [PATCH 8/9] Staging/iio/adc/touchscreen/MXS: provide devicetree
- adaption
+Date: Mon, 23 Sep 2013 16:36:32 +0200
+Subject: [PATCH 3/9] Staging/iio/adc/touchscreen/MXS: separate i.MX28 specific
+ register bits
 In-Reply-To: <1379946998-23041-1-git-send-email-jbe@pengutronix.de>
 References: <1379946998-23041-1-git-send-email-jbe@pengutronix.de>
-Message-ID: <1379946998-23041-9-git-send-email-jbe@pengutronix.de>
+Message-ID: <1379946998-23041-4-git-send-email-jbe@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is an RFC for the new touchscreen properties.
+In order to support i.MX23 and i.MX28 within one driver we need to separate the
+register definitions which differ in both SoC variants.
 
 Signed-off-by: Juergen Beisert <jbe@pengutronix.de>
 CC: linux-arm-kernel at lists.infradead.org
@@ -17,169 +18,187 @@ CC: devel at driverdev.osuosl.org
 CC: Marek Vasut <marex@denx.de>
 CC: Fabio Estevam <fabio.estevam@freescale.com>
 CC: Jonathan Cameron <jic23@cam.ac.uk>
-CC: devicetree at vger.kernel.org
 ---
- .../bindings/staging/iio/adc/mxs-lradc.txt         | 36 ++++++++++++--
- arch/arm/boot/dts/imx28-evk.dts                    |  4 ++
- drivers/staging/iio/adc/mxs-lradc.c                | 57 ++++++++++++++--------
- 3 files changed, 71 insertions(+), 26 deletions(-)
+ drivers/staging/iio/adc/mxs-lradc.c | 61 ++++++++++++++++++++-----------------
+ 1 file changed, 33 insertions(+), 28 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/staging/iio/adc/mxs-lradc.txt b/Documentation/devicetree/bindings/staging/iio/adc/mxs-lradc.txt
-index 4688205..ee05dc3 100644
---- a/Documentation/devicetree/bindings/staging/iio/adc/mxs-lradc.txt
-+++ b/Documentation/devicetree/bindings/staging/iio/adc/mxs-lradc.txt
-@@ -1,7 +1,8 @@
- * Freescale i.MX28 LRADC device driver
- 
- Required properties:
--- compatible: Should be "fsl,imx28-lradc"
-+- compatible: Should be "fsl,imx23-lradc" for i.MX23 SoC and "fsl,imx28-lradc"
-+              for i.MX28 SoC
- - reg: Address and length of the register set for the device
- - interrupts: Should contain the LRADC interrupts
- 
-@@ -9,13 +10,38 @@ Optional properties:
- - fsl,lradc-touchscreen-wires: Number of wires used to connect the touchscreen
-                                to LRADC. Valid value is either 4 or 5. If this
-                                property is not present, then the touchscreen is
--                               disabled.
-+                               disabled. 5 wires is valid for i.MX28 SoC only.
-+- fsl,ave-ctrl: number of samples per direction to calculate an average value.
-+                Allowed value is 1 ... 31, default is 4
-+- fsl,ave-delay: delay between consecutive samples. Allowed value is
-+                 1 ... 2047. It is used if 'fsl,ave-ctrl' > 1, counts at
-+                 2 kHz and its default is 2 (= 1 ms)
-+- fsl,settling: delay between plate switch to next sample. Allowed value is
-+                1 ... 2047. It counts at 2 kHz and its default is
-+                10 (= 5 ms)
- 
--Examples:
-+Example for i.MX23 SoC:
-+
-+	lradc at 80050000 {
-+		compatible = "fsl,imx23-lradc";
-+		reg = <0x80050000 0x2000>;
-+		interrupts = <36 37 38 39 40 41 42 43 44>;
-+		status = "okay";
-+		fsl,lradc-touchscreen-wires = <4>;
-+		fsl,ave-ctrl = <4>;
-+		fsl,ave-delay = <2>;
-+		fsl,settling = <10>;
-+	};
-+
-+Example for i.MX28 SoC:
- 
- 	lradc at 80050000 {
- 		compatible = "fsl,imx28-lradc";
- 		reg = <0x80050000 0x2000>;
--		interrupts = <10 14 15 16 17 18 19
--				20 21 22 23 24 25>;
-+		interrupts = <10 14 15 16 17 18 19 20 21 22 23 24 25>;
-+		status = "okay";
-+		fsl,lradc-touchscreen-wires = <5>;
-+		fsl,ave-ctrl = <4>;
-+		fsl,ave-delay = <2>;
-+		fsl,settling = <10>;
- 	};
-diff --git a/arch/arm/boot/dts/imx28-evk.dts b/arch/arm/boot/dts/imx28-evk.dts
-index 15715d9..aa33393 100644
---- a/arch/arm/boot/dts/imx28-evk.dts
-+++ b/arch/arm/boot/dts/imx28-evk.dts
-@@ -183,6 +183,10 @@
- 
- 			lradc at 80050000 {
- 				status = "okay";
-+				fsl,lradc-touchscreen-wires = <4>;
-+				fsl,ave-ctrl = <4>;
-+				fsl,ave-delay = <2>;
-+				fsl,settling = <10>;
- 			};
- 
- 			i2c0: i2c at 80058000 {
 diff --git a/drivers/staging/iio/adc/mxs-lradc.c b/drivers/staging/iio/adc/mxs-lradc.c
-index aa1f337..dbc0af6 100644
+index 3abc91f..f2fb10a 100644
 --- a/drivers/staging/iio/adc/mxs-lradc.c
 +++ b/drivers/staging/iio/adc/mxs-lradc.c
-@@ -1230,10 +1230,45 @@ MODULE_DEVICE_TABLE(of, mxs_lradc_dt_ids);
- static int mxs_lradc_probe_touchscreen(struct mxs_lradc *lradc,
- 						struct device_node *lradc_node)
- {
--	/* TODO retrieve from device tree */
-+	int ret;
-+	u32 ts_wires = 0, adapt;
-+
-+	ret = of_property_read_u32(lradc_node, "fsl,lradc-touchscreen-wires",
-+				&ts_wires);
-+	if (ret)
-+		return -ENODEV; /* touchscreen feature disabled */
-+
-+	switch (ts_wires) {
-+	case 4:
-+		lradc->use_touchscreen = MXS_LRADC_TOUCHSCREEN_4WIRE;
-+		break;
-+	case 5:
-+		if (lradc->soc == IMX28_LRADC) {
-+			lradc->use_touchscreen = MXS_LRADC_TOUCHSCREEN_5WIRE;
-+			break;
-+		}
-+		/* fall through an error message for i.MX23 */
-+	default:
-+		dev_err(lradc->dev,
-+			"Unsupported number of touchscreen wires (%d)\n",
-+			ts_wires);
-+		return -EINVAL;
-+	}
-+
- 	lradc->over_sample_cnt = 4;
-+	ret = of_property_read_u32(lradc_node, "fsl,ave-ctrl", &adapt);
-+	if (ret == 0)
-+		lradc->over_sample_cnt = adapt;
-+
- 	lradc->over_sample_delay = 2;
-+	ret = of_property_read_u32(lradc_node, "fsl,ave-delay", &adapt);
-+	if (ret == 0)
-+		lradc->over_sample_delay = adapt;
-+
- 	lradc->settling_delay = 10;
-+	ret = of_property_read_u32(lradc_node, "fsl,settling", &adapt);
-+	if (ret == 0)
-+		lradc->settling_delay = adapt;
+@@ -182,24 +182,29 @@ struct mxs_lradc {
+ };
  
- 	return 0;
+ #define	LRADC_CTRL0				0x00
+-#define	LRADC_CTRL0_TOUCH_DETECT_ENABLE		(1 << 23)
+-#define	LRADC_CTRL0_TOUCH_SCREEN_TYPE		(1 << 22)
+-#define	LRADC_CTRL0_YNNSW	/* YM */	(1 << 21)
+-#define	LRADC_CTRL0_YPNSW	/* YP */	(1 << 20)
+-#define	LRADC_CTRL0_YPPSW	/* YP */	(1 << 19)
+-#define	LRADC_CTRL0_XNNSW	/* XM */	(1 << 18)
+-#define	LRADC_CTRL0_XNPSW	/* XM */	(1 << 17)
+-#define	LRADC_CTRL0_XPPSW	/* XP */	(1 << 16)
+-#define	LRADC_CTRL0_PLATE_MASK			(0x3f << 16)
++# define LRADC_CTRL0_MX28_TOUCH_DETECT_ENABLE	(1 << 23)
++# define LRADC_CTRL0_MX28_TOUCH_SCREEN_TYPE	(1 << 22)
++# define LRADC_CTRL0_MX28_YNNSW	/* YM */	(1 << 21)
++# define LRADC_CTRL0_MX28_YPNSW	/* YP */	(1 << 20)
++# define LRADC_CTRL0_MX28_YPPSW	/* YP */	(1 << 19)
++# define LRADC_CTRL0_MX28_XNNSW	/* XM */	(1 << 18)
++# define LRADC_CTRL0_MX28_XNPSW	/* XM */	(1 << 17)
++# define LRADC_CTRL0_MX28_XPPSW	/* XP */	(1 << 16)
++
++# define LRADC_CTRL0_MX28_PLATE_MASK \
++		(LRADC_CTRL0_MX28_TOUCH_DETECT_ENABLE | \
++		LRADC_CTRL0_MX28_YNNSW | LRADC_CTRL0_MX28_YPNSW | \
++		LRADC_CTRL0_MX28_YPPSW | LRADC_CTRL0_MX28_XNNSW | \
++		LRADC_CTRL0_MX28_XNPSW | LRADC_CTRL0_MX28_XPPSW)
+ 
+ #define	LRADC_CTRL1				0x10
+ #define	LRADC_CTRL1_TOUCH_DETECT_IRQ_EN		(1 << 24)
+ #define	LRADC_CTRL1_LRADC_IRQ_EN(n)		(1 << ((n) + 16))
+-#define	LRADC_CTRL1_LRADC_IRQ_EN_MASK		(0x1fff << 16)
++#define	LRADC_CTRL1_MX28_LRADC_IRQ_EN_MASK	(0x1fff << 16)
+ #define	LRADC_CTRL1_LRADC_IRQ_EN_OFFSET		16
+ #define	LRADC_CTRL1_TOUCH_DETECT_IRQ		(1 << 8)
+ #define	LRADC_CTRL1_LRADC_IRQ(n)		(1 << (n))
+-#define	LRADC_CTRL1_LRADC_IRQ_MASK		0x1fff
++#define	LRADC_CTRL1_MX28_LRADC_IRQ_MASK		0x1fff
+ #define	LRADC_CTRL1_LRADC_IRQ_OFFSET		0
+ 
+ #define	LRADC_CTRL2				0x20
+@@ -267,7 +272,7 @@ static int mxs_lradc_read_raw(struct iio_dev *iio_dev,
+ 	 * Virtual channel 0 is always used here as the others are always not
+ 	 * used if doing raw sampling.
+ 	 */
+-	writel(LRADC_CTRL1_LRADC_IRQ_EN_MASK,
++	writel(LRADC_CTRL1_MX28_LRADC_IRQ_EN_MASK,
+ 		lradc->base + LRADC_CTRL1 + STMP_OFFSET_REG_CLR);
+ 	writel(0xff, lradc->base + LRADC_CTRL0 + STMP_OFFSET_REG_CLR);
+ 
+@@ -322,9 +327,9 @@ static int mxs_lradc_ts_touched(struct mxs_lradc *lradc)
+ 	uint32_t reg;
+ 
+ 	/* Enable touch detection. */
+-	writel(LRADC_CTRL0_PLATE_MASK,
++	writel(LRADC_CTRL0_MX28_PLATE_MASK,
+ 		lradc->base + LRADC_CTRL0 + STMP_OFFSET_REG_CLR);
+-	writel(LRADC_CTRL0_TOUCH_DETECT_ENABLE,
++	writel(LRADC_CTRL0_MX28_TOUCH_DETECT_ENABLE,
+ 		lradc->base + LRADC_CTRL0 + STMP_OFFSET_REG_SET);
+ 
+ 	msleep(LRADC_TS_SAMPLE_DELAY_MS);
+@@ -370,21 +375,21 @@ static int32_t mxs_lradc_ts_sample(struct mxs_lradc *lradc,
+ 	 */
+ 	switch (plate) {
+ 	case LRADC_SAMPLE_X:
+-		ctrl0 = LRADC_CTRL0_XPPSW | LRADC_CTRL0_XNNSW;
++		ctrl0 = LRADC_CTRL0_MX28_XPPSW | LRADC_CTRL0_MX28_XNNSW;
+ 		chan = 3;
+ 		break;
+ 	case LRADC_SAMPLE_Y:
+-		ctrl0 = LRADC_CTRL0_YPPSW | LRADC_CTRL0_YNNSW;
++		ctrl0 = LRADC_CTRL0_MX28_YPPSW | LRADC_CTRL0_MX28_YNNSW;
+ 		chan = 4;
+ 		break;
+ 	case LRADC_SAMPLE_PRESSURE:
+-		ctrl0 = LRADC_CTRL0_YPPSW | LRADC_CTRL0_XNNSW;
++		ctrl0 = LRADC_CTRL0_MX28_YPPSW | LRADC_CTRL0_MX28_XNNSW;
+ 		chan = 5;
+ 		break;
+ 	}
+ 
+ 	if (change) {
+-		writel(LRADC_CTRL0_PLATE_MASK,
++		writel(LRADC_CTRL0_MX28_PLATE_MASK,
+ 			lradc->base + LRADC_CTRL0 + STMP_OFFSET_REG_CLR);
+ 		writel(ctrl0, lradc->base + LRADC_CTRL0 + STMP_OFFSET_REG_SET);
+ 
+@@ -445,7 +450,7 @@ static void mxs_lradc_ts_work(struct work_struct *ts_work)
+ 
+ 	while (mxs_lradc_ts_touched(lradc)) {
+ 		/* Disable touch detector so we can sample the touchscreen. */
+-		writel(LRADC_CTRL0_TOUCH_DETECT_ENABLE,
++		writel(LRADC_CTRL0_MX28_TOUCH_DETECT_ENABLE,
+ 			lradc->base + LRADC_CTRL0 + STMP_OFFSET_REG_CLR);
+ 
+ 		if (likely(valid)) {
+@@ -494,7 +499,7 @@ static int mxs_lradc_ts_open(struct input_dev *dev)
+ 	lradc->stop_touchscreen = false;
+ 
+ 	/* Enable the touch-detect circuitry. */
+-	writel(LRADC_CTRL0_TOUCH_DETECT_ENABLE,
++	writel(LRADC_CTRL0_MX28_TOUCH_DETECT_ENABLE,
+ 		lradc->base + LRADC_CTRL0 + STMP_OFFSET_REG_SET);
+ 
+ 	/* Enable the touch-detect IRQ. */
+@@ -520,7 +525,7 @@ static void mxs_lradc_ts_close(struct input_dev *dev)
+ 		lradc->base + LRADC_CTRL1 + STMP_OFFSET_REG_CLR);
+ 
+ 	/* Power-down touchscreen touch-detect circuitry. */
+-	writel(LRADC_CTRL0_TOUCH_DETECT_ENABLE,
++	writel(LRADC_CTRL0_MX28_TOUCH_DETECT_ENABLE,
+ 		lradc->base + LRADC_CTRL0 + STMP_OFFSET_REG_CLR);
  }
-@@ -1249,7 +1284,6 @@ static int mxs_lradc_probe(struct platform_device *pdev)
- 	struct mxs_lradc *lradc;
- 	struct iio_dev *iio;
- 	struct resource *iores;
--	uint32_t ts_wires = 0;
- 	int ret = 0, touch_ret;
+ 
+@@ -584,7 +589,7 @@ static irqreturn_t mxs_lradc_handle_irq(int irq, void *data)
+ 		LRADC_CTRL1_TOUCH_DETECT_IRQ_EN |
+ 		LRADC_CTRL1_TOUCH_DETECT_IRQ;
+ 
+-	if (!(reg & LRADC_CTRL1_LRADC_IRQ_MASK))
++	if (!(reg & LRADC_CTRL1_MX28_LRADC_IRQ_MASK))
+ 		return IRQ_NONE;
+ 
+ 	/*
+@@ -604,7 +609,7 @@ static irqreturn_t mxs_lradc_handle_irq(int irq, void *data)
+ 	else if (reg & LRADC_CTRL1_LRADC_IRQ(0))
+ 		complete(&lradc->completion);
+ 
+-	writel(reg & LRADC_CTRL1_LRADC_IRQ_MASK,
++	writel(reg & LRADC_CTRL1_MX28_LRADC_IRQ_MASK,
+ 		lradc->base + LRADC_CTRL1 + STMP_OFFSET_REG_CLR);
+ 
+ 	return IRQ_HANDLED;
+@@ -725,7 +730,7 @@ static int mxs_lradc_buffer_preenable(struct iio_dev *iio)
+ 	if (ret < 0)
+ 		goto err_buf;
+ 
+-	writel(LRADC_CTRL1_LRADC_IRQ_EN_MASK,
++	writel(LRADC_CTRL1_MX28_LRADC_IRQ_EN_MASK,
+ 		lradc->base + LRADC_CTRL1 + STMP_OFFSET_REG_CLR);
+ 	writel(0xff, lradc->base + LRADC_CTRL0 + STMP_OFFSET_REG_CLR);
+ 
+@@ -766,7 +771,7 @@ static int mxs_lradc_buffer_postdisable(struct iio_dev *iio)
+ 		lradc->base + LRADC_DELAY(0) + STMP_OFFSET_REG_CLR);
+ 
+ 	writel(0xff, lradc->base + LRADC_CTRL0 + STMP_OFFSET_REG_CLR);
+-	writel(LRADC_CTRL1_LRADC_IRQ_EN_MASK,
++	writel(LRADC_CTRL1_MX28_LRADC_IRQ_EN_MASK,
+ 		lradc->base + LRADC_CTRL1 + STMP_OFFSET_REG_CLR);
+ 
+ 	kfree(lradc->buffer);
+@@ -870,11 +875,11 @@ static int mxs_lradc_hw_init(struct mxs_lradc *lradc)
+ 	writel(0, lradc->base + LRADC_DELAY(3));
+ 
+ 	/* Configure the touchscreen type */
+-	writel(LRADC_CTRL0_TOUCH_SCREEN_TYPE,
++	writel(LRADC_CTRL0_MX28_TOUCH_SCREEN_TYPE,
+ 		lradc->base + LRADC_CTRL0 + STMP_OFFSET_REG_CLR);
+ 
+ 	if (lradc->use_touchscreen == MXS_LRADC_TOUCHSCREEN_5WIRE) {
+-		writel(LRADC_CTRL0_TOUCH_SCREEN_TYPE,
++		writel(LRADC_CTRL0_MX28_TOUCH_SCREEN_TYPE,
+ 			lradc->base + LRADC_CTRL0 + STMP_OFFSET_REG_SET);
+ 	}
+ 
+@@ -888,7 +893,7 @@ static void mxs_lradc_hw_stop(struct mxs_lradc *lradc)
+ {
  	int i;
  
-@@ -1275,25 +1309,6 @@ static int mxs_lradc_probe(struct platform_device *pdev)
+-	writel(LRADC_CTRL1_LRADC_IRQ_EN_MASK,
++	writel(LRADC_CTRL1_MX28_LRADC_IRQ_EN_MASK,
+ 		lradc->base + LRADC_CTRL1 + STMP_OFFSET_REG_CLR);
  
- 	touch_ret = mxs_lradc_probe_touchscreen(lradc, node);
- 
--	/* Check if touchscreen is enabled in DT. */
--	ret = of_property_read_u32(node, "fsl,lradc-touchscreen-wires",
--				&ts_wires);
--	if (ret)
--		dev_info(dev, "Touchscreen not enabled.\n");
--	else if (ts_wires == 4)
--		lradc->use_touchscreen = MXS_LRADC_TOUCHSCREEN_4WIRE;
--	else if (ts_wires == 5)
--		lradc->use_touchscreen = MXS_LRADC_TOUCHSCREEN_5WIRE;
--	else
--		dev_warn(dev, "Unsupported number of touchscreen wires (%d)\n",
--				ts_wires);
--
--	if ((lradc->soc == IMX23_LRADC) && (ts_wires == 5)) {
--		dev_warn(dev, "No support for 5 wire touches on i.MX23\n");
--		dev_warn(dev, "Falling back to 4 wire\n");
--		ts_wires = 4;
--	}
--
- 	/* Grab all IRQ sources */
- 	for (i = 0; i < of_cfg->irq_count; i++) {
- 		lradc->irq[i] = platform_get_irq(pdev, i);
+ 	for (i = 0; i < LRADC_MAX_DELAY_CHANS; i++)
 -- 
 1.8.4.rc3
