@@ -1,87 +1,83 @@
-From: anup@brainfault.org (Anup Patel)
-Date: Mon, 23 Sep 2013 13:35:20 +0530
-Subject: [PATCH v3 1/4] ARM: KVM: Implement kvm_vcpu_preferred_target()
- function
-In-Reply-To: <20130919192008.GL7623@lvm>
-References: <1379596302-21522-1-git-send-email-anup.patel@linaro.org>
- <1379596302-21522-2-git-send-email-anup.patel@linaro.org>
- <523B09EA.9050408@arm.com> <20130919192008.GL7623@lvm>
-Message-ID: <CAAhSdy04eNBeVMtGR+GE_hsE66KG--wFyLU5szFXFeXehgzSaw@mail.gmail.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 23 Sep 2013 10:13:38 +0200
+Subject: [PATCH v2 04/10] irqdomain: Return errors from
+ irq_create_of_mapping()
+In-Reply-To: <CAL_JsqLQeAQD460f8Lk9eDE2dCzLusC1mXZ-_uaKVFLfhJNryg@mail.gmail.com>
+References: <1379510692-32435-1-git-send-email-treding@nvidia.com>
+ <1379510692-32435-5-git-send-email-treding@nvidia.com>
+ <CAL_JsqLQeAQD460f8Lk9eDE2dCzLusC1mXZ-_uaKVFLfhJNryg@mail.gmail.com>
+Message-ID: <20130923081337.GB11881@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christoffer/Marc,
+On Sun, Sep 22, 2013 at 04:14:43PM -0500, Rob Herring wrote:
+> On Wed, Sep 18, 2013 at 8:24 AM, Thierry Reding
+> <thierry.reding@gmail.com> wrote:
+> > Instead of returning 0 for all errors, allow the precise error code to
+> > be propagated. This will be used in subsequent patches to allow further
+> > propagation of error codes.
+> >
+> > The interrupt number corresponding to the new mapping is returned in an
+> > output parameter so that the return value is reserved to signal success
+> > (== 0) or failure (< 0).
+> >
+> > Signed-off-by: Thierry Reding <treding@nvidia.com>
+> 
+> One comment below, otherwise:
+> 
+> Acked-by: Rob Herring <rob.herring@calxeda.com>
+> 
+> > diff --git a/arch/powerpc/kernel/pci-common.c b/arch/powerpc/kernel/pci-common.c
+> > index 905a24b..ae71b14 100644
+> > --- a/arch/powerpc/kernel/pci-common.c
+> > +++ b/arch/powerpc/kernel/pci-common.c
+> > @@ -230,6 +230,7 @@ static int pci_read_irq_line(struct pci_dev *pci_dev)
+> >  {
+> >         struct of_irq oirq;
+> >         unsigned int virq;
+> > +       int ret;
+> >
+> >         pr_debug("PCI: Try to map irq for %s...\n", pci_name(pci_dev));
+> >
+> > @@ -266,8 +267,10 @@ static int pci_read_irq_line(struct pci_dev *pci_dev)
+> >                          oirq.size, oirq.specifier[0], oirq.specifier[1],
+> >                          of_node_full_name(oirq.controller));
+> >
+> > -               virq = irq_create_of_mapping(oirq.controller, oirq.specifier,
+> > -                                            oirq.size);
+> > +               ret = irq_create_of_mapping(oirq.controller, oirq.specifier,
+> > +                                           oirq.size, &virq);
+> > +               if (ret)
+> > +                       virq = NO_IRQ;
+> >         }
+> >         if(virq == NO_IRQ) {
+> >                 pr_debug(" Failed to map !\n");
+> 
+> Can you get rid of NO_IRQ usage here instead of adding to it.
 
-On Fri, Sep 20, 2013 at 12:50 AM, Christoffer Dall
-<christoffer.dall@linaro.org> wrote:
-> On Thu, Sep 19, 2013 at 03:27:54PM +0100, Marc Zyngier wrote:
->> On 19/09/13 14:11, Anup Patel wrote:
->> > This patch implements kvm_vcpu_preferred_target() function for
->> > KVM ARM which will help us implement KVM_ARM_PREFERRED_TARGET ioctl
->> > for user space.
->> >
->> > Signed-off-by: Anup Patel <anup.patel@linaro.org>
->> > Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
->> > ---
->> >  arch/arm/kvm/guest.c              |   20 ++++++++++++++++++++
->> >  arch/arm64/include/asm/kvm_host.h |    1 +
->> >  2 files changed, 21 insertions(+)
->> >
->> > diff --git a/arch/arm/kvm/guest.c b/arch/arm/kvm/guest.c
->> > index 152d036..b407e6c 100644
->> > --- a/arch/arm/kvm/guest.c
->> > +++ b/arch/arm/kvm/guest.c
->> > @@ -222,6 +222,26 @@ int kvm_vcpu_set_target(struct kvm_vcpu *vcpu,
->> >     return kvm_reset_vcpu(vcpu);
->> >  }
->> >
->> > +int kvm_vcpu_preferred_target(struct kvm_vcpu_init *init)
->> > +{
->> > +   int target = kvm_target_cpu();
->> > +
->> > +   if (target < 0)
->> > +           return -ENODEV;
->> > +
->> > +   memset(init, 0, sizeof(*init));
->> > +
->> > +   /*
->> > +    * For now, we return all optional features are available
->> > +    * for preferred target. In future, we might have features
->> > +    * available based on underlying host.
->> > +    */
->> > +   init->target = (__u32)target;
->> > +   init->features[0] |= (1 << KVM_ARM_VCPU_POWER_OFF);
->>
->> I'm in two minds about this feature reporting. I see they serve a
->> purpose, but they also duplicate capabilities, which is the standard way
->> to advertise what KVM can do.
->>
->> It means we end up having to sync two reporting mechanism, and I feel
->> this is in general a bad idea.
->>
->> Furthermore, KVM_ARM_VCPU_POWER_OFF is hardly a feature of the HW, but
->> rather a firmware emulation thing.
->>
->> Peter, Christoffer: Thoughts?
->>
-> I wanted to return the full kvm_vcpu_init instead of just a target int,
-> so we did not have to come up with yet another ioctl if we need to
-> return more information about the capabilities of the host CPU in the
-> future.
->
-> But perhaps we can formulate the API, to say only the (currently empty)
-> following list of features can only be enabled if the corresponding bit
-> is enabled, or something along those lines.
->
-> -Christoffer
-> _______________________________________________
-> kvmarm mailing list
-> kvmarm at lists.cs.columbia.edu
-> https://lists.cs.columbia.edu/cucslists/listinfo/kvmarm
+I was trying to stay consistent with the remainder of the code. PowerPC
+is a pretty heavy user of NO_IRQ. Of all 348 references, more than half
+(182) are in arch/powerpc, so I'd rather like to get a go-ahead from
+Benjamin on this.
 
-Do we stick with current implementation of returning struct kvm_vcpu_init ?
-OR
-Do we return struct kvm_vcpu_init with all features set to zero ?
+That said, perhaps we should just go all the way and get rid of NO_IRQ
+for good. Things could get somewhat messy, though. There are a couple of
+these spread through the code:
 
-Regards,
-Anup
+	#ifndef NO_IRQ
+	#define NO_IRQ (-1)
+	#endif
+
+And this isn't very encouraging either:
+
+	$ git grep 'irq.*=.*-1' | wc -l
+	638
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130923/c73738f4/attachment-0001.sig>
