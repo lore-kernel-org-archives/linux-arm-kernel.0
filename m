@@ -1,7 +1,7 @@
 From: wujianguo@huawei.com (Jianguo Wu)
-Date: Mon, 23 Sep 2013 18:37:04 +0800
-Subject: [Resend with ACK][PATCH] mm/arch: use NUMA_NODE
-Message-ID: <524019D0.9070706@huawei.com>
+Date: Mon, 23 Sep 2013 18:40:50 +0800
+Subject: [Resend with ACK][PATCH] mm/arch: use NUMA_NO_NODE
+Message-ID: <52401AB2.8000605@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
