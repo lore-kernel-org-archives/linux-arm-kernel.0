@@ -1,47 +1,42 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 23 Sep 2013 12:59:44 -0700
-Subject: [PATCH] ARM: kvm: rename cpu_reset to avoid name clash
-In-Reply-To: <CAMJs5B9NW6cDuG-xwYucP8rONn0MdEtwTm5R2p=aBE4Q3EHNOg@mail.gmail.com>
-References: <1378938461-10835-1-git-send-email-olof@lixom.net>
- <CAOesGMjum0TSyudXiZtXHOGX4R7dBAhjUpoYnwjTcfD1MMpTxw@mail.gmail.com>
- <20130912015002.GO9860@cbox>
- <CAOesGMiGaM=s85iKHPXd9eBiL1vy3SVws+KR0ToxPpZeiisscg@mail.gmail.com>
- <CAMJs5B9NW6cDuG-xwYucP8rONn0MdEtwTm5R2p=aBE4Q3EHNOg@mail.gmail.com>
-Message-ID: <CAOesGMhPHaZ7tOshbvU1M87nshTOVqU7-+1AvOmARzKUDN6syw@mail.gmail.com>
+From: sre@ring0.de (Sebastian Reichel)
+Date: Mon, 23 Sep 2013 22:00:09 +0200
+Subject: [PATCH 4/4] RX-51: Add platform function and data for bq24150a
+ charger
+In-Reply-To: <201309232116.19161@pali>
+References: <1378630239-10006-1-git-send-email-pali.rohar@gmail.com>
+ <201309202122.06327@pali> <20130923180259.GJ2684@atomide.com>
+ <201309232116.19161@pali>
+Message-ID: <20130923200008.GA21808@earth.universe>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christoffer,
+On Mon, Sep 23, 2013 at 09:16:18PM +0200, Pali Roh?r wrote:
+> It is not as simple as it looks. This is reason why I submited 
+> this patch long time after I submited bq2415x driver.
+> 
+> Problem is that for rx51 is needed specific function which connect 
+> to two drivers (bq2415x and isp1704) plus it call specific rx51 
+> board functions.
+> 
+> Something which cannot be in DT (unless DT support C/ASM code).
 
-On Mon, Sep 16, 2013 at 8:47 PM, Christoffer Dall
-<christoffer.dall@linaro.org> wrote:
-> On 16 September 2013 19:41, Olof Johansson <olof@lixom.net> wrote:
->> Hi,
->>
->> On Wed, Sep 11, 2013 at 6:50 PM, Christoffer Dall
->> <christoffer.dall@linaro.org> wrote:
->>> On Wed, Sep 11, 2013 at 03:39:26PM -0700, Olof Johansson wrote:
->>>> On Wed, Sep 11, 2013 at 3:27 PM, Olof Johansson <olof@lixom.net> wrote:
->>>> > cpu_reset is already #defined in <asm/proc-fns.h> as processor.reset,
->>>> > so it expands here and causes problems.
->>>> >
->>>> > Signed-off-by: Olof Johansson <olof@lixom.net>
->>>>
->>>> I just noticed this is broken on 3.10 too, so if/when applying feel free to add:
->>>>
->>>> Cc: <stable@vger.kernel.org> # 3.10+
->>>>
->>> Thanks for the fix, applied.
->>
->> I haven't seen this hit linux-next yet?
->>
-> I was waiting for kvm/next to move to 3.12-rc1 and base the patch for
-> kvm-arm-next off there, but I pushed this to kvm-arm-next now and it
-> should land in linux-next as soon as they update.
+mh could isp1704 driver expose the data via the regulator framework?
+Then the bq2415x chip can just use the regulator framework. This
+should make converting to DT easy (by giving the bq2415x chip the
+isp1704 as regulator) and uses existing standard interfaces.
 
-Another week has passed, and -next and mainline are both still broken.
-Can we please see a fix in mainline and -next within the next few
-days?
+> Patches for modem support are being prepared for upstreaming :-) 
+> so after that it is up to you to create "call" script as you want
 
+I'm on it. RFC round will be sent out this week. It seems
+hwmod data is already finished, since i didn't get feedback for
+that patch :)
 
--Olof
+-- Sebastian
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130923/853a6857/attachment.sig>
