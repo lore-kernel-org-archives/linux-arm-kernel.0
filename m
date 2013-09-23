@@ -1,55 +1,72 @@
-From: pali.rohar@gmail.com (Pali =?utf-8?q?Roh=C3=A1r?=)
-Date: Mon, 23 Sep 2013 22:06:46 +0200
-Subject: [PATCH 4/4] RX-51: Add platform function and data for bq24150a
- charger
-In-Reply-To: <20130923200008.GA21808@earth.universe>
-References: <1378630239-10006-1-git-send-email-pali.rohar@gmail.com>
- <201309232116.19161@pali> <20130923200008.GA21808@earth.universe>
-Message-ID: <201309232206.47391@pali>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 23 Sep 2013 15:30:34 -0500
+Subject: [PATCH] TTY: hvc_dcc: probe for a JTAG connection before registering
+Message-ID: <1379968234-23373-1-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 23 September 2013 22:00:09 Sebastian Reichel wrote:
-> On Mon, Sep 23, 2013 at 09:16:18PM +0200, Pali Roh?r wrote:
-> > It is not as simple as it looks. This is reason why I
-> > submited this patch long time after I submited bq2415x
-> > driver.
-> > 
-> > Problem is that for rx51 is needed specific function which
-> > connect to two drivers (bq2415x and isp1704) plus it call
-> > specific rx51 board functions.
-> > 
-> > Something which cannot be in DT (unless DT support C/ASM
-> > code).
-> 
-> mh could isp1704 driver expose the data via the regulator
-> framework?
+From: Rob Herring <rob.herring@calxeda.com>
 
-No, isp1704 is power supply driver and export data via power 
-supply (sysfs) interface. It is not regulator but charger driver.
+Enabling the ARM DCC console and using without a JTAG connection will
+simply hang the system. Since distros like to turn on all options, this
+is a reoccurring problem to debug. We can do better by checking if
+anything is attached and handling characters. There is no way to probe
+this, so send a newline and check that it is handled.
 
-> Then the bq2415x chip can just use the regulator
-> framework. This should make converting to DT easy (by giving
-> the bq2415x chip the isp1704 as regulator) and uses existing
-> standard interfaces.
-> 
-> > Patches for modem support are being prepared for upstreaming
-> > :-) so after that it is up to you to create "call" script
-> > as you want
-> 
-> I'm on it. RFC round will be sent out this week. It seems
-> hwmod data is already finished, since i didn't get feedback
-> for that patch :)
-> 
-> -- Sebastian
+Cc: Paolo Pisati <paolo.pisati@canonical.com>
+Cc: Tim Gardner <tim.gardner@canonical.com>
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Cc: Jiri Slaby <jslaby@suse.cz>
+Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+---
+ drivers/tty/hvc/hvc_dcc.c | 21 +++++++++++++++++++++
+ 1 file changed, 21 insertions(+)
 
+diff --git a/drivers/tty/hvc/hvc_dcc.c b/drivers/tty/hvc/hvc_dcc.c
+index 44fbeba..44c8aff 100644
+--- a/drivers/tty/hvc/hvc_dcc.c
++++ b/drivers/tty/hvc/hvc_dcc.c
+@@ -86,6 +86,21 @@ static int hvc_dcc_get_chars(uint32_t vt, char *buf, int count)
+ 	return i;
+ }
+ 
++static bool hvc_dcc_check(void)
++{
++	unsigned long time = jiffies;
++
++	/* Write a test character to check if it is handled */
++	__dcc_putchar('\n');
++
++	while (jiffies < time + (HZ / 10)) {
++		if (!(__dcc_getstatus() & DCC_STATUS_TX))
++			return true;
++	}
++
++	return false;
++}
++
+ static const struct hv_ops hvc_dcc_get_put_ops = {
+ 	.get_chars = hvc_dcc_get_chars,
+ 	.put_chars = hvc_dcc_put_chars,
+@@ -93,6 +108,9 @@ static const struct hv_ops hvc_dcc_get_put_ops = {
+ 
+ static int __init hvc_dcc_console_init(void)
+ {
++	if (!hvc_dcc_check())
++		return -ENODEV;
++
+ 	hvc_instantiate(0, 0, &hvc_dcc_get_put_ops);
+ 	return 0;
+ }
+@@ -100,6 +118,9 @@ console_initcall(hvc_dcc_console_init);
+ 
+ static int __init hvc_dcc_init(void)
+ {
++	if (!hvc_dcc_check())
++		return -ENODEV;
++
+ 	hvc_alloc(0, 0, &hvc_dcc_get_put_ops, 128);
+ 	return 0;
+ }
 -- 
-Pali Roh?r
-pali.rohar at gmail.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130923/07adf26c/attachment.sig>
+1.8.1.2
