@@ -1,25 +1,43 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 23 Sep 2013 20:00:33 +0300
-Subject: [PATCH 3/3] clk: sunxi: protect core clocks from accidental
- shutdown
-In-Reply-To: <1379725392-30202-4-git-send-email-emilio@elopez.com.ar>
-References: <1379725392-30202-1-git-send-email-emilio@elopez.com.ar>
- <1379725392-30202-4-git-send-email-emilio@elopez.com.ar>
-Message-ID: <20130923170033.GO2779@lukather>
+Date: Mon, 23 Sep 2013 20:03:55 +0300
+Subject: [PATCH V3: Add Smp support for Allwinner A20. 2/3] Add cpuconfig
+ nodes in dts for smp configure.
+In-Reply-To: <1379852488-32147-3-git-send-email-cinifr@gmail.com>
+References: <1379852488-32147-1-git-send-email-cinifr@gmail.com>
+ <1379852488-32147-3-git-send-email-cinifr@gmail.com>
+Message-ID: <20130923170355.GP2779@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 20, 2013 at 10:03:12PM -0300, Emilio L?pez wrote:
-> Some important clocks may get disabled as a side effect of another clock
-> being disabled, because they have no consumers. This patch implements a
-> mechanism so those clocks can be claimed by the driver and therefore
-> remain enabled at all times.
+Hi Fan,
+
+On Sun, Sep 22, 2013 at 08:21:27PM +0800, Fan Rong wrote:
+> Signed-off-by: Fan Rong <cinifr@gmail.com>
+> ---
+>  arch/arm/boot/dts/sun7i-a20.dtsi | 9 +++++++--
+>  1 file changed, 7 insertions(+), 2 deletions(-)
 > 
-> Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
+> diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
+> index 999ff45..f745e0b 100644
+> --- a/arch/arm/boot/dts/sun7i-a20.dtsi
+> +++ b/arch/arm/boot/dts/sun7i-a20.dtsi
+> @@ -20,13 +20,13 @@
+>  		#address-cells = <1>;
+>  		#size-cells = <0>;
+>  
+> -		cpu at 0 {
+> +		cpu0: cpu at 0  {
+>  			compatible = "arm,cortex-a7";
+>  			device_type = "cpu";
+>  			reg = <0>;
+>  		};
+>  
+> -		cpu at 1 {
+> +		cpu1: cpu at 1 {
 
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+You still haven't replied on why you need these two changes.
 
-Thanks!
+Thanks,
 Maxime
 
 -- 
@@ -32,4 +50,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130923/878c7f57/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130923/5aa20a34/attachment.sig>
