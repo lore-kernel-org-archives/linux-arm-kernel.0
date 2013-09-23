@@ -1,59 +1,110 @@
 From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Mon, 23 Sep 2013 19:17:51 -0400
-Subject: [PATCH 08/13] ARM: GIC: interface to send a SGI directly
+Date: Mon, 23 Sep 2013 19:17:49 -0400
+Subject: [PATCH 06/13] ARM: mcpm: add a simple poke mechanism to the early
+ entry code
 In-Reply-To: <1379978276-31241-1-git-send-email-nicolas.pitre@linaro.org>
 References: <1379978276-31241-1-git-send-email-nicolas.pitre@linaro.org>
-Message-ID: <1379978276-31241-9-git-send-email-nicolas.pitre@linaro.org>
+Message-ID: <1379978276-31241-7-git-send-email-nicolas.pitre@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The regular gic_raise_softirq() takes as input a CPU mask which is not
-adequate when we need to send an IPI to a CPU which is not represented
-in the kernel to GIC mapping.  That is the case with the b.L switcher
-when GIC migration to the inbound CPU has not yet occurred.
+This allows to poke a predetermined value into a specific address
+upon entering the early boot code in bL_head.S.
 
 Signed-off-by: Nicolas Pitre <nico@linaro.org>
 ---
- drivers/irqchip/irq-gic.c       | 14 ++++++++++++++
- include/linux/irqchip/arm-gic.h |  1 +
- 2 files changed, 15 insertions(+)
+ arch/arm/common/mcpm_entry.c | 12 ++++++++++++
+ arch/arm/common/mcpm_head.S  | 16 ++++++++++++++--
+ arch/arm/include/asm/mcpm.h  |  8 ++++++++
+ 3 files changed, 34 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
-index 09fdf3d574..9031171c14 100644
---- a/drivers/irqchip/irq-gic.c
-+++ b/drivers/irqchip/irq-gic.c
-@@ -674,6 +674,20 @@ void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
- 
- #ifdef CONFIG_BL_SWITCHER
- /*
-+ * gic_send_sgi - send a SGI directly to given CPU interface number
-+ *
-+ * cpu_id: the ID for the destination CPU interface
-+ * irq: the IPI number to send a SGI for
-+ */
-+void gic_send_sgi(unsigned int cpu_id, unsigned int irq)
-+{
-+	BUG_ON(cpu_id >= NR_GIC_CPU_IF);
-+	cpu_id = 1 << cpu_id;
-+	/* this always happens on GIC0 */
-+	writel_relaxed((cpu_id << 16) | irq, gic_data_dist_base(&gic_data[0]) + GIC_DIST_SOFTINT);
-+}
-+
-+/*
-  * gic_get_cpu_id - get the CPU interface ID for the specified CPU
-  *
-  * @cpu: the logical CPU number to get the GIC ID for.
-diff --git a/include/linux/irqchip/arm-gic.h b/include/linux/irqchip/arm-gic.h
-index dc30835099..cac496b1e2 100644
---- a/include/linux/irqchip/arm-gic.h
-+++ b/include/linux/irqchip/arm-gic.h
-@@ -76,6 +76,7 @@ static inline void gic_init(unsigned int nr, int start,
- 	gic_init_bases(nr, start, dist, cpu, 0, NULL);
+diff --git a/arch/arm/common/mcpm_entry.c b/arch/arm/common/mcpm_entry.c
+index 370236dd1a..4a2b32fd53 100644
+--- a/arch/arm/common/mcpm_entry.c
++++ b/arch/arm/common/mcpm_entry.c
+@@ -27,6 +27,18 @@ void mcpm_set_entry_vector(unsigned cpu, unsigned cluster, void *ptr)
+ 	sync_cache_w(&mcpm_entry_vectors[cluster][cpu]);
  }
  
-+void gic_send_sgi(unsigned int cpu_id, unsigned int irq);
- int gic_get_cpu_id(unsigned int cpu);
- void gic_migrate_target(unsigned int new_cpu_id);
- unsigned long gic_get_sgir_physaddr(void);
++extern unsigned long mcpm_entry_early_pokes[MAX_NR_CLUSTERS][MAX_CPUS_PER_CLUSTER][2];
++
++void mcpm_set_early_poke(unsigned cpu, unsigned cluster,
++			 unsigned long poke_phys_addr, unsigned long poke_val)
++{
++	unsigned long *poke = &mcpm_entry_early_pokes[cluster][cpu][0];
++	poke[0] = poke_phys_addr;
++	poke[1] = poke_val;
++	__cpuc_flush_dcache_area((void *)poke, 8);
++	outer_clean_range(__pa(poke), __pa(poke + 2));
++}
++
+ static const struct mcpm_platform_ops *platform_ops;
+ 
+ int __init mcpm_platform_register(const struct mcpm_platform_ops *ops)
+diff --git a/arch/arm/common/mcpm_head.S b/arch/arm/common/mcpm_head.S
+index 39c96df347..49dd5352fe 100644
+--- a/arch/arm/common/mcpm_head.S
++++ b/arch/arm/common/mcpm_head.S
+@@ -71,12 +71,19 @@ ENTRY(mcpm_entry_point)
+ 	 * position independent way.
+ 	 */
+ 	adr	r5, 3f
+-	ldmia	r5, {r6, r7, r8, r11}
++	ldmia	r5, {r0, r6, r7, r8, r11}
++	add	r0, r5, r0			@ r0 = mcpm_entry_early_pokes
+ 	add	r6, r5, r6			@ r6 = mcpm_entry_vectors
+ 	ldr	r7, [r5, r7]			@ r7 = mcpm_power_up_setup_phys
+ 	add	r8, r5, r8			@ r8 = mcpm_sync
+ 	add	r11, r5, r11			@ r11 = first_man_locks
+ 
++	@ Perform an early poke, if any
++	add	r0, r0, r4, lsl #3
++	ldmia	r0, {r0, r1}
++	teq	r0, #0
++	strne	r1, [r0]
++
+ 	mov	r0, #MCPM_SYNC_CLUSTER_SIZE
+ 	mla	r8, r0, r10, r8			@ r8 = sync cluster base
+ 
+@@ -195,7 +202,8 @@ mcpm_entry_gated:
+ 
+ 	.align	2
+ 
+-3:	.word	mcpm_entry_vectors - .
++3:	.word	mcpm_entry_early_pokes - .
++	.word	mcpm_entry_vectors - 3b
+ 	.word	mcpm_power_up_setup_phys - 3b
+ 	.word	mcpm_sync - 3b
+ 	.word	first_man_locks - 3b
+@@ -214,6 +222,10 @@ first_man_locks:
+ ENTRY(mcpm_entry_vectors)
+ 	.space	4 * MAX_NR_CLUSTERS * MAX_CPUS_PER_CLUSTER
+ 
++	.type	mcpm_entry_early_pokes, #object
++ENTRY(mcpm_entry_early_pokes)
++	.space	8 * MAX_NR_CLUSTERS * MAX_CPUS_PER_CLUSTER
++
+ 	.type	mcpm_power_up_setup_phys, #object
+ ENTRY(mcpm_power_up_setup_phys)
+ 	.space  4		@ set by mcpm_sync_init()
+diff --git a/arch/arm/include/asm/mcpm.h b/arch/arm/include/asm/mcpm.h
+index 0f7b7620e9..7626a7fd49 100644
+--- a/arch/arm/include/asm/mcpm.h
++++ b/arch/arm/include/asm/mcpm.h
+@@ -42,6 +42,14 @@ extern void mcpm_entry_point(void);
+ void mcpm_set_entry_vector(unsigned cpu, unsigned cluster, void *ptr);
+ 
+ /*
++ * This sets an early poke i.e a value to be poked into some address
++ * from very early assembly code before the CPU is ungated.  The
++ * address must be physical, and if 0 then nothing will happen.
++ */
++void mcpm_set_early_poke(unsigned cpu, unsigned cluster,
++			 unsigned long poke_phys_addr, unsigned long poke_val);
++
++/*
+  * CPU/cluster power operations API for higher subsystems to use.
+  */
+ 
 -- 
 1.8.4.98.gb022869
