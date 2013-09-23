@@ -1,135 +1,54 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Mon, 23 Sep 2013 10:42:45 +0300
-Subject: [RFC PATCH 08/15] ata: ahci_platform: Manage SATA PHY
-In-Reply-To: <523F3567.80303@cogentembedded.com>
-References: <1379595943-14622-1-git-send-email-rogerq@ti.com>
- <1379595943-14622-9-git-send-email-rogerq@ti.com>
- <523F3567.80303@cogentembedded.com>
-Message-ID: <523FF0F5.50504@ti.com>
+From: hector.palacios@digi.com (Hector Palacios)
+Date: Mon, 23 Sep 2013 09:50:23 +0200
+Subject: [PATCH] clk: mxs: source LCD clock from PLL instead of from ref_xtal
+Message-ID: <1379922623-4875-1-git-send-email-hector.palacios@digi.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The lcd clock hierarchy is as follows:
 
-On 09/22/2013 09:22 PM, Sergei Shtylyov wrote:
-> Hello.
-> 
-> On 09/19/2013 05:05 PM, Roger Quadros wrote:
-> 
->> From: Balaji T K <balajitk@ti.com>
-> 
->> Some platforms have a PHY hooked up to the
->> SATA controller. The PHY needs to be initialized
->> and powered up for SATA to work. We do that
->> using the PHY framework.
-> 
->> [Roger Q] Cleaned up.
-> 
->> CC: Tejun Heo <tj@kernel.org>
->> Signed-off-by: Balaji T K <balajitk@ti.com>
->> Signed-off-by: Roger Quadros <rogerq@ti.com>
-> [...]
-> 
->> diff --git a/drivers/ata/ahci.h b/drivers/ata/ahci.h
->> index 1145637..94484cb 100644
->> --- a/drivers/ata/ahci.h
->> +++ b/drivers/ata/ahci.h
->> @@ -37,6 +37,7 @@
->>
->>   #include <linux/clk.h>
->>   #include <linux/libata.h>
->> +#include <linux/phy/phy.h>
-> 
-> struct phy;
-> 
-> should suffice.
-> 
->> @@ -322,6 +323,7 @@ struct ahci_host_priv {
->>       u32            em_buf_sz;    /* EM buffer size in byte */
->>       u32            em_msg_type;    /* EM message type */
->>       struct clk        *clk;        /* Only for platforms supporting clk */
->> +    struct phy        *phy;        /* If platforms use phy */
->>       void            *plat_data;    /* Other platform data */
->>   };
->>
->> diff --git a/drivers/ata/ahci_platform.c b/drivers/ata/ahci_platform.c
->> index 2daaee0..f812ffa 100644
->> --- a/drivers/ata/ahci_platform.c
->> +++ b/drivers/ata/ahci_platform.c
->> @@ -23,6 +23,7 @@
->>   #include <linux/platform_device.h>
->>   #include <linux/libata.h>
->>   #include <linux/ahci_platform.h>
->> +#include <linux/phy/phy.h>
-> 
->    Why include it from both ahci.h and here?
-> 
-OK. will move it to just .c file.
+    ref_clk (24MHz)-----\
+                         +--+ lcdif_sel (MUX type)
+    frac1_clk (480Mhz)--/   |
+                            \--+ lcdif_div (DIV type)
+                               |
+                               \-- lcdif (GATE type)
 
->>   #include "ahci.h"
->>
->>   static void ahci_host_stop(struct ata_host *host);
->> @@ -141,16 +142,32 @@ static int ahci_probe(struct platform_device *pdev)
->>           }
->>       }
->>
->> +    hpriv->phy = devm_phy_get(dev, "sata-phy");
->> +    if (IS_ERR(hpriv->phy)) {
->> +        dev_err(dev, "can't get phy\n");
-> 
->    Don't think it's a good idea to complain about missing PHY when the driver doesn't even use it.
+The mxsfb driver retrieves the 'lcdif_div' clock from the DT, but the
+'lcdif_sel' is by default sourced from 'ref_clk' which is a fixed 24MHz.
+This means the pixel clock can only be 24MHz or a power-of-two divisor
+of that frequency (12, 6, 3...) which is a very poor divisor granularity.
 
-OK. will change it to dev_dbg() instead.
-> 
->> +        /* return only if -EPROBE_DEFER */
->> +        if (PTR_ERR(hpriv->phy) == -EPROBE_DEFER) {
->> +            rc = -EPROBE_DEFER;
->> +            goto disable_unprepare_clk;
->> +        }
->> +    }
->> +
->>       /*
->>        * Some platforms might need to prepare for mmio region access,
->>        * which could be done in the following init call. So, the mmio
->>        * region shouldn't be accessed before init (if provided) has
->>        * returned successfully.
->>        */
->> +
->> +    if (!(IS_ERR(hpriv->phy))) {
-> 
->    () not needed around IS_ERR() invocation.
+Since the driver doesn't know about the different clocks that can
+source its clk parent from, we must select the PLL (480MHz) to be the
+parent during the general clocks initialization. This allows for much
+better divisor granularity and for more accurate frequencies for LCD
+displays.
 
-OK.
+Signed-off-by: Hector Palacios <hector.palacios@digi.com>
+Tested-by: Fabio Estevam <fabio.estevam@freescale.com>
+CC: Maxime Rippard <maxime.ripard@free-electrons.com>
+CC: Marek Vasut <marex@denx.de>
+CC: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+CC: Gwenhael Goavec-Merou <gwenhael.goavec-merou@armadeus.com>
+---
+ drivers/clk/mxs/clk-imx28.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-> 
->> +        phy_init(hpriv->phy);
->> +        phy_power_on(hpriv->phy);
->> +    }
->> +
-> 
->    I think this is misplaced, i.e. it should precede the comment.
-> 
-
-OK.
-
->>       if (pdata && pdata->init) {
->>           rc = pdata->init(dev, hpriv->mmio);
->>           if (rc)
->> -            goto disable_unprepare_clk;
->> +            goto disable_phy;
->>       }
->>
->>       ahci_save_initial_config(dev, hpriv,
-> [...]
->> @@ -328,6 +356,7 @@ static SIMPLE_DEV_PM_OPS(ahci_pm_ops, ahci_suspend, ahci_resume);
->>   static const struct of_device_id ahci_of_match[] = {
->>       { .compatible = "snps,spear-ahci", },
->>       { .compatible = "snps,exynos5440-ahci", },
->> +    { .compatible = "snps,dwc-ahci", },
-> 
->    Looks like the binding documentation is incomplete -- it doesn't list "snps,exynos5440-ahci"...
-
-OK, I'll update it. Thanks for review.
-
-cheers,
--roger
+diff --git a/drivers/clk/mxs/clk-imx28.c b/drivers/clk/mxs/clk-imx28.c
+index 4faf0af..882ec3f 100644
+--- a/drivers/clk/mxs/clk-imx28.c
++++ b/drivers/clk/mxs/clk-imx28.c
+@@ -246,6 +246,12 @@ int __init mx28_clocks_init(void)
+ 	clk_data.clk_num = ARRAY_SIZE(clks);
+ 	of_clk_add_provider(np, of_clk_src_onecell_get, &clk_data);
+ 
++	/*
++	 * Select PLL as the parent source of lcdif_sel clk to have a finer
++	 * granularity when calculating the LCD pixelclock
++	 */
++	clk_set_parent(clks[lcdif_sel], clks[ref_pix]);
++
+ 	clk_register_clkdev(clks[enet_out], NULL, "enet_out");
+ 
+ 	for (i = 0; i < ARRAY_SIZE(clks_init_on); i++)
