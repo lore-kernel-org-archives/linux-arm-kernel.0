@@ -1,66 +1,77 @@
 From: marex@denx.de (Marek Vasut)
-Date: Mon, 23 Sep 2013 17:23:56 +0200
-Subject: [PATCH] clk: mxs: source LCD clock from PLL instead of from
- ref_xtal
-In-Reply-To: <1379922623-4875-1-git-send-email-hector.palacios@digi.com>
-References: <1379922623-4875-1-git-send-email-hector.palacios@digi.com>
-Message-ID: <201309231723.56516.marex@denx.de>
+Date: Mon, 23 Sep 2013 17:25:58 +0200
+Subject: [PATCHv6] staging/iio/adc: change the MXS touchscreen driver
+ implementation
+In-Reply-To: <1379946998-23041-1-git-send-email-jbe@pengutronix.de>
+References: <1379946998-23041-1-git-send-email-jbe@pengutronix.de>
+Message-ID: <201309231725.58996.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Hector Palacios,
+Dear Juergen Beisert,
 
-> The lcd clock hierarchy is as follows:
+> The following series replaces the current busy loop touchscreen
+> implementation for i.MX28/i.MX23 SoCs by a fully interrupt driven
+> implementation.
 > 
->     ref_clk (24MHz)-----\
->                          +--+ lcdif_sel (MUX type)
->     frac1_clk (480Mhz)--/   |
->                             \--+ lcdif_div (DIV type)
+> Since i.MX23 and i.MX28 silicon differs, the existing implementation can
+> be used for the i.MX28 SoC only.
 > 
->                                \-- lcdif (GATE type)
+> The first patch adds proper clock handling. Various platforms seems to
+> disable the internal 2 kHz clock which is used by the LRADC delay units.
 > 
-> The mxsfb driver retrieves the 'lcdif_div' clock from the DT, but the
-> 'lcdif_sel' is by default sourced from 'ref_clk' which is a fixed 24MHz.
-> This means the pixel clock can only be 24MHz or a power-of-two divisor
-> of that frequency (12, 6, 3...) which is a very poor divisor granularity.
+> The next two patches of this series move the i.MX28 specific definitions
+> out of the way. The forth patch simplifies the register access to make it
+> easier to add the i.MX23 support. Then the i.MX23 specific definitions are
+> added, also the code to distinguish both SoCs at run-time.
+> Up to here the existing touchscreen driver will now run on an i.MX23 Soc as
+> well.
 > 
-> Since the driver doesn't know about the different clocks that can
-> source its clk parent from, we must select the PLL (480MHz) to be the
-> parent during the general clocks initialization. This allows for much
-> better divisor granularity and for more accurate frequencies for LCD
-> displays.
+> When these i.MX SoCs are running from battery it seems not to be a good
+> idea to run a busy loop to detect touches and their location. The 6th
+> patch adds a fully interrupt driven implementation which makes use of the
+> built-in delay and multiple sample features of the touchscreen controller.
+> This will reduce the interrupt load to a minimum.
 > 
-> Signed-off-by: Hector Palacios <hector.palacios@digi.com>
-> Tested-by: Fabio Estevam <fabio.estevam@freescale.com>
-> CC: Maxime Rippard <maxime.ripard@free-electrons.com>
-> CC: Marek Vasut <marex@denx.de>
-> CC: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> CC: Gwenhael Goavec-Merou <gwenhael.goavec-merou@armadeus.com>
-> ---
->  drivers/clk/mxs/clk-imx28.c | 6 ++++++
->  1 file changed, 6 insertions(+)
+> The remaining patches in this series just removes the existing busy loop
+> implementation, add a proposal for devicetree binding and a reminder what
+> has still to be done with the LRADC driver.
 > 
-> diff --git a/drivers/clk/mxs/clk-imx28.c b/drivers/clk/mxs/clk-imx28.c
-> index 4faf0af..882ec3f 100644
-> --- a/drivers/clk/mxs/clk-imx28.c
-> +++ b/drivers/clk/mxs/clk-imx28.c
-> @@ -246,6 +246,12 @@ int __init mx28_clocks_init(void)
->  	clk_data.clk_num = ARRAY_SIZE(clks);
->  	of_clk_add_provider(np, of_clk_src_onecell_get, &clk_data);
+> Changes since v5:
 > 
-> +	/*
-> +	 * Select PLL as the parent source of lcdif_sel clk to have a finer
-> +	 * granularity when calculating the LCD pixelclock
-> +	 */
-> +	clk_set_parent(clks[lcdif_sel], clks[ref_pix]);
-> +
->  	clk_register_clkdev(clks[enet_out], NULL, "enet_out");
+> - add missing clock handling which prevents the delay units from work (this
+>   should make it work on the MX28EVK and M28EVK as well)
 > 
->  	for (i = 0; i < ARRAY_SIZE(clks_init_on); i++)
+> Changes since v4:
+> 
+> - honor Jonathan's comments about function names
+> - honor Dmitry's comments about workqueue canceling and interrupts
+> - adding devicetree bindings proposal
+> 
+> Changes since v3:
+> 
+> - split adding register access functions and i.MX23 support into two
+> patches
+> 
+> Changes since v2:
+> 
+> - useless debug output removed
+> 
+> Changes since v1:
+> 
+> - adding register access functions to make the existing code more readable
+> - adding some functions to distinguish the SoCs at run-time to avoid
+> if-else contructs whenever differences in the register layout between
+> i.MX23 and i.MX28 must be handled
+> 
+> Comments are welcome.
 
 On M28EVK:
 
 Tested-by: Marek Vasut <marex@denx.de>
+Acked-by: Marek Vasut <marex@denx.de>
+
+Thanks!
 
 Best regards,
 Marek Vasut
