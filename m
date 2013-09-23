@@ -1,41 +1,31 @@
-From: B35083@freescale.com (Lu Jingchang-B35083)
-Date: Mon, 23 Sep 2013 06:56:37 +0000
-Subject: [PATCH 3/3] dma: Add Freescale eDMA engine driver support
-In-Reply-To: <20130923042549.GC17188@intel.com>
-References: <1378374799-16357-1-git-send-email-b35083@freescale.com>
- <20130917045359.GN17188@intel.com>
- <B56CDBE15CE27145A4B77D2D24263E85223E21@039-SN1MPN1-003.039d.mgd.msft.net>
- <20130923042549.GC17188@intel.com>
-Message-ID: <B56CDBE15CE27145A4B77D2D24263E852260F9@039-SN1MPN1-003.039d.mgd.msft.net>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 23 Sep 2013 09:03:26 +0200
+Subject: [PATCH 1/3] Add smp support for Allwinner A20(sunxi 7i).
+In-Reply-To: <20130921224900.GF2779@lukather>
+References: <1379768716-11672-1-git-send-email-cinifr@gmail.com>
+ <1379768716-11672-2-git-send-email-cinifr@gmail.com>
+ <20130921140059.GA2779@lukather>
+ <CAK3cCByL3nD5pMdDwAkxOE8pP0HQEWthD1HUPJ70VeprNpLzBA@mail.gmail.com>
+ <20130921224900.GF2779@lukather>
+Message-ID: <20130923070326.GC16106@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hello,
 
-> -----Original Message-----
-> From: Vinod Koul [mailto:vinod.koul at intel.com]
-> Sent: Monday, September 23, 2013 12:26 PM
-> To: Lu Jingchang-B35083
-> Cc: djbw at fb.com; shawn.guo at linaro.org; linux-kernel at vger.kernel.org;
-> linux-arm-kernel at lists.infradead.org; devicetree at vger.kernel.org
-> Subject: Re: [PATCH 3/3] dma: Add Freescale eDMA engine driver support
+On Sat, Sep 21, 2013 at 05:49:00PM -0500, Maxime Ripard wrote:
+> On Sun, Sep 22, 2013 at 12:49:45AM +0800, cinifr wrote:
+> > Thanks. I have modify my patch as you said.
+> > It is in attachments. Maybe I remail the new patch?
 > 
-> On Tue, Sep 17, 2013 at 08:08:46AM +0000, Lu Jingchang-B35083 wrote:
-> > > > +	case DMA_PAUSE:
-> > > > +		if (fsl_chan->edesc)
-> > > > +			fsl_edma_disable_request(fsl_chan);
-> > > racy here too...
-> > It only set the channel HW register, no list is handled,
-> > is lock needed here? Thanks!
-> well thats the point while you are terminating the current trasnaction
-> can
-> complete and then start another one. You want to try and prevent these
-> case
-> also. Here you are neither locking the HW access nor the the list, so its
-> juts
-> waiting to crash!
-Thanks! I have sent out the new v6 patch last week with holding lock here,
-Could you please help review it?
+> Yes, remail the whole serie and change the prefix to PATCHv3 (you can
+> use the --subject-prefix option of git format-patch to do so).
+git >= 1.8.2 also support --reroll-count 3 which also changes the filenames
+of the patches.
 
+Best regards
+Uwe
 
-Best Regards,
-Jingchang
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
