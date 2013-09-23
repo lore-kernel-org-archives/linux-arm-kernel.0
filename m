@@ -1,87 +1,64 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 23 Sep 2013 15:06:54 -0600
-Subject: [PATCH 1/4] i2c: busses: i2c-st: Add ST I2C controller
-In-Reply-To: <1379498483-4236-2-git-send-email-maxime.coquelin@st.com>
-References: <1379498483-4236-1-git-send-email-maxime.coquelin@st.com>
- <1379498483-4236-2-git-send-email-maxime.coquelin@st.com>
-Message-ID: <5240AD6E.4090905@wwwdotorg.org>
+From: tim.gardner@canonical.com (Tim Gardner)
+Date: Mon, 23 Sep 2013 14:10:27 -0700
+Subject: [PATCH] TTY: hvc_dcc: probe for a JTAG connection before
+ registering
+In-Reply-To: <1379968234-23373-1-git-send-email-robherring2@gmail.com>
+References: <1379968234-23373-1-git-send-email-robherring2@gmail.com>
+Message-ID: <5240AE43.6070708@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/18/2013 04:01 AM, Maxime COQUELIN wrote:
-> This patch adds support to SSC (Synchronous Serial Controller)
-> I2C driver. This IP also supports SPI protocol, but this is not
-> the aim of this driver.
+On 09/23/2013 01:30 PM, Rob Herring wrote:
+> From: Rob Herring <rob.herring@calxeda.com>
 > 
-> This IP is embedded in all ST SoCs for Set-top box platorms, and
-> supports I2C Standard and Fast modes.
-
-> diff --git a/Documentation/devicetree/bindings/i2c/i2c-st.txt b/Documentation/devicetree/bindings/i2c/i2c-st.txt
-
-> +I2C for ST platforms
-
-If the HW block supports both I2C and SPI, the DT binding ought to
-support that too. It's be best to create a single DT binding that
-represents the IP block, and include a property that indicates whether
-the device should operate in I2C or SPI mode.
-
-I suppose you could reasonably define different compatible values for
-those two cases. However, the binding should be titled something more
-like "ST SSC binding, for I2C mode operation" and "ST SSC binding, for
-SPI mode operation", rather than "I2C for ST platforms", since the HW
-includes an SSC block, not an I2C block.
-
-> +Required properties :
-> +- compatible : Must be "st,comms-i2c"
-> +- reg : Offset and length of the register set for the device
-> +- interrupts : the interrupt number
-
-It's an interrupt specifier, not an interrupt number. The format is
-defined by the interrupt controller, not this binding.
-
-> +- clocks : phandle to the I2C clock source
-
-What about clock-names?
-
-> +Recommended (non-standard) properties :
-
-Usually you'd just say "Optional properties:", or perhaps "Recommended
-properties:". I don't think adding "(non-standard)" serves any purpose.
-
-> +- clock-frequency : Desired I2C bus clock frequency in Hz. Otherwise
-> +  the default 100 kHz frequency will be used. As only Normal and Fast modes
-> +  are supported, possible values are 100000 and 400000.
+> Enabling the ARM DCC console and using without a JTAG connection will
+> simply hang the system. Since distros like to turn on all options, this
+> is a reoccurring problem to debug. We can do better by checking if
+> anything is attached and handling characters. There is no way to probe
+> this, so send a newline and check that it is handled.
+> 
+> Cc: Paolo Pisati <paolo.pisati@canonical.com>
+> Cc: Tim Gardner <tim.gardner@canonical.com>
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Cc: Jiri Slaby <jslaby@suse.cz>
+> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+> ---
+>  drivers/tty/hvc/hvc_dcc.c | 21 +++++++++++++++++++++
+>  1 file changed, 21 insertions(+)
+> 
+> diff --git a/drivers/tty/hvc/hvc_dcc.c b/drivers/tty/hvc/hvc_dcc.c
+> index 44fbeba..44c8aff 100644
+> --- a/drivers/tty/hvc/hvc_dcc.c
+> +++ b/drivers/tty/hvc/hvc_dcc.c
+> @@ -86,6 +86,21 @@ static int hvc_dcc_get_chars(uint32_t vt, char *buf, int count)
+>  	return i;
+>  }
+>  
+> +static bool hvc_dcc_check(void)
+> +{
+> +	unsigned long time = jiffies;
 > +
-> +Optional (non-standard) properties:
+> +	/* Write a test character to check if it is handled */
+> +	__dcc_putchar('\n');
+> +
+> +	while (jiffies < time + (HZ / 10)) {
+> +		if (!(__dcc_getstatus() & DCC_STATUS_TX))
+> +			return true;
+> +	}
 
-Same here.
+I think you should use one of the jiffies time comparison functions, e.g.,
 
-> +- st,glitches : Enable timing glitch suppression support.
+	time = jiffies + (HZ / 10);
+	while (time_before(jiffies,time) {
+		...
+	}
 
-That property name doesn't really convey the "enables" that appears in
-the property description to me...
+What is the possibility that __dcc_getstatus() will return garbage if no
+JTAG is connected ? In that event you're likely to get a false positive
+on DCC_STATUS_TX.
 
-> +- st,glitch-clk : SCL line timinig glitch suppression value in ns.
-> +- st,glitch-dat : SDA line timinig glitch suppression value in ns.
+rtg
 
-s/timinig/timing/
 
-> +- st,hw-glitches : Enable filter glitch suppression support.
-> +- st,hw-glitch-clk : SCL line filter glitch suppression value in us.
-> +- st,hw-glitch-dat : SDA line filter glitch suppression value in us.
-
-Those sound more like runtime configuration rather than HW description.
-Can you rephrase the descriptions (and property names) more along the
-lines of HW properties? Perhaps e.g.:
-
-st,needs-glitch-suppression: The board design needs timing glitch
-suppression enabled to operate reliably.
-
-st,min-scl-pulse-width: The minimum valid SCL pulse width that is
-allowed through the deglitch circuit. In units of ns.
-
-(I just made up those descriptions to give a feel for the flavor of
-description that I expect. They likely need some adjustment to reflect
-whatever they're actually intended to represent in HW).
-
-What is the difference between "glitch" and "hw-glitch"?
+-- 
+Tim Gardner tim.gardner at canonical.com
