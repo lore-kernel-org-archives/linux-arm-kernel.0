@@ -1,29 +1,33 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 23 Sep 2013 14:50:42 +0100
-Subject: [PATCH] spi: s3c64xx: Add missing compatibles
-In-Reply-To: <1379929545-27517-1-git-send-email-m.krawczuk@partner.samsung.com>
-References: <1379929545-27517-1-git-send-email-m.krawczuk@partner.samsung.com>
-Message-ID: <20130923135042.GH21013@sirena.org.uk>
+From: rogerq@ti.com (Roger Quadros)
+Date: Mon, 23 Sep 2013 16:59:09 +0300
+Subject: [RFC PATCH 08/15] ata: ahci_platform: Manage SATA PHY
+In-Reply-To: <52403B4F.3070406@cogentembedded.com>
+References: <1379595943-14622-1-git-send-email-rogerq@ti.com>
+ <1379595943-14622-9-git-send-email-rogerq@ti.com>
+ <20130922165817.GD30946@htj.dyndns.org> <523F35E4.6050707@cogentembedded.com>
+ <20130922215107.GD27616@mtj.dyndns.org> <523FEFC2.801@ti.com>
+ <52403B4F.3070406@cogentembedded.com>
+Message-ID: <5240492D.6060204@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 23, 2013 at 11:45:45AM +0200, Mateusz Krawczuk wrote:
-> Add compatibles for s3c6410, s5pc100 and s5pc110/s5pv210 boards.
+On 09/23/2013 03:59 PM, Sergei Shtylyov wrote:
+> Hello.
+> 
+> On 23-09-2013 11:37, Roger Quadros wrote:
+> 
+>>>>     Not sure why you asked -- I'm not using this driver, neither I'm
+> 
+>>> Well, you have better grip of what's going on in the embedded world
+>>> than me.  I'm mostly curious whether adding dependency on PHY is okay.
+> 
+>> There is no hard dependency on presence of PHY. The driver will continue
+>> as usual if devm_phy_get() fails.
+>> I hope selecting GENERIC_PHY in Kconfig is not an issue.
+> 
+>    Selecting in the AHCI_PLATFORM section? It seems I have overlooked it. No, I don't think it's a good idea. The generic PHY functions seem to be stubbed when GENERIC_PHY=n.
+> 
+OK I will remove the select then.
 
->  static const struct of_device_id s3c64xx_spi_dt_match[] = {
-> +	{ .compatible = "samsung,s3c2443-spi",
-> +			.data = (void *)&s3c2443_spi_port_config,
-> +	},
-> +	{ .compatible = "samsung,s3c6410-spi",
-> +			.data = (void *)&s3c6410_spi_port_config,
-> +	},
-
-This is missing s3c6400 and at least one other s3c24xx I think.  They
-can be added later though so applied, thanks.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130923/40003e57/attachment.sig>
+cheers,
+-roger
