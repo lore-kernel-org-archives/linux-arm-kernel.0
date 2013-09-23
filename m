@@ -1,117 +1,46 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Mon, 23 Sep 2013 16:11:30 +0300
-Subject: [PATCH v7 09/10] usb: dwc3: omap: manage "usb_otg_ss_refclk960m"
- clock
-In-Reply-To: <1379508542-22389-10-git-send-email-rogerq@ti.com>
-References: <1379508542-22389-1-git-send-email-rogerq@ti.com>
- <1379508542-22389-10-git-send-email-rogerq@ti.com>
-Message-ID: <52403E02.4070208@ti.com>
+From: steve.capper@linaro.org (Steve Capper)
+Date: Mon, 23 Sep 2013 14:19:24 +0100
+Subject: [RFC V2] ARM: mm: make UACCESS_WITH_MEMCPY huge page aware
+In-Reply-To: <1379410429-3372-1-git-send-email-steve.capper@linaro.org>
+References: <1379410429-3372-1-git-send-email-steve.capper@linaro.org>
+Message-ID: <20130923131923.GA7233@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Felipe,
-
-On 09/18/2013 03:49 PM, Roger Quadros wrote:
-> "usb_otg_ss_refclk960m" is an optional functional clock to the
-> UBS_OTG_SS module. So manage it in the driver.
+On Tue, Sep 17, 2013 at 10:33:49AM +0100, Steve Capper wrote:
+> The memory pinning code in uaccess_with_memcpy.c does not check
+> for HugeTLB or THP pmds, and will enter an infinite loop should
+> a __copy_to_user or __clear_user occur against a huge page.
 > 
-
-Just realized that "usb_otg_ss_refclk960m" is in fact functional clock to the 
-PHY and not USB_OTG_SS module. The name is misleading.
-
-So please ignore patch 9 and 10.
-
-cheers,
--roger
-
-
-> Also update device tree binding information.
+> This patch adds detection code for huge pages to pin_page_for_write.
+> As this code can be executed in a fast path it refers to the actual
+> pmds rather than the vma. If a HugeTLB or THP is found (they have
+> the same pmd representation on ARM), the page table spinlock is
+> taken to prevent modification whilst the page is pinned.
 > 
-> Signed-off-by: Roger Quadros <rogerq@ti.com>
+> On ARM, huge pages are only represented as pmds, thus no huge pud
+> checks are performed. (For huge puds one would lock the page table
+> in a similar manner as in the pmd case).
+> 
+> Two helper functions are introduced; pmd_thp_or_huge will check
+> whether or not a page is huge or transparent huge (which have the
+> same pmd layout on ARM), and pmd_hugewillfault will detect whether
+> or not a page fault will occur on write to the page.
+> 
+> Changes since first RFC:
+>    * The page mask is widened for hugepages to reduce the number
+>      of potential locks/unlocks.
+>      (A knobbled /dev/zero with its latency reduction chunks
+>       removed shows a 2x data rate boost with hugepages backing:
+>       dd if=/dev/zero of=/dev/null bs=10M count=1024 )
+> 
+> Signed-off-by: Steve Capper <steve.capper@linaro.org>
 > ---
->  Documentation/devicetree/bindings/usb/omap-usb.txt |    4 ++++
->  drivers/usb/dwc3/dwc3-omap.c                       |   13 +++++++++++++
->  2 files changed, 17 insertions(+), 0 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/usb/omap-usb.txt b/Documentation/devicetree/bindings/usb/omap-usb.txt
-> index f67573c..47c8530 100644
-> --- a/Documentation/devicetree/bindings/usb/omap-usb.txt
-> +++ b/Documentation/devicetree/bindings/usb/omap-usb.txt
-> @@ -47,6 +47,8 @@ OMAP DWC3 GLUE
->   - #address-cells, #size-cells : Must be present if the device has sub-nodes
->   - utmi-mode : controls the source of UTMI/PIPE status for VBUS and OTG ID.
->     It should be set to "1" for HW mode and "2" for SW mode.
-> + - clock : should refer to the clock node that provides 960MHz functional clock.
-> + - clock-names : should be "usb_otg_ss_refclk960m"
->   - ranges: the child address space are mapped 1:1 onto the parent address space
->  
->  Optional Properties:
-> @@ -68,6 +70,8 @@ omap_dwc3 {
->  	#address-cells = <1>;
->  	#size-cells = <1>;
->  	utmi-mode = <2>;
-> +	clocks = <&usb_otg_ss1_refclk960m>;
-> +	clock-names = "usb_otg_ss_refclk960m";
->  	ranges;
->  };
->  
-> diff --git a/drivers/usb/dwc3/dwc3-omap.c b/drivers/usb/dwc3/dwc3-omap.c
-> index 7f7ea62..c33b26c 100644
-> --- a/drivers/usb/dwc3/dwc3-omap.c
-> +++ b/drivers/usb/dwc3/dwc3-omap.c
-> @@ -32,6 +32,7 @@
->  #include <linux/extcon.h>
->  #include <linux/extcon/of_extcon.h>
->  #include <linux/regulator/consumer.h>
-> +#include <linux/clk.h>
->  
->  #include <linux/usb/otg.h>
->  
-> @@ -119,6 +120,8 @@
->  #define USBOTGSS_UTMI_OTG_STATUS_SESSVALID	(1 << 2)
->  #define USBOTGSS_UTMI_OTG_STATUS_VBUSVALID	(1 << 1)
->  
-> +#define USBOTGSS_REFCLK "usb_otg_ss_refclk960m"
-> +
->  struct dwc3_omap {
->  	/* device lock */
->  	spinlock_t		lock;
-> @@ -144,6 +147,7 @@ struct dwc3_omap {
->  	struct notifier_block	id_nb;
->  
->  	struct regulator	*vbus_reg;
-> +	struct clk		*refclk;
->  };
->  
->  enum omap_dwc3_vbus_id_status {
-> @@ -449,6 +453,12 @@ static int dwc3_omap_probe(struct platform_device *pdev)
->  		}
->  	}
->  
-> +	omap->refclk = devm_clk_get(dev, USBOTGSS_REFCLK);
-> +	if (IS_ERR(omap->refclk)) {
-> +		dev_err(dev, "couldn't get %s\n", USBOTGSS_REFCLK);
-> +		return PTR_ERR(omap->refclk);
-> +	}
-> +
->  	spin_lock_init(&omap->lock);
->  
->  	omap->dev	= dev;
-> @@ -464,6 +474,8 @@ static int dwc3_omap_probe(struct platform_device *pdev)
->  		goto err0;
->  	}
->  
-> +	clk_prepare_enable(omap->refclk);
-> +
->  	reg = dwc3_omap_readl(omap->base, USBOTGSS_REVISION);
->  	omap->revision = reg;
->  	x_major = USBOTGSS_REVISION_XMAJOR(reg);
-> @@ -593,6 +605,7 @@ static int dwc3_omap_remove(struct platform_device *pdev)
->  		extcon_unregister_interest(&omap->extcon_id_dev);
->  	dwc3_omap_disable_irqs(omap);
->  	pm_runtime_put_sync(&pdev->dev);
-> +	clk_disable_unprepare(omap->refclk);
->  	pm_runtime_disable(&pdev->dev);
->  	device_for_each_child(&pdev->dev, NULL, dwc3_omap_remove_core);
->  
-> 
+
+A ping to see if anyone had any questions/comments/flames :-)?
+
+Should it go into the patch system?
+
+Thanks,
+-- 
+Steve 
