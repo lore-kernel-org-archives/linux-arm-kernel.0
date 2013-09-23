@@ -1,40 +1,58 @@
 From: t.figa@samsung.com (Tomasz Figa)
-Date: Mon, 23 Sep 2013 14:26:41 +0200
-Subject: [PATCH v5 0/4] media: s5p-tv: clean-up and fixes
-In-Reply-To: <1379775649-6331-1-git-send-email-m.krawczuk@partner.samsung.com>
-References: <1379775649-6331-1-git-send-email-m.krawczuk@partner.samsung.com>
-Message-ID: <1439143.k4bEV6oqux@amdc1227>
+Date: Mon, 23 Sep 2013 14:28:33 +0200
+Subject: [PATCH v4 0/3] ARM: S5PV210: move to common clk framework
+In-Reply-To: <1379785342-25107-1-git-send-email-m.krawczuk@partner.samsung.com>
+References: <1379785342-25107-1-git-send-email-m.krawczuk@partner.samsung.com>
+Message-ID: <1533271.F4sWn2BdKU@amdc1227>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Mateusz,
 
-On Saturday 21 of September 2013 17:00:45 Mateusz Krawczuk wrote:
-> This patch series add restoring previous vpll rate after driver offs
-> stream or recives error.
-> It also replace mxr_info, mxr_dbg, mxr_warn and mxr_err macro
-> by generic solution.
+On Saturday 21 of September 2013 19:42:19 Mateusz Krawczuk wrote:
+> This patch series is the new s5pv210 clock implementation
+> (using common clk framework).
 > 
-> Mateusz Krawczuk (4):
->   media: s5p-tv: Replace mxr_ macro by default dev_
->   media: s5p-tv: Restore vpll clock rate
->   media: s5p-tv: Fix sdo driver to work with CCF
->   media: s5p-tv: Fix mixer driver to work with CCF
+> This implementation is compatible with device tree definition and board
+> files.
 > 
->  drivers/media/platform/s5p-tv/mixer.h           |  12 ---
->  drivers/media/platform/s5p-tv/mixer_drv.c       |  81
-> ++++++++++++------- drivers/media/platform/s5p-tv/mixer_grp_layer.c |  
-> 2 +-
->  drivers/media/platform/s5p-tv/mixer_reg.c       |   6 +-
->  drivers/media/platform/s5p-tv/mixer_video.c     | 100
-> ++++++++++++------------ drivers/media/platform/s5p-tv/mixer_vp_layer.c 
-> |   2 +-
->  drivers/media/platform/s5p-tv/sdo_drv.c         |  39 +++++++--
->  7 files changed, 137 insertions(+), 105 deletions(-)
+> This patch series is based on linux-next and has been tested on goni and
+> aquila
+> boards using board file.
+> 
+> Since v3:
+> 
+> Replace s5pv210_clk_register_finpll, by creating mux finpll
+> with xusbxti and xxti as parrents.
+> 
+> Mateusz Krawczuk (3):
+>   clk: samsung: Add clock driver for s5pc110/s5pv210
+>   Cpufreq: s5pv210 cpufreq fixes for CCF
+>   ARM: s5pv210: Migrate clock handling to Common Clock Framework
+> 
+>  .../bindings/clock/samsung,s5pv210-clock.txt       |  75 +++
+>  arch/arm/mach-s5pv210/Kconfig                      |   9 +
+>  arch/arm/mach-s5pv210/Makefile                     |   4 +-
+>  arch/arm/mach-s5pv210/common.c                     |  17 +
+>  arch/arm/mach-s5pv210/common.h                     |  10 +
+>  arch/arm/mach-s5pv210/mach-goni.c                  |   2 +-
+>  arch/arm/mach-s5pv210/mach-smdkv210.c              |   2 +-
+>  arch/arm/plat-samsung/Kconfig                      |   2 +-
+>  drivers/clk/samsung/Makefile                       |   3 +
+>  drivers/clk/samsung/clk-s5pv210.c                  | 673
+> +++++++++++++++++++++ drivers/cpufreq/s5pv210-cpufreq.c                 
+> |   6 +-
+>  include/dt-bindings/clock/samsung,s5pv210-clock.h  | 224 +++++++
+>  12 files changed, 1019 insertions(+), 8 deletions(-)
+>  create mode 100644
+> Documentation/devicetree/bindings/clock/samsung,s5pv210-clock.txt create
+> mode 100644 drivers/clk/samsung/clk-s5pv210.c
+>  create mode 100644 include/dt-bindings/clock/samsung,s5pv210-clock.h
 
-For the whole series:
+Very nice work. I hope we will be able to finally move S5PV210 to Device 
+Tree for 3.13 and drop all the legacy code.
 
-Reviewed-by: Tomasz Figa <t.figa@samsung.com>
+Acked-by: Tomasz Figa <t.figa@samsung.com>
 
 Best regards,
 Tomasz
