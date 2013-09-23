@@ -1,62 +1,55 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 23 Sep 2013 21:19:17 +0300
-Subject: [PATCH 1/3] Add smp support for Allwinner A20(sunxi 7i).
-In-Reply-To: <523FB773.4050408@roeck-us.net>
-References: <1379768716-11672-1-git-send-email-cinifr@gmail.com>
- <1379768716-11672-2-git-send-email-cinifr@gmail.com>
- <20130921140059.GA2779@lukather> <523FB773.4050408@roeck-us.net>
-Message-ID: <20130923181917.GS2779@lukather>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 23 Sep 2013 12:22:31 -0600
+Subject: [PATCH 07/12] clk: tegra: move audio clk to common file
+In-Reply-To: <1379515331-19427-8-git-send-email-pdeschrijver@nvidia.com>
+References: <1379515331-19427-1-git-send-email-pdeschrijver@nvidia.com>
+ <1379515331-19427-8-git-send-email-pdeschrijver@nvidia.com>
+Message-ID: <524086E7.3020903@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Guenter,
+On 09/18/2013 08:40 AM, Peter De Schrijver wrote:
+> Move audio clocks and PLLA initialization to a common file so it can be used by
+> multiple Tegra SoCs.
 
-On Sun, Sep 22, 2013 at 08:37:23PM -0700, Guenter Roeck wrote:
-> On 09/21/2013 07:00 AM, Maxime Ripard wrote:
-> 
-> [ ... ]
-> 
-> >>+	/* assert cpu core reset */
-> >>+	writel(0, sunxi7i_cc_base + CPUX_RESET_CTL(cpu));
-> >>+	/* L1RSTDISABLE hold low */
-> >>+	pwr_reg = readl(sunxi7i_cc_base + AW_CPUCFG_GENCTL);
-> >>+	pwr_reg &= ~(1<<cpu);
-> >>+	writel(pwr_reg, sunxi7i_cc_base + AW_CPUCFG_GENCTL);
-> >>+	/* DBGPWRDUP hold low */
-> >>+	pwr_reg = readl(sunxi7i_cc_base + AW_CPUCFG_DBGCTL1);
-> >>+	pwr_reg &= ~(1<<cpu);
-> >
-> >Use BIT(cpu) here. And you should run scripts/checkpatch.pl on your
-> >patches before sending them.
-> >
-> 
-> For the record:
-> 
-> $ scripts/checkpatch.pl --strict allwinner.patch
-> total: 0 errors, 0 warnings, 0 checks, 527 lines checked
-> 
-> allwinner.patch has no obvious style problems and is ready for submission.
-> 
-> This is on top of "v3.12-rc1-336-gd8524ae".
-> 
-> checkpatch.pl does not complain as long as the number of spaces before
-> and after an operator is the same. There is a patch pending to change
-> this with the --strict option, but it will still not complain in 'normal'
-> operation.
+> diff --git a/drivers/clk/tegra/clk-tegra-audio.c b/drivers/clk/tegra/clk-tegra-audio.c
 
-Hmmm, ok. Somehow, I was convinced that it was triggering a warning.
-Thanks for the heads up :)
+> +static struct div_nmp pllp_nmp = {
+> +	.divm_shift = 0,
+> +	.divm_width = 5,
+> +	.divn_shift = 8,
+> +	.divn_width = 10,
+> +	.divp_shift = 20,
+> +	.divp_width = 3,
+> +};
+> +
+> +static struct tegra_clk_pll_freq_table pll_a_freq_table[] = {
+> +	{9600000, 282240000, 147, 5, 0, 4},
+> +	{9600000, 368640000, 192, 5, 0, 4},
+> +	{9600000, 240000000, 200, 8, 0, 8},
+> +
+> +	{28800000, 282240000, 245, 25, 0, 8},
+> +	{28800000, 368640000, 320, 25, 0, 8},
+> +	{28800000, 240000000, 200, 24, 0, 8},
+> +	{0, 0, 0, 0, 0, 0},
+> +};
+> +
+> +static struct tegra_clk_pll_params pll_a_params = {
+> +	.input_min = 2000000,
+> +	.input_max = 31000000,
+> +	.cf_min = 1000000,
+> +	.cf_max = 6000000,
+> +	.vco_min = 200000000,
+> +	.vco_max = 700000000,
+> +	.base_reg = PLLA_BASE,
+> +	.misc_reg = PLLA_MISC,
+> +	.lock_mask = PLL_BASE_LOCK,
+> +	.lock_enable_bit_idx = PLL_MISC_LOCK_ENABLE,
+> +	.lock_delay = 300,
+> +	.div_nmp = &pllp_nmp,
+> +};
 
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130923/c7dcb961/attachment.sig>
+I'm not convinced any of those tables are common across SoCs. In fact, I
+can see definite differences in those tables between the 3 SoCs we
+already have upstream... How will this be handled once you've enhanced
+this series to handle all supported SoCs?
