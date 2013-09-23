@@ -1,25 +1,27 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 23 Sep 2013 12:05:23 -0600
-Subject: [PATCH 05/12] clk: tegra: add header for common tegra clock IDs
-In-Reply-To: <1379515331-19427-6-git-send-email-pdeschrijver@nvidia.com>
+Date: Mon, 23 Sep 2013 12:16:18 -0600
+Subject: [PATCH 06/12] clk: tegra: add common infra for DT clocks
+In-Reply-To: <1379515331-19427-7-git-send-email-pdeschrijver@nvidia.com>
 References: <1379515331-19427-1-git-send-email-pdeschrijver@nvidia.com>
- <1379515331-19427-6-git-send-email-pdeschrijver@nvidia.com>
-Message-ID: <524082E3.8070801@wwwdotorg.org>
+ <1379515331-19427-7-git-send-email-pdeschrijver@nvidia.com>
+Message-ID: <52408572.2030907@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 09/18/2013 08:40 AM, Peter De Schrijver wrote:
-> Many clocks are common between several Tegra SoCs. Define an enum to list
-> them so we can move them to separate files which can be shared between
-> SoCs. Each SoC specific file will provide an array with the common clocks
-> which are present on the SoC and their DT binding ID.
+> Introduce a common infrastructure for registering DT IDs for tegra clocks and
+> sharing clock initialization between SoCs. Move Tegra114 to this new
+> infrastructure.
 
-So, this enum is purely something internal to the driver, and is in no
-way related to the DT binding clock IDs, nor the HW peripheral clock
-register bits, and finally is a union of all extant clocks across all chips?
+> diff --git a/drivers/clk/tegra/clk-tegra114.c b/drivers/clk/tegra/clk-tegra114.c
 
-If so, I suppose it's OK to make an enum for this. If not, the same
-comments I had re: trying to unify the DT binding clock IDs would apply
-here; if there's no architectural guarantee that the clock IDs will be
-kept the same across all future chips, assuming they are the same seems
-dangerous...
+> +static struct tegra_clk __initdata tegra114_clks[tegra_clk_max] = {
+> +	[tegra_clk_rtc] = { .dt_id = TEGRA114_CLK_RTC, .present = true },
+> +	[tegra_clk_timer] = { .dt_id = TEGRA114_CLK_TIMER, .present = true },
+
+It seems rather odd for a patch that adds "common infrastructure" to be
+adding a Tegra114-specific table of clock IDs, especially since this new
+table isn't actually used at all. I think I would expect a separate
+patch for the common infra-structure and the Tegra114-specific table.
+Hopefully there will be Tegra20-/30-specific tables added too in that
+second patch?
