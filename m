@@ -1,63 +1,77 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 23 Sep 2013 20:42:58 +0800
-Subject: [PATCH] clk: mxs: source LCD clock from PLL instead of from
- ref_xtal
-In-Reply-To: <1379922623-4875-1-git-send-email-hector.palacios@digi.com>
-References: <1379922623-4875-1-git-send-email-hector.palacios@digi.com>
-Message-ID: <20130923124256.GA18948@S2101-09.ap.freescale.net>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Mon, 23 Sep 2013 14:44:09 +0200
+Subject: [PATCH v5 4/4] media: s5p-tv: Fix mixer driver to work with CCF
+In-Reply-To: <1379775649-6331-5-git-send-email-m.krawczuk@partner.samsung.com>
+References: <1379775649-6331-1-git-send-email-m.krawczuk@partner.samsung.com>
+ <1379775649-6331-5-git-send-email-m.krawczuk@partner.samsung.com>
+Message-ID: <52403799.7020103@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Copy Mike who will help apply the patch.
+On 21/09/13 17:00, Mateusz Krawczuk wrote:
+> Replace clk_enable by clock_enable_prepare and clk_disable with clk_disable_unprepare.
+> Clock prepare is required by Clock Common Framework, and old clock driver didn`t support it.
+> Without it Common Clock Framework prints a warning.
 
-On Mon, Sep 23, 2013 at 09:50:23AM +0200, Hector Palacios wrote:
-> The lcd clock hierarchy is as follows:
-> 
->     ref_clk (24MHz)-----\
->                          +--+ lcdif_sel (MUX type)
->     frac1_clk (480Mhz)--/   |
->                             \--+ lcdif_div (DIV type)
->                                |
->                                \-- lcdif (GATE type)
-> 
-> The mxsfb driver retrieves the 'lcdif_div' clock from the DT, but the
-> 'lcdif_sel' is by default sourced from 'ref_clk' which is a fixed 24MHz.
-> This means the pixel clock can only be 24MHz or a power-of-two divisor
-> of that frequency (12, 6, 3...) which is a very poor divisor granularity.
-> 
-> Since the driver doesn't know about the different clocks that can
-> source its clk parent from, we must select the PLL (480MHz) to be the
-> parent during the general clocks initialization. This allows for much
-> better divisor granularity and for more accurate frequencies for LCD
-> displays.
-> 
-> Signed-off-by: Hector Palacios <hector.palacios@digi.com>
-> Tested-by: Fabio Estevam <fabio.estevam@freescale.com>
-> CC: Maxime Rippard <maxime.ripard@free-electrons.com>
-> CC: Marek Vasut <marex@denx.de>
-> CC: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> CC: Gwenhael Goavec-Merou <gwenhael.goavec-merou@armadeus.com>
+nit: Please wrap this text to not exceed 80 columns.
 
-Acked-by: Shawn Guo <shawn.guo@linaro.org>
-
+> Signed-off-by: Mateusz Krawczuk <m.krawczuk@partner.samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 > ---
->  drivers/clk/mxs/clk-imx28.c | 6 ++++++
->  1 file changed, 6 insertions(+)
+>  drivers/media/platform/s5p-tv/mixer_drv.c | 34 +++++++++++++++++++++++++------
+>  1 file changed, 28 insertions(+), 6 deletions(-)
 > 
-> diff --git a/drivers/clk/mxs/clk-imx28.c b/drivers/clk/mxs/clk-imx28.c
-> index 4faf0af..882ec3f 100644
-> --- a/drivers/clk/mxs/clk-imx28.c
-> +++ b/drivers/clk/mxs/clk-imx28.c
-> @@ -246,6 +246,12 @@ int __init mx28_clocks_init(void)
->  	clk_data.clk_num = ARRAY_SIZE(clks);
->  	of_clk_add_provider(np, of_clk_src_onecell_get, &clk_data);
+> diff --git a/drivers/media/platform/s5p-tv/mixer_drv.c b/drivers/media/platform/s5p-tv/mixer_drv.c
+> index 8ce7c3e..7eea286 100644
+> --- a/drivers/media/platform/s5p-tv/mixer_drv.c
+> +++ b/drivers/media/platform/s5p-tv/mixer_drv.c
+> @@ -347,19 +347,41 @@ static int mxr_runtime_resume(struct device *dev)
+>  {
+>  	struct mxr_device *mdev = to_mdev(dev);
+>  	struct mxr_resources *res = &mdev->res;
+> +	int ret;
 >  
-> +	/*
-> +	 * Select PLL as the parent source of lcdif_sel clk to have a finer
-> +	 * granularity when calculating the LCD pixelclock
-> +	 */
-> +	clk_set_parent(clks[lcdif_sel], clks[ref_pix]);
+>  	dev_dbg(mdev->dev, "resume - start\n");
+>  	mutex_lock(&mdev->mutex);
+>  	/* turn clocks on */
+> -	clk_enable(res->mixer);
+> -	clk_enable(res->vp);
+> -	clk_enable(res->sclk_mixer);
+> +	ret = clk_prepare_enable(res->mixer);
+> +	if (ret < 0) {
+> +		dev_err(mdev->dev, "clk_prepare_enable(mixer) failed\n");
+> +		goto fail;
+> +	}
+> +	ret = clk_prepare_enable(res->vp);
+> +	if (ret < 0) {
+> +		dev_err(mdev->dev, "clk_prepare_enable(vp) failed\n");
+> +		goto fail_mixer;
+> +	}
+> +	ret = clk_prepare_enable(res->sclk_mixer);
+> +	if (ret < 0) {
+> +		dev_err(mdev->dev, "clk_prepare_enable(sclk_mixer) failed\n");
+> +		goto fail_vp;
+> +	}
+>  	/* apply default configuration */
+>  	mxr_reg_reset(mdev);
+>  	dev_dbg(mdev->dev, "resume - finished\n");
+>  
+>  	mutex_unlock(&mdev->mutex);
+>  	return 0;
 > +
->  	clk_register_clkdev(clks[enet_out], NULL, "enet_out");
->  
->  	for (i = 0; i < ARRAY_SIZE(clks_init_on); i++)
+> +fail_vp:
+> +	clk_disable_unprepare(res->vp);
+> +fail_mixer:
+> +	clk_disable_unprepare(res->mixer);
+> +fail:
+
+How about only one error log here if any of the clk_prepare_enable() calls
+fails ? I'm not sure if we need a separate log for each single clock.
+
+> +	mutex_unlock(&mdev->mutex);
+> +	dev_err(mdev->dev, "resume failed\n");
+> +	return ret;
+>  }
+
+Regards,
+Sylwester
