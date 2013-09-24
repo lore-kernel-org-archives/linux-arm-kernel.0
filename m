@@ -1,72 +1,54 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 24 Sep 2013 08:01:52 -0400
-Subject: [PATCH RESEND] ARM: add dtbImage.<dt> and dtbuImage.<dt> rules
-In-Reply-To: <52416F97.802@keymile.com>
-References: <504DFBBF.5010202@free-electrons.com>
- <1348733441-11626-1-git-send-email-richard.genoud@gmail.com>
- <20120927082955.GR17667@game.jcrosoft.org>
- <CACQ1gAgwv4pBFZBrVZiWM2_=OneUO-s16LufSENx27gMC3DUig@mail.gmail.com>
- <52416F97.802@keymile.com>
-Message-ID: <20130924120152.GI11119@titan.lakedaemon.net>
+From: jean.pihet@linaro.org (Jean Pihet)
+Date: Tue, 24 Sep 2013 14:03:47 +0200
+Subject: [PATCH 3/4] perf tools: Check libunwind for availability of dwarf
+ parsing feature
+In-Reply-To: <20130924100620.GG15119@mudshark.cambridge.arm.com>
+References: <1379323053-11458-1-git-send-email-jean.pihet@linaro.org>
+ <1379323053-11458-4-git-send-email-jean.pihet@linaro.org>
+ <20130917102904.GA27258@mudshark.cambridge.arm.com>
+ <CAFrcx1nnx0+kWx3z3A86Fwz13RYRVSPSG0YHBcxFeFQP8W7jBg@mail.gmail.com>
+ <20130924093450.GB1008@krava.brq.redhat.com>
+ <20130924100620.GG15119@mudshark.cambridge.arm.com>
+Message-ID: <CAFrcx1k-sfHMRz6mvibBbph4vNOMkVddE4LEE4yXbWHC3DwMZA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Gerlando,
+Hi Jiri, Will,
 
-On Tue, Sep 24, 2013 at 12:55:19PM +0200, Gerlando Falauto wrote:
-> We're in the position where we'd like to have FDT support just
-> because it simplifies our code a whole lot;
+On 24 September 2013 12:06, Will Deacon <will.deacon@arm.com> wrote:
+> On Tue, Sep 24, 2013 at 10:34:50AM +0100, Jiri Olsa wrote:
+>> On Tue, Sep 24, 2013 at 10:55:32AM +0200, Jean Pihet wrote:
+>> > Ping on the series. The two patches above (3/4 and 4/4) are generic
+>> > while the two others are impacting ARM only.
+>> > Is it possible to get an Ack for the generic ones?
+>>
+>> I'm fine with those changes.. still I'm sort of worried about
+>> current DWARF unwind users (but not sure if there're any),
+>> who depends on packaged libunwind compiled without
+>> --enable-debug-frame option.
+>
+> Since x86 is the only architecture using libunwind with perf at the moment,
+> and I'd expect it to use .eh_frame for unwinding, I'm also not sure there
+> are any existing users to worry about.
+Right
 
-Great!
+>
+>> I've seen your libunwind patch to make it default, but
+>> not sure if it was accepted.. if not, maybe we should
+>> detect this and build that code conditionaly.
+>
+> It certainly defaults to "on" for ARM, but other architectures have to
+> enable it explicitly afaict.
+Yes that is correct.
+This patch (3/4) detects if the debug frame code is enabled in
+libunwind and uses the lib only if it is the case.
+Users that want the feature have to enable it explicitly; the commit
+description documents how to do that.
 
-> yet we want to be able to run such a kernel on older u-boots
-> (completely unaware of FTDs) as well.
-> I believe this must be a very common use case indeed.
+So I think we are safe here.
 
-Yes, very much so.  With the understanding that this is an artifact of
-the transition, hopefully not a permanent state. ;-)
+>
+> Will
 
-> So a dtbuImage.<dtb> would be very useful in this case.
-
-well...
-
-> If I understand it correctly, dtbImage.<dtb> is indeed just a cat of
-> zImage+dtb, whereas dtbuImage.<dtb> is the uimage of such a
-> dtbImage.<dtb>.
-
-Yes.
-
-> So it shouldn't be such a crazy idea to create a dtbuImage.<dtb>
-> within Kbuild (as opposed to from an external wrapper for make).
-
-Yes :)  The problem is that we are moving to multiplatform zImages.  In
-that scenario, the uImage target isn't very helpful because it needs to
-be custom to each board.  Additionally, appended-dtb was intended as a
-developer tool and isn't intended as a deployable item.  It also
-defeats the purpose of multiplatform.
-
-> Is there any reason why nothing like that was ever mainlined?
-> Or maybe I'm just missing something?
-
-We are strongly encouraging all vendors to upgrade their bootloaders to
-support field upgradeable dtbs.  eg having the dtb on a separate
-partition of the flash (or whereever the bootloader environment is)
-
-iirc, keymile is using an odd flavor of Kirkwood.  Have you tried kwboot
-over serial?  It can be found in barebox and u-boot source repositories.
-
-The above is the long-term goal, in the short term, please take a look
-at:
-
-https://github.com/zonque/pxa-impedance-matcher
-
-You can use this to boot a modern fdt kernel on a legacy bootloader,
-with one or more dtb's linked in.  I tested it on the dreamplug, so it's
-mostly there for you.
-
-The big outstanding TODO I have on it is to parse the atags and modify
-the selected dtb before passing off to the kernel.  Patches welcome! :)
-
-hth,
-
-Jason.
+Thanks,
+Jean
