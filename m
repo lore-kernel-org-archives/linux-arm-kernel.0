@@ -1,44 +1,57 @@
-From: andreas.herrmann@calxeda.com (Andreas Herrmann)
-Date: Tue, 24 Sep 2013 17:07:01 +0200
-Subject: [PATCH 7/7] iommu/arm-smmu: Clear global and context bank fault
- status and syndrome registers
-In-Reply-To: <1380035221-11576-1-git-send-email-andreas.herrmann@calxeda.com>
-References: <1380035221-11576-1-git-send-email-andreas.herrmann@calxeda.com>
-Message-ID: <1380035221-11576-8-git-send-email-andreas.herrmann@calxeda.com>
+From: gerlando.falauto@keymile.com (Gerlando Falauto)
+Date: Tue, 24 Sep 2013 17:14:26 +0200
+Subject: [PATCH RESEND] ARM: add dtbImage.<dt> and dtbuImage.<dt> rules
+In-Reply-To: <20130924120152.GI11119@titan.lakedaemon.net>
+References: <504DFBBF.5010202@free-electrons.com>
+ <1348733441-11626-1-git-send-email-richard.genoud@gmail.com>
+ <20120927082955.GR17667@game.jcrosoft.org>
+ <CACQ1gAgwv4pBFZBrVZiWM2_=OneUO-s16LufSENx27gMC3DUig@mail.gmail.com>
+ <52416F97.802@keymile.com> <20130924120152.GI11119@titan.lakedaemon.net>
+Message-ID: <5241AC52.7000808@keymile.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Andreas Herrmann <andreas.herrmann@calxeda.com>
----
- drivers/iommu/arm-smmu.c |    9 +++++++++
- 1 file changed, 9 insertions(+)
+Hi Jason,
 
-diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index 251564e..a499146 100644
---- a/drivers/iommu/arm-smmu.c
-+++ b/drivers/iommu/arm-smmu.c
-@@ -645,6 +645,10 @@ static void arm_smmu_init_context_bank(struct arm_smmu_domain *smmu_domain)
- 	stage1 = root_cfg->cbar != CBAR_TYPE_S2_TRANS;
- 	cb_base = ARM_SMMU_CB_BASE(smmu) + ARM_SMMU_CB(smmu, root_cfg->cbndx);
- 
-+	/* clear fsr */
-+	writel_relaxed(0xffffffff, cb_base + ARM_SMMU_CB_FSR);
-+	writel_relaxed(0, cb_base + ARM_SMMU_CB_FSYNR0);
-+
- 	/* CBAR */
- 	reg = root_cfg->cbar;
- 	if (smmu->version == 1)
-@@ -1570,6 +1574,11 @@ static void arm_smmu_device_reset(struct arm_smmu_device *smmu)
- 	int i = 0;
- 	u32 scr0 = readl_relaxed(gr0_base + ARM_SMMU_GR0_sCR0);
- 
-+	/* clear global FSRs */
-+	writel(0xffffffff, gr0_base + ARM_SMMU_GR0_sGFSR);
-+	writel(0, gr0_base + ARM_SMMU_GR0_sGFSYNR0);
-+	writel(0, gr0_base + ARM_SMMU_GR0_sGFSYNR1);
-+
- 	/* Mark all SMRn as invalid and all S2CRn as bypass */
- 	for (i = 0; i < smmu->num_mapping_groups; ++i) {
- 		writel_relaxed(~SMR_VALID, gr0_base + ARM_SMMU_GR0_SMR(i));
--- 
-1.7.9.5
+On 09/24/2013 02:01 PM, Jason Cooper wrote:
+> Gerlando,
+[...]
+
+> We are strongly encouraging all vendors to upgrade their bootloaders to
+> support field upgradeable dtbs.  eg having the dtb on a separate
+> partition of the flash (or whereever the bootloader environment is)
+
+This will most definitely be the case for future boards, but we sort of 
+follow the unspoken guideline of not upgrading u-boot on field-deployed 
+units. Arguable at least, but that's the way it is.
+
+> iirc, keymile is using an odd flavor of Kirkwood.
+
+Correct, it's a kirkwood + a switch on the same die.
+
+> Have you tried kwboot over serial?  It can be found in barebox and u-boot source repositories.
+
+Uhm, yes, I've used it a few times... but what are you suggesting?
+That u-boot can be upgraded? Yes, I believe that... ;-)
+
+> The above is the long-term goal, in the short term, please take a look
+> at:
+>
+> https://github.com/zonque/pxa-impedance-matcher
+>
+> You can use this to boot a modern fdt kernel on a legacy bootloader,
+> with one or more dtb's linked in.  I tested it on the dreamplug, so it's
+> mostly there for you.
+>
+> The big outstanding TODO I have on it is to parse the atags and modify
+> the selected dtb before passing off to the kernel.  Patches welcome! :)
+
+Thank you, I had a quick look at the README and it sounds great!
+But CONFIG_APPENDED_DTB already does the job of filling this gap for me...
+
+>
+> hth,
+
+It sure did. I really appreciate it. Thanks!!!
+
+Gerlando
