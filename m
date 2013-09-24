@@ -1,37 +1,30 @@
-From: abrestic@chromium.org (Andrew Bresticker)
-Date: Tue, 24 Sep 2013 15:12:27 -0700
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 24 Sep 2013 15:16:24 -0700
 Subject: [PATCH V3 1/6] clk: exynos-audss: convert to platform device
-In-Reply-To: <524200FB.8010004@gmail.com>
+In-Reply-To: <1380046016-5811-1-git-send-email-abrestic@chromium.org>
 References: <1379982078-23381-1-git-send-email-abrestic@chromium.org>
  <1380046016-5811-1-git-send-email-abrestic@chromium.org>
- <524200FB.8010004@gmail.com>
-Message-ID: <CAL1qeaEpu=YRasZpSvrCTNwC6OGWZgECjwDSFgkAN07eWObmrg@mail.gmail.com>
+Message-ID: <52420F38.6030004@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->> +static int exynos_audss_clk_remove(struct platform_device *pdev)
->> +{
->> +       int i;
->> +
->> +       of_clk_del_provider(pdev->dev.of_node);
->> +
->> +       for (i = 0; i<  EXYNOS_AUDSS_MAX_CLKS; i++) {
->> +               if (!IS_ERR_OR_NULL(clk_table[i]))
->> +                       clk_unregister(clk_table[i]);
->> +       }
->
->
-> Since we only get here if all the clocks are registered properly and we
-> always register EXYNOS_AUDSS_MAX_CLKS clocks, couldn't this simply be:
->
->
->         for (i = 0; i < EXYNOS_AUDSS_MAX_CLKS; i++)
->                 clk_unregister(clk_table[i]);
->
-> ?
+On 09/24/13 11:06, Andrew Bresticker wrote:
+> +static int __init exynos_audss_clk_init(void)
+> +{
+> +	return platform_driver_register(&exynos_audss_clk_driver);
+> +}
+> +core_initcall(exynos_audss_clk_init);
+> +
+> +static void __init exynos_audss_clk_exit(void)
 
-Once support is added for Exynos5420, we won't always register
-EXYNOS_AUDSS_MAX_CLKS clocks, so we'd still need the NULL check.
+__exit?
 
-Thanks,
-Andrew
+> +{
+> +	platform_driver_unregister(&exynos_audss_clk_driver);
+> +}
+> +module_exit(exynos_audss_clk_exit);
+>
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
