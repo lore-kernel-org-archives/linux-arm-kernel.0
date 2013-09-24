@@ -1,51 +1,59 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 24 Sep 2013 15:01:22 +0200
-Subject: [GIT PULL] at91: fixes for 3.12 #1
-Message-ID: <1380027682-8132-1-git-send-email-nicolas.ferre@atmel.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Tue, 24 Sep 2013 15:04:07 +0200
+Subject: [PATCH v5 0/3] ARM: S5PV210: move to common clk framework
+In-Reply-To: <1380027009-2239-1-git-send-email-m.krawczuk@partner.samsung.com>
+References: <1380027009-2239-1-git-send-email-m.krawczuk@partner.samsung.com>
+Message-ID: <4983756.tzuZRus2Wn@amdc1227>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof, Kevin,
+Hi Mateusz,
 
-This is the first batch of fixes for AT91.
-I think that the removal of the void flag IRQF_DISABLED can be schedulled in
-this timeframe as we are pretty early in the cycle and that this patch
-shouldn't wait more.
+On Tuesday 24 of September 2013 14:50:06 Mateusz Krawczuk wrote:
+> This patch series is the new s5pv210 clock implementation
+> (using common clk framework).
+> 
+> This implementation is compatible with device tree definition and board
+> files.
+> 
+> This patch series is based on linux-next and has been tested on goni and
+> aquila
+> boards using board file.
+> 
+> Since v4:
+> Corrected mux flags for finpll.
+> 
+> Since v3:
+> 
+> Replace s5pv210_clk_register_finpll, by creating mux finpll
+> with xusbxti and xxti as parrents.
+> 
+> 
+> Mateusz Krawczuk (3):
+>   clk: samsung: Add clock driver for s5pc110/s5pv210
+>   Cpufreq: s5pv210 cpufreq fixes for CCF
+>   ARM: s5pv210: Migrate clock handling to Common Clock Framework
+> 
+>  .../bindings/clock/samsung,s5pv210-clock.txt       |  75 +++
+>  arch/arm/mach-s5pv210/Kconfig                      |   9 +
+>  arch/arm/mach-s5pv210/Makefile                     |   4 +-
+>  arch/arm/mach-s5pv210/common.c                     |  17 +
+>  arch/arm/mach-s5pv210/common.h                     |  10 +
+>  arch/arm/mach-s5pv210/mach-goni.c                  |   2 +-
+>  arch/arm/mach-s5pv210/mach-smdkv210.c              |   2 +-
+>  arch/arm/plat-samsung/Kconfig                      |   2 +-
+>  drivers/clk/samsung/Makefile                       |   3 +
+>  drivers/clk/samsung/clk-s5pv210.c                  | 673 +++++++++++++++++++++
+>  drivers/cpufreq/s5pv210-cpufreq.c                  |   6 +-
+>  include/dt-bindings/clock/samsung,s5pv210-clock.h  | 224 +++++++
+>  12 files changed, 1019 insertions(+), 8 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/clock/samsung,s5pv210-clock.txt
+>  create mode 100644 drivers/clk/samsung/clk-s5pv210.c
+>  create mode 100644 include/dt-bindings/clock/samsung,s5pv210-clock.h
 
-Thanks, best regards,
+For this series:
 
-The following changes since commit 272b98c6455f00884f0350f775c5342358ebb73f:
+Acked-by: Tomasz Figa <t.figa@samsung.com>
 
-  Linux 3.12-rc1 (2013-09-16 16:17:51 -0400)
-
-are available in the git repository at:
-
-  git://github.com/at91linux/linux-at91.git tags/at91-fixes
-
-for you to fetch changes up to 9ceb389dddbcdb87830f01fcf84d94b2da581dae:
-
-  ARM: at91: remove IRQF_DISABLED (2013-09-19 15:36:35 +0200)
-
-----------------------------------------------------------------
-First fixes series for 3.12
-- removal of void IRQF_DISABLED flag in timer drivers
-- two little fixes in DT for at91sam9x5 family
-
-----------------------------------------------------------------
-Jiri Prchal (1):
-      ARM: at91: serial: fix wrong pinctrl_usart2_rts
-
-Michael Opdenacker (1):
-      ARM: at91: remove IRQF_DISABLED
-
-Nicolas Ferre (1):
-      ARM: at91: at91sam9x5: set default mmc[01] pinctrl-names
-
- arch/arm/boot/dts/at91sam9x5.dtsi     | 6 ++++--
- arch/arm/mach-at91/at91rm9200_time.c  | 2 +-
- arch/arm/mach-at91/at91sam926x_time.c | 2 +-
- arch/arm/mach-at91/at91x40_time.c     | 2 +-
- 4 files changed, 7 insertions(+), 5 deletions(-)
-
--- 
-Nicolas Ferre
+Best regards,
+Tomasz
