@@ -1,167 +1,119 @@
-From: jolsa@redhat.com (Jiri Olsa)
-Date: Tue, 24 Sep 2013 19:43:18 +0200
-Subject: [PATCH 3/4] perf tools: Check libunwind for availability of
- dwarf parsing feature
-In-Reply-To: <CAFrcx1k-sfHMRz6mvibBbph4vNOMkVddE4LEE4yXbWHC3DwMZA@mail.gmail.com>
-References: <1379323053-11458-1-git-send-email-jean.pihet@linaro.org>
- <1379323053-11458-4-git-send-email-jean.pihet@linaro.org>
- <20130917102904.GA27258@mudshark.cambridge.arm.com>
- <CAFrcx1nnx0+kWx3z3A86Fwz13RYRVSPSG0YHBcxFeFQP8W7jBg@mail.gmail.com>
- <20130924093450.GB1008@krava.brq.redhat.com>
- <20130924100620.GG15119@mudshark.cambridge.arm.com>
- <CAFrcx1k-sfHMRz6mvibBbph4vNOMkVddE4LEE4yXbWHC3DwMZA@mail.gmail.com>
-Message-ID: <20130924174318.GE3080@krava.brq.redhat.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Tue, 24 Sep 2013 13:43:53 -0400
+Subject: [PATCH] ARM: Update SMP_ON_UP code to detect A9MPCore with 1
+ CPU devices
+In-Reply-To: <20130924170849.GC32220@mudshark.cambridge.arm.com>
+References: <1375381033-13220-1-git-send-email-santosh.shilimkar@ti.com>
+ <51FBC610.9030900@arm.com> <51FBCEC3.4030207@ti.com>
+ <51FBD42A.9040901@arm.com> <20130802154857.GD5292@mudshark.cambridge.arm.com>
+ <52092AA5.3090005@ti.com> <20130813111943.GE30280@mudshark.cambridge.arm.com>
+ <520A3518.3030301@ti.com> <20130924170849.GC32220@mudshark.cambridge.arm.com>
+Message-ID: <5241CF59.3000006@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 24, 2013 at 02:03:47PM +0200, Jean Pihet wrote:
-> Hi Jiri, Will,
+On Tuesday 24 September 2013 01:08 PM, Will Deacon wrote:
+> Hi Santosh,
 > 
-> On 24 September 2013 12:06, Will Deacon <will.deacon@arm.com> wrote:
-> > On Tue, Sep 24, 2013 at 10:34:50AM +0100, Jiri Olsa wrote:
-> >> On Tue, Sep 24, 2013 at 10:55:32AM +0200, Jean Pihet wrote:
-> >> > Ping on the series. The two patches above (3/4 and 4/4) are generic
-> >> > while the two others are impacting ARM only.
-> >> > Is it possible to get an Ack for the generic ones?
-> >>
-> >> I'm fine with those changes.. still I'm sort of worried about
-> >> current DWARF unwind users (but not sure if there're any),
-> >> who depends on packaged libunwind compiled without
-> >> --enable-debug-frame option.
-> >
-> > Since x86 is the only architecture using libunwind with perf at the moment,
-> > and I'd expect it to use .eh_frame for unwinding, I'm also not sure there
-> > are any existing users to worry about.
-> Right
+> On Tue, Aug 13, 2013 at 02:31:04PM +0100, Santosh Shilimkar wrote:
+>> On Tuesday 13 August 2013 07:19 AM, Will Deacon wrote:
+>>> On Mon, Aug 12, 2013 at 07:34:13PM +0100, Santosh Shilimkar wrote:
+>>>> On Friday 02 August 2013 11:48 AM, Will Deacon wrote:
+>>>>> I think this an A9-specific register, which reads as 0 on UP A9 and reads as
+>>>>> some form of PERIPH_BASE for SMP parts. The issue I have is when PERIPH_BASE
+>>>>> is zero.
+>>>>>
+>>>> What do we do here ? Should we document this in the code and proceed ?
+>>>> Mostly there is no platform with PERIPH_BASE = 0, so its should be fine but
+>>>> I am open for any other alternative.
+>>>
+>>> The only other alternative I can think of is forcing people to have
+>>> CONFIG_SMP=n, but that blows away single zImage for your platform.
+>>>
+>> Yep which surely we don't want considering after so much effort we
+>> have it working first place. How about going ahead with assumption
+>> that PERIPH_BASE = 0 case doesn't work.
 > 
-> >
-> >> I've seen your libunwind patch to make it default, but
-> >> not sure if it was accepted.. if not, maybe we should
-> >> detect this and build that code conditionaly.
-> >
-> > It certainly defaults to "on" for ARM, but other architectures have to
-> > enable it explicitly afaict.
-> Yes that is correct.
-> This patch (3/4) detects if the debug frame code is enabled in
-> libunwind and uses the lib only if it is the case.
+> It's been over a month and I can't think of anything better than this
+> without jeopardising the single zImage effort. However, it also doesn't seem
+> fair if we rule out the possibility of single zImage for future SoCs which
+> use 0x0 as their PERIPH_BASE (I don't know of any at the moment).
+> 
+> So how about we go ahead with this, but add a big fat comment to the code in
+> head.S saying that, if a future SoC *does* use 0x0 as the PERIPH_BASE, then
+> the check will need to be #ifdef'd or equivalent for the Aegis platform?
+> 
+I agree. Updated patch end of the email. If you are fine with this version,
+will stick it into RMK's patch system.
 
-My concern is about users (again, not sure if there are any ;-) )
-that use this with packaged libunwind compiled without
---enable-debug-frame option.
+Regards,
+Santosh
 
-For them perf will consider libunwind as 'not available' with
-your changes:
+>From 05b1b43324f3e8d10a38f78dbcbf7632d4c3530c Mon Sep 17 00:00:00 2001
+From: Vaibhav Bedia <vaibhav.bedia@ti.com>
+Date: Thu, 18 Jul 2013 13:01:53 -0400
+Subject: [PATCH] ARM: Update SMP_ON_UP code to detect A9MPCore with 1 CPU
+ devices
 
-      ...
-      CHK libunwind
-  config/Makefile:223: No libunwind found, disabling post unwind support.  Please install libunwind-dev[el] >= 1.1
-      ...
+The generic code is well equipped to differentiate between
+SMP and UP configurations.However, there are some devices which
+use Cortex-A9 MP core IP with 1 CPU as configuration. To let
+these SOCs to co-exist in a CONFIG_SMP=y build by leveraging
+the SMP_ON_UP support, we need to additionally check the
+number the cores in Cortex-A9 MPCore configuration. Without
+such a check in place, the startup code tries to execute
+ALT_SMP() set of instructions which lead to CPU faults.
 
-and they'll need to compile their own libunwind
-(thats the case on Fedora).
+The issue was spotted on TI's Aegis device and this patch
+makes now the device work with omap2plus_defconfig which
+enables SMP by default. The change is kept limited to only
+Cortex-A9 MPCore detection code.
 
-This could be solved by detecting this and make your
-code conditional as attached below (not much tested).
+Note that if any future SoC *does* use 0x0 as the PERIPH_BASE, then
+the SCU address check code needs to be #ifdef'd for for the Aegis
+platform.
 
-thanks,
-jirka
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Russell King <linux@arm.linux.org.uk>
 
-
+Acked-by: Sricharan R <r.sricharan@ti.com>
+Signed-off-by: Vaibhav Bedia <vaibhav.bedia@ti.com>
+Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 ---
-diff --git a/tools/perf/config/Makefile b/tools/perf/config/Makefile
-index 134b36e..d40cf0a 100644
---- a/tools/perf/config/Makefile
-+++ b/tools/perf/config/Makefile
-@@ -223,6 +223,10 @@ ifneq ($(call try-cc,$(SOURCE_LIBUNWIND),$(FLAGS_UNWIND),libunwind),y)
-   msg := $(warning No libunwind found, disabling post unwind support. Please install libunwind-dev[el] >= 1.1);
-   NO_LIBUNWIND := 1
- endif # Libunwind support
-+ifneq ($(call try-cc,$(SOURCE_LIBUNWIND_DEBUG_FRAME),$(FLAGS_UNWIND),libunwind debug_frame),y)
-+  msg := $(warning No debug_frame support found in libunwind);
-+CFLAGS += -DNO_LIBUNWIND_DEBUG_FRAME
-+endif
- endif # NO_LIBUNWIND
- 
- ifndef NO_LIBUNWIND
-diff --git a/tools/perf/config/feature-tests.mak b/tools/perf/config/feature-tests.mak
-index 87124d0..645141c 100644
---- a/tools/perf/config/feature-tests.mak
-+++ b/tools/perf/config/feature-tests.mak
-@@ -178,6 +178,28 @@ extern int UNW_OBJ(dwarf_search_unwind_table) (unw_addr_space_t as,
- 
- #define dwarf_search_unwind_table UNW_OBJ(dwarf_search_unwind_table)
- 
-+int main(void)
-+{
-+	unw_addr_space_t addr_space;
-+	addr_space = unw_create_addr_space(NULL, 0);
-+	unw_init_remote(NULL, addr_space, NULL);
-+	dwarf_search_unwind_table(addr_space, 0, NULL, NULL, 0, NULL);
-+	return 0;
-+}
-+endef
+ arch/arm/kernel/head.S |   21 ++++++++++++++++++++-
+ 1 file changed, 20 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
+index 2c7cc1e..476de57 100644
+--- a/arch/arm/kernel/head.S
++++ b/arch/arm/kernel/head.S
+@@ -487,7 +487,26 @@ __fixup_smp:
+ 	mrc	p15, 0, r0, c0, c0, 5	@ read MPIDR
+ 	and	r0, r0, #0xc0000000	@ multiprocessing extensions and
+ 	teq	r0, #0x80000000		@ not part of a uniprocessor system?
+-	moveq	pc, lr			@ yes, assume SMP
++	bne    __fixup_smp_on_up	@ no, assume UP
 +
-+define SOURCE_LIBUNWIND_DEBUG_FRAME
-+#include <libunwind.h>
-+#include <stdlib.h>
++	@ Core indicates it is SMP. Check for Aegis SOC where a single
++	@ Cortex-A9 CPU is present but SMP operations fault.
++	mov	r4, #0x41000000
++	orr	r4, r4, #0x0000c000
++	orr	r4, r4, #0x00000090
++	teq	r3, r4			@ Check for ARM Cortex-A9
++	movne	pc, lr			@ Not ARM Cortex-A9,
 +
-+extern int UNW_OBJ(dwarf_search_unwind_table) (unw_addr_space_t as,
-+                                      unw_word_t ip,
-+                                      unw_dyn_info_t *di,
-+                                      unw_proc_info_t *pi,
-+                                      int need_unwind_info, void *arg);
-+
-+#define dwarf_search_unwind_table UNW_OBJ(dwarf_search_unwind_table)
-+
- extern int
- UNW_OBJ(dwarf_find_debug_frame) (int found, unw_dyn_info_t *di_debug,
- 				 unw_word_t ip,
-@@ -189,11 +211,7 @@ UNW_OBJ(dwarf_find_debug_frame) (int found, unw_dyn_info_t *di_debug,
++	@ If a future SoC *does* use 0x0 as the PERIPH_BASE, then the
++	@ below address check will need to be #ifdef'd or equivalent
++	@ for the Aegis platform.
++	mrc	p15, 4, r0, c15, c0	@ get SCU base address
++	teq	r0, #0x0		@ '0' on actual UP A9 hardware
++	beq	__fixup_smp_on_up	@ So its an A9 UP
++	ldr	r0, [r0, #4]		@ read SCU Config
++	and	r0, r0, #0x3		@ number of CPUs
++	teq	r0, #0x0		@ is 1?
++	movne	pc, lr
  
- int main(void)
- {
--	unw_addr_space_t addr_space;
--	addr_space = unw_create_addr_space(NULL, 0);
--	unw_init_remote(NULL, addr_space, NULL);
- 	dwarf_find_debug_frame(0, NULL, 0, 0, NULL, 0, 0);
--	dwarf_search_unwind_table(addr_space, 0, NULL, NULL, 0, NULL);
- 	return 0;
- }
- endef
-diff --git a/tools/perf/util/unwind.c b/tools/perf/util/unwind.c
-index 429a99c..231c941 100644
---- a/tools/perf/util/unwind.c
-+++ b/tools/perf/util/unwind.c
-@@ -277,6 +277,7 @@ static int read_unwind_spec_eh_frame(struct dso *dso, struct machine *machine,
- 	return ret;
- }
- 
-+#ifndef NO_LIBUNWIND_DEBUG_FRAME
- static int read_unwind_spec_debug_frame(struct dso *dso,
- 					struct machine *machine, u64 *offset)
- {
-@@ -294,6 +295,7 @@ static int read_unwind_spec_debug_frame(struct dso *dso,
- 
- 	return -EINVAL;
- }
-+#endif
- 
- static struct map *find_map(unw_word_t ip, struct unwind_info *ui)
- {
-@@ -334,6 +336,7 @@ find_proc_info(unw_addr_space_t as, unw_word_t ip, unw_proc_info_t *pi,
- 						 need_unwind_info, arg);
- 	}
- 
-+#ifndef NO_LIBUNWIND_DEBUG_FRAME
- 	/* Check the .debug_frame section for unwinding info */
- 	if (!read_unwind_spec_debug_frame(map->dso, ui->machine, &segbase)) {
- 		memset(&di, 0, sizeof(di));
-@@ -342,7 +345,7 @@ find_proc_info(unw_addr_space_t as, unw_word_t ip, unw_proc_info_t *pi,
- 		return dwarf_search_unwind_table(as, ip, &di, pi,
- 						 need_unwind_info, arg);
- 	}
--
-+#endif
- 	return -EINVAL;
- }
- 
+ __fixup_smp_on_up:
+ 	adr	r0, 1f
+-- 
+1.7.9.5
