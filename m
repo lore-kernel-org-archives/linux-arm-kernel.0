@@ -1,47 +1,40 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 24 Sep 2013 18:08:49 +0100
-Subject: [PATCH] ARM: Update SMP_ON_UP code to detect A9MPCore with 1 CPU
- devices
-In-Reply-To: <520A3518.3030301@ti.com>
-References: <1375381033-13220-1-git-send-email-santosh.shilimkar@ti.com>
- <51FBC610.9030900@arm.com> <51FBCEC3.4030207@ti.com>
- <51FBD42A.9040901@arm.com>
- <20130802154857.GD5292@mudshark.cambridge.arm.com>
- <52092AA5.3090005@ti.com>
- <20130813111943.GE30280@mudshark.cambridge.arm.com>
- <520A3518.3030301@ti.com>
-Message-ID: <20130924170849.GC32220@mudshark.cambridge.arm.com>
+From: acme@ghostprotocols.net (Arnaldo Carvalho de Melo)
+Date: Tue, 24 Sep 2013 14:12:20 -0300
+Subject: [PATCH 3/4] perf tools: Check libunwind for availability of
+ dwarf parsing feature
+In-Reply-To: <20130917102904.GA27258@mudshark.cambridge.arm.com>
+References: <1379323053-11458-1-git-send-email-jean.pihet@linaro.org>
+ <1379323053-11458-4-git-send-email-jean.pihet@linaro.org>
+ <20130917102904.GA27258@mudshark.cambridge.arm.com>
+Message-ID: <20130924171220.GB2634@ghostprotocols.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Santosh,
-
-On Tue, Aug 13, 2013 at 02:31:04PM +0100, Santosh Shilimkar wrote:
-> On Tuesday 13 August 2013 07:19 AM, Will Deacon wrote:
-> > On Mon, Aug 12, 2013 at 07:34:13PM +0100, Santosh Shilimkar wrote:
-> >> On Friday 02 August 2013 11:48 AM, Will Deacon wrote:
-> >>> I think this an A9-specific register, which reads as 0 on UP A9 and reads as
-> >>> some form of PERIPH_BASE for SMP parts. The issue I have is when PERIPH_BASE
-> >>> is zero.
-> >>>
-> >> What do we do here ? Should we document this in the code and proceed ?
-> >> Mostly there is no platform with PERIPH_BASE = 0, so its should be fine but
-> >> I am open for any other alternative.
+Em Tue, Sep 17, 2013 at 11:29:04AM +0100, Will Deacon escreveu:
+> Arnaldo, Ingo,
+> 
+> On Mon, Sep 16, 2013 at 10:17:32AM +0100, Jean Pihet wrote:
+> > The newly added dwarf unwinding feature [1] requires:
+> > . a recent version (>= 1.1) of libunwind,
+> > . libunwind to be configured with --enable-debug-frame.
 > > 
-> > The only other alternative I can think of is forcing people to have
-> > CONFIG_SMP=n, but that blows away single zImage for your platform.
+> > [1] http://www.spinics.net/lists/kernel/msg1598951.html
 > > 
-> Yep which surely we don't want considering after so much effort we
-> have it working first place. How about going ahead with assumption
-> that PERIPH_BASE = 0 case doesn't work.
+> > Add the corresponding API test in the feature check list.
+> > 
+> > Signed-off-by: Jean Pihet <jean.pihet@linaro.org>
+> > ---
+> >  tools/perf/config/Makefile          |  2 +-
+> >  tools/perf/config/feature-tests.mak | 11 ++++++++++-
+> >  2 files changed, 11 insertions(+), 2 deletions(-)
+> 
+> Can I have an ack for this and the following patch please?
+> 
+> (http://lists.infradead.org/pipermail/linux-arm-kernel/2013-September/198531.html)
+> 
+> Then I can stick these into -next for some more exposure before I queue them
+> for 3.13.
 
-It's been over a month and I can't think of anything better than this
-without jeopardising the single zImage effort. However, it also doesn't seem
-fair if we rule out the possibility of single zImage for future SoCs which
-use 0x0 as their PERIPH_BASE (I don't know of any at the moment).
+I can pick it now that Jiri kinda acked it, right Jiri?
 
-So how about we go ahead with this, but add a big fat comment to the code in
-head.S saying that, if a future SoC *does* use 0x0 as the PERIPH_BASE, then
-the check will need to be #ifdef'd or equivalent for the Aegis platform?
-
-Will
+- Arnaldo
