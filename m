@@ -1,29 +1,29 @@
 From: csd@broadcom.com (Christian Daudt)
-Date: Tue, 24 Sep 2013 13:18:59 -0700
-Subject: [PATCH] ARM: bcm281xx: more descriptive machine string
-Message-ID: <1380053939-11329-1-git-send-email-csd@broadcom.com>
+Date: Tue, 24 Sep 2013 13:20:52 -0700
+Subject: [PATCH] ARM: bcm281xx: Add ARCH Timers to config
+Message-ID: <1380054052-11527-1-git-send-email-csd@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add SoC model to DT_MACHINE_START string.
+Add HAVE_ARM_ARCH_TIMER to Broadcom Kconfig as it is
+required for some Mobile SoCs.
 
 Signed-off-by: Christian Daudt <bcm@fixthebug.org>
 Reviewed-by: Markus Mayer <mmayer@broadcom.com>
 Reviewed-by: Mark Hambleton <mahamble@broadcom.com>
 Reviewed-by: James King <jamesk@broadcom.com>
 
-diff --git a/arch/arm/mach-bcm/board_bcm281xx.c b/arch/arm/mach-bcm/board_bcm281xx.c
-index 8d9f931..dcfaf4a 100644
---- a/arch/arm/mach-bcm/board_bcm281xx.c
-+++ b/arch/arm/mach-bcm/board_bcm281xx.c
-@@ -67,7 +67,7 @@ static void __init board_init(void)
- 
- static const char * const bcm11351_dt_compat[] = { "brcm,bcm11351", NULL, };
- 
--DT_MACHINE_START(BCM11351_DT, "Broadcom Application Processor")
-+DT_MACHINE_START(BCM11351_DT, "BCM281xx Broadcom Application Processor")
- 	.init_time = clocksource_of_init,
- 	.init_machine = board_init,
- 	.restart = bcm_kona_restart,
+diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
+index 69d67f7..635537b 100644
+--- a/arch/arm/mach-bcm/Kconfig
++++ b/arch/arm/mach-bcm/Kconfig
+@@ -13,6 +13,7 @@ config ARCH_BCM
+ 	select SPARSE_IRQ
+ 	select TICK_ONESHOT
+ 	select CACHE_L2X0
++	select HAVE_ARM_ARCH_TIMER
+ 	help
+ 	  This enables support for system based on Broadcom SoCs.
+ 	  It currently supports the 'BCM281XX' family, which includes
 -- 
 1.7.10.4
