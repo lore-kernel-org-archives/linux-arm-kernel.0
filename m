@@ -1,72 +1,29 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 24 Sep 2013 13:10:05 -0700
-Subject: [RFCv2 3/3] ARM: dts: N900: Add SSI information
-In-Reply-To: <5241EE47.5050907@wwwdotorg.org>
-References: <1379277856-24571-1-git-send-email-sre@debian.org>
- <1379277856-24571-4-git-send-email-sre@debian.org>
- <5240A617.1010208@wwwdotorg.org>
- <20130923234656.GB24781@earth.universe>
- <5241EE47.5050907@wwwdotorg.org>
-Message-ID: <20130924201005.GB8949@atomide.com>
+From: csd@broadcom.com (Christian Daudt)
+Date: Tue, 24 Sep 2013 13:18:59 -0700
+Subject: [PATCH] ARM: bcm281xx: more descriptive machine string
+Message-ID: <1380053939-11329-1-git-send-email-csd@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Stephen Warren <swarren@wwwdotorg.org> [130924 13:03]:
-> On 09/23/2013 05:46 PM, Sebastian Reichel wrote:
-> > Hi,
-> > 
-> > On Mon, Sep 23, 2013 at 02:35:35PM -0600, Stephen Warren wrote:
-> >> On 09/15/2013 02:44 PM, Sebastian Reichel wrote:
-> >>> Add SSI device tree data for OMAP34xx and Nokia N900.
-> 
-> ...
-> >>> +- ti,hwmods:		Name of the hwmod associated to the controller,
-> >>> which +			is "ssi".
-> >> 
-> >> I don't think we should add any more of that, for new bindings.
-> > 
-> > That basically means not adding new drivers until hwmod is
-> > completly removed, since no new drivers not using DT are accepted
-> > anymore.
-> > 
-> > hwmod still holds some information, which are not yet mapped to
-> > DT.
-> 
-> Tony, is defining hwmod properties for new OMAP bindings what everyone
-> is currently doing? I'm not sure how that will work with a stable DT
-> ABI...
-> 
-> I wonder if it makes sense not to define the ti,hwmods property in the
-> binding document (so it doesn't become part of the ABI), but put it
-> into the DTS file simply to make the current Linux code work? I'm not
-> sure if that's any better though.
+Add SoC model to DT_MACHINE_START string.
 
-There are still pieces of information in hwmod that is needed for
-PM to work for things like device autoidle and reset. The plan is
-to describe those with Linux generic bindings, but that's going
-to take a while.
+Signed-off-by: Christian Daudt <bcm@fixthebug.org>
+Reviewed-by: Markus Mayer <mmayer@broadcom.com>
+Reviewed-by: Mark Hambleton <mahamble@broadcom.com>
+Reviewed-by: James King <jamesk@broadcom.com>
 
-Clearly once we have those bindings, ti,hwmods is not needed and
-then the problem is how to support old .dtb files..
-
-> It would be best to completely define the DT binding so that all
-> required clocks etc. are already present in the DT. That way, the DT
-> ABI won't change once people stop using hwmods. Tony, is that possible
-> on OMAP at present, irrespective of whether those e.g. clock
-> properties will actually be used by Linux?
-
-Unfortunately not doable yet. For v3.13 we should have the
-clock bindings in place, but quite a bit of work still
-remains for the remaining hwmod pieces.
-
-Considering all this, we may be best off dropping ti,hwmods
-binding completely, and populate it based on DT auxdata or
-something similar. That means that old .dtb files won't
-work once we populate things from DT, but at least the binding
-issue would be sorted out.
-
-If anybody has better suggestions, let me know.
-
-Regards,
-
-Tony
+diff --git a/arch/arm/mach-bcm/board_bcm281xx.c b/arch/arm/mach-bcm/board_bcm281xx.c
+index 8d9f931..dcfaf4a 100644
+--- a/arch/arm/mach-bcm/board_bcm281xx.c
++++ b/arch/arm/mach-bcm/board_bcm281xx.c
+@@ -67,7 +67,7 @@ static void __init board_init(void)
+ 
+ static const char * const bcm11351_dt_compat[] = { "brcm,bcm11351", NULL, };
+ 
+-DT_MACHINE_START(BCM11351_DT, "Broadcom Application Processor")
++DT_MACHINE_START(BCM11351_DT, "BCM281xx Broadcom Application Processor")
+ 	.init_time = clocksource_of_init,
+ 	.init_machine = board_init,
+ 	.restart = bcm_kona_restart,
+-- 
+1.7.10.4
