@@ -1,37 +1,38 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 24 Sep 2013 11:06:20 +0100
-Subject: [PATCH 3/4] perf tools: Check libunwind for availability of
- dwarf parsing feature
-In-Reply-To: <20130924093450.GB1008@krava.brq.redhat.com>
-References: <1379323053-11458-1-git-send-email-jean.pihet@linaro.org>
- <1379323053-11458-4-git-send-email-jean.pihet@linaro.org>
- <20130917102904.GA27258@mudshark.cambridge.arm.com>
- <CAFrcx1nnx0+kWx3z3A86Fwz13RYRVSPSG0YHBcxFeFQP8W7jBg@mail.gmail.com>
- <20130924093450.GB1008@krava.brq.redhat.com>
-Message-ID: <20130924100620.GG15119@mudshark.cambridge.arm.com>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Tue, 24 Sep 2013 11:17:47 +0100
+Subject: Vexpress config
+In-Reply-To: <CAHSGOuuLx6Cfuq5otV+Jd1ZvdJ-Hg-an_3A2XXNik-AUsw+QVw@mail.gmail.com>
+References: <CAHSGOuusvazUFFAAraCZmQgXr8LvwdV4zess=KsEMsCtbg0y2A@mail.gmail.com>
+ <CAHSGOus7VsJh+-mpxOWeeyqfsB4jNYiG-vwRirFaJh39c3Heww@mail.gmail.com>
+ <1379323515.3998.12.camel@hornet>
+ <CAHSGOusEZtdVwnKo7fxLKQKnVVde1FRHtruRYG9BkBpNB6r3ag@mail.gmail.com>
+ <1379601512.3347.26.camel@hornet>
+ <CAHSGOuuLx6Cfuq5otV+Jd1ZvdJ-Hg-an_3A2XXNik-AUsw+QVw@mail.gmail.com>
+Message-ID: <1380017867.3316.7.camel@hornet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 24, 2013 at 10:34:50AM +0100, Jiri Olsa wrote:
-> On Tue, Sep 24, 2013 at 10:55:32AM +0200, Jean Pihet wrote:
-> > Ping on the series. The two patches above (3/4 and 4/4) are generic
-> > while the two others are impacting ARM only.
-> > Is it possible to get an Ack for the generic ones?
+On Sun, 2013-09-22 at 11:07 +0100, melwyn lobo wrote:
+> 1. ARM pl11x CLCD driver fails (only clcd, whereas other peripherals
+> initialization is OK) :
 > 
-> I'm fine with those changes.. still I'm sort of worried about
-> current DWARF unwind users (but not sure if there're any),
-> who depends on packaged libunwind compiled without
-> --enable-debug-frame option.
+> clcd-pl11x: probe of 1c1f0000.clcd failed with error -22
+> 
+> On running prebuilt images from linaro releases site, they work just
+> fine on CA15x4 with four clean TUX logos on the simulated CLCD screen.
 
-Since x86 is the only architecture using libunwind with perf at the moment,
-and I'd expect it to use .eh_frame for unwinding, I'm also not sure there
-are any existing users to worry about.
+This is - unfortunately - expected. The CLCD driver in main line does
+not speak Device Tree yet. Linaro kernels carry some early version of
+patches changing that. The latest version is being discussed here:
 
-> I've seen your libunwind patch to make it default, but
-> not sure if it was accepted.. if not, maybe we should
-> detect this and build that code conditionaly.
+http://thread.gmane.org/gmane.linux.drivers.devicetree/44721
 
-It certainly defaults to "on" for ARM, but other architectures have to
-enable it explicitly afaict.
+> 2. I don't have an initrd which boot till shell prompt. It could just
+> be a problem with my image but I would really like to have a clean
+> working initrd to start with. (Don't want to use Linaro's becuase they
+> boot till Android home screen)
 
-Will
+No offence meant, but this is already your problem ;-) Definitely
+nothing to do with Versatile Express.
+
+Pawe?
