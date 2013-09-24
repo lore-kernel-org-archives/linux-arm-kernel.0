@@ -1,119 +1,146 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Tue, 24 Sep 2013 13:43:53 -0400
-Subject: [PATCH] ARM: Update SMP_ON_UP code to detect A9MPCore with 1
- CPU devices
-In-Reply-To: <20130924170849.GC32220@mudshark.cambridge.arm.com>
-References: <1375381033-13220-1-git-send-email-santosh.shilimkar@ti.com>
- <51FBC610.9030900@arm.com> <51FBCEC3.4030207@ti.com>
- <51FBD42A.9040901@arm.com> <20130802154857.GD5292@mudshark.cambridge.arm.com>
- <52092AA5.3090005@ti.com> <20130813111943.GE30280@mudshark.cambridge.arm.com>
- <520A3518.3030301@ti.com> <20130924170849.GC32220@mudshark.cambridge.arm.com>
-Message-ID: <5241CF59.3000006@ti.com>
+From: abrestic@chromium.org (Andrew Bresticker)
+Date: Tue, 24 Sep 2013 11:06:52 -0700
+Subject: [PATCH V3 2/6] clk: exynos-audss: allow input clocks to be specified
+ in device tree
+In-Reply-To: <1380046016-5811-1-git-send-email-abrestic@chromium.org>
+References: <1379982078-23381-1-git-send-email-abrestic@chromium.org>
+ <1380046016-5811-1-git-send-email-abrestic@chromium.org>
+Message-ID: <1380046016-5811-2-git-send-email-abrestic@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 24 September 2013 01:08 PM, Will Deacon wrote:
-> Hi Santosh,
-> 
-> On Tue, Aug 13, 2013 at 02:31:04PM +0100, Santosh Shilimkar wrote:
->> On Tuesday 13 August 2013 07:19 AM, Will Deacon wrote:
->>> On Mon, Aug 12, 2013 at 07:34:13PM +0100, Santosh Shilimkar wrote:
->>>> On Friday 02 August 2013 11:48 AM, Will Deacon wrote:
->>>>> I think this an A9-specific register, which reads as 0 on UP A9 and reads as
->>>>> some form of PERIPH_BASE for SMP parts. The issue I have is when PERIPH_BASE
->>>>> is zero.
->>>>>
->>>> What do we do here ? Should we document this in the code and proceed ?
->>>> Mostly there is no platform with PERIPH_BASE = 0, so its should be fine but
->>>> I am open for any other alternative.
->>>
->>> The only other alternative I can think of is forcing people to have
->>> CONFIG_SMP=n, but that blows away single zImage for your platform.
->>>
->> Yep which surely we don't want considering after so much effort we
->> have it working first place. How about going ahead with assumption
->> that PERIPH_BASE = 0 case doesn't work.
-> 
-> It's been over a month and I can't think of anything better than this
-> without jeopardising the single zImage effort. However, it also doesn't seem
-> fair if we rule out the possibility of single zImage for future SoCs which
-> use 0x0 as their PERIPH_BASE (I don't know of any at the moment).
-> 
-> So how about we go ahead with this, but add a big fat comment to the code in
-> head.S saying that, if a future SoC *does* use 0x0 as the PERIPH_BASE, then
-> the check will need to be #ifdef'd or equivalent for the Aegis platform?
-> 
-I agree. Updated patch end of the email. If you are fine with this version,
-will stick it into RMK's patch system.
+This allows the input clocks to the Exynos AudioSS block to be
+specified via device-tree bindings.  Default names will be used
+when an input clock is not given.
 
-Regards,
-Santosh
-
->From 05b1b43324f3e8d10a38f78dbcbf7632d4c3530c Mon Sep 17 00:00:00 2001
-From: Vaibhav Bedia <vaibhav.bedia@ti.com>
-Date: Thu, 18 Jul 2013 13:01:53 -0400
-Subject: [PATCH] ARM: Update SMP_ON_UP code to detect A9MPCore with 1 CPU
- devices
-
-The generic code is well equipped to differentiate between
-SMP and UP configurations.However, there are some devices which
-use Cortex-A9 MP core IP with 1 CPU as configuration. To let
-these SOCs to co-exist in a CONFIG_SMP=y build by leveraging
-the SMP_ON_UP support, we need to additionally check the
-number the cores in Cortex-A9 MPCore configuration. Without
-such a check in place, the startup code tries to execute
-ALT_SMP() set of instructions which lead to CPU faults.
-
-The issue was spotted on TI's Aegis device and this patch
-makes now the device work with omap2plus_defconfig which
-enables SMP by default. The change is kept limited to only
-Cortex-A9 MPCore detection code.
-
-Note that if any future SoC *does* use 0x0 as the PERIPH_BASE, then
-the SCU address check code needs to be #ifdef'd for for the Aegis
-platform.
-
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Russell King <linux@arm.linux.org.uk>
-
-Acked-by: Sricharan R <r.sricharan@ti.com>
-Signed-off-by: Vaibhav Bedia <vaibhav.bedia@ti.com>
-Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Signed-off-by: Andrew Bresticker <abrestic@chromium.org>
 ---
- arch/arm/kernel/head.S |   21 ++++++++++++++++++++-
- 1 file changed, 20 insertions(+), 1 deletion(-)
+Changes since v1:
+ - listed input clocks as required properties
+---
+ .../devicetree/bindings/clock/clk-exynos-audss.txt | 32 ++++++++++++++++++++--
+ drivers/clk/samsung/clk-exynos-audss.c             | 25 +++++++++++++----
+ 2 files changed, 50 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
-index 2c7cc1e..476de57 100644
---- a/arch/arm/kernel/head.S
-+++ b/arch/arm/kernel/head.S
-@@ -487,7 +487,26 @@ __fixup_smp:
- 	mrc	p15, 0, r0, c0, c0, 5	@ read MPIDR
- 	and	r0, r0, #0xc0000000	@ multiprocessing extensions and
- 	teq	r0, #0x80000000		@ not part of a uniprocessor system?
--	moveq	pc, lr			@ yes, assume SMP
-+	bne    __fixup_smp_on_up	@ no, assume UP
-+
-+	@ Core indicates it is SMP. Check for Aegis SOC where a single
-+	@ Cortex-A9 CPU is present but SMP operations fault.
-+	mov	r4, #0x41000000
-+	orr	r4, r4, #0x0000c000
-+	orr	r4, r4, #0x00000090
-+	teq	r3, r4			@ Check for ARM Cortex-A9
-+	movne	pc, lr			@ Not ARM Cortex-A9,
-+
-+	@ If a future SoC *does* use 0x0 as the PERIPH_BASE, then the
-+	@ below address check will need to be #ifdef'd or equivalent
-+	@ for the Aegis platform.
-+	mrc	p15, 4, r0, c15, c0	@ get SCU base address
-+	teq	r0, #0x0		@ '0' on actual UP A9 hardware
-+	beq	__fixup_smp_on_up	@ So its an A9 UP
-+	ldr	r0, [r0, #4]		@ read SCU Config
-+	and	r0, r0, #0x3		@ number of CPUs
-+	teq	r0, #0x0		@ is 1?
-+	movne	pc, lr
+diff --git a/Documentation/devicetree/bindings/clock/clk-exynos-audss.txt b/Documentation/devicetree/bindings/clock/clk-exynos-audss.txt
+index 75e2e19..85b9e28 100644
+--- a/Documentation/devicetree/bindings/clock/clk-exynos-audss.txt
++++ b/Documentation/devicetree/bindings/clock/clk-exynos-audss.txt
+@@ -14,6 +14,21 @@ Required Properties:
  
- __fixup_smp_on_up:
- 	adr	r0, 1f
+ - #clock-cells: should be 1.
+ 
++- clocks:
++  - pll_ref: Fixed rate PLL reference clock, parent of mout_audss. "fin_pll"
++    is used if not specified.
++  - pll_in: Input PLL to the AudioSS block, parent of mout_audss. "fout_epll"
++    is used if not specified.
++  - cdclk: External i2s clock, parent of mout_i2s. "cdclk0" is used if not
++    specified.
++  - sclk_audio: Audio bus clock, parent of mout_i2s. "sclk_audio0" is used if
++    not specified.
++  - sclk_pcm_in: PCM clock, parent of sclk_pcm.  "sclk_pcm0" is used if not
++    specified.
++
++- clock-names: Aliases for the above clocks. They should be "pll_ref",
++  "pll_in", "cdclk", "sclk_audio", and "sclk_pcm_in" respectively.
++
+ The following is the list of clocks generated by the controller. Each clock is
+ assigned an identifier and client nodes use this identifier to specify the
+ clock which they consume. Some of the clocks are available only on a particular
+@@ -35,15 +50,28 @@ sclk_i2s        7
+ pcm_bus         8
+ sclk_pcm        9
+ 
+-Example 1: An example of a clock controller node is listed below.
++Example 1: An example of a clock controller node using the default input
++	   clock names is listed below.
++
++clock_audss: audss-clock-controller at 3810000 {
++	compatible = "samsung,exynos5250-audss-clock";
++	reg = <0x03810000 0x0C>;
++	#clock-cells = <1>;
++};
++
++Example 2: An example of a clock controller node with the input clocks
++           specified.
+ 
+ clock_audss: audss-clock-controller at 3810000 {
+ 	compatible = "samsung,exynos5250-audss-clock";
+ 	reg = <0x03810000 0x0C>;
+ 	#clock-cells = <1>;
++	clocks = <&clock 1>, <&clock 7>, <&clock 138>, <&clock 160>,
++		<&ext_i2s_clk>;
++	clock-names = "pll_ref", "pll_in", "sclk_audio", "sclk_pcm_in", "cdclk";
+ };
+ 
+-Example 2: I2S controller node that consumes the clock generated by the clock
++Example 3: I2S controller node that consumes the clock generated by the clock
+            controller. Refer to the standard clock bindings for information
+            about 'clocks' and 'clock-names' property.
+ 
+diff --git a/drivers/clk/samsung/clk-exynos-audss.c b/drivers/clk/samsung/clk-exynos-audss.c
+index 319c6e4..e7e800a 100644
+--- a/drivers/clk/samsung/clk-exynos-audss.c
++++ b/drivers/clk/samsung/clk-exynos-audss.c
+@@ -34,10 +34,6 @@ static unsigned long reg_save[][2] = {
+ 	{ASS_CLK_GATE, 0},
+ };
+ 
+-/* list of all parent clock list */
+-static const char *mout_audss_p[] = { "fin_pll", "fout_epll" };
+-static const char *mout_i2s_p[] = { "mout_audss", "cdclk0", "sclk_audio0" };
+-
+ #ifdef CONFIG_PM_SLEEP
+ static int exynos_audss_clk_suspend(void)
+ {
+@@ -68,6 +64,10 @@ static int exynos_audss_clk_probe(struct platform_device *pdev)
+ {
+ 	int i, ret = 0;
+ 	struct resource *res;
++	const char *mout_audss_p[] = {"fin_pll", "fout_epll"};
++	const char *mout_i2s_p[] = {"mout_audss", "cdclk0", "sclk_audio0"};
++	const char *sclk_pcm_p = "sclk_pcm0";
++	struct clk *pll_ref, *pll_in, *cdclk, *sclk_audio, *sclk_pcm_in;
+ 
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	reg_base = devm_ioremap_resource(&pdev->dev, res);
+@@ -82,11 +82,23 @@ static int exynos_audss_clk_probe(struct platform_device *pdev)
+ 	if (!clk_table)
+ 		return -ENOMEM;
+ 
++	pll_ref = devm_clk_get(&pdev->dev, "pll_ref");
++	pll_in = devm_clk_get(&pdev->dev, "pll_in");
++	if (!IS_ERR(pll_ref))
++		mout_audss_p[0] = __clk_get_name(pll_ref);
++	if (!IS_ERR(pll_in))
++		mout_audss_p[1] = __clk_get_name(pll_in);
+ 	clk_table[EXYNOS_MOUT_AUDSS] = clk_register_mux(NULL, "mout_audss",
+ 				mout_audss_p, ARRAY_SIZE(mout_audss_p),
+ 				CLK_SET_RATE_NO_REPARENT,
+ 				reg_base + ASS_CLK_SRC, 0, 1, 0, &lock);
+ 
++	cdclk = devm_clk_get(&pdev->dev, "cdclk");
++	sclk_audio = devm_clk_get(&pdev->dev, "sclk_audio");
++	if (!IS_ERR(cdclk))
++		mout_i2s_p[1] = __clk_get_name(cdclk);
++	if (!IS_ERR(sclk_audio))
++		mout_i2s_p[2] = __clk_get_name(sclk_audio);
+ 	clk_table[EXYNOS_MOUT_I2S] = clk_register_mux(NULL, "mout_i2s",
+ 				mout_i2s_p, ARRAY_SIZE(mout_i2s_p),
+ 				CLK_SET_RATE_NO_REPARENT,
+@@ -120,8 +132,11 @@ static int exynos_audss_clk_probe(struct platform_device *pdev)
+ 				 "sclk_pcm", CLK_SET_RATE_PARENT,
+ 				reg_base + ASS_CLK_GATE, 4, 0, &lock);
+ 
++	sclk_pcm_in = devm_clk_get(&pdev->dev, "sclk_pcm_in");
++	if (!IS_ERR(sclk_pcm_in))
++		sclk_pcm_p = __clk_get_name(sclk_pcm_in);
+ 	clk_table[EXYNOS_SCLK_PCM] = clk_register_gate(NULL, "sclk_pcm",
+-				"div_pcm0", CLK_SET_RATE_PARENT,
++				sclk_pcm_p, CLK_SET_RATE_PARENT,
+ 				reg_base + ASS_CLK_GATE, 5, 0, &lock);
+ 
+ 	for (i = 0; i < EXYNOS_AUDSS_MAX_CLKS; i++) {
 -- 
-1.7.9.5
+1.8.4
