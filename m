@@ -1,57 +1,39 @@
 From: abrestic@chromium.org (Andrew Bresticker)
-Date: Mon, 23 Sep 2013 17:21:15 -0700
-Subject: [PATCH V2 3/6] clk: exynos5250: add clock ID for div_pcm0
+Date: Mon, 23 Sep 2013 17:21:18 -0700
+Subject: [PATCH V2 6/6] ARM: dts: exynos5420: add input clocks to audss clock
+ controller
 In-Reply-To: <1379982078-23381-1-git-send-email-abrestic@chromium.org>
 References: <1379711637-5226-1-git-send-email-abrestic@chromium.org>
  <1379982078-23381-1-git-send-email-abrestic@chromium.org>
-Message-ID: <1379982078-23381-3-git-send-email-abrestic@chromium.org>
+Message-ID: <1379982078-23381-6-git-send-email-abrestic@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is no gate for the PCM clock input to the AudioSS block, so
-the parent of sclk_pcm is div_pcm0.  Add a clock ID for it so that
-we can reference it in device trees.
+Specify the remaining input clocks (pll_ref, pll_in, and sclk_pcm_in)
+for the AudioSS clock controller.
 
 Signed-off-by: Andrew Bresticker <abrestic@chromium.org>
-Reviewed-by: Tomasz Figa <t.figa@samsung.com>
 ---
- Documentation/devicetree/bindings/clock/exynos5250-clock.txt | 1 +
- drivers/clk/samsung/clk-exynos5250.c                         | 4 ++--
- 2 files changed, 3 insertions(+), 2 deletions(-)
+Changes since v1:
+ - specified additional input clocks
+---
+ arch/arm/boot/dts/exynos5420.dtsi | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/clock/exynos5250-clock.txt b/Documentation/devicetree/bindings/clock/exynos5250-clock.txt
-index 24765c1..67e9a47 100644
---- a/Documentation/devicetree/bindings/clock/exynos5250-clock.txt
-+++ b/Documentation/devicetree/bindings/clock/exynos5250-clock.txt
-@@ -62,6 +62,7 @@ clock which they consume.
-   div_i2s1		157
-   div_i2s2		158
-   sclk_hdmiphy		159
-+  div_pcm0		160
+diff --git a/arch/arm/boot/dts/exynos5420.dtsi b/arch/arm/boot/dts/exynos5420.dtsi
+index d537cd7..056b55e 100644
+--- a/arch/arm/boot/dts/exynos5420.dtsi
++++ b/arch/arm/boot/dts/exynos5420.dtsi
+@@ -72,8 +72,8 @@
+ 		compatible = "samsung,exynos5420-audss-clock";
+ 		reg = <0x03810000 0x0C>;
+ 		#clock-cells = <1>;
+-		clocks = <&clock 148>;
+-		clock-names = "sclk_audio";
++		clocks = <&clock 1>, <&clock 5>, <&clock 148>, <&clock 149>;
++		clock-names = "pll_ref", "pll_in", "sclk_audio", "sclk_pcm_in";
+ 	};
  
- 
-    [Peripheral Clock Gates]
-diff --git a/drivers/clk/samsung/clk-exynos5250.c b/drivers/clk/samsung/clk-exynos5250.c
-index adf3234..dec5376 100644
---- a/drivers/clk/samsung/clk-exynos5250.c
-+++ b/drivers/clk/samsung/clk-exynos5250.c
-@@ -108,7 +108,7 @@ enum exynos5250_clks {
- 	sclk_mmc0, sclk_mmc1, sclk_mmc2, sclk_mmc3, sclk_sata, sclk_usb3,
- 	sclk_jpeg, sclk_uart0, sclk_uart1, sclk_uart2, sclk_uart3, sclk_pwm,
- 	sclk_audio1, sclk_audio2, sclk_spdif, sclk_spi0, sclk_spi1, sclk_spi2,
--	div_i2s1, div_i2s2, sclk_hdmiphy,
-+	div_i2s1, div_i2s2, sclk_hdmiphy, div_pcm0,
- 
- 	/* gate clocks */
- 	gscl0 = 256, gscl1, gscl2, gscl3, gscl_wa, gscl_wb, smmu_gscl0,
-@@ -301,7 +301,7 @@ static struct samsung_div_clock exynos5250_div_clks[] __initdata = {
- 	DIV(none, "div_dp", "mout_dp", DIV_DISP1_0, 24, 4),
- 	DIV(none, "div_jpeg", "mout_jpeg", DIV_GEN, 4, 4),
- 	DIV(none, "div_audio0", "mout_audio0", DIV_MAU, 0, 4),
--	DIV(none, "div_pcm0", "sclk_audio0", DIV_MAU, 4, 8),
-+	DIV(div_pcm0, "div_pcm0", "sclk_audio0", DIV_MAU, 4, 8),
- 	DIV(none, "div_sata", "mout_sata", DIV_FSYS0, 20, 4),
- 	DIV(none, "div_usb3", "mout_usb3", DIV_FSYS0, 24, 4),
- 	DIV(none, "div_mmc0", "mout_mmc0", DIV_FSYS1, 0, 4),
+ 	codec at 11000000 {
 -- 
 1.8.4
