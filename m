@@ -1,17 +1,69 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 24 Sep 2013 11:51:27 +0100
-Subject: [PATCH] ASoC: kirkwood: add S/PDIF support
-In-Reply-To: <20130924124122.64834b2a@armhf>
-References: <20130924124122.64834b2a@armhf>
-Message-ID: <20130924105127.GB12758@n2100.arm.linux.org.uk>
+From: leoy@marvell.com (Leo Yan)
+Date: Tue, 24 Sep 2013 19:49:33 +0800
+Subject: [Question] Verification For arm64: suspend/resume implementation
+In-Reply-To: <20130924090236.GY10174@e102648.cambridge.arm.com>
+References: <52327E41.1070904@marvell.com>
+ <20130913144001.GA28531@e102568-lin.cambridge.arm.com>
+ <524021EC.2000207@marvell.com>
+ <20130923152606.GA6157@e102648.cambridge.arm.com>
+ <5240F246.6050402@marvell.com>
+ <20130924090236.GY10174@e102648.cambridge.arm.com>
+Message-ID: <52417C4D.1030009@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 24, 2013 at 12:41:22PM +0200, Jean-Francois Moine wrote:
-> This patch adds S/PDIF input/output for mvebu DT boards.
-> 
-> Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
 
-Right, so if this goes in, then we're completely fucked for doing this
-the way that Mark apparantly wants it to be done, because once these
-DT properties go in, they're there to stay.
+On 09/24/2013 05:02 PM, Achin Gupta wrote:
+> Hi Leo,
+>
+> On Tue, Sep 24, 2013 at 03:00:38AM +0100, Leo Yan wrote:
+>>
+>> On 09/23/2013 11:26 PM, Achin Gupta wrote:
+>>
+>>> The foundation model (if thats what you are using) does not model an
+>>> ARM cpu implementation. The CPUECTLR is a cpu specific register
+>>> (imp. def.)  so it is not present. The caches on the Foundation Model
+>>> are inherently coherent so you do not need to access this register. If
+>>> you do then the access is treated as an illegal instruction.
+>>>
+>>
+>> Thx for the info. So do u mean i need use FVP Model for A53?
+>
+> I think you should use the dual cluster A57_A53 Base FVP models. They
+> have the power controller and model the CPUECTLR.SMP bit behaviour as
+> well.
+>
+
+Hmm...So far i only focus on A53; actually i have built FVP model for 
+A53x4 cores, but now are pending for the license. If this model can 
+support power controller and SMP bit, it will let my work much clean.
+
+>>
+>> Here have another question, ARM have the example code for boot wrapper
+>> which will switch from EL3 to secure EL1 rather than non-secure's EL1?
+>
+> I dont' think we do but let me check. Switching to S-EL1 instead of
+> NS-EL1 should be a matter of _not_ setting the SCR_EL3.NS bit before
+> doing the exception level change (ERET).
+
+I quick try with below patch for boot wrapper, i saw foundataion model 
+cannot boot up successfully and there have no console output; suppose 
+it's hang at some boot operations, but now foundation model cannot debug 
+low level code, so i cannot debug further more. :-(
+
+diff --git a/boot.S b/boot.S
+index a1f25e2..2f1b867 100644
+--- a/boot.S
++++ b/boot.S
+@@ -19,7 +19,6 @@ _start:
+         b.ne    start_ns                        // skip EL3 initialisation
+
+         mov     x0, #0x30                       // RES1
+-       orr     x0, x0, #(1 << 0)               // Non-secure EL1
+         orr     x0, x0, #(1 << 8)               // HVC enable
+         orr     x0, x0, #(1 << 10)              // 64-bit EL2
+         msr     scr_el3, x0
+
+
+Thx,
+Leo Yan
