@@ -1,44 +1,66 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 24 Sep 2013 15:05:38 +0100
-Subject: [PATCH] arm64: avoid multiple evaluation of ptr in
- get_user/put_user()
-In-Reply-To: <524154C2.1080303@linaro.org>
-References: <524154C2.1080303@linaro.org>
-Message-ID: <20130924140537.GF25907@arm.com>
+From: drjones@redhat.com (Andrew Jones)
+Date: Tue, 24 Sep 2013 16:09:28 +0200
+Subject: [PATCH v2] arm32: kvm: rename CONFIG_KVM_ARM_MAX_VCPUS
+In-Reply-To: <1379160656-28050-3-git-send-email-drjones@redhat.com>
+References: <1379160656-28050-3-git-send-email-drjones@redhat.com>
+Message-ID: <1380031768-21354-1-git-send-email-drjones@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 24, 2013 at 10:00:50AM +0100, AKASHI Takahiro wrote:
-> get_user() is defined as a function macro in arm64, and trace_get_user()
-> calls it as followed:
->      get_user(ch, ptr++);
-> Since the second parameter occurs twice in the definition, 'ptr++' is
-> unexpectedly evaluated twice and trace_get_user() will generate a bogus
-> string from user-provided one. As a result, some ftrace sysfs operations,
-> like "echo FUNCNAME > set_ftrace_filter," hit this case and eventually fail.
-> This patch fixes the issue both in get_user() and put_user().
-> 
-> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> ---
->   arch/arm64/include/asm/uaccess.h |   12 ++++++++----
->   1 file changed, 8 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/uaccess.h b/arch/arm64/include/asm/uaccess.h
-> index edb3d5c..bbeab83 100644
-> --- a/arch/arm64/include/asm/uaccess.h
-> +++ b/arch/arm64/include/asm/uaccess.h
-> @@ -166,9 +166,11 @@ do {									\
->    #define get_user(x, ptr)						\
->   ({									\
-> +	__typeof__(*(ptr)) *optr = (ptr);				\
+Drop the _ARM_ part of the name. We can then introduce a config option
+like this to aarch64 and other arches using the same name - allowing
+grep to show them all. Also update the help text to describe the option
+more completely.
 
-I think this should be:
+Signed-off-by: Andrew Jones <drjones@redhat.com>
 
-	__typeof__(*(ptr)) __user *optr = (ptr);
+---
+v2: reword help text some more
+---
+ arch/arm/include/asm/kvm_host.h | 4 ++--
+ arch/arm/kvm/Kconfig            | 9 +++++----
+ 2 files changed, 7 insertions(+), 6 deletions(-)
 
-Otherwise the patch looks fine. I can fix the above.
-
-Thanks.
-
+diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+index 7d22517d80711..c614d3eb176c6 100644
+--- a/arch/arm/include/asm/kvm_host.h
++++ b/arch/arm/include/asm/kvm_host.h
+@@ -25,8 +25,8 @@
+ #include <asm/fpstate.h>
+ #include <kvm/arm_arch_timer.h>
+ 
+-#if defined(CONFIG_KVM_ARM_MAX_VCPUS)
+-#define KVM_MAX_VCPUS CONFIG_KVM_ARM_MAX_VCPUS
++#if defined(CONFIG_KVM_MAX_VCPUS)
++#define KVM_MAX_VCPUS CONFIG_KVM_MAX_VCPUS
+ #else
+ #define KVM_MAX_VCPUS 0
+ #endif
+diff --git a/arch/arm/kvm/Kconfig b/arch/arm/kvm/Kconfig
+index ebf5015508b52..8e56ccf45edce 100644
+--- a/arch/arm/kvm/Kconfig
++++ b/arch/arm/kvm/Kconfig
+@@ -40,16 +40,17 @@ config KVM_ARM_HOST
+ 	---help---
+ 	  Provides host support for ARM processors.
+ 
+-config KVM_ARM_MAX_VCPUS
++config KVM_MAX_VCPUS
+ 	int "Number maximum supported virtual CPUs per VM"
+ 	depends on KVM_ARM_HOST
+ 	default 4
+ 	help
+ 	  Static number of max supported virtual CPUs per VM.
+ 
+-	  If you choose a high number, the vcpu structures will be quite
+-	  large, so only choose a reasonable number that you expect to
+-	  actually use.
++	  The default is set to the highest number of vcpus that
++	  current hardware supports. Choosing a lower number decreases
++	  the size of the VM data structure. This number may also be
++	  increased.
+ 
+ config KVM_ARM_VGIC
+ 	bool "KVM support for Virtual GIC"
 -- 
-Catalin
+1.8.1.4
