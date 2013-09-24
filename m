@@ -1,49 +1,42 @@
-From: jean.pihet@linaro.org (Jean Pihet)
-Date: Tue, 24 Sep 2013 10:55:32 +0200
-Subject: [PATCH 3/4] perf tools: Check libunwind for availability of dwarf
- parsing feature
-In-Reply-To: <20130917102904.GA27258@mudshark.cambridge.arm.com>
-References: <1379323053-11458-1-git-send-email-jean.pihet@linaro.org>
- <1379323053-11458-4-git-send-email-jean.pihet@linaro.org>
- <20130917102904.GA27258@mudshark.cambridge.arm.com>
-Message-ID: <CAFrcx1nnx0+kWx3z3A86Fwz13RYRVSPSG0YHBcxFeFQP8W7jBg@mail.gmail.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Tue, 24 Sep 2013 11:20:05 +0200
+Subject: [PATCH V2 1/6] clk: exynos-audss: convert to platform device
+In-Reply-To: <1379982078-23381-1-git-send-email-abrestic@chromium.org>
+References: <1379711637-5226-1-git-send-email-abrestic@chromium.org>
+ <1379982078-23381-1-git-send-email-abrestic@chromium.org>
+Message-ID: <3549301.xmRx49e0Zc@amdc1227>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hin
+Hi Andrew,
 
-On 17 September 2013 12:29, Will Deacon <will.deacon@arm.com> wrote:
-> Arnaldo, Ingo,
->
-> On Mon, Sep 16, 2013 at 10:17:32AM +0100, Jean Pihet wrote:
->> The newly added dwarf unwinding feature [1] requires:
->> . a recent version (>= 1.1) of libunwind,
->> . libunwind to be configured with --enable-debug-frame.
->>
->> [1] http://www.spinics.net/lists/kernel/msg1598951.html
->>
->> Add the corresponding API test in the feature check list.
->>
->> Signed-off-by: Jean Pihet <jean.pihet@linaro.org>
->> ---
->>  tools/perf/config/Makefile          |  2 +-
->>  tools/perf/config/feature-tests.mak | 11 ++++++++++-
->>  2 files changed, 11 insertions(+), 2 deletions(-)
->
-> Can I have an ack for this and the following patch please?
->
-> (http://lists.infradead.org/pipermail/linux-arm-kernel/2013-September/198531.html)
->
-> Then I can stick these into -next for some more exposure before I queue them
-> for 3.13.
->
-> Cheers,
->
-> Will
+I'd like to ack this series, but there is one more thing that I think
+should be fixed. Please see my comment inline.
 
-Ping on the series. The two patches above (3/4 and 4/4) are generic
-while the two others are impacting ARM only.
-Is it possible to get an Ack for the generic ones?
+On Monday 23 of September 2013 17:21:13 Andrew Bresticker wrote:
+> @@ -128,8 +135,53 @@ static void __init exynos_audss_clk_init(struct device_node *np)
+>  #endif
+>  
+>  	pr_info("Exynos: Audss: clock setup completed\n");
 
-Kind regards,
-Jean
+nit (not the thing I mentioned above): This (and possibly other uses of
+pr_*() could be replaced with dev_*().
+
+> +
+> +	return 0;
+> +}
+> +
+> +static int exynos_audss_clk_remove(struct platform_device *pdev)
+> +{
+> +	int i;
+> +
+> +	for (i = 0; i < EXYNOS_AUDSS_MAX_CLKS; i++) {
+> +		if (clk_table[i])
+
+I believe clk_register_* functions return ERR_PTR() in case of failure,
+not NULL, so this should be accounted for either here or at probe time.
+Possibly checking for registration error in probe() would be the best
+solution, although bloating the code a bit (but what error path isn't?).
+
+Best regards,
+Tomasz
