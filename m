@@ -1,10 +1,10 @@
 From: rogerq@ti.com (Roger Quadros)
-Date: Tue, 24 Sep 2013 11:53:51 +0300
-Subject: [PATCH v3 05/10] ARM: dts: omap3-beagle: Use reset-gpios for
- hsusb2_reset
+Date: Tue, 24 Sep 2013 11:53:52 +0300
+Subject: [PATCH v3 06/10] ARM: dts: omap4-panda: Use reset-gpios for
+ hsusb1_reset
 In-Reply-To: <1380012836-29900-1-git-send-email-rogerq@ti.com>
 References: <1380012836-29900-1-git-send-email-rogerq@ti.com>
-Message-ID: <1380012836-29900-6-git-send-email-rogerq@ti.com>
+Message-ID: <1380012836-29900-7-git-send-email-rogerq@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,39 +13,44 @@ the USB phy-nop driver accepts "reset-gpios" property.
 
 Signed-off-by: Roger Quadros <rogerq@ti.com>
 ---
- arch/arm/boot/dts/omap3-beagle.dts |   13 +------------
- 1 files changed, 1 insertions(+), 12 deletions(-)
+ arch/arm/boot/dts/omap4-panda-common.dtsi |   18 +-----------------
+ 1 files changed, 1 insertions(+), 17 deletions(-)
 
-diff --git a/arch/arm/boot/dts/omap3-beagle.dts b/arch/arm/boot/dts/omap3-beagle.dts
-index dfd8310..71bde47 100644
---- a/arch/arm/boot/dts/omap3-beagle.dts
-+++ b/arch/arm/boot/dts/omap3-beagle.dts
-@@ -44,17 +44,6 @@
- 		};
+diff --git a/arch/arm/boot/dts/omap4-panda-common.dtsi b/arch/arm/boot/dts/omap4-panda-common.dtsi
+index faa95b5..c60ebd0 100644
+--- a/arch/arm/boot/dts/omap4-panda-common.dtsi
++++ b/arch/arm/boot/dts/omap4-panda-common.dtsi
+@@ -60,22 +60,6 @@
+ 			"AFMR", "Line In";
  	};
  
--	/* HS USB Port 2 RESET */
--	hsusb2_reset: hsusb2_reset_reg {
+-	/*
+-	 * Temp hack: Need to be replaced with the proper gpio-controlled
+-	 * reset driver as soon it will be merged.
+-	 * http://thread.gmane.org/gmane.linux.drivers.devicetree/36830
+-	 */
+-	/* HS USB Port 1 RESET */
+-	hsusb1_reset: hsusb1_reset_reg {
 -		compatible = "regulator-fixed";
--		regulator-name = "hsusb2_reset";
+-		regulator-name = "hsusb1_reset";
 -		regulator-min-microvolt = <3300000>;
 -		regulator-max-microvolt = <3300000>;
--		gpio = <&gpio5 19 0>;	/* gpio_147 */
+-		gpio = <&gpio2 30 0>;	/* gpio_62 */
 -		startup-delay-us = <70000>;
 -		enable-active-high;
 -	};
 -
- 	/* HS USB Port 2 Power */
- 	hsusb2_power: hsusb2_power_reg {
+ 	/* HS USB Port 1 Power */
+ 	hsusb1_power: hsusb1_power_reg {
  		compatible = "regulator-fixed";
-@@ -68,7 +57,7 @@
- 	/* HS USB Host PHY on PORT 2 */
- 	hsusb2_phy: hsusb2_phy {
+@@ -97,7 +81,7 @@
+ 	/* HS USB Host PHY on PORT 1 */
+ 	hsusb1_phy: hsusb1_phy {
  		compatible = "usb-nop-xceiv";
--		reset-supply = <&hsusb2_reset>;
-+		reset-gpios = <&gpio5 19 GPIO_ACTIVE_LOW>;	/* gpio_147 */
- 		vcc-supply = <&hsusb2_power>;
- 	};
- 
+-		reset-supply = <&hsusb1_reset>;
++		reset-gpios = <&gpio2 30 GPIO_ACTIVE_LOW>;   /* gpio_62 */
+ 		vcc-supply = <&hsusb1_power>;
+ 	/**
+ 	 * FIXME:
 -- 
 1.7.4.1
