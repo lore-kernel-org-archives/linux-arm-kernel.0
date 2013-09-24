@@ -1,33 +1,59 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 24 Sep 2013 16:52:16 +0100
-Subject: [PATCH] media: i2c: adv7343: fix the DT binding properties
-In-Reply-To: <6800560.AEqRA3IBkp@avalon>
-References: <1379073471-7244-1-git-send-email-prabhakar.csengg@gmail.com>
- <3002978.Cb6jL1xtkE@avalon> <5240B396.2010705@wwwdotorg.org>
- <6800560.AEqRA3IBkp@avalon>
-Message-ID: <20130924155216.GG3226@sirena.org.uk>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 24 Sep 2013 11:54:18 -0400
+Subject: [PATCH RESEND] ARM: add dtbImage.<dt> and dtbuImage.<dt> rules
+In-Reply-To: <5241AC52.7000808@keymile.com>
+References: <504DFBBF.5010202@free-electrons.com>
+ <1348733441-11626-1-git-send-email-richard.genoud@gmail.com>
+ <20120927082955.GR17667@game.jcrosoft.org>
+ <CACQ1gAgwv4pBFZBrVZiWM2_=OneUO-s16LufSENx27gMC3DUig@mail.gmail.com>
+ <52416F97.802@keymile.com>
+ <20130924120152.GI11119@titan.lakedaemon.net>
+ <5241AC52.7000808@keymile.com>
+Message-ID: <20130924155418.GJ11119@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 24, 2013 at 11:44:57AM +0200, Laurent Pinchart wrote:
-> On Monday 23 September 2013 15:33:10 Stephen Warren wrote:
+On Tue, Sep 24, 2013 at 05:14:26PM +0200, Gerlando Falauto wrote:
+> On 09/24/2013 02:01 PM, Jason Cooper wrote:
+> >We are strongly encouraging all vendors to upgrade their bootloaders to
+> >support field upgradeable dtbs.  eg having the dtb on a separate
+> >partition of the flash (or whereever the bootloader environment is)
+> 
+> This will most definitely be the case for future boards, but we sort
+> of follow the unspoken guideline of not upgrading u-boot on
+> field-deployed units. Arguable at least, but that's the way it is.
 
-> > So I think you want to make the supply properties mandatory in DT (since
-> > some form of supply is mandatory in HW), yet make the driver support
-> > broken DTs which don't have those properties, by error-checking the
-> > return value from regulator_get(). You might want to put a note into DT
-> > saying that a previous version of the binding didn't require those
-> > supply properties, so they may be missing from older DTs.
+Understandable.
 
-> Are there such devices in the wild ?
+> >Have you tried kwboot over serial?  It can be found in barebox and u-boot source repositories.
+> 
+> Uhm, yes, I've used it a few times... but what are you suggesting?
+> That u-boot can be upgraded? Yes, I believe that... ;-)
 
->From v3.12 on the kernel will stub in a dummy supply if one isn't found
-when using DT but I wouldn't mention that in the bindings since it's
-very much fixing up broken DTs rather than a good idea.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130924/c9956124/attachment.sig>
+I'm suggesting that I primarily talk to hobbyists and tinkerers, and
+occasionally forget there are people that have jtag access :-P
+
+> >The above is the long-term goal, in the short term, please take a look
+> >at:
+> >
+> >https://github.com/zonque/pxa-impedance-matcher
+> >
+> >You can use this to boot a modern fdt kernel on a legacy bootloader,
+> >with one or more dtb's linked in.  I tested it on the dreamplug, so it's
+> >mostly there for you.
+> >
+> >The big outstanding TODO I have on it is to parse the atags and modify
+> >the selected dtb before passing off to the kernel.  Patches welcome! :)
+> 
+> Thank you, I had a quick look at the README and it sounds great!
+> But CONFIG_APPENDED_DTB already does the job of filling this gap for me...
+
+Right, it's intended as a replacement for APPENDED_DTB since it can
+handle multiple dtbs (so you can do one multiplatform zImage), and you
+can hack around custom vendor atags.  eg ethernet mac addresses, Thomas'
+CP15 register base address hack, etc.  All that goodness without
+polluting the kernel source.  :)
+
+thx,
+
+Jason.
