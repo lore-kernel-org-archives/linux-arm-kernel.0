@@ -1,44 +1,29 @@
 From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Tue, 24 Sep 2013 12:17:01 -0700 (PDT)
-Subject: [PATCH V3 1/6] clk: exynos-audss: convert to platform device
-In-Reply-To: <1380046016-5811-1-git-send-email-abrestic@chromium.org>
-References: <1379982078-23381-1-git-send-email-abrestic@chromium.org>
- <1380046016-5811-1-git-send-email-abrestic@chromium.org>
-Message-ID: <1706375.1GRhkzSkm0@flatron>
+Date: Tue, 24 Sep 2013 21:19:42 +0200
+Subject: [PATCH v2] ARM: SAMSUNG: S5P: If detected device tree skip irq
+ init
+In-Reply-To: <1380038363-487-1-git-send-email-m.krawczuk@partner.samsung.com>
+References: <1380038363-487-1-git-send-email-m.krawczuk@partner.samsung.com>
+Message-ID: <2123658.6S6hP57GRg@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew,
+Hi Mateusz,
 
-On Tuesday 24 of September 2013 11:06:51 Andrew Bresticker wrote:
-> The Exynos AudioSS clock controller will later be modified to allow
-> input clocks to be specified via device-tree in order to support
-> multiple Exynos SoCs.  This will introduce a dependency on the core
-> SoC clock controller being initialized first so that the AudioSS driver
-> can look up its input clocks, but the order in which clock providers
-> are probed in of_clk_init() is not guaranteed.  Since deferred probing
-> is not supported in of_clk_init() and the AudioSS block is not the core
-> controller, we can initialize it later as a platform device.
+On Tuesday 24 of September 2013 17:59:23 Mateusz Krawczuk wrote:
+> It prevents from executing things already handled by pinctrl-exynos
+> driver, when device tree is available.
 > 
-> Signed-off-by: Andrew Bresticker <abrestic@chromium.org>
+> Signed-off-by: Mateusz Krawczuk <m.krawczuk@partner.samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 > ---
-> Changes since v2:
->  - add error handling to probe callback
->  - fixed ordering of of_clk_{add,del}_provider
->  - fixed nits from Tomasz and Sylwester
-> Changes since v1:
->  - add clk_unregister() calls to remove callback
->  - fixed minor nits from Tomasz
-> ---
->  drivers/clk/samsung/clk-exynos-audss.c | 109
-> +++++++++++++++++++++++++++------ 1 file changed, 90 insertions(+), 19
-> deletions(-)
-
-For the whole series:
+>  arch/arm/plat-samsung/s5p-irq-eint.c | 4 ++++
+>  1 file changed, 4 insertions(+)
 
 Acked-by: Tomasz Figa <t.figa@samsung.com>
 
-Thanks for addressing all the comments.
+[as a temporary solution until we move all the users of this code to 
+device tree]
 
 Best regards,
 Tomasz
