@@ -1,57 +1,49 @@
-From: gerlando.falauto@keymile.com (Gerlando Falauto)
-Date: Tue, 24 Sep 2013 17:14:26 +0200
-Subject: [PATCH RESEND] ARM: add dtbImage.<dt> and dtbuImage.<dt> rules
-In-Reply-To: <20130924120152.GI11119@titan.lakedaemon.net>
-References: <504DFBBF.5010202@free-electrons.com>
- <1348733441-11626-1-git-send-email-richard.genoud@gmail.com>
- <20120927082955.GR17667@game.jcrosoft.org>
- <CACQ1gAgwv4pBFZBrVZiWM2_=OneUO-s16LufSENx27gMC3DUig@mail.gmail.com>
- <52416F97.802@keymile.com> <20130924120152.GI11119@titan.lakedaemon.net>
-Message-ID: <5241AC52.7000808@keymile.com>
+From: andreas.herrmann@calxeda.com (Andreas Herrmann)
+Date: Tue, 24 Sep 2013 17:14:30 +0200
+Subject: [PATCH 1/7] iommu/arm-smmu: Switch to arch_initcall for driver
+ registration
+In-Reply-To: <1380035221-11576-2-git-send-email-andreas.herrmann@calxeda.com>
+References: <1380035221-11576-1-git-send-email-andreas.herrmann@calxeda.com>
+ <1380035221-11576-2-git-send-email-andreas.herrmann@calxeda.com>
+Message-ID: <20130924151430.GT4845@alberich>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jason,
+iommu/arm-smmu: Remove bogus semicolon from if conditions
 
-On 09/24/2013 02:01 PM, Jason Cooper wrote:
-> Gerlando,
-[...]
+Those prevented proper registration of arm_smmu_ops.
 
-> We are strongly encouraging all vendors to upgrade their bootloaders to
-> support field upgradeable dtbs.  eg having the dtb on a separate
-> partition of the flash (or whereever the bootloader environment is)
+Signed-off-by: Andreas Herrmann <andreas.herrmann@calxeda.com>
+---
+ drivers/iommu/arm-smmu.c |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-This will most definitely be the case for future boards, but we sort of 
-follow the unspoken guideline of not upgrading u-boot on field-deployed 
-units. Arguable at least, but that's the way it is.
+Will,
 
-> iirc, keymile is using an odd flavor of Kirkwood.
+It seems that I've managed to exclude the very first patch of the
+series. Here it is.
 
-Correct, it's a kirkwood + a switch on the same die.
 
-> Have you tried kwboot over serial?  It can be found in barebox and u-boot source repositories.
+Regards,
 
-Uhm, yes, I've used it a few times... but what are you suggesting?
-That u-boot can be upgraded? Yes, I believe that... ;-)
+Andreas
 
-> The above is the long-term goal, in the short term, please take a look
-> at:
->
-> https://github.com/zonque/pxa-impedance-matcher
->
-> You can use this to boot a modern fdt kernel on a legacy bootloader,
-> with one or more dtb's linked in.  I tested it on the dreamplug, so it's
-> mostly there for you.
->
-> The big outstanding TODO I have on it is to parse the atags and modify
-> the selected dtb before passing off to the kernel.  Patches welcome! :)
-
-Thank you, I had a quick look at the README and it sounds great!
-But CONFIG_APPENDED_DTB already does the job of filling this gap for me...
-
->
-> hth,
-
-It sure did. I really appreciate it. Thanks!!!
-
-Gerlando
+diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+index f417e89..be56846 100644
+--- a/drivers/iommu/arm-smmu.c
++++ b/drivers/iommu/arm-smmu.c
+@@ -1966,10 +1966,10 @@ static int __init arm_smmu_init(void)
+ 		return ret;
+ 
+ 	/* Oh, for a proper bus abstraction */
+-	if (!iommu_present(&platform_bus_type));
++	if (!iommu_present(&platform_bus_type))
+ 		bus_set_iommu(&platform_bus_type, &arm_smmu_ops);
+ 
+-	if (!iommu_present(&amba_bustype));
++	if (!iommu_present(&amba_bustype))
+ 		bus_set_iommu(&amba_bustype, &arm_smmu_ops);
+ 
+ 	return 0;
+-- 
+1.7.9.5
