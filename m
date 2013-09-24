@@ -1,76 +1,72 @@
 From: andreas.herrmann@calxeda.com (Andreas Herrmann)
-Date: Tue, 24 Sep 2013 17:06:57 +0200
-Subject: [PATCH 3/7] ARM: dma-mapping: Always pass proper prot flags to
- iommu_map()
+Date: Tue, 24 Sep 2013 17:06:58 +0200
+Subject: [PATCH 4/7] iommu/arm-smmu: Check for num_context_irqs > 0 to avoid
+ divide by zero exception
 In-Reply-To: <1380035221-11576-1-git-send-email-andreas.herrmann@calxeda.com>
 References: <1380035221-11576-1-git-send-email-andreas.herrmann@calxeda.com>
-Message-ID: <1380035221-11576-4-git-send-email-andreas.herrmann@calxeda.com>
+Message-ID: <1380035221-11576-5-git-send-email-andreas.herrmann@calxeda.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-... otherwise it is impossible for the low level iommu driver to
-figure out which pte flags should be used.
+With the right (or wrong;-) definition of v1 SMMU node in DTB it is
+possible to trigger a division by zero in arm_smmu_init_domain_context
+(if number of context irqs is 0):
 
-In __map_sg_chunk we can derive the flags from dma_data_direction.
+       if (smmu->version == 1) {
+               root_cfg->irptndx = atomic_inc_return(&smmu->irptndx);
+ ?             root_cfg->irptndx %= smmu->num_context_irqs;
+       } else {
 
-In __iommu_create_mapping we should treat the memory like
-DMA_BIDIRECTIONAL and pass both IOMMU_READ and IOMMU_WRITE to
-iommu_map.
-__iommu_create_mapping is used during dma_alloc_coherent (via
-arm_iommu_alloc_attrs).  AFAIK dma_alloc_coherent is responsible for
-allocation _and_ mapping.  I think this implies that access to the
-mapped pages should be allowed.
+Avoid this by checking for num_context_irqs > 0 before trying to
+assign interrupts to contexts.
 
-Cc: Marek Szyprowski <m.szyprowski@samsung.com>
 Signed-off-by: Andreas Herrmann <andreas.herrmann@calxeda.com>
 ---
- arch/arm/mm/dma-mapping.c |   20 ++++++++++++++++++--
- 1 file changed, 18 insertions(+), 2 deletions(-)
+ drivers/iommu/arm-smmu.c |   31 +++++++++++++++++--------------
+ 1 file changed, 17 insertions(+), 14 deletions(-)
 
-diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-index f5e1a84..95abed8 100644
---- a/arch/arm/mm/dma-mapping.c
-+++ b/arch/arm/mm/dma-mapping.c
-@@ -1232,7 +1232,8 @@ __iommu_create_mapping(struct device *dev, struct page **pages, size_t size)
- 				break;
+diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+index f5a856e..0dfd255 100644
+--- a/drivers/iommu/arm-smmu.c
++++ b/drivers/iommu/arm-smmu.c
+@@ -828,21 +828,24 @@ static int arm_smmu_init_domain_context(struct iommu_domain *domain,
+ 		return ret;
  
- 		len = (j - i) << PAGE_SHIFT;
--		ret = iommu_map(mapping->domain, iova, phys, len, 0);
-+		ret = iommu_map(mapping->domain, iova, phys, len,
-+				IOMMU_READ|IOMMU_WRITE);
- 		if (ret < 0)
- 			goto fail;
- 		iova += len;
-@@ -1444,6 +1445,7 @@ static int __map_sg_chunk(struct device *dev, struct scatterlist *sg,
- 	int ret = 0;
- 	unsigned int count;
- 	struct scatterlist *s;
-+	int prot;
+ 	root_cfg->cbndx = ret;
+-	if (smmu->version == 1) {
+-		root_cfg->irptndx = atomic_inc_return(&smmu->irptndx);
+-		root_cfg->irptndx %= smmu->num_context_irqs;
+-	} else {
+-		root_cfg->irptndx = root_cfg->cbndx;
+-	}
  
- 	size = PAGE_ALIGN(size);
- 	*handle = DMA_ERROR_CODE;
-@@ -1460,7 +1462,21 @@ static int __map_sg_chunk(struct device *dev, struct scatterlist *sg,
- 			!dma_get_attr(DMA_ATTR_SKIP_CPU_SYNC, attrs))
- 			__dma_page_cpu_to_dev(sg_page(s), s->offset, s->length, dir);
- 
--		ret = iommu_map(mapping->domain, iova, phys, len, 0);
-+		switch (dir) {
-+		case DMA_BIDIRECTIONAL:
-+			prot = IOMMU_READ | IOMMU_WRITE;
-+			break;
-+		case DMA_TO_DEVICE:
-+			prot = IOMMU_READ;
-+			break;
-+		case DMA_FROM_DEVICE:
-+			prot = IOMMU_WRITE;
-+			break;
-+		default:
-+			prot = 0;
+-	irq = smmu->irqs[smmu->num_global_irqs + root_cfg->irptndx];
+-	ret = request_irq(irq, arm_smmu_context_fault, IRQF_SHARED,
+-			  "arm-smmu-context-fault", domain);
+-	if (IS_ERR_VALUE(ret)) {
+-		dev_err(smmu->dev, "failed to request context IRQ %d (%u)\n",
+-			root_cfg->irptndx, irq);
+-		root_cfg->irptndx = -1;
+-		goto out_free_context;
++	if (smmu->num_context_irqs) {
++		if (smmu->version == 1) {
++			root_cfg->irptndx = atomic_inc_return(&smmu->irptndx);
++			root_cfg->irptndx %= smmu->num_context_irqs;
++		} else {
++			root_cfg->irptndx = root_cfg->cbndx;
 +		}
 +
-+		ret = iommu_map(mapping->domain, iova, phys, len, prot);
- 		if (ret < 0)
- 			goto fail;
- 		count += len >> PAGE_SHIFT;
++		irq = smmu->irqs[smmu->num_global_irqs + root_cfg->irptndx];
++		ret = request_irq(irq, arm_smmu_context_fault, IRQF_SHARED,
++				"arm-smmu-context-fault", domain);
++		if (IS_ERR_VALUE(ret)) {
++			dev_err(smmu->dev, "failed to request context IRQ %d (%u)\n",
++				root_cfg->irptndx, irq);
++			root_cfg->irptndx = -1;
++			goto out_free_context;
++		}
+ 	}
+ 
+ 	root_cfg->smmu = smmu;
 -- 
 1.7.9.5
