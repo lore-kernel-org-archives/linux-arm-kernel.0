@@ -1,91 +1,84 @@
-From: t.stanislaws@samsung.com (Tomasz Stanislawski)
-Date: Tue, 24 Sep 2013 11:43:53 +0200
-Subject: [PATCH v5 1/4] media: s5p-tv: Replace mxr_ macro by default dev_
-In-Reply-To: <13162989.WhfDRzW6dg@amdc1032>
-References: <1379775649-6331-1-git-send-email-m.krawczuk@partner.samsung.com>
- <1379775649-6331-2-git-send-email-m.krawczuk@partner.samsung.com>
- <52405519.3020504@samsung.com> <13162989.WhfDRzW6dg@amdc1032>
-Message-ID: <52415ED9.3030407@samsung.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Tue, 24 Sep 2013 11:44:57 +0200
+Subject: [PATCH] media: i2c: adv7343: fix the DT binding properties
+In-Reply-To: <5240B396.2010705@wwwdotorg.org>
+References: <1379073471-7244-1-git-send-email-prabhakar.csengg@gmail.com>
+ <3002978.Cb6jL1xtkE@avalon> <5240B396.2010705@wwwdotorg.org>
+Message-ID: <6800560.AEqRA3IBkp@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 09/23/2013 05:48 PM, Bartlomiej Zolnierkiewicz wrote:
+On Monday 23 September 2013 15:33:10 Stephen Warren wrote:
+> On 09/23/2013 05:50 AM, Laurent Pinchart wrote:
+> > On Monday 23 September 2013 08:18:52 Prabhakar Lad wrote:
+> >> On Fri, Sep 20, 2013 at 3:22 PM, Sylwester Nawrocki wrote:
+> >>> On 09/20/2013 10:11 AM, Prabhakar Lad wrote:
+> >>>> OK I will, just send out a fix up patch which fixes the mismatch
+> >>>> between
+> >>>> names for the rc-cycle, and later send out a patch which removes the
+> >>>> platform data usage for next release with proper DT bindings.
+> >>> 
+> >>> I think the binding need to be fully corrected now, I just meant to not
+> >>> touch the board file, i.e. leave non-dt support unchanged.
+> >> 
+> >> Ok
+> >> 
+> >>>> I'm OK with making regulator properties as optional, But still it would
+> >>>> change the meaning of what DT is, we know that the VDD/VDD_IO .. etc
+> >>>> pins are required properties (but still making them as optional) :-(
+> >>>> 
+> >>>> I think there might several devices where this situation may arise so
+> >>>> just thinking of a alternative solution.
+> >>>> 
+> >>>> say we have property 'software-regulator' which takes true/false(0/1)
+> >>>> If set to true we make the regulators as required property or else we
+> >>>> assume it is handled and ignore it ?
+> >>> 
+> >>> I don't think this is a good idea. You would have to add a similar
+> >>> platform data flag for non-dt, it doesn't sound right. I can see two
+> >>> options here:
+> >>> 
+> >>> 1. Make the regulator properties mandatory and, e.g. define a fixed
+> >>> 
+> >>>    voltage GPIO regulator in DT with an empty 'gpio' property. Then
+> >>>    pass a phandle to that regulator in the adv7343 *-supply properties.
+> >>>    For non-dt similarly a fixed voltage regulator(s) and voltage
+> >>>    supplies  would need to be defined in the board files.
+> >>> 
+> >>> 2. Make the properties optional and use (devm_)regulator_get_optional()
+> >>> 
+> >>>    calls in the driver (a recently added function). I must admit I don't
+> >>>    fully understand description of this function, it currently looks
+> >>>    pretty much same as (devm_)regulator_get(). Thus the driver would
+> >>>    need to be handling regulator supplies only when non ERR_PTR() is
+> >>>    returned from regulator_get_optional() and otherwise assume a non
+> >>>    critical error. There is already quite a few example occurrences of
+> >>>    regulator_get_optional() usage.
+> >> 
+> >> Thanks for pointing it I'll choose option 2 and post the patch.
+> > 
+> > Isn't regulator_get_optional() intended for devices that can have supplies
+> > unconnected in normal use ?
 > 
-> Hi Tomasz,
+> I believe so, yes.
 > 
-> On Monday, September 23, 2013 04:50:01 PM Tomasz Stanislawski wrote:
->> Hello,
->> May I ask what is the rationale for this patch?
->> To reduce a few lines of code?
+> > The ADV7343 supplies are mandatory from a hardware
+> > point of view, so I think we should use regulator_get(). Otherwise the
+> > driver won't be able to tell the difference between a regulator that
+> > isn't present yet (for instance because the regulator device/driver
+> > hasn't been probed yet), which should result in deferred probing, and an
+> > always-on regulator that has been left out.
 > 
-> This patch makes source code more generic-like and easier to follow (mxd_r*
+> So I think you want to make the supply properties mandatory in DT (since
+> some form of supply is mandatory in HW), yet make the driver support
+> broken DTs which don't have those properties, by error-checking the
+> return value from regulator_get(). You might want to put a note into DT
+> saying that a previous version of the binding didn't require those
+> supply properties, so they may be missing from older DTs.
 
-more generic(-like?) - NOT. Using mxr_ macros is a more generic way to produce logs
-because one can change only one line to change error format for the whole module.
-For example, in case of mxr_ family, a patch adding function name to debug message
-would require just a few lines patch. Using in case of dev_ family, one has to
-produce 200-lines of highly conflicting patch.
+Are there such devices in the wild ?
 
-'easier to follow' - MAYBE. I agree that some people may prefer to
-see more directly what is happening, but tell me if you really consider line:
-
-mxr_dbg(mdev, "this is debug\n");
-
-as a very confusing and obfuscated piece of code.
-
-COME ON!
-
+-- 
 Regards,
-TS
 
-> macros currently only obfuscate the code and make them harder to read for
-> everybody, maybe besides the original driver author ;). Removal of few
-> superfluous lines of code is just a bonus.
-> 
->> Or to give up possibility of changing message format in just one place?
-> 
-> For over two and half year (since s5p-tv driver introduction in Feb 2011)
-> such change was not needed and it doesn't seem that keeping the code to
-> allow such possibility is worth an added code obfuscation.
-> 
-> Besides you can easily script a change to message format so in practice
-> I don't see a real advantage of keeping non-standard messaging macros
-> just for easing a potential message format conversion.
-> 
->> I could see migrating from mxr_* to pr_* could seen as the fix, but not this.
-> 
-> Such migration seems to be pointless as you would have to add an extra
-> argument to pr_* to not lose the device information.
-
-There is something called pr_fmt. It may help with mentioned issue.
-
-> 
-
-
-
-> Best regards,
-> --
-> Bartlomiej Zolnierkiewicz
-> Samsung R&D Institute Poland
-> Samsung Electronics
-> 
->> Waiting for reply,
->> Tomasz Stanislawski
->>
->>
->> On 09/21/2013 05:00 PM, Mateusz Krawczuk wrote:
->>> Replace mxr_dbg, mxr_info and mxr_warn by generic solution.
->>>
->>> Signed-off-by: Mateusz Krawczuk <m.krawczuk@partner.samsung.com>
->>> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
->>> ---
->>>  drivers/media/platform/s5p-tv/mixer.h           |  12 ---
->>>  drivers/media/platform/s5p-tv/mixer_drv.c       |  47 ++++++-----
->>>  drivers/media/platform/s5p-tv/mixer_grp_layer.c |   2 +-
->>>  drivers/media/platform/s5p-tv/mixer_reg.c       |   6 +-
->>>  drivers/media/platform/s5p-tv/mixer_video.c     | 100 ++++++++++++------------
->>>  drivers/media/platform/s5p-tv/mixer_vp_layer.c  |   2 +-
->>>  6 files changed, 78 insertions(+), 91 deletions(-)
->>>
+Laurent Pinchart
