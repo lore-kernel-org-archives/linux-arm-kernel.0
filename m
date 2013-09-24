@@ -1,30 +1,28 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 24 Sep 2013 16:54:43 +0100
-Subject: [PATCH] media: i2c: adv7343: fix the DT binding properties
-In-Reply-To: <3002978.Cb6jL1xtkE@avalon>
-References: <1379073471-7244-1-git-send-email-prabhakar.csengg@gmail.com>
- <523C1AE0.9020603@samsung.com>
- <CA+V-a8u5_rhxTgkVgCbtmGpaZCt2ciu4vABW4t80aSp7csttnw@mail.gmail.com>
- <3002978.Cb6jL1xtkE@avalon>
-Message-ID: <20130924155443.GH3226@sirena.org.uk>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Tue, 24 Sep 2013 17:59:25 +0200
+Subject: [PATCH 1/4] i2c: busses: i2c-st: Add ST I2C controller
+In-Reply-To: <5241B1FA.6020500@st.com>
+References: <1379498483-4236-1-git-send-email-maxime.coquelin@st.com>
+ <1379498483-4236-2-git-send-email-maxime.coquelin@st.com>
+ <5240AD6E.4090905@wwwdotorg.org> <5241B1FA.6020500@st.com>
+Message-ID: <20130924155925.GA2995@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 23, 2013 at 01:50:51PM +0200, Laurent Pinchart wrote:
 
-> Isn't regulator_get_optional() intended for devices that can have supplies 
-> unconnected in normal use ? The ADV7343 supplies are mandatory from a hardware 
-> point of view, so I think we should use regulator_get(). Otherwise the driver 
-> won't be able to tell the difference between a regulator that isn't present 
-> yet (for instance because the regulator device/driver hasn't been probed yet), 
-> which should result in deferred probing, and an always-on regulator that has 
-> been left out.
+> "glitch" is is used to tune the I2C timing requirements, and has a 
+> nanosecond granularity.
+> These values are added to default timing values.
+> I'm not 100% sure, but it looks like the "samsung,i2c-sda-delay" in the 
+> i2c-s3c2410 driver.
 
-Yes, everything you say here is correct.
+For that, we have the generic "i2c-sda-hold-time-ns" property. The s3c
+driver hasn't been converted to use it, sadly.
+
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130924/fc1dba98/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130924/9c8288cb/attachment.sig>
