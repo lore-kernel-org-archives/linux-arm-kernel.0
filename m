@@ -1,26 +1,26 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Tue, 24 Sep 2013 17:06:31 +0200
-Subject: [PATCH] pinctrl: Correct number of pins for s5pv210
-In-Reply-To: <1380035051-24526-1-git-send-email-m.krawczuk@partner.samsung.com>
-References: <1380035051-24526-1-git-send-email-m.krawczuk@partner.samsung.com>
-Message-ID: <2660734.r2Dp8L0F5K@amdc1227>
+From: andreas.herrmann@calxeda.com (Andreas Herrmann)
+Date: Tue, 24 Sep 2013 17:06:54 +0200
+Subject: [PATCH 0/7]: iommu/arm-smmu: Misc fixes/adaptions
+Message-ID: <1380035221-11576-1-git-send-email-andreas.herrmann@calxeda.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mateusz,
+Hi,
 
-On Tuesday 24 of September 2013 16:35:07 Mateusz Krawczuk wrote:
-> Values of pins in table s5pv210 bank are incorrect. This patch correct values.
-> 
-> Signed-off-by: Mateusz Krawczuk <m.krawczuk@partner.samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> ---
->  drivers/pinctrl/pinctrl-exynos.c | 12 ++++++------
->  1 file changed, 6 insertions(+), 6 deletions(-)
+Following patches fix misc issues, that I've seen when using arm-smmu
+driver with MMU-400.
 
-Acked-by: Tomasz Figa <t.figa@samsung.com>
+I also suggest to add an option to automatically create domains for
+each master of detected SMMUs. (Similar to what is available for other
+iommu driver(s).)
 
-Best regards,
-Tomasz
+Comments welcome.
 
-P.S. Please be more careful next time when defining things like this.
+
+Regards,
+
+Andreas
+
+PS: Patches are against v3.12-rc1-336-gd8524ae (and yes I probably
+    need to rebase against Joerg's or your smmu tree but I wanted to
+    sent this out to get feedback as soon as possible.)
