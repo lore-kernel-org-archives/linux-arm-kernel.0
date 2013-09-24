@@ -1,93 +1,60 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Tue, 24 Sep 2013 11:35:27 +0200
-Subject: [PATCH V2 1/6] clk: exynos-audss: convert to platform device
-In-Reply-To: <1379982078-23381-1-git-send-email-abrestic@chromium.org>
-References: <1379711637-5226-1-git-send-email-abrestic@chromium.org>
- <1379982078-23381-1-git-send-email-abrestic@chromium.org>
-Message-ID: <52415CDF.4090002@samsung.com>
+From: bcousson@baylibre.com (Benoit Cousson)
+Date: Tue, 24 Sep 2013 11:41:21 +0200
+Subject: [PATCH 2/2] ARM: dts: dra7-evm: Add mmc2 node for eMMC support
+In-Reply-To: <1377525218-7655-3-git-send-email-balajitk@ti.com>
+References: <1377525218-7655-1-git-send-email-balajitk@ti.com>
+ <1377525218-7655-3-git-send-email-balajitk@ti.com>
+Message-ID: <52415E41.7050301@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
++ Sekhar
 
-On 24/09/13 02:21, Andrew Bresticker wrote:
-> @@ -62,24 +64,29 @@ static struct syscore_ops exynos_audss_clk_syscore_ops = {
->  #endif /* CONFIG_PM_SLEEP */
->  
->  /* register exynos_audss clocks */
-> -static void __init exynos_audss_clk_init(struct device_node *np)
-> +static int exynos_audss_clk_probe(struct platform_device *pdev)
->  {
-> -	reg_base = of_iomap(np, 0);
-> -	if (!reg_base) {
-> -		pr_err("%s: failed to map audss registers\n", __func__);
-> -		return;
-> +	struct resource *res;
+Hi Balaji,
+
+On 26/08/2013 15:53, Balaji T K wrote:
+> Add mmc2 dt node to dra7-evm board
+> and model eMMC vcc as fixed regulator.
+>
+> Signed-off-by: Balaji T K <balajitk@ti.com>
+> ---
+>   arch/arm/boot/dts/dra7-evm.dts |   14 ++++++++++++++
+>   1 files changed, 14 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/dra7-evm.dts b/arch/arm/boot/dts/dra7-evm.dts
+> index a59bbd0..2062724 100644
+> --- a/arch/arm/boot/dts/dra7-evm.dts
+> +++ b/arch/arm/boot/dts/dra7-evm.dts
+> @@ -17,6 +17,13 @@
+>   		device_type = "memory";
+>   		reg = <0x80000000 0x60000000>; /* 1536 MB */
+>   	};
 > +
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	reg_base = devm_ioremap_resource(&pdev->dev, res);
-> +	if (IS_ERR(reg_base)) {
-> +		dev_err(&pdev->dev, "failed to map audss registers\n");
-> +		return PTR_ERR(reg_base);
->  	}
->  
-> -	clk_table = kzalloc(sizeof(struct clk *) * EXYNOS_AUDSS_MAX_CLKS,
-> +	clk_table = devm_kzalloc(&pdev->dev,
-> +				sizeof(struct clk *) * EXYNOS_AUDSS_MAX_CLKS,
->  				GFP_KERNEL);
->  	if (!clk_table) {
-> -		pr_err("%s: could not allocate clk lookup table\n", __func__);
-> -		return;
-> +		dev_err(&pdev->dev, "could not allocate clk lookup table\n");
-
-You could drop this error log, k*alloc() functions already log any errors.
-
-> +		return -ENOMEM;
->  	}
->  
->  	clk_data.clks = clk_table;
->  	clk_data.clk_num = EXYNOS_AUDSS_MAX_CLKS;
-> -	of_clk_add_provider(np, of_clk_src_onecell_get, &clk_data);
-> +	of_clk_add_provider(pdev->dev.of_node, of_clk_src_onecell_get,
-> +				&clk_data);
-
->  	clk_table[EXYNOS_MOUT_AUDSS] = clk_register_mux(NULL, "mout_audss",
->  				mout_audss_p, ARRAY_SIZE(mout_audss_p),
-> @@ -128,8 +135,53 @@ static void __init exynos_audss_clk_init(struct device_node *np)
->  #endif
->  
->  	pr_info("Exynos: Audss: clock setup completed\n");
+> +	mmc2_3v3: fixedregulator-mmc2 {
+> +		compatible = "regulator-fixed";
+> +		regulator-name = "mmc2_3v3";
+> +		regulator-min-microvolt = <3300000>;
+> +		regulator-max-microvolt = <3300000>;
+> +	};
+>   };
+>
+>   &dra7_pmx_core {
+> @@ -257,3 +264,10 @@
+>   	vmmc-supply = <&ldo1_reg>;
+>   	bus-width = <4>;
+>   };
 > +
-> +	return 0;
-> +}
-> +
-> +static int exynos_audss_clk_remove(struct platform_device *pdev)
-> +{
-> +	int i;
-> +
-> +	for (i = 0; i < EXYNOS_AUDSS_MAX_CLKS; i++) {
-> +		if (clk_table[i])
+> +&mmc2 {
+> +	status = "okay";
+> +	vmmc-supply = <&mmc2_3v3>;
+> +	bus-width = <8>;
+> +	ti,non-removable;
 
-This would need to be:
-		if (!IS_ERR(clk_table[i]))
+Sekhar just posted a series to replace that with a non-TI attribute: 
+non-removable.
 
-Note the clock provider should be unregistered first, to avoid potential
-race condition, where the clock provider returns an invalid pointer to
-a clock, which has already been unregistered and freed.
+I'm not sure if this got merged, but it might be good to use the 
+standard attribute instead.
 
-I just noticed the sequence in probe needs to be fixed as well. i.e.
-clocks should be created with clk_register() before the clock provider
-is actually registered. It might warrant a separate patch but it's
-probably also fine to make such change part of this patch.
-
-> +			clk_unregister(clk_table[i]);
-> +	}
-> +
-> +	of_clk_del_provider(pdev->dev.of_node);
-> +
-> +	return 0;
->  }
-
---
-Thanks,
-Sylwester
+Regards,
+Benoit
