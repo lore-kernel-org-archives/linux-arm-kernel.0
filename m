@@ -1,26 +1,59 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 24 Sep 2013 11:49:35 +0100
-Subject: [alsa-devel] "ASoC: ab8500: Convert register I/O to regmap"
- breaks snowball
-In-Reply-To: <20130924071718.GA12019@quad.lixom.net>
-References: <20130924071718.GA12019@quad.lixom.net>
-Message-ID: <20130924104935.GB3226@sirena.org.uk>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Tue, 24 Sep 2013 12:56:46 +0200
+Subject: [PATCH v3 1/2] ASoC: kirkwood: clk: probe defer when clock not yet
+ ready
+Message-ID: <20130924125646.68d3f7b4@armhf>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 24, 2013 at 12:17:18AM -0700, Olof Johansson wrote:
-> Mark, Lee,
-> 
-> [I wasn't subscribed to alsa-devel when the patch was posted, so I'm
-> sending this as a standalone email instead of as a reply to that]
+At probe time, a clock device may not be ready when some other device
+wants to use it. 
 
-Please, as previously requested, CC maintainers on things like this.
-This is important both for filtering and for subsystems with multiple
-maintainers like ASoC.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130924/22a755bf/attachment-0001.sig>
+This patch lets the functions clk_get/devm_clk_get return a probe defer
+when the clock is defined in the DT but not yet available.
+
+It also fixes an erroneous call to clk_get_sys() when __clk_get() fails.
+
+Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
+---
+v2: fix __clk_get() failure (from Russell King)
+Note: the associated patch v2 2/2 is unchanged and not resent
+---
+ drivers/clk/clk.c    | 2 +-
+ drivers/clk/clkdev.c | 7 ++++++-
+ 2 files changed, 7 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+index a004769..582abc8 100644
+--- a/drivers/clk/clk.c
++++ b/drivers/clk/clk.c
+@@ -2181,7 +2181,7 @@ EXPORT_SYMBOL_GPL(of_clk_del_provider);
+ struct clk *of_clk_get_from_provider(struct of_phandle_args *clkspec)
+ {
+ 	struct of_clk_provider *provider;
+-	struct clk *clk = ERR_PTR(-ENOENT);
++	struct clk *clk = ERR_PTR(-EPROBE_DEFER);
+ 
+ 	/* Check if we have such a provider in our array */
+ 	mutex_lock(&of_clk_lock);
+diff --git a/drivers/clk/clkdev.c b/drivers/clk/clkdev.c
+index 442a313..1f402b9 100644
+--- a/drivers/clk/clkdev.c
++++ b/drivers/clk/clkdev.c
+@@ -157,7 +157,12 @@ struct clk *clk_get(struct device *dev, const char *con_id)
+ 
+ 	if (dev) {
+ 		clk = of_clk_get_by_name(dev->of_node, con_id);
+-		if (!IS_ERR(clk) && __clk_get(clk))
++		if (!IS_ERR(clk)) {
++			if (!__clk_get(clk))
++				clk = ERR_PTR(-ENOENT);
++			return clk;
++		}
++		if (PTR_ERR(clk) == -EPROBE_DEFER)
+ 			return clk;
+ 	}
+ 
+-- 
+Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
+Jef		|		http://moinejf.free.fr/
