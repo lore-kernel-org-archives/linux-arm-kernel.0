@@ -1,28 +1,46 @@
-From: davem@davemloft.net (David Miller)
-Date: Tue, 24 Sep 2013 10:34:16 -0400 (EDT)
-Subject: [net-next PATCH 0/4] cpsw: support for control module register
-In-Reply-To: <1379704841-32693-1-git-send-email-mugunthanvnm@ti.com>
-References: <1379704841-32693-1-git-send-email-mugunthanvnm@ti.com>
-Message-ID: <20130924.103416.2050021711877592417.davem@davemloft.net>
+From: m.krawczuk@partner.samsung.com (Mateusz Krawczuk)
+Date: Tue, 24 Sep 2013 17:04:11 +0200
+Subject: [PATCH] pinctrl: Correct number of pins for s5pv210
+Message-ID: <1380035051-24526-1-git-send-email-m.krawczuk@partner.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mugunthan V N <mugunthanvnm@ti.com>
-Date: Sat, 21 Sep 2013 00:50:37 +0530
+Values of pins in table s5pv210 bank are incorrect. This patch correct values.
 
-> This patch series adds the support for configuring GMII_SEL register
-> of control module to select the phy mode type and also to configure
-> the clock source for RMII phy mode whether to use internal clock or
-> the external clock from the phy itself.
-> 
-> Till now CPSW works as this configuration is done in U-Boot and carried
-> over to the kernel. But during suspend/resume Control module tends to
-> lose its configured value for GMII_SEL register in AM33xx PG1.0, so
-> if CPSW is used in RMII or RGMII mode, on resume cpsw is not working
-> as GMII_SEL register lost its configuration values.
-> 
-> The initial version of the patch is done by Daniel Mack but as per
-> Tony's comment he wants it as a seperate driver as it is done in USB
-> control module. I have created a seperate driver for the same.
+Signed-off-by: Mateusz Krawczuk <m.krawczuk@partner.samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
+ drivers/pinctrl/pinctrl-exynos.c | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
 
-Series applied, thanks.
+diff --git a/drivers/pinctrl/pinctrl-exynos.c b/drivers/pinctrl/pinctrl-exynos.c
+index 2689f8d..155b1b3 100644
+--- a/drivers/pinctrl/pinctrl-exynos.c
++++ b/drivers/pinctrl/pinctrl-exynos.c
+@@ -663,18 +663,18 @@ static void exynos_pinctrl_resume(struct samsung_pinctrl_drv_data *drvdata)
+ /* pin banks of s5pv210 pin-controller */
+ static struct samsung_pin_bank s5pv210_pin_bank[] = {
+ 	EXYNOS_PIN_BANK_EINTG(8, 0x000, "gpa0", 0x00),
+-	EXYNOS_PIN_BANK_EINTG(6, 0x020, "gpa1", 0x04),
++	EXYNOS_PIN_BANK_EINTG(4, 0x020, "gpa1", 0x04),
+ 	EXYNOS_PIN_BANK_EINTG(8, 0x040, "gpb", 0x08),
+ 	EXYNOS_PIN_BANK_EINTG(5, 0x060, "gpc0", 0x0c),
+ 	EXYNOS_PIN_BANK_EINTG(5, 0x080, "gpc1", 0x10),
+ 	EXYNOS_PIN_BANK_EINTG(4, 0x0a0, "gpd0", 0x14),
+-	EXYNOS_PIN_BANK_EINTG(4, 0x0c0, "gpd1", 0x18),
+-	EXYNOS_PIN_BANK_EINTG(5, 0x0e0, "gpe0", 0x1c),
+-	EXYNOS_PIN_BANK_EINTG(8, 0x100, "gpe1", 0x20),
+-	EXYNOS_PIN_BANK_EINTG(6, 0x120, "gpf0", 0x24),
++	EXYNOS_PIN_BANK_EINTG(6, 0x0c0, "gpd1", 0x18),
++	EXYNOS_PIN_BANK_EINTG(8, 0x0e0, "gpe0", 0x1c),
++	EXYNOS_PIN_BANK_EINTG(5, 0x100, "gpe1", 0x20),
++	EXYNOS_PIN_BANK_EINTG(8, 0x120, "gpf0", 0x24),
+ 	EXYNOS_PIN_BANK_EINTG(8, 0x140, "gpf1", 0x28),
+ 	EXYNOS_PIN_BANK_EINTG(8, 0x160, "gpf2", 0x2c),
+-	EXYNOS_PIN_BANK_EINTG(8, 0x180, "gpf3", 0x30),
++	EXYNOS_PIN_BANK_EINTG(6, 0x180, "gpf3", 0x30),
+ 	EXYNOS_PIN_BANK_EINTG(7, 0x1a0, "gpg0", 0x34),
+ 	EXYNOS_PIN_BANK_EINTG(7, 0x1c0, "gpg1", 0x38),
+ 	EXYNOS_PIN_BANK_EINTG(7, 0x1e0, "gpg2", 0x3c),
+-- 
+1.8.1.2
