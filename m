@@ -1,81 +1,29 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 24 Sep 2013 16:36:25 +0100
-Subject: [PATCH 3/7] ARM: dma-mapping: Always pass proper prot flags to
- iommu_map()
-In-Reply-To: <1380035221-11576-4-git-send-email-andreas.herrmann@calxeda.com>
-References: <1380035221-11576-1-git-send-email-andreas.herrmann@calxeda.com>
- <1380035221-11576-4-git-send-email-andreas.herrmann@calxeda.com>
-Message-ID: <20130924153625.GD20774@mudshark.cambridge.arm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 24 Sep 2013 16:37:01 +0100
+Subject: [PATCH] ASoC: kirkwood: add S/PDIF support
+In-Reply-To: <20130924105127.GB12758@n2100.arm.linux.org.uk>
+References: <20130924124122.64834b2a@armhf>
+ <20130924105127.GB12758@n2100.arm.linux.org.uk>
+Message-ID: <20130924153701.GF3226@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 24, 2013 at 04:06:57PM +0100, Andreas Herrmann wrote:
-> ... otherwise it is impossible for the low level iommu driver to
-> figure out which pte flags should be used.
-> 
-> In __map_sg_chunk we can derive the flags from dma_data_direction.
-> 
-> In __iommu_create_mapping we should treat the memory like
-> DMA_BIDIRECTIONAL and pass both IOMMU_READ and IOMMU_WRITE to
-> iommu_map.
-> __iommu_create_mapping is used during dma_alloc_coherent (via
-> arm_iommu_alloc_attrs).  AFAIK dma_alloc_coherent is responsible for
-> allocation _and_ mapping.  I think this implies that access to the
-> mapped pages should be allowed.
-> 
-> Cc: Marek Szyprowski <m.szyprowski@samsung.com>
-> Signed-off-by: Andreas Herrmann <andreas.herrmann@calxeda.com>
-> ---
->  arch/arm/mm/dma-mapping.c |   20 ++++++++++++++++++--
->  1 file changed, 18 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-> index f5e1a84..95abed8 100644
-> --- a/arch/arm/mm/dma-mapping.c
-> +++ b/arch/arm/mm/dma-mapping.c
-> @@ -1232,7 +1232,8 @@ __iommu_create_mapping(struct device *dev, struct page **pages, size_t size)
->  				break;
->  
->  		len = (j - i) << PAGE_SHIFT;
-> -		ret = iommu_map(mapping->domain, iova, phys, len, 0);
-> +		ret = iommu_map(mapping->domain, iova, phys, len,
-> +				IOMMU_READ|IOMMU_WRITE);
->  		if (ret < 0)
->  			goto fail;
->  		iova += len;
-> @@ -1444,6 +1445,7 @@ static int __map_sg_chunk(struct device *dev, struct scatterlist *sg,
->  	int ret = 0;
->  	unsigned int count;
->  	struct scatterlist *s;
-> +	int prot;
->  
->  	size = PAGE_ALIGN(size);
->  	*handle = DMA_ERROR_CODE;
-> @@ -1460,7 +1462,21 @@ static int __map_sg_chunk(struct device *dev, struct scatterlist *sg,
->  			!dma_get_attr(DMA_ATTR_SKIP_CPU_SYNC, attrs))
->  			__dma_page_cpu_to_dev(sg_page(s), s->offset, s->length, dir);
->  
-> -		ret = iommu_map(mapping->domain, iova, phys, len, 0);
-> +		switch (dir) {
-> +		case DMA_BIDIRECTIONAL:
-> +			prot = IOMMU_READ | IOMMU_WRITE;
-> +			break;
-> +		case DMA_TO_DEVICE:
-> +			prot = IOMMU_READ;
-> +			break;
-> +		case DMA_FROM_DEVICE:
-> +			prot = IOMMU_WRITE;
-> +			break;
-> +		default:
-> +			prot = 0;
-> +		}
-> +
-> +		ret = iommu_map(mapping->domain, iova, phys, len, prot);
+On Tue, Sep 24, 2013 at 11:51:27AM +0100, Russell King - ARM Linux wrote:
+> On Tue, Sep 24, 2013 at 12:41:22PM +0200, Jean-Francois Moine wrote:
+> > This patch adds S/PDIF input/output for mvebu DT boards.
 
-I already added this code to arm_coherent_iommu_map_page but forgot to
-update the rest of the time. Could you shift the switch into a helper and
-call that instead of inlining it explicitly?
+> Right, so if this goes in, then we're completely fucked for doing this
+> the way that Mark apparantly wants it to be done, because once these
+> DT properties go in, they're there to stay.
 
-Cheers,
-
-Will
+I'm not sure that this is in particular conflict with any other way of
+writing things, though it would be redundant.  The best thing would be
+to key this off connecting to DAIs so that people just need to make the
+connections that exist in their system in the device tree.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130924/86f8d022/attachment.sig>
