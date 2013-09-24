@@ -1,51 +1,65 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 24 Sep 2013 14:00:13 +0100
-Subject: [Question] Verification For arm64: suspend/resume implementation
-In-Reply-To: <52417C4D.1030009@marvell.com>
-References: <52327E41.1070904@marvell.com>
- <20130913144001.GA28531@e102568-lin.cambridge.arm.com>
- <524021EC.2000207@marvell.com>
- <20130923152606.GA6157@e102648.cambridge.arm.com>
- <5240F246.6050402@marvell.com>
- <20130924090236.GY10174@e102648.cambridge.arm.com>
- <52417C4D.1030009@marvell.com>
-Message-ID: <20130924130012.GE25907@arm.com>
+From: m.chehab@samsung.com (Mauro Carvalho Chehab)
+Date: Tue, 24 Sep 2013 10:02:40 -0300
+Subject: [PATCH v5 1/4] media: s5p-tv: Replace mxr_ macro by default dev_
+In-Reply-To: <1583471.Ys4OY3iSLA@amdc1032>
+References: <1379775649-6331-1-git-send-email-m.krawczuk@partner.samsung.com>
+ <13162989.WhfDRzW6dg@amdc1032> <52415ED9.3030407@samsung.com>
+ <1583471.Ys4OY3iSLA@amdc1032>
+Message-ID: <20130924100240.211dcaa3@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 24, 2013 at 12:49:33PM +0100, Leo Yan wrote:
-> On 09/24/2013 05:02 PM, Achin Gupta wrote:
-> > On Tue, Sep 24, 2013 at 03:00:38AM +0100, Leo Yan wrote:
-> >> Here have another question, ARM have the example code for boot wrapper
-> >> which will switch from EL3 to secure EL1 rather than non-secure's EL1?
-> >
-> > I dont' think we do but let me check. Switching to S-EL1 instead of
-> > NS-EL1 should be a matter of _not_ setting the SCR_EL3.NS bit before
-> > doing the exception level change (ERET).
-> 
-> I quick try with below patch for boot wrapper, i saw foundataion model 
-> cannot boot up successfully and there have no console output; suppose 
-> it's hang at some boot operations, but now foundation model cannot debug 
-> low level code, so i cannot debug further more. :-(
-> 
-> diff --git a/boot.S b/boot.S
-> index a1f25e2..2f1b867 100644
-> --- a/boot.S
-> +++ b/boot.S
-> @@ -19,7 +19,6 @@ _start:
->          b.ne    start_ns                        // skip EL3 initialisation
-> 
->          mov     x0, #0x30                       // RES1
-> -       orr     x0, x0, #(1 << 0)               // Non-secure EL1
->          orr     x0, x0, #(1 << 8)               // HVC enable
->          orr     x0, x0, #(1 << 10)              // 64-bit EL2
->          msr     scr_el3, x0
+Em Tue, 24 Sep 2013 12:33:34 +0200
+Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com> escreveu:
 
-You also need to make sure the boot wrapper starts the kernel in S-EL1
-rather than NS-EL2.
+> 
+> Hi Tomasz,
+> 
+> On Tuesday, September 24, 2013 11:43:53 AM Tomasz Stanislawski wrote:
+> > Hi,
+> > 
+> > On 09/23/2013 05:48 PM, Bartlomiej Zolnierkiewicz wrote:
+> > > 
+> > > Hi Tomasz,
+> > > 
+> > > On Monday, September 23, 2013 04:50:01 PM Tomasz Stanislawski wrote:
+> > >> Hello,
+> > >> May I ask what is the rationale for this patch?
+> > >> To reduce a few lines of code?
+> > > 
+> > > This patch makes source code more generic-like and easier to follow (mxd_r*
+> > 
+> > more generic(-like?) - NOT. Using mxr_ macros is a more generic way to produce logs
+> 
+> Using mxr_* macros is not more generic, don't be silly. :)
 
-BTW, why do you need this? There are no virtualisation features
-supported on the secure side.
+Let me give my 2 cents on it: it used to be common on media drivers to
+define their own print macros. The rationale for that is because the
+existing macros, on that time (kernel 2.2), weren't good enough[1].
+Other drivers just followed it due to cut-and-paste.
 
--- 
-Catalin
+However, nowadays, most developers are just sticking with the existing
+common debug infrastructure (either dev_* or pr_* - being the last more
+used). By using them, Kernel janitors can do a better job, as they may
+have scripts already prepared to check issues there.
+
+I prefer the usage of pr_* macros, as they allow debug messages to be
+selectively enabled/disabled, if dynamic printk's are enabled. So,
+a change like that actually improves the debug capability on a given 
+driver.
+
+So, IMHO, the better would be to change the patch to use pr_* macros,
+and follow Joe's suggestions to improve it.
+
+Regards,
+Mauro
+
+
+[1] on other drivers that create their own macros, the usual prefix is the
+name of the driver (so, on em28xx, it is em28xx_dbg, and so on). In this 
+case, the driver is s5p_tv. So, a macro following the old way should be 
+called as s5p_tv_dbg. Yet, it is takes just a fraction of time to identify
+them as printk-alike macros, as all those macros are similar.
+
+Cheers,
+Mauro
