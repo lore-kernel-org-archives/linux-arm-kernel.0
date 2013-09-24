@@ -1,29 +1,47 @@
-From: csd@broadcom.com (Christian Daudt)
-Date: Tue, 24 Sep 2013 13:20:52 -0700
-Subject: [PATCH] ARM: bcm281xx: Add ARCH Timers to config
-Message-ID: <1380054052-11527-1-git-send-email-csd@broadcom.com>
+From: sre@ring0.de (Sebastian Reichel)
+Date: Tue, 24 Sep 2013 22:50:27 +0200
+Subject: [PATCH 4/4] RX-51: Add platform function and data for bq24150a
+ charger
+In-Reply-To: <201309241905.48301@pali>
+References: <1378630239-10006-1-git-send-email-pali.rohar@gmail.com>
+ <201309232206.47391@pali> <20130923204714.GB22995@earth.universe>
+ <201309241905.48301@pali>
+Message-ID: <20130924205026.GA13204@earth.universe>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add HAVE_ARM_ARCH_TIMER to Broadcom Kconfig as it is
-required for some Mobile SoCs.
+Hi,
 
-Signed-off-by: Christian Daudt <bcm@fixthebug.org>
-Reviewed-by: Markus Mayer <mmayer@broadcom.com>
-Reviewed-by: Mark Hambleton <mahamble@broadcom.com>
-Reviewed-by: James King <jamesk@broadcom.com>
+On Tue, Sep 24, 2013 at 07:05:47PM +0200, Pali Roh?r wrote:
+> No, isp1704 driver is doing fastcharger detection (and then 
+> export charger type via sysfs power supply) based on musb usb 
+> events.
+> 
+> Real charging (enabling/disabling and setting properties) is done 
+> by bq24150a chip which has own power driver bq2415x_charger.
+> 
+> As already wrote this is not simple and this is reason why I sent 
+> board data and functions only now...
 
-diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
-index 69d67f7..635537b 100644
---- a/arch/arm/mach-bcm/Kconfig
-+++ b/arch/arm/mach-bcm/Kconfig
-@@ -13,6 +13,7 @@ config ARCH_BCM
- 	select SPARSE_IRQ
- 	select TICK_ONESHOT
- 	select CACHE_L2X0
-+	select HAVE_ARM_ARCH_TIMER
- 	help
- 	  This enables support for system based on Broadcom SoCs.
- 	  It currently supports the 'BCM281XX' family, which includes
--- 
-1.7.10.4
+Yes, I'm aware of this. Technically the isp1704 does not provide the
+5 volt line, but for the system as a whole that fact does not really
+matter.
+
+The isp1704 can provide its functionality via the regulator API
+as a simple regulator device. It provides information about the
+power "it can supply".
+
+The bq24150a on the other hand can just use the regulator via the
+consumer interface.
+
+The regulator framework provides capabilities for events:
+"Regulators can notify consumers of external events"
+
+-- Sebastian
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130924/649da08c/attachment.sig>
