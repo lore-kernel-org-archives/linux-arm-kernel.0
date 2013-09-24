@@ -1,46 +1,84 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue, 24 Sep 2013 19:30:32 +0200
-Subject: [PATCH] ARM: at91: sama5d: add the PWM clock
-Message-ID: <1380043832-26600-1-git-send-email-alexandre.belloni@free-electrons.com>
+From: andreas.herrmann@calxeda.com (Andreas Herrmann)
+Date: Tue, 24 Sep 2013 19:40:36 +0200
+Subject: [PATCH 3/7] ARM: dma-mapping: Always pass proper prot flags to
+ iommu_map()
+In-Reply-To: <20130924153625.GD20774@mudshark.cambridge.arm.com>
+References: <1380035221-11576-1-git-send-email-andreas.herrmann@calxeda.com>
+ <1380035221-11576-4-git-send-email-andreas.herrmann@calxeda.com>
+ <20130924153625.GD20774@mudshark.cambridge.arm.com>
+Message-ID: <20130924174036.GU4845@alberich>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
----
- arch/arm/mach-at91/sama5d3.c | 7 +++++++
- 1 file changed, 7 insertions(+)
+On Tue, Sep 24, 2013 at 11:36:25AM -0400, Will Deacon wrote:
+> On Tue, Sep 24, 2013 at 04:06:57PM +0100, Andreas Herrmann wrote:
+> > ... otherwise it is impossible for the low level iommu driver to
+> > figure out which pte flags should be used.
+> > 
+> > In __map_sg_chunk we can derive the flags from dma_data_direction.
+> > 
+> > In __iommu_create_mapping we should treat the memory like
+> > DMA_BIDIRECTIONAL and pass both IOMMU_READ and IOMMU_WRITE to
+> > iommu_map.
+> > __iommu_create_mapping is used during dma_alloc_coherent (via
+> > arm_iommu_alloc_attrs).  AFAIK dma_alloc_coherent is responsible for
+> > allocation _and_ mapping.  I think this implies that access to the
+> > mapped pages should be allowed.
+> > 
+> > Cc: Marek Szyprowski <m.szyprowski@samsung.com>
+> > Signed-off-by: Andreas Herrmann <andreas.herrmann@calxeda.com>
+> > ---
+> >  arch/arm/mm/dma-mapping.c |   20 ++++++++++++++++++--
+> >  1 file changed, 18 insertions(+), 2 deletions(-)
+> > 
+> > diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+> > index f5e1a84..95abed8 100644
+> > --- a/arch/arm/mm/dma-mapping.c
+> > +++ b/arch/arm/mm/dma-mapping.c
+> > @@ -1232,7 +1232,8 @@ __iommu_create_mapping(struct device *dev, struct page **pages, size_t size)
+> >  				break;
+> >  
+> >  		len = (j - i) << PAGE_SHIFT;
+> > -		ret = iommu_map(mapping->domain, iova, phys, len, 0);
+> > +		ret = iommu_map(mapping->domain, iova, phys, len,
+> > +				IOMMU_READ|IOMMU_WRITE);
+> >  		if (ret < 0)
+> >  			goto fail;
+> >  		iova += len;
+> > @@ -1444,6 +1445,7 @@ static int __map_sg_chunk(struct device *dev, struct scatterlist *sg,
+> >  	int ret = 0;
+> >  	unsigned int count;
+> >  	struct scatterlist *s;
+> > +	int prot;
+> >  
+> >  	size = PAGE_ALIGN(size);
+> >  	*handle = DMA_ERROR_CODE;
+> > @@ -1460,7 +1462,21 @@ static int __map_sg_chunk(struct device *dev, struct scatterlist *sg,
+> >  			!dma_get_attr(DMA_ATTR_SKIP_CPU_SYNC, attrs))
+> >  			__dma_page_cpu_to_dev(sg_page(s), s->offset, s->length, dir);
+> >  
+> > -		ret = iommu_map(mapping->domain, iova, phys, len, 0);
+> > +		switch (dir) {
+> > +		case DMA_BIDIRECTIONAL:
+> > +			prot = IOMMU_READ | IOMMU_WRITE;
+> > +			break;
+> > +		case DMA_TO_DEVICE:
+> > +			prot = IOMMU_READ;
+> > +			break;
+> > +		case DMA_FROM_DEVICE:
+> > +			prot = IOMMU_WRITE;
+> > +			break;
+> > +		default:
+> > +			prot = 0;
+> > +		}
+> > +
+> > +		ret = iommu_map(mapping->domain, iova, phys, len, prot);
+> 
+> I already added this code to arm_coherent_iommu_map_page but forgot to
+> update the rest of the time. Could you shift the switch into a helper and
+> call that instead of inlining it explicitly?
 
-diff --git a/arch/arm/mach-at91/sama5d3.c b/arch/arm/mach-at91/sama5d3.c
-index 4012797..8e43e8d 100644
---- a/arch/arm/mach-at91/sama5d3.c
-+++ b/arch/arm/mach-at91/sama5d3.c
-@@ -241,6 +241,11 @@ static struct clk tdes_clk = {
- 	.pid		= SAMA5D3_ID_TDES,
- 	.type		= CLK_TYPE_PERIPHERAL,
- };
-+static struct clk pwm_clk = {
-+	.name		= "pwm_clk",
-+	.pid		= SAMA5D3_ID_PWM,
-+	.type		= CLK_TYPE_PERIPHERAL,
-+};
- 
- static struct clk *periph_clocks[] __initdata = {
- 	&pioA_clk,
-@@ -281,6 +286,7 @@ static struct clk *periph_clocks[] __initdata = {
- 	&sha_clk,
- 	&aes_clk,
- 	&tdes_clk,
-+	&pwm_clk,
- };
- 
- static struct clk pck0 = {
-@@ -345,6 +351,7 @@ static struct clk_lookup periph_clocks_lookups[] = {
- 	CLKDEV_CON_DEV_ID("sha_clk", "f8034000.sha", &sha_clk),
- 	CLKDEV_CON_DEV_ID("aes_clk", "f8038000.aes", &aes_clk),
- 	CLKDEV_CON_DEV_ID("tdes_clk", "f803c000.tdes", &tdes_clk),
-+	CLKDEV_CON_DEV_ID(NULL, "f002c000.pwm", &pwm_clk),
- };
- 
- static void __init sama5d3_register_clocks(void)
--- 
-1.8.1.2
+Yes, will do so.
+
+
+Andreas
