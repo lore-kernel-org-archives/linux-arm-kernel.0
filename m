@@ -1,58 +1,113 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 24 Sep 2013 16:40:48 +0100
-Subject: [PATCH 4/7] iommu/arm-smmu: Check for num_context_irqs > 0 to
- avoid divide by zero exception
-In-Reply-To: <1380035221-11576-5-git-send-email-andreas.herrmann@calxeda.com>
-References: <1380035221-11576-1-git-send-email-andreas.herrmann@calxeda.com>
- <1380035221-11576-5-git-send-email-andreas.herrmann@calxeda.com>
-Message-ID: <20130924154048.GE20774@mudshark.cambridge.arm.com>
+From: steve.capper@linaro.org (Steve Capper)
+Date: Tue, 24 Sep 2013 16:41:19 +0100
+Subject: [PATCH 3/3] KVM: ARM: Transparent huge pages and hugetlbfs support
+In-Reply-To: <524013BB.4090303@arm.com>
+References: <1376021239-10532-1-git-send-email-christoffer.dall@linaro.org>
+ <1376021239-10532-4-git-send-email-christoffer.dall@linaro.org>
+ <524013BB.4090303@arm.com>
+Message-ID: <20130924154118.GA18779@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 24, 2013 at 04:06:58PM +0100, Andreas Herrmann wrote:
-> With the right (or wrong;-) definition of v1 SMMU node in DTB it is
-> possible to trigger a division by zero in arm_smmu_init_domain_context
-> (if number of context irqs is 0):
+On Mon, Sep 23, 2013 at 11:11:07AM +0100, Marc Zyngier wrote:
+> Hi Christoffer,
 > 
->        if (smmu->version == 1) {
->                root_cfg->irptndx = atomic_inc_return(&smmu->irptndx);
->  ?             root_cfg->irptndx %= smmu->num_context_irqs;
->        } else {
+> Finally taking some time to review this patch. Sorry for the delay...
 > 
-> Avoid this by checking for num_context_irqs > 0 before trying to
-> assign interrupts to contexts.
-> 
-> Signed-off-by: Andreas Herrmann <andreas.herrmann@calxeda.com>
-> ---
->  drivers/iommu/arm-smmu.c |   31 +++++++++++++++++--------------
->  1 file changed, 17 insertions(+), 14 deletions(-)
-> 
-> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-> index f5a856e..0dfd255 100644
-> --- a/drivers/iommu/arm-smmu.c
-> +++ b/drivers/iommu/arm-smmu.c
-> @@ -828,21 +828,24 @@ static int arm_smmu_init_domain_context(struct iommu_domain *domain,
->  		return ret;
->  
->  	root_cfg->cbndx = ret;
-> -	if (smmu->version == 1) {
-> -		root_cfg->irptndx = atomic_inc_return(&smmu->irptndx);
-> -		root_cfg->irptndx %= smmu->num_context_irqs;
-> -	} else {
-> -		root_cfg->irptndx = root_cfg->cbndx;
-> -	}
->  
-> -	irq = smmu->irqs[smmu->num_global_irqs + root_cfg->irptndx];
-> -	ret = request_irq(irq, arm_smmu_context_fault, IRQF_SHARED,
-> -			  "arm-smmu-context-fault", domain);
-> -	if (IS_ERR_VALUE(ret)) {
-> -		dev_err(smmu->dev, "failed to request context IRQ %d (%u)\n",
-> -			root_cfg->irptndx, irq);
-> -		root_cfg->irptndx = -1;
-> -		goto out_free_context;
-> +	if (smmu->num_context_irqs) {
+> On 09/08/13 05:07, Christoffer Dall wrote:
+> > From: Christoffer Dall <cdall@cs.columbia.edu>
+> > 
 
-Can we move this check to probe time, to avoid re-evaluating it every time
-we initialise a new domain?
+[ snip ]
 
-Will
+> >  static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+> > -                         gfn_t gfn, struct kvm_memory_slot *memslot,
+> > +                         struct kvm_memory_slot *memslot,
+> >                           unsigned long fault_status)
+> >  {
+> > -       pte_t new_pte;
+> > -       pfn_t pfn;
+> >         int ret;
+> > -       bool write_fault, writable;
+> > +       bool write_fault, writable, hugetlb = false, force_pte = false;
+> >         unsigned long mmu_seq;
+> > +       gfn_t gfn = fault_ipa >> PAGE_SHIFT;
+> > +       unsigned long hva = gfn_to_hva(vcpu->kvm, gfn);
+> > +       struct kvm *kvm = vcpu->kvm;
+> >         struct kvm_mmu_memory_cache *memcache = &vcpu->arch.mmu_page_cache;
+> > +       struct vm_area_struct *vma;
+> > +       pfn_t pfn;
+> > +       unsigned long psize;
+> > 
+> >         write_fault = kvm_is_write_fault(kvm_vcpu_get_hsr(vcpu));
+> >         if (fault_status == FSC_PERM && !write_fault) {
+> > @@ -525,6 +638,27 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+> >                 return -EFAULT;
+> >         }
+> > 
+> > +       /* Let's check if we will get back a huge page */
+> > +       down_read(&current->mm->mmap_sem);
+> > +       vma = find_vma_intersection(current->mm, hva, hva + 1);
+> > +       if (is_vm_hugetlb_page(vma)) {
+> > +               hugetlb = true;
+> > +               hva &= PMD_MASK;
+> > +               gfn = (fault_ipa & PMD_MASK) >> PAGE_SHIFT;
+> > +               psize = PMD_SIZE;
+> > +       } else {
+> > +               psize = PAGE_SIZE;
+> > +               if (vma->vm_start & ~PMD_MASK)
+> > +                       force_pte = true;
+> > +       }
+> > +       up_read(&current->mm->mmap_sem);
+> > +
+> > +       pfn = gfn_to_pfn_prot(kvm, gfn, write_fault, &writable);
+> > +       if (is_error_pfn(pfn))
+> > +               return -EFAULT;
+> 
+> How does this work with respect to the comment that talks about reading
+> mmu_seq before calling gfp_to_pfn_prot? Either the comment is wrong, or
+> we read this too early.
+> 
+> > +       coherent_icache_guest_page(kvm, hva, psize);
+> > +
+> >         /* We need minimum second+third level pages */
+> >         ret = mmu_topup_memory_cache(memcache, 2, KVM_NR_MEM_OBJS);
+> >         if (ret)
+> > @@ -542,26 +676,34 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+> >          */
+> >         smp_rmb();
+> > 
+> > -       pfn = gfn_to_pfn_prot(vcpu->kvm, gfn, write_fault, &writable);
+> > -       if (is_error_pfn(pfn))
+> > -               return -EFAULT;
+> > -
+> > -       new_pte = pfn_pte(pfn, PAGE_S2);
+> > -       coherent_icache_guest_page(vcpu->kvm, gfn);
+> > -
+> > -       spin_lock(&vcpu->kvm->mmu_lock);
+> > -       if (mmu_notifier_retry(vcpu->kvm, mmu_seq))
+> > +       spin_lock(&kvm->mmu_lock);
+> > +       if (mmu_notifier_retry(kvm, mmu_seq))
+> >                 goto out_unlock;
+> > -       if (writable) {
+> > -               kvm_set_s2pte_writable(&new_pte);
+> > -               kvm_set_pfn_dirty(pfn);
+> > +       if (!hugetlb && !force_pte)
+> > +               hugetlb = transparent_hugepage_adjust(&pfn, &fault_ipa);
+> 
+> How do we ensure that there is no race between this pte being promoted
+> to a pmd and another page allocation in the same pmd somewhere else in
+> the system? We only hold the kvm lock here, so there must be some extra
+> implicit guarantee somewhere...
+> 
+
+This isn't a promotion to a huge page, it is a mechanism to ensure that
+pfn corresponds with the head page of a THP as that's where refcount
+information is stored. I think this is safe.
+
+I'm still getting my brain working with kvm, so sorry don't have any
+other feedback yet sorry :-).
+
+Cheers,
+-- 
+Steve
