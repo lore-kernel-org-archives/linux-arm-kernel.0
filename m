@@ -1,37 +1,43 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Tue, 24 Sep 2013 18:32:41 +0200
-Subject: [PATCH] ASoC: kirkwood: add S/PDIF support
-In-Reply-To: <20130924105127.GB12758@n2100.arm.linux.org.uk>
-References: <20130924124122.64834b2a@armhf>
- <20130924105127.GB12758@n2100.arm.linux.org.uk>
-Message-ID: <20130924183241.12a97af4@armhf>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 24 Sep 2013 10:44:24 -0600
+Subject: [PATCH 08/12] clk: tegra: move periph clocks to common file
+In-Reply-To: <20130924082004.GJ30013@tbergstrom-lnx.Nvidia.com>
+References: <1379515331-19427-1-git-send-email-pdeschrijver@nvidia.com>
+ <1379515331-19427-9-git-send-email-pdeschrijver@nvidia.com>
+ <5240890F.6050807@wwwdotorg.org>
+ <20130924082004.GJ30013@tbergstrom-lnx.Nvidia.com>
+Message-ID: <5241C168.4060100@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 24 Sep 2013 11:51:27 +0100
-Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
-
-> On Tue, Sep 24, 2013 at 12:41:22PM +0200, Jean-Francois Moine wrote:
-> > This patch adds S/PDIF input/output for mvebu DT boards.
-> > 
-> > Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
+On 09/24/2013 02:20 AM, Peter De Schrijver wrote:
+> On Mon, Sep 23, 2013 at 08:31:43PM +0200, Stephen Warren wrote:
+>> On 09/18/2013 08:41 AM, Peter De Schrijver wrote:
+>>> Introduce a new file for peripheral clocks common between several Tegra
+>>> SoCs and move Tegra114 to this new infrastructure. Also PLLP and the PLLP_OUT
+>>> clocks will be initialized here.
+>>
+>>> diff --git a/drivers/clk/tegra/clk-tegra-periph.c b/drivers/clk/tegra/clk-tegra-periph.c
+>>
+>> Similarly here: don't the following differences exist between the SoCs:
+>>
+>> * At least the set of extant peripheral clocks, and perhaps some
+>> parameters of those clocks.
 > 
-> Right, so if this goes in, then we're completely fucked for doing this
-> the way that Mark apparantly wants it to be done, because once these
-> DT properties go in, they're there to stay.
+> That's what the tegra_clks is for. If the clock isn't in that table, it won't
+> be registered.
+> 
+>> * The set of legal parents for some peripheral clocks (?)
+> 
+> If they differ for Tegra20 and Tegra30, we will need some extra clocks here,
+> which will have a new ID and then only be defined in the tegra_clks for those
+> SoCs. Alternatively they can stay in the SoC specific files.
 
-Indeed!
+I guess that would work.
 
-The DT properties I propose just reflect the hardware connections of
-the board. There are only i2s-out and spdif-out in the Cubox, while
-there may be kirkwood boards with, say, only spdif-in and spdif-out.
-
-These definitions do not interfere with your DPCM problem: you assume
-i2s-out and spdif-out for the i2s1 dove device, and that is what I
-assume too, but from the DT. Then, the driver does not need to know the
-type of the audio device (Kirkwood or Dove), nor to know if it is the
-first or the second i2s device of the Dove chip.
-
--- 
-Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
-Jef		|		http://moinejf.free.fr/
+However, I'd suggest simply leaving all the SoC-specific stuff in the
+SoC-specific files until it actually becomes shared. Otherwise, you're
+simply putting all the code into one big file, and parameterizing it to
+get the correct SoC-specific clocks registered, when you could just keep
+the SoC-specific code in the SoC-specific file/functions, and not need
+any of the conditions.
