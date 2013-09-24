@@ -1,29 +1,35 @@
-From: leoy@marvell.com (Leo Yan)
-Date: Tue, 24 Sep 2013 10:00:38 +0800
-Subject: [Question] Verification For arm64: suspend/resume implementation
-In-Reply-To: <20130923152606.GA6157@e102648.cambridge.arm.com>
-References: <52327E41.1070904@marvell.com>
- <20130913144001.GA28531@e102568-lin.cambridge.arm.com>
- <524021EC.2000207@marvell.com>
- <20130923152606.GA6157@e102648.cambridge.arm.com>
-Message-ID: <5240F246.6050402@marvell.com>
+From: rob@landley.net (Rob Landley)
+Date: Mon, 23 Sep 2013 21:13:20 -0500
+Subject: new binutils needed for arm in 3.12-rc1
+In-Reply-To: <20130923235917.GA30967@amd.pavel.ucw.cz> (from pavel@ucw.cz on
+ Mon Sep 23 18:59:17 2013)
+Message-ID: <1379988800.1974.68@driftwood>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 09/23/2013 06:59:17 PM, Pavel Machek wrote:
+> During 3.12-rc, Will Deacon introduced code into arch/arm that
+> requires binutils 2.22.
 
-On 09/23/2013 11:26 PM, Achin Gupta wrote:
+Um, my toolchain is using the last gplv2 snapshot of binutils out of  
+git, which is just past 2.17 and can build armv7 (but not armv8).
 
-> The foundation model (if thats what you are using) does not model an
-> ARM cpu implementation. The CPUECTLR is a cpu specific register
-> (imp. def.)  so it is not present. The caches on the Foundation Model
-> are inherently coherent so you do not need to access this register. If
-> you do then the access is treated as an illegal instruction.
->
+Binutils 2.12->2.22 is quite the jump. (11 years.) I'd except some  
+thought to have gone into that? Possibly a mention of it?
 
-Thx for the info. So do u mean i need use FVP Model for A53?
+> diff --git a/Documentation/Changes b/Documentation/Changes
+> index b175808..0f8deaf 100644
+> --- a/Documentation/Changes
+> +++ b/Documentation/Changes
+> @@ -23,7 +23,7 @@ you probably needn't concern yourself with  
+> isdn4k-utils.
+> 
+>  o  Gnu C                  3.2                     # gcc --version
+>  o  Gnu make               3.80                    # make --version
+> -o  binutils               2.12                    # ld -v
+> +o  binutils               2.22                    # ld -v
 
-Here have another question, ARM have the example code for boot wrapper 
-which will switch from EL3 to secure EL1 rather than non-secure's EL1?
+When the sh4 platform did this, I just reverted the patch. (It still  
+reverts cleanly ~4 years later, and builds with my old tool versions...)
 
-Thx,
-Leo Yan
+Rob
