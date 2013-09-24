@@ -1,62 +1,31 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Mon, 23 Sep 2013 21:24:06 -0500
-Subject: [PATCH 1/1] ARM: dts: am335x-bone-common: correct mux mode for
- mmc1_cmd
-In-Reply-To: <52405E30.2020001@ti.com>
-References: <1379698696-21945-1-git-send-email-balajitk@ti.com>
- <523C9DE4.6040109@ti.com> <52405E30.2020001@ti.com>
-Message-ID: <CAGo_u6qRwq8nYe+A69uqKKfJzg6PMuAcvTQYy2soEWOoaMS3bw@mail.gmail.com>
+From: rvaswani@codeaurora.org (Rohit Vaswani)
+Date: Mon, 23 Sep 2013 20:13:26 -0700
+Subject: [PATCH 3/3] defconfig: msm_defconfig: Enable CONFIG_ARCH_MSM8974
+In-Reply-To: <1379992406-3541-1-git-send-email-rvaswani@codeaurora.org>
+References: <1379992406-3541-1-git-send-email-rvaswani@codeaurora.org>
+Message-ID: <1379992406-3541-3-git-send-email-rvaswani@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 23, 2013 at 10:28 AM, Balaji T K <balajitk@ti.com> wrote:
-> On Saturday 21 September 2013 12:41 AM, Nishanth Menon wrote:
->>
->> On 09/20/2013 12:38 PM, Balaji T K wrote:
->>>
->>> correct mux mode for mmc1_cmd to detect eMMC on bone-black
->>>
->>> Signed-off-by: Balaji T K <balajitk@ti.com>
->>> ---
->>>   arch/arm/boot/dts/am335x-bone-common.dtsi |    2 +-
->>>   1 files changed, 1 insertions(+), 1 deletions(-)
->>>
->>> diff --git a/arch/arm/boot/dts/am335x-bone-common.dtsi
->>> b/arch/arm/boot/dts/am335x-bone-common.dtsi
->>> index 56361ce..90ab56c 100644
->>> --- a/arch/arm/boot/dts/am335x-bone-common.dtsi
->>> +++ b/arch/arm/boot/dts/am335x-bone-common.dtsi
->>> @@ -117,7 +117,7 @@
->>>                 emmc_pins: pinmux_emmc_pins {
->>>                         pinctrl-single,pins = <
->>>                                 0x80 (PIN_INPUT_PULLUP | MUX_MODE2) /*
->>> gpmc_csn1.mmc1_clk */
->>> -                               0x84 (PIN_INPUT_PULLUP | MUX_MODE1) /*
->>> gpmc_csn2.mmc1_cmd */
->>> +                               0x84 (PIN_INPUT_PULLUP | MUX_MODE2) /*
->>> gpmc_csn2.mmc1_cmd */
->>>                                 0x00 (PIN_INPUT_PULLUP | MUX_MODE1) /*
->>> gpmc_ad0.mmc1_dat0 */
->>>                                 0x04 (PIN_INPUT_PULLUP | MUX_MODE1) /*
->>> gpmc_ad1.mmc1_dat1 */
->>>                                 0x08 (PIN_INPUT_PULLUP | MUX_MODE1) /*
->>> gpmc_ad2.mmc1_dat2 */
->>>
->> is'nt this a common change? why is it "black only"? if it is so, then
->> the pinmux should probably be spun off outside bone-common.dtsi into
->> boneblack.dtsi perhaps?
->>
->
-> It is applicable for add-on eMMC-cape for beagle bone white, so eMMC pinmux
-> can
-> remain in bone-common.dtsi.
-> However I could test only on beagle bone black which has eMMC on board,
-> since I
-> don't have access to eMMC-cape
+This patch enables MSM8974 build support.
 
+Signed-off-by: Rohit Vaswani <rvaswani@codeaurora.org>
+---
+ arch/arm/configs/msm_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-Could you update the patch to the effect please considering you are
-modifying am335x-bone-common.dtsi
-
-Regards,
-Nishanth Menon
+diff --git a/arch/arm/configs/msm_defconfig b/arch/arm/configs/msm_defconfig
+index 690b5f9..0ed32e5 100644
+--- a/arch/arm/configs/msm_defconfig
++++ b/arch/arm/configs/msm_defconfig
+@@ -20,6 +20,7 @@ CONFIG_PARTITION_ADVANCED=y
+ CONFIG_ARCH_MSM=y
+ CONFIG_ARCH_MSM8X60=y
+ CONFIG_ARCH_MSM8960=y
++CONFIG_ARCH_MSM8974=y
+ CONFIG_SMP=y
+ CONFIG_PREEMPT=y
+ CONFIG_AEABI=y
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
