@@ -1,192 +1,188 @@
-From: m.krawczuk@partner.samsung.com (Mateusz Krawczuk)
-Date: Tue, 24 Sep 2013 14:50:09 +0200
-Subject: [PATCH v5 3/3] ARM: s5pv210: Migrate clock handling to Common Clock
- Framework
-In-Reply-To: <1380027009-2239-1-git-send-email-m.krawczuk@partner.samsung.com>
-References: <1380027009-2239-1-git-send-email-m.krawczuk@partner.samsung.com>
-Message-ID: <1380027009-2239-4-git-send-email-m.krawczuk@partner.samsung.com>
+From: t.stanislaws@samsung.com (Tomasz Stanislawski)
+Date: Tue, 24 Sep 2013 14:52:44 +0200
+Subject: [PATCH v5 1/4] media: s5p-tv: Replace mxr_ macro by default dev_
+In-Reply-To: <1379958282.3575.31.camel@joe-AO722>
+References: <1379775649-6331-1-git-send-email-m.krawczuk@partner.samsung.com>
+ <1379775649-6331-2-git-send-email-m.krawczuk@partner.samsung.com>
+ <52405519.3020504@samsung.com> <13162989.WhfDRzW6dg@amdc1032>
+ <1379958282.3575.31.camel@joe-AO722>
+Message-ID: <52418B1C.6030600@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch migrates the s5pv210 platform to use new clock driver
-using Common Clock Framework.
+On 09/23/2013 07:44 PM, Joe Perches wrote:
+> On Mon, 2013-09-23 at 17:48 +0200, Bartlomiej Zolnierkiewicz wrote:
+>> On Monday, September 23, 2013 04:50:01 PM Tomasz Stanislawski wrote:
+>>> May I ask what is the rationale for this patch?
+>>> To reduce a few lines of code?
+>> This patch makes source code more generic-like and easier to follow (mxd_r*
+>> macros currently only obfuscate the code and make them harder to read for
+>> everybody, maybe besides the original driver author ;). Removal of few
+>> superfluous lines of code is just a bonus.
+> I don't see any significant issue with this change.
+> Using generic mechanisms is good.
+>
 
-Signed-off-by: Mateusz Krawczuk <m.krawczuk@partner.samsung.com>
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
----
- arch/arm/mach-s5pv210/Kconfig         |  9 +++++++++
- arch/arm/mach-s5pv210/Makefile        |  4 ++--
- arch/arm/mach-s5pv210/common.c        | 17 +++++++++++++++++
- arch/arm/mach-s5pv210/common.h        | 10 ++++++++++
- arch/arm/mach-s5pv210/mach-goni.c     |  2 +-
- arch/arm/mach-s5pv210/mach-smdkv210.c |  2 +-
- arch/arm/plat-samsung/Kconfig         |  2 +-
- 7 files changed, 41 insertions(+), 5 deletions(-)
+Hi Joe,
+Sorry for flaming but please let me explain reasons of my opposition to this patch.
 
-diff --git a/arch/arm/mach-s5pv210/Kconfig b/arch/arm/mach-s5pv210/Kconfig
-index caaedaf..abad41f 100644
---- a/arch/arm/mach-s5pv210/Kconfig
-+++ b/arch/arm/mach-s5pv210/Kconfig
-@@ -11,6 +11,7 @@ if ARCH_S5PV210
- 
- config CPU_S5PV210
- 	bool
-+	select S5P_CLOCK if !COMMON_CLK
- 	select S5P_EXT_INT
- 	select S5P_PM if PM
- 	select S5P_SLEEP if PM
-@@ -69,6 +70,14 @@ config S5PV210_SETUP_USB_PHY
- 	help
- 	  Common setup code for USB PHY controller
- 
-+config COMMON_CLK_S5PV210
-+	bool "Common Clock Framework support"
-+	default y
-+	select COMMON_CLK
-+	help
-+	  Enable this option to use new clock driver
-+	  based on Common Clock Framework.
-+
- menu "S5PC110 Machines"
- 
- config MACH_AQUILA
-diff --git a/arch/arm/mach-s5pv210/Makefile b/arch/arm/mach-s5pv210/Makefile
-index 1c4e419..0c67fe2 100644
---- a/arch/arm/mach-s5pv210/Makefile
-+++ b/arch/arm/mach-s5pv210/Makefile
-@@ -12,8 +12,8 @@ obj-				:=
- 
- # Core
- 
--obj-y				+= common.o clock.o
--
-+obj-y					+= common.o
-+obj-$(CONFIG_S5P_CLOCK)			+= clock.o
- obj-$(CONFIG_PM)		+= pm.o
- 
- obj-y				+= dma.o
-diff --git a/arch/arm/mach-s5pv210/common.c b/arch/arm/mach-s5pv210/common.c
-index 26027a2..48ce5f8 100644
---- a/arch/arm/mach-s5pv210/common.c
-+++ b/arch/arm/mach-s5pv210/common.c
-@@ -24,6 +24,7 @@
- #include <linux/sched.h>
- #include <linux/dma-mapping.h>
- #include <linux/serial_core.h>
-+#include <linux/of.h>
- 
- #include <asm/proc-fns.h>
- #include <asm/mach/arch.h>
-@@ -34,7 +35,13 @@
- #include <mach/regs-clock.h>
- 
- #include <plat/cpu.h>
-+
-+#ifdef CONFIG_S5P_CLOCK
- #include <plat/clock.h>
-+#else
-+#include <linux/clk-provider.h>
-+#endif
-+
- #include <plat/devs.h>
- #include <plat/sdhci.h>
- #include <plat/adc-core.h>
-@@ -50,6 +57,9 @@
- 
- #include "common.h"
- 
-+/* External clock frequency */
-+static unsigned long xusbxti_f;
-+
- static const char name_s5pv210[] = "S5PV210/S5PC110";
- 
- static struct cpu_table cpu_ids[] __initdata = {
-@@ -229,12 +239,16 @@ void __init s5pv210_map_io(void)
- 
- void __init s5pv210_init_clocks(int xtal)
- {
-+#ifdef CONFIG_S5P_CLOCK
- 	printk(KERN_DEBUG "%s: initializing clocks\n", __func__);
- 
- 	s3c24xx_register_baseclocks(xtal);
- 	s5p_register_clocks(xtal);
- 	s5pv210_register_clocks();
- 	s5pv210_setup_clocks();
-+#else
-+	xusbxti_f = xtal;
-+#endif
- }
- 
- void __init s5pv210_init_irq(void)
-@@ -248,6 +262,9 @@ void __init s5pv210_init_irq(void)
- 	vic[3] = ~0;
- 
- 	s5p_init_irq(vic, ARRAY_SIZE(vic));
-+
-+	if (!of_have_populated_dt())
-+		s5pv210_clk_init(NULL, 0, xusbxti_f, S3C_VA_SYS);
- }
- 
- struct bus_type s5pv210_subsys = {
-diff --git a/arch/arm/mach-s5pv210/common.h b/arch/arm/mach-s5pv210/common.h
-index fe1beb5..cf3136a 100644
---- a/arch/arm/mach-s5pv210/common.h
-+++ b/arch/arm/mach-s5pv210/common.h
-@@ -14,6 +14,16 @@
- 
- #include <linux/reboot.h>
- 
-+#ifdef CONFIG_COMMON_CLK_S5PV210
-+void s5pv210_clk_init(struct device_node *np,
-+			    unsigned long xxti_f, unsigned long xusbxti_f,
-+			    void __iomem *reg_base);
-+#else
-+static inline void s5pv210_clk_init(struct device_node *np,
-+			    unsigned long xxti_f, unsigned long xusbxti_f,
-+			    void __iomem *reg_base) {}
-+#endif
-+
- void s5pv210_init_io(struct map_desc *mach_desc, int size);
- void s5pv210_init_irq(void);
- 
-diff --git a/arch/arm/mach-s5pv210/mach-goni.c b/arch/arm/mach-s5pv210/mach-goni.c
-index 282d714..4c9681b 100644
---- a/arch/arm/mach-s5pv210/mach-goni.c
-+++ b/arch/arm/mach-s5pv210/mach-goni.c
-@@ -966,7 +966,7 @@ static void __init goni_sound_init(void)
- static void __init goni_map_io(void)
- {
- 	s5pv210_init_io(NULL, 0);
--	s3c24xx_init_clocks(clk_xusbxti.rate);
-+	s3c24xx_init_clocks(24000000);
- 	s3c24xx_init_uarts(goni_uartcfgs, ARRAY_SIZE(goni_uartcfgs));
- 	samsung_set_timer_source(SAMSUNG_PWM3, SAMSUNG_PWM4);
- }
-diff --git a/arch/arm/mach-s5pv210/mach-smdkv210.c b/arch/arm/mach-s5pv210/mach-smdkv210.c
-index 6d72bb99..f13aa99 100644
---- a/arch/arm/mach-s5pv210/mach-smdkv210.c
-+++ b/arch/arm/mach-s5pv210/mach-smdkv210.c
-@@ -284,7 +284,7 @@ static struct platform_pwm_backlight_data smdkv210_bl_data = {
- static void __init smdkv210_map_io(void)
- {
- 	s5pv210_init_io(NULL, 0);
--	s3c24xx_init_clocks(clk_xusbxti.rate);
-+	s3c24xx_init_clocks(24000000);
- 	s3c24xx_init_uarts(smdkv210_uartcfgs, ARRAY_SIZE(smdkv210_uartcfgs));
- 	samsung_set_timer_source(SAMSUNG_PWM2, SAMSUNG_PWM4);
- }
-diff --git a/arch/arm/plat-samsung/Kconfig b/arch/arm/plat-samsung/Kconfig
-index 7dfba93..2a98613 100644
---- a/arch/arm/plat-samsung/Kconfig
-+++ b/arch/arm/plat-samsung/Kconfig
-@@ -91,7 +91,7 @@ config SAMSUNG_CLKSRC
- 	  used by newer systems such as the S3C64XX.
- 
- config S5P_CLOCK
--	def_bool (ARCH_S5P64X0 || ARCH_S5PC100 || ARCH_S5PV210)
-+	def_bool (ARCH_S5P64X0 || ARCH_S5PC100)
- 	help
- 	  Support common clock part for ARCH_S5P and ARCH_EXYNOS SoCs
- 
--- 
-1.8.1.2
+1. It is true that there was no change in mixer messages for 2.5 year in MAINLINE.
+But sometimes I used modification of mxr_ macros while testing the driver.
+Therefore those macros are useful for me.
+
+2. The other problem with this patch is its high 'conflictness' during merging.
+Unfortunately, sometimes I have to use s5p-tv on platform and configuration
+that is only supported in older versions of the kernel + some integration patches.
+The s5p-tv differs from mainline version in those kernels. Therefore
+I would need to keep two versions of patches, one for old and another one for new kernel.
+Or backport the 'cleanup patch' and all experimental patches above it.
+
+3. As I understand the coding guidelines asked to use dev_* to ensure that all
+error messages have information about the device. There is no change in format of
+errors after this patch. So they do not change anything from userland point of view.
+
+4. I looked for other files where macro for dev_err is used.
+I tried following shell command on v3.12-rc2.
+
+git grep -A1 "_err(" | grep -A1 '#define' | grep -B1 "dev_err"
+
+then processing results using
+grep -v "^--" | cut -d: -f 1 | sort -u | wc
+
+produced 55 files. Among them, the files below makes use of a macro that is
+directly expanded to dev_err(dev_ptr, fmt, ...) without any changes in format.
+
+drivers/firewire/ohci.c
+drivers/gpu/drm/i2c/ch7006_priv.h
+drivers/gpu/drm/i2c/sil164_drv.c
+drivers/infiniband/hw/mthca/mthca_dev.h
+drivers/infiniband/hw/qib/qib.h
+drivers/media/platform/marvell-ccic/cafe-driver.c
+drivers/media/platform/marvell-ccic/mcam-core.c
+drivers/media/platform/s5p-tv/mixer.h
+drivers/media/platform/via-camera.c
+drivers/mtd/devices/docg3.h
+drivers/net/ethernet/broadcom/bgmac.h
+drivers/net/ethernet/chelsio/cxgb3/common.h
+drivers/net/ethernet/intel/e1000/e1000.h
+drivers/net/ethernet/intel/ixgbe/ixgbe_common.h
+drivers/net/ethernet/mellanox/mlx4/mlx4.h
+drivers/net/wireless/iwlegacy/common.h
+drivers/pci/hotplug/pciehp.h
+drivers/pci/hotplug/shpchp.h
+drivers/remoteproc/ste_modem_rproc.c
+drivers/scsi/csiostor/csio_hw.h
+drivers/staging/fwserial/fwserial.c
+drivers/usb/atm/usbatm.h
+drivers/usb/host/ehci.h
+drivers/usb/host/fhci.h
+drivers/usb/host/fotg210-hcd.c
+drivers/usb/host/fusbh200-hcd.c
+drivers/usb/host/ohci.h
+drivers/usb/host/oxu210hp-hcd.c
+drivers/usb/host/xhci.h
+include/linux/hid.h
+include/net/cfg80211.h
+
+Other files makes only cosmetic changes to format, so they might still be worth to
+be 'demacronized'. So I think we can consider that macros wrapping dev_* is still
+a widely used technique so I ask for a good reason before changing the driver.
+
+If one still would like to continue a 'dev_* cleanup crusade' then I kindly
+ask to create a big patchset that fixes all over mentioned files.
+If most of their maintainers accepts the patches I promise to accept it in
+s5p-tv.
+
+Currently, due to mentioned reason the patch is not a cleanup-up for me.
+And since I am still a maintainer of this god-forgotten driver I am
+going NACK this patch because it makes my work more difficult and because
+this patch provides only (if any) relative aesthetic gain.
+
+However this patch can be saved a little. (see below)
+
+> Few trivial nits:
+>
+> I'd remove the trailing periods from some of the messages
+> at the same time.
+>
+> Function tracing is better done by the function tracing
+> mechanism built in to the kernel.  Removing the
+> 	dev_dbg(dev, "%s: enter\n", __func__)
+> lines would be good too.
+>
+> Maybe look at the message levels of more of these
+> logging messages and determine which are actually
+> useful and what is mostly noise and should be dev_dbg
+> or deleted altogether.
+>
+
+I agree that most of debugs in form
+
+mxr_dbg(layer->mdev, "%s:%d\n", __func__, __LINE__);
+
+are obfuscation. So removal of such lines is a cleanup
+and provides some gain and I can ACK this kind of change.
+
+Moreover, I agree that some mxr_info() should be changed mxr_dbg().
+I ask Mateusz to modify the 'cleanup' patch to remove only useless
+mxr_dbg() and mxr_info() but to keep mxr_* macros intact.
+
+Regards,
+Tomasz Stanislawski
+
+>>>> diff --git a/drivers/media/platform/s5p-tv/mixer_drv.c b/drivers/media/platform/s5p-tv/mixer_drv.c
+> 
+>>>> @@ -59,7 +59,7 @@ void mxr_streamer_get(struct mxr_device *mdev)
+>>>>  {
+>>>>  	mutex_lock(&mdev->mutex);
+>>>>  	++mdev->n_streamer;
+>>>> -	mxr_dbg(mdev, "%s(%d)\n", __func__, mdev->n_streamer);
+>>>> +	dev_dbg(mdev->dev, "%s(%d)\n", __func__, mdev->n_streamer);
+> 
+> not too useful
+> 
+> []
+> 
+>>>> @@ -159,42 +159,42 @@ static int mxr_acquire_plat_resources(struct mxr_device *mdev,
+>>>>  
+>>>>  	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "mxr");
+>>>>  	if (res == NULL) {
+>>>> -		mxr_err(mdev, "get memory resource failed.\n");
+>>>> +		dev_err(mdev->dev, "get memory resource failed.\n");
+> 
+> 		dev_err(mdev->dev, "get memory resource failed\n");
+> etc... because of:
+> 
+>>>> @@ -252,27 +252,27 @@ static int mxr_acquire_clocks(struct mxr_device *mdev)
+>>>>  
+>>>>  	res->mixer = clk_get(dev, "mixer");
+>>>>  	if (IS_ERR(res->mixer)) {
+>>>> -		mxr_err(mdev, "failed to get clock 'mixer'\n");
+>>>> +		dev_err(mdev->dev, "failed to get clock 'mixer'\n");
+> 
+> Mixed use of messages with/without periods.
+> 
+>>>> @@ -295,13 +295,13 @@ static int mxr_acquire_resources(struct mxr_device *mdev,
+>>>>  	if (ret)
+>>>>  		goto fail_plat;
+>>>>  
+>>>> -	mxr_info(mdev, "resources acquired\n");
+>>>> +	dev_info(mdev->dev, "resources acquired\n");
+> 
+> This isn't really a useful message so I'd convert it
+> to dev_dbg
+> 
+>>>> @@ -391,7 +391,6 @@ static int mxr_probe(struct platform_device *pdev)
+>>>>  	struct mxr_device *mdev;
+>>>>  	int ret;
+>>>>  
+>>>> -	/* mdev does not exist yet so no mxr_dbg is used */
+>>>>  	dev_info(dev, "probe start\n");
+> 
+> Same with a lot of these...
+> 
+> Maybe in a separate patch.
+> 
+> 
+> 
+> 
