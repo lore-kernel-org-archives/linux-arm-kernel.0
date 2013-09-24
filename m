@@ -1,65 +1,42 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 24 Sep 2013 09:51:17 -0700
-Subject: [PATCH v2 2/2] RX-51: ARM errata 430973 workaround
-In-Reply-To: <20130924001545.GA31569@amd.pavel.ucw.cz>
-References: <1362044548-5398-1-git-send-email-pali.rohar@gmail.com>
- <1373461145-9812-3-git-send-email-pali.rohar@gmail.com>
- <20130917232417.GK9994@atomide.com> <201309181033.24965@pali>
- <20130918171816.GT9994@atomide.com>
- <20130924001545.GA31569@amd.pavel.ucw.cz>
-Message-ID: <20130924165117.GQ2684@atomide.com>
+From: m.krawczuk@partner.samsung.com (Mateusz Krawczuk)
+Date: Tue, 24 Sep 2013 18:53:23 +0200
+Subject: [PATCH 1/3] clk: samsung: pll: Add support for PLL6545a and PLL6522x
+Message-ID: <1380041605-15736-1-git-send-email-m.krawczuk@partner.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Pavel Machek <pavel@ucw.cz> [130923 17:23]:
-> Hi!
-> 
-> > > Tony, if you did not have time for review this patch months ago 
-> > > or you found it only today - no problem, I understand it. But 
-> > > what I need to know is what will happen with board-rx51-* files 
-> > > (and when?) You can see that DT does not have definitions of all 
-> > > n900 hw parts (plus it is not in last 3.11 kernel!) which means 
-> > > that DT is not usable for me and other n900 people. This also 
-> > > means that I cannot rewrite my patches for DT and test if they 
-> > > working.
-> > 
-> > I usually stop looking at new code around -rc4 and concentrate
-> > on fixes until -rc1 or so. So there can be easily one month
-> > delays on reviewing stuff depending on where we are with the
-> > current merge window or -rc cycle, sorry if that's annoying.
-> > 
-> > The .dts files will be separate from the kernel soonish, so
-> > that's not be a show stopper. Just like all the board specific
-> > .config files are separate from the kernel already. Too bad our
-> > .dts changes did not get merged for v3.12 because of conflicts
-> > with other branches, but hey, they should be independent from the
-> > kernel anyways.
-> 
-> Well... I'd say it is still time to merge them. "New hardware support"
-> is ok after -rc1.
+Signed-off-by: Mateusz Krawczuk <m.krawczuk@partner.samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
+ drivers/clk/samsung/clk-pll.c | 2 ++
+ drivers/clk/samsung/clk-pll.h | 2 ++
+ 2 files changed, 4 insertions(+)
 
-Sure if there's a good reason like "driver foo is already device
-tree only and cannot be used for board bar without blah".
+diff --git a/drivers/clk/samsung/clk-pll.c b/drivers/clk/samsung/clk-pll.c
+index 529e11d..dea8715 100644
+--- a/drivers/clk/samsung/clk-pll.c
++++ b/drivers/clk/samsung/clk-pll.c
+@@ -773,6 +773,8 @@ static void __init _samsung_clk_register_pll(struct samsung_pll_clock *pll_clk,
+ 			init.ops = &samsung_pll36xx_clk_ops;
+ 		break;
+ 	case pll_6552:
++	case pll_6545a:
++	case pll_6522x:
+ 		init.ops = &samsung_pll6552_clk_ops;
+ 		break;
+ 	case pll_6553:
+diff --git a/drivers/clk/samsung/clk-pll.h b/drivers/clk/samsung/clk-pll.h
+index 6c39030..e786875 100644
+--- a/drivers/clk/samsung/clk-pll.h
++++ b/drivers/clk/samsung/clk-pll.h
+@@ -25,6 +25,8 @@ enum samsung_pll_type {
+ 	pll_4650c,
+ 	pll_6552,
+ 	pll_6553,
++	pll_6545a,
++	pll_6522x,
+ };
  
-> > The board files will be going away as soon as things are working
-> > with DT. We've been pretty much only applying fixes to them for
-> > quite some time now. For the timeline, the earliest we'll be able
-> > to remove the board-*.c files and platform data is for v3.13
-> 
-> And it would be good to merge n900 dts support for 3.12. Adding 
-> device tree at the same release as removing board support files in
-> same release leaves zero room for testing, and practically guarantees
-> regressions.
-
-Yes we experienced that with omap4 conversion where it caused
-some wl12xx regression. So we might want to keep some omap3
-board files around until v3.14 if necessary.
-
-Also please take a look at the "[PATCH 0/4] Clean up legacy platform
-data handling for omaps for v3.13" patches I posted few days ago,
-those should make it easy to have board specific pdata quirks
-for DT based booting.
-
-Regards,
-
-Tony
+ #define PLL_35XX_RATE(_rate, _m, _p, _s)			\
+-- 
+1.8.1.2
