@@ -1,52 +1,139 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Tue, 24 Sep 2013 02:15:45 +0200
-Subject: [PATCH v2 2/2] RX-51: ARM errata 430973 workaround
-In-Reply-To: <20130918171816.GT9994@atomide.com>
-References: <1362044548-5398-1-git-send-email-pali.rohar@gmail.com>
- <1373461145-9812-3-git-send-email-pali.rohar@gmail.com>
- <20130917232417.GK9994@atomide.com> <201309181033.24965@pali>
- <20130918171816.GT9994@atomide.com>
-Message-ID: <20130924001545.GA31569@amd.pavel.ucw.cz>
+From: abrestic@chromium.org (Andrew Bresticker)
+Date: Mon, 23 Sep 2013 17:21:13 -0700
+Subject: [PATCH V2 1/6] clk: exynos-audss: convert to platform device
+In-Reply-To: <1379711637-5226-1-git-send-email-abrestic@chromium.org>
+References: <1379711637-5226-1-git-send-email-abrestic@chromium.org>
+Message-ID: <1379982078-23381-1-git-send-email-abrestic@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+The Exynos AudioSS clock controller will later be modified to allow
+input clocks to be specified via device-tree in order to support
+multiple Exynos SoCs.  This will introduce a dependency on the core
+SoC clock controller being initialized first so that the AudioSS driver
+can look up its input clocks, but the order in which clock providers
+are probed in of_clk_init() is not guaranteed.  Since deferred probing
+is not supported in of_clk_init() and the AudioSS block is not the core
+controller, we can initialize it later as a platform device.
 
-> > Tony, if you did not have time for review this patch months ago 
-> > or you found it only today - no problem, I understand it. But 
-> > what I need to know is what will happen with board-rx51-* files 
-> > (and when?) You can see that DT does not have definitions of all 
-> > n900 hw parts (plus it is not in last 3.11 kernel!) which means 
-> > that DT is not usable for me and other n900 people. This also 
-> > means that I cannot rewrite my patches for DT and test if they 
-> > working.
-> 
-> I usually stop looking at new code around -rc4 and concentrate
-> on fixes until -rc1 or so. So there can be easily one month
-> delays on reviewing stuff depending on where we are with the
-> current merge window or -rc cycle, sorry if that's annoying.
-> 
-> The .dts files will be separate from the kernel soonish, so
-> that's not be a show stopper. Just like all the board specific
-> .config files are separate from the kernel already. Too bad our
-> .dts changes did not get merged for v3.12 because of conflicts
-> with other branches, but hey, they should be independent from the
-> kernel anyways.
+Signed-off-by: Andrew Bresticker <abrestic@chromium.org>
+---
+Changes since v1:
+ - add clk_unregister() calls to remove callback
+ - fixed minor nits from Tomasz
+---
+ drivers/clk/samsung/clk-exynos-audss.c | 78 ++++++++++++++++++++++++++++------
+ 1 file changed, 65 insertions(+), 13 deletions(-)
 
-Well... I'd say it is still time to merge them. "New hardware support"
-is ok after -rc1.
-
-> The board files will be going away as soon as things are working
-> with DT. We've been pretty much only applying fixes to them for
-> quite some time now. For the timeline, the earliest we'll be able
-> to remove the board-*.c files and platform data is for v3.13
-
-And it would be good to merge n900 dts support for 3.12. Adding 
-device tree at the same release as removing board support files in
-same release leaves zero room for testing, and practically guarantees
-regressions.
-
-									Pavel
+diff --git a/drivers/clk/samsung/clk-exynos-audss.c b/drivers/clk/samsung/clk-exynos-audss.c
+index 39b40aa..c512efd 100644
+--- a/drivers/clk/samsung/clk-exynos-audss.c
++++ b/drivers/clk/samsung/clk-exynos-audss.c
+@@ -14,6 +14,8 @@
+ #include <linux/clk-provider.h>
+ #include <linux/of_address.h>
+ #include <linux/syscore_ops.h>
++#include <linux/module.h>
++#include <linux/platform_device.h>
+ 
+ #include <dt-bindings/clk/exynos-audss-clk.h>
+ 
+@@ -62,24 +64,29 @@ static struct syscore_ops exynos_audss_clk_syscore_ops = {
+ #endif /* CONFIG_PM_SLEEP */
+ 
+ /* register exynos_audss clocks */
+-static void __init exynos_audss_clk_init(struct device_node *np)
++static int exynos_audss_clk_probe(struct platform_device *pdev)
+ {
+-	reg_base = of_iomap(np, 0);
+-	if (!reg_base) {
+-		pr_err("%s: failed to map audss registers\n", __func__);
+-		return;
++	struct resource *res;
++
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	reg_base = devm_ioremap_resource(&pdev->dev, res);
++	if (IS_ERR(reg_base)) {
++		dev_err(&pdev->dev, "failed to map audss registers\n");
++		return PTR_ERR(reg_base);
+ 	}
+ 
+-	clk_table = kzalloc(sizeof(struct clk *) * EXYNOS_AUDSS_MAX_CLKS,
++	clk_table = devm_kzalloc(&pdev->dev,
++				sizeof(struct clk *) * EXYNOS_AUDSS_MAX_CLKS,
+ 				GFP_KERNEL);
+ 	if (!clk_table) {
+-		pr_err("%s: could not allocate clk lookup table\n", __func__);
+-		return;
++		dev_err(&pdev->dev, "could not allocate clk lookup table\n");
++		return -ENOMEM;
+ 	}
+ 
+ 	clk_data.clks = clk_table;
+ 	clk_data.clk_num = EXYNOS_AUDSS_MAX_CLKS;
+-	of_clk_add_provider(np, of_clk_src_onecell_get, &clk_data);
++	of_clk_add_provider(pdev->dev.of_node, of_clk_src_onecell_get,
++				&clk_data);
+ 
+ 	clk_table[EXYNOS_MOUT_AUDSS] = clk_register_mux(NULL, "mout_audss",
+ 				mout_audss_p, ARRAY_SIZE(mout_audss_p),
+@@ -128,8 +135,53 @@ static void __init exynos_audss_clk_init(struct device_node *np)
+ #endif
+ 
+ 	pr_info("Exynos: Audss: clock setup completed\n");
++
++	return 0;
++}
++
++static int exynos_audss_clk_remove(struct platform_device *pdev)
++{
++	int i;
++
++	for (i = 0; i < EXYNOS_AUDSS_MAX_CLKS; i++) {
++		if (clk_table[i])
++			clk_unregister(clk_table[i]);
++	}
++
++	of_clk_del_provider(pdev->dev.of_node);
++
++	return 0;
+ }
+-CLK_OF_DECLARE(exynos4210_audss_clk, "samsung,exynos4210-audss-clock",
+-		exynos_audss_clk_init);
+-CLK_OF_DECLARE(exynos5250_audss_clk, "samsung,exynos5250-audss-clock",
+-		exynos_audss_clk_init);
++
++static const struct of_device_id exynos_audss_clk_of_match[] = {
++	{ .compatible = "samsung,exynos4210-audss-clock", },
++	{ .compatible = "samsung,exynos5250-audss-clock", },
++	{},
++};
++
++static struct platform_driver exynos_audss_clk_driver = {
++	.driver	= {
++		.name = "exynos-audss-clk",
++		.owner = THIS_MODULE,
++		.of_match_table = exynos_audss_clk_of_match,
++	},
++	.probe = exynos_audss_clk_probe,
++	.remove = exynos_audss_clk_remove,
++};
++
++static int __init exynos_audss_clk_init(void)
++{
++	return platform_driver_register(&exynos_audss_clk_driver);
++}
++core_initcall(exynos_audss_clk_init);
++
++static void __init exynos_audss_clk_exit(void)
++{
++	platform_driver_unregister(&exynos_audss_clk_driver);
++}
++module_exit(exynos_audss_clk_exit);
++
++MODULE_AUTHOR("Padmavathi Venna <padma.v@samsung.com>");
++MODULE_DESCRIPTION("Exynos Audio Subsystem Clock Controller");
++MODULE_LICENSE("GPL v2");
++MODULE_ALIAS("platform:exynos-audss-clk");
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+1.8.4
