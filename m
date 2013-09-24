@@ -1,52 +1,115 @@
-From: andreas.herrmann@calxeda.com (Andreas Herrmann)
-Date: Tue, 24 Sep 2013 20:32:47 +0200
-Subject: [PATCH 7/7] iommu/arm-smmu: Clear global and context bank fault
- status and syndrome registers
-In-Reply-To: <20130924154252.GG20774@mudshark.cambridge.arm.com>
-References: <1380035221-11576-1-git-send-email-andreas.herrmann@calxeda.com>
- <1380035221-11576-8-git-send-email-andreas.herrmann@calxeda.com>
- <20130924154252.GG20774@mudshark.cambridge.arm.com>
-Message-ID: <20130924183247.GW4845@alberich>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Tue, 24 Sep 2013 20:42:47 +0200
+Subject: [PATCH] [media] marvell-ccic: simplify and fix clk handling (a bit)
+In-Reply-To: <1379951159-8294-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1379951159-8294-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <1380048167-13729-1-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 24, 2013 at 11:42:52AM -0400, Will Deacon wrote:
-> On Tue, Sep 24, 2013 at 04:07:01PM +0100, Andreas Herrmann wrote:
-> > Signed-off-by: Andreas Herrmann <andreas.herrmann@calxeda.com>
-> > ---
-> >  drivers/iommu/arm-smmu.c |    9 +++++++++
-> >  1 file changed, 9 insertions(+)
-> > 
-> > diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-> > index 251564e..a499146 100644
-> > --- a/drivers/iommu/arm-smmu.c
-> > +++ b/drivers/iommu/arm-smmu.c
-> > @@ -645,6 +645,10 @@ static void arm_smmu_init_context_bank(struct arm_smmu_domain *smmu_domain)
-> >  	stage1 = root_cfg->cbar != CBAR_TYPE_S2_TRANS;
-> >  	cb_base = ARM_SMMU_CB_BASE(smmu) + ARM_SMMU_CB(smmu, root_cfg->cbndx);
-> >  
-> > +	/* clear fsr */
-> > +	writel_relaxed(0xffffffff, cb_base + ARM_SMMU_CB_FSR);
-> > +	writel_relaxed(0, cb_base + ARM_SMMU_CB_FSYNR0);
-> > +
-> >  	/* CBAR */
-> >  	reg = root_cfg->cbar;
-> >  	if (smmu->version == 1)
-> > @@ -1570,6 +1574,11 @@ static void arm_smmu_device_reset(struct arm_smmu_device *smmu)
-> >  	int i = 0;
-> >  	u32 scr0 = readl_relaxed(gr0_base + ARM_SMMU_GR0_sCR0);
-> >  
-> > +	/* clear global FSRs */
-> > +	writel(0xffffffff, gr0_base + ARM_SMMU_GR0_sGFSR);
-> > +	writel(0, gr0_base + ARM_SMMU_GR0_sGFSYNR0);
-> > +	writel(0, gr0_base + ARM_SMMU_GR0_sGFSYNR1);
-> 
-> Why do you need this?
+The marvell-ccic does several things wrong or ineffectively in the clock
+handling and it's usage of the devm_* stuff
 
-According to the spec the status and syndrome registers have
-unknown/unpredictable reset values. So better set known values before
-we start to use these registers (ie. handle faults where we read
-them). No?
+ - it assumes clk_get doesn't return NULL
+ - it explicitly calls devm_clk_put instead just keeping the reference
+   during it's lifetime and let the driver core call it
+ - it calls kfree, gpio_free and free_irq for resources it requested
+   using devm_kzalloc, devm_gpio_request and devm_request_irq
+   respectively.
+ - it mixes devm_ and unmanaged resources which probably results in a
+   race condition during remove
 
+This patch fixes all but the last issue in this list. This patch doesn't
+introduce new reasons for not building, but there are already several
+bulid problems.
 
-Andreas
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+---
+Cc: Libin Yang <lbyang@marvell.com>
+---
+ drivers/media/platform/marvell-ccic/mmp-driver.c | 26 ++----------------------
+ 1 file changed, 2 insertions(+), 24 deletions(-)
+
+diff --git a/drivers/media/platform/marvell-ccic/mmp-driver.c b/drivers/media/platform/marvell-ccic/mmp-driver.c
+index b5a19af..49ff52e 100644
+--- a/drivers/media/platform/marvell-ccic/mmp-driver.c
++++ b/drivers/media/platform/marvell-ccic/mmp-driver.c
+@@ -143,7 +143,6 @@ static int mmpcam_power_up(struct mcam_camera *mcam)
+ 	struct mmp_camera_platform_data *pdata;
+ 
+ 	if (mcam->bus_type == V4L2_MBUS_CSI2) {
+-		cam->mipi_clk = devm_clk_get(mcam->dev, "mipi");
+ 		if ((IS_ERR(cam->mipi_clk) && mcam->dphy[2] == 0))
+ 			return PTR_ERR(cam->mipi_clk);
+ 	}
+@@ -186,12 +185,6 @@ static void mmpcam_power_down(struct mcam_camera *mcam)
+ 	gpio_set_value(pdata->sensor_power_gpio, 0);
+ 	gpio_set_value(pdata->sensor_reset_gpio, 0);
+ 
+-	if (mcam->bus_type == V4L2_MBUS_CSI2 && !IS_ERR(cam->mipi_clk)) {
+-		if (cam->mipi_clk)
+-			devm_clk_put(mcam->dev, cam->mipi_clk);
+-		cam->mipi_clk = NULL;
+-	}
+-
+ 	mcam_clk_disable(mcam);
+ }
+ 
+@@ -325,19 +318,6 @@ static irqreturn_t mmpcam_irq(int irq, void *data)
+ 	return IRQ_RETVAL(handled);
+ }
+ 
+-static void mcam_deinit_clk(struct mcam_camera *mcam)
+-{
+-	unsigned int i;
+-
+-	for (i = 0; i < NR_MCAM_CLK; i++) {
+-		if (!IS_ERR(mcam->clk[i])) {
+-			if (mcam->clk[i])
+-				devm_clk_put(mcam->dev, mcam->clk[i]);
+-		}
+-		mcam->clk[i] = NULL;
+-	}
+-}
+-
+ static void mcam_init_clk(struct mcam_camera *mcam)
+ {
+ 	unsigned int i;
+@@ -371,7 +351,7 @@ static int mmpcam_probe(struct platform_device *pdev)
+ 	if (cam == NULL)
+ 		return -ENOMEM;
+ 	cam->pdev = pdev;
+-	cam->mipi_clk = NULL;
++	cam->mipi_clk = devm_clk_get(&pdev->dev, "mipi");
+ 	INIT_LIST_HEAD(&cam->devlist);
+ 
+ 	mcam = &cam->mcam;
+@@ -442,6 +422,7 @@ static int mmpcam_probe(struct platform_device *pdev)
+ 	/*
+ 	 * Power the device up and hand it off to the core.
+ 	 */
++
+ 	ret = mmpcam_power_up(mcam);
+ 	if (ret)
+ 		goto out_deinit_clk;
+@@ -470,7 +451,6 @@ out_unregister:
+ out_power_down:
+ 	mmpcam_power_down(mcam);
+ out_deinit_clk:
+-	mcam_deinit_clk(mcam);
+ 	return ret;
+ }
+ 
+@@ -487,10 +467,8 @@ static int mmpcam_remove(struct mmp_camera *cam)
+ 	pdata = cam->pdev->dev.platform_data;
+ 	gpio_free(pdata->sensor_reset_gpio);
+ 	gpio_free(pdata->sensor_power_gpio);
+-	mcam_deinit_clk(mcam);
+ 	iounmap(cam->power_regs);
+ 	iounmap(mcam->regs);
+-	kfree(cam);
+ 	return 0;
+ }
+ 
+-- 
+1.8.4.rc3
