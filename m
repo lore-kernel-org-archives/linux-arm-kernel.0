@@ -1,111 +1,59 @@
-From: jbe@pengutronix.de (=?iso-8859-1?q?J=FCrgen_Beisert?=)
-Date: Tue, 24 Sep 2013 09:50:54 +0200
-Subject: [PATCH 1/9] Staging/iio/adc/touchscreen/MXS: add proper clock
- handling
-In-Reply-To: <52405A7F.1050801@freescale.com>
-References: <1379946998-23041-1-git-send-email-jbe@pengutronix.de>
- <1379946998-23041-2-git-send-email-jbe@pengutronix.de>
- <52405A7F.1050801@freescale.com>
-Message-ID: <201309240950.54789.jbe@pengutronix.de>
+From: zzhu3@marvell.com (Zhou Zhu)
+Date: Tue, 24 Sep 2013 15:55:13 +0800
+Subject: [PATCH] video: mmp: drop needless devm cleanup
+In-Reply-To: <5241406B.8090106@ti.com>
+References: <1379951159-8294-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <1379952790-13202-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <20130923161944.GU12758@n2100.arm.linux.org.uk> <5241406B.8090106@ti.com>
+Message-ID: <52414561.1010000@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fabio,
-
-On Monday 23 September 2013 17:13:03 Fabio Estevam wrote:
-> On 09/23/2013 11:36 AM, Juergen Beisert wrote:
-> > +	lradc->clk = devm_clk_get(&pdev->dev, NULL);
-> > +	clk_prepare_enable(lradc->clk);
+On 09/24/2013 03:34 PM, Tomi Valkeinen wrote:
+> On 23/09/13 19:19, Russell King - ARM Linux wrote:
+>> On Mon, Sep 23, 2013 at 06:13:10PM +0200, Uwe Kleine-K?nig wrote:
+>>> The nice thing about devm_* is that the driver doesn't need to free the
+>>> resources but the driver core takes care about that. This also
+>>> simplifies the error path quite a bit and removes the wrong check for a
+>>> clock pointer being NULL.
+>>>
+>>> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+>>> ---
+>>>   drivers/video/mmp/hw/mmp_ctrl.c | 17 ++---------------
+>>>   1 file changed, 2 insertions(+), 15 deletions(-)
+>>>
+>>> diff --git a/drivers/video/mmp/hw/mmp_ctrl.c b/drivers/video/mmp/hw/mmp_ctrl.c
+>>> index 75dca19..6ac7552 100644
+>>> --- a/drivers/video/mmp/hw/mmp_ctrl.c
+>>> +++ b/drivers/video/mmp/hw/mmp_ctrl.c
+>>> @@ -514,7 +514,7 @@ static int mmphw_probe(struct platform_device *pdev)
+>>>   	if (IS_ERR(ctrl->clk)) {
+>>>   		dev_err(ctrl->dev, "unable to get clk %s\n", mi->clk_name);
+>>>   		ret = -ENOENT;
+>>> -		goto failed_get_clk;
+>>> +		goto failed;
+>>>   	}
+>>>   	clk_prepare_enable(ctrl->clk);
+>>>
+>>> @@ -551,21 +551,8 @@ failed_path_init:
+>>>   		path_deinit(path_plat);
+>>>   	}
+>>>
+>>> -	if (ctrl->clk) {
+>>> -		devm_clk_put(ctrl->dev, ctrl->clk);
+>>> -		clk_disable_unprepare(ctrl->clk);
+>>
+>> And this patch also fixes the above: disabling/unpreparing _after_ putting
+>> the thing - which was quite silly... :)
 >
-> clk_prepare_enable() may fail, so better check its return value.
-
-Thanks for the comment. Better this way?
-
-commit 825c5bb787a0dc9d25d480178e117be08810639c
-Author: Juergen Beisert <jbe@pengutronix.de>
-Date:   Mon Sep 23 16:10:56 2013 +0200
-
-    Staging/iio/adc/touchscreen/MXS: add proper clock handling
-    
-    The delay units inside the LRADC depend on the presence of a 2 kHz clock.
-    This change enables the clock to be able to use the delay unit for the
-    touchscreen part of the driver.
-    
-    Signed-off-by: Juergen Beisert <jbe@pengutronix.de>
-
-diff --git a/arch/arm/boot/dts/imx23.dtsi b/arch/arm/boot/dts/imx23.dtsi
-index 28b5ce2..07caf76 100644
---- a/arch/arm/boot/dts/imx23.dtsi
-+++ b/arch/arm/boot/dts/imx23.dtsi
-@@ -430,6 +430,7 @@
- 				reg = <0x80050000 0x2000>;
- 				interrupts = <36 37 38 39 40 41 42 43 44>;
- 				status = "disabled";
-+				clocks = <&clks 26>;
- 			};
- 
- 			spdif at 80054000 {
-diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
-index 7363fde..175deef 100644
---- a/arch/arm/boot/dts/imx28.dtsi
-+++ b/arch/arm/boot/dts/imx28.dtsi
-@@ -902,6 +902,7 @@
- 				interrupts = <10 14 15 16 17 18 19
- 						20 21 22 23 24 25>;
- 				status = "disabled";
-+				clocks = <&clks 41>;
- 			};
- 
- 			spdif: spdif at 80054000 {
-diff --git a/drivers/staging/iio/adc/mxs-lradc.c b/drivers/staging/iio/adc/mxs-lradc.c
-index a08c173..eaca1ae 100644
---- a/drivers/staging/iio/adc/mxs-lradc.c
-+++ b/drivers/staging/iio/adc/mxs-lradc.c
-@@ -35,6 +35,7 @@
- #include <linux/completion.h>
- #include <linux/delay.h>
- #include <linux/input.h>
-+#include <linux/clk.h>
- 
- #include <linux/iio/iio.h>
- #include <linux/iio/buffer.h>
-@@ -134,6 +135,8 @@ struct mxs_lradc {
- 	void __iomem		*base;
- 	int			irq[13];
- 
-+	struct clk		*clk;
-+
- 	uint32_t		*buffer;
- 	struct iio_trigger	*trig;
- 
-@@ -928,6 +931,17 @@ static int mxs_lradc_probe(struct platform_device *pdev)
- 	if (IS_ERR(lradc->base))
- 		return PTR_ERR(lradc->base);
- 
-+	lradc->clk = devm_clk_get(&pdev->dev, NULL);
-+	if (IS_ERR(lradc->clk)) {
-+		dev_err(dev, "Failed to get the delay unit clock\n");
-+		return PTR_ERR(lradc->clk);
-+	}
-+	ret = clk_prepare_enable(lradc->clk);
-+	if (ret != 0) {
-+		dev_err(dev, "Failed to enable the delay unit clock\n");
-+		return ret;
-+	}
-+
- 	INIT_WORK(&lradc->ts_work, mxs_lradc_ts_work);
- 
- 	/* Check if touchscreen is enabled in DT. */
-@@ -1020,6 +1034,7 @@ static int mxs_lradc_remove(struct platform_device *pdev)
- 	iio_triggered_buffer_cleanup(iio);
- 	mxs_lradc_trigger_remove(iio);
- 
-+	clk_disable_unprepare(lradc->clk);
- 	return 0;
- }
- 
-Juergen
+> Hmm, I wonder if that causes any issues... I.e. should this patch go for
+> 3.12, or is 3.13 fine?
+>
+>   Tomi
+>
+It would cause oops if probe failed due to some reason - although it 
+would almost never happen so we missed it.
+Thank you for finding it out.
 
 -- 
-Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?| Juergen Beisert ? ? ? ? ? ? |
-Linux Solutions for Science and Industry ? ? ?| http://www.pengutronix.de/  |
+Thanks, -Zhou
