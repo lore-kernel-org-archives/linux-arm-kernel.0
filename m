@@ -1,120 +1,44 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Tue, 24 Sep 2013 16:00:39 +0200
-Subject: [PATCH] ARM: DEBUG_LL on efm32 SoCs
-In-Reply-To: <1379447884-14025-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1379447884-14025-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <1380031239-25414-1-git-send-email-u.kleine-koenig@pengutronix.de>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 24 Sep 2013 15:05:38 +0100
+Subject: [PATCH] arm64: avoid multiple evaluation of ptr in
+ get_user/put_user()
+In-Reply-To: <524154C2.1080303@linaro.org>
+References: <524154C2.1080303@linaro.org>
+Message-ID: <20130924140537.GF25907@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This implements output of debug messages on efm32 SoCs.
+On Tue, Sep 24, 2013 at 10:00:50AM +0100, AKASHI Takahiro wrote:
+> get_user() is defined as a function macro in arm64, and trace_get_user()
+> calls it as followed:
+>      get_user(ch, ptr++);
+> Since the second parameter occurs twice in the definition, 'ptr++' is
+> unexpectedly evaluated twice and trace_get_user() will generate a bogus
+> string from user-provided one. As a result, some ftrace sysfs operations,
+> like "echo FUNCNAME > set_ftrace_filter," hit this case and eventually fail.
+> This patch fixes the issue both in get_user() and put_user().
+> 
+> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+> ---
+>   arch/arm64/include/asm/uaccess.h |   12 ++++++++----
+>   1 file changed, 8 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/uaccess.h b/arch/arm64/include/asm/uaccess.h
+> index edb3d5c..bbeab83 100644
+> --- a/arch/arm64/include/asm/uaccess.h
+> +++ b/arch/arm64/include/asm/uaccess.h
+> @@ -166,9 +166,11 @@ do {									\
+>    #define get_user(x, ptr)						\
+>   ({									\
+> +	__typeof__(*(ptr)) *optr = (ptr);				\
 
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
- arch/arm/Kconfig.debug         | 17 ++++++++++++++++
- arch/arm/include/debug/efm32.S | 45 ++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 62 insertions(+)
- create mode 100644 arch/arm/include/debug/efm32.S
+I think this should be:
 
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index 9762c84..2b32068 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -834,6 +834,20 @@ choice
- 		  options; the platform specific options are deprecated
- 		  and will be soon removed.
- 
-+	config DEBUG_LL_UART_EFM32
-+		bool "Kernel low-level debugging via efm32 UART"
-+		depends on ARCH_EFM32
-+		help
-+		  Say Y here if you want the debug print routines to direct
-+		  their output to an UART or USART port on efm32 based
-+		  machines. Use the following addresses for DEBUG_UART_PHYS:
-+
-+		    0x4000c000 | USART0
-+		    0x4000c400 | USART1
-+		    0x4000c800 | USART2
-+		    0x4000e000 | UART0
-+		    0x4000e400 | UART1
-+
- 	config DEBUG_LL_UART_PL01X
- 		bool "Kernel low-level debugging via ARM Ltd PL01x Primecell UART"
- 		help
-@@ -885,6 +899,7 @@ config DEBUG_LL_INCLUDE
- 	default "debug/8250.S" if DEBUG_LL_UART_8250 || DEBUG_UART_8250
- 	default "debug/pl01x.S" if DEBUG_LL_UART_PL01X || DEBUG_UART_PL01X
- 	default "debug/exynos.S" if DEBUG_EXYNOS_UART
-+	default "debug/efm32.S" if DEBUG_LL_UART_EFM32
- 	default "debug/icedcc.S" if DEBUG_ICEDCC
- 	default "debug/imx.S" if DEBUG_IMX1_UART || \
- 				 DEBUG_IMX25_UART || \
-@@ -951,6 +966,7 @@ config DEBUG_UART_PHYS
- 	default 0x20064000 if DEBUG_RK29_UART1 || DEBUG_RK3X_UART2
- 	default 0x20068000 if DEBUG_RK29_UART2 || DEBUG_RK3X_UART3
- 	default 0x20201000 if DEBUG_BCM2835
-+	default 0x4000e400 if DEBUG_LL_UART_EFM32
- 	default 0x40090000 if ARCH_LPC32XX
- 	default 0x40100000 if DEBUG_PXA_UART1
- 	default 0x42000000 if ARCH_GEMINI
-@@ -981,6 +997,7 @@ config DEBUG_UART_PHYS
- 	default 0xfff36000 if DEBUG_HIGHBANK_UART
- 	default 0xfffff700 if ARCH_IOP33X
- 	depends on DEBUG_LL_UART_8250 || DEBUG_LL_UART_PL01X || \
-+		DEBUG_LL_UART_EFM32 || \
- 		DEBUG_UART_8250 || DEBUG_UART_PL01X
- 
- config DEBUG_UART_VIRT
-diff --git a/arch/arm/include/debug/efm32.S b/arch/arm/include/debug/efm32.S
-new file mode 100644
-index 0000000..2265a19
---- /dev/null
-+++ b/arch/arm/include/debug/efm32.S
-@@ -0,0 +1,45 @@
-+/*
-+ * Copyright (C) 2013 Pengutronix
-+ * Uwe Kleine-Koenig <u.kleine-koenig@pengutronix.de>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#define UARTn_CMD		0x000c
-+#define UARTn_CMD_TXEN			0x0004
-+
-+#define	UARTn_STATUS		0x0010
-+#define	UARTn_STATUS_TXC		0x0020
-+#define	UARTn_STATUS_TXBL		0x0040
-+
-+#define	UARTn_TXDATA		0x0034
-+
-+		.macro	addruart, rx, tmp
-+		ldr	\rx, =(CONFIG_DEBUG_UART_PHYS)
-+
-+		/*
-+		 * enable TX. The driver might disable it to save energy. We
-+		 * don't care about disabling at the end as during debug power
-+		 * consumption isn't that important.
-+		 */
-+		ldr	\tmp, =(UARTn_CMD_TXEN)
-+		str	\tmp, [\rx, #UARTn_CMD]
-+		.endm
-+
-+		.macro	senduart,rd,rx
-+		strb	\rd, [\rx, #UARTn_TXDATA]
-+		.endm
-+
-+		.macro	waituart,rd,rx
-+1001:		ldr	\rd, [\rx, #UARTn_STATUS]
-+		tst	\rd, #UARTn_STATUS_TXBL
-+		beq	1001b
-+		.endm
-+
-+		.macro	busyuart,rd,rx
-+1001:		ldr	\rd, [\rx, UARTn_STATUS]
-+		tst	\rd, #UARTn_STATUS_TXC
-+		bne	1001b
-+		.endm
+	__typeof__(*(ptr)) __user *optr = (ptr);
+
+Otherwise the patch looks fine. I can fix the above.
+
+Thanks.
+
 -- 
-1.8.4.rc3
+Catalin
