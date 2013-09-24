@@ -1,51 +1,137 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 24 Sep 2013 10:30:41 +0100
-Subject: [PATCH] ARM: include: asm: atomic.h: use type cast 's64' for the
- return value of atomic64_add_return().
-In-Reply-To: <523D7DC7.8030603@asianux.com>
-References: <523D7DC7.8030603@asianux.com>
-Message-ID: <20130924093041.GB15119@mudshark.cambridge.arm.com>
+From: steve.capper@linaro.org (Steve Capper)
+Date: Tue, 24 Sep 2013 10:34:53 +0100
+Subject: [PATCH] ARM: mm: make UACCESS_WITH_MEMCPY huge page aware
+Message-ID: <1380015293-9590-1-git-send-email-steve.capper@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+The memory pinning code in uaccess_with_memcpy.c does not check
+for HugeTLB or THP pmds, and will enter an infinite loop should
+a __copy_to_user or __clear_user occur against a huge page.
 
-On Sat, Sep 21, 2013 at 12:06:47PM +0100, Chen Gang wrote:
-> The return value of atomic64_add_return() is u64 which never less than
-> zero, so need type cast 's64' for comparing in atomic64_add_negative().
-> 
-> The related error: (allmodconfig for S5PV210, with "EXTRA_CFLAGS=-W"):
-> 
->   kernel/events/core.c:5404:2: warning: comparison of unsigned expression < 0 is always false [-Wtype-limits]
-> 
-> 
-> Signed-off-by: Chen Gang <gang.chen@asianux.com>
-> ---
->  arch/arm/include/asm/atomic.h |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/atomic.h b/arch/arm/include/asm/atomic.h
-> index da1c77d..8cf005d 100644
-> --- a/arch/arm/include/asm/atomic.h
-> +++ b/arch/arm/include/asm/atomic.h
-> @@ -475,7 +475,7 @@ static inline int atomic64_add_unless(atomic64_t *v, u64 a, u64 u)
->  	return ret;
->  }
->  
-> -#define atomic64_add_negative(a, v)	(atomic64_add_return((a), (v)) < 0)
-> +#define atomic64_add_negative(a, v)	((s64)atomic64_add_return((a), (v)) < 0)
->  #define atomic64_inc(v)			atomic64_add(1LL, (v))
->  #define atomic64_inc_return(v)		atomic64_add_return(1LL, (v))
->  #define atomic64_inc_and_test(v)	(atomic64_inc_return(v) == 0)
+This patch adds detection code for huge pages to pin_page_for_write.
+As this code can be executed in a fast path it refers to the actual
+pmds rather than the vma. If a HugeTLB or THP is found (they have
+the same pmd representation on ARM), the page table spinlock is
+taken to prevent modification whilst the page is pinned.
 
-Is this the right fix? It looks more like atomic[64]_t should be signed, but
-some 32-bit architectures (ARM, x86, tile) are actually implementing
-atomic64_t as u64. Furthermore, there are discrepencies in the operands to
-the various atomic64_* function (long long vs u64) which probably need
-sorting out.
+On ARM, huge pages are only represented as pmds, thus no huge pud
+checks are performed. (For huge puds one would lock the page table
+in a similar manner as in the pmd case).
 
-Since the 32-bit interface is well defined (Documentation/atomic_ops.txt),
-I think we should just follow the same signedness rules for the 64-bit
-versions.
+Two helper functions are introduced; pmd_thp_or_huge will check
+whether or not a page is huge or transparent huge (which have the
+same pmd layout on ARM), and pmd_hugewillfault will detect whether
+or not a page fault will occur on write to the page.
 
-Will
+---
+
+Changes since second RFC:
+    * After some more thought about the potential impact on the
+      overall latency, I have decided not to widen the page mask
+      for huge pages.
+
+Changes since first RFC:
+    * The page mask is widened for hugepages to reduce the number
+      of potential locks/unlocks.
+      (A knobbled /dev/zero with its latency reduction chunks
+      removed shows a 2x data rate boost with hugepages backing:
+      dd if=/dev/zero of=/dev/null bs=10M count=1024 )
+
+---
+
+Signed-off-by: Steve Capper <steve.capper@linaro.org>
+---
+ arch/arm/include/asm/pgtable-3level.h |  3 +++
+ arch/arm/lib/uaccess_with_memcpy.c    | 41 ++++++++++++++++++++++++++++++++---
+ 2 files changed, 41 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/include/asm/pgtable-3level.h b/arch/arm/include/asm/pgtable-3level.h
+index 5689c18..39c54cf 100644
+--- a/arch/arm/include/asm/pgtable-3level.h
++++ b/arch/arm/include/asm/pgtable-3level.h
+@@ -206,6 +206,9 @@ static inline pmd_t *pmd_offset(pud_t *pud, unsigned long addr)
+ #define __HAVE_ARCH_PMD_WRITE
+ #define pmd_write(pmd)		(!(pmd_val(pmd) & PMD_SECT_RDONLY))
+ 
++#define pmd_hugewillfault(pmd)	(!pmd_young(pmd) || !pmd_write(pmd))
++#define pmd_thp_or_huge(pmd)	(pmd_huge(pmd) || pmd_trans_huge(pmd))
++
+ #ifdef CONFIG_TRANSPARENT_HUGEPAGE
+ #define pmd_trans_huge(pmd)	(pmd_val(pmd) && !(pmd_val(pmd) & PMD_TABLE_BIT))
+ #define pmd_trans_splitting(pmd) (pmd_val(pmd) & PMD_SECT_SPLITTING)
+diff --git a/arch/arm/lib/uaccess_with_memcpy.c b/arch/arm/lib/uaccess_with_memcpy.c
+index 025f742..3e58d71 100644
+--- a/arch/arm/lib/uaccess_with_memcpy.c
++++ b/arch/arm/lib/uaccess_with_memcpy.c
+@@ -18,6 +18,7 @@
+ #include <linux/hardirq.h> /* for in_atomic() */
+ #include <linux/gfp.h>
+ #include <linux/highmem.h>
++#include <linux/hugetlb.h>
+ #include <asm/current.h>
+ #include <asm/page.h>
+ 
+@@ -40,7 +41,35 @@ pin_page_for_write(const void __user *_addr, pte_t **ptep, spinlock_t **ptlp)
+ 		return 0;
+ 
+ 	pmd = pmd_offset(pud, addr);
+-	if (unlikely(pmd_none(*pmd) || pmd_bad(*pmd)))
++	if (unlikely(pmd_none(*pmd)))
++		return 0;
++
++	/*
++	 * A pmd can be bad if it refers to a HugeTLB or THP page.
++	 *
++	 * Both THP and HugeTLB pages have the same pmd layout
++	 * and should not be manipulated by the pte functions.
++	 *
++	 * Lock the page table for the destination and check
++	 * to see that it's still huge and whether or not we will
++	 * need to fault on write, or if we have a splitting THP.
++	 */
++	if (unlikely(pmd_thp_or_huge(*pmd))) {
++		ptl = &current->mm->page_table_lock;
++		spin_lock(ptl);
++		if (unlikely(!pmd_thp_or_huge(*pmd)
++			|| pmd_hugewillfault(*pmd)
++			|| pmd_trans_splitting(*pmd))) {
++			spin_unlock(ptl);
++			return 0;
++		}
++
++		*ptep = NULL;
++		*ptlp = ptl;
++		return 1;
++	}
++
++	if (unlikely(pmd_bad(*pmd)))
+ 		return 0;
+ 
+ 	pte = pte_offset_map_lock(current->mm, pmd, addr, &ptl);
+@@ -94,7 +123,10 @@ __copy_to_user_memcpy(void __user *to, const void *from, unsigned long n)
+ 		from += tocopy;
+ 		n -= tocopy;
+ 
+-		pte_unmap_unlock(pte, ptl);
++		if (pte)
++			pte_unmap_unlock(pte, ptl);
++		else
++			spin_unlock(ptl);
+ 	}
+ 	if (!atomic)
+ 		up_read(&current->mm->mmap_sem);
+@@ -147,7 +179,10 @@ __clear_user_memset(void __user *addr, unsigned long n)
+ 		addr += tocopy;
+ 		n -= tocopy;
+ 
+-		pte_unmap_unlock(pte, ptl);
++		if (pte)
++			pte_unmap_unlock(pte, ptl);
++		else
++			spin_unlock(ptl);
+ 	}
+ 	up_read(&current->mm->mmap_sem);
+ 
+-- 
+1.8.1.4
