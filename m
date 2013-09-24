@@ -1,58 +1,80 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 24 Sep 2013 18:19:47 -0400 (EDT)
-Subject: [PATCH] ARM: MCPM: don't explode if invoked without being
- initialized first
-In-Reply-To: <20130924220341.GA23730@e102568-lin.cambridge.arm.com>
-References: <alpine.LFD.2.03.1309231522470.312@syhkavp.arg>
- <20130924085101.GA25927@e102568-lin.cambridge.arm.com>
- <alpine.LFD.2.03.1309241136540.312@syhkavp.arg>
- <20130924220341.GA23730@e102568-lin.cambridge.arm.com>
-Message-ID: <alpine.LFD.2.03.1309241807000.312@syhkavp.arg>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Wed, 25 Sep 2013 04:40:45 +0530
+Subject: [GIT PULL] DaVinci GPIO changes for v3.13
+Message-ID: <52421BF5.6020206@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 24 Sep 2013, Lorenzo Pieralisi wrote:
+Hi Arnd, Olof, Kevin,
 
-> On Tue, Sep 24, 2013 at 04:49:17PM +0100, Nicolas Pitre wrote:
-> > @@ -98,8 +101,11 @@ void mcpm_cpu_power_down(void);
-> >   *
-> >   * This must be called with interrupts disabled.
-> >   *
-> > - * This does not return.  Re-entry in the kernel is expected via
-> > - * mcpm_entry_point.
-> > + * On success this does not return.  Re-entry in the kernel is expected
-> > + * via mcpm_entry_point.
-> > + *
-> > + * This will return if mcpm_platform_register() has not been called
-> > + * previously in which case the caller should take appropriate action.
-> >   */
-> >  void mcpm_cpu_suspend(u64 expected_residency);
-> 
-> Ok, it is fine as it is, but at the risk of sounding pedantic, I thought
-> about it and I reckon that it would be nicer to return an error value
-> instead of just returning. In the bigger picture we might not want
-> to always resume from the reset entry point, I think that adding a
-> return value is worth the hassle, given that it is a trivial change.
+Please pull the following changes for DaVinci GPIO driver for v3.13.
+The changes have been acked by Linus W. They were sent for last merge
+window as well, but did not get pulled due to the late request.
 
-And given it is trivial, this can be postponed until there is a clear 
-meaning for a return value.  Right now there would be none.
+Thanks,
+Sekhar
 
-> Resuming through the reset vector implies a successful cpu_suspend
-> call (even if eg TC2 wfi is skipped), we may want for instance to monitor
-> aborted shutdowns or the like.
+The following changes since commit 4a10c2ac2f368583138b774ca41fac4207911983:
 
-OTOH, adding a return value now is on the verge of over engineering.
+  Linux 3.12-rc2 (2013-09-23 15:41:09 -0700)
 
-> Again, a return value gives us flexibility and it costs nothing, you
-> can postpone it till the API is refactored though (residency parameter, etc).
+are available in the git repository at:
 
-Absolutely.  Until there is clear semantics for those return values, I 
-don't see the point of having any.  The flexibility Linux gives us is 
-not in the existence of a return value, but rather in the ability to add 
-one when we really need it.  And right now we don't.
+  git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v3.13/gpio
 
-So unless there is a fundamental objection to this patch I'll submit it 
-as is and we can augment the code with return values later.
+for you to fetch changes up to f1a4c52ff5913378b7baf05ac71f10282b341cf7:
 
+  ARM: davinci: gpio: use gpiolib API instead of inline functions (2013-09-25 04:16:37 +0530)
 
-Nicolas
+----------------------------------------------------------------
+GPIO driver updates for DaVinci
+-------------------------------
+
+This pull request moves DaVinci GPIO
+driver to use platform device framework
+and the corresponding changes needed to
+keep GPIO working on existing DaVinci
+boards. This is a pre-requisite to DT
+support for GPIO.
+
+----------------------------------------------------------------
+KV Sujith (2):
+      gpio: davinci: move to platform device
+      ARM: davinci: da8xx: support gpio platform device
+
+Philip Avinash (5):
+      gpio: davinci: coding style correction
+      ARM: davinci: support gpio platform device
+      ARM: davinci: da8xx boards: gpio device creation
+      ARM: davinci: board: gpio device creation
+      ARM: davinci: gpio: use gpiolib API instead of inline functions
+
+ arch/arm/Kconfig                                  |    1 -
+ arch/arm/mach-davinci/board-da830-evm.c           |   14 ++-
+ arch/arm/mach-davinci/board-da850-evm.c           |    6 +
+ arch/arm/mach-davinci/board-dm355-evm.c           |   15 ++-
+ arch/arm/mach-davinci/board-dm355-leopard.c       |   14 ++-
+ arch/arm/mach-davinci/board-dm365-evm.c           |    6 +
+ arch/arm/mach-davinci/board-dm644x-evm.c          |    5 +
+ arch/arm/mach-davinci/board-dm646x-evm.c          |   13 +-
+ arch/arm/mach-davinci/board-neuros-osd2.c         |   14 ++-
+ arch/arm/mach-davinci/board-omapl138-hawk.c       |    6 +
+ arch/arm/mach-davinci/da830.c                     |   16 ++-
+ arch/arm/mach-davinci/da850.c                     |   16 ++-
+ arch/arm/mach-davinci/davinci.h                   |    7 ++
+ arch/arm/mach-davinci/devices-da8xx.c             |   26 ++++
+ arch/arm/mach-davinci/devices.c                   |   13 ++
+ arch/arm/mach-davinci/dm355.c                     |   35 ++++--
+ arch/arm/mach-davinci/dm365.c                     |   37 ++++--
+ arch/arm/mach-davinci/dm644x.c                    |   30 ++++-
+ arch/arm/mach-davinci/dm646x.c                    |   30 ++++-
+ arch/arm/mach-davinci/include/mach/da8xx.h        |    3 +
+ arch/arm/mach-davinci/include/mach/gpio-davinci.h |   91 --------------
+ arch/arm/mach-davinci/include/mach/gpio.h         |   88 --------------
+ drivers/gpio/gpio-davinci.c                       |  132 ++++++++++++++-------
+ drivers/gpio/gpio-tnetv107x.c                     |    1 +
+ include/linux/platform_data/gpio-davinci.h        |   60 ++++++++++
+ 25 files changed, 402 insertions(+), 277 deletions(-)
+ delete mode 100644 arch/arm/mach-davinci/include/mach/gpio-davinci.h
+ delete mode 100644 arch/arm/mach-davinci/include/mach/gpio.h
+ create mode 100644 include/linux/platform_data/gpio-davinci.h
