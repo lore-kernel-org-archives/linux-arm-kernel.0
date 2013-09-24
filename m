@@ -1,47 +1,31 @@
-From: sre@ring0.de (Sebastian Reichel)
-Date: Tue, 24 Sep 2013 22:50:27 +0200
-Subject: [PATCH 4/4] RX-51: Add platform function and data for bq24150a
- charger
-In-Reply-To: <201309241905.48301@pali>
-References: <1378630239-10006-1-git-send-email-pali.rohar@gmail.com>
- <201309232206.47391@pali> <20130923204714.GB22995@earth.universe>
- <201309241905.48301@pali>
-Message-ID: <20130924205026.GA13204@earth.universe>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 24 Sep 2013 23:11:39 +0200
+Subject: Timekeeping on at91rm9200 [Was: [PATCH v2] clockevents: Sanitize
+ ticks to nsec conversion]
+In-Reply-To: <1380052223-24139-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <alpine.DEB.2.02.1309191629040.4089@ionos.tec.linutronix.de>
+ <1380052223-24139-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <20130924211139.GE16106@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hello Nicolas, hello Jean-Christophe,
 
-On Tue, Sep 24, 2013 at 07:05:47PM +0200, Pali Roh?r wrote:
-> No, isp1704 driver is doing fastcharger detection (and then 
-> export charger type via sysfs power supply) based on musb usb 
-> events.
-> 
-> Real charging (enabling/disabling and setting properties) is done 
-> by bq24150a chip which has own power driver bq2415x_charger.
-> 
-> As already wrote this is not simple and this is reason why I sent 
-> board data and functions only now...
+I expect you should be able to revert 
 
-Yes, I'm aware of this. Technically the isp1704 does not provide the
-5 volt line, but for the system as a whole that fact does not really
-matter.
+	b7a8ca5 (ARM: at91: rm9200 fix time support)
 
-The isp1704 can provide its functionality via the regulator API
-as a simple regulator device. It provides information about the
-power "it can supply".
+which reverted 
 
-The bq24150a on the other hand can just use the regulator via the
-consumer interface.
+	838a2ae (ARM: use clockevents_config_and_register() where possible)
 
-The regulator framework provides capabilities for events:
-"Regulators can notify consumers of external events"
+for at91rm9200 on top of the patch this mail is a reply to.
 
--- Sebastian
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130924/649da08c/attachment.sig>
+Can you please test that?
+
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
