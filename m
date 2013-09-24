@@ -1,34 +1,53 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 24 Sep 2013 12:49:19 -0700
-Subject: [GIT PULL] KVM/ARM Fixes for 3.12-rc2
-Message-ID: <1380052160-20755-1-git-send-email-christoffer.dall@linaro.org>
+Date: Tue, 24 Sep 2013 12:49:20 -0700
+Subject: [PATCH] ARM: kvm: rename cpu_reset to avoid name clash
+In-Reply-To: <1380052160-20755-1-git-send-email-christoffer.dall@linaro.org>
+References: <1380052160-20755-1-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <1380052160-20755-2-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 62d228b8c676232eca579f91cc0782b060a59097:
+From: Olof Johansson <olof@lixom.net>
 
-  Merge branch 'fixes' of git://git.kernel.org/pub/scm/virt/kvm/kvm (2013-09-17 22:20:30 -0400)
+cpu_reset is already #defined in <asm/proc-fns.h> as processor.reset,
+so it expands here and causes problems.
 
-are available in the git repository at:
-
-
-  git://git.linaro.org/people/cdall/linux-kvm-arm.git tags/kvm-arm-fixes-3.12-rc2
-
-for you to fetch changes up to ac570e0493815e0b41681c89cb50d66421429d27:
-
-  ARM: kvm: rename cpu_reset to avoid name clash (2013-09-24 11:15:05 -0700)
-
-----------------------------------------------------------------
-KVM/ARM Fixes for 3.12-rc2
-
-Fixes compilation error with KVM/ARM enabled.
-
-----------------------------------------------------------------
-Olof Johansson (1):
-      ARM: kvm: rename cpu_reset to avoid name clash
-
+Cc: <stable@vger.kernel.org>
+Signed-off-by: Olof Johansson <olof@lixom.net>
+Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+---
  arch/arm/kvm/reset.c |    6 +++---
  1 file changed, 3 insertions(+), 3 deletions(-)
 
+diff --git a/arch/arm/kvm/reset.c b/arch/arm/kvm/reset.c
+index 71e08ba..c02ba4a 100644
+--- a/arch/arm/kvm/reset.c
++++ b/arch/arm/kvm/reset.c
+@@ -58,14 +58,14 @@ static const struct kvm_irq_level a15_vtimer_irq = {
+  */
+ int kvm_reset_vcpu(struct kvm_vcpu *vcpu)
+ {
+-	struct kvm_regs *cpu_reset;
++	struct kvm_regs *reset_regs;
+ 	const struct kvm_irq_level *cpu_vtimer_irq;
+ 
+ 	switch (vcpu->arch.target) {
+ 	case KVM_ARM_TARGET_CORTEX_A15:
+ 		if (vcpu->vcpu_id > a15_max_cpu_idx)
+ 			return -EINVAL;
+-		cpu_reset = &a15_regs_reset;
++		reset_regs = &a15_regs_reset;
+ 		vcpu->arch.midr = read_cpuid_id();
+ 		cpu_vtimer_irq = &a15_vtimer_irq;
+ 		break;
+@@ -74,7 +74,7 @@ int kvm_reset_vcpu(struct kvm_vcpu *vcpu)
+ 	}
+ 
+ 	/* Reset core registers */
+-	memcpy(&vcpu->arch.regs, cpu_reset, sizeof(vcpu->arch.regs));
++	memcpy(&vcpu->arch.regs, reset_regs, sizeof(vcpu->arch.regs));
+ 
+ 	/* Reset CP15 registers */
+ 	kvm_reset_coprocs(vcpu);
 -- 
 1.7.10.4
