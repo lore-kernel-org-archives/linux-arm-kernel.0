@@ -1,60 +1,45 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Tue, 24 Sep 2013 10:34:03 +0300
-Subject: [PATCH] video: mmp: drop needless devm cleanup
-In-Reply-To: <20130923161944.GU12758@n2100.arm.linux.org.uk>
-References: <1379951159-8294-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <1379952790-13202-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <20130923161944.GU12758@n2100.arm.linux.org.uk>
-Message-ID: <5241406B.8090106@ti.com>
+From: jbe@pengutronix.de (=?utf-8?q?J=C3=BCrgen_Beisert?=)
+Date: Tue, 24 Sep 2013 09:39:48 +0200
+Subject: [PATCH 1/9] Staging/iio/adc/touchscreen/MXS: add proper clock
+ handling
+In-Reply-To: <21056.24202.312851.105281@ipc1.ka-ro>
+References: <1379946998-23041-1-git-send-email-jbe@pengutronix.de>
+ <1379946998-23041-2-git-send-email-jbe@pengutronix.de>
+ <21056.24202.312851.105281@ipc1.ka-ro>
+Message-ID: <201309240939.48094.jbe@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23/09/13 19:19, Russell King - ARM Linux wrote:
-> On Mon, Sep 23, 2013 at 06:13:10PM +0200, Uwe Kleine-K?nig wrote:
->> The nice thing about devm_* is that the driver doesn't need to free the
->> resources but the driver core takes care about that. This also
->> simplifies the error path quite a bit and removes the wrong check for a
->> clock pointer being NULL.
->>
->> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
->> ---
->>  drivers/video/mmp/hw/mmp_ctrl.c | 17 ++---------------
->>  1 file changed, 2 insertions(+), 15 deletions(-)
->>
->> diff --git a/drivers/video/mmp/hw/mmp_ctrl.c b/drivers/video/mmp/hw/mmp_ctrl.c
->> index 75dca19..6ac7552 100644
->> --- a/drivers/video/mmp/hw/mmp_ctrl.c
->> +++ b/drivers/video/mmp/hw/mmp_ctrl.c
->> @@ -514,7 +514,7 @@ static int mmphw_probe(struct platform_device *pdev)
->>  	if (IS_ERR(ctrl->clk)) {
->>  		dev_err(ctrl->dev, "unable to get clk %s\n", mi->clk_name);
->>  		ret = -ENOENT;
->> -		goto failed_get_clk;
->> +		goto failed;
->>  	}
->>  	clk_prepare_enable(ctrl->clk);
->>  
->> @@ -551,21 +551,8 @@ failed_path_init:
->>  		path_deinit(path_plat);
->>  	}
->>  
->> -	if (ctrl->clk) {
->> -		devm_clk_put(ctrl->dev, ctrl->clk);
->> -		clk_disable_unprepare(ctrl->clk);
-> 
-> And this patch also fixes the above: disabling/unpreparing _after_ putting
-> the thing - which was quite silly... :)
+Hi Lothar,
 
-Hmm, I wonder if that causes any issues... I.e. should this patch go for
-3.12, or is 3.13 fine?
+On Monday 23 September 2013 17:30:18 Lothar Wa?mann wrote:
+> > [...]
+> > @@ -928,6 +931,9 @@ static int mxs_lradc_probe(struct platform_device
+> > *pdev) if (IS_ERR(lradc->base))
+> >  		return PTR_ERR(lradc->base);
+> >
+> > +	lradc->clk = devm_clk_get(&pdev->dev, NULL);
+> > +	clk_prepare_enable(lradc->clk);
+> > +
+>
+> Wouldn't it make sense to enable the clock only when the device is
+> opened to save power while not actually in use?
 
- Tomi
+Sure. But I haven't analyzed yet if the IIO part of the driver also uses the 
+delay units and - more important - when it use them.
 
+@Marek: can you tell us, where the clock should be enabled in your part of the 
+driver (if required)?
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 901 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130924/c25c927b/attachment-0001.sig>
+BTW: do we also need to get and enable the 24 MHz clock (used by the ADC 
+itself)? I'm not sure if this clock is the "CLK_ANA24M" shown in 
+their "Logical Diagram of Clock Domains". The datasheets also mention 
+the "clk_xtal24m" clock for "analog 24 MHz clock domains". But does "Fixed 
+clock domains" mean they are not switchable and thus always enabled?
+
+Regards,
+Juergen
+
+-- 
+Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?| Juergen Beisert ? ? ? ? ? ? |
+Linux Solutions for Science and Industry ? ? ?| http://www.pengutronix.de/  |
