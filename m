@@ -1,58 +1,47 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 24 Sep 2013 19:38:13 +0900
-Subject: [PATCH] ARM: EXYNOS: fix PL330 MDMA1 address in DT for Universal
- C210 board
-In-Reply-To: <5328103.I4Op9muCR3@amdc1032>
-References: <8667689.9TcYbn9cHO@amdc1032> <5328103.I4Op9muCR3@amdc1032>
-Message-ID: <000001ceb912$2df4a240$89dde6c0$%kim@samsung.com>
+From: gang.chen@asianux.com (Chen Gang)
+Date: Tue, 24 Sep 2013 18:37:25 +0800
+Subject: [PATCH] ARM: include: asm: atomic.h: use type cast 's64' for
+ the return value of atomic64_add_return().
+In-Reply-To: <20130924102736.GA12758@n2100.arm.linux.org.uk>
+References: <523D7DC7.8030603@asianux.com>
+ <20130924093041.GB15119@mudshark.cambridge.arm.com>
+ <20130924102736.GA12758@n2100.arm.linux.org.uk>
+Message-ID: <52416B65.4070601@asianux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Bartlomiej Zolnierkiewicz wrote:
+On 09/24/2013 06:27 PM, Russell King - ARM Linux wrote:
+> On Tue, Sep 24, 2013 at 10:30:41AM +0100, Will Deacon wrote:
+>> On Sat, Sep 21, 2013 at 12:06:47PM +0100, Chen Gang wrote:
+>>> diff --git a/arch/arm/include/asm/atomic.h b/arch/arm/include/asm/atomic.h
+>>> index da1c77d..8cf005d 100644
+>>> --- a/arch/arm/include/asm/atomic.h
+>>> +++ b/arch/arm/include/asm/atomic.h
+>>> @@ -475,7 +475,7 @@ static inline int atomic64_add_unless(atomic64_t *v, u64 a, u64 u)
+>>>  	return ret;
+>>>  }
+>>>  
+>>> -#define atomic64_add_negative(a, v)	(atomic64_add_return((a), (v)) < 0)
+>>> +#define atomic64_add_negative(a, v)	((s64)atomic64_add_return((a), (v)) < 0)
+>>>  #define atomic64_inc(v)			atomic64_add(1LL, (v))
+>>>  #define atomic64_inc_return(v)		atomic64_add_return(1LL, (v))
+>>>  #define atomic64_inc_and_test(v)	(atomic64_inc_return(v) == 0)
+>>
+>> Is this the right fix? It looks more like atomic[64]_t should be signed, but
+>> some 32-bit architectures (ARM, x86, tile) are actually implementing
+>> atomic64_t as u64. Furthermore, there are discrepencies in the operands to
+>> the various atomic64_* function (long long vs u64) which probably need
+>> sorting out.
+> 
+> Even though our underlying type is u64, we could change the arguments to
+> be 'long long' as per the asm-generic/atomic64.h version.  Remember that
+> this is ARM specific code, and we know that long long == 64-bit int.
 > 
 > 
-> Hi Kukjin,
-> 
-Hi Bart,
 
-> Could you please apply this patch?
-> 
-Can you make sure there is no rev1 for universal c210 board?
+That sounds reasonable, too, I will change them in patch v2 for arm
+(also for tile).
 
-- Kukjin
-
-> Best regards,
-> --
-> Bartlomiej Zolnierkiewicz
-> Samsung R&D Institute Poland
-> Samsung Electronics
-> 
-> On Tuesday, August 20, 2013 01:22:45 PM Bartlomiej Zolnierkiewicz wrote:
-> > Revision 0 of Exynos4210 SoC (used on Universal C210 board) requires
-> > 'secure' PL330 MDMA1 address (0x12840000) instead of 'non-secure' one
-> > (0x12850000). Fix it by overriding the default PL330 MDMA1 address in
-> > exynos4210-universal_c210.dts.
-> >
-> > This is a Device Tree (DT) version of commit 91280e7 ("ARM: EXYNOS:
-> > PL330 MDMA1 fix for revision 0 of Exynos4210 SOC") and fixes recent
-> > regression caused by conversion to DT-only setup on ARM EXYNOS.
-> >
-> > Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-> > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> > ---
-> >  arch/arm/boot/dts/exynos4210-universal_c210.dts | 4 ++++
-> >  1 file changed, 4 insertions(+)
-> >
-> > diff --git a/arch/arm/boot/dts/exynos4210-universal_c210.dts
-> b/arch/arm/boot/dts/exynos4210-universal_c210.dts
-> > index 889cdad..d2e3f5f 100644
-> > --- a/arch/arm/boot/dts/exynos4210-universal_c210.dts
-> > +++ b/arch/arm/boot/dts/exynos4210-universal_c210.dts
-> > @@ -350,3 +350,7 @@
-> >  		status = "okay";
-> >  	};
-> >  };
-> > +
-> > +&mdma1 {
-> > +	reg = <0x12840000 0x1000>;
-> > +};
+Thanks.
+-- 
+Chen Gang
