@@ -1,42 +1,29 @@
-From: pwalmsley@nvidia.com (Paul Walmsley)
-Date: Mon, 23 Sep 2013 18:08:42 -0700
-Subject: Tegra baseline test results for v3.12-rc2
-Message-ID: <5240E61A.9000204@nvidia.com>
+From: leoy@marvell.com (Leo Yan)
+Date: Tue, 24 Sep 2013 10:00:38 +0800
+Subject: [Question] Verification For arm64: suspend/resume implementation
+In-Reply-To: <20130923152606.GA6157@e102648.cambridge.arm.com>
+References: <52327E41.1070904@marvell.com>
+ <20130913144001.GA28531@e102568-lin.cambridge.arm.com>
+ <524021EC.2000207@marvell.com>
+ <20130923152606.GA6157@e102648.cambridge.arm.com>
+Message-ID: <5240F246.6050402@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here are some basic Tegra test results for Linux v3.12-rc2.
-Logs and other details at:
 
-     http://nvt.pwsan.com/pub/linux/testlogs/test_v3.12-rc2/20130923160110/
+On 09/23/2013 11:26 PM, Achin Gupta wrote:
 
+> The foundation model (if thats what you are using) does not model an
+> ARM cpu implementation. The CPUECTLR is a cpu specific register
+> (imp. def.)  so it is not present. The caches on the Foundation Model
+> are inherently coherent so you do not need to access this register. If
+> you do then the access is treated as an illegal instruction.
+>
 
-Test summary
-------------
+Thx for the info. So do u mean i need use FVP Model for A53?
 
-Build: zImage:
-     Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
+Here have another question, ARM have the example code for boot wrapper 
+which will switch from EL3 to secure EL1 rather than non-secure's EL1?
 
-Boot to userspace: multi_v7_defconfig:
-     Pass: ( 2/ 2): tegra114-dalmore-headless, tegra30-beaver
-
-Boot to userspace: tegra_defconfig:
-     Pass: ( 2/ 2): tegra114-dalmore-headless, tegra30-beaver
-
-
-
-vmlinux object size
-(delta in bytes from test_v3.12-rc1 (272b98c6455f00884f0350f775c5342358ebb73f)):
-    text     data      bss    total  kernel
-    +388       +8        0     +396  multi_v7_defconfig
-    +384        0        0     +384  tegra_defconfig
-
-
-
-Boot-time memory difference
-(delta in bytes from test_v3.12-rc1 (272b98c6455f00884f0350f775c5342358ebb73f))
-     avail    rsrvd     high    freed                board              kconfig                  dtb
-         .        .        .        . tegra114-dalmore-hea   multi_v7_defconfig     tegra114-dalmore
-         .        .        .        . tegra114-dalmore-hea      tegra_defconfig     tegra114-dalmore
-         .        .        .        .       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
-         .        .        .        .       tegra30-beaver      tegra_defconfig       tegra30-beaver
+Thx,
+Leo Yan
