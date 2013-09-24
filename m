@@ -1,78 +1,44 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 24 Sep 2013 16:42:18 +0100
-Subject: [PATCH 6/7] iommu/arm-smmu: Add module parameter
- arm-smmu=off|force_isolation
-In-Reply-To: <1380035221-11576-7-git-send-email-andreas.herrmann@calxeda.com>
+Date: Tue, 24 Sep 2013 16:42:52 +0100
+Subject: [PATCH 7/7] iommu/arm-smmu: Clear global and context bank fault
+ status and syndrome registers
+In-Reply-To: <1380035221-11576-8-git-send-email-andreas.herrmann@calxeda.com>
 References: <1380035221-11576-1-git-send-email-andreas.herrmann@calxeda.com>
- <1380035221-11576-7-git-send-email-andreas.herrmann@calxeda.com>
-Message-ID: <20130924154218.GF20774@mudshark.cambridge.arm.com>
+ <1380035221-11576-8-git-send-email-andreas.herrmann@calxeda.com>
+Message-ID: <20130924154252.GG20774@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 24, 2013 at 04:07:00PM +0100, Andreas Herrmann wrote:
->   arm-smmu=	arm-smmu driver option
-> 
-> 	off	Disable arm-smmu driver (ie. ignore available SMMUs)
-> 
-> 	force_isolation
-> 		Try to attach each master device on every SMMU to a
-> 		separate iommu_domain.
-> 
-> Default is that driver detects SMMUs but no translation is configured
-> (transactions just bypass translation process).
-> 
+On Tue, Sep 24, 2013 at 04:07:01PM +0100, Andreas Herrmann wrote:
 > Signed-off-by: Andreas Herrmann <andreas.herrmann@calxeda.com>
 > ---
->  drivers/iommu/arm-smmu.c |   26 ++++++++++++++++++++++++++
->  1 file changed, 26 insertions(+)
+>  drivers/iommu/arm-smmu.c |    9 +++++++++
+>  1 file changed, 9 insertions(+)
 > 
 > diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-> index 3eb2259..251564e 100644
+> index 251564e..a499146 100644
 > --- a/drivers/iommu/arm-smmu.c
 > +++ b/drivers/iommu/arm-smmu.c
-> @@ -399,6 +399,9 @@ struct arm_smmu_domain {
->  static DEFINE_SPINLOCK(arm_smmu_devices_lock);
->  static LIST_HEAD(arm_smmu_devices);
+> @@ -645,6 +645,10 @@ static void arm_smmu_init_context_bank(struct arm_smmu_domain *smmu_domain)
+>  	stage1 = root_cfg->cbar != CBAR_TYPE_S2_TRANS;
+>  	cb_base = ARM_SMMU_CB_BASE(smmu) + ARM_SMMU_CB(smmu, root_cfg->cbndx);
 >  
-> +static bool arm_smmu_disabled;
-> +static bool arm_smmu_force_isolation;
+> +	/* clear fsr */
+> +	writel_relaxed(0xffffffff, cb_base + ARM_SMMU_CB_FSR);
+> +	writel_relaxed(0, cb_base + ARM_SMMU_CB_FSYNR0);
 > +
->  static struct arm_smmu_master *find_smmu_master(struct arm_smmu_device *smmu,
->  						struct device_node *dev_node)
->  {
-> @@ -1837,6 +1840,9 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
->  	struct of_phandle_args masterspec;
->  	int num_irqs, i, err;
+>  	/* CBAR */
+>  	reg = root_cfg->cbar;
+>  	if (smmu->version == 1)
+> @@ -1570,6 +1574,11 @@ static void arm_smmu_device_reset(struct arm_smmu_device *smmu)
+>  	int i = 0;
+>  	u32 scr0 = readl_relaxed(gr0_base + ARM_SMMU_GR0_sCR0);
 >  
-> +	if (arm_smmu_disabled)
-> +		return -ENODEV;
-> +
->  	smmu = devm_kzalloc(dev, sizeof(*smmu), GFP_KERNEL);
->  	if (!smmu) {
->  		dev_err(dev, "failed to allocate arm_smmu_device\n");
-> @@ -2022,6 +2028,23 @@ static struct platform_driver arm_smmu_driver = {
->  	.remove	= arm_smmu_device_remove,
->  };
->  
-> +static int __init arm_smmu_parse_options(char *str)
-> +{
-> +	if (*str) {
-> +		str++;
-> +		if (!strncmp(str, "off", 3))
-> +			arm_smmu_disabled = true;
-> +		else if(!strncmp(str, "force_isolation", 15))
-> +			arm_smmu_force_isolation = true;
-> +		else {
-> +			pr_warn("arm_smmu: invalid parameter (\"%s\")\n", str);
-> +			return 0;
-> +		}
-> +	}
-> +	return 1;
-> +}
-> +__setup("arm-smmu", arm_smmu_parse_options);
+> +	/* clear global FSRs */
+> +	writel(0xffffffff, gr0_base + ARM_SMMU_GR0_sGFSR);
+> +	writel(0, gr0_base + ARM_SMMU_GR0_sGFSYNR0);
+> +	writel(0, gr0_base + ARM_SMMU_GR0_sGFSYNR1);
 
-If this is going to be a common function for IOMMUs, let's instead move the
-command-line parsing out into the generic IOMMU layer, then have an optional
-callback into the low-level IOMMU driver for enabling/disabling it.
+Why do you need this?
 
 Will
