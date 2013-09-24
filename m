@@ -1,92 +1,52 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Tue, 24 Sep 2013 20:12:35 +0200
-Subject: [PATCH] ASoC: kirkwood: simplify clock handling
-In-Reply-To: <1379951159-8294-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1379951159-8294-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <1380046355-7920-1-git-send-email-u.kleine-koenig@pengutronix.de>
+From: andreas.herrmann@calxeda.com (Andreas Herrmann)
+Date: Tue, 24 Sep 2013 20:32:47 +0200
+Subject: [PATCH 7/7] iommu/arm-smmu: Clear global and context bank fault
+ status and syndrome registers
+In-Reply-To: <20130924154252.GG20774@mudshark.cambridge.arm.com>
+References: <1380035221-11576-1-git-send-email-andreas.herrmann@calxeda.com>
+ <1380035221-11576-8-git-send-email-andreas.herrmann@calxeda.com>
+ <20130924154252.GG20774@mudshark.cambridge.arm.com>
+Message-ID: <20130924183247.GW4845@alberich>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is no need to not use extclk if it is identical to the main clk.
-The main motivation for this patch is dropping devm_clk_put which is
-used in a wrong way by all other users.
+On Tue, Sep 24, 2013 at 11:42:52AM -0400, Will Deacon wrote:
+> On Tue, Sep 24, 2013 at 04:07:01PM +0100, Andreas Herrmann wrote:
+> > Signed-off-by: Andreas Herrmann <andreas.herrmann@calxeda.com>
+> > ---
+> >  drivers/iommu/arm-smmu.c |    9 +++++++++
+> >  1 file changed, 9 insertions(+)
+> > 
+> > diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+> > index 251564e..a499146 100644
+> > --- a/drivers/iommu/arm-smmu.c
+> > +++ b/drivers/iommu/arm-smmu.c
+> > @@ -645,6 +645,10 @@ static void arm_smmu_init_context_bank(struct arm_smmu_domain *smmu_domain)
+> >  	stage1 = root_cfg->cbar != CBAR_TYPE_S2_TRANS;
+> >  	cb_base = ARM_SMMU_CB_BASE(smmu) + ARM_SMMU_CB(smmu, root_cfg->cbndx);
+> >  
+> > +	/* clear fsr */
+> > +	writel_relaxed(0xffffffff, cb_base + ARM_SMMU_CB_FSR);
+> > +	writel_relaxed(0, cb_base + ARM_SMMU_CB_FSYNR0);
+> > +
+> >  	/* CBAR */
+> >  	reg = root_cfg->cbar;
+> >  	if (smmu->version == 1)
+> > @@ -1570,6 +1574,11 @@ static void arm_smmu_device_reset(struct arm_smmu_device *smmu)
+> >  	int i = 0;
+> >  	u32 scr0 = readl_relaxed(gr0_base + ARM_SMMU_GR0_sCR0);
+> >  
+> > +	/* clear global FSRs */
+> > +	writel(0xffffffff, gr0_base + ARM_SMMU_GR0_sGFSR);
+> > +	writel(0, gr0_base + ARM_SMMU_GR0_sGFSYNR0);
+> > +	writel(0, gr0_base + ARM_SMMU_GR0_sGFSYNR1);
+> 
+> Why do you need this?
 
-While at it also extend the comments.
+According to the spec the status and syndrome registers have
+unknown/unpredictable reset values. So better set known values before
+we start to use these registers (ie. handle faults where we read
+them). No?
 
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
-Hello,
 
-there might be some further optimisations possible. I only note them
-here because I don't have the hardware to test:
-
- - only enable extclk if it a clock rate used that makes use of the
-   external clock. Not sure if that works; hardware docs reading
-   necessary.
- - only provide extclk if it's != the internal clock.
- - The code uses:
-
-	priv->clk = devm_clk_get(&pdev->dev, np ? "internal" : NULL);
-
-   i.e. provides a con_id in the dt-case. I think that using NULL
-   unconditionally should also work, i.e. return the first clk
-   associated to the device. OTOH the current code might make things
-   clearer because it's more explicit.
-
-Best regards
-Uwe
----
- sound/soc/kirkwood/kirkwood-i2s.c | 24 +++++++++++++++---------
- 1 file changed, 15 insertions(+), 9 deletions(-)
-
-diff --git a/sound/soc/kirkwood/kirkwood-i2s.c b/sound/soc/kirkwood/kirkwood-i2s.c
-index 0f3d73d..8224f93 100644
---- a/sound/soc/kirkwood/kirkwood-i2s.c
-+++ b/sound/soc/kirkwood/kirkwood-i2s.c
-@@ -104,16 +104,25 @@ static void kirkwood_set_rate(struct snd_soc_dai *dai,
- 	uint32_t clks_ctrl;
- 
- 	if (rate == 44100 || rate == 48000 || rate == 96000) {
--		/* use internal dco for the supported rates
--		 * defined in kirkwood_i2s_dai */
-+		/*
-+		 * use internal dco for the supported rates
-+		 * defined in kirkwood_i2s_dai
-+		 * Note: For these specific rates the dco is also used if
-+		 * kirkwood_i2s_dai_extclk is in use.
-+		 */
- 		dev_dbg(dai->dev, "%s: dco set rate = %lu\n",
- 			__func__, rate);
- 		kirkwood_set_dco(priv->io, rate);
- 
- 		clks_ctrl = KIRKWOOD_MCLK_SOURCE_DCO;
- 	} else {
--		/* use the external clock for the other rates
--		 * defined in kirkwood_i2s_dai_extclk */
-+		/*
-+		 * use the external clock for the other rates
-+		 * defined in kirkwood_i2s_dai_extclk
-+		 * This case isn't reached if kirkwood_i2s_dai is in use (and so
-+		 * extclk isn't valid) because it only supports the three rates
-+		 * above.
-+		 */
- 		dev_dbg(dai->dev, "%s: extclk set rate = %lu -> %lu\n",
- 			__func__, rate, 256 * rate);
- 		clk_set_rate(priv->extclk, 256 * rate);
-@@ -497,12 +506,9 @@ static int kirkwood_i2s_dev_probe(struct platform_device *pdev)
- 
- 	priv->extclk = devm_clk_get(&pdev->dev, "extclk");
- 	if (!IS_ERR(priv->extclk)) {
--		if (priv->extclk == priv->clk) {
--			devm_clk_put(&pdev->dev, priv->extclk);
--			priv->extclk = ERR_PTR(-EINVAL);
--		} else {
-+		clk_prepare_enable(priv->extclk);
-+		if (priv->extclk != priv->clk) {
- 			dev_info(&pdev->dev, "found external clock\n");
--			clk_prepare_enable(priv->extclk);
- 			soc_dai = &kirkwood_i2s_dai_extclk;
- 		}
- 	}
--- 
-1.8.4.rc3
+Andreas
