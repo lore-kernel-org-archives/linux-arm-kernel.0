@@ -1,47 +1,71 @@
-From: achin.gupta@arm.com (Achin Gupta)
-Date: Tue, 24 Sep 2013 10:02:36 +0100
-Subject: [Question] Verification For arm64: suspend/resume implementation
-In-Reply-To: <5240F246.6050402@marvell.com>
-References: <52327E41.1070904@marvell.com>
- <20130913144001.GA28531@e102568-lin.cambridge.arm.com>
- <524021EC.2000207@marvell.com>
- <20130923152606.GA6157@e102648.cambridge.arm.com>
- <5240F246.6050402@marvell.com>
-Message-ID: <20130924090236.GY10174@e102648.cambridge.arm.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Tue, 24 Sep 2013 11:00:24 +0200
+Subject: [PATCH 00/10] pwm-backlight: Add GPIO and power supply support
+In-Reply-To: <20130924081446.GA11981@verge.net.au>
+References: <1379972467-11243-1-git-send-email-treding@nvidia.com>
+ <20130924081446.GA11981@verge.net.au>
+Message-ID: <20130924090023.GA13971@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Leo,
-
-On Tue, Sep 24, 2013 at 03:00:38AM +0100, Leo Yan wrote:
->
-> On 09/23/2013 11:26 PM, Achin Gupta wrote:
->
-> > The foundation model (if thats what you are using) does not model an
-> > ARM cpu implementation. The CPUECTLR is a cpu specific register
-> > (imp. def.)  so it is not present. The caches on the Foundation Model
-> > are inherently coherent so you do not need to access this register. If
-> > you do then the access is treated as an illegal instruction.
+On Tue, Sep 24, 2013 at 05:14:46PM +0900, Simon Horman wrote:
+> [ Cc: Olof Johansson, Kevin Hilman and Arnd Bergman: arm-soc maintainers ]
+> 
+> On Mon, Sep 23, 2013 at 11:40:57PM +0200, Thierry Reding wrote:
+> > This series adds the ability to specify a GPIO and a power supply to
+> > enable a backlight.
+> > 
+> > Patch 1 refactors the power on and power off sequences into separate
+> > functions in preparation for subsequent patches.
+> > 
+> > Patch 2 adds an optional GPIO to enable a backlight. This patch only
+> > includes the field within the platform data so that it can be properly
+> > setup before actually being put to use.
+> > 
+> > Patches 3 to 7 convert all users of the pwm-backlight driver to use the
+> > new field. For most of them, this just initializes the field to -1,
+> > marking the field as unused.
 > >
->
-> Thx for the info. So do u mean i need use FVP Model for A53?
+> > Patch 8 uses the new field within the pwm-backlight driver and at the
+> > same time allows it to be parsed from device tree.
+> > 
+> > Patch 9 implements support for an optional power supply. This relies on
+> > the regulator core to return a dummy regulator when no supply has been
+> > otherwise setup so the driver doesn't have to handle that specially nor
+> > require all users to be updated.
+> > 
+> > Patch 10 adds a way to keep a backlight turned off at boot. This is
+> > useful when hooking up a backlight with a subsystem such as DRM which
+> > has more explicit semantics as to when a backlight should be turned on.
+> > 
+> > Due to the dependencies within the series, I propose to take all these
+> > patches through the PWM tree, so I'll need acks from OMAP, PXA, Samsung,
+> > shmobile and Unicore32 maintainers.
+> 
+> I received some feedback regarding shmobile conflicts when
+> arm-soc was merged between v3.11 and v3.12-rc1. With this
+> in mind I now have a strong preference for changes inside
+> arch/arm/mach-shmobile/ to be taken through my renesas
+> tree and thus more importantly through arm-soc if possible.
 
-I think you should use the dual cluster A57_A53 Base FVP models. They
-have the power controller and model the CPUECTLR.SMP bit behaviour as
-well.
+I understand. Unfortunately the nature of patche series such as this is
+that they require the whole series to be applied atomically (or at least
+in a very specific order). So the patch that uses the new enable_gpio
+field can only be applied after all previous patches. The only
+reasonable way to ensure that is to take all of the patches through one
+tree. Furthermore this patch is tiny (it adds a single line) and touches
+code that's unlikely to be modified by anyone else.
 
->
-> Here have another question, ARM have the example code for boot wrapper
-> which will switch from EL3 to secure EL1 rather than non-secure's EL1?
+But if it makes you more comfortable, I could provide a stable branch
+that contains this series for you to merge into the shmobile tree. That
+should enable you to handle all conflict resolution prior to submitting
+to arm-soc.
 
-I dont' think we do but let me check. Switching to S-EL1 instead of
-NS-EL1 should be a matter of _not_ setting the SCR_EL3.NS bit before
-doing the exception level change (ERET).
-
-hth,
-Achin
-
->
-> Thx,
-> Leo Yan
->
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130924/7b1d7aee/attachment.sig>
