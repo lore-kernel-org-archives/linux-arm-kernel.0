@@ -1,35 +1,120 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Tue, 24 Sep 2013 15:58:06 +0200
-Subject: [PATCH v5 1/3] clk: samsung: Add clock driver for s5pc110/s5pv210
-In-Reply-To: <1380027009-2239-2-git-send-email-m.krawczuk@partner.samsung.com>
-References: <1380027009-2239-1-git-send-email-m.krawczuk@partner.samsung.com>
- <1380027009-2239-2-git-send-email-m.krawczuk@partner.samsung.com>
-Message-ID: <52419A6E.9020203@samsung.com>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Tue, 24 Sep 2013 16:00:39 +0200
+Subject: [PATCH] ARM: DEBUG_LL on efm32 SoCs
+In-Reply-To: <1379447884-14025-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1379447884-14025-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <1380031239-25414-1-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This implements output of debug messages on efm32 SoCs.
 
-On 24/09/13 14:50, Mateusz Krawczuk wrote:
-> +++ b/Documentation/devicetree/bindings/clock/samsung,s5pv210-clock.txt
-> @@ -0,0 +1,75 @@
-> +* Samsung S5PC110/S5PV210 Clock Controller
-> +
-> +The S5PV210 clock controller generates and supplies clock to various controllers
-> +within the SoC. The clock binding described here is applicable to all SoCs in
-> +the S5PC110/S5PV210 family.
-> +
-> +Required Properties:
-> +
-> +- compatible: should be "samsung,s5pv210-clock".
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+---
+ arch/arm/Kconfig.debug         | 17 ++++++++++++++++
+ arch/arm/include/debug/efm32.S | 45 ++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 62 insertions(+)
+ create mode 100644 arch/arm/include/debug/efm32.S
 
-I have nothing against this compatible value, but wouldn't it be more
-accurate to use, e.g. "samsung,s5pv210-cmu" - for Clock Management Unit,
-as this IP block is also referred to in the documentation ?
-
-May just be me, but "samsung,s5pv210-clock" sounds like just one
-specific clock type.
-
---
-Thanks,
-Sylwester
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index 9762c84..2b32068 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -834,6 +834,20 @@ choice
+ 		  options; the platform specific options are deprecated
+ 		  and will be soon removed.
+ 
++	config DEBUG_LL_UART_EFM32
++		bool "Kernel low-level debugging via efm32 UART"
++		depends on ARCH_EFM32
++		help
++		  Say Y here if you want the debug print routines to direct
++		  their output to an UART or USART port on efm32 based
++		  machines. Use the following addresses for DEBUG_UART_PHYS:
++
++		    0x4000c000 | USART0
++		    0x4000c400 | USART1
++		    0x4000c800 | USART2
++		    0x4000e000 | UART0
++		    0x4000e400 | UART1
++
+ 	config DEBUG_LL_UART_PL01X
+ 		bool "Kernel low-level debugging via ARM Ltd PL01x Primecell UART"
+ 		help
+@@ -885,6 +899,7 @@ config DEBUG_LL_INCLUDE
+ 	default "debug/8250.S" if DEBUG_LL_UART_8250 || DEBUG_UART_8250
+ 	default "debug/pl01x.S" if DEBUG_LL_UART_PL01X || DEBUG_UART_PL01X
+ 	default "debug/exynos.S" if DEBUG_EXYNOS_UART
++	default "debug/efm32.S" if DEBUG_LL_UART_EFM32
+ 	default "debug/icedcc.S" if DEBUG_ICEDCC
+ 	default "debug/imx.S" if DEBUG_IMX1_UART || \
+ 				 DEBUG_IMX25_UART || \
+@@ -951,6 +966,7 @@ config DEBUG_UART_PHYS
+ 	default 0x20064000 if DEBUG_RK29_UART1 || DEBUG_RK3X_UART2
+ 	default 0x20068000 if DEBUG_RK29_UART2 || DEBUG_RK3X_UART3
+ 	default 0x20201000 if DEBUG_BCM2835
++	default 0x4000e400 if DEBUG_LL_UART_EFM32
+ 	default 0x40090000 if ARCH_LPC32XX
+ 	default 0x40100000 if DEBUG_PXA_UART1
+ 	default 0x42000000 if ARCH_GEMINI
+@@ -981,6 +997,7 @@ config DEBUG_UART_PHYS
+ 	default 0xfff36000 if DEBUG_HIGHBANK_UART
+ 	default 0xfffff700 if ARCH_IOP33X
+ 	depends on DEBUG_LL_UART_8250 || DEBUG_LL_UART_PL01X || \
++		DEBUG_LL_UART_EFM32 || \
+ 		DEBUG_UART_8250 || DEBUG_UART_PL01X
+ 
+ config DEBUG_UART_VIRT
+diff --git a/arch/arm/include/debug/efm32.S b/arch/arm/include/debug/efm32.S
+new file mode 100644
+index 0000000..2265a19
+--- /dev/null
++++ b/arch/arm/include/debug/efm32.S
+@@ -0,0 +1,45 @@
++/*
++ * Copyright (C) 2013 Pengutronix
++ * Uwe Kleine-Koenig <u.kleine-koenig@pengutronix.de>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#define UARTn_CMD		0x000c
++#define UARTn_CMD_TXEN			0x0004
++
++#define	UARTn_STATUS		0x0010
++#define	UARTn_STATUS_TXC		0x0020
++#define	UARTn_STATUS_TXBL		0x0040
++
++#define	UARTn_TXDATA		0x0034
++
++		.macro	addruart, rx, tmp
++		ldr	\rx, =(CONFIG_DEBUG_UART_PHYS)
++
++		/*
++		 * enable TX. The driver might disable it to save energy. We
++		 * don't care about disabling at the end as during debug power
++		 * consumption isn't that important.
++		 */
++		ldr	\tmp, =(UARTn_CMD_TXEN)
++		str	\tmp, [\rx, #UARTn_CMD]
++		.endm
++
++		.macro	senduart,rd,rx
++		strb	\rd, [\rx, #UARTn_TXDATA]
++		.endm
++
++		.macro	waituart,rd,rx
++1001:		ldr	\rd, [\rx, #UARTn_STATUS]
++		tst	\rd, #UARTn_STATUS_TXBL
++		beq	1001b
++		.endm
++
++		.macro	busyuart,rd,rx
++1001:		ldr	\rd, [\rx, UARTn_STATUS]
++		tst	\rd, #UARTn_STATUS_TXC
++		bne	1001b
++		.endm
+-- 
+1.8.4.rc3
