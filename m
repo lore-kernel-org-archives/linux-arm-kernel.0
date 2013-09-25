@@ -1,41 +1,38 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Wed, 25 Sep 2013 11:48:29 +0300
-Subject: [PATCHv7 23/36] ARM: dts: DRA7: link in clock DT data
-In-Reply-To: <1380098922-30340-1-git-send-email-t-kristo@ti.com>
-References: <1380098922-30340-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1380098922-30340-24-git-send-email-t-kristo@ti.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Wed, 25 Sep 2013 11:18:52 +0200
+Subject: ARM/Samsung/S3C24xx: Linux-3.11 crashes when using PWM
+In-Reply-To: <201309251029.44265.jbe@pengutronix.de>
+References: <201309251029.44265.jbe@pengutronix.de>
+Message-ID: <5242AA7C.4010905@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Clock tree DT data is now included from base dra7.dtsi file.
+Hi J?rgen,
 
-Signed-off-by: Tero Kristo <t-kristo@ti.com>
----
- arch/arm/boot/dts/dra7.dtsi |   14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+On 25/09/13 10:29, J?rgen Beisert wrote:
+> Change one single line:
+> 
+> diff --git a/arch/arm/mach-s3c24xx/mach-mini2440.c b/arch/arm/mach-s3c24xx/mach-mini2440.c
+> index a83db46..d8273da 100644
+> --- a/arch/arm/mach-s3c24xx/mach-mini2440.c
+> +++ b/arch/arm/mach-s3c24xx/mach-mini2440.c
+> @@ -519,6 +519,7 @@ static struct platform_device *mini2440_devices[] __initdata = {
+>         &s3c_device_iis,
+>         &uda1340_codec,
+>         &mini2440_audio,
+> +       &s3c_device_timer[0],
+>  };
 
-diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
-index c01ef76..c98997b 100644
---- a/arch/arm/boot/dts/dra7.dtsi
-+++ b/arch/arm/boot/dts/dra7.dtsi
-@@ -572,4 +572,18 @@
- 			status = "disabled";
- 		};
- 	};
-+
-+	clocks {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges;
-+		/include/ "dra7xx-clocks.dtsi"
-+	};
-+
-+	clockdomains {
-+		coreaon_clkdm: coreaon_clkdm {
-+			compatible = "ti,clockdomain";
-+			clocks = <&dpll_usb_ck>;
-+		};
-+	};
- };
--- 
-1.7.9.5
+I think you need to add instead:
+
+	&samsung_device_pwm,
+
+IIRC I had this working, can't verify at the moment as I don't
+have access to the board right now. Please see commit:
+
+7fa33bdb4c44155e390c9ebbc5aa4c5cfc73f6fa
+ARM: SAMSUNG: Modify board files to use new PWM platform device
+
+--
+Regards,
+Sylwester
