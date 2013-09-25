@@ -1,61 +1,80 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 25 Sep 2013 17:49:18 +0100
-Subject: [PATCH 7/7] iommu/arm-smmu: Clear global and context bank fault
- status and syndrome registers
-In-Reply-To: <20130924183247.GW4845@alberich>
-References: <1380035221-11576-1-git-send-email-andreas.herrmann@calxeda.com>
- <1380035221-11576-8-git-send-email-andreas.herrmann@calxeda.com>
- <20130924154252.GG20774@mudshark.cambridge.arm.com>
- <20130924183247.GW4845@alberich>
-Message-ID: <20130925164917.GG14502@mudshark.cambridge.arm.com>
+From: timothy.c.pepper@linux.intel.com (Timothy Pepper)
+Date: Wed, 25 Sep 2013 10:12:43 -0700
+Subject: mm: insure topdown mmap chooses addresses above security minimum
+In-Reply-To: <20130925073048.GB27960@gmail.com>
+References: <1380057811-5352-1-git-send-email-timothy.c.pepper@linux.intel.com>
+ <20130925073048.GB27960@gmail.com>
+Message-ID: <20130925171243.GA7428@tcpepper-desk.jf.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 24, 2013 at 07:32:47PM +0100, Andreas Herrmann wrote:
-> On Tue, Sep 24, 2013 at 11:42:52AM -0400, Will Deacon wrote:
-> > On Tue, Sep 24, 2013 at 04:07:01PM +0100, Andreas Herrmann wrote:
-> > > Signed-off-by: Andreas Herrmann <andreas.herrmann@calxeda.com>
-> > > ---
-> > >  drivers/iommu/arm-smmu.c |    9 +++++++++
-> > >  1 file changed, 9 insertions(+)
-> > > 
-> > > diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-> > > index 251564e..a499146 100644
-> > > --- a/drivers/iommu/arm-smmu.c
-> > > +++ b/drivers/iommu/arm-smmu.c
-> > > @@ -645,6 +645,10 @@ static void arm_smmu_init_context_bank(struct arm_smmu_domain *smmu_domain)
-> > >  	stage1 = root_cfg->cbar != CBAR_TYPE_S2_TRANS;
-> > >  	cb_base = ARM_SMMU_CB_BASE(smmu) + ARM_SMMU_CB(smmu, root_cfg->cbndx);
-> > >  
-> > > +	/* clear fsr */
-> > > +	writel_relaxed(0xffffffff, cb_base + ARM_SMMU_CB_FSR);
-> > > +	writel_relaxed(0, cb_base + ARM_SMMU_CB_FSYNR0);
-> > > +
-> > >  	/* CBAR */
-> > >  	reg = root_cfg->cbar;
-> > >  	if (smmu->version == 1)
-> > > @@ -1570,6 +1574,11 @@ static void arm_smmu_device_reset(struct arm_smmu_device *smmu)
-> > >  	int i = 0;
-> > >  	u32 scr0 = readl_relaxed(gr0_base + ARM_SMMU_GR0_sCR0);
-> > >  
-> > > +	/* clear global FSRs */
-> > > +	writel(0xffffffff, gr0_base + ARM_SMMU_GR0_sGFSR);
-> > > +	writel(0, gr0_base + ARM_SMMU_GR0_sGFSYNR0);
-> > > +	writel(0, gr0_base + ARM_SMMU_GR0_sGFSYNR1);
-> > 
-> > Why do you need this?
+On Wed 25 Sep at 09:30:49 +0200 mingo at kernel.org said:
+> >  	info.flags = VM_UNMAPPED_AREA_TOPDOWN;
+> >  	info.length = len;
+> > -	info.low_limit = PAGE_SIZE;
+> > +	info.low_limit = max(PAGE_SIZE, PAGE_ALIGN(mmap_min_addr));
+> >  	info.high_limit = mm->mmap_base;
+> >  	info.align_mask = filp ? get_align_mask() : 0;
+> >  	info.align_offset = pgoff << PAGE_SHIFT;
 > 
-> According to the spec the status and syndrome registers have
-> unknown/unpredictable reset values. So better set known values before
-> we start to use these registers (ie. handle faults where we read
-> them). No?
+> There appears to be a lot of repetition in these methods - instead of 
+> changing 6 places it would be more future-proof to first factor out the 
+> common bits and then to apply the fix to the shared implementation.
 
-Sure, but the only time these are made visible should be if we take a fault,
-in which case the registers should contain something meaningful. I guess I
-could see a problem if there is a shared interrupt line for faults though,
-so a cut-down version of your patch (just clearing ARM_SMMU_GR0_sGFSR and
-the ARM_SMMU_CB_FSR registers) should be enough.
+Besides that existing redundancy in the multiple somewhat similar
+arch_get_unmapped_area_topdown() functions, I was expecting people might
+question the added redundancy of the six instances of:
 
-Cheers,
+	max(PAGE_SIZE, PAGE_ALIGN(mmap_min_addr));
 
-Will
+There's also a seventh similar instance if you consider
+mm/mmap.c:round_hint_to_min() and its call stack.  I'm inclined to
+think mmap_min_addr should be validated/aligned in one place, namely on
+initialization and input in security/min_addr.c:update_mmap_min_addr(),
+with mmap_min_addr always stored as an aligned value.
+
+In the past commit 40401530 Al Viro arguably moved that checking out
+of the security code and toward the mmap code.  Granted at that point
+though there was only the round_hint_to_min() insuring the value in
+mmap_min_addr was page aligned before use in that call path.  I'm thinking
+something like:
+
+diff --git a/security/min_addr.c b/security/min_addr.c
+--- a/security/min_addr.c
++++ b/security/min_addr.c
+@@ -14,14 +14,16 @@ unsigned long dac_mmap_min_addr = CONFIG_DEFAULT_MMAP_MIN_ADDR;
+  */
+ static void update_mmap_min_addr(void)
+ {
++	unsigned long addr;
+ #ifdef CONFIG_LSM_MMAP_MIN_ADDR
+ 	if (dac_mmap_min_addr > CONFIG_LSM_MMAP_MIN_ADDR)
+-		mmap_min_addr = dac_mmap_min_addr;
++		addr = dac_mmap_min_addr;
+ 	else
+-		mmap_min_addr = CONFIG_LSM_MMAP_MIN_ADDR;
++		addr = CONFIG_LSM_MMAP_MIN_ADDR;
+ #else
+-	mmap_min_addr = dac_mmap_min_addr;
++	addr = dac_mmap_min_addr;
+ #endif
++	mmap_min_addr = max(PAGE_SIZE, PAGE_ALIGN(addr));
+ }
+ 
+ /*
+
+But this possibly has implications beyond the mmap code.
+
+Al Viro, James Morris: any thoughts on the above?
+
+Michel, Rik: what do you think of common helpers called by
+ARM, MIPS, SH, Sparc, x86_64 arch_get_unmapped_area_topdown()
+and arch_get_unmapped_area() to handle initialization of struct
+vm_unmapped_area_info info fields which are currently mostly common?
+Given the nuances of "mostly common" I'm not sure the result would
+actually be positive for overall readability / self-documenting-ness of
+the per arch files.
+
+-- 
+Tim Pepper <timothy.c.pepper@linux.intel.com>
+Intel Open Source Technology Center
