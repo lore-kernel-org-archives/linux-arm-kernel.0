@@ -1,77 +1,35 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 24 Sep 2013 21:05:58 -0500
-Subject: [PATCH v2] TTY: hvc_dcc: probe for a JTAG connection before
- registering
-In-Reply-To: <1379968234-23373-1-git-send-email-robherring2@gmail.com>
-References: <1379968234-23373-1-git-send-email-robherring2@gmail.com>
-Message-ID: <1380074758-19808-1-git-send-email-robherring2@gmail.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Tue, 24 Sep 2013 22:07:57 -0400 (EDT)
+Subject: new binutils needed for arm in 3.12-rc1
+In-Reply-To: <1380071607.1974.78@driftwood>
+References: <1380071607.1974.78@driftwood>
+Message-ID: <alpine.LFD.2.03.1309242158340.312@syhkavp.arg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rob Herring <rob.herring@calxeda.com>
+On Tue, 24 Sep 2013, Rob Landley wrote:
 
-Enabling the ARM DCC console and using without a JTAG connection will
-simply hang the system. Since distros like to turn on all options, this
-is a reoccurring problem to debug. We can do better by checking if
-anything is attached and handling characters. There is no way to probe
-this, so send a newline and check that it is handled.
+> On 09/24/2013 04:48:00 PM, Russell King - ARM Linux wrote:
+> > Now, if you feel strongly about this, we _could_ introduce a
+> > CONFIG_OLD_BINUTILS and give everyone their cake - but it will be
+> > fragile.  Not everyone will remember to get that right, because they'll
+> > be using the later binutils.  Also, we already have an excessive number
+> > of potential breakage-inducing options and we certainly don't need
+> > another.
+> 
+> I'm doing the regression testing either way, on several different
+> architectures. (Although I tend to to only really do a thorough job quarterly
+> when a new kernel comes out and it's time to make it work.) So I'm going to be
+> doing something locally like this anyway, and if a CONFIG_OLD_BINUTILS is
+> acceptable I might as well push it upstream.
 
-Cc: Paolo Pisati <paolo.pisati@canonical.com>
-Cc: Tim Gardner <tim.gardner@canonical.com>
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: Jiri Slaby <jslaby@suse.cz>
-Signed-off-by: Rob Herring <rob.herring@calxeda.com>
----
-v2: use time_is_after_jiffies
+If you are convinced you have no choice but to stick to old binutils, 
+I'd strongly suggest you make your binutils compatible with newer 
+instruction syntax instead of making the kernel more complex.  This is 
+more in line with being future proof rather than stuck into the past.
 
- drivers/tty/hvc/hvc_dcc.c | 21 +++++++++++++++++++++
- 1 file changed, 21 insertions(+)
+It could be as simple as making gas accept an extra argument for 
+instructions like dsb and just ignoring it.
 
-diff --git a/drivers/tty/hvc/hvc_dcc.c b/drivers/tty/hvc/hvc_dcc.c
-index 44fbeba..3502a7b 100644
---- a/drivers/tty/hvc/hvc_dcc.c
-+++ b/drivers/tty/hvc/hvc_dcc.c
-@@ -86,6 +86,21 @@ static int hvc_dcc_get_chars(uint32_t vt, char *buf, int count)
- 	return i;
- }
- 
-+static bool hvc_dcc_check(void)
-+{
-+	unsigned long time = jiffies + (HZ / 10);
-+
-+	/* Write a test character to check if it is handled */
-+	__dcc_putchar('\n');
-+
-+	while (time_is_after_jiffies(time)) {
-+		if (!(__dcc_getstatus() & DCC_STATUS_TX))
-+			return true;
-+	}
-+
-+	return false;
-+}
-+
- static const struct hv_ops hvc_dcc_get_put_ops = {
- 	.get_chars = hvc_dcc_get_chars,
- 	.put_chars = hvc_dcc_put_chars,
-@@ -93,6 +108,9 @@ static const struct hv_ops hvc_dcc_get_put_ops = {
- 
- static int __init hvc_dcc_console_init(void)
- {
-+	if (!hvc_dcc_check())
-+		return -ENODEV;
-+
- 	hvc_instantiate(0, 0, &hvc_dcc_get_put_ops);
- 	return 0;
- }
-@@ -100,6 +118,9 @@ console_initcall(hvc_dcc_console_init);
- 
- static int __init hvc_dcc_init(void)
- {
-+	if (!hvc_dcc_check())
-+		return -ENODEV;
-+
- 	hvc_alloc(0, 0, &hvc_dcc_get_put_ops, 128);
- 	return 0;
- }
--- 
-1.8.1.2
+
+Nicolas
