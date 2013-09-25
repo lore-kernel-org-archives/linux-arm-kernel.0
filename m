@@ -1,54 +1,26 @@
-From: liuj97@gmail.com (Jiang Liu)
-Date: Wed, 25 Sep 2013 23:50:40 +0800
-Subject: [PATCH v1 1/7] arm64: introduce basic aarch64 instruction decoding
- helpers
-In-Reply-To: <5242DE0F.1080601@codeaurora.org>
-References: <1380105868-31985-1-git-send-email-liuj97@gmail.com>
- <1380105868-31985-2-git-send-email-liuj97@gmail.com>
- <5242DE0F.1080601@codeaurora.org>
-Message-ID: <52430650.90300@gmail.com>
+From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
+Date: Wed, 25 Sep 2013 16:52:44 +0100
+Subject: new binutils needed for arm in 3.12-rc1
+In-Reply-To: <1380122586.1974.84@driftwood> (Rob Landley's message of "Wed, 25
+ Sep 2013 10:23:06 -0500")
+References: <1380122586.1974.84@driftwood>
+Message-ID: <yw1x7ge4x5ir.fsf@unicorn.mansr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/25/2013 08:58 PM, Christopher Covington wrote:
-> Hi Jiang,
-> 
-> On 09/25/2013 06:44 AM, Jiang Liu wrote:
-> 
-> [...]
-> 
->> diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
-> 
-> [...]
-> 
->> +static int aarch64_insn_cls[] = {
->> +	AARCH64_INSN_CLS_UNKNOWN,	/* 0 0 X X */
->> +	AARCH64_INSN_CLS_UNKNOWN,	/* 0 0 X X */
->> +	AARCH64_INSN_CLS_UNKNOWN,	/* 0 0 X X */
->> +	AARCH64_INSN_CLS_UNKNOWN,	/* 0 0 X X */
->> +	AARCH64_INSN_CLS_LDST,		/* X 1 X 0 */
->> +	AARCH64_INSN_CLS_DP_REG,	/* X 1 0 1 */
->> +	AARCH64_INSN_CLS_LDST,		/* X 1 X 0 */
->> +	AARCH64_INSN_CLS_DP_FPSIMD,	/* 0 1 1 1 */
->> +	AARCH64_INSN_CLS_DP_IMM,	/* 1 0 0 X */
->> +	AARCH64_INSN_CLS_DP_IMM,	/* 1 0 0 X */
->> +	AARCH64_INSN_CLS_BR_SYS,	/* 1 0 1 X */
->> +	AARCH64_INSN_CLS_BR_SYS,	/* 1 0 1 X */
->> +	AARCH64_INSN_CLS_LDST,		/* X 1 X 0 */
->> +	AARCH64_INSN_CLS_DP_REG,	/* X 1 0 1 */
->> +	AARCH64_INSN_CLS_LDST,		/* X 1 X 0 */
->> +	AARCH64_INSN_CLS_DP_FPSIMD,	/* 1 1 1 1 */
->> +};
-> 
-> As I read this, I was initially puzzled as to why there are duplicate entries
-> in the list. Since the data structure doesn't really support don't-cares,
-> perhaps it would be clearer to use 1's and 0's instead of X's.
-Thanks for review, Chris!
-I will try to improve the comments in next version.
+Rob Landley <rob@landley.net> writes:
 
-> 
-> [...]
-> 
-> Thanks,
-> Christopher
-> 
+> On 09/24/2013 09:07:57 PM, Nicolas Pitre wrote:
+>> I'd strongly suggest you make your binutils compatible with newer
+>> instruction syntax instead of making the kernel more complex.
+>
+> Meaning I play whack-a-mole as this becomes permission to depend on  
+> endless new gnuisms just because they're there and nobody else is  
+> regression testing against them, not because they actually add anything.
+
+Since when is assembling the instructions correctly, as specified in the
+arch ref, and not in some other random way a gnuism?
+
+-- 
+M?ns Rullg?rd
+mans at mansr.com
