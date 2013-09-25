@@ -1,60 +1,61 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 25 Sep 2013 17:43:56 +0100
-Subject: [PATCH 2/7] iommu/arm-smmu: Calculate SMMU_CB_BASE from smmu
- register values
-In-Reply-To: <20130924180720.GV4845@alberich>
+Date: Wed, 25 Sep 2013 17:49:18 +0100
+Subject: [PATCH 7/7] iommu/arm-smmu: Clear global and context bank fault
+ status and syndrome registers
+In-Reply-To: <20130924183247.GW4845@alberich>
 References: <1380035221-11576-1-git-send-email-andreas.herrmann@calxeda.com>
- <1380035221-11576-3-git-send-email-andreas.herrmann@calxeda.com>
- <20130924153457.GC20774@mudshark.cambridge.arm.com>
- <20130924180720.GV4845@alberich>
-Message-ID: <20130925164356.GF14502@mudshark.cambridge.arm.com>
+ <1380035221-11576-8-git-send-email-andreas.herrmann@calxeda.com>
+ <20130924154252.GG20774@mudshark.cambridge.arm.com>
+ <20130924183247.GW4845@alberich>
+Message-ID: <20130925164917.GG14502@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 24, 2013 at 07:07:20PM +0100, Andreas Herrmann wrote:
-> On Tue, Sep 24, 2013 at 11:34:57AM -0400, Will Deacon wrote:
-> > On Tue, Sep 24, 2013 at 04:06:56PM +0100, Andreas Herrmann wrote:
-> > > Currently it is derived from smmu resource size. If the resource size
-> > > is wrongly specified (e.g. too large) this leads to a miscalculation
-> > > and can cause undefined behaviour when context bank registers are
-> > > modified.
-
-[...]
-
-> > Hmm, this is a tricky one. We know that we have an inconsistency (i.e. the
-> > DT and the hardware don't agree on the size of the device) but we warn and
-> > attempt to continue with the value from the DT. I don't think that trusting
-> > the hardware is the right thing to do in this case, since it's not possible
-> > to change so we should let the DT act as an override.
+On Tue, Sep 24, 2013 at 07:32:47PM +0100, Andreas Herrmann wrote:
+> On Tue, Sep 24, 2013 at 11:42:52AM -0400, Will Deacon wrote:
+> > On Tue, Sep 24, 2013 at 04:07:01PM +0100, Andreas Herrmann wrote:
+> > > Signed-off-by: Andreas Herrmann <andreas.herrmann@calxeda.com>
+> > > ---
+> > >  drivers/iommu/arm-smmu.c |    9 +++++++++
+> > >  1 file changed, 9 insertions(+)
+> > > 
+> > > diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+> > > index 251564e..a499146 100644
+> > > --- a/drivers/iommu/arm-smmu.c
+> > > +++ b/drivers/iommu/arm-smmu.c
+> > > @@ -645,6 +645,10 @@ static void arm_smmu_init_context_bank(struct arm_smmu_domain *smmu_domain)
+> > >  	stage1 = root_cfg->cbar != CBAR_TYPE_S2_TRANS;
+> > >  	cb_base = ARM_SMMU_CB_BASE(smmu) + ARM_SMMU_CB(smmu, root_cfg->cbndx);
+> > >  
+> > > +	/* clear fsr */
+> > > +	writel_relaxed(0xffffffff, cb_base + ARM_SMMU_CB_FSR);
+> > > +	writel_relaxed(0, cb_base + ARM_SMMU_CB_FSYNR0);
+> > > +
+> > >  	/* CBAR */
+> > >  	reg = root_cfg->cbar;
+> > >  	if (smmu->version == 1)
+> > > @@ -1570,6 +1574,11 @@ static void arm_smmu_device_reset(struct arm_smmu_device *smmu)
+> > >  	int i = 0;
+> > >  	u32 scr0 = readl_relaxed(gr0_base + ARM_SMMU_GR0_sCR0);
+> > >  
+> > > +	/* clear global FSRs */
+> > > +	writel(0xffffffff, gr0_base + ARM_SMMU_GR0_sGFSR);
+> > > +	writel(0, gr0_base + ARM_SMMU_GR0_sGFSYNR0);
+> > > +	writel(0, gr0_base + ARM_SMMU_GR0_sGFSYNR1);
+> > 
+> > Why do you need this?
 > 
-> > In other words: if the device tree is wrong, go fix it.
-> 
-> Yes, I've found this issue with a wrong DT. With the original code
-> there was some weirdness when setting certain context bank
-> registers. (Identifying the root cause was not straight forward.)
-> 
-> I think it's somehow odd not to trust the hardware values in the first
-> place and to add (right from the beginning) a quirk for potential
-> implementation bugs. Are there already implementations that use wrong
-> register values that are required to determine the partitioning of the
-> SMMU address space?
+> According to the spec the status and syndrome registers have
+> unknown/unpredictable reset values. So better set known values before
+> we start to use these registers (ie. handle faults where we read
+> them). No?
 
-I don't know of any, but you can bet that people will want to run old
-kernels on future hardware, so we should try and get this right from day
-one.
+Sure, but the only time these are made visible should be if we take a fault,
+in which case the registers should contain something meaningful. I guess I
+could see a problem if there is a shared interrupt line for faults though,
+so a cut-down version of your patch (just clearing ARM_SMMU_GR0_sGFSR and
+the ARM_SMMU_CB_FSR registers) should be enough.
 
-> If there is a mismatch it's hard to say which value is the correct
-> one. I think there are three options:
-> (1) just print a warning about the mismatch
-> (2) print a warning + override based on DT
-> (3) print a warning + override based on DT + have an option to switch
->     off the override
-> 
-> So, what's your choice?
-
-I had gone for (2), on the assumption that fixing a broken DT shouldn't be
-too hard as well as allowing people to work around broken hardware. Yes, it
-means we treat the DT as golden, but that's already the case in the absence
-of fully probable hardware.
+Cheers,
 
 Will
