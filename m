@@ -1,63 +1,45 @@
-From: andreas.herrmann@calxeda.com (Andreas Herrmann)
-Date: Wed, 25 Sep 2013 12:50:10 +0200
-Subject: [PATCH 4/7] iommu/arm-smmu: Check for num_context_irqs > 0 to
- avoid divide by zero exception
-In-Reply-To: <20130924154048.GE20774@mudshark.cambridge.arm.com>
-References: <1380035221-11576-1-git-send-email-andreas.herrmann@calxeda.com>
- <1380035221-11576-5-git-send-email-andreas.herrmann@calxeda.com>
- <20130924154048.GE20774@mudshark.cambridge.arm.com>
-Message-ID: <20130925105010.GA4845@alberich>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 25 Sep 2013 13:24:18 +0200
+Subject: [PATCH] ARM: mvebu: fix gated clock documentation
+Message-ID: <1380108258-14739-1-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 24, 2013 at 11:40:48AM -0400, Will Deacon wrote:
-> On Tue, Sep 24, 2013 at 04:06:58PM +0100, Andreas Herrmann wrote:
-> > With the right (or wrong;-) definition of v1 SMMU node in DTB it is
-> > possible to trigger a division by zero in arm_smmu_init_domain_context
-> > (if number of context irqs is 0):
-> > 
-> >        if (smmu->version == 1) {
-> >                root_cfg->irptndx = atomic_inc_return(&smmu->irptndx);
-> >  ?             root_cfg->irptndx %= smmu->num_context_irqs;
-> >        } else {
-> > 
-> > Avoid this by checking for num_context_irqs > 0 before trying to
-> > assign interrupts to contexts.
-> > 
-> > Signed-off-by: Andreas Herrmann <andreas.herrmann@calxeda.com>
-> > ---
-> >  drivers/iommu/arm-smmu.c |   31 +++++++++++++++++--------------
-> >  1 file changed, 17 insertions(+), 14 deletions(-)
-> > 
-> > diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-> > index f5a856e..0dfd255 100644
-> > --- a/drivers/iommu/arm-smmu.c
-> > +++ b/drivers/iommu/arm-smmu.c
-> > @@ -828,21 +828,24 @@ static int arm_smmu_init_domain_context(struct iommu_domain *domain,
-> >  		return ret;
-> >  
-> >  	root_cfg->cbndx = ret;
-> > -	if (smmu->version == 1) {
-> > -		root_cfg->irptndx = atomic_inc_return(&smmu->irptndx);
-> > -		root_cfg->irptndx %= smmu->num_context_irqs;
-> > -	} else {
-> > -		root_cfg->irptndx = root_cfg->cbndx;
-> > -	}
-> >  
-> > -	irq = smmu->irqs[smmu->num_global_irqs + root_cfg->irptndx];
-> > -	ret = request_irq(irq, arm_smmu_context_fault, IRQF_SHARED,
-> > -			  "arm-smmu-context-fault", domain);
-> > -	if (IS_ERR_VALUE(ret)) {
-> > -		dev_err(smmu->dev, "failed to request context IRQ %d (%u)\n",
-> > -			root_cfg->irptndx, irq);
-> > -		root_cfg->irptndx = -1;
-> > -		goto out_free_context;
-> > +	if (smmu->num_context_irqs) {
-> 
-> Can we move this check to probe time, to avoid re-evaluating it every time
-> we initialise a new domain?
+The gated clock documentation referred only to the Orion SoC whereas
+it also applied for the Armada 370/XP SoC. This commit updates the
+introduction text and also the list of the compatible strings.
 
-Yes, I'll move this check and issue an error message when there is not
-at least one context interrupt available.
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
-Andreas
+diff --git a/Documentation/devicetree/bindings/clock/mvebu-gated-clock.txt b/Documentation/devicetree/bindings/clock/mvebu-gated-clock.txt
+index cffc93d..fc2910f 100644
+--- a/Documentation/devicetree/bindings/clock/mvebu-gated-clock.txt
++++ b/Documentation/devicetree/bindings/clock/mvebu-gated-clock.txt
+@@ -1,10 +1,10 @@
+-* Gated Clock bindings for Marvell Orion SoCs
++* Gated Clock bindings for Marvell EBU SoCs
+ 
+-Marvell Dove and Kirkwood allow some peripheral clocks to be gated to save
+-some power. The clock consumer should specify the desired clock by having
+-the clock ID in its "clocks" phandle cell. The clock ID is directly mapped to
+-the corresponding clock gating control bit in HW to ease manual clock lookup
+-in datasheet.
++Marvell Armada 370/XP, Dove and Kirkwood allow some peripheral clocks to be
++gated to save some power. The clock consumer should specify the desired clock
++by having the clock ID in its "clocks" phandle cell. The clock ID is directly
++mapped to the corresponding clock gating control bit in HW to ease manual clock
++lookup in datasheet.
+ 
+ The following is a list of provided IDs for Armada 370:
+ ID	Clock	Peripheral
+@@ -94,6 +94,8 @@ ID	Clock	Peripheral
+ 
+ Required properties:
+ - compatible : shall be one of the following:
++	"marvell,armada-370-gating-clock" - for Armada 370 SoC clock gating
++	"marvell,armada-xp-gating-clock" - for Armada XP SoC clock gating
+ 	"marvell,dove-gating-clock" - for Dove SoC clock gating
+ 	"marvell,kirkwood-gating-clock" - for Kirkwood SoC clock gating
+ - reg : shall be the register address of the Clock Gating Control register
+-- 
+1.8.1.2
