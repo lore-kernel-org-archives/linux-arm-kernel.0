@@ -1,62 +1,209 @@
-From: agraf@suse.de (Alexander Graf)
-Date: Thu, 26 Sep 2013 00:26:50 +0200
-Subject: [PATCH v4 4/4] KVM: Add documentation for
- KVM_ARM_PREFERRED_TARGET ioctl
-In-Reply-To: <20130925161923.GB32311@cbox>
-References: <1380101163-20028-1-git-send-email-anup.patel@linaro.org>
- <1380101163-20028-5-git-send-email-anup.patel@linaro.org>
- <ECFE274D-FC43-43AD-8A9E-D3131E327F26@suse.de>
- <CAAhSdy1hZc3Cx51KLwEaDUo4fbiLLzdcBJYXrFgv5AxdWDzbMg@mail.gmail.com>
- <20130925161923.GB32311@cbox>
-Message-ID: <7FAC4D31-979B-49E0-9F93-61010F5DF66D@suse.de>
+From: rvaswani@codeaurora.org (Rohit Vaswani)
+Date: Wed, 25 Sep 2013 15:35:27 -0700
+Subject: [PATCHv4 2/3] ARM: msm: Add support for APQ8074 Dragonboard
+In-Reply-To: <4E7868D6-56CB-4AF8-8EBF-069966899C23@codeaurora.org>
+References: <1379992406-3541-1-git-send-email-rvaswani@codeaurora.org>
+ <1379992406-3541-2-git-send-email-rvaswani@codeaurora.org>
+ <4E7868D6-56CB-4AF8-8EBF-069966899C23@codeaurora.org>
+Message-ID: <5243652F.7090408@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 9/25/2013 12:49 PM, Kumar Gala wrote:
+> On Sep 23, 2013, at 10:13 PM, Rohit Vaswani wrote:
+>
+>> This patch adds basic board support for APQ8074 Dragonboard
+>> which belongs to the Snapdragon 800 family.
+>> For now, just support a basic machine with device tree.
+>>
+>> Signed-off-by: Rohit Vaswani <rvaswani@codeaurora.org>
+>> ---
+>> arch/arm/Kconfig.debug                         |  9 +++++++
+>> arch/arm/boot/dts/Makefile                     |  3 ++-
+>> arch/arm/boot/dts/qcom-apq8074-dragonboard.dts |  6 +++++
+>> arch/arm/boot/dts/qcom-msm8974.dtsi            | 35 ++++++++++++++++++++++++++
+>> arch/arm/include/debug/msm.S                   |  5 ++++
+>> arch/arm/mach-msm/Kconfig                      | 13 ++++++++++
+>> arch/arm/mach-msm/board-dt.c                   |  9 +++++++
+>> 7 files changed, 79 insertions(+), 1 deletion(-)
+>> create mode 100644 arch/arm/boot/dts/qcom-apq8074-dragonboard.dts
+>> create mode 100644 arch/arm/boot/dts/qcom-msm8974.dtsi
+>>
+>> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+>> index e18a6fc..959b2c7 100644
+>> --- a/arch/arm/Kconfig.debug
+>> +++ b/arch/arm/Kconfig.debug
+>> @@ -357,6 +357,15 @@ choice
+>> 		  Say Y here if you want the debug print routines to direct
+>> 		  their output to the serial port on MSM 8960 devices.
+>>
+>> +	config DEBUG_MSM8974_UART
+>> +		bool "Kernel low-level debugging messages via MSM 8974 UART"
+>> +		depends on ARCH_MSM8974
+>> +		select MSM_HAS_DEBUG_UART_HS
+>> +		select DEBUG_MSM_UART
+>> +		help
+>> +		  Say Y here if you want the debug print routines to direct
+>> +		  their output to the serial port on MSM 8974 devices.
+>> +
+> A little surprised you didn't pull this and the ARCH_MSM8974 into its own patch outside of this patch being board support.
 
-On 25.09.2013, at 18:19, Christoffer Dall wrote:
+Well, its good to have this as part of initial board setup for earlyprintk.
 
-> On Wed, Sep 25, 2013 at 05:58:07PM +0530, Anup Patel wrote:
->> On Wed, Sep 25, 2013 at 5:43 PM, Alexander Graf <agraf@suse.de> wrote:
->>> 
->>> On 25.09.2013, at 11:26, Anup Patel wrote:
->>> 
->>>> To implement CPU=Host we have added KVM_ARM_PREFERRED_TARGET
->>>> vm ioctl which provides information to user space required for
->>>> creating VCPU matching underlying Host.
->>>> 
->>>> This patch adds info related to this new KVM_ARM_PREFERRED_TARGET
->>>> vm ioctl in the KVM API documentation.
->>>> 
->>>> Signed-off-by: Anup Patel <anup.patel@linaro.org>
->>>> Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
->>>> ---
->>>> Documentation/virtual/kvm/api.txt |   27 +++++++++++++++++++++++----
->>>> 1 file changed, 23 insertions(+), 4 deletions(-)
->>>> 
->>>> diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
->>>> index 858aecf..f31e6e8 100644
->>>> --- a/Documentation/virtual/kvm/api.txt
->>>> +++ b/Documentation/virtual/kvm/api.txt
->>>> @@ -2303,8 +2303,28 @@ Possible features:
->>>>      - KVM_ARM_VCPU_EL1_32BIT: Starts the CPU in a 32bit mode.
->>>>        Depends on KVM_CAP_ARM_EL1_32BIT (arm64 only).
->>>> 
->>>> +4.83 KVM_ARM_PREFERRED_TARGET
->>> 
->>> Why 4.83 and not 4.86? It feels backwards to rename all these other sections.
->> 
->> I wanted to have KVM_ARM_xxxx IOCTLs located nearby hence
->> placed KVM_ARM_PREFERRED_TARGET after KVM_ARM_VCPU_INIT.
->> 
->> There is no point in keeping KVM_ARM_PREFERRED_TARGET
->> after KVM_PPC_RTAS_DEFINE_TOKEN and make
->> KVM_PPC_RTAS_DEFINE_TOKEN dangle in-between documentation
->> of various KVM_ARM_xxxx IOCTLs.
->> 
-> I checked the git log and this is not the first time this has happened,
-> so I think Anup's point here is valid.
+>
+>> 	config DEBUG_MVEBU_UART
+>> 		bool "Kernel low-level debugging messages via MVEBU UART (old bootloaders)"
+>> 		depends on ARCH_MVEBU
+>> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+>> index 000cf76..e71a3ec 100644
+>> --- a/arch/arm/boot/dts/Makefile
+>> +++ b/arch/arm/boot/dts/Makefile
+>> @@ -102,7 +102,8 @@ dtb-$(CONFIG_ARCH_KIRKWOOD) += kirkwood-cloudbox.dtb \
+>> 	kirkwood-openblocks_a6.dtb
+>> dtb-$(CONFIG_ARCH_MARCO) += marco-evb.dtb
+>> dtb-$(CONFIG_ARCH_MSM) += msm8660-surf.dtb \
+>> -	msm8960-cdp.dtb
+>> +	msm8960-cdp.dtb \
+>> +	qcom-apq8074-dragonboard.dtb
+>> dtb-$(CONFIG_ARCH_MVEBU) += armada-370-db.dtb \
+>> 	armada-370-mirabox.dtb \
+>> 	armada-370-netgear-rn102.dtb \
+>> diff --git a/arch/arm/boot/dts/qcom-apq8074-dragonboard.dts b/arch/arm/boot/dts/qcom-apq8074-dragonboard.dts
+>> new file mode 100644
+>> index 0000000..bb6f3c4
+>> --- /dev/null
+>> +++ b/arch/arm/boot/dts/qcom-apq8074-dragonboard.dts
+>> @@ -0,0 +1,6 @@
+>> +/include/ "qcom-msm8974.dtsi"
+>> +
+>> +/ {
+>> +	model = "Qualcomm APQ8074 Dragonboard";
+>> +	compatible = "qcom,apq8074-dragonboard", "qcom,apq8074";
+>> +};
+>> diff --git a/arch/arm/boot/dts/qcom-msm8974.dtsi b/arch/arm/boot/dts/qcom-msm8974.dtsi
+>> new file mode 100644
+>> index 0000000..f04b643
+>> --- /dev/null
+>> +++ b/arch/arm/boot/dts/qcom-msm8974.dtsi
+>> @@ -0,0 +1,35 @@
+>> +/dts-v1/;
+>> +
+>> +/include/ "skeleton.dtsi"
+>> +
+>> +/ {
+>> +	model = "Qualcomm MSM8974";
+>> +	compatible = "qcom,msm8974";
+>> +	interrupt-parent = <&intc>;
+>> +
+>> +	soc: soc { };
+> We should have a unit address here:
+>
+> 	  soc: soc at FOOBAR {
+>
+> also, split out the curly braces so any future patches do have to muck with that.
+>
+> 	};
+>
 
-Well, I think it makes sense to be consistent here. Maybe we should add a new section for arch specific ioctls so that we get our own number space? But regardless, all subarchs should try and follow the same scheme - regardless of what the scheme is :).
+Im not sure I understand the reasoning behind the unit address for soc ?
+>> +};
+>> +
+>> +&soc {
+>> +	#address-cells = <1>;
+>> +	#size-cells = <1>;
+>> +	ranges;
+>> +	compatible = "simple-bus";
+>> +
+>> +	intc: interrupt-controller at f9000000 {
+>> +		compatible = "qcom,msm-qgic2";
+>> +		interrupt-controller;
+>> +		#interrupt-cells = <3>;
+>> +		reg = <0xf9000000 0x1000>,
+>> +		      <0xf9002000 0x1000>;
+>> +	};
+>> +
+>> +	timer {
+>> +		compatible = "arm,armv7-timer";
+>> +		interrupts = <1 2 0xf08>,
+>> +			     <1 3 0xf08>,
+>> +			     <1 4 0xf08>,
+>> +			     <1 1 0xf08>;
+>> +		clock-frequency = <19200000>;
+>> +	};
+>> +};
+>> diff --git a/arch/arm/include/debug/msm.S b/arch/arm/include/debug/msm.S
+>> index 9166e1b..9d653d4 100644
+>> --- a/arch/arm/include/debug/msm.S
+>> +++ b/arch/arm/include/debug/msm.S
+>> @@ -46,6 +46,11 @@
+>> #define MSM_DEBUG_UART_PHYS	0x16440000
+>> #endif
+>>
+>> +#ifdef CONFIG_DEBUG_MSM8974_UART
+>> +#define MSM_DEBUG_UART_BASE	0xFA71E000
+>> +#define MSM_DEBUG_UART_PHYS	0xF991E000
+>> +#endif
+>> +
+>> 	.macro	addruart, rp, rv, tmp
+>> #ifdef MSM_DEBUG_UART_PHYS
+>> 	ldr	\rp, =MSM_DEBUG_UART_PHYS
+>> diff --git a/arch/arm/mach-msm/Kconfig b/arch/arm/mach-msm/Kconfig
+>> index 2586c28..086bcb9 100644
+>> --- a/arch/arm/mach-msm/Kconfig
+>> +++ b/arch/arm/mach-msm/Kconfig
+>> @@ -64,6 +64,19 @@ config ARCH_MSM_DT
+>> 	select SPARSE_IRQ
+>> 	select USE_OF
+>>
+>> +config ARCH_MSM8974
+>> +	bool "MSM8974"
+>> +	select ARM_GIC
+>> +	select CPU_V7
+>> +	select HAVE_ARM_ARCH_TIMER
+>> +	select HAVE_SMP
+>> +	select MSM_SCM if SMP
+>> +	select USE_OF
+>> +
+>> +config ARCH_MSM_DT
+>> +	def_bool y
+>> +	depends on (ARCH_MSM8X60 || ARCH_MSM8960 || ARCH_MSM8974)
+>> +
+>> config MSM_HAS_DEBUG_UART_HS
+>> 	bool
+>>
+>> diff --git a/arch/arm/mach-msm/board-dt.c b/arch/arm/mach-msm/board-dt.c
+>> index 266a280..5211e80 100644
+>> --- a/arch/arm/mach-msm/board-dt.c
+>> +++ b/arch/arm/mach-msm/board-dt.c
+>> @@ -26,7 +26,16 @@ static const char * const msm_dt_match[] __initconst = {
+>> 	NULL
+>> };
+>>
+>> +static const char * const apq8074_dt_match[] __initconst = {
+>> +	"qcom,apq8074-dragonboard",
+>> +	NULL
+>> +};
+>> +
+>> DT_MACHINE_START(MSM_DT, "Qualcomm MSM (Flattened Device Tree)")
+>> 	.smp = smp_ops(msm_smp_ops),
+>> 	.dt_compat = msm_dt_match,
+>> MACHINE_END
+>> +
+>> +DT_MACHINE_START(APQ_DT, "Qualcomm MSM (Flattened Device Tree)")
+>> +	.dt_compat = apq8074_dt_match,
+>> +MACHINE_END
+>> -- 
+>> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+>> hosted by The Linux Foundation
+>>
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
 
-Alex
+Thanks,
+Rohit Vaswani
+
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum, hosted by The Linux Foundation
