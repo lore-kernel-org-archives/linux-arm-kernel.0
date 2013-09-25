@@ -1,83 +1,31 @@
-From: t.stanislaws@samsung.com (Tomasz Stanislawski)
-Date: Wed, 25 Sep 2013 18:10:52 +0200
-Subject: [PATCH v5 4/4] media: s5p-tv: Fix mixer driver to work with CCF
-In-Reply-To: <52403799.7020103@samsung.com>
-References: <1379775649-6331-1-git-send-email-m.krawczuk@partner.samsung.com>
- <1379775649-6331-5-git-send-email-m.krawczuk@partner.samsung.com>
- <52403799.7020103@samsung.com>
-Message-ID: <52430B0C.9080702@samsung.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 25 Sep 2013 17:03:06 +0300
+Subject: [PATCH 1/5] clocksource: sun4i: Select CLKSRC_MMIO
+In-Reply-To: <1380117790-19390-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1380117790-19390-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1380117790-19390-2-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/23/2013 02:44 PM, Sylwester Nawrocki wrote:
-> On 21/09/13 17:00, Mateusz Krawczuk wrote:
->> Replace clk_enable by clock_enable_prepare and clk_disable with clk_disable_unprepare.
->> Clock prepare is required by Clock Common Framework, and old clock driver didn`t support it.
->> Without it Common Clock Framework prints a warning.
-> 
-> nit: Please wrap this text to not exceed 80 columns.
-> 
->> Signed-off-by: Mateusz Krawczuk <m.krawczuk@partner.samsung.com>
->> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
->> ---
->>  drivers/media/platform/s5p-tv/mixer_drv.c | 34 +++++++++++++++++++++++++------
->>  1 file changed, 28 insertions(+), 6 deletions(-)
->>
->> diff --git a/drivers/media/platform/s5p-tv/mixer_drv.c b/drivers/media/platform/s5p-tv/mixer_drv.c
->> index 8ce7c3e..7eea286 100644
->> --- a/drivers/media/platform/s5p-tv/mixer_drv.c
->> +++ b/drivers/media/platform/s5p-tv/mixer_drv.c
->> @@ -347,19 +347,41 @@ static int mxr_runtime_resume(struct device *dev)
->>  {
->>  	struct mxr_device *mdev = to_mdev(dev);
->>  	struct mxr_resources *res = &mdev->res;
->> +	int ret;
->>  
->>  	dev_dbg(mdev->dev, "resume - start\n");
->>  	mutex_lock(&mdev->mutex);
->>  	/* turn clocks on */
->> -	clk_enable(res->mixer);
->> -	clk_enable(res->vp);
->> -	clk_enable(res->sclk_mixer);
->> +	ret = clk_prepare_enable(res->mixer);
->> +	if (ret < 0) {
->> +		dev_err(mdev->dev, "clk_prepare_enable(mixer) failed\n");
->> +		goto fail;
->> +	}
->> +	ret = clk_prepare_enable(res->vp);
->> +	if (ret < 0) {
->> +		dev_err(mdev->dev, "clk_prepare_enable(vp) failed\n");
->> +		goto fail_mixer;
->> +	}
->> +	ret = clk_prepare_enable(res->sclk_mixer);
->> +	if (ret < 0) {
->> +		dev_err(mdev->dev, "clk_prepare_enable(sclk_mixer) failed\n");
->> +		goto fail_vp;
->> +	}
->>  	/* apply default configuration */
->>  	mxr_reg_reset(mdev);
->>  	dev_dbg(mdev->dev, "resume - finished\n");
->>  
->>  	mutex_unlock(&mdev->mutex);
->>  	return 0;
->> +
->> +fail_vp:
->> +	clk_disable_unprepare(res->vp);
->> +fail_mixer:
->> +	clk_disable_unprepare(res->mixer);
->> +fail:
-> 
-> How about only one error log here if any of the clk_prepare_enable() calls
-> fails ? I'm not sure if we need a separate log for each single clock.
-> 
+The Allwinner SoCs timer use the clocksource MMIO functions. We thus
+need to select them in Kconfig.
 
-I think it would nice to know which clock caused a failure.
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ drivers/clocksource/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
->> +	mutex_unlock(&mdev->mutex);
->> +	dev_err(mdev->dev, "resume failed\n");
->> +	return ret;
->>  }
-> 
-> Regards,
-> Sylwester
-> 
+diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+index 41c6946..cea50f0 100644
+--- a/drivers/clocksource/Kconfig
++++ b/drivers/clocksource/Kconfig
+@@ -33,6 +33,7 @@ config ORION_TIMER
+ 	bool
+ 
+ config SUN4I_TIMER
++	select CLKSRC_MMIO
+ 	bool
+ 
+ config VT8500_TIMER
+-- 
+1.8.4
