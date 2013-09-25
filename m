@@ -1,70 +1,55 @@
-From: balajitk@ti.com (Balaji T K)
-Date: Wed, 25 Sep 2013 21:47:14 +0530
-Subject: [PATCH 2/2] ARM: dts: dra7-evm: Add mmc2 node for eMMC support
-In-Reply-To: <52415E41.7050301@baylibre.com>
-References: <1377525218-7655-1-git-send-email-balajitk@ti.com>
- <1377525218-7655-3-git-send-email-balajitk@ti.com>
- <52415E41.7050301@baylibre.com>
-Message-ID: <52430C8A.6040404@ti.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Wed, 25 Sep 2013 09:19:23 -0700
+Subject: [PATCH v4 4/4] KVM: Add documentation for
+ KVM_ARM_PREFERRED_TARGET ioctl
+In-Reply-To: <CAAhSdy1hZc3Cx51KLwEaDUo4fbiLLzdcBJYXrFgv5AxdWDzbMg@mail.gmail.com>
+References: <1380101163-20028-1-git-send-email-anup.patel@linaro.org>
+ <1380101163-20028-5-git-send-email-anup.patel@linaro.org>
+ <ECFE274D-FC43-43AD-8A9E-D3131E327F26@suse.de>
+ <CAAhSdy1hZc3Cx51KLwEaDUo4fbiLLzdcBJYXrFgv5AxdWDzbMg@mail.gmail.com>
+Message-ID: <20130925161923.GB32311@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 24 September 2013 03:11 PM, Benoit Cousson wrote:
-> + Sekhar
->
-> Hi Balaji,
->
-> On 26/08/2013 15:53, Balaji T K wrote:
->> Add mmc2 dt node to dra7-evm board
->> and model eMMC vcc as fixed regulator.
->>
->> Signed-off-by: Balaji T K <balajitk@ti.com>
->> ---
->>   arch/arm/boot/dts/dra7-evm.dts |   14 ++++++++++++++
->>   1 files changed, 14 insertions(+), 0 deletions(-)
->>
->> diff --git a/arch/arm/boot/dts/dra7-evm.dts b/arch/arm/boot/dts/dra7-evm.dts
->> index a59bbd0..2062724 100644
->> --- a/arch/arm/boot/dts/dra7-evm.dts
->> +++ b/arch/arm/boot/dts/dra7-evm.dts
->> @@ -17,6 +17,13 @@
->>           device_type = "memory";
->>           reg = <0x80000000 0x60000000>; /* 1536 MB */
->>       };
->> +
->> +    mmc2_3v3: fixedregulator-mmc2 {
->> +        compatible = "regulator-fixed";
->> +        regulator-name = "mmc2_3v3";
->> +        regulator-min-microvolt = <3300000>;
->> +        regulator-max-microvolt = <3300000>;
->> +    };
->>   };
->>
->>   &dra7_pmx_core {
->> @@ -257,3 +264,10 @@
->>       vmmc-supply = <&ldo1_reg>;
->>       bus-width = <4>;
->>   };
->> +
->> +&mmc2 {
->> +    status = "okay";
->> +    vmmc-supply = <&mmc2_3v3>;
->> +    bus-width = <8>;
->> +    ti,non-removable;
->
-> Sekhar just posted a series to replace that with a non-TI attribute: non-removable.
->
-> I'm not sure if this got merged, but it might be good to use the standard attribute instead.
+On Wed, Sep 25, 2013 at 05:58:07PM +0530, Anup Patel wrote:
+> On Wed, Sep 25, 2013 at 5:43 PM, Alexander Graf <agraf@suse.de> wrote:
+> >
+> > On 25.09.2013, at 11:26, Anup Patel wrote:
+> >
+> >> To implement CPU=Host we have added KVM_ARM_PREFERRED_TARGET
+> >> vm ioctl which provides information to user space required for
+> >> creating VCPU matching underlying Host.
+> >>
+> >> This patch adds info related to this new KVM_ARM_PREFERRED_TARGET
+> >> vm ioctl in the KVM API documentation.
+> >>
+> >> Signed-off-by: Anup Patel <anup.patel@linaro.org>
+> >> Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
+> >> ---
+> >> Documentation/virtual/kvm/api.txt |   27 +++++++++++++++++++++++----
+> >> 1 file changed, 23 insertions(+), 4 deletions(-)
+> >>
+> >> diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
+> >> index 858aecf..f31e6e8 100644
+> >> --- a/Documentation/virtual/kvm/api.txt
+> >> +++ b/Documentation/virtual/kvm/api.txt
+> >> @@ -2303,8 +2303,28 @@ Possible features:
+> >>       - KVM_ARM_VCPU_EL1_32BIT: Starts the CPU in a 32bit mode.
+> >>         Depends on KVM_CAP_ARM_EL1_32BIT (arm64 only).
+> >>
+> >> +4.83 KVM_ARM_PREFERRED_TARGET
+> >
+> > Why 4.83 and not 4.86? It feels backwards to rename all these other sections.
+> 
+> I wanted to have KVM_ARM_xxxx IOCTLs located nearby hence
+> placed KVM_ARM_PREFERRED_TARGET after KVM_ARM_VCPU_INIT.
+> 
+> There is no point in keeping KVM_ARM_PREFERRED_TARGET
+> after KVM_PPC_RTAS_DEFINE_TOKEN and make
+> KVM_PPC_RTAS_DEFINE_TOKEN dangle in-between documentation
+> of various KVM_ARM_xxxx IOCTLs.
+> 
+I checked the git log and this is not the first time this has happened,
+so I think Anup's point here is valid.
 
-Hi Benoit,
-
-Those patches are not merged yet, standard attribute is good, but few cleanups are needed
-before ti,non-removable can be replaced by standard non-removable,
-no_regulator_off_init flag set under ti,non-removable is needed to detect eMMC
-during boot on OMAP4 devices to keep regulator ON during init. Given that eMMC on dra7-evm
-is powered by always ON regulator, ti,non-removable and standard attribute will behave same
-way. Let me know if you want to remove ti,non-removable attribute from this patch.
-
->
-> Regards,
-> Benoit
+-Christoffer
