@@ -1,41 +1,38 @@
-From: agraf@suse.de (Alexander Graf)
-Date: Wed, 25 Sep 2013 14:13:10 +0200
-Subject: [PATCH v4 4/4] KVM: Add documentation for
- KVM_ARM_PREFERRED_TARGET ioctl
-In-Reply-To: <1380101163-20028-5-git-send-email-anup.patel@linaro.org>
-References: <1380101163-20028-1-git-send-email-anup.patel@linaro.org>
- <1380101163-20028-5-git-send-email-anup.patel@linaro.org>
-Message-ID: <ECFE274D-FC43-43AD-8A9E-D3131E327F26@suse.de>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Wed, 25 Sep 2013 14:16:41 +0200
+Subject: [RFC PATCH 08/15] ata: ahci_platform: Manage SATA PHY
+In-Reply-To: <524039E0.2060205@cogentembedded.com>
+References: <1379595943-14622-1-git-send-email-rogerq@ti.com>
+ <20130922215107.GD27616@mtj.dyndns.org> <524039E0.2060205@cogentembedded.com>
+Message-ID: <2926093.ynDRy1bx5J@amdc1032>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-On 25.09.2013, at 11:26, Anup Patel wrote:
+Hi,
 
-> To implement CPU=Host we have added KVM_ARM_PREFERRED_TARGET
-> vm ioctl which provides information to user space required for
-> creating VCPU matching underlying Host.
+On Monday, September 23, 2013 04:53:52 PM Sergei Shtylyov wrote:
+> Hello.
 > 
-> This patch adds info related to this new KVM_ARM_PREFERRED_TARGET
-> vm ioctl in the KVM API documentation.
+> On 23-09-2013 1:51, Tejun Heo wrote:
 > 
-> Signed-off-by: Anup Patel <anup.patel@linaro.org>
-> Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
-> ---
-> Documentation/virtual/kvm/api.txt |   27 +++++++++++++++++++++++----
-> 1 file changed, 23 insertions(+), 4 deletions(-)
+> >>     Not sure why you asked -- I'm not using this driver, neither I'm
 > 
-> diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
-> index 858aecf..f31e6e8 100644
-> --- a/Documentation/virtual/kvm/api.txt
-> +++ b/Documentation/virtual/kvm/api.txt
-> @@ -2303,8 +2303,28 @@ Possible features:
-> 	- KVM_ARM_VCPU_EL1_32BIT: Starts the CPU in a 32bit mode.
-> 	  Depends on KVM_CAP_ARM_EL1_32BIT (arm64 only).
+> > Well, you have better grip of what's going on in the embedded world
+> > than me.  I'm mostly curious whether adding dependency on PHY is okay.
 > 
-> +4.83 KVM_ARM_PREFERRED_TARGET
+>     This driver already supports optional clock, the optional PHY support
+> seems analogous.
 
-Why 4.83 and not 4.86? It feels backwards to rename all these other sections.
+Right, this reminds me that PHY support should probably also be added to
+ahci_suspend() and ahci_resume().
 
+Also please note the generic PHY framework is not yet merged in Linus'
+tree so this patch should probably be merged only after the generic PHY
+framework is in.
 
-Alex
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
