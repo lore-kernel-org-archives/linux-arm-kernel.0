@@ -1,39 +1,73 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Wed, 25 Sep 2013 14:29:39 +0900
-Subject: [PATCH] ARM: shmobile: r8a7791 SMP support
-In-Reply-To: <20130912005007.24692.14749.sendpatchset@w520>
-References: <20130912005007.24692.14749.sendpatchset@w520>
-Message-ID: <20130925052938.GB1916@verge.net.au>
+Date: Wed, 25 Sep 2013 14:39:22 +0900
+Subject: [PATCH 00/10] pwm-backlight: Add GPIO and power supply support
+In-Reply-To: <20130924090023.GA13971@ulmo>
+References: <1379972467-11243-1-git-send-email-treding@nvidia.com>
+ <20130924081446.GA11981@verge.net.au> <20130924090023.GA13971@ulmo>
+Message-ID: <20130925053922.GE1916@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 12, 2013 at 09:50:07AM +0900, Magnus Damm wrote:
-> From: Magnus Damm <damm@opensource.se>
+On Tue, Sep 24, 2013 at 11:00:24AM +0200, Thierry Reding wrote:
+> On Tue, Sep 24, 2013 at 05:14:46PM +0900, Simon Horman wrote:
+> > [ Cc: Olof Johansson, Kevin Hilman and Arnd Bergman: arm-soc maintainers ]
+> > 
+> > On Mon, Sep 23, 2013 at 11:40:57PM +0200, Thierry Reding wrote:
+> > > This series adds the ability to specify a GPIO and a power supply to
+> > > enable a backlight.
+> > > 
+> > > Patch 1 refactors the power on and power off sequences into separate
+> > > functions in preparation for subsequent patches.
+> > > 
+> > > Patch 2 adds an optional GPIO to enable a backlight. This patch only
+> > > includes the field within the platform data so that it can be properly
+> > > setup before actually being put to use.
+> > > 
+> > > Patches 3 to 7 convert all users of the pwm-backlight driver to use the
+> > > new field. For most of them, this just initializes the field to -1,
+> > > marking the field as unused.
+> > >
+> > > Patch 8 uses the new field within the pwm-backlight driver and at the
+> > > same time allows it to be parsed from device tree.
+> > > 
+> > > Patch 9 implements support for an optional power supply. This relies on
+> > > the regulator core to return a dummy regulator when no supply has been
+> > > otherwise setup so the driver doesn't have to handle that specially nor
+> > > require all users to be updated.
+> > > 
+> > > Patch 10 adds a way to keep a backlight turned off at boot. This is
+> > > useful when hooking up a backlight with a subsystem such as DRM which
+> > > has more explicit semantics as to when a backlight should be turned on.
+> > > 
+> > > Due to the dependencies within the series, I propose to take all these
+> > > patches through the PWM tree, so I'll need acks from OMAP, PXA, Samsung,
+> > > shmobile and Unicore32 maintainers.
+> > 
+> > I received some feedback regarding shmobile conflicts when
+> > arm-soc was merged between v3.11 and v3.12-rc1. With this
+> > in mind I now have a strong preference for changes inside
+> > arch/arm/mach-shmobile/ to be taken through my renesas
+> > tree and thus more importantly through arm-soc if possible.
 > 
-> Add r8a7791 SMP support using the shared APMU code. This patch
-> also includes DTS modifications to enable the secondary CA15
-> CPU core to fully support the single cluster dual core r8a7791.
+> I understand. Unfortunately the nature of patche series such as this is
+> that they require the whole series to be applied atomically (or at least
+> in a very specific order). So the patch that uses the new enable_gpio
+> field can only be applied after all previous patches. The only
+> reasonable way to ensure that is to take all of the patches through one
+> tree. Furthermore this patch is tiny (it adds a single line) and touches
+> code that's unlikely to be modified by anyone else.
 > 
-> SMP boot and CPU Hotplug are known to be working.
-> 
-> Signed-off-by: Magnus Damm <damm@opensource.se>
-> ---
-> 
->  Written against renesas-devel-20130906, depends on
->  [PATCH v2 01/03] ARM: shmobile: Shared APMU SMP support code without DT
-> 
->  arch/arm/boot/dts/r8a7791.dtsi                |    7 ++
->  arch/arm/mach-shmobile/Makefile               |    1 
->  arch/arm/mach-shmobile/board-koelsch.c        |    1 
->  arch/arm/mach-shmobile/include/mach/r8a7791.h |    1 
->  arch/arm/mach-shmobile/setup-r8a7791.c        |    1 
->  arch/arm/mach-shmobile/smp-r8a7791.c          |   62 +++++++++++++++++++++++++
->  6 files changed, 73 insertions(+)
+> But if it makes you more comfortable, I could provide a stable branch
+> that contains this series for you to merge into the shmobile tree. That
+> should enable you to handle all conflict resolution prior to submitting
+> to arm-soc.
 
-Hi Magnus,
+After some further thought I have reasoned that:
 
-please split this into three patches.
+1. It is only a one line change on the shmobile side
+2. It is to a file that is not seeing much chainge and in
+   a block of code that is seeing even less change.
 
-1. An SoC patch: The *r8a7791.[ch] and Makefile changes
-2. A board patch: The board-koelsh.c change
-3. A dt patch: The .dtsi change
+And thus the chance of a conflict is small.
+
+With this in mind I will ack the shmobile patch.
