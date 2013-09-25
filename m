@@ -1,32 +1,41 @@
-From: chander.kashyap@linaro.org (Chander Kashyap)
-Date: Wed, 25 Sep 2013 14:34:24 +0530
-Subject: [PATCH] clk: samsung: fix cpll clock register offsets for exynos5420
- SoC
-Message-ID: <1380099864-32031-1-git-send-email-chander.kashyap@linaro.org>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Wed, 25 Sep 2013 11:48:29 +0300
+Subject: [PATCHv7 23/36] ARM: dts: DRA7: link in clock DT data
+In-Reply-To: <1380098922-30340-1-git-send-email-t-kristo@ti.com>
+References: <1380098922-30340-1-git-send-email-t-kristo@ti.com>
+Message-ID: <1380098922-30340-24-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fixes cpll control and lock register offset values for Exynos5420 SoC.
+Clock tree DT data is now included from base dra7.dtsi file.
 
-Signed-off-by: Chander Kashyap <chander.kashyap@linaro.org>
+Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- drivers/clk/samsung/clk-exynos5420.c |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/dra7.dtsi |   14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
-diff --git a/drivers/clk/samsung/clk-exynos5420.c b/drivers/clk/samsung/clk-exynos5420.c
-index 86dfc64..892aac0 100644
---- a/drivers/clk/samsung/clk-exynos5420.c
-+++ b/drivers/clk/samsung/clk-exynos5420.c
-@@ -730,8 +730,8 @@ struct samsung_gate_clock exynos5420_gate_clks[] __initdata = {
- struct __initdata samsung_pll_clock exynos5420_plls[nr_plls] = {
- 	[apll] = PLL(pll_2550, fout_apll, "fout_apll", "fin_pll", APLL_LOCK,
- 		APLL_CON0, NULL),
--	[cpll] = PLL(pll_2550, fout_mpll, "fout_mpll", "fin_pll", MPLL_LOCK,
--		MPLL_CON0, NULL),
-+	[cpll] = PLL(pll_2550, fout_cpll, "fout_cpll", "fin_pll", CPLL_LOCK,
-+		CPLL_CON0, NULL),
- 	[dpll] = PLL(pll_2550, fout_dpll, "fout_dpll", "fin_pll", DPLL_LOCK,
- 		DPLL_CON0, NULL),
- 	[epll] = PLL(pll_2650, fout_epll, "fout_epll", "fin_pll", EPLL_LOCK,
+diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
+index c01ef76..c98997b 100644
+--- a/arch/arm/boot/dts/dra7.dtsi
++++ b/arch/arm/boot/dts/dra7.dtsi
+@@ -572,4 +572,18 @@
+ 			status = "disabled";
+ 		};
+ 	};
++
++	clocks {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges;
++		/include/ "dra7xx-clocks.dtsi"
++	};
++
++	clockdomains {
++		coreaon_clkdm: coreaon_clkdm {
++			compatible = "ti,clockdomain";
++			clocks = <&dpll_usb_ck>;
++		};
++	};
+ };
 -- 
 1.7.9.5
