@@ -1,34 +1,24 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 25 Sep 2013 14:40:00 +0900
-Subject: [PATCH 06/10] ARM: shmobile: Initialize PWM backlight
- enable_gpio field
-In-Reply-To: <1379972467-11243-7-git-send-email-treding@nvidia.com>
-References: <1379972467-11243-1-git-send-email-treding@nvidia.com>
- <1379972467-11243-7-git-send-email-treding@nvidia.com>
-Message-ID: <20130925053957.GF1916@verge.net.au>
+From: slapdau@yahoo.com.au (Craig McGeachie)
+Date: Wed, 25 Sep 2013 18:00:53 +1200
+Subject: [PATCH] irq: bcm2835: Re-implement the hardware IRQ handler.
+In-Reply-To: <52410949.8070403@wwwdotorg.org>
+References: <1379751251-2799-1-git-send-email-slapdau@yahoo.com.au>
+ <1379755112-19446-1-git-send-email-slapdau@yahoo.com.au>
+ <52410949.8070403@wwwdotorg.org>
+Message-ID: <52427C15.6010204@yahoo.com.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 23, 2013 at 11:41:03PM +0200, Thierry Reding wrote:
-> The GPIO API defines 0 as being a valid GPIO number, so this field needs
-> to be initialized explicitly.
-> 
-> Signed-off-by: Thierry Reding <treding@nvidia.com>
-> ---
->  arch/arm/mach-shmobile/board-armadillo800eva.c | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/mach-shmobile/board-armadillo800eva.c b/arch/arm/mach-shmobile/board-armadillo800eva.c
-> index 7f8f607..6ccb854 100644
-> --- a/arch/arm/mach-shmobile/board-armadillo800eva.c
-> +++ b/arch/arm/mach-shmobile/board-armadillo800eva.c
-> @@ -423,6 +423,7 @@ static struct platform_pwm_backlight_data pwm_backlight_data = {
->  	.max_brightness = 255,
->  	.dft_brightness = 255,
->  	.pwm_period_ns = 33333, /* 30kHz */
-> +	.enable_gpio = -1,
->  };
->  
->  static struct platform_device pwm_backlight_device = {
+On 09/24/2013 03:38 PM, Stephen Warren wrote:
+>> +#define BAD_IRQ_NUM	-1
+>
+> That should be 0; Using -1 for invalid IRQ is deprecated.
 
-Acked-by: Simon Horman <horms+renesas@verge.net.au>
+Could you please point me to something that describes this? I can't find 
+anything that limits the internal representations used by the driver for 
+an interrupt controller.  That, and the design of 
+include/linux/irqdomain.h and kernel/irq/irqdomain.c implies that a 
+0-based hwirq numbering scheme is the natural order of things.
+
+Cheers,
+Craig.
