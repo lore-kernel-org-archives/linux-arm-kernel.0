@@ -1,34 +1,81 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Wed, 25 Sep 2013 11:48:41 +0300
-Subject: [PATCHv7 35/36] ARM: dts: AM43xx: link in clock DT data
+Date: Wed, 25 Sep 2013 11:48:39 +0300
+Subject: [PATCHv7 33/36] ARM: OMAP3: use DT clock init if DT data is available
 In-Reply-To: <1380098922-30340-1-git-send-email-t-kristo@ti.com>
 References: <1380098922-30340-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1380098922-30340-36-git-send-email-t-kristo@ti.com>
+Message-ID: <1380098922-30340-34-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Clock tree data is now included from base am4372.dtsi file.
+OMAP3 platforms support both DT and non-DT boot at the moment, make
+the clock init work according to the used setup.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- arch/arm/boot/dts/am4372.dtsi |    7 +++++++
- 1 file changed, 7 insertions(+)
+ arch/arm/mach-omap2/clock3xxx.h |    4 ++++
+ arch/arm/mach-omap2/io.c        |   13 ++++++++++++-
+ 2 files changed, 16 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/am4372.dtsi b/arch/arm/boot/dts/am4372.dtsi
-index 0fe393a..218c1bd 100644
---- a/arch/arm/boot/dts/am4372.dtsi
-+++ b/arch/arm/boot/dts/am4372.dtsi
-@@ -412,4 +412,11 @@
- 			status = "disabled";
- 		};
- 	};
-+
-+	clocks {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges;
-+		/include/ "am43xx-clocks.dtsi"
-+	};
- };
+diff --git a/arch/arm/mach-omap2/clock3xxx.h b/arch/arm/mach-omap2/clock3xxx.h
+index 78d9f56..a5e2308 100644
+--- a/arch/arm/mach-omap2/clock3xxx.h
++++ b/arch/arm/mach-omap2/clock3xxx.h
+@@ -9,6 +9,10 @@
+ #define __ARCH_ARM_MACH_OMAP2_CLOCK3XXX_H
+ 
+ int omap3xxx_clk_init(void);
++int omap3430_clk_init(void);
++int omap3630_clk_init(void);
++int ti81xx_clk_init(void);
++int am35xx_clk_init(void);
+ int omap3_core_dpll_m2_set_rate(struct clk_hw *clk, unsigned long rate,
+ 					unsigned long parent_rate);
+ 
+diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
+index 1f23182..315a148 100644
+--- a/arch/arm/mach-omap2/io.c
++++ b/arch/arm/mach-omap2/io.c
+@@ -488,21 +488,29 @@ void __init omap3_init_early(void)
+ void __init omap3430_init_early(void)
+ {
+ 	omap3_init_early();
++	if (of_have_populated_dt())
++		omap_clk_init = omap3430_clk_init;
+ }
+ 
+ void __init omap35xx_init_early(void)
+ {
+ 	omap3_init_early();
++	if (of_have_populated_dt())
++		omap_clk_init = omap3430_clk_init;
+ }
+ 
+ void __init omap3630_init_early(void)
+ {
+ 	omap3_init_early();
++	if (of_have_populated_dt())
++		omap_clk_init = omap3630_clk_init;
+ }
+ 
+ void __init am35xx_init_early(void)
+ {
+ 	omap3_init_early();
++	if (of_have_populated_dt())
++		omap_clk_init = am35xx_clk_init;
+ }
+ 
+ void __init ti81xx_init_early(void)
+@@ -520,7 +528,10 @@ void __init ti81xx_init_early(void)
+ 	omap3xxx_clockdomains_init();
+ 	omap3xxx_hwmod_init();
+ 	omap_hwmod_init_postsetup();
+-	omap_clk_init = omap3xxx_clk_init;
++	if (of_have_populated_dt())
++		omap_clk_init = ti81xx_clk_init;
++	else
++		omap_clk_init = omap3xxx_clk_init;
+ }
+ 
+ void __init omap3_init_late(void)
 -- 
 1.7.9.5
