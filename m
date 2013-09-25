@@ -1,48 +1,63 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Wed, 25 Sep 2013 11:48:23 +0300
-Subject: [PATCHv7 17/36] ARM: dts: clk: Add apll related clocks
+Date: Wed, 25 Sep 2013 11:48:25 +0300
+Subject: [PATCHv7 19/36] ARM: dts: DRA7: Add PCIe related clock nodes
 In-Reply-To: <1380098922-30340-1-git-send-email-t-kristo@ti.com>
 References: <1380098922-30340-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1380098922-30340-18-git-send-email-t-kristo@ti.com>
+Message-ID: <1380098922-30340-20-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Keerthy <j-keerthy@ti.com>
 
-The patch adds a mux node to choose the parent of apll_pcie_ck node.
+This patch adds optfclk_pciephy_clk and optfclk_pciephy_div_clk
+which are used by PCIe phy. It also adds a mux clock to choose
+the source of optfclk_pciephy_div_clk clock.
 
 Signed-off-by: Keerthy <j-keerthy@ti.com>
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- arch/arm/boot/dts/dra7xx-clocks.dtsi |   14 +++++++++++---
- 1 file changed, 11 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/dra7xx-clocks.dtsi |   27 ++++++++++++++++++++++++++-
+ 1 file changed, 26 insertions(+), 1 deletion(-)
 
 diff --git a/arch/arm/boot/dts/dra7xx-clocks.dtsi b/arch/arm/boot/dts/dra7xx-clocks.dtsi
-index 0d83f95..c830e15 100644
+index 75d5e1b..d83afd3 100644
 --- a/arch/arm/boot/dts/dra7xx-clocks.dtsi
 +++ b/arch/arm/boot/dts/dra7xx-clocks.dtsi
-@@ -315,11 +315,19 @@ dpll_pcie_ref_m2ldo_ck: dpll_pcie_ref_m2ldo_ck at 4a008210 {
- 	ti,autoidle-low;
+@@ -1973,8 +1973,33 @@ vip3_gclk_mux: vip3_gclk_mux at 4a009030 {
+ 	reg = <0x4a009030 0x4>;
  };
  
-+apll_pcie_in_clk_mux: apll_pcie_in_clk_mux at 4ae06118 {
-+	compatible = "ti,mux-clock";
-+	clocks = <&dpll_pcie_ref_ck>, <&pciesref_acs_clk_ck>;
++optfclk_pciephy_div: optfclk_pciephy_div at 4a00821c {
++	compatible = "ti,divider-clock";
++	clocks = <&apll_pcie_ck>;
 +	#clock-cells = <0>;
 +	reg = <0x4a00821c 0x4>;
-+	ti,bit-shift = <7>;
++	ti,bit-shift = <8>;
++	ti,max-div = <2>;
 +};
 +
- apll_pcie_ck: apll_pcie_ck at 4a008200 {
++optfclk_pciephy_clk: optfclk_pciephy_clk at 4a0093b0 {
++	compatible = "ti,gate-clock";
++	clocks = <&apll_pcie_ck>;
++	#clock-cells = <0>;
++	reg = <0x4a0093b0 0x4>;
++	ti,bit-shift = <9>;
++};
++
++optfclk_pciephy_div_clk: optfclk_pciephy_div_clk at 4a0093b0 {
++	compatible = "ti,gate-clock";
++	clocks = <&optfclk_pciephy_div>;
++	#clock-cells = <0>;
++	reg = <0x4a0093b0 0x4>;
++	ti,bit-shift = <10>;
++};
++
+ dummy_ck: dummy_ck {
  	#clock-cells = <0>;
--	compatible = "ti,omap4-dpll-clock";
--	clocks = <&dpll_pcie_ref_ck>, <&dpll_pcie_ref_ck>;
--	reg = <0x4a008200 0x4>, <0x4a008204 0x4>, <0x4a008208 0x4>, <0x4a00820c 0x4>;
-+	compatible = "ti,dra7-apll-clock";
-+	clocks = <&apll_pcie_in_clk_mux>, <&dpll_pcie_ref_ck>;
-+	reg = <0x4a00821c 0x4>, <0x4a008220 0x4>;
- };
- 
- apll_pcie_clkvcoldo: apll_pcie_clkvcoldo {
+ 	compatible = "fixed-clock";
+ 	clock-frequency = <0>;
+-};
+\ No newline at end of file
++};
 -- 
 1.7.9.5
