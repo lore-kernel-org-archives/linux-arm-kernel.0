@@ -1,138 +1,73 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 25 Sep 2013 16:30:21 +0800
-Subject: [PATCH 3/5] ARM: imx: add a common function to initialize revision
- from anatop
+Date: Wed, 25 Sep 2013 16:30:22 +0800
+Subject: [PATCH 4/5] ARM: imx: use imx_init_revision_from_anatop() on imx6sl
 In-Reply-To: <1380097823-29027-1-git-send-email-shawn.guo@linaro.org>
 References: <1380097823-29027-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1380097823-29027-4-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1380097823-29027-5-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch creates a common function imx_init_revision_from_anatop() by
-merging imx6q_init_revision() and imx_anatop_get_digprog(), so that any
-SoC that encodes revision info in anatop can use it to initialize
-revision.
+Add imx6sl support into imx_init_revision_from_anatop(), so that it can
+be used to initialize cpu type and revision on imx6sl.
 
 Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 ---
- arch/arm/mach-imx/anatop.c     |   27 +++++++++++++++++++++------
- arch/arm/mach-imx/common.h     |    2 +-
- arch/arm/mach-imx/mach-imx6q.c |   25 +------------------------
- 3 files changed, 23 insertions(+), 31 deletions(-)
+ arch/arm/boot/dts/imx6sl.dtsi   |    4 +++-
+ arch/arm/mach-imx/anatop.c      |    6 +++++-
+ arch/arm/mach-imx/mach-imx6sl.c |    1 +
+ 3 files changed, 9 insertions(+), 2 deletions(-)
 
+diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
+index f295290..17607b3 100644
+--- a/arch/arm/boot/dts/imx6sl.dtsi
++++ b/arch/arm/boot/dts/imx6sl.dtsi
+@@ -384,7 +384,9 @@
+ 			};
+ 
+ 			anatop: anatop at 020c8000 {
+-				compatible = "fsl,imx6sl-anatop", "syscon", "simple-bus";
++				compatible = "fsl,imx6sl-anatop",
++					     "fsl,imx6q-anatop",
++					     "syscon", "simple-bus";
+ 				reg = <0x020c8000 0x1000>;
+ 				interrupts = <0 49 0x04 0 54 0x04 0 127 0x04>;
+ 
 diff --git a/arch/arm/mach-imx/anatop.c b/arch/arm/mach-imx/anatop.c
-index ad3b755..b2d600f 100644
+index b2d600f..4a40bbb 100644
 --- a/arch/arm/mach-imx/anatop.c
 +++ b/arch/arm/mach-imx/anatop.c
-@@ -16,6 +16,7 @@
- #include <linux/mfd/syscon.h>
- #include <linux/regmap.h>
- #include "common.h"
-+#include "hardware.h"
+@@ -27,6 +27,7 @@
+ #define ANADIG_USB1_CHRG_DETECT	0x1b0
+ #define ANADIG_USB2_CHRG_DETECT	0x210
+ #define ANADIG_DIGPROG		0x260
++#define ANADIG_DIGPROG_IMX6SL	0x280
  
- #define REG_SET		0x4
- #define REG_CLR		0x8
-@@ -76,21 +77,35 @@ static void imx_anatop_usb_chrg_detect_disable(void)
- 		BM_ANADIG_USB_CHRG_DETECT_CHK_CHRG_B);
- }
- 
--u32 imx_anatop_get_digprog(void)
-+void __init imx_init_revision_from_anatop(void)
- {
- 	struct device_node *np;
+ #define BM_ANADIG_REG_2P5_ENABLE_WEAK_LINREG	0x40000
+ #define BM_ANADIG_REG_CORE_FET_ODRIVE		0x20000000
+@@ -83,11 +84,14 @@ void __init imx_init_revision_from_anatop(void)
  	void __iomem *anatop_base;
--	static u32 digprog;
--
--	if (digprog)
--		return digprog;
-+	unsigned int revision;
-+	u32 digprog;
+ 	unsigned int revision;
+ 	u32 digprog;
++	u16 offset = ANADIG_DIGPROG;
  
  	np = of_find_compatible_node(NULL, NULL, "fsl,imx6q-anatop");
  	anatop_base = of_iomap(np, 0);
  	WARN_ON(!anatop_base);
- 	digprog = readl_relaxed(anatop_base + ANADIG_DIGPROG);
-+	iounmap(anatop_base);
-+
-+	switch (digprog & 0xff) {
-+	case 0:
-+		revision = IMX_CHIP_REVISION_1_0;
-+		break;
-+	case 1:
-+		revision = IMX_CHIP_REVISION_1_1;
-+		break;
-+	case 2:
-+		revision = IMX_CHIP_REVISION_1_2;
-+		break;
-+	default:
-+		revision = IMX_CHIP_REVISION_UNKNOWN;
-+	}
+-	digprog = readl_relaxed(anatop_base + ANADIG_DIGPROG);
++	if (of_device_is_compatible(np, "fsl,imx6sl-anatop"))
++		offset = ANADIG_DIGPROG_IMX6SL;
++	digprog = readl_relaxed(anatop_base + offset);
+ 	iounmap(anatop_base);
  
--	return digprog;
-+	mxc_set_cpu_type(digprog >> 16 & 0xff);
-+	imx_set_soc_revision(revision);
- }
+ 	switch (digprog & 0xff) {
+diff --git a/arch/arm/mach-imx/mach-imx6sl.c b/arch/arm/mach-imx/mach-imx6sl.c
+index 892b629..b1aaa47 100644
+--- a/arch/arm/mach-imx/mach-imx6sl.c
++++ b/arch/arm/mach-imx/mach-imx6sl.c
+@@ -46,6 +46,7 @@ static void __init imx6sl_init_machine(void)
  
- void __init imx_anatop_init(void)
-diff --git a/arch/arm/mach-imx/common.h b/arch/arm/mach-imx/common.h
-index 64b2b9f..282af93 100644
---- a/arch/arm/mach-imx/common.h
-+++ b/arch/arm/mach-imx/common.h
-@@ -82,6 +82,7 @@ extern void imx_set_aips(void __iomem *);
- extern int mxc_device_init(void);
- void imx_set_soc_revision(unsigned int rev);
- unsigned int imx_get_soc_revision(void);
-+void imx_init_revision_from_anatop(void);
- 
- enum mxc_cpu_pwr_mode {
- 	WAIT_CLOCKED,		/* wfi only */
-@@ -138,7 +139,6 @@ extern void imx_gpc_restore_all(void);
- extern void imx_anatop_init(void);
- extern void imx_anatop_pre_suspend(void);
- extern void imx_anatop_post_resume(void);
--extern u32 imx_anatop_get_digprog(void);
- extern int imx6q_set_lpm(enum mxc_cpu_pwr_mode mode);
- extern void imx6q_set_chicken_bit(void);
- 
-diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
-index 2efdbce..ea01ac3 100644
---- a/arch/arm/mach-imx/mach-imx6q.c
-+++ b/arch/arm/mach-imx/mach-imx6q.c
-@@ -40,29 +40,6 @@
- #include "cpuidle.h"
- #include "hardware.h"
- 
--static void __init imx6q_init_revision(void)
--{
--	u32 rev = imx_anatop_get_digprog();
--	u32 chip_revision;
--
--	switch (rev & 0xff) {
--	case 0:
--		chip_revision = IMX_CHIP_REVISION_1_0;
--		break;
--	case 1:
--		chip_revision = IMX_CHIP_REVISION_1_1;
--		break;
--	case 2:
--		chip_revision = IMX_CHIP_REVISION_1_2;
--		break;
--	default:
--		chip_revision = IMX_CHIP_REVISION_UNKNOWN;
--	}
--
--	mxc_set_cpu_type(rev >> 16 & 0xff);
--	imx_set_soc_revision(chip_revision);
--}
--
- static void imx6q_restart(enum reboot_mode mode, const char *cmd)
+ static void __init imx6sl_init_irq(void)
  {
- 	struct device_node *np;
-@@ -276,7 +253,7 @@ static void __init imx6q_map_io(void)
- 
- static void __init imx6q_init_irq(void)
- {
--	imx6q_init_revision();
 +	imx_init_revision_from_anatop();
  	imx_init_l2cache();
  	imx_src_init();
