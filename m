@@ -1,76 +1,105 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 25 Sep 2013 16:30:22 +0800
-Subject: [PATCH 4/5] ARM: imx: use imx_init_revision_from_anatop() on imx6sl
+Date: Wed, 25 Sep 2013 16:30:20 +0800
+Subject: [PATCH 2/5] ARM: imx6q: use common soc revision helpers
 In-Reply-To: <1380097823-29027-1-git-send-email-shawn.guo@linaro.org>
 References: <1380097823-29027-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1380097823-29027-5-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1380097823-29027-3-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add imx6sl support into imx_init_revision_from_anatop(), so that it can
-be used to initialize cpu type and revision on imx6sl.
+It calls imx_set_soc_revision() to set up soc revision in
+imx6q_init_revision(), and replaces all the occurrences of
+imx6q_revision() with common helper imx_get_soc_revision().
 
 Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 ---
- arch/arm/boot/dts/imx6sl.dtsi   |    4 +++-
- arch/arm/mach-imx/anatop.c      |    6 +++++-
- arch/arm/mach-imx/mach-imx6sl.c |    1 +
- 3 files changed, 9 insertions(+), 2 deletions(-)
+ arch/arm/mach-imx/clk-imx6q.c  |    5 +++--
+ arch/arm/mach-imx/common.h     |    1 -
+ arch/arm/mach-imx/mach-imx6q.c |   13 ++++---------
+ 3 files changed, 7 insertions(+), 12 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
-index f295290..17607b3 100644
---- a/arch/arm/boot/dts/imx6sl.dtsi
-+++ b/arch/arm/boot/dts/imx6sl.dtsi
-@@ -384,7 +384,9 @@
- 			};
+diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
+index 913ad85..c681566 100644
+--- a/arch/arm/mach-imx/clk-imx6q.c
++++ b/arch/arm/mach-imx/clk-imx6q.c
+@@ -300,7 +300,7 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
+ 	WARN_ON(!base);
  
- 			anatop: anatop at 020c8000 {
--				compatible = "fsl,imx6sl-anatop", "syscon", "simple-bus";
-+				compatible = "fsl,imx6sl-anatop",
-+					     "fsl,imx6q-anatop",
-+					     "syscon", "simple-bus";
- 				reg = <0x020c8000 0x1000>;
- 				interrupts = <0 49 0x04 0 54 0x04 0 127 0x04>;
+ 	/* Audio/video PLL post dividers do not work on i.MX6q revision 1.0 */
+-	if (cpu_is_imx6q() && imx6q_revision() == IMX_CHIP_REVISION_1_0) {
++	if (cpu_is_imx6q() && imx_get_soc_revision() == IMX_CHIP_REVISION_1_0) {
+ 		post_div_table[1].div = 1;
+ 		post_div_table[2].div = 1;
+ 		video_div_table[1].div = 1;
+@@ -574,7 +574,8 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
+ 	clk_register_clkdev(clk[pll4_post_div], "pll4_post_div", NULL);
+ 	clk_register_clkdev(clk[pll4_audio], "pll4_audio", NULL);
  
-diff --git a/arch/arm/mach-imx/anatop.c b/arch/arm/mach-imx/anatop.c
-index b2d600f..4a40bbb 100644
---- a/arch/arm/mach-imx/anatop.c
-+++ b/arch/arm/mach-imx/anatop.c
-@@ -27,6 +27,7 @@
- #define ANADIG_USB1_CHRG_DETECT	0x1b0
- #define ANADIG_USB2_CHRG_DETECT	0x210
- #define ANADIG_DIGPROG		0x260
-+#define ANADIG_DIGPROG_IMX6SL	0x280
+-	if ((imx6q_revision() != IMX_CHIP_REVISION_1_0) || cpu_is_imx6dl()) {
++	if ((imx_get_soc_revision() != IMX_CHIP_REVISION_1_0) ||
++	    cpu_is_imx6dl()) {
+ 		clk_set_parent(clk[ldb_di0_sel], clk[pll5_video_div]);
+ 		clk_set_parent(clk[ldb_di1_sel], clk[pll5_video_div]);
+ 	}
+diff --git a/arch/arm/mach-imx/common.h b/arch/arm/mach-imx/common.h
+index d87fff1..64b2b9f 100644
+--- a/arch/arm/mach-imx/common.h
++++ b/arch/arm/mach-imx/common.h
+@@ -77,7 +77,6 @@ extern void mxc_restart(enum reboot_mode, const char *);
+ extern void mxc_arch_reset_init(void __iomem *);
+ extern void mxc_arch_reset_init_dt(void);
+ extern int mx53_revision(void);
+-extern int imx6q_revision(void);
+ extern int mx53_display_revision(void);
+ extern void imx_set_aips(void __iomem *);
+ extern int mxc_device_init(void);
+diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
+index 85a1b51..2efdbce 100644
+--- a/arch/arm/mach-imx/mach-imx6q.c
++++ b/arch/arm/mach-imx/mach-imx6q.c
+@@ -40,16 +40,10 @@
+ #include "cpuidle.h"
+ #include "hardware.h"
  
- #define BM_ANADIG_REG_2P5_ENABLE_WEAK_LINREG	0x40000
- #define BM_ANADIG_REG_CORE_FET_ODRIVE		0x20000000
-@@ -83,11 +84,14 @@ void __init imx_init_revision_from_anatop(void)
- 	void __iomem *anatop_base;
- 	unsigned int revision;
- 	u32 digprog;
-+	u16 offset = ANADIG_DIGPROG;
- 
- 	np = of_find_compatible_node(NULL, NULL, "fsl,imx6q-anatop");
- 	anatop_base = of_iomap(np, 0);
- 	WARN_ON(!anatop_base);
--	digprog = readl_relaxed(anatop_base + ANADIG_DIGPROG);
-+	if (of_device_is_compatible(np, "fsl,imx6sl-anatop"))
-+		offset = ANADIG_DIGPROG_IMX6SL;
-+	digprog = readl_relaxed(anatop_base + offset);
- 	iounmap(anatop_base);
- 
- 	switch (digprog & 0xff) {
-diff --git a/arch/arm/mach-imx/mach-imx6sl.c b/arch/arm/mach-imx/mach-imx6sl.c
-index 892b629..b1aaa47 100644
---- a/arch/arm/mach-imx/mach-imx6sl.c
-+++ b/arch/arm/mach-imx/mach-imx6sl.c
-@@ -46,6 +46,7 @@ static void __init imx6sl_init_machine(void)
- 
- static void __init imx6sl_init_irq(void)
+-static u32 chip_revision;
+-
+-int imx6q_revision(void)
+-{
+-	return chip_revision;
+-}
+-
+ static void __init imx6q_init_revision(void)
  {
-+	imx_init_revision_from_anatop();
- 	imx_init_l2cache();
- 	imx_src_init();
- 	imx_gpc_init();
+ 	u32 rev = imx_anatop_get_digprog();
++	u32 chip_revision;
+ 
+ 	switch (rev & 0xff) {
+ 	case 0:
+@@ -66,6 +60,7 @@ static void __init imx6q_init_revision(void)
+ 	}
+ 
+ 	mxc_set_cpu_type(rev >> 16 & 0xff);
++	imx_set_soc_revision(chip_revision);
+ }
+ 
+ static void imx6q_restart(enum reboot_mode mode, const char *cmd)
+@@ -264,7 +259,7 @@ static void __init imx6q_init_late(void)
+ 	 * WAIT mode is broken on TO 1.0 and 1.1, so there is no point
+ 	 * to run cpuidle on them.
+ 	 */
+-	if (imx6q_revision() > IMX_CHIP_REVISION_1_1)
++	if (imx_get_soc_revision() > IMX_CHIP_REVISION_1_1)
+ 		imx6q_cpuidle_init();
+ 
+ 	if (IS_ENABLED(CONFIG_ARM_IMX6Q_CPUFREQ)) {
+@@ -293,7 +288,7 @@ static void __init imx6q_timer_init(void)
+ 	of_clk_init(NULL);
+ 	clocksource_of_init();
+ 	imx_print_silicon_rev(cpu_is_imx6dl() ? "i.MX6DL" : "i.MX6Q",
+-			      imx6q_revision());
++			      imx_get_soc_revision());
+ }
+ 
+ static const char *imx6q_dt_compat[] __initdata = {
 -- 
 1.7.9.5
