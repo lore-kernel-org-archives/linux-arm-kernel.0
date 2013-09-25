@@ -1,28 +1,25 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Wed, 25 Sep 2013 12:13:01 +0200
-Subject: [PATCH] ARM: integrator: Make sure INTEGRATOR_AP depends on PCI
-In-Reply-To: <CACRpkdZVAG=0zvLbR4E+UEjHUaYOgqUxsfGoZybPtm1DwDAJ1Q@mail.gmail.com>
-References: <1376509818-22163-1-git-send-email-joro@8bytes.org>
- <20130814195701.GY23006@n2100.arm.linux.org.uk>
- <20130814200442.GA20372@8bytes.org>
- <CACRpkdZVAG=0zvLbR4E+UEjHUaYOgqUxsfGoZybPtm1DwDAJ1Q@mail.gmail.com>
-Message-ID: <20130925101301.GZ20372@8bytes.org>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Wed, 25 Sep 2013 11:28:56 +0100
+Subject: [PATCH] ARM: drop explicit selection of HAVE_CLK and CLKDEV_LOOKUP
+In-Reply-To: <1380044515-3173-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1380044515-3173-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <1380104936.7211.3.camel@hornet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 28, 2013 at 09:26:57AM +0200, Linus Walleij wrote:
-> Yes.
-> Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
+On Tue, 2013-09-24 at 18:41 +0100, Uwe Kleine-K?nig wrote:
+> CLKDEV_LOOKUP selects HAVE_CLK and COMMON_CLK selects CLKDEV_LOOKUP. So
+> all symbols that select at least two of these symbols can be simplified.
 > 
-> And can you please create and send a proper patch with this
-> content to arm at kernel.org and the mailing list on CC, with
-> a request for the ARM SoC maintainers to apply it directly
-> as a fix?
+> For imx, omap2 and ux500 some rearrangements were necessary before the
+> simplification.
 > 
-> You might as well add Cc: stable at vger.kernel.org as well.
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+>
+>  arch/arm/mach-vexpress/Kconfig |  2 --
 
-Okay, sorry, forgot about this one. But my compile-tests kindly reminded
-me and I sent the patch out again now :)
+Acked-by: Pawel Moll <pawel.moll@arm.com>
 
+Thanks!
 
-	Joerg
+Pawel
