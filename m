@@ -1,63 +1,43 @@
-From: andreas.herrmann@calxeda.com (Andreas Herrmann)
-Date: Wed, 25 Sep 2013 20:20:03 +0200
-Subject: [PATCH 7/7] iommu/arm-smmu: Clear global and context bank fault
- status and syndrome registers
-In-Reply-To: <20130925164917.GG14502@mudshark.cambridge.arm.com>
-References: <1380035221-11576-1-git-send-email-andreas.herrmann@calxeda.com>
- <1380035221-11576-8-git-send-email-andreas.herrmann@calxeda.com>
- <20130924154252.GG20774@mudshark.cambridge.arm.com>
- <20130924183247.GW4845@alberich>
- <20130925164917.GG14502@mudshark.cambridge.arm.com>
-Message-ID: <20130925182003.GD4845@alberich>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 25 Sep 2013 21:44:35 +0300
+Subject: [PATCH V3: Add Smp support for Allwinner A20. 1/3] Add smp
+ support for Allwinner A20(sunxi 7i).
+In-Reply-To: <CAK3cCBwLrnV7L9WzJ+1P_62PEjEEtgzVjFH8m6SZzWG1O+2vEw@mail.gmail.com>
+References: <1379852488-32147-1-git-send-email-cinifr@gmail.com>
+ <1379852488-32147-2-git-send-email-cinifr@gmail.com>
+ <20130923181707.GR2779@lukather>
+ <CAK3cCBwLrnV7L9WzJ+1P_62PEjEEtgzVjFH8m6SZzWG1O+2vEw@mail.gmail.com>
+Message-ID: <20130925184435.GH2954@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 25, 2013 at 12:49:18PM -0400, Will Deacon wrote:
-> On Tue, Sep 24, 2013 at 07:32:47PM +0100, Andreas Herrmann wrote:
-> > On Tue, Sep 24, 2013 at 11:42:52AM -0400, Will Deacon wrote:
-> > > On Tue, Sep 24, 2013 at 04:07:01PM +0100, Andreas Herrmann wrote:
-> > > > Signed-off-by: Andreas Herrmann <andreas.herrmann@calxeda.com>
-> > > > ---
-> > > >  drivers/iommu/arm-smmu.c |    9 +++++++++
-> > > >  1 file changed, 9 insertions(+)
-> > > > 
-> > > > diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-> > > > index 251564e..a499146 100644
-> > > > --- a/drivers/iommu/arm-smmu.c
-> > > > +++ b/drivers/iommu/arm-smmu.c
-> > > > @@ -645,6 +645,10 @@ static void arm_smmu_init_context_bank(struct arm_smmu_domain *smmu_domain)
-> > > >  	stage1 = root_cfg->cbar != CBAR_TYPE_S2_TRANS;
-> > > >  	cb_base = ARM_SMMU_CB_BASE(smmu) + ARM_SMMU_CB(smmu, root_cfg->cbndx);
-> > > >  
-> > > > +	/* clear fsr */
-> > > > +	writel_relaxed(0xffffffff, cb_base + ARM_SMMU_CB_FSR);
-> > > > +	writel_relaxed(0, cb_base + ARM_SMMU_CB_FSYNR0);
-> > > > +
-> > > >  	/* CBAR */
-> > > >  	reg = root_cfg->cbar;
-> > > >  	if (smmu->version == 1)
-> > > > @@ -1570,6 +1574,11 @@ static void arm_smmu_device_reset(struct arm_smmu_device *smmu)
-> > > >  	int i = 0;
-> > > >  	u32 scr0 = readl_relaxed(gr0_base + ARM_SMMU_GR0_sCR0);
-> > > >  
-> > > > +	/* clear global FSRs */
-> > > > +	writel(0xffffffff, gr0_base + ARM_SMMU_GR0_sGFSR);
-> > > > +	writel(0, gr0_base + ARM_SMMU_GR0_sGFSYNR0);
-> > > > +	writel(0, gr0_base + ARM_SMMU_GR0_sGFSYNR1);
-> > > 
-> > > Why do you need this?
-> > 
-> > According to the spec the status and syndrome registers have
-> > unknown/unpredictable reset values. So better set known values before
-> > we start to use these registers (ie. handle faults where we read
-> > them). No?
-> 
-> Sure, but the only time these are made visible should be if we take a fault,
-> in which case the registers should contain something meaningful. I guess I
-> could see a problem if there is a shared interrupt line for faults though,
-> so a cut-down version of your patch (just clearing ARM_SMMU_GR0_sGFSR and
-> the ARM_SMMU_CB_FSR registers) should be enough.
+Hi Fan,
 
-Agreed.
+On Wed, Sep 25, 2013 at 12:22:44AM +0800, cinifr wrote:
+> > You still haven't said why you don't want to use smp_init_cpus there.
+> I find that of_funcation liking of_find_matching_node and of_iomap can
+> not run well in smp_init_cpus. It cause kernel crash. So I have to use
+> early_initcall.
 
-Andreas
+Ah, right.
+
+Then, can't we use smp_prepare_cpus for this? it looks to be late enough
+so that we can use ioremap there.
+
+I don't want it to be an initcall. The code will be different on the
+A31, and we don't want it to be run on all the other machines whenever
+we boot a multiplatform kernel anyway.
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130925/27ff960d/attachment.sig>
