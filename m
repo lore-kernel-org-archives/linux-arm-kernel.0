@@ -1,74 +1,158 @@
 From: magnus.damm@gmail.com (Magnus Damm)
-Date: Thu, 26 Sep 2013 08:18:01 +0900
-Subject: [PATCH/RFC] ARM: shmobile: Add r8a7791 thermal sensor DT device
-Message-ID: <20130925231801.16487.26821.sendpatchset@w520>
+Date: Thu, 26 Sep 2013 08:21:58 +0900
+Subject: [PATCH] ARM: shmobile: Add r8a7791 Koelsch DT reference support
+Message-ID: <20130925232158.16508.13781.sendpatchset@w520>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Magnus Damm <damm@opensource.se>
 
-Hook up the single channel thermal sensor via DT
-on r8a7791. The information comes from the device
-data sheet.
+Add DT reference support for the r8a7791 Koelsch board.
 
-Unfortunately it seems that r8a7791 uses a different
-register offset compared to r8a7790, so passing
-the singel channel offset results in the following
-error:
+This board support file will be used together with common
+clocks in the future.
 
-rcar_thermal e61f0000.thermal: can't request region for resource [mem 0xe61f0000-0xe61f0037]                                                                    
-rcar_thermal: probe of e61f0000.thermal failed with error -16                   
-
-Before this can be merged the thermal driver may beed
-to be extended to support the different register layouts
-for the thermal sensor in r8a7779, r8a7790 and r8a7791.
-
-Not-Yet-Signed-off-by: Magnus Damm <damm@opensource.se>
+Signed-off-by: Magnus Damm <damm@opensource.se>
 ---
 
  Written against renesas-devel-20130925
 
- arch/arm/boot/dts/r8a7791.dtsi         |    7 +++++++
- arch/arm/mach-shmobile/clock-r8a7791.c |    3 +++
- 2 files changed, 10 insertions(+)
+ arch/arm/boot/dts/Makefile                       |    1 
+ arch/arm/boot/dts/r8a7791-koelsch-reference.dts  |   32 ++++++++++++++++
+ arch/arm/mach-shmobile/Kconfig                   |   11 +++++
+ arch/arm/mach-shmobile/Makefile                  |    1 
+ arch/arm/mach-shmobile/Makefile.boot             |    1 
+ arch/arm/mach-shmobile/board-koelsch-reference.c |   43 ++++++++++++++++++++++
+ 6 files changed, 89 insertions(+)
 
---- 0001/arch/arm/boot/dts/r8a7791.dtsi
-+++ work/arch/arm/boot/dts/r8a7791.dtsi	2013-09-26 07:34:01.000000000 +0900
-@@ -38,4 +38,11 @@
- 			<0 0xf1006000 0 0x2000>;
- 		interrupts = <1 9 0xf04>;
- 	};
+--- 0001/arch/arm/boot/dts/Makefile
++++ work/arch/arm/boot/dts/Makefile	2013-09-26 07:45:16.000000000 +0900
+@@ -203,6 +203,7 @@ dtb-$(CONFIG_ARCH_SHMOBILE) += emev2-kzm
+ 	r8a7779-marzen.dtb \
+ 	r8a7779-marzen-reference.dtb \
+ 	r8a7791-koelsch.dtb \
++	r8a7791-koelsch-reference.dtb \
+ 	r8a7790-lager.dtb \
+ 	r8a7790-lager-reference.dtb \
+ 	sh73a0-kzm9g.dtb \
+--- /dev/null
++++ work/arch/arm/boot/dts/r8a7791-koelsch-reference.dts	2013-09-26 07:40:52.000000000 +0900
+@@ -0,0 +1,32 @@
++/*
++ * Device Tree Source for the Koelsch board
++ *
++ * Copyright (C) 2013 Renesas Electronics Corporation
++ * Copyright (C) 2013 Renesas Solutions Corp.
++ *
++ * This file is licensed under the terms of the GNU General Public License
++ * version 2.  This program is licensed "as is" without any warranty of any
++ * kind, whether express or implied.
++ */
 +
-+	thermal at e61f0000 {
-+		compatible = "renesas,rcar-thermal";
-+		reg = <0 0xe61f0000 0 0x14>, <0 0xe61f0000 0 0x38>;
-+		interrupt-parent = <&gic>;
-+		interrupts = <0 69 4>;
++/dts-v1/;
++/include/ "r8a7791.dtsi"
++
++/ {
++	model = "Koelsch";
++	compatible = "renesas,koelsch-reference", "renesas,r8a7791";
++
++	chosen {
++		bootargs = "console=ttySC6,115200 ignore_loglevel rw root=/dev/nfs ip=dhcp";
 +	};
- };
---- 0001/arch/arm/mach-shmobile/clock-r8a7791.c
-+++ work/arch/arm/mach-shmobile/clock-r8a7791.c	2013-09-26 07:32:34.000000000 +0900
-@@ -122,6 +122,7 @@ static struct clk *main_clks[] = {
- enum {
- 	MSTP721, MSTP720,
- 	MSTP719, MSTP718, MSTP715, MSTP714,
-+	MSTP522,
- 	MSTP216, MSTP207, MSTP206,
- 	MSTP204, MSTP203, MSTP202, MSTP1105, MSTP1106, MSTP1107,
- 	MSTP124,
-@@ -135,6 +136,7 @@ static struct clk mstp_clks[MSTP_NR] = {
- 	[MSTP718] = SH_CLK_MSTP32(&p_clk, SMSTPCR7, 18, 0), /* SCIF3 */
- 	[MSTP715] = SH_CLK_MSTP32(&p_clk, SMSTPCR7, 15, 0), /* SCIF4 */
- 	[MSTP714] = SH_CLK_MSTP32(&p_clk, SMSTPCR7, 14, 0), /* SCIF5 */
-+	[MSTP522] = SH_CLK_MSTP32(&extal_clk, SMSTPCR5, 22, 0), /* Thermal */
- 	[MSTP216] = SH_CLK_MSTP32(&mp_clk, SMSTPCR2, 16, 0), /* SCIFB2 */
- 	[MSTP207] = SH_CLK_MSTP32(&mp_clk, SMSTPCR2, 7, 0), /* SCIFB1 */
- 	[MSTP206] = SH_CLK_MSTP32(&mp_clk, SMSTPCR2, 6, 0), /* SCIFB0 */
-@@ -179,6 +181,7 @@ static struct clk_lookup lookups[] = {
- 	CLKDEV_DEV_ID("sh-sci.12", &mstp_clks[MSTP1105]), /* SCIFA3 */
- 	CLKDEV_DEV_ID("sh-sci.13", &mstp_clks[MSTP1106]), /* SCIFA4 */
- 	CLKDEV_DEV_ID("sh-sci.14", &mstp_clks[MSTP1107]), /* SCIFA5 */
-+	CLKDEV_DEV_ID("e61f0000.thermal", &mstp_clks[MSTP522]),
- 	CLKDEV_DEV_ID("sh_cmt.0", &mstp_clks[MSTP124]),
- };
++
++	memory at 40000000 {
++		device_type = "memory";
++		reg = <0 0x40000000 0 0x80000000>;
++	};
++
++	lbsc {
++		#address-cells = <1>;
++		#size-cells = <1>;
++	};
++};
+--- 0001/arch/arm/mach-shmobile/Kconfig
++++ work/arch/arm/mach-shmobile/Kconfig	2013-09-26 07:38:59.000000000 +0900
+@@ -226,6 +226,17 @@ config MACH_KOELSCH
+ 	depends on ARCH_R8A7791
+ 	select USE_OF
  
++config MACH_KOELSCH_REFERENCE
++	bool "Koelsch board - Reference Device Tree Implementation"
++	depends on ARCH_R8A7791
++	select USE_OF
++	---help---
++	   Use reference implementation of Koelsch board support
++	   which makes use of device tree at the expense
++	   of not supporting a number of devices.
++
++	   This is intended to aid developers
++
+ config MACH_KZM9D
+ 	bool "KZM9D board"
+ 	depends on ARCH_EMEV2
+--- 0001/arch/arm/mach-shmobile/Makefile
++++ work/arch/arm/mach-shmobile/Makefile	2013-09-26 07:38:15.000000000 +0900
+@@ -64,6 +64,7 @@ obj-$(CONFIG_MACH_LAGER_REFERENCE)	+= bo
+ obj-$(CONFIG_MACH_ARMADILLO800EVA)	+= board-armadillo800eva.o
+ obj-$(CONFIG_MACH_ARMADILLO800EVA_REFERENCE)	+= board-armadillo800eva-reference.o
+ obj-$(CONFIG_MACH_KOELSCH)	+= board-koelsch.o
++obj-$(CONFIG_MACH_KOELSCH_REFERENCE)	+= board-koelsch-reference.o
+ obj-$(CONFIG_MACH_KZM9D)	+= board-kzm9d.o
+ obj-$(CONFIG_MACH_KZM9D_REFERENCE)	+= board-kzm9d-reference.o
+ obj-$(CONFIG_MACH_KZM9G)	+= board-kzm9g.o
+--- 0001/arch/arm/mach-shmobile/Makefile.boot
++++ work/arch/arm/mach-shmobile/Makefile.boot	2013-09-26 07:39:10.000000000 +0900
+@@ -7,6 +7,7 @@ loadaddr-$(CONFIG_MACH_ARMADILLO800EVA_R
+ loadaddr-$(CONFIG_MACH_BOCKW) += 0x60008000
+ loadaddr-$(CONFIG_MACH_BOCKW_REFERENCE) += 0x60008000
+ loadaddr-$(CONFIG_MACH_KOELSCH) += 0x40008000
++loadaddr-$(CONFIG_MACH_KOELSCH_REFERENCE) += 0x40008000
+ loadaddr-$(CONFIG_MACH_KZM9D) += 0x40008000
+ loadaddr-$(CONFIG_MACH_KZM9D_REFERENCE) += 0x40008000
+ loadaddr-$(CONFIG_MACH_KZM9G) += 0x41008000
+--- /dev/null
++++ work/arch/arm/mach-shmobile/board-koelsch-reference.c	2013-09-26 07:41:56.000000000 +0900
+@@ -0,0 +1,43 @@
++/*
++ * Koelsch board support - Reference DT implementation
++ *
++ * Copyright (C) 2013  Renesas Electronics Corporation
++ * Copyright (C) 2013  Renesas Solutions Corp.
++ * Copyright (C) 2013  Magnus Damm
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; version 2 of the License.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
++ */
++
++#include <linux/kernel.h>
++#include <linux/of_platform.h>
++#include <mach/r8a7791.h>
++#include <asm/mach/arch.h>
++
++static void __init koelsch_add_standard_devices(void)
++{
++	r8a7791_clock_init();
++	r8a7791_add_dt_devices();
++        of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
++}
++
++static const char * const koelsch_boards_compat_dt[] __initconst = {
++	"renesas,koelsch-reference",
++	NULL,
++};
++
++DT_MACHINE_START(KOELSCH_DT, "koelsch")
++	.init_early	= r8a7791_init_early,
++	.init_machine	= koelsch_add_standard_devices,
++	.dt_compat	= koelsch_boards_compat_dt,
++MACHINE_END
