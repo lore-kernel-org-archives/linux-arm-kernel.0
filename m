@@ -1,168 +1,292 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 25 Sep 2013 17:12:58 +0100
-Subject: [PATCH v2 1/2] Documentation: devicetree: arm: cpus/cpu nodes
- bindings updates
-In-Reply-To: <1379330464-27917-2-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1379330464-27917-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1379330464-27917-2-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <20130925161258.GG7601@e106331-lin.cambridge.arm.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 25 Sep 2013 17:03:07 +0300
+Subject: [PATCH 2/5] clocksource: Add Allwinner SoCs HS timers driver
+In-Reply-To: <1380117790-19390-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1380117790-19390-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1380117790-19390-3-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lorenzo,
+Most of the Allwinner SoCs (at this time, all but the A10) also have a
+High Speed timers that are not using the 24MHz oscillator as a source
+but rather the AHB clock running much faster.
 
-This looks good, but I have a couple comments.
+The IP is slightly different between the A10s/A13 and the one used in
+the A20/A31, since the latter have 4 timers available, while the former
+have only 2 of them.
 
-On Mon, Sep 16, 2013 at 12:21:03PM +0100, Lorenzo Pieralisi wrote:
-> In order to extend the current cpu nodes bindings to newer CPUs
-> inclusive of AArch64 and to update support for older ARM CPUs this
-> patch updates device tree documentation for the cpu nodes bindings.
-> 
-> Main changes:
->     - adds 64-bit bindings
->     - define usage of #address-cells
->     - defines behaviour on pre and post v7 uniprocessor systems
->     - adds ARM 11MPcore specific reg property definition
-> 
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ .../bindings/timer/allwinner,sun5i-a13-hstimer.txt |  22 +++
+ arch/arm/mach-sunxi/Kconfig                        |   1 +
+ drivers/clocksource/Kconfig                        |   4 +
+ drivers/clocksource/Makefile                       |   1 +
+ drivers/clocksource/timer-sun5i.c                  | 189 +++++++++++++++++++++
+ 5 files changed, 217 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/timer/allwinner,sun5i-a13-hstimer.txt
+ create mode 100644 drivers/clocksource/timer-sun5i.c
 
-[...]
-
-> +=====================================
-> +cpus and cpu node bindings definition
-> +=====================================
-> +
-> +The ARM architecture, in accordance with the ePAPR, requires the cpus and cpu
-> +nodes to be present and contain the properties described below.
-> +
-> +- cpus node
-> +
-> +	Description: Container of cpu nodes
-> +
-> +	The node name must be "cpus".
-> +
-> +	A cpus node must define the following properties:
-> +
-> +	- #address-cells
-> +		Usage: required
-> +		Value type: <u32>
-> +
-> +		Definition depends on ARM architecture version and
-> +		configuration:
-> +
-> +			# On uniprocessor ARM architectures previous to v7
-> +			  value must be 1, to enable a simple enumeration
-> +			  scheme for processors that do not have a HW CPU
-> +			  identification register.
-> +			# On 32-bit ARM 11 MPcore, ARM v7 or later systems
-> +			  value must be 1, that corresponds to CPUID/MPIDR
-> +			  registers sizes.
-> +			# On ARM v8 64-bit systems value must be set to 2,
-> +			  that corresponds to the MPIDR_EL1 register size.
-
-Under some situations (where mpidr_el1[63:32] == 0), #address-cells =
-<1> needs to be supported for 64-bit hardware, to maintain compatibility
-with kvmtool. Will had a commit specifically to allow this (72aea393a2:
-"arm64: smp: honour #address-size when parsing CPU reg property"), which
-mentions the kvmtool compatibility issue.
-
-I think we need to state that it _should_ be 2. If all the identifiying
-bits in the upper half of the register (currently Aff3) are zero, then 1
-cell is permitted, and the cell refers to mpidr_el1[31:0].
-
-It's possible that bits which are currently RES0 may become identifying
-bits in future, so for the moment we could state that we only allow one
-cell when all of mpidr_el1[63:32] is zero, and if mpidr_el1[40:42,23:0]
-becomes insufficient to uniquely identify a CPU we need to update the
-binding document.
-
-> +
-> +	- #size-cells
-> +		Usage: required
-> +		Value type: <u32>
-> +		Definition: must be set to 0
-> +
-> +- cpu node
-> +
-> +	Description: Describes a CPU in an ARM based system
-> +
-> +	PROPERTIES
-> +
-> +	- device_type
-> +		Usage: required
-> +		Value type: <string>
-> +		Definition: must be "cpu"
-> +	- reg
-> +		Usage and definition depend on ARM architecture version and
-> +		configuration:
-> +
-> +			# On uniprocessor ARM architectures previous to v7
-> +			  this property is required and must be set to 0.
-> +
-> +			# On ARM 11 MPcore based systems this property is
-> +			  required and matches the CPUID[11:0] register bits.
-> +
-> +			  Bits [11:0] in the reg cell must be set to
-> +			  bits [11:0] in CPU ID register.
-> +
-> +			  All other bits in the reg cell must be set to 0.
-> +
-> +			# On 32-bit ARM v7 or later systems this property is
-> +			  required and matches the CPU MPIDR[23:0] register
-> +			  bits.
-> +
-> +			  Bits [23:0] in the reg cell must be set to
-> +			  bits [23:0] in MPIDR.
-> +
-> +			  All other bits in the reg cell must be set to 0.
-
-These all look fine to me.
-
-> +
-> +			# On ARM v8 64-bit systems this property is required
-> +			  and matches the MPIDR_EL1 register affinity bits:
-> +
-> +			  The first reg cell bits [7:0] must be set to
-> +			  bits [39:32] of MPIDR_EL1.
-> +
-> +			  The second reg cell bits [23:0] must be set to
-> +			  bits [23:0] of MPIDR_EL1.
-> +
-> +			  All other bits in the reg cells must be set to 0.
-
-This probably needs to be reworded to cover the #address-cells = <1>
-case mentioned above.
-
-[...]
-
-> +	- enable-method
-> +		Value type: <stringlist>
-> +		Usage and definition depend on ARM architecture version.
-> +			# On ARM v8 64-bit this property is required and must
-> +			  be one of:
-> +			     "spin-table"
-> +			     "psci"
-> +			# On ARM 32-bit systems this property is optional.
-> +
-> +	- cpu-release-addr
-> +		Usage: required for systems that have an "enable-method"
-> +		       property value of "spin-table".
-> +		Value type: <prop-encoded-array>
-> +		Definition:
-> +			# On ARM v8 64-bit systems must be a two cell
-> +			  property identifying a 64-bit zero-initialised
-> +			  memory location.
-> +
-
-Later, we should probably split these into individual bindings docs to
-better describe platform requirements. We don't need to do that now.
-
-Otherwise this looks good. Thanks for all the hard work putting this
-together, sorry for the last-minute change request.
-
-With the #address-cells = <1> fixups:
-
-Acked-by: Mark Rutland <mark.rutland@arm.com>
-
-Thanks,
-Mark.
+diff --git a/Documentation/devicetree/bindings/timer/allwinner,sun5i-a13-hstimer.txt b/Documentation/devicetree/bindings/timer/allwinner,sun5i-a13-hstimer.txt
+new file mode 100644
+index 0000000..b1f81e9
+--- /dev/null
++++ b/Documentation/devicetree/bindings/timer/allwinner,sun5i-a13-hstimer.txt
+@@ -0,0 +1,22 @@
++Allwinner SoCs High Speed Timer Controller
++
++Required properties:
++
++- compatible :	should be "allwinner,sun5i-a13-hstimer" or
++		"allwinner,sun7i-a20-hstimer"
++- reg : Specifies base physical address and size of the registers.
++- interrupts :	The interrupts of these timers (2 for the sun5i IP, 4 for the sun7i
++		one)
++- clocks: phandle to the source clock (usually the AHB clock)
++
++Example:
++
++hstimer at 01c60000 {
++	compatible = "allwinner,sun7i-a20-hstimer";
++        reg = <0x01c60000 0x1000>;
++        interrupts = <0 51 1>,
++                     <0 52 1>,
++                     <0 53 1>,
++                     <0 54 1>;
++        clocks = <&ahb1_gates 19>;
++};
+diff --git a/arch/arm/mach-sunxi/Kconfig b/arch/arm/mach-sunxi/Kconfig
+index 3ab2f65..b78931d 100644
+--- a/arch/arm/mach-sunxi/Kconfig
++++ b/arch/arm/mach-sunxi/Kconfig
+@@ -9,6 +9,7 @@ config ARCH_SUNXI
+ 	select PINCTRL
+ 	select SPARSE_IRQ
+ 	select SUN4I_TIMER
++	select SUN5I_HSTIMER
+ 	select PINCTRL_SUNXI
+ 	select ARM_GIC
+ 	select HAVE_SMP
+diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+index cea50f0..4f53439 100644
+--- a/drivers/clocksource/Kconfig
++++ b/drivers/clocksource/Kconfig
+@@ -36,6 +36,10 @@ config SUN4I_TIMER
+ 	select CLKSRC_MMIO
+ 	bool
+ 
++config SUN5I_HSTIMER
++	select CLKSRC_MMIO
++	bool
++
+ config VT8500_TIMER
+ 	bool
+ 
+diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
+index 704d6d3..30488d6 100644
+--- a/drivers/clocksource/Makefile
++++ b/drivers/clocksource/Makefile
+@@ -22,6 +22,7 @@ obj-$(CONFIG_ARCH_MOXART)	+= moxart_timer.o
+ obj-$(CONFIG_ARCH_MXS)		+= mxs_timer.o
+ obj-$(CONFIG_ARCH_PRIMA2)	+= timer-prima2.o
+ obj-$(CONFIG_SUN4I_TIMER)	+= sun4i_timer.o
++obj-$(CONFIG_SUN5I_HSTIMER)	+= timer-sun5i.o
+ obj-$(CONFIG_ARCH_TEGRA)	+= tegra20_timer.o
+ obj-$(CONFIG_VT8500_TIMER)	+= vt8500_timer.o
+ obj-$(CONFIG_ARCH_NSPIRE)	+= zevio-timer.o
+diff --git a/drivers/clocksource/timer-sun5i.c b/drivers/clocksource/timer-sun5i.c
+new file mode 100644
+index 0000000..dc39a9d
+--- /dev/null
++++ b/drivers/clocksource/timer-sun5i.c
+@@ -0,0 +1,189 @@
++/*
++ * Allwinner SoCs hstimer driver.
++ *
++ * Copyright (C) 2013 Maxime Ripard
++ *
++ * Maxime Ripard <maxime.ripard@free-electrons.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2.  This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
++
++#include <linux/clk.h>
++#include <linux/clockchips.h>
++#include <linux/delay.h>
++#include <linux/interrupt.h>
++#include <linux/irq.h>
++#include <linux/irqreturn.h>
++#include <linux/sched_clock.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
++#include <linux/of_irq.h>
++
++#define TIMER_IRQ_EN_REG		0x00
++#define TIMER_IRQ_EN(val)			BIT(val)
++#define TIMER_IRQ_ST_REG		0x04
++#define TIMER_CTL_REG(val)		(0x20 * (val) + 0x10)
++#define TIMER_CTL_ENABLE			BIT(0)
++#define TIMER_CTL_RELOAD			BIT(1)
++#define TIMER_CTL_CLK_PRES(val)			(((val) & 0x7) << 4)
++#define TIMER_CTL_ONESHOT			BIT(7)
++#define TIMER_INTVAL_LO_REG(val)	(0x20 * (val) + 0x14)
++#define TIMER_INTVAL_HI_REG(val)	(0x20 * (val) + 0x18)
++#define TIMER_CNTVAL_LO_REG(val)	(0x20 * (val) + 0x1c)
++#define TIMER_CNTVAL_HI_REG(val)	(0x20 * (val) + 0x20)
++
++static void __iomem *timer_base;
++static u32 ticks_per_jiffy;
++
++/*
++ * When we disable a timer, we need to wait at least for 2 cycles of
++ * the timer source clock. We will use for that the clocksource timer
++ * that is already setup and runs@the same frequency than the other
++ * timers, and we never will be disabled.
++ */
++static void sun5i_clkevt_sync(void)
++{
++	u32 old = readl(timer_base + TIMER_CNTVAL_LO_REG(1));
++
++	while ((old - readl(timer_base + TIMER_CNTVAL_LO_REG(1))) < 3)
++		cpu_relax();
++}
++
++static void sun5i_clkevt_time_stop(u8 timer)
++{
++	u32 val = readl(timer_base + TIMER_CTL_REG(timer));
++	writel(val & ~TIMER_CTL_ENABLE, timer_base + TIMER_CTL_REG(timer));
++
++	sun5i_clkevt_sync();
++}
++
++static void sun5i_clkevt_time_setup(u8 timer, u32 delay)
++{
++	writel(delay, timer_base + TIMER_INTVAL_LO_REG(timer));
++}
++
++static void sun5i_clkevt_time_start(u8 timer, bool periodic)
++{
++	u32 val = readl(timer_base + TIMER_CTL_REG(timer));
++
++	if (periodic)
++		val &= ~TIMER_CTL_ONESHOT;
++	else
++		val |= TIMER_CTL_ONESHOT;
++
++	writel(val | TIMER_CTL_ENABLE | TIMER_CTL_RELOAD,
++	       timer_base + TIMER_CTL_REG(timer));
++}
++
++static void sun5i_clkevt_mode(enum clock_event_mode mode,
++			      struct clock_event_device *clk)
++{
++	switch (mode) {
++	case CLOCK_EVT_MODE_PERIODIC:
++		sun5i_clkevt_time_stop(0);
++		sun5i_clkevt_time_setup(0, ticks_per_jiffy);
++		sun5i_clkevt_time_start(0, true);
++		break;
++	case CLOCK_EVT_MODE_ONESHOT:
++		sun5i_clkevt_time_stop(0);
++		sun5i_clkevt_time_start(0, false);
++		break;
++	case CLOCK_EVT_MODE_UNUSED:
++	case CLOCK_EVT_MODE_SHUTDOWN:
++	default:
++		sun5i_clkevt_time_stop(0);
++		break;
++	}
++}
++
++static int sun5i_clkevt_next_event(unsigned long evt,
++				   struct clock_event_device *unused)
++{
++	sun5i_clkevt_time_stop(0);
++	sun5i_clkevt_time_setup(0, evt);
++	sun5i_clkevt_time_start(0, false);
++
++	return 0;
++}
++
++static struct clock_event_device sun5i_clockevent = {
++	.name = "sun5i_tick",
++	.rating = 350,
++	.features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
++	.set_mode = sun5i_clkevt_mode,
++	.set_next_event = sun5i_clkevt_next_event,
++};
++
++
++static irqreturn_t sun5i_timer_interrupt(int irq, void *dev_id)
++{
++	struct clock_event_device *evt = (struct clock_event_device *)dev_id;
++
++	writel(0x1, timer_base + TIMER_IRQ_ST_REG);
++	evt->event_handler(evt);
++
++	return IRQ_HANDLED;
++}
++
++static struct irqaction sun5i_timer_irq = {
++	.name = "sun5i_timer0",
++	.flags = IRQF_DISABLED | IRQF_TIMER | IRQF_IRQPOLL,
++	.handler = sun5i_timer_interrupt,
++	.dev_id = &sun5i_clockevent,
++};
++
++static u32 sun5i_timer_sched_read(void)
++{
++	return ~readl(timer_base + TIMER_CNTVAL_LO_REG(1));
++}
++
++static void __init sun5i_timer_init(struct device_node *node)
++{
++	unsigned long rate;
++	struct clk *clk;
++	int ret, irq;
++	u32 val;
++
++	timer_base = of_iomap(node, 0);
++	if (!timer_base)
++		panic("Can't map registers");
++
++	irq = irq_of_parse_and_map(node, 0);
++	if (irq <= 0)
++		panic("Can't parse IRQ");
++
++	clk = of_clk_get(node, 0);
++	if (IS_ERR(clk))
++		panic("Can't get timer clock");
++	clk_prepare_enable(clk);
++	rate = clk_get_rate(clk);
++
++	writel(~0, timer_base + TIMER_INTVAL_LO_REG(1));
++	writel(TIMER_CTL_ENABLE | TIMER_CTL_RELOAD,
++	       timer_base + TIMER_CTL_REG(1));
++
++	setup_sched_clock(sun5i_timer_sched_read, 32, rate);
++	clocksource_mmio_init(timer_base + TIMER_CNTVAL_LO_REG(1), node->name,
++			      rate, 350, 32, clocksource_mmio_readl_down);
++
++	ticks_per_jiffy = DIV_ROUND_UP(rate, HZ);
++
++	ret = setup_irq(irq, &sun5i_timer_irq);
++	if (ret)
++		pr_warn("failed to setup irq %d\n", irq);
++
++	/* Enable timer0 interrupt */
++	val = readl(timer_base + TIMER_IRQ_EN_REG);
++	writel(val | TIMER_IRQ_EN(0), timer_base + TIMER_IRQ_EN_REG);
++
++	sun5i_clockevent.cpumask = cpumask_of(0);
++
++	clockevents_config_and_register(&sun5i_clockevent, rate, 0x1,
++					0xffffffff);
++}
++CLOCKSOURCE_OF_DECLARE(sun5i_a13, "allwinner,sun5i-a13-hstimer",
++		       sun5i_timer_init);
++CLOCKSOURCE_OF_DECLARE(sun7i_a20, "allwinner,sun7i-a20-hstimer",
++		       sun5i_timer_init);
+-- 
+1.8.4
