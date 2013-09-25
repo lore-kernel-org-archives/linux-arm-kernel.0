@@ -1,54 +1,73 @@
-From: emilio@elopez.com.ar (=?ISO-8859-1?Q?Emilio_L=F3pez?=)
-Date: Wed, 25 Sep 2013 20:23:14 -0300
-Subject: [PATCH 2/5] clocksource: Add Allwinner SoCs HS timers driver
-In-Reply-To: <1380117790-19390-3-git-send-email-maxime.ripard@free-electrons.com>
-References: <1380117790-19390-1-git-send-email-maxime.ripard@free-electrons.com>
- <1380117790-19390-3-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <52437062.5040705@elopez.com.ar>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 25 Sep 2013 16:26:49 -0700
+Subject: [PATCH v2 1/3] ARM: OMAP2: pdata-quirks: set internal clock
+ source for MMC2 on N950/N9
+In-Reply-To: <1380050897-6605-2-git-send-email-aaro.koskinen@iki.fi>
+References: <1380050897-6605-1-git-send-email-aaro.koskinen@iki.fi>
+ <1380050897-6605-2-git-send-email-aaro.koskinen@iki.fi>
+Message-ID: <20130925232649.GC8949@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
+* Aaro Koskinen <aaro.koskinen@iki.fi> [130924 12:36]:
+> Set internal clock source for MMC2 on N950/N9.
+> 
+> Signed-off-by: Aaro Koskinen <aaro.koskinen@iki.fi>
 
-El 25/09/13 11:03, Maxime Ripard escribi?:
-> Most of the Allwinner SoCs (at this time, all but the A10) also have a
-> High Speed timers that are not using the 24MHz oscillator as a source
-> but rather the AHB clock running much faster.
->
-> The IP is slightly different between the A10s/A13 and the one used in
-> the A20/A31, since the latter have 4 timers available, while the former
-> have only 2 of them.
->
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> ---
+Thanks applied into omap-for-v3.13/quirk and pushed
+out.
 
-[...]
+I'll apply the board file removal later on into a separate
+branch, and Benoit can pick the .dts changes.
 
-> +static void __init sun5i_timer_init(struct device_node *node)
+Regards,
+
+Tony
+
+>  arch/arm/mach-omap2/pdata-quirks.c | 16 ++++++++++++++++
+>  1 file changed, 16 insertions(+)
+> 
+> diff --git a/arch/arm/mach-omap2/pdata-quirks.c b/arch/arm/mach-omap2/pdata-quirks.c
+> index 52b4bc3..1a7f492 100644
+> --- a/arch/arm/mach-omap2/pdata-quirks.c
+> +++ b/arch/arm/mach-omap2/pdata-quirks.c
+> @@ -16,6 +16,7 @@
+>  #include "common.h"
+>  #include "common-board-devices.h"
+>  #include "dss-common.h"
+> +#include "control.h"
+>  
+>  struct pdata_init {
+>  	const char *compatible;
+> @@ -62,6 +63,17 @@ static inline void omap_init_wl12xx_of(void)
+>  }
+>  #endif
+>  
+> +#ifdef CONFIG_ARCH_OMAP3
+> +static void __init hsmmc2_internal_input_clk(void)
 > +{
-> +	unsigned long rate;
-> +	struct clk *clk;
-> +	int ret, irq;
-> +	u32 val;
+> +	u32 reg;
 > +
-> +	timer_base = of_iomap(node, 0);
-> +	if (!timer_base)
-> +		panic("Can't map registers");
+> +	reg = omap_ctrl_readl(OMAP343X_CONTROL_DEVCONF1);
+> +	reg |= OMAP2_MMCSDIO2ADPCLKISEL;
+> +	omap_ctrl_writel(reg, OMAP343X_CONTROL_DEVCONF1);
+> +}
+> +#endif /* CONFIG_ARCH_OMAP3 */
 > +
-> +	irq = irq_of_parse_and_map(node, 0);
-> +	if (irq <= 0)
-> +		panic("Can't parse IRQ");
-> +
-> +	clk = of_clk_get(node, 0);
-> +	if (IS_ERR(clk))
-> +		panic("Can't get timer clock");
-
-I'm not familiar with clocksources, but does this have to be as fatal as 
-it is considering the kernel also supports the slower sun4i timer?
-
-Also, would any special considerations be needed when adjusting the ahb 
-clock? A future cpufreq driver will most likely need to.
-
-Cheers,
-
-Emilio
+>  #ifdef CONFIG_ARCH_OMAP4
+>  static void __init omap4_sdp_legacy_init(void)
+>  {
+> @@ -86,6 +98,10 @@ static void __init omap5_uevm_legacy_init(void)
+>  #endif
+>  
+>  static struct pdata_init pdata_quirks[] __initdata = {
+> +#ifdef CONFIG_ARCH_OMAP3
+> +	{ "nokia,omap3-n9", hsmmc2_internal_input_clk, },
+> +	{ "nokia,omap3-n950", hsmmc2_internal_input_clk, },
+> +#endif
+>  #ifdef CONFIG_ARCH_OMAP4
+>  	{ "ti,omap4-sdp", omap4_sdp_legacy_init, },
+>  	{ "ti,omap4-panda", omap4_panda_legacy_init, },
+> -- 
+> 1.8.4.rc3
+> 
