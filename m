@@ -1,204 +1,314 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 25 Sep 2013 16:47:40 -0700
-Subject: [PATCH 2/2] mmc: omap_hsmmc: Enable SDIO interrupt
-In-Reply-To: <20130925234544.3745.55170.stgit@localhost>
-References: <20130925234544.3745.55170.stgit@localhost>
-Message-ID: <20130925234740.3745.50637.stgit@localhost>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Thu, 26 Sep 2013 01:49:52 +0200
+Subject: [RFC, PATCH] clocksource: provide timekeeping for efm32 SoCs
+In-Reply-To: <20130925153207.GG16106@pengutronix.de>
+References: <1379324644-20934-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <5242F434.7060702@linaro.org> <20130925153207.GG16106@pengutronix.de>
+Message-ID: <524376A0.7020405@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There have been various patches floating around for enabling
-the SDIO IRQ for hsmmc, but none of them ever got merged.
+On 09/25/2013 05:32 PM, Uwe Kleine-K?nig wrote:
+> Hello Daniel,
+> 
+> On Wed, Sep 25, 2013 at 04:33:24PM +0200, Daniel Lezcano wrote:
+>> On 09/16/2013 11:44 AM, Uwe Kleine-K?nig wrote:
+>>> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+>>> ---
+>>> I'm not sure that the way I implemented if a given timer is used as
+>>> clock_source or clock_event_device is robust. Does it need locking?
+>>> The reason to create a timer device for each timer instead of a single
+>>> device of all of them is that it makes it cleaner to specify irqs and
+>>> clks which each timer has one of each respectively. I didn't find an
+>>> example, but while looking I wondered if in zevio-timer.c a single timer
+>>> can really support both clock_event and clocksource.
+>>>
+>>> I guess for inclusion I need to write a document describing the
+>>> of-binding. I will include that in the next iteration.
+>>
+>> Right and a nice description of the timer would be valuable.
+> in the binding document or the commit log?
 
-Probably the reason for not merging the SDIO interrupt patches
-has been the lack of wake-up path for SDIO on some omaps that
-has also needed remuxing the SDIO DAT1 line to a GPIO making
-the patches complex.
+commit log.
 
-This patch adds the minimal SDIO IRQ support to hsmmc for
-omaps that do have the wake-up path. For those omaps, the
-DAT1 line need to have the wake-up enable bit set, and the
-wake-up interrupt is the same as for the MMC controller.
+>> The first letter of the description should be in capital "Provide".
+>>
+>>> checkpatch wails that the description of CLKSRC_EFM32 is too short. I
+>>> think it's OK though.
+>>>
+>>> Best regards
+>>> Uwe
+>>>
+>>>  drivers/clocksource/Kconfig      |   8 ++
+>>>  drivers/clocksource/Makefile     |   1 +
+>>>  drivers/clocksource/time-efm32.c | 274 +++++++++++++++++++++++++++++++++++++++
+>>>  3 files changed, 283 insertions(+)
+>>>  create mode 100644 drivers/clocksource/time-efm32.c
+>>>
+>>> diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+>>> index 41c6946..410b152 100644
+>>> --- a/drivers/clocksource/Kconfig
+>>> +++ b/drivers/clocksource/Kconfig
+>>> @@ -70,6 +70,14 @@ config CLKSRC_DBX500_PRCMU_SCHED_CLOCK
+>>>  	help
+>>>  	  Use the always on PRCMU Timer as sched_clock
+>>>  
+>>> +config CLKSRC_EFM32
+>>> +	bool "Clocksource for Energy Micro's EFM32 SoCs" if !ARCH_EFM32
+>>> +	depends on OF && ARM && (ARCH_EFM32 || COMPILE_TEST)
+>>> +	default ARCH_EFM32
+>>> +	help
+>>> +	  Support to use the timers of EFM32 SoCs as clock source and clock
+>>> +	  event device.
+>>> +
+>>
+>> No option for the timer. It must be selected by the platform.
+> It is. If ARCH_EFM32=y there is no prompt and the "default ARCH_EFM32"
+> makes it true.
 
-This patch has been tested on am3730 es1.2 with wl12xx
-connected to MMC2 with wl12xx waking to Ethernet traffic
-from off-idle mode. Note that for omaps that do not have
-the SDIO wake-up path, this patch will not work for idle
-modes and further patches for remuxing DAT1 to GPIO are
-needed.
+ok, with that but if ARCH_EFM32=no, you can enable it manually. AFAIK,
+we want to prevent this and let the correct arch to enable it.
 
-Based on earlier patches [1][2] by David Vrabel
-<david.vrabel@csr.com>, Steve Sakoman <steve@sakoman.com>
-and Andreas Fenkart <andreas.fenkart@streamunlimited.com>
-with the SDIO IRQ handing improved following how sdhci.c
-is doing it.
+John ?
 
-[1] http://www.sakoman.com/cgi-bin/gitweb.cgi?p=linux.git;a=commitdiff_plain;h=010810d22f6f49ac03da4ba384969432e0320453
-[2] http://comments.gmane.org/gmane.linux.kernel.mmc/20446
+>>>  config ARM_ARCH_TIMER
+>>>  	bool
+>>>  	select CLKSRC_OF if OF
+>>> diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
+>>> index 704d6d3..33621ef 100644
+>>> --- a/drivers/clocksource/Makefile
+>>> +++ b/drivers/clocksource/Makefile
+>>> @@ -27,6 +27,7 @@ obj-$(CONFIG_VT8500_TIMER)	+= vt8500_timer.o
+>>>  obj-$(CONFIG_ARCH_NSPIRE)	+= zevio-timer.o
+>>>  obj-$(CONFIG_ARCH_BCM)		+= bcm_kona_timer.o
+>>>  obj-$(CONFIG_CADENCE_TTC_TIMER)	+= cadence_ttc_timer.o
+>>> +obj-$(CONFIG_CLKSRC_EFM32)	+= time-efm32.o
+>>>  obj-$(CONFIG_CLKSRC_EXYNOS_MCT)	+= exynos_mct.o
+>>>  obj-$(CONFIG_CLKSRC_SAMSUNG_PWM)	+= samsung_pwm_timer.o
+>>>  obj-$(CONFIG_VF_PIT_TIMER)	+= vf_pit_timer.o
+>>> diff --git a/drivers/clocksource/time-efm32.c b/drivers/clocksource/time-efm32.c
+>>> new file mode 100644
+>>> index 0000000..6ead8d7
+>>> --- /dev/null
+>>> +++ b/drivers/clocksource/time-efm32.c
+>>> @@ -0,0 +1,274 @@
+>>> +/*
+>>> + * Copyright (C) 2013 Pengutronix
+>>> + * Uwe Kleine-Koenig <u.kleine-koenig@pengutronix.de>
+>>> + *
+>>> + * This program is free software; you can redistribute it and/or modify it under
+>>> + * the terms of the GNU General Public License version 2 as published by the
+>>> + * Free Software Foundation.
+>>> + */
+>>> +
+>>> +#define pr_fmt(fmt)	KBUILD_MODNAME ": " fmt
+>>> +
+>>> +#include <linux/kernel.h>
+>>> +#include <linux/clocksource.h>
+>>> +#include <linux/clockchips.h>
+>>> +#include <linux/irq.h>
+>>> +#include <linux/interrupt.h>
+>>> +#include <linux/of.h>
+>>> +#include <linux/of_address.h>
+>>> +#include <linux/of_irq.h>
+>>> +#include <linux/clk.h>
+>>> +
+>>> +#define TIMERn_CTRL			0x00
+>>> +#define TIMERn_CTRL_PRESC(val)			(((val) & 0xf) << 24)
+>>
+>> You can replace all binary shift with the BIT macro.
+> The BIT macro only can define values that have a single bit set. So it
+> doesn't help for the definition of the TIMERn_CTRL_PRESC macro and most
+> others. And then I prefer to have a common way to define the register
+> descriptions.
 
-Cc: Andreas Fenkart <afenkart@gmail.com>
-Cc: Balaji T K <balajitk@ti.com>
-Signed-off-by: Tony Lindgren <tony@atomide.com>
----
- drivers/mmc/host/omap_hsmmc.c |   75 +++++++++++++++++++++++++++++++++++++----
- 1 file changed, 67 insertions(+), 8 deletions(-)
+Ok.
 
-diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
-index aa97497..e925c0e 100644
---- a/drivers/mmc/host/omap_hsmmc.c
-+++ b/drivers/mmc/host/omap_hsmmc.c
-@@ -103,6 +103,7 @@
- #define TC_EN			(1 << 1)
- #define BWR_EN			(1 << 4)
- #define BRR_EN			(1 << 5)
-+#define CIRQ_EN			(1 << 8)
- #define ERR_EN			(1 << 15)
- #define CTO_EN			(1 << 16)
- #define CCRC_EN			(1 << 17)
-@@ -183,6 +184,11 @@ struct omap_hsmmc_host {
- 	int			reqs_blocked;
- 	int			use_reg;
- 	int			req_in_progress;
-+
-+	int			flags;
-+#define HSMMC_RUNTIME_SUSPENDED	(1 << 0)	/* Runtime suspended */
-+#define HSMMC_SDIO_IRQ_ENABLED	(1 << 1)	/* SDIO irq enabled */
-+
- 	struct omap_hsmmc_next	next_data;
- 	struct	omap_mmc_platform_data	*pdata;
- };
-@@ -463,27 +469,34 @@ static void omap_hsmmc_stop_clock(struct omap_hsmmc_host *host)
- static void omap_hsmmc_enable_irq(struct omap_hsmmc_host *host,
- 				  struct mmc_command *cmd)
- {
--	unsigned int irq_mask;
-+	u32 irq_mask = INT_EN_MASK;
-+	unsigned long flags;
- 
- 	if (host->use_dma)
--		irq_mask = INT_EN_MASK & ~(BRR_EN | BWR_EN);
--	else
--		irq_mask = INT_EN_MASK;
-+		irq_mask &= ~(BRR_EN | BWR_EN);
- 
- 	/* Disable timeout for erases */
- 	if (cmd->opcode == MMC_ERASE)
- 		irq_mask &= ~DTO_EN;
- 
-+	spin_lock_irqsave(&host->irq_lock, flags);
- 	OMAP_HSMMC_WRITE(host->base, STAT, STAT_CLEAR);
- 	OMAP_HSMMC_WRITE(host->base, ISE, irq_mask);
-+	if (host->flags & HSMMC_SDIO_IRQ_ENABLED)
-+		irq_mask |= CIRQ_EN;
- 	OMAP_HSMMC_WRITE(host->base, IE, irq_mask);
-+	spin_unlock_irqrestore(&host->irq_lock, flags);
- }
- 
- static void omap_hsmmc_disable_irq(struct omap_hsmmc_host *host)
- {
-+	unsigned long flags;
-+
-+	spin_lock_irqsave(&host->irq_lock, flags);
- 	OMAP_HSMMC_WRITE(host->base, ISE, 0);
- 	OMAP_HSMMC_WRITE(host->base, IE, 0);
- 	OMAP_HSMMC_WRITE(host->base, STAT, STAT_CLEAR);
-+	spin_unlock_irqrestore(&host->irq_lock, flags);
- }
- 
- /* Calculate divisor for the given clock frequency */
-@@ -1040,8 +1053,12 @@ static irqreturn_t omap_hsmmc_irq(int irq, void *dev_id)
- 	int status;
- 
- 	status = OMAP_HSMMC_READ(host->base, STAT);
--	while (status & INT_EN_MASK && host->req_in_progress) {
--		omap_hsmmc_do_irq(host, status);
-+	while (status & (INT_EN_MASK | CIRQ_EN)) {
-+		if (host->req_in_progress)
-+			omap_hsmmc_do_irq(host, status);
-+
-+		if (status & CIRQ_EN)
-+			mmc_signal_sdio_irq(host->mmc);
- 
- 		/* Flush posted write */
- 		status = OMAP_HSMMC_READ(host->base, STAT);
-@@ -1556,6 +1573,43 @@ static void omap_hsmmc_init_card(struct mmc_host *mmc, struct mmc_card *card)
- 		mmc_slot(host).init_card(card);
- }
- 
-+static void omap_hsmmc_enable_sdio_irq_nolock(struct omap_hsmmc_host *host,
-+					 int enable)
-+{
-+	u32 irq_mask;
-+
-+	if (enable)
-+		host->flags |= HSMMC_SDIO_IRQ_ENABLED;
-+	else
-+		host->flags &= ~HSMMC_SDIO_IRQ_ENABLED;
-+
-+	/* SDIO IRQ will be enabled as appropriate in runtime resume */
-+	if (host->flags & HSMMC_RUNTIME_SUSPENDED)
-+		goto out;
-+
-+	irq_mask = OMAP_HSMMC_READ(host->base, IE);
-+	if (enable)
-+		irq_mask |= CIRQ_EN;
-+	else
-+		irq_mask &= ~CIRQ_EN;
-+	OMAP_HSMMC_WRITE(host->base, IE, irq_mask);
-+	if (!host->req_in_progress)
-+		OMAP_HSMMC_WRITE(host->base, ISE, irq_mask);
-+
-+out:
-+	OMAP_HSMMC_READ(host->base, IE);
-+}
-+
-+static void omap_hsmmc_enable_sdio_irq(struct mmc_host *mmc, int enable)
-+{
-+	struct omap_hsmmc_host *host = mmc_priv(mmc);
-+	unsigned long flags;
-+
-+	spin_lock_irqsave(&host->irq_lock, flags);
-+	omap_hsmmc_enable_sdio_irq_nolock(host, enable);
-+	spin_unlock_irqrestore(&host->irq_lock, flags);
-+}
-+
- static void omap_hsmmc_conf_bus_power(struct omap_hsmmc_host *host)
- {
- 	u32 hctl, capa, value;
-@@ -1608,7 +1662,7 @@ static const struct mmc_host_ops omap_hsmmc_ops = {
- 	.get_cd = omap_hsmmc_get_cd,
- 	.get_ro = omap_hsmmc_get_ro,
- 	.init_card = omap_hsmmc_init_card,
--	/* NYET -- enable_sdio_irq */
-+	.enable_sdio_irq = omap_hsmmc_enable_sdio_irq,
- };
- 
- #ifdef CONFIG_DEBUG_FS
-@@ -1874,7 +1928,8 @@ static int omap_hsmmc_probe(struct platform_device *pdev)
- 	mmc->max_seg_size = mmc->max_req_size;
- 
- 	mmc->caps |= MMC_CAP_MMC_HIGHSPEED | MMC_CAP_SD_HIGHSPEED |
--		     MMC_CAP_WAIT_WHILE_BUSY | MMC_CAP_ERASE;
-+		     MMC_CAP_WAIT_WHILE_BUSY | MMC_CAP_ERASE |
-+		     MMC_CAP_SDIO_IRQ;
- 
- 	mmc->caps |= mmc_slot(host).caps;
- 	if (mmc->caps & MMC_CAP_8_BIT_DATA)
-@@ -2172,6 +2227,7 @@ static int omap_hsmmc_runtime_suspend(struct device *dev)
- 
- 	host = platform_get_drvdata(to_platform_device(dev));
- 	omap_hsmmc_context_save(host);
-+	host->flags |= HSMMC_RUNTIME_SUSPENDED;
- 	dev_dbg(dev, "disabled\n");
- 
- 	return 0;
-@@ -2183,6 +2239,9 @@ static int omap_hsmmc_runtime_resume(struct device *dev)
- 
- 	host = platform_get_drvdata(to_platform_device(dev));
- 	omap_hsmmc_context_restore(host);
-+	host->flags &= ~HSMMC_RUNTIME_SUSPENDED;
-+	if ((host->flags & HSMMC_SDIO_IRQ_ENABLED))
-+		omap_hsmmc_enable_sdio_irq_nolock(host, true);
- 	dev_dbg(dev, "enabled\n");
- 
- 	return 0;
+>>> +#define TIMERn_CTRL_PRESC_1024			TIMERn_CTRL_PRESC(10)
+>>> +#define TIMERn_CTRL_CLKSEL(val)			(((val) & 0x3) << 16)
+>>> +#define TIMERn_CTRL_CLKSEL_PRESCHFPERCLK	TIMERn_CTRL_CLKSEL(0)
+>>> +#define TIMERn_CTRL_OSMEN			0x00000010
+>>> +#define TIMERn_CTRL_MODE(val)			(((val) & 0x3) <<  0)
+>>> +#define TIMERn_CTRL_MODE_UP			TIMERn_CTRL_MODE(0)
+>>> +#define TIMERn_CTRL_MODE_DOWN			TIMERn_CTRL_MODE(1)
+>>> +
+>>> +#define TIMERn_CMD			0x04
+>>> +#define TIMERn_CMD_START			0x1
+>>> +#define TIMERn_CMD_STOP				0x2
+>>> +
+>>> +#define TIMERn_IEN			0x0c
+>>> +#define TIMERn_IF			0x10
+>>> +#define TIMERn_IFS			0x14
+>>> +#define TIMERn_IFC			0x18
+>>> +#define TIMERn_IRQ_UF				0x2
+>>> +#define TIMERn_IRQ_OF				0x1
+>>
+>> I see a wrong alignment with the values. May be it is due to my mailer.
+> Maybe that's because the patch has one char more (the +) before the
+> tabs, that make things look wrong sometimes. In the file it looks ok.
+
+Ok.
+
+>>> +
+>>> +#define TIMERn_TOP			0x1c
+>>> +#define TIMERn_CNT			0x24
+>>> +
+>>> +#define TIMER_CLOCKSOURCE	0
+>>> +#define TIMER_CLOCKEVENT	1
+>>
+>> I don't see these macro used anywhere.
+> Right, pre-dt cruft.
+> 
+>>> +struct efm32_clock_event_ddata {
+>>
+>> The structure name looks a bit long to me.
+>>
+>>> +	struct clock_event_device evtdev;
+>>> +	void __iomem *base;
+>>> +	unsigned periodic_top;
+>>> +};
+>>> +static void efm32_clock_event_set_mode(enum clock_event_mode mode,
+>>> +				       struct clock_event_device *evtdev)
+>>> +{
+>>> +	struct efm32_clock_event_ddata *ddata =
+>>> +		container_of(evtdev, struct efm32_clock_event_ddata, evtdev);
+>>
+>> Wouldn't be worth to check the previous mode of the timer before
+>> switching to a mode where it is already ?
+> This isn't a hot path, is it? IIRC this function is called exactly
+> twice. And I think it still needs stopping at least in some cases. Then
+> it's more complicated and so not worth the effort.
+
+Ok.
+
+>>> +	switch (mode) {
+>>> +	case CLOCK_EVT_MODE_PERIODIC:
+>>> +		writel_relaxed(TIMERn_CMD_STOP, ddata->base + TIMERn_CMD);
+>>> +		writel_relaxed(ddata->periodic_top, ddata->base + TIMERn_TOP);
+>>> +		writel_relaxed(TIMERn_CTRL_PRESC_1024 |
+>>> +			       TIMERn_CTRL_CLKSEL_PRESCHFPERCLK |
+>>> +			       TIMERn_CTRL_MODE_DOWN,
+>>> +			       ddata->base + TIMERn_CTRL);
+>>> +		writel_relaxed(TIMERn_CMD_START, ddata->base + TIMERn_CMD);
+>>> +		break;
+>>> +
+>>> +	case CLOCK_EVT_MODE_ONESHOT:
+>>> +		writel_relaxed(TIMERn_CMD_STOP, ddata->base + TIMERn_CMD);
+>>> +		writel_relaxed(TIMERn_CTRL_PRESC_1024 |
+>>> +			       TIMERn_CTRL_CLKSEL_PRESCHFPERCLK |
+>>> +			       TIMERn_CTRL_OSMEN |
+>>> +			       TIMERn_CTRL_MODE_DOWN,
+>>> +			       ddata->base + TIMERn_CTRL);
+>>> +		break;
+>>
+>> IMO, these two routines are similar enough to factor them out in a
+>> single function.
+> I don't know what you want here? A #define for the common bits? I like
+> being explicit here to not have to jump around to verify the settings
+> with the hardware reference manual.
+
+Never mind, I missed one line when reading the CLOCK_EVT_MODE_PERIODIC
+and the CLOCK_EVT_MODE_ONESHOT blocks. At the first glance, they looked
+very similar and I thought they can be factored out into a function.
+
+>>> +	case CLOCK_EVT_MODE_UNUSED:
+>>> +	case CLOCK_EVT_MODE_SHUTDOWN:
+>>> +		writel_relaxed(TIMERn_CMD_STOP, ddata->base + TIMERn_CMD);
+>>> +		break;
+>>> +
+>>> +	case CLOCK_EVT_MODE_RESUME:
+>>> +		break;
+>>> +	}
+>>> +}
+>>> +
+>>> +static int efm32_clock_event_set_next_event(unsigned long evt,
+>>> +					    struct clock_event_device *evtdev)
+>>> +{
+>>> +	struct efm32_clock_event_ddata *ddata =
+>>> +		container_of(evtdev, struct efm32_clock_event_ddata, evtdev);
+>>> +
+>>> +	writel_relaxed(TIMERn_CMD_STOP, ddata->base + TIMERn_CMD);
+>>> +	writel_relaxed(evt, ddata->base + TIMERn_CNT);
+>>> +	writel_relaxed(TIMERn_CMD_START, ddata->base + TIMERn_CMD);
+>>> +
+>>> +	return 0;
+>>> +}
+>>> +
+>>> +static irqreturn_t efm32_clock_event_handler(int irq, void *dev_id)
+>>> +{
+>>> +	struct efm32_clock_event_ddata *ddata = dev_id;
+>>> +
+>>> +	writel_relaxed(TIMERn_IRQ_UF, ddata->base + TIMERn_IFC);
+>>> +
+>>> +	ddata->evtdev.event_handler(&ddata->evtdev);
+>>> +
+>>> +	return IRQ_HANDLED;
+>>> +}
+>>> +
+>>> +static struct efm32_clock_event_ddata clock_event_ddata = {
+>>> +	.evtdev = {
+>>> +		.name = "efm32 clockevent",
+>>> +		.features = CLOCK_EVT_FEAT_ONESHOT | CLOCK_EVT_MODE_PERIODIC,
+>>> +		.set_mode = efm32_clock_event_set_mode,
+>>> +		.set_next_event = efm32_clock_event_set_next_event,
+>>> +		.rating = 200,
+>>> +	},
+>>> +};
+>>> +
+>>> +static struct irqaction efm32_clock_event_irq = {
+>>> +	.name = "efm32 clockevent",
+>>> +	.flags = IRQF_TIMER,
+>>> +	.handler = efm32_clock_event_handler,
+>>> +	.dev_id = &clock_event_ddata,
+>>> +};
+>>
+>> Function name looks a bit long.
+> Which function? I prefer having a unique prefix for the driver + an
+> accurate description. All lines affected by "efm32_clock_event_handler"
+> don't even need to be broken, so IMO it's OK like that.
+
+Well, replacing clock_event/clockevent by clkevt and clocksource by
+clksrc would have made the functions name shorter. But it is a personal
+preference, feel free to ignore it if you prefer your naming convention.
+
+[ ... ]
+
+>>> +
+>>> +static void __init efm32_timer_init(struct device_node *np)
+>>> +{
+>>> +	static int has_clocksource, has_clockevent;
+>>> +	int ret;
+>>> +
+>>> +	if (!has_clocksource) {
+>>> +		ret = efm32_clocksource_init(np);
+>>> +		if (!ret) {
+>>> +			has_clocksource = 1;
+>>> +			return;
+>>> +		}
+>>> +	}
+>>> +
+>>> +	if (!has_clockevent) {
+>>> +		ret = efm32_clockevent_init(np);
+>>> +		if (!ret) {
+>>> +			has_clockevent = 1;
+>>> +			return;
+>>> +		}
+>>> +	}
+>>> +}
+>>
+>> I don't get the purpose of this initialization, can you explain ?
+> An efm32 SoC has four timer blocks. A single block can only be used for
+> one of clocksource or clockevent device and having more than one
+> clocksource or clockevent device doesn't make sense. So this routine
+> asserts that the first timer is used as clocksource and the second as
+> clockevent device. The others are unused.
+
+Shouldn't be up to the dt to give the timers you want ?
+
+
+-- 
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
