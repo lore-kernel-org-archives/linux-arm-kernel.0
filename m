@@ -1,62 +1,51 @@
-From: emilio@elopez.com.ar (=?ISO-8859-1?Q?Emilio_L=F3pez?=)
-Date: Wed, 25 Sep 2013 19:41:06 -0300
-Subject: [PATCH 0/5] Allwinner SoCs High Speed Timer support
-In-Reply-To: <1380117790-19390-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1380117790-19390-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <52436682.3060106@elopez.com.ar>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Thu, 26 Sep 2013 01:06:23 +0200
+Subject: [PATCH] arm: mvebu: use the main timer as clock source from DT
+In-Reply-To: <20130925103902.GA2418@localhost>
+References: <1379530168-9359-1-git-send-email-jean.pihet@linaro.org>
+ <20130918185611.GP19937@titan.lakedaemon.net>
+ <20130925103902.GA2418@localhost>
+Message-ID: <52436C6F.1010501@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
+On 09/25/2013 12:39 PM, Ezequiel Garcia wrote:
+> On Wed, Sep 18, 2013 at 02:56:11PM -0400, Jason Cooper wrote:
+>> Adding clocksource maintainers to the Cc: ...
+>>
+>> On Wed, Sep 18, 2013 at 08:49:28PM +0200, Jean Pihet wrote:
+>>> This commit:
+>>>   573145f08c2b92c45498468afbbba909f6ce6135
+>>>   clocksource: armada-370-xp: Use CLOCKSOURCE_OF_DECLARE
+>>>
+>>> replaced a call to the driver's timer initialization by a call to
+>>> clocksource_of_init(). However, it failed to select CONFIG_CLKSRC_OF.
+>>>
+>>> Fix this by selecting CONFIG_CLKSRC_OF for Armada370/XP machines.
+>>> Without this change the kernel is stuck at: 'Calibrating delay loop...'.
+>>>
+>>> Signed-off-by: Jean Pihet <jean.pihet@linaro.org>
+>>> Acked-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+>>> ---
+>>>  drivers/clocksource/Kconfig | 1 +
+>>>  1 file changed, 1 insertion(+)
+>>
+>> Acked-by: Jason Cooper <jason@lakedaemon.net>
+>>
+>> Daniel, John, Thomas,
+>>
+>> Can you queue this up for v3.12-rc2?  It fixes a boot breakage.
+>>
+> 
+> Is this already merged somewhere? Is there any chance we can push
+> it through *any* tree so it makes -rc3?
 
-El 25/09/13 11:03, Maxime Ripard escribi?:
-> Hi everyone,
->
-> Here is a few patches adding support for the High Speed Timers running on the
-> Allwinner SoCs.
->
-> These timers are 64 bits timers running at a much higher speed than the timers
-> used for now on these SoCs, since they are no longer wired to the 24MHz
-> oscillator, but to the AHB clock.
->
-> This HS timers are actually found in all the supported SoCs but the A10.
-> However, the A20 and A31 come with 4 of these high speed timers, while the A10s
-> and A13 only have two, hence why we introduce two different compatibles.
->
-> The A31 is not using these for now, as its timers are asserted in reset by a
-> reset controller that first need to gain some support in the kernel first, but
-> that's for another patchset.
->
-> Thanks,
-> Maxime
->
-> Maxime Ripard (5):
->    clocksource: sun4i: Select CLKSRC_MMIO
->    clocksource: Add Allwinner SoCs HS timers driver
->    ARM: sun5i: a10s: Add support for the High Speed Timers
->    ARM: sun5i: a13: Add support for the High Speed Timers
->    ARM: sun7i: a20: Add support for the High Speed Timers
+Yes, I will take it in my tree.
 
-I tested these 5 patches on my Cubieboard2 (A20) and it boots and seems 
-to work fine, so
 
-Tested-by: Emilio L?pez <emilio@elopez.com.ar>
+-- 
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
 
-# uptime && cat /proc/interrupts
-  01:45:01 up  1:45,  load average: 0.01, 0.03, 0.04
-            CPU0
-  33:      56223       GIC  33  serial
-  54:          0       GIC  54  sun4i_timer0
-  87:        522       GIC  87  eth0
-113:      66980       GIC 113  sun5i_timer0
-IPI0:          0  CPU wakeup interrupts
-IPI1:          0  Timer broadcast interrupts
-IPI2:          0  Rescheduling interrupts
-IPI3:          0  Function call interrupts
-IPI4:          0  Single function call interrupts
-IPI5:          0  CPU stop interrupts
-Err:          0
-
-Cheers,
-
-Emilio
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
