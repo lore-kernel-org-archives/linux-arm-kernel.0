@@ -1,136 +1,66 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 25 Sep 2013 14:30:41 -0700
-Subject: [PATCH 8/8] KVM: arm-vgic: Support CPU interface reg access
-In-Reply-To: <05BF567A-DD8A-4226-A51F-0D661F4D7EB2@suse.de>
-References: <1377285606-15692-1-git-send-email-christoffer.dall@linaro.org>
- <1377285606-15692-9-git-send-email-christoffer.dall@linaro.org>
- <05BF567A-DD8A-4226-A51F-0D661F4D7EB2@suse.de>
-Message-ID: <20130925211150.GH32311@cbox>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Wed, 25 Sep 2013 18:37:31 -0300
+Subject: [PATCH 0/5] Add Core Divider clock support for Armada 370/XP
+In-Reply-To: <1380144502-24109-1-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1380144502-24109-1-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <20130925213730.GA19371@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Aug 25, 2013 at 04:24:20PM +0100, Alexander Graf wrote:
+(Ccing forgotten mvebu maintainers)
+
+On Wed, Sep 25, 2013 at 06:28:17PM -0300, Ezequiel Garcia wrote:
+> This patchset adds support for a set of clocks available in Armada 370/XP
+> known as "Core Divider" clocks.
 > 
-> On 23.08.2013, at 20:20, Christoffer Dall wrote:
+> These are a set of gatable clocks, derived from a fixed PLL at
+> a configurable ratio. Although this patchset adds support for the more
+> general case, we only support one of the clocks, namely the NAND ECC clock.
 > 
-> > Implement support for the CPU interface register access driven by MMIO
-> > address offsets from the CPU interface base address.  Useful for user
-> > space to support save/restore of the VGIC state.
-> > 
-> > This commit adds support only for the same logic as the current VGIC
-> > support, and no more.  For example, the active priority registers are
-> > handled as RAZ/WI, just like setting priorities on the emulated
-> > distributor.
-> > 
-> > Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> > ---
-> > virt/kvm/arm/vgic.c |   66 +++++++++++++++++++++++++++++++++++++++++++++++----
-> > 1 file changed, 62 insertions(+), 4 deletions(-)
-> > 
-> > diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-> > index d44b5a1..257dbae 100644
-> > --- a/virt/kvm/arm/vgic.c
-> > +++ b/virt/kvm/arm/vgic.c
-> > @@ -1684,9 +1684,67 @@ int kvm_vgic_addr(struct kvm *kvm, unsigned long type, u64 *addr, bool write)
-> > static bool handle_cpu_mmio_misc(struct kvm_vcpu *vcpu,
-> > 				 struct kvm_exit_mmio *mmio, phys_addr_t offset)
-> > {
-> > -	return true;
-> > +	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
-> > +	u32 reg, mask = 0, shift = 0;
-> > +	bool updated = false;
-> > +
-> > +	switch (offset & ~0x3) {
-> > +	case GIC_CPU_CTRL:
-> > +		mask = GICH_VMCR_CTRL_MASK;
-> > +		shift = GICH_VMCR_CTRL_SHIFT;
-> > +		break;
-> > +	case GIC_CPU_PRIMASK:
-> > +		mask = GICH_VMCR_PRIMASK_MASK;
-> > +		shift = GICH_VMCR_PRIMASK_SHIFT;
-> > +		break;
-> > +	case GIC_CPU_BINPOINT:
-> > +		mask = GICH_VMCR_BINPOINT_MASK;
-> > +		shift = GICH_VMCR_BINPOINT_SHIFT;
-> > +		break;
-> > +	case GIC_CPU_ALIAS_BINPOINT:
-> > +		mask = GICH_VMCR_ALIAS_BINPOINT_MASK;
-> > +		shift = GICH_VMCR_ALIAS_BINPOINT_SHIFT;
-> > +		break;
-> > +	}
-> > +
-> > +	if (!mmio->is_write) {
-> > +		reg = (vgic_cpu->vgic_vmcr & mask) >> shift;
-> > +		memcpy(mmio->data, &reg, sizeof(reg));
-> > +	} else {
-> > +		memcpy(&reg, mmio->data, sizeof(reg));
-> > +		reg = (reg << shift) & mask;
-> > +		if (reg != (vgic_cpu->vgic_vmcr & mask))
-> > +			updated = true;
-> > +		vgic_cpu->vgic_vmcr &= ~mask;
-> > +		vgic_cpu->vgic_vmcr |= reg;
-> > +	}
-> > +	return updated;
-> > +}
-> > +
-> > +static bool handle_mmio_abpr(struct kvm_vcpu *vcpu,
-> > +			     struct kvm_exit_mmio *mmio, phys_addr_t offset)
-> > +{
-> > +	return handle_cpu_mmio_misc(vcpu, mmio, GIC_CPU_ALIAS_BINPOINT);
-> > +}
-> > +
-> > +static bool handle_cpu_mmio_ident(struct kvm_vcpu *vcpu,
-> > +				  struct kvm_exit_mmio *mmio,
-> > +				  phys_addr_t offset)
-> > +{
-> > +	u32 reg;
-> > +
-> > +	if (mmio->is_write)
-> > +		return false;
-> > +
-> > +	reg = 0x0002043B;
+> With this infrastructure in place, the addition of the rest of the clocks
+> would be fairly easy.
 > 
-> This wants a comment and probably also a #define :).
+> In addition, the NAND clock is added as a fixed-ratio from the NAND ECC clock,
+> to model accurately the SoC clock tree.
+> 
+> A pictorical representation of the clock tree would be:
+> 
+>     PLL
+>     |
+>     |
+>     ---------------------
+>     |			|
+>     |			|
+>     NAND ECC clock	...
+>     |
+>     |
+>     NAND clock
+> 
+> This patchset is based on v3.12-rc2. Any opinions are highly appreciated.
+> 
+> Thanks!
+> 
+> Ezequiel Garcia (5):
+>   clk: mvebu: Add core-divider clock
+>   ARM: mvebu: Add Core Divider clock device-tree binding
+>   ARM: mvebu: Add a 2 GHz fixed-clock Armada 370/XP
+>   ARM: mvebu: Add the core-divider clock to Armada 370/XP
+>   ARM: mvebu: Add NAND clock to Armada 370/XP
+> 
+>  .../bindings/clock/mvebu-corediv-clock.txt         |  19 ++
+>  arch/arm/boot/dts/armada-370-xp.dtsi               |  25 +++
+>  drivers/clk/mvebu/Kconfig                          |   5 +
+>  drivers/clk/mvebu/Makefile                         |   1 +
+>  drivers/clk/mvebu/clk-corediv.c                    | 209 +++++++++++++++++++++
+>  5 files changed, 259 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/clock/mvebu-corediv-clock.txt
+>  create mode 100644 drivers/clk/mvebu/clk-corediv.c
+> 
+> -- 
+> 1.8.1.5
 > 
 
-Marc, where does the 0x4b0 product id code come from for the distributor
-IIDR?
-
-Would this be satisfying?
-
-
-diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index 5214424..558be38 100644
---- a/virt/kvm/arm/vgic.c
-+++ b/virt/kvm/arm/vgic.c
-@@ -71,6 +71,9 @@
- #define VGIC_ADDR_UNDEF		(-1)
- #define IS_VGIC_ADDR_UNDEF(_x)  ((_x) == VGIC_ADDR_UNDEF)
- 
-+#define GIC_PRODUCT_ID		0x4b0
-+#define ARM_JEP106_IMPLEMENTER	0x43b
-+
- /* Physical address of vgic virtual cpu interface */
- static phys_addr_t vgic_vcpu_base;
- 
-@@ -331,7 +334,7 @@ static bool handle_mmio_misc(struct kvm_vcpu *vcpu,
- 		break;
- 
- 	case 8:			/* IIDR */
--		reg = 0x4B00043B;
-+		reg = (GIC_PRODUCT_ID << 20) | ARM_JEP106_IMPLEMENTER;
- 		vgic_reg_access(mmio, &reg, word_offset,
- 				ACCESS_READ_VALUE | ACCESS_WRITE_IGNORED);
- 		break;
-@@ -1734,7 +1737,7 @@ static bool handle_cpu_mmio_ident(struct kvm_vcpu *vcpu,
- 	if (mmio->is_write)
- 		return false;
- 
--	reg = 0x0002043B;
-+	reg = (GIC_PRODUCT_ID << 20) | (0x2 << 16) | ARM_JEP106_IMPLEMENTER;
- 	mmio_data_write(mmio, ~0, reg);
- 	return false;
- }
-
-Thanks,
--Christoffer
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
