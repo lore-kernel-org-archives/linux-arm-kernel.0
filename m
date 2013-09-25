@@ -1,29 +1,30 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Wed, 25 Sep 2013 16:08:46 -0300
-Subject: [PATCH] clk: fixed-factor: Fix a trivial typo
-Message-ID: <1380136126-15503-1-git-send-email-ezequiel.garcia@free-electrons.com>
+Date: Wed, 25 Sep 2013 16:10:18 -0300
+Subject: [PATCH] clk: fixed-factor: Fix device-tree binding typo
+Message-ID: <1380136218-15578-1-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Just a trivial print message typo fix.
+The required properties are not named "div" and "mult",
+but rather "clock-div" and "clock-mult".
 
 Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 ---
- drivers/clk/clk-fixed-factor.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ Documentation/devicetree/bindings/clock/fixed-factor-clock.txt | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/clk/clk-fixed-factor.c b/drivers/clk/clk-fixed-factor.c
-index 0e1d89b..d9e3f67 100644
---- a/drivers/clk/clk-fixed-factor.c
-+++ b/drivers/clk/clk-fixed-factor.c
-@@ -117,7 +117,7 @@ void __init of_fixed_factor_clk_setup(struct device_node *node)
- 	}
- 
- 	if (of_property_read_u32(node, "clock-mult", &mult)) {
--		pr_err("%s Fixed factor clock <%s> must have a clokc-mult property\n",
-+		pr_err("%s Fixed factor clock <%s> must have a clock-mult property\n",
- 			__func__, node->name);
- 		return;
- 	}
+diff --git a/Documentation/devicetree/bindings/clock/fixed-factor-clock.txt b/Documentation/devicetree/bindings/clock/fixed-factor-clock.txt
+index 5757f9a..1bae8527 100644
+--- a/Documentation/devicetree/bindings/clock/fixed-factor-clock.txt
++++ b/Documentation/devicetree/bindings/clock/fixed-factor-clock.txt
+@@ -19,6 +19,6 @@ Example:
+ 		compatible = "fixed-factor-clock";
+ 		clocks = <&parentclk>;
+ 		#clock-cells = <0>;
+-		div = <2>;
+-		mult = <1>;
++		clock-div = <2>;
++		clock-mult = <1>;
+ 	};
 -- 
 1.8.1.5
