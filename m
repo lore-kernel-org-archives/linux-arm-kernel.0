@@ -1,21 +1,34 @@
-From: lznuaa@gmail.com (Frank Li)
-Date: Wed, 25 Sep 2013 11:05:49 -0500
-Subject: [PATCH v6 3/3] PCI: imx6: Add support for i.MX6 PCIe controller
-In-Reply-To: <1379319655-20210-4-git-send-email-xobs@kosagi.com>
-References: <1379319655-20210-1-git-send-email-xobs@kosagi.com>
- <1379319655-20210-4-git-send-email-xobs@kosagi.com>
-Message-ID: <CAHrpEqQXUUtfB3BCmZsq1+YUk4kgzAyVuFHwQT2S0GL01PJjHg@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 25 Sep 2013 17:07:47 +0100
+Subject: [PATCH v2] ARM: include: asm: use 'long long' instead of 'u64'
+ within atomic.h
+In-Reply-To: <5242498F.8060407@asianux.com>
+References: <523D7DC7.8030603@asianux.com>
+ <20130924093041.GB15119@mudshark.cambridge.arm.com>
+ <5242498F.8060407@asianux.com>
+Message-ID: <20130925160746.GC14502@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 16, 2013 at 3:20 AM, Sean Cross <xobs@kosagi.com> wrote:
-> Add support for the PCIe port present on the i.MX6 family of controllers.
-> These use the Synopsis Designware core tied to their own PHY.
->
-> Signed-off-by: Sean Cross <xobs@kosagi.com>
-> Acked-by: Bjorn Helgaas <bhelgaas@google.com>
+On Wed, Sep 25, 2013 at 03:25:19AM +0100, Chen Gang wrote:
+> atomic* value is signed value, and atomic* functions need also process
+> signed value (parameter value, and return value), so 32-bit arm need
+> use 'long long' instead of 'u64'.
+> 
+> After replacement, it will also fix a bug for atomic64_add_negative():
+> "u64 is never less than 0".
+> 
+> The modifications are:
+> 
+>   in vim, use "1,% s/\<u64\>/long long/g" command.
+>   remove '__aligned(8)' which is useless for 64-bit.
+>   be sure of 80 column limitation after replacement.
+> 
+> 
+> Signed-off-by: Chen Gang <gang.chen@asianux.com>
 
-What is the status of this patch, is it queued in next or need future change ?
+Looks better to me, thanks. While you're here, we could also replace the use
+of `unsigned long' with `int' for the 32-bit atomics, then the whole header
+is consistent with the generic types.
 
-Best regards
-Frank Li
+Will
