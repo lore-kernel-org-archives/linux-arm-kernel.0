@@ -1,89 +1,77 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 25 Sep 2013 01:15:45 +0000 (UTC)
-Subject: OMAP baseline test results for v3.12-rc2
-Message-ID: <alpine.DEB.2.02.1309242206470.31082@utopia.booyaka.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 24 Sep 2013 21:05:58 -0500
+Subject: [PATCH v2] TTY: hvc_dcc: probe for a JTAG connection before
+ registering
+In-Reply-To: <1379968234-23373-1-git-send-email-robherring2@gmail.com>
+References: <1379968234-23373-1-git-send-email-robherring2@gmail.com>
+Message-ID: <1380074758-19808-1-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Rob Herring <rob.herring@calxeda.com>
 
-Here are some basic OMAP test results for Linux v3.12-rc2.
-Logs and other details at:
+Enabling the ARM DCC console and using without a JTAG connection will
+simply hang the system. Since distros like to turn on all options, this
+is a reoccurring problem to debug. We can do better by checking if
+anything is attached and handling characters. There is no way to probe
+this, so send a newline and check that it is handled.
 
-    http://www.pwsan.com/omap/testlogs/test_v3.12-rc2/20130924152551/
+Cc: Paolo Pisati <paolo.pisati@canonical.com>
+Cc: Tim Gardner <tim.gardner@canonical.com>
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Cc: Jiri Slaby <jslaby@suse.cz>
+Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+---
+v2: use time_is_after_jiffies
 
+ drivers/tty/hvc/hvc_dcc.c | 21 +++++++++++++++++++++
+ 1 file changed, 21 insertions(+)
 
-Test summary
-------------
-
-Build: zImage:
-    Pass ( 2/ 2): omap2plus_defconfig, omap2plus_defconfig_am33xx_only
-
-Build: uImage+dtb:
-    Pass ( 3/ 3): omap2plus_defconfig_am33xx_only/am335x-bone,
-		  omap2plus_defconfig/omap4-panda,
-		  omap2plus_defconfig/omap4-panda-es
-
-Build: uImage:
-    Pass (14/14): omap1_defconfig, omap1_defconfig_1510innovator_only,
-		  omap1_defconfig_5912osk_only, omap2plus_defconfig,
-		  omap2plus_defconfig_2430sdp_only,
-		  omap2plus_defconfig_cpupm, omap2plus_defconfig_no_pm,
-		  omap2plus_defconfig_n800_only_a,
-		  omap2plus_defconfig_n800_multi_omap2xxx,
-		  omap2plus_defconfig_omap2_4_only,
-		  omap2plus_defconfig_omap3_4_only,
-		  rmk_omap3430_ldp_allnoconfig,
-		  rmk_omap3430_ldp_oldconfig,
-		  rmk_omap4430_sdp_allnoconfig
-
-Boot to userspace:
-    skip ( 1/ 1): 5912osk
-    Pass (11/11): 2430sdp, 3517evm, 3530es3beagle, 3730beaglexm,
-		  37xxevm, 4430es2panda, 4460pandaes, am335xbone,
-		  am335xbonelt, cmt3517, 4460varsomom
-
-PM: chip retention via suspend:
-    FAIL ( 3/ 7): 2430sdp, 4430es2panda, 4460varsomom
-    Pass ( 4/ 7): 3530es3beagle, 3730beaglexm, 37xxevm, 4460pandaes
-
-PM: chip retention via dynamic idle:
-    FAIL ( 4/ 7): 2430sdp, 4430es2panda, 4460pandaes, 4460varsomom
-    Pass ( 3/ 7): 3530es3beagle, 3730beaglexm, 37xxevm
-
-PM: chip off except CORE via suspend:
-    Pass ( 1/ 1): 3730beaglexm
-
-PM: chip off except CORE via dynamic idle:
-    Pass ( 1/ 1): 3730beaglexm
-
-PM: chip off via suspend:
-    FAIL ( 3/ 5): 4430es2panda, 4460pandaes, 4460varsomom
-    Pass ( 2/ 5): 3530es3beagle, 37xxevm
-
-PM: chip off via dynamic idle:
-    FAIL ( 3/ 5): 4430es2panda, 4460pandaes, 4460varsomom
-    Pass ( 2/ 5): 3530es3beagle, 37xxevm
-
-
-vmlinux object size
-(delta in bytes from test_v3.12-rc1 (272b98c6455f00884f0350f775c5342358ebb73f)):
-   text     data      bss    total  kernel
-   +784       -8        0     +776  omap1_defconfig
-   +816      +24        0     +840  omap1_defconfig_1510innovator_only
-   +752        0        0     +752  omap1_defconfig_5912osk_only
-   +708      -16        0     +692  omap2plus_defconfig
-   +916      -16        0     +900  omap2plus_defconfig_2430sdp_only
-   +780      +16        0     +796  omap2plus_defconfig_cpupm
-   +236       -8        0     +228  omap2plus_defconfig_n800_multi_omap2xxx
-   +236       -8        0     +228  omap2plus_defconfig_n800_only_a
-   +708      -16        0     +692  omap2plus_defconfig_no_pm
-   +708      -16        0     +692  omap2plus_defconfig_omap2_4_only
-   +772      -16        0     +756  omap2plus_defconfig_omap3_4_only
-   +632        0     -264     +368  rmk_omap3430_ldp_allnoconfig
-   +544        0        0     +544  rmk_omap3430_ldp_oldconfig
-   +680        0     -280     +400  rmk_omap4430_sdp_allnoconfig
-
-Boot-time memory difference
-(delta in bytes from test_v3.12-rc1 (272b98c6455f00884f0350f775c5342358ebb73f))
-  avail  rsrvd   high  freed  board          kconfig
-  (no differences)
+diff --git a/drivers/tty/hvc/hvc_dcc.c b/drivers/tty/hvc/hvc_dcc.c
+index 44fbeba..3502a7b 100644
+--- a/drivers/tty/hvc/hvc_dcc.c
++++ b/drivers/tty/hvc/hvc_dcc.c
+@@ -86,6 +86,21 @@ static int hvc_dcc_get_chars(uint32_t vt, char *buf, int count)
+ 	return i;
+ }
+ 
++static bool hvc_dcc_check(void)
++{
++	unsigned long time = jiffies + (HZ / 10);
++
++	/* Write a test character to check if it is handled */
++	__dcc_putchar('\n');
++
++	while (time_is_after_jiffies(time)) {
++		if (!(__dcc_getstatus() & DCC_STATUS_TX))
++			return true;
++	}
++
++	return false;
++}
++
+ static const struct hv_ops hvc_dcc_get_put_ops = {
+ 	.get_chars = hvc_dcc_get_chars,
+ 	.put_chars = hvc_dcc_put_chars,
+@@ -93,6 +108,9 @@ static const struct hv_ops hvc_dcc_get_put_ops = {
+ 
+ static int __init hvc_dcc_console_init(void)
+ {
++	if (!hvc_dcc_check())
++		return -ENODEV;
++
+ 	hvc_instantiate(0, 0, &hvc_dcc_get_put_ops);
+ 	return 0;
+ }
+@@ -100,6 +118,9 @@ console_initcall(hvc_dcc_console_init);
+ 
+ static int __init hvc_dcc_init(void)
+ {
++	if (!hvc_dcc_check())
++		return -ENODEV;
++
+ 	hvc_alloc(0, 0, &hvc_dcc_get_put_ops, 128);
+ 	return 0;
+ }
+-- 
+1.8.1.2
