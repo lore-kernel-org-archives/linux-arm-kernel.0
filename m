@@ -1,55 +1,262 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Wed, 25 Sep 2013 13:47:20 +0900
-Subject: [PATCH v2 4/4] ARM: shmobile: BOCK-W reference: add Ether PFC
- settings
-In-Reply-To: <52305EA4.1060902@cogentembedded.com>
-References: <201309070423.30672.sergei.shtylyov@cogentembedded.com>
- <201309070431.35908.sergei.shtylyov@cogentembedded.com>
- <CANqRtoRKFoS9tehteDGaTUYJ8fSBqAYJJDiLxZmoNB9W0N+Mpg@mail.gmail.com>
- <52305EA4.1060902@cogentembedded.com>
-Message-ID: <20130925044720.GB24243@verge.net.au>
+Date: Wed, 25 Sep 2013 13:50:07 +0900
+Subject: [PATCH v2 1/2] ARM: shmobile: r8a7790: implement CPU clock
+ scaling for CPUFreq
+In-Reply-To: <20130525013445.GE24005@verge.net.au>
+References: <Pine.LNX.4.64.1305211601180.2863@axis700.grange>
+ <20130525013445.GE24005@verge.net.au>
+Message-ID: <20130925045007.GC24243@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 11, 2013 at 04:14:28PM +0400, Sergei Shtylyov wrote:
-> Hello.
+On Sat, May 25, 2013 at 10:34:45AM +0900, Simon Horman wrote:
+> On Tue, May 21, 2013 at 04:07:46PM +0200, Guennadi Liakhovetski wrote:
+> > This patch adds support for the Z-clock on r8a7790 SoCs, which is driving
+> > the Cortex A15 core, and a "cpufreq-cpu0" platform device. Adding an
+> > "operating-points" property to the CPU0 DT node and a regulator, this
+> > patch allows platforms to use the generic cpufreq-cpu0 driver to use
+> > SoC's DVFS capabilities.
+> > 
+> > Signed-off-by: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
+> > ---
+> > 
+> > v2:
+> > 1. a typo in the r8a7790 datasheet confused me to implement kick-bit 
+> > handling wrongly, this is fixed in this version
+> > 2. patch 3 merged with this one
+> > 
+> > Same comments, as to v1 of this series, apply.
 > 
-> On 09-09-2013 11:05, Magnus Damm wrote:
+> Magnus,
 > 
-> >>Add the Ether pin group to bockw_pinctrl_map[].
-> 
-> >>Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> 
-> >>---
-> >>  arch/arm/mach-shmobile/board-bockw-reference.c |    3 +++
-> >>  1 file changed, 3 insertions(+)
-> >>
-> >>Index: renesas/arch/arm/mach-shmobile/board-bockw-reference.c
-> >>===================================================================
-> >>--- renesas.orig/arch/arm/mach-shmobile/board-bockw-reference.c
-> >>+++ renesas/arch/arm/mach-shmobile/board-bockw-reference.c
-> >>@@ -29,6 +29,9 @@
-> >>   */
-> >>
-> >>  static const struct pinctrl_map bockw_pinctrl_map[] = {
-> >>+       /* Ether */
-> >>+       PIN_MAP_MUX_GROUP_DEFAULT("fde00000.ethernet", "pfc-r8a7778",
-> >>+                                 "ether_rmii", "ether"),
-> >>         /* SCIF0 */
-> >>         PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.0", "pfc-r8a7778",
-> >>                                   "scif0_data_a", "scif0"),
-> 
-> >Hi Sergei,
-> 
-> >Thanks for your patches. In general I think your series looks fine. I
-> >have a single comment, and that's about the pinctrl-related hunk
-> >above. I can see that this patch is for DT reference for Bock-W, so I
-> >expect the code to be in DT. Do you have any plans to use DT to
-> >describe the pinmux bits? Perhaps you have some incremental patch
-> >planned?
-> 
->    No, I just repeated what I saw mechanically. Now I'm seeing some
-> evidence that PFC driver supports the device tree, so I probably
-> need to redo the patchset... let me study this question better.
+> could you please review this series?
 
-Ping.
+I have marked this patch as deferred in the patch tracker
+as it has been rotting there for several months now.
+
+I will need the following before taking it into the tree:
+1. Repost, rebased if needed.
+2. An ack from Magnus or indication from him that someone else should
+   review it.
+
+> 
+> > 
+> >  arch/arm/mach-shmobile/Kconfig         |    2 +
+> >  arch/arm/mach-shmobile/clock-r8a7790.c |  129 ++++++++++++++++++++++++++++++++
+> >  arch/arm/mach-shmobile/setup-r8a7790.c |    1 +
+> >  3 files changed, 132 insertions(+), 0 deletions(-)
+> > 
+> > diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
+> > index 0319cf9..97bc6cf 100644
+> > --- a/arch/arm/mach-shmobile/Kconfig
+> > +++ b/arch/arm/mach-shmobile/Kconfig
+> > @@ -60,6 +60,8 @@ config ARCH_R8A7790
+> >  	select ARM_ARCH_TIMER
+> >  	select SH_CLK_CPG
+> >  	select RENESAS_IRQC
+> > +	select ARCH_HAS_CPUFREQ
+> > +	select ARCH_HAS_OPP
+> >  
+> >  config ARCH_EMEV2
+> >  	bool "Emma Mobile EV2"
+> > diff --git a/arch/arm/mach-shmobile/clock-r8a7790.c b/arch/arm/mach-shmobile/clock-r8a7790.c
+> > index 53a13b4..0f2aa68 100644
+> > --- a/arch/arm/mach-shmobile/clock-r8a7790.c
+> > +++ b/arch/arm/mach-shmobile/clock-r8a7790.c
+> > @@ -47,6 +47,9 @@
+> >  #define CPG_BASE 0xe6150000
+> >  #define CPG_LEN 0x1000
+> >  
+> > +#define FRQCRB   0xe6150004
+> > +#define FRQCRC   0xe61500e0
+> > +
+> >  #define SMSTPCR2 0xe6150138
+> >  #define SMSTPCR3 0xe615013c
+> >  #define SMSTPCR7 0xe615014c
+> > @@ -83,11 +86,132 @@ static struct clk main_clk = {
+> >   * clock ratio of these clock will be updated
+> >   * on r8a7790_clock_init()
+> >   */
+> > +SH_FIXED_RATIO_CLK_SET(pll0_clk,		main_clk,	1, 1);
+> >  SH_FIXED_RATIO_CLK_SET(pll1_clk,		main_clk,	1, 1);
+> >  SH_FIXED_RATIO_CLK_SET(pll3_clk,		main_clk,	1, 1);
+> >  SH_FIXED_RATIO_CLK_SET(lb_clk,			pll1_clk,	1, 1);
+> >  SH_FIXED_RATIO_CLK_SET(qspi_clk,		pll1_clk,	1, 1);
+> >  
+> > +/* If more clocks need to access FRQCRB, we'll have to lock eventually */
+> > +static int frqcr_kick_check(struct clk *clk)
+> > +{
+> > +	return ioread32(clk->mapped_reg) & BIT(31) ? -EBUSY : 0;
+> > +}
+> > +
+> > +static int frqcr_kick_do(struct clk *clk)
+> > +{
+> > +	int i;
+> > +
+> > +	/* set KICK bit in FRQCRB to update hardware setting, check success */
+> > +	iowrite32(ioread32(clk->mapped_reg) | BIT(31), clk->mapped_reg);
+> > +	for (i = 1000; i; i--)
+> > +		if (ioread32(clk->mapped_reg) & BIT(31))
+> > +			cpu_relax();
+> > +		else
+> > +			return 0;
+> > +
+> > +	return -ETIMEDOUT;
+> > +}
+> > +
+> > +static int zclk_set_rate(struct clk *clk, unsigned long rate)
+> > +{
+> > +	void __iomem *frqcrc;
+> > +	int ret;
+> > +	unsigned long step, p_rate;
+> > +	u32 val;
+> > +
+> > +	if (!clk->parent || !__clk_get(clk->parent))
+> > +		return -ENODEV;
+> > +
+> > +	ret = frqcr_kick_check(clk);
+> > +	if (ret < 0)
+> > +		goto done;
+> > +
+> > +	frqcrc = clk->mapped_reg + (FRQCRC - (u32)clk->enable_reg);
+> > +
+> > +	p_rate = clk_get_rate(clk->parent);
+> > +	if (rate == p_rate) {
+> > +		val = 0;
+> > +	} else {
+> > +		step = DIV_ROUND_CLOSEST(p_rate, 32);
+> > +		val = 32 - rate / step;
+> > +	}
+> > +
+> > +	iowrite32((ioread32(frqcrc) & ~(clk->div_mask << clk->enable_bit)) |
+> > +		  (val << clk->enable_bit), frqcrc);
+> > +
+> > +	ret = frqcr_kick_do(clk);
+> > +
+> > +done:
+> > +	__clk_put(clk->parent);
+> > +	return ret;
+> > +}
+> > +
+> > +static long zclk_round_rate(struct clk *clk, unsigned long rate)
+> > +{
+> > +	/*
+> > +	 * theoretical rate = parent rate * multiplier / 32,
+> > +	 * where 1 <= multiplier <= 32. Therefore we should do
+> > +	 * multiplier = rate * 32 / parent rate
+> > +	 * rounded rate = parent rate * multiplier / 32.
+> > +	 * However, multiplication before division won't fit in 32 bits, so
+> > +	 * we sacrifice some precision by first dividing and then multiplying.
+> > +	 * To find the nearest divisor we calculate both and pick up the best
+> > +	 * one. This avoids 64-bit arithmetics.
+> > +	 */
+> > +	unsigned long step, mul_min, mul_max, rate_min, rate_max;
+> > +
+> > +	rate_max = clk_get_rate(clk->parent);
+> > +
+> > +	/* output freq <= parent */
+> > +	if (rate >= rate_max)
+> > +		return rate_max;
+> > +
+> > +	step = DIV_ROUND_CLOSEST(rate_max, 32);
+> > +	/* output freq >= parent / 32 */
+> > +	if (step >= rate)
+> > +		return step;
+> > +
+> > +	mul_min = rate / step;
+> > +	mul_max = DIV_ROUND_UP(rate, step);
+> > +	rate_min = step * mul_min;
+> > +	if (mul_max == mul_min)
+> > +		return rate_min;
+> > +
+> > +	rate_max = step * mul_max;
+> > +
+> > +	if (rate_max - rate <  rate - rate_min)
+> > +		return rate_max;
+> > +
+> > +	return rate_min;
+> > +}
+> > +
+> > +static unsigned long zclk_recalc(struct clk *clk)
+> > +{
+> > +	void __iomem *frqcrc = FRQCRC - (u32)clk->enable_reg + clk->mapped_reg;
+> > +	unsigned int max = clk->div_mask + 1;
+> > +	unsigned long val = ((ioread32(frqcrc) >> clk->enable_bit) &
+> > +			     clk->div_mask);
+> > +
+> > +	return DIV_ROUND_CLOSEST(clk_get_rate(clk->parent), max) *
+> > +		(max - val);
+> > +}
+> > +
+> > +static struct sh_clk_ops zclk_ops = {
+> > +	.recalc = zclk_recalc,
+> > +	.set_rate = zclk_set_rate,
+> > +	.round_rate = zclk_round_rate,
+> > +};
+> > +
+> > +static struct clk z_clk = {
+> > +	.parent = &pll0_clk,
+> > +	.div_mask = 0x1f,
+> > +	.enable_bit = 8,
+> > +	/* We'll need to access FRQCRB and FRQCRC */
+> > +	.enable_reg = (void __iomem *)FRQCRB,
+> > +	.ops = &zclk_ops,
+> > +};
+> > +
+> >  /* fixed ratio clock */
+> >  SH_FIXED_RATIO_CLK_SET(extal_div2_clk,		extal_clk,	1, 2);
+> >  SH_FIXED_RATIO_CLK_SET(cp_clk,			extal_clk,	1, 2);
+> > @@ -115,11 +239,13 @@ static struct clk *main_clks[] = {
+> >  	&extal_clk,
+> >  	&extal_div2_clk,
+> >  	&main_clk,
+> > +	&pll0_clk,
+> >  	&pll1_clk,
+> >  	&pll1_div2_clk,
+> >  	&pll3_clk,
+> >  	&lb_clk,
+> >  	&qspi_clk,
+> > +	&z_clk,
+> >  	&zg_clk,
+> >  	&zx_clk,
+> >  	&zs_clk,
+> > @@ -213,6 +339,7 @@ static struct clk_lookup lookups[] = {
+> >  	CLKDEV_CON_ID("pll1",		&pll1_clk),
+> >  	CLKDEV_CON_ID("pll1_div2",	&pll1_div2_clk),
+> >  	CLKDEV_CON_ID("pll3",		&pll3_clk),
+> > +	CLKDEV_DEV_ID("cpufreq-cpu0",	&z_clk),
+> >  	CLKDEV_CON_ID("zg",		&zg_clk),
+> >  	CLKDEV_CON_ID("zx",		&zx_clk),
+> >  	CLKDEV_CON_ID("zs",		&zs_clk),
+> > @@ -263,9 +390,11 @@ static struct clk_lookup lookups[] = {
+> >  	CLKDEV_DEV_ID("sh_mmcif.1", &mstp_clks[MSTP305]),
+> >  };
+> >  
+> > +/* "/ 2" is a "fixed divider" - see the "PLL Multiplication Ratio" table */
+> >  #define R8A7790_CLOCK_ROOT(e, m, p0, p1, p30, p31)		\
+> >  	extal_clk.rate	= e * 1000 * 1000;			\
+> >  	main_clk.parent	= m;					\
+> > +	SH_CLK_SET_RATIO(&pll0_clk_ratio, p0 / 2, 1);		\
+> >  	SH_CLK_SET_RATIO(&pll1_clk_ratio, p1 / 2, 1);		\
+> >  	if (mode & MD(19))					\
+> >  		SH_CLK_SET_RATIO(&pll3_clk_ratio, p31, 1);	\
+> > diff --git a/arch/arm/mach-shmobile/setup-r8a7790.c b/arch/arm/mach-shmobile/setup-r8a7790.c
+> > index eeef5f6..49c3166 100644
+> > --- a/arch/arm/mach-shmobile/setup-r8a7790.c
+> > +++ b/arch/arm/mach-shmobile/setup-r8a7790.c
+> > @@ -166,6 +166,7 @@ void __init r8a7790_timer_init(void)
+> >  #ifdef CONFIG_USE_OF
+> >  void __init r8a7790_add_standard_devices_dt(void)
+> >  {
+> > +	platform_device_register_simple("cpufreq-cpu0", -1, NULL, 0);
+> >  	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+> >  }
+> >  
+> > -- 
+> > 1.7.2.5
+> > 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
