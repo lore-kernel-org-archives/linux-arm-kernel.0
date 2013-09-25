@@ -1,31 +1,78 @@
-From: john.stultz@linaro.org (John Stultz)
-Date: Tue, 24 Sep 2013 17:54:35 -0700
-Subject: [GIT PULL] drivers/clocksource: sched_clock_register() conversion
- for 3.13 (via tip/timers/core)
-In-Reply-To: <52422732.5000501@linaro.org>
-References: <52422732.5000501@linaro.org>
-Message-ID: <5242344B.8020002@linaro.org>
+From: rob@landley.net (Rob Landley)
+Date: Tue, 24 Sep 2013 20:13:27 -0500
+Subject: new binutils needed for arm in 3.12-rc1
+In-Reply-To: <20130924214800.GV25647@n2100.arm.linux.org.uk> (from
+ linux@arm.linux.org.uk on Tue Sep 24 16:48:00 2013)
+Message-ID: <1380071607.1974.78@driftwood>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/24/2013 04:58 PM, John Stultz wrote:
-> Hey Daniel,
->     Here's the sched_clock_register conversion that Stephen did earlier
-> this summer, as part of extending the generic sched_clock code to
-> support 64bit counters. Unfortunately the prereqs for this series missed
-> getting into tip/timers/core for 3.12, so I never sent out this pull
-> request. But now that the prereqs are in tip/timers/core for 3.13, I've
-> merge it up and I wanted to go ahead and send this out.
->
-> Let me know if you have any issues or concerns.
-Hey Daniel,
-    Maybe hold off on this one. The kbuild test robot is has some
-complaints aobut the deprecation of setup_sched_clock() while there are
-still users in arch/arm.
+On 09/24/2013 04:48:00 PM, Russell King - ARM Linux wrote:
+> On Tue, Sep 24, 2013 at 04:23:48PM -0500, Rob Landley wrote:
+> > What value is there in requiring the new toolchain? From what I  
+> could
+> > see of the commits it was micro-optimizations around memory  
+> barriers.
+> >
+> > *shrug* I can revert the patch locally, or patch the extra  
+> instruction
+> > into my toolchain. But I do object to changing the documentation
+> > globally for every architecture because one architecture did  
+> something
+> > they apparently never thought through (or they'd have commented in  
+> the
+> > commit that it requires a big toolchain version jump; pretty sure  
+> they
+> > didn't actually notice).
+> 
+> Some of us are notoriously slow at updating our toolchains.
+...
 
-I'll likely rework a new branch for you to pull that will be all but the
-"Deprecate setup_sched_clock()" patch.
+Some of us can't ship GPLv3 binaries and are looking forward to the day  
+LLVM or some such provides a complete solution.
 
+> Now, if you feel strongly about this, we _could_ introduce a
+> CONFIG_OLD_BINUTILS and give everyone their cake - but it will be
+> fragile.  Not everyone will remember to get that right, because  
+> they'll
+> be using the later binutils.  Also, we already have an excessive  
+> number
+> of potential breakage-inducing options and we certainly don't need
+> another.
 
-thanks
--john
+I'm doing the regression testing either way, on several different  
+architectures. (Although I tend to to only really do a thorough job  
+quarterly when a new kernel comes out and it's time to make it work.)  
+So I'm going to be doing something locally like this anyway, and if a  
+CONFIG_OLD_BINUTILS is acceptable I might as well push it upstream.
+
+My use case is running all these targets under qemu, so it's not  
+exactly performance-critical. :)
+
+> Use IS_ENABLED() I hear you say.  That won't get the one dsb  
+> instruction
+> in some SoC code which was missed which will break the build on older
+> toolchains.
+
+My regression test is my http://landley.net/aboriginal/about.html  
+project, where I:
+
+1) build cross compilers for ~15 different architecture variants (maybe  
+half unique, the rest variants of the others).
+
+2) Use them to build the smallest native development environment  
+capable of reproducing itself from soruce code.
+
+3) Boot it under qemu.
+
+4) Build linux from scratch under the result.
+
+I've sometimes had it the whole mess automated from a cron job, but the  
+server I had it on blew out its hard drive controller and I haven't  
+bothered to set it up again...
+
+Next couple days are crazy but I'll try to get you a patch this weekend.
+
+Thanks,
+
+Rob
