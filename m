@@ -1,37 +1,51 @@
 From: joelf@ti.com (Joel Fernandes)
-Date: Wed, 25 Sep 2013 17:01:06 -0500
-Subject: [PATCH 6/9] ARM: am437x: dts: Add AES node for am437x
-In-Reply-To: <1380146469-29496-1-git-send-email-joelf@ti.com>
-References: <1380146469-29496-1-git-send-email-joelf@ti.com>
-Message-ID: <1380146469-29496-7-git-send-email-joelf@ti.com>
+Date: Wed, 25 Sep 2013 17:01:00 -0500
+Subject: [PATCH 0/9] ARM: dts: DT data for OMAP platforms for v3.13
+Message-ID: <1380146469-29496-1-git-send-email-joelf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-AM437x SoC has AES module similar to the one on OMAP4.
-Add DT node for the same.
+Following series is a collection of dts patches for the below features:
+crypto:
+ aes, sha on am335x
+ aes, des on am437x
+ aes, des on omap4
+display:
+  beaglebone black HDMI
+  am335x-evm panel
 
-Signed-off-by: Joel Fernandes <joelf@ti.com>
----
- arch/arm/boot/dts/am4372.dtsi | 8 ++++++++
- 1 file changed, 8 insertions(+)
+Series is based on Benoit Cousson's for_3.13/dts branch (commit sha 45646cd)
+Available at: git at github.com:joelagnel/linux-kernel.git (branch for-benoit)
 
-diff --git a/arch/arm/boot/dts/am4372.dtsi b/arch/arm/boot/dts/am4372.dtsi
-index 0fe393a..3e631ab 100644
---- a/arch/arm/boot/dts/am4372.dtsi
-+++ b/arch/arm/boot/dts/am4372.dtsi
-@@ -411,5 +411,13 @@
- 			ti,hwmods = "epwmss5";
- 			status = "disabled";
- 		};
-+
-+		aes: aes at 53501000 {
-+			compatible = "ti,omap4-aes";
-+			ti,hwmods = "aes";
-+			reg = <0x53501000 0xa0>;
-+			interrupt-parent = <&gic>;
-+			interrupts = <0 103 0x4>;
-+		};
- 	};
- };
+Benoit Parrot (1):
+  ARM: dts: AM33XX: Add LCDC info into am335x-evm
+
+Darren Etheridge (1):
+  dts: boneblack: add pinmux and hdmi node to enable display
+
+Joel Fernandes (5):
+  omap4: dts: Add node for AES
+  omap4: dts: Add node for DES3DES module
+  am33xx: dts: Fix AES interrupt number
+  ARM: am437x: dts: Add AES node for am437x
+  ARM: am437x: dts: Add DES node for am437x
+
+Mark A. Greer (2):
+  ARM: dts: Add SHAM data and documentation for AM33XX
+  ARM: dts: Add AES data and documentation for AM33XX
+
+ .../devicetree/bindings/crypto/omap-aes.txt        | 34 ++++++++++
+ .../devicetree/bindings/crypto/omap-sham.txt       | 31 +++++++++
+ arch/arm/boot/dts/am335x-bone.dts                  |  8 +++
+ arch/arm/boot/dts/am335x-boneblack.dts             | 48 +++++++++++++
+ arch/arm/boot/dts/am335x-evm.dts                   | 79 ++++++++++++++++++++++
+ arch/arm/boot/dts/am335x-evmsk.dts                 |  8 +++
+ arch/arm/boot/dts/am33xx.dtsi                      | 30 ++++++++
+ arch/arm/boot/dts/am4372.dtsi                      | 16 +++++
+ arch/arm/boot/dts/omap4.dtsi                       | 20 ++++++
+ 9 files changed, 274 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/crypto/omap-aes.txt
+ create mode 100644 Documentation/devicetree/bindings/crypto/omap-sham.txt
+
 -- 
 1.8.1.2
