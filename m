@@ -1,176 +1,57 @@
 From: abrestic@chromium.org (Andrew Bresticker)
-Date: Wed, 25 Sep 2013 14:12:47 -0700
-Subject: [PATCH V4 1/6] clk: exynos-audss: convert to platform device
-In-Reply-To: <1380046016-5811-1-git-send-email-abrestic@chromium.org>
+Date: Wed, 25 Sep 2013 14:12:49 -0700
+Subject: [PATCH V4 3/6] clk: exynos5250: add clock ID for div_pcm0
+In-Reply-To: <1380143572-11741-1-git-send-email-abrestic@chromium.org>
 References: <1380046016-5811-1-git-send-email-abrestic@chromium.org>
-Message-ID: <1380143572-11741-1-git-send-email-abrestic@chromium.org>
+ <1380143572-11741-1-git-send-email-abrestic@chromium.org>
+Message-ID: <1380143572-11741-3-git-send-email-abrestic@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Exynos AudioSS clock controller will later be modified to allow
-input clocks to be specified via device-tree in order to support
-multiple Exynos SoCs.  This will introduce a dependency on the core
-SoC clock controller being initialized first so that the AudioSS driver
-can look up its input clocks, but the order in which clock providers
-are probed in of_clk_init() is not guaranteed.  Since deferred probing
-is not supported in of_clk_init() and the AudioSS block is not the core
-controller, we can initialize it later as a platform device.
+There is no gate for the PCM clock input to the AudioSS block, so
+the parent of sclk_pcm is div_pcm0.  Add a clock ID for it so that
+we can reference it in device trees.
 
 Signed-off-by: Andrew Bresticker <abrestic@chromium.org>
-Acked-by: Tomasz Figa <t.figa@samsung.com>
-Reviewed-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+Reviewed-by: Tomasz Figa <t.figa@samsung.com>
 ---
-Changes since v3:
- - __init -> __exit for module exit function
- - fixed nits from Sylwester
-Changes since v2:
- - add error handling to probe callback
- - fixed ordering of of_clk_{add,del}_provider
- - fixed nits from Tomasz and Sylwester
-Changes since v1:
- - add clk_unregister() calls to remove callback
- - fixed minor nits from Tomasz
----
- drivers/clk/samsung/clk-exynos-audss.c | 104 ++++++++++++++++++++++++++++-----
- 1 file changed, 88 insertions(+), 16 deletions(-)
+ Documentation/devicetree/bindings/clock/exynos5250-clock.txt | 1 +
+ drivers/clk/samsung/clk-exynos5250.c                         | 4 ++--
+ 2 files changed, 3 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/clk/samsung/clk-exynos-audss.c b/drivers/clk/samsung/clk-exynos-audss.c
-index 39b40aa..742dabc 100644
---- a/drivers/clk/samsung/clk-exynos-audss.c
-+++ b/drivers/clk/samsung/clk-exynos-audss.c
-@@ -14,6 +14,8 @@
- #include <linux/clk-provider.h>
- #include <linux/of_address.h>
- #include <linux/syscore_ops.h>
-+#include <linux/module.h>
-+#include <linux/platform_device.h>
+diff --git a/Documentation/devicetree/bindings/clock/exynos5250-clock.txt b/Documentation/devicetree/bindings/clock/exynos5250-clock.txt
+index 24765c1..67e9a47 100644
+--- a/Documentation/devicetree/bindings/clock/exynos5250-clock.txt
++++ b/Documentation/devicetree/bindings/clock/exynos5250-clock.txt
+@@ -62,6 +62,7 @@ clock which they consume.
+   div_i2s1		157
+   div_i2s2		158
+   sclk_hdmiphy		159
++  div_pcm0		160
  
- #include <dt-bindings/clk/exynos-audss-clk.h>
  
-@@ -62,24 +64,26 @@ static struct syscore_ops exynos_audss_clk_syscore_ops = {
- #endif /* CONFIG_PM_SLEEP */
+    [Peripheral Clock Gates]
+diff --git a/drivers/clk/samsung/clk-exynos5250.c b/drivers/clk/samsung/clk-exynos5250.c
+index adf3234..dec5376 100644
+--- a/drivers/clk/samsung/clk-exynos5250.c
++++ b/drivers/clk/samsung/clk-exynos5250.c
+@@ -108,7 +108,7 @@ enum exynos5250_clks {
+ 	sclk_mmc0, sclk_mmc1, sclk_mmc2, sclk_mmc3, sclk_sata, sclk_usb3,
+ 	sclk_jpeg, sclk_uart0, sclk_uart1, sclk_uart2, sclk_uart3, sclk_pwm,
+ 	sclk_audio1, sclk_audio2, sclk_spdif, sclk_spi0, sclk_spi1, sclk_spi2,
+-	div_i2s1, div_i2s2, sclk_hdmiphy,
++	div_i2s1, div_i2s2, sclk_hdmiphy, div_pcm0,
  
- /* register exynos_audss clocks */
--static void __init exynos_audss_clk_init(struct device_node *np)
-+static int exynos_audss_clk_probe(struct platform_device *pdev)
- {
--	reg_base = of_iomap(np, 0);
--	if (!reg_base) {
--		pr_err("%s: failed to map audss registers\n", __func__);
--		return;
-+	int i, ret = 0;
-+	struct resource *res;
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	reg_base = devm_ioremap_resource(&pdev->dev, res);
-+	if (IS_ERR(reg_base)) {
-+		dev_err(&pdev->dev, "failed to map audss registers\n");
-+		return PTR_ERR(reg_base);
- 	}
- 
--	clk_table = kzalloc(sizeof(struct clk *) * EXYNOS_AUDSS_MAX_CLKS,
-+	clk_table = devm_kzalloc(&pdev->dev,
-+				sizeof(struct clk *) * EXYNOS_AUDSS_MAX_CLKS,
- 				GFP_KERNEL);
--	if (!clk_table) {
--		pr_err("%s: could not allocate clk lookup table\n", __func__);
--		return;
--	}
-+	if (!clk_table)
-+		return -ENOMEM;
- 
- 	clk_data.clks = clk_table;
- 	clk_data.clk_num = EXYNOS_AUDSS_MAX_CLKS;
--	of_clk_add_provider(np, of_clk_src_onecell_get, &clk_data);
- 
- 	clk_table[EXYNOS_MOUT_AUDSS] = clk_register_mux(NULL, "mout_audss",
- 				mout_audss_p, ARRAY_SIZE(mout_audss_p),
-@@ -123,13 +127,81 @@ static void __init exynos_audss_clk_init(struct device_node *np)
- 				"div_pcm0", CLK_SET_RATE_PARENT,
- 				reg_base + ASS_CLK_GATE, 5, 0, &lock);
- 
-+	for (i = 0; i < clk_data.clk_num; i++) {
-+		if (IS_ERR(clk_table[i])) {
-+			dev_err(&pdev->dev, "failed to register clock %d\n", i);
-+			ret = PTR_ERR(clk_table[i]);
-+			goto unregister;
-+		}
-+	}
-+
-+	ret = of_clk_add_provider(pdev->dev.of_node, of_clk_src_onecell_get,
-+					&clk_data);
-+	if (ret) {
-+		dev_err(&pdev->dev, "failed to add clock provider\n");
-+		goto unregister;
-+	}
-+
- #ifdef CONFIG_PM_SLEEP
- 	register_syscore_ops(&exynos_audss_clk_syscore_ops);
- #endif
- 
--	pr_info("Exynos: Audss: clock setup completed\n");
-+	dev_info(&pdev->dev, "setup completed\n");
-+
-+	return 0;
-+
-+unregister:
-+	for (i = 0; i < clk_data.clk_num; i++) {
-+		if (!IS_ERR(clk_table[i]))
-+			clk_unregister(clk_table[i]);
-+	}
-+
-+	return ret;
-+}
-+
-+static int exynos_audss_clk_remove(struct platform_device *pdev)
-+{
-+	int i;
-+
-+	of_clk_del_provider(pdev->dev.of_node);
-+
-+	for (i = 0; i < clk_data.clk_num; i++) {
-+		if (!IS_ERR(clk_table[i]))
-+			clk_unregister(clk_table[i]);
-+	}
-+
-+	return 0;
- }
--CLK_OF_DECLARE(exynos4210_audss_clk, "samsung,exynos4210-audss-clock",
--		exynos_audss_clk_init);
--CLK_OF_DECLARE(exynos5250_audss_clk, "samsung,exynos5250-audss-clock",
--		exynos_audss_clk_init);
-+
-+static const struct of_device_id exynos_audss_clk_of_match[] = {
-+	{ .compatible = "samsung,exynos4210-audss-clock", },
-+	{ .compatible = "samsung,exynos5250-audss-clock", },
-+	{},
-+};
-+
-+static struct platform_driver exynos_audss_clk_driver = {
-+	.driver	= {
-+		.name = "exynos-audss-clk",
-+		.owner = THIS_MODULE,
-+		.of_match_table = exynos_audss_clk_of_match,
-+	},
-+	.probe = exynos_audss_clk_probe,
-+	.remove = exynos_audss_clk_remove,
-+};
-+
-+static int __init exynos_audss_clk_init(void)
-+{
-+	return platform_driver_register(&exynos_audss_clk_driver);
-+}
-+core_initcall(exynos_audss_clk_init);
-+
-+static void __exit exynos_audss_clk_exit(void)
-+{
-+	platform_driver_unregister(&exynos_audss_clk_driver);
-+}
-+module_exit(exynos_audss_clk_exit);
-+
-+MODULE_AUTHOR("Padmavathi Venna <padma.v@samsung.com>");
-+MODULE_DESCRIPTION("Exynos Audio Subsystem Clock Controller");
-+MODULE_LICENSE("GPL v2");
-+MODULE_ALIAS("platform:exynos-audss-clk");
+ 	/* gate clocks */
+ 	gscl0 = 256, gscl1, gscl2, gscl3, gscl_wa, gscl_wb, smmu_gscl0,
+@@ -301,7 +301,7 @@ static struct samsung_div_clock exynos5250_div_clks[] __initdata = {
+ 	DIV(none, "div_dp", "mout_dp", DIV_DISP1_0, 24, 4),
+ 	DIV(none, "div_jpeg", "mout_jpeg", DIV_GEN, 4, 4),
+ 	DIV(none, "div_audio0", "mout_audio0", DIV_MAU, 0, 4),
+-	DIV(none, "div_pcm0", "sclk_audio0", DIV_MAU, 4, 8),
++	DIV(div_pcm0, "div_pcm0", "sclk_audio0", DIV_MAU, 4, 8),
+ 	DIV(none, "div_sata", "mout_sata", DIV_FSYS0, 20, 4),
+ 	DIV(none, "div_usb3", "mout_usb3", DIV_FSYS0, 24, 4),
+ 	DIV(none, "div_mmc0", "mout_mmc0", DIV_FSYS1, 0, 4),
 -- 
 1.8.4
