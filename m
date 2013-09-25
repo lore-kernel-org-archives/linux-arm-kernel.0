@@ -1,134 +1,286 @@
-From: steve.capper@linaro.org (Steve Capper)
-Date: Wed, 25 Sep 2013 13:31:29 +0100
-Subject: [PATCH V2] ARM: mm: make UACCESS_WITH_MEMCPY huge page aware
-Message-ID: <1380112289-19572-1-git-send-email-steve.capper@linaro.org>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Wed, 25 Sep 2013 14:37:19 +0200
+Subject: [RFC PATCH 09/15] ata: ti_sata: Add Texas Instruments SATA Wrapper
+ driver
+In-Reply-To: <1379595943-14622-10-git-send-email-rogerq@ti.com>
+References: <1379595943-14622-1-git-send-email-rogerq@ti.com>
+ <1379595943-14622-10-git-send-email-rogerq@ti.com>
+Message-ID: <5608096.0pgFIteLqQ@amdc1032>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The memory pinning code in uaccess_with_memcpy.c does not check
-for HugeTLB or THP pmds, and will enter an infinite loop should
-a __copy_to_user or __clear_user occur against a huge page.
 
-This patch adds detection code for huge pages to pin_page_for_write.
-As this code can be executed in a fast path it refers to the actual
-pmds rather than the vma. If a HugeTLB or THP is found (they have
-the same pmd representation on ARM), the page table spinlock is
-taken to prevent modification whilst the page is pinned.
+Hi,
 
-On ARM, huge pages are only represented as pmds, thus no huge pud
-checks are performed. (For huge puds one would lock the page table
-in a similar manner as in the pmd case).
+On Thursday, September 19, 2013 04:05:37 PM Roger Quadros wrote:
+> Texas Instruments SoCs like OMAP5 and DRA7 contain a SATA wrapper
+> around the AHCI SATA core. This driver will manage that.
+> 
+> CC: Tejun Heo <tj@kernel.org>
+> Signed-off-by: Roger Quadros <rogerq@ti.com>
+> ---
+>  Documentation/devicetree/bindings/ata/ti-sata.txt |   31 ++++
+>  drivers/ata/Kconfig                               |    7 +
+>  drivers/ata/Makefile                              |    1 +
+>  drivers/ata/sata_ti.c                             |  160 +++++++++++++++++++++
+>  4 files changed, 199 insertions(+), 0 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/ata/ti-sata.txt
+>  create mode 100644 drivers/ata/sata_ti.c
+> 
+> diff --git a/Documentation/devicetree/bindings/ata/ti-sata.txt b/Documentation/devicetree/bindings/ata/ti-sata.txt
+> new file mode 100644
+> index 0000000..bf0ea3b
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/ata/ti-sata.txt
+> @@ -0,0 +1,31 @@
+> +* Texas Instruments SATA Controller Wrapper
+> +
+> +Required properties:
+> +- compatible	: "ti,sata"
+> +- ti,hwmods	: "sata"
+> +- reg		: Register mapping
+> +- #address-cells: <1>
+> +- #size-cells	: <1>
+> +- ranges	: allows valid translation between child's address space and parent's
+> +		  address space.
+> +- Must contain at least one child node for the SATA controller core
+> +
+> +Example:
+> +
+> +	sata: sata at 4a141100 {
+> +		compatible = "ti,sata";
+> +		ti,hwmods = "sata";
+> +		reg = <0x4a141100 0x7>;
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		ranges;
+> +		dwc-ahci at 4a140000 {
+> +			compatible = "snps,dwc-ahci";
+> +			reg = <0x4a140000 0x1100>;
+> +			interrupts = <GIC_SPI 54 IRQ_TYPE_LEVEL_HIGH>;
+> +			phys = <&sata_phy>;
+> +			phy-names = "sata-phy";
+> +			clocks = <&sata_ref_clk>;
+> +			clock-names = "optclk";
+> +		};
+> +	};
+> diff --git a/drivers/ata/Kconfig b/drivers/ata/Kconfig
+> index a53ef27..a3de4d2 100644
+> --- a/drivers/ata/Kconfig
+> +++ b/drivers/ata/Kconfig
+> @@ -138,6 +138,13 @@ config SATA_SIL24
+>  
+>  	  If unsure, say N.
+>  
+> +config SATA_TI
+> +	tristate "Texas Instruments SATA Wrapper driver"
+> +	depends on ARCH_OMAP
+> +	help
+> +	  This options enables SATA Wrapper driver for Texas Instruments SoCs.
+> +	  It is found on OMAP5 and DRA7.
+> +
+>  config ATA_SFF
+>  	bool "ATA SFF support (for legacy IDE and PATA)"
+>  	default y
+> diff --git a/drivers/ata/Makefile b/drivers/ata/Makefile
+> index 46518c6..673ba5e 100644
+> --- a/drivers/ata/Makefile
+> +++ b/drivers/ata/Makefile
+> @@ -11,6 +11,7 @@ obj-$(CONFIG_SATA_SIL24)	+= sata_sil24.o
+>  obj-$(CONFIG_SATA_DWC)		+= sata_dwc_460ex.o
+>  obj-$(CONFIG_SATA_HIGHBANK)	+= sata_highbank.o libahci.o
+>  obj-$(CONFIG_AHCI_IMX)		+= ahci_imx.o
+> +obj-$(CONFIG_SATA_TI)		+= sata_ti.o
+>  
+>  # SFF w/ custom DMA
+>  obj-$(CONFIG_PDC_ADMA)		+= pdc_adma.o
+> diff --git a/drivers/ata/sata_ti.c b/drivers/ata/sata_ti.c
+> new file mode 100644
+> index 0000000..0b9093d
+> --- /dev/null
+> +++ b/drivers/ata/sata_ti.c
+> @@ -0,0 +1,160 @@
+> +/**
+> + * sata-ti.c - Texas Instruments Specific SATA Glue layer
 
-Two helper functions are introduced; pmd_thp_or_huge will check
-whether or not a page is huge or transparent huge (which have the
-same pmd layout on ARM), and pmd_hugewillfault will detect whether
-or not a page fault will occur on write to the page.
+s/sata-ti/sata_ti/
 
-Running the following test (with the chunking from read_zero
-removed):
- $ dd if=/dev/zero of=/dev/null bs=10M count=1024
-Gave:  2.3 GB/s backed by normal pages,
-       2.9 GB/s backed by huge pages,
-       5.1 GB/s backed by huge pages, with page mask=HPAGE_MASK.
+> + *
+> + * Copyright (C) 2013 Texas Instruments Incorporated - http://www.ti.com
+> + *
+> + * Authors: Roger Quadros <rogerq@ti.com>
+> + *
+> + * This program is free software: you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2  of
+> + * the License as published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#include <linux/module.h>
+> +#include <linux/kernel.h>
+> +#include <linux/slab.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/ioport.h>
+> +#include <linux/io.h>
+> +#include <linux/pm_runtime.h>
+> +#include <linux/of.h>
+> +#include <linux/of_platform.h>
+> +
+> +/*
+> + * All these registers belong to OMAP's Wrapper around the
+> + * DesignWare SATA Core.
+> + */
+> +
+> +#define SATA_SYSCONFIG				0x0000
+> +#define SATA_CDRLOCK				0x0004
 
-After some discussion, it was decided not to adopt the HPAGE_MASK,
-as this would have a significant detrimental effect on the overall
-system latency due to page_table_lock being held for too long.
-This could be revisited if split huge page locks are adopted.
+These defines are not used anywhere.
 
-Signed-off-by: Steve Capper <steve.capper@linaro.org>
-Reviewed-by: Nicolas Pitre <nico@linaro.org>
----
- arch/arm/include/asm/pgtable-3level.h |  3 +++
- arch/arm/lib/uaccess_with_memcpy.c    | 41 ++++++++++++++++++++++++++++++++---
- 2 files changed, 41 insertions(+), 3 deletions(-)
+> +struct ti_sata {
+> +	struct device *dev;
+> +	void __iomem *base;
+> +};
+> +
+> +static int ti_sata_probe(struct platform_device *pdev)
+> +{
+> +	struct device_node *np = pdev->dev.of_node;
+> +	struct device *dev = &pdev->dev;
+> +	struct ti_sata *sata;
+> +	struct resource *res;
+> +	void __iomem *base;
+> +	int ret;
+> +
+> +	if (!np) {
+> +		dev_err(dev, "device node not found\n");
+> +		return -EINVAL;
+> +	}
+> +
+> +	sata = devm_kzalloc(dev, sizeof(*sata), GFP_KERNEL);
+> +	if (!sata)
+> +		return -ENOMEM;
+> +
+> +	platform_set_drvdata(pdev, sata);
+> +
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	if (!res) {
+> +		dev_err(dev, "missing memory base resource\n");
+> +		return -EINVAL;
+> +	}
+> +
+> +	base = devm_ioremap_resource(dev, res);
+> +	if (IS_ERR(base))
+> +		return PTR_ERR(base);
+> +
+> +	sata->dev = dev;
+> +	sata->base = base;
 
-diff --git a/arch/arm/include/asm/pgtable-3level.h b/arch/arm/include/asm/pgtable-3level.h
-index 5689c18..39c54cf 100644
---- a/arch/arm/include/asm/pgtable-3level.h
-+++ b/arch/arm/include/asm/pgtable-3level.h
-@@ -206,6 +206,9 @@ static inline pmd_t *pmd_offset(pud_t *pud, unsigned long addr)
- #define __HAVE_ARCH_PMD_WRITE
- #define pmd_write(pmd)		(!(pmd_val(pmd) & PMD_SECT_RDONLY))
- 
-+#define pmd_hugewillfault(pmd)	(!pmd_young(pmd) || !pmd_write(pmd))
-+#define pmd_thp_or_huge(pmd)	(pmd_huge(pmd) || pmd_trans_huge(pmd))
-+
- #ifdef CONFIG_TRANSPARENT_HUGEPAGE
- #define pmd_trans_huge(pmd)	(pmd_val(pmd) && !(pmd_val(pmd) & PMD_TABLE_BIT))
- #define pmd_trans_splitting(pmd) (pmd_val(pmd) & PMD_SECT_SPLITTING)
-diff --git a/arch/arm/lib/uaccess_with_memcpy.c b/arch/arm/lib/uaccess_with_memcpy.c
-index 025f742..3e58d71 100644
---- a/arch/arm/lib/uaccess_with_memcpy.c
-+++ b/arch/arm/lib/uaccess_with_memcpy.c
-@@ -18,6 +18,7 @@
- #include <linux/hardirq.h> /* for in_atomic() */
- #include <linux/gfp.h>
- #include <linux/highmem.h>
-+#include <linux/hugetlb.h>
- #include <asm/current.h>
- #include <asm/page.h>
- 
-@@ -40,7 +41,35 @@ pin_page_for_write(const void __user *_addr, pte_t **ptep, spinlock_t **ptlp)
- 		return 0;
- 
- 	pmd = pmd_offset(pud, addr);
--	if (unlikely(pmd_none(*pmd) || pmd_bad(*pmd)))
-+	if (unlikely(pmd_none(*pmd)))
-+		return 0;
-+
-+	/*
-+	 * A pmd can be bad if it refers to a HugeTLB or THP page.
-+	 *
-+	 * Both THP and HugeTLB pages have the same pmd layout
-+	 * and should not be manipulated by the pte functions.
-+	 *
-+	 * Lock the page table for the destination and check
-+	 * to see that it's still huge and whether or not we will
-+	 * need to fault on write, or if we have a splitting THP.
-+	 */
-+	if (unlikely(pmd_thp_or_huge(*pmd))) {
-+		ptl = &current->mm->page_table_lock;
-+		spin_lock(ptl);
-+		if (unlikely(!pmd_thp_or_huge(*pmd)
-+			|| pmd_hugewillfault(*pmd)
-+			|| pmd_trans_splitting(*pmd))) {
-+			spin_unlock(ptl);
-+			return 0;
-+		}
-+
-+		*ptep = NULL;
-+		*ptlp = ptl;
-+		return 1;
-+	}
-+
-+	if (unlikely(pmd_bad(*pmd)))
- 		return 0;
- 
- 	pte = pte_offset_map_lock(current->mm, pmd, addr, &ptl);
-@@ -94,7 +123,10 @@ __copy_to_user_memcpy(void __user *to, const void *from, unsigned long n)
- 		from += tocopy;
- 		n -= tocopy;
- 
--		pte_unmap_unlock(pte, ptl);
-+		if (pte)
-+			pte_unmap_unlock(pte, ptl);
-+		else
-+			spin_unlock(ptl);
- 	}
- 	if (!atomic)
- 		up_read(&current->mm->mmap_sem);
-@@ -147,7 +179,10 @@ __clear_user_memset(void __user *addr, unsigned long n)
- 		addr += tocopy;
- 		n -= tocopy;
- 
--		pte_unmap_unlock(pte, ptl);
-+		if (pte)
-+			pte_unmap_unlock(pte, ptl);
-+		else
-+			spin_unlock(ptl);
- 	}
- 	up_read(&current->mm->mmap_sem);
- 
--- 
-1.8.1.4
+sata structure is just setup and it is not used later anywhere.
+
+> +	pm_runtime_enable(dev);
+> +	ret = pm_runtime_get_sync(dev);
+> +	if (ret < 0) {
+> +		dev_err(dev, "pm_runtime_get_sync failed with err %d\n",
+> +									ret);
+> +		goto runtime_disable;
+> +	}
+> +
+> +	ret = of_platform_populate(np, NULL, NULL, dev);
+
+Shouldn't this driver depend on CONFIG_OF?
+
+> +	if (ret) {
+> +		dev_err(&pdev->dev, "failed to create TI SATA children\n");
+> +		goto runtime_put;
+> +	}
+> +
+> +	return 0;
+> +
+> +runtime_put:
+> +	pm_runtime_put_sync(dev);
+> +
+> +runtime_disable:
+> +	pm_runtime_disable(dev);
+> +
+> +	return ret;
+> +}
+> +
+> +static int ti_sata_remove_child(struct device *dev, void *c)
+> +{
+> +	struct platform_device *pdev = to_platform_device(dev);
+> +
+> +	platform_device_unregister(pdev);
+> +
+> +	return 0;
+> +}
+> +
+> +static int ti_sata_remove(struct platform_device *pdev)
+> +{
+> +	pm_runtime_put_sync(&pdev->dev);
+> +	pm_runtime_disable(&pdev->dev);
+> +	device_for_each_child(&pdev->dev, NULL, ti_sata_remove_child);
+> +
+> +	return 0;
+> +}
+> +
+> +static const struct of_device_id of_ti_sata_match[] = {
+> +	{
+> +		.compatible =	"ti,sata"
+> +	},
+> +	{ },
+> +};
+> +MODULE_DEVICE_TABLE(of, of_ti_sata_match);
+> +
+> +#ifdef CONFIG_PM
+> +
+> +static int ti_sata_resume(struct device *dev)
+> +{
+> +	pm_runtime_disable(dev);
+> +	pm_runtime_set_active(dev);
+> +	pm_runtime_enable(dev);
+
+This doesn't look like a correct ->resume method:
+* it shouldn't touch runtime PM at all
+* for each ->resume method there should be a corresponding ->suspend method
+
+Moreover this whole wrapper driver seems strange, why not just add a proper
+runtime PM support to ahci_platform driver instead?
+
+> +
+> +	return 0;
+> +}
+> +
+> +static const struct dev_pm_ops ti_sata_dev_pm_ops = {
+> +	.resume = ti_sata_resume,
+> +};
+> +
+> +#define DEV_PM_OPS	(&ti_sata_dev_pm_ops)
+> +#else
+> +#define DEV_PM_OPS	NULL
+> +#endif /* CONFIG_PM */
+> +
+> +static struct platform_driver ti_sata_driver = {
+> +	.probe		= ti_sata_probe,
+> +	.remove		= ti_sata_remove,
+> +	.driver		= {
+> +		.name	= "ti-sata",
+> +		.of_match_table	= of_ti_sata_match,
+> +		.pm	= DEV_PM_OPS,
+> +	},
+> +};
+> +
+> +module_platform_driver(ti_sata_driver);
+> +
+> +MODULE_ALIAS("platform:ti-sata");
+> +MODULE_AUTHOR("Roger Quadros <rogerq@ti.com>");
+> +MODULE_LICENSE("GPL v2");
+> +MODULE_DESCRIPTION("TI SATA Glue Layer");
+
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
