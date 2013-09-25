@@ -1,55 +1,63 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 25 Sep 2013 09:19:23 -0700
-Subject: [PATCH v4 4/4] KVM: Add documentation for
- KVM_ARM_PREFERRED_TARGET ioctl
-In-Reply-To: <CAAhSdy1hZc3Cx51KLwEaDUo4fbiLLzdcBJYXrFgv5AxdWDzbMg@mail.gmail.com>
-References: <1380101163-20028-1-git-send-email-anup.patel@linaro.org>
- <1380101163-20028-5-git-send-email-anup.patel@linaro.org>
- <ECFE274D-FC43-43AD-8A9E-D3131E327F26@suse.de>
- <CAAhSdy1hZc3Cx51KLwEaDUo4fbiLLzdcBJYXrFgv5AxdWDzbMg@mail.gmail.com>
-Message-ID: <20130925161923.GB32311@cbox>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Wed, 25 Sep 2013 12:30:45 -0400
+Subject: [PATCH v1 7/7] jump_label: use defined macros instead of
+ hard-coding for better readability
+In-Reply-To: <52430587.6050900@gmail.com>
+References: <1380105868-31985-1-git-send-email-liuj97@gmail.com>
+ <1380105868-31985-8-git-send-email-liuj97@gmail.com>
+ <20130925105330.4b717a80@gandalf.local.home>
+ <52430587.6050900@gmail.com>
+Message-ID: <20130925123045.6e3a5b88@gandalf.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 25, 2013 at 05:58:07PM +0530, Anup Patel wrote:
-> On Wed, Sep 25, 2013 at 5:43 PM, Alexander Graf <agraf@suse.de> wrote:
-> >
-> > On 25.09.2013, at 11:26, Anup Patel wrote:
-> >
-> >> To implement CPU=Host we have added KVM_ARM_PREFERRED_TARGET
-> >> vm ioctl which provides information to user space required for
-> >> creating VCPU matching underlying Host.
-> >>
-> >> This patch adds info related to this new KVM_ARM_PREFERRED_TARGET
-> >> vm ioctl in the KVM API documentation.
-> >>
-> >> Signed-off-by: Anup Patel <anup.patel@linaro.org>
-> >> Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
-> >> ---
-> >> Documentation/virtual/kvm/api.txt |   27 +++++++++++++++++++++++----
-> >> 1 file changed, 23 insertions(+), 4 deletions(-)
-> >>
-> >> diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
-> >> index 858aecf..f31e6e8 100644
-> >> --- a/Documentation/virtual/kvm/api.txt
-> >> +++ b/Documentation/virtual/kvm/api.txt
-> >> @@ -2303,8 +2303,28 @@ Possible features:
-> >>       - KVM_ARM_VCPU_EL1_32BIT: Starts the CPU in a 32bit mode.
-> >>         Depends on KVM_CAP_ARM_EL1_32BIT (arm64 only).
-> >>
-> >> +4.83 KVM_ARM_PREFERRED_TARGET
-> >
-> > Why 4.83 and not 4.86? It feels backwards to rename all these other sections.
-> 
-> I wanted to have KVM_ARM_xxxx IOCTLs located nearby hence
-> placed KVM_ARM_PREFERRED_TARGET after KVM_ARM_VCPU_INIT.
-> 
-> There is no point in keeping KVM_ARM_PREFERRED_TARGET
-> after KVM_PPC_RTAS_DEFINE_TOKEN and make
-> KVM_PPC_RTAS_DEFINE_TOKEN dangle in-between documentation
-> of various KVM_ARM_xxxx IOCTLs.
-> 
-I checked the git log and this is not the first time this has happened,
-so I think Anup's point here is valid.
 
--Christoffer
+[ Added Jason to Cc. ]
+
+On Wed, 25 Sep 2013 23:47:19 +0800
+Jiang Liu <liuj97@gmail.com> wrote:
+
+> On 09/25/2013 10:53 PM, Steven Rostedt wrote:
+> > On Wed, 25 Sep 2013 18:44:27 +0800
+> > Jiang Liu <liuj97@gmail.com> wrote:
+> > 
+> >> From: Jiang Liu <jiang.liu@huawei.com>
+> >>
+> >> Use macro JUMP_LABEL_TRUE_BRANCH instead of hard-coding for better
+> >> readability.
+> >>
+> >> Signed-off-by: Jiang Liu <jiang.liu@huawei.com>
+> >> Cc: Jiang Liu <liuj97@gmail.com>
+> >> ---
+> >>  include/linux/jump_label.h | 3 ++-
+> >>  1 file changed, 2 insertions(+), 1 deletion(-)
+> >>
+> >> diff --git a/include/linux/jump_label.h b/include/linux/jump_label.h
+> >> index a507907..b697fbd 100644
+> >> --- a/include/linux/jump_label.h
+> >> +++ b/include/linux/jump_label.h
+> >> @@ -116,7 +116,8 @@ extern void static_key_slow_dec(struct static_key *key);
+> >>  extern void jump_label_apply_nops(struct module *mod);
+> >>  
+> >>  #define STATIC_KEY_INIT_TRUE ((struct static_key) \
+> >> -	{ .enabled = ATOMIC_INIT(1), .entries = (void *)1 })
+> >> +	{ .enabled = ATOMIC_INIT(1), \
+> >> +	  .entries = (void *)JUMP_LABEL_TRUE_BRANCH })
+> >>  #define STATIC_KEY_INIT_FALSE ((struct static_key) \
+> >>  	{ .enabled = ATOMIC_INIT(0), .entries = (void *)0 })
+> >>  
+> > 
+> > Probably should add a comment that there is no
+> > "JUMP_LABEL_FALSE_BRANCH" or maybe we should add one?
+> Hi Steven,
+> 	How about
+> JUMP_LABEL_TYPE_MASK/JUMP_LABEL_TRUE_BRANCH/JUMP_LABEL_FALSE_BRANCH
+> tuple? That should have the best readability.
+> Thanks!
+> 
+
+You mean a mask of ~1, and TRUE be 1 and FALSE be 0.
+
+That may work.
+
+-- Steve
