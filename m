@@ -1,67 +1,80 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 25 Sep 2013 08:50:38 -0500
-Subject: [PATCH v2 0/2] ARM DT cpus/cpu and topology bindings
-In-Reply-To: <20130924160126.GC403@e102568-lin.cambridge.arm.com>
-References: <1379330464-27917-1-git-send-email-lorenzo.pieralisi@arm.com>
- <20130924160126.GC403@e102568-lin.cambridge.arm.com>
-Message-ID: <5242EA2E.1010106@gmail.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Wed, 25 Sep 2013 16:05:28 +0200
+Subject: [PATCH RESEND CRITICAL] clocksource: exynos_mct: Set IRQ affinity when
+ the CPU goes online
+In-Reply-To: <1377534836-21682-1-git-send-email-t.figa@samsung.com>
+References: <1377534836-21682-1-git-send-email-t.figa@samsung.com>
+Message-ID: <30004270.5bGcANHqs4@amdc1227>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/24/2013 11:01 AM, Lorenzo Pieralisi wrote:
-> [replying to self]
-> 
-> Any further comments on this series ? If not, I think bindings are ready to be
-> queued, but for that I need acks from DT maintainers.
+Some variants of Exynos MCT, namely exynos4210-mct at the moment, use
+normal, shared interrupts for local timers. This means that each
+interrupt must have correct affinity set to fire only on CPU
+corresponding to given local timer.
 
-Who do you plan to take this? Is this dependent on something for 3.13?
-If not, I'll apply it.
+However after recent conversion of clocksource drivers to not use the
+local timer API for local timer initialization any more, the point of
+time when local timers get initialized changed and irq_set_affinity()
+fails because the CPU is not marked as online yet.
 
-Rob
+This patch fixes this by moving the call to irq_set_affinity() to
+CPU_ONLINE notification, so the affinity is being set when the CPU goes
+online.
 
-> The issue with in kernel dts that (re)-need patching owing to re-introduction
-> of reg property on pre-v7 UP is still pending.
-> 
-> Please advise, thank you very much,
-> Lorenzo
-> 
-> On Mon, Sep 16, 2013 at 12:21:02PM +0100, Lorenzo Pieralisi wrote:
->> This is v2 of a previous posting:
->>
->> http://lists.infradead.org/pipermail/linux-arm-kernel/2013-August/192322.html
->>
->> - v2 changes
->> 	- Removed single core cpu-map example
->> 	- Removed OS dependency from cpus/cpu bindings
->> 	- Updated Marvell compatible strings
->> 	- Clarified behaviour on pre ARM v7 uniprocessor systems and updated
->> 	  examples
->>
->> This patch resumes DT topology/cpu bindings discussions for ARM that were
->> started here:
->>
->> https://lists.ozlabs.org/pipermail/devicetree-discuss/2013-April/031725.html
->> https://lists.ozlabs.org/pipermail/devicetree-discuss/2013-April/032450.html
->>
->> Comments welcome, thanks,
->> Lorenzo
->>
->> Lorenzo Pieralisi (2):
->>   Documentation: devicetree: arm: cpus/cpu nodes bindings updates
->>   Documentation: DT: arm: define CPU topology bindings
->>
->>  Documentation/devicetree/bindings/arm/cpus.txt     | 391 +++++++++++++++--
->>  Documentation/devicetree/bindings/arm/topology.txt | 474 +++++++++++++++++++++
->>  2 files changed, 818 insertions(+), 47 deletions(-)
->>  create mode 100644 Documentation/devicetree/bindings/arm/topology.txt
->>
->> -- 
->> 1.8.2.2
->>
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+This fixes a problem with Exynos4210 failing to boot, present since commit
+	ee98d27df6 ARM: EXYNOS4: Divorce mct from local timer API
+due to failing irq_set_affinity().
+
+Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+---
+ drivers/clocksource/exynos_mct.c | 10 +++++++++-
+ 1 file changed, 9 insertions(+), 1 deletion(-)
+
+Resending again, since my mail client previously freaked out and reset
+message format to HTML...
+
+diff --git a/drivers/clocksource/exynos_mct.c b/drivers/clocksource/exynos_mct.c
+index 5b34768..62b0de6 100644
+--- a/drivers/clocksource/exynos_mct.c
++++ b/drivers/clocksource/exynos_mct.c
+@@ -428,7 +428,6 @@ static int exynos4_local_timer_setup(struct clock_event_device *evt)
+ 				evt->irq);
+ 			return -EIO;
+ 		}
+-		irq_set_affinity(evt->irq, cpumask_of(cpu));
+ 	} else {
+ 		enable_percpu_irq(mct_irqs[MCT_L0_IRQ], 0);
+ 	}
+@@ -449,6 +448,7 @@ static int exynos4_mct_cpu_notify(struct notifier_block *self,
+ 					   unsigned long action, void *hcpu)
+ {
+ 	struct mct_clock_event_device *mevt;
++	unsigned int cpu;
+ 
+ 	/*
+ 	 * Grab cpu pointer in each case to avoid spurious
+@@ -459,6 +459,12 @@ static int exynos4_mct_cpu_notify(struct notifier_block *self,
+ 		mevt = this_cpu_ptr(&percpu_mct_tick);
+ 		exynos4_local_timer_setup(&mevt->evt);
+ 		break;
++	case CPU_ONLINE:
++		cpu = (unsigned long)hcpu;
++		if (mct_int_type == MCT_INT_SPI)
++			irq_set_affinity(mct_irqs[MCT_L0_IRQ + cpu],
++						cpumask_of(cpu));
++		break;
+ 	case CPU_DYING:
+ 		mevt = this_cpu_ptr(&percpu_mct_tick);
+ 		exynos4_local_timer_stop(&mevt->evt);
+@@ -500,6 +506,8 @@ static void __init exynos4_timer_resources(struct device_node *np, void __iomem
+ 					 &percpu_mct_tick);
+ 		WARN(err, "MCT: can't request IRQ %d (%d)\n",
+ 		     mct_irqs[MCT_L0_IRQ], err);
++	} else {
++		irq_set_affinity(mct_irqs[MCT_L0_IRQ], cpumask_of(0));
+ 	}
+ 
+ 	err = register_cpu_notifier(&exynos4_mct_cpu_nb);
+-- 
+1.8.3.2
