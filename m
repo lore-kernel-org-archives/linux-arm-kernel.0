@@ -1,53 +1,32 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Wed, 25 Sep 2013 08:58:55 -0400
-Subject: [PATCH v1 1/7] arm64: introduce basic aarch64 instruction decoding
- helpers
-In-Reply-To: <1380105868-31985-2-git-send-email-liuj97@gmail.com>
-References: <1380105868-31985-1-git-send-email-liuj97@gmail.com>
- <1380105868-31985-2-git-send-email-liuj97@gmail.com>
-Message-ID: <5242DE0F.1080601@codeaurora.org>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Wed, 25 Sep 2013 15:15:01 +0200
+Subject: [PATCH v4] PWM: atmel-pwm: add PWM controller driver
+In-Reply-To: <524290F5.2090406@atmel.com>
+References: <1380079664-21959-1-git-send-email-voice.shen@atmel.com>
+ <524290F5.2090406@atmel.com>
+Message-ID: <5242E1D5.5000503@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jiang,
+On 25/09/2013 09:29, Nicolas Ferre wrote:
+> On 25/09/2013 05:27, Bo Shen :
+>> Add Atmel PWM controller driver based on PWM framework.
+>>
+>> This is the basic function implementation of Atmel PWM controller.
+>> It can work with PWM based led and backlight.
+>>
+>> Signed-off-by: Bo Shen <voice.shen@atmel.com>
+>
+> It seems simple and nice.
+>
+> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-On 09/25/2013 06:44 AM, Jiang Liu wrote:
+Tested on a sama5d31 board with leds-pwm.
 
-[...]
-
-> diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
-
-[...]
-
-> +static int aarch64_insn_cls[] = {
-> +	AARCH64_INSN_CLS_UNKNOWN,	/* 0 0 X X */
-> +	AARCH64_INSN_CLS_UNKNOWN,	/* 0 0 X X */
-> +	AARCH64_INSN_CLS_UNKNOWN,	/* 0 0 X X */
-> +	AARCH64_INSN_CLS_UNKNOWN,	/* 0 0 X X */
-> +	AARCH64_INSN_CLS_LDST,		/* X 1 X 0 */
-> +	AARCH64_INSN_CLS_DP_REG,	/* X 1 0 1 */
-> +	AARCH64_INSN_CLS_LDST,		/* X 1 X 0 */
-> +	AARCH64_INSN_CLS_DP_FPSIMD,	/* 0 1 1 1 */
-> +	AARCH64_INSN_CLS_DP_IMM,	/* 1 0 0 X */
-> +	AARCH64_INSN_CLS_DP_IMM,	/* 1 0 0 X */
-> +	AARCH64_INSN_CLS_BR_SYS,	/* 1 0 1 X */
-> +	AARCH64_INSN_CLS_BR_SYS,	/* 1 0 1 X */
-> +	AARCH64_INSN_CLS_LDST,		/* X 1 X 0 */
-> +	AARCH64_INSN_CLS_DP_REG,	/* X 1 0 1 */
-> +	AARCH64_INSN_CLS_LDST,		/* X 1 X 0 */
-> +	AARCH64_INSN_CLS_DP_FPSIMD,	/* 1 1 1 1 */
-> +};
-
-As I read this, I was initially puzzled as to why there are duplicate entries
-in the list. Since the data structure doesn't really support don't-cares,
-perhaps it would be clearer to use 1's and 0's instead of X's.
-
-[...]
-
-Thanks,
-Christopher
+Tested-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+>
 
 -- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by the Linux Foundation.
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
