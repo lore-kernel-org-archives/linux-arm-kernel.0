@@ -1,77 +1,71 @@
-From: anup.patel@linaro.org (Anup Patel)
-Date: Wed, 25 Sep 2013 14:56:03 +0530
-Subject: =?UTF-8?q?=5BPATCH=20v4=204/4=5D=20KVM=3A=20Add=20documentation=20for=20KVM=5FARM=5FPREFERRED=5FTARGET=20ioctl?=
-In-Reply-To: <1380101163-20028-1-git-send-email-anup.patel@linaro.org>
-References: <1380101163-20028-1-git-send-email-anup.patel@linaro.org>
-Message-ID: <1380101163-20028-5-git-send-email-anup.patel@linaro.org>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Wed, 25 Sep 2013 18:29:52 +0900
+Subject: [PATCH] arm64: avoid multiple evaluation of ptr in
+ get_user/put_user()
+In-Reply-To: <20130924142553.GG25907@arm.com>
+References: <524154C2.1080303@linaro.org> <20130924142553.GG25907@arm.com>
+Message-ID: <5242AD10.3070001@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To implement CPU=Host we have added KVM_ARM_PREFERRED_TARGET
-vm ioctl which provides information to user space required for
-creating VCPU matching underlying Host.
+Catalin,
 
-This patch adds info related to this new KVM_ARM_PREFERRED_TARGET
-vm ioctl in the KVM API documentation.
+Thank you for your comments, and let me send a revised patch again
+because my original message didn't reach MLs due to my screw-up.
 
-Signed-off-by: Anup Patel <anup.patel@linaro.org>
-Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
----
- Documentation/virtual/kvm/api.txt |   27 +++++++++++++++++++++++----
- 1 file changed, 23 insertions(+), 4 deletions(-)
+BTW, I will submit a patch of ftrace support on arm64 once gcc supports
+gprof (-pg) options.
 
-diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
-index 858aecf..f31e6e8 100644
---- a/Documentation/virtual/kvm/api.txt
-+++ b/Documentation/virtual/kvm/api.txt
-@@ -2303,8 +2303,28 @@ Possible features:
- 	- KVM_ARM_VCPU_EL1_32BIT: Starts the CPU in a 32bit mode.
- 	  Depends on KVM_CAP_ARM_EL1_32BIT (arm64 only).
- 
-+4.83 KVM_ARM_PREFERRED_TARGET
- 
--4.83 KVM_GET_REG_LIST
-+Capability: basic
-+Architectures: arm, arm64
-+Type: vm ioctl
-+Parameters: struct struct kvm_vcpu_init (out)
-+Returns: 0 on success; -1 on error
-+Errors:
-+ ?ENODEV: ???no preferred target available for the host
-+
-+This queries KVM for preferred CPU target type which can be emulated
-+by KVM on underlying host.
-+
-+The ioctl returns struct kvm_vcpu_init instance containing information
-+about preferred CPU target type and target specific features available
-+for it.
-+
-+The information returned by this ioctl can be used to prepare instance
-+of struct kvm_vcpu_init for KVM_ARM_VCPU_INIT ioctl which will result
-+in VCPU matching underlying host.
-+
-+4.84 KVM_GET_REG_LIST
- 
- Capability: basic
- Architectures: arm, arm64
-@@ -2323,8 +2343,7 @@ struct kvm_reg_list {
- This ioctl returns the guest registers that are supported for the
- KVM_GET_ONE_REG/KVM_SET_ONE_REG calls.
- 
--
--4.84 KVM_ARM_SET_DEVICE_ADDR
-+4.85 KVM_ARM_SET_DEVICE_ADDR
- 
- Capability: KVM_CAP_ARM_SET_DEVICE_ADDR
- Architectures: arm, arm64
-@@ -2362,7 +2381,7 @@ must be called after calling KVM_CREATE_IRQCHIP, but before calling
- KVM_RUN on any of the VCPUs.  Calling this ioctl twice for any of the
- base addresses will return -EEXIST.
- 
--4.85 KVM_PPC_RTAS_DEFINE_TOKEN
-+4.86 KVM_PPC_RTAS_DEFINE_TOKEN
- 
- Capability: KVM_CAP_PPC_RTAS
- Architectures: ppc
--- 
-1.7.9.5
+-Takahiro AKASHI
+
+On 09/24/2013 11:25 PM, Catalin Marinas wrote:
+> On Tue, Sep 24, 2013 at 10:00:50AM +0100, AKASHI Takahiro wrote:
+>> get_user() is defined as a function macro in arm64, and trace_get_user()
+>> calls it as followed:
+>>       get_user(ch, ptr++);
+>> Since the second parameter occurs twice in the definition, 'ptr++' is
+>> unexpectedly evaluated twice and trace_get_user() will generate a bogus
+>> string from user-provided one. As a result, some ftrace sysfs operations,
+>> like "echo FUNCNAME > set_ftrace_filter," hit this case and eventually fail.
+>> This patch fixes the issue both in get_user() and put_user().
+>>
+>> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+>> ---
+>>    arch/arm64/include/asm/uaccess.h |   12 ++++++++----
+>>    1 file changed, 8 insertions(+), 4 deletions(-)
+>>
+>> diff --git a/arch/arm64/include/asm/uaccess.h b/arch/arm64/include/asm/uaccess.h
+>> index edb3d5c..bbeab83 100644
+>> --- a/arch/arm64/include/asm/uaccess.h
+>> +++ b/arch/arm64/include/asm/uaccess.h
+>> @@ -166,9 +166,11 @@ do {									\
+>>     #define get_user(x, ptr)						\
+>>    ({									\
+>> +	__typeof__(*(ptr)) *optr = (ptr);				\
+>> +									\
+>>    	might_fault();							\
+>> -	access_ok(VERIFY_READ, (ptr), sizeof(*(ptr))) ?			\
+>> -		__get_user((x), (ptr)) :				\
+>> +	access_ok(VERIFY_READ, optr, sizeof(*optr)) ?			\
+>> +		__get_user((x), optr) :					\
+>>    		((x) = 0, -EFAULT);					\
+>>    })
+>>    @@ -227,9 +229,11 @@ do {									\
+>>     #define put_user(x, ptr)						\
+>>    ({									\
+>> +	__typeof__(*(ptr)) *optr = (ptr);				\
+>> +									\
+>>    	might_fault();							\
+>> -	access_ok(VERIFY_WRITE, (ptr), sizeof(*(ptr))) ?		\
+>> -		__put_user((x), (ptr)) :				\
+>> +	access_ok(VERIFY_WRITE, optr, sizeof(*optr)) ?			\
+>> +		__put_user((x), optr) :					\
+>>    		-EFAULT;						\
+>>    })
+>>    -- 1.7.9.5
+>
+> BTW, please use git send-email or other email client, the diff above is
+> heavily corrupted (too many spaces at the beginning of the line, removed
+> empty lines; I managed to fix it up this time but only because it was a
+> small patch).
+>
