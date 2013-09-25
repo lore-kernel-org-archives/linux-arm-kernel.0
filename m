@@ -1,217 +1,119 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 25 Sep 2013 13:38:03 -0700
-Subject: [PATCH 6/8] KVM: arm-vgic: Add vgic reg access from dev attr
-In-Reply-To: <2FCDD68C-E993-4E52-AB7F-A4E5B0FB6E6F@suse.de>
-References: <1377285606-15692-1-git-send-email-christoffer.dall@linaro.org>
- <1377285606-15692-7-git-send-email-christoffer.dall@linaro.org>
- <2FCDD68C-E993-4E52-AB7F-A4E5B0FB6E6F@suse.de>
-Message-ID: <20130925203803.GF32311@cbox>
+From: dinguyen@altera.com (dinguyen at altera.com)
+Date: Wed, 25 Sep 2013 15:41:57 -0500
+Subject: [PATCH] dts: socfpga: Add support for Altera's SOCFPGA Arria V board
+Message-ID: <1380141717-18050-1-git-send-email-dinguyen@altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Aug 25, 2013 at 04:21:58PM +0100, Alexander Graf wrote:
-> 
-> On 23.08.2013, at 20:20, Christoffer Dall wrote:
-> 
-> > Add infrastructure to handle distributor and cpu interface register
-> > accesses through the KVM_{GET/SET}_DEVICE_ATTR interface by adding the
-> > KVM_DEV_ARM_VGIC_GRP_DIST_REGS and KVM_DEV_ARM_VGIC_GRP_CPU_REGS groups
-> > and defining the semantics of the attr field to be the MMIO offset as
-> > specified in the GICv2 specs.
-> > 
-> > Missing register accesses or other changes in individual register access
-> > functions to support save/restore of the VGIC state is added in
-> > subsequent patches.
-> > 
-> > Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> > ---
-> > Documentation/virtual/kvm/devices/arm-vgic.txt |   35 ++++++
-> > virt/kvm/arm/vgic.c                            |  143 ++++++++++++++++++++++++
-> > 2 files changed, 178 insertions(+)
-> > 
-> > diff --git a/Documentation/virtual/kvm/devices/arm-vgic.txt b/Documentation/virtual/kvm/devices/arm-vgic.txt
-> > index c9febb2..1b68475 100644
-> > --- a/Documentation/virtual/kvm/devices/arm-vgic.txt
-> > +++ b/Documentation/virtual/kvm/devices/arm-vgic.txt
-> > @@ -19,3 +19,38 @@ Groups:
-> >     KVM_VGIC_V2_ADDR_TYPE_CPU (rw, 64-bit)
-> >       Base address in the guest physical address space of the GIC virtual cpu
-> >       interface register mappings.
-> > +
-> > +  KVM_DEV_ARM_VGIC_GRP_DIST_REGS
-> > +  Attributes:
-> > +    The attr field of kvm_device_attr encodes two values:
-> > +    bits:     | 63   ....  40 | 39 ..  32  |  31   ....    0 |
-> > +    values:   |    reserved   |   cpu id   |      offset     |
-> > +
-> > +    All distributor regs are (rw, 32-bit)
-> > +
-> > +    The offset is relative to the "Distributor base address" as defined in the
-> > +    GICv2 specs.  Getting or setting such a register has the same effect as
-> > +    reading or writing the register on the actual hardware from the cpu
-> > +    specified with cpu id field.  Note that most distributor fields are not
-> > +    banked, but return the same value regardless of the cpu id used to access
-> > +    the register.
-> > +  Limitations:
-> > +    - Priorities are not implemented, and registers are RAZ/WI
-> > +  Errors:
-> > +    - ENODEV: Getting or setting this register is not yet supported
-> > +
-> > +  KVM_DEV_ARM_VGIC_GRP_CPU_REGS
-> > +  Attributes:
-> > +    The attr field of kvm_device_attr encodes two values:
-> > +    bits:     | 63   ....  40 | 39 ..  32  |  31   ....    0 |
-> > +    values:   |    reserved   |   cpu id   |      offset     |
-> > +
-> > +    All CPU regs are (rw, 32-bit)
-> > +
-> > +    The offsetspecifies the offset from the "CPU interface base address" as
-> 
-> offset specifies
-> 
-> > +    defined in the GICv2 specs.  Getting or setting such a register has the
-> > +    same effect as reading or writing the register on the actual hardware.
-> > +  Limitations:
-> > +    - Priorities are not implemented, and registers are RAZ/WI
-> > +  Errors:
-> > +    - ENODEV: Getting or setting this register is not yet supported
-> > diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-> > index 629caeb..e31625c 100644
-> > --- a/virt/kvm/arm/vgic.c
-> > +++ b/virt/kvm/arm/vgic.c
-> > @@ -591,11 +591,29 @@ static bool handle_mmio_sgi_reg(struct kvm_vcpu *vcpu,
-> > 	return false;
-> > }
-> > 
-> > +static bool handle_mmio_sgi_clear(struct kvm_vcpu *vcpu,
-> > +				  struct kvm_exit_mmio *mmio,
-> > +				  phys_addr_t offset)
-> > +{
-> > +	return false;
-> > +}
-> > +
-> > +static bool handle_mmio_sgi_set(struct kvm_vcpu *vcpu,
-> > +				struct kvm_exit_mmio *mmio,
-> > +				phys_addr_t offset)
-> > +{
-> > +	return false;
-> > +}
-> > +
-> > /*
-> >  * I would have liked to use the kvm_bus_io_*() API instead, but it
-> >  * cannot cope with banked registers (only the VM pointer is passed
-> >  * around, and we need the vcpu). One of these days, someone please
-> >  * fix it!
-> > + *
-> > + * Note that the handle_mmio implementations should not use the phys_addr
-> > + * field from the kvm_exit_mmio struct as this will not have any sane values
-> > + * when used to save/restore state from user space.
-> >  */
-> > struct mmio_range {
-> > 	phys_addr_t base;
-> > @@ -665,6 +683,16 @@ static const struct mmio_range vgic_dist_ranges[] = {
-> > 		.len		= 4,
-> > 		.handle_mmio	= handle_mmio_sgi_reg,
-> > 	},
-> > +	{
-> > +		.base		= GIC_DIST_SGI_CLEAR,
-> > +		.len		= VGIC_NR_SGIS,
-> > +		.handle_mmio	= handle_mmio_sgi_clear,
-> > +	},
-> > +	{
-> > +		.base		= GIC_DIST_SGI_SET,
-> > +		.len		= VGIC_NR_SGIS,
-> > +		.handle_mmio	= handle_mmio_sgi_set,
-> > +	},
-> > 	{}
-> > };
-> > 
-> > @@ -1543,6 +1571,80 @@ int kvm_vgic_addr(struct kvm *kvm, unsigned long type, u64 *addr, bool write)
-> > 	return r;
-> > }
-> > 
-> > +static bool handle_cpu_mmio_misc(struct kvm_vcpu *vcpu,
-> > +				 struct kvm_exit_mmio *mmio, phys_addr_t offset)
-> > +{
-> > +	return true;
-> > +}
-> > +
-> > +static const struct mmio_range vgic_cpu_ranges[] = {
-> > +	{
-> > +		.base		= GIC_CPU_CTRL,
-> > +		.len		= 12,
-> > +		.handle_mmio	= handle_cpu_mmio_misc,
-> > +	},
-> > +	{
-> > +		.base		= GIC_CPU_ALIAS_BINPOINT,
-> > +		.len		= 4,
-> > +		.handle_mmio	= handle_cpu_mmio_misc,
-> > +	},
-> > +	{
-> > +		.base		= GIC_CPU_ACTIVEPRIO,
-> > +		.len		= 16,
-> > +		.handle_mmio	= handle_cpu_mmio_misc,
-> > +	},
-> > +	{
-> > +		.base		= GIC_CPU_IDENT,
-> > +		.len		= 4,
-> > +		.handle_mmio	= handle_cpu_mmio_misc,
-> > +	},
-> > +};
-> > +
-> > +static struct kvm_exit_mmio dev_attr_mmio = { .len = 4 };
-> > +
-> > +static int vgic_attr_regs_access(struct kvm_device *dev,
-> > +				 struct kvm_device_attr *attr,
-> > +				 u32 *reg, bool is_write)
-> > +{
-> > +	const struct mmio_range *r = NULL;
-> > +	phys_addr_t offset;
-> > +	int cpuid;
-> > +	struct kvm_vcpu *vcpu;
-> > +	struct kvm_exit_mmio mmio;
-> > +
-> > +	offset = attr->attr & KVM_DEV_ARM_VGIC_OFFSET_MASK;
-> > +	cpuid = (attr->attr & KVM_DEV_ARM_VGIC_CPUID_MASK) >>
-> > +		KVM_DEV_ARM_VGIC_CPUID_SHIFT;
-> > +
-> > +	if (cpuid >= atomic_read(&dev->kvm->online_vcpus))
-> > +		return -EINVAL;
-> > +
-> > +	vcpu = kvm_get_vcpu(dev->kvm, cpuid);
-> > +
-> > +	mmio.len = 4;
-> > +	mmio.is_write = is_write;
-> > +	if (is_write)
-> > +		memcpy(mmio.data, reg, sizeof(*reg));
-> 
-> Is this endianness safe?
-> 
-With a big-endian kernel, no.  But I suspect that breaks KVM elsewhere
-too.  However, this is actually nicer:
+From: Dinh Nguyen <dinguyen@altera.com>
 
-diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index ea7fb5c..191ff9f 100644
---- a/virt/kvm/arm/vgic.c
-+++ b/virt/kvm/arm/vgic.c
-@@ -1622,7 +1622,7 @@ static int vgic_attr_regs_access(struct kvm_device *dev,
- 	mmio.len = 4;
- 	mmio.is_write = is_write;
- 	if (is_write)
--		memcpy(mmio.data, reg, sizeof(*reg));
-+		mmio_data_write(mmio, ~0, *reg);
- 
- 	if (attr->group == KVM_DEV_ARM_VGIC_GRP_DIST_REGS)
- 		r = find_matching_range(vgic_dist_ranges, &mmio, offset);
-@@ -1638,7 +1638,7 @@ static int vgic_attr_regs_access(struct kvm_device *dev,
- 	spin_unlock(&vcpu->kvm->arch.vgic.lock);
- 
- 	if (!is_write)
--		memcpy(reg, mmio.data, sizeof(*reg));
-+		*reg = mmio_data_read(mmio, ~0);
- 
- 	return 0;
- }
+Add support for a new SOCFPGA board that has an Arria V FPGA along with
+dual ARM Cortex-A9 cores.
 
-Thanks,
--Christoffer
+Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
+Cc: Pavel Machek <pavel@denx.de>
+Cc: Rob Herring <rob.herring@calxeda.com>
+Cc: Pawel Moll <pawel.moll@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Stephen Warren <swarren@wwwdotorg.org>
+Cc: devicetree at vger.kernel.org
+CC: linux-arm-kernel at lists.infradead.org
+---
+ arch/arm/boot/dts/Makefile           |    3 +-
+ arch/arm/boot/dts/socfpga_arria5.dts |   71 ++++++++++++++++++++++++++++++++++
+ 2 files changed, 73 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/boot/dts/socfpga_arria5.dts
+
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index e95af3f..e15419c 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -211,7 +211,8 @@ dtb-$(CONFIG_ARCH_SHMOBILE) += emev2-kzm9d.dtb \
+ 	r8a73a4-ape6evm-reference.dtb \
+ 	sh7372-mackerel.dtb
+ dtb-$(CONFIG_ARCH_SHMOBILE_MULTI) += emev2-kzm9d-reference.dtb
+-dtb-$(CONFIG_ARCH_SOCFPGA) += socfpga_cyclone5.dtb \
++dtb-$(CONFIG_ARCH_SOCFPGA) += socfpga_arria5.dtb \
++	socfpga_cyclone5.dtb \
+ 	socfpga_vt.dtb
+ dtb-$(CONFIG_ARCH_SPEAR13XX) += spear1310-evb.dtb \
+ 	spear1340-evb.dtb
+diff --git a/arch/arm/boot/dts/socfpga_arria5.dts b/arch/arm/boot/dts/socfpga_arria5.dts
+new file mode 100644
+index 0000000..ea163a5
+--- /dev/null
++++ b/arch/arm/boot/dts/socfpga_arria5.dts
+@@ -0,0 +1,71 @@
++/*
++ *  Copyright (C) 2013 Altera Corporation <www.altera.com>
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms and conditions of the GNU General Public License,
++ * version 2, as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ *
++ * You should have received a copy of the GNU General Public License along with
++ * this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++/dts-v1/;
++/include/ "socfpga.dtsi"
++
++/ {
++	model = "Altera SOCFPGA Arria V";
++	compatible = "altr,socfpga-arria5", "altr,socfpga";
++
++	chosen {
++		bootargs = "console=ttyS0,115200";
++	};
++
++	memory {
++		name = "memory";
++		device_type = "memory";
++		reg = <0x0 0x40000000>; /* 1 GB */
++	};
++
++	soc {
++		clkmgr at ffd04000 {
++			clocks {
++				osc1 {
++					clock-frequency = <25000000>;
++				};
++			};
++		};
++
++		serial0 at ffc02000 {
++			clock-frequency = <100000000>;
++		};
++
++		serial1 at ffc03000 {
++			clock-frequency = <100000000>;
++		};
++
++		sysmgr at ffd08000 {
++			cpu1-start-addr = <0xffd080c4>;
++		};
++
++		timer0 at ffc08000 {
++			clock-frequency = <100000000>;
++		};
++
++		timer1 at ffc09000 {
++			clock-frequency = <100000000>;
++		};
++
++		timer2 at ffd00000 {
++			clock-frequency = <25000000>;
++		};
++
++		timer3 at ffd01000 {
++			clock-frequency = <25000000>;
++		};
++	};
++};
+-- 
+1.7.9.5
