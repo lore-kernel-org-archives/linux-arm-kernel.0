@@ -1,38 +1,53 @@
-From: mingo@kernel.org (Ingo Molnar)
-Date: Wed, 25 Sep 2013 19:44:36 +0200
-Subject: mm: insure topdown mmap chooses addresses above security minimum
-In-Reply-To: <20130925171243.GA7428@tcpepper-desk.jf.intel.com>
-References: <1380057811-5352-1-git-send-email-timothy.c.pepper@linux.intel.com>
- <20130925073048.GB27960@gmail.com>
- <20130925171243.GA7428@tcpepper-desk.jf.intel.com>
-Message-ID: <20130925174436.GA14037@gmail.com>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Wed, 25 Sep 2013 10:38:58 -0700
+Subject: [PATCH] arm: Fix build error with context tracking calls
+In-Reply-To: <CAFTL4hzccoaUinQ37bpbqXDv-bbNkuww8FURQMwD_zEb9RqSMA@mail.gmail.com>
+ (Frederic Weisbecker's message of "Sun, 22 Sep 2013 11:59:35 -0500")
+References: <522CB0DE.2010102@roeck-us.net>
+ <20130909105115.GL25647@n2100.arm.linux.org.uk>
+ <522DB86A.8010207@roeck-us.net>
+ <alpine.LFD.2.03.1309091023440.20709@syhkavp.arg>
+ <20130909160348.GB18975@roeck-us.net>
+ <20130909203141.GM25647@n2100.arm.linux.org.uk>
+ <20130909210203.GC28416@roeck-us.net>
+ <alpine.LFD.2.03.1309091714420.20709@syhkavp.arg>
+ <87y574g1fi.fsf@linaro.org> <20130913170331.GA8453@somewhere>
+ <20130914143213.GN25647@n2100.arm.linux.org.uk>
+ <CAFTL4hzccoaUinQ37bpbqXDv-bbNkuww8FURQMwD_zEb9RqSMA@mail.gmail.com>
+Message-ID: <874n986bt9.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Frederic Weisbecker <fweisbec@gmail.com> writes:
 
-* Timothy Pepper <timothy.c.pepper@linux.intel.com> wrote:
+> 2013/9/14, Russell King - ARM Linux <linux@arm.linux.org.uk>:
+>> On Fri, Sep 13, 2013 at 07:03:34PM +0200, Frederic Weisbecker wrote:
+>>> diff --git a/kernel/context_tracking.c b/kernel/context_tracking.c
+>>> index 247091b..859c8df 100644
+>>> --- a/kernel/context_tracking.c
+>>> +++ b/kernel/context_tracking.c
+>>> @@ -51,6 +51,15 @@ void context_tracking_user_enter(void)
+>>>  	unsigned long flags;
+>>>
+>>>  	/*
+>>> +	 * Repeat the user_enter() check here because some archs may be calling
+>>> +	 * this from asm and if no CPU needs context tracking, they shouldn't
+>>> +	 * go further. We can remove that check here once these archs support
+>>> the static key
+>>> +	 * check.
+>>
+>> The only (minor) comment on this is that the above would fail checkpatch,
+>> but that's not a good enough reason to respin it if you've already applied
+>> it IMHO.
+>>
+>
+> Ah I haven't yet pushed that patch anywhere so I can definetly fix
+> that. Thanks for the review. BTW, I initially first thought this fix
+> could go through your tree but if you prefer I can push it through
+> Ingo to the context tracking bits.
+>
+> Just tell me either way.
 
-> On Wed 25 Sep at 09:30:49 +0200 mingo at kernel.org said:
-> > >  	info.flags = VM_UNMAPPED_AREA_TOPDOWN;
-> > >  	info.length = len;
-> > > -	info.low_limit = PAGE_SIZE;
-> > > +	info.low_limit = max(PAGE_SIZE, PAGE_ALIGN(mmap_min_addr));
-> > >  	info.high_limit = mm->mmap_base;
-> > >  	info.align_mask = filp ? get_align_mask() : 0;
-> > >  	info.align_offset = pgoff << PAGE_SHIFT;
-> > 
-> > There appears to be a lot of repetition in these methods - instead of 
-> > changing 6 places it would be more future-proof to first factor out the 
-> > common bits and then to apply the fix to the shared implementation.
-> 
-> Besides that existing redundancy in the multiple somewhat similar
-> arch_get_unmapped_area_topdown() functions, I was expecting people might
-> question the added redundancy of the six instances of:
-> 
-> 	max(PAGE_SIZE, PAGE_ALIGN(mmap_min_addr));
+Frederic, I suggest you queue it directly for v3.12-rc.  Thanks,
 
-That redundancy would be automatically addressed by my suggestion.
-
-Thanks,
-
-	Ingo
+Kevin
