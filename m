@@ -1,44 +1,83 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Wed, 25 Sep 2013 10:53:30 -0400
-Subject: [PATCH v1 7/7] jump_label: use defined macros instead of
- hard-coding for better readability
-In-Reply-To: <1380105868-31985-8-git-send-email-liuj97@gmail.com>
-References: <1380105868-31985-1-git-send-email-liuj97@gmail.com>
- <1380105868-31985-8-git-send-email-liuj97@gmail.com>
-Message-ID: <20130925105330.4b717a80@gandalf.local.home>
+From: andreas.herrmann@calxeda.com (Andreas Herrmann)
+Date: Wed, 25 Sep 2013 16:56:37 +0200
+Subject: [PATCH 6/7] iommu/arm-smmu: Add module parameter
+ arm-smmu=off|force_isolation
+In-Reply-To: <20130924154218.GF20774@mudshark.cambridge.arm.com>
+References: <1380035221-11576-1-git-send-email-andreas.herrmann@calxeda.com>
+ <1380035221-11576-7-git-send-email-andreas.herrmann@calxeda.com>
+ <20130924154218.GF20774@mudshark.cambridge.arm.com>
+Message-ID: <20130925145637.GB4845@alberich>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 25 Sep 2013 18:44:27 +0800
-Jiang Liu <liuj97@gmail.com> wrote:
-
-> From: Jiang Liu <jiang.liu@huawei.com>
+On Tue, Sep 24, 2013 at 11:42:18AM -0400, Will Deacon wrote:
+> On Tue, Sep 24, 2013 at 04:07:00PM +0100, Andreas Herrmann wrote:
+> >   arm-smmu=	arm-smmu driver option
+> > 
+> > 	off	Disable arm-smmu driver (ie. ignore available SMMUs)
+> > 
+> > 	force_isolation
+> > 		Try to attach each master device on every SMMU to a
+> > 		separate iommu_domain.
+> > 
+> > Default is that driver detects SMMUs but no translation is configured
+> > (transactions just bypass translation process).
+> > 
+> > Signed-off-by: Andreas Herrmann <andreas.herrmann@calxeda.com>
+> > ---
+> >  drivers/iommu/arm-smmu.c |   26 ++++++++++++++++++++++++++
+> >  1 file changed, 26 insertions(+)
+> > 
+> > diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+> > index 3eb2259..251564e 100644
+> > --- a/drivers/iommu/arm-smmu.c
+> > +++ b/drivers/iommu/arm-smmu.c
+> > @@ -399,6 +399,9 @@ struct arm_smmu_domain {
+> >  static DEFINE_SPINLOCK(arm_smmu_devices_lock);
+> >  static LIST_HEAD(arm_smmu_devices);
+> >  
+> > +static bool arm_smmu_disabled;
+> > +static bool arm_smmu_force_isolation;
+> > +
+> >  static struct arm_smmu_master *find_smmu_master(struct arm_smmu_device *smmu,
+> >  						struct device_node *dev_node)
+> >  {
+> > @@ -1837,6 +1840,9 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
+> >  	struct of_phandle_args masterspec;
+> >  	int num_irqs, i, err;
+> >  
+> > +	if (arm_smmu_disabled)
+> > +		return -ENODEV;
+> > +
+> >  	smmu = devm_kzalloc(dev, sizeof(*smmu), GFP_KERNEL);
+> >  	if (!smmu) {
+> >  		dev_err(dev, "failed to allocate arm_smmu_device\n");
+> > @@ -2022,6 +2028,23 @@ static struct platform_driver arm_smmu_driver = {
+> >  	.remove	= arm_smmu_device_remove,
+> >  };
+> >  
+> > +static int __init arm_smmu_parse_options(char *str)
+> > +{
+> > +	if (*str) {
+> > +		str++;
+> > +		if (!strncmp(str, "off", 3))
+> > +			arm_smmu_disabled = true;
+> > +		else if(!strncmp(str, "force_isolation", 15))
+> > +			arm_smmu_force_isolation = true;
+> > +		else {
+> > +			pr_warn("arm_smmu: invalid parameter (\"%s\")\n", str);
+> > +			return 0;
+> > +		}
+> > +	}
+> > +	return 1;
+> > +}
+> > +__setup("arm-smmu", arm_smmu_parse_options);
 > 
-> Use macro JUMP_LABEL_TRUE_BRANCH instead of hard-coding for better
-> readability.
-> 
-> Signed-off-by: Jiang Liu <jiang.liu@huawei.com>
-> Cc: Jiang Liu <liuj97@gmail.com>
-> ---
->  include/linux/jump_label.h | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
-> 
-> diff --git a/include/linux/jump_label.h b/include/linux/jump_label.h
-> index a507907..b697fbd 100644
-> --- a/include/linux/jump_label.h
-> +++ b/include/linux/jump_label.h
-> @@ -116,7 +116,8 @@ extern void static_key_slow_dec(struct static_key *key);
->  extern void jump_label_apply_nops(struct module *mod);
->  
->  #define STATIC_KEY_INIT_TRUE ((struct static_key) \
-> -	{ .enabled = ATOMIC_INIT(1), .entries = (void *)1 })
-> +	{ .enabled = ATOMIC_INIT(1), \
-> +	  .entries = (void *)JUMP_LABEL_TRUE_BRANCH })
->  #define STATIC_KEY_INIT_FALSE ((struct static_key) \
->  	{ .enabled = ATOMIC_INIT(0), .entries = (void *)0 })
->  
+> If this is going to be a common function for IOMMUs, let's instead move the
+> command-line parsing out into the generic IOMMU layer, then have an optional
+> callback into the low-level IOMMU driver for enabling/disabling it.
 
-Probably should add a comment that there is no
-"JUMP_LABEL_FALSE_BRANCH" or maybe we should add one?
+Makes sense and I am currently looking into it.
 
--- Steve
+
+Andreas
