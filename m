@@ -1,22 +1,38 @@
-From: Sudeep.KarkadaNagesha@arm.com (Sudeep KarkadaNagesha)
-Date: Wed, 25 Sep 2013 18:19:51 +0100
-Subject: [PATCH v6 RESEND 0/5] ARM/ARM64 architected timer updates
-In-Reply-To: <5242FC09.2050604@linaro.org>
-References: <1379502306-12911-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
- <5242FC09.2050604@linaro.org>
-Message-ID: <52431B37.5000901@arm.com>
+From: mingo@kernel.org (Ingo Molnar)
+Date: Wed, 25 Sep 2013 19:44:36 +0200
+Subject: mm: insure topdown mmap chooses addresses above security minimum
+In-Reply-To: <20130925171243.GA7428@tcpepper-desk.jf.intel.com>
+References: <1380057811-5352-1-git-send-email-timothy.c.pepper@linux.intel.com>
+ <20130925073048.GB27960@gmail.com>
+ <20130925171243.GA7428@tcpepper-desk.jf.intel.com>
+Message-ID: <20130925174436.GA14037@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25/09/13 16:06, Daniel Lezcano wrote:
-> On 09/18/2013 01:05 PM, Sudeep KarkadaNagesha wrote:
->> From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
->>
->> Hi Olof/Kevin,
-> 
-> Added Olof and Kevin in Cc.
-> 
-Thanks Daniel, sorry I assumed mailing list alias(arm at kernel.org) was preferred way.
 
-Regards,
-Sudeep
+* Timothy Pepper <timothy.c.pepper@linux.intel.com> wrote:
+
+> On Wed 25 Sep at 09:30:49 +0200 mingo at kernel.org said:
+> > >  	info.flags = VM_UNMAPPED_AREA_TOPDOWN;
+> > >  	info.length = len;
+> > > -	info.low_limit = PAGE_SIZE;
+> > > +	info.low_limit = max(PAGE_SIZE, PAGE_ALIGN(mmap_min_addr));
+> > >  	info.high_limit = mm->mmap_base;
+> > >  	info.align_mask = filp ? get_align_mask() : 0;
+> > >  	info.align_offset = pgoff << PAGE_SHIFT;
+> > 
+> > There appears to be a lot of repetition in these methods - instead of 
+> > changing 6 places it would be more future-proof to first factor out the 
+> > common bits and then to apply the fix to the shared implementation.
+> 
+> Besides that existing redundancy in the multiple somewhat similar
+> arch_get_unmapped_area_topdown() functions, I was expecting people might
+> question the added redundancy of the six instances of:
+> 
+> 	max(PAGE_SIZE, PAGE_ALIGN(mmap_min_addr));
+
+That redundancy would be automatically addressed by my suggestion.
+
+Thanks,
+
+	Ingo
