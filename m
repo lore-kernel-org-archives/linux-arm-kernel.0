@@ -1,122 +1,143 @@
 From: joelf@ti.com (Joel Fernandes)
-Date: Wed, 25 Sep 2013 17:01:03 -0500
-Subject: [PATCH 3/9] ARM: dts: Add SHAM data and documentation for AM33XX
+Date: Wed, 25 Sep 2013 17:01:08 -0500
+Subject: [PATCH 8/9] ARM: dts: AM33XX: Add LCDC info into am335x-evm
 In-Reply-To: <1380146469-29496-1-git-send-email-joelf@ti.com>
 References: <1380146469-29496-1-git-send-email-joelf@ti.com>
-Message-ID: <1380146469-29496-4-git-send-email-joelf@ti.com>
+Message-ID: <1380146469-29496-9-git-send-email-joelf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "Mark A. Greer" <mgreer@animalcreek.com>
+From: Benoit Parrot <bparrot@ti.com>
 
-Add the generic AM33XX SHAM module's device tree data and
-enable it for the am335x-evm, am335x-evmsk, and am335x-bone
-platforms.  Also add Documentation file describing the data
-for the SHAM module.
+Add LCDC device node in DT for am33xx
+Add LCDC and Panel info in DT for am335x-evm
 
-CC: Paul Walmsley <paul@pwsan.com>
-Signed-off-by: Mark A. Greer <mgreer@animalcreek.com>
+Changes:
+- remove redundant/unnecessary SoC specific setting in the board dts
+- resolved conflicts on for_3.13/dts
+
+Signed-off-by: Benoit Parrot <bparrot@ti.com>
+Signed-off-by: Joel Fernandes <joelf@ti.com>
 ---
- .../devicetree/bindings/crypto/omap-sham.txt       | 31 ++++++++++++++++++++++
- arch/arm/boot/dts/am335x-bone.dts                  |  4 +++
- arch/arm/boot/dts/am335x-evm.dts                   |  4 +++
- arch/arm/boot/dts/am335x-evmsk.dts                 |  4 +++
- arch/arm/boot/dts/am33xx.dtsi                      | 10 +++++++
- 5 files changed, 53 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/crypto/omap-sham.txt
+ arch/arm/boot/dts/am335x-evm.dts | 71 ++++++++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/am33xx.dtsi    |  9 +++++
+ 2 files changed, 80 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/crypto/omap-sham.txt b/Documentation/devicetree/bindings/crypto/omap-sham.txt
-new file mode 100644
-index 0000000..b97710f
---- /dev/null
-+++ b/Documentation/devicetree/bindings/crypto/omap-sham.txt
-@@ -0,0 +1,31 @@
-+OMAP SoC SHA crypto Module
-+
-+Required properties:
-+
-+- compatible : Should contain entries for this and backward compatible
-+  SHAM versions:
-+  - "ti,omap2-sham" for OMAP2 & OMAP3.
-+  - "ti,omap4-sham" for OMAP4 and AM33XX.
-+  Note that these two versions are incompatible.
-+- ti,hwmods: Name of the hwmod associated with the SHAM module
-+- reg : Offset and length of the register set for the module
-+- interrupt-parent : the phandle for the interrupt controller that
-+  services interrupts for this module.
-+- interrupts : the interrupt number for the SHAM module.
-+
-+Optional properties:
-+- dmas: DMA specifier for the rx dma. See the DMA client binding,
-+	Documentation/devicetree/bindings/dma/dma.txt
-+- dma-names: DMA request name. Should be "rx" if a dma is present.
-+
-+Example:
-+	/* AM335x */
-+	sham: sham at 53100000 {
-+		compatible = "ti,omap4-sham";
-+		ti,hwmods = "sham";
-+		reg = <0x53100000 0x200>;
-+		interrupt-parent = <&intc>;
-+		interrupts = <109>;
-+		dmas = <&edma 36>;
-+		dma-names = "rx";
-+	};
-diff --git a/arch/arm/boot/dts/am335x-bone.dts b/arch/arm/boot/dts/am335x-bone.dts
-index 0d63348..8a9802e 100644
---- a/arch/arm/boot/dts/am335x-bone.dts
-+++ b/arch/arm/boot/dts/am335x-bone.dts
-@@ -19,3 +19,7 @@
- &mmc1 {
- 	vmmc-supply = <&ldo3_reg>;
- };
-+
-+&sham {
-+	status = "okay";
-+};
 diff --git a/arch/arm/boot/dts/am335x-evm.dts b/arch/arm/boot/dts/am335x-evm.dts
-index 23b0a3e..d59e51c 100644
+index 86463fa..b73f41f 100644
 --- a/arch/arm/boot/dts/am335x-evm.dts
 +++ b/arch/arm/boot/dts/am335x-evm.dts
-@@ -522,3 +522,7 @@
- 	status = "okay";
- 	vmmc-supply = <&vmmc_reg>;
- };
+@@ -85,6 +85,40 @@
+ 		brightness-levels = <0 51 53 56 62 75 101 152 255>;
+ 		default-brightness-level = <8>;
+ 	};
 +
-+&sham {
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/am335x-evmsk.dts b/arch/arm/boot/dts/am335x-evmsk.dts
-index bc93895..d45a330 100644
---- a/arch/arm/boot/dts/am335x-evmsk.dts
-+++ b/arch/arm/boot/dts/am335x-evmsk.dts
-@@ -424,3 +424,7 @@
- 	status = "okay";
- 	vmmc-supply = <&vmmc_reg>;
- };
-+
-+&sham {
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
-index 553adc6..e77aa6e 100644
---- a/arch/arm/boot/dts/am33xx.dtsi
-+++ b/arch/arm/boot/dts/am33xx.dtsi
-@@ -710,5 +710,15 @@
- 			#size-cells = <1>;
- 			status = "disabled";
- 		};
-+
-+		sham: sham at 53100000 {
-+			compatible = "ti,omap4-sham";
-+			ti,hwmods = "sham";
-+			reg = <0x53100000 0x200>;
-+			interrupt-parent = <&intc>;
-+			interrupts = <109>;
-+			dmas = <&edma 36>;
-+			dma-names = "rx";
++	panel {
++		compatible = "ti,tilcdc,panel";
++		status = "okay";
++		pinctrl-names = "default";
++		pinctrl-0 = <&lcd_pins_s0>;
++		panel-info {
++			ac-bias           = <255>;
++			ac-bias-intrpt    = <0>;
++			dma-burst-sz      = <16>;
++			bpp               = <32>;
++			fdd               = <0x80>;
++			sync-edge         = <0>;
++			sync-ctrl         = <1>;
++			raster-order      = <0>;
++			fifo-th           = <0>;
 +		};
++
++		display-timings {
++			800x480p62 {
++				clock-frequency = <30000000>;
++				hactive = <800>;
++				vactive = <480>;
++				hfront-porch = <39>;
++				hback-porch = <39>;
++				hsync-len = <47>;
++				vback-porch = <29>;
++				vfront-porch = <13>;
++				vsync-len = <2>;
++				hsync-active = <1>;
++				vsync-active = <1>;
++			};
++		};
++	};
+ };
+ 
+ &am33xx_pinmux {
+@@ -212,6 +246,39 @@
+ 			0x14c (PIN_INPUT_PULLDOWN | MUX_MODE7)
+ 		>;
+ 	};
++
++	lcd_pins_s0: lcd_pins_s0 {
++		pinctrl-single,pins = <
++			0x20 0x01	/* gpmc_ad8.lcd_data16, OUTPUT | MODE1 */
++			0x24 0x01	/* gpmc_ad9.lcd_data17, OUTPUT | MODE1 */
++			0x28 0x01	/* gpmc_ad10.lcd_data18, OUTPUT | MODE1 */
++			0x2c 0x01	/* gpmc_ad11.lcd_data19, OUTPUT | MODE1 */
++			0x30 0x01	/* gpmc_ad12.lcd_data20, OUTPUT | MODE1 */
++			0x34 0x01	/* gpmc_ad13.lcd_data21, OUTPUT | MODE1 */
++			0x38 0x01	/* gpmc_ad14.lcd_data22, OUTPUT | MODE1 */
++			0x3c 0x01	/* gpmc_ad15.lcd_data23, OUTPUT | MODE1 */
++			0xa0 0x00	/* lcd_data0.lcd_data0, OUTPUT | MODE0 */
++			0xa4 0x00	/* lcd_data1.lcd_data1, OUTPUT | MODE0 */
++			0xa8 0x00	/* lcd_data2.lcd_data2, OUTPUT | MODE0 */
++			0xac 0x00	/* lcd_data3.lcd_data3, OUTPUT | MODE0 */
++			0xb0 0x00	/* lcd_data4.lcd_data4, OUTPUT | MODE0 */
++			0xb4 0x00	/* lcd_data5.lcd_data5, OUTPUT | MODE0 */
++			0xb8 0x00	/* lcd_data6.lcd_data6, OUTPUT | MODE0 */
++			0xbc 0x00	/* lcd_data7.lcd_data7, OUTPUT | MODE0 */
++			0xc0 0x00	/* lcd_data8.lcd_data8, OUTPUT | MODE0 */
++			0xc4 0x00	/* lcd_data9.lcd_data9, OUTPUT | MODE0 */
++			0xc8 0x00	/* lcd_data10.lcd_data10, OUTPUT | MODE0 */
++			0xcc 0x00	/* lcd_data11.lcd_data11, OUTPUT | MODE0 */
++			0xd0 0x00	/* lcd_data12.lcd_data12, OUTPUT | MODE0 */
++			0xd4 0x00	/* lcd_data13.lcd_data13, OUTPUT | MODE0 */
++			0xd8 0x00	/* lcd_data14.lcd_data14, OUTPUT | MODE0 */
++			0xdc 0x00	/* lcd_data15.lcd_data15, OUTPUT | MODE0 */
++			0xe0 0x00	/* lcd_vsync.lcd_vsync, OUTPUT | MODE0 */
++			0xe4 0x00	/* lcd_hsync.lcd_hsync, OUTPUT | MODE0 */
++			0xe8 0x00	/* lcd_pclk.lcd_pclk, OUTPUT | MODE0 */
++			0xec 0x00	/* lcd_ac_bias_en.lcd_ac_bias_en, OUTPUT | MODE0 */
++		>;
++	};
+ };
+ 
+ &uart0 {
+@@ -308,6 +375,10 @@
  	};
  };
+ 
++&lcdc {
++	status = "okay";
++};
++
+ &elm {
+ 	status = "okay";
+ };
+diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
+index 1a5575d..25578ea 100644
+--- a/arch/arm/boot/dts/am33xx.dtsi
++++ b/arch/arm/boot/dts/am33xx.dtsi
+@@ -682,6 +682,15 @@
+ 			status = "disabled";
+ 		};
+ 
++		lcdc: lcdc at 4830e000 {
++			compatible = "ti,am33xx-tilcdc";
++			reg = <0x4830e000 0x1000>;
++			interrupt-parent = <&intc>;
++			interrupts = <36>;
++			ti,hwmods = "lcdc";
++			status = "disabled";
++		};
++
+ 		tscadc: tscadc at 44e0d000 {
+ 			compatible = "ti,am3359-tscadc";
+ 			reg = <0x44e0d000 0x1000>;
 -- 
 1.8.1.2
