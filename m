@@ -1,30 +1,60 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Wed, 25 Sep 2013 11:16:05 -0400
-Subject: [PATCH v1 2/7] arm64: introduce interfaces to hotpatch kernel
- and module code
-In-Reply-To: <CA+b37P0P0RhUytnkLSXmz28wzzsoL3-viV2oxNJqq2nP7kZBFA@mail.gmail.com>
-References: <1380105868-31985-1-git-send-email-liuj97@gmail.com>
- <1380105868-31985-3-git-send-email-liuj97@gmail.com>
- <20130925103535.2249f617@gandalf.local.home>
- <CA+b37P0P0RhUytnkLSXmz28wzzsoL3-viV2oxNJqq2nP7kZBFA@mail.gmail.com>
-Message-ID: <20130925111605.7437f70f@gandalf.local.home>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Wed, 25 Sep 2013 17:20:43 +0200
+Subject: [PATCH v2 0/4] arm: zynq: Enable global timer
+In-Reply-To: <1379530118-22813-1-git-send-email-soren.brinkmann@xilinx.com>
+References: <1379530118-22813-1-git-send-email-soren.brinkmann@xilinx.com>
+Message-ID: <5242FF4B.6050901@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 25 Sep 2013 20:12:17 +0530
-Sandeepa Prabhu <sandeepa.prabhu@linaro.org> wrote:
-
-
-> > On aarch64, are instructions always word aligned? If not, it should be
-> > safe for stop machine to modify non word aligned instructions, but this
-> > patch looks like it doesn't allow stop_machine() to do so.
-> Steve,
+On 09/18/2013 08:48 PM, Soren Brinkmann wrote:
+> Hi all,
 > 
-> Yes, aarch64 instructions must be word-aligned, else instruction fetch
-> would generate Misaligned PC fault.
+> here's a v2. I reused the subject from my v1 submission although the focus of
+> this series moved a bit towards the timer subsystem.
+> I replaced Stephen's fix to prevent per cpu devices from becoming
+> the broadcast device with Thomas' proposal, but I kept the original commit
+> message. I split the whole approach in small chunks that I found reasonable.
 > 
+> In 4/4, I picked up Grant's comment regarding the DT node name.
+> 
+> v2:
+>  - drop 1/2 of the original series
+>  - implement preventing per cpu devices from becoming broadcast device according
+>    to Thomas' proposal
+>    - introduce new CLOCK_EVT_FEAT_PERCPU flag
+>    - set the flag for the arm_global_timer
+>    - filter per cpu devices based on this flag when choosing the broadcast
+>      device
+>  - rename DT node to avoid '_'s
+>  
+> 
+> Soren Brinkmann (4):
+>   clockchips: Add FEAT_PERCPU clockevent flag
+>   clocksource/arm_global_timer: Set FEAT_PERCPU flag
+>   tick: broadcast: Deny per-cpu clockevents from being broadcast sources
+>   arm: zynq: Enable arm_global_timer
+> 
+>  arch/arm/boot/dts/zynq-7000.dtsi       | 8 ++++++++
+>  arch/arm/mach-zynq/Kconfig             | 1 +
+>  drivers/clocksource/arm_global_timer.c | 3 ++-
+>  include/linux/clockchips.h             | 1 +
+>  kernel/time/tick-broadcast.c           | 1 +
+>  5 files changed, 13 insertions(+), 1 deletion(-)
 
-Thanks for clarifying, as IIUC, there's ARM architectures that allow
-for 2 and 4 byte instructions.
+This patches falls under different maintainer's umbrella.
 
--- Steve
+I acked-by the patches, so if someone is willing to take the patches I
+am ok with that. I am ok also to pick them into my tree with the
+acked-by maintainer. Just let me know ...
+
+Thanks
+  -- Daniel
+
+
+-- 
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
