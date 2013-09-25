@@ -1,32 +1,20 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 25 Sep 2013 15:15:01 +0200
-Subject: [PATCH v4] PWM: atmel-pwm: add PWM controller driver
-In-Reply-To: <524290F5.2090406@atmel.com>
-References: <1380079664-21959-1-git-send-email-voice.shen@atmel.com>
- <524290F5.2090406@atmel.com>
-Message-ID: <5242E1D5.5000503@free-electrons.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 25 Sep 2013 14:21:50 +0100
+Subject: [PATCH] arm64: avoid multiple evaluation of ptr in
+ get_user/put_user()
+In-Reply-To: <5242AD10.3070001@linaro.org>
+References: <524154C2.1080303@linaro.org> <20130924142553.GG25907@arm.com>
+ <5242AD10.3070001@linaro.org>
+Message-ID: <20130925132149.GA27093@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25/09/2013 09:29, Nicolas Ferre wrote:
-> On 25/09/2013 05:27, Bo Shen :
->> Add Atmel PWM controller driver based on PWM framework.
->>
->> This is the basic function implementation of Atmel PWM controller.
->> It can work with PWM based led and backlight.
->>
->> Signed-off-by: Bo Shen <voice.shen@atmel.com>
->
-> It seems simple and nice.
->
-> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+On Wed, Sep 25, 2013 at 10:29:52AM +0100, AKASHI Takahiro wrote:
+> Thank you for your comments, and let me send a revised patch again
+> because my original message didn't reach MLs due to my screw-up.
 
-Tested on a sama5d31 board with leds-pwm.
-
-Tested-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
->
+You can send it if you want but I already merged it in my tree (should
+appear in -next this week as well).
 
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Catalin
