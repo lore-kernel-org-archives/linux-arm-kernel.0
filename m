@@ -1,388 +1,99 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Wed, 25 Sep 2013 16:33:24 +0200
-Subject: [RFC, PATCH] clocksource: provide timekeeping for efm32 SoCs
-In-Reply-To: <1379324644-20934-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1379324644-20934-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <5242F434.7060702@linaro.org>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Wed, 25 Sep 2013 10:35:35 -0400
+Subject: [PATCH v1 2/7] arm64: introduce interfaces to hotpatch kernel
+ and module code
+In-Reply-To: <1380105868-31985-3-git-send-email-liuj97@gmail.com>
+References: <1380105868-31985-1-git-send-email-liuj97@gmail.com>
+ <1380105868-31985-3-git-send-email-liuj97@gmail.com>
+Message-ID: <20130925103535.2249f617@gandalf.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/16/2013 11:44 AM, Uwe Kleine-K?nig wrote:
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> ---
-> Hello,
-> 
-> I'm not sure that the way I implemented if a given timer is used as
-> clock_source or clock_event_device is robust. Does it need locking?
-> The reason to create a timer device for each timer instead of a single
-> device of all of them is that it makes it cleaner to specify irqs and
-> clks which each timer has one of each respectively. I didn't find an
-> example, but while looking I wondered if in zevio-timer.c a single timer
-> can really support both clock_event and clocksource.
-> 
-> I guess for inclusion I need to write a document describing the
-> of-binding. I will include that in the next iteration.
-
-Right and a nice description of the timer would be valuable.
-
-The first letter of the description should be in capital "Provide".
-
-> checkpatch wails that the description of CLKSRC_EFM32 is too short. I
-> think it's OK though.
-> 
-> Best regards
-> Uwe
-> 
->  drivers/clocksource/Kconfig      |   8 ++
->  drivers/clocksource/Makefile     |   1 +
->  drivers/clocksource/time-efm32.c | 274 +++++++++++++++++++++++++++++++++++++++
->  3 files changed, 283 insertions(+)
->  create mode 100644 drivers/clocksource/time-efm32.c
-> 
-> diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
-> index 41c6946..410b152 100644
-> --- a/drivers/clocksource/Kconfig
-> +++ b/drivers/clocksource/Kconfig
-> @@ -70,6 +70,14 @@ config CLKSRC_DBX500_PRCMU_SCHED_CLOCK
->  	help
->  	  Use the always on PRCMU Timer as sched_clock
+On Wed, 25 Sep 2013 18:44:22 +0800
+Jiang Liu <liuj97@gmail.com> wrote:
+> diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
+> index 8541c3a..50facfc 100644
+> --- a/arch/arm64/kernel/insn.c
+> +++ b/arch/arm64/kernel/insn.c
+> @@ -15,6 +15,8 @@
+>   * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+>   */
+>  #include <linux/kernel.h>
+> +#include <linux/stop_machine.h>
+> +#include <asm/cacheflush.h>
+>  #include <asm/insn.h>
 >  
-> +config CLKSRC_EFM32
-> +	bool "Clocksource for Energy Micro's EFM32 SoCs" if !ARCH_EFM32
-> +	depends on OF && ARM && (ARCH_EFM32 || COMPILE_TEST)
-> +	default ARCH_EFM32
-> +	help
-> +	  Support to use the timers of EFM32 SoCs as clock source and clock
-> +	  event device.
+>  static int aarch64_insn_cls[] = {
+> @@ -69,3 +71,65 @@ bool __kprobes aarch64_insn_hotpatch_safe(u32 old_insn, u32 new_insn)
+>  	return __aarch64_insn_hotpatch_safe(old_insn) &&
+>  	       __aarch64_insn_hotpatch_safe(new_insn);
+>  }
 > +
-
-No option for the timer. It must be selected by the platform.
-
->  config ARM_ARCH_TIMER
->  	bool
->  	select CLKSRC_OF if OF
-> diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
-> index 704d6d3..33621ef 100644
-> --- a/drivers/clocksource/Makefile
-> +++ b/drivers/clocksource/Makefile
-> @@ -27,6 +27,7 @@ obj-$(CONFIG_VT8500_TIMER)	+= vt8500_timer.o
->  obj-$(CONFIG_ARCH_NSPIRE)	+= zevio-timer.o
->  obj-$(CONFIG_ARCH_BCM)		+= bcm_kona_timer.o
->  obj-$(CONFIG_CADENCE_TTC_TIMER)	+= cadence_ttc_timer.o
-> +obj-$(CONFIG_CLKSRC_EFM32)	+= time-efm32.o
->  obj-$(CONFIG_CLKSRC_EXYNOS_MCT)	+= exynos_mct.o
->  obj-$(CONFIG_CLKSRC_SAMSUNG_PWM)	+= samsung_pwm_timer.o
->  obj-$(CONFIG_VF_PIT_TIMER)	+= vf_pit_timer.o
-> diff --git a/drivers/clocksource/time-efm32.c b/drivers/clocksource/time-efm32.c
-> new file mode 100644
-> index 0000000..6ead8d7
-> --- /dev/null
-> +++ b/drivers/clocksource/time-efm32.c
-> @@ -0,0 +1,274 @@
-> +/*
-> + * Copyright (C) 2013 Pengutronix
-> + * Uwe Kleine-Koenig <u.kleine-koenig@pengutronix.de>
-> + *
-> + * This program is free software; you can redistribute it and/or modify it under
-> + * the terms of the GNU General Public License version 2 as published by the
-> + * Free Software Foundation.
-> + */
-> +
-> +#define pr_fmt(fmt)	KBUILD_MODNAME ": " fmt
-> +
-> +#include <linux/kernel.h>
-> +#include <linux/clocksource.h>
-> +#include <linux/clockchips.h>
-> +#include <linux/irq.h>
-> +#include <linux/interrupt.h>
-> +#include <linux/of.h>
-> +#include <linux/of_address.h>
-> +#include <linux/of_irq.h>
-> +#include <linux/clk.h>
-> +
-> +#define TIMERn_CTRL			0x00
-> +#define TIMERn_CTRL_PRESC(val)			(((val) & 0xf) << 24)
-
-You can replace all binary shift with the BIT macro.
-
-> +#define TIMERn_CTRL_PRESC_1024			TIMERn_CTRL_PRESC(10)
-> +#define TIMERn_CTRL_CLKSEL(val)			(((val) & 0x3) << 16)
-> +#define TIMERn_CTRL_CLKSEL_PRESCHFPERCLK	TIMERn_CTRL_CLKSEL(0)
-> +#define TIMERn_CTRL_OSMEN			0x00000010
-> +#define TIMERn_CTRL_MODE(val)			(((val) & 0x3) <<  0)
-> +#define TIMERn_CTRL_MODE_UP			TIMERn_CTRL_MODE(0)
-> +#define TIMERn_CTRL_MODE_DOWN			TIMERn_CTRL_MODE(1)
-> +
-> +#define TIMERn_CMD			0x04
-> +#define TIMERn_CMD_START			0x1
-> +#define TIMERn_CMD_STOP				0x2
-> +
-> +#define TIMERn_IEN			0x0c
-> +#define TIMERn_IF			0x10
-> +#define TIMERn_IFS			0x14
-> +#define TIMERn_IFC			0x18
-> +#define TIMERn_IRQ_UF				0x2
-> +#define TIMERn_IRQ_OF				0x1
-
-I see a wrong alignment with the values. May be it is due to my mailer.
-
-> +
-> +#define TIMERn_TOP			0x1c
-> +#define TIMERn_CNT			0x24
-> +
-> +#define TIMER_CLOCKSOURCE	0
-> +#define TIMER_CLOCKEVENT	1
-
-I don't see these macro used anywhere.
-
-> +struct efm32_clock_event_ddata {
-
-The structure name looks a bit long to me.
-
-> +	struct clock_event_device evtdev;
-> +	void __iomem *base;
-> +	unsigned periodic_top;
+> +struct aarch64_insn_patch {
+> +	void	*text_addr;
+> +	u32	*new_insns;
+> +	int	insn_cnt;
 > +};
-> +static void efm32_clock_event_set_mode(enum clock_event_mode mode,
-> +				       struct clock_event_device *evtdev)
+> +
+> +int __kprobes __aarch64_insn_patch_text(void *addr, u32 *insns, int cnt)
 > +{
-> +	struct efm32_clock_event_ddata *ddata =
-> +		container_of(evtdev, struct efm32_clock_event_ddata, evtdev);
-
-Wouldn't be worth to check the previous mode of the timer before
-switching to a mode where it is already ?
-
-> +	switch (mode) {
-> +	case CLOCK_EVT_MODE_PERIODIC:
-> +		writel_relaxed(TIMERn_CMD_STOP, ddata->base + TIMERn_CMD);
-> +		writel_relaxed(ddata->periodic_top, ddata->base + TIMERn_TOP);
-> +		writel_relaxed(TIMERn_CTRL_PRESC_1024 |
-> +			       TIMERn_CTRL_CLKSEL_PRESCHFPERCLK |
-> +			       TIMERn_CTRL_MODE_DOWN,
-> +			       ddata->base + TIMERn_CTRL);
-> +		writel_relaxed(TIMERn_CMD_START, ddata->base + TIMERn_CMD);
-> +		break;
+> +	int i;
+> +	u32 *tp = addr;
 > +
-> +	case CLOCK_EVT_MODE_ONESHOT:
-> +		writel_relaxed(TIMERn_CMD_STOP, ddata->base + TIMERn_CMD);
-> +		writel_relaxed(TIMERn_CTRL_PRESC_1024 |
-> +			       TIMERn_CTRL_CLKSEL_PRESCHFPERCLK |
-> +			       TIMERn_CTRL_OSMEN |
-> +			       TIMERn_CTRL_MODE_DOWN,
-> +			       ddata->base + TIMERn_CTRL);
-> +		break;
+> +	/* instructions must be word aligned */
+> +	if (cnt <= 0 || ((uintptr_t)addr & 0x3))
+> +		return -EINVAL;
 
-IMO, these two routines are similar enough to factor them out in a
-single function.
+On aarch64, are instructions always word aligned? If not, it should be
+safe for stop machine to modify non word aligned instructions, but this
+patch looks like it doesn't allow stop_machine() to do so.
+
+-- Steve
 
 > +
-> +	case CLOCK_EVT_MODE_UNUSED:
-> +	case CLOCK_EVT_MODE_SHUTDOWN:
-> +		writel_relaxed(TIMERn_CMD_STOP, ddata->base + TIMERn_CMD);
-> +		break;
+> +	for (i = 0; i < cnt; i++)
+> +		tp[i] = insns[i];
 > +
-> +	case CLOCK_EVT_MODE_RESUME:
-> +		break;
-> +	}
-> +}
-> +
-> +static int efm32_clock_event_set_next_event(unsigned long evt,
-> +					    struct clock_event_device *evtdev)
-> +{
-> +	struct efm32_clock_event_ddata *ddata =
-> +		container_of(evtdev, struct efm32_clock_event_ddata, evtdev);
-> +
-> +	writel_relaxed(TIMERn_CMD_STOP, ddata->base + TIMERn_CMD);
-> +	writel_relaxed(evt, ddata->base + TIMERn_CNT);
-> +	writel_relaxed(TIMERn_CMD_START, ddata->base + TIMERn_CMD);
+> +	flush_icache_range((uintptr_t)tp, (uintptr_t)tp + cnt * sizeof(u32));
 > +
 > +	return 0;
 > +}
 > +
-> +static irqreturn_t efm32_clock_event_handler(int irq, void *dev_id)
+> +static int __kprobes aarch64_insn_patch_text_cb(void *arg)
 > +{
-> +	struct efm32_clock_event_ddata *ddata = dev_id;
+> +	struct aarch64_insn_patch *pp = arg;
 > +
-> +	writel_relaxed(TIMERn_IRQ_UF, ddata->base + TIMERn_IFC);
-> +
-> +	ddata->evtdev.event_handler(&ddata->evtdev);
-> +
-> +	return IRQ_HANDLED;
+> +	return __aarch64_insn_patch_text(pp->text_addr, pp->new_insns,
+> +					 pp->insn_cnt);
 > +}
 > +
-> +static struct efm32_clock_event_ddata clock_event_ddata = {
-> +	.evtdev = {
-> +		.name = "efm32 clockevent",
-> +		.features = CLOCK_EVT_FEAT_ONESHOT | CLOCK_EVT_MODE_PERIODIC,
-> +		.set_mode = efm32_clock_event_set_mode,
-> +		.set_next_event = efm32_clock_event_set_next_event,
-> +		.rating = 200,
-> +	},
-> +};
-> +
-> +static struct irqaction efm32_clock_event_irq = {
-> +	.name = "efm32 clockevent",
-> +	.flags = IRQF_TIMER,
-> +	.handler = efm32_clock_event_handler,
-> +	.dev_id = &clock_event_ddata,
-> +};
-
-Function name looks a bit long.
-
-> +static int efm32_clocksource_init(struct device_node *np)
+> +int __kprobes aarch64_insn_patch_text(void *addr, u32 *insns, int cnt)
 > +{
-> +	struct clk *clk;
-> +	void __iomem *base;
-> +	unsigned long rate;
 > +	int ret;
+> +	bool safe = false;
 > +
-> +	clk = of_clk_get(np, 0);
-> +	if (IS_ERR(clk)) {
-> +		ret = PTR_ERR(clk);
-> +		pr_err("failed to get clock for clocksource (%d)\n", ret);
-> +		goto err_clk_get;
+> +	/* instructions must be word aligned */
+> +	if (cnt <= 0 || ((uintptr_t)addr & 0x3))
+> +		return -EINVAL;
+> +
+> +	if (cnt == 1)
+> +		safe = aarch64_insn_hotpatch_safe(*(u32 *)addr, insns[0]);
+> +
+> +	if (safe) {
+> +		ret = __aarch64_insn_patch_text(addr, insns, cnt);
+> +	} else {
+> +		struct aarch64_insn_patch patch = {
+> +			.text_addr = addr,
+> +			.new_insns = insns,
+> +			.insn_cnt = cnt,
+> +		};
+> +
+> +		/*
+> +		 * Execute __aarch64_insn_patch_text() on every online CPU,
+> +		 * which ensure serialization among all online CPUs.
+> +		 */
+> +		ret = stop_machine(aarch64_insn_patch_text_cb, &patch, NULL);
 > +	}
-> +
-> +	ret = clk_prepare_enable(clk);
-> +	if (ret) {
-> +		pr_err("failed to enable timer clock for clocksource (%d)\n",
-> +		       ret);
-> +		goto err_clk_enable;
-> +	}
-> +	rate = clk_get_rate(clk);
-> +
-> +	base = of_iomap(np, 0);
-> +	if (!base) {
-> +		ret = -EADDRNOTAVAIL;
-> +		pr_err("failed to map registers for clocksource\n");
-> +		goto err_iomap;
-> +	}
-> +
-> +	writel_relaxed(TIMERn_CTRL_PRESC_1024 |
-> +		       TIMERn_CTRL_CLKSEL_PRESCHFPERCLK |
-> +		       TIMERn_CTRL_MODE_UP, base + TIMERn_CTRL);
-> +	writel_relaxed(TIMERn_CMD_START, base + TIMERn_CMD);
-> +
-> +	ret = clocksource_mmio_init(base + TIMERn_CNT, "efm32 timer",
-> +				    DIV_ROUND_CLOSEST(rate, 1024), 200, 16,
-> +				    clocksource_mmio_readl_up);
-> +	if (ret) {
-> +		pr_err("failed to init clocksource (%d)\n", ret);
-> +		goto err_clocksource_init;
-> +	}
-> +
-> +	return 0;
-> +
-> +err_clocksource_init:
-> +
-> +	iounmap(base);
-> +err_iomap:
-> +
-> +	clk_disable_unprepare(clk);
-> +err_clk_enable:
-> +
-> +	clk_put(clk);
-> +err_clk_get:
 > +
 > +	return ret;
 > +}
-> +
-> +static int __init efm32_clockevent_init(struct device_node *np)
-> +{
-> +	struct clk *clk;
-> +	void __iomem *base;
-> +	unsigned long rate;
-> +	int irq;
-> +	int ret;
-> +
-> +	clk = of_clk_get(np, 0);
-> +	if (IS_ERR(clk)) {
-> +		ret = PTR_ERR(clk);
-> +		pr_err("failed to get clock for clockevent (%d)\n", ret);
-> +		goto err_clk_get;
-> +	}
-> +
-> +	ret = clk_prepare_enable(clk);
-> +	if (ret) {
-> +		pr_err("failed to enable timer clock for clockevent (%d)\n",
-> +		       ret);
-> +		goto err_clk_enable;
-> +	}
-> +	rate = clk_get_rate(clk);
-> +
-> +	base = of_iomap(np, 0);
-> +	if (!base) {
-> +		ret = -EADDRNOTAVAIL;
-> +		pr_err("failed to map registers for clockevent\n");
-> +		goto err_iomap;
-> +	}
-> +
-> +	irq = irq_of_parse_and_map(np, 0);
-> +	if (!irq) {
-> +		ret = -ENOENT;
-> +		pr_err("failed to get irq for clockevent\n");
-> +		goto err_get_irq;
-> +	}
-> +
-> +	writel_relaxed(TIMERn_IRQ_UF, base + TIMERn_IEN);
-> +
-> +	clock_event_ddata.base = base;
-> +	clock_event_ddata.periodic_top = DIV_ROUND_CLOSEST(rate, 1024 * HZ);
-> +
-> +	setup_irq(irq, &efm32_clock_event_irq);
-> +
-> +	clockevents_config_and_register(&clock_event_ddata.evtdev,
-> +			DIV_ROUND_CLOSEST(rate, 1024), 0xf, 0xffff);
-> +
-> +	return 0;
-> +
-> +err_get_irq:
-> +
-> +	iounmap(base);
-> +err_iomap:
-> +
-> +	clk_disable_unprepare(clk);
-> +err_clk_enable:
-> +
-> +	clk_put(clk);
-> +err_clk_get:
-> +
-> +	return ret;
-> +}
-> +
-> +static void __init efm32_timer_init(struct device_node *np)
-> +{
-> +	static int has_clocksource, has_clockevent;
-> +	int ret;
-> +
-> +	if (!has_clocksource) {
-> +		ret = efm32_clocksource_init(np);
-> +		if (!ret) {
-> +			has_clocksource = 1;
-> +			return;
-> +		}
-> +	}
-> +
-> +	if (!has_clockevent) {
-> +		ret = efm32_clockevent_init(np);
-> +		if (!ret) {
-> +			has_clockevent = 1;
-> +			return;
-> +		}
-> +	}
-> +}
-
-I don't get the purpose of this initialization, can you explain ?
-
-
-
-> +CLOCKSOURCE_OF_DECLARE(efm32, "efm32,timer", efm32_timer_init);
-> 
-
-
--- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
