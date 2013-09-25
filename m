@@ -1,20 +1,52 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 25 Sep 2013 14:21:50 +0100
-Subject: [PATCH] arm64: avoid multiple evaluation of ptr in
- get_user/put_user()
-In-Reply-To: <5242AD10.3070001@linaro.org>
-References: <524154C2.1080303@linaro.org> <20130924142553.GG25907@arm.com>
- <5242AD10.3070001@linaro.org>
-Message-ID: <20130925132149.GA27093@arm.com>
+From: rogerq@ti.com (Roger Quadros)
+Date: Wed, 25 Sep 2013 16:29:01 +0300
+Subject: [RFC PATCH 09/15] ata: ti_sata: Add Texas Instruments SATA Wrapper
+ driver
+In-Reply-To: <3930265.gHe05HETI5@amdc1032>
+References: <1379595943-14622-1-git-send-email-rogerq@ti.com>
+ <1379595943-14622-10-git-send-email-rogerq@ti.com>
+ <5608096.0pgFIteLqQ@amdc1032> <3930265.gHe05HETI5@amdc1032>
+Message-ID: <5242E51D.1020602@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 25, 2013 at 10:29:52AM +0100, AKASHI Takahiro wrote:
-> Thank you for your comments, and let me send a revised patch again
-> because my original message didn't reach MLs due to my screw-up.
+Hi,
 
-You can send it if you want but I already merged it in my tree (should
-appear in -next this week as well).
+On 09/25/2013 03:49 PM, Bartlomiej Zolnierkiewicz wrote:
+> On Wednesday, September 25, 2013 02:37:19 PM Bartlomiej Zolnierkiewicz wrote:
+> 
+> [...]
+> 
+>>> +#ifdef CONFIG_PM
+>>> +
+>>> +static int ti_sata_resume(struct device *dev)
+>>> +{
+>>> +	pm_runtime_disable(dev);
+>>> +	pm_runtime_set_active(dev);
+>>> +	pm_runtime_enable(dev);
+>>
+>> This doesn't look like a correct ->resume method:
+>> * it shouldn't touch runtime PM at all
+>> * for each ->resume method there should be a corresponding ->suspend method
+>>
+>> Moreover this whole wrapper driver seems strange, why not just add a proper
+>> runtime PM support to ahci_platform driver instead?
+> 
+> Hmm, even this shouldn't be needed as this wrapper driver doesn't have
+> ->runtime_suspend and ->runtime resume methods.
+> 
+> What exactly is the purpose of the existence of this wrapper driver?
 
--- 
-Catalin
+This is the weirdness of OMAP hwmod framework :).
+
+The OMAP hwmod framework tries to manage the module clocks by itself and needs
+a runtime_resume to enable the relevant clocks.
+
+hwmod framework will be deprecated in the near future and this is the place where
+we need to handle the resources.
+
+But since we are not yet there, I can get rid of this wrapper driver for now
+and add the necessary pm_runtime calls in the ahci_platform driver.
+
+cheers,
+-roger
