@@ -1,35 +1,55 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Wed, 25 Sep 2013 13:39:14 +0900
-Subject: [PATCH 00/03] ARM: shmobile: Initial r7s72100 SoC and Genmai
- board support
-In-Reply-To: <20130918201101.6319.97667.sendpatchset@w520>
-References: <20130918201101.6319.97667.sendpatchset@w520>
-Message-ID: <20130925043913.GA23347@verge.net.au>
+Date: Wed, 25 Sep 2013 13:47:20 +0900
+Subject: [PATCH v2 4/4] ARM: shmobile: BOCK-W reference: add Ether PFC
+ settings
+In-Reply-To: <52305EA4.1060902@cogentembedded.com>
+References: <201309070423.30672.sergei.shtylyov@cogentembedded.com>
+ <201309070431.35908.sergei.shtylyov@cogentembedded.com>
+ <CANqRtoRKFoS9tehteDGaTUYJ8fSBqAYJJDiLxZmoNB9W0N+Mpg@mail.gmail.com>
+ <52305EA4.1060902@cogentembedded.com>
+Message-ID: <20130925044720.GB24243@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 19, 2013 at 05:11:01AM +0900, Magnus Damm wrote:
-> ARM: shmobile: Initial r7s72100 SoC and Genmai board support
+On Wed, Sep 11, 2013 at 04:14:28PM +0400, Sergei Shtylyov wrote:
+> Hello.
 > 
-> [PATCH 01/03] ARM: shmobile: Initial r7s72100 SoC support
-> [PATCH 02/03] ARM: shmobile: r7s72100 SCIF support
-> [PATCH 03/03] ARM: shmobile: Genmai support
+> On 09-09-2013 11:05, Magnus Damm wrote:
 > 
-> This series adds initial support for r7s72100 and Genmai. The SoC
-> is known as r7s72100 which is based on a single core Cortex-A9
-> and makes use of SCIF for serial. Many other on-chip I/O devices
-> are available, and support for those will be added by incremental
-> feature patches.
+> >>Add the Ether pin group to bockw_pinctrl_map[].
 > 
-> This initial SoC and board support is providing limited DT-only
-> support and a very basic C-version of board support. In the future
-> improved PINCTRL and common clock framework support will be added.
+> >>Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 > 
-> Implemented in same style as r8a7790 and r8a7791.
+> >>---
+> >>  arch/arm/mach-shmobile/board-bockw-reference.c |    3 +++
+> >>  1 file changed, 3 insertions(+)
+> >>
+> >>Index: renesas/arch/arm/mach-shmobile/board-bockw-reference.c
+> >>===================================================================
+> >>--- renesas.orig/arch/arm/mach-shmobile/board-bockw-reference.c
+> >>+++ renesas/arch/arm/mach-shmobile/board-bockw-reference.c
+> >>@@ -29,6 +29,9 @@
+> >>   */
+> >>
+> >>  static const struct pinctrl_map bockw_pinctrl_map[] = {
+> >>+       /* Ether */
+> >>+       PIN_MAP_MUX_GROUP_DEFAULT("fde00000.ethernet", "pfc-r8a7778",
+> >>+                                 "ether_rmii", "ether"),
+> >>         /* SCIF0 */
+> >>         PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.0", "pfc-r8a7778",
+> >>                                   "scif0_data_a", "scif0"),
 > 
-> Signed-off-by: Magnus Damm <damm@opensource.se>
+> >Hi Sergei,
+> 
+> >Thanks for your patches. In general I think your series looks fine. I
+> >have a single comment, and that's about the pinctrl-related hunk
+> >above. I can see that this patch is for DT reference for Bock-W, so I
+> >expect the code to be in DT. Do you have any plans to use DT to
+> >describe the pinmux bits? Perhaps you have some incremental patch
+> >planned?
+> 
+>    No, I just repeated what I saw mechanically. Now I'm seeing some
+> evidence that PFC driver supports the device tree, so I probably
+> need to redo the patchset... let me study this question better.
 
-Hi Magnus,
-
-please provide a defconfig if you would like this series merged.
-Otherwise this seems reasonable to me.
+Ping.
