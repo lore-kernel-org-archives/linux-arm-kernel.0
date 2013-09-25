@@ -1,31 +1,62 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 25 Sep 2013 16:30:18 +0800
-Subject: [PATCH 0/5] ARM: imx6: export soc info via soc device
-Message-ID: <1380097823-29027-1-git-send-email-shawn.guo@linaro.org>
+Date: Wed, 25 Sep 2013 16:30:19 +0800
+Subject: [PATCH 1/5] ARM: imx: add soc revision helper functions
+In-Reply-To: <1380097823-29027-1-git-send-email-shawn.guo@linaro.org>
+References: <1380097823-29027-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1380097823-29027-2-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The series adds a few helper functions to initialize soc type and
-revision from anatop, and then export imx6 soc info via soc device
-sysfs interface based on that.
+Similar to what we do for cpu type, the patch adds helper functions
+imx_set_soc_revision() and imx_get_soc_revision() to maintain
+imx_soc_revision in cpu.c.
 
-Shawn Guo (5):
-  ARM: imx: add soc revision helper functions
-  ARM: imx6q: use common soc revision helpers
-  ARM: imx: add a common function to initialize revision from anatop
-  ARM: imx: use imx_init_revision_from_anatop() on imx6sl
-  ARM: imx6: report soc info via soc device
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
+ arch/arm/mach-imx/common.h |    2 ++
+ arch/arm/mach-imx/cpu.c    |   12 ++++++++++++
+ 2 files changed, 14 insertions(+)
 
- arch/arm/boot/dts/imx6sl.dtsi   |    4 +-
- arch/arm/mach-imx/Kconfig       |    1 +
- arch/arm/mach-imx/anatop.c      |   33 +++++++++++---
- arch/arm/mach-imx/clk-imx6q.c   |    5 ++-
- arch/arm/mach-imx/common.h      |    6 ++-
- arch/arm/mach-imx/cpu.c         |   93 +++++++++++++++++++++++++++++++++++++++
- arch/arm/mach-imx/mach-imx6q.c  |   42 +++++-------------
- arch/arm/mach-imx/mach-imx6sl.c |    9 +++-
- arch/arm/mach-imx/mxc.h         |    1 +
- 9 files changed, 149 insertions(+), 45 deletions(-)
-
+diff --git a/arch/arm/mach-imx/common.h b/arch/arm/mach-imx/common.h
+index 4517fd7..d87fff1 100644
+--- a/arch/arm/mach-imx/common.h
++++ b/arch/arm/mach-imx/common.h
+@@ -81,6 +81,8 @@ extern int imx6q_revision(void);
+ extern int mx53_display_revision(void);
+ extern void imx_set_aips(void __iomem *);
+ extern int mxc_device_init(void);
++void imx_set_soc_revision(unsigned int rev);
++unsigned int imx_get_soc_revision(void);
+ 
+ enum mxc_cpu_pwr_mode {
+ 	WAIT_CLOCKED,		/* wfi only */
+diff --git a/arch/arm/mach-imx/cpu.c b/arch/arm/mach-imx/cpu.c
+index e70e3ac..51f6c51 100644
+--- a/arch/arm/mach-imx/cpu.c
++++ b/arch/arm/mach-imx/cpu.c
+@@ -8,11 +8,23 @@
+ unsigned int __mxc_cpu_type;
+ EXPORT_SYMBOL(__mxc_cpu_type);
+ 
++static unsigned int imx_soc_revision;
++
+ void mxc_set_cpu_type(unsigned int type)
+ {
+ 	__mxc_cpu_type = type;
+ }
+ 
++void imx_set_soc_revision(unsigned int rev)
++{
++	imx_soc_revision = rev;
++}
++
++unsigned int imx_get_soc_revision(void)
++{
++	return imx_soc_revision;
++}
++
+ void imx_print_silicon_rev(const char *cpu, int srev)
+ {
+ 	if (srev == IMX_CHIP_REVISION_UNKNOWN)
 -- 
 1.7.9.5
