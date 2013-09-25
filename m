@@ -1,24 +1,56 @@
-From: slapdau@yahoo.com.au (Craig McGeachie)
-Date: Wed, 25 Sep 2013 18:00:53 +1200
-Subject: [PATCH] irq: bcm2835: Re-implement the hardware IRQ handler.
-In-Reply-To: <52410949.8070403@wwwdotorg.org>
-References: <1379751251-2799-1-git-send-email-slapdau@yahoo.com.au>
- <1379755112-19446-1-git-send-email-slapdau@yahoo.com.au>
- <52410949.8070403@wwwdotorg.org>
-Message-ID: <52427C15.6010204@yahoo.com.au>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 25 Sep 2013 15:55:49 +0900
+Subject: [PATCH v2 2/2] ARM: shmobile: Marzen: enable DMA for SDHI0
+In-Reply-To: <201308252147.27210.sergei.shtylyov@cogentembedded.com>
+References: <201308252143.33458.sergei.shtylyov@cogentembedded.com>
+ <201308252147.27210.sergei.shtylyov@cogentembedded.com>
+Message-ID: <20130925065549.GG1916@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/24/2013 03:38 PM, Stephen Warren wrote:
->> +#define BAD_IRQ_NUM	-1
->
-> That should be 0; Using -1 for invalid IRQ is deprecated.
+[ Cc: Guennadi Liakhovetski ]
 
-Could you please point me to something that describes this? I can't find 
-anything that limits the internal representations used by the driver for 
-an interrupt controller.  That, and the design of 
-include/linux/irqdomain.h and kernel/irq/irqdomain.c implies that a 
-0-based hwirq numbering scheme is the natural order of things.
+On Sun, Aug 25, 2013 at 09:47:26PM +0400, Sergei Shtylyov wrote:
+> From: Max Filippov <max.filippov@cogentembedded.com>
+> 
+> Pass HPB-DMA slave IDs in the SDHI0 platform data to enable DMA in the SDHI
+> driver.
+> 
+> Signed-off-by: Max Filippov <max.filippov@cogentembedded.com>
+> [Sergei: removed #include <mach/dma.h>]
+> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> 
+> ---
+> Changes in version 2:
+> - refreshed the patch.
+> 
+>  arch/arm/mach-shmobile/board-marzen.c |    2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> Index: renesas/arch/arm/mach-shmobile/board-marzen.c
+> ===================================================================
+> --- renesas.orig/arch/arm/mach-shmobile/board-marzen.c
+> +++ renesas/arch/arm/mach-shmobile/board-marzen.c
+> @@ -123,6 +123,8 @@ static struct resource sdhi0_resources[]
+>  };
+>  
+>  static struct sh_mobile_sdhi_info sdhi0_platform_data = {
+> +	.dma_slave_tx = HPBDMA_SLAVE_SDHI0_TX,
+> +	.dma_slave_rx = HPBDMA_SLAVE_SDHI0_RX,
+>  	.tmio_flags = TMIO_MMC_WRPROTECT_DISABLE | TMIO_MMC_HAS_IDLE_WAIT,
+>  	.tmio_caps = MMC_CAP_SD_HIGHSPEED,
+>  };
 
-Cheers,
-Craig.
+Hi,
+
+I am intending to queue up this change for v3.13.
+
+I am wondering if you could give me some details of dependencies
+of this change on the previous patch. If possible I would
+like to apply this patch in a branch that does not include the previous patch.
+
+Also, could you provide a patch to update the marzen defconfig?
+
+Lastly, the driver does not seem to compile as it makes use of
+shdma_free_irq() which was removed by Guennadi in
+c1c63a14f4f2419d ("DMA: shdma: switch to managed resource allocation").
