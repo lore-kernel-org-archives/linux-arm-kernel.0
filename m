@@ -1,209 +1,60 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 25 Sep 2013 16:30:23 +0800
-Subject: [PATCH 5/5] ARM: imx6: report soc info via soc device
-In-Reply-To: <1380097823-29027-1-git-send-email-shawn.guo@linaro.org>
-References: <1380097823-29027-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1380097823-29027-6-git-send-email-shawn.guo@linaro.org>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Wed, 25 Sep 2013 11:48:06 +0300
+Subject: [PATCHv7 00/36] ARM: OMAP: clock data conversion to DT
+Message-ID: <1380098922-30340-1-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch enables soc bus infrastructure and adds a function
-imx_soc_device_init() to report soc info via soc device interface for
-imx6qdl and imx6sl.  With the support, user space can get soc related
-info by looking at sysfs like below.
+Hi all,
 
-  $ cat /sys/devices/soc0/machine
-  Freescale i.MX6 Quad SABRE Smart Device Board
-  $ cat /sys/devices/soc0/family
-  Freescale i.MX
-  $ cat /sys/devices/soc0/soc_id
-  i.MX6Q
-  $ cat /sys/devices/soc0/revision
-  1.2
+Version 7 contains following high level changes:
+- Dropped support for basic bindings from Mike Turquette, instead using
+  vendor specific bindings for all clocks
+- Mux clock + divider clock vendor specific bindings get rid of use
+  of the bit-masks, instead these are generated runtime based on parent
+  clock / divider min/max info, see individual patches for details
+- Added support for dummy_ck nodes, was missing from previous version
+- Fixed support for omap3630
+- Added support for new clock node type: ti,mux-gate-clock (using composite
+  clock type)
+- OMAP4 / OMAP5 only build fixes (compiler flag checks added to some files)
+- most of the of_omap_* calls renamed to of_ti_*
+- Rebased on top of v3.12-rc2
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
----
- arch/arm/mach-imx/Kconfig       |    1 +
- arch/arm/mach-imx/common.h      |    1 +
- arch/arm/mach-imx/cpu.c         |   81 +++++++++++++++++++++++++++++++++++++++
- arch/arm/mach-imx/mach-imx6q.c  |    8 +++-
- arch/arm/mach-imx/mach-imx6sl.c |    8 +++-
- arch/arm/mach-imx/mxc.h         |    1 +
- 6 files changed, 98 insertions(+), 2 deletions(-)
+Some detailed comments about patch level changes (if no mention, no major
+changes):
+- Patch #1:
+  * removed use of reg-names property, instead registers mapped using
+    compatible string
+  * removed ti,modes property, instead uses DPLL mode flags now
+  * separated AM33XX DPLLs under their own compatible strings
+- Patch #4 & #5: new patches
+- Patch #6: merged basic gate support from Mike to this patch as vendor
+  specific gate clock support
+- Patch #9 & #10: new patches
+- Patch #11: dummy clocks added, USB / ABE DPLL setup ordering changed
+- Patch #14: dummy clocks added
+- Patch #20: dropped usage of reg-names property
+- Patch #21: dummy clocks added
+- Patch #22 & #23: new patches
+- Patch #30: AM35XX clock data added to this patch
+- Patch #31:
+  * dummy clocks added
+  * added missing 3630 clocks
 
-diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-index 9f67338..e017915 100644
---- a/arch/arm/mach-imx/Kconfig
-+++ b/arch/arm/mach-imx/Kconfig
-@@ -11,6 +11,7 @@ config ARCH_MXC
- 	select GENERIC_IRQ_CHIP
- 	select MIGHT_HAVE_CACHE_L2X0 if ARCH_MULTI_V6_V7
- 	select MULTI_IRQ_HANDLER
-+	select SOC_BUS
- 	select SPARSE_IRQ
- 	select USE_OF
- 	help
-diff --git a/arch/arm/mach-imx/common.h b/arch/arm/mach-imx/common.h
-index 282af93..4f9aea9 100644
---- a/arch/arm/mach-imx/common.h
-+++ b/arch/arm/mach-imx/common.h
-@@ -83,6 +83,7 @@ extern int mxc_device_init(void);
- void imx_set_soc_revision(unsigned int rev);
- unsigned int imx_get_soc_revision(void);
- void imx_init_revision_from_anatop(void);
-+struct device *imx_soc_device_init(void);
- 
- enum mxc_cpu_pwr_mode {
- 	WAIT_CLOCKED,		/* wfi only */
-diff --git a/arch/arm/mach-imx/cpu.c b/arch/arm/mach-imx/cpu.c
-index 51f6c51..fae2c9a 100644
---- a/arch/arm/mach-imx/cpu.c
-+++ b/arch/arm/mach-imx/cpu.c
-@@ -1,6 +1,9 @@
- 
- #include <linux/module.h>
- #include <linux/io.h>
-+#include <linux/of.h>
-+#include <linux/slab.h>
-+#include <linux/sys_soc.h>
- 
- #include "hardware.h"
- #include "common.h"
-@@ -56,3 +59,81 @@ void __init imx_set_aips(void __iomem *base)
- 	reg = __raw_readl(base + 0x50) & 0x00FFFFFF;
- 	__raw_writel(reg, base + 0x50);
- }
-+
-+struct device * __init imx_soc_device_init(void)
-+{
-+	struct soc_device_attribute *soc_dev_attr;
-+	struct soc_device *soc_dev;
-+	struct device_node *root;
-+	const char *soc_id;
-+	int ret;
-+
-+	soc_dev_attr = kzalloc(sizeof(*soc_dev_attr), GFP_KERNEL);
-+	if (!soc_dev_attr)
-+		return NULL;
-+
-+	soc_dev_attr->family = "Freescale i.MX";
-+
-+	root = of_find_node_by_path("/");
-+	ret = of_property_read_string(root, "model", &soc_dev_attr->machine);
-+	of_node_put(root);
-+	if (ret)
-+		goto free_soc;
-+
-+	switch (__mxc_cpu_type) {
-+	case MXC_CPU_MX1:
-+		soc_id = "i.MX1";
-+		break;
-+	case MXC_CPU_MX21:
-+		soc_id = "i.MX21";
-+		break;
-+	case MXC_CPU_MX25:
-+		soc_id = "i.MX25";
-+		break;
-+	case MXC_CPU_MX27:
-+		soc_id = "i.MX27";
-+		break;
-+	case MXC_CPU_MX31:
-+		soc_id = "i.MX31";
-+		break;
-+	case MXC_CPU_MX35:
-+		soc_id = "i.MX35";
-+		break;
-+	case MXC_CPU_MX51:
-+		soc_id = "i.MX51";
-+		break;
-+	case MXC_CPU_MX53:
-+		soc_id = "i.MX53";
-+		break;
-+	case MXC_CPU_IMX6SL:
-+		soc_id = "i.MX6SL";
-+		break;
-+	case MXC_CPU_IMX6DL:
-+		soc_id = "i.MX6DL";
-+		break;
-+	case MXC_CPU_IMX6Q:
-+		soc_id = "i.MX6Q";
-+		break;
-+	default:
-+		soc_id = "Unknown";
-+	}
-+	soc_dev_attr->soc_id = soc_id;
-+
-+	soc_dev_attr->revision = kasprintf(GFP_KERNEL, "%d.%d",
-+					   (imx_soc_revision >> 4) & 0xf,
-+					   imx_soc_revision & 0xf);
-+	if (!soc_dev_attr->revision)
-+		goto free_soc;
-+
-+	soc_dev = soc_device_register(soc_dev_attr);
-+	if (IS_ERR(soc_dev))
-+		goto free_rev;
-+
-+	return soc_device_to_device(soc_dev);
-+
-+free_rev:
-+	kfree(soc_dev_attr->revision);
-+free_soc:
-+	kfree(soc_dev_attr);
-+	return NULL;
-+}
-diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
-index ea01ac3..ebcfd8d 100644
---- a/arch/arm/mach-imx/mach-imx6q.c
-+++ b/arch/arm/mach-imx/mach-imx6q.c
-@@ -164,9 +164,15 @@ static void __init imx6q_1588_init(void)
- 
- static void __init imx6q_init_machine(void)
- {
-+	struct device *parent;
-+
-+	parent = imx_soc_device_init();
-+	if (parent == NULL)
-+		pr_warn("failed to initialize soc device\n");
-+
- 	imx6q_enet_phy_init();
- 
--	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
-+	of_platform_populate(NULL, of_default_bus_match_table, NULL, parent);
- 
- 	imx_anatop_init();
- 	imx6q_pm_init();
-diff --git a/arch/arm/mach-imx/mach-imx6sl.c b/arch/arm/mach-imx/mach-imx6sl.c
-index b1aaa47..5c767f0 100644
---- a/arch/arm/mach-imx/mach-imx6sl.c
-+++ b/arch/arm/mach-imx/mach-imx6sl.c
-@@ -37,9 +37,15 @@ static void __init imx6sl_fec_init(void)
- 
- static void __init imx6sl_init_machine(void)
- {
-+	struct device *parent;
-+
- 	mxc_arch_reset_init_dt();
- 
--	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
-+	parent = imx_soc_device_init();
-+	if (parent == NULL)
-+		pr_warn("failed to initialize soc device\n");
-+
-+	of_platform_populate(NULL, of_default_bus_match_table, NULL, parent);
- 
- 	imx6sl_fec_init();
- }
-diff --git a/arch/arm/mach-imx/mxc.h b/arch/arm/mach-imx/mxc.h
-index 8629e5b..99e03ea 100644
---- a/arch/arm/mach-imx/mxc.h
-+++ b/arch/arm/mach-imx/mxc.h
-@@ -34,6 +34,7 @@
- #define MXC_CPU_MX35		35
- #define MXC_CPU_MX51		51
- #define MXC_CPU_MX53		53
-+#define MXC_CPU_IMX6SL		0x60
- #define MXC_CPU_IMX6DL		0x61
- #define MXC_CPU_IMX6Q		0x63
- 
--- 
-1.7.9.5
+Test branch available here:
+https://github.com/t-kristo/linux-pm.git
+branch: mainline-3.12-rc2-ti-dt-clks-v7
+
+Testing done:
+- am335x-bone : boot only
+- omap5-sevm : boot only
+- dra7-evm : boot only
+- omap3-beagle : boot + suspend/resume (ret + off)
+- omap4-panda-es : boot + suspend/resume
+
+Nishanth has also been doing some tests with omap3-beagle-xm with some WIP
+versions of this branch, but not with this latest one. Nishanth, maybe you
+can provide test results to this one also?
+
+-Tero
