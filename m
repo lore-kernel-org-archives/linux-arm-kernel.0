@@ -1,79 +1,62 @@
-From: joelf@ti.com (Joel Fernandes)
-Date: Wed, 25 Sep 2013 17:01:09 -0500
-Subject: [PATCH 9/9] dts: boneblack: add pinmux and hdmi node to enable display
-In-Reply-To: <1380146469-29496-1-git-send-email-joelf@ti.com>
-References: <1380146469-29496-1-git-send-email-joelf@ti.com>
-Message-ID: <1380146469-29496-10-git-send-email-joelf@ti.com>
+From: agraf@suse.de (Alexander Graf)
+Date: Thu, 26 Sep 2013 00:26:50 +0200
+Subject: [PATCH v4 4/4] KVM: Add documentation for
+ KVM_ARM_PREFERRED_TARGET ioctl
+In-Reply-To: <20130925161923.GB32311@cbox>
+References: <1380101163-20028-1-git-send-email-anup.patel@linaro.org>
+ <1380101163-20028-5-git-send-email-anup.patel@linaro.org>
+ <ECFE274D-FC43-43AD-8A9E-D3131E327F26@suse.de>
+ <CAAhSdy1hZc3Cx51KLwEaDUo4fbiLLzdcBJYXrFgv5AxdWDzbMg@mail.gmail.com>
+ <20130925161923.GB32311@cbox>
+Message-ID: <7FAC4D31-979B-49E0-9F93-61010F5DF66D@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Darren Etheridge <detheridge@ti.com>
 
-Enable the hdmi output and the LCD Controller on BeagleBone
-Black. Also configure the correct pinmux for output of
-video data from the SoC to the HDMI encoder.
+On 25.09.2013, at 18:19, Christoffer Dall wrote:
 
-Signed-off-by: Darren Etheridge <detheridge@ti.com>
-Signed-off-by: Joel Fernandes <joelf@ti.com>
----
- arch/arm/boot/dts/am335x-boneblack.dts | 48 ++++++++++++++++++++++++++++++++++
- 1 file changed, 48 insertions(+)
+> On Wed, Sep 25, 2013 at 05:58:07PM +0530, Anup Patel wrote:
+>> On Wed, Sep 25, 2013 at 5:43 PM, Alexander Graf <agraf@suse.de> wrote:
+>>> 
+>>> On 25.09.2013, at 11:26, Anup Patel wrote:
+>>> 
+>>>> To implement CPU=Host we have added KVM_ARM_PREFERRED_TARGET
+>>>> vm ioctl which provides information to user space required for
+>>>> creating VCPU matching underlying Host.
+>>>> 
+>>>> This patch adds info related to this new KVM_ARM_PREFERRED_TARGET
+>>>> vm ioctl in the KVM API documentation.
+>>>> 
+>>>> Signed-off-by: Anup Patel <anup.patel@linaro.org>
+>>>> Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
+>>>> ---
+>>>> Documentation/virtual/kvm/api.txt |   27 +++++++++++++++++++++++----
+>>>> 1 file changed, 23 insertions(+), 4 deletions(-)
+>>>> 
+>>>> diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
+>>>> index 858aecf..f31e6e8 100644
+>>>> --- a/Documentation/virtual/kvm/api.txt
+>>>> +++ b/Documentation/virtual/kvm/api.txt
+>>>> @@ -2303,8 +2303,28 @@ Possible features:
+>>>>      - KVM_ARM_VCPU_EL1_32BIT: Starts the CPU in a 32bit mode.
+>>>>        Depends on KVM_CAP_ARM_EL1_32BIT (arm64 only).
+>>>> 
+>>>> +4.83 KVM_ARM_PREFERRED_TARGET
+>>> 
+>>> Why 4.83 and not 4.86? It feels backwards to rename all these other sections.
+>> 
+>> I wanted to have KVM_ARM_xxxx IOCTLs located nearby hence
+>> placed KVM_ARM_PREFERRED_TARGET after KVM_ARM_VCPU_INIT.
+>> 
+>> There is no point in keeping KVM_ARM_PREFERRED_TARGET
+>> after KVM_PPC_RTAS_DEFINE_TOKEN and make
+>> KVM_PPC_RTAS_DEFINE_TOKEN dangle in-between documentation
+>> of various KVM_ARM_xxxx IOCTLs.
+>> 
+> I checked the git log and this is not the first time this has happened,
+> so I think Anup's point here is valid.
 
-diff --git a/arch/arm/boot/dts/am335x-boneblack.dts b/arch/arm/boot/dts/am335x-boneblack.dts
-index 16b3bea..6b71ad9 100644
---- a/arch/arm/boot/dts/am335x-boneblack.dts
-+++ b/arch/arm/boot/dts/am335x-boneblack.dts
-@@ -28,3 +28,51 @@
- 	status = "okay";
- 	ti,vcc-aux-disable-is-sleep;
- };
-+
-+&am33xx_pinmux {
-+	nxp_hdmi_bonelt_pins: nxp_hdmi_bonelt_pins {
-+		pinctrl-single,pins = <
-+			0x1b0 0x03      /* xdma_event_intr0, OMAP_MUX_MODE3 | AM33XX_PIN_OUTPUT */
-+			0xa0 0x08       /* lcd_data0.lcd_data0, OMAP_MUX_MODE0 | AM33XX_PIN_OUTPUT | AM33XX_PULL_DISA */
-+			0xa4 0x08       /* lcd_data1.lcd_data1, OMAP_MUX_MODE0 | AM33XX_PIN_OUTPUT | AM33XX_PULL_DISA */
-+			0xa8 0x08       /* lcd_data2.lcd_data2, OMAP_MUX_MODE0 | AM33XX_PIN_OUTPUT | AM33XX_PULL_DISA */
-+			0xac 0x08       /* lcd_data3.lcd_data3, OMAP_MUX_MODE0 | AM33XX_PIN_OUTPUT | AM33XX_PULL_DISA */
-+			0xb0 0x08       /* lcd_data4.lcd_data4, OMAP_MUX_MODE0 | AM33XX_PIN_OUTPUT | AM33XX_PULL_DISA */
-+			0xb4 0x08       /* lcd_data5.lcd_data5, OMAP_MUX_MODE0 | AM33XX_PIN_OUTPUT | AM33XX_PULL_DISA */
-+			0xb8 0x08       /* lcd_data6.lcd_data6, OMAP_MUX_MODE0 | AM33XX_PIN_OUTPUT | AM33XX_PULL_DISA */
-+			0xbc 0x08       /* lcd_data7.lcd_data7, OMAP_MUX_MODE0 | AM33XX_PIN_OUTPUT | AM33XX_PULL_DISA */
-+			0xc0 0x08       /* lcd_data8.lcd_data8, OMAP_MUX_MODE0 | AM33XX_PIN_OUTPUT | AM33XX_PULL_DISA */
-+			0xc4 0x08       /* lcd_data9.lcd_data9, OMAP_MUX_MODE0 | AM33XX_PIN_OUTPUT | AM33XX_PULL_DISA */
-+			0xc8 0x08       /* lcd_data10.lcd_data10, OMAP_MUX_MODE0 | AM33XX_PIN_OUTPUT | AM33XX_PULL_DISA */
-+			0xcc 0x08       /* lcd_data11.lcd_data11, OMAP_MUX_MODE0 | AM33XX_PIN_OUTPUT | AM33XX_PULL_DISA */
-+			0xd0 0x08       /* lcd_data12.lcd_data12, OMAP_MUX_MODE0 | AM33XX_PIN_OUTPUT | AM33XX_PULL_DISA */
-+			0xd4 0x08       /* lcd_data13.lcd_data13, OMAP_MUX_MODE0 | AM33XX_PIN_OUTPUT | AM33XX_PULL_DISA */
-+			0xd8 0x08       /* lcd_data14.lcd_data14, OMAP_MUX_MODE0 | AM33XX_PIN_OUTPUT | AM33XX_PULL_DISA */
-+			0xdc 0x08       /* lcd_data15.lcd_data15, OMAP_MUX_MODE0 | AM33XX_PIN_OUTPUT | AM33XX_PULL_DISA */
-+			0xe0 0x00       /* lcd_vsync.lcd_vsync, OMAP_MUX_MODE0 | AM33XX_PIN_OUTPUT */
-+			0xe4 0x00       /* lcd_hsync.lcd_hsync, OMAP_MUX_MODE0 | AM33XX_PIN_OUTPUT */
-+			0xe8 0x00       /* lcd_pclk.lcd_pclk, OMAP_MUX_MODE0 | AM33XX_PIN_OUTPUT */
-+			0xec 0x00       /* lcd_ac_bias_en.lcd_ac_bias_en, OMAP_MUX_MODE0 | AM33XX_PIN_OUTPUT */
-+		>;
-+	};
-+	nxp_hdmi_bonelt_off_pins: nxp_hdmi_bonelt_off_pins {
-+		pinctrl-single,pins = <
-+			0x1b0 0x03      /* xdma_event_intr0, OMAP_MUX_MODE3 | AM33XX_PIN_OUTPUT */
-+		>;
-+	};
-+};
-+
-+&lcdc {
-+	status = "okay";
-+};
-+
-+/ {
-+	hdmi {
-+		compatible = "ti,tilcdc,slave";
-+		i2c = <&i2c0>;
-+		pinctrl-names = "default", "off";
-+		pinctrl-0 = <&nxp_hdmi_bonelt_pins>;
-+		pinctrl-1 = <&nxp_hdmi_bonelt_off_pins>;
-+		status = "okay";
-+	};
-+};
--- 
-1.8.1.2
+Well, I think it makes sense to be consistent here. Maybe we should add a new section for arch specific ioctls so that we get our own number space? But regardless, all subarchs should try and follow the same scheme - regardless of what the scheme is :).
+
+
+Alex
