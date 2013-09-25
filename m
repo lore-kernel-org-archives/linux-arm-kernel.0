@@ -1,61 +1,91 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Thu, 26 Sep 2013 08:40:03 +0900
-Subject: [PATCH] ARM: shmobile: Allow build of the MTU2 timer driver
-In-Reply-To: <20130925050647.GG24243@verge.net.au>
-References: <20130918195000.6075.25025.sendpatchset@w520>
- <CAOesGMhJmFQwcmUzwoVvA3yBjZVLYj0x9fwCpr_kvTWoWc2qew@mail.gmail.com>
- <20130925050647.GG24243@verge.net.au>
-Message-ID: <CANqRtoQCLLvxE5tiHaRLWU3cDTfBfA2D79xsRRKHTSk3U-50bA@mail.gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 26 Sep 2013 08:40:24 +0900
+Subject: [PATCH/RFC] ARM: shmobile: Add r8a7791 thermal sensor DT device
+In-Reply-To: <20130925231801.16487.26821.sendpatchset@w520>
+References: <20130925231801.16487.26821.sendpatchset@w520>
+Message-ID: <20130925234023.GD20882@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 25, 2013 at 2:06 PM, Simon Horman <horms@verge.net.au> wrote:
-> On Wed, Sep 18, 2013 at 01:53:48PM -0700, Olof Johansson wrote:
->> Hi,
->>
->>
->> On Wed, Sep 18, 2013 at 12:50 PM, Magnus Damm <magnus.damm@gmail.com> wrote:
->> > From: Magnus Damm <damm@opensource.se>
->> >
->> > Include MTU2 in the list of timer drivers that may
->> > be used on mach-shmobile. This driver has previously
->> > only been used by the SH architecture. With this patch
->> > the MTU2 joins TMU and CMT as timer drivers that may be
->> > used on ARM or SH.
->> >
->> > Signed-off-by: Magnus Damm <damm@opensource.se>
->> > ---
->> >
->> >  arch/arm/mach-shmobile/Kconfig |    6 ++++++
->> >  1 file changed, 6 insertions(+)
->> >
->> > --- 0004/arch/arm/mach-shmobile/Kconfig
->> > +++ work/arch/arm/mach-shmobile/Kconfig 2013-09-19 04:17:55.000000000 +0900
->> > @@ -314,6 +314,12 @@ config SH_TIMER_CMT
->> >         help
->> >           This enables build of the CMT timer driver.
->> >
->> > +config SH_TIMER_MTU2
->> > +       bool "MTU2 timer driver"
->> > +       default y
->> > +       help
->> > +         This enables build of the MTU2 timer driver.
->>
->> It's odd to have the config entry in arch/arm/ when the driver is in
->> drivers/clocksource. I think this entry should be moved to
->> drivers/clocksource/Kconfig for that reason (with appropriate
->> dependencies).
->
-> This sounds logical to me.
-> Magnus, how do you feel about this?
+On Thu, Sep 26, 2013 at 08:18:01AM +0900, Magnus Damm wrote:
+> From: Magnus Damm <damm@opensource.se>
+> 
+> Hook up the single channel thermal sensor via DT
+> on r8a7791. The information comes from the device
+> data sheet.
+> 
+> Unfortunately it seems that r8a7791 uses a different
+> register offset compared to r8a7790, so passing
+> the singel channel offset results in the following
+> error:
+> 
+> rcar_thermal e61f0000.thermal: can't request region for resource [mem 0xe61f0000-0xe61f0037]                                                                    
+> rcar_thermal: probe of e61f0000.thermal failed with error -16                   
+> 
+> Before this can be merged the thermal driver may beed
+> to be extended to support the different register layouts
+> for the thermal sensor in r8a7779, r8a7790 and r8a7791.
+> 
+> Not-Yet-Signed-off-by: Magnus Damm <damm@opensource.se>
 
-Keeping it in a single location sounds good to me, but I worry a bit
-about how to merge it without any conflicts.
+Hi Magnus,
 
-A little while ago did I send out a first rough patch for this:
+when you repost this patch please split it into two.
+An SoC patch that updates clock-r8a7791.c.
+And a DT patch which updates r8a7791.dtsi.
 
-[PATCH/RFC] clocksource: Consolidate SH and ARM mach-shmobile Kconfig bits
+Thanks
 
-Cheers,
-
-/ magnus
+> ---
+> 
+>  Written against renesas-devel-20130925
+> 
+>  arch/arm/boot/dts/r8a7791.dtsi         |    7 +++++++
+>  arch/arm/mach-shmobile/clock-r8a7791.c |    3 +++
+>  2 files changed, 10 insertions(+)
+> 
+> --- 0001/arch/arm/boot/dts/r8a7791.dtsi
+> +++ work/arch/arm/boot/dts/r8a7791.dtsi	2013-09-26 07:34:01.000000000 +0900
+> @@ -38,4 +38,11 @@
+>  			<0 0xf1006000 0 0x2000>;
+>  		interrupts = <1 9 0xf04>;
+>  	};
+> +
+> +	thermal at e61f0000 {
+> +		compatible = "renesas,rcar-thermal";
+> +		reg = <0 0xe61f0000 0 0x14>, <0 0xe61f0000 0 0x38>;
+> +		interrupt-parent = <&gic>;
+> +		interrupts = <0 69 4>;
+> +	};
+>  };
+> --- 0001/arch/arm/mach-shmobile/clock-r8a7791.c
+> +++ work/arch/arm/mach-shmobile/clock-r8a7791.c	2013-09-26 07:32:34.000000000 +0900
+> @@ -122,6 +122,7 @@ static struct clk *main_clks[] = {
+>  enum {
+>  	MSTP721, MSTP720,
+>  	MSTP719, MSTP718, MSTP715, MSTP714,
+> +	MSTP522,
+>  	MSTP216, MSTP207, MSTP206,
+>  	MSTP204, MSTP203, MSTP202, MSTP1105, MSTP1106, MSTP1107,
+>  	MSTP124,
+> @@ -135,6 +136,7 @@ static struct clk mstp_clks[MSTP_NR] = {
+>  	[MSTP718] = SH_CLK_MSTP32(&p_clk, SMSTPCR7, 18, 0), /* SCIF3 */
+>  	[MSTP715] = SH_CLK_MSTP32(&p_clk, SMSTPCR7, 15, 0), /* SCIF4 */
+>  	[MSTP714] = SH_CLK_MSTP32(&p_clk, SMSTPCR7, 14, 0), /* SCIF5 */
+> +	[MSTP522] = SH_CLK_MSTP32(&extal_clk, SMSTPCR5, 22, 0), /* Thermal */
+>  	[MSTP216] = SH_CLK_MSTP32(&mp_clk, SMSTPCR2, 16, 0), /* SCIFB2 */
+>  	[MSTP207] = SH_CLK_MSTP32(&mp_clk, SMSTPCR2, 7, 0), /* SCIFB1 */
+>  	[MSTP206] = SH_CLK_MSTP32(&mp_clk, SMSTPCR2, 6, 0), /* SCIFB0 */
+> @@ -179,6 +181,7 @@ static struct clk_lookup lookups[] = {
+>  	CLKDEV_DEV_ID("sh-sci.12", &mstp_clks[MSTP1105]), /* SCIFA3 */
+>  	CLKDEV_DEV_ID("sh-sci.13", &mstp_clks[MSTP1106]), /* SCIFA4 */
+>  	CLKDEV_DEV_ID("sh-sci.14", &mstp_clks[MSTP1107]), /* SCIFA5 */
+> +	CLKDEV_DEV_ID("e61f0000.thermal", &mstp_clks[MSTP522]),
+>  	CLKDEV_DEV_ID("sh_cmt.0", &mstp_clks[MSTP124]),
+>  };
+>  
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
