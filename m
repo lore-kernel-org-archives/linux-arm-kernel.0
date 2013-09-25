@@ -1,114 +1,107 @@
-From: sandeepa.prabhu@linaro.org (Sandeepa Prabhu)
-Date: Wed, 25 Sep 2013 20:12:17 +0530
-Subject: [PATCH v1 2/7] arm64: introduce interfaces to hotpatch kernel and
- module code
-In-Reply-To: <20130925103535.2249f617@gandalf.local.home>
-References: <1380105868-31985-1-git-send-email-liuj97@gmail.com>
- <1380105868-31985-3-git-send-email-liuj97@gmail.com>
- <20130925103535.2249f617@gandalf.local.home>
-Message-ID: <CA+b37P0P0RhUytnkLSXmz28wzzsoL3-viV2oxNJqq2nP7kZBFA@mail.gmail.com>
+From: tom.leiming@gmail.com (Ming Lei)
+Date: Wed, 25 Sep 2013 22:49:38 +0800
+Subject: [PATCH] clockevent: exynos_mct: fix lockdep warning
+Message-ID: <1380120578-17458-1-git-send-email-tom.leiming@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25 September 2013 20:05, Steven Rostedt <rostedt@goodmis.org> wrote:
-> On Wed, 25 Sep 2013 18:44:22 +0800
-> Jiang Liu <liuj97@gmail.com> wrote:
->> diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
->> index 8541c3a..50facfc 100644
->> --- a/arch/arm64/kernel/insn.c
->> +++ b/arch/arm64/kernel/insn.c
->> @@ -15,6 +15,8 @@
->>   * along with this program.  If not, see <http://www.gnu.org/licenses/>.
->>   */
->>  #include <linux/kernel.h>
->> +#include <linux/stop_machine.h>
->> +#include <asm/cacheflush.h>
->>  #include <asm/insn.h>
->>
->>  static int aarch64_insn_cls[] = {
->> @@ -69,3 +71,65 @@ bool __kprobes aarch64_insn_hotpatch_safe(u32 old_insn, u32 new_insn)
->>       return __aarch64_insn_hotpatch_safe(old_insn) &&
->>              __aarch64_insn_hotpatch_safe(new_insn);
->>  }
->> +
->> +struct aarch64_insn_patch {
->> +     void    *text_addr;
->> +     u32     *new_insns;
->> +     int     insn_cnt;
->> +};
->> +
->> +int __kprobes __aarch64_insn_patch_text(void *addr, u32 *insns, int cnt)
->> +{
->> +     int i;
->> +     u32 *tp = addr;
->> +
->> +     /* instructions must be word aligned */
->> +     if (cnt <= 0 || ((uintptr_t)addr & 0x3))
->> +             return -EINVAL;
->
-> On aarch64, are instructions always word aligned? If not, it should be
-> safe for stop machine to modify non word aligned instructions, but this
-> patch looks like it doesn't allow stop_machine() to do so.
-Steve,
+This patch moves request_irq() out of cpu notifier callback
+to fix below lockdep warning:
 
-Yes, aarch64 instructions must be word-aligned, else instruction fetch
-would generate Misaligned PC fault.
+[    0.249513] ------------[ cut here ]------------
+[    0.249525] WARNING: CPU: 1 PID: 0 at kernel/lockdep.c:2740 lockdep_trace_alloc+0xc8/0x10c()
+[    0.249534] DEBUG_LOCKS_WARN_ON(irqs_disabled_flags(flags))
+[    0.249538] Modules linked in:
+[    0.249548] CPU: 1 PID: 0 Comm: swapper/1 Not tainted 3.12.0-rc1-next-20130923+ #338
+[    0.249564] [<c00165d0>] (unwind_backtrace+0x0/0xec) from [<c0012b48>] (show_stack+0x20/0x24)
+[    0.249577] [<c0012b48>] (show_stack+0x20/0x24) from [<c04ebf0c>] (dump_stack+0x74/0xb4)
+[    0.249591] [<c04ebf0c>] (dump_stack+0x74/0xb4) from [<c00237a8>] (warn_slowpath_common+0x78/0x9c)
+[    0.249604] [<c00237a8>] (warn_slowpath_common+0x78/0x9c) from [<c0023888>] (warn_slowpath_fmt+0x40/0x48)
+[    0.249615] [<c0023888>] (warn_slowpath_fmt+0x40/0x48) from [<c007f194>] (lockdep_trace_alloc+0xc8/0x10c)
+[    0.249626] [<c007f194>] (lockdep_trace_alloc+0xc8/0x10c) from [<c01173b0>] (kmem_cache_alloc_trace+0x38/0x2
+24)
+[    0.249638] [<c01173b0>] (kmem_cache_alloc_trace+0x38/0x224) from [<c006bc4c>] (request_threaded_irq+0x90/0x130)
+[    0.249651] [<c006bc4c>] (request_threaded_irq+0x90/0x130) from [<c0408c60>] (exynos4_local_timer_setup+0xdc/0x140)
+[    0.249663] [<c0408c60>] (exynos4_local_timer_setup+0xdc/0x140) from [<c0408d78>] (exynos4_mct_cpu_notify+0x40/0xb0)
+[    0.249675] [<c0408d78>] (exynos4_mct_cpu_notify+0x40/0xb0) from [<c04f4e18>] (notifier_call_chain+0x48/0x78)
+[    0.249688] [<c04f4e18>] (notifier_call_chain+0x48/0x78) from [<c004abb0>] (__raw_notifier_call_chain+0x24/0x2c)
+[    0.249700] [<c004abb0>] (__raw_notifier_call_chain+0x24/0x2c) from [<c0023908>] (__cpu_notify+0x3c/0x58)
+[    0.249713] [<c0023908>] (__cpu_notify+0x3c/0x58) from [<c0023944>] (cpu_notify+0x20/0x24)
+[    0.249725] [<c0023944>] (cpu_notify+0x20/0x24) from [<c002407c>] (notify_cpu_starting+0x58/0x60)
+[    0.249737] [<c002407c>] (notify_cpu_starting+0x58/0x60) from [<c00143cc>] (secondary_start_kernel+0xec/0x13
+8)
+[    0.249748] [<c00143cc>] (secondary_start_kernel+0xec/0x138) from [<40008664>] (0x40008664)
+[    0.249767] ---[ end trace 3406ff24bd97382e ]---
 
-Thanks,
-Sandeepa
->
-> -- Steve
->
->> +
->> +     for (i = 0; i < cnt; i++)
->> +             tp[i] = insns[i];
->> +
->> +     flush_icache_range((uintptr_t)tp, (uintptr_t)tp + cnt * sizeof(u32));
->> +
->> +     return 0;
->> +}
->> +
->> +static int __kprobes aarch64_insn_patch_text_cb(void *arg)
->> +{
->> +     struct aarch64_insn_patch *pp = arg;
->> +
->> +     return __aarch64_insn_patch_text(pp->text_addr, pp->new_insns,
->> +                                      pp->insn_cnt);
->> +}
->> +
->> +int __kprobes aarch64_insn_patch_text(void *addr, u32 *insns, int cnt)
->> +{
->> +     int ret;
->> +     bool safe = false;
->> +
->> +     /* instructions must be word aligned */
->> +     if (cnt <= 0 || ((uintptr_t)addr & 0x3))
->> +             return -EINVAL;
->> +
->> +     if (cnt == 1)
->> +             safe = aarch64_insn_hotpatch_safe(*(u32 *)addr, insns[0]);
->> +
->> +     if (safe) {
->> +             ret = __aarch64_insn_patch_text(addr, insns, cnt);
->> +     } else {
->> +             struct aarch64_insn_patch patch = {
->> +                     .text_addr = addr,
->> +                     .new_insns = insns,
->> +                     .insn_cnt = cnt,
->> +             };
->> +
->> +             /*
->> +              * Execute __aarch64_insn_patch_text() on every online CPU,
->> +              * which ensure serialization among all online CPUs.
->> +              */
->> +             ret = stop_machine(aarch64_insn_patch_text_cb, &patch, NULL);
->> +     }
->> +
->> +     return ret;
->> +}
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: Kukjin Kim <kgene.kim@samsung.com>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-samsung-soc at vger.kernel.org
+Signed-off-by: Ming Lei <tom.leiming@gmail.com>
+---
+ drivers/clocksource/exynos_mct.c |   34 +++++++++++++++++++++-------------
+ 1 file changed, 21 insertions(+), 13 deletions(-)
+
+diff --git a/drivers/clocksource/exynos_mct.c b/drivers/clocksource/exynos_mct.c
+index 5b34768..94b35aa 100644
+--- a/drivers/clocksource/exynos_mct.c
++++ b/drivers/clocksource/exynos_mct.c
+@@ -419,19 +419,10 @@ static int exynos4_local_timer_setup(struct clock_event_device *evt)
+ 
+ 	exynos4_mct_write(TICK_BASE_CNT, mevt->base + MCT_L_TCNTB_OFFSET);
+ 
+-	if (mct_int_type == MCT_INT_SPI) {
+-		evt->irq = mct_irqs[MCT_L0_IRQ + cpu];
+-		if (request_irq(evt->irq, exynos4_mct_tick_isr,
+-				IRQF_TIMER | IRQF_NOBALANCING,
+-				evt->name, mevt)) {
+-			pr_err("exynos-mct: cannot register IRQ %d\n",
+-				evt->irq);
+-			return -EIO;
+-		}
+-		irq_set_affinity(evt->irq, cpumask_of(cpu));
+-	} else {
++	if (mct_int_type == MCT_INT_PPI)
+ 		enable_percpu_irq(mct_irqs[MCT_L0_IRQ], 0);
+-	}
++	else
++		enable_irq(evt->irq);
+ 
+ 	return 0;
+ }
+@@ -440,7 +431,7 @@ static void exynos4_local_timer_stop(struct clock_event_device *evt)
+ {
+ 	evt->set_mode(CLOCK_EVT_MODE_UNUSED, evt);
+ 	if (mct_int_type == MCT_INT_SPI)
+-		free_irq(evt->irq, this_cpu_ptr(&percpu_mct_tick));
++		disable_irq(evt->irq);
+ 	else
+ 		disable_percpu_irq(mct_irqs[MCT_L0_IRQ]);
+ }
+@@ -500,6 +491,23 @@ static void __init exynos4_timer_resources(struct device_node *np, void __iomem
+ 					 &percpu_mct_tick);
+ 		WARN(err, "MCT: can't request IRQ %d (%d)\n",
+ 		     mct_irqs[MCT_L0_IRQ], err);
++	} else {
++		int cpu;
++
++		for_each_possible_cpu(cpu) {
++			struct mct_clock_event_device *mevt =
++				&per_cpu(percpu_mct_tick, cpu);
++
++			mevt->evt.irq = mct_irqs[MCT_L0_IRQ + cpu];
++			if (request_irq(mevt->evt.irq, exynos4_mct_tick_isr,
++					IRQF_TIMER | IRQF_NOBALANCING,
++					mevt->evt.name, mevt)) {
++				WARN(1, "exynos-mct: cannot register IRQ %d\n",
++				     mevt->evt.irq);
++			}
++			irq_set_affinity(mevt->evt.irq, cpumask_of(cpu));
++			disable_irq(mevt->evt.irq);
++		}
+ 	}
+ 
+ 	err = register_cpu_notifier(&exynos4_mct_cpu_nb);
+-- 
+1.7.9.5
