@@ -1,91 +1,203 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 25 Sep 2013 12:34:41 -0700
-Subject: [PATCH v4] dt: update PSCI binding documentation for v0.2
-In-Reply-To: <CAL_JsqK1LE9rptajTOfvzNd1NQEihJzwm0YtJMzpUz-BhwJg5w@mail.gmail.com>
-References: <1379625868-5395-1-git-send-email-robherring2@gmail.com>
- <CAOesGMjNhYTfPOr5NPEC9GWym-nuFE0hX_6+LW9bTv_E3iXbcQ@mail.gmail.com>
- <20130920102015.GH17453@e106331-lin.cambridge.arm.com>
- <CAOesGMid5pgcVD+oCjUr_75tv+C5QtVZt=Vt9kdiT_QPFOrzrg@mail.gmail.com>
- <CAL_JsqK1LE9rptajTOfvzNd1NQEihJzwm0YtJMzpUz-BhwJg5w@mail.gmail.com>
-Message-ID: <CAOesGMgM2JsWbBOujdiCZdKkHqTRuN0P=OsdKGiyzz6_aiGWSA@mail.gmail.com>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Wed, 25 Sep 2013 14:49:10 -0500
+Subject: [PATCHv4 2/3] ARM: msm: Add support for APQ8074 Dragonboard
+In-Reply-To: <1379992406-3541-2-git-send-email-rvaswani@codeaurora.org>
+References: <1379992406-3541-1-git-send-email-rvaswani@codeaurora.org>
+ <1379992406-3541-2-git-send-email-rvaswani@codeaurora.org>
+Message-ID: <4E7868D6-56CB-4AF8-8EBF-069966899C23@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 25, 2013 at 12:20 PM, Rob Herring <robherring2@gmail.com> wrote:
-> On Wed, Sep 25, 2013 at 12:15 PM, Olof Johansson <olof@lixom.net> wrote:
->> On Fri, Sep 20, 2013 at 3:20 AM, Mark Rutland <mark.rutland@arm.com> wrote:
->>> On Fri, Sep 20, 2013 at 05:36:51AM +0100, Olof Johansson wrote:
->>>> Hi,
->>>
->>> Hi Olof,
->>>
->>>>
->>>> Just a quick drive-by. Sorry, I don't know the history of previous
->>>> review cycles.
->>>>
->>>>
->>>> On Thu, Sep 19, 2013 at 2:24 PM, Rob Herring <robherring2@gmail.com> wrote:
->>>>
->>>> >  Main node optional properties:
->>>> >
->>>> > - - cpu_suspend   : Function ID for CPU_SUSPEND operation
->>>> > + - cpu_suspend[-<32|64]   : Function ID for CPU_SUSPEND operation
->>>> > +
->>>> > + - cpu_off                : Function ID for CPU_OFF operation
->>>> > +
->>>> > + - cpu_on[-<32|64]        : Function ID for CPU_ON operation
->>>> > +
->>>> > + - affinity_info[-<32|64] : Function ID for AFFINITY_INFO operation
->>>> >
->>>> > - - cpu_off       : Function ID for CPU_OFF operation
->>>> > + - migrate[-<32|64]       : Function ID for MIGRATE operation
->>>> >
->>>> > - - cpu_on        : Function ID for CPU_ON operation
->>>> > + - migrate_info_type      : Function ID for MIGRATE_INFO_TYPE operation
->>>> >
->>>> > - - migrate       : Function ID for MIGRATE operation
->>>> > + - migrate_info_up_cpu[-<32|64] : Function ID for MIGRATE_INFO_UP_CPU operation
->>>> >
->>>> > + - system_reset           : Function ID for SYSTEM_RESET operation
->>>> > +
->>>> > + - system_off             : Function ID for SYSTEM_OFF operation
->>>>
->>>> All of these should use dashes instead of underscores.
->>>
->>> I also don't like the underscores, but they're an unfortunate historical
->>> artifact that we can't get rid of (at least for cpu_on, cpu_off, and
->>> cpu_suspend).
->>
->> We need to keep those three old ones supported in the driver, but the
->> newer binding can use dashes instead, as long as the kernel also
->> handles the old binding.
->>
->>> Both Xen and kvmtool are already passing DTs to guests which have
->>> underscores in the property names, so it's both a boot ABI and a
->>> userspace ABI.
->>
->> Again, as mentioned on IRC: We've said that bindings are not yet
->> stable until we lock them down, so we will need to adjust accordingly.
->> Once we lock them down, they are stable and part of ABI. But we really
->> don't want to deal with the bad bindings that people came up with
->> without much review, and that's what the whole idea behind cleaning up
->> and then locking them down is all about.
->
-> For some of us, bindings are already in production. Until we have some
-> way to document stable vs. unstable, it is not up to anyone but the
-> users of a binding to define the stability. If the users of a binding
-> can tolerate the change, then it is unstable and can change.
 
-Ok, so why review bindings at all then? Just implement what you want,
-ship it and force it on the rest of us for ever.
+On Sep 23, 2013, at 10:13 PM, Rohit Vaswani wrote:
 
-> All this boils down to using '_' vs. '-', right? Come on. I'm all for
-> consistency, but let's be practical. There are plenty of documented
-> examples that use '_' starting with device_type.
+> This patch adds basic board support for APQ8074 Dragonboard
+> which belongs to the Snapdragon 800 family.
+> For now, just support a basic machine with device tree.
+> 
+> Signed-off-by: Rohit Vaswani <rvaswani@codeaurora.org>
+> ---
+> arch/arm/Kconfig.debug                         |  9 +++++++
+> arch/arm/boot/dts/Makefile                     |  3 ++-
+> arch/arm/boot/dts/qcom-apq8074-dragonboard.dts |  6 +++++
+> arch/arm/boot/dts/qcom-msm8974.dtsi            | 35 ++++++++++++++++++++++++++
+> arch/arm/include/debug/msm.S                   |  5 ++++
+> arch/arm/mach-msm/Kconfig                      | 13 ++++++++++
+> arch/arm/mach-msm/board-dt.c                   |  9 +++++++
+> 7 files changed, 79 insertions(+), 1 deletion(-)
+> create mode 100644 arch/arm/boot/dts/qcom-apq8074-dragonboard.dts
+> create mode 100644 arch/arm/boot/dts/qcom-msm8974.dtsi
+> 
+> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+> index e18a6fc..959b2c7 100644
+> --- a/arch/arm/Kconfig.debug
+> +++ b/arch/arm/Kconfig.debug
+> @@ -357,6 +357,15 @@ choice
+> 		  Say Y here if you want the debug print routines to direct
+> 		  their output to the serial port on MSM 8960 devices.
+> 
+> +	config DEBUG_MSM8974_UART
+> +		bool "Kernel low-level debugging messages via MSM 8974 UART"
+> +		depends on ARCH_MSM8974
+> +		select MSM_HAS_DEBUG_UART_HS
+> +		select DEBUG_MSM_UART
+> +		help
+> +		  Say Y here if you want the debug print routines to direct
+> +		  their output to the serial port on MSM 8974 devices.
+> +
 
-Next property I add will be called Device_Type then, if we're willing
-to not give a shit about best practices any more. Thanks for setting
-the direction and holding the bar high, Rob!
+A little surprised you didn't pull this and the ARCH_MSM8974 into its own patch outside of this patch being board support.
+
+> 	config DEBUG_MVEBU_UART
+> 		bool "Kernel low-level debugging messages via MVEBU UART (old bootloaders)"
+> 		depends on ARCH_MVEBU
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index 000cf76..e71a3ec 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -102,7 +102,8 @@ dtb-$(CONFIG_ARCH_KIRKWOOD) += kirkwood-cloudbox.dtb \
+> 	kirkwood-openblocks_a6.dtb
+> dtb-$(CONFIG_ARCH_MARCO) += marco-evb.dtb
+> dtb-$(CONFIG_ARCH_MSM) += msm8660-surf.dtb \
+> -	msm8960-cdp.dtb
+> +	msm8960-cdp.dtb \
+> +	qcom-apq8074-dragonboard.dtb
+> dtb-$(CONFIG_ARCH_MVEBU) += armada-370-db.dtb \
+> 	armada-370-mirabox.dtb \
+> 	armada-370-netgear-rn102.dtb \
+> diff --git a/arch/arm/boot/dts/qcom-apq8074-dragonboard.dts b/arch/arm/boot/dts/qcom-apq8074-dragonboard.dts
+> new file mode 100644
+> index 0000000..bb6f3c4
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/qcom-apq8074-dragonboard.dts
+> @@ -0,0 +1,6 @@
+> +/include/ "qcom-msm8974.dtsi"
+> +
+> +/ {
+> +	model = "Qualcomm APQ8074 Dragonboard";
+> +	compatible = "qcom,apq8074-dragonboard", "qcom,apq8074";
+> +};
+> diff --git a/arch/arm/boot/dts/qcom-msm8974.dtsi b/arch/arm/boot/dts/qcom-msm8974.dtsi
+> new file mode 100644
+> index 0000000..f04b643
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/qcom-msm8974.dtsi
+> @@ -0,0 +1,35 @@
+> +/dts-v1/;
+> +
+> +/include/ "skeleton.dtsi"
+> +
+> +/ {
+> +	model = "Qualcomm MSM8974";
+> +	compatible = "qcom,msm8974";
+> +	interrupt-parent = <&intc>;
+> +
+> +	soc: soc { };
+
+We should have a unit address here:
+
+	  soc: soc at FOOBAR {
+
+also, split out the curly braces so any future patches do have to muck with that.
+
+	};
 
 
--Olof
+> +};
+> +
+> +&soc {
+> +	#address-cells = <1>;
+> +	#size-cells = <1>;
+> +	ranges;
+> +	compatible = "simple-bus";
+> +
+> +	intc: interrupt-controller at f9000000 {
+> +		compatible = "qcom,msm-qgic2";
+> +		interrupt-controller;
+> +		#interrupt-cells = <3>;
+> +		reg = <0xf9000000 0x1000>,
+> +		      <0xf9002000 0x1000>;
+> +	};
+> +
+> +	timer {
+> +		compatible = "arm,armv7-timer";
+> +		interrupts = <1 2 0xf08>,
+> +			     <1 3 0xf08>,
+> +			     <1 4 0xf08>,
+> +			     <1 1 0xf08>;
+> +		clock-frequency = <19200000>;
+> +	};
+> +};
+> diff --git a/arch/arm/include/debug/msm.S b/arch/arm/include/debug/msm.S
+> index 9166e1b..9d653d4 100644
+> --- a/arch/arm/include/debug/msm.S
+> +++ b/arch/arm/include/debug/msm.S
+> @@ -46,6 +46,11 @@
+> #define MSM_DEBUG_UART_PHYS	0x16440000
+> #endif
+> 
+> +#ifdef CONFIG_DEBUG_MSM8974_UART
+> +#define MSM_DEBUG_UART_BASE	0xFA71E000
+> +#define MSM_DEBUG_UART_PHYS	0xF991E000
+> +#endif
+> +
+> 	.macro	addruart, rp, rv, tmp
+> #ifdef MSM_DEBUG_UART_PHYS
+> 	ldr	\rp, =MSM_DEBUG_UART_PHYS
+> diff --git a/arch/arm/mach-msm/Kconfig b/arch/arm/mach-msm/Kconfig
+> index 2586c28..086bcb9 100644
+> --- a/arch/arm/mach-msm/Kconfig
+> +++ b/arch/arm/mach-msm/Kconfig
+> @@ -64,6 +64,19 @@ config ARCH_MSM_DT
+> 	select SPARSE_IRQ
+> 	select USE_OF
+> 
+> +config ARCH_MSM8974
+> +	bool "MSM8974"
+> +	select ARM_GIC
+> +	select CPU_V7
+> +	select HAVE_ARM_ARCH_TIMER
+> +	select HAVE_SMP
+> +	select MSM_SCM if SMP
+> +	select USE_OF
+> +
+> +config ARCH_MSM_DT
+> +	def_bool y
+> +	depends on (ARCH_MSM8X60 || ARCH_MSM8960 || ARCH_MSM8974)
+> +
+> config MSM_HAS_DEBUG_UART_HS
+> 	bool
+> 
+> diff --git a/arch/arm/mach-msm/board-dt.c b/arch/arm/mach-msm/board-dt.c
+> index 266a280..5211e80 100644
+> --- a/arch/arm/mach-msm/board-dt.c
+> +++ b/arch/arm/mach-msm/board-dt.c
+> @@ -26,7 +26,16 @@ static const char * const msm_dt_match[] __initconst = {
+> 	NULL
+> };
+> 
+> +static const char * const apq8074_dt_match[] __initconst = {
+> +	"qcom,apq8074-dragonboard",
+> +	NULL
+> +};
+> +
+> DT_MACHINE_START(MSM_DT, "Qualcomm MSM (Flattened Device Tree)")
+> 	.smp = smp_ops(msm_smp_ops),
+> 	.dt_compat = msm_dt_match,
+> MACHINE_END
+> +
+> +DT_MACHINE_START(APQ_DT, "Qualcomm MSM (Flattened Device Tree)")
+> +	.dt_compat = apq8074_dt_match,
+> +MACHINE_END
+> -- 
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+> hosted by The Linux Foundation
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+
+-- 
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
