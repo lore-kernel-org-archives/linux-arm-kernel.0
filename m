@@ -1,68 +1,91 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 25 Sep 2013 12:31:27 -0700
-Subject: [PATCH v2] arm32: kvm: rename CONFIG_KVM_ARM_MAX_VCPUS
-In-Reply-To: <1380031768-21354-1-git-send-email-drjones@redhat.com>
-References: <1379160656-28050-3-git-send-email-drjones@redhat.com>
- <1380031768-21354-1-git-send-email-drjones@redhat.com>
-Message-ID: <20130925193127.GD32311@cbox>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 25 Sep 2013 12:34:41 -0700
+Subject: [PATCH v4] dt: update PSCI binding documentation for v0.2
+In-Reply-To: <CAL_JsqK1LE9rptajTOfvzNd1NQEihJzwm0YtJMzpUz-BhwJg5w@mail.gmail.com>
+References: <1379625868-5395-1-git-send-email-robherring2@gmail.com>
+ <CAOesGMjNhYTfPOr5NPEC9GWym-nuFE0hX_6+LW9bTv_E3iXbcQ@mail.gmail.com>
+ <20130920102015.GH17453@e106331-lin.cambridge.arm.com>
+ <CAOesGMid5pgcVD+oCjUr_75tv+C5QtVZt=Vt9kdiT_QPFOrzrg@mail.gmail.com>
+ <CAL_JsqK1LE9rptajTOfvzNd1NQEihJzwm0YtJMzpUz-BhwJg5w@mail.gmail.com>
+Message-ID: <CAOesGMgM2JsWbBOujdiCZdKkHqTRuN0P=OsdKGiyzz6_aiGWSA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 24, 2013 at 04:09:28PM +0200, Andrew Jones wrote:
-> Drop the _ARM_ part of the name. We can then introduce a config option
-> like this to aarch64 and other arches using the same name - allowing
-> grep to show them all. Also update the help text to describe the option
-> more completely.
-> 
-> Signed-off-by: Andrew Jones <drjones@redhat.com>
-> 
-> ---
-> v2: reword help text some more
-> ---
->  arch/arm/include/asm/kvm_host.h | 4 ++--
->  arch/arm/kvm/Kconfig            | 9 +++++----
->  2 files changed, 7 insertions(+), 6 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-> index 7d22517d80711..c614d3eb176c6 100644
-> --- a/arch/arm/include/asm/kvm_host.h
-> +++ b/arch/arm/include/asm/kvm_host.h
-> @@ -25,8 +25,8 @@
->  #include <asm/fpstate.h>
->  #include <kvm/arm_arch_timer.h>
->  
-> -#if defined(CONFIG_KVM_ARM_MAX_VCPUS)
-> -#define KVM_MAX_VCPUS CONFIG_KVM_ARM_MAX_VCPUS
-> +#if defined(CONFIG_KVM_MAX_VCPUS)
-> +#define KVM_MAX_VCPUS CONFIG_KVM_MAX_VCPUS
->  #else
->  #define KVM_MAX_VCPUS 0
->  #endif
-> diff --git a/arch/arm/kvm/Kconfig b/arch/arm/kvm/Kconfig
-> index ebf5015508b52..8e56ccf45edce 100644
-> --- a/arch/arm/kvm/Kconfig
-> +++ b/arch/arm/kvm/Kconfig
-> @@ -40,16 +40,17 @@ config KVM_ARM_HOST
->  	---help---
->  	  Provides host support for ARM processors.
->  
-> -config KVM_ARM_MAX_VCPUS
-> +config KVM_MAX_VCPUS
->  	int "Number maximum supported virtual CPUs per VM"
->  	depends on KVM_ARM_HOST
->  	default 4
->  	help
->  	  Static number of max supported virtual CPUs per VM.
->  
-> -	  If you choose a high number, the vcpu structures will be quite
-> -	  large, so only choose a reasonable number that you expect to
-> -	  actually use.
-> +	  The default is set to the highest number of vcpus that
-> +	  current hardware supports. Choosing a lower number decreases
-> +	  the size of the VM data structure. This number may also be
-> +	  increased.
->  
-Maybe I'm being forgetful, but what do you mean by "This number may also
-be increased" ?
+On Wed, Sep 25, 2013 at 12:20 PM, Rob Herring <robherring2@gmail.com> wrote:
+> On Wed, Sep 25, 2013 at 12:15 PM, Olof Johansson <olof@lixom.net> wrote:
+>> On Fri, Sep 20, 2013 at 3:20 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+>>> On Fri, Sep 20, 2013 at 05:36:51AM +0100, Olof Johansson wrote:
+>>>> Hi,
+>>>
+>>> Hi Olof,
+>>>
+>>>>
+>>>> Just a quick drive-by. Sorry, I don't know the history of previous
+>>>> review cycles.
+>>>>
+>>>>
+>>>> On Thu, Sep 19, 2013 at 2:24 PM, Rob Herring <robherring2@gmail.com> wrote:
+>>>>
+>>>> >  Main node optional properties:
+>>>> >
+>>>> > - - cpu_suspend   : Function ID for CPU_SUSPEND operation
+>>>> > + - cpu_suspend[-<32|64]   : Function ID for CPU_SUSPEND operation
+>>>> > +
+>>>> > + - cpu_off                : Function ID for CPU_OFF operation
+>>>> > +
+>>>> > + - cpu_on[-<32|64]        : Function ID for CPU_ON operation
+>>>> > +
+>>>> > + - affinity_info[-<32|64] : Function ID for AFFINITY_INFO operation
+>>>> >
+>>>> > - - cpu_off       : Function ID for CPU_OFF operation
+>>>> > + - migrate[-<32|64]       : Function ID for MIGRATE operation
+>>>> >
+>>>> > - - cpu_on        : Function ID for CPU_ON operation
+>>>> > + - migrate_info_type      : Function ID for MIGRATE_INFO_TYPE operation
+>>>> >
+>>>> > - - migrate       : Function ID for MIGRATE operation
+>>>> > + - migrate_info_up_cpu[-<32|64] : Function ID for MIGRATE_INFO_UP_CPU operation
+>>>> >
+>>>> > + - system_reset           : Function ID for SYSTEM_RESET operation
+>>>> > +
+>>>> > + - system_off             : Function ID for SYSTEM_OFF operation
+>>>>
+>>>> All of these should use dashes instead of underscores.
+>>>
+>>> I also don't like the underscores, but they're an unfortunate historical
+>>> artifact that we can't get rid of (at least for cpu_on, cpu_off, and
+>>> cpu_suspend).
+>>
+>> We need to keep those three old ones supported in the driver, but the
+>> newer binding can use dashes instead, as long as the kernel also
+>> handles the old binding.
+>>
+>>> Both Xen and kvmtool are already passing DTs to guests which have
+>>> underscores in the property names, so it's both a boot ABI and a
+>>> userspace ABI.
+>>
+>> Again, as mentioned on IRC: We've said that bindings are not yet
+>> stable until we lock them down, so we will need to adjust accordingly.
+>> Once we lock them down, they are stable and part of ABI. But we really
+>> don't want to deal with the bad bindings that people came up with
+>> without much review, and that's what the whole idea behind cleaning up
+>> and then locking them down is all about.
+>
+> For some of us, bindings are already in production. Until we have some
+> way to document stable vs. unstable, it is not up to anyone but the
+> users of a binding to define the stability. If the users of a binding
+> can tolerate the change, then it is unstable and can change.
 
--Christoffer
+Ok, so why review bindings at all then? Just implement what you want,
+ship it and force it on the rest of us for ever.
+
+> All this boils down to using '_' vs. '-', right? Come on. I'm all for
+> consistency, but let's be practical. There are plenty of documented
+> examples that use '_' starting with device_type.
+
+Next property I add will be called Device_Type then, if we're willing
+to not give a shit about best practices any more. Thanks for setting
+the direction and holding the bar high, Rob!
+
+
+-Olof
