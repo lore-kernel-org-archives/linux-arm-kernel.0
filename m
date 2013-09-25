@@ -1,40 +1,69 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 25 Sep 2013 09:24:11 +0200
-Subject: [GIT PULL] ux500 fixes for v3.12
-Message-ID: <CACRpkdZyE6XphN_dhhh1OCdS6-sF1ypUo9qryp=vbLOyQEUmLQ@mail.gmail.com>
+From: khalasa@piap.pl (Krzysztof =?utf-8?Q?Ha=C5=82asa?=)
+Date: Wed, 25 Sep 2013 09:24:39 +0200
+Subject: [PATCH] IXP4xx: Add Gateworks Cambria support.
+In-Reply-To: <op.w3pc81032s3iss@ecaz> (Imre Kaloz's message of "Fri, 20 Sep
+ 2013 11:13:39 +0200")
+References: <m3vc1ya9fw.fsf@t19.piap.pl> <op.w3oex8sc2s3iss@ecaz>
+ <m37gebanth.fsf@t19.piap.pl> <op.w3pc81032s3iss@ecaz>
+Message-ID: <m31u4dbbyg.fsf@t19.piap.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi ARM SoC folks,
+"Imre Kaloz" <kaloz@openwrt.org> writes:
 
-this seems to have got stuck in some limbo in my tree, sorry for that.
-Please pull this in for fixes bound for the v3.12 RC:s so we have the
-Snowball I2C devices on DT boots again.
+> So you delete portions of the code because you don't want to ask
+> someone with the board to test your changes if needed, but given quite
+> some people use the code for quite some time, you can also assume it
+> works for them.
 
-Yours,
-Linus Wallleij
+No, I didn't delete any code at all. Look at the patch again, it's only
+adding stuff.
+I have picked up parts of your code (parts of another project). GPL
+doesn't allow a requirement that I have to take the whole.
 
-The following changes since commit 272b98c6455f00884f0350f775c5342358ebb73f:
+> OpenWrt (yeah, we spell it this way for about 10 years now)
 
-  Linux 3.12-rc1 (2013-09-16 16:17:51 -0400)
+Sorry, didn't know, I don't use it.
 
-are available in the git repository at:
+> is a Linux distribution, you do mix things up a bit here.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git
-tags/ux500-fixes-v3.12-1
+Well, at least Cambria code is not a part of the official Linux then.
 
-for you to fetch changes up to 0ec941e61c020ab6df8d39ae368000b31eb37ba3:
+> It's up to you if you add your copyright, but removing others' is
+> clearly a different story legally. And I bet that's the same in your
+> country, too.
 
-  ARM: ux500: Remove PrimeCell IDs from Nomadik I2C DT nodes
-(2013-09-17 13:17:02 +0200)
+You are making things up. I didn't remove anything. I've created
+a derivative work of (among others) your project. The copyright for the
+base work doesn't apply for the derivative work, the creator of the
+derivative work formally holds the copyright. The GPL explicitly allows
+creating derivative works - actually, the whole point about GPL is
+encouraging derivative works. OpenWrt is based on other works in
+precisely the same way.
 
-----------------------------------------------------------------
-Fix to make the Snowball boot properly from device tree
-by not hardcoding the I2C PrimeCell IDs.
+I didn't include my copyright because I didn't care a bit. The code in
+question is mostly a trivial list of devices, and I guess in most parts
+it's not even copyrightable. Remember, copyright is about the form, and
+there aren't two ways to express e.g. that it has a serial port
+(identical to other IXP4xx platforms), that it has a NOR flash
+(identical to others) and so on.
 
-----------------------------------------------------------------
-Lee Jones (1):
-      ARM: ux500: Remove PrimeCell IDs from Nomadik I2C DT nodes
+> I'll do when I'll get around it. Both others and we've pushed a lot of
+> code upstream. In the meantime, anyone is free to do so, including you
+> - dumbing down the code could be justifiable in some cases (I don't
+> think this one applies), but dropping others' copyright -- hardly.
 
- arch/arm/boot/dts/ste-dbx5x0.dtsi | 5 -----
- 1 file changed, 5 deletions(-)
+Again, creating derivative works by picking up needed parts is not
+dropping or dumbing anything. You are trying to force your view of what
+is justifiable and what does apply. There is absolutely no legal or
+other basis for this.
+
+I have to say I'm disappointed. I didn't expect such reaction from you.
+Actually I thought I was helping your project a bit (and my project, of
+course). Since the former is not the case, I'm simply withdrawing my
+patch.
+-- 
+Krzysztof Halasa
+
+Research Institute for Automation and Measurements PIAP
+Al. Jerozolimskie 202, 02-486 Warsaw, Poland
