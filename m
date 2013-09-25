@@ -1,53 +1,52 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Wed, 25 Sep 2013 10:38:58 -0700
-Subject: [PATCH] arm: Fix build error with context tracking calls
-In-Reply-To: <CAFTL4hzccoaUinQ37bpbqXDv-bbNkuww8FURQMwD_zEb9RqSMA@mail.gmail.com>
- (Frederic Weisbecker's message of "Sun, 22 Sep 2013 11:59:35 -0500")
-References: <522CB0DE.2010102@roeck-us.net>
- <20130909105115.GL25647@n2100.arm.linux.org.uk>
- <522DB86A.8010207@roeck-us.net>
- <alpine.LFD.2.03.1309091023440.20709@syhkavp.arg>
- <20130909160348.GB18975@roeck-us.net>
- <20130909203141.GM25647@n2100.arm.linux.org.uk>
- <20130909210203.GC28416@roeck-us.net>
- <alpine.LFD.2.03.1309091714420.20709@syhkavp.arg>
- <87y574g1fi.fsf@linaro.org> <20130913170331.GA8453@somewhere>
- <20130914143213.GN25647@n2100.arm.linux.org.uk>
- <CAFTL4hzccoaUinQ37bpbqXDv-bbNkuww8FURQMwD_zEb9RqSMA@mail.gmail.com>
-Message-ID: <874n986bt9.fsf@linaro.org>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Wed, 25 Sep 2013 13:51:59 -0400
+Subject: [PATCH 0/3 v2] clk: keystone: Add common clock drivers
+In-Reply-To: <CAPtuhTg1z29+L8jjY4+putq6_-yX4G12UgMm7K3PnD4q5KZVjA@mail.gmail.com>
+References: <1377803662-3509-1-git-send-email-santosh.shilimkar@ti.com>
+ <52430B96.5070702@ti.com>
+ <CAPtuhTg1z29+L8jjY4+putq6_-yX4G12UgMm7K3PnD4q5KZVjA@mail.gmail.com>
+Message-ID: <524322BF.5000407@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Frederic Weisbecker <fweisbec@gmail.com> writes:
-
-> 2013/9/14, Russell King - ARM Linux <linux@arm.linux.org.uk>:
->> On Fri, Sep 13, 2013 at 07:03:34PM +0200, Frederic Weisbecker wrote:
->>> diff --git a/kernel/context_tracking.c b/kernel/context_tracking.c
->>> index 247091b..859c8df 100644
->>> --- a/kernel/context_tracking.c
->>> +++ b/kernel/context_tracking.c
->>> @@ -51,6 +51,15 @@ void context_tracking_user_enter(void)
->>>  	unsigned long flags;
+On Wednesday 25 September 2013 01:50 PM, Mike Turquette wrote:
+> On Wed, Sep 25, 2013 at 9:13 AM, Santosh Shilimkar
+> <santosh.shilimkar@ti.com> wrote:
+>> Mike,
+>>
+>> On Thursday 29 August 2013 03:14 PM, Santosh Shilimkar wrote:
+>>> v2:
+>>> - Aligned the bindings as per the list discussion. Removed the additional
+>>>       parameters by usage of reg-names and additional compatible fields.
+>>> - Addressed all the comments from v1 on drivers.
+>>> - Split the series into clock drivers($subject series) and
+>>>       platform, dt updates. Will post that one separately.
 >>>
->>>  	/*
->>> +	 * Repeat the user_enter() check here because some archs may be calling
->>> +	 * this from asm and if no CPU needs context tracking, they shouldn't
->>> +	 * go further. We can remove that check here once these archs support
->>> the static key
->>> +	 * check.
+>>> Special thanks to Mike and Mark for the detailed review on v1.
+>>>
+>>> Series is an attempt to add the clock drivers for Keystone SOCs
+>>> based on common clock framework. A PLL drivers taking care of
+>>> SOC PLLs and a gate control driver taking clock management for
+>>> the IPs. The current Keystone based SOCs don' support dynamic power
+>>> management usecases like DVFS, SOC ilde etc and hence most of the
+>>> usage is limited to enabling clocks and finding the current clock
+>>> rate etc.
+>>>
+>>> Based on to of Mike's dt binding series [1] and tested on Keystone2
+>>> EVM.
+>>>
+>>> Cc: Mike Turquette <mturquette@linaro.org>
 >>
->> The only (minor) comment on this is that the above would fail checkpatch,
->> but that's not a good enough reason to respin it if you've already applied
->> it IMHO.
->>
->
-> Ah I haven't yet pushed that patch anywhere so I can definetly fix
-> that. Thanks for the review. BTW, I initially first thought this fix
-> could go through your tree but if you prefer I can push it through
-> Ingo to the context tracking bits.
->
-> Just tell me either way.
+>> As aligned off-list, I will revise the series to remove the
+>> dependency with your DT bindings series which still seems to
+>> be under discussion.
+> 
+> ACK. I plan to refresh my DT bindings and make them more concise, but
+> I still think it is wise if you do not rely on them. As we discussed
+> you can switch over to those bindings at any point in the future if
+> you wish.
+> 
+Sounds good.
 
-Frederic, I suggest you queue it directly for v3.12-rc.  Thanks,
-
-Kevin
+Regards,
+Santosh
