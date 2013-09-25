@@ -1,38 +1,53 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Wed, 25 Sep 2013 11:18:52 +0200
-Subject: ARM/Samsung/S3C24xx: Linux-3.11 crashes when using PWM
-In-Reply-To: <201309251029.44265.jbe@pengutronix.de>
-References: <201309251029.44265.jbe@pengutronix.de>
-Message-ID: <5242AA7C.4010905@samsung.com>
+From: anup.patel@linaro.org (Anup Patel)
+Date: Wed, 25 Sep 2013 14:55:59 +0530
+Subject: [PATCH v4 0/4] Target CPU=Host implementation for KVM ARM/ARM64
+Message-ID: <1380101163-20028-1-git-send-email-anup.patel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi J?rgen,
+It will be very useful for user space (QEMU/KVMTOOL) if it has a
+method of querying VCPU target type matching to underlying Host.
+We can use such querying mechanism and implement machine models
+in user space where VCPU target type is always same-as/similar-to
+underlying Host (i.e. Target CPU=Host).
 
-On 25/09/13 10:29, J?rgen Beisert wrote:
-> Change one single line:
-> 
-> diff --git a/arch/arm/mach-s3c24xx/mach-mini2440.c b/arch/arm/mach-s3c24xx/mach-mini2440.c
-> index a83db46..d8273da 100644
-> --- a/arch/arm/mach-s3c24xx/mach-mini2440.c
-> +++ b/arch/arm/mach-s3c24xx/mach-mini2440.c
-> @@ -519,6 +519,7 @@ static struct platform_device *mini2440_devices[] __initdata = {
->         &s3c_device_iis,
->         &uda1340_codec,
->         &mini2440_audio,
-> +       &s3c_device_timer[0],
->  };
+This patch series implements KVM_ARM_PREFERRED_TARGET vm ioclt for
+querying VCPU target type matching underlying host. Using this new
+ioctl we can implement VCPU target CPU=Host in user space.
 
-I think you need to add instead:
+Also, it is not mandatory to call KVM_ARM_PREFERRED_TARGET vm ioctl
+and the old method of trying all possible target types using the
+KVM_ARM_VCPU_INIT ioctl to initialize VCPU works fine.
 
-	&samsung_device_pwm,
+V4:
+ - Fixed files exchanged between patches
+ - For now return zeroed features in struct kvm_vcpu_init instance
 
-IIRC I had this working, can't verify at the moment as I don't
-have access to the board right now. Please see commit:
+V3:
+ - Return -ENODEV if no preferred target available for host
+ - Make KVM_ARM_PREFERRED_TARGET ioctl as vm ioctl
 
-7fa33bdb4c44155e390c9ebbc5aa4c5cfc73f6fa
-ARM: SAMSUNG: Modify board files to use new PWM platform device
+V2:
+ - Renamed the ioclt to KVM_ARM_PREFERRED_TARGET
+ - Return struct kvm_vcpu_init instace instead of just target type
 
---
-Regards,
-Sylwester
+V1:
+ - Initial patch-set with ioctl named as KVM_ARM_SUITABLE_TARGET
+
+Anup Patel (4):
+  ARM: KVM: Implement kvm_vcpu_preferred_target() function
+  ARM64: KVM: Implement kvm_vcpu_preferred_target() function
+  ARM/ARM64: KVM: Implement KVM_ARM_PREFERRED_TARGET ioctl
+  KVM: Add documentation for KVM_ARM_PREFERRED_TARGET ioctl
+
+ Documentation/virtual/kvm/api.txt |   27 +++++++++++++++++++++++----
+ arch/arm/include/asm/kvm_host.h   |    1 +
+ arch/arm/kvm/arm.c                |   13 +++++++++++++
+ arch/arm/kvm/guest.c              |   20 ++++++++++++++++++++
+ arch/arm64/include/asm/kvm_host.h |    1 +
+ arch/arm64/kvm/guest.c            |   20 ++++++++++++++++++++
+ include/uapi/linux/kvm.h          |    1 +
+ 7 files changed, 79 insertions(+), 4 deletions(-)
+
+-- 
+1.7.9.5
