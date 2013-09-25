@@ -1,25 +1,40 @@
-From: fkan@apm.com (Feng Kan)
-Date: Tue, 24 Sep 2013 20:33:04 -0700
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 24 Sep 2013 21:37:54 -0700
 Subject: General placement of platform drivers and header files
-Message-ID: <CAL85gmAi9qZWdeHt5JWeEW-OuNKdxqt-0fPDeCugnpun_6BDKA@mail.gmail.com>
+In-Reply-To: <CAL85gmAi9qZWdeHt5JWeEW-OuNKdxqt-0fPDeCugnpun_6BDKA@mail.gmail.com>
+References: <CAL85gmAi9qZWdeHt5JWeEW-OuNKdxqt-0fPDeCugnpun_6BDKA@mail.gmail.com>
+Message-ID: <CAOesGMj9qUKw9hTSmoV76bvbKHbapxyUss4JfrD0pg9=oPpLdg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all:
+Hi,
 
-I have some drivers like Queue Manager and co-processor driver that
-are used by other
-drivers like Ethernet. Would it be appropriate to locate these drivers
-under one folder under
-drivers/misc/arch_name/xxx.
+On Tue, Sep 24, 2013 at 8:33 PM, Feng Kan <fkan@apm.com> wrote:
+> Hi all:
+>
+> I have some drivers like Queue Manager and co-processor driver that
+> are used by other
+> drivers like Ethernet. Would it be appropriate to locate these drivers
+> under one folder under
+> drivers/misc/arch_name/xxx.
 
-My other question is on common header files (belonging to Queue
-Manager) but is sourced
-by Ethernet, where should those reside. Should they go under
-linux/include/misc/arch_name
-or directly sourced using the ../../../misc/arch_name/headerfile method.
+drivers/misc is almost always the wrong answer to where to add a driver.
 
--- 
-Feng Kan | Engineer
-Ph: 408.543.8382
-Em: fkan at apm.com
+It would help to also know how the devices interact to answer the
+question of best location. Are the drivers for the coprocessor and for
+the queue manager mostly a pass-through for some operations (and some
+shared allocation of resources), i.e. more of a library, or is it a
+full-fledged driver that will service interrupts, etc?
+
+> My other question is on common header files (belonging to Queue
+> Manager) but is sourced
+> by Ethernet, where should those reside. Should they go under
+> linux/include/misc/arch_name
+> or directly sourced using the ../../../misc/arch_name/headerfile method.
+
+This depends somewhat on where the driver ends up, but somewhere under
+include/linux is likely the right place for the in-kernel interface
+header files.
+
+
+-Olof
