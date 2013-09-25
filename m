@@ -1,71 +1,45 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Wed, 25 Sep 2013 18:29:52 +0900
-Subject: [PATCH] arm64: avoid multiple evaluation of ptr in
- get_user/put_user()
-In-Reply-To: <20130924142553.GG25907@arm.com>
-References: <524154C2.1080303@linaro.org> <20130924142553.GG25907@arm.com>
-Message-ID: <5242AD10.3070001@linaro.org>
+From: jbe@pengutronix.de (=?iso-8859-15?q?J=FCrgen_Beisert?=)
+Date: Wed, 25 Sep 2013 11:40:36 +0200
+Subject: ARM/Samsung/S3C24xx: Linux-3.11 crashes when using PWM
+In-Reply-To: <5242AA7C.4010905@samsung.com>
+References: <201309251029.44265.jbe@pengutronix.de>
+ <5242AA7C.4010905@samsung.com>
+Message-ID: <201309251140.36582.jbe@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Catalin,
+Hi Sylwester,
 
-Thank you for your comments, and let me send a revised patch again
-because my original message didn't reach MLs due to my screw-up.
-
-BTW, I will submit a patch of ftrace support on arm64 once gcc supports
-gprof (-pg) options.
-
--Takahiro AKASHI
-
-On 09/24/2013 11:25 PM, Catalin Marinas wrote:
-> On Tue, Sep 24, 2013 at 10:00:50AM +0100, AKASHI Takahiro wrote:
->> get_user() is defined as a function macro in arm64, and trace_get_user()
->> calls it as followed:
->>       get_user(ch, ptr++);
->> Since the second parameter occurs twice in the definition, 'ptr++' is
->> unexpectedly evaluated twice and trace_get_user() will generate a bogus
->> string from user-provided one. As a result, some ftrace sysfs operations,
->> like "echo FUNCNAME > set_ftrace_filter," hit this case and eventually fail.
->> This patch fixes the issue both in get_user() and put_user().
->>
->> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
->> ---
->>    arch/arm64/include/asm/uaccess.h |   12 ++++++++----
->>    1 file changed, 8 insertions(+), 4 deletions(-)
->>
->> diff --git a/arch/arm64/include/asm/uaccess.h b/arch/arm64/include/asm/uaccess.h
->> index edb3d5c..bbeab83 100644
->> --- a/arch/arm64/include/asm/uaccess.h
->> +++ b/arch/arm64/include/asm/uaccess.h
->> @@ -166,9 +166,11 @@ do {									\
->>     #define get_user(x, ptr)						\
->>    ({									\
->> +	__typeof__(*(ptr)) *optr = (ptr);				\
->> +									\
->>    	might_fault();							\
->> -	access_ok(VERIFY_READ, (ptr), sizeof(*(ptr))) ?			\
->> -		__get_user((x), (ptr)) :				\
->> +	access_ok(VERIFY_READ, optr, sizeof(*optr)) ?			\
->> +		__get_user((x), optr) :					\
->>    		((x) = 0, -EFAULT);					\
->>    })
->>    @@ -227,9 +229,11 @@ do {									\
->>     #define put_user(x, ptr)						\
->>    ({									\
->> +	__typeof__(*(ptr)) *optr = (ptr);				\
->> +									\
->>    	might_fault();							\
->> -	access_ok(VERIFY_WRITE, (ptr), sizeof(*(ptr))) ?		\
->> -		__put_user((x), (ptr)) :				\
->> +	access_ok(VERIFY_WRITE, optr, sizeof(*optr)) ?			\
->> +		__put_user((x), optr) :					\
->>    		-EFAULT;						\
->>    })
->>    -- 1.7.9.5
+On Wednesday 25 September 2013 11:18:52 Sylwester Nawrocki wrote:
+> On 25/09/13 10:29, J?rgen Beisert wrote:
+> > Change one single line:
+> >
+> > diff --git a/arch/arm/mach-s3c24xx/mach-mini2440.c
+> > b/arch/arm/mach-s3c24xx/mach-mini2440.c index a83db46..d8273da 100644
+> > --- a/arch/arm/mach-s3c24xx/mach-mini2440.c
+> > +++ b/arch/arm/mach-s3c24xx/mach-mini2440.c
+> > @@ -519,6 +519,7 @@ static struct platform_device *mini2440_devices[]
+> > __initdata = { &s3c_device_iis,
+> >         &uda1340_codec,
+> >         &mini2440_audio,
+> > +       &s3c_device_timer[0],
+> >  };
 >
-> BTW, please use git send-email or other email client, the diff above is
-> heavily corrupted (too many spaces at the beginning of the line, removed
-> empty lines; I managed to fix it up this time but only because it was a
-> small patch).
+> I think you need to add instead:
 >
+> 	&samsung_device_pwm,
+>
+> IIRC I had this working, can't verify at the moment as I don't
+> have access to the board right now. Please see commit:
+>
+> 7fa33bdb4c44155e390c9ebbc5aa4c5cfc73f6fa
+> ARM: SAMSUNG: Modify board files to use new PWM platform device
+
+Seems valid for 3.12, but not for 3.11.
+
+Regards,
+Juergen
+
+-- 
+Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?| Juergen Beisert ? ? ? ? ? ? |
+Linux Solutions for Science and Industry ? ? ?| http://www.pengutronix.de/  |
