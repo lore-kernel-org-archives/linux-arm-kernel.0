@@ -1,62 +1,141 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 25 Sep 2013 16:30:19 +0800
-Subject: [PATCH 1/5] ARM: imx: add soc revision helper functions
+Date: Wed, 25 Sep 2013 16:30:21 +0800
+Subject: [PATCH 3/5] ARM: imx: add a common function to initialize revision
+ from anatop
 In-Reply-To: <1380097823-29027-1-git-send-email-shawn.guo@linaro.org>
 References: <1380097823-29027-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1380097823-29027-2-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1380097823-29027-4-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Similar to what we do for cpu type, the patch adds helper functions
-imx_set_soc_revision() and imx_get_soc_revision() to maintain
-imx_soc_revision in cpu.c.
+The patch creates a common function imx_init_revision_from_anatop() by
+merging imx6q_init_revision() and imx_anatop_get_digprog(), so that any
+SoC that encodes revision info in anatop can use it to initialize
+revision.
 
 Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 ---
- arch/arm/mach-imx/common.h |    2 ++
- arch/arm/mach-imx/cpu.c    |   12 ++++++++++++
- 2 files changed, 14 insertions(+)
+ arch/arm/mach-imx/anatop.c     |   27 +++++++++++++++++++++------
+ arch/arm/mach-imx/common.h     |    2 +-
+ arch/arm/mach-imx/mach-imx6q.c |   25 +------------------------
+ 3 files changed, 23 insertions(+), 31 deletions(-)
 
+diff --git a/arch/arm/mach-imx/anatop.c b/arch/arm/mach-imx/anatop.c
+index ad3b755..b2d600f 100644
+--- a/arch/arm/mach-imx/anatop.c
++++ b/arch/arm/mach-imx/anatop.c
+@@ -16,6 +16,7 @@
+ #include <linux/mfd/syscon.h>
+ #include <linux/regmap.h>
+ #include "common.h"
++#include "hardware.h"
+ 
+ #define REG_SET		0x4
+ #define REG_CLR		0x8
+@@ -76,21 +77,35 @@ static void imx_anatop_usb_chrg_detect_disable(void)
+ 		BM_ANADIG_USB_CHRG_DETECT_CHK_CHRG_B);
+ }
+ 
+-u32 imx_anatop_get_digprog(void)
++void __init imx_init_revision_from_anatop(void)
+ {
+ 	struct device_node *np;
+ 	void __iomem *anatop_base;
+-	static u32 digprog;
+-
+-	if (digprog)
+-		return digprog;
++	unsigned int revision;
++	u32 digprog;
+ 
+ 	np = of_find_compatible_node(NULL, NULL, "fsl,imx6q-anatop");
+ 	anatop_base = of_iomap(np, 0);
+ 	WARN_ON(!anatop_base);
+ 	digprog = readl_relaxed(anatop_base + ANADIG_DIGPROG);
++	iounmap(anatop_base);
++
++	switch (digprog & 0xff) {
++	case 0:
++		revision = IMX_CHIP_REVISION_1_0;
++		break;
++	case 1:
++		revision = IMX_CHIP_REVISION_1_1;
++		break;
++	case 2:
++		revision = IMX_CHIP_REVISION_1_2;
++		break;
++	default:
++		revision = IMX_CHIP_REVISION_UNKNOWN;
++	}
+ 
+-	return digprog;
++	mxc_set_cpu_type(digprog >> 16 & 0xff);
++	imx_set_soc_revision(revision);
+ }
+ 
+ void __init imx_anatop_init(void)
 diff --git a/arch/arm/mach-imx/common.h b/arch/arm/mach-imx/common.h
-index 4517fd7..d87fff1 100644
+index 64b2b9f..282af93 100644
 --- a/arch/arm/mach-imx/common.h
 +++ b/arch/arm/mach-imx/common.h
-@@ -81,6 +81,8 @@ extern int imx6q_revision(void);
- extern int mx53_display_revision(void);
- extern void imx_set_aips(void __iomem *);
+@@ -82,6 +82,7 @@ extern void imx_set_aips(void __iomem *);
  extern int mxc_device_init(void);
-+void imx_set_soc_revision(unsigned int rev);
-+unsigned int imx_get_soc_revision(void);
+ void imx_set_soc_revision(unsigned int rev);
+ unsigned int imx_get_soc_revision(void);
++void imx_init_revision_from_anatop(void);
  
  enum mxc_cpu_pwr_mode {
  	WAIT_CLOCKED,		/* wfi only */
-diff --git a/arch/arm/mach-imx/cpu.c b/arch/arm/mach-imx/cpu.c
-index e70e3ac..51f6c51 100644
---- a/arch/arm/mach-imx/cpu.c
-+++ b/arch/arm/mach-imx/cpu.c
-@@ -8,11 +8,23 @@
- unsigned int __mxc_cpu_type;
- EXPORT_SYMBOL(__mxc_cpu_type);
+@@ -138,7 +139,6 @@ extern void imx_gpc_restore_all(void);
+ extern void imx_anatop_init(void);
+ extern void imx_anatop_pre_suspend(void);
+ extern void imx_anatop_post_resume(void);
+-extern u32 imx_anatop_get_digprog(void);
+ extern int imx6q_set_lpm(enum mxc_cpu_pwr_mode mode);
+ extern void imx6q_set_chicken_bit(void);
  
-+static unsigned int imx_soc_revision;
-+
- void mxc_set_cpu_type(unsigned int type)
- {
- 	__mxc_cpu_type = type;
- }
+diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
+index 2efdbce..ea01ac3 100644
+--- a/arch/arm/mach-imx/mach-imx6q.c
++++ b/arch/arm/mach-imx/mach-imx6q.c
+@@ -40,29 +40,6 @@
+ #include "cpuidle.h"
+ #include "hardware.h"
  
-+void imx_set_soc_revision(unsigned int rev)
-+{
-+	imx_soc_revision = rev;
-+}
-+
-+unsigned int imx_get_soc_revision(void)
-+{
-+	return imx_soc_revision;
-+}
-+
- void imx_print_silicon_rev(const char *cpu, int srev)
+-static void __init imx6q_init_revision(void)
+-{
+-	u32 rev = imx_anatop_get_digprog();
+-	u32 chip_revision;
+-
+-	switch (rev & 0xff) {
+-	case 0:
+-		chip_revision = IMX_CHIP_REVISION_1_0;
+-		break;
+-	case 1:
+-		chip_revision = IMX_CHIP_REVISION_1_1;
+-		break;
+-	case 2:
+-		chip_revision = IMX_CHIP_REVISION_1_2;
+-		break;
+-	default:
+-		chip_revision = IMX_CHIP_REVISION_UNKNOWN;
+-	}
+-
+-	mxc_set_cpu_type(rev >> 16 & 0xff);
+-	imx_set_soc_revision(chip_revision);
+-}
+-
+ static void imx6q_restart(enum reboot_mode mode, const char *cmd)
  {
- 	if (srev == IMX_CHIP_REVISION_UNKNOWN)
+ 	struct device_node *np;
+@@ -276,7 +253,7 @@ static void __init imx6q_map_io(void)
+ 
+ static void __init imx6q_init_irq(void)
+ {
+-	imx6q_init_revision();
++	imx_init_revision_from_anatop();
+ 	imx_init_l2cache();
+ 	imx_src_init();
+ 	imx_gpc_init();
 -- 
 1.7.9.5
