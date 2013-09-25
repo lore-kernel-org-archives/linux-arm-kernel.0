@@ -1,25 +1,45 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Wed, 25 Sep 2013 11:28:56 +0100
-Subject: [PATCH] ARM: drop explicit selection of HAVE_CLK and CLKDEV_LOOKUP
-In-Reply-To: <1380044515-3173-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1380044515-3173-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <1380104936.7211.3.camel@hornet>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Wed, 25 Sep 2013 07:39:03 -0300
+Subject: [PATCH] arm: mvebu: use the main timer as clock source from DT
+In-Reply-To: <20130918185611.GP19937@titan.lakedaemon.net>
+References: <1379530168-9359-1-git-send-email-jean.pihet@linaro.org>
+ <20130918185611.GP19937@titan.lakedaemon.net>
+Message-ID: <20130925103902.GA2418@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2013-09-24 at 18:41 +0100, Uwe Kleine-K?nig wrote:
-> CLKDEV_LOOKUP selects HAVE_CLK and COMMON_CLK selects CLKDEV_LOOKUP. So
-> all symbols that select at least two of these symbols can be simplified.
+On Wed, Sep 18, 2013 at 02:56:11PM -0400, Jason Cooper wrote:
+> Adding clocksource maintainers to the Cc: ...
 > 
-> For imx, omap2 and ux500 some rearrangements were necessary before the
-> simplification.
+> On Wed, Sep 18, 2013 at 08:49:28PM +0200, Jean Pihet wrote:
+> > This commit:
+> >   573145f08c2b92c45498468afbbba909f6ce6135
+> >   clocksource: armada-370-xp: Use CLOCKSOURCE_OF_DECLARE
+> > 
+> > replaced a call to the driver's timer initialization by a call to
+> > clocksource_of_init(). However, it failed to select CONFIG_CLKSRC_OF.
+> > 
+> > Fix this by selecting CONFIG_CLKSRC_OF for Armada370/XP machines.
+> > Without this change the kernel is stuck at: 'Calibrating delay loop...'.
+> > 
+> > Signed-off-by: Jean Pihet <jean.pihet@linaro.org>
+> > Acked-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> > ---
+> >  drivers/clocksource/Kconfig | 1 +
+> >  1 file changed, 1 insertion(+)
 > 
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
->
->  arch/arm/mach-vexpress/Kconfig |  2 --
+> Acked-by: Jason Cooper <jason@lakedaemon.net>
+> 
+> Daniel, John, Thomas,
+> 
+> Can you queue this up for v3.12-rc2?  It fixes a boot breakage.
+> 
 
-Acked-by: Pawel Moll <pawel.moll@arm.com>
+Is this already merged somewhere? Is there any chance we can push
+it through *any* tree so it makes -rc3?
 
-Thanks!
-
-Pawel
+Thanks,
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
