@@ -1,60 +1,77 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Wed, 25 Sep 2013 17:20:43 +0200
-Subject: [PATCH v2 0/4] arm: zynq: Enable global timer
-In-Reply-To: <1379530118-22813-1-git-send-email-soren.brinkmann@xilinx.com>
-References: <1379530118-22813-1-git-send-email-soren.brinkmann@xilinx.com>
-Message-ID: <5242FF4B.6050901@linaro.org>
+From: rob@landley.net (Rob Landley)
+Date: Wed, 25 Sep 2013 10:23:06 -0500
+Subject: new binutils needed for arm in 3.12-rc1
+In-Reply-To: <alpine.LFD.2.03.1309242158340.312@syhkavp.arg> (from
+ nico@fluxnic.net on Tue Sep 24 21:07:57 2013)
+Message-ID: <1380122586.1974.84@driftwood>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/18/2013 08:48 PM, Soren Brinkmann wrote:
-> Hi all,
+On 09/24/2013 09:07:57 PM, Nicolas Pitre wrote:
+> On Tue, 24 Sep 2013, Rob Landley wrote:
 > 
-> here's a v2. I reused the subject from my v1 submission although the focus of
-> this series moved a bit towards the timer subsystem.
-> I replaced Stephen's fix to prevent per cpu devices from becoming
-> the broadcast device with Thomas' proposal, but I kept the original commit
-> message. I split the whole approach in small chunks that I found reasonable.
+> > On 09/24/2013 04:48:00 PM, Russell King - ARM Linux wrote:
+> > > Now, if you feel strongly about this, we _could_ introduce a
+> > > CONFIG_OLD_BINUTILS and give everyone their cake - but it will be
+> > > fragile.  Not everyone will remember to get that right, because  
+> they'll
+> > > be using the later binutils.  Also, we already have an excessive  
+> number
+> > > of potential breakage-inducing options and we certainly don't need
+> > > another.
+> >
+> > I'm doing the regression testing either way, on several different
+> > architectures. (Although I tend to to only really do a thorough job  
+> quarterly
+> > when a new kernel comes out and it's time to make it work.) So I'm  
+> going to be
+> > doing something locally like this anyway, and if a  
+> CONFIG_OLD_BINUTILS is
+> > acceptable I might as well push it upstream.
 > 
-> In 4/4, I picked up Grant's comment regarding the DT node name.
-> 
-> v2:
->  - drop 1/2 of the original series
->  - implement preventing per cpu devices from becoming broadcast device according
->    to Thomas' proposal
->    - introduce new CLOCK_EVT_FEAT_PERCPU flag
->    - set the flag for the arm_global_timer
->    - filter per cpu devices based on this flag when choosing the broadcast
->      device
->  - rename DT node to avoid '_'s
->  
-> 
-> Soren Brinkmann (4):
->   clockchips: Add FEAT_PERCPU clockevent flag
->   clocksource/arm_global_timer: Set FEAT_PERCPU flag
->   tick: broadcast: Deny per-cpu clockevents from being broadcast sources
->   arm: zynq: Enable arm_global_timer
-> 
->  arch/arm/boot/dts/zynq-7000.dtsi       | 8 ++++++++
->  arch/arm/mach-zynq/Kconfig             | 1 +
->  drivers/clocksource/arm_global_timer.c | 3 ++-
->  include/linux/clockchips.h             | 1 +
->  kernel/time/tick-broadcast.c           | 1 +
->  5 files changed, 13 insertions(+), 1 deletion(-)
+> If you are convinced you have no choice but to stick to old binutils,
 
-This patches falls under different maintainer's umbrella.
+Oh no, long-term other choices include lld.llvm.org and  
+http://landley.net/code/qcc but they're not ready yet and I don't have  
+time to work on them right now. (I had high hopes for gold, until the  
+guy signed it over to the FSF and it vanished into the tiergruben. Oh  
+well.)
 
-I acked-by the patches, so if someone is willing to take the patches I
-am ok with that. I am ok also to pick them into my tree with the
-acked-by maintainer. Just let me know ...
+> I'd strongly suggest you make your binutils compatible with newer
+> instruction syntax instead of making the kernel more complex.
 
-Thanks
-  -- Daniel
+Meaning I play whack-a-mole as this becomes permission to depend on  
+endless new gnuisms just because they're there and nobody else is  
+regression testing against them, not because they actually add anything.
 
+Whereas if I add an old binutils config option, other people might help  
+regression test it (if not actually fix it), and the other toolchain  
+projects have less of a moving target to catch up to.
 
--- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+> This is more in line with being future proof rather than stuck into  
+> the past.
 
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+No, it's exactly the opposite of that. Future proof is getting off a  
+toolchain whose license is a moving target.
+
+GPLv2: "shut up and show me the code"
+GPLv3: "I am altering the bargain, pray I don't alter it any further."
+GPLv4: ???
+
+> It could be as simple as making gas accept an extra argument for
+> instructions like dsb and just ignoring it.
+
+So you prefer I come up with the reversion patches locally and _not_  
+send them upstream?
+
+*shrug* That's what I've been doing for sh4 for around 4 years now.  
+(And their breakage still reverts cleanly even.) It's also what I did  
+when the arm versatile interrupts changed randomly 3 times in ways that  
+weren't backwards compatible with existing qemu versions. And I  
+maintained perl removal patches for 5 years before they finally went  
+upstream.
+
+But I do at least post said patches publicly, and other people use 'em  
+when I do...
+
+Rob
