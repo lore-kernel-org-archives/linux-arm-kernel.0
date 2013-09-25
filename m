@@ -1,43 +1,86 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 25 Sep 2013 21:44:35 +0300
-Subject: [PATCH V3: Add Smp support for Allwinner A20. 1/3] Add smp
- support for Allwinner A20(sunxi 7i).
-In-Reply-To: <CAK3cCBwLrnV7L9WzJ+1P_62PEjEEtgzVjFH8m6SZzWG1O+2vEw@mail.gmail.com>
-References: <1379852488-32147-1-git-send-email-cinifr@gmail.com>
- <1379852488-32147-2-git-send-email-cinifr@gmail.com>
- <20130923181707.GR2779@lukather>
- <CAK3cCBwLrnV7L9WzJ+1P_62PEjEEtgzVjFH8m6SZzWG1O+2vEw@mail.gmail.com>
-Message-ID: <20130925184435.GH2954@lukather>
+Date: Wed, 25 Sep 2013 21:59:46 +0300
+Subject: [PATCH] ARM: sunxi: Add a defconfig for the Allwinner SoCs
+Message-ID: <1380135586-15651-1-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fan,
+So far, the Allwinner SoCs were only supported using the
+multi_v7_defconfig. Add a defconfig of our own to have one a bit more
+tailor-made.
 
-On Wed, Sep 25, 2013 at 12:22:44AM +0800, cinifr wrote:
-> > You still haven't said why you don't want to use smp_init_cpus there.
-> I find that of_funcation liking of_find_matching_node and of_iomap can
-> not run well in smp_init_cpus. It cause kernel crash. So I have to use
-> early_initcall.
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ arch/arm/configs/sunxi_defconfig | 61 ++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 61 insertions(+)
+ create mode 100644 arch/arm/configs/sunxi_defconfig
 
-Ah, right.
-
-Then, can't we use smp_prepare_cpus for this? it looks to be late enough
-so that we can use ioremap there.
-
-I don't want it to be an initcall. The code will be different on the
-A31, and we don't want it to be run on all the other machines whenever
-we boot a multiplatform kernel anyway.
-
-Maxime
-
+diff --git a/arch/arm/configs/sunxi_defconfig b/arch/arm/configs/sunxi_defconfig
+new file mode 100644
+index 0000000..470333d
+--- /dev/null
++++ b/arch/arm/configs/sunxi_defconfig
+@@ -0,0 +1,61 @@
++CONFIG_NO_HZ=y
++CONFIG_HIGH_RES_TIMERS=y
++CONFIG_BLK_DEV_INITRD=y
++CONFIG_ARCH_SUNXI=y
++CONFIG_ARM_ERRATA_754322=y
++CONFIG_SMP=y
++CONFIG_AEABI=y
++CONFIG_HIGHMEM=y
++CONFIG_HIGHPTE=y
++CONFIG_VFP=y
++CONFIG_NEON=y
++CONFIG_NET=y
++CONFIG_PACKET=y
++CONFIG_UNIX=y
++CONFIG_INET=y
++# CONFIG_INET_XFRM_MODE_TRANSPORT is not set
++# CONFIG_INET_XFRM_MODE_TUNNEL is not set
++# CONFIG_INET_XFRM_MODE_BEET is not set
++# CONFIG_INET_LRO is not set
++# CONFIG_INET_DIAG is not set
++# CONFIG_IPV6 is not set
++# CONFIG_WIRELESS is not set
++CONFIG_DEVTMPFS=y
++CONFIG_DEVTMPFS_MOUNT=y
++CONFIG_NETDEVICES=y
++CONFIG_SUN4I_EMAC=y
++# CONFIG_NET_CADENCE is not set
++# CONFIG_NET_VENDOR_BROADCOM is not set
++# CONFIG_NET_VENDOR_CIRRUS is not set
++# CONFIG_NET_VENDOR_FARADAY is not set
++# CONFIG_NET_VENDOR_INTEL is not set
++# CONFIG_NET_VENDOR_MARVELL is not set
++# CONFIG_NET_VENDOR_MICREL is not set
++# CONFIG_NET_VENDOR_NATSEMI is not set
++# CONFIG_NET_VENDOR_SEEQ is not set
++# CONFIG_NET_VENDOR_SMSC is not set
++# CONFIG_NET_VENDOR_STMICRO is not set
++# CONFIG_NET_VENDOR_WIZNET is not set
++# CONFIG_WLAN is not set
++CONFIG_SERIAL_8250=y
++CONFIG_SERIAL_8250_CONSOLE=y
++CONFIG_SERIAL_8250_NR_UARTS=8
++CONFIG_SERIAL_8250_RUNTIME_UARTS=8
++CONFIG_SERIAL_8250_DW=y
++CONFIG_SERIAL_OF_PLATFORM=y
++CONFIG_I2C=y
++# CONFIG_I2C_COMPAT is not set
++CONFIG_I2C_CHARDEV=y
++CONFIG_I2C_MV64XXX=y
++CONFIG_GPIO_SYSFS=y
++# CONFIG_HWMON is not set
++# CONFIG_USB_SUPPORT is not set
++CONFIG_NEW_LEDS=y
++CONFIG_LEDS_CLASS=y
++CONFIG_LEDS_GPIO=y
++CONFIG_LEDS_TRIGGERS=y
++CONFIG_LEDS_TRIGGER_HEARTBEAT=y
++CONFIG_LEDS_TRIGGER_DEFAULT_ON=y
++CONFIG_COMMON_CLK_DEBUG=y
++# CONFIG_IOMMU_SUPPORT is not set
++CONFIG_NLS=y
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130925/27ff960d/attachment.sig>
+1.8.4
