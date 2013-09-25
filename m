@@ -1,48 +1,125 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Thu, 26 Sep 2013 08:11:19 +0900
-Subject: [PATCH] ARM: shmobile: Add r8a7790 thermal sensor DT device
-Message-ID: <20130925231119.16473.31647.sendpatchset@w520>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 25 Sep 2013 16:16:14 -0700
+Subject: [PATCH 2/5] clocksource: Add Allwinner SoCs HS timers driver
+In-Reply-To: <1380117790-19390-3-git-send-email-maxime.ripard@free-electrons.com>
+References: <1380117790-19390-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1380117790-19390-3-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <52436EBE.9010002@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm@opensource.se>
+On 09/25/13 07:03, Maxime Ripard wrote:
+> diff --git a/Documentation/devicetree/bindings/timer/allwinner,sun5i-a13-hstimer.txt b/Documentation/devicetree/bindings/timer/allwinner,sun5i-a13-hstimer.txt
+> new file mode 100644
+> index 0000000..b1f81e9
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/timer/allwinner,sun5i-a13-hstimer.txt
+> @@ -0,0 +1,22 @@
+> +Allwinner SoCs High Speed Timer Controller
+> +
+> +Required properties:
+> +
+> +- compatible :	should be "allwinner,sun5i-a13-hstimer" or
+> +		"allwinner,sun7i-a20-hstimer"
+> +- reg : Specifies base physical address and size of the registers.
+> +- interrupts :	The interrupts of these timers (2 for the sun5i IP, 4 for the sun7i
+> +		one)
+> +- clocks: phandle to the source clock (usually the AHB clock)
+> +
+> +Example:
+> +
+> +hstimer at 01c60000 {
 
-Hook up the single channel thermal sensor via DT
-on r8a7790. The information used by the platform
-device has been verified against the data sheet.
+This should just be 'timer at 1c60000'
 
-Signed-off-by: Magnus Damm <damm@opensource.se>
----
+> +	compatible = "allwinner,sun7i-a20-hstimer";
+> +        reg = <0x01c60000 0x1000>;
+> +        interrupts = <0 51 1>,
+> +                     <0 52 1>,
+> +                     <0 53 1>,
+> +                     <0 54 1>;
+> +        clocks = <&ahb1_gates 19>;
+> +};
 
- Written against renesas-devel-20130925
+Weird mix of tabs and spaces here.
 
- arch/arm/boot/dts/r8a7790.dtsi         |    7 +++++++
- arch/arm/mach-shmobile/clock-r8a7790.c |    1 +
- 2 files changed, 8 insertions(+)
+> +
+> +static void __iomem *timer_base;
+> +static u32 ticks_per_jiffy;
+> +
+> +/*
+> + * When we disable a timer, we need to wait at least for 2 cycles of
+> + * the timer source clock. We will use for that the clocksource timer
+> + * that is already setup and runs at the same frequency than the other
+> + * timers, and we never will be disabled.
+> + */
+> +static void sun5i_clkevt_sync(void)
+> +{
+> +	u32 old = readl(timer_base + TIMER_CNTVAL_LO_REG(1));
+> +
+> +	while ((old - readl(timer_base + TIMER_CNTVAL_LO_REG(1))) < 3)
+> +		cpu_relax();
+> +}
+> +
+[...]
+> +
+> +static int sun5i_clkevt_next_event(unsigned long evt,
+> +				   struct clock_event_device *unused)
+> +{
+> +	sun5i_clkevt_time_stop(0);
+> +	sun5i_clkevt_time_setup(0, evt);
+> +	sun5i_clkevt_time_start(0, false);
 
---- 0001/arch/arm/boot/dts/r8a7790.dtsi
-+++ work/arch/arm/boot/dts/r8a7790.dtsi	2013-09-26 07:23:04.000000000 +0900
-@@ -87,6 +87,13 @@
- 		interrupts = <1 9 0xf04>;
- 	};
- 
-+	thermal at e61f0000 {
-+		compatible = "renesas,rcar-thermal";
-+		reg = <0 0xe61f0000 0 0x14>, <0 0xe61f0100 0 0x38>;
-+		interrupt-parent = <&gic>;
-+		interrupts = <0 69 4>;
-+	};
-+
- 	gpio0: gpio at ffc40000 {
- 		compatible = "renesas,gpio-r8a7790", "renesas,gpio-rcar";
- 		reg = <0 0xffc40000 0 0x2c>;
---- 0001/arch/arm/mach-shmobile/clock-r8a7790.c
-+++ work/arch/arm/mach-shmobile/clock-r8a7790.c	2013-09-26 07:24:37.000000000 +0900
-@@ -272,6 +272,7 @@ static struct clk_lookup lookups[] = {
- 	CLKDEV_DEV_ID("sh-sci.8", &mstp_clks[MSTP717]),
- 	CLKDEV_DEV_ID("sh-sci.9", &mstp_clks[MSTP716]),
- 	CLKDEV_DEV_ID("r8a7790-ether", &mstp_clks[MSTP813]),
-+	CLKDEV_DEV_ID("e61f0000.thermal", &mstp_clks[MSTP522]),
- 	CLKDEV_DEV_ID("rcar_thermal", &mstp_clks[MSTP522]),
- 	CLKDEV_DEV_ID("ee200000.mmcif", &mstp_clks[MSTP315]),
- 	CLKDEV_DEV_ID("sh_mmcif.0", &mstp_clks[MSTP315]),
+I suppose the min delta wants to be 3 instead of 1 because if we program
+an evt one tick in the future first we'll wait for two ticks (or is that
+three?) while we stop the timer and then program the timer to fire one
+tick after that. Perhaps we should subtract two ticks from the evt as
+well when we program it here?
+
+> +
+> +	return 0;
+> +}
+> +
+> +static struct clock_event_device sun5i_clockevent = {
+> +	.name = "sun5i_tick",
+> +	.rating = 350,
+> +	.features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
+> +	.set_mode = sun5i_clkevt_mode,
+> +	.set_next_event = sun5i_clkevt_next_event,
+> +};
+> +
+> +
+> +static irqreturn_t sun5i_timer_interrupt(int irq, void *dev_id)
+> +{
+> +	struct clock_event_device *evt = (struct clock_event_device *)dev_id;
+> +
+> +	writel(0x1, timer_base + TIMER_IRQ_ST_REG);
+> +	evt->event_handler(evt);
+> +
+> +	return IRQ_HANDLED;
+> +}
+> +
+> +static struct irqaction sun5i_timer_irq = {
+> +	.name = "sun5i_timer0",
+> +	.flags = IRQF_DISABLED | IRQF_TIMER | IRQF_IRQPOLL,
+
+IRQF_DISABLED is a no-op and can be dropped.
+
+> +
+> +static u32 sun5i_timer_sched_read(void)
+> +{
+> +	return ~readl(timer_base + TIMER_CNTVAL_LO_REG(1));
+> +}
+> +
+> +static void __init sun5i_timer_init(struct device_node *node)
+> +{
+[...]
+> +
+> +	sun5i_clockevent.cpumask = cpumask_of(0);
+
+Can this timer interrupt any CPU or is it hardwired to CPU0? If the
+interrupt can go to any CPU this should be cpu_possible_mask instead.
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
