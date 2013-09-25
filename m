@@ -1,52 +1,100 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Wed, 25 Sep 2013 16:29:01 +0300
-Subject: [RFC PATCH 09/15] ata: ti_sata: Add Texas Instruments SATA Wrapper
- driver
-In-Reply-To: <3930265.gHe05HETI5@amdc1032>
-References: <1379595943-14622-1-git-send-email-rogerq@ti.com>
- <1379595943-14622-10-git-send-email-rogerq@ti.com>
- <5608096.0pgFIteLqQ@amdc1032> <3930265.gHe05HETI5@amdc1032>
-Message-ID: <5242E51D.1020602@ti.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 25 Sep 2013 15:32:24 +0200
+Subject: [GIT PULL] delete the Shark machine for v3.13
+Message-ID: <CACRpkdaRp-FYOVN+bcS73MJ6hVSVH1s0yF4Q40UQrbBVYXW2yg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi ARM SoC folks,
 
-On 09/25/2013 03:49 PM, Bartlomiej Zolnierkiewicz wrote:
-> On Wednesday, September 25, 2013 02:37:19 PM Bartlomiej Zolnierkiewicz wrote:
-> 
-> [...]
-> 
->>> +#ifdef CONFIG_PM
->>> +
->>> +static int ti_sata_resume(struct device *dev)
->>> +{
->>> +	pm_runtime_disable(dev);
->>> +	pm_runtime_set_active(dev);
->>> +	pm_runtime_enable(dev);
->>
->> This doesn't look like a correct ->resume method:
->> * it shouldn't touch runtime PM at all
->> * for each ->resume method there should be a corresponding ->suspend method
->>
->> Moreover this whole wrapper driver seems strange, why not just add a proper
->> runtime PM support to ahci_platform driver instead?
-> 
-> Hmm, even this shouldn't be needed as this wrapper driver doesn't have
-> ->runtime_suspend and ->runtime resume methods.
-> 
-> What exactly is the purpose of the existence of this wrapper driver?
+This patch set deletes the Shark sub-architecture from the ARM
+tree. All patches cleaning up the subsystem trees from references
+to this machine have been ACKed except a oneliner in the block
+layer, which I am pretty sure Jens will not be upset about.
 
-This is the weirdness of OMAP hwmod framework :).
+Please pull it in on a suitable cleanup branch.
 
-The OMAP hwmod framework tries to manage the module clocks by itself and needs
-a runtime_resume to enable the relevant clocks.
+Yours,
+Linus Walleij
 
-hwmod framework will be deprecated in the near future and this is the place where
-we need to handle the resources.
 
-But since we are not yet there, I can get rid of this wrapper driver for now
-and add the necessary pm_runtime calls in the ahci_platform driver.
+The following changes since commit 272b98c6455f00884f0350f775c5342358ebb73f:
 
-cheers,
--roger
+  Linux 3.12-rc1 (2013-09-16 16:17:51 -0400)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git
+tags/del-shark-for-v3.13
+
+for you to fetch changes up to fc6ad619a5d29c94e3eecefa572dc1d4fefdc240:
+
+  video: drop code for ARCH_SHARK in cyber2000fb (2013-09-25 15:25:24 +0200)
+
+----------------------------------------------------------------
+This deletes the Shark SA110-based sub-architecture from
+the kernel.
+
+----------------------------------------------------------------
+Linus Walleij (6):
+      ARM: delete mach-shark
+      MAINTAINERS: delete Shark machine entry
+      block: drop dependency on ARCH_SHARK
+      ide: drop dependency on ARCH_SHARK
+      input: i8042: drop dependency on ARCH_SHARK
+      video: drop code for ARCH_SHARK in cyber2000fb
+
+ MAINTAINERS                                    |   5 -
+ arch/arm/Kconfig                               |  20 --
+ arch/arm/Makefile                              |   1 -
+ arch/arm/boot/compressed/Makefile              |   4 -
+ arch/arm/boot/compressed/head-shark.S          | 140 -------------
+ arch/arm/boot/compressed/ofw-shark.c           | 260 -------------------------
+ arch/arm/common/Makefile                       |   1 -
+ arch/arm/common/via82c505.c                    |  83 --------
+ arch/arm/configs/shark_defconfig               |  80 --------
+ arch/arm/include/asm/mach/pci.h                |   4 -
+ arch/arm/lib/Makefile                          |   1 -
+ arch/arm/lib/io-shark.c                        |  13 --
+ arch/arm/mach-shark/Makefile                   |  10 -
+ arch/arm/mach-shark/Makefile.boot              |   2 -
+ arch/arm/mach-shark/core.c                     | 146 --------------
+ arch/arm/mach-shark/dma.c                      |  23 ---
+ arch/arm/mach-shark/include/mach/debug-macro.S |  34 ----
+ arch/arm/mach-shark/include/mach/entry-macro.S |  36 ----
+ arch/arm/mach-shark/include/mach/framebuffer.h |  16 --
+ arch/arm/mach-shark/include/mach/hardware.h    |  16 --
+ arch/arm/mach-shark/include/mach/irqs.h        |  13 --
+ arch/arm/mach-shark/include/mach/isa-dma.h     |  13 --
+ arch/arm/mach-shark/include/mach/memory.h      |  26 ---
+ arch/arm/mach-shark/include/mach/timex.h       |   7 -
+ arch/arm/mach-shark/include/mach/uncompress.h  |  50 -----
+ arch/arm/mach-shark/irq.c                      | 108 ----------
+ arch/arm/mach-shark/leds.c                     | 117 -----------
+ arch/arm/mach-shark/pci.c                      |  57 ------
+ drivers/block/Kconfig                          |   2 +-
+ drivers/ide/Kconfig                            |   4 +-
+ drivers/input/serio/Kconfig                    |   2 +-
+ drivers/video/cyber2000fb.c                    |  70 -------
+ 32 files changed, 4 insertions(+), 1360 deletions(-)
+ delete mode 100644 arch/arm/boot/compressed/head-shark.S
+ delete mode 100644 arch/arm/boot/compressed/ofw-shark.c
+ delete mode 100644 arch/arm/common/via82c505.c
+ delete mode 100644 arch/arm/configs/shark_defconfig
+ delete mode 100644 arch/arm/lib/io-shark.c
+ delete mode 100644 arch/arm/mach-shark/Makefile
+ delete mode 100644 arch/arm/mach-shark/Makefile.boot
+ delete mode 100644 arch/arm/mach-shark/core.c
+ delete mode 100644 arch/arm/mach-shark/dma.c
+ delete mode 100644 arch/arm/mach-shark/include/mach/debug-macro.S
+ delete mode 100644 arch/arm/mach-shark/include/mach/entry-macro.S
+ delete mode 100644 arch/arm/mach-shark/include/mach/framebuffer.h
+ delete mode 100644 arch/arm/mach-shark/include/mach/hardware.h
+ delete mode 100644 arch/arm/mach-shark/include/mach/irqs.h
+ delete mode 100644 arch/arm/mach-shark/include/mach/isa-dma.h
+ delete mode 100644 arch/arm/mach-shark/include/mach/memory.h
+ delete mode 100644 arch/arm/mach-shark/include/mach/timex.h
+ delete mode 100644 arch/arm/mach-shark/include/mach/uncompress.h
+ delete mode 100644 arch/arm/mach-shark/irq.c
+ delete mode 100644 arch/arm/mach-shark/leds.c
+ delete mode 100644 arch/arm/mach-shark/pci.c
