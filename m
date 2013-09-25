@@ -1,66 +1,43 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Wed, 25 Sep 2013 18:37:31 -0300
-Subject: [PATCH 0/5] Add Core Divider clock support for Armada 370/XP
-In-Reply-To: <1380144502-24109-1-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1380144502-24109-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <20130925213730.GA19371@localhost>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Wed, 25 Sep 2013 12:33:05 +0200
+Subject: [ARM attend] Any news on agenda? Device tree documentation
+ discussion
+In-Reply-To: <CAOesGMhVjw0y50McCPPLeFvcr0NNkCO+BszT4zZELWYSgb0-GQ@mail.gmail.com>
+References: <F5184659D418E34EA12B1903EE5EF5FD8538E865C1@seldmbx02.corpusers.net>
+ <CAOesGMhVjw0y50McCPPLeFvcr0NNkCO+BszT4zZELWYSgb0-GQ@mail.gmail.com>
+Message-ID: <1877784.0NqxWJadn8@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(Ccing forgotten mvebu maintainers)
+Hi Olof,
 
-On Wed, Sep 25, 2013 at 06:28:17PM -0300, Ezequiel Garcia wrote:
-> This patchset adds support for a set of clocks available in Armada 370/XP
-> known as "Core Divider" clocks.
+(CC'ing Mauro Carvalho Chehab and Hans Verkuil)
+
+On Thursday 19 September 2013 22:30:16 Olof Johansson wrote:
+> On Wed, Sep 18, 2013 at 2:35 PM, Bird, Tim <Tim.Bird@sonymobile.com> wrote:
+> > I'm interested in the ARM kernel summit - particularly any
+> > sessions having to do with device tree. Is there an agenda or
+> > session list available for the ARM summit yet?
 > 
-> These are a set of gatable clocks, derived from a fixed PLL at
-> a configurable ratio. Although this patchset adds support for the more
-> general case, we only support one of the clocks, namely the NAND ECC clock.
+> No, I asked the KS PC a while back for the rough outline (break times,
+> etc), but I'm guessing they might not have them yet either.
 > 
-> With this infrastructure in place, the addition of the rest of the clocks
-> would be fairly easy.
+> > I have other meetings Wednesday (Oct 23), but heard that
+> > there might be device tree sessions on Wednesday afternoon.
+> > If so, and if these are open for me to attend, I would like to know
+> > so I can re-arrange my schedule to attend.
 > 
-> In addition, the NAND clock is added as a fixed-ratio from the NAND ECC clock,
-> to model accurately the SoC clock tree.
-> 
-> A pictorical representation of the clock tree would be:
-> 
->     PLL
->     |
->     |
->     ---------------------
->     |			|
->     |			|
->     NAND ECC clock	...
->     |
->     |
->     NAND clock
-> 
-> This patchset is based on v3.12-rc2. Any opinions are highly appreciated.
-> 
-> Thanks!
-> 
-> Ezequiel Garcia (5):
->   clk: mvebu: Add core-divider clock
->   ARM: mvebu: Add Core Divider clock device-tree binding
->   ARM: mvebu: Add a 2 GHz fixed-clock Armada 370/XP
->   ARM: mvebu: Add the core-divider clock to Armada 370/XP
->   ARM: mvebu: Add NAND clock to Armada 370/XP
-> 
->  .../bindings/clock/mvebu-corediv-clock.txt         |  19 ++
->  arch/arm/boot/dts/armada-370-xp.dtsi               |  25 +++
->  drivers/clk/mvebu/Kconfig                          |   5 +
->  drivers/clk/mvebu/Makefile                         |   1 +
->  drivers/clk/mvebu/clk-corediv.c                    | 209 +++++++++++++++++++++
->  5 files changed, 259 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/clock/mvebu-corediv-clock.txt
->  create mode 100644 drivers/clk/mvebu/clk-corediv.c
-> 
-> -- 
-> 1.8.1.5
-> 
+> Yes, the general idea is to schedule them on Wed PM, and allow a wider
+> audience at those sessions.
+
+The V4L2 mini-summit will take place on Wednesday October 23rd. As I can't 
+attend both simultaneously, we're trying to draft the agenda to minimize the 
+schedule conflicts between topics that embedded media developers would like to 
+discuss (this affects more than me, there will be several developers invited 
+to both the ARM KS and the V4L2 mini-summit). Getting a rough outline of the 
+ARM KS agenda before the last minute would thus be very appreciated.
 
 -- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+Regards,
+
+Laurent Pinchart
