@@ -1,40 +1,31 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Wed, 25 Sep 2013 12:13:10 -0400
-Subject: [PATCH 0/3 v2] clk: keystone: Add common clock drivers
-In-Reply-To: <1377803662-3509-1-git-send-email-santosh.shilimkar@ti.com>
-References: <1377803662-3509-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <52430B96.5070702@ti.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 25 Sep 2013 17:56:35 +0300
+Subject: [PATCH] ARM: sunxi: Order Kconfig options alphabetically
+Message-ID: <1380120995-9242-1-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mike,
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ arch/arm/mach-sunxi/Kconfig | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-On Thursday 29 August 2013 03:14 PM, Santosh Shilimkar wrote:
-> v2:
-> - Aligned the bindings as per the list discussion. Removed the additional
-> 	parameters by usage of reg-names and additional compatible fields.
-> - Addressed all the comments from v1 on drivers.
-> - Split the series into clock drivers($subject series) and
-> 	platform, dt updates. Will post that one separately.
-> 
-> Special thanks to Mike and Mark for the detailed review on v1.
-> 
-> Series is an attempt to add the clock drivers for Keystone SOCs
-> based on common clock framework. A PLL drivers taking care of
-> SOC PLLs and a gate control driver taking clock management for
-> the IPs. The current Keystone based SOCs don' support dynamic power
-> management usecases like DVFS, SOC ilde etc and hence most of the
-> usage is limited to enabling clocks and finding the current clock
-> rate etc.
-> 
-> Based on to of Mike's dt binding series [1] and tested on Keystone2
-> EVM.
->
-> Cc: Mike Turquette <mturquette@linaro.org>
-
-As aligned off-list, I will revise the series to remove the
-dependency with your DT bindings series which still seems to
-be under discussion.
-
-Regards,
-Santosh
+diff --git a/arch/arm/mach-sunxi/Kconfig b/arch/arm/mach-sunxi/Kconfig
+index b78931d..33cef54 100644
+--- a/arch/arm/mach-sunxi/Kconfig
++++ b/arch/arm/mach-sunxi/Kconfig
+@@ -6,10 +6,10 @@ config ARCH_SUNXI
+ 	select COMMON_CLK
+ 	select GENERIC_CLOCKEVENTS
+ 	select GENERIC_IRQ_CHIP
++	select HAVE_SMP
+ 	select PINCTRL
++	select PINCTRL_SUNXI
+ 	select SPARSE_IRQ
+ 	select SUN4I_TIMER
+ 	select SUN5I_HSTIMER
+-	select PINCTRL_SUNXI
+ 	select ARM_GIC
+-	select HAVE_SMP
+-- 
+1.8.4
