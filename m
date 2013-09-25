@@ -1,71 +1,70 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Wed, 25 Sep 2013 20:16:53 +0400
-Subject: [PATCH v2 2/2] ARM: shmobile: Marzen: enable DMA for SDHI0
-In-Reply-To: <20130925065549.GG1916@verge.net.au>
-References: <201308252143.33458.sergei.shtylyov@cogentembedded.com>
- <201308252147.27210.sergei.shtylyov@cogentembedded.com>
- <20130925065549.GG1916@verge.net.au>
-Message-ID: <52430C75.5090409@cogentembedded.com>
+From: balajitk@ti.com (Balaji T K)
+Date: Wed, 25 Sep 2013 21:47:14 +0530
+Subject: [PATCH 2/2] ARM: dts: dra7-evm: Add mmc2 node for eMMC support
+In-Reply-To: <52415E41.7050301@baylibre.com>
+References: <1377525218-7655-1-git-send-email-balajitk@ti.com>
+ <1377525218-7655-3-git-send-email-balajitk@ti.com>
+ <52415E41.7050301@baylibre.com>
+Message-ID: <52430C8A.6040404@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
-
-On 09/25/2013 10:55 AM, Simon Horman wrote:
-
-> [ Cc: Guennadi Liakhovetski ]
-
->> From: Max Filippov <max.filippov@cogentembedded.com>
-
->> Pass HPB-DMA slave IDs in the SDHI0 platform data to enable DMA in the SDHI
->> driver.
-
->> Signed-off-by: Max Filippov <max.filippov@cogentembedded.com>
->> [Sergei: removed #include <mach/dma.h>]
->> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-
+On Tuesday 24 September 2013 03:11 PM, Benoit Cousson wrote:
+> + Sekhar
+>
+> Hi Balaji,
+>
+> On 26/08/2013 15:53, Balaji T K wrote:
+>> Add mmc2 dt node to dra7-evm board
+>> and model eMMC vcc as fixed regulator.
+>>
+>> Signed-off-by: Balaji T K <balajitk@ti.com>
 >> ---
->> Changes in version 2:
->> - refreshed the patch.
-
->>   arch/arm/mach-shmobile/board-marzen.c |    2 ++
->>   1 file changed, 2 insertions(+)
-
->> Index: renesas/arch/arm/mach-shmobile/board-marzen.c
->> ===================================================================
->> --- renesas.orig/arch/arm/mach-shmobile/board-marzen.c
->> +++ renesas/arch/arm/mach-shmobile/board-marzen.c
->> @@ -123,6 +123,8 @@ static struct resource sdhi0_resources[]
+>>   arch/arm/boot/dts/dra7-evm.dts |   14 ++++++++++++++
+>>   1 files changed, 14 insertions(+), 0 deletions(-)
+>>
+>> diff --git a/arch/arm/boot/dts/dra7-evm.dts b/arch/arm/boot/dts/dra7-evm.dts
+>> index a59bbd0..2062724 100644
+>> --- a/arch/arm/boot/dts/dra7-evm.dts
+>> +++ b/arch/arm/boot/dts/dra7-evm.dts
+>> @@ -17,6 +17,13 @@
+>>           device_type = "memory";
+>>           reg = <0x80000000 0x60000000>; /* 1536 MB */
+>>       };
+>> +
+>> +    mmc2_3v3: fixedregulator-mmc2 {
+>> +        compatible = "regulator-fixed";
+>> +        regulator-name = "mmc2_3v3";
+>> +        regulator-min-microvolt = <3300000>;
+>> +        regulator-max-microvolt = <3300000>;
+>> +    };
 >>   };
 >>
->>   static struct sh_mobile_sdhi_info sdhi0_platform_data = {
->> +	.dma_slave_tx = HPBDMA_SLAVE_SDHI0_TX,
->> +	.dma_slave_rx = HPBDMA_SLAVE_SDHI0_RX,
->>   	.tmio_flags = TMIO_MMC_WRPROTECT_DISABLE | TMIO_MMC_HAS_IDLE_WAIT,
->>   	.tmio_caps = MMC_CAP_SD_HIGHSPEED,
+>>   &dra7_pmx_core {
+>> @@ -257,3 +264,10 @@
+>>       vmmc-supply = <&ldo1_reg>;
+>>       bus-width = <4>;
 >>   };
+>> +
+>> +&mmc2 {
+>> +    status = "okay";
+>> +    vmmc-supply = <&mmc2_3v3>;
+>> +    bus-width = <8>;
+>> +    ti,non-removable;
+>
+> Sekhar just posted a series to replace that with a non-TI attribute: non-removable.
+>
+> I'm not sure if this got merged, but it might be good to use the standard attribute instead.
 
-> Hi,
+Hi Benoit,
 
-> I am intending to queue up this change for v3.13.
+Those patches are not merged yet, standard attribute is good, but few cleanups are needed
+before ti,non-removable can be replaced by standard non-removable,
+no_regulator_off_init flag set under ti,non-removable is needed to detect eMMC
+during boot on OMAP4 devices to keep regulator ON during init. Given that eMMC on dra7-evm
+is powered by always ON regulator, ti,non-removable and standard attribute will behave same
+way. Let me know if you want to remove ti,non-removable attribute from this patch.
 
-    Thanks in advance. :-)
-
-> I am wondering if you could give me some details of dependencies
-> of this change on the previous patch. If possible I would
-> like to apply this patch in a branch that does not include the previous patch.
-
-    HPBDMA_SLAVE_* are defined there. I'm afraid it's not possible to apply 
-this patch separately.
-
-> Also, could you provide a patch to update the marzen defconfig?
-
-    Yes, I intended to.
-
-> Lastly, the driver does not seem to compile as it makes use of
-> shdma_free_irq() which was removed by Guennadi in
-> c1c63a14f4f2419d ("DMA: shdma: switch to managed resource allocation").
-
-    Thanks for the information, I wasn't aware of that.
-
-WBR, Sergei
+>
+> Regards,
+> Benoit
