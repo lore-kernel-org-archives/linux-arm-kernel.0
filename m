@@ -1,69 +1,37 @@
-From: sylvester.nawrocki@gmail.com (Sylwester Nawrocki)
-Date: Wed, 25 Sep 2013 22:51:08 +0200
-Subject: [PATCH v6 0/5] clk: clock deregistration support
-In-Reply-To: <3160771.O1gFkR91vK@avalon>
-References: <1377874402-2944-1-git-send-email-s.nawrocki@samsung.com>
- <52420664.2040604@gmail.com> <3160771.O1gFkR91vK@avalon>
-Message-ID: <52434CBC.2070408@gmail.com>
+From: abrestic@chromium.org (Andrew Bresticker)
+Date: Wed, 25 Sep 2013 14:12:50 -0700
+Subject: [PATCH V4 4/6] ARM: dts: exynos5250: add input clocks to audss clock
+ controller
+In-Reply-To: <1380143572-11741-1-git-send-email-abrestic@chromium.org>
+References: <1380046016-5811-1-git-send-email-abrestic@chromium.org>
+ <1380143572-11741-1-git-send-email-abrestic@chromium.org>
+Message-ID: <1380143572-11741-4-git-send-email-abrestic@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laurent,
+Specify pll_ref, pll_in, sclk_audio, and sclk_pcm_in for the AudioSS
+clock controller.
 
-On 09/25/2013 11:47 AM, Laurent Pinchart wrote:
-> Doesn't that introduce race conditions ? If the sub-drivers require the clock,
-> they want to be sure that the clock won't disappear beyond their backs. I
-> agree that the circular dependency needs to be solved somehow, but we probably
-> need a more generic solution. The problem will become more widespread in the
-> future with DT-based device instantiation in both V4L2 and KMS.
+Signed-off-by: Andrew Bresticker <abrestic@chromium.org>
+---
+Changes since v1:
+ - specified additional input clocks
+---
+ arch/arm/boot/dts/exynos5250.dtsi | 2 ++
+ 1 file changed, 2 insertions(+)
 
-It doesn't introduce any new race conditions AFAICT. I doubt all these 
-issues
-can be resolved in one single step. Currently the modular clock 
-providers are
-seriously broken, there is no reference tracking and the clock consumers 
-can
-easily get into a state where they have invalid references to clocks 
-supplied
-by already unregistered drivers.
-
-With this patch series the clock consumer drivers will not crash thanks 
-to the
-clock object reference counting. So the worst thing may happen is a 
-clock left
-in an unexpected state.
-
-However there should be no problems with the v4l2-async API, the host driver
-in its de-initialization routine unregisters its sub-drivers (they 
-should stop
-using the clock when notified of such an event), only then the host would
-unregister the clock (subsequently the sub-drivers get re-attached and put
-into deferred probing state).
-
-There may be issues when a sub-driver's file handle is opened while the host
-is about to de-initialize. But I doubt resolution of such problems belongs
-to the common clock framework. I have been trying to improve the situation
-in small steps, rather than waiting forever for a perfect solution.
-
-Do you perhaps have any ideas WRT to a "more generic solution" ? In general
-I have been trying to avoid using v4l2-clk and add what's missing in the
-common clock framework.
-
-Perhaps we should leave only the kref part in the __clk_get(), __clk_put()
-hooks and be taking reference to a clock in clk_prepare() and releasing it
-in clk_unprepare() ? This way circular reference would exist only between
-clk_prepare(), clk_unprepare() calls.
-
-Assuming a driver prepares clock in device's open() and unprepares in device
-close() handler perhaps it could all work better, without relying on the 
-host
-to ensure the resource reference tracking. I'm not sure if that is not 
-making
-too many assumptions for a generic API.
-
-
-Thanks for the feedback.
-
---
-Regards,
-Sylwester
+diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
+index 7d7cc77..2d6a93d 100644
+--- a/arch/arm/boot/dts/exynos5250.dtsi
++++ b/arch/arm/boot/dts/exynos5250.dtsi
+@@ -88,6 +88,8 @@
+ 		compatible = "samsung,exynos5250-audss-clock";
+ 		reg = <0x03810000 0x0C>;
+ 		#clock-cells = <1>;
++		clocks = <&clock 1>, <&clock 7>, <&clock 138>, <&clock 160>;
++		clock-names = "pll_ref", "pll_in", "sclk_audio", "sclk_pcm_in";
+ 	};
+ 
+ 	timer {
+-- 
+1.8.4
