@@ -1,36 +1,31 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Wed, 25 Sep 2013 05:36:17 +0530
-Subject: [GIT PULL] DaVinci SoC updates for v3.13
-Message-ID: <524228F9.50104@ti.com>
+From: john.stultz@linaro.org (John Stultz)
+Date: Tue, 24 Sep 2013 17:54:35 -0700
+Subject: [GIT PULL] drivers/clocksource: sched_clock_register() conversion
+ for 3.13 (via tip/timers/core)
+In-Reply-To: <52422732.5000501@linaro.org>
+References: <52422732.5000501@linaro.org>
+Message-ID: <5242344B.8020002@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 4a10c2ac2f368583138b774ca41fac4207911983:
+On 09/24/2013 04:58 PM, John Stultz wrote:
+> Hey Daniel,
+>     Here's the sched_clock_register conversion that Stephen did earlier
+> this summer, as part of extending the generic sched_clock code to
+> support 64bit counters. Unfortunately the prereqs for this series missed
+> getting into tip/timers/core for 3.12, so I never sent out this pull
+> request. But now that the prereqs are in tip/timers/core for 3.13, I've
+> merge it up and I wanted to go ahead and send this out.
+>
+> Let me know if you have any issues or concerns.
+Hey Daniel,
+    Maybe hold off on this one. The kbuild test robot is has some
+complaints aobut the deprecation of setup_sched_clock() while there are
+still users in arch/arm.
 
-  Linux 3.12-rc2 (2013-09-23 15:41:09 -0700)
+I'll likely rework a new branch for you to pull that will be all but the
+"Deprecate setup_sched_clock()" patch.
 
-are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v3.13/soc
-
-for you to fetch changes up to 5093f84e708574142ce26fa4a6c4558176436c86:
-
-  ARM: edma: dt: create unused channel list (2013-09-25 05:04:28 +0530)
-
-----------------------------------------------------------------
-This pull request contains a patch to remove
-a long deprecated irq flag and completes the
-DT support in EDMA library.
-
-----------------------------------------------------------------
-Joel Fernandes (1):
-      ARM: edma: dt: create unused channel list
-
-Michael Opdenacker (1):
-      ARM: davinci: remove deprecated IRQF_DISABLED
-
- arch/arm/common/edma.c                      |   39 ++++++++++++++++++++++-----
- arch/arm/mach-davinci/board-da830-evm.c     |    2 +-
- arch/arm/mach-davinci/board-omapl138-hawk.c |    2 +-
- arch/arm/mach-davinci/time.c                |    4 +--
- 4 files changed, 36 insertions(+), 11 deletions(-)
+thanks
+-john
