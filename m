@@ -1,105 +1,209 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 25 Sep 2013 16:30:20 +0800
-Subject: [PATCH 2/5] ARM: imx6q: use common soc revision helpers
+Date: Wed, 25 Sep 2013 16:30:23 +0800
+Subject: [PATCH 5/5] ARM: imx6: report soc info via soc device
 In-Reply-To: <1380097823-29027-1-git-send-email-shawn.guo@linaro.org>
 References: <1380097823-29027-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1380097823-29027-3-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1380097823-29027-6-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It calls imx_set_soc_revision() to set up soc revision in
-imx6q_init_revision(), and replaces all the occurrences of
-imx6q_revision() with common helper imx_get_soc_revision().
+The patch enables soc bus infrastructure and adds a function
+imx_soc_device_init() to report soc info via soc device interface for
+imx6qdl and imx6sl.  With the support, user space can get soc related
+info by looking at sysfs like below.
+
+  $ cat /sys/devices/soc0/machine
+  Freescale i.MX6 Quad SABRE Smart Device Board
+  $ cat /sys/devices/soc0/family
+  Freescale i.MX
+  $ cat /sys/devices/soc0/soc_id
+  i.MX6Q
+  $ cat /sys/devices/soc0/revision
+  1.2
 
 Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 ---
- arch/arm/mach-imx/clk-imx6q.c  |    5 +++--
- arch/arm/mach-imx/common.h     |    1 -
- arch/arm/mach-imx/mach-imx6q.c |   13 ++++---------
- 3 files changed, 7 insertions(+), 12 deletions(-)
+ arch/arm/mach-imx/Kconfig       |    1 +
+ arch/arm/mach-imx/common.h      |    1 +
+ arch/arm/mach-imx/cpu.c         |   81 +++++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-imx/mach-imx6q.c  |    8 +++-
+ arch/arm/mach-imx/mach-imx6sl.c |    8 +++-
+ arch/arm/mach-imx/mxc.h         |    1 +
+ 6 files changed, 98 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
-index 913ad85..c681566 100644
---- a/arch/arm/mach-imx/clk-imx6q.c
-+++ b/arch/arm/mach-imx/clk-imx6q.c
-@@ -300,7 +300,7 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
- 	WARN_ON(!base);
- 
- 	/* Audio/video PLL post dividers do not work on i.MX6q revision 1.0 */
--	if (cpu_is_imx6q() && imx6q_revision() == IMX_CHIP_REVISION_1_0) {
-+	if (cpu_is_imx6q() && imx_get_soc_revision() == IMX_CHIP_REVISION_1_0) {
- 		post_div_table[1].div = 1;
- 		post_div_table[2].div = 1;
- 		video_div_table[1].div = 1;
-@@ -574,7 +574,8 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
- 	clk_register_clkdev(clk[pll4_post_div], "pll4_post_div", NULL);
- 	clk_register_clkdev(clk[pll4_audio], "pll4_audio", NULL);
- 
--	if ((imx6q_revision() != IMX_CHIP_REVISION_1_0) || cpu_is_imx6dl()) {
-+	if ((imx_get_soc_revision() != IMX_CHIP_REVISION_1_0) ||
-+	    cpu_is_imx6dl()) {
- 		clk_set_parent(clk[ldb_di0_sel], clk[pll5_video_div]);
- 		clk_set_parent(clk[ldb_di1_sel], clk[pll5_video_div]);
- 	}
+diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+index 9f67338..e017915 100644
+--- a/arch/arm/mach-imx/Kconfig
++++ b/arch/arm/mach-imx/Kconfig
+@@ -11,6 +11,7 @@ config ARCH_MXC
+ 	select GENERIC_IRQ_CHIP
+ 	select MIGHT_HAVE_CACHE_L2X0 if ARCH_MULTI_V6_V7
+ 	select MULTI_IRQ_HANDLER
++	select SOC_BUS
+ 	select SPARSE_IRQ
+ 	select USE_OF
+ 	help
 diff --git a/arch/arm/mach-imx/common.h b/arch/arm/mach-imx/common.h
-index d87fff1..64b2b9f 100644
+index 282af93..4f9aea9 100644
 --- a/arch/arm/mach-imx/common.h
 +++ b/arch/arm/mach-imx/common.h
-@@ -77,7 +77,6 @@ extern void mxc_restart(enum reboot_mode, const char *);
- extern void mxc_arch_reset_init(void __iomem *);
- extern void mxc_arch_reset_init_dt(void);
- extern int mx53_revision(void);
--extern int imx6q_revision(void);
- extern int mx53_display_revision(void);
- extern void imx_set_aips(void __iomem *);
- extern int mxc_device_init(void);
+@@ -83,6 +83,7 @@ extern int mxc_device_init(void);
+ void imx_set_soc_revision(unsigned int rev);
+ unsigned int imx_get_soc_revision(void);
+ void imx_init_revision_from_anatop(void);
++struct device *imx_soc_device_init(void);
+ 
+ enum mxc_cpu_pwr_mode {
+ 	WAIT_CLOCKED,		/* wfi only */
+diff --git a/arch/arm/mach-imx/cpu.c b/arch/arm/mach-imx/cpu.c
+index 51f6c51..fae2c9a 100644
+--- a/arch/arm/mach-imx/cpu.c
++++ b/arch/arm/mach-imx/cpu.c
+@@ -1,6 +1,9 @@
+ 
+ #include <linux/module.h>
+ #include <linux/io.h>
++#include <linux/of.h>
++#include <linux/slab.h>
++#include <linux/sys_soc.h>
+ 
+ #include "hardware.h"
+ #include "common.h"
+@@ -56,3 +59,81 @@ void __init imx_set_aips(void __iomem *base)
+ 	reg = __raw_readl(base + 0x50) & 0x00FFFFFF;
+ 	__raw_writel(reg, base + 0x50);
+ }
++
++struct device * __init imx_soc_device_init(void)
++{
++	struct soc_device_attribute *soc_dev_attr;
++	struct soc_device *soc_dev;
++	struct device_node *root;
++	const char *soc_id;
++	int ret;
++
++	soc_dev_attr = kzalloc(sizeof(*soc_dev_attr), GFP_KERNEL);
++	if (!soc_dev_attr)
++		return NULL;
++
++	soc_dev_attr->family = "Freescale i.MX";
++
++	root = of_find_node_by_path("/");
++	ret = of_property_read_string(root, "model", &soc_dev_attr->machine);
++	of_node_put(root);
++	if (ret)
++		goto free_soc;
++
++	switch (__mxc_cpu_type) {
++	case MXC_CPU_MX1:
++		soc_id = "i.MX1";
++		break;
++	case MXC_CPU_MX21:
++		soc_id = "i.MX21";
++		break;
++	case MXC_CPU_MX25:
++		soc_id = "i.MX25";
++		break;
++	case MXC_CPU_MX27:
++		soc_id = "i.MX27";
++		break;
++	case MXC_CPU_MX31:
++		soc_id = "i.MX31";
++		break;
++	case MXC_CPU_MX35:
++		soc_id = "i.MX35";
++		break;
++	case MXC_CPU_MX51:
++		soc_id = "i.MX51";
++		break;
++	case MXC_CPU_MX53:
++		soc_id = "i.MX53";
++		break;
++	case MXC_CPU_IMX6SL:
++		soc_id = "i.MX6SL";
++		break;
++	case MXC_CPU_IMX6DL:
++		soc_id = "i.MX6DL";
++		break;
++	case MXC_CPU_IMX6Q:
++		soc_id = "i.MX6Q";
++		break;
++	default:
++		soc_id = "Unknown";
++	}
++	soc_dev_attr->soc_id = soc_id;
++
++	soc_dev_attr->revision = kasprintf(GFP_KERNEL, "%d.%d",
++					   (imx_soc_revision >> 4) & 0xf,
++					   imx_soc_revision & 0xf);
++	if (!soc_dev_attr->revision)
++		goto free_soc;
++
++	soc_dev = soc_device_register(soc_dev_attr);
++	if (IS_ERR(soc_dev))
++		goto free_rev;
++
++	return soc_device_to_device(soc_dev);
++
++free_rev:
++	kfree(soc_dev_attr->revision);
++free_soc:
++	kfree(soc_dev_attr);
++	return NULL;
++}
 diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
-index 85a1b51..2efdbce 100644
+index ea01ac3..ebcfd8d 100644
 --- a/arch/arm/mach-imx/mach-imx6q.c
 +++ b/arch/arm/mach-imx/mach-imx6q.c
-@@ -40,16 +40,10 @@
- #include "cpuidle.h"
- #include "hardware.h"
+@@ -164,9 +164,15 @@ static void __init imx6q_1588_init(void)
  
--static u32 chip_revision;
--
--int imx6q_revision(void)
--{
--	return chip_revision;
--}
--
- static void __init imx6q_init_revision(void)
+ static void __init imx6q_init_machine(void)
  {
- 	u32 rev = imx_anatop_get_digprog();
-+	u32 chip_revision;
++	struct device *parent;
++
++	parent = imx_soc_device_init();
++	if (parent == NULL)
++		pr_warn("failed to initialize soc device\n");
++
+ 	imx6q_enet_phy_init();
  
- 	switch (rev & 0xff) {
- 	case 0:
-@@ -66,6 +60,7 @@ static void __init imx6q_init_revision(void)
- 	}
+-	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
++	of_platform_populate(NULL, of_default_bus_match_table, NULL, parent);
  
- 	mxc_set_cpu_type(rev >> 16 & 0xff);
-+	imx_set_soc_revision(chip_revision);
+ 	imx_anatop_init();
+ 	imx6q_pm_init();
+diff --git a/arch/arm/mach-imx/mach-imx6sl.c b/arch/arm/mach-imx/mach-imx6sl.c
+index b1aaa47..5c767f0 100644
+--- a/arch/arm/mach-imx/mach-imx6sl.c
++++ b/arch/arm/mach-imx/mach-imx6sl.c
+@@ -37,9 +37,15 @@ static void __init imx6sl_fec_init(void)
+ 
+ static void __init imx6sl_init_machine(void)
+ {
++	struct device *parent;
++
+ 	mxc_arch_reset_init_dt();
+ 
+-	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
++	parent = imx_soc_device_init();
++	if (parent == NULL)
++		pr_warn("failed to initialize soc device\n");
++
++	of_platform_populate(NULL, of_default_bus_match_table, NULL, parent);
+ 
+ 	imx6sl_fec_init();
  }
+diff --git a/arch/arm/mach-imx/mxc.h b/arch/arm/mach-imx/mxc.h
+index 8629e5b..99e03ea 100644
+--- a/arch/arm/mach-imx/mxc.h
++++ b/arch/arm/mach-imx/mxc.h
+@@ -34,6 +34,7 @@
+ #define MXC_CPU_MX35		35
+ #define MXC_CPU_MX51		51
+ #define MXC_CPU_MX53		53
++#define MXC_CPU_IMX6SL		0x60
+ #define MXC_CPU_IMX6DL		0x61
+ #define MXC_CPU_IMX6Q		0x63
  
- static void imx6q_restart(enum reboot_mode mode, const char *cmd)
-@@ -264,7 +259,7 @@ static void __init imx6q_init_late(void)
- 	 * WAIT mode is broken on TO 1.0 and 1.1, so there is no point
- 	 * to run cpuidle on them.
- 	 */
--	if (imx6q_revision() > IMX_CHIP_REVISION_1_1)
-+	if (imx_get_soc_revision() > IMX_CHIP_REVISION_1_1)
- 		imx6q_cpuidle_init();
- 
- 	if (IS_ENABLED(CONFIG_ARM_IMX6Q_CPUFREQ)) {
-@@ -293,7 +288,7 @@ static void __init imx6q_timer_init(void)
- 	of_clk_init(NULL);
- 	clocksource_of_init();
- 	imx_print_silicon_rev(cpu_is_imx6dl() ? "i.MX6DL" : "i.MX6Q",
--			      imx6q_revision());
-+			      imx_get_soc_revision());
- }
- 
- static const char *imx6q_dt_compat[] __initdata = {
 -- 
 1.7.9.5
