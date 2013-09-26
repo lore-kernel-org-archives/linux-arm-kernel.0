@@ -1,7 +1,7 @@
-From: alexandre.torgue@st.com (Alexandre TORGUE)
-Date: Thu, 26 Sep 2013 11:51:12 +0200
+From: maxime.coquelin@st.com (Maxime COQUELIN)
+Date: Thu, 26 Sep 2013 11:53:33 +0200
 Subject: [PATCH v2 0/4] Add I2C support to ST SoCs
-Message-ID: <1380189072-5551-1-git-send-email-maxime.coquelin@st.com>
+Message-ID: <1380189213-5667-1-git-send-email-maxime.coquelin@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
