@@ -1,69 +1,35 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Fri, 27 Sep 2013 00:44:18 +0400
-Subject: [PATCH v2 4/4] ARM: shmobile: BOCK-W reference: add Ether PFC
- settings
-In-Reply-To: <20130926015142.GB18396@verge.net.au>
-References: <201309070423.30672.sergei.shtylyov@cogentembedded.com>
- <201309070431.35908.sergei.shtylyov@cogentembedded.com>
- <CANqRtoRKFoS9tehteDGaTUYJ8fSBqAYJJDiLxZmoNB9W0N+Mpg@mail.gmail.com>
- <52305EA4.1060902@cogentembedded.com> <20130925044720.GB24243@verge.net.au>
- <5243073C.8070402@cogentembedded.com> <20130926015142.GB18396@verge.net.au>
-Message-ID: <52449CA2.8040509@cogentembedded.com>
+From: davidb@codeaurora.org (David Brown)
+Date: Thu, 26 Sep 2013 13:58:08 -0700
+Subject: [PATCHv4 2/3] ARM: msm: Add support for APQ8074 Dragonboard
+In-Reply-To: <50877C70-6066-4E87-9DEA-9F29D098525B@codeaurora.org>
+References: <1379992406-3541-1-git-send-email-rvaswani@codeaurora.org>
+ <1379992406-3541-2-git-send-email-rvaswani@codeaurora.org>
+ <4E7868D6-56CB-4AF8-8EBF-069966899C23@codeaurora.org>
+ <5243652F.7090408@codeaurora.org>
+ <B0F416B8-042A-49F1-81E9-B217F02AAD1E@codeaurora.org>
+ <52447779.3010908@codeaurora.org> <52448852.9050608@codeaurora.org>
+ <50877C70-6066-4E87-9DEA-9F29D098525B@codeaurora.org>
+Message-ID: <20130926205808.GA3146@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Thu, Sep 26, 2013 at 02:33:53PM -0500, Kumar Gala wrote:
 
-On 09/26/2013 05:51 AM, Simon Horman wrote:
+>> "ePAPR 1.1 section 2.2.1.1 "Node Name Requirements" specifies that any
+>> node that has a reg property must include a unit address in its name
+>> with value matching the first entry in its reg property. Conversely, if
+>> a node does not have a reg property, the node name must not include a
+>> unit address."
+>>
+>> The soc node we have does not have a reg property ?
+>
+>Not 100% sure what people will decide on this.  There are a number of
+>examples on the PPC side (arch/powerpc/boot/dts) that are soc at ADDR,
+>but they don't typically have "reg" properties at the soc level.
+>
+>Let's go ahead w/o the unit address (as you have it) for now.
 
->>>>>> Add the Ether pin group to bockw_pinctrl_map[].
+What is the address even supposed to mean?  Are we expecting multiple
+'soc' nodes?
 
->>>>>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-
->>>>>> ---
->>>>>>   arch/arm/mach-shmobile/board-bockw-reference.c |    3 +++
->>>>>>   1 file changed, 3 insertions(+)
-
->>>>>> Index: renesas/arch/arm/mach-shmobile/board-bockw-reference.c
->>>>>> ===================================================================
->>>>>> --- renesas.orig/arch/arm/mach-shmobile/board-bockw-reference.c
->>>>>> +++ renesas/arch/arm/mach-shmobile/board-bockw-reference.c
->>>>>> @@ -29,6 +29,9 @@
->>>>>>    */
->>>>>>
->>>>>>   static const struct pinctrl_map bockw_pinctrl_map[] = {
->>>>>> +       /* Ether */
->>>>>> +       PIN_MAP_MUX_GROUP_DEFAULT("fde00000.ethernet", "pfc-r8a7778",
->>>>>> +                                 "ether_rmii", "ether"),
->>>>>>          /* SCIF0 */
->>>>>>          PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.0", "pfc-r8a7778",
->>>>>>                                    "scif0_data_a", "scif0"),
-
->>>>> Hi Sergei,
-
->>>>> Thanks for your patches. In general I think your series looks fine. I
->>>>> have a single comment, and that's about the pinctrl-related hunk
->>>>> above. I can see that this patch is for DT reference for Bock-W, so I
->>>>> expect the code to be in DT. Do you have any plans to use DT to
->>>>> describe the pinmux bits? Perhaps you have some incremental patch
->>>>> planned?
-
->>>>     No, I just repeated what I saw mechanically. Now I'm seeing some
->>>> evidence that PFC driver supports the device tree, so I probably
->>>> need to redo the patchset... let me study this question better.
-
->>> Ping.
-
->>     Sorry, I got distracted by other work and didn't advance much here.
->> Will try to respin the patchset before my vacation (next Monday).
->> Although the driver DT support patch have seemingly stalemated due
->> to the most recent comments...
-
-> Thanks for the update.
-
-> I guess the key is to move forward on the driver side, somehow.
-
-    Do you mean we should grant Stephen's requests concerning clock DT support 
-before we add the DT support to the driver?
-
-WBR, Sergei
+David
