@@ -1,45 +1,96 @@
-From: greg@kroah.com (Greg KH)
-Date: Thu, 26 Sep 2013 09:50:50 -0700
-Subject: [PATCH V5 1/9] USB: OHCI: make ohci-exynos a separate driver
-In-Reply-To: <1379761727-10656-2-git-send-email-manjunath.goudar@linaro.org>
-References: <1370585013-12809-1-git-send-email-manjunath.goudar@linaro.org>
- <1379761727-10656-1-git-send-email-manjunath.goudar@linaro.org>
- <1379761727-10656-2-git-send-email-manjunath.goudar@linaro.org>
-Message-ID: <20130926165050.GA27342@kroah.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 26 Sep 2013 17:53:52 +0100
+Subject: [Question] Verification For arm64: suspend/resume implementation
+In-Reply-To: <524416B5.3040303@marvell.com>
+References: <52327E41.1070904@marvell.com>
+ <20130913144001.GA28531@e102568-lin.cambridge.arm.com>
+ <524021EC.2000207@marvell.com>
+ <20130923152606.GA6157@e102648.cambridge.arm.com>
+ <5240F246.6050402@marvell.com>
+ <20130924090236.GY10174@e102648.cambridge.arm.com>
+ <52417C4D.1030009@marvell.com> <20130924130012.GE25907@arm.com>
+ <524416B5.3040303@marvell.com>
+Message-ID: <20130926165351.GK3253@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 21, 2013 at 04:38:38PM +0530, Manjunath Goudar wrote:
-> Separate the  Samsung OHCI EXYNOS host controller driver from ohci-hcd
-> host code so that it can be built as a separate driver module.
-> This work is part of enabling multi-platform kernels on ARM.
+On Thu, Sep 26, 2013 at 12:12:53PM +0100, Leo Yan wrote:
+> On 09/24/2013 09:00 PM, Catalin Marinas wrote:
+> > On Tue, Sep 24, 2013 at 12:49:33PM +0100, Leo Yan wrote:
+> >> On 09/24/2013 05:02 PM, Achin Gupta wrote:
+> >>> On Tue, Sep 24, 2013 at 03:00:38AM +0100, Leo Yan wrote:
+> >>>> Here have another question, ARM have the example code for boot wrapper
+> >>>> which will switch from EL3 to secure EL1 rather than non-secure's EL1?
+> >>>
+> >>> I dont' think we do but let me check. Switching to S-EL1 instead of
+> >>> NS-EL1 should be a matter of _not_ setting the SCR_EL3.NS bit before
+> >>> doing the exception level change (ERET).
+> >>
+> >> I quick try with below patch for boot wrapper, i saw foundataion model
+> >> cannot boot up successfully and there have no console output; suppose
+> >> it's hang at some boot operations, but now foundation model cannot debug
+> >> low level code, so i cannot debug further more. :-(
+> >>
+> >> diff --git a/boot.S b/boot.S
+> >> index a1f25e2..2f1b867 100644
+> >> --- a/boot.S
+> >> +++ b/boot.S
+> >> @@ -19,7 +19,6 @@ _start:
+> >>           b.ne    start_ns                        // skip EL3 initialisation
+> >>
+> >>           mov     x0, #0x30                       // RES1
+> >> -       orr     x0, x0, #(1 << 0)               // Non-secure EL1
+> >>           orr     x0, x0, #(1 << 8)               // HVC enable
+> >>           orr     x0, x0, #(1 << 10)              // 64-bit EL2
+> >>           msr     scr_el3, x0
+> >
+> > You also need to make sure the boot wrapper starts the kernel in S-EL1
+> > rather than NS-EL2.
 > 
-> Signed-off-by: Manjunath Goudar <manjunath.goudar@linaro.org>
-> Signed-off-by: Deepak Saxena <dsaxena@linaro.org>
-> Acked-by: Alan Stern <stern@rowland.harvard.edu>
-> Acked-by: Jingoo Han <jg1.han@samsung.com>
-> Cc: Vivek Gautam <gautam.vivek@samsung.com>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Kukjin Kim <kgene.kim@samsung.com>
-> Cc: Greg KH <greg@kroah.com>
-> Cc: linux-usb at vger.kernel.org
+> I tried to use below modification, but it still failed to boot up on 
+> foundation model; pls help review if convienence.
+
+You probably need group 0 interrupts as well.
+
+> Also, i reviewed the kernel's code, the kernel will check if the core is 
+> NS-EL2 and will switch to NS-EL1; do u think this code will conflict w/t 
+> the core run into the kernel with S-EL1 state?
+
+The kernel, if started at EL1, doesn't know whether it's secure or
+non-secure. So this code wouldn't get in the way.
+
+> > BTW, why do you need this? There are no virtualisation features
+> > supported on the secure side.
 > 
-> V2->V3:
->  -No major changes only "exynos" written in capital letters
->   in "OHCI exynos driver".
+> So far the virtualisation is not a mandatory feature in short term due 
+> now our product is mainly focusing on the mobile product, so firstly we 
+> want to enable Linux kernel directly on secure world; just like we do 
+> same as ARMv7.
+
+But is there other reason than just being the same as on your ARMv7
+platform?
+
+Apart from virtualisation, there are other Linux developments that
+assume Linux running in non-secure mode (SMMU, future GIC). I *strongly*
+recommend that you run AArch64 Linux in non-secure mode from start (and
+for the early bring-up, just configure your hardware to allow non-secure
+access to all your peripherals/registers).
+
+You also make life easier for your customers (mobile vendors) that are
+more likely to require a secure OS.
+
+>  From the previous discussion of MCPM, I understand this is not very 
+> consolidate w/t ARM's original idea of generic firmware (including 
+> PSCI); but actually i also think this is not confict.
 > 
-> V1->V2:
->  -exynos_ohci_hcd structure assignment error fixed.
->  -Removed multiple usb_create_hcd() from prob funtion.
->  -platform_set_drvdata() called before exynos_ohci_phy_enable().
->  -ohci_setup() removed because it is called in .reset member
->   of the ohci_hc_driver structure
-> ---
+> because even the kernel run in S-EL1, we also can call SMC to switch to 
+> monitor mode and call PSCI related APIs, so whatever the kernel run in 
+> which world, eventually the firmware and PSCI will both support them. 
+> pls correct me if i misunderstand for this.
 
-In the future, these "version" lines need to go below the cut ("---"),
-not above it, as I need to edit these patches by hand to remove them now
-:(
+That's not in conflict with PSCI as this is handled at EL3 (the first
+mode an ARMv8 CPU runs in, unlike ARMv7 where it starts in secure EL1,
+a.k.a. SVC).
 
-thanks,
-
-greg k-h
+-- 
+Catalin
