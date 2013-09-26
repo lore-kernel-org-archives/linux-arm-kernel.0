@@ -1,111 +1,116 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 26 Sep 2013 12:01:30 -0700
-Subject: [PATCH v2 1/8] ARM: KVM: Allow creating the VGIC after VCPUs
-In-Reply-To: <1380222097-20251-1-git-send-email-christoffer.dall@linaro.org>
-References: <1380222097-20251-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <1380222097-20251-2-git-send-email-christoffer.dall@linaro.org>
+From: rvaswani@codeaurora.org (Rohit Vaswani)
+Date: Thu, 26 Sep 2013 12:17:38 -0700
+Subject: [PATCHv4 2/3] ARM: msm: Add support for APQ8074 Dragonboard
+In-Reply-To: <52447779.3010908@codeaurora.org>
+References: <1379992406-3541-1-git-send-email-rvaswani@codeaurora.org>
+ <1379992406-3541-2-git-send-email-rvaswani@codeaurora.org>
+ <4E7868D6-56CB-4AF8-8EBF-069966899C23@codeaurora.org>
+ <5243652F.7090408@codeaurora.org>
+ <B0F416B8-042A-49F1-81E9-B217F02AAD1E@codeaurora.org>
+ <52447779.3010908@codeaurora.org>
+Message-ID: <52448852.9050608@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rework the VGIC initialization slightly to allow initialization of the
-vgic cpu-specific state even if the irqchip (the VGIC) hasn't been
-created by user space yet.  This is safe, because the vgic data
-structures are already allocated when the CPU is allocated if VGIC
-support is compiled into the kernel.  Further, the init process does not
-depend on any other information and the sacrifice is a slight
-performance degradation for creating VMs in the no-VGIC case.
+On 9/26/2013 11:05 AM, Rohit Vaswani wrote:
+> On 9/26/2013 9:37 AM, Kumar Gala wrote:
+>> <snip>
+>
+>> +++ b/arch/arm/boot/dts/qcom-apq8074-dragonboard.dts
+>> @@ -0,0 +1,6 @@
+>> +/include/ "qcom-msm8974.dtsi"
+>> +
+>> +/ {
+>> +    model = "Qualcomm APQ8074 Dragonboard";
+>> +    compatible = "qcom,apq8074-dragonboard", "qcom,apq8074";
+>> +};
+>> diff --git a/arch/arm/boot/dts/qcom-msm8974.dtsi 
+>> b/arch/arm/boot/dts/qcom-msm8974.dtsi
+>> new file mode 100644
+>> index 0000000..f04b643
+>> --- /dev/null
+>> +++ b/arch/arm/boot/dts/qcom-msm8974.dtsi
+>> @@ -0,0 +1,35 @@
+>> +/dts-v1/;
+>> +
+>> +/include/ "skeleton.dtsi"
+>> +
+>> +/ {
+>> +    model = "Qualcomm MSM8974";
+>> +    compatible = "qcom,msm8974";
+>> +    interrupt-parent = <&intc>;
+>> +
+>> +    soc: soc { };
+>>>> We should have a unit address here:
+>>>>
+>>>>       soc: soc at FOOBAR {
+>>>>
+>>>> also, split out the curly braces so any future patches do have to 
+>>>> muck with that.
+>>>>
+>>>>     };
+>>>>
+>>> Im not sure I understand the reasoning behind the unit address for 
+>>> soc ?
+>> Its fairly standard practice and there is a fair amount of discussion 
+>> about the lack of a unit address for memory nodes.
+>>
+> That still doesn't really answer anything :) - and I couldn't find any 
+> discussions about this either.
+> I don't see anybody in upstream adding an address to soc except sun.
+> What is that address supposed to be for - what does it mean ?
+> The soc is way of encapsulating meaningful blocks  for the particular 
+> SoC.
 
-The reason is that the new device control API doesn't mandate creating
-the VGIC before creating the VCPU and it is unreasonable to require user
-space to create the VGIC before creating the VCPUs.
+I see the mail from Stephen Warren for adding a check stating that
 
-At the same time move the irqchip_in_kernel check out of
-kvm_vcpu_first_run_init and into the init function to make the per-vcpu
-and global init functions symmetric and add comments on the exported
-functions making it a bit easier to understand the init flow by only
-looking at vgic.c.
+"ePAPR 1.1 section 2.2.1.1 "Node Name Requirements" specifies that any
+node that has a reg property must include a unit address in its name
+with value matching the first entry in its reg property. Conversely, if
+a node does not have a reg property, the node name must not include a
+unit address."
 
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-Reviewed-by: Alexander Graf <agraf@suse.de>
----
- arch/arm/kvm/arm.c  |    7 ++++---
- virt/kvm/arm/vgic.c |   22 +++++++++++++++++++---
- 2 files changed, 23 insertions(+), 6 deletions(-)
+The soc node we have does not have a reg property ?
 
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index 9c697db..2b1091a 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -461,6 +461,8 @@ static void update_vttbr(struct kvm *kvm)
- 
- static int kvm_vcpu_first_run_init(struct kvm_vcpu *vcpu)
- {
-+	int ret;
-+
- 	if (likely(vcpu->arch.has_run_once))
- 		return 0;
- 
-@@ -470,9 +472,8 @@ static int kvm_vcpu_first_run_init(struct kvm_vcpu *vcpu)
- 	 * Initialize the VGIC before running a vcpu the first time on
- 	 * this VM.
- 	 */
--	if (irqchip_in_kernel(vcpu->kvm) &&
--	    unlikely(!vgic_initialized(vcpu->kvm))) {
--		int ret = kvm_vgic_init(vcpu->kvm);
-+	if (unlikely(!vgic_initialized(vcpu->kvm))) {
-+		ret = kvm_vgic_init(vcpu->kvm);
- 		if (ret)
- 			return ret;
- 	}
-diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index 685fc72..5ce100f 100644
---- a/virt/kvm/arm/vgic.c
-+++ b/virt/kvm/arm/vgic.c
-@@ -1243,15 +1243,19 @@ static irqreturn_t vgic_maintenance_handler(int irq, void *data)
- 	return IRQ_HANDLED;
- }
- 
-+/**
-+ * kvm_vgic_vcpu_init - Initialize per-vcpu VGIC state
-+ * @vcpu: pointer to the vcpu struct
-+ *
-+ * Initialize the vgic_cpu struct and vgic_dist struct fields pertaining to
-+ * this vcpu and enable the VGIC for this VCPU
-+ */
- int kvm_vgic_vcpu_init(struct kvm_vcpu *vcpu)
- {
- 	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
- 	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
- 	int i;
- 
--	if (!irqchip_in_kernel(vcpu->kvm))
--		return 0;
--
- 	if (vcpu->vcpu_id >= VGIC_MAX_CPUS)
- 		return -EBUSY;
- 
-@@ -1383,10 +1387,22 @@ out:
- 	return ret;
- }
- 
-+/**
-+ * kvm_vgic_init - Initialize global VGIC state before running any VCPUs
-+ * @kvm: pointer to the kvm struct
-+ *
-+ * Map the virtual CPU interface into the VM before running any VCPUs.  We
-+ * can't do this at creation time, because user space must first set the
-+ * virtual CPU interface address in the guest physical address space.  Also
-+ * initialize the ITARGETSRn regs to 0 on the emulated distributor.
-+ */
- int kvm_vgic_init(struct kvm *kvm)
- {
- 	int ret = 0, i;
- 
-+	if (!irqchip_in_kernel(kvm))
-+		return 0;
-+
- 	mutex_lock(&kvm->lock);
- 
- 	if (vgic_initialized(kvm))
+
+>
+>>
+>>>>> +};
+>>>>> +
+>>>>> +&soc {
+>>>>> +    #address-cells = <1>;
+>>>>> +    #size-cells = <1>;
+>>>>> +    ranges;
+>>>>> +    compatible = "simple-bus";
+>>>>> +
+>>>>> +    intc: interrupt-controller at f9000000 {
+>>>>> +        compatible = "qcom,msm-qgic2";
+>>>>> +        interrupt-controller;
+>>>>> +        #interrupt-cells = <3>;
+>>>>> +        reg = <0xf9000000 0x1000>,
+>>>>> +              <0xf9002000 0x1000>;
+>>>>> +    };
+>>>>> +
+>>>>> +    timer {
+>>>>> +        compatible = "arm,armv7-timer";
+>>>>> +        interrupts = <1 2 0xf08>,
+>>>>> +                 <1 3 0xf08>,
+>>>>> +                 <1 4 0xf08>,
+>>>>> +                 <1 1 0xf08>;
+>>>>> +        clock-frequency = <19200000>;
+>>>>> +    };
+>>>>> +};
+>> - k
+>>
+>
+>
+> Thanks,
+> Rohit Vaswani
+>
+
+
+Thanks,
+Rohit Vaswani
+
 -- 
-1.7.10.4
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum, hosted by The Linux Foundation
