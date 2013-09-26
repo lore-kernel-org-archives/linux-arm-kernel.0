@@ -1,46 +1,55 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 26 Sep 2013 08:54:25 +0100
-Subject: [PATCH 28/51] DMA-API: sound: fix dma mask handling in a lot
- of drivers
-In-Reply-To: <s5h1u4cf2bo.wl%tiwai@suse.de>
-References: <20130919212235.GD12758@n2100.arm.linux.org.uk>
- <E1VMm9m-0007ij-ER@rmk-PC.arm.linux.org.uk> <s5h1u4cf2bo.wl%tiwai@suse.de>
-Message-ID: <20130926075425.GX25647@n2100.arm.linux.org.uk>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 26 Sep 2013 09:58:55 +0200
+Subject: [RFC, PATCH] clocksource: provide timekeeping for efm32 SoCs
+In-Reply-To: <524377E3.4050806@linaro.org>
+References: <1379324644-20934-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <5242F434.7060702@linaro.org>
+ <20130925153207.GG16106@pengutronix.de>
+ <524376A0.7020405@linaro.org> <524377E3.4050806@linaro.org>
+Message-ID: <20130926075855.GH16106@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 26, 2013 at 09:51:23AM +0200, Takashi Iwai wrote:
-> Hi,
+On Wed, Sep 25, 2013 at 04:55:15PM -0700, John Stultz wrote:
+> On 09/25/2013 04:49 PM, Daniel Lezcano wrote:
+> > On 09/25/2013 05:32 PM, Uwe Kleine-K?nig wrote:
+> >> Hello Daniel,
+> >>
+> >> On Wed, Sep 25, 2013 at 04:33:24PM +0200, Daniel Lezcano wrote:
+> >>> On 09/16/2013 11:44 AM, Uwe Kleine-K?nig wrote:
+> >>>> diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+> >>>> index 41c6946..410b152 100644
+> >>>> --- a/drivers/clocksource/Kconfig
+> >>>> +++ b/drivers/clocksource/Kconfig
+> >>>> @@ -70,6 +70,14 @@ config CLKSRC_DBX500_PRCMU_SCHED_CLOCK
+> >>>>  	help
+> >>>>  	  Use the always on PRCMU Timer as sched_clock
+> >>>>  
+> >>>> +config CLKSRC_EFM32
+> >>>> +	bool "Clocksource for Energy Micro's EFM32 SoCs" if !ARCH_EFM32
+> >>>> +	depends on OF && ARM && (ARCH_EFM32 || COMPILE_TEST)
+> >>>> +	default ARCH_EFM32
+> >>>> +	help
+> >>>> +	  Support to use the timers of EFM32 SoCs as clock source and clock
+> >>>> +	  event device.
+> >>>> +
+> >>> No option for the timer. It must be selected by the platform.
+> >> It is. If ARCH_EFM32=y there is no prompt and the "default ARCH_EFM32"
+> >> makes it true.
+> > ok, with that but if ARCH_EFM32=no, you can enable it manually. AFAIK,
+> > we want to prevent this and let the correct arch to enable it.
+> >
+> > John ?
 > 
-> sorry for the lat response, as I've been traveling in the last weeks.
-> 
-> At Thu, 19 Sep 2013 22:53:02 +0100,
-> Russell King wrote:
-> > 
-> > This code sequence is unsafe in modules:
-> > 
-> > static u64 mask = DMA_BIT_MASK(something);
-> > ...
-> > 	if (!dev->dma_mask)
-> > 		dev->dma_mask = &mask;
-> > 
-> > as if a module is reloaded, the mask will be pointing at the original
-> > module's mask address, and this can lead to oopses.  Moreover, they
-> > all follow this with:
-> > 
-> > 	if (!dev->coherent_dma_mask)
-> > 		dev->coherent_dma_mask = mask;
-> > 
-> > where 'mask' is the same value as the statically defined mask, and this
-> > bypasses the architecture's check on whether the DMA mask is possible.
-> > 
-> > Fix these issues by using the new dma_coerce_coherent_and_mask()
-> > function.
-> > 
-> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> 
-> Applied with Mark's ack now.
+> Right until there's really a compelling reason (which I've still not
+> heard), I don't want to introduce independent clocksource options. Any
+> such options should be something like a platform or board config option.
+You can only manually enable it if you also enabled COMPILE_TEST. Then
+the intention is clear, isn't it?
 
-Which is a very stupid thing to do because you won't have
-dma_coerce_coherent_and_mask() in your tree, so all these drivers
-will fail to build for you.
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
