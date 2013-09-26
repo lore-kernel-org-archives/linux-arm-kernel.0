@@ -1,85 +1,113 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 26 Sep 2013 11:02:50 +0100
-Subject: [PATCH v2 0/2] ARM DT cpus/cpu and topology bindings
-In-Reply-To: <5242EA2E.1010106@gmail.com>
-References: <1379330464-27917-1-git-send-email-lorenzo.pieralisi@arm.com>
- <20130924160126.GC403@e102568-lin.cambridge.arm.com>
- <5242EA2E.1010106@gmail.com>
-Message-ID: <20130926100250.GA20705@e102568-lin.cambridge.arm.com>
+From: lbyang@marvell.com (Libin Yang)
+Date: Thu, 26 Sep 2013 03:03:42 -0700
+Subject: [PATCH v2] [media] marvell-ccic: simplify and fix clk handling
+ (a bit)
+In-Reply-To: <20130926081356.GA6314@pengutronix.de>
+References: <1380048167-13729-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <1380049187-16036-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <20130925011520.1fa24013@lwn.net>
+ <A63A0DC671D719488CD1A6CD8BDC16CF4AB6BB9AAD@SC-VEXCH4.marvell.com>
+ <20130926081356.GA6314@pengutronix.de>
+Message-ID: <A63A0DC671D719488CD1A6CD8BDC16CF4AB6BB9CB7@SC-VEXCH4.marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 25, 2013 at 02:50:38PM +0100, Rob Herring wrote:
-> On 09/24/2013 11:01 AM, Lorenzo Pieralisi wrote:
-> > [replying to self]
-> > 
-> > Any further comments on this series ? If not, I think bindings are ready to be
-> > queued, but for that I need acks from DT maintainers.
-> 
-> Who do you plan to take this? Is this dependent on something for 3.13?
-> If not, I'll apply it.
+Hi Uwe,
 
-v3 on the lists, should be final. No, there are no dependencies on 3.13
-to the best of my knowledge. The problem with pre-v7 UP systems with
-cpus node #address-cells == 0 is still there and I would like to ask you
-please what we/I should do about that, it can trigger a considerable
-amount of churn. As soon as these bindings hit the mainline I will
-update the DT parsing code, I can easily take all pre-v7 UP dts out
-of the picture in the parsing loop (after all, reg property for those
-processors is useless), but the dts are _wrong_ regardless when these
-patches become the official bindings.
+Thanks for your reviewing. Please see the comments below.
 
-Thanks !
-Lorenzo
+>On Wed, Sep 25, 2013 at 07:47:19PM -0700, Libin Yang wrote:
+>> In the clk enable and prepare function, we will check the NULL
+>> pointer. So it should be no problem.
+>I'm not sure what you mean here and unfortunately your quoting style makes your statement
+>appear without context.
+>
+>	if (... && !IS_ERR(cam->mipi_clk)) {
+>		if (cam->mipi_clk)
+>			devm_clk_put(mcam->dev, cam->mipi_clk);
+>		cam->mipi_clk = NULL;
+>	}
+>
+>might work in your setup, but it's wrong usage of the clk API. There is no reason NULL
+>couldn't be a valid clk pointer. Moreover I cannot find a place in that driver that calls prepare
+>and/or enable for the mipi_clk.
 
-> 
-> Rob
-> 
-> > The issue with in kernel dts that (re)-need patching owing to re-introduction
-> > of reg property on pre-v7 UP is still pending.
-> > 
-> > Please advise, thank you very much,
-> > Lorenzo
-> > 
-> > On Mon, Sep 16, 2013 at 12:21:02PM +0100, Lorenzo Pieralisi wrote:
-> >> This is v2 of a previous posting:
-> >>
-> >> http://lists.infradead.org/pipermail/linux-arm-kernel/2013-August/192322.html
-> >>
-> >> - v2 changes
-> >> 	- Removed single core cpu-map example
-> >> 	- Removed OS dependency from cpus/cpu bindings
-> >> 	- Updated Marvell compatible strings
-> >> 	- Clarified behaviour on pre ARM v7 uniprocessor systems and updated
-> >> 	  examples
-> >>
-> >> This patch resumes DT topology/cpu bindings discussions for ARM that were
-> >> started here:
-> >>
-> >> https://lists.ozlabs.org/pipermail/devicetree-discuss/2013-April/031725.html
-> >> https://lists.ozlabs.org/pipermail/devicetree-discuss/2013-April/032450.html
-> >>
-> >> Comments welcome, thanks,
-> >> Lorenzo
-> >>
-> >> Lorenzo Pieralisi (2):
-> >>   Documentation: devicetree: arm: cpus/cpu nodes bindings updates
-> >>   Documentation: DT: arm: define CPU topology bindings
-> >>
-> >>  Documentation/devicetree/bindings/arm/cpus.txt     | 391 +++++++++++++++--
-> >>  Documentation/devicetree/bindings/arm/topology.txt | 474 +++++++++++++++++++++
-> >>  2 files changed, 818 insertions(+), 47 deletions(-)
-> >>  create mode 100644 Documentation/devicetree/bindings/arm/topology.txt
-> >>
-> >> -- 
-> >> 1.8.2.2
-> >>
-> > 
-> > 
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> > 
-> 
-> 
+[Libin] Right. NULL could be a valid clk pointer. In the code, the clk will not be released if mipi_clk is NULL.
+Is below OK?
++	if (... && !IS_ERR(cam->mipi_clk)) {
++		devm_clk_put(mcam->dev, cam->mipi_clk);
++		cam->mipi_clk = NULL;
++	}
+Set cam->mipi_clk = NULL is let cam->mipi_clk to be the initial state just like after cam is allocated.
+
+>(BTW, calling clk_get_rate on a disabled clk is another thing you shouldn't do.)
+
+[Libin] Thanks for pointing it out. We enable the clk in other components. 
+Yes, you are right. We should enable the clk explicitly here.
+
+>
+>> For the mipi_clk, it is shared between other components, so we put the clk it we don't use it.
+>There should be no problem if >1 driver holds a reference to the clock. It's clk_disable (+
+>maybe clk_unprepare) you should call when you don't need it any more. (But even having >1
+>driver enabling a clk isn't a problem ...)
+
+[Libin] So you mean we need not release the clk here and wait for devm to release it later? I will check it with my colleagues to see whether they are OK with this.
+
+>
+>> >> This patch fixes all but the last issue in this list. This patch
+>> >> doesn't introduce new reasons for not building, but there are
+>> >> already several bulid problems.
+>> >
+>> >Care to report those?
+>Sure:
+>
+>	  CC      drivers/media/platform/marvell-ccic/mmp-driver.o
+>	drivers/media/platform/marvell-ccic/mmp-driver.c: In function 'mmpcam_calc_dphy':
+>	drivers/media/platform/marvell-ccic/mmp-driver.c:264:15: error: 'struct
+>mmp_camera_platform_data' has no member named 'dphy3_algo'
+>	drivers/media/platform/marvell-ccic/mmp-driver.c:265:7: error:
+>'DPHY3_ALGO_PXA910' undeclared (first use in this function)
+>	drivers/media/platform/marvell-ccic/mmp-driver.c:265:7: note: each undeclared
+>identifier is reported only once for each function it appears in
+>	drivers/media/platform/marvell-ccic/mmp-driver.c:269:8: error: 'struct
+>mmp_camera_platform_data' has no member named 'dphy'
+>	drivers/media/platform/marvell-ccic/mmp-driver.c:270:17: error: 'struct
+>mmp_camera_platform_data' has no member named 'lane_clk'
+>	drivers/media/platform/marvell-ccic/mmp-driver.c:271:16: error: 'struct
+>mmp_camera_platform_data' has no member named 'lane_clk'
+>	drivers/media/platform/marvell-ccic/mmp-driver.c:273:7: error:
+>'DPHY3_ALGO_PXA2128' undeclared (first use in this function)
+>	drivers/media/platform/marvell-ccic/mmp-driver.c:277:8: error: 'struct
+>mmp_camera_platform_data' has no member named 'dphy'
+>	drivers/media/platform/marvell-ccic/mmp-driver.c:278:17: error: 'struct
+>mmp_camera_platform_data' has no member named 'lane_clk'
+>	drivers/media/platform/marvell-ccic/mmp-driver.c:279:16: error: 'struct
+>mmp_camera_platform_data' has no member named 'lane_clk'
+>	drivers/media/platform/marvell-ccic/mmp-driver.c:308:7: error: 'struct
+>mmp_camera_platform_data' has no member named 'dphy'
+>	drivers/media/platform/marvell-ccic/mmp-driver.c:312:104: error: 'struct
+>mmp_camera_platform_data' has no member named 'dphy'
+>	drivers/media/platform/marvell-ccic/mmp-driver.c:312:120: error: 'struct
+>mmp_camera_platform_data' has no member named 'dphy'
+>	drivers/media/platform/marvell-ccic/mmp-driver.c:312:136: error: 'struct
+>mmp_camera_platform_data' has no member named 'dphy'
+>	drivers/media/platform/marvell-ccic/mmp-driver.c: In function 'mmpcam_probe':
+>	drivers/media/platform/marvell-ccic/mmp-driver.c:385:24: error: 'struct
+>mmp_camera_platform_data' has no member named 'mclk_min'
+>	drivers/media/platform/marvell-ccic/mmp-driver.c:386:24: error: 'struct
+>mmp_camera_platform_data' has no member named 'mclk_src'
+>	drivers/media/platform/marvell-ccic/mmp-driver.c:387:24: error: 'struct
+>mmp_camera_platform_data' has no member named 'mclk_div'
+>	drivers/media/platform/marvell-ccic/mmp-driver.c:388:24: error: 'struct
+>mmp_camera_platform_data' has no member named 'bus_type'
+>	drivers/media/platform/marvell-ccic/mmp-driver.c:389:20: error: 'struct
+>mmp_camera_platform_data' has no member named 'dphy'
+>	drivers/media/platform/marvell-ccic/mmp-driver.c:391:20: error: 'struct
+>mmp_camera_platform_data' has no member named 'lane'
+>
+>Best regards
+>Uwe
+>
+>--
+>Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+>Industrial Linux Solutions                 | http://www.pengutronix.de/  |
