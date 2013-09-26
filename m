@@ -1,33 +1,48 @@
-From: Sudeep.KarkadaNagesha@arm.com (Sudeep KarkadaNagesha)
-Date: Thu, 26 Sep 2013 10:49:57 +0100
-Subject: [PATCH v6 RESEND 0/5] ARM/ARM64 architected timer updates
-In-Reply-To: <201309261143.55010.arnd@arndb.de>
-References: <1379502306-12911-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
- <5242FC09.2050604@linaro.org> <52431B37.5000901@arm.com>
- <201309261143.55010.arnd@arndb.de>
-Message-ID: <52440345.3040204@arm.com>
+From: alexandre.torgue@st.com (Alexandre TORGUE)
+Date: Thu, 26 Sep 2013 11:51:12 +0200
+Subject: [PATCH v2 0/4] Add I2C support to ST SoCs
+Message-ID: <1380189072-5551-1-git-send-email-maxime.coquelin@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26/09/13 10:43, Arnd Bergmann wrote:
-> On Wednesday 25 September 2013, Sudeep KarkadaNagesha wrote:
->> On 25/09/13 16:06, Daniel Lezcano wrote:
->>> On 09/18/2013 01:05 PM, Sudeep KarkadaNagesha wrote:
->>>> From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
->>>>
->>>> Hi Olof/Kevin,
->>>
->>> Added Olof and Kevin in Cc.
->>>
->> Thanks Daniel, sorry I assumed mailing list alias(arm at kernel.org) was preferred way.
->>
-> 
-> The alias is mainly for when you are sending a pull request or a patch to
-> be applied directly. For any review it makes more sense to Cc the ones you
-> want involved directly.
-> 
-Thanks Arnd for clarification. I came across the same info yesterday from one of
-the mails from Olof a while ago. I had a wrong assumption, sorry for that.
+The goal of this series is to add I2C support to ST SoCs.
+The DT definition is added for STiH415 and STiH416 SoCs on
+B2000 and B2020 boards.
 
-Regards,
-Sudeep
+The series has been tested working on STiH416-B2020 board.
+It applies on top of v3.12-rc1.
+
+Changes since v1:
+  - Anti-glitch filtering simplified (Only HW Anti-glitch is kept)
+  - Update I2C timings to comply with I2C specification
+  - Handle spurious interrupts properly
+  - DT binding updates taking into account Stephen's comments
+  - Use "clock-names" property to comply with GCF
+  - DT cosmetic changes reported by Lee and Gabriel 
+
+Signed-off-by: Maxime Coquelin <maxime.coquelin@st.com>
+
+Maxime Coquelin (4):
+  i2c: busses: i2c-st: Add ST I2C controller
+  ARM: STi: Supply I2C configuration to STiH416 SoC
+  ARM: STi: Supply I2C configuration to STiH415 SoC
+  ARM: STi: Add I2C config to B2000 and B2020 boards
+
+ Documentation/devicetree/bindings/i2c/i2c-st.txt |   37 ++
+ arch/arm/boot/dts/stih415-pinctrl.dtsi           |   36 ++
+ arch/arm/boot/dts/stih415.dtsi                   |   65 ++
+ arch/arm/boot/dts/stih416-pinctrl.dtsi           |   35 ++
+ arch/arm/boot/dts/stih416.dtsi                   |   65 ++
+ arch/arm/boot/dts/stih41x-b2000.dtsi             |    7 +
+ arch/arm/boot/dts/stih41x-b2020.dtsi             |   20 +
+ drivers/i2c/busses/Kconfig                       |   10 +
+ drivers/i2c/busses/Makefile                      |    1 +
+ drivers/i2c/busses/i2c-st.c                      |  691 ++++++++++++++++++++++
+ drivers/i2c/busses/i2c-st.h                      |  208 +++++++
+ 11 files changed, 1175 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/i2c/i2c-st.txt
+ create mode 100644 drivers/i2c/busses/i2c-st.c
+ create mode 100644 drivers/i2c/busses/i2c-st.h
+
+-- 
+1.7.9.5
