@@ -1,21 +1,25 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Thu, 26 Sep 2013 12:22:48 -0300
+Date: Thu, 26 Sep 2013 12:26:22 -0300
 Subject: imprecise external abort using the flexcan driver on i.MX6Q
-In-Reply-To: <21060.15934.600859.167074@ipc1.ka-ro>
+In-Reply-To: <CAOMZO5AODznB9D+J2D1juoL=f5eBuJEyuNtN+DEYFuSdhNdt5g@mail.gmail.com>
 References: <21060.15934.600859.167074@ipc1.ka-ro>
-Message-ID: <CAOMZO5AODznB9D+J2D1juoL=f5eBuJEyuNtN+DEYFuSdhNdt5g@mail.gmail.com>
+ <CAOMZO5AODznB9D+J2D1juoL=f5eBuJEyuNtN+DEYFuSdhNdt5g@mail.gmail.com>
+Message-ID: <CAOMZO5C22z_iavshVhJtbYiZr=SoNV65uNxnQ1MWJ9+Uhmrfjw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lothar,
-
-On Thu, Sep 26, 2013 at 11:01 AM, =?utf-8?Q?Lothar_Wa=C3=9Fmann?=
-<LW@karo-electronics.de> wrote:
-> Does anyone have any clue how this can happen?
+On Thu, Sep 26, 2013 at 12:22 PM, Fabio Estevam <festevam@gmail.com> wrote:
+> Hi Lothar,
 >
-> Can anyone reproduce this on another machine?
+> On Thu, Sep 26, 2013 at 11:01 AM, =?utf-8?Q?Lothar_Wa=C3=9Fmann?=
+> <LW@karo-electronics.de> wrote:
+>> Does anyone have any clue how this can happen?
+>>
+>> Can anyone reproduce this on another machine?
+>
+> Is the change below needed?
 
-Is the change below needed?
+I meant:
 
 --- a/arch/arm/boot/dts/imx6qdl.dtsi
 +++ b/arch/arm/boot/dts/imx6qdl.dtsi
