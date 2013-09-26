@@ -1,48 +1,132 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 26 Sep 2013 09:17:43 -0700
-Subject: [PATCH 3/3] KVM: ARM: Add support for Cortex-A7
-In-Reply-To: <1380210568-23175-4-git-send-email-jonathan.austin@arm.com>
-References: <1380210568-23175-1-git-send-email-jonathan.austin@arm.com>
- <1380210568-23175-4-git-send-email-jonathan.austin@arm.com>
-Message-ID: <20130926161743.GD1389@cbox>
+From: nm@ti.com (Nishanth Menon)
+Date: Thu, 26 Sep 2013 11:23:35 -0500
+Subject: [PATCHv7 30/36] ARM: dts: omap3 clock data
+In-Reply-To: <20130926160657.GA6280@kahuna>
+References: <1380098922-30340-1-git-send-email-t-kristo@ti.com>
+ <1380098922-30340-31-git-send-email-t-kristo@ti.com>
+ <20130926160657.GA6280@kahuna>
+Message-ID: <52445F87.30006@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 26, 2013 at 04:49:28PM +0100, Jonathan Austin wrote:
-> This patch adds support for running Cortex-A7 guests on Cortex-A7 hosts.
+On 09/26/2013 11:06 AM, Nishanth Menon wrote:
+> On 11:48-20130925, Tero Kristo wrote:
+>> diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
+>> index 16420ae..bc11b83 100644
+>> --- a/arch/arm/boot/dts/omap3.dtsi
+>> +++ b/arch/arm/boot/dts/omap3.dtsi
+>> @@ -533,4 +533,11 @@
+>>  			ram-bits = <12>;
+>>  		};
+>>  	};
+>> +
+>> +	clocks {
+>> +		#address-cells = <1>;
+>> +		#size-cells = <1>;
+>> +		ranges;
+>> +		/include/ "omap3xxx-clocks.dtsi"
+>> +	};
+>>  };
+> Clocks are introduced towards the tail of the dts -> this has a problem
+> associated with it -> device nodes should be able to reference phandle
+> like:
 > 
-> As Cortex-A7 is architecturally compatible with A15, this patch is largely just
-> generalising existing code. Areas where 'implementation defined' behaviour
-> is identical for A7 and A15 is moved to allow it to be used by both cores.
+> devicex {
+> 	clocks = <&sys_ck>;
+> }
 > 
-> The check to ensure that coprocessor register tables are sorted correctly is
-> also moved in to 'common' code to avoid each new cpu doing its own check
-> (and possibly forgetting to do so!)
+> Since all the devices on ocp and cpu0 node appears above the definition
+> they fail to catch the phandle. instead, moving the clocks node as high
+> in the tree as possible resolves this: something like:
+> diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
+> index bc11b83..0b2161d 100644
+> --- a/arch/arm/boot/dts/omap3.dtsi
+> +++ b/arch/arm/boot/dts/omap3.dtsi
+> @@ -24,6 +24,13 @@
+>  		serial2 = &uart3;
+>  	};
+>  
+> +	clocks {
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		ranges;
+> +		/include/ "omap3xxx-clocks.dtsi"
+> +	};
+> +
+>  	cpus {
+>  		#address-cells = <1>;
+>  		#size-cells = <0>;
+> @@ -534,10 +541,4 @@
+>  		};
+>  	};
+>  
+> -	clocks {
+> -		#address-cells = <1>;
+> -		#size-cells = <1>;
+> -		ranges;
+> -		/include/ "omap3xxx-clocks.dtsi"
+> -	};
+>  };
 > 
-> Signed-off-by: Jonathan Austin <jonathan.austin@arm.com>
-> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+> What do you think of the change? applies for all clock nodes in other
+> dtsi as well - I will mark them as I find them.
 
-The patch itself looks good, I'm wondering if we are creating potential
-confusion by not having a separate table for shared, but implementation
-defined, co-processors.  One option would be to have multiple levels of
-'inheritance' of the the coprocessor table, so you could load the
-generic one, overload it with the a15 one, and then overload it with the
-a7 one.  That may be a bit over-engineerd though.
+Digging further, the above is not needed. Apologies on the noise.
+below changes will be nice though..
 
-Then again, if A7/A15 end up being just two cores out of many many more,
-it's a bit weird to have their register definitions in the coproc.c
-files and everyone elses in their own files, sort of pushing the problem
-under the rug.
+> 
+> Further,
+>> diff --git a/arch/arm/boot/dts/omap34xx.dtsi b/arch/arm/boot/dts/omap34xx.dtsi
+>> index 5355d61..2ed7c69 100644
+>> --- a/arch/arm/boot/dts/omap34xx.dtsi
+>> +++ b/arch/arm/boot/dts/omap34xx.dtsi
+>> @@ -25,4 +25,123 @@
+>>  			clock-latency = <300000>; /* From legacy driver */
+>>  		};
+>>  	};
+>> -};
+>> +
+>> +	clocks {
+>> +		#address-cells = <1>;
+>> +		#size-cells = <1>;
+>> +		ranges;
+> dont need to state the above two -> already done in omap3.dtsi.
+>> +		/include/ "omap34xx-omap36xx-clocks.dtsi"
+>> +		/include/ "omap36xx-omap3430es2plus-clocks.dtsi"
+>> +		/include/ "omap36xx-am35xx-omap3430es2plus-clocks.dtsi"
+>> +	};
+>> +};
+> [...]
+>> \ No newline at end of file
+> ^^
+> [...]
+>> diff --git a/arch/arm/boot/dts/omap36xx.dtsi b/arch/arm/boot/dts/omap36xx.dtsi
+>> index f8b3765..71fb6fb 100644
+>> --- a/arch/arm/boot/dts/omap36xx.dtsi
+>> +++ b/arch/arm/boot/dts/omap36xx.dtsi
+>> @@ -35,4 +35,124 @@
+>>  			clock-frequency = <48000000>;
+>>  		};
+>>  	};
+>> -};
+>> +
+>> +	clocks {
+>> +		#address-cells = <1>;
+>> +		#size-cells = <1>;
+>> +		ranges;
+> ^^ here as well.
+>> +		/include/ "omap36xx-clocks.dtsi"
+>> +		/include/ "omap34xx-omap36xx-clocks.dtsi"
+>> +		/include/ "omap36xx-omap3430es2plus-clocks.dtsi"
+>> +		/include/ "omap36xx-am35xx-omap3430es2plus-clocks.dtsi"
+>> +	};
+> [...]
+>> +};
+>> \ No newline at end of file
+> ^^ this need fix as well.
+> 
 
-Unless of course we just agree that there are probably not going to be
-that many cores and they're all just going to look a lot like each other
-wrt. to the impdef registers anyhow, so it makes sense to provide this
-default implementation...
 
-If nobody else objects, I'm ok with merging this code (once I have a
-chance to test it).  We can always add more logic and move things around
-later, as there's no api breakage or anything like that.
-
-Thanks for taking care of this!
-
--Christoffer
+-- 
+Regards,
+Nishanth Menon
