@@ -1,69 +1,86 @@
 From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 26 Sep 2013 16:54:43 +0200
-Subject: [PATCH 18/27] mmc: s3cmci: Remove redundant suspend and resume
- callbacks
+Date: Thu, 26 Sep 2013 16:54:42 +0200
+Subject: [PATCH 17/27] mmc: wmt-sdmmc: Move away from using deprecated APIs
 In-Reply-To: <1380207292-16968-1-git-send-email-ulf.hansson@linaro.org>
 References: <1380207292-16968-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <1380207292-16968-19-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <1380207292-16968-18-git-send-email-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Suspend and resume of cards are handled by the protocol layer and
-consequently the mmc_suspend|resume_host APIs are marked as deprecated.
+Suspend and resume of cards are being handled from the protocol layer
+and consequently the mmc_suspend|resume_host APIs are deprecated.
 
-While moving away from using the deprecated APIs, there are nothing
-left to be done for the suspend and resume callbacks, so remove them.
+This means we can simplify the suspend|resume callbacks by removing the
+use of the deprecated APIs.
 
-Cc: Ben Dooks <ben-linux@fluff.org>
+Cc: Tony Prisk <linux@prisktech.co.nz>
 Cc: linux-arm-kernel at lists.infradead.org
 Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 ---
- drivers/mmc/host/s3cmci.c |   29 -----------------------------
- 1 file changed, 29 deletions(-)
+ drivers/mmc/host/wmt-sdmmc.c |   27 ++++++++++-----------------
+ 1 file changed, 10 insertions(+), 17 deletions(-)
 
-diff --git a/drivers/mmc/host/s3cmci.c b/drivers/mmc/host/s3cmci.c
-index 8d6794c..2fce5ea 100644
---- a/drivers/mmc/host/s3cmci.c
-+++ b/drivers/mmc/host/s3cmci.c
-@@ -1949,39 +1949,10 @@ static struct platform_device_id s3cmci_driver_ids[] = {
+diff --git a/drivers/mmc/host/wmt-sdmmc.c b/drivers/mmc/host/wmt-sdmmc.c
+index 34231d5..be94470 100644
+--- a/drivers/mmc/host/wmt-sdmmc.c
++++ b/drivers/mmc/host/wmt-sdmmc.c
+@@ -939,28 +939,23 @@ static int wmt_mci_suspend(struct device *dev)
+ 	struct platform_device *pdev = to_platform_device(dev);
+ 	struct mmc_host *mmc = platform_get_drvdata(pdev);
+ 	struct wmt_mci_priv *priv;
+-	int ret;
  
- MODULE_DEVICE_TABLE(platform, s3cmci_driver_ids);
+ 	if (!mmc)
+ 		return 0;
  
+ 	priv = mmc_priv(mmc);
+-	ret = mmc_suspend_host(mmc);
 -
--#ifdef CONFIG_PM
--
--static int s3cmci_suspend(struct device *dev)
--{
--	struct mmc_host *mmc = platform_get_drvdata(to_platform_device(dev));
--
--	return mmc_suspend_host(mmc);
--}
--
--static int s3cmci_resume(struct device *dev)
--{
--	struct mmc_host *mmc = platform_get_drvdata(to_platform_device(dev));
--
--	return mmc_resume_host(mmc);
--}
--
--static const struct dev_pm_ops s3cmci_pm = {
--	.suspend	= s3cmci_suspend,
--	.resume		= s3cmci_resume,
--};
--
--#define s3cmci_pm_ops &s3cmci_pm
--#else /* CONFIG_PM */
--#define s3cmci_pm_ops NULL
--#endif /* CONFIG_PM */
--
--
- static struct platform_driver s3cmci_driver = {
- 	.driver	= {
- 		.name	= "s3c-sdi",
- 		.owner	= THIS_MODULE,
--		.pm	= s3cmci_pm_ops,
- 	},
- 	.id_table	= s3cmci_driver_ids,
- 	.probe		= s3cmci_probe,
+-	if (!ret) {
+-		reg_tmp = readb(priv->sdmmc_base + SDMMC_BUSMODE);
+-		writeb(reg_tmp | BM_SOFT_RESET, priv->sdmmc_base +
+-		       SDMMC_BUSMODE);
++	reg_tmp = readb(priv->sdmmc_base + SDMMC_BUSMODE);
++	writeb(reg_tmp | BM_SOFT_RESET, priv->sdmmc_base +
++	       SDMMC_BUSMODE);
+ 
+-		reg_tmp = readw(priv->sdmmc_base + SDMMC_BLKLEN);
+-		writew(reg_tmp & 0x5FFF, priv->sdmmc_base + SDMMC_BLKLEN);
++	reg_tmp = readw(priv->sdmmc_base + SDMMC_BLKLEN);
++	writew(reg_tmp & 0x5FFF, priv->sdmmc_base + SDMMC_BLKLEN);
+ 
+-		writeb(0xFF, priv->sdmmc_base + SDMMC_STS0);
+-		writeb(0xFF, priv->sdmmc_base + SDMMC_STS1);
++	writeb(0xFF, priv->sdmmc_base + SDMMC_STS0);
++	writeb(0xFF, priv->sdmmc_base + SDMMC_STS1);
+ 
+-		clk_disable(priv->clk_sdmmc);
+-	}
+-	return ret;
++	clk_disable(priv->clk_sdmmc);
++	return 0;
+ }
+ 
+ static int wmt_mci_resume(struct device *dev)
+@@ -969,7 +964,6 @@ static int wmt_mci_resume(struct device *dev)
+ 	struct platform_device *pdev = to_platform_device(dev);
+ 	struct mmc_host *mmc = platform_get_drvdata(pdev);
+ 	struct wmt_mci_priv *priv;
+-	int ret = 0;
+ 
+ 	if (mmc) {
+ 		priv = mmc_priv(mmc);
+@@ -987,10 +981,9 @@ static int wmt_mci_resume(struct device *dev)
+ 		writeb(reg_tmp | INT0_DI_INT_EN, priv->sdmmc_base +
+ 		       SDMMC_INTMASK0);
+ 
+-		ret = mmc_resume_host(mmc);
+ 	}
+ 
+-	return ret;
++	return 0;
+ }
+ 
+ static const struct dev_pm_ops wmt_mci_pm = {
 -- 
 1.7.9.5
