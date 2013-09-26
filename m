@@ -1,90 +1,94 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 26 Sep 2013 10:20:59 +0200
-Subject: [RFC, PATCH] clocksource: provide timekeeping for efm32 SoCs
-In-Reply-To: <524376A0.7020405@linaro.org>
-References: <1379324644-20934-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <5242F434.7060702@linaro.org>
- <20130925153207.GG16106@pengutronix.de>
- <524376A0.7020405@linaro.org>
-Message-ID: <20130926082059.GI16106@pengutronix.de>
+From: tiwai@suse.de (Takashi Iwai)
+Date: Thu, 26 Sep 2013 10:25:13 +0200
+Subject: [PATCH 28/51] DMA-API: sound: fix dma mask handling in a lot	of
+ drivers
+In-Reply-To: <20130926075425.GX25647@n2100.arm.linux.org.uk>
+References: <20130919212235.GD12758@n2100.arm.linux.org.uk>
+ <E1VMm9m-0007ij-ER@rmk-PC.arm.linux.org.uk>
+ <s5h1u4cf2bo.wl%tiwai@suse.de>
+ <20130926075425.GX25647@n2100.arm.linux.org.uk>
+Message-ID: <s5hob7gdm6u.wl%tiwai@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Daniel,
-
-On Thu, Sep 26, 2013 at 01:49:52AM +0200, Daniel Lezcano wrote:
-> On 09/25/2013 05:32 PM, Uwe Kleine-K?nig wrote:
-> >>> +static void __init efm32_timer_init(struct device_node *np)
-> >>> +{
-> >>> +	static int has_clocksource, has_clockevent;
-> >>> +	int ret;
-> >>> +
-> >>> +	if (!has_clocksource) {
-> >>> +		ret = efm32_clocksource_init(np);
-> >>> +		if (!ret) {
-> >>> +			has_clocksource = 1;
-> >>> +			return;
-> >>> +		}
-> >>> +	}
-> >>> +
-> >>> +	if (!has_clockevent) {
-> >>> +		ret = efm32_clockevent_init(np);
-> >>> +		if (!ret) {
-> >>> +			has_clockevent = 1;
-> >>> +			return;
-> >>> +		}
-> >>> +	}
-> >>> +}
-> >>
-> >> I don't get the purpose of this initialization, can you explain ?
-> > An efm32 SoC has four timer blocks. A single block can only be used for
-> > one of clocksource or clockevent device and having more than one
-> > clocksource or clockevent device doesn't make sense. So this routine
-> > asserts that the first timer is used as clocksource and the second as
-> > clockevent device. The others are unused.
+At Thu, 26 Sep 2013 08:54:25 +0100,
+Russell King - ARM Linux wrote:
 > 
-> Shouldn't be up to the dt to give the timers you want ?
-The dt looks as follows:
+> On Thu, Sep 26, 2013 at 09:51:23AM +0200, Takashi Iwai wrote:
+> > Hi,
+> > 
+> > sorry for the lat response, as I've been traveling in the last weeks.
+> > 
+> > At Thu, 19 Sep 2013 22:53:02 +0100,
+> > Russell King wrote:
+> > > 
+> > > This code sequence is unsafe in modules:
+> > > 
+> > > static u64 mask = DMA_BIT_MASK(something);
+> > > ...
+> > > 	if (!dev->dma_mask)
+> > > 		dev->dma_mask = &mask;
+> > > 
+> > > as if a module is reloaded, the mask will be pointing at the original
+> > > module's mask address, and this can lead to oopses.  Moreover, they
+> > > all follow this with:
+> > > 
+> > > 	if (!dev->coherent_dma_mask)
+> > > 		dev->coherent_dma_mask = mask;
+> > > 
+> > > where 'mask' is the same value as the statically defined mask, and this
+> > > bypasses the architecture's check on whether the DMA mask is possible.
+> > > 
+> > > Fix these issues by using the new dma_coerce_coherent_and_mask()
+> > > function.
+> > > 
+> > > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> > 
+> > Applied with Mark's ack now.
+> 
+> Which is a very stupid thing to do because you won't have
+> dma_coerce_coherent_and_mask() in your tree, so all these drivers
+> will fail to build for you.
 
-                timer0: timer at 40010000 {
-                        compatible = "efm32,timer";
-                        reg = <0x40010000 0x400>;
-                        interrupts = <2>;
-                        clocks = <&cmu clk_HFPERCLKTIMER0>;
-                };
+Ah, silly me, I missed the very first thing.  Reverted it now...
 
-                timer1: timer at 40010400 {
-                        compatible = "efm32,timer";
-                        reg = <0x40010400 0x400>;
-                        interrupts = <12>;
-                        clocks = <&cmu clk_HFPERCLKTIMER1>;
-                };
+FWIW, below is the missing piece.  Please apply it in your side if
+necessary.
 
-                timer2: timer at 40010800 {
-                        compatible = "efm32,timer";
-                        reg = <0x40010800 0x400>;
-                        interrupts = <13>;
-                        clocks = <&cmu clk_HFPERCLKTIMER2>;
-                };
 
-                timer3: timer at 40010c00 {
-                        compatible = "efm32,timer";
-                        reg = <0x40010c00 0x400>;
-                        interrupts = <14>;
-                        clocks = <&cmu clk_HFPERCLKTIMER3>;
-                };
+Takashi
 
-What is your suggestion now? Add a property that specifies if the block
-should be used as clocksource or clockevent_device? That isn't a
-hardware description and so shouldn't go into the device tree.
-Provide two drivers that match on "efm32,timer", one for clocksource and
-another for clockevent_device? That wouldn't work, too, as the first
-driver to be loaded would grab all four timers and the second would get
-none.
+---
+ sound/soc/fsl/imx-pcm-fiq.c | 12 +++++-------
+ 1 file changed, 5 insertions(+), 7 deletions(-)
 
-Best regards
-Uwe
-
+diff --git a/sound/soc/fsl/imx-pcm-fiq.c b/sound/soc/fsl/imx-pcm-fiq.c
+index 34043c5..fd5f2fb 100644
+--- a/sound/soc/fsl/imx-pcm-fiq.c
++++ b/sound/soc/fsl/imx-pcm-fiq.c
+@@ -272,18 +272,16 @@ static int imx_pcm_preallocate_dma_buffer(struct snd_pcm *pcm, int stream)
+ 	return 0;
+ }
+ 
+-static u64 imx_pcm_dmamask = DMA_BIT_MASK(32);
+-
+ static int imx_pcm_new(struct snd_soc_pcm_runtime *rtd)
+ {
+ 	struct snd_card *card = rtd->card->snd_card;
+ 	struct snd_pcm *pcm = rtd->pcm;
+-	int ret = 0;
++	int ret;
++
++	ret = dma_coerce_mask_and_coherent(card->dev, DMA_BIT_MASK(32));
++	if (ret)
++		return ret;
+ 
+-	if (!card->dev->dma_mask)
+-		card->dev->dma_mask = &imx_pcm_dmamask;
+-	if (!card->dev->coherent_dma_mask)
+-		card->dev->coherent_dma_mask = DMA_BIT_MASK(32);
+ 	if (pcm->streams[SNDRV_PCM_STREAM_PLAYBACK].substream) {
+ 		ret = imx_pcm_preallocate_dma_buffer(pcm,
+ 			SNDRV_PCM_STREAM_PLAYBACK);
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+1.8.4
