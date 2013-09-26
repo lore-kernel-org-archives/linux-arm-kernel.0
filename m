@@ -1,54 +1,144 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 26 Sep 2013 12:56:37 +0900
-Subject: [PATCH] DT: if dt is available don't use s3c_arch_init
-In-Reply-To: <2025079.MVbFYJdokX@amdc1227>
-References: <1379931289-29384-1-git-send-email-m.krawczuk@partner.samsung.com>
- <2025079.MVbFYJdokX@amdc1227>
-Message-ID: <029601ceba6c$661bdf20$32539d60$%kim@samsung.com>
+Date: Thu, 26 Sep 2013 13:09:53 +0900
+Subject: [PATCH] ARM: EXYNOS: remove CONFIG_MACH_EXYNOS[4,5]_DT config
+ options
+In-Reply-To: <3809234.0NkWBIjRC9@amdc1032>
+References: <3809234.0NkWBIjRC9@amdc1032>
+Message-ID: <029701ceba6e$40ca9430$c25fbc90$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tomasz Figa wrote:
+Bartlomiej Zolnierkiewicz wrote:
 > 
-> Hi Mateusz,
+> EXYNOS is now Device Tree (DT) only platform so it makes no sense to have
+> config options responsible for enabling platform specific DT support.
 > 
-> On Monday 23 of September 2013 12:14:49 Mateusz Krawczuk wrote:
-> > It prevents from executing platform code, when booting from device tree.
-> >
-> > Signed-off-by: Mateusz Krawczuk <m.krawczuk@partner.samsung.com>
-> > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> > ---
-> >  arch/arm/plat-samsung/init.c | 3 +++
-> >  1 file changed, 3 insertions(+)
-> >
-> > diff --git a/arch/arm/plat-samsung/init.c b/arch/arm/plat-samsung/init.c
-> > index aa9511b..0ace02d 100644
-> > --- a/arch/arm/plat-samsung/init.c
-> > +++ b/arch/arm/plat-samsung/init.c
-> > @@ -20,6 +20,7 @@
-> >  #include <linux/module.h>
-> >  #include <linux/interrupt.h>
-> >  #include <linux/ioport.h>
-> > +#include <linux/of.h>
-> >  #include <linux/serial_core.h>
-> >  #include <linux/platform_device.h>
-> >  #include <linux/of.h>
-> > @@ -152,6 +153,8 @@ static int __init s3c_arch_init(void)
-> >  {
-> >  	int ret;
-> >
-> > +	if (of_have_populated_dt())
-> > +		return 0;
+> Moreover the kernel image won't even link if neither
+> CONFIG_MACH_EXYNOS4_DT
+> nor CONFIG_MACH_EXYNOS5_DT config option is enabled (linker fails with "no
+> machine record defined" error).
 > 
-> I'm not sure if this is the correct thing to do here (note platforms that
-> still want this initialization to be handled, even when booting with DT).
+> Remove CONFIG_MACH_EXYNOS[4,5]_DT config options and just use the standard
+> CONFIG_ARCH_EXYNOS[4,5] ones instead.
 > 
-> The DT case is already handled several lines below in if (cpu == NULL)
-> check and if your platform requires this initialization not to happen you
-> should assure it has cpu == NULL.
+> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> ---
+>  arch/arm/configs/exynos_defconfig |  1 -
+>  arch/arm/mach-exynos/Kconfig      | 38
++++++++++--------------------------
+> ---
+>  arch/arm/mach-exynos/Makefile     |  4 ++--
+>  3 files changed, 11 insertions(+), 32 deletions(-)
 > 
-Yeah, I agree and I think this is not needed at this moment we could cleanup
-the init functions later for Samsung SoCs though.
+> diff --git a/arch/arm/configs/exynos_defconfig
+> b/arch/arm/configs/exynos_defconfig
+> index ad7dfbb..5181d0d 100644
+> --- a/arch/arm/configs/exynos_defconfig
+> +++ b/arch/arm/configs/exynos_defconfig
+> @@ -11,7 +11,6 @@ CONFIG_ARCH_EXYNOS=y
+>  CONFIG_S3C_LOWLEVEL_UART_PORT=3
+>  CONFIG_S3C24XX_PWM=y
+>  CONFIG_ARCH_EXYNOS5=y
+> -CONFIG_MACH_EXYNOS4_DT=y
+>  CONFIG_SMP=y
+>  CONFIG_NR_CPUS=2
+>  CONFIG_PREEMPT=y
+> diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
+> index cb36807..b810f2f 100644
+> --- a/arch/arm/mach-exynos/Kconfig
+> +++ b/arch/arm/mach-exynos/Kconfig
+> @@ -14,19 +14,28 @@ menu "SAMSUNG EXYNOS SoCs Support"
+>  config ARCH_EXYNOS4
+>  	bool "SAMSUNG EXYNOS4"
+>  	default y
+> +	select ARM_AMBA
+> +	select CLKSRC_OF
+> +	select CLKSRC_SAMSUNG_PWM if CPU_EXYNOS4210
+> +	select CPU_EXYNOS4210
+>  	select GIC_NON_BANKED
+> +	select KEYBOARD_SAMSUNG if INPUT_KEYBOARD
+>  	select HAVE_ARM_SCU if SMP
+>  	select HAVE_SMP
+>  	select MIGHT_HAVE_CACHE_L2X0
+>  	select PINCTRL
+> +	select S5P_DEV_MFC
+>  	help
+>  	  Samsung EXYNOS4 SoCs based systems
+> 
+>  config ARCH_EXYNOS5
+>  	bool "SAMSUNG EXYNOS5"
+> +	select ARM_AMBA
+> +	select CLKSRC_OF
+>  	select HAVE_ARM_SCU if SMP
+>  	select HAVE_SMP
+>  	select PINCTRL
+> +	select USB_ARCH_HAS_XHCI
+>  	help
+>  	  Samsung EXYNOS5 (Cortex-A15) SoC based systems
+> 
+> @@ -110,35 +119,6 @@ config SOC_EXYNOS5440
+>  	help
+>  	  Enable EXYNOS5440 SoC support
+> 
+> -comment "Flattened Device Tree based board for EXYNOS SoCs"
+> -
+> -config MACH_EXYNOS4_DT
+> -	bool "Samsung Exynos4 Machine using device tree"
+> -	default y
+> -	depends on ARCH_EXYNOS4
+> -	select ARM_AMBA
+> -	select CLKSRC_OF
+> -	select CLKSRC_SAMSUNG_PWM if CPU_EXYNOS4210
+> -	select CPU_EXYNOS4210
+> -	select KEYBOARD_SAMSUNG if INPUT_KEYBOARD
+> -	select S5P_DEV_MFC
+> -	help
+> -	  Machine support for Samsung Exynos4 machine with device tree
+> enabled.
+> -	  Select this if a fdt blob is available for the Exynos4 SoC based
+> board.
+> -	  Note: This is under development and not all peripherals can be
+> supported
+> -	  with this machine file.
+> -
+> -config MACH_EXYNOS5_DT
+> -	bool "SAMSUNG EXYNOS5 Machine using device tree"
+> -	default y
+> -	depends on ARCH_EXYNOS5
+> -	select ARM_AMBA
+> -	select CLKSRC_OF
+> -	select USB_ARCH_HAS_XHCI
+> -	help
+> -	  Machine support for Samsung EXYNOS5 machine with device tree
+> enabled.
+> -	  Select this if a fdt blob is available for the EXYNOS5 SoC based
+> board.
+> -
+>  endmenu
+> 
+>  endif
+> diff --git a/arch/arm/mach-exynos/Makefile b/arch/arm/mach-exynos/Makefile
+> index 5369615..8930b66 100644
+> --- a/arch/arm/mach-exynos/Makefile
+> +++ b/arch/arm/mach-exynos/Makefile
+> @@ -32,5 +32,5 @@ AFLAGS_exynos-smc.o		:=-Wa,-march=armv7-
+> a$(plus_sec)
+> 
+>  # machine support
+> 
+> -obj-$(CONFIG_MACH_EXYNOS4_DT)		+= mach-exynos4-dt.o
+> -obj-$(CONFIG_MACH_EXYNOS5_DT)		+= mach-exynos5-dt.o
+> +obj-$(CONFIG_ARCH_EXYNOS4)	+= mach-exynos4-dt.o
+> +obj-$(CONFIG_ARCH_EXYNOS5)	+= mach-exynos5-dt.o
+> --
+> 1.8.2.3
+
+OK, this cleanup looks good to me but updating defconfig is not required in
+this patch because it should be updated separately according to updating
+other stuff...
+
+Will apply except updating defconfig.
 
 Thanks,
 Kukjin
