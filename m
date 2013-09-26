@@ -1,70 +1,47 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Thu, 26 Sep 2013 13:00:11 -0300
-Subject: [PATCH 0/5] Add Core Divider clock support for Armada 370/XP
-In-Reply-To: <20130926174755.15a65f92@skate>
-References: <1380144502-24109-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <20130925213730.GA19371@localhost>
- <5243E46B.2000406@free-electrons.com>
- <20130926152651.GC4583@localhost> <20130926174755.15a65f92@skate>
-Message-ID: <20130926160010.GD4583@localhost>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 26 Sep 2013 16:54:22 +0100
+Subject: imprecise external abort using the flexcan driver on i.MX6Q
+In-Reply-To: <524455FD.7070808@pengutronix.de>
+References: <21060.15934.600859.167074@ipc1.ka-ro>
+ <524455FD.7070808@pengutronix.de>
+Message-ID: <20130926155422.GQ12758@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 26, 2013 at 05:47:55PM +0200, Thomas Petazzoni wrote:
-> Dear Ezequiel Garcia,
+On Thu, Sep 26, 2013 at 05:42:53PM +0200, Marc Kleine-Budde wrote:
+> On 09/26/2013 04:01 PM, =?utf-8?Q?Lothar_Wa=C3=9Fmann?= wrote:
+> > Hi,
+> > 
+> > when enabling the can interface with 'ifconfig can0 up' (after
+> > configuring the bitrate with canconfig) on an i.MX6Q board (TX6) I'm
+> > getting the following kernel dump:
+> > 
+> > |flexcan 2094000.flexcan can0: writing ctrl=0x0a212003
+> > |flexcan 2094000.flexcan can0: flexcan_set_bittiming: mcr=0x5980000f ctrl=0x0a212003
+> > |flexcan 2094000.flexcan can0: flexcan_chip_start: writing mcr=0x79a2020f
+> > |flexcan 2094000.flexcan can0: flexcan_chip_start: writing ctrl=0x0a21ac53
+> > |Unhandled fault: imprecise external abort (0x1c06) at 0x00057adc
 > 
-> On Thu, 26 Sep 2013 12:26:52 -0300, Ezequiel Garcia wrote:
-> 
-> > 3. We hack the NAND driver to consume the NAND ECC, but use the rate
-> > as the half of it, and forget about the halved-rate NAND clock.
-> > This seems certainly hacky.
-> 
-> Is this really hacky? Since we can't change the rate of one without
-> changing the other, or gating the one without the other, we can also
-> see those two clocks as being an internal business of the NAND hardware
-> block. So instead of seeing things as:
-> 
->                         -------------
->  NAND ECC clk    ---->  |           | 
->      ||                 |  NAND HW  |
->      ||                 |   block   |
->      \/                 |           |
->  NAND clk        ---->  |           |
->                         -------------
-> 
-> You can see things as follows:
-> 
->                         -------------
->                         |           | 
->                         |  NAND HW  |
->  NAND clk        ---->  |   block   |
->                         |           |
->                         |           |
->                         -------------
-> 
-> and the ECC clock is actually some internal business of the NAND hw
-> block, and therefore handled internally by the NAND driver, as your
-> option (3) suggests.
-> 
-> Since the amount of details that we have about the exact hardware
-> architecture are pretty scarce, I believe this is probably the easiest
-> solution.
-> 
+> Looks like a NULL pointer deref to me. But it doesn't make any sense,
+> because the offset is way beyond the length of the struct flexcan_regs.
 
-Hm... could be. Considering the lack of hardware details (as you
-point out) maybe this is indeed the best option.
+NULL pointer derefs don't produce imprecise external aborts.  I believe
+that the FAR is unpredictable for such aborts as well, which means the
+"at xxxx" should be ignored.
 
-And it has the cool advantage of simplfying the clock tree, which
-is unnecessarily complex with the NAND ECC clock -> NAND clock layout.
+Bearing in mind that it is imprecise, that means that the abort happened
+sometime in the past, so the PC isn't reliable either.
 
-On the other side, Emilio has just pointed out (in private) that there's
-a flag "CLK_SET_RATE_PARENT" that is meant for these cases.
+The code here is:
 
-Anyway, I feel inclined to your suggestion and just forget about the NAND
-ECC clock for good, which is only confusing.
+   0:	f57ff04e 	dsb	st
+   4:	e3a01000 	mov	r1, #0
+   8:	e5820000 	str	r0, [r2]
+   c:	f57ff04e 	dsb	st
+  10:	e5820004 	str	r0, [r2, #4]
 
-Thanks,
--- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+Given the dsbs there, it's probably the str r0, [r2] which provoked it,
+and we can see from the register dump, r2 is not NULL.
+
+It's probably complaining that a clock necessary for the peripherals
+registers to be accessible is not running.
