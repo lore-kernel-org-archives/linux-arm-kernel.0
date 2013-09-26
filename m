@@ -1,31 +1,51 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Thu, 26 Sep 2013 20:14:16 +0200
-Subject: [RFC 3/3] Samsung: DT: Add Device tree for S5PC110/S5PV210 Boards
-In-Reply-To: <1380214769-7685-4-git-send-email-m.krawczuk@partner.samsung.com>
-References: <1380214769-7685-1-git-send-email-m.krawczuk@partner.samsung.com>
- <1380214769-7685-4-git-send-email-m.krawczuk@partner.samsung.com>
-Message-ID: <4009668.rmW0ykQNyc@amdc1032>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Thu, 26 Sep 2013 22:28:31 +0400
+Subject: [PATCH] ARM: shmobile: Lager: add Micrel KSZ8041 PHY fixup
+In-Reply-To: <CANqRtoTiHQ3EVDZ8POCkyN2ga95rF=u5ERfYsdZbX+toqAWmaQ@mail.gmail.com>
+References: <201309140429.23474.sergei.shtylyov@cogentembedded.com>
+ <CANqRtoTiHQ3EVDZ8POCkyN2ga95rF=u5ERfYsdZbX+toqAWmaQ@mail.gmail.com>
+Message-ID: <52447CCF.8000301@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hello.
 
-Hi Mateusz,
+On 09/26/2013 10:50 AM, Magnus Damm wrote:
 
-On Thursday, September 26, 2013 06:59:29 PM Mateusz Krawczuk wrote:
-> Add DTS for s5pc110 boards: goni, aquila, smdkc110
-> s5pv210: smdkv210, tiny210
-> Torbreck is replaced by FriendlyARM Tiny210 board.
+>> Currently on the Lager board NFS timeouts/delays are seen when booting.  That
+>> turned out to happen because the SoC's ETH_LINK signal turns on and off after
+>> each packet.  It is connected to Micrel KSZ8041 PHY's LED0 signal. Ether LEDs
+>> on the Lager board are named LINK and ACTIVE which corresponds to non-default
+>> 01 setting of the PHY control register 1 bits 14-15. The 'sh_eth' driver resets
+>> the PHY when opening the network device, so we have to set the mentioned bits
+>> back to 01 from the default 00 value which causes bouncing of ETH_LINK.  That
+>> can be achieved using the PHY platform fixup mechanism if we also modify the
+>> driver to use it..
 
-Could you please explain what do you mean by "replaced" here?
+>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-Looking at the current board code it should be pretty easy to add
-device tree support for Torbreck if needed (it is just a subset of
-smdkc110 support + mmc). Then you would have all mach-s5pv210 boards
-covered by the device tree and could plan for the removal of non-DT
-code in the near future.
+> Hi Sergei,
 
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
+> Thanks for your efforts on this. Nice to see that Ethernet for Lager
+> board support is improving.
+
+> Can you please share with us with link speeds you tested? I suspect
+
+    100 Mbit/s, full duplex.
+
+> that this patch is only needed for some case, like for instance 100
+> MBit Full Duplex.
+
+    Hm, why? :-O
+
+> Fixing the PHY settings makes sense even though only
+> a single mode needs it, but knowing which link speeds that are known
+> to work would help a lot.
+
+    This patch should not depend on the link speed and duplex settings.
+
+> Cheers,
+
+> / magnus
+
+WBR, Sergei
