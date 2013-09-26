@@ -1,18 +1,30 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 26 Sep 2013 21:40:35 +0200
-Subject: [PATCH] clk: nomadik: set all timers to use 2.4 MHz TIMCLK
-In-Reply-To: <1379101551-2722-1-git-send-email-linus.walleij@linaro.org>
-References: <1379101551-2722-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <CACRpkdYfSfAFRD_s1UHfV-k+JS5G3B5tN9UAwxOEzWB4t7yibA@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 26 Sep 2013 20:51:58 +0100
+Subject: device tree binding documentation outdated
+Message-ID: <20130926195158.GS12758@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 13, 2013 at 9:45 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+Can someone please point me at the current documentation for the
+iMX6DL pinctrl bindings?
 
-> This fixes a regression for the Nomadik on the main system
-> timers.
+I mean the stuff which looks like this:
 
-Ping Mike, are you picking this up for fixes?
+#define MX6QDL_PAD_ENET_MDC__ESAI_TX5_RX0           0x1e8 0x5b8 0x858 0x2 0x0
 
-Yours,
-Linus Walleij
+which clearly doesn't match:
+
+Required properties for pin configuration node:
+- fsl,pins: two integers array, represents a group of pins mux and config
+  setting. The format is fsl,pins = <PIN_FUNC_ID CONFIG>, PIN_FUNC_ID is a
+  pin working on a specific function, which consists of a tuple of
+  <mux_reg conf_reg input_reg mux_val input_val>.  CONFIG is the pad setting
+  value like pull-up on this pin.
+
+I thought DT was supposed to make bringing up support on new hardware
+easier, but without documentation, I'm frankly stuffed with the cubox-i,
+because it's impossible to work out what the right pinctrl settings
+should be from what seems to be an undocumented pile of random numbers
+stuffed into DT.
+
+Thanks.
