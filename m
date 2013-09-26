@@ -1,112 +1,178 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Thu, 26 Sep 2013 14:42:23 +0200
-Subject: [PATCH 2/2] ARM: Dove: Add the audio device to the Cubox DT
-In-Reply-To: <20130926132859.04ad4407@armhf>
-References: <20130828113521.35c53365@armhf> <521DCD80.9010105@gmail.com>
- <20130831125128.0e3a23c7@armhf>
- <140d8d8a23f.2784.107cef0f820c2f5d7b7f41463071c310@gmail.com>
- <20130926101147.217015e1@armhf> <5243F0CE.9000301@gmail.com>
- <20130926132859.04ad4407@armhf>
-Message-ID: <52442BAF.6090006@gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Thu, 26 Sep 2013 09:48:01 -0300
+Subject: [PATCH 2/3] ARM: mxs: crypto: Add Freescale MXS DCP driver
+In-Reply-To: <1380194306-5243-2-git-send-email-marex@denx.de>
+References: <1380194306-5243-1-git-send-email-marex@denx.de>
+ <1380194306-5243-2-git-send-email-marex@denx.de>
+Message-ID: <CAOMZO5A4rH_id25ROU_CdiOd79MhtU9J3jtFVyqeeD0R+=EuTw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/26/2013 01:28 PM, Jean-Francois Moine wrote:
-> On Thu, 26 Sep 2013 10:31:10 +0200
-> Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> wrote:
->
->> On 09/26/2013 10:11 AM, Jean-Francois Moine wrote:
->>> In the Cubox, I changed the audio DT to:
->>>
->>> &i2s1 {
->>> 	status = "okay";
->>> 	clocks = <&gate_clk 13>, <&si5351 1>;
->>> 	clock-names = "internal", "extclk";
->>> 	pinctrl-0 = <&pmx_audio1_i2s1_spdifo &pmx_gpio_13_audio1>;
->>
->> Have you checked that pinmux was configured correctly?
->>
->> You are missing a
->>
->> pinctrl-names = "default";
->>
->> to actually execute the above pinmux setting.
->
-> Thanks, the pinmux was not set correctly, and I added the "default".
->
-> 	[snip]
->> What about trying to get 48kHz working first? Does it work with
->> internal DCO and 48kHz? External audio clock should be 256*fs as stated
->> in dove datasheet.
->
-> I have no input with 48kHz.
+On Thu, Sep 26, 2013 at 8:18 AM, Marek Vasut <marex@denx.de> wrote:
 
-Or 44k1, just something that works with internal dco. kirkwood-i2s
-should request 256*fs, or 11289600 Hz for 44k1 audio rate from external
-clock.
+> +config CRYPTO_DEV_MXS_DCP
+> +       tristate "Support for Freescale MXS DCP"
+> +       depends on ARCH_MXS
+> +       select CRYPTO_SHA1
+> +       select CRYPTO_SHA256
+> +       select CRYPTO_CBC
+> +       select CRYPTO_ECB
+> +       select CRYPTO_AES
+> +       select CRYPTO_BLKCIPHER
+> +       select CRYPTO_ALGAPI
+> +       help
+> +         The Freescale i.MX23/i.MX28 has SHA1/SHA256 and AES128 CBC/ECB
+> +         co-processor on the die.
+> +
+> +         To compile this driver as a module, choose M here: the module
+> +         will be called atmel-sha.
 
->>> For more information, I use i2s input in the tda998x with audio rate
->>> 96kHz on HDMI output. The sound is fine with the internal dco (tested
->>> with 44.1kHz only).
->>
->> Sorry, I don't understand the above "information". How can you have a
->> different input audio rate tested with 44k1 output rate?
->
-> The internal dco permits only 44.1, 44 and 96 kHz, so, vlc translates
-> the input rates smaller than 44.1 kHz to 44.1 kHz.
+Actually it will be called 'mxs-dcp'.
 
-So you are actually testing 44k1 in any case. Let's stick with 44k1 for
-now.
+> + * There can even be only one instance of the MXS DCP due to the
+> + * design of Linux Crypto API.
 
->> Have you ever tested your audio equipment with something different than
->> 48k and 44k1 SPDIF PCM? Are you actually sure it works at all, i.e. do
->> you have different audio source with SPDIF >48kHz? Can you try optical
->> SPDIF instead of HDMI?
->>
->> Just try to narrow it down, currently I cannot see why this behavior
->> should be limited to either si5351 or dove audio alone.
->
-> I have no optical S/PDIF.
+Is this true? Usually we don't want to create a global struct.
 
-Ok, but 44k1 works with HDMI, we try to reproduce 44k1 with external
-clock now.
+> +
+> +/* AES 128 ECB and AES 128 CBC */
+> +static struct crypto_alg dcp_aes_algs[] = {
+> +       [0] = {
 
-> Well, I did more tests:
->
-> - i2s or s/pdif input by the tda998x work fine with the internal dco
+No need for explicitely add this [0]
 
-Ok.
+> +               .cra_name               = "ecb(aes)",
+> +               .cra_driver_name        = "ecb-aes-dcp",
+> +               .cra_priority           = 400,
+> +               .cra_alignmask          = 15,
+> +               .cra_flags              = CRYPTO_ALG_TYPE_ABLKCIPHER |
+> +                                         CRYPTO_ALG_ASYNC |
+> +                                         CRYPTO_ALG_NEED_FALLBACK,
+> +               .cra_init               = mxs_dcp_aes_fallback_init,
+> +               .cra_exit               = mxs_dcp_aes_fallback_exit,
+> +               .cra_blocksize          = AES_BLOCK_SIZE,
+> +               .cra_ctxsize            = sizeof(struct dcp_async_ctx),
+> +               .cra_type               = &crypto_ablkcipher_type,
+> +               .cra_module             = THIS_MODULE,
+> +               .cra_u  = {
+> +                       .ablkcipher = {
+> +                               .min_keysize    = AES_MIN_KEY_SIZE,
+> +                               .max_keysize    = AES_MAX_KEY_SIZE,
+> +                               .setkey         = mxs_dcp_aes_setkey,
+> +                               .encrypt        = mxs_dcp_aes_ecb_encrypt,
+> +                               .decrypt        = mxs_dcp_aes_ecb_decrypt
+> +                       }
+> +               }
+> +       },
+> +       [1] = {
 
-> - the pinmux seems correct:
->
-> device f10b4000.audio-controller
-> state default
-> type MUX_GROUP (2)
-> controlling device f10d0200.pin-ctrl
-> group mpp_audio1
-> function i2s1/spdifo
->
-> device f10b4000.audio-controller
-> state default
-> type MUX_GROUP (2)
-> controlling device f10d0200.pin-ctrl
-> group mpp13
-> function audio1
->
-> - I tried both <&si5351 1> and <&si5351 2>, and I get no sound with the
->    external clock.
->
-> - when running vlc with the external clock, the flux towards the
->    kirkwood driver is blocked and there is no sound interrupt.
->
->   47:          0  main-interrupt-ctrl  21  kirkwood-i2s
+Same here.
 
-Can you add "usleep_range(10000, 12000);" after clk_set_rate(extclk) in
-kirkwood-i2s. That should be enough to get around any issues with
-external clock not being stable. I will look up real requirements for
-si5351 later (and actually this should move to clk-si5351.c later too).
+> +static int mxs_dcp_probe(struct platform_device *pdev)
+> +{
+> +       struct device *dev = &pdev->dev;
+> +       struct dcp *sdcp = NULL;
+> +       int i, ret;
+> +
+> +       struct resource *iores;
+> +       int dcp_vmi_irq, dcp_irq;
+> +
+> +       mutex_lock(&global_mutex);
+> +       if (global_sdcp) {
+> +               dev_err(dev, "Only one DCP instance allowed!\n");
+> +               ret = -ENODEV;
+> +               goto err_mutex;
+> +       }
+> +
+> +       iores = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +       dcp_vmi_irq = platform_get_irq(pdev, 0);
+> +       dcp_irq = platform_get_irq(pdev, 1);
+> +       if (!iores || dcp_vmi_irq < 0 || dcp_irq < 0) {
 
-Please make sure, you stick with 44k1 (or something that works with
-DCO).
+No need to check for !iores here.
 
-Sebastian
+You use it inside devm_ioremap_resource, which already does this checking.
+
+
+> +       /*
+> +        * We do not enable context switching. Give the context buffer a
+> +        * pointer to an illegal address so if context switching is
+> +        * inadvertantly enabled, the DCP will return an error instead of
+> +        * trashing good memory. The DCP DMA cannot access ROM, so any ROM
+> +        * address will do.
+> +        */
+> +       writel(0xffff0000, sdcp->base + MXS_DCP_CONTEXT);
+
+Can you use a define instead of this hardcoded number?
+
+> +static int mxs_dcp_remove(struct platform_device *pdev)
+> +{
+> +       struct dcp *sdcp;
+> +       int i;
+> +
+> +       sdcp = platform_get_drvdata(pdev);
+> +
+> +       kthread_stop(sdcp->thread[DCP_CHAN_HASH_SHA]);
+> +       kthread_stop(sdcp->thread[DCP_CHAN_CRYPTO]);
+> +
+> +       platform_set_drvdata(pdev, NULL);
+> +
+> +       dma_free_coherent(sdcp->dev, sizeof(struct dcp_coherent_block),
+> +                         sdcp->coh, sdcp->coh_phys);
+> +
+> +       if (sdcp->caps & MXS_DCP_CAPABILITY1_SHA256)
+> +               crypto_unregister_ahash(&dcp_sha256_alg);
+> +
+> +       if (sdcp->caps & MXS_DCP_CAPABILITY1_SHA1)
+> +               crypto_unregister_ahash(&dcp_sha1_alg);
+> +
+> +       if (sdcp->caps & MXS_DCP_CAPABILITY1_AES128) {
+> +               for (i = ARRAY_SIZE(dcp_aes_algs); i >= 0; i--)
+> +                       crypto_unregister_alg(&dcp_aes_algs[i]);
+> +       }
+> +
+> +       mutex_lock(&global_mutex);
+> +       global_sdcp = NULL;
+> +       mutex_unlock(&global_mutex);
+
+
+The order of the resources removal does not look correct here.
+
+It should match the order of the error path in probe.
+
+> +
+> +       return 0;
+> +}
+> +
+> +static const struct of_device_id mxs_dcp_dt_ids[] = {
+> +       {.compatible = "fsl,mxs-dcp", .data = NULL,},
+
+In the other mxs/imx drivers we use:
+
+.compatible = "fsl,<soc>-dcp"
+
+You also need to provide a devicetree documentation for this binding.
+
+> +       { /* sentinel */ }
+> +};
+> +
+> +MODULE_DEVICE_TABLE(of, mxs_dcp_dt_ids);
+> +
+> +static struct platform_driver mxs_dcp_driver = {
+> +       .probe  = mxs_dcp_probe,
+> +       .remove = mxs_dcp_remove,
+> +       .driver = {
+> +               .name           = "mxs-dcp",
+> +               .owner          = THIS_MODULE,
+> +               .of_match_table = mxs_dcp_dt_ids,
+> +       },
+> +};
+> +
+> +module_platform_driver(mxs_dcp_driver);
+> +
+> +MODULE_AUTHOR("Marek Vasut <marex@denx.de>");
+> +MODULE_DESCRIPTION("Freescale MXS DCP Driver");
+> +MODULE_LICENSE("GPL");
+
+
+Could also add MODULE_ALIAS.
