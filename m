@@ -1,56 +1,40 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 27 Sep 2013 06:40:11 +0900
-Subject: [PATCH v2 1/2] ARM: shmobile: r8a7790: implement CPU clock
- scaling for CPUFreq
-In-Reply-To: <Pine.LNX.4.64.1309261052580.11968@axis700.grange>
-References: <Pine.LNX.4.64.1305211601180.2863@axis700.grange>
- <20130525013445.GE24005@verge.net.au>
- <20130925045007.GC24243@verge.net.au>
- <Pine.LNX.4.64.1309261052580.11968@axis700.grange>
-Message-ID: <20130926214008.GA19788@verge.net.au>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 26 Sep 2013 16:42:28 -0500
+Subject: [PATCH v2 0/2] ARM DT cpus/cpu and topology bindings
+In-Reply-To: <20130926100250.GA20705@e102568-lin.cambridge.arm.com>
+References: <1379330464-27917-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <20130924160126.GC403@e102568-lin.cambridge.arm.com>
+ <5242EA2E.1010106@gmail.com>
+ <20130926100250.GA20705@e102568-lin.cambridge.arm.com>
+Message-ID: <5244AA44.7070208@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 26, 2013 at 10:56:02AM +0200, Guennadi Liakhovetski wrote:
-> Hi Simon
+On 09/26/2013 05:02 AM, Lorenzo Pieralisi wrote:
+> On Wed, Sep 25, 2013 at 02:50:38PM +0100, Rob Herring wrote:
+>> On 09/24/2013 11:01 AM, Lorenzo Pieralisi wrote:
+>>> [replying to self]
+>>>
+>>> Any further comments on this series ? If not, I think bindings are ready to be
+>>> queued, but for that I need acks from DT maintainers.
+>>
+>> Who do you plan to take this? Is this dependent on something for 3.13?
+>> If not, I'll apply it.
 > 
-> Thanks for following on this.
-> 
-> On Wed, 25 Sep 2013, Simon Horman wrote:
-> 
-> > On Sat, May 25, 2013 at 10:34:45AM +0900, Simon Horman wrote:
-> > > On Tue, May 21, 2013 at 04:07:46PM +0200, Guennadi Liakhovetski wrote:
-> > > > This patch adds support for the Z-clock on r8a7790 SoCs, which is driving
-> > > > the Cortex A15 core, and a "cpufreq-cpu0" platform device. Adding an
-> > > > "operating-points" property to the CPU0 DT node and a regulator, this
-> > > > patch allows platforms to use the generic cpufreq-cpu0 driver to use
-> > > > SoC's DVFS capabilities.
-> > > > 
-> > > > Signed-off-by: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
-> > > > ---
-> > > > 
-> > > > v2:
-> > > > 1. a typo in the r8a7790 datasheet confused me to implement kick-bit 
-> > > > handling wrongly, this is fixed in this version
-> > > > 2. patch 3 merged with this one
-> > > > 
-> > > > Same comments, as to v1 of this series, apply.
-> > > 
-> > > Magnus,
-> > > 
-> > > could you please review this series?
-> > 
-> > I have marked this patch as deferred in the patch tracker
-> > as it has been rotting there for several months now.
-> > 
-> > I will need the following before taking it into the tree:
-> > 1. Repost, rebased if needed.
-> > 2. An ack from Magnus or indication from him that someone else should
-> >    review it.
-> 
-> This patch is superseded by my recent patches
-> 
-> [PATCH 3/4] ARM: shmobile: r8a7790: add CPUFreq clock support
-> [PATCH/RFC 4/4] ARM: shmobile: lager: add CPUFreq support
+> v3 on the lists, should be final. No, there are no dependencies on 3.13
+> to the best of my knowledge. The problem with pre-v7 UP systems with
+> cpus node #address-cells == 0 is still there and I would like to ask you
+> please what we/I should do about that, it can trigger a considerable
+> amount of churn. As soon as these bindings hit the mainline I will
+> update the DT parsing code, I can easily take all pre-v7 UP dts out
+> of the picture in the parsing loop (after all, reg property for those
+> processors is useless), but the dts are _wrong_ regardless when these
+> patches become the official bindings.
 
-Thanks, noted.
+Given that this is really a don't care for the kernel, I'm not sure what
+kernel change you are thinking. It is not the kernel's job to validate
+the dtb, so I think the kernel should not care. We should do this sort
+of validation at dtb build time at the latest. As to updating the dts
+files, yes we should probably do that.
+
+Rob
