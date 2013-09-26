@@ -1,79 +1,142 @@
-From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
-Date: Thu, 26 Sep 2013 16:09:29 +0200
-Subject: [PATCH 2/3] ARM: mxs: crypto: Add Freescale MXS DCP driver
-In-Reply-To: <201309261604.37168.marex@denx.de>
-References: <1380194306-5243-1-git-send-email-marex@denx.de>
- <1380194306-5243-2-git-send-email-marex@denx.de>
- <21060.9453.908125.71858@ipc1.ka-ro>
- <201309261604.37168.marex@denx.de>
-Message-ID: <21060.16409.341402.552996@ipc1.ka-ro>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 26 Sep 2013 07:19:37 -0700
+Subject: [PATCH 2/2] mmc: omap_hsmmc: Enable SDIO interrupt
+In-Reply-To: <CALtMJEBKbbpM47uhM-KeSRHRkM5CJkgBx4kFq4j+GG9sKXEfag@mail.gmail.com>
+References: <20130925234544.3745.55170.stgit@localhost>
+ <20130925234740.3745.50637.stgit@localhost>
+ <CALtMJEBKbbpM47uhM-KeSRHRkM5CJkgBx4kFq4j+GG9sKXEfag@mail.gmail.com>
+Message-ID: <20130926141936.GE8949@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-Marek Vasut writes:
-> Dear Lothar Wa?mann,
+* Andreas Fenkart <afenkart@gmail.com> [130926 01:34]:
+> 2013/9/26 Tony Lindgren <tony@atomide.com>:
+> > @@ -463,27 +469,34 @@ static void omap_hsmmc_stop_clock(struct omap_hsmmc_host *host)
+> >  static void omap_hsmmc_enable_irq(struct omap_hsmmc_host *host,
+> >                                   struct mmc_command *cmd)
+> >  {
+> > -       unsigned int irq_mask;
+> > +       u32 irq_mask = INT_EN_MASK;
+> > +       unsigned long flags;
+> >
+> >         if (host->use_dma)
+> > -               irq_mask = INT_EN_MASK & ~(BRR_EN | BWR_EN);
+> > -       else
+> > -               irq_mask = INT_EN_MASK;
+> > +               irq_mask &= ~(BRR_EN | BWR_EN);
+> >
+> >         /* Disable timeout for erases */
+> >         if (cmd->opcode == MMC_ERASE)
+> >                 irq_mask &= ~DTO_EN;
+> >
+> > +       spin_lock_irqsave(&host->irq_lock, flags);
+> >         OMAP_HSMMC_WRITE(host->base, STAT, STAT_CLEAR);
+> >         OMAP_HSMMC_WRITE(host->base, ISE, irq_mask);
+> > +       if (host->flags & HSMMC_SDIO_IRQ_ENABLED)
+> > +               irq_mask |= CIRQ_EN;
+> >         OMAP_HSMMC_WRITE(host->base, IE, irq_mask);
+> > +       spin_unlock_irqrestore(&host->irq_lock, flags);
+> >  }
+> >
+> >  static void omap_hsmmc_disable_irq(struct omap_hsmmc_host *host)
+> >  {
+> > +       unsigned long flags;
+> > +
+> > +       spin_lock_irqsave(&host->irq_lock, flags);
+> >         OMAP_HSMMC_WRITE(host->base, ISE, 0);
+> >         OMAP_HSMMC_WRITE(host->base, IE, 0);
+> >         OMAP_HSMMC_WRITE(host->base, STAT, STAT_CLEAR);
 > 
-> > Hi Marek,
-> > 
-> > some small comments below.
-> > 
-> > Marek Vasut writes:
-> > > diff --git a/drivers/crypto/mxs-dcp.c b/drivers/crypto/mxs-dcp.c
-> > > new file mode 100644
-> > > index 0000000..c2b35c7
-> > > --- /dev/null
-> > > +++ b/drivers/crypto/mxs-dcp.c
-> > 
-> > [...]
-> > 
-> > > +/* AES 128 ECB and AES 128 CBC */
-> > > +static struct crypto_alg dcp_aes_algs[] = {
-> > > +	[0] = {
-> > > +		.cra_name		= "ecb(aes)",
-> > > +		.cra_driver_name	= "ecb-aes-dcp",
-> > > +		.cra_priority		= 400,
-> > > +		.cra_alignmask		= 15,
-> > > +		.cra_flags		= CRYPTO_ALG_TYPE_ABLKCIPHER |
-> > > +					  CRYPTO_ALG_ASYNC |
-> > > +					  CRYPTO_ALG_NEED_FALLBACK,
-> > > +		.cra_init		= mxs_dcp_aes_fallback_init,
-> > > +		.cra_exit		= mxs_dcp_aes_fallback_exit,
-> > > +		.cra_blocksize		= AES_BLOCK_SIZE,
-> > > +		.cra_ctxsize		= sizeof(struct dcp_async_ctx),
-> > > +		.cra_type		= &crypto_ablkcipher_type,
-> > > +		.cra_module		= THIS_MODULE,
-> > > +		.cra_u	= {
-> > > +			.ablkcipher = {
-> > > +				.min_keysize	= AES_MIN_KEY_SIZE,
-> > > +				.max_keysize	= AES_MAX_KEY_SIZE,
-> > > +				.setkey		= mxs_dcp_aes_setkey,
-> > > +				.encrypt	= mxs_dcp_aes_ecb_encrypt,
-> > > +				.decrypt	= mxs_dcp_aes_ecb_decrypt
-> > > +			}
-> > 
-> > missing ',' after '}'
+> This is wrong. SDIO IRQ must not be disabled upon host initiated transfer.
+> see omap_hsmmc_request_done
+
+Hmm I don't quite follow you here, are you saying that
+omap_hsmmc_request_done() should call this conditionally?
+
+Or maybe even do a patch on top of this based on what you discovered
+with your earlier patches?
+
+I know we don't have the remuxing support yet, but that has
+dependencies to the pending pinctrl wake-up handling in general,
+and pinctrl state grouping. So let's remove those dependencies
+for now and get the basics going first before moving on to
+the remuxing part :)
+ 
+> > +       spin_unlock_irqrestore(&host->irq_lock, flags);
+> >  }
+> >
+> >  /* Calculate divisor for the given clock frequency */
+> > @@ -1040,8 +1053,12 @@ static irqreturn_t omap_hsmmc_irq(int irq, void *dev_id)
+> >         int status;
+> >
+> >         status = OMAP_HSMMC_READ(host->base, STAT);
+> > -       while (status & INT_EN_MASK && host->req_in_progress) {
+> > -               omap_hsmmc_do_irq(host, status);
+> > +       while (status & (INT_EN_MASK | CIRQ_EN)) {
+> > +               if (host->req_in_progress)
+> > +                       omap_hsmmc_do_irq(host, status);
+> > +
+> > +               if (status & CIRQ_EN)
+> > +                       mmc_signal_sdio_irq(host->mmc);
+> >
+> >                 /* Flush posted write */
+> >                 status = OMAP_HSMMC_READ(host->base, STAT);
+> > @@ -1556,6 +1573,43 @@ static void omap_hsmmc_init_card(struct mmc_host *mmc, struct mmc_card *card)
+> >                 mmc_slot(host).init_card(card);
+> >  }
+> >
+> > +static void omap_hsmmc_enable_sdio_irq_nolock(struct omap_hsmmc_host *host,
+> > +                                        int enable)
+> > +{
+> > +       u32 irq_mask;
+> > +
+> > +       if (enable)
+> > +               host->flags |= HSMMC_SDIO_IRQ_ENABLED;
+> > +       else
+> > +               host->flags &= ~HSMMC_SDIO_IRQ_ENABLED;
+> > +
+> > +       /* SDIO IRQ will be enabled as appropriate in runtime resume */
+> > +       if (host->flags & HSMMC_RUNTIME_SUSPENDED)
+> > +               goto out;
 > 
-> Is this a problem? The last ',' is not needed by the C standard.
+> Not sure here, will the module still come out of suspend even with
+> SDIO IRQ disabled?
+> Otherwise nak, sdio irq must enabled independent of pm runtime state. In the
+> worst case need pm_runtime_get().
+
+Well this handling is similar to what's done in sdhci.c and
+seems to work for me for off-idle on 3730. In that case the
+whole MMC block is powered off and the wake up follows the
+dedicated io chain path. For the am33xx off-idle case, the
+wake-up path would be remuxed to the GPIO in the first GPIO
+bank that's always on, so again the whole MMC block is off.
+
+Maybe try to test this with your case with some additional
+patches?
+
+> >  static void omap_hsmmc_conf_bus_power(struct omap_hsmmc_host *host)
+> >  {
+> >         u32 hctl, capa, value;
+> > @@ -1608,7 +1662,7 @@ static const struct mmc_host_ops omap_hsmmc_ops = {
+> >         .get_cd = omap_hsmmc_get_cd,
+> >         .get_ro = omap_hsmmc_get_ro,
+> >         .init_card = omap_hsmmc_init_card,
+> > -       /* NYET -- enable_sdio_irq */
+> > +       .enable_sdio_irq = omap_hsmmc_enable_sdio_irq,
 > 
-The problem arises when someone wants to append another item to the
-list. Without the comma he has to change two lines which may cause
-merge conflicts if two people add different items to the same struct.
+> What about am335x, if this patch goes in, it will break that platform.
+> quirk flag via device tree?
 
-That's why we usually have (unnecessary) commas on the last element of
-a struct initializer (except when they are meant to be the last
-element of course).
+I think it should still work, except the wake-up won't work for
+the off-idle case unless the SDIO interrupt is remux to the
+GPIO input?
 
+If there are other issues then yes, we can use the compatible
+flags.
 
-Lothar Wa?mann
--- 
-___________________________________________________________
+Thanks for the review and comments, 
 
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+Tony
+ 
