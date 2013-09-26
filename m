@@ -1,41 +1,61 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Thu, 26 Sep 2013 11:51:51 -0700
-Subject: [PATCH v11 2/8] usb: phy: omap-usb2: use the new generic PHY
- framework
-In-Reply-To: <1377063973-22044-3-git-send-email-kishon@ti.com>
-References: <1377063973-22044-1-git-send-email-kishon@ti.com>
- <1377063973-22044-3-git-send-email-kishon@ti.com>
-Message-ID: <20130926185151.GA8689@kroah.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Thu, 26 Sep 2013 12:01:29 -0700
+Subject: [PATCH v2 0/8] Support VGIC save/restore using device control API
+Message-ID: <1380222097-20251-1-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 21, 2013 at 11:16:07AM +0530, Kishon Vijay Abraham I wrote:
-> Used the generic PHY framework API to create the PHY. Now the power off and
-> power on are done in omap_usb_power_off and omap_usb_power_on respectively.
-> The omap-usb2 driver is also moved to driver/phy.
-> 
-> However using the old USB PHY library cannot be completely removed
-> because OTG is intertwined with PHY and moving to the new framework
-> will break OTG. Once we have a separate OTG state machine, we
-> can get rid of the USB PHY library.
-> 
-> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
-> Reviewed-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-> Acked-by: Felipe Balbi <balbi@ti.com>
-> ---
->  drivers/phy/Kconfig                   |   12 +++++++++
->  drivers/phy/Makefile                  |    1 +
->  drivers/{usb => }/phy/phy-omap-usb2.c |   45 ++++++++++++++++++++++++++++++---
->  drivers/usb/phy/Kconfig               |   10 --------
->  drivers/usb/phy/Makefile              |    1 -
->  5 files changed, 54 insertions(+), 15 deletions(-)
->  rename drivers/{usb => }/phy/phy-omap-usb2.c (88%)
+Implement save/restore of the VGIC state using the newer KVM Device
+Control API.  This requries some number of changes to existing code in
+addition to actually supporting save/restore of the necessary state.
 
-I tried to apply this to my USB branch, but it fails.
+The first patches (01-03) support creating the VGIC using the Device
+Control API.  This change is necessary because there are no other
+suitable KVM APIs that we can leverage to access the VGIC state from
+user space and the device control API was crafted exactly for this
+purpose.
 
-Kishon, you were going to refresh this patch series, right?  Please do,
-because as-is, I can't take it.
+Subsequent patches add the missing infrastructure and user space API
+pieces necessary to actually save and restore the VGIC state.  The GIC
+v2.0 architecture specification already specifies registers that can be
+used to save and restore the complete VGIC state for suspend/resume
+purposes on real hardware, and we can resuse this interface for the
+VGIC.  The API is therefore based on the memory-mapped register accesses
+defined in the specs.  See the individual patches for details.
 
-thanks,
+The patches are based on kvm-arm-next:
+git://git.linaro.org/people/cdall/linux-kvm-arm.git kvm-arm-next
 
-greg k-h
+This patch series based on the above can be cloned from:
+git://git.linaro.org/people/cdall/linux-kvm-arm.git vgic-migrate-v2
+
+User space patches for QEMU also posted on the list.  Tested on Versatile
+Express TC2.
+
+Changelogs in the individual patches.
+
+Christoffer Dall (8):
+  ARM: KVM: Allow creating the VGIC after VCPUs
+  KVM: arm-vgic: Support KVM_CREATE_DEVICE for VGIC
+  KVM: arm-vgic: Set base addr through device API
+  irqchip: arm-gic: Define additional MMIO offsets and masks
+  KVM: arm-vgic: Make vgic mmio functions more generic
+  KVM: arm-vgic: Add vgic reg access from dev attr
+  KVM: arm-vgic: Add GICD_SPENDSGIR and GICD_CPENDSGIR handlers
+  KVM: arm-vgic: Support CPU interface reg access
+
+ Documentation/virtual/kvm/api.txt              |    6 +-
+ Documentation/virtual/kvm/devices/arm-vgic.txt |   71 ++++
+ arch/arm/include/uapi/asm/kvm.h                |    8 +
+ arch/arm/kvm/arm.c                             |   10 +-
+ include/kvm/arm_vgic.h                         |    2 +-
+ include/linux/irqchip/arm-gic.h                |   14 +
+ include/linux/kvm_host.h                       |    1 +
+ include/uapi/linux/kvm.h                       |    1 +
+ virt/kvm/arm/vgic.c                            |  494 ++++++++++++++++++++++--
+ virt/kvm/kvm_main.c                            |    5 +
+ 10 files changed, 580 insertions(+), 32 deletions(-)
+ create mode 100644 Documentation/virtual/kvm/devices/arm-vgic.txt
+
+-- 
+1.7.10.4
