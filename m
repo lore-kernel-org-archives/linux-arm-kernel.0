@@ -1,98 +1,98 @@
-From: gang.chen@asianux.com (Chen Gang)
-Date: Thu, 26 Sep 2013 19:03:43 +0800
-Subject: [PATCH v2] ARM: include: asm: use 'long long' instead of 'u64'
- within atomic.h
-In-Reply-To: <20130926100422.GE2855@mudshark.cambridge.arm.com>
-References: <523D7DC7.8030603@asianux.com>
- <20130924093041.GB15119@mudshark.cambridge.arm.com>
- <5242498F.8060407@asianux.com>
- <20130925160746.GC14502@mudshark.cambridge.arm.com>
- <5243953E.6010405@asianux.com>
- <20130926100422.GE2855@mudshark.cambridge.arm.com>
-Message-ID: <5244148F.6080405@asianux.com>
+From: leoy@marvell.com (Leo Yan)
+Date: Thu, 26 Sep 2013 19:12:53 +0800
+Subject: [Question] Verification For arm64: suspend/resume implementation
+In-Reply-To: <20130924130012.GE25907@arm.com>
+References: <52327E41.1070904@marvell.com>
+ <20130913144001.GA28531@e102568-lin.cambridge.arm.com>
+ <524021EC.2000207@marvell.com>
+ <20130923152606.GA6157@e102648.cambridge.arm.com>
+ <5240F246.6050402@marvell.com>
+ <20130924090236.GY10174@e102648.cambridge.arm.com>
+ <52417C4D.1030009@marvell.com> <20130924130012.GE25907@arm.com>
+Message-ID: <524416B5.3040303@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/26/2013 06:04 PM, Will Deacon wrote:
-> On Thu, Sep 26, 2013 at 03:00:30AM +0100, Chen Gang wrote:
->> On 09/26/2013 12:07 AM, Will Deacon wrote:
->>> On Wed, Sep 25, 2013 at 03:25:19AM +0100, Chen Gang wrote:
->>>> atomic* value is signed value, and atomic* functions need also process
->>>> signed value (parameter value, and return value), so 32-bit arm need
->>>> use 'long long' instead of 'u64'.
->>>>
->>>> After replacement, it will also fix a bug for atomic64_add_negative():
->>>> "u64 is never less than 0".
->>>>
->>>> The modifications are:
->>>>
->>>>   in vim, use "1,% s/\<u64\>/long long/g" command.
->>>>   remove '__aligned(8)' which is useless for 64-bit.
->>>>   be sure of 80 column limitation after replacement.
->>>>
->>>>
->>>> Signed-off-by: Chen Gang <gang.chen@asianux.com>
+On 09/24/2013 09:00 PM, Catalin Marinas wrote:
+> On Tue, Sep 24, 2013 at 12:49:33PM +0100, Leo Yan wrote:
+>> On 09/24/2013 05:02 PM, Achin Gupta wrote:
+>>> On Tue, Sep 24, 2013 at 03:00:38AM +0100, Leo Yan wrote:
+>>>> Here have another question, ARM have the example code for boot wrapper
+>>>> which will switch from EL3 to secure EL1 rather than non-secure's EL1?
 >>>
->>> Looks better to me, thanks. While you're here, we could also replace the use
->>> of `unsigned long' with `int' for the 32-bit atomics, then the whole header
->>> is consistent with the generic types.
->>>
->>> Will
->>>
->>>
+>>> I dont' think we do but let me check. Switching to S-EL1 instead of
+>>> NS-EL1 should be a matter of _not_ setting the SCR_EL3.NS bit before
+>>> doing the exception level change (ERET).
 >>
->> Hmm... at least, it seems we can let "use 'int' for 32-bit atomics" in
->> another patch.
-> 
-> Sure, it can be a follow-up to this one.
-> 
-
-OK, if it is really a useful patch too, I will follow-up.
-
-
->> Firstly, this 'fix' is not belong to API, and either, it has no related
->> 'standard' 'demo' in "asm-generic/" (it is architecture independent, so
->> no related inline assembly code).
-> 
-> I was simply going by the types of atomic_t and atomic64_t, which are both
-> constructed using signed types.
-> 
-
-So, it is not quite necessary (but still better) to let it 'consistent'
-with 'generic' types (in fact, I feel, for a register related variable,
-'unsigned long' is more 'generic' than 'int').
-
-Since it is not belong to API, if some architectures have some reasons
-(or excuse) to keep 'inconsistent' with 'generic' types, it is still
-acceptable.
-
-
->> After a random check, another 3 architectures (maybe more) are also may
->> using 'unsigned long': "arm64/include/asm/atomic.h",
->> "sh/include/asm/atomic-llsc.h", and "xtensa/include/asm/atomic.h".
+>> I quick try with below patch for boot wrapper, i saw foundataion model
+>> cannot boot up successfully and there have no console output; suppose
+>> it's hang at some boot operations, but now foundation model cannot debug
+>> low level code, so i cannot debug further more. :-(
 >>
->> And as far as I know, for a register related variable, 'unsigned long'
->> is also a common using way for both 32-bit and 64-bit (at least, it is a
->> simple way to prevent issues).
-> 
-> Maybe, but atomic_t is always 32-bit and atomic64_t is always 64-bit, so I
-> don't think unsigned long buys you anything with regards to sizing.
-> 
+>> diff --git a/boot.S b/boot.S
+>> index a1f25e2..2f1b867 100644
+>> --- a/boot.S
+>> +++ b/boot.S
+>> @@ -19,7 +19,6 @@ _start:
+>>           b.ne    start_ns                        // skip EL3 initialisation
+>>
+>>           mov     x0, #0x30                       // RES1
+>> -       orr     x0, x0, #(1 << 0)               // Non-secure EL1
+>>           orr     x0, x0, #(1 << 8)               // HVC enable
+>>           orr     x0, x0, #(1 << 10)              // 64-bit EL2
+>>           msr     scr_el3, x0
+>
+> You also need to make sure the boot wrapper starts the kernel in S-EL1
+> rather than NS-EL2.
+>
 
-'unsigned long' can be used as a register related variable, it is always
-32-bit under 32-bit machine, and always 64-bit under 64-bit machine.
+Hi Catalin,
 
-So can use it for both arm and arm64, for arm, it can not cause issue,
-and for arm64, it is also OK (if changed to 'int' under arm64, may cause
-real issue).
+I tried to use below modification, but it still failed to boot up on 
+foundation model; pls help review if convienence.
 
-So I feel, current arm/arm64 implementation for 'unsigned long' is well
-done, not need additional improvement.
+Also, i reviewed the kernel's code, the kernel will check if the core is 
+NS-EL2 and will switch to NS-EL1; do u think this code will conflict w/t 
+the core run into the kernel with S-EL1 state?
 
-> Will
-> 
-> 
+diff --git a/boot.S b/boot.S
+index a1f25e2..f5683d6 100644
+--- a/boot.S
++++ b/boot.S
+@@ -19,7 +19,6 @@ _start:
+         b.ne    start_ns                        // skip EL3 initialisation
 
-Thanks.
--- 
-Chen Gang
+         mov     x0, #0x30                       // RES1
+-       orr     x0, x0, #(1 << 0)               // Non-secure EL1
+         orr     x0, x0, #(1 << 8)               // HVC enable
+         orr     x0, x0, #(1 << 10)              // 64-bit EL2
+         msr     scr_el3, x0
+@@ -62,7 +61,7 @@ _start:
+          * Prepare the switch to the EL2_SP1 mode from EL3
+          */
+         ldr     x0, =start_ns                   // Return after mode switch
+-       mov     x1, #0x3c9                      // EL2_SP1 | D | A | I | F
++       mov     x1, #0x3c5                      // EL1_SP1 | D | A | I | F
+         msr     elr_el3, x0
+         msr     spsr_el3, x1
+         eret
+
+> BTW, why do you need this? There are no virtualisation features
+> supported on the secure side.
+
+So far the virtualisation is not a mandatory feature in short term due 
+now our product is mainly focusing on the mobile product, so firstly we 
+want to enable Linux kernel directly on secure world; just like we do 
+same as ARMv7.
+
+ From the previous discussion of MCPM, I understand this is not very 
+consolidate w/t ARM's original idea of generic firmware (including 
+PSCI); but actually i also think this is not confict.
+
+because even the kernel run in S-EL1, we also can call SMC to switch to 
+monitor mode and call PSCI related APIs, so whatever the kernel run in 
+which world, eventually the firmware and PSCI will both support them. 
+pls correct me if i misunderstand for this.
+
+Thx,
+Leo Yan
