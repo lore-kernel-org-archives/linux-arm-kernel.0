@@ -1,80 +1,38 @@
-From: balajitk@ti.com (Balaji T K)
-Date: Thu, 26 Sep 2013 20:01:34 +0530
-Subject: [PATCH 2/2] mmc: omap_hsmmc: Enable SDIO interrupt
-In-Reply-To: <20130926141936.GE8949@atomide.com>
-References: <20130925234544.3745.55170.stgit@localhost>
- <20130925234740.3745.50637.stgit@localhost>
- <CALtMJEBKbbpM47uhM-KeSRHRkM5CJkgBx4kFq4j+GG9sKXEfag@mail.gmail.com>
- <20130926141936.GE8949@atomide.com>
-Message-ID: <52444546.4060303@ti.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 26 Sep 2013 16:39:42 +0200
+Subject: [PATCH 0/5] Allwinner SoCs High Speed Timer support
+In-Reply-To: <20130925195012.GI2954@lukather>
+References: <1380117790-19390-1-git-send-email-maxime.ripard@free-electrons.com>
+ <87zjr04vnh.fsf@linaro.org>
+ <CAOesGMhTZS1MdHW9cL4s_X8jUXHS3VkNZupCfX4ZGroL6k4gEw@mail.gmail.com>
+ <20130925195012.GI2954@lukather>
+Message-ID: <20130926163942.675266e5@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 26 September 2013 07:49 PM, Tony Lindgren wrote:
-> Hi,
->
-> * Andreas Fenkart <afenkart@gmail.com> [130926 01:34]:
->> 2013/9/26 Tony Lindgren <tony@atomide.com>:
->>> @@ -463,27 +469,34 @@ static void omap_hsmmc_stop_clock(struct omap_hsmmc_host *host)
->>>   static void omap_hsmmc_enable_irq(struct omap_hsmmc_host *host,
->>>                                    struct mmc_command *cmd)
->>>   {
->>> -       unsigned int irq_mask;
->>> +       u32 irq_mask = INT_EN_MASK;
->>> +       unsigned long flags;
->>>
->>>          if (host->use_dma)
->>> -               irq_mask = INT_EN_MASK & ~(BRR_EN | BWR_EN);
->>> -       else
->>> -               irq_mask = INT_EN_MASK;
->>> +               irq_mask &= ~(BRR_EN | BWR_EN);
->>>
->>>          /* Disable timeout for erases */
->>>          if (cmd->opcode == MMC_ERASE)
->>>                  irq_mask &= ~DTO_EN;
->>>
->>> +       spin_lock_irqsave(&host->irq_lock, flags);
->>>          OMAP_HSMMC_WRITE(host->base, STAT, STAT_CLEAR);
->>>          OMAP_HSMMC_WRITE(host->base, ISE, irq_mask);
->>> +       if (host->flags & HSMMC_SDIO_IRQ_ENABLED)
->>> +               irq_mask |= CIRQ_EN;
->>>          OMAP_HSMMC_WRITE(host->base, IE, irq_mask);
->>> +       spin_unlock_irqrestore(&host->irq_lock, flags);
->>>   }
->>>
->>>   static void omap_hsmmc_disable_irq(struct omap_hsmmc_host *host)
->>>   {
->>> +       unsigned long flags;
->>> +
->>> +       spin_lock_irqsave(&host->irq_lock, flags);
->>>          OMAP_HSMMC_WRITE(host->base, ISE, 0);
->>>          OMAP_HSMMC_WRITE(host->base, IE, 0);
->>>          OMAP_HSMMC_WRITE(host->base, STAT, STAT_CLEAR);
->>
->> This is wrong. SDIO IRQ must not be disabled upon host initiated transfer.
->> see omap_hsmmc_request_done
->
-> Hmm I don't quite follow you here, are you saying that
-> omap_hsmmc_request_done() should call this conditionally?
->
-> Or maybe even do a patch on top of this based on what you discovered
-> with your earlier patches?
-Hi Tony,
+Dear Maxime Ripard,
 
-Resetting CIRQ_ENABLE in ISE and IE, clears the (latched) pending CIRQ_EN
-if set in STAT register and also disables SDIO interrupt during interrupt
-period (outside of command/data transaction).
+On Wed, 25 Sep 2013 22:50:12 +0300, Maxime Ripard wrote:
 
-+	u32 irq_mask = 0;
-+	unsigned long flags;
-+
-+	spin_lock_irqsave(&host->irq_lock, flags);
-+
-+	/* no transfer running, need to signal cirq if */
-+	if (host->sdio_irq_en)
-+		irq_mask |= CIRQ_EN;
-+
-+	OMAP_HSMMC_WRITE(host->base, ISE, irq_mask);
-+	OMAP_HSMMC_WRITE(host->base, IE, irq_mask);
+> For all we know, so far, allwinner has released, by family:
+>   - sun3i (ARM926)
+>     * F20 (not supported)
+>   - sun4i (Cortex A8)
+>     * A10
+>   - sun5i (Cortex A8)
+>     * A10s
+>     * A13
+>   - sun6i (4 * Cortex A7)
+>     * A31
+>     * A31s (not supported)
+>   - sun7i (2 * Cortex A7)
+>     * A20
+>     * A23? (that was just announced)
 
-I will try testing these patches with above code change and let you know
+A small update to Documentation/arm/sunxi/README would be nice :)
+
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
