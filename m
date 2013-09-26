@@ -1,116 +1,66 @@
-From: rvaswani@codeaurora.org (Rohit Vaswani)
-Date: Thu, 26 Sep 2013 12:17:38 -0700
-Subject: [PATCHv4 2/3] ARM: msm: Add support for APQ8074 Dragonboard
-In-Reply-To: <52447779.3010908@codeaurora.org>
-References: <1379992406-3541-1-git-send-email-rvaswani@codeaurora.org>
- <1379992406-3541-2-git-send-email-rvaswani@codeaurora.org>
- <4E7868D6-56CB-4AF8-8EBF-069966899C23@codeaurora.org>
- <5243652F.7090408@codeaurora.org>
- <B0F416B8-042A-49F1-81E9-B217F02AAD1E@codeaurora.org>
- <52447779.3010908@codeaurora.org>
-Message-ID: <52448852.9050608@codeaurora.org>
+From: john.stultz@linaro.org (John Stultz)
+Date: Thu, 26 Sep 2013 12:25:58 -0700
+Subject: [GIT PULL v2] drivers/clocksource: sched_clock_register() conversion
+ for 3.13 (via tip/timers/core)
+Message-ID: <52448A46.9020207@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9/26/2013 11:05 AM, Rohit Vaswani wrote:
-> On 9/26/2013 9:37 AM, Kumar Gala wrote:
->> <snip>
->
->> +++ b/arch/arm/boot/dts/qcom-apq8074-dragonboard.dts
->> @@ -0,0 +1,6 @@
->> +/include/ "qcom-msm8974.dtsi"
->> +
->> +/ {
->> +    model = "Qualcomm APQ8074 Dragonboard";
->> +    compatible = "qcom,apq8074-dragonboard", "qcom,apq8074";
->> +};
->> diff --git a/arch/arm/boot/dts/qcom-msm8974.dtsi 
->> b/arch/arm/boot/dts/qcom-msm8974.dtsi
->> new file mode 100644
->> index 0000000..f04b643
->> --- /dev/null
->> +++ b/arch/arm/boot/dts/qcom-msm8974.dtsi
->> @@ -0,0 +1,35 @@
->> +/dts-v1/;
->> +
->> +/include/ "skeleton.dtsi"
->> +
->> +/ {
->> +    model = "Qualcomm MSM8974";
->> +    compatible = "qcom,msm8974";
->> +    interrupt-parent = <&intc>;
->> +
->> +    soc: soc { };
->>>> We should have a unit address here:
->>>>
->>>>       soc: soc at FOOBAR {
->>>>
->>>> also, split out the curly braces so any future patches do have to 
->>>> muck with that.
->>>>
->>>>     };
->>>>
->>> Im not sure I understand the reasoning behind the unit address for 
->>> soc ?
->> Its fairly standard practice and there is a fair amount of discussion 
->> about the lack of a unit address for memory nodes.
->>
-> That still doesn't really answer anything :) - and I couldn't find any 
-> discussions about this either.
-> I don't see anybody in upstream adding an address to soc except sun.
-> What is that address supposed to be for - what does it mean ?
-> The soc is way of encapsulating meaningful blocks  for the particular 
-> SoC.
+Hey Daniel,
+    Here's the sched_clock_register conversion that Stephen did earlier
+this summer, as part of extending the generic sched_clock code to
+support 64bit counters. Unfortunately the prereqs for this series missed
+getting into tip/timers/core for 3.12, so I never sent out this pull
+request. But now that the prereqs are in tip/timers/core for 3.13, I've
+merge it up and I wanted to go ahead and send this out.
 
-I see the mail from Stephen Warren for adding a check stating that
+This v2 pull request removes the setup_sched_clock deprecation, as that
+causes lots of warnings since there's still users in the arch/arm tree.
 
-"ePAPR 1.1 section 2.2.1.1 "Node Name Requirements" specifies that any
-node that has a reg property must include a unit address in its name
-with value matching the first entry in its reg property. Conversely, if
-a node does not have a reg property, the node name must not include a
-unit address."
+Let me know if you have any issues or concerns.
 
-The soc node we have does not have a reg property ?
+thanks
+-john
 
 
->
->>
->>>>> +};
->>>>> +
->>>>> +&soc {
->>>>> +    #address-cells = <1>;
->>>>> +    #size-cells = <1>;
->>>>> +    ranges;
->>>>> +    compatible = "simple-bus";
->>>>> +
->>>>> +    intc: interrupt-controller at f9000000 {
->>>>> +        compatible = "qcom,msm-qgic2";
->>>>> +        interrupt-controller;
->>>>> +        #interrupt-cells = <3>;
->>>>> +        reg = <0xf9000000 0x1000>,
->>>>> +              <0xf9002000 0x1000>;
->>>>> +    };
->>>>> +
->>>>> +    timer {
->>>>> +        compatible = "arm,armv7-timer";
->>>>> +        interrupts = <1 2 0xf08>,
->>>>> +                 <1 3 0xf08>,
->>>>> +                 <1 4 0xf08>,
->>>>> +                 <1 1 0xf08>;
->>>>> +        clock-frequency = <19200000>;
->>>>> +    };
->>>>> +};
->> - k
->>
->
->
-> Thanks,
-> Rohit Vaswani
->
+The following changes since commit 389e067032fbb96e439abafae848dd447e4cafb4:
+
+  Merge branch 'fortglx/3.12/time' into fortglx/3.13/time (2013-09-16 18:54:07 -0700)
+
+are available in the git repository at:
 
 
-Thanks,
-Rohit Vaswani
+  git://git.linaro.org/people/jstultz/linux.git fordlezcano/3.13/sched-clock64-conversion
 
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum, hosted by The Linux Foundation
+for you to fetch changes up to 17deb9c2db01c7813611291d251d8c7dbdfd3c9d:
+
+  Merge remote-tracking branch 'tip/timers/core' into fordlezcano/3.13/sched-clock64-conversion (2013-09-26 12:05:54 -0700)
+
+----------------------------------------------------------------
+
+John Stultz (1):
+      Merge remote-tracking branch 'tip/timers/core' into fordlezcano/3.13/sched-clock64-conversion
+
+Stephen Boyd (10):
+      clocksource: bcm2835: Switch to sched_clock_register()
+      clocksource: dbx500-prcmu: Switch to sched_clock_register()
+      clocksource: dw_apb_timer_of: Switch to sched_clock_register()
+      clocksource: mxs_timer: Switch to sched_clock_register()
+      clocksource: nomadik: Switch to sched_clock_register()
+      clocksource: samsung_pwm_timer: Switch to sched_clock_register()
+      clocksource: tegra: Switch to sched_clock_register()
+      clocksource: time-armada-370-xp: Switch to sched_clock_register()
+      clocksource: sirf: Switch to sched_clock_register() and use 64 bits
+      clocksource: vf_pit_timer: Switch to sched_clock_register()
+
+ drivers/clocksource/bcm2835_timer.c       | 4 ++--
+ drivers/clocksource/clksrc-dbx500-prcmu.c | 5 ++---
+ drivers/clocksource/dw_apb_timer_of.c     | 4 ++--
+ drivers/clocksource/mxs_timer.c           | 4 ++--
+ drivers/clocksource/nomadik-mtu.c         | 4 ++--
+ drivers/clocksource/samsung_pwm_timer.c   | 4 ++--
+ drivers/clocksource/tegra20_timer.c       | 4 ++--
+ drivers/clocksource/time-armada-370-xp.c  | 4 ++--
+ drivers/clocksource/timer-prima2.c        | 6 +++---
+ drivers/clocksource/vf_pit_timer.c        | 4 ++--
+ 10 files changed, 21 insertions(+), 22 deletions(-)
