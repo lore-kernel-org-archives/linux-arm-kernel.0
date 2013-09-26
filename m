@@ -1,79 +1,64 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Thu, 26 Sep 2013 10:29:10 -0500
-Subject: [PATCHv7 00/36] ARM: OMAP: clock data conversion to DT
-In-Reply-To: <52445115.7010800@ti.com>
-References: <1380098922-30340-1-git-send-email-t-kristo@ti.com>
- <52445115.7010800@ti.com>
-Message-ID: <524452C6.6090801@ti.com>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Thu, 26 Sep 2013 18:34:05 +0300
+Subject: [PATCH] clk: tegra: PLLE spread spectrum control
+Message-ID: <1380209654-25458-1-git-send-email-pdeschrijver@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/26/2013 10:21 AM, Nishanth Menon wrote:
-> On 09/25/2013 03:48 AM, Tero Kristo wrote:
-> [...]
->> Test branch available here:
->> https://github.com/t-kristo/linux-pm.git
->> branch: mainline-3.12-rc2-ti-dt-clks-v7
->>
->> Testing done:
->> - am335x-bone : boot only
->> - omap5-sevm : boot only
->> - dra7-evm : boot only
->> - omap3-beagle : boot + suspend/resume (ret + off)
->> - omap4-panda-es : boot + suspend/resume
->>
->> Nishanth has also been doing some tests with omap3-beagle-xm with some WIP
->> versions of this branch, but not with this latest one. Nishanth, maybe you
->> can provide test results to this one also?
-> I rebased the branch on top of benoit's for_3.13/dts merged with
-> v3.12-rc2 tag
-> 45646cd ARM: dts: AM33XX: don't redefine OCP bus and device nodes
-> 
-> All platforms were to MMC filesystem boot (SD card). u-boot used
-> v2013.10-rc3 on all platforms (mainline u-boot).
-> 
-> OMAP3630: Beagle-XM:
-> http://pastebin.pandaboard.org/index.php/view/96577127
-> (needs additional patch
-> -> https://patchwork.kernel.org/patch/2919661/ )
-dependency patch needs rework
-> 
-> OMAP4460: Panda-ES: http://pastebin.pandaboard.org/index.php/view/85143661
-> 
-> OMAP5432: OMAP5-UEVM:
-> http://pastebin.pandaboard.org/index.php/view/91361843
-> (nice to have patch
-> -> https://patchwork.kernel.org/patch/2907761/ )
-Acked,tested, pending merge from  maintainers
-> 
-> AM335x: BeagleBone Black:
-> http://pastebin.pandaboard.org/index.php/view/42000597
-> (needs additional patches:
->  https://patchwork.kernel.org/patch/2902711/
--> merged to Shekar's davinci branch -> pending upstream.
->  https://patchwork.kernel.org/patch/2902711/
-Correction on ^^: should have been:
-https://patchwork.kernel.org/patch/2919661/
-tested, pending ack, merge.
-> )
-> 
-> DRA7: DRA7-EVM: http://pastebin.pandaboard.org/index.php/view/38362805
-> (needs additional patches:
-> -> https://patchwork.kernel.org/patch/2849391/
-> -> https://patchwork.kernel.org/patch/2849601/
-> -> https://patchwork.kernel.org/patch/2849602/
-> -> https://patchwork.kernel.org/patch/2907761/
-All of the above:
-Acked,tested, pending merge from  maintainers
-> )
-> 
-> So, for the entire series:
-> Tested-by: Nishanth Menon <nm@ti.com>
-> 
+Add spread spectrum control for PLLE in Tegra114.
 
-Maybe Benoit and Tony could help reduce few of these acked patches
-pending merge from having to be cherry-picked by folks.
+Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
+---
+ drivers/clk/tegra/clk-pll.c |   30 +++++++++++++++++++++++++++++-
+ 1 files changed, 29 insertions(+), 1 deletions(-)
 
+diff --git a/drivers/clk/tegra/clk-pll.c b/drivers/clk/tegra/clk-pll.c
+index 87f0533..f0577e3 100644
+--- a/drivers/clk/tegra/clk-pll.c
++++ b/drivers/clk/tegra/clk-pll.c
+@@ -77,7 +77,23 @@
+ #define PLLE_MISC_SETUP_VALUE (7 << PLLE_MISC_SETUP_BASE_SHIFT)
+ 
+ #define PLLE_SS_CTRL 0x68
+-#define PLLE_SS_DISABLE (7 << 10)
++#define PLLE_SS_CNTL_BYPASS_SS BIT(10)
++#define PLLE_SS_CNTL_INTERP_RESET BIT(11)
++#define PLLE_SS_CNTL_SSC_BYP BIT(12)
++#define PLLE_SS_CNTL_CENTER BIT(14)
++#define PLLE_SS_CNTL_INVERT BIT(15)
++#define PLLE_SS_DISABLE (PLLE_SS_CNTL_BYPASS_SS | PLLE_SS_CNTL_INTERP_RESET |\
++				PLLE_SS_CNTL_SSC_BYP)
++#define PLLE_SS_MAX_MASK 0x1ff
++#define PLLE_SS_MAX_VAL 0x25
++#define PLLE_SS_INC_MASK (0xff << 16)
++#define PLLE_SS_INC_VAL (0x1 << 16)
++#define PLLE_SS_INCINTRV_MASK (0x3f << 24)
++#define PLLE_SS_INCINTRV_VAL (0x20 << 24)
++#define PLLE_SS_COEFFICIENTS_MASK \
++	(PLLE_SS_MAX_MASK | PLLE_SS_INC_MASK | PLLE_SS_INCINTRV_MASK)
++#define PLLE_SS_COEFFICIENTS_VAL \
++	(PLLE_SS_MAX_VAL | PLLE_SS_INC_VAL | PLLE_SS_INCINTRV_VAL)
+ 
+ #define PLLE_AUX_PLLP_SEL	BIT(2)
+ #define PLLE_AUX_ENABLE_SWCTL	BIT(4)
+@@ -1286,6 +1302,18 @@ static int clk_plle_tegra114_enable(struct clk_hw *hw)
+ 	if (ret < 0)
+ 		goto out;
+ 
++	val = pll_readl(PLLE_SS_CTRL, pll);
++	val &= ~(PLLE_SS_CNTL_CENTER | PLLE_SS_CNTL_INVERT);
++	val &= ~PLLE_SS_COEFFICIENTS_MASK;
++	val |= PLLE_SS_COEFFICIENTS_VAL;
++	pll_writel(val, PLLE_SS_CTRL, pll);
++	val &= ~(PLLE_SS_CNTL_SSC_BYP | PLLE_SS_CNTL_BYPASS_SS);
++	pll_writel(val, PLLE_SS_CTRL, pll);
++	udelay(1);
++	val &= ~PLLE_SS_CNTL_INTERP_RESET;
++	pll_writel(val, PLLE_SS_CTRL, pll);
++	udelay(1);
++
+ 	/* TODO: enable hw control of xusb brick pll */
+ 
+ out:
 -- 
-Regards,
-Nishanth Menon
+1.7.7.rc0.72.g4b5ea.dirty
