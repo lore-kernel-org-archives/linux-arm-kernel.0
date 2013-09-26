@@ -1,62 +1,111 @@
-From: neko@bakuhatsu.net (Matt Sealey)
-Date: Thu, 26 Sep 2013 14:04:59 -0500
-Subject: imprecise external abort using the flexcan driver on i.MX6Q
-In-Reply-To: <20130926155422.GQ12758@n2100.arm.linux.org.uk>
-References: <21060.15934.600859.167074@ipc1.ka-ro>
- <524455FD.7070808@pengutronix.de>
- <20130926155422.GQ12758@n2100.arm.linux.org.uk>
-Message-ID: <CAHCPf3u7qpdiqoOhD1yxoHybgS1+mvdd8xxaTKnK-DJ9sJYY7g@mail.gmail.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Thu, 26 Sep 2013 12:01:30 -0700
+Subject: [PATCH v2 1/8] ARM: KVM: Allow creating the VGIC after VCPUs
+In-Reply-To: <1380222097-20251-1-git-send-email-christoffer.dall@linaro.org>
+References: <1380222097-20251-1-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <1380222097-20251-2-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russel,
+Rework the VGIC initialization slightly to allow initialization of the
+vgic cpu-specific state even if the irqchip (the VGIC) hasn't been
+created by user space yet.  This is safe, because the vgic data
+structures are already allocated when the CPU is allocated if VGIC
+support is compiled into the kernel.  Further, the init process does not
+depend on any other information and the sacrifice is a slight
+performance degradation for creating VMs in the no-VGIC case.
 
-On Thu, Sep 26, 2013 at 10:54 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
->
-> The code here is:
->
->    0:   f57ff04e        dsb     st
->    4:   e3a01000        mov     r1, #0
->    8:   e5820000        str     r0, [r2]
->    c:   f57ff04e        dsb     st
->   10:   e5820004        str     r0, [r2, #4]
->
-> Given the dsbs there, it's probably the str r0, [r2] which provoked it,
-> and we can see from the register dump, r2 is not NULL.
+The reason is that the new device control API doesn't mandate creating
+the VGIC before creating the VCPU and it is unreasonable to require user
+space to create the VGIC before creating the VCPUs.
 
-For reference, that was:
+At the same time move the irqchip_in_kernel check out of
+kvm_vcpu_first_run_init and into the init function to make the per-vcpu
+and global init functions symmetric and add comments on the exported
+functions making it a bit easier to understand the init flow by only
+looking at vgic.c.
 
-|r7 : 04000000  r6 : c0a18088  r5 : be168000  r4 : c0a18000
-|r3 : 00000001  r2 : c0a18090  r1 : 00000000  r0 : 00000000
+Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+Reviewed-by: Alexander Graf <agraf@suse.de>
+---
+ arch/arm/kvm/arm.c  |    7 ++++---
+ virt/kvm/arm/vgic.c |   22 +++++++++++++++++++---
+ 2 files changed, 23 insertions(+), 6 deletions(-)
 
-If r2 is indeed the address of the access, then this is entirely down
-to a misuse of the hardware; from the manual:
-
-~
-When the FEN bit is set in the MCR, the memory area from 0x80 to 0xFF (which is
-normally occupied by MB0 to MB7) is used by the reception FIFO engine.
-Table 34-6
-shows the Rx FIFO data structure. The region 0x80-0x8F contains an
-message buffer
-structure which is the port through which the ARM core reads data from
-the FIFO (the
-oldest frame received and not read yet). The region 0x90-0xDF is
-reserved for internal
-use of the FIFO engine.
-^^^^^^^^^^^^^^^^^^^^
-~
-
-In this case, yes, we're trying to write to 0x90. And in
-flexcan_chip_start, above the location where it dumps the array to
-hardware, FEN is set; this is reflected by the debug (mcr=0x79a2020f).
-
-I'm surprised this ever worked.. if the area 0x90-0xDF is being used
-by the FIFO internally then the difference between i.MX53 ('working')
-and i.MX6Q ('imprecise abort') is that the i.MX6Q is causing the
-proper bus response. We can only hope that the i.MX53 is ONLY not
-causing the proper bus response and not actually letting you write
-into a FIFO internal data area..
-
---
-Matt Sealey <neko@bakuhatsu.net>
+diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+index 9c697db..2b1091a 100644
+--- a/arch/arm/kvm/arm.c
++++ b/arch/arm/kvm/arm.c
+@@ -461,6 +461,8 @@ static void update_vttbr(struct kvm *kvm)
+ 
+ static int kvm_vcpu_first_run_init(struct kvm_vcpu *vcpu)
+ {
++	int ret;
++
+ 	if (likely(vcpu->arch.has_run_once))
+ 		return 0;
+ 
+@@ -470,9 +472,8 @@ static int kvm_vcpu_first_run_init(struct kvm_vcpu *vcpu)
+ 	 * Initialize the VGIC before running a vcpu the first time on
+ 	 * this VM.
+ 	 */
+-	if (irqchip_in_kernel(vcpu->kvm) &&
+-	    unlikely(!vgic_initialized(vcpu->kvm))) {
+-		int ret = kvm_vgic_init(vcpu->kvm);
++	if (unlikely(!vgic_initialized(vcpu->kvm))) {
++		ret = kvm_vgic_init(vcpu->kvm);
+ 		if (ret)
+ 			return ret;
+ 	}
+diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+index 685fc72..5ce100f 100644
+--- a/virt/kvm/arm/vgic.c
++++ b/virt/kvm/arm/vgic.c
+@@ -1243,15 +1243,19 @@ static irqreturn_t vgic_maintenance_handler(int irq, void *data)
+ 	return IRQ_HANDLED;
+ }
+ 
++/**
++ * kvm_vgic_vcpu_init - Initialize per-vcpu VGIC state
++ * @vcpu: pointer to the vcpu struct
++ *
++ * Initialize the vgic_cpu struct and vgic_dist struct fields pertaining to
++ * this vcpu and enable the VGIC for this VCPU
++ */
+ int kvm_vgic_vcpu_init(struct kvm_vcpu *vcpu)
+ {
+ 	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
+ 	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
+ 	int i;
+ 
+-	if (!irqchip_in_kernel(vcpu->kvm))
+-		return 0;
+-
+ 	if (vcpu->vcpu_id >= VGIC_MAX_CPUS)
+ 		return -EBUSY;
+ 
+@@ -1383,10 +1387,22 @@ out:
+ 	return ret;
+ }
+ 
++/**
++ * kvm_vgic_init - Initialize global VGIC state before running any VCPUs
++ * @kvm: pointer to the kvm struct
++ *
++ * Map the virtual CPU interface into the VM before running any VCPUs.  We
++ * can't do this at creation time, because user space must first set the
++ * virtual CPU interface address in the guest physical address space.  Also
++ * initialize the ITARGETSRn regs to 0 on the emulated distributor.
++ */
+ int kvm_vgic_init(struct kvm *kvm)
+ {
+ 	int ret = 0, i;
+ 
++	if (!irqchip_in_kernel(kvm))
++		return 0;
++
+ 	mutex_lock(&kvm->lock);
+ 
+ 	if (vgic_initialized(kvm))
+-- 
+1.7.10.4
