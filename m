@@ -1,290 +1,162 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 26 Sep 2013 12:01:35 -0700
-Subject: [PATCH v2 6/8] KVM: arm-vgic: Add vgic reg access from dev attr
+Date: Thu, 26 Sep 2013 12:01:37 -0700
+Subject: [PATCH v2 8/8] KVM: arm-vgic: Support CPU interface reg access
 In-Reply-To: <1380222097-20251-1-git-send-email-christoffer.dall@linaro.org>
 References: <1380222097-20251-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <1380222097-20251-7-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <1380222097-20251-9-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add infrastructure to handle distributor and cpu interface register
-accesses through the KVM_{GET/SET}_DEVICE_ATTR interface by adding the
-KVM_DEV_ARM_VGIC_GRP_DIST_REGS and KVM_DEV_ARM_VGIC_GRP_CPU_REGS groups
-and defining the semantics of the attr field to be the MMIO offset as
-specified in the GICv2 specs.
+Implement support for the CPU interface register access driven by MMIO
+address offsets from the CPU interface base address.  Useful for user
+space to support save/restore of the VGIC state.
 
-Missing register accesses or other changes in individual register access
-functions to support save/restore of the VGIC state is added in
-subsequent patches.
+This commit adds support only for the same logic as the current VGIC
+support, and no more.  For example, the active priority registers are
+handled as RAZ/WI, just like setting priorities on the emulated
+distributor.
 
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 Reviewed-by: Alexander Graf <agraf@suse.de>
-
 ---
-Changelog[v2]:
- - Added implementation specific format for the GICC_APRn registers.
----
- Documentation/virtual/kvm/devices/arm-vgic.txt |   50 +++++++++
- virt/kvm/arm/vgic.c                            |  143 ++++++++++++++++++++++++
- 2 files changed, 193 insertions(+)
+ virt/kvm/arm/vgic.c |   81 ++++++++++++++++++++++++++++++++++++++++++++++-----
+ 1 file changed, 73 insertions(+), 8 deletions(-)
 
-diff --git a/Documentation/virtual/kvm/devices/arm-vgic.txt b/Documentation/virtual/kvm/devices/arm-vgic.txt
-index c9febb2..e6416f8e 100644
---- a/Documentation/virtual/kvm/devices/arm-vgic.txt
-+++ b/Documentation/virtual/kvm/devices/arm-vgic.txt
-@@ -19,3 +19,53 @@ Groups:
-     KVM_VGIC_V2_ADDR_TYPE_CPU (rw, 64-bit)
-       Base address in the guest physical address space of the GIC virtual cpu
-       interface register mappings.
-+
-+  KVM_DEV_ARM_VGIC_GRP_DIST_REGS
-+  Attributes:
-+    The attr field of kvm_device_attr encodes two values:
-+    bits:     | 63   ....  40 | 39 ..  32  |  31   ....    0 |
-+    values:   |    reserved   |   cpu id   |      offset     |
-+
-+    All distributor regs are (rw, 32-bit)
-+
-+    The offset is relative to the "Distributor base address" as defined in the
-+    GICv2 specs.  Getting or setting such a register has the same effect as
-+    reading or writing the register on the actual hardware from the cpu
-+    specified with cpu id field.  Note that most distributor fields are not
-+    banked, but return the same value regardless of the cpu id used to access
-+    the register.
-+  Limitations:
-+    - Priorities are not implemented, and registers are RAZ/WI
-+  Errors:
-+    - ENODEV: Getting or setting this register is not yet supported
-+
-+  KVM_DEV_ARM_VGIC_GRP_CPU_REGS
-+  Attributes:
-+    The attr field of kvm_device_attr encodes two values:
-+    bits:     | 63   ....  40 | 39 ..  32  |  31   ....    0 |
-+    values:   |    reserved   |   cpu id   |      offset     |
-+
-+    All CPU regs are (rw, 32-bit)
-+
-+    The offset specifies the offset from the "CPU interface base address" as
-+    defined in the GICv2 specs.  Getting or setting such a register has the
-+    same effect as reading or writing the register on the actual hardware.
-+
-+    The Active Priorities Registers APRn are implementation defined, so we set a
-+    fixed format for our implementation that fits with the model of a "GICv2
-+    impementation without the security extensions" which we present to the
-+    guest.  This interface always exposes four register APR[0-3] describing the
-+    maximum possible 128 preemption levels.  The semantics of the register
-+    indicate if any interrupts in a given preemption level are in the active
-+    state by setting the corresponding bit.
-+
-+    Thus, preemption level X has one or more active interrupts if and only if:
-+
-+      APRn[X mod 32] == 0b1,  where n = X / 32
-+
-+    Bits for undefined preemption levels are RAZ/WI.
-+
-+  Limitations:
-+    - Priorities are not implemented, and registers are RAZ/WI
-+  Errors:
-+    - ENODEV: Getting or setting this register is not yet supported
 diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index 1148a2e..f2dc72a 100644
+index 4e8c3ab..3cfdd4d 100644
 --- a/virt/kvm/arm/vgic.c
 +++ b/virt/kvm/arm/vgic.c
-@@ -589,11 +589,29 @@ static bool handle_mmio_sgi_reg(struct kvm_vcpu *vcpu,
- 	return false;
+@@ -71,6 +71,10 @@
+ #define VGIC_ADDR_UNDEF		(-1)
+ #define IS_VGIC_ADDR_UNDEF(_x)  ((_x) == VGIC_ADDR_UNDEF)
+ 
++#define PRODUCT_ID_KVM		0x4b	/* ASCII code K */
++#define IMPLEMENTER_ARM		0x43b
++#define GICC_ARCH_VERSION_V2	0x2
++
+ /* Physical address of vgic virtual cpu interface */
+ static phys_addr_t vgic_vcpu_base;
+ 
+@@ -312,7 +316,7 @@ static bool handle_mmio_misc(struct kvm_vcpu *vcpu,
+ 	u32 word_offset = offset & 3;
+ 
+ 	switch (offset & ~3) {
+-	case 0:			/* CTLR */
++	case 0:			/* GICD_CTLR */
+ 		reg = vcpu->kvm->arch.vgic.enabled;
+ 		vgic_reg_access(mmio, &reg, word_offset,
+ 				ACCESS_READ_VALUE | ACCESS_WRITE_VALUE);
+@@ -323,15 +327,15 @@ static bool handle_mmio_misc(struct kvm_vcpu *vcpu,
+ 		}
+ 		break;
+ 
+-	case 4:			/* TYPER */
++	case 4:			/* GICD_TYPER */
+ 		reg  = (atomic_read(&vcpu->kvm->online_vcpus) - 1) << 5;
+ 		reg |= (VGIC_NR_IRQS >> 5) - 1;
+ 		vgic_reg_access(mmio, &reg, word_offset,
+ 				ACCESS_READ_VALUE | ACCESS_WRITE_IGNORED);
+ 		break;
+ 
+-	case 8:			/* IIDR */
+-		reg = 0x4B00043B;
++	case 8:			/* GICD_IIDR */
++		reg = (PRODUCT_ID_KVM << 24) | (IMPLEMENTER_ARM << 0);
+ 		vgic_reg_access(mmio, &reg, word_offset,
+ 				ACCESS_READ_VALUE | ACCESS_WRITE_IGNORED);
+ 		break;
+@@ -1682,9 +1686,70 @@ int kvm_vgic_addr(struct kvm *kvm, unsigned long type, u64 *addr, bool write)
+ static bool handle_cpu_mmio_misc(struct kvm_vcpu *vcpu,
+ 				 struct kvm_exit_mmio *mmio, phys_addr_t offset)
+ {
+-	return true;
++	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
++	u32 reg, mask = 0, shift = 0;
++	bool updated = false;
++
++	switch (offset & ~0x3) {
++	case GIC_CPU_CTRL:
++		mask = GICH_VMCR_CTRL_MASK;
++		shift = GICH_VMCR_CTRL_SHIFT;
++		break;
++	case GIC_CPU_PRIMASK:
++		mask = GICH_VMCR_PRIMASK_MASK;
++		shift = GICH_VMCR_PRIMASK_SHIFT;
++		break;
++	case GIC_CPU_BINPOINT:
++		mask = GICH_VMCR_BINPOINT_MASK;
++		shift = GICH_VMCR_BINPOINT_SHIFT;
++		break;
++	case GIC_CPU_ALIAS_BINPOINT:
++		mask = GICH_VMCR_ALIAS_BINPOINT_MASK;
++		shift = GICH_VMCR_ALIAS_BINPOINT_SHIFT;
++		break;
++	}
++
++	if (!mmio->is_write) {
++		reg = (vgic_cpu->vgic_vmcr & mask) >> shift;
++		mmio_data_write(mmio, ~0, reg);
++	} else {
++		reg = mmio_data_read(mmio, ~0);
++		reg = (reg << shift) & mask;
++		if (reg != (vgic_cpu->vgic_vmcr & mask))
++			updated = true;
++		vgic_cpu->vgic_vmcr &= ~mask;
++		vgic_cpu->vgic_vmcr |= reg;
++	}
++	return updated;
  }
  
-+static bool handle_mmio_sgi_clear(struct kvm_vcpu *vcpu,
++static bool handle_mmio_abpr(struct kvm_vcpu *vcpu,
++			     struct kvm_exit_mmio *mmio, phys_addr_t offset)
++{
++	return handle_cpu_mmio_misc(vcpu, mmio, GIC_CPU_ALIAS_BINPOINT);
++}
++
++static bool handle_cpu_mmio_ident(struct kvm_vcpu *vcpu,
 +				  struct kvm_exit_mmio *mmio,
 +				  phys_addr_t offset)
 +{
++	u32 reg;
++
++	if (mmio->is_write)
++		return false;
++
++	/* GICC_IIDR */
++	reg = (PRODUCT_ID_KVM << 20) |
++	      (GICC_ARCH_VERSION_V2 << 16) |
++	      (IMPLEMENTER_ARM << 0);
++	mmio_data_write(mmio, ~0, reg);
 +	return false;
 +}
 +
-+static bool handle_mmio_sgi_set(struct kvm_vcpu *vcpu,
-+				struct kvm_exit_mmio *mmio,
-+				phys_addr_t offset)
-+{
-+	return false;
-+}
-+
- /*
-  * I would have liked to use the kvm_bus_io_*() API instead, but it
-  * cannot cope with banked registers (only the VM pointer is passed
-  * around, and we need the vcpu). One of these days, someone please
-  * fix it!
-+ *
-+ * Note that the handle_mmio implementations should not use the phys_addr
-+ * field from the kvm_exit_mmio struct as this will not have any sane values
-+ * when used to save/restore state from user space.
-  */
- struct mmio_range {
- 	phys_addr_t base;
-@@ -663,6 +681,16 @@ static const struct mmio_range vgic_dist_ranges[] = {
++/*
++ * CPU Interface Register accesses - these are not accessed by the VM, but by
++ * user space for saving and restoring VGIC state.
++ */
+ static const struct mmio_range vgic_cpu_ranges[] = {
+ 	{
+ 		.base		= GIC_CPU_CTRL,
+@@ -1694,17 +1759,17 @@ static const struct mmio_range vgic_cpu_ranges[] = {
+ 	{
+ 		.base		= GIC_CPU_ALIAS_BINPOINT,
  		.len		= 4,
- 		.handle_mmio	= handle_mmio_sgi_reg,
+-		.handle_mmio	= handle_cpu_mmio_misc,
++		.handle_mmio	= handle_mmio_abpr,
  	},
-+	{
-+		.base		= GIC_DIST_SGI_CLEAR,
-+		.len		= VGIC_NR_SGIS,
-+		.handle_mmio	= handle_mmio_sgi_clear,
-+	},
-+	{
-+		.base		= GIC_DIST_SGI_SET,
-+		.len		= VGIC_NR_SGIS,
-+		.handle_mmio	= handle_mmio_sgi_set,
-+	},
- 	{}
+ 	{
+ 		.base		= GIC_CPU_ACTIVEPRIO,
+ 		.len		= 16,
+-		.handle_mmio	= handle_cpu_mmio_misc,
++		.handle_mmio	= handle_mmio_raz_wi,
+ 	},
+ 	{
+ 		.base		= GIC_CPU_IDENT,
+ 		.len		= 4,
+-		.handle_mmio	= handle_cpu_mmio_misc,
++		.handle_mmio	= handle_cpu_mmio_ident,
+ 	},
  };
  
-@@ -1541,6 +1569,80 @@ int kvm_vgic_addr(struct kvm *kvm, unsigned long type, u64 *addr, bool write)
- 	return r;
- }
- 
-+static bool handle_cpu_mmio_misc(struct kvm_vcpu *vcpu,
-+				 struct kvm_exit_mmio *mmio, phys_addr_t offset)
-+{
-+	return true;
-+}
-+
-+static const struct mmio_range vgic_cpu_ranges[] = {
-+	{
-+		.base		= GIC_CPU_CTRL,
-+		.len		= 12,
-+		.handle_mmio	= handle_cpu_mmio_misc,
-+	},
-+	{
-+		.base		= GIC_CPU_ALIAS_BINPOINT,
-+		.len		= 4,
-+		.handle_mmio	= handle_cpu_mmio_misc,
-+	},
-+	{
-+		.base		= GIC_CPU_ACTIVEPRIO,
-+		.len		= 16,
-+		.handle_mmio	= handle_cpu_mmio_misc,
-+	},
-+	{
-+		.base		= GIC_CPU_IDENT,
-+		.len		= 4,
-+		.handle_mmio	= handle_cpu_mmio_misc,
-+	},
-+};
-+
-+static struct kvm_exit_mmio dev_attr_mmio = { .len = 4 };
-+
-+static int vgic_attr_regs_access(struct kvm_device *dev,
-+				 struct kvm_device_attr *attr,
-+				 u32 *reg, bool is_write)
-+{
-+	const struct mmio_range *r = NULL;
-+	phys_addr_t offset;
-+	int cpuid;
-+	struct kvm_vcpu *vcpu;
-+	struct kvm_exit_mmio mmio;
-+
-+	offset = attr->attr & KVM_DEV_ARM_VGIC_OFFSET_MASK;
-+	cpuid = (attr->attr & KVM_DEV_ARM_VGIC_CPUID_MASK) >>
-+		KVM_DEV_ARM_VGIC_CPUID_SHIFT;
-+
-+	if (cpuid >= atomic_read(&dev->kvm->online_vcpus))
-+		return -EINVAL;
-+
-+	vcpu = kvm_get_vcpu(dev->kvm, cpuid);
-+
-+	mmio.len = 4;
-+	mmio.is_write = is_write;
-+	if (is_write)
-+		mmio_data_write(&mmio, ~0, *reg);
-+
-+	if (attr->group == KVM_DEV_ARM_VGIC_GRP_DIST_REGS)
-+		r = find_matching_range(vgic_dist_ranges, &mmio, offset);
-+	else if (attr->group == KVM_DEV_ARM_VGIC_GRP_CPU_REGS)
-+		r = find_matching_range(vgic_cpu_ranges, &mmio, offset);
-+
-+	if (unlikely(!r || !r->handle_mmio))
-+		return -ENXIO;
-+
-+	spin_lock(&vcpu->kvm->arch.vgic.lock);
-+	offset -= r->base;
-+	r->handle_mmio(vcpu, &mmio, offset);
-+	spin_unlock(&vcpu->kvm->arch.vgic.lock);
-+
-+	if (!is_write)
-+		*reg = mmio_data_read(&mmio, ~0);
-+
-+	return 0;
-+}
-+
- static int vgic_set_attr(struct kvm_device *dev, struct kvm_device_attr *attr)
- {
- 	int r;
-@@ -1557,6 +1659,18 @@ static int vgic_set_attr(struct kvm_device *dev, struct kvm_device_attr *attr)
- 		r = kvm_vgic_addr(dev->kvm, type, &addr, true);
- 		return (r == -ENODEV) ? -ENXIO : r;
- 	}
-+
-+	case KVM_DEV_ARM_VGIC_GRP_DIST_REGS:
-+	case KVM_DEV_ARM_VGIC_GRP_CPU_REGS: {
-+		u32 __user *uaddr = (u32 __user *)(long)attr->addr;
-+		u32 reg;
-+
-+		if (get_user(reg, uaddr))
-+			return -EFAULT;
-+
-+		return vgic_attr_regs_access(dev, attr, &reg, true);
-+	}
-+
- 	}
- 
- 	return -ENXIO;
-@@ -1579,12 +1693,35 @@ static int vgic_get_attr(struct kvm_device *dev, struct kvm_device_attr *attr)
- 		r = 0;
- 		if (copy_to_user(uaddr, &addr, sizeof(addr)))
- 			return -EFAULT;
-+		break;
- 	}
-+
-+	case KVM_DEV_ARM_VGIC_GRP_DIST_REGS:
-+	case KVM_DEV_ARM_VGIC_GRP_CPU_REGS: {
-+		u32 __user *uaddr = (u32 __user *)(long)attr->addr;
-+		u32 reg = 0;
-+
-+		r = vgic_attr_regs_access(dev, attr, &reg, false);
-+		if (r)
-+			return r;
-+		r = put_user(reg, uaddr);
-+		break;
-+	}
-+
- 	}
- 
- 	return r;
- }
- 
-+static int vgic_has_attr_regs(const struct mmio_range *ranges,
-+			      phys_addr_t offset)
-+{
-+	if (find_matching_range(ranges, &dev_attr_mmio, offset))
-+		return 0;
-+	else
-+		return -ENXIO;
-+}
-+
- static int vgic_has_attr(struct kvm_device *dev, struct kvm_device_attr *attr)
- {
- 	phys_addr_t offset;
-@@ -1597,6 +1734,12 @@ static int vgic_has_attr(struct kvm_device *dev, struct kvm_device_attr *attr)
- 			return 0;
- 		}
- 		break;
-+	case KVM_DEV_ARM_VGIC_GRP_DIST_REGS:
-+		offset = attr->attr & KVM_DEV_ARM_VGIC_OFFSET_MASK;
-+		return vgic_has_attr_regs(vgic_dist_ranges, offset);
-+	case KVM_DEV_ARM_VGIC_GRP_CPU_REGS:
-+		offset = attr->attr & KVM_DEV_ARM_VGIC_OFFSET_MASK;
-+		return vgic_has_attr_regs(vgic_cpu_ranges, offset);
- 	}
- 	return -ENXIO;
- }
 -- 
 1.7.10.4
