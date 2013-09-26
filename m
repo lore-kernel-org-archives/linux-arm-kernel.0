@@ -1,39 +1,46 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 26 Sep 2013 14:29:13 +0900
-Subject: [PATCH v2] ARM: SAMSUNG: S5P: If detected device tree skip irq
- init
-In-Reply-To: <2123658.6S6hP57GRg@flatron>
-References: <1380038363-487-1-git-send-email-m.krawczuk@partner.samsung.com>
- <2123658.6S6hP57GRg@flatron>
-Message-ID: <02c901ceba79$55b382c0$011a8840$%kim@samsung.com>
+Date: Thu, 26 Sep 2013 14:44:12 +0900
+Subject: [RFC] clk: samsung:  Remove old clock drivers for s5pc100 and
+ s5pv210
+In-Reply-To: <1380043160-16824-1-git-send-email-m.krawczuk@partner.samsung.com>
+References: <1380043160-16824-1-git-send-email-m.krawczuk@partner.samsung.com>
+Message-ID: <02f401ceba7b$6dc16e20$49444a60$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tomasz Figa wrote:
+Mateusz Krawczuk wrote:
 > 
-> Hi Mateusz,
+> This patch removes old clock management code for S5PC100 and
+> S5PC110/S5PV210,
+> since the platform has been already moved to the new clock driver
+> using Common Clock Framework.
 > 
-> On Tuesday 24 of September 2013 17:59:23 Mateusz Krawczuk wrote:
-> > It prevents from executing things already handled by pinctrl-exynos
-> > driver, when device tree is available.
-> >
-> > Signed-off-by: Mateusz Krawczuk <m.krawczuk@partner.samsung.com>
-> > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> > ---
-> >  arch/arm/plat-samsung/s5p-irq-eint.c | 4 ++++
-> >  1 file changed, 4 insertions(+)
+> Signed-off-by: Mateusz Krawczuk <m.krawczuk@partner.samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> ---
+> This patch series require
+> S5PC100 and S5PV210 patch series moving to common clock framework.
 > 
-> Acked-by: Tomasz Figa <t.figa@samsung.com>
+>  arch/arm/mach-s5pc100/Kconfig  |    2 +-
+>  arch/arm/mach-s5pc100/Makefile |    1 -
+>  arch/arm/mach-s5pc100/clock.c  | 1361 -----------------------------------
+> ----
+>  arch/arm/mach-s5pv210/Kconfig  |    2 +-
+>  arch/arm/mach-s5pv210/Makefile |    1 -
+>  arch/arm/mach-s5pv210/clock.c  | 1365 -----------------------------------
+> -----
+>  6 files changed, 2 insertions(+), 2730 deletions(-)
+>  delete mode 100644 arch/arm/mach-s5pc100/clock.c
+>  delete mode 100644 arch/arm/mach-s5pv210/clock.c
 > 
-> [as a temporary solution until we move all the users of this code to
-> device tree]
-> 
-Yes, agreed.
+In this case, would be easier to review with using "-D" for format-patch.
 
-The 'skip irq init' in subject would be changed to 'skip eint init' for
-clear meaning.
+And this should be followed by moving common clk series for s5pc100/s5pv210.
+See s3c64xx common clk patches in v3.13-next/common-clk-s3c64xx branch as a
+reference.
 
-Applied.
+And I have never seen common clk stuff for s5pc100. In addition, I'm not
+sure we _still_ need to support s5pc100 in mainline.
 
 Thanks,
-Kukjin
+- Kukjin
