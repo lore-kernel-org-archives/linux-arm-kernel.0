@@ -1,47 +1,62 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 26 Sep 2013 16:54:22 +0100
-Subject: imprecise external abort using the flexcan driver on i.MX6Q
-In-Reply-To: <524455FD.7070808@pengutronix.de>
-References: <21060.15934.600859.167074@ipc1.ka-ro>
- <524455FD.7070808@pengutronix.de>
-Message-ID: <20130926155422.GQ12758@n2100.arm.linux.org.uk>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Thu, 26 Sep 2013 17:56:56 +0200
+Subject: [PATCH 1/5] clk: mvebu: Add core-divider clock
+In-Reply-To: <20130926151240.GB4583@localhost>
+References: <1380144502-24109-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20130925213730.GA19371@localhost> <20130926082404.GA18244@lunn.ch>
+ <20130926151240.GB4583@localhost>
+Message-ID: <20130926155656.GF18244@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 26, 2013 at 05:42:53PM +0200, Marc Kleine-Budde wrote:
-> On 09/26/2013 04:01 PM, =?utf-8?Q?Lothar_Wa=C3=9Fmann?= wrote:
-> > Hi,
+> > > +	/* Valid ratio are 1:4, 1:5, 1:6 and 1:8 */
+> > > +	u32 div;
+> > > +
+> > > +	div = *parent_rate / rate;
+> > > +	if (div <= 4)
+> > > +	   div = 4;
+> > > +	   else if (div <= 5)
+> > > +	   	div = 5;
+> > > +		else if (div <= 6)
+> > > +		     div = 6;
+> > > +		     else
+> > > +			div = 8;
+> > > +
+> > > +	return *parent_rate / div;
+> > > +}
 > > 
-> > when enabling the can interface with 'ifconfig can0 up' (after
-> > configuring the bitrate with canconfig) on an i.MX6Q board (TX6) I'm
-> > getting the following kernel dump:
+> > This looks odd. Is not the following clearer?
 > > 
-> > |flexcan 2094000.flexcan can0: writing ctrl=0x0a212003
-> > |flexcan 2094000.flexcan can0: flexcan_set_bittiming: mcr=0x5980000f ctrl=0x0a212003
-> > |flexcan 2094000.flexcan can0: flexcan_chip_start: writing mcr=0x79a2020f
-> > |flexcan 2094000.flexcan can0: flexcan_chip_start: writing ctrl=0x0a21ac53
-> > |Unhandled fault: imprecise external abort (0x1c06) at 0x00057adc
+> > 	div = *parent_rate / rate;
+> > 	if (div < 5)
+> > 	   div = 4;
+> > 	   else if (div > 6)
+> > 		div = 8;
+> > 
 > 
-> Looks like a NULL pointer deref to me. But it doesn't make any sense,
-> because the offset is way beyond the length of the struct flexcan_regs.
+> Mmmm... no, it's not at all clearer to me.
+> IMHO, the original construction explicitly show the possible ratios:
+> 
+> 	/* If it's smaller than or equal to 4, set to 4 */
+> 	if (div <= 4)
+> 		div = 4;
+> 
+> 	/* Otherwise, if it's between 4 and 5, set to 5 */
+> 	else if (div <= 5)
+> 	 	div = 5;
 
-NULL pointer derefs don't produce imprecise external aborts.  I believe
-that the FAR is unpredictable for such aborts as well, which means the
-"at xxxx" should be ignored.
+If div was a float or double, i would probably agree. But its a u32.
+It cannot be between 4 and 5. It must be 5. So it becomes
 
-Bearing in mind that it is imprecise, that means that the abort happened
-sometime in the past, so the PC isn't reliable either.
+ 	if (div <= 4)
+ 		div = 4;
+        else if (div == 5)
+	        div = 5;
+        else if (div == 6)
+                div = 6
+        else 
+	    div = 8
 
-The code here is:
+Those two middle statements look odd to me...
 
-   0:	f57ff04e 	dsb	st
-   4:	e3a01000 	mov	r1, #0
-   8:	e5820000 	str	r0, [r2]
-   c:	f57ff04e 	dsb	st
-  10:	e5820004 	str	r0, [r2, #4]
-
-Given the dsbs there, it's probably the str r0, [r2] which provoked it,
-and we can see from the register dump, r2 is not NULL.
-
-It's probably complaining that a clock necessary for the peripherals
-registers to be accessible is not running.
+      Andrew
