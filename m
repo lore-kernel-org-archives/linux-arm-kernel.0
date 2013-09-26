@@ -1,66 +1,427 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Wed, 25 Sep 2013 21:18:12 -0400
-Subject: [PATCH v3 0/3] clk: keystone: Add common clock drivers
-Message-ID: <1380158295-30629-1-git-send-email-santosh.shilimkar@ti.com>
+Date: Wed, 25 Sep 2013 21:18:13 -0400
+Subject: [PATCH v3 1/3] clk: keystone: add Keystone PLL clock driver
+In-Reply-To: <1380158295-30629-1-git-send-email-santosh.shilimkar@ti.com>
+References: <1380158295-30629-1-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1380158295-30629-2-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mike,
-
-Here is the updated version of the series as aligned on the list.
-Patchset is also available on my git tree [1]
-
-v3:
-Removed the dependency with common clock dt bindings for mux and
-divider considering they are still under discussion. Only first
-patch has changed from last version.
-
-v2:
-- Aligned the bindings as per the list discussion. Removed the additional
-	parameters by usage of reg-names and additional compatible fields.
-- Addressed all the comments from v1 on drivers.
-- Split the series into clock drivers($subject series) and
-	platform, dt updates. Will post that one separately.
-
-Special thanks to Mike and Mark for the detailed review on v1.
-
-Series is an attempt to add the clock drivers for Keystone SOCs
-based on common clock framework. A PLL drivers taking care of
-SOC PLLs and a gate control driver taking clock management for
-the IPs. The current Keystone based SOCs don' support dynamic power
-management usecases like DVFS, SOC ilde etc and hence most of the
-usage is limited to enabling clocks and finding the current clock
-rate etc.
-
-Tested on Keystone2 EVM.
+Add the driver for the PLL IPs found on Keystone 2 devices. The PLL
+IP typically has a multiplier, a divider and a post-divider. The PLL IPs like
+ARMPLL, DDRPLL and PAPLL are controlled by the memory mapped register where
+as the Main PLL is controlled by a PLL controller and memory map registers.
 
 Cc: Mike Turquette <mturquette@linaro.org>
 
-Santosh Shilimkar (3):
-  clk: keystone: add Keystone PLL clock driver
-  clk: keystone: Add gate control clock driver
-  clk: keystone: Build Keystone clock drivers
-
- .../devicetree/bindings/clock/keystone-gate.txt    |   29 ++
+Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+---
  .../devicetree/bindings/clock/keystone-pll.txt     |   84 ++++++
- drivers/clk/Kconfig                                |    7 +
- drivers/clk/Makefile                               |    1 +
- drivers/clk/keystone/Makefile                      |    1 +
- drivers/clk/keystone/gate.c                        |  264 +++++++++++++++++
  drivers/clk/keystone/pll.c                         |  305 ++++++++++++++++++++
- 7 files changed, 691 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/clock/keystone-gate.txt
+ 2 files changed, 389 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/clock/keystone-pll.txt
- create mode 100644 drivers/clk/keystone/Makefile
- create mode 100644 drivers/clk/keystone/gate.c
  create mode 100644 drivers/clk/keystone/pll.c
 
-
-Regards,
-Santosh
-
-[1] git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git
-for_3.13/keystone/clock
-
+diff --git a/Documentation/devicetree/bindings/clock/keystone-pll.txt b/Documentation/devicetree/bindings/clock/keystone-pll.txt
+new file mode 100644
+index 0000000..12bd726
+--- /dev/null
++++ b/Documentation/devicetree/bindings/clock/keystone-pll.txt
+@@ -0,0 +1,84 @@
++Status: Unstable - ABI compatibility may be broken in the future
++
++Binding for keystone PLLs. The main PLL IP typically has a multiplier,
++a divider and a post divider. The additional PLL IPs like ARMPLL, DDRPLL
++and PAPLL are controlled by the memory mapped register where as the Main
++PLL is controlled by a PLL controller registers along with memory mapped
++registers.
++
++This binding uses the common clock binding[1].
++
++[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
++
++Required properties:
++- #clock-cells : from common clock binding; shall be set to 0.
++- compatible : shall be "ti,keystone,main-pll-clock" or "ti,keystone,pll-clock"
++- clocks : parent clock phandle
++- reg - pll control0 and pll multipler registers
++- reg-names : control and multiplier. The multiplier is applicable only for
++		main pll clock
++- fixed-postdiv : fixed post divider value
++
++Example:
++	mainpllclk: mainpllclk at 2310110 {
++		#clock-cells = <0>;
++		compatible = "ti,keystone,main-pll-clock";
++		clocks = <&refclkmain>;
++		reg = <0x02620350 4>, <0x02310110 4>;
++		reg-names = "control", "multiplier";
++		fixed-postdiv = <2>;
++	};
++
++	papllclk: papllclk at 2620358 {
++		#clock-cells = <0>;
++		compatible = "ti,keystone,pll-clock";
++		clocks = <&refclkmain>;
++		clock-output-names = "pa-pll-clk";
++		reg = <0x02620358 4>;
++		reg-names = "control";
++		fixed-postdiv = <6>;
++	};
++
++Required properties:
++- #clock-cells : from common clock binding; shall be set to 0.
++- compatible : shall be "ti,keystone,pll-mux-clock"
++- clocks : link phandles of parent clocks
++- reg - pll mux register
++- bit-shift : number of bits to shift the bit-mask
++- bit-mask : arbitrary bitmask for programming the mux
++
++Optional properties:
++- clock-output-names : From common clock binding.
++
++Example:
++	mainmuxclk: mainmuxclk at 2310108 {
++		#clock-cells = <0>;
++		compatible = "ti,keystone,pll-mux-clock";
++		clocks = <&mainpllclk>, <&refclkmain>;
++		reg = <0x02310108 4>;
++		bit-shift = <23>;
++		bit-mask = <1>;
++		clock-output-names = "mainmuxclk";
++	};
++
++Required properties:
++- #clock-cells : from common clock binding; shall be set to 0.
++- compatible : shall be "ti,keystone,pll-divider-clock"
++- clocks : parent clock phandle
++- reg - pll mux register
++- bit-shift : number of bits to shift the bit-mask
++- bit-mask : arbitrary bitmask for programming the divider
++
++Optional properties:
++- clock-output-names : From common clock binding.
++
++Example:
++	gemtraceclk: gemtraceclk at 2310120 {
++		#clock-cells = <0>;
++		compatible = "ti,keystone,pll-divider-clock";
++		clocks = <&mainmuxclk>;
++		reg = <0x02310120 4>;
++		bit-shift = <0>;
++		bit-mask = <8>;
++		clock-output-names = "gemtraceclk";
++	};
+diff --git a/drivers/clk/keystone/pll.c b/drivers/clk/keystone/pll.c
+new file mode 100644
+index 0000000..c9ebbba
+--- /dev/null
++++ b/drivers/clk/keystone/pll.c
+@@ -0,0 +1,305 @@
++/*
++ * PLL clock driver for Keystone devices
++ *
++ * Copyright (C) 2013 Texas Instruments Inc.
++ *	Murali Karicheri <m-karicheri2@ti.com>
++ *	Santosh Shilimkar <santosh.shilimkar@ti.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ */
++#include <linux/clk.h>
++#include <linux/clk-provider.h>
++#include <linux/err.h>
++#include <linux/io.h>
++#include <linux/slab.h>
++#include <linux/of_address.h>
++#include <linux/of.h>
++#include <linux/module.h>
++
++#define PLLM_LOW_MASK		0x3f
++#define PLLM_HIGH_MASK		0x7ffc0
++#define MAIN_PLLM_HIGH_MASK	0x7f000
++#define PLLM_HIGH_SHIFT		6
++#define PLLD_MASK		0x3f
++
++/**
++ * struct clk_pll_data - pll data structure
++ * @has_pllctrl: If set to non zero, lower 6 bits of multiplier is in pllm
++ *	register of pll controller, else it is in the pll_ctrl0((bit 11-6)
++ * @phy_pllm: Physical address of PLLM in pll controller. Used when
++ *	has_pllctrl is non zero.
++ * @phy_pll_ctl0: Physical address of PLL ctrl0. This could be that of
++ *	Main PLL or any other PLLs in the device such as ARM PLL, DDR PLL
++ *	or PA PLL available on keystone2. These PLLs are controlled by
++ *	this register. Main PLL is controlled by a PLL controller.
++ * @pllm: PLL register map address
++ * @pll_ctl0: PLL controller map address
++ * @pllm_lower_mask: multiplier lower mask
++ * @pllm_upper_mask: multiplier upper mask
++ * @pllm_upper_shift: multiplier upper shift
++ * @plld_mask: divider mask
++ * @postdiv: Post divider
++ */
++struct clk_pll_data {
++	bool has_pllctrl;
++	u32 phy_pllm;
++	u32 phy_pll_ctl0;
++	void __iomem *pllm;
++	void __iomem *pll_ctl0;
++	u32 pllm_lower_mask;
++	u32 pllm_upper_mask;
++	u32 pllm_upper_shift;
++	u32 plld_mask;
++	u32 postdiv;
++};
++
++/**
++ * struct clk_pll - Main pll clock
++ * @hw: clk_hw for the pll
++ * @pll_data: PLL driver specific data
++ */
++struct clk_pll {
++	struct clk_hw hw;
++	struct clk_pll_data *pll_data;
++};
++
++#define to_clk_pll(_hw) container_of(_hw, struct clk_pll, hw)
++
++static unsigned long clk_pllclk_recalc(struct clk_hw *hw,
++					unsigned long parent_rate)
++{
++	struct clk_pll *pll = to_clk_pll(hw);
++	struct clk_pll_data *pll_data = pll->pll_data;
++	unsigned long rate = parent_rate;
++	u32  mult = 0, prediv, postdiv, val;
++
++	/*
++	 * get bits 0-5 of multiplier from pllctrl PLLM register
++	 * if has_pllctrl is non zero
++	 */
++	if (pll_data->has_pllctrl) {
++		val = readl(pll_data->pllm);
++		mult = (val & pll_data->pllm_lower_mask);
++	}
++
++	/* bit6-12 of PLLM is in Main PLL control register */
++	val = readl(pll_data->pll_ctl0);
++	mult |= ((val & pll_data->pllm_upper_mask)
++			>> pll_data->pllm_upper_shift);
++	prediv = (val & pll_data->plld_mask);
++	postdiv = pll_data->postdiv;
++
++	rate /= (prediv + 1);
++	rate = (rate * (mult + 1));
++	rate /= postdiv;
++
++	return rate;
++}
++
++static const struct clk_ops clk_pll_ops = {
++	.recalc_rate = clk_pllclk_recalc,
++};
++
++static struct clk *clk_register_pll(struct device *dev,
++			const char *name,
++			const char *parent_name,
++			struct clk_pll_data *pll_data)
++{
++	struct clk_init_data init;
++	struct clk_pll *pll;
++	struct clk *clk;
++
++	pll = kzalloc(sizeof(*pll), GFP_KERNEL);
++	if (!pll)
++		return ERR_PTR(-ENOMEM);
++
++	init.name = name;
++	init.ops = &clk_pll_ops;
++	init.flags = 0;
++	init.parent_names = (parent_name ? &parent_name : NULL);
++	init.num_parents = (parent_name ? 1 : 0);
++
++	pll->pll_data	= pll_data;
++	pll->hw.init = &init;
++
++	clk = clk_register(NULL, &pll->hw);
++	if (IS_ERR(clk))
++		goto out;
++
++	return clk;
++out:
++	kfree(pll);
++	return NULL;
++}
++
++/**
++ * _of_clk_init - PLL initialisation via DT
++ * @node: device tree node for this clock
++ * @pllctrl: If true, lower 6 bits of multiplier is in pllm register of
++ *		pll controller, else it is in the control regsiter0(bit 11-6)
++ */
++static void __init _of_pll_clk_init(struct device_node *node, bool pllctrl)
++{
++	struct clk_pll_data *pll_data;
++	const char *parent_name;
++	struct clk *clk;
++	int i;
++
++	pll_data = kzalloc(sizeof(*pll_data), GFP_KERNEL);
++	if (!pll_data) {
++		pr_err("%s: Out of memory\n", __func__);
++		return;
++	}
++
++	parent_name = of_clk_get_parent_name(node, 0);
++	if (of_property_read_u32(node, "fixed-postdiv",	&pll_data->postdiv))
++		goto out;
++
++	i = of_property_match_string(node, "reg-names", "control");
++	pll_data->pll_ctl0 = of_iomap(node, i);
++	if (!pll_data->pll_ctl0) {
++		pr_err("%s: ioremap failed\n", __func__);
++		goto out;
++	}
++
++	pll_data->pllm_lower_mask = PLLM_LOW_MASK;
++	pll_data->pllm_upper_shift = PLLM_HIGH_SHIFT;
++	pll_data->plld_mask = PLLD_MASK;
++	pll_data->has_pllctrl = pllctrl;
++	if (!pll_data->has_pllctrl) {
++		pll_data->pllm_upper_mask = PLLM_HIGH_MASK;
++	} else {
++		pll_data->pllm_upper_mask = MAIN_PLLM_HIGH_MASK;
++		i = of_property_match_string(node, "reg-names", "multiplier");
++		pll_data->pllm = of_iomap(node, i);
++		if (!pll_data->pllm) {
++			iounmap(pll_data->pll_ctl0);
++			goto out;
++		}
++	}
++
++	clk = clk_register_pll(NULL, node->name, parent_name, pll_data);
++	if (clk) {
++		of_clk_add_provider(node, of_clk_src_simple_get, clk);
++		return;
++	}
++
++out:
++	pr_err("%s: error initializing pll %s\n", __func__, node->name);
++	kfree(pll_data);
++}
++
++/**
++ * of_keystone_pll_clk_init - PLL initialisation DT wrapper
++ * @node: device tree node for this clock
++ */
++static void __init of_keystone_pll_clk_init(struct device_node *node)
++{
++	_of_pll_clk_init(node, false);
++}
++CLK_OF_DECLARE(keystone_pll_clock, "ti,keystone,pll-clock",
++					of_keystone_pll_clk_init);
++
++/**
++ * of_keystone_pll_main_clk_init - Main PLL initialisation DT wrapper
++ * @node: device tree node for this clock
++ */
++static void __init of_keystone_main_pll_clk_init(struct device_node *node)
++{
++	_of_pll_clk_init(node, true);
++}
++CLK_OF_DECLARE(keystone_main_pll_clock, "ti,keystone,main-pll-clock",
++						of_keystone_main_pll_clk_init);
++
++/**
++ * of_pll_div_clk_init - PLL divider setup function
++ * @node: device tree node for this clock
++ */
++static void __init of_pll_div_clk_init(struct device_node *node)
++{
++	const char *parent_name;
++	void __iomem *reg;
++	u32 shift, mask;
++	struct clk *clk;
++	const char *clk_name = node->name;
++
++	of_property_read_string(node, "clock-output-names", &clk_name);
++	reg = of_iomap(node, 0);
++	if (!reg) {
++		pr_err("%s: ioremap failed\n", __func__);
++		return;
++	}
++
++	parent_name = of_clk_get_parent_name(node, 0);
++	if (!parent_name) {
++		pr_err("%s: missing parent clock\n", __func__);
++		return;
++	}
++
++	if (of_property_read_u32(node, "bit-shift", &shift)) {
++		pr_err("%s: missing 'shift' property\n", __func__);
++		return;
++	}
++
++	if (of_property_read_u32(node, "bit-mask", &mask)) {
++		pr_err("%s: missing 'bit-mask' property\n", __func__);
++		return;
++	}
++
++	clk = clk_register_divider(NULL, clk_name, parent_name, 0, reg, shift,
++				 mask, 0, NULL);
++	if (clk)
++		of_clk_add_provider(node, of_clk_src_simple_get, clk);
++	else
++		pr_err("%s: error registering divider %s\n", __func__, clk_name);
++}
++CLK_OF_DECLARE(pll_divider_clock, "ti,keystone,pll-divider-clock", of_pll_div_clk_init);
++
++/**
++ * of_pll_mux_clk_init - PLL mux setup function
++ * @node: device tree node for this clock
++ */
++static void __init of_pll_mux_clk_init(struct device_node *node)
++{
++	void __iomem *reg;
++	u32 shift, mask;
++	struct clk *clk;
++	const char *parents[2];
++	const char *clk_name = node->name;
++
++	of_property_read_string(node, "clock-output-names", &clk_name);
++	reg = of_iomap(node, 0);
++	if (!reg) {
++		pr_err("%s: ioremap failed\n", __func__);
++		return;
++	}
++
++	parents[0] = of_clk_get_parent_name(node, 0);
++	parents[1] = of_clk_get_parent_name(node, 1);
++	if (!parents[0] || !parents[1]) {
++		pr_err("%s: missing parent clocks\n", __func__);
++		return;
++	}
++
++	if (of_property_read_u32(node, "bit-shift", &shift)) {
++		pr_err("%s: missing 'shift' property\n", __func__);
++		return;
++	}
++
++	if (of_property_read_u32(node, "bit-mask", &mask)) {
++		pr_err("%s: missing 'bit-mask' property\n", __func__);
++		return;
++	}
++
++	clk = clk_register_mux(NULL, clk_name, (const char **)&parents,
++				ARRAY_SIZE(parents) , 0, reg, shift, mask,
++				0, NULL);
++	if (clk)
++		of_clk_add_provider(node, of_clk_src_simple_get, clk);
++	else
++		pr_err("%s: error registering mux %s\n", __func__, clk_name);
++}
++CLK_OF_DECLARE(pll_mux_clock, "ti,keystone,pll-mux-clock", of_pll_mux_clk_init);
 -- 
 1.7.9.5
