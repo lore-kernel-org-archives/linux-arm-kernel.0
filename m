@@ -1,54 +1,78 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Thu, 26 Sep 2013 17:29:47 -0300
-Subject: device tree binding documentation outdated
-In-Reply-To: <20130926195158.GS12758@n2100.arm.linux.org.uk>
-References: <20130926195158.GS12758@n2100.arm.linux.org.uk>
-Message-ID: <CAOMZO5ANsZGcpvmtBE7d0q0E6+f0bE_U8CBF7G2v3xtqoLbqcA@mail.gmail.com>
+Date: Thu, 26 Sep 2013 17:43:52 -0300
+Subject: [PATCH] ARM: dts: imx6q-udoo: Add initial board support
+Message-ID: <1380228232-9137-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
-On Thu, Sep 26, 2013 at 4:51 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> Can someone please point me at the current documentation for the
-> iMX6DL pinctrl bindings?
+For more information about the Udoo board:
+http://www.udoo.org/
 
-Best reference is the mx6dl reference manual (chapter 37 - IOMUXC):
-http://cache.freescale.com/files/32bit/doc/ref_manual/IMX6SDLRM.pdf
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/boot/dts/Makefile       |  1 +
+ arch/arm/boot/dts/imx6q-udoo.dts | 39 +++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 40 insertions(+)
+ create mode 100644 arch/arm/boot/dts/imx6q-udoo.dts
 
-> I mean the stuff which looks like this:
->
-> #define MX6QDL_PAD_ENET_MDC__ESAI_TX5_RX0           0x1e8 0x5b8 0x858 0x2 0x0
-
-Let me try to decode it:
-
-0x1e8: Offset of IOMUXC_SW_MUX_CTL_PAD_ENET_MDC register
-
-0x5b8: Offset of IOMUXC_SW_PAD_CTL_PAD_ENET_MDC register
-
-0x2: This means that the MUX_MODE field selects the ESAI_TX5_RX0 function
-in this pad
-
-0x0: SELECT_INPUT not used for this pad
-
-> which clearly doesn't match:
->
-> Required properties for pin configuration node:
-> - fsl,pins: two integers array, represents a group of pins mux and config
->   setting. The format is fsl,pins = <PIN_FUNC_ID CONFIG>, PIN_FUNC_ID is a
->   pin working on a specific function, which consists of a tuple of
->   <mux_reg conf_reg input_reg mux_val input_val>.  CONFIG is the pad setting
->   value like pull-up on this pin.
->
-> I thought DT was supposed to make bringing up support on new hardware
-> easier, but without documentation, I'm frankly stuffed with the cubox-i,
-> because it's impossible to work out what the right pinctrl settings
-> should be from what seems to be an undocumented pile of random numbers
-> stuffed into DT.
-
-Let me know if you need help with the iomux settings for cubox-i.
-
-Regards,
-
-Fabio Estevam
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index cf75889..c62da5b 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -141,6 +141,7 @@ dtb-$(CONFIG_ARCH_MXC) += \
+ 	imx6q-sabrelite.dtb \
+ 	imx6q-sabresd.dtb \
+ 	imx6q-sbc6x.dtb \
++	imx6q-udoo.dtb \
+ 	imx6q-wandboard.dtb \
+ 	imx6sl-evk.dtb \
+ 	vf610-cosmic.dtb \
+diff --git a/arch/arm/boot/dts/imx6q-udoo.dts b/arch/arm/boot/dts/imx6q-udoo.dts
+new file mode 100644
+index 0000000..6e1ccdc
+--- /dev/null
++++ b/arch/arm/boot/dts/imx6q-udoo.dts
+@@ -0,0 +1,39 @@
++/*
++ * Copyright 2013 Freescale Semiconductor, Inc.
++ *
++ * Author: Fabio Estevam <fabio.estevam@freescale.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ */
++
++/dts-v1/;
++#include "imx6q.dtsi"
++
++/ {
++	model = "Udoo i.MX6 Quad Board";
++	compatible = "udoo,imx6q-udoo", "fsl,imx6q";
++
++	memory {
++		reg = <0x10000000 0x40000000>;
++	};
++};
++
++&sata {
++	status = "okay";
++};
++
++&uart2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_uart2_1>;
++	status = "okay";
++};
++
++&usdhc3 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_usdhc3_2>;
++	non-removable;
++	status = "okay";
++};
+-- 
+1.8.1.2
