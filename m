@@ -1,24 +1,39 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 25 Sep 2013 22:09:21 -0700
-Subject: [PATCH v6 RESEND 0/5] ARM/ARM64 architected timer updates
-In-Reply-To: <1379502306-12911-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
-References: <1379502306-12911-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
-Message-ID: <20130926050921.GA14630@quad.lixom.net>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 26 Sep 2013 14:29:13 +0900
+Subject: [PATCH v2] ARM: SAMSUNG: S5P: If detected device tree skip irq
+ init
+In-Reply-To: <2123658.6S6hP57GRg@flatron>
+References: <1380038363-487-1-git-send-email-m.krawczuk@partner.samsung.com>
+ <2123658.6S6hP57GRg@flatron>
+Message-ID: <02c901ceba79$55b382c0$011a8840$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 18, 2013 at 12:05:01PM +0100, Sudeep KarkadaNagesha wrote:
-> From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
+Tomasz Figa wrote:
 > 
-> Hi Olof/Kevin,
+> Hi Mateusz,
 > 
-> I am reposting this series as suggested by Olof[1]. This is reviewed and
-> acked by Will and Catalin. Daniel needs Ack from arm-soc maintainers
-> to take these through his tree. Can you review this ?
+> On Tuesday 24 of September 2013 17:59:23 Mateusz Krawczuk wrote:
+> > It prevents from executing things already handled by pinctrl-exynos
+> > driver, when device tree is available.
+> >
+> > Signed-off-by: Mateusz Krawczuk <m.krawczuk@partner.samsung.com>
+> > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> > ---
+> >  arch/arm/plat-samsung/s5p-irq-eint.c | 4 ++++
+> >  1 file changed, 4 insertions(+)
+> 
+> Acked-by: Tomasz Figa <t.figa@samsung.com>
+> 
+> [as a temporary solution until we move all the users of this code to
+> device tree]
+> 
+Yes, agreed.
 
-Acked-by: Olof Johansson <olof@lixom.net>
+The 'skip irq init' in subject would be changed to 'skip eint init' for
+clear meaning.
 
-Sorry for the delay.
+Applied.
 
-
--Olof
+Thanks,
+Kukjin
