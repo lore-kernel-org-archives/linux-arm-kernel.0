@@ -1,58 +1,71 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 26 Sep 2013 09:12:45 -0700
-Subject: [PATCH 2/3] KVM: ARM: Fix calculation of virtual CPU ID
-In-Reply-To: <1380210568-23175-3-git-send-email-jonathan.austin@arm.com>
-References: <1380210568-23175-1-git-send-email-jonathan.austin@arm.com>
- <1380210568-23175-3-git-send-email-jonathan.austin@arm.com>
-Message-ID: <20130926161245.GC1389@cbox>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Thu, 26 Sep 2013 18:15:38 +0200
+Subject: [RFC PATCH] ARM: zynq: cpuidle: convert to platform driver
+Message-ID: <1380212138-4020-1-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 26, 2013 at 04:49:27PM +0100, Jonathan Austin wrote:
-> KVM does not have a notion of multiple clusters for CPUs, just a linear
-> array of CPUs. When using a system with cores in more than one cluster, the
-> current method for calculating the virtual MPIDR will leak the (physical)
-> cluster information into the virtual MPIDR. One effect of this is that
-> Linux under KVM fails to boot multiple CPUs that aren't in the 0th cluster.
-> 
-> This patch does away with exposing the real MPIDR fields in favour of simply
-> using the virtual CPU number (but preserving the U bit, as before).
-> 
-> Signed-off-by: Jonathan Austin <jonathan.austin@arm.com>
-> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  arch/arm/kvm/coproc_a15.c |   11 ++++-------
->  1 file changed, 4 insertions(+), 7 deletions(-)
-> 
-> diff --git a/arch/arm/kvm/coproc_a15.c b/arch/arm/kvm/coproc_a15.c
-> index cf93472..bbd4b88 100644
-> --- a/arch/arm/kvm/coproc_a15.c
-> +++ b/arch/arm/kvm/coproc_a15.c
-> @@ -27,14 +27,11 @@
->  static void reset_mpidr(struct kvm_vcpu *vcpu, const struct coproc_reg *r)
->  {
->  	/*
-> -	 * Compute guest MPIDR:
-> -	 * (Even if we present only one VCPU to the guest on an SMP
-> -	 * host we don't set the U bit in the MPIDR, or vice versa, as
-> -	 * revealing the underlying hardware properties is likely to
-> -	 * be the best choice).
-> +	 * Compute guest MPIDR. No need to mess around with different clusters
-> +	 * but we read the 'U' bit from the underlying hardware directly.
->  	 */
-> -	vcpu->arch.cp15[c0_MPIDR] = (read_cpuid_mpidr() & ~MPIDR_LEVEL_MASK)
-> -		| (vcpu->vcpu_id & MPIDR_LEVEL_MASK);
-> +	vcpu->arch.cp15[c0_MPIDR] = (read_cpuid_mpidr() & MPIDR_SMP_BITMASK)
-> +					| vcpu->vcpu_id;
->  }
->  
->  #include "coproc.h"
-> -- 
-> 1.7.9.5
-> 
-> 
-Makes sense.
+As the ux500 and the kirkwood driver, make the zynq driver a platform driver
 
-ack.
+Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+---
+ arch/arm/mach-zynq/common.c    |    7 +++++++
+ drivers/cpuidle/cpuidle-zynq.c |   15 ++++++++++-----
+ 2 files changed, 17 insertions(+), 5 deletions(-)
 
--Christoffer
+diff --git a/arch/arm/mach-zynq/common.c b/arch/arm/mach-zynq/common.c
+index 5f25256..0f0d88f 100644
+--- a/arch/arm/mach-zynq/common.c
++++ b/arch/arm/mach-zynq/common.c
+@@ -44,6 +44,10 @@ static struct of_device_id zynq_of_bus_ids[] __initdata = {
+ 	{}
+ };
+ 
++static struct platform_device zynq_cpuidle_device = {
++	.name = "cpuidle-zynq",
++};
++
+ /**
+  * zynq_init_machine - System specific initialization, intended to be
+  *		       called from board specific initialization.
+@@ -56,6 +60,9 @@ static void __init zynq_init_machine(void)
+ 	l2x0_of_init(0x02060000, 0xF0F0FFFF);
+ 
+ 	of_platform_bus_probe(NULL, zynq_of_bus_ids, NULL);
++
++	if (of_machine_is_compatible("xlnx,zynq-7000"))
++		platform_device_register(&zynq_cpuidle_device);
+ }
+ 
+ static void __init zynq_timer_init(void)
+diff --git a/drivers/cpuidle/cpuidle-zynq.c b/drivers/cpuidle/cpuidle-zynq.c
+index 38e03a1..c8bd261 100644
+--- a/drivers/cpuidle/cpuidle-zynq.c
++++ b/drivers/cpuidle/cpuidle-zynq.c
+@@ -70,14 +70,19 @@ static struct cpuidle_driver zynq_idle_driver = {
+ };
+ 
+ /* Initialize CPU idle by registering the idle states */
+-static int __init zynq_cpuidle_init(void)
++static int __init zynq_cpuidle_probe(void)
+ {
+-	if (!of_machine_is_compatible("xlnx,zynq-7000"))
+-		return -ENODEV;
+-
+ 	pr_info("Xilinx Zynq CpuIdle Driver started\n");
+ 
+ 	return cpuidle_register(&zynq_idle_driver, NULL);
+ }
+ 
+-device_initcall(zynq_cpuidle_init);
++static struct platform_driver zynq_cpuidle_driver = {
++	.driver = {
++		.name = "cpuidle-zynq",
++		.owner = THIS_MODULE,
++	},
++	.probe = zynq_cpuidle_probe,
++};
++
++module_platform_driver(zynq_cpuidle_driver);
+-- 
+1.7.9.5
