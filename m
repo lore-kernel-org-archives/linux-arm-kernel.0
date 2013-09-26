@@ -1,78 +1,69 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Thu, 26 Sep 2013 17:43:52 -0300
-Subject: [PATCH] ARM: dts: imx6q-udoo: Add initial board support
-Message-ID: <1380228232-9137-1-git-send-email-festevam@gmail.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Fri, 27 Sep 2013 00:44:18 +0400
+Subject: [PATCH v2 4/4] ARM: shmobile: BOCK-W reference: add Ether PFC
+ settings
+In-Reply-To: <20130926015142.GB18396@verge.net.au>
+References: <201309070423.30672.sergei.shtylyov@cogentembedded.com>
+ <201309070431.35908.sergei.shtylyov@cogentembedded.com>
+ <CANqRtoRKFoS9tehteDGaTUYJ8fSBqAYJJDiLxZmoNB9W0N+Mpg@mail.gmail.com>
+ <52305EA4.1060902@cogentembedded.com> <20130925044720.GB24243@verge.net.au>
+ <5243073C.8070402@cogentembedded.com> <20130926015142.GB18396@verge.net.au>
+Message-ID: <52449CA2.8040509@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+Hello.
 
-For more information about the Udoo board:
-http://www.udoo.org/
+On 09/26/2013 05:51 AM, Simon Horman wrote:
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/boot/dts/Makefile       |  1 +
- arch/arm/boot/dts/imx6q-udoo.dts | 39 +++++++++++++++++++++++++++++++++++++++
- 2 files changed, 40 insertions(+)
- create mode 100644 arch/arm/boot/dts/imx6q-udoo.dts
+>>>>>> Add the Ether pin group to bockw_pinctrl_map[].
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index cf75889..c62da5b 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -141,6 +141,7 @@ dtb-$(CONFIG_ARCH_MXC) += \
- 	imx6q-sabrelite.dtb \
- 	imx6q-sabresd.dtb \
- 	imx6q-sbc6x.dtb \
-+	imx6q-udoo.dtb \
- 	imx6q-wandboard.dtb \
- 	imx6sl-evk.dtb \
- 	vf610-cosmic.dtb \
-diff --git a/arch/arm/boot/dts/imx6q-udoo.dts b/arch/arm/boot/dts/imx6q-udoo.dts
-new file mode 100644
-index 0000000..6e1ccdc
---- /dev/null
-+++ b/arch/arm/boot/dts/imx6q-udoo.dts
-@@ -0,0 +1,39 @@
-+/*
-+ * Copyright 2013 Freescale Semiconductor, Inc.
-+ *
-+ * Author: Fabio Estevam <fabio.estevam@freescale.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ */
-+
-+/dts-v1/;
-+#include "imx6q.dtsi"
-+
-+/ {
-+	model = "Udoo i.MX6 Quad Board";
-+	compatible = "udoo,imx6q-udoo", "fsl,imx6q";
-+
-+	memory {
-+		reg = <0x10000000 0x40000000>;
-+	};
-+};
-+
-+&sata {
-+	status = "okay";
-+};
-+
-+&uart2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart2_1>;
-+	status = "okay";
-+};
-+
-+&usdhc3 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_usdhc3_2>;
-+	non-removable;
-+	status = "okay";
-+};
--- 
-1.8.1.2
+>>>>>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+
+>>>>>> ---
+>>>>>>   arch/arm/mach-shmobile/board-bockw-reference.c |    3 +++
+>>>>>>   1 file changed, 3 insertions(+)
+
+>>>>>> Index: renesas/arch/arm/mach-shmobile/board-bockw-reference.c
+>>>>>> ===================================================================
+>>>>>> --- renesas.orig/arch/arm/mach-shmobile/board-bockw-reference.c
+>>>>>> +++ renesas/arch/arm/mach-shmobile/board-bockw-reference.c
+>>>>>> @@ -29,6 +29,9 @@
+>>>>>>    */
+>>>>>>
+>>>>>>   static const struct pinctrl_map bockw_pinctrl_map[] = {
+>>>>>> +       /* Ether */
+>>>>>> +       PIN_MAP_MUX_GROUP_DEFAULT("fde00000.ethernet", "pfc-r8a7778",
+>>>>>> +                                 "ether_rmii", "ether"),
+>>>>>>          /* SCIF0 */
+>>>>>>          PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.0", "pfc-r8a7778",
+>>>>>>                                    "scif0_data_a", "scif0"),
+
+>>>>> Hi Sergei,
+
+>>>>> Thanks for your patches. In general I think your series looks fine. I
+>>>>> have a single comment, and that's about the pinctrl-related hunk
+>>>>> above. I can see that this patch is for DT reference for Bock-W, so I
+>>>>> expect the code to be in DT. Do you have any plans to use DT to
+>>>>> describe the pinmux bits? Perhaps you have some incremental patch
+>>>>> planned?
+
+>>>>     No, I just repeated what I saw mechanically. Now I'm seeing some
+>>>> evidence that PFC driver supports the device tree, so I probably
+>>>> need to redo the patchset... let me study this question better.
+
+>>> Ping.
+
+>>     Sorry, I got distracted by other work and didn't advance much here.
+>> Will try to respin the patchset before my vacation (next Monday).
+>> Although the driver DT support patch have seemingly stalemated due
+>> to the most recent comments...
+
+> Thanks for the update.
+
+> I guess the key is to move forward on the driver side, somehow.
+
+    Do you mean we should grant Stephen's requests concerning clock DT support 
+before we add the DT support to the driver?
+
+WBR, Sergei
