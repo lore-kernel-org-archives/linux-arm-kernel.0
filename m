@@ -1,113 +1,56 @@
 From: andreas.herrmann@calxeda.com (Andreas Herrmann)
-Date: Fri, 27 Sep 2013 00:36:15 +0200
-Subject: [PATCH 3/9] ARM: dma-mapping: Always pass proper prot flags to
- iommu_map()
+Date: Fri, 27 Sep 2013 00:36:16 +0200
+Subject: [PATCH 4/9] iommu/arm-smmu: Check for num_context_irqs > 0 to avoid
+ divide by zero exception
 In-Reply-To: <1380234982-1677-1-git-send-email-andreas.herrmann@calxeda.com>
 References: <1380234982-1677-1-git-send-email-andreas.herrmann@calxeda.com>
-Message-ID: <1380234982-1677-4-git-send-email-andreas.herrmann@calxeda.com>
+Message-ID: <1380234982-1677-5-git-send-email-andreas.herrmann@calxeda.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-... otherwise it is impossible for the low level iommu driver to
-figure out which pte flags should be used.
+With the right (or wrong;-) definition of v1 SMMU node in DTB it is
+possible to trigger a division by zero in arm_smmu_init_domain_context
+(if number of context irqs is 0):
 
-In __map_sg_chunk we can derive the flags from dma_data_direction.
+       if (smmu->version == 1) {
+               root_cfg->irptndx = atomic_inc_return(&smmu->irptndx);
+ =>            root_cfg->irptndx %= smmu->num_context_irqs;
+       } else {
 
-In __iommu_create_mapping we should treat the memory like
-DMA_BIDIRECTIONAL and pass both IOMMU_READ and IOMMU_WRITE to
-iommu_map.
-__iommu_create_mapping is used during dma_alloc_coherent (via
-arm_iommu_alloc_attrs).  AFAIK dma_alloc_coherent is responsible for
-allocation _and_ mapping.  I think this implies that access to the
-mapped pages should be allowed.
+Avoid this by checking for num_context_irqs > 0 when probing
+for SMMU devices.
 
-Cc: Marek Szyprowski <m.szyprowski@samsung.com>
+Rationale: Assuming that at least one context bank for non-secure
+usage is provided per SMMU, it follows (from ARM SMMU Architecture
+Spec) that at least one context interrupt must be available.
+
+Also remove the line of code that derived num_context_irqs from
+num_irqs and num_global_irqs. If DT is wrong and interrupt property
+contains less interrupts than num_global_irqs this would set
+num_context_irqs to a big u32 value which most likely causes trouble
+in other parts of the driver.
+
 Signed-off-by: Andreas Herrmann <andreas.herrmann@calxeda.com>
 ---
- arch/arm/mm/dma-mapping.c |   43 ++++++++++++++++++++++++++++---------------
- 1 file changed, 28 insertions(+), 15 deletions(-)
+ drivers/iommu/arm-smmu.c |    6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-index f5e1a84..1272ed2 100644
---- a/arch/arm/mm/dma-mapping.c
-+++ b/arch/arm/mm/dma-mapping.c
-@@ -1232,7 +1232,8 @@ __iommu_create_mapping(struct device *dev, struct page **pages, size_t size)
- 				break;
- 
- 		len = (j - i) << PAGE_SHIFT;
--		ret = iommu_map(mapping->domain, iova, phys, len, 0);
-+		ret = iommu_map(mapping->domain, iova, phys, len,
-+				IOMMU_READ|IOMMU_WRITE);
- 		if (ret < 0)
- 			goto fail;
- 		iova += len;
-@@ -1431,6 +1432,27 @@ static int arm_iommu_get_sgtable(struct device *dev, struct sg_table *sgt,
- 					 GFP_KERNEL);
- }
- 
-+static int __dma_direction_to_prot(enum dma_data_direction dir)
-+{
-+	int prot;
+diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+index 4307fbc..de9dd60 100644
+--- a/drivers/iommu/arm-smmu.c
++++ b/drivers/iommu/arm-smmu.c
+@@ -1822,7 +1822,11 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
+ 			 num_irqs, smmu->num_global_irqs);
+ 		smmu->num_global_irqs = num_irqs;
+ 	}
+-	smmu->num_context_irqs = num_irqs - smmu->num_global_irqs;
 +
-+	switch (dir) {
-+	case DMA_BIDIRECTIONAL:
-+		prot = IOMMU_READ | IOMMU_WRITE;
-+		break;
-+	case DMA_TO_DEVICE:
-+		prot = IOMMU_READ;
-+		break;
-+	case DMA_FROM_DEVICE:
-+		prot = IOMMU_WRITE;
-+		break;
-+	default:
-+		prot = 0;
++	if (!smmu->num_context_irqs) {
++		dev_err(dev, "no context interrupt specified in DT\n");
++		return -ENODEV;
 +	}
-+
-+	return prot;
-+}
-+
- /*
-  * Map a part of the scatter-gather list into contiguous io address space
-  */
-@@ -1444,6 +1466,7 @@ static int __map_sg_chunk(struct device *dev, struct scatterlist *sg,
- 	int ret = 0;
- 	unsigned int count;
- 	struct scatterlist *s;
-+	int prot;
  
- 	size = PAGE_ALIGN(size);
- 	*handle = DMA_ERROR_CODE;
-@@ -1460,7 +1483,9 @@ static int __map_sg_chunk(struct device *dev, struct scatterlist *sg,
- 			!dma_get_attr(DMA_ATTR_SKIP_CPU_SYNC, attrs))
- 			__dma_page_cpu_to_dev(sg_page(s), s->offset, s->length, dir);
- 
--		ret = iommu_map(mapping->domain, iova, phys, len, 0);
-+		prot = __dma_direction_to_prot(dir);
-+
-+		ret = iommu_map(mapping->domain, iova, phys, len, prot);
- 		if (ret < 0)
- 			goto fail;
- 		count += len >> PAGE_SHIFT;
-@@ -1665,19 +1690,7 @@ static dma_addr_t arm_coherent_iommu_map_page(struct device *dev, struct page *p
- 	if (dma_addr == DMA_ERROR_CODE)
- 		return dma_addr;
- 
--	switch (dir) {
--	case DMA_BIDIRECTIONAL:
--		prot = IOMMU_READ | IOMMU_WRITE;
--		break;
--	case DMA_TO_DEVICE:
--		prot = IOMMU_READ;
--		break;
--	case DMA_FROM_DEVICE:
--		prot = IOMMU_WRITE;
--		break;
--	default:
--		prot = 0;
--	}
-+	prot = __dma_direction_to_prot(dir);
- 
- 	ret = iommu_map(mapping->domain, dma_addr, page_to_phys(page), len, prot);
- 	if (ret < 0)
+ 	smmu->irqs = devm_kzalloc(dev, sizeof(*smmu->irqs) * num_irqs,
+ 				  GFP_KERNEL);
 -- 
 1.7.9.5
