@@ -1,65 +1,38 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Thu, 26 Sep 2013 02:23:49 +0200
-Subject: 3.12-rc1: no longer compiles for Nokia n900 (omap based),
- display no longer works
-In-Reply-To: <20130919184703.GE30568@blackmetal.musicnaut.iki.fi>
-References: <20130919093002.GA23806@amd.pavel.ucw.cz>
- <20130919094402.GA27253@amd.pavel.ucw.cz>
- <20130919184703.GE30568@blackmetal.musicnaut.iki.fi>
-Message-ID: <20130926002349.GA26599@amd.pavel.ucw.cz>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 26 Sep 2013 09:29:20 +0900
+Subject: [PATCH] ARM: shmobile: Add r8a7790 thermal sensor DT device
+In-Reply-To: <CANqRtoRPAMDDgPo5kBTxnEoVG7N1UwxWGBuz+ORzTPqP=+7r_A@mail.gmail.com>
+References: <20130925231119.16473.31647.sendpatchset@w520>
+ <20130925233552.GA20882@verge.net.au>
+ <CANqRtoRPAMDDgPo5kBTxnEoVG7N1UwxWGBuz+ORzTPqP=+7r_A@mail.gmail.com>
+Message-ID: <20130926002919.GB13464@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
-
-> On Thu, Sep 19, 2013 at 11:44:02AM +0200, Pavel Machek wrote:
-> > something in 3.12-rc1 broke display :-(. (dmesg diff attached at the
-> > end, maybe someone knows...)
+On Thu, Sep 26, 2013 at 08:43:46AM +0900, Magnus Damm wrote:
+> On Thu, Sep 26, 2013 at 8:35 AM, Simon Horman <horms@verge.net.au> wrote:
+> > On Thu, Sep 26, 2013 at 08:11:19AM +0900, Magnus Damm wrote:
+> >> From: Magnus Damm <damm@opensource.se>
+> >>
+> >> Hook up the single channel thermal sensor via DT
+> >> on r8a7790. The information used by the platform
+> >> device has been verified against the data sheet.
+> >>
+> >> Signed-off-by: Magnus Damm <damm@opensource.se>
+> >
+> > Hi Magnus,
+> >
+> > I would prefer if this was split into two patches.
+> > An SoC patch that updates clock-r8a7790.c.
+> > And a DT patch which updates r8a7790.dtsi.
 > 
-> 3.12-rc1 for N900 compiles and works (also display) here with binutils
-> 2.23.2.
+> Sure, that's fine with me. I will do that from now on.
 
-I updated to eldk-5.4, and now it compiles, but still no display on 
+Thanks. I'm trying to reduce dependencies/conflicts between
+branches. I'm not sure how well it will pan out. But that is my aim
+at the moment.
 
-> > + omapfb omapfb: no displays
-> 
-> [...]
-> 
-> > - acx565akm spi1.2: omapfb: acx565akm rev 12 LCD detected
-> 
-> I think this is because the panel driver has changed, and the old one
-> was deleted. You need to change your kernel configuration with something
-> like below:
-> 
-> -CONFIG_PANEL_ACX565AKM=y
-> +CONFIG_DISPLAY_PANEL_SONY_ACX565AKM=y
+> I believe that common clock framework will allow us to handle all
+> within a single dtsi patch.
 
-Thanks for the hint.. but apparently it was not enough. Still no
-display on qemu :-(.
-
-Anyway, "make oldconfig" is expected to produce working kernel, which
-is clearly not case here. Perhaps this should be added to fix that?
-
-[Who can take the patch?]
-   	       	    	  	       	      	       	      Pavel
-
-PS: whoever named directory in kernel sources "displays-new" should...
-think again.
-
-Signed-off-by: Pavel Machek <pavel@ucw.cz>
-
-index 6c90885..d3eabd2 100644
---- a/drivers/video/omap2/displays-new/Kconfig
-+++ b/drivers/video/omap2/displays-new/Kconfig
-@@ -40,6 +40,7 @@ config DISPLAY_PANEL_DSI_CM
- 
- config DISPLAY_PANEL_SONY_ACX565AKM
- 	tristate "ACX565AKM Panel"
-+	default PANEL_ACX565AKM
- 	depends on SPI && BACKLIGHT_CLASS_DEVICE
- 	help
- 	  This is the LCD panel used on Nokia N900
-
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Excellent.
