@@ -1,39 +1,18 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Thu, 26 Sep 2013 16:35:30 -0300
-Subject: [PATCH v2 4/4] ARM: mvebu: Add the core-divider clock to Armada 370/XP
-In-Reply-To: <1380224130-11868-1-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1380224130-11868-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1380224130-11868-5-git-send-email-ezequiel.garcia@free-electrons.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 26 Sep 2013 21:40:35 +0200
+Subject: [PATCH] clk: nomadik: set all timers to use 2.4 MHz TIMCLK
+In-Reply-To: <1379101551-2722-1-git-send-email-linus.walleij@linaro.org>
+References: <1379101551-2722-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <CACRpkdYfSfAFRD_s1UHfV-k+JS5G3B5tN9UAwxOEzWB4t7yibA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Armada 370/XP SoC has a clock provider called "Core Divider",
-that is derived from a fixed 2 GHz PLL clock.
+On Fri, Sep 13, 2013 at 9:45 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
 
-Reviewed-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
----
- arch/arm/boot/dts/armada-370-xp.dtsi | 8 ++++++++
- 1 file changed, 8 insertions(+)
+> This fixes a regression for the Nomadik on the main system
+> timers.
 
-diff --git a/arch/arm/boot/dts/armada-370-xp.dtsi b/arch/arm/boot/dts/armada-370-xp.dtsi
-index 924c721..01e69fc 100644
---- a/arch/arm/boot/dts/armada-370-xp.dtsi
-+++ b/arch/arm/boot/dts/armada-370-xp.dtsi
-@@ -137,6 +137,14 @@
- 				status = "disabled";
- 			};
- 
-+			coredivclk: corediv-clock at 18740 {
-+				compatible = "marvell,armada-370-corediv-clock";
-+				reg = <0x18740 0xc>;
-+				#clock-cells = <1>;
-+				clocks = <&mainpll>;
-+				clock-output-names = "nand";
-+			};
-+
- 			timer at 20300 {
- 				reg = <0x20300 0x30>, <0x21040 0x30>;
- 				interrupts = <37>, <38>, <39>, <40>, <5>, <6>;
--- 
-1.8.1.5
+Ping Mike, are you picking this up for fixes?
+
+Yours,
+Linus Walleij
