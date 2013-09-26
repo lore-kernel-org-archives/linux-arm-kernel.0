@@ -1,23 +1,76 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Thu, 26 Sep 2013 15:47:55 -0700
-Subject: [PATCH] serial: prepare for 9bit data
-In-Reply-To: <1379938052-6026-1-git-send-email-jiri.prchal@aksignal.cz>
-References: <1379938052-6026-1-git-send-email-jiri.prchal@aksignal.cz>
-Message-ID: <20130926224755.GA15399@kroah.com>
+From: rob@landley.net (Rob Landley)
+Date: Thu, 26 Sep 2013 17:48:29 -0500
+Subject: new binutils needed for arm in 3.12-rc1
+In-Reply-To: <alpine.LFD.2.03.1309251147320.312@syhkavp.arg> (from
+ nico@fluxnic.net on Wed Sep 25 11:13:17 2013)
+Message-ID: <1380235709.1974.93@driftwood>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 23, 2013 at 02:07:32PM +0200, Jiri Prchal wrote:
-> This patch adds 9bit data possibility for serial_core. Please confirm that I did it right way at right place. I'll make atmel_serial driver for 9bit data later.
+On 09/25/2013 11:13:17 AM, Nicolas Pitre wrote:
+> On Wed, 25 Sep 2013, Rob Landley wrote:
+> 
+> > On 09/24/2013 09:07:57 PM, Nicolas Pitre wrote:
+> > > I'd strongly suggest you make your binutils compatible with newer
+> > > instruction syntax instead of making the kernel more complex.
+> >
+> > Meaning I play whack-a-mole as this becomes permission to depend on  
+> endless
+> > new gnuisms just because they're there and nobody else is  
+> regression testing
+> > against them, not because they actually add anything.
+> 
+> Gnuism?
+> 
+> Let me quote the ARM ARchitecture Reference Manual, version 7  
+> revision C,
+> section A8.8.44 (sorry for the whitespace dammage):
 
-Please wrap your lines properly.
+Globally changing the binutils requirement for all architectures, as  
+the doc patch at the start of this thread proposed doing, would mean  
+gnuisms in common code (ext2 and such) wouldn't get caught, giving llvm  
+and pcc and such a moving target when trying to build the kernel with  
+non-gnu toolchains. That's what I meant by gnuisms breeding.
 
-I'd rather wait to add this type of patch _after_ you have tested it and
-verified that your driver works, and take that patch at the same time.
+> So what's the link with the above and your issue with GPLv3, besides  
+> the
+> fact that the last binutils version to have been released under the
+> GPLv2 is defficient?
 
-Otherwise, this is just added cruft that no one is using, and I'd have
-to remove it :)
+I apparently wasn't clear. The new instructions aren't gnuisms. The  
+lack of widespread regression testing for armv5l and such would allow  
+introduction of nonportable constructs in a larger context.
 
-thanks,
+(The fact that armv7 could apparently build fine for ~7 years with  
+binutils 2.18 through 2.21, and now it's suddenly can't Because Reasons  
+is kinda silly, but not really a big deal. That, I can patch my  
+toolchain.)
 
-greg k-h
+> > > It could be as simple as making gas accept an extra argument for
+> > > instructions like dsb and just ignoring it.
+> >
+> > So you prefer I come up with the reversion patches locally and  
+> _not_ send them
+> > upstream?
+> 
+> Sort of.  And I'm suggesting you patch your binutils rather than the
+> kernel.
+
+I had this misidentified as a global arm problem and not specific to  
+arm7l. If armv5l still still builds with the old toolchains, it's not a  
+big deal.
+
+> Given you're not upgrading your binutils anymore that means
+> you'll have to apply that patch only once instead of having to apply  
+> it
+> to every kernel upgrade.
+
+Indeed. Patching my own toolchain isn't really a problem. My objection  
+was to the Documentation patch telling the world at large that for all  
+targets, older binutils aren't supported even on x86. That was worth  
+pushing back against.
+
+I don't indend to use old gcc/binutils versions forever, I just want to  
+be able to use them until I can replace them with llvm or similar.
+
+Rob
