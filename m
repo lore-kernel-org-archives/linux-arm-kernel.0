@@ -1,63 +1,109 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Thu, 26 Sep 2013 12:46:14 +0200
-Subject: [PATCH 2/2] ARM i.MX53: dts: Add TVE to i.MX53-QSB device tree
-In-Reply-To: <1380192374-9531-1-git-send-email-p.zabel@pengutronix.de>
-References: <1380192374-9531-1-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <1380192374-9531-2-git-send-email-p.zabel@pengutronix.de>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 26 Sep 2013 11:47:28 +0100
+Subject: [PATCH 8/8] KVM: arm-vgic: Support CPU interface reg access
+In-Reply-To: <20130925211150.GH32311@cbox>
+References: <1377285606-15692-1-git-send-email-christoffer.dall@linaro.org>
+ <1377285606-15692-9-git-send-email-christoffer.dall@linaro.org>
+ <05BF567A-DD8A-4226-A51F-0D661F4D7EB2@suse.de> <20130925211150.GH32311@cbox>
+Message-ID: <524410C0.6020201@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch enables the TVE which is driving the VGA connector on i.MX53-QSB.
+On 25/09/13 22:30, Christoffer Dall wrote:
+> On Sun, Aug 25, 2013 at 04:24:20PM +0100, Alexander Graf wrote:
+>>
+>> On 23.08.2013, at 20:20, Christoffer Dall wrote:
+>>
+>>> Implement support for the CPU interface register access driven by MMIO
+>>> address offsets from the CPU interface base address.  Useful for user
+>>> space to support save/restore of the VGIC state.
+>>>
+>>> This commit adds support only for the same logic as the current VGIC
+>>> support, and no more.  For example, the active priority registers are
+>>> handled as RAZ/WI, just like setting priorities on the emulated
+>>> distributor.
+>>>
+>>> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+>>> ---
+>>> virt/kvm/arm/vgic.c |   66 +++++++++++++++++++++++++++++++++++++++++++++++----
+>>> 1 file changed, 62 insertions(+), 4 deletions(-)
+>>>
+>>> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+>>> index d44b5a1..257dbae 100644
+>>> --- a/virt/kvm/arm/vgic.c
+>>> +++ b/virt/kvm/arm/vgic.c
+>>> @@ -1684,9 +1684,67 @@ int kvm_vgic_addr(struct kvm *kvm, unsigned long type, u64 *addr, bool write)
+>>> static bool handle_cpu_mmio_misc(struct kvm_vcpu *vcpu,
+>>> 				 struct kvm_exit_mmio *mmio, phys_addr_t offset)
+>>> {
+>>> -	return true;
+>>> +	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
+>>> +	u32 reg, mask = 0, shift = 0;
+>>> +	bool updated = false;
+>>> +
+>>> +	switch (offset & ~0x3) {
+>>> +	case GIC_CPU_CTRL:
+>>> +		mask = GICH_VMCR_CTRL_MASK;
+>>> +		shift = GICH_VMCR_CTRL_SHIFT;
+>>> +		break;
+>>> +	case GIC_CPU_PRIMASK:
+>>> +		mask = GICH_VMCR_PRIMASK_MASK;
+>>> +		shift = GICH_VMCR_PRIMASK_SHIFT;
+>>> +		break;
+>>> +	case GIC_CPU_BINPOINT:
+>>> +		mask = GICH_VMCR_BINPOINT_MASK;
+>>> +		shift = GICH_VMCR_BINPOINT_SHIFT;
+>>> +		break;
+>>> +	case GIC_CPU_ALIAS_BINPOINT:
+>>> +		mask = GICH_VMCR_ALIAS_BINPOINT_MASK;
+>>> +		shift = GICH_VMCR_ALIAS_BINPOINT_SHIFT;
+>>> +		break;
+>>> +	}
+>>> +
+>>> +	if (!mmio->is_write) {
+>>> +		reg = (vgic_cpu->vgic_vmcr & mask) >> shift;
+>>> +		memcpy(mmio->data, &reg, sizeof(reg));
+>>> +	} else {
+>>> +		memcpy(&reg, mmio->data, sizeof(reg));
+>>> +		reg = (reg << shift) & mask;
+>>> +		if (reg != (vgic_cpu->vgic_vmcr & mask))
+>>> +			updated = true;
+>>> +		vgic_cpu->vgic_vmcr &= ~mask;
+>>> +		vgic_cpu->vgic_vmcr |= reg;
+>>> +	}
+>>> +	return updated;
+>>> +}
+>>> +
+>>> +static bool handle_mmio_abpr(struct kvm_vcpu *vcpu,
+>>> +			     struct kvm_exit_mmio *mmio, phys_addr_t offset)
+>>> +{
+>>> +	return handle_cpu_mmio_misc(vcpu, mmio, GIC_CPU_ALIAS_BINPOINT);
+>>> +}
+>>> +
+>>> +static bool handle_cpu_mmio_ident(struct kvm_vcpu *vcpu,
+>>> +				  struct kvm_exit_mmio *mmio,
+>>> +				  phys_addr_t offset)
+>>> +{
+>>> +	u32 reg;
+>>> +
+>>> +	if (mmio->is_write)
+>>> +		return false;
+>>> +
+>>> +	reg = 0x0002043B;
+>>
+>> This wants a comment and probably also a #define :).
+>>
+> 
+> Marc, where does the 0x4b0 product id code come from for the distributor
+> IIDR?
 
-Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
----
- arch/arm/boot/dts/imx53-qsb.dts | 20 ++++++++++++++++++--
- 1 file changed, 18 insertions(+), 2 deletions(-)
+0x4B is the ASCII value for 'K', and the whole thing is intended to read
+as KVM/ARM. Call that a feeble attempt at an Easter Egg.
 
-diff --git a/arch/arm/boot/dts/imx53-qsb.dts b/arch/arm/boot/dts/imx53-qsb.dts
-index cf1aef7..3bbedf7 100644
---- a/arch/arm/boot/dts/imx53-qsb.dts
-+++ b/arch/arm/boot/dts/imx53-qsb.dts
-@@ -173,6 +173,15 @@ memgpu: /memreserve/ 0xb0000000 0x04000000;
- 		};
- 	};
- 
-+	tve {
-+		pinctrl_vga_sync_1: vgasync-grp1 {
-+			fsl,pins = <
-+				/* VGA_HSYNC, VSYNC with max drive strength */
-+				MX53_PAD_EIM_OE__IPU_DI1_PIN7 0xe6
-+				MX53_PAD_EIM_RW__IPU_DI1_PIN8 0xe6
-+			>;
-+		};
-+	};
- };
- 
- &uart1 {
-@@ -280,8 +289,8 @@ memgpu: /memreserve/ 0xb0000000 0x04000000;
- 			};
- 
- 			ldo8_reg: ldo8 {
--				regulator-min-microvolt = <1200000>;
--				regulator-max-microvolt = <3600000>;
-+				regulator-min-microvolt = <2750000>;
-+				regulator-max-microvolt = <2750000>;
- 				regulator-always-on;
- 			};
- 
-@@ -318,6 +327,13 @@ memgpu: /memreserve/ 0xb0000000 0x04000000;
- 	status = "okay";
- };
- 
-+&tve {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_vga_sync_1>;
-+	dac-supply = <&ldo7_reg>;
-+	status = "okay";
-+};
-+
- &usbh1 {
- 	vbus-supply = <&reg_usb_vbus>;
- 	phy_type = "utmi";
+I'd very much refrain from pretending we emulate an existing GICv2
+implementation, as the damned thing is behaving very differently from
+the hardware.
+
+	M.
 -- 
-1.8.4.rc3
+Jazz is not dead. It just smells funny...
