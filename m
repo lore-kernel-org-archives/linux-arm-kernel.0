@@ -1,71 +1,27 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 26 Sep 2013 16:13:33 -0700
-Subject: [PATCH v3] ARM: EDMA: Fix clearing of unused list for DT DMA
- resources
-In-Reply-To: <1380232546-821-1-git-send-email-joelf@ti.com>
-References: <1380232546-821-1-git-send-email-joelf@ti.com>
-Message-ID: <CAOesGMgELbnuu8PM7Ah2xKo2H5rzgAN3w0g6wA7aVFsjuds-8g@mail.gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 26 Sep 2013 17:16:11 -0600
+Subject: [PATCH] ASoC: generic: Add generic DT based simple codec
+In-Reply-To: <20130923232648.GL21013@sirena.org.uk>
+References: <20130919105437.75e0f0a3@armhf> <5240B07C.6080404@wwwdotorg.org>
+ <20130923232648.GL21013@sirena.org.uk>
+Message-ID: <5244C03B.6060806@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 26, 2013 at 2:55 PM, Joel Fernandes <joelf@ti.com> wrote:
-> HWMOD removal for MMC is breaking edma_start as the events are being manually
-> triggered due to unused channel list not being clear.
->
-> The above issue is fixed by reading the "dmas" property from the DT node if it
-> exists and clearing the bits in the unused channel list if the dma controller
-> used by any device is EDMA. For this purpose we use the of_* helpers to parse
-> the arguments in the dmas phandle list.
->
-> Also introduced is a minor clean up of a checkpatch error in old code.
->
-> Reviewed-by: Sekhar Nori <nsekhar@ti.com>
-> Reported-by: Balaji T K <balajitk@ti.com>
-> Cc: Sekhar Nori <nsekhar@ti.com>
-> Cc: Tony Lindgren <tony@atomide.com>
-> Cc: Olof Johansson <olof@lixom.net>
-> Cc: Nishanth Menon <nm@ti.com>
-> Cc: Pantel Antoniou <panto@antoniou-consulting.com>
-> Cc: Jason Kridner <jkridner@beagleboard.org>
-> Cc: Koen Kooi <koen@dominion.thruhere.net>
-> Signed-off-by: Joel Fernandes <joelf@ti.com>
-> ---
-> Just resending this patch after discussing with Sekhar and Olof.
+On 09/23/2013 05:26 PM, Mark Brown wrote:
+> On Mon, Sep 23, 2013 at 03:19:56PM -0600, Stephen Warren wrote:
+>> On 09/19/2013 02:54 AM, Jean-Francois Moine wrote:
+> 
+>>> +Required properties: +- compatible: should be
+>>> "linux,simple-codec".
+> 
+>> We shouldn't have any Linux-specific bindings. It might be
+>> reasonable to define a binding for a "simple CODEC", but there's
+>> no reason it should be Linux-specific.
+> 
+> What's the vendor prefix to use then?  The same thought did occur
+> to me but I wasn't sure what to suggest instead.
 
-Actually, the patch you talked to me about was v3 of this. It seems
-that you have reposted v6 but labelled it v3. This is very confusing.
-
-> AM335x is being booted by many users such as the beaglebone community. DT is
-> the only boot method available for all these users.  EDMA is required for the
-> operation for many common peripherals in AM335x SoC such as McASP, MMC and
-> Crypto.
->
-> Although EDMA DT nodes are going in only for 3.13, in reality the kernel has
-> been used for more than a year with EDMA code and out of tree EDMA DTS patches.
-> Hence though the DT nodes are still not in mainline, this patch can be still be
-> considered a critical fix as such and it would be great if it could be included
-> in 3.12-rc release. Thanks.
-
-This is really the root of this problem. If you sit on code out of
-tree for a year, and something breaks that we couldn't even have
-detected since we didn't have the out-of-tree pieces. We'll help you
-the first few times (such as now) but we will eventually stop caring.
-
-If I was in a worse mood, then I'd just say that since your users
-already has to have out-of-tree code to even use this functionality,
-they could just add this fix on top of that stack of patches. But I'm
-in a slightly better mood than that and I'll pick it up this time. :)
-
-> More details about why this broke an existing feature folks were using:
-> Previously the DMA resources for platform devices were being populated through
-> HWMOD, however with the recent clean ups with HWMOD, this data has been moved
-> to Device tree. The EDMA code though is not aware of this so it fails to fetch
-> the DMA resources correctly which it needs to prepare the unused channel list
-> (basically doesn't properly clear the channels that are in use, in the unused
-> list).
-
-So that we can learn for next time: What should we (as in us
-maintainers and you TI) have done differently to avoid this?
-
-
--Olof
+For other non-vendor-specific/generic bindings, we've simply omitted
+the vendor prefix from the compatible value, e.g.: gpio-keys,
+i2c-gpio, regulator-fixed, etc.
