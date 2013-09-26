@@ -1,193 +1,148 @@
-From: yadi.brar01@gmail.com (Yadwinder Singh Brar)
-Date: Thu, 26 Sep 2013 17:38:58 +0530
-Subject: [PATCH 2/3] clk: samsung: Add clock driver for s5pc100
-In-Reply-To: <1380041605-15736-2-git-send-email-m.krawczuk@partner.samsung.com>
-References: <1380041605-15736-1-git-send-email-m.krawczuk@partner.samsung.com>
- <1380041605-15736-2-git-send-email-m.krawczuk@partner.samsung.com>
-Message-ID: <CAKew6eUgpnqvZUCsWGpqwDXtp6ARmhd-Nw-BXiod8=MK-k0fUA@mail.gmail.com>
+From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
+Date: Thu, 26 Sep 2013 14:13:33 +0200
+Subject: [PATCH 2/3] ARM: mxs: crypto: Add Freescale MXS DCP driver
+In-Reply-To: <1380194306-5243-2-git-send-email-marex@denx.de>
+References: <1380194306-5243-1-git-send-email-marex@denx.de>
+ <1380194306-5243-2-git-send-email-marex@denx.de>
+Message-ID: <21060.9453.908125.71858@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mateusz,
+Hi Marek,
 
+some small comments below.
 
-After a quick view, just few things regarding coding styles.
-
+Marek Vasut writes:
+> diff --git a/drivers/crypto/mxs-dcp.c b/drivers/crypto/mxs-dcp.c
+> new file mode 100644
+> index 0000000..c2b35c7
+> --- /dev/null
+> +++ b/drivers/crypto/mxs-dcp.c
 [...]
-> +#define        GENERAL_STATUS          0x0104
-> +#define        CAM_MUX_SEL             0x0300
-> +#define        MIXER_OUT_SEL           0x0304
-> +#define        LPMP3_MODE_SEL          0x0308
-> +#define MIPI_PHY_CON0          0x0400
-> +#define MIPI_PHY_CON1          0x0414
-> +#define HDMI_PHY_CON0          0x0420
+> +/* AES 128 ECB and AES 128 CBC */
+> +static struct crypto_alg dcp_aes_algs[] = {
+> +	[0] = {
+> +		.cra_name		= "ecb(aes)",
+> +		.cra_driver_name	= "ecb-aes-dcp",
+> +		.cra_priority		= 400,
+> +		.cra_alignmask		= 15,
+> +		.cra_flags		= CRYPTO_ALG_TYPE_ABLKCIPHER |
+> +					  CRYPTO_ALG_ASYNC |
+> +					  CRYPTO_ALG_NEED_FALLBACK,
+> +		.cra_init		= mxs_dcp_aes_fallback_init,
+> +		.cra_exit		= mxs_dcp_aes_fallback_exit,
+> +		.cra_blocksize		= AES_BLOCK_SIZE,
+> +		.cra_ctxsize		= sizeof(struct dcp_async_ctx),
+> +		.cra_type		= &crypto_ablkcipher_type,
+> +		.cra_module		= THIS_MODULE,
+> +		.cra_u	= {
+> +			.ablkcipher = {
+> +				.min_keysize	= AES_MIN_KEY_SIZE,
+> +				.max_keysize	= AES_MAX_KEY_SIZE,
+> +				.setkey		= mxs_dcp_aes_setkey,
+> +				.encrypt	= mxs_dcp_aes_ecb_encrypt,
+> +				.decrypt	= mxs_dcp_aes_ecb_decrypt
+> +			}
+missing ',' after '}'
+> +		}
+dto.
 
-How about aligning all above with same no. of tabs?
-
-> +
-> +/* Helper macros to define clock arrays. */
-> +#define FIXED_RATE_CLOCKS(name)        \
-> +               static struct samsung_fixed_rate_clock name[]
-> +#define MUX_CLOCKS(name)       \
-> +               static struct samsung_mux_clock name[]
-> +#define DIV_CLOCKS(name)       \
-> +               static struct samsung_div_clock name[]
-> +#define GATE_CLOCKS(name)      \
-> +               static struct samsung_gate_clock name[]
-> +
-
-These macros seems little bit odd in our common practice,
-perhaps these are making code harder to read below.
-
-> +/* Helper macros for gate types present on S5PC100. */
-> +#define GATE_BUS(_id, cname, pname, o, b) \
-> +               GATE(_id, cname, pname, o, b, 0, 0)
-> +#define GATE_SCLK(_id, cname, pname, o, b) \
-> +               GATE(_id, cname, pname, o, b, CLK_SET_RATE_PARENT, 0)
-> +#define GATE_ON(_id, cname, pname, o, b) \
-> +               GATE(_id, cname, pname, o, b, CLK_IGNORE_UNUSED, 0)
-> +
-[...]
-> +PNAME(mout_hclk_2_p) = {
-> +       "fout_epll",
-> +       "i2scdclk0"
+> +	},
+> +	[1] = {
+> +		.cra_name		= "cbc(aes)",
+> +		.cra_driver_name	= "cbc-aes-dcp",
+> +		.cra_priority		= 400,
+> +		.cra_alignmask		= 15,
+> +		.cra_flags		= CRYPTO_ALG_TYPE_ABLKCIPHER |
+> +					  CRYPTO_ALG_ASYNC |
+> +					  CRYPTO_ALG_NEED_FALLBACK,
+> +		.cra_init		= mxs_dcp_aes_fallback_init,
+> +		.cra_exit		= mxs_dcp_aes_fallback_exit,
+> +		.cra_blocksize		= AES_BLOCK_SIZE,
+> +		.cra_ctxsize		= sizeof(struct dcp_async_ctx),
+> +		.cra_type		= &crypto_ablkcipher_type,
+> +		.cra_module		= THIS_MODULE,
+> +		.cra_u = {
+> +			.ablkcipher = {
+> +				.min_keysize	= AES_MIN_KEY_SIZE,
+> +				.max_keysize	= AES_MAX_KEY_SIZE,
+> +				.setkey		= mxs_dcp_aes_setkey,
+> +				.encrypt	= mxs_dcp_aes_cbc_encrypt,
+> +				.decrypt	= mxs_dcp_aes_cbc_decrypt,
+> +				.ivsize		= AES_BLOCK_SIZE,
+> +			}
+dto.
+> +		}
+dto.
+> +	},
 > +};
 > +
-> +PNAME(mout_i2s_2_p) = {
-> +       "fout_epll",
-> +       "i2scdclk0",
-> +       "dout_audio0",
-> +       "none"
+> +/* SHA1 */
+> +static struct ahash_alg dcp_sha1_alg = {
+> +	.init	= dcp_sha_init,
+> +	.update	= dcp_sha_update,
+> +	.final	= dcp_sha_final,
+> +	.finup	= dcp_sha_finup,
+> +	.digest	= dcp_sha_digest,
+> +	.halg	= {
+> +		.digestsize	= SHA1_DIGEST_SIZE,
+> +		.base		= {
+> +			.cra_name		= "sha1",
+> +			.cra_driver_name	= "sha1-dcp",
+> +			.cra_priority		= 400,
+> +			.cra_alignmask		= 63,
+> +			.cra_flags		= CRYPTO_ALG_ASYNC,
+> +			.cra_blocksize		= SHA1_BLOCK_SIZE,
+> +			.cra_ctxsize		= sizeof(struct dcp_async_ctx),
+> +			.cra_module		= THIS_MODULE,
+> +			.cra_init		= dcp_sha_cra_init,
+> +			.cra_exit		= dcp_sha_cra_exit,
+> +		}
+dto.
+> +	}
+dto.
+
 > +};
 > +
+> +/* SHA256 */
+> +static struct ahash_alg dcp_sha256_alg = {
+> +	.init	= dcp_sha_init,
+> +	.update	= dcp_sha_update,
+> +	.final	= dcp_sha_final,
+> +	.finup	= dcp_sha_finup,
+> +	.digest	= dcp_sha_digest,
+> +	.halg	= {
+> +		.digestsize	= SHA256_DIGEST_SIZE,
+> +		.base		= {
+> +			.cra_name		= "sha256",
+> +			.cra_driver_name	= "sha256-dcp",
+> +			.cra_priority		= 400,
+> +			.cra_alignmask		= 63,
+> +			.cra_flags		= CRYPTO_ALG_ASYNC,
+> +			.cra_blocksize		= SHA256_BLOCK_SIZE,
+> +			.cra_ctxsize		= sizeof(struct dcp_async_ctx),
+> +			.cra_module		= THIS_MODULE,
+> +			.cra_init		= dcp_sha_cra_init,
+> +			.cra_exit		= dcp_sha_cra_exit,
+> +		}
+dto.
+> +	}
+dto.
 
-Using one line per parent isn't increasing length of file unnecessarily?
-
-[ ... ]
-> +
-> +/* list of all parent clock list */
-> +static struct samsung_clock_alias s5pc100_clock_aliases[] = {
-> +       ALIAS(FIMC0, "s5pc100-fimc.0", "fimc"),
-> +       ALIAS(FIMC1, "s5pc100-fimc.1", "fimc"),
-> +       ALIAS(FIMC2, "s5pc100-fimc.2", "fimc"),
-> +       ALIAS(MOUT_FIMC2, NULL, "mout_fimc2"),
-> +       ALIAS(MOUT_FIMC1, NULL, "mout_fimc1"),
-> +       ALIAS(MOUT_FIMC0, NULL, "mout_fimc0"),
-> +       ALIAS(SCLK_FIMC0, "s5pc100-fimc.0", "sclk_fimc"),
-> +       ALIAS(SCLK_FIMC1, "s5pc100-fimc.1", "sclk_fimc"),
-> +       ALIAS(SCLK_FIMC2, "s5pc100-fimc.2", "sclk_fimc"),
-> +
-> +       ALIAS(MOUT_APLL, NULL, "mout_apll"),
-> +       ALIAS(MOUT_MPLL, NULL, "mout_mpll"),
-> +       ALIAS(MOUT_EPLL, NULL, "mout_epll"),
-> +       ALIAS(MOUT_HPLL, NULL, "mout_hpll"),
-> +       ALIAS(MOUT_HPLL, NULL, "sclk_hpll"),
-> +       ALIAS(UART0, "s3c6400-uart.0", "uart"),
-> +       ALIAS(UART1, "s3c6400-uart.1", "uart"),
-> +       ALIAS(UART2, "s3c6400-uart.2", "uart"),
-> +       ALIAS(UART3, "s3c6400-uart.3", "uart"),
-> +       ALIAS(UART0, "s3c6400-uart.0", "clk_uart_baud0"),
-> +       ALIAS(UART1, "s3c6400-uart.1", "clk_uart_baud0"),
-> +       ALIAS(UART2, "s3c6400-uart.2", "clk_uart_baud0"),
-> +       ALIAS(UART3, "s3c6400-uart.3", "clk_uart_baud0"),
-> +       ALIAS(UART0, "s3c6400-uart.0", "clk_uart_baud2"),
-> +       ALIAS(UART1, "s3c6400-uart.1", "clk_uart_baud2"),
-> +       ALIAS(UART2, "s3c6400-uart.2", "clk_uart_baud2"),
-> +       ALIAS(UART3, "s3c6400-uart.3", "clk_uart_baud2"),
-> +       ALIAS(SCLK_UART, "s3c6400-uart.0", "clk_uart_baud3"),
-> +       ALIAS(SCLK_UART, "s3c6400-uart.1", "clk_uart_baud3"),
-> +       ALIAS(SCLK_UART, "s3c6400-uart.2", "clk_uart_baud3"),
-> +       ALIAS(SCLK_UART, "s3c6400-uart.3", "clk_uart_baud3"),
-> +
-> +       ALIAS(HSMMC0, "s3c-sdhci.0", "hsmmc"),
-> +       ALIAS(HSMMC1, "s3c-sdhci.1", "hsmmc"),
-> +       ALIAS(HSMMC2, "s3c-sdhci.2", "hsmmc"),
-> +       ALIAS(HSMMC0, "s3c-sdhci.0", "mmc_busclk.0"),
-> +       ALIAS(HSMMC1, "s3c-sdhci.1", "mmc_busclk.0"),
-> +       ALIAS(HSMMC2, "s3c-sdhci.2", "mmc_busclk.0"),
-> +       ALIAS(SCLK_MMC0, "s3c-sdhci.0", "mmc_busclk.2"),
-> +       ALIAS(SCLK_MMC1, "s3c-sdhci.1", "mmc_busclk.2"),
-> +       ALIAS(SCLK_MMC2, "s3c-sdhci.2", "mmc_busclk.2"),
-> +       ALIAS(SCLK_MMC0_48, "s3c-sdhci.0", "mmc_busclk.3"),
-> +       ALIAS(SCLK_MMC1_48, "s3c-sdhci.1", "mmc_busclk.3"),
-> +       ALIAS(SCLK_MMC2_48, "s3c-sdhci.2", "mmc_busclk.3"),
-> +
-> +       ALIAS(SPI0, "s5pc100-spi.0", "spi"),
-> +       ALIAS(SPI1, "s5pc100-spi.1", "spi"),
-> +       ALIAS(SPI2, "s5pc100-spi.2", "spi"),
-> +       ALIAS(SPI0, "s5pc100-spi.0", "spi_busclk0"),
-> +       ALIAS(SPI1, "s5pc100-spi.1", "spi_busclk0"),
-> +       ALIAS(SPI2, "s5pc100-spi.2", "spi_busclk0"),
-> +       ALIAS(SCLK_SPI0_48, "s5pc100-spi.0", "spi_busclk1"),
-> +       ALIAS(SCLK_SPI1_48, "s5pc100-spi.1", "spi_busclk1"),
-> +       ALIAS(SCLK_SPI2_48, "s5pc100-spi.2", "spi_busclk1"),
-> +       ALIAS(SCLK_SPI0, "s5pc100-spi.0", "spi_busclk2"),
-> +       ALIAS(SCLK_SPI1, "s5pc100-spi.1", "spi_busclk2"),
-> +       ALIAS(SCLK_SPI2, "s5pc100-spi.2", "spi_busclk2"),
-> +       ALIAS(PDMA0, "dma-pl330.0", "apb_pclk"),
-> +       ALIAS(PDMA1, "dma-pl330.1", "apb_pclk"),
-> +       ALIAS(PWM, NULL, "timers"),
-> +
-> +       ALIAS(JPEG, NULL, "jpeg"),
-> +       ALIAS(MFC, "s5p-mfc", "mfc"),
-> +       ALIAS(TV, "s5p-sdo", "dac"),
-> +       ALIAS(MIXER, "s5p-mixer", "mixer"),
-> +       ALIAS(VP, "s5p-mixer", "vp"),
-> +       ALIAS(HDMI, "s5p-hdmi", "hdmi"),
-> +       ALIAS(SCLK_HDMI, "s5p-hdmi", "hdmiphy"),
-> +
-> +       ALIAS(USB_OTG, NULL, "otg"),
-> +       ALIAS(USB_HOST, NULL, "usb-host"),
-> +       ALIAS(USB_HOST, NULL, "usbhost"),
-> +       ALIAS(LCDCON, "s5pc100-fb", "lcd"),
-> +       ALIAS(CFCON, NULL, "cfcon"),
-> +       ALIAS(SYSTIMER, NULL, "systimer"),
-> +       ALIAS(WDT, NULL, "watchdog"),
-> +       ALIAS(RTC, NULL, "rtc"),
-> +       ALIAS(I2C, "s3c2440-i2c.0", "i2c"),
-> +       ALIAS(CCAN0, NULL, "ccan"),
-> +       ALIAS(CCAN1, NULL, "ccan"),
-> +       ALIAS(I2C_HDMI, "s3c2440-i2c.1", "i2c"),
-> +       ALIAS(HSITX, NULL, "hsitx"),
-> +       ALIAS(HSIRX, NULL, "hsirx"),
-> +       ALIAS(TSADC, NULL, "adc"),
-> +       ALIAS(KEYIF, "s5pc100-keypad", "keypad"),
-> +       ALIAS(I2S0, "samsung-i2s.0", "iis"),
-> +       ALIAS(I2S1, "samsung-i2s.1", "iis"),
-> +       ALIAS(I2S2, "samsung-i2s.2", "iis"),
-> +       ALIAS(SPDIF, NULL, "spdif"),
-> +       ALIAS(ROTATOR, NULL, "rot"),
-> +       ALIAS(DOUT_ARM, NULL, "armclk"),
-> +       ALIAS(SCLK_AUDIO0, "soc-audio.0", "sclk_audio"),
-> +       ALIAS(SCLK_AUDIO1, "soc-audio.1", "sclk_audio"),
-> +       ALIAS(SCLK_AUDIO2, "soc-audio.2", "sclk_audio"),
-> +       ALIAS(KEYIF, NULL, "keypad"),
-> +
-> +       ALIAS(MFC, "s5p-mfc", "sclk_mfc"),
-> +       ALIAS(G2D, "s5p-g2d", "fimg2d"),
-> +
-> +};
-> +
-
-Any reason/hidden advantage for using a separate of ALIAS,
-instead of using MUX_A/GATE_A ?
-
-[ ... ]
-> +       s5pc100_clk_register_finpll(xom);
-> +
-> +       /* Register PLLs. */
-
-Why this special comment/treatment for PLLs :) ?
-Others below doesn't get such treatment.
-
-> +       samsung_clk_register_pll(s5pc100_pll_clks,
-> +                               ARRAY_SIZE(s5pc100_pll_clks), reg_base);
-> +
-> +       samsung_clk_register_fixed_rate(s5pc100_fixed_rate_clks,
-> +                       ARRAY_SIZE(s5pc100_fixed_rate_clks));
-> +
+> +static const struct of_device_id mxs_dcp_dt_ids[] = {
+> +	{.compatible = "fsl,mxs-dcp", .data = NULL,},
 >
+missing spaces after '{' and before '}'
 
 
-Regards,
-Yadwinder
+Lothar Wa?mann
+-- 
+___________________________________________________________
+
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
