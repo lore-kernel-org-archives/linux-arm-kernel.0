@@ -1,107 +1,65 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Thu, 26 Sep 2013 12:12:41 -0300
-Subject: [PATCH 1/5] clk: mvebu: Add core-divider clock
-In-Reply-To: <20130926082404.GA18244@lunn.ch>
-References: <1380144502-24109-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <20130925213730.GA19371@localhost> <20130926082404.GA18244@lunn.ch>
-Message-ID: <20130926151240.GB4583@localhost>
+From: nm@ti.com (Nishanth Menon)
+Date: Thu, 26 Sep 2013 10:21:57 -0500
+Subject: [PATCHv7 00/36] ARM: OMAP: clock data conversion to DT
+In-Reply-To: <1380098922-30340-1-git-send-email-t-kristo@ti.com>
+References: <1380098922-30340-1-git-send-email-t-kristo@ti.com>
+Message-ID: <52445115.7010800@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 26, 2013 at 10:24:04AM +0200, Andrew Lunn wrote:
-> Hi Ezequiel
+On 09/25/2013 03:48 AM, Tero Kristo wrote:
+[...]
+> Test branch available here:
+> https://github.com/t-kristo/linux-pm.git
+> branch: mainline-3.12-rc2-ti-dt-clks-v7
 > 
-> > +static int clk_corediv_enable(struct clk_hw *hwclk)
-> > +{
-> > +	struct clk_corediv *corediv = to_corediv_clk(hwclk);
-> > +	struct clk_corediv_desc *desc = &corediv->desc;
-> > +	u32 reg;
-> > +
-> > +	reg = readl(corediv->reg);
-> > +	reg |= (BIT(desc->fieldbit) << CORE_CLOCK_DIVIDER_ENABLE_OFFSET);
-> > +	writel(reg, corediv->reg);
-> > +	return 0;
-> > +}
+> Testing done:
+> - am335x-bone : boot only
+> - omap5-sevm : boot only
+> - dra7-evm : boot only
+> - omap3-beagle : boot + suspend/resume (ret + off)
+> - omap4-panda-es : boot + suspend/resume
 > 
-> Shouldn't there be spinlocks around these register accesses? At least
-> the core gate clk driver has a spinlock.
-> 
+> Nishanth has also been doing some tests with omap3-beagle-xm with some WIP
+> versions of this branch, but not with this latest one. Nishanth, maybe you
+> can provide test results to this one also?
+I rebased the branch on top of benoit's for_3.13/dts merged with
+v3.12-rc2 tag
+45646cd ARM: dts: AM33XX: don't redefine OCP bus and device nodes
 
-Indeed.
+All platforms were to MMC filesystem boot (SD card). u-boot used
+v2013.10-rc3 on all platforms (mainline u-boot).
 
-> > +static long clk_corediv_round_rate(struct clk_hw *hwclk, unsigned long rate,
-> > +	     				          unsigned long *parent_rate)
-> > +{
-> > +	/* Valid ratio are 1:4, 1:5, 1:6 and 1:8 */
-> > +	u32 div;
-> > +
-> > +	div = *parent_rate / rate;
-> > +	if (div <= 4)
-> > +	   div = 4;
-> > +	   else if (div <= 5)
-> > +	   	div = 5;
-> > +		else if (div <= 6)
-> > +		     div = 6;
-> > +		     else
-> > +			div = 8;
-> > +
-> > +	return *parent_rate / div;
-> > +}
-> 
-> This looks odd. Is not the following clearer?
-> 
-> 	div = *parent_rate / rate;
-> 	if (div < 5)
-> 	   div = 4;
-> 	   else if (div > 6)
-> 		div = 8;
-> 
-> The CodingStyle might require some {} here?
-> 
+OMAP3630: Beagle-XM:
+http://pastebin.pandaboard.org/index.php/view/96577127
+(needs additional patch
+-> https://patchwork.kernel.org/patch/2919661/ )
 
-Mmmm... no, it's not at all clearer to me.
-IMHO, the original construction explicitly show the possible ratios:
+OMAP4460: Panda-ES: http://pastebin.pandaboard.org/index.php/view/85143661
 
-	/* If it's smaller than or equal to 4, set to 4 */
-	if (div <= 4)
-		div = 4;
+OMAP5432: OMAP5-UEVM:
+http://pastebin.pandaboard.org/index.php/view/91361843
+(nice to have patch
+-> https://patchwork.kernel.org/patch/2907761/ )
 
-	/* Otherwise, if it's between 4 and 5, set to 5 */
-	else if (div <= 5)
-	 	div = 5;
+AM335x: BeagleBone Black:
+http://pastebin.pandaboard.org/index.php/view/42000597
+(needs additional patches:
+ https://patchwork.kernel.org/patch/2902711/
+ https://patchwork.kernel.org/patch/2902711/
+)
 
-	/* Otherwise, if it's between 5 and 6, set to 6 */
-	else if (div <= 6)
-		div = 6;
+DRA7: DRA7-EVM: http://pastebin.pandaboard.org/index.php/view/38362805
+(needs additional patches:
+-> https://patchwork.kernel.org/patch/2849391/
+-> https://patchwork.kernel.org/patch/2849601/
+-> https://patchwork.kernel.org/patch/2849602/
+-> https://patchwork.kernel.org/patch/2907761/
+)
 
-	/* Otherwise, if it's bigger than 6, set to 8 */
-	else
-		div = 8;
+So, for the entire series:
+Tested-by: Nishanth Menon <nm@ti.com>
 
-(And I don't think we need any braces).
-
-Is this not clear?
-
-> +   /*
-> +    * Wait for clocks to settle down, and then clear all the
-> +     * ratios request and the reload request.
-> +      */
-> +      udelay(1000);
-> +      reg &= ~(CORE_CLOCK_DIVIDER_RATIO_MASK | CORE_CLOCK_DIVIDER_RATIO_RELOAD);
-> +      writel(reg, corediv->reg);
-> +      udelay(1000);
-> 
-> 
-> Documentation/timers/timers-howto.txt says: 
-> 
->        SLEEPING FOR ~USECS OR SMALL MSECS ( 10us - 20ms):
->        		* Use usleep_range
-> 
-
-Right, forgot about that as well...
-
-Thanks for the feedback!
 -- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+Regards,
+Nishanth Menon
