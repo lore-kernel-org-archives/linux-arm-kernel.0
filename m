@@ -1,39 +1,62 @@
-From: afzal@ti.com (Afzal Mohammed)
-Date: Thu, 26 Sep 2013 15:03:55 +0530
-Subject: [PATCH v4 11/11] ARM: OMAP2+: AM43x PRCM init
-In-Reply-To: <cover.1380179370.git.afzal@ti.com>
-References: <cover.1380179370.git.afzal@ti.com>
-Message-ID: <0d7fb00e7ea5209362fca057611da741b18bd84d.1380179370.git.afzal@ti.com>
+From: bcousson@baylibre.com (Benoit Cousson)
+Date: Thu, 26 Sep 2013 11:36:01 +0200
+Subject: [PATCH 0/9] ARM: dts: DT data for OMAP platforms for v3.13
+In-Reply-To: <1380146469-29496-1-git-send-email-joelf@ti.com>
+References: <1380146469-29496-1-git-send-email-joelf@ti.com>
+Message-ID: <52440001.8070804@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ambresh K <ambresh@ti.com>
+Hi Joel,
 
-Initialise AM43x HWMOD, powerdomains and clockdomains.
+On 26/09/2013 00:01, Joel Fernandes wrote:
+> Following series is a collection of dts patches for the below features:
+> crypto:
+>   aes, sha on am335x
+>   aes, des on am437x
+>   aes, des on omap4
+> display:
+>    beaglebone black HDMI
+>    am335x-evm panel
+>
+> Series is based on Benoit Cousson's for_3.13/dts branch (commit sha 45646cd)
+> Available at: git at github.com:joelagnel/linux-kernel.git (branch for-benoit)
 
-Signed-off-by: Ambresh K <ambresh@ti.com>
-Signed-off-by: Afzal Mohammed <afzal@ti.com>
----
- arch/arm/mach-omap2/io.c | 6 ++++++
- 1 file changed, 6 insertions(+)
+Thanks for the update and rebase.
 
-diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
-index ff2113c..c90f647 100644
---- a/arch/arm/mach-omap2/io.c
-+++ b/arch/arm/mach-omap2/io.c
-@@ -594,7 +594,13 @@ void __init am43xx_init_early(void)
- 				  NULL);
- 	omap2_set_globals_prm(AM33XX_L4_WK_IO_ADDRESS(AM43XX_PRCM_BASE));
- 	omap2_set_globals_cm(AM33XX_L4_WK_IO_ADDRESS(AM43XX_PRCM_BASE), NULL);
-+	omap_prm_base_init();
-+	omap_cm_base_init();
- 	omap3xxx_check_revision();
-+	am43xx_powerdomains_init();
-+	am43xx_clockdomains_init();
-+	am43xx_hwmod_init();
-+	omap_hwmod_init_postsetup();
- }
- #endif
- 
--- 
-1.8.3.4
+I'll check the series ASAP.
+
+Thanks,
+Benoit
+
+>
+> Benoit Parrot (1):
+>    ARM: dts: AM33XX: Add LCDC info into am335x-evm
+>
+> Darren Etheridge (1):
+>    dts: boneblack: add pinmux and hdmi node to enable display
+>
+> Joel Fernandes (5):
+>    omap4: dts: Add node for AES
+>    omap4: dts: Add node for DES3DES module
+>    am33xx: dts: Fix AES interrupt number
+>    ARM: am437x: dts: Add AES node for am437x
+>    ARM: am437x: dts: Add DES node for am437x
+>
+> Mark A. Greer (2):
+>    ARM: dts: Add SHAM data and documentation for AM33XX
+>    ARM: dts: Add AES data and documentation for AM33XX
+>
+>   .../devicetree/bindings/crypto/omap-aes.txt        | 34 ++++++++++
+>   .../devicetree/bindings/crypto/omap-sham.txt       | 31 +++++++++
+>   arch/arm/boot/dts/am335x-bone.dts                  |  8 +++
+>   arch/arm/boot/dts/am335x-boneblack.dts             | 48 +++++++++++++
+>   arch/arm/boot/dts/am335x-evm.dts                   | 79 ++++++++++++++++++++++
+>   arch/arm/boot/dts/am335x-evmsk.dts                 |  8 +++
+>   arch/arm/boot/dts/am33xx.dtsi                      | 30 ++++++++
+>   arch/arm/boot/dts/am4372.dtsi                      | 16 +++++
+>   arch/arm/boot/dts/omap4.dtsi                       | 20 ++++++
+>   9 files changed, 274 insertions(+)
+>   create mode 100644 Documentation/devicetree/bindings/crypto/omap-aes.txt
+>   create mode 100644 Documentation/devicetree/bindings/crypto/omap-sham.txt
+>
