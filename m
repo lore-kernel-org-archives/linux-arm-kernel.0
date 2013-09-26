@@ -1,98 +1,145 @@
 From: mpa@pengutronix.de (Markus Pargmann)
-Date: Thu, 26 Sep 2013 17:06:35 +0200
-Subject: [PATCH 2/3] dma: mxs-dma: Track number of irqs for callback
+Date: Thu, 26 Sep 2013 17:06:34 +0200
+Subject: [PATCH 1/3] dma: mxs-dma: Cleanup interrupt handler
 In-Reply-To: <1380207996-27257-1-git-send-email-mpa@pengutronix.de>
 References: <1380207996-27257-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <1380207996-27257-3-git-send-email-mpa@pengutronix.de>
+Message-ID: <1380207996-27257-2-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently there is one tasklet scheduled for all interrupts between two
-mxs_dma_tasklet calls for one channel. With more than one interrupts,
-the tasklet is only called once.
+The DMA interrupt handler uses its controll registers to handle all
+available channel interrupts it can find.
 
-Using low latency audio playback, can lead to problems. When using
-sound/soc/soc-dmaengine-pcm.c, the dmaengine_pcm_dma_complete relies on
-being called for each interrupt that occures. This function is the
-callback which is called from the mxs-dma driver in mxs_dma_tasklet.
-This can cause wrong position counters and can lead to a wrong DMA
-buffer offset. In this situation the DMA engine and pcm lib may write
-and read from the same buffer segment.
-
-This patch adds a locked per-channel irq counter and calls the callback
-function in a loop for irq-counter times.
+This patch changes it to handle only one interrupt by directly mapping
+irq number to channel. It also includes a cleanup of the ctrl-register
+usage.
 
 Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
 ---
- drivers/dma/mxs-dma.c | 26 +++++++++++++++++++++++++-
- 1 file changed, 25 insertions(+), 1 deletion(-)
+ drivers/dma/mxs-dma.c | 95 ++++++++++++++++++++++++++++++++-------------------
+ 1 file changed, 59 insertions(+), 36 deletions(-)
 
 diff --git a/drivers/dma/mxs-dma.c b/drivers/dma/mxs-dma.c
-index bfca8dc..13c7d83 100644
+index ccd13df..bfca8dc 100644
 --- a/drivers/dma/mxs-dma.c
 +++ b/drivers/dma/mxs-dma.c
-@@ -115,6 +115,8 @@ struct mxs_dma_chan {
- 	int				desc_count;
- 	enum dma_status			status;
- 	unsigned int			flags;
-+	unsigned int			nr_irqs;
-+	spinlock_t			lock;
- #define MXS_DMA_SG_LOOP			(1 << 0)
- };
- 
-@@ -267,9 +269,21 @@ static dma_cookie_t mxs_dma_tx_submit(struct dma_async_tx_descriptor *tx)
- static void mxs_dma_tasklet(unsigned long data)
- {
- 	struct mxs_dma_chan *mxs_chan = (struct mxs_dma_chan *) data;
-+	unsigned long flags;
- 
-+	spin_lock_irqsave(&mxs_chan->lock, flags);
-+
-+	/*
-+	 * Some DMA users need exactly one call for each interrupt generated.
-+	 * This loop calls the callback nr_irqs times.
-+	 */
- 	if (mxs_chan->desc.callback)
--		mxs_chan->desc.callback(mxs_chan->desc.callback_param);
-+		for (; mxs_chan->nr_irqs; --mxs_chan->nr_irqs)
-+			mxs_chan->desc.callback(mxs_chan->desc.callback_param);
-+	else
-+		mxs_chan->nr_irqs = 0;
-+
-+	spin_unlock_irqrestore(&mxs_chan->lock, flags);
+@@ -272,58 +272,81 @@ static void mxs_dma_tasklet(unsigned long data)
+ 		mxs_chan->desc.callback(mxs_chan->desc.callback_param);
  }
  
- static int mxs_dma_irq_to_chan(struct mxs_dma_engine *mxs_dma, int irq)
-@@ -290,6 +304,7 @@ static irqreturn_t mxs_dma_int_handler(int irq, void *dev_id)
- 	u32 completed;
- 	u32 err;
- 	int chan = mxs_dma_irq_to_chan(mxs_dma, irq);
-+	unsigned long flags;
++static int mxs_dma_irq_to_chan(struct mxs_dma_engine *mxs_dma, int irq)
++{
++	int i;
++
++	for (i = 0; i != mxs_dma->nr_channels; ++i)
++		if (mxs_dma->mxs_chans[i].chan_irq == irq)
++			return i;
++
++	return -EINVAL;
++}
++
+ static irqreturn_t mxs_dma_int_handler(int irq, void *dev_id)
+ {
+ 	struct mxs_dma_engine *mxs_dma = dev_id;
+-	u32 stat1, stat2;
++	struct mxs_dma_chan *mxs_chan;
++	u32 completed;
++	u32 err;
++	int chan = mxs_dma_irq_to_chan(mxs_dma, irq);
++
++	if (chan < 0)
++		return IRQ_NONE;
  
- 	if (chan < 0)
- 		return IRQ_NONE;
-@@ -344,6 +359,13 @@ static irqreturn_t mxs_dma_int_handler(int irq, void *dev_id)
- 	if (mxs_chan->status == DMA_SUCCESS)
- 		dma_cookie_complete(&mxs_chan->desc);
+ 	/* completion status */
+-	stat1 = readl(mxs_dma->base + HW_APBHX_CTRL1);
+-	stat1 &= MXS_DMA_CHANNELS_MASK;
+-	writel(stat1, mxs_dma->base + HW_APBHX_CTRL1 + STMP_OFFSET_REG_CLR);
++	completed = readl(mxs_dma->base + HW_APBHX_CTRL1);
++	completed = (completed >> chan) & 0x1;
++
++	/* Clear interrupt */
++	writel((1 << chan),
++			mxs_dma->base + HW_APBHX_CTRL1 + STMP_OFFSET_REG_CLR);
  
+ 	/* error status */
+-	stat2 = readl(mxs_dma->base + HW_APBHX_CTRL2);
+-	writel(stat2, mxs_dma->base + HW_APBHX_CTRL2 + STMP_OFFSET_REG_CLR);
++	err = readl(mxs_dma->base + HW_APBHX_CTRL2);
++	err &= (1 << (MXS_DMA_CHANNELS + chan)) | (1 << chan);
++
 +	/*
-+	 * Increase the number of irqs we saw for this channel.
++	 * error status bit is in the upper 16 bits, error irq bit in the lower
++	 * 16 bits. We transform it into a simpler error code:
++	 * err: 0x00 = no error, 0x01 = TERMINATION, 0x02 = BUS_ERROR
 +	 */
-+	spin_lock_irqsave(&mxs_chan->lock, flags);
-+	++mxs_chan->nr_irqs;
-+	spin_unlock_irqrestore(&mxs_chan->lock, flags);
++	err = (err >> (MXS_DMA_CHANNELS + chan)) + (err >> chan);
 +
- 	/* schedule tasklet on this channel */
- 	tasklet_schedule(&mxs_chan->tasklet);
++	/* Clear error irq */
++	writel((1 << chan),
++			mxs_dma->base + HW_APBHX_CTRL2 + STMP_OFFSET_REG_CLR);
  
-@@ -385,6 +407,8 @@ static int mxs_dma_alloc_chan_resources(struct dma_chan *chan)
- 	/* the descriptor is ready */
- 	async_tx_ack(&mxs_chan->desc);
+ 	/*
+ 	 * When both completion and error of termination bits set at the
+ 	 * same time, we do not take it as an error.  IOW, it only becomes
+-	 * an error we need to handle here in case of either it's (1) a bus
+-	 * error or (2) a termination error with no completion.
++	 * an error we need to handle here in case of either it's a bus
++	 * error or a termination error with no completion. 0x01 is termination
++	 * error, so we can subtract err & completed to get the real error case.
+ 	 */
+-	stat2 = ((stat2 >> MXS_DMA_CHANNELS) & stat2) | /* (1) */
+-		(~(stat2 >> MXS_DMA_CHANNELS) & stat2 & ~stat1); /* (2) */
+-
+-	/* combine error and completion status for checking */
+-	stat1 = (stat2 << MXS_DMA_CHANNELS) | stat1;
+-	while (stat1) {
+-		int channel = fls(stat1) - 1;
+-		struct mxs_dma_chan *mxs_chan =
+-			&mxs_dma->mxs_chans[channel % MXS_DMA_CHANNELS];
+-
+-		if (channel >= MXS_DMA_CHANNELS) {
+-			dev_dbg(mxs_dma->dma_device.dev,
+-				"%s: error in channel %d\n", __func__,
+-				channel - MXS_DMA_CHANNELS);
+-			mxs_chan->status = DMA_ERROR;
+-			mxs_dma_reset_chan(mxs_chan);
+-		} else {
+-			if (mxs_chan->flags & MXS_DMA_SG_LOOP)
+-				mxs_chan->status = DMA_IN_PROGRESS;
+-			else
+-				mxs_chan->status = DMA_SUCCESS;
+-		}
++	err -= err & completed;
  
-+	spin_lock_init(&mxs_chan->lock);
+-		stat1 &= ~(1 << channel);
++	mxs_chan = &mxs_dma->mxs_chans[chan];
+ 
+-		if (mxs_chan->status == DMA_SUCCESS)
+-			dma_cookie_complete(&mxs_chan->desc);
+-
+-		/* schedule tasklet on this channel */
+-		tasklet_schedule(&mxs_chan->tasklet);
++	if (err) {
++		dev_dbg(mxs_dma->dma_device.dev,
++			"%s: error in channel %d\n", __func__,
++			chan);
++		mxs_chan->status = DMA_ERROR;
++		mxs_dma_reset_chan(mxs_chan);
++	} else {
++		if (mxs_chan->flags & MXS_DMA_SG_LOOP)
++			mxs_chan->status = DMA_IN_PROGRESS;
++		else
++			mxs_chan->status = DMA_SUCCESS;
+ 	}
+ 
++	if (mxs_chan->status == DMA_SUCCESS)
++		dma_cookie_complete(&mxs_chan->desc);
 +
- 	return 0;
++	/* schedule tasklet on this channel */
++	tasklet_schedule(&mxs_chan->tasklet);
++
+ 	return IRQ_HANDLED;
+ }
  
- err_clk:
 -- 
 1.8.4.rc3
