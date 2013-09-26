@@ -1,91 +1,98 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 26 Sep 2013 11:55:28 +0100
-Subject: [PATCH 39/51] DMA-API: others: use dma_set_coherent_mask()
-In-Reply-To: <524411B8.4070000@ti.com>
-References: <20130919212235.GD12758@n2100.arm.linux.org.uk>
- <E1VMnNq-0007s4-HN@rmk-PC.arm.linux.org.uk> <524411B8.4070000@ti.com>
-Message-ID: <20130926105528.GY25647@n2100.arm.linux.org.uk>
+From: gang.chen@asianux.com (Chen Gang)
+Date: Thu, 26 Sep 2013 19:03:43 +0800
+Subject: [PATCH v2] ARM: include: asm: use 'long long' instead of 'u64'
+ within atomic.h
+In-Reply-To: <20130926100422.GE2855@mudshark.cambridge.arm.com>
+References: <523D7DC7.8030603@asianux.com>
+ <20130924093041.GB15119@mudshark.cambridge.arm.com>
+ <5242498F.8060407@asianux.com>
+ <20130925160746.GC14502@mudshark.cambridge.arm.com>
+ <5243953E.6010405@asianux.com>
+ <20130926100422.GE2855@mudshark.cambridge.arm.com>
+Message-ID: <5244148F.6080405@asianux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 26, 2013 at 04:21:36PM +0530, Archit Taneja wrote:
-> Hi,
->
-> On Friday 20 September 2013 04:41 AM, Russell King wrote:
->> The correct way for a driver to specify the coherent DMA mask is
->> not to directly access the field in the struct device, but to use
->> dma_set_coherent_mask().  Only arch and bus code should access this
->> member directly.
+On 09/26/2013 06:04 PM, Will Deacon wrote:
+> On Thu, Sep 26, 2013 at 03:00:30AM +0100, Chen Gang wrote:
+>> On 09/26/2013 12:07 AM, Will Deacon wrote:
+>>> On Wed, Sep 25, 2013 at 03:25:19AM +0100, Chen Gang wrote:
+>>>> atomic* value is signed value, and atomic* functions need also process
+>>>> signed value (parameter value, and return value), so 32-bit arm need
+>>>> use 'long long' instead of 'u64'.
+>>>>
+>>>> After replacement, it will also fix a bug for atomic64_add_negative():
+>>>> "u64 is never less than 0".
+>>>>
+>>>> The modifications are:
+>>>>
+>>>>   in vim, use "1,% s/\<u64\>/long long/g" command.
+>>>>   remove '__aligned(8)' which is useless for 64-bit.
+>>>>   be sure of 80 column limitation after replacement.
+>>>>
+>>>>
+>>>> Signed-off-by: Chen Gang <gang.chen@asianux.com>
+>>>
+>>> Looks better to me, thanks. While you're here, we could also replace the use
+>>> of `unsigned long' with `int' for the 32-bit atomics, then the whole header
+>>> is consistent with the generic types.
+>>>
+>>> Will
+>>>
+>>>
 >>
->> Convert all direct write accesses to using the correct API.
->>
->> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
->> ---
->>   drivers/ata/pata_ixp4xx_cf.c             |    5 ++++-
->>   drivers/gpu/drm/exynos/exynos_drm_drv.c  |    6 +++++-
->>   drivers/gpu/drm/omapdrm/omap_dmm_tiler.c |    5 +++--
->>   3 files changed, 12 insertions(+), 4 deletions(-)
->>
->> diff --git a/drivers/ata/pata_ixp4xx_cf.c b/drivers/ata/pata_ixp4xx_cf.c
->> index 1ec53f8..ddf470c 100644
->> --- a/drivers/ata/pata_ixp4xx_cf.c
->> +++ b/drivers/ata/pata_ixp4xx_cf.c
->> @@ -144,6 +144,7 @@ static int ixp4xx_pata_probe(struct platform_device *pdev)
->>   	struct ata_host *host;
->>   	struct ata_port *ap;
->>   	struct ixp4xx_pata_data *data = dev_get_platdata(&pdev->dev);
->> +	int ret;
->>
->>   	cs0 = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->>   	cs1 = platform_get_resource(pdev, IORESOURCE_MEM, 1);
->> @@ -157,7 +158,9 @@ static int ixp4xx_pata_probe(struct platform_device *pdev)
->>   		return -ENOMEM;
->>
->>   	/* acquire resources and fill host */
->> -	pdev->dev.coherent_dma_mask = DMA_BIT_MASK(32);
->> +	ret = dma_set_coherent_mask(&pdev->dev, DMA_BIT_MASK(32));
->> +	if (ret)
->> +		return ret;
->>
->>   	data->cs0 = devm_ioremap(&pdev->dev, cs0->start, 0x1000);
->>   	data->cs1 = devm_ioremap(&pdev->dev, cs1->start, 0x1000);
->> diff --git a/drivers/gpu/drm/exynos/exynos_drm_drv.c b/drivers/gpu/drm/exynos/exynos_drm_drv.c
->> index bb82ef7..81192d0 100644
->> --- a/drivers/gpu/drm/exynos/exynos_drm_drv.c
->> +++ b/drivers/gpu/drm/exynos/exynos_drm_drv.c
->> @@ -286,7 +286,11 @@ static struct drm_driver exynos_drm_driver = {
->>
->>   static int exynos_drm_platform_probe(struct platform_device *pdev)
->>   {
->> -	pdev->dev.coherent_dma_mask = DMA_BIT_MASK(32);
->> +	int ret;
->> +
->> +	ret = dma_set_coherent_mask(&pdev->dev, DMA_BIT_MASK(32));
->> +	if (ret)
->> +		return ret;
->>
->>   	return drm_platform_init(&exynos_drm_driver, pdev);
->>   }
->> diff --git a/drivers/gpu/drm/omapdrm/omap_dmm_tiler.c b/drivers/gpu/drm/omapdrm/omap_dmm_tiler.c
->> index acf6678..701c4c1 100644
->> --- a/drivers/gpu/drm/omapdrm/omap_dmm_tiler.c
->> +++ b/drivers/gpu/drm/omapdrm/omap_dmm_tiler.c
->> @@ -664,8 +664,9 @@ static int omap_dmm_probe(struct platform_device *dev)
->>   	}
->>
->>   	/* set dma mask for device */
->> -	/* NOTE: this is a workaround for the hwmod not initializing properly */
->> -	dev->dev.coherent_dma_mask = DMA_BIT_MASK(32);
->> +	ret = dma_set_coherent_mask(&dev->dev, DMA_BIT_MASK(32));
->> +	if (ret)
->> +		goto fail;
->
-> Tested with omapdrm on omap4 panda es board.
+>> Hmm... at least, it seems we can let "use 'int' for 32-bit atomics" in
+>> another patch.
+> 
+> Sure, it can be a follow-up to this one.
+> 
 
-Just wish to make sure - that's code for:
+OK, if it is really a useful patch too, I will follow-up.
 
-Tested-by: Archit Taneja <archit@ti.com>
 
-to be added?
+>> Firstly, this 'fix' is not belong to API, and either, it has no related
+>> 'standard' 'demo' in "asm-generic/" (it is architecture independent, so
+>> no related inline assembly code).
+> 
+> I was simply going by the types of atomic_t and atomic64_t, which are both
+> constructed using signed types.
+> 
+
+So, it is not quite necessary (but still better) to let it 'consistent'
+with 'generic' types (in fact, I feel, for a register related variable,
+'unsigned long' is more 'generic' than 'int').
+
+Since it is not belong to API, if some architectures have some reasons
+(or excuse) to keep 'inconsistent' with 'generic' types, it is still
+acceptable.
+
+
+>> After a random check, another 3 architectures (maybe more) are also may
+>> using 'unsigned long': "arm64/include/asm/atomic.h",
+>> "sh/include/asm/atomic-llsc.h", and "xtensa/include/asm/atomic.h".
+>>
+>> And as far as I know, for a register related variable, 'unsigned long'
+>> is also a common using way for both 32-bit and 64-bit (at least, it is a
+>> simple way to prevent issues).
+> 
+> Maybe, but atomic_t is always 32-bit and atomic64_t is always 64-bit, so I
+> don't think unsigned long buys you anything with regards to sizing.
+> 
+
+'unsigned long' can be used as a register related variable, it is always
+32-bit under 32-bit machine, and always 64-bit under 64-bit machine.
+
+So can use it for both arm and arm64, for arm, it can not cause issue,
+and for arm64, it is also OK (if changed to 'int' under arm64, may cause
+real issue).
+
+So I feel, current arm/arm64 implementation for 'unsigned long' is well
+done, not need additional improvement.
+
+> Will
+> 
+> 
 
 Thanks.
+-- 
+Chen Gang
