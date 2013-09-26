@@ -1,36 +1,58 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 26 Sep 2013 18:12:06 +0200
-Subject: [PATCH 0/5] Add Core Divider clock support for Armada 370/XP
-In-Reply-To: <20130926160010.GD4583@localhost>
-References: <1380144502-24109-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <20130925213730.GA19371@localhost>
- <5243E46B.2000406@free-electrons.com>
- <20130926152651.GC4583@localhost> <20130926174755.15a65f92@skate>
- <20130926160010.GD4583@localhost>
-Message-ID: <20130926181206.70ef355b@skate>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Thu, 26 Sep 2013 09:12:45 -0700
+Subject: [PATCH 2/3] KVM: ARM: Fix calculation of virtual CPU ID
+In-Reply-To: <1380210568-23175-3-git-send-email-jonathan.austin@arm.com>
+References: <1380210568-23175-1-git-send-email-jonathan.austin@arm.com>
+ <1380210568-23175-3-git-send-email-jonathan.austin@arm.com>
+Message-ID: <20130926161245.GC1389@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Ezequiel Garcia,
-
-On Thu, 26 Sep 2013 13:00:11 -0300, Ezequiel Garcia wrote:
-
-> Hm... could be. Considering the lack of hardware details (as you
-> point out) maybe this is indeed the best option.
+On Thu, Sep 26, 2013 at 04:49:27PM +0100, Jonathan Austin wrote:
+> KVM does not have a notion of multiple clusters for CPUs, just a linear
+> array of CPUs. When using a system with cores in more than one cluster, the
+> current method for calculating the virtual MPIDR will leak the (physical)
+> cluster information into the virtual MPIDR. One effect of this is that
+> Linux under KVM fails to boot multiple CPUs that aren't in the 0th cluster.
 > 
-> And it has the cool advantage of simplfying the clock tree, which
-> is unnecessarily complex with the NAND ECC clock -> NAND clock layout.
+> This patch does away with exposing the real MPIDR fields in favour of simply
+> using the virtual CPU number (but preserving the U bit, as before).
 > 
-> On the other side, Emilio has just pointed out (in private) that
-> there's a flag "CLK_SET_RATE_PARENT" that is meant for these cases.
+> Signed-off-by: Jonathan Austin <jonathan.austin@arm.com>
+> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  arch/arm/kvm/coproc_a15.c |   11 ++++-------
+>  1 file changed, 4 insertions(+), 7 deletions(-)
 > 
-> Anyway, I feel inclined to your suggestion and just forget about the
-> NAND ECC clock for good, which is only confusing.
+> diff --git a/arch/arm/kvm/coproc_a15.c b/arch/arm/kvm/coproc_a15.c
+> index cf93472..bbd4b88 100644
+> --- a/arch/arm/kvm/coproc_a15.c
+> +++ b/arch/arm/kvm/coproc_a15.c
+> @@ -27,14 +27,11 @@
+>  static void reset_mpidr(struct kvm_vcpu *vcpu, const struct coproc_reg *r)
+>  {
+>  	/*
+> -	 * Compute guest MPIDR:
+> -	 * (Even if we present only one VCPU to the guest on an SMP
+> -	 * host we don't set the U bit in the MPIDR, or vice versa, as
+> -	 * revealing the underlying hardware properties is likely to
+> -	 * be the best choice).
+> +	 * Compute guest MPIDR. No need to mess around with different clusters
+> +	 * but we read the 'U' bit from the underlying hardware directly.
+>  	 */
+> -	vcpu->arch.cp15[c0_MPIDR] = (read_cpuid_mpidr() & ~MPIDR_LEVEL_MASK)
+> -		| (vcpu->vcpu_id & MPIDR_LEVEL_MASK);
+> +	vcpu->arch.cp15[c0_MPIDR] = (read_cpuid_mpidr() & MPIDR_SMP_BITMASK)
+> +					| vcpu->vcpu_id;
+>  }
+>  
+>  #include "coproc.h"
+> -- 
+> 1.7.9.5
+> 
+> 
+Makes sense.
 
-Yes, I also believe it's the easiest solution.
+ack.
 
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+-Christoffer
