@@ -1,41 +1,49 @@
 From: jonathan.austin@arm.com (Jonathan Austin)
-Date: Thu, 26 Sep 2013 16:49:25 +0100
-Subject: [PATCH 0/3] KVM: ARM: Cortex-A7 support and fixes
-Message-ID: <1380210568-23175-1-git-send-email-jonathan.austin@arm.com>
+Date: Thu, 26 Sep 2013 16:49:27 +0100
+Subject: [PATCH 2/3] KVM: ARM: Fix calculation of virtual CPU ID
+In-Reply-To: <1380210568-23175-1-git-send-email-jonathan.austin@arm.com>
+References: <1380210568-23175-1-git-send-email-jonathan.austin@arm.com>
+Message-ID: <1380210568-23175-3-git-send-email-jonathan.austin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series adds support for using KVM on ARM Cortex-A7 CPUs. As the Cortex-A7
-is architecturally identical to the A15 there is not a huge amount of code
-required, however there are a number of fixups necessary to core KVM code that
-testing on A7 has revealed.
+KVM does not have a notion of multiple clusters for CPUs, just a linear
+array of CPUs. When using a system with cores in more than one cluster, the
+current method for calculating the virtual MPIDR will leak the (physical)
+cluster information into the virtual MPIDR. One effect of this is that
+Linux under KVM fails to boot multiple CPUs that aren't in the 0th cluster.
 
-I'm open to comments about other ways to share the functionality between A7/A15
-while still maintaining the architectural/implementation defined split that
-existed between coproc.c and coproc_a15.c - The approach in this series avoids
-adding '3 levels' of abstraction and feels like a good compromise that doesn't
-require duplication of a lot of the A15 code for A7 but still permits
-implementation differences to be fully expressed in coproc_X files.
+This patch does away with exposing the real MPIDR fields in favour of simply
+using the virtual CPU number (but preserving the U bit, as before).
 
-This patch series has been developed/tested on TC2 with the A15 cluster held in
-reset.
+Signed-off-by: Jonathan Austin <jonathan.austin@arm.com>
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm/kvm/coproc_a15.c |   11 ++++-------
+ 1 file changed, 4 insertions(+), 7 deletions(-)
 
-Jonathan Austin (3):
-  KVM: ARM: fix the size of TTBCR_{T0SZ,T1SZ} masks
-  KVM: ARM: Fix calculation of virtual CPU ID
-  KVM: ARM: Add support for Cortex-A7
-
- arch/arm/include/asm/kvm_arm.h  |    4 +-
- arch/arm/include/asm/kvm_asm.h  |    2 +-
- arch/arm/include/uapi/asm/kvm.h |    3 +-
- arch/arm/kvm/Makefile           |    2 +-
- arch/arm/kvm/coproc.c           |  114 ++++++++++++++++++++++++++++++++++++++
- arch/arm/kvm/coproc_a15.c       |  117 +--------------------------------------
- arch/arm/kvm/coproc_a7.c        |   54 ++++++++++++++++++
- arch/arm/kvm/guest.c            |    4 +-
- arch/arm/kvm/reset.c            |   15 ++---
- 9 files changed, 186 insertions(+), 129 deletions(-)
- create mode 100644 arch/arm/kvm/coproc_a7.c
-
+diff --git a/arch/arm/kvm/coproc_a15.c b/arch/arm/kvm/coproc_a15.c
+index cf93472..bbd4b88 100644
+--- a/arch/arm/kvm/coproc_a15.c
++++ b/arch/arm/kvm/coproc_a15.c
+@@ -27,14 +27,11 @@
+ static void reset_mpidr(struct kvm_vcpu *vcpu, const struct coproc_reg *r)
+ {
+ 	/*
+-	 * Compute guest MPIDR:
+-	 * (Even if we present only one VCPU to the guest on an SMP
+-	 * host we don't set the U bit in the MPIDR, or vice versa, as
+-	 * revealing the underlying hardware properties is likely to
+-	 * be the best choice).
++	 * Compute guest MPIDR. No need to mess around with different clusters
++	 * but we read the 'U' bit from the underlying hardware directly.
+ 	 */
+-	vcpu->arch.cp15[c0_MPIDR] = (read_cpuid_mpidr() & ~MPIDR_LEVEL_MASK)
+-		| (vcpu->vcpu_id & MPIDR_LEVEL_MASK);
++	vcpu->arch.cp15[c0_MPIDR] = (read_cpuid_mpidr() & MPIDR_SMP_BITMASK)
++					| vcpu->vcpu_id;
+ }
+ 
+ #include "coproc.h"
 -- 
 1.7.9.5
