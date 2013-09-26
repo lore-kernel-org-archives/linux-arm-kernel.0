@@ -1,72 +1,68 @@
-From: lbyang@marvell.com (Libin Yang)
-Date: Thu, 26 Sep 2013 03:08:12 -0700
-Subject: [PATCH v2] [media] marvell-ccic: simplify and fix clk handling
- (a bit)
-In-Reply-To: <20130926082418.GN12758@n2100.arm.linux.org.uk>
-References: <1380048167-13729-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <1380049187-16036-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <20130925011520.1fa24013@lwn.net>
- <A63A0DC671D719488CD1A6CD8BDC16CF4AB6BB9AAD@SC-VEXCH4.marvell.com>
- <20130926081356.GA6314@pengutronix.de>
- <20130926082418.GN12758@n2100.arm.linux.org.uk>
-Message-ID: <A63A0DC671D719488CD1A6CD8BDC16CF4AB6BB9CBC@SC-VEXCH4.marvell.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Thu, 26 Sep 2013 12:12:41 +0200
+Subject: [GIT PULL] ARM/ARM64 architected timer updates for v3.13
+In-Reply-To: <52440218.9040009@arm.com>
+References: <52440218.9040009@arm.com>
+Message-ID: <52440899.90102@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+On 09/26/2013 11:44 AM, Sudeep KarkadaNagesha wrote:
+> Hi Daniel,
+>
+> Please pull the ARM/ARM64 arch timer updates for v3.13.
+
+Applied to my tree for 3.13.
+
+Thanks
+   -- Daniel
+
+>
+> Regards,
+> Sudeep
+>
+> -->8--
+>
+> The following changes since commit 4a10c2ac2f368583138b774ca41fac4207911983:
+>
+>    Linux 3.12-rc2 (2013-09-23 15:41:09 -0700)
+>
+> are available in the git repository at:
+>
+>    git://linux-arm.org/linux-skn.git timer_evtstrm
+>
+> for you to fetch changes up to 346e7480f1d4740b3d798da60f83f087ea6488b4:
+>
+>    drivers: clocksource: add CPU PM notifier for ARM architected timer
+> (2013-09-26 09:48:24 +0100)
+>
+> ----------------------------------------------------------------
+> Sudeep KarkadaNagesha (4):
+>        ARM/ARM64: arch_timer: add macros for bits in control register
+>        ARM: arch_timer: add support to configure and enable event stream
+>        ARM64: arch_timer: add support to configure and enable event stream
+>        drivers: clocksource: add CPU PM notifier for ARM architected timer
+>
+> Will Deacon (1):
+>        drivers: clocksource: add support for ARM architected timer event stream
+>
+>   arch/arm/include/asm/arch_timer.h    | 36 +++++++++++++++++++++++-----
+>   arch/arm/include/uapi/asm/hwcap.h    |  1 +
+>   arch/arm/kernel/setup.c              |  1 +
+>   arch/arm64/include/asm/arch_timer.h  | 42 +++++++++++++++++++++++++++------
+>   arch/arm64/include/asm/hwcap.h       | 11 +++----
+>   arch/arm64/include/uapi/asm/hwcap.h  |  1 +
+>   arch/arm64/kernel/setup.c            | 11 +++++++
+>   drivers/clocksource/Kconfig          | 15 ++++++++++++
+>   drivers/clocksource/arm_arch_timer.c | 49 ++++++++++++++++++++++++++++++++++++
+>   include/clocksource/arm_arch_timer.h | 10 ++++++++++
+>   10 files changed, 161 insertions(+), 16 deletions(-)
+>
 
 
->-----Original Message-----
->From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
->Sent: Thursday, September 26, 2013 4:24 PM
->To: Uwe Kleine-K?nig
->Cc: Libin Yang; Jonathan Corbet; Mauro Carvalho Chehab; linux-media at vger.kernel.org;
->linux-arm-kernel at lists.infradead.org; kernel at pengutronix.de
->Subject: Re: [PATCH v2] [media] marvell-ccic: simplify and fix clk handling (a bit)
->
->On Thu, Sep 26, 2013 at 10:13:56AM +0200, Uwe Kleine-K?nig wrote:
->> Hi Libin,
->>
->> On Wed, Sep 25, 2013 at 07:47:19PM -0700, Libin Yang wrote:
->> > In the clk enable and prepare function, we will check the NULL
->> > pointer. So it should be no problem.
->> I'm not sure what you mean here and unfortunately your quoting style
->> makes your statement appear without context.
->>
->> 	if (... && !IS_ERR(cam->mipi_clk)) {
->> 		if (cam->mipi_clk)
->> 			devm_clk_put(mcam->dev, cam->mipi_clk);
->> 		cam->mipi_clk = NULL;
->> 	}
->>
->> might work in your setup, but it's wrong usage of the clk API. There
->> is no reason NULL couldn't be a valid clk pointer. Moreover I cannot
->> find a place in that driver that calls prepare and/or enable for the mipi_clk.
->> (BTW, calling clk_get_rate on a disabled clk is another thing you
->> shouldn't do.)
->
->It's a bug for another reason.  Consider this:
->
->	clk = devm_clk_get(...);
->
->Now, as the CLK API defines only IS_ERR(clk) to be errors, if clk is NULL then the devm
->API will allocate a tracking structure for the "allocated"
->clock.  If you then do:
->
->	if (!IS_ERR(clk)) {
->		if (clk)
->			devm_clk_put(clk);
->		clk = NULL;
->	}
->
->Then this structure won't get freed.  Next time you call devm_clk_get(), you'll allocate another
->tracking structure.  If the driver does this a lot, it will spawn lots of these tracking structures
->which will only get cleaned up when the device is unbound (possibly never.)
->
->So, what this driver is doing with its NULL checks against clocks is buggy, no two ways
->about it. 
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
 
-[Libin] Yes, you are right. it will not release the clk tracking structure if it is NULL and may allocate again later. It is a bug.
-
-Regards,
-Libin
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
