@@ -1,38 +1,59 @@
-From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
-Date: Thu, 26 Sep 2013 23:24:07 +0100
-Subject: new binutils needed for arm in 3.12-rc1
-In-Reply-To: <1380154255.1974.92@driftwood> (Rob Landley's message of "Wed, 25
- Sep 2013 19:10:55 -0500")
-References: <1380154255.1974.92@driftwood>
-Message-ID: <yw1xy56jusqg.fsf@unicorn.mansr.com>
+From: andreas.herrmann@calxeda.com (Andreas Herrmann)
+Date: Fri, 27 Sep 2013 00:36:12 +0200
+Subject: [PATCH 0/9] arm-smmu: Misc changes/Calxeda ECX-2000 support
+Message-ID: <1380234982-1677-1-git-send-email-andreas.herrmann@calxeda.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rob Landley <rob@landley.net> writes:
+Hi,
 
-> On 09/25/2013 10:52:44 AM, M?ns Rullg?rd wrote:
->> Rob Landley <rob@landley.net> writes:
->> 
->> > On 09/24/2013 09:07:57 PM, Nicolas Pitre wrote:
->> >> I'd strongly suggest you make your binutils compatible with newer
->> >> instruction syntax instead of making the kernel more complex.
->> >
->> > Meaning I play whack-a-mole as this becomes permission to depend on
->> > endless new gnuisms just because they're there and nobody else is
->> > regression testing against them, not because they actually add  
->> > anything.
->> 
->> Since when is assembling the instructions correctly, as specified in
->> the arch ref, and not in some other random way a gnuism?
->
-> If you require current gnome and drop support for older versions (and  
-> implicitly all other desktops), people start writing stuff that depends  
-> on systemd. It doesn't matter if the feature you abandoned support for  
-> the past 10 years of everthing else for wasn't itself provided by  
-> systemd.
+Following a new patch set to fix some issues, that I've seen when
+using arm-smmu driver with MMU-400 and to enable support for SMMUs on
+Calxeda ECX-2000.
 
-Are you saying current binutils depends on gnome and/or systemd?
+Patches are rebased on Joerg's latest joro/next branch (as of today).
+I hope that I have addressed all (most) comments from the last
+submission for following patches:
 
--- 
-M?ns Rullg?rd
-mans at mansr.com
+ [PATCH 1/9] iommu/arm-smmu: Switch to arch_initcall for driver ...
+ [PATCH 2/9] iommu/arm-smmu: Calculate SMMU_CB_BASE from smmu ...
+ [PATCH 3/9] ARM: dma-mapping: Always pass proper prot flags to ...
+ [PATCH 4/9] iommu/arm-smmu: Check for num_context_irqs > 0 to avoid ...
+ [PATCH 5/9] iommu/arm-smmu: Clear global and context bank fault ...
+
+This time I've added patches for SMMU support on Calxeda ECX-2000.
+Unfortunately this requires a quirk in the arm-smmu driver
+(and that is the ugly part):
+
+ [PATCH 6/9] iommu/arm-smmu: Support buggy implemenations where all
+             config accesses are secure
+
+I still kept the patch (slightly modified) to introduce a function to
+isolate devices. I also merged the command line stuff into that patch
+because it mainly belongs to it:
+
+ [PATCH 7/9] iommu/arm-smmu: Add function that conditionally isolates
+             all masters of all SMMUs
+
+ (Maybe it's better to use a bus notifier to attach/detach devices
+ instead. But I just started to look into this and code is not yet
+ ready+tested.)
+
+Also I think we need a default handler for context faults
+Otherwise we won't notice when something goes wrong:
+
+ [PATCH 8/9] iommu/arm-smmu: Introduce a default fault handler
+
+And finally here's the dts-adaption to enable SMMUs
+
+ [PATCH 9/9] ARM: dts: Add nodes for SMMUs on Calxeda ECX-2000
+
+Would be nice if the noncontroversial patches (1-5?) could be applied.
+(Esp. in case there are longer discussions about the rest.)
+
+Comments welcome.
+
+
+Thanks,
+
+Andreas
