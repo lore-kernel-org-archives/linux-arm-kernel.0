@@ -1,33 +1,71 @@
-From: simon@fire.lp0.eu (Simon Arlott)
-Date: Thu, 26 Sep 2013 12:28:33 +0100
-Subject: [PATCH] irq: bcm2835: Re-implement the hardware IRQ handler.
-In-Reply-To: <5243EE06.1020200@yahoo.com.au>
-References: <1379751251-2799-1-git-send-email-slapdau@yahoo.com.au>
- <5e0b6222e8648fb0c63aa649ee70b29d11f4924f@8b5064a13e22126c1b9329f0dc35b8915774b7c3.invalid>
- <5243EE06.1020200@yahoo.com.au>
-Message-ID: <7c93a6d33e96b3eaa854bc4fbd5039594d4eca18@8b5064a13e22126c1b9329f0dc35b8915774b7c3.invalid>
+From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
+Date: Thu, 26 Sep 2013 13:36:10 +0200
+Subject: [PATCH 3/3] ARM: mxs: dts: Enable DCP for MXS
+In-Reply-To: <1380194306-5243-3-git-send-email-marex@denx.de>
+References: <1380194306-5243-1-git-send-email-marex@denx.de>
+ <1380194306-5243-3-git-send-email-marex@denx.de>
+Message-ID: <21060.7210.127710.800708@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, September 26, 2013 09:19, Craig McGeachie wrote:
-> And if anyone is going to attempt this sort of trickery, then I'm fairly
-> certain that having a well defined interrupt prioritisation scheme is
-> going to be important.  Not being able to make a good prediction of
-> which interrupt handler will be invoked next because you don't know what
-> bit pattern the interrupt controller currently has cached doesn't seem
-> good enough.
+Hi,
 
-Why do you need to predict which interrupt handler will be invoked next?
+Marek Vasut writes:
+> Enable the DCP by default on both i.MX23 and i.MX28.
+> 
+> Signed-off-by: Marek Vasut <marex@denx.de>
+> Cc: Herbert Xu <herbert@gondor.apana.org.au>
+> Cc: David S. Miller <davem@davemloft.net>
+> Cc: Fabio Estevam <fabio.estevam@freescale.com>
+> Cc: Shawn Guo <shawn.guo@linaro.org>
+> To: linux-crypto at vger.kernel.org
+> ---
+>  arch/arm/boot/dts/imx23.dtsi | 4 +++-
+>  arch/arm/boot/dts/imx28.dtsi | 5 +++--
+>  2 files changed, 6 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/imx23.dtsi b/arch/arm/boot/dts/imx23.dtsi
+> index 87faa6e..0630a9a 100644
+> --- a/arch/arm/boot/dts/imx23.dtsi
+> +++ b/arch/arm/boot/dts/imx23.dtsi
+> @@ -337,8 +337,10 @@
+>  			};
+>  
+>  			dcp at 80028000 {
+> +				compatible = "fsl,mxs-dcp";
+>  				reg = <0x80028000 0x2000>;
+> -				status = "disabled";
+> +				interrupts = <53 54>;
+> +				status = "okay";
+>  			};
+AFAICT the policy seems to be that nodes, that are always enabled
+don't get a 'status' property at all.
 
-> You aren't developing a framework for a bunch of cosseted application
-> developers who can't even get basic resource management right.  Your
-> users are device driver developers who should damn well know better than
-> to hog the system.  And that is the sort of developer who would
-> appreciate some more control and some slightly better guarantees from
-> other code, even if the rest of the world isn't going to play ball.
+>  			pxp at 8002a000 {
+> diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
+> index 918d419..8b5ad60 100644
+> --- a/arch/arm/boot/dts/imx28.dtsi
+> +++ b/arch/arm/boot/dts/imx28.dtsi
+> @@ -782,9 +782,10 @@
+>  			};
+>  
+>  			dcp: dcp at 80028000 {
+> +				compatible = "fsl,mxs-dcp";
+>  				reg = <0x80028000 0x2000>;
+> -				interrupts = <52 53 54>;
+> -				compatible = "fsl-dcp";
+>
+What about drivers/crypto/dcp.c that is currently using this property?
 
-Device driver developers should know better than to write drivers that
-depend on such specific behaviour of the interrupt controller driver.
 
+Lothar Wa?mann
 -- 
-Simon Arlott
+___________________________________________________________
+
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
