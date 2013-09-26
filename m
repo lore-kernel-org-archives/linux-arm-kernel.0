@@ -1,39 +1,57 @@
 From: marex@denx.de (Marek Vasut)
-Date: Thu, 26 Sep 2013 13:18:24 +0200
-Subject: [PATCH 1/3] crypto: Fully restore ahash request before completing
-Message-ID: <1380194306-5243-1-git-send-email-marex@denx.de>
+Date: Thu, 26 Sep 2013 13:18:26 +0200
+Subject: [PATCH 3/3] ARM: mxs: dts: Enable DCP for MXS
+In-Reply-To: <1380194306-5243-1-git-send-email-marex@denx.de>
+References: <1380194306-5243-1-git-send-email-marex@denx.de>
+Message-ID: <1380194306-5243-3-git-send-email-marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When finishing the ahash request, the ahash_op_unaligned_done() will
-call complete() on the request. Yet, this will not call the correct
-complete callback. The correct complete callback was previously stored
-in the requests' private data, as seen in ahash_op_unaligned(). This
-patch restores the correct complete callback and .data field of the
-request before calling complete() on it.
+Enable the DCP by default on both i.MX23 and i.MX28.
 
 Signed-off-by: Marek Vasut <marex@denx.de>
 Cc: Herbert Xu <herbert@gondor.apana.org.au>
 Cc: David S. Miller <davem@davemloft.net>
+Cc: Fabio Estevam <fabio.estevam@freescale.com>
+Cc: Shawn Guo <shawn.guo@linaro.org>
+To: linux-crypto at vger.kernel.org
 ---
- crypto/ahash.c | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/imx23.dtsi | 4 +++-
+ arch/arm/boot/dts/imx28.dtsi | 5 +++--
+ 2 files changed, 6 insertions(+), 3 deletions(-)
 
-diff --git a/crypto/ahash.c b/crypto/ahash.c
-index 793a27f..a92dc38 100644
---- a/crypto/ahash.c
-+++ b/crypto/ahash.c
-@@ -213,7 +213,10 @@ static void ahash_op_unaligned_done(struct crypto_async_request *req, int err)
+diff --git a/arch/arm/boot/dts/imx23.dtsi b/arch/arm/boot/dts/imx23.dtsi
+index 87faa6e..0630a9a 100644
+--- a/arch/arm/boot/dts/imx23.dtsi
++++ b/arch/arm/boot/dts/imx23.dtsi
+@@ -337,8 +337,10 @@
+ 			};
  
- 	ahash_op_unaligned_finish(areq, err);
+ 			dcp at 80028000 {
++				compatible = "fsl,mxs-dcp";
+ 				reg = <0x80028000 0x2000>;
+-				status = "disabled";
++				interrupts = <53 54>;
++				status = "okay";
+ 			};
  
--	complete(data, err);
-+	areq->base.complete = complete;
-+	areq->base.data = data;
-+
-+	complete(&areq->base, err);
- }
+ 			pxp at 8002a000 {
+diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
+index 918d419..8b5ad60 100644
+--- a/arch/arm/boot/dts/imx28.dtsi
++++ b/arch/arm/boot/dts/imx28.dtsi
+@@ -782,9 +782,10 @@
+ 			};
  
- static int ahash_op_unaligned(struct ahash_request *req,
+ 			dcp: dcp at 80028000 {
++				compatible = "fsl,mxs-dcp";
+ 				reg = <0x80028000 0x2000>;
+-				interrupts = <52 53 54>;
+-				compatible = "fsl-dcp";
++				interrupts = <53 54>;
++				status = "okay";
+ 			};
+ 
+ 			pxp: pxp at 8002a000 {
 -- 
 1.8.4.rc3
