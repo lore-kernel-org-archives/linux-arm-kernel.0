@@ -1,58 +1,41 @@
-From: bcousson@baylibre.com (Benoit Cousson)
-Date: Thu, 26 Sep 2013 11:41:31 +0200
-Subject: [PATCH 1/9] omap4: dts: Add node for AES
-In-Reply-To: <1380146469-29496-2-git-send-email-joelf@ti.com>
-References: <1380146469-29496-1-git-send-email-joelf@ti.com>
- <1380146469-29496-2-git-send-email-joelf@ti.com>
-Message-ID: <5244014B.1090502@baylibre.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 26 Sep 2013 10:42:01 +0100
+Subject: [PATCH v3 0/2] ARM DT cpus/cpu and topology bindings
+Message-ID: <1380188523-20589-1-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26/09/2013 00:01, Joel Fernandes wrote:
-> OMAP4 has an AES module that uses the omap-aes crypto driver.
-> Add DT entries for the same.
->
-> Signed-off-by: Joel Fernandes <joelf@ti.com>
-> ---
->   arch/arm/boot/dts/omap4.dtsi | 10 ++++++++++
->   1 file changed, 10 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
-> index 45708e1..4267a74 100644
-> --- a/arch/arm/boot/dts/omap4.dtsi
-> +++ b/arch/arm/boot/dts/omap4.dtsi
-> @@ -663,5 +663,15 @@
->   			ram-bits = <12>;
->   			ti,has-mailbox;
->   		};
-> +
-> +		aes: aes at 4B501000 {
-> +			compatible = "ti,omap4-aes";
-> +			ti,hwmods = "aes";
-> +			reg = <0x4B501000 0xa0>;
+This is v3 of a previous posting:
 
-Nit: Please use lower case for hexa value.
+http://lists.infradead.org/pipermail/linux-arm-kernel/2013-September/198564.html
 
-> +			interrupt-parent = <&gic>;
+- v3 changes
+	- Updated #address-cells and reg properties requirements for ARM v8
 
-You don't have to add the interrupt-parent, it is already set by default 
-at the root of the tree.
+- v2 changes
+	- Removed single core cpu-map example
+	- Removed OS dependency from cpus/cpu bindings
+	- Updated Marvell compatible strings
+	- Clarified behaviour on pre ARM v7 uniprocessor systems and updated
+	  examples
 
-We did not add it for most nodes. Some are still there becasue I missed 
-them during the review :-)
+This patch resumes DT topology/cpu bindings discussions for ARM that were
+started here:
 
-> +			interrupts = <0 85 0x4>;
+https://lists.ozlabs.org/pipermail/devicetree-discuss/2013-April/031725.html
+https://lists.ozlabs.org/pipermail/devicetree-discuss/2013-April/032450.html
 
-For interrupt, you should use the macros now for better readability.
+Comments welcome, thanks,
+Lorenzo
 
-  +			interrupts = <GIC_SPI 85 IRQ_TYPE_LEVEL_HIGH>;
+Lorenzo Pieralisi (2):
+  Documentation: devicetree: arm: cpus/cpu nodes bindings updates
+  Documentation: DT: arm: define CPU topology bindings
 
-Regards,
-Benoit
+ Documentation/devicetree/bindings/arm/cpus.txt     | 401 +++++++++++++++--
+ Documentation/devicetree/bindings/arm/topology.txt | 474 +++++++++++++++++++++
+ 2 files changed, 828 insertions(+), 47 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/topology.txt
 
-> +			dmas = <&sdma 111>, <&sdma 110>;
-> +			dma-names = "tx", "rx";
-> +		};
->   	};
->   };
->
+-- 
+1.8.2.2
