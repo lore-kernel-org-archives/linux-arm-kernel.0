@@ -1,54 +1,84 @@
 From: jean.pihet@linaro.org (Jean Pihet)
-Date: Thu, 26 Sep 2013 13:36:34 +0200
-Subject: [PATCH v3 0/4] perf: parse the dwarf backtrace info from .debug_frame
- section
-Message-ID: <1380195398-4402-1-git-send-email-jean.pihet@linaro.org>
+Date: Thu, 26 Sep 2013 13:36:37 +0200
+Subject: [PATCH 3/4] perf tools: Check libunwind for availability of dwarf
+ parsing feature
+In-Reply-To: <1380195398-4402-1-git-send-email-jean.pihet@linaro.org>
+References: <1380195398-4402-1-git-send-email-jean.pihet@linaro.org>
+Message-ID: <1380195398-4402-4-git-send-email-jean.pihet@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On ARM the debug info is not present in the .eh_frame sections but
-in .debug_frame instead, in dwarf format.
+The newly added dwarf unwinding feature [1] requires:
+. a recent version (>= 1.1) of libunwind,
+. libunwind to be configured with --enable-debug-frame.
 
-This patch set uses libunwind to load and parse the dwarf debug info from
-the .debug_frame section if no .eh_frame_hdr section is found; also it
-sets the hooks in the perf_regs and libunwind code for ARMv7.
+[1] http://www.spinics.net/lists/kernel/msg1598951.html
 
-Dependencies:
- . if present, libunwind >= 1.1 is needed to prevent a segfault when
-   parsing the dwarf info,
- . libunwind needs to be configured with --enable-debug-frame. Note:
-   --enable-debug-frame is automatically selected on ARM.
+Add the corresponding API tests in the feature check list.
 
-The generated perf binary has been tested on ARMv7 (OMAP4, Marvell
-Armada XP) and x86_64, using the following commands:
- perf record -g [dwarf] -- <binary>
- perf report --sort symbol --call-graph --stdio
+Signed-off-by: Jean Pihet <jean.pihet@linaro.org>
+---
+ tools/perf/config/Makefile          |  6 +++++-
+ tools/perf/config/feature-tests.mak | 21 ++++++++++++++++++++-
+ 2 files changed, 25 insertions(+), 2 deletions(-)
 
-
-Jean Pihet (2):
-  perf tools: Check libunwind for availability of dwarf parsing feature
-  perf: parse the .debug_frame section in case .eh_frame is not present
-
-Will Deacon (2):
-  ARM: perf: add support for perf registers API
-  ARM: perf: wire up perf_regs and unwind support for ARM
-
- arch/arm/Kconfig                        |  2 +
- arch/arm/include/uapi/asm/Kbuild        |  1 +
- arch/arm/include/uapi/asm/perf_regs.h   | 23 ++++++++++
- arch/arm/kernel/Makefile                |  1 +
- arch/arm/kernel/perf_regs.c             | 30 +++++++++++++
- tools/perf/arch/arm/Makefile            |  3 ++
- tools/perf/arch/arm/include/perf_regs.h | 54 ++++++++++++++++++++++++
- tools/perf/arch/arm/util/unwind.c       | 48 +++++++++++++++++++++
- tools/perf/config/Makefile              | 13 ++++--
- tools/perf/config/feature-tests.mak     | 21 ++++++++-
- tools/perf/util/unwind.c                | 75 ++++++++++++++++++++++++++-------
- 11 files changed, 251 insertions(+), 20 deletions(-)
- create mode 100644 arch/arm/include/uapi/asm/perf_regs.h
- create mode 100644 arch/arm/kernel/perf_regs.c
- create mode 100644 tools/perf/arch/arm/include/perf_regs.h
- create mode 100644 tools/perf/arch/arm/util/unwind.c
-
+diff --git a/tools/perf/config/Makefile b/tools/perf/config/Makefile
+index 4b65710..bbaeb04 100644
+--- a/tools/perf/config/Makefile
++++ b/tools/perf/config/Makefile
+@@ -223,9 +223,13 @@ endif
+ 
+ FLAGS_UNWIND=$(LIBUNWIND_CFLAGS) $(CFLAGS) $(LIBUNWIND_LDFLAGS) $(LDFLAGS) $(EXTLIBS) $(LIBUNWIND_LIBS)
+ ifneq ($(call try-cc,$(SOURCE_LIBUNWIND),$(FLAGS_UNWIND),libunwind),y)
+-  msg := $(warning No libunwind found, disabling post unwind support. Please install libunwind-dev[el] >= 0.99);
++  msg := $(warning No libunwind found, disabling post unwind support. Please install libunwind-dev[el] >= 1.1);
+   NO_LIBUNWIND := 1
+ endif # Libunwind support
++ifneq ($(call try-cc,$(SOURCE_LIBUNWIND_DEBUG_FRAME),$(FLAGS_UNWIND),libunwind debug_frame),y)
++  msg := $(warning No debug_frame support found in libunwind);
++CFLAGS += -DNO_LIBUNWIND_DEBUG_FRAME
++endif # debug_frame support in libunwind
+ endif # NO_LIBUNWIND
+ 
+ ifndef NO_LIBUNWIND
+diff --git a/tools/perf/config/feature-tests.mak b/tools/perf/config/feature-tests.mak
+index 708fb8e..cde75f5 100644
+--- a/tools/perf/config/feature-tests.mak
++++ b/tools/perf/config/feature-tests.mak
+@@ -176,7 +176,6 @@ extern int UNW_OBJ(dwarf_search_unwind_table) (unw_addr_space_t as,
+                                       unw_proc_info_t *pi,
+                                       int need_unwind_info, void *arg);
+ 
+-
+ #define dwarf_search_unwind_table UNW_OBJ(dwarf_search_unwind_table)
+ 
+ int main(void)
+@@ -188,6 +187,26 @@ int main(void)
+ 	return 0;
+ }
+ endef
++
++define SOURCE_LIBUNWIND_DEBUG_FRAME
++#include <libunwind.h>
++#include <stdlib.h>
++
++extern int
++UNW_OBJ(dwarf_find_debug_frame) (int found, unw_dyn_info_t *di_debug,
++				 unw_word_t ip, unw_word_t segbase,
++				 const char *obj_name, unw_word_t start,
++				 unw_word_t end);
++
++#define dwarf_find_debug_frame UNW_OBJ(dwarf_find_debug_frame)
++
++int main(void)
++{
++	dwarf_find_debug_frame(0, NULL, 0, 0, NULL, 0, 0);
++	return 0;
++}
++endef
++
+ endif
+ 
+ ifndef NO_BACKTRACE
 -- 
 1.7.11.7
