@@ -1,47 +1,57 @@
-From: john.stultz@linaro.org (John Stultz)
-Date: Wed, 25 Sep 2013 16:55:15 -0700
-Subject: [RFC, PATCH] clocksource: provide timekeeping for efm32 SoCs
-In-Reply-To: <524376A0.7020405@linaro.org>
-References: <1379324644-20934-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <5242F434.7060702@linaro.org> <20130925153207.GG16106@pengutronix.de>
- <524376A0.7020405@linaro.org>
-Message-ID: <524377E3.4050806@linaro.org>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Thu, 26 Sep 2013 02:00:59 +0200
+Subject: [PATCH usb 1/2] usb: musb: Add missing ATOMIC_INIT_NOTIFIER_HEAD
+In-Reply-To: <20130925203333.GU10746@radagast>
+References: <1378630239-10006-1-git-send-email-pali.rohar@gmail.com>
+ <20130918164816.GN21559@radagast> <201309181903.33243@pali>
+ <201309251017.39014@pali> <20130925203333.GU10746@radagast>
+Message-ID: <20130926000059.GA25716@amd.pavel.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/25/2013 04:49 PM, Daniel Lezcano wrote:
-> On 09/25/2013 05:32 PM, Uwe Kleine-K?nig wrote:
->> Hello Daniel,
->>
->> On Wed, Sep 25, 2013 at 04:33:24PM +0200, Daniel Lezcano wrote:
->>> On 09/16/2013 11:44 AM, Uwe Kleine-K?nig wrote:
->>>> diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
->>>> index 41c6946..410b152 100644
->>>> --- a/drivers/clocksource/Kconfig
->>>> +++ b/drivers/clocksource/Kconfig
->>>> @@ -70,6 +70,14 @@ config CLKSRC_DBX500_PRCMU_SCHED_CLOCK
->>>>  	help
->>>>  	  Use the always on PRCMU Timer as sched_clock
->>>>  
->>>> +config CLKSRC_EFM32
->>>> +	bool "Clocksource for Energy Micro's EFM32 SoCs" if !ARCH_EFM32
->>>> +	depends on OF && ARM && (ARCH_EFM32 || COMPILE_TEST)
->>>> +	default ARCH_EFM32
->>>> +	help
->>>> +	  Support to use the timers of EFM32 SoCs as clock source and clock
->>>> +	  event device.
->>>> +
->>> No option for the timer. It must be selected by the platform.
->> It is. If ARCH_EFM32=y there is no prompt and the "default ARCH_EFM32"
->> makes it true.
-> ok, with that but if ARCH_EFM32=no, you can enable it manually. AFAIK,
-> we want to prevent this and let the correct arch to enable it.
->
-> John ?
+On Wed 2013-09-25 15:33:33, Felipe Balbi wrote:
+> Hi,
+> 
+> On Wed, Sep 25, 2013 at 10:17:38AM +0200, Pali Roh?r wrote:
+> > On Wednesday 18 September 2013 19:03:33 Pali Roh?r wrote:
+> > > &twl->phy.notifier is not initalized
+> > > 
+> > > Signed-off-by: Pali Roh?r <pali.rohar@gmail.com>
+> > > 
+> > > diff --git a/drivers/usb/phy/phy-twl4030-usb.c
+> > > b/drivers/usb/phy/phy-twl4030-usb.c index 8f78d2d..efe6155
+> > > 100644
+> > > --- a/drivers/usb/phy/phy-twl4030-usb.c
+> > > +++ b/drivers/usb/phy/phy-twl4030-usb.c
+> > > @@ -705,6 +705,8 @@ static int twl4030_usb_probe(struct
+> > > platform_device *pdev) if (device_create_file(&pdev->dev,
+> > > &dev_attr_vbus)) dev_warn(&pdev->dev, "could not create sysfs
+> > > file\n");
+> > > 
+> > > +	ATOMIC_INIT_NOTIFIER_HEAD(&twl->phy.notifier);
+> > > +
+> > >  	/* Our job is to use irqs and status from the power module
+> > >  	 * to keep the transceiver disabled when nothing's
+> > > connected. *
+> > 
+> > I sent above patch week ago. Did you already included it?
+> 
+> look at my testing branch.
 
-Right until there's really a compelling reason (which I've still not
-heard), I don't want to introduce independent clocksource options. Any
-such options should be something like a platform or board config option.
+Felipe prefers you to go MAINTAINERS file for
 
-thanks
--john
+git://git.kernel.org/pub/scm/linux/kernel/git/balbi/usb.git
+
+entry. After few clicks, you'll find out your two patches in 
+
+https://git.kernel.org/cgit/linux/kernel/git/balbi/usb.git/log/?h=testing
+
+. So yes, it seems that after 10+ flames Felipe was _not_ lazy to
+send, "Thanks for a patch" mail was too much work.
+
+Apparently, we'll need  Documentation/HowToBeGoodMaintainer file...
+
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
