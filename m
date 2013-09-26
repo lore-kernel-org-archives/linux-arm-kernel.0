@@ -1,28 +1,27 @@
-From: vivien.didelot@savoirfairelinux.com (Vivien Didelot)
-Date: Thu, 26 Sep 2013 16:09:12 -0400 (EDT)
-Subject: [PATCH] misc: (at24) move header to linux/platform_data/
-In-Reply-To: <169123028.921974.1377290733515.JavaMail.root@mail>
-Message-ID: <1414767040.1054326.1380226152008.JavaMail.root@mail>
+From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
+Date: Thu, 26 Sep 2013 22:23:08 +0200
+Subject: [PATCH 00/51] DMA mask changes
+In-Reply-To: <20130919212235.GD12758@n2100.arm.linux.org.uk>
+References: <20130919212235.GD12758@n2100.arm.linux.org.uk>
+Message-ID: <CACna6rxkpYzdD8_Jfi22vA2suUa3k-JM65_gCySQpp4crVCoPg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Wolfram,
+2013/9/19 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+> This email is only being sent to the mailing lists in question, not to
+> anyone personally.  The list of individuals is far to great to do that.
+> I'm hoping no mailing lists reject the patches based on the number of
+> recipients.
 
-> Wolfram wrote:
-> 
-> > > IMHO it makes sense. Why wouldn't we want all platform_data in
-> > > include/linux/platform_data/?
-> > 
-> > For the same reason we don't want all driver source files in one
-> > directory? It's a mess.
-> 
-> Well, that's different. Not all drivers expose platform data, but
-> many subsystems have drivers with platform data. A common include
-> directory for the *_platform_data structure definitions makes sense.
+Huh, I think it was enough to send only 3 patches to the b43-dev at . Like:
+[PATCH 01/51] DMA-API: provide a helper to set both DMA and coherent DMA masks
+[PATCH 14/51] DMA-API: net: b43: (...)
+[PATCH 15/51] DMA-API: net: b43legacy: (...)
+;)
 
-Also IMO having such header file in include/linux/i2c/ for a driver
-declared in drivers/misc/eeprom/ is not very consistent.
-So this is the purpose of this include directory. What do you think?
+I believe Joe has some nice script for doing it that way. When fixing
+some coding style / formatting, he sends only related patches to the
+given ML.
 
-Best,
-Vivien
+-- 
+Rafa?
