@@ -1,117 +1,60 @@
-From: afzal@ti.com (Afzal Mohammed)
-Date: Thu, 26 Sep 2013 16:00:12 +0530
-Subject: [PATCH v4 00/11] ARM: OMAP2+: AM43x PRCM basic support
-In-Reply-To: <cover.1380179370.git.afzal@ti.com>
-References: <cover.1380179370.git.afzal@ti.com>
-Message-ID: <52440CB4.7010705@ti.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Thu, 26 Sep 2013 12:32:26 +0200
+Subject: [PATCH] clockevent: exynos_mct: fix lockdep warning
+In-Reply-To: <5243823D.4040208@linaro.org>
+References: <1380120578-17458-1-git-send-email-tom.leiming@gmail.com>
+ <5243823D.4040208@linaro.org>
+Message-ID: <17472486.7GQJa9ux9F@amdc1227>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Daniel,
 
-It seems,
-"[PATCH v4 02/11] ARM: OMAP2+: hwmod: AM335x/AM43x: move common data"
-is held on LAKML for moderator approval due to big size.
+On Thursday 26 of September 2013 02:39:25 Daniel Lezcano wrote:
+> On 09/25/2013 04:49 PM, Ming Lei wrote:
+> > This patch moves request_irq() out of cpu notifier callback
+> > to fix below lockdep warning:
+> > 
+> > [    0.249513] ------------[ cut here ]------------
+> > [    0.249525] WARNING: CPU: 1 PID: 0 at kernel/lockdep.c:2740 lockdep_trace_alloc+0xc8/0x10c()
+> > [    0.249534] DEBUG_LOCKS_WARN_ON(irqs_disabled_flags(flags))
+> > [    0.249538] Modules linked in:
+> > [    0.249548] CPU: 1 PID: 0 Comm: swapper/1 Not tainted 3.12.0-rc1-next-20130923+ #338
+> > [    0.249564] [<c00165d0>] (unwind_backtrace+0x0/0xec) from [<c0012b48>] (show_stack+0x20/0x24)
+> > [    0.249577] [<c0012b48>] (show_stack+0x20/0x24) from [<c04ebf0c>] (dump_stack+0x74/0xb4)
+> > [    0.249591] [<c04ebf0c>] (dump_stack+0x74/0xb4) from [<c00237a8>] (warn_slowpath_common+0x78/0x9c)
+> > [    0.249604] [<c00237a8>] (warn_slowpath_common+0x78/0x9c) from [<c0023888>] (warn_slowpath_fmt+0x40/0x48)
+> > [    0.249615] [<c0023888>] (warn_slowpath_fmt+0x40/0x48) from [<c007f194>] (lockdep_trace_alloc+0xc8/0x10c)
+> > [    0.249626] [<c007f194>] (lockdep_trace_alloc+0xc8/0x10c) from [<c01173b0>] (kmem_cache_alloc_trace+0x38/0x2
+> > 24)
+> > [    0.249638] [<c01173b0>] (kmem_cache_alloc_trace+0x38/0x224) from [<c006bc4c>] (request_threaded_irq+0x90/0x130)
+> > [    0.249651] [<c006bc4c>] (request_threaded_irq+0x90/0x130) from [<c0408c60>] (exynos4_local_timer_setup+0xdc/0x140)
+> > [    0.249663] [<c0408c60>] (exynos4_local_timer_setup+0xdc/0x140) from [<c0408d78>] (exynos4_mct_cpu_notify+0x40/0xb0)
+> > [    0.249675] [<c0408d78>] (exynos4_mct_cpu_notify+0x40/0xb0) from [<c04f4e18>] (notifier_call_chain+0x48/0x78)
+> > [    0.249688] [<c04f4e18>] (notifier_call_chain+0x48/0x78) from [<c004abb0>] (__raw_notifier_call_chain+0x24/0x2c)
+> > [    0.249700] [<c004abb0>] (__raw_notifier_call_chain+0x24/0x2c) from [<c0023908>] (__cpu_notify+0x3c/0x58)
+> > [    0.249713] [<c0023908>] (__cpu_notify+0x3c/0x58) from [<c0023944>] (cpu_notify+0x20/0x24)
+> > [    0.249725] [<c0023944>] (cpu_notify+0x20/0x24) from [<c002407c>] (notify_cpu_starting+0x58/0x60)
+> > [    0.249737] [<c002407c>] (notify_cpu_starting+0x58/0x60) from [<c00143cc>] (secondary_start_kernel+0xec/0x13
+> > 8)
+> > [    0.249748] [<c00143cc>] (secondary_start_kernel+0xec/0x138) from [<40008664>] (0x40008664)
+> > [    0.249767] ---[ end trace 3406ff24bd97382e ]---
+> > 
+> > Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+> > Cc: Thomas Gleixner <tglx@linutronix.de>
+> > Cc: Kukjin Kim <kgene.kim@samsung.com>
+> > Cc: linux-arm-kernel at lists.infradead.org
+> > Cc: linux-samsung-soc at vger.kernel.org
+> > Signed-off-by: Ming Lei <tom.leiming@gmail.com>
+> > ---
+> 
+> Tomasz, what do you think ?
 
-I will wait for some time to see if moderator approves, if not, will
-ping him (believe it is David Woodhouse), but not sure how to get it
-into omap list though.
+This is a fix that we may want to have, but it must be modified to take
+my regression fix[1] into account.
 
-Changes are also available
-@git://gitorious.org/x0148406-public/linux-kernel.git tags/am43x-prcm-v4
+[1] clocksource: exynos_mct: Set IRQ affinity when the CPU goes online
+http://thread.gmane.org/gmane.linux.kernel.samsung-soc/22511/focus=23418
 
-Regards
-Afzal
-
-On Thursday 26 September 2013 02:58 PM, Afzal Mohammed wrote:
-> Hi Paul, Benoit, Tony,
-> 
-> This series adds PRCM support (except clock tree) for AM43x SoC's.
-> Current version is based on Rajendra's comments and discussions, please
-> consider this for inclusion in the coming merge window.
-> 
-> Major changes compared to v2 (v3 was only an rfc for current approach):
-> 1. omap_hwmod_33xx_43xx_interconnect_data.c has the common interconnect
->    ocp's structs shared between AM335x and AM43x
-> 2. omap_hwmod_33xx_43xx_ipblock_data.c has the common hwmod structs
->    shared between AM335x and AM43x
-> 3. Instances where clock domain or clock topology has changed in the few
->    cases, have separate structures for AM335x and AM43x
-> 4. To handle scenarios where register offsets are different, they are
->    dynamically init-ed in omap_hwmod_33xx_43xx_ipblock_data.c
-> 5. Register offsets for hwmod's that are present either in AM335x or
->    AM43x are updated statically in omap_hwmod_33xx_data.c or
->    omap_hwmod_43xx_data.c as that was cleaner.
-> 
-> Major changes compared to rfc v3:
-> 1. All register offsets properly taken care for AM43x (with rfc v3, a
->    couple of issues was detected while testing on pre-silicon)
-> 2. There were two patches for common hwmod data movement (one for
->    interconnect and other for ip block data), both were combined to have
->    a cleaner series that is bisectable.
-> 3. Cleaner seperation of common data
-> 
-> This series has been boot tested on pre-silicon platform with the help
-> of Tero's DT clock tree conversion series. This series has been tested
-> on AM335x-EVM too.
-> 
-> The change that re-introduces SW_SLEEP for OMAP4 has been left out from
-> this series as it is the only potential change that affect other
-> platforms. It will be taken care seperately.
-> 
-> Additional details:
-> AM43x reuses most of the IP's from AM335x, as that is the case, much of
-> the AM335x hwmod data is reused. As AM43x PRCM register layout differs
-> from AM335x and is similar to OMAP4, power domain, clock domain & hwmod
-> operations are reused from OMAP4. Currently there is no public TRM
-> available for AM43x.
-> 
-> Changes based on: v3.12-rc2
-> 
-> Regards
-> Afzal
-> 
-> Afzal Mohammed (7):
->   ARM: OMAP2+: hwmod: AM335x/AM43x: move common data
->   ARM: OMAP2+: hwmod: AM335x: runtime register update
->   ARM: OMAP2+: hwmod: AM335x: remove static register offs
->   ARM: OMAP2+: PRCM: AM43x definitions
->   ARM: OMAP2+: hwmod: AM43x support
->   ARM: OMAP2+: hwmod: AM43x operations
->   ARM: OMAP2+: AM43x: PRCM kbuild
-> 
-> Ambresh K (3):
->   ARM: OMAP2+: PM: AM43x powerdomain data
->   ARM: OMAP2+: CM: AM43x clockdomain data
->   ARM: OMAP2+: AM43x PRCM init
-> 
-> Ankur Kishore (1):
->   ARM: OMAP2+: CM: cm_inst offset s16->u16
-> 
->  arch/arm/mach-omap2/Makefile                       |    9 +-
->  arch/arm/mach-omap2/clockdomain.h                  |    4 +-
->  arch/arm/mach-omap2/clockdomains43xx_data.c        |  196 ++
->  arch/arm/mach-omap2/cm33xx.c                       |   16 +-
->  arch/arm/mach-omap2/cm33xx.h                       |   12 +-
->  arch/arm/mach-omap2/cminst44xx.c                   |   29 +-
->  arch/arm/mach-omap2/cminst44xx.h                   |   26 +-
->  arch/arm/mach-omap2/io.c                           |    6 +
->  arch/arm/mach-omap2/omap_hwmod.c                   |    8 +
->  arch/arm/mach-omap2/omap_hwmod.h                   |    1 +
->  .../mach-omap2/omap_hwmod_33xx_43xx_common_data.h  |  163 ++
->  .../omap_hwmod_33xx_43xx_interconnect_data.c       |  643 +++++++
->  .../mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c | 1456 +++++++++++++++
->  arch/arm/mach-omap2/omap_hwmod_33xx_data.c         | 1966 +-------------------
->  arch/arm/mach-omap2/omap_hwmod_43xx_data.c         |  622 +++++++
->  arch/arm/mach-omap2/powerdomain.h                  |    1 +
->  arch/arm/mach-omap2/powerdomains43xx_data.c        |  142 ++
->  arch/arm/mach-omap2/prcm43xx.h                     |  141 ++
->  18 files changed, 3438 insertions(+), 2003 deletions(-)
->  create mode 100644 arch/arm/mach-omap2/clockdomains43xx_data.c
->  create mode 100644 arch/arm/mach-omap2/omap_hwmod_33xx_43xx_common_data.h
->  create mode 100644 arch/arm/mach-omap2/omap_hwmod_33xx_43xx_interconnect_data.c
->  create mode 100644 arch/arm/mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c
->  create mode 100644 arch/arm/mach-omap2/omap_hwmod_43xx_data.c
->  create mode 100644 arch/arm/mach-omap2/powerdomains43xx_data.c
->  create mode 100644 arch/arm/mach-omap2/prcm43xx.h
-> 
+Best regards,
+Tomasz
