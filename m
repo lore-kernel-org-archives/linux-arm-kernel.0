@@ -1,31 +1,35 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Thu, 26 Sep 2013 10:36:55 +0200
-Subject: [PATCH 2/5] ARM: mvebu: Add Core Divider clock device-tree binding
-In-Reply-To: <20130925213730.GA19371@localhost>
-References: <1380144502-24109-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <20130925213730.GA19371@localhost>
-Message-ID: <20130926083655.GB18244@lunn.ch>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Thu, 26 Sep 2013 11:43:04 +0300
+Subject: [PATCH] video: mmp: drop needless devm cleanup
+In-Reply-To: <1379952790-13202-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1379951159-8294-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <1379952790-13202-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <5243F398.1070705@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ezequiel
+On 23/09/13 19:13, Uwe Kleine-K?nig wrote:
+> The nice thing about devm_* is that the driver doesn't need to free the
+> resources but the driver core takes care about that. This also
+> simplifies the error path quite a bit and removes the wrong check for a
+> clock pointer being NULL.
+> 
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> ---
+>  drivers/video/mmp/hw/mmp_ctrl.c | 17 ++---------------
+>  1 file changed, 2 insertions(+), 15 deletions(-)
+> 
 
-+#define CORE_CLOCK_DIVIDER_RATIO_OFFSET		0x8
-...
+Thanks, queuing for 3.12 fixes.
 
-reg = readl(corediv->reg + CORE_CLOCK_DIVIDER_RATIO_OFFSET);
+ Tomi
 
-...
 
-+Example:
-+
-+corediv_clk: corediv-clocks at 18740 {
-+	      compatible = "marvell,armada-370-corediv-clock";
-+	      reg = <0x18740 0x8>;
-+	      #clock-cells = <1>;
-+	      clocks = <&pll>;
-+};
 
-The reg property seems to be wrong.
-
-    Andrew
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 901 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130926/a1a59c36/attachment.sig>
