@@ -1,57 +1,65 @@
 From: pavel@ucw.cz (Pavel Machek)
-Date: Thu, 26 Sep 2013 02:00:59 +0200
-Subject: [PATCH usb 1/2] usb: musb: Add missing ATOMIC_INIT_NOTIFIER_HEAD
-In-Reply-To: <20130925203333.GU10746@radagast>
-References: <1378630239-10006-1-git-send-email-pali.rohar@gmail.com>
- <20130918164816.GN21559@radagast> <201309181903.33243@pali>
- <201309251017.39014@pali> <20130925203333.GU10746@radagast>
-Message-ID: <20130926000059.GA25716@amd.pavel.ucw.cz>
+Date: Thu, 26 Sep 2013 02:23:49 +0200
+Subject: 3.12-rc1: no longer compiles for Nokia n900 (omap based),
+ display no longer works
+In-Reply-To: <20130919184703.GE30568@blackmetal.musicnaut.iki.fi>
+References: <20130919093002.GA23806@amd.pavel.ucw.cz>
+ <20130919094402.GA27253@amd.pavel.ucw.cz>
+ <20130919184703.GE30568@blackmetal.musicnaut.iki.fi>
+Message-ID: <20130926002349.GA26599@amd.pavel.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed 2013-09-25 15:33:33, Felipe Balbi wrote:
-> Hi,
+Hi!
+
+> On Thu, Sep 19, 2013 at 11:44:02AM +0200, Pavel Machek wrote:
+> > something in 3.12-rc1 broke display :-(. (dmesg diff attached at the
+> > end, maybe someone knows...)
 > 
-> On Wed, Sep 25, 2013 at 10:17:38AM +0200, Pali Roh?r wrote:
-> > On Wednesday 18 September 2013 19:03:33 Pali Roh?r wrote:
-> > > &twl->phy.notifier is not initalized
-> > > 
-> > > Signed-off-by: Pali Roh?r <pali.rohar@gmail.com>
-> > > 
-> > > diff --git a/drivers/usb/phy/phy-twl4030-usb.c
-> > > b/drivers/usb/phy/phy-twl4030-usb.c index 8f78d2d..efe6155
-> > > 100644
-> > > --- a/drivers/usb/phy/phy-twl4030-usb.c
-> > > +++ b/drivers/usb/phy/phy-twl4030-usb.c
-> > > @@ -705,6 +705,8 @@ static int twl4030_usb_probe(struct
-> > > platform_device *pdev) if (device_create_file(&pdev->dev,
-> > > &dev_attr_vbus)) dev_warn(&pdev->dev, "could not create sysfs
-> > > file\n");
-> > > 
-> > > +	ATOMIC_INIT_NOTIFIER_HEAD(&twl->phy.notifier);
-> > > +
-> > >  	/* Our job is to use irqs and status from the power module
-> > >  	 * to keep the transceiver disabled when nothing's
-> > > connected. *
-> > 
-> > I sent above patch week ago. Did you already included it?
+> 3.12-rc1 for N900 compiles and works (also display) here with binutils
+> 2.23.2.
+
+I updated to eldk-5.4, and now it compiles, but still no display on 
+
+> > + omapfb omapfb: no displays
 > 
-> look at my testing branch.
+> [...]
+> 
+> > - acx565akm spi1.2: omapfb: acx565akm rev 12 LCD detected
+> 
+> I think this is because the panel driver has changed, and the old one
+> was deleted. You need to change your kernel configuration with something
+> like below:
+> 
+> -CONFIG_PANEL_ACX565AKM=y
+> +CONFIG_DISPLAY_PANEL_SONY_ACX565AKM=y
 
-Felipe prefers you to go MAINTAINERS file for
+Thanks for the hint.. but apparently it was not enough. Still no
+display on qemu :-(.
 
-git://git.kernel.org/pub/scm/linux/kernel/git/balbi/usb.git
+Anyway, "make oldconfig" is expected to produce working kernel, which
+is clearly not case here. Perhaps this should be added to fix that?
 
-entry. After few clicks, you'll find out your two patches in 
+[Who can take the patch?]
+   	       	    	  	       	      	       	      Pavel
 
-https://git.kernel.org/cgit/linux/kernel/git/balbi/usb.git/log/?h=testing
+PS: whoever named directory in kernel sources "displays-new" should...
+think again.
 
-. So yes, it seems that after 10+ flames Felipe was _not_ lazy to
-send, "Thanks for a patch" mail was too much work.
+Signed-off-by: Pavel Machek <pavel@ucw.cz>
 
-Apparently, we'll need  Documentation/HowToBeGoodMaintainer file...
+index 6c90885..d3eabd2 100644
+--- a/drivers/video/omap2/displays-new/Kconfig
++++ b/drivers/video/omap2/displays-new/Kconfig
+@@ -40,6 +40,7 @@ config DISPLAY_PANEL_DSI_CM
+ 
+ config DISPLAY_PANEL_SONY_ACX565AKM
+ 	tristate "ACX565AKM Panel"
++	default PANEL_ACX565AKM
+ 	depends on SPI && BACKLIGHT_CLASS_DEVICE
+ 	help
+ 	  This is the LCD panel used on Nokia N900
 
-									Pavel
 -- 
 (english) http://www.livejournal.com/~pavelmachek
 (cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
