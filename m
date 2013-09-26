@@ -1,124 +1,57 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Thu, 26 Sep 2013 11:06:57 -0500
-Subject: [PATCHv7 30/36] ARM: dts: omap3 clock data
-In-Reply-To: <1380098922-30340-31-git-send-email-t-kristo@ti.com>
-References: <1380098922-30340-1-git-send-email-t-kristo@ti.com>
- <1380098922-30340-31-git-send-email-t-kristo@ti.com>
-Message-ID: <20130926160657.GA6280@kahuna>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Thu, 26 Sep 2013 09:07:20 -0700
+Subject: [PATCH 1/3] KVM: ARM: fix the size of TTBCR_{T0SZ,T1SZ} masks
+In-Reply-To: <1380210568-23175-2-git-send-email-jonathan.austin@arm.com>
+References: <1380210568-23175-1-git-send-email-jonathan.austin@arm.com>
+ <1380210568-23175-2-git-send-email-jonathan.austin@arm.com>
+Message-ID: <20130926160720.GB1389@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11:48-20130925, Tero Kristo wrote:
-> diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
-> index 16420ae..bc11b83 100644
-> --- a/arch/arm/boot/dts/omap3.dtsi
-> +++ b/arch/arm/boot/dts/omap3.dtsi
-> @@ -533,4 +533,11 @@
->  			ram-bits = <12>;
->  		};
->  	};
-> +
-> +	clocks {
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		ranges;
-> +		/include/ "omap3xxx-clocks.dtsi"
-> +	};
->  };
-Clocks are introduced towards the tail of the dts -> this has a problem
-associated with it -> device nodes should be able to reference phandle
-like:
+On Thu, Sep 26, 2013 at 04:49:26PM +0100, Jonathan Austin wrote:
+> The T{0,1}SZ fields of TTBCR are 3 bits wide when using the long descriptor
+> format. Likewise, the T0SZ field of the HTCR is 3-bits. KVM currently
+> defines TTBCR_T{0,1}SZ as 3, not 7.
+> 
+> The T0SZ mask is used to calculate the value for the HTCR, both to pick out
+> TTBCR.T0SZ and mask off the equivalent field in the HTCR during
+> read-modify-write. The incorrect mask size causes the (UNKNOWN) reset value
+> of HTCR.T0SZ to leak in to the calculated HTCR value. Linux will hang when
+> initializing KVM if HTCR's reset value has bit 2 set (sometimes the case on
+> A7/TC2)
+> 
+> Fixing T0SZ allows A7 cores to boot and T1SZ is also fixed for completeness.
+> 
+> Signed-off-by: Jonathan Austin <jonathan.austin@arm.com>
+> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  arch/arm/include/asm/kvm_arm.h |    4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/kvm_arm.h b/arch/arm/include/asm/kvm_arm.h
+> index 64e9696..d556f03 100644
+> --- a/arch/arm/include/asm/kvm_arm.h
+> +++ b/arch/arm/include/asm/kvm_arm.h
+> @@ -95,12 +95,12 @@
+>  #define TTBCR_IRGN1	(3 << 24)
+>  #define TTBCR_EPD1	(1 << 23)
+>  #define TTBCR_A1	(1 << 22)
+> -#define TTBCR_T1SZ	(3 << 16)
+> +#define TTBCR_T1SZ	(7 << 16)
+>  #define TTBCR_SH0	(3 << 12)
+>  #define TTBCR_ORGN0	(3 << 10)
+>  #define TTBCR_IRGN0	(3 << 8)
+>  #define TTBCR_EPD0	(1 << 7)
+> -#define TTBCR_T0SZ	3
+> +#define TTBCR_T0SZ	(7 << 0)
+>  #define HTCR_MASK	(TTBCR_T0SZ | TTBCR_IRGN0 | TTBCR_ORGN0 | TTBCR_SH0)
+>  
+>  /* Hyp System Trap Register */
+> -- 
+> 1.7.9.5
+> 
+Good catch!
 
-devicex {
-	clocks = <&sys_ck>;
-}
+ack.
 
-Since all the devices on ocp and cpu0 node appears above the definition
-they fail to catch the phandle. instead, moving the clocks node as high
-in the tree as possible resolves this: something like:
-diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
-index bc11b83..0b2161d 100644
---- a/arch/arm/boot/dts/omap3.dtsi
-+++ b/arch/arm/boot/dts/omap3.dtsi
-@@ -24,6 +24,13 @@
- 		serial2 = &uart3;
- 	};
- 
-+	clocks {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges;
-+		/include/ "omap3xxx-clocks.dtsi"
-+	};
-+
- 	cpus {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-@@ -534,10 +541,4 @@
- 		};
- 	};
- 
--	clocks {
--		#address-cells = <1>;
--		#size-cells = <1>;
--		ranges;
--		/include/ "omap3xxx-clocks.dtsi"
--	};
- };
-
-What do you think of the change? applies for all clock nodes in other
-dtsi as well - I will mark them as I find them.
-
-Further,
-> diff --git a/arch/arm/boot/dts/omap34xx.dtsi b/arch/arm/boot/dts/omap34xx.dtsi
-> index 5355d61..2ed7c69 100644
-> --- a/arch/arm/boot/dts/omap34xx.dtsi
-> +++ b/arch/arm/boot/dts/omap34xx.dtsi
-> @@ -25,4 +25,123 @@
->  			clock-latency = <300000>; /* From legacy driver */
->  		};
->  	};
-> -};
-> +
-> +	clocks {
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		ranges;
-dont need to state the above two -> already done in omap3.dtsi.
-> +		/include/ "omap34xx-omap36xx-clocks.dtsi"
-> +		/include/ "omap36xx-omap3430es2plus-clocks.dtsi"
-> +		/include/ "omap36xx-am35xx-omap3430es2plus-clocks.dtsi"
-> +	};
-> +};
-[...]
-> \ No newline at end of file
-^^
-[...]
-> diff --git a/arch/arm/boot/dts/omap36xx.dtsi b/arch/arm/boot/dts/omap36xx.dtsi
-> index f8b3765..71fb6fb 100644
-> --- a/arch/arm/boot/dts/omap36xx.dtsi
-> +++ b/arch/arm/boot/dts/omap36xx.dtsi
-> @@ -35,4 +35,124 @@
->  			clock-frequency = <48000000>;
->  		};
->  	};
-> -};
-> +
-> +	clocks {
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		ranges;
-^^ here as well.
-> +		/include/ "omap36xx-clocks.dtsi"
-> +		/include/ "omap34xx-omap36xx-clocks.dtsi"
-> +		/include/ "omap36xx-omap3430es2plus-clocks.dtsi"
-> +		/include/ "omap36xx-am35xx-omap3430es2plus-clocks.dtsi"
-> +	};
-[...]
-> +};
-> \ No newline at end of file
-^^ this need fix as well.
-
--- 
-Regards,
-Nishanth Menon
+-Christoffer
