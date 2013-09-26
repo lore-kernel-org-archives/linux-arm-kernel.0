@@ -1,50 +1,27 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 26 Sep 2013 11:42:51 +0200
-Subject: [PATCH v2] ARM: new platform for Energy Micro's EFM32 Cortex-M3
- SoCs
-In-Reply-To: <201309172245.25367.arnd@arndb.de>
-References: <1379447884-14025-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <201309172245.25367.arnd@arndb.de>
-Message-ID: <20130926094251.GK16106@pengutronix.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 26 Sep 2013 11:43:54 +0200
+Subject: [PATCH v6 RESEND 0/5] ARM/ARM64 architected timer updates
+In-Reply-To: <52431B37.5000901@arm.com>
+References: <1379502306-12911-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+ <5242FC09.2050604@linaro.org> <52431B37.5000901@arm.com>
+Message-ID: <201309261143.55010.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 17, 2013 at 10:45:25PM +0200, Arnd Bergmann wrote:
-> On Tuesday 17 September 2013, Uwe Kleine-K?nig wrote:
-> >  arch/arm/Kconfig                               |  16 +++-
-> >  arch/arm/Kconfig.debug                         |  16 ++++
-> >  arch/arm/Makefile                              |   1 +
-> >  arch/arm/configs/efm32_defconfig               | 104 +++++++++++++++++++++++++
-> >  arch/arm/mach-efm32/Makefile                   |   1 +
-> >  arch/arm/mach-efm32/Makefile.boot              |   2 +
-> >  arch/arm/mach-efm32/cmu.h                      |  15 ++++
-> >  arch/arm/mach-efm32/common.c                   |  19 +++++
-> >  arch/arm/mach-efm32/common.h                   |   1 +
-> >  arch/arm/mach-efm32/dtmachine.c                |  31 ++++++++
-> >  arch/arm/mach-efm32/include/mach/debug-macro.S |  48 ++++++++++++
-> >  arch/arm/mach-efm32/include/mach/entry-macro.S |   5 ++
-> >  arch/arm/mach-efm32/include/mach/io.h          |   6 ++
-> >  arch/arm/mach-efm32/include/mach/irqs.h        |   6 ++
-> >  arch/arm/mach-efm32/include/mach/timex.h       |   7 ++
+On Wednesday 25 September 2013, Sudeep KarkadaNagesha wrote:
+> On 25/09/13 16:06, Daniel Lezcano wrote:
+> > On 09/18/2013 01:05 PM, Sudeep KarkadaNagesha wrote:
+> >> From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
+> >>
+> >> Hi Olof/Kevin,
+> > 
+> > Added Olof and Kevin in Cc.
+> > 
+> Thanks Daniel, sorry I assumed mailing list alias(arm at kernel.org) was preferred way.
 > 
-> You should be able to add NOMMU platforms in combination with CONFIG_MULTIPLATFORM
-> now, which gets rid of most of these files.
-I made that work now and can prepare a patch. I had to drop "depends on
-!ARCH_MULTIPLATFORM" from XIP_KERNEL. That's because my machine only
-works with XIP_KERNEL as it only has 4 MiB of RAM.
 
-Also note that for !MMU you need to specify the base address and size of
-your RAM (DRAM_BASE, DRAM_SIZE) and flash (FLASH_MEM_BASE, FLASH_SIZE).
-So the resulting image is hardly runnable on different machines. (I
-don't know off-hand why these are needed though, maybe this can be
-discussed away.)
+The alias is mainly for when you are sending a pull request or a patch to
+be applied directly. For any review it makes more sense to Cc the ones you
+want involved directly.
 
-So ARCH_MULTIPLATFORM is only good as it allows to simplify a few
-things, but the result isn't really multi-platform.
-
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+	Arnd
