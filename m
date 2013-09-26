@@ -1,101 +1,79 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Thu, 26 Sep 2013 12:26:52 -0300
-Subject: [PATCH 0/5] Add Core Divider clock support for Armada 370/XP
-In-Reply-To: <5243E46B.2000406@free-electrons.com>
-References: <1380144502-24109-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <20130925213730.GA19371@localhost>
- <5243E46B.2000406@free-electrons.com>
-Message-ID: <20130926152651.GC4583@localhost>
+From: nm@ti.com (Nishanth Menon)
+Date: Thu, 26 Sep 2013 10:29:10 -0500
+Subject: [PATCHv7 00/36] ARM: OMAP: clock data conversion to DT
+In-Reply-To: <52445115.7010800@ti.com>
+References: <1380098922-30340-1-git-send-email-t-kristo@ti.com>
+ <52445115.7010800@ti.com>
+Message-ID: <524452C6.6090801@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 26, 2013 at 09:38:19AM +0200, Gregory CLEMENT wrote:
-> Hi Ezequiel,
+On 09/26/2013 10:21 AM, Nishanth Menon wrote:
+> On 09/25/2013 03:48 AM, Tero Kristo wrote:
+> [...]
+>> Test branch available here:
+>> https://github.com/t-kristo/linux-pm.git
+>> branch: mainline-3.12-rc2-ti-dt-clks-v7
+>>
+>> Testing done:
+>> - am335x-bone : boot only
+>> - omap5-sevm : boot only
+>> - dra7-evm : boot only
+>> - omap3-beagle : boot + suspend/resume (ret + off)
+>> - omap4-panda-es : boot + suspend/resume
+>>
+>> Nishanth has also been doing some tests with omap3-beagle-xm with some WIP
+>> versions of this branch, but not with this latest one. Nishanth, maybe you
+>> can provide test results to this one also?
+> I rebased the branch on top of benoit's for_3.13/dts merged with
+> v3.12-rc2 tag
+> 45646cd ARM: dts: AM33XX: don't redefine OCP bus and device nodes
 > 
-> On 25/09/2013 23:37, Ezequiel Garcia wrote:
-> > (Ccing forgotten mvebu maintainers)
-> > 
-> > On Wed, Sep 25, 2013 at 06:28:17PM -0300, Ezequiel Garcia wrote:
-> >> This patchset adds support for a set of clocks available in Armada 370/XP
-> >> known as "Core Divider" clocks.
-> >>
-> >> These are a set of gatable clocks, derived from a fixed PLL at
-> >> a configurable ratio. Although this patchset adds support for the more
-> >> general case, we only support one of the clocks, namely the NAND ECC clock.
-> >>
-> >> With this infrastructure in place, the addition of the rest of the clocks
-> >> would be fairly easy.
-> >>
-> >> In addition, the NAND clock is added as a fixed-ratio from the NAND ECC clock,
-> >> to model accurately the SoC clock tree.
-> >>
-> >> A pictorical representation of the clock tree would be:
-> >>
-> >>     PLL
-> >>     |
-> >>     |
-> >>     ---------------------
-> >>     |			|
-> >>     |			|
-> >>     NAND ECC clock	...
-> >>     |
-> >>     |
-> >>     NAND clock
-> >>
-> >> This patchset is based on v3.12-rc2. Any opinions are highly appreciated.
-> >>
+> All platforms were to MMC filesystem boot (SD card). u-boot used
+> v2013.10-rc3 on all platforms (mainline u-boot).
 > 
-> For the whole series you can add my
-> Reviewed-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> OMAP3630: Beagle-XM:
+> http://pastebin.pandaboard.org/index.php/view/96577127
+> (needs additional patch
+> -> https://patchwork.kernel.org/patch/2919661/ )
+dependency patch needs rework
+> 
+> OMAP4460: Panda-ES: http://pastebin.pandaboard.org/index.php/view/85143661
+> 
+> OMAP5432: OMAP5-UEVM:
+> http://pastebin.pandaboard.org/index.php/view/91361843
+> (nice to have patch
+> -> https://patchwork.kernel.org/patch/2907761/ )
+Acked,tested, pending merge from  maintainers
+> 
+> AM335x: BeagleBone Black:
+> http://pastebin.pandaboard.org/index.php/view/42000597
+> (needs additional patches:
+>  https://patchwork.kernel.org/patch/2902711/
+-> merged to Shekar's davinci branch -> pending upstream.
+>  https://patchwork.kernel.org/patch/2902711/
+Correction on ^^: should have been:
+https://patchwork.kernel.org/patch/2919661/
+tested, pending ack, merge.
+> )
+> 
+> DRA7: DRA7-EVM: http://pastebin.pandaboard.org/index.php/view/38362805
+> (needs additional patches:
+> -> https://patchwork.kernel.org/patch/2849391/
+> -> https://patchwork.kernel.org/patch/2849601/
+> -> https://patchwork.kernel.org/patch/2849602/
+> -> https://patchwork.kernel.org/patch/2907761/
+All of the above:
+Acked,tested, pending merge from  maintainers
+> )
+> 
+> So, for the entire series:
+> Tested-by: Nishanth Menon <nm@ti.com>
 > 
 
-Great! However, I found some issues on this patchset :-(, see below.
+Maybe Benoit and Tony could help reduce few of these acked patches
+pending merge from having to be cherry-picked by folks.
 
-> I just wonder if you were enable to test the enable and disable for the clock,
-> because the datasheet is a little fuzzy about it.
-> 
-
-Enabling and disabling the clock seems to work OK. I must admit I did
-just a simple test:
-
-* If NAND DT node does not consume the correct clock, the controller stops
-working just as soon as the core clock framework disables the unused clocks.
-* If you make the NAND DT node consumer of the "ndclk", the controller
-  works fine.
-
-On the other side, I found this approach is incorrect! (silly me!).
-
-Declaring the NAND clock as a fixed-ratio from the NAND ECC clock,
-and making the NAND DT consume the NAND clock removes the possibility
-of setting the clock rate from the NAND driver.
-
-This happens because the controller's clock is declared as fixed,
-whereas the clock that can be adjusted is the NAND ECC (the parent of NAND
-clock).
-
-I've been thinking on how to work this out in a clean way, but I'm not
-sure which way is cleaner/better. These are my options so far, feel free
-to propose any other:
-
-1. The NAND DT node consumes the two clocks: NAND ECC and NAND clock.
-It uses the former to set the rate, and the latter to read the rate to
-calculate the timings.
-
-This means we have to modify the NAND driver (but not too much).
-
-2. We register the NAND clock in the clk-corediv driver, as a child of
-NAND ECC, and implement some set_rate operation to act on NAND ECC.
-The NAND DT node can then consume this clock.
-
-This has the advantage that it's transparent to the NAND driver
-(which currently consumes one clock).
-
-3. We hack the NAND driver to consume the NAND ECC, but use the rate
-as the half of it, and forget about the halved-rate NAND clock.
-This seems certainly hacky.
-
-Thoughts?
 -- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+Regards,
+Nishanth Menon
