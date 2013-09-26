@@ -1,48 +1,84 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 26 Sep 2013 11:33:32 +0800
-Subject: [PATCH 3/3] ARM: dts: imx6qdl: add pcie device node
+Date: Thu, 26 Sep 2013 11:33:30 +0800
+Subject: [PATCH 1/3] ARM: imx: Add LVDS general-purpose clocks to i.MX6Q
 In-Reply-To: <1380166412-13586-1-git-send-email-shawn.guo@linaro.org>
 References: <1380166412-13586-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1380166412-13586-4-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1380166412-13586-2-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sean Cross <xobs@kosagi.com>
 
-Add pcie device node for imx6qdl.
+The i.MX6 has two general-purpose LVDS clocks that can be driven
+from a variety of sources.  This patch adds a mux and a gate for
+both of these clocks.
 
 Signed-off-by: Sean Cross <xobs@kosagi.com>
 Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 ---
- arch/arm/boot/dts/imx6qdl.dtsi |   16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+ .../devicetree/bindings/clock/imx6q-clock.txt      |    4 ++++
+ arch/arm/mach-imx/clk-imx6q.c                      |   20 +++++++++++++++++++-
+ 2 files changed, 23 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
-index ef51342..59154dc 100644
---- a/arch/arm/boot/dts/imx6qdl.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl.dtsi
-@@ -116,6 +116,22 @@
- 			arm,data-latency = <4 2 3>;
- 		};
+diff --git a/Documentation/devicetree/bindings/clock/imx6q-clock.txt b/Documentation/devicetree/bindings/clock/imx6q-clock.txt
+index e8b1baa..6aab72b 100644
+--- a/Documentation/devicetree/bindings/clock/imx6q-clock.txt
++++ b/Documentation/devicetree/bindings/clock/imx6q-clock.txt
+@@ -216,6 +216,10 @@ clocks and IDs.
+ 	cko      		201
+ 	vdoa      		202
+ 	pll4_audio_div		203
++	lvds1_sel		204
++	lvds2_sel		205
++	lvds1_gate		206
++	lvds2_gate		207
  
-+		pcie: pcie at 0x01000000 {
-+			compatible = "fsl,imx6q-pcie", "snps,dw-pcie";
-+			reg = <0x01ffc000 0x4000>; /* DBI */
-+			#address-cells = <3>;
-+			#size-cells = <2>;
-+			device_type = "pci";
-+			ranges = <0x00000800 0 0x01f00000 0x01f00000 0 0x00080000 /* configuration space */
-+				  0x81000000 0 0          0x01f80000 0 0x00010000 /* downstream I/O */
-+				  0x82000000 0 0x01000000 0x01000000 0 0x00f00000>; /* non-prefetchable memory */
-+			num-lanes = <1>;
-+			interrupts = <0 123 0x04>;
-+			clocks = <&clks 189>, <&clks 187>, <&clks 206>, <&clks 144>;
-+			clock-names = "pcie_ref_125m", "sata_ref_100m", "lvds_gate", "pcie_axi";
-+			status = "disabled";
-+		};
+ Examples:
+ 
+diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
+index 913ad85..0e7f3bc 100644
+--- a/arch/arm/mach-imx/clk-imx6q.c
++++ b/arch/arm/mach-imx/clk-imx6q.c
+@@ -217,6 +217,11 @@ static const char *cko2_sels[] = {
+ 	"uart_serial", "spdif", "asrc", "hsi_tx",
+ };
+ static const char *cko_sels[] = { "cko1", "cko2", };
++static const char *lvds_sels[] = {
++	"dummy", "dummy", "dummy", "dummy", "dummy", "dummy",
++	"pll4_audio", "pll5_video", "pll8_mlb", "enet_ref",
++	"pcie_ref", "sata_ref",
++};
+ 
+ enum mx6q_clks {
+ 	dummy, ckil, ckih, osc, pll2_pfd0_352m, pll2_pfd1_594m, pll2_pfd2_396m,
+@@ -251,7 +256,8 @@ enum mx6q_clks {
+ 	ssi2_ipg, ssi3_ipg, rom, usbphy1, usbphy2, ldb_di0_div_3_5, ldb_di1_div_3_5,
+ 	sata_ref, sata_ref_100m, pcie_ref, pcie_ref_125m, enet_ref, usbphy1_gate,
+ 	usbphy2_gate, pll4_post_div, pll5_post_div, pll5_video_div, eim_slow,
+-	spdif, cko2_sel, cko2_podf, cko2, cko, vdoa, pll4_audio_div, clk_max
++	spdif, cko2_sel, cko2_podf, cko2, cko, vdoa, pll4_audio_div,
++	lvds1_sel, lvds2_sel, lvds1_gate, lvds2_gate, clk_max
+ };
+ 
+ static struct clk *clk[clk_max];
+@@ -342,6 +348,18 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
+ 			base + 0xe0, 0, 2, 0, clk_enet_ref_table,
+ 			&imx_ccm_lock);
+ 
++	clk[lvds1_sel] = imx_clk_mux("lvds1_sel", base + 0x160, 0, 5, lvds_sels, ARRAY_SIZE(lvds_sels));
++	clk[lvds2_sel] = imx_clk_mux("lvds2_sel", base + 0x160, 5, 5, lvds_sels, ARRAY_SIZE(lvds_sels));
 +
- 		pmu {
- 			compatible = "arm,cortex-a9-pmu";
- 			interrupts = <0 94 0x04>;
++	/*
++	 * lvds1_gate and lvds2_gate are pseudo-gates.  Both can be
++	 * independently configured as clock inputs or outputs.  We treat
++	 * the "output_enable" bit as a gate, even though it's really just
++	 * enabling clock output.
++	 */
++	clk[lvds1_gate] = imx_clk_gate("lvds1_gate", "dummy", base + 0x160, 10);
++	clk[lvds2_gate] = imx_clk_gate("lvds2_gate", "dummy", base + 0x160, 11);
++
+ 	/*                                name              parent_name        reg       idx */
+ 	clk[pll2_pfd0_352m] = imx_clk_pfd("pll2_pfd0_352m", "pll2_bus",     base + 0x100, 0);
+ 	clk[pll2_pfd1_594m] = imx_clk_pfd("pll2_pfd1_594m", "pll2_bus",     base + 0x100, 1);
 -- 
 1.7.9.5
