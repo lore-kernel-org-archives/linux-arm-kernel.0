@@ -1,100 +1,35 @@
-From: afzal@ti.com (Afzal Mohammed)
-Date: Thu, 26 Sep 2013 14:58:51 +0530
-Subject: [PATCH v4 00/11] ARM: OMAP2+: AM43x PRCM basic support
-Message-ID: <cover.1380179370.git.afzal@ti.com>
+From: maxime.coquelin@st.com (Maxime COQUELIN)
+Date: Thu, 26 Sep 2013 11:30:23 +0200
+Subject: [PATCH 1/4] i2c: busses: i2c-st: Add ST I2C controller
+In-Reply-To: <20130924155925.GA2995@katana>
+References: <1379498483-4236-1-git-send-email-maxime.coquelin@st.com>
+ <1379498483-4236-2-git-send-email-maxime.coquelin@st.com>
+ <5240AD6E.4090905@wwwdotorg.org> <5241B1FA.6020500@st.com>
+ <20130924155925.GA2995@katana>
+Message-ID: <5243FEAF.4090506@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul, Benoit, Tony,
 
-This series adds PRCM support (except clock tree) for AM43x SoC's.
-Current version is based on Rajendra's comments and discussions, please
-consider this for inclusion in the coming merge window.
+On 09/24/2013 05:59 PM, Wolfram Sang wrote:
+>> "glitch" is is used to tune the I2C timing requirements, and has a
+>> nanosecond granularity.
+>> These values are added to default timing values.
+>> I'm not 100% sure, but it looks like the "samsung,i2c-sda-delay" in the
+>> i2c-s3c2410 driver.
+> For that, we have the generic "i2c-sda-hold-time-ns" property. The s3c
+> driver hasn't been converted to use it, sadly.
+>
+Ok, thank you for pointing this out.
+After some checks, this property doesn't match with what is done in this 
+driver.
 
-Major changes compared to v2 (v3 was only an rfc for current approach):
-1. omap_hwmod_33xx_43xx_interconnect_data.c has the common interconnect
-   ocp's structs shared between AM335x and AM43x
-2. omap_hwmod_33xx_43xx_ipblock_data.c has the common hwmod structs
-   shared between AM335x and AM43x
-3. Instances where clock domain or clock topology has changed in the few
-   cases, have separate structures for AM335x and AM43x
-4. To handle scenarios where register offsets are different, they are
-   dynamically init-ed in omap_hwmod_33xx_43xx_ipblock_data.c
-5. Register offsets for hwmod's that are present either in AM335x or
-   AM43x are updated statically in omap_hwmod_33xx_data.c or
-   omap_hwmod_43xx_data.c as that was cleaner.
+In the v2 series I am sending, I removed the I2C timing tuning as it 
+works on all
+the boards I have tested with.
+I will only keep the anti-glitch filtering, using private properties as 
+I didn't find any generic
+ones that could fit.
 
-Major changes compared to rfc v3:
-1. All register offsets properly taken care for AM43x (with rfc v3, a
-   couple of issues was detected while testing on pre-silicon)
-2. There were two patches for common hwmod data movement (one for
-   interconnect and other for ip block data), both were combined to have
-   a cleaner series that is bisectable.
-3. Cleaner seperation of common data
-
-This series has been boot tested on pre-silicon platform with the help
-of Tero's DT clock tree conversion series. This series has been tested
-on AM335x-EVM too.
-
-The change that re-introduces SW_SLEEP for OMAP4 has been left out from
-this series as it is the only potential change that affect other
-platforms. It will be taken care seperately.
-
-Additional details:
-AM43x reuses most of the IP's from AM335x, as that is the case, much of
-the AM335x hwmod data is reused. As AM43x PRCM register layout differs
-from AM335x and is similar to OMAP4, power domain, clock domain & hwmod
-operations are reused from OMAP4. Currently there is no public TRM
-available for AM43x.
-
-Changes based on: v3.12-rc2
-
-Regards
-Afzal
-
-Afzal Mohammed (7):
-  ARM: OMAP2+: hwmod: AM335x/AM43x: move common data
-  ARM: OMAP2+: hwmod: AM335x: runtime register update
-  ARM: OMAP2+: hwmod: AM335x: remove static register offs
-  ARM: OMAP2+: PRCM: AM43x definitions
-  ARM: OMAP2+: hwmod: AM43x support
-  ARM: OMAP2+: hwmod: AM43x operations
-  ARM: OMAP2+: AM43x: PRCM kbuild
-
-Ambresh K (3):
-  ARM: OMAP2+: PM: AM43x powerdomain data
-  ARM: OMAP2+: CM: AM43x clockdomain data
-  ARM: OMAP2+: AM43x PRCM init
-
-Ankur Kishore (1):
-  ARM: OMAP2+: CM: cm_inst offset s16->u16
-
- arch/arm/mach-omap2/Makefile                       |    9 +-
- arch/arm/mach-omap2/clockdomain.h                  |    4 +-
- arch/arm/mach-omap2/clockdomains43xx_data.c        |  196 ++
- arch/arm/mach-omap2/cm33xx.c                       |   16 +-
- arch/arm/mach-omap2/cm33xx.h                       |   12 +-
- arch/arm/mach-omap2/cminst44xx.c                   |   29 +-
- arch/arm/mach-omap2/cminst44xx.h                   |   26 +-
- arch/arm/mach-omap2/io.c                           |    6 +
- arch/arm/mach-omap2/omap_hwmod.c                   |    8 +
- arch/arm/mach-omap2/omap_hwmod.h                   |    1 +
- .../mach-omap2/omap_hwmod_33xx_43xx_common_data.h  |  163 ++
- .../omap_hwmod_33xx_43xx_interconnect_data.c       |  643 +++++++
- .../mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c | 1456 +++++++++++++++
- arch/arm/mach-omap2/omap_hwmod_33xx_data.c         | 1966 +-------------------
- arch/arm/mach-omap2/omap_hwmod_43xx_data.c         |  622 +++++++
- arch/arm/mach-omap2/powerdomain.h                  |    1 +
- arch/arm/mach-omap2/powerdomains43xx_data.c        |  142 ++
- arch/arm/mach-omap2/prcm43xx.h                     |  141 ++
- 18 files changed, 3438 insertions(+), 2003 deletions(-)
- create mode 100644 arch/arm/mach-omap2/clockdomains43xx_data.c
- create mode 100644 arch/arm/mach-omap2/omap_hwmod_33xx_43xx_common_data.h
- create mode 100644 arch/arm/mach-omap2/omap_hwmod_33xx_43xx_interconnect_data.c
- create mode 100644 arch/arm/mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c
- create mode 100644 arch/arm/mach-omap2/omap_hwmod_43xx_data.c
- create mode 100644 arch/arm/mach-omap2/powerdomains43xx_data.c
- create mode 100644 arch/arm/mach-omap2/prcm43xx.h
-
--- 
-1.8.3.4
+Regards,
+Maxime
