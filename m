@@ -1,47 +1,23 @@
-From: kgene@kernel.org (Kukjin Kim)
-Date: Thu, 26 Sep 2013 13:59:13 +0900
-Subject: [PATCH] clk: samsung: fix cpll clock register offsets for
- exynos5420 SoC
-In-Reply-To: <1380099864-32031-1-git-send-email-chander.kashyap@linaro.org>
-References: <1380099864-32031-1-git-send-email-chander.kashyap@linaro.org>
-Message-ID: <02c601ceba75$24c763b0$6e562b10$@org>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 25 Sep 2013 22:02:42 -0700
+Subject: [PATCH] arm: mach-integrator: Add stub for pci_v3_early_init()
+ for !CONFIG_PCI
+In-Reply-To: <CACRpkdZ5G02w9JivgfVW4LvGe35=uCD+ROLC0+iL4HzFaAh9ng@mail.gmail.com>
+References: <1380103893-7119-1-git-send-email-joro@8bytes.org>
+ <CACRpkdZ5G02w9JivgfVW4LvGe35=uCD+ROLC0+iL4HzFaAh9ng@mail.gmail.com>
+Message-ID: <CAOesGMjFi8BdcYT7rswcAyvYVqJxBZeFNOEO8EJhj9uEp-wKGQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Chander Kashyap wrote:
-> 
-> Fixes cpll control and lock register offset values for Exynos5420 SoC.
-> 
-> Signed-off-by: Chander Kashyap <chander.kashyap@linaro.org>
+On Wed, Sep 25, 2013 at 6:39 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> On Wed, Sep 25, 2013 at 12:11 PM, Joerg Roedel <joro@8bytes.org> wrote:
+>
+>> This fixes a compile error where CONFIG_PCI is disabled:
+>
+> ARM SoC folks, can you please apply this directly for fixes?
 
-Just nit in the subject,
-'clk: exynos5420: ...' or 'clk/exynos5420: ...' would be nice...
-
-Acked-by: Kukjin Kim <kgene.kim@samsung.com>
+Done!
 
 Thanks,
-Kukjin
 
-> ---
->  drivers/clk/samsung/clk-exynos5420.c |    4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/clk/samsung/clk-exynos5420.c
-> b/drivers/clk/samsung/clk-exynos5420.c
-> index 86dfc64..892aac0 100644
-> --- a/drivers/clk/samsung/clk-exynos5420.c
-> +++ b/drivers/clk/samsung/clk-exynos5420.c
-> @@ -730,8 +730,8 @@ struct samsung_gate_clock exynos5420_gate_clks[]
-> __initdata = {
->  struct __initdata samsung_pll_clock exynos5420_plls[nr_plls] = {
->  	[apll] = PLL(pll_2550, fout_apll, "fout_apll", "fin_pll", APLL_LOCK,
->  		APLL_CON0, NULL),
-> -	[cpll] = PLL(pll_2550, fout_mpll, "fout_mpll", "fin_pll", MPLL_LOCK,
-> -		MPLL_CON0, NULL),
-> +	[cpll] = PLL(pll_2550, fout_cpll, "fout_cpll", "fin_pll", CPLL_LOCK,
-> +		CPLL_CON0, NULL),
->  	[dpll] = PLL(pll_2550, fout_dpll, "fout_dpll", "fin_pll", DPLL_LOCK,
->  		DPLL_CON0, NULL),
->  	[epll] = PLL(pll_2650, fout_epll, "fout_epll", "fin_pll", EPLL_LOCK,
-> --
-> 1.7.9.5
+-Olof
