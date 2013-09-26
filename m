@@ -1,58 +1,41 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 26 Sep 2013 17:47:55 +0200
-Subject: [PATCH 0/5] Add Core Divider clock support for Armada 370/XP
-In-Reply-To: <20130926152651.GC4583@localhost>
-References: <1380144502-24109-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <20130925213730.GA19371@localhost>
- <5243E46B.2000406@free-electrons.com>
- <20130926152651.GC4583@localhost>
-Message-ID: <20130926174755.15a65f92@skate>
+From: jonathan.austin@arm.com (Jonathan Austin)
+Date: Thu, 26 Sep 2013 16:49:25 +0100
+Subject: [PATCH 0/3] KVM: ARM: Cortex-A7 support and fixes
+Message-ID: <1380210568-23175-1-git-send-email-jonathan.austin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Ezequiel Garcia,
+This series adds support for using KVM on ARM Cortex-A7 CPUs. As the Cortex-A7
+is architecturally identical to the A15 there is not a huge amount of code
+required, however there are a number of fixups necessary to core KVM code that
+testing on A7 has revealed.
 
-On Thu, 26 Sep 2013 12:26:52 -0300, Ezequiel Garcia wrote:
+I'm open to comments about other ways to share the functionality between A7/A15
+while still maintaining the architectural/implementation defined split that
+existed between coproc.c and coproc_a15.c - The approach in this series avoids
+adding '3 levels' of abstraction and feels like a good compromise that doesn't
+require duplication of a lot of the A15 code for A7 but still permits
+implementation differences to be fully expressed in coproc_X files.
 
-> 3. We hack the NAND driver to consume the NAND ECC, but use the rate
-> as the half of it, and forget about the halved-rate NAND clock.
-> This seems certainly hacky.
+This patch series has been developed/tested on TC2 with the A15 cluster held in
+reset.
 
-Is this really hacky? Since we can't change the rate of one without
-changing the other, or gating the one without the other, we can also
-see those two clocks as being an internal business of the NAND hardware
-block. So instead of seeing things as:
+Jonathan Austin (3):
+  KVM: ARM: fix the size of TTBCR_{T0SZ,T1SZ} masks
+  KVM: ARM: Fix calculation of virtual CPU ID
+  KVM: ARM: Add support for Cortex-A7
 
-                        -------------
- NAND ECC clk    ---->  |           | 
-     ||                 |  NAND HW  |
-     ||                 |   block   |
-     \/                 |           |
- NAND clk        ---->  |           |
-                        -------------
+ arch/arm/include/asm/kvm_arm.h  |    4 +-
+ arch/arm/include/asm/kvm_asm.h  |    2 +-
+ arch/arm/include/uapi/asm/kvm.h |    3 +-
+ arch/arm/kvm/Makefile           |    2 +-
+ arch/arm/kvm/coproc.c           |  114 ++++++++++++++++++++++++++++++++++++++
+ arch/arm/kvm/coproc_a15.c       |  117 +--------------------------------------
+ arch/arm/kvm/coproc_a7.c        |   54 ++++++++++++++++++
+ arch/arm/kvm/guest.c            |    4 +-
+ arch/arm/kvm/reset.c            |   15 ++---
+ 9 files changed, 186 insertions(+), 129 deletions(-)
+ create mode 100644 arch/arm/kvm/coproc_a7.c
 
-You can see things as follows:
-
-                        -------------
-                        |           | 
-                        |  NAND HW  |
- NAND clk        ---->  |   block   |
-                        |           |
-                        |           |
-                        -------------
-
-and the ECC clock is actually some internal business of the NAND hw
-block, and therefore handled internally by the NAND driver, as your
-option (3) suggests.
-
-Since the amount of details that we have about the exact hardware
-architecture are pretty scarce, I believe this is probably the easiest
-solution.
-
-Best regards,
-
-Thomas
 -- 
-Thomas Petazzoni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+1.7.9.5
