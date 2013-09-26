@@ -1,66 +1,75 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu, 26 Sep 2013 15:27:42 +0200
-Subject: at91sam9263 not booting on 3.12-rc1
-In-Reply-To: <CAOMZO5D6Dfh3utsK8DRNHXUZpo4sk7UmOqVchGf2hvbpoFW6Lg@mail.gmail.com>
-References: <5240A95F.8000604@linaro.org>
- <CAOMZO5D6Dfh3utsK8DRNHXUZpo4sk7UmOqVchGf2hvbpoFW6Lg@mail.gmail.com>
-Message-ID: <5244364E.5060103@linaro.org>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Thu, 26 Sep 2013 16:00:28 +0200
+Subject: [PATCH 2/3] clk: samsung: Add clock driver for s5pc100
+In-Reply-To: <CAKew6eUgpnqvZUCsWGpqwDXtp6ARmhd-Nw-BXiod8=MK-k0fUA@mail.gmail.com>
+References: <1380041605-15736-1-git-send-email-m.krawczuk@partner.samsung.com>
+ <1380041605-15736-2-git-send-email-m.krawczuk@partner.samsung.com>
+ <CAKew6eUgpnqvZUCsWGpqwDXtp6ARmhd-Nw-BXiod8=MK-k0fUA@mail.gmail.com>
+Message-ID: <3392871.UAAWoO4asY@amdc1227>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/23/2013 11:31 PM, Fabio Estevam wrote:
-> On Mon, Sep 23, 2013 at 5:49 PM, Daniel Lezcano
-> <daniel.lezcano@linaro.org> wrote:
->
->> So I enabled the CONFIG_USE_OF, the dtb are correctly generated.
->>
->> I tried to boot again, specifying the dtb address with bootm.
->>
->> tftp 0x20000000 /var/lib/tftpboot/at91/arch/arm/boot/usb_a9263.dtb
->>
->> tftp 0x21000000 /var/lib/tftpboot/at91/arch/arm/boot/uImage
->>
->> bootm 0x21000000 - 0x20000000
->>
->> but without success.
->>
->> I am wondering what I could be doing wrong ...
->>
->> Any help would be appreciate.
->>
->>    -- Daniel
->>
->>
->> ps: u-boot is "U-Boot 2010.09 (Oct 27 2010 - 12:28:54)"
->
-> I am not familiar with this board, but most likely this old U-boot
-> does not support dtb booting.
-> You can check whether "#define CONFIG_OF_LIBFDT" is included in your
-> board config file.
->
-> You could also try to update the bootloader or try to generate a
-> kernel + dtb image (need to select CONFIG_ARM_APPENDED_DTB option in
-> the kernel).
+Hi Yadwinder,
 
-Hi Fabio,
+I haven't reviewed this series yet, but let me clarify some things from
+your comments.
 
-thanks for your answer. It took me awhile to setup everything and find 
-the right tools.
+On Thursday 26 of September 2013 17:38:58 Yadwinder Singh Brar wrote:
+> > +
+> > +/* Helper macros to define clock arrays. */
+> > +#define FIXED_RATE_CLOCKS(name)        \
+> > +               static struct samsung_fixed_rate_clock name[]
+> > +#define MUX_CLOCKS(name)       \
+> > +               static struct samsung_mux_clock name[]
+> > +#define DIV_CLOCKS(name)       \
+> > +               static struct samsung_div_clock name[]
+> > +#define GATE_CLOCKS(name)      \
+> > +               static struct samsung_gate_clock name[]
+> > +
+> 
+> These macros seems little bit odd in our common practice,
+> perhaps these are making code harder to read below.
+> 
 
-So I tried CONFIG_ARM_APPENDED_DTB but that does not work. I did not 
-give much credit to that as it is flagged experimental.
+They allow array declaration to fit into single line. I agree that it is
+not particularly easy to read at first sight, but shouldn't really be
+much of nuisance. In addition, most of this driver is based on macros
+like this, e.g. GATE(), MUX(), PNAME(), etc.
 
-Then I tried to flash a more recent u-boot but something went wrong. I 
-have still the FlashRom prompt but the ttyACM0 where I can upload the 
-u-boot does not appear anymore on my system.
+> > +PNAME(mout_i2s_2_p) = {
+> > +       "fout_epll",
+> > +       "i2scdclk0",
+> > +       "dout_audio0",
+> > +       "none"
+> > +};
+> > +
+> 
+> Using one line per parent isn't increasing length of file unnecessarily?
 
-I am totally stuck at this point ...
+I believe this improves readability. Do we really care about size of
+source code that much, over readability?
 
+> > +       ALIAS(SCLK_AUDIO0, "soc-audio.0", "sclk_audio"),
+> > +       ALIAS(SCLK_AUDIO1, "soc-audio.1", "sclk_audio"),
+> > +       ALIAS(SCLK_AUDIO2, "soc-audio.2", "sclk_audio"),
+> > +       ALIAS(KEYIF, NULL, "keypad"),
+> > +
+> > +       ALIAS(MFC, "s5p-mfc", "sclk_mfc"),
+> > +       ALIAS(G2D, "s5p-g2d", "fimg2d"),
+> > +
+> > +};
+> > +
+> 
+> Any reason/hidden advantage for using a separate of ALIAS,
+> instead of using MUX_A/GATE_A ?
 
+Yes, not even hidden. Alias is not a property of clock. One clock can
+have multiple aliases, e.g. the same clock being input to multiple
+devices.
 
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+In addition, as soon as we fully move s5pv210 to device tree, the whole
+array of aliases will be dropped, without the need to touch the main
+clock arrays at all.
 
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Best regards,
+Tomasz
