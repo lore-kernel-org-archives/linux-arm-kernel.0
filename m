@@ -1,71 +1,48 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu, 26 Sep 2013 18:15:38 +0200
-Subject: [RFC PATCH] ARM: zynq: cpuidle: convert to platform driver
-Message-ID: <1380212138-4020-1-git-send-email-daniel.lezcano@linaro.org>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Thu, 26 Sep 2013 09:17:43 -0700
+Subject: [PATCH 3/3] KVM: ARM: Add support for Cortex-A7
+In-Reply-To: <1380210568-23175-4-git-send-email-jonathan.austin@arm.com>
+References: <1380210568-23175-1-git-send-email-jonathan.austin@arm.com>
+ <1380210568-23175-4-git-send-email-jonathan.austin@arm.com>
+Message-ID: <20130926161743.GD1389@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As the ux500 and the kirkwood driver, make the zynq driver a platform driver
+On Thu, Sep 26, 2013 at 04:49:28PM +0100, Jonathan Austin wrote:
+> This patch adds support for running Cortex-A7 guests on Cortex-A7 hosts.
+> 
+> As Cortex-A7 is architecturally compatible with A15, this patch is largely just
+> generalising existing code. Areas where 'implementation defined' behaviour
+> is identical for A7 and A15 is moved to allow it to be used by both cores.
+> 
+> The check to ensure that coprocessor register tables are sorted correctly is
+> also moved in to 'common' code to avoid each new cpu doing its own check
+> (and possibly forgetting to do so!)
+> 
+> Signed-off-by: Jonathan Austin <jonathan.austin@arm.com>
+> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 
-Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
----
- arch/arm/mach-zynq/common.c    |    7 +++++++
- drivers/cpuidle/cpuidle-zynq.c |   15 ++++++++++-----
- 2 files changed, 17 insertions(+), 5 deletions(-)
+The patch itself looks good, I'm wondering if we are creating potential
+confusion by not having a separate table for shared, but implementation
+defined, co-processors.  One option would be to have multiple levels of
+'inheritance' of the the coprocessor table, so you could load the
+generic one, overload it with the a15 one, and then overload it with the
+a7 one.  That may be a bit over-engineerd though.
 
-diff --git a/arch/arm/mach-zynq/common.c b/arch/arm/mach-zynq/common.c
-index 5f25256..0f0d88f 100644
---- a/arch/arm/mach-zynq/common.c
-+++ b/arch/arm/mach-zynq/common.c
-@@ -44,6 +44,10 @@ static struct of_device_id zynq_of_bus_ids[] __initdata = {
- 	{}
- };
- 
-+static struct platform_device zynq_cpuidle_device = {
-+	.name = "cpuidle-zynq",
-+};
-+
- /**
-  * zynq_init_machine - System specific initialization, intended to be
-  *		       called from board specific initialization.
-@@ -56,6 +60,9 @@ static void __init zynq_init_machine(void)
- 	l2x0_of_init(0x02060000, 0xF0F0FFFF);
- 
- 	of_platform_bus_probe(NULL, zynq_of_bus_ids, NULL);
-+
-+	if (of_machine_is_compatible("xlnx,zynq-7000"))
-+		platform_device_register(&zynq_cpuidle_device);
- }
- 
- static void __init zynq_timer_init(void)
-diff --git a/drivers/cpuidle/cpuidle-zynq.c b/drivers/cpuidle/cpuidle-zynq.c
-index 38e03a1..c8bd261 100644
---- a/drivers/cpuidle/cpuidle-zynq.c
-+++ b/drivers/cpuidle/cpuidle-zynq.c
-@@ -70,14 +70,19 @@ static struct cpuidle_driver zynq_idle_driver = {
- };
- 
- /* Initialize CPU idle by registering the idle states */
--static int __init zynq_cpuidle_init(void)
-+static int __init zynq_cpuidle_probe(void)
- {
--	if (!of_machine_is_compatible("xlnx,zynq-7000"))
--		return -ENODEV;
--
- 	pr_info("Xilinx Zynq CpuIdle Driver started\n");
- 
- 	return cpuidle_register(&zynq_idle_driver, NULL);
- }
- 
--device_initcall(zynq_cpuidle_init);
-+static struct platform_driver zynq_cpuidle_driver = {
-+	.driver = {
-+		.name = "cpuidle-zynq",
-+		.owner = THIS_MODULE,
-+	},
-+	.probe = zynq_cpuidle_probe,
-+};
-+
-+module_platform_driver(zynq_cpuidle_driver);
--- 
-1.7.9.5
+Then again, if A7/A15 end up being just two cores out of many many more,
+it's a bit weird to have their register definitions in the coproc.c
+files and everyone elses in their own files, sort of pushing the problem
+under the rug.
+
+Unless of course we just agree that there are probably not going to be
+that many cores and they're all just going to look a lot like each other
+wrt. to the impdef registers anyhow, so it makes sense to provide this
+default implementation...
+
+If nobody else objects, I'm ok with merging this code (once I have a
+chance to test it).  We can always add more logic and move things around
+later, as there's no api breakage or anything like that.
+
+Thanks for taking care of this!
+
+-Christoffer
