@@ -1,47 +1,66 @@
-From: cjb@laptop.org (Chris Ball)
-Date: Wed, 25 Sep 2013 21:50:07 -0400
-Subject: [PATCH 1/3] arm: socfpga: Set the SDMMC clock phase in system
- manager
-In-Reply-To: <20130914110031.GB15077@amd.pavel.ucw.cz> (Pavel Machek's message
- of "Sat, 14 Sep 2013 13:00:31 +0200")
-References: <1378740833-4883-1-git-send-email-dinguyen@altera.com>
- <1378740833-4883-2-git-send-email-dinguyen@altera.com>
- <20130914110031.GB15077@amd.pavel.ucw.cz>
-Message-ID: <8761to4ai8.fsf@octavius.laptop.org>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 26 Sep 2013 10:51:42 +0900
+Subject: [PATCH v2 4/4] ARM: shmobile: BOCK-W reference: add Ether PFC
+ settings
+In-Reply-To: <5243073C.8070402@cogentembedded.com>
+References: <201309070423.30672.sergei.shtylyov@cogentembedded.com>
+ <201309070431.35908.sergei.shtylyov@cogentembedded.com>
+ <CANqRtoRKFoS9tehteDGaTUYJ8fSBqAYJJDiLxZmoNB9W0N+Mpg@mail.gmail.com>
+ <52305EA4.1060902@cogentembedded.com>
+ <20130925044720.GB24243@verge.net.au>
+ <5243073C.8070402@cogentembedded.com>
+Message-ID: <20130926015142.GB18396@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dinh,
+On Wed, Sep 25, 2013 at 07:54:36PM +0400, Sergei Shtylyov wrote:
+> Hello.
+> 
+> On 09/25/2013 08:47 AM, Simon Horman wrote:
+> 
+> >>>>Add the Ether pin group to bockw_pinctrl_map[].
+> 
+> >>>>Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> 
+> >>>>---
+> >>>>  arch/arm/mach-shmobile/board-bockw-reference.c |    3 +++
+> >>>>  1 file changed, 3 insertions(+)
+> 
+> >>>>Index: renesas/arch/arm/mach-shmobile/board-bockw-reference.c
+> >>>>===================================================================
+> >>>>--- renesas.orig/arch/arm/mach-shmobile/board-bockw-reference.c
+> >>>>+++ renesas/arch/arm/mach-shmobile/board-bockw-reference.c
+> >>>>@@ -29,6 +29,9 @@
+> >>>>   */
+> >>>>
+> >>>>  static const struct pinctrl_map bockw_pinctrl_map[] = {
+> >>>>+       /* Ether */
+> >>>>+       PIN_MAP_MUX_GROUP_DEFAULT("fde00000.ethernet", "pfc-r8a7778",
+> >>>>+                                 "ether_rmii", "ether"),
+> >>>>         /* SCIF0 */
+> >>>>         PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.0", "pfc-r8a7778",
+> >>>>                                   "scif0_data_a", "scif0"),
+> 
+> >>>Hi Sergei,
+> 
+> >>>Thanks for your patches. In general I think your series looks fine. I
+> >>>have a single comment, and that's about the pinctrl-related hunk
+> >>>above. I can see that this patch is for DT reference for Bock-W, so I
+> >>>expect the code to be in DT. Do you have any plans to use DT to
+> >>>describe the pinmux bits? Perhaps you have some incremental patch
+> >>>planned?
+> 
+> >>    No, I just repeated what I saw mechanically. Now I'm seeing some
+> >>evidence that PFC driver supports the device tree, so I probably
+> >>need to redo the patchset... let me study this question better.
+> 
+> >Ping.
+> 
+>    Sorry, I got distracted by other work and didn't advance much here.
+> Will try to respin the patchset before my vacation (next Monday).
+> Although the driver DT support patch have seemingly stalemated due
+> to the most recent comments...
 
-On Sat, Sep 14 2013, Pavel Machek wrote:
->> From: Dinh Nguyen <dinguyen@altera.com>
->> 
->> Add functionality in the System Manager to set the SDR settings for the
->> SD/MMC IP.
->> 
->> Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
->> Cc: Pavel Machek <pavel@denx.de>
->
->> +void socfpga_sysmgr_set_dwmmc_drvsel_smpsel(void)
->> +{
->> +	struct device_node *np;
->> +	u32 timing[2];
->> +	u32 hs_timing;
->> +
->> +	np = of_find_compatible_node(NULL, NULL, "altr,socfpga-dw-mshc");
->> +	of_property_read_u32_array(np, "samsung,dw-mshc-sdr-timing", timing, 2);
->> +	hs_timing = SYSMGR_SDMMC_CTRL_SET(timing[0], timing[1]);
->> +	writel(hs_timing, sys_manager_base_addr + SYSMGR_SDMMCGRP_CTRL_OFFSET);
->> +}
->> +EXPORT_SYMBOL(socfpga_sysmgr_set_dwmmc_drvsel_smpsel);
->
-> To get the abstraction right, would it make sense to have timing
-> parameters as arguments to socfpga_sysmgr_set_dwmmc_drvsel_smpsel(),
-> so that sysmgr code is not walking MMC's device tree directly?
+Thanks for the update.
 
-I think this review comment from Pavel is still open, please reply.
-Thanks,
-
-- Chris.
--- 
-Chris Ball   <cjb@laptop.org>   <http://printf.net/>
+I guess the key is to move forward on the driver side, somehow.
