@@ -1,149 +1,52 @@
-From: galak@codeaurora.org (Kumar Gala)
-Date: Thu, 26 Sep 2013 11:37:33 -0500
-Subject: [PATCHv4 2/3] ARM: msm: Add support for APQ8074 Dragonboard
-In-Reply-To: <5243652F.7090408@codeaurora.org>
-References: <1379992406-3541-1-git-send-email-rvaswani@codeaurora.org>
- <1379992406-3541-2-git-send-email-rvaswani@codeaurora.org>
- <4E7868D6-56CB-4AF8-8EBF-069966899C23@codeaurora.org>
- <5243652F.7090408@codeaurora.org>
-Message-ID: <B0F416B8-042A-49F1-81E9-B217F02AAD1E@codeaurora.org>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Thu, 26 Sep 2013 09:44:22 -0700
+Subject: [GIT PULL] ux500 fixes for v3.12
+In-Reply-To: <878uyj7ehx.fsf@linaro.org>
+References: <CACRpkdZyE6XphN_dhhh1OCdS6-sF1ypUo9qryp=vbLOyQEUmLQ@mail.gmail.com>
+ <878uyj7ehx.fsf@linaro.org>
+Message-ID: <CAGa+x86c-TQ45fPaTfinL2Y83J7Jd6UownrcgatiDY54mRGZTQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Sep 26, 2013 at 9:07 AM, Kevin Hilman <khilman@linaro.org> wrote:
+> Linus Walleij <linus.walleij@linaro.org> writes:
+>
+>> Hi ARM SoC folks,
+>>
+>> this seems to have got stuck in some limbo in my tree, sorry for that.
+>> Please pull this in for fixes bound for the v3.12 RC:s so we have the
+>> Snowball I2C devices on DT boots again.
+>>
+>> Yours,
+>> Linus Wallleij
+>>
+>> The following changes since commit 272b98c6455f00884f0350f775c5342358ebb73f:
+>>
+>>   Linux 3.12-rc1 (2013-09-16 16:17:51 -0400)
+>>
+>> are available in the git repository at:
+>>
+>>   git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git
+>> tags/ux500-fixes-v3.12-1
+>>
+>> for you to fetch changes up to 0ec941e61c020ab6df8d39ae368000b31eb37ba3:
+>>
+>>   ARM: ux500: Remove PrimeCell IDs from Nomadik I2C DT nodes
+>> (2013-09-17 13:17:02 +0200)
+>>
+>> ----------------------------------------------------------------
+>> Fix to make the Snowball boot properly from device tree
+>> by not hardcoding the I2C PrimeCell IDs.
+>>
+>> ----------------------------------------------------------------
+>> Lee Jones (1):
+>>       ARM: ux500: Remove PrimeCell IDs from Nomadik I2C DT nodes
+>>
+>>  arch/arm/boot/dts/ste-dbx5x0.dtsi | 5 -----
+>>  1 file changed, 5 deletions(-)
+>
+> Pulled into fixes,
 
-On Sep 25, 2013, at 5:35 PM, Rohit Vaswani wrote:
+And backed out after catching up on other discussion, sorry for noise.
 
-> On 9/25/2013 12:49 PM, Kumar Gala wrote:
->> On Sep 23, 2013, at 10:13 PM, Rohit Vaswani wrote:
->> 
->>> This patch adds basic board support for APQ8074 Dragonboard
->>> which belongs to the Snapdragon 800 family.
->>> For now, just support a basic machine with device tree.
->>> 
->>> Signed-off-by: Rohit Vaswani <rvaswani@codeaurora.org>
->>> ---
->>> arch/arm/Kconfig.debug                         |  9 +++++++
->>> arch/arm/boot/dts/Makefile                     |  3 ++-
->>> arch/arm/boot/dts/qcom-apq8074-dragonboard.dts |  6 +++++
->>> arch/arm/boot/dts/qcom-msm8974.dtsi            | 35 ++++++++++++++++++++++++++
->>> arch/arm/include/debug/msm.S                   |  5 ++++
->>> arch/arm/mach-msm/Kconfig                      | 13 ++++++++++
->>> arch/arm/mach-msm/board-dt.c                   |  9 +++++++
->>> 7 files changed, 79 insertions(+), 1 deletion(-)
->>> create mode 100644 arch/arm/boot/dts/qcom-apq8074-dragonboard.dts
->>> create mode 100644 arch/arm/boot/dts/qcom-msm8974.dtsi
->>> 
->>> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
->>> index e18a6fc..959b2c7 100644
->>> --- a/arch/arm/Kconfig.debug
->>> +++ b/arch/arm/Kconfig.debug
->>> @@ -357,6 +357,15 @@ choice
->>> 		  Say Y here if you want the debug print routines to direct
->>> 		  their output to the serial port on MSM 8960 devices.
->>> 
->>> +	config DEBUG_MSM8974_UART
->>> +		bool "Kernel low-level debugging messages via MSM 8974 UART"
->>> +		depends on ARCH_MSM8974
->>> +		select MSM_HAS_DEBUG_UART_HS
->>> +		select DEBUG_MSM_UART
->>> +		help
->>> +		  Say Y here if you want the debug print routines to direct
->>> +		  their output to the serial port on MSM 8974 devices.
->>> +
->> A little surprised you didn't pull this and the ARCH_MSM8974 into its own patch outside of this patch being board support.
-> 
-> Well, its good to have this as part of initial board setup for earlyprintk.
-
-I agree, just figured it would have been a standalone patch and a precursor to this patch.
-
->>> 	config DEBUG_MVEBU_UART
->>> 		bool "Kernel low-level debugging messages via MVEBU UART (old bootloaders)"
->>> 		depends on ARCH_MVEBU
->>> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
->>> index 000cf76..e71a3ec 100644
->>> --- a/arch/arm/boot/dts/Makefile
->>> +++ b/arch/arm/boot/dts/Makefile
->>> @@ -102,7 +102,8 @@ dtb-$(CONFIG_ARCH_KIRKWOOD) += kirkwood-cloudbox.dtb \
->>> 	kirkwood-openblocks_a6.dtb
->>> dtb-$(CONFIG_ARCH_MARCO) += marco-evb.dtb
->>> dtb-$(CONFIG_ARCH_MSM) += msm8660-surf.dtb \
->>> -	msm8960-cdp.dtb
->>> +	msm8960-cdp.dtb \
->>> +	qcom-apq8074-dragonboard.dtb
->>> dtb-$(CONFIG_ARCH_MVEBU) += armada-370-db.dtb \
->>> 	armada-370-mirabox.dtb \
->>> 	armada-370-netgear-rn102.dtb \
->>> diff --git a/arch/arm/boot/dts/qcom-apq8074-dragonboard.dts b/arch/arm/boot/dts/qcom-apq8074-dragonboard.dts
->>> new file mode 100644
->>> index 0000000..bb6f3c4
->>> --- /dev/null
->>> +++ b/arch/arm/boot/dts/qcom-apq8074-dragonboard.dts
->>> @@ -0,0 +1,6 @@
->>> +/include/ "qcom-msm8974.dtsi"
->>> +
->>> +/ {
->>> +	model = "Qualcomm APQ8074 Dragonboard";
->>> +	compatible = "qcom,apq8074-dragonboard", "qcom,apq8074";
->>> +};
->>> diff --git a/arch/arm/boot/dts/qcom-msm8974.dtsi b/arch/arm/boot/dts/qcom-msm8974.dtsi
->>> new file mode 100644
->>> index 0000000..f04b643
->>> --- /dev/null
->>> +++ b/arch/arm/boot/dts/qcom-msm8974.dtsi
->>> @@ -0,0 +1,35 @@
->>> +/dts-v1/;
->>> +
->>> +/include/ "skeleton.dtsi"
->>> +
->>> +/ {
->>> +	model = "Qualcomm MSM8974";
->>> +	compatible = "qcom,msm8974";
->>> +	interrupt-parent = <&intc>;
->>> +
->>> +	soc: soc { };
->> We should have a unit address here:
->> 
->> 	  soc: soc at FOOBAR {
->> 
->> also, split out the curly braces so any future patches do have to muck with that.
->> 
->> 	};
->> 
-> 
-> Im not sure I understand the reasoning behind the unit address for soc ?
-
-Its fairly standard practice and there is a fair amount of discussion about the lack of a unit address for memory nodes.
-
-
-
->>> +};
->>> +
->>> +&soc {
->>> +	#address-cells = <1>;
->>> +	#size-cells = <1>;
->>> +	ranges;
->>> +	compatible = "simple-bus";
->>> +
->>> +	intc: interrupt-controller at f9000000 {
->>> +		compatible = "qcom,msm-qgic2";
->>> +		interrupt-controller;
->>> +		#interrupt-cells = <3>;
->>> +		reg = <0xf9000000 0x1000>,
->>> +		      <0xf9002000 0x1000>;
->>> +	};
->>> +
->>> +	timer {
->>> +		compatible = "arm,armv7-timer";
->>> +		interrupts = <1 2 0xf08>,
->>> +			     <1 3 0xf08>,
->>> +			     <1 4 0xf08>,
->>> +			     <1 1 0xf08>;
->>> +		clock-frequency = <19200000>;
->>> +	};
->>> +};
-
-- k
-
--- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+Kevin
