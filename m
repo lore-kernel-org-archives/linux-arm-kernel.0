@@ -1,86 +1,39 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 26 Sep 2013 16:54:42 +0200
-Subject: [PATCH 17/27] mmc: wmt-sdmmc: Move away from using deprecated APIs
-In-Reply-To: <1380207292-16968-1-git-send-email-ulf.hansson@linaro.org>
-References: <1380207292-16968-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <1380207292-16968-18-git-send-email-ulf.hansson@linaro.org>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Thu, 26 Sep 2013 12:04:17 -0300
+Subject: [PATCH 2/5] ARM: mvebu: Add Core Divider clock device-tree binding
+In-Reply-To: <20130926083655.GB18244@lunn.ch>
+References: <1380144502-24109-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20130925213730.GA19371@localhost> <20130926083655.GB18244@lunn.ch>
+Message-ID: <20130926150416.GA4583@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Suspend and resume of cards are being handled from the protocol layer
-and consequently the mmc_suspend|resume_host APIs are deprecated.
+On Thu, Sep 26, 2013 at 10:36:55AM +0200, Andrew Lunn wrote:
+> Hi Ezequiel
+> 
+> +#define CORE_CLOCK_DIVIDER_RATIO_OFFSET		0x8
+> ...
+> 
+> reg = readl(corediv->reg + CORE_CLOCK_DIVIDER_RATIO_OFFSET);
+> 
+> ...
+> 
+> +Example:
+> +
+> +corediv_clk: corediv-clocks at 18740 {
+> +	      compatible = "marvell,armada-370-corediv-clock";
+> +	      reg = <0x18740 0x8>;
+> +	      #clock-cells = <1>;
+> +	      clocks = <&pll>;
+> +};
+> 
+> The reg property seems to be wrong.
+> 
 
-This means we can simplify the suspend|resume callbacks by removing the
-use of the deprecated APIs.
+Mm.. good catch!
 
-Cc: Tony Prisk <linux@prisktech.co.nz>
-Cc: linux-arm-kernel at lists.infradead.org
-Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
----
- drivers/mmc/host/wmt-sdmmc.c |   27 ++++++++++-----------------
- 1 file changed, 10 insertions(+), 17 deletions(-)
-
-diff --git a/drivers/mmc/host/wmt-sdmmc.c b/drivers/mmc/host/wmt-sdmmc.c
-index 34231d5..be94470 100644
---- a/drivers/mmc/host/wmt-sdmmc.c
-+++ b/drivers/mmc/host/wmt-sdmmc.c
-@@ -939,28 +939,23 @@ static int wmt_mci_suspend(struct device *dev)
- 	struct platform_device *pdev = to_platform_device(dev);
- 	struct mmc_host *mmc = platform_get_drvdata(pdev);
- 	struct wmt_mci_priv *priv;
--	int ret;
- 
- 	if (!mmc)
- 		return 0;
- 
- 	priv = mmc_priv(mmc);
--	ret = mmc_suspend_host(mmc);
--
--	if (!ret) {
--		reg_tmp = readb(priv->sdmmc_base + SDMMC_BUSMODE);
--		writeb(reg_tmp | BM_SOFT_RESET, priv->sdmmc_base +
--		       SDMMC_BUSMODE);
-+	reg_tmp = readb(priv->sdmmc_base + SDMMC_BUSMODE);
-+	writeb(reg_tmp | BM_SOFT_RESET, priv->sdmmc_base +
-+	       SDMMC_BUSMODE);
- 
--		reg_tmp = readw(priv->sdmmc_base + SDMMC_BLKLEN);
--		writew(reg_tmp & 0x5FFF, priv->sdmmc_base + SDMMC_BLKLEN);
-+	reg_tmp = readw(priv->sdmmc_base + SDMMC_BLKLEN);
-+	writew(reg_tmp & 0x5FFF, priv->sdmmc_base + SDMMC_BLKLEN);
- 
--		writeb(0xFF, priv->sdmmc_base + SDMMC_STS0);
--		writeb(0xFF, priv->sdmmc_base + SDMMC_STS1);
-+	writeb(0xFF, priv->sdmmc_base + SDMMC_STS0);
-+	writeb(0xFF, priv->sdmmc_base + SDMMC_STS1);
- 
--		clk_disable(priv->clk_sdmmc);
--	}
--	return ret;
-+	clk_disable(priv->clk_sdmmc);
-+	return 0;
- }
- 
- static int wmt_mci_resume(struct device *dev)
-@@ -969,7 +964,6 @@ static int wmt_mci_resume(struct device *dev)
- 	struct platform_device *pdev = to_platform_device(dev);
- 	struct mmc_host *mmc = platform_get_drvdata(pdev);
- 	struct wmt_mci_priv *priv;
--	int ret = 0;
- 
- 	if (mmc) {
- 		priv = mmc_priv(mmc);
-@@ -987,10 +981,9 @@ static int wmt_mci_resume(struct device *dev)
- 		writeb(reg_tmp | INT0_DI_INT_EN, priv->sdmmc_base +
- 		       SDMMC_INTMASK0);
- 
--		ret = mmc_resume_host(mmc);
- 	}
- 
--	return ret;
-+	return 0;
- }
- 
- static const struct dev_pm_ops wmt_mci_pm = {
+Thanks for the review,
 -- 
-1.7.9.5
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
