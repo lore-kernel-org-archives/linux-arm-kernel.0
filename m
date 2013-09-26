@@ -1,64 +1,116 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu, 26 Sep 2013 02:37:38 +0200
-Subject: [GIT PULL 3.12-rc2 fixes] clocksource: Several fixes for 3.12-rc2
-Message-ID: <524381D2.7050604@linaro.org>
+Date: Thu, 26 Sep 2013 02:39:25 +0200
+Subject: [PATCH] clockevent: exynos_mct: fix lockdep warning
+In-Reply-To: <1380120578-17458-1-git-send-email-tom.leiming@gmail.com>
+References: <1380120578-17458-1-git-send-email-tom.leiming@gmail.com>
+Message-ID: <5243823D.4040208@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+On 09/25/2013 04:49 PM, Ming Lei wrote:
+> This patch moves request_irq() out of cpu notifier callback
+> to fix below lockdep warning:
+> 
+> [    0.249513] ------------[ cut here ]------------
+> [    0.249525] WARNING: CPU: 1 PID: 0 at kernel/lockdep.c:2740 lockdep_trace_alloc+0xc8/0x10c()
+> [    0.249534] DEBUG_LOCKS_WARN_ON(irqs_disabled_flags(flags))
+> [    0.249538] Modules linked in:
+> [    0.249548] CPU: 1 PID: 0 Comm: swapper/1 Not tainted 3.12.0-rc1-next-20130923+ #338
+> [    0.249564] [<c00165d0>] (unwind_backtrace+0x0/0xec) from [<c0012b48>] (show_stack+0x20/0x24)
+> [    0.249577] [<c0012b48>] (show_stack+0x20/0x24) from [<c04ebf0c>] (dump_stack+0x74/0xb4)
+> [    0.249591] [<c04ebf0c>] (dump_stack+0x74/0xb4) from [<c00237a8>] (warn_slowpath_common+0x78/0x9c)
+> [    0.249604] [<c00237a8>] (warn_slowpath_common+0x78/0x9c) from [<c0023888>] (warn_slowpath_fmt+0x40/0x48)
+> [    0.249615] [<c0023888>] (warn_slowpath_fmt+0x40/0x48) from [<c007f194>] (lockdep_trace_alloc+0xc8/0x10c)
+> [    0.249626] [<c007f194>] (lockdep_trace_alloc+0xc8/0x10c) from [<c01173b0>] (kmem_cache_alloc_trace+0x38/0x2
+> 24)
+> [    0.249638] [<c01173b0>] (kmem_cache_alloc_trace+0x38/0x224) from [<c006bc4c>] (request_threaded_irq+0x90/0x130)
+> [    0.249651] [<c006bc4c>] (request_threaded_irq+0x90/0x130) from [<c0408c60>] (exynos4_local_timer_setup+0xdc/0x140)
+> [    0.249663] [<c0408c60>] (exynos4_local_timer_setup+0xdc/0x140) from [<c0408d78>] (exynos4_mct_cpu_notify+0x40/0xb0)
+> [    0.249675] [<c0408d78>] (exynos4_mct_cpu_notify+0x40/0xb0) from [<c04f4e18>] (notifier_call_chain+0x48/0x78)
+> [    0.249688] [<c04f4e18>] (notifier_call_chain+0x48/0x78) from [<c004abb0>] (__raw_notifier_call_chain+0x24/0x2c)
+> [    0.249700] [<c004abb0>] (__raw_notifier_call_chain+0x24/0x2c) from [<c0023908>] (__cpu_notify+0x3c/0x58)
+> [    0.249713] [<c0023908>] (__cpu_notify+0x3c/0x58) from [<c0023944>] (cpu_notify+0x20/0x24)
+> [    0.249725] [<c0023944>] (cpu_notify+0x20/0x24) from [<c002407c>] (notify_cpu_starting+0x58/0x60)
+> [    0.249737] [<c002407c>] (notify_cpu_starting+0x58/0x60) from [<c00143cc>] (secondary_start_kernel+0xec/0x13
+> 8)
+> [    0.249748] [<c00143cc>] (secondary_start_kernel+0xec/0x138) from [<40008664>] (0x40008664)
+> [    0.249767] ---[ end trace 3406ff24bd97382e ]---
+> 
+> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+> Cc: Thomas Gleixner <tglx@linutronix.de>
+> Cc: Kukjin Kim <kgene.kim@samsung.com>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-samsung-soc at vger.kernel.org
+> Signed-off-by: Ming Lei <tom.leiming@gmail.com>
+> ---
 
-this pull request contains several fixes for the clocksource/clockevent
-drivers:
+Tomasz, what do you think ?
 
- - Jean Pihet fixed a missing Kconfig option preventing the Armada370/XP
-to boot up.
+>  drivers/clocksource/exynos_mct.c |   34 +++++++++++++++++++++-------------
+>  1 file changed, 21 insertions(+), 13 deletions(-)
+> 
+> diff --git a/drivers/clocksource/exynos_mct.c b/drivers/clocksource/exynos_mct.c
+> index 5b34768..94b35aa 100644
+> --- a/drivers/clocksource/exynos_mct.c
+> +++ b/drivers/clocksource/exynos_mct.c
+> @@ -419,19 +419,10 @@ static int exynos4_local_timer_setup(struct clock_event_device *evt)
+>  
+>  	exynos4_mct_write(TICK_BASE_CNT, mevt->base + MCT_L_TCNTB_OFFSET);
+>  
+> -	if (mct_int_type == MCT_INT_SPI) {
+> -		evt->irq = mct_irqs[MCT_L0_IRQ + cpu];
+> -		if (request_irq(evt->irq, exynos4_mct_tick_isr,
+> -				IRQF_TIMER | IRQF_NOBALANCING,
+> -				evt->name, mevt)) {
+> -			pr_err("exynos-mct: cannot register IRQ %d\n",
+> -				evt->irq);
+> -			return -EIO;
+> -		}
+> -		irq_set_affinity(evt->irq, cpumask_of(cpu));
+> -	} else {
+> +	if (mct_int_type == MCT_INT_PPI)
+>  		enable_percpu_irq(mct_irqs[MCT_L0_IRQ], 0);
+> -	}
+> +	else
+> +		enable_irq(evt->irq);
+>  
+>  	return 0;
+>  }
+> @@ -440,7 +431,7 @@ static void exynos4_local_timer_stop(struct clock_event_device *evt)
+>  {
+>  	evt->set_mode(CLOCK_EVT_MODE_UNUSED, evt);
+>  	if (mct_int_type == MCT_INT_SPI)
+> -		free_irq(evt->irq, this_cpu_ptr(&percpu_mct_tick));
+> +		disable_irq(evt->irq);
+>  	else
+>  		disable_percpu_irq(mct_irqs[MCT_L0_IRQ]);
+>  }
+> @@ -500,6 +491,23 @@ static void __init exynos4_timer_resources(struct device_node *np, void __iomem
+>  					 &percpu_mct_tick);
+>  		WARN(err, "MCT: can't request IRQ %d (%d)\n",
+>  		     mct_irqs[MCT_L0_IRQ], err);
+> +	} else {
+> +		int cpu;
+> +
+> +		for_each_possible_cpu(cpu) {
+> +			struct mct_clock_event_device *mevt =
+> +				&per_cpu(percpu_mct_tick, cpu);
+> +
+> +			mevt->evt.irq = mct_irqs[MCT_L0_IRQ + cpu];
+> +			if (request_irq(mevt->evt.irq, exynos4_mct_tick_isr,
+> +					IRQF_TIMER | IRQF_NOBALANCING,
+> +					mevt->evt.name, mevt)) {
+> +				WARN(1, "exynos-mct: cannot register IRQ %d\n",
+> +				     mevt->evt.irq);
+> +			}
+> +			irq_set_affinity(mevt->evt.irq, cpumask_of(cpu));
+> +			disable_irq(mevt->evt.irq);
+> +		}
+>  	}
+>  
+>  	err = register_cpu_notifier(&exynos4_mct_cpu_nb);
+> 
 
- - Magnus Damm fixed the cpumask on the em_sti driver to have the
-broadcast timer working on a SMP system
-
- - Sebastian Hesselbarth skipped the initialization of a timer for
-uninitialized DT nodes
-
- - Tomasz Figa fixed the irq affinity failing on non online cpus
-
-Thanks
-  -- Daniel
-
------------------------------------------------------------------------------
-
-The following changes since commit 4a10c2ac2f368583138b774ca41fac4207911983:
-
-  Linux 3.12-rc2 (2013-09-23 15:41:09 -0700)
-
-are available in the git repository at:
-
-
-ssh://daniel.lezcano at git.linaro.org//srv/git.linaro.org/git/people/dlezcano/linux.git
-clockevents/3.12-rc2-fixes
-
-for you to fetch changes up to 2199a5574b6d94b9ca26c6345356f45ec60fef8b:
-
-  clocksource: em_sti: Set cpu_possible_mask to fix SMP broadcast
-(2013-09-26 02:31:04 +0200)
-
-----------------------------------------------------------------
-Jean Pihet (1):
-      arm: clocksource: mvebu: Use the main timer as clock source from DT
-
-Magnus Damm (1):
-      clocksource: em_sti: Set cpu_possible_mask to fix SMP broadcast
-
-Sebastian Hesselbarth (1):
-      clocksource: of: Respect device tree node status
-
-Tomasz Figa (1):
-      clocksource: exynos_mct: Set IRQ affinity when the CPU goes online
-
- drivers/clocksource/Kconfig      |    1 +
- drivers/clocksource/clksrc-of.c  |    3 +++
- drivers/clocksource/em_sti.c     |    2 +-
- drivers/clocksource/exynos_mct.c |   10 +++++++++-
- 4 files changed, 14 insertions(+), 2 deletions(-)
 
 -- 
  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
