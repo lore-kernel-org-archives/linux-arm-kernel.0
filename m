@@ -1,49 +1,36 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Thu, 26 Sep 2013 09:07:54 -0700
-Subject: [GIT PULL] ux500 fixes for v3.12
-In-Reply-To: <CACRpkdZyE6XphN_dhhh1OCdS6-sF1ypUo9qryp=vbLOyQEUmLQ@mail.gmail.com>
- (Linus Walleij's message of "Wed, 25 Sep 2013 09:24:11 +0200")
-References: <CACRpkdZyE6XphN_dhhh1OCdS6-sF1ypUo9qryp=vbLOyQEUmLQ@mail.gmail.com>
-Message-ID: <878uyj7ehx.fsf@linaro.org>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 26 Sep 2013 18:12:06 +0200
+Subject: [PATCH 0/5] Add Core Divider clock support for Armada 370/XP
+In-Reply-To: <20130926160010.GD4583@localhost>
+References: <1380144502-24109-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20130925213730.GA19371@localhost>
+ <5243E46B.2000406@free-electrons.com>
+ <20130926152651.GC4583@localhost> <20130926174755.15a65f92@skate>
+ <20130926160010.GD4583@localhost>
+Message-ID: <20130926181206.70ef355b@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Linus Walleij <linus.walleij@linaro.org> writes:
+Dear Ezequiel Garcia,
 
-> Hi ARM SoC folks,
->
-> this seems to have got stuck in some limbo in my tree, sorry for that.
-> Please pull this in for fixes bound for the v3.12 RC:s so we have the
-> Snowball I2C devices on DT boots again.
->
-> Yours,
-> Linus Wallleij
->
-> The following changes since commit 272b98c6455f00884f0350f775c5342358ebb73f:
->
->   Linux 3.12-rc1 (2013-09-16 16:17:51 -0400)
->
-> are available in the git repository at:
->
->   git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git
-> tags/ux500-fixes-v3.12-1
->
-> for you to fetch changes up to 0ec941e61c020ab6df8d39ae368000b31eb37ba3:
->
->   ARM: ux500: Remove PrimeCell IDs from Nomadik I2C DT nodes
-> (2013-09-17 13:17:02 +0200)
->
-> ----------------------------------------------------------------
-> Fix to make the Snowball boot properly from device tree
-> by not hardcoding the I2C PrimeCell IDs.
->
-> ----------------------------------------------------------------
-> Lee Jones (1):
->       ARM: ux500: Remove PrimeCell IDs from Nomadik I2C DT nodes
->
->  arch/arm/boot/dts/ste-dbx5x0.dtsi | 5 -----
->  1 file changed, 5 deletions(-)
+On Thu, 26 Sep 2013 13:00:11 -0300, Ezequiel Garcia wrote:
 
-Pulled into fixes,
+> Hm... could be. Considering the lack of hardware details (as you
+> point out) maybe this is indeed the best option.
+> 
+> And it has the cool advantage of simplfying the clock tree, which
+> is unnecessarily complex with the NAND ECC clock -> NAND clock layout.
+> 
+> On the other side, Emilio has just pointed out (in private) that
+> there's a flag "CLK_SET_RATE_PARENT" that is meant for these cases.
+> 
+> Anyway, I feel inclined to your suggestion and just forget about the
+> NAND ECC clock for good, which is only confusing.
 
-Kevin
+Yes, I also believe it's the easiest solution.
+
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
