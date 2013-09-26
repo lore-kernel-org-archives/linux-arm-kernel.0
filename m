@@ -1,120 +1,171 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu, 26 Sep 2013 02:39:25 +0200
-Subject: [PATCH] clockevent: exynos_mct: fix lockdep warning
-In-Reply-To: <1380120578-17458-1-git-send-email-tom.leiming@gmail.com>
-References: <1380120578-17458-1-git-send-email-tom.leiming@gmail.com>
-Message-ID: <5243823D.4040208@linaro.org>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Wed, 25 Sep 2013 17:54:37 -0700
+Subject: [PATCH 8/8] KVM: arm-vgic: Support CPU interface reg access
+In-Reply-To: <BD74C365-718A-4946-AC27-21BADEF6F0DC@suse.de>
+References: <1377285606-15692-1-git-send-email-christoffer.dall@linaro.org>
+ <1377285606-15692-9-git-send-email-christoffer.dall@linaro.org>
+ <05BF567A-DD8A-4226-A51F-0D661F4D7EB2@suse.de>
+ <20130925211150.GH32311@cbox>
+ <BD74C365-718A-4946-AC27-21BADEF6F0DC@suse.de>
+Message-ID: <20130926005437.GI32311@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/25/2013 04:49 PM, Ming Lei wrote:
-> This patch moves request_irq() out of cpu notifier callback
-> to fix below lockdep warning:
+On Thu, Sep 26, 2013 at 12:37:03AM +0200, Alexander Graf wrote:
 > 
-> [    0.249513] ------------[ cut here ]------------
-> [    0.249525] WARNING: CPU: 1 PID: 0 at kernel/lockdep.c:2740 lockdep_trace_alloc+0xc8/0x10c()
-> [    0.249534] DEBUG_LOCKS_WARN_ON(irqs_disabled_flags(flags))
-> [    0.249538] Modules linked in:
-> [    0.249548] CPU: 1 PID: 0 Comm: swapper/1 Not tainted 3.12.0-rc1-next-20130923+ #338
-> [    0.249564] [<c00165d0>] (unwind_backtrace+0x0/0xec) from [<c0012b48>] (show_stack+0x20/0x24)
-> [    0.249577] [<c0012b48>] (show_stack+0x20/0x24) from [<c04ebf0c>] (dump_stack+0x74/0xb4)
-> [    0.249591] [<c04ebf0c>] (dump_stack+0x74/0xb4) from [<c00237a8>] (warn_slowpath_common+0x78/0x9c)
-> [    0.249604] [<c00237a8>] (warn_slowpath_common+0x78/0x9c) from [<c0023888>] (warn_slowpath_fmt+0x40/0x48)
-> [    0.249615] [<c0023888>] (warn_slowpath_fmt+0x40/0x48) from [<c007f194>] (lockdep_trace_alloc+0xc8/0x10c)
-> [    0.249626] [<c007f194>] (lockdep_trace_alloc+0xc8/0x10c) from [<c01173b0>] (kmem_cache_alloc_trace+0x38/0x2
-> 24)
-> [    0.249638] [<c01173b0>] (kmem_cache_alloc_trace+0x38/0x224) from [<c006bc4c>] (request_threaded_irq+0x90/0x130)
-> [    0.249651] [<c006bc4c>] (request_threaded_irq+0x90/0x130) from [<c0408c60>] (exynos4_local_timer_setup+0xdc/0x140)
-> [    0.249663] [<c0408c60>] (exynos4_local_timer_setup+0xdc/0x140) from [<c0408d78>] (exynos4_mct_cpu_notify+0x40/0xb0)
-> [    0.249675] [<c0408d78>] (exynos4_mct_cpu_notify+0x40/0xb0) from [<c04f4e18>] (notifier_call_chain+0x48/0x78)
-> [    0.249688] [<c04f4e18>] (notifier_call_chain+0x48/0x78) from [<c004abb0>] (__raw_notifier_call_chain+0x24/0x2c)
-> [    0.249700] [<c004abb0>] (__raw_notifier_call_chain+0x24/0x2c) from [<c0023908>] (__cpu_notify+0x3c/0x58)
-> [    0.249713] [<c0023908>] (__cpu_notify+0x3c/0x58) from [<c0023944>] (cpu_notify+0x20/0x24)
-> [    0.249725] [<c0023944>] (cpu_notify+0x20/0x24) from [<c002407c>] (notify_cpu_starting+0x58/0x60)
-> [    0.249737] [<c002407c>] (notify_cpu_starting+0x58/0x60) from [<c00143cc>] (secondary_start_kernel+0xec/0x13
-> 8)
-> [    0.249748] [<c00143cc>] (secondary_start_kernel+0xec/0x138) from [<40008664>] (0x40008664)
-> [    0.249767] ---[ end trace 3406ff24bd97382e ]---
+> On 25.09.2013, at 23:30, Christoffer Dall wrote:
 > 
-> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Cc: Kukjin Kim <kgene.kim@samsung.com>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-samsung-soc at vger.kernel.org
-> Signed-off-by: Ming Lei <tom.leiming@gmail.com>
-> ---
-
-Tomasz, what do you think ?
-
->  drivers/clocksource/exynos_mct.c |   34 +++++++++++++++++++++-------------
->  1 file changed, 21 insertions(+), 13 deletions(-)
+> > On Sun, Aug 25, 2013 at 04:24:20PM +0100, Alexander Graf wrote:
+> >> 
+> >> On 23.08.2013, at 20:20, Christoffer Dall wrote:
+> >> 
+> >>> Implement support for the CPU interface register access driven by MMIO
+> >>> address offsets from the CPU interface base address.  Useful for user
+> >>> space to support save/restore of the VGIC state.
+> >>> 
+> >>> This commit adds support only for the same logic as the current VGIC
+> >>> support, and no more.  For example, the active priority registers are
+> >>> handled as RAZ/WI, just like setting priorities on the emulated
+> >>> distributor.
+> >>> 
+> >>> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> >>> ---
+> >>> virt/kvm/arm/vgic.c |   66 +++++++++++++++++++++++++++++++++++++++++++++++----
+> >>> 1 file changed, 62 insertions(+), 4 deletions(-)
+> >>> 
+> >>> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+> >>> index d44b5a1..257dbae 100644
+> >>> --- a/virt/kvm/arm/vgic.c
+> >>> +++ b/virt/kvm/arm/vgic.c
+> >>> @@ -1684,9 +1684,67 @@ int kvm_vgic_addr(struct kvm *kvm, unsigned long type, u64 *addr, bool write)
+> >>> static bool handle_cpu_mmio_misc(struct kvm_vcpu *vcpu,
+> >>> 				 struct kvm_exit_mmio *mmio, phys_addr_t offset)
+> >>> {
+> >>> -	return true;
+> >>> +	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
+> >>> +	u32 reg, mask = 0, shift = 0;
+> >>> +	bool updated = false;
+> >>> +
+> >>> +	switch (offset & ~0x3) {
+> >>> +	case GIC_CPU_CTRL:
+> >>> +		mask = GICH_VMCR_CTRL_MASK;
+> >>> +		shift = GICH_VMCR_CTRL_SHIFT;
+> >>> +		break;
+> >>> +	case GIC_CPU_PRIMASK:
+> >>> +		mask = GICH_VMCR_PRIMASK_MASK;
+> >>> +		shift = GICH_VMCR_PRIMASK_SHIFT;
+> >>> +		break;
+> >>> +	case GIC_CPU_BINPOINT:
+> >>> +		mask = GICH_VMCR_BINPOINT_MASK;
+> >>> +		shift = GICH_VMCR_BINPOINT_SHIFT;
+> >>> +		break;
+> >>> +	case GIC_CPU_ALIAS_BINPOINT:
+> >>> +		mask = GICH_VMCR_ALIAS_BINPOINT_MASK;
+> >>> +		shift = GICH_VMCR_ALIAS_BINPOINT_SHIFT;
+> >>> +		break;
+> >>> +	}
+> >>> +
+> >>> +	if (!mmio->is_write) {
+> >>> +		reg = (vgic_cpu->vgic_vmcr & mask) >> shift;
+> >>> +		memcpy(mmio->data, &reg, sizeof(reg));
+> >>> +	} else {
+> >>> +		memcpy(&reg, mmio->data, sizeof(reg));
+> >>> +		reg = (reg << shift) & mask;
+> >>> +		if (reg != (vgic_cpu->vgic_vmcr & mask))
+> >>> +			updated = true;
+> >>> +		vgic_cpu->vgic_vmcr &= ~mask;
+> >>> +		vgic_cpu->vgic_vmcr |= reg;
+> >>> +	}
+> >>> +	return updated;
+> >>> +}
+> >>> +
+> >>> +static bool handle_mmio_abpr(struct kvm_vcpu *vcpu,
+> >>> +			     struct kvm_exit_mmio *mmio, phys_addr_t offset)
+> >>> +{
+> >>> +	return handle_cpu_mmio_misc(vcpu, mmio, GIC_CPU_ALIAS_BINPOINT);
+> >>> +}
+> >>> +
+> >>> +static bool handle_cpu_mmio_ident(struct kvm_vcpu *vcpu,
+> >>> +				  struct kvm_exit_mmio *mmio,
+> >>> +				  phys_addr_t offset)
+> >>> +{
+> >>> +	u32 reg;
+> >>> +
+> >>> +	if (mmio->is_write)
+> >>> +		return false;
+> >>> +
+> >>> +	reg = 0x0002043B;
+> >> 
+> >> This wants a comment and probably also a #define :).
+> >> 
+> > 
+> > Marc, where does the 0x4b0 product id code come from for the distributor
+> > IIDR?
+> > 
+> > Would this be satisfying?
+> > 
+> > 
+> > diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+> > index 5214424..558be38 100644
+> > --- a/virt/kvm/arm/vgic.c
+> > +++ b/virt/kvm/arm/vgic.c
+> > @@ -71,6 +71,9 @@
+> > #define VGIC_ADDR_UNDEF		(-1)
+> > #define IS_VGIC_ADDR_UNDEF(_x)  ((_x) == VGIC_ADDR_UNDEF)
+> > 
+> > +#define GIC_PRODUCT_ID		0x4b0
 > 
-> diff --git a/drivers/clocksource/exynos_mct.c b/drivers/clocksource/exynos_mct.c
-> index 5b34768..94b35aa 100644
-> --- a/drivers/clocksource/exynos_mct.c
-> +++ b/drivers/clocksource/exynos_mct.c
-> @@ -419,19 +419,10 @@ static int exynos4_local_timer_setup(struct clock_event_device *evt)
->  
->  	exynos4_mct_write(TICK_BASE_CNT, mevt->base + MCT_L_TCNTB_OFFSET);
->  
-> -	if (mct_int_type == MCT_INT_SPI) {
-> -		evt->irq = mct_irqs[MCT_L0_IRQ + cpu];
-> -		if (request_irq(evt->irq, exynos4_mct_tick_isr,
-> -				IRQF_TIMER | IRQF_NOBALANCING,
-> -				evt->name, mevt)) {
-> -			pr_err("exynos-mct: cannot register IRQ %d\n",
-> -				evt->irq);
-> -			return -EIO;
-> -		}
-> -		irq_set_affinity(evt->irq, cpumask_of(cpu));
-> -	} else {
-> +	if (mct_int_type == MCT_INT_PPI)
->  		enable_percpu_irq(mct_irqs[MCT_L0_IRQ], 0);
-> -	}
-> +	else
-> +		enable_irq(evt->irq);
->  
->  	return 0;
->  }
-> @@ -440,7 +431,7 @@ static void exynos4_local_timer_stop(struct clock_event_device *evt)
->  {
->  	evt->set_mode(CLOCK_EVT_MODE_UNUSED, evt);
->  	if (mct_int_type == MCT_INT_SPI)
-> -		free_irq(evt->irq, this_cpu_ptr(&percpu_mct_tick));
-> +		disable_irq(evt->irq);
->  	else
->  		disable_percpu_irq(mct_irqs[MCT_L0_IRQ]);
->  }
-> @@ -500,6 +491,23 @@ static void __init exynos4_timer_resources(struct device_node *np, void __iomem
->  					 &percpu_mct_tick);
->  		WARN(err, "MCT: can't request IRQ %d (%d)\n",
->  		     mct_irqs[MCT_L0_IRQ], err);
-> +	} else {
-> +		int cpu;
-> +
-> +		for_each_possible_cpu(cpu) {
-> +			struct mct_clock_event_device *mevt =
-> +				&per_cpu(percpu_mct_tick, cpu);
-> +
-> +			mevt->evt.irq = mct_irqs[MCT_L0_IRQ + cpu];
-> +			if (request_irq(mevt->evt.irq, exynos4_mct_tick_isr,
-> +					IRQF_TIMER | IRQF_NOBALANCING,
-> +					mevt->evt.name, mevt)) {
-> +				WARN(1, "exynos-mct: cannot register IRQ %d\n",
-> +				     mevt->evt.irq);
-> +			}
-> +			irq_set_affinity(mevt->evt.irq, cpumask_of(cpu));
-> +			disable_irq(mevt->evt.irq);
-> +		}
->  	}
->  
->  	err = register_cpu_notifier(&exynos4_mct_cpu_nb);
+> This is a specific GIC version. PL390 for example is 0x3b0:
+> 
+>   http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0416b/Beiggeba.html
+> 
+> That should be reflected in the #define. If it means "GICv2" then it should be GICV2_PRODUCT_ID for example.
 > 
 
+I know what field in the register it is thanks :)
 
--- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+But I couldn't find 0x4b0 anywhere in the docs, so I'm asking
+Marc where he got it from.  I don't believe it means GICv2, but a
+specific implementation of a GICv2, and once I have more info I can
+change the define name, I suspect this is potentially something made-up
+to indicate that this is the KVM VGIC...
 
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+> > +#define ARM_JEP106_IMPLEMENTER	0x43b
+> 
+> I think naming this JEP106_IMPLEMENTER_ARM makes it more obvious that we're talking about the implementer code for ARM. Or maybe just only IMPLEMENTER_ARM.
+> 
+
+ok
+
+> > +
+> > /* Physical address of vgic virtual cpu interface */
+> > static phys_addr_t vgic_vcpu_base;
+> > 
+> > @@ -331,7 +334,7 @@ static bool handle_mmio_misc(struct kvm_vcpu *vcpu,
+> > 		break;
+> > 
+> > 	case 8:			/* IIDR */
+> > -		reg = 0x4B00043B;
+> > +		reg = (GIC_PRODUCT_ID << 20) | ARM_JEP106_IMPLEMENTER;
+> > 		vgic_reg_access(mmio, &reg, word_offset,
+> > 				ACCESS_READ_VALUE | ACCESS_WRITE_IGNORED);
+> > 		break;
+> > @@ -1734,7 +1737,7 @@ static bool handle_cpu_mmio_ident(struct kvm_vcpu *vcpu,
+> > 	if (mmio->is_write)
+> > 		return false;
+> > 
+> > -	reg = 0x0002043B;
+> > +	reg = (GIC_PRODUCT_ID << 20) | (0x2 << 16) | ARM_JEP106_IMPLEMENTER;
+> 
+> What is the 0x2 here?
+> 
+> 
+
+GICv2, and now you're going to tell me to create a define for it right?
+
+Which of course I can, but it's getting a bit silly, because then you
+can ask me what is the field shifted at 16 bits, and the next question
+is what is the GICC_IIDR, and at some point you're just going to have to
+look up the definition of this specific register in the GIC specs.
+
+-Christoffer
