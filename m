@@ -1,38 +1,68 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 26 Sep 2013 09:29:20 +0900
-Subject: [PATCH] ARM: shmobile: Add r8a7790 thermal sensor DT device
-In-Reply-To: <CANqRtoRPAMDDgPo5kBTxnEoVG7N1UwxWGBuz+ORzTPqP=+7r_A@mail.gmail.com>
-References: <20130925231119.16473.31647.sendpatchset@w520>
- <20130925233552.GA20882@verge.net.au>
- <CANqRtoRPAMDDgPo5kBTxnEoVG7N1UwxWGBuz+ORzTPqP=+7r_A@mail.gmail.com>
-Message-ID: <20130926002919.GB13464@verge.net.au>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Thu, 26 Sep 2013 02:37:38 +0200
+Subject: [GIT PULL 3.12-rc2 fixes] clocksource: Several fixes for 3.12-rc2
+Message-ID: <524381D2.7050604@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 26, 2013 at 08:43:46AM +0900, Magnus Damm wrote:
-> On Thu, Sep 26, 2013 at 8:35 AM, Simon Horman <horms@verge.net.au> wrote:
-> > On Thu, Sep 26, 2013 at 08:11:19AM +0900, Magnus Damm wrote:
-> >> From: Magnus Damm <damm@opensource.se>
-> >>
-> >> Hook up the single channel thermal sensor via DT
-> >> on r8a7790. The information used by the platform
-> >> device has been verified against the data sheet.
-> >>
-> >> Signed-off-by: Magnus Damm <damm@opensource.se>
-> >
-> > Hi Magnus,
-> >
-> > I would prefer if this was split into two patches.
-> > An SoC patch that updates clock-r8a7790.c.
-> > And a DT patch which updates r8a7790.dtsi.
-> 
-> Sure, that's fine with me. I will do that from now on.
+Hi Thomas,
 
-Thanks. I'm trying to reduce dependencies/conflicts between
-branches. I'm not sure how well it will pan out. But that is my aim
-at the moment.
+this pull request contains several fixes for the clocksource/clockevent
+drivers:
 
-> I believe that common clock framework will allow us to handle all
-> within a single dtsi patch.
+ - Jean Pihet fixed a missing Kconfig option preventing the Armada370/XP
+to boot up.
 
-Excellent.
+ - Magnus Damm fixed the cpumask on the em_sti driver to have the
+broadcast timer working on a SMP system
+
+ - Sebastian Hesselbarth skipped the initialization of a timer for
+uninitialized DT nodes
+
+ - Tomasz Figa fixed the irq affinity failing on non online cpus
+
+Thanks
+  -- Daniel
+
+-----------------------------------------------------------------------------
+
+The following changes since commit 4a10c2ac2f368583138b774ca41fac4207911983:
+
+  Linux 3.12-rc2 (2013-09-23 15:41:09 -0700)
+
+are available in the git repository at:
+
+
+ssh://daniel.lezcano at git.linaro.org//srv/git.linaro.org/git/people/dlezcano/linux.git
+clockevents/3.12-rc2-fixes
+
+for you to fetch changes up to 2199a5574b6d94b9ca26c6345356f45ec60fef8b:
+
+  clocksource: em_sti: Set cpu_possible_mask to fix SMP broadcast
+(2013-09-26 02:31:04 +0200)
+
+----------------------------------------------------------------
+Jean Pihet (1):
+      arm: clocksource: mvebu: Use the main timer as clock source from DT
+
+Magnus Damm (1):
+      clocksource: em_sti: Set cpu_possible_mask to fix SMP broadcast
+
+Sebastian Hesselbarth (1):
+      clocksource: of: Respect device tree node status
+
+Tomasz Figa (1):
+      clocksource: exynos_mct: Set IRQ affinity when the CPU goes online
+
+ drivers/clocksource/Kconfig      |    1 +
+ drivers/clocksource/clksrc-of.c  |    3 +++
+ drivers/clocksource/em_sti.c     |    2 +-
+ drivers/clocksource/exynos_mct.c |   10 +++++++++-
+ 4 files changed, 14 insertions(+), 2 deletions(-)
+
+-- 
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
