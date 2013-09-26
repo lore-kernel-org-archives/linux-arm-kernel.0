@@ -1,145 +1,90 @@
 From: jean.pihet@linaro.org (Jean Pihet)
-Date: Thu, 26 Sep 2013 13:36:38 +0200
-Subject: [PATCH 4/4] perf: parse the .debug_frame section in case .eh_frame is
- not present
-In-Reply-To: <1380195398-4402-1-git-send-email-jean.pihet@linaro.org>
-References: <1380195398-4402-1-git-send-email-jean.pihet@linaro.org>
-Message-ID: <1380195398-4402-5-git-send-email-jean.pihet@linaro.org>
+Date: Thu, 26 Sep 2013 13:39:00 +0200
+Subject: [PATCH 3/4] perf tools: Check libunwind for availability of dwarf
+ parsing feature
+In-Reply-To: <20130925073113.GA1027@krava.brq.redhat.com>
+References: <1379323053-11458-1-git-send-email-jean.pihet@linaro.org>
+ <1379323053-11458-4-git-send-email-jean.pihet@linaro.org>
+ <20130917102904.GA27258@mudshark.cambridge.arm.com>
+ <CAFrcx1nnx0+kWx3z3A86Fwz13RYRVSPSG0YHBcxFeFQP8W7jBg@mail.gmail.com>
+ <20130924093450.GB1008@krava.brq.redhat.com>
+ <20130924100620.GG15119@mudshark.cambridge.arm.com>
+ <CAFrcx1k-sfHMRz6mvibBbph4vNOMkVddE4LEE4yXbWHC3DwMZA@mail.gmail.com>
+ <20130924174318.GE3080@krava.brq.redhat.com>
+ <CAFrcx1kw-vEo8m0yNFK1d7Sw+o8C7K7j1feLdOk3Mcdmw9tPcw@mail.gmail.com>
+ <20130925073113.GA1027@krava.brq.redhat.com>
+Message-ID: <CAFrcx1m8BWd-4jktgsKUdFAoHXWS-eWkOKQroEcNYjDaoQ3pZA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On ARM the debug info is not present in the .eh_frame sections but
-in .debug_frame instead, in dwarf format.
-Use libunwind to load and parse the debug info.
+Hi Jiri, Will,
 
-Dependencies:
- . if present, libunwind >= 1.1 is needed to prevent a segfault when
-   parsing the dwarf info,
- . libunwind needs to be configured with --enable-debug-frame. Note:
-   --enable-debug-frame is automatically selected on ARM.
+I just sent the reworked series as '[PATCH v3 0/4] perf: parse the
+dwarf backtrace info from .debug_frame section'.
+Tested on x86 and ARMv7.
 
-Signed-off-by: Jean Pihet <jean.pihet@linaro.org>
----
- tools/perf/util/unwind.c | 75 +++++++++++++++++++++++++++++++++++++-----------
- 1 file changed, 59 insertions(+), 16 deletions(-)
+Regards,
+Jean
 
-diff --git a/tools/perf/util/unwind.c b/tools/perf/util/unwind.c
-index 2f891f7..5390d0b 100644
---- a/tools/perf/util/unwind.c
-+++ b/tools/perf/util/unwind.c
-@@ -39,6 +39,15 @@ UNW_OBJ(dwarf_search_unwind_table) (unw_addr_space_t as,
- 
- #define dwarf_search_unwind_table UNW_OBJ(dwarf_search_unwind_table)
- 
-+extern int
-+UNW_OBJ(dwarf_find_debug_frame) (int found, unw_dyn_info_t *di_debug,
-+				 unw_word_t ip,
-+				 unw_word_t segbase,
-+				 const char *obj_name, unw_word_t start,
-+				 unw_word_t end);
-+
-+#define dwarf_find_debug_frame UNW_OBJ(dwarf_find_debug_frame)
-+
- #define DW_EH_PE_FORMAT_MASK	0x0f	/* format of the encoded value */
- #define DW_EH_PE_APPL_MASK	0x70	/* how the value is to be applied */
- 
-@@ -245,8 +254,9 @@ static int unwind_spec_ehframe(struct dso *dso, struct machine *machine,
- 	return 0;
- }
- 
--static int read_unwind_spec(struct dso *dso, struct machine *machine,
--			    u64 *table_data, u64 *segbase, u64 *fde_count)
-+static int read_unwind_spec_eh_frame(struct dso *dso, struct machine *machine,
-+				     u64 *table_data, u64 *segbase,
-+				     u64 *fde_count)
- {
- 	int ret = -EINVAL, fd;
- 	u64 offset;
-@@ -255,6 +265,7 @@ static int read_unwind_spec(struct dso *dso, struct machine *machine,
- 	if (fd < 0)
- 		return -EINVAL;
- 
-+	/* Check the .eh_frame section for unwinding info */
- 	offset = elf_section_offset(fd, ".eh_frame_hdr");
- 	close(fd);
- 
-@@ -263,10 +274,29 @@ static int read_unwind_spec(struct dso *dso, struct machine *machine,
- 					  table_data, segbase,
- 					  fde_count);
- 
--	/* TODO .debug_frame check if eh_frame_hdr fails */
- 	return ret;
- }
- 
-+#ifndef NO_LIBUNWIND_DEBUG_FRAME
-+static int read_unwind_spec_debug_frame(struct dso *dso,
-+					struct machine *machine, u64 *offset)
-+{
-+	int fd = dso__data_fd(dso, machine);
-+
-+	if (fd < 0)
-+		return -EINVAL;
-+
-+	/* Check the .debug_frame section for unwinding info */
-+	*offset = elf_section_offset(fd, ".debug_frame");
-+	close(fd);
-+
-+	if (*offset)
-+		return 0;
-+
-+	return -EINVAL;
-+}
-+#endif
-+
- static struct map *find_map(unw_word_t ip, struct unwind_info *ui)
- {
- 	struct addr_location al;
-@@ -291,20 +321,33 @@ find_proc_info(unw_addr_space_t as, unw_word_t ip, unw_proc_info_t *pi,
- 
- 	pr_debug("unwind: find_proc_info dso %s\n", map->dso->name);
- 
--	if (read_unwind_spec(map->dso, ui->machine,
--			     &table_data, &segbase, &fde_count))
--		return -EINVAL;
-+	/* Check the .eh_frame section for unwinding info */
-+	if (!read_unwind_spec_eh_frame(map->dso, ui->machine,
-+				       &table_data, &segbase, &fde_count)) {
-+		memset(&di, 0, sizeof(di));
-+		di.format   = UNW_INFO_FORMAT_REMOTE_TABLE;
-+		di.start_ip = map->start;
-+		di.end_ip   = map->end;
-+		di.u.rti.segbase    = map->start + segbase;
-+		di.u.rti.table_data = map->start + table_data;
-+		di.u.rti.table_len  = fde_count * sizeof(struct table_entry)
-+				      / sizeof(unw_word_t);
-+		return dwarf_search_unwind_table(as, ip, &di, pi,
-+						 need_unwind_info, arg);
-+	}
-+
-+#ifndef NO_LIBUNWIND_DEBUG_FRAME
-+	/* Check the .debug_frame section for unwinding info */
-+	if (!read_unwind_spec_debug_frame(map->dso, ui->machine, &segbase)) {
-+		memset(&di, 0, sizeof(di));
-+		dwarf_find_debug_frame(0, &di, ip, 0, map->dso->name,
-+				       map->start, map->end);
-+		return dwarf_search_unwind_table(as, ip, &di, pi,
-+						 need_unwind_info, arg);
-+	}
-+#endif
- 
--	memset(&di, 0, sizeof(di));
--	di.format   = UNW_INFO_FORMAT_REMOTE_TABLE;
--	di.start_ip = map->start;
--	di.end_ip   = map->end;
--	di.u.rti.segbase    = map->start + segbase;
--	di.u.rti.table_data = map->start + table_data;
--	di.u.rti.table_len  = fde_count * sizeof(struct table_entry)
--			      / sizeof(unw_word_t);
--	return dwarf_search_unwind_table(as, ip, &di, pi,
--					 need_unwind_info, arg);
-+	return -EINVAL;
- }
- 
- static int access_fpreg(unw_addr_space_t __maybe_unused as,
--- 
-1.7.11.7
+
+On 25 September 2013 09:31, Jiri Olsa <jolsa@redhat.com> wrote:
+> On Wed, Sep 25, 2013 at 08:53:44AM +0200, Jean Pihet wrote:
+>> Hi Jiri,
+>>
+>> On 24 September 2013 19:43, Jiri Olsa <jolsa@redhat.com> wrote:
+>> > On Tue, Sep 24, 2013 at 02:03:47PM +0200, Jean Pihet wrote:
+>> >> Hi Jiri, Will,
+>> >>
+>> >> On 24 September 2013 12:06, Will Deacon <will.deacon@arm.com> wrote:
+>> >> > On Tue, Sep 24, 2013 at 10:34:50AM +0100, Jiri Olsa wrote:
+>> >> >> On Tue, Sep 24, 2013 at 10:55:32AM +0200, Jean Pihet wrote:
+>> >> >> > Ping on the series. The two patches above (3/4 and 4/4) are generic
+>> >> >> > while the two others are impacting ARM only.
+>> >> >> > Is it possible to get an Ack for the generic ones?
+>> >> >>
+>> >> >> I'm fine with those changes.. still I'm sort of worried about
+>> >> >> current DWARF unwind users (but not sure if there're any),
+>> >> >> who depends on packaged libunwind compiled without
+>> >> >> --enable-debug-frame option.
+>> >> >
+>> >> > Since x86 is the only architecture using libunwind with perf at the moment,
+>> >> > and I'd expect it to use .eh_frame for unwinding, I'm also not sure there
+>> >> > are any existing users to worry about.
+>> >> Right
+>> >>
+>> >> >
+>> >> >> I've seen your libunwind patch to make it default, but
+>> >> >> not sure if it was accepted.. if not, maybe we should
+>> >> >> detect this and build that code conditionaly.
+>> >> >
+>> >> > It certainly defaults to "on" for ARM, but other architectures have to
+>> >> > enable it explicitly afaict.
+>> >> Yes that is correct.
+>> >> This patch (3/4) detects if the debug frame code is enabled in
+>> >> libunwind and uses the lib only if it is the case.
+>> >
+>> > My concern is about users (again, not sure if there are any ;-) )
+>> > that use this with packaged libunwind compiled without
+>> > --enable-debug-frame option.
+>> >
+>> > For them perf will consider libunwind as 'not available' with
+>> > your changes:
+>> >
+>> >       ...
+>> >       CHK libunwind
+>> >   config/Makefile:223: No libunwind found, disabling post unwind support.  Please install libunwind-dev[el] >= 1.1
+>> >       ...
+>> >
+>> > and they'll need to compile their own libunwind
+>> > (thats the case on Fedora).
+>> >
+>> > This could be solved by detecting this and make your
+>> > code conditional as attached below (not much tested).
+>> Ok that makes sense.
+>> Let me integrate this in the patch series, test it (on ARM and x86)
+>> and re-submit. Is that OK?
+>
+> that'd be great
+>
+> thanks,
+> jirka
