@@ -1,62 +1,31 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Thu, 26 Sep 2013 17:56:56 +0200
-Subject: [PATCH 1/5] clk: mvebu: Add core-divider clock
-In-Reply-To: <20130926151240.GB4583@localhost>
-References: <1380144502-24109-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <20130925213730.GA19371@localhost> <20130926082404.GA18244@lunn.ch>
- <20130926151240.GB4583@localhost>
-Message-ID: <20130926155656.GF18244@lunn.ch>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Thu, 26 Sep 2013 18:06:05 +0200
+Subject: [RFC PATCH 0/2] ARM: at91: cpuidle: encapsulate and move the driver
+ to drivers/cpuidle
+Message-ID: <1380211567-2972-1-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > > +	/* Valid ratio are 1:4, 1:5, 1:6 and 1:8 */
-> > > +	u32 div;
-> > > +
-> > > +	div = *parent_rate / rate;
-> > > +	if (div <= 4)
-> > > +	   div = 4;
-> > > +	   else if (div <= 5)
-> > > +	   	div = 5;
-> > > +		else if (div <= 6)
-> > > +		     div = 6;
-> > > +		     else
-> > > +			div = 8;
-> > > +
-> > > +	return *parent_rate / div;
-> > > +}
-> > 
-> > This looks odd. Is not the following clearer?
-> > 
-> > 	div = *parent_rate / rate;
-> > 	if (div < 5)
-> > 	   div = 4;
-> > 	   else if (div > 6)
-> > 		div = 8;
-> > 
-> 
-> Mmmm... no, it's not at all clearer to me.
-> IMHO, the original construction explicitly show the possible ratios:
-> 
-> 	/* If it's smaller than or equal to 4, set to 4 */
-> 	if (div <= 4)
-> 		div = 4;
-> 
-> 	/* Otherwise, if it's between 4 and 5, set to 5 */
-> 	else if (div <= 5)
-> 	 	div = 5;
+Several patches were send to encapsulate the standby code.
 
-If div was a float or double, i would probably agree. But its a u32.
-It cannot be between 4 and 5. It must be 5. So it becomes
+Creating a platform driver model allows to finish to encapsulate this code more
+and make possible to move the driver to the drivers/cpuidle directory.
 
- 	if (div <= 4)
- 		div = 4;
-        else if (div == 5)
-	        div = 5;
-        else if (div == 6)
-                div = 6
-        else 
-	    div = 8
+I was not able to test the patchset, I don't have the hardware.
 
-Those two middle statements look odd to me...
+Daniel Lezcano (2):
+  ARM: at91: cpuidle: convert to platform driver
+  ARM: at91: cpuidle: Move driver to drivers/cpuidle
 
-      Andrew
+ arch/arm/mach-at91/Makefile    |    1 -
+ arch/arm/mach-at91/cpuidle.c   |   68 ---------------------------------------
+ arch/arm/mach-at91/pm.c        |   16 +++++++++-
+ drivers/cpuidle/Kconfig.arm    |    6 ++++
+ drivers/cpuidle/Makefile       |    1 +
+ drivers/cpuidle/cpuidle-at91.c |   69 ++++++++++++++++++++++++++++++++++++++++
+ 6 files changed, 91 insertions(+), 70 deletions(-)
+ delete mode 100644 arch/arm/mach-at91/cpuidle.c
+ create mode 100644 drivers/cpuidle/cpuidle-at91.c
+
+-- 
+1.7.9.5
