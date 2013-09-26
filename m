@@ -1,51 +1,54 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Thu, 26 Sep 2013 22:28:31 +0400
-Subject: [PATCH] ARM: shmobile: Lager: add Micrel KSZ8041 PHY fixup
-In-Reply-To: <CANqRtoTiHQ3EVDZ8POCkyN2ga95rF=u5ERfYsdZbX+toqAWmaQ@mail.gmail.com>
-References: <201309140429.23474.sergei.shtylyov@cogentembedded.com>
- <CANqRtoTiHQ3EVDZ8POCkyN2ga95rF=u5ERfYsdZbX+toqAWmaQ@mail.gmail.com>
-Message-ID: <52447CCF.8000301@cogentembedded.com>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Thu, 26 Sep 2013 15:29:37 -0300
+Subject: [PATCH 1/5] clk: mvebu: Add core-divider clock
+In-Reply-To: <20130926082404.GA18244@lunn.ch>
+References: <1380144502-24109-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20130925213730.GA19371@localhost> <20130926082404.GA18244@lunn.ch>
+Message-ID: <20130926182936.GA7772@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Hey Andrew,
 
-On 09/26/2013 10:50 AM, Magnus Damm wrote:
+On Thu, Sep 26, 2013 at 10:24:04AM +0200, Andrew Lunn wrote:
+> 
+> +   /*
+> +    * Wait for clocks to settle down, and then clear all the
+> +     * ratios request and the reload request.
+> +      */
+> +      udelay(1000);
+> +      reg &= ~(CORE_CLOCK_DIVIDER_RATIO_MASK | CORE_CLOCK_DIVIDER_RATIO_RELOAD);
+> +      writel(reg, corediv->reg);
+> +      udelay(1000);
+> 
+> 
+> Documentation/timers/timers-howto.txt says: 
+> 
+>        SLEEPING FOR ~USECS OR SMALL MSECS ( 10us - 20ms):
+>        		* Use usleep_range
+> 
 
->> Currently on the Lager board NFS timeouts/delays are seen when booting.  That
->> turned out to happen because the SoC's ETH_LINK signal turns on and off after
->> each packet.  It is connected to Micrel KSZ8041 PHY's LED0 signal. Ether LEDs
->> on the Lager board are named LINK and ACTIVE which corresponds to non-default
->> 01 setting of the PHY control register 1 bits 14-15. The 'sh_eth' driver resets
->> the PHY when opening the network device, so we have to set the mentioned bits
->> back to 01 from the default 00 value which causes bouncing of ETH_LINK.  That
->> can be achieved using the PHY platform fixup mechanism if we also modify the
->> driver to use it..
+Given the set_rate should be protected by spinlocks (as you pointed out),
+I guess we can't afford using usleep_range (the context is now non-atomic).
 
->> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Now, according to arch/arm/include/asm/delay.h this is the suggestion
+for udelay and friends:
 
-> Hi Sergei,
+ * Use only for very small delays ( < 2 msec).  Should probably use a
+ * lookup table, really, as the multiplications take much too long with
+ * short delays.  This is a "reasonable" implementation, though (and
+ * the first constant multiplications gets optimized away if the delay is
+ * a constant)  
 
-> Thanks for your efforts on this. Nice to see that Ethernet for Lager
-> board support is improving.
+Which means we could just use udelay(1000) without much trouble.
 
-> Can you please share with us with link speeds you tested? I suspect
+On the other side, since we know the rate the clock is running, we could
+use __delay() just as drivers/clk/sunxi/clk-factors.c is doing.
+__delay() has a much simpler implementation, which feels correct in
+this case of "wait until the clock settles".
 
-    100 Mbit/s, full duplex.
-
-> that this patch is only needed for some case, like for instance 100
-> MBit Full Duplex.
-
-    Hm, why? :-O
-
-> Fixing the PHY settings makes sense even though only
-> a single mode needs it, but knowing which link speeds that are known
-> to work would help a lot.
-
-    This patch should not depend on the link speed and duplex settings.
-
-> Cheers,
-
-> / magnus
-
-WBR, Sergei
+Therefore, I'm currently going to try that option.
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
