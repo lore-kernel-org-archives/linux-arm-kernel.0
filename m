@@ -1,36 +1,24 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 27 Sep 2013 11:48:02 +0100
-Subject: [PATCH 4/9] iommu/arm-smmu: Check for num_context_irqs > 0 to
- avoid divide by zero exception
-In-Reply-To: <20130927103949.GM3315@alberich>
-References: <1380234982-1677-1-git-send-email-andreas.herrmann@calxeda.com>
- <1380234982-1677-5-git-send-email-andreas.herrmann@calxeda.com>
- <20130927084154.GB8319@mudshark.cambridge.arm.com>
- <20130927090348.GF3315@alberich>
- <20130927102307.GE9057@mudshark.cambridge.arm.com>
- <20130927103949.GM3315@alberich>
-Message-ID: <20130927104802.GF9057@mudshark.cambridge.arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 27 Sep 2013 11:50:46 +0100
+Subject: [RFT PATCH v1 0/7] enable FPSIMD lazy save and restore for arm64
+In-Reply-To: <1380269087-8520-1-git-send-email-liuj97@gmail.com>
+References: <1380269087-8520-1-git-send-email-liuj97@gmail.com>
+Message-ID: <20130927105045.GA11063@MacBook-Pro.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 27, 2013 at 11:39:49AM +0100, Andreas Herrmann wrote:
-> On Fri, Sep 27, 2013 at 06:23:07AM -0400, Will Deacon wrote:
-> > What do you think?
+On Fri, Sep 27, 2013 at 09:04:40AM +0100, Jiang Liu wrote:
+> From: Jiang Liu <jiang.liu@huawei.com>
 > 
-> Yes, that should suffice.
+> This patchset enables FPSIMD lazy save and restore for ARM64, you could
+> apply it against v3.12-rc2.
 > 
-> I know it's clear for us but what about a short comment to emphasize
-> that we expect to find at least one context irq?
-> 
-> -       if (num_irqs < smmu->num_global_irqs) {
-> +       /* expect num_global_irqs plus at least one context irq */
-> +       if (num_irqs <= smmu->num_global_irqs) {
-> 
-> which can be translated to
-> 
-> -       if (num_irqs < smmu->num_global_irqs) {
-> +       if (!smmu->num_context_irqs) {
+> We have done basic functional tests on ARM fast model, but still lack
+> of detail performance benchmark on real hardware platforms. We would
+> appreciate if you could help to test it on really hardware platforms!
 
-Even better! Do you want to send a patch, or shall I just create one myself?
+That's my issue as well, I would like to see some benchmarks before
+merging such patches.
 
-Will
+-- 
+Catalin
