@@ -1,68 +1,72 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Fri, 27 Sep 2013 12:14:21 +0200
-Subject: imprecise external abort using the flexcan driver on i.MX6Q
-In-Reply-To: <21061.22576.404020.384558@ipc1.ka-ro>
-References: <21060.15934.600859.167074@ipc1.ka-ro>
- <524455FD.7070808@pengutronix.de>
- <20130926155422.GQ12758@n2100.arm.linux.org.uk> <52445FBE.4060503@ti.com>
- <21061.20097.221946.197751@ipc1.ka-ro> <5245535F.6020804@pengutronix.de>
- <21061.22576.404020.384558@ipc1.ka-ro>
-Message-ID: <52455A7D.6030403@pengutronix.de>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 27 Sep 2013 11:23:07 +0100
+Subject: [PATCH 4/9] iommu/arm-smmu: Check for num_context_irqs > 0 to
+ avoid divide by zero exception
+In-Reply-To: <20130927090348.GF3315@alberich>
+References: <1380234982-1677-1-git-send-email-andreas.herrmann@calxeda.com>
+ <1380234982-1677-5-git-send-email-andreas.herrmann@calxeda.com>
+ <20130927084154.GB8319@mudshark.cambridge.arm.com>
+ <20130927090348.GF3315@alberich>
+Message-ID: <20130927102307.GE9057@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/27/2013 12:04 PM, Lothar Wa?mann wrote:
-
->> They layout of the flexcan varies in the different imx chips. I'm
->> comparing the datasheets at the moment. As Russell pointed out the area
->> staring at offset 0x80 is by the reception FIFO engine.
->>
-> The layout is correct when the Rx FIFO is disabled!
+On Fri, Sep 27, 2013 at 10:03:48AM +0100, Andreas Herrmann wrote:
+> On Fri, Sep 27, 2013 at 04:41:54AM -0400, Will Deacon wrote:
+> > On Thu, Sep 26, 2013 at 11:36:16PM +0100, Andreas Herrmann wrote:
+> > > diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+> > > index 4307fbc..de9dd60 100644
+> > > --- a/drivers/iommu/arm-smmu.c
+> > > +++ b/drivers/iommu/arm-smmu.c
+> > > @@ -1822,7 +1822,11 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
+> > >  			 num_irqs, smmu->num_global_irqs);
+> > >  		smmu->num_global_irqs = num_irqs;
+> > >  	}
+> > > -	smmu->num_context_irqs = num_irqs - smmu->num_global_irqs;
+> > 
+> > Why are you deleting this line?
 > 
-> removing 'FLEXCAN_MCR_FEN' from the MCR setting makes the driver work
-> as expected (just without receive fifo).
+> Because I felt it's redundant in some cases and erroneously I thought
+> it could be bogus if num_irqs < num_global_irqs.
+> Of course the latter is wrong, as num_global_irqs is corrected two
+> lines above.
 > 
-> For the use case with the FIFO enabled, the layout has to be changed
-> obviously.
+> Now I think it's always redundant. num_context_irqs is only
+> incremented here
+> 
+>                if (num_irqs > smmu->num_global_irqs)
+>                         smmu->num_context_irqs++;
 
-Can you just remove the loop completely? I think it's not needed. It
-was in the original driver, when I picked it up.
+Yes, I think you're right. This leaves us in a situation where getting the
+#global-interrupts property wrong will trigger a warning followed
+immediately by a failure to probe. That means we could simply augment the
+current check and make it fatal instead:
 
-diff --git a/drivers/net/can/flexcan.c b/drivers/net/can/flexcan.c
-index e1ac75d..57ee3df 100644
---- a/drivers/net/can/flexcan.c
-+++ b/drivers/net/can/flexcan.c
-@@ -778,17 +778,6 @@ static int flexcan_chip_start(struct net_device *dev)
-        netdev_dbg(dev, "%s: writing ctrl=0x%08x", __func__, reg_ctrl);
-        flexcan_write(reg_ctrl, &regs->ctrl);
+--->8
 
--       for (i = 0; i < ARRAY_SIZE(regs->cantxfg); i++) {
--               flexcan_write(0, &regs->cantxfg[i].can_ctrl);
--               flexcan_write(0, &regs->cantxfg[i].can_id);
--               flexcan_write(0, &regs->cantxfg[i].data[0]);
--               flexcan_write(0, &regs->cantxfg[i].data[1]);
--
--               /* put MB into rx queue */
--               flexcan_write(FLEXCAN_MB_CNT_CODE(0x4),
--                       &regs->cantxfg[i].can_ctrl);
--       }
--
-        /* acceptance mask/acceptance code (accept everything) */
-        flexcan_write(0x0, &regs->rxgmask);
-        flexcan_write(0x0, &regs->rx14mask);
+diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+index 2931921..03ffbae 100644
+--- a/drivers/iommu/arm-smmu.c
++++ b/drivers/iommu/arm-smmu.c
+@@ -1799,12 +1799,11 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
+                        smmu->num_context_irqs++;
+        }
+ 
+-       if (num_irqs < smmu->num_global_irqs) {
++       if (num_irqs <= smmu->num_global_irqs) {
+                dev_warn(dev, "found %d interrupts but expected at least %d\n",
+-                        num_irqs, smmu->num_global_irqs);
+-               smmu->num_global_irqs = num_irqs;
++                        num_irqs, smmu->num_global_irqs + 1);
++               return -ENODEV;
+        }
+-       smmu->num_context_irqs = num_irqs - smmu->num_global_irqs;
+ 
+        smmu->irqs = devm_kzalloc(dev, sizeof(*smmu->irqs) * num_irqs,
+                                  GFP_KERNEL);
 
-Marc
+8<---
 
--- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+What do you think?
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 259 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130927/0383f13f/attachment.sig>
+Will
