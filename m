@@ -1,80 +1,92 @@
-From: liuj97@gmail.com (Jiang Liu)
-Date: Fri, 27 Sep 2013 21:20:04 +0800
-Subject: [RFT PATCH v1 2/7] arm64: restore FPSIMD to default state for
- kernel and signal contexts
-In-Reply-To: <20130927113507.GC11063@MacBook-Pro.local>
-References: <1380269087-8520-1-git-send-email-liuj97@gmail.com>
- <1380269087-8520-3-git-send-email-liuj97@gmail.com>
- <20130927113507.GC11063@MacBook-Pro.local>
-Message-ID: <52458604.7030902@gmail.com>
+From: eduardo.valentin@ti.com (Eduardo Valentin)
+Date: Fri, 27 Sep 2013 09:20:31 -0400
+Subject: [PATCHv4 11/18] arm: dts: add omap4430 thermal data
+In-Reply-To: <20130927122439.GA8360@kahuna>
+References: <1380251605-3804-1-git-send-email-eduardo.valentin@ti.com>
+ <1380251605-3804-12-git-send-email-eduardo.valentin@ti.com>
+ <20130927122439.GA8360@kahuna>
+Message-ID: <5245861F.7000109@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/27/2013 07:35 PM, Catalin Marinas wrote:
-> On Fri, Sep 27, 2013 at 09:04:42AM +0100, Jiang Liu wrote:
->> diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
->> index bb785d2..12a25e5 100644
->> --- a/arch/arm64/kernel/fpsimd.c
->> +++ b/arch/arm64/kernel/fpsimd.c
->> @@ -80,9 +80,14 @@ void fpsimd_thread_switch(struct task_struct *next)
+On 27-09-2013 08:24, Nishanth Menon wrote:
+> On 23:13-20130926, Eduardo Valentin wrote:
+>> This patch changes the dtsi entry on omap4430 to contain
+>> the thermal data. This data will enable the passive
+>> cooling with CPUfreq cooling device at 100C and the
+>> system will do a thermal shutdown at 125C.
+>>
+>> Cc: "Beno?t Cousson" <bcousson@baylibre.com>
+>> Cc: Tony Lindgren <tony@atomide.com>
+>> Cc: Russell King <linux@arm.linux.org.uk>
+>> Cc: linux-omap at vger.kernel.org
+>> Cc: devicetree-discuss at lists.ozlabs.org
+>> Cc: linux-arm-kernel at lists.infradead.org
+>> Cc: linux-kernel at vger.kernel.org
+>> Signed-off-by: Eduardo Valentin <eduardo.valentin@ti.com>
+>> ---
+>>  arch/arm/boot/dts/omap443x.dtsi | 10 ++++++++--
+>>  1 file changed, 8 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/arch/arm/boot/dts/omap443x.dtsi b/arch/arm/boot/dts/omap443x.dtsi
+>> index bcf455e..e9c97d6 100644
+>> --- a/arch/arm/boot/dts/omap443x.dtsi
+>> +++ b/arch/arm/boot/dts/omap443x.dtsi
+>> @@ -12,7 +12,7 @@
 >>  
->>  void fpsimd_flush_thread(void)
->>  {
->> +	struct fpsimd_state *state = &current->thread.fpsimd_state;
+>>  / {
+>>  	cpus {
+>> -		cpu at 0 {
+>> +		cpu0: cpu at 0 {
+>>  			/* OMAP443x variants OPP50-OPPNT */
+>>  			operating-points = <
+>>  				/* kHz    uV */
+>> @@ -25,9 +25,15 @@
+>>  		};
+>>  	};
+>>  
+>> -	bandgap {
+>> +	thermal-zones{
+>> +		#include "omap4-cpu-thermal.dtsi"
+>> +	};
 >> +
->>  	preempt_disable();
->> -	memset(&current->thread.fpsimd_state, 0, sizeof(struct fpsimd_state));
->> -	fpsimd_load_state(&current->thread.fpsimd_state);
->> +	memset(state, 0, sizeof(struct fpsimd_state));
->> +#if (AARCH64_FPCR_DEFAULT_VAL != 0)
->> +	state->fpcr = AARCH64_FPCR_DEFAULT_VAL;
->> +#endif
->> +	fpsimd_load_state(state);
->>  	preempt_enable();
-> 
-> We can leave this to 0 as the default for user. Glibc already programs
-> this register.
-OK, will drop it.
-
-> 
->>  }
->>  
->> @@ -99,6 +104,8 @@ void kernel_neon_begin(void)
->>  
->>  	if (current->mm)
->>  		fpsimd_save_state(&current->thread.fpsimd_state);
+>> +	bandgap: bandgap {
+>>  		reg = <0x4a002260 0x4
+>>  		       0x4a00232C 0x4>;
+>>  		compatible = "ti,omap4430-bandgap";
 >> +
->> +	fpsimd_init_hw_state();
+>> +		#thermal-sensor-cells = <0>;
+> 2 cents:
+> we might want to move bandgap under ocp?
 > 
-> This function should indeed do some initialisation rather than relying
-> on whatever the user set for FPCR.
-> 
->> diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
->> index 890a591..6d80612 100644
->> --- a/arch/arm64/kernel/signal.c
->> +++ b/arch/arm64/kernel/signal.c
->> @@ -52,6 +52,7 @@ static int preserve_fpsimd_context(struct fpsimd_context __user *ctx)
->>  
->>  	/* dump the hardware registers to the fpsimd_state structure */
->>  	fpsimd_save_state(fpsimd);
->> +	fpsimd_init_hw_state();
-> 
-> Here I think we need to leave the default user setting for fpcr as
-> decided by glibc (or libgcc) when an application starts.
-OK, will keep FPCR and clear FPSR.
 
+Yes, agreed. But I don't think this change is related to this patch or
+to this series.
+
+Tks Nishanth
+
+>>  	};
+>>  };
+>> -- 
+>> 1.8.2.1.342.gfa7285d
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 > 
->>  	/* copy the FP and status/control registers */
->>  	err = __copy_to_user(ctx->vregs, fpsimd->vregs, sizeof(fpsimd->vregs));
->> diff --git a/arch/arm64/kernel/signal32.c b/arch/arm64/kernel/signal32.c
->> index e393174..cb2cb41 100644
->> --- a/arch/arm64/kernel/signal32.c
->> +++ b/arch/arm64/kernel/signal32.c
->> @@ -248,6 +248,7 @@ static int compat_preserve_vfp_context(struct compat_vfp_sigframe __user *frame)
->>  	 * in AArch32.
->>  	 */
->>  	fpsimd_save_state(fpsimd);
->> +	fpsimd_init_hw_state();
-> 
-> Same here.
-> 
+
+
+-- 
+You have got to be excited about what you are doing. (L. Lamport)
+
+Eduardo Valentin
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 295 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130927/def0a093/attachment-0001.sig>
