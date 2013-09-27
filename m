@@ -1,99 +1,81 @@
-From: liuj97@gmail.com (Jiang Liu)
-Date: Fri, 27 Sep 2013 22:20:10 +0800
-Subject: [RFT PATCH v1 6/7] amd64: avoid saving and restoring FPSIMD
- registers until threads access them
-In-Reply-To: <20130927105902.GH9057@mudshark.cambridge.arm.com>
-References: <1380269087-8520-1-git-send-email-liuj97@gmail.com>
- <1380269087-8520-7-git-send-email-liuj97@gmail.com>
- <20130927105902.GH9057@mudshark.cambridge.arm.com>
-Message-ID: <5245941A.5000805@gmail.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 27 Sep 2013 15:29:13 +0100
+Subject: [PATCH] arm: vexpress: tc2: fix CPU hotplug and CPU idle race on
+ cluster power down
+Message-ID: <1380292153-10480-1-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/27/2013 06:59 PM, Will Deacon wrote:
-> On Fri, Sep 27, 2013 at 09:04:46AM +0100, Jiang Liu wrote:
->> From: Jiang Liu <jiang.liu@huawei.com>
->>
->> Use PF_USED_MATH flag to mark whether the thread has accessed any FPSIMD
->> registers, so we could avoid saving and restroing FPSIMD registers until
->> threads access them. This may improve performance when lazy FPSIMD restore
->> is disabled.
-> 
-> Hehe, the subject made me smile :)
-> 
-> I suppose that means I have to give a semi-useful review for the patch...
-> 
->> Signed-off-by: Jiang Liu <jiang.liu@huawei.com>
->> Cc: Jiang Liu <liuj97@gmail.com>
->> ---
->>  arch/arm64/kernel/fpsimd.c | 38 +++++++++++++++++++++++---------------
->>  1 file changed, 23 insertions(+), 15 deletions(-)
->>
->> diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
->> index 267e54a..a81af5f 100644
->> --- a/arch/arm64/kernel/fpsimd.c
->> +++ b/arch/arm64/kernel/fpsimd.c
->> @@ -99,7 +99,8 @@ void fpsimd_disable_lazy_restore(void)
->>   * If lazy mode is enabled, caller needs to disable preemption
->>   * when calling fpsimd_load_state_lazy() and fpsimd_save_state_lazy().
->>   */
->> -static void fpsimd_load_state_lazy(struct fpsimd_state *state)
->> +static void fpsimd_load_state_lazy(struct fpsimd_state *state,
->> +				   struct task_struct *tsk)
->>  {
->>  	/* Could we reuse the hardware context? */
->>  	if (state->last_cpu == smp_processor_id() &&
->> @@ -109,13 +110,19 @@ static void fpsimd_load_state_lazy(struct fpsimd_state *state)
->>  	if (static_key_false(&fpsimd_lazy_mode)) {
->>  		fpsimd_clear_on_hw(state);
->>  		fpsimd_enable_trap();
->> -	} else {
->> +	} else if (tsk_used_math(tsk)) {
->> +		fpsimd_disable_trap();
->>  		fpsimd_load_state(state);
->> +	} else {
->> +		fpsimd_enable_trap();
-> 
-> One thing worth checking in sequences like this is that you have the
-> relevant memory barriers (isb instructions) to ensure that the CPU is
-> synchronised wrt side-effects from the msr instructions. *Some* operations
-> are self-synchronising, but I don't think this is the case for fpsimd in v8
-> (although I haven't re-checked).
-> 
-> Your earlier patch (3/7) doesn't seem to have any of these barriers.
-Hi Will,
-	Thanks for reminder, I tried to confirm this by scanning over
-ARMv8 reference manual but failed. So how about changing the code as:
+On the TC2 testchip, when all CPUs in a cluster enter standbywfi and
+commit a power down request, the power controller will wait for
+standbywfil2 coming from L2 cache controller to shut the cluster down.
+By the time all CPUs in a cluster commit a power down request and enter wfi,
+the power controller cannot backtrack, or put it another way, a CPU must
+not be allowed to complete execution independently of the power
+controller, the only way for it to resume properly must be upon wake-up IRQ
+pending and subsequent reset triggered from the power controller.
 
-static inline void fpsimd_enable_trap(void)
-{
-        u32 __val;
+Current MCPM back-end for TC2 disables the GIC CPU IF only when power
+down is committed through the suspend method, that makes sense since a
+suspended CPU is still online and can receive interrupts whereas a
+hotplugged CPU, since it is offline, migrated all IRQs and shutdown
+the per-CPU peripherals, hence their PPIs.
 
-        asm volatile ("mrs %0, cpacr_el1\n"
-                      "tbz %w0, #20, 1f\n"
-                      "and %w0, %w0, #0xFFCFFFFF\n"
-                      "msr cpacr_el1, %0\n"
-                      "isb\n"
-                      "1:"
-                      : "=&r" (__val));
-}
+The flaw with this reasoning is the following. If all CPUs in a clusters are
+entering a power down state either through CPU idle or CPU hotplug, when the
+last man successfully completes the MCPM power down sequence (and executes
+wfi), power controller waits for L2 wfi signal to quiesce the cluster and shut
+it down. If, when all CPUs are sitting in wfi, an online CPU hotplugs back in
+one of the CPUs in the cluster being shutdown, that CPU receives an IPI that
+causes wfi to complete (since MCPM power down method does not disable the GIC
+CPU IF in that case - CPU being hotplugged out, not idle) and the power
+controller will never see the stanbywfil2 signal coming from L2 that is
+required for shutdown to happen and the system deadlocks.
 
-static inline void fpsimd_disable_trap(void)
-{
-        u32 __val;
+The only solution to this problem consists in disabling the GIC CPU IF
+on a CPU committed to power down regardless of the power down entry
+method (CPU hotplug or CPU idle). This way, CPU wake-up is under power
+controller control, which prevents unexpected wfi exit caused by a
+pending IRQ.
 
-        asm volatile ("mrs %0, cpacr_el1\n"
-                      "tbnz %w0, #20, 1f\n"
-                      "orr %w0, %w0, #0x000300000\n"
-                      "msr cpacr_el1, %0\n"
-                      "isb\n"
-                      "1:"
-                      : "=&r" (__val));
-}
+This patch moves the GIC CPU IF disable call in the TC2 MCPM implementation
+from the suspend method to the power down method to fix the mentioned
+race condition.
 
-Thanks!
-Gerry
+Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Signed-off-by: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
+---
+ arch/arm/mach-vexpress/tc2_pm.c | 11 ++++++++++-
+ 1 file changed, 10 insertions(+), 1 deletion(-)
 
-> 
-> Will
-> 
+diff --git a/arch/arm/mach-vexpress/tc2_pm.c b/arch/arm/mach-vexpress/tc2_pm.c
+index 7aeb5d6..e6eb481 100644
+--- a/arch/arm/mach-vexpress/tc2_pm.c
++++ b/arch/arm/mach-vexpress/tc2_pm.c
+@@ -131,6 +131,16 @@ static void tc2_pm_down(u64 residency)
+ 	} else
+ 		BUG();
+ 
++	/*
++	 * If the CPU is committed to power down, make sure
++	 * the power controller will be in charge of waking it
++	 * up upon IRQ, ie IRQ lines are cut from GIC CPU IF
++	 * to the CPU by disabling the GIC CPU IF to prevent wfi
++	 * from completing execution behind power controller back
++	 */
++	if (!skip_wfi)
++		gic_cpu_if_down();
++
+ 	if (last_man && __mcpm_outbound_enter_critical(cpu, cluster)) {
+ 		arch_spin_unlock(&tc2_pm_lock);
+ 
+@@ -231,7 +241,6 @@ static void tc2_pm_suspend(u64 residency)
+ 	cpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
+ 	cluster = MPIDR_AFFINITY_LEVEL(mpidr, 1);
+ 	ve_spc_set_resume_addr(cluster, cpu, virt_to_phys(mcpm_entry_point));
+-	gic_cpu_if_down();
+ 	tc2_pm_down(residency);
+ }
+ 
+-- 
+1.8.2.2
