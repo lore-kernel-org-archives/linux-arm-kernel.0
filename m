@@ -1,64 +1,63 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Fri, 27 Sep 2013 08:48:15 +0200
-Subject: [PATCH 1/2] ARM: AT91: Animeo IP: fix mtd partition table
-Message-ID: <1380264496-16887-1-git-send-email-plagnioj@jcrosoft.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Fri, 27 Sep 2013 08:52:55 +0200
+Subject: [GIT PULL 3.12-rc2 fixes] clocksource: Several fixes for 3.12-rc2
+In-Reply-To: <20130927054957.GC6597@gmail.com>
+References: <524381D2.7050604@linaro.org> <20130927054957.GC6597@gmail.com>
+Message-ID: <52452B47.80205@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update to production one.
+On 09/27/2013 07:49 AM, Ingo Molnar wrote:
+>
+> * Daniel Lezcano <daniel.lezcano@linaro.org> wrote:
+>
+>> Hi Thomas,
+>>
+>> this pull request contains several fixes for the clocksource/clockevent
+>> drivers:
+>>
+>>   - Jean Pihet fixed a missing Kconfig option preventing the Armada370/XP
+>> to boot up.
+>>
+>>   - Magnus Damm fixed the cpumask on the em_sti driver to have the
+>> broadcast timer working on a SMP system
+>>
+>>   - Sebastian Hesselbarth skipped the initialization of a timer for
+>> uninitialized DT nodes
+>>
+>>   - Tomasz Figa fixed the irq affinity failing on non online cpus
+>>
+>> Thanks
+>>    -- Daniel
+>>
+>> -----------------------------------------------------------------------------
+>>
+>> The following changes since commit 4a10c2ac2f368583138b774ca41fac4207911983:
+>>
+>>    Linux 3.12-rc2 (2013-09-23 15:41:09 -0700)
+>>
+>> are available in the git repository at:
+>>
+>>
+>> ssh://daniel.lezcano at git.linaro.org//srv/git.linaro.org/git/people/dlezcano/linux.git
+>> clockevents/3.12-rc2-fixes
+>
+> If you want me to pull this you'll need to send along your SSH password as
+> well!
 
-Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
----
- arch/arm/boot/dts/animeo_ip.dts | 31 ++++++++-----------------------
- 1 file changed, 8 insertions(+), 23 deletions(-)
+Oops ! :)
 
-diff --git a/arch/arm/boot/dts/animeo_ip.dts b/arch/arm/boot/dts/animeo_ip.dts
-index cfed178..6b4b6a1 100644
---- a/arch/arm/boot/dts/animeo_ip.dts
-+++ b/arch/arm/boot/dts/animeo_ip.dts
-@@ -101,34 +101,19 @@
- 			nand-on-flash-bbt;
- 			status = "okay";
- 
--			at91bootstrap at 0 {
--				label = "at91bootstrap";
--				reg = <0x0 0x8000>;
--			};
--
--			barebox at 8000 {
-+			barebox at 0 {
- 				label = "barebox";
--				reg = <0x8000 0x40000>;
--			};
--
--			bareboxenv at 48000 {
--				label = "bareboxenv";
--				reg = <0x48000 0x8000>;
--			};
--
--			user_block at 0x50000 {
--				label = "user_block";
--				reg = <0x50000 0xb0000>;
-+				reg = <0x0 0x58000>;
- 			};
- 
--			kernel at 100000 {
--				label = "kernel";
--				reg = <0x100000 0x1b0000>;
-+			u_boot_env at 58000 {
-+				label = "u_boot_env";
-+				reg = <0x58000 0x8000>;
- 			};
- 
--			root at 2b0000 {
--				label = "root";
--				reg = <0x2b0000 0x1D50000>;
-+			ubi at 60000 {
-+				label = "ubi";
-+				reg = <0x60000 0x1FA0000>;
- 			};
- 		};
- 
+Here is the right one:
+
+git://git.linaro.org/people/dlezcano/linux.git clockevents/3.12-rc2-fixes
+
+Thanks
+   -- Daniel
+
+
 -- 
-1.8.4.rc3
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
