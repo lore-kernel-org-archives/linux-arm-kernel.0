@@ -1,101 +1,64 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri, 27 Sep 2013 16:54:42 +0100
-Subject: [PATCH v2] arm: vexpress: tc2: fix hotplug/idle/kexec race on cluster
- power down
-Message-ID: <1380297282-13021-1-git-send-email-lorenzo.pieralisi@arm.com>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Fri, 27 Sep 2013 08:58:59 -0700
+Subject: [PATCH 1/2] ARM: zynq: cpuidle: Remove useless compatibility
+ string
+In-Reply-To: <5245471F.6040707@xilinx.com>
+References: <1380269867-18336-1-git-send-email-daniel.lezcano@linaro.org>
+ <31f13d14-2af7-4285-8770-3cc7ef7e7b09@AM1EHSMHS008.ehs.local>
+ <52454342.80706@linaro.org> <5245471F.6040707@xilinx.com>
+Message-ID: <43fa0b3d-019f-4438-899d-0adaf730591a@DB9EHSMHS030.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On the TC2 testchip, when all CPUs in a cluster enter standbywfi
-and commit a power down request, the power controller will wait
-for standbywfil2 coming from L2 cache controller to shut the
-cluster down.
-By the time all CPUs in a cluster commit a power down request
-and enter wfi, the power controller cannot backtrack, or put it
-another way, a CPU must not be allowed to complete execution
-independently of the power controller, the only way for it to
-resume properly must be upon wake-up IRQ pending and subsequent
-reset triggered from the power controller.
+On Fri, Sep 27, 2013 at 10:51:43AM +0200, Michal Simek wrote:
+> On 09/27/2013 10:35 AM, Daniel Lezcano wrote:
+> > On 09/27/2013 10:19 AM, Michal Simek wrote:
+> >> On 09/27/2013 10:17 AM, Daniel Lezcano wrote:
+> >>> All zynq platforms have this compatibility string and there is no any other
+> >>> clone.
+> >>>
+> >>> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+> > 
+> > The patchset is only compile-tested (I don't have the hardware).
+> > 
+> > Michal or someone else, if you have the time can you give it a try ?
+> > 
+> 
+> Soren: Can you please retest it on hw?
+Hmm, I'm not subscribed to LAKML (only LKML), but well found the series on
+patchworks.
 
-Current MCPM back-end for TC2 disables the GIC CPU IF only when
-power down is committed through the tc2_pm_suspend() method, that
-makes sense since a suspended CPU is still online and can receive
-interrupts whereas a hotplugged CPU, since it is offline,
-migrated all IRQs and shutdown the per-CPU peripherals, hence
-their PPIs.
+The series introduces new build warnings:
+WARNING: drivers/cpuidle/built-in.o(.data+0x28c): Section mismatch in reference from the variable zynq_cpuidle_driver to the function .init.text:zynq_cpuidle_probe()
+The variable zynq_cpuidle_driver references
+the function __init zynq_cpuidle_probe()
+If the reference is valid then annotate the
+variable with __init* or __refdata (see linux/init.h) or name the variable:
+*_template, *_timer, *_sht, *_ops, *_probe, *_probe_one, *_console
 
-The flaw with this reasoning is the following. If all CPUs in
-a clusters are entering a power down state either through CPU
-idle or CPU hotplug, when the last man successfully completes
-the MCPM power down sequence (and executes wfi), power controller
-waits for L2 wfi signal to quiesce the cluster and shut it down.
-If, when all CPUs are sitting in wfi, an online CPU hotplugs back
-in one of the CPUs in the cluster being shutdown, that CPU
-receives an IPI that causes wfi to complete (since tc2_pm_down()
-method does not disable the GIC CPU IF in that case - CPU being
-hotplugged out, not idle) and the power controller will never see
-the stanbywfil2 signal coming from L2 that is required for
-shutdown to happen and the system deadlocks.
+  CC      kernel/trace/trace.o
+  LD      drivers/built-in.o
+WARNING: drivers/built-in.o(.data+0x13870): Section mismatch in reference from the variable zynq_cpuidle_driver to the function .init.text:zynq_cpuidle_probe()
+The variable zynq_cpuidle_driver references
+the function __init zynq_cpuidle_probe()
+If the reference is valid then annotate the
+variable with __init* or __refdata (see linux/init.h) or name the variable:
+*_template, *_timer, *_sht, *_ops, *_probe, *_probe_one, *_console
 
-Further to this issue, kexec hotplugs secondary CPUs out during
-kernel reload/restart.
-Because kexec may (deliberately) trash the old kernel text, it is
-not OK for CPUs to follow the MCPM soft reboot path, since
-instructions after the WFI may have been replaced by kexec.
+  LD      kernel/trace/built-in.o
+  LD      kernel/built-in.o
+  LINK    vmlinux
+  LD      vmlinux.o
+  MODPOST vmlinux.o
+WARNING: vmlinux.o(.data+0x2e0b0): Section mismatch in reference from the variable zynq_cpuidle_driver to the function .init.text:zynq_cpuidle_probe()
+The variable zynq_cpuidle_driver references
+the function __init zynq_cpuidle_probe()
+If the reference is valid then annotate the
+variable with __init* or __refdata (see linux/init.h) or name the variable:
+*_template, *_timer, *_sht, *_ops, *_probe, *_probe_one, *_console
 
-If tc2_pm_down() does not disable the GIC cpu interface, there is a
-race between CPU powerdown in the old kernel and the IPI from the
-new kernel that triggers secondary boot, particularly if the
-powerdown is slow (due to L2 cache cleaning for example).  If the
-new kernel wins the race, the affected CPU(s) will not really be
-reset and may execute garbage after the WFI.
 
-The only solution to this problem consists in disabling the GIC
-CPU IF on a CPU committed to power down regardless of the power
-down entry method (CPU hotplug or CPU idle). This way, CPU wake-up
-is under power controller control, which prevents unexpected wfi
-exit caused by a pending IRQ.
+Other than that it looks good. I assume there is just some __init
+annotation missing somewhere. Feel free to add my 'Tested-by'.
 
-This patch moves the GIC CPU IF disable call in the TC2 MCPM
-implementation from the tc2_pm_suspend() method to the
-tc2_pm_down() method to fix the mentioned race condition(s).
-
-Reviewed-by: Dave Martin <Dave.Martin@arm.com>
-Tested-by: Dave Martin <Dave.Martin@arm.com> (for kexec)
-Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Signed-off-by: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
----
- arch/arm/mach-vexpress/tc2_pm.c | 11 ++++++++++-
- 1 file changed, 10 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/mach-vexpress/tc2_pm.c b/arch/arm/mach-vexpress/tc2_pm.c
-index 7aeb5d6..e6eb481 100644
---- a/arch/arm/mach-vexpress/tc2_pm.c
-+++ b/arch/arm/mach-vexpress/tc2_pm.c
-@@ -131,6 +131,16 @@ static void tc2_pm_down(u64 residency)
- 	} else
- 		BUG();
- 
-+	/*
-+	 * If the CPU is committed to power down, make sure
-+	 * the power controller will be in charge of waking it
-+	 * up upon IRQ, ie IRQ lines are cut from GIC CPU IF
-+	 * to the CPU by disabling the GIC CPU IF to prevent wfi
-+	 * from completing execution behind power controller back
-+	 */
-+	if (!skip_wfi)
-+		gic_cpu_if_down();
-+
- 	if (last_man && __mcpm_outbound_enter_critical(cpu, cluster)) {
- 		arch_spin_unlock(&tc2_pm_lock);
- 
-@@ -231,7 +241,6 @@ static void tc2_pm_suspend(u64 residency)
- 	cpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
- 	cluster = MPIDR_AFFINITY_LEVEL(mpidr, 1);
- 	ve_spc_set_resume_addr(cluster, cpu, virt_to_phys(mcpm_entry_point));
--	gic_cpu_if_down();
- 	tc2_pm_down(residency);
- }
- 
--- 
-1.8.2.2
+	S?ren
