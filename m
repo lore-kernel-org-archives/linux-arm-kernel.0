@@ -1,39 +1,33 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 27 Sep 2013 09:16:22 +0100
-Subject: [PATCH] ARM: ux500: delete devices-common remnants
-In-Reply-To: <1380187608-26492-1-git-send-email-linus.walleij@linaro.org>
-References: <1380187608-26492-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <20130927081622.GB9048@lee--X1>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 27 Sep 2013 09:27:04 +0100
+Subject: [PATCH 00/51] DMA mask changes
+In-Reply-To: <CACna6rxkpYzdD8_Jfi22vA2suUa3k-JM65_gCySQpp4crVCoPg@mail.gmail.com>
+References: <20130919212235.GD12758@n2100.arm.linux.org.uk>
+ <CACna6rxkpYzdD8_Jfi22vA2suUa3k-JM65_gCySQpp4crVCoPg@mail.gmail.com>
+Message-ID: <20130927082703.GZ25647@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 26 Sep 2013, Linus Walleij wrote:
-
-> commit f1ff5b2549990b5de080b52e3313cbb30c218853
-> "ARM: ux500: Stop enabling GPIOs when not booting with Device Tree"
-> deleted devices-common.c, but did not delete the build
-> rule from Makefile (most likely due to compiling in
-> a dirty tree where the object file still existed so
-> linking would complete anyway).
+On Thu, Sep 26, 2013 at 10:23:08PM +0200, Rafa? Mi?ecki wrote:
+> 2013/9/19 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+> > This email is only being sent to the mailing lists in question, not to
+> > anyone personally.  The list of individuals is far to great to do that.
+> > I'm hoping no mailing lists reject the patches based on the number of
+> > recipients.
 > 
-> Delete the makerule, the header file associated
-> with this file and the remaining reference to the header.
+> Huh, I think it was enough to send only 3 patches to the b43-dev at . Like:
+> [PATCH 01/51] DMA-API: provide a helper to set both DMA and coherent DMA masks
+> [PATCH 14/51] DMA-API: net: b43: (...)
+> [PATCH 15/51] DMA-API: net: b43legacy: (...)
+> ;)
 > 
-> Cc: Lee Jones <lee.jones@linaro.org>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
->  arch/arm/mach-ux500/Makefile         |  3 +--
->  arch/arm/mach-ux500/devices-common.h | 15 ---------------
->  arch/arm/mach-ux500/devices-db8500.h |  1 -
->  3 files changed, 1 insertion(+), 18 deletions(-)
->  delete mode 100644 arch/arm/mach-ux500/devices-common.h
-> 
-> diff --git a/arch/arm/mach-ux500/Makefile b/arch/arm/mach-ux500/Makefile
+> I believe Joe has some nice script for doing it that way. When fixing
+> some coding style / formatting, he sends only related patches to the
+> given ML.
 
-Acked-by: Lee Jones <lee.jones@linaro.org>
+If I did that, then the mailing lists would not get the first patch,
+because almost none of the lists would be referred to by patch 1.
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Moreover, people complain when they don't have access to the full
+patch series - they assume patches are missing for some reason, and
+they ask for the rest of the series.
