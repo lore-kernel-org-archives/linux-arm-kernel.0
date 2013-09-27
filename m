@@ -1,41 +1,48 @@
 From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Fri, 27 Sep 2013 17:10:02 +0100
-Subject: [PATCH v6 14/19] swiotlb: print a warning when the swiotlb is full
+Date: Fri, 27 Sep 2013 17:10:03 +0100
+Subject: [PATCH v6 15/19] swiotlb-xen: call dma_capable only if dev->dma_mask
+ is allocated
 In-Reply-To: <alpine.DEB.2.02.1309271653420.5498@kaball.uk.xensource.com>
 References: <alpine.DEB.2.02.1309271653420.5498@kaball.uk.xensource.com>
-Message-ID: <1380298207-29151-14-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <1380298207-29151-15-git-send-email-stefano.stabellini@eu.citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 ---
- drivers/xen/swiotlb-xen.c |    1 +
- lib/swiotlb.c             |    1 +
- 2 files changed, 2 insertions(+), 0 deletions(-)
+ drivers/xen/swiotlb-xen.c |    6 +++---
+ 1 files changed, 3 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/xen/swiotlb-xen.c b/drivers/xen/swiotlb-xen.c
-index 96ad316..790c2eb 100644
+index 790c2eb..3011736 100644
 --- a/drivers/xen/swiotlb-xen.c
 +++ b/drivers/xen/swiotlb-xen.c
-@@ -674,6 +674,7 @@ xen_swiotlb_map_sg_attrs(struct device *hwdev, struct scatterlist *sgl,
- 								 sg->length,
- 								 dir);
- 			if (map == SWIOTLB_MAP_ERROR) {
-+				pr_warn("swiotlb buffer is full\n");
- 				/* Don't panic here, we expect map_sg users
- 				   to do proper error handling. */
- 				xen_swiotlb_unmap_sg_attrs(hwdev, sgl, i, dir,
-diff --git a/lib/swiotlb.c b/lib/swiotlb.c
-index eb45d17..f06da0d 100644
---- a/lib/swiotlb.c
-+++ b/lib/swiotlb.c
-@@ -502,6 +502,7 @@ phys_addr_t swiotlb_tbl_map_single(struct device *hwdev,
+@@ -512,7 +512,7 @@ dma_addr_t xen_swiotlb_map_page(struct device *dev, struct page *page,
+ 	 * buffering it.
+ 	 */
+ 	if (!xen_feature(XENFEAT_auto_translated_physmap) &&
+-	    dma_capable(dev, dev_addr, size) &&
++	    dev->dma_mask && dma_capable(dev, dev_addr, size) &&
+ 	    !range_straddles_page_boundary(phys, size) && !swiotlb_force)
+ 		return dev_addr;
  
- not_found:
- 	spin_unlock_irqrestore(&io_tlb_lock, flags);
-+	pr_warn("swiotlb buffer is full\n");
- 	return SWIOTLB_MAP_ERROR;
- found:
- 	spin_unlock_irqrestore(&io_tlb_lock, flags);
+@@ -532,7 +532,7 @@ dma_addr_t xen_swiotlb_map_page(struct device *dev, struct page *page,
+ 	/*
+ 	 * Ensure that the address returned is DMA'ble
+ 	 */
+-	if (!dma_capable(dev, dev_addr, size)) {
++	if (dev->dma_mask && !dma_capable(dev, dev_addr, size)) {
+ 		swiotlb_tbl_unmap_single(dev, map, size, dir);
+ 		dev_addr = 0;
+ 	}
+@@ -660,7 +660,7 @@ xen_swiotlb_map_sg_attrs(struct device *hwdev, struct scatterlist *sgl,
+ 
+ 		if (swiotlb_force ||
+ 		    xen_feature(XENFEAT_auto_translated_physmap) ||
+-		    !dma_capable(hwdev, dev_addr, sg->length) ||
++		    (hwdev->dma_mask && !dma_capable(hwdev, dev_addr, sg->length)) ||
+ 		    range_straddles_page_boundary(paddr, sg->length)) {
+ 			/*
+ 			 * Pass the dma_addr of the first slab in the iotlb buffer as
 -- 
 1.7.2.5
