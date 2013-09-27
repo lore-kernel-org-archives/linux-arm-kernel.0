@@ -1,86 +1,119 @@
-From: andreas.herrmann@calxeda.com (Andreas Herrmann)
-Date: Fri, 27 Sep 2013 11:03:48 +0200
-Subject: [PATCH 4/9] iommu/arm-smmu: Check for num_context_irqs > 0 to
- avoid divide by zero exception
-In-Reply-To: <20130927084154.GB8319@mudshark.cambridge.arm.com>
-References: <1380234982-1677-1-git-send-email-andreas.herrmann@calxeda.com>
- <1380234982-1677-5-git-send-email-andreas.herrmann@calxeda.com>
- <20130927084154.GB8319@mudshark.cambridge.arm.com>
-Message-ID: <20130927090348.GF3315@alberich>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Fri, 27 Sep 2013 14:34:18 +0530
+Subject: [PATCH v3] ARM: EDMA: Fix clearing of unused list for DT DMA
+ resources
+In-Reply-To: <5244D142.1090307@ti.com>
+References: <1380232546-821-1-git-send-email-joelf@ti.com>
+ <CAOesGMgELbnuu8PM7Ah2xKo2H5rzgAN3w0g6wA7aVFsjuds-8g@mail.gmail.com>
+ <5244D142.1090307@ti.com>
+Message-ID: <52454A12.5010108@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 27, 2013 at 04:41:54AM -0400, Will Deacon wrote:
-> On Thu, Sep 26, 2013 at 11:36:16PM +0100, Andreas Herrmann wrote:
-> > With the right (or wrong;-) definition of v1 SMMU node in DTB it is
-> > possible to trigger a division by zero in arm_smmu_init_domain_context
-> > (if number of context irqs is 0):
-> > 
-> >        if (smmu->version == 1) {
-> >                root_cfg->irptndx = atomic_inc_return(&smmu->irptndx);
-> >  =>            root_cfg->irptndx %= smmu->num_context_irqs;
-> >        } else {
-> > 
-> > Avoid this by checking for num_context_irqs > 0 when probing
-> > for SMMU devices.
-> > 
-> > Rationale: Assuming that at least one context bank for non-secure
-> > usage is provided per SMMU, it follows (from ARM SMMU Architecture
-> > Spec) that at least one context interrupt must be available.
+On 9/27/2013 5:58 AM, Joel Fernandes wrote:
+> On 09/26/2013 06:13 PM, Olof Johansson wrote:
+>> On Thu, Sep 26, 2013 at 2:55 PM, Joel Fernandes <joelf@ti.com> wrote:
+>>> HWMOD removal for MMC is breaking edma_start as the events are being manually
+>>> triggered due to unused channel list not being clear.
+>>>
+>>> The above issue is fixed by reading the "dmas" property from the DT node if it
+>>> exists and clearing the bits in the unused channel list if the dma controller
+>>> used by any device is EDMA. For this purpose we use the of_* helpers to parse
+>>> the arguments in the dmas phandle list.
+>>>
+>>> Also introduced is a minor clean up of a checkpatch error in old code.
+>>>
+>>> Reviewed-by: Sekhar Nori <nsekhar@ti.com>
+>>> Reported-by: Balaji T K <balajitk@ti.com>
+>>> Cc: Sekhar Nori <nsekhar@ti.com>
+>>> Cc: Tony Lindgren <tony@atomide.com>
+>>> Cc: Olof Johansson <olof@lixom.net>
+>>> Cc: Nishanth Menon <nm@ti.com>
+>>> Cc: Pantel Antoniou <panto@antoniou-consulting.com>
+>>> Cc: Jason Kridner <jkridner@beagleboard.org>
+>>> Cc: Koen Kooi <koen@dominion.thruhere.net>
+>>> Signed-off-by: Joel Fernandes <joelf@ti.com>
+>>> ---
+>>> Just resending this patch after discussing with Sekhar and Olof.
+>>
+>> Actually, the patch you talked to me about was v3 of this. It seems
+>> that you have reposted v6 but labelled it v3. This is very confusing.
 > 
-> One problem with this reasoning is that the interrupt line might just not be
-> wired up to the GIC, despite existing on the SMMU. Still, we needn't solve
-> that now (let's wait for somebody to build it first...).
+> Sorry about this. :-( This is indeed v6.
 > 
-> > Also remove the line of code that derived num_context_irqs from
-> > num_irqs and num_global_irqs. If DT is wrong and interrupt property
-> > contains less interrupts than num_global_irqs this would set
-> > num_context_irqs to a big u32 value which most likely causes trouble
-> > in other parts of the driver.
-> > 
-> > Signed-off-by: Andreas Herrmann <andreas.herrmann@calxeda.com>
-> > ---
-> >  drivers/iommu/arm-smmu.c |    6 +++++-
-> >  1 file changed, 5 insertions(+), 1 deletion(-)
-> > 
-> > diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-> > index 4307fbc..de9dd60 100644
-> > --- a/drivers/iommu/arm-smmu.c
-> > +++ b/drivers/iommu/arm-smmu.c
-> > @@ -1822,7 +1822,11 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
-> >  			 num_irqs, smmu->num_global_irqs);
-> >  		smmu->num_global_irqs = num_irqs;
-> >  	}
-> > -	smmu->num_context_irqs = num_irqs - smmu->num_global_irqs;
+>>> AM335x is being booted by many users such as the beaglebone community. DT is
+>>> the only boot method available for all these users.  EDMA is required for the
+>>> operation for many common peripherals in AM335x SoC such as McASP, MMC and
+>>> Crypto.
+>>>
+>>> Although EDMA DT nodes are going in only for 3.13, in reality the kernel has
+>>> been used for more than a year with EDMA code and out of tree EDMA DTS patches.
+>>> Hence though the DT nodes are still not in mainline, this patch can be still be
+>>> considered a critical fix as such and it would be great if it could be included
+>>> in 3.12-rc release. Thanks.
+>>
+>> This is really the root of this problem. If you sit on code out of
+>> tree for a year, and something breaks that we couldn't even have
+>> detected since we didn't have the out-of-tree pieces. We'll help you
+>> the first few times (such as now) but we will eventually stop caring.
 > 
-> Why are you deleting this line?
-
-Because I felt it's redundant in some cases and erroneously I thought
-it could be bogus if num_irqs < num_global_irqs.
-Of course the latter is wrong, as num_global_irqs is corrected two
-lines above.
-
-Now I think it's always redundant. num_context_irqs is only
-incremented here
-
-               if (num_irqs > smmu->num_global_irqs)
-                        smmu->num_context_irqs++;
-
-So either it is still 0 (and no fixup required for num_irqs <
-num_global_irqs) or it contains already a positive value based on
-(num_irqs - num_global_irqs).
-
-But maybe I've missed something.
-(At least I need to fix the commit message wrt to this removal.)
-
-> > +
-> > +	if (!smmu->num_context_irqs) {
-> > +		dev_err(dev, "no context interrupt specified in DT\n");
+> When I started looking at EDMA in June, I noticed that a lot had already been
+> merged. EDMA DMA Engine driver itself was merged last year, no worries there.
+> but the long pending list of fixes to be made to the driver had to written and
+> rewritten multiple times which took a long time.
 > 
-> I'd avoid mentioning "DT" in the log message, just in case this ever starts
-> probing from something else.
+> Due to this, the EDMA device tree entries could not be merged in fear that doing
+> so would cause problems such as MMC/SD corruption etc.
+> 
+>> If I was in a worse mood, then I'd just say that since your users
+>> already has to have out-of-tree code to even use this functionality,
+>> they could just add this fix on top of that stack of patches. But I'm
+>> in a slightly better mood than that and I'll pick it up this time. :)
+> 
+> Thank you! :)
+> 
+>>> More details about why this broke an existing feature folks were using:
+>>> Previously the DMA resources for platform devices were being populated through
+>>> HWMOD, however with the recent clean ups with HWMOD, this data has been moved
+>>> to Device tree. The EDMA code though is not aware of this so it fails to fetch
+>>> the DMA resources correctly which it needs to prepare the unused channel list
+>>> (basically doesn't properly clear the channels that are in use, in the unused
+>>> list).
+>>
+>> So that we can learn for next time: What should we (as in us
+>> maintainers and you TI) have done differently to avoid this?
+> 
+> I think a little on both sides can be improved.
 
-Ok, will fix this.
+Since we are in lessons learnt mode, I think as developers we need to
+learn to prioritize fixes over other features we are working on. I went
+back to the chronology of this patch series.
 
+22nd July 2013: v2 posted
+29th July 2013: Discussion on whether the patch can wait till *v3.12*
+		merge window.
+29th July 2013: comments given on v2
+22nd Aug 2013: 	Pull request's sent by Sekhar for v3.12
+24th Aug 2013: 	another v2 posted (all comments given earlier not
+		addressed, received some comments on build warnings)
+27th Aug 2013:	another v3 posted (all comments given on 29th July not
+		addressed)
+10th Sept 2013: another v3 posted (all comments given on 29th July not
+		addressed)
+[some discussion on comments and why this cannot wait until v3.13]
+17th Sept 2013:	Final version ready for merge posted.
+26th Sept 2013: Another v3 posted, this time for Olof to send into
+		v3.12-rc
 
-Andreas
+See, early on, the patch was actually in consideration for v3.12 merge.
+The barrier of entry into -rc cycle is pretty high. So if you have an
+opportunity to hit a merge window, utilize that by prioritizing this
+work over anything else you may be doing.
+
+I know you got busy with adding support for SG lists and all, but
+clearly this patch is critical in your mind. Plus the comments were not
+tough to fix. There is a need to keep looking at what provides the best
+return on time invested.
+
+Thanks,
+Sekhar
