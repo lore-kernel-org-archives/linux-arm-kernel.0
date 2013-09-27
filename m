@@ -1,29 +1,34 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 27 Sep 2013 14:44:55 +0200
-Subject: [PATCH] ARM: drop explicit selection of HAVE_CLK and CLKDEV_LOOKUP
-In-Reply-To: <1380044515-3173-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1380044515-3173-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <CACRpkdZOSn0UuZkz2ZsKeG8u0j216BfrkUmO0Za74AYNKFNiiQ@mail.gmail.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Fri, 27 Sep 2013 14:50:41 +0200
+Subject: [PATCH] ARM: highbank: cpuidle: convert to platform driver
+In-Reply-To: <CAL_Jsq+PoqWf5oAQosPg8N0WWHm-7c+JgDzpGD8OfMyKtvPJ0w@mail.gmail.com>
+References: <1380278865-27457-1-git-send-email-daniel.lezcano@linaro.org>
+ <CAL_Jsq+PoqWf5oAQosPg8N0WWHm-7c+JgDzpGD8OfMyKtvPJ0w@mail.gmail.com>
+Message-ID: <52457F21.3030502@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 24, 2013 at 7:41 PM, Uwe Kleine-K?nig
-<u.kleine-koenig@pengutronix.de> wrote:
-
-> CLKDEV_LOOKUP selects HAVE_CLK and COMMON_CLK selects CLKDEV_LOOKUP. So
-> all symbols that select at least two of these symbols can be simplified.
+On 09/27/2013 02:29 PM, Rob Herring wrote:
+> On Fri, Sep 27, 2013 at 5:47 AM, Daniel Lezcano
+> <daniel.lezcano@linaro.org> wrote:
+>> As the ux500 and the kirkwood driver, make the calxeda driver a platform driver
+>>
+>> [Compiled only]
+>>
+>> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+>> ---
+>>   arch/arm/mach-highbank/highbank.c |    8 ++++++++
+>>   drivers/cpuidle/cpuidle-calxeda.c |   18 ++++++++++++------
+>>   2 files changed, 20 insertions(+), 6 deletions(-)
 >
-> For imx, omap2 and ux500 some rearrangements were necessary before the
-> simplification.
->
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> Looks fine to me, but this will conflict with my series. Perhaps I can
+> pick this up as part of that.
 
->  arch/arm/mach-u300/Kconfig     |  1 -
->  arch/arm/mach-ux500/Kconfig    | 29 ++++++++++++-----------------
+Yes I agree, it makes sense.
 
-I am worried that the ux500 stuff may conflict with other stuff destined
-for the ARM SoC tree, so if you coordinate with the ARM SoC folks:
-Acked-by: Linus Walleij <linus.walleij@linaro.org> for these two.
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
 
-Yours,
-Linus Walleij
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
