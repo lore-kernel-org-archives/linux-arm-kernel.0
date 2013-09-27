@@ -1,70 +1,46 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 27 Sep 2013 13:20:43 +0800
-Subject: [PATCH 1/1] mmc: sdhci-of-esdhc: fix building error
-In-Reply-To: <1380254414-12045-1-git-send-email-b29396@freescale.com>
-References: <1380254414-12045-1-git-send-email-b29396@freescale.com>
-Message-ID: <20130927052041.GH25146@S2101-09.ap.freescale.net>
+From: B18965@freescale.com (Wang Huan-B18965)
+Date: Fri, 27 Sep 2013 05:29:04 +0000
+Subject: [PATCH v3 0/5] ARM: vf610: Add DCU framebuffer driver for
+ Vybrid VF610 platform
+In-Reply-To: <523C1DAB.60808@ti.com>
+References: <1376553714-25922-1-git-send-email-b18965@freescale.com>
+ <81BA6E5E0BC2344391CABCEE22D1B6D83F448E@039-SN1MPN1-002.039d.mgd.msft.net>
+ <81BA6E5E0BC2344391CABCEE22D1B6D8403CB3@039-SN1MPN1-002.039d.mgd.msft.net>
+ <52270C71.7080805@ti.com>
+ <81BA6E5E0BC2344391CABCEE22D1B6D842FD6A@039-SN1MPN1-003.039d.mgd.msft.net>
+ <523C1DAB.60808@ti.com>
+Message-ID: <81BA6E5E0BC2344391CABCEE22D1B6D84426AA@039-SN1MPN1-003.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 27, 2013 at 12:00:14PM +0800, Dong Aisheng wrote:
-> tree:   git://git.kernel.org/pub/scm/linux/kernel/git/cjb/mmc.git mmc-next
-> head:   53279906cf17c2b6138c70f41ec8f2da53cea65f
-> commit: d31fc00a71b4f3a52d23c5a995ccd63e50a2c877 [36/41] mmc: sdhci-esdhc: move common esdhc_set_clock to platform driver
-> config: make ARCH=powerpc allmodconfig
+> >> On 03/09/13 11:21, Wang Huan-B18965 wrote:
+> >>> Hi, Jean-Christophe, Tomi,
+> >>>
+> >>> Could you please help to review these patches? Thanks!
+> >>
+> >> There seemed to be some strong opinions that there should be a drm
+> >> driver for this hardware, instead of an fb driver. So as there seems
+> >> to be disagreements about this, I'll leave this series to
+> >> Jean-Christophe, who's the primary maintainer.
+> > [Alison Wang]
+> >
+> > Thanks for Tomi's comments.
+> >
+> > I agree that we can implement the DRM driver for the DCU. As the
+> > bandwidth limitation, I suggest we use the fb driver firstly. On the
+> > other hand, the fb driver can meet the application requirement based
+> > on this SoC. We'll try to provide the DRM driver when this IP
+> > integrated into other SoC.
 > 
-> All error/warnings:
+> If you plan to move to DRM driver anyway, I would strongly suggest
+> merging only the DRM driver. If we merge the fb driver, and a bit later
+> the DRM driver for the same hardware, we'll have two drivers of which
+> the other is already deprecated.
 > 
->    drivers/mmc/host/sdhci-of-esdhc.c: In function 'esdhc_of_set_clock':
-> >> drivers/mmc/host/sdhci-of-esdhc.c:229:179: error: 'host_clock' undeclared (first use in this function)
->      dev_dbg(mmc_dev(host->mmc), "desired SD clock: %d, actual: %d\n",
->                                                                                                                                                                                       ^
->    drivers/mmc/host/sdhci-of-esdhc.c:229:179: note: each undeclared identifier is reported only once for each function it appears in
-> 
-> vim +/host_clock +229 drivers/mmc/host/sdhci-of-esdhc.c
-> 
->    223          while (host->max_clk / pre_div / 16 > clock && pre_div < 256)
->    224                  pre_div *= 2;
->    225
->    226          while (host->max_clk / pre_div / div > clock && div < 16)
->    227                  div++;
->    228
->  > 229           dev_dbg(mmc_dev(host->mmc), "desired SD clock: %d, actual: %d\n",
->    230                  clock, host_clock / pre_div / div);
->    231
->    232          pre_div >>= 1;
-> 
-> Signed-off-by: Dong Aisheng <b29396@freescale.com>
+[Alison Wang] We will not have bandwidth and develop the DRM driver in the near future. On the other hand, this IP is not integrated into other high-end SOC. So this fb driver will be used for some kind of long time for current SoC. We can try to remove the fb driver when we developed the DRM driver for other SoC.
 
-I just compile-tested it with powerpc toolchain, so
+Jean-Christophe, Do you have any comments? Thanks.
 
-Tested-by: Shawn Guo <shawn.guo@linaro.org>
 
-Hi Chris,
-
-It's your call to apply it as a fix patch or amend it to the offending
-one.  We're fine with either way.
-
-Shawn
-
-> ---
->  drivers/mmc/host/sdhci-of-esdhc.c |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
-> 
-> diff --git a/drivers/mmc/host/sdhci-of-esdhc.c b/drivers/mmc/host/sdhci-of-esdhc.c
-> index b1605a1..0b24997 100644
-> --- a/drivers/mmc/host/sdhci-of-esdhc.c
-> +++ b/drivers/mmc/host/sdhci-of-esdhc.c
-> @@ -227,7 +227,7 @@ static void esdhc_of_set_clock(struct sdhci_host *host, unsigned int clock)
->  		div++;
->  
->  	dev_dbg(mmc_dev(host->mmc), "desired SD clock: %d, actual: %d\n",
-> -		clock, host_clock / pre_div / div);
-> +		clock, host->max_clk / pre_div / div);
->  
->  	pre_div >>= 1;
->  	div--;
-> -- 
-> 1.7.2.rc3
-> 
-> 
+Best Regards,
+Alison Wang
