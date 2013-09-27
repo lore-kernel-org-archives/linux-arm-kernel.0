@@ -1,41 +1,30 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 27 Sep 2013 12:08:32 +0100
-Subject: [PATCH 2/9] iommu/arm-smmu: Calculate SMMU_CB_BASE from smmu
- register values
-In-Reply-To: <20130927110521.GO3315@alberich>
-References: <1380234982-1677-1-git-send-email-andreas.herrmann@calxeda.com>
- <1380234982-1677-3-git-send-email-andreas.herrmann@calxeda.com>
- <20130927095157.GA9057@mudshark.cambridge.arm.com>
- <20130927102359.GL3315@alberich>
- <20130927105153.GG9057@mudshark.cambridge.arm.com>
- <20130927110521.GO3315@alberich>
-Message-ID: <20130927110832.GC9520@mudshark.cambridge.arm.com>
+Date: Fri, 27 Sep 2013 12:23:32 +0100
+Subject: [RFT PATCH v1 0/7] enable FPSIMD lazy save and restore for arm64
+In-Reply-To: <20130927105045.GA11063@MacBook-Pro.local>
+References: <1380269087-8520-1-git-send-email-liuj97@gmail.com>
+ <20130927105045.GA11063@MacBook-Pro.local>
+Message-ID: <20130927112332.GD9520@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 27, 2013 at 12:05:21PM +0100, Andreas Herrmann wrote:
-> On Fri, Sep 27, 2013 at 06:51:53AM -0400, Will Deacon wrote:
-> > Well, we should already print the "device is 0x%lx bytes but only mapped
-> > 0x%lx!" message, which I think is enough to go and figure out what happened.
+On Fri, Sep 27, 2013 at 11:50:46AM +0100, Catalin Marinas wrote:
+> On Fri, Sep 27, 2013 at 09:04:40AM +0100, Jiang Liu wrote:
+> > From: Jiang Liu <jiang.liu@huawei.com>
+> > 
+> > This patchset enables FPSIMD lazy save and restore for ARM64, you could
+> > apply it against v3.12-rc2.
+> > 
+> > We have done basic functional tests on ARM fast model, but still lack
+> > of detail performance benchmark on real hardware platforms. We would
+> > appreciate if you could help to test it on really hardware platforms!
 > 
-> No, you can map a larger region and still wrongly calculate cb_base
-> w/o this warning.
+> That's my issue as well, I would like to see some benchmarks before
+> merging such patches.
 
-Gotcha.
-
-> So the required check is something like
-> 
->          /* Check for mismatch between SMMU address space size and size of mapped region */
->          size = 1 << (((id >> ID1_NUMPAGENDXB_SHIFT) & ID1_NUMPAGENDXB_MASK) + 1);
->          size *= (smmu->pagesize << 1);
->          if (smmu->size != size)
->                  dev_warn(smmu->dev,
->                           "SMMU_GLOBAL_SIZE (0x%lx) differs from mapped "
-> 			  region size (0x%lx)!\n", size, smmu->size);
-
-Sure, tightening up that check sounds like a good idea.
-Looking forward to the next version of the patches!
-
-(I need some more time to think about that secure config access patch :).
+Furthermore, with GCC's register allocator starting to use vector registers to
+optimise *integer* code instead of spilling to the stack, it's going to become
+more and more common to tasks to have live FP state at context switch. Lazy
+switching might simply introduce overhead in the form of additional trapping.
 
 Will
