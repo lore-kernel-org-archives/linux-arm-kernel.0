@@ -1,56 +1,24 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 27 Sep 2013 19:42:34 -0400
-Subject: [PATCH 2/4] ARM: dts: keystone: Add the SPI nodes
-In-Reply-To: <1380325356-2100-1-git-send-email-santosh.shilimkar@ti.com>
-References: <1380325356-2100-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1380325356-2100-3-git-send-email-santosh.shilimkar@ti.com>
+Date: Fri, 27 Sep 2013 19:42:32 -0400
+Subject: [PATCH 0/4] ARM: keystone: Enable SPI and I2C support
+Message-ID: <1380325356-2100-1-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Keystone2 based SOCs supports 3 instances of SPI controllers. Add
-the device nodes for them.
+Here is small set of patches which enables I2C and SPI bus support
+for Keystone SOCs. The relevant driver updates are already merged
+in the last merge cycle. Tested on Keystone 2 EVM.
 
-Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
----
- arch/arm/boot/dts/keystone.dts |   27 +++++++++++++++++++++++++++
- 1 file changed, 27 insertions(+)
+Santosh Shilimkar (4):
+  ARM: dts: keystone: Add i2c device nodes
+  ARM: dts: keystone: Add the SPI nodes
+  spi: davinci: Allow SPI to be build without EDMA support
+  ARM: keystone: Enable I2C and SPI bus support
 
-diff --git a/arch/arm/boot/dts/keystone.dts b/arch/arm/boot/dts/keystone.dts
-index 3f56556..8203da5 100644
---- a/arch/arm/boot/dts/keystone.dts
-+++ b/arch/arm/boot/dts/keystone.dts
-@@ -154,5 +154,32 @@
- 			clocks = <&clki2c>;
- 			interrupts = <GIC_SPI 289 IRQ_TYPE_EDGE_RISING>;
- 		};
-+
-+		spi0: spi at 21000400 {
-+			compatible = "ti,dm6441-spi";
-+			reg = <0x21000400 0x200>;
-+			num-cs = <4>;
-+			ti,davinci-spi-intr-line = <0>;
-+			interrupts = <GIC_SPI 292 IRQ_TYPE_EDGE_RISING>;
-+			clocks = <&clkspi>;
-+		};
-+
-+		spi1: spi at 21000600 {
-+			compatible = "ti,dm6441-spi";
-+			reg = <0x21000600 0x200>;
-+			num-cs = <4>;
-+			ti,davinci-spi-intr-line = <0>;
-+			interrupts = <GIC_SPI 296 IRQ_TYPE_EDGE_RISING>;
-+			clocks = <&clkspi>;
-+		};
-+
-+		spi2: spi at 21000800 {
-+			compatible = "ti,dm6441-spi";
-+			reg = <0x21000800 0x200>;
-+			num-cs = <4>;
-+			ti,davinci-spi-intr-line = <0>;
-+			interrupts = <GIC_SPI 300 IRQ_TYPE_EDGE_RISING>;
-+			clocks = <&clkspi>;
-+		};
- 	};
- };
+ arch/arm/boot/dts/keystone.dts      |   57 +++++++++++++++++++++++++++++++++++
+ arch/arm/configs/keystone_defconfig |    2 ++
+ drivers/spi/Kconfig                 |    2 +-
+ 3 files changed, 60 insertions(+), 1 deletion(-)
+
 -- 
 1.7.9.5
