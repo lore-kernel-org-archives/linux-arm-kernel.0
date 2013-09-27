@@ -1,130 +1,95 @@
-From: joelf@ti.com (Joel Fernandes)
-Date: Fri, 27 Sep 2013 10:25:39 -0500
-Subject: [PATCH v3] ARM: EDMA: Fix clearing of unused list for DT DMA
- resources
-In-Reply-To: <52454A12.5010108@ti.com>
-References: <1380232546-821-1-git-send-email-joelf@ti.com>
- <CAOesGMgELbnuu8PM7Ah2xKo2H5rzgAN3w0g6wA7aVFsjuds-8g@mail.gmail.com>
- <5244D142.1090307@ti.com> <52454A12.5010108@ti.com>
-Message-ID: <5245A373.1090407@ti.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 27 Sep 2013 16:27:52 +0100
+Subject: [PATCH] arm: vexpress: tc2: fix CPU hotplug and CPU idle race on
+ cluster power down
+In-Reply-To: <20130927151043.GA9746@localhost.localdomain>
+References: <1380292153-10480-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <20130927151043.GA9746@localhost.localdomain>
+Message-ID: <20130927152752.GC10613@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/27/2013 04:04 AM, Sekhar Nori wrote:
-> On 9/27/2013 5:58 AM, Joel Fernandes wrote:
->> On 09/26/2013 06:13 PM, Olof Johansson wrote:
->>> On Thu, Sep 26, 2013 at 2:55 PM, Joel Fernandes <joelf@ti.com> wrote:
->>>> HWMOD removal for MMC is breaking edma_start as the events are being manually
->>>> triggered due to unused channel list not being clear.
->>>>
->>>> The above issue is fixed by reading the "dmas" property from the DT node if it
->>>> exists and clearing the bits in the unused channel list if the dma controller
->>>> used by any device is EDMA. For this purpose we use the of_* helpers to parse
->>>> the arguments in the dmas phandle list.
->>>>
->>>> Also introduced is a minor clean up of a checkpatch error in old code.
->>>>
->>>> Reviewed-by: Sekhar Nori <nsekhar@ti.com>
->>>> Reported-by: Balaji T K <balajitk@ti.com>
->>>> Cc: Sekhar Nori <nsekhar@ti.com>
->>>> Cc: Tony Lindgren <tony@atomide.com>
->>>> Cc: Olof Johansson <olof@lixom.net>
->>>> Cc: Nishanth Menon <nm@ti.com>
->>>> Cc: Pantel Antoniou <panto@antoniou-consulting.com>
->>>> Cc: Jason Kridner <jkridner@beagleboard.org>
->>>> Cc: Koen Kooi <koen@dominion.thruhere.net>
->>>> Signed-off-by: Joel Fernandes <joelf@ti.com>
->>>> ---
->>>> Just resending this patch after discussing with Sekhar and Olof.
->>>
->>> Actually, the patch you talked to me about was v3 of this. It seems
->>> that you have reposted v6 but labelled it v3. This is very confusing.
->>
->> Sorry about this. :-( This is indeed v6.
->>
->>>> AM335x is being booted by many users such as the beaglebone community. DT is
->>>> the only boot method available for all these users.  EDMA is required for the
->>>> operation for many common peripherals in AM335x SoC such as McASP, MMC and
->>>> Crypto.
->>>>
->>>> Although EDMA DT nodes are going in only for 3.13, in reality the kernel has
->>>> been used for more than a year with EDMA code and out of tree EDMA DTS patches.
->>>> Hence though the DT nodes are still not in mainline, this patch can be still be
->>>> considered a critical fix as such and it would be great if it could be included
->>>> in 3.12-rc release. Thanks.
->>>
->>> This is really the root of this problem. If you sit on code out of
->>> tree for a year, and something breaks that we couldn't even have
->>> detected since we didn't have the out-of-tree pieces. We'll help you
->>> the first few times (such as now) but we will eventually stop caring.
->>
->> When I started looking at EDMA in June, I noticed that a lot had already been
->> merged. EDMA DMA Engine driver itself was merged last year, no worries there.
->> but the long pending list of fixes to be made to the driver had to written and
->> rewritten multiple times which took a long time.
->>
->> Due to this, the EDMA device tree entries could not be merged in fear that doing
->> so would cause problems such as MMC/SD corruption etc.
->>
->>> If I was in a worse mood, then I'd just say that since your users
->>> already has to have out-of-tree code to even use this functionality,
->>> they could just add this fix on top of that stack of patches. But I'm
->>> in a slightly better mood than that and I'll pick it up this time. :)
->>
->> Thank you! :)
->>
->>>> More details about why this broke an existing feature folks were using:
->>>> Previously the DMA resources for platform devices were being populated through
->>>> HWMOD, however with the recent clean ups with HWMOD, this data has been moved
->>>> to Device tree. The EDMA code though is not aware of this so it fails to fetch
->>>> the DMA resources correctly which it needs to prepare the unused channel list
->>>> (basically doesn't properly clear the channels that are in use, in the unused
->>>> list).
->>>
->>> So that we can learn for next time: What should we (as in us
->>> maintainers and you TI) have done differently to avoid this?
->>
->> I think a little on both sides can be improved.
+On Fri, Sep 27, 2013 at 04:10:49PM +0100, Dave Martin wrote:
+> On Fri, Sep 27, 2013 at 03:29:13PM +0100, Lorenzo Pieralisi wrote:
+> > On the TC2 testchip, when all CPUs in a cluster enter standbywfi and
+> > commit a power down request, the power controller will wait for
 > 
-> Since we are in lessons learnt mode, I think as developers we need to
-> learn to prioritize fixes over other features we are working on. I went
-> back to the chronology of this patch series.
-
-Sure, I agree with this. Will definitely work on it.
-
+> [...]
 > 
-> 22nd July 2013: v2 posted
-> 29th July 2013: Discussion on whether the patch can wait till *v3.12*
-> 		merge window.
-> 29th July 2013: comments given on v2
-> 22nd Aug 2013: 	Pull request's sent by Sekhar for v3.12
-> 24th Aug 2013: 	another v2 posted (all comments given earlier not
-> 		addressed, received some comments on build warnings)
-> 27th Aug 2013:	another v3 posted (all comments given on 29th July not
-> 		addressed)
-> 10th Sept 2013: another v3 posted (all comments given on 29th July not
-> 		addressed)
-> [some discussion on comments and why this cannot wait until v3.13]
-> 17th Sept 2013:	Final version ready for merge posted.
-> 26th Sept 2013: Another v3 posted, this time for Olof to send into
-> 		v3.12-rc
+> (Minor nit: please wrap the commit message to a shorter length for git
+> log.  I use 67, but I can't remember where that recommendation came from)
+
+Ok, will do.
+
+> [...]
 > 
-> See, early on, the patch was actually in consideration for v3.12 merge.
-> The barrier of entry into -rc cycle is pretty high. So if you have an
-> opportunity to hit a merge window, utilize that by prioritizing this
-> work over anything else you may be doing.
+> > This patch moves the GIC CPU IF disable call in the TC2 MCPM implementation
+> > from the suspend method to the power down method to fix the mentioned
+> > race condition.
 > 
-> I know you got busy with adding support for SG lists and all, but
-> clearly this patch is critical in your mind. Plus the comments were not
-> tough to fix. There is a need to keep looking at what provides the best
-> return on time invested.
+> Reviewed-by: Dave Martin <Dave.Martin@arm.com>
+> Tested-by: Dave Martn <Dave.Martin@arm.com> (for kexec)
 
+Thanks !
 
-Yes, but we are not referring to this particular patch at all. Olof was asking
-about the code that was not been merged and/or the reasons things are not
-working. I was just responding to that. But thanks for the advice, will def keep
-it in mind.
+> It's worth briefly summarising the kexec scenario too:
+> 
+> kexec hotplugs secondary CPUs out during kernel reload/restart.
+> Because kexec may (deliberately) trash the old kernel text, it is
+> not OK for CPUs to follow the MCPM soft reboot path, since
+> instructions after the WFI may have been replaced by kexec.
+> 
+> If tc2_pm_down() does not disable the GIC cpu interface, there is a
+> race between CPU powerdown in the old kernel and the IPI from the
+> new kernel that triggers secondary boot, particluarly if the
+> powerdown is slow (due to L2 cache cleaning for example).  If the
+> new kernel wins the race, the affected CPU(s) will not really be
+> reset and may execute garbage after the WFI.
+> 
+> (some comments below)
+> 
+> > 
+> > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> > Signed-off-by: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
+> > ---
+> >  arch/arm/mach-vexpress/tc2_pm.c | 11 ++++++++++-
+> >  1 file changed, 10 insertions(+), 1 deletion(-)
+> > 
+> > diff --git a/arch/arm/mach-vexpress/tc2_pm.c b/arch/arm/mach-vexpress/tc2_pm.c
+> > index 7aeb5d6..e6eb481 100644
+> > --- a/arch/arm/mach-vexpress/tc2_pm.c
+> > +++ b/arch/arm/mach-vexpress/tc2_pm.c
+> > @@ -131,6 +131,16 @@ static void tc2_pm_down(u64 residency)
+> >  	} else
+> >  		BUG();
+> >  
+> > +	/*
+> > +	 * If the CPU is committed to power down, make sure
+> > +	 * the power controller will be in charge of waking it
+> > +	 * up upon IRQ, ie IRQ lines are cut from GIC CPU IF
+> > +	 * to the CPU by disabling the GIC CPU IF to prevent wfi
+> > +	 * from completing execution behind power controller back
+> > +	 */
+> > +	if (!skip_wfi)
+> > +		gic_cpu_if_down();
+> > +
+> 
+> In my version of this fix, I disabled the CPU interface much earlier,
+> just after entering the function.  I think it probably works either
+> way.  Do you think the location is critical, or should it not matter?
+> 
+> As far as I could tell, it matters only that this is done sometime
+> between committing to WFI and actually doing it, but if you think
+> there are extra requirements then I would like to understand them.
 
-Regards,
+You are right, it can be added anywhere before executing wfi; I just added it
+there for two reasons:
 
--Joel
+- MCPM checked if wfi should be skipped. If wfi should be skipped disabling
+  GIC CPU IF is useless
+- I want to issue the write to the GIC before we enter the no-fly zone
+  (disable C-bit, clean cache, exit SMP (and disable CCI)). I know we
+  could disable the GIC CPU IF right before executing wfi, but let's not
+  play with fire, if that write hides a barrier we are in a bind.
+
+Lorenzo
