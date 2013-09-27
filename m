@@ -1,57 +1,68 @@
-From: andreas.herrmann@calxeda.com (Andreas Herrmann)
-Date: Fri, 27 Sep 2013 16:30:48 +0200
-Subject: [PATCH] iommu/arm-smmu: Check for num_context_irqs > 0 to avoid
- divide by zero exception
-In-Reply-To: <20130927110756.GP3315@alberich>
-References: <1380234982-1677-1-git-send-email-andreas.herrmann@calxeda.com>
- <1380234982-1677-5-git-send-email-andreas.herrmann@calxeda.com>
- <20130927084154.GB8319@mudshark.cambridge.arm.com>
- <20130927090348.GF3315@alberich>
- <20130927102307.GE9057@mudshark.cambridge.arm.com>
- <20130927103949.GM3315@alberich>
- <20130927104802.GF9057@mudshark.cambridge.arm.com>
- <20130927110756.GP3315@alberich>
-Message-ID: <20130927143048.GR3315@alberich>
+From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
+Date: Fri, 27 Sep 2013 16:32:03 +0200
+Subject: imprecise external abort using the flexcan driver on i.MX6Q
+In-Reply-To: <CAOMZO5AODznB9D+J2D1juoL=f5eBuJEyuNtN+DEYFuSdhNdt5g@mail.gmail.com>
+References: <21060.15934.600859.167074@ipc1.ka-ro>
+ <CAOMZO5AODznB9D+J2D1juoL=f5eBuJEyuNtN+DEYFuSdhNdt5g@mail.gmail.com>
+Message-ID: <21061.38627.854812.311229@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
-With the right (or wrong;-) definition of v1 SMMU node in DTB it is
-possible to trigger a division by zero in arm_smmu_init_domain_context
-(if number of context irqs is 0):
+Fabio Estevam writes:
+> Hi Lothar,
+> 
+> On Thu, Sep 26, 2013 at 11:01 AM, Lothar Wa?mann
+> <LW@karo-electronics.de> wrote:
+> > Does anyone have any clue how this can happen?
+> >
+> > Can anyone reproduce this on another machine?
+> 
+> Is the change below needed?
+> 
+> --- a/arch/arm/boot/dts/imx6qdl.dtsi
+> +++ b/arch/arm/boot/dts/imx6qdl.dtsi
+> @@ -310,7 +310,7 @@
+>                         };
+> 
+>                         can1: flexcan at 02090000 {
+> -                               compatible = "fsl,imx6q-flexcan";
+> +                               compatible = "fsl,imx6q-flexcan",
+> "fsl,p1010-flexcan";
+>                                 reg = <0x02090000 0x4000>;
+>                                 interrupts = <0 110 0x04>;
+>                                 clocks = <&clks 108>, <&clks 109>;
+> @@ -318,7 +318,7 @@
+>                         };
+> 
+>                         can2: flexcan at 02094000 {
+> -                               compatible = "fsl,imx6q-flexcan";
+> +                               compatible = "fsl,imx6q-flexcan",
+> "fsl,p1010-flexcan";
+>                                 reg = <0x02094000 0x4000>;
+>                                 interrupts = <0 111 0x04>;
+>                                 clocks = <&clks 110>, <&clks 111>;
+The driver contains:
+|static const struct of_device_id flexcan_of_match[] = {
+|	{ .compatible = "fsl,p1010-flexcan", .data = &fsl_p1010_devtype_data, },
+|	{ .compatible = "fsl,imx28-flexcan", .data = &fsl_imx28_devtype_data, },
+|	{ .compatible = "fsl,imx6q-flexcan", .data = &fsl_imx6q_devtype_data, },
+|	{ /* sentinel */ },
 
-       if (smmu->version == 1) {
-               root_cfg->irptndx = atomic_inc_return(&smmu->irptndx);
- =>            root_cfg->irptndx %= smmu->num_context_irqs;
-       } else {
+Thus, with your proposed change the DT data would become ambiguous and
+the driver might use &fsl_p1010_devtype_data rather than
+&fsl_imx6q_devtype_data depending how the matching algorithm works.
 
-Avoid this by checking for num_context_irqs > 0 when probing
-for SMMU devices.
 
-Signed-off-by: Andreas Herrmann <andreas.herrmann@calxeda.com>
----
- drivers/iommu/arm-smmu.c |    7 +++----
- 1 file changed, 3 insertions(+), 4 deletions(-)
-
-diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index d19676c..7d07561 100644
---- a/drivers/iommu/arm-smmu.c
-+++ b/drivers/iommu/arm-smmu.c
-@@ -1803,12 +1803,11 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
- 			smmu->num_context_irqs++;
- 	}
- 
--	if (num_irqs < smmu->num_global_irqs) {
-+	if (!smmu->num_context_irqs) {
- 		dev_warn(dev, "found %d interrupts but expected at least %d\n",
--			 num_irqs, smmu->num_global_irqs);
--		smmu->num_global_irqs = num_irqs;
-+			 num_irqs, smmu->num_global_irqs + 1);
-+		return -ENODEV;
- 	}
--	smmu->num_context_irqs = num_irqs - smmu->num_global_irqs;
- 
- 	smmu->irqs = devm_kzalloc(dev, sizeof(*smmu->irqs) * num_irqs,
- 				  GFP_KERNEL);
+Lothar Wa?mann
 -- 
-1.7.9.5
+___________________________________________________________
+
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
