@@ -1,67 +1,37 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Fri, 27 Sep 2013 22:10:28 +0200
-Subject: [PATCH] PWM: atmel-pwm: use request/free instead of enable/disable
-Message-ID: <1380312628-6564-1-git-send-email-alexandre.belloni@free-electrons.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 27 Sep 2013 13:13:12 -0700
+Subject: [PATCH] clocksource: arm_arch_timer: Use clocksource for suspend
+ timekeeping
+Message-ID: <1380312792-7275-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I found that disabling a pwm while it is at a low level will actually put it
-back at a high level. The main symptom is that leds-pwm is calling pwm_disable()
-after setting the duty cycle to 0. Hence, instead of getting a switched off LED,
-you get an LED lit up at full brightness.
+The ARM architected timers keep counting during suspend so we can
+mark this clocksource with the CLOCK_SOURCE_SUSPEND_NONSTOP flag.
+This flag will indicate that this clocksource can be used for
+calculating suspend time and injecting sleep time into the
+timekeeping core. This should be more accurate than using an
+external RTC or architecture specific persistent clock.
 
-Solve that by using the request and free callbacks to enable and disable the
-pwm channels and the clock.
-
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
+ drivers/clocksource/arm_arch_timer.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-This patch applies after:
-  [PATCH v4] PWM: atmel-pwm: add PWM controller driver
-
- drivers/pwm/pwm-atmel.c | 14 +++++---------
- 1 file changed, 5 insertions(+), 9 deletions(-)
-
-diff --git a/drivers/pwm/pwm-atmel.c b/drivers/pwm/pwm-atmel.c
-index 6af7a50..4526e71 100644
---- a/drivers/pwm/pwm-atmel.c
-+++ b/drivers/pwm/pwm-atmel.c
-@@ -209,7 +209,7 @@ static int atmel_pwm_set_polarity(struct pwm_chip *chip, struct pwm_device *pwm,
- 	return 0;
- }
- 
--static int atmel_pwm_enable(struct pwm_chip *chip, struct pwm_device *pwm)
-+static int atmel_pwm_request(struct pwm_chip *chip, struct pwm_device *pwm)
- {
- 	struct atmel_pwm_chip *atmel_pwm = to_atmel_pwm_chip(chip);
- 	int ret;
-@@ -225,23 +225,19 @@ static int atmel_pwm_enable(struct pwm_chip *chip, struct pwm_device *pwm)
- 	return 0;
- }
- 
--static void atmel_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
-+static void atmel_pwm_free(struct pwm_chip *chip, struct pwm_device *pwm)
- {
- 	struct atmel_pwm_chip *atmel_pwm = to_atmel_pwm_chip(chip);
--	u32 val;
- 
- 	atmel_pwm_writel(atmel_pwm, PWM_DIS, 1 << pwm->hwpwm);
--
--	val = atmel_pwm_readl(atmel_pwm, PWM_SR);
--	if ((val & PWM_SR_ALL_CH_ON) == 0)
--		clk_disable(atmel_pwm->clk);
-+	clk_disable(atmel_pwm->clk);
- }
- 
- static const struct pwm_ops atmel_pwm_ops = {
- 	.config = atmel_pwm_config,
- 	.set_polarity = atmel_pwm_set_polarity,
--	.enable = atmel_pwm_enable,
--	.disable = atmel_pwm_disable,
-+	.request = atmel_pwm_request,
-+	.free = atmel_pwm_free,
- 	.owner = THIS_MODULE,
+diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+index fbd9ccd..ce98d5e 100644
+--- a/drivers/clocksource/arm_arch_timer.c
++++ b/drivers/clocksource/arm_arch_timer.c
+@@ -389,7 +389,7 @@ static struct clocksource clocksource_counter = {
+ 	.rating	= 400,
+ 	.read	= arch_counter_read,
+ 	.mask	= CLOCKSOURCE_MASK(56),
+-	.flags	= CLOCK_SOURCE_IS_CONTINUOUS,
++	.flags	= CLOCK_SOURCE_IS_CONTINUOUS | CLOCK_SOURCE_SUSPEND_NONSTOP,
  };
  
+ static struct cyclecounter cyclecounter = {
 -- 
-1.8.1.2
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
