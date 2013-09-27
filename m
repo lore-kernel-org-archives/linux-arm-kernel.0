@@ -1,75 +1,48 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Fri, 27 Sep 2013 03:56:13 +0200
-Subject: [PATCH 31/51] DMA-API: media: omap3isp: use
- dma_coerce_mask_and_coherent()
-In-Reply-To: <E1VMmCg-0007j1-Pi@rmk-PC.arm.linux.org.uk>
-References: <20130919212235.GD12758@n2100.arm.linux.org.uk>
- <E1VMmCg-0007j1-Pi@rmk-PC.arm.linux.org.uk>
-Message-ID: <4110555.qb0XUyFHNE@avalon>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 27 Sep 2013 10:01:44 +0800
+Subject: [PATCH 2/2] ARM: dts: mxs: Add MSR M28CU3 board
+In-Reply-To: <1380194177-5191-2-git-send-email-marex@denx.de>
+References: <1380194177-5191-1-git-send-email-marex@denx.de>
+ <1380194177-5191-2-git-send-email-marex@denx.de>
+Message-ID: <20130927020142.GE25146@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+On Thu, Sep 26, 2013 at 01:16:17PM +0200, Marek Vasut wrote:
+> diff --git a/arch/arm/mach-mxs/mach-mxs.c b/arch/arm/mach-mxs/mach-mxs.c
+> index 98f6e2a..b5a709e 100644
+> --- a/arch/arm/mach-mxs/mach-mxs.c
+> +++ b/arch/arm/mach-mxs/mach-mxs.c
+> @@ -332,6 +332,13 @@ static void __init crystalfontz_init(void)
+>  	update_fec_mac_prop(OUI_CRYSTALFONTZ);
+>  }
+>  
+> +static void __init m28cu3_init(void)
+> +{
+> +	enable_clk_enet_out();
 
-Thank you for the patch.
+Since commit daa7d39 (net: freescale: fec: add support for optional
+enet_out clk), we can have fec driver enable the clock if you do not
+need the clock at the platform initialization.
 
-On Thursday 19 September 2013 22:56:02 Russell King wrote:
-> The code sequence:
-> 	isp->raw_dmamask = DMA_BIT_MASK(32);
-> 	isp->dev->dma_mask = &isp->raw_dmamask;
-> 	isp->dev->coherent_dma_mask = DMA_BIT_MASK(32);
-> bypasses the architectures check on the DMA mask.  It can be replaced
-> with dma_coerce_mask_and_coherent(), avoiding the direct initialization
-> of this mask.
-> 
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+Shawn
 
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-
-> ---
->  drivers/media/platform/omap3isp/isp.c |    6 +++---
->  drivers/media/platform/omap3isp/isp.h |    3 ---
->  2 files changed, 3 insertions(+), 6 deletions(-)
+> +
+> +	update_fec_mac_prop(OUI_DENX);
+> +}
+> +
+>  static const char __init *mxs_get_soc_id(void)
+>  {
+>  	struct device_node *np;
+> @@ -459,6 +466,8 @@ static void __init mxs_machine_init(void)
+>  		apx4devkit_init();
+>  	else if (of_machine_is_compatible("crystalfontz,cfa10036"))
+>  		crystalfontz_init();
+> +	else if (of_machine_is_compatible("msr,m28cu3"))
+> +		m28cu3_init();
+>  
+>  	of_platform_populate(NULL, of_default_bus_match_table,
+>  			     NULL, parent);
+> -- 
+> 1.8.4.rc3
 > 
-> diff --git a/drivers/media/platform/omap3isp/isp.c
-> b/drivers/media/platform/omap3isp/isp.c index df3a0ec..1c36080 100644
-> --- a/drivers/media/platform/omap3isp/isp.c
-> +++ b/drivers/media/platform/omap3isp/isp.c
-> @@ -2182,9 +2182,9 @@ static int isp_probe(struct platform_device *pdev)
->  	isp->pdata = pdata;
->  	isp->ref_count = 0;
-> 
-> -	isp->raw_dmamask = DMA_BIT_MASK(32);
-> -	isp->dev->dma_mask = &isp->raw_dmamask;
-> -	isp->dev->coherent_dma_mask = DMA_BIT_MASK(32);
-> +	ret = dma_coerce_mask_and_coherent(isp->dev, DMA_BIT_MASK(32));
-> +	if (ret)
-> +		return ret;
-> 
->  	platform_set_drvdata(pdev, isp);
-> 
-> diff --git a/drivers/media/platform/omap3isp/isp.h
-> b/drivers/media/platform/omap3isp/isp.h index cd3eff4..ce65d3a 100644
-> --- a/drivers/media/platform/omap3isp/isp.h
-> +++ b/drivers/media/platform/omap3isp/isp.h
-> @@ -152,7 +152,6 @@ struct isp_xclk {
->   * @mmio_base_phys: Array with physical L4 bus addresses for ISP register
->   *                  regions.
->   * @mmio_size: Array with ISP register regions size in bytes.
-> - * @raw_dmamask: Raw DMA mask
->   * @stat_lock: Spinlock for handling statistics
->   * @isp_mutex: Mutex for serializing requests to ISP.
->   * @crashed: Bitmask of crashed entities (indexed by entity ID)
-> @@ -190,8 +189,6 @@ struct isp_device {
->  	unsigned long mmio_base_phys[OMAP3_ISP_IOMEM_LAST];
->  	resource_size_t mmio_size[OMAP3_ISP_IOMEM_LAST];
-> 
-> -	u64 raw_dmamask;
-> -
->  	/* ISP Obj */
->  	spinlock_t stat_lock;	/* common lock for statistic drivers */
->  	struct mutex isp_mutex;	/* For handling ref_count field */
--- 
-Regards,
-
-Laurent Pinchart
