@@ -1,41 +1,45 @@
-From: dinh.linux@gmail.com (Dinh Nguyen)
-Date: Thu, 26 Sep 2013 22:27:55 -0500
-Subject: [PATCH 1/2] dts: socfpga: Add ethernet support on Altera's SOCFPGA
- platform
-In-Reply-To: <5244C171.2040705@wwwdotorg.org>
-References: <1380057120-27108-1-git-send-email-dinguyen@altera.com>
- <5244C171.2040705@wwwdotorg.org>
-Message-ID: <5244FB3B.2050906@gmail.com>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Fri, 27 Sep 2013 12:40:11 +0900
+Subject: [PATCH v6 3/3] PCI: imx6: Add support for i.MX6 PCIe controller
+In-Reply-To: <20130927021925.GF25146@S2101-09.ap.freescale.net>
+References: <1379319655-20210-1-git-send-email-xobs@kosagi.com>
+ <1379319655-20210-4-git-send-email-xobs@kosagi.com>
+ <CAJ+vNU32oMZq=jrSCpk_ZjYc08kRBAqhOS8uYfor28gY8WGhnw@mail.gmail.com>
+ <0E83723C55F66F43A6041464FE31119D3F7E6A@039-SN2MPN1-012.039d.mgd.msft.net>
+ <20130927021925.GF25146@S2101-09.ap.freescale.net>
+Message-ID: <017e01cebb33$44fa65b0$ceef3110$%han@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+On Friday, September 27, 2013 11:19 AM, Shawn Guo wrote:
+> On Fri, Sep 27, 2013 at 01:38:39AM +0000, Zhu Richard-R65037 wrote:
+> > Hi Tim:
+> > Thanks for your tests.
+> > Yes, it is. There are some problems when the PCIe switch is used
+> > on the 3.1x kernel at my side too,
+> although the PCIe switch
+> > is ok on FSL imx_3.0.35 kernels.
+> > I'm debugging this issue now, and would summit the patches asap.
+> >
+> 
+> From what I read, it seems Sean's series does not support PCIe switch.
+> At least, he hasn't got any device to test it.  And there is some
+> problem with PCIe switch running the latest kernel, which might not be
+> related to the controller driver.
+> 
+> I suggest we ask Bjorn to merge the v7 I sent yesterday, so that people
+> can have a same base to work on, and add PCIe switch support with
+> incremental patches.   Does that sound good to you, Tim?
+> 
 
-On 9/26/13 6:21 PM, Stephen Warren wrote:
-> On 09/24/2013 03:11 PM, dinguyen at altera.com wrote:
->> From: Dinh Nguyen <dinguyen@altera.com>
->>
->> The STMMAC Ethernet controller in SOCFPGA requires setting a register for
->> the phy-mode that is outside of the ethernet IP. This register resides in
->> the System Manager block. So we define a new DTS binding
->> "altr,sysmgr-phy-mask". This binding's property is a bitmask that can be
->> used to set the correct register bit.
->> diff --git a/Documentation/devicetree/bindings/net/stmmac-altr-socfpga.txt b/Documentation/devicetree/bindings/net/stmmac-altr-socfpga.txt
->> +* altr,sysmgr-phy-mask: This property contains the bitmask that is needed to
->> +	set the appropriate register bits for the phy-mode in the System Manager.
->> +	The value should be:
->> +		-Ethernet Controller 1 (gmac0) = 0x3
->> +		-Ethernet Controller 2 (gmac1) = 0xC
-> Wouldn't you need a phandle to the sysmgr node so that the driver could
-> be located, and a register number within its register block too? Or,
-> does sysmgr know which register to poke? If so, couldn't the API take
-> just a device index rather than a bitmask instead, and calculate the
-> mask itself?
-The function that pokes this register is a platform specific init 
-function call from the driver, so the function knows which register in 
-the the sysmgr to poke. The first byte of the register has controls for 
-both ethernet controllers. I thought it would be better to use a mask to 
-be used to differentiate between each controller.
+Hi Shawn Guo,
 
-Thanks,
-Dinh
+I agree with your suggestion. :-)
+The PCIe switch support patches can be added later, after the v7 patch for
+i.MX6 PCIe controller driver is merged.
+
+Also, if the PCIe switch support patches modify the synopsys designware PCIe
+driver (pcie-designware.c), it should be confirmed by other related people.
+
+Best regards,
+Jingoo Han
