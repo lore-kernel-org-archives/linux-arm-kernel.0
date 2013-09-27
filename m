@@ -1,37 +1,80 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 27 Sep 2013 15:17:02 +0200
-Subject: [PATCH] clockevent: exynos_mct: fix lockdep warning
-In-Reply-To: <CACVXFVO=k-wJ2SrjVQ_k1JhtAOo0-rZ_M780rqGWCbKA8_1qBQ@mail.gmail.com>
-References: <1380120578-17458-1-git-send-email-tom.leiming@gmail.com>	<5243823D.4040208@linaro.org>	<17472486.7GQJa9ux9F@amdc1227>
- <CACVXFVO=k-wJ2SrjVQ_k1JhtAOo0-rZ_M780rqGWCbKA8_1qBQ@mail.gmail.com>
-Message-ID: <5245854E.5030600@linaro.org>
+From: liuj97@gmail.com (Jiang Liu)
+Date: Fri, 27 Sep 2013 21:20:04 +0800
+Subject: [RFT PATCH v1 2/7] arm64: restore FPSIMD to default state for
+ kernel and signal contexts
+In-Reply-To: <20130927113507.GC11063@MacBook-Pro.local>
+References: <1380269087-8520-1-git-send-email-liuj97@gmail.com>
+ <1380269087-8520-3-git-send-email-liuj97@gmail.com>
+ <20130927113507.GC11063@MacBook-Pro.local>
+Message-ID: <52458604.7030902@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/27/2013 03:09 PM, Ming Lei wrote:
-> On Thu, Sep 26, 2013 at 6:32 PM, Tomasz Figa <t.figa@samsung.com> wrote:
->>
->> This is a fix that we may want to have, but it must be modified to take
->> my regression fix[1] into account.
->>
->> [1] clocksource: exynos_mct: Set IRQ affinity when the CPU goes online
->> http://thread.gmane.org/gmane.linux.kernel.samsung-soc/22511/focus=23418
->
-> OK, I will write and submit v1 against your patch.
+On 09/27/2013 07:35 PM, Catalin Marinas wrote:
+> On Fri, Sep 27, 2013 at 09:04:42AM +0100, Jiang Liu wrote:
+>> diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
+>> index bb785d2..12a25e5 100644
+>> --- a/arch/arm64/kernel/fpsimd.c
+>> +++ b/arch/arm64/kernel/fpsimd.c
+>> @@ -80,9 +80,14 @@ void fpsimd_thread_switch(struct task_struct *next)
+>>  
+>>  void fpsimd_flush_thread(void)
+>>  {
+>> +	struct fpsimd_state *state = &current->thread.fpsimd_state;
+>> +
+>>  	preempt_disable();
+>> -	memset(&current->thread.fpsimd_state, 0, sizeof(struct fpsimd_state));
+>> -	fpsimd_load_state(&current->thread.fpsimd_state);
+>> +	memset(state, 0, sizeof(struct fpsimd_state));
+>> +#if (AARCH64_FPCR_DEFAULT_VAL != 0)
+>> +	state->fpcr = AARCH64_FPCR_DEFAULT_VAL;
+>> +#endif
+>> +	fpsimd_load_state(state);
+>>  	preempt_enable();
+> 
+> We can leave this to 0 as the default for user. Glibc already programs
+> this register.
+OK, will drop it.
 
-Better you stick to
+> 
+>>  }
+>>  
+>> @@ -99,6 +104,8 @@ void kernel_neon_begin(void)
+>>  
+>>  	if (current->mm)
+>>  		fpsimd_save_state(&current->thread.fpsimd_state);
+>> +
+>> +	fpsimd_init_hw_state();
+> 
+> This function should indeed do some initialisation rather than relying
+> on whatever the user set for FPCR.
+> 
+>> diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
+>> index 890a591..6d80612 100644
+>> --- a/arch/arm64/kernel/signal.c
+>> +++ b/arch/arm64/kernel/signal.c
+>> @@ -52,6 +52,7 @@ static int preserve_fpsimd_context(struct fpsimd_context __user *ctx)
+>>  
+>>  	/* dump the hardware registers to the fpsimd_state structure */
+>>  	fpsimd_save_state(fpsimd);
+>> +	fpsimd_init_hw_state();
+> 
+> Here I think we need to leave the default user setting for fpcr as
+> decided by glibc (or libgcc) when an application starts.
+OK, will keep FPCR and clear FPSR.
 
-https://git.kernel.org/cgit/linux/kernel/git/tip/tip.git/
-
-or you rebase it against the v3.12-rc3 when it goes out.
-
-Thanks
-   -- Daniel
-
-
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+> 
+>>  	/* copy the FP and status/control registers */
+>>  	err = __copy_to_user(ctx->vregs, fpsimd->vregs, sizeof(fpsimd->vregs));
+>> diff --git a/arch/arm64/kernel/signal32.c b/arch/arm64/kernel/signal32.c
+>> index e393174..cb2cb41 100644
+>> --- a/arch/arm64/kernel/signal32.c
+>> +++ b/arch/arm64/kernel/signal32.c
+>> @@ -248,6 +248,7 @@ static int compat_preserve_vfp_context(struct compat_vfp_sigframe __user *frame)
+>>  	 * in AArch32.
+>>  	 */
+>>  	fpsimd_save_state(fpsimd);
+>> +	fpsimd_init_hw_state();
+> 
+> Same here.
+> 
