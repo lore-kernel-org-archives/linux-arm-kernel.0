@@ -1,42 +1,42 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Fri, 27 Sep 2013 11:12:41 -0300
-Subject: [PATCH 2/3] ARM: dts: imx6qdl-sabresd: Provide phy-reset-gpios
+Date: Fri, 27 Sep 2013 11:12:42 -0300
+Subject: [PATCH 3/3] ARM: dts: imx6qdl-wandboard: Provide phy-reset-gpios
 In-Reply-To: <1380291162-17099-1-git-send-email-festevam@gmail.com>
 References: <1380291162-17099-1-git-send-email-festevam@gmail.com>
-Message-ID: <1380291162-17099-2-git-send-email-festevam@gmail.com>
+Message-ID: <1380291162-17099-3-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Fabio Estevam <fabio.estevam@freescale.com>
 
-GPIO1_25 is used to reset the ethernet phy.
+GPIO3_29 is used to reset the ethernet phy.
 
 Add support for it.
 
 Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 ---
- arch/arm/boot/dts/imx6qdl-sabresd.dtsi | 2 ++
+ arch/arm/boot/dts/imx6qdl-wandboard.dtsi | 2 ++
  1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-index 64e454b..2035d66 100644
---- a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-@@ -108,6 +108,7 @@
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_enet_1>;
- 	phy-mode = "rgmii";
-+	phy-reset-gpios = <&gpio1 25 0>;
- 	status = "okay";
- };
- 
-@@ -172,6 +173,7 @@
- 				MX6QDL_PAD_NANDF_CLE__GPIO6_IO07 0x80000000
- 				MX6QDL_PAD_ENET_TXD1__GPIO1_IO29 0x80000000
- 				MX6QDL_PAD_EIM_D22__GPIO3_IO22  0x80000000
-+				MX6QDL_PAD_ENET_CRS_DV__GPIO1_IO25 0x80000000
+diff --git a/arch/arm/boot/dts/imx6qdl-wandboard.dtsi b/arch/arm/boot/dts/imx6qdl-wandboard.dtsi
+index df42d3c..35f5479 100644
+--- a/arch/arm/boot/dts/imx6qdl-wandboard.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-wandboard.dtsi
+@@ -88,6 +88,7 @@
+ 				MX6QDL_PAD_ENET_RXD1__GPIO1_IO26 0x80000000 /* WL_REG_ON */
+ 				MX6QDL_PAD_ENET_TXD1__GPIO1_IO29 0x80000000 /* WL_HOST_WAKE */
+ 				MX6QDL_PAD_ENET_TXD0__GPIO1_IO30 0x80000000 /* WL_WAKE */
++				MX6QDL_PAD_EIM_D29__GPIO3_IO29   0x80000000
  			>;
  		};
  	};
+@@ -97,6 +98,7 @@
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_enet_1>;
+ 	phy-mode = "rgmii";
++	phy-reset-gpios = <&gpio3 29 0>;
+ 	status = "okay";
+ };
+ 
 -- 
 1.8.1.2
