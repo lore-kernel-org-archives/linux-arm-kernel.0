@@ -1,63 +1,41 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 27 Sep 2013 11:59:03 +0100
-Subject: [RFT PATCH v1 6/7] amd64: avoid saving and restoring FPSIMD
- registers until threads access them
-In-Reply-To: <1380269087-8520-7-git-send-email-liuj97@gmail.com>
-References: <1380269087-8520-1-git-send-email-liuj97@gmail.com>
- <1380269087-8520-7-git-send-email-liuj97@gmail.com>
-Message-ID: <20130927105902.GH9057@mudshark.cambridge.arm.com>
+From: david.woodhouse@intel.com (Woodhouse, David)
+Date: Fri, 27 Sep 2013 10:59:16 +0000
+Subject: [GIT PULL] ARM: SoC fixes for 3.12-rc
+In-Reply-To: <CAN8TOE8Xf9fv9zyY6wof3b9QhqgV=s-cK4V4D6n+Gw4HgacT0g@mail.gmail.com>
+References: <20130919194752.GA19975@quad.lixom.net>
+ <1379626776.753.164.camel@shinybook.infradead.org>
+ <CAN8TOE8j=oosn-5hAdqoTPcuW-sGvDAHd_nK6BZfJpxMwwpisQ@mail.gmail.com>
+ <1379632757.12963.4.camel@shinybook.infradead.org>
+ <CAN8TOE8Xf9fv9zyY6wof3b9QhqgV=s-cK4V4D6n+Gw4HgacT0g@mail.gmail.com>
+Message-ID: <1380279555.28494.171.camel@i7.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 27, 2013 at 09:04:46AM +0100, Jiang Liu wrote:
-> From: Jiang Liu <jiang.liu@huawei.com>
+On Thu, 2013-09-19 at 17:44 -0700, Brian Norris wrote:
+> > Does that m25p80 'fix 4 byte addressing' fix for Micron not also want to
+> > go in?
 > 
-> Use PF_USED_MATH flag to mark whether the thread has accessed any FPSIMD
-> registers, so we could avoid saving and restroing FPSIMD registers until
-> threads access them. This may improve performance when lazy FPSIMD restore
-> is disabled.
+> I suppose the m25p80 one can go in as well. It's not so much a bugfix
+> as augmenting my original patch to support more devices. But it is
+> safe enough.
 
-Hehe, the subject made me smile :)
+You say 'support more devices', but AFAICT the code in -rc1 will already
+*attempt* to enable 4-byte addressing on those devices, and fail.
 
-I suppose that means I have to give a semi-useful review for the patch...
+(It looks like set_4byte() can return failure, but its return code isn't
+checked, and anyway it's only a SPI write so there's no feedback from
+the *chip* if it fails due to lack of WREN; it can only indicate failure
+if the SPI connection falls over.)
 
-> Signed-off-by: Jiang Liu <jiang.liu@huawei.com>
-> Cc: Jiang Liu <liuj97@gmail.com>
-> ---
->  arch/arm64/kernel/fpsimd.c | 38 +++++++++++++++++++++++---------------
->  1 file changed, 23 insertions(+), 15 deletions(-)
-> 
-> diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-> index 267e54a..a81af5f 100644
-> --- a/arch/arm64/kernel/fpsimd.c
-> +++ b/arch/arm64/kernel/fpsimd.c
-> @@ -99,7 +99,8 @@ void fpsimd_disable_lazy_restore(void)
->   * If lazy mode is enabled, caller needs to disable preemption
->   * when calling fpsimd_load_state_lazy() and fpsimd_save_state_lazy().
->   */
-> -static void fpsimd_load_state_lazy(struct fpsimd_state *state)
-> +static void fpsimd_load_state_lazy(struct fpsimd_state *state,
-> +				   struct task_struct *tsk)
->  {
->  	/* Could we reuse the hardware context? */
->  	if (state->last_cpu == smp_processor_id() &&
-> @@ -109,13 +110,19 @@ static void fpsimd_load_state_lazy(struct fpsimd_state *state)
->  	if (static_key_false(&fpsimd_lazy_mode)) {
->  		fpsimd_clear_on_hw(state);
->  		fpsimd_enable_trap();
-> -	} else {
-> +	} else if (tsk_used_math(tsk)) {
-> +		fpsimd_disable_trap();
->  		fpsimd_load_state(state);
-> +	} else {
-> +		fpsimd_enable_trap();
+So I'm inclined to think of it as a bug fix and include it.
 
-One thing worth checking in sequences like this is that you have the
-relevant memory barriers (isb instructions) to ensure that the CPU is
-synchronised wrt side-effects from the msr instructions. *Some* operations
-are self-synchronising, but I don't think this is the case for fpsimd in v8
-(although I haven't re-checked).
-
-Your earlier patch (3/7) doesn't seem to have any of these barriers.
-
-Will
+-- 
+David Woodhouse                            Open Source Technology Centre
+David.Woodhouse at intel.com                              Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: smime.p7s
+Type: application/x-pkcs7-signature
+Size: 6242 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130927/bdd29266/attachment.bin>
