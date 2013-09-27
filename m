@@ -1,60 +1,81 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri, 27 Sep 2013 15:51:35 +0100
-Subject: [PATCH v2 0/2] ARM DT cpus/cpu and topology bindings
-In-Reply-To: <5244AA44.7070208@gmail.com>
-References: <1379330464-27917-1-git-send-email-lorenzo.pieralisi@arm.com>
- <20130924160126.GC403@e102568-lin.cambridge.arm.com>
- <5242EA2E.1010106@gmail.com>
- <20130926100250.GA20705@e102568-lin.cambridge.arm.com>
- <5244AA44.7070208@gmail.com>
-Message-ID: <20130927145135.GA10613@e102568-lin.cambridge.arm.com>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Fri, 27 Sep 2013 08:10:32 -0700
+Subject: [PATCH V5 5/9] USB: OHCI: make ohci-at91 a separate driver
+In-Reply-To: <1379761727-10656-6-git-send-email-manjunath.goudar@linaro.org>
+ (Manjunath Goudar's message of "Sat, 21 Sep 2013 16:38:42 +0530")
+References: <1370585013-12809-1-git-send-email-manjunath.goudar@linaro.org>
+ <1379761727-10656-1-git-send-email-manjunath.goudar@linaro.org>
+ <1379761727-10656-6-git-send-email-manjunath.goudar@linaro.org>
+Message-ID: <877ge2l2qf.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 26, 2013 at 10:42:28PM +0100, Rob Herring wrote:
-> On 09/26/2013 05:02 AM, Lorenzo Pieralisi wrote:
-> > On Wed, Sep 25, 2013 at 02:50:38PM +0100, Rob Herring wrote:
-> >> On 09/24/2013 11:01 AM, Lorenzo Pieralisi wrote:
-> >>> [replying to self]
-> >>>
-> >>> Any further comments on this series ? If not, I think bindings are ready to be
-> >>> queued, but for that I need acks from DT maintainers.
-> >>
-> >> Who do you plan to take this? Is this dependent on something for 3.13?
-> >> If not, I'll apply it.
-> > 
-> > v3 on the lists, should be final. No, there are no dependencies on 3.13
-> > to the best of my knowledge. The problem with pre-v7 UP systems with
-> > cpus node #address-cells == 0 is still there and I would like to ask you
-> > please what we/I should do about that, it can trigger a considerable
-> > amount of churn. As soon as these bindings hit the mainline I will
-> > update the DT parsing code, I can easily take all pre-v7 UP dts out
-> > of the picture in the parsing loop (after all, reg property for those
-> > processors is useless), but the dts are _wrong_ regardless when these
-> > patches become the official bindings.
-> 
-> Given that this is really a don't care for the kernel, I'm not sure what
-> kernel change you are thinking. It is not the kernel's job to validate
-> the dtb, so I think the kernel should not care. We should do this sort
-> of validation at dtb build time at the latest. As to updating the dts
-> files, yes we should probably do that.
+Manjunath,
 
-I would like to change the DT parsing loop to improve it (eg now it bails
-out as soon as a cpu node does not contain a reg property), not to
-change the MPIDR checks related to these new bindings. In short,
-kernel changes are not related to these bindings. I will make sure that the
-changes will sit in -next for a while to prevent any issues; I understand
-your reticence, I will tread more carefully this time.
+Manjunath Goudar <manjunath.goudar@linaro.org> writes:
 
-As to updating the dts files, I am not looking forward to it at all :D,
-I would kindly ask platform maintainers to do it, but only when these
-bindings get merged in the kernel.
+> Separate the  TI OHCI Atmel host controller driver from ohci-hcd
+> host code so that it can be built as a separate driver module.
+> This work is part of enabling multi-platform kernels on ARM.
 
-Having said that, if you do not have any objection I would ask you please to
-apply v3:
+This broke booting on atmel sama5 boards (and likely others with the
+same conversion)...
 
-http://lists.infradead.org/pipermail/linux-arm-kernel/2013-September/200531.html
-or I can send you a pull request for that, as you wish.
+[...]
 
-Thank you very much,
-Lorenzo
+> +static int __init ohci_at91_init(void)
+> +{
+> +	if (usb_disabled())
+> +		return -ENODEV;
+> +
+> +	pr_info("%s: " DRIVER_DESC "\n", hcd_name);
+> +	ohci_init_driver(&ohci_at91_hc_driver, NULL);
+
+ohci_init_driver() doesn't have any sanity checks for NULL overrides, so
+it blindly dereferences and faults.
+
+Some of the other conversions have this same problem (at least omap3).
+Did anyone test this series on hardware?
+
+I'm not too familiar with OHCI, but something like the patch below is
+probably needed along with this series.
+
+Kevin
+
+
+>From a3b5cc90e74038a6449fbd25e0d720ea02884f30 Mon Sep 17 00:00:00 2001
+From: Kevin Hilman <khilman@linaro.org>
+Date: Fri, 27 Sep 2013 08:07:19 -0700
+Subject: [PATCH] USB: OHCI: ohci_init_driver(): sanity check overrides
+
+Check for non-NULL overrides before dereferencing since platforms may
+pass in NULL overrides.
+
+Signed-off-by: Kevin Hilman <khilman@linaro.org>
+---
+ drivers/usb/host/ohci-hcd.c | 10 ++++++----
+ 1 file changed, 6 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/usb/host/ohci-hcd.c b/drivers/usb/host/ohci-hcd.c
+index 21d937a..8ada13f 100644
+--- a/drivers/usb/host/ohci-hcd.c
++++ b/drivers/usb/host/ohci-hcd.c
+@@ -1161,10 +1161,12 @@ void ohci_init_driver(struct hc_driver *drv,
+ 	/* Copy the generic table to drv and then apply the overrides */
+ 	*drv = ohci_hc_driver;
+ 
+-	drv->product_desc = over->product_desc;
+-	drv->hcd_priv_size += over->extra_priv_size;
+-	if (over->reset)
+-		drv->reset = over->reset;
++	if (over) {
++		drv->product_desc = over->product_desc;
++		drv->hcd_priv_size += over->extra_priv_size;
++		if (over->reset)
++			drv->reset = over->reset;
++	}
+ }
+ EXPORT_SYMBOL_GPL(ohci_init_driver);
+ 
+-- 
+1.8.3
