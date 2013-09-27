@@ -1,65 +1,124 @@
-From: liuj97@gmail.com (Jiang Liu)
-Date: Fri, 27 Sep 2013 23:20:15 +0800
-Subject: [RFT PATCH v1 0/7] enable FPSIMD lazy save and restore for arm64
-In-Reply-To: <20130927112332.GD9520@mudshark.cambridge.arm.com>
-References: <1380269087-8520-1-git-send-email-liuj97@gmail.com>
- <20130927105045.GA11063@MacBook-Pro.local>
- <20130927112332.GD9520@mudshark.cambridge.arm.com>
-Message-ID: <5245A22F.7020305@gmail.com>
+From: joelf@ti.com (Joel Fernandes)
+Date: Fri, 27 Sep 2013 10:20:08 -0500
+Subject: [PATCH v3] ARM: EDMA: Fix clearing of unused list for DT DMA
+ resources
+In-Reply-To: <5245387E.7080000@ti.com>
+References: <1380232546-821-1-git-send-email-joelf@ti.com>
+ <CAOesGMgELbnuu8PM7Ah2xKo2H5rzgAN3w0g6wA7aVFsjuds-8g@mail.gmail.com>
+ <5244D142.1090307@ti.com> <5245387E.7080000@ti.com>
+Message-ID: <5245A228.4070609@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/27/2013 07:23 PM, Will Deacon wrote:
-> On Fri, Sep 27, 2013 at 11:50:46AM +0100, Catalin Marinas wrote:
->> On Fri, Sep 27, 2013 at 09:04:40AM +0100, Jiang Liu wrote:
->>> From: Jiang Liu <jiang.liu@huawei.com>
+On 09/27/2013 02:49 AM, Sekhar Nori wrote:
+> On 9/27/2013 5:58 AM, Joel Fernandes wrote:
+>> On 09/26/2013 06:13 PM, Olof Johansson wrote:
+>>> On Thu, Sep 26, 2013 at 2:55 PM, Joel Fernandes <joelf@ti.com> wrote:
+>>>> HWMOD removal for MMC is breaking edma_start as the events are being manually
+>>>> triggered due to unused channel list not being clear.
+>>>>
+>>>> The above issue is fixed by reading the "dmas" property from the DT node if it
+>>>> exists and clearing the bits in the unused channel list if the dma controller
+>>>> used by any device is EDMA. For this purpose we use the of_* helpers to parse
+>>>> the arguments in the dmas phandle list.
+>>>>
+>>>> Also introduced is a minor clean up of a checkpatch error in old code.
+>>>>
+>>>> Reviewed-by: Sekhar Nori <nsekhar@ti.com>
+>>>> Reported-by: Balaji T K <balajitk@ti.com>
+>>>> Cc: Sekhar Nori <nsekhar@ti.com>
+>>>> Cc: Tony Lindgren <tony@atomide.com>
+>>>> Cc: Olof Johansson <olof@lixom.net>
+>>>> Cc: Nishanth Menon <nm@ti.com>
+>>>> Cc: Pantel Antoniou <panto@antoniou-consulting.com>
+>>>> Cc: Jason Kridner <jkridner@beagleboard.org>
+>>>> Cc: Koen Kooi <koen@dominion.thruhere.net>
+>>>> Signed-off-by: Joel Fernandes <joelf@ti.com>
+>>>> ---
+>>>> Just resending this patch after discussing with Sekhar and Olof.
 >>>
->>> This patchset enables FPSIMD lazy save and restore for ARM64, you could
->>> apply it against v3.12-rc2.
->>>
->>> We have done basic functional tests on ARM fast model, but still lack
->>> of detail performance benchmark on real hardware platforms. We would
->>> appreciate if you could help to test it on really hardware platforms!
+>>> Actually, the patch you talked to me about was v3 of this. It seems
+>>> that you have reposted v6 but labelled it v3. This is very confusing.
 >>
->> That's my issue as well, I would like to see some benchmarks before
->> merging such patches.
+>> Sorry about this. :-( This is indeed v6.
+>>
+>>>> AM335x is being booted by many users such as the beaglebone community. DT is
+>>>> the only boot method available for all these users.  EDMA is required for the
+>>>> operation for many common peripherals in AM335x SoC such as McASP, MMC and
+>>>> Crypto.
+>>>>
+>>>> Although EDMA DT nodes are going in only for 3.13, in reality the kernel has
+>>>> been used for more than a year with EDMA code and out of tree EDMA DTS patches.
+>>>> Hence though the DT nodes are still not in mainline, this patch can be still be
+>>>> considered a critical fix as such and it would be great if it could be included
+>>>> in 3.12-rc release. Thanks.
+>>>
+>>> This is really the root of this problem. If you sit on code out of
+>>> tree for a year, and something breaks that we couldn't even have
+>>> detected since we didn't have the out-of-tree pieces. We'll help you
+>>> the first few times (such as now) but we will eventually stop caring.
+>>
+>> When I started looking at EDMA in June, I noticed that a lot had already been
+>> merged. EDMA DMA Engine driver itself was merged last year, no worries there.
+>> but the long pending list of fixes to be made to the driver had to written and
+>> rewritten multiple times which took a long time.
+>>
+>> Due to this, the EDMA device tree entries could not be merged in fear that doing
+>> so would cause problems such as MMC/SD corruption etc.
+>>
+>>> If I was in a worse mood, then I'd just say that since your users
+>>> already has to have out-of-tree code to even use this functionality,
+>>> they could just add this fix on top of that stack of patches. But I'm
+>>> in a slightly better mood than that and I'll pick it up this time. :)
+>>
+>> Thank you! :)
+>>
+>>>> More details about why this broke an existing feature folks were using:
+>>>> Previously the DMA resources for platform devices were being populated through
+>>>> HWMOD, however with the recent clean ups with HWMOD, this data has been moved
+>>>> to Device tree. The EDMA code though is not aware of this so it fails to fetch
+>>>> the DMA resources correctly which it needs to prepare the unused channel list
+>>>> (basically doesn't properly clear the channels that are in use, in the unused
+>>>> list).
+>>>
+>>> So that we can learn for next time: What should we (as in us
+>>> maintainers and you TI) have done differently to avoid this?
+>>
+>> I think a little on both sides can be improved.
+>>
+>> For TI, a bit more work toward explaining patches better in change logs so that
+>> maintainers understand and are willing to help to get the code upstream would
+>> help. A lot of improvement to internal policies have been made for developing on
+>> upstream, and that's certainly a good thing but there's still more room forard
+>> improvement.
+>>
+>> For maintainers,  EDMA code would have been kept breathing all these months
+>> (atleast 8 months) if those temporary fixes mentioned above would have been
+>> merged into the kernel instead of not applied. With those fixes in place, dts
+>> could have been enabled and EDMA would be fully working all these months. This
+>> would have certainly made things a lot easier. Rewriting stuff the right way is
+>> OK but if it is a _lot_ of effort, then to keep things alive, merging stuff "for
+>> now" specially if they are one-liners could be made acceptable.
 > 
-> Furthermore, with GCC's register allocator starting to use vector registers to
-> optimise *integer* code instead of spilling to the stack, it's going to become
-> more and more common to tasks to have live FP state at context switch. Lazy
-> switching might simply introduce overhead in the form of additional trapping.
-> 
-> Will
-> 
-Hi Will,
-	The patchset actually includes three optimizations.
+> Joel, can you give a link to the "one-liner" "temporary fix" that was
+> was not merged? I am unable to put it in context.
 
-The first one uses PF_USED_MATH to track whether the thread has
-accessed FPSIMD registers since it has been created. If the thread
-hasn't accessed FPSIMD registers since it's birth, we don't need to
-save and restore FPSIMD context on thread context switching.
+Sure, not exactly a one-line but maybe couple of lines (see below). Also wasn't
+referring to anything you're maintaining. I was just continuing the original
+discussion of where we can improve as a community.
 
-The second one uses a percpu variable to track the owner of the
-FPSIMD hardware. When switching a thread, if it's the owner of
-the FPSIMD hardware, we don't need to load FPSIMD registers again.
-This is useful when context switching between user thread and
-kernel(idle) threads.
+My point was very trivial changes that keep things working such as this one
+should be merged in time to keep things working:
+http://lkml.indiana.edu/hypermail/linux/kernel/1210.2/01476.html
 
-The third one disable access to FPSIMD registers when switching a
-thread. When the thread tries to access FPSIMD registers the first
-time since it has been switched in, an exception is raised and then
-we will load FPSIMD context onto hardware.
+That one patch was reworked several times, and then was decided to do the right
+way and finally merged with the limit-less series. All I am saying is all this
+while the above patch(es) could be merged to keep things alive, and that way we
+could avoid a lot of the pain and frustration that folks felt.
 
-The overhead (penalty) of the first and second optimizations is
-relatively small, so we could always enable them. The overhead
-of the third one is relatively high and the optimization effect
-depends on many factors, such as workload, glibc etc. So we
-provide a kernel boot option "eagerfpu" to enable/disable the
-third optimization.
+Its just my opinion though, I don't feel strongly about it but I think this may
+be a helpful approach that's all.
 
-So what's your thought about the first and second optimizations?
-Should we always enable them? I do need to do some benchmark for
-this, but still lack of hardware.
+regards,
 
-Thanks!
-Gerry
+-Joel
