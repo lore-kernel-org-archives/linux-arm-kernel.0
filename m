@@ -1,58 +1,30 @@
-From: cxie4@marvell.com (Chao Xie)
-Date: Thu, 26 Sep 2013 19:15:23 -0700
-Subject: [PATCH RESEND] ARM: pxa: ssp: remove kfree for memory allocated
- with devm_kzalloc
-In-Reply-To: <52415363.5020009@gmail.com>
-References: <CAPgLHd9T5_auqA_4Ev_Qh6f_vZONqc8z6AcJVuV1S0VkFn4S_Q@mail.gmail.com>
- <52415363.5020009@gmail.com>
-Message-ID: <AAD1C6EB06EE3649B35B7E026785068D275FE72362@SC-VEXCH2.marvell.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 27 Sep 2013 10:19:27 +0800
+Subject: [PATCH v6 3/3] PCI: imx6: Add support for i.MX6 PCIe controller
+In-Reply-To: <0E83723C55F66F43A6041464FE31119D3F7E6A@039-SN2MPN1-012.039d.mgd.msft.net>
+References: <1379319655-20210-1-git-send-email-xobs@kosagi.com>
+ <1379319655-20210-4-git-send-email-xobs@kosagi.com>
+ <CAJ+vNU32oMZq=jrSCpk_ZjYc08kRBAqhOS8uYfor28gY8WGhnw@mail.gmail.com>
+ <0E83723C55F66F43A6041464FE31119D3F7E6A@039-SN2MPN1-012.039d.mgd.msft.net>
+Message-ID: <20130927021925.GF25146@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Daniel Mack [mailto:zonque at gmail.com] 
-> Sent: Tuesday, September 24, 2013 4:55 PM
-> To: Wei Yongjun
-> Cc: linux at arm.linux.org.uk; grant.likely at linaro.org; rob.herring at calxeda.com; broonie at sirena.org.uk; haojian.zhuang at gmail.com; olof at lixom.net; gregkh at linuxfoundation.org; yongjun_wei at trendmicro.com.cn; linux-arm-kernel at lists.infradead.org; Chao Xie
-> Subject: Re: [PATCH RESEND] ARM: pxa: ssp: remove kfree for memory allocated with devm_kzalloc
+On Fri, Sep 27, 2013 at 01:38:39AM +0000, Zhu Richard-R65037 wrote:
+> Hi Tim:
+> Thanks for your tests.
+> Yes, it is. There are some problems when the PCIe switch is used on the 3.1x kernel at my side too, although the PCIe switch
+> is ok on FSL imx_3.0.35 kernels.
+> I'm debugging this issue now, and would summit the patches asap.
 > 
-> On 24.09.2013 05:35, Wei Yongjun wrote:
-> From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
-> 
-> It's not necessary to free memory allocated with devm_kzalloc
-> and using kfree leads to a double free.
-> 
-> Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
-> 
-> Acked-by: Daniel Mack <zonque@gmail.com>
-> 
-> Chao Xie wanted to work on getting rid of the "middle layer" the pxa ssp
-> driver has. If that's going to happen for 3.13, it will again affect
-> both the ASoC part and code in arch/arm. Therefore, I would again prefer
-> if ssp patches went through Mark's ASoC tree. Chao, are you still
-> planning to work on this?
-> 
-For last month I had to work at other project.
-I will continue to work at it at early Oct.
-> 
-> 
-> Daniel
-> 
-> 
-> ---
->  arch/arm/plat-pxa/ssp.c | 1 -
->  1 file changed, 1 deletion(-)
-> 
-> diff --git a/arch/arm/plat-pxa/ssp.c b/arch/arm/plat-pxa/ssp.c
-> index 3ea0290..528143e 100644
-> --- a/arch/arm/plat-pxa/ssp.c
-> +++ b/arch/arm/plat-pxa/ssp.c
-> @@ -250,7 +250,6 @@ static int pxa_ssp_remove(struct platform_device *pdev)
->  	list_del(&ssp->node);
->  	mutex_unlock(&ssp_lock);
->  
-> -	kfree(ssp);
->  	return 0;
->  }
->  
-> 
+
+>From what I read, it seems Sean's series does not support PCIe switch.
+At least, he hasn't got any device to test it.  And there is some
+problem with PCIe switch running the latest kernel, which might not be
+related to the controller driver.
+
+I suggest we ask Bjorn to merge the v7 I sent yesterday, so that people
+can have a same base to work on, and add PCIe switch support with
+incremental patches.   Does that sound good to you, Tim?
+
+Shawn
