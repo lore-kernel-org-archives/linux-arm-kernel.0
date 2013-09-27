@@ -1,48 +1,30 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 27 Sep 2013 10:51:57 +0100
-Subject: [PATCH 2/9] iommu/arm-smmu: Calculate SMMU_CB_BASE from smmu
- register values
-In-Reply-To: <1380234982-1677-3-git-send-email-andreas.herrmann@calxeda.com>
-References: <1380234982-1677-1-git-send-email-andreas.herrmann@calxeda.com>
- <1380234982-1677-3-git-send-email-andreas.herrmann@calxeda.com>
-Message-ID: <20130927095157.GA9057@mudshark.cambridge.arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 27 Sep 2013 10:49:02 +0100
+Subject: device tree binding documentation outdated
+In-Reply-To: <20130926195158.GS12758@n2100.arm.linux.org.uk>
+References: <20130926195158.GS12758@n2100.arm.linux.org.uk>
+Message-ID: <20130927094902.GX12758@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andreas,
+Here's another instance:
 
-On Thu, Sep 26, 2013 at 11:36:14PM +0100, Andreas Herrmann wrote:
-> Currently it is derived from smmu resource size.  In case of a
-> mismatchin between the two calculations trust DT more than register
-> values and overwrite cb_base.
+Documentation/devicetree/bindings/net/fsl-fec.txt:
 
-I thought the driver already favoured the DT?
+Required properties:
+- phy-mode : String, operation mode of the PHY interface.
+  Supported values are: "mii", "gmii", "sgmii", "tbi", "rmii",
+  "rgmii", "rgmii-id", "rgmii-rxid", "rgmii-txid", "rtbi", "smii".
 
-> @@ -1702,12 +1704,23 @@ static int arm_smmu_device_cfg_probe(struct arm_smmu_device *smmu)
->  
->  	/* Check that we ioremapped enough */
->  	size = 1 << (((id >> ID1_NUMPAGENDXB_SHIFT) & ID1_NUMPAGENDXB_MASK) + 1);
-> -	size *= (smmu->pagesize << 1);
-> +	size *= smmu->pagesize;
-> +	smmu->cb_base = smmu->base + size;
-> +	size *= 2;
-> +
->  	if (smmu->size < size)
->  		dev_warn(smmu->dev,
->  			 "device is 0x%lx bytes but only mapped 0x%lx!\n",
->  			 size, smmu->size);
->  
-> +	t = (unsigned long) smmu->base + (smmu->size >> 1);
-> +	if ((unsigned long)smmu->cb_base != t) {
-> +		dev_warn(smmu->dev, "address space mismatch, "
-> +			"overwriting cb_base (old: 0x%lx, new: 0x%lx)\n",
-> +			(unsigned long) smmu->cb_base, t);
-> +		smmu->cb_base = (void *) t;
-> +	}
-> +
+Is this really required?  Maybe someone can point to where the code
+makes use of this, because I'm damned if I can find it:
 
-I expect I'm just being slow here (only one coffee in), but I can't see what
-this gets us over the current use of resource_size (which goes and uses the
-DT).
+$ grep phy-mode drivers/net/ include/ net/ -r
+drivers/net/ethernet/marvell/mvneta.c:              dev_err(&pdev->dev, "incorrect phy-mode\n");
+drivers/net/ethernet/nxp/lpc_eth.c:                                            phy-mode", NULL);
 
-Will
+"local-mac-address" in the optional properties also falls into this
+category: only a small handful of network drivers make use of this,
+and fec is not one of them.
+
+What's the use of documentation if its inaccurate.
