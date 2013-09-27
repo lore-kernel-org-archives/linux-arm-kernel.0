@@ -1,55 +1,52 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 27 Sep 2013 08:52:55 +0200
-Subject: [GIT PULL 3.12-rc2 fixes] clocksource: Several fixes for 3.12-rc2
-In-Reply-To: <20130927054957.GC6597@gmail.com>
-References: <524381D2.7050604@linaro.org> <20130927054957.GC6597@gmail.com>
-Message-ID: <52452B47.80205@linaro.org>
+Date: Fri, 27 Sep 2013 09:21:52 +0200
+Subject: [RFC PATCH] ARM: zynq: cpuidle: convert to platform driver
+In-Reply-To: <22edc518-27ad-4dcf-918a-def23df93bcc@DB9EHSMHS022.ehs.local>
+References: <1380212138-4020-1-git-send-email-daniel.lezcano@linaro.org>
+ <22edc518-27ad-4dcf-918a-def23df93bcc@DB9EHSMHS022.ehs.local>
+Message-ID: <52453210.6090606@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/27/2013 07:49 AM, Ingo Molnar wrote:
+On 09/27/2013 07:12 AM, Michal Simek wrote:
+> Hi Daniel,
 >
-> * Daniel Lezcano <daniel.lezcano@linaro.org> wrote:
+> On 09/26/2013 06:15 PM, Daniel Lezcano wrote:
+>> As the ux500 and the kirkwood driver, make the zynq driver a platform driver
+>>
+>> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+>> ---
+>>   arch/arm/mach-zynq/common.c    |    7 +++++++
+>>   drivers/cpuidle/cpuidle-zynq.c |   15 ++++++++++-----
+>>   2 files changed, 17 insertions(+), 5 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-zynq/common.c b/arch/arm/mach-zynq/common.c
+>> index 5f25256..0f0d88f 100644
+>> --- a/arch/arm/mach-zynq/common.c
+>> +++ b/arch/arm/mach-zynq/common.c
+>> @@ -44,6 +44,10 @@ static struct of_device_id zynq_of_bus_ids[] __initdata = {
+>>   	{}
+>>   };
+>>
+>> +static struct platform_device zynq_cpuidle_device = {
+>> +	.name = "cpuidle-zynq",
+>> +};
+>> +
+>>   /**
+>>    * zynq_init_machine - System specific initialization, intended to be
+>>    *		       called from board specific initialization.
+>> @@ -56,6 +60,9 @@ static void __init zynq_init_machine(void)
+>>   	l2x0_of_init(0x02060000, 0xF0F0FFFF);
+>>
+>>   	of_platform_bus_probe(NULL, zynq_of_bus_ids, NULL);
+>> +
+>> +	if (of_machine_is_compatible("xlnx,zynq-7000"))
 >
->> Hi Thomas,
->>
->> this pull request contains several fixes for the clocksource/clockevent
->> drivers:
->>
->>   - Jean Pihet fixed a missing Kconfig option preventing the Armada370/XP
->> to boot up.
->>
->>   - Magnus Damm fixed the cpumask on the em_sti driver to have the
->> broadcast timer working on a SMP system
->>
->>   - Sebastian Hesselbarth skipped the initialization of a timer for
->> uninitialized DT nodes
->>
->>   - Tomasz Figa fixed the irq affinity failing on non online cpus
->>
->> Thanks
->>    -- Daniel
->>
->> -----------------------------------------------------------------------------
->>
->> The following changes since commit 4a10c2ac2f368583138b774ca41fac4207911983:
->>
->>    Linux 3.12-rc2 (2013-09-23 15:41:09 -0700)
->>
->> are available in the git repository at:
->>
->>
->> ssh://daniel.lezcano at git.linaro.org//srv/git.linaro.org/git/people/dlezcano/linux.git
->> clockevents/3.12-rc2-fixes
->
-> If you want me to pull this you'll need to send along your SSH password as
-> well!
+> This is not needed because all zynq platforms have this compatibility string
+> and there is no any other clone.
 
-Oops ! :)
-
-Here is the right one:
-
-git://git.linaro.org/people/dlezcano/linux.git clockevents/3.12-rc2-fixes
+Ah, ok. So it is not needed in the current code. I will write its 
+removal in a separate patch.
 
 Thanks
    -- Daniel
