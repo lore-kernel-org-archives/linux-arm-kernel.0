@@ -1,82 +1,65 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Fri, 27 Sep 2013 16:10:49 +0100
-Subject: [PATCH] arm: vexpress: tc2: fix CPU hotplug and CPU idle race on
- cluster power down
-In-Reply-To: <1380292153-10480-1-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1380292153-10480-1-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <20130927151043.GA9746@localhost.localdomain>
+From: liuj97@gmail.com (Jiang Liu)
+Date: Fri, 27 Sep 2013 23:20:15 +0800
+Subject: [RFT PATCH v1 0/7] enable FPSIMD lazy save and restore for arm64
+In-Reply-To: <20130927112332.GD9520@mudshark.cambridge.arm.com>
+References: <1380269087-8520-1-git-send-email-liuj97@gmail.com>
+ <20130927105045.GA11063@MacBook-Pro.local>
+ <20130927112332.GD9520@mudshark.cambridge.arm.com>
+Message-ID: <5245A22F.7020305@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 27, 2013 at 03:29:13PM +0100, Lorenzo Pieralisi wrote:
-> On the TC2 testchip, when all CPUs in a cluster enter standbywfi and
-> commit a power down request, the power controller will wait for
-
-[...]
-
-(Minor nit: please wrap the commit message to a shorter length for git
-log.  I use 67, but I can't remember where that recommendation came from)
-
-[...]
-
-> This patch moves the GIC CPU IF disable call in the TC2 MCPM implementation
-> from the suspend method to the power down method to fix the mentioned
-> race condition.
-
-Reviewed-by: Dave Martin <Dave.Martin@arm.com>
-Tested-by: Dave Martn <Dave.Martin@arm.com> (for kexec)
-
-It's worth briefly summarising the kexec scenario too:
-
-kexec hotplugs secondary CPUs out during kernel reload/restart.
-Because kexec may (deliberately) trash the old kernel text, it is
-not OK for CPUs to follow the MCPM soft reboot path, since
-instructions after the WFI may have been replaced by kexec.
-
-If tc2_pm_down() does not disable the GIC cpu interface, there is a
-race between CPU powerdown in the old kernel and the IPI from the
-new kernel that triggers secondary boot, particluarly if the
-powerdown is slow (due to L2 cache cleaning for example).  If the
-new kernel wins the race, the affected CPU(s) will not really be
-reset and may execute garbage after the WFI.
-
-(some comments below)
-
+On 09/27/2013 07:23 PM, Will Deacon wrote:
+> On Fri, Sep 27, 2013 at 11:50:46AM +0100, Catalin Marinas wrote:
+>> On Fri, Sep 27, 2013 at 09:04:40AM +0100, Jiang Liu wrote:
+>>> From: Jiang Liu <jiang.liu@huawei.com>
+>>>
+>>> This patchset enables FPSIMD lazy save and restore for ARM64, you could
+>>> apply it against v3.12-rc2.
+>>>
+>>> We have done basic functional tests on ARM fast model, but still lack
+>>> of detail performance benchmark on real hardware platforms. We would
+>>> appreciate if you could help to test it on really hardware platforms!
+>>
+>> That's my issue as well, I would like to see some benchmarks before
+>> merging such patches.
 > 
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Signed-off-by: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
-> ---
->  arch/arm/mach-vexpress/tc2_pm.c | 11 ++++++++++-
->  1 file changed, 10 insertions(+), 1 deletion(-)
+> Furthermore, with GCC's register allocator starting to use vector registers to
+> optimise *integer* code instead of spilling to the stack, it's going to become
+> more and more common to tasks to have live FP state at context switch. Lazy
+> switching might simply introduce overhead in the form of additional trapping.
 > 
-> diff --git a/arch/arm/mach-vexpress/tc2_pm.c b/arch/arm/mach-vexpress/tc2_pm.c
-> index 7aeb5d6..e6eb481 100644
-> --- a/arch/arm/mach-vexpress/tc2_pm.c
-> +++ b/arch/arm/mach-vexpress/tc2_pm.c
-> @@ -131,6 +131,16 @@ static void tc2_pm_down(u64 residency)
->  	} else
->  		BUG();
->  
-> +	/*
-> +	 * If the CPU is committed to power down, make sure
-> +	 * the power controller will be in charge of waking it
-> +	 * up upon IRQ, ie IRQ lines are cut from GIC CPU IF
-> +	 * to the CPU by disabling the GIC CPU IF to prevent wfi
-> +	 * from completing execution behind power controller back
-> +	 */
-> +	if (!skip_wfi)
-> +		gic_cpu_if_down();
-> +
+> Will
+> 
+Hi Will,
+	The patchset actually includes three optimizations.
 
-In my version of this fix, I disabled the CPU interface much earlier,
-just after entering the function.  I think it probably works either
-way.  Do you think the location is critical, or should it not matter?
+The first one uses PF_USED_MATH to track whether the thread has
+accessed FPSIMD registers since it has been created. If the thread
+hasn't accessed FPSIMD registers since it's birth, we don't need to
+save and restore FPSIMD context on thread context switching.
 
-As far as I could tell, it matters only that this is done sometime
-between committing to WFI and actually doing it, but if you think
-there are extra requirements then I would like to understand them.
+The second one uses a percpu variable to track the owner of the
+FPSIMD hardware. When switching a thread, if it's the owner of
+the FPSIMD hardware, we don't need to load FPSIMD registers again.
+This is useful when context switching between user thread and
+kernel(idle) threads.
 
-[...]
+The third one disable access to FPSIMD registers when switching a
+thread. When the thread tries to access FPSIMD registers the first
+time since it has been switched in, an exception is raised and then
+we will load FPSIMD context onto hardware.
 
-Cheers
----Dave
+The overhead (penalty) of the first and second optimizations is
+relatively small, so we could always enable them. The overhead
+of the third one is relatively high and the optimization effect
+depends on many factors, such as workload, glibc etc. So we
+provide a kernel boot option "eagerfpu" to enable/disable the
+third optimization.
+
+So what's your thought about the first and second optimizations?
+Should we always enable them? I do need to do some benchmark for
+this, but still lack of hardware.
+
+Thanks!
+Gerry
