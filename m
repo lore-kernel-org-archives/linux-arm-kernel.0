@@ -1,48 +1,111 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Fri, 27 Sep 2013 20:21:51 +0200
-Subject: [PATCH 04/26] clk: prima2: declare OF clock provider
-In-Reply-To: <CAGsJ_4yPcM4YM_i-JMCoDeRb5zKWJyNEt+jnMJ6LqoF5gC3KhA@mail.gmail.com>
-References: <1379526839-14798-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1379526839-14798-5-git-send-email-sebastian.hesselbarth@gmail.com>
- <CAGsJ_4xC_g1C-pGQGrcLOBhKLSMG3D8369DRPoFgNZhKqs-aTQ@mail.gmail.com>
- <523ABA7A.50305@gmail.com> <523EDEB0.1060601@gmail.com>
- <CAGsJ_4yPcM4YM_i-JMCoDeRb5zKWJyNEt+jnMJ6LqoF5gC3KhA@mail.gmail.com>
-Message-ID: <5245CCBF.3070206@gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 27 Sep 2013 19:31:02 +0100
+Subject: device tree binding documentation outdated
+In-Reply-To: <20130927170552.GC12758@n2100.arm.linux.org.uk>
+References: <20130926195158.GS12758@n2100.arm.linux.org.uk>
+ <CAOMZO5ANsZGcpvmtBE7d0q0E6+f0bE_U8CBF7G2v3xtqoLbqcA@mail.gmail.com>
+ <20130926205906.GT12758@n2100.arm.linux.org.uk>
+ <CAHCPf3u9KyoJiAPv6oc_ZdVBqgix41__RAGRXh8z+d5bXO8fQw@mail.gmail.com>
+ <20130926232907.GV12758@n2100.arm.linux.org.uk>
+ <20130927131554.GB31178@titan.lakedaemon.net>
+ <20130927170552.GC12758@n2100.arm.linux.org.uk>
+Message-ID: <20130927183101.GE12758@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/22/2013 12:37 PM, Barry Song wrote:
-> 2013/9/22 Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>:
->> On 09/19/2013 10:48 AM, Sebastian Hesselbarth wrote:
->>>
->>> On 09/19/13 10:45, Barry Song wrote:
->>>>>
->>>>> @@ -1124,3 +1106,4 @@ void __init sirfsoc_of_clk_init(void)
->>>>>
->>>>>           of_clk_add_provider(np, of_clk_src_onecell_get, &clk_data);
->>>>>    }
->>>>> +CLK_OF_DECLARE(sirfsoc_clk, "sirf,prima2-clkc", sirfsoc_clk_init);
->>>>
->>>>
->>>> hi Sebastian,
->>>> what if the driver is compatible with multiple clk controllers and we
->>>> want to add another compatible string here except "sirf,prima2-clkc"?
->>>>
->>>> -barry
->>>>
->>>
->>> Just add
->>> CLK_OF_DECLARE(other_fancy_clk, "sirf,different-compatible",
->>> sirfsoc_clk_init);
->>
->>
->> Barry, BTW, do I get your Acked-By for this and the corresponding
->> removal patch?
->
-> Sebastian, would you wait for a while as i need to merge them and make a test.
+On Fri, Sep 27, 2013 at 06:05:52PM +0100, Russell King - ARM Linux wrote:
+> On Fri, Sep 27, 2013 at 09:15:54AM -0400, Jason Cooper wrote:
+> > Russell,
+> > 
+> > On Fri, Sep 27, 2013 at 12:29:07AM +0100, Russell King - ARM Linux wrote:
+> > > I haven't sorted out a rootfs for this yet, so it fails trying to find
+> > > that.  (Rabeeh's kernel contained an initramfs buildroot image - it
+> > > might be useful to find some way to load that as a separate image -
+> > > does appended DT support that?)
+> > 
+> > yes, point to it in your config, kbuild will build the initramfs in.
+> > Appending the dtb and running mkimage has been working fine for me.
+> 
+> Yes... if I could rip the initramfs out of Rabeeh's kernel.
+> 
+> Having sorted out the beer problem (pintctrl-names), I now have ethernet
+> sort of working, but not quite.  It produces data on my LAN, but that
+> data is not correct.
+> 
+> Here's an extract from the interesting bits that I captured using another
+> machine (other bytes are zeros):
+> 
+> 	0x0000:  ffff ffff ffff d063 0000 0000 0800 4500
+> 	0x0010:  0240 0000 0000 0800 4500 0240 0000 4000
+> 	0x0020:  4011 38ae 0000 0000 4000 4011 38ae 0043
+> 	0x0030:  0200 ffff ffff 0044 0043 022c ffff ffff
+> 	0x0040:  0600 5fe9 bf2c 0000 0101 0600 5fe9 bfd8
+> 	0x0050:  0002 0000 0000 0000 0000 0002 0000 0000
+> 	0x0060:  0000 0000 0000 0000 0000 0000 0000 0000
+> 	0x0070:  0000 0000 0000 0000 d063 0000 0000 0000
+> 	0x0080:  0000 d063 0000 0000 0000 0000 0000 0000
+> ...
+> 	0x01d0:  0000 0000 0000 0000 0000 0000 0000 6382
+> 	0x01e0:  0000 0000 0000 0000 0382 5363 3501 0137
+> 	0x01f0:  0801 0306 5363 3501 0137 0000 0006 0c0f
+> 	0x0200:  111a 28ff 0000 0000 0c0f 111a 0000 0000
+> 
+> That data has a pattern to it.  It's supposed to be a DHCP packet, which
+> would be something like (this is from the same board but booting Rabeeh's
+> kernel instead):
+> 
+> 	0x0000:  ffff ffff ffff d063 0000 0000 0800 4500
+> 	0x0010:  0240 0000 4000 4011 38ae 0000 0000 ffff
+> 	0x0020:  ffff 0044 0043 022c 0000 0101 0600 5e9a
+> 	0x0030:  dac5 0000 0000 0000 0000 0000 0000 0000
+> 	0x0040:  0000 0000 0000 d063 0000 0000 0000 0000
+> 	0x0050:  0000 0000 0000 0000 0000 0000 0000 0000
+> ...
+> 	0x0110:  0000 0000 0000 6382 5363 3501 0137 0801
+> 	0x0120:  0306 0c0f 111a 28ff 0000 0000 0000 0000
+> 
+> Now, there's a pattern to the corruption - let me rearrange them slightly:
+> 
+> ff ff ff ff ff ff d0 63
+> 
+> 00 00 00 00 08 00 45 00 02 40
+> 00 00 00 00 08 00 45 00 02 40
+> 
+> 00 00 40 00 40 11 38 ae 00 00
+> 00 00 40 00 40 11 38 ae
+> 
+> 00 43 02 00 ff ff ff ff 00 44
+> 00 43 02 2c ff ff ff ff 06 00
+> 5f e9 bf 2c 00 00 01 01 06 00
+> 5f e9 bf d8
+> 
+> 00 02 00 00 00 00 00 00 00 00
+> 00 02 00 00 00 00 00 00 00 00
+> 
+> 00 00 00 00 00 00 00 00 00 00
+> 00 00 00 00 00 00 00 00 00 00
+> d0 63 00 00 00 00 00 00 00 00
+> d0 63 00 00 00 00 00 00 00 00
+> 00 00 00 00
+> ...
+> 
+> 00 00 00 00 
+> 00 00 00 00 00 00 00 00 00 00
+> 63 82 00 00 00 00 00 00 00 00
+> 03 82 53 63 35 01 01 37 08 01
+> 03 06 53 63 35 01 01 37 00 00
+> 00 06 0c 0f 11 1a 28 ff 00 00
+> 00 00 0c 0f 11 1a 00 00 00 00
+> 
+> That's the same order of bytes as in the original packet.  Notice how there
+> are identical bytes between ones below and above, and notice how the repeated
+> groups of bytes are always 10 bytes apart.  No, it's not giving any errors
+> in the interface which I ran tcpdump on!
+> 
+> I'm not yet sure what could cause this...
 
-Sure, take your time.
-I now have almost all Acked-by's for the other patches, would be
-great if you find some time to test this on prima2 anytime soon.
+An interesting data point.  Connect it to a 100mbit switch and it works.
+gigabit and it behaves as above.
 
-Sebastian
+So, the question is: does anyone have gigabit networking working on imx6
+with recent DT based kernels?
