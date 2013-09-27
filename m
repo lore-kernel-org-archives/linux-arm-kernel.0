@@ -1,46 +1,91 @@
-From: andreas.herrmann@calxeda.com (Andreas Herrmann)
-Date: Fri, 27 Sep 2013 12:45:57 +0200
-Subject: [PATCH 8/9] iommu/arm-smmu: Introduce a default fault handler
-In-Reply-To: <20130927100902.GD9057@mudshark.cambridge.arm.com>
-References: <1380234982-1677-1-git-send-email-andreas.herrmann@calxeda.com>
- <1380234982-1677-9-git-send-email-andreas.herrmann@calxeda.com>
- <20130927100902.GD9057@mudshark.cambridge.arm.com>
-Message-ID: <20130927104557.GN3315@alberich>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Fri, 27 Sep 2013 12:47:45 +0200
+Subject: [PATCH] ARM: highbank: cpuidle: convert to platform driver
+Message-ID: <1380278865-27457-1-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 27, 2013 at 06:09:02AM -0400, Will Deacon wrote:
-> On Thu, Sep 26, 2013 at 11:36:20PM +0100, Andreas Herrmann wrote:
-> > And register the default handler for domains that are created during
-> > device isolation.
-> > 
-> > Signed-off-by: Andreas Herrmann <andreas.herrmann@calxeda.com>
-> > ---
-> >  drivers/iommu/arm-smmu.c |   10 ++++++++++
-> >  1 file changed, 10 insertions(+)
-> > 
-> > diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-> > index 48f3bfb..380c2a0 100644
-> > --- a/drivers/iommu/arm-smmu.c
-> > +++ b/drivers/iommu/arm-smmu.c
-> > @@ -1816,6 +1816,13 @@ static int arm_smmu_device_cfg_probe(struct arm_smmu_device *smmu)
-> >  	return 0;
-> >  }
-> >  
-> > +static int arm_smmu_context_fault_handler(struct iommu_domain *domain,
-> > +		struct device *dev, unsigned long iova, int flags, void *arg)
-> > +{
-> > +	dev_warn(dev, "context fault: iova=0x%08lx, flags=0x%x\n", iova, flags);
-> > +	return 0;
-> 
-> Maybe we're better off sandwiching this into arm_smmu_context_fault when
-> report_iommu_fault doesn't handle the fault.
+As the ux500 and the kirkwood driver, make the calxeda driver a platform driver
 
-... which would allow us to dump the entire cb fault syndrome register.
-(which has more info than what we get from above flags)
+[Compiled only]
 
-Fine with me.
+Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+---
+ arch/arm/mach-highbank/highbank.c |    8 ++++++++
+ drivers/cpuidle/cpuidle-calxeda.c |   18 ++++++++++++------
+ 2 files changed, 20 insertions(+), 6 deletions(-)
 
-
-
-Andreas
+diff --git a/arch/arm/mach-highbank/highbank.c b/arch/arm/mach-highbank/highbank.c
+index 8e63ccd..a78ed62 100644
+--- a/arch/arm/mach-highbank/highbank.c
++++ b/arch/arm/mach-highbank/highbank.c
+@@ -25,6 +25,7 @@
+ #include <linux/of_address.h>
+ #include <linux/amba/bus.h>
+ #include <linux/clk-provider.h>
++#include <linux/platform_device.h>
+ 
+ #include <asm/cacheflush.h>
+ #include <asm/cputype.h>
+@@ -153,6 +154,10 @@ static struct notifier_block highbank_platform_nb = {
+ 	.notifier_call = highbank_platform_notifier,
+ };
+ 
++static struct platform_device highbank_cpuidle_device = {
++	.name = "cpuidle-calxeda",
++};
++
+ static void __init highbank_init(void)
+ {
+ 	pm_power_off = highbank_power_off;
+@@ -162,6 +167,9 @@ static void __init highbank_init(void)
+ 	bus_register_notifier(&amba_bustype, &highbank_amba_nb);
+ 
+ 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
++
++	if (of_machine_is_compatible("calxeda,highbank"))
++		platform_device_register(&highbank_cpuidle_device);
+ }
+ 
+ static const char *highbank_match[] __initconst = {
+diff --git a/drivers/cpuidle/cpuidle-calxeda.c b/drivers/cpuidle/cpuidle-calxeda.c
+index 3460584..7b6105b 100644
+--- a/drivers/cpuidle/cpuidle-calxeda.c
++++ b/drivers/cpuidle/cpuidle-calxeda.c
+@@ -23,10 +23,10 @@
+ #include <linux/cpuidle.h>
+ #include <linux/init.h>
+ #include <linux/io.h>
+-#include <linux/of.h>
+ #include <linux/time.h>
+ #include <linux/delay.h>
+ #include <linux/suspend.h>
++#include <linux/platform_device.h>
+ #include <asm/cpuidle.h>
+ #include <asm/proc-fns.h>
+ #include <asm/smp_scu.h>
+@@ -88,11 +88,17 @@ static struct cpuidle_driver calxeda_idle_driver = {
+ 	.state_count = 2,
+ };
+ 
+-static int __init calxeda_cpuidle_init(void)
++static int __init calxeda_cpuidle_probe(struct platform_device *pdev)
+ {
+-	if (!of_machine_is_compatible("calxeda,highbank"))
+-		return -ENODEV;
+-
+ 	return cpuidle_register(&calxeda_idle_driver, NULL);
+ }
+-module_init(calxeda_cpuidle_init);
++
++static struct platform_driver calxeda_cpuidle_plat_driver = {
++        .driver = {
++                .name = "cpuidle-calxeda",
++                .owner = THIS_MODULE,
++        },
++        .probe = calxeda_cpuidle_probe,
++};
++
++module_platform_driver(calxeda_cpuidle_plat_driver);
+-- 
+1.7.9.5
