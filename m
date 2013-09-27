@@ -1,49 +1,45 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 27 Sep 2013 17:16:22 +0100
-Subject: [RFT PATCH v1 0/7] enable FPSIMD lazy save and restore for arm64
-In-Reply-To: <5245A22F.7020305@gmail.com>
-References: <1380269087-8520-1-git-send-email-liuj97@gmail.com>
- <20130927105045.GA11063@MacBook-Pro.local>
- <20130927112332.GD9520@mudshark.cambridge.arm.com>
- <5245A22F.7020305@gmail.com>
-Message-ID: <20130927161622.GH26069@arm.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Fri, 27 Sep 2013 18:32:42 +0200
+Subject: [PATCH] misc: (at24) move header to linux/platform_data/
+In-Reply-To: <1414767040.1054326.1380226152008.JavaMail.root@mail>
+References: <169123028.921974.1377290733515.JavaMail.root@mail>
+ <1414767040.1054326.1380226152008.JavaMail.root@mail>
+Message-ID: <20130927163242.GB3094@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 27, 2013 at 04:20:15PM +0100, Jiang Liu wrote:
-> 	The patchset actually includes three optimizations.
+On Thu, Sep 26, 2013 at 04:09:12PM -0400, Vivien Didelot wrote:
+> Hi Wolfram,
 > 
-> The first one uses PF_USED_MATH to track whether the thread has
-> accessed FPSIMD registers since it has been created. If the thread
-> hasn't accessed FPSIMD registers since it's birth, we don't need to
-> save and restore FPSIMD context on thread context switching.
-
-But for detecting whether a thread used the FP/SIMD registers, you need
-to disable the FP at context switch and trap the initial access. That's
-one of the main issues with lazy saving/restoring and sometimes it could
-be less efficient.
-
-> The second one uses a percpu variable to track the owner of the
-> FPSIMD hardware. When switching a thread, if it's the owner of
-> the FPSIMD hardware, we don't need to load FPSIMD registers again.
-> This is useful when context switching between user thread and
-> kernel(idle) threads.
-
-fpsimd_thread_switch() checks whether it switches to/from kernel thread.
-I think we could do a bit better and avoid restoring if returning to the
-same user thread but without the need for disabling the FP on thread
-switch. I'm happy to take this part if factored out of the lazy patches
-(for the rest I'd like to see benchmarks).
-
-> The third one disable access to FPSIMD registers when switching a
-> thread. When the thread tries to access FPSIMD registers the first
-> time since it has been switched in, an exception is raised and then
-> we will load FPSIMD context onto hardware.
+> > Wolfram wrote:
+> > 
+> > > > IMHO it makes sense. Why wouldn't we want all platform_data in
+> > > > include/linux/platform_data/?
+> > > 
+> > > For the same reason we don't want all driver source files in one
+> > > directory? It's a mess.
+> > 
+> > Well, that's different. Not all drivers expose platform data, but
+> > many subsystems have drivers with platform data. A common include
+> > directory for the *_platform_data structure definitions makes sense.
 > 
-> The overhead (penalty) of the first and second optimizations is
-> relatively small, so we could always enable them.
+> Also IMO having such header file in include/linux/i2c/ for a driver
+> declared in drivers/misc/eeprom/ is not very consistent.
+> So this is the purpose of this include directory. What do you think?
 
-How do you detect that a thread used fpsimd?
+Well, yes, I will apply it if you could rebase it onto v3.12-rc2. I am
+unsure about the platform_data dir in general, though. For example, I'd
+prefer to have the i2c-* files in the i2c-dir, but this is another
+question.
 
--- 
-Catalin
+Thanks,
+
+   Wolfram
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130927/13b6ef67/attachment.sig>
