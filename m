@@ -1,73 +1,46 @@
-From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
-Date: Fri, 27 Sep 2013 12:43:10 +0200
-Subject: imprecise external abort using the flexcan driver on i.MX6Q
-In-Reply-To: <52455A7D.6030403@pengutronix.de>
-References: <21060.15934.600859.167074@ipc1.ka-ro>
- <524455FD.7070808@pengutronix.de>
- <20130926155422.GQ12758@n2100.arm.linux.org.uk>
- <52445FBE.4060503@ti.com> <21061.20097.221946.197751@ipc1.ka-ro>
- <5245535F.6020804@pengutronix.de>
- <21061.22576.404020.384558@ipc1.ka-ro>
- <52455A7D.6030403@pengutronix.de>
-Message-ID: <21061.24894.57898.36640@ipc1.ka-ro>
+From: andreas.herrmann@calxeda.com (Andreas Herrmann)
+Date: Fri, 27 Sep 2013 12:45:57 +0200
+Subject: [PATCH 8/9] iommu/arm-smmu: Introduce a default fault handler
+In-Reply-To: <20130927100902.GD9057@mudshark.cambridge.arm.com>
+References: <1380234982-1677-1-git-send-email-andreas.herrmann@calxeda.com>
+ <1380234982-1677-9-git-send-email-andreas.herrmann@calxeda.com>
+ <20130927100902.GD9057@mudshark.cambridge.arm.com>
+Message-ID: <20130927104557.GN3315@alberich>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-Marc Kleine-Budde writes:
-> On 09/27/2013 12:04 PM, Lothar Wa?mann wrote:
-> 
-> >> They layout of the flexcan varies in the different imx chips. I'm
-> >> comparing the datasheets at the moment. As Russell pointed out the area
-> >> staring at offset 0x80 is by the reception FIFO engine.
-> >>
-> > The layout is correct when the Rx FIFO is disabled!
+On Fri, Sep 27, 2013 at 06:09:02AM -0400, Will Deacon wrote:
+> On Thu, Sep 26, 2013 at 11:36:20PM +0100, Andreas Herrmann wrote:
+> > And register the default handler for domains that are created during
+> > device isolation.
 > > 
-> > removing 'FLEXCAN_MCR_FEN' from the MCR setting makes the driver work
-> > as expected (just without receive fifo).
+> > Signed-off-by: Andreas Herrmann <andreas.herrmann@calxeda.com>
+> > ---
+> >  drivers/iommu/arm-smmu.c |   10 ++++++++++
+> >  1 file changed, 10 insertions(+)
 > > 
-> > For the use case with the FIFO enabled, the layout has to be changed
-> > obviously.
+> > diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+> > index 48f3bfb..380c2a0 100644
+> > --- a/drivers/iommu/arm-smmu.c
+> > +++ b/drivers/iommu/arm-smmu.c
+> > @@ -1816,6 +1816,13 @@ static int arm_smmu_device_cfg_probe(struct arm_smmu_device *smmu)
+> >  	return 0;
+> >  }
+> >  
+> > +static int arm_smmu_context_fault_handler(struct iommu_domain *domain,
+> > +		struct device *dev, unsigned long iova, int flags, void *arg)
+> > +{
+> > +	dev_warn(dev, "context fault: iova=0x%08lx, flags=0x%x\n", iova, flags);
+> > +	return 0;
 > 
-> Can you just remove the loop completely? I think it's not needed. It
-> was in the original driver, when I picked it up.
-> 
-> diff --git a/drivers/net/can/flexcan.c b/drivers/net/can/flexcan.c
-> index e1ac75d..57ee3df 100644
-> --- a/drivers/net/can/flexcan.c
-> +++ b/drivers/net/can/flexcan.c
-> @@ -778,17 +778,6 @@ static int flexcan_chip_start(struct net_device *dev)
->         netdev_dbg(dev, "%s: writing ctrl=0x%08x", __func__, reg_ctrl);
->         flexcan_write(reg_ctrl, &regs->ctrl);
-> 
-> -       for (i = 0; i < ARRAY_SIZE(regs->cantxfg); i++) {
-> -               flexcan_write(0, &regs->cantxfg[i].can_ctrl);
-> -               flexcan_write(0, &regs->cantxfg[i].can_id);
-> -               flexcan_write(0, &regs->cantxfg[i].data[0]);
-> -               flexcan_write(0, &regs->cantxfg[i].data[1]);
-> -
-> -               /* put MB into rx queue */
-> -               flexcan_write(FLEXCAN_MB_CNT_CODE(0x4),
-> -                       &regs->cantxfg[i].can_ctrl);
-> -       }
-> -
->         /* acceptance mask/acceptance code (accept everything) */
->         flexcan_write(0x0, &regs->rxgmask);
->         flexcan_write(0x0, &regs->rx14mask);
-> 
-OK, done that. Driver works perfectly well now on i.MX6Q. I'll retest
-on i.MX53 later to make sure it's still working there too.
+> Maybe we're better off sandwiching this into arm_smmu_context_fault when
+> report_iommu_fault doesn't handle the fault.
+
+... which would allow us to dump the entire cb fault syndrome register.
+(which has more info than what we get from above flags)
+
+Fine with me.
 
 
-Lothar Wa?mann
--- 
-___________________________________________________________
 
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+Andreas
