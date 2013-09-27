@@ -1,151 +1,80 @@
 From: liuj97@gmail.com (Jiang Liu)
-Date: Fri, 27 Sep 2013 16:04:46 +0800
-Subject: [RFT PATCH v1 6/7] amd64: avoid saving and restoring FPSIMD registers
- until threads access them
+Date: Fri, 27 Sep 2013 16:04:47 +0800
+Subject: [RFT PATCH v1 7/7] arm64: disable lazy load if FPSIMD registers are
+ frequently used
 In-Reply-To: <1380269087-8520-1-git-send-email-liuj97@gmail.com>
 References: <1380269087-8520-1-git-send-email-liuj97@gmail.com>
-Message-ID: <1380269087-8520-7-git-send-email-liuj97@gmail.com>
+Message-ID: <1380269087-8520-8-git-send-email-liuj97@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jiang Liu <jiang.liu@huawei.com>
 
-Use PF_USED_MATH flag to mark whether the thread has accessed any FPSIMD
-registers, so we could avoid saving and restroing FPSIMD registers until
-threads access them. This may improve performance when lazy FPSIMD restore
-is disabled.
+Disable lazy load if FPSIMD registers are frequently used by the thread,
+so we can reduce overhead of lazy FPSIMD restore for FPU extensive
+applications. The thresholds are randomly chosen without thorough
+benchmarks, we may need to tune it for really systems.
 
 Signed-off-by: Jiang Liu <jiang.liu@huawei.com>
 Cc: Jiang Liu <liuj97@gmail.com>
 ---
- arch/arm64/kernel/fpsimd.c | 38 +++++++++++++++++++++++---------------
- 1 file changed, 23 insertions(+), 15 deletions(-)
+ arch/arm64/include/asm/fpsimd.h | 1 +
+ arch/arm64/kernel/fpsimd.c      | 9 +++++++--
+ 2 files changed, 8 insertions(+), 2 deletions(-)
 
+diff --git a/arch/arm64/include/asm/fpsimd.h b/arch/arm64/include/asm/fpsimd.h
+index 3490935..de6e877 100644
+--- a/arch/arm64/include/asm/fpsimd.h
++++ b/arch/arm64/include/asm/fpsimd.h
+@@ -37,6 +37,7 @@ struct fpsimd_state {
+ 			u32 fpcr;
+ 			bool on_hw;	/* soft state: whether loaded onto hw */
+ 			int last_cpu;
++			int fpu_counter;
+ 		};
+ 	};
+ };
 diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-index 267e54a..a81af5f 100644
+index a81af5f..03e96b8 100644
 --- a/arch/arm64/kernel/fpsimd.c
 +++ b/arch/arm64/kernel/fpsimd.c
-@@ -99,7 +99,8 @@ void fpsimd_disable_lazy_restore(void)
-  * If lazy mode is enabled, caller needs to disable preemption
-  * when calling fpsimd_load_state_lazy() and fpsimd_save_state_lazy().
-  */
--static void fpsimd_load_state_lazy(struct fpsimd_state *state)
-+static void fpsimd_load_state_lazy(struct fpsimd_state *state,
-+				   struct task_struct *tsk)
- {
- 	/* Could we reuse the hardware context? */
- 	if (state->last_cpu == smp_processor_id() &&
-@@ -109,13 +110,19 @@ static void fpsimd_load_state_lazy(struct fpsimd_state *state)
- 	if (static_key_false(&fpsimd_lazy_mode)) {
+@@ -107,7 +107,7 @@ static void fpsimd_load_state_lazy(struct fpsimd_state *state,
+ 	    __this_cpu_read(fpsimd_owner) == state)
+ 		return;
+ 
+-	if (static_key_false(&fpsimd_lazy_mode)) {
++	if (state->fpu_counter < 5 && static_key_false(&fpsimd_lazy_mode)) {
  		fpsimd_clear_on_hw(state);
  		fpsimd_enable_trap();
--	} else {
-+	} else if (tsk_used_math(tsk)) {
-+		fpsimd_disable_trap();
- 		fpsimd_load_state(state);
-+	} else {
-+		fpsimd_enable_trap();
- 	}
- }
+ 	} else if (tsk_used_math(tsk)) {
+@@ -124,8 +124,11 @@ static void fpsimd_save_state_lazy(struct fpsimd_state *state)
+ 		return;
  
- static void fpsimd_save_state_lazy(struct fpsimd_state *state)
- {
-+	if (!used_math())
-+		return;
-+
  	if (static_key_false(&fpsimd_lazy_mode)) {
- 		if (!fpsimd_is_on_hw(state))
+-		if (!fpsimd_is_on_hw(state))
++		if (!fpsimd_is_on_hw(state)) {
++			state->fpu_counter = clamp(state->fpu_counter - 1,
++						   0, 10);
  			return;
-@@ -133,12 +140,14 @@ void do_fpsimd_acc(unsigned int esr, struct pt_regs *regs)
- {
- 	struct fpsimd_state *state = &current->thread.fpsimd_state;
- 
-+	fpsimd_disable_trap();
-+	fpsimd_load_state(state);
- 	if (static_key_false(&fpsimd_lazy_mode)) {
--		fpsimd_disable_trap();
--		fpsimd_load_state(state);
- 		fpsimd_set_on_hw(state);
-+		if (!used_math())
-+			set_used_math();
- 	} else {
--		WARN_ON(1);
-+		set_used_math();
++		}
  	}
- }
  
-@@ -175,7 +184,7 @@ void fpsimd_thread_switch(struct task_struct *next)
- 	if (current->mm)
- 		fpsimd_save_state_lazy(&current->thread.fpsimd_state);
- 	if (next->mm)
--		fpsimd_load_state_lazy(&next->thread.fpsimd_state);
-+		fpsimd_load_state_lazy(&next->thread.fpsimd_state, next);
- }
- 
- void fpsimd_flush_thread(void)
-@@ -187,8 +196,9 @@ void fpsimd_flush_thread(void)
- #if (AARCH64_FPCR_DEFAULT_VAL != 0)
- 	state->fpcr = AARCH64_FPCR_DEFAULT_VAL;
- #endif
-+	clear_used_math();
- 	fpsimd_set_last_cpu(state, -1);
--	fpsimd_load_state_lazy(state);
-+	fpsimd_load_state_lazy(state, current);
- 	preempt_enable();
- }
- 
-@@ -205,7 +215,7 @@ void fpsimd_dup_state(struct fpsimd_state *src, struct fpsimd_state *dst)
+ 	fpsimd_save_state(state);
+@@ -144,6 +147,7 @@ void do_fpsimd_acc(unsigned int esr, struct pt_regs *regs)
+ 	fpsimd_load_state(state);
+ 	if (static_key_false(&fpsimd_lazy_mode)) {
+ 		fpsimd_set_on_hw(state);
++		state->fpu_counter++;
+ 		if (!used_math())
+ 			set_used_math();
+ 	} else {
+@@ -213,6 +217,7 @@ void fpsimd_dup_state(struct fpsimd_state *src, struct fpsimd_state *dst)
+ 		preempt_disable();
+ 		if (fpsimd_is_on_hw(src))
  			fpsimd_save_state(dst);
++		dst->fpu_counter = 0;
  		fpsimd_clear_on_hw(dst);
  		preempt_enable();
--	} else {
-+	} else if (used_math()) {
- 		fpsimd_save_state(dst);
- 	}
- 	fpsimd_set_last_cpu(dst, -1);
-@@ -226,12 +236,12 @@ void fpsimd_prepare_sigctx(struct fpsimd_state *ctx)
- 		preempt_disable();
- 		if (fpsimd_is_on_hw(ctx)) {
- 			fpsimd_init_hw_state();
--		} else {
-+		} else if (used_math()) {
- 			ctx->fpsr = 0;
- 			ctx->fpcr = AARCH64_FPCR_DEFAULT_VAL;
- 		}
- 		preempt_enable();
--	} else {
-+	} else if (used_math()) {
- 		fpsimd_init_hw_state();
- 	}
- }
-@@ -243,7 +253,7 @@ void fpsimd_restore_sigctx(struct fpsimd_state *ctx)
- 	preempt_disable();
- 	*state = *ctx;
- 	__this_cpu_write(fpsimd_owner, NULL);
--	fpsimd_load_state_lazy(state);
-+	fpsimd_load_state_lazy(state, current);
- 	preempt_enable();
- }
- 
-@@ -261,9 +271,7 @@ void kernel_neon_begin(void)
- 	if (current->mm)
- 		fpsimd_save_state_lazy(&current->thread.fpsimd_state);
- 
--	if (static_key_false(&fpsimd_lazy_mode))
--		fpsimd_disable_trap();
--
-+	fpsimd_disable_trap();
- 	fpsimd_init_hw_state();
- 	__this_cpu_write(fpsimd_owner, NULL);
- }
-@@ -272,7 +280,7 @@ EXPORT_SYMBOL(kernel_neon_begin);
- void kernel_neon_end(void)
- {
- 	if (current->mm)
--		fpsimd_load_state_lazy(&current->thread.fpsimd_state);
-+		fpsimd_load_state_lazy(&current->thread.fpsimd_state, current);
- 
- 	preempt_enable();
- }
+ 	} else if (used_math()) {
 -- 
 1.8.1.2
