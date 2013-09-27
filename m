@@ -1,33 +1,68 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 27 Sep 2013 09:27:04 +0100
-Subject: [PATCH 00/51] DMA mask changes
-In-Reply-To: <CACna6rxkpYzdD8_Jfi22vA2suUa3k-JM65_gCySQpp4crVCoPg@mail.gmail.com>
-References: <20130919212235.GD12758@n2100.arm.linux.org.uk>
- <CACna6rxkpYzdD8_Jfi22vA2suUa3k-JM65_gCySQpp4crVCoPg@mail.gmail.com>
-Message-ID: <20130927082703.GZ25647@n2100.arm.linux.org.uk>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Fri, 27 Sep 2013 10:35:14 +0200
+Subject: [PATCH 1/2] ARM: zynq: cpuidle: Remove useless compatibility
+ string
+In-Reply-To: <31f13d14-2af7-4285-8770-3cc7ef7e7b09@AM1EHSMHS008.ehs.local>
+References: <1380269867-18336-1-git-send-email-daniel.lezcano@linaro.org>
+ <31f13d14-2af7-4285-8770-3cc7ef7e7b09@AM1EHSMHS008.ehs.local>
+Message-ID: <52454342.80706@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 26, 2013 at 10:23:08PM +0200, Rafa? Mi?ecki wrote:
-> 2013/9/19 Russell King - ARM Linux <linux@arm.linux.org.uk>:
-> > This email is only being sent to the mailing lists in question, not to
-> > anyone personally.  The list of individuals is far to great to do that.
-> > I'm hoping no mailing lists reject the patches based on the number of
-> > recipients.
-> 
-> Huh, I think it was enough to send only 3 patches to the b43-dev at . Like:
-> [PATCH 01/51] DMA-API: provide a helper to set both DMA and coherent DMA masks
-> [PATCH 14/51] DMA-API: net: b43: (...)
-> [PATCH 15/51] DMA-API: net: b43legacy: (...)
-> ;)
-> 
-> I believe Joe has some nice script for doing it that way. When fixing
-> some coding style / formatting, he sends only related patches to the
-> given ML.
+On 09/27/2013 10:19 AM, Michal Simek wrote:
+> On 09/27/2013 10:17 AM, Daniel Lezcano wrote:
+>> All zynq platforms have this compatibility string and there is no any other
+>> clone.
+>>
+>> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 
-If I did that, then the mailing lists would not get the first patch,
-because almost none of the lists would be referred to by patch 1.
+The patchset is only compile-tested (I don't have the hardware).
 
-Moreover, people complain when they don't have access to the full
-patch series - they assume patches are missing for some reason, and
-they ask for the rest of the series.
+Michal or someone else, if you have the time can you give it a try ?
+
+Thanks in advance
+
+   -- Daniel
+
+>> ---
+>>   drivers/cpuidle/cpuidle-zynq.c |    4 ----
+>>   1 file changed, 4 deletions(-)
+>>
+>> diff --git a/drivers/cpuidle/cpuidle-zynq.c b/drivers/cpuidle/cpuidle-zynq.c
+>> index 38e03a1..ab6c4b4 100644
+>> --- a/drivers/cpuidle/cpuidle-zynq.c
+>> +++ b/drivers/cpuidle/cpuidle-zynq.c
+>> @@ -28,7 +28,6 @@
+>>   #include <linux/init.h>
+>>   #include <linux/cpu_pm.h>
+>>   #include <linux/cpuidle.h>
+>> -#include <linux/of.h>
+>>   #include <asm/proc-fns.h>
+>>   #include <asm/cpuidle.h>
+>>
+>> @@ -72,9 +71,6 @@ static struct cpuidle_driver zynq_idle_driver = {
+>>   /* Initialize CPU idle by registering the idle states */
+>>   static int __init zynq_cpuidle_init(void)
+>>   {
+>> -	if (!of_machine_is_compatible("xlnx,zynq-7000"))
+>> -		return -ENODEV;
+>> -
+>>   	pr_info("Xilinx Zynq CpuIdle Driver started\n");
+>>
+>>   	return cpuidle_register(&zynq_idle_driver, NULL);
+>>
+>
+> Acked-by: Michal Simek <michal.simek@xilinx.com>
+>
+> Thx,
+> M
+>
+>
+
+
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
