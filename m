@@ -1,54 +1,112 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Fri, 27 Sep 2013 17:09:56 +0100
-Subject: [PATCH v6 08/19] arm/xen: get_dma_ops: return xen_dma_ops if we are
- running on Xen
-In-Reply-To: <alpine.DEB.2.02.1309271653420.5498@kaball.uk.xensource.com>
-References: <alpine.DEB.2.02.1309271653420.5498@kaball.uk.xensource.com>
-Message-ID: <1380298207-29151-8-git-send-email-stefano.stabellini@eu.citrix.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Fri, 27 Sep 2013 12:12:25 -0400 (EDT)
+Subject: [PATCH v2] arm: vexpress: tc2: fix hotplug/idle/kexec race on
+ cluster power down
+In-Reply-To: <1380297282-13021-1-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1380297282-13021-1-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <alpine.LFD.2.03.1309271209450.312@syhkavp.arg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-Suggested-by: Catalin Marinas <catalin.marinas@arm.com>
-CC: will.deacon at arm.com
-CC: linux at arm.linux.org.uk
----
- arch/arm/include/asm/dma-mapping.h |   13 ++++++++++++-
- 1 files changed, 12 insertions(+), 1 deletions(-)
+On Fri, 27 Sep 2013, Lorenzo Pieralisi wrote:
 
-diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
-index 8807124..b638d6d 100644
---- a/arch/arm/include/asm/dma-mapping.h
-+++ b/arch/arm/include/asm/dma-mapping.h
-@@ -12,17 +12,28 @@
- #include <asm/memory.h>
- #include <asm/cacheflush.h>
- 
-+#include <xen/xen.h>
-+#include <asm/xen/hypervisor.h>
-+
- #define DMA_ERROR_CODE	(~0)
- extern struct dma_map_ops arm_dma_ops;
- extern struct dma_map_ops arm_coherent_dma_ops;
- 
--static inline struct dma_map_ops *get_dma_ops(struct device *dev)
-+static inline struct dma_map_ops *__get_dma_ops(struct device *dev)
- {
- 	if (dev && dev->archdata.dma_ops)
- 		return dev->archdata.dma_ops;
- 	return &arm_dma_ops;
- }
- 
-+static inline struct dma_map_ops *get_dma_ops(struct device *dev)
-+{
-+	if (xen_domain())
-+		return xen_dma_ops;
-+	else
-+		return __get_dma_ops(dev);
-+}
-+
- static inline void set_dma_ops(struct device *dev, struct dma_map_ops *ops)
- {
- 	BUG_ON(!dev);
--- 
-1.7.2.5
+> On the TC2 testchip, when all CPUs in a cluster enter standbywfi
+> and commit a power down request, the power controller will wait
+> for standbywfil2 coming from L2 cache controller to shut the
+> cluster down.
+> By the time all CPUs in a cluster commit a power down request
+> and enter wfi, the power controller cannot backtrack, or put it
+> another way, a CPU must not be allowed to complete execution
+> independently of the power controller, the only way for it to
+> resume properly must be upon wake-up IRQ pending and subsequent
+> reset triggered from the power controller.
+> 
+> Current MCPM back-end for TC2 disables the GIC CPU IF only when
+> power down is committed through the tc2_pm_suspend() method, that
+> makes sense since a suspended CPU is still online and can receive
+> interrupts whereas a hotplugged CPU, since it is offline,
+> migrated all IRQs and shutdown the per-CPU peripherals, hence
+> their PPIs.
+> 
+> The flaw with this reasoning is the following. If all CPUs in
+> a clusters are entering a power down state either through CPU
+> idle or CPU hotplug, when the last man successfully completes
+> the MCPM power down sequence (and executes wfi), power controller
+> waits for L2 wfi signal to quiesce the cluster and shut it down.
+> If, when all CPUs are sitting in wfi, an online CPU hotplugs back
+> in one of the CPUs in the cluster being shutdown, that CPU
+> receives an IPI that causes wfi to complete (since tc2_pm_down()
+> method does not disable the GIC CPU IF in that case - CPU being
+> hotplugged out, not idle) and the power controller will never see
+> the stanbywfil2 signal coming from L2 that is required for
+> shutdown to happen and the system deadlocks.
+> 
+> Further to this issue, kexec hotplugs secondary CPUs out during
+> kernel reload/restart.
+> Because kexec may (deliberately) trash the old kernel text, it is
+> not OK for CPUs to follow the MCPM soft reboot path, since
+> instructions after the WFI may have been replaced by kexec.
+> 
+> If tc2_pm_down() does not disable the GIC cpu interface, there is a
+> race between CPU powerdown in the old kernel and the IPI from the
+> new kernel that triggers secondary boot, particularly if the
+> powerdown is slow (due to L2 cache cleaning for example).  If the
+> new kernel wins the race, the affected CPU(s) will not really be
+> reset and may execute garbage after the WFI.
+> 
+> The only solution to this problem consists in disabling the GIC
+> CPU IF on a CPU committed to power down regardless of the power
+> down entry method (CPU hotplug or CPU idle). This way, CPU wake-up
+> is under power controller control, which prevents unexpected wfi
+> exit caused by a pending IRQ.
+> 
+> This patch moves the GIC CPU IF disable call in the TC2 MCPM
+> implementation from the tc2_pm_suspend() method to the
+> tc2_pm_down() method to fix the mentioned race condition(s).
+> 
+> Reviewed-by: Dave Martin <Dave.Martin@arm.com>
+> Tested-by: Dave Martin <Dave.Martin@arm.com> (for kexec)
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Signed-off-by: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
+
+Acked-by: Nicolas Pitre <nico@linaro.org>
+
+ARM-SOC dudes: would you please pick this up?
+
+> ---
+>  arch/arm/mach-vexpress/tc2_pm.c | 11 ++++++++++-
+>  1 file changed, 10 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/mach-vexpress/tc2_pm.c b/arch/arm/mach-vexpress/tc2_pm.c
+> index 7aeb5d6..e6eb481 100644
+> --- a/arch/arm/mach-vexpress/tc2_pm.c
+> +++ b/arch/arm/mach-vexpress/tc2_pm.c
+> @@ -131,6 +131,16 @@ static void tc2_pm_down(u64 residency)
+>  	} else
+>  		BUG();
+>  
+> +	/*
+> +	 * If the CPU is committed to power down, make sure
+> +	 * the power controller will be in charge of waking it
+> +	 * up upon IRQ, ie IRQ lines are cut from GIC CPU IF
+> +	 * to the CPU by disabling the GIC CPU IF to prevent wfi
+> +	 * from completing execution behind power controller back
+> +	 */
+> +	if (!skip_wfi)
+> +		gic_cpu_if_down();
+> +
+>  	if (last_man && __mcpm_outbound_enter_critical(cpu, cluster)) {
+>  		arch_spin_unlock(&tc2_pm_lock);
+>  
+> @@ -231,7 +241,6 @@ static void tc2_pm_suspend(u64 residency)
+>  	cpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
+>  	cluster = MPIDR_AFFINITY_LEVEL(mpidr, 1);
+>  	ve_spc_set_resume_addr(cluster, cpu, virt_to_phys(mcpm_entry_point));
+> -	gic_cpu_if_down();
+>  	tc2_pm_down(residency);
+>  }
+>  
+> -- 
+> 1.8.2.2
+> 
+> 
