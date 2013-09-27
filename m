@@ -1,58 +1,79 @@
-From: andreas.herrmann@calxeda.com (Andreas Herrmann)
-Date: Fri, 27 Sep 2013 11:24:25 +0200
-Subject: [PATCH 1/9] iommu/arm-smmu: Switch to arch_initcall for driver
- registration
-In-Reply-To: <20130927085811.GD8319@mudshark.cambridge.arm.com>
-References: <1380234982-1677-1-git-send-email-andreas.herrmann@calxeda.com>
- <1380234982-1677-2-git-send-email-andreas.herrmann@calxeda.com>
- <20130927085811.GD8319@mudshark.cambridge.arm.com>
-Message-ID: <20130927092425.GG3315@alberich>
+From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
+Date: Fri, 27 Sep 2013 11:23:13 +0200
+Subject: imprecise external abort using the flexcan driver on i.MX6Q
+In-Reply-To: <52445FBE.4060503@ti.com>
+References: <21060.15934.600859.167074@ipc1.ka-ro>
+ <524455FD.7070808@pengutronix.de>
+ <20130926155422.GQ12758@n2100.arm.linux.org.uk>
+ <52445FBE.4060503@ti.com>
+Message-ID: <21061.20097.221946.197751@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 27, 2013 at 04:58:12AM -0400, Will Deacon wrote:
-> On Thu, Sep 26, 2013 at 11:36:13PM +0100, Andreas Herrmann wrote:
-> > This should ensure that arm-smmu is initialized before other drivers
-> > start handling devices that propably need smmu support.
+Hi,
+
+Santosh Shilimkar writes:
+> On Thursday 26 September 2013 11:54 AM, Russell King - ARM Linux wrote:
+> > On Thu, Sep 26, 2013 at 05:42:53PM +0200, Marc Kleine-Budde wrote:
+> >> On 09/26/2013 04:01 PM, Lothar Wa?mann wrote:
+> >>> Hi,
+> >>>
+> >>> when enabling the can interface with 'ifconfig can0 up' (after
+> >>> configuring the bitrate with canconfig) on an i.MX6Q board (TX6) I'm
+> >>> getting the following kernel dump:
+> >>>
+> >>> |flexcan 2094000.flexcan can0: writing ctrl=0x0a212003
+> >>> |flexcan 2094000.flexcan can0: flexcan_set_bittiming: mcr=0x5980000f ctrl=0x0a212003
+> >>> |flexcan 2094000.flexcan can0: flexcan_chip_start: writing mcr=0x79a2020f
+> >>> |flexcan 2094000.flexcan can0: flexcan_chip_start: writing ctrl=0x0a21ac53
+> >>> |Unhandled fault: imprecise external abort (0x1c06) at 0x00057adc
+> >>
+> >> Looks like a NULL pointer deref to me. But it doesn't make any sense,
+> >> because the offset is way beyond the length of the struct flexcan_regs.
 > > 
-> > Also remove module_exit function as we most likely never want to
-> > unload this driver.
-> 
-> Doesn't hurt to leave the exit function there though, right?
-
-Yes.
-
-> > Signed-off-by: Andreas Herrmann <andreas.herrmann@calxeda.com>
-> > ---
-> >  drivers/iommu/arm-smmu.c |    8 +-------
-> >  1 file changed, 1 insertion(+), 7 deletions(-)
+> > NULL pointer derefs don't produce imprecise external aborts.  I believe
+> > that the FAR is unpredictable for such aborts as well, which means the
+> > "at xxxx" should be ignored.
 > > 
-> > diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-> > index 181c9ba..6808577 100644
-> > --- a/drivers/iommu/arm-smmu.c
-> > +++ b/drivers/iommu/arm-smmu.c
-> > @@ -1976,13 +1976,7 @@ static int __init arm_smmu_init(void)
-> >  	return 0;
-> >  }
-> >  
-> > -static void __exit arm_smmu_exit(void)
-> > -{
-> > -	return platform_driver_unregister(&arm_smmu_driver);
-> > -}
-> > -
-> > -module_init(arm_smmu_init);
-> > -module_exit(arm_smmu_exit);
-> > +arch_initcall(arm_smmu_init);
+> yep .. FAR is never reliable for imprecise external aborts.
 > 
-> Why not subsys_initcall, like the other ARM IOMMUs?
+> > Bearing in mind that it is imprecise, that means that the abort happened
+> > sometime in the past, so the PC isn't reliable either.
+> > 
+> > The code here is:
+> > 
+> >    0:	f57ff04e 	dsb	st
+> >    4:	e3a01000 	mov	r1, #0
+> >    8:	e5820000 	str	r0, [r2]
+> >    c:	f57ff04e 	dsb	st
+> >   10:	e5820004 	str	r0, [r2, #4]
+> > 
+> > Given the dsbs there, it's probably the str r0, [r2] which provoked it,
+> > and we can see from the register dump, r2 is not NULL.
+> > 
+> > It's probably complaining that a clock necessary for the peripherals
+> > registers to be accessible is not running.
+> > 
+> Not sure if it helps but almost 90% of the imprecise external aborts
+> cases I have seen on OMAP attributed to clock not being available
+> at the IP register accesses race conditions either at SW or
+> hardware(clock settling time). And rest of the 10 % majority falling
+> into interconnect synchronization issues.
+> 
+I already checked this by enabling all clocks with devmem.
+If a clock would be missing I would expect all register wriites to
+fail not the register write to the _second_ mailbox (after the first
+mailbox has been successfully initialized).
 
-No specific reason. I just tried to load the driver at the earliest
-point during boot.
 
-I just retested successful with subsys_initcall. The initialization
-sequence looks fine (and yes, arch_initcall is overkill).
+Lothar Wa?mann
+-- 
+___________________________________________________________
 
-Will adapt this.
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
 
-
-Andreas
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
