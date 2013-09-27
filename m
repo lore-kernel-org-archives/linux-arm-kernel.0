@@ -1,18 +1,42 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 27 Sep 2013 22:55:23 +0100
-Subject: [PATCH v2] ARM: new platform for Energy Micro's EFM32
- Cortex-M3 SoCs
-In-Reply-To: <201309272344.01386.arnd@arndb.de>
-References: <1379447884-14025-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <201309172245.25367.arnd@arndb.de> <20130926094251.GK16106@pengutronix.de>
- <201309272344.01386.arnd@arndb.de>
-Message-ID: <20130927215523.GO12758@n2100.arm.linux.org.uk>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Fri, 27 Sep 2013 19:42:35 -0400
+Subject: [PATCH 3/4] spi: davinci: Allow SPI to be build without EDMA support
+In-Reply-To: <1380325356-2100-1-git-send-email-santosh.shilimkar@ti.com>
+References: <1380325356-2100-1-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1380325356-2100-4-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 27, 2013 at 11:44:01PM +0200, Arnd Bergmann wrote:
-> * Do you need any other patches (unrelated to EFM32) to run NOMMU on a
-> recent kernel? When I last tried, I could not get any NOMMU build to work
-> at all.
+DaVinci SPI IP works without EDMA support and thats how it has
+been used on Keystone SOCs currently. Hence keep the EDMA select
+limited to ARCH_DAVINCI so that Keystone SOCs can use the driver.
 
-My Oki platform builds fine.  The core noMMU stuff seems fine.
+Keystone SOC do support EDMA IP as well but the support has
+not been added and tested so far.
+
+Cc: Mark Brown <broonie@kernel.org>
+Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+---
+Mark,
+If you are ok with this trivial change, I will need your ack to carry the patch
+via arm-soc tree. Without this patch, enabling SPI throws unmet dependency
+warnings and last patch in the series enables the SPI support.
+
+ drivers/spi/Kconfig |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/spi/Kconfig b/drivers/spi/Kconfig
+index b9c53cc..514d883 100644
+--- a/drivers/spi/Kconfig
++++ b/drivers/spi/Kconfig
+@@ -159,7 +159,7 @@ config SPI_DAVINCI
+ 	tristate "Texas Instruments DaVinci/DA8x/OMAP-L/AM1x SoC SPI controller"
+ 	depends on ARCH_DAVINCI || ARCH_KEYSTONE
+ 	select SPI_BITBANG
+-	select TI_EDMA
++	select TI_EDMA if ARCH_DAVINCI
+ 	help
+ 	  SPI master controller for DaVinci/DA8x/OMAP-L/AM1x SPI modules.
+ 
+-- 
+1.7.9.5
