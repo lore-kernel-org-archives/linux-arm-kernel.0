@@ -1,62 +1,49 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Fri, 27 Sep 2013 13:37:32 +0800
-Subject: [PATCH 1/2] ARM: mmp: delete the custom GPIO header
-In-Reply-To: <1380183060-27366-1-git-send-email-linus.walleij@linaro.org>
-References: <1380183060-27366-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <CAN1soZzNNPckXZVEE_iz8XYUOtmuLd39zebgGN2GTv+iZZWFBw@mail.gmail.com>
+From: mingo@kernel.org (Ingo Molnar)
+Date: Fri, 27 Sep 2013 07:49:58 +0200
+Subject: [GIT PULL 3.12-rc2 fixes] clocksource: Several fixes for 3.12-rc2
+In-Reply-To: <524381D2.7050604@linaro.org>
+References: <524381D2.7050604@linaro.org>
+Message-ID: <20130927054957.GC6597@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 26, 2013 at 4:11 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> The MMP sub-architecture appears to have a custom <mach/gpio.h>
-> for no reason whatsoever. The file became completely empty
-> after Haojian removed the remaining content in
-> commit 157d2644cb0c1e71a18baaffca56d2b1d0ebf10f
-> "ARM: pxa: change gpio to platform device".
->
-> Cc: Haojian Zhuang <haojian.zhuang@marvell.com>
-> Cc: Eric Miao <eric.y.miao@gmail.com>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
-> Haojian, I'm seeking an ACK for this patch so I can take it
-> through the GPIO tree.
-> ---
->  arch/arm/Kconfig                      | 1 -
->  arch/arm/mach-mmp/include/mach/gpio.h | 8 --------
->  2 files changed, 9 deletions(-)
->  delete mode 100644 arch/arm/mach-mmp/include/mach/gpio.h
->
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 3f7714d..3950a12 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -559,7 +559,6 @@ config ARCH_MMP
->         select GPIO_PXA
->         select IRQ_DOMAIN
->         select MULTI_IRQ_HANDLER
-> -       select NEED_MACH_GPIO_H
->         select PINCTRL
->         select PLAT_PXA
->         select SPARSE_IRQ
-> diff --git a/arch/arm/mach-mmp/include/mach/gpio.h b/arch/arm/mach-mmp/include/mach/gpio.h
-> deleted file mode 100644
-> index 13219eb..0000000
-> --- a/arch/arm/mach-mmp/include/mach/gpio.h
-> +++ /dev/null
-> @@ -1,8 +0,0 @@
-> -#ifndef __ASM_MACH_GPIO_H
-> -#define __ASM_MACH_GPIO_H
-> -
-> -#include <asm-generic/gpio.h>
-> -
-> -#include <mach/cputype.h>
-> -
-> -#endif /* __ASM_MACH_GPIO_H */
-> --
-> 1.8.3.1
->
 
-Acked on all patches.
+* Daniel Lezcano <daniel.lezcano@linaro.org> wrote:
 
-Regards
-Haojian
+> Hi Thomas,
+> 
+> this pull request contains several fixes for the clocksource/clockevent
+> drivers:
+> 
+>  - Jean Pihet fixed a missing Kconfig option preventing the Armada370/XP
+> to boot up.
+> 
+>  - Magnus Damm fixed the cpumask on the em_sti driver to have the
+> broadcast timer working on a SMP system
+> 
+>  - Sebastian Hesselbarth skipped the initialization of a timer for
+> uninitialized DT nodes
+> 
+>  - Tomasz Figa fixed the irq affinity failing on non online cpus
+> 
+> Thanks
+>   -- Daniel
+> 
+> -----------------------------------------------------------------------------
+> 
+> The following changes since commit 4a10c2ac2f368583138b774ca41fac4207911983:
+> 
+>   Linux 3.12-rc2 (2013-09-23 15:41:09 -0700)
+> 
+> are available in the git repository at:
+> 
+> 
+> ssh://daniel.lezcano at git.linaro.org//srv/git.linaro.org/git/people/dlezcano/linux.git
+> clockevents/3.12-rc2-fixes
+
+If you want me to pull this you'll need to send along your SSH password as 
+well!
+
+Thanks,
+
+	Ingo
