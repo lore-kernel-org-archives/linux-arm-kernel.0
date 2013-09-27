@@ -1,106 +1,111 @@
 From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Fri, 27 Sep 2013 17:09:49 +0100
-Subject: [PATCH v6 01/19] arm: make SWIOTLB available
+Date: Fri, 27 Sep 2013 17:09:51 +0100
+Subject: [PATCH v6 03/19] xen: introduce XENMEM_exchange_and_pin and
+ XENMEM_unpin
 In-Reply-To: <alpine.DEB.2.02.1309271653420.5498@kaball.uk.xensource.com>
 References: <alpine.DEB.2.02.1309271653420.5498@kaball.uk.xensource.com>
-Message-ID: <1380298207-29151-1-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <1380298207-29151-3-git-send-email-stefano.stabellini@eu.citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-IOMMU_HELPER is needed because SWIOTLB calls iommu_is_span_boundary,
-provided by lib/iommu_helper.c.
+XENMEM_exchange can't be used by autotranslate guests because of two
+severe limitations:
+
+- it does not copy back the mfns into the out field for autotranslate
+  guests;
+
+- it does not guarantee that the hypervisor won't change the p2m
+  mappings for the exchanged pages while the guest is using them. Xen
+  never promises to keep the p2m mapping stable for autotranslate guests
+  in general.  In practice it won't happen unless one uses uncommon
+  features like memory sharing or paging.
+
+To overcome these problems I am introducing two new hypercalls.
 
 Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-Reviewed-by: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
-CC: will.deacon at arm.com
-CC: linux at arm.linux.org.uk
 
 
 Changes in v6:
-- check for dev->dma_mask being NULL in dma_capable.
+- update the comments and the hypercalls structures.
 
 Changes in v5:
-- implement dma_mark_clean using dmac_flush_range.
+- better comment for XENMEM_exchange_and_pin return codes;
 
-Changes in v3:
-- dma_capable: do not treat dma_mask as a limit;
-- remove SWIOTLB dependency on NEED_SG_DMA_LENGTH.
+Changes in v4:
+- rename XENMEM_get_dma_buf to XENMEM_exchange_and_pin;
+- rename XENMEM_put_dma_buf to XENMEM_unpin;
+- improve the documentation of the new hypercalls;
+- add a note about out.address_bits for XENMEM_exchange.
 ---
- arch/arm/Kconfig                   |    6 +++++
- arch/arm/include/asm/dma-mapping.h |   37 ++++++++++++++++++++++++++++++++++++
- 2 files changed, 43 insertions(+), 0 deletions(-)
+ include/xen/interface/memory.h |   51 ++++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 51 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index ba412e0..c0bfb33 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1832,6 +1832,12 @@ config CC_STACKPROTECTOR
- 	  neutralized via a kernel panic.
- 	  This feature requires gcc version 4.2 or above.
+diff --git a/include/xen/interface/memory.h b/include/xen/interface/memory.h
+index 2ecfe4f..49db252 100644
+--- a/include/xen/interface/memory.h
++++ b/include/xen/interface/memory.h
+@@ -66,6 +66,9 @@ struct xen_memory_exchange {
+     /*
+      * [IN] Details of memory extents to be exchanged (GMFN bases).
+      * Note that @in.address_bits is ignored and unused.
++     * @out.address_bits contains the maximum number of bits addressable
++     * by the caller. The addresses of the newly allocated pages have to
++     * meet this restriction.
+      */
+     struct xen_memory_reservation in;
  
-+config SWIOTLB
-+	def_bool y
-+
-+config IOMMU_HELPER
-+	def_bool SWIOTLB
-+
- config XEN_DOM0
- 	def_bool y
- 	depends on XEN
-diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
-index 5b579b9..8807124 100644
---- a/arch/arm/include/asm/dma-mapping.h
-+++ b/arch/arm/include/asm/dma-mapping.h
-@@ -10,6 +10,7 @@
+@@ -263,4 +266,52 @@ struct xen_remove_from_physmap {
+ };
+ DEFINE_GUEST_HANDLE_STRUCT(xen_remove_from_physmap);
  
- #include <asm-generic/dma-coherent.h>
- #include <asm/memory.h>
-+#include <asm/cacheflush.h>
- 
- #define DMA_ERROR_CODE	(~0)
- extern struct dma_map_ops arm_dma_ops;
-@@ -86,6 +87,42 @@ static inline dma_addr_t virt_to_dma(struct device *dev, void *addr)
- }
- #endif
- 
-+static inline dma_addr_t phys_to_dma(struct device *dev, phys_addr_t paddr)
-+{
-+	unsigned int offset = paddr & ~PAGE_MASK;
-+	return pfn_to_dma(dev, paddr >> PAGE_SHIFT) + offset;
-+}
++/*
++ * This hypercall is similar to XENMEM_exchange: it takes the same
++ * struct as an argument and it exchanges the pages passed in with a new
++ * set of pages. The new pages are going to be "pinned": it's guaranteed
++ * that their p2m mapping won't be changed until explicitly "unpinned".
++ * Only normal guest r/w memory can be pinned: no granted pages or
++ * ballooned pages.
++ * If return code is zero then @out.extent_list provides the frame
++ * numbers of the newly-allocated memory.
++ * On X86 the frame numbers are machine frame numbers (mfns).
++ * On ARMv7 and ARMv8 the frame numbers are machine frame numbers (mfns).
++ * Returns zero on complete success, otherwise a negative error code.
++ * The most common error codes are:
++ *   -ENOSYS if not implemented
++ *   -EPERM  if the domain is not privileged for this operation
++ *   -EBUSY  if the page is already pinned
++ *   -EFAULT if an internal error occurs
++ * On complete success then always @nr_exchanged == @in.nr_extents.  On
++ * partial success @nr_exchanged indicates how much work was done and a
++ * negative error code is returned.
++ */
++#define XENMEM_exchange_and_pin             26
 +
-+static inline phys_addr_t dma_to_phys(struct device *dev, dma_addr_t dev_addr)
-+{
-+	unsigned int offset = dev_addr & ~PAGE_MASK;
-+	return (dma_to_pfn(dev, dev_addr) << PAGE_SHIFT) + offset;
-+}
++/*
++ * XENMEM_unpin unpins a set of pages, previously pinned by
++ * XENMEM_exchange_and_pin. After this call the p2m mapping of the pages can
++ * be transparently changed by the hypervisor, as usual. The pages are
++ * still accessible from the guest.
++ */
++#define XENMEM_unpin             27
++struct xen_unpin {
++    /*
++     * [IN] Details of memory extents to be unpinned (GMFN bases).
++     * Note that @in.address_bits is ignored and unused.
++     */
++    struct xen_memory_reservation in;
++    /*
++     * [OUT] Number of input extents that were successfully unpinned.
++     *  1. The first @nr_unpinned input extents were successfully
++     *     unpinned.
++     *  2. All other input extents are untouched.
++     *  3. If not all input extents are unpinned then the return code of this
++     *     command will be non-zero.
++     */
++    xen_ulong_t nr_unpinned;
++};
++DEFINE_GUEST_HANDLE_STRUCT(xen_unpin);
 +
-+static inline bool dma_capable(struct device *dev, dma_addr_t addr, size_t size)
-+{
-+	u64 limit, mask;
-+	
-+	if (!dev->dma_mask)
-+		return 0;
-+
-+	mask = *dev->dma_mask;
-+
-+	limit = (mask + 1) & ~mask;
-+	if (limit && size > limit)
-+		return 0;
-+
-+	if ((addr | (addr + size - 1)) & ~mask)
-+		return 0;
-+
-+	return 1;
-+}
-+
-+static inline void dma_mark_clean(void *addr, size_t size)
-+{
-+	dmac_flush_range(addr, addr + size);
-+}
-+
- /*
-  * DMA errors are defined by all-bits-set in the DMA address.
-  */
+ #endif /* __XEN_PUBLIC_MEMORY_H__ */
 -- 
 1.7.2.5
