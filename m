@@ -1,81 +1,82 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Fri, 27 Sep 2013 08:10:32 -0700
-Subject: [PATCH V5 5/9] USB: OHCI: make ohci-at91 a separate driver
-In-Reply-To: <1379761727-10656-6-git-send-email-manjunath.goudar@linaro.org>
- (Manjunath Goudar's message of "Sat, 21 Sep 2013 16:38:42 +0530")
-References: <1370585013-12809-1-git-send-email-manjunath.goudar@linaro.org>
- <1379761727-10656-1-git-send-email-manjunath.goudar@linaro.org>
- <1379761727-10656-6-git-send-email-manjunath.goudar@linaro.org>
-Message-ID: <877ge2l2qf.fsf@linaro.org>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Fri, 27 Sep 2013 16:10:49 +0100
+Subject: [PATCH] arm: vexpress: tc2: fix CPU hotplug and CPU idle race on
+ cluster power down
+In-Reply-To: <1380292153-10480-1-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1380292153-10480-1-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <20130927151043.GA9746@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Manjunath,
-
-Manjunath Goudar <manjunath.goudar@linaro.org> writes:
-
-> Separate the  TI OHCI Atmel host controller driver from ohci-hcd
-> host code so that it can be built as a separate driver module.
-> This work is part of enabling multi-platform kernels on ARM.
-
-This broke booting on atmel sama5 boards (and likely others with the
-same conversion)...
+On Fri, Sep 27, 2013 at 03:29:13PM +0100, Lorenzo Pieralisi wrote:
+> On the TC2 testchip, when all CPUs in a cluster enter standbywfi and
+> commit a power down request, the power controller will wait for
 
 [...]
 
-> +static int __init ohci_at91_init(void)
-> +{
-> +	if (usb_disabled())
-> +		return -ENODEV;
+(Minor nit: please wrap the commit message to a shorter length for git
+log.  I use 67, but I can't remember where that recommendation came from)
+
+[...]
+
+> This patch moves the GIC CPU IF disable call in the TC2 MCPM implementation
+> from the suspend method to the power down method to fix the mentioned
+> race condition.
+
+Reviewed-by: Dave Martin <Dave.Martin@arm.com>
+Tested-by: Dave Martn <Dave.Martin@arm.com> (for kexec)
+
+It's worth briefly summarising the kexec scenario too:
+
+kexec hotplugs secondary CPUs out during kernel reload/restart.
+Because kexec may (deliberately) trash the old kernel text, it is
+not OK for CPUs to follow the MCPM soft reboot path, since
+instructions after the WFI may have been replaced by kexec.
+
+If tc2_pm_down() does not disable the GIC cpu interface, there is a
+race between CPU powerdown in the old kernel and the IPI from the
+new kernel that triggers secondary boot, particluarly if the
+powerdown is slow (due to L2 cache cleaning for example).  If the
+new kernel wins the race, the affected CPU(s) will not really be
+reset and may execute garbage after the WFI.
+
+(some comments below)
+
+> 
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Signed-off-by: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
+> ---
+>  arch/arm/mach-vexpress/tc2_pm.c | 11 ++++++++++-
+>  1 file changed, 10 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/mach-vexpress/tc2_pm.c b/arch/arm/mach-vexpress/tc2_pm.c
+> index 7aeb5d6..e6eb481 100644
+> --- a/arch/arm/mach-vexpress/tc2_pm.c
+> +++ b/arch/arm/mach-vexpress/tc2_pm.c
+> @@ -131,6 +131,16 @@ static void tc2_pm_down(u64 residency)
+>  	} else
+>  		BUG();
+>  
+> +	/*
+> +	 * If the CPU is committed to power down, make sure
+> +	 * the power controller will be in charge of waking it
+> +	 * up upon IRQ, ie IRQ lines are cut from GIC CPU IF
+> +	 * to the CPU by disabling the GIC CPU IF to prevent wfi
+> +	 * from completing execution behind power controller back
+> +	 */
+> +	if (!skip_wfi)
+> +		gic_cpu_if_down();
 > +
-> +	pr_info("%s: " DRIVER_DESC "\n", hcd_name);
-> +	ohci_init_driver(&ohci_at91_hc_driver, NULL);
 
-ohci_init_driver() doesn't have any sanity checks for NULL overrides, so
-it blindly dereferences and faults.
+In my version of this fix, I disabled the CPU interface much earlier,
+just after entering the function.  I think it probably works either
+way.  Do you think the location is critical, or should it not matter?
 
-Some of the other conversions have this same problem (at least omap3).
-Did anyone test this series on hardware?
+As far as I could tell, it matters only that this is done sometime
+between committing to WFI and actually doing it, but if you think
+there are extra requirements then I would like to understand them.
 
-I'm not too familiar with OHCI, but something like the patch below is
-probably needed along with this series.
+[...]
 
-Kevin
-
-
->From a3b5cc90e74038a6449fbd25e0d720ea02884f30 Mon Sep 17 00:00:00 2001
-From: Kevin Hilman <khilman@linaro.org>
-Date: Fri, 27 Sep 2013 08:07:19 -0700
-Subject: [PATCH] USB: OHCI: ohci_init_driver(): sanity check overrides
-
-Check for non-NULL overrides before dereferencing since platforms may
-pass in NULL overrides.
-
-Signed-off-by: Kevin Hilman <khilman@linaro.org>
----
- drivers/usb/host/ohci-hcd.c | 10 ++++++----
- 1 file changed, 6 insertions(+), 4 deletions(-)
-
-diff --git a/drivers/usb/host/ohci-hcd.c b/drivers/usb/host/ohci-hcd.c
-index 21d937a..8ada13f 100644
---- a/drivers/usb/host/ohci-hcd.c
-+++ b/drivers/usb/host/ohci-hcd.c
-@@ -1161,10 +1161,12 @@ void ohci_init_driver(struct hc_driver *drv,
- 	/* Copy the generic table to drv and then apply the overrides */
- 	*drv = ohci_hc_driver;
- 
--	drv->product_desc = over->product_desc;
--	drv->hcd_priv_size += over->extra_priv_size;
--	if (over->reset)
--		drv->reset = over->reset;
-+	if (over) {
-+		drv->product_desc = over->product_desc;
-+		drv->hcd_priv_size += over->extra_priv_size;
-+		if (over->reset)
-+			drv->reset = over->reset;
-+	}
- }
- EXPORT_SYMBOL_GPL(ohci_init_driver);
- 
--- 
-1.8.3
+Cheers
+---Dave
