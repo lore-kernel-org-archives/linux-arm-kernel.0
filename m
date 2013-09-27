@@ -1,92 +1,44 @@
-From: gang.chen@asianux.com (Chen Gang)
-Date: Fri, 27 Sep 2013 19:36:11 +0800
-Subject: [PATCH v2] ARM: include: asm: use 'long long' instead of 'u64'
- within atomic.h
-In-Reply-To: <20130927110618.GB9520@mudshark.cambridge.arm.com>
-References: <523D7DC7.8030603@asianux.com>
- <20130924093041.GB15119@mudshark.cambridge.arm.com>
- <5242498F.8060407@asianux.com>
- <20130925160746.GC14502@mudshark.cambridge.arm.com>
- <5243953E.6010405@asianux.com>
- <20130926100422.GE2855@mudshark.cambridge.arm.com>
- <5244148F.6080405@asianux.com>
- <20130927110618.GB9520@mudshark.cambridge.arm.com>
-Message-ID: <52456DAB.8060900@asianux.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 27 Sep 2013 14:08:01 +0200
+Subject: device tree binding documentation outdated
+In-Reply-To: <20130927094902.GX12758@n2100.arm.linux.org.uk>
+References: <20130926195158.GS12758@n2100.arm.linux.org.uk>
+ <20130927094902.GX12758@n2100.arm.linux.org.uk>
+Message-ID: <20130927120801.GU30088@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/27/2013 07:06 PM, Will Deacon wrote:
-> On Thu, Sep 26, 2013 at 12:03:43PM +0100, Chen Gang wrote:
->> On 09/26/2013 06:04 PM, Will Deacon wrote:
->>> On Thu, Sep 26, 2013 at 03:00:30AM +0100, Chen Gang wrote:
->>>> On 09/26/2013 12:07 AM, Will Deacon wrote:
->>>>> On Wed, Sep 25, 2013 at 03:25:19AM +0100, Chen Gang wrote:
->>>>>> atomic* value is signed value, and atomic* functions need also process
->>>>>> signed value (parameter value, and return value), so 32-bit arm need
->>>>>> use 'long long' instead of 'u64'.
->>>>>>
->>>>>> After replacement, it will also fix a bug for atomic64_add_negative():
->>>>>> "u64 is never less than 0".
->>>>>>
->>>>>> The modifications are:
->>>>>>
->>>>>>   in vim, use "1,% s/\<u64\>/long long/g" command.
->>>>>>   remove '__aligned(8)' which is useless for 64-bit.
->>>>>>   be sure of 80 column limitation after replacement.
->>>>>>
->>>>>>
->>>>>> Signed-off-by: Chen Gang <gang.chen@asianux.com>
->>>>>
->>>>> Looks better to me, thanks. While you're here, we could also replace the use
->>>>> of `unsigned long' with `int' for the 32-bit atomics, then the whole header
->>>>> is consistent with the generic types.
->>>>>
->>>>> Will
->>>>>
->>>>>
->>>>
->>>> Hmm... at least, it seems we can let "use 'int' for 32-bit atomics" in
->>>> another patch.
->>>
->>> Sure, it can be a follow-up to this one.
->>>
->>
->> OK, if it is really a useful patch too, I will follow-up.
+On Fri, Sep 27, 2013 at 10:49:02AM +0100, Russell King - ARM Linux wrote:
+> Here's another instance:
 > 
-> It's a cosmetic change to bring the signedness of our 32-bit atomics in-line
-> with your proposal for 64-bit atomics.
+> Documentation/devicetree/bindings/net/fsl-fec.txt:
 > 
->> 'unsigned long' can be used as a register related variable, it is always
->> 32-bit under 32-bit machine, and always 64-bit under 64-bit machine.
+> Required properties:
+> - phy-mode : String, operation mode of the PHY interface.
+>   Supported values are: "mii", "gmii", "sgmii", "tbi", "rmii",
+>   "rgmii", "rgmii-id", "rgmii-rxid", "rgmii-txid", "rtbi", "smii".
 > 
-> Not necessarily (c.f. ILP32).
+> Is this really required?  Maybe someone can point to where the code
+> makes use of this, because I'm damned if I can find it:
 > 
->> So can use it for both arm and arm64, for arm, it can not cause issue,
->> and for arm64, it is also OK (if changed to 'int' under arm64, may cause
->> real issue).
+> $ grep phy-mode drivers/net/ include/ net/ -r
+> drivers/net/ethernet/marvell/mvneta.c:              dev_err(&pdev->dev, "incorrect phy-mode\n");
+> drivers/net/ethernet/nxp/lpc_eth.c:                                            phy-mode", NULL);
+
+See of_get_phy_mode() implemented in drivers/net/of_net.c and used in
+the FEC driver.
+
 > 
-> arm and arm64 have different instructions sets. There's no way the inline
-> assembly used to implement the atomic operations can be made portable
-> between them.
-> 
+> "local-mac-address" in the optional properties also falls into this
+> category: only a small handful of network drivers make use of this,
+> and fec is not one of them.
 
+of_get_mac_address(), also in drivers/net/of_net.c
 
-Hmm... if you like, I will send a follow-up patch for it, the reason is:
+Sascha
 
-It is belong to internal implementation, not belong to API, so if it is
-harmless, better to follow related maintainers' 'hobby' or 'tastes', it
-will let the related code more clearer.  :-)
-
-
-I will wait 1-2 days to let another reviewers check, if no reply, I will
-send 2 patches for it. (if you already applied the "u64 -> long long"
-patch, please let me know, and I will send one patch enough).
-
-
-> Will
-> 
-> 
-
-Thanks.
 -- 
-Chen Gang
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
