@@ -1,88 +1,141 @@
-From: tobiasrauter@gmail.com (Tobias Rauter)
-Date: Fri, 27 Sep 2013 18:03:39 +0200
-Subject: [PATCH 2/3] ARM: mxs: crypto: Add Freescale MXS DCP driver
-In-Reply-To: <201309261407.33923.marex@denx.de>
-References: <1380194306-5243-1-git-send-email-marex@denx.de>
- <1380194306-5243-2-git-send-email-marex@denx.de>
- <CAOMZO5AU_R5aeHKbkGRGuyXsVOVdUwdF5oZXdEZZYs442nFnEA@mail.gmail.com>
- <201309261407.33923.marex@denx.de>
-Message-ID: <5245AC5B.80800@gmail.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Fri, 27 Sep 2013 17:09:14 +0100
+Subject: [PATCH v6 0/19] enable swiotlb-xen on arm and arm64
+Message-ID: <alpine.DEB.2.02.1309271653420.5498@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi all,
+this patch series enables xen-swiotlb on arm and arm64.
 
-Here are some thoughts of the design decisions I made when I wrote
-the dcp.c driver. Maybe it helps.
+Considering that all guests, including dom0, run on xen on arm with
+second stage translation enabled, it follows that without an IOMMU no
+guests could actually drive the hardware.
 
-On 2013-09-26 14:07, Marek Vasut wrote:
-> Dear Fabio Estevam,
->
->> Hi Marek,
->>
->> Why do we need to have two drivers for the same IP block? It looks
->> confusing to have both.
->
-> Sure, I agree. I reviewed the one in mainline just now and I see some
-> deficiencies of the dcp.c driver:
->
-> 1) It only supports AES_CBC (mine does support AES_ECB, AES_CBC, SHA1 and SH256)
+The solution for platforms without an IOMMU is to use swiotlb-xen,
+adapted to autotranslate guests. swiotlb-xen provides a set of dma_ops
+that can be used by Linux to setup a contiguous buffer in stage-2
+addresses and use it for dma operations.
+Basically Linux asks Xen to make a buffer contiguous and gets the
+machine address for it. This buffer is going to be used by lib/swiotlb.c
+to allocate bounce buffers.
 
-Right, but for ECP only the interface is missing (and it is no real
-mode of operation) and hashes should be generally faster in SW.
+In few cases we can actually avoid going through the swiotlb bounce
+buffer: if a dma request involves only a single page we can try to pin
+the page passed in as an argument and return its machine address.
+In order to do this we need to keep track of the machine to physical
+mappings of the pinned pages.
+Since this approach is preferable to bouncing all the times but it only
+works with single pages, we force biovec requests not to be merged.
 
-> 2) The driver was apparently never ran behind anyone working with MXS.
+Cheers,
 
-
-That is probably right.
-
-
-> 3) What are those ugly new IOCTLs in the dcp.c driver?
-
-When I firstly posted the driver in the mailinglist, there where one
-person who actually used this interface (it was introduced in
-Freescale's SDK) to use the OTP keys for crypto. As far as I have
-seen, the crypto API does not support such keys (i.e. there seems to
-be no way to tell a driver to use some kind of special keys - which
-are not delivered by the user - via the API).
-Therefore I added this miscdevice and adopted Freescale's interface.
-
-> 4) The VMI IRQ is never used, yet it even calls the IRQ handler, this is bogus
-
-That's absolutely right.
-
->     -> The DCP always triggers the dcp_irq upon DMA completion
-
-The IRQ is triggered after every packet, to enable simultaneous work
-for CPU/DCP: While the DCP is computing, the CPU is able to fill more
-packets. I don't know how far this is useful, because the 20 Packets
-which are enabled by default can address up to 80kB of
-plain-/ciphertext. However, I think it is better to do the work 
-simultaneously to safe time (actual real world time, not CPU time).
-
-> 5) The IRQ handler can't use usual completion() in the driver because that'd
-> trigger "scheduling while atomic" oops, yes?
-
-I decided to use the tasklets because of performance reasons. I don't
-remember numbers but a workqueue was significantly slower.  The
-use of a kernel thread may reduce the overhead compared to the wq. I
-was not sure if it is appropriate to create an extra thread for a
-crypto-driver, without real reason (IMHO).
-
-> Finally, because the dcp.c driver only supports AES128 CBC, it depends on kernel
-> _always_ passing the DCP scatterlist such that each of it's elements is 16-bytes
-> long. [...]
-> So, in the AES128 case, if the hardware is passed two (4 bytes + 12 bytes for
-> example) DMA descriptors instead of single 16 bytes descriptor, the DCP will
-> simply stall or produce incorrect result. This can happen if the user of the
-> async crypto API passes such a scatterlist.
-
-The scatterlist alignment and bounce-buffering to get full 16 Byte
-blocks is done by the ablkcipher_walk API (with the error
-parameter) when needed. As far as I see, you are copying the whole 
-buffer to your coherent block and back. Wouldn't it be better to do that 
-just for unaligned blocks?
+Stefano
 
 
-kind regards,
-tr
+Changes in v6:
+- check for dev->dma_mask being NULL in dma_capable;
+- update the comments and the hypercalls structures;
+- add a xen_dma_info entry to the rbtree in xen_swiotlb_alloc_coherent
+to keep track of the new mapping. Free the entry in xen_swiotlb_free_coherent;
+- rename xen_dma_seg to dma_info in xen_swiotlb_alloc/free_coherent to
+avoid confusions;
+- introduce and export xen_dma_ops;
+- call xen_mm_init from as arch_initcall;
+- call __get_dma_ops to get the native dma_ops pointer on arm;
+- do not merge biovecs;
+- add single page optimization: pin the page rather than bouncing.
+
+Changes in v5:
+- dropped the first two patches, already in the Xen tree;
+- implement dma_mark_clean using dmac_flush_range on arm;
+- add "arm64: define DMA_ERROR_CODE"
+- better comment for XENMEM_exchange_and_pin return codes;
+- fix xen_dma_add_entry error path;
+- remove the spin_lock: the red-black tree is not modified at run time;
+- add "swiotlb-xen: introduce xen_swiotlb_set_dma_mask";
+- add "xen: introduce xen_alloc/free_coherent_pages";
+- add "swiotlb-xen: use xen_alloc/free_coherent_pages";
+- add "swiotlb: don't assume that io_tlb_start-io_tlb_end is coherent".
+
+Changes in v4:
+- rename XENMEM_get_dma_buf to XENMEM_exchange_and_pin;
+- rename XENMEM_put_dma_buf to XENMEM_unpin;
+- improve the documentation of the new hypercalls;
+- add a note about out.address_bits for XENMEM_exchange;
+- code style fixes;
+- add err_out label in xen_dma_add_entry;
+- remove INVALID_ADDRESS, use DMA_ERROR_CODE instead;
+- add in-code comments regarding the usage of xen_dma_seg[0].dma_addr.
+
+Changes in v3:
+- add a patch to compile SWIOTLB without CONFIG_NEED_SG_DMA_LENGTH;
+- add a patch to compile SWIOTLB_XEN without CONFIG_NEED_SG_DMA_LENGTH;
+- arm/dma_capable: do not treat dma_mask as a limit;
+- arm/dmabounce: keep using arm_dma_ops;
+- add missing __init in xen_early_init declaration;
+- many code style and name changes in swiotlb-xen.c;
+- improve error checks in xen_dma_add_entry;
+- warn on XENMEM_put_dma_buf failures.
+
+Changes in v2:
+- fixed a couple of errors in xen_bus_to_phys, xen_phys_to_bus and
+xen_swiotlb_fixup.
+
+
+
+Julien Grall (1):
+      ASoC: Samsung: Rename dma_ops by samsung_dma_ops
+
+Stefano Stabellini (18):
+      arm: make SWIOTLB available
+      arm64: define DMA_ERROR_CODE
+      xen: introduce XENMEM_exchange_and_pin and XENMEM_unpin
+      xen: make xen_create_contiguous_region return the dma address
+      swiotlb-xen: support autotranslate guests
+      xen/arm,arm64: enable SWIOTLB_XEN
+      swiotlb-xen: introduce xen_swiotlb_set_dma_mask
+      arm/xen: get_dma_ops: return xen_dma_ops if we are running on Xen
+      arm64/xen: get_dma_ops: return xen_dma_ops if we are running on Xen
+      xen: introduce xen_alloc/free_coherent_pages
+      swiotlb-xen: use xen_alloc/free_coherent_pages
+      swiotlb: don't assume that io_tlb_start-io_tlb_end is coherent
+      swiotlb: print a warning when the swiotlb is full
+      swiotlb-xen: call dma_capable only if dev->dma_mask is allocated
+      arm,arm64: do not always merge biovec if we are running on Xen
+      xen: introduce XENMEM_pin
+      swiotlb-xen: introduce a rbtree to track phys to bus mappings
+      swiotlb-xen: instead of bouncing on the swiotlb, pin single pages
+
+ arch/arm/Kconfig                           |    7 +
+ arch/arm/include/asm/dma-mapping.h         |   50 +++-
+ arch/arm/include/asm/io.h                  |    8 +
+ arch/arm/include/asm/xen/hypervisor.h      |    2 +
+ arch/arm/include/asm/xen/page-coherent.h   |   22 ++
+ arch/arm/include/asm/xen/page.h            |    2 +
+ arch/arm/xen/Makefile                      |    2 +-
+ arch/arm/xen/mm.c                          |  137 ++++++++
+ arch/arm64/Kconfig                         |    1 +
+ arch/arm64/include/asm/dma-mapping.h       |   14 +-
+ arch/arm64/include/asm/io.h                |    9 +
+ arch/arm64/include/asm/xen/page-coherent.h |   24 ++
+ arch/arm64/xen/Makefile                    |    2 +-
+ arch/ia64/include/asm/xen/page-coherent.h  |   24 ++
+ arch/x86/include/asm/xen/page-coherent.h   |   24 ++
+ arch/x86/xen/mmu.c                         |   18 +-
+ drivers/xen/Kconfig                        |    1 -
+ drivers/xen/biomerge.c                     |    4 +-
+ drivers/xen/swiotlb-xen.c                  |  464 +++++++++++++++++++++++++---
+ include/xen/interface/memory.h             |   83 +++++
+ include/xen/swiotlb-xen.h                  |    2 +
+ include/xen/xen-ops.h                      |    8 +-
+ lib/swiotlb.c                              |   14 +-
+ sound/soc/samsung/dma.c                    |    4 +-
+ 24 files changed, 870 insertions(+), 56 deletions(-)
+ create mode 100644 arch/arm/include/asm/xen/page-coherent.h
+ create mode 100644 arch/arm/xen/mm.c
+ create mode 100644 arch/arm64/include/asm/xen/page-coherent.h
+ create mode 100644 arch/ia64/include/asm/xen/page-coherent.h
+ create mode 100644 arch/x86/include/asm/xen/page-coherent.h
+
+git://git.kernel.org/pub/scm/linux/kernel/git/sstabellini/xen.git swiotlb-xen-6
