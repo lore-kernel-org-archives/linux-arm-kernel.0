@@ -1,68 +1,33 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 27 Sep 2013 10:35:14 +0200
-Subject: [PATCH 1/2] ARM: zynq: cpuidle: Remove useless compatibility
- string
-In-Reply-To: <31f13d14-2af7-4285-8770-3cc7ef7e7b09@AM1EHSMHS008.ehs.local>
-References: <1380269867-18336-1-git-send-email-daniel.lezcano@linaro.org>
- <31f13d14-2af7-4285-8770-3cc7ef7e7b09@AM1EHSMHS008.ehs.local>
-Message-ID: <52454342.80706@linaro.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 27 Sep 2013 09:35:24 +0100
+Subject: [PATCH 3/9] ARM: dma-mapping: Always pass proper prot flags to
+ iommu_map()
+In-Reply-To: <1380234982-1677-4-git-send-email-andreas.herrmann@calxeda.com>
+References: <1380234982-1677-1-git-send-email-andreas.herrmann@calxeda.com>
+ <1380234982-1677-4-git-send-email-andreas.herrmann@calxeda.com>
+Message-ID: <20130927083523.GA8319@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/27/2013 10:19 AM, Michal Simek wrote:
-> On 09/27/2013 10:17 AM, Daniel Lezcano wrote:
->> All zynq platforms have this compatibility string and there is no any other
->> clone.
->>
->> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+On Thu, Sep 26, 2013 at 11:36:15PM +0100, Andreas Herrmann wrote:
+> ... otherwise it is impossible for the low level iommu driver to
+> figure out which pte flags should be used.
+> 
+> In __map_sg_chunk we can derive the flags from dma_data_direction.
+> 
+> In __iommu_create_mapping we should treat the memory like
+> DMA_BIDIRECTIONAL and pass both IOMMU_READ and IOMMU_WRITE to
+> iommu_map.
+> __iommu_create_mapping is used during dma_alloc_coherent (via
+> arm_iommu_alloc_attrs).  AFAIK dma_alloc_coherent is responsible for
+> allocation _and_ mapping.  I think this implies that access to the
+> mapped pages should be allowed.
+> 
+> Cc: Marek Szyprowski <m.szyprowski@samsung.com>
+> Signed-off-by: Andreas Herrmann <andreas.herrmann@calxeda.com>
 
-The patchset is only compile-tested (I don't have the hardware).
+  Acked-by: Will Deacon <will.deacon@arm.com>
 
-Michal or someone else, if you have the time can you give it a try ?
+This one should go via the dma-mapping tree.
 
-Thanks in advance
-
-   -- Daniel
-
->> ---
->>   drivers/cpuidle/cpuidle-zynq.c |    4 ----
->>   1 file changed, 4 deletions(-)
->>
->> diff --git a/drivers/cpuidle/cpuidle-zynq.c b/drivers/cpuidle/cpuidle-zynq.c
->> index 38e03a1..ab6c4b4 100644
->> --- a/drivers/cpuidle/cpuidle-zynq.c
->> +++ b/drivers/cpuidle/cpuidle-zynq.c
->> @@ -28,7 +28,6 @@
->>   #include <linux/init.h>
->>   #include <linux/cpu_pm.h>
->>   #include <linux/cpuidle.h>
->> -#include <linux/of.h>
->>   #include <asm/proc-fns.h>
->>   #include <asm/cpuidle.h>
->>
->> @@ -72,9 +71,6 @@ static struct cpuidle_driver zynq_idle_driver = {
->>   /* Initialize CPU idle by registering the idle states */
->>   static int __init zynq_cpuidle_init(void)
->>   {
->> -	if (!of_machine_is_compatible("xlnx,zynq-7000"))
->> -		return -ENODEV;
->> -
->>   	pr_info("Xilinx Zynq CpuIdle Driver started\n");
->>
->>   	return cpuidle_register(&zynq_idle_driver, NULL);
->>
->
-> Acked-by: Michal Simek <michal.simek@xilinx.com>
->
-> Thx,
-> M
->
->
-
-
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Will
