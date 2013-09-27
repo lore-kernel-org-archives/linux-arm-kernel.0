@@ -1,27 +1,51 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 27 Sep 2013 15:29:55 +0200
-Subject: device tree binding documentation outdated
-In-Reply-To: <20130927132107.GZ12758@n2100.arm.linux.org.uk>
-References: <20130926195158.GS12758@n2100.arm.linux.org.uk>
- <CAOMZO5ANsZGcpvmtBE7d0q0E6+f0bE_U8CBF7G2v3xtqoLbqcA@mail.gmail.com>
- <CACRpkda9HZ4JKnidnJJh-HkhCgtvJwQPQJnv9CZ4iYcQP36_Nw@mail.gmail.com>
- <20130927025116.GG25146@S2101-09.ap.freescale.net>
- <20130927084504.GW12758@n2100.arm.linux.org.uk>
- <20130927122814.GK25146@S2101-09.ap.freescale.net>
- <20130927131225.GA31178@titan.lakedaemon.net>
- <20130927132107.GZ12758@n2100.arm.linux.org.uk>
-Message-ID: <CACRpkdasN9Yg5C0cNM7USncXqRG4Q3n-xRKL0DcnJ-iLCc3pSQ@mail.gmail.com>
+From: fweisbec@gmail.com (Frederic Weisbecker)
+Date: Fri, 27 Sep 2013 15:30:05 +0200
+Subject: [PATCH] arm: Fix build error with context tracking calls
+In-Reply-To: <874n986bt9.fsf@linaro.org>
+References: <alpine.LFD.2.03.1309091023440.20709@syhkavp.arg>
+ <20130909160348.GB18975@roeck-us.net>
+ <20130909203141.GM25647@n2100.arm.linux.org.uk>
+ <20130909210203.GC28416@roeck-us.net>
+ <alpine.LFD.2.03.1309091714420.20709@syhkavp.arg>
+ <87y574g1fi.fsf@linaro.org> <20130913170331.GA8453@somewhere>
+ <20130914143213.GN25647@n2100.arm.linux.org.uk>
+ <CAFTL4hzccoaUinQ37bpbqXDv-bbNkuww8FURQMwD_zEb9RqSMA@mail.gmail.com>
+ <874n986bt9.fsf@linaro.org>
+Message-ID: <20130927133003.GA7927@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 27, 2013 at 3:21 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
+On Wed, Sep 25, 2013 at 10:38:58AM -0700, Kevin Hilman wrote:
+> Frederic Weisbecker <fweisbec@gmail.com> writes:
+> 
+> > 2013/9/14, Russell King - ARM Linux <linux@arm.linux.org.uk>:
+> >> On Fri, Sep 13, 2013 at 07:03:34PM +0200, Frederic Weisbecker wrote:
+> >>> diff --git a/kernel/context_tracking.c b/kernel/context_tracking.c
+> >>> index 247091b..859c8df 100644
+> >>> --- a/kernel/context_tracking.c
+> >>> +++ b/kernel/context_tracking.c
+> >>> @@ -51,6 +51,15 @@ void context_tracking_user_enter(void)
+> >>>  	unsigned long flags;
+> >>>
+> >>>  	/*
+> >>> +	 * Repeat the user_enter() check here because some archs may be calling
+> >>> +	 * this from asm and if no CPU needs context tracking, they shouldn't
+> >>> +	 * go further. We can remove that check here once these archs support
+> >>> the static key
+> >>> +	 * check.
+> >>
+> >> The only (minor) comment on this is that the above would fail checkpatch,
+> >> but that's not a good enough reason to respin it if you've already applied
+> >> it IMHO.
+> >>
+> >
+> > Ah I haven't yet pushed that patch anywhere so I can definetly fix
+> > that. Thanks for the review. BTW, I initially first thought this fix
+> > could go through your tree but if you prefer I can push it through
+> > Ingo to the context tracking bits.
+> >
+> > Just tell me either way.
+> 
+> Frederic, I suggest you queue it directly for v3.12-rc.  Thanks,
 
-> I think I'll be bringing up what a disaster this DT stuff is in
-> Edinburgh.
-
-I think this topic suggested by Wolfram is spot on:
-http://lists.linuxfoundation.org/pipermail/ksummit-2013-discuss/2013-July/000110.html
-
-Yours,
-Linus Walleij
+Ok, I'm doing that then, thanks you!
