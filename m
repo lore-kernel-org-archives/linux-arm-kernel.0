@@ -1,38 +1,34 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 26 Sep 2013 21:24:51 -0500
-Subject: [PATCH 3/6] cpuidle: calxeda: add ecx-2000 support
+Date: Thu, 26 Sep 2013 21:24:52 -0500
+Subject: [PATCH 4/6] ARM: PSCI: remove unnecessary include of arm-gic.h
 In-Reply-To: <1380248694-13388-1-git-send-email-robherring2@gmail.com>
 References: <1380248694-13388-1-git-send-email-robherring2@gmail.com>
-Message-ID: <1380248694-13388-4-git-send-email-robherring2@gmail.com>
+Message-ID: <1380248694-13388-5-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Rob Herring <rob.herring@calxeda.com>
 
-Add cpuidle support for Calxeda ecx-2000 SoC.
+Now that gic_secondary_init is no longer needed to be called by SMP init
+functions, the header is not needed.
 
 Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-Cc: "Rafael J. Wysocki" <rjw@sisk.pl>
-Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-Cc: linux-pm at vger.kernel.org
+Cc: Russell King <linux@arm.linux.org.uk>
 ---
- drivers/cpuidle/cpuidle-calxeda.c | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+ arch/arm/kernel/psci_smp.c | 1 -
+ 1 file changed, 1 deletion(-)
 
-diff --git a/drivers/cpuidle/cpuidle-calxeda.c b/drivers/cpuidle/cpuidle-calxeda.c
-index b04767a..c6e9d80 100644
---- a/drivers/cpuidle/cpuidle-calxeda.c
-+++ b/drivers/cpuidle/cpuidle-calxeda.c
-@@ -66,7 +66,9 @@ static struct cpuidle_driver calxeda_idle_driver = {
+diff --git a/arch/arm/kernel/psci_smp.c b/arch/arm/kernel/psci_smp.c
+index 70ded3f..570a48c 100644
+--- a/arch/arm/kernel/psci_smp.c
++++ b/arch/arm/kernel/psci_smp.c
+@@ -14,7 +14,6 @@
+  */
  
- static int __init calxeda_cpuidle_init(void)
- {
--	if (!of_machine_is_compatible("calxeda,highbank") || !psci_ops.cpu_suspend)
-+	if (!of_machine_is_compatible("calxeda,highbank") ||
-+	    !of_machine_is_compatible("calxeda,ecx-2000") ||
-+	    !psci_ops.cpu_suspend)
- 		return -ENODEV;
+ #include <linux/init.h>
+-#include <linux/irqchip/arm-gic.h>
+ #include <linux/smp.h>
+ #include <linux/of.h>
  
- 	return cpuidle_register(&calxeda_idle_driver, NULL);
 -- 
 1.8.1.2
