@@ -1,25 +1,49 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 27 Sep 2013 13:55:06 +0900
-Subject: [PATCH v2 2/2] ARM: shmobile: Marzen: enable DMA for SDHI0
-In-Reply-To: <201308252147.27210.sergei.shtylyov@cogentembedded.com>
-References: <201308252143.33458.sergei.shtylyov@cogentembedded.com>
- <201308252147.27210.sergei.shtylyov@cogentembedded.com>
-Message-ID: <20130927045506.GB23732@verge.net.au>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Fri, 27 Sep 2013 07:12:20 +0200
+Subject: [RFC PATCH] ARM: zynq: cpuidle: convert to platform driver
+In-Reply-To: <1380212138-4020-1-git-send-email-daniel.lezcano@linaro.org>
+References: <1380212138-4020-1-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <22edc518-27ad-4dcf-918a-def23df93bcc@DB9EHSMHS022.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Aug 25, 2013 at 09:47:26PM +0400, Sergei Shtylyov wrote:
-> From: Max Filippov <max.filippov@cogentembedded.com>
+Hi Daniel,
+
+On 09/26/2013 06:15 PM, Daniel Lezcano wrote:
+> As the ux500 and the kirkwood driver, make the zynq driver a platform driver
 > 
-> Pass HPB-DMA slave IDs in the SDHI0 platform data to enable DMA in the SDHI
-> driver.
+> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+> ---
+>  arch/arm/mach-zynq/common.c    |    7 +++++++
+>  drivers/cpuidle/cpuidle-zynq.c |   15 ++++++++++-----
+>  2 files changed, 17 insertions(+), 5 deletions(-)
 > 
-> Signed-off-by: Max Filippov <max.filippov@cogentembedded.com>
-> [Sergei: removed #include <mach/dma.h>]
-> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> diff --git a/arch/arm/mach-zynq/common.c b/arch/arm/mach-zynq/common.c
+> index 5f25256..0f0d88f 100644
+> --- a/arch/arm/mach-zynq/common.c
+> +++ b/arch/arm/mach-zynq/common.c
+> @@ -44,6 +44,10 @@ static struct of_device_id zynq_of_bus_ids[] __initdata = {
+>  	{}
+>  };
+>  
+> +static struct platform_device zynq_cpuidle_device = {
+> +	.name = "cpuidle-zynq",
+> +};
+> +
+>  /**
+>   * zynq_init_machine - System specific initialization, intended to be
+>   *		       called from board specific initialization.
+> @@ -56,6 +60,9 @@ static void __init zynq_init_machine(void)
+>  	l2x0_of_init(0x02060000, 0xF0F0FFFF);
+>  
+>  	of_platform_bus_probe(NULL, zynq_of_bus_ids, NULL);
+> +
+> +	if (of_machine_is_compatible("xlnx,zynq-7000"))
 
-Thanks, queued up for v3.13.
+This is not needed because all zynq platforms have this compatibility string
+and there is no any other clone.
 
-Please send along a defconfig update as you mentioned you would yesterday.
+The rest is fine.
 
-Thanks.
+Thanks,
+Michal
