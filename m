@@ -1,54 +1,71 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 27 Sep 2013 21:21:10 +0100
-Subject: device tree binding documentation outdated
-In-Reply-To: <CAHCPf3sv3wSbUc9QFVhmYsPc1kqiWYRuOMO7rreuiGSrwyepBQ@mail.gmail.com>
-References: <CAOMZO5Dj7o3qBH2hzPFWjepgpt5XR5qKmQorKS6jH_7=gnY5cg@mail.gmail.com>
- <20130927121357.GY12758@n2100.arm.linux.org.uk>
- <20130927132601.GL25146@S2101-09.ap.freescale.net>
- <20130927151900.GA12758@n2100.arm.linux.org.uk>
- <CAHCPf3t8=mJn-RCz3C1cY6zqsH9ds8UANKpKx9ZpwPM6WjJt3g@mail.gmail.com>
- <20130927174916.GD12758@n2100.arm.linux.org.uk>
- <CAHCPf3sC7bY=p4vpBQFpRUmyPspT_PVjx0rH9cm1ov=SqkO+Vg@mail.gmail.com>
- <20130927190546.GG12758@n2100.arm.linux.org.uk>
- <CAHCPf3vxGAzTnY360KC7Yt-DB1FB14Sv_Cn7DBTH6HGZ6y=stg@mail.gmail.com>
- <CAHCPf3sv3wSbUc9QFVhmYsPc1kqiWYRuOMO7rreuiGSrwyepBQ@mail.gmail.com>
-Message-ID: <20130927202110.GI12758@n2100.arm.linux.org.uk>
+From: vbocek@gmail.com (Vojtech Bocek)
+Date: Fri, 27 Sep 2013 22:25:45 +0200
+Subject: About atags_proc buffer size
+Message-ID: <5245E9C9.9030509@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 27, 2013 at 02:48:16PM -0500, Matt Sealey wrote:
-> On Fri, Sep 27, 2013 at 2:41 PM, Matt Sealey <neko@bakuhatsu.net> wrote:
-> > On Fri, Sep 27, 2013 at 2:05 PM, Russell King - ARM Linux
-> > <linux@arm.linux.org.uk> wrote:
-> >> I've got good news... finally!
-> >>
-> > The difference would be
-> >
-> > * In the top situation, your PHY is generating the clock for the
-> > entire system - the i.MX6 takes it and uses it drive logic and to
-> > clock receive and sends it back out on TXC to transmit data (GPR1[21]
-> > = 0)
-> > * In the bottom situation, the i.MX6 generates a clock, the PHY uses
-> > it to drive it's logic AND generate other clocks, and the i.MX6 clock
-> > is looped back through the pad to the MAC to drive it's logic and
-> > clock transmit data (GPR1[21] = 1)
-> 
-> Ignore that. It's not totally wrong but it's weird. This is really
-> difficult to put into words...
-> 
-> GPR1[21] = 0 i.MX6 receives a clock from the PHY. You need to generate
-> a clock at the PHY as input to the MAC. The MAC won't run until the
-> PHY is out of reset and the clock is generated. You may need SION set
-> for RMII depending on the pin...
-> GPR1[21] = 1 implies we generate a clock from i.MX6 TO the PHY. The
-> clock is looped back through the pad to the MAC. SION is irrelevant.
-> 
-> Still want to know who's clock it is and where it should be going....
+Hello,
+I want to ask something about atags_proc.c implementation. Currently,
+it uses a buffer to temporarily store atags. The buffer size is set to
+1.5kb for some reason, but as far as I know, atag list's size is not
+limited in any way. I've got a device (HTC One) which uses about 12kb
+of tags, that means it panics during boot if CONFIG_ATAGS_PROC is
+enabled, because the buffer contains only part of the tag list without
+an end tag.
 
-As I said, when Rabeeh is around, I will ask questions about this.
-I'm fairly certain that we don't need _all_ those ethernet pinmux
-settings (we just need the RGMII ones, and can omit the MII ones.)
+Why is only 1.5kb used? Is it some specific size the device should not
+exceed?
 
-Having hacked on this solidly since about 5pm yesterday, I'm not going
-to spend very much time on this until later next week, or I can talk to
-Rabeeh.
+I don't know much about the way ARM boot process works, but I tried to
+store just the pointer to atag list, and it works fine (quick patch
+attached). Do atags get erased later in boot process on some platforms,
+is that the reason why buffer had to be used?
+This requires modifications in kexec-tools, because it uses that 1.5kb
+buffer, too. Again, here's my version of such modification[1]. If this
+is okay, I can create a proper patch and submit it.
+
+Yours,
+Vojtech Bocek
+
+[1]: https://github.com/Tasssadar/kexec-tools/commit/c6844e1ddb13a6b60cfefcb01c3843da97d6174c
+
+---
+
+diff --git a/arch/arm/kernel/atags_proc.c b/arch/arm/kernel/atags_proc.c
+index c7ff807..12cc483 100644
+--- a/arch/arm/kernel/atags_proc.c
++++ b/arch/arm/kernel/atags_proc.c
+@@ -21,12 +21,11 @@ static const struct file_operations atags_fops = {
+ 	.llseek = default_llseek,
+ };
+ 
+-#define BOOT_PARAMS_SIZE 1536
+-static char __initdata atags_copy[BOOT_PARAMS_SIZE];
++static const struct tag* __initdata atags_copy;
+ 
+ void __init save_atags(const struct tag *tags)
+ {
+-	memcpy(atags_copy, tags, sizeof(atags_copy));
++	atags_copy = tags;
+ }
+ 
+ static int __init init_atags_procfs(void)
+@@ -40,7 +39,7 @@ static int __init init_atags_procfs(void)
+ 	struct buffer *b;
+ 	size_t size;
+ 
+-	if (tag->hdr.tag != ATAG_CORE) {
++	if (!atags_copy || tag->hdr.tag != ATAG_CORE) {
+ 		printk(KERN_INFO "No ATAGs?");
+ 		return -EINVAL;
+ 	}
+@@ -49,7 +48,7 @@ static int __init init_atags_procfs(void)
+ 		;
+ 
+ 	/* include the terminating ATAG_NONE */
+-	size = (char *)tag - atags_copy + sizeof(struct tag_header);
++	size = (char *)tag - (char *)atags_copy + sizeof(struct tag_header);
+ 
+ 	WARN_ON(tag->hdr.tag != ATAG_NONE);
+ 
