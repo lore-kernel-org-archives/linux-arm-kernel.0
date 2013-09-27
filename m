@@ -1,45 +1,119 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 27 Sep 2013 10:51:17 +0800
-Subject: device tree binding documentation outdated
-In-Reply-To: <CACRpkda9HZ4JKnidnJJh-HkhCgtvJwQPQJnv9CZ4iYcQP36_Nw@mail.gmail.com>
-References: <20130926195158.GS12758@n2100.arm.linux.org.uk>
- <CAOMZO5ANsZGcpvmtBE7d0q0E6+f0bE_U8CBF7G2v3xtqoLbqcA@mail.gmail.com>
- <CACRpkda9HZ4JKnidnJJh-HkhCgtvJwQPQJnv9CZ4iYcQP36_Nw@mail.gmail.com>
-Message-ID: <20130927025116.GG25146@S2101-09.ap.freescale.net>
+From: leoy@marvell.com (Leo Yan)
+Date: Fri, 27 Sep 2013 10:53:58 +0800
+Subject: [Question] Verification For arm64: suspend/resume implementation
+In-Reply-To: <20130926165351.GK3253@arm.com>
+References: <52327E41.1070904@marvell.com>
+ <20130913144001.GA28531@e102568-lin.cambridge.arm.com>
+ <524021EC.2000207@marvell.com>
+ <20130923152606.GA6157@e102648.cambridge.arm.com>
+ <5240F246.6050402@marvell.com>
+ <20130924090236.GY10174@e102648.cambridge.arm.com>
+ <52417C4D.1030009@marvell.com> <20130924130012.GE25907@arm.com>
+ <524416B5.3040303@marvell.com> <20130926165351.GK3253@arm.com>
+Message-ID: <5244F346.1040205@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 26, 2013 at 11:35:43PM +0200, Linus Walleij wrote:
-> On Thu, Sep 26, 2013 at 10:29 PM, Fabio Estevam <festevam@gmail.com> wrote:
-> > On Thu, Sep 26, 2013 at 4:51 PM, Russell King - ARM Linux
-> 
-> >> I mean the stuff which looks like this:
-> >>
-> >> #define MX6QDL_PAD_ENET_MDC__ESAI_TX5_RX0           0x1e8 0x5b8 0x858 0x2 0x0
-> >
-> > Let me try to decode it:
-> >
-> > 0x1e8: Offset of IOMUXC_SW_MUX_CTL_PAD_ENET_MDC register
-> >
-> > 0x5b8: Offset of IOMUXC_SW_PAD_CTL_PAD_ENET_MDC register
-> >
-> > 0x2: This means that the MUX_MODE field selects the ESAI_TX5_RX0 function
-> > in this pad
-> >
-> > 0x0: SELECT_INPUT not used for this pad
-> 
-> This I guess predates the inctroduction of defines into the DTC,
-> but we can do a lot better now.
-> 
-> Can someone from the i.MX camp take a sweep and convert this
-> to defines in some include/dt-bindings/imx.h or similar file so
-> this thing becomes readable?
 
-We call those macros like MX6QDL_PAD_ENET_MDC__ESAI_TX5_RX0 in
-imx6q-pinfunc.h pin function ID.  It's all about choosing a pinmux
-function (ESAI_TX5_RX0) for given pad (MX6QDL_PAD_ENET_MDC), and
-that's all what users care and need to read from the macro.  The
-decoding of the macro is the register details that users do not care in
-general.  But fsl,pinctrl bindings doc documented these details anyway.
+On 09/27/2013 12:53 AM, Catalin Marinas wrote:
+> On Thu, Sep 26, 2013 at 12:12:53PM +0100, Leo Yan wrote:
+>> On 09/24/2013 09:00 PM, Catalin Marinas wrote:
+>>> On Tue, Sep 24, 2013 at 12:49:33PM +0100, Leo Yan wrote:
+>>>> On 09/24/2013 05:02 PM, Achin Gupta wrote:
+>>>>> On Tue, Sep 24, 2013 at 03:00:38AM +0100, Leo Yan wrote:
+>>>>>> Here have another question, ARM have the example code for boot wrapper
+>>>>>> which will switch from EL3 to secure EL1 rather than non-secure's EL1?
+>>>>>
+>>>>> I dont' think we do but let me check. Switching to S-EL1 instead of
+>>>>> NS-EL1 should be a matter of _not_ setting the SCR_EL3.NS bit before
+>>>>> doing the exception level change (ERET).
+>>>>
+>>>> I quick try with below patch for boot wrapper, i saw foundataion model
+>>>> cannot boot up successfully and there have no console output; suppose
+>>>> it's hang at some boot operations, but now foundation model cannot debug
+>>>> low level code, so i cannot debug further more. :-(
+>>>>
+>>>> diff --git a/boot.S b/boot.S
+>>>> index a1f25e2..2f1b867 100644
+>>>> --- a/boot.S
+>>>> +++ b/boot.S
+>>>> @@ -19,7 +19,6 @@ _start:
+>>>>            b.ne    start_ns                        // skip EL3 initialisation
+>>>>
+>>>>            mov     x0, #0x30                       // RES1
+>>>> -       orr     x0, x0, #(1 << 0)               // Non-secure EL1
+>>>>            orr     x0, x0, #(1 << 8)               // HVC enable
+>>>>            orr     x0, x0, #(1 << 10)              // 64-bit EL2
+>>>>            msr     scr_el3, x0
+>>>
+>>> You also need to make sure the boot wrapper starts the kernel in S-EL1
+>>> rather than NS-EL2.
+>>
+>> I tried to use below modification, but it still failed to boot up on
+>> foundation model; pls help review if convienence.
+>
+> You probably need group 0 interrupts as well.
 
-Shawn
+Thanks a lot for help. After change the IRQs to group 0, then kernel can 
+work well in S-EL1. :-)
+
+diff --git a/boot.S b/boot.S
+index a1f25e2..ae14c66 100644
+--- a/boot.S
++++ b/boot.S
+@@ -19,7 +19,6 @@ _start:
+         b.ne    start_ns                        // skip EL3 initialisation
+
+         mov     x0, #0x30                       // RES1
+-       orr     x0, x0, #(1 << 0)               // Non-secure EL1
+         orr     x0, x0, #(1 << 8)               // HVC enable
+         orr     x0, x0, #(1 << 10)              // 64-bit EL2
+         msr     scr_el3, x0
+@@ -42,7 +41,7 @@ _start:
+         str     w0, [x1]
+
+  1:     ldr     x1, =GIC_DIST_BASE + 0x80       // GICD_IGROUPR
+-       mov     w0, #~0                         // Grp1 interrupts
++       mov     w0, #0                          // Grp0 interrupts
+         str     w0, [x1], #4
+         b.ne    2f                              // Only local 
+interrupts for secondary CPUs
+         str     w0, [x1], #4
+@@ -62,7 +61,7 @@ _start:
+          * Prepare the switch to the EL2_SP1 mode from EL3
+          */
+         ldr     x0, =start_ns                   // Return after mode switch
+-       mov     x1, #0x3c9                      // EL2_SP1 | D | A | I | F
++       mov     x1, #0x3c5                      // EL1_SP1 | D | A | I | F
+         msr     elr_el3, x0
+         msr     spsr_el3, x1
+         eret
+
+>>> BTW, why do you need this? There are no virtualisation features
+>>> supported on the secure side.
+>>
+>> So far the virtualisation is not a mandatory feature in short term due
+>> now our product is mainly focusing on the mobile product, so firstly we
+>> want to enable Linux kernel directly on secure world; just like we do
+>> same as ARMv7.
+>
+> But is there other reason than just being the same as on your ARMv7
+> platform?
+>
+> Apart from virtualisation, there are other Linux developments that
+> assume Linux running in non-secure mode (SMMU, future GIC). I *strongly*
+> recommend that you run AArch64 Linux in non-secure mode from start (and
+> for the early bring-up, just configure your hardware to allow non-secure
+> access to all your peripherals/registers).
+>
+
+I have no such whole picture as you arm guys for ARMv8 and related 
+features; this is also what i have concern if here have show stopper 
+issue if kernel run in S-EL1. So thanks for the reminding and more 
+detailed info will always be welcomed.
+
+After the generic firmware has been opened and we get the code, then we 
+will study it carefully and estimate how to deploy it.
+
+Thx,
+Leo Yan
