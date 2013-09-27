@@ -1,29 +1,37 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 27 Sep 2013 09:15:54 -0400
-Subject: device tree binding documentation outdated
-In-Reply-To: <20130926232907.GV12758@n2100.arm.linux.org.uk>
-References: <20130926195158.GS12758@n2100.arm.linux.org.uk>
- <CAOMZO5ANsZGcpvmtBE7d0q0E6+f0bE_U8CBF7G2v3xtqoLbqcA@mail.gmail.com>
- <20130926205906.GT12758@n2100.arm.linux.org.uk>
- <CAHCPf3u9KyoJiAPv6oc_ZdVBqgix41__RAGRXh8z+d5bXO8fQw@mail.gmail.com>
- <20130926232907.GV12758@n2100.arm.linux.org.uk>
-Message-ID: <20130927131554.GB31178@titan.lakedaemon.net>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Fri, 27 Sep 2013 15:17:02 +0200
+Subject: [PATCH] clockevent: exynos_mct: fix lockdep warning
+In-Reply-To: <CACVXFVO=k-wJ2SrjVQ_k1JhtAOo0-rZ_M780rqGWCbKA8_1qBQ@mail.gmail.com>
+References: <1380120578-17458-1-git-send-email-tom.leiming@gmail.com>	<5243823D.4040208@linaro.org>	<17472486.7GQJa9ux9F@amdc1227>
+ <CACVXFVO=k-wJ2SrjVQ_k1JhtAOo0-rZ_M780rqGWCbKA8_1qBQ@mail.gmail.com>
+Message-ID: <5245854E.5030600@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell,
+On 09/27/2013 03:09 PM, Ming Lei wrote:
+> On Thu, Sep 26, 2013 at 6:32 PM, Tomasz Figa <t.figa@samsung.com> wrote:
+>>
+>> This is a fix that we may want to have, but it must be modified to take
+>> my regression fix[1] into account.
+>>
+>> [1] clocksource: exynos_mct: Set IRQ affinity when the CPU goes online
+>> http://thread.gmane.org/gmane.linux.kernel.samsung-soc/22511/focus=23418
+>
+> OK, I will write and submit v1 against your patch.
 
-On Fri, Sep 27, 2013 at 12:29:07AM +0100, Russell King - ARM Linux wrote:
-> I haven't sorted out a rootfs for this yet, so it fails trying to find
-> that.  (Rabeeh's kernel contained an initramfs buildroot image - it
-> might be useful to find some way to load that as a separate image -
-> does appended DT support that?)
+Better you stick to
 
-yes, point to it in your config, kbuild will build the initramfs in.
-Appending the dtb and running mkimage has been working fine for me.
+https://git.kernel.org/cgit/linux/kernel/git/tip/tip.git/
 
-That's how I get to /sys/kernel/debug/pinctrl :)
+or you rebase it against the v3.12-rc3 when it goes out.
 
-thx,
+Thanks
+   -- Daniel
 
-Jason.
+
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
