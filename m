@@ -1,30 +1,111 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 27 Sep 2013 10:19:27 +0800
-Subject: [PATCH v6 3/3] PCI: imx6: Add support for i.MX6 PCIe controller
-In-Reply-To: <0E83723C55F66F43A6041464FE31119D3F7E6A@039-SN2MPN1-012.039d.mgd.msft.net>
-References: <1379319655-20210-1-git-send-email-xobs@kosagi.com>
- <1379319655-20210-4-git-send-email-xobs@kosagi.com>
- <CAJ+vNU32oMZq=jrSCpk_ZjYc08kRBAqhOS8uYfor28gY8WGhnw@mail.gmail.com>
- <0E83723C55F66F43A6041464FE31119D3F7E6A@039-SN2MPN1-012.039d.mgd.msft.net>
-Message-ID: <20130927021925.GF25146@S2101-09.ap.freescale.net>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 26 Sep 2013 21:24:49 -0500
+Subject: [PATCH 1/6] cpuidle: calxeda: add support to use PSCI calls
+In-Reply-To: <1380248694-13388-1-git-send-email-robherring2@gmail.com>
+References: <1380248694-13388-1-git-send-email-robherring2@gmail.com>
+Message-ID: <1380248694-13388-2-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 27, 2013 at 01:38:39AM +0000, Zhu Richard-R65037 wrote:
-> Hi Tim:
-> Thanks for your tests.
-> Yes, it is. There are some problems when the PCIe switch is used on the 3.1x kernel at my side too, although the PCIe switch
-> is ok on FSL imx_3.0.35 kernels.
-> I'm debugging this issue now, and would summit the patches asap.
-> 
+From: Rob Herring <rob.herring@calxeda.com>
 
->From what I read, it seems Sean's series does not support PCIe switch.
-At least, he hasn't got any device to test it.  And there is some
-problem with PCIe switch running the latest kernel, which might not be
-related to the controller driver.
+This updates the Calxeda cpuidle driver to use PSCI calls to powergate
+cores. This is needed to enable cpuidle for the ECX-2000.
 
-I suggest we ask Bjorn to merge the v7 I sent yesterday, so that people
-can have a same base to work on, and add PCIe switch support with
-incremental patches.   Does that sound good to you, Tim?
+This could possibly become a generic PSCI driver, but there are no other
+PSCI users in the kernel other than mach-virt.
 
-Shawn
+Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+Cc: "Rafael J. Wysocki" <rjw@sisk.pl>
+Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+Cc: linux-pm at vger.kernel.org
+---
+ drivers/cpuidle/Kconfig.arm       |  2 +-
+ drivers/cpuidle/cpuidle-calxeda.c | 40 ++++++---------------------------------
+ 2 files changed, 7 insertions(+), 35 deletions(-)
+
+diff --git a/drivers/cpuidle/Kconfig.arm b/drivers/cpuidle/Kconfig.arm
+index 8e36603..d6f57d5 100644
+--- a/drivers/cpuidle/Kconfig.arm
++++ b/drivers/cpuidle/Kconfig.arm
+@@ -4,7 +4,7 @@
+ 
+ config ARM_HIGHBANK_CPUIDLE
+ 	bool "CPU Idle Driver for Calxeda processors"
+-	depends on ARCH_HIGHBANK
++	depends on ARM_PSCI
+ 	select ARM_CPU_SUSPEND
+ 	help
+ 	  Select this to enable cpuidle on Calxeda processors.
+diff --git a/drivers/cpuidle/cpuidle-calxeda.c b/drivers/cpuidle/cpuidle-calxeda.c
+index 3460584..01cfecf3 100644
+--- a/drivers/cpuidle/cpuidle-calxeda.c
++++ b/drivers/cpuidle/cpuidle-calxeda.c
+@@ -22,51 +22,23 @@
+ 
+ #include <linux/cpuidle.h>
+ #include <linux/init.h>
+-#include <linux/io.h>
+ #include <linux/of.h>
+-#include <linux/time.h>
+-#include <linux/delay.h>
+-#include <linux/suspend.h>
+ #include <asm/cpuidle.h>
+-#include <asm/proc-fns.h>
+-#include <asm/smp_scu.h>
+ #include <asm/suspend.h>
+-#include <asm/cacheflush.h>
+-#include <asm/cp15.h>
+-
+-extern void highbank_set_cpu_jump(int cpu, void *jump_addr);
+-extern void __iomem *scu_base_addr;
+-
+-static noinline void calxeda_idle_restore(void)
+-{
+-	set_cr(get_cr() | CR_C);
+-	set_auxcr(get_auxcr() | 0x40);
+-	scu_power_mode(scu_base_addr, SCU_PM_NORMAL);
+-}
++#include <asm/psci.h>
+ 
+ static int calxeda_idle_finish(unsigned long val)
+ {
+-	/* Already flushed cache, but do it again as the outer cache functions
+-	 * dirty the cache with spinlocks */
+-	flush_cache_all();
+-
+-	set_auxcr(get_auxcr() & ~0x40);
+-	set_cr(get_cr() & ~CR_C);
+-
+-	scu_power_mode(scu_base_addr, SCU_PM_DORMANT);
+-
+-	cpu_do_idle();
+-
+-	/* Restore things if we didn't enter power-gating */
+-	calxeda_idle_restore();
+-	return 1;
++	const struct psci_power_state ps = {
++		.type = PSCI_POWER_STATE_TYPE_POWER_DOWN,
++	};
++	return psci_ops.cpu_suspend(ps, __pa(cpu_resume));
+ }
+ 
+ static int calxeda_pwrdown_idle(struct cpuidle_device *dev,
+ 				struct cpuidle_driver *drv,
+ 				int index)
+ {
+-	highbank_set_cpu_jump(smp_processor_id(), cpu_resume);
+ 	cpu_suspend(0, calxeda_idle_finish);
+ 	return index;
+ }
+@@ -90,7 +62,7 @@ static struct cpuidle_driver calxeda_idle_driver = {
+ 
+ static int __init calxeda_cpuidle_init(void)
+ {
+-	if (!of_machine_is_compatible("calxeda,highbank"))
++	if (!of_machine_is_compatible("calxeda,highbank") || !psci_ops.cpu_suspend)
+ 		return -ENODEV;
+ 
+ 	return cpuidle_register(&calxeda_idle_driver, NULL);
+-- 
+1.8.1.2
