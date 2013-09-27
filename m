@@ -1,51 +1,64 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Fri, 27 Sep 2013 08:48:16 +0200
-Subject: [PATCH 2/2] ARM: AT91: Animeo IP: add ADC support
-In-Reply-To: <1380264496-16887-1-git-send-email-plagnioj@jcrosoft.com>
-References: <1380264496-16887-1-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <1380264496-16887-2-git-send-email-plagnioj@jcrosoft.com>
+Date: Fri, 27 Sep 2013 08:48:15 +0200
+Subject: [PATCH 1/2] ARM: AT91: Animeo IP: fix mtd partition table
+Message-ID: <1380264496-16887-1-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-enable ADC driver in dt defconfig
+Update to production one.
 
 Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
 ---
- arch/arm/boot/dts/animeo_ip.dts    | 7 +++++++
- arch/arm/configs/at91_dt_defconfig | 2 ++
- 2 files changed, 9 insertions(+)
+ arch/arm/boot/dts/animeo_ip.dts | 31 ++++++++-----------------------
+ 1 file changed, 8 insertions(+), 23 deletions(-)
 
 diff --git a/arch/arm/boot/dts/animeo_ip.dts b/arch/arm/boot/dts/animeo_ip.dts
-index 6b4b6a1..ee188ce 100644
+index cfed178..6b4b6a1 100644
 --- a/arch/arm/boot/dts/animeo_ip.dts
 +++ b/arch/arm/boot/dts/animeo_ip.dts
-@@ -90,6 +90,13 @@
- 				};
+@@ -101,34 +101,19 @@
+ 			nand-on-flash-bbt;
+ 			status = "okay";
+ 
+-			at91bootstrap at 0 {
+-				label = "at91bootstrap";
+-				reg = <0x0 0x8000>;
+-			};
+-
+-			barebox at 8000 {
++			barebox at 0 {
+ 				label = "barebox";
+-				reg = <0x8000 0x40000>;
+-			};
+-
+-			bareboxenv at 48000 {
+-				label = "bareboxenv";
+-				reg = <0x48000 0x8000>;
+-			};
+-
+-			user_block at 0x50000 {
+-				label = "user_block";
+-				reg = <0x50000 0xb0000>;
++				reg = <0x0 0x58000>;
  			};
  
-+			adc0: adc at fffe0000 {
-+				atmel,adc-channels-used = <0x3>;
-+				atmel,adc-sleep-mode;
-+				atmel,adc-sample-hold-time = <2>;
-+				status = "okay";
-+			};
-+
- 			watchdog at fffffd40 {
- 				status = "okay";
+-			kernel at 100000 {
+-				label = "kernel";
+-				reg = <0x100000 0x1b0000>;
++			u_boot_env at 58000 {
++				label = "u_boot_env";
++				reg = <0x58000 0x8000>;
  			};
-diff --git a/arch/arm/configs/at91_dt_defconfig b/arch/arm/configs/at91_dt_defconfig
-index 690e892..1eae64f 100644
---- a/arch/arm/configs/at91_dt_defconfig
-+++ b/arch/arm/configs/at91_dt_defconfig
-@@ -177,6 +177,8 @@ CONFIG_RTC_DRV_AT91RM9200=y
- CONFIG_RTC_DRV_AT91SAM9=y
- CONFIG_DMADEVICES=y
- # CONFIG_IOMMU_SUPPORT is not set
-+CONFIG_IIO=y
-+CONFIG_AT91_ADC=y
- CONFIG_EXT4_FS=y
- CONFIG_FANOTIFY=y
- CONFIG_VFAT_FS=y
+ 
+-			root at 2b0000 {
+-				label = "root";
+-				reg = <0x2b0000 0x1D50000>;
++			ubi at 60000 {
++				label = "ubi";
++				reg = <0x60000 0x1FA0000>;
+ 			};
+ 		};
+ 
 -- 
 1.8.4.rc3
