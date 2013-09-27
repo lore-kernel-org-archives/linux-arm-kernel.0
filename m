@@ -1,53 +1,51 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Fri, 27 Sep 2013 08:37:59 +0200
-Subject: [PATCH v2] ARM: at91: sam9g45: shutdown ddr1 too when rebooting
-Message-ID: <1380263879-16325-1-git-send-email-plagnioj@jcrosoft.com>
+Date: Fri, 27 Sep 2013 08:48:16 +0200
+Subject: [PATCH 2/2] ARM: AT91: Animeo IP: add ADC support
+In-Reply-To: <1380264496-16887-1-git-send-email-plagnioj@jcrosoft.com>
+References: <1380264496-16887-1-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <1380264496-16887-2-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-as on ddr0 we need to cleanly shutdown ddr1 if used before rebooting
+enable ADC driver in dt defconfig
 
 Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
 ---
-v2:
+ arch/arm/boot/dts/animeo_ip.dts    | 7 +++++++
+ arch/arm/configs/at91_dt_defconfig | 2 ++
+ 2 files changed, 9 insertions(+)
 
-	use ldr     r5, [r5, #4]
-
-Best Regards,
-J.
- arch/arm/mach-at91/at91sam9g45_reset.S | 8 ++++++++
- 1 file changed, 8 insertions(+)
-
-diff --git a/arch/arm/mach-at91/at91sam9g45_reset.S b/arch/arm/mach-at91/at91sam9g45_reset.S
-index 721a1a3..c40c1e2 100644
---- a/arch/arm/mach-at91/at91sam9g45_reset.S
-+++ b/arch/arm/mach-at91/at91sam9g45_reset.S
-@@ -16,11 +16,17 @@
- #include "at91_rstc.h"
- 			.arm
+diff --git a/arch/arm/boot/dts/animeo_ip.dts b/arch/arm/boot/dts/animeo_ip.dts
+index 6b4b6a1..ee188ce 100644
+--- a/arch/arm/boot/dts/animeo_ip.dts
++++ b/arch/arm/boot/dts/animeo_ip.dts
+@@ -90,6 +90,13 @@
+ 				};
+ 			};
  
-+/*
-+ * at91_ramc_base is an array void*
-+ * init at NULL if only one DDR controler is present in or DT
-+ */
- 			.globl	at91sam9g45_restart
- 
- at91sam9g45_restart:
- 			ldr	r5, =at91_ramc_base		@ preload constants
- 			ldr	r0, [r5]
-+			ldr	r5, [r5, #4]			@ ddr1
-+			cmp	r5, #0
- 			ldr	r4, =at91_rstc_base
- 			ldr	r1, [r4]
- 
-@@ -30,6 +36,8 @@ at91sam9g45_restart:
- 
- 			.balign	32				@ align to cache line
- 
-+			strne	r2, [r5, #AT91_DDRSDRC_RTR]	@ disable DDR1 access
-+			strne	r3, [r5, #AT91_DDRSDRC_LPR]	@ power down DDR1
- 			str	r2, [r0, #AT91_DDRSDRC_RTR]	@ disable DDR0 access
- 			str	r3, [r0, #AT91_DDRSDRC_LPR]	@ power down DDR0
- 			str	r4, [r1, #AT91_RSTC_CR]		@ reset processor
++			adc0: adc at fffe0000 {
++				atmel,adc-channels-used = <0x3>;
++				atmel,adc-sleep-mode;
++				atmel,adc-sample-hold-time = <2>;
++				status = "okay";
++			};
++
+ 			watchdog at fffffd40 {
+ 				status = "okay";
+ 			};
+diff --git a/arch/arm/configs/at91_dt_defconfig b/arch/arm/configs/at91_dt_defconfig
+index 690e892..1eae64f 100644
+--- a/arch/arm/configs/at91_dt_defconfig
++++ b/arch/arm/configs/at91_dt_defconfig
+@@ -177,6 +177,8 @@ CONFIG_RTC_DRV_AT91RM9200=y
+ CONFIG_RTC_DRV_AT91SAM9=y
+ CONFIG_DMADEVICES=y
+ # CONFIG_IOMMU_SUPPORT is not set
++CONFIG_IIO=y
++CONFIG_AT91_ADC=y
+ CONFIG_EXT4_FS=y
+ CONFIG_FANOTIFY=y
+ CONFIG_VFAT_FS=y
 -- 
 1.8.4.rc3
