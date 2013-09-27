@@ -1,49 +1,63 @@
-From: xobs@kosagi.com (Sean Cross)
-Date: Fri, 27 Sep 2013 11:54:40 +0800
-Subject: [PATCH v6 3/3] PCI: imx6: Add support for i.MX6 PCIe controller
-In-Reply-To: <017e01cebb33$44fa65b0$ceef3110$%han@samsung.com>
-References: <1379319655-20210-1-git-send-email-xobs@kosagi.com>
- <1379319655-20210-4-git-send-email-xobs@kosagi.com>
- <CAJ+vNU32oMZq=jrSCpk_ZjYc08kRBAqhOS8uYfor28gY8WGhnw@mail.gmail.com>
- <0E83723C55F66F43A6041464FE31119D3F7E6A@039-SN2MPN1-012.039d.mgd.msft.net>
- <20130927021925.GF25146@S2101-09.ap.freescale.net>
- <017e01cebb33$44fa65b0$ceef3110$%han@samsung.com>
-Message-ID: <52450180.2070807@kosagi.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Fri, 27 Sep 2013 05:59:20 +0200
+Subject: [PATCH] video: mxsfb: Add missing break
+In-Reply-To: <201309261504.45088.marex@denx.de>
+References: <1380194038-5148-1-git-send-email-marex@denx.de>
+ <524429C0.2020907@ti.com> <201309261504.45088.marex@denx.de>
+Message-ID: <20130927035920.GG18477@ns203013.ovh.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27/9/13 11:40 AM, Jingoo Han wrote:
-> On Friday, September 27, 2013 11:19 AM, Shawn Guo wrote:
->> On Fri, Sep 27, 2013 at 01:38:39AM +0000, Zhu Richard-R65037 wrote:
->>> Hi Tim:
->>> Thanks for your tests.
->>> Yes, it is. There are some problems when the PCIe switch is used
->>> on the 3.1x kernel at my side too,
->> although the PCIe switch
->>> is ok on FSL imx_3.0.35 kernels.
->>> I'm debugging this issue now, and would summit the patches asap.
->>>
->>  From what I read, it seems Sean's series does not support PCIe switch.
->> At least, he hasn't got any device to test it.  And there is some
->> problem with PCIe switch running the latest kernel, which might not be
->> related to the controller driver.
->>
->> I suggest we ask Bjorn to merge the v7 I sent yesterday, so that people
->> can have a same base to work on, and add PCIe switch support with
->> incremental patches.   Does that sound good to you, Tim?
->>
-> Hi Shawn Guo,
->
-> I agree with your suggestion. :-)
-> The PCIe switch support patches can be added later, after the v7 patch for
-> i.MX6 PCIe controller driver is merged.
->
-> Also, if the PCIe switch support patches modify the synopsys designware PCIe
-> driver (pcie-designware.c), it should be confirmed by other related people.
->
-Correct.  My series doesn't support PCIe switches mostly because I don't 
-have one to test with.  It would be interesting to see if PCIe switches 
-work with other Designware drivers.
+On 15:04 Thu 26 Sep     , Marek Vasut wrote:
+> Hi Tomi,
+> 
+> > On 26/09/13 14:13, Marek Vasut wrote:
+> > > Add missing break into the restore function.
+> > > 
+> > > Signed-off-by: Marek Vasut <marex@denx.de>
+> > > Cc: Fabio Estevam <fabio.estevam@freescale.com>
+> > > Cc: Shawn Guo <shawn.guo@linaro.org>
+> > > Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
+> > > ---
+> > > 
+> > >  drivers/video/mxsfb.c | 1 +
+> > >  1 file changed, 1 insertion(+)
+> > > 
+> > > diff --git a/drivers/video/mxsfb.c b/drivers/video/mxsfb.c
+> > > index d250ed0..27197a8 100644
+> > > --- a/drivers/video/mxsfb.c
+> > > +++ b/drivers/video/mxsfb.c
+> > > @@ -620,6 +620,7 @@ static int mxsfb_restore_mode(struct mxsfb_info
+> > > *host)
+> > > 
+> > >  		break;
+> > >  	
+> > >  	case 3:
+> > >  		bits_per_pixel = 32;
+> > > 
+> > > +		break;
+> > > 
+> > >  	case 1:
+> > >  	
+> > >  	default:
+> > >  		return -EINVAL;
+> > 
+> > Thanks, queued for 3.12 fixes.
+> 
+> Can you please also queue this for stable 3.10? It's broken there too.
 
----
-Sean
+this you have to do it by yourself by cc stable
+
+Greg will take it not us
+
+Best Regards,
+J.
+> 
+> Thanks!
+> 
+> Best regards,
+> Marek Vasut
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-fbdev" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
