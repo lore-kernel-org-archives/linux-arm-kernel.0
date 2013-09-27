@@ -1,72 +1,27 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Fri, 27 Sep 2013 08:26:35 -0500
-Subject: [PATCHv4 11/18] arm: dts: add omap4430 thermal data
-In-Reply-To: <5245861F.7000109@ti.com>
-References: <1380251605-3804-1-git-send-email-eduardo.valentin@ti.com>
- <1380251605-3804-12-git-send-email-eduardo.valentin@ti.com>
- <20130927122439.GA8360@kahuna> <5245861F.7000109@ti.com>
-Message-ID: <CAGo_u6p3pp2EBo_fJE_RJOdrc05OHM-QFgCZFBUW+duhPgOYpw@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 27 Sep 2013 15:29:55 +0200
+Subject: device tree binding documentation outdated
+In-Reply-To: <20130927132107.GZ12758@n2100.arm.linux.org.uk>
+References: <20130926195158.GS12758@n2100.arm.linux.org.uk>
+ <CAOMZO5ANsZGcpvmtBE7d0q0E6+f0bE_U8CBF7G2v3xtqoLbqcA@mail.gmail.com>
+ <CACRpkda9HZ4JKnidnJJh-HkhCgtvJwQPQJnv9CZ4iYcQP36_Nw@mail.gmail.com>
+ <20130927025116.GG25146@S2101-09.ap.freescale.net>
+ <20130927084504.GW12758@n2100.arm.linux.org.uk>
+ <20130927122814.GK25146@S2101-09.ap.freescale.net>
+ <20130927131225.GA31178@titan.lakedaemon.net>
+ <20130927132107.GZ12758@n2100.arm.linux.org.uk>
+Message-ID: <CACRpkdasN9Yg5C0cNM7USncXqRG4Q3n-xRKL0DcnJ-iLCc3pSQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 27, 2013 at 8:20 AM, Eduardo Valentin
-<eduardo.valentin@ti.com> wrote:
-> On 27-09-2013 08:24, Nishanth Menon wrote:
->> On 23:13-20130926, Eduardo Valentin wrote:
->>> This patch changes the dtsi entry on omap4430 to contain
->>> the thermal data. This data will enable the passive
->>> cooling with CPUfreq cooling device at 100C and the
->>> system will do a thermal shutdown at 125C.
->>>
->>> Cc: "Beno?t Cousson" <bcousson@baylibre.com>
->>> Cc: Tony Lindgren <tony@atomide.com>
->>> Cc: Russell King <linux@arm.linux.org.uk>
->>> Cc: linux-omap at vger.kernel.org
->>> Cc: devicetree-discuss at lists.ozlabs.org
->>> Cc: linux-arm-kernel at lists.infradead.org
->>> Cc: linux-kernel at vger.kernel.org
->>> Signed-off-by: Eduardo Valentin <eduardo.valentin@ti.com>
->>> ---
->>>  arch/arm/boot/dts/omap443x.dtsi | 10 ++++++++--
->>>  1 file changed, 8 insertions(+), 2 deletions(-)
->>>
->>> diff --git a/arch/arm/boot/dts/omap443x.dtsi b/arch/arm/boot/dts/omap443x.dtsi
->>> index bcf455e..e9c97d6 100644
->>> --- a/arch/arm/boot/dts/omap443x.dtsi
->>> +++ b/arch/arm/boot/dts/omap443x.dtsi
->>> @@ -12,7 +12,7 @@
->>>
->>>  / {
->>>      cpus {
->>> -            cpu at 0 {
->>> +            cpu0: cpu at 0 {
->>>                      /* OMAP443x variants OPP50-OPPNT */
->>>                      operating-points = <
->>>                              /* kHz    uV */
->>> @@ -25,9 +25,15 @@
->>>              };
->>>      };
->>>
->>> -    bandgap {
->>> +    thermal-zones{
->>> +            #include "omap4-cpu-thermal.dtsi"
->>> +    };
->>> +
->>> +    bandgap: bandgap {
->>>              reg = <0x4a002260 0x4
->>>                     0x4a00232C 0x4>;
->>>              compatible = "ti,omap4430-bandgap";
->>> +
->>> +            #thermal-sensor-cells = <0>;
->> 2 cents:
->> we might want to move bandgap under ocp?
->>
->
-> Yes, agreed. But I don't think this change is related to this patch or
-> to this series.
+On Fri, Sep 27, 2013 at 3:21 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
 
-Correct - this comment is not related to the current patch, hence my 2
-cents ;) - will be nice to have it cleaned up though..
+> I think I'll be bringing up what a disaster this DT stuff is in
+> Edinburgh.
 
-Regards,
-Nishanth Menon
+I think this topic suggested by Wolfram is spot on:
+http://lists.linuxfoundation.org/pipermail/ksummit-2013-discuss/2013-July/000110.html
+
+Yours,
+Linus Walleij
