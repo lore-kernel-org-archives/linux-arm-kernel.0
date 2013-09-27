@@ -1,47 +1,51 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Fri, 27 Sep 2013 13:24:26 -0600
-Subject: [PATCH v7 0/2] Add PCIe support for i.MX6q
-In-Reply-To: <1380165887-13506-1-git-send-email-shawn.guo@linaro.org>
-References: <1380165887-13506-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <CAErSpo4JhjW5a-74eJp5bajmAMKSn4Vxknk8NoVdD462N=Ncug@mail.gmail.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Fri, 27 Sep 2013 21:41:32 +0200
+Subject: new binutils needed for arm in 3.12-rc1
+In-Reply-To: <1380235709.1974.93@driftwood>
+References: <alpine.LFD.2.03.1309251147320.312@syhkavp.arg>
+ <1380235709.1974.93@driftwood>
+Message-ID: <20130927194132.GA31663@amd.pavel.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 25, 2013 at 9:24 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
-> Hi Bjorn,
->
-> This is basically a resend of imx6 pcie driver patch for inclusion into
-> PCI tree.  Since we expect you apply the patch with your SoB, I dropped
-> your ACK tag there.
->
-> I have to ask you to carry the first patch which adds some macros to be
-> used by pcie driver patch.  Since imx6q-iomuxc-gpr.h gets rare updates
-> recently, it should be less likely we will run into merge conflict on it.
->
-> Changes since v6:
->
-> * Drop arch bits from driver patch, and will handle arch bits through
->   arm-soc separately.
-> * Use devm_clk_get() instead of clk_get().
-> * Drop unnecessary (val != exp_val) check in pcie_phy_poll_ack() loop.
-> * Rename function imx6_init() to imx6_pcie_init().
->
-> Shawn
->
-> Sean Cross (2):
->   ARM: imx6q: Add PCIe bits to GPR syscon definition
->   PCI: imx6: Add support for i.MX6 PCIe controller
->
->  .../devicetree/bindings/pci/designware-pcie.txt    |    7 +-
->  drivers/pci/host/Kconfig                           |    6 +
->  drivers/pci/host/Makefile                          |    1 +
->  drivers/pci/host/pci-imx6.c                        |  576 ++++++++++++++++++++
->  include/linux/mfd/syscon/imx6q-iomuxc-gpr.h        |    8 +
->  5 files changed, 597 insertions(+), 1 deletion(-)
->  create mode 100644 drivers/pci/host/pci-imx6.c
+Hi!
 
-I merged both of these to my pci/host-imx6 branch for v3.13.
+On Thu 2013-09-26 17:48:29, Rob Landley wrote:
+> On 09/25/2013 11:13:17 AM, Nicolas Pitre wrote:
+> >On Wed, 25 Sep 2013, Rob Landley wrote:
+> >
+> >> On 09/24/2013 09:07:57 PM, Nicolas Pitre wrote:
+> >> > I'd strongly suggest you make your binutils compatible with newer
+> >> > instruction syntax instead of making the kernel more complex.
+> >>
+> >> Meaning I play whack-a-mole as this becomes permission to depend
+> >on endless
+> >> new gnuisms just because they're there and nobody else is
+> >regression testing
+> >> against them, not because they actually add anything.
+> >
+> >Gnuism?
+> >
+> >Let me quote the ARM ARchitecture Reference Manual, version 7
+> >revision C,
+> >section A8.8.44 (sorry for the whitespace dammage):
+> 
+> Globally changing the binutils requirement for all architectures, as
+> the doc patch at the start of this thread proposed doing, would mean
+> gnuisms in common code (ext2 and such) wouldn't get caught, giving
+> llvm and pcc and such a moving target when trying to build the
+> kernel with non-gnu toolchains. That's what I meant by gnuisms
+> breeding.
 
-I made a couple minor spelling and whitespace corrections.
+Well. I did the docs patch, but my preferred solution would actually
+be to get the patches reverted so that it still works with old
+binutils.
 
-Bjorn
+(So far, I updated one machine with new cross environment, two more to
+go.)
+
+Anyway, it should be solved _somehow_.
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
