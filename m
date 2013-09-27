@@ -1,86 +1,48 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Fri, 27 Sep 2013 11:43:59 +0200
-Subject: imprecise external abort using the flexcan driver on i.MX6Q
-In-Reply-To: <21061.20097.221946.197751@ipc1.ka-ro>
-References: <21060.15934.600859.167074@ipc1.ka-ro>
- <524455FD.7070808@pengutronix.de>
- <20130926155422.GQ12758@n2100.arm.linux.org.uk> <52445FBE.4060503@ti.com>
- <21061.20097.221946.197751@ipc1.ka-ro>
-Message-ID: <5245535F.6020804@pengutronix.de>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 27 Sep 2013 10:51:57 +0100
+Subject: [PATCH 2/9] iommu/arm-smmu: Calculate SMMU_CB_BASE from smmu
+ register values
+In-Reply-To: <1380234982-1677-3-git-send-email-andreas.herrmann@calxeda.com>
+References: <1380234982-1677-1-git-send-email-andreas.herrmann@calxeda.com>
+ <1380234982-1677-3-git-send-email-andreas.herrmann@calxeda.com>
+Message-ID: <20130927095157.GA9057@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/27/2013 11:23 AM, Lothar Wa?mann wrote:
-> Hi,
-> 
-> Santosh Shilimkar writes:
->> On Thursday 26 September 2013 11:54 AM, Russell King - ARM Linux wrote:
->>> On Thu, Sep 26, 2013 at 05:42:53PM +0200, Marc Kleine-Budde wrote:
->>>> On 09/26/2013 04:01 PM, Lothar Wa?mann wrote:
->>>>> Hi,
->>>>>
->>>>> when enabling the can interface with 'ifconfig can0 up' (after
->>>>> configuring the bitrate with canconfig) on an i.MX6Q board (TX6) I'm
->>>>> getting the following kernel dump:
->>>>>
->>>>> |flexcan 2094000.flexcan can0: writing ctrl=0x0a212003
->>>>> |flexcan 2094000.flexcan can0: flexcan_set_bittiming: mcr=0x5980000f ctrl=0x0a212003
->>>>> |flexcan 2094000.flexcan can0: flexcan_chip_start: writing mcr=0x79a2020f
->>>>> |flexcan 2094000.flexcan can0: flexcan_chip_start: writing ctrl=0x0a21ac53
->>>>> |Unhandled fault: imprecise external abort (0x1c06) at 0x00057adc
->>>>
->>>> Looks like a NULL pointer deref to me. But it doesn't make any sense,
->>>> because the offset is way beyond the length of the struct flexcan_regs.
->>>
->>> NULL pointer derefs don't produce imprecise external aborts.  I believe
->>> that the FAR is unpredictable for such aborts as well, which means the
->>> "at xxxx" should be ignored.
->>>
->> yep .. FAR is never reliable for imprecise external aborts.
->>
->>> Bearing in mind that it is imprecise, that means that the abort happened
->>> sometime in the past, so the PC isn't reliable either.
->>>
->>> The code here is:
->>>
->>>    0:	f57ff04e 	dsb	st
->>>    4:	e3a01000 	mov	r1, #0
->>>    8:	e5820000 	str	r0, [r2]
->>>    c:	f57ff04e 	dsb	st
->>>   10:	e5820004 	str	r0, [r2, #4]
->>>
->>> Given the dsbs there, it's probably the str r0, [r2] which provoked it,
->>> and we can see from the register dump, r2 is not NULL.
->>>
->>> It's probably complaining that a clock necessary for the peripherals
->>> registers to be accessible is not running.
->>>
->> Not sure if it helps but almost 90% of the imprecise external aborts
->> cases I have seen on OMAP attributed to clock not being available
->> at the IP register accesses race conditions either at SW or
->> hardware(clock settling time). And rest of the 10 % majority falling
->> into interconnect synchronization issues.
->>
-> I already checked this by enabling all clocks with devmem.
-> If a clock would be missing I would expect all register wriites to
-> fail not the register write to the _second_ mailbox (after the first
-> mailbox has been successfully initialized).
+Hi Andreas,
 
-They layout of the flexcan varies in the different imx chips. I'm
-comparing the datasheets at the moment. As Russell pointed out the area
-staring at offset 0x80 is by the reception FIFO engine.
+On Thu, Sep 26, 2013 at 11:36:14PM +0100, Andreas Herrmann wrote:
+> Currently it is derived from smmu resource size.  In case of a
+> mismatchin between the two calculations trust DT more than register
+> values and overwrite cb_base.
 
-Marc
--- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+I thought the driver already favoured the DT?
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 259 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130927/5ba657f9/attachment.sig>
+> @@ -1702,12 +1704,23 @@ static int arm_smmu_device_cfg_probe(struct arm_smmu_device *smmu)
+>  
+>  	/* Check that we ioremapped enough */
+>  	size = 1 << (((id >> ID1_NUMPAGENDXB_SHIFT) & ID1_NUMPAGENDXB_MASK) + 1);
+> -	size *= (smmu->pagesize << 1);
+> +	size *= smmu->pagesize;
+> +	smmu->cb_base = smmu->base + size;
+> +	size *= 2;
+> +
+>  	if (smmu->size < size)
+>  		dev_warn(smmu->dev,
+>  			 "device is 0x%lx bytes but only mapped 0x%lx!\n",
+>  			 size, smmu->size);
+>  
+> +	t = (unsigned long) smmu->base + (smmu->size >> 1);
+> +	if ((unsigned long)smmu->cb_base != t) {
+> +		dev_warn(smmu->dev, "address space mismatch, "
+> +			"overwriting cb_base (old: 0x%lx, new: 0x%lx)\n",
+> +			(unsigned long) smmu->cb_base, t);
+> +		smmu->cb_base = (void *) t;
+> +	}
+> +
+
+I expect I'm just being slow here (only one coffee in), but I can't see what
+this gets us over the current use of resource_size (which goes and uses the
+DT).
+
+Will
