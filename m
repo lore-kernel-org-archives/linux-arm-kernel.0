@@ -1,59 +1,63 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 27 Sep 2013 11:51:53 +0100
-Subject: [PATCH 2/9] iommu/arm-smmu: Calculate SMMU_CB_BASE from smmu
- register values
-In-Reply-To: <20130927102359.GL3315@alberich>
-References: <1380234982-1677-1-git-send-email-andreas.herrmann@calxeda.com>
- <1380234982-1677-3-git-send-email-andreas.herrmann@calxeda.com>
- <20130927095157.GA9057@mudshark.cambridge.arm.com>
- <20130927102359.GL3315@alberich>
-Message-ID: <20130927105153.GG9057@mudshark.cambridge.arm.com>
+Date: Fri, 27 Sep 2013 11:59:03 +0100
+Subject: [RFT PATCH v1 6/7] amd64: avoid saving and restoring FPSIMD
+ registers until threads access them
+In-Reply-To: <1380269087-8520-7-git-send-email-liuj97@gmail.com>
+References: <1380269087-8520-1-git-send-email-liuj97@gmail.com>
+ <1380269087-8520-7-git-send-email-liuj97@gmail.com>
+Message-ID: <20130927105902.GH9057@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 27, 2013 at 11:23:59AM +0100, Andreas Herrmann wrote:
-> On Fri, Sep 27, 2013 at 05:51:57AM -0400, Will Deacon wrote:
-> > Hi Andreas,
-> > 
-> > On Thu, Sep 26, 2013 at 11:36:14PM +0100, Andreas Herrmann wrote:
-> > > Currently it is derived from smmu resource size.  In case of a
-> > > mismatchin between the two calculations trust DT more than register
-> > > values and overwrite cb_base.
-> > 
-> > I thought the driver already favoured the DT?
-> > 
-> > > @@ -1702,12 +1704,23 @@ static int arm_smmu_device_cfg_probe(struct arm_smmu_device *smmu)
-> > >  
-> > >  	/* Check that we ioremapped enough */
-> > >  	size = 1 << (((id >> ID1_NUMPAGENDXB_SHIFT) & ID1_NUMPAGENDXB_MASK) + 1);
-> > > -	size *= (smmu->pagesize << 1);
-> > > +	size *= smmu->pagesize;
-> > > +	smmu->cb_base = smmu->base + size;
-> > > +	size *= 2;
-> > > +
-> > >  	if (smmu->size < size)
-> > >  		dev_warn(smmu->dev,
-> > >  			 "device is 0x%lx bytes but only mapped 0x%lx!\n",
-> > >  			 size, smmu->size);
-> > >  
-> > > +	t = (unsigned long) smmu->base + (smmu->size >> 1);
-> > > +	if ((unsigned long)smmu->cb_base != t) {
-> > > +		dev_warn(smmu->dev, "address space mismatch, "
-> > > +			"overwriting cb_base (old: 0x%lx, new: 0x%lx)\n",
-> > > +			(unsigned long) smmu->cb_base, t);
-> > > +		smmu->cb_base = (void *) t;
-> > > +	}
-> > > +
-> > 
-> > I expect I'm just being slow here (only one coffee in), but I can't see what
-> > this gets us over the current use of resource_size (which goes and uses the
-> > DT).
+On Fri, Sep 27, 2013 at 09:04:46AM +0100, Jiang Liu wrote:
+> From: Jiang Liu <jiang.liu@huawei.com>
 > 
-> On balance it adds a warning if there is an inconsistency between the
-> resource size and the relevant registers describing the SMMU address
-> space.
+> Use PF_USED_MATH flag to mark whether the thread has accessed any FPSIMD
+> registers, so we could avoid saving and restroing FPSIMD registers until
+> threads access them. This may improve performance when lazy FPSIMD restore
+> is disabled.
 
-Well, we should already print the "device is 0x%lx bytes but only mapped
-0x%lx!" message, which I think is enough to go and figure out what happened.
+Hehe, the subject made me smile :)
+
+I suppose that means I have to give a semi-useful review for the patch...
+
+> Signed-off-by: Jiang Liu <jiang.liu@huawei.com>
+> Cc: Jiang Liu <liuj97@gmail.com>
+> ---
+>  arch/arm64/kernel/fpsimd.c | 38 +++++++++++++++++++++++---------------
+>  1 file changed, 23 insertions(+), 15 deletions(-)
+> 
+> diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
+> index 267e54a..a81af5f 100644
+> --- a/arch/arm64/kernel/fpsimd.c
+> +++ b/arch/arm64/kernel/fpsimd.c
+> @@ -99,7 +99,8 @@ void fpsimd_disable_lazy_restore(void)
+>   * If lazy mode is enabled, caller needs to disable preemption
+>   * when calling fpsimd_load_state_lazy() and fpsimd_save_state_lazy().
+>   */
+> -static void fpsimd_load_state_lazy(struct fpsimd_state *state)
+> +static void fpsimd_load_state_lazy(struct fpsimd_state *state,
+> +				   struct task_struct *tsk)
+>  {
+>  	/* Could we reuse the hardware context? */
+>  	if (state->last_cpu == smp_processor_id() &&
+> @@ -109,13 +110,19 @@ static void fpsimd_load_state_lazy(struct fpsimd_state *state)
+>  	if (static_key_false(&fpsimd_lazy_mode)) {
+>  		fpsimd_clear_on_hw(state);
+>  		fpsimd_enable_trap();
+> -	} else {
+> +	} else if (tsk_used_math(tsk)) {
+> +		fpsimd_disable_trap();
+>  		fpsimd_load_state(state);
+> +	} else {
+> +		fpsimd_enable_trap();
+
+One thing worth checking in sequences like this is that you have the
+relevant memory barriers (isb instructions) to ensure that the CPU is
+synchronised wrt side-effects from the msr instructions. *Some* operations
+are self-synchronising, but I don't think this is the case for fpsimd in v8
+(although I haven't re-checked).
+
+Your earlier patch (3/7) doesn't seem to have any of these barriers.
 
 Will
