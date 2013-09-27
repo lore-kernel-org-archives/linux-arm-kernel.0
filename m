@@ -1,48 +1,41 @@
-From: eduardo.valentin@ti.com (Eduardo Valentin)
-Date: Thu, 26 Sep 2013 23:13:25 -0400
-Subject: [PATCHv4 18/18] arm: dts: add cooling properties on omap5 cpu node
-In-Reply-To: <1380251605-3804-1-git-send-email-eduardo.valentin@ti.com>
-References: <1380251605-3804-1-git-send-email-eduardo.valentin@ti.com>
-Message-ID: <1380251605-3804-19-git-send-email-eduardo.valentin@ti.com>
+From: dinh.linux@gmail.com (Dinh Nguyen)
+Date: Thu, 26 Sep 2013 22:27:55 -0500
+Subject: [PATCH 1/2] dts: socfpga: Add ethernet support on Altera's SOCFPGA
+ platform
+In-Reply-To: <5244C171.2040705@wwwdotorg.org>
+References: <1380057120-27108-1-git-send-email-dinguyen@altera.com>
+ <5244C171.2040705@wwwdotorg.org>
+Message-ID: <5244FB3B.2050906@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-OMAP5 devices can reach high temperatures and thus
-needs to have cpufreq-cooling on systems running on it.
+Hi Stephen,
 
-This patch adds the required cooling device properties
-so that cpufreq-cpu0 driver loads the cooling device.
+On 9/26/13 6:21 PM, Stephen Warren wrote:
+> On 09/24/2013 03:11 PM, dinguyen at altera.com wrote:
+>> From: Dinh Nguyen <dinguyen@altera.com>
+>>
+>> The STMMAC Ethernet controller in SOCFPGA requires setting a register for
+>> the phy-mode that is outside of the ethernet IP. This register resides in
+>> the System Manager block. So we define a new DTS binding
+>> "altr,sysmgr-phy-mask". This binding's property is a bitmask that can be
+>> used to set the correct register bit.
+>> diff --git a/Documentation/devicetree/bindings/net/stmmac-altr-socfpga.txt b/Documentation/devicetree/bindings/net/stmmac-altr-socfpga.txt
+>> +* altr,sysmgr-phy-mask: This property contains the bitmask that is needed to
+>> +	set the appropriate register bits for the phy-mode in the System Manager.
+>> +	The value should be:
+>> +		-Ethernet Controller 1 (gmac0) = 0x3
+>> +		-Ethernet Controller 2 (gmac1) = 0xC
+> Wouldn't you need a phandle to the sysmgr node so that the driver could
+> be located, and a register number within its register block too? Or,
+> does sysmgr know which register to poke? If so, couldn't the API take
+> just a device index rather than a bitmask instead, and calculate the
+> mask itself?
+The function that pokes this register is a platform specific init 
+function call from the driver, so the function knows which register in 
+the the sysmgr to poke. The first byte of the register has controls for 
+both ethernet controllers. I thought it would be better to use a mask to 
+be used to differentiate between each controller.
 
-Cc: "Beno?t Cousson" <bcousson@baylibre.com>
-Cc: Tony Lindgren <tony@atomide.com>
-Cc: Rob Herring <rob.herring@calxeda.com>
-Cc: Pawel Moll <pawel.moll@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Stephen Warren <swarren@wwwdotorg.org>
-Cc: Ian Campbell <ian.campbell@citrix.com>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: linux-omap at vger.kernel.org
-Cc: devicetree at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
-Signed-off-by: Eduardo Valentin <eduardo.valentin@ti.com>
----
- arch/arm/boot/dts/omap5.dtsi | 3 +++
- 1 file changed, 3 insertions(+)
-
-diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
-index 187cb71..a35cd61 100644
---- a/arch/arm/boot/dts/omap5.dtsi
-+++ b/arch/arm/boot/dts/omap5.dtsi
-@@ -37,6 +37,9 @@
- 			device_type = "cpu";
- 			compatible = "arm,cortex-a15";
- 			reg = <0x0>;
-+
-+			/* cooling options */
-+			#cooling-cells = <2>; /* min followed by max */
- 		};
- 		cpu at 1 {
- 			device_type = "cpu";
--- 
-1.8.2.1.342.gfa7285d
+Thanks,
+Dinh
