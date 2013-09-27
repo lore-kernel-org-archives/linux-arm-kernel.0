@@ -1,81 +1,57 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri, 27 Sep 2013 15:29:13 +0100
-Subject: [PATCH] arm: vexpress: tc2: fix CPU hotplug and CPU idle race on
- cluster power down
-Message-ID: <1380292153-10480-1-git-send-email-lorenzo.pieralisi@arm.com>
+From: andreas.herrmann@calxeda.com (Andreas Herrmann)
+Date: Fri, 27 Sep 2013 16:30:48 +0200
+Subject: [PATCH] iommu/arm-smmu: Check for num_context_irqs > 0 to avoid
+ divide by zero exception
+In-Reply-To: <20130927110756.GP3315@alberich>
+References: <1380234982-1677-1-git-send-email-andreas.herrmann@calxeda.com>
+ <1380234982-1677-5-git-send-email-andreas.herrmann@calxeda.com>
+ <20130927084154.GB8319@mudshark.cambridge.arm.com>
+ <20130927090348.GF3315@alberich>
+ <20130927102307.GE9057@mudshark.cambridge.arm.com>
+ <20130927103949.GM3315@alberich>
+ <20130927104802.GF9057@mudshark.cambridge.arm.com>
+ <20130927110756.GP3315@alberich>
+Message-ID: <20130927143048.GR3315@alberich>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On the TC2 testchip, when all CPUs in a cluster enter standbywfi and
-commit a power down request, the power controller will wait for
-standbywfil2 coming from L2 cache controller to shut the cluster down.
-By the time all CPUs in a cluster commit a power down request and enter wfi,
-the power controller cannot backtrack, or put it another way, a CPU must
-not be allowed to complete execution independently of the power
-controller, the only way for it to resume properly must be upon wake-up IRQ
-pending and subsequent reset triggered from the power controller.
 
-Current MCPM back-end for TC2 disables the GIC CPU IF only when power
-down is committed through the suspend method, that makes sense since a
-suspended CPU is still online and can receive interrupts whereas a
-hotplugged CPU, since it is offline, migrated all IRQs and shutdown
-the per-CPU peripherals, hence their PPIs.
+With the right (or wrong;-) definition of v1 SMMU node in DTB it is
+possible to trigger a division by zero in arm_smmu_init_domain_context
+(if number of context irqs is 0):
 
-The flaw with this reasoning is the following. If all CPUs in a clusters are
-entering a power down state either through CPU idle or CPU hotplug, when the
-last man successfully completes the MCPM power down sequence (and executes
-wfi), power controller waits for L2 wfi signal to quiesce the cluster and shut
-it down. If, when all CPUs are sitting in wfi, an online CPU hotplugs back in
-one of the CPUs in the cluster being shutdown, that CPU receives an IPI that
-causes wfi to complete (since MCPM power down method does not disable the GIC
-CPU IF in that case - CPU being hotplugged out, not idle) and the power
-controller will never see the stanbywfil2 signal coming from L2 that is
-required for shutdown to happen and the system deadlocks.
+       if (smmu->version == 1) {
+               root_cfg->irptndx = atomic_inc_return(&smmu->irptndx);
+ =>            root_cfg->irptndx %= smmu->num_context_irqs;
+       } else {
 
-The only solution to this problem consists in disabling the GIC CPU IF
-on a CPU committed to power down regardless of the power down entry
-method (CPU hotplug or CPU idle). This way, CPU wake-up is under power
-controller control, which prevents unexpected wfi exit caused by a
-pending IRQ.
+Avoid this by checking for num_context_irqs > 0 when probing
+for SMMU devices.
 
-This patch moves the GIC CPU IF disable call in the TC2 MCPM implementation
-from the suspend method to the power down method to fix the mentioned
-race condition.
-
-Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Signed-off-by: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
+Signed-off-by: Andreas Herrmann <andreas.herrmann@calxeda.com>
 ---
- arch/arm/mach-vexpress/tc2_pm.c | 11 ++++++++++-
- 1 file changed, 10 insertions(+), 1 deletion(-)
+ drivers/iommu/arm-smmu.c |    7 +++----
+ 1 file changed, 3 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/mach-vexpress/tc2_pm.c b/arch/arm/mach-vexpress/tc2_pm.c
-index 7aeb5d6..e6eb481 100644
---- a/arch/arm/mach-vexpress/tc2_pm.c
-+++ b/arch/arm/mach-vexpress/tc2_pm.c
-@@ -131,6 +131,16 @@ static void tc2_pm_down(u64 residency)
- 	} else
- 		BUG();
+diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+index d19676c..7d07561 100644
+--- a/drivers/iommu/arm-smmu.c
++++ b/drivers/iommu/arm-smmu.c
+@@ -1803,12 +1803,11 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
+ 			smmu->num_context_irqs++;
+ 	}
  
-+	/*
-+	 * If the CPU is committed to power down, make sure
-+	 * the power controller will be in charge of waking it
-+	 * up upon IRQ, ie IRQ lines are cut from GIC CPU IF
-+	 * to the CPU by disabling the GIC CPU IF to prevent wfi
-+	 * from completing execution behind power controller back
-+	 */
-+	if (!skip_wfi)
-+		gic_cpu_if_down();
-+
- 	if (last_man && __mcpm_outbound_enter_critical(cpu, cluster)) {
- 		arch_spin_unlock(&tc2_pm_lock);
+-	if (num_irqs < smmu->num_global_irqs) {
++	if (!smmu->num_context_irqs) {
+ 		dev_warn(dev, "found %d interrupts but expected at least %d\n",
+-			 num_irqs, smmu->num_global_irqs);
+-		smmu->num_global_irqs = num_irqs;
++			 num_irqs, smmu->num_global_irqs + 1);
++		return -ENODEV;
+ 	}
+-	smmu->num_context_irqs = num_irqs - smmu->num_global_irqs;
  
-@@ -231,7 +241,6 @@ static void tc2_pm_suspend(u64 residency)
- 	cpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
- 	cluster = MPIDR_AFFINITY_LEVEL(mpidr, 1);
- 	ve_spc_set_resume_addr(cluster, cpu, virt_to_phys(mcpm_entry_point));
--	gic_cpu_if_down();
- 	tc2_pm_down(residency);
- }
- 
+ 	smmu->irqs = devm_kzalloc(dev, sizeof(*smmu->irqs) * num_irqs,
+ 				  GFP_KERNEL);
 -- 
-1.8.2.2
+1.7.9.5
