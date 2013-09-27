@@ -1,92 +1,489 @@
-From: neko@bakuhatsu.net (Matt Sealey)
-Date: Fri, 27 Sep 2013 11:33:19 -0500
-Subject: device tree binding documentation outdated
-In-Reply-To: <20130927133120.GC31178@titan.lakedaemon.net>
-References: <20130926195158.GS12758@n2100.arm.linux.org.uk>
- <CAOMZO5ANsZGcpvmtBE7d0q0E6+f0bE_U8CBF7G2v3xtqoLbqcA@mail.gmail.com>
- <CACRpkda9HZ4JKnidnJJh-HkhCgtvJwQPQJnv9CZ4iYcQP36_Nw@mail.gmail.com>
- <20130927025116.GG25146@S2101-09.ap.freescale.net>
- <20130927084504.GW12758@n2100.arm.linux.org.uk>
- <20130927122814.GK25146@S2101-09.ap.freescale.net>
- <20130927131225.GA31178@titan.lakedaemon.net>
- <20130927132107.GZ12758@n2100.arm.linux.org.uk>
- <20130927133120.GC31178@titan.lakedaemon.net>
-Message-ID: <CAHCPf3tfc9Z14YYm9K0AXNinMDsTwE51_6tbYfyFU7cA8M7MgA@mail.gmail.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Fri, 27 Sep 2013 18:52:39 +0200
+Subject: [PATCH v4] PWM: atmel-pwm: add PWM controller driver
+In-Reply-To: <1380079664-21959-1-git-send-email-voice.shen@atmel.com>
+References: <1380079664-21959-1-git-send-email-voice.shen@atmel.com>
+Message-ID: <5245B7D7.2040405@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 27, 2013 at 8:31 AM, Jason Cooper <jason@lakedaemon.net> wrote:
-> On Fri, Sep 27, 2013 at 02:21:07PM +0100, Russell King - ARM Linux wrote:
->> On Fri, Sep 27, 2013 at 09:12:25AM -0400, Jason Cooper wrote:
->> > I'm currently slogging through the exact same issues for adding imx50
->> > (SanDisk Connect Wireless media Drive).  I thought I was just thick.
->> > It's a relief to know I'm not the only one having trouble with this.
->>
->> I'm coming to the conclusion that it's almost to the point of "vendor
->> lockin" - you have to find someone who understands this stuff to take
->> your hardware description and turn it into a working DT description.
+Sorry to get in so late but there is a small issue with the driver.
+
+On 25/09/2013 05:27, Bo Shen wrote:
+> Add Atmel PWM controller driver based on PWM framework.
 >
-> I don't think it's vendor lock-in, I think Freescale's pinctrl/gpio IP
-> block is just an over-complicated pain in the ass that doesn't lend
-> itself to DT well.
+> This is the basic function implementation of Atmel PWM controller.
+> It can work with PWM based led and backlight.
+>
+> Signed-off-by: Bo Shen <voice.shen@atmel.com>
+>
+> ---
+> Changes in v4:
+>   - check the return value of clk_prepare()
+>   - change channel register size as constant
+>
+> Changes in v3:
+>   - change compatible string from "atmel,sama5-pwm" to "atmel,sama5d3-pwm"
+>   - Add PWM led example in binding documentation
+>   - Using micro replace hard code
+>
+> Changes in v2:
+>   - Address the comments from Thierry Reding
+>
+>  .../devicetree/bindings/pwm/atmel-pwm.txt          |   41 +++
+>  drivers/pwm/Kconfig                                |    9 +
+>  drivers/pwm/Makefile                               |    1 +
+>  drivers/pwm/pwm-atmel.c                            |  350 ++++++++++++++++++++
+>  4 files changed, 401 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/pwm/atmel-pwm.txt
+>  create mode 100644 drivers/pwm/pwm-atmel.c
+>
+> diff --git a/Documentation/devicetree/bindings/pwm/atmel-pwm.txt b/Documentation/devicetree/bindings/pwm/atmel-pwm.txt
+> new file mode 100644
+> index 0000000..1c1a5fa
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/pwm/atmel-pwm.txt
+> @@ -0,0 +1,41 @@
+> +Atmel PWM controller
+> +
+> +Required properties:
+> +  - compatible: should be one of:
+> +    - "atmel,at91sam9rl-pwm"
+> +    - "atmel,sama5d3-pwm"
+> +  - reg: physical base address and length of the controller's registers
+> +  - #pwm-cells: Should be 3. See pwm.txt in this directory for a
+> +    description of the cells format
+> +
+> +Example:
+> +
+> +	pwm0: pwm at f8034000 {
+> +		compatible = "atmel,at91sam9rl-pwm";
+> +		reg = <0xf8034000 0x400>;
+> +		#pwm-cells = <3>;
+> +	};
+> +
+> +The following the pwm led based example:
+> +
+> +	pwm0: pwm at f8034000 {
+> +		compatible = "atmel,at91sam9rl-pwm";
+> +		reg = <0xf8034000 0x400>;
+> +		#pwm-cells = <3>;
+> +	};
+> +
+> +	pwdleds {
+> +		compatible = "pwm-leds";
+> +
+> +		d1 {
+> +			label = "d1";
+> +			pwms = <&pwm0 3 5000 0>
+> +			max-brightness = <255>;
+> +		};
+> +
+> +		d2 {
+> +			label = "d2";
+> +			pwms = <&pwm0 1 5000 1>
+> +			max-brightness = <255>;
+> +		};
+> +	};
+> diff --git a/drivers/pwm/Kconfig b/drivers/pwm/Kconfig
+> index 75840b5..54237b9 100644
+> --- a/drivers/pwm/Kconfig
+> +++ b/drivers/pwm/Kconfig
+> @@ -41,6 +41,15 @@ config PWM_AB8500
+>  	  To compile this driver as a module, choose M here: the module
+>  	  will be called pwm-ab8500.
+>  
+> +config PWM_ATMEL
+> +	tristate "Atmel PWM support"
+> +	depends on ARCH_AT91
+> +	help
+> +	  Generic PWM framework driver for Atmel SoC.
+> +
+> +	  To compile this driver as a module, choose M here: the module
+> +	  will be called pwm-atmel.
+> +
+>  config PWM_ATMEL_TCB
+>  	tristate "Atmel TC Block PWM support"
+>  	depends on ATMEL_TCLIB && OF
+> diff --git a/drivers/pwm/Makefile b/drivers/pwm/Makefile
+> index 77a8c18..5b193f8 100644
+> --- a/drivers/pwm/Makefile
+> +++ b/drivers/pwm/Makefile
+> @@ -1,6 +1,7 @@
+>  obj-$(CONFIG_PWM)		+= core.o
+>  obj-$(CONFIG_PWM_SYSFS)		+= sysfs.o
+>  obj-$(CONFIG_PWM_AB8500)	+= pwm-ab8500.o
+> +obj-$(CONFIG_PWM_ATMEL)		+= pwm-atmel.o
+>  obj-$(CONFIG_PWM_ATMEL_TCB)	+= pwm-atmel-tcb.o
+>  obj-$(CONFIG_PWM_BFIN)		+= pwm-bfin.o
+>  obj-$(CONFIG_PWM_IMX)		+= pwm-imx.o
+> diff --git a/drivers/pwm/pwm-atmel.c b/drivers/pwm/pwm-atmel.c
+> new file mode 100644
+> index 0000000..6af7a50
+> --- /dev/null
+> +++ b/drivers/pwm/pwm-atmel.c
+> @@ -0,0 +1,350 @@
+> +/*
+> + * Driver for Atmel Pulse Width Modulation Controller
+> + *
+> + * Copyright (C) 2013 Atmel Corporation
+> + *		 Bo Shen <voice.shen@atmel.com>
+> + *
+> + * Licensed under GPLv2.
+> + */
+> +
+> +#include <linux/clk.h>
+> +#include <linux/err.h>
+> +#include <linux/io.h>
+> +#include <linux/module.h>
+> +#include <linux/of.h>
+> +#include <linux/of_device.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/pwm.h>
+> +#include <linux/slab.h>
+> +
+> +/* The following is global registers for PWM controller */
+> +#define PWM_ENA			0x04
+> +#define PWM_DIS			0x08
+> +#define PWM_SR			0x0C
+> +/* bit field in SR */
+> +#define PWM_SR_ALL_CH_ON	0x0F
+> +
+> +/* The following register is PWM channel related registers */
+> +#define PWM_CH_REG_OFFSET	0x200
+> +#define PWM_CH_REG_SIZE		0x20
+> +
+> +#define PWM_CMR			0x0
+> +/* bit field in CMR */
+> +#define PWM_CMR_CPOL		(1 << 9)
+> +#define PWM_CMR_UPD_CDTY	(1 << 10)
+> +
+> +/* The following registers for PWM v1 */
+> +#define PWMv1_CDTY		0x04
+> +#define PWMv1_CPRD		0x08
+> +#define PWMv1_CUPD		0x10
+> +
+> +/* The following registers for PWM v2 */
+> +#define PWMv2_CDTY		0x04
+> +#define PWMv2_CDTYUPD		0x08
+> +#define PWMv2_CPRD		0x0C
+> +#define PWMv2_CPRDUPD		0x10
+> +
+> +/* max value for duty and period */
+> +/*
+> + * Although the duty and period register is 32 bit,
+> + * however only the LSB 16 bits are significant.
+> + */
+> +#define PWM_MAX_DTY		0xFFFF
+> +#define PWM_MAX_PRD		0xFFFF
+> +#define PRD_MAX_PRES		10
+> +
+> +struct atmel_pwm_chip {
+> +	struct pwm_chip chip;
+> +	struct clk *clk;
+> +	void __iomem *base;
+> +
+> +	void (*config)(struct pwm_chip *chip, struct pwm_device *pwm,
+> +		       int dty, int prd);
+> +};
+> +
+> +static inline struct atmel_pwm_chip *to_atmel_pwm_chip(struct pwm_chip *chip)
+> +{
+> +	return container_of(chip, struct atmel_pwm_chip, chip);
+> +}
+> +
+> +static inline u32 atmel_pwm_readl(struct atmel_pwm_chip *chip,
+> +				  unsigned long offset)
+> +{
+> +	return readl(chip->base + offset);
+> +}
+> +
+> +static inline void atmel_pwm_writel(struct atmel_pwm_chip *chip,
+> +				    unsigned long offset, unsigned long val)
+> +{
+> +	writel(val, chip->base + offset);
+> +}
+> +
+> +static inline u32 atmel_pwm_ch_readl(struct atmel_pwm_chip *chip,
+> +				     unsigned int ch, unsigned long offset)
+> +{
+> +	return readl(chip->base + PWM_CH_REG_OFFSET + ch * PWM_CH_REG_SIZE
+> +		     + offset);
+> +}
+> +
+> +static inline void atmel_pwm_ch_writel(struct atmel_pwm_chip *chip,
+> +				       unsigned int ch, unsigned long offset,
+> +				       unsigned long val)
+> +{
+> +	writel(val, chip->base + PWM_CH_REG_OFFSET + ch * PWM_CH_REG_SIZE
+> +	       + offset);
+> +}
+> +
+> +static int atmel_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
+> +		int duty_ns, int period_ns)
+> +{
+> +	struct atmel_pwm_chip *atmel_pwm = to_atmel_pwm_chip(chip);
+> +	unsigned long clk_rate, prd, dty;
+> +	unsigned long long val, div;
+> +	int ret, pres = 0;
+> +
+> +	clk_rate = clk_get_rate(atmel_pwm->clk);
+> +	div = clk_rate;
+> +
+> +	/* Calculate the period cycles */
+> +	while (div > PWM_MAX_PRD) {
+> +		div = clk_rate / (1 << pres);
+> +		div = div * period_ns;
+> +		/* 1/Hz = 100000000 ns */
+> +		do_div(div, 1000000000);
+> +
+> +		if (pres++ > PRD_MAX_PRES) {
+> +			pr_err("PRES is bigger than maximum pre-scaler\n");
+> +			return -EINVAL;
+> +		}
+> +	}
+> +
+> +	/* Calculate the duty cycles */
+> +	prd = div;
+> +	div *= duty_ns;
+> +	do_div(div, period_ns);
+> +	dty = div;
+> +
+> +	ret = clk_enable(atmel_pwm->clk);
+> +	if (ret) {
+> +		pr_err("Failed to enable pwm clock\n");
+> +		return ret;
+> +	}
+> +
+> +	atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWM_CMR, pres);
+> +	atmel_pwm->config(chip, pwm, dty, prd);
+> +
+> +	/* Check whether need to disable clock */
+> +	val = atmel_pwm_readl(atmel_pwm, PWM_SR);
+> +	if ((val & PWM_SR_ALL_CH_ON) == 0)
+> +		clk_disable(atmel_pwm->clk);
+> +
+> +	return 0;
+> +}
+> +
+> +static void atmel_pwm_config_v1(struct pwm_chip *chip, struct pwm_device *pwm,
+> +				int dty, int prd)
+> +{
+> +	struct atmel_pwm_chip *atmel_pwm = to_atmel_pwm_chip(chip);
+> +	unsigned int val;
+> +
+> +	/*
+> +	 * If the PWM channel is disabled, write value to duty and period
+> +	 * registers directly.
+> +	 * If the PWM channel is enabled, using the update register, it needs
+> +	 * to set bit 10 of CMR to 0
+> +	 */
+> +	if (test_bit(PWMF_ENABLED, &pwm->flags)) {
+> +		atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWMv1_CUPD, dty);
+> +
+> +		val = atmel_pwm_ch_readl(atmel_pwm, pwm->hwpwm, PWM_CMR);
+> +		val &= ~PWM_CMR_UPD_CDTY;
+> +		atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWM_CMR, val);
+> +	} else {
+> +		atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWMv1_CDTY, dty);
+> +		atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWMv1_CPRD, prd);
+> +	}
+> +}
+> +
+> +static void atmel_pwm_config_v2(struct pwm_chip *chip, struct pwm_device *pwm,
+> +				int dty, int prd)
+> +{
+> +	struct atmel_pwm_chip *atmel_pwm = to_atmel_pwm_chip(chip);
+> +
+> +	/*
+> +	 * If the PWM channel is disabled, write value to duty and period
+> +	 * registers directly.
+> +	 * If the PWM channel is enabled, using the duty update register to
+> +	 * update the value.
+> +	 */
+> +	if (test_bit(PWMF_ENABLED, &pwm->flags)) {
+> +		atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWMv2_CDTYUPD, dty);
+> +	} else {
+> +		atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWMv2_CDTY, dty);
+> +		atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWMv2_CPRD, prd);
+> +	}
+> +}
+> +
+> +static int atmel_pwm_set_polarity(struct pwm_chip *chip, struct pwm_device *pwm,
+> +		enum pwm_polarity polarity)
+> +{
+> +	struct atmel_pwm_chip *atmel_pwm = to_atmel_pwm_chip(chip);
+> +	u32 val = 0;
+> +	int ret;
+> +
+> +	ret = clk_enable(atmel_pwm->clk);
+> +	if (ret) {
+> +		pr_err("failed to enable pwm clock\n");
+> +		return ret;
+> +	}
+> +
+> +	if (polarity == PWM_POLARITY_NORMAL)
+> +		val &= ~PWM_CMR_CPOL;
+> +	else
+> +		val |= PWM_CMR_CPOL;
+> +
+> +	atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWM_CMR, val);
+> +
+> +	clk_disable(atmel_pwm->clk);
+> +
+> +	return 0;
+> +}
+> +
+> +static int atmel_pwm_enable(struct pwm_chip *chip, struct pwm_device *pwm)
+> +{
+> +	struct atmel_pwm_chip *atmel_pwm = to_atmel_pwm_chip(chip);
+> +	int ret;
+> +
+> +	ret = clk_enable(atmel_pwm->clk);
+> +	if (ret) {
+> +		pr_err("failed to enable pwm clock\n");
+> +		return ret;
+> +	}
+> +
+
+This will increment clk->enable_count each time it is called.
+> +	atmel_pwm_writel(atmel_pwm, PWM_ENA, 1 << pwm->hwpwm);
+> +
+> +	return 0;
+> +}
+> +
+> +static void atmel_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
+> +{
+> +	struct atmel_pwm_chip *atmel_pwm = to_atmel_pwm_chip(chip);
+> +	u32 val;
+> +
+> +	atmel_pwm_writel(atmel_pwm, PWM_DIS, 1 << pwm->hwpwm);
+> +
+> +	val = atmel_pwm_readl(atmel_pwm, PWM_SR);
+> +	if ((val & PWM_SR_ALL_CH_ON) == 0)
+> +		clk_disable(atmel_pwm->clk);
+> +}
+
+This will decrement clk->enable_count only once there are no pwm enabled
+anymore.  So in you enable more than one channel, you will never disable
+the clock. The simple fix is to always call clk_diasble, regardless of
+the state of the other channels.
+
+> +
+> +static const struct pwm_ops atmel_pwm_ops = {
+> +	.config = atmel_pwm_config,
+> +	.set_polarity = atmel_pwm_set_polarity,
+> +	.enable = atmel_pwm_enable,
+> +	.disable = atmel_pwm_disable,
+> +	.owner = THIS_MODULE,
+> +};
+> +
+> +struct atmel_pwm_data {
+> +	void (*config)(struct pwm_chip *chip, struct pwm_device *pwm,
+> +		       int dty, int prd);
+> +};
+> +
+> +static const struct atmel_pwm_data atmel_pwm_data_v1 = {
+> +	.config = atmel_pwm_config_v1,
+> +};
+> +
+> +static const struct atmel_pwm_data atmel_pwm_data_v2 = {
+> +	.config = atmel_pwm_config_v2,
+> +};
+> +
+> +#ifdef CONFIG_OF
+> +static const struct of_device_id atmel_pwm_dt_ids[] = {
+> +	{
+> +		.compatible = "atmel,at91sam9rl-pwm",
+> +		.data = &atmel_pwm_data_v1,
+> +	}, {
+> +		.compatible = "atmel,sama5d3-pwm",
+> +		.data = &atmel_pwm_data_v2,
+> +	}, {
+> +		/* sentinel */
+> +	},
+> +};
+> +MODULE_DEVICE_TABLE(of, atmel_pwm_dt_ids);
+> +#endif
+> +
+> +static int atmel_pwm_probe(struct platform_device *pdev)
+> +{
+> +	const struct of_device_id *of_id =
+> +		of_match_device(atmel_pwm_dt_ids, &pdev->dev);
+> +	const struct atmel_pwm_data *data;
+> +	struct atmel_pwm_chip *atmel_pwm;
+> +	struct resource *res;
+> +	int ret;
+> +
+> +	atmel_pwm = devm_kzalloc(&pdev->dev, sizeof(*atmel_pwm), GFP_KERNEL);
+> +	if (!atmel_pwm)
+> +		return -ENOMEM;
+> +
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	if (!res)
+> +		return -ENODEV;
+> +
+> +	atmel_pwm->base = devm_ioremap_resource(&pdev->dev, res);
+> +
+> +	atmel_pwm->clk = devm_clk_get(&pdev->dev, NULL);
+> +	if (IS_ERR(atmel_pwm->clk))
+> +		return PTR_ERR(atmel_pwm->clk);
+> +
+> +	ret = clk_prepare(atmel_pwm->clk);
+> +	if (ret) {
+> +		dev_err(&pdev->dev, "failed to prepare pwm clock\n");
+> +		return ret;
+> +	}
+> +
+> +	atmel_pwm->chip.dev = &pdev->dev;
+> +	atmel_pwm->chip.ops = &atmel_pwm_ops;
+> +	atmel_pwm->chip.of_xlate = of_pwm_xlate_with_flags;
+> +	atmel_pwm->chip.of_pwm_n_cells = 3;
+> +	atmel_pwm->chip.base = -1;
+> +	atmel_pwm->chip.npwm = 4;
+> +
+> +	data = of_id->data;
+> +	atmel_pwm->config = data->config;
+> +
+> +	ret = pwmchip_add(&atmel_pwm->chip);
+> +	if (ret < 0) {
+> +		dev_err(&pdev->dev, "failed to add pwm chip %d\n", ret);
+> +		goto unprepare_clk;
+> +	}
+> +
+> +	platform_set_drvdata(pdev, atmel_pwm);
+> +
+> +unprepare_clk:
+> +	clk_unprepare(atmel_pwm->clk);
+> +	return ret;
+> +}
+> +
+> +static int atmel_pwm_remove(struct platform_device *pdev)
+> +{
+> +	struct atmel_pwm_chip *atmel_pwm = platform_get_drvdata(pdev);
+> +
+> +	clk_unprepare(atmel_pwm->clk);
+> +
+> +	return pwmchip_remove(&atmel_pwm->chip);
+> +}
+> +
+> +static struct platform_driver atmel_pwm_driver = {
+> +	.driver = {
+> +		.name = "atmel-pwm",
+> +		.of_match_table = of_match_ptr(atmel_pwm_dt_ids),
+> +	},
+> +	.probe = atmel_pwm_probe,
+> +	.remove = atmel_pwm_remove,
+> +};
+> +module_platform_driver(atmel_pwm_driver);
+> +
+> +MODULE_ALIAS("platform:atmel-pwm");
+> +MODULE_AUTHOR("Bo Shen <voice.shen@atmel.com>");
+> +MODULE_DESCRIPTION("Atmel PWM driver");
+> +MODULE_LICENSE("GPL v2");
 
 
-Me either - device trees aren't vendor lock-in but they ARE a huge
-reminder of how silicon vendors prioritize software development - the
-chip works. The i.MX IOMUX block lends itself VERY well to device
-trees.
-
-The problem with vendors is when they ship their chips and docs from
-America or Israel or so on, do verification in the UK or Mexico or
-India, hand it to a software team in some far away place like China or
-India and expect everything to just come out all nice and shiny. The
-problem compounds itself when the docs are bad, but in this instance,
-Freescale usually give out REALLY good documentation.
-
-The issue with this particular block is there have been 5 different
-ways to "do it", originally it was just a list of addresses and values
-in an array, then it got turned into a packed 64-bit magic value which
-was decoded (possibly to reduce stack usage as a function call,
-although it was always inlined...) and then device trees as an
-enumerated index into a hardcoded array in Linux, and a pad settings
-value on top, and now back to addresses and values again. The number
-of possibilities for porting the thing is immense.
-
-The only way to do it from the manual - or Freescale's IOMUX Tool,
-which is pretty awesome if a little crashy and for Windows - is the 6
-value tuple way.
-
-As an example, this is what I get for the SabreLite Rev A, exported as CSV
-
-~~
-Chip,Package,Board,Board Rev.,Design Version
-i.MX6DQ,BGA,Sabre_Lite,Rev. A,2
-
-Ball,Name,PowerGroup,Instance.Signal,Instance-Alias.Signal-Alias,Comment,Register,Value,
-Register,Value,Register,Value
-A22,SD2_DATA0,NVCC_SD2,audmux.AUD4_RXD,audmux.AUD4_RXD,,0x020E0054,0x00000003,0x020E0368,0x0001B0B0,0x020E07B4,0x00000000
-B22,SD2_DATA3,NVCC_SD2,audmux.AUD4_TXC,audmux.AUD4_TXC,,0x020E035C,0x00000003,0x020E0744,0x0001B0B0,0x020E07C4,0x00000001
-A23,SD2_DATA2,NVCC_SD2,audmux.AUD4_TXD,audmux.AUD4_TXD,,0x020E0050,0x00000003,0x020E0364,0x0001B0B0,0x020E07B8,0x00000000
-E20,SD2_DATA1,NVCC_SD2,audmux.AUD4_TXFS,audmux.AUD4_TXFS,,0x020E004C,0x00000003,0x020E0360,0x0001B0B0,0x020E07C8,0x00000000
-~~
-
-I used the last pin in my example previously in the list. Note the
-0x04c, 0x360 addresses and 0x1b0b0 pad setting (setting the register
-to 0x0 is an instruction to the fsl,pins parsing code to ignore it..
-hence the need for better macros)
-
-It would be incredibly easy to parse the CSV (or XML or..) or
-cross-check the output source code (since it will give you source
-code, if a little obtuse and over excited code) and generate the
-preprocessor headers or even fsl,pins output for any particular board.
-The Name field, Instance prefix, Signal suffix, and register values
-and even the comment from the board designer (if they used the IOMUX
-tool and if they didn't, bop on the nose with a newspaper..) right
-into a device tree.
-
-So, the design tools exist, they're just not being used, or they're
-being misused, or supplemental parsers to extract and generate the
-files don't exist (Shawn, we talked about the docs being generated
-from the RTL and some ability to export them..)
-
-A schema would help, too..
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
