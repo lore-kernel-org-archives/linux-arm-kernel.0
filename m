@@ -1,489 +1,160 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Fri, 27 Sep 2013 18:52:39 +0200
-Subject: [PATCH v4] PWM: atmel-pwm: add PWM controller driver
-In-Reply-To: <1380079664-21959-1-git-send-email-voice.shen@atmel.com>
-References: <1380079664-21959-1-git-send-email-voice.shen@atmel.com>
-Message-ID: <5245B7D7.2040405@free-electrons.com>
+From: neko@bakuhatsu.net (Matt Sealey)
+Date: Fri, 27 Sep 2013 11:52:52 -0500
+Subject: device tree binding documentation outdated
+In-Reply-To: <20130927151900.GA12758@n2100.arm.linux.org.uk>
+References: <20130926195158.GS12758@n2100.arm.linux.org.uk>
+ <CAOMZO5ANsZGcpvmtBE7d0q0E6+f0bE_U8CBF7G2v3xtqoLbqcA@mail.gmail.com>
+ <20130926205906.GT12758@n2100.arm.linux.org.uk>
+ <CAOMZO5Dj7o3qBH2hzPFWjepgpt5XR5qKmQorKS6jH_7=gnY5cg@mail.gmail.com>
+ <20130927121357.GY12758@n2100.arm.linux.org.uk>
+ <20130927132601.GL25146@S2101-09.ap.freescale.net>
+ <20130927151900.GA12758@n2100.arm.linux.org.uk>
+Message-ID: <CAHCPf3t8=mJn-RCz3C1cY6zqsH9ds8UANKpKx9ZpwPM6WjJt3g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sorry to get in so late but there is a small issue with the driver.
+Russell,
 
-On 25/09/2013 05:27, Bo Shen wrote:
-> Add Atmel PWM controller driver based on PWM framework.
->
-> This is the basic function implementation of Atmel PWM controller.
-> It can work with PWM based led and backlight.
->
-> Signed-off-by: Bo Shen <voice.shen@atmel.com>
->
-> ---
-> Changes in v4:
->   - check the return value of clk_prepare()
->   - change channel register size as constant
->
-> Changes in v3:
->   - change compatible string from "atmel,sama5-pwm" to "atmel,sama5d3-pwm"
->   - Add PWM led example in binding documentation
->   - Using micro replace hard code
->
-> Changes in v2:
->   - Address the comments from Thierry Reding
->
->  .../devicetree/bindings/pwm/atmel-pwm.txt          |   41 +++
->  drivers/pwm/Kconfig                                |    9 +
->  drivers/pwm/Makefile                               |    1 +
->  drivers/pwm/pwm-atmel.c                            |  350 ++++++++++++++++++++
->  4 files changed, 401 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/pwm/atmel-pwm.txt
->  create mode 100644 drivers/pwm/pwm-atmel.c
->
-> diff --git a/Documentation/devicetree/bindings/pwm/atmel-pwm.txt b/Documentation/devicetree/bindings/pwm/atmel-pwm.txt
-> new file mode 100644
-> index 0000000..1c1a5fa
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/pwm/atmel-pwm.txt
-> @@ -0,0 +1,41 @@
-> +Atmel PWM controller
-> +
-> +Required properties:
-> +  - compatible: should be one of:
-> +    - "atmel,at91sam9rl-pwm"
-> +    - "atmel,sama5d3-pwm"
-> +  - reg: physical base address and length of the controller's registers
-> +  - #pwm-cells: Should be 3. See pwm.txt in this directory for a
-> +    description of the cells format
-> +
-> +Example:
-> +
-> +	pwm0: pwm at f8034000 {
-> +		compatible = "atmel,at91sam9rl-pwm";
-> +		reg = <0xf8034000 0x400>;
-> +		#pwm-cells = <3>;
-> +	};
-> +
-> +The following the pwm led based example:
-> +
-> +	pwm0: pwm at f8034000 {
-> +		compatible = "atmel,at91sam9rl-pwm";
-> +		reg = <0xf8034000 0x400>;
-> +		#pwm-cells = <3>;
-> +	};
-> +
-> +	pwdleds {
-> +		compatible = "pwm-leds";
-> +
-> +		d1 {
-> +			label = "d1";
-> +			pwms = <&pwm0 3 5000 0>
-> +			max-brightness = <255>;
-> +		};
-> +
-> +		d2 {
-> +			label = "d2";
-> +			pwms = <&pwm0 1 5000 1>
-> +			max-brightness = <255>;
-> +		};
-> +	};
-> diff --git a/drivers/pwm/Kconfig b/drivers/pwm/Kconfig
-> index 75840b5..54237b9 100644
-> --- a/drivers/pwm/Kconfig
-> +++ b/drivers/pwm/Kconfig
-> @@ -41,6 +41,15 @@ config PWM_AB8500
->  	  To compile this driver as a module, choose M here: the module
->  	  will be called pwm-ab8500.
->  
-> +config PWM_ATMEL
-> +	tristate "Atmel PWM support"
-> +	depends on ARCH_AT91
-> +	help
-> +	  Generic PWM framework driver for Atmel SoC.
-> +
-> +	  To compile this driver as a module, choose M here: the module
-> +	  will be called pwm-atmel.
-> +
->  config PWM_ATMEL_TCB
->  	tristate "Atmel TC Block PWM support"
->  	depends on ATMEL_TCLIB && OF
-> diff --git a/drivers/pwm/Makefile b/drivers/pwm/Makefile
-> index 77a8c18..5b193f8 100644
-> --- a/drivers/pwm/Makefile
-> +++ b/drivers/pwm/Makefile
-> @@ -1,6 +1,7 @@
->  obj-$(CONFIG_PWM)		+= core.o
->  obj-$(CONFIG_PWM_SYSFS)		+= sysfs.o
->  obj-$(CONFIG_PWM_AB8500)	+= pwm-ab8500.o
-> +obj-$(CONFIG_PWM_ATMEL)		+= pwm-atmel.o
->  obj-$(CONFIG_PWM_ATMEL_TCB)	+= pwm-atmel-tcb.o
->  obj-$(CONFIG_PWM_BFIN)		+= pwm-bfin.o
->  obj-$(CONFIG_PWM_IMX)		+= pwm-imx.o
-> diff --git a/drivers/pwm/pwm-atmel.c b/drivers/pwm/pwm-atmel.c
-> new file mode 100644
-> index 0000000..6af7a50
-> --- /dev/null
-> +++ b/drivers/pwm/pwm-atmel.c
-> @@ -0,0 +1,350 @@
-> +/*
-> + * Driver for Atmel Pulse Width Modulation Controller
-> + *
-> + * Copyright (C) 2013 Atmel Corporation
-> + *		 Bo Shen <voice.shen@atmel.com>
-> + *
-> + * Licensed under GPLv2.
-> + */
-> +
-> +#include <linux/clk.h>
-> +#include <linux/err.h>
-> +#include <linux/io.h>
-> +#include <linux/module.h>
-> +#include <linux/of.h>
-> +#include <linux/of_device.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/pwm.h>
-> +#include <linux/slab.h>
-> +
-> +/* The following is global registers for PWM controller */
-> +#define PWM_ENA			0x04
-> +#define PWM_DIS			0x08
-> +#define PWM_SR			0x0C
-> +/* bit field in SR */
-> +#define PWM_SR_ALL_CH_ON	0x0F
-> +
-> +/* The following register is PWM channel related registers */
-> +#define PWM_CH_REG_OFFSET	0x200
-> +#define PWM_CH_REG_SIZE		0x20
-> +
-> +#define PWM_CMR			0x0
-> +/* bit field in CMR */
-> +#define PWM_CMR_CPOL		(1 << 9)
-> +#define PWM_CMR_UPD_CDTY	(1 << 10)
-> +
-> +/* The following registers for PWM v1 */
-> +#define PWMv1_CDTY		0x04
-> +#define PWMv1_CPRD		0x08
-> +#define PWMv1_CUPD		0x10
-> +
-> +/* The following registers for PWM v2 */
-> +#define PWMv2_CDTY		0x04
-> +#define PWMv2_CDTYUPD		0x08
-> +#define PWMv2_CPRD		0x0C
-> +#define PWMv2_CPRDUPD		0x10
-> +
-> +/* max value for duty and period */
-> +/*
-> + * Although the duty and period register is 32 bit,
-> + * however only the LSB 16 bits are significant.
-> + */
-> +#define PWM_MAX_DTY		0xFFFF
-> +#define PWM_MAX_PRD		0xFFFF
-> +#define PRD_MAX_PRES		10
-> +
-> +struct atmel_pwm_chip {
-> +	struct pwm_chip chip;
-> +	struct clk *clk;
-> +	void __iomem *base;
-> +
-> +	void (*config)(struct pwm_chip *chip, struct pwm_device *pwm,
-> +		       int dty, int prd);
-> +};
-> +
-> +static inline struct atmel_pwm_chip *to_atmel_pwm_chip(struct pwm_chip *chip)
-> +{
-> +	return container_of(chip, struct atmel_pwm_chip, chip);
-> +}
-> +
-> +static inline u32 atmel_pwm_readl(struct atmel_pwm_chip *chip,
-> +				  unsigned long offset)
-> +{
-> +	return readl(chip->base + offset);
-> +}
-> +
-> +static inline void atmel_pwm_writel(struct atmel_pwm_chip *chip,
-> +				    unsigned long offset, unsigned long val)
-> +{
-> +	writel(val, chip->base + offset);
-> +}
-> +
-> +static inline u32 atmel_pwm_ch_readl(struct atmel_pwm_chip *chip,
-> +				     unsigned int ch, unsigned long offset)
-> +{
-> +	return readl(chip->base + PWM_CH_REG_OFFSET + ch * PWM_CH_REG_SIZE
-> +		     + offset);
-> +}
-> +
-> +static inline void atmel_pwm_ch_writel(struct atmel_pwm_chip *chip,
-> +				       unsigned int ch, unsigned long offset,
-> +				       unsigned long val)
-> +{
-> +	writel(val, chip->base + PWM_CH_REG_OFFSET + ch * PWM_CH_REG_SIZE
-> +	       + offset);
-> +}
-> +
-> +static int atmel_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
-> +		int duty_ns, int period_ns)
-> +{
-> +	struct atmel_pwm_chip *atmel_pwm = to_atmel_pwm_chip(chip);
-> +	unsigned long clk_rate, prd, dty;
-> +	unsigned long long val, div;
-> +	int ret, pres = 0;
-> +
-> +	clk_rate = clk_get_rate(atmel_pwm->clk);
-> +	div = clk_rate;
-> +
-> +	/* Calculate the period cycles */
-> +	while (div > PWM_MAX_PRD) {
-> +		div = clk_rate / (1 << pres);
-> +		div = div * period_ns;
-> +		/* 1/Hz = 100000000 ns */
-> +		do_div(div, 1000000000);
-> +
-> +		if (pres++ > PRD_MAX_PRES) {
-> +			pr_err("PRES is bigger than maximum pre-scaler\n");
-> +			return -EINVAL;
-> +		}
-> +	}
-> +
-> +	/* Calculate the duty cycles */
-> +	prd = div;
-> +	div *= duty_ns;
-> +	do_div(div, period_ns);
-> +	dty = div;
-> +
-> +	ret = clk_enable(atmel_pwm->clk);
-> +	if (ret) {
-> +		pr_err("Failed to enable pwm clock\n");
-> +		return ret;
-> +	}
-> +
-> +	atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWM_CMR, pres);
-> +	atmel_pwm->config(chip, pwm, dty, prd);
-> +
-> +	/* Check whether need to disable clock */
-> +	val = atmel_pwm_readl(atmel_pwm, PWM_SR);
-> +	if ((val & PWM_SR_ALL_CH_ON) == 0)
-> +		clk_disable(atmel_pwm->clk);
-> +
-> +	return 0;
-> +}
-> +
-> +static void atmel_pwm_config_v1(struct pwm_chip *chip, struct pwm_device *pwm,
-> +				int dty, int prd)
-> +{
-> +	struct atmel_pwm_chip *atmel_pwm = to_atmel_pwm_chip(chip);
-> +	unsigned int val;
-> +
-> +	/*
-> +	 * If the PWM channel is disabled, write value to duty and period
-> +	 * registers directly.
-> +	 * If the PWM channel is enabled, using the update register, it needs
-> +	 * to set bit 10 of CMR to 0
-> +	 */
-> +	if (test_bit(PWMF_ENABLED, &pwm->flags)) {
-> +		atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWMv1_CUPD, dty);
-> +
-> +		val = atmel_pwm_ch_readl(atmel_pwm, pwm->hwpwm, PWM_CMR);
-> +		val &= ~PWM_CMR_UPD_CDTY;
-> +		atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWM_CMR, val);
-> +	} else {
-> +		atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWMv1_CDTY, dty);
-> +		atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWMv1_CPRD, prd);
-> +	}
-> +}
-> +
-> +static void atmel_pwm_config_v2(struct pwm_chip *chip, struct pwm_device *pwm,
-> +				int dty, int prd)
-> +{
-> +	struct atmel_pwm_chip *atmel_pwm = to_atmel_pwm_chip(chip);
-> +
-> +	/*
-> +	 * If the PWM channel is disabled, write value to duty and period
-> +	 * registers directly.
-> +	 * If the PWM channel is enabled, using the duty update register to
-> +	 * update the value.
-> +	 */
-> +	if (test_bit(PWMF_ENABLED, &pwm->flags)) {
-> +		atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWMv2_CDTYUPD, dty);
-> +	} else {
-> +		atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWMv2_CDTY, dty);
-> +		atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWMv2_CPRD, prd);
-> +	}
-> +}
-> +
-> +static int atmel_pwm_set_polarity(struct pwm_chip *chip, struct pwm_device *pwm,
-> +		enum pwm_polarity polarity)
-> +{
-> +	struct atmel_pwm_chip *atmel_pwm = to_atmel_pwm_chip(chip);
-> +	u32 val = 0;
-> +	int ret;
-> +
-> +	ret = clk_enable(atmel_pwm->clk);
-> +	if (ret) {
-> +		pr_err("failed to enable pwm clock\n");
-> +		return ret;
-> +	}
-> +
-> +	if (polarity == PWM_POLARITY_NORMAL)
-> +		val &= ~PWM_CMR_CPOL;
-> +	else
-> +		val |= PWM_CMR_CPOL;
-> +
-> +	atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWM_CMR, val);
-> +
-> +	clk_disable(atmel_pwm->clk);
-> +
-> +	return 0;
-> +}
-> +
-> +static int atmel_pwm_enable(struct pwm_chip *chip, struct pwm_device *pwm)
-> +{
-> +	struct atmel_pwm_chip *atmel_pwm = to_atmel_pwm_chip(chip);
-> +	int ret;
-> +
-> +	ret = clk_enable(atmel_pwm->clk);
-> +	if (ret) {
-> +		pr_err("failed to enable pwm clock\n");
-> +		return ret;
-> +	}
-> +
+There is a chicken bit in the IOMUXC GPR1 (IOMUXC+0x4 bit 21, it's on
+page 1927 of the i.MX6DQRM Rev 1 04/2013) which turns on or off the
+ENET_REF_CLK loopback. You could need to clear it to make the pad an
+input to the i.MX6 rather than an output to the PHY.. while it may
+seem like this removes the need for the SION bit in the pin you want,
+that's actually also required otherwise the pad mux latch 'sees' the
+data but the input latch behind it doesn't.
 
-This will increment clk->enable_count each time it is called.
-> +	atmel_pwm_writel(atmel_pwm, PWM_ENA, 1 << pwm->hwpwm);
-> +
-> +	return 0;
-> +}
-> +
-> +static void atmel_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
-> +{
-> +	struct atmel_pwm_chip *atmel_pwm = to_atmel_pwm_chip(chip);
-> +	u32 val;
-> +
-> +	atmel_pwm_writel(atmel_pwm, PWM_DIS, 1 << pwm->hwpwm);
-> +
-> +	val = atmel_pwm_readl(atmel_pwm, PWM_SR);
-> +	if ((val & PWM_SR_ALL_CH_ON) == 0)
-> +		clk_disable(atmel_pwm->clk);
-> +}
+There is a great diagram somewhere in the manual (Figure 28-1, right
+at the top of the GPIO docs) - SION *forces* data (it's the input_on
+signal in the diagram IIRC) to the gpio data register behind the
+IOMUX, but the logic behind every muxed pad is almost the same across
+the SoC.
 
-This will decrement clk->enable_count only once there are no pwm enabled
-anymore.  So in you enable more than one channel, you will never disable
-the clock. The simple fix is to always call clk_diasble, regardless of
-the state of the other channels.
+In essence, the pad control setting needs to be correct (SION set) and
+that chicken bit correctly cleared, or the clock input never goes into
+the MAC, because the MAC isn't connected directly to the pad, it's
+connected to the input latch. The only logic block that can 'really'
+read the pad latch is the GPIO unit.
 
-> +
-> +static const struct pwm_ops atmel_pwm_ops = {
-> +	.config = atmel_pwm_config,
-> +	.set_polarity = atmel_pwm_set_polarity,
-> +	.enable = atmel_pwm_enable,
-> +	.disable = atmel_pwm_disable,
-> +	.owner = THIS_MODULE,
-> +};
-> +
-> +struct atmel_pwm_data {
-> +	void (*config)(struct pwm_chip *chip, struct pwm_device *pwm,
-> +		       int dty, int prd);
-> +};
-> +
-> +static const struct atmel_pwm_data atmel_pwm_data_v1 = {
-> +	.config = atmel_pwm_config_v1,
-> +};
-> +
-> +static const struct atmel_pwm_data atmel_pwm_data_v2 = {
-> +	.config = atmel_pwm_config_v2,
-> +};
-> +
-> +#ifdef CONFIG_OF
-> +static const struct of_device_id atmel_pwm_dt_ids[] = {
-> +	{
-> +		.compatible = "atmel,at91sam9rl-pwm",
-> +		.data = &atmel_pwm_data_v1,
-> +	}, {
-> +		.compatible = "atmel,sama5d3-pwm",
-> +		.data = &atmel_pwm_data_v2,
-> +	}, {
-> +		/* sentinel */
-> +	},
-> +};
-> +MODULE_DEVICE_TABLE(of, atmel_pwm_dt_ids);
-> +#endif
-> +
-> +static int atmel_pwm_probe(struct platform_device *pdev)
-> +{
-> +	const struct of_device_id *of_id =
-> +		of_match_device(atmel_pwm_dt_ids, &pdev->dev);
-> +	const struct atmel_pwm_data *data;
-> +	struct atmel_pwm_chip *atmel_pwm;
-> +	struct resource *res;
-> +	int ret;
-> +
-> +	atmel_pwm = devm_kzalloc(&pdev->dev, sizeof(*atmel_pwm), GFP_KERNEL);
-> +	if (!atmel_pwm)
-> +		return -ENOMEM;
-> +
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	if (!res)
-> +		return -ENODEV;
-> +
-> +	atmel_pwm->base = devm_ioremap_resource(&pdev->dev, res);
-> +
-> +	atmel_pwm->clk = devm_clk_get(&pdev->dev, NULL);
-> +	if (IS_ERR(atmel_pwm->clk))
-> +		return PTR_ERR(atmel_pwm->clk);
-> +
-> +	ret = clk_prepare(atmel_pwm->clk);
-> +	if (ret) {
-> +		dev_err(&pdev->dev, "failed to prepare pwm clock\n");
-> +		return ret;
-> +	}
-> +
-> +	atmel_pwm->chip.dev = &pdev->dev;
-> +	atmel_pwm->chip.ops = &atmel_pwm_ops;
-> +	atmel_pwm->chip.of_xlate = of_pwm_xlate_with_flags;
-> +	atmel_pwm->chip.of_pwm_n_cells = 3;
-> +	atmel_pwm->chip.base = -1;
-> +	atmel_pwm->chip.npwm = 4;
-> +
-> +	data = of_id->data;
-> +	atmel_pwm->config = data->config;
-> +
-> +	ret = pwmchip_add(&atmel_pwm->chip);
-> +	if (ret < 0) {
-> +		dev_err(&pdev->dev, "failed to add pwm chip %d\n", ret);
-> +		goto unprepare_clk;
-> +	}
-> +
-> +	platform_set_drvdata(pdev, atmel_pwm);
-> +
-> +unprepare_clk:
-> +	clk_unprepare(atmel_pwm->clk);
-> +	return ret;
-> +}
-> +
-> +static int atmel_pwm_remove(struct platform_device *pdev)
-> +{
-> +	struct atmel_pwm_chip *atmel_pwm = platform_get_drvdata(pdev);
-> +
-> +	clk_unprepare(atmel_pwm->clk);
-> +
-> +	return pwmchip_remove(&atmel_pwm->chip);
-> +}
-> +
-> +static struct platform_driver atmel_pwm_driver = {
-> +	.driver = {
-> +		.name = "atmel-pwm",
-> +		.of_match_table = of_match_ptr(atmel_pwm_dt_ids),
-> +	},
-> +	.probe = atmel_pwm_probe,
-> +	.remove = atmel_pwm_remove,
-> +};
-> +module_platform_driver(atmel_pwm_driver);
-> +
-> +MODULE_ALIAS("platform:atmel-pwm");
-> +MODULE_AUTHOR("Bo Shen <voice.shen@atmel.com>");
-> +MODULE_DESCRIPTION("Atmel PWM driver");
-> +MODULE_LICENSE("GPL v2");
+Note that you MAY have to cycle the clock or reset the PHY or MAC
+*after* setting the pin up, otherwise the MAC won't get the clock..
+it's really a laborious process which isn't described properly in the
+DT (all it needs is a property to define where it's clock comes from
+and Do The Right Thing (tm) at driver init.. because this is
+infuriatingly common on i.MX6 designs, but not so common that everyone
+needs it)
 
 
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+On Fri, Sep 27, 2013 at 10:19 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Fri, Sep 27, 2013 at 09:26:02PM +0800, Shawn Guo wrote:
+>> On Fri, Sep 27, 2013 at 01:13:57PM +0100, Russell King - ARM Linux wrote:
+>> > There's also this which follows the above:
+>> >
+>> > +       /* Set enet clock to 50MHz RMII */
+>> > +       enet = clk_get_sys("enet.0", NULL);
+>> > +       if (IS_ERR(enet))
+>> > +               pr_err("Unable to get enet.0 clock\n");
+>>
+>> I can not find clock lookup for "enet.0" in FSL 3.0.35 BSP 4.1.0, so
+>> I'm not sure how this works at all.  Can you confirm that by running
+>> Rabeeh's kernel to see if you get that error message?
+>
+> Here . Trying to find clock enet.0 (null)
+> Returning clk_lookup at 824f9854
+> Here . Trying to find clock (null) esai_clk
+> Returning clk_lookup at 824f95ac
+> Here . Trying to find clock (null) pll3_pfd_508M
+> Returning clk_lookup at 824f919c
+> Here . Trying to find clock (null) asrc_clk
+> Returning clk_lookup at 824f96ec
+>
+> So it seems to be able to get that clock.  I'm wondering if it's based
+> on BSP 4.0.0 which does have that clock, rather than 4.1.0.
+>
+>> > +       else {
+>> > +               clk_prepare(enet);
+>> > +               clk_set_rate(enet, 50000000);
+>> > +               clk_enable(enet);
+>> > +       }
+>> >
+>> > I'm not sure at the moment which clock that refers to, or whether that's
+>> > necessary only for the AR8030 (which is used in RMII mode).  The enable
+>> > bit seems to be CCM_CCGR1 CG5_OFFSET.
+>>
+>> There are two clocks ENET related, 'enet' (117) and 'enet_ref' (190).
+>> The enet is fec internal working clock, and enet_ref is provided by
+>> imx6q CCM (Clock Controller Module) on pad ENET_REF_CLK which can
+>> generally be used to clock the external PHY.
+>
+> In this case, the phy provides the clock to the IMX6.
+>
+>> The CCM_CCGR1_CG5 is clock 'enet', while I think the clock in above
+>> code should be 'enet_ref'.  It seems you need to set up
+>> MX6QDL_PAD_GPIO_16__ENET_REF_CLK to use the clock though.
+>
+> Okay, and it seems Rabeeh is setting the enet clock (117) to 50MHz.
+> It defaults to 66MHz for me in 3.12-rc1, but I've hacked clk-imx6q.c
+> to call clk_set_rate(clk[enet], 50000000).
+>
+> I've changed the enet_ref clock pinctrl settings to:
+>
+>         /* ENET_REF_CLK is an output on AR8035 - SION must be set */
+>         MX6QDL_PAD_GPIO_16__ENET_REF_CLK        0xc0000000
+> (which expands to: 0x214 0x5e4 0x80c 0x2 0x0 0xc0000000)
+>
+> which in Rabeeh's version corresponds to:
+>
+>         MX6DL_PAD_GPIO_16__ENET_ANATOP_ETHERNET_REF_OUT,
+> (which expands to: IOMUX_PAD(0x05E4, 0x0214, 0x12, 0x080C, 0, NO_PAD_CTRL))
+>
+> I've been through all the pinctrl settings for this now, taking them
+> back to the hex numbers and comparing.  I'm quite certain I have the
+> pinctrl settings correct now.
+>
+> Probing the AR8035, I see that it's generating its 125M clock, as per
+> the fixup function, so at least that's working.
+>
+> I've just enabled the debug in pinctrl-imx.c, and I get this:
+>
+> imx6dl-pinctrl 20e0000.iomuxc: group(3): enetgrp-4
+> imx6dl-pinctrl 20e0000.iomuxc: MX6DL_PAD_RESERVE0: 1 0x0001b0b0
+> imx6dl-pinctrl 20e0000.iomuxc: MX6DL_PAD_RESERVE1: 1 0x0001b0b0
+> imx6dl-pinctrl 20e0000.iomuxc: MX6DL_PAD_RESERVE2: 5 0x000130b0
+> imx6dl-pinctrl 20e0000.iomuxc: MX6DL_PAD_RESERVE3: 5 0x80000000
+> imx6dl-pinctrl 20e0000.iomuxc: MX6DL_PAD_RESERVE4: 1 0x00003000
+> imx6dl-pinctrl 20e0000.iomuxc: MX6DL_PAD_RESERVE5: 1 0x00003000
+> imx6dl-pinctrl 20e0000.iomuxc: MX6DL_PAD_RESERVE6: 1 0x00003000
+> imx6dl-pinctrl 20e0000.iomuxc: MX6DL_PAD_RESERVE7: 1 0x80000000
+> imx6dl-pinctrl 20e0000.iomuxc: MX6DL_PAD_RESERVE8: 1 0x80000000
+> imx6dl-pinctrl 20e0000.iomuxc: MX6DL_PAD_RESERVE9: 1 0x80000000
+> imx6dl-pinctrl 20e0000.iomuxc: MX6DL_PAD_RESERVE10: 18 0x80000000
+> imx6dl-pinctrl 20e0000.iomuxc: MX6DL_PAD_RESERVE11: 1 0x80000000
+> imx6dl-pinctrl 20e0000.iomuxc: MX6DL_PAD_RESERVE12: 1 0x0001b0b0
+> imx6dl-pinctrl 20e0000.iomuxc: MX6DL_PAD_RESERVE13: 1 0x0001b0b0
+> imx6dl-pinctrl 20e0000.iomuxc: MX6DL_PAD_RESERVE14: 1 0x0001b0b0
+> imx6dl-pinctrl 20e0000.iomuxc: MX6DL_PAD_RESERVE15: 1 0x0001b0b0
+> imx6dl-pinctrl 20e0000.iomuxc: MX6DL_PAD_RESERVE16: 1 0x0001b0b0
+> imx6dl-pinctrl 20e0000.iomuxc: MX6DL_PAD_RESERVE17: 1 0x0000a0b1
+> imx6dl-pinctrl 20e0000.iomuxc: MX6DL_PAD_RESERVE18: 1 0x0001b0b0
+> imx6dl-pinctrl 20e0000.iomuxc: MX6DL_PAD_CSI0_DAT10: 1 0x000130b0
+> imx6dl-pinctrl 20e0000.iomuxc: MX6DL_PAD_CSI0_DAT11: 1 0x000130b0
+> imx6dl-pinctrl 20e0000.iomuxc: MX6DL_PAD_CSI0_DAT12: 1 0x0001b0b0
+> imx6dl-pinctrl 20e0000.iomuxc: MX6DL_PAD_CSI0_DAT13: 1 0x0001b0b0
+> imx6dl-pinctrl 20e0000.iomuxc: MX6DL_PAD_CSI0_DAT14: 1 0x000130b0
+> ...
+> brd: module loaded
+> loop: module loaded
+> imx6dl-pinctrl 20e0000.iomuxc: maps: function enet group enetgrp-4 num 19
+> ar8035_phy_fixup()
+> libphy: fec_enet_mii_bus: probed
+> fec 2188000.ethernet eth0: registered PHC device 0
+>
+> So where is the pinctrl settings applied - or more to the point, why
+> aren't they being applied?  This would probably explain why ethernet
+> doesn't work - I mean, if the pinctrl settings are never written to
+> the registers...
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
