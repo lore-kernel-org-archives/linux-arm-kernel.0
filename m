@@ -1,34 +1,48 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 27 Sep 2013 19:55:18 +0200
-Subject: [PATCH 0/5] Allwinner SoCs High Speed Timer support
-In-Reply-To: <20130927170505.GX2954@lukather>
-References: <1380117790-19390-1-git-send-email-maxime.ripard@free-electrons.com>
- <87zjr04vnh.fsf@linaro.org>
- <CAOesGMhTZS1MdHW9cL4s_X8jUXHS3VkNZupCfX4ZGroL6k4gEw@mail.gmail.com>
- <20130925195012.GI2954@lukather> <20130926163942.675266e5@skate>
- <20130927170505.GX2954@lukather>
-Message-ID: <20130927195518.4b0895b6@skate>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Fri, 27 Sep 2013 20:21:51 +0200
+Subject: [PATCH 04/26] clk: prima2: declare OF clock provider
+In-Reply-To: <CAGsJ_4yPcM4YM_i-JMCoDeRb5zKWJyNEt+jnMJ6LqoF5gC3KhA@mail.gmail.com>
+References: <1379526839-14798-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1379526839-14798-5-git-send-email-sebastian.hesselbarth@gmail.com>
+ <CAGsJ_4xC_g1C-pGQGrcLOBhKLSMG3D8369DRPoFgNZhKqs-aTQ@mail.gmail.com>
+ <523ABA7A.50305@gmail.com> <523EDEB0.1060601@gmail.com>
+ <CAGsJ_4yPcM4YM_i-JMCoDeRb5zKWJyNEt+jnMJ6LqoF5gC3KhA@mail.gmail.com>
+Message-ID: <5245CCBF.3070206@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Maxime Ripard,
+On 09/22/2013 12:37 PM, Barry Song wrote:
+> 2013/9/22 Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>:
+>> On 09/19/2013 10:48 AM, Sebastian Hesselbarth wrote:
+>>>
+>>> On 09/19/13 10:45, Barry Song wrote:
+>>>>>
+>>>>> @@ -1124,3 +1106,4 @@ void __init sirfsoc_of_clk_init(void)
+>>>>>
+>>>>>           of_clk_add_provider(np, of_clk_src_onecell_get, &clk_data);
+>>>>>    }
+>>>>> +CLK_OF_DECLARE(sirfsoc_clk, "sirf,prima2-clkc", sirfsoc_clk_init);
+>>>>
+>>>>
+>>>> hi Sebastian,
+>>>> what if the driver is compatible with multiple clk controllers and we
+>>>> want to add another compatible string here except "sirf,prima2-clkc"?
+>>>>
+>>>> -barry
+>>>>
+>>>
+>>> Just add
+>>> CLK_OF_DECLARE(other_fancy_clk, "sirf,different-compatible",
+>>> sirfsoc_clk_init);
+>>
+>>
+>> Barry, BTW, do I get your Acked-By for this and the corresponding
+>> removal patch?
+>
+> Sebastian, would you wait for a while as i need to merge them and make a test.
 
-On Fri, 27 Sep 2013 20:05:05 +0300, Maxime Ripard wrote:
+Sure, take your time.
+I now have almost all Acked-by's for the other patches, would be
+great if you find some time to test this on prima2 anytime soon.
 
-> > A small update to Documentation/arm/sunxi/README would be nice :)
-> 
-> Yep, right. Even though, for most of these SoCs (F20, A10s, A31*,
-> A2*), I don't think we have publicly available datasheet to point to
-> there.
-
-The Marvell file mentions Armada 370 and XP even though no public
-datasheets are available. I think you should mention those SOCs, and
-indicate that no datasheet is publicly available for the moment.
-
-Best regards,
-
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Sebastian
