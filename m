@@ -1,57 +1,30 @@
-From: sylvester.nawrocki@gmail.com (Sylwester Nawrocki)
-Date: Sat, 28 Sep 2013 21:37:09 +0200
-Subject: [PATCH V5 1/5] ARM: dts: Add MIPI PHY node to exynos4.dtsi
-In-Reply-To: <1380396467-29278-2-git-send-email-s.nawrocki@samsung.com>
-References: <1380396467-29278-1-git-send-email-s.nawrocki@samsung.com>
- <1380396467-29278-2-git-send-email-s.nawrocki@samsung.com>
-Message-ID: <52472FE5.5020609@gmail.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Sun, 29 Sep 2013 00:11:28 +0400
+Subject: [PATCH 1/2] ARM: shmobile: bockw: enable HPB-DMAC in defconfig
+Message-ID: <201309290011.28982.sergei.shtylyov@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(adding missing devicetree mailing list at Cc)
+Enable HPB-DMAC driver in 'bockw_defconfig'.
 
-On 09/28/2013 09:27 PM, Sylwester Nawrocki wrote:
-> Add PHY provider node for the MIPI CSIS and MIPI DSIM PHYs.
->
-> Signed-off-by: Sylwester Nawrocki<s.nawrocki@samsung.com>
-> Signed-off-by: Kyungmin Park<kyungmin.park@samsung.com>
-> Acked-by: Felipe Balbi<balbi@ti.com>
-> ---
->   arch/arm/boot/dts/exynos4.dtsi |   10 ++++++++++
->   1 files changed, 10 insertions(+), 0 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/exynos4.dtsi b/arch/arm/boot/dts/exynos4.dtsi
-> index caadc02..a73eeb5 100644
-> --- a/arch/arm/boot/dts/exynos4.dtsi
-> +++ b/arch/arm/boot/dts/exynos4.dtsi
-> @@ -49,6 +49,12 @@
->   		reg =<0x10000000 0x100>;
->   	};
->
-> +	mipi_phy: video-phy at 10020710 {
-> +		compatible = "samsung,s5pv210-mipi-video-phy";
-> +		reg =<0x10020710 8>;
-> +		#phy-cells =<1>;
-> +	};
-> +
->   	pd_mfc: mfc-power-domain at 10023C40 {
->   		compatible = "samsung,exynos4210-pd";
->   		reg =<0x10023C40 0x20>;
-> @@ -161,6 +167,8 @@
->   			clock-names = "csis", "sclk_csis";
->   			bus-width =<4>;
->   			samsung,power-domain =<&pd_cam>;
-> +			phys =<&mipi_phy 0>;
-> +			phy-names = "csis";
->   			status = "disabled";
->   			#address-cells =<1>;
->   			#size-cells =<0>;
-> @@ -174,6 +182,8 @@
->   			clock-names = "csis", "sclk_csis";
->   			bus-width =<2>;
->   			samsung,power-domain =<&pd_cam>;
-> +			phys =<&mipi_phy 2>;
-> +			phy-names = "csis";
->   			status = "disabled";
->   			#address-cells =<1>;
->   			#size-cells =<0>;
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+
+---
+The patch is against 'renesas-devel-20130927v2' tag of the 'renesas.git' repo.
+
+ arch/arm/configs/bockw_defconfig |    2 ++
+ 1 file changed, 2 insertions(+)
+
+Index: renesas/arch/arm/configs/bockw_defconfig
+===================================================================
+--- renesas.orig/arch/arm/configs/bockw_defconfig
++++ renesas/arch/arm/configs/bockw_defconfig
+@@ -108,6 +108,8 @@ CONFIG_MMC_SDHI=y
+ CONFIG_MMC_SH_MMCIF=y
+ CONFIG_RTC_CLASS=y
+ CONFIG_RTC_DRV_RX8581=y
++CONFIG_DMADEVICES=y
++CONFIG_RCAR_HPB_DMAE=y
+ CONFIG_UIO=y
+ CONFIG_UIO_PDRV_GENIRQ=y
+ # CONFIG_IOMMU_SUPPORT is not set
