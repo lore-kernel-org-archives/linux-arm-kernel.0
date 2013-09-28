@@ -1,47 +1,69 @@
 From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Sat, 28 Sep 2013 04:44:09 +0400
-Subject: [PATCH 1/2] ARM: shmobile: r8a7778: add CAN clock support
+Date: Sat, 28 Sep 2013 04:45:33 +0400
+Subject: [PATCH 2/2] ARM: shmobile: BOCK-W: add CAN0 support
 In-Reply-To: <201309280441.52414.sergei.shtylyov@cogentembedded.com>
 References: <201309280441.52414.sergei.shtylyov@cogentembedded.com>
-Message-ID: <201309280444.09539.sergei.shtylyov@cogentembedded.com>
+Message-ID: <201309280445.34234.sergei.shtylyov@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for R8A7778 CAN0/1 clocks.
+Register platform device and pin data for CAN0 controller on the BOCK-W board. 
 
 Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
 ---
- arch/arm/mach-shmobile/clock-r8a7778.c |    5 +++++
- 1 file changed, 5 insertions(+)
+ arch/arm/mach-shmobile/board-bockw.c |   20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
 
-Index: renesas/arch/arm/mach-shmobile/clock-r8a7778.c
+Index: renesas/arch/arm/mach-shmobile/board-bockw.c
 ===================================================================
---- renesas.orig/arch/arm/mach-shmobile/clock-r8a7778.c
-+++ renesas/arch/arm/mach-shmobile/clock-r8a7778.c
-@@ -117,6 +117,7 @@ static struct clk *main_clks[] = {
- enum {
- 	MSTP331,
- 	MSTP323, MSTP322, MSTP321,
-+	MSTP316, MSTP315,
- 	MSTP311, MSTP310,
- 	MSTP309, MSTP308, MSTP307,
- 	MSTP114,
-@@ -133,6 +134,8 @@ static struct clk mstp_clks[MSTP_NR] = {
- 	[MSTP323] = SH_CLK_MSTP32(&p_clk, MSTPCR3, 23, 0), /* SDHI0 */
- 	[MSTP322] = SH_CLK_MSTP32(&p_clk, MSTPCR3, 22, 0), /* SDHI1 */
- 	[MSTP321] = SH_CLK_MSTP32(&p_clk, MSTPCR3, 21, 0), /* SDHI2 */
-+	[MSTP316] = SH_CLK_MSTP32(&p_clk, MSTPCR3, 16, 0), /* CAN0 */
-+	[MSTP315] = SH_CLK_MSTP32(&p_clk, MSTPCR3, 15, 0), /* CAN1 */
- 	[MSTP311] = SH_CLK_MSTP32(&p_clk, MSTPCR3, 11, 0), /* SSI4 */
- 	[MSTP310] = SH_CLK_MSTP32(&p_clk, MSTPCR3, 10, 0), /* SSI5 */
- 	[MSTP309] = SH_CLK_MSTP32(&p_clk, MSTPCR3,  9, 0), /* SSI6 */
-@@ -176,6 +179,8 @@ static struct clk_lookup lookups[] = {
- 	CLKDEV_DEV_ID("sh_mobile_sdhi.0", &mstp_clks[MSTP323]), /* SDHI0 */
- 	CLKDEV_DEV_ID("sh_mobile_sdhi.1", &mstp_clks[MSTP322]), /* SDHI1 */
- 	CLKDEV_DEV_ID("sh_mobile_sdhi.2", &mstp_clks[MSTP321]), /* SDHI2 */
-+	CLKDEV_DEV_ID("rcar_can.0", &mstp_clks[MSTP316]), /* CAN0 */
-+	CLKDEV_DEV_ID("rcar_can.1", &mstp_clks[MSTP315]), /* CAN1 */
- 	CLKDEV_DEV_ID("r8a777x-ether", &mstp_clks[MSTP114]), /* Ether */
- 	CLKDEV_DEV_ID("r8a7778-vin.0", &mstp_clks[MSTP110]), /* VIN0 */
- 	CLKDEV_DEV_ID("r8a7778-vin.1", &mstp_clks[MSTP109]), /* VIN1 */
+--- renesas.orig/arch/arm/mach-shmobile/board-bockw.c
++++ renesas/arch/arm/mach-shmobile/board-bockw.c
+@@ -19,6 +19,7 @@
+  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
+  */
+ 
++#include <linux/can/platform/rcar_can.h>
+ #include <linux/mfd/tmio.h>
+ #include <linux/mmc/host.h>
+ #include <linux/mmc/sh_mobile_sdhi.h>
+@@ -193,6 +194,16 @@ static struct resource usb_phy_resources
+ static struct rcar_phy_platform_data usb_phy_platform_data __initdata =
+ 	USB_PHY_SETTING;
+ 
++/* CAN */
++static struct resource can_resources[] __initdata = {
++	/* CAN0 */
++	DEFINE_RES_MEM(0xfffd0000, 0x1000),
++	DEFINE_RES_IRQ(gic_iid(0x64)),
++};
++
++static struct rcar_can_platform_data can_platform_data __initdata = {
++	.clock_select	= CLKR_CLKP1,
++};
+ 
+ /* SDHI */
+ static struct sh_mobile_sdhi_info sdhi0_info __initdata = {
+@@ -523,6 +534,9 @@ static const struct pinctrl_map bockw_pi
+ 				  "ssi7_data", "ssi"),
+ 	PIN_MAP_MUX_GROUP_DEFAULT("rcar_sound", "pfc-r8a7778",
+ 				  "ssi8_data", "ssi"),
++	/* CAN0 */
++	PIN_MAP_MUX_GROUP_DEFAULT("rcar_can.0", "pfc-r8a7778",
++				  "can0_data_a", "can0"),
+ 	/* Ether */
+ 	PIN_MAP_MUX_GROUP_DEFAULT("r8a777x-ether", "pfc-r8a7778",
+ 				  "ether_rmii", "ether"),
+@@ -684,6 +698,12 @@ static void __init bockw_init(void)
+ 
+ 		platform_device_register_full(&cardinfo);
+ 	}
++
++	platform_device_register_resndata(&platform_bus, "rcar_can", 0,
++					  can_resources,
++					  ARRAY_SIZE(can_resources),
++					  &can_platform_data,
++					  sizeof(can_platform_data));
+ }
+ 
+ static void __init bockw_init_late(void)
