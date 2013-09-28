@@ -1,92 +1,28 @@
 From: roy.franz@linaro.org (Roy Franz)
-Date: Sat, 28 Sep 2013 09:23:17 -0700
-Subject: [PATCH V4 0/6] ADD ARM EFI stub
-Message-ID: <1380385403-31904-1-git-send-email-roy.franz@linaro.org>
+Date: Sat, 28 Sep 2013 10:32:56 -0700
+Subject: [PATCH V2 ] Improve EFI stub command line conversion
+Message-ID: <1380389577-27039-1-git-send-email-roy.franz@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Improve the conversion of the UTF-16 EFI command line
+to UTF-8 for passing to the kernel.
 
-This patch series adds EFI stub support for the ARM architecture.  The 
-stub for ARM is implemented in a similar manner to x86 in that it is a 
-shim layer between EFI and the normal zImage/bzImage boot process, and 
-that an image with the stub configured is bootable as both a zImage and 
-EFI application.  
+Depends on series:
+[PATCH V4 0/6] ADD ARM EFI stub
 
+Changes from V1:
+* Fix loop limit when processing UTF-16 EFI command line
+* Break out from series: [PATCH V5 00/18] ARM EFI stub common code
+* Now includes caller fixup in ARM EFI stub.
 
-Changes since v3:
-* Common and x86 EFI stub changes have been broken out and submitted separately.
-  This patch series depends on the "[PATCH V5 00/18] ARM EFI stub common code"
-  series as merged by Matt Fleming. (Patch 10 of that series omitted)
-* Re-added -fno-stack-protector.  Needed for compilation with 
-  CONFIG_CC_STACKPROTECTOR option.  Cannot easily add support for stack 
-  protection since there are no functions in stub that never return, which 
-  is a requirement for use.  (x86 stub also disables stack protector.)
-  Note that even in the absense of -fno-stack-protector, stack protection
-  was never present in the decompressor, as the required functions are not
-  implemented.
-* Fixed long summaries in commit messages.
-* Further cleanups of assembly in head.S
+H. Peter Anvin (1):
+  Improve EFI stub command line conversion
 
-
-Changes since v2:
-* Now depends on "arm: Add [U]EFI runtime services support" patches by leif.lindholm at linaro.org.
-  The EFI memory map is the only memory map passed to the kernel, so EFI support
-  is now required.
-* remove "-fno-stack-protector" from decompressor Makefile.  The current code doesn't
-  trigger the stack protection, so the decompressor now compiles with it still
-  on.  Note that there has never been any stack protection in the decompressor
-  since the stack usage doesn't trigger the heuristic in GCC, so right now
-  the "-fno-stack-protector" is a noop.
-* Changed EFI command line handling to not have a fixed limit.
-* Change FDT memory allocation to retry with a larger allocation if
-  first educated guess is inadequate.
-* Correctly set 'SizeOfCode' in PE/COFF header.
-* Reviewed ".setup" section that is in x86 PE/COFF header.  This is used for x86
-  to account for code that is not in the .text section.  We don't need this
-  for ARM, as all of our code is in the .text section, or in the PE/COFF header
-  itself.
-* Moved EFI_STUB_ERROR #define to header file to share between stub C and ASM.
-* Variety of cleanups and fixes in head.S.
-* Changed update_fdt_and_exit_boot() to just update the device tree, and
-  renamed appropriately.  Memory allocations moved out of this function as
-  well, which enables the retries if the initial FDT size is too small.
-  Note that in order to do the retried allocations, the original FDT and 
-  command line memory regions are left allocated.  This is OK since the kernel
-  has the memory map and will free these allocations along with the initrd
-  and new fdt allocations.
-* Added prefix to all prints, reduced number of prints, and reviewed all
-  messages.
-* Change mixed usage of dtb/fdt to all be fdt or "device tree" in efi-stub.c
-* remove unnecessary zimage_size variable from relocate_kernel()
-* correct return types on EFI functions - should be efi_status_t, not int.
-
-
-
-Changes since V1:
-* Updated head.S based on feedback from Dave Martin.  ARM/THUMB
-  switches now much cleaner.
-
-Roy Franz (6):
-  efi-stub.txt updates for ARM
-  Add shared update_fdt() function for ARM/ARM64
-  Add strstr to compressed string.c for ARM.
-  Add EFI stub for ARM
-  Disable stack protection for decompressor/stub
-  Add config EFI_STUB for ARM to Kconfig
-
- Documentation/efi-stub.txt             |   27 ++-
- arch/arm/Kconfig                       |   11 ++
- arch/arm/boot/compressed/Makefile      |   17 +-
- arch/arm/boot/compressed/efi-header.S  |  111 ++++++++++++
- arch/arm/boot/compressed/efi-stub.c    |  288 ++++++++++++++++++++++++++++++++
- arch/arm/boot/compressed/efi-stub.h    |    5 +
- arch/arm/boot/compressed/head.S        |   83 ++++++++-
- arch/arm/boot/compressed/string.c      |   21 +++
- drivers/firmware/efi/efi-stub-helper.c |   86 ++++++++++
- 9 files changed, 633 insertions(+), 16 deletions(-)
- create mode 100644 arch/arm/boot/compressed/efi-header.S
- create mode 100644 arch/arm/boot/compressed/efi-stub.c
- create mode 100644 arch/arm/boot/compressed/efi-stub.h
+ arch/arm/boot/compressed/efi-stub.c    |    2 +-
+ arch/x86/boot/compressed/eboot.c       |    3 +-
+ drivers/firmware/efi/efi-stub-helper.c |   93 ++++++++++++++++++++++++--------
+ 3 files changed, 72 insertions(+), 26 deletions(-)
 
 -- 
 1.7.10.4
