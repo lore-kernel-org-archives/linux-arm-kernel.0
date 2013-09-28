@@ -1,29 +1,47 @@
-From: richard.weinberger@gmail.com (richard -rw- weinberger)
-Date: Sat, 28 Sep 2013 11:03:17 +0200
-Subject: new binutils needed for arm in 3.12-rc1
-In-Reply-To: <CAMuHMdXN3CgOt6Lk1S-xYjeeACOZtuxuYu2RqSGMoTvp9qz8Cg@mail.gmail.com>
-References: <20130924214800.GV25647@n2100.arm.linux.org.uk>
- <1380071607.1974.78@driftwood>
- <CAMuHMdXN3CgOt6Lk1S-xYjeeACOZtuxuYu2RqSGMoTvp9qz8Cg@mail.gmail.com>
-Message-ID: <CAFLxGvyYQ6ng-yeBZe4TOTtTyk1d4v3RNEhdU29tEnm9vTLhBQ@mail.gmail.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Sat, 28 Sep 2013 15:12:12 +0530
+Subject: [PATCH v12 0/7] PHY framework
+In-Reply-To: <20130928003742.GA3659@kroah.com>
+References: <1380263012-9687-1-git-send-email-kishon@ti.com>
+ <20130928003742.GA3659@kroah.com>
+Message-ID: <5246A474.90500@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 26, 2013 at 9:18 AM, Geert Uytterhoeven
-<geert@linux-m68k.org> wrote:
-> Hi Rob,
->
-> On Wed, Sep 25, 2013 at 3:13 AM, Rob Landley <rob@landley.net> wrote:
->> Some of us can't ship GPLv3 binaries and are looking forward to the day LLVM
->> or some such provides a complete solution.
->
-> Sorry, I didn't have a coffee yet, but which subtility am I missing
-> that prohibits
-> you from shipping GPLv3 binaries?
+On Saturday 28 September 2013 06:07 AM, Greg KH wrote:
+> On Fri, Sep 27, 2013 at 11:53:24AM +0530, Kishon Vijay Abraham I wrote:
+>> Added a generic PHY framework that provides a set of APIs for the PHY drivers
+>> to create/destroy a PHY and APIs for the PHY users to obtain a reference to
+>> the PHY with or without using phandle.
+>>
+>> This framework will be of use only to devices that uses external PHY (PHY
+>> functionality is not embedded within the controller).
+>>
+>> The intention of creating this framework is to bring the phy drivers spread
+>> all over the Linux kernel to drivers/phy to increase code re-use and to
+>> increase code maintainability.
+>>
+>> Comments to make PHY as bus wasn't done because PHY devices can be part of
+>> other bus and making a same device attached to multiple bus leads to bad
+>> design.
+>>
+>> If the PHY driver has to send notification on connect/disconnect, the PHY
+>> driver should make use of the extcon framework. Using this susbsystem
+>> to use extcon framwork will have to be analysed.
+>>
+>> You can find this patch series @
+>> git://git.kernel.org/pub/scm/linux/kernel/git/kishon/linux-phy.git testing
+>>
+>> I'll create a new branch *next* once this patch series is finalized. All the
+>> PHY driver development that depends on PHY framework can be based on this
+>> branch.
+>>
+>> Did USB enumeration testing in panda and beagle after applying [1] (needed for
+>> non-dt)
+> 
+> All now applied to my usb-next branch.  Thanks for redoing this many
+> times and sticking with it.
 
-/me had coffee but still doesn't get why you can't ship GPLv3 binaries.
-Rob, can you please enlighten us?
+Thanks :-)
 
--- 
-Thanks,
-//richard
+-Kishon
