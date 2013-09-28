@@ -1,156 +1,269 @@
 From: sylvester.nawrocki@gmail.com (Sylwester Nawrocki)
-Date: Sat, 28 Sep 2013 21:27:47 +0200
-Subject: [PATCH V5 5/5] ARM: Samsung: Remove the MIPI PHY setup code
-In-Reply-To: <1380396467-29278-1-git-send-email-s.nawrocki@samsung.com>
+Date: Sat, 28 Sep 2013 21:35:47 +0200
+Subject: [PATCH V5 2/5] phy: Add driver for Exynos MIPI CSIS/DSIM DPHYs
+In-Reply-To: <1380396467-29278-3-git-send-email-s.nawrocki@samsung.com>
 References: <1380396467-29278-1-git-send-email-s.nawrocki@samsung.com>
-Message-ID: <1380396467-29278-6-git-send-email-s.nawrocki@samsung.com>
+ <1380396467-29278-3-git-send-email-s.nawrocki@samsung.com>
+Message-ID: <52472F93.7000205@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Generic PHY drivers are used to handle the MIPI CSIS and MIPI DSIM
-DPHYs so we can remove now unused code at arch/arm/plat-samsung.
-In case there is any board file for S5PV210 platforms using MIPI
-CSIS/DSIM (not any upstream currently) it should use the generic
-PHY API to bind the PHYs to respective PHY consumer drivers and
-a platform device for the PHY provider should be defined.
+(adding missing devicetree mailing list at Cc)
 
-Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-Acked-by: Felipe Balbi <balbi@ti.com>
-Acked-by: Kukjin Kim <kgene.kim@samsung.com>
----
- arch/arm/mach-exynos/include/mach/regs-pmu.h    |    5 --
- arch/arm/mach-s5pv210/include/mach/regs-clock.h |    4 --
- arch/arm/plat-samsung/Kconfig                   |    5 --
- arch/arm/plat-samsung/Makefile                  |    1 -
- arch/arm/plat-samsung/setup-mipiphy.c           |   60 -----------------------
- 5 files changed, 0 insertions(+), 75 deletions(-)
- delete mode 100644 arch/arm/plat-samsung/setup-mipiphy.c
-
-diff --git a/arch/arm/mach-exynos/include/mach/regs-pmu.h b/arch/arm/mach-exynos/include/mach/regs-pmu.h
-index 57344b7..2cdb63e 100644
---- a/arch/arm/mach-exynos/include/mach/regs-pmu.h
-+++ b/arch/arm/mach-exynos/include/mach/regs-pmu.h
-@@ -44,11 +44,6 @@
- #define S5P_DAC_PHY_CONTROL			S5P_PMUREG(0x070C)
- #define S5P_DAC_PHY_ENABLE			(1 << 0)
- 
--#define S5P_MIPI_DPHY_CONTROL(n)		S5P_PMUREG(0x0710 + (n) * 4)
--#define S5P_MIPI_DPHY_ENABLE			(1 << 0)
--#define S5P_MIPI_DPHY_SRESETN			(1 << 1)
--#define S5P_MIPI_DPHY_MRESETN			(1 << 2)
--
- #define S5P_INFORM0				S5P_PMUREG(0x0800)
- #define S5P_INFORM1				S5P_PMUREG(0x0804)
- #define S5P_INFORM2				S5P_PMUREG(0x0808)
-diff --git a/arch/arm/mach-s5pv210/include/mach/regs-clock.h b/arch/arm/mach-s5pv210/include/mach/regs-clock.h
-index 032de66..e345584 100644
---- a/arch/arm/mach-s5pv210/include/mach/regs-clock.h
-+++ b/arch/arm/mach-s5pv210/include/mach/regs-clock.h
-@@ -147,10 +147,6 @@
- #define S5P_HDMI_PHY_CONTROL	S5P_CLKREG(0xE804)
- #define S5P_USB_PHY_CONTROL	S5P_CLKREG(0xE80C)
- #define S5P_DAC_PHY_CONTROL	S5P_CLKREG(0xE810)
--#define S5P_MIPI_DPHY_CONTROL(x) S5P_CLKREG(0xE814)
--#define S5P_MIPI_DPHY_ENABLE	(1 << 0)
--#define S5P_MIPI_DPHY_SRESETN	(1 << 1)
--#define S5P_MIPI_DPHY_MRESETN	(1 << 2)
- 
- #define S5P_INFORM0		S5P_CLKREG(0xF000)
- #define S5P_INFORM1		S5P_CLKREG(0xF004)
-diff --git a/arch/arm/plat-samsung/Kconfig b/arch/arm/plat-samsung/Kconfig
-index 7dfba93..ec882ad 100644
---- a/arch/arm/plat-samsung/Kconfig
-+++ b/arch/arm/plat-samsung/Kconfig
-@@ -395,11 +395,6 @@ config S3C24XX_PWM
- 	  Support for exporting the PWM timer blocks via the pwm device
- 	  system
- 
--config S5P_SETUP_MIPIPHY
--	bool
--	help
--	  Compile in common setup code for MIPI-CSIS and MIPI-DSIM devices
--
- config S3C_SETUP_CAMIF
- 	bool
- 	help
-diff --git a/arch/arm/plat-samsung/Makefile b/arch/arm/plat-samsung/Makefile
-index 498c7c2..9267d29 100644
---- a/arch/arm/plat-samsung/Makefile
-+++ b/arch/arm/plat-samsung/Makefile
-@@ -38,7 +38,6 @@ obj-$(CONFIG_S5P_DEV_UART)	+= s5p-dev-uart.o
- obj-$(CONFIG_SAMSUNG_DEV_BACKLIGHT)	+= dev-backlight.o
- 
- obj-$(CONFIG_S3C_SETUP_CAMIF)	+= setup-camif.o
--obj-$(CONFIG_S5P_SETUP_MIPIPHY)	+= setup-mipiphy.o
- 
- # DMA support
- 
-diff --git a/arch/arm/plat-samsung/setup-mipiphy.c b/arch/arm/plat-samsung/setup-mipiphy.c
-deleted file mode 100644
-index 66df315..0000000
---- a/arch/arm/plat-samsung/setup-mipiphy.c
-+++ /dev/null
-@@ -1,60 +0,0 @@
--/*
-- * Copyright (C) 2011 Samsung Electronics Co., Ltd.
-- *
-- * S5P - Helper functions for MIPI-CSIS and MIPI-DSIM D-PHY control
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- */
--
--#include <linux/export.h>
--#include <linux/kernel.h>
--#include <linux/platform_device.h>
--#include <linux/io.h>
--#include <linux/spinlock.h>
--#include <mach/regs-clock.h>
--
--static int __s5p_mipi_phy_control(int id, bool on, u32 reset)
--{
--	static DEFINE_SPINLOCK(lock);
--	void __iomem *addr;
--	unsigned long flags;
--	u32 cfg;
--
--	id = max(0, id);
--	if (id > 1)
--		return -EINVAL;
--
--	addr = S5P_MIPI_DPHY_CONTROL(id);
--
--	spin_lock_irqsave(&lock, flags);
--
--	cfg = __raw_readl(addr);
--	cfg = on ? (cfg | reset) : (cfg & ~reset);
--	__raw_writel(cfg, addr);
--
--	if (on) {
--		cfg |= S5P_MIPI_DPHY_ENABLE;
--	} else if (!(cfg & (S5P_MIPI_DPHY_SRESETN |
--			    S5P_MIPI_DPHY_MRESETN) & ~reset)) {
--		cfg &= ~S5P_MIPI_DPHY_ENABLE;
--	}
--
--	__raw_writel(cfg, addr);
--	spin_unlock_irqrestore(&lock, flags);
--
--	return 0;
--}
--
--int s5p_csis_phy_enable(int id, bool on)
--{
--	return __s5p_mipi_phy_control(id, on, S5P_MIPI_DPHY_SRESETN);
--}
--EXPORT_SYMBOL(s5p_csis_phy_enable);
--
--int s5p_dsim_phy_enable(struct platform_device *pdev, bool on)
--{
--	return __s5p_mipi_phy_control(pdev->id, on, S5P_MIPI_DPHY_MRESETN);
--}
--EXPORT_SYMBOL(s5p_dsim_phy_enable);
--- 
-1.7.4.1
+On 09/28/2013 09:27 PM, Sylwester Nawrocki wrote:
+> Add a PHY provider driver for the Samsung S5P/Exynos SoC MIPI CSI-2
+> receiver and MIPI DSI transmitter DPHYs.
+>
+> Signed-off-by: Sylwester Nawrocki<s.nawrocki@samsung.com>
+> Signed-off-by: Kyungmin Park<kyungmin.park@samsung.com>
+> ---
+> Changes since v4:
+>   - updated to latest version of the PHY framework - removed PHY
+>     labels.
+>
+> The individual driver symbols in drivers/phy/Kconfig should
+> presumably be prefixed with, e.g. PHY_. This is something that
+> perhaps could be done as a follow up patch.
+> ---
+>   .../devicetree/bindings/phy/samsung-phy.txt        |   14 ++
+>   drivers/phy/Kconfig                                |    6 +
+>   drivers/phy/Makefile                               |    7 +-
+>   drivers/phy/phy-exynos-mipi-video.c                |  176 ++++++++++++++++++++
+>   4 files changed, 200 insertions(+), 3 deletions(-)
+>   create mode 100644 Documentation/devicetree/bindings/phy/samsung-phy.txt
+>   create mode 100644 drivers/phy/phy-exynos-mipi-video.c
+>
+> diff --git a/Documentation/devicetree/bindings/phy/samsung-phy.txt b/Documentation/devicetree/bindings/phy/samsung-phy.txt
+> new file mode 100644
+> index 0000000..5ff208c
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/phy/samsung-phy.txt
+> @@ -0,0 +1,14 @@
+> +Samsung S5P/EXYNOS SoC series MIPI CSIS/DSIM DPHY
+> +-------------------------------------------------
+> +
+> +Required properties:
+> +- compatible : should be "samsung,s5pv210-mipi-video-phy";
+> +- reg : offset and length of the MIPI DPHY register set;
+> +- #phy-cells : from the generic phy bindings, must be 1;
+> +
+> +For "samsung,s5pv210-mipi-video-phy" compatible PHYs the second cell in
+> +the PHY specifier identifies the PHY and its meaning is as follows:
+> +  0 - MIPI CSIS 0,
+> +  1 - MIPI DSIM 0,
+> +  2 - MIPI CSIS 1,
+> +  3 - MIPI DSIM 1.
+> diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
+> index ac239ac..0062d7e 100644
+> --- a/drivers/phy/Kconfig
+> +++ b/drivers/phy/Kconfig
+> @@ -15,6 +15,12 @@ config GENERIC_PHY
+>   	  phy users can obtain reference to the PHY. All the users of this
+>   	  framework should select this config.
+>
+> +config PHY_EXYNOS_MIPI_VIDEO
+> +	tristate "S5P/EXYNOS SoC series MIPI CSI-2/DSI PHY driver"
+> +	help
+> +	  Support for MIPI CSI-2 and MIPI DSI DPHY found on Samsung S5P
+> +	  and EXYNOS SoCs.
+> +
+>   config OMAP_USB2
+>   	tristate "OMAP USB2 PHY Driver"
+>   	depends on ARCH_OMAP2PLUS
+> diff --git a/drivers/phy/Makefile b/drivers/phy/Makefile
+> index 0dd8a98..6344053 100644
+> --- a/drivers/phy/Makefile
+> +++ b/drivers/phy/Makefile
+> @@ -2,6 +2,7 @@
+>   # Makefile for the phy drivers.
+>   #
+>
+> -obj-$(CONFIG_GENERIC_PHY)	+= phy-core.o
+> -obj-$(CONFIG_OMAP_USB2)		+= phy-omap-usb2.o
+> -obj-$(CONFIG_TWL4030_USB)	+= phy-twl4030-usb.o
+> +obj-$(CONFIG_GENERIC_PHY)		+= phy-core.o
+> +obj-$(CONFIG_PHY_EXYNOS_MIPI_VIDEO)	+= phy-exynos-mipi-video.o
+> +obj-$(CONFIG_OMAP_USB2)			+= phy-omap-usb2.o
+> +obj-$(CONFIG_TWL4030_USB)		+= phy-twl4030-usb.o
+> diff --git a/drivers/phy/phy-exynos-mipi-video.c b/drivers/phy/phy-exynos-mipi-video.c
+> new file mode 100644
+> index 0000000..b73b86a
+> --- /dev/null
+> +++ b/drivers/phy/phy-exynos-mipi-video.c
+> @@ -0,0 +1,176 @@
+> +/*
+> + * Samsung S5P/EXYNOS SoC series MIPI CSIS/DSIM DPHY driver
+> + *
+> + * Copyright (C) 2013 Samsung Electronics Co., Ltd.
+> + * Author: Sylwester Nawrocki<s.nawrocki@samsung.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#include<linux/io.h>
+> +#include<linux/kernel.h>
+> +#include<linux/module.h>
+> +#include<linux/of.h>
+> +#include<linux/of_address.h>
+> +#include<linux/phy/phy.h>
+> +#include<linux/platform_device.h>
+> +#include<linux/spinlock.h>
+> +
+> +/* MIPI_PHYn_CONTROL register offset: n = 0..1 */
+> +#define EXYNOS_MIPI_PHY_CONTROL(n)	((n) * 4)
+> +#define EXYNOS_MIPI_PHY_ENABLE		(1<<  0)
+> +#define EXYNOS_MIPI_PHY_SRESETN		(1<<  1)
+> +#define EXYNOS_MIPI_PHY_MRESETN		(1<<  2)
+> +#define EXYNOS_MIPI_PHY_RESET_MASK	(3<<  1)
+> +
+> +enum exynos_mipi_phy_id {
+> +	EXYNOS_MIPI_PHY_ID_CSIS0,
+> +	EXYNOS_MIPI_PHY_ID_DSIM0,
+> +	EXYNOS_MIPI_PHY_ID_CSIS1,
+> +	EXYNOS_MIPI_PHY_ID_DSIM1,
+> +	EXYNOS_MIPI_PHYS_NUM
+> +};
+> +
+> +#define is_mipi_dsim_phy_id(id) \
+> +	((id) == EXYNOS_MIPI_PHY_ID_DSIM0 || (id) == EXYNOS_MIPI_PHY_ID_DSIM1)
+> +
+> +struct exynos_mipi_video_phy {
+> +	spinlock_t slock;
+> +	struct video_phy_desc {
+> +		struct phy *phy;
+> +		unsigned int index;
+> +	} phys[EXYNOS_MIPI_PHYS_NUM];
+> +	void __iomem *regs;
+> +};
+> +
+> +static int __set_phy_state(struct exynos_mipi_video_phy *state,
+> +			enum exynos_mipi_phy_id id, unsigned int on)
+> +{
+> +	void __iomem *addr;
+> +	u32 reg, reset;
+> +
+> +	addr = state->regs + EXYNOS_MIPI_PHY_CONTROL(id / 2);
+> +
+> +	if (is_mipi_dsim_phy_id(id))
+> +		reset = EXYNOS_MIPI_PHY_MRESETN;
+> +	else
+> +		reset = EXYNOS_MIPI_PHY_SRESETN;
+> +
+> +	spin_lock(&state->slock);
+> +	reg = readl(addr);
+> +	if (on)
+> +		reg |= reset;
+> +	else
+> +		reg&= ~reset;
+> +	writel(reg, addr);
+> +
+> +	/* Clear ENABLE bit only if MRESETN, SRESETN bits are not set. */
+> +	if (on)
+> +		reg |= EXYNOS_MIPI_PHY_ENABLE;
+> +	else if (!(reg&  EXYNOS_MIPI_PHY_RESET_MASK))
+> +		reg&= ~EXYNOS_MIPI_PHY_ENABLE;
+> +
+> +	writel(reg, addr);
+> +	spin_unlock(&state->slock);
+> +	return 0;
+> +}
+> +
+> +#define to_mipi_video_phy(desc) \
+> +	container_of((desc), struct exynos_mipi_video_phy, phys[(desc)->index]);
+> +
+> +static int exynos_mipi_video_phy_power_on(struct phy *phy)
+> +{
+> +	struct video_phy_desc *phy_desc = phy_get_drvdata(phy);
+> +	struct exynos_mipi_video_phy *state = to_mipi_video_phy(phy_desc);
+> +
+> +	return __set_phy_state(state, phy_desc->index, 1);
+> +}
+> +
+> +static int exynos_mipi_video_phy_power_off(struct phy *phy)
+> +{
+> +	struct video_phy_desc *phy_desc = phy_get_drvdata(phy);
+> +	struct exynos_mipi_video_phy *state = to_mipi_video_phy(phy_desc);
+> +
+> +	return __set_phy_state(state, phy_desc->index, 1);
+> +}
+> +
+> +static struct phy *exynos_mipi_video_phy_xlate(struct device *dev,
+> +					struct of_phandle_args *args)
+> +{
+> +	struct exynos_mipi_video_phy *state = dev_get_drvdata(dev);
+> +
+> +	if (WARN_ON(args->args[0]>  EXYNOS_MIPI_PHYS_NUM))
+> +		return ERR_PTR(-ENODEV);
+> +
+> +	return state->phys[args->args[0]].phy;
+> +}
+> +
+> +static struct phy_ops exynos_mipi_video_phy_ops = {
+> +	.power_on	= exynos_mipi_video_phy_power_on,
+> +	.power_off	= exynos_mipi_video_phy_power_off,
+> +	.owner		= THIS_MODULE,
+> +};
+> +
+> +static int exynos_mipi_video_phy_probe(struct platform_device *pdev)
+> +{
+> +	struct exynos_mipi_video_phy *state;
+> +	struct device *dev =&pdev->dev;
+> +	struct resource *res;
+> +	struct phy_provider *phy_provider;
+> +	unsigned int i;
+> +
+> +	state = devm_kzalloc(dev, sizeof(*state), GFP_KERNEL);
+> +	if (!state)
+> +		return -ENOMEM;
+> +
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +
+> +	state->regs = devm_ioremap_resource(dev, res);
+> +	if (IS_ERR(state->regs))
+> +		return PTR_ERR(state->regs);
+> +
+> +	dev_set_drvdata(dev, state);
+> +	spin_lock_init(&state->slock);
+> +
+> +	phy_provider = devm_of_phy_provider_register(dev,
+> +					exynos_mipi_video_phy_xlate);
+> +	if (IS_ERR(phy_provider))
+> +		return PTR_ERR(phy_provider);
+> +
+> +	for (i = 0; i<  EXYNOS_MIPI_PHYS_NUM; i++) {
+> +		struct phy *phy = devm_phy_create(dev,
+> +					&exynos_mipi_video_phy_ops, NULL);
+> +		if (IS_ERR(phy)) {
+> +			dev_err(dev, "failed to create PHY %d\n", i);
+> +			return PTR_ERR(phy);
+> +		}
+> +
+> +		state->phys[i].phy = phy;
+> +		state->phys[i].index = i;
+> +		phy_set_drvdata(phy,&state->phys[i]);
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +static const struct of_device_id exynos_mipi_video_phy_of_match[] = {
+> +	{ .compatible = "samsung,s5pv210-mipi-video-phy" },
+> +	{ },
+> +};
+> +MODULE_DEVICE_TABLE(of, exynos_mipi_video_phy_of_match);
+> +
+> +static struct platform_driver exynos_mipi_video_phy_driver = {
+> +	.probe	= exynos_mipi_video_phy_probe,
+> +	.driver = {
+> +		.of_match_table	= exynos_mipi_video_phy_of_match,
+> +		.name  = "exynos-mipi-video-phy",
+> +		.owner = THIS_MODULE,
+> +	}
+> +};
+> +module_platform_driver(exynos_mipi_video_phy_driver);
+> +
+> +MODULE_DESCRIPTION("Samsung S5P/EXYNOS SoC MIPI CSI-2/DSI PHY driver");
+> +MODULE_AUTHOR("Sylwester Nawrocki<s.nawrocki@samsung.com>");
+> +MODULE_LICENSE("GPL v2");
