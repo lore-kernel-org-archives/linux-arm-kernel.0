@@ -1,70 +1,40 @@
 From: roy.franz@linaro.org (Roy Franz)
-Date: Sat, 28 Sep 2013 09:23:18 -0700
-Subject: [PATCH 1/6] efi-stub.txt updates for ARM
+Date: Sat, 28 Sep 2013 09:23:22 -0700
+Subject: [PATCH 5/6] Disable stack protection for decompressor/stub
 In-Reply-To: <1380385403-31904-1-git-send-email-roy.franz@linaro.org>
 References: <1380385403-31904-1-git-send-email-roy.franz@linaro.org>
-Message-ID: <1380385403-31904-2-git-send-email-roy.franz@linaro.org>
+Message-ID: <1380385403-31904-6-git-send-email-roy.franz@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update efi-stub.txt documentation to be more general
-and not x86 specific.  Add ARM only "dtb=" command
-line option description.
+The ARM decompressor/EFI stub do not implement the functions
+(__stack_chk_guard_setup, etc) that are required for support of
+stack protection.  The actual enablement of stack protection is
+controlled by heuristics in GCC, which the code added for the EFI
+stub triggers when CONFIG_STACKPROTECTOR is set.  Even with
+CONFIG_STACKPROTECTOR set, the decompressor was not compiled
+with stack protection actually enabled. Adding -fno-stack-protector
+to the decompressor/stub build keeps it building without stack
+protection as it has always been built.
+The x86 decompressor/stub is also build with -fno-stack-protector.
 
 Signed-off-by: Roy Franz <roy.franz@linaro.org>
 ---
- Documentation/efi-stub.txt |   27 ++++++++++++++++++++-------
- 1 file changed, 20 insertions(+), 7 deletions(-)
+ arch/arm/boot/compressed/Makefile |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/Documentation/efi-stub.txt b/Documentation/efi-stub.txt
-index 44e6bb6..19e897c 100644
---- a/Documentation/efi-stub.txt
-+++ b/Documentation/efi-stub.txt
-@@ -1,13 +1,16 @@
- 			  The EFI Boot Stub
- 		     ---------------------------
+diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
+index 5fad8bd..551dbf9 100644
+--- a/arch/arm/boot/compressed/Makefile
++++ b/arch/arm/boot/compressed/Makefile
+@@ -136,7 +136,7 @@ ORIG_CFLAGS := $(KBUILD_CFLAGS)
+ KBUILD_CFLAGS = $(subst -pg, , $(ORIG_CFLAGS))
+ endif
  
--On the x86 platform, a bzImage can masquerade as a PE/COFF image,
--thereby convincing EFI firmware loaders to load it as an EFI
--executable. The code that modifies the bzImage header, along with the
--EFI-specific entry point that the firmware loader jumps to are
--collectively known as the "EFI boot stub", and live in
-+On the x86 and ARM platforms, a kernel zImage/bzImage can masquerade
-+as a PE/COFF image, thereby convincing EFI firmware loaders to load
-+it as an EFI executable. The code that modifies the bzImage header,
-+along with the EFI-specific entry point that the firmware loader
-+jumps to are collectively known as the "EFI boot stub", and live in
- arch/x86/boot/header.S and arch/x86/boot/compressed/eboot.c,
--respectively.
-+respectively.  For ARM the EFI stub is implemented in
-+arch/arm/boot/compressed/efi-header.S and
-+arch/arm/boot/compressed/efi-stub.c.  EFI stub code that is shared
-+between architectures is in drivers/firmware/efi/efi-stub-helper.c.
+-ccflags-y := -fpic -mno-single-pic-base -fno-builtin -I$(obj)
++ccflags-y := -fpic -mno-single-pic-base -fno-builtin -fno-stack-protector -I$(obj)
+ asflags-y := -DZIMAGE
  
- By using the EFI boot stub it's possible to boot a Linux kernel
- without the use of a conventional EFI boot loader, such as grub or
-@@ -23,7 +26,9 @@ The bzImage located in arch/x86/boot/bzImage must be copied to the EFI
- System Partiion (ESP) and renamed with the extension ".efi". Without
- the extension the EFI firmware loader will refuse to execute it. It's
- not possible to execute bzImage.efi from the usual Linux file systems
--because EFI firmware doesn't have support for them.
-+because EFI firmware doesn't have support for them.  For ARM the
-+arch/arm/boot/zImage should be copied to the system partition, and it
-+may not need to be renamed.
- 
- 
- **** Passing kernel parameters from the EFI shell
-@@ -63,3 +68,11 @@ Notice how bzImage.efi can be specified with a relative path. That's
- because the image we're executing is interpreted by the EFI shell,
- which understands relative paths, whereas the rest of the command line
- is passed to bzImage.efi.
-+
-+
-+**** The "dtb=" option
-+
-+For the ARM architecture, we also need to be able to provide a device
-+tree to the kernel.  This is done with the "dtb=" command line option,
-+and is process in the same manner as the "initrd=" option that is described
-+above.
+ # Supply kernel BSS size to the decompressor via a linker symbol.
 -- 
 1.7.10.4
