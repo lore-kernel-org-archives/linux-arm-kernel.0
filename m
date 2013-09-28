@@ -1,47 +1,47 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Sat, 28 Sep 2013 15:12:12 +0530
-Subject: [PATCH v12 0/7] PHY framework
-In-Reply-To: <20130928003742.GA3659@kroah.com>
-References: <1380263012-9687-1-git-send-email-kishon@ti.com>
- <20130928003742.GA3659@kroah.com>
-Message-ID: <5246A474.90500@ti.com>
+From: cinifr@gmail.com (cinifr)
+Date: Sat, 28 Sep 2013 21:48:11 +0800
+Subject: [PATCH V3: Add Smp support for Allwinner A20. 1/3] Add smp
+ support for Allwinner A20(sunxi 7i).
+In-Reply-To: <20130925184435.GH2954@lukather>
+References: <1379852488-32147-1-git-send-email-cinifr@gmail.com>
+ <1379852488-32147-2-git-send-email-cinifr@gmail.com>
+ <20130923181707.GR2779@lukather>
+ <CAK3cCBwLrnV7L9WzJ+1P_62PEjEEtgzVjFH8m6SZzWG1O+2vEw@mail.gmail.com>
+ <20130925184435.GH2954@lukather>
+Message-ID: <CAK3cCBwOpkk5ObeEm+by=RS6jSptPdGZM+fvpgGZpX9TPij5gg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 28 September 2013 06:07 AM, Greg KH wrote:
-> On Fri, Sep 27, 2013 at 11:53:24AM +0530, Kishon Vijay Abraham I wrote:
->> Added a generic PHY framework that provides a set of APIs for the PHY drivers
->> to create/destroy a PHY and APIs for the PHY users to obtain a reference to
->> the PHY with or without using phandle.
->>
->> This framework will be of use only to devices that uses external PHY (PHY
->> functionality is not embedded within the controller).
->>
->> The intention of creating this framework is to bring the phy drivers spread
->> all over the Linux kernel to drivers/phy to increase code re-use and to
->> increase code maintainability.
->>
->> Comments to make PHY as bus wasn't done because PHY devices can be part of
->> other bus and making a same device attached to multiple bus leads to bad
->> design.
->>
->> If the PHY driver has to send notification on connect/disconnect, the PHY
->> driver should make use of the extcon framework. Using this susbsystem
->> to use extcon framwork will have to be analysed.
->>
->> You can find this patch series @
->> git://git.kernel.org/pub/scm/linux/kernel/git/kishon/linux-phy.git testing
->>
->> I'll create a new branch *next* once this patch series is finalized. All the
->> PHY driver development that depends on PHY framework can be based on this
->> branch.
->>
->> Did USB enumeration testing in panda and beagle after applying [1] (needed for
->> non-dt)
-> 
-> All now applied to my usb-next branch.  Thanks for redoing this many
-> times and sticking with it.
+Hi  Maxime,
+    I have test it, but I found it does not work. If using
+smp_prepare_cpus, the kernenl cannot find the secondary cpus because
+that smp_prepare_cpus semms not be excuted before kernel is booting
+secondary cpus. So I have to use early_initcall.
 
-Thanks :-)
+Fan.
 
--Kishon
+On 26 September 2013 02:44, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> Hi Fan,
+>
+> On Wed, Sep 25, 2013 at 12:22:44AM +0800, cinifr wrote:
+>> > You still haven't said why you don't want to use smp_init_cpus there.
+>> I find that of_funcation liking of_find_matching_node and of_iomap can
+>> not run well in smp_init_cpus. It cause kernel crash. So I have to use
+>> early_initcall.
+>
+> Ah, right.
+>
+> Then, can't we use smp_prepare_cpus for this? it looks to be late enough
+> so that we can use ioremap there.
+>
+> I don't want it to be an initcall. The code will be different on the
+> A31, and we don't want it to be run on all the other machines whenever
+> we boot a multiplatform kernel anyway.
+>
+> Maxime
+>
+> --
+> Maxime Ripard, Free Electrons
+> Embedded Linux, Kernel and Android engineering
+> http://free-electrons.com
