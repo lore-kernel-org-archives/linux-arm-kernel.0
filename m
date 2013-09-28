@@ -1,98 +1,79 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Sat, 28 Sep 2013 21:15:11 +0200
-Subject: [PATCH v2] ARM: new platform for Energy Micro's EFM32 Cortex-M3
- SoCs
-In-Reply-To: <201309272344.01386.arnd@arndb.de>
-References: <1379447884-14025-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <201309172245.25367.arnd@arndb.de>
- <20130926094251.GK16106@pengutronix.de>
- <201309272344.01386.arnd@arndb.de>
-Message-ID: <20130928191511.GA2548@pengutronix.de>
+From: sylvester.nawrocki@gmail.com (Sylwester Nawrocki)
+Date: Sat, 28 Sep 2013 21:27:42 +0200
+Subject: [PATCH V5 0/5] Generic PHY driver for the Exynos SoC MIPI CSI-2/DSI
+ DPHYs
+Message-ID: <1380396467-29278-1-git-send-email-s.nawrocki@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+This patch series adds a simple driver for the Samsung S5P/Exynos SoC
+series MIPI CSI-2 receiver (MIPI CSIS) and MIPI DSI transmitter (MIPI
+DSIM) DPHYs, using the generic PHY framework. Previously the MIPI
+CSIS and MIPI DSIM used a platform callback to control the PHY power
+enable and reset bits. This non-generic platform code supporting only
+limited set of SoCs is now removed.
+This completes migration to the device tree of the Exynos/S5P MIPI CSI
+slave device driver.
 
-On Fri, Sep 27, 2013 at 11:44:01PM +0200, Arnd Bergmann wrote:
-> On Thursday 26 September 2013, Uwe Kleine-K?nig wrote:
-> > I made that work now and can prepare a patch. I had to drop "depends on
-> > !ARCH_MULTIPLATFORM" from XIP_KERNEL. That's because my machine only
-> > works with XIP_KERNEL as it only has 4 MiB of RAM.
-> 
-> Ok, cool. We might run into a few problems with 'make randconfig' and
-> 'make allyesconfig' when it becomes possible to enable XIP_KERNEL then.
-> IIRC, there is no fundamental reason to disallow XIP_KERNEL with
-> ARCH_MULTIPLATFORM, but I added the dependency because it causes
-> build errors in combination with other options.
-ah, OK. Do you have an idea to fix both?
- 
-> A few questions from my side, out of curiosity:
-> 
-> * Do you need any other patches (unrelated to EFM32) to run NOMMU on a
-> recent kernel? When I last tried, I could not get any NOMMU build to work
-> at all.
-no, there isn't much needed on top of current mainline. My current wip is at
+Changes since v4:
+ - updated to the latest version of the generic PHY framework - removed
+   PHY labels from the platform data structure. There is already no need
+   for non-dt support in this PHY driver so the platform data where any
+   struct phy_init_data would be passed is not added.
 
-	git://git.pengutronix.de/git/ukl/linux.git efm32
+Changes since v3 (only patch 1/5):
+ - replaced spin_(un)lock_irq_{save,restore} with spin_{lock,unlock}.
+ - DT binding file renamed to samsung-phy.txt, so it can be used for
+   other PHYs as well,
+ - removed <linux/delay.h> inclusion,
+ - added missing spin_lock_init().
 
-I don't even rely on all the HACK-patches that are included there. (The
-multi-arch stuff isn't there yet.)
- 
-> * Do you think 4MB is now a strict lower bound for running a modern
-> kernel? It would be a good data point if we could show that any target
-> with less than that is by definition broken and could get removed
-> from the kernel. What is the size of your kernel and user space?
-$ objdump -p vmlinux
+Changes since v2:
+ - adapted to the generic PHY API v9: use phy_set/get_drvdata(),
+ - fixed of_xlate callback to return ERR_PTR() instead of NULL,
+ - namespace cleanup, put "GPL v2" as MODULE_LICENSE, removed pr_debug,
+ - removed phy id check in __set_phy_state().
 
-vmlinux:     file format elf32-littlearm
+Changes since v1:
+ - enabled build as module and with CONFIG_OF disabled,
+ - added phy_id enum,
+ - of_address_to_resource() replaced with platform_get_resource(),
+ - adapted to changes in the PHY API v7, v8 - added phy labels,
+ - added MODULE_DEVICE_TABLE() entry,
+ - the driver file renamed to phy-exynos-mipi-video.c,
+ - changed DT compatible string to "samsung,s5pv210-mipi-video-phy",
+ - corrected the compatible property's description.
+ - patch 3/5 "video: exynos_dsi: Use generic PHY driver" replaced
+   with a patch modifying the MIPI DSIM driver which is currently
+   in mainline.
 
-Program Header:
-    LOAD off    0x00000000 vaddr 0x88020000 paddr 0x88020000 align 2**15
-         filesz 0x00000094 memsz 0x0000a9f4 flags rw-
-    LOAD off    0x00008000 vaddr 0x8c000000 paddr 0x8c000000 align 2**15
-         filesz 0x001679b0 memsz 0x001679b0 flags rwx
-    LOAD off    0x00170000 vaddr 0x88008000 paddr 0x8c1679b0 align 2**15
-         filesz 0x00018d2c memsz 0x00018d2c flags rw-
-private flags = 5000002: [Version5 EABI] [has entry point]
+Sylwester Nawrocki (5):
+  ARM: dts: Add MIPI PHY node to exynos4.dtsi
+  phy: Add driver for Exynos MIPI CSIS/DSIM DPHYs
+  [media] exynos4-is: Use the generic MIPI CSIS PHY driver
+  video: exynos_mipi_dsim: Use the generic PHY driver
+  ARM: Samsung: Remove the MIPI PHY setup code
 
-my rootfs (busybox, no init) is 153600 bytes big.
+ .../devicetree/bindings/phy/samsung-phy.txt        |   14 ++
+ arch/arm/boot/dts/exynos4.dtsi                     |   10 +
+ arch/arm/mach-exynos/include/mach/regs-pmu.h       |    5 -
+ arch/arm/mach-s5pv210/include/mach/regs-clock.h    |    4 -
+ arch/arm/plat-samsung/Kconfig                      |    5 -
+ arch/arm/plat-samsung/Makefile                     |    1 -
+ arch/arm/plat-samsung/setup-mipiphy.c              |   60 -------
+ drivers/media/platform/exynos4-is/Kconfig          |    2 +-
+ drivers/media/platform/exynos4-is/mipi-csis.c      |   13 +-
+ drivers/phy/Kconfig                                |    6 +
+ drivers/phy/Makefile                               |    7 +-
+ drivers/phy/phy-exynos-mipi-video.c                |  176 ++++++++++++++++++++
+ drivers/video/exynos/Kconfig                       |    1 +
+ drivers/video/exynos/exynos_mipi_dsi.c             |   19 +-
+ include/linux/platform_data/mipi-csis.h            |    9 -
+ include/video/exynos_mipi_dsim.h                   |    5 +-
+ 16 files changed, 234 insertions(+), 103 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/phy/samsung-phy.txt
+ delete mode 100644 arch/arm/plat-samsung/setup-mipiphy.c
+ create mode 100644 drivers/phy/phy-exynos-mipi-video.c
 
-After booting I get:
-
-	/ # free
-		     total         used         free       shared      buffers
-	Mem:          3892         1428         2464            0            0
-	-/+ buffers:               1428         2464
-
-but it doesn't run anything but a busybox shell ATM. Assuming the next
-smaller configuration is 2 MiB of RAM I'd say that machine can maybe
-boot, but cannot do anything sensible after that.
-
-> * What user space are you running? Anything that's easy to build
-> for testing? Should that run with a mach-virt kernel built for
-> ARMv7-A NOMMU?
-There is a BSP publically available at
-
-	http://git-public.pengutronix.de/?p=OSELAS.BSP-EnergyMicro-Gecko.git;a=summary
-
-which also includes a README file. For troubleshooting /join #efm32 on
-freenode.
- 
-> * An ARMv7-M kernel cannot run on either ARMv4/v5 nor ARMv6/v7-A, right?
-The entry convention is different (ARMv7-M doesn't support the ARM
-instruction set but you need to jump into the kernel in ARM mode for
-v4-v7). Other that that I don't know if there is a problem. Maybe
-Jonathan can say anything here? Or alternatively if you want an efm32
-devboard, just tell me.
-
-> Do you prevent building such a kernel in Kconfig?
-I'm sure my Kconfig magic isn't waterproof. It took me a few tries to
-expand the multiarch architecture selection to make v7-m selectable at
-all.
-
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+--
+1.7.4.1
