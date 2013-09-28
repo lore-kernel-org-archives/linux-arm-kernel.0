@@ -1,37 +1,126 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Sat, 28 Sep 2013 00:28:46 -0300
-Subject: device tree binding documentation outdated
-In-Reply-To: <CAHCPf3vxGAzTnY360KC7Yt-DB1FB14Sv_Cn7DBTH6HGZ6y=stg@mail.gmail.com>
-References: <20130926195158.GS12758@n2100.arm.linux.org.uk>
- <CAOMZO5ANsZGcpvmtBE7d0q0E6+f0bE_U8CBF7G2v3xtqoLbqcA@mail.gmail.com>
- <20130926205906.GT12758@n2100.arm.linux.org.uk>
- <CAOMZO5Dj7o3qBH2hzPFWjepgpt5XR5qKmQorKS6jH_7=gnY5cg@mail.gmail.com>
- <20130927121357.GY12758@n2100.arm.linux.org.uk>
- <20130927132601.GL25146@S2101-09.ap.freescale.net>
- <20130927151900.GA12758@n2100.arm.linux.org.uk>
- <CAHCPf3t8=mJn-RCz3C1cY6zqsH9ds8UANKpKx9ZpwPM6WjJt3g@mail.gmail.com>
- <20130927174916.GD12758@n2100.arm.linux.org.uk>
- <CAHCPf3sC7bY=p4vpBQFpRUmyPspT_PVjx0rH9cm1ov=SqkO+Vg@mail.gmail.com>
- <20130927190546.GG12758@n2100.arm.linux.org.uk>
- <CAHCPf3vxGAzTnY360KC7Yt-DB1FB14Sv_Cn7DBTH6HGZ6y=stg@mail.gmail.com>
-Message-ID: <CAOMZO5Ap39b_UJvDjy7UGWV8iL6nLYg0-9xSd5zaR1UEbzkXYw@mail.gmail.com>
+From: marex@denx.de (Marek Vasut)
+Date: Sat, 28 Sep 2013 05:35:33 +0200
+Subject: [PATCH 2/3] ARM: mxs: crypto: Add Freescale MXS DCP driver
+In-Reply-To: <5245AC5B.80800@gmail.com>
+References: <1380194306-5243-1-git-send-email-marex@denx.de>
+ <201309261407.33923.marex@denx.de> <5245AC5B.80800@gmail.com>
+Message-ID: <201309280535.33672.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Matt,
+Hi Tobias,
 
-On Fri, Sep 27, 2013 at 4:41 PM, Matt Sealey <neko@bakuhatsu.net> wrote:
-> Subtle difference which I know I just faceplanted on in my previous
-> mail.. Same concept though... but if you have a DualLite then you
-> don't HAVE gigabit ethernet... a 125MHz clock is ridiculous, and Fabio
-> gave you the wrong manual.
+> Hi,
+> 
+> Here are some thoughts of the design decisions I made when I wrote
+> the dcp.c driver. Maybe it helps.
 
-What you say here is not correct.
+Was the driver not rather forward-ported from some old FSL BSP kernel?
 
-quad and dual: have Gigabit ethernet
-dual-lite and solo: have Gigabit ethernet
-solo-lite: don't have Gigabit ethernet
+> On 2013-09-26 14:07, Marek Vasut wrote:
+> > Dear Fabio Estevam,
+> > 
+> >> Hi Marek,
+> >> 
+> >> Why do we need to have two drivers for the same IP block? It looks
+> >> confusing to have both.
+> > 
+> > Sure, I agree. I reviewed the one in mainline just now and I see some
+> > deficiencies of the dcp.c driver:
+> > 
+> > 1) It only supports AES_CBC (mine does support AES_ECB, AES_CBC, SHA1 and
+> > SH256)
+> 
+> Right, but for ECP only the interface is missing (and it is no real
+> mode of operation) and hashes should be generally faster in SW.
 
-Anyway, good news that Russell managed to get ethernet running on cubox-i.
+The ECB is slightly different from CBC, for example the IV handling differs. As 
+for the performance, the SHA* hashing was more performant in hardware starting 
+with ~8MB chunks. I checked this via the "openssl -speed" test via the linux 
+cryptodev patch.
 
-I will probably get access to a cubox-i next week :-)
+> > 2) The driver was apparently never ran behind anyone working with MXS.
+> 
+> That is probably right.
+> 
+> > 3) What are those ugly new IOCTLs in the dcp.c driver?
+> 
+> When I firstly posted the driver in the mailinglist, there where one
+> person who actually used this interface (it was introduced in
+> Freescale's SDK) to use the OTP keys for crypto. As far as I have
+> seen, the crypto API does not support such keys (i.e. there seems to
+> be no way to tell a driver to use some kind of special keys - which
+> are not delivered by the user - via the API).
+> Therefore I added this miscdevice and adopted Freescale's interface.
+
+The keys are programmed into the OTP registers, correct? There is OCOTP driver 
+for the MX23/MX28 OTP hardware. This is what should have been used then.
+
+NOTE: This IOCTL interface seems like quite an abusive way to allow userland to 
+access the crypto API in kernel. I understand this is used by some Freescale 
+tool, but won't it be better to fix the Freescale tool instead ?
+
+> > 4) The VMI IRQ is never used, yet it even calls the IRQ handler, this is
+> > bogus
+> 
+> That's absolutely right.
+> 
+> >     -> The DCP always triggers the dcp_irq upon DMA completion
+> 
+> The IRQ is triggered after every packet, to enable simultaneous work
+> for CPU/DCP: While the DCP is computing, the CPU is able to fill more
+> packets. I don't know how far this is useful, because the 20 Packets
+> which are enabled by default can address up to 80kB of
+> plain-/ciphertext. However, I think it is better to do the work
+> simultaneously to safe time (actual real world time, not CPU time).
+
+This really depends on how you program the DCP's own DMA controller, or more 
+precisely what you write into the DMA descriptors. Each descriptor has a bit 
+that signalizes whether the DCP should generate an IRQ upon it's completion. You 
+can thus program it to generate IRQ upon competing each descriptor only for the 
+last descriptor in a chain or what fits you.
+
+NOTE that chaining multiple DMA descriptors of small size is less performant 
+than filling up a large buffer and then running it through the DCP in one longer 
+DMA descriptor. This is actually why I have such a large bounce-buffer and not 
+only a small one.
+
+> > 5) The IRQ handler can't use usual completion() in the driver because
+> > that'd trigger "scheduling while atomic" oops, yes?
+> 
+> I decided to use the tasklets because of performance reasons. I don't
+> remember numbers but a workqueue was significantly slower.  The
+> use of a kernel thread may reduce the overhead compared to the wq. I
+> was not sure if it is appropriate to create an extra thread for a
+> crypto-driver, without real reason (IMHO).
+
+Certainly, my remark was that the FSL driver had this issue and the code here 
+didn't change much from the FSL driver. I was thus curious why you don't use 
+completion in the driver as usual and whether this was to work around the issue 
+the FSL driver had.
+
+> > Finally, because the dcp.c driver only supports AES128 CBC, it depends on
+> > kernel _always_ passing the DCP scatterlist such that each of it's
+> > elements is 16-bytes long. [...]
+> > So, in the AES128 case, if the hardware is passed two (4 bytes + 12 bytes
+> > for example) DMA descriptors instead of single 16 bytes descriptor, the
+> > DCP will simply stall or produce incorrect result. This can happen if
+> > the user of the async crypto API passes such a scatterlist.
+> 
+> The scatterlist alignment and bounce-buffering to get full 16 Byte
+> blocks is done by the ablkcipher_walk API (with the error
+> parameter) when needed. As far as I see, you are copying the whole
+> buffer to your coherent block and back. Wouldn't it be better to do that
+> just for unaligned blocks?
+
+I tried writing a proper driver for this DCP piece of crap hardware about 7 
+times. I tried to squeeze as much power from it as possible, among others tried 
+to avoid the copying, but there was always some hidden problem somewhere. The 
+DCP is really _horribly_ designed hardware. But to answer your question, the 
+copying of stuff back and forth is actually not a problem here.
+
+The real question here is, how do we handle the current situation? I think this 
+might be a question for Dave or Herbert to answer though.
+
+Best regards,
+Marek Vasut
