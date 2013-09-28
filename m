@@ -1,73 +1,37 @@
-From: jkridner@beagleboard.org (Jason Kridner)
-Date: Fri, 27 Sep 2013 23:13:50 -0400
-Subject: [PATCH v4 1/4] ARM: dts: am335x-bone: add CD for mmc1
-In-Reply-To: <1379010935-25943-2-git-send-email-koen@dominion.thruhere.net>
-References: <1379010935-25943-1-git-send-email-koen@dominion.thruhere.net>
- <1379010935-25943-2-git-send-email-koen@dominion.thruhere.net>
-Message-ID: <CA+T6QPk=Z+u2eo63-2T4dZcyaZ=yL=+rBck5r5y14MiQK_w00w@mail.gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Sat, 28 Sep 2013 00:28:46 -0300
+Subject: device tree binding documentation outdated
+In-Reply-To: <CAHCPf3vxGAzTnY360KC7Yt-DB1FB14Sv_Cn7DBTH6HGZ6y=stg@mail.gmail.com>
+References: <20130926195158.GS12758@n2100.arm.linux.org.uk>
+ <CAOMZO5ANsZGcpvmtBE7d0q0E6+f0bE_U8CBF7G2v3xtqoLbqcA@mail.gmail.com>
+ <20130926205906.GT12758@n2100.arm.linux.org.uk>
+ <CAOMZO5Dj7o3qBH2hzPFWjepgpt5XR5qKmQorKS6jH_7=gnY5cg@mail.gmail.com>
+ <20130927121357.GY12758@n2100.arm.linux.org.uk>
+ <20130927132601.GL25146@S2101-09.ap.freescale.net>
+ <20130927151900.GA12758@n2100.arm.linux.org.uk>
+ <CAHCPf3t8=mJn-RCz3C1cY6zqsH9ds8UANKpKx9ZpwPM6WjJt3g@mail.gmail.com>
+ <20130927174916.GD12758@n2100.arm.linux.org.uk>
+ <CAHCPf3sC7bY=p4vpBQFpRUmyPspT_PVjx0rH9cm1ov=SqkO+Vg@mail.gmail.com>
+ <20130927190546.GG12758@n2100.arm.linux.org.uk>
+ <CAHCPf3vxGAzTnY360KC7Yt-DB1FB14Sv_Cn7DBTH6HGZ6y=stg@mail.gmail.com>
+Message-ID: <CAOMZO5Ap39b_UJvDjy7UGWV8iL6nLYg0-9xSd5zaR1UEbzkXYw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 12, 2013 at 2:35 PM, Koen Kooi <koen@dominion.thruhere.net> wrote:
-> From: Alexander Holler <holler@ahsoftware.de>
->
-> This enables the use of MMC cards even when no card was inserted at boot.
->
-> Signed-off-by: Alexander Holler <holler@ahsoftware.de>
-> Signed-off-by: Koen Kooi <koen@dominion.thruhere.net>
+Matt,
 
-Acked-by: Jason Kridner <jdk@ti.com>
+On Fri, Sep 27, 2013 at 4:41 PM, Matt Sealey <neko@bakuhatsu.net> wrote:
+> Subtle difference which I know I just faceplanted on in my previous
+> mail.. Same concept though... but if you have a DualLite then you
+> don't HAVE gigabit ethernet... a 125MHz clock is ridiculous, and Fabio
+> gave you the wrong manual.
 
-> ---
->  arch/arm/boot/dts/am335x-bone-common.dtsi | 14 ++++++++++++++
->  arch/arm/boot/dts/am335x-bone.dts         |  1 -
->  2 files changed, 14 insertions(+), 1 deletion(-)
->
-> diff --git a/arch/arm/boot/dts/am335x-bone-common.dtsi b/arch/arm/boot/dts/am335x-bone-common.dtsi
-> index 2f66ded..0d95d54 100644
-> --- a/arch/arm/boot/dts/am335x-bone-common.dtsi
-> +++ b/arch/arm/boot/dts/am335x-bone-common.dtsi
-> @@ -107,6 +107,12 @@
->                                 0x14c (PIN_INPUT_PULLDOWN | MUX_MODE7)
->                         >;
->                 };
-> +
-> +               mmc1_pins: pinmux_mmc1_pins {
-> +                       pinctrl-single,pins = <
-> +                               0x160 (PIN_INPUT | MUX_MODE7) /* GPIO0_6 */
-> +                       >;
-> +               };
->         };
->
->         ocp {
-> @@ -260,3 +266,11 @@
->         pinctrl-0 = <&davinci_mdio_default>;
->         pinctrl-1 = <&davinci_mdio_sleep>;
->  };
-> +
-> +&mmc1 {
-> +       status = "okay";
-> +       pinctrl-names = "default";
-> +       pinctrl-0 = <&mmc1_pins>;
-> +       cd-gpios = <&gpio0 6 GPIO_ACTIVE_HIGH>;
-> +       cd-inverted;
-> +};
-> diff --git a/arch/arm/boot/dts/am335x-bone.dts b/arch/arm/boot/dts/am335x-bone.dts
-> index d5f43fe..0d63348 100644
-> --- a/arch/arm/boot/dts/am335x-bone.dts
-> +++ b/arch/arm/boot/dts/am335x-bone.dts
-> @@ -17,6 +17,5 @@
->  };
->
->  &mmc1 {
-> -       status = "okay";
->         vmmc-supply = <&ldo3_reg>;
->  };
-> --
-> 1.8.2.1
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+What you say here is not correct.
+
+quad and dual: have Gigabit ethernet
+dual-lite and solo: have Gigabit ethernet
+solo-lite: don't have Gigabit ethernet
+
+Anyway, good news that Russell managed to get ethernet running on cubox-i.
+
+I will probably get access to a cubox-i next week :-)
