@@ -1,66 +1,109 @@
 From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Sun, 29 Sep 2013 02:37:15 +0200
-Subject: [PATCH 2/3] clk: Use kcalloc() to allocate arrays
-In-Reply-To: <1380415036-15997-1-git-send-email-tomasz.figa@gmail.com>
-References: <1380415036-15997-1-git-send-email-tomasz.figa@gmail.com>
-Message-ID: <1380415036-15997-2-git-send-email-tomasz.figa@gmail.com>
+Date: Sun, 29 Sep 2013 02:37:14 +0200
+Subject: [PATCH 1/3] clk: Add error handling to clk_fetch_parent_index()
+Message-ID: <1380415036-15997-1-git-send-email-tomasz.figa@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Instead of calculating sizes of arrays manually, kcalloc() can be used
-to allocate arrays of elements with defined size. This is just a cleanup
-patch without any functional changes.
+There are at least two different error cases that can happen in
+clk_fetch_parent_index() function:
+ - allocation failure,
+ - parent clock lookup failure,
+however it returns only an u8, which is supposed to contain parent clock
+index.
+
+This patch modified the function to return full int instead allowing
+positive clock indices and negative error codes to be returned. All
+users of this function are adjusted as well to handle the return value
+correctly.
 
 Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
 ---
- drivers/clk/clk.c | 14 +++++++-------
- 1 file changed, 7 insertions(+), 7 deletions(-)
+ drivers/clk/clk.c | 25 ++++++++++++++-----------
+ 1 file changed, 14 insertions(+), 11 deletions(-)
 
 diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index 9e0a837..63f9ac1 100644
+index a004769..9e0a837 100644
 --- a/drivers/clk/clk.c
 +++ b/drivers/clk/clk.c
-@@ -1085,8 +1085,8 @@ static int clk_fetch_parent_index(struct clk *clk, struct clk *parent)
- 	int i;
+@@ -1080,13 +1080,16 @@ unsigned long clk_get_rate(struct clk *clk)
+ }
+ EXPORT_SYMBOL_GPL(clk_get_rate);
  
- 	if (!clk->parents) {
--		clk->parents = kzalloc((sizeof(struct clk*) * clk->num_parents),
--								GFP_KERNEL);
-+		clk->parents = kcalloc(clk->num_parents,
-+					sizeof(struct clk *), GFP_KERNEL);
- 		if (!clk->parents)
- 			return -ENOMEM;
- 	}
-@@ -1535,7 +1535,7 @@ static struct clk *__clk_init_parent(struct clk *clk)
+-static u8 clk_fetch_parent_index(struct clk *clk, struct clk *parent)
++static int clk_fetch_parent_index(struct clk *clk, struct clk *parent)
+ {
+-	u8 i;
++	int i;
  
- 	if (!clk->parents)
- 		clk->parents =
--			kzalloc((sizeof(struct clk*) * clk->num_parents),
-+			kcalloc(clk->num_parents, sizeof(struct clk *),
- 					GFP_KERNEL);
+-	if (!clk->parents)
++	if (!clk->parents) {
+ 		clk->parents = kzalloc((sizeof(struct clk*) * clk->num_parents),
+ 								GFP_KERNEL);
++		if (!clk->parents)
++			return -ENOMEM;
++	}
  
- 	ret = clk_get_parent_by_index(clk, index);
-@@ -1692,8 +1692,8 @@ int __clk_init(struct device *dev, struct clk *clk)
- 	 * for clock drivers to statically initialize clk->parents.
+ 	/*
+ 	 * find index of new parent clock using cached parent ptrs,
+@@ -1095,15 +1098,15 @@ static u8 clk_fetch_parent_index(struct clk *clk, struct clk *parent)
  	 */
- 	if (clk->num_parents > 1 && !clk->parents) {
--		clk->parents = kzalloc((sizeof(struct clk*) * clk->num_parents),
--				GFP_KERNEL);
-+		clk->parents = kcalloc(clk->num_parents, sizeof(struct clk *),
-+					GFP_KERNEL);
- 		/*
- 		 * __clk_lookup returns NULL for parents that have not been
- 		 * clk_init'd; thus any access to clk->parents[] must check
-@@ -1833,8 +1833,8 @@ static int _clk_register(struct device *dev, struct clk_hw *hw, struct clk *clk)
- 	hw->clk = clk;
+ 	for (i = 0; i < clk->num_parents; i++) {
+ 		if (clk->parents && clk->parents[i] == parent)
+-			break;
++			return i;
+ 		else if (!strcmp(clk->parent_names[i], parent->name)) {
+ 			if (clk->parents)
+ 				clk->parents[i] = __clk_lookup(parent->name);
+-			break;
++			return i;
+ 		}
+ 	}
  
- 	/* allocate local copy in case parent_names is __initdata */
--	clk->parent_names = kzalloc((sizeof(char*) * clk->num_parents),
--			GFP_KERNEL);
-+	clk->parent_names = kcalloc(clk->num_parents, sizeof(char *),
-+					GFP_KERNEL);
+-	return i;
++	return -EINVAL;
+ }
  
- 	if (!clk->parent_names) {
- 		pr_err("%s: could not allocate clk->parent_names\n", __func__);
+ static void clk_reparent(struct clk *clk, struct clk *new_parent)
+@@ -1265,7 +1268,7 @@ static struct clk *clk_calc_new_rates(struct clk *clk, unsigned long rate)
+ 	struct clk *old_parent, *parent;
+ 	unsigned long best_parent_rate = 0;
+ 	unsigned long new_rate;
+-	u8 p_index = 0;
++	int p_index = 0;
+ 
+ 	/* sanity */
+ 	if (IS_ERR_OR_NULL(clk))
+@@ -1306,7 +1309,7 @@ static struct clk *clk_calc_new_rates(struct clk *clk, unsigned long rate)
+ 	/* try finding the new parent index */
+ 	if (parent) {
+ 		p_index = clk_fetch_parent_index(clk, parent);
+-		if (p_index == clk->num_parents) {
++		if (p_index < 0) {
+ 			pr_debug("%s: clk %s can not be parent of clk %s\n",
+ 				 __func__, parent->name, clk->name);
+ 			return NULL;
+@@ -1568,7 +1571,7 @@ void __clk_reparent(struct clk *clk, struct clk *new_parent)
+ int clk_set_parent(struct clk *clk, struct clk *parent)
+ {
+ 	int ret = 0;
+-	u8 p_index = 0;
++	int p_index = 0;
+ 	unsigned long p_rate = 0;
+ 
+ 	if (!clk)
+@@ -1597,10 +1600,10 @@ int clk_set_parent(struct clk *clk, struct clk *parent)
+ 	if (parent) {
+ 		p_index = clk_fetch_parent_index(clk, parent);
+ 		p_rate = parent->rate;
+-		if (p_index == clk->num_parents) {
++		if (p_index < 0) {
+ 			pr_debug("%s: clk %s can not be parent of clk %s\n",
+ 					__func__, parent->name, clk->name);
+-			ret = -EINVAL;
++			ret = p_index;
+ 			goto out;
+ 		}
+ 	}
 -- 
 1.8.3.2
