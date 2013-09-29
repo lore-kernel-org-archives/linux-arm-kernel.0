@@ -1,50 +1,41 @@
-From: linux@prisktech.co.nz (Tony Prisk)
-Date: Mon, 30 Sep 2013 06:44:53 +1300
-Subject: [RFC PATCH] imx: video: staging: Add HDMI support to imx-drm
- driver
-In-Reply-To: <CAOMZO5ATJr24zVJXBLaje2M1TiQQb5D_oHjw=b855Ym07wG=5w@mail.gmail.com>
-References: <1375645673-18237-1-git-send-email-linux@prisktech.co.nz>	<CAOMZO5CGpdD-iSVBc_dCvCFPXnRuP8PEBRi=xUEcOGwNubX3GQ@mail.gmail.com>	<52069F7C.9050600@prisktech.co.nz>
- <CAOMZO5ATJr24zVJXBLaje2M1TiQQb5D_oHjw=b855Ym07wG=5w@mail.gmail.com>
-Message-ID: <52486715.5090609@prisktech.co.nz>
+From: arno@natisbad.org (Arnaud Ebalard)
+Date: Sun, 29 Sep 2013 20:36:41 +0200
+Subject: [PATCH,
+ FIX] ARM: mvebu: fix ReadyNAS 102 Power button GPIO to make it active
+ high
+Message-ID: <87ob7bh3uu.fsf@natisbad.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28/09/13 15:52, Fabio Estevam wrote:
-> Hi Tony,
->
-> [Fix ARM kernel mailing list address that was wrong in your first email]
->
-> On Sat, Aug 10, 2013 at 5:15 PM, Tony Prisk <linux@prisktech.co.nz> wrote:
->> On 11/08/13 05:52, Fabio Estevam wrote:
->> Thanks for the review.. Most of this is expected. I hadn't spent a lot of
->> time tidying up or 'formalizing' the patch, but I will tidy up the comments
->> you made.
->>
->> Three problem's I have noticed with the driver are:
->>
->> 1) If I start the system with no output connected, then connect the hdmi,
->> the framebuffer is initialized in 1024x768, but the connector/encoder is in
->> 1920x1080 (as per the video= kernel param).
->>
->> 2) The PLL fails to lock several times during startup, but always seems to
->> be ok to initialize the actually requested mode.
->>
->> 3) EDID reading fails occassionally for no obvious reason. Powering down the
->> Wandboard (sometimes several times) and it comes right.
->>
->> Once I get all this sorted out, and the code tidied up properly I will send
->> a 'proper' patch.
-> Do you still plan to submitting the HDMI driver for mx6?
->
-> Regards,
->
-> Fabio Estevam
-Sorry... I've been tied up with work a lot lately and haven't had a lot 
-of time to spend on it.
-I still haven't been able to overcome the problem with the resolutions 
-at 108Mhz, otherwise it seems to work pretty well. I expect it will be a 
-while yet before I can spend any serious time on it, so if someone else 
-wants to work through the problem and submit a patch, feel free.
 
-Regards
-Tony Prisk
+NETGEAR ReadyNAS 102 Power button definition in .dts file flags
+associated GPIO active low instead of active high. This results
+in reversed events reported by input subsystem (0 returned when
+the button is pressed, 1 when released). This patch makes
+associated GPIO active high to recover correct behaviour.
+
+Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
+---
+RN102 .dts file sits in Linus tree only since 3.12-rc1 so I guess
+no one has currently relied on current reversed behaviour, i.e.
+this can be fixed w/o impact on any userspace program. As a side
+note, the initial error is mine.
+
+ arch/arm/boot/dts/armada-370-netgear-rn102.dts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/boot/dts/armada-370-netgear-rn102.dts b/arch/arm/boot/dts/armada-370-netgear-rn102.dts
+index 05e4485..396949d 100644
+--- a/arch/arm/boot/dts/armada-370-netgear-rn102.dts
++++ b/arch/arm/boot/dts/armada-370-netgear-rn102.dts
+@@ -160,7 +160,7 @@
+ 		button at 1 {
+ 			label = "Power Button";
+ 			linux,code = <116>;     /* KEY_POWER */
+-			gpios = <&gpio1 30 1>;
++			gpios = <&gpio1 30 0>;
+ 		};
+ 
+ 		button at 2 {
+-- 
+1.8.4.rc3
