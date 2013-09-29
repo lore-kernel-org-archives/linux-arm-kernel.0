@@ -1,134 +1,121 @@
 From: emilio@elopez.com.ar (=?UTF-8?q?Emilio=20L=C3=B3pez?=)
-Date: Sun, 29 Sep 2013 00:49:36 -0300
-Subject: [PATCH 07/10] ARM: sun4i: dt: mod0 clocks
+Date: Sun, 29 Sep 2013 00:49:35 -0300
+Subject: [PATCH 06/10] clk: sunxi: mod0 support
 In-Reply-To: <1380426579-32458-1-git-send-email-emilio@elopez.com.ar>
 References: <1380426579-32458-1-git-send-email-emilio@elopez.com.ar>
-Message-ID: <1380426579-32458-8-git-send-email-emilio@elopez.com.ar>
+Message-ID: <1380426579-32458-7-git-send-email-emilio@elopez.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adds all the mod0 clocks present on sun4i to its device tree
+This commit implements support for the "module 0" type of clocks, as
+used by MMC, IR, NAND, SATA and other components.
 
 Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
 ---
- arch/arm/boot/dts/sun4i-a10.dtsi | 105 +++++++++++++++++++++++++++++++++++++++
- 1 file changed, 105 insertions(+)
+ Documentation/devicetree/bindings/clock/sunxi.txt |  1 +
+ drivers/clk/sunxi/clk-sunxi.c                     | 57 +++++++++++++++++++++++
+ 2 files changed, 58 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
-index 94b6fbb..235d078 100644
---- a/arch/arm/boot/dts/sun4i-a10.dtsi
-+++ b/arch/arm/boot/dts/sun4i-a10.dtsi
-@@ -180,6 +180,111 @@
- 				"apb1_uart4", "apb1_uart5", "apb1_uart6",
- 				"apb1_uart7";
- 		};
-+
-+		nand: nand at 01c20080 {
-+			#clock-cells = <0>;
-+			compatible = "allwinner,sun4i-mod0-clk";
-+			reg = <0x01c20080 0x4>;
-+			clocks = <&osc24M>, <&pll6 1>, <&pll5 1>;
-+		};
-+
-+		ms: ms at 01c20084 {
-+			#clock-cells = <0>;
-+			compatible = "allwinner,sun4i-mod0-clk";
-+			reg = <0x01c20084 0x4>;
-+			clocks = <&osc24M>, <&pll6 1>, <&pll5 1>;
-+		};
-+
-+		mmc0: mmc0 at 01c20088 {
-+			#clock-cells = <0>;
-+			compatible = "allwinner,sun4i-mod0-clk";
-+			reg = <0x01c20088 0x4>;
-+			clocks = <&osc24M>, <&pll6 1>, <&pll5 1>;
-+		};
-+
-+		mmc1: mmc1 at 01c2008c {
-+			#clock-cells = <0>;
-+			compatible = "allwinner,sun4i-mod0-clk";
-+			reg = <0x01c2008c 0x4>;
-+			clocks = <&osc24M>, <&pll6 1>, <&pll5 1>;
-+		};
-+
-+		mmc2: mmc2 at 01c20090 {
-+			#clock-cells = <0>;
-+			compatible = "allwinner,sun4i-mod0-clk";
-+			reg = <0x01c20090 0x4>;
-+			clocks = <&osc24M>, <&pll6 1>, <&pll5 1>;
-+		};
-+
-+		mmc3: mmc3 at 01c20094 {
-+			#clock-cells = <0>;
-+			compatible = "allwinner,sun4i-mod0-clk";
-+			reg = <0x01c20094 0x4>;
-+			clocks = <&osc24M>, <&pll6 1>, <&pll5 1>;
-+		};
-+
-+		ts: ts at 01c20098 {
-+			#clock-cells = <0>;
-+			compatible = "allwinner,sun4i-mod0-clk";
-+			reg = <0x01c20098 0x4>;
-+			clocks = <&osc24M>, <&pll6 1>, <&pll5 1>;
-+		};
-+
-+		ss: ss at 01c2009c {
-+			#clock-cells = <0>;
-+			compatible = "allwinner,sun4i-mod0-clk";
-+			reg = <0x01c2009c 0x4>;
-+			clocks = <&osc24M>, <&pll6 1>, <&pll5 1>;
-+		};
-+
-+		spi0: spi0 at 01c200a0 {
-+			#clock-cells = <0>;
-+			compatible = "allwinner,sun4i-mod0-clk";
-+			reg = <0x01c200a0 0x4>;
-+			clocks = <&osc24M>, <&pll6 1>, <&pll5 1>;
-+		};
-+
-+		spi1: spi1 at 01c200a4 {
-+			#clock-cells = <0>;
-+			compatible = "allwinner,sun4i-mod0-clk";
-+			reg = <0x01c200a4 0x4>;
-+			clocks = <&osc24M>, <&pll6 1>, <&pll5 1>;
-+		};
-+
-+		spi2: spi2 at 01c200a8 {
-+			#clock-cells = <0>;
-+			compatible = "allwinner,sun4i-mod0-clk";
-+			reg = <0x01c200a8 0x4>;
-+			clocks = <&osc24M>, <&pll6 1>, <&pll5 1>;
-+		};
-+
-+		pata: pata at 01c200ac {
-+			#clock-cells = <0>;
-+			compatible = "allwinner,sun4i-mod0-clk";
-+			reg = <0x01c200ac 0x4>;
-+			clocks = <&osc24M>, <&pll6 1>, <&pll5 1>;
-+		};
-+
-+		ir0: ir0 at 01c200b0 {
-+			#clock-cells = <0>;
-+			compatible = "allwinner,sun4i-mod0-clk";
-+			reg = <0x01c200b0 0x4>;
-+			clocks = <&osc24M>, <&pll6 1>, <&pll5 1>;
-+		};
-+
-+		ir1: ir1 at 01c200b4 {
-+			#clock-cells = <0>;
-+			compatible = "allwinner,sun4i-mod0-clk";
-+			reg = <0x01c200b4 0x4>;
-+			clocks = <&osc24M>, <&pll6 1>, <&pll5 1>;
-+		};
-+
-+		spi3: spi3 at 01c200d4 {
-+			#clock-cells = <0>;
-+			compatible = "allwinner,sun4i-mod0-clk";
-+			reg = <0x01c200d4 0x4>;
-+			clocks = <&osc24M>, <&pll6 1>, <&pll5 1>;
-+		};
- 	};
+diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
+index 773f3ae..ff3f61c 100644
+--- a/Documentation/devicetree/bindings/clock/sunxi.txt
++++ b/Documentation/devicetree/bindings/clock/sunxi.txt
+@@ -35,6 +35,7 @@ Required properties:
+ 	"allwinner,sun7i-a20-apb1-gates-clk" - for the APB1 gates on A20
+ 	"allwinner,sun6i-a31-apb2-div-clk" - for the APB2 gates on A31
+ 	"allwinner,sun6i-a31-apb2-gates-clk" - for the APB2 gates on A31
++	"allwinner,sun4i-mod0-clk" - for the module 0 family of clocks
  
- 	soc at 01c00000 {
+ Required properties for all clocks:
+ - reg : shall be the control register address for the clock.
+diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
+index b1210f3..163a3d8 100644
+--- a/drivers/clk/sunxi/clk-sunxi.c
++++ b/drivers/clk/sunxi/clk-sunxi.c
+@@ -287,6 +287,47 @@ static void sun4i_get_apb1_factors(u32 *freq, u32 parent_rate,
+ 
+ 
+ /**
++ * sun4i_get_mod0_factors() - calculates m, n factors for MOD0-style clocks
++ * MMC rate is calculated as follows
++ * rate = (parent_rate >> p) / (m + 1);
++ */
++
++static void sun4i_get_mod0_factors(u32 *freq, u32 parent_rate,
++				   u8 *n, u8 *k, u8 *m, u8 *p)
++{
++	u8 div, calcm, calcp;
++
++	/* These clocks can only divide, so we will never be able to achieve
++	 * frequencies higher than the parent frequency */
++	if (*freq > parent_rate)
++		*freq = parent_rate;
++
++	div = parent_rate / *freq;
++
++	if (div < 16)
++		calcp = 0;
++	else if (div / 2 < 16)
++		calcp = 1;
++	else if (div / 4 < 16)
++		calcp = 2;
++	else
++		calcp = 3;
++
++	calcm = DIV_ROUND_UP(div, 1 << calcp);
++
++	*freq = (parent_rate >> calcp) / calcm;
++
++	/* we were called to round the frequency, we can now return */
++	if (n == NULL)
++		return;
++
++	*m = calcm - 1;
++	*p = calcp;
++}
++
++
++
++/**
+  * sunxi_factors_clk_setup() - Setup function for factor clocks
+  */
+ 
+@@ -333,6 +374,14 @@ static struct clk_factors_config sun4i_apb1_config = {
+ 	.pwidth = 2,
+ };
+ 
++/* user manual says "n" but it's really "p" */
++static struct clk_factors_config sun4i_mod0_config = {
++	.mshift = 0,
++	.mwidth = 4,
++	.pshift = 16,
++	.pwidth = 2,
++};
++
+ static const struct factors_data sun4i_pll1_data __initconst = {
+ 	.enable = 31,
+ 	.table = &sun4i_pll1_config,
+@@ -356,6 +405,13 @@ static const struct factors_data sun4i_apb1_data __initconst = {
+ 	.getter = sun4i_get_apb1_factors,
+ };
+ 
++static const struct factors_data sun4i_mod0_data __initconst = {
++	.enable = 31,
++	.mux = 24,
++	.table = &sun4i_mod0_config,
++	.getter = sun4i_get_mod0_factors,
++};
++
+ static struct clk * __init sunxi_factors_clk_setup(struct device_node *node,
+ 						const struct factors_data *data)
+ {
+@@ -779,6 +835,7 @@ static const struct of_device_id clk_factors_match[] __initconst = {
+ 	{.compatible = "allwinner,sun4i-pll1-clk", .data = &sun4i_pll1_data,},
+ 	{.compatible = "allwinner,sun6i-a31-pll1-clk", .data = &sun6i_a31_pll1_data,},
+ 	{.compatible = "allwinner,sun4i-apb1-clk", .data = &sun4i_apb1_data,},
++	{.compatible = "allwinner,sun4i-mod0-clk", .data = &sun4i_mod0_data,},
+ 	{}
+ };
+ 
 -- 
 1.8.4
