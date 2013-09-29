@@ -1,31 +1,70 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Sun, 29 Sep 2013 22:45:10 +0800
-Subject: [PATCH 2/2] MAINTAINERS: ARM: SIRF: use kernel.org mail box
-In-Reply-To: <1380465910-20786-1-git-send-email-Baohua.Song@csr.com>
-References: <1380465910-20786-1-git-send-email-Baohua.Song@csr.com>
-Message-ID: <1380465910-20786-2-git-send-email-Baohua.Song@csr.com>
+From: valentin.ilie@gmail.com (Valentin Ilie)
+Date: Sun, 29 Sep 2013 18:19:28 +0300
+Subject: [PATCH] ARM: mach-iop32x: iq31244: Replace if-then-else with a
+ switch statement
+In-Reply-To: <1378135394-31092-1-git-send-email-valentin.ilie@gmail.com>
+References: <1378135394-31092-1-git-send-email-valentin.ilie@gmail.com>
+Message-ID: <CAHuBVBbDk_bgJ9-R-tr9qrt7O3i6NEF6m2QeWnpU5UCxPC9DrA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-change my email to kernel.org which is easier for me to catch.
+On 2 September 2013 18:23, Valentin Ilie <valentin.ilie@gmail.com> wrote:
+> Convert a compound if-else blob to a switch statement.
+>
+> Signed-off-by: Valentin Ilie <valentin.ilie@gmail.com>
+> ---
+>  arch/arm/mach-iop32x/iq31244.c | 29 +++++++++++------------------
+>  1 file changed, 11 insertions(+), 18 deletions(-)
+>
+> diff --git a/arch/arm/mach-iop32x/iq31244.c b/arch/arm/mach-iop32x/iq31244.c
+> index f2cd296..3415f11 100644
+> --- a/arch/arm/mach-iop32x/iq31244.c
+> +++ b/arch/arm/mach-iop32x/iq31244.c
+> @@ -101,28 +101,21 @@ void __init iq31244_map_io(void)
+>  static int __init
+>  ep80219_pci_map_irq(const struct pci_dev *dev, u8 slot, u8 pin)
+>  {
+> -       int irq;
+> -
+> -       if (slot == 0) {
+> -               /* CFlash */
+> -               irq = IRQ_IOP32X_XINT1;
+> -       } else if (slot == 1) {
+> -               /* 82551 Pro 100 */
+> -               irq = IRQ_IOP32X_XINT0;
+> -       } else if (slot == 2) {
+> -               /* PCI-X Slot */
+> -               irq = IRQ_IOP32X_XINT3;
+> -       } else if (slot == 3) {
+> -               /* SATA */
+> -               irq = IRQ_IOP32X_XINT2;
+> -       } else {
+> +       switch (slot) {
+> +       case 0: /* CFlash */
+> +               return IRQ_IOP32X_XINT1;
+> +       case 1: /* 82551 Pro 100 */
+> +               return IRQ_IOP32X_XINT0;
+> +       case 2: /* PCI-X Slot */
+> +               return IRQ_IOP32X_XINT3;
+> +       case 3: /* SATA */
+> +               return IRQ_IOP32X_XINT2;
+> +       default:
+>                 printk(KERN_ERR "ep80219_pci_map_irq() called for unknown "
+>                         "device PCI:%d:%d:%d\n", dev->bus->number,
+>                         PCI_SLOT(dev->devfn), PCI_FUNC(dev->devfn));
+> -               irq = -1;
+> +               return -1;
+>         }
+> -
+> -       return irq;
+>  }
+>
+>  static struct hw_pci ep80219_pci __initdata = {
+> --
+> 1.8.1.2
+>
 
-Signed-off-by: Barry Song <Baohua.Song@csr.com>
----
- MAINTAINERS | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Can someone look into this?
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index a663819..9d96b9c 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -824,7 +824,7 @@ S:	Maintained
- F:	arch/arm/mach-gemini/
- 
- ARM/CSR SIRFPRIMA2 MACHINE SUPPORT
--M:	Barry Song <baohua.song@csr.com>
-+M:	Barry Song <baohua@kernel.org>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
- T:	git git://git.kernel.org/pub/scm/linux/kernel/git/baohua/linux.git
- S:	Maintained
 -- 
-1.8.2.3
+Valentin Ilie
