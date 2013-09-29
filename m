@@ -1,74 +1,50 @@
-From: eranpublic@yahoo.com (Eran Ben-Avi)
-Date: Sun, 29 Sep 2013 09:51:53 -0700 (PDT)
-Subject: [PATCH] ARM: l2x0: protect outer_cache_fns.sync pointer
- assignment with OUTER_CACHE_SYNC
-In-Reply-To: <20130926131207.GA3467@darko.cambridge.arm.com>
-References: <1379861550.88310.YahooMailNeo@web161601.mail.bf1.yahoo.com>
- <20130926131207.GA3467@darko.cambridge.arm.com>
-Message-ID: <1380473513.19674.YahooMailNeo@web161602.mail.bf1.yahoo.com>
+From: linux@prisktech.co.nz (Tony Prisk)
+Date: Mon, 30 Sep 2013 06:44:53 +1300
+Subject: [RFC PATCH] imx: video: staging: Add HDMI support to imx-drm
+ driver
+In-Reply-To: <CAOMZO5ATJr24zVJXBLaje2M1TiQQb5D_oHjw=b855Ym07wG=5w@mail.gmail.com>
+References: <1375645673-18237-1-git-send-email-linux@prisktech.co.nz>	<CAOMZO5CGpdD-iSVBc_dCvCFPXnRuP8PEBRi=xUEcOGwNubX3GQ@mail.gmail.com>	<52069F7C.9050600@prisktech.co.nz>
+ <CAOMZO5ATJr24zVJXBLaje2M1TiQQb5D_oHjw=b855Ym07wG=5w@mail.gmail.com>
+Message-ID: <52486715.5090609@prisktech.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 28/09/13 15:52, Fabio Estevam wrote:
+> Hi Tony,
+>
+> [Fix ARM kernel mailing list address that was wrong in your first email]
+>
+> On Sat, Aug 10, 2013 at 5:15 PM, Tony Prisk <linux@prisktech.co.nz> wrote:
+>> On 11/08/13 05:52, Fabio Estevam wrote:
+>> Thanks for the review.. Most of this is expected. I hadn't spent a lot of
+>> time tidying up or 'formalizing' the patch, but I will tidy up the comments
+>> you made.
+>>
+>> Three problem's I have noticed with the driver are:
+>>
+>> 1) If I start the system with no output connected, then connect the hdmi,
+>> the framebuffer is initialized in 1024x768, but the connector/encoder is in
+>> 1920x1080 (as per the video= kernel param).
+>>
+>> 2) The PLL fails to lock several times during startup, but always seems to
+>> be ok to initialize the actually requested mode.
+>>
+>> 3) EDID reading fails occassionally for no obvious reason. Powering down the
+>> Wandboard (sometimes several times) and it comes right.
+>>
+>> Once I get all this sorted out, and the code tidied up properly I will send
+>> a 'proper' patch.
+> Do you still plan to submitting the HDMI driver for mx6?
+>
+> Regards,
+>
+> Fabio Estevam
+Sorry... I've been tied up with work a lot lately and haven't had a lot 
+of time to spend on it.
+I still haven't been able to overcome the problem with the resolutions 
+at 108Mhz, otherwise it seems to work pretty well. I expect it will be a 
+while yet before I can spend any serious time on it, so if someone else 
+wants to work through the problem and submit a patch, feel free.
 
-On Thu, Sep 26, 2013 at 4:13 PM, Catalin Marinas wrote:
-
-> Since outer_cache.sync is conditionally defined, the patch makes sense.
-> Alternatively, we could leave the .sync member always defined and just
-> have a conditionally defined l2x0_cache_sync (NULL when
-> !OUTER_CACHE_SYNC).
-Fully agree.
-Here is updated patch:
-
-
-[PATCH] ARM: l2x0: define l2x0_cache_sync according to OUTER_CACHE_SYNC selection
-
-??? Always define outer_cache_fns sync member and conditionally assign
-??? l2x0_cache_sync depends on OUTER_CACHE_SYNC selection state.
-
-Signed-off-by: Eran Ben-Avi <benavi@marvell.com>
----
-?arch/arm/include/asm/outercache.h |??? 2 --
-?arch/arm/mm/cache-l2x0.c????????? |??? 4 ++++
-?2 files changed, 4 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/include/asm/outercache.h b/arch/arm/include/asm/outercache.h
-index f94784f..697317c 100644
---- a/arch/arm/include/asm/outercache.h
-+++ b/arch/arm/include/asm/outercache.h
-@@ -30,9 +30,7 @@ struct outer_cache_fns {
-???? void (*flush_all)(void);
-???? void (*inv_all)(void);
-???? void (*disable)(void);
--#ifdef CONFIG_OUTER_CACHE_SYNC
-???? void (*sync)(void);
--#endif
-???? void (*set_debug)(unsigned long);
-???? void (*resume)(void);
-?};
-diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-index 447da6f..5f3a0ca 100644
---- a/arch/arm/mm/cache-l2x0.c
-+++ b/arch/arm/mm/cache-l2x0.c
-@@ -128,6 +128,7 @@ static inline void l2x0_flush_line(unsigned long addr)
-?}
-?#endif
-?
-+#ifdef CONFIG_OUTER_CACHE_SYNC
-?static void l2x0_cache_sync(void)
-?{
-???? unsigned long flags;
-@@ -136,6 +137,9 @@ static void l2x0_cache_sync(void)
-???? cache_sync();
-???? raw_spin_unlock_irqrestore(&l2x0_lock, flags);
-?}
-+#else
-+#define l2x0_cache_sync??? NULL
-+#endif
-?
-?static void __l2x0_flush_all(void)
-?{
--- 
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel at lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel 
+Regards
+Tony Prisk
