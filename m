@@ -1,70 +1,107 @@
-From: valentin.ilie@gmail.com (Valentin Ilie)
-Date: Sun, 29 Sep 2013 18:19:28 +0300
-Subject: [PATCH] ARM: mach-iop32x: iq31244: Replace if-then-else with a
- switch statement
-In-Reply-To: <1378135394-31092-1-git-send-email-valentin.ilie@gmail.com>
-References: <1378135394-31092-1-git-send-email-valentin.ilie@gmail.com>
-Message-ID: <CAHuBVBbDk_bgJ9-R-tr9qrt7O3i6NEF6m2QeWnpU5UCxPC9DrA@mail.gmail.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Sun, 29 Sep 2013 17:54:02 +0200
+Subject: [PATCH] PWM: atmel-pwm: use request/free instead of enable/disable
+In-Reply-To: <5247FCF5.9090501@atmel.com>
+References: <1380312628-6564-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <5247FCF5.9090501@atmel.com>
+Message-ID: <52484D1A.20402@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2 September 2013 18:23, Valentin Ilie <valentin.ilie@gmail.com> wrote:
-> Convert a compound if-else blob to a switch statement.
+On 29/09/2013 12:12, Bo Shen wrote:
+> Hi Alexandre,
 >
-> Signed-off-by: Valentin Ilie <valentin.ilie@gmail.com>
-> ---
->  arch/arm/mach-iop32x/iq31244.c | 29 +++++++++++------------------
->  1 file changed, 11 insertions(+), 18 deletions(-)
+> On 9/28/2013 04:10, Alexandre Belloni wrote:
+>> I found that disabling a pwm while it is at a low level will actually
+>> put it
+>> back at a high level. The main symptom is that leds-pwm is calling
+>> pwm_disable()
+>> after setting the duty cycle to 0. Hence, instead of getting a
+>> switched off LED,
+>> you get an LED lit up at full brightness.
+>>
+>> Solve that by using the request and free callbacks to enable and
+>> disable the
+>> pwm channels and the clock.
+>>
+>> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+>> ---
+>>
+>> This patch applies after:
+>>    [PATCH v4] PWM: atmel-pwm: add PWM controller driver
+>>
+>>   drivers/pwm/pwm-atmel.c | 14 +++++---------
+>>   1 file changed, 5 insertions(+), 9 deletions(-)
+>>
+>> diff --git a/drivers/pwm/pwm-atmel.c b/drivers/pwm/pwm-atmel.c
+>> index 6af7a50..4526e71 100644
+>> --- a/drivers/pwm/pwm-atmel.c
+>> +++ b/drivers/pwm/pwm-atmel.c
+>> @@ -209,7 +209,7 @@ static int atmel_pwm_set_polarity(struct pwm_chip
+>> *chip, struct pwm_device *pwm,
+>>       return 0;
+>>   }
+>>
+>> -static int atmel_pwm_enable(struct pwm_chip *chip, struct pwm_device
+>> *pwm)
+>> +static int atmel_pwm_request(struct pwm_chip *chip, struct
+>> pwm_device *pwm)
+>>   {
+>>       struct atmel_pwm_chip *atmel_pwm = to_atmel_pwm_chip(chip);
+>>       int ret;
+>> @@ -225,23 +225,19 @@ static int atmel_pwm_enable(struct pwm_chip
+>> *chip, struct pwm_device *pwm)
+>>       return 0;
+>>   }
+>>
+>> -static void atmel_pwm_disable(struct pwm_chip *chip, struct
+>> pwm_device *pwm)
+>> +static void atmel_pwm_free(struct pwm_chip *chip, struct pwm_device
+>> *pwm)
+>>   {
+>>       struct atmel_pwm_chip *atmel_pwm = to_atmel_pwm_chip(chip);
+>> -    u32 val;
+>>
+>>       atmel_pwm_writel(atmel_pwm, PWM_DIS, 1 << pwm->hwpwm);
+>> -
+>> -    val = atmel_pwm_readl(atmel_pwm, PWM_SR);
+>> -    if ((val & PWM_SR_ALL_CH_ON) == 0)
+>> -        clk_disable(atmel_pwm->clk);
+>> +    clk_disable(atmel_pwm->clk);
+>>   }
+>>
+>>   static const struct pwm_ops atmel_pwm_ops = {
+>>       .config = atmel_pwm_config,
+>>       .set_polarity = atmel_pwm_set_polarity,
+>> -    .enable = atmel_pwm_enable,
+>> -    .disable = atmel_pwm_disable,
+>> +    .request = atmel_pwm_request,
+>> +    .free = atmel_pwm_free,
 >
-> diff --git a/arch/arm/mach-iop32x/iq31244.c b/arch/arm/mach-iop32x/iq31244.c
-> index f2cd296..3415f11 100644
-> --- a/arch/arm/mach-iop32x/iq31244.c
-> +++ b/arch/arm/mach-iop32x/iq31244.c
-> @@ -101,28 +101,21 @@ void __init iq31244_map_io(void)
->  static int __init
->  ep80219_pci_map_irq(const struct pci_dev *dev, u8 slot, u8 pin)
->  {
-> -       int irq;
-> -
-> -       if (slot == 0) {
-> -               /* CFlash */
-> -               irq = IRQ_IOP32X_XINT1;
-> -       } else if (slot == 1) {
-> -               /* 82551 Pro 100 */
-> -               irq = IRQ_IOP32X_XINT0;
-> -       } else if (slot == 2) {
-> -               /* PCI-X Slot */
-> -               irq = IRQ_IOP32X_XINT3;
-> -       } else if (slot == 3) {
-> -               /* SATA */
-> -               irq = IRQ_IOP32X_XINT2;
-> -       } else {
-> +       switch (slot) {
-> +       case 0: /* CFlash */
-> +               return IRQ_IOP32X_XINT1;
-> +       case 1: /* 82551 Pro 100 */
-> +               return IRQ_IOP32X_XINT0;
-> +       case 2: /* PCI-X Slot */
-> +               return IRQ_IOP32X_XINT3;
-> +       case 3: /* SATA */
-> +               return IRQ_IOP32X_XINT2;
-> +       default:
->                 printk(KERN_ERR "ep80219_pci_map_irq() called for unknown "
->                         "device PCI:%d:%d:%d\n", dev->bus->number,
->                         PCI_SLOT(dev->devfn), PCI_FUNC(dev->devfn));
-> -               irq = -1;
-> +               return -1;
->         }
-> -
-> -       return irq;
->  }
+> This will cause pwmadd_chip failure.
 >
->  static struct hw_pci ep80219_pci __initdata = {
-> --
-> 1.8.1.2
+> Code from <drivers/pwm/core.c>, in function: pwmadd_chip()
+> ---8>---
+> if (!chip || !chip->dev || !chip->ops || !chip->ops->config ||
+>     !chip->ops->enable || !chip->ops->disable)
+>     return -EINVAL;
+> ---<8---
 >
 
-Can someone look into this?
+You are right, I tested with dummy pwm_enable/pwm_disable functions and
+removed them before sending the patch, thinking they weren't needed.
+I'll respin that patch.
+
+>>       .owner = THIS_MODULE,
+>>   };
+>>
+>
+> Best Regards,
+> Bo Shen
+>
+
 
 -- 
-Valentin Ilie
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
