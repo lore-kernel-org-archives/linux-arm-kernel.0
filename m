@@ -1,60 +1,67 @@
 From: 21cnbao@gmail.com (Barry Song)
-Date: Sun, 29 Sep 2013 21:29:16 +0800
-Subject: [GIT PULL]ARM: sirf: dts fixes for 3.12-rc
-Message-ID: <CAGsJ_4yfNE3NMvf9jkyaZM84i9zdEM3wm=VgFPamKT_F33Lo2A@mail.gmail.com>
+Date: Sun, 29 Sep 2013 22:27:57 +0800
+Subject: [PATCH 1/3] pinctrl: sirf: add lost uart0-no-stream-control pingroup
+ for prima2
+Message-ID: <1380464879-19897-1-git-send-email-Baohua.Song@csr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 4a10c2ac2f368583138b774ca41fac4207911983:
+From: Qipan Li <Qipan.Li@csr.com>
 
-  Linux 3.12-rc2 (2013-09-23 15:41:09 -0700)
+the old codes defined uart0_nostreamctrl_pins, but missed pingroup
+and padmux definition for it. this patch fixes it.
 
-are available in the git repository at:
+Signed-off-by: Qipan Li <Qipan.Li@csr.com>
+Signed-off-by: Barry Song <Baohua.Song@csr.com>
+---
+ arch/arm/boot/dts/prima2.dtsi         | 6 ++++++
+ drivers/pinctrl/sirf/pinctrl-prima2.c | 3 +++
+ 2 files changed, 9 insertions(+)
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/baohua/linux.git
-tags/dts-fixes-for-3.12
-
-for you to fetch changes up to 65dc961989ba0f4dc57d614a9af43c19460204dd:
-
-  ARM: dts: sirf: fix interrupt and dma prop of VIP for prima2 and
-atlas6 (2013-09-29 21:08:06 +0800)
-
-----------------------------------------------------------------
-ARM: sirf: dts fixes for 3.12-rc
-
-A set of fixes for sirf dts for 3.12. Among them:
-  - add missed chhifbg node in prima2 and atlas6 dts
-  - add missed cell, cs and dma channel for SPI nodes
-  - add missed graphics2d iobg in atlas6 dts
-  - add missed address-cells and size-cells for prima2 I2C
-  - add missed memcontrol-monitor node in prima2 and atlas6 dts
-  - fix makefile to build atlas6-evb.dtb for ARCH_ATLAS6
-  - fix the ranges of peri-iobrg of prima2
-  - fix fifosize, clks, dma channels for UART
-  - fix interrupt and dma prop of VIP for prima2 and atlas6
-
-----------------------------------------------------------------
-Barry Song (4):
-      ARM: dts: sirf: add missed chhifbg node in prima2 and atlas6 dts
-      ARM: dts: sirf: add missed cell, cs and dma channel for SPI nodes
-      ARM: dts: makefile: build atlas6-evb.dtb for ARCH_ATLAS6
-      ARM: dts: sirf: fix the ranges of peri-iobrg of prima2
-
-Jiansong Chen (1):
-      ARM: dts: sirf: add missed graphics2d iobg in atlas6 dts
-
-Qipan Li (1):
-      ARM: dts: sirf: fix fifosize, clks, dma channels for UART
-
-Renwei Wu (2):
-      ARM: dts: sirf: add missed address-cells and size-cells for prima2 I2C
-      ARM: dts: sirf: fix interrupt and dma prop of VIP for prima2 and atlas6
-
-Ye He (1):
-      ARM: dts: sirf: add missed memcontrol-monitor node in prima2 and
-atlas6 dts
-
- arch/arm/boot/dts/Makefile    |  2 ++
- arch/arm/boot/dts/atlas6.dtsi | 45 +++++++++++++++++++++++++++++++++-
- arch/arm/boot/dts/prima2.dtsi | 57 +++++++++++++++++++++++++++++++++++++++----
- 3 files changed, 98 insertions(+), 6 deletions(-)
+diff --git a/arch/arm/boot/dts/prima2.dtsi b/arch/arm/boot/dts/prima2.dtsi
+index 7cf78af..528ced8 100644
+--- a/arch/arm/boot/dts/prima2.dtsi
++++ b/arch/arm/boot/dts/prima2.dtsi
+@@ -388,6 +388,12 @@
+ 						sirf,function = "uart0";
+ 					};
+ 				};
++				uart0_noflow_pins_a: uart0 at 1 {
++					uart {
++						sirf,pins = "uart0_nostreamctrlgrp";
++						sirf,function = "uart0_nostreamctrl";
++					};
++				};
+ 				uart1_pins_a: uart1 at 0 {
+ 					uart {
+ 						sirf,pins = "uart1grp";
+diff --git a/drivers/pinctrl/sirf/pinctrl-prima2.c b/drivers/pinctrl/sirf/pinctrl-prima2.c
+index 1f0ad1e..29fc842 100644
+--- a/drivers/pinctrl/sirf/pinctrl-prima2.c
++++ b/drivers/pinctrl/sirf/pinctrl-prima2.c
+@@ -764,6 +764,7 @@ static const struct sirfsoc_pin_group sirfsoc_pin_groups[] = {
+ 	SIRFSOC_PIN_GROUP("lcd_24bitsgrp", lcd_24bits_pins),
+ 	SIRFSOC_PIN_GROUP("lcdrom_grp", lcdrom_pins),
+ 	SIRFSOC_PIN_GROUP("uart0grp", uart0_pins),
++	SIRFSOC_PIN_GROUP("uart0_nostreamctrlgrp", uart0_nostreamctrl_pins),
+ 	SIRFSOC_PIN_GROUP("uart1grp", uart1_pins),
+ 	SIRFSOC_PIN_GROUP("uart2grp", uart2_pins),
+ 	SIRFSOC_PIN_GROUP("uart2_nostreamctrlgrp", uart2_nostreamctrl_pins),
+@@ -803,6 +804,7 @@ static const char * const lcd_18bitsgrp[] = { "lcd_18bitsgrp" };
+ static const char * const lcd_24bitsgrp[] = { "lcd_24bitsgrp" };
+ static const char * const lcdromgrp[] = { "lcdromgrp" };
+ static const char * const uart0grp[] = { "uart0grp" };
++static const char * const uart0_nostreamctrlgrp[] = { "uart0_nostreamctrlgrp" };
+ static const char * const uart1grp[] = { "uart1grp" };
+ static const char * const uart2grp[] = { "uart2grp" };
+ static const char * const uart2_nostreamctrlgrp[] = { "uart2_nostreamctrlgrp" };
+@@ -842,6 +844,7 @@ static const struct sirfsoc_pmx_func sirfsoc_pmx_functions[] = {
+ 	SIRFSOC_PMX_FUNCTION("lcd_24bits", lcd_24bitsgrp, lcd_24bits_padmux),
+ 	SIRFSOC_PMX_FUNCTION("lcdrom", lcdromgrp, lcdrom_padmux),
+ 	SIRFSOC_PMX_FUNCTION("uart0", uart0grp, uart0_padmux),
++	SIRFSOC_PMX_FUNCTION("uart0_nostreamctrl", uart0_nostreamctrlgrp, uart0_nostreamctrl_padmux),
+ 	SIRFSOC_PMX_FUNCTION("uart1", uart1grp, uart1_padmux),
+ 	SIRFSOC_PMX_FUNCTION("uart2", uart2grp, uart2_padmux),
+ 	SIRFSOC_PMX_FUNCTION("uart2_nostreamctrl", uart2_nostreamctrlgrp, uart2_nostreamctrl_padmux),
+-- 
+1.8.2.3
