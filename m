@@ -1,42 +1,30 @@
-From: yrehan@gmail.com (Mian Yousaf Kaukab)
-Date: Sun, 29 Sep 2013 12:17:49 +0200
-Subject: [PATCH] ARM: vexpress: ignore MIDR[0] for uart detection
-Message-ID: <1380449869-19911-1-git-send-email-yrehan@gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Sun, 29 Sep 2013 13:31:40 +0100
+Subject: [PATCH 3/4] spi: davinci: Allow SPI to be build without EDMA
+ support
+In-Reply-To: <1380325356-2100-4-git-send-email-santosh.shilimkar@ti.com>
+References: <1380325356-2100-1-git-send-email-santosh.shilimkar@ti.com>
+ <1380325356-2100-4-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <20130929123140.GU19304@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Qemu vexpress-a9 target reports id of ARM Cortex-A9 core as r0p0
-and uses legacy map. That is UART0 at address 0x10009000. Ignore
-MIDR[0] during uart detection so that r0p0 as well as r0p1 use
-legacy map.
+On Fri, Sep 27, 2013 at 07:42:35PM -0400, Santosh Shilimkar wrote:
 
-Signed-off-by: Mian Yousaf Kaukab <yrehan@gmail.com>
----
- arch/arm/include/debug/vexpress.S | 9 +++++++--
- 1 file changed, 7 insertions(+), 2 deletions(-)
+> DaVinci SPI IP works without EDMA support and thats how it has
+> been used on Keystone SOCs currently. Hence keep the EDMA select
+> limited to ARCH_DAVINCI so that Keystone SOCs can use the driver.
 
-diff --git a/arch/arm/include/debug/vexpress.S b/arch/arm/include/debug/vexpress.S
-index 524acd5..932db8b 100644
---- a/arch/arm/include/debug/vexpress.S
-+++ b/arch/arm/include/debug/vexpress.S
-@@ -27,11 +27,16 @@
- 
- 		@ Make an educated guess regarding the memory map:
- 		@ - the original A9 core tile (based on ARM Cortex-A9 r0p1)
--		@   should use UART at 0x10009000
-+		@   should use UART at 0x10009000. Moreover, qemu vexpress-a9
-+		@   target reports id of ARM Cortex-A9 core as r0p0 and uses
-+		@   legacy map.
- 		@ - all other (RS1 complaint) tiles use UART mapped
- 		@   at 0x1c090000
- 		mrc	p15, 0, \rp, c0, c0, 0
--		movw	\rv, #0xc091
-+		mov	\rv, #1
-+		@ Ignore MIDR[0] during comparison
-+		bic	\rp, \rp, \rv
-+		movw	\rv, #0xc090
- 		movt	\rv, #0x410f
- 		cmp	\rp, \rv
- 
--- 
-1.8.1.2
+> Keystone SOC do support EDMA IP as well but the support has
+> not been added and tested so far.
+
+If there's no hard dependency on EDMA then the driver probably ought to
+be marked as COMPILE_TEST so that it can be build tested on other
+systems.  Is that possible?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130929/ab65c9b9/attachment.sig>
