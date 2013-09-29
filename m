@@ -1,47 +1,31 @@
-From: marex@denx.de (Marek Vasut)
-Date: Mon, 30 Sep 2013 00:50:19 +0200
-Subject: [PATCH] ARM: mxs: stub out mxs_pm_init for !CONFIG_PM
-In-Reply-To: <2964094.prhBouhISv@wuerfel>
-References: <2964094.prhBouhISv@wuerfel>
-Message-ID: <201309300050.20047.marex@denx.de>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 30 Sep 2013 01:12:10 +0200
+Subject: [PATCH] ARM: ux500: cpuidle: fix section mismatch
+In-Reply-To: <1380302195-18678-1-git-send-email-daniel.lezcano@linaro.org>
+References: <1380302195-18678-1-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <CACRpkdZN0ErvBSYuOK3XP5JgLZRqJ7Rvcc=sj=naT9c4tSSG5Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Greg,
+On Fri, Sep 27, 2013 at 7:16 PM, Daniel Lezcano
+<daniel.lezcano@linaro.org> wrote:
 
-> When building a kernel without CONFIG_PM, we get a link
-> error from referencing mxs_pm_init in the machine
-> descriptor. This defines a macro to NULL for that case.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: Shawn Guo <shawn.guo@linaro.org>
-> 
-> diff --git a/arch/arm/mach-mxs/pm.h b/arch/arm/mach-mxs/pm.h
-> index f57e7cd..09d77b0 100644
-> --- a/arch/arm/mach-mxs/pm.h
-> +++ b/arch/arm/mach-mxs/pm.h
-> @@ -9,6 +9,10 @@
->  #ifndef __ARCH_MXS_PM_H
->  #define __ARCH_MXS_PM_H
-> 
-> +#ifdef CONFIG_PM
->  void mxs_pm_init(void);
-> +#else
-> +#define mxs_pm_init NULL
-> +#endif
-> 
->  #endif
+> The dbx500_cpuidle_probe is tagged as an __init section but the variable
+> dbx500_cpuidle_plat_driver is not.
+>
+> The dbx500_cpuidle_probe could not be declared as __init because of macro
+> module_platform_driver builds the exit function, tags as __exit and this one
+> refers to the dbx500_cpuidle_plat_driver which is an __initdata.
+>
+> That leads to a section mismatch.
+>
+> Fix it by removing the __init tag for the probe function.
+>
+> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 
-Can you please pick this patch for 3.10 stable? It fixes a build issue on 
-i.MX23/i.MX28 in case CONFIG_PM is not enabled.
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-Patchwork link: http://patchwork.ozlabs.org/patch/253324/
+Sorry if I caused this and thanks for fixing it up!
 
-Upstream GIT: 
-http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/arch/arm/mach-
-mxs/pm.h?id=7a9caf59f60e55a8caf96f856713bd0ef0cc25a7
-
-Thank you!
-
-Best regards,
-Marek Vasut
+Yours,
+Linus Walleij
