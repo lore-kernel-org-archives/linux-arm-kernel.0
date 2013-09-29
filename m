@@ -1,30 +1,31 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Sun, 29 Sep 2013 13:31:40 +0100
-Subject: [PATCH 3/4] spi: davinci: Allow SPI to be build without EDMA
- support
-In-Reply-To: <1380325356-2100-4-git-send-email-santosh.shilimkar@ti.com>
-References: <1380325356-2100-1-git-send-email-santosh.shilimkar@ti.com>
- <1380325356-2100-4-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <20130929123140.GU19304@sirena.org.uk>
+From: tj@kernel.org (Tejun Heo)
+Date: Sun, 29 Sep 2013 08:51:28 -0400
+Subject: =?utf-8?B?5Zue5aSN77yaUmU=?= =?utf-8?Q?=3A?= [v1] ahci: imx:
+ setup power saving methods
+In-Reply-To: <20130929074817.GG26156@S2101-09.ap.freescale.net>
+References: <1380269265-10821-1-git-send-email-Hong-Xing.Zhu@freescale.com>
+ <1380269265-10821-2-git-send-email-Hong-Xing.Zhu@freescale.com>
+ <20130927131441.GA3205@htj.dyndns.org>
+ <20130929073528.GE26156@S2101-09.ap.freescale.net>
+ <1vugbd691bjfibh5crdihlrh.1380440262216@email.android.com>
+ <20130929074817.GG26156@S2101-09.ap.freescale.net>
+Message-ID: <20130929125128.GA7599@htj.dyndns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 27, 2013 at 07:42:35PM -0400, Santosh Shilimkar wrote:
+On Sun, Sep 29, 2013 at 03:48:18PM +0800, Shawn Guo wrote:
+> On Sun, Sep 29, 2013 at 07:40:57AM +0000, Zhu Richard-R65037 wrote:
+> > Hi Shawn:
+> > Thanks.
+> > The hot-plug can?t be supported, if we support this method unconditionally.
+> 
+> Ah, okay.  Then you should make this clear in the help text of the
+> Kconfig option.
 
-> DaVinci SPI IP works without EDMA support and thats how it has
-> been used on Keystone SOCs currently. Hence keep the EDMA select
-> limited to ARCH_DAVINCI so that Keystone SOCs can use the driver.
+Yeah but it's still weird to require kernel build to flip this
+feature, isn't it?  Shouldn't it be a module param or something?
 
-> Keystone SOC do support EDMA IP as well but the support has
-> not been added and tested so far.
+Thanks.
 
-If there's no hard dependency on EDMA then the driver probably ought to
-be marked as COMPILE_TEST so that it can be build tested on other
-systems.  Is that possible?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130929/ab65c9b9/attachment.sig>
+-- 
+tejun
