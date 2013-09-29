@@ -1,76 +1,59 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Sun, 29 Sep 2013 17:37:42 -0300
-Subject: [PATCH 3/3] ARM: kirkwood: Move the nand node under the mbus node
-In-Reply-To: <20130918153455.GA18122@obsidianresearch.com>
-References: <20130917184433.GF21230@obsidianresearch.com>
- <20130918122910.GA2563@localhost>
- <20130918153455.GA18122@obsidianresearch.com>
-Message-ID: <20130929203741.GB2457@localhost>
+From: arno@natisbad.org (Arnaud Ebalard)
+Date: Sun, 29 Sep 2013 23:41:43 +0200
+Subject: [PATCH] ARM: mvebu: Add DT entry for ReadyNAS 102 to use
+ gpio-poweroff driver
+Message-ID: <8738onqp9k.fsf@natisbad.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jason,
 
-On Wed, Sep 18, 2013 at 09:34:55AM -0600, Jason Gunthorpe wrote:
-> On Wed, Sep 18, 2013 at 09:29:11AM -0300, Ezequiel Garcia wrote:
-> > Hi Jason,
-> > 
-> > On Tue, Sep 17, 2013 at 12:44:33PM -0600, Jason Gunthorpe wrote:
-> > > There should be no nodes that are not children of the mbus. Move
-> > > the nand node under the mbus, and rework the board .dts files
-> > > to use an & reference to the nand node.
-> 
-> > Thanks for taking the time to do this. However, notice this may
-> > be not the accurate way of representing NAND in DT. 
-> 
-> These patches (nand and crypto) are just intended to fix the current
-> use of the mbus driver in the kirkwood boards, not fix the small
-> problems in the other drivers :)
-> 
-> > The kirkwood specification has a NAND Flash Registers section which
-> > speaks about registers and they seem to match (to some extent) the
-> > MVEBU's Device Bus.
-> 
-> Yes, the NAND IP is dual ported like crypto and has a register block
-> on the internal-regs block that controls the interface timing. The
-> driver should bind to this block and it should write to it.
-> 
-> However, it is not like devbus. devbus is a generic bus that can
-> connect to a wide range of devices we already have in the kernel, and
-> the bus timing configuration cannot be auto-detected. This is why you
-> need the 'mvebu-devbus' node. That node sets up the bus and then
-> allows a Linux generic child driver to bind to it.
-> 
-> NAND is not a generic bus, the NAND driver is the final consumer.
-> 
-> Further, the NAND driver itself should determine the bus timing in a
-> NAND specific way by following the ONFI defined auto detection
-> method, probably with some help from the MTD layer. That is to say,
-> determining the timing parmeters is intimately entangled with NAND
-> itself and should not be separated.
-> 
-> So, there is no need for a mvebu-devbus node with NAND, and the
-> orion-nand driver should be improved. As things are now the driver
-> relies on the firmware to set the correct interface timing and doesn't
-> touch anything.
-> 
-> > I haven't had time to investigate this any further and that's why
-> > NAND hasn't been moved yet.
-> 
-> Moving the block and improving the orion driver don't need to be
-> linked. The new location for the nand block doesn't preclude anything
-> :)
-> 
+Without that fix, at the end of the shutdown process, the board is
+still powered (led glowing, fan running, ...).
 
-Agreed. So we can move it now, and fix it later.
+Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
+---
+HI Jason and Andrew,
 
-Acked-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+This is not per se a fix for a real problem, as the NAS runs
+as expected w/o it, it only solves a minor limitation of the
+shutdown process so I guess it can be queued for 3.13 if it
+is too late.
 
-And, in Openblocks-A6:
+Additionally, I wonder if I should send another patch to either have
+ARCH_MVEBU select POWER_SUPPLY, POWER_RESET and POWER_RESET_GPIO,
+or have mvebu_defconfig modified to enable those, or keep things as
+they are until there are more users on mvebu.
 
-Tested-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+ arch/arm/boot/dts/armada-370-netgear-rn102.dts | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
+diff --git a/arch/arm/boot/dts/armada-370-netgear-rn102.dts b/arch/arm/boot/dts/armada-370-netgear-rn102.dts
+index 05e4485..5f7e7ec 100644
+--- a/arch/arm/boot/dts/armada-370-netgear-rn102.dts
++++ b/arch/arm/boot/dts/armada-370-netgear-rn102.dts
+@@ -57,6 +57,11 @@
+ 					marvell,pins = "mpp56";
+ 					marvell,function = "gpio";
+ 				};
++
++				poweroff: poweroff {
++					marvell,pins = "mpp8";
++					marvell,function = "gpio";
++				};
+ 			};
+ 
+ 			mdio {
+@@ -176,4 +181,11 @@
+ 		};
+ 	};
+ 
++	gpio_poweroff {
++		compatible = "gpio-poweroff";
++		pinctrl-0 = <&poweroff>;
++		pinctrl-names = "default";
++		gpios = <&gpio0 8 1>;
++	};
++
+ };
 -- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+1.8.4.rc3
