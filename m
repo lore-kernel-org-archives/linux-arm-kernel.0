@@ -1,135 +1,174 @@
-From: emilio@elopez.com.ar (=?UTF-8?q?Emilio=20L=C3=B3pez?=)
-Date: Sun, 29 Sep 2013 00:49:38 -0300
-Subject: [PATCH 09/10] ARM: sun7i: dt: mod0 clocks
-In-Reply-To: <1380426579-32458-1-git-send-email-emilio@elopez.com.ar>
-References: <1380426579-32458-1-git-send-email-emilio@elopez.com.ar>
-Message-ID: <1380426579-32458-10-git-send-email-emilio@elopez.com.ar>
+From: gang.chen@asianux.com (Chen Gang)
+Date: Sun, 29 Sep 2013 11:52:28 +0800
+Subject: [PATCH 2/2] ARM: include: asm: use 'int' instead of 'unsigned long'
+ for normal register variables within atomic.h
+In-Reply-To: <5247A1FA.4030305@asianux.com>
+References: <523D7DC7.8030603@asianux.com>
+ <20130924093041.GB15119@mudshark.cambridge.arm.com>
+ <5242498F.8060407@asianux.com>
+ <20130925160746.GC14502@mudshark.cambridge.arm.com>
+ <5243953E.6010405@asianux.com>
+ <20130926100422.GE2855@mudshark.cambridge.arm.com>
+ <5244148F.6080405@asianux.com>
+ <20130927110618.GB9520@mudshark.cambridge.arm.com>
+ <5247A1D1.6080505@asianux.com> <5247A1FA.4030305@asianux.com>
+Message-ID: <5247A3FC.9020508@asianux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adds all the mod0 clocks available on A20 to its device
-tree. This list was created by looking at AW's code release.
+"arc/arm" will be never on 64-bit, it is mainly on 32-bit (may also can
+be on 16-bit).
 
-Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
+So better to use 'int' instead of 'unsigned long' for normal register
+variable (on 16-bit, 'int' is allowed to be 16-bit, so historically,
+often use 'int' for normal register variables).
+
+
+Signed-off-by: Chen Gang <gang.chen@asianux.com>
 ---
- arch/arm/boot/dts/sun7i-a20.dtsi | 105 +++++++++++++++++++++++++++++++++++++++
- 1 file changed, 105 insertions(+)
+ arch/arm/include/asm/atomic.h |   28 ++++++++++++++--------------
+ 1 files changed, 14 insertions(+), 14 deletions(-)
 
-diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
-index c622e51..d75eb53 100644
---- a/arch/arm/boot/dts/sun7i-a20.dtsi
-+++ b/arch/arm/boot/dts/sun7i-a20.dtsi
-@@ -170,6 +170,111 @@
- 				"apb1_uart2", "apb1_uart3", "apb1_uart4",
- 				"apb1_uart5", "apb1_uart6", "apb1_uart7";
- 		};
-+
-+		nand: nand at 01c20080 {
-+			#clock-cells = <0>;
-+			compatible = "allwinner,sun4i-mod0-clk";
-+			reg = <0x01c20080 0x4>;
-+			clocks = <&osc24M>, <&pll6 1>, <&pll5 1>;
-+		};
-+
-+		ms: ms at 01c20084 {
-+			#clock-cells = <0>;
-+			compatible = "allwinner,sun4i-mod0-clk";
-+			reg = <0x01c20084 0x4>;
-+			clocks = <&osc24M>, <&pll6 1>, <&pll5 1>;
-+		};
-+
-+		mmc0: mmc0 at 01c20088 {
-+			#clock-cells = <0>;
-+			compatible = "allwinner,sun4i-mod0-clk";
-+			reg = <0x01c20088 0x4>;
-+			clocks = <&osc24M>, <&pll6 1>, <&pll5 1>;
-+		};
-+
-+		mmc1: mmc1 at 01c2008c {
-+			#clock-cells = <0>;
-+			compatible = "allwinner,sun4i-mod0-clk";
-+			reg = <0x01c2008c 0x4>;
-+			clocks = <&osc24M>, <&pll6 1>, <&pll5 1>;
-+		};
-+
-+		mmc2: mmc2 at 01c20090 {
-+			#clock-cells = <0>;
-+			compatible = "allwinner,sun4i-mod0-clk";
-+			reg = <0x01c20090 0x4>;
-+			clocks = <&osc24M>, <&pll6 1>, <&pll5 1>;
-+		};
-+
-+		mmc3: mmc3 at 01c20094 {
-+			#clock-cells = <0>;
-+			compatible = "allwinner,sun4i-mod0-clk";
-+			reg = <0x01c20094 0x4>;
-+			clocks = <&osc24M>, <&pll6 1>, <&pll5 1>;
-+		};
-+
-+		ts: ts at 01c20098 {
-+			#clock-cells = <0>;
-+			compatible = "allwinner,sun4i-mod0-clk";
-+			reg = <0x01c20098 0x4>;
-+			clocks = <&osc24M>, <&pll6 1>, <&pll5 1>;
-+		};
-+
-+		ss: ss at 01c2009c {
-+			#clock-cells = <0>;
-+			compatible = "allwinner,sun4i-mod0-clk";
-+			reg = <0x01c2009c 0x4>;
-+			clocks = <&osc24M>, <&pll6 1>, <&pll5 1>;
-+		};
-+
-+		spi0: spi0 at 01c200a0 {
-+			#clock-cells = <0>;
-+			compatible = "allwinner,sun4i-mod0-clk";
-+			reg = <0x01c200a0 0x4>;
-+			clocks = <&osc24M>, <&pll6 1>, <&pll5 1>;
-+		};
-+
-+		spi1: spi1 at 01c200a4 {
-+			#clock-cells = <0>;
-+			compatible = "allwinner,sun4i-mod0-clk";
-+			reg = <0x01c200a4 0x4>;
-+			clocks = <&osc24M>, <&pll6 1>, <&pll5 1>;
-+		};
-+
-+		spi2: spi2 at 01c200a8 {
-+			#clock-cells = <0>;
-+			compatible = "allwinner,sun4i-mod0-clk";
-+			reg = <0x01c200a8 0x4>;
-+			clocks = <&osc24M>, <&pll6 1>, <&pll5 1>;
-+		};
-+
-+		pata: pata at 01c200ac {
-+			#clock-cells = <0>;
-+			compatible = "allwinner,sun4i-mod0-clk";
-+			reg = <0x01c200ac 0x4>;
-+			clocks = <&osc24M>, <&pll6 1>, <&pll5 1>;
-+		};
-+
-+		ir0: ir0 at 01c200b0 {
-+			#clock-cells = <0>;
-+			compatible = "allwinner,sun4i-mod0-clk";
-+			reg = <0x01c200b0 0x4>;
-+			clocks = <&osc24M>, <&pll6 1>, <&pll5 1>;
-+		};
-+
-+		ir1: ir1 at 01c200b4 {
-+			#clock-cells = <0>;
-+			compatible = "allwinner,sun4i-mod0-clk";
-+			reg = <0x01c200b4 0x4>;
-+			clocks = <&osc24M>, <&pll6 1>, <&pll5 1>;
-+		};
-+
-+		spi3: spi3 at 01c200d4 {
-+			#clock-cells = <0>;
-+			compatible = "allwinner,sun4i-mod0-clk";
-+			reg = <0x01c200d4 0x4>;
-+			clocks = <&osc24M>, <&pll6 1>, <&pll5 1>;
-+		};
- 	};
- 
- 	soc at 01c00000 {
+diff --git a/arch/arm/include/asm/atomic.h b/arch/arm/include/asm/atomic.h
+index a715ac0..9f94ee7 100644
+--- a/arch/arm/include/asm/atomic.h
++++ b/arch/arm/include/asm/atomic.h
+@@ -38,7 +38,7 @@
+  */
+ static inline void atomic_add(int i, atomic_t *v)
+ {
+-	unsigned long tmp;
++	int tmp;
+ 	int result;
+
+ 	__asm__ __volatile__("@ atomic_add\n"
+@@ -54,7 +54,7 @@ static inline void atomic_add(int i, atomic_t *v)
+
+ static inline int atomic_add_return(int i, atomic_t *v)
+ {
+-	unsigned long tmp;
++	int tmp;
+ 	int result;
+
+ 	smp_mb();
+@@ -76,7 +76,7 @@ static inline int atomic_add_return(int i, atomic_t *v)
+
+ static inline void atomic_sub(int i, atomic_t *v)
+ {
+-	unsigned long tmp;
++	int tmp;
+ 	int result;
+
+ 	__asm__ __volatile__("@ atomic_sub\n"
+@@ -92,7 +92,7 @@ static inline void atomic_sub(int i, atomic_t *v)
+
+ static inline int atomic_sub_return(int i, atomic_t *v)
+ {
+-	unsigned long tmp;
++	int tmp;
+ 	int result;
+
+ 	smp_mb();
+@@ -114,7 +114,7 @@ static inline int atomic_sub_return(int i, atomic_t *v)
+
+ static inline int atomic_cmpxchg(atomic_t *ptr, int old, int new)
+ {
+-	unsigned long oldval, res;
++	int oldval, res;
+
+ 	smp_mb();
+
+@@ -136,7 +136,7 @@ static inline int atomic_cmpxchg(atomic_t *ptr, int
+old, int new)
+
+ static inline void atomic_clear_mask(unsigned long mask, unsigned long
+*addr)
+ {
+-	unsigned long tmp, tmp2;
++	int tmp, tmp2;
+
+ 	__asm__ __volatile__("@ atomic_clear_mask\n"
+ "1:	ldrex	%0, [%3]\n"
+@@ -297,7 +297,7 @@ static inline void atomic64_set(atomic64_t *v, long
+long i)
+ static inline void atomic64_add(long long i, atomic64_t *v)
+ {
+ 	long long result;
+-	unsigned long tmp;
++	int tmp;
+
+ 	__asm__ __volatile__("@ atomic64_add\n"
+ "1:	ldrexd	%0, %H0, [%3]\n"
+@@ -314,7 +314,7 @@ static inline void atomic64_add(long long i,
+atomic64_t *v)
+ static inline long long atomic64_add_return(long long i, atomic64_t *v)
+ {
+ 	long long result;
+-	unsigned long tmp;
++	int tmp;
+
+ 	smp_mb();
+
+@@ -337,7 +337,7 @@ static inline long long atomic64_add_return(long
+long i, atomic64_t *v)
+ static inline void atomic64_sub(long long i, atomic64_t *v)
+ {
+ 	long long result;
+-	unsigned long tmp;
++	int tmp;
+
+ 	__asm__ __volatile__("@ atomic64_sub\n"
+ "1:	ldrexd	%0, %H0, [%3]\n"
+@@ -354,7 +354,7 @@ static inline void atomic64_sub(long long i,
+atomic64_t *v)
+ static inline long long atomic64_sub_return(long long i, atomic64_t *v)
+ {
+ 	long long result;
+-	unsigned long tmp;
++	int tmp;
+
+ 	smp_mb();
+
+@@ -378,7 +378,7 @@ static inline long long atomic64_cmpxchg(atomic64_t
+*ptr, long long old,
+ 					long long new)
+ {
+ 	long long oldval;
+-	unsigned long res;
++	int res;
+
+ 	smp_mb();
+
+@@ -402,7 +402,7 @@ static inline long long atomic64_cmpxchg(atomic64_t
+*ptr, long long old,
+ static inline long long atomic64_xchg(atomic64_t *ptr, long long new)
+ {
+ 	long long result;
+-	unsigned long tmp;
++	int tmp;
+
+ 	smp_mb();
+
+@@ -423,7 +423,7 @@ static inline long long atomic64_xchg(atomic64_t
+*ptr, long long new)
+ static inline long long atomic64_dec_if_positive(atomic64_t *v)
+ {
+ 	long long result;
+-	unsigned long tmp;
++	int tmp;
+
+ 	smp_mb();
+
+@@ -449,7 +449,7 @@ static inline long long
+atomic64_dec_if_positive(atomic64_t *v)
+ static inline int atomic64_add_unless(atomic64_t *v, long long a, long
+long u)
+ {
+ 	long long val;
+-	unsigned long tmp;
++	int tmp;
+ 	int ret = 1;
+
+ 	smp_mb();
 -- 
-1.8.4
+1.7.7.6
