@@ -1,69 +1,33 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 30 Sep 2013 18:21:01 +0200
-Subject: [PATCH v2] ARM: at91: sam9g45: shutdown ddr1 too when rebooting
-In-Reply-To: <1380263879-16325-1-git-send-email-plagnioj@jcrosoft.com>
-References: <1380263879-16325-1-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <5249A4ED.7030006@atmel.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 30 Sep 2013 09:25:39 -0700
+Subject: [GIT PULL 0/5] Fourth Round of Renesas ARM based SoC fixes for
+ v3.12
+In-Reply-To: <cover.1380513421.git.horms+renesas@verge.net.au>
+References: <cover.1380513421.git.horms+renesas@verge.net.au>
+Message-ID: <CAOesGMgfkzep-Qpf1aS-=+KBJjcHK=5B2kQ3VMu4+OB0m-SX6A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27/09/2013 08:37, Jean-Christophe PLAGNIOL-VILLARD :
-> as on ddr0 we need to cleanly shutdown ddr1 if used before rebooting
+Hi,
 
-I would have liked more comments.
+On Sun, Sep 29, 2013 at 9:00 PM, Simon Horman
+<horms+renesas@verge.net.au> wrote:
+> Hi Kevin, Olof and Arnd,
+>
+> please consider this third round of Renesas ARM based SoC DT fixes for v3.12.
+>
+> This pull request is based on v3.12-rc1 which includes the previous
+> rounds of fixes.
+>
+> The following changes since commit 272b98c6455f00884f0350f775c5342358ebb73f:
+>
+>   Linux 3.12-rc1 (2013-09-16 16:17:51 -0400)
+>
+> are available in the git repository at:
+>
+>   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-fixes4-for-v3.12
 
-> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> ---
-> v2:
->
-> 	use ldr     r5, [r5, #4]
-
-Yep,
-and you forget: test for ddr controller 1 address not being NULL
-
-Anyway, I try to add information and stack it in at91-3.12-fixes
-
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-
->
-> Best Regards,
-> J.
->   arch/arm/mach-at91/at91sam9g45_reset.S | 8 ++++++++
->   1 file changed, 8 insertions(+)
->
-> diff --git a/arch/arm/mach-at91/at91sam9g45_reset.S b/arch/arm/mach-at91/at91sam9g45_reset.S
-> index 721a1a3..c40c1e2 100644
-> --- a/arch/arm/mach-at91/at91sam9g45_reset.S
-> +++ b/arch/arm/mach-at91/at91sam9g45_reset.S
-> @@ -16,11 +16,17 @@
->   #include "at91_rstc.h"
->   			.arm
->
-> +/*
-> + * at91_ramc_base is an array void*
-> + * init at NULL if only one DDR controler is present in or DT
-> + */
->   			.globl	at91sam9g45_restart
->
->   at91sam9g45_restart:
->   			ldr	r5, =at91_ramc_base		@ preload constants
->   			ldr	r0, [r5]
-> +			ldr	r5, [r5, #4]			@ ddr1
-> +			cmp	r5, #0
->   			ldr	r4, =at91_rstc_base
->   			ldr	r1, [r4]
->
-> @@ -30,6 +36,8 @@ at91sam9g45_restart:
->
->   			.balign	32				@ align to cache line
->
-> +			strne	r2, [r5, #AT91_DDRSDRC_RTR]	@ disable DDR1 access
-> +			strne	r3, [r5, #AT91_DDRSDRC_LPR]	@ power down DDR1
->   			str	r2, [r0, #AT91_DDRSDRC_RTR]	@ disable DDR0 access
->   			str	r3, [r0, #AT91_DDRSDRC_LPR]	@ power down DDR0
->   			str	r4, [r1, #AT91_RSTC_CR]		@ reset processor
->
+Pulled, thanks.
 
 
--- 
-Nicolas Ferre
+-Olof
