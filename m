@@ -1,66 +1,240 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Mon, 30 Sep 2013 18:26:12 +0100
-Subject: [RFC PATCH 3/3] ARM: vexpress/TC2: Implement MCPM
- power_down_finish()
-In-Reply-To: <alpine.LFD.2.03.1309301300390.6331@syhkavp.arg>
-References: <1380553607-3271-1-git-send-email-Dave.Martin@arm.com>
- <1380553607-3271-4-git-send-email-Dave.Martin@arm.com>
- <alpine.LFD.2.03.1309301300390.6331@syhkavp.arg>
-Message-ID: <20130930172612.GD3209@localhost.localdomain>
+From: konrad.wilk@oracle.com (Konrad Rzeszutek Wilk)
+Date: Mon, 30 Sep 2013 13:27:18 -0400
+Subject: [PATCH v6 18/19] swiotlb-xen: introduce a rbtree to track phys
+ to bus mappings
+In-Reply-To: <1380298207-29151-18-git-send-email-stefano.stabellini@eu.citrix.com>
+References: <alpine.DEB.2.02.1309271653420.5498@kaball.uk.xensource.com>
+ <1380298207-29151-18-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <20130930172718.GY3106@phenom.dumpdata.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 30, 2013 at 01:14:38PM -0400, Nicolas Pitre wrote:
-> On Mon, 30 Sep 2013, Dave Martin wrote:
+On Fri, Sep 27, 2013 at 05:10:06PM +0100, Stefano Stabellini wrote:
+> Introduce a second red-back tree to track phys to bus mappings created after
+> the initialization of the swiotlb buffer.
+
+Could you explain the use case a bit more please?
+
+As in:
+ a) why is this needed
+ b) why are we using the rb tree instead of something else (say FIFO queue)
+ c) how long are these in usage?
+ d) do we need locking now?
+
 > 
-> > This patch implements the power_down_finish() method for TC2, to
-> > enable the kernel to confirm when CPUs are safely powered down.
-> > 
-> > The information required for determining when a CPU is parked
-> > cannot be obtained from any single place, so a few sources of
-> > information must be combined:
-> > 
-> >   * mcpm_cpu_power_down() must be pending for the CPU, so that we
-> >     don't get confused by false STANDBYWFI positives arising from
-> >     CPUidle.  This is detected by waiting for the tc2_pm use count
-> >     for the target CPU to reach 0.
-> > 
-> >   * Either the SPC must report that the CPU has asserted
-> >     STANDBYWFI, or the TC2 tile's reset control logic must be
-> >     holding the CPU in reset.
-> > 
-> >     Just checking for STANDBYWFI is not sufficient, because this
-> >     signal is not latched when the the cluster is clamped off and
-> >     powered down: the relevant status bits just drop to zero.  This
-> >     means that STANDBYWFI status cannot be used for reliable
-> >     detection of the last CPU in a cluster reaching WFI.
-> > 
-> > This patch is required in order for kexec to work with MCPM on TC2.
-> > 
-> > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> > ---
-> > 
-> > The mdelay(1) in tc2_pm_power_down_finish() is arbitrary.  The power
-> > controller can show millisecond response times in the worst case, and
-> > CPU hotplug is not expected to be performance-critical.
-> > 
-> > It may be wise to add a timeout to this function, but that's open to
-> > discussion.
+> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> ---
+>  drivers/xen/swiotlb-xen.c |   99 +++++++++++++++++++++++++++++++++++++-------
+>  1 files changed, 83 insertions(+), 16 deletions(-)
 > 
-> That would be a good idea.  I'd suggest you reduce the polling loop to 
-> something like 10 ms and bail out after one second.   We've been 
-> affected by funny STANDBYWFI 
-> behaviors before.
+> diff --git a/drivers/xen/swiotlb-xen.c b/drivers/xen/swiotlb-xen.c
+> index 3011736..022bcaf 100644
+> --- a/drivers/xen/swiotlb-xen.c
+> +++ b/drivers/xen/swiotlb-xen.c
+> @@ -79,7 +79,8 @@ struct xen_dma_info {
+>  	dma_addr_t dma_addr;
+>  	phys_addr_t phys_addr;
+>  	size_t size;
+> -	struct rb_node rbnode;
+> +	struct rb_node rbnode_dma;
+> +	struct rb_node rbnode_phys;
+>  };
+>  
+>  /*
+> @@ -96,8 +97,13 @@ static struct xen_dma_info *xen_dma_seg;
+>   * mappings.
+>   */
+>  static struct rb_root bus_to_phys = RB_ROOT;
+> +/*
+> + * This tree keeps track of physical address to bus address
+> + * mappings apart from the ones belonging to the initial swiotlb buffer.
+> + */
+> +static struct rb_root phys_to_bus = RB_ROOT;
+>  
+> -static int xen_dma_add_entry(struct xen_dma_info *new)
+> +static int xen_dma_add_entry_bus(struct xen_dma_info *new)
+>  {
+>  	struct rb_node **link = &bus_to_phys.rb_node;
+>  	struct rb_node *parent = NULL;
+> @@ -106,7 +112,7 @@ static int xen_dma_add_entry(struct xen_dma_info *new)
+>  
+>  	while (*link) {
+>  		parent = *link;
+> -		entry = rb_entry(parent, struct xen_dma_info, rbnode);
+> +		entry = rb_entry(parent, struct xen_dma_info, rbnode_dma);
+>  
+>  		if (new->dma_addr == entry->dma_addr)
+>  			goto err_out;
+> @@ -118,8 +124,41 @@ static int xen_dma_add_entry(struct xen_dma_info *new)
+>  		else
+>  			link = &(*link)->rb_right;
+>  	}
+> -	rb_link_node(&new->rbnode, parent, link);
+> -	rb_insert_color(&new->rbnode, &bus_to_phys);
+> +	rb_link_node(&new->rbnode_dma, parent, link);
+> +	rb_insert_color(&new->rbnode_dma, &bus_to_phys);
+> +	goto out;
+> +
+> +err_out:
+> +	rc = -EINVAL;
+> +	pr_warn("%s: cannot add phys=%pa -> dma=%pa: phys=%pa -> dma=%pa already exists\n",
+> +			__func__, &new->phys_addr, &new->dma_addr, &entry->phys_addr, &entry->dma_addr);
+> +out:
+> +	return rc;
+> +}
+> +
+> +static int xen_dma_add_entry_phys(struct xen_dma_info *new)
+> +{
+> +	struct rb_node **link = &phys_to_bus.rb_node;
+> +	struct rb_node *parent = NULL;
+> +	struct xen_dma_info *entry;
+> +	int rc = 0;
+> +
+> +	while (*link) {
+> +		parent = *link;
+> +		entry = rb_entry(parent, struct xen_dma_info, rbnode_phys);
+> +
+> +		if (new->dma_addr == entry->dma_addr)
+> +			goto err_out;
+> +		if (new->phys_addr == entry->phys_addr)
+> +			goto err_out;
+> +
+> +		if (new->phys_addr < entry->phys_addr)
+> +			link = &(*link)->rb_left;
+> +		else
+> +			link = &(*link)->rb_right;
+> +	}
+> +	rb_link_node(&new->rbnode_phys, parent, link);
+> +	rb_insert_color(&new->rbnode_phys, &phys_to_bus);
+>  	goto out;
+>  
+>  err_out:
+> @@ -130,13 +169,22 @@ out:
+>  	return rc;
+>  }
+>  
+> +static int xen_dma_add_entry(struct xen_dma_info *new)
+> +{
+> +	int rc;
+> +	if ((rc = xen_dma_add_entry_bus(new) < 0) ||
+> +		(rc = xen_dma_add_entry_phys(new) < 0))
 
-OK, I'm happy to do that.  I don't have a strong opinion on the correct
-answer here -- the main thing is to avoid thrashing the bus and wasting
-power, so even quite a short delay will help considerably.
+Please don't do that. Just do
 
-I'll just loop 100 times and then give up and return 0.
+	rc = xen_dma_add_entry(bus);
+	if (rc)
+		return rc;
+	rc = xen_dma_add_entry_phys(new);
+	if (rc) {
+		// unwind it somehow? <<== This is important :-)
+	}
+	return rc;
 
-So far as I've seen, it's very unlikely in practice that repeated polling
-is needed.  The most likely cause is that cluster powerdown involves a
-lengthy drain of L2 within the blackout period.
 
-Cheers
----Dave
+> +		return rc;
+> +	return 0;
+> +}
+> +
+>  static struct xen_dma_info *xen_get_dma_info_from_dma(dma_addr_t dma_addr)
+>  {
+>  	struct rb_node *n = bus_to_phys.rb_node;
+>  	struct xen_dma_info *entry;
+>  
+>  	while (n) {
+> -		entry = rb_entry(n, struct xen_dma_info, rbnode);
+> +		entry = rb_entry(n, struct xen_dma_info, rbnode_dma);
+>  		if (entry->dma_addr <= dma_addr &&
+>  				entry->dma_addr + entry->size > dma_addr) {
+>  			return entry;
+> @@ -150,11 +198,30 @@ static struct xen_dma_info *xen_get_dma_info_from_dma(dma_addr_t dma_addr)
+>  	return NULL;
+>  }
+>  
+> -static dma_addr_t xen_phys_to_bus(phys_addr_t paddr)
+> +static struct xen_dma_info *xen_get_dma_info_from_phys(phys_addr_t phys)
+>  {
+> -	int nr_seg;
+> -	unsigned long offset;
+> -	char *vaddr;
+> +	struct rb_node *n = phys_to_bus.rb_node;
+> +	struct xen_dma_info *entry;
+> +
+> +	while (n) {
+> +		entry = rb_entry(n, struct xen_dma_info, rbnode_phys);
+> +		if (entry->phys_addr <= phys &&
+> +				entry->phys_addr + entry->size > phys) {
+> +			return entry;
+> +		}
+> +		if (phys < entry->phys_addr)
+> +			n = n->rb_left;
+> +		else
+> +			n = n->rb_right;
+> +	}
+> +
+> +	return NULL;
+> +}
+> +
+> +/* Only looks into the initial buffer allocation in case of
+> + * XENFEAT_auto_translated_physmap guests. */
+> +static dma_addr_t xen_phys_to_bus_quick(phys_addr_t paddr) { int nr_seg;
+> +	unsigned long offset; char *vaddr;
+>  
+>  	if (!xen_feature(XENFEAT_auto_translated_physmap))
+>  		return phys_to_machine(XPADDR(paddr)).maddr;
+> @@ -184,7 +251,7 @@ static phys_addr_t xen_bus_to_phys(dma_addr_t baddr)
+>  
+>  static dma_addr_t xen_virt_to_bus(void *address)
+>  {
+> -	return xen_phys_to_bus(virt_to_phys(address));
+> +	return xen_phys_to_bus_quick(virt_to_phys(address));
+>  }
+>  
+>  static int check_pages_physically_contiguous(unsigned long pfn,
+> @@ -424,7 +491,7 @@ xen_swiotlb_alloc_coherent(struct device *hwdev, size_t size,
+>  	 * Do not use virt_to_phys(ret) because on ARM it doesn't correspond
+>  	 * to *dma_handle. */
+>  	phys = *dma_handle;
+> -	dev_addr = xen_phys_to_bus(phys);
+> +	dev_addr = xen_phys_to_bus_quick(phys);
+>  	if (!xen_feature(XENFEAT_auto_translated_physmap) &&
+>  	    ((dev_addr + size - 1 <= dma_mask)) &&
+>  	    !range_straddles_page_boundary(phys, size))
+> @@ -503,7 +570,7 @@ dma_addr_t xen_swiotlb_map_page(struct device *dev, struct page *page,
+>  				struct dma_attrs *attrs)
+>  {
+>  	phys_addr_t map, phys = page_to_phys(page) + offset;
+> -	dma_addr_t dev_addr = xen_phys_to_bus(phys);
+> +	dma_addr_t dev_addr = xen_phys_to_bus_quick(phys);
+>  
+>  	BUG_ON(dir == DMA_NONE);
+>  	/*
+> @@ -527,7 +594,7 @@ dma_addr_t xen_swiotlb_map_page(struct device *dev, struct page *page,
+>  	if (map == SWIOTLB_MAP_ERROR)
+>  		return DMA_ERROR_CODE;
+>  
+> -	dev_addr = xen_phys_to_bus(map);
+> +	dev_addr = xen_phys_to_bus_quick(map);
+>  
+>  	/*
+>  	 * Ensure that the address returned is DMA'ble
+> @@ -656,7 +723,7 @@ xen_swiotlb_map_sg_attrs(struct device *hwdev, struct scatterlist *sgl,
+>  
+>  	for_each_sg(sgl, sg, nelems, i) {
+>  		phys_addr_t paddr = sg_phys(sg);
+> -		dma_addr_t dev_addr = xen_phys_to_bus(paddr);
+> +		dma_addr_t dev_addr = xen_phys_to_bus_quick(paddr);
+>  
+>  		if (swiotlb_force ||
+>  		    xen_feature(XENFEAT_auto_translated_physmap) ||
+> @@ -682,7 +749,7 @@ xen_swiotlb_map_sg_attrs(struct device *hwdev, struct scatterlist *sgl,
+>  				sg_dma_len(sgl) = 0;
+>  				return DMA_ERROR_CODE;
+>  			}
+> -			sg->dma_address = xen_phys_to_bus(map);
+> +			sg->dma_address = xen_phys_to_bus_quick(map);
+>  		} else
+>  			sg->dma_address = dev_addr;
+>  		sg_dma_len(sg) = sg->length;
+> -- 
+> 1.7.2.5
+> 
