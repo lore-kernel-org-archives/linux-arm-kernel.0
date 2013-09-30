@@ -1,33 +1,75 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 30 Sep 2013 13:36:36 +0200
-Subject: [PATCH] ARM: ux500: u8500_defconfig: add missing cpuidle option
-Message-ID: <1380540996-18521-1-git-send-email-daniel.lezcano@linaro.org>
+From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
+Date: Mon, 30 Sep 2013 13:37:09 +0200
+Subject: imprecise external abort using the flexcan driver on i.MX6Q
+In-Reply-To: <52495E24.4080703@pengutronix.de>
+References: <21060.15934.600859.167074@ipc1.ka-ro>
+ <524455FD.7070808@pengutronix.de>
+ <20130926155422.GQ12758@n2100.arm.linux.org.uk>
+ <CAHCPf3u7qpdiqoOhD1yxoHybgS1+mvdd8xxaTKnK-DJ9sJYY7g@mail.gmail.com>
+ <21061.21191.197931.54061@ipc1.ka-ro>
+ <CAHCPf3vJi5HH52XRsJ5tsaOsGk_1YsoSHHgJNPpeJLBpd5EZsA@mail.gmail.com>
+ <5245E2C5.1030705@pengutronix.de>
+ <21065.23354.418805.871480@ipc1.ka-ro>
+ <52495E24.4080703@pengutronix.de>
+Message-ID: <21065.25189.119250.773885@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With the commit d3f2950f2adeea3da0317e952914b59adaa4cdb3, the option
-ARM_U8500_CPUIDLE was added to the Kconfig but not reflected in the
-default config file, hence the cpuidle driver is no longer enabled
-since this commit.
+Hi,
 
-Enable it again by adding the missing option in the default config file.
+Marc Kleine-Budde writes:
+> On 09/30/2013 01:06 PM, Lothar Wa?mann wrote:
+> > Hi,
+> > 
+> > Marc Kleine-Budde writes:
+> >> On 09/27/2013 07:24 PM, Matt Sealey wrote:
+> >>> Marc - I don't think FLEXCAN has changed layout at all in these areas.
+> >>> The hardware always worked this way..
+> >>
+> >> All flexcan cores support the RX FIFO, the mx6 supports an additional
+> >> mode for different acceptance filters.
+> >>
+> >>> The only difference here  is that the i.MX53 is doing something weird
+> >>> on the bus. The i.MX6Q is giving the absolutely correct BRESP for the
+> >>> transfer to the peripheral (in effect, a "go away, this is my data"
+> >>> failure, which the CPU turns into an imprecise abort since it no idea
+> >>> which transaction it committed aeons ago caused it).
+> >>>
+> >>> Writes to 0x90 to 0xDF while MCR[FEN] is set *should* cause a data
+> >>> abort.. because it's not even a read-only region, it *should* be
+> >>> totally inaccessible to the CPU.
+> >>>
+> >>> The question I have is, when MCR[FEN] is set on i.MX53, does reading
+> >>> from those reserved registers give anything but 0's or garbage? I'm
+> >>> curious, that's all, it doesn't really matter ;)
+> >>
+> >> The driver only read from message buffer 0, and uses buffer 8 for tx.
+> >> The others are not accessed, unless in that chip start routine. We don't
+> >> need this loop, it comes from the original driver. I think no one has
+> >> ever noticed that bug, because all other CPUs have not complained.
+> >>
+> >> The driver without the loop is working on mx6 and Lothar is testing it
+> >> on mx53.
+> >>
+> > I can confirm, that the driver still works on i.MX53 as before the
+> > patch.
+> > Is someone going to prepare a patch, or should I do it, as I was the
+> > one who first brought up this issue?
+> 
+> I have a patch ready, it's basically what I send you. Can I add your
+> Tested-by?
+> 
+Yes, of course.
 
-Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
----
- arch/arm/configs/u8500_defconfig |    1 +
- 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/configs/u8500_defconfig b/arch/arm/configs/u8500_defconfig
-index a0025dc..4bd93bf 100644
---- a/arch/arm/configs/u8500_defconfig
-+++ b/arch/arm/configs/u8500_defconfig
-@@ -20,6 +20,7 @@ CONFIG_CMDLINE="root=/dev/ram0 console=ttyAMA2,115200n8"
- CONFIG_CPU_FREQ=y
- CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND=y
- CONFIG_CPU_IDLE=y
-+CONFIG_ARM_U8500_CPUIDLE=y
- CONFIG_VFP=y
- CONFIG_NEON=y
- CONFIG_PM_RUNTIME=y
+Lothar Wa?mann
 -- 
-1.7.9.5
+___________________________________________________________
+
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
