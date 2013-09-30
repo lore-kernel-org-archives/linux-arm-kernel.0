@@ -1,83 +1,37 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Mon, 30 Sep 2013 11:49:37 +0200
-Subject: [PATCH 3/3] [RFC] ARM: prepare ARMv7-M for MULTIPLATFORM use
-In-Reply-To: <1380534577-15076-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1380534577-15076-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <1380534577-15076-4-git-send-email-u.kleine-koenig@pengutronix.de>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Mon, 30 Sep 2013 19:11:41 +0900
+Subject: [PATCH v2 00/12] clk/exynos convert clock IDs to macros
+In-Reply-To: <20130916193709.27384.86101@quantum>
+References: <1378462361-13680-1-git-send-email-a.hajda@samsung.com>
+ <8412301.YP2zzplWoe@amdc1227>
+ <070001ceafa5$d4d81a40$7e884ec0$%kim@samsung.com>
+ <523716C9.3000204@samsung.com> <20130916193709.27384.86101@quantum>
+Message-ID: <06c101cebdc5$75a83d10$60f8b730$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-v7-M is a third group that is incompatible with both v4/v5 and v6/v7.
+Mike Turquette wrote:
+> 
+> Quoting Sylwester Nawrocki (2013-09-16 07:33:45)
+> > On 09/12/2013 12:50 PM, Kukjin Kim wrote:
+> > > Well...I'm not sure changing to use macro is better or not at this
+> moment...
+> >
+> > I think it is. ;) It's really less error prone to have symbolic names
+> instead
+> > of the plain numbers. The clock ids are defined in one place and it is
+> more
+> > clear what a clock is by looking at symbolic name. It's especially
+> annoying
+> > to use plain numbers where are are many clock in a single node, like 10
+> or
+> > more. What are you main concerns with this ?
+> 
+> I think having the symbolic names is a win for readability.
+> 
+Hmm...since Mike who is a maintainer for ccf agrees with Sylwester's opinion, so I agree. Actually, I had no strong objection on this but still I'm not sure using macro is really better because sometimes the name doesn't give readability really I think though.
 
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
-This behaves strange but I think is robust not to allow broken configs:
+Mike, can you give me your ack on clk stuff?
 
-When v4/v5 is selected, v6/v7 and v7m are available for enabling, too.
-When v6/v7 is selected the other choices are disabled
-When v7m is selected only v6/v7 are available for enabling.
----
- arch/arm/Kconfig            | 11 ++++++++---
- arch/arm/kernel/entry-v7m.S |  6 ++++--
- 2 files changed, 12 insertions(+), 5 deletions(-)
-
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index d873a34..4d749fa 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -881,7 +881,7 @@ comment "CPU Core family selection"
- 
- config ARCH_MULTI_V4T
- 	bool "ARMv4T based platforms (ARM720T, ARM920T, ...)"
--	depends on !ARCH_MULTI_V6_V7
-+	depends on !ARCH_MULTI_V6_V7 && !ARCH_MULTI_V7M
- 	select ARCH_MULTI_V4_V5
- 	select CPU_ARM920T if !(CPU_ARM7TDMI || CPU_ARM720T || \
- 		CPU_ARM740T || CPU_ARM9TDMI || CPU_ARM922T || \
-@@ -889,7 +889,7 @@ config ARCH_MULTI_V4T
- 
- config ARCH_MULTI_V5
- 	bool "ARMv5 based platforms (ARM926T, XSCALE, PJ1, ...)"
--	depends on !ARCH_MULTI_V6_V7
-+	depends on !ARCH_MULTI_V6_V7 && !ARCH_MULTI_V7M
- 	select ARCH_MULTI_V4_V5
- 	select CPU_ARM926T if (!CPU_ARM946E || CPU_ARM1020 || \
- 		CPU_ARM1020E || CPU_ARM1022 || CPU_ARM1026 || \
-@@ -912,8 +912,13 @@ config ARCH_MULTI_V7
- config ARCH_MULTI_V6_V7
- 	bool
- 
-+config ARCH_MULTI_V7M
-+	bool "ARMv7-M based platforms (Cortex-M)"
-+	depends on !ARCH_MULTI_V6_V7 && !MMU
-+	select CPU_V7M
-+
- config ARCH_MULTI_CPU_AUTO
--	def_bool !(ARCH_MULTI_V4 || ARCH_MULTI_V4T || ARCH_MULTI_V6_V7)
-+	def_bool !(ARCH_MULTI_V4 || ARCH_MULTI_V4T || ARCH_MULTI_V6_V7 || ARCH_MULTI_V7M)
- 	select ARCH_MULTI_V5
- 
- endmenu
-diff --git a/arch/arm/kernel/entry-v7m.S b/arch/arm/kernel/entry-v7m.S
-index 52b2643..f72ced6 100644
---- a/arch/arm/kernel/entry-v7m.S
-+++ b/arch/arm/kernel/entry-v7m.S
-@@ -14,8 +14,6 @@
- #include <asm/thread_notify.h>
- #include <asm/v7m.h>
- 
--#include <mach/entry-macro.S>
--
- #include "entry-header.S"
- 
- #ifdef CONFIG_TRACE_IRQFLAGS
-@@ -141,3 +139,7 @@ ENTRY(vector_table)
- 	.rept	64 - 16
- 	.long	__irq_entry		@ 16..64 - External Interrupts
- 	.endr
-+
-+	.globl  handle_arch_irq
-+handle_arch_irq:
-+	.long	0
--- 
-1.8.4.rc3
+Thanks,
+Kukjin
