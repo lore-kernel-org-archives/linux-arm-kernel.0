@@ -1,57 +1,78 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 30 Sep 2013 03:23:29 +0000 (UTC)
-Subject: [PATCH v4 01/11] ARM: OMAP2+: CM: cm_inst offset s16->u16
-In-Reply-To: <5e9ef86c35c60862a1c2aa24172e41ee4c6f07de.1380179370.git.afzal@ti.com>
-References: <cover.1380179370.git.afzal@ti.com>
- <5e9ef86c35c60862a1c2aa24172e41ee4c6f07de.1380179370.git.afzal@ti.com>
-Message-ID: <alpine.DEB.2.02.1309300314520.17980@utopia.booyaka.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Mon, 30 Sep 2013 13:00:08 +0900
+Subject: [GIT PULL 0/5] Fourth Round of Renesas ARM based SoC fixes for v3.12
+Message-ID: <cover.1380513421.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+Hi Kevin, Olof and Arnd,
 
-On Thu, 26 Sep 2013, Afzal Mohammed wrote:
+please consider this third round of Renesas ARM based SoC DT fixes for v3.12.
 
-> Most of the AM43x CM reg address offsets are with MSB bit '1' (on
-> 16-bit value) leading to arithmetic miscalculations while calculating
-> CLOCK ENABLE register's address because cm_inst field was a type of
-> "const s16", so make it "const u16".
-> 
-> Also modify relevant functions so as to take care of the above.
-> 
-> [afzal at ti.com: fixup and cleanup]
-> 
-> Signed-off-by: Ankur Kishore <a-kishore@ti.com>
-> Signed-off-by: Afzal Mohammed <afzal@ti.com>
-> ---
->  arch/arm/mach-omap2/clockdomain.h |  2 +-
->  arch/arm/mach-omap2/cm33xx.c      | 16 ++++++++--------
->  arch/arm/mach-omap2/cm33xx.h      | 10 +++++-----
->  arch/arm/mach-omap2/cminst44xx.c  | 20 ++++++++++----------
->  arch/arm/mach-omap2/cminst44xx.h  | 26 +++++++++++++-------------
->  5 files changed, 37 insertions(+), 37 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/clockdomain.h b/arch/arm/mach-omap2/clockdomain.h
-> index 4b03394..5431b0c 100644
-> --- a/arch/arm/mach-omap2/clockdomain.h
-> +++ b/arch/arm/mach-omap2/clockdomain.h
-> @@ -132,7 +132,7 @@ struct clockdomain {
->  	u8 _flags;
->  	const u8 dep_bit;
->  	const u8 prcm_partition;
-> -	const s16 cm_inst;
-> +	const u16 cm_inst;
->  	const u16 clkdm_offs;
->  	struct clkdm_dep *wkdep_srcs;
->  	struct clkdm_dep *sleepdep_srcs;
+This pull request is based on v3.12-rc1 which includes the previous
+rounds of fixes.
 
-OMAP3 has at least one CM_INST that's negative:
+The following changes since commit 272b98c6455f00884f0350f775c5342358ebb73f:
 
-./prcm-common.h:40:#define OMAP3430_IVA2_MOD				-0x800
+  Linux 3.12-rc1 (2013-09-16 16:17:51 -0400)
 
-Have you tested this on OMAP34xx/35xx to ensure that the generated 
-addresses for IVA2_MOD-based addresses doesn't change?  Seems like there's 
-a risk that they might change, due to sign extension.
+are available in the git repository at:
 
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-fixes4-for-v3.12
 
-- Paul
+for you to fetch changes up to 3786f86b60833f32e3eeb016fcf8c324f8147e00:
+
+  ARM: shmobile: Remove #gpio-ranges-cells DT property (2013-09-22 21:28:18 +0900)
+
+----------------------------------------------------------------
+Fourth Round of Renesas ARM based SoC fixes for v3.12
+
+* Remove unused #gpio-ranges-cells DT property
+
+* Remove usage of deprecated #gpio-range-cells DT property
+  from GPIO R-Car
+
+  Property was deprecated in v3.11-rc2
+
+* Correct ether pinctl naming for armadillo800eva board
+
+  Regression introduced in v3.10-rc5
+
+* Add Micrel KSZ8041 PHY fixup to lager board
+
+  This resolves a problem that has been present since 3.11-rc2
+
+* Update SDHI DT compatibility string to the <unit>-<soc> format
+
+  This makes compatibility strings consistent across all renesas
+  hardware which currently supports DT.
+
+  The bindings which are being updated where intorodiced on
+  a per-SoC basis starting in v3.8-rc7. They may have
+  been internally consistent when originally added.
+
+----------------------------------------------------------------
+Guennadi Liakhovetski (1):
+      ARM: shmobile: update SDHI DT compatibility string to the <unit>-<soc> format
+
+Kuninori Morimoto (1):
+      ARM: shmobile: armadillo: fixup ether pinctrl naming
+
+Laurent Pinchart (2):
+      gpio: rcar: Remove #gpio-range-cells DT property usage
+      ARM: shmobile: Remove #gpio-ranges-cells DT property
+
+Sergei Shtylyov (1):
+      ARM: shmobile: Lager: add Micrel KSZ8041 PHY fixup
+
+ Documentation/devicetree/bindings/mmc/tmio_mmc.txt | 17 ++++++++------
+ arch/arm/boot/dts/r8a73a4.dtsi                     |  6 ++---
+ arch/arm/boot/dts/r8a7778.dtsi                     |  1 -
+ arch/arm/boot/dts/r8a7779.dtsi                     |  1 -
+ arch/arm/boot/dts/r8a7790.dtsi                     |  9 ++++----
+ arch/arm/boot/dts/sh73a0.dtsi                      |  6 ++---
+ arch/arm/mach-shmobile/board-armadillo800eva.c     |  4 ++--
+ arch/arm/mach-shmobile/board-lager.c               | 27 +++++++++++++++++++++-
+ drivers/gpio/gpio-rcar.c                           |  7 +++---
+ drivers/mmc/host/sh_mobile_sdhi.c                  | 16 ++++++-------
+ 10 files changed, 59 insertions(+), 35 deletions(-)
