@@ -1,223 +1,65 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Mon, 30 Sep 2013 16:06:47 +0100
-Subject: [RFC PATCH 3/3] ARM: vexpress/TC2: Implement MCPM power_down_finish()
-In-Reply-To: <1380553607-3271-1-git-send-email-Dave.Martin@arm.com>
-References: <1380553607-3271-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <1380553607-3271-4-git-send-email-Dave.Martin@arm.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 30 Sep 2013 10:09:53 -0500
+Subject: [RFC PATCH 0/6] DRIVERS: IRQCHIP: Add support for crossbar IP
+In-Reply-To: <1380549564-31045-1-git-send-email-r.sricharan@ti.com>
+References: <1380549564-31045-1-git-send-email-r.sricharan@ti.com>
+Message-ID: <52499441.1030403@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch implements the power_down_finish() method for TC2, to
-enable the kernel to confirm when CPUs are safely powered down.
+On 09/30/2013 08:59 AM, Sricharan R wrote:
+> Some socs have a large number of interrupts requests to service
+> the needs of its many peripherals and subsystems. All of the interrupt
+> requests lines from the subsystems are not needed at the same
+> time, so they have to be muxed to the controllers appropriately.
+> In such places a interrupt controllers are preceded by an
+> IRQ CROSSBAR that provides flexibility in muxing the device interrupt
+> requests to the controller inputs.
+> 
+> This series models the peripheral interrupts that can be routed through
+> the crossbar to the GIC as 'routable-irqs'. The routable irqs are added
+> in a separate linear domain inside the GIC. The registered routable domain's
+> callback are invoked as a part of the GIC's callback, which in turn should
+> allocate a free irq line and configure the IP accordingly. So every peripheral
+> in the dts files mentions the fixed crossbar number as its interrupt. A free
+> gic line for that gets allocated and configured when the peripheral's interrupt
+> is mapped.
+> 
+> The minimal crossbar driver to track and allocate free GIC lines and configure the
+> crossbar is added here, along with the DT bindings.
 
-The information required for determining when a CPU is parked
-cannot be obtained from any single place, so a few sources of
-information must be combined:
+Seems like interrupt-map property is what you need here.
 
-  * mcpm_cpu_power_down() must be pending for the CPU, so that we
-    don't get confused by false STANDBYWFI positives arising from
-    CPUidle.  This is detected by waiting for the tc2_pm use count
-    for the target CPU to reach 0.
+http://devicetree.org/Device_Tree_Usage#Advanced_Interrupt_Mapping
 
-  * Either the SPC must report that the CPU has asserted
-    STANDBYWFI, or the TC2 tile's reset control logic must be
-    holding the CPU in reset.
+Versatile Express also has an example.
 
-    Just checking for STANDBYWFI is not sufficient, because this
-    signal is not latched when the the cluster is clamped off and
-    powered down: the relevant status bits just drop to zero.  This
-    means that STANDBYWFI status cannot be used for reliable
-    detection of the last CPU in a cluster reaching WFI.
+Rob
 
-This patch is required in order for kexec to work with MCPM on TC2.
-
-Signed-off-by: Dave Martin <Dave.Martin@arm.com>
----
-
-The mdelay(1) in tc2_pm_power_down_finish() is arbitrary.  The power
-controller can show millisecond response times in the worst case, and
-CPU hotplug is not expected to be performance-critical.
-
-It may be wise to add a timeout to this function, but that's open to
-discussion.
-
-
- arch/arm/mach-vexpress/spc.c    |   39 +++++++++++++++++++++++++
- arch/arm/mach-vexpress/spc.h    |    1 +
- arch/arm/mach-vexpress/tc2_pm.c |   60 +++++++++++++++++++++++++++++++++++----
- 3 files changed, 95 insertions(+), 5 deletions(-)
-
-diff --git a/arch/arm/mach-vexpress/spc.c b/arch/arm/mach-vexpress/spc.c
-index eefb029..6f6ac56 100644
---- a/arch/arm/mach-vexpress/spc.c
-+++ b/arch/arm/mach-vexpress/spc.c
-@@ -35,6 +35,10 @@
- /* SPC per-CPU mailboxes */
- #define A15_BX_ADDR0		0x68
- #define A7_BX_ADDR0		0x78
-+/* SPC CPU/cluster reset statue */
-+#define STANDBYWFI_STAT		0x3c
-+#define STANDBYWFI_STAT_A15_CPU_MASK(cpu)	(1 << (cpu))
-+#define STANDBYWFI_STAT_A7_CPU_MASK(cpu)	(1 << (3 + (cpu)))
- 
- /* wake-up interrupt masks */
- #define GBL_WAKEUP_INT_MSK	(0x3 << 10)
-@@ -157,6 +161,41 @@ void ve_spc_powerdown(u32 cluster, bool enable)
- 	writel_relaxed(enable, info->baseaddr + pwdrn_reg);
- }
- 
-+static u32 standbywfi_cpu_mask(u32 cpu, u32 cluster)
-+{
-+	return cluster_is_a15(cluster) ?
-+		  STANDBYWFI_STAT_A15_CPU_MASK(cpu)
-+		: STANDBYWFI_STAT_A7_CPU_MASK(cpu);
-+}
-+
-+/**
-+ * ve_spc_cpu_in_wfi(u32 cpu, u32 cluster)
-+ *
-+ * @cpu: mpidr[7:0] bitfield describing CPU affinity level within cluster
-+ * @cluster: mpidr[15:8] bitfield describing cluster affinity level
-+ *
-+ * @return: non-zero if and only if the specified CPU is in WFI
-+ *
-+ * Take care when interpreting the result of this function: a CPU might
-+ * be in WFI temporarily due to idle, and is not necessarily safely
-+ * parked.
-+ */
-+int ve_spc_cpu_in_wfi(u32 cpu, u32 cluster)
-+{
-+	int ret;
-+	u32 mask = standbywfi_cpu_mask(cpu, cluster);
-+
-+	if (cluster >= MAX_CLUSTERS)
-+		return 1;
-+
-+	ret = readl_relaxed(info->baseaddr + STANDBYWFI_STAT);
-+
-+	pr_debug("%s: PCFGREG[0x%X] = 0x%08X, mask = 0x%X\n",
-+		 __func__, STANDBYWFI_STAT, ret, mask);
-+
-+	return ret & mask;
-+}
-+
- int __init ve_spc_init(void __iomem *baseaddr, u32 a15_clusid)
- {
- 	info = kzalloc(sizeof(*info), GFP_KERNEL);
-diff --git a/arch/arm/mach-vexpress/spc.h b/arch/arm/mach-vexpress/spc.h
-index 5f7e4a4..edb1b06 100644
---- a/arch/arm/mach-vexpress/spc.h
-+++ b/arch/arm/mach-vexpress/spc.h
-@@ -20,5 +20,6 @@ void ve_spc_global_wakeup_irq(bool set);
- void ve_spc_cpu_wakeup_irq(u32 cluster, u32 cpu, bool set);
- void ve_spc_set_resume_addr(u32 cluster, u32 cpu, u32 addr);
- void ve_spc_powerdown(u32 cluster, bool enable);
-+int ve_spc_cpu_in_wfi(u32 cpu, u32 cluster);
- 
- #endif
-diff --git a/arch/arm/mach-vexpress/tc2_pm.c b/arch/arm/mach-vexpress/tc2_pm.c
-index e6eb481..0c56e72 100644
---- a/arch/arm/mach-vexpress/tc2_pm.c
-+++ b/arch/arm/mach-vexpress/tc2_pm.c
-@@ -12,6 +12,7 @@
-  * published by the Free Software Foundation.
-  */
- 
-+#include <linux/delay.h>
- #include <linux/init.h>
- #include <linux/io.h>
- #include <linux/kernel.h>
-@@ -31,11 +32,17 @@
- #include "spc.h"
- 
- /* SCC conf registers */
-+#define RESET_CTRL		0x018
-+#define RESET_A15_NCORERESET(cpu)	(1 << (2 + (cpu)))
-+#define RESET_A7_NCORERESET(cpu)	(1 << (19 + (cpu)))
-+
- #define A15_CONF		0x400
- #define A7_CONF			0x500
- #define SYS_INFO		0x700
- #define SPC_BASE		0xb00
- 
-+static void __iomem *scc;
-+
- /*
-  * We can't use regular spinlocks. In the switcher case, it is possible
-  * for an outbound CPU to call power_down() after its inbound counterpart
-@@ -233,6 +240,49 @@ static void tc2_pm_power_down(void)
- 	tc2_pm_down(0);
- }
- 
-+static int tc2_core_in_reset(unsigned int cpu, unsigned int cluster)
-+{
-+	u32 mask = cluster ?
-+		  RESET_A7_NCORERESET(cpu)
-+		: RESET_A15_NCORERESET(cpu);
-+
-+	return !(readl_relaxed(scc + RESET_CTRL) & mask);
-+}
-+
-+static int tc2_pm_power_down_finish(unsigned int cpu, unsigned int cluster)
-+{
-+	while (1) {
-+		/*
-+		 * In case this CPU raced too far ahead of the target CPU,
-+		 * wait until tc2_pm_down() has really been entered:
-+		 */
-+		if (ACCESS_ONCE(tc2_pm_use_count[cpu][cluster]) != 0)
-+			goto poll;
-+
-+		pr_debug("%s(cpu=%u, cluster=%u): RESET_CTRL = 0x%08X\n",
-+			 __func__, cpu, cluster,
-+			 readl_relaxed(scc + RESET_CTRL));
-+
-+		/*
-+		 * We need the CPU to reach WFI, but the power
-+		 * controller may immediately put the CPU in reset and
-+		 * power the cluster off as soon as that happens, if
-+		 * there are no other CPUs live on the cluster.  That
-+		 * can cause the CPU's STANDBYWFI signal to disappear.
-+		 *
-+		 * So we need to check for both conditions:
-+		 */
-+		if (tc2_core_in_reset(cpu, cluster) ||
-+		    ve_spc_cpu_in_wfi(cpu, cluster))
-+			break;
-+
-+	poll:
-+		msleep(1);
-+	}
-+		
-+	return 1;
-+}
-+
- static void tc2_pm_suspend(u64 residency)
- {
- 	unsigned int mpidr, cpu, cluster;
-@@ -275,10 +325,11 @@ static void tc2_pm_powered_up(void)
- }
- 
- static const struct mcpm_platform_ops tc2_pm_power_ops = {
--	.power_up	= tc2_pm_power_up,
--	.power_down	= tc2_pm_power_down,
--	.suspend	= tc2_pm_suspend,
--	.powered_up	= tc2_pm_powered_up,
-+	.power_up		= tc2_pm_power_up,
-+	.power_down		= tc2_pm_power_down,
-+	.power_down_finish	= tc2_pm_power_down_finish,
-+	.suspend		= tc2_pm_suspend,
-+	.powered_up		= tc2_pm_powered_up,
- };
- 
- static bool __init tc2_pm_usage_count_init(void)
-@@ -312,7 +363,6 @@ static void __naked tc2_pm_power_up_setup(unsigned int affinity_level)
- static int __init tc2_pm_init(void)
- {
- 	int ret;
--	void __iomem *scc;
- 	u32 a15_cluster_id, a7_cluster_id, sys_info;
- 	struct device_node *np;
- 
--- 
-1.7.9.5
+> 
+> Sricharan R (6):
+>   DRIVERS: IRQCHIP: IRQ-GIC: Add support for routable irqs
+>   DRIVERS: IRQCHIP: CROSSBAR: Add support for Crossbar IP
+>   ARM: DTS: DRA: Add crossbar device binding
+>   ARM: DTS: DRA: Replace peripheral interrupt numbers with crossbar
+>     inputs.
+>   ARM: OMAP4+: Correct Wakeup-gen code to use physical irq number
+>   ARM: DRA: Enable Crossbar IP support for DRA7XX
+> 
+>  Documentation/devicetree/bindings/arm/gic.txt      |    5 +
+>  .../devicetree/bindings/arm/omap/crossbar.txt      |   27 +++
+>  arch/arm/boot/dts/dra7.dtsi                        |   98 +++++-----
+>  arch/arm/mach-omap2/Kconfig                        |    1 +
+>  arch/arm/mach-omap2/omap-wakeupgen.c               |    4 +-
+>  arch/arm/mach-omap2/omap4-common.c                 |    4 +
+>  drivers/irqchip/Kconfig                            |    8 +
+>  drivers/irqchip/Makefile                           |    1 +
+>  drivers/irqchip/irq-crossbar.c                     |  195 ++++++++++++++++++++
+>  drivers/irqchip/irq-gic.c                          |   57 +++++-
+>  include/linux/irqchip/arm-gic.h                    |    8 +-
+>  include/linux/irqchip/irq-crossbar.h               |   11 ++
+>  12 files changed, 363 insertions(+), 56 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/arm/omap/crossbar.txt
+>  create mode 100644 drivers/irqchip/irq-crossbar.c
+>  create mode 100644 include/linux/irqchip/irq-crossbar.h
+> 
