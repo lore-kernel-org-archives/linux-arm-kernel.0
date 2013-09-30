@@ -1,39 +1,55 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Mon, 30 Sep 2013 09:47:04 -0700
-Subject: [PATCH 0/3] nohz full: drop 64-bit requirement,
- enable ARM support v2
-In-Reply-To: <1380550012-7321-1-git-send-email-fweisbec@gmail.com> (Frederic
- Weisbecker's message of "Mon, 30 Sep 2013 16:06:49 +0200")
-References: <1380550012-7321-1-git-send-email-fweisbec@gmail.com>
-Message-ID: <87li2ejlyv.fsf@linaro.org>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 30 Sep 2013 18:48:06 +0200
+Subject: [GIT PULL] at91: fixes for 3.12 #2
+Message-ID: <1380559686-2605-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Frederic Weisbecker <fweisbec@gmail.com> writes:
+Arnd, Olof, Kevin,
 
-> Hi Kevin,
->
-> Your patchset was fine but I just did a second round. Namely I did the following changes:
->
-> * Drop the 64 bits dependency after we settle the new dependency on HAVE_VIRT_CPU_ACCOUNTING_GEN
-> and not before. This way we don't have a middle state that loose the dependency in the middle of
-> the patchset. Probablyt no big deal but it looks more natural this way.
->
-> * Refined a few changelogs.
->
-> If you're ok I'll send a pull request to Ingo.
+Second batch of fixes for AT91. Two little patches but that can be important
+for AT91.
+One is finishing the conversion to clk_xxx_[un]prepare() routines. That will
+allow us to begin the move to common clock framework with help from Boris and
+his big patch series. I tried to push it through Thomas and John's git tree but
+without success.
+The other one is important for sam9g45 when the second DDR conrtoller is in
+use. The DDR / EBI lines are not properly reseted after a shutdown and could
+prevent the use of whatever is connected to this EBI. It is not a configuration
+that we are using on the Evaluation Kit and this explains why we face this isue
+just now...
 
-Looks good to me, thanks.
+Thanks, best regards,
 
-Kevin
+The following changes since commit 9ceb389dddbcdb87830f01fcf84d94b2da581dae:
 
-> Kevin Hilman (3):
->   vtime: Add HAVE_VIRT_CPU_ACCOUNTING_GEN Kconfig
->   nohz: Drop generic vtime obsolete dependency on CONFIG_64BIT
->   ARM: Kconfig: allow full nohz CPU accounting
->
->  arch/Kconfig        | 12 ++++++++++++
->  arch/arm/Kconfig    |  1 +
->  init/Kconfig        |  3 ++-
->  kernel/time/Kconfig |  2 +-
->  4 files changed, 16 insertions(+), 2 deletions(-)
+  ARM: at91: remove IRQF_DISABLED (2013-09-19 15:36:35 +0200)
+
+are available in the git repository at:
+
+  git://github.com/at91linux/linux-at91.git tags/at91-fixes
+
+for you to fetch changes up to 93f6319386b1bd57c9937c818bf1de0b81f03271:
+
+  ARM: at91: sam9g45: shutdown ddr1 too when rebooting (2013-09-30 18:24:52 +0200)
+
+----------------------------------------------------------------
+2nd fixes series for 3.12
+- one TC clocksource enhancement that is the remaining patch that moves to
+  clk_xxx_[un]prepare()
+- management of second DDR controller for the sam9g45 shutdown. This routine
+  also applies to most of other sam9s.
+
+----------------------------------------------------------------
+Boris BREZILLON (1):
+      ARM: at91/tc/clocksource: replace clk_enable/disable with clk_prepare_enable/disable_unprepare.
+
+Jean-Christophe PLAGNIOL-VILLARD (1):
+      ARM: at91: sam9g45: shutdown ddr1 too when rebooting
+
+ arch/arm/mach-at91/at91sam9g45_reset.S |  8 ++++++++
+ drivers/clocksource/tcb_clksrc.c       | 10 +++++-----
+ 2 files changed, 13 insertions(+), 5 deletions(-)
+
+-- 
+Nicolas Ferre
