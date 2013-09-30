@@ -1,20 +1,57 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 30 Sep 2013 02:58:15 +0000 (UTC)
-Subject: OMAP baseline test results for v3.12-rc3
-In-Reply-To: <alpine.DEB.2.02.1309300158430.17980@utopia.booyaka.com>
-References: <alpine.DEB.2.02.1309300158430.17980@utopia.booyaka.com>
-Message-ID: <alpine.DEB.2.02.1309300257070.17980@utopia.booyaka.com>
+Date: Mon, 30 Sep 2013 03:23:29 +0000 (UTC)
+Subject: [PATCH v4 01/11] ARM: OMAP2+: CM: cm_inst offset s16->u16
+In-Reply-To: <5e9ef86c35c60862a1c2aa24172e41ee4c6f07de.1380179370.git.afzal@ti.com>
+References: <cover.1380179370.git.afzal@ti.com>
+ <5e9ef86c35c60862a1c2aa24172e41ee4c6f07de.1380179370.git.afzal@ti.com>
+Message-ID: <alpine.DEB.2.02.1309300314520.17980@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi
 
-One of the changes to this testbed, starting with the v3.12-rc kernels, is 
-the addition of an OMAP4460-based Variscite VAR-SOM-OM DVK board, 
-graciously donated by Jeff Graham at Bruker Optics.
+On Thu, 26 Sep 2013, Afzal Mohammed wrote:
 
-Right now, the bootloader and userspaces in use are the ones that came 
-with the board.  So it should be representative of the mainline kernel's 
-ability to boot to userspace on many similar board designs.
+> Most of the AM43x CM reg address offsets are with MSB bit '1' (on
+> 16-bit value) leading to arithmetic miscalculations while calculating
+> CLOCK ENABLE register's address because cm_inst field was a type of
+> "const s16", so make it "const u16".
+> 
+> Also modify relevant functions so as to take care of the above.
+> 
+> [afzal at ti.com: fixup and cleanup]
+> 
+> Signed-off-by: Ankur Kishore <a-kishore@ti.com>
+> Signed-off-by: Afzal Mohammed <afzal@ti.com>
+> ---
+>  arch/arm/mach-omap2/clockdomain.h |  2 +-
+>  arch/arm/mach-omap2/cm33xx.c      | 16 ++++++++--------
+>  arch/arm/mach-omap2/cm33xx.h      | 10 +++++-----
+>  arch/arm/mach-omap2/cminst44xx.c  | 20 ++++++++++----------
+>  arch/arm/mach-omap2/cminst44xx.h  | 26 +++++++++++++-------------
+>  5 files changed, 37 insertions(+), 37 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/clockdomain.h b/arch/arm/mach-omap2/clockdomain.h
+> index 4b03394..5431b0c 100644
+> --- a/arch/arm/mach-omap2/clockdomain.h
+> +++ b/arch/arm/mach-omap2/clockdomain.h
+> @@ -132,7 +132,7 @@ struct clockdomain {
+>  	u8 _flags;
+>  	const u8 dep_bit;
+>  	const u8 prcm_partition;
+> -	const s16 cm_inst;
+> +	const u16 cm_inst;
+>  	const u16 clkdm_offs;
+>  	struct clkdm_dep *wkdep_srcs;
+>  	struct clkdm_dep *sleepdep_srcs;
+
+OMAP3 has at least one CM_INST that's negative:
+
+./prcm-common.h:40:#define OMAP3430_IVA2_MOD				-0x800
+
+Have you tested this on OMAP34xx/35xx to ensure that the generated 
+addresses for IVA2_MOD-based addresses doesn't change?  Seems like there's 
+a risk that they might change, due to sign extension.
 
 
 - Paul
