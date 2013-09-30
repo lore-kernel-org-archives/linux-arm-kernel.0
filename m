@@ -1,43 +1,44 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Mon, 30 Sep 2013 17:38:06 +0200
-Subject: [PATCH v2] ARM: at91: cam60: fix incorrect placement of __initdata tag
-Message-ID: <4748525.slmbI8ubRr@amdc1032>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Mon, 30 Sep 2013 11:42:08 -0400
+Subject: [GIT PULL] ARM: mvebu: soc changes for v3.13
+Message-ID: <20130930154208.GG31178@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-__initdata tag should be placed between the variable name and equal
-sign for the variable to be placed in the intended .init.data section.
+Guys,
 
-Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
----
-v2:
-- use __initdata as it is OK to do it
+These are the SoC changes that didn't make it during the last merge
+window.  As with mvebu/drivers, these have been in -next since 3.12-rc1
+without issue.
 
- arch/arm/mach-at91/board-cam60.c | 4 +---
- 1 file changed, 1 insertion(+), 3 deletions(-)
+thx,
 
-diff --git a/arch/arm/mach-at91/board-cam60.c b/arch/arm/mach-at91/board-cam60.c
-index ade948b..ecabbed 100644
---- a/arch/arm/mach-at91/board-cam60.c
-+++ b/arch/arm/mach-at91/board-cam60.c
-@@ -108,16 +108,14 @@ static struct spi_board_info cam60_spi_devices[] __initdata = {
- #endif
- };
- 
--
- /*
-  * MACB Ethernet device
-  */
--static struct __initdata macb_platform_data cam60_macb_data = {
-+static struct macb_platform_data cam60_macb_data __initdata = {
- 	.phy_irq_pin	= AT91_PIN_PB5,
- 	.is_rmii	= 0,
- };
- 
--
- /*
-  * NAND Flash
-  */
--- 
-1.8.2.3
+Jason.
+
+
+The following changes since commit 272b98c6455f00884f0350f775c5342358ebb73f:
+
+  Linux 3.12-rc1 (2013-09-16 16:17:51 -0400)
+
+are available in the git repository at:
+
+  git://git.infradead.org/linux-mvebu.git tags/soc-3.13
+
+for you to fetch changes up to ffe195c369656b5e4d3b5c21376483c23589be30:
+
+  ARM: dove: remove legacy pcie and clock init (2013-09-30 15:01:51 +0000)
+
+----------------------------------------------------------------
+mvebu soc changes for v3.13
+
+ - dove
+    - use DT for mbus windows
+    - use DT for pcie and clock init
+
+----------------------------------------------------------------
+Sebastian Hesselbarth (2):
+      ARM: dove: switch to DT probed mbus address windows
+      ARM: dove: remove legacy pcie and clock init
+
+ arch/arm/mach-dove/board-dt.c | 39 +--------------------------------------
+ 1 file changed, 1 insertion(+), 38 deletions(-)
