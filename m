@@ -1,68 +1,66 @@
-From: afzal@ti.com (Afzal Mohammed)
-Date: Mon, 30 Sep 2013 14:20:38 +0530
-Subject: [PATCH v4 01/11] ARM: OMAP2+: CM: cm_inst offset s16->u16
-In-Reply-To: <alpine.DEB.2.02.1309300314520.17980@utopia.booyaka.com>
-References: <cover.1380179370.git.afzal@ti.com>
- <5e9ef86c35c60862a1c2aa24172e41ee4c6f07de.1380179370.git.afzal@ti.com>
- <alpine.DEB.2.02.1309300314520.17980@utopia.booyaka.com>
-Message-ID: <52493B5E.7000807@ti.com>
+From: anup.patel@linaro.org (Anup Patel)
+Date: Mon, 30 Sep 2013 14:20:05 +0530
+Subject: [PATCH v5 1/4] ARM: KVM: Implement kvm_vcpu_preferred_target()
+ function
+In-Reply-To: <1380531008-15901-1-git-send-email-anup.patel@linaro.org>
+References: <1380531008-15901-1-git-send-email-anup.patel@linaro.org>
+Message-ID: <1380531008-15901-2-git-send-email-anup.patel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
+This patch implements kvm_vcpu_preferred_target() function for
+KVM ARM which will help us implement KVM_ARM_PREFERRED_TARGET ioctl
+for user space.
 
-On Monday 30 September 2013 08:53 AM, Paul Walmsley wrote:
-> On Thu, 26 Sep 2013, Afzal Mohammed wrote:
+Signed-off-by: Anup Patel <anup.patel@linaro.org>
+Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
+---
+ arch/arm/include/asm/kvm_host.h |    1 +
+ arch/arm/kvm/guest.c            |   20 ++++++++++++++++++++
+ 2 files changed, 21 insertions(+)
 
->> Most of the AM43x CM reg address offsets are with MSB bit '1' (on
->> 16-bit value) leading to arithmetic miscalculations while calculating
->> CLOCK ENABLE register's address because cm_inst field was a type of
->> "const s16", so make it "const u16".
->>
->> Also modify relevant functions so as to take care of the above.
->>
->> [afzal at ti.com: fixup and cleanup]
->>
->> Signed-off-by: Ankur Kishore <a-kishore@ti.com>
->> Signed-off-by: Afzal Mohammed <afzal@ti.com>
->> ---
->>  arch/arm/mach-omap2/clockdomain.h |  2 +-
->>  arch/arm/mach-omap2/cm33xx.c      | 16 ++++++++--------
->>  arch/arm/mach-omap2/cm33xx.h      | 10 +++++-----
->>  arch/arm/mach-omap2/cminst44xx.c  | 20 ++++++++++----------
->>  arch/arm/mach-omap2/cminst44xx.h  | 26 +++++++++++++-------------
->>  5 files changed, 37 insertions(+), 37 deletions(-)
->>
->> diff --git a/arch/arm/mach-omap2/clockdomain.h b/arch/arm/mach-omap2/clockdomain.h
->> index 4b03394..5431b0c 100644
->> --- a/arch/arm/mach-omap2/clockdomain.h
->> +++ b/arch/arm/mach-omap2/clockdomain.h
->> @@ -132,7 +132,7 @@ struct clockdomain {
->>  	u8 _flags;
->>  	const u8 dep_bit;
->>  	const u8 prcm_partition;
->> -	const s16 cm_inst;
->> +	const u16 cm_inst;
->>  	const u16 clkdm_offs;
->>  	struct clkdm_dep *wkdep_srcs;
->>  	struct clkdm_dep *sleepdep_srcs;
-
-> OMAP3 has at least one CM_INST that's negative:
-> 
-> ./prcm-common.h:40:#define OMAP3430_IVA2_MOD				-0x800
-> 
-> Have you tested this on OMAP34xx/35xx to ensure that the generated 
-> addresses for IVA2_MOD-based addresses doesn't change?  Seems like there's 
-> a risk that they might change, due to sign extension.
-
-cm_inst field of clockdomain struct is not being used on OMAP3, but
-instead prcm_offs of struct powerdomain is being made use. cm_inst field
-of struct clockdomain is being used by OMAP4 types only, hence would
-affect OMAP4, OMAP5, DRA7x & AM43x only and these don't have CM_INST
-that is negative.
-
-This has been tested on OMAP3 Beagle Xm and verified that it does not
-cause any regresions.
-
-Regards
-Afzal
+diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+index 7d22517..76f3c19 100644
+--- a/arch/arm/include/asm/kvm_host.h
++++ b/arch/arm/include/asm/kvm_host.h
+@@ -154,6 +154,7 @@ struct kvm_vcpu_stat {
+ struct kvm_vcpu_init;
+ int kvm_vcpu_set_target(struct kvm_vcpu *vcpu,
+ 			const struct kvm_vcpu_init *init);
++int kvm_vcpu_preferred_target(struct kvm_vcpu_init *init);
+ unsigned long kvm_arm_num_regs(struct kvm_vcpu *vcpu);
+ int kvm_arm_copy_reg_indices(struct kvm_vcpu *vcpu, u64 __user *indices);
+ struct kvm_one_reg;
+diff --git a/arch/arm/kvm/guest.c b/arch/arm/kvm/guest.c
+index 152d036..21beea0 100644
+--- a/arch/arm/kvm/guest.c
++++ b/arch/arm/kvm/guest.c
+@@ -222,6 +222,26 @@ int kvm_vcpu_set_target(struct kvm_vcpu *vcpu,
+ 	return kvm_reset_vcpu(vcpu);
+ }
+ 
++int kvm_vcpu_preferred_target(struct kvm_vcpu_init *init)
++{
++	int target = kvm_target_cpu();
++
++	if (target < 0)
++		return -ENODEV;
++
++	memset(init, 0, sizeof(*init));
++
++	/* 
++	 * For now, we don't return any features.
++	 * In future, we might use features to return target
++	 * specific features available for the preferred
++	 * target type.
++	 */
++	init->target = (__u32)target;
++
++	return 0;
++}
++
+ int kvm_arch_vcpu_ioctl_get_fpu(struct kvm_vcpu *vcpu, struct kvm_fpu *fpu)
+ {
+ 	return -EINVAL;
+-- 
+1.7.9.5
