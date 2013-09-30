@@ -1,67 +1,33 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Mon, 30 Sep 2013 16:30:47 +0200
-Subject: [PATCH v2 1/3] dma: mxs-dma: Cleanup interrupt handler
-In-Reply-To: <524983AE.8020706@pengutronix.de>
-References: <1380546822-14034-1-git-send-email-mpa@pengutronix.de>
- <1380546822-14034-2-git-send-email-mpa@pengutronix.de>
- <21065.33455.71463.188271@ipc1.ka-ro>
- <524983AE.8020706@pengutronix.de>
-Message-ID: <20130930143047.GG4869@pengutronix.de>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 30 Sep 2013 15:38:48 +0100
+Subject: [PATCH 3/4] spi: davinci: Allow SPI to be build without EDMA
+ support
+In-Reply-To: <52497E57.5080700@ti.com>
+References: <1380325356-2100-1-git-send-email-santosh.shilimkar@ti.com>
+ <1380325356-2100-4-git-send-email-santosh.shilimkar@ti.com>
+ <20130929123140.GU19304@sirena.org.uk> <52497E57.5080700@ti.com>
+Message-ID: <20130930143848.GB19304@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, Sep 30, 2013 at 09:36:23AM -0400, Santosh Shilimkar wrote:
+> On Sunday 29 September 2013 08:31 AM, Mark Brown wrote:
 
-On Mon, Sep 30, 2013 at 03:59:10PM +0200, Marc Kleine-Budde wrote:
-> On 09/30/2013 03:54 PM, Lothar Wa?mann wrote:
-> > Hi,
-> > 
-> > Markus Pargmann writes:
-> >> The DMA interrupt handler uses its controll registers to handle all
-> >> available channel interrupts it can find.
-> >>
-> >> This patch changes it to handle only one interrupt by directly mapping
-> >> irq number to channel. It also includes a cleanup of the ctrl-register
-> >> usage.
-> >>
-> >> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-> >> ---
-> >>  drivers/dma/mxs-dma.c | 95 ++++++++++++++++++++++++++++++++-------------------
-> >>  1 file changed, 59 insertions(+), 36 deletions(-)
-> >>
-> >> diff --git a/drivers/dma/mxs-dma.c b/drivers/dma/mxs-dma.c
-> >> index ccd13df..bfca8dc 100644
-> >> --- a/drivers/dma/mxs-dma.c
-> >> +++ b/drivers/dma/mxs-dma.c
-> >> @@ -272,58 +272,81 @@ static void mxs_dma_tasklet(unsigned long data)
-> >>  		mxs_chan->desc.callback(mxs_chan->desc.callback_param);
-> >>  }
-> >>  
-> >> +static int mxs_dma_irq_to_chan(struct mxs_dma_engine *mxs_dma, int irq)
-> >> +{
-> >> +	int i;
-> >> +
-> >> +	for (i = 0; i != mxs_dma->nr_channels; ++i)
-> >> +		if (mxs_dma->mxs_chans[i].chan_irq == irq)
-> >> +			return i;
-> >>
-> > You might use a linked list for all active channels so that you don't
-> > have to check all unused channels when trying to find the channel
-> > number for an irq.
-> 
-> Or an array of mxs_dma->nr_channels length for direct mapping.
+> > If there's no hard dependency on EDMA then the driver probably ought to
+> > be marked as COMPILE_TEST so that it can be build tested on other
+> > systems.  Is that possible?
 
-We map irq to channel so an array of nr_channels won't work here.
+> EDMA is already getting tested for DAVINCI builds and there are patches
+> coming AMXXXX SOC support. So probably marking it COMPILE_TEST isn't
+> needed since it has been in use already for other SOCs.
 
-I will use a linked list.
-
-Thanks
-
-Markus
-
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+It'd make life easier for general subsystem development if we were able
+to get build coverage without having to build a specific config, even if
+it's never actually going to be run.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130930/bcaa17e5/attachment.sig>
