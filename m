@@ -1,57 +1,171 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Mon, 30 Sep 2013 17:31:08 +0200
-Subject: [PATCH] ARM: shmobile: ape6evm: fix incorrect placement of
- __initdata tag
-In-Reply-To: <1800955.Mbr9gmJOD4@avalon>
-References: <26068642.Hn7T63a6ac@amdc1032> <1800955.Mbr9gmJOD4@avalon>
-Message-ID: <1556252.bjXjV3hKBt@amdc1032>
+From: konrad.wilk@oracle.com (Konrad Rzeszutek Wilk)
+Date: Mon, 30 Sep 2013 11:31:43 -0400
+Subject: [PATCH v6 10/19] xen: introduce xen_alloc/free_coherent_pages
+In-Reply-To: <1380298207-29151-10-git-send-email-stefano.stabellini@eu.citrix.com>
+References: <alpine.DEB.2.02.1309271653420.5498@kaball.uk.xensource.com>
+ <1380298207-29151-10-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <20130930153143.GQ3106@phenom.dumpdata.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-Hi,
-
-On Monday, September 30, 2013 05:05:37 PM Laurent Pinchart wrote:
-> Hi Bartlomiej,
+On Fri, Sep 27, 2013 at 05:09:58PM +0100, Stefano Stabellini wrote:
+> xen_swiotlb_alloc_coherent needs to allocate a coherent buffer for cpu
+> and devices. On native x86 and ARMv8 is sufficient to call
+> __get_free_pages in order to get a coherent buffer, while on ARM we need
+> to call the native dma_ops->alloc implementation.
 > 
-> Thank you for the patch.
+> When arm64 stops using the swiotlb by default and starts having multiple
+> dma_ops implementations, we'll use __get_dma_ops there too.
+
+I presume this is a future TODO, not some further patch (in which
+case you should say in here the title of it). If it is a TODO could
+you stick that in the sentence here somewhere to make it crytal clear that
+it is not implemented.
+
+Thank you.
+
 > 
-> On Monday 30 September 2013 15:07:47 Bartlomiej Zolnierkiewicz wrote:
-> > __initdata tag should be placed between the variable name and equal
-> > sign for the variable to be placed in the intended .init.data section.
-> > 
-> > In this particular case __initdata is incorrect as ape6evm_keys_pdata
-> > can be used as a platform data for gpio-keys driver which can be
-> > compiled as module.
+> Introduce xen_alloc_coherent_pages to abstract the arch specific buffer
+> allocation.
 > 
-> A pointer to the ape6evm_keys_pdata structure is passed to the 
-> platform_device_register_data() function, which makes a copy of the structure. 
-> Marking it as __initdata is thus correct.
-
-Thanks for catching this. I'll fix the patch and post v2.
-
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
-
-> > Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-> > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> > ---
-> >  arch/arm/mach-shmobile/board-ape6evm.c | 2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > 
-> > diff --git a/arch/arm/mach-shmobile/board-ape6evm.c
-> > b/arch/arm/mach-shmobile/board-ape6evm.c index 7627385..8954f55 100644
-> > --- a/arch/arm/mach-shmobile/board-ape6evm.c
-> > +++ b/arch/arm/mach-shmobile/board-ape6evm.c
-> > @@ -86,7 +86,7 @@ static struct gpio_keys_button gpio_buttons[] = {
-> >  	GPIO_KEY(KEY_VOLUMEDOWN,	329,	"S21"),
-> >  };
-> > 
-> > -static struct __initdata gpio_keys_platform_data ape6evm_keys_pdata = {
-> > +static struct gpio_keys_platform_data ape6evm_keys_pdata = {
-> >  	.buttons	= gpio_buttons,
-> >  	.nbuttons	= ARRAY_SIZE(gpio_buttons),
-> >  };
+> Similarly introduce xen_free_coherent_pages to free a coherent buffer:
+> on x86 and ARM64 is simply a call to free_pages while on ARM is
+> arm_dma_ops.free.
+> 
+> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> 
+> 
+> Changes in v6:
+> - call __get_dma_ops to get the native dma_ops pointer on arm.
+> ---
+>  arch/arm/include/asm/xen/page-coherent.h   |   22 ++++++++++++++++++++++
+>  arch/arm64/include/asm/xen/page-coherent.h |   24 ++++++++++++++++++++++++
+>  arch/ia64/include/asm/xen/page-coherent.h  |   24 ++++++++++++++++++++++++
+>  arch/x86/include/asm/xen/page-coherent.h   |   24 ++++++++++++++++++++++++
+>  4 files changed, 94 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm/include/asm/xen/page-coherent.h
+>  create mode 100644 arch/arm64/include/asm/xen/page-coherent.h
+>  create mode 100644 arch/ia64/include/asm/xen/page-coherent.h
+>  create mode 100644 arch/x86/include/asm/xen/page-coherent.h
+> 
+> diff --git a/arch/arm/include/asm/xen/page-coherent.h b/arch/arm/include/asm/xen/page-coherent.h
+> new file mode 100644
+> index 0000000..92b7a8a
+> --- /dev/null
+> +++ b/arch/arm/include/asm/xen/page-coherent.h
+> @@ -0,0 +1,22 @@
+> +#ifndef _ASM_ARM_XEN_PAGE_COHERENT_H
+> +#define _ASM_ARM_XEN_PAGE_COHERENT_H
+> +
+> +#include <asm/page.h>
+> +#include <linux/dma-attrs.h>
+> +#include <linux/dma-mapping.h>
+> +
+> +static inline void *xen_alloc_coherent_pages(struct device *hwdev, size_t size,
+> +		dma_addr_t *dma_handle, gfp_t flags,
+> +		struct dma_attrs *attrs)
+> +{
+> +	return __get_dma_ops(hwdev)->alloc(hwdev, size, dma_handle, flags, attrs);
+> +}
+> +
+> +static inline void xen_free_coherent_pages(struct device *hwdev, size_t size,
+> +		void *cpu_addr, dma_addr_t dma_handle,
+> +		struct dma_attrs *attrs)
+> +{
+> +	__get_dma_ops(hwdev)->free(hwdev, size, cpu_addr, dma_handle, attrs);
+> +}
+> +
+> +#endif /* _ASM_ARM_XEN_PAGE_COHERENT_H */
+> diff --git a/arch/arm64/include/asm/xen/page-coherent.h b/arch/arm64/include/asm/xen/page-coherent.h
+> new file mode 100644
+> index 0000000..0d6ad25
+> --- /dev/null
+> +++ b/arch/arm64/include/asm/xen/page-coherent.h
+> @@ -0,0 +1,24 @@
+> +#ifndef _ASM_ARM64_XEN_PAGE_COHERENT_H
+> +#define _ASM_ARM64_XEN_PAGE_COHERENT_H
+> +
+> +#include <asm/page.h>
+> +#include <linux/dma-attrs.h>
+> +#include <linux/dma-mapping.h>
+> +
+> +static inline void *xen_alloc_coherent_pages(struct device *hwdev, size_t size,
+> +		dma_addr_t *dma_handle, gfp_t flags,
+> +		struct dma_attrs *attrs)
+> +{
+> +	void *vstart = (void*)__get_free_pages(flags, get_order(size));
+> +	*dma_handle = virt_to_phys(vstart);
+> +	return vstart;
+> +}
+> +
+> +static inline void xen_free_coherent_pages(struct device *hwdev, size_t size,
+> +		void *cpu_addr, dma_addr_t dma_handle,
+> +		struct dma_attrs *attrs)
+> +{
+> +	free_pages((unsigned long) cpu_addr, get_order(size));
+> +}
+> +
+> +#endif /* _ASM_ARM64_XEN_PAGE_COHERENT_H */
+> diff --git a/arch/ia64/include/asm/xen/page-coherent.h b/arch/ia64/include/asm/xen/page-coherent.h
+> new file mode 100644
+> index 0000000..37b929c
+> --- /dev/null
+> +++ b/arch/ia64/include/asm/xen/page-coherent.h
+> @@ -0,0 +1,24 @@
+> +#ifndef _ASM_IA64_XEN_PAGE_COHERENT_H
+> +#define _ASM_IA64_XEN_PAGE_COHERENT_H
+> +
+> +#include <asm/page.h>
+> +#include <linux/dma-attrs.h>
+> +#include <linux/dma-mapping.h>
+> +
+> +static inline void *xen_alloc_coherent_pages(struct device *hwdev, size_t size,
+> +		dma_addr_t *dma_handle, gfp_t flags,
+> +		struct dma_attrs *attrs)
+> +{
+> +	void *vstart = (void*)__get_free_pages(flags, get_order(size));
+> +	*dma_handle = virt_to_phys(vstart);
+> +	return vstart;
+> +}
+> +
+> +static inline void xen_free_coherent_pages(struct device *hwdev, size_t size,
+> +		void *cpu_addr, dma_addr_t dma_handle,
+> +		struct dma_attrs *attrs)
+> +{
+> +	free_pages((unsigned long) cpu_addr, get_order(size));
+> +}
+> +
+> +#endif /* _ASM_IA64_XEN_PAGE_COHERENT_H */
+> diff --git a/arch/x86/include/asm/xen/page-coherent.h b/arch/x86/include/asm/xen/page-coherent.h
+> new file mode 100644
+> index 0000000..31de2e0
+> --- /dev/null
+> +++ b/arch/x86/include/asm/xen/page-coherent.h
+> @@ -0,0 +1,24 @@
+> +#ifndef _ASM_X86_XEN_PAGE_COHERENT_H
+> +#define _ASM_X86_XEN_PAGE_COHERENT_H
+> +
+> +#include <asm/page.h>
+> +#include <linux/dma-attrs.h>
+> +#include <linux/dma-mapping.h>
+> +
+> +static inline void *xen_alloc_coherent_pages(struct device *hwdev, size_t size,
+> +		dma_addr_t *dma_handle, gfp_t flags,
+> +		struct dma_attrs *attrs)
+> +{
+> +	void *vstart = (void*)__get_free_pages(flags, get_order(size));
+> +	*dma_handle = virt_to_phys(vstart);
+> +	return vstart;
+> +}
+> +
+> +static inline void xen_free_coherent_pages(struct device *hwdev, size_t size,
+> +		void *cpu_addr, dma_addr_t dma_handle,
+> +		struct dma_attrs *attrs)
+> +{
+> +	free_pages((unsigned long) cpu_addr, get_order(size));
+> +}
+> +
+> +#endif /* _ASM_X86_XEN_PAGE_COHERENT_H */
+> -- 
+> 1.7.2.5
+> 
