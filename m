@@ -1,41 +1,49 @@
-From: r.sricharan@ti.com (Sricharan R)
-Date: Mon, 30 Sep 2013 20:30:43 +0530
-Subject: [RFC PATCH 1/6] DRIVERS: IRQCHIP: IRQ-GIC: Add support for
- routable irqs
-In-Reply-To: <5249890B.7020906@ti.com>
-References: <1380549564-31045-1-git-send-email-r.sricharan@ti.com>
- <1380549564-31045-2-git-send-email-r.sricharan@ti.com>
- <524987A3.4090204@arm.com> <5249890B.7020906@ti.com>
-Message-ID: <5249921B.5020108@ti.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Mon, 30 Sep 2013 17:05:37 +0200
+Subject: [PATCH] ARM: shmobile: ape6evm: fix incorrect placement of
+ __initdata tag
+In-Reply-To: <26068642.Hn7T63a6ac@amdc1032>
+References: <26068642.Hn7T63a6ac@amdc1032>
+Message-ID: <1800955.Mbr9gmJOD4@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 30 September 2013 07:52 PM, Santosh Shilimkar wrote:
-> On Monday 30 September 2013 10:16 AM, Marc Zyngier wrote:
->> On 30/09/13 14:59, Sricharan R wrote:
->>> In some socs the gic can be preceded by a crossbar IP which
->>> routes the peripheral interrupts to the gic inputs. The peripheral
->>> interrupts are associated with a fixed crossbar input line and the
->>> crossbar routes that to one of the free gic input line.
->>>
->>> The DT entries for peripherals provides the fixed crossbar input line
->>> as its interrupt number and the mapping code should associate this with
->>> a free gic input line. This patch adds the support inside the gic irqchip
->>> to handle such routable irqs. The routable irqs are registered in a linear
->>> domain. The registered routable domain's callback should be implemented
->>> to get a free irq and to configure the IP to route it.
->> Isn't this just another chained interrupt controller? How is it GIC
->> specific?
->>
-> No it isn't a irq controller rather a event router. Patch is missing
-> reference to the previous discussion. Previous discussion is here [1]
->
-> Regards,
-> Santosh
->
-> [1] https://lkml.org/lkml/2013/9/13/413
->
-Sorry, missed adding that and thanks for pointing it.
+Hi Bartlomiej,
 
+Thank you for the patch.
+
+On Monday 30 September 2013 15:07:47 Bartlomiej Zolnierkiewicz wrote:
+> __initdata tag should be placed between the variable name and equal
+> sign for the variable to be placed in the intended .init.data section.
+> 
+> In this particular case __initdata is incorrect as ape6evm_keys_pdata
+> can be used as a platform data for gpio-keys driver which can be
+> compiled as module.
+
+A pointer to the ape6evm_keys_pdata structure is passed to the 
+platform_device_register_data() function, which makes a copy of the structure. 
+Marking it as __initdata is thus correct.
+
+> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> ---
+>  arch/arm/mach-shmobile/board-ape6evm.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/mach-shmobile/board-ape6evm.c
+> b/arch/arm/mach-shmobile/board-ape6evm.c index 7627385..8954f55 100644
+> --- a/arch/arm/mach-shmobile/board-ape6evm.c
+> +++ b/arch/arm/mach-shmobile/board-ape6evm.c
+> @@ -86,7 +86,7 @@ static struct gpio_keys_button gpio_buttons[] = {
+>  	GPIO_KEY(KEY_VOLUMEDOWN,	329,	"S21"),
+>  };
+> 
+> -static struct __initdata gpio_keys_platform_data ape6evm_keys_pdata = {
+> +static struct gpio_keys_platform_data ape6evm_keys_pdata = {
+>  	.buttons	= gpio_buttons,
+>  	.nbuttons	= ARRAY_SIZE(gpio_buttons),
+>  };
+-- 
 Regards,
- Sricharan
+
+Laurent Pinchart
