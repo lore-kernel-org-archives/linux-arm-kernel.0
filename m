@@ -1,45 +1,37 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 30 Sep 2013 15:28:36 +0100
-Subject: [RFC PATCH 1/6] DRIVERS: IRQCHIP: IRQ-GIC: Add support for
- routable irqs
-In-Reply-To: <5249890B.7020906@ti.com>
-References: <1380549564-31045-1-git-send-email-r.sricharan@ti.com>
- <1380549564-31045-2-git-send-email-r.sricharan@ti.com>
- <524987A3.4090204@arm.com> <5249890B.7020906@ti.com>
-Message-ID: <52498A94.7090009@arm.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Mon, 30 Sep 2013 16:29:12 +0200
+Subject: [GIT PULL v2] drivers/clocksource: sched_clock_register()
+ conversion for 3.13 (via tip/timers/core)
+In-Reply-To: <52448A46.9020207@linaro.org>
+References: <52448A46.9020207@linaro.org>
+Message-ID: <52498AB8.7090209@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/09/13 15:22, Santosh Shilimkar wrote:
-> On Monday 30 September 2013 10:16 AM, Marc Zyngier wrote:
->> On 30/09/13 14:59, Sricharan R wrote:
->>> In some socs the gic can be preceded by a crossbar IP which
->>> routes the peripheral interrupts to the gic inputs. The peripheral
->>> interrupts are associated with a fixed crossbar input line and the
->>> crossbar routes that to one of the free gic input line.
->>>
->>> The DT entries for peripherals provides the fixed crossbar input line
->>> as its interrupt number and the mapping code should associate this with
->>> a free gic input line. This patch adds the support inside the gic irqchip
->>> to handle such routable irqs. The routable irqs are registered in a linear
->>> domain. The registered routable domain's callback should be implemented
->>> to get a free irq and to configure the IP to route it.
->>
->> Isn't this just another chained interrupt controller? How is it GIC
->> specific?
->>
-> No it isn't a irq controller rather a event router. Patch is missing
-> reference to the previous discussion. Previous discussion is here [1]
-> 
-> Regards,
-> Santosh
-> 
-> [1] https://lkml.org/lkml/2013/9/13/413
+On 09/26/2013 09:25 PM, John Stultz wrote:
+> Hey Daniel,
+>      Here's the sched_clock_register conversion that Stephen did earlier
+> this summer, as part of extending the generic sched_clock code to
+> support 64bit counters. Unfortunately the prereqs for this series missed
+> getting into tip/timers/core for 3.12, so I never sent out this pull
+> request. But now that the prereqs are in tip/timers/core for 3.13, I've
+> merge it up and I wanted to go ahead and send this out.
+>
+> This v2 pull request removes the setup_sched_clock deprecation, as that
+> causes lots of warnings since there's still users in the arch/arm tree.
+>
+> Let me know if you have any issues or concerns.
 
-Right. I need to go and understand that bit first.
+Thanks John,
 
-Thanks Santosh.
+pulled in my tree as 3.13 material.
 
-	M.
+   -- Daniel
+
+
 -- 
-Jazz is not dead. It just smells funny...
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
