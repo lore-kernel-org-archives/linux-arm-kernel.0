@@ -1,219 +1,450 @@
 From: vijay.kilari@gmail.com (vijay.kilari at gmail.com)
-Date: Mon, 30 Sep 2013 15:14:09 +0530
-Subject: [PATCH v2 1/3] AArch64: Add single-step and breakpoint handler hooks
+Date: Mon, 30 Sep 2013 15:14:10 +0530
+Subject: [PATCH v2 2/3] AArch64: KGDB: Add Basic KGDB support
 In-Reply-To: <1380534251-4464-1-git-send-email-vijay.kilari@gmail.com>
 References: <1380534251-4464-1-git-send-email-vijay.kilari@gmail.com>
-Message-ID: <1380534251-4464-2-git-send-email-vijay.kilari@gmail.com>
+Message-ID: <1380534251-4464-3-git-send-email-vijay.kilari@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sandeepa Prabhu <sandeepa.prabhu@linaro.org>
+From: Vijaya Kumar K <Vijaya.Kumar@caviumnetworks.com>
 
-AArch64 Single Steping and Breakpoint debug exceptions will be
-used by multiple debug framworks like kprobes & kgdb.
+Add KGDB debug support for kernel debugging.
+With this patch, basic KGDB debugging is possible.GDB register
+layout is updated and GDB tool can establish connection with
+target and can set/clear breakpoints.
 
-This patch implements the hooks for those frameworks to register
-their own handlers for handling breakpoint and single step events.
-
-Reworked the debug exception handler in entry.S: do_dbg to
-pass the correct break/step address to the handlers, i.e. FAR_EL1 if
-exception is watchpoint, ELR_EL1 for all other debug exceptions.
-
-Signed-off-by: Sandeepa Prabhu <sandeepa.prabhu@linaro.org>
-Signed-off-by: Deepak Saxena <dsaxena@linaro.org>
+Signed-off-by: Vijaya Kumar K <Vijaya.Kumar@caviumnetworks.com>
 ---
- arch/arm64/include/asm/debug-monitors.h |   20 +++++++
- arch/arm64/kernel/debug-monitors.c      |   95 ++++++++++++++++++++++++++++++-
- arch/arm64/kernel/entry.S               |    6 +-
- 3 files changed, 117 insertions(+), 4 deletions(-)
+ arch/arm64/include/asm/debug-monitors.h |   10 ++
+ arch/arm64/include/asm/kgdb.h           |   81 +++++++++
+ arch/arm64/kernel/Makefile              |    1 +
+ arch/arm64/kernel/kgdb.c                |  298 +++++++++++++++++++++++++++++++
+ 4 files changed, 390 insertions(+)
 
 diff --git a/arch/arm64/include/asm/debug-monitors.h b/arch/arm64/include/asm/debug-monitors.h
-index a2232d0..19e429e 100644
+index 19e429e..ed376ce 100644
 --- a/arch/arm64/include/asm/debug-monitors.h
 +++ b/arch/arm64/include/asm/debug-monitors.h
-@@ -16,6 +16,8 @@
- #ifndef __ASM_DEBUG_MONITORS_H
- #define __ASM_DEBUG_MONITORS_H
+@@ -28,6 +28,16 @@
+ #define DBG_ESR_EVT_HWWP	0x2
+ #define DBG_ESR_EVT_BRK		0x6
  
-+#include <linux/list.h>
++/*
++ * Break point instruction encoding
++ */
++#define BREAK_INSTR_SIZE		4
++#define KGDB_BREAKINST_ESR_VAL		0xf2000000
++#define KGDB_COMPILED_BREAK_ESR_VAL	0xf2000001
++#define KGDB_ARM64_COMPILE_BRK_IMM	1
++#define CACHE_FLUSH_IS_SAFE		1
 +
- #ifdef __KERNEL__
- 
- #define	DBG_ESR_EVT(x)		(((x) >> 27) & 0x7)
-@@ -62,6 +64,24 @@ struct task_struct;
- 
- #define DBG_ARCH_ID_RESERVED	0	/* In case of ptrace ABI updates. */
- 
-+struct step_hook {
-+	struct list_head node;
-+	int (*fn)(struct pt_regs *regs, unsigned int esr, unsigned long addr);
-+};
 +
-+void register_step_hook(struct step_hook *hook);
-+void unregister_step_hook(struct step_hook *hook);
+ enum debug_el {
+ 	DBG_ACTIVE_EL0 = 0,
+ 	DBG_ACTIVE_EL1,
+diff --git a/arch/arm64/include/asm/kgdb.h b/arch/arm64/include/asm/kgdb.h
+new file mode 100644
+index 0000000..15b36fd
+--- /dev/null
++++ b/arch/arm64/include/asm/kgdb.h
+@@ -0,0 +1,81 @@
++/*
++ * AArch64 KGDB support
++ *
++ * Based on arch/arm/include/kgdb.h
++ *
++ * Copyright (C) 2013 Cavium Inc.
++ * Author: Vijaya Kumar K <vijaya.kumar@caviumnetworks.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
 +
-+struct break_hook {
-+	struct list_head node;
-+	u32 esr_val;
-+	u32 esr_mask;
-+	int (*fn)(struct pt_regs *regs, unsigned int esr, unsigned long addr);
-+};
++#ifndef __ARM_KGDB_H__
++#define __ARM_KGDB_H__
 +
-+void register_break_hook(struct break_hook *hook);
-+void unregister_break_hook(struct break_hook *hook);
++#include <linux/ptrace.h>
++#include <asm/debug-monitors.h>
 +
- u8 debug_monitors_arch(void);
- 
- void enable_debug_monitors(enum debug_el el);
-diff --git a/arch/arm64/kernel/debug-monitors.c b/arch/arm64/kernel/debug-monitors.c
-index cbfacf7..d8a159e 100644
---- a/arch/arm64/kernel/debug-monitors.c
-+++ b/arch/arm64/kernel/debug-monitors.c
-@@ -188,6 +188,52 @@ static void clear_regs_spsr_ss(struct pt_regs *regs)
- 	regs->pstate = spsr;
- }
- 
-+/* EL1 Single Step Handler hooks */
-+static LIST_HEAD(step_hook);
-+static DEFINE_RAW_SPINLOCK(step_lock);
++#ifndef	__ASSEMBLY__
 +
-+void register_step_hook(struct step_hook *hook)
++static inline void arch_kgdb_breakpoint(void)
 +{
-+	raw_spin_lock(&step_lock);
-+	list_add(&hook->node, &step_hook);
-+	raw_spin_unlock(&step_lock);
++	asm ("brk %0" :: "I" (KGDB_ARM64_COMPILE_BRK_IMM));
 +}
 +
-+void unregister_step_hook(struct step_hook *hook)
++extern void kgdb_handle_bus_error(void);
++extern int kgdb_fault_expected;
++
++#endif /* !__ASSEMBLY__ */
++
++/*
++ * gdb is expecting the following registers layout.
++ *
++ * General purpose regs:
++ *     r0-r30: 64 bit
++ *     sp,pc : 64 bit
++ *     pstate  : 32 bit
++ *     Total: 34
++ * FPU regs:
++ *     f0-f31: 128 bit
++ *     Total: 32
++ * Extra regs
++ *     fpsr & fpcr: 32 bit
++ *     Total: 2
++ *
++ */
++
++#define _GP_REGS		34
++#define _FP_REGS		32
++#define _EXTRA_REGS		2
++#define DBG_MAX_REG_NUM		(_GP_REGS + _FP_REGS + _EXTRA_REGS)
++
++/*
++ * Size of I/O buffer for gdb packet.
++ * considering to hold all register contents, size is set to 1024
++ */
++
++#define BUFMAX			1024
++
++/*
++ * Number of bytes required for gdb_regs buffer.
++ * _GP_REGS: 8 bytes, _FP_REGS: 16 bytes and _EXTRA_REGS: 4 bytes each
++ * pstate reg is only 4 bytes. subtract 4 from size contributed
++ * by _GP_REGS.
++ * GDB fails to connect for size beyond this with error
++ * "'g' packet reply is too long"
++ */
++
++#define NUMREGBYTES	(((_GP_REGS * 8) - 4) + (_FP_REGS * 16) + \
++			(_EXTRA_REGS * 4))
++
++#endif /* __ASM_KGDB_H__ */
+diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+index 7b4b564..69613bb 100644
+--- a/arch/arm64/kernel/Makefile
++++ b/arch/arm64/kernel/Makefile
+@@ -18,6 +18,7 @@ arm64-obj-$(CONFIG_SMP)			+= smp.o smp_spin_table.o smp_psci.o
+ arm64-obj-$(CONFIG_HW_PERF_EVENTS)	+= perf_event.o
+ arm64-obj-$(CONFIG_HAVE_HW_BREAKPOINT)+= hw_breakpoint.o
+ arm64-obj-$(CONFIG_EARLY_PRINTK)	+= early_printk.o
++arm64-obj-$(CONFIG_KGDB)		+= kgdb.o
+ 
+ obj-y					+= $(arm64-obj-y) vdso/
+ obj-m					+= $(arm64-obj-m)
+diff --git a/arch/arm64/kernel/kgdb.c b/arch/arm64/kernel/kgdb.c
+new file mode 100644
+index 0000000..c99e04d
+--- /dev/null
++++ b/arch/arm64/kernel/kgdb.c
+@@ -0,0 +1,298 @@
++/*
++ * AArch64 KGDB support
++ *
++ * Based on arch/arm/kernel/kgdb.c
++ *
++ * Copyright (C) 2013 Cavium Inc.
++ * Author: Vijaya Kumar K <vijaya.kumar@caviumnetworks.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++#include <linux/irq.h>
++#include <linux/kdebug.h>
++#include <linux/kgdb.h>
++#include <asm/traps.h>
++
++struct dbg_reg_def_t dbg_reg_def[DBG_MAX_REG_NUM] =
 +{
-+	raw_spin_lock(&step_lock);
-+	list_del(&hook->node);
-+	raw_spin_unlock(&step_lock);
++	{ "x0", 8, offsetof(struct pt_regs, regs[0])},
++	{ "x1", 8, offsetof(struct pt_regs, regs[1])},
++	{ "x2", 8, offsetof(struct pt_regs, regs[2])},
++	{ "x3", 8, offsetof(struct pt_regs, regs[3])},
++	{ "x4", 8, offsetof(struct pt_regs, regs[4])},
++	{ "x5", 8, offsetof(struct pt_regs, regs[5])},
++	{ "x6", 8, offsetof(struct pt_regs, regs[6])},
++	{ "x7", 8, offsetof(struct pt_regs, regs[7])},
++	{ "x8", 8, offsetof(struct pt_regs, regs[8])},
++	{ "x9", 8, offsetof(struct pt_regs, regs[9])},
++	{ "x10", 8, offsetof(struct pt_regs, regs[10])},
++	{ "x11", 8, offsetof(struct pt_regs, regs[11])},
++	{ "x12", 8, offsetof(struct pt_regs, regs[12])},
++	{ "x13", 8, offsetof(struct pt_regs, regs[13])},
++	{ "x14", 8, offsetof(struct pt_regs, regs[14])},
++	{ "x15", 8, offsetof(struct pt_regs, regs[15])},
++	{ "x16", 8, offsetof(struct pt_regs, regs[16])},
++	{ "x17", 8, offsetof(struct pt_regs, regs[17])},
++	{ "x18", 8, offsetof(struct pt_regs, regs[18])},
++	{ "x19", 8, offsetof(struct pt_regs, regs[19])},
++	{ "x20", 8, offsetof(struct pt_regs, regs[20])},
++	{ "x21", 8, offsetof(struct pt_regs, regs[21])},
++	{ "x22", 8, offsetof(struct pt_regs, regs[22])},
++	{ "x23", 8, offsetof(struct pt_regs, regs[23])},
++	{ "x24", 8, offsetof(struct pt_regs, regs[24])},
++	{ "x25", 8, offsetof(struct pt_regs, regs[25])},
++	{ "x26", 8, offsetof(struct pt_regs, regs[26])},
++	{ "x27", 8, offsetof(struct pt_regs, regs[27])},
++	{ "x28", 8, offsetof(struct pt_regs, regs[28])},
++	{ "x29", 8, offsetof(struct pt_regs, regs[29])},
++	{ "x30", 8, offsetof(struct pt_regs, regs[30])},
++	{ "sp", 8, offsetof(struct pt_regs, sp)},
++	{ "pc", 8, offsetof(struct pt_regs, pc)},
++	{ "pstate", 4, offsetof(struct pt_regs, pstate)},
++	{ "v0", 16, -1 },
++	{ "v1", 16, -1 },
++	{ "v2", 16, -1 },
++	{ "v3", 16, -1 },
++	{ "v4", 16, -1 },
++	{ "v5", 16, -1 },
++	{ "v6", 16, -1 },
++	{ "v7", 16, -1 },
++	{ "v8", 16, -1 },
++	{ "v9", 16, -1 },
++	{ "v10", 16, -1 },
++	{ "v11", 16, -1 },
++	{ "v12", 16, -1 },
++	{ "v13", 16, -1 },
++	{ "v14", 16, -1 },
++	{ "v15", 16, -1 },
++	{ "v16", 16, -1 },
++	{ "v17", 16, -1 },
++	{ "v18", 16, -1 },
++	{ "v19", 16, -1 },
++	{ "v20", 16, -1 },
++	{ "v21", 16, -1 },
++	{ "v22", 16, -1 },
++	{ "v23", 16, -1 },
++	{ "v24", 16, -1 },
++	{ "v25", 16, -1 },
++	{ "v26", 16, -1 },
++	{ "v27", 16, -1 },
++	{ "v28", 16, -1 },
++	{ "v29", 16, -1 },
++	{ "v30", 16, -1 },
++	{ "v31", 16, -1 },
++	{ "fpsr", 4, -1 },
++	{ "fpcr", 4, -1 },
++};
++
++char *dbg_get_reg(int regno, void *mem, struct pt_regs *regs)
++{
++	if (regno >= DBG_MAX_REG_NUM || regno < 0)
++		return NULL;
++
++	if (dbg_reg_def[regno].offset != -1)
++		memcpy(mem, (void *)regs + dbg_reg_def[regno].offset,
++		       dbg_reg_def[regno].size);
++	else
++		memset(mem, 0, dbg_reg_def[regno].size);
++	return dbg_reg_def[regno].name;
++}
++
++int dbg_set_reg(int regno, void *mem, struct pt_regs *regs)
++{
++	if (regno >= DBG_MAX_REG_NUM || regno < 0)
++		return -EINVAL;
++
++	if (dbg_reg_def[regno].offset != -1)
++		memcpy((void *)regs + dbg_reg_def[regno].offset, mem,
++		       dbg_reg_def[regno].size);
++	return 0;
++}
++
++void
++sleeping_thread_to_gdb_regs(unsigned long *gdb_regs, struct task_struct *task)
++{
++	struct pt_regs *thread_regs;
++	int regno;
++	int i;
++
++	/* Just making sure... */
++	if (task == NULL)
++		return;
++
++	/* Initialize to zero */
++	for (regno = 0; regno < DBG_MAX_REG_NUM; regno++)
++		gdb_regs[regno] = 0;
++
++	thread_regs		= task_pt_regs(task);
++
++	for(i = 0; i < 31; i++)
++		gdb_regs[i] = thread_regs->regs[i];
++
++        gdb_regs[31]            = thread_regs->sp;
++        gdb_regs[32]            = thread_regs->pc;
++        gdb_regs[33]            = thread_regs->pstate;
++}
++
++void kgdb_arch_set_pc(struct pt_regs *regs, unsigned long pc)
++{
++	regs->pc = pc;
++}
++
++static int compiled_break;
++
++int kgdb_arch_handle_exception(int exception_vector, int signo,
++			       int err_code, char *remcom_in_buffer,
++			       char *remcom_out_buffer,
++			       struct pt_regs *linux_regs)
++{
++	unsigned long addr;
++	char *ptr;
++	int err;
++
++	switch (remcom_in_buffer[0]) {
++	case 'D':
++	case 'k':
++	case 'c':
++		/*
++		 * Packet D (Detach), k (kill) & c (Continue) requires
++		 * to continue executing. Set pc to required address.
++		 * Try to read optional parameter, pc unchanged if no parm.
++		 * If this was a compiled breakpoint, we need to move
++		 * to the next instruction or we will just breakpoint
++		 * over and over again.
++		 */
++		ptr = &remcom_in_buffer[1];
++		if (kgdb_hex2long(&ptr, &addr))
++			kgdb_arch_set_pc(linux_regs, addr);
++		else if (compiled_break == 1)
++			kgdb_arch_set_pc(linux_regs, linux_regs->pc + 4);
++
++		compiled_break = 0;
++
++		err = 0;
++		break;
++	default:
++		err = -1;
++	}
++	return err;
++}
++
++static int
++kgdb_brk_fn(struct pt_regs *regs, unsigned int esr, unsigned long addr)
++{
++	kgdb_handle_exception(1, SIGTRAP, 0, regs);
++	return 0;
++}
++
++static int kgdb_compiled_brk_fn(struct pt_regs *regs, unsigned int esr,
++				unsigned long addr)
++{
++	compiled_break = 1;
++	kgdb_handle_exception(1, SIGTRAP, 0, regs);
++
++	return 0;
++}
++
++static struct break_hook kgdb_brkpt_hook = {
++	.esr_mask		= 0xffffffff,
++	.esr_val		= KGDB_BREAKINST_ESR_VAL,
++	.fn			= kgdb_brk_fn
++};
++
++static struct break_hook kgdb_compiled_brkpt_hook = {
++	.esr_mask		= 0xffffffff,
++	.esr_val		= KGDB_COMPILED_BREAK_ESR_VAL,
++	.fn			= kgdb_compiled_brk_fn
++};
++
++static void kgdb_call_nmi_hook(void *ignored)
++{
++       kgdb_nmicallback(raw_smp_processor_id(), get_irq_regs());
++}
++
++void kgdb_roundup_cpus(unsigned long flags)
++{
++       local_irq_enable();
++       smp_call_function(kgdb_call_nmi_hook, NULL, 0);
++       local_irq_disable();
++}
++
++static int __kgdb_notify(struct die_args *args, unsigned long cmd)
++{
++	struct pt_regs *regs = args->regs;
++
++	if (kgdb_handle_exception(1, args->signr, cmd, regs))
++		return NOTIFY_DONE;
++	return NOTIFY_STOP;
++}
++
++static int
++kgdb_notify(struct notifier_block *self, unsigned long cmd, void *ptr)
++{
++	unsigned long flags;
++	int ret;
++
++	local_irq_save(flags);
++	ret = __kgdb_notify(ptr, cmd);
++	local_irq_restore(flags);
++
++	return ret;
++}
++
++static struct notifier_block kgdb_notifier = {
++	.notifier_call	= kgdb_notify,
++	.priority	= -INT_MAX,
++};
++
++
++/*
++ *	kgdb_arch_init - Perform any architecture specific initalization.
++ *
++ *	This function will handle the initalization of any architecture
++ *	specific callbacks.
++ */
++int kgdb_arch_init(void)
++{
++	int ret = register_die_notifier(&kgdb_notifier);
++
++	if (ret != 0)
++		return ret;
++
++	register_break_hook(&kgdb_brkpt_hook);
++	register_break_hook(&kgdb_compiled_brkpt_hook);
++
++	return 0;
 +}
 +
 +/*
-+ * Call registered single step handers
-+ * There is no Syndrome info to check for determining the handler.
-+ * So we call all the registered handlers, until the right handler is
-+ * found which returns zero.
++ *	kgdb_arch_exit - Perform any architecture specific uninitalization.
++ *
++ *	This function will handle the uninitalization of any architecture
++ *	specific callbacks, for dynamic registration and unregistration.
 + */
-+static int call_step_hook(struct pt_regs *regs,
-+		unsigned int esr, unsigned long addr)
++void kgdb_arch_exit(void)
 +{
-+	struct step_hook *hook;
-+	int (*fn)(struct pt_regs *regs,
-+		unsigned int esr, unsigned long addr) = NULL;
-+
-+	raw_spin_lock(&step_lock);
-+	list_for_each_entry(hook, &step_hook, node)	{
-+		fn = hook->fn;
-+		raw_spin_unlock(&step_lock);
-+
-+		if (!fn(regs, esr, addr))
-+			return 0;
-+
-+		raw_spin_lock(&step_lock);
-+	}
-+	raw_spin_unlock(&step_lock);
-+
-+	return 1;
++	unregister_break_hook(&kgdb_brkpt_hook);
++	unregister_break_hook(&kgdb_compiled_brkpt_hook);
++	unregister_die_notifier(&kgdb_notifier);
 +}
 +
- static int single_step_handler(unsigned long addr, unsigned int esr,
- 			       struct pt_regs *regs)
- {
-@@ -215,8 +261,11 @@ static int single_step_handler(unsigned long addr, unsigned int esr,
- 		 */
- 		user_rewind_single_step(current);
- 	} else {
--		/* TODO: route to KGDB */
--		pr_warning("Unexpected kernel single-step exception at EL1\n");
-+		/* Call single step handlers for kgdb/kprobes */
-+		if (call_step_hook(regs, esr, addr) == 0)
-+			return 0;
-+
-+		pr_warn("unexpected single step exception at %lx!\n", addr);
- 		/*
- 		 * Re-enable stepping since we know that we will be
- 		 * returning to regs.
-@@ -227,11 +276,51 @@ static int single_step_handler(unsigned long addr, unsigned int esr,
- 	return 0;
- }
- 
-+
-+static LIST_HEAD(break_hook);
-+static DEFINE_RAW_SPINLOCK(break_lock);
-+
-+void register_break_hook(struct break_hook *hook)
-+{
-+	raw_spin_lock(&break_lock);
-+	list_add(&hook->node, &break_hook);
-+	raw_spin_unlock(&break_lock);
-+}
-+
-+void unregister_break_hook(struct break_hook *hook)
-+{
-+	raw_spin_lock(&break_lock);
-+	list_del(&hook->node);
-+	raw_spin_unlock(&break_lock);
-+}
-+
-+static int call_break_hook(struct pt_regs *regs,
-+		unsigned int esr, unsigned long addr)
-+{
-+	struct break_hook *hook;
-+	int (*fn)(struct pt_regs *regs,
-+		unsigned int esr, unsigned long addr) = NULL;
-+
-+	raw_spin_lock(&break_lock);
-+	list_for_each_entry(hook, &break_hook, node)
-+		if ((esr & hook->esr_mask) == hook->esr_val)
-+			fn = hook->fn;
-+	raw_spin_unlock(&break_lock);
-+
-+	return fn ? fn(regs, esr, addr) : 1;
-+}
-+
- static int brk_handler(unsigned long addr, unsigned int esr,
- 		       struct pt_regs *regs)
- {
- 	siginfo_t info;
- 
-+	/* Call single step handlers for kgdb/kprobes */
-+	if (call_break_hook(regs, esr, addr) == 0)
-+		return 0;
-+
-+	pr_warn("unexpected brk exception at %lx, esr=0x%x\n", addr, esr);
-+
- 	if (!user_mode(regs))
- 		return -EFAULT;
- 
-@@ -291,7 +380,7 @@ static int __init debug_traps_init(void)
- 	hook_debug_fault_code(DBG_ESR_EVT_HWSS, single_step_handler, SIGTRAP,
- 			      TRAP_HWBKPT, "single-step handler");
- 	hook_debug_fault_code(DBG_ESR_EVT_BRK, brk_handler, SIGTRAP,
--			      TRAP_BRKPT, "ptrace BRK handler");
-+			      TRAP_BRKPT, "AArch64 BRK handler");
- 	return 0;
- }
- arch_initcall(debug_traps_init);
-diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index 3881fd1..9589242 100644
---- a/arch/arm64/kernel/entry.S
-+++ b/arch/arm64/kernel/entry.S
-@@ -288,8 +288,12 @@ el1_dbg:
- 	/*
- 	 * Debug exception handling
- 	 */
-+	cmp	x24, #ESR_EL1_EC_BRK64		// if BRK64
-+	cinc	x24, x24, eq			// set bit '0'
- 	tbz	x24, #0, el1_inv		// EL1 only
--	mrs	x0, far_el1
-+	mrs	x25, far_el1			// Watchpoint location
-+	cmp	x24, #ESR_EL1_EC_WATCHPT_EL1
-+	csel	x0, x25, x22, eq	// addr: x25->far_el1, x22->elr_el1
- 	mov	x2, sp				// struct pt_regs
- 	bl	do_debug_exception
- 
++/*
++ * ARM instructions are always in LE.
++ * Break instruction is encoded in LE format
++ */
++struct kgdb_arch arch_kgdb_ops = {
++	.gdb_bpt_instr		= {0x00, 0x00, 0x20, 0xd4}
++};
 -- 
 1.7.9.5
