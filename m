@@ -1,39 +1,38 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 30 Sep 2013 09:07:09 -0700
-Subject: [GIT PULL] ux500 device tree changes for v3.13 take 2
-In-Reply-To: <CAOesGMgrX+j7UvtYuN68hk0-qaNtZ_-LkBqeXU1fTp86td4fkg@mail.gmail.com>
-References: <CACRpkdYdguwxau-NRRP1mEOzdRTecYuz+RV_j7-VCEUTK-NN3w@mail.gmail.com>
- <CAOesGMgrX+j7UvtYuN68hk0-qaNtZ_-LkBqeXU1fTp86td4fkg@mail.gmail.com>
-Message-ID: <CAOesGMhi=3C1CACYKTdNxQfOi8NAzyuv5-jwBSYPRJU9mMdcWw@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 30 Sep 2013 17:07:52 +0100
+Subject: [PATCH 1/2] ARM: include: asm: use 'long long' instead of 'u64'
+ within atomic.h
+In-Reply-To: <5247A1FA.4030305@asianux.com>
+References: <523D7DC7.8030603@asianux.com>
+ <20130924093041.GB15119@mudshark.cambridge.arm.com>
+ <5242498F.8060407@asianux.com>
+ <20130925160746.GC14502@mudshark.cambridge.arm.com>
+ <5243953E.6010405@asianux.com>
+ <20130926100422.GE2855@mudshark.cambridge.arm.com>
+ <5244148F.6080405@asianux.com>
+ <20130927110618.GB9520@mudshark.cambridge.arm.com>
+ <5247A1D1.6080505@asianux.com> <5247A1FA.4030305@asianux.com>
+Message-ID: <20130930160752.GH26036@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 30, 2013 at 7:44 AM, Olof Johansson <olof@lixom.net> wrote:
-> On Thu, Sep 26, 2013 at 3:45 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
->> Hi ARM SoC folks,
->>
->> This is a second version of the pull request from yesterday, now
->> with a (hopefully) sanitized history, and a patch on top of it fixing
->> a build problem that I just sent out.
->>
->> Please pull this in for v3.13!
->
-> Hi,
->
-> I've pulled in this.
->
-> In the future, please squash down some of these patches when you apply
-> them, there's really no point in splitting them up this much in the
-> tree.
+On Sun, Sep 29, 2013 at 04:43:54AM +0100, Chen Gang wrote:
+> atomic* value is signed value, and atomic* functions need also process
+> signed value (parameter value, and return value), so 32-bit arm need
+> use 'long long' instead of 'u64'.
+> 
+> After replacement, it will also fix a bug for atomic64_add_negative():
+> "u64 is never less than 0".
+> 
+> The modifications are:
+> 
+>   in vim, use "1,% s/\<u64\>/long long/g" command.
+>   remove '__aligned(8)' which is useless for 64-bit.
+>   be sure of 80 column limitation after replacement.
+> 
+> 
+> Signed-off-by: Chen Gang <gang.chen@asianux.com>
 
-I just noticed that snowball doesn't boot with u8500_defconfig due to
-this branch. Not so strange maybe since appended dtb support isn't
-enabled. I'll add a patch on top for that.
+Acked-by: Will Deacon <will.deacon@arm.com>
 
-Also, snowball is spewing a lot of errors about i2c devices now, looks
-like the device tree contents isn't correct. I think these have shown
-up with multi_v7_defconfig in the past as well but I didn't notice.
-Something to look at on a rainy day.
-
-
--Olof
+Will
