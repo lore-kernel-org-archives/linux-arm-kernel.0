@@ -1,29 +1,30 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 30 Sep 2013 10:20:58 +0200
-Subject: [PATCHv5 0/4] Add Freescale FTM PWM driver.
-In-Reply-To: <1380521611-2764-1-git-send-email-Li.Xiubo@freescale.com>
-References: <1380521611-2764-1-git-send-email-Li.Xiubo@freescale.com>
-Message-ID: <20130930082058.GB30088@pengutronix.de>
+From: rric@kernel.org (Robert Richter)
+Date: Mon, 30 Sep 2013 10:49:45 +0200
+Subject: [PATCH] arm, kbuild: make "make install" not depend on vmlinux
+In-Reply-To: <51E7B3D0.4060609@suse.cz>
+References: <20130710133742.GA29368@emu.suse.cz>
+ <CA+55aFxtvT3Yvbxe5JGBThZS13payymFJ7jCLyEiE2iNDvsZtQ@mail.gmail.com>
+ <20130711135445.GA21500@sepie.suse.cz>
+ <CA+55aFyVjugxM7cUDWi0ASWttYthCxa6e7X3CADknBcSFxWgew@mail.gmail.com>
+ <20130712105721.GF8731@rric.localhost>
+ <20130717160506.GI8731@rric.localhost>
+ <CA+55aFx4G5gME3ByqE0Wr-_t2x_6WkP3Ta4k1z4jfW+PrcK0og@mail.gmail.com>
+ <20130717165743.GK8731@rric.localhost>
+ <CA+55aFzhmV7iq+Pv37trMCmdNzk53ORAoj0a6rV14fzKta3Dhw@mail.gmail.com>
+ <51E7B3D0.4060609@suse.cz>
+Message-ID: <20130930084945.GA1963@rric.localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 30, 2013 at 02:13:27PM +0800, Xiubo Li wrote:
-> Hello,
+On 18.07.13 11:22:24, Michal Marek wrote:
+> > So Michal (or ARM people - whoever wants to take the patch), just take
+> > my ack. No objections.
 > 
-> This patch series is the Freescale FTM PWM implementation. And there are 8 channels most supported by the FTM PWM. This implementation is only compatible with device tree definition.
-> 
-> This patch series is based on linux-next and has been tested on Vybrid VF610 Tower board using device tree.
+> I can add it to the kbuild tree if needed. Otherwise you can add
+> Acked-by: Michal Marek <mmarek@suse.cz>.
 
-Looks good to me now. Thanks for fixing.
+This didn't make it upstream yet, can somebody at it to a tree?
 
-For the series:
+Thanks,
 
-Reviewed-by: Sascha Hauer <s.hauer@pengutronix.de>
-
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+-Robert
