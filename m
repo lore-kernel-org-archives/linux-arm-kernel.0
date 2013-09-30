@@ -1,96 +1,64 @@
-From: andreas.herrmann@calxeda.com (Andreas Herrmann)
-Date: Mon, 30 Sep 2013 15:56:21 +0200
-Subject: [PATCH] iommu/arm-smmu: Clear global and context bank fault status
- registers
-In-Reply-To: <20130930135401.GV3315@alberich>
-References: <1380234982-1677-1-git-send-email-andreas.herrmann@calxeda.com>
- <1380234982-1677-6-git-send-email-andreas.herrmann@calxeda.com>
- <20130927085255.GC8319@mudshark.cambridge.arm.com>
- <20130930135401.GV3315@alberich>
-Message-ID: <20130930135621.GW3315@alberich>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Mon, 30 Sep 2013 15:59:10 +0200
+Subject: [PATCH v2 1/3] dma: mxs-dma: Cleanup interrupt handler
+In-Reply-To: <21065.33455.71463.188271@ipc1.ka-ro>
+References: <1380546822-14034-1-git-send-email-mpa@pengutronix.de>
+ <1380546822-14034-2-git-send-email-mpa@pengutronix.de>
+ <21065.33455.71463.188271@ipc1.ka-ro>
+Message-ID: <524983AE.8020706@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 09/30/2013 03:54 PM, Lothar Wa?mann wrote:
+> Hi,
+> 
+> Markus Pargmann writes:
+>> The DMA interrupt handler uses its controll registers to handle all
+>> available channel interrupts it can find.
+>>
+>> This patch changes it to handle only one interrupt by directly mapping
+>> irq number to channel. It also includes a cleanup of the ctrl-register
+>> usage.
+>>
+>> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+>> ---
+>>  drivers/dma/mxs-dma.c | 95 ++++++++++++++++++++++++++++++++-------------------
+>>  1 file changed, 59 insertions(+), 36 deletions(-)
+>>
+>> diff --git a/drivers/dma/mxs-dma.c b/drivers/dma/mxs-dma.c
+>> index ccd13df..bfca8dc 100644
+>> --- a/drivers/dma/mxs-dma.c
+>> +++ b/drivers/dma/mxs-dma.c
+>> @@ -272,58 +272,81 @@ static void mxs_dma_tasklet(unsigned long data)
+>>  		mxs_chan->desc.callback(mxs_chan->desc.callback_param);
+>>  }
+>>  
+>> +static int mxs_dma_irq_to_chan(struct mxs_dma_engine *mxs_dma, int irq)
+>> +{
+>> +	int i;
+>> +
+>> +	for (i = 0; i != mxs_dma->nr_channels; ++i)
+>> +		if (mxs_dma->mxs_chans[i].chan_irq == irq)
+>> +			return i;
+>>
+> You might use a linked list for all active channels so that you don't
+> have to check all unused channels when trying to find the channel
+> number for an irq.
 
-After reset these registers have unknown values.
-This might cause problems when evaluating SMMU_GFSR and/or SMMU_CB_FSR
-in handlers for combined interrupts.
+Or an array of mxs_dma->nr_channels length for direct mapping.
 
-Signed-off-by: Andreas Herrmann <andreas.herrmann@calxeda.com>
----
- drivers/iommu/arm-smmu.c |   27 ++++++++++++++++++++-------
- 1 file changed, 20 insertions(+), 7 deletions(-)
+Marc
 
-diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index 579b6f8..cbbf597 100644
---- a/drivers/iommu/arm-smmu.c
-+++ b/drivers/iommu/arm-smmu.c
-@@ -631,6 +631,12 @@ static irqreturn_t arm_smmu_global_fault(int irq, void *dev)
- 	return IRQ_HANDLED;
- }
- 
-+static void arm_smmu_clear_cb_fsr(struct arm_smmu_device *smmu, u8 cbndx)
-+{
-+	void __iomem *cb_base = ARM_SMMU_CB_BASE(smmu) + ARM_SMMU_CB(smmu, cbndx);
-+	writel_relaxed(FSR_FAULT, cb_base + ARM_SMMU_CB_FSR);
-+}
-+
- static void arm_smmu_init_context_bank(struct arm_smmu_domain *smmu_domain)
- {
- 	u32 reg;
-@@ -838,6 +844,7 @@ static int arm_smmu_init_domain_context(struct iommu_domain *domain,
- 		root_cfg->irptndx = root_cfg->cbndx;
- 	}
- 
-+	arm_smmu_clear_cb_fsr(smmu, root_cfg->cbndx);
- 	irq = smmu->irqs[smmu->num_global_irqs + root_cfg->irptndx];
- 	ret = request_irq(irq, arm_smmu_context_fault, IRQF_SHARED,
- 			  "arm-smmu-context-fault", domain);
-@@ -1564,7 +1571,11 @@ static void arm_smmu_device_reset(struct arm_smmu_device *smmu)
- 	void __iomem *gr0_base = ARM_SMMU_GR0(smmu);
- 	void __iomem *sctlr_base = ARM_SMMU_CB_BASE(smmu) + ARM_SMMU_CB_SCTLR;
- 	int i = 0;
--	u32 scr0 = readl_relaxed(gr0_base + ARM_SMMU_GR0_sCR0);
-+	u32 val;
-+
-+	/* clear global FSR */
-+	val = readl_relaxed(gr0_base + ARM_SMMU_GR0_sGFSR);
-+	writel(val, gr0_base + ARM_SMMU_GR0_sGFSR);
- 
- 	/* Mark all SMRn as invalid and all S2CRn as bypass */
- 	for (i = 0; i < smmu->num_mapping_groups; ++i) {
-@@ -1581,24 +1592,26 @@ static void arm_smmu_device_reset(struct arm_smmu_device *smmu)
- 	writel_relaxed(0, gr0_base + ARM_SMMU_GR0_TLBIALLH);
- 	writel_relaxed(0, gr0_base + ARM_SMMU_GR0_TLBIALLNSNH);
- 
-+	val = readl_relaxed(gr0_base + ARM_SMMU_GR0_sCR0);
-+
- 	/* Enable fault reporting */
--	scr0 |= (sCR0_GFRE | sCR0_GFIE | sCR0_GCFGFRE | sCR0_GCFGFIE);
-+	val |= (sCR0_GFRE | sCR0_GFIE | sCR0_GCFGFRE | sCR0_GCFGFIE);
- 
- 	/* Disable TLB broadcasting. */
--	scr0 |= (sCR0_VMIDPNE | sCR0_PTM);
-+	val |= (sCR0_VMIDPNE | sCR0_PTM);
- 
- 	/* Enable client access, but bypass when no mapping is found */
--	scr0 &= ~(sCR0_CLIENTPD | sCR0_USFCFG);
-+	val &= ~(sCR0_CLIENTPD | sCR0_USFCFG);
- 
- 	/* Disable forced broadcasting */
--	scr0 &= ~sCR0_FB;
-+	val &= ~sCR0_FB;
- 
- 	/* Don't upgrade barriers */
--	scr0 &= ~(sCR0_BSU_MASK << sCR0_BSU_SHIFT);
-+	val &= ~(sCR0_BSU_MASK << sCR0_BSU_SHIFT);
- 
- 	/* Push the button */
- 	arm_smmu_tlb_sync(smmu);
--	writel(scr0, gr0_base + ARM_SMMU_GR0_sCR0);
-+	writel(val, gr0_base + ARM_SMMU_GR0_sCR0);
- }
- 
- static int arm_smmu_id_size_to_bits(int size)
 -- 
-1.7.9.5
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 259 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130930/33c1b90f/attachment.sig>
