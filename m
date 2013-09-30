@@ -1,32 +1,24 @@
-From: mbizon@freebox.fr (Maxime Bizon)
-Date: Mon, 30 Sep 2013 23:07:45 +0200
-Subject: [PATCH RESEND] ARM: add dtbImage.<dt> and dtbuImage.<dt> rules
-In-Reply-To: <20130930204223.GJ31178@titan.lakedaemon.net>
-References: <504DFBBF.5010202@free-electrons.com>
- <1348733441-11626-1-git-send-email-richard.genoud@gmail.com>
- <20120927082955.GR17667@game.jcrosoft.org>
- <CACQ1gAgwv4pBFZBrVZiWM2_=OneUO-s16LufSENx27gMC3DUig@mail.gmail.com>
- <52416F97.802@keymile.com> <20130924120152.GI11119@titan.lakedaemon.net>
- <20130924121939.GD12758@n2100.arm.linux.org.uk>
- <1380572483.31472.51.camel@sakura.staff.proxad.net>
- <20130930204223.GJ31178@titan.lakedaemon.net>
-Message-ID: <1380575265.23932.11.camel@sakura.staff.proxad.net>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Mon, 30 Sep 2013 23:16:50 +0200
+Subject: [PATCH 0/4] Kirkwood: minor cleanups
+In-Reply-To: <1380575010-8573-1-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1380575010-8573-1-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <20130930211650.GF6735@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+> The third and fourth patch are related: the latter strictly depends on
+> the former. The idea behind these two patches is basically to convert
+> the "keep the ethernet clocks enabled by calling clk_enable()" hack
+> into a simpler and cleaner usage of the CLK_IGNORE_UNUSED flags which
+> prevent these clocks from being ever gated.
 
-On Mon, 2013-09-30 at 16:42 -0400, Jason Cooper wrote:
+Hi Ezequiel
 
-> Nicolas Pitre already suggested an impedance matcher that keeps this
-> kind of hacky code out of the kernel, and allows users to do exactly
+This should work, but what would be nicer is to look and see if there
+is a node in DT for each device. If it does not have a node, don't set
+CLK_IGNORE_UNUSED, so that the clock does get turned off, and we save
+a bit of power. Quite a few of the kirkwood devices only have one
+ethernet.
 
-I know that, my proposal was to bring this back into the kernel.
-
-That "kind of hacky" ATAG thing was actually the only supported way to
-boot a platform not so long ago :)
-
-In the end, people needing the impedance matcher will somehow integrate
-it in the kernel build system anyway.
-
--- 
-Maxime
+	Andrew
