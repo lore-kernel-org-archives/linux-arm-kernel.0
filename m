@@ -1,85 +1,50 @@
 From: konrad.wilk@oracle.com (Konrad Rzeszutek Wilk)
-Date: Mon, 30 Sep 2013 11:56:17 -0400
-Subject: [PATCH v6 12/19] swiotlb: don't assume that
- io_tlb_start-io_tlb_end is coherent
-In-Reply-To: <1380298207-29151-12-git-send-email-stefano.stabellini@eu.citrix.com>
+Date: Mon, 30 Sep 2013 11:58:08 -0400
+Subject: [PATCH v6 14/19] swiotlb: print a warning when the swiotlb is full
+In-Reply-To: <1380298207-29151-14-git-send-email-stefano.stabellini@eu.citrix.com>
 References: <alpine.DEB.2.02.1309271653420.5498@kaball.uk.xensource.com>
- <1380298207-29151-12-git-send-email-stefano.stabellini@eu.citrix.com>
-Message-ID: <20130930155617.GS3106@phenom.dumpdata.com>
+ <1380298207-29151-14-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <20130930155808.GT3106@phenom.dumpdata.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 27, 2013 at 05:10:00PM +0100, Stefano Stabellini wrote:
-> The swiotlb code has appropriate calls to dma_mark_clean in place for
-> buffers passed to swiotlb_map_page as an argument. However it assumes
-> that the swiotlb bounce buffer (io_tlb_start-io_tlb_end) is already
-> coherent and doesn't need any calls to dma_mark_clean.
-> 
-> On ARM the swiotlb bounce buffer is not coherent (the memory is
-> writealloc while it should be bufferable) and therefore we need to call
-> dma_mark_clean appropriately on the bounce buffer code paths too.
-> 
-> Note that most architecures have an empty dma_mark_clean implementation
-> anyway.
-
-The other architecture that uses swiotlb is IA64 and that does have
-an implementation where it touches on page attributes.
-
-Which means I have to figure out why my HP zx6000 won't boot with 3.11 now :-(
-
-> 
+On Fri, Sep 27, 2013 at 05:10:02PM +0100, Stefano Stabellini wrote:
 > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 > ---
->  lib/swiotlb.c |   13 ++++++++++---
->  1 files changed, 10 insertions(+), 3 deletions(-)
+>  drivers/xen/swiotlb-xen.c |    1 +
+>  lib/swiotlb.c             |    1 +
+>  2 files changed, 2 insertions(+), 0 deletions(-)
 > 
+> diff --git a/drivers/xen/swiotlb-xen.c b/drivers/xen/swiotlb-xen.c
+> index 96ad316..790c2eb 100644
+> --- a/drivers/xen/swiotlb-xen.c
+> +++ b/drivers/xen/swiotlb-xen.c
+> @@ -674,6 +674,7 @@ xen_swiotlb_map_sg_attrs(struct device *hwdev, struct scatterlist *sgl,
+>  								 sg->length,
+>  								 dir);
+>  			if (map == SWIOTLB_MAP_ERROR) {
+> +				pr_warn("swiotlb buffer is full\n");
+
+It would be beneficial to use dev_warn instead.
+
+And perhaps even call debug_dma_dump_mappings to help in diagnosing
+a problem?
+
+>  				/* Don't panic here, we expect map_sg users
+>  				   to do proper error handling. */
+>  				xen_swiotlb_unmap_sg_attrs(hwdev, sgl, i, dir,
 > diff --git a/lib/swiotlb.c b/lib/swiotlb.c
-> index 4e8686c..eb45d17 100644
+> index eb45d17..f06da0d 100644
 > --- a/lib/swiotlb.c
 > +++ b/lib/swiotlb.c
-> @@ -515,6 +515,7 @@ found:
->  		io_tlb_orig_addr[index+i] = orig_addr + (i << IO_TLB_SHIFT);
->  	if (dir == DMA_TO_DEVICE || dir == DMA_BIDIRECTIONAL)
->  		swiotlb_bounce(orig_addr, tlb_addr, size, DMA_TO_DEVICE);
-> +	dma_mark_clean(phys_to_virt(tlb_addr), size);
+> @@ -502,6 +502,7 @@ phys_addr_t swiotlb_tbl_map_single(struct device *hwdev,
 >  
->  	return tlb_addr;
->  }
-> @@ -547,7 +548,10 @@ void swiotlb_tbl_unmap_single(struct device *hwdev, phys_addr_t tlb_addr,
->  	 * First, sync the memory before unmapping the entry
->  	 */
->  	if (orig_addr && ((dir == DMA_FROM_DEVICE) || (dir == DMA_BIDIRECTIONAL)))
-> +	{
-> +		dma_mark_clean(phys_to_virt(tlb_addr), size);
->  		swiotlb_bounce(orig_addr, tlb_addr, size, DMA_FROM_DEVICE);
-> +	}
->  
->  	/*
->  	 * Return the buffer to the free list by setting the corresponding
-> @@ -587,17 +591,20 @@ void swiotlb_tbl_sync_single(struct device *hwdev, phys_addr_t tlb_addr,
->  
->  	switch (target) {
->  	case SYNC_FOR_CPU:
-> -		if (likely(dir == DMA_FROM_DEVICE || dir == DMA_BIDIRECTIONAL))
-> +		if (likely(dir == DMA_FROM_DEVICE || dir == DMA_BIDIRECTIONAL)) {
-> +			dma_mark_clean(phys_to_virt(tlb_addr), size);
->  			swiotlb_bounce(orig_addr, tlb_addr,
->  				       size, DMA_FROM_DEVICE);
-> +		}
->  		else
->  			BUG_ON(dir != DMA_TO_DEVICE);
->  		break;
->  	case SYNC_FOR_DEVICE:
-> -		if (likely(dir == DMA_TO_DEVICE || dir == DMA_BIDIRECTIONAL))
-> +		if (likely(dir == DMA_TO_DEVICE || dir == DMA_BIDIRECTIONAL)) {
->  			swiotlb_bounce(orig_addr, tlb_addr,
->  				       size, DMA_TO_DEVICE);
-> -		else
-> +			dma_mark_clean(phys_to_virt(tlb_addr), size);
-> +		} else
->  			BUG_ON(dir != DMA_FROM_DEVICE);
->  		break;
->  	default:
+>  not_found:
+>  	spin_unlock_irqrestore(&io_tlb_lock, flags);
+> +	pr_warn("swiotlb buffer is full\n");
+>  	return SWIOTLB_MAP_ERROR;
+>  found:
+>  	spin_unlock_irqrestore(&io_tlb_lock, flags);
 > -- 
 > 1.7.2.5
 > 
