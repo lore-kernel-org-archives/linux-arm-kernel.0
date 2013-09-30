@@ -1,43 +1,32 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Mon, 30 Sep 2013 20:31:05 +0200
-Subject: [PATCH v2] ARM: shmobile: ape6evm: fix incorrect placement of
- __initdata tag
-In-Reply-To: <1959578.PFsrHiTtYY@amdc1032>
-References: <1959578.PFsrHiTtYY@amdc1032>
-Message-ID: <27072275.6rIbiFzHY2@avalon>
+From: markus.mayer@linaro.org (Markus Mayer)
+Date: Mon, 30 Sep 2013 11:39:13 -0700
+Subject: [PATCH v2] ARM: dts: bcm281xx: Add card detect GPIO
+Message-ID: <1380566353-13815-1-git-send-email-markus.mayer@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 30 September 2013 17:34:36 Bartlomiej Zolnierkiewicz wrote:
-> __initdata tag should be placed between the variable name and equal
-> sign for the variable to be placed in the intended .init.data section.
-> 
-> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+Register GPIO 14 as card detect interrupt for the SD card slot.
 
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Signed-off-by: Markus Mayer <markus.mayer@linaro.org>
+---
 
-> ---
-> v2:
-> - use __initdata as it is OK to do it
-> 
->  arch/arm/mach-shmobile/board-ape6evm.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/mach-shmobile/board-ape6evm.c
-> b/arch/arm/mach-shmobile/board-ape6evm.c index 7627385..8954f55 100644
-> --- a/arch/arm/mach-shmobile/board-ape6evm.c
-> +++ b/arch/arm/mach-shmobile/board-ape6evm.c
-> @@ -86,7 +86,7 @@ static struct gpio_keys_button gpio_buttons[] = {
->  	GPIO_KEY(KEY_VOLUMEDOWN,	329,	"S21"),
->  };
-> 
-> -static struct __initdata gpio_keys_platform_data ape6evm_keys_pdata = {
-> +static struct gpio_keys_platform_data ape6evm_keys_pdata __initdata = {
->  	.buttons	= gpio_buttons,
->  	.nbuttons	= ARRAY_SIZE(gpio_buttons),
->  };
+Changes since v1:
+- Corrected commit message to mention "card detect"
+
+ arch/arm/boot/dts/bcm11351.dtsi |    1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/boot/dts/bcm11351.dtsi b/arch/arm/boot/dts/bcm11351.dtsi
+index 05a5aab..d384ed5 100644
+--- a/arch/arm/boot/dts/bcm11351.dtsi
++++ b/arch/arm/boot/dts/bcm11351.dtsi
+@@ -93,6 +93,7 @@
+ 		compatible = "brcm,kona-sdhci";
+ 		reg = <0x3f1b0000 0x10000>;
+ 		interrupts = <0x0 73 0x4>;
++		cd-gpios = <&gpio 14 0>;
+ 		status = "disabled";
+ 	};
+ 
 -- 
-Regards,
-
-Laurent Pinchart
+1.7.9.5
