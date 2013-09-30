@@ -1,39 +1,38 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Mon, 30 Sep 2013 18:03:28 -0300
-Subject: [PATCH 2/4] ARM: kirkwood: Remove unneeded PCIe clock adding
-In-Reply-To: <1380575010-8573-1-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1380575010-8573-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1380575010-8573-3-git-send-email-ezequiel.garcia@free-electrons.com>
+Date: Mon, 30 Sep 2013 18:03:26 -0300
+Subject: [PATCH 0/4] Kirkwood: minor cleanups
+Message-ID: <1380575010-8573-1-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since the PCIe devices is properly initialized from the DT, the clocks
-are now referenced in the device tree nodes, and it's not needed
-to have this hack to add them explicitly.
+This is just a small patchset containing minor cleanups for Kirkwood SoC
+as a result of a review of the mach-dependent DT initialization code.
 
-Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
----
- arch/arm/mach-kirkwood/board-dt.c | 8 --------
- 1 file changed, 8 deletions(-)
+The first patch is a trivial cleanup, with no dependencies.
 
-diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
-index ee6297e..1bbced8 100644
---- a/arch/arm/mach-kirkwood/board-dt.c
-+++ b/arch/arm/mach-kirkwood/board-dt.c
-@@ -44,14 +44,6 @@ static void __init kirkwood_legacy_clk_init(void)
- 	clkspec.np = np;
- 	clkspec.args_count = 1;
- 
--	clkspec.args[0] = CGC_BIT_PEX0;
--	orion_clkdev_add("0", "pcie",
--			 of_clk_get_from_provider(&clkspec));
--
--	clkspec.args[0] = CGC_BIT_PEX1;
--	orion_clkdev_add("1", "pcie",
--			 of_clk_get_from_provider(&clkspec));
--
- 	/*
- 	 * The ethernet interfaces forget the MAC address assigned by
- 	 * u-boot if the clocks are turned off. Until proper DT support
+The second patch is also trivial, but given I don't have any boards
+with PCIe to test, I would appreciate if someone could give it a try.
+
+The third and fourth patch are related: the latter strictly depends on
+the former. The idea behind these two patches is basically to convert
+the "keep the ethernet clocks enabled by calling clk_enable()" hack
+into a simpler and cleaner usage of the CLK_IGNORE_UNUSED flags which
+prevent these clocks from being ever gated.
+
+I've tested these two by building the ethernet driver as a module
+and checking the MAC address is properly retained.
+
+Any comments welcome.
+
+Ezequiel Garcia (4):
+  ARM: kirkwood: Remove unneeded MBus initialization
+  ARM: kirkwood: Remove unneeded PCIe clock adding
+  clk: kirkwood: Add CLK_IGNORE_UNUSED to ethernet ge0 and ge1 clocks
+  ARM: kirkwood: Remove redundant ethernet clock enable
+
+ arch/arm/mach-kirkwood/board-dt.c | 50 ---------------------------------------
+ drivers/clk/mvebu/kirkwood.c      |  9 +++++--
+ 2 files changed, 7 insertions(+), 52 deletions(-)
+
 -- 
 1.8.1.5
