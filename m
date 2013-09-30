@@ -1,64 +1,55 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Mon, 30 Sep 2013 15:59:10 +0200
-Subject: [PATCH v2 1/3] dma: mxs-dma: Cleanup interrupt handler
-In-Reply-To: <21065.33455.71463.188271@ipc1.ka-ro>
-References: <1380546822-14034-1-git-send-email-mpa@pengutronix.de>
- <1380546822-14034-2-git-send-email-mpa@pengutronix.de>
- <21065.33455.71463.188271@ipc1.ka-ro>
-Message-ID: <524983AE.8020706@pengutronix.de>
+From: r.sricharan@ti.com (Sricharan R)
+Date: Mon, 30 Sep 2013 19:29:18 +0530
+Subject: [RFC PATCH 0/6] DRIVERS: IRQCHIP: Add support for crossbar IP
+Message-ID: <1380549564-31045-1-git-send-email-r.sricharan@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/30/2013 03:54 PM, Lothar Wa?mann wrote:
-> Hi,
-> 
-> Markus Pargmann writes:
->> The DMA interrupt handler uses its controll registers to handle all
->> available channel interrupts it can find.
->>
->> This patch changes it to handle only one interrupt by directly mapping
->> irq number to channel. It also includes a cleanup of the ctrl-register
->> usage.
->>
->> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
->> ---
->>  drivers/dma/mxs-dma.c | 95 ++++++++++++++++++++++++++++++++-------------------
->>  1 file changed, 59 insertions(+), 36 deletions(-)
->>
->> diff --git a/drivers/dma/mxs-dma.c b/drivers/dma/mxs-dma.c
->> index ccd13df..bfca8dc 100644
->> --- a/drivers/dma/mxs-dma.c
->> +++ b/drivers/dma/mxs-dma.c
->> @@ -272,58 +272,81 @@ static void mxs_dma_tasklet(unsigned long data)
->>  		mxs_chan->desc.callback(mxs_chan->desc.callback_param);
->>  }
->>  
->> +static int mxs_dma_irq_to_chan(struct mxs_dma_engine *mxs_dma, int irq)
->> +{
->> +	int i;
->> +
->> +	for (i = 0; i != mxs_dma->nr_channels; ++i)
->> +		if (mxs_dma->mxs_chans[i].chan_irq == irq)
->> +			return i;
->>
-> You might use a linked list for all active channels so that you don't
-> have to check all unused channels when trying to find the channel
-> number for an irq.
+Some socs have a large number of interrupts requests to service
+the needs of its many peripherals and subsystems. All of the interrupt
+requests lines from the subsystems are not needed at the same
+time, so they have to be muxed to the controllers appropriately.
+In such places a interrupt controllers are preceded by an
+IRQ CROSSBAR that provides flexibility in muxing the device interrupt
+requests to the controller inputs.
 
-Or an array of mxs_dma->nr_channels length for direct mapping.
+This series models the peripheral interrupts that can be routed through
+the crossbar to the GIC as 'routable-irqs'. The routable irqs are added
+in a separate linear domain inside the GIC. The registered routable domain's
+callback are invoked as a part of the GIC's callback, which in turn should
+allocate a free irq line and configure the IP accordingly. So every peripheral
+in the dts files mentions the fixed crossbar number as its interrupt. A free
+gic line for that gets allocated and configured when the peripheral's interrupt
+is mapped.
 
-Marc
+The minimal crossbar driver to track and allocate free GIC lines and configure the
+crossbar is added here, along with the DT bindings.
+
+Sricharan R (6):
+  DRIVERS: IRQCHIP: IRQ-GIC: Add support for routable irqs
+  DRIVERS: IRQCHIP: CROSSBAR: Add support for Crossbar IP
+  ARM: DTS: DRA: Add crossbar device binding
+  ARM: DTS: DRA: Replace peripheral interrupt numbers with crossbar
+    inputs.
+  ARM: OMAP4+: Correct Wakeup-gen code to use physical irq number
+  ARM: DRA: Enable Crossbar IP support for DRA7XX
+
+ Documentation/devicetree/bindings/arm/gic.txt      |    5 +
+ .../devicetree/bindings/arm/omap/crossbar.txt      |   27 +++
+ arch/arm/boot/dts/dra7.dtsi                        |   98 +++++-----
+ arch/arm/mach-omap2/Kconfig                        |    1 +
+ arch/arm/mach-omap2/omap-wakeupgen.c               |    4 +-
+ arch/arm/mach-omap2/omap4-common.c                 |    4 +
+ drivers/irqchip/Kconfig                            |    8 +
+ drivers/irqchip/Makefile                           |    1 +
+ drivers/irqchip/irq-crossbar.c                     |  195 ++++++++++++++++++++
+ drivers/irqchip/irq-gic.c                          |   57 +++++-
+ include/linux/irqchip/arm-gic.h                    |    8 +-
+ include/linux/irqchip/irq-crossbar.h               |   11 ++
+ 12 files changed, 363 insertions(+), 56 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/omap/crossbar.txt
+ create mode 100644 drivers/irqchip/irq-crossbar.c
+ create mode 100644 include/linux/irqchip/irq-crossbar.h
 
 -- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 259 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130930/33c1b90f/attachment.sig>
+1.7.9.5
