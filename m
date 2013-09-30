@@ -1,50 +1,58 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 30 Sep 2013 08:47:07 -0700
-Subject: [GIT PULL]ARM: sirf: dts fixes for 3.12-rc
-In-Reply-To: <CAGsJ_4yfNE3NMvf9jkyaZM84i9zdEM3wm=VgFPamKT_F33Lo2A@mail.gmail.com>
-References: <CAGsJ_4yfNE3NMvf9jkyaZM84i9zdEM3wm=VgFPamKT_F33Lo2A@mail.gmail.com>
-Message-ID: <CAOesGMiQKdoq8ir0OPtWOgd1ndSxvdn8C69nDy_BC-a4AZ891g@mail.gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 30 Sep 2013 17:48:54 +0200
+Subject: [PATCH v2] ARM: at91: cam60: fix incorrect placement of __initdata
+ tag
+In-Reply-To: <4748525.slmbI8ubRr@amdc1032>
+References: <4748525.slmbI8ubRr@amdc1032>
+Message-ID: <52499D66.9070203@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 30/09/2013 17:38, Bartlomiej Zolnierkiewicz :
+> __initdata tag should be placed between the variable name and equal
+> sign for the variable to be placed in the intended .init.data section.
 
-On Sun, Sep 29, 2013 at 6:29 AM, Barry Song <21cnbao@gmail.com> wrote:
-> The following changes since commit 4a10c2ac2f368583138b774ca41fac4207911983:
->
->   Linux 3.12-rc2 (2013-09-23 15:41:09 -0700)
->
-> are available in the git repository at:
->
->   git://git.kernel.org/pub/scm/linux/kernel/git/baohua/linux.git
-> tags/dts-fixes-for-3.12
->
-> for you to fetch changes up to 65dc961989ba0f4dc57d614a9af43c19460204dd:
->
->   ARM: dts: sirf: fix interrupt and dma prop of VIP for prima2 and
-> atlas6 (2013-09-29 21:08:06 +0800)
->
-> ----------------------------------------------------------------
-> ARM: sirf: dts fixes for 3.12-rc
->
-> A set of fixes for sirf dts for 3.12. Among them:
->   - add missed chhifbg node in prima2 and atlas6 dts
->   - add missed cell, cs and dma channel for SPI nodes
->   - add missed graphics2d iobg in atlas6 dts
->   - add missed address-cells and size-cells for prima2 I2C
->   - add missed memcontrol-monitor node in prima2 and atlas6 dts
+Yes, okay. But please do not mix the removal of white lines with your 
+modification.
 
-This looks like new SoC enablement to me? Or did something break that
-used to work?
+> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 
->   - fix makefile to build atlas6-evb.dtb for ARCH_ATLAS6
->   - fix the ranges of peri-iobrg of prima2
->   - fix fifosize, clks, dma channels for UART
->   - fix interrupt and dma prop of VIP for prima2 and atlas6
+Anyway, no need to resend it:
 
-These four look OK.
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-I'll cherry-pick in the fixes, please queue the rest for 3.13.
+> ---
+> v2:
+> - use __initdata as it is OK to do it
+>
+>   arch/arm/mach-at91/board-cam60.c | 4 +---
+>   1 file changed, 1 insertion(+), 3 deletions(-)
+>
+> diff --git a/arch/arm/mach-at91/board-cam60.c b/arch/arm/mach-at91/board-cam60.c
+> index ade948b..ecabbed 100644
+> --- a/arch/arm/mach-at91/board-cam60.c
+> +++ b/arch/arm/mach-at91/board-cam60.c
+> @@ -108,16 +108,14 @@ static struct spi_board_info cam60_spi_devices[] __initdata = {
+>   #endif
+>   };
+>
+> -
+>   /*
+>    * MACB Ethernet device
+>    */
+> -static struct __initdata macb_platform_data cam60_macb_data = {
+> +static struct macb_platform_data cam60_macb_data __initdata = {
+>   	.phy_irq_pin	= AT91_PIN_PB5,
+>   	.is_rmii	= 0,
+>   };
+>
+> -
+>   /*
+>    * NAND Flash
+>    */
+>
 
 
--Olof
+-- 
+Nicolas Ferre
