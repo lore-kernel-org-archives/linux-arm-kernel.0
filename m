@@ -1,63 +1,85 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 30 Sep 2013 17:49:12 +0200
-Subject: [PATCH v2] ARM: new platform for Energy Micro's EFM32 Cortex-M3
- SoCs
-In-Reply-To: <201309292100.41701.arnd@arndb.de>
-References: <1379447884-14025-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <201309272344.01386.arnd@arndb.de>
- <20130928191511.GA2548@pengutronix.de>
- <201309292100.41701.arnd@arndb.de>
-Message-ID: <20130930154912.GE2548@pengutronix.de>
+From: konrad.wilk@oracle.com (Konrad Rzeszutek Wilk)
+Date: Mon, 30 Sep 2013 11:56:17 -0400
+Subject: [PATCH v6 12/19] swiotlb: don't assume that
+ io_tlb_start-io_tlb_end is coherent
+In-Reply-To: <1380298207-29151-12-git-send-email-stefano.stabellini@eu.citrix.com>
+References: <alpine.DEB.2.02.1309271653420.5498@kaball.uk.xensource.com>
+ <1380298207-29151-12-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <20130930155617.GS3106@phenom.dumpdata.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Arnd,
-
-On Sun, Sep 29, 2013 at 09:00:41PM +0200, Arnd Bergmann wrote:
-> On Saturday 28 September 2013, Uwe Kleine-K?nig wrote:
-> > On Fri, Sep 27, 2013 at 11:44:01PM +0200, Arnd Bergmann wrote:
-> > > On Thursday 26 September 2013, Uwe Kleine-K?nig wrote:
-> > > > I made that work now and can prepare a patch. I had to drop "depends on
-> > > > !ARCH_MULTIPLATFORM" from XIP_KERNEL. That's because my machine only
-> > > > works with XIP_KERNEL as it only has 4 MiB of RAM.
-> > > 
-> > > Ok, cool. We might run into a few problems with 'make randconfig' and
-> > > 'make allyesconfig' when it becomes possible to enable XIP_KERNEL then.
-> > > IIRC, there is no fundamental reason to disallow XIP_KERNEL with
-> > > ARCH_MULTIPLATFORM, but I added the dependency because it causes
-> > > build errors in combination with other options.
-> > ah, OK. Do you have an idea to fix both?
+On Fri, Sep 27, 2013 at 05:10:00PM +0100, Stefano Stabellini wrote:
+> The swiotlb code has appropriate calls to dma_mark_clean in place for
+> buffers passed to swiotlb_map_page as an argument. However it assumes
+> that the swiotlb bounce buffer (io_tlb_start-io_tlb_end) is already
+> coherent and doesn't need any calls to dma_mark_clean.
 > 
-> No, I don't actually remember what problems I ran into. It may be anywhere
-> from trivial to impossible to fix.
-I sent a patch series (without looking much for problems :-).
-
-> > There is a BSP publically available at
-> > 
-> > 	http://git-public.pengutronix.de/?p=OSELAS.BSP-EnergyMicro-Gecko.git;a=summary
-> > 
-> > which also includes a README file. For troubleshooting /join #efm32 on
-> > freenode.
+> On ARM the swiotlb bounce buffer is not coherent (the memory is
+> writealloc while it should be bufferable) and therefore we need to call
+> dma_mark_clean appropriately on the bounce buffer code paths too.
 > 
-> I've never tried ptxdist, but if that is known to work fine with NOMMU,
-> I might just try building the base distro and running it on mach-virt.
+> Note that most architecures have an empty dma_mark_clean implementation
+> anyway.
+
+The other architecture that uses swiotlb is IA64 and that does have
+an implementation where it touches on page attributes.
+
+Which means I have to figure out why my HP zx6000 won't boot with 3.11 now :-(
+
 > 
-> Does this work with ELF FDPIC or do you need binfmt-flat?
-I use binfmt-flat, but that's because Marc (on Cc: now) created the base
-BSP for me that way. I don't know what ELF FDPIC is.
-
-> > > Do you prevent building such a kernel in Kconfig?
-> > I'm sure my Kconfig magic isn't waterproof. It took me a few tries to
-> > expand the multiarch architecture selection to make v7-m selectable at
-> > all.
+> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> ---
+>  lib/swiotlb.c |   13 ++++++++++---
+>  1 files changed, 10 insertions(+), 3 deletions(-)
 > 
-> Ok, I can have a look and give you suggestions for how it needs to be
-> phrased if it currently allows broken (non-building) combinations.
-You have the chance now to comment in the respective thread.
-
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> diff --git a/lib/swiotlb.c b/lib/swiotlb.c
+> index 4e8686c..eb45d17 100644
+> --- a/lib/swiotlb.c
+> +++ b/lib/swiotlb.c
+> @@ -515,6 +515,7 @@ found:
+>  		io_tlb_orig_addr[index+i] = orig_addr + (i << IO_TLB_SHIFT);
+>  	if (dir == DMA_TO_DEVICE || dir == DMA_BIDIRECTIONAL)
+>  		swiotlb_bounce(orig_addr, tlb_addr, size, DMA_TO_DEVICE);
+> +	dma_mark_clean(phys_to_virt(tlb_addr), size);
+>  
+>  	return tlb_addr;
+>  }
+> @@ -547,7 +548,10 @@ void swiotlb_tbl_unmap_single(struct device *hwdev, phys_addr_t tlb_addr,
+>  	 * First, sync the memory before unmapping the entry
+>  	 */
+>  	if (orig_addr && ((dir == DMA_FROM_DEVICE) || (dir == DMA_BIDIRECTIONAL)))
+> +	{
+> +		dma_mark_clean(phys_to_virt(tlb_addr), size);
+>  		swiotlb_bounce(orig_addr, tlb_addr, size, DMA_FROM_DEVICE);
+> +	}
+>  
+>  	/*
+>  	 * Return the buffer to the free list by setting the corresponding
+> @@ -587,17 +591,20 @@ void swiotlb_tbl_sync_single(struct device *hwdev, phys_addr_t tlb_addr,
+>  
+>  	switch (target) {
+>  	case SYNC_FOR_CPU:
+> -		if (likely(dir == DMA_FROM_DEVICE || dir == DMA_BIDIRECTIONAL))
+> +		if (likely(dir == DMA_FROM_DEVICE || dir == DMA_BIDIRECTIONAL)) {
+> +			dma_mark_clean(phys_to_virt(tlb_addr), size);
+>  			swiotlb_bounce(orig_addr, tlb_addr,
+>  				       size, DMA_FROM_DEVICE);
+> +		}
+>  		else
+>  			BUG_ON(dir != DMA_TO_DEVICE);
+>  		break;
+>  	case SYNC_FOR_DEVICE:
+> -		if (likely(dir == DMA_TO_DEVICE || dir == DMA_BIDIRECTIONAL))
+> +		if (likely(dir == DMA_TO_DEVICE || dir == DMA_BIDIRECTIONAL)) {
+>  			swiotlb_bounce(orig_addr, tlb_addr,
+>  				       size, DMA_TO_DEVICE);
+> -		else
+> +			dma_mark_clean(phys_to_virt(tlb_addr), size);
+> +		} else
+>  			BUG_ON(dir != DMA_FROM_DEVICE);
+>  		break;
+>  	default:
+> -- 
+> 1.7.2.5
+> 
