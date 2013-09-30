@@ -1,86 +1,32 @@
-From: fweisbec@gmail.com (Frederic Weisbecker)
-Date: Mon, 30 Sep 2013 16:06:50 +0200
-Subject: [PATCH 1/3] vtime: Add HAVE_VIRT_CPU_ACCOUNTING_GEN Kconfig
-In-Reply-To: <1380550012-7321-1-git-send-email-fweisbec@gmail.com>
-References: <1380550012-7321-1-git-send-email-fweisbec@gmail.com>
-Message-ID: <1380550012-7321-2-git-send-email-fweisbec@gmail.com>
+From: fabio.estevam@freescale.com (Fabio Estevam)
+Date: Mon, 30 Sep 2013 11:08:25 -0300
+Subject: [PATCH] ARM: mach-imx: cpu: Include <linux/err.h>
+Message-ID: <1380550105-19372-1-git-send-email-fabio.estevam@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kevin Hilman <khilman@linaro.org>
+Commit e709f38cd7 (ARM: imx6: report soc info via soc device) causes the 
+following build error on imx_v4_v5_defconfig:
 
-With VIRT_CPU_ACCOUNTING_GEN, cputime_t becomes 64-bit. In order
-to use that feature, arch code should be audited to ensure there are no
-races in concurrent read/write of cputime_t. For example,
-reading/writing 64-bit cputime_t on some 32-bit arches may require
-multiple accesses for low and high value parts, so proper locking
-is needed to protect against concurrent accesses.
+arch/arm/mach-imx/cpu.c: In function 'imx_soc_device_init':
+arch/arm/mach-imx/cpu.c:129:2: error: implicit declaration of function 'IS_ERR' [-Werror=implicit-function-declaration]
 
-Therefore, add CONFIG_HAVE_VIRT_CPU_ACCOUNTING_GEN which arches can
-enable after they've been audited for potential races.
+Include <linux/err.h> to fix it.
 
-This option is automatically enabled on 64-bit platforms.
-
-Feature requested by Frederic Weisbecker.
-
-Signed-off-by: Kevin Hilman <khilman@linaro.org>
-Cc: Ingo Molnar <mingo@kernel.org>
-Cc: Russell King <rmk@arm.linux.org.uk>
-Cc: Paul E. McKenney <paulmck@linux.vnet.ibm.com>
-Cc: Arm Linux <linux-arm-kernel@lists.infradead.org>
-Signed-off-by: Frederic Weisbecker <fweisbec@gmail.com>
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 ---
- arch/Kconfig        | 12 ++++++++++++
- init/Kconfig        |  1 +
- kernel/time/Kconfig |  1 +
- 3 files changed, 14 insertions(+)
+ arch/arm/mach-imx/cpu.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/Kconfig b/arch/Kconfig
-index af2cc6e..185f8b0 100644
---- a/arch/Kconfig
-+++ b/arch/Kconfig
-@@ -353,6 +353,18 @@ config HAVE_CONTEXT_TRACKING
- config HAVE_VIRT_CPU_ACCOUNTING
- 	bool
+diff --git a/arch/arm/mach-imx/cpu.c b/arch/arm/mach-imx/cpu.c
+index fae2c9a..c862402 100644
+--- a/arch/arm/mach-imx/cpu.c
++++ b/arch/arm/mach-imx/cpu.c
+@@ -1,4 +1,5 @@
  
-+config HAVE_VIRT_CPU_ACCOUNTING_GEN
-+	bool
-+	default y if 64BIT
-+	help
-+	  With VIRT_CPU_ACCOUNTING_GEN, cputime_t becomes 64-bit.
-+	  Before enabling this option, arch code must be audited
-+	  to ensure there are no races in concurrent read/write of
-+	  cputime_t. For example, reading/writing 64-bit cputime_t on
-+	  some 32-bit arches may require multiple accesses, so proper
-+	  locking is needed to protect against concurrent accesses.
-+
-+
- config HAVE_IRQ_TIME_ACCOUNTING
- 	bool
- 	help
-diff --git a/init/Kconfig b/init/Kconfig
-index 3ecd8a1..68c1a0e 100644
---- a/init/Kconfig
-+++ b/init/Kconfig
-@@ -355,6 +355,7 @@ config VIRT_CPU_ACCOUNTING_NATIVE
- config VIRT_CPU_ACCOUNTING_GEN
- 	bool "Full dynticks CPU time accounting"
- 	depends on HAVE_CONTEXT_TRACKING && 64BIT
-+	depends on HAVE_VIRT_CPU_ACCOUNTING_GEN
- 	select VIRT_CPU_ACCOUNTING
- 	select CONTEXT_TRACKING
- 	help
-diff --git a/kernel/time/Kconfig b/kernel/time/Kconfig
-index 2b62fe8..f148475 100644
---- a/kernel/time/Kconfig
-+++ b/kernel/time/Kconfig
-@@ -101,6 +101,7 @@ config NO_HZ_FULL
- 	depends on HAVE_CONTEXT_TRACKING
- 	# VIRT_CPU_ACCOUNTING_GEN dependency
- 	depends on 64BIT
-+	depends on HAVE_VIRT_CPU_ACCOUNTING_GEN
- 	select NO_HZ_COMMON
- 	select RCU_USER_QS
- 	select RCU_NOCB_CPU
++#include <linux/err.h>
+ #include <linux/module.h>
+ #include <linux/io.h>
+ #include <linux/of.h>
 -- 
-1.8.3.1
+1.8.1.2
