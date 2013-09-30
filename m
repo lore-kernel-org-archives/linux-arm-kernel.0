@@ -1,65 +1,55 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 30 Sep 2013 10:09:53 -0500
-Subject: [RFC PATCH 0/6] DRIVERS: IRQCHIP: Add support for crossbar IP
-In-Reply-To: <1380549564-31045-1-git-send-email-r.sricharan@ti.com>
-References: <1380549564-31045-1-git-send-email-r.sricharan@ti.com>
-Message-ID: <52499441.1030403@gmail.com>
+From: joelf@ti.com (Joel Fernandes)
+Date: Mon, 30 Sep 2013 10:12:57 -0500
+Subject: [PATCH v2 0/9] ARM: dts: DT data for OMAP platforms for v3.13
+Message-ID: <1380553986-15910-1-git-send-email-joelf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/30/2013 08:59 AM, Sricharan R wrote:
-> Some socs have a large number of interrupts requests to service
-> the needs of its many peripherals and subsystems. All of the interrupt
-> requests lines from the subsystems are not needed at the same
-> time, so they have to be muxed to the controllers appropriately.
-> In such places a interrupt controllers are preceded by an
-> IRQ CROSSBAR that provides flexibility in muxing the device interrupt
-> requests to the controller inputs.
-> 
-> This series models the peripheral interrupts that can be routed through
-> the crossbar to the GIC as 'routable-irqs'. The routable irqs are added
-> in a separate linear domain inside the GIC. The registered routable domain's
-> callback are invoked as a part of the GIC's callback, which in turn should
-> allocate a free irq line and configure the IP accordingly. So every peripheral
-> in the dts files mentions the fixed crossbar number as its interrupt. A free
-> gic line for that gets allocated and configured when the peripheral's interrupt
-> is mapped.
-> 
-> The minimal crossbar driver to track and allocate free GIC lines and configure the
-> crossbar is added here, along with the DT bindings.
+Following series is a collection of dts patches for the below features:
+crypto:
+ aes, sha on am335x
+ aes, des on am437x
+ aes, des on omap4
+display:
+  beaglebone black HDMI
+  am335x-evm panel
 
-Seems like interrupt-map property is what you need here.
+Series is based on Benoit Cousson's for_3.13/dts branch (commit sha 45646cd)
+Available at: git at github.com:joelagnel/linux-kernel.git (branch for-benoit)
 
-http://devicetree.org/Device_Tree_Usage#Advanced_Interrupt_Mapping
+v2 changes:
+ - Fixed hex capitalization
+ - Dropped interrupt-parent property and use macros
 
-Versatile Express also has an example.
+Benoit Parrot (1):
+  ARM: dts: AM33XX: Add LCDC info into am335x-evm
 
-Rob
+Darren Etheridge (1):
+  dts: boneblack: add pinmux and hdmi node to enable display
 
-> 
-> Sricharan R (6):
->   DRIVERS: IRQCHIP: IRQ-GIC: Add support for routable irqs
->   DRIVERS: IRQCHIP: CROSSBAR: Add support for Crossbar IP
->   ARM: DTS: DRA: Add crossbar device binding
->   ARM: DTS: DRA: Replace peripheral interrupt numbers with crossbar
->     inputs.
->   ARM: OMAP4+: Correct Wakeup-gen code to use physical irq number
->   ARM: DRA: Enable Crossbar IP support for DRA7XX
-> 
->  Documentation/devicetree/bindings/arm/gic.txt      |    5 +
->  .../devicetree/bindings/arm/omap/crossbar.txt      |   27 +++
->  arch/arm/boot/dts/dra7.dtsi                        |   98 +++++-----
->  arch/arm/mach-omap2/Kconfig                        |    1 +
->  arch/arm/mach-omap2/omap-wakeupgen.c               |    4 +-
->  arch/arm/mach-omap2/omap4-common.c                 |    4 +
->  drivers/irqchip/Kconfig                            |    8 +
->  drivers/irqchip/Makefile                           |    1 +
->  drivers/irqchip/irq-crossbar.c                     |  195 ++++++++++++++++++++
->  drivers/irqchip/irq-gic.c                          |   57 +++++-
->  include/linux/irqchip/arm-gic.h                    |    8 +-
->  include/linux/irqchip/irq-crossbar.h               |   11 ++
->  12 files changed, 363 insertions(+), 56 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/arm/omap/crossbar.txt
->  create mode 100644 drivers/irqchip/irq-crossbar.c
->  create mode 100644 include/linux/irqchip/irq-crossbar.h
-> 
+Joel Fernandes (5):
+  omap4: dts: Add node for AES
+  omap4: dts: Add node for DES3DES module
+  am33xx: dts: Fix AES interrupt number
+  ARM: am437x: dts: Add AES node for am437x
+  ARM: am437x: dts: Add DES node for am437x
+
+Mark A. Greer (2):
+  ARM: dts: Add SHAM data and documentation for AM33XX
+  ARM: dts: Add AES data and documentation for AM33XX
+
+ .../devicetree/bindings/crypto/omap-aes.txt        | 34 ++++++++++
+ .../devicetree/bindings/crypto/omap-sham.txt       | 31 +++++++++
+ arch/arm/boot/dts/am335x-bone.dts                  |  8 +++
+ arch/arm/boot/dts/am335x-boneblack.dts             | 48 +++++++++++++
+ arch/arm/boot/dts/am335x-evm.dts                   | 79 ++++++++++++++++++++++
+ arch/arm/boot/dts/am335x-evmsk.dts                 |  8 +++
+ arch/arm/boot/dts/am33xx.dtsi                      | 28 ++++++++
+ arch/arm/boot/dts/am4372.dtsi                      | 14 ++++
+ arch/arm/boot/dts/omap4.dtsi                       | 18 +++++
+ 9 files changed, 268 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/crypto/omap-aes.txt
+ create mode 100644 Documentation/devicetree/bindings/crypto/omap-sham.txt
+
+-- 
+1.8.1.2
