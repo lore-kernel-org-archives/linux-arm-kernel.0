@@ -1,27 +1,17 @@
-From: geoff@infradead.org (Geoff Levand)
-Date: Mon, 30 Sep 2013 11:41:00 -0700
-Subject: kexec/kdump for arm64
-Message-ID: <1380566460.9509.31.camel@smoke>
+From: Tim.Bird@sonymobile.com (Bird, Tim)
+Date: Mon, 30 Sep 2013 20:48:15 +0200
+Subject: Status of ARM FIQ?
+Message-ID: <F5184659D418E34EA12B1903EE5EF5FD8538E865F6@seldmbx02.corpusers.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi All,
+I'm working through some proposals for contract work for the Consumer
+Electronics Workgroup, and one of them involves use of ARM FIQ
+as a debug activator.  I have heard a rumor that FIQ mode is not being
+included in some modern ARM CPUs.
 
-Just for anyone who might be interested, I've started to do
-some work on kexec and kdump support for arm64.  This work
-is being done within Linaro, so is tracked by their Jira
-system:
+Is there any truth to this?  Can someone give me a pointer to information
+about this?
 
-  https://cards.linaro.org/browse/CARD-563
-
-I have these two git repos with my work-in-progress patches:
-
-  https://git.linaro.org/gitweb?p=people/geoff/kexec-tools.git
-
-  https://git.linaro.org/gitweb?p=people/geoff/linux-kexec.git
-
-As of now, I'm just trying to get the pieces in place for a
-basic kexec reboot.  Kdump and advanced features will come
-later.  Comments or suggestions welcome.
-
--Geoff
+Thanks,
+ -- Tim
