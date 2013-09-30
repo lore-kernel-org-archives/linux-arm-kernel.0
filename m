@@ -1,188 +1,120 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 30 Sep 2013 13:00:20 +0900
-Subject: [PATCH 1/5] ARM: shmobile: update SDHI DT compatibility string to the
- <unit>-<soc> format
-In-Reply-To: <cover.1380513421.git.horms+renesas@verge.net.au>
-References: <cover.1380513421.git.horms+renesas@verge.net.au>
-Message-ID: <df1d0584b2292df5b9d576d7e5246e94616220a1.1380513421.git.horms+renesas@verge.net.au>
+From: anup@brainfault.org (Anup Patel)
+Date: Mon, 30 Sep 2013 09:43:38 +0530
+Subject: [PATCH v4 4/4] KVM: Add documentation for KVM_ARM_PREFERRED_TARGET
+ ioctl
+In-Reply-To: <20130925201059.GE32311@cbox>
+References: <1380101163-20028-1-git-send-email-anup.patel@linaro.org>
+ <1380101163-20028-5-git-send-email-anup.patel@linaro.org>
+ <20130925201059.GE32311@cbox>
+Message-ID: <CAAhSdy3nFRQWWbsxrPH6NOgBWx-naAx2GoBbSHCO=NSkWYf2Dw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+On Thu, Sep 26, 2013 at 1:40 AM, Christoffer Dall
+<christoffer.dall@linaro.org> wrote:
+> On Wed, Sep 25, 2013 at 02:56:03PM +0530, Anup Patel wrote:
+>> To implement CPU=Host we have added KVM_ARM_PREFERRED_TARGET
+>> vm ioctl which provides information to user space required for
+>> creating VCPU matching underlying Host.
+>>
+>> This patch adds info related to this new KVM_ARM_PREFERRED_TARGET
+>> vm ioctl in the KVM API documentation.
+>>
+>> Signed-off-by: Anup Patel <anup.patel@linaro.org>
+>> Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
+>> ---
+>>  Documentation/virtual/kvm/api.txt |   27 +++++++++++++++++++++++----
+>>  1 file changed, 23 insertions(+), 4 deletions(-)
+>>
+>> diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
+>> index 858aecf..f31e6e8 100644
+>> --- a/Documentation/virtual/kvm/api.txt
+>> +++ b/Documentation/virtual/kvm/api.txt
+>> @@ -2303,8 +2303,28 @@ Possible features:
+>>       - KVM_ARM_VCPU_EL1_32BIT: Starts the CPU in a 32bit mode.
+>>         Depends on KVM_CAP_ARM_EL1_32BIT (arm64 only).
+>>
+>> +4.83 KVM_ARM_PREFERRED_TARGET
+>>
+>> -4.83 KVM_GET_REG_LIST
+>
+> I think the convention here is to keep two new lines after a Section.
 
-Currently DT compatibility strings of both types can be found in the kernel
-sources: <unit>-<soc> and <soc>-<unit>, whereas a unique format should be
-followed and the former one is preferred. This patch converts the SDHI
-MMC driver and its users to the common standard. This is safe for now, since
-ATM no real products are using this driver with DT.
+Well this is not be consistenly followed by everyone.
+Please look at the api.txt again.
 
-Signed-off-by: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
-Acked-by: Chris Ball <cjb@laptop.org>
-[Removed r8a7740.dtsi portion as it is not applicable]
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- Documentation/devicetree/bindings/mmc/tmio_mmc.txt | 17 ++++++++++-------
- arch/arm/boot/dts/r8a73a4.dtsi                     |  6 +++---
- arch/arm/boot/dts/r8a7790.dtsi                     |  8 ++++----
- arch/arm/boot/dts/sh73a0.dtsi                      |  6 +++---
- drivers/mmc/host/sh_mobile_sdhi.c                  | 16 ++++++++--------
- 5 files changed, 28 insertions(+), 25 deletions(-)
+Anyways, I will change and keep two new lines after a Section.
 
-diff --git a/Documentation/devicetree/bindings/mmc/tmio_mmc.txt b/Documentation/devicetree/bindings/mmc/tmio_mmc.txt
-index df204e1..6a2a116 100644
---- a/Documentation/devicetree/bindings/mmc/tmio_mmc.txt
-+++ b/Documentation/devicetree/bindings/mmc/tmio_mmc.txt
-@@ -9,12 +9,15 @@ compulsory and any optional properties, common to all SD/MMC drivers, as
- described in mmc.txt, can be used. Additionally the following tmio_mmc-specific
- optional bindings can be used.
- 
-+Required properties:
-+- compatible:	"renesas,sdhi-shmobile" - a generic sh-mobile SDHI unit
-+		"renesas,sdhi-sh7372" - SDHI IP on SH7372 SoC
-+		"renesas,sdhi-sh73a0" - SDHI IP on SH73A0 SoC
-+		"renesas,sdhi-r8a73a4" - SDHI IP on R8A73A4 SoC
-+		"renesas,sdhi-r8a7740" - SDHI IP on R8A7740 SoC
-+		"renesas,sdhi-r8a7778" - SDHI IP on R8A7778 SoC
-+		"renesas,sdhi-r8a7779" - SDHI IP on R8A7779 SoC
-+		"renesas,sdhi-r8a7790" - SDHI IP on R8A7790 SoC
-+
- Optional properties:
- - toshiba,mmc-wrprotect-disable: write-protect detection is unavailable
--
--When used with Renesas SDHI hardware, the following compatibility strings
--configure various model-specific properties:
--
--"renesas,sh7372-sdhi":	(default) compatible with SH7372
--"renesas,r8a7740-sdhi":	compatible with R8A7740: certain MMC/SD commands have to
--			wait for the interface to become idle.
-diff --git a/arch/arm/boot/dts/r8a73a4.dtsi b/arch/arm/boot/dts/r8a73a4.dtsi
-index 6c26caa..658fcc5 100644
---- a/arch/arm/boot/dts/r8a73a4.dtsi
-+++ b/arch/arm/boot/dts/r8a73a4.dtsi
-@@ -193,7 +193,7 @@
- 	};
- 
- 	sdhi0: sdhi at ee100000 {
--		compatible = "renesas,r8a73a4-sdhi";
-+		compatible = "renesas,sdhi-r8a73a4";
- 		reg = <0 0xee100000 0 0x100>;
- 		interrupt-parent = <&gic>;
- 		interrupts = <0 165 4>;
-@@ -202,7 +202,7 @@
- 	};
- 
- 	sdhi1: sdhi at ee120000 {
--		compatible = "renesas,r8a73a4-sdhi";
-+		compatible = "renesas,sdhi-r8a73a4";
- 		reg = <0 0xee120000 0 0x100>;
- 		interrupt-parent = <&gic>;
- 		interrupts = <0 166 4>;
-@@ -211,7 +211,7 @@
- 	};
- 
- 	sdhi2: sdhi at ee140000 {
--		compatible = "renesas,r8a73a4-sdhi";
-+		compatible = "renesas,sdhi-r8a73a4";
- 		reg = <0 0xee140000 0 0x100>;
- 		interrupt-parent = <&gic>;
- 		interrupts = <0 167 4>;
-diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
-index 3b879e7..885f9f4 100644
---- a/arch/arm/boot/dts/r8a7790.dtsi
-+++ b/arch/arm/boot/dts/r8a7790.dtsi
-@@ -152,7 +152,7 @@
- 	};
- 
- 	sdhi0: sdhi at ee100000 {
--		compatible = "renesas,r8a7790-sdhi";
-+		compatible = "renesas,sdhi-r8a7790";
- 		reg = <0 0xee100000 0 0x100>;
- 		interrupt-parent = <&gic>;
- 		interrupts = <0 165 4>;
-@@ -161,7 +161,7 @@
- 	};
- 
- 	sdhi1: sdhi at ee120000 {
--		compatible = "renesas,r8a7790-sdhi";
-+		compatible = "renesas,sdhi-r8a7790";
- 		reg = <0 0xee120000 0 0x100>;
- 		interrupt-parent = <&gic>;
- 		interrupts = <0 166 4>;
-@@ -170,7 +170,7 @@
- 	};
- 
- 	sdhi2: sdhi at ee140000 {
--		compatible = "renesas,r8a7790-sdhi";
-+		compatible = "renesas,sdhi-r8a7790";
- 		reg = <0 0xee140000 0 0x100>;
- 		interrupt-parent = <&gic>;
- 		interrupts = <0 167 4>;
-@@ -179,7 +179,7 @@
- 	};
- 
- 	sdhi3: sdhi at ee160000 {
--		compatible = "renesas,r8a7790-sdhi";
-+		compatible = "renesas,sdhi-r8a7790";
- 		reg = <0 0xee160000 0 0x100>;
- 		interrupt-parent = <&gic>;
- 		interrupts = <0 168 4>;
-diff --git a/arch/arm/boot/dts/sh73a0.dtsi b/arch/arm/boot/dts/sh73a0.dtsi
-index ba59a58..3955c76 100644
---- a/arch/arm/boot/dts/sh73a0.dtsi
-+++ b/arch/arm/boot/dts/sh73a0.dtsi
-@@ -196,7 +196,7 @@
- 	};
- 
- 	sdhi0: sdhi at ee100000 {
--		compatible = "renesas,r8a7740-sdhi";
-+		compatible = "renesas,sdhi-r8a7740";
- 		reg = <0xee100000 0x100>;
- 		interrupt-parent = <&gic>;
- 		interrupts = <0 83 4
-@@ -208,7 +208,7 @@
- 
- 	/* SDHI1 and SDHI2 have no CD pins, no need for CD IRQ */
- 	sdhi1: sdhi@ee120000 {
--		compatible = "renesas,r8a7740-sdhi";
-+		compatible = "renesas,sdhi-r8a7740";
- 		reg = <0xee120000 0x100>;
- 		interrupt-parent = <&gic>;
- 		interrupts = <0 88 4
-@@ -219,7 +219,7 @@
- 	};
- 
- 	sdhi2: sdhi@ee140000 {
--		compatible = "renesas,r8a7740-sdhi";
-+		compatible = "renesas,sdhi-r8a7740";
- 		reg = <0xee140000 0x100>;
- 		interrupt-parent = <&gic>;
- 		interrupts = <0 104 4
-diff --git a/drivers/mmc/host/sh_mobile_sdhi.c b/drivers/mmc/host/sh_mobile_sdhi.c
-index 87ed3fb..f344659 100644
---- a/drivers/mmc/host/sh_mobile_sdhi.c
-+++ b/drivers/mmc/host/sh_mobile_sdhi.c
-@@ -113,14 +113,14 @@ static const struct sh_mobile_sdhi_ops sdhi_ops = {
- };
- 
- static const struct of_device_id sh_mobile_sdhi_of_match[] = {
--	{ .compatible = "renesas,shmobile-sdhi" },
--	{ .compatible = "renesas,sh7372-sdhi" },
--	{ .compatible = "renesas,sh73a0-sdhi", .data = &sh_mobile_sdhi_of_cfg[0], },
--	{ .compatible = "renesas,r8a73a4-sdhi", .data = &sh_mobile_sdhi_of_cfg[0], },
--	{ .compatible = "renesas,r8a7740-sdhi", .data = &sh_mobile_sdhi_of_cfg[0], },
--	{ .compatible = "renesas,r8a7778-sdhi", .data = &sh_mobile_sdhi_of_cfg[0], },
--	{ .compatible = "renesas,r8a7779-sdhi", .data = &sh_mobile_sdhi_of_cfg[0], },
--	{ .compatible = "renesas,r8a7790-sdhi", .data = &sh_mobile_sdhi_of_cfg[0], },
-+	{ .compatible = "renesas,sdhi-shmobile" },
-+	{ .compatible = "renesas,sdhi-sh7372" },
-+	{ .compatible = "renesas,sdhi-sh73a0", .data = &sh_mobile_sdhi_of_cfg[0], },
-+	{ .compatible = "renesas,sdhi-r8a73a4", .data = &sh_mobile_sdhi_of_cfg[0], },
-+	{ .compatible = "renesas,sdhi-r8a7740", .data = &sh_mobile_sdhi_of_cfg[0], },
-+	{ .compatible = "renesas,sdhi-r8a7778", .data = &sh_mobile_sdhi_of_cfg[0], },
-+	{ .compatible = "renesas,sdhi-r8a7779", .data = &sh_mobile_sdhi_of_cfg[0], },
-+	{ .compatible = "renesas,sdhi-r8a7790", .data = &sh_mobile_sdhi_of_cfg[0], },
- 	{},
- };
- MODULE_DEVICE_TABLE(of, sh_mobile_sdhi_of_match);
--- 
-1.8.4
+>
+>> +Capability: basic
+>> +Architectures: arm, arm64
+>> +Type: vm ioctl
+>> +Parameters: struct struct kvm_vcpu_init (out)
+>> +Returns: 0 on success; -1 on error
+>> +Errors:
+>> +  ENODEV:    no preferred target available for the host
+>> +
+>> +This queries KVM for preferred CPU target type which can be emulated
+>> +by KVM on underlying host.
+>> +
+>> +The ioctl returns struct kvm_vcpu_init instance containing information
+>> +about preferred CPU target type and target specific features available
+>> +for it.
+>> +
+>> +The information returned by this ioctl can be used to prepare instance
+>
+> an instance
+
+Ok.
+
+>
+>> +of struct kvm_vcpu_init for KVM_ARM_VCPU_INIT ioctl which will result
+>
+> the KVM_ARM_VCPU_INIT ioctl.
+> (the last part is not necessarily true is it?  It's only a best bet,
+> think for example about Big.Little...)
+>
+>> +in VCPU matching underlying host.
+>
+> You also need to add something about the features here:
+>
+> The kvm_vcpu_init->features bitmap will have feature bits set if the
+> preferred target recommends setting these features, but this is not
+> required.
+
+Ok.
+
+>
+>> +
+>> +4.84 KVM_GET_REG_LIST
+>>
+>>  Capability: basic
+>>  Architectures: arm, arm64
+>> @@ -2323,8 +2343,7 @@ struct kvm_reg_list {
+>>  This ioctl returns the guest registers that are supported for the
+>>  KVM_GET_ONE_REG/KVM_SET_ONE_REG calls.
+>>
+>> -
+>> -4.84 KVM_ARM_SET_DEVICE_ADDR
+>> +4.85 KVM_ARM_SET_DEVICE_ADDR
+>>
+>>  Capability: KVM_CAP_ARM_SET_DEVICE_ADDR
+>>  Architectures: arm, arm64
+>> @@ -2362,7 +2381,7 @@ must be called after calling KVM_CREATE_IRQCHIP, but before calling
+>>  KVM_RUN on any of the VCPUs.  Calling this ioctl twice for any of the
+>>  base addresses will return -EEXIST.
+>>
+>> -4.85 KVM_PPC_RTAS_DEFINE_TOKEN
+>> +4.86 KVM_PPC_RTAS_DEFINE_TOKEN
+>>
+>>  Capability: KVM_CAP_PPC_RTAS
+>>  Architectures: ppc
+>> --
+>> 1.7.9.5
+>>
+> _______________________________________________
+> kvmarm mailing list
+> kvmarm at lists.cs.columbia.edu
+> https://lists.cs.columbia.edu/cucslists/listinfo/kvmarm
+
+--Anup
