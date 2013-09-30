@@ -1,72 +1,71 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Mon, 30 Sep 2013 18:03:30 -0300
-Subject: [PATCH 4/4] ARM: kirkwood: Remove redundant ethernet clock enable
-In-Reply-To: <1380575010-8573-1-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1380575010-8573-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1380575010-8573-5-git-send-email-ezequiel.garcia@free-electrons.com>
+From: andreas.herrmann@calxeda.com (Andreas Herrmann)
+Date: Mon, 30 Sep 2013 23:06:20 +0200
+Subject: [PATCH] iommu/arm-smmu: Clear global and context bank fault
+ status registers
+In-Reply-To: <20130930183006.GK26036@mudshark.cambridge.arm.com>
+References: <1380234982-1677-1-git-send-email-andreas.herrmann@calxeda.com>
+ <1380234982-1677-6-git-send-email-andreas.herrmann@calxeda.com>
+ <20130927085255.GC8319@mudshark.cambridge.arm.com>
+ <20130930135401.GV3315@alberich> <20130930135621.GW3315@alberich>
+ <20130930160615.GG26036@mudshark.cambridge.arm.com>
+ <20130930171716.GX3315@alberich>
+ <20130930183006.GK26036@mudshark.cambridge.arm.com>
+Message-ID: <20130930210620.GY3315@alberich>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After adding the CLK_IGNORE_UNUSED flags for the ethernet clocks
-ge0 and ge1, we can get rid of the hack to prevent such clocks
-from being gated.
+On Mon, Sep 30, 2013 at 02:30:06PM -0400, Will Deacon wrote:
+> On Mon, Sep 30, 2013 at 06:17:16PM +0100, Andreas Herrmann wrote:
+> > On Mon, Sep 30, 2013 at 12:06:15PM -0400, Will Deacon wrote:
+> > > On Mon, Sep 30, 2013 at 02:56:21PM +0100, Andreas Herrmann wrote:
+> > > > 
+> > > > After reset these registers have unknown values.
+> > > > This might cause problems when evaluating SMMU_GFSR and/or SMMU_CB_FSR
+> > > > in handlers for combined interrupts.
+> > > > 
+> > > > Signed-off-by: Andreas Herrmann <andreas.herrmann@calxeda.com>
+> > > > ---
+> > > >  drivers/iommu/arm-smmu.c |   27 ++++++++++++++++++++-------
+> > > >  1 file changed, 20 insertions(+), 7 deletions(-)
+> > > > 
+> > > > diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+> > > > index 579b6f8..cbbf597 100644
+> > > > --- a/drivers/iommu/arm-smmu.c
+> > > > +++ b/drivers/iommu/arm-smmu.c
+> > > > @@ -631,6 +631,12 @@ static irqreturn_t arm_smmu_global_fault(int irq, void *dev)
+> > > >  	return IRQ_HANDLED;
+> > > >  }
+> > > >  
+> > > > +static void arm_smmu_clear_cb_fsr(struct arm_smmu_device *smmu, u8 cbndx)
+> > > > +{
+> > > > +	void __iomem *cb_base = ARM_SMMU_CB_BASE(smmu) + ARM_SMMU_CB(smmu, cbndx);
+> > > > +	writel_relaxed(FSR_FAULT, cb_base + ARM_SMMU_CB_FSR);
+> > > > +}
+> > > 
+> > > Hmm, why not just stick this in arm_smmu_init_context_bank...
+> > 
+> > Because we should clear the FSR before we call request_irq.
+> > Otherwise we might handle interrupts although the context bank is not
+> > enabled.
+> > 
+> > Moving request_irq after arm_smmu_init_context_bank is not optimal
+> > either. (We should have configured the context interrupt before
+> > translation is enabled. Otherwise it's possible to miss a fault.)
+> 
+> How would you miss a fault?
 
-Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
----
- arch/arm/mach-kirkwood/board-dt.c | 34 ----------------------------------
- 1 file changed, 34 deletions(-)
+> If the device can start issuing transactions before the SMMU has set
+> up the mapping, then there's a race in the caller code which we
+> shouldn't attempt to resolve here.
 
-diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
-index 1bbced8..92be484 100644
---- a/arch/arm/mach-kirkwood/board-dt.c
-+++ b/arch/arm/mach-kirkwood/board-dt.c
-@@ -27,37 +27,6 @@
- #include <plat/common.h>
- #include "common.h"
- 
--/*
-- * There are still devices that doesn't know about DT yet.  Get clock
-- * gates here and add a clock lookup alias, so that old platform
-- * devices still work.
--*/
--
--static void __init kirkwood_legacy_clk_init(void)
--{
--
--	struct device_node *np = of_find_compatible_node(
--		NULL, NULL, "marvell,kirkwood-gating-clock");
--	struct of_phandle_args clkspec;
--	struct clk *clk;
--
--	clkspec.np = np;
--	clkspec.args_count = 1;
--
--	/*
--	 * The ethernet interfaces forget the MAC address assigned by
--	 * u-boot if the clocks are turned off. Until proper DT support
--	 * is available we always enable them for now.
--	 */
--	clkspec.args[0] = CGC_BIT_GE0;
--	clk = of_clk_get_from_provider(&clkspec);
--	clk_prepare_enable(clk);
--
--	clkspec.args[0] = CGC_BIT_GE1;
--	clk = of_clk_get_from_provider(&clkspec);
--	clk_prepare_enable(clk);
--}
--
- static void __init kirkwood_dt_time_init(void)
- {
- 	of_clk_init(NULL);
-@@ -83,9 +52,6 @@ static void __init kirkwood_dt_init(void)
- 
- 	kirkwood_cpufreq_init();
- 
--	/* Setup clocks for legacy devices */
--	kirkwood_legacy_clk_init();
--
- 	kirkwood_cpuidle_init();
- 
- #ifdef CONFIG_KEXEC
--- 
-1.8.1.5
+Broken device, broken driver code (maybe violating dma-api)
+whatsoever. All that's needed is a device that is already doing DMA
+when we enable SMMU handling for its transactions.
+Yes, normally this should not happen. But if it happens we get a fault
+and better should handle it.
+
+I think, it's somehow logical to have fault handling set up before
+fault reporting is switched on for a context bank.
+
+
+Andreas
