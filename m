@@ -1,21 +1,39 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Mon, 30 Sep 2013 21:46:42 +0100
-Subject: Status of ARM FIQ?
-In-Reply-To: <F5184659D418E34EA12B1903EE5EF5FD8538E865F6@seldmbx02.corpusers.net>
-References: <F5184659D418E34EA12B1903EE5EF5FD8538E865F6@seldmbx02.corpusers.net>
-Message-ID: <8684879.1NkbgkbVjO@lenovo>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Mon, 30 Sep 2013 18:03:28 -0300
+Subject: [PATCH 2/4] ARM: kirkwood: Remove unneeded PCIe clock adding
+In-Reply-To: <1380575010-8573-1-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1380575010-8573-1-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1380575010-8573-3-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le lundi 30 septembre 2013 20:48:15 Bird, Tim a ?crit :
-> I'm working through some proposals for contract work for the Consumer
-> Electronics Workgroup, and one of them involves use of ARM FIQ
-> as a debug activator.  I have heard a rumor that FIQ mode is not being
-> included in some modern ARM CPUs.
-> 
-> Is there any truth to this?  Can someone give me a pointer to information
-> about this?
+Since the PCIe devices is properly initialized from the DT, the clocks
+are now referenced in the device tree nodes, and it's not needed
+to have this hack to add them explicitly.
 
-What are these modern ARM CPUs? The 3 ARMv7 (A, R, M) and ARMv8 have FIQ.
+Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+---
+ arch/arm/mach-kirkwood/board-dt.c | 8 --------
+ 1 file changed, 8 deletions(-)
+
+diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
+index ee6297e..1bbced8 100644
+--- a/arch/arm/mach-kirkwood/board-dt.c
++++ b/arch/arm/mach-kirkwood/board-dt.c
+@@ -44,14 +44,6 @@ static void __init kirkwood_legacy_clk_init(void)
+ 	clkspec.np = np;
+ 	clkspec.args_count = 1;
+ 
+-	clkspec.args[0] = CGC_BIT_PEX0;
+-	orion_clkdev_add("0", "pcie",
+-			 of_clk_get_from_provider(&clkspec));
+-
+-	clkspec.args[0] = CGC_BIT_PEX1;
+-	orion_clkdev_add("1", "pcie",
+-			 of_clk_get_from_provider(&clkspec));
+-
+ 	/*
+ 	 * The ethernet interfaces forget the MAC address assigned by
+ 	 * u-boot if the clocks are turned off. Until proper DT support
 -- 
-Florian
+1.8.1.5
