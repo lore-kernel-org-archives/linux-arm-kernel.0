@@ -1,70 +1,78 @@
-From: konrad.wilk@oracle.com (Konrad Rzeszutek Wilk)
-Date: Mon, 30 Sep 2013 11:17:12 -0400
-Subject: [PATCH v6 08/19] arm/xen: get_dma_ops: return xen_dma_ops if we
- are running on Xen
-In-Reply-To: <1380298207-29151-8-git-send-email-stefano.stabellini@eu.citrix.com>
-References: <alpine.DEB.2.02.1309271653420.5498@kaball.uk.xensource.com>
- <1380298207-29151-8-git-send-email-stefano.stabellini@eu.citrix.com>
-Message-ID: <20130930151712.GP3106@phenom.dumpdata.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Mon, 30 Sep 2013 17:22:33 +0200
+Subject: [PATCH v2] PWM: atmel-pwm: use request/free instead of enable/disable
+Message-ID: <1380554553-25676-1-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 27, 2013 at 05:09:56PM +0100, Stefano Stabellini wrote:
-> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> Suggested-by: Catalin Marinas <catalin.marinas@arm.com>
-> CC: will.deacon at arm.com
-> CC: linux at arm.linux.org.uk
+I found that disabling a pwm while it is at a low level will actually put it
+back at a high level. The main symptom is that leds-pwm is calling pwm_disable()
+after setting the duty cycle to 0. Hence, instead of getting a switched off LED,
+you get an LED lit up at full brightness.
 
-> ---
->  arch/arm/include/asm/dma-mapping.h |   13 ++++++++++++-
->  1 files changed, 12 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
-> index 8807124..b638d6d 100644
-> --- a/arch/arm/include/asm/dma-mapping.h
-> +++ b/arch/arm/include/asm/dma-mapping.h
-> @@ -12,17 +12,28 @@
->  #include <asm/memory.h>
->  #include <asm/cacheflush.h>
->  
-> +#include <xen/xen.h>
-> +#include <asm/xen/hypervisor.h>
-> +
->  #define DMA_ERROR_CODE	(~0)
->  extern struct dma_map_ops arm_dma_ops;
->  extern struct dma_map_ops arm_coherent_dma_ops;
->  
-> -static inline struct dma_map_ops *get_dma_ops(struct device *dev)
-> +static inline struct dma_map_ops *__get_dma_ops(struct device *dev)
+Solve that by using the request and free callbacks to enable and disable the
+pwm channels and the clock.
 
-How about calling it __generic_dma_ops ?
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+---
+Applies on [PATCH v5] PWM: atmel-pwm: add PWM controller driver
 
+Changes in v2:
+  - add dummies pwm_enable and pwm_disable to be able to register the pwm chip.
 
->  {
->  	if (dev && dev->archdata.dma_ops)
->  		return dev->archdata.dma_ops;
->  	return &arm_dma_ops;
->  }
->  
-> +static inline struct dma_map_ops *get_dma_ops(struct device *dev)
-> +{
-> +	if (xen_domain())
-> +		return xen_dma_ops;
-> +	else
-> +		return __get_dma_ops(dev);
+ drivers/pwm/pwm-atmel.c | 23 +++++++++++++++++++++--
+ 1 file changed, 21 insertions(+), 2 deletions(-)
 
-
-Could you explan (hopefully in the git commit description) why
-we cannot over-write arm_dma_ops with xen_dma_ops?
-
-
-Thank you.
-
-> +}
-> +
->  static inline void set_dma_ops(struct device *dev, struct dma_map_ops *ops)
->  {
->  	BUG_ON(!dev);
-> -- 
-> 1.7.2.5
-> 
+diff --git a/drivers/pwm/pwm-atmel.c b/drivers/pwm/pwm-atmel.c
+index b4df36c..732312c 100644
+--- a/drivers/pwm/pwm-atmel.c
++++ b/drivers/pwm/pwm-atmel.c
+@@ -206,7 +206,7 @@ static int atmel_pwm_set_polarity(struct pwm_chip *chip, struct pwm_device *pwm,
+ 	return 0;
+ }
+ 
+-static int atmel_pwm_enable(struct pwm_chip *chip, struct pwm_device *pwm)
++static int atmel_pwm_request(struct pwm_chip *chip, struct pwm_device *pwm)
+ {
+ 	struct atmel_pwm_chip *atmel_pwm = to_atmel_pwm_chip(chip);
+ 	int ret;
+@@ -222,7 +222,7 @@ static int atmel_pwm_enable(struct pwm_chip *chip, struct pwm_device *pwm)
+ 	return 0;
+ }
+ 
+-static void atmel_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
++static void atmel_pwm_free(struct pwm_chip *chip, struct pwm_device *pwm)
+ {
+ 	struct atmel_pwm_chip *atmel_pwm = to_atmel_pwm_chip(chip);
+ 
+@@ -231,9 +231,28 @@ static void atmel_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
+ 	clk_disable(atmel_pwm->clk);
+ }
+ 
++static int atmel_pwm_enable(struct pwm_chip *chip, struct pwm_device *pwm)
++{
++	/*
++	 * This is a dummy function, required to be able to register the pwm
++	 * chip, see pwmadd_chip() in pwm/core.c
++	 */
++	return 0;
++}
++
++static void atmel_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
++{
++	/*
++	 * This is a dummy function, required to be able to register the pwm
++	 * chip, see pwmadd_chip() in pwm/core.c
++	 */
++}
++
+ static const struct pwm_ops atmel_pwm_ops = {
+ 	.config = atmel_pwm_config,
+ 	.set_polarity = atmel_pwm_set_polarity,
++	.request = atmel_pwm_request,
++	.free = atmel_pwm_free,
+ 	.enable = atmel_pwm_enable,
+ 	.disable = atmel_pwm_disable,
+ 	.owner = THIS_MODULE,
+-- 
+1.8.1.2
