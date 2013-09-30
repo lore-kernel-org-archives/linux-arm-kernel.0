@@ -1,30 +1,56 @@
-From: rric@kernel.org (Robert Richter)
-Date: Mon, 30 Sep 2013 10:49:45 +0200
-Subject: [PATCH] arm, kbuild: make "make install" not depend on vmlinux
-In-Reply-To: <51E7B3D0.4060609@suse.cz>
-References: <20130710133742.GA29368@emu.suse.cz>
- <CA+55aFxtvT3Yvbxe5JGBThZS13payymFJ7jCLyEiE2iNDvsZtQ@mail.gmail.com>
- <20130711135445.GA21500@sepie.suse.cz>
- <CA+55aFyVjugxM7cUDWi0ASWttYthCxa6e7X3CADknBcSFxWgew@mail.gmail.com>
- <20130712105721.GF8731@rric.localhost>
- <20130717160506.GI8731@rric.localhost>
- <CA+55aFx4G5gME3ByqE0Wr-_t2x_6WkP3Ta4k1z4jfW+PrcK0og@mail.gmail.com>
- <20130717165743.GK8731@rric.localhost>
- <CA+55aFzhmV7iq+Pv37trMCmdNzk53ORAoj0a6rV14fzKta3Dhw@mail.gmail.com>
- <51E7B3D0.4060609@suse.cz>
-Message-ID: <20130930084945.GA1963@rric.localhost>
+From: anup.patel@linaro.org (Anup Patel)
+Date: Mon, 30 Sep 2013 14:20:04 +0530
+Subject: [PATCH v5 0/4] Target CPU=Host implementation for KVM ARM/ARM64
+Message-ID: <1380531008-15901-1-git-send-email-anup.patel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18.07.13 11:22:24, Michal Marek wrote:
-> > So Michal (or ARM people - whoever wants to take the patch), just take
-> > my ack. No objections.
-> 
-> I can add it to the kbuild tree if needed. Otherwise you can add
-> Acked-by: Michal Marek <mmarek@suse.cz>.
+It will be very useful for user space (QEMU/KVMTOOL) if it has a
+method of querying VCPU target type matching to underlying Host.
+We can use such querying mechanism and implement machine models
+in user space where VCPU target type is always same-as/similar-to
+underlying Host (i.e. Target CPU=Host).
 
-This didn't make it upstream yet, can somebody at it to a tree?
+This patch series implements KVM_ARM_PREFERRED_TARGET vm ioclt for
+querying VCPU target type matching underlying host. Using this new
+ioctl we can implement VCPU target CPU=Host in user space.
 
-Thanks,
+Also, it is not mandatory to call KVM_ARM_PREFERRED_TARGET vm ioctl
+and the old method of trying all possible target types using the
+KVM_ARM_VCPU_INIT ioctl to initialize VCPU works fine.
 
--Robert
+V5:
+ - Update documentation based on review comments
+
+V4:
+ - Fixed files exchanged between patches
+ - For now return zeroed features in struct kvm_vcpu_init instance
+
+V3:
+ - Return -ENODEV if no preferred target available for host
+ - Make KVM_ARM_PREFERRED_TARGET ioctl as vm ioctl
+
+V2:
+ - Renamed the ioclt to KVM_ARM_PREFERRED_TARGET
+ - Return struct kvm_vcpu_init instace instead of just target type
+
+V1:
+ - Initial patch-set with ioctl named as KVM_ARM_SUITABLE_TARGET
+
+Anup Patel (4):
+  ARM: KVM: Implement kvm_vcpu_preferred_target() function
+  ARM64: KVM: Implement kvm_vcpu_preferred_target() function
+  ARM/ARM64: KVM: Implement KVM_ARM_PREFERRED_TARGET ioctl
+  KVM: Add documentation for KVM_ARM_PREFERRED_TARGET ioctl
+
+ Documentation/virtual/kvm/api.txt |   31 +++++++++++++++++++++++++++----
+ arch/arm/include/asm/kvm_host.h   |    1 +
+ arch/arm/kvm/arm.c                |   13 +++++++++++++
+ arch/arm/kvm/guest.c              |   20 ++++++++++++++++++++
+ arch/arm64/include/asm/kvm_host.h |    1 +
+ arch/arm64/kvm/guest.c            |   20 ++++++++++++++++++++
+ include/uapi/linux/kvm.h          |    1 +
+ 7 files changed, 83 insertions(+), 4 deletions(-)
+
+-- 
+1.7.9.5
