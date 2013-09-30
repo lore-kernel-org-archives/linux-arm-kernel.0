@@ -1,38 +1,29 @@
 From: joelf@ti.com (Joel Fernandes)
-Date: Mon, 30 Sep 2013 10:12:59 -0500
-Subject: [PATCH v2 2/9] omap4: dts: Add node for DES3DES module
+Date: Mon, 30 Sep 2013 10:13:02 -0500
+Subject: [PATCH v2 5/9] am33xx: dts: Fix AES interrupt number
 In-Reply-To: <1380553986-15910-1-git-send-email-joelf@ti.com>
 References: <1380553986-15910-1-git-send-email-joelf@ti.com>
-Message-ID: <1380553986-15910-3-git-send-email-joelf@ti.com>
+Message-ID: <1380553986-15910-6-git-send-email-joelf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-OMAP4 has an DES3DES  module that uses the omap-des crypto driver.
-Add DT entries for the same.
-
 Signed-off-by: Joel Fernandes <joelf@ti.com>
 ---
- arch/arm/boot/dts/omap4.dtsi | 9 +++++++++
- 1 file changed, 9 insertions(+)
+ arch/arm/boot/dts/am33xx.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
-index 16a44d6..6be1f56 100644
---- a/arch/arm/boot/dts/omap4.dtsi
-+++ b/arch/arm/boot/dts/omap4.dtsi
-@@ -672,5 +672,14 @@
- 			dmas = <&sdma 111>, <&sdma 110>;
+diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
+index 0daa1b2..d7be90a 100644
+--- a/arch/arm/boot/dts/am33xx.dtsi
++++ b/arch/arm/boot/dts/am33xx.dtsi
+@@ -724,7 +724,7 @@
+ 			compatible = "ti,omap4-aes";
+ 			ti,hwmods = "aes";
+ 			reg = <0x53500000 0xa0>;
+-			interrupts = <102>;
++			interrupts = <103>;
+ 			dmas = <&edma 6
+ 				&edma 5>;
  			dma-names = "tx", "rx";
- 		};
-+
-+		des: des at 480a5000 {
-+			compatible = "ti,omap4-des";
-+			ti,hwmods = "des";
-+			reg = <0x480a5000 0xa0>;
-+			interrupts = <GIC_SPI 82 IRQ_TYPE_LEVEL_HIGH>;
-+			dmas = <&sdma 117>, <&sdma 116>;
-+			dma-names = "tx", "rx";
-+		};
- 	};
- };
 -- 
 1.8.1.2
