@@ -1,42 +1,30 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 30 Sep 2013 10:13:01 -0400
-Subject: [PATCH] ARM: mvebu: Add DT entry for ReadyNAS 102 to use
- gpio-poweroff driver
-In-Reply-To: <8738onqp9k.fsf@natisbad.org>
-References: <8738onqp9k.fsf@natisbad.org>
-Message-ID: <20130930141301.GE31178@titan.lakedaemon.net>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 30 Sep 2013 15:16:03 +0100
+Subject: [RFC PATCH 1/6] DRIVERS: IRQCHIP: IRQ-GIC: Add support for
+ routable irqs
+In-Reply-To: <1380549564-31045-2-git-send-email-r.sricharan@ti.com>
+References: <1380549564-31045-1-git-send-email-r.sricharan@ti.com>
+ <1380549564-31045-2-git-send-email-r.sricharan@ti.com>
+Message-ID: <524987A3.4090204@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Sep 29, 2013 at 11:41:43PM +0200, Arnaud Ebalard wrote:
+On 30/09/13 14:59, Sricharan R wrote:
+> In some socs the gic can be preceded by a crossbar IP which
+> routes the peripheral interrupts to the gic inputs. The peripheral
+> interrupts are associated with a fixed crossbar input line and the
+> crossbar routes that to one of the free gic input line.
 > 
-> Without that fix, at the end of the shutdown process, the board is
-> still powered (led glowing, fan running, ...).
-> 
-> Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
-> ---
-> HI Jason and Andrew,
-> 
-> This is not per se a fix for a real problem, as the NAS runs
-> as expected w/o it, it only solves a minor limitation of the
-> shutdown process so I guess it can be queued for 3.13 if it
-> is too late.
+> The DT entries for peripherals provides the fixed crossbar input line
+> as its interrupt number and the mapping code should associate this with
+> a free gic input line. This patch adds the support inside the gic irqchip
+> to handle such routable irqs. The routable irqs are registered in a linear
+> domain. The registered routable domain's callback should be implemented
+> to get a free irq and to configure the IP to route it.
 
-I consider a server not being able to automatically reboot unattended to
-be a regression.  ;-)
+Isn't this just another chained interrupt controller? How is it GIC
+specific?
 
-> Additionally, I wonder if I should send another patch to either have
-> ARCH_MVEBU select POWER_SUPPLY, POWER_RESET and POWER_RESET_GPIO,
-> or have mvebu_defconfig modified to enable those, or keep things as
-> they are until there are more users on mvebu.
-
-I'm inclined towards select, but I also agree that there's no rush.
-
->  arch/arm/boot/dts/armada-370-netgear-rn102.dts | 12 ++++++++++++
->  1 file changed, 12 insertions(+)
-
-Applied to mvebu/fixes for v3.12.
-
-thx,
-
-Jason.
+	M.
+-- 
+Jazz is not dead. It just smells funny...
