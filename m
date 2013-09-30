@@ -1,57 +1,60 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 30 Sep 2013 18:02:19 +0200
-Subject: [PATCH 3/3] [RFC] ARM: prepare ARMv7-M for MULTIPLATFORM use
-In-Reply-To: <201309301234.25913.arnd@arndb.de>
-References: <1380534577-15076-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <1380534577-15076-4-git-send-email-u.kleine-koenig@pengutronix.de>
- <201309301234.25913.arnd@arndb.de>
-Message-ID: <20130930160219.GF2548@pengutronix.de>
+From: konrad.wilk@oracle.com (Konrad Rzeszutek Wilk)
+Date: Mon, 30 Sep 2013 12:02:23 -0400
+Subject: [PATCH v6 15/19] swiotlb-xen: call dma_capable only if
+ dev->dma_mask is allocated
+In-Reply-To: <1380298207-29151-15-git-send-email-stefano.stabellini@eu.citrix.com>
+References: <alpine.DEB.2.02.1309271653420.5498@kaball.uk.xensource.com>
+ <1380298207-29151-15-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <20130930160223.GU3106@phenom.dumpdata.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Arnd,
+On Fri, Sep 27, 2013 at 05:10:03PM +0100, Stefano Stabellini wrote:
 
-On Mon, Sep 30, 2013 at 12:34:25PM +0200, Arnd Bergmann wrote:
-> On Monday 30 September 2013, Uwe Kleine-K?nig wrote:
-> > v7-M is a third group that is incompatible with both v4/v5 and v6/v7.
-> > 
-> > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> > ---
-> > This behaves strange but I think is robust not to allow broken configs:
-> > 
-> > When v4/v5 is selected, v6/v7 and v7m are available for enabling, too.
-> > When v6/v7 is selected the other choices are disabled
-> > When v7m is selected only v6/v7 are available for enabling.
+Why? I am looking at X86 and IA64 and I see:
+
+ 79         if (!dev->dma_mask)                                                     
+ 80                 return 0;           
+
+
+Why not port dma_capable over to ARM?
+
+> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> ---
+>  drivers/xen/swiotlb-xen.c |    6 +++---
+>  1 files changed, 3 insertions(+), 3 deletions(-)
 > 
-> The Kconfig stuff all looks good, 
+> diff --git a/drivers/xen/swiotlb-xen.c b/drivers/xen/swiotlb-xen.c
+> index 790c2eb..3011736 100644
+> --- a/drivers/xen/swiotlb-xen.c
+> +++ b/drivers/xen/swiotlb-xen.c
+> @@ -512,7 +512,7 @@ dma_addr_t xen_swiotlb_map_page(struct device *dev, struct page *page,
+>  	 * buffering it.
+>  	 */
+>  	if (!xen_feature(XENFEAT_auto_translated_physmap) &&
+> -	    dma_capable(dev, dev_addr, size) &&
+> +	    dev->dma_mask && dma_capable(dev, dev_addr, size) &&
+>  	    !range_straddles_page_boundary(phys, size) && !swiotlb_force)
+>  		return dev_addr;
+>  
+> @@ -532,7 +532,7 @@ dma_addr_t xen_swiotlb_map_page(struct device *dev, struct page *page,
+>  	/*
+>  	 * Ensure that the address returned is DMA'ble
+>  	 */
+> -	if (!dma_capable(dev, dev_addr, size)) {
+> +	if (dev->dma_mask && !dma_capable(dev, dev_addr, size)) {
+>  		swiotlb_tbl_unmap_single(dev, map, size, dir);
+>  		dev_addr = 0;
+>  	}
+> @@ -660,7 +660,7 @@ xen_swiotlb_map_sg_attrs(struct device *hwdev, struct scatterlist *sgl,
+>  
+>  		if (swiotlb_force ||
+>  		    xen_feature(XENFEAT_auto_translated_physmap) ||
+> -		    !dma_capable(hwdev, dev_addr, sg->length) ||
+> +		    (hwdev->dma_mask && !dma_capable(hwdev, dev_addr, sg->length)) ||
+>  		    range_straddles_page_boundary(paddr, sg->length)) {
+>  			/*
+>  			 * Pass the dma_addr of the first slab in the iotlb buffer as
+> -- 
+> 1.7.2.5
 > 
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
-Thanks
-
-> > @@ -141,3 +139,7 @@ ENTRY(vector_table)
-> >  	.rept	64 - 16
-> >  	.long	__irq_entry		@ 16..64 - External Interrupts
-> >  	.endr
-> > +
-> > +	.globl  handle_arch_irq
-> > +handle_arch_irq:
-> > +	.long	0
-> > -- 
-> > 1.8.4.rc3
-> 
-> I'm not sure about this part. I guess you should either make it
-> a separate patch, or describe what it's for in the patch description above.
-This is needed because ARCH_MULTIPLATFORM selects MULTI_IRQ_HANDLER
-which v7-M didn't use up to now. I will wait for a while for more
-feedback then respin with a better changelog.
- 
-> Also, I'd put all of the text you have in the comment into the actual
-> changeset text, above the --- line, as others might find that useful
-> later.
-ok
-
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
