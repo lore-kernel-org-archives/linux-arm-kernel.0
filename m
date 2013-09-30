@@ -1,50 +1,56 @@
-From: konrad.wilk@oracle.com (Konrad Rzeszutek Wilk)
-Date: Mon, 30 Sep 2013 11:58:08 -0400
-Subject: [PATCH v6 14/19] swiotlb: print a warning when the swiotlb is full
-In-Reply-To: <1380298207-29151-14-git-send-email-stefano.stabellini@eu.citrix.com>
-References: <alpine.DEB.2.02.1309271653420.5498@kaball.uk.xensource.com>
- <1380298207-29151-14-git-send-email-stefano.stabellini@eu.citrix.com>
-Message-ID: <20130930155808.GT3106@phenom.dumpdata.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 30 Sep 2013 17:01:41 +0100
+Subject: [PATCH 3/4] perf tools: Check libunwind for availability of
+ dwarf parsing feature
+In-Reply-To: <20130924171220.GB2634@ghostprotocols.net>
+References: <1379323053-11458-1-git-send-email-jean.pihet@linaro.org>
+ <1379323053-11458-4-git-send-email-jean.pihet@linaro.org>
+ <20130917102904.GA27258@mudshark.cambridge.arm.com>
+ <20130924171220.GB2634@ghostprotocols.net>
+Message-ID: <20130930160141.GF26036@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 27, 2013 at 05:10:02PM +0100, Stefano Stabellini wrote:
-> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> ---
->  drivers/xen/swiotlb-xen.c |    1 +
->  lib/swiotlb.c             |    1 +
->  2 files changed, 2 insertions(+), 0 deletions(-)
+Hi Arnaldo,
+
+On Tue, Sep 24, 2013 at 06:12:20PM +0100, Arnaldo Carvalho de Melo wrote:
+> Em Tue, Sep 17, 2013 at 11:29:04AM +0100, Will Deacon escreveu:
+> > Arnaldo, Ingo,
+> > 
+> > On Mon, Sep 16, 2013 at 10:17:32AM +0100, Jean Pihet wrote:
+> > > The newly added dwarf unwinding feature [1] requires:
+> > > . a recent version (>= 1.1) of libunwind,
+> > > . libunwind to be configured with --enable-debug-frame.
+> > > 
+> > > [1] http://www.spinics.net/lists/kernel/msg1598951.html
+> > > 
+> > > Add the corresponding API test in the feature check list.
+> > > 
+> > > Signed-off-by: Jean Pihet <jean.pihet@linaro.org>
+> > > ---
+> > >  tools/perf/config/Makefile          |  2 +-
+> > >  tools/perf/config/feature-tests.mak | 11 ++++++++++-
+> > >  2 files changed, 11 insertions(+), 2 deletions(-)
+> > 
+> > Can I have an ack for this and the following patch please?
+> > 
+> > (http://lists.infradead.org/pipermail/linux-arm-kernel/2013-September/198531.html)
+> > 
+> > Then I can stick these into -next for some more exposure before I queue them
+> > for 3.13.
 > 
-> diff --git a/drivers/xen/swiotlb-xen.c b/drivers/xen/swiotlb-xen.c
-> index 96ad316..790c2eb 100644
-> --- a/drivers/xen/swiotlb-xen.c
-> +++ b/drivers/xen/swiotlb-xen.c
-> @@ -674,6 +674,7 @@ xen_swiotlb_map_sg_attrs(struct device *hwdev, struct scatterlist *sgl,
->  								 sg->length,
->  								 dir);
->  			if (map == SWIOTLB_MAP_ERROR) {
-> +				pr_warn("swiotlb buffer is full\n");
+> I can pick it now that Jiri kinda acked it, right Jiri?
 
-It would be beneficial to use dev_warn instead.
+Jiri ended up acking v3 of the patches:
 
-And perhaps even call debug_dma_dump_mappings to help in diagnosing
-a problem?
+http://lists.infradead.org/pipermail/linux-arm-kernel/2013-September/200579.html
 
->  				/* Don't panic here, we expect map_sg users
->  				   to do proper error handling. */
->  				xen_swiotlb_unmap_sg_attrs(hwdev, sgl, i, dir,
-> diff --git a/lib/swiotlb.c b/lib/swiotlb.c
-> index eb45d17..f06da0d 100644
-> --- a/lib/swiotlb.c
-> +++ b/lib/swiotlb.c
-> @@ -502,6 +502,7 @@ phys_addr_t swiotlb_tbl_map_single(struct device *hwdev,
->  
->  not_found:
->  	spin_unlock_irqrestore(&io_tlb_lock, flags);
-> +	pr_warn("swiotlb buffer is full\n");
->  	return SWIOTLB_MAP_ERROR;
->  found:
->  	spin_unlock_irqrestore(&io_tlb_lock, flags);
-> -- 
-> 1.7.2.5
-> 
+but I don't see them in -next. I'm happy to take them via my tree, just want
+to make sure they don't conflict with anything you have planned for 3.13
+and/or end up with our trees colliding in -next.
+
+What's the plan?
+
+Cheers,
+
+Will
