@@ -1,48 +1,77 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Mon, 30 Sep 2013 15:13:41 +0200
-Subject: [PATCH v2 2/3] dma: mxs-dma: Pause channel while prep_dma_cyclic
-In-Reply-To: <1380546822-14034-1-git-send-email-mpa@pengutronix.de>
-References: <1380546822-14034-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <1380546822-14034-3-git-send-email-mpa@pengutronix.de>
+From: prabhakar.csengg@gmail.com (Prabhakar Lad)
+Date: Mon, 30 Sep 2013 18:57:01 +0530
+Subject: [PATCH] media: i2c: adv7343: fix the DT binding properties
+In-Reply-To: <CA+V-a8u5_rhxTgkVgCbtmGpaZCt2ciu4vABW4t80aSp7csttnw@mail.gmail.com>
+References: <1379073471-7244-1-git-send-email-prabhakar.csengg@gmail.com>
+ <523395DC.5080009@wwwdotorg.org>
+ <CA+V-a8sVyJ1TrTSiaj8vpaD+f_qJ5Hp287E3HuHJ_pRzzmdAvg@mail.gmail.com>
+ <523730A8.9060201@wwwdotorg.org>
+ <CA+V-a8vY-qsdUoUUH=3HOg-UAZZPujOLPHFC_udNWFtksgzRRA@mail.gmail.com>
+ <523B554A.2030701@gmail.com>
+ <CA+V-a8s3PYr7qem6m8au0E7N2Xb_gD37_8uLcdXZjeHppBaC6g@mail.gmail.com>
+ <523C1AE0.9020603@samsung.com>
+ <CA+V-a8u5_rhxTgkVgCbtmGpaZCt2ciu4vABW4t80aSp7csttnw@mail.gmail.com>
+Message-ID: <CA+V-a8sEPAFz=Jo9LdwRf5QtnY6TFXzSTrtHQuyeb3uSEYCvSQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Using mxs-dma with pcm-dmaengine with small period-length can in some
-cases lead to strange audio effects. This patch pauses the DMA channel
-while preparing cyclic DMA commands. I tested with mx28 and
-period-length of 160.
+Hi All,
 
-Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
----
- drivers/dma/mxs-dma.c | 9 +++++++--
- 1 file changed, 7 insertions(+), 2 deletions(-)
+On Mon, Sep 23, 2013 at 8:18 AM, Prabhakar Lad
+<prabhakar.csengg@gmail.com> wrote:
+> Hi Sylwester,
+>
+> On Fri, Sep 20, 2013 at 3:22 PM, Sylwester Nawrocki
+> <s.nawrocki@samsung.com> wrote:
+>> Hi Prabhakar,
+>>
+>> On 09/20/2013 10:11 AM, Prabhakar Lad wrote:
+>>> OK I will, just send out a fix up patch which fixes the mismatch between
+>>> names for the rc-cycle, and later send out a patch which removes the
+>>> platform data usage for next release with proper DT bindings.
+>>
+>> I think the binding need to be fully corrected now, I just meant to not
+>> touch the board file, i.e. leave non-dt support unchanged.
+>>
+> Ok
+>
+>>> I'm OK with making regulator properties as optional, But still it would
+>>> change the meaning of what DT is, we know that the VDD/VDD_IO .. etc
+>>> pins are required properties (but still making them as optional) :-(
+>>>
+>>> I think there might several devices where this situation may arise so
+>>> just thinking of a alternative solution.
+>>>
+>>> say we have property 'software-regulator' which takes true/false(0/1)
+>>> If set to true we make the regulators as required property or else we
+>>> assume it is handled and ignore it ?
+>>
+>> I don't think this is a good idea. You would have to add a similar platform
+>> data flag for non-dt, it doesn't sound right. I can see two options here:
+>>
+>> 1. Make the regulator properties mandatory and, e.g. define a fixed
+>>    voltage GPIO regulator in DT with an empty 'gpio' property. Then
+>>    pass a phandle to that regulator in the adv7343 *-supply properties.
+>>    For non-dt similarly a fixed voltage regulator(s) and voltage
+>>    supplies  would need to be defined in the board files.
+>>
+>> 2. Make the properties optional and use (devm_)regulator_get_optional()
+>>    calls in the driver (a recently added function). I must admit I don't
+>>    fully understand description of this function, it currently looks
+>>    pretty much same as (devm_)regulator_get(). Thus the driver would
+>>    need to be handling regulator supplies only when non ERR_PTR() is
+>>    returned from regulator_get_optional() and otherwise assume a non
+>>    critical error. There is already quite a few example occurrences of
+>>    regulator_get_optional() usage.
+>>
+The same question arises in case of the clock, The adv7343 encoder has
+two input clocks CLKIN_A and CLKIN_B. I case of da850 EVM the
+clock source to adv7343 encoder is fixed source which is enabled
+by default so none of the bridge nor the adv7343 driver cares of the
+clock to enable/disable.
+So in this case should I be registering  (v4l2_clk_register() /
+v4l2_clk_unregister())
+a dummy clock in the bridge driver or in the board file ?
 
-diff --git a/drivers/dma/mxs-dma.c b/drivers/dma/mxs-dma.c
-index bfca8dc..a696438 100644
---- a/drivers/dma/mxs-dma.c
-+++ b/drivers/dma/mxs-dma.c
-@@ -544,8 +544,8 @@ static struct dma_async_tx_descriptor *mxs_dma_prep_dma_cyclic(
- 	if (mxs_chan->status == DMA_IN_PROGRESS)
- 		return NULL;
- 
--	mxs_chan->status = DMA_IN_PROGRESS;
--	mxs_chan->flags |= MXS_DMA_SG_LOOP;
-+	mxs_dma_pause_chan(mxs_chan);
-+	mxs_dma_reset_chan(mxs_chan);
- 
- 	if (num_periods > NUM_CCW) {
- 		dev_err(mxs_dma->dma_device.dev,
-@@ -585,6 +585,11 @@ static struct dma_async_tx_descriptor *mxs_dma_prep_dma_cyclic(
- 
- 		i++;
- 	}
-+	mxs_dma_resume_chan(mxs_chan);
-+
-+	mxs_chan->status = DMA_IN_PROGRESS;
-+	mxs_chan->flags |= MXS_DMA_SG_LOOP;
-+
- 	mxs_chan->desc_count = i;
- 
- 	return &mxs_chan->desc;
--- 
-1.8.4.rc3
+Regards,
+--Prabhakar Lad
