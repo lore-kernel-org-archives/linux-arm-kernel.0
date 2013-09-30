@@ -1,80 +1,188 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 30 Sep 2013 13:00:21 +0900
-Subject: [PATCH 2/5] ARM: shmobile: Lager: add Micrel KSZ8041 PHY fixup
+Date: Mon, 30 Sep 2013 13:00:20 +0900
+Subject: [PATCH 1/5] ARM: shmobile: update SDHI DT compatibility string to the
+ <unit>-<soc> format
 In-Reply-To: <cover.1380513421.git.horms+renesas@verge.net.au>
 References: <cover.1380513421.git.horms+renesas@verge.net.au>
-Message-ID: <48c8b96f21817aad695246ef020b849d466cc502.1380513421.git.horms+renesas@verge.net.au>
+Message-ID: <df1d0584b2292df5b9d576d7e5246e94616220a1.1380513421.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+From: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
 
-Currently on the Lager board NFS timeouts/delays are seen when booting.  That
-turned out to happen because the SoC's ETH_LINK signal turns on and off after
-each packet.  It is connected to Micrel KSZ8041 PHY's LED0 signal. Ether LEDs
-on the Lager board are named LINK and ACTIVE which corresponds to non-default
-01 setting of the PHY control register 1 bits 14-15. The 'sh_eth' driver resets
-the PHY when opening the network device, so we have to set the mentioned bits
-back to 01 from the default 00 value which causes bouncing of ETH_LINK.  That
-can be achieved using the PHY platform fixup mechanism if we also modify the
-driver to use it..
+Currently DT compatibility strings of both types can be found in the kernel
+sources: <unit>-<soc> and <soc>-<unit>, whereas a unique format should be
+followed and the former one is preferred. This patch converts the SDHI
+MMC driver and its users to the common standard. This is safe for now, since
+ATM no real products are using this driver with DT.
 
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Signed-off-by: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
+Acked-by: Chris Ball <cjb@laptop.org>
+[Removed r8a7740.dtsi portion as it is not applicable]
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/board-lager.c | 27 ++++++++++++++++++++++++++-
- 1 file changed, 26 insertions(+), 1 deletion(-)
+ Documentation/devicetree/bindings/mmc/tmio_mmc.txt | 17 ++++++++++-------
+ arch/arm/boot/dts/r8a73a4.dtsi                     |  6 +++---
+ arch/arm/boot/dts/r8a7790.dtsi                     |  8 ++++----
+ arch/arm/boot/dts/sh73a0.dtsi                      |  6 +++---
+ drivers/mmc/host/sh_mobile_sdhi.c                  | 16 ++++++++--------
+ 5 files changed, 28 insertions(+), 25 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/board-lager.c b/arch/arm/mach-shmobile/board-lager.c
-index ffb6f0a..5930af8 100644
---- a/arch/arm/mach-shmobile/board-lager.c
-+++ b/arch/arm/mach-shmobile/board-lager.c
-@@ -29,6 +29,7 @@
- #include <linux/pinctrl/machine.h>
- #include <linux/platform_data/gpio-rcar.h>
- #include <linux/platform_device.h>
-+#include <linux/phy.h>
- #include <linux/regulator/fixed.h>
- #include <linux/regulator/machine.h>
- #include <linux/sh_eth.h>
-@@ -155,6 +156,30 @@ static void __init lager_add_standard_devices(void)
- 					  &ether_pdata, sizeof(ether_pdata));
- }
+diff --git a/Documentation/devicetree/bindings/mmc/tmio_mmc.txt b/Documentation/devicetree/bindings/mmc/tmio_mmc.txt
+index df204e1..6a2a116 100644
+--- a/Documentation/devicetree/bindings/mmc/tmio_mmc.txt
++++ b/Documentation/devicetree/bindings/mmc/tmio_mmc.txt
+@@ -9,12 +9,15 @@ compulsory and any optional properties, common to all SD/MMC drivers, as
+ described in mmc.txt, can be used. Additionally the following tmio_mmc-specific
+ optional bindings can be used.
  
-+/*
-+ * Ether LEDs on the Lager board are named LINK and ACTIVE which corresponds
-+ * to non-default 01 setting of the Micrel KSZ8041 PHY control register 1 bits
-+ * 14-15. We have to set them back to 01 from the default 00 value each time
-+ * the PHY is reset. It's also important because the PHY's LED0 signal is
-+ * connected to SoC's ETH_LINK signal and in the PHY's default mode it will
-+ * bounce on and off after each packet, which we apparently want to avoid.
-+ */
-+static int lager_ksz8041_fixup(struct phy_device *phydev)
-+{
-+	u16 phyctrl1 = phy_read(phydev, 0x1e);
++Required properties:
++- compatible:	"renesas,sdhi-shmobile" - a generic sh-mobile SDHI unit
++		"renesas,sdhi-sh7372" - SDHI IP on SH7372 SoC
++		"renesas,sdhi-sh73a0" - SDHI IP on SH73A0 SoC
++		"renesas,sdhi-r8a73a4" - SDHI IP on R8A73A4 SoC
++		"renesas,sdhi-r8a7740" - SDHI IP on R8A7740 SoC
++		"renesas,sdhi-r8a7778" - SDHI IP on R8A7778 SoC
++		"renesas,sdhi-r8a7779" - SDHI IP on R8A7779 SoC
++		"renesas,sdhi-r8a7790" - SDHI IP on R8A7790 SoC
 +
-+	phyctrl1 &= ~0xc000;
-+	phyctrl1 |= 0x4000;
-+	return phy_write(phydev, 0x1e, phyctrl1);
-+}
-+
-+static void __init lager_init(void)
-+{
-+	lager_add_standard_devices();
-+
-+	phy_register_fixup_for_id("r8a7790-ether-ff:01", lager_ksz8041_fixup);
-+}
-+
- static const char *lager_boards_compat_dt[] __initdata = {
- 	"renesas,lager",
- 	NULL,
-@@ -163,6 +188,6 @@ static const char *lager_boards_compat_dt[] __initdata = {
- DT_MACHINE_START(LAGER_DT, "lager")
- 	.init_early	= r8a7790_init_delay,
- 	.init_time	= r8a7790_timer_init,
--	.init_machine	= lager_add_standard_devices,
-+	.init_machine	= lager_init,
- 	.dt_compat	= lager_boards_compat_dt,
- MACHINE_END
+ Optional properties:
+ - toshiba,mmc-wrprotect-disable: write-protect detection is unavailable
+-
+-When used with Renesas SDHI hardware, the following compatibility strings
+-configure various model-specific properties:
+-
+-"renesas,sh7372-sdhi":	(default) compatible with SH7372
+-"renesas,r8a7740-sdhi":	compatible with R8A7740: certain MMC/SD commands have to
+-			wait for the interface to become idle.
+diff --git a/arch/arm/boot/dts/r8a73a4.dtsi b/arch/arm/boot/dts/r8a73a4.dtsi
+index 6c26caa..658fcc5 100644
+--- a/arch/arm/boot/dts/r8a73a4.dtsi
++++ b/arch/arm/boot/dts/r8a73a4.dtsi
+@@ -193,7 +193,7 @@
+ 	};
+ 
+ 	sdhi0: sdhi at ee100000 {
+-		compatible = "renesas,r8a73a4-sdhi";
++		compatible = "renesas,sdhi-r8a73a4";
+ 		reg = <0 0xee100000 0 0x100>;
+ 		interrupt-parent = <&gic>;
+ 		interrupts = <0 165 4>;
+@@ -202,7 +202,7 @@
+ 	};
+ 
+ 	sdhi1: sdhi at ee120000 {
+-		compatible = "renesas,r8a73a4-sdhi";
++		compatible = "renesas,sdhi-r8a73a4";
+ 		reg = <0 0xee120000 0 0x100>;
+ 		interrupt-parent = <&gic>;
+ 		interrupts = <0 166 4>;
+@@ -211,7 +211,7 @@
+ 	};
+ 
+ 	sdhi2: sdhi at ee140000 {
+-		compatible = "renesas,r8a73a4-sdhi";
++		compatible = "renesas,sdhi-r8a73a4";
+ 		reg = <0 0xee140000 0 0x100>;
+ 		interrupt-parent = <&gic>;
+ 		interrupts = <0 167 4>;
+diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
+index 3b879e7..885f9f4 100644
+--- a/arch/arm/boot/dts/r8a7790.dtsi
++++ b/arch/arm/boot/dts/r8a7790.dtsi
+@@ -152,7 +152,7 @@
+ 	};
+ 
+ 	sdhi0: sdhi at ee100000 {
+-		compatible = "renesas,r8a7790-sdhi";
++		compatible = "renesas,sdhi-r8a7790";
+ 		reg = <0 0xee100000 0 0x100>;
+ 		interrupt-parent = <&gic>;
+ 		interrupts = <0 165 4>;
+@@ -161,7 +161,7 @@
+ 	};
+ 
+ 	sdhi1: sdhi at ee120000 {
+-		compatible = "renesas,r8a7790-sdhi";
++		compatible = "renesas,sdhi-r8a7790";
+ 		reg = <0 0xee120000 0 0x100>;
+ 		interrupt-parent = <&gic>;
+ 		interrupts = <0 166 4>;
+@@ -170,7 +170,7 @@
+ 	};
+ 
+ 	sdhi2: sdhi at ee140000 {
+-		compatible = "renesas,r8a7790-sdhi";
++		compatible = "renesas,sdhi-r8a7790";
+ 		reg = <0 0xee140000 0 0x100>;
+ 		interrupt-parent = <&gic>;
+ 		interrupts = <0 167 4>;
+@@ -179,7 +179,7 @@
+ 	};
+ 
+ 	sdhi3: sdhi at ee160000 {
+-		compatible = "renesas,r8a7790-sdhi";
++		compatible = "renesas,sdhi-r8a7790";
+ 		reg = <0 0xee160000 0 0x100>;
+ 		interrupt-parent = <&gic>;
+ 		interrupts = <0 168 4>;
+diff --git a/arch/arm/boot/dts/sh73a0.dtsi b/arch/arm/boot/dts/sh73a0.dtsi
+index ba59a58..3955c76 100644
+--- a/arch/arm/boot/dts/sh73a0.dtsi
++++ b/arch/arm/boot/dts/sh73a0.dtsi
+@@ -196,7 +196,7 @@
+ 	};
+ 
+ 	sdhi0: sdhi at ee100000 {
+-		compatible = "renesas,r8a7740-sdhi";
++		compatible = "renesas,sdhi-r8a7740";
+ 		reg = <0xee100000 0x100>;
+ 		interrupt-parent = <&gic>;
+ 		interrupts = <0 83 4
+@@ -208,7 +208,7 @@
+ 
+ 	/* SDHI1 and SDHI2 have no CD pins, no need for CD IRQ */
+ 	sdhi1: sdhi@ee120000 {
+-		compatible = "renesas,r8a7740-sdhi";
++		compatible = "renesas,sdhi-r8a7740";
+ 		reg = <0xee120000 0x100>;
+ 		interrupt-parent = <&gic>;
+ 		interrupts = <0 88 4
+@@ -219,7 +219,7 @@
+ 	};
+ 
+ 	sdhi2: sdhi@ee140000 {
+-		compatible = "renesas,r8a7740-sdhi";
++		compatible = "renesas,sdhi-r8a7740";
+ 		reg = <0xee140000 0x100>;
+ 		interrupt-parent = <&gic>;
+ 		interrupts = <0 104 4
+diff --git a/drivers/mmc/host/sh_mobile_sdhi.c b/drivers/mmc/host/sh_mobile_sdhi.c
+index 87ed3fb..f344659 100644
+--- a/drivers/mmc/host/sh_mobile_sdhi.c
++++ b/drivers/mmc/host/sh_mobile_sdhi.c
+@@ -113,14 +113,14 @@ static const struct sh_mobile_sdhi_ops sdhi_ops = {
+ };
+ 
+ static const struct of_device_id sh_mobile_sdhi_of_match[] = {
+-	{ .compatible = "renesas,shmobile-sdhi" },
+-	{ .compatible = "renesas,sh7372-sdhi" },
+-	{ .compatible = "renesas,sh73a0-sdhi", .data = &sh_mobile_sdhi_of_cfg[0], },
+-	{ .compatible = "renesas,r8a73a4-sdhi", .data = &sh_mobile_sdhi_of_cfg[0], },
+-	{ .compatible = "renesas,r8a7740-sdhi", .data = &sh_mobile_sdhi_of_cfg[0], },
+-	{ .compatible = "renesas,r8a7778-sdhi", .data = &sh_mobile_sdhi_of_cfg[0], },
+-	{ .compatible = "renesas,r8a7779-sdhi", .data = &sh_mobile_sdhi_of_cfg[0], },
+-	{ .compatible = "renesas,r8a7790-sdhi", .data = &sh_mobile_sdhi_of_cfg[0], },
++	{ .compatible = "renesas,sdhi-shmobile" },
++	{ .compatible = "renesas,sdhi-sh7372" },
++	{ .compatible = "renesas,sdhi-sh73a0", .data = &sh_mobile_sdhi_of_cfg[0], },
++	{ .compatible = "renesas,sdhi-r8a73a4", .data = &sh_mobile_sdhi_of_cfg[0], },
++	{ .compatible = "renesas,sdhi-r8a7740", .data = &sh_mobile_sdhi_of_cfg[0], },
++	{ .compatible = "renesas,sdhi-r8a7778", .data = &sh_mobile_sdhi_of_cfg[0], },
++	{ .compatible = "renesas,sdhi-r8a7779", .data = &sh_mobile_sdhi_of_cfg[0], },
++	{ .compatible = "renesas,sdhi-r8a7790", .data = &sh_mobile_sdhi_of_cfg[0], },
+ 	{},
+ };
+ MODULE_DEVICE_TABLE(of, sh_mobile_sdhi_of_match);
 -- 
 1.8.4
