@@ -1,23 +1,48 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Mon, 30 Sep 2013 13:41:25 +0200
-Subject: [PATCH 2/3 V3] i2c: mxs: Rework the PIO mode operation
-In-Reply-To: <201309301338.27043.marex@denx.de>
-References: <1380497035-7457-1-git-send-email-marex@denx.de>
- <1380497035-7457-2-git-send-email-marex@denx.de>
- <20130930112201.GE3222@katana> <201309301338.27043.marex@denx.de>
-Message-ID: <20130930114125.GF3222@katana>
+From: hverkuil@xs4all.nl (Hans Verkuil)
+Date: Mon, 30 Sep 2013 13:57:47 +0200
+Subject: [PATCH 19/51] DMA-API: media: dt3155v4l: replace
+ dma_set_mask()+dma_set_coherent_mask() with new helper
+In-Reply-To: <E1VMm13-0007hO-9l@rmk-PC.arm.linux.org.uk>
+References: <20130919212235.GD12758@n2100.arm.linux.org.uk>
+ <E1VMm13-0007hO-9l@rmk-PC.arm.linux.org.uk>
+Message-ID: <5249673B.5020705@xs4all.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 09/19/2013 11:44 PM, Russell King wrote:
+> Replace the following sequence:
+> 
+> 	dma_set_mask(dev, mask);
+> 	dma_set_coherent_mask(dev, mask);
+> 
+> with a call to the new helper dma_set_mask_and_coherent().
+> 
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 
-> Are you coming to ELCE btw ?
+Acked-by: Hans Verkuil <hans.verkuil@cisco.com>
 
-Yup, ELCE and ARM mini summit.
+Regards,
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130930/32092e21/attachment.sig>
+	Hans
+
+> ---
+>  drivers/staging/media/dt3155v4l/dt3155v4l.c |    5 +----
+>  1 files changed, 1 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/staging/media/dt3155v4l/dt3155v4l.c b/drivers/staging/media/dt3155v4l/dt3155v4l.c
+> index 90d6ac4..081407b 100644
+> --- a/drivers/staging/media/dt3155v4l/dt3155v4l.c
+> +++ b/drivers/staging/media/dt3155v4l/dt3155v4l.c
+> @@ -901,10 +901,7 @@ dt3155_probe(struct pci_dev *pdev, const struct pci_device_id *id)
+>  	int err;
+>  	struct dt3155_priv *pd;
+>  
+> -	err = dma_set_mask(&pdev->dev, DMA_BIT_MASK(32));
+> -	if (err)
+> -		return -ENODEV;
+> -	err = dma_set_coherent_mask(&pdev->dev, DMA_BIT_MASK(32));
+> +	err = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(32));
+>  	if (err)
+>  		return -ENODEV;
+>  	pd = kzalloc(sizeof(*pd), GFP_KERNEL);
+> 
