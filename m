@@ -1,170 +1,55 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Mon, 30 Sep 2013 19:23:32 +0200
-Subject: [PATCH v3] i2c: enable runtime PM for I2C adapter devices
- enumerated from ACPI
-In-Reply-To: <34540715.4ajYlpge4D@vostro.rjw.lan>
-References: <1380552228-23329-1-git-send-email-mika.westerberg@linux.intel.com>
- <1380552228-23329-2-git-send-email-mika.westerberg@linux.intel.com>
- <34540715.4ajYlpge4D@vostro.rjw.lan>
-Message-ID: <1433974.U2vlIFJzvq@vostro.rjw.lan>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Mon, 30 Sep 2013 13:14:38 -0400 (EDT)
+Subject: [RFC PATCH 3/3] ARM: vexpress/TC2: Implement MCPM
+ power_down_finish()
+In-Reply-To: <1380553607-3271-4-git-send-email-Dave.Martin@arm.com>
+References: <1380553607-3271-1-git-send-email-Dave.Martin@arm.com>
+ <1380553607-3271-4-git-send-email-Dave.Martin@arm.com>
+Message-ID: <alpine.LFD.2.03.1309301300390.6331@syhkavp.arg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, September 30, 2013 07:20:59 PM Rafael J. Wysocki wrote:
-> On Monday, September 30, 2013 05:43:48 PM Mika Westerberg wrote:
-> > The ACPI specification requires the parent device to be powered on before
-> > any of its children. It can be only powered off when all the children are
-> > already off.
-> > 
-> > Currently whenever there is no I2C traffic going on, the I2C controller
-> > driver can put the device into low power state transparently to its
-> > children (the I2C client devices). This violates the ACPI specification
-> > because now the parent device is in lower power state than its children.
-> > 
-> > In order to keep ACPI happy we enable runtime PM for the I2C adapter device
-> > if we find out that the I2C controller was in fact an ACPI device. In
-> > addition to that we attach the I2C client devices to the ACPI power domain
-> > and make sure that they are powered on when the driver ->probe() is called.
-> > 
-> > Non-ACPI devices are not affected by this change.
-> > 
-> > This patch is based on the work by Aaron Lu and Lv Zheng.
-> > 
-> > Signed-off-by: Mika Westerberg <mika.westerberg@linux.intel.com>
-> > ---
-> >  drivers/i2c/i2c-core.c | 47 ++++++++++++++++++++++++++++++++++++++++++++++-
-> >  1 file changed, 46 insertions(+), 1 deletion(-)
-> > 
-> > diff --git a/drivers/i2c/i2c-core.c b/drivers/i2c/i2c-core.c
-> > index 29d3f04..fa861ad 100644
-> > --- a/drivers/i2c/i2c-core.c
-> > +++ b/drivers/i2c/i2c-core.c
-> > @@ -236,6 +236,27 @@ int i2c_recover_bus(struct i2c_adapter *adap)
-> >  	return adap->bus_recovery_info->recover_bus(adap);
-> >  }
-> >  
-> > +static void acpi_i2c_device_pm_get(struct i2c_client *client)
-> > +{
-> > +	struct i2c_adapter *adap = client->adapter;
-> > +
-> > +	/* Make sure the adapter is active */
-> > +	if (ACPI_HANDLE(adap->dev.parent))
-> > +		pm_runtime_get_sync(&adap->dev);
-> > +	if (ACPI_HANDLE(&client->dev))
-> > +		acpi_dev_pm_attach(&client->dev, true);
-> 
-> It would be sufficient to do
-> 
-> 	if (ACPI_HANDLE(&client->dev)) {
-> 		pm_runtime_get_sync(&adap->dev);
-> 		acpi_dev_pm_attach(&client->dev, true);
-> 	}
-> 
-> here (and below), because I don't think the client with an ACPI handle and the
+On Mon, 30 Sep 2013, Dave Martin wrote:
 
-s/I don't think/I think/
+> This patch implements the power_down_finish() method for TC2, to
+> enable the kernel to confirm when CPUs are safely powered down.
+> 
+> The information required for determining when a CPU is parked
+> cannot be obtained from any single place, so a few sources of
+> information must be combined:
+> 
+>   * mcpm_cpu_power_down() must be pending for the CPU, so that we
+>     don't get confused by false STANDBYWFI positives arising from
+>     CPUidle.  This is detected by waiting for the tc2_pm use count
+>     for the target CPU to reach 0.
+> 
+>   * Either the SPC must report that the CPU has asserted
+>     STANDBYWFI, or the TC2 tile's reset control logic must be
+>     holding the CPU in reset.
+> 
+>     Just checking for STANDBYWFI is not sufficient, because this
+>     signal is not latched when the the cluster is clamped off and
+>     powered down: the relevant status bits just drop to zero.  This
+>     means that STANDBYWFI status cannot be used for reliable
+>     detection of the last CPU in a cluster reaching WFI.
+> 
+> This patch is required in order for kexec to work with MCPM on TC2.
+> 
+> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+> ---
+> 
+> The mdelay(1) in tc2_pm_power_down_finish() is arbitrary.  The power
+> controller can show millisecond response times in the worst case, and
+> CPU hotplug is not expected to be performance-critical.
+> 
+> It may be wise to add a timeout to this function, but that's open to
+> discussion.
 
-> parent without one is extremely unlikely (to the point of non-existence
-> actually ;-)).  And even if something like that happens, then we only enable
-> runtime PM for the adapter if the parent has an ACPI handle, so it still should
-> be OK.
-> 
-> Apart from this the patch looks good to me.
-> 
-> > +}
-> > +
-> > +static void acpi_i2c_device_pm_put(struct i2c_client *client, bool detach)
-> > +{
-> > +	struct i2c_adapter *adap = client->adapter;
-> > +
-> > +	if (ACPI_HANDLE(&client->dev) && detach)
-> > +		acpi_dev_pm_detach(&client->dev, true);
-> > +	if (ACPI_HANDLE(adap->dev.parent))
-> > +		pm_runtime_put(&adap->dev);
-> > +}
-> > +
-> >  static int i2c_device_probe(struct device *dev)
-> >  {
-> >  	struct i2c_client	*client = i2c_verify_client(dev);
-> > @@ -254,11 +275,15 @@ static int i2c_device_probe(struct device *dev)
-> >  					client->flags & I2C_CLIENT_WAKE);
-> >  	dev_dbg(dev, "probe\n");
-> >  
-> > +	acpi_i2c_device_pm_get(client);
-> > +
-> >  	status = driver->probe(client, i2c_match_id(driver->id_table, client));
-> >  	if (status) {
-> >  		client->driver = NULL;
-> >  		i2c_set_clientdata(client, NULL);
-> >  	}
-> > +
-> > +	acpi_i2c_device_pm_put(client, !!status);
-> >  	return status;
-> >  }
-> >  
-> > @@ -271,6 +296,8 @@ static int i2c_device_remove(struct device *dev)
-> >  	if (!client || !dev->driver)
-> >  		return 0;
-> >  
-> > +	acpi_i2c_device_pm_get(client);
-> > +
-> >  	driver = to_i2c_driver(dev->driver);
-> >  	if (driver->remove) {
-> >  		dev_dbg(dev, "remove\n");
-> > @@ -283,6 +310,8 @@ static int i2c_device_remove(struct device *dev)
-> >  		client->driver = NULL;
-> >  		i2c_set_clientdata(client, NULL);
-> >  	}
-> > +
-> > +	acpi_i2c_device_pm_put(client, true);
-> >  	return status;
-> >  }
-> >  
-> > @@ -294,8 +323,11 @@ static void i2c_device_shutdown(struct device *dev)
-> >  	if (!client || !dev->driver)
-> >  		return;
-> >  	driver = to_i2c_driver(dev->driver);
-> > -	if (driver->shutdown)
-> > +	if (driver->shutdown) {
-> > +		acpi_i2c_device_pm_get(client);
-> >  		driver->shutdown(client);
-> > +		acpi_i2c_device_pm_put(client, false);
-> > +	}
-> >  }
-> >  
-> >  #ifdef CONFIG_PM_SLEEP
-> > @@ -1263,6 +1295,16 @@ exit_recovery:
-> >  	bus_for_each_drv(&i2c_bus_type, NULL, adap, __process_new_adapter);
-> >  	mutex_unlock(&core_lock);
-> >  
-> > +	/*
-> > +	 * For ACPI enumerated controllers we must make sure that the
-> > +	 * controller is powered on before its children. Runtime PM handles
-> > +	 * this for us once we have enabled it for the adapter device.
-> > +	 */
-> > +	if (ACPI_HANDLE(adap->dev.parent)) {
-> > +		pm_runtime_no_callbacks(&adap->dev);
-> > +		pm_runtime_enable(&adap->dev);
-> > +	}
-> > +
-> >  	return 0;
-> >  
-> >  out_list:
-> > @@ -1427,6 +1469,9 @@ void i2c_del_adapter(struct i2c_adapter *adap)
-> >  		return;
-> >  	}
-> >  
-> > +	if (ACPI_HANDLE(adap->dev.parent))
-> > +		pm_runtime_disable(&adap->dev);
-> > +
-> >  	/* Tell drivers about this removal */
-> >  	mutex_lock(&core_lock);
-> >  	bus_for_each_drv(&i2c_bus_type, NULL, adap,
-> > 
-> 
-> Thanks!
-> 
-> 
--- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+That would be a good idea.  I'd suggest you reduce the polling loop to 
+something like 10 ms and bail out after one second.   We've been 
+affected by funny STANDBYWFI 
+behaviors before.
+
+
+
+Nicolas
