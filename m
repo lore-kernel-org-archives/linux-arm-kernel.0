@@ -1,44 +1,69 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 30 Sep 2013 17:11:49 +0100
-Subject: [PATCH 2/2] ARM: include: asm: use 'int' instead of 'unsigned
- long' for normal register variables within atomic.h
-In-Reply-To: <5247A3FC.9020508@asianux.com>
-References: <20130924093041.GB15119@mudshark.cambridge.arm.com>
- <5242498F.8060407@asianux.com>
- <20130925160746.GC14502@mudshark.cambridge.arm.com>
- <5243953E.6010405@asianux.com>
- <20130926100422.GE2855@mudshark.cambridge.arm.com>
- <5244148F.6080405@asianux.com>
- <20130927110618.GB9520@mudshark.cambridge.arm.com>
- <5247A1D1.6080505@asianux.com> <5247A1FA.4030305@asianux.com>
- <5247A3FC.9020508@asianux.com>
-Message-ID: <20130930161149.GI26036@mudshark.cambridge.arm.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 30 Sep 2013 18:21:01 +0200
+Subject: [PATCH v2] ARM: at91: sam9g45: shutdown ddr1 too when rebooting
+In-Reply-To: <1380263879-16325-1-git-send-email-plagnioj@jcrosoft.com>
+References: <1380263879-16325-1-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <5249A4ED.7030006@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Sep 29, 2013 at 04:52:28AM +0100, Chen Gang wrote:
-> "arc/arm" will be never on 64-bit, it is mainly on 32-bit (may also can
-> be on 16-bit).
-> 
-> So better to use 'int' instead of 'unsigned long' for normal register
-> variable (on 16-bit, 'int' is allowed to be 16-bit, so historically,
-> often use 'int' for normal register variables).
+On 27/09/2013 08:37, Jean-Christophe PLAGNIOL-VILLARD :
+> as on ddr0 we need to cleanly shutdown ddr1 if used before rebooting
 
-This commit message doesn't make a blind bit of sense! arch/arm/ is a 32-bit
-architecture in the sense that int will always be 32-bit there. This patch
-is just a cosmetic change, bringing our atomic_t manipulation code inline
-with the atomic_t type definition.
+I would have liked more comments.
 
-> @@ -297,7 +297,7 @@ static inline void atomic64_set(atomic64_t *v, long
-> long i)
->  static inline void atomic64_add(long long i, atomic64_t *v)
->  {
->  	long long result;
-> -	unsigned long tmp;
-> +	int tmp;
+> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> ---
+> v2:
+>
+> 	use ldr     r5, [r5, #4]
 
-Please leave the atomic64_* functions alone here; the reasoning I explained
-above doesn't apply to them. Whilst int may work, it seems gratuitous to
-make this change for no reason.
+Yep,
+and you forget: test for ddr controller 1 address not being NULL
 
-Will
+Anyway, I try to add information and stack it in at91-3.12-fixes
+
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+
+>
+> Best Regards,
+> J.
+>   arch/arm/mach-at91/at91sam9g45_reset.S | 8 ++++++++
+>   1 file changed, 8 insertions(+)
+>
+> diff --git a/arch/arm/mach-at91/at91sam9g45_reset.S b/arch/arm/mach-at91/at91sam9g45_reset.S
+> index 721a1a3..c40c1e2 100644
+> --- a/arch/arm/mach-at91/at91sam9g45_reset.S
+> +++ b/arch/arm/mach-at91/at91sam9g45_reset.S
+> @@ -16,11 +16,17 @@
+>   #include "at91_rstc.h"
+>   			.arm
+>
+> +/*
+> + * at91_ramc_base is an array void*
+> + * init at NULL if only one DDR controler is present in or DT
+> + */
+>   			.globl	at91sam9g45_restart
+>
+>   at91sam9g45_restart:
+>   			ldr	r5, =at91_ramc_base		@ preload constants
+>   			ldr	r0, [r5]
+> +			ldr	r5, [r5, #4]			@ ddr1
+> +			cmp	r5, #0
+>   			ldr	r4, =at91_rstc_base
+>   			ldr	r1, [r4]
+>
+> @@ -30,6 +36,8 @@ at91sam9g45_restart:
+>
+>   			.balign	32				@ align to cache line
+>
+> +			strne	r2, [r5, #AT91_DDRSDRC_RTR]	@ disable DDR1 access
+> +			strne	r3, [r5, #AT91_DDRSDRC_LPR]	@ power down DDR1
+>   			str	r2, [r0, #AT91_DDRSDRC_RTR]	@ disable DDR0 access
+>   			str	r3, [r0, #AT91_DDRSDRC_LPR]	@ power down DDR0
+>   			str	r4, [r1, #AT91_RSTC_CR]		@ reset processor
+>
+
+
+-- 
+Nicolas Ferre
