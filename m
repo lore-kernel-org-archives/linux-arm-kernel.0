@@ -1,58 +1,63 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 30 Sep 2013 17:48:54 +0200
-Subject: [PATCH v2] ARM: at91: cam60: fix incorrect placement of __initdata
- tag
-In-Reply-To: <4748525.slmbI8ubRr@amdc1032>
-References: <4748525.slmbI8ubRr@amdc1032>
-Message-ID: <52499D66.9070203@atmel.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 30 Sep 2013 17:49:12 +0200
+Subject: [PATCH v2] ARM: new platform for Energy Micro's EFM32 Cortex-M3
+ SoCs
+In-Reply-To: <201309292100.41701.arnd@arndb.de>
+References: <1379447884-14025-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <201309272344.01386.arnd@arndb.de>
+ <20130928191511.GA2548@pengutronix.de>
+ <201309292100.41701.arnd@arndb.de>
+Message-ID: <20130930154912.GE2548@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/09/2013 17:38, Bartlomiej Zolnierkiewicz :
-> __initdata tag should be placed between the variable name and equal
-> sign for the variable to be placed in the intended .init.data section.
+Hello Arnd,
 
-Yes, okay. But please do not mix the removal of white lines with your 
-modification.
+On Sun, Sep 29, 2013 at 09:00:41PM +0200, Arnd Bergmann wrote:
+> On Saturday 28 September 2013, Uwe Kleine-K?nig wrote:
+> > On Fri, Sep 27, 2013 at 11:44:01PM +0200, Arnd Bergmann wrote:
+> > > On Thursday 26 September 2013, Uwe Kleine-K?nig wrote:
+> > > > I made that work now and can prepare a patch. I had to drop "depends on
+> > > > !ARCH_MULTIPLATFORM" from XIP_KERNEL. That's because my machine only
+> > > > works with XIP_KERNEL as it only has 4 MiB of RAM.
+> > > 
+> > > Ok, cool. We might run into a few problems with 'make randconfig' and
+> > > 'make allyesconfig' when it becomes possible to enable XIP_KERNEL then.
+> > > IIRC, there is no fundamental reason to disallow XIP_KERNEL with
+> > > ARCH_MULTIPLATFORM, but I added the dependency because it causes
+> > > build errors in combination with other options.
+> > ah, OK. Do you have an idea to fix both?
+> 
+> No, I don't actually remember what problems I ran into. It may be anywhere
+> from trivial to impossible to fix.
+I sent a patch series (without looking much for problems :-).
 
-> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> > There is a BSP publically available at
+> > 
+> > 	http://git-public.pengutronix.de/?p=OSELAS.BSP-EnergyMicro-Gecko.git;a=summary
+> > 
+> > which also includes a README file. For troubleshooting /join #efm32 on
+> > freenode.
+> 
+> I've never tried ptxdist, but if that is known to work fine with NOMMU,
+> I might just try building the base distro and running it on mach-virt.
+> 
+> Does this work with ELF FDPIC or do you need binfmt-flat?
+I use binfmt-flat, but that's because Marc (on Cc: now) created the base
+BSP for me that way. I don't know what ELF FDPIC is.
 
-Anyway, no need to resend it:
+> > > Do you prevent building such a kernel in Kconfig?
+> > I'm sure my Kconfig magic isn't waterproof. It took me a few tries to
+> > expand the multiarch architecture selection to make v7-m selectable at
+> > all.
+> 
+> Ok, I can have a look and give you suggestions for how it needs to be
+> phrased if it currently allows broken (non-building) combinations.
+You have the chance now to comment in the respective thread.
 
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-
-> ---
-> v2:
-> - use __initdata as it is OK to do it
->
->   arch/arm/mach-at91/board-cam60.c | 4 +---
->   1 file changed, 1 insertion(+), 3 deletions(-)
->
-> diff --git a/arch/arm/mach-at91/board-cam60.c b/arch/arm/mach-at91/board-cam60.c
-> index ade948b..ecabbed 100644
-> --- a/arch/arm/mach-at91/board-cam60.c
-> +++ b/arch/arm/mach-at91/board-cam60.c
-> @@ -108,16 +108,14 @@ static struct spi_board_info cam60_spi_devices[] __initdata = {
->   #endif
->   };
->
-> -
->   /*
->    * MACB Ethernet device
->    */
-> -static struct __initdata macb_platform_data cam60_macb_data = {
-> +static struct macb_platform_data cam60_macb_data __initdata = {
->   	.phy_irq_pin	= AT91_PIN_PB5,
->   	.is_rmii	= 0,
->   };
->
-> -
->   /*
->    * NAND Flash
->    */
->
-
+Best regards
+Uwe
 
 -- 
-Nicolas Ferre
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
