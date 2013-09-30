@@ -1,60 +1,70 @@
-From: konrad.wilk@oracle.com (Konrad Rzeszutek Wilk)
-Date: Mon, 30 Sep 2013 12:02:23 -0400
-Subject: [PATCH v6 15/19] swiotlb-xen: call dma_capable only if
- dev->dma_mask is allocated
-In-Reply-To: <1380298207-29151-15-git-send-email-stefano.stabellini@eu.citrix.com>
-References: <alpine.DEB.2.02.1309271653420.5498@kaball.uk.xensource.com>
- <1380298207-29151-15-git-send-email-stefano.stabellini@eu.citrix.com>
-Message-ID: <20130930160223.GU3106@phenom.dumpdata.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 30 Sep 2013 17:06:15 +0100
+Subject: [PATCH] iommu/arm-smmu: Clear global and context bank fault
+ status registers
+In-Reply-To: <20130930135621.GW3315@alberich>
+References: <1380234982-1677-1-git-send-email-andreas.herrmann@calxeda.com>
+ <1380234982-1677-6-git-send-email-andreas.herrmann@calxeda.com>
+ <20130927085255.GC8319@mudshark.cambridge.arm.com>
+ <20130930135401.GV3315@alberich> <20130930135621.GW3315@alberich>
+Message-ID: <20130930160615.GG26036@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 27, 2013 at 05:10:03PM +0100, Stefano Stabellini wrote:
-
-Why? I am looking at X86 and IA64 and I see:
-
- 79         if (!dev->dma_mask)                                                     
- 80                 return 0;           
-
-
-Why not port dma_capable over to ARM?
-
-> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+On Mon, Sep 30, 2013 at 02:56:21PM +0100, Andreas Herrmann wrote:
+> 
+> After reset these registers have unknown values.
+> This might cause problems when evaluating SMMU_GFSR and/or SMMU_CB_FSR
+> in handlers for combined interrupts.
+> 
+> Signed-off-by: Andreas Herrmann <andreas.herrmann@calxeda.com>
 > ---
->  drivers/xen/swiotlb-xen.c |    6 +++---
->  1 files changed, 3 insertions(+), 3 deletions(-)
+>  drivers/iommu/arm-smmu.c |   27 ++++++++++++++++++++-------
+>  1 file changed, 20 insertions(+), 7 deletions(-)
 > 
-> diff --git a/drivers/xen/swiotlb-xen.c b/drivers/xen/swiotlb-xen.c
-> index 790c2eb..3011736 100644
-> --- a/drivers/xen/swiotlb-xen.c
-> +++ b/drivers/xen/swiotlb-xen.c
-> @@ -512,7 +512,7 @@ dma_addr_t xen_swiotlb_map_page(struct device *dev, struct page *page,
->  	 * buffering it.
->  	 */
->  	if (!xen_feature(XENFEAT_auto_translated_physmap) &&
-> -	    dma_capable(dev, dev_addr, size) &&
-> +	    dev->dma_mask && dma_capable(dev, dev_addr, size) &&
->  	    !range_straddles_page_boundary(phys, size) && !swiotlb_force)
->  		return dev_addr;
+> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+> index 579b6f8..cbbf597 100644
+> --- a/drivers/iommu/arm-smmu.c
+> +++ b/drivers/iommu/arm-smmu.c
+> @@ -631,6 +631,12 @@ static irqreturn_t arm_smmu_global_fault(int irq, void *dev)
+>  	return IRQ_HANDLED;
+>  }
 >  
-> @@ -532,7 +532,7 @@ dma_addr_t xen_swiotlb_map_page(struct device *dev, struct page *page,
->  	/*
->  	 * Ensure that the address returned is DMA'ble
->  	 */
-> -	if (!dma_capable(dev, dev_addr, size)) {
-> +	if (dev->dma_mask && !dma_capable(dev, dev_addr, size)) {
->  		swiotlb_tbl_unmap_single(dev, map, size, dir);
->  		dev_addr = 0;
+> +static void arm_smmu_clear_cb_fsr(struct arm_smmu_device *smmu, u8 cbndx)
+> +{
+> +	void __iomem *cb_base = ARM_SMMU_CB_BASE(smmu) + ARM_SMMU_CB(smmu, cbndx);
+> +	writel_relaxed(FSR_FAULT, cb_base + ARM_SMMU_CB_FSR);
+> +}
+
+Hmm, why not just stick this in arm_smmu_init_context_bank...
+
+>  static void arm_smmu_init_context_bank(struct arm_smmu_domain *smmu_domain)
+>  {
+>  	u32 reg;
+> @@ -838,6 +844,7 @@ static int arm_smmu_init_domain_context(struct iommu_domain *domain,
+>  		root_cfg->irptndx = root_cfg->cbndx;
 >  	}
-> @@ -660,7 +660,7 @@ xen_swiotlb_map_sg_attrs(struct device *hwdev, struct scatterlist *sgl,
 >  
->  		if (swiotlb_force ||
->  		    xen_feature(XENFEAT_auto_translated_physmap) ||
-> -		    !dma_capable(hwdev, dev_addr, sg->length) ||
-> +		    (hwdev->dma_mask && !dma_capable(hwdev, dev_addr, sg->length)) ||
->  		    range_straddles_page_boundary(paddr, sg->length)) {
->  			/*
->  			 * Pass the dma_addr of the first slab in the iotlb buffer as
-> -- 
-> 1.7.2.5
-> 
+> +	arm_smmu_clear_cb_fsr(smmu, root_cfg->cbndx);
+
+... then move that function call here instead of where it currently is?
+
+>  	irq = smmu->irqs[smmu->num_global_irqs + root_cfg->irptndx];
+>  	ret = request_irq(irq, arm_smmu_context_fault, IRQF_SHARED,
+>  			  "arm-smmu-context-fault", domain);
+> @@ -1564,7 +1571,11 @@ static void arm_smmu_device_reset(struct arm_smmu_device *smmu)
+>  	void __iomem *gr0_base = ARM_SMMU_GR0(smmu);
+>  	void __iomem *sctlr_base = ARM_SMMU_CB_BASE(smmu) + ARM_SMMU_CB_SCTLR;
+>  	int i = 0;
+> -	u32 scr0 = readl_relaxed(gr0_base + ARM_SMMU_GR0_sCR0);
+> +	u32 val;
+
+I guess we have to dilute the meaning of the variable, but perhaps `reg' is
+slightly more indicative than `val'?
+
+Do you plan to post all your patches as a new series (it's hard to keep
+track of what to pick)?
+
+Cheers,
+
+Will
