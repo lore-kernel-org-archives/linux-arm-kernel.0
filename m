@@ -1,56 +1,57 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 30 Sep 2013 17:01:41 +0100
-Subject: [PATCH 3/4] perf tools: Check libunwind for availability of
- dwarf parsing feature
-In-Reply-To: <20130924171220.GB2634@ghostprotocols.net>
-References: <1379323053-11458-1-git-send-email-jean.pihet@linaro.org>
- <1379323053-11458-4-git-send-email-jean.pihet@linaro.org>
- <20130917102904.GA27258@mudshark.cambridge.arm.com>
- <20130924171220.GB2634@ghostprotocols.net>
-Message-ID: <20130930160141.GF26036@mudshark.cambridge.arm.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 30 Sep 2013 18:02:19 +0200
+Subject: [PATCH 3/3] [RFC] ARM: prepare ARMv7-M for MULTIPLATFORM use
+In-Reply-To: <201309301234.25913.arnd@arndb.de>
+References: <1380534577-15076-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <1380534577-15076-4-git-send-email-u.kleine-koenig@pengutronix.de>
+ <201309301234.25913.arnd@arndb.de>
+Message-ID: <20130930160219.GF2548@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnaldo,
+Hello Arnd,
 
-On Tue, Sep 24, 2013 at 06:12:20PM +0100, Arnaldo Carvalho de Melo wrote:
-> Em Tue, Sep 17, 2013 at 11:29:04AM +0100, Will Deacon escreveu:
-> > Arnaldo, Ingo,
+On Mon, Sep 30, 2013 at 12:34:25PM +0200, Arnd Bergmann wrote:
+> On Monday 30 September 2013, Uwe Kleine-K?nig wrote:
+> > v7-M is a third group that is incompatible with both v4/v5 and v6/v7.
 > > 
-> > On Mon, Sep 16, 2013 at 10:17:32AM +0100, Jean Pihet wrote:
-> > > The newly added dwarf unwinding feature [1] requires:
-> > > . a recent version (>= 1.1) of libunwind,
-> > > . libunwind to be configured with --enable-debug-frame.
-> > > 
-> > > [1] http://www.spinics.net/lists/kernel/msg1598951.html
-> > > 
-> > > Add the corresponding API test in the feature check list.
-> > > 
-> > > Signed-off-by: Jean Pihet <jean.pihet@linaro.org>
-> > > ---
-> > >  tools/perf/config/Makefile          |  2 +-
-> > >  tools/perf/config/feature-tests.mak | 11 ++++++++++-
-> > >  2 files changed, 11 insertions(+), 2 deletions(-)
+> > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> > ---
+> > This behaves strange but I think is robust not to allow broken configs:
 > > 
-> > Can I have an ack for this and the following patch please?
-> > 
-> > (http://lists.infradead.org/pipermail/linux-arm-kernel/2013-September/198531.html)
-> > 
-> > Then I can stick these into -next for some more exposure before I queue them
-> > for 3.13.
+> > When v4/v5 is selected, v6/v7 and v7m are available for enabling, too.
+> > When v6/v7 is selected the other choices are disabled
+> > When v7m is selected only v6/v7 are available for enabling.
 > 
-> I can pick it now that Jiri kinda acked it, right Jiri?
+> The Kconfig stuff all looks good, 
+> 
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
+Thanks
 
-Jiri ended up acking v3 of the patches:
+> > @@ -141,3 +139,7 @@ ENTRY(vector_table)
+> >  	.rept	64 - 16
+> >  	.long	__irq_entry		@ 16..64 - External Interrupts
+> >  	.endr
+> > +
+> > +	.globl  handle_arch_irq
+> > +handle_arch_irq:
+> > +	.long	0
+> > -- 
+> > 1.8.4.rc3
+> 
+> I'm not sure about this part. I guess you should either make it
+> a separate patch, or describe what it's for in the patch description above.
+This is needed because ARCH_MULTIPLATFORM selects MULTI_IRQ_HANDLER
+which v7-M didn't use up to now. I will wait for a while for more
+feedback then respin with a better changelog.
+ 
+> Also, I'd put all of the text you have in the comment into the actual
+> changeset text, above the --- line, as others might find that useful
+> later.
+ok
 
-http://lists.infradead.org/pipermail/linux-arm-kernel/2013-September/200579.html
+Uwe
 
-but I don't see them in -next. I'm happy to take them via my tree, just want
-to make sure they don't conflict with anything you have planned for 3.13
-and/or end up with our trees colliding in -next.
-
-What's the plan?
-
-Cheers,
-
-Will
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
