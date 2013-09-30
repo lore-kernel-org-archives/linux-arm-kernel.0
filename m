@@ -1,31 +1,54 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Mon, 30 Sep 2013 18:26:16 -0300
-Subject: [PATCH 0/4] Kirkwood: minor cleanups
-In-Reply-To: <20130930211650.GF6735@lunn.ch>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Mon, 30 Sep 2013 15:31:31 -0600
+Subject: [PATCH 3/4] clk: kirkwood: Add CLK_IGNORE_UNUSED to ethernet ge0
+ and ge1 clocks
+In-Reply-To: <1380575010-8573-4-git-send-email-ezequiel.garcia@free-electrons.com>
 References: <1380575010-8573-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <20130930211650.GF6735@lunn.ch>
-Message-ID: <20130930212615.GA8823@localhost>
+ <1380575010-8573-4-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <20130930213131.GB10393@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 30, 2013 at 11:16:50PM +0200, Andrew Lunn wrote:
-> > The third and fourth patch are related: the latter strictly depends on
-> > the former. The idea behind these two patches is basically to convert
-> > the "keep the ethernet clocks enabled by calling clk_enable()" hack
-> > into a simpler and cleaner usage of the CLK_IGNORE_UNUSED flags which
-> > prevent these clocks from being ever gated.
-> 
-> Hi Ezequiel
-> 
-> This should work, but what would be nicer is to look and see if there
-> is a node in DT for each device. If it does not have a node, don't set
-> CLK_IGNORE_UNUSED, so that the clock does get turned off, and we save
-> a bit of power. Quite a few of the kirkwood devices only have one
-> ethernet.
-> 
+On Mon, Sep 30, 2013 at 06:03:29PM -0300, Ezequiel Garcia wrote:
 
-Good idea. I'll take a look at it.
--- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+> These clocks should never be gated, since the ethernet interfaces
+> forget the assigned MAC address assigned if their clock source is
+> turned off.
+
+Hrm, this hack is only needed to support the hack of passing the MAC
+address from the bootloader to the kernel via the ethernet registers.
+
+If local-mac-address is present in the DT (or fixed up via ATAGS) then
+none of this is needed.
+
+Boards that have well formed DT's don't need this.
+
+The major downside to this patch is we never get power savings by
+disabling the 2nd GE. On my boards it is not connected so we always
+want to see it powered down.
+
+Our bootloader gates the power and turns off the clock, having Linux
+turn the clock back on without knowing how to control the power seems
+like a possible problem.
+
+I don't have code, but when this was first brought up it was suggested
+to add local-mac-address to the DT nodes if it isn't present in the
+common code and don't mess with the clocks.
+
+Psudeo code:
+
+void marvell_dt_ethernet_fixup(void)
+{
+ for_each_compatible_node(np, "marvell,kirkwood-eth-port")
+ {
+   if (of_get_mac_address(np) != NULL)
+      continue;
+   regs = ioremap(of_regs(np->parent,0));
+   address = (readl(regs + MAC_ADDR_HIGH) << 32) | 
+              readl(regs + MAC_ADDR_LOW))
+   iounmap(regs);
+   of_add_property(np, {"local-mac-address" = address});
+ }
+}
+
+Jason
