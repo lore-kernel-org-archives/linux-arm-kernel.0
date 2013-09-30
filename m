@@ -1,89 +1,35 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 30 Sep 2013 02:00:10 +0000 (UTC)
-Subject: OMAP baseline test results for v3.12-rc3
-Message-ID: <alpine.DEB.2.02.1309300158430.17980@utopia.booyaka.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Sun, 29 Sep 2013 19:03:06 -0700
+Subject: [PATCH v6 07/12] ARM: EXYNOS: remove system mmu initialization
+ from exynos tree
+In-Reply-To: <20130930105234.73b5380ec08bf4cc6b2c9677@samsung.com>
+References: <003a01cde30b$e13c1910$a3b44b30$%cho@samsung.com>
+ <CAOw6vbJfi7UhwxgFKmMzO91fnywWZNTRVDLLSWQOkbbU=C5ndA@mail.gmail.com>
+ <20130930093500.ffa527f8f5f004e02a9cb187@samsung.com>
+ <CAOw6vbKSQ2xTj7__D5F40vRLxU5Yt1NH4zEp4WcRtB1rVK5gQQ@mail.gmail.com>
+ <20130930105234.73b5380ec08bf4cc6b2c9677@samsung.com>
+Message-ID: <CALiw-2HwQvpHCoJw0JyGn87ZV1vuvqMtPv8i+AcVGQHnAKtEJw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
-Here are some basic OMAP test results for Linux v3.12-rc3.
-Logs and other details at:
+2013/9/29 Cho KyongHo <pullip.cho@samsung.com>:
 
-    http://www.pwsan.com/omap/testlogs/test_v3.12-rc3/20130929171908/
+> Ah, I remember that this is merged.
+> I agreed to merge this patch because iommu driver need to be completely changed.
+> Whenever I change exynos-iommu driver, synchronizing samsung-next and iommu-next
+> branches is a big challenge.
+> Thus I decided to remove dependencies to samsung-next branch.
+> But I didn't know that the rest of the new driver is not merged soon. :(
+> I am sorry about that.
+>
+> new patch (v10) will be posted soon.
 
+Will the v10 patch set be incremental based on v6?
 
-Test summary
-------------
+How have you tested v10 on mainline?
 
-Build: uImage:
-    Pass (14/14): omap1_defconfig, omap1_defconfig_1510innovator_only,
-		  omap1_defconfig_5912osk_only, omap2plus_defconfig,
-		  omap2plus_defconfig_2430sdp_only,
-		  omap2plus_defconfig_cpupm, omap2plus_defconfig_no_pm,
-		  omap2plus_defconfig_n800_only_a,
-		  omap2plus_defconfig_n800_multi_omap2xxx,
-		  omap2plus_defconfig_omap2_4_only,
-		  omap2plus_defconfig_omap3_4_only,
-		  rmk_omap3430_ldp_allnoconfig,
-		  rmk_omap3430_ldp_oldconfig,
-		  rmk_omap4430_sdp_allnoconfig
+Thanks,
 
-Build: zImage:
-    Pass ( 2/ 2): omap2plus_defconfig, omap2plus_defconfig_am33xx_only
-
-Build: uImage+dtb:
-    Pass ( 3/ 3): omap2plus_defconfig_am33xx_only/am335x-bone,
-		  omap2plus_defconfig/omap4-panda,
-		  omap2plus_defconfig/omap4-panda-es
-
-Boot to userspace:
-    skip ( 1/ 1): 5912osk
-    Pass (11/11): 2430sdp, 3517evm, 3530es3beagle, 3730beaglexm,
-		  37xxevm, 4430es2panda, 4460pandaes, am335xbone,
-		  am335xbonelt, cmt3517, 4460varsomom
-
-PM: chip retention via suspend:
-    FAIL ( 3/ 7): 2430sdp, 4430es2panda, 4460varsomom
-    Pass ( 4/ 7): 3530es3beagle, 3730beaglexm, 37xxevm, 4460pandaes
-
-PM: chip retention via dynamic idle:
-    FAIL ( 4/ 7): 2430sdp, 4430es2panda, 4460pandaes, 4460varsomom
-    Pass ( 3/ 7): 3530es3beagle, 3730beaglexm, 37xxevm
-
-PM: chip off except CORE via suspend:
-    Pass ( 1/ 1): 3730beaglexm
-
-PM: chip off except CORE via dynamic idle:
-    Pass ( 1/ 1): 3730beaglexm
-
-PM: chip off via suspend:
-    FAIL ( 3/ 5): 4430es2panda, 4460pandaes, 4460varsomom
-    Pass ( 2/ 5): 3530es3beagle, 37xxevm
-
-PM: chip off via dynamic idle:
-    FAIL ( 3/ 5): 4430es2panda, 4460pandaes, 4460varsomom
-    Pass ( 2/ 5): 3530es3beagle, 37xxevm
-
-
-vmlinux object size
-(delta in bytes from test_v3.12-rc2 (4a10c2ac2f368583138b774ca41fac4207911983)):
-   text     data      bss    total  kernel
-   +492      -16        0     +476  omap1_defconfig
-   +524      -16        0     +508  omap1_defconfig_1510innovator_only
-   +524       +8        0     +532  omap1_defconfig_5912osk_only
-   +404        0        0     +404  omap2plus_defconfig
-   +388      +16      -32     +372  omap2plus_defconfig_2430sdp_only
-   +404       -8        0     +396  omap2plus_defconfig_cpupm
-   +200       +8        0     +208  omap2plus_defconfig_n800_multi_omap2xxx
-   +232       +8        0     +240  omap2plus_defconfig_n800_only_a
-   +404        0        0     +404  omap2plus_defconfig_no_pm
-   +404      +24        0     +428  omap2plus_defconfig_omap2_4_only
-   +340        0        0     +340  omap2plus_defconfig_omap3_4_only
-    -88      +24      +32      -32  rmk_omap3430_ldp_allnoconfig
-   +128        0        0     +128  rmk_omap3430_ldp_oldconfig
-    -72       -8      +16      -64  rmk_omap4430_sdp_allnoconfig
-
-Boot-time memory difference
-(delta in bytes from test_v3.12-rc2 (4a10c2ac2f368583138b774ca41fac4207911983))
-  avail  rsrvd   high  freed  board          kconfig
-  (no differences)
+-Olof
