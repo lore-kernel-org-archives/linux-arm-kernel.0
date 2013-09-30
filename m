@@ -1,131 +1,66 @@
-From: konrad.wilk@oracle.com (Konrad Rzeszutek Wilk)
-Date: Mon, 30 Sep 2013 13:22:09 -0400
-Subject: [PATCH v6 17/19] xen: introduce XENMEM_pin
-In-Reply-To: <1380298207-29151-17-git-send-email-stefano.stabellini@eu.citrix.com>
-References: <alpine.DEB.2.02.1309271653420.5498@kaball.uk.xensource.com>
- <1380298207-29151-17-git-send-email-stefano.stabellini@eu.citrix.com>
-Message-ID: <20130930172209.GX3106@phenom.dumpdata.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Mon, 30 Sep 2013 18:26:12 +0100
+Subject: [RFC PATCH 3/3] ARM: vexpress/TC2: Implement MCPM
+ power_down_finish()
+In-Reply-To: <alpine.LFD.2.03.1309301300390.6331@syhkavp.arg>
+References: <1380553607-3271-1-git-send-email-Dave.Martin@arm.com>
+ <1380553607-3271-4-git-send-email-Dave.Martin@arm.com>
+ <alpine.LFD.2.03.1309301300390.6331@syhkavp.arg>
+Message-ID: <20130930172612.GD3209@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 27, 2013 at 05:10:05PM +0100, Stefano Stabellini wrote:
-> Introduce a new hypercall to pin one or more pages whose machine
-> addresses respect a dma_mask passed as an argument
+On Mon, Sep 30, 2013 at 01:14:38PM -0400, Nicolas Pitre wrote:
+> On Mon, 30 Sep 2013, Dave Martin wrote:
 > 
-> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> ---
->  arch/arm/xen/mm.c              |   16 ++++++++++++++++
->  arch/x86/xen/mmu.c             |    7 +++++++
->  include/xen/interface/memory.h |   32 ++++++++++++++++++++++++++++++++
->  include/xen/xen-ops.h          |    1 +
->  4 files changed, 56 insertions(+), 0 deletions(-)
+> > This patch implements the power_down_finish() method for TC2, to
+> > enable the kernel to confirm when CPUs are safely powered down.
+> > 
+> > The information required for determining when a CPU is parked
+> > cannot be obtained from any single place, so a few sources of
+> > information must be combined:
+> > 
+> >   * mcpm_cpu_power_down() must be pending for the CPU, so that we
+> >     don't get confused by false STANDBYWFI positives arising from
+> >     CPUidle.  This is detected by waiting for the tc2_pm use count
+> >     for the target CPU to reach 0.
+> > 
+> >   * Either the SPC must report that the CPU has asserted
+> >     STANDBYWFI, or the TC2 tile's reset control logic must be
+> >     holding the CPU in reset.
+> > 
+> >     Just checking for STANDBYWFI is not sufficient, because this
+> >     signal is not latched when the the cluster is clamped off and
+> >     powered down: the relevant status bits just drop to zero.  This
+> >     means that STANDBYWFI status cannot be used for reliable
+> >     detection of the last CPU in a cluster reaching WFI.
+> > 
+> > This patch is required in order for kexec to work with MCPM on TC2.
+> > 
+> > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+> > ---
+> > 
+> > The mdelay(1) in tc2_pm_power_down_finish() is arbitrary.  The power
+> > controller can show millisecond response times in the worst case, and
+> > CPU hotplug is not expected to be performance-critical.
+> > 
+> > It may be wise to add a timeout to this function, but that's open to
+> > discussion.
 > 
-> diff --git a/arch/arm/xen/mm.c b/arch/arm/xen/mm.c
-> index b305b94..146c1c3 100644
-> --- a/arch/arm/xen/mm.c
-> +++ b/arch/arm/xen/mm.c
-> @@ -55,6 +55,22 @@ static int xen_exchange_memory(xen_ulong_t extents_in,
->  	return success;
->  }
->  
-> +int xen_pin_page(xen_pfn_t *in_frame, unsigned int address_bits)
-> +{
-> +	struct xen_pin pin = {
-> +		.in = {
-> +			.nr_extents   = 1,
-> +			.extent_order = 0,
-> +			.domid        = DOMID_SELF,
-> +			.address_bits = address_bits
-> +		},
-> +	};
-> +	set_xen_guest_handle(pin.in.extent_start, in_frame);
-> +
-> +	return HYPERVISOR_memory_op(XENMEM_pin, &pin);
-> +}
-> +EXPORT_SYMBOL_GPL(xen_pin_page);
-> +
->  int xen_create_contiguous_region(phys_addr_t pstart, unsigned int order,
->  				 unsigned int address_bits,
->  				 dma_addr_t *dma_handle)
-> diff --git a/arch/x86/xen/mmu.c b/arch/x86/xen/mmu.c
-> index 8830883..8f76ce2 100644
-> --- a/arch/x86/xen/mmu.c
-> +++ b/arch/x86/xen/mmu.c
-> @@ -2568,3 +2568,10 @@ int xen_unmap_domain_mfn_range(struct vm_area_struct *vma,
->  	return -EINVAL;
->  }
->  EXPORT_SYMBOL_GPL(xen_unmap_domain_mfn_range);
-> +
-> +int xen_pin_page(xen_pfn_t *in_frame, unsigned int address_bits)
-> +{
-> +	return -ENOSYS;
-> +}
-> +EXPORT_SYMBOL_GPL(xen_pin_page);
-> +
-> diff --git a/include/xen/interface/memory.h b/include/xen/interface/memory.h
-> index 49db252..66ab578 100644
-> --- a/include/xen/interface/memory.h
-> +++ b/include/xen/interface/memory.h
-> @@ -314,4 +314,36 @@ struct xen_unpin {
->  };
->  DEFINE_GUEST_HANDLE_STRUCT(xen_unpin);
->  
-> +/*
-> + * XENMEM_pin pins a set of pages to make sure that the hypervisor does
-> + * not change the p2m mappings for them.
-> + *
-> + */
-> +#define XENMEM_pin               28
-> +struct xen_pin {
-> +    /*
-> +     * [IN/OUT] Details of memory extents to be pinned (GMFN bases).
-> +     * Xen copies back the MFNs corresponding to the GMFNs passed in as
-> +     * argument.
-> +     * @in.address_bits contains the maximum number of bits addressable
-> +     * by the caller. If the machine addresses of the pages to be pinned
-> +     * are not addressable according to @in.address_bits, the hypercall
-> +     * fails and returns an errors. The pages are not pinned. Otherwise
-                               ^^^^^-error.
-What kind of error? And you should probably join the two sentences together
-(the "If the ... The pages are not pinned.")
+> That would be a good idea.  I'd suggest you reduce the polling loop to 
+> something like 10 ms and bail out after one second.   We've been 
+> affected by funny STANDBYWFI 
+> behaviors before.
 
+OK, I'm happy to do that.  I don't have a strong opinion on the correct
+answer here -- the main thing is to avoid thrashing the bus and wasting
+power, so even quite a short delay will help considerably.
 
-> +     * the hypercall succeeds.
+I'll just loop 100 times and then give up and return 0.
 
-and does it return a number of pages that were pinned or just zero?
+So far as I've seen, it's very unlikely in practice that repeated polling
+is needed.  The most likely cause is that cluster powerdown involves a
+lengthy drain of L2 within the blackout period.
 
-> +     */
-> +    struct xen_memory_reservation in;
-> +
-> +    /*
-> +     * [OUT] Number of input extents that were successfully pinned.
-> +     *  1. The first @nr_pinned input extents were successfully
-> +     *     pinned.
-> +     *  2. All other input extents are untouched.
-> +     *  3. If not all input extents are pinned then the return code of this
-> +     *     command will be non-zero.
-
-OK, what return code?
-
-> +     */
-> +    xen_ulong_t nr_pinned;
-> +};
-> +DEFINE_GUEST_HANDLE_STRUCT(xen_pin);
-> +
-> +
->  #endif /* __XEN_PUBLIC_MEMORY_H__ */
-> diff --git a/include/xen/xen-ops.h b/include/xen/xen-ops.h
-> index fb2ea8f..4cf4fc5 100644
-> --- a/include/xen/xen-ops.h
-> +++ b/include/xen/xen-ops.h
-> @@ -22,6 +22,7 @@ extern unsigned long *xen_contiguous_bitmap;
->  int xen_create_contiguous_region(phys_addr_t pstart, unsigned int order,
->  				unsigned int address_bits,
->  				dma_addr_t *dma_handle);
-> +int xen_pin_page(xen_pfn_t *in_frame, unsigned int address_bits);
->  
->  void xen_destroy_contiguous_region(phys_addr_t pstart, unsigned int order);
->  
-> -- 
-> 1.7.2.5
-> 
+Cheers
+---Dave
