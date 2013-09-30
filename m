@@ -1,33 +1,67 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 30 Sep 2013 18:41:27 -0400
-Subject: [PATCH v2 5/5] ARM: keystone: Enable I2C and SPI bus support
-In-Reply-To: <1380580887-24249-1-git-send-email-santosh.shilimkar@ti.com>
-References: <1380580887-24249-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1380580887-24249-6-git-send-email-santosh.shilimkar@ti.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 30 Sep 2013 17:44:18 -0500
+Subject: [PATCH RESEND] ARM: add dtbImage.<dt> and dtbuImage.<dt> rules
+In-Reply-To: <CA+bK7J7=x6=ZsWnSkGByvDLbht9nD6G3wQ5d05P-D96v6udDgg@mail.gmail.com>
+References: <504DFBBF.5010202@free-electrons.com>
+ <1348733441-11626-1-git-send-email-richard.genoud@gmail.com>
+ <20120927082955.GR17667@game.jcrosoft.org>
+ <CACQ1gAgwv4pBFZBrVZiWM2_=OneUO-s16LufSENx27gMC3DUig@mail.gmail.com>
+ <52416F97.802@keymile.com>
+ <20130924120152.GI11119@titan.lakedaemon.net>
+ <20130924121939.GD12758@n2100.arm.linux.org.uk>
+ <CA+bK7J7=x6=ZsWnSkGByvDLbht9nD6G3wQ5d05P-D96v6udDgg@mail.gmail.com>
+Message-ID: <CAL_JsqJ4Fn93ULo1sAA=8VUm33XkKY9iVpdqjQm6jh0s4pNFBw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Keystone I2C dnd SPI driver updates are already merged so lets
-enable them in config.
+On Mon, Sep 30, 2013 at 1:14 PM, Tim Bird <tbird20d@gmail.com> wrote:
+> On Tue, Sep 24, 2013 at 5:19 AM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+>> On Tue, Sep 24, 2013 at 08:01:52AM -0400, Jason Cooper wrote:
+>>> On Tue, Sep 24, 2013 at 12:55:19PM +0200, Gerlando Falauto wrote:
+>>> > So it shouldn't be such a crazy idea to create a dtbuImage.<dtb>
+>>> > within Kbuild (as opposed to from an external wrapper for make).
+>>>
+>>> Yes :)  The problem is that we are moving to multiplatform zImages.  In
+>>> that scenario, the uImage target isn't very helpful because it needs to
+>>> be custom to each board.  Additionally, appended-dtb was intended as a
+>>> developer tool and isn't intended as a deployable item.  It also
+>>> defeats the purpose of multiplatform.
+>>
+>> And we've already taken the decision that we will not be augmenting
+>> kbuild with any more ubooot specific stuff, especially with anything
+>> that goes against the long term goal of having a single kernel image
+>> which is bootable across multiple platforms.
+>>
+>> Having kbuild wrap the zImage + DTB up into a uImage goes directly
+>> against this goal, because it turns the produced kernel into something
+>> which is specific to a single target.  It's much worse than what we
+>> had before we went to DT, because with this it can only be used on a
+>> _single_ target, whereas prior to DT we could boot a single kernel
+>> on a variety of compatible targets.
+>>
+>> Moreover, the support for appending the DTB to the zImage is a stop-gap
+>> solution for the transition to a full DT based environment - don't
+>> expect it to be around into the long term future.  Modern platforms
+>> should be using a DT compatible boot loader, which means you don't
+>> want to use the DTB appended to zImage method.
+>>
+>
+> What is the long-term mechanism/methodology for creating a kernel
+> that runs on a single system?  So many drivers now have device-tree
+> dependencies that it seems unlikely we'll be able to avoid using
+> device tree.  But if we don't care or don't want to support more than
+> a single platform, what should we do (if appending DTB to the zImage
+> will eventually go away).  Will the requirement be that all future
+> Linux bootloaders will be DT-aware?
 
-Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
----
- arch/arm/configs/keystone_defconfig |    2 ++
- 1 file changed, 2 insertions(+)
+I don't think appended DTB will go away. In fact, use of it is now
+being added to flash-kernel in debian/ubuntu. However, this is only
+done at OS install time on running on the h/w. The problem goes beyond
+just having a DT aware bootloader. You also need the bootloader to
+ship with the DTB. This isn't happening yet, so the distros are having
+to install their own DTB. Since there is not a standard way to install
+a dtb and tell the bootloader where it is, the appended dtb is the
+quick solution.
 
-diff --git a/arch/arm/configs/keystone_defconfig b/arch/arm/configs/keystone_defconfig
-index 1f36b82..9943e5d 100644
---- a/arch/arm/configs/keystone_defconfig
-+++ b/arch/arm/configs/keystone_defconfig
-@@ -123,7 +123,9 @@ CONFIG_SERIAL_OF_PLATFORM=y
- CONFIG_I2C=y
- # CONFIG_I2C_COMPAT is not set
- CONFIG_I2C_CHARDEV=y
-+CONFIG_I2C_DAVINCI=y
- CONFIG_SPI=y
-+CONFIG_SPI_DAVINCI=y
- CONFIG_SPI_SPIDEV=y
- # CONFIG_HWMON is not set
- CONFIG_WATCHDOG=y
--- 
-1.7.9.5
+Rob
