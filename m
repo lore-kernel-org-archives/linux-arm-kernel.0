@@ -1,45 +1,41 @@
 From: Li.Xiubo@freescale.com (Xiubo Li)
-Date: Mon, 30 Sep 2013 14:13:27 +0800
-Subject: [PATCHv5 0/4] Add Freescale FTM PWM driver.
-Message-ID: <1380521611-2764-1-git-send-email-Li.Xiubo@freescale.com>
+Date: Mon, 30 Sep 2013 14:13:29 +0800
+Subject: [PATCHv5 2/4] ARM: dts: Add Freescale FTM PWM node for VF610.
+In-Reply-To: <1380521611-2764-1-git-send-email-Li.Xiubo@freescale.com>
+References: <1380521611-2764-1-git-send-email-Li.Xiubo@freescale.com>
+Message-ID: <1380521611-2764-3-git-send-email-Li.Xiubo@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+This adds devicetree node for VF610, and there are 8 channels supported
+by default.
 
-This patch series is the Freescale FTM PWM implementation. And there are 8 channels most supported by the FTM PWM. This implementation is only compatible with device tree definition.
+Signed-off-by: Xiubo Li <Li.Xiubo@freescale.com>
+---
+ arch/arm/boot/dts/vf610.dtsi | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-This patch series is based on linux-next and has been tested on Vybrid VF610 Tower board using device tree.
-
-Changes in v5:
-- Remove active/idle pinctrl stuff.
-
-Changes in v4:
-- Check for the result and return an error for devm_kzalloc().
-- Move pinmux setting from the SoC file to the board specific file.
-- Revise the written mistake of 'ret |= FTMSC_CLKEXT;' --> 'reg |= FTMSC_CLKEXT;'.
-
-
-Changes in v3:
-- Remove "availabe" field.
-- Remove "fsl,pwm-avaliable-chs" property.
-- ...
-
-Changes in v2:
-- Remove PWM CPWM/EPWM feature and sysfs.
-- Remove some redundant code.
-- Revise some code for more readable.
-- Remove "fsl,pwm-clk-ps", "fsl,pwm-number", "fsl,pwm-channels",etc.
-- Add "fsl,pwm-avaliable-chs", "fsl,pwm-counter-clk", etc.
-- Support 8 channels default in dtsi file.
-- Add counter clock source selection.
-- Rename some function name, macro name, etc.
-- Use PWM's and OF's existing function interfaces.
-- Split clk_unprepare_enable to clk_unprepare and clk_enable,etc.
-- ...
-
-Added in v1:
-- Add Freescale FTM PWM driver support.
-- Add Freescale FTM PWM node for VF610.
-- Enable Enables FTM PWM device for Vybrid VF610 TOWER.
-- Add device tree bindings for Freescale.
+diff --git a/arch/arm/boot/dts/vf610.dtsi b/arch/arm/boot/dts/vf610.dtsi
+index 67d929c..3c23d92 100644
+--- a/arch/arm/boot/dts/vf610.dtsi
++++ b/arch/arm/boot/dts/vf610.dtsi
+@@ -140,6 +140,17 @@
+ 				clock-names = "pit";
+ 			};
+ 
++			pwm0: pwm at 40038000 {
++				compatible = "fsl,vf610-ftm-pwm";
++				#pwm-cells = <3>;
++				reg = <0x40038000 0x1000>;
++				clock-names = "ftm0", "ftm0_fix_sel", "ftm0_ext_sel";
++				clocks = <&clks VF610_CLK_FTM0>,
++					<&clks VF610_CLK_FTM0_FIX_SEL>,
++					<&clks VF610_CLK_FTM0_EXT_SEL>;
++				status = "disabled";
++			};
++
+ 			wdog at 4003e000 {
+ 				compatible = "fsl,vf610-wdt", "fsl,imx21-wdt";
+ 				reg = <0x4003e000 0x1000>;
+-- 
+1.8.0
