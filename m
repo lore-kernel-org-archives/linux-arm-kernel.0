@@ -1,56 +1,68 @@
-From: anup.patel@linaro.org (Anup Patel)
-Date: Mon, 30 Sep 2013 14:20:04 +0530
-Subject: [PATCH v5 0/4] Target CPU=Host implementation for KVM ARM/ARM64
-Message-ID: <1380531008-15901-1-git-send-email-anup.patel@linaro.org>
+From: afzal@ti.com (Afzal Mohammed)
+Date: Mon, 30 Sep 2013 14:20:38 +0530
+Subject: [PATCH v4 01/11] ARM: OMAP2+: CM: cm_inst offset s16->u16
+In-Reply-To: <alpine.DEB.2.02.1309300314520.17980@utopia.booyaka.com>
+References: <cover.1380179370.git.afzal@ti.com>
+ <5e9ef86c35c60862a1c2aa24172e41ee4c6f07de.1380179370.git.afzal@ti.com>
+ <alpine.DEB.2.02.1309300314520.17980@utopia.booyaka.com>
+Message-ID: <52493B5E.7000807@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It will be very useful for user space (QEMU/KVMTOOL) if it has a
-method of querying VCPU target type matching to underlying Host.
-We can use such querying mechanism and implement machine models
-in user space where VCPU target type is always same-as/similar-to
-underlying Host (i.e. Target CPU=Host).
+Hi Paul,
 
-This patch series implements KVM_ARM_PREFERRED_TARGET vm ioclt for
-querying VCPU target type matching underlying host. Using this new
-ioctl we can implement VCPU target CPU=Host in user space.
+On Monday 30 September 2013 08:53 AM, Paul Walmsley wrote:
+> On Thu, 26 Sep 2013, Afzal Mohammed wrote:
 
-Also, it is not mandatory to call KVM_ARM_PREFERRED_TARGET vm ioctl
-and the old method of trying all possible target types using the
-KVM_ARM_VCPU_INIT ioctl to initialize VCPU works fine.
+>> Most of the AM43x CM reg address offsets are with MSB bit '1' (on
+>> 16-bit value) leading to arithmetic miscalculations while calculating
+>> CLOCK ENABLE register's address because cm_inst field was a type of
+>> "const s16", so make it "const u16".
+>>
+>> Also modify relevant functions so as to take care of the above.
+>>
+>> [afzal at ti.com: fixup and cleanup]
+>>
+>> Signed-off-by: Ankur Kishore <a-kishore@ti.com>
+>> Signed-off-by: Afzal Mohammed <afzal@ti.com>
+>> ---
+>>  arch/arm/mach-omap2/clockdomain.h |  2 +-
+>>  arch/arm/mach-omap2/cm33xx.c      | 16 ++++++++--------
+>>  arch/arm/mach-omap2/cm33xx.h      | 10 +++++-----
+>>  arch/arm/mach-omap2/cminst44xx.c  | 20 ++++++++++----------
+>>  arch/arm/mach-omap2/cminst44xx.h  | 26 +++++++++++++-------------
+>>  5 files changed, 37 insertions(+), 37 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-omap2/clockdomain.h b/arch/arm/mach-omap2/clockdomain.h
+>> index 4b03394..5431b0c 100644
+>> --- a/arch/arm/mach-omap2/clockdomain.h
+>> +++ b/arch/arm/mach-omap2/clockdomain.h
+>> @@ -132,7 +132,7 @@ struct clockdomain {
+>>  	u8 _flags;
+>>  	const u8 dep_bit;
+>>  	const u8 prcm_partition;
+>> -	const s16 cm_inst;
+>> +	const u16 cm_inst;
+>>  	const u16 clkdm_offs;
+>>  	struct clkdm_dep *wkdep_srcs;
+>>  	struct clkdm_dep *sleepdep_srcs;
 
-V5:
- - Update documentation based on review comments
+> OMAP3 has at least one CM_INST that's negative:
+> 
+> ./prcm-common.h:40:#define OMAP3430_IVA2_MOD				-0x800
+> 
+> Have you tested this on OMAP34xx/35xx to ensure that the generated 
+> addresses for IVA2_MOD-based addresses doesn't change?  Seems like there's 
+> a risk that they might change, due to sign extension.
 
-V4:
- - Fixed files exchanged between patches
- - For now return zeroed features in struct kvm_vcpu_init instance
+cm_inst field of clockdomain struct is not being used on OMAP3, but
+instead prcm_offs of struct powerdomain is being made use. cm_inst field
+of struct clockdomain is being used by OMAP4 types only, hence would
+affect OMAP4, OMAP5, DRA7x & AM43x only and these don't have CM_INST
+that is negative.
 
-V3:
- - Return -ENODEV if no preferred target available for host
- - Make KVM_ARM_PREFERRED_TARGET ioctl as vm ioctl
+This has been tested on OMAP3 Beagle Xm and verified that it does not
+cause any regresions.
 
-V2:
- - Renamed the ioclt to KVM_ARM_PREFERRED_TARGET
- - Return struct kvm_vcpu_init instace instead of just target type
-
-V1:
- - Initial patch-set with ioctl named as KVM_ARM_SUITABLE_TARGET
-
-Anup Patel (4):
-  ARM: KVM: Implement kvm_vcpu_preferred_target() function
-  ARM64: KVM: Implement kvm_vcpu_preferred_target() function
-  ARM/ARM64: KVM: Implement KVM_ARM_PREFERRED_TARGET ioctl
-  KVM: Add documentation for KVM_ARM_PREFERRED_TARGET ioctl
-
- Documentation/virtual/kvm/api.txt |   31 +++++++++++++++++++++++++++----
- arch/arm/include/asm/kvm_host.h   |    1 +
- arch/arm/kvm/arm.c                |   13 +++++++++++++
- arch/arm/kvm/guest.c              |   20 ++++++++++++++++++++
- arch/arm64/include/asm/kvm_host.h |    1 +
- arch/arm64/kvm/guest.c            |   20 ++++++++++++++++++++
- include/uapi/linux/kvm.h          |    1 +
- 7 files changed, 83 insertions(+), 4 deletions(-)
-
--- 
-1.7.9.5
+Regards
+Afzal
