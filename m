@@ -1,43 +1,60 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 30 Sep 2013 10:49:06 -0600
-Subject: [PATCH] ASoC: generic: Add generic DT based simple codec
-In-Reply-To: <CAL_JsqKmfurrCqEYRNqcLRZMU-VjPin2dvK1Q6CMcK4i=+x-8w@mail.gmail.com>
-References: <20130919105437.75e0f0a3@armhf> <5240B07C.6080404@wwwdotorg.org>
- <CAL_JsqKmfurrCqEYRNqcLRZMU-VjPin2dvK1Q6CMcK4i=+x-8w@mail.gmail.com>
-Message-ID: <5249AB82.60701@wwwdotorg.org>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Mon, 30 Sep 2013 12:51:33 -0400 (EDT)
+Subject: [RFC PATCH 1/3] ARM: mcpm: Factor out logical-to-physical CPU
+ translation
+In-Reply-To: <1380553607-3271-2-git-send-email-Dave.Martin@arm.com>
+References: <1380553607-3271-1-git-send-email-Dave.Martin@arm.com>
+ <1380553607-3271-2-git-send-email-Dave.Martin@arm.com>
+Message-ID: <alpine.LFD.2.03.1309301250450.6331@syhkavp.arg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/26/2013 08:57 PM, Rob Herring wrote:
-> On Mon, Sep 23, 2013 at 4:19 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
->> On 09/19/2013 02:54 AM, Jean-Francois Moine wrote:
->>> This patch adds a simple sound codec which is described by the DT.
->>> This codec may be used when no specific codec action is needed.
->>
->>> diff --git a/Documentation/devicetree/bindings/sound/simple-codec.txt b/Documentation/devicetree/bindings/sound/simple-codec.txt
->>
->>> +Device-Tree bindings for the simple codec
->>> +
->>> +Required properties:
->>> +- compatible: should be "linux,simple-codec".
->>
->> We shouldn't have any Linux-specific bindings. It might be reasonable to
->> define a binding for a "simple CODEC", but there's no reason it should
->> be Linux-specific.
+On Mon, 30 Sep 2013, Dave Martin wrote:
+
+> This patch factors the logical-to-physical CPU translation out of
+> mcpm_boot_secondary(), so that it can be reused elsewhere.
 > 
-> Further, just define the type of codec h/w. If linux can use its
-> simple-codec driver for it, then add a match table entry for said
-> codec. Then the DT is future proof when you decide the simple driver
-> doesn't really work for that h/w.
+> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
 
-The only potential issue with that approach is if the CODEC can be used
-in a "simple" mode where e.g. no control GPIOs, regulator manipulation,
-etc. are required, or in a more complex mode where such things are
-required, you may end up with the device-specific binding being written
-to the simple mode, and hence missing features required for the complex
-mode. Having a separate simple binding prevents the device-specific
-binding from being broken that way.
+Acked-by: Nicolas Pitre <nico@linaro.org>
 
-That said, it's probably better to simply get the device-specific
-binding completely fleshed out and representing all resources the first
-time around, then there's no issue either.
+
+> ---
+>  arch/arm/common/mcpm_platsmp.c |   17 +++++++++++++----
+>  1 file changed, 13 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm/common/mcpm_platsmp.c b/arch/arm/common/mcpm_platsmp.c
+> index 1bc34c7..c0c3cd7 100644
+> --- a/arch/arm/common/mcpm_platsmp.c
+> +++ b/arch/arm/common/mcpm_platsmp.c
+> @@ -19,14 +19,23 @@
+>  #include <asm/smp.h>
+>  #include <asm/smp_plat.h>
+>  
+> +static void cpu_to_pcpu(unsigned int cpu,
+> +			unsigned int *pcpu, unsigned int *pcluster)
+> +{
+> +	unsigned int mpidr;
+> +
+> +	mpidr = cpu_logical_map(cpu);
+> +	*pcpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
+> +	*pcluster = MPIDR_AFFINITY_LEVEL(mpidr, 1);
+> +}
+> +
+>  static int mcpm_boot_secondary(unsigned int cpu, struct task_struct *idle)
+>  {
+> -	unsigned int mpidr, pcpu, pcluster, ret;
+> +	unsigned int pcpu, pcluster, ret;
+>  	extern void secondary_startup(void);
+>  
+> -	mpidr = cpu_logical_map(cpu);
+> -	pcpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
+> -	pcluster = MPIDR_AFFINITY_LEVEL(mpidr, 1);
+> +	cpu_to_pcpu(cpu, &pcpu, &pcluster);
+> +
+>  	pr_debug("%s: logical CPU %d is physical CPU %d cluster %d\n",
+>  		 __func__, cpu, pcpu, pcluster);
+>  
+> -- 
+> 1.7.9.5
+> 
