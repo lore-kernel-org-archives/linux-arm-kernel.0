@@ -1,64 +1,141 @@
 From: Dave.Martin@arm.com (Dave Martin)
-Date: Mon, 30 Sep 2013 20:00:00 +0100
-Subject: [PATCH 0/3] MCPM/TC2 support for CPU powerdown synchronisation
-Message-ID: <1380567603-21367-1-git-send-email-Dave.Martin@arm.com>
+Date: Mon, 30 Sep 2013 20:00:02 +0100
+Subject: [PATCH 2/3] ARM: mcpm: Implement cpu_kill() to synchronise on
+ powerdown
+In-Reply-To: <1380567603-21367-1-git-send-email-Dave.Martin@arm.com>
+References: <1380567603-21367-1-git-send-email-Dave.Martin@arm.com>
+Message-ID: <1380567603-21367-3-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series adds MCPM support for detecting when a CPU is safely powered
-down, and provides an implementation for TC2.
+CPU hotplug and kexec rely on smp_ops.cpu_kill(), which is supposed
+to wait for the CPU to park or power down, and perform the last
+rites (such as disabling clocks etc., where the platform doesn't do
+this automatically).
 
-It should be possible to implement the same thing for PSCI using the
-AFFINITY_INFO call (I need to check the semantics with Charles)
+kexec in particular is unsafe without performing this
+synchronisation to park secondaries.  Without it, the secondaries
+might not be parked when kexec trashes the kernel.
 
-This is sufficient to for working kexec with real power management on
-TC2.  To test it, you'll also need:
+There is no generic way to do this synchronisation, so a new mcpm
+platform_ops method power_down_finish() is added by this patch.
 
-  * CONFIG_KEXEC=y
-  * CONFIG_PROC_DEVICE_TREE=y
-  * CONFIG_MCPM=y
-  * CONFIG_ARCH_VEXPRESS_TC2_PM=y
-  * sufficiently new kexec-tools
-    (git://git.kernel.org/pub/scm/utils/kernel/kexec/kexec-tools.git
-    v2.0.4 worked for me)
+The new method is mandatory.  A platform which provides no way to
+detect when CPUs are parked is likely broken.
 
-This build on Nico's patch
-http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=7842/1
-(MCPM: don't explode if invoked without being initialized first)
+Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+---
+ arch/arm/common/mcpm_entry.c   |   15 +++++++++++++++
+ arch/arm/common/mcpm_platsmp.c |   10 ++++++++++
+ arch/arm/include/asm/mcpm.h    |   31 +++++++++++++++++++++++++++++++
+ 3 files changed, 56 insertions(+)
 
-To prevent CPUs from running off into the weeds across kexec, this
-series requires Lorenzo's patch
-http://lists.infradead.org/pipermail/linux-arm-kernel/2013-September/200917.html
-(arm: vexpress: tc2: fix hotplug/idle/kexec race on cluster power down).
-
-Changes since RFC:
-
- * Print a big fat warning instead of branching to null if the
-   power_down_finish() method is not supplied by the backend, or not
-   registered.
-
- * Add a generous timeout of 1 second for the TC2 implementation.
-
- * Relax the polling interval to 10ms for TC2, since the need to poll
-   more than once is rare and this is not a performance-critical path.
-
- * Fix some silly typos.
-
-Thanks Nico for these suggestions.
-
-
-Dave Martin (3):
-  ARM: mcpm: Factor out logical-to-physical CPU translation
-  ARM: mcpm: Implement cpu_kill() to synchronise on powerdown
-  ARM: vexpress/TC2: Implement MCPM power_down_finish()
-
- arch/arm/common/mcpm_entry.c    |   15 +++++++++
- arch/arm/common/mcpm_platsmp.c  |   27 +++++++++++++---
- arch/arm/include/asm/mcpm.h     |   31 ++++++++++++++++++
- arch/arm/mach-vexpress/spc.c    |   39 +++++++++++++++++++++++
- arch/arm/mach-vexpress/spc.h    |    1 +
- arch/arm/mach-vexpress/tc2_pm.c |   66 ++++++++++++++++++++++++++++++++++++---
- 6 files changed, 170 insertions(+), 9 deletions(-)
-
+diff --git a/arch/arm/common/mcpm_entry.c b/arch/arm/common/mcpm_entry.c
+index 9902509..fecaa75 100644
+--- a/arch/arm/common/mcpm_entry.c
++++ b/arch/arm/common/mcpm_entry.c
+@@ -90,6 +90,21 @@ void mcpm_cpu_power_down(void)
+ 	BUG();
+ }
+ 
++int mcpm_cpu_power_down_finish(unsigned int cpu, unsigned int cluster)
++{
++	int ret;
++
++	if (WARN_ON_ONCE(!platform_ops || !platform_ops->power_down_finish))
++		return 0;
++
++	ret = platform_ops->power_down_finish(cpu, cluster);
++	if (!ret)
++		pr_warn("%s: cpu %u, cluster %u failed to power down\n",
++			__func__, cpu, cluster);
++
++	return ret;
++}
++
+ void mcpm_cpu_suspend(u64 expected_residency)
+ {
+ 	phys_reset_t phys_reset;
+diff --git a/arch/arm/common/mcpm_platsmp.c b/arch/arm/common/mcpm_platsmp.c
+index c0c3cd7..ac48cc7 100644
+--- a/arch/arm/common/mcpm_platsmp.c
++++ b/arch/arm/common/mcpm_platsmp.c
+@@ -56,6 +56,15 @@ static void mcpm_secondary_init(unsigned int cpu)
+ 
+ #ifdef CONFIG_HOTPLUG_CPU
+ 
++static int mcpm_cpu_kill(unsigned int cpu)
++{
++	unsigned int pcpu, pcluster;
++
++	cpu_to_pcpu(cpu, &pcpu, &pcluster);
++
++	return mcpm_cpu_power_down_finish(pcpu, pcluster);
++}
++
+ static int mcpm_cpu_disable(unsigned int cpu)
+ {
+ 	/*
+@@ -82,6 +91,7 @@ static struct smp_operations __initdata mcpm_smp_ops = {
+ 	.smp_boot_secondary	= mcpm_boot_secondary,
+ 	.smp_secondary_init	= mcpm_secondary_init,
+ #ifdef CONFIG_HOTPLUG_CPU
++	.cpu_kill		= mcpm_cpu_kill,
+ 	.cpu_disable		= mcpm_cpu_disable,
+ 	.cpu_die		= mcpm_cpu_die,
+ #endif
+diff --git a/arch/arm/include/asm/mcpm.h b/arch/arm/include/asm/mcpm.h
+index fc82a88..1cf2601 100644
+--- a/arch/arm/include/asm/mcpm.h
++++ b/arch/arm/include/asm/mcpm.h
+@@ -81,10 +81,40 @@ int mcpm_cpu_power_up(unsigned int cpu, unsigned int cluster);
+  *
+  * This will return if mcpm_platform_register() has not been called
+  * previously in which case the caller should take appropriate action.
++ *
++ * On success, the CPU is not guaranteed to be truly halted until
++ * mcpm_cpu_power_down_finish() subsequently returns non-zero for the
++ * specified cpu.  Until then, other CPUs should make sure they do not
++ * trash memory the target CPU might be executing/accessing.
+  */
+ void mcpm_cpu_power_down(void);
+ 
+ /**
++ * mcpm_cpu_power_down_finish - wait for a specified CPU to halt, and
++ *	make sure it is powered off
++ *
++ * @cpu: CPU number within given cluster
++ * @cluster: cluster number for the CPU
++ *
++ * Call this function to ensure that a pending powerdown has taken
++ * effect and the CPU is safely parked before performing non-mcpm
++ * operations that may affect the CPU (such as kexec trashing the
++ * kernel text).
++ *
++ * It is *not* necessary to call this function if you only need to
++ * serialise a pending powerdown with mcpm_cpu_power_up() or a wakeup
++ * event.
++ *
++ * Do not call this function unless the specified CPU has already
++ * called mcpm_cpu_power_down() or has committed to doing so.
++ *
++ * @return:
++ *	- zero if the CPU is in a safely parked state
++ *	- nonzero otherwise (e.g., timeout)
++ */
++int mcpm_cpu_power_down_finish(unsigned int cpu, unsigned int cluster);
++
++/**
+  * mcpm_cpu_suspend - bring the calling CPU in a suspended state
+  *
+  * @expected_residency: duration in microseconds the CPU is expected
+@@ -126,6 +156,7 @@ int mcpm_cpu_powered_up(void);
+ struct mcpm_platform_ops {
+ 	int (*power_up)(unsigned int cpu, unsigned int cluster);
+ 	void (*power_down)(void);
++	int (*power_down_finish)(unsigned int cpu, unsigned int cluster);
+ 	void (*suspend)(u64);
+ 	void (*powered_up)(void);
+ };
 -- 
 1.7.9.5
