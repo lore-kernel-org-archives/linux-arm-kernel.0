@@ -1,32 +1,41 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 30 Sep 2013 10:09:13 -0400
-Subject: [PATCH, FIX] ARM: mvebu: fix ReadyNAS 102 Power button GPIO to
- make it active high
-In-Reply-To: <87ob7bh3uu.fsf@natisbad.org>
-References: <87ob7bh3uu.fsf@natisbad.org>
-Message-ID: <20130930140913.GD31178@titan.lakedaemon.net>
+Date: Mon, 30 Sep 2013 10:13:01 -0400
+Subject: [PATCH] ARM: mvebu: Add DT entry for ReadyNAS 102 to use
+ gpio-poweroff driver
+In-Reply-To: <8738onqp9k.fsf@natisbad.org>
+References: <8738onqp9k.fsf@natisbad.org>
+Message-ID: <20130930141301.GE31178@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Sep 29, 2013 at 08:36:41PM +0200, Arnaud Ebalard wrote:
+On Sun, Sep 29, 2013 at 11:41:43PM +0200, Arnaud Ebalard wrote:
 > 
-> NETGEAR ReadyNAS 102 Power button definition in .dts file flags
-> associated GPIO active low instead of active high. This results
-> in reversed events reported by input subsystem (0 returned when
-> the button is pressed, 1 when released). This patch makes
-> associated GPIO active high to recover correct behaviour.
+> Without that fix, at the end of the shutdown process, the board is
+> still powered (led glowing, fan running, ...).
 > 
 > Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
 > ---
-> RN102 .dts file sits in Linus tree only since 3.12-rc1 so I guess
-> no one has currently relied on current reversed behaviour, i.e.
-> this can be fixed w/o impact on any userspace program. As a side
-> note, the initial error is mine.
+> HI Jason and Andrew,
 > 
->  arch/arm/boot/dts/armada-370-netgear-rn102.dts | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+> This is not per se a fix for a real problem, as the NAS runs
+> as expected w/o it, it only solves a minor limitation of the
+> shutdown process so I guess it can be queued for 3.13 if it
+> is too late.
 
-Applied to mvebu/fixes
+I consider a server not being able to automatically reboot unattended to
+be a regression.  ;-)
+
+> Additionally, I wonder if I should send another patch to either have
+> ARCH_MVEBU select POWER_SUPPLY, POWER_RESET and POWER_RESET_GPIO,
+> or have mvebu_defconfig modified to enable those, or keep things as
+> they are until there are more users on mvebu.
+
+I'm inclined towards select, but I also agree that there's no rush.
+
+>  arch/arm/boot/dts/armada-370-netgear-rn102.dts | 12 ++++++++++++
+>  1 file changed, 12 insertions(+)
+
+Applied to mvebu/fixes for v3.12.
 
 thx,
 
