@@ -1,38 +1,38 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 30 Sep 2013 18:41:26 -0400
-Subject: [PATCH v2 4/5] ARM: keystone: Select TI_EDMA to be able to enable SPI
- driver
+Date: Mon, 30 Sep 2013 18:41:25 -0400
+Subject: [PATCH v2 3/5] dma: Allow TI_EDMA selectable for ARCH_KEYSTONE
 In-Reply-To: <1380580887-24249-1-git-send-email-santosh.shilimkar@ti.com>
 References: <1380580887-24249-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1380580887-24249-5-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1380580887-24249-4-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Select the TI EDMA to be able to enable SPI driver on Keystone
-SOCs. Keystone SOCs share the EDMA IP with other TI SOCs.
+Allow the TI_EDMA to be built for ARCH_KEYSTONE which also supports
+the EDMA IP.
 
-Note that EDMA support hasn't been added and tested yet for
-Keystone SOC data(device tree), but building it, is harmless since
-driver like SPI already takes care of supporting non-dma mode
-in the absence of such data.
+Cc: Vinod Koul <vinod.koul@intel.com>
 
 Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 ---
- arch/arm/mach-keystone/Kconfig |    2 ++
- 1 file changed, 2 insertions(+)
+Vinod,
+I need your ack on this patch to carry $subject patch via arm-soc tree
+to avoid the unmet dependency warnings.
 
-diff --git a/arch/arm/mach-keystone/Kconfig b/arch/arm/mach-keystone/Kconfig
-index d7c425d..525e4b9 100644
---- a/arch/arm/mach-keystone/Kconfig
-+++ b/arch/arm/mach-keystone/Kconfig
-@@ -10,6 +10,8 @@ config ARCH_KEYSTONE
- 	select ARCH_WANT_OPTIONAL_GPIOLIB
- 	select ARM_ERRATA_798181 if SMP
- 	select COMMON_CLK_KEYSTONE
-+	select TI_EDMA
-+	select TI_PRIV_EDMA
- 	help
- 	  Support for boards based on the Texas Instruments Keystone family of
- 	  SoCs.
+ drivers/dma/Kconfig |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
+index 526ec77..b1dde16 100644
+--- a/drivers/dma/Kconfig
++++ b/drivers/dma/Kconfig
+@@ -195,7 +195,7 @@ config SIRF_DMA
+ 
+ config TI_EDMA
+ 	bool "TI EDMA support"
+-	depends on ARCH_DAVINCI || ARCH_OMAP
++	depends on ARCH_DAVINCI || ARCH_OMAP || ARCH_KEYSTONE
+ 	select DMA_ENGINE
+ 	select DMA_VIRTUAL_CHANNELS
+ 	default n
 -- 
 1.7.9.5
