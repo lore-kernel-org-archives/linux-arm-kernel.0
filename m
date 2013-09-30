@@ -1,58 +1,40 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 30 Sep 2013 13:00:24 +0900
-Subject: [PATCH 5/5] ARM: shmobile: Remove #gpio-ranges-cells DT property
+Date: Mon, 30 Sep 2013 13:00:22 +0900
+Subject: [PATCH 3/5] ARM: shmobile: armadillo: fixup ether pinctrl naming
 In-Reply-To: <cover.1380513421.git.horms+renesas@verge.net.au>
 References: <cover.1380513421.git.horms+renesas@verge.net.au>
-Message-ID: <3786f86b60833f32e3eeb016fcf8c324f8147e00.1380513421.git.horms+renesas@verge.net.au>
+Message-ID: <7cd402b30a701c2b4d38a98281a00fc5e3680b13.1380513421.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-This property is no longer required by the GPIO binding. Remove it.
+e5c9b4cd665106d9b5397114ea81a53059410b6a ("sh_eth: get R8A7740 support
+out of #ifdef") exchanged sh-eth driver name to r8a7740-gether, but,
+eva_pinctrl_map[] didn't follow it. Fixes it.
 
+Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7778.dtsi | 1 -
- arch/arm/boot/dts/r8a7779.dtsi | 1 -
- arch/arm/boot/dts/r8a7790.dtsi | 1 -
- 3 files changed, 3 deletions(-)
+ arch/arm/mach-shmobile/board-armadillo800eva.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7778.dtsi b/arch/arm/boot/dts/r8a7778.dtsi
-index 45ac404..3577aba 100644
---- a/arch/arm/boot/dts/r8a7778.dtsi
-+++ b/arch/arm/boot/dts/r8a7778.dtsi
-@@ -96,6 +96,5 @@
- 	pfc: pfc at fffc0000 {
- 		compatible = "renesas,pfc-r8a7778";
- 		reg = <0xfffc000 0x118>;
--		#gpio-range-cells = <3>;
- 	};
- };
-diff --git a/arch/arm/boot/dts/r8a7779.dtsi b/arch/arm/boot/dts/r8a7779.dtsi
-index 23a6244..ebbe507 100644
---- a/arch/arm/boot/dts/r8a7779.dtsi
-+++ b/arch/arm/boot/dts/r8a7779.dtsi
-@@ -188,7 +188,6 @@
- 	pfc: pfc at fffc0000 {
- 		compatible = "renesas,pfc-r8a7779";
- 		reg = <0xfffc0000 0x23c>;
--		#gpio-range-cells = <3>;
- 	};
- 
- 	thermal at ffc48000 {
-diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
-index 885f9f4..413b4c2 100644
---- a/arch/arm/boot/dts/r8a7790.dtsi
-+++ b/arch/arm/boot/dts/r8a7790.dtsi
-@@ -148,7 +148,6 @@
- 	pfc: pfc at e6060000 {
- 		compatible = "renesas,pfc-r8a7790";
- 		reg = <0 0xe6060000 0 0x250>;
--		#gpio-range-cells = <3>;
- 	};
- 
- 	sdhi0: sdhi at ee100000 {
+diff --git a/arch/arm/mach-shmobile/board-armadillo800eva.c b/arch/arm/mach-shmobile/board-armadillo800eva.c
+index 5bd1479..7f8f607 100644
+--- a/arch/arm/mach-shmobile/board-armadillo800eva.c
++++ b/arch/arm/mach-shmobile/board-armadillo800eva.c
+@@ -1108,9 +1108,9 @@ static const struct pinctrl_map eva_pinctrl_map[] = {
+ 	PIN_MAP_MUX_GROUP_DEFAULT("asoc-simple-card.1", "pfc-r8a7740",
+ 				  "fsib_mclk_in", "fsib"),
+ 	/* GETHER */
+-	PIN_MAP_MUX_GROUP_DEFAULT("sh-eth", "pfc-r8a7740",
++	PIN_MAP_MUX_GROUP_DEFAULT("r8a7740-gether", "pfc-r8a7740",
+ 				  "gether_mii", "gether"),
+-	PIN_MAP_MUX_GROUP_DEFAULT("sh-eth", "pfc-r8a7740",
++	PIN_MAP_MUX_GROUP_DEFAULT("r8a7740-gether", "pfc-r8a7740",
+ 				  "gether_int", "gether"),
+ 	/* HDMI */
+ 	PIN_MAP_MUX_GROUP_DEFAULT("sh-mobile-hdmi", "pfc-r8a7740",
 -- 
 1.8.4
