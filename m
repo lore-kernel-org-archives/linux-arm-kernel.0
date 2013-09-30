@@ -1,68 +1,38 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Mon, 30 Sep 2013 15:18:08 -0400 (EDT)
-Subject: [PATCH 2/3] ARM: mcpm: Implement cpu_kill() to synchronise on
- powerdown
-In-Reply-To: <1380567603-21367-3-git-send-email-Dave.Martin@arm.com>
-References: <1380567603-21367-1-git-send-email-Dave.Martin@arm.com>
- <1380567603-21367-3-git-send-email-Dave.Martin@arm.com>
-Message-ID: <alpine.LFD.2.03.1309301507360.6331@syhkavp.arg>
+From: mbizon@freebox.fr (Maxime Bizon)
+Date: Mon, 30 Sep 2013 22:21:23 +0200
+Subject: [PATCH RESEND] ARM: add dtbImage.<dt> and dtbuImage.<dt> rules
+In-Reply-To: <20130924121939.GD12758@n2100.arm.linux.org.uk>
+References: <504DFBBF.5010202@free-electrons.com>
+ <1348733441-11626-1-git-send-email-richard.genoud@gmail.com>
+ <20120927082955.GR17667@game.jcrosoft.org>
+ <CACQ1gAgwv4pBFZBrVZiWM2_=OneUO-s16LufSENx27gMC3DUig@mail.gmail.com>
+ <52416F97.802@keymile.com> <20130924120152.GI11119@titan.lakedaemon.net>
+ <20130924121939.GD12758@n2100.arm.linux.org.uk>
+Message-ID: <1380572483.31472.51.camel@sakura.staff.proxad.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 30 Sep 2013, Dave Martin wrote:
 
-> CPU hotplug and kexec rely on smp_ops.cpu_kill(), which is supposed
-> to wait for the CPU to park or power down, and perform the last
-> rites (such as disabling clocks etc., where the platform doesn't do
-> this automatically).
+On Tue, 2013-09-24 at 13:19 +0100, Russell King - ARM Linux wrote:
+
+Hi Russell,
 > 
-> kexec in particular is unsafe without performing this
-> synchronisation to park secondaries.  Without it, the secondaries
-> might not be parked when kexec trashes the kernel.
-> 
-> There is no generic way to do this synchronisation, so a new mcpm
-> platform_ops method power_down_finish() is added by this patch.
-> 
-> The new method is mandatory.  A platform which provides no way to
-> detect when CPUs are parked is likely broken.
-> 
-> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+> Having kbuild wrap the zImage + DTB up into a uImage goes directly
+> against this goal, because it turns the produced kernel into something
+> which is specific to a single target.  It's much worse than what we
+> had before we went to DT, because with this it can only be used on a
+> _single_ target, whereas prior to DT we could boot a single kernel
+> on a variety of compatible targets.
 
-There is still a problem with this patch.
+What would you think of a patch allowing multiple DTB selected using
+ATAG number ?
 
-> +int mcpm_cpu_power_down_finish(unsigned int cpu, unsigned int cluster)
-> +{
-> +	int ret;
-> +
-> +	if (WARN_ON_ONCE(!platform_ops || !platform_ops->power_down_finish))
-> +		return 0;
-> +
-> +	ret = platform_ops->power_down_finish(cpu, cluster);
-> +	if (!ret)
-> +		pr_warn("%s: cpu %u, cluster %u failed to power down\n",
-> +			__func__, cpu, cluster);
-> +
-> +	return ret;
-> +}
+I don't believe telling people to upgrade bootloaders in the field is a
+reasonable thing to ask.
 
-So 0 is the error case.
+We can make fun of vendors for leaving devices with outdated kernel
+versions, but this is making life harder for the one who played by the
+rules.
 
-[...]
-> + * mcpm_cpu_power_down_finish - wait for a specified CPU to halt, and
-> + *	make sure it is powered off
-[...]
-> + * @return:
-> + *	- zero if the CPU is in a safely parked state
-> + *	- nonzero otherwise (e.g., timeout)
-
-But you document it as being the opposite.
-
-I'd suggest that the return value is either an int where 0 means success 
-and negative error codes are returned otherwise, or it is a bool and 
-true/false means success/failure.
-
-I see that platform_cpu_kill() is a bit inconsistent in that regard, but 
-we don't have to propagate this down.
-
-
-Nicolas
+-- 
+Maxime
