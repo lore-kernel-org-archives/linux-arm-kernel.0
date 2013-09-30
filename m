@@ -1,76 +1,52 @@
-From: arno@natisbad.org (Arnaud Ebalard)
-Date: Tue, 01 Oct 2013 00:19:16 +0200
-Subject: [PATCH,
- FIX] ARM: mvebu: add missing DT Mbus ranges and relocate PCIe DT
- nodes for RN102
-Message-ID: <87a9iuq7ff.fsf@natisbad.org>
+From: gerg@uclinux.org (Greg Ungerer)
+Date: Tue, 01 Oct 2013 08:43:40 +1000
+Subject: [PATCH] ARM: ks8695: fix incorrect placement of __initdata tag
+In-Reply-To: <1551134.v305P4LSfh@amdc1032>
+References: <1551134.v305P4LSfh@amdc1032>
+Message-ID: <5249FE9C.2000208@uclinux.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 30/09/13 23:02, Bartlomiej Zolnierkiewicz wrote:
+> __initdata tag should be placed between the variable name and equal
+> sign for the variable to be placed in the intended .init.data section.
+>
+> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 
-When 5e12a613 and 0cd3754a were introduced, Netgear ReadyNAS 102 .dts
-file was queued for inclusion and missed the update to have Mbus (and
-then BootROM) ranges properties declared. It also missed the relocation
-of Armada 370/XP PCIe DT nodes introduced by 14fd8ed0 after de1af8d4.
-This patch fixes that which makes 3.12-rc3 bootable on the NAS.
+Acked-by: Greg Ungerer <gerg@uclinux.org>
 
-Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
----
- arch/arm/boot/dts/armada-370-netgear-rn102.dts | 35 ++++++++++++++------------
- 1 file changed, 19 insertions(+), 16 deletions(-)
 
-diff --git a/arch/arm/boot/dts/armada-370-netgear-rn102.dts b/arch/arm/boot/dts/armada-370-netgear-rn102.dts
-index 05e4485..aef5ac5 100644
---- a/arch/arm/boot/dts/armada-370-netgear-rn102.dts
-+++ b/arch/arm/boot/dts/armada-370-netgear-rn102.dts
-@@ -27,6 +27,25 @@
- 	};
- 
- 	soc {
-+		ranges = <MBUS_ID(0xf0, 0x01) 0 0xd0000000 0x100000
-+			  MBUS_ID(0x01, 0xe0) 0 0xfff00000 0x100000>;
-+
-+		pcie-controller {
-+			status = "okay";
-+
-+			/* Connected to Marvell SATA controller */
-+			pcie at 1,0 {
-+				/* Port 0, Lane 0 */
-+				status = "okay";
-+			};
-+
-+			/* Connected to FL1009 USB 3.0 controller */
-+			pcie at 2,0 {
-+				/* Port 1, Lane 0 */
-+				status = "okay";
-+			};
-+		};
-+
- 		internal-regs {
- 			serial at 12000 {
- 				clock-frequency = <200000000>;
-@@ -89,22 +108,6 @@
- 					pwm_polarity = <0>;
- 				};
- 			};
--
--			pcie-controller {
--				status = "okay";
--
--				/* Connected to Marvell SATA controller */
--				pcie at 1,0 {
--					/* Port 0, Lane 0 */
--					status = "okay";
--				};
--
--				/* Connected to FL1009 USB 3.0 controller */
--				pcie at 2,0 {
--					/* Port 1, Lane 0 */
--					status = "okay";
--				};
--			};
- 		};
- 	};
- 
--- 
-1.8.4.rc3
+> ---
+>   arch/arm/mach-ks8695/board-og.c | 2 +-
+>   arch/arm/mach-ks8695/cpu.c      | 3 +--
+>   2 files changed, 2 insertions(+), 3 deletions(-)
+>
+> diff --git a/arch/arm/mach-ks8695/board-og.c b/arch/arm/mach-ks8695/board-og.c
+> index 002bc61..9204f5a 100644
+> --- a/arch/arm/mach-ks8695/board-og.c
+> +++ b/arch/arm/mach-ks8695/board-og.c
+> @@ -79,7 +79,7 @@ static void __init og_pci_bus_reset(void)
+>   #define	S8250_VIRT	0xf4000000
+>   #define	S8250_SIZE	0x00100000
+>
+> -static struct __initdata map_desc og_io_desc[] = {
+> +static struct map_desc og_io_desc[] __initdata = {
+>   	{
+>   		.virtual	= S8250_VIRT,
+>   		.pfn		= __phys_to_pfn(S8250_PHYS),
+> diff --git a/arch/arm/mach-ks8695/cpu.c b/arch/arm/mach-ks8695/cpu.c
+> index ddb2422..9618654 100644
+> --- a/arch/arm/mach-ks8695/cpu.c
+> +++ b/arch/arm/mach-ks8695/cpu.c
+> @@ -33,8 +33,7 @@
+>   #include <mach/regs-sys.h>
+>   #include <mach/regs-misc.h>
+>
+> -
+> -static struct __initdata map_desc ks8695_io_desc[] = {
+> +static struct map_desc ks8695_io_desc[] __initdata = {
+>   	{
+>   		.virtual	= (unsigned long)KS8695_IO_VA,
+>   		.pfn		= __phys_to_pfn(KS8695_IO_PA),
+>
