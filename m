@@ -1,37 +1,24 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 30 Sep 2013 19:11:41 +0900
-Subject: [PATCH v2 00/12] clk/exynos convert clock IDs to macros
-In-Reply-To: <20130916193709.27384.86101@quantum>
-References: <1378462361-13680-1-git-send-email-a.hajda@samsung.com>
- <8412301.YP2zzplWoe@amdc1227>
- <070001ceafa5$d4d81a40$7e884ec0$%kim@samsung.com>
- <523716C9.3000204@samsung.com> <20130916193709.27384.86101@quantum>
-Message-ID: <06c101cebdc5$75a83d10$60f8b730$%kim@samsung.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Mon, 30 Sep 2013 10:16:43 +0000 (UTC)
+Subject: [PATCH v4 07/11] ARM: OMAP2+: CM: AM43x clockdomain data
+In-Reply-To: <alpine.DEB.2.02.1309300927520.17980@utopia.booyaka.com>
+References: <cover.1380179370.git.afzal@ti.com>
+ <a6758751113ef93bc912ccefb9cdb0ba383f19d5.1380179370.git.afzal@ti.com>
+ <alpine.DEB.2.02.1309300927520.17980@utopia.booyaka.com>
+Message-ID: <alpine.DEB.2.02.1309301014220.17980@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mike Turquette wrote:
-> 
-> Quoting Sylwester Nawrocki (2013-09-16 07:33:45)
-> > On 09/12/2013 12:50 PM, Kukjin Kim wrote:
-> > > Well...I'm not sure changing to use macro is better or not at this
-> moment...
-> >
-> > I think it is. ;) It's really less error prone to have symbolic names
-> instead
-> > of the plain numbers. The clock ids are defined in one place and it is
-> more
-> > clear what a clock is by looking at symbolic name. It's especially
-> annoying
-> > to use plain numbers where are are many clock in a single node, like 10
-> or
-> > more. What are you main concerns with this ?
-> 
-> I think having the symbolic names is a win for readability.
-> 
-Hmm...since Mike who is a maintainer for ccf agrees with Sylwester's opinion, so I agree. Actually, I had no strong objection on this but still I'm not sure using macro is really better because sometimes the name doesn't give readability really I think though.
+On Mon, 30 Sep 2013, Paul Walmsley wrote:
 
-Mike, can you give me your ack on clk stuff?
+> The references to "wkup_pwrdm" on some of these clockdomains don't 
+> look right to me.  For example, this clockdomain is listed as being in 
+> AM43XX_CM_WKUP_INST, but its enclosing powerdomain is listed as being in 
+> AM43XX_PRM_WKUP_INST.  Looks to me like it's best to have two different 
+> wakeup powerdomains: one CM_WKUP, and one PRM_WKUP.
 
-Thanks,
-Kukjin
+Looks like the same problem exists with at least the PER powerdomain also.  
+Looks to me like that needs to be split into cm_per and prm_per variants?
+
+
+- Paul
