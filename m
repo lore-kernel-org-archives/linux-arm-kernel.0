@@ -1,57 +1,43 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 30 Sep 2013 11:36:43 -0400
-Subject: [GIT PULL] ARM: mvebu: driver changes for v3.13
-Message-ID: <20130930153643.GF31178@titan.lakedaemon.net>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Mon, 30 Sep 2013 17:38:06 +0200
+Subject: [PATCH v2] ARM: at91: cam60: fix incorrect placement of __initdata tag
+Message-ID: <4748525.slmbI8ubRr@amdc1032>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Guys,
+__initdata tag should be placed between the variable name and equal
+sign for the variable to be placed in the intended .init.data section.
 
-Here are all of the driver changes that didn't make it during the last
-merge window.  They've been in -next since v3.12-rc1, without
-merge-conflicts or build issues.
+Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
+v2:
+- use __initdata as it is OK to do it
 
-thx,
+ arch/arm/mach-at91/board-cam60.c | 4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
 
-Jason.
-
-The following changes since commit 272b98c6455f00884f0350f775c5342358ebb73f:
-
-  Linux 3.12-rc1 (2013-09-16 16:17:51 -0400)
-
-are available in the git repository at:
-
-  git://git.infradead.org/linux-mvebu.git tags/drivers-3.13
-
-for you to fetch changes up to cc54ccd9a6966708c00ebd8a08acc3e627a432c5:
-
-  PCI: mvebu: add support for Marvell Dove SoCs (2013-09-30 14:58:47 +0000)
-
-----------------------------------------------------------------
-mvebu drivers changes for v3.13
-
- - irqchip
-    - add MSI support for armada-370/XP
- - pci
-    - add MSI support
-    - add support for Marvell Dove SoCs
-
-----------------------------------------------------------------
-Sebastian Hesselbarth (5):
-      PCI: mvebu: move clock enable before register access
-      PCI: mvebu: increment nports only for registered ports
-      PCI: mvebu: remove subsys_initcall
-      PCI: mvebu: add support for reset on GPIO
-      PCI: mvebu: add support for Marvell Dove SoCs
-
-Thomas Petazzoni (3):
-      irqchip: armada-370-xp: properly request resources
-      irqchip: armada-370-xp: implement MSI support
-      PCI: mvebu: add support for MSI
-
- .../devicetree/bindings/arm/armada-370-xp-mpic.txt |   3 +
- .../devicetree/bindings/pci/mvebu-pci.txt          |  10 +
- drivers/irqchip/irq-armada-370-xp.c                | 202 ++++++++++++++++++++-
- drivers/pci/host/Kconfig                           |   2 +-
- drivers/pci/host/pci-mvebu.c                       | 121 ++++++++----
- 5 files changed, 298 insertions(+), 40 deletions(-)
+diff --git a/arch/arm/mach-at91/board-cam60.c b/arch/arm/mach-at91/board-cam60.c
+index ade948b..ecabbed 100644
+--- a/arch/arm/mach-at91/board-cam60.c
++++ b/arch/arm/mach-at91/board-cam60.c
+@@ -108,16 +108,14 @@ static struct spi_board_info cam60_spi_devices[] __initdata = {
+ #endif
+ };
+ 
+-
+ /*
+  * MACB Ethernet device
+  */
+-static struct __initdata macb_platform_data cam60_macb_data = {
++static struct macb_platform_data cam60_macb_data __initdata = {
+ 	.phy_irq_pin	= AT91_PIN_PB5,
+ 	.is_rmii	= 0,
+ };
+ 
+-
+ /*
+  * NAND Flash
+  */
+-- 
+1.8.2.3
