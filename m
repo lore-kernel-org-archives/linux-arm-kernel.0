@@ -1,38 +1,164 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 30 Sep 2013 10:02:54 -0700
-Subject: [GIT PULL] at91: fixes for 3.12 #2
-In-Reply-To: <1380559686-2605-1-git-send-email-nicolas.ferre@atmel.com>
-References: <1380559686-2605-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <CAOesGMh8sv0mSZ5NbJGd=oN4Ay_k8WMUDkVjpM7Aw+S6_jJk3w@mail.gmail.com>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Mon, 30 Sep 2013 19:20:59 +0200
+Subject: [PATCH v3] i2c: enable runtime PM for I2C adapter devices
+ enumerated from ACPI
+In-Reply-To: <1380552228-23329-2-git-send-email-mika.westerberg@linux.intel.com>
+References: <1380552228-23329-1-git-send-email-mika.westerberg@linux.intel.com>
+ <1380552228-23329-2-git-send-email-mika.westerberg@linux.intel.com>
+Message-ID: <34540715.4ajYlpge4D@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 30, 2013 at 9:48 AM, Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
-> Arnd, Olof, Kevin,
->
-> Second batch of fixes for AT91. Two little patches but that can be important
-> for AT91.
-> One is finishing the conversion to clk_xxx_[un]prepare() routines. That will
-> allow us to begin the move to common clock framework with help from Boris and
-> his big patch series. I tried to push it through Thomas and John's git tree but
-> without success.
+On Monday, September 30, 2013 05:43:48 PM Mika Westerberg wrote:
+> The ACPI specification requires the parent device to be powered on before
+> any of its children. It can be only powered off when all the children are
+> already off.
+> 
+> Currently whenever there is no I2C traffic going on, the I2C controller
+> driver can put the device into low power state transparently to its
+> children (the I2C client devices). This violates the ACPI specification
+> because now the parent device is in lower power state than its children.
+> 
+> In order to keep ACPI happy we enable runtime PM for the I2C adapter device
+> if we find out that the I2C controller was in fact an ACPI device. In
+> addition to that we attach the I2C client devices to the ACPI power domain
+> and make sure that they are powered on when the driver ->probe() is called.
+> 
+> Non-ACPI devices are not affected by this change.
+> 
+> This patch is based on the work by Aaron Lu and Lv Zheng.
+> 
+> Signed-off-by: Mika Westerberg <mika.westerberg@linux.intel.com>
+> ---
+>  drivers/i2c/i2c-core.c | 47 ++++++++++++++++++++++++++++++++++++++++++++++-
+>  1 file changed, 46 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/i2c/i2c-core.c b/drivers/i2c/i2c-core.c
+> index 29d3f04..fa861ad 100644
+> --- a/drivers/i2c/i2c-core.c
+> +++ b/drivers/i2c/i2c-core.c
+> @@ -236,6 +236,27 @@ int i2c_recover_bus(struct i2c_adapter *adap)
+>  	return adap->bus_recovery_info->recover_bus(adap);
+>  }
+>  
+> +static void acpi_i2c_device_pm_get(struct i2c_client *client)
+> +{
+> +	struct i2c_adapter *adap = client->adapter;
+> +
+> +	/* Make sure the adapter is active */
+> +	if (ACPI_HANDLE(adap->dev.parent))
+> +		pm_runtime_get_sync(&adap->dev);
+> +	if (ACPI_HANDLE(&client->dev))
+> +		acpi_dev_pm_attach(&client->dev, true);
 
-It sounds to me like this patch should go in together with the CCF
-patches, since it doesn't address a regression and is just a
-prerequisite for the conversion? If you can shake an Ack out of John
-you should be all set for that. :-)
+It would be sufficient to do
 
-> The other one is important for sam9g45 when the second DDR conrtoller is in
-> use. The DDR / EBI lines are not properly reseted after a shutdown and could
-> prevent the use of whatever is connected to this EBI. It is not a configuration
-> that we are using on the Evaluation Kit and this explains why we face this isue
-> just now...
+	if (ACPI_HANDLE(&client->dev)) {
+		pm_runtime_get_sync(&adap->dev);
+		acpi_dev_pm_attach(&client->dev, true);
+	}
 
-Ok, that sounds like a valid fix.
+here (and below), because I don't think the client with an ACPI handle and the
+parent without one is extremely unlikely (to the point of non-existence
+actually ;-)).  And even if something like that happens, then we only enable
+runtime PM for the adapter if the parent has an ACPI handle, so it still should
+be OK.
 
-I'll cherry-pick in the DDR fix right away, and if you for some reason
-need the other one we can add it later, but it sounds like it should
-just go in with the CCF branch.
+Apart from this the patch looks good to me.
 
+> +}
+> +
+> +static void acpi_i2c_device_pm_put(struct i2c_client *client, bool detach)
+> +{
+> +	struct i2c_adapter *adap = client->adapter;
+> +
+> +	if (ACPI_HANDLE(&client->dev) && detach)
+> +		acpi_dev_pm_detach(&client->dev, true);
+> +	if (ACPI_HANDLE(adap->dev.parent))
+> +		pm_runtime_put(&adap->dev);
+> +}
+> +
+>  static int i2c_device_probe(struct device *dev)
+>  {
+>  	struct i2c_client	*client = i2c_verify_client(dev);
+> @@ -254,11 +275,15 @@ static int i2c_device_probe(struct device *dev)
+>  					client->flags & I2C_CLIENT_WAKE);
+>  	dev_dbg(dev, "probe\n");
+>  
+> +	acpi_i2c_device_pm_get(client);
+> +
+>  	status = driver->probe(client, i2c_match_id(driver->id_table, client));
+>  	if (status) {
+>  		client->driver = NULL;
+>  		i2c_set_clientdata(client, NULL);
+>  	}
+> +
+> +	acpi_i2c_device_pm_put(client, !!status);
+>  	return status;
+>  }
+>  
+> @@ -271,6 +296,8 @@ static int i2c_device_remove(struct device *dev)
+>  	if (!client || !dev->driver)
+>  		return 0;
+>  
+> +	acpi_i2c_device_pm_get(client);
+> +
+>  	driver = to_i2c_driver(dev->driver);
+>  	if (driver->remove) {
+>  		dev_dbg(dev, "remove\n");
+> @@ -283,6 +310,8 @@ static int i2c_device_remove(struct device *dev)
+>  		client->driver = NULL;
+>  		i2c_set_clientdata(client, NULL);
+>  	}
+> +
+> +	acpi_i2c_device_pm_put(client, true);
+>  	return status;
+>  }
+>  
+> @@ -294,8 +323,11 @@ static void i2c_device_shutdown(struct device *dev)
+>  	if (!client || !dev->driver)
+>  		return;
+>  	driver = to_i2c_driver(dev->driver);
+> -	if (driver->shutdown)
+> +	if (driver->shutdown) {
+> +		acpi_i2c_device_pm_get(client);
+>  		driver->shutdown(client);
+> +		acpi_i2c_device_pm_put(client, false);
+> +	}
+>  }
+>  
+>  #ifdef CONFIG_PM_SLEEP
+> @@ -1263,6 +1295,16 @@ exit_recovery:
+>  	bus_for_each_drv(&i2c_bus_type, NULL, adap, __process_new_adapter);
+>  	mutex_unlock(&core_lock);
+>  
+> +	/*
+> +	 * For ACPI enumerated controllers we must make sure that the
+> +	 * controller is powered on before its children. Runtime PM handles
+> +	 * this for us once we have enabled it for the adapter device.
+> +	 */
+> +	if (ACPI_HANDLE(adap->dev.parent)) {
+> +		pm_runtime_no_callbacks(&adap->dev);
+> +		pm_runtime_enable(&adap->dev);
+> +	}
+> +
+>  	return 0;
+>  
+>  out_list:
+> @@ -1427,6 +1469,9 @@ void i2c_del_adapter(struct i2c_adapter *adap)
+>  		return;
+>  	}
+>  
+> +	if (ACPI_HANDLE(adap->dev.parent))
+> +		pm_runtime_disable(&adap->dev);
+> +
+>  	/* Tell drivers about this removal */
+>  	mutex_lock(&core_lock);
+>  	bus_for_each_drv(&i2c_bus_type, NULL, adap,
+> 
 
--Olof
+Thanks!
+
+-- 
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
