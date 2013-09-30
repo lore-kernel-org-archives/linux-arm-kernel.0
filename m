@@ -1,57 +1,72 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Mon, 30 Sep 2013 16:40:08 +0200
-Subject: [PATCH 2/2] ARM i.MX53: dts: Add TVE to i.MX53-QSB device tree
-In-Reply-To: <20130927011643.GB25146@S2101-09.ap.freescale.net>
-References: <1380192374-9531-1-git-send-email-p.zabel@pengutronix.de>
- <1380192374-9531-2-git-send-email-p.zabel@pengutronix.de>
- <20130927011643.GB25146@S2101-09.ap.freescale.net>
-Message-ID: <1380552008.3959.29.camel@pizza.hi.pengutronix.de>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Mon, 30 Sep 2013 16:41:38 +0200
+Subject: [PATCH] media: i2c: adv7343: fix the DT binding properties
+In-Reply-To: <CA+V-a8sEPAFz=Jo9LdwRf5QtnY6TFXzSTrtHQuyeb3uSEYCvSQ@mail.gmail.com>
+References: <1379073471-7244-1-git-send-email-prabhakar.csengg@gmail.com>
+ <CA+V-a8u5_rhxTgkVgCbtmGpaZCt2ciu4vABW4t80aSp7csttnw@mail.gmail.com>
+ <CA+V-a8sEPAFz=Jo9LdwRf5QtnY6TFXzSTrtHQuyeb3uSEYCvSQ@mail.gmail.com>
+Message-ID: <12127401.nFSuWlICDy@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, den 27.09.2013, 09:16 +0800 schrieb Shawn Guo:
-> On Thu, Sep 26, 2013 at 12:46:14PM +0200, Philipp Zabel wrote:
-> > This patch enables the TVE which is driving the VGA connector on i.MX53-QSB.
+Hi Prabhakar,
+
+On Monday 30 September 2013 18:57:01 Prabhakar Lad wrote:
+> On Mon, Sep 23, 2013 at 8:18 AM, Prabhakar Lad wrote:
+> > On Fri, Sep 20, 2013 at 3:22 PM, Sylwester Nawrocki wrote:
+> >> On 09/20/2013 10:11 AM, Prabhakar Lad wrote:
+> >>> OK I will, just send out a fix up patch which fixes the mismatch between
+> >>> names for the rc-cycle, and later send out a patch which removes the
+> >>> platform data usage for next release with proper DT bindings.
+> >> 
+> >> I think the binding need to be fully corrected now, I just meant to not
+> >> touch the board file, i.e. leave non-dt support unchanged.
 > > 
-> > Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-> > ---
-> >  arch/arm/boot/dts/imx53-qsb.dts | 20 ++++++++++++++++++--
-> >  1 file changed, 18 insertions(+), 2 deletions(-)
+> > Ok
 > > 
-> > diff --git a/arch/arm/boot/dts/imx53-qsb.dts b/arch/arm/boot/dts/imx53-qsb.dts
-> > index cf1aef7..3bbedf7 100644
-> > --- a/arch/arm/boot/dts/imx53-qsb.dts
-> > +++ b/arch/arm/boot/dts/imx53-qsb.dts
-> > @@ -173,6 +173,15 @@ memgpu: /memreserve/ 0xb0000000 0x04000000;
-> >  		};
-> >  	};
-> >  
-> > +	tve {
-> > +		pinctrl_vga_sync_1: vgasync-grp1 {
-> > +			fsl,pins = <
-> > +				/* VGA_HSYNC, VSYNC with max drive strength */
-> > +				MX53_PAD_EIM_OE__IPU_DI1_PIN7 0xe6
-> > +				MX53_PAD_EIM_RW__IPU_DI1_PIN8 0xe6
-> > +			>;
-> > +		};
-> > +	};
-> >  };
-> >  
-> >  &uart1 {
-> > @@ -280,8 +289,8 @@ memgpu: /memreserve/ 0xb0000000 0x04000000;
-> >  			};
-> >  
-> >  			ldo8_reg: ldo8 {
-> > -				regulator-min-microvolt = <1200000>;
-> > -				regulator-max-microvolt = <3600000>;
-> > +				regulator-min-microvolt = <2750000>;
-> > +				regulator-max-microvolt = <2750000>;
+> >>> I'm OK with making regulator properties as optional, But still it would
+> >>> change the meaning of what DT is, we know that the VDD/VDD_IO .. etc
+> >>> pins are required properties (but still making them as optional) :-(
+> >>> 
+> >>> I think there might several devices where this situation may arise so
+> >>> just thinking of a alternative solution.
+> >>> 
+> >>> say we have property 'software-regulator' which takes true/false(0/1)
+> >>> If set to true we make the regulators as required property or else we
+> >>> assume it is handled and ignore it ?
+> >> 
+> >> I don't think this is a good idea. You would have to add a similar
+> >> platform data flag for non-dt, it doesn't sound right. I can see two
+> >> options here:
+> >> 
+> >> 1. Make the regulator properties mandatory and, e.g. define a fixed
+> >>    voltage GPIO regulator in DT with an empty 'gpio' property. Then
+> >>    pass a phandle to that regulator in the adv7343 *-supply properties.
+> >>    For non-dt similarly a fixed voltage regulator(s) and voltage
+> >>    supplies  would need to be defined in the board files.
+> >> 
+> >> 2. Make the properties optional and use (devm_)regulator_get_optional()
+> >>    calls in the driver (a recently added function). I must admit I don't
+> >>    fully understand description of this function, it currently looks
+> >>    pretty much same as (devm_)regulator_get(). Thus the driver would
+> >>    need to be handling regulator supplies only when non ERR_PTR() is
+> >>    returned from regulator_get_optional() and otherwise assume a non
+> >>    critical error. There is already quite a few example occurrences of
+> >>    regulator_get_optional() usage.
 > 
-> Why this change?
+> The same question arises in case of the clock, The adv7343 encoder has two
+> input clocks CLKIN_A and CLKIN_B. I case of da850 EVM the clock source to
+> adv7343 encoder is fixed source which is enabled by default so none of the
+> bridge nor the adv7343 driver cares of the clock to enable/disable. So in
+> this case should I be registering  (v4l2_clk_register() /
+> v4l2_clk_unregister()) a dummy clock in the bridge driver or in the board
+> file ?
 
-According to the reference manual, the TVDAC supply should be 2.75 V. If
-there are no ill effects if this ldo is actually set to 3.6 V, this
-change could be dropped.
+The fixed clock (which is a real clock, not a dummy clock) should be 
+registered in board file, preferably using the common clock framework if 
+that's available on your platform.
 
-regards
-Philipp
+-- 
+Regards,
+
+Laurent Pinchart
