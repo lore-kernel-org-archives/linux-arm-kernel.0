@@ -1,57 +1,43 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 30 Sep 2013 19:30:06 +0100
-Subject: [PATCH] iommu/arm-smmu: Clear global and context bank fault
- status registers
-In-Reply-To: <20130930171716.GX3315@alberich>
-References: <1380234982-1677-1-git-send-email-andreas.herrmann@calxeda.com>
- <1380234982-1677-6-git-send-email-andreas.herrmann@calxeda.com>
- <20130927085255.GC8319@mudshark.cambridge.arm.com>
- <20130930135401.GV3315@alberich> <20130930135621.GW3315@alberich>
- <20130930160615.GG26036@mudshark.cambridge.arm.com>
- <20130930171716.GX3315@alberich>
-Message-ID: <20130930183006.GK26036@mudshark.cambridge.arm.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Mon, 30 Sep 2013 20:31:05 +0200
+Subject: [PATCH v2] ARM: shmobile: ape6evm: fix incorrect placement of
+ __initdata tag
+In-Reply-To: <1959578.PFsrHiTtYY@amdc1032>
+References: <1959578.PFsrHiTtYY@amdc1032>
+Message-ID: <27072275.6rIbiFzHY2@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 30, 2013 at 06:17:16PM +0100, Andreas Herrmann wrote:
-> On Mon, Sep 30, 2013 at 12:06:15PM -0400, Will Deacon wrote:
-> > On Mon, Sep 30, 2013 at 02:56:21PM +0100, Andreas Herrmann wrote:
-> > > 
-> > > After reset these registers have unknown values.
-> > > This might cause problems when evaluating SMMU_GFSR and/or SMMU_CB_FSR
-> > > in handlers for combined interrupts.
-> > > 
-> > > Signed-off-by: Andreas Herrmann <andreas.herrmann@calxeda.com>
-> > > ---
-> > >  drivers/iommu/arm-smmu.c |   27 ++++++++++++++++++++-------
-> > >  1 file changed, 20 insertions(+), 7 deletions(-)
-> > > 
-> > > diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-> > > index 579b6f8..cbbf597 100644
-> > > --- a/drivers/iommu/arm-smmu.c
-> > > +++ b/drivers/iommu/arm-smmu.c
-> > > @@ -631,6 +631,12 @@ static irqreturn_t arm_smmu_global_fault(int irq, void *dev)
-> > >  	return IRQ_HANDLED;
-> > >  }
-> > >  
-> > > +static void arm_smmu_clear_cb_fsr(struct arm_smmu_device *smmu, u8 cbndx)
-> > > +{
-> > > +	void __iomem *cb_base = ARM_SMMU_CB_BASE(smmu) + ARM_SMMU_CB(smmu, cbndx);
-> > > +	writel_relaxed(FSR_FAULT, cb_base + ARM_SMMU_CB_FSR);
-> > > +}
-> > 
-> > Hmm, why not just stick this in arm_smmu_init_context_bank...
+On Monday 30 September 2013 17:34:36 Bartlomiej Zolnierkiewicz wrote:
+> __initdata tag should be placed between the variable name and equal
+> sign for the variable to be placed in the intended .init.data section.
 > 
-> Because we should clear the FSR before we call request_irq.
-> Otherwise we might handle interrupts although the context bank is not
-> enabled.
+> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+
+Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+
+> ---
+> v2:
+> - use __initdata as it is OK to do it
 > 
-> Moving request_irq after arm_smmu_init_context_bank is not optimal
-> either. (We should have configured the context interrupt before
-> translation is enabled. Otherwise it's possible to miss a fault.)
+>  arch/arm/mach-shmobile/board-ape6evm.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/mach-shmobile/board-ape6evm.c
+> b/arch/arm/mach-shmobile/board-ape6evm.c index 7627385..8954f55 100644
+> --- a/arch/arm/mach-shmobile/board-ape6evm.c
+> +++ b/arch/arm/mach-shmobile/board-ape6evm.c
+> @@ -86,7 +86,7 @@ static struct gpio_keys_button gpio_buttons[] = {
+>  	GPIO_KEY(KEY_VOLUMEDOWN,	329,	"S21"),
+>  };
+> 
+> -static struct __initdata gpio_keys_platform_data ape6evm_keys_pdata = {
+> +static struct gpio_keys_platform_data ape6evm_keys_pdata __initdata = {
+>  	.buttons	= gpio_buttons,
+>  	.nbuttons	= ARRAY_SIZE(gpio_buttons),
+>  };
+-- 
+Regards,
 
-How would you miss a fault? If the device can start issuing transactions
-before the SMMU has set up the mapping, then there's a race in the caller
-code which we shouldn't attempt to resolve here.
-
-Will
+Laurent Pinchart
