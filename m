@@ -1,85 +1,119 @@
-From: andreas.herrmann@calxeda.com (Andreas Herrmann)
-Date: Mon, 30 Sep 2013 19:17:16 +0200
-Subject: [PATCH] iommu/arm-smmu: Clear global and context bank fault
- status registers
-In-Reply-To: <20130930160615.GG26036@mudshark.cambridge.arm.com>
-References: <1380234982-1677-1-git-send-email-andreas.herrmann@calxeda.com>
- <1380234982-1677-6-git-send-email-andreas.herrmann@calxeda.com>
- <20130927085255.GC8319@mudshark.cambridge.arm.com>
- <20130930135401.GV3315@alberich> <20130930135621.GW3315@alberich>
- <20130930160615.GG26036@mudshark.cambridge.arm.com>
-Message-ID: <20130930171716.GX3315@alberich>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Mon, 30 Sep 2013 18:20:55 +0100
+Subject: [RFC PATCH 2/3] ARM: mcpm: Implement cpu_kill() to synchronise
+ on powerdown
+In-Reply-To: <alpine.LFD.2.03.1309301252050.6331@syhkavp.arg>
+References: <1380553607-3271-1-git-send-email-Dave.Martin@arm.com>
+ <1380553607-3271-3-git-send-email-Dave.Martin@arm.com>
+ <alpine.LFD.2.03.1309301252050.6331@syhkavp.arg>
+Message-ID: <20130930172055.GC3209@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 30, 2013 at 12:06:15PM -0400, Will Deacon wrote:
-> On Mon, Sep 30, 2013 at 02:56:21PM +0100, Andreas Herrmann wrote:
+On Mon, Sep 30, 2013 at 01:00:00PM -0400, Nicolas Pitre wrote:
+> On Mon, 30 Sep 2013, Dave Martin wrote:
+> 
+> > CPU hotplug and kexec rely on smp_ops.cpu_kill(), which is supposed
+> > to wait for the CPU to park or power down, and perform the last
+> > rites (such as disabling clocks etc., where the platform doesn't do
+> > this automatically).
 > > 
-> > After reset these registers have unknown values.
-> > This might cause problems when evaluating SMMU_GFSR and/or SMMU_CB_FSR
-> > in handlers for combined interrupts.
+> > kexec in particular is unsafe without performing this
+> > synchronisation to park secondaries.  Without it, the secondaries
+> > might not be parked when kexec trashes the kernel.
 > > 
-> > Signed-off-by: Andreas Herrmann <andreas.herrmann@calxeda.com>
+> > There is no generic way to do this synchronisation, so a new mcpm
+> > platform_ops method power_down_finish() is added by this patch.
+> > 
+> > The new method is mandatory.  A platform which provides no way to
+> > detect when CPUs are parked is likely broken.
+> > 
+> > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
 > > ---
-> >  drivers/iommu/arm-smmu.c |   27 ++++++++++++++++++++-------
-> >  1 file changed, 20 insertions(+), 7 deletions(-)
+> >  arch/arm/common/mcpm_entry.c   |    5 +++++
+> >  arch/arm/common/mcpm_platsmp.c |   10 ++++++++++
+> >  arch/arm/include/asm/mcpm.h    |   31 +++++++++++++++++++++++++++++++
+> >  3 files changed, 46 insertions(+)
 > > 
-> > diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-> > index 579b6f8..cbbf597 100644
-> > --- a/drivers/iommu/arm-smmu.c
-> > +++ b/drivers/iommu/arm-smmu.c
-> > @@ -631,6 +631,12 @@ static irqreturn_t arm_smmu_global_fault(int irq, void *dev)
-> >  	return IRQ_HANDLED;
+> > diff --git a/arch/arm/common/mcpm_entry.c b/arch/arm/common/mcpm_entry.c
+> > index 370236d..b722027 100644
+> > --- a/arch/arm/common/mcpm_entry.c
+> > +++ b/arch/arm/common/mcpm_entry.c
+> > @@ -89,6 +89,11 @@ void mcpm_cpu_power_down(void)
+> >  	BUG();
 > >  }
 > >  
-> > +static void arm_smmu_clear_cb_fsr(struct arm_smmu_device *smmu, u8 cbndx)
+> > +int mcpm_cpu_power_down_finish(unsigned int cpu, unsigned int cluster)
 > > +{
-> > +	void __iomem *cb_base = ARM_SMMU_CB_BASE(smmu) + ARM_SMMU_CB(smmu, cbndx);
-> > +	writel_relaxed(FSR_FAULT, cb_base + ARM_SMMU_CB_FSR);
+> > +	return platform_ops->power_down_finish(cpu, cluster);
 > > +}
 > 
-> Hmm, why not just stick this in arm_smmu_init_context_bank...
+> Please make it return an error (non-zero return value) if platform_ops 
+> or platform_ops->power_down_finish is NULL.  Otherwise this would oops 
+> the kernel.
+> 
+> There is a patch already handling the other cases in RMK's patch system.
 
-Because we should clear the FSR before we call request_irq.
-Otherwise we might handle interrupts although the context bank is not
-enabled.
+OK -- I didn't pay enough attention as that went past.
 
-Moving request_irq after arm_smmu_init_context_bank is not optimal
-either. (We should have configured the context interrupt before
-translation is enabled. Otherwise it's possible to miss a fault.)
+I'll grab that patch and rebase onto it.
 
-> >  static void arm_smmu_init_context_bank(struct arm_smmu_domain *smmu_domain)
-> >  {
-> >  	u32 reg;
-> > @@ -838,6 +844,7 @@ static int arm_smmu_init_domain_context(struct iommu_domain *domain,
-> >  		root_cfg->irptndx = root_cfg->cbndx;
-> >  	}
+
+Do you have concerns about the mandatoriness of the new call?  The
+alternative would be to check for it at registration time and set
+smp_ops.cpu_kill to NULL if the backend method isn't there.
+
+But I really wouldn't want to encourage that until someone comes
+up with a good reason.
+
+[...]
+
+> > diff --git a/arch/arm/include/asm/mcpm.h b/arch/arm/include/asm/mcpm.h
+> > index 0f7b762..22cdc6f 100644
+> > --- a/arch/arm/include/asm/mcpm.h
+> > +++ b/arch/arm/include/asm/mcpm.h
+> > @@ -78,10 +78,40 @@ int mcpm_cpu_power_up(unsigned int cpu, unsigned int cluster);
+> >   *
+> >   * This does not return.  Re-entry in the kernel is expected via
+> >   * mcpm_entry_point.
+> > + *
+> > + * The CPU is not necessarily truly halted until
+> > + * mcpu_cpu_power_down_finish() subsequently returns non-zero for the
+> 
+> s/mcpu/mcpm/
+> 
+> > + * specified cpu.  Until then, other CPUs should make sure they do not
+> > + * trash memory the target CPU might be executing/accessing.
+> >   */
+> >  void mcpm_cpu_power_down(void);
 > >  
-> > +	arm_smmu_clear_cb_fsr(smmu, root_cfg->cbndx);
+> >  /**
+> > + * mcpm_cpu_power_down_finish - wait for a specified CPU to halt, and
+> > + *	make sure it is powered off
+> > + *
+> > + * @cpu: CPU number within given cluster
+> > + * @cluster: cluster number for the CPU
+> > + *
+> > + * Call this function to ensure that a pending powerdown has taken
+> > + * effect and the CPU is safely parked before performing non-mcpm
+> > + * operations that may affect the CPU (such as kexec trashing the
+> > + * kernel text).
+> > + *
+> > + * It is *not* necessary to call this function if you only need to
+> > + * serialise a pending powerdown with mcpu_cpu_power_up() or a wakeup
 > 
-> ... then move that function call here instead of where it currently is?
-
-See above.
-
-> >  	irq = smmu->irqs[smmu->num_global_irqs + root_cfg->irptndx];
-> >  	ret = request_irq(irq, arm_smmu_context_fault, IRQF_SHARED,
-> >  			  "arm-smmu-context-fault", domain);
-> > @@ -1564,7 +1571,11 @@ static void arm_smmu_device_reset(struct arm_smmu_device *smmu)
-> >  	void __iomem *gr0_base = ARM_SMMU_GR0(smmu);
-> >  	void __iomem *sctlr_base = ARM_SMMU_CB_BASE(smmu) + ARM_SMMU_CB_SCTLR;
-> >  	int i = 0;
-> > -	u32 scr0 = readl_relaxed(gr0_base + ARM_SMMU_GR0_sCR0);
-> > +	u32 val;
+> Ditto.
 > 
-> I guess we have to dilute the meaning of the variable, but perhaps `reg' is
-> slightly more indicative than `val'?
+> > + * event.
+> > + *
+> > + * Do not call this function unless the specified CPU has already
+> > + * called mcpu_cpu_power_down() or has committed to doing so.
+> 
+> Ditto.
 
-Will change that.
+Ummm, duh.  Fixed -- thanks.
 
-> Do you plan to post all your patches as a new series (it's hard to keep
-> track of what to pick)?
+[...]
 
-Yes.
-
-
-Andreas
+Cheers
+---Dave
