@@ -1,65 +1,33 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Mon, 30 Sep 2013 11:42:45 -0600
-Subject: [PATCH v2 1/3] ARM: kirkwood: Remove kirkwood_setup_wins and
- rely on the DT binding (Was Re: ..)
-In-Reply-To: <20130929203314.GA2457@localhost>
-References: <20130917184146.GD21230@obsidianresearch.com>
- <20130929203314.GA2457@localhost>
-Message-ID: <20130930174245.GB28898@obsidianresearch.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 30 Sep 2013 18:43:19 +0100
+Subject: [PATCH] ASoC: generic: Add generic DT based simple codec
+In-Reply-To: <5249AB82.60701@wwwdotorg.org>
+References: <20130919105437.75e0f0a3@armhf> <5240B07C.6080404@wwwdotorg.org>
+ <CAL_JsqKmfurrCqEYRNqcLRZMU-VjPin2dvK1Q6CMcK4i=+x-8w@mail.gmail.com>
+ <5249AB82.60701@wwwdotorg.org>
+Message-ID: <20130930174319.GG19304@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Sep 29, 2013 at 05:33:15PM -0300, Ezequiel Garcia wrote:
-> Hi Jason,
-> 
-> Sorry for the delayed review. I finally found some time off
-> to take a deeper look at this series.
-> 
-> So, despite the wrong subject this is v2 for:
-> 
-> "ARM: kirkwood: Remove kirkwood_setup_wins and rely on the DT binding"
-> 
-> Right? I took the liberty of fixing the subject.
+On Mon, Sep 30, 2013 at 10:49:06AM -0600, Stephen Warren wrote:
 
-Yes, sorry, mailer trouble. I finally got git send-email working here
-so that shouldn't happen again :)
- 
-> I think a small cover-letter would have been nice, just to have
-> some context about the three patches. I assume the series is:
-> 
-> ARM: kirkwood: Remove kirkwood_setup_wins and rely on the DT binding
-> ARM: kirkwood: Move the crypto node under the mbus node
-> ARM: kirkwood: Move the nand node under the mbus node
+> The only potential issue with that approach is if the CODEC can be used
+> in a "simple" mode where e.g. no control GPIOs, regulator manipulation,
+> etc. are required, or in a more complex mode where such things are
+> required, you may end up with the device-specific binding being written
+> to the simple mode, and hence missing features required for the complex
+> mode. Having a separate simple binding prevents the device-specific
+> binding from being broken that way.
 
-Yes, that looks right.
-
-> >  		compatible = "marvell,kirkwood-mbus", "simple-bus";
-> >  		#address-cells = <2>;
-> >  		#size-cells = <1>;
-> > +		/* If a board file needs to change this ranges it must replace it completely */
-> 
-> I'd rather have a longer comment in here, explaining why such
-> replacement is needed and how the 'ranges' entries are not inherited
-> in any way.
-
-Generally I try to avoid explaining how a language works in
-comments :) 
-
-> Other than that, the patch looks good:
-> 
-> Acked-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> 
-> And, in Openblocks-A6:
-> 
-> Tested-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-
-Did you test patch #2 as well? 
-
-I put the 3 patches on my github:
-
-https://github.com/jgunthorpe/linux/tree/kirkwood-mbus
-
-Jason C: Do you want me to repost the patches?
-
-Thanks,
-Jason
+That would probably indicate a bug in the complex bindings since if the
+simple mode exists then usually that would mean that the bindings for
+the complex mode ought to be specifying things as optional, these things
+are typically just done by strapping pins instead of routing them to the
+CPU.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130930/8047c508/attachment.sig>
