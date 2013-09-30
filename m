@@ -1,33 +1,28 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sun, 29 Sep 2013 17:39:27 -0700
-Subject: [PATCH] ARM: multi_v7_defconfig: add SDHCI for i.MX
-Message-ID: <1380501567-6175-1-git-send-email-olof@lixom.net>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 30 Sep 2013 09:47:33 +0900
+Subject: [PATCH 0/2] Add CAN0 support for R8A7778/BOCK-W board
+In-Reply-To: <201309280441.52414.sergei.shtylyov@cogentembedded.com>
+References: <201309280441.52414.sergei.shtylyov@cogentembedded.com>
+Message-ID: <20130930004733.GA30501@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Turn on SDHCI for i.MX support so machines can boot with local rootfs
-on SD. Tested on a Wandboard Quad.
+On Sat, Sep 28, 2013 at 04:41:51AM +0400, Sergei Shtylyov wrote:
+> Hello.
+> 
+>    Here's the set of 2 patches against Simon Horman's 'renesas.git' repo,
+> 'renesas-devel-20130927v2' tag. Here we add the CAN0 controller support working
+> on the R8A7778/BOCK-W board. The patchset requires the 'rcar_can' driver and 
+> R8A7778 PFC patch posted earlier in order to compile and/or work.
 
-Signed-off-by: Olof Johansson <olof@lixom.net>
----
+Thanks, got it. At the very least I will have to wait
+for the driver to be merged before taking these patches.
 
-I'll apply this in the fixes branch for 3.12 since it increases test
-coverage in my setup here.
+> 
+> [1/2] ARM: shmobile: r8a7778: add CAN clock support
+> [2/2] ARM: shmobile: BOCK-W: add CAN0 support
+> 
+>    Unfortunately, the use of CAN is much hindered by the fact that the CAN0
+> signals use the BOCK-W's product serial port and CAN1 pins are not connected.
 
- arch/arm/configs/multi_v7_defconfig |    1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index f3935b4..119fc37 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -135,6 +135,7 @@ CONFIG_MMC=y
- CONFIG_MMC_ARMMMCI=y
- CONFIG_MMC_SDHCI=y
- CONFIG_MMC_SDHCI_PLTFM=y
-+CONFIG_MMC_SDHCI_ESDHC_IMX=y
- CONFIG_MMC_SDHCI_TEGRA=y
- CONFIG_MMC_SDHCI_SPEAR=y
- CONFIG_MMC_OMAP=y
--- 
-1.7.10.4
+Morimoto-san, do you have any thoughts on this?
