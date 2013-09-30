@@ -1,45 +1,49 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Mon, 30 Sep 2013 18:03:27 -0300
-Subject: [PATCH 1/4] ARM: kirkwood: Remove unneeded MBus initialization
+Date: Mon, 30 Sep 2013 18:03:29 -0300
+Subject: [PATCH 3/4] clk: kirkwood: Add CLK_IGNORE_UNUSED to ethernet ge0 and
+ ge1 clocks
 In-Reply-To: <1380575010-8573-1-git-send-email-ezequiel.garcia@free-electrons.com>
 References: <1380575010-8573-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1380575010-8573-2-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1380575010-8573-4-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since the MBus is initialized from the DT, it's not necessary to
-call the legacy initialization.
+These clocks should never be gated, since the ethernet interfaces forget
+the assigned MAC address assigned if their clock source is turned off.
 
 Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 ---
- arch/arm/mach-kirkwood/board-dt.c | 8 --------
- 1 file changed, 8 deletions(-)
+Cc: Mike Turquette <mturquette@linaro.org>
 
-diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
-index 82d3ad8..ee6297e 100644
---- a/arch/arm/mach-kirkwood/board-dt.c
-+++ b/arch/arm/mach-kirkwood/board-dt.c
-@@ -72,13 +72,6 @@ static void __init kirkwood_dt_time_init(void)
- 	clocksource_of_init();
- }
+ drivers/clk/mvebu/kirkwood.c | 9 +++++++--
+ 1 file changed, 7 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/clk/mvebu/kirkwood.c b/drivers/clk/mvebu/kirkwood.c
+index 2636a55..69d9603 100644
+--- a/drivers/clk/mvebu/kirkwood.c
++++ b/drivers/clk/mvebu/kirkwood.c
+@@ -220,7 +220,12 @@ CLK_OF_DECLARE(mv88f6180_core_clk, "marvell,mv88f6180-core-clock",
+  */
  
--static void __init kirkwood_dt_init_early(void)
--{
--	mvebu_mbus_init("marvell,kirkwood-mbus",
--			BRIDGE_WINS_BASE, BRIDGE_WINS_SZ,
--			DDR_WINDOW_CPU_BASE, DDR_WINDOW_CPU_SZ);
--}
--
- static void __init kirkwood_dt_init(void)
- {
- 	pr_info("Kirkwood: %s, TCLK=%d.\n", kirkwood_id(), kirkwood_tclk);
-@@ -121,7 +114,6 @@ static const char * const kirkwood_dt_board_compat[] = {
- DT_MACHINE_START(KIRKWOOD_DT, "Marvell Kirkwood (Flattened Device Tree)")
- 	/* Maintainer: Jason Cooper <jason@lakedaemon.net> */
- 	.map_io		= kirkwood_map_io,
--	.init_early	= kirkwood_dt_init_early,
- 	.init_time	= kirkwood_dt_time_init,
- 	.init_machine	= kirkwood_dt_init,
- 	.restart	= kirkwood_restart,
+ static const struct clk_gating_soc_desc kirkwood_gating_desc[] __initconst = {
+-	{ "ge0", NULL, 0, 0 },
++	/*
++	 * The ethernet interfaces forget their assigned MAC address
++	 * if the clocks are turned off. Until proper DT support
++	 * is available we prevent ge0 and ge1 gating for now.
++	 */
++	{ "ge0", NULL, 0, CLK_IGNORE_UNUSED },
+ 	{ "pex0", NULL, 2, 0 },
+ 	{ "usb0", NULL, 3, 0 },
+ 	{ "sdio", NULL, 4, 0 },
+@@ -234,7 +239,7 @@ static const struct clk_gating_soc_desc kirkwood_gating_desc[] __initconst = {
+ 	{ "xor1", NULL, 16, 0 },
+ 	{ "crypto", NULL, 17, 0 },
+ 	{ "pex1", NULL, 18, 0 },
+-	{ "ge1", NULL, 19, 0 },
++	{ "ge1", NULL, 19, CLK_IGNORE_UNUSED },
+ 	{ "tdm", NULL, 20, 0 },
+ 	{ }
+ };
 -- 
 1.8.1.5
