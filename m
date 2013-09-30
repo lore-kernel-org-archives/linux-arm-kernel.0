@@ -1,119 +1,131 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Mon, 30 Sep 2013 18:20:55 +0100
-Subject: [RFC PATCH 2/3] ARM: mcpm: Implement cpu_kill() to synchronise
- on powerdown
-In-Reply-To: <alpine.LFD.2.03.1309301252050.6331@syhkavp.arg>
-References: <1380553607-3271-1-git-send-email-Dave.Martin@arm.com>
- <1380553607-3271-3-git-send-email-Dave.Martin@arm.com>
- <alpine.LFD.2.03.1309301252050.6331@syhkavp.arg>
-Message-ID: <20130930172055.GC3209@localhost.localdomain>
+From: konrad.wilk@oracle.com (Konrad Rzeszutek Wilk)
+Date: Mon, 30 Sep 2013 13:22:09 -0400
+Subject: [PATCH v6 17/19] xen: introduce XENMEM_pin
+In-Reply-To: <1380298207-29151-17-git-send-email-stefano.stabellini@eu.citrix.com>
+References: <alpine.DEB.2.02.1309271653420.5498@kaball.uk.xensource.com>
+ <1380298207-29151-17-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <20130930172209.GX3106@phenom.dumpdata.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 30, 2013 at 01:00:00PM -0400, Nicolas Pitre wrote:
-> On Mon, 30 Sep 2013, Dave Martin wrote:
+On Fri, Sep 27, 2013 at 05:10:05PM +0100, Stefano Stabellini wrote:
+> Introduce a new hypercall to pin one or more pages whose machine
+> addresses respect a dma_mask passed as an argument
 > 
-> > CPU hotplug and kexec rely on smp_ops.cpu_kill(), which is supposed
-> > to wait for the CPU to park or power down, and perform the last
-> > rites (such as disabling clocks etc., where the platform doesn't do
-> > this automatically).
-> > 
-> > kexec in particular is unsafe without performing this
-> > synchronisation to park secondaries.  Without it, the secondaries
-> > might not be parked when kexec trashes the kernel.
-> > 
-> > There is no generic way to do this synchronisation, so a new mcpm
-> > platform_ops method power_down_finish() is added by this patch.
-> > 
-> > The new method is mandatory.  A platform which provides no way to
-> > detect when CPUs are parked is likely broken.
-> > 
-> > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> > ---
-> >  arch/arm/common/mcpm_entry.c   |    5 +++++
-> >  arch/arm/common/mcpm_platsmp.c |   10 ++++++++++
-> >  arch/arm/include/asm/mcpm.h    |   31 +++++++++++++++++++++++++++++++
-> >  3 files changed, 46 insertions(+)
-> > 
-> > diff --git a/arch/arm/common/mcpm_entry.c b/arch/arm/common/mcpm_entry.c
-> > index 370236d..b722027 100644
-> > --- a/arch/arm/common/mcpm_entry.c
-> > +++ b/arch/arm/common/mcpm_entry.c
-> > @@ -89,6 +89,11 @@ void mcpm_cpu_power_down(void)
-> >  	BUG();
-> >  }
-> >  
-> > +int mcpm_cpu_power_down_finish(unsigned int cpu, unsigned int cluster)
-> > +{
-> > +	return platform_ops->power_down_finish(cpu, cluster);
-> > +}
+> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> ---
+>  arch/arm/xen/mm.c              |   16 ++++++++++++++++
+>  arch/x86/xen/mmu.c             |    7 +++++++
+>  include/xen/interface/memory.h |   32 ++++++++++++++++++++++++++++++++
+>  include/xen/xen-ops.h          |    1 +
+>  4 files changed, 56 insertions(+), 0 deletions(-)
 > 
-> Please make it return an error (non-zero return value) if platform_ops 
-> or platform_ops->power_down_finish is NULL.  Otherwise this would oops 
-> the kernel.
+> diff --git a/arch/arm/xen/mm.c b/arch/arm/xen/mm.c
+> index b305b94..146c1c3 100644
+> --- a/arch/arm/xen/mm.c
+> +++ b/arch/arm/xen/mm.c
+> @@ -55,6 +55,22 @@ static int xen_exchange_memory(xen_ulong_t extents_in,
+>  	return success;
+>  }
+>  
+> +int xen_pin_page(xen_pfn_t *in_frame, unsigned int address_bits)
+> +{
+> +	struct xen_pin pin = {
+> +		.in = {
+> +			.nr_extents   = 1,
+> +			.extent_order = 0,
+> +			.domid        = DOMID_SELF,
+> +			.address_bits = address_bits
+> +		},
+> +	};
+> +	set_xen_guest_handle(pin.in.extent_start, in_frame);
+> +
+> +	return HYPERVISOR_memory_op(XENMEM_pin, &pin);
+> +}
+> +EXPORT_SYMBOL_GPL(xen_pin_page);
+> +
+>  int xen_create_contiguous_region(phys_addr_t pstart, unsigned int order,
+>  				 unsigned int address_bits,
+>  				 dma_addr_t *dma_handle)
+> diff --git a/arch/x86/xen/mmu.c b/arch/x86/xen/mmu.c
+> index 8830883..8f76ce2 100644
+> --- a/arch/x86/xen/mmu.c
+> +++ b/arch/x86/xen/mmu.c
+> @@ -2568,3 +2568,10 @@ int xen_unmap_domain_mfn_range(struct vm_area_struct *vma,
+>  	return -EINVAL;
+>  }
+>  EXPORT_SYMBOL_GPL(xen_unmap_domain_mfn_range);
+> +
+> +int xen_pin_page(xen_pfn_t *in_frame, unsigned int address_bits)
+> +{
+> +	return -ENOSYS;
+> +}
+> +EXPORT_SYMBOL_GPL(xen_pin_page);
+> +
+> diff --git a/include/xen/interface/memory.h b/include/xen/interface/memory.h
+> index 49db252..66ab578 100644
+> --- a/include/xen/interface/memory.h
+> +++ b/include/xen/interface/memory.h
+> @@ -314,4 +314,36 @@ struct xen_unpin {
+>  };
+>  DEFINE_GUEST_HANDLE_STRUCT(xen_unpin);
+>  
+> +/*
+> + * XENMEM_pin pins a set of pages to make sure that the hypervisor does
+> + * not change the p2m mappings for them.
+> + *
+> + */
+> +#define XENMEM_pin               28
+> +struct xen_pin {
+> +    /*
+> +     * [IN/OUT] Details of memory extents to be pinned (GMFN bases).
+> +     * Xen copies back the MFNs corresponding to the GMFNs passed in as
+> +     * argument.
+> +     * @in.address_bits contains the maximum number of bits addressable
+> +     * by the caller. If the machine addresses of the pages to be pinned
+> +     * are not addressable according to @in.address_bits, the hypercall
+> +     * fails and returns an errors. The pages are not pinned. Otherwise
+                               ^^^^^-error.
+What kind of error? And you should probably join the two sentences together
+(the "If the ... The pages are not pinned.")
+
+
+> +     * the hypercall succeeds.
+
+and does it return a number of pages that were pinned or just zero?
+
+> +     */
+> +    struct xen_memory_reservation in;
+> +
+> +    /*
+> +     * [OUT] Number of input extents that were successfully pinned.
+> +     *  1. The first @nr_pinned input extents were successfully
+> +     *     pinned.
+> +     *  2. All other input extents are untouched.
+> +     *  3. If not all input extents are pinned then the return code of this
+> +     *     command will be non-zero.
+
+OK, what return code?
+
+> +     */
+> +    xen_ulong_t nr_pinned;
+> +};
+> +DEFINE_GUEST_HANDLE_STRUCT(xen_pin);
+> +
+> +
+>  #endif /* __XEN_PUBLIC_MEMORY_H__ */
+> diff --git a/include/xen/xen-ops.h b/include/xen/xen-ops.h
+> index fb2ea8f..4cf4fc5 100644
+> --- a/include/xen/xen-ops.h
+> +++ b/include/xen/xen-ops.h
+> @@ -22,6 +22,7 @@ extern unsigned long *xen_contiguous_bitmap;
+>  int xen_create_contiguous_region(phys_addr_t pstart, unsigned int order,
+>  				unsigned int address_bits,
+>  				dma_addr_t *dma_handle);
+> +int xen_pin_page(xen_pfn_t *in_frame, unsigned int address_bits);
+>  
+>  void xen_destroy_contiguous_region(phys_addr_t pstart, unsigned int order);
+>  
+> -- 
+> 1.7.2.5
 > 
-> There is a patch already handling the other cases in RMK's patch system.
-
-OK -- I didn't pay enough attention as that went past.
-
-I'll grab that patch and rebase onto it.
-
-
-Do you have concerns about the mandatoriness of the new call?  The
-alternative would be to check for it at registration time and set
-smp_ops.cpu_kill to NULL if the backend method isn't there.
-
-But I really wouldn't want to encourage that until someone comes
-up with a good reason.
-
-[...]
-
-> > diff --git a/arch/arm/include/asm/mcpm.h b/arch/arm/include/asm/mcpm.h
-> > index 0f7b762..22cdc6f 100644
-> > --- a/arch/arm/include/asm/mcpm.h
-> > +++ b/arch/arm/include/asm/mcpm.h
-> > @@ -78,10 +78,40 @@ int mcpm_cpu_power_up(unsigned int cpu, unsigned int cluster);
-> >   *
-> >   * This does not return.  Re-entry in the kernel is expected via
-> >   * mcpm_entry_point.
-> > + *
-> > + * The CPU is not necessarily truly halted until
-> > + * mcpu_cpu_power_down_finish() subsequently returns non-zero for the
-> 
-> s/mcpu/mcpm/
-> 
-> > + * specified cpu.  Until then, other CPUs should make sure they do not
-> > + * trash memory the target CPU might be executing/accessing.
-> >   */
-> >  void mcpm_cpu_power_down(void);
-> >  
-> >  /**
-> > + * mcpm_cpu_power_down_finish - wait for a specified CPU to halt, and
-> > + *	make sure it is powered off
-> > + *
-> > + * @cpu: CPU number within given cluster
-> > + * @cluster: cluster number for the CPU
-> > + *
-> > + * Call this function to ensure that a pending powerdown has taken
-> > + * effect and the CPU is safely parked before performing non-mcpm
-> > + * operations that may affect the CPU (such as kexec trashing the
-> > + * kernel text).
-> > + *
-> > + * It is *not* necessary to call this function if you only need to
-> > + * serialise a pending powerdown with mcpu_cpu_power_up() or a wakeup
-> 
-> Ditto.
-> 
-> > + * event.
-> > + *
-> > + * Do not call this function unless the specified CPU has already
-> > + * called mcpu_cpu_power_down() or has committed to doing so.
-> 
-> Ditto.
-
-Ummm, duh.  Fixed -- thanks.
-
-[...]
-
-Cheers
----Dave
