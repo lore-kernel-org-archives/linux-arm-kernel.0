@@ -1,32 +1,33 @@
-From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Mon, 30 Sep 2013 11:08:25 -0300
-Subject: [PATCH] ARM: mach-imx: cpu: Include <linux/err.h>
-Message-ID: <1380550105-19372-1-git-send-email-fabio.estevam@freescale.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Mon, 30 Sep 2013 10:09:13 -0400
+Subject: [PATCH, FIX] ARM: mvebu: fix ReadyNAS 102 Power button GPIO to
+ make it active high
+In-Reply-To: <87ob7bh3uu.fsf@natisbad.org>
+References: <87ob7bh3uu.fsf@natisbad.org>
+Message-ID: <20130930140913.GD31178@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit e709f38cd7 (ARM: imx6: report soc info via soc device) causes the 
-following build error on imx_v4_v5_defconfig:
+On Sun, Sep 29, 2013 at 08:36:41PM +0200, Arnaud Ebalard wrote:
+> 
+> NETGEAR ReadyNAS 102 Power button definition in .dts file flags
+> associated GPIO active low instead of active high. This results
+> in reversed events reported by input subsystem (0 returned when
+> the button is pressed, 1 when released). This patch makes
+> associated GPIO active high to recover correct behaviour.
+> 
+> Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
+> ---
+> RN102 .dts file sits in Linus tree only since 3.12-rc1 so I guess
+> no one has currently relied on current reversed behaviour, i.e.
+> this can be fixed w/o impact on any userspace program. As a side
+> note, the initial error is mine.
+> 
+>  arch/arm/boot/dts/armada-370-netgear-rn102.dts | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 
-arch/arm/mach-imx/cpu.c: In function 'imx_soc_device_init':
-arch/arm/mach-imx/cpu.c:129:2: error: implicit declaration of function 'IS_ERR' [-Werror=implicit-function-declaration]
+Applied to mvebu/fixes
 
-Include <linux/err.h> to fix it.
+thx,
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/mach-imx/cpu.c | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm/mach-imx/cpu.c b/arch/arm/mach-imx/cpu.c
-index fae2c9a..c862402 100644
---- a/arch/arm/mach-imx/cpu.c
-+++ b/arch/arm/mach-imx/cpu.c
-@@ -1,4 +1,5 @@
- 
-+#include <linux/err.h>
- #include <linux/module.h>
- #include <linux/io.h>
- #include <linux/of.h>
--- 
-1.8.1.2
+Jason.
