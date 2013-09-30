@@ -1,55 +1,85 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Mon, 30 Sep 2013 13:14:38 -0400 (EDT)
-Subject: [RFC PATCH 3/3] ARM: vexpress/TC2: Implement MCPM
- power_down_finish()
-In-Reply-To: <1380553607-3271-4-git-send-email-Dave.Martin@arm.com>
-References: <1380553607-3271-1-git-send-email-Dave.Martin@arm.com>
- <1380553607-3271-4-git-send-email-Dave.Martin@arm.com>
-Message-ID: <alpine.LFD.2.03.1309301300390.6331@syhkavp.arg>
+From: andreas.herrmann@calxeda.com (Andreas Herrmann)
+Date: Mon, 30 Sep 2013 19:17:16 +0200
+Subject: [PATCH] iommu/arm-smmu: Clear global and context bank fault
+ status registers
+In-Reply-To: <20130930160615.GG26036@mudshark.cambridge.arm.com>
+References: <1380234982-1677-1-git-send-email-andreas.herrmann@calxeda.com>
+ <1380234982-1677-6-git-send-email-andreas.herrmann@calxeda.com>
+ <20130927085255.GC8319@mudshark.cambridge.arm.com>
+ <20130930135401.GV3315@alberich> <20130930135621.GW3315@alberich>
+ <20130930160615.GG26036@mudshark.cambridge.arm.com>
+Message-ID: <20130930171716.GX3315@alberich>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 30 Sep 2013, Dave Martin wrote:
+On Mon, Sep 30, 2013 at 12:06:15PM -0400, Will Deacon wrote:
+> On Mon, Sep 30, 2013 at 02:56:21PM +0100, Andreas Herrmann wrote:
+> > 
+> > After reset these registers have unknown values.
+> > This might cause problems when evaluating SMMU_GFSR and/or SMMU_CB_FSR
+> > in handlers for combined interrupts.
+> > 
+> > Signed-off-by: Andreas Herrmann <andreas.herrmann@calxeda.com>
+> > ---
+> >  drivers/iommu/arm-smmu.c |   27 ++++++++++++++++++++-------
+> >  1 file changed, 20 insertions(+), 7 deletions(-)
+> > 
+> > diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+> > index 579b6f8..cbbf597 100644
+> > --- a/drivers/iommu/arm-smmu.c
+> > +++ b/drivers/iommu/arm-smmu.c
+> > @@ -631,6 +631,12 @@ static irqreturn_t arm_smmu_global_fault(int irq, void *dev)
+> >  	return IRQ_HANDLED;
+> >  }
+> >  
+> > +static void arm_smmu_clear_cb_fsr(struct arm_smmu_device *smmu, u8 cbndx)
+> > +{
+> > +	void __iomem *cb_base = ARM_SMMU_CB_BASE(smmu) + ARM_SMMU_CB(smmu, cbndx);
+> > +	writel_relaxed(FSR_FAULT, cb_base + ARM_SMMU_CB_FSR);
+> > +}
+> 
+> Hmm, why not just stick this in arm_smmu_init_context_bank...
 
-> This patch implements the power_down_finish() method for TC2, to
-> enable the kernel to confirm when CPUs are safely powered down.
-> 
-> The information required for determining when a CPU is parked
-> cannot be obtained from any single place, so a few sources of
-> information must be combined:
-> 
->   * mcpm_cpu_power_down() must be pending for the CPU, so that we
->     don't get confused by false STANDBYWFI positives arising from
->     CPUidle.  This is detected by waiting for the tc2_pm use count
->     for the target CPU to reach 0.
-> 
->   * Either the SPC must report that the CPU has asserted
->     STANDBYWFI, or the TC2 tile's reset control logic must be
->     holding the CPU in reset.
-> 
->     Just checking for STANDBYWFI is not sufficient, because this
->     signal is not latched when the the cluster is clamped off and
->     powered down: the relevant status bits just drop to zero.  This
->     means that STANDBYWFI status cannot be used for reliable
->     detection of the last CPU in a cluster reaching WFI.
-> 
-> This patch is required in order for kexec to work with MCPM on TC2.
-> 
-> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> ---
-> 
-> The mdelay(1) in tc2_pm_power_down_finish() is arbitrary.  The power
-> controller can show millisecond response times in the worst case, and
-> CPU hotplug is not expected to be performance-critical.
-> 
-> It may be wise to add a timeout to this function, but that's open to
-> discussion.
+Because we should clear the FSR before we call request_irq.
+Otherwise we might handle interrupts although the context bank is not
+enabled.
 
-That would be a good idea.  I'd suggest you reduce the polling loop to 
-something like 10 ms and bail out after one second.   We've been 
-affected by funny STANDBYWFI 
-behaviors before.
+Moving request_irq after arm_smmu_init_context_bank is not optimal
+either. (We should have configured the context interrupt before
+translation is enabled. Otherwise it's possible to miss a fault.)
+
+> >  static void arm_smmu_init_context_bank(struct arm_smmu_domain *smmu_domain)
+> >  {
+> >  	u32 reg;
+> > @@ -838,6 +844,7 @@ static int arm_smmu_init_domain_context(struct iommu_domain *domain,
+> >  		root_cfg->irptndx = root_cfg->cbndx;
+> >  	}
+> >  
+> > +	arm_smmu_clear_cb_fsr(smmu, root_cfg->cbndx);
+> 
+> ... then move that function call here instead of where it currently is?
+
+See above.
+
+> >  	irq = smmu->irqs[smmu->num_global_irqs + root_cfg->irptndx];
+> >  	ret = request_irq(irq, arm_smmu_context_fault, IRQF_SHARED,
+> >  			  "arm-smmu-context-fault", domain);
+> > @@ -1564,7 +1571,11 @@ static void arm_smmu_device_reset(struct arm_smmu_device *smmu)
+> >  	void __iomem *gr0_base = ARM_SMMU_GR0(smmu);
+> >  	void __iomem *sctlr_base = ARM_SMMU_CB_BASE(smmu) + ARM_SMMU_CB_SCTLR;
+> >  	int i = 0;
+> > -	u32 scr0 = readl_relaxed(gr0_base + ARM_SMMU_GR0_sCR0);
+> > +	u32 val;
+> 
+> I guess we have to dilute the meaning of the variable, but perhaps `reg' is
+> slightly more indicative than `val'?
+
+Will change that.
+
+> Do you plan to post all your patches as a new series (it's hard to keep
+> track of what to pick)?
+
+Yes.
 
 
-
-Nicolas
+Andreas
