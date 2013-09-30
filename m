@@ -1,26 +1,35 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 30 Sep 2013 17:32:12 +0200
-Subject: [PATCH] ARM: mach-imx: cpu: Include <linux/err.h>
-In-Reply-To: <1380550105-19372-1-git-send-email-fabio.estevam@freescale.com>
-References: <1380550105-19372-1-git-send-email-fabio.estevam@freescale.com>
-Message-ID: <20130930153212.GD2548@pengutronix.de>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Mon, 30 Sep 2013 17:34:36 +0200
+Subject: [PATCH v2] ARM: shmobile: ape6evm: fix incorrect placement of
+ __initdata tag
+Message-ID: <1959578.PFsrHiTtYY@amdc1032>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 30, 2013 at 11:08:25AM -0300, Fabio Estevam wrote:
-> Commit e709f38cd7 (ARM: imx6: report soc info via soc device) causes the 
-> following build error on imx_v4_v5_defconfig:
-> 
-> arch/arm/mach-imx/cpu.c: In function 'imx_soc_device_init':
-> arch/arm/mach-imx/cpu.c:129:2: error: implicit declaration of function 'IS_ERR' [-Werror=implicit-function-declaration]
-> 
-> Include <linux/err.h> to fix it.
-The same fix was already sent earlier: 
-	http://mid.gmane.org/1380542691-24756-1-git-send-email-treding at nvidia.com
+__initdata tag should be placed between the variable name and equal
+sign for the variable to be placed in the intended .init.data section.
 
-Best regards
-Uwe
+Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
+v2:
+- use __initdata as it is OK to do it
 
+ arch/arm/mach-shmobile/board-ape6evm.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-shmobile/board-ape6evm.c b/arch/arm/mach-shmobile/board-ape6evm.c
+index 7627385..8954f55 100644
+--- a/arch/arm/mach-shmobile/board-ape6evm.c
++++ b/arch/arm/mach-shmobile/board-ape6evm.c
+@@ -86,7 +86,7 @@ static struct gpio_keys_button gpio_buttons[] = {
+ 	GPIO_KEY(KEY_VOLUMEDOWN,	329,	"S21"),
+ };
+ 
+-static struct __initdata gpio_keys_platform_data ape6evm_keys_pdata = {
++static struct gpio_keys_platform_data ape6evm_keys_pdata __initdata = {
+ 	.buttons	= gpio_buttons,
+ 	.nbuttons	= ARRAY_SIZE(gpio_buttons),
+ };
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+1.8.2.3
