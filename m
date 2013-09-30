@@ -1,63 +1,64 @@
-From: afzal@ti.com (Afzal Mohammed)
-Date: Mon, 30 Sep 2013 16:35:39 +0530
-Subject: [PATCH v4 07/11] ARM: OMAP2+: CM: AM43x clockdomain data
-In-Reply-To: <alpine.DEB.2.02.1309300927520.17980@utopia.booyaka.com>
-References: <cover.1380179370.git.afzal@ti.com>
- <a6758751113ef93bc912ccefb9cdb0ba383f19d5.1380179370.git.afzal@ti.com>
- <alpine.DEB.2.02.1309300927520.17980@utopia.booyaka.com>
-Message-ID: <52495B03.3050006@ti.com>
+From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
+Date: Mon, 30 Sep 2013 13:06:34 +0200
+Subject: imprecise external abort using the flexcan driver on i.MX6Q
+In-Reply-To: <5245E2C5.1030705@pengutronix.de>
+References: <21060.15934.600859.167074@ipc1.ka-ro>
+ <524455FD.7070808@pengutronix.de>
+ <20130926155422.GQ12758@n2100.arm.linux.org.uk>
+ <CAHCPf3u7qpdiqoOhD1yxoHybgS1+mvdd8xxaTKnK-DJ9sJYY7g@mail.gmail.com>
+ <21061.21191.197931.54061@ipc1.ka-ro>
+ <CAHCPf3vJi5HH52XRsJ5tsaOsGk_1YsoSHHgJNPpeJLBpd5EZsA@mail.gmail.com>
+ <5245E2C5.1030705@pengutronix.de>
+Message-ID: <21065.23354.418805.871480@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
+Hi,
 
-On Monday 30 September 2013 03:01 PM, Paul Walmsley wrote:
-> On Thu, 26 Sep 2013, Afzal Mohammed wrote:
-
->> From: Ambresh K <ambresh@ti.com>
->>
->> Add the data file to describe clock domains in AM43x SoC.
->> OMAP4 clockdomain operations is being reused here.
->>
->> Signed-off-by: Ambresh K <ambresh@ti.com>
->> Signed-off-by: Afzal Mohammed <afzal@ti.com>
->> ---
->>  arch/arm/mach-omap2/clockdomain.h           |   2 +
->>  arch/arm/mach-omap2/clockdomains43xx_data.c | 196 ++++++++++++++++++++++++++++
->>  arch/arm/mach-omap2/cminst44xx.c            |   9 ++
->>  3 files changed, 207 insertions(+)
->>  create mode 100644 arch/arm/mach-omap2/clockdomains43xx_data.c
->>
+Marc Kleine-Budde writes:
+> On 09/27/2013 07:24 PM, Matt Sealey wrote:
+> > Marc - I don't think FLEXCAN has changed layout at all in these areas.
+> > The hardware always worked this way..
 > 
-> ...
+> All flexcan cores support the RX FIFO, the mx6 supports an additional
+> mode for different acceptance filters.
 > 
->> diff --git a/arch/arm/mach-omap2/clockdomains43xx_data.c b/arch/arm/mach-omap2/clockdomains43xx_data.c
->> new file mode 100644
->> index 0000000..6d71c60
->> --- /dev/null
->> +++ b/arch/arm/mach-omap2/clockdomains43xx_data.c
->> @@ -0,0 +1,196 @@
+> > The only difference here  is that the i.MX53 is doing something weird
+> > on the bus. The i.MX6Q is giving the absolutely correct BRESP for the
+> > transfer to the peripheral (in effect, a "go away, this is my data"
+> > failure, which the CPU turns into an imprecise abort since it no idea
+> > which transaction it committed aeons ago caused it).
+> > 
+> > Writes to 0x90 to 0xDF while MCR[FEN] is set *should* cause a data
+> > abort.. because it's not even a read-only region, it *should* be
+> > totally inaccessible to the CPU.
+> > 
+> > The question I have is, when MCR[FEN] is set on i.MX53, does reading
+> > from those reserved registers give anything but 0's or garbage? I'm
+> > curious, that's all, it doesn't really matter ;)
 > 
-> ...
+> The driver only read from message buffer 0, and uses buffer 8 for tx.
+> The others are not accessed, unless in that chip start routine. We don't
+> need this loop, it comes from the original driver. I think no one has
+> ever noticed that bug, because all other CPUs have not complained.
 > 
->> +static struct clockdomain l3s_tsc_43xx_clkdm = {
->> +	.name		  = "l3s_tsc_clkdm",
->> +	.pwrdm		  = { .name = "wkup_pwrdm" },
->> +	.prcm_partition	  = AM43XX_CM_PARTITION,
->> +	.cm_inst	  = AM43XX_CM_WKUP_INST,
->> +	.clkdm_offs	  = AM43XX_CM_WKUP_L3S_TSC_CDOFFS,
->> +	.flags		  = CLKDM_CAN_SWSUP,
->> +};
+> The driver without the loop is working on mx6 and Lothar is testing it
+> on mx53.
+> 
+I can confirm, that the driver still works on i.MX53 as before the
+patch.
+Is someone going to prepare a patch, or should I do it, as I was the
+one who first brought up this issue?
 
-> The references to "wkup_pwrdm" on some of these clockdomains don't 
-> look right to me.  For example, this clockdomain is listed as being in 
-> AM43XX_CM_WKUP_INST, but its enclosing powerdomain is listed as being in 
-> AM43XX_PRM_WKUP_INST.  Looks to me like it's best to have two different 
-> wakeup powerdomains: one CM_WKUP, and one PRM_WKUP.
 
-On AM43x, prcm is a single block as in AM335x and is part of wakeup
-domain. This is different from OMAP4 that had separate prm and cm
-blocks. Script also generated the same output.
+Lothar Wa?mann
+-- 
+___________________________________________________________
 
-Regards
-Afzal
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
