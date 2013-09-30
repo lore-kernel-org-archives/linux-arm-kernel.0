@@ -1,71 +1,32 @@
-From: andreas.herrmann@calxeda.com (Andreas Herrmann)
-Date: Mon, 30 Sep 2013 23:06:20 +0200
-Subject: [PATCH] iommu/arm-smmu: Clear global and context bank fault
- status registers
-In-Reply-To: <20130930183006.GK26036@mudshark.cambridge.arm.com>
-References: <1380234982-1677-1-git-send-email-andreas.herrmann@calxeda.com>
- <1380234982-1677-6-git-send-email-andreas.herrmann@calxeda.com>
- <20130927085255.GC8319@mudshark.cambridge.arm.com>
- <20130930135401.GV3315@alberich> <20130930135621.GW3315@alberich>
- <20130930160615.GG26036@mudshark.cambridge.arm.com>
- <20130930171716.GX3315@alberich>
- <20130930183006.GK26036@mudshark.cambridge.arm.com>
-Message-ID: <20130930210620.GY3315@alberich>
+From: mbizon@freebox.fr (Maxime Bizon)
+Date: Mon, 30 Sep 2013 23:07:45 +0200
+Subject: [PATCH RESEND] ARM: add dtbImage.<dt> and dtbuImage.<dt> rules
+In-Reply-To: <20130930204223.GJ31178@titan.lakedaemon.net>
+References: <504DFBBF.5010202@free-electrons.com>
+ <1348733441-11626-1-git-send-email-richard.genoud@gmail.com>
+ <20120927082955.GR17667@game.jcrosoft.org>
+ <CACQ1gAgwv4pBFZBrVZiWM2_=OneUO-s16LufSENx27gMC3DUig@mail.gmail.com>
+ <52416F97.802@keymile.com> <20130924120152.GI11119@titan.lakedaemon.net>
+ <20130924121939.GD12758@n2100.arm.linux.org.uk>
+ <1380572483.31472.51.camel@sakura.staff.proxad.net>
+ <20130930204223.GJ31178@titan.lakedaemon.net>
+Message-ID: <1380575265.23932.11.camel@sakura.staff.proxad.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 30, 2013 at 02:30:06PM -0400, Will Deacon wrote:
-> On Mon, Sep 30, 2013 at 06:17:16PM +0100, Andreas Herrmann wrote:
-> > On Mon, Sep 30, 2013 at 12:06:15PM -0400, Will Deacon wrote:
-> > > On Mon, Sep 30, 2013 at 02:56:21PM +0100, Andreas Herrmann wrote:
-> > > > 
-> > > > After reset these registers have unknown values.
-> > > > This might cause problems when evaluating SMMU_GFSR and/or SMMU_CB_FSR
-> > > > in handlers for combined interrupts.
-> > > > 
-> > > > Signed-off-by: Andreas Herrmann <andreas.herrmann@calxeda.com>
-> > > > ---
-> > > >  drivers/iommu/arm-smmu.c |   27 ++++++++++++++++++++-------
-> > > >  1 file changed, 20 insertions(+), 7 deletions(-)
-> > > > 
-> > > > diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-> > > > index 579b6f8..cbbf597 100644
-> > > > --- a/drivers/iommu/arm-smmu.c
-> > > > +++ b/drivers/iommu/arm-smmu.c
-> > > > @@ -631,6 +631,12 @@ static irqreturn_t arm_smmu_global_fault(int irq, void *dev)
-> > > >  	return IRQ_HANDLED;
-> > > >  }
-> > > >  
-> > > > +static void arm_smmu_clear_cb_fsr(struct arm_smmu_device *smmu, u8 cbndx)
-> > > > +{
-> > > > +	void __iomem *cb_base = ARM_SMMU_CB_BASE(smmu) + ARM_SMMU_CB(smmu, cbndx);
-> > > > +	writel_relaxed(FSR_FAULT, cb_base + ARM_SMMU_CB_FSR);
-> > > > +}
-> > > 
-> > > Hmm, why not just stick this in arm_smmu_init_context_bank...
-> > 
-> > Because we should clear the FSR before we call request_irq.
-> > Otherwise we might handle interrupts although the context bank is not
-> > enabled.
-> > 
-> > Moving request_irq after arm_smmu_init_context_bank is not optimal
-> > either. (We should have configured the context interrupt before
-> > translation is enabled. Otherwise it's possible to miss a fault.)
-> 
-> How would you miss a fault?
 
-> If the device can start issuing transactions before the SMMU has set
-> up the mapping, then there's a race in the caller code which we
-> shouldn't attempt to resolve here.
+On Mon, 2013-09-30 at 16:42 -0400, Jason Cooper wrote:
 
-Broken device, broken driver code (maybe violating dma-api)
-whatsoever. All that's needed is a device that is already doing DMA
-when we enable SMMU handling for its transactions.
-Yes, normally this should not happen. But if it happens we get a fault
-and better should handle it.
+> Nicolas Pitre already suggested an impedance matcher that keeps this
+> kind of hacky code out of the kernel, and allows users to do exactly
 
-I think, it's somehow logical to have fault handling set up before
-fault reporting is switched on for a context bank.
+I know that, my proposal was to bring this back into the kernel.
 
+That "kind of hacky" ATAG thing was actually the only supported way to
+boot a platform not so long ago :)
 
-Andreas
+In the end, people needing the impedance matcher will somehow integrate
+it in the kernel build system anyway.
+
+-- 
+Maxime
