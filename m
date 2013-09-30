@@ -1,70 +1,116 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 30 Sep 2013 17:06:15 +0100
-Subject: [PATCH] iommu/arm-smmu: Clear global and context bank fault
- status registers
-In-Reply-To: <20130930135621.GW3315@alberich>
-References: <1380234982-1677-1-git-send-email-andreas.herrmann@calxeda.com>
- <1380234982-1677-6-git-send-email-andreas.herrmann@calxeda.com>
- <20130927085255.GC8319@mudshark.cambridge.arm.com>
- <20130930135401.GV3315@alberich> <20130930135621.GW3315@alberich>
-Message-ID: <20130930160615.GG26036@mudshark.cambridge.arm.com>
+From: konrad.wilk@oracle.com (Konrad Rzeszutek Wilk)
+Date: Mon, 30 Sep 2013 12:06:46 -0400
+Subject: [PATCH v6 16/19] arm, arm64: do not always merge biovec if we are
+ running on Xen
+In-Reply-To: <1380298207-29151-16-git-send-email-stefano.stabellini@eu.citrix.com>
+References: <alpine.DEB.2.02.1309271653420.5498@kaball.uk.xensource.com>
+ <1380298207-29151-16-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <20130930160646.GV3106@phenom.dumpdata.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 30, 2013 at 02:56:21PM +0100, Andreas Herrmann wrote:
+On Fri, Sep 27, 2013 at 05:10:04PM +0100, Stefano Stabellini wrote:
+> This is similar to what it is done on X86: biovecs are prevented from merging
+> otherwise every dma requests would be forced to bounce on the swiotlb buffer.
 > 
-> After reset these registers have unknown values.
-> This might cause problems when evaluating SMMU_GFSR and/or SMMU_CB_FSR
-> in handlers for combined interrupts.
-> 
-> Signed-off-by: Andreas Herrmann <andreas.herrmann@calxeda.com>
+> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+
+
+This also alters the generic (well, was x86, now it is generic) code.
+Perhaps that change should be made in a seperate patch and explain
+what the autotranslate extra check will do for PV, PVH and HVM guests?
+
+Wait, does that mean we had not been merging requests on HVM guests?
+Is that good or bad?
+
 > ---
->  drivers/iommu/arm-smmu.c |   27 ++++++++++++++++++++-------
->  1 file changed, 20 insertions(+), 7 deletions(-)
+>  arch/arm/include/asm/io.h   |    8 ++++++++
+>  arch/arm64/include/asm/io.h |    9 +++++++++
+>  drivers/xen/biomerge.c      |    4 +++-
+>  3 files changed, 20 insertions(+), 1 deletions(-)
 > 
-> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-> index 579b6f8..cbbf597 100644
-> --- a/drivers/iommu/arm-smmu.c
-> +++ b/drivers/iommu/arm-smmu.c
-> @@ -631,6 +631,12 @@ static irqreturn_t arm_smmu_global_fault(int irq, void *dev)
->  	return IRQ_HANDLED;
+> diff --git a/arch/arm/include/asm/io.h b/arch/arm/include/asm/io.h
+> index d070741..c45effc 100644
+> --- a/arch/arm/include/asm/io.h
+> +++ b/arch/arm/include/asm/io.h
+> @@ -24,9 +24,11 @@
+>  #ifdef __KERNEL__
+>  
+>  #include <linux/types.h>
+> +#include <linux/blk_types.h>
+>  #include <asm/byteorder.h>
+>  #include <asm/memory.h>
+>  #include <asm-generic/pci_iomap.h>
+> +#include <xen/xen.h>
+>  
+>  /*
+>   * ISA I/O bus memory addresses are 1:1 with the physical address.
+> @@ -372,6 +374,12 @@ extern void pci_iounmap(struct pci_dev *dev, void __iomem *addr);
+>  #define BIOVEC_MERGEABLE(vec1, vec2)	\
+>  	((bvec_to_phys((vec1)) + (vec1)->bv_len) == bvec_to_phys((vec2)))
+>  
+> +extern bool xen_biovec_phys_mergeable(const struct bio_vec *vec1,
+> +				      const struct bio_vec *vec2);
+> +#define BIOVEC_PHYS_MERGEABLE(vec1, vec2)				\
+> +	(__BIOVEC_PHYS_MERGEABLE(vec1, vec2) &&				\
+> +	 (!xen_domain() || xen_biovec_phys_mergeable(vec1, vec2)))
+> +
+>  #ifdef CONFIG_MMU
+>  #define ARCH_HAS_VALID_PHYS_ADDR_RANGE
+>  extern int valid_phys_addr_range(phys_addr_t addr, size_t size);
+> diff --git a/arch/arm64/include/asm/io.h b/arch/arm64/include/asm/io.h
+> index 1d12f89..c163287b 100644
+> --- a/arch/arm64/include/asm/io.h
+> +++ b/arch/arm64/include/asm/io.h
+> @@ -22,11 +22,14 @@
+>  #ifdef __KERNEL__
+>  
+>  #include <linux/types.h>
+> +#include <linux/blk_types.h>
+>  
+>  #include <asm/byteorder.h>
+>  #include <asm/barrier.h>
+>  #include <asm/pgtable.h>
+>  
+> +#include <xen/xen.h>
+> +
+>  /*
+>   * Generic IO read/write.  These perform native-endian accesses.
+>   */
+> @@ -263,5 +266,11 @@ extern int devmem_is_allowed(unsigned long pfn);
+>   */
+>  #define xlate_dev_kmem_ptr(p)	p
+>  
+> +extern bool xen_biovec_phys_mergeable(const struct bio_vec *vec1,
+> +				      const struct bio_vec *vec2);
+> +#define BIOVEC_PHYS_MERGEABLE(vec1, vec2)				\
+> +	(__BIOVEC_PHYS_MERGEABLE(vec1, vec2) &&				\
+> +	 (!xen_domain() || xen_biovec_phys_mergeable(vec1, vec2)))
+> +
+>  #endif	/* __KERNEL__ */
+>  #endif	/* __ASM_IO_H */
+> diff --git a/drivers/xen/biomerge.c b/drivers/xen/biomerge.c
+> index 0edb91c..f323a2d 100644
+> --- a/drivers/xen/biomerge.c
+> +++ b/drivers/xen/biomerge.c
+> @@ -2,6 +2,7 @@
+>  #include <linux/io.h>
+>  #include <linux/export.h>
+>  #include <xen/page.h>
+> +#include <xen/features.h>
+>  
+>  bool xen_biovec_phys_mergeable(const struct bio_vec *vec1,
+>  			       const struct bio_vec *vec2)
+> @@ -9,7 +10,8 @@ bool xen_biovec_phys_mergeable(const struct bio_vec *vec1,
+>  	unsigned long mfn1 = pfn_to_mfn(page_to_pfn(vec1->bv_page));
+>  	unsigned long mfn2 = pfn_to_mfn(page_to_pfn(vec2->bv_page));
+>  
+> -	return __BIOVEC_PHYS_MERGEABLE(vec1, vec2) &&
+> +	return !xen_feature(XENFEAT_auto_translated_physmap) &&
+> +		__BIOVEC_PHYS_MERGEABLE(vec1, vec2) &&
+>  		((mfn1 == mfn2) || ((mfn1+1) == mfn2));
 >  }
->  
-> +static void arm_smmu_clear_cb_fsr(struct arm_smmu_device *smmu, u8 cbndx)
-> +{
-> +	void __iomem *cb_base = ARM_SMMU_CB_BASE(smmu) + ARM_SMMU_CB(smmu, cbndx);
-> +	writel_relaxed(FSR_FAULT, cb_base + ARM_SMMU_CB_FSR);
-> +}
-
-Hmm, why not just stick this in arm_smmu_init_context_bank...
-
->  static void arm_smmu_init_context_bank(struct arm_smmu_domain *smmu_domain)
->  {
->  	u32 reg;
-> @@ -838,6 +844,7 @@ static int arm_smmu_init_domain_context(struct iommu_domain *domain,
->  		root_cfg->irptndx = root_cfg->cbndx;
->  	}
->  
-> +	arm_smmu_clear_cb_fsr(smmu, root_cfg->cbndx);
-
-... then move that function call here instead of where it currently is?
-
->  	irq = smmu->irqs[smmu->num_global_irqs + root_cfg->irptndx];
->  	ret = request_irq(irq, arm_smmu_context_fault, IRQF_SHARED,
->  			  "arm-smmu-context-fault", domain);
-> @@ -1564,7 +1571,11 @@ static void arm_smmu_device_reset(struct arm_smmu_device *smmu)
->  	void __iomem *gr0_base = ARM_SMMU_GR0(smmu);
->  	void __iomem *sctlr_base = ARM_SMMU_CB_BASE(smmu) + ARM_SMMU_CB_SCTLR;
->  	int i = 0;
-> -	u32 scr0 = readl_relaxed(gr0_base + ARM_SMMU_GR0_sCR0);
-> +	u32 val;
-
-I guess we have to dilute the meaning of the variable, but perhaps `reg' is
-slightly more indicative than `val'?
-
-Do you plan to post all your patches as a new series (it's hard to keep
-track of what to pick)?
-
-Cheers,
-
-Will
+>  EXPORT_SYMBOL(xen_biovec_phys_mergeable);
+> -- 
+> 1.7.2.5
+> 
