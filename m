@@ -1,185 +1,74 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Tue, 01 Oct 2013 19:48:04 +0200
-Subject: [PATCH 6/6] ARM: smdk5410_defconfig: add defconfig for smdk5410
-In-Reply-To: <1380644227-12244-7-git-send-email-v.tyrtov@samsung.com>
-References: <1380644227-12244-1-git-send-email-v.tyrtov@samsung.com>
- <1380644227-12244-7-git-send-email-v.tyrtov@samsung.com>
-Message-ID: <1556357.Ys4C5Q5WGD@amdc1032>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Tue,  1 Oct 2013 11:58:00 -0600
+Subject: [PATCH RESEND] PCI: mvebu: Dynamically detect if the PEX link is up
+ to enable hot plug
+Message-ID: <1380650281-16175-1-git-send-email-jgunthorpe@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Otherwise hotplugging the PEX doesn't work at all since the driver
+detects the link state at probe time. Simply replacing the two tests
+of haslink with a register read is enough to fix it.
 
-Hi,
+Tested on kirkwood with repeated plug/unplug of the link partner.
 
-On Tuesday, October 01, 2013 08:17:07 PM Vyacheslav Tyrtov wrote:
-> From: Tarek Dakhran <t.dakhran@samsung.com>
-> 
-> Since current exynos_defconfig cannot support for EXYNOS5410 because
-> of big.LITTLE architecture, MCPM and ARM_CCI bus there added
+Signed-off-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
+---
+ drivers/pci/host/pci-mvebu.c | 16 ++--------------
+ 1 file changed, 2 insertions(+), 14 deletions(-)
 
-CONFIG_MCPM and CONFIG_ARM_CCI are optional features that won't be used
-unless explicitly enabled in the device tree. CONFIG_BIG_LITTLE is not
-enabled in the new defconfig at all (I also believe that it is optional
-or at least can be made optional).
-
-Therefore please modify existing exynos_defconfig to support EXYNOS5410
-instead of adding the new defconfig. Having the common defconfig is really
-important from the long-term maintainance POV.
-
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
-
-> smdk5410_defconfig which is tested on SMDK5410 board
-> for all 8 cpu running at the same time.
-> This defconfig enables ARM_CCI, MCPM, EDCS.
-> 
-> Signed-off-by: Tarek Dakhran <t.dakhran@samsung.com>
-> Signed-off-by: Vyacheslav Tyrtov <v.tyrtov@samsung.com>
-> ---
->  arch/arm/configs/smdk5410_defconfig | 134 ++++++++++++++++++++++++++++++++++++
->  1 file changed, 134 insertions(+)
->  create mode 100644 arch/arm/configs/smdk5410_defconfig
-> 
-> diff --git a/arch/arm/configs/smdk5410_defconfig b/arch/arm/configs/smdk5410_defconfig
-> new file mode 100644
-> index 0000000..1c19594
-> --- /dev/null
-> +++ b/arch/arm/configs/smdk5410_defconfig
-> @@ -0,0 +1,134 @@
-> +CONFIG_SYSVIPC=y
-> +CONFIG_NO_HZ=y
-> +CONFIG_HIGH_RES_TIMERS=y
-> +CONFIG_BLK_DEV_INITRD=y
-> +CONFIG_KALLSYMS_ALL=y
-> +CONFIG_MODULES=y
-> +CONFIG_MODULE_UNLOAD=y
-> +CONFIG_PARTITION_ADVANCED=y
-> +CONFIG_ARCH_EXYNOS=y
-> +CONFIG_S3C_LOWLEVEL_UART_PORT=3
-> +CONFIG_S3C24XX_PWM=y
-> +CONFIG_ARCH_EXYNOS5=y
-> +CONFIG_SMP=y
-> +CONFIG_NR_CPUS=8
-> +CONFIG_PREEMPT=y
-> +CONFIG_AEABI=y
-> +CONFIG_HIGHMEM=y
-> +CONFIG_ZBOOT_ROM_TEXT=0x0
-> +CONFIG_ZBOOT_ROM_BSS=0x0
-> +CONFIG_ARM_APPENDED_DTB=y
-> +CONFIG_ARM_ATAG_DTB_COMPAT=y
-> +CONFIG_CMDLINE="console=ttySAC2,115200"
-> +CONFIG_VFP=y
-> +CONFIG_NEON=y
-> +CONFIG_NET=y
-> +CONFIG_PACKET=y
-> +CONFIG_UNIX=y
-> +CONFIG_NET_KEY=y
-> +CONFIG_INET=y
-> +CONFIG_RFKILL_REGULATOR=y
-> +CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
-> +CONFIG_DEVTMPFS=y
-> +CONFIG_DEVTMPFS_MOUNT=y
-> +CONFIG_PROC_DEVICETREE=y
-> +CONFIG_BLK_DEV_LOOP=y
-> +CONFIG_BLK_DEV_CRYPTOLOOP=y
-> +CONFIG_BLK_DEV_RAM=y
-> +CONFIG_BLK_DEV_RAM_SIZE=8192
-> +CONFIG_SCSI=y
-> +CONFIG_BLK_DEV_SD=y
-> +CONFIG_CHR_DEV_SG=y
-> +CONFIG_MD=y
-> +CONFIG_BLK_DEV_DM=y
-> +CONFIG_DM_CRYPT=m
-> +CONFIG_NETDEVICES=y
-> +CONFIG_SMSC911X=y
-> +CONFIG_USB_USBNET=y
-> +CONFIG_USB_NET_SMSC75XX=y
-> +CONFIG_USB_NET_SMSC95XX=y
-> +CONFIG_INPUT_EVDEV=y
-> +CONFIG_KEYBOARD_GPIO=y
-> +CONFIG_KEYBOARD_CROS_EC=y
-> +# CONFIG_MOUSE_PS2 is not set
-> +CONFIG_MOUSE_CYAPA=y
-> +CONFIG_INPUT_TOUCHSCREEN=y
-> +CONFIG_SERIAL_8250=y
-> +CONFIG_SERIAL_SAMSUNG=y
-> +CONFIG_SERIAL_SAMSUNG_CONSOLE=y
-> +CONFIG_SERIAL_OF_PLATFORM=y
-> +CONFIG_HW_RANDOM=y
-> +CONFIG_TCG_TPM=y
-> +CONFIG_TCG_TIS_I2C_INFINEON=y
-> +CONFIG_I2C=y
-> +CONFIG_I2C_MUX=y
-> +CONFIG_I2C_ARB_GPIO_CHALLENGE=y
-> +CONFIG_I2C_S3C2410=y
-> +CONFIG_DEBUG_GPIO=y
-> +# CONFIG_HWMON is not set
-> +CONFIG_MFD_CROS_EC=y
-> +CONFIG_MFD_CROS_EC_I2C=y
-> +CONFIG_MFD_MAX77686=y
-> +CONFIG_MFD_MAX8997=y
-> +CONFIG_MFD_SEC_CORE=y
-> +CONFIG_MFD_TPS65090=y
-> +CONFIG_REGULATOR=y
-> +CONFIG_REGULATOR_FIXED_VOLTAGE=y
-> +CONFIG_REGULATOR_GPIO=y
-> +CONFIG_REGULATOR_MAX8997=y
-> +CONFIG_REGULATOR_MAX77686=y
-> +CONFIG_REGULATOR_S5M8767=y
-> +CONFIG_REGULATOR_TPS65090=y
-> +CONFIG_FB=y
-> +CONFIG_FB_MODE_HELPERS=y
-> +CONFIG_FB_SIMPLE=y
-> +CONFIG_EXYNOS_VIDEO=y
-> +CONFIG_EXYNOS_MIPI_DSI=y
-> +CONFIG_EXYNOS_DP=y
-> +CONFIG_FRAMEBUFFER_CONSOLE=y
-> +CONFIG_FONTS=y
-> +CONFIG_FONT_7x14=y
-> +CONFIG_LOGO=y
-> +CONFIG_USB=y
-> +CONFIG_USB_EHCI_HCD=y
-> +CONFIG_USB_EHCI_S5P=y
-> +CONFIG_USB_STORAGE=y
-> +CONFIG_USB_DWC3=y
-> +CONFIG_USB_PHY=y
-> +CONFIG_SAMSUNG_USB2PHY=y
-> +CONFIG_SAMSUNG_USB3PHY=y
-> +CONFIG_MMC=y
-> +CONFIG_MMC_SDHCI=y
-> +CONFIG_MMC_SDHCI_S3C=y
-> +CONFIG_MMC_DW=y
-> +CONFIG_MMC_DW_IDMAC=y
-> +CONFIG_MMC_DW_EXYNOS=y
-> +CONFIG_RTC_CLASS=y
-> +CONFIG_RTC_DRV_S3C=y
-> +CONFIG_COMMON_CLK_MAX77686=y
-> +CONFIG_EXT2_FS=y
-> +CONFIG_EXT3_FS=y
-> +CONFIG_EXT4_FS=y
-> +CONFIG_MSDOS_FS=y
-> +CONFIG_VFAT_FS=y
-> +CONFIG_TMPFS=y
-> +CONFIG_TMPFS_POSIX_ACL=y
-> +CONFIG_CRAMFS=y
-> +CONFIG_ROMFS_FS=y
-> +CONFIG_NLS_CODEPAGE_437=y
-> +CONFIG_NLS_ASCII=y
-> +CONFIG_NLS_ISO8859_1=y
-> +CONFIG_PRINTK_TIME=y
-> +CONFIG_MAGIC_SYSRQ=y
-> +CONFIG_DEBUG_KERNEL=y
-> +CONFIG_DETECT_HUNG_TASK=y
-> +CONFIG_DEBUG_RT_MUTEXES=y
-> +CONFIG_DEBUG_SPINLOCK=y
-> +CONFIG_DEBUG_MUTEXES=y
-> +CONFIG_DEBUG_INFO=y
-> +CONFIG_DEBUG_USER=y
-> +CONFIG_CRYPTO_SHA256=y
-> +CONFIG_CRC_CCITT=y
-> +CONFIG_ARM_CCI=y
-> +CONFIG_MCPM=y
-> +CONFIG_CMDLINE_FORCE=y
+diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
+index 729d5a1..f2d61f5 100644
+--- a/drivers/pci/host/pci-mvebu.c
++++ b/drivers/pci/host/pci-mvebu.c
+@@ -115,7 +115,6 @@ struct mvebu_pcie_port {
+ 	char *name;
+ 	void __iomem *base;
+ 	spinlock_t conf_lock;
+-	int haslink;
+ 	u32 port;
+ 	u32 lane;
+ 	int devfn;
+@@ -552,7 +551,7 @@ static int mvebu_pcie_wr_conf(struct pci_bus *bus, u32 devfn,
+ 	if (bus->number == 0)
+ 		return mvebu_sw_pci_bridge_write(port, where, size, val);
+ 
+-	if (!port->haslink)
++	if (!mvebu_pcie_link_up(port))
+ 		return PCIBIOS_DEVICE_NOT_FOUND;
+ 
+ 	/*
+@@ -594,7 +593,7 @@ static int mvebu_pcie_rd_conf(struct pci_bus *bus, u32 devfn, int where,
+ 	if (bus->number == 0)
+ 		return mvebu_sw_pci_bridge_read(port, where, size, val);
+ 
+-	if (!port->haslink) {
++	if (!mvebu_pcie_link_up(port)) {
+ 		*val = 0xffffffff;
+ 		return PCIBIOS_DEVICE_NOT_FOUND;
+ 	}
+@@ -883,22 +882,11 @@ static int __init mvebu_pcie_probe(struct platform_device *pdev)
+ 
+ 		mvebu_pcie_set_local_dev_nr(port, 1);
+ 
+-		if (mvebu_pcie_link_up(port)) {
+-			port->haslink = 1;
+-			dev_info(&pdev->dev, "PCIe%d.%d: link up\n",
+-				 port->port, port->lane);
+-		} else {
+-			port->haslink = 0;
+-			dev_info(&pdev->dev, "PCIe%d.%d: link down\n",
+-				 port->port, port->lane);
+-		}
+-
+ 		port->clk = of_clk_get_by_name(child, NULL);
+ 		if (IS_ERR(port->clk)) {
+ 			dev_err(&pdev->dev, "PCIe%d.%d: cannot get clock\n",
+ 			       port->port, port->lane);
+ 			iounmap(port->base);
+-			port->haslink = 0;
+ 			continue;
+ 		}
+ 
+-- 
+1.8.1.2
