@@ -1,30 +1,27 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Tue, 01 Oct 2013 17:39:15 +0100
-Subject: [PATCH] ARM: vexpress: ignore MIDR[0] for uart detection
-In-Reply-To: <CAC_HJnzfvi59i0e0-VwhUtKPxiPLU9o+Y6Dvts9HVkKC6gyqRw@mail.gmail.com>
-References: <1380449869-19911-1-git-send-email-yrehan@gmail.com>
- <CAC_HJnzfvi59i0e0-VwhUtKPxiPLU9o+Y6Dvts9HVkKC6gyqRw@mail.gmail.com>
-Message-ID: <1380645555.30015.8.camel@hornet>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 1 Oct 2013 12:44:09 -0400
+Subject: [PATCH v2] bus: mvebu-mbus: Fix optional pcie-mem/io-aperture
+ properties
+In-Reply-To: <20130917201104.GA5209@obsidianresearch.com>
+References: <20130917201104.GA5209@obsidianresearch.com>
+Message-ID: <20131001164409.GC31178@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2013-10-01 at 09:11 +0100, Mian Yousaf Kaukab wrote:
-> Can you please take a look at this patch? Default vexpress_defconfig
-> does not boot on qemu vexpress-a9 target without it.
+On Tue, Sep 17, 2013 at 02:11:04PM -0600, Jason Gunthorpe wrote:
+> If the property was not specified then then the returned resource
+> had a resource_size(..) == 1, rather than 0. The PCI-E driver checks
+> for 0 so it blindly continues on with a corrupted resource.
+> 
+> Signed-off-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
+> ---
+>  drivers/bus/mvebu-mbus.c | 6 ++++--
+>  1 file changed, 4 insertions(+), 2 deletions(-)
 
-Right, I think I've heard about it...
+Applied to mvebu/drivers since you didn't mention a specific regression.
+If there is one, please let me know shortly and I'll try to queue it up
+for v3.12 instead.
 
-To be honest, I have rather mixed feelings about it. In particular I
-could say that if qemu returns r0p0, it doesn't model V2P-CA9, which has
-A9 r0p1 :-) Also, the DEBUG_LL and EARLY_PRINTK are pretty low level
-features and it seems that they simply shouldn't be enabled in the
-defconfig. As I'll be updating defconfig soon, I'll make sure they're
-disabled.
+thx,
 
-Yes, I agree that the "detection" code is a hack. I'm not sure we have
-to make it even hackier. Let me have a think about it, as I can't really
-spend any time of the matter this week, sorry.
-
-Thanks for your efforts!
-
-Pawel
+Jason.
