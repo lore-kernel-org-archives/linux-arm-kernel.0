@@ -1,34 +1,91 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 1 Oct 2013 09:37:36 -0400
-Subject: [PATCH v3 2/2] ARM: kirkwood: Add standby support
-In-Reply-To: <20130831161918.GA2404@localhost>
+Date: Tue, 1 Oct 2013 09:38:50 -0400
+Subject: [PATCH v3 1/2] ARM: feroceon: Add suspend/resume operation
+In-Reply-To: <1377186547-14284-2-git-send-email-ezequiel.garcia@free-electrons.com>
 References: <1377186547-14284-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1377186547-14284-3-git-send-email-ezequiel.garcia@free-electrons.com>
- <20130830231003.GA2398@localhost>
- <20130831155125.GY19598@titan.lakedaemon.net>
- <20130831161918.GA2404@localhost>
-Message-ID: <20131001133736.GQ31178@titan.lakedaemon.net>
+ <1377186547-14284-2-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <20131001133850.GR31178@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 31, 2013 at 01:19:19PM -0300, Ezequiel Garcia wrote:
-> On Sat, Aug 31, 2013 at 11:51:25AM -0400, Jason Cooper wrote:
-...
-> > How about expanding the series to add proper suspend/resume support to
-> > some of the more power hungry drivers
-> 
-> So -just to check- you definitely prefer not to take the stand-by
-> support until we have some more suspend/resume support in other drivers?
-> 
-> If the stand-by is ready and it's working, I'd say we're ready to
-> include it, disregarding the drivers, but it's completely your call.
++rmk (oops, forgot to add you the first time around)
 
-Looking things over, most drivers we care about are missing
-suspend/resume.  At some point I think it's reasonable to assume that
-we'll do a sweep.  So I drop my objection to this.
+On Thu, Aug 22, 2013 at 12:49:06PM -0300, Ezequiel Garcia wrote:
+> Add support for suspend/resume operations. The implemented procedures
+> are identical to the ones for ARM926.
+> 
+> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> ---
+>  arch/arm/Kconfig            |  2 +-
+>  arch/arm/mm/proc-feroceon.S | 26 ++++++++++++++++++++++++++
+>  2 files changed, 27 insertions(+), 1 deletion(-)
 
-Let's see how rmk wants to handle #1 and go from there.
+Russell,
+
+This is pretty isolated, and the next patch in the series depends on it
+for building (it's changes are all in mach-kirkwood/).  Should Ezequiel
+push this into your patch tracker (and then could you create a public,
+non-rebasable branch containing it?), or can I take it with your Ack?
 
 thx,
 
 Jason.
+
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 43594d5..a5111ec 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -2199,7 +2199,7 @@ source "kernel/power/Kconfig"
+>  
+>  config ARCH_SUSPEND_POSSIBLE
+>  	depends on !ARCH_S5PC100
+> -	depends on CPU_ARM920T || CPU_ARM926T || CPU_SA1100 || \
+> +	depends on CPU_ARM920T || CPU_ARM926T || CPU_FEROCEON || CPU_SA1100 || \
+>  		CPU_V6 || CPU_V6K || CPU_V7 || CPU_XSC3 || CPU_XSCALE || CPU_MOHAWK
+>  	def_bool y
+>  
+> diff --git a/arch/arm/mm/proc-feroceon.S b/arch/arm/mm/proc-feroceon.S
+> index d5146b9..db79b62 100644
+> --- a/arch/arm/mm/proc-feroceon.S
+> +++ b/arch/arm/mm/proc-feroceon.S
+> @@ -514,6 +514,32 @@ ENTRY(cpu_feroceon_set_pte_ext)
+>  #endif
+>  	mov	pc, lr
+>  
+> +/* Suspend/resume support: taken from arch/arm/mm/proc-arm926.S */
+> +.globl	cpu_feroceon_suspend_size
+> +.equ	cpu_feroceon_suspend_size, 4 * 3
+> +#ifdef CONFIG_ARM_CPU_SUSPEND
+> +ENTRY(cpu_feroceon_do_suspend)
+> +	stmfd	sp!, {r4 - r6, lr}
+> +	mrc	p15, 0, r4, c13, c0, 0	@ PID
+> +	mrc	p15, 0, r5, c3, c0, 0	@ Domain ID
+> +	mrc	p15, 0, r6, c1, c0, 0	@ Control register
+> +	stmia	r0, {r4 - r6}
+> +	ldmfd	sp!, {r4 - r6, pc}
+> +ENDPROC(cpu_feroceon_do_suspend)
+> +
+> +ENTRY(cpu_feroceon_do_resume)
+> +	mov	ip, #0
+> +	mcr	p15, 0, ip, c8, c7, 0	@ invalidate I+D TLBs
+> +	mcr	p15, 0, ip, c7, c7, 0	@ invalidate I+D caches
+> +	ldmia	r0, {r4 - r6}
+> +	mcr	p15, 0, r4, c13, c0, 0	@ PID
+> +	mcr	p15, 0, r5, c3, c0, 0	@ Domain ID
+> +	mcr	p15, 0, r1, c2, c0, 0	@ TTB address
+> +	mov	r0, r6			@ control register
+> +	b	cpu_resume_mmu
+> +ENDPROC(cpu_feroceon_do_resume)
+> +#endif
+> +
+>  	.type	__feroceon_setup, #function
+>  __feroceon_setup:
+>  	mov	r0, #0
+> -- 
+> 1.8.1.5
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
