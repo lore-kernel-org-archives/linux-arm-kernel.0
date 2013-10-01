@@ -1,30 +1,27 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 30 Sep 2013 20:40:09 -0400
-Subject: [PATCH 3/4] clk: kirkwood: Add CLK_IGNORE_UNUSED to ethernet
- ge0 and ge1 clocks
-In-Reply-To: <1380575010-8573-4-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1380575010-8573-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1380575010-8573-4-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <20131001004009.GK31178@titan.lakedaemon.net>
+Date: Mon, 30 Sep 2013 20:50:32 -0400
+Subject: [PATCH,FIX] ARM: mvebu: add missing DT Mbus ranges and
+ relocate PCIe DT nodes for RN102
+In-Reply-To: <87a9iuq7ff.fsf@natisbad.org>
+References: <87a9iuq7ff.fsf@natisbad.org>
+Message-ID: <20131001005032.GL31178@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 30, 2013 at 06:03:29PM -0300, Ezequiel Garcia wrote:
-> These clocks should never be gated, since the ethernet interfaces forget
-> the assigned MAC address assigned if their clock source is turned off.
+On Tue, Oct 01, 2013 at 12:19:16AM +0200, Arnaud Ebalard wrote:
 > 
-> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> When 5e12a613 and 0cd3754a were introduced, Netgear ReadyNAS 102 .dts
+> file was queued for inclusion and missed the update to have Mbus (and
+> then BootROM) ranges properties declared. It also missed the relocation
+> of Armada 370/XP PCIe DT nodes introduced by 14fd8ed0 after de1af8d4.
+> This patch fixes that which makes 3.12-rc3 bootable on the NAS.
+> 
+> Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
 > ---
-> Cc: Mike Turquette <mturquette@linaro.org>
-> 
->  drivers/clk/mvebu/kirkwood.c | 9 +++++++--
->  1 file changed, 7 insertions(+), 2 deletions(-)
+>  arch/arm/boot/dts/armada-370-netgear-rn102.dts | 35 ++++++++++++++------------
+>  1 file changed, 19 insertions(+), 16 deletions(-)
 
-I'm inclined to leave this as a hack in board-dt.c...  At some point we
-are going to move kirkwood over to mach-mvebu/, and there will be eyes
-on the code.  There's less chance of 're-discovering' this for cleanup
-if it's in the clock driver, looking all proper and such.  Even with the
-clear comment.
+Applied to mvebu/fixes
 
 thx,
 
