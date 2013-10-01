@@ -1,38 +1,56 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue,  1 Oct 2013 11:35:50 +0900
-Subject: [PATCH 11/14] ARM: shmobile: Let r8a7779 rely on SCU CPU notifier
+Date: Tue,  1 Oct 2013 11:35:51 +0900
+Subject: [PATCH 12/14] ARM: shmobile: Remove shmobile_smp_scu_boot_secondary()
 In-Reply-To: <cover.1380532277.git.horms+renesas@verge.net.au>
 References: <cover.1380532277.git.horms+renesas@verge.net.au>
-Message-ID: <deb4928ea39c5eeef1c9f4562b5cee71f06a31ad.1380532277.git.horms+renesas@verge.net.au>
+Message-ID: <e4550216ef8245b1c9892239a2121a7b15ac2e91.1380532277.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Magnus Damm <damm@opensource.se>
 
-Now when CPU notifiers are used for SCU boot vector
-setup shmobile_smp_scu_boot_secondary() is no longer
-needed.
+Remove shmobile_smp_scu_boot_secondary() since
+it is no longer used. CPU boot vector setup is
+instead handled by CPU notifiers.
 
 Signed-off-by: Magnus Damm <damm@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/smp-r8a7779.c | 4 ----
- 1 file changed, 4 deletions(-)
+ arch/arm/mach-shmobile/include/mach/common.h | 2 --
+ arch/arm/mach-shmobile/platsmp-scu.c         | 8 --------
+ 2 files changed, 10 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/smp-r8a7779.c b/arch/arm/mach-shmobile/smp-r8a7779.c
-index 0f05e9f..627c1f0 100644
---- a/arch/arm/mach-shmobile/smp-r8a7779.c
-+++ b/arch/arm/mach-shmobile/smp-r8a7779.c
-@@ -87,10 +87,6 @@ static int r8a7779_boot_secondary(unsigned int cpu, struct task_struct *idle)
- 	unsigned int lcpu = cpu_logical_map(cpu);
- 	int ret;
+diff --git a/arch/arm/mach-shmobile/include/mach/common.h b/arch/arm/mach-shmobile/include/mach/common.h
+index 3460bb1..e319805 100644
+--- a/arch/arm/mach-shmobile/include/mach/common.h
++++ b/arch/arm/mach-shmobile/include/mach/common.h
+@@ -18,8 +18,6 @@ extern int shmobile_smp_cpu_disable(unsigned int cpu);
+ extern void shmobile_invalidate_start(void);
+ extern void shmobile_boot_scu(void);
+ extern void shmobile_smp_scu_prepare_cpus(unsigned int max_cpus);
+-extern int shmobile_smp_scu_boot_secondary(unsigned int cpu,
+-					   struct task_struct *idle);
+ extern void shmobile_smp_scu_cpu_die(unsigned int cpu);
+ extern int shmobile_smp_scu_cpu_kill(unsigned int cpu);
+ extern void shmobile_smp_apmu_prepare_cpus(unsigned int max_cpus);
+diff --git a/arch/arm/mach-shmobile/platsmp-scu.c b/arch/arm/mach-shmobile/platsmp-scu.c
+index 49ae8df..673ad6e 100644
+--- a/arch/arm/mach-shmobile/platsmp-scu.c
++++ b/arch/arm/mach-shmobile/platsmp-scu.c
+@@ -51,14 +51,6 @@ void __init shmobile_smp_scu_prepare_cpus(unsigned int max_cpus)
+ 	register_cpu_notifier(&shmobile_smp_scu_notifier);
+ }
  
--	ret = shmobile_smp_scu_boot_secondary(cpu, idle);
--	if (ret)
--		return ret;
+-int shmobile_smp_scu_boot_secondary(unsigned int cpu, struct task_struct *idle)
+-{
+-	/* For this particular CPU register SCU boot vector */
+-	shmobile_smp_hook(cpu, virt_to_phys(shmobile_boot_scu),
+-			  (unsigned long)shmobile_scu_base);
+-	return 0;
+-}
 -
- 	if (lcpu < ARRAY_SIZE(r8a7779_ch_cpu))
- 		ch = r8a7779_ch_cpu[lcpu];
- 
+ #ifdef CONFIG_HOTPLUG_CPU
+ void shmobile_smp_scu_cpu_die(unsigned int cpu)
+ {
 -- 
 1.8.4
