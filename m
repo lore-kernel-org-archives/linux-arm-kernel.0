@@ -1,45 +1,80 @@
-From: sachin.kamat@linaro.org (Sachin Kamat)
-Date: Tue, 1 Oct 2013 13:45:04 +0530
-Subject: [PATCH 2/3] Phy: Exynos: Add Exynos5250 sata phy driver
-In-Reply-To: <1380609183-21430-3-git-send-email-yuvaraj.cd@samsung.com>
-References: <1380609183-21430-1-git-send-email-yuvaraj.cd@samsung.com>
- <1380609183-21430-3-git-send-email-yuvaraj.cd@samsung.com>
-Message-ID: <CAK9yfHzpiU+ugak6escnn2ioAq8yvTjK7RzrQaUrL7cwwq_EMA@mail.gmail.com>
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Tue, 01 Oct 2013 10:25:46 +0100
+Subject: [PATCHv6] staging/iio/adc: change the MXS touchscreen driver
+ implementation
+In-Reply-To: <1379946998-23041-1-git-send-email-jbe@pengutronix.de>
+References: <1379946998-23041-1-git-send-email-jbe@pengutronix.de>
+Message-ID: <524A951A.5050606@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Yuvaraj,
+I'm looking for some Tested-by: or Acks on this before applying the series.
+I got the impression from the comments on the previous version that the
+series has now been reasonably thoroughly tested on both i.MX28 and i.MX23 boards.
+This is not yet reflected in the sign off trail and in fact a couple of the patch
+descriptions say that they are untested on i.MX28.
 
-On 1 October 2013 12:03, Yuvaraj Kumar C D <yuvaraj.cd@gmail.com> wrote:
+Jonathan
 
-> +static int exynos_sata_i2c_remove(struct i2c_client *client)
-> +{
-> +       dev_info(&client->adapter->dev,
-> +               "detached %s from i2c adapter successfully\n",
-> +               client->name);
-> +
-> +       return 0;
-> +}
-> +
 
-Since this function does not do anything, this could be removed.
-
-> +static const struct i2c_device_id phy_i2c_device_match[] = {
-> +       { "sata-phy-i2c", 0 },
-> +};
-> +MODULE_DEVICE_TABLE(of, phy_i2c_device_match);
-> +
-> +struct i2c_driver sataphy_i2c_driver = {
-> +       .probe    = exynos_sata_i2c_probe,
-> +       .id_table = phy_i2c_device_match,
-> +       .remove         = exynos_sata_i2c_remove,
-> +       .driver   = {
-> +               .name = "sata-phy-i2c",
-> +               .owner = THIS_MODULE,
-> +               .of_match_table = (void *)phy_i2c_device_match,
-
-type casting is not required.
-
--- 
-With warm regards,
-Sachin
+On 09/23/13 15:36, Juergen Beisert wrote:
+> The following series replaces the current busy loop touchscreen implementation
+> for i.MX28/i.MX23 SoCs by a fully interrupt driven implementation.
+> 
+> Since i.MX23 and i.MX28 silicon differs, the existing implementation can
+> be used for the i.MX28 SoC only.
+> 
+> The first patch adds proper clock handling. Various platforms seems to disable
+> the internal 2 kHz clock which is used by the LRADC delay units.
+> 
+> The next two patches of this series move the i.MX28 specific definitions
+> out of the way. The forth patch simplifies the register access to make it easier
+> to add the i.MX23 support. Then the i.MX23 specific definitions are added, also
+> the code to distinguish both SoCs at run-time.
+> Up to here the existing touchscreen driver will now run on an i.MX23 Soc as well.
+> 
+> When these i.MX SoCs are running from battery it seems not to be a good idea to
+> run a busy loop to detect touches and their location. The 6th patch adds a
+> fully interrupt driven implementation which makes use of the built-in delay
+> and multiple sample features of the touchscreen controller. This will reduce
+> the interrupt load to a minimum.
+> 
+> The remaining patches in this series just removes the existing busy loop
+> implementation, add a proposal for devicetree binding and a reminder what has
+> still to be done with the LRADC driver.
+> 
+> Changes since v5:
+> 
+> - add missing clock handling which prevents the delay units from work (this
+>   should make it work on the MX28EVK and M28EVK as well)
+> 
+> Changes since v4:
+> 
+> - honor Jonathan's comments about function names
+> - honor Dmitry's comments about workqueue canceling and interrupts
+> - adding devicetree bindings proposal
+> 
+> Changes since v3:
+> 
+> - split adding register access functions and i.MX23 support into two patches
+> 
+> Changes since v2:
+> 
+> - useless debug output removed
+> 
+> Changes since v1:
+> 
+> - adding register access functions to make the existing code more readable
+> - adding some functions to distinguish the SoCs at run-time to avoid if-else
+>   contructs whenever differences in the register layout between i.MX23 and
+>   i.MX28 must be handled
+> 
+> Comments are welcome.
+> 
+> Juergen
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-iio" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
