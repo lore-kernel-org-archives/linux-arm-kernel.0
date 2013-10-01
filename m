@@ -1,78 +1,47 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Tue, 1 Oct 2013 12:01:08 +0300
-Subject: [PATCH] clocksource: dw_apb_timer_of: Mark a few more functions
- as __init
-In-Reply-To: <1380616692-10253-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1380616692-10253-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <20131001090108.GL6918@tarshish>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 1 Oct 2013 10:01:19 +0100
+Subject: [PATCH 2/2] ARM: include: asm: use 'int' instead of 'unsigned
+ long' for normal register variables within atomic.h
+In-Reply-To: <524A2DE7.8040208@asianux.com>
+References: <20130925160746.GC14502@mudshark.cambridge.arm.com>
+ <5243953E.6010405@asianux.com>
+ <20130926100422.GE2855@mudshark.cambridge.arm.com>
+ <5244148F.6080405@asianux.com>
+ <20130927110618.GB9520@mudshark.cambridge.arm.com>
+ <5247A1D1.6080505@asianux.com> <5247A1FA.4030305@asianux.com>
+ <5247A3FC.9020508@asianux.com>
+ <20130930161149.GI26036@mudshark.cambridge.arm.com>
+ <524A2DE7.8040208@asianux.com>
+Message-ID: <20131001090119.GA17629@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe,
-
-On Tue, Oct 01, 2013 at 10:38:12AM +0200, Uwe Kleine-K?nig wrote:
-> These are all only called by dw_apb_timer_init which is an __init
-> function, too
+On Tue, Oct 01, 2013 at 03:05:27AM +0100, Chen Gang wrote:
+> On 10/01/2013 12:11 AM, Will Deacon wrote:
+> > On Sun, Sep 29, 2013 at 04:52:28AM +0100, Chen Gang wrote:
+> >> "arc/arm" will be never on 64-bit, it is mainly on 32-bit (may also can
+> >> be on 16-bit).
+> >>
+> >> So better to use 'int' instead of 'unsigned long' for normal register
+> >> variable (on 16-bit, 'int' is allowed to be 16-bit, so historically,
+> >> often use 'int' for normal register variables).
+> > 
+> > This commit message doesn't make a blind bit of sense! arch/arm/ is a 32-bit
+> > architecture in the sense that int will always be 32-bit there. This patch
+> > is just a cosmetic change, bringing our atomic_t manipulation code inline
+> > with the atomic_t type definition.
+> > 
 > 
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> ---
->  drivers/clocksource/dw_apb_timer_of.c | 10 +++++-----
->  1 file changed, 5 insertions(+), 5 deletions(-)
+> OK, thanks. That means: "arm means arm 32-bit, arm64 means arm 64-bit.
+> The current Linux kernel main line does not support arm 16-bit".
 > 
-> diff --git a/drivers/clocksource/dw_apb_timer_of.c b/drivers/clocksource/dw_apb_timer_of.c
-> index 4cbae4f..993cdde 100644
-> --- a/drivers/clocksource/dw_apb_timer_of.c
-> +++ b/drivers/clocksource/dw_apb_timer_of.c
-> @@ -23,7 +23,7 @@
->  #include <linux/clk.h>
->  #include <linux/sched_clock.h>
->  
-> -static void timer_get_base_and_rate(struct device_node *np,
-> +static void __init timer_get_base_and_rate(struct device_node *np,
->  				    void __iomem **base, u32 *rate)
->  {
->  	struct clk *timer_clk;
-> @@ -55,11 +55,11 @@ static void timer_get_base_and_rate(struct device_node *np,
->  
->  try_clock_freq:
->  	if (of_property_read_u32(np, "clock-freq", rate) &&
-> -		of_property_read_u32(np, "clock-frequency", rate))
-> +	    of_property_read_u32(np, "clock-frequency", rate))
+> Since "bringing our atomic_t ... with the atomic_t type definition", can
+> we use 'atomic_t" instead of 'unsigned long'?
+> 
+> And can we use 'atomic64_t" instead of 'unsigned long' in atomic64_*()?
 
-Unintended whitespace change?
+That's probably a bit dodgy, since they are typedefs to compound types
+which, if ever extended, would fall to bits if we tried to pack them into a
+single register.
 
-baruch
-
->  		panic("No clock nor clock-frequency property for %s", np->name);
->  }
->  
-> -static void add_clockevent(struct device_node *event_timer)
-> +static void __init add_clockevent(struct device_node *event_timer)
->  {
->  	void __iomem *iobase;
->  	struct dw_apb_clock_event_device *ced;
-> @@ -82,7 +82,7 @@ static void add_clockevent(struct device_node *event_timer)
->  static void __iomem *sched_io_base;
->  static u32 sched_rate;
->  
-> -static void add_clocksource(struct device_node *source_timer)
-> +static void __init add_clocksource(struct device_node *source_timer)
->  {
->  	void __iomem *iobase;
->  	struct dw_apb_clocksource *cs;
-> @@ -117,7 +117,7 @@ static const struct of_device_id sptimer_ids[] __initconst = {
->  	{ /* Sentinel */ },
->  };
->  
-> -static void init_sched_clock(void)
-> +static void __init init_sched_clock(void)
->  {
->  	struct device_node *sched_timer;
->  
-> -- 
-> 1.8.4.rc3
-
--- 
-     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+Will
