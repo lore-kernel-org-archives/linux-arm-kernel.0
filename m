@@ -1,104 +1,51 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue,  1 Oct 2013 11:34:19 +0900
-Subject: [PATCH 8/8] ARM: shmobile: r8a7778: add usb phy power control function
-In-Reply-To: <cover.1380530437.git.horms+renesas@verge.net.au>
-References: <cover.1380530437.git.horms+renesas@verge.net.au>
-Message-ID: <f39d35fcc2cd7a24ec3128adffd7876953999e1f.1380530437.git.horms+renesas@verge.net.au>
+Date: Tue,  1 Oct 2013 11:35:33 +0900
+Subject: [PATCH 01/14] ARM: shmobile: Introduce shmobile_smp_cpu_disable()
+In-Reply-To: <cover.1380532277.git.horms+renesas@verge.net.au>
+References: <cover.1380532277.git.horms+renesas@verge.net.au>
+Message-ID: <5c4dfcd663b6e96cc20f02dc2c7c315749ea1bc1.1380532277.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+From: Magnus Damm <damm@opensource.se>
 
-USB phy initialisation function is needed from not only
-USB Host but also USB Function too.
-This patch adds usb phy common control function.
+Introduce the shared CPU Hotplug function shmobile_smp_cpu_disable()
+for mach-shmobile. It is useful for the case when all CPUs may be
+hotplugged, including CPU 0.
 
-Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Signed-off-by: Magnus Damm <damm@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/include/mach/r8a7778.h |  2 ++
- arch/arm/mach-shmobile/setup-r8a7778.c        | 37 +++++++++++++++++++--------
- 2 files changed, 28 insertions(+), 11 deletions(-)
+ arch/arm/mach-shmobile/include/mach/common.h | 1 +
+ arch/arm/mach-shmobile/platsmp.c             | 7 +++++++
+ 2 files changed, 8 insertions(+)
 
-diff --git a/arch/arm/mach-shmobile/include/mach/r8a7778.h b/arch/arm/mach-shmobile/include/mach/r8a7778.h
-index adfcf51..ea1dca6 100644
---- a/arch/arm/mach-shmobile/include/mach/r8a7778.h
-+++ b/arch/arm/mach-shmobile/include/mach/r8a7778.h
-@@ -35,4 +35,6 @@ extern void r8a7778_clock_init(void);
- extern void r8a7778_init_irq_extpin(int irlm);
- extern void r8a7778_pinmux_init(void);
- 
-+extern int r8a7778_usb_phy_power(bool enable);
+diff --git a/arch/arm/mach-shmobile/include/mach/common.h b/arch/arm/mach-shmobile/include/mach/common.h
+index 7b93868..1ed155e 100644
+--- a/arch/arm/mach-shmobile/include/mach/common.h
++++ b/arch/arm/mach-shmobile/include/mach/common.h
+@@ -13,6 +13,7 @@ extern void shmobile_smp_boot(void);
+ extern void shmobile_smp_sleep(void);
+ extern void shmobile_smp_hook(unsigned int cpu, unsigned long fn,
+ 			      unsigned long arg);
++extern int shmobile_smp_cpu_disable(unsigned int cpu);
+ extern void shmobile_boot_scu(void);
+ extern void shmobile_smp_scu_prepare_cpus(unsigned int max_cpus);
+ extern int shmobile_smp_scu_boot_secondary(unsigned int cpu,
+diff --git a/arch/arm/mach-shmobile/platsmp.c b/arch/arm/mach-shmobile/platsmp.c
+index d4ae616..3741562 100644
+--- a/arch/arm/mach-shmobile/platsmp.c
++++ b/arch/arm/mach-shmobile/platsmp.c
+@@ -44,3 +44,10 @@ void shmobile_smp_hook(unsigned int cpu, unsigned long fn, unsigned long arg)
+ 	shmobile_smp_arg[cpu] = arg;
+ 	flush_cache_all();
+ }
 +
- #endif /* __ASM_R8A7778_H__ */
-diff --git a/arch/arm/mach-shmobile/setup-r8a7778.c b/arch/arm/mach-shmobile/setup-r8a7778.c
-index 6a2657e..e484d14 100644
---- a/arch/arm/mach-shmobile/setup-r8a7778.c
-+++ b/arch/arm/mach-shmobile/setup-r8a7778.c
-@@ -95,29 +95,46 @@ static struct sh_timer_config sh_tmu1_platform_data __initdata = {
- 		&sh_tmu##idx##_platform_data,		\
- 		sizeof(sh_tmu##idx##_platform_data))
- 
--/* USB */
--static struct usb_phy *phy;
-+int r8a7778_usb_phy_power(bool enable)
++#ifdef CONFIG_HOTPLUG_CPU
++int shmobile_smp_cpu_disable(unsigned int cpu)
 +{
-+	static struct usb_phy *phy = NULL;
-+	int ret = 0;
-+
-+	if (!phy)
-+		phy = usb_get_phy(USB_PHY_TYPE_USB2);
-+
-+	if (IS_ERR(phy)) {
-+		pr_err("kernel doesn't have usb phy driver\n");
-+		return PTR_ERR(phy);
-+	}
-+
-+	if (enable)
-+		ret = usb_phy_init(phy);
-+	else
-+		usb_phy_shutdown(phy);
- 
-+	return ret;
++	return 0; /* Hotplug of any CPU is supported */
 +}
-+
-+/* USB */
- static int usb_power_on(struct platform_device *pdev)
- {
--	if (IS_ERR(phy))
--		return PTR_ERR(phy);
-+	int ret = r8a7778_usb_phy_power(true);
-+
-+	if (ret)
-+		return ret;
- 
- 	pm_runtime_enable(&pdev->dev);
- 	pm_runtime_get_sync(&pdev->dev);
- 
--	usb_phy_init(phy);
--
- 	return 0;
- }
- 
- static void usb_power_off(struct platform_device *pdev)
- {
--	if (IS_ERR(phy))
-+	if (r8a7778_usb_phy_power(false))
- 		return;
- 
--	usb_phy_shutdown(phy);
--
- 	pm_runtime_put_sync(&pdev->dev);
- 	pm_runtime_disable(&pdev->dev);
- }
-@@ -353,8 +370,6 @@ void __init r8a7778_add_standard_devices(void)
- 
- void __init r8a7778_init_late(void)
- {
--	phy = usb_get_phy(USB_PHY_TYPE_USB2);
--
- 	platform_device_register_full(&ehci_info);
- 	platform_device_register_full(&ohci_info);
- }
++#endif
 -- 
 1.8.4
