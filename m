@@ -1,54 +1,57 @@
-From: jonathan.austin@arm.com (Jonathan Austin)
-Date: Tue, 01 Oct 2013 11:29:54 +0100
-Subject: [PATCH 2/3] ARM: allow MULTIPLATFORM on no-MMU machines
-In-Reply-To: <1380534577-15076-3-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1380534577-15076-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <1380534577-15076-3-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <524AA422.9040106@arm.com>
+From: maxime.coquelin@st.com (Maxime COQUELIN)
+Date: Tue,  1 Oct 2013 12:29:11 +0200
+Subject: [PATCH v3 0/4] Add I2C support to ST SoCs
+Message-ID: <1380623351-3614-1-git-send-email-maxime.coquelin@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/09/13 10:49, Uwe Kleine-K?nig wrote:
-> There is no technical reason to not use the benefits of MULTIPLATFORM on a
-> no-MMU machine and my not-yet-mainline efm32 port does work just fine with
-> it. So drop the dependency.
->
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> ---
->   arch/arm/Kconfig | 3 +--
->   1 file changed, 1 insertion(+), 2 deletions(-)
->
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 0f63a70..d873a34 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -296,8 +296,7 @@ choice
->
->   config ARCH_MULTIPLATFORM
->   	bool "Allow multiple platforms to be selected"
-> -	depends on MMU
-> -	select ARM_PATCH_PHYS_VIRT
-> +	select ARM_PATCH_PHYS_VIRT if MMU && !XIP_KERNEL
->   	select AUTO_ZRELADDR
->   	select COMMON_CLK
->   	select MULTI_IRQ_HANDLER
->
+The goal of this series is to add I2C support to ST SoCs.
+The DT definition is added for STiH415 and STiH416 SoCs on
+B2000 and B2020 boards.
 
+The series has been tested working on STiH416-B2020 board.
+It applies on top of v3.12-rc3.
 
-A patch much like this has been submitted in the past by Arnd and me, 
-and Russell wasn't too happy with the idea because ARCH_MULTIPLATFORM 
-doesn't really make sense for !MMU.
+Changes since v2:
+  - Create generic DT property for Anti-glitch filtering configuration
+  - Sort i2c-st entries in Makefile and Kconfig
+  - Various cosmetics changes
+  - Return IRQ_NONE in case of spurious interrupt
+  - Use INIT_COMPLETION instead of init_completion in st_i2c_xfer_msg
+  - Simplify st_i2c_xfer as proposed by Wolfram
+  - Fix PM ops issues
+  - Change author name to myself and fix license to GPL v2
+  - Inclu .h file content into the .c file
 
-However, back then we were talking R/A class. For M-class the memory map 
-is more clearly mandated, the idea of V7M platforms that are 
-ARCH_MULTIPLATFORM compatible is much more feasible. One of the big 
-issues for !MMU/ARCH_MULTIPLATFORM in the past was the need to select 
-the vector configuration at build time - not something we need to worry 
-about with V7M (where we have a configurable vector base), so from that 
-point of view, this change makes sense.
+Changes since v1:
+  - Anti-glitch filtering simplified (Only HW Anti-glitch is kept)
+  - Update I2C timings to comply with I2C specification
+  - Handle spurious interrupts properly
+  - DT binding updates taking into account Stephen's comments
+  - Use "clock-names" property to comply with GCF
+  - DT cosmetic changes reported by Lee and Gabriel 
 
-But I'm not sure about the XIP_KERNEL part. Once you're using XIP_KERNEL 
-again, multi-platform doesn't make much sense. Uwe, can you correct me 
-on that?
+Signed-off-by: Maxime Coquelin <maxime.coquelin@st.com>
 
-Jonny
+Maxime Coquelin (4):
+  i2c: busses: i2c-st: Add ST I2C controller
+  ARM: STi: Supply I2C configuration to STiH416 SoC
+  ARM: STi: Supply I2C configuration to STiH415 SoC
+  ARM: STi: Add I2C config to B2000 and B2020 boards
+
+ Documentation/devicetree/bindings/i2c/i2c-st.txt |   34 +
+ arch/arm/boot/dts/stih415-pinctrl.dtsi           |   36 +
+ arch/arm/boot/dts/stih415.dtsi                   |   53 ++
+ arch/arm/boot/dts/stih416-pinctrl.dtsi           |   35 +
+ arch/arm/boot/dts/stih416.dtsi                   |   53 ++
+ arch/arm/boot/dts/stih41x-b2000.dtsi             |    9 +
+ arch/arm/boot/dts/stih41x-b2020.dtsi             |   22 +
+ drivers/i2c/busses/Kconfig                       |   10 +
+ drivers/i2c/busses/Makefile                      |    1 +
+ drivers/i2c/busses/i2c-st.c                      |  867 ++++++++++++++++++++++
+ 10 files changed, 1120 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/i2c/i2c-st.txt
+ create mode 100644 drivers/i2c/busses/i2c-st.c
+
+-- 
+1.7.9.5
