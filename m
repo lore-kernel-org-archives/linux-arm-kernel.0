@@ -1,46 +1,205 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 01 Oct 2013 09:57:44 -0600
-Subject: [RFC, PATCH] clocksource: provide timekeeping for efm32 SoCs
-In-Reply-To: <20131001080829.GJ2548@pengutronix.de>
-References: <1379324644-20934-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <5242F434.7060702@linaro.org> <20131001080829.GJ2548@pengutronix.de>
-Message-ID: <524AF0F8.3050008@wwwdotorg.org>
+From: sandeepa.prabhu@linaro.org (Sandeepa Prabhu)
+Date: Tue,  1 Oct 2013 21:27:56 +0530
+Subject: [PATCH RFC v3 1/5] AArch64: Add single-step and breakpoint handler
+ hooks
+In-Reply-To: <1380643080-8984-1-git-send-email-sandeepa.prabhu@linaro.org>
+References: <1380643080-8984-1-git-send-email-sandeepa.prabhu@linaro.org>
+Message-ID: <1380643080-8984-2-git-send-email-sandeepa.prabhu@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/01/2013 02:08 AM, Uwe Kleine-K?nig wrote:
-> On Wed, Sep 25, 2013 at 04:33:24PM +0200, Daniel Lezcano wrote:
->> On 09/16/2013 11:44 AM, Uwe Kleine-K?nig wrote:
->>> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
->>> ---
->>> Hello,
->>>
->>> I'm not sure that the way I implemented if a given timer is used as
->>> clock_source or clock_event_device is robust. Does it need locking?
->>> The reason to create a timer device for each timer instead of a single
->>> device of all of them is that it makes it cleaner to specify irqs and
->>> clks which each timer has one of each respectively. I didn't find an
->>> example, but while looking I wondered if in zevio-timer.c a single timer
->>> can really support both clock_event and clocksource.
->>>
->>> I guess for inclusion I need to write a document describing the
->>> of-binding. I will include that in the next iteration.
->>
->> Right and a nice description of the timer would be valuable.
-> Where is the location to put a device tree binding document for a
-> clocksource/clock event device? I found
-> 
-> 	arm,armv7-timer-mem	| arm/arch_timer.txt
-> 	fsl,timrot		| N/A
-> 	nvidia,tegra20-rtc	| rtc/nvidia,tegra20-rtc.txt
+AArch64 Single Steping and Breakpoint debug exceptions will be
+used by multiple debug framworks like kprobes & kgdb.
 
-The Tegra example isn't a good one here, since the Tegra HW block is
-primarily an RTC (hence the location of the binding file), which also
-happens to be able to act as the clocksource.
+This patch implements the hooks for those frameworks to register
+their own handlers for handling breakpoint and single step events.
 
-> Should I introduce a "clocksource" directory below
-> Documentation/devicetree/bindings?
+Reworked the debug exception handler in entry.S: do_dbg to route
+software breakpoint (BRK64) exception to do_debug_exception()
 
-That seems reasonable for any HW block that is truly purely a
-clocksource. However, you'd want to also check with all the other DT
-bindings maintainers.
+Signed-off-by: Sandeepa Prabhu <sandeepa.prabhu@linaro.org>
+Signed-off-by: Deepak Saxena <dsaxena@linaro.org>
+---
+ arch/arm64/include/asm/debug-monitors.h | 23 +++++++++
+ arch/arm64/kernel/debug-monitors.c      | 85 +++++++++++++++++++++++++++++++--
+ arch/arm64/kernel/entry.S               |  2 +
+ 3 files changed, 107 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm64/include/asm/debug-monitors.h b/arch/arm64/include/asm/debug-monitors.h
+index a2232d0..8e354b3 100644
+--- a/arch/arm64/include/asm/debug-monitors.h
++++ b/arch/arm64/include/asm/debug-monitors.h
+@@ -16,6 +16,8 @@
+ #ifndef __ASM_DEBUG_MONITORS_H
+ #define __ASM_DEBUG_MONITORS_H
+ 
++#include <linux/rculist.h>
++
+ #ifdef __KERNEL__
+ 
+ #define	DBG_ESR_EVT(x)		(((x) >> 27) & 0x7)
+@@ -62,6 +64,27 @@ struct task_struct;
+ 
+ #define DBG_ARCH_ID_RESERVED	0	/* In case of ptrace ABI updates. */
+ 
++#define DEBUG_HOOK_HANDLED	0
++#define DEBUG_HOOK_ERROR	1
++
++struct step_hook {
++	struct list_head node;
++	int (*fn)(struct pt_regs *regs, unsigned int esr);
++};
++
++void register_step_hook(struct step_hook *hook);
++void unregister_step_hook(struct step_hook *hook);
++
++struct break_hook {
++	struct list_head node;
++	u32 esr_val;
++	u32 esr_mask;
++	int (*fn)(struct pt_regs *regs, unsigned int esr);
++};
++
++void register_break_hook(struct break_hook *hook);
++void unregister_break_hook(struct break_hook *hook);
++
+ u8 debug_monitors_arch(void);
+ 
+ void enable_debug_monitors(enum debug_el el);
+diff --git a/arch/arm64/kernel/debug-monitors.c b/arch/arm64/kernel/debug-monitors.c
+index cbfacf7..fbbf824 100644
+--- a/arch/arm64/kernel/debug-monitors.c
++++ b/arch/arm64/kernel/debug-monitors.c
+@@ -188,6 +188,43 @@ static void clear_regs_spsr_ss(struct pt_regs *regs)
+ 	regs->pstate = spsr;
+ }
+ 
++/* EL1 Single Step Handler hooks */
++static LIST_HEAD(step_hook);
++
++void register_step_hook(struct step_hook *hook)
++{
++	list_add_rcu(&hook->node, &step_hook);
++}
++
++void unregister_step_hook(struct step_hook *hook)
++{
++	list_del_rcu(&hook->node);
++}
++
++/*
++ * Call registered single step handers
++ * There is no Syndrome info to check for determining the handler.
++ * So we call all the registered handlers, until the right handler is
++ * found which returns zero.
++ */
++static int call_step_hook(struct pt_regs *regs, unsigned int esr)
++{
++	struct step_hook *hook;
++	int retval = DEBUG_HOOK_ERROR;
++
++	rcu_read_lock();
++
++	list_for_each_entry_rcu(hook, &step_hook, node)	{
++		retval = hook->fn(regs, esr);
++		if (retval == DEBUG_HOOK_HANDLED)
++			break;
++	}
++
++	rcu_read_unlock();
++
++	return retval;
++}
++
+ static int single_step_handler(unsigned long addr, unsigned int esr,
+ 			       struct pt_regs *regs)
+ {
+@@ -215,8 +252,11 @@ static int single_step_handler(unsigned long addr, unsigned int esr,
+ 		 */
+ 		user_rewind_single_step(current);
+ 	} else {
+-		/* TODO: route to KGDB */
+-		pr_warning("Unexpected kernel single-step exception at EL1\n");
++		/* Call single step handlers for kgdb/kprobes */
++		if (call_step_hook(regs, esr) == DEBUG_HOOK_HANDLED)
++			return 0;
++
++		pr_warn("unexpected single step exception at %lx!\n", addr);
+ 		/*
+ 		 * Re-enable stepping since we know that we will be
+ 		 * returning to regs.
+@@ -227,11 +267,50 @@ static int single_step_handler(unsigned long addr, unsigned int esr,
+ 	return 0;
+ }
+ 
++
++static LIST_HEAD(break_hook);
++static DEFINE_RAW_SPINLOCK(break_hook_lock);
++
++void register_break_hook(struct break_hook *hook)
++{
++	raw_spin_lock(&break_hook_lock);
++	list_add(&hook->node, &break_hook);
++	raw_spin_unlock(&break_hook_lock);
++}
++
++void unregister_break_hook(struct break_hook *hook)
++{
++	raw_spin_lock(&break_hook_lock);
++	list_del(&hook->node);
++	raw_spin_unlock(&break_hook_lock);
++}
++
++static int call_break_hook(struct pt_regs *regs, unsigned int esr)
++{
++	struct break_hook *hook;
++	int (*fn)(struct pt_regs *regs, unsigned int esr) = NULL;
++
++	raw_spin_lock(&break_hook_lock);
++	list_for_each_entry(hook, &break_hook, node)
++		if ((esr & hook->esr_mask) == hook->esr_val)
++			fn = hook->fn;
++	raw_spin_unlock(&break_hook_lock);
++
++	return fn ? fn(regs, esr) : DEBUG_HOOK_ERROR;
++}
++
+ static int brk_handler(unsigned long addr, unsigned int esr,
+ 		       struct pt_regs *regs)
+ {
+ 	siginfo_t info;
+ 
++	/* call single step handlers for kgdb/kprobes */
++	if (call_break_hook(regs, esr) == DEBUG_HOOK_HANDLED)
++		return 0;
++
++	pr_warn("unexpected brk exception at %llx, esr=0x%x\n",
++			instruction_pointer(regs), esr);
++
+ 	if (!user_mode(regs))
+ 		return -EFAULT;
+ 
+@@ -291,7 +370,7 @@ static int __init debug_traps_init(void)
+ 	hook_debug_fault_code(DBG_ESR_EVT_HWSS, single_step_handler, SIGTRAP,
+ 			      TRAP_HWBKPT, "single-step handler");
+ 	hook_debug_fault_code(DBG_ESR_EVT_BRK, brk_handler, SIGTRAP,
+-			      TRAP_BRKPT, "ptrace BRK handler");
++			      TRAP_BRKPT, "AArch64 BRK handler");
+ 	return 0;
+ }
+ arch_initcall(debug_traps_init);
+diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+index 3881fd1..7fbc510 100644
+--- a/arch/arm64/kernel/entry.S
++++ b/arch/arm64/kernel/entry.S
+@@ -288,6 +288,8 @@ el1_dbg:
+ 	/*
+ 	 * Debug exception handling
+ 	 */
++	cmp	x24, #ESR_EL1_EC_BRK64		// if BRK64
++	cinc	x24, x24, eq			// set bit '0'
+ 	tbz	x24, #0, el1_inv		// EL1 only
+ 	mrs	x0, far_el1
+ 	mov	x2, sp				// struct pt_regs
+-- 
+1.8.1.2
