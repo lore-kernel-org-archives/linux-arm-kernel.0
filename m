@@ -1,86 +1,69 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue,  1 Oct 2013 11:28:21 +0900
-Subject: [PATCH 1/3] ARM: shmobile: Rename to r8a73a4_init_early()
-In-Reply-To: <cover.1380523393.git.horms+renesas@verge.net.au>
-References: <cover.1380523393.git.horms+renesas@verge.net.au>
-Message-ID: <0750a54592a2daff70771a1c170f9859d5901d3d.1380523393.git.horms+renesas@verge.net.au>
+Date: Tue,  1 Oct 2013 11:34:09 +0900
+Subject: [GIT PULL 0/8] Renesas ARM based SoC updates for v3.13
+Message-ID: <cover.1380530437.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm@opensource.se>
+Hi Kevin, Olof and Arnd,
 
-Rename r8a73a4_init_delay() into r8a73a4_init_early()
-to make the function name show that more than just
-delay setup may happen in the future.
+please consider these Renesas ARM based SoC updates for v3.13.
 
-Signed-off-by: Magnus Damm <damm@opensource.se>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/mach-shmobile/board-ape6evm-reference.c | 2 +-
- arch/arm/mach-shmobile/board-ape6evm.c           | 2 +-
- arch/arm/mach-shmobile/include/mach/r8a73a4.h    | 2 +-
- arch/arm/mach-shmobile/setup-r8a73a4.c           | 4 ++--
- 4 files changed, 5 insertions(+), 5 deletions(-)
+This pull-request is based on v3.12-rc1.
 
-diff --git a/arch/arm/mach-shmobile/board-ape6evm-reference.c b/arch/arm/mach-shmobile/board-ape6evm-reference.c
-index a23fa71..3276afc 100644
---- a/arch/arm/mach-shmobile/board-ape6evm-reference.c
-+++ b/arch/arm/mach-shmobile/board-ape6evm-reference.c
-@@ -57,7 +57,7 @@ static const char *ape6evm_boards_compat_dt[] __initdata = {
- };
- 
- DT_MACHINE_START(APE6EVM_DT, "ape6evm")
--	.init_early	= r8a73a4_init_delay,
-+	.init_early	= r8a73a4_init_early,
- 	.init_machine	= ape6evm_add_standard_devices,
- 	.dt_compat	= ape6evm_boards_compat_dt,
- MACHINE_END
-diff --git a/arch/arm/mach-shmobile/board-ape6evm.c b/arch/arm/mach-shmobile/board-ape6evm.c
-index 24b87eea..d36e23f 100644
---- a/arch/arm/mach-shmobile/board-ape6evm.c
-+++ b/arch/arm/mach-shmobile/board-ape6evm.c
-@@ -240,7 +240,7 @@ static const char *ape6evm_boards_compat_dt[] __initdata = {
- };
- 
- DT_MACHINE_START(APE6EVM_DT, "ape6evm")
--	.init_early	= r8a73a4_init_delay,
-+	.init_early	= r8a73a4_init_early,
- 	.init_machine	= ape6evm_add_standard_devices,
- 	.dt_compat	= ape6evm_boards_compat_dt,
- MACHINE_END
-diff --git a/arch/arm/mach-shmobile/include/mach/r8a73a4.h b/arch/arm/mach-shmobile/include/mach/r8a73a4.h
-index f3a9b70..5214338 100644
---- a/arch/arm/mach-shmobile/include/mach/r8a73a4.h
-+++ b/arch/arm/mach-shmobile/include/mach/r8a73a4.h
-@@ -5,6 +5,6 @@ void r8a73a4_add_standard_devices(void);
- void r8a73a4_add_dt_devices(void);
- void r8a73a4_clock_init(void);
- void r8a73a4_pinmux_init(void);
--void r8a73a4_init_delay(void);
-+void r8a73a4_init_early(void);
- 
- #endif /* __ASM_R8A73A4_H__ */
-diff --git a/arch/arm/mach-shmobile/setup-r8a73a4.c b/arch/arm/mach-shmobile/setup-r8a73a4.c
-index 8949170..53a8962 100644
---- a/arch/arm/mach-shmobile/setup-r8a73a4.c
-+++ b/arch/arm/mach-shmobile/setup-r8a73a4.c
-@@ -207,7 +207,7 @@ void __init r8a73a4_add_standard_devices(void)
- 	r8a73a4_register_thermal();
- }
- 
--void __init r8a73a4_init_delay(void)
-+void __init r8a73a4_init_early(void)
- {
- #ifndef CONFIG_ARM_ARCH_TIMER
- 	shmobile_setup_delay(1500, 2, 4); /* Cortex-A15 @ 1500MHz */
-@@ -222,7 +222,7 @@ static const char *r8a73a4_boards_compat_dt[] __initdata = {
- };
- 
- DT_MACHINE_START(R8A73A4_DT, "Generic R8A73A4 (Flattened Device Tree)")
--	.init_early	= r8a73a4_init_delay,
-+	.init_early	= r8a73a4_init_early,
- 	.dt_compat	= r8a73a4_boards_compat_dt,
- MACHINE_END
- #endif /* CONFIG_USE_OF */
--- 
-1.8.4
+
+The following changes since commit 272b98c6455f00884f0350f775c5342358ebb73f:
+
+  Linux 3.12-rc1 (2013-09-16 16:17:51 -0400)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git soc
+
+for you to fetch changes up to f39d35fcc2cd7a24ec3128adffd7876953999e1f:
+
+  ARM: shmobile: r8a7778: add usb phy power control function (2013-09-30 16:11:23 +0900)
+
+----------------------------------------------------------------
+Renesas ARM based SoC updates for v3.13
+
+* Add support for r8a7791 SoC
+* Rename DU device in clock lookups list of r8a7779 SoC
+* USB and SSI/SRU clock support for r8a7778 SoC
+* USB phy power control function support for r8a7778 SoC
+
+----------------------------------------------------------------
+Hisashi Nakamura (1):
+      ARM: shmobile: Initial r8a7791 SoC support
+
+Kuninori Morimoto (3):
+      ARM: shmobile: r8a7778: add SSI/SRU clock support
+      ARM: shmobile: r8a7778: add USBHS clock
+      ARM: shmobile: r8a7778: add usb phy power control function
+
+Laurent Pinchart (2):
+      ARM: shmobile: r8a7779: Rename DU device in clock lookups list
+      ARM: shmobile: r8a7790: Add DU and LVDS clocks
+
+Magnus Damm (1):
+      ARM: shmobile: r8a7791 CMT support
+
+Yoshikazu Fujikawa (1):
+      ARM: shmobile: r8a7791 SCIF support
+
+ arch/arm/boot/dts/r8a7791.dtsi                |  41 +++++
+ arch/arm/mach-shmobile/Kconfig                |   6 +
+ arch/arm/mach-shmobile/Makefile               |   2 +
+ arch/arm/mach-shmobile/clock-r8a7778.c        |  44 ++++-
+ arch/arm/mach-shmobile/clock-r8a7779.c        |   2 +-
+ arch/arm/mach-shmobile/clock-r8a7790.c        |  12 +-
+ arch/arm/mach-shmobile/clock-r8a7791.c        | 237 ++++++++++++++++++++++++++
+ arch/arm/mach-shmobile/include/mach/r8a7778.h |   2 +
+ arch/arm/mach-shmobile/include/mach/r8a7791.h |   8 +
+ arch/arm/mach-shmobile/setup-r8a7778.c        |  37 ++--
+ arch/arm/mach-shmobile/setup-r8a7791.c        | 149 ++++++++++++++++
+ 11 files changed, 525 insertions(+), 15 deletions(-)
+ create mode 100644 arch/arm/boot/dts/r8a7791.dtsi
+ create mode 100644 arch/arm/mach-shmobile/clock-r8a7791.c
+ create mode 100644 arch/arm/mach-shmobile/include/mach/r8a7791.h
+ create mode 100644 arch/arm/mach-shmobile/setup-r8a7791.c
