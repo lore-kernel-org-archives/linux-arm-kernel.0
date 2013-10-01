@@ -1,71 +1,82 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 1 Oct 2013 13:09:18 -0400
-Subject: [PATCH v2] bus: mvebu-mbus: Fix optional pcie-mem/io-aperture
- properties
-In-Reply-To: <20131001165045.GB23874@obsidianresearch.com>
-References: <20130917201104.GA5209@obsidianresearch.com>
- <20131001164409.GC31178@titan.lakedaemon.net>
- <20131001165045.GB23874@obsidianresearch.com>
-Message-ID: <20131001170918.GF31178@titan.lakedaemon.net>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Tue,  1 Oct 2013 18:15:15 +0100
+Subject: [PATCH v3 0/3] MCPM/TC2 support for CPU powerdown synchronisation
+Message-ID: <1380647718-9178-1-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 01, 2013 at 10:50:45AM -0600, Jason Gunthorpe wrote:
-> On Tue, Oct 01, 2013 at 12:44:09PM -0400, Jason Cooper wrote:
-> > On Tue, Sep 17, 2013 at 02:11:04PM -0600, Jason Gunthorpe wrote:
-> > > If the property was not specified then then the returned resource
-> > > had a resource_size(..) == 1, rather than 0. The PCI-E driver checks
-> > > for 0 so it blindly continues on with a corrupted resource.
-> > > 
-> > > Signed-off-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
-> > >  drivers/bus/mvebu-mbus.c | 6 ++++--
-> > >  1 file changed, 4 insertions(+), 2 deletions(-)
-> > 
-> > Applied to mvebu/drivers since you didn't mention a specific regression.
-> > If there is one, please let me know shortly and I'll try to queue it up
-> > for v3.12 instead.
-> 
-> If the DT is not formed exactly how the driver expects it goes
-> sideways. The kernel DT's are all OK.
-> 
-> Was the PCI driver new in 3.12?
-> 
-> If so it should probably be fixed in 3.12 as well, since this
-> sequence in the PCI driver:
-> 
->    mvebu_mbus_get_pcie_io_aperture(&pcie->io);
->    if (resource_size(&pcie->io) == 0) {
->       dev_err(&pdev->dev, "invalid I/O aperture size\n");
->       return -EINVAL;
->    }
-> 
-> Doesn't work.
+This series adds MCPM support for detecting when a CPU is safely powered
+down, and provides an implementation for TC2.
 
-Ok, I've moved it over the mvebu/fixes and amended the commit as
-follows:
+It should be possible to implement the same thing for PSCI using the
+AFFINITY_INFO call (I need to check the semantics with Charles)
 
-"""
-    bus: mvebu-mbus: Fix optional pcie-mem/io-aperture properties
-    
-    If the property was not specified then the returned resource had a
-    resource_size(..) == 1, rather than 0. The PCI-E driver checks for 0 so it
-    blindly continues on with a corrupted resource.
-    
-    The regression was introduced into v3.12 by:
-    
-      11be654 PCI: mvebu: Adapt to the new device tree layout
-    
-"""
+This is sufficient to for working kexec with real power management on
+TC2.  To test it, you'll also need:
 
-> This patch is a necessary precondition to applying:
-> 
-> https://github.com/jgunthorpe/linux/commit/ef90b0bf7d8552dc7dfaad82d964446f6a9b6a3b
-> PCI: mvebu - Support a bridge with no IO port window
+  * CONFIG_KEXEC=y
+  * CONFIG_PROC_DEVICE_TREE=y
+  * CONFIG_MCPM=y
+  * CONFIG_ARCH_VEXPRESS_TC2_PM=y
+  * sufficiently new kexec-tools
+    (git://git.kernel.org/pub/scm/utils/kernel/kexec/kexec-tools.git
+    v2.0.4 worked for me)
 
-I don't see this one in my stack, have you submitted it yet?  When you
-do, please add a note mentioning the dependency on this commit in
-mvebu/fixes.
+This build on Nico's patch
+http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=7842/1
+(MCPM: don't explode if invoked without being initialized first)
 
-thx,
+To prevent CPUs from running off into the weeds across kexec, this
+series requires Lorenzo's patch
+http://lists.infradead.org/pipermail/linux-arm-kernel/2013-September/200917.html
+(arm: vexpress: tc2: fix hotplug/idle/kexec race on cluster power down).
 
-Jason.
+Changes since v2:
+
+ * Return a proper failure code if mcpm_cpu_power_down_finish() is
+   called with no mcpm platforms_ops registered, or a NULL
+   power_down_finish() method.  (Thanks again Nico)
+
+ * Minor refactoring of the loop in tc2_pm_power_down_finish() to
+   avoid the goto.
+
+Changes between v1 and v2:
+
+ * "Fix" erroneous documentation comment by switching to -errno return
+   value convention for power_down_finish(), which is more informative.
+   tc2_pm now returns -ETIMEDOUT on timeout.  The return is adapted to
+   bool convention on return from smp_ops.cpu_kill() instead.  (Thanks,
+   Nico).
+
+ * For consistency, BUG_ON out of range cpu or cluster values
+   tc2_pm_power_down_finish(), as for tc2_pm_power_down().
+
+Changes between RFC and v1:
+
+ * Print a big fat warning instead of branching to null if the
+   power_down_finish() method is not supplied by the backend, or not
+   registered.
+
+ * Add a generous timeout of 1 second for the TC2 implementation.
+
+ * Relax the polling interval to 10ms for TC2, since the need to poll
+   more than once is rare and this is not a performance-critical path.
+
+ * Fix some silly typos.
+
+
+Dave Martin (3):
+  ARM: mcpm: Factor out logical-to-physical CPU translation
+  ARM: mcpm: Implement cpu_kill() to synchronise on powerdown
+  ARM: vexpress/TC2: Implement MCPM power_down_finish()
+
+ arch/arm/common/mcpm_entry.c    |   15 +++++++++
+ arch/arm/common/mcpm_platsmp.c  |   27 +++++++++++++---
+ arch/arm/include/asm/mcpm.h     |   31 ++++++++++++++++++
+ arch/arm/mach-vexpress/spc.c    |   39 +++++++++++++++++++++++
+ arch/arm/mach-vexpress/spc.h    |    1 +
+ arch/arm/mach-vexpress/tc2_pm.c |   66 ++++++++++++++++++++++++++++++++++++---
+ 6 files changed, 170 insertions(+), 9 deletions(-)
+
+-- 
+1.7.9.5
