@@ -1,59 +1,64 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 1 Oct 2013 11:11:01 +0200
-Subject: [PATCH] clocksource: dw_apb_timer_of: Mark a few more functions
- as __init
-In-Reply-To: <20131001090108.GL6918@tarshish>
-References: <1380616692-10253-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <20131001090108.GL6918@tarshish>
-Message-ID: <20131001091101.GK2548@pengutronix.de>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 1 Oct 2013 10:19:20 +0100
+Subject: [PATCH] arm64: check for number of arguments in
+ syscall_get/set_arguments()
+In-Reply-To: <1380605584-22125-1-git-send-email-takahiro.akashi@linaro.org>
+References: <1380605584-22125-1-git-send-email-takahiro.akashi@linaro.org>
+Message-ID: <20131001091919.GA17667@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Baruch,
-
-On Tue, Oct 01, 2013 at 12:01:08PM +0300, Baruch Siach wrote:
-> On Tue, Oct 01, 2013 at 10:38:12AM +0200, Uwe Kleine-K?nig wrote:
-> > These are all only called by dw_apb_timer_init which is an __init
-> > function, too
-> > 
-> > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> > ---
-> >  drivers/clocksource/dw_apb_timer_of.c | 10 +++++-----
-> >  1 file changed, 5 insertions(+), 5 deletions(-)
-> > 
-> > diff --git a/drivers/clocksource/dw_apb_timer_of.c b/drivers/clocksource/dw_apb_timer_of.c
-> > index 4cbae4f..993cdde 100644
-> > --- a/drivers/clocksource/dw_apb_timer_of.c
-> > +++ b/drivers/clocksource/dw_apb_timer_of.c
-> > @@ -23,7 +23,7 @@
-> >  #include <linux/clk.h>
-> >  #include <linux/sched_clock.h>
-> >  
-> > -static void timer_get_base_and_rate(struct device_node *np,
-> > +static void __init timer_get_base_and_rate(struct device_node *np,
-> >  				    void __iomem **base, u32 *rate)
-> >  {
-> >  	struct clk *timer_clk;
-> > @@ -55,11 +55,11 @@ static void timer_get_base_and_rate(struct device_node *np,
-> >  
-> >  try_clock_freq:
-> >  	if (of_property_read_u32(np, "clock-freq", rate) &&
-> > -		of_property_read_u32(np, "clock-frequency", rate))
-> > +	    of_property_read_u32(np, "clock-frequency", rate))
+On Tue, Oct 01, 2013 at 06:33:04AM +0100, AKASHI Takahiro wrote:
+> In ftrace_syscall_enter(),
+>     syscall_get_arguments(..., 0, n, ...)
+> 	if (i == 0) { <handle orig_x0> ...; n--;}
+> 	memcpy(..., n * sizeof(args[0]));
+> If 'number of arguments(n)' is zero and 'argument index(i)' is also zero in
+> syscall_get_arguments(), none of arguments should be copied by memcpy().
+> Otherwise 'n--' can be a big positive number and unexpected amount of data
+> will be copied. Tracing system calls which take no argument, say sync(void),
+> may hit this case and eventually make the system corrupted.
+> This patch fixes the issue both in syscall_get_arguments() and
+> syscall_set_arguments().
 > 
-> Unintended whitespace change?
-Well no, it was intended and I wanted to mention it in the commit log,
-but forgot about it. It read:
+> Please note, however, that asm-generic/syscall.h says,
+>  * syscall_get_arguments - extract system call parameter values
+>  * @i:          argument index [0,5]
+>  * @n:          number of arguments; n+i must be [1,6].
+> and so we'd better change the caller's code(ftrace_syscall_enter).
 
-	if (something &&
-		somethingelse)
-		dosomething;
+Since (most) other architectures deal with n+i == 0, please can you submit a
+separate patch updating that comment?
 
-which is hard to read.
+> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+> ---
+>  arch/arm64/include/asm/syscall.h |    6 ++++++
+>  1 file changed, 6 insertions(+)
+> 
+> diff --git a/arch/arm64/include/asm/syscall.h b/arch/arm64/include/asm/syscall.h
+> index c89821f..01bb8cc 100644
+> --- a/arch/arm64/include/asm/syscall.h
+> +++ b/arch/arm64/include/asm/syscall.h
+> @@ -63,6 +63,9 @@ static inline void syscall_get_arguments(struct task_struct *task,
+>  					 unsigned int i, unsigned int n,
+>  					 unsigned long *args)
+>  {
+> +	if (n == 0)
+> +		return;
+> +
+>  	if (i + n > SYSCALL_MAX_ARGS) {
+>  		unsigned long *args_bad = args + SYSCALL_MAX_ARGS - i;
+>  		unsigned int n_bad = n + i - SYSCALL_MAX_ARGS;
+> @@ -86,6 +89,9 @@ static inline void syscall_set_arguments(struct task_struct *task,
+>  					 unsigned int i, unsigned int n,
+>  					 const unsigned long *args)
+>  {
+> +	if (n == 0)
+> +		return;
+> +
 
-Best regards
-Uwe
+Looks sensible. Please can you fix arch/arm/ as well?
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Cheers,
+
+Will
