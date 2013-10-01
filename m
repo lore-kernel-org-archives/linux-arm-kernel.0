@@ -1,56 +1,60 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue,  1 Oct 2013 11:35:51 +0900
-Subject: [PATCH 12/14] ARM: shmobile: Remove shmobile_smp_scu_boot_secondary()
+Date: Tue,  1 Oct 2013 11:35:52 +0900
+Subject: [PATCH 13/14] ARM: shmobile: Extend APMU code to allow single cluster
+ only
 In-Reply-To: <cover.1380532277.git.horms+renesas@verge.net.au>
 References: <cover.1380532277.git.horms+renesas@verge.net.au>
-Message-ID: <e4550216ef8245b1c9892239a2121a7b15ac2e91.1380532277.git.horms+renesas@verge.net.au>
+Message-ID: <ee490bcc4f2d456c40df93236cf6a1bce2d5ddd0.1380532277.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Magnus Damm <damm@opensource.se>
 
-Remove shmobile_smp_scu_boot_secondary() since
-it is no longer used. CPU boot vector setup is
-instead handled by CPU notifiers.
+Extend the APMU code with a check to only allow boot
+of CPU cores that sit in the same cluster as CPU0.
+
+This makes it possible for people to use the r8a790
+CA7 boot mode with CA7-cores only. The default CA15
+boot mode will enable CA15 cores only. This is an
+intentional software limitation to cope with lacking
+scheduler support.
+
+By removing this patch it is possible to run all 8 cores
+in parallel, but this is not recommended without out of tree
+scheduler modfications or custom user space code to control
+the CPU affinitiy.
 
 Signed-off-by: Magnus Damm <damm@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/include/mach/common.h | 2 --
- arch/arm/mach-shmobile/platsmp-scu.c         | 8 --------
- 2 files changed, 10 deletions(-)
+ arch/arm/mach-shmobile/platsmp-apmu.c | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
-diff --git a/arch/arm/mach-shmobile/include/mach/common.h b/arch/arm/mach-shmobile/include/mach/common.h
-index 3460bb1..e319805 100644
---- a/arch/arm/mach-shmobile/include/mach/common.h
-+++ b/arch/arm/mach-shmobile/include/mach/common.h
-@@ -18,8 +18,6 @@ extern int shmobile_smp_cpu_disable(unsigned int cpu);
- extern void shmobile_invalidate_start(void);
- extern void shmobile_boot_scu(void);
- extern void shmobile_smp_scu_prepare_cpus(unsigned int max_cpus);
--extern int shmobile_smp_scu_boot_secondary(unsigned int cpu,
--					   struct task_struct *idle);
- extern void shmobile_smp_scu_cpu_die(unsigned int cpu);
- extern int shmobile_smp_scu_cpu_kill(unsigned int cpu);
- extern void shmobile_smp_apmu_prepare_cpus(unsigned int max_cpus);
-diff --git a/arch/arm/mach-shmobile/platsmp-scu.c b/arch/arm/mach-shmobile/platsmp-scu.c
-index 49ae8df..673ad6e 100644
---- a/arch/arm/mach-shmobile/platsmp-scu.c
-+++ b/arch/arm/mach-shmobile/platsmp-scu.c
-@@ -51,14 +51,6 @@ void __init shmobile_smp_scu_prepare_cpus(unsigned int max_cpus)
- 	register_cpu_notifier(&shmobile_smp_scu_notifier);
- }
+diff --git a/arch/arm/mach-shmobile/platsmp-apmu.c b/arch/arm/mach-shmobile/platsmp-apmu.c
+index 34dc40d..caaaa35 100644
+--- a/arch/arm/mach-shmobile/platsmp-apmu.c
++++ b/arch/arm/mach-shmobile/platsmp-apmu.c
+@@ -94,8 +94,21 @@ static void apmu_parse_cfg(void (*fn)(struct resource *res, int cpu, int bit))
+ 	u32 id;
+ 	int k;
+ 	int bit, index;
++	bool is_allowed;
  
--int shmobile_smp_scu_boot_secondary(unsigned int cpu, struct task_struct *idle)
--{
--	/* For this particular CPU register SCU boot vector */
--	shmobile_smp_hook(cpu, virt_to_phys(shmobile_boot_scu),
--			  (unsigned long)shmobile_scu_base);
--	return 0;
--}
--
- #ifdef CONFIG_HOTPLUG_CPU
- void shmobile_smp_scu_cpu_die(unsigned int cpu)
- {
+ 	for (k = 0; k < ARRAY_SIZE(apmu_config); k++) {
++		/* only enable the cluster that includes the boot CPU */
++		is_allowed = false;
++		for (bit = 0; bit < ARRAY_SIZE(apmu_config[k].cpus); bit++) {
++			id = apmu_config[k].cpus[bit];
++			if (id >= 0) {
++				if (id == cpu_logical_map(0))
++					is_allowed = true;
++			}
++		}
++		if (!is_allowed)
++			continue;
++
+ 		for (bit = 0; bit < ARRAY_SIZE(apmu_config[k].cpus); bit++) {
+ 			id = apmu_config[k].cpus[bit];
+ 			if (id >= 0) {
 -- 
 1.8.4
