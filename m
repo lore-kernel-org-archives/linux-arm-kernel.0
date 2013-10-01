@@ -1,92 +1,27 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Tue, 01 Oct 2013 21:15:44 +0200
-Subject: [PATCH 3/4] clk: kirkwood: Add CLK_IGNORE_UNUSED to ethernet
- ge0 and ge1 clocks
-In-Reply-To: <524B1E12.9080302@gmail.com>
+From: arno@natisbad.org (Arnaud Ebalard)
+Date: Tue, 01 Oct 2013 21:20:33 +0200
+Subject: [PATCH 2/4] ARM: kirkwood: Remove unneeded PCIe clock adding
+In-Reply-To: <20131001160135.GA3998@localhost> (Ezequiel Garcia's message of
+ "Tue, 1 Oct 2013 13:01:36 -0300")
 References: <1380575010-8573-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1380575010-8573-4-git-send-email-ezequiel.garcia@free-electrons.com>
- <20131001004009.GK31178@titan.lakedaemon.net>
- <20131001134213.GC2448@localhost> <524AD2F7.4090803@gmail.com>
- <20131001142205.GF2448@localhost> <524ADFAA.40805@gmail.com>
- <20131001164556.GA23874@obsidianresearch.com> <524B1E12.9080302@gmail.com>
-Message-ID: <524B1F60.1020206@gmail.com>
+ <1380575010-8573-3-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20131001160135.GA3998@localhost>
+Message-ID: <8761tgg5mm.fsf@natisbad.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/01/2013 09:10 PM, Sebastian Hesselbarth wrote:
-> On 10/01/2013 06:45 PM, Jason Gunthorpe wrote:
->> On Tue, Oct 01, 2013 at 04:43:54PM +0200, Sebastian Hesselbarth wrote:
->>
->>> The local-mac-address property is a placeholder for the real mac
->>> address. Also, mv643xx_eth calls of_get_mac_address which fails for
->>> the invalid local-mac-address value of [00 00 00 00 00 00].
->>>
->>> If you manage to setup local-mac-address in your bootloader, everything
->>> should be fine.
->>
->> FWIW, my environment is like this, and it works fine (this is recent,
->> 3.10 didn't work). The driver now properly sets the MAC from the DT.
->>
->> The driver will also need an update to call of_get_phy_mode and set
->> the interface properly, and the board files will need update to
->> specify the phy-mode property. I'm guessing things are working for
->> most people because the POR value happens to match the board?
->>
->>> If we have a DT fixup that takes care of the above for non-DT
->>> bootloaders, everything should be fine.
->>
->> Exactly, the problem is a broken DT on input to the kernel, the proper
->> action, IMHO, is to correct the DT in the kernel, so the hacking is
->> contained. Similar to how pci-fixups.c centralizes fixing of broken
->> firmware for PCI, and how CONFIG_ARM_ATAG_DTB_COMPAT centralizes it
->> for ATAG conversion.
->>
->> BTW, why doesn't CONFIG_ARM_ATAG_DTB_COMPAT fix this? Do the boot
->> loaders on these systems not pass the mac at all??
->>
->>> I still prefer Jason's approach and would give it a try on LAKML and
->>> devtree ML: Backup register contents if of_get_mac_address does not
->>> contain a valid address, and gate clocks.
->>
->> FWIW, I would not use the language of 'backup' - this is a fixup
->> correcting an unsupported input DT.
->>
->> IMHO, when this code triggers it should also:
->>
->> printk(KERN_ERROR FW_BUG "local-mac-address is not set");
->
-> Ezequiel,
->
-> before you jump to prepare a patch for the above, I made one based on
-> my previous work and JasonG's suggestions above. Testing it right now,
-> looks promising.
+Hi Ezequiel,
 
-And works:
+Ezequiel Garcia <ezequiel.garcia@free-electrons.com> writes:
 
-Uncompressing Linux... done, booting the kernel.
-[    0.000000] Booting Linux on physical CPU 0x0
-[    0.000000] Linux version 3.12.0-rc3-dirty (hesselba at edge) (gcc 
-version 4.4.6 (Debian 4.4.6-14) ) #9 PREEMPT Tue Oct 1 21:01:34 CEST 2013
-...
-[    0.100128] [Firmware Bug]: 
-/ocp at f1000000/ethernet-controller at 72000/ethernet0-port at 0: 
-local-mac-address is not set
-...
-# cat /sys/kernel/debug/clk/clk_summary
-    clock                        enable_cnt  prepare_cnt  rate
----------------------------------------------------------------------
-...
-  tclk                           6           6            200000000
-...
-     ge1                         0           0            200000000
-...
-     ge0                         0           0            200000000
+> If anyone with a PCIe Kirkwood board can give this patch a try
+> it would be great to have some Tested-by's.
 
-# insmod mvmdio.ko
-[  172.888802] libphy: orion_mdio_bus: probed
-# insmod mv643xx_eth.ko
-[  175.790366] mv643xx_eth: MV-643xx 10/100/1000 ethernet driver version 1.4
-[  176.811888] mv643xx_eth_port mv643xx_eth_port.0 eth0: port 0 with MAC 
-address 02:50:43:19:fd:e2
+Works on my ReadyNAS Duo v2 (88F6282), i.e. I can see and use the USB3.0
+controller attached to the PCIe bus so ...
 
-> @JasonC: To avoid rebase mess again, where do you want it based against?
+Tested-by: Arnaud Ebalard <arno@natisbad.org>
+
+Cheers,
+
+a+
