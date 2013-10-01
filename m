@@ -1,205 +1,116 @@
 From: sandeepa.prabhu@linaro.org (Sandeepa Prabhu)
-Date: Tue,  1 Oct 2013 21:27:56 +0530
-Subject: [PATCH RFC v3 1/5] AArch64: Add single-step and breakpoint handler
- hooks
+Date: Tue,  1 Oct 2013 21:27:57 +0530
+Subject: [PATCH RFC v1 2/5] arm64: Kernel code patching support
 In-Reply-To: <1380643080-8984-1-git-send-email-sandeepa.prabhu@linaro.org>
 References: <1380643080-8984-1-git-send-email-sandeepa.prabhu@linaro.org>
-Message-ID: <1380643080-8984-2-git-send-email-sandeepa.prabhu@linaro.org>
+Message-ID: <1380643080-8984-3-git-send-email-sandeepa.prabhu@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-AArch64 Single Steping and Breakpoint debug exceptions will be
-used by multiple debug framworks like kprobes & kgdb.
+Implement API for kernel code section. These API supports
+modifying kernel text section, one instruction at a time.
 
-This patch implements the hooks for those frameworks to register
-their own handlers for handling breakpoint and single step events.
-
-Reworked the debug exception handler in entry.S: do_dbg to route
-software breakpoint (BRK64) exception to do_debug_exception()
+This functionality will be used in kprobes handlers to place/replace
+software breakpoints, kprobe breakpoints cannot be placed inside these
+handlers so will be added under __kprobes section.
 
 Signed-off-by: Sandeepa Prabhu <sandeepa.prabhu@linaro.org>
-Signed-off-by: Deepak Saxena <dsaxena@linaro.org>
 ---
- arch/arm64/include/asm/debug-monitors.h | 23 +++++++++
- arch/arm64/kernel/debug-monitors.c      | 85 +++++++++++++++++++++++++++++++--
- arch/arm64/kernel/entry.S               |  2 +
- 3 files changed, 107 insertions(+), 3 deletions(-)
+ arch/arm64/kernel/patch.c | 58 +++++++++++++++++++++++++++++++++++++++++++++++
+ arch/arm64/kernel/patch.h | 20 ++++++++++++++++
+ 2 files changed, 78 insertions(+)
+ create mode 100644 arch/arm64/kernel/patch.c
+ create mode 100644 arch/arm64/kernel/patch.h
 
-diff --git a/arch/arm64/include/asm/debug-monitors.h b/arch/arm64/include/asm/debug-monitors.h
-index a2232d0..8e354b3 100644
---- a/arch/arm64/include/asm/debug-monitors.h
-+++ b/arch/arm64/include/asm/debug-monitors.h
-@@ -16,6 +16,8 @@
- #ifndef __ASM_DEBUG_MONITORS_H
- #define __ASM_DEBUG_MONITORS_H
- 
-+#include <linux/rculist.h>
-+
- #ifdef __KERNEL__
- 
- #define	DBG_ESR_EVT(x)		(((x) >> 27) & 0x7)
-@@ -62,6 +64,27 @@ struct task_struct;
- 
- #define DBG_ARCH_ID_RESERVED	0	/* In case of ptrace ABI updates. */
- 
-+#define DEBUG_HOOK_HANDLED	0
-+#define DEBUG_HOOK_ERROR	1
-+
-+struct step_hook {
-+	struct list_head node;
-+	int (*fn)(struct pt_regs *regs, unsigned int esr);
-+};
-+
-+void register_step_hook(struct step_hook *hook);
-+void unregister_step_hook(struct step_hook *hook);
-+
-+struct break_hook {
-+	struct list_head node;
-+	u32 esr_val;
-+	u32 esr_mask;
-+	int (*fn)(struct pt_regs *regs, unsigned int esr);
-+};
-+
-+void register_break_hook(struct break_hook *hook);
-+void unregister_break_hook(struct break_hook *hook);
-+
- u8 debug_monitors_arch(void);
- 
- void enable_debug_monitors(enum debug_el el);
-diff --git a/arch/arm64/kernel/debug-monitors.c b/arch/arm64/kernel/debug-monitors.c
-index cbfacf7..fbbf824 100644
---- a/arch/arm64/kernel/debug-monitors.c
-+++ b/arch/arm64/kernel/debug-monitors.c
-@@ -188,6 +188,43 @@ static void clear_regs_spsr_ss(struct pt_regs *regs)
- 	regs->pstate = spsr;
- }
- 
-+/* EL1 Single Step Handler hooks */
-+static LIST_HEAD(step_hook);
-+
-+void register_step_hook(struct step_hook *hook)
-+{
-+	list_add_rcu(&hook->node, &step_hook);
-+}
-+
-+void unregister_step_hook(struct step_hook *hook)
-+{
-+	list_del_rcu(&hook->node);
-+}
-+
+diff --git a/arch/arm64/kernel/patch.c b/arch/arm64/kernel/patch.c
+new file mode 100644
+index 0000000..880742d
+--- /dev/null
++++ b/arch/arm64/kernel/patch.c
+@@ -0,0 +1,58 @@
 +/*
-+ * Call registered single step handers
-+ * There is no Syndrome info to check for determining the handler.
-+ * So we call all the registered handlers, until the right handler is
-+ * found which returns zero.
++ * arch/arm64/kernel/patch.c
++ *
++ * Copyright (C) 2013 Linaro Limited.
++ * Based on arch/arm/kernel/patch.c
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++ * General Public License for more details.
 + */
-+static int call_step_hook(struct pt_regs *regs, unsigned int esr)
++#include <linux/kernel.h>
++#include <linux/stop_machine.h>
++#include <asm/cacheflush.h>
++#include <asm/smp_plat.h>
++
++#include "patch.h"
++
++struct patch {
++	void *addr;
++	unsigned int insn;
++};
++
++/* Patching kernel text -AArch64 mode */
++void __kprobes __patch_text(void *addr, unsigned int insn)
 +{
-+	struct step_hook *hook;
-+	int retval = DEBUG_HOOK_ERROR;
++	int size = sizeof(u32);
 +
-+	rcu_read_lock();
++	/* AArch64 32-bit alignment check */
++	if ((unsigned long)addr % size)
++		return;
 +
-+	list_for_each_entry_rcu(hook, &step_hook, node)	{
-+		retval = hook->fn(regs, esr);
-+		if (retval == DEBUG_HOOK_HANDLED)
-+			break;
-+	}
++	/* little-endian mode: does it work for big-endian mode? */
++	*(u32 *) addr = insn;
 +
-+	rcu_read_unlock();
-+
-+	return retval;
++	flush_icache_range((uintptr_t) (addr), (uintptr_t) (addr) + size);
 +}
 +
- static int single_step_handler(unsigned long addr, unsigned int esr,
- 			       struct pt_regs *regs)
- {
-@@ -215,8 +252,11 @@ static int single_step_handler(unsigned long addr, unsigned int esr,
- 		 */
- 		user_rewind_single_step(current);
- 	} else {
--		/* TODO: route to KGDB */
--		pr_warning("Unexpected kernel single-step exception at EL1\n");
-+		/* Call single step handlers for kgdb/kprobes */
-+		if (call_step_hook(regs, esr) == DEBUG_HOOK_HANDLED)
-+			return 0;
-+
-+		pr_warn("unexpected single step exception at %lx!\n", addr);
- 		/*
- 		 * Re-enable stepping since we know that we will be
- 		 * returning to regs.
-@@ -227,11 +267,50 @@ static int single_step_handler(unsigned long addr, unsigned int esr,
- 	return 0;
- }
- 
-+
-+static LIST_HEAD(break_hook);
-+static DEFINE_RAW_SPINLOCK(break_hook_lock);
-+
-+void register_break_hook(struct break_hook *hook)
++static int __kprobes patch_text_stop_machine(void *data)
 +{
-+	raw_spin_lock(&break_hook_lock);
-+	list_add(&hook->node, &break_hook);
-+	raw_spin_unlock(&break_hook_lock);
++	struct patch *patch = data;
++
++	__patch_text(patch->addr, patch->insn);
++	return 0;
 +}
 +
-+void unregister_break_hook(struct break_hook *hook)
++void __kprobes patch_text(void *addr, unsigned int insn)
 +{
-+	raw_spin_lock(&break_hook_lock);
-+	list_del(&hook->node);
-+	raw_spin_unlock(&break_hook_lock);
++	struct patch patch = {
++		.addr = addr,
++		.insn = insn,
++	};
++	stop_machine(patch_text_stop_machine, &patch, cpu_online_mask);
 +}
+diff --git a/arch/arm64/kernel/patch.h b/arch/arm64/kernel/patch.h
+new file mode 100644
+index 0000000..e9d5e75
+--- /dev/null
++++ b/arch/arm64/kernel/patch.h
+@@ -0,0 +1,20 @@
++/*
++ * arch/arm/kernel/patch.h
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++ * General Public License for more details.
++ */
 +
-+static int call_break_hook(struct pt_regs *regs, unsigned int esr)
-+{
-+	struct break_hook *hook;
-+	int (*fn)(struct pt_regs *regs, unsigned int esr) = NULL;
++#ifndef _AARCH64_KERNEL_PATCH_H
++#define _AARCH64_KERNEL_PATCH_H
 +
-+	raw_spin_lock(&break_hook_lock);
-+	list_for_each_entry(hook, &break_hook, node)
-+		if ((esr & hook->esr_mask) == hook->esr_val)
-+			fn = hook->fn;
-+	raw_spin_unlock(&break_hook_lock);
++void patch_text(void *addr, unsigned int insn);
++void __patch_text(void *addr, unsigned int insn);
 +
-+	return fn ? fn(regs, esr) : DEBUG_HOOK_ERROR;
-+}
-+
- static int brk_handler(unsigned long addr, unsigned int esr,
- 		       struct pt_regs *regs)
- {
- 	siginfo_t info;
- 
-+	/* call single step handlers for kgdb/kprobes */
-+	if (call_break_hook(regs, esr) == DEBUG_HOOK_HANDLED)
-+		return 0;
-+
-+	pr_warn("unexpected brk exception at %llx, esr=0x%x\n",
-+			instruction_pointer(regs), esr);
-+
- 	if (!user_mode(regs))
- 		return -EFAULT;
- 
-@@ -291,7 +370,7 @@ static int __init debug_traps_init(void)
- 	hook_debug_fault_code(DBG_ESR_EVT_HWSS, single_step_handler, SIGTRAP,
- 			      TRAP_HWBKPT, "single-step handler");
- 	hook_debug_fault_code(DBG_ESR_EVT_BRK, brk_handler, SIGTRAP,
--			      TRAP_BRKPT, "ptrace BRK handler");
-+			      TRAP_BRKPT, "AArch64 BRK handler");
- 	return 0;
- }
- arch_initcall(debug_traps_init);
-diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index 3881fd1..7fbc510 100644
---- a/arch/arm64/kernel/entry.S
-+++ b/arch/arm64/kernel/entry.S
-@@ -288,6 +288,8 @@ el1_dbg:
- 	/*
- 	 * Debug exception handling
- 	 */
-+	cmp	x24, #ESR_EL1_EC_BRK64		// if BRK64
-+	cinc	x24, x24, eq			// set bit '0'
- 	tbz	x24, #0, el1_inv		// EL1 only
- 	mrs	x0, far_el1
- 	mov	x2, sp				// struct pt_regs
++#endif /* _AARCH64_KERNEL_PATCH_H */
 -- 
 1.8.1.2
