@@ -1,58 +1,66 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Thu, 31 Oct 2013 23:28:48 -0600
-Subject: [PATCH v2] PCI: mvebu - Support a bridge with no IO port window
-In-Reply-To: <CAErSpo4NDuNJ4mj1n4V8UgsdAJxMrSRy43Qz=3JNvtsrv2rMjA@mail.gmail.com>
-References: <1381868182-8544-1-git-send-email-jgunthorpe@obsidianresearch.com>
- <20131031101357.5a56e2d0@skate>
- <20131031164810.GA26426@obsidianresearch.com>
- <CAErSpo7bUP63J5RkXr-DkQE8qmvKT7ri-vjkfq+TtGEaYWxSwA@mail.gmail.com>
- <20131031233245.GA9853@obsidianresearch.com>
- <CAErSpo4NDuNJ4mj1n4V8UgsdAJxMrSRy43Qz=3JNvtsrv2rMjA@mail.gmail.com>
-Message-ID: <20131101052848.GA20163@obsidianresearch.com>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Tue, 1 Oct 2013 12:03:51 +0800
+Subject: [GIT PULL]ARM: sirf: dts fixes for 3.12-rc
+In-Reply-To: <CAOesGMiQKdoq8ir0OPtWOgd1ndSxvdn8C69nDy_BC-a4AZ891g@mail.gmail.com>
+References: <CAGsJ_4yfNE3NMvf9jkyaZM84i9zdEM3wm=VgFPamKT_F33Lo2A@mail.gmail.com>
+ <CAOesGMiQKdoq8ir0OPtWOgd1ndSxvdn8C69nDy_BC-a4AZ891g@mail.gmail.com>
+Message-ID: <CAGsJ_4ya8VyCz4vtkrHjVfpSYBYDuwohoCj7a13FAtByRyKakg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 31, 2013 at 08:44:36PM -0600, Bjorn Helgaas wrote:
- 
-> You obviously understand all this, so sorry for the repetition; I
-> guess I'm just trying to get it clear in my own mind :)
+Hi Olof,
+Thanks!
 
-Ditto, it is tricky. When I first looked at that code I thought it was
-trying to do something else..
+2013/9/30 Olof Johansson <olof@lixom.net>:
+> Hi,
+>
+> On Sun, Sep 29, 2013 at 6:29 AM, Barry Song <21cnbao@gmail.com> wrote:
+>> The following changes since commit 4a10c2ac2f368583138b774ca41fac4207911983:
+>>
+>>   Linux 3.12-rc2 (2013-09-23 15:41:09 -0700)
+>>
+>> are available in the git repository at:
+>>
+>>   git://git.kernel.org/pub/scm/linux/kernel/git/baohua/linux.git
+>> tags/dts-fixes-for-3.12
+>>
+>> for you to fetch changes up to 65dc961989ba0f4dc57d614a9af43c19460204dd:
+>>
+>>   ARM: dts: sirf: fix interrupt and dma prop of VIP for prima2 and
+>> atlas6 (2013-09-29 21:08:06 +0800)
+>>
+>> ----------------------------------------------------------------
+>> ARM: sirf: dts fixes for 3.12-rc
+>>
+>> A set of fixes for sirf dts for 3.12. Among them:
+>>   - add missed chhifbg node in prima2 and atlas6 dts
+>>   - add missed cell, cs and dma channel for SPI nodes
+>>   - add missed graphics2d iobg in atlas6 dts
+>>   - add missed address-cells and size-cells for prima2 I2C
+>>   - add missed memcontrol-monitor node in prima2 and atlas6 dts
+>
+> This looks like new SoC enablement to me? Or did something break that
+> used to work?
 
-> > How about this instead:
-> >
-> >         if (!io) {
-> >                 /* Disable the IO window by setting limit < base */
-> >                 pci_write_config_word(bridge, PCI_IO_BASE, 0x00f0);
-> >                 pci_read_config_word(bridge, PCI_IO_BASE, &io);
-> >         }
-> >         /* Bridges without IO support must wire the IO register to 0 */
-> >         if (io)
-> >                 b_res[0].flags |= IORESOURCE_IO;
-> 
-> If an I/O window happened to be configured to the 4K region at 0x0,
-> this disables it.  An I/O window configured anywhere else is left
-> enabled.  Previously the only effect of the function was to set bits
-> in b_res[].flags; with this change it would also sometimes disable an
-> I/O window.  That seems worse to me.  Am I just misunderstanding the
-> problem you're solving?
+"add missed cell, cs and dma channel for SPI nodes" should break
+current SPI as related codes have been in drivers/spi/spi-sirf.c.
+"add missed address-cells and size-cells for prima2 I2C" should also
+fix the enumeration of  i2c clients.
 
-No, you've got it right. The problem I had is completely solved by
-PATCH 1/2 PCI: mvebu - The bridge should obey the MEM and IO command
-bits
+others can be queued for 3.13.
 
-But the code looks odd to me. 
 
-It is certainly correct as written if the check is only ever called
-with PCI_COMMAND_IO cleared. 
+>
+>>   - fix makefile to build atlas6-evb.dtb for ARCH_ATLAS6
+>>   - fix the ranges of peri-iobrg of prima2
+>>   - fix fifosize, clks, dma channels for UART
+>>   - fix interrupt and dma prop of VIP for prima2 and atlas6
+>
+> These four look OK.
+>
+> I'll cherry-pick in the fixes, please queue the rest for 3.13.
+>
+>
+> -Olof
 
-However, I am having trouble convincing myself of this. Notably
-pci_setup_bridge does not seem to make that assumption.
-
-If PCI_COMMAND_IO is set, it can just assume IORESOURCE_IO and skip
-the testing of the PCI_IO_BASE register.
-
-Why 0xf0f0 anyhow? :)
-
-Jason
+-barry
