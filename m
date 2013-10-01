@@ -1,49 +1,69 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Tue, 1 Oct 2013 07:24:54 +0530
-Subject: [PATCH v2 3/5] dma: Allow TI_EDMA selectable for ARCH_KEYSTONE
-In-Reply-To: <1380580887-24249-4-git-send-email-santosh.shilimkar@ti.com>
-References: <1380580887-24249-1-git-send-email-santosh.shilimkar@ti.com>
- <1380580887-24249-4-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <20131001015454.GA16684@intel.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue,  1 Oct 2013 00:21:12 -0300
+Subject: [PATCH 1/3] ARM: mach-imx: clk-imx51-imx53: Retrieve base address and
+ irq from dt
+Message-ID: <1380597674-31122-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 30, 2013 at 06:41:25PM -0400, Santosh Shilimkar wrote:
-> Allow the TI_EDMA to be built for ARCH_KEYSTONE which also supports
-> the EDMA IP.
-> 
-> Cc: Vinod Koul <vinod.koul@intel.com>
-> 
-> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> ---
-> Vinod,
-> I need your ack on this patch to carry $subject patch via arm-soc tree
-> to avoid the unmet dependency warnings.
-Sure, but too many dependency fixes have been popoing up for this part and this
-IIRC is third patch! Something doesn't seem right, hopefully am wrong..
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
-I have a patch in my -next from Josh which selects TI_PRIV_EDMA for this...
+As mx53 is a dt-only SoC, we should retrieve the gpt base address and irq
+from the device tree, instead of using the old MX53_IO_ADDRESS method.
 
-~Vinod
-> 
->  drivers/dma/Kconfig |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
-> index 526ec77..b1dde16 100644
-> --- a/drivers/dma/Kconfig
-> +++ b/drivers/dma/Kconfig
-> @@ -195,7 +195,7 @@ config SIRF_DMA
->  
->  config TI_EDMA
->  	bool "TI EDMA support"
-> -	depends on ARCH_DAVINCI || ARCH_OMAP
-> +	depends on ARCH_DAVINCI || ARCH_OMAP || ARCH_KEYSTONE
->  	select DMA_ENGINE
->  	select DMA_VIRTUAL_CHANNELS
->  	default n
-> -- 
-> 1.7.9.5
-> 
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/mach-imx/clk-imx51-imx53.c | 15 +++++++++++----
+ 1 file changed, 11 insertions(+), 4 deletions(-)
 
+diff --git a/arch/arm/mach-imx/clk-imx51-imx53.c b/arch/arm/mach-imx/clk-imx51-imx53.c
+index 7c0dc45..03ca2e3 100644
+--- a/arch/arm/mach-imx/clk-imx51-imx53.c
++++ b/arch/arm/mach-imx/clk-imx51-imx53.c
+@@ -13,6 +13,9 @@
+ #include <linux/clkdev.h>
+ #include <linux/of.h>
+ #include <linux/err.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
++#include <linux/of_irq.h>
+ 
+ #include "crm-regs-imx5.h"
+ #include "clk.h"
+@@ -468,9 +471,10 @@ int __init mx51_clocks_init(unsigned long rate_ckil, unsigned long rate_osc,
+ int __init mx53_clocks_init(unsigned long rate_ckil, unsigned long rate_osc,
+ 			unsigned long rate_ckih1, unsigned long rate_ckih2)
+ {
+-	int i;
++	int i, irq;
+ 	unsigned long r;
+ 	struct device_node *np;
++	void __iomem *base;
+ 
+ 	clk[pll1_sw] = imx_clk_pllv2("pll1_sw", "osc", MX53_DPLL1_BASE);
+ 	clk[pll2_sw] = imx_clk_pllv2("pll2_sw", "osc", MX53_DPLL2_BASE);
+@@ -557,9 +561,6 @@ int __init mx53_clocks_init(unsigned long rate_ckil, unsigned long rate_osc,
+ 	clk_set_rate(clk[esdhc_a_podf], 200000000);
+ 	clk_set_rate(clk[esdhc_b_podf], 200000000);
+ 
+-	/* System timer */
+-	mxc_timer_init(MX53_IO_ADDRESS(MX53_GPT1_BASE_ADDR), MX53_INT_GPT);
+-
+ 	clk_prepare_enable(clk[iim_gate]);
+ 	imx_print_silicon_rev("i.MX53", mx53_revision());
+ 	clk_disable_unprepare(clk[iim_gate]);
+@@ -567,6 +568,12 @@ int __init mx53_clocks_init(unsigned long rate_ckil, unsigned long rate_osc,
+ 	r = clk_round_rate(clk[usboh3_per_gate], 54000000);
+ 	clk_set_rate(clk[usboh3_per_gate], r);
+ 
++	np = of_find_compatible_node(NULL, NULL, "fsl,imx53-gpt");
++	base = of_iomap(np, 0);
++	WARN_ON(!base);
++	irq = irq_of_parse_and_map(np, 0);
++	mxc_timer_init(base, irq);
++
+ 	return 0;
+ }
+ 
 -- 
+1.8.1.2
