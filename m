@@ -1,60 +1,50 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue,  1 Oct 2013 11:35:52 +0900
-Subject: [PATCH 13/14] ARM: shmobile: Extend APMU code to allow single cluster
- only
+Date: Tue,  1 Oct 2013 11:35:37 +0900
+Subject: [PATCH 05/14] ARM: shmobile: Introduce shmobile_boot_size
 In-Reply-To: <cover.1380532277.git.horms+renesas@verge.net.au>
 References: <cover.1380532277.git.horms+renesas@verge.net.au>
-Message-ID: <ee490bcc4f2d456c40df93236cf6a1bce2d5ddd0.1380532277.git.horms+renesas@verge.net.au>
+Message-ID: <a84a5ab73f77a5dd4f09f0af33f09d8d751d0cc7.1380532277.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Magnus Damm <damm@opensource.se>
 
-Extend the APMU code with a check to only allow boot
-of CPU cores that sit in the same cluster as CPU0.
-
-This makes it possible for people to use the r8a790
-CA7 boot mode with CA7-cores only. The default CA15
-boot mode will enable CA15 cores only. This is an
-intentional software limitation to cope with lacking
-scheduler support.
-
-By removing this patch it is possible to run all 8 cores
-in parallel, but this is not recommended without out of tree
-scheduler modfications or custom user space code to control
-the CPU affinitiy.
+Introduce shmobile_boot_size that can be used by
+future SMP code to determine the size of the boot
+code that needs to be copied to internal SRAM.
 
 Signed-off-by: Magnus Damm <damm@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/platsmp-apmu.c | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+ arch/arm/mach-shmobile/headsmp.S             | 3 +++
+ arch/arm/mach-shmobile/include/mach/common.h | 1 +
+ 2 files changed, 4 insertions(+)
 
-diff --git a/arch/arm/mach-shmobile/platsmp-apmu.c b/arch/arm/mach-shmobile/platsmp-apmu.c
-index 34dc40d..caaaa35 100644
---- a/arch/arm/mach-shmobile/platsmp-apmu.c
-+++ b/arch/arm/mach-shmobile/platsmp-apmu.c
-@@ -94,8 +94,21 @@ static void apmu_parse_cfg(void (*fn)(struct resource *res, int cpu, int bit))
- 	u32 id;
- 	int k;
- 	int bit, index;
-+	bool is_allowed;
+diff --git a/arch/arm/mach-shmobile/headsmp.S b/arch/arm/mach-shmobile/headsmp.S
+index f93751c..e5be5c8 100644
+--- a/arch/arm/mach-shmobile/headsmp.S
++++ b/arch/arm/mach-shmobile/headsmp.S
+@@ -40,6 +40,9 @@ shmobile_boot_fn:
+ 	.globl	shmobile_boot_arg
+ shmobile_boot_arg:
+ 2:	.space	4
++	.globl	shmobile_boot_size
++shmobile_boot_size:
++	.long	. - shmobile_boot_vector
  
- 	for (k = 0; k < ARRAY_SIZE(apmu_config); k++) {
-+		/* only enable the cluster that includes the boot CPU */
-+		is_allowed = false;
-+		for (bit = 0; bit < ARRAY_SIZE(apmu_config[k].cpus); bit++) {
-+			id = apmu_config[k].cpus[bit];
-+			if (id >= 0) {
-+				if (id == cpu_logical_map(0))
-+					is_allowed = true;
-+			}
-+		}
-+		if (!is_allowed)
-+			continue;
-+
- 		for (bit = 0; bit < ARRAY_SIZE(apmu_config[k].cpus); bit++) {
- 			id = apmu_config[k].cpus[bit];
- 			if (id >= 0) {
+ /*
+  * Per-CPU SMP boot function/argument selection code based on MPIDR
+diff --git a/arch/arm/mach-shmobile/include/mach/common.h b/arch/arm/mach-shmobile/include/mach/common.h
+index a9df8f3..cfe3977 100644
+--- a/arch/arm/mach-shmobile/include/mach/common.h
++++ b/arch/arm/mach-shmobile/include/mach/common.h
+@@ -9,6 +9,7 @@ extern void shmobile_setup_console(void);
+ extern void shmobile_boot_vector(void);
+ extern unsigned long shmobile_boot_fn;
+ extern unsigned long shmobile_boot_arg;
++extern unsigned long shmobile_boot_size;
+ extern void shmobile_smp_boot(void);
+ extern void shmobile_smp_sleep(void);
+ extern void shmobile_smp_hook(unsigned int cpu, unsigned long fn,
 -- 
 1.8.4
