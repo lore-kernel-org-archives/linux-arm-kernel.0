@@ -1,154 +1,57 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue,  1 Oct 2013 11:37:08 +0900
-Subject: [PATCH 08/12] ARM: shmobile: bockw: add USB Function support
-In-Reply-To: <cover.1380530519.git.horms+renesas@verge.net.au>
-References: <cover.1380530519.git.horms+renesas@verge.net.au>
-Message-ID: <81a0d9062d5c93490b215d2440bbd7deb3918707.1380530519.git.horms+renesas@verge.net.au>
+Date: Tue,  1 Oct 2013 11:38:36 +0900
+Subject: [GIT PULL 0/4] Renesas ARM based SoC defconfig updates for v3.13
+Message-ID: <cover.1380514316.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Hi Kevin, Olof and Arnd,
 
-Bock-W USB1 (CN29) can be USB Host/Func by SW98/SW99 settings.
-USB Func will be enabled if CONFIG_USB_RENESAS_USBHS_UDC[_MODULE]
-was selected on this patch
+please consider these Renesas ARM based SoC defconfig updates for v3.13.
 
-Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/mach-shmobile/board-bockw.c | 81 ++++++++++++++++++++++++++++++++++--
- 1 file changed, 78 insertions(+), 3 deletions(-)
+This pull request is based on v3.12-rc1.
 
-diff --git a/arch/arm/mach-shmobile/board-bockw.c b/arch/arm/mach-shmobile/board-bockw.c
-index 7ad868d..330e84c 100644
---- a/arch/arm/mach-shmobile/board-bockw.c
-+++ b/arch/arm/mach-shmobile/board-bockw.c
-@@ -32,6 +32,7 @@
- #include <linux/smsc911x.h>
- #include <linux/spi/spi.h>
- #include <linux/spi/flash.h>
-+#include <linux/usb/renesas_usbhs.h>
- #include <media/soc_camera.h>
- #include <mach/common.h>
- #include <mach/irqs.h>
-@@ -99,6 +100,16 @@ static void __iomem *fpga;
-  * # amixer set "LINEOUT Mixer DACL" on
-  */
- 
-+/*
-+ * USB
-+ *
-+ * USB1 (CN29) can be Host/Function
-+ *
-+ *		Host	Func
-+ * SW98		1	2
-+ * SW99		1	3
-+ */
-+
- /* Dummy supplies, where voltage doesn't matter */
- static struct regulator_consumer_supply dummy_supplies[] = {
- 	REGULATOR_SUPPLY("vddvario", "smsc911x"),
-@@ -117,13 +128,71 @@ static struct resource smsc911x_resources[] __initdata = {
- 	DEFINE_RES_IRQ(irq_pin(0)), /* IRQ 0 */
- };
- 
-+#if IS_ENABLED(CONFIG_USB_RENESAS_USBHS_UDC)
-+/*
-+ * When USB1 is Func
-+ */
-+static int usbhsf_get_id(struct platform_device *pdev)
-+{
-+	return USBHS_GADGET;
-+}
-+
-+#define SUSPMODE	0x102
-+static int usbhsf_power_ctrl(struct platform_device *pdev,
-+			     void __iomem *base, int enable)
-+{
-+	enable = !!enable;
-+
-+	r8a7778_usb_phy_power(enable);
-+
-+	iowrite16(enable << 14, base + SUSPMODE);
-+
-+	return 0;
-+}
-+
-+static struct resource usbhsf_resources[] __initdata = {
-+	DEFINE_RES_MEM(0xffe60000, 0x110),
-+	DEFINE_RES_IRQ(gic_iid(0x4f)),
-+};
-+
-+static struct renesas_usbhs_platform_info usbhs_info __initdata = {
-+	.platform_callback = {
-+		.get_id		= usbhsf_get_id,
-+		.power_ctrl	= usbhsf_power_ctrl,
-+	},
-+	.driver_param = {
-+		.buswait_bwait	= 4,
-+	},
-+};
-+
-+#define USB_PHY_SETTING {.port1_func = 1, .ovc_pin[1].active_high = 1,}
-+#define USB1_DEVICE	"renesas_usbhs"
-+#define ADD_USB_FUNC_DEVICE_IF_POSSIBLE()			\
-+	platform_device_register_resndata(			\
-+		&platform_bus, "renesas_usbhs", -1,		\
-+		usbhsf_resources,				\
-+		ARRAY_SIZE(usbhsf_resources),			\
-+		&usbhs_info, sizeof(struct renesas_usbhs_platform_info))
-+
-+#else
-+/*
-+ * When USB1 is Host
-+ */
-+#define USB_PHY_SETTING { }
-+#define USB1_DEVICE	"ehci-platform"
-+#define ADD_USB_FUNC_DEVICE_IF_POSSIBLE()
-+
-+#endif
-+
- /* USB */
- static struct resource usb_phy_resources[] __initdata = {
- 	DEFINE_RES_MEM(0xffe70800, 0x100),
- 	DEFINE_RES_MEM(0xffe76000, 0x100),
- };
- 
--static struct rcar_phy_platform_data usb_phy_platform_data __initdata;
-+static struct rcar_phy_platform_data usb_phy_platform_data __initdata =
-+	USB_PHY_SETTING;
-+
- 
- /* SDHI */
- static struct sh_mobile_sdhi_info sdhi0_info __initdata = {
-@@ -445,7 +514,7 @@ static const struct pinctrl_map bockw_pinctrl_map[] = {
- 	/* USB */
- 	PIN_MAP_MUX_GROUP_DEFAULT("ehci-platform", "pfc-r8a7778",
- 				  "usb0", "usb0"),
--	PIN_MAP_MUX_GROUP_DEFAULT("ehci-platform", "pfc-r8a7778",
-+	PIN_MAP_MUX_GROUP_DEFAULT(USB1_DEVICE, "pfc-r8a7778",
- 				  "usb1", "usb1"),
- 	/* SDHI0 */
- 	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.0", "pfc-r8a7778",
-@@ -583,6 +652,12 @@ static void __init bockw_init(void)
- 	}
- }
- 
-+static void __init bockw_init_late(void)
-+{
-+	r8a7778_init_late();
-+	ADD_USB_FUNC_DEVICE_IF_POSSIBLE();
-+}
-+
- static const char *bockw_boards_compat_dt[] __initdata = {
- 	"renesas,bockw",
- 	NULL,
-@@ -593,5 +668,5 @@ DT_MACHINE_START(BOCKW_DT, "bockw")
- 	.init_irq	= r8a7778_init_irq_dt,
- 	.init_machine	= bockw_init,
- 	.dt_compat	= bockw_boards_compat_dt,
--	.init_late      = r8a7778_init_late,
-+	.init_late      = bockw_init_late,
- MACHINE_END
--- 
-1.8.4
+
+As I discussed with Olof recently, we are making solid progress towards
+multi-platform with common-clocks being the last major hurdle. I do expect
+to be able to start booting some shmobile boards using multi-platform
+within the next few release cycles. However, we are not there yet and in
+the mean time I would like to keep the defconfigs in good shape.
+
+
+The following changes since commit 272b98c6455f00884f0350f775c5342358ebb73f:
+
+  Linux 3.12-rc1 (2013-09-16 16:17:51 -0400)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-defconfig-for-v3.13
+
+for you to fetch changes up to 6bb2e347899b297eea26f2658eac8fdcd633fba5:
+
+  ARM: shmobile: Add koelsch defconfig (2013-09-20 17:46:15 -0700)
+
+----------------------------------------------------------------
+Renesas ARM based SoC defconfig updates for v3.13
+
+* Add defconfig for koelsch board
+* Enable sound in defconfig for bockw board
+* Enable R-Car DU DRM in defconfig for lager and marzen boards
+
+----------------------------------------------------------------
+Kuninori Morimoto (1):
+      ARM: shmobile: bockw defconfig: add Sound support
+
+Laurent Pinchart (2):
+      ARM: shmobile: marzen: Select DRM_RCAR_DU in defconfig
+      ARM: shmobile: lager: Select DRM_RCAR_DU in defconfig
+
+Simon Horman (1):
+      ARM: shmobile: Add koelsch defconfig
+
+ arch/arm/configs/bockw_defconfig   |  4 +++
+ arch/arm/configs/koelsch_defconfig | 54 ++++++++++++++++++++++++++++++++++++++
+ arch/arm/configs/lager_defconfig   |  2 ++
+ arch/arm/configs/marzen_defconfig  |  2 ++
+ 4 files changed, 62 insertions(+)
+ create mode 100644 arch/arm/configs/koelsch_defconfig
