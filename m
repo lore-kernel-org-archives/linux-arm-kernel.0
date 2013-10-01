@@ -1,29 +1,80 @@
-From: andreas.herrmann@calxeda.com (Andreas Herrmann)
-Date: Tue, 1 Oct 2013 20:20:28 +0200
-Subject: [PATCH 0/6] iommu/arm-smmu: Misc changes
-In-Reply-To: <20131001155008.GB17667@mudshark.cambridge.arm.com>
-References: <1380631150-10783-1-git-send-email-andreas.herrmann@calxeda.com>
- <20131001155008.GB17667@mudshark.cambridge.arm.com>
-Message-ID: <20131001182028.GA3315@alberich>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 1 Oct 2013 14:23:43 -0400 (EDT)
+Subject: Why does unmap_area_sections() depend on !CONFIG_SMP?
+In-Reply-To: <20131001095955.GA22859@lge.com>
+References: <20131001095955.GA22859@lge.com>
+Message-ID: <alpine.LFD.2.03.1310011337450.21228@syhkavp.arg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 01, 2013 at 11:50:09AM -0400, Will Deacon wrote:
-> On Tue, Oct 01, 2013 at 01:39:04PM +0100, Andreas Herrmann wrote:
-> > Hi,
-> > 
-> > here a reworked set of patches. Hopefully all comments addressed.
+On Tue, 1 Oct 2013, Joonsoo Kim wrote:
+
+> Hello, Russell.
 > 
-> Cheers Andreas! I've taken the first 5.
+> I looked at ioremap code in arm tree and found that unmap_area_sections()
+> is enabled only if !CONFIG_SMP. I can't understand the comments
+> above this function and it comes from you. Could you elaborate more
+> on this?
+> 
+> I guess that flush_cache_vunmap() before clearing page table and
+> flush_tlb_kernel_range() after clearing page table is safe enough to cache
+> consistency regardless CONFIG_SMP configuration. I think that 4K vunmap()
+> also depends on this flushing logic.
+> 
+> Please let me know what I am missing here.
 
-Cool, thanks!
+This is all related to the page table level involved.
 
-> Whilst I like the cleanup you've made to the final patch, I'll need
-> an Ack from Rob until I can take anything containing DT bindings.
+Each entry in the first level page table may refer to a second level 
+page table covering 1MB worth of virtual space, or it may be a direct 
+mapping corresponding to 1MB of contiguous physical memory.
 
-I'll send an update of the 5th patch.
-(But first waiting whether you might have additional comments on my
-last suggestion about introducing smmu->options).
+In Linux, all tasks, including kernel threads, have their own first 
+level page table.  On process creation, the top entries covering 
+TASK_SIZE and above in the first level page table is copied from init_mm 
+into the new page table as the kernel address space is meant to be 
+identical across all tasks.
+
+This is however not always the case though.  Consider one call to 
+ioremap() which does create a new entry in the kernel virtual space.  
+In order to ensure that the kernel virtual space is indeed the same 
+across all tasks, the ioremap code would have to walk the entire task 
+list just to update their own copy of the kernel virtual mapping.  So 
+what we do instead is to create the new page table entry in init_mm 
+only, and lazily update the other task's page table when they fault on 
+access due to their own page table being incomplete.
+
+What about iounmap() then.  When a mapping is removed, we don't want it 
+to be accessible through some random task's page table.  Well, in the 
+normal ioremap() case, the actual mapping is created into a second level 
+page table which happens to be common to all tasks.  Hence the first 
+level page table entry being created is actually a pointer to that 
+second level page table, and when a mapping is removed it is only 
+removed from that second level page table.  The second level table 
+itself remains in memory forever, ready to be reused for any other call 
+to ioremap().  Therefore there is no need to update each task's first 
+level table again.
+
+So far so good.
+
+Now comes the section mapping for ioremap().  Since this is handled into 
+the first level page table only with no common second level table, we 
+needed a mechanism to ensure that any mapping removal gets propagated to 
+all first level tables in the system.  This is accomplished with a 
+sequence counter namely vmalloc_seq which is incremented whenever such a 
+change occurs.  Upon every task switch, this counter is checked against 
+the master copy to detect when the next task to be scheduled has its 
+first level page table out of date, and if so it is updated before the 
+new memory context is instated.
+
+But... this works only if not SMP.  On SMP, different tasks might be 
+running on the other CPUs and incrementing vmalloc_seq won't have any 
+effect on them.  This is why section mappings for ioremap() is not 
+available if SMP.
+
+This could probably be fixed by sending an IPI to the other processors, 
+forcing them to resync their page table right after clearing the mapping 
+from the master table.  But no one implemented it so far.
 
 
-Andreas
+Nicolas
