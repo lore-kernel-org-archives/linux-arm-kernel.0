@@ -1,55 +1,75 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Tue, 1 Oct 2013 22:43:35 +0200
-Subject: [PATCH 05/10] ARM: SAMSUNG: Initialize PWM backlight enable_gpio
- field
-In-Reply-To: <524B14E8.5040302@wwwdotorg.org>
-References: <1379972467-11243-1-git-send-email-treding@nvidia.com>
- <1379972467-11243-6-git-send-email-treding@nvidia.com>
- <524B14E8.5040302@wwwdotorg.org>
-Message-ID: <20131001204335.GB9201@ulmo.nvidia.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 01 Oct 2013 14:45:32 -0600
+Subject: [PATCH 1/4] i2c: busses: i2c-st: Add ST I2C controller
+In-Reply-To: <1380623952-4252-2-git-send-email-maxime.coquelin@st.com>
+References: <1380623952-4252-1-git-send-email-maxime.coquelin@st.com>
+ <1380623952-4252-2-git-send-email-maxime.coquelin@st.com>
+Message-ID: <524B346C.8070607@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 01, 2013 at 12:31:04PM -0600, Stephen Warren wrote:
-> On 09/23/2013 03:41 PM, Thierry Reding wrote:
-> > The GPIO API defines 0 as being a valid GPIO number, so this field needs
-> > to be initialized explicitly.
+On 10/01/2013 04:39 AM, Maxime COQUELIN wrote:
+> This patch adds support to SSC (Synchronous Serial Controller)
+> I2C driver. This IP also supports SPI protocol, but this is not
+> the aim of this driver.
 > 
-> >  static void __init smdkv210_map_io(void)
-> 
-> > @@ -70,6 +70,7 @@ static struct samsung_bl_drvdata samsung_dfl_bl_data __initdata = {
-> >  		.max_brightness = 255,
-> >  		.dft_brightness = 255,
-> >  		.pwm_period_ns  = 78770,
-> > +		.enable_gpio    = -1,
-> >  		.init           = samsung_bl_init,
-> >  		.exit           = samsung_bl_exit,
-> >  	},
-> > @@ -121,6 +122,10 @@ void __init samsung_bl_set(struct samsung_bl_gpio_info *gpio_info,
-> >  		samsung_bl_data->lth_brightness = bl_data->lth_brightness;
-> >  	if (bl_data->pwm_period_ns)
-> >  		samsung_bl_data->pwm_period_ns = bl_data->pwm_period_ns;
-> > +	if (bl_data->enable_gpio)
-> > +		samsung_bl_data->enable_gpio = bl_data->enable_gpio;
-> > +	if (bl_data->enable_gpio_flags)
-> > +		samsung_bl_data->enable_gpio_flags = bl_data->enable_gpio_flags;
-> 
-> Won't this cause the core pwm_bl driver to request/manipulate the GPIO,
-> whereas this driver already does that inside the samsung_bl_init/exit
-> callbacks? I think you either need to adjust those callbacks, or not set
-> the new standard GPIO property in samsung_bl_data.
+> This IP is embedded in all ST SoCs for Set-top box platorms, and
+> supports I2C Standard and Fast modes.
 
-I don't think so. The samsung_bl_data is a copy of samsung_dfl_bl_data
-augmented by board-specific settings. So in fact copying these values
-here is essential to allow boards to override the enable_gpio and flags
-fields. Currently no board sets the enable_gpio to a valid GPIO so it's
-all still handled by the callbacks only.
+> diff --git a/Documentation/devicetree/bindings/i2c/i2c-st.txt b/Documentation/devicetree/bindings/i2c/i2c-st.txt
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131001/a24201f7/attachment.sig>
+> +Required properties :
+
+> +- clocks : phandle to the I2C clock source
+> +- clock-names : from common clock binding: Shall be "ssc"
+
+I'd prefer to define that as:
+
+clock-names: Must contain "ssc".
+clocks: Must contain an entry for each name in clock-names. See the
+common clock bindings.
+
+That way, it makes it clear that clock-names is the primary lookup
+mechanism, rather than some auxiliary documentation.
+
+> +Recommended properties :
+> +- clock-frequency : Desired I2C bus clock frequency in Hz. Otherwise
+
+s/Otherwise/If not specified,/
+
+> +  the default 100 kHz frequency will be used. As only Normal and Fast modes
+> +  are supported, possible values are 100000 and 400000.
+
+I think that's just optional. Since there's a well-defined sensible
+default, there's no need to recommend it.
+
+> +Optional properties :
+> +- i2c-min-scl-pulse-width-us : The minimum valid SCL pulse width that is allowed
+> +  through the deglitch circuit. In units of us.
+> +- i2c-min-sda-pulse-width-us : The minimum valid SDA pulse width that is allowed
+> +  through the deglitch circuit. In units of us.
+
+Are those properties specific to this binding, or intended to be
+generic? If specific to this binding, a vendor prefix should be present
+in the property name. If not, you probably want to document the
+properties in some common file.
+
+> +Examples :
+
+s/Examples/Example/ since there's just one.
+
+> +i2c0: i2c at fed40000 {
+> +	compatible	= "st,comms-ssc-i2c";
+> +	reg		= <0xfed40000 0x110>;
+> +	interrupts	=  <GIC_SPI 187 IRQ_TYPE_EDGE_RISING>;
+> +	clocks		= <&CLK_S_ICN_REG_0>;
+> +	clock-names	= "ssc";
+> +	clock-frequency = <400000>;
+> +	pinctrl-names	= "default";
+> +	pinctrl-0	= <&pinctrl_i2c0_default>;
+
+That wasn't mentioned in the binding definition. You'd probably want to
+document the requirement for those two properties by saying something like:
+
+A pinctrl state named "default" must be defined, using the bindings in
+../pinctrl/pinctrl-binding.txt.
