@@ -1,78 +1,107 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue,  1 Oct 2013 10:48:45 +0200
-Subject: [PATCH] ARM: gemini: delete <mach/gpio.h>
-Message-ID: <1380617325-7477-1-git-send-email-linus.walleij@linaro.org>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Tue,  1 Oct 2013 11:00:53 +0200
+Subject: [PATCH] clocksource: put nodes passed to CLOCKSOURCE_OF_DECLARE
+ callbacks centrally
+Message-ID: <1380618053-11159-1-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Gemini has no need of a <mach/gpio.h> header as this is only
-used by the machine-local gpio.c gpiochip driver, which is also
-only using the irq_to_gpio() macro. Delete the file, move the single
-macro into the driver and remove the NEED_MACH_GPIO_H flag.
+Instead of letting each driver call of_node_put do it centrally in the
+loop that also calls the CLOCKSOURCE_OF_DECLARE callbacks. This is less
+prone to error and also moves getting and putting the references into the
+same function.
 
-Cc: Hans Ulli Kroll <ulli.kroll@googlemail.com>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
-This will be applied to the GPIO tree unless there are protests.
----
- arch/arm/Kconfig                         |  1 -
- arch/arm/mach-gemini/gpio.c              |  2 +-
- arch/arm/mach-gemini/include/mach/gpio.h | 20 --------------------
- 3 files changed, 1 insertion(+), 22 deletions(-)
- delete mode 100644 arch/arm/mach-gemini/include/mach/gpio.h
+Consequently all respective of_node_put calls in drivers are removed.
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 3f7714d..b46a078 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -388,7 +388,6 @@ config ARCH_GEMINI
- 	select ARCH_REQUIRE_GPIOLIB
- 	select ARCH_USES_GETTIMEOFFSET
- 	select CPU_FA526
--	select NEED_MACH_GPIO_H
- 	help
- 	  Support for the Cortina Systems Gemini family SoCs
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+---
+ arch/arm/mach-msm/timer.c             | 1 -
+ drivers/clocksource/clksrc-of.c       | 1 +
+ drivers/clocksource/dw_apb_timer_of.c | 2 --
+ drivers/clocksource/tegra20_timer.c   | 4 ----
+ drivers/clocksource/vt8500_timer.c    | 2 --
+ 5 files changed, 1 insertion(+), 9 deletions(-)
+
+diff --git a/arch/arm/mach-msm/timer.c b/arch/arm/mach-msm/timer.c
+index 696fb73..1e9c338 100644
+--- a/arch/arm/mach-msm/timer.c
++++ b/arch/arm/mach-msm/timer.c
+@@ -274,7 +274,6 @@ static void __init msm_dt_timer_init(struct device_node *np)
+ 		pr_err("Unknown frequency\n");
+ 		return;
+ 	}
+-	of_node_put(np);
  
-diff --git a/arch/arm/mach-gemini/gpio.c b/arch/arm/mach-gemini/gpio.c
-index 70bfa57..f8cb571 100644
---- a/arch/arm/mach-gemini/gpio.c
-+++ b/arch/arm/mach-gemini/gpio.c
-@@ -21,9 +21,9 @@
+ 	event_base = base + 0x4;
+ 	sts_base = base + 0x88;
+diff --git a/drivers/clocksource/clksrc-of.c b/drivers/clocksource/clksrc-of.c
+index 37f5325..8b2ed14 100644
+--- a/drivers/clocksource/clksrc-of.c
++++ b/drivers/clocksource/clksrc-of.c
+@@ -32,5 +32,6 @@ void __init clocksource_of_init(void)
+ 	for_each_matching_node_and_match(np, __clksrc_of_table, &match) {
+ 		init_func = match->data;
+ 		init_func(np);
++		of_node_put(np);
+ 	}
+ }
+diff --git a/drivers/clocksource/dw_apb_timer_of.c b/drivers/clocksource/dw_apb_timer_of.c
+index 4cbae4f..294aeb7 100644
+--- a/drivers/clocksource/dw_apb_timer_of.c
++++ b/drivers/clocksource/dw_apb_timer_of.c
+@@ -138,12 +138,10 @@ static void __init dw_apb_timer_init(struct device_node *timer)
+ 	case 0:
+ 		pr_debug("%s: found clockevent timer\n", __func__);
+ 		add_clockevent(timer);
+-		of_node_put(timer);
+ 		break;
+ 	case 1:
+ 		pr_debug("%s: found clocksource timer\n", __func__);
+ 		add_clocksource(timer);
+-		of_node_put(timer);
+ 		init_sched_clock();
+ 		break;
+ 	default:
+diff --git a/drivers/clocksource/tegra20_timer.c b/drivers/clocksource/tegra20_timer.c
+index 9396170..fc173a6 100644
+--- a/drivers/clocksource/tegra20_timer.c
++++ b/drivers/clocksource/tegra20_timer.c
+@@ -181,8 +181,6 @@ static void __init tegra20_init_timer(struct device_node *np)
+ 		rate = clk_get_rate(clk);
+ 	}
  
- #include <mach/hardware.h>
- #include <mach/irqs.h>
--#include <mach/gpio.h>
+-	of_node_put(np);
+-
+ 	switch (rate) {
+ 	case 12000000:
+ 		timer_writel(0x000b, TIMERUS_USEC_CFG);
+@@ -241,8 +239,6 @@ static void __init tegra20_init_rtc(struct device_node *np)
+ 	else
+ 		clk_prepare_enable(clk);
  
- #define GPIO_BASE(x)		IO_ADDRESS(GEMINI_GPIO_BASE(x))
-+#define irq_to_gpio(x)		((x) - GPIO_IRQ_BASE)
+-	of_node_put(np);
+-
+ 	register_persistent_clock(NULL, tegra_read_persistent_clock);
+ }
+ CLOCKSOURCE_OF_DECLARE(tegra20_rtc, "nvidia,tegra20-rtc", tegra20_init_rtc);
+diff --git a/drivers/clocksource/vt8500_timer.c b/drivers/clocksource/vt8500_timer.c
+index 64f553f..ad3c0e8 100644
+--- a/drivers/clocksource/vt8500_timer.c
++++ b/drivers/clocksource/vt8500_timer.c
+@@ -137,14 +137,12 @@ static void __init vt8500_timer_init(struct device_node *np)
+ 	if (!regbase) {
+ 		pr_err("%s: Missing iobase description in Device Tree\n",
+ 								__func__);
+-		of_node_put(np);
+ 		return;
+ 	}
+ 	timer_irq = irq_of_parse_and_map(np, 0);
+ 	if (!timer_irq) {
+ 		pr_err("%s: Missing irq description in Device Tree\n",
+ 								__func__);
+-		of_node_put(np);
+ 		return;
+ 	}
  
- /* GPIO registers definition */
- #define GPIO_DATA_OUT		0x0
-diff --git a/arch/arm/mach-gemini/include/mach/gpio.h b/arch/arm/mach-gemini/include/mach/gpio.h
-deleted file mode 100644
-index 40a0527..0000000
---- a/arch/arm/mach-gemini/include/mach/gpio.h
-+++ /dev/null
-@@ -1,20 +0,0 @@
--/*
-- * Gemini gpiolib specific defines
-- *
-- * Copyright (C) 2008-2009 Paulius Zaleckas <paulius.zaleckas@teltonika.lt>
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; either version 2 of the License, or
-- * (at your option) any later version.
-- */
--
--#ifndef __MACH_GPIO_H__
--#define __MACH_GPIO_H__
--
--#include <mach/irqs.h>
--
--#define gpio_to_irq(x)	((x) + GPIO_IRQ_BASE)
--#define irq_to_gpio(x)	((x) - GPIO_IRQ_BASE)
--
--#endif /* __MACH_GPIO_H__ */
 -- 
-1.8.3.1
+1.8.4.rc3
