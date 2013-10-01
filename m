@@ -1,381 +1,173 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue,  1 Oct 2013 11:37:06 +0900
-Subject: [PATCH 06/12] ARM: shmobile: bockw: add R-Car sound support (PIO)
+Date: Tue,  1 Oct 2013 11:37:07 +0900
+Subject: [PATCH 07/12] ARM: shmobile: Koelsch support
 In-Reply-To: <cover.1380530519.git.horms+renesas@verge.net.au>
 References: <cover.1380530519.git.horms+renesas@verge.net.au>
-Message-ID: <688e6a6df880ee70e76f6ec1991dd0f186c25329.1380530519.git.horms+renesas@verge.net.au>
+Message-ID: <1f52c65975ba16cdba1830ba216776111197a3ee.1380530519.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+From: Hisashi Nakamura <hisashi.nakamura.ak@renesas.com>
 
-This patch enables R-Car sound,
-AK4643 (CN19) and AK4554 (CN20/CN21) codec chip
-on Bock-W.
+Koelsch base board support making use of 2 GiB of memory,
+the r8a7791 SoC with the SCIF0 serial port and CA15 with
+CMT timer.
 
-But, it supports PIO transfer only at this point.
-User can check sound settings (Dip-switch/PFC etc)
-via this patch, but will get under/over flow error
-when playback/capture.
-Because PIO transfer via SSI will be interrupted
-"sampling rate" times per 1 second.
-
-DMA transfer will be supported when HPB-DMAC was
-enabled on r8a7778.
-
-You will notice strange ALSA sound card HW
-numbering on Bock-W board.
-This came from AK4554 strange format on playback/capture.
-The format on playback/capture is same on "normal" codec chip,
-but AK4554 was different.
-Because of that, AK4554 playback/capture are
-registered as a different sound card.
-
-Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-[horms+renesas at verge.net.au: squashed cleanup of SND_SOC_xxx in
- Kconfig by Kuninori Morimoto]
+Signed-off-by: Hisashi Nakamura <hisashi.nakamura.ak@renesas.com>
+Signed-off-by: Ryo Kataoka <ryo.kataoka.wt@renesas.com>
+[damm at opensource.se: Forward ported to upstream, dropped not-yet-ready SMP/PFC]
+Signed-off-by: Magnus Damm <damm@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/Kconfig       |   2 +
- arch/arm/mach-shmobile/board-bockw.c | 274 ++++++++++++++++++++++++++++++++++-
- 2 files changed, 275 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/Makefile             |  1 +
+ arch/arm/boot/dts/r8a7791-koelsch.dts  | 32 +++++++++++++++++++++++++
+ arch/arm/mach-shmobile/Kconfig         |  5 ++++
+ arch/arm/mach-shmobile/Makefile        |  1 +
+ arch/arm/mach-shmobile/Makefile.boot   |  1 +
+ arch/arm/mach-shmobile/board-koelsch.c | 44 ++++++++++++++++++++++++++++++++++
+ 6 files changed, 84 insertions(+)
+ create mode 100644 arch/arm/boot/dts/r8a7791-koelsch.dts
+ create mode 100644 arch/arm/mach-shmobile/board-koelsch.c
 
-diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
-index b452405..d01e427 100644
---- a/arch/arm/mach-shmobile/Kconfig
-+++ b/arch/arm/mach-shmobile/Kconfig
-@@ -168,6 +168,8 @@ config MACH_BOCKW
- 	select RENESAS_INTC_IRQPIN
- 	select REGULATOR_FIXED_VOLTAGE if REGULATOR
- 	select USE_OF
-+	select SND_SOC_AK4554 if SND_SIMPLE_CARD
-+	select SND_SOC_AK4642 if SND_SIMPLE_CARD
- 
- config MACH_BOCKW_REFERENCE
- 	bool "BOCK-W  - Reference Device Tree Implementation"
-diff --git a/arch/arm/mach-shmobile/board-bockw.c b/arch/arm/mach-shmobile/board-bockw.c
-index b998c6b..7ad868d 100644
---- a/arch/arm/mach-shmobile/board-bockw.c
-+++ b/arch/arm/mach-shmobile/board-bockw.c
-@@ -37,9 +37,12 @@
- #include <mach/irqs.h>
- #include <mach/r8a7778.h>
- #include <asm/mach/arch.h>
-+#include <sound/rcar_snd.h>
-+#include <sound/simple_card.h>
- 
- #define FPGA	0x18200000
- #define IRQ0MR	0x30
-+#define COMCTLR	0x101c
- static void __iomem *fpga;
- 
- /*
-@@ -67,6 +70,35 @@ static void __iomem *fpga;
-  * SW19	(MMC)	1 pin
-  */
- 
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index cc0f1fb..3b1c462 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -202,6 +202,7 @@ dtb-$(CONFIG_ARCH_SHMOBILE) += emev2-kzm9d.dtb \
+ 	r8a7740-armadillo800eva-reference.dtb \
+ 	r8a7779-marzen.dtb \
+ 	r8a7779-marzen-reference.dtb \
++	r8a7791-koelsch.dtb \
+ 	r8a7790-lager.dtb \
+ 	r8a7790-lager-reference.dtb \
+ 	sh73a0-kzm9g.dtb \
+diff --git a/arch/arm/boot/dts/r8a7791-koelsch.dts b/arch/arm/boot/dts/r8a7791-koelsch.dts
+new file mode 100644
+index 0000000..1ce5250
+--- /dev/null
++++ b/arch/arm/boot/dts/r8a7791-koelsch.dts
+@@ -0,0 +1,32 @@
 +/*
-+ *	SSI settings
++ * Device Tree Source for the Koelsch board
 + *
-+ * SW45: 1-4 side	(SSI5 out, ROUT/LOUT CN19 Mid)
-+ * SW46: 1101		(SSI6 Recorde)
-+ * SW47: 1110		(SSI5 Playback)
-+ * SW48: 11		(Recorde power)
-+ * SW49: 1		(SSI slave mode)
-+ * SW50: 1111		(SSI7, SSI8)
-+ * SW51: 1111		(SSI3, SSI4)
-+ * SW54: 1pin		(ak4554 FPGA control)
-+ * SW55: 1		(CLKB is 24.5760MHz)
-+ * SW60: 1pin		(ak4554 FPGA control)
-+ * SW61: 3pin		(use X11 clock)
-+ * SW78: 3-6		(ak4642 connects I2C0)
++ * Copyright (C) 2013 Renesas Electronics Corporation
++ * Copyright (C) 2013 Renesas Solutions Corp.
 + *
-+ * You can use sound as
-+ *
-+ * hw0: CN19: SSI56-AK4643
-+ * hw1: CN21: SSI3-AK4554(playback)
-+ * hw2: CN21: SSI4-AK4554(capture)
-+ * hw3: CN20: SSI7-AK4554(playback)
-+ * hw4: CN20: SSI8-AK4554(capture)
-+ *
-+ * this command is required when playback on hw0.
-+ *
-+ * # amixer set "LINEOUT Mixer DACL" on
++ * This file is licensed under the terms of the GNU General Public License
++ * version 2.  This program is licensed "as is" without any warranty of any
++ * kind, whether express or implied.
 + */
 +
- /* Dummy supplies, where voltage doesn't matter */
- static struct regulator_consumer_supply dummy_supplies[] = {
- 	REGULATOR_SUPPLY("vddvario", "smsc911x"),
-@@ -122,7 +154,9 @@ static struct sh_eth_plat_data ether_platform_data __initdata = {
- static struct i2c_board_info i2c0_devices[] = {
- 	{
- 		I2C_BOARD_INFO("rx8581", 0x51),
--	},
-+	}, {
-+		I2C_BOARD_INFO("ak4643", 0x12),
-+	}
- };
++/dts-v1/;
++/include/ "r8a7791.dtsi"
++
++/ {
++	model = "Koelsch";
++	compatible = "renesas,koelsch", "renesas,r8a7791";
++
++	chosen {
++		bootargs = "console=ttySC6,115200 ignore_loglevel rw root=/dev/nfs ip=dhcp";
++	};
++
++	memory at 40000000 {
++		device_type = "memory";
++		reg = <0 0x40000000 0 0x80000000>;
++	};
++
++	lbsc {
++		#address-cells = <1>;
++		#size-cells = <1>;
++	};
++};
+diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
+index d01e427..eda2857 100644
+--- a/arch/arm/mach-shmobile/Kconfig
++++ b/arch/arm/mach-shmobile/Kconfig
+@@ -221,6 +221,11 @@ config MACH_LAGER_REFERENCE
  
- /* HSPI*/
-@@ -185,7 +219,213 @@ static struct soc_camera_link iclink##idx##_ml86v7667 __initdata = {	\
- BOCKW_CAMERA(0);
- BOCKW_CAMERA(1);
+ 	   This is intended to aid developers
  
-+/* Sound */
-+static struct resource rsnd_resources[] __initdata = {
-+	[RSND_GEN1_SRU] = DEFINE_RES_MEM(0xffd90000, 0x1000),
-+	[RSND_GEN1_SSI] = DEFINE_RES_MEM(0xffd91000, 0x1240),
-+	[RSND_GEN1_ADG] = DEFINE_RES_MEM(0xfffe0000, 0x24),
-+};
++config MACH_KOELSCH
++	bool "Koelsch board"
++	depends on ARCH_R8A7791
++	select USE_OF
 +
-+static struct rsnd_ssi_platform_info rsnd_ssi[] = {
-+	RSND_SSI_UNUSED, /* SSI 0 */
-+	RSND_SSI_UNUSED, /* SSI 1 */
-+	RSND_SSI_UNUSED, /* SSI 2 */
-+	RSND_SSI_SET(1, 0, gic_iid(0x85), RSND_SSI_PLAY),
-+	RSND_SSI_SET(2, 0, gic_iid(0x85), RSND_SSI_CLK_PIN_SHARE | RSND_SSI_CLK_FROM_ADG),
-+	RSND_SSI_SET(0, 0, gic_iid(0x86), RSND_SSI_PLAY),
-+	RSND_SSI_SET(0, 0, gic_iid(0x86), 0),
-+	RSND_SSI_SET(3, 0, gic_iid(0x86), RSND_SSI_PLAY),
-+	RSND_SSI_SET(4, 0, gic_iid(0x86), RSND_SSI_CLK_PIN_SHARE | RSND_SSI_CLK_FROM_ADG),
-+};
+ config MACH_KZM9D
+ 	bool "KZM9D board"
+ 	depends on ARCH_EMEV2
+diff --git a/arch/arm/mach-shmobile/Makefile b/arch/arm/mach-shmobile/Makefile
+index 228193c..e552e84 100644
+--- a/arch/arm/mach-shmobile/Makefile
++++ b/arch/arm/mach-shmobile/Makefile
+@@ -61,6 +61,7 @@ obj-$(CONFIG_MACH_LAGER)	+= board-lager.o
+ obj-$(CONFIG_MACH_LAGER_REFERENCE)	+= board-lager-reference.o
+ obj-$(CONFIG_MACH_ARMADILLO800EVA)	+= board-armadillo800eva.o
+ obj-$(CONFIG_MACH_ARMADILLO800EVA_REFERENCE)	+= board-armadillo800eva-reference.o
++obj-$(CONFIG_MACH_KOELSCH)	+= board-koelsch.o
+ obj-$(CONFIG_MACH_KZM9D)	+= board-kzm9d.o
+ obj-$(CONFIG_MACH_KZM9D_REFERENCE)	+= board-kzm9d-reference.o
+ obj-$(CONFIG_MACH_KZM9G)	+= board-kzm9g.o
+diff --git a/arch/arm/mach-shmobile/Makefile.boot b/arch/arm/mach-shmobile/Makefile.boot
+index 6a504fe..60e29e6 100644
+--- a/arch/arm/mach-shmobile/Makefile.boot
++++ b/arch/arm/mach-shmobile/Makefile.boot
+@@ -6,6 +6,7 @@ loadaddr-$(CONFIG_MACH_ARMADILLO800EVA) += 0x40008000
+ loadaddr-$(CONFIG_MACH_ARMADILLO800EVA_REFERENCE) += 0x40008000
+ loadaddr-$(CONFIG_MACH_BOCKW) += 0x60008000
+ loadaddr-$(CONFIG_MACH_BOCKW_REFERENCE) += 0x60008000
++loadaddr-$(CONFIG_MACH_KOELSCH) += 0x40008000
+ loadaddr-$(CONFIG_MACH_KZM9D) += 0x40008000
+ loadaddr-$(CONFIG_MACH_KZM9D_REFERENCE) += 0x40008000
+ loadaddr-$(CONFIG_MACH_KZM9G) += 0x41008000
+diff --git a/arch/arm/mach-shmobile/board-koelsch.c b/arch/arm/mach-shmobile/board-koelsch.c
+new file mode 100644
+index 0000000..cc2d5e8
+--- /dev/null
++++ b/arch/arm/mach-shmobile/board-koelsch.c
+@@ -0,0 +1,44 @@
++/*
++ * Koelsch board support
++ *
++ * Copyright (C) 2013  Renesas Electronics Corporation
++ * Copyright (C) 2013  Renesas Solutions Corp.
++ * Copyright (C) 2013  Magnus Damm
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; version 2 of the License.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
++ */
 +
-+static struct rsnd_scu_platform_info rsnd_scu[9] = {
-+	/* no member at this point */
-+};
++#include <linux/kernel.h>
++#include <linux/platform_device.h>
++#include <mach/common.h>
++#include <mach/r8a7791.h>
++#include <asm/mach-types.h>
++#include <asm/mach/arch.h>
 +
-+enum {
-+	AK4554_34 = 0,
-+	AK4643_56,
-+	AK4554_78,
-+	SOUND_MAX,
-+};
-+
-+static int rsnd_codec_power(int id, int enable)
++static void __init koelsch_add_standard_devices(void)
 +{
-+	static int sound_user[SOUND_MAX] = {0, 0, 0};
-+	int *usr = NULL;
-+	u32 bit;
-+
-+	switch (id) {
-+	case 3:
-+	case 4:
-+		usr = sound_user + AK4554_34;
-+		bit = (1 << 10);
-+		break;
-+	case 5:
-+	case 6:
-+		usr = sound_user + AK4643_56;
-+		bit = (1 << 6);
-+		break;
-+	case 7:
-+	case 8:
-+		usr = sound_user + AK4554_78;
-+		bit = (1 << 7);
-+		break;
-+	}
-+
-+	if (!usr)
-+		return -EIO;
-+
-+	if (enable) {
-+		if (*usr == 0) {
-+			u32 val = ioread16(fpga + COMCTLR);
-+			val &= ~bit;
-+			iowrite16(val, fpga + COMCTLR);
-+		}
-+
-+		(*usr)++;
-+	} else {
-+		if (*usr == 0)
-+			return 0;
-+
-+		(*usr)--;
-+
-+		if (*usr == 0) {
-+			u32 val = ioread16(fpga + COMCTLR);
-+			val |= bit;
-+			iowrite16(val, fpga + COMCTLR);
-+		}
-+	}
-+
-+	return 0;
++	r8a7791_clock_init();
++	r8a7791_add_dt_devices();
 +}
 +
-+static int rsnd_start(int id)
-+{
-+	return rsnd_codec_power(id, 1);
-+}
-+
-+static int rsnd_stop(int id)
-+{
-+	return rsnd_codec_power(id, 0);
-+}
-+
-+static struct rcar_snd_info rsnd_info = {
-+	.flags		= RSND_GEN1,
-+	.ssi_info	= rsnd_ssi,
-+	.ssi_info_nr	= ARRAY_SIZE(rsnd_ssi),
-+	.scu_info	= rsnd_scu,
-+	.scu_info_nr	= ARRAY_SIZE(rsnd_scu),
-+	.start		= rsnd_start,
-+	.stop		= rsnd_stop,
++static const char * const koelsch_boards_compat_dt[] __initconst = {
++	"renesas,koelsch",
++	NULL,
 +};
 +
-+static struct asoc_simple_card_info rsnd_card_info[] = {
-+	/* SSI5, SSI6 */
-+	{
-+		.name		= "AK4643",
-+		.card		= "SSI56-AK4643",
-+		.codec		= "ak4642-codec.0-0012",
-+		.platform	= "rcar_sound",
-+		.daifmt		= SND_SOC_DAIFMT_LEFT_J,
-+		.cpu_dai = {
-+			.name	= "rsnd-dai.0",
-+			.fmt	= SND_SOC_DAIFMT_CBS_CFS,
-+		},
-+		.codec_dai = {
-+			.name	= "ak4642-hifi",
-+			.fmt	= SND_SOC_DAIFMT_CBM_CFM,
-+			.sysclk	= 11289600,
-+		},
-+	},
-+	/* SSI3 */
-+	{
-+		.name		= "AK4554",
-+		.card		= "SSI3-AK4554(playback)",
-+		.codec		= "ak4554-adc-dac.0",
-+		.platform	= "rcar_sound",
-+		.cpu_dai = {
-+			.name	= "rsnd-dai.1",
-+			.fmt	= SND_SOC_DAIFMT_CBM_CFM |
-+				  SND_SOC_DAIFMT_RIGHT_J,
-+		},
-+		.codec_dai = {
-+			.name	= "ak4554-hifi",
-+		},
-+	},
-+	/* SSI4 */
-+	{
-+		.name		= "AK4554",
-+		.card		= "SSI4-AK4554(capture)",
-+		.codec		= "ak4554-adc-dac.0",
-+		.platform	= "rcar_sound",
-+		.cpu_dai = {
-+			.name	= "rsnd-dai.2",
-+			.fmt	= SND_SOC_DAIFMT_CBM_CFM |
-+				  SND_SOC_DAIFMT_LEFT_J,
-+		},
-+		.codec_dai = {
-+			.name	= "ak4554-hifi",
-+		},
-+	},
-+	/* SSI7 */
-+	{
-+		.name		= "AK4554",
-+		.card		= "SSI7-AK4554(playback)",
-+		.codec		= "ak4554-adc-dac.1",
-+		.platform	= "rcar_sound",
-+		.cpu_dai = {
-+			.name	= "rsnd-dai.3",
-+			.fmt	= SND_SOC_DAIFMT_CBM_CFM |
-+				  SND_SOC_DAIFMT_RIGHT_J,
-+		},
-+		.codec_dai = {
-+			.name	= "ak4554-hifi",
-+		},
-+	},
-+	/* SSI8 */
-+	{
-+		.name		= "AK4554",
-+		.card		= "SSI8-AK4554(capture)",
-+		.codec		= "ak4554-adc-dac.1",
-+		.platform	= "rcar_sound",
-+		.cpu_dai = {
-+			.name	= "rsnd-dai.4",
-+			.fmt	= SND_SOC_DAIFMT_CBM_CFM |
-+				  SND_SOC_DAIFMT_LEFT_J,
-+		},
-+		.codec_dai = {
-+			.name	= "ak4554-hifi",
-+		},
-+	}
-+};
-+
- static const struct pinctrl_map bockw_pinctrl_map[] = {
-+	/* AUDIO */
-+	PIN_MAP_MUX_GROUP_DEFAULT("rcar_sound", "pfc-r8a7778",
-+				  "audio_clk_a", "audio_clk"),
-+	PIN_MAP_MUX_GROUP_DEFAULT("rcar_sound", "pfc-r8a7778",
-+				  "audio_clk_b", "audio_clk"),
-+	PIN_MAP_MUX_GROUP_DEFAULT("rcar_sound", "pfc-r8a7778",
-+				  "ssi34_ctrl", "ssi"),
-+	PIN_MAP_MUX_GROUP_DEFAULT("rcar_sound", "pfc-r8a7778",
-+				  "ssi3_data", "ssi"),
-+	PIN_MAP_MUX_GROUP_DEFAULT("rcar_sound", "pfc-r8a7778",
-+				  "ssi4_data", "ssi"),
-+	PIN_MAP_MUX_GROUP_DEFAULT("rcar_sound", "pfc-r8a7778",
-+				  "ssi5_ctrl", "ssi"),
-+	PIN_MAP_MUX_GROUP_DEFAULT("rcar_sound", "pfc-r8a7778",
-+				  "ssi5_data", "ssi"),
-+	PIN_MAP_MUX_GROUP_DEFAULT("rcar_sound", "pfc-r8a7778",
-+				  "ssi6_ctrl", "ssi"),
-+	PIN_MAP_MUX_GROUP_DEFAULT("rcar_sound", "pfc-r8a7778",
-+				  "ssi6_data", "ssi"),
-+	PIN_MAP_MUX_GROUP_DEFAULT("rcar_sound", "pfc-r8a7778",
-+				  "ssi78_ctrl", "ssi"),
-+	PIN_MAP_MUX_GROUP_DEFAULT("rcar_sound", "pfc-r8a7778",
-+				  "ssi7_data", "ssi"),
-+	PIN_MAP_MUX_GROUP_DEFAULT("rcar_sound", "pfc-r8a7778",
-+				  "ssi8_data", "ssi"),
- 	/* Ether */
- 	PIN_MAP_MUX_GROUP_DEFAULT("r8a777x-ether", "pfc-r8a7778",
- 				  "ether_rmii", "ether"),
-@@ -233,6 +473,8 @@ static const struct pinctrl_map bockw_pinctrl_map[] = {
- static void __init bockw_init(void)
- {
- 	void __iomem *base;
-+	struct clk *clk;
-+	int i;
- 
- 	r8a7778_clock_init();
- 	r8a7778_init_irq_extpin(1);
-@@ -309,6 +551,36 @@ static void __init bockw_init(void)
- 			sdhi0_resources, ARRAY_SIZE(sdhi0_resources),
- 			&sdhi0_info, sizeof(struct sh_mobile_sdhi_info));
- 	}
-+
-+	/* for Audio */
-+	clk = clk_get(NULL, "audio_clk_b");
-+	clk_set_rate(clk, 24576000);
-+	clk_put(clk);
-+	rsnd_codec_power(5, 1); /* enable ak4642 */
-+
-+	platform_device_register_simple(
-+		"ak4554-adc-dac", 0, NULL, 0);
-+
-+	platform_device_register_simple(
-+		"ak4554-adc-dac", 1, NULL, 0);
-+
-+	platform_device_register_resndata(
-+		&platform_bus, "rcar_sound", -1,
-+		rsnd_resources, ARRAY_SIZE(rsnd_resources),
-+		&rsnd_info, sizeof(rsnd_info));
-+
-+	for (i = 0; i < ARRAY_SIZE(rsnd_card_info); i++) {
-+		struct platform_device_info cardinfo = {
-+			.parent         = &platform_bus,
-+			.name           = "asoc-simple-card",
-+			.id             = i,
-+			.data           = &rsnd_card_info[i],
-+			.size_data      = sizeof(struct asoc_simple_card_info),
-+			.dma_mask       = ~0,
-+		};
-+
-+		platform_device_register_full(&cardinfo);
-+	}
- }
- 
- static const char *bockw_boards_compat_dt[] __initdata = {
++DT_MACHINE_START(KOELSCH_DT, "koelsch")
++	.init_early	= r8a7791_init_early,
++	.init_machine	= koelsch_add_standard_devices,
++	.dt_compat	= koelsch_boards_compat_dt,
++MACHINE_END
 -- 
 1.8.4
