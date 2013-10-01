@@ -1,46 +1,53 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 1 Oct 2013 10:08:29 +0200
-Subject: [RFC, PATCH] clocksource: provide timekeeping for efm32 SoCs
-In-Reply-To: <5242F434.7060702@linaro.org>
-References: <1379324644-20934-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <5242F434.7060702@linaro.org>
-Message-ID: <20131001080829.GJ2548@pengutronix.de>
+From: yrehan@gmail.com (Mian Yousaf Kaukab)
+Date: Tue, 1 Oct 2013 10:11:17 +0200
+Subject: [PATCH] ARM: vexpress: ignore MIDR[0] for uart detection
+In-Reply-To: <1380449869-19911-1-git-send-email-yrehan@gmail.com>
+References: <1380449869-19911-1-git-send-email-yrehan@gmail.com>
+Message-ID: <CAC_HJnzfvi59i0e0-VwhUtKPxiPLU9o+Y6Dvts9HVkKC6gyqRw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 25, 2013 at 04:33:24PM +0200, Daniel Lezcano wrote:
-> On 09/16/2013 11:44 AM, Uwe Kleine-K?nig wrote:
-> > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> > ---
-> > Hello,
-> > 
-> > I'm not sure that the way I implemented if a given timer is used as
-> > clock_source or clock_event_device is robust. Does it need locking?
-> > The reason to create a timer device for each timer instead of a single
-> > device of all of them is that it makes it cleaner to specify irqs and
-> > clks which each timer has one of each respectively. I didn't find an
-> > example, but while looking I wondered if in zevio-timer.c a single timer
-> > can really support both clock_event and clocksource.
-> > 
-> > I guess for inclusion I need to write a document describing the
-> > of-binding. I will include that in the next iteration.
-> 
-> Right and a nice description of the timer would be valuable.
-Where is the location to put a device tree binding document for a
-clocksource/clock event device? I found
+Hi Pawel,
 
-	arm,armv7-timer-mem	| arm/arch_timer.txt
-	fsl,timrot		| N/A
-	nvidia,tegra20-rtc	| rtc/nvidia,tegra20-rtc.txt
+On Sun, Sep 29, 2013 at 12:17 PM, Mian Yousaf Kaukab <yrehan@gmail.com> wrote:
+> Qemu vexpress-a9 target reports id of ARM Cortex-A9 core as r0p0
+> and uses legacy map. That is UART0 at address 0x10009000. Ignore
+> MIDR[0] during uart detection so that r0p0 as well as r0p1 use
+> legacy map.
+>
+> Signed-off-by: Mian Yousaf Kaukab <yrehan@gmail.com>
+> ---
+>  arch/arm/include/debug/vexpress.S | 9 +++++++--
+>  1 file changed, 7 insertions(+), 2 deletions(-)
+>
+> diff --git a/arch/arm/include/debug/vexpress.S b/arch/arm/include/debug/vexpress.S
+> index 524acd5..932db8b 100644
+> --- a/arch/arm/include/debug/vexpress.S
+> +++ b/arch/arm/include/debug/vexpress.S
+> @@ -27,11 +27,16 @@
+>
+>                 @ Make an educated guess regarding the memory map:
+>                 @ - the original A9 core tile (based on ARM Cortex-A9 r0p1)
+> -               @   should use UART at 0x10009000
+> +               @   should use UART at 0x10009000. Moreover, qemu vexpress-a9
+> +               @   target reports id of ARM Cortex-A9 core as r0p0 and uses
+> +               @   legacy map.
+>                 @ - all other (RS1 complaint) tiles use UART mapped
+>                 @   at 0x1c090000
+>                 mrc     p15, 0, \rp, c0, c0, 0
+> -               movw    \rv, #0xc091
+> +               mov     \rv, #1
+> +               @ Ignore MIDR[0] during comparison
+> +               bic     \rp, \rp, \rv
+> +               movw    \rv, #0xc090
+>                 movt    \rv, #0x410f
+>                 cmp     \rp, \rv
 
-Should I introduce a "clocksource" directory below
-Documentation/devicetree/bindings?
+Can you please take a look at this patch? Default vexpress_defconfig
+does not boot on qemu vexpress-a9 target without it.
+I apologize if you get this message twice. I have to resend because
+the previous message didn't reach the mailing list.
 
-Other than that if there are no further comments I'll sent a v2 soon.
 
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+BR,
+Yousaf
