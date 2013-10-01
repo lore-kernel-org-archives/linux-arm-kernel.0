@@ -1,66 +1,76 @@
 From: horms+renesas@verge.net.au (Simon Horman)
 Date: Tue,  1 Oct 2013 11:35:35 +0900
-Subject: [PATCH 03/14] ARM: shmobile: Remove unused shmobile_smp_init_cpus()
-In-Reply-To: <cover.1380532277.git.horms+renesas@verge.net.au>
-References: <cover.1380532277.git.horms+renesas@verge.net.au>
-Message-ID: <c4e1e64d2b6a921a57629ede635f81f5d2882543.1380532277.git.horms+renesas@verge.net.au>
+Subject: [GIT PULL 00/14] Renesas ARM based SoC SMP updates for v3.13
+Message-ID: <cover.1380532277.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm@opensource.se>
+Hi Kevin, Olof and Arnd,
 
-Remove shmobile_smp_init_cpus() since all SMP platforms in
-mach-shmobile now rely on DT for CPU core description instead
-of for instance determining number of cores from the SCU.
+please consider these Renesas ARM based SoC SMP updates for v3.13.
 
-Signed-off-by: Magnus Damm <damm@opensource.se>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/mach-shmobile/include/mach/common.h |  1 -
- arch/arm/mach-shmobile/platsmp.c             | 15 ---------------
- 2 files changed, 16 deletions(-)
+This pull-request is based on renesas-cleanups-v3.13 which
+I has also sent a pull-request for today. The reason for choosing
+that base is to reduce conflicts.
 
-diff --git a/arch/arm/mach-shmobile/include/mach/common.h b/arch/arm/mach-shmobile/include/mach/common.h
-index 1ed155e..26eaff1 100644
---- a/arch/arm/mach-shmobile/include/mach/common.h
-+++ b/arch/arm/mach-shmobile/include/mach/common.h
-@@ -40,7 +40,6 @@ static inline int shmobile_cpuidle_init(void) { return 0; }
- #endif
- 
- extern void __iomem *shmobile_scu_base;
--extern void shmobile_smp_init_cpus(unsigned int ncores);
- 
- static inline void __init shmobile_init_late(void)
- {
-diff --git a/arch/arm/mach-shmobile/platsmp.c b/arch/arm/mach-shmobile/platsmp.c
-index 3741562..9ebc246 100644
---- a/arch/arm/mach-shmobile/platsmp.c
-+++ b/arch/arm/mach-shmobile/platsmp.c
-@@ -11,25 +11,10 @@
-  * published by the Free Software Foundation.
-  */
- #include <linux/init.h>
--#include <linux/smp.h>
- #include <asm/cacheflush.h>
- #include <asm/smp_plat.h>
- #include <mach/common.h>
- 
--void __init shmobile_smp_init_cpus(unsigned int ncores)
--{
--	unsigned int i;
--
--	if (ncores > nr_cpu_ids) {
--		pr_warn("SMP: %u cores greater than maximum (%u), clipping\n",
--			ncores, nr_cpu_ids);
--		ncores = nr_cpu_ids;
--	}
--
--	for (i = 0; i < ncores; i++)
--		set_cpu_possible(i, true);
--}
--
- extern unsigned long shmobile_smp_fn[];
- extern unsigned long shmobile_smp_arg[];
- extern unsigned long shmobile_smp_mpidr[];
--- 
-1.8.4
+
+The following changes since commit cde214a890f81797a5eee94fffc89c1de21ed991:
+
+  ARM: shmobile: r8a7790: Constify platform data and resources (2013-09-19 14:33:44 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-smp-for-v3.13
+
+for you to fetch changes up to 43651b15de94d6a5e188ea032311e9661ec708d2:
+
+  ARM: shmobile: Include CA7 cores in APMU table (2013-09-30 17:56:11 +0900)
+
+----------------------------------------------------------------
+Renesas ARM based SoC SMP updates for v3.13
+
+* Add CPU notifier based SCU boot vector code
+  - Use on emev2, r8a7779 and sh73a0 SoCs
+  - Remove now unused shmobile_smp_scu_boot_secondary()
+* Add shared APMU SMP support code
+  - Use to add SMP support for r8a7790 SoC
+* Introduce shmobile_boot_size
+* Expose shmobile_invalidate_start()
+* Introduce shmobile_smp_cpu_disable()
+  - Use on sh73a0 SoC
+  - Remove now unused shmobile_smp_init_cpus()
+
+----------------------------------------------------------------
+Magnus Damm (14):
+      ARM: shmobile: Introduce shmobile_smp_cpu_disable()
+      ARM: shmobile: Use shmobile_smp_cpu_disable() on sh73a0
+      ARM: shmobile: Remove unused shmobile_smp_init_cpus()
+      ARM: shmobile: Expose shmobile_invalidate_start()
+      ARM: shmobile: Introduce shmobile_boot_size
+      ARM: shmobile: Shared APMU SMP support code without DT
+      ARM: shmobile: Add r8a7790 SMP support using APMU code
+      ARM: shmobile: Add CPU notifier based SCU boot vector code
+      ARM: shmobile: Let sh73a0 rely on SCU CPU notifier
+      ARM: shmobile: Let EMEV2 rely on SCU CPU notifier
+      ARM: shmobile: Let r8a7779 rely on SCU CPU notifier
+      ARM: shmobile: Remove shmobile_smp_scu_boot_secondary()
+      ARM: shmobile: Extend APMU code to allow single cluster only
+      ARM: shmobile: Include CA7 cores in APMU table
+
+ arch/arm/mach-shmobile/Makefile                |   1 +
+ arch/arm/mach-shmobile/board-lager-reference.c |   1 +
+ arch/arm/mach-shmobile/board-lager.c           |   1 +
+ arch/arm/mach-shmobile/headsmp.S               |   3 +
+ arch/arm/mach-shmobile/include/mach/common.h   |  12 +-
+ arch/arm/mach-shmobile/include/mach/r8a7790.h  |   1 +
+ arch/arm/mach-shmobile/platsmp-apmu.c          | 195 +++++++++++++++++++++++++
+ arch/arm/mach-shmobile/platsmp-scu.c           |  30 +++-
+ arch/arm/mach-shmobile/platsmp.c               |  22 +--
+ arch/arm/mach-shmobile/setup-r8a7790.c         |   1 +
+ arch/arm/mach-shmobile/smp-emev2.c             |   6 -
+ arch/arm/mach-shmobile/smp-r8a7779.c           |   4 -
+ arch/arm/mach-shmobile/smp-r8a7790.c           |  67 +++++++++
+ arch/arm/mach-shmobile/smp-sh73a0.c            |  14 +-
+ 14 files changed, 310 insertions(+), 48 deletions(-)
+ create mode 100644 arch/arm/mach-shmobile/platsmp-apmu.c
+ create mode 100644 arch/arm/mach-shmobile/smp-r8a7790.c
