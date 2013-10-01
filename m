@@ -1,34 +1,34 @@
 From: marex@denx.de (Marek Vasut)
-Date: Tue, 1 Oct 2013 06:14:39 +0200
-Subject: [PATCH] ARM: mxs: stub out mxs_pm_init for !CONFIG_PM
-In-Reply-To: <CAOMZO5AAPjtomrbzMN_+9C1gv1R5v8PCtP4bzynm1Ff_e7jcVg@mail.gmail.com>
-References: <2964094.prhBouhISv@wuerfel> <201309300050.20047.marex@denx.de>
- <CAOMZO5AAPjtomrbzMN_+9C1gv1R5v8PCtP4bzynm1Ff_e7jcVg@mail.gmail.com>
-Message-ID: <201310010614.39469.marex@denx.de>
+Date: Tue,  1 Oct 2013 06:22:30 +0200
+Subject: [PATCH] video: mxsfb: Add missing break
+Message-ID: <1380601350-6665-1-git-send-email-marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Fabio Estevam,
+Add missing break into the restore function.
 
-> Hi Marek,
-> 
-> On Sun, Sep 29, 2013 at 7:50 PM, Marek Vasut <marex@denx.de> wrote:
-> > Can you please pick this patch for 3.10 stable? It fixes a build issue on
-> > i.MX23/i.MX28 in case CONFIG_PM is not enabled.
-> > 
-> > Patchwork link: http://patchwork.ozlabs.org/patch/253324/
-> > 
-> > Upstream GIT:
-> > http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/arc
-> > h/arm/mach- mxs/pm.h?id=7a9caf59f60e55a8caf96f856713bd0ef0cc25a7
-> > 
-> > Thank you!
-> 
-> Just send the patch following this document so that it can be included
-> in stable:
-> Documentation/stable_kernel_rules.txt
+Upstream commit: 6d0bb818041a02be682abadb3ba35ff608f7d60a
 
-Fixed now (I hope). Thanks!
+Signed-off-by: Marek Vasut <marex@denx.de>
+Cc: Fabio Estevam <fabio.estevam@freescale.com>
+Cc: Shawn Guo <shawn.guo@linaro.org>
+Cc: stable at vger.kernel.org
 
-Best regards,
-Marek Vasut
+---
+ drivers/video/mxsfb.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/drivers/video/mxsfb.c b/drivers/video/mxsfb.c
+index 21223d4..75c5b4e 100644
+--- a/drivers/video/mxsfb.c
++++ b/drivers/video/mxsfb.c
+@@ -647,6 +647,7 @@ static int mxsfb_restore_mode(struct mxsfb_info *host)
+ 		break;
+ 	case 3:
+ 		bits_per_pixel = 32;
++		break;
+ 	case 1:
+ 	default:
+ 		return -EINVAL;
+-- 
+1.8.4.rc3
