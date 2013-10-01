@@ -1,61 +1,30 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 1 Oct 2013 11:15:28 -0400
-Subject: [PATCH 3/4] clk: kirkwood: Add CLK_IGNORE_UNUSED to ethernet
- ge0 and ge1 clocks
-In-Reply-To: <20131001170932.54d53aa4@skate>
-References: <1380575010-8573-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1380575010-8573-4-git-send-email-ezequiel.garcia@free-electrons.com>
- <20131001004009.GK31178@titan.lakedaemon.net>
- <20131001134213.GC2448@localhost>
- <20131001135800.GS31178@titan.lakedaemon.net>
- <20131001141716.GE2448@localhost>
- <20131001150130.GT31178@titan.lakedaemon.net>
- <20131001170932.54d53aa4@skate>
-Message-ID: <20131001151528.GV31178@titan.lakedaemon.net>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Tue, 1 Oct 2013 20:56:52 +0530
+Subject: [PATCH V5 1/5] ARM: dts: Add MIPI PHY node to exynos4.dtsi
+In-Reply-To: <524B3B04.3000704@gmail.com>
+References: <1380396467-29278-1-git-send-email-s.nawrocki@samsung.com>
+ <1380396467-29278-2-git-send-email-s.nawrocki@samsung.com>
+ <524A5D68.8080904@ti.com> <524B3B04.3000704@gmail.com>
+Message-ID: <524AE9BC.6060103@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 01, 2013 at 05:09:32PM +0200, Thomas Petazzoni wrote:
-> Dear Jason Cooper,
+On Wednesday 02 October 2013 02:43 AM, Sylwester Nawrocki wrote:
+> On 10/01/2013 07:28 AM, Kishon Vijay Abraham I wrote:
+>> On Sunday 29 September 2013 12:57 AM, Sylwester Nawrocki wrote:
+>>> >  Add PHY provider node for the MIPI CSIS and MIPI DSIM PHYs.
+>>> >
+>>> >  Signed-off-by: Sylwester Nawrocki<s.nawrocki@samsung.com>
+>>> >  Signed-off-by: Kyungmin Park<kyungmin.park@samsung.com>
+>>> >  Acked-by: Felipe Balbi<balbi@ti.com>
+>>
+>> Can this patch be taken through exynos dt tree?
 > 
-> On Tue, 1 Oct 2013 11:01:30 -0400, Jason Cooper wrote:
-> > On Tue, Oct 01, 2013 at 11:17:18AM -0300, Ezequiel Garcia wrote:
-> > > On Tue, Oct 01, 2013 at 09:58:00AM -0400, Jason Cooper wrote:
-> > ...
-> > > > However, I think the problem is that the IP block loses it's mac address
-> > > > when gated.  That hasn't been solved, all you're doing is moving the
-> > > > hack/workaround from one place to another less visible place.
-> > > > 
-> > > 
-> > > There's an already existing and clock-framework-specific way of preventing
-> > > a clock from being ever gated -which seems to match exactly this case-
-> > > so I have a hard time seeing why we wouldn't use it.
-> > > 
-> > > Also: I'm wondering why you think this change would 'hide' the clock gating.
-> > > It seems whenever a (future?) developer finds these clocks are not gated,
-> > > one of the first places he will look for is precisely on those flags.
-> > 
-> > True, I'm approaching it from "I unloaded mv643xx_eth.ko, and my power
-> > draw didn't change.  Let's go look at the driver."  But you are correct.
-> > 
-> > I'd really like to see if we can extend your patch to having the
-> > driver's probe function detect the mac address in the DT, and change the
-> > IGNORE_UNUSED flag on the clock.  MikeT might have some thoughts on that
-> > since I don't see anyone doing that atm.
+> Yes, that makes more sense indeed. Kukjin, would you mind taking
+> this patch to your tree ?
+
+FWIW
+Acked-by: Kishon Vijay Abraham I <kishon@ti.com>
 > 
-> Sorry for jumping into the discussion, but how does that solve the case
-> when the driver is loaded as a module, and therefore unused clocks are
-> disabled before the driver ->probe() function gets called?
-
-Sorry, I wrote the reply to JasonG just moments before and assumed a
-little knowledge of that in this reply.
-
-We would use Ezequiel's patch to ensure CLK_IGNORE_UNUSED is set for the
-clock during boot, then, after boot, mv643xx_eth's probe would look for
-the mac address in the DT.  If it's there, it would unset the flag
-knowing that it can recover the mac address from the DT.  Then we could
-get the power savings from suspend/unload.
-
-thx,
-
-Jason.
+> Thanks,
+> Sylwester
