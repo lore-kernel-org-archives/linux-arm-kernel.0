@@ -1,56 +1,71 @@
-From: Tim.Bird@sonymobile.com (Bird, Tim)
-Date: Tue, 1 Oct 2013 18:04:29 +0200
-Subject: Status of ARM FIQ?
-In-Reply-To: <20131001092623.GA2640@localhost.localdomain>
-References: <F5184659D418E34EA12B1903EE5EF5FD8538E865F6@seldmbx02.corpusers.net>,
- <20131001092623.GA2640@localhost.localdomain>
-Message-ID: <F5184659D418E34EA12B1903EE5EF5FD8538E86602@seldmbx02.corpusers.net>
+From: sandeepa.prabhu@linaro.org (Sandeepa Prabhu)
+Date: Tue,  1 Oct 2013 21:27:55 +0530
+Subject: [PATCH RFC v1 0/5] ARM64 kernel probes(kprobes) support
+Message-ID: <1380643080-8984-1-git-send-email-sandeepa.prabhu@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, October 01, 2013 2:26 AM, Dave Martin [Dave.Martin at arm.com] wrote:
->On Mon, Sep 30, 2013 at 08:48:15PM +0200, Bird, Tim wrote:
->> I'm working through some proposals for contract work for the Consumer
->> Electronics Workgroup, and one of them involves use of ARM FIQ
->> as a debug activator.  I have heard a rumor that FIQ mode is not being
->> included in some modern ARM CPUs.
->>
->> Is there any truth to this?  Can someone give me a pointer to information
->> about this?
->
->All CPUs implement FIQ, except for the M-class CPUS in v7 onwards (which
->don't have an MMU, and thus could only run ucLinux).
->
->
->As to whether you can use FIQ, "it depends":
->
->Since the introduction of the Security Extensions in v6Z / v7,
->FIQ can be repurposed as a private interrupt for the Secure World, so
->if there is resident Secure World software, it may be impossible for
->Linux to use FIQ.
->
->Whether this does or doesn't apply depends on the SoC, and on how
->it has been integrated and set up.  Consumer device SoCs, especially
->anything coming to you via a mobile provider, will likely have this
->restriction.  Dev boards may be a bit more relaxed.
+This patchset adds support for basic kernel probes(kprobes), jump probes(jprobes)
+and return probes(kretprobes) support for AArch64.
 
-Ahh.  This is exactly the information I was looking for.  I think
-this is what I heard about, but I mangled it in my mind.  (It was several
-months ago that I heard something along these lines.)
+This kprobes mechanism make use of software breakpoint and single stepping
+support available in ARM v8 kernel.
 
->John Stultz has been working on the FIQ debugger for Android and may
->have some ideas.
+Basic verification is done with sample test modules available as part of
+"samples/kprobes/" running on ARM v8 fast model (RTSM). 
 
-The CE WG is considering sponsoring some work on the FIQ debugger, and
-some Sony teams are still very interested in this getting mainlined all the way.
-(though not the mobile phone team, for the reasons you mention - I'm pretty sure
-that FIQ is not available to us in that product segment.)
+Patch 1 (AArch64-Add-single-step-and-breakpoint-handler-hooks.patch) is v3 version of: 
+	http://permalink.gmane.org/gmane.linux.ports.arm.kernel/269733
 
-Thanks very much for the info (to all who responded).
+Changes:
+  v2 -> v3
+  - Renamed break_lock to break_hook_lock
+  - Use rcu protected list traversal for step_hook
+  - eliminated addr argument for debug hooks, now callback functions shall extract address from pt_regs instead.
+  - refined entry.S changes only to handler 'BRK64' esr value.
 
-John,
+Patch 2 (arm64-Kernel-code-patching-support.patch) implement basic code patching support needed for kprobes. 
+Similar api is published earlier on LKML/LAKML as part of jump label support: https://lkml.org/lkml/2013/9/25/250  
+However, for kprobes some changes required with that version, can rebase on new version of patch from Jiang.
 
-Do you know the status of this?  Wasn't Anton Vorontsov working on this last year?
-Does anyone know what the current status of that is?
 
- -- Tim
+Sandeepa Prabhu (5):
+  AArch64: Add single-step and breakpoint handler hooks
+  arm64: Kernel code patching support
+  AArch64: Instruction simulation and decode support
+  AArch64: Add Kprobes support for ARM v8 kernel
+  AArch64: Support kretprobe support for ARM v8
+
+ arch/arm64/Kconfig                      |   2 +
+ arch/arm64/include/asm/debug-monitors.h |  23 ++
+ arch/arm64/include/asm/kprobes.h        |  58 +++
+ arch/arm64/include/asm/probes.h         |  48 +++
+ arch/arm64/include/asm/ptrace.h         |   6 +
+ arch/arm64/kernel/Makefile              |   2 +
+ arch/arm64/kernel/debug-monitors.c      |  85 ++++-
+ arch/arm64/kernel/entry.S               |   2 +
+ arch/arm64/kernel/kprobes-arm64.c       | 245 ++++++++++++
+ arch/arm64/kernel/kprobes-arm64.h       |  26 ++
+ arch/arm64/kernel/kprobes.c             | 642 ++++++++++++++++++++++++++++++++
+ arch/arm64/kernel/kprobes.h             |  28 ++
+ arch/arm64/kernel/patch.c               |  58 +++
+ arch/arm64/kernel/patch.h               |  20 +
+ arch/arm64/kernel/probes-aarch64.c      | 235 ++++++++++++
+ arch/arm64/kernel/probes-aarch64.h      | 127 +++++++
+ arch/arm64/kernel/probes-common.c       | 117 ++++++
+ arch/arm64/kernel/vmlinux.lds.S         |   1 +
+ 18 files changed, 1722 insertions(+), 3 deletions(-)
+ create mode 100644 arch/arm64/include/asm/kprobes.h
+ create mode 100644 arch/arm64/include/asm/probes.h
+ create mode 100644 arch/arm64/kernel/kprobes-arm64.c
+ create mode 100644 arch/arm64/kernel/kprobes-arm64.h
+ create mode 100644 arch/arm64/kernel/kprobes.c
+ create mode 100644 arch/arm64/kernel/kprobes.h
+ create mode 100644 arch/arm64/kernel/patch.c
+ create mode 100644 arch/arm64/kernel/patch.h
+ create mode 100644 arch/arm64/kernel/probes-aarch64.c
+ create mode 100644 arch/arm64/kernel/probes-aarch64.h
+ create mode 100644 arch/arm64/kernel/probes-common.c
+
+-- 
+1.8.1.2
