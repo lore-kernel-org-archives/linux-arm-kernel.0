@@ -1,71 +1,155 @@
-From: sandeepa.prabhu@linaro.org (Sandeepa Prabhu)
-Date: Tue,  1 Oct 2013 21:27:55 +0530
-Subject: [PATCH RFC v1 0/5] ARM64 kernel probes(kprobes) support
-Message-ID: <1380643080-8984-1-git-send-email-sandeepa.prabhu@linaro.org>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Tue, 01 Oct 2013 18:24:07 +0200
+Subject: [PATCH v4] i2c: enable runtime PM for I2C adapter devices
+ enumerated from ACPI
+In-Reply-To: <1380632982-10709-1-git-send-email-mika.westerberg@linux.intel.com>
+References: <1380552228-23329-2-git-send-email-mika.westerberg@linux.intel.com>
+ <1380632982-10709-1-git-send-email-mika.westerberg@linux.intel.com>
+Message-ID: <8760212.nXgBqaRVWQ@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset adds support for basic kernel probes(kprobes), jump probes(jprobes)
-and return probes(kretprobes) support for AArch64.
+On Tuesday, October 01, 2013 04:09:42 PM Mika Westerberg wrote:
+> The ACPI specification requires the parent device to be powered on before
+> any of its children. It can be only powered off when all the children are
+> already off.
+> 
+> Currently whenever there is no I2C traffic going on, the I2C controller
+> driver can put the device into low power state transparently to its
+> children (the I2C client devices). This violates the ACPI specification
+> because now the parent device is in lower power state than its children.
+> 
+> In order to keep ACPI happy we enable runtime PM for the I2C adapter device
+> if we find out that the I2C controller was in fact an ACPI device. In
+> addition to that we attach the I2C client devices to the ACPI power domain
+> and make sure that they are powered on when the driver ->probe() is called.
+> 
+> Non-ACPI devices are not affected by this change.
+> 
+> This patch is based on the work by Aaron Lu and Lv Zheng.
+> 
+> Signed-off-by: Mika Westerberg <mika.westerberg@linux.intel.com>
 
-This kprobes mechanism make use of software breakpoint and single stepping
-support available in ARM v8 kernel.
+Acked-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
 
-Basic verification is done with sample test modules available as part of
-"samples/kprobes/" running on ARM v8 fast model (RTSM). 
-
-Patch 1 (AArch64-Add-single-step-and-breakpoint-handler-hooks.patch) is v3 version of: 
-	http://permalink.gmane.org/gmane.linux.ports.arm.kernel/269733
-
-Changes:
-  v2 -> v3
-  - Renamed break_lock to break_hook_lock
-  - Use rcu protected list traversal for step_hook
-  - eliminated addr argument for debug hooks, now callback functions shall extract address from pt_regs instead.
-  - refined entry.S changes only to handler 'BRK64' esr value.
-
-Patch 2 (arm64-Kernel-code-patching-support.patch) implement basic code patching support needed for kprobes. 
-Similar api is published earlier on LKML/LAKML as part of jump label support: https://lkml.org/lkml/2013/9/25/250  
-However, for kprobes some changes required with that version, can rebase on new version of patch from Jiang.
-
-
-Sandeepa Prabhu (5):
-  AArch64: Add single-step and breakpoint handler hooks
-  arm64: Kernel code patching support
-  AArch64: Instruction simulation and decode support
-  AArch64: Add Kprobes support for ARM v8 kernel
-  AArch64: Support kretprobe support for ARM v8
-
- arch/arm64/Kconfig                      |   2 +
- arch/arm64/include/asm/debug-monitors.h |  23 ++
- arch/arm64/include/asm/kprobes.h        |  58 +++
- arch/arm64/include/asm/probes.h         |  48 +++
- arch/arm64/include/asm/ptrace.h         |   6 +
- arch/arm64/kernel/Makefile              |   2 +
- arch/arm64/kernel/debug-monitors.c      |  85 ++++-
- arch/arm64/kernel/entry.S               |   2 +
- arch/arm64/kernel/kprobes-arm64.c       | 245 ++++++++++++
- arch/arm64/kernel/kprobes-arm64.h       |  26 ++
- arch/arm64/kernel/kprobes.c             | 642 ++++++++++++++++++++++++++++++++
- arch/arm64/kernel/kprobes.h             |  28 ++
- arch/arm64/kernel/patch.c               |  58 +++
- arch/arm64/kernel/patch.h               |  20 +
- arch/arm64/kernel/probes-aarch64.c      | 235 ++++++++++++
- arch/arm64/kernel/probes-aarch64.h      | 127 +++++++
- arch/arm64/kernel/probes-common.c       | 117 ++++++
- arch/arm64/kernel/vmlinux.lds.S         |   1 +
- 18 files changed, 1722 insertions(+), 3 deletions(-)
- create mode 100644 arch/arm64/include/asm/kprobes.h
- create mode 100644 arch/arm64/include/asm/probes.h
- create mode 100644 arch/arm64/kernel/kprobes-arm64.c
- create mode 100644 arch/arm64/kernel/kprobes-arm64.h
- create mode 100644 arch/arm64/kernel/kprobes.c
- create mode 100644 arch/arm64/kernel/kprobes.h
- create mode 100644 arch/arm64/kernel/patch.c
- create mode 100644 arch/arm64/kernel/patch.h
- create mode 100644 arch/arm64/kernel/probes-aarch64.c
- create mode 100644 arch/arm64/kernel/probes-aarch64.h
- create mode 100644 arch/arm64/kernel/probes-common.c
-
+> ---
+> Changes to v3:
+>  * Check only client ACPI_HANDLE().
+>  * Fixed bug where we attach the device to ACPI power domain multiple
+>    times.
+>  * Functions are renamed to _get_attach/_put_attach to make it clear that
+>    we do attach/detach as well.
+> 
+>  drivers/i2c/i2c-core.c | 47 ++++++++++++++++++++++++++++++++++++++++++++++-
+>  1 file changed, 46 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/i2c/i2c-core.c b/drivers/i2c/i2c-core.c
+> index 29d3f04..e289b1d 100644
+> --- a/drivers/i2c/i2c-core.c
+> +++ b/drivers/i2c/i2c-core.c
+> @@ -236,6 +236,27 @@ int i2c_recover_bus(struct i2c_adapter *adap)
+>  	return adap->bus_recovery_info->recover_bus(adap);
+>  }
+>  
+> +static void acpi_i2c_device_pm_get_attach(struct i2c_client *client,
+> +					  bool attach)
+> +{
+> +	if (ACPI_HANDLE(&client->dev)) {
+> +		/* Make sure the adapter is active */
+> +		pm_runtime_get_sync(&client->adapter->dev);
+> +		if (attach)
+> +			acpi_dev_pm_attach(&client->dev, true);
+> +	}
+> +}
+> +
+> +static void acpi_i2c_device_pm_put_detach(struct i2c_client *client,
+> +					  bool detach)
+> +{
+> +	if (ACPI_HANDLE(&client->dev)) {
+> +		if (detach)
+> +			acpi_dev_pm_detach(&client->dev, true);
+> +		pm_runtime_put(&client->adapter->dev);
+> +	}
+> +}
+> +
+>  static int i2c_device_probe(struct device *dev)
+>  {
+>  	struct i2c_client	*client = i2c_verify_client(dev);
+> @@ -254,11 +275,15 @@ static int i2c_device_probe(struct device *dev)
+>  					client->flags & I2C_CLIENT_WAKE);
+>  	dev_dbg(dev, "probe\n");
+>  
+> +	acpi_i2c_device_pm_get_attach(client, true);
+> +
+>  	status = driver->probe(client, i2c_match_id(driver->id_table, client));
+>  	if (status) {
+>  		client->driver = NULL;
+>  		i2c_set_clientdata(client, NULL);
+>  	}
+> +
+> +	acpi_i2c_device_pm_put_detach(client, !!status);
+>  	return status;
+>  }
+>  
+> @@ -271,6 +296,8 @@ static int i2c_device_remove(struct device *dev)
+>  	if (!client || !dev->driver)
+>  		return 0;
+>  
+> +	acpi_i2c_device_pm_get_attach(client, false);
+> +
+>  	driver = to_i2c_driver(dev->driver);
+>  	if (driver->remove) {
+>  		dev_dbg(dev, "remove\n");
+> @@ -283,6 +310,8 @@ static int i2c_device_remove(struct device *dev)
+>  		client->driver = NULL;
+>  		i2c_set_clientdata(client, NULL);
+>  	}
+> +
+> +	acpi_i2c_device_pm_put_detach(client, true);
+>  	return status;
+>  }
+>  
+> @@ -294,8 +323,11 @@ static void i2c_device_shutdown(struct device *dev)
+>  	if (!client || !dev->driver)
+>  		return;
+>  	driver = to_i2c_driver(dev->driver);
+> -	if (driver->shutdown)
+> +	if (driver->shutdown) {
+> +		acpi_i2c_device_pm_get_attach(client, false);
+>  		driver->shutdown(client);
+> +		acpi_i2c_device_pm_put_detach(client, false);
+> +	}
+>  }
+>  
+>  #ifdef CONFIG_PM_SLEEP
+> @@ -1263,6 +1295,16 @@ exit_recovery:
+>  	bus_for_each_drv(&i2c_bus_type, NULL, adap, __process_new_adapter);
+>  	mutex_unlock(&core_lock);
+>  
+> +	/*
+> +	 * For ACPI enumerated controllers we must make sure that the
+> +	 * controller is powered on before its children. Runtime PM handles
+> +	 * this for us once we have enabled it for the adapter device.
+> +	 */
+> +	if (ACPI_HANDLE(adap->dev.parent)) {
+> +		pm_runtime_no_callbacks(&adap->dev);
+> +		pm_runtime_enable(&adap->dev);
+> +	}
+> +
+>  	return 0;
+>  
+>  out_list:
+> @@ -1427,6 +1469,9 @@ void i2c_del_adapter(struct i2c_adapter *adap)
+>  		return;
+>  	}
+>  
+> +	if (ACPI_HANDLE(adap->dev.parent))
+> +		pm_runtime_disable(&adap->dev);
+> +
+>  	/* Tell drivers about this removal */
+>  	mutex_lock(&core_lock);
+>  	bus_for_each_drv(&i2c_bus_type, NULL, adap,
+> 
 -- 
-1.8.1.2
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
