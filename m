@@ -1,148 +1,145 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 1 Oct 2013 13:35:17 -0400 (EDT)
-Subject: [PATCH v3 2/3] ARM: mcpm: Implement cpu_kill() to synchronise
- on powerdown
-In-Reply-To: <1380647718-9178-3-git-send-email-Dave.Martin@arm.com>
-References: <1380647718-9178-1-git-send-email-Dave.Martin@arm.com>
- <1380647718-9178-3-git-send-email-Dave.Martin@arm.com>
-Message-ID: <alpine.LFD.2.03.1310011334550.21228@syhkavp.arg>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Tue, 01 Oct 2013 19:37:43 +0200
+Subject: [PATCH 5/6] ARM: EXYNOS: Minor fixes to enable EXYNOS5410 support
+In-Reply-To: <1380644227-12244-6-git-send-email-v.tyrtov@samsung.com>
+References: <1380644227-12244-1-git-send-email-v.tyrtov@samsung.com>
+ <1380644227-12244-6-git-send-email-v.tyrtov@samsung.com>
+Message-ID: <2138155.cI0KCUKyhh@amdc1032>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 1 Oct 2013, Dave Martin wrote:
 
-> CPU hotplug and kexec rely on smp_ops.cpu_kill(), which is supposed
-> to wait for the CPU to park or power down, and perform the last
-> rites (such as disabling clocks etc., where the platform doesn't do
-> this automatically).
-> 
-> kexec in particular is unsafe without performing this
-> synchronisation to park secondaries.  Without it, the secondaries
-> might not be parked when kexec trashes the kernel.
-> 
-> There is no generic way to do this synchronisation, so a new mcpm
-> platform_ops method power_down_finish() is added by this patch.
-> 
-> The new method is mandatory.  A platform which provides no way to
-> detect when CPUs are parked is likely broken.
-> 
-> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+Hi,
 
-Reviewed-by: Nicolas Pitre <nico@linaro.org>
+On Tuesday, October 01, 2013 08:17:06 PM Vyacheslav Tyrtov wrote:
+> From: Tarek Dakhran <t.dakhran@samsung.com>
+> 
+> Configure ARM_NR_BANKS as 16 for EXYNOS SoC.
+> Enable cci_control_port_by_index for ACE_PORT.
+> Add additional irqs for Exynos MCT.
+> Set irq base as 256 for EXYNOS5410 SoC.
 
+It would be better if these changes were separate patches as they touch
+different code areas.
+
+> Signed-off-by: Vyacheslav Tyrtov <v.tyrtov@samsung.com>
 > ---
->  arch/arm/common/mcpm_entry.c   |   15 +++++++++++++++
->  arch/arm/common/mcpm_platsmp.c |   10 ++++++++++
->  arch/arm/include/asm/mcpm.h    |   31 +++++++++++++++++++++++++++++++
->  3 files changed, 56 insertions(+)
+>  arch/arm/Kconfig                  |  2 +-
+>  drivers/bus/arm-cci.c             |  7 +++++++
+>  drivers/clocksource/exynos_mct.c  |  8 +++++++-
+>  drivers/irqchip/exynos-combiner.c | 12 +++++++++++-
+>  4 files changed, 26 insertions(+), 3 deletions(-)
 > 
-> diff --git a/arch/arm/common/mcpm_entry.c b/arch/arm/common/mcpm_entry.c
-> index 9902509..6c03d01 100644
-> --- a/arch/arm/common/mcpm_entry.c
-> +++ b/arch/arm/common/mcpm_entry.c
-> @@ -90,6 +90,21 @@ void mcpm_cpu_power_down(void)
->  	BUG();
->  }
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 3f7714d..7f88896 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -1080,7 +1080,7 @@ source arch/arm/mm/Kconfig
 >  
-> +int mcpm_cpu_power_down_finish(unsigned int cpu, unsigned int cluster)
-> +{
-> +	int ret;
-> +
-> +	if (WARN_ON_ONCE(!platform_ops || !platform_ops->power_down_finish))
-> +		return -EUNATCH;
-> +
-> +	ret = platform_ops->power_down_finish(cpu, cluster);
-> +	if (ret)
-> +		pr_warn("%s: cpu %u, cluster %u failed to power down (%d)\n",
-> +			__func__, cpu, cluster, ret);
-> +
-> +	return ret;
-> +}
-> +
->  void mcpm_cpu_suspend(u64 expected_residency)
->  {
->  	phys_reset_t phys_reset;
-> diff --git a/arch/arm/common/mcpm_platsmp.c b/arch/arm/common/mcpm_platsmp.c
-> index c0c3cd7..177251a 100644
-> --- a/arch/arm/common/mcpm_platsmp.c
-> +++ b/arch/arm/common/mcpm_platsmp.c
-> @@ -56,6 +56,15 @@ static void mcpm_secondary_init(unsigned int cpu)
+>  config ARM_NR_BANKS
+>  	int
+> -	default 16 if ARCH_EP93XX
+> +	default 16 if ARCH_EP93XX || ARCH_EXYNOS
+>  	default 8
 >  
->  #ifdef CONFIG_HOTPLUG_CPU
->  
-> +static int mcpm_cpu_kill(unsigned int cpu)
-> +{
-> +	unsigned int pcpu, pcluster;
+>  config IWMMXT
+> diff --git a/drivers/bus/arm-cci.c b/drivers/bus/arm-cci.c
+> index 2009266..f2f5df1 100644
+> --- a/drivers/bus/arm-cci.c
+> +++ b/drivers/bus/arm-cci.c
+> @@ -363,8 +363,15 @@ int notrace __cci_control_port_by_index(u32 port, bool enable)
+>  	 * interface (ie cci_disable_port_by_cpu(); control by general purpose
+>  	 * indexing is therefore disabled for ACE ports.
+>  	 */
 > +
-> +	cpu_to_pcpu(cpu, &pcpu, &pcluster);
+> +	/*
+> +	 * Using this way to enable cci_port on EXYNOS5410 SoC
+> +	 */
 > +
-> +	return !mcpm_cpu_power_down_finish(pcpu, pcluster);
-> +}
-> +
->  static int mcpm_cpu_disable(unsigned int cpu)
->  {
->  	/*
-> @@ -82,6 +91,7 @@ static struct smp_operations __initdata mcpm_smp_ops = {
->  	.smp_boot_secondary	= mcpm_boot_secondary,
->  	.smp_secondary_init	= mcpm_secondary_init,
->  #ifdef CONFIG_HOTPLUG_CPU
-> +	.cpu_kill		= mcpm_cpu_kill,
->  	.cpu_disable		= mcpm_cpu_disable,
->  	.cpu_die		= mcpm_cpu_die,
->  #endif
-> diff --git a/arch/arm/include/asm/mcpm.h b/arch/arm/include/asm/mcpm.h
-> index fc82a88..1cf2601 100644
-> --- a/arch/arm/include/asm/mcpm.h
-> +++ b/arch/arm/include/asm/mcpm.h
-> @@ -81,10 +81,40 @@ int mcpm_cpu_power_up(unsigned int cpu, unsigned int cluster);
->   *
->   * This will return if mcpm_platform_register() has not been called
->   * previously in which case the caller should take appropriate action.
-> + *
-> + * On success, the CPU is not guaranteed to be truly halted until
-> + * mcpm_cpu_power_down_finish() subsequently returns non-zero for the
-> + * specified cpu.  Until then, other CPUs should make sure they do not
-> + * trash memory the target CPU might be executing/accessing.
->   */
->  void mcpm_cpu_power_down(void);
->  
->  /**
-> + * mcpm_cpu_power_down_finish - wait for a specified CPU to halt, and
-> + *	make sure it is powered off
-> + *
-> + * @cpu: CPU number within given cluster
-> + * @cluster: cluster number for the CPU
-> + *
-> + * Call this function to ensure that a pending powerdown has taken
-> + * effect and the CPU is safely parked before performing non-mcpm
-> + * operations that may affect the CPU (such as kexec trashing the
-> + * kernel text).
-> + *
-> + * It is *not* necessary to call this function if you only need to
-> + * serialise a pending powerdown with mcpm_cpu_power_up() or a wakeup
-> + * event.
-> + *
-> + * Do not call this function unless the specified CPU has already
-> + * called mcpm_cpu_power_down() or has committed to doing so.
-> + *
-> + * @return:
-> + *	- zero if the CPU is in a safely parked state
-> + *	- nonzero otherwise (e.g., timeout)
-> + */
-> +int mcpm_cpu_power_down_finish(unsigned int cpu, unsigned int cluster);
-> +
-> +/**
->   * mcpm_cpu_suspend - bring the calling CPU in a suspended state
->   *
->   * @expected_residency: duration in microseconds the CPU is expected
-> @@ -126,6 +156,7 @@ int mcpm_cpu_powered_up(void);
->  struct mcpm_platform_ops {
->  	int (*power_up)(unsigned int cpu, unsigned int cluster);
->  	void (*power_down)(void);
-> +	int (*power_down_finish)(unsigned int cpu, unsigned int cluster);
->  	void (*suspend)(u64);
->  	void (*powered_up)(void);
+> +#ifndef CONFIG_SOC_EXYNOS5410
+>  	if (ports[port].type == ACE_PORT)
+>  		return -EPERM;
+> +#endif
+
+This won't work for multiplatform kernels, please detect EXYNOS5410
+at runtime using the device tree info.
+
+>  	cci_port_control(port, enable);
+>  	return 0;
+> diff --git a/drivers/clocksource/exynos_mct.c b/drivers/clocksource/exynos_mct.c
+> index 5b34768..33884d7 100644
+> --- a/drivers/clocksource/exynos_mct.c
+> +++ b/drivers/clocksource/exynos_mct.c
+> @@ -71,6 +71,12 @@ enum {
+>  	MCT_L1_IRQ,
+>  	MCT_L2_IRQ,
+>  	MCT_L3_IRQ,
+> +#ifdef CONFIG_ARM_CCI
+> +	MCT_L4_IRQ,
+> +	MCT_L5_IRQ,
+> +	MCT_L6_IRQ,
+> +	MCT_L7_IRQ,
+> +#endif
+>  	MCT_NR_IRQS,
 >  };
-> -- 
-> 1.7.9.5
-> 
+>  
+> @@ -406,7 +412,7 @@ static int exynos4_local_timer_setup(struct clock_event_device *evt)
+>  	mevt = container_of(evt, struct mct_clock_event_device, evt);
+>  
+>  	mevt->base = EXYNOS4_MCT_L_BASE(cpu);
+> -	sprintf(mevt->name, "mct_tick%d", cpu);
+> +	snprintf(mevt->name, 10, "mct_tick%d", cpu);
+
+What is the rationale behind this change?
+
+Also there is nothing about it in the patch description.
+
+>  	evt->name = mevt->name;
+>  	evt->cpumask = cpumask_of(cpu);
+> diff --git a/drivers/irqchip/exynos-combiner.c b/drivers/irqchip/exynos-combiner.c
+> index 868ed40..2e056fc 100644
+> --- a/drivers/irqchip/exynos-combiner.c
+> +++ b/drivers/irqchip/exynos-combiner.c
+> @@ -18,6 +18,7 @@
+>  #include <linux/of_address.h>
+>  #include <linux/of_irq.h>
+>  #include <asm/mach/irq.h>
+> +#include <plat/cpu.h>
+>  
+>  #include "irqchip.h"
+>  
+> @@ -66,6 +67,11 @@ static void combiner_handle_cascade_irq(unsigned int irq, struct irq_desc *desc)
+>  	struct irq_chip *chip = irq_get_chip(irq);
+>  	unsigned int cascade_irq, combiner_irq;
+>  	unsigned long status;
+
+Please add a newline here.
+
+> +	if (unlikely(!chip || !chip_data)) {
+> +		printk_once(KERN_ALERT "%s: Chip not found for IRQ %d\n"
+> +				, __func__, irq);
+> +		return;
+> +	}
+
+There is nothing about this change in the patch description.
+
+>  	chained_irq_enter(chip, desc);
+>  
+> @@ -226,7 +232,11 @@ static int __init combiner_of_init(struct device_node *np,
+>  	 * get their IRQ from DT, remove this in order to get dynamic
+>  	 * allocation.
+>  	 */
+> -	irq_base = 160;
+> +
+> +	if (soc_is_exynos5410())
+> +		irq_base = 256;
+> +	else
+> +		irq_base = 160;
+>  
+>  	combiner_init(combiner_base, np, max_nr, irq_base);
+
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
