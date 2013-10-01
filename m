@@ -1,93 +1,319 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Tue, 01 Oct 2013 14:27:51 +0200
-Subject: [PATCH 5/6] clk: emev2: Add support for emev2 SMU clocks with DT
-In-Reply-To: <CANqRtoRD35Ei31PK8a_TOp=2uiYPCoaJuDb6tyZtQL8s0PavNw@mail.gmail.com>
-References: <52410F86.4040301@renesas.com>
- <20130924131542.f865fad4dec98e024c0d4676@ops.dti.ne.jp>
- <CANqRtoRD35Ei31PK8a_TOp=2uiYPCoaJuDb6tyZtQL8s0PavNw@mail.gmail.com>
-Message-ID: <690317658.gaTDz3TliP@avalon>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Tue, 1 Oct 2013 18:06:03 +0530
+Subject: [PATCH 1/3] ahci: exynos: add ahci sata support on Exynos platform
+In-Reply-To: <1380609183-21430-2-git-send-email-yuvaraj.cd@samsung.com>
+References: <1380609183-21430-1-git-send-email-yuvaraj.cd@samsung.com>
+ <1380609183-21430-2-git-send-email-yuvaraj.cd@samsung.com>
+Message-ID: <524AC1B3.5070203@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Yoshii-san,
-
-Thank you for the patch.
-
-(CC'ing LAMK as a generic CCF question follows)
-
-On Tuesday 01 October 2013 18:15:26 Magnus Damm wrote:
-> On Tue, Sep 24, 2013 at 1:15 PM,  <takasi-y@ops.dti.ne.jp> wrote:
-> > Common clock framework version of emev2 clock support.
-> > smu_clkdiv and smu_gclk are handled.
-> > So far, reparent is not implemented, and is fixed to index #0.
-> > SMU and small numbers of clocks are described in emev2.dtsi.
-> > 
-> > That function and numbers of clocks are equivalent to current
-> > sh-clkfwk version. It is just enough to run kzm9d-reference.
-> > 
-> > Signed-off-by: Takashi Yoshii <takashi.yoshii.zj@renesas.com>
-> > ---
-> > 
-> >  arch/arm/boot/dts/emev2.dtsi     |  84 +++++++++++++++++++++++++++++++
-> >  drivers/clk/Makefile             |   2 +
-> >  drivers/clk/shmobile/Makefile    |   5 ++
-> >  drivers/clk/shmobile/clk-emev2.c | 104 ++++++++++++++++++++++++++++++++++
-> >  4 files changed, 195 insertions(+)
-> >  create mode 100644 drivers/clk/shmobile/Makefile
-> >  create mode 100644 drivers/clk/shmobile/clk-emev2.c
+On Tuesday 01 October 2013 12:03 PM, Yuvaraj Kumar C D wrote:
+> Exynos5250 contains one Synopsys AHCI SATA controller.The avalaible
+> ahci_platform driver is not sufficient to handle the AHCI PHY and PHY
+> clock related initialization.
 > 
-> Hi Yoshii-san,
+> This patch adds exynos specific ahci sata driver,contained the exynos
+> specific initialized codes, re-use the generic ahci_platform driver, and
+> keep the generic ahci_platform driver clean as much as possible.
 > 
-> Thanks for your efforts on this. I'm very pleased to see that you describe
-> the clock topology using DT.
+> This patch depends on the below patch
+> 	[1].drivers: phy: add generic PHY framework
+> 		by Kishon Vijay Abraham I<kishon@ti.com>
+> 
+> Signed-off-by: Yuvaraj Kumar C D <yuvaraj.cd@samsung.com>
+> ---
+>  drivers/ata/Kconfig       |    9 ++
+>  drivers/ata/Makefile      |    1 +
+>  drivers/ata/ahci_exynos.c |  226 +++++++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 236 insertions(+)
+>  create mode 100644 drivers/ata/ahci_exynos.c
+> 
+> diff --git a/drivers/ata/Kconfig b/drivers/ata/Kconfig
+> index 4e73772..99b2392 100644
+> --- a/drivers/ata/Kconfig
+> +++ b/drivers/ata/Kconfig
+> @@ -106,6 +106,15 @@ config AHCI_IMX
+>  
+>  	  If unsure, say N.
+>  
+> +config AHCI_EXYNOS
+> +	tristate "Samsung Exynos AHCI SATA support"
+> +	depends on SATA_AHCI_PLATFORM
 
-What is the generally accepted practice when an IP core provides a large 
-number of clocks, with either one register or one register bit dedicated to 
-each clock ? Should each clock be described as one DT node, or should the IP 
-core be described by a single DT node ?
+Can we select GENERIC_PHY here?
+> +	help
+> +	  This option enables support for the Samsung's Exynos SoC's
+> +	  onboard AHCI SATA.
+> +
+> +	  If unsure, say N.
+> +
+>  config SATA_FSL
+>  	tristate "Freescale 3.0Gbps SATA support"
+>  	depends on FSL_SOC
+> diff --git a/drivers/ata/Makefile b/drivers/ata/Makefile
+> index 46518c6..0e1f420f 100644
+> --- a/drivers/ata/Makefile
+> +++ b/drivers/ata/Makefile
+> @@ -11,6 +11,7 @@ obj-$(CONFIG_SATA_SIL24)	+= sata_sil24.o
+>  obj-$(CONFIG_SATA_DWC)		+= sata_dwc_460ex.o
+>  obj-$(CONFIG_SATA_HIGHBANK)	+= sata_highbank.o libahci.o
+>  obj-$(CONFIG_AHCI_IMX)		+= ahci_imx.o
+> +obj-$(CONFIG_AHCI_EXYNOS)	+= ahci_exynos.o
+>  
+>  # SFF w/ custom DMA
+>  obj-$(CONFIG_PDC_ADMA)		+= pdc_adma.o
+> diff --git a/drivers/ata/ahci_exynos.c b/drivers/ata/ahci_exynos.c
+> new file mode 100644
+> index 0000000..7f0af00
+> --- /dev/null
+> +++ b/drivers/ata/ahci_exynos.c
+> @@ -0,0 +1,226 @@
+> +/*
+> + * Samsung AHCI SATA platform driver
+> + * Copyright 2013 Samsung Electronics Co., Ltd.
+> + *
+> + * based on the AHCI SATA platform driver by Jeff Garzik and Anton Vorontsov
+> + *
+> + * This program is free software; you can redistribute it and/or modify it
+> + * under the terms and conditions of the GNU General Public License,
+> + * version 2, as published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope it will be useful, but WITHOUT
+> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+> + * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+> + * more details.
+> + *
+> + * You should have received a copy of the GNU General Public License along with
+> + * this program. If not, see <http://www.gnu.org/licenses/>.
+> + */
+> +
+> +#include <linux/kernel.h>
+> +#include <linux/module.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/i2c.h>
+> +#include <linux/io.h>
+> +#include <linux/ahci_platform.h>
+> +#include <linux/of_device.h>
+> +#include <linux/phy/phy.h>
+> +#include "ahci.h"
+> +
+> +#define MHZ             (1000 * 1000)
+> +
+> +struct exynos_ahci_priv {
+> +	struct platform_device *ahci_pdev;
+> +	struct clk *sclk;
+> +	unsigned int freq;
+> +	struct phy *phy;
+> +};
+> +
+> +static int exynos_sata_init(struct device *dev, void __iomem *mmio)
+> +{
+> +	struct exynos_ahci_priv *priv = dev_get_drvdata(dev->parent);
+> +	int ret;
+> +
+> +	priv->phy = devm_phy_get(dev , "sata-phy");
+                                    ^^
+                             spurious space here
 
-I also see both platforms using CLK_OF_DECLARE and platforms calling a clock 
-init function provided by drivers/clk/<platform>.c in the SoC setup code in 
-arch/arm/. What is the preferred practice there ?
+phy_get should be called from probe.
+> +	if (IS_ERR(priv->phy))
+> +		return PTR_ERR(priv->phy);
+> +
+> +	ret = phy_init(priv->phy);
+> +	if (ret < 0) {
+> +			dev_err(dev, "failed to init SATA PHY\n");
+single tab is sufficient here and below.
+> +			return ret;
+> +	}
+> +
+> +	ret = clk_prepare_enable(priv->sclk);
+> +	if (ret < 0) {
+> +		dev_err(dev, "failed to enable source clk\n");
+> +		return ret;
+> +	}
+> +
+> +	ret = clk_set_rate(priv->sclk, priv->freq * MHZ);
+> +	if (ret < 0) {
+> +		dev_err(dev, "failed to set clk frequency\n");
+> +		clk_disable_unprepare(priv->sclk);
+> +		return ret;
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +static void exynos_sata_exit(struct device *dev)
+> +{
+> +	struct exynos_ahci_priv *priv = dev_get_drvdata(dev->parent);
+> +	if (!IS_ERR(priv->sclk))
 
-> In general I think your patch looks fine, but I have some comment related to
-> the multiplatform integration, please see below.
-> 
-> > diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
-> > index 7b11106..3e64ac4 100644
-> > --- a/drivers/clk/Makefile
-> > +++ b/drivers/clk/Makefile
-> > @@ -32,6 +32,8 @@ obj-$(CONFIG_ARCH_VT8500)     += clk-vt8500.o
-> > 
-> >  obj-$(CONFIG_ARCH_ZYNQ)                += zynq/
-> >  obj-$(CONFIG_ARCH_TEGRA)       += tegra/
-> >  obj-$(CONFIG_PLAT_SAMSUNG)     += samsung/
-> > 
-> > +obj-$(CONFIG_ARCH_SHMOBILE)    += shmobile/
-> > +obj-$(CONFIG_ARCH_SHMOBILE_MULTI)      += shmobile/
-> 
-> Here I believe it is enough that you only use
-> CONFIG_ARCH_SHMOBILE_MULTI. Building common clocks to coexist with the
-> old legacy board code does not make any sense IMO. If you think it
-> makes sense for some reason, please explain why. =)
-> 
-> > diff --git a/drivers/clk/shmobile/Makefile b/drivers/clk/shmobile/Makefile
-> > new file mode 100644
-> > index 0000000..6a26eb6
-> > --- /dev/null
-> > +++ b/drivers/clk/shmobile/Makefile
-> > @@ -0,0 +1,5 @@
-> > +ifeq ($(CONFIG_COMMON_CLK), y)
-> > +obj-$(CONFIG_ARCH_EMEV2)       += clk-emev2.o
-> > +endif
-> 
-> I don't think you would need the above ifeq/endif wrapper if you only
-> used CONFIG_ARCH_SHMOBILE_MULTI above.
-> 
-> Apart from that it looks good to me. And, yes, I have tested this on
-> my KZM9D board together with multiplatform and it works very well!
+This error check is not needed. You fail probe if you dont get clock anyways.
+> +		clk_disable_unprepare(priv->sclk);
+> +}
+> +
+> +static int exynos_sata_suspend(struct device *dev)
+> +{
+> +	struct exynos_ahci_priv *priv = dev_get_drvdata(dev->parent);
+> +
+> +	if (!IS_ERR(priv->sclk))
+ditto..
+> +		clk_disable_unprepare(priv->sclk);
+> +	phy_power_off(priv->phy);
+> +	return 0;
+> +}
+> +
+> +static int exynos_sata_resume(struct device *dev)
+> +{
+> +	struct exynos_ahci_priv *priv = dev_get_drvdata(dev->parent);
+> +	phy_power_on(priv->phy);
+> +	exynos_sata_init(dev, NULL);
+> +	return 0;
+> +}
+> +
+> +static struct ahci_platform_data exynos_sata_pdata = {
+> +	.init = exynos_sata_init,
 
--- 
-Regards,
+Why is exynos_sata_init given as callback and also in exynos_sata_resume?
+> +	.exit = exynos_sata_exit,
+> +	.suspend = exynos_sata_suspend,
+> +	.resume = exynos_sata_resume,
 
-Laurent Pinchart
+Can't we use this in runtime_suspend/runtime_resume or suspend/resume pm ops?
+> +};
+> +
+> +static const struct of_device_id exynos_ahci_of_match[] = {
+> +	{ .compatible = "samsung,exynos5250-sata-ahci",
+> +		.data = &exynos_sata_pdata},
+> +	{},
+> +};
+> +MODULE_DEVICE_TABLE(of, exynos_ahci_of_match);
+> +
+> +static int exynos_sata_parse_dt(struct device_node *np,
+> +				struct exynos_ahci_priv *priv)
+> +{
+> +	if (!np)
+> +		return -EINVAL;
+> +	return of_property_read_u32(np, "samsung,sata-freq",
+> +						&priv->freq);
+> +}
+> +
+> +static int exynos_ahci_probe(struct platform_device *pdev)
+> +{
+> +	struct device *dev = &pdev->dev;
+> +	struct resource *mem, *irq, res[2];
+> +	const struct of_device_id *of_id;
+> +	const struct ahci_platform_data *pdata = NULL;
+> +	struct exynos_ahci_priv *priv;
+> +	struct device *ahci_dev;
+> +	struct platform_device *ahci_pdev;
+> +	int ret;
+> +
+> +	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
+> +	if (!priv) {
+> +		dev_err(dev, "can't alloc ahci_host_priv\n");
+
+error message not needed. kzalloc will give a dump if it fails.
+> +		return -ENOMEM;
+> +	}
+> +
+> +	ahci_pdev = platform_device_alloc("ahci", -1);
+
+Should be using PLATFORM_DEVID_AUTO unless it is absolutely necessary.
+> +	if (!ahci_pdev)
+> +		return -ENODEV;
+> +
+> +	ahci_dev = &ahci_pdev->dev;
+> +	ahci_dev->parent = dev;
+> +
+> +	ret = exynos_sata_parse_dt(dev->of_node, priv);
+> +	if (ret < 0) {
+> +			dev_err(dev, "failed to parse device tree\n");
+> +			goto err_out;
+> +	}
+> +
+> +	priv->sclk = devm_clk_get(dev, "sclk_sata");
+> +	if (IS_ERR(priv->sclk)) {
+> +		dev_err(dev, "failed to get sclk_sata\n");
+> +		ret = PTR_ERR(priv->sclk);
+> +		goto err_out;
+> +	}
+> +	priv->ahci_pdev = ahci_pdev;
+> +	platform_set_drvdata(pdev, priv);
+> +
+> +	of_id = of_match_device(exynos_ahci_of_match, dev);
+> +	if (of_id) {
+> +		pdata = of_id->data;
+> +	} else {
+> +		ret = -EINVAL;
+> +		goto err_out;
+> +	}
+> +
+> +	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	irq = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
+> +	if (!mem || !irq) {
+> +		dev_err(dev, "no mmio/irq resource\n");
+> +		ret = -ENOMEM;
+> +		goto err_out;
+> +	}
+> +
+> +	res[0] = *mem;
+> +	res[1] = *irq;
+> +
+> +	ahci_dev->coherent_dma_mask = DMA_BIT_MASK(32);
+> +	ahci_dev->dma_mask = &ahci_dev->coherent_dma_mask;
+> +	ahci_dev->of_node = dev->of_node;
+> +
+> +	ret = platform_device_add_resources(ahci_pdev, res, 2);
+> +	if (ret)
+> +		goto err_out;
+> +
+> +	ret = platform_device_add_data(ahci_pdev, pdata, sizeof(*pdata));
+> +	if (ret)
+> +		goto err_out;
+> +
+> +	ret = platform_device_add(ahci_pdev);
+> +	if (ret) {
+> +
+> +
+> +err_out:
+> +		platform_set_drvdata(pdev, NULL);
+> +		platform_device_put(ahci_pdev);
+> +		return ret;
+Move this to the end of this function and then goto err_out for better readability.
+
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +static int exynos_ahci_remove(struct platform_device *pdev)
+> +{
+> +	struct exynos_ahci_priv *priv = platform_get_drvdata(pdev);
+> +	struct platform_device *ahci_pdev = priv->ahci_pdev;
+> +
+> +	platform_device_unregister(ahci_pdev);
+> +	platform_set_drvdata(pdev, NULL);
+> +
+> +	return 0;
+> +}
+> +
+> +static struct platform_driver exynos_ahci_driver = {
+> +	.probe = exynos_ahci_probe,
+> +	.remove = exynos_ahci_remove,
+> +	.driver = {
+> +		.name = "sata-exynos",
+> +		.owner = THIS_MODULE,
+> +		.of_match_table = exynos_ahci_of_match,
+> +	},
+> +};
+> +module_platform_driver(exynos_ahci_driver);
+> +
+> +MODULE_DESCRIPTION("Samsung Exynos AHCI SATA platform driver");
+> +MODULE_AUTHOR("Yuvaraj C D <yuvaraj.cd@samsung.com>");
+> +MODULE_LICENSE("GPL");
+
+GPL v2?
+
+Thanks
+Kishon
