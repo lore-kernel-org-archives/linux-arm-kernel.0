@@ -1,72 +1,114 @@
-From: florian@openwrt.org (Florian Fainelli)
-Date: Tue, 1 Oct 2013 14:18:08 +0100
-Subject: [PATCH] RFT: ARM: gemini: convert to GENERIC_CLOCKEVENTS
-In-Reply-To: <CACRpkdZygLfbE=kC6E+sRDRwZsY-Oi-HOB2mf6G7LeX-=XrcgQ@mail.gmail.com>
-References: <1380625040-25912-1-git-send-email-linus.walleij@linaro.org>
- <201310011328.57653.arnd@arndb.de>
- <CACRpkdZygLfbE=kC6E+sRDRwZsY-Oi-HOB2mf6G7LeX-=XrcgQ@mail.gmail.com>
-Message-ID: <CAGVrzcarF8aOqbp9rTcU8opONoejK_O+h93-0__=5fRS+bqxhg@mail.gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 01 Oct 2013 08:28:51 -0500
+Subject: [PATCH 6/6] iommu/arm-smmu: Support buggy implemenations where
+ all config accesses are secure
+In-Reply-To: <1380631150-10783-7-git-send-email-andreas.herrmann@calxeda.com>
+References: <1380631150-10783-1-git-send-email-andreas.herrmann@calxeda.com>
+ <1380631150-10783-7-git-send-email-andreas.herrmann@calxeda.com>
+Message-ID: <524ACE13.4020309@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/10/1 Linus Walleij <linus.walleij@linaro.org>:
-> On Tue, Oct 1, 2013 at 1:28 PM, Arnd Bergmann <arnd@arndb.de> wrote:
->> On Tuesday 01 October 2013, Linus Walleij wrote:
->>> This converts the gemini machine to use generic clockevents
->>> by rewriting the timer driver.
->>
->> I've put a few more people on Cc that I think have access to hardware, according
->> to the openwrt changelog for gemini.
->
-> Thanks, if the fine OpenWRT folks can suggest a cheapo piece of equipment
-> that is fully supported by OpenWRT and that I can eBay to test my patches on
-> my own I'm all ears.
+On 10/01/2013 07:39 AM, Andreas Herrmann wrote:
+> In such a case we have to use secure aliases of some non-secure
+> registers.
+> 
+> This behaviour is controlled via a flag in smmu->bugs. It is set
+> based on DT information when probing an SMMU device.
 
-I can't remember off the top of my head what exact hardware Tomasz
-Figa handed to me (could probably find it somewhere tomorrow).
+Perhaps quirks would be a nicer word...
 
->
->> I've suggested removing the platform before, but got the feedback that it's
->> actively maintained in openwrt. Unfortunately we didn't get much
->> activity to upstream the patches from
->> http://git.openwrt.org/?p=openwrt.git;a=tree;f=target/linux/gemini/patches
->> which are apparently required.
->
-> Both with OpenWRT and OpenEmbedded we are seeing this forking
-> instead of working with actively upstreaming and reducing the patch
-> stack. This is not so nice, we need to discuss what can be done to
-> reduce the patch stacks carried by other Open Source projects such
-> as these.
+> 
+> Signed-off-by: Andreas Herrmann <andreas.herrmann@calxeda.com>
+> ---
+>  drivers/iommu/arm-smmu.c |   33 ++++++++++++++++++++++++---------
+>  1 file changed, 24 insertions(+), 9 deletions(-)
+> 
+> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+> index b632bcd..46f2b78 100644
+> --- a/drivers/iommu/arm-smmu.c
+> +++ b/drivers/iommu/arm-smmu.c
+> @@ -60,6 +60,15 @@
+>  #define ARM_SMMU_GR0(smmu)		((smmu)->base)
+>  #define ARM_SMMU_GR1(smmu)		((smmu)->base + (smmu)->pagesize)
+>  
+> +/*
+> + * SMMU global address space with conditional offset to access secure aliases of
+> + * non-secure registers (e.g. nsCR0: 0x400, nsGFSR: 0x448, nsGFSYNR0: 0x450)
+> + */
+> +#define ARM_SMMU_GR0_NS(smmu)						\
+> +	((smmu)->base +							\
+> +		((smmu->bugs & ARM_SMMU_BUG_SECURE_CFG_ACCESS) ? 0x400 : 0))
+> +
+> +
+>  /* Page table bits */
+>  #define ARM_SMMU_PTE_PAGE		(((pteval_t)3) << 0)
+>  #define ARM_SMMU_PTE_CONT		(((pteval_t)1) << 52)
+> @@ -348,6 +357,8 @@ struct arm_smmu_device {
+>  #define ARM_SMMU_FEAT_TRANS_S2		(1 << 3)
+>  #define ARM_SMMU_FEAT_TRANS_NESTED	(1 << 4)
+>  	u32				features;
+> +#define ARM_SMMU_BUG_SECURE_CFG_ACCESS	(1 << 0)
+> +	u32				bugs;
+>  	int				version;
+>  
+>  	u32				num_context_banks;
+> @@ -611,16 +622,16 @@ static irqreturn_t arm_smmu_global_fault(int irq, void *dev)
+>  {
+>  	u32 gfsr, gfsynr0, gfsynr1, gfsynr2;
+>  	struct arm_smmu_device *smmu = dev;
+> -	void __iomem *gr0_base = ARM_SMMU_GR0(smmu);
+> +	void __iomem *gr0_base = ARM_SMMU_GR0_NS(smmu);
+>  
+>  	gfsr = readl_relaxed(gr0_base + ARM_SMMU_GR0_sGFSR);
+> -	if (!gfsr)
+> -		return IRQ_NONE;
+> -
+>  	gfsynr0 = readl_relaxed(gr0_base + ARM_SMMU_GR0_sGFSYNR0);
+>  	gfsynr1 = readl_relaxed(gr0_base + ARM_SMMU_GR0_sGFSYNR1);
+>  	gfsynr2 = readl_relaxed(gr0_base + ARM_SMMU_GR0_sGFSYNR2);
+>  
+> +	if (!gfsr)
+> +		return IRQ_NONE;
+> +
+>  	dev_err_ratelimited(smmu->dev,
+>  		"Unexpected global fault, this could be serious\n");
+>  	dev_err_ratelimited(smmu->dev,
+> @@ -1567,8 +1578,8 @@ static void arm_smmu_device_reset(struct arm_smmu_device *smmu)
+>  	u32 reg;
+>  
+>  	/* clear global FSR */
+> -	reg = readl_relaxed(gr0_base + ARM_SMMU_GR0_sGFSR);
+> -	writel(reg, gr0_base + ARM_SMMU_GR0_sGFSR);
+> +	reg = readl_relaxed(ARM_SMMU_GR0_NS(smmu) + ARM_SMMU_GR0_sGFSR);
+> +	writel(reg, ARM_SMMU_GR0_NS(smmu) + ARM_SMMU_GR0_sGFSR);
+>  
+>  	/* Mark all SMRn as invalid and all S2CRn as bypass */
+>  	for (i = 0; i < smmu->num_mapping_groups; ++i) {
+> @@ -1588,7 +1599,7 @@ static void arm_smmu_device_reset(struct arm_smmu_device *smmu)
+>  	writel_relaxed(0, gr0_base + ARM_SMMU_GR0_TLBIALLH);
+>  	writel_relaxed(0, gr0_base + ARM_SMMU_GR0_TLBIALLNSNH);
+>  
+> -	reg = readl_relaxed(gr0_base + ARM_SMMU_GR0_sCR0);
+> +	reg = readl_relaxed(ARM_SMMU_GR0_NS(smmu) + ARM_SMMU_GR0_sCR0);
+>  
+>  	/* Enable fault reporting */
+>  	reg |= (sCR0_GFRE | sCR0_GFIE | sCR0_GCFGFRE | sCR0_GCFGFIE);
+> @@ -1607,7 +1618,7 @@ static void arm_smmu_device_reset(struct arm_smmu_device *smmu)
+>  
+>  	/* Push the button */
+>  	arm_smmu_tlb_sync(smmu);
+> -	writel(reg, gr0_base + ARM_SMMU_GR0_sCR0);
+> +	writel(reg, ARM_SMMU_GR0_NS(smmu) + ARM_SMMU_GR0_sCR0);
+>  }
+>  
+>  static int arm_smmu_id_size_to_bits(int size)
+> @@ -1881,6 +1892,9 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
+>  		}
+>  	}
+>  
+> +	if (of_property_read_bool(dev->of_node, "calxeda,smmu-secure-cfg-access"))
 
-I definitively agree, this has been a bad practice over the years, and
-even though some of us have tried to resolve that, we are still not
-quite there yet.
+This needs to be documented.
 
->
->> Rather than deleting the platform entirely, I'd be more inclined to accept
->> any cleanup patches like yours, testing or not, and let the downstream
->> users deal with fixing it up if it breaks. The ideal case of course would
->> be for someone to actively maintain the platform again and submit any patches
->> that are needed.
->
-> Yeah :-/
->
-> As with any other platform with an active community interested in
-> long-term support it'd be best if someone stepped up to do
-> the necessary conversion to DT and maybe also multiplatform
-> (no idea if that works with the FA526 CPU though) so we can get
-> the maintenance burden down for everone involved.
->
-> I suggested project like this for the advanced kernel newbies
-> actually... let's see if it takes hold.
-
-One big prerequisite is having actual hardware support, we can
-probably work out something to give these people access to hardware
-(either remotely or physically).
-
-Does not anybody actually have a farm of "old" ARM-based platforms
-besides Olof? That way we could just ship the device to someone kind
-enough to get some power supply + network + serial + JTAG/system
-reset?
--- 
-Florian
+Rob
