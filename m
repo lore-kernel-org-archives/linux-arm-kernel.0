@@ -1,38 +1,60 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 01 Oct 2013 12:31:04 -0600
-Subject: [PATCH 05/10] ARM: SAMSUNG: Initialize PWM backlight enable_gpio
- field
-In-Reply-To: <1379972467-11243-6-git-send-email-treding@nvidia.com>
-References: <1379972467-11243-1-git-send-email-treding@nvidia.com>
- <1379972467-11243-6-git-send-email-treding@nvidia.com>
-Message-ID: <524B14E8.5040302@wwwdotorg.org>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 1 Oct 2013 14:34:37 -0400 (EDT)
+Subject: [PATCH v3 2/3] ARM: mcpm: Implement cpu_kill() to synchronise
+ on powerdown
+In-Reply-To: <20131001181211.GC2640@localhost.localdomain>
+References: <1380647718-9178-1-git-send-email-Dave.Martin@arm.com>
+ <1380647718-9178-3-git-send-email-Dave.Martin@arm.com>
+ <alpine.LFD.2.03.1310011334550.21228@syhkavp.arg>
+ <20131001181211.GC2640@localhost.localdomain>
+Message-ID: <alpine.LFD.2.03.1310011426120.21228@syhkavp.arg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/23/2013 03:41 PM, Thierry Reding wrote:
-> The GPIO API defines 0 as being a valid GPIO number, so this field needs
-> to be initialized explicitly.
+On Tue, 1 Oct 2013, Dave Martin wrote:
 
->  static void __init smdkv210_map_io(void)
+> On Tue, Oct 01, 2013 at 01:35:17PM -0400, Nicolas Pitre wrote:
+> > On Tue, 1 Oct 2013, Dave Martin wrote:
+> > 
+> > > CPU hotplug and kexec rely on smp_ops.cpu_kill(), which is supposed
+> > > to wait for the CPU to park or power down, and perform the last
+> > > rites (such as disabling clocks etc., where the platform doesn't do
+> > > this automatically).
+> > > 
+> > > kexec in particular is unsafe without performing this
+> > > synchronisation to park secondaries.  Without it, the secondaries
+> > > might not be parked when kexec trashes the kernel.
+> > > 
+> > > There is no generic way to do this synchronisation, so a new mcpm
+> > > platform_ops method power_down_finish() is added by this patch.
+> > > 
+> > > The new method is mandatory.  A platform which provides no way to
+> > > detect when CPUs are parked is likely broken.
+> > > 
+> > > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+> > 
+> > Reviewed-by: Nicolas Pitre <nico@linaro.org>
+> 
+> Thanks!
+> 
+> I can recommend kexec -- speeds up my reboots no end.
+> 
+> 
+> I can send the MCPM patches to the patch system, but the TC2 patch
+> probably ought to go via arm-soc when Russell has a stable branch
+> available.
 
-> @@ -70,6 +70,7 @@ static struct samsung_bl_drvdata samsung_dfl_bl_data __initdata = {
->  		.max_brightness = 255,
->  		.dft_brightness = 255,
->  		.pwm_period_ns  = 78770,
-> +		.enable_gpio    = -1,
->  		.init           = samsung_bl_init,
->  		.exit           = samsung_bl_exit,
->  	},
-> @@ -121,6 +122,10 @@ void __init samsung_bl_set(struct samsung_bl_gpio_info *gpio_info,
->  		samsung_bl_data->lth_brightness = bl_data->lth_brightness;
->  	if (bl_data->pwm_period_ns)
->  		samsung_bl_data->pwm_period_ns = bl_data->pwm_period_ns;
-> +	if (bl_data->enable_gpio)
-> +		samsung_bl_data->enable_gpio = bl_data->enable_gpio;
-> +	if (bl_data->enable_gpio_flags)
-> +		samsung_bl_data->enable_gpio_flags = bl_data->enable_gpio_flags;
+Agreed.  You may ask Russell explicitly for it.
 
-Won't this cause the core pwm_bl driver to request/manipulate the GPIO,
-whereas this driver already does that inside the samsung_bl_init/exit
-callbacks? I think you either need to adjust those callbacks, or not set
-the new standard GPIO property in samsung_bl_data.
+Yet my patch #7842/1 upon which yours are based should go upstream 
+before v3.12-final whereas your patches are meant for the next merge 
+window.  This should be mentioned explicitly to avoid potential 
+confusion.
+
+> Lorenzo's patch fixes something relevant but independent, so should be
+> mergeable separately.
+
+Agreed.  And it is on its way already.
+
+
+Nicolas
