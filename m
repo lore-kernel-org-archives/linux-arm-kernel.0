@@ -1,76 +1,93 @@
-From: gang.chen@asianux.com (Chen Gang)
-Date: Tue, 01 Oct 2013 20:03:44 +0800
-Subject: [PATCH 2/2] ARM: include: asm: use 'int' instead of 'unsigned
- long' for normal register variables within atomic.h
-In-Reply-To: <20131001090119.GA17629@mudshark.cambridge.arm.com>
-References: <20130925160746.GC14502@mudshark.cambridge.arm.com>
- <5243953E.6010405@asianux.com>
- <20130926100422.GE2855@mudshark.cambridge.arm.com>
- <5244148F.6080405@asianux.com>
- <20130927110618.GB9520@mudshark.cambridge.arm.com>
- <5247A1D1.6080505@asianux.com> <5247A1FA.4030305@asianux.com>
- <5247A3FC.9020508@asianux.com>
- <20130930161149.GI26036@mudshark.cambridge.arm.com>
- <524A2DE7.8040208@asianux.com>
- <20131001090119.GA17629@mudshark.cambridge.arm.com>
-Message-ID: <524ABA20.6060106@asianux.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Tue, 01 Oct 2013 14:27:51 +0200
+Subject: [PATCH 5/6] clk: emev2: Add support for emev2 SMU clocks with DT
+In-Reply-To: <CANqRtoRD35Ei31PK8a_TOp=2uiYPCoaJuDb6tyZtQL8s0PavNw@mail.gmail.com>
+References: <52410F86.4040301@renesas.com>
+ <20130924131542.f865fad4dec98e024c0d4676@ops.dti.ne.jp>
+ <CANqRtoRD35Ei31PK8a_TOp=2uiYPCoaJuDb6tyZtQL8s0PavNw@mail.gmail.com>
+Message-ID: <690317658.gaTDz3TliP@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/01/2013 05:01 PM, Will Deacon wrote:
-> On Tue, Oct 01, 2013 at 03:05:27AM +0100, Chen Gang wrote:
->> On 10/01/2013 12:11 AM, Will Deacon wrote:
->>> On Sun, Sep 29, 2013 at 04:52:28AM +0100, Chen Gang wrote:
->>>> "arc/arm" will be never on 64-bit, it is mainly on 32-bit (may also can
->>>> be on 16-bit).
->>>>
->>>> So better to use 'int' instead of 'unsigned long' for normal register
->>>> variable (on 16-bit, 'int' is allowed to be 16-bit, so historically,
->>>> often use 'int' for normal register variables).
->>>
->>> This commit message doesn't make a blind bit of sense! arch/arm/ is a 32-bit
->>> architecture in the sense that int will always be 32-bit there. This patch
->>> is just a cosmetic change, bringing our atomic_t manipulation code inline
->>> with the atomic_t type definition.
->>>
->>
->> OK, thanks. That means: "arm means arm 32-bit, arm64 means arm 64-bit.
->> The current Linux kernel main line does not support arm 16-bit".
->>
->> Since "bringing our atomic_t ... with the atomic_t type definition", can
->> we use 'atomic_t" instead of 'unsigned long'?
->>
->> And can we use 'atomic64_t" instead of 'unsigned long' in atomic64_*()?
+Hi Yoshii-san,
+
+Thank you for the patch.
+
+(CC'ing LAMK as a generic CCF question follows)
+
+On Tuesday 01 October 2013 18:15:26 Magnus Damm wrote:
+> On Tue, Sep 24, 2013 at 1:15 PM,  <takasi-y@ops.dti.ne.jp> wrote:
+> > Common clock framework version of emev2 clock support.
+> > smu_clkdiv and smu_gclk are handled.
+> > So far, reparent is not implemented, and is fixed to index #0.
+> > SMU and small numbers of clocks are described in emev2.dtsi.
+> > 
+> > That function and numbers of clocks are equivalent to current
+> > sh-clkfwk version. It is just enough to run kzm9d-reference.
+> > 
+> > Signed-off-by: Takashi Yoshii <takashi.yoshii.zj@renesas.com>
+> > ---
+> > 
+> >  arch/arm/boot/dts/emev2.dtsi     |  84 +++++++++++++++++++++++++++++++
+> >  drivers/clk/Makefile             |   2 +
+> >  drivers/clk/shmobile/Makefile    |   5 ++
+> >  drivers/clk/shmobile/clk-emev2.c | 104 ++++++++++++++++++++++++++++++++++
+> >  4 files changed, 195 insertions(+)
+> >  create mode 100644 drivers/clk/shmobile/Makefile
+> >  create mode 100644 drivers/clk/shmobile/clk-emev2.c
 > 
-> That's probably a bit dodgy, since they are typedefs to compound types
-> which, if ever extended, would fall to bits if we tried to pack them into a
-> single register.
+> Hi Yoshii-san,
 > 
+> Thanks for your efforts on this. I'm very pleased to see that you describe
+> the clock topology using DT.
 
-Excuse me, my English is not quite well, I guess your meaning is: "in
-'atomic.h', for arm/arm64, let register variables type equal to related
-atomic type: use 64-bit type if 'atomic64_t', 32-bit type if 'atomic_t'.
+What is the generally accepted practice when an IP core provides a large 
+number of clocks, with either one register or one register bit dedicated to 
+each clock ? Should each clock be described as one DT node, or should the IP 
+core be described by a single DT node ?
 
-If what I guess is correct, please continue reading, or please help
-repeat again (not need reading below contents), thanks.
+I also see both platforms using CLK_OF_DECLARE and platforms calling a clock 
+init function provided by drivers/clk/<platform>.c in the SoC setup code in 
+arch/arm/. What is the preferred practice there ?
 
-
-Can we say: "under arm, using 'unsigned long' for register related
-variables in atomic64_*() is not suitable (although not a bug), need use
-'long long' (which is 'atomic64_t' under arm) instead of"?
-
-And under arm64, can we use 'int' (which is 'atomic_t' under 64-bit arm)
-instead of 'unsigned long' for register related variables in atomic_*()?
-
-I feel, if both of them above are correct, your idea sounds reasonable,
-or it seems your idea is a little complex (at least, keeping original
-implementation no touch is still not a bad idea).
-
-
-> Will
+> In general I think your patch looks fine, but I have some comment related to
+> the multiplatform integration, please see below.
 > 
+> > diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
+> > index 7b11106..3e64ac4 100644
+> > --- a/drivers/clk/Makefile
+> > +++ b/drivers/clk/Makefile
+> > @@ -32,6 +32,8 @@ obj-$(CONFIG_ARCH_VT8500)     += clk-vt8500.o
+> > 
+> >  obj-$(CONFIG_ARCH_ZYNQ)                += zynq/
+> >  obj-$(CONFIG_ARCH_TEGRA)       += tegra/
+> >  obj-$(CONFIG_PLAT_SAMSUNG)     += samsung/
+> > 
+> > +obj-$(CONFIG_ARCH_SHMOBILE)    += shmobile/
+> > +obj-$(CONFIG_ARCH_SHMOBILE_MULTI)      += shmobile/
 > 
+> Here I believe it is enough that you only use
+> CONFIG_ARCH_SHMOBILE_MULTI. Building common clocks to coexist with the
+> old legacy board code does not make any sense IMO. If you think it
+> makes sense for some reason, please explain why. =)
+> 
+> > diff --git a/drivers/clk/shmobile/Makefile b/drivers/clk/shmobile/Makefile
+> > new file mode 100644
+> > index 0000000..6a26eb6
+> > --- /dev/null
+> > +++ b/drivers/clk/shmobile/Makefile
+> > @@ -0,0 +1,5 @@
+> > +ifeq ($(CONFIG_COMMON_CLK), y)
+> > +obj-$(CONFIG_ARCH_EMEV2)       += clk-emev2.o
+> > +endif
+> 
+> I don't think you would need the above ifeq/endif wrapper if you only
+> used CONFIG_ARCH_SHMOBILE_MULTI above.
+> 
+> Apart from that it looks good to me. And, yes, I have tested this on
+> my KZM9D board together with multiplatform and it works very well!
 
-Thanks.
 -- 
-Chen Gang
+Regards,
+
+Laurent Pinchart
