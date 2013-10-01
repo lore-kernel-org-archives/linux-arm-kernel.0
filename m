@@ -1,50 +1,25 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 1 Oct 2013 11:36:31 -0400
-Subject: [PATCH 3/4] clk: kirkwood: Add CLK_IGNORE_UNUSED to ethernet
- ge0 and ge1 clocks
-In-Reply-To: <20131001173358.188968e2@skate>
-References: <1380575010-8573-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1380575010-8573-4-git-send-email-ezequiel.garcia@free-electrons.com>
- <20131001004009.GK31178@titan.lakedaemon.net>
- <20131001134213.GC2448@localhost>
- <20131001135800.GS31178@titan.lakedaemon.net>
- <20131001141716.GE2448@localhost>
- <20131001150130.GT31178@titan.lakedaemon.net>
- <20131001170932.54d53aa4@skate>
- <20131001151528.GV31178@titan.lakedaemon.net>
- <20131001173358.188968e2@skate>
-Message-ID: <20131001153631.GX31178@titan.lakedaemon.net>
+From: cinifr@gmail.com (Fan Rong)
+Date: Tue,  1 Oct 2013 23:42:22 +0800
+Subject: [Add SMP support for Allwinner A20: PATCH V4 0/3] 
+Message-ID: <1380642145-17295-1-git-send-email-cinifr@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 01, 2013 at 05:33:58PM +0200, Thomas Petazzoni wrote:
-> Dear Jason Cooper,
-> 
-> On Tue, 1 Oct 2013 11:15:28 -0400, Jason Cooper wrote:
-> 
-> > > Sorry for jumping into the discussion, but how does that solve the case
-> > > when the driver is loaded as a module, and therefore unused clocks are
-> > > disabled before the driver ->probe() function gets called?
-> > 
-> > Sorry, I wrote the reply to JasonG just moments before and assumed a
-> > little knowledge of that in this reply.
-> > 
-> > We would use Ezequiel's patch to ensure CLK_IGNORE_UNUSED is set for the
-> > clock during boot, then, after boot, mv643xx_eth's probe would look for
-> > the mac address in the DT.  If it's there, it would unset the flag
-> > knowing that it can recover the mac address from the DT.  Then we could
-> > get the power savings from suspend/unload.
-> 
-> Ah, ok. What was wrong with the idea of getting the MAC address from
-> the hardware early at boot time, and adjust the in-memory Device Tree
-> with this information, so that the mv643xx_eth driver can find them
-> whenever it gets loaded, and regardless of whether clocks have been
-> disabled or not?
+This is the version 4 patch. It use smp_prepare_cpus replacing early_init as cpuconfigure map init funcation caller and use sun7i replacing sunxi7i as funcation name and variable name.
 
-I'm personally not opposed to that at all.  iirc, there was some
-opposition (from Grant?) to modifying the DT from within the kernel.
-Sorry, I can't put my finger on the objection atm.
+Fan Rong (3):
+  Add smp support for Allwinner A20(sunxi 7i).
+  Add cpuconfig nodes in dts for smp configure.
+  Add arch count timer node in dts for Allwinner A20(sunxi 7i).
 
-thx,
+ arch/arm/boot/dts/sun7i-a20.dtsi |  15 ++++++
+ arch/arm/mach-sunxi/Makefile     |   2 +
+ arch/arm/mach-sunxi/headsmp.S    |  18 +++++++
+ arch/arm/mach-sunxi/platsmp.c    | 114 +++++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-sunxi/sunxi.c      |   3 ++
+ 5 files changed, 152 insertions(+)
+ create mode 100644 arch/arm/mach-sunxi/headsmp.S
+ create mode 100644 arch/arm/mach-sunxi/platsmp.c
 
-Jason.
+-- 
+1.8.1.2
