@@ -1,44 +1,50 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 1 Oct 2013 11:10:43 -0400 (EDT)
-Subject: [PATCH v2 2/3] ARM: mcpm: Implement cpu_kill() to synchronise
- on powerdown
-In-Reply-To: <1380621302-5655-3-git-send-email-Dave.Martin@arm.com>
-References: <1380621302-5655-1-git-send-email-Dave.Martin@arm.com>
- <1380621302-5655-3-git-send-email-Dave.Martin@arm.com>
-Message-ID: <alpine.LFD.2.03.1310011108530.21228@syhkavp.arg>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Tue, 1 Oct 2013 12:13:59 -0300
+Subject: [PATCH v3 1/2] ARM: feroceon: Add suspend/resume operation
+In-Reply-To: <20131001150352.GU31178@titan.lakedaemon.net>
+References: <1377186547-14284-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1377186547-14284-2-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20131001133850.GR31178@titan.lakedaemon.net>
+ <20131001134428.GD2448@localhost>
+ <20131001150352.GU31178@titan.lakedaemon.net>
+Message-ID: <20131001151358.GH2448@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 1 Oct 2013, Dave Martin wrote:
-
-> CPU hotplug and kexec rely on smp_ops.cpu_kill(), which is supposed
-> to wait for the CPU to park or power down, and perform the last
-> rites (such as disabling clocks etc., where the platform doesn't do
-> this automatically).
+On Tue, Oct 01, 2013 at 11:03:52AM -0400, Jason Cooper wrote:
+> On Tue, Oct 01, 2013 at 10:44:29AM -0300, Ezequiel Garcia wrote:
+> > Jason,
+> > 
+> > On Tue, Oct 01, 2013 at 09:38:50AM -0400, Jason Cooper wrote:
+> > > +rmk (oops, forgot to add you the first time around)
+> > > 
+> > > On Thu, Aug 22, 2013 at 12:49:06PM -0300, Ezequiel Garcia wrote:
+> > > > Add support for suspend/resume operations. The implemented procedures
+> > > > are identical to the ones for ARM926.
+> > > > 
+> > > > Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> > > > ---
+> > > >  arch/arm/Kconfig            |  2 +-
+> > > >  arch/arm/mm/proc-feroceon.S | 26 ++++++++++++++++++++++++++
+> > > >  2 files changed, 27 insertions(+), 1 deletion(-)
+> > > 
+> > > Russell,
+> > > 
+> > > This is pretty isolated, and the next patch in the series depends on it
+> > > for building (it's changes are all in mach-kirkwood/).  Should Ezequiel
+> > > push this into your patch tracker (and then could you create a public,
+> > > non-rebasable branch containing it?), or can I take it with your Ack?
+> > > 
+> > 
+> > This one is already sitting happy in Linus' :-)
 > 
-> kexec in particular is unsafe without performing this
-> synchronisation to park secondaries.  Without it, the secondaries
-> might not be parked when kexec trashes the kernel.
+> Ah, very well then.  I'll queue up the other one.
 > 
-> There is no generic way to do this synchronisation, so a new mcpm
-> platform_ops method power_down_finish() is added by this patch.
-> 
-> The new method is mandatory.  A platform which provides no way to
-> detect when CPUs are parked is likely broken.
-> 
-> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
 
-We're getting there.  ;-)
+Awesome.
 
-[...]
-> +int mcpm_cpu_power_down_finish(unsigned int cpu, unsigned int cluster)
-> +{
-> +	int ret;
-> +
-> +	if (WARN_ON_ONCE(!platform_ops || !platform_ops->power_down_finish))
-> +		return 0;
-
-You'd have to return a non-zero value here to be consistent.
-
-
-Nicolas
+Thanks,
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
