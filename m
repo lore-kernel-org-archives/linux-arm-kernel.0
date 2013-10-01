@@ -1,178 +1,54 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue,  1 Oct 2013 12:57:20 +0200
-Subject: [PATCH] RFT: ARM: gemini: convert to GENERIC_CLOCKEVENTS
-Message-ID: <1380625040-25912-1-git-send-email-linus.walleij@linaro.org>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 1 Oct 2013 07:12:57 -0400
+Subject: [PATCH RESEND] ARM: add dtbImage.<dt> and dtbuImage.<dt> rules
+In-Reply-To: <20131001104115.GA1384@sakura.staff.proxad.net>
+References: <20120927082955.GR17667@game.jcrosoft.org>
+ <CACQ1gAgwv4pBFZBrVZiWM2_=OneUO-s16LufSENx27gMC3DUig@mail.gmail.com>
+ <52416F97.802@keymile.com>
+ <20130924120152.GI11119@titan.lakedaemon.net>
+ <20130924121939.GD12758@n2100.arm.linux.org.uk>
+ <1380572483.31472.51.camel@sakura.staff.proxad.net>
+ <20130930204223.GJ31178@titan.lakedaemon.net>
+ <1380575265.23932.11.camel@sakura.staff.proxad.net>
+ <alpine.LFD.2.03.1309302241400.6331@syhkavp.arg>
+ <20131001104115.GA1384@sakura.staff.proxad.net>
+Message-ID: <20131001111257.GN31178@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This converts the gemini machine to use generic clockevents
-by rewriting the timer driver.
+On Tue, Oct 01, 2013 at 12:41:15PM +0200, Maxime Bizon wrote:
+> On Monday 30 Sep 2013 ? 23:14:49 (-0400), Nicolas Pitre wrote:
+> 
+> > > That "kind of hacky" ATAG thing was actually the only supported way to
+> > > boot a platform not so long ago :)
+> > 
+> > Strictly speaking, this was never supported in mainline.
 
-Cc: arm at kernel.org
-Cc: Hans Ulli Kroll <ulli.kroll@googlemail.com>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
-This is flagged as Request for Testing (RFT) as I have no Gemini
-platform. If I do not get help with testing this, the next step
-will be a patch series to delete the platform.
----
- arch/arm/Kconfig            |  3 +-
- arch/arm/mach-gemini/time.c | 97 +++++++++++++++++++++++++++++++++++++++++----
- 2 files changed, 91 insertions(+), 9 deletions(-)
+I was referring to the non-approved atags many vendors arbitrarily added
+to their bootloaders and kernels.  Ethernet mac addresses, etc.  It's
+not proper to go cluttering the kernel with every hair-brained, one-off
+tag a board vendor came up with to ship a product.
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 1ad6fb6..1a903e6 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -386,8 +386,9 @@ config ARCH_CLPS711X
- config ARCH_GEMINI
- 	bool "Cortina Systems Gemini"
- 	select ARCH_REQUIRE_GPIOLIB
--	select ARCH_USES_GETTIMEOFFSET
-+	select CLKSRC_MMIO
- 	select CPU_FA526
-+	select GENERIC_CLOCKEVENTS
- 	select NEED_MACH_GPIO_H
- 	help
- 	  Support for the Cortina Systems Gemini family SoCs
-diff --git a/arch/arm/mach-gemini/time.c b/arch/arm/mach-gemini/time.c
-index 21dc5a8..0a63c4d 100644
---- a/arch/arm/mach-gemini/time.c
-+++ b/arch/arm/mach-gemini/time.c
-@@ -13,6 +13,8 @@
- #include <mach/hardware.h>
- #include <mach/global_reg.h>
- #include <asm/mach/time.h>
-+#include <linux/clockchips.h>
-+#include <linux/clocksource.h>
- 
- /*
-  * Register definitions for the timers
-@@ -33,19 +35,89 @@
- #define TIMER_3_CR_CLOCK		(1 << 7)
- #define TIMER_3_CR_INT			(1 << 8)
- 
-+static unsigned int tick_rate;
-+
-+static int gemini_timer_set_next_event(unsigned long cycles,
-+				       struct clock_event_device *evt)
-+{
-+	u32 cr;
-+
-+	cr = readl(TIMER_CR(IO_ADDRESS(GEMINI_TIMER_BASE)));
-+
-+	/* This may be overdoing it, feel free to test without this */
-+	cr &= ~TIMER_2_CR_ENABLE;
-+	cr &= ~TIMER_2_CR_INT;
-+	writel(cr, TIMER_CR(IO_ADDRESS(GEMINI_TIMER_BASE)));
-+
-+	/* Set next event */
-+	writel(cycles, TIMER_COUNT(IO_ADDRESS(GEMINI_TIMER2_BASE)));
-+	writel(cycles, TIMER_LOAD(IO_ADDRESS(GEMINI_TIMER2_BASE)));
-+	cr |= TIMER_2_CR_ENABLE;
-+	cr |= TIMER_2_CR_INT;
-+	writel(cr, TIMER_CR(IO_ADDRESS(GEMINI_TIMER_BASE)));
-+
-+	return 0;
-+}
-+
-+static void gemini_timer_set_mode(enum clock_event_mode mode,
-+				  struct clock_event_device *evt)
-+{
-+	u32 period = DIV_ROUND_CLOSEST(tick_rate, HZ);
-+	u32 cr;
-+
-+	switch (mode) {
-+        case CLOCK_EVT_MODE_PERIODIC:
-+		/* Start the timer */
-+		writel(period,
-+		       TIMER_COUNT(IO_ADDRESS(GEMINI_TIMER2_BASE)));
-+		writel(period,
-+		       TIMER_LOAD(IO_ADDRESS(GEMINI_TIMER2_BASE)));
-+		cr = readl(TIMER_CR(IO_ADDRESS(GEMINI_TIMER_BASE)));
-+		cr |= TIMER_2_CR_ENABLE;
-+		cr |= TIMER_2_CR_INT;
-+		writel(cr, TIMER_CR(IO_ADDRESS(GEMINI_TIMER_BASE)));
-+		break;
-+	case CLOCK_EVT_MODE_ONESHOT:
-+	case CLOCK_EVT_MODE_UNUSED:
-+        case CLOCK_EVT_MODE_SHUTDOWN:
-+	case CLOCK_EVT_MODE_RESUME:
-+		/*
-+		 * Disable also for oneshot: the set_next() call will
-+		 * arm the timer instead.
-+		 */
-+		cr = readl(TIMER_CR(IO_ADDRESS(GEMINI_TIMER_BASE)));
-+		cr &= ~TIMER_2_CR_ENABLE;
-+		cr &= ~TIMER_2_CR_INT;
-+		writel(cr, TIMER_CR(IO_ADDRESS(GEMINI_TIMER_BASE)));
-+		break;
-+	default:
-+                break;
-+	}
-+}
-+
-+/* Use TIMER2 as clock event */
-+static struct clock_event_device gemini_clockevent = {
-+	.name		= "TIMER2",
-+	.rating		= 300, /* Reasonably fast and accurate clock event */
-+	.features	= CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
-+	.set_next_event	= gemini_timer_set_next_event,
-+	.set_mode	= gemini_timer_set_mode,
-+};
-+
- /*
-  * IRQ handler for the timer
-  */
- static irqreturn_t gemini_timer_interrupt(int irq, void *dev_id)
- {
--	timer_tick();
-+	struct clock_event_device *evt = &gemini_clockevent;
- 
-+	evt->event_handler(evt);
- 	return IRQ_HANDLED;
- }
- 
- static struct irqaction gemini_timer_irq = {
- 	.name		= "Gemini Timer Tick",
--	.flags		= IRQF_DISABLED | IRQF_TIMER,
-+	.flags		= IRQF_TIMER,
- 	.handler	= gemini_timer_interrupt,
- };
- 
-@@ -54,9 +126,9 @@ static struct irqaction gemini_timer_irq = {
-  */
- void __init gemini_timer_init(void)
- {
--	unsigned int tick_rate, reg_v;
-+	u32 reg_v;
- 
--	reg_v = __raw_readl(IO_ADDRESS(GEMINI_GLOBAL_BASE + GLOBAL_STATUS));
-+	reg_v = readl(IO_ADDRESS(GEMINI_GLOBAL_BASE + GLOBAL_STATUS));
- 	tick_rate = REG_TO_AHB_SPEED(reg_v) * 1000000;
- 
- 	printk(KERN_INFO "Bus: %dMHz", tick_rate / 1000000);
-@@ -82,8 +154,17 @@ void __init gemini_timer_init(void)
- 	 * Make irqs happen for the system timer
- 	 */
- 	setup_irq(IRQ_TIMER2, &gemini_timer_irq);
--	/* Start the timer */
--	__raw_writel(tick_rate / HZ, TIMER_COUNT(IO_ADDRESS(GEMINI_TIMER2_BASE)));
--	__raw_writel(tick_rate / HZ, TIMER_LOAD(IO_ADDRESS(GEMINI_TIMER2_BASE)));
--	__raw_writel(TIMER_2_CR_ENABLE | TIMER_2_CR_INT, TIMER_CR(IO_ADDRESS(GEMINI_TIMER_BASE)));
-+
-+	/* Enable and use TIMER1 as clock source */
-+	writel(0xffffffff, TIMER_COUNT(IO_ADDRESS(GEMINI_TIMER1_BASE)));
-+	writel(0xffffffff, TIMER_LOAD(IO_ADDRESS(GEMINI_TIMER1_BASE)));
-+	writel(TIMER_1_CR_ENABLE, TIMER_CR(IO_ADDRESS(GEMINI_TIMER_BASE)));
-+	if (clocksource_mmio_init(TIMER_COUNT(IO_ADDRESS(GEMINI_TIMER1_BASE)),
-+				  "TIMER1", tick_rate, 300, 32,
-+				  clocksource_mmio_readl_up))
-+		pr_err("timer: failed to initialize gemini clock source\n");
-+
-+	/* Configure and register the clockevent */
-+	clockevents_config_and_register(&gemini_clockevent, tick_rate,
-+					1, 0xffffffff);
- }
--- 
-1.8.3.1
+> > The ultimate idea with the impedance matcher was to augment existing 
+> > bootloaders with sort of a semi second stage bootloader that would be 
+> > separate from zImage and installed permanently, and then only the zImage 
+> > itself would be updateable.  This way you'd get a DT capable environment 
+> > without replacing the actual bootloader.
+> 
+> That's true if you have access to the bootloader in some way (serial,
+> flash env).
+> 
+> But for devices in the field for which upgrading the booloader is not
+> an option, neither is changing anything else in the boot process
+> (anything before linux starts). The risk of bricking the device is
+> just too high.
+
+This is the exact scenario we are solving with the impedance matcher.
+It's a wrapper around a kernel and a series of dtbs.  To the bootloader,
+it looks _exactly_ like the kernel, but it translates the info passed to
+it into terms newer kernels can understand.  No need for a separate
+binary.
+
+hth,
+
+Jason.
