@@ -1,52 +1,44 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 1 Oct 2013 17:09:32 +0200
-Subject: [PATCH 3/4] clk: kirkwood: Add CLK_IGNORE_UNUSED to ethernet
- ge0 and ge1 clocks
-In-Reply-To: <20131001150130.GT31178@titan.lakedaemon.net>
-References: <1380575010-8573-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1380575010-8573-4-git-send-email-ezequiel.garcia@free-electrons.com>
- <20131001004009.GK31178@titan.lakedaemon.net>
- <20131001134213.GC2448@localhost>
- <20131001135800.GS31178@titan.lakedaemon.net>
- <20131001141716.GE2448@localhost>
- <20131001150130.GT31178@titan.lakedaemon.net>
-Message-ID: <20131001170932.54d53aa4@skate>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 1 Oct 2013 11:10:43 -0400 (EDT)
+Subject: [PATCH v2 2/3] ARM: mcpm: Implement cpu_kill() to synchronise
+ on powerdown
+In-Reply-To: <1380621302-5655-3-git-send-email-Dave.Martin@arm.com>
+References: <1380621302-5655-1-git-send-email-Dave.Martin@arm.com>
+ <1380621302-5655-3-git-send-email-Dave.Martin@arm.com>
+Message-ID: <alpine.LFD.2.03.1310011108530.21228@syhkavp.arg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Jason Cooper,
+On Tue, 1 Oct 2013, Dave Martin wrote:
 
-On Tue, 1 Oct 2013 11:01:30 -0400, Jason Cooper wrote:
-> On Tue, Oct 01, 2013 at 11:17:18AM -0300, Ezequiel Garcia wrote:
-> > On Tue, Oct 01, 2013 at 09:58:00AM -0400, Jason Cooper wrote:
-> ...
-> > > However, I think the problem is that the IP block loses it's mac address
-> > > when gated.  That hasn't been solved, all you're doing is moving the
-> > > hack/workaround from one place to another less visible place.
-> > > 
-> > 
-> > There's an already existing and clock-framework-specific way of preventing
-> > a clock from being ever gated -which seems to match exactly this case-
-> > so I have a hard time seeing why we wouldn't use it.
-> > 
-> > Also: I'm wondering why you think this change would 'hide' the clock gating.
-> > It seems whenever a (future?) developer finds these clocks are not gated,
-> > one of the first places he will look for is precisely on those flags.
+> CPU hotplug and kexec rely on smp_ops.cpu_kill(), which is supposed
+> to wait for the CPU to park or power down, and perform the last
+> rites (such as disabling clocks etc., where the platform doesn't do
+> this automatically).
 > 
-> True, I'm approaching it from "I unloaded mv643xx_eth.ko, and my power
-> draw didn't change.  Let's go look at the driver."  But you are correct.
+> kexec in particular is unsafe without performing this
+> synchronisation to park secondaries.  Without it, the secondaries
+> might not be parked when kexec trashes the kernel.
 > 
-> I'd really like to see if we can extend your patch to having the
-> driver's probe function detect the mac address in the DT, and change the
-> IGNORE_UNUSED flag on the clock.  MikeT might have some thoughts on that
-> since I don't see anyone doing that atm.
+> There is no generic way to do this synchronisation, so a new mcpm
+> platform_ops method power_down_finish() is added by this patch.
+> 
+> The new method is mandatory.  A platform which provides no way to
+> detect when CPUs are parked is likely broken.
+> 
+> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
 
-Sorry for jumping into the discussion, but how does that solve the case
-when the driver is loaded as a module, and therefore unused clocks are
-disabled before the driver ->probe() function gets called?
+We're getting there.  ;-)
 
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+[...]
+> +int mcpm_cpu_power_down_finish(unsigned int cpu, unsigned int cluster)
+> +{
+> +	int ret;
+> +
+> +	if (WARN_ON_ONCE(!platform_ops || !platform_ops->power_down_finish))
+> +		return 0;
+
+You'd have to return a non-zero value here to be consistent.
+
+
+Nicolas
