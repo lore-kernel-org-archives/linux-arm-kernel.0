@@ -1,61 +1,31 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 01 Oct 2013 08:48:00 -0500
-Subject: [RFC PATCH 0/6] DRIVERS: IRQCHIP: Add support for crossbar IP
-In-Reply-To: <524AAE69.8060703@ti.com>
-References: <1380549564-31045-1-git-send-email-r.sricharan@ti.com>
- <52499441.1030403@gmail.com> <524AAE69.8060703@ti.com>
-Message-ID: <524AD290.207@gmail.com>
+From: sylvester.nawrocki@gmail.com (Sylwester Nawrocki)
+Date: Tue, 01 Oct 2013 15:49:23 +0200
+Subject: [PATCH] PCI: exynos: missing clk_disable_unprepare() on error
+ in exynos_pcie_probe()
+In-Reply-To: <000301cebe46$42e86e00$c8b94a00$%han@samsung.com>
+References: <CAPgLHd_RTNxi-OYhmTZ35NttjnAg-gQ_WKHkUQr5ueMhXVLTMg@mail.gmail.com>
+ <000301cebe46$42e86e00$c8b94a00$%han@samsung.com>
+Message-ID: <524AD2E3.9010808@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/01/2013 06:13 AM, Sricharan R wrote:
-> Hi,
-> 
-> On Monday 30 September 2013 08:39 PM, Rob Herring wrote:
->> On 09/30/2013 08:59 AM, Sricharan R wrote:
->>> Some socs have a large number of interrupts requests to service
->>> the needs of its many peripherals and subsystems. All of the interrupt
->>> requests lines from the subsystems are not needed at the same
->>> time, so they have to be muxed to the controllers appropriately.
->>> In such places a interrupt controllers are preceded by an
->>> IRQ CROSSBAR that provides flexibility in muxing the device interrupt
->>> requests to the controller inputs.
->>>
->>> This series models the peripheral interrupts that can be routed through
->>> the crossbar to the GIC as 'routable-irqs'. The routable irqs are added
->>> in a separate linear domain inside the GIC. The registered routable domain's
->>> callback are invoked as a part of the GIC's callback, which in turn should
->>> allocate a free irq line and configure the IP accordingly. So every peripheral
->>> in the dts files mentions the fixed crossbar number as its interrupt. A free
->>> gic line for that gets allocated and configured when the peripheral's interrupt
->>> is mapped.
->>>
->>> The minimal crossbar driver to track and allocate free GIC lines and configure the
->>> crossbar is added here, along with the DT bindings.
->> Seems like interrupt-map property is what you need here.
+On 10/01/2013 03:33 AM, Jingoo Han wrote:
+> On Sunday, September 29, 2013 11:29 AM, Wei Yongjun wrote:
 >>
->> http://devicetree.org/Device_Tree_Usage#Advanced_Interrupt_Mapping
+>> From: Wei Yongjun<yongjun_wei@trendmicro.com.cn>
 >>
->> Versatile Express also has an example.
->    OK, but the idea was not to tie up the crossbar<->interrupt numbers at the
->    DTS level, but to assign it dynamically during runtime. This was one of the
->   comments that came up with first crossbar support patches, which was assigning a
->   interrupt line to crossbar number in the DTS and setting it up in crossbar probe.
+>> Add the missing clk_disable_unprepare() before return
+>> from exynos_pcie_probe() in the error handling case.
+>>
+>> Signed-off-by: Wei Yongjun<yongjun_wei@trendmicro.com.cn>
+>
+> Acked-by: Jingoo Han<jg1.han@samsung.com>
+>
+> However, the commit name should be fixed as below:
+> [PATCH] PCI: exynos: use missing clk_disable_unprepare() on error in exynos_pcie_probe()
 
-Is there an actual usecase on a single h/w design that you run out of
-interrupts and it is a user decision which interrupts to use?
+Perhaps just:
 
-You could fill in the interrupt-map at run-time. It would have to be
-early (bootloader or early kernel init) and can't be at request_irq time.
+"PCI: exynos: Add missing clk_disable_unprepare() on error path
 
->     https://lkml.org/lkml/2013/7/18/416
-> 
->    Since this approach of assigning in DTS was opposed, we moved to IRQCHIP and
->    that did not go as well. Finally was asked to handle this as a part of GIC driver with
->    a separate domain.
->    
->   http://www.spinics.net/lists/linux-omap/msg97085.html
-
-This has nothing to do with the GIC, so it does not belong there.
-
-Rob
+How can something that is missing be used ? :)
