@@ -1,29 +1,45 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Tue, 01 Oct 2013 17:13:26 +0900
-Subject: [PATCH 10/10] ARM: shmobile: Use SMP on Koelsch
-In-Reply-To: <20131001081143.4136.46925.sendpatchset@w520>
-References: <20131001081143.4136.46925.sendpatchset@w520>
-Message-ID: <20131001081326.4136.95868.sendpatchset@w520>
+From: sachin.kamat@linaro.org (Sachin Kamat)
+Date: Tue, 1 Oct 2013 13:45:04 +0530
+Subject: [PATCH 2/3] Phy: Exynos: Add Exynos5250 sata phy driver
+In-Reply-To: <1380609183-21430-3-git-send-email-yuvaraj.cd@samsung.com>
+References: <1380609183-21430-1-git-send-email-yuvaraj.cd@samsung.com>
+ <1380609183-21430-3-git-send-email-yuvaraj.cd@samsung.com>
+Message-ID: <CAK9yfHzpiU+ugak6escnn2ioAq8yvTjK7RzrQaUrL7cwwq_EMA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm@opensource.se>
+Hi Yuvaraj,
 
-Enable r8a7791 SMP support code on the Koelsch board.
+On 1 October 2013 12:03, Yuvaraj Kumar C D <yuvaraj.cd@gmail.com> wrote:
 
-Signed-off-by: Magnus Damm <damm@opensource.se>
----
+> +static int exynos_sata_i2c_remove(struct i2c_client *client)
+> +{
+> +       dev_info(&client->adapter->dev,
+> +               "detached %s from i2c adapter successfully\n",
+> +               client->name);
+> +
+> +       return 0;
+> +}
+> +
 
- arch/arm/mach-shmobile/board-koelsch.c |    1 +
- 1 file changed, 1 insertion(+)
+Since this function does not do anything, this could be removed.
 
---- 0008/arch/arm/mach-shmobile/board-koelsch.c
-+++ work/arch/arm/mach-shmobile/board-koelsch.c	2013-10-01 16:40:07.000000000 +0900
-@@ -39,6 +39,7 @@ static const char * const koelsch_boards
- };
- 
- DT_MACHINE_START(KOELSCH_DT, "koelsch")
-+	.smp		= smp_ops(r8a7791_smp_ops),
- 	.init_early	= r8a7791_init_early,
- 	.init_machine	= koelsch_add_standard_devices,
- 	.init_time	= rcar_gen2_timer_init,
+> +static const struct i2c_device_id phy_i2c_device_match[] = {
+> +       { "sata-phy-i2c", 0 },
+> +};
+> +MODULE_DEVICE_TABLE(of, phy_i2c_device_match);
+> +
+> +struct i2c_driver sataphy_i2c_driver = {
+> +       .probe    = exynos_sata_i2c_probe,
+> +       .id_table = phy_i2c_device_match,
+> +       .remove         = exynos_sata_i2c_remove,
+> +       .driver   = {
+> +               .name = "sata-phy-i2c",
+> +               .owner = THIS_MODULE,
+> +               .of_match_table = (void *)phy_i2c_device_match,
+
+type casting is not required.
+
+-- 
+With warm regards,
+Sachin
