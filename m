@@ -1,52 +1,31 @@
-From: gerg@uclinux.org (Greg Ungerer)
-Date: Tue, 01 Oct 2013 08:43:40 +1000
-Subject: [PATCH] ARM: ks8695: fix incorrect placement of __initdata tag
-In-Reply-To: <1551134.v305P4LSfh@amdc1032>
-References: <1551134.v305P4LSfh@amdc1032>
-Message-ID: <5249FE9C.2000208@uclinux.org>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Tue, 01 Oct 2013 10:33:41 +0900
+Subject: [PATCH] PCI: exynos: missing clk_disable_unprepare() on error in
+ exynos_pcie_probe()
+In-Reply-To: <CAPgLHd_RTNxi-OYhmTZ35NttjnAg-gQ_WKHkUQr5ueMhXVLTMg@mail.gmail.com>
+References: <CAPgLHd_RTNxi-OYhmTZ35NttjnAg-gQ_WKHkUQr5ueMhXVLTMg@mail.gmail.com>
+Message-ID: <000301cebe46$42e86e00$c8b94a00$%han@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/09/13 23:02, Bartlomiej Zolnierkiewicz wrote:
-> __initdata tag should be placed between the variable name and equal
-> sign for the variable to be placed in the intended .init.data section.
->
-> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+On Sunday, September 29, 2013 11:29 AM, Wei Yongjun wrote:
+> 
+> From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+> 
+> Add the missing clk_disable_unprepare() before return
+> from exynos_pcie_probe() in the error handling case.
+> 
+> Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
 
-Acked-by: Greg Ungerer <gerg@uclinux.org>
+Acked-by: Jingoo Han <jg1.han@samsung.com>
 
+However, the commit name should be fixed as below:
+[PATCH] PCI: exynos: use missing clk_disable_unprepare() on error in exynos_pcie_probe()
+
+Best regards,
+Jingoo Han
 
 > ---
->   arch/arm/mach-ks8695/board-og.c | 2 +-
->   arch/arm/mach-ks8695/cpu.c      | 3 +--
->   2 files changed, 2 insertions(+), 3 deletions(-)
->
-> diff --git a/arch/arm/mach-ks8695/board-og.c b/arch/arm/mach-ks8695/board-og.c
-> index 002bc61..9204f5a 100644
-> --- a/arch/arm/mach-ks8695/board-og.c
-> +++ b/arch/arm/mach-ks8695/board-og.c
-> @@ -79,7 +79,7 @@ static void __init og_pci_bus_reset(void)
->   #define	S8250_VIRT	0xf4000000
->   #define	S8250_SIZE	0x00100000
->
-> -static struct __initdata map_desc og_io_desc[] = {
-> +static struct map_desc og_io_desc[] __initdata = {
->   	{
->   		.virtual	= S8250_VIRT,
->   		.pfn		= __phys_to_pfn(S8250_PHYS),
-> diff --git a/arch/arm/mach-ks8695/cpu.c b/arch/arm/mach-ks8695/cpu.c
-> index ddb2422..9618654 100644
-> --- a/arch/arm/mach-ks8695/cpu.c
-> +++ b/arch/arm/mach-ks8695/cpu.c
-> @@ -33,8 +33,7 @@
->   #include <mach/regs-sys.h>
->   #include <mach/regs-misc.h>
->
-> -
-> -static struct __initdata map_desc ks8695_io_desc[] = {
-> +static struct map_desc ks8695_io_desc[] __initdata = {
->   	{
->   		.virtual	= (unsigned long)KS8695_IO_VA,
->   		.pfn		= __phys_to_pfn(KS8695_IO_PA),
+>  drivers/pci/host/pci-exynos.c | 18 ++++++++++++------
+>  1 file changed, 12 insertions(+), 6 deletions(-)
 >
