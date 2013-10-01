@@ -1,116 +1,86 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Tue, 1 Oct 2013 23:14:49 +0200
-Subject: [PATCH 10/10] pwm-backlight: Allow backlight to remain disabled
- on boot
-In-Reply-To: <524B198B.3010609@wwwdotorg.org>
+Date: Tue, 1 Oct 2013 23:23:06 +0200
+Subject: [PATCH 05/10] ARM: SAMSUNG: Initialize PWM backlight enable_gpio
+ field
+In-Reply-To: <524B376E.6060507@wwwdotorg.org>
 References: <1379972467-11243-1-git-send-email-treding@nvidia.com>
- <1379972467-11243-11-git-send-email-treding@nvidia.com>
- <524B198B.3010609@wwwdotorg.org>
-Message-ID: <20131001211448.GE9201@ulmo.nvidia.com>
+ <1379972467-11243-6-git-send-email-treding@nvidia.com>
+ <524B14E8.5040302@wwwdotorg.org>
+ <20131001204335.GB9201@ulmo.nvidia.com>
+ <524B376E.6060507@wwwdotorg.org>
+Message-ID: <20131001212305.GF9201@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 01, 2013 at 12:50:51PM -0600, Stephen Warren wrote:
-> On 09/23/2013 03:41 PM, Thierry Reding wrote:
-> > The default for backlight devices is to be enabled immediately when
-> > registering with the backlight core. This can be useful for setups that
-> > use a simple framebuffer device and where the backlight cannot otherwise
-> > be hooked up to the panel.
+On Tue, Oct 01, 2013 at 02:58:22PM -0600, Stephen Warren wrote:
+> On 10/01/2013 02:43 PM, Thierry Reding wrote:
+> > On Tue, Oct 01, 2013 at 12:31:04PM -0600, Stephen Warren wrote:
+> >> On 09/23/2013 03:41 PM, Thierry Reding wrote:
+> >>> The GPIO API defines 0 as being a valid GPIO number, so this
+> >>> field needs to be initialized explicitly.
+> >> 
+> >>> static void __init smdkv210_map_io(void)
+> >> 
+> >>> @@ -70,6 +70,7 @@ static struct samsung_bl_drvdata
+> >>> samsung_dfl_bl_data __initdata = { .max_brightness = 255, 
+> >>> .dft_brightness = 255, .pwm_period_ns  = 78770, +		.enable_gpio
+> >>> = -1, .init           = samsung_bl_init, .exit           =
+> >>> samsung_bl_exit, }, @@ -121,6 +122,10 @@ void __init
+> >>> samsung_bl_set(struct samsung_bl_gpio_info *gpio_info, 
+> >>> samsung_bl_data->lth_brightness = bl_data->lth_brightness; if
+> >>> (bl_data->pwm_period_ns) samsung_bl_data->pwm_period_ns =
+> >>> bl_data->pwm_period_ns; +	if (bl_data->enable_gpio) +
+> >>> samsung_bl_data->enable_gpio = bl_data->enable_gpio; +	if
+> >>> (bl_data->enable_gpio_flags) +
+> >>> samsung_bl_data->enable_gpio_flags =
+> >>> bl_data->enable_gpio_flags;
+> >> 
+> >> Won't this cause the core pwm_bl driver to request/manipulate the
+> >> GPIO, whereas this driver already does that inside the
+> >> samsung_bl_init/exit callbacks? I think you either need to adjust
+> >> those callbacks, or not set the new standard GPIO property in
+> >> samsung_bl_data.
 > > 
-> > However, when dealing with more complex setups, such as those of recent
-> > ARM SoCs, this can be problematic. Since the backlight is usually setup
-> > separately from the display controller, the probe order is not usually
-> > deterministic. That can lead to situations where the backlight will be
-> > powered up and the panel will show an uninitialized framebuffer.
-> > 
-> > Furthermore, subsystems such as DRM have advanced functionality to set
-> > the power mode of a panel. In order to allow such setups to power up the
-> > panel at exactly the right moment, a way is needed to prevent the
-> > backlight core from powering the backlight up automatically when it is
-> > registered.
-> > 
-> > This commit introduces a new boot_off field in the platform data (and
-> > also implements getting the same information from device tree). When set
-> > the initial backlight power mode will be set to "off".
+> > I don't think so. The samsung_bl_data is a copy of
+> > samsung_dfl_bl_data augmented by board-specific settings. So in
+> > fact copying these values here is essential to allow boards to
+> > override the enable_gpio and flags fields. Currently no board sets
+> > the enable_gpio to a valid GPIO so it's all still handled by the
+> > callbacks only.
 > 
-> > diff --git a/Documentation/devicetree/bindings/video/backlight/pwm-backlight.txt b/Documentation/devicetree/bindings/video/backlight/pwm-backlight.txt
+> Oh yes, you're right. I was confusing the new enable_gpio field in
+> pwm_bl's platform data with some other field in a custom data structure.
 > 
-> > +  - backlight-boot-off: keep the backlight disabled on boot
+> One minor point though:
 > 
-> A few thoughts:
+> >>> +	if (bl_data->enable_gpio) +		samsung_bl_data->enable_gpio =
+> >>> bl_data->enable_gpio;
 > 
-> 1) Does this property indicate that:
-> 
-> a) The current state of the backlight at boot. In which case, this will
-> need bootloader involvement to modify the value in the DT at boot time
-> based on whether the bootloader turned on the backlight:-(
+> That assumes that enable_gpio==0 means "none", whereas you've gone to
+> great pains in the rest of the series to allow 0 to be a valid GPIO
+> ID. right now, the default value of samsung_bl_data->enable_gpio is
+> -1, and if !bl_data->enable_gpio, that value won't be propagated across.
 
-I was pretty much following the regulator bindings here. But the meaning
-is different indeed, see below.
+Right, that check should now be:
 
-> b) That the driver should not turn on the backlight immediately? That
-> seems to describe driver behaviour more than HW. Is it appropriate to
-> put that into DT?
+	if (bl_data->enable_gpio >= 0)
 
-That's what it was supposed to mean. The idea is, and I mentioned that
-in the commit message, that when wired up with a higher-level API such
-as DRM, then usually that framework knows exactly when to enable the
-backlight. Having the backlight enable itself on probe may cause the
-panel to light up with no content or garbage.
+Well, it depends. It would be possible for the default to specify a
+valid GPIO and for a board to override it with -1 (and provide a set of
+corresponding callbacks). In that case the right thing to do here would
+be not to check at all.
 
-> Your suggestion to make the backlight not turn on by default might be a
-> better fix?
+Then again, I don't think that will ever happen, because no fixed GPIO
+will ever be a good default. So changing to >= 0 instead of != 0 should
+work fine.
 
-I think so too, but the problem in this case is that users of this
-driver heretofore assumed that it would be turned on by default. I think
-that's been common practice for all backlight drivers. Adding a property
-to DT was supposed to be a way to keep backwards compatibility with any
-existing users while at the same time allowing the backlight to be used
-in a more "modern" system. I don't really have any other ideas how to
-achieve this.
-
-It is quite possible that the only reason why turning on the backlight
-at probe time is the current default is because backlight_properties'
-.power field is by default initialized to 0, which turns out to be the
-value of FB_BLANK_UNBLANK. That's been the source of quite a bit of
-confusion (I could tell you stories of how people tried to convince me
-that there must be a bug in the Linux kernel because writing a 0 to the
-backlight's bl_power field in sysfs turns the backlight on instead of
-off). The same is true for DPMS modes in DRM and X, where "on" has the
-value 0.
-
-Now there have been plans to overhaul the backlight subsystem for quite
-some time. One of the goals was to decouple it from the FB subsystem,
-which might help solve this to some degree. At the same time sysfs is an
-ABI, so we can't just go and change it randomly. The same is true for
-the default behaviour of enabling the backlight at boot. That can
-equally be considered an ABI and changing it will cause the majority of
-devices to regress, and that's not something that I look forward to
-taking the blame for...
-
-> 2) Should the driver instead attempt to read the current state of the
-> GPIO output to determine whether the backlight is on? This may not be
-> possible on all HW.
-> 
-> 3) Doesn't the following code in probe() (added in a previous patch)
-> need to be updated?
-> 
-> > +	if (gpio_is_valid(pb->enable_gpio)) {
-> > +		if (pb->enable_gpio_flags & PWM_BACKLIGHT_GPIO_ACTIVE_LOW)
-> > +			gpio_set_value(pb->enable_gpio, 0);
-> > +		else
-> > +			gpio_set_value(pb->enable_gpio, 1);
-> > +	}
-> 
-> ... That assumes that the backlight is on at boot, and hence presumably
-> after this patch still always turns on the backlight, only to turn it
-> off very quickly once the following code in this patch executes:
-> 
-> (and perhaps we also need to avoid turning the backlight off then on if
-> it was already on at boot)
-
-Yes, that's a good point. Depending on the outcome of the above
-discussion I'll update this to match the expectations.
+Again, starting with 3.13 this should become a lot easier to handle
+since the GPIO subsystem will gain functionality to use a per-board
+lookup table, similarly to what the regulator and PWM subsystems do.
+Once that's in place I plan to make another pass over all users of the
+pwm-backlight driver and replace the enable_gpio field with a GPIO
+lookup table, so that the driver can uniformly request them using a
+simple gpiod_get().
 
 Thierry
 -------------- next part --------------
@@ -119,4 +89,4 @@ Name: not available
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131001/1eeb9e36/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131001/0ff774f6/attachment.sig>
