@@ -1,53 +1,57 @@
-From: jonathan.austin@arm.com (Jonathan Austin)
-Date: Tue, 01 Oct 2013 11:38:16 +0100
-Subject: [PATCH v2] ARM: new platform for Energy Micro's EFM32 Cortex-M3
- SoCs
-In-Reply-To: <20130928191511.GA2548@pengutronix.de>
-References: <1379447884-14025-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <201309172245.25367.arnd@arndb.de> <20130926094251.GK16106@pengutronix.de>
- <201309272344.01386.arnd@arndb.de> <20130928191511.GA2548@pengutronix.de>
-Message-ID: <524AA618.20307@arm.com>
+From: maxime.coquelin@st.com (Maxime COQUELIN)
+Date: Tue,  1 Oct 2013 12:39:08 +0200
+Subject: [PATCH v3 0/4] Add I2C support to ST SoCs
+Message-ID: <1380623952-4252-1-git-send-email-maxime.coquelin@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28/09/13 20:15, Uwe Kleine-K?nig wrote:
-> Hi Arnd,
->
-> On Fri, Sep 27, 2013 at 11:44:01PM +0200, Arnd Bergmann wrote:
->> On Thursday 26 September 2013, Uwe Kleine-K?nig wrote:
-[...]
->> * An ARMv7-M kernel cannot run on either ARMv4/v5 nor ARMv6/v7-A, right?
+The goal of this series is to add I2C support to ST SoCs.
+The DT definition is added for STiH415 and STiH416 SoCs on
+B2000 and B2020 boards.
 
-> The entry convention is different (ARMv7-M doesn't support the ARM
-> instruction set but you need to jump into the kernel in ARM mode for
-> v4-v7). Other that that I don't know if there is a problem. Maybe
-> Jonathan can say anything here?
+The series has been tested working on STiH416-B2020 board.
+It applies on top of v3.12-rc3.
 
-There's a more fundamental difference between V7M and other things 
-before it - V7M uses a different exception model (We don't have the idea 
-of SVC, USR, IRQ, FIQ etc, instead it is Thread/Process/Handler modes).
+Changes since v2:
+  - Create generic DT property for Anti-glitch filtering configuration
+  - Sort i2c-st entries in Makefile and Kconfig
+  - Various cosmetics changes
+  - Return IRQ_NONE in case of spurious interrupt
+  - Use INIT_COMPLETION instead of init_completion in st_i2c_xfer_msg
+  - Simplify st_i2c_xfer as proposed by Wolfram
+  - Fix PM ops issues
+  - Change author name to myself and fix license to GPL v2
+  - Include .h file content into the .c file
 
-So no, V7M is V7M, I'm afraid.
+Changes since v1:
+  - Anti-glitch filtering simplified (Only HW Anti-glitch is kept)
+  - Update I2C timings to comply with I2C specification
+  - Handle spurious interrupts properly
+  - DT binding updates taking into account Stephen's comments
+  - Use "clock-names" property to comply with GCF
+  - DT cosmetic changes reported by Lee and Gabriel 
 
-> Or alternatively if you want an efm32
-> devboard, just tell me.
+Signed-off-by: Maxime Coquelin <maxime.coquelin@st.com>
 
-They're cool, I can recommend one ;)
+Maxime Coquelin (4):
+  i2c: busses: i2c-st: Add ST I2C controller
+  ARM: STi: Supply I2C configuration to STiH416 SoC
+  ARM: STi: Supply I2C configuration to STiH415 SoC
+  ARM: STi: Add I2C config to B2000 and B2020 boards
 
->
->> Do you prevent building such a kernel in Kconfig?
-> I'm sure my Kconfig magic isn't waterproof. It took me a few tries to
-> expand the multiarch architecture selection to make v7-m selectable at
-> all.
+ Documentation/devicetree/bindings/i2c/i2c-st.txt |   34 +
+ arch/arm/boot/dts/stih415-pinctrl.dtsi           |   36 +
+ arch/arm/boot/dts/stih415.dtsi                   |   53 ++
+ arch/arm/boot/dts/stih416-pinctrl.dtsi           |   35 +
+ arch/arm/boot/dts/stih416.dtsi                   |   53 ++
+ arch/arm/boot/dts/stih41x-b2000.dtsi             |    9 +
+ arch/arm/boot/dts/stih41x-b2020.dtsi             |   22 +
+ drivers/i2c/busses/Kconfig                       |   10 +
+ drivers/i2c/busses/Makefile                      |    1 +
+ drivers/i2c/busses/i2c-st.c                      |  867 ++++++++++++++++++++++
+ 10 files changed, 1120 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/i2c/i2c-st.txt
+ create mode 100644 drivers/i2c/busses/i2c-st.c
 
-There's a patch series I posted in the past for !MMU with Vexpress that 
-was a way to have a !MMU without changing the ARCH_MULTIPLATFORM 
-configuration:
-
-http://lists.infradead.org/pipermail/linux-arm-kernel/2013-May/168106.html
-
-You could take a look at that as an alternative approach, but the other 
-series you've sent looks reasonable from a !MMU/Multiplatform point of 
-view, I'm just not sure about the XIP stuff.
-
-Jonny
+-- 
+1.7.9.5
