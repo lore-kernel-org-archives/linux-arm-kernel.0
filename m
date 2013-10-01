@@ -1,54 +1,55 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 1 Oct 2013 07:12:57 -0400
-Subject: [PATCH RESEND] ARM: add dtbImage.<dt> and dtbuImage.<dt> rules
-In-Reply-To: <20131001104115.GA1384@sakura.staff.proxad.net>
-References: <20120927082955.GR17667@game.jcrosoft.org>
- <CACQ1gAgwv4pBFZBrVZiWM2_=OneUO-s16LufSENx27gMC3DUig@mail.gmail.com>
- <52416F97.802@keymile.com>
- <20130924120152.GI11119@titan.lakedaemon.net>
- <20130924121939.GD12758@n2100.arm.linux.org.uk>
- <1380572483.31472.51.camel@sakura.staff.proxad.net>
- <20130930204223.GJ31178@titan.lakedaemon.net>
- <1380575265.23932.11.camel@sakura.staff.proxad.net>
- <alpine.LFD.2.03.1309302241400.6331@syhkavp.arg>
- <20131001104115.GA1384@sakura.staff.proxad.net>
-Message-ID: <20131001111257.GN31178@titan.lakedaemon.net>
+From: r.sricharan@ti.com (Sricharan R)
+Date: Tue, 1 Oct 2013 16:43:45 +0530
+Subject: [RFC PATCH 0/6] DRIVERS: IRQCHIP: Add support for crossbar IP
+In-Reply-To: <52499441.1030403@gmail.com>
+References: <1380549564-31045-1-git-send-email-r.sricharan@ti.com>
+ <52499441.1030403@gmail.com>
+Message-ID: <524AAE69.8060703@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 01, 2013 at 12:41:15PM +0200, Maxime Bizon wrote:
-> On Monday 30 Sep 2013 ? 23:14:49 (-0400), Nicolas Pitre wrote:
-> 
-> > > That "kind of hacky" ATAG thing was actually the only supported way to
-> > > boot a platform not so long ago :)
-> > 
-> > Strictly speaking, this was never supported in mainline.
+Hi,
 
-I was referring to the non-approved atags many vendors arbitrarily added
-to their bootloaders and kernels.  Ethernet mac addresses, etc.  It's
-not proper to go cluttering the kernel with every hair-brained, one-off
-tag a board vendor came up with to ship a product.
+On Monday 30 September 2013 08:39 PM, Rob Herring wrote:
+> On 09/30/2013 08:59 AM, Sricharan R wrote:
+>> Some socs have a large number of interrupts requests to service
+>> the needs of its many peripherals and subsystems. All of the interrupt
+>> requests lines from the subsystems are not needed at the same
+>> time, so they have to be muxed to the controllers appropriately.
+>> In such places a interrupt controllers are preceded by an
+>> IRQ CROSSBAR that provides flexibility in muxing the device interrupt
+>> requests to the controller inputs.
+>>
+>> This series models the peripheral interrupts that can be routed through
+>> the crossbar to the GIC as 'routable-irqs'. The routable irqs are added
+>> in a separate linear domain inside the GIC. The registered routable domain's
+>> callback are invoked as a part of the GIC's callback, which in turn should
+>> allocate a free irq line and configure the IP accordingly. So every peripheral
+>> in the dts files mentions the fixed crossbar number as its interrupt. A free
+>> gic line for that gets allocated and configured when the peripheral's interrupt
+>> is mapped.
+>>
+>> The minimal crossbar driver to track and allocate free GIC lines and configure the
+>> crossbar is added here, along with the DT bindings.
+> Seems like interrupt-map property is what you need here.
+>
+> http://devicetree.org/Device_Tree_Usage#Advanced_Interrupt_Mapping
+>
+> Versatile Express also has an example.
+   OK, but the idea was not to tie up the crossbar<->interrupt numbers at the
+   DTS level, but to assign it dynamically during runtime. This was one of the
+  comments that came up with first crossbar support patches, which was assigning a
+  interrupt line to crossbar number in the DTS and setting it up in crossbar probe.
 
-> > The ultimate idea with the impedance matcher was to augment existing 
-> > bootloaders with sort of a semi second stage bootloader that would be 
-> > separate from zImage and installed permanently, and then only the zImage 
-> > itself would be updateable.  This way you'd get a DT capable environment 
-> > without replacing the actual bootloader.
-> 
-> That's true if you have access to the bootloader in some way (serial,
-> flash env).
-> 
-> But for devices in the field for which upgrading the booloader is not
-> an option, neither is changing anything else in the boot process
-> (anything before linux starts). The risk of bricking the device is
-> just too high.
+    https://lkml.org/lkml/2013/7/18/416
 
-This is the exact scenario we are solving with the impedance matcher.
-It's a wrapper around a kernel and a series of dtbs.  To the bootloader,
-it looks _exactly_ like the kernel, but it translates the info passed to
-it into terms newer kernels can understand.  No need for a separate
-binary.
+   Since this approach of assigning in DTS was opposed, we moved to IRQCHIP and
+   that did not go as well. Finally was asked to handle this as a part of GIC driver with
+   a separate domain.
+   
+  http://www.spinics.net/lists/linux-omap/msg97085.html
+  
+Regards,
+ Sricharan
 
-hth,
-
-Jason.
+ 
