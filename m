@@ -1,51 +1,22 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Tue, 01 Oct 2013 11:58:52 +0100
-Subject: [PATCH 2/9] Staging/iio/adc/touchscreen/MXS: distinguish i.MX23's
- and i.MX28's LRADC
-In-Reply-To: <1379946998-23041-3-git-send-email-jbe@pengutronix.de>
-References: <1379946998-23041-1-git-send-email-jbe@pengutronix.de>
- <1379946998-23041-3-git-send-email-jbe@pengutronix.de>
-Message-ID: <524AAAEC.8020006@kernel.org>
+From: iamjoonsoo.kim@lge.com (Joonsoo Kim)
+Date: Tue, 1 Oct 2013 18:59:55 +0900
+Subject: Why does unmap_area_sections() depend on !CONFIG_SMP?
+Message-ID: <20131001095955.GA22859@lge.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/23/13 15:36, Juergen Beisert wrote:
-> The LRADC units in i.MX23 and i.MX28 differ and we need to distinguish both
-> SoC variants in order to make the touchscreen work on i.MX23
-> 
-> Signed-off-by: Juergen Beisert <jbe@pengutronix.de>
-> CC: linux-arm-kernel at lists.infradead.org
-> CC: linux-input at vger.kernel.org
-> CC: devel at driverdev.osuosl.org
-> CC: Marek Vasut <marex@denx.de>
-> CC: Fabio Estevam <fabio.estevam@freescale.com>
-> CC: Jonathan Cameron <jic23@cam.ac.uk>
-Applied to the togreg branch of iio.git
+Hello, Russell.
 
-Thanks
-> ---
->  drivers/staging/iio/adc/mxs-lradc.c | 3 +++
->  1 file changed, 3 insertions(+)
-> 
-> diff --git a/drivers/staging/iio/adc/mxs-lradc.c b/drivers/staging/iio/adc/mxs-lradc.c
-> index 00b61ac..3abc91f 100644
-> --- a/drivers/staging/iio/adc/mxs-lradc.c
-> +++ b/drivers/staging/iio/adc/mxs-lradc.c
-> @@ -177,6 +177,8 @@ struct mxs_lradc {
->  
->  	struct input_dev	*ts_input;
->  	struct work_struct	ts_work;
-> +
-> +	enum mxs_lradc_id	soc;
->  };
->  
->  #define	LRADC_CTRL0				0x00
-> @@ -923,6 +925,7 @@ static int mxs_lradc_probe(struct platform_device *pdev)
->  	}
->  
->  	lradc = iio_priv(iio);
-> +	lradc->soc = (enum mxs_lradc_id)of_id->data;
->  
->  	/* Grab the memory area */
->  	iores = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> 
+I looked at ioremap code in arm tree and found that unmap_area_sections()
+is enabled only if !CONFIG_SMP. I can't understand the comments
+above this function and it comes from you. Could you elaborate more
+on this?
+
+I guess that flush_cache_vunmap() before clearing page table and
+flush_tlb_kernel_range() after clearing page table is safe enough to cache
+consistency regardless CONFIG_SMP configuration. I think that 4K vunmap()
+also depends on this flushing logic.
+
+Please let me know what I am missing here.
+
+Thanks.
