@@ -1,148 +1,44 @@
-From: mika.westerberg@linux.intel.com (Mika Westerberg)
-Date: Tue,  1 Oct 2013 16:09:42 +0300
-Subject: [PATCH v4] i2c: enable runtime PM for I2C adapter devices enumerated
- from ACPI
-In-Reply-To: <1380552228-23329-2-git-send-email-mika.westerberg@linux.intel.com>
-References: <1380552228-23329-2-git-send-email-mika.westerberg@linux.intel.com>
-Message-ID: <1380632982-10709-1-git-send-email-mika.westerberg@linux.intel.com>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Tue,  1 Oct 2013 15:15:29 +0200
+Subject: [PATCH 1/2] w1-gpio: Detect of_gpio_error for first gpio
+Message-ID: <1380633330-2534-1-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ACPI specification requires the parent device to be powered on before
-any of its children. It can be only powered off when all the children are
-already off.
+The first DT gpio is necessary for this driver, but errors returned for
+of_get_gpio are ignored.
 
-Currently whenever there is no I2C traffic going on, the I2C controller
-driver can put the device into low power state transparently to its
-children (the I2C client devices). This violates the ACPI specification
-because now the parent device is in lower power state than its children.
+This patch adds a return value check for the first of_get_gpio.
 
-In order to keep ACPI happy we enable runtime PM for the I2C adapter device
-if we find out that the I2C controller was in fact an ACPI device. In
-addition to that we attach the I2C client devices to the ACPI power domain
-and make sure that they are powered on when the driver ->probe() is called.
-
-Non-ACPI devices are not affected by this change.
-
-This patch is based on the work by Aaron Lu and Lv Zheng.
-
-Signed-off-by: Mika Westerberg <mika.westerberg@linux.intel.com>
+Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
 ---
-Changes to v3:
- * Check only client ACPI_HANDLE().
- * Fixed bug where we attach the device to ACPI power domain multiple
-   times.
- * Functions are renamed to _get_attach/_put_attach to make it clear that
-   we do attach/detach as well.
+ drivers/w1/masters/w1-gpio.c | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
 
- drivers/i2c/i2c-core.c | 47 ++++++++++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 46 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/i2c/i2c-core.c b/drivers/i2c/i2c-core.c
-index 29d3f04..e289b1d 100644
---- a/drivers/i2c/i2c-core.c
-+++ b/drivers/i2c/i2c-core.c
-@@ -236,6 +236,27 @@ int i2c_recover_bus(struct i2c_adapter *adap)
- 	return adap->bus_recovery_info->recover_bus(adap);
- }
- 
-+static void acpi_i2c_device_pm_get_attach(struct i2c_client *client,
-+					  bool attach)
-+{
-+	if (ACPI_HANDLE(&client->dev)) {
-+		/* Make sure the adapter is active */
-+		pm_runtime_get_sync(&client->adapter->dev);
-+		if (attach)
-+			acpi_dev_pm_attach(&client->dev, true);
-+	}
-+}
-+
-+static void acpi_i2c_device_pm_put_detach(struct i2c_client *client,
-+					  bool detach)
-+{
-+	if (ACPI_HANDLE(&client->dev)) {
-+		if (detach)
-+			acpi_dev_pm_detach(&client->dev, true);
-+		pm_runtime_put(&client->adapter->dev);
-+	}
-+}
-+
- static int i2c_device_probe(struct device *dev)
+diff --git a/drivers/w1/masters/w1-gpio.c b/drivers/w1/masters/w1-gpio.c
+index f54ece2..ae53e88 100644
+--- a/drivers/w1/masters/w1-gpio.c
++++ b/drivers/w1/masters/w1-gpio.c
+@@ -58,6 +58,7 @@ static int w1_gpio_probe_dt(struct platform_device *pdev)
  {
- 	struct i2c_client	*client = i2c_verify_client(dev);
-@@ -254,11 +275,15 @@ static int i2c_device_probe(struct device *dev)
- 					client->flags & I2C_CLIENT_WAKE);
- 	dev_dbg(dev, "probe\n");
+ 	struct w1_gpio_platform_data *pdata = pdev->dev.platform_data;
+ 	struct device_node *np = pdev->dev.of_node;
++	int gpio;
  
-+	acpi_i2c_device_pm_get_attach(client, true);
+ 	pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
+ 	if (!pdata)
+@@ -66,7 +67,11 @@ static int w1_gpio_probe_dt(struct platform_device *pdev)
+ 	if (of_get_property(np, "linux,open-drain", NULL))
+ 		pdata->is_open_drain = 1;
+ 
+-	pdata->pin = of_get_gpio(np, 0);
++	gpio = of_get_gpio(np, 0);
++	if (gpio < 0)
++		return gpio;
++	pdata->pin = gpio;
 +
- 	status = driver->probe(client, i2c_match_id(driver->id_table, client));
- 	if (status) {
- 		client->driver = NULL;
- 		i2c_set_clientdata(client, NULL);
- 	}
-+
-+	acpi_i2c_device_pm_put_detach(client, !!status);
- 	return status;
- }
+ 	pdata->ext_pullup_enable_pin = of_get_gpio(np, 1);
+ 	pdev->dev.platform_data = pdata;
  
-@@ -271,6 +296,8 @@ static int i2c_device_remove(struct device *dev)
- 	if (!client || !dev->driver)
- 		return 0;
- 
-+	acpi_i2c_device_pm_get_attach(client, false);
-+
- 	driver = to_i2c_driver(dev->driver);
- 	if (driver->remove) {
- 		dev_dbg(dev, "remove\n");
-@@ -283,6 +310,8 @@ static int i2c_device_remove(struct device *dev)
- 		client->driver = NULL;
- 		i2c_set_clientdata(client, NULL);
- 	}
-+
-+	acpi_i2c_device_pm_put_detach(client, true);
- 	return status;
- }
- 
-@@ -294,8 +323,11 @@ static void i2c_device_shutdown(struct device *dev)
- 	if (!client || !dev->driver)
- 		return;
- 	driver = to_i2c_driver(dev->driver);
--	if (driver->shutdown)
-+	if (driver->shutdown) {
-+		acpi_i2c_device_pm_get_attach(client, false);
- 		driver->shutdown(client);
-+		acpi_i2c_device_pm_put_detach(client, false);
-+	}
- }
- 
- #ifdef CONFIG_PM_SLEEP
-@@ -1263,6 +1295,16 @@ exit_recovery:
- 	bus_for_each_drv(&i2c_bus_type, NULL, adap, __process_new_adapter);
- 	mutex_unlock(&core_lock);
- 
-+	/*
-+	 * For ACPI enumerated controllers we must make sure that the
-+	 * controller is powered on before its children. Runtime PM handles
-+	 * this for us once we have enabled it for the adapter device.
-+	 */
-+	if (ACPI_HANDLE(adap->dev.parent)) {
-+		pm_runtime_no_callbacks(&adap->dev);
-+		pm_runtime_enable(&adap->dev);
-+	}
-+
- 	return 0;
- 
- out_list:
-@@ -1427,6 +1469,9 @@ void i2c_del_adapter(struct i2c_adapter *adap)
- 		return;
- 	}
- 
-+	if (ACPI_HANDLE(adap->dev.parent))
-+		pm_runtime_disable(&adap->dev);
-+
- 	/* Tell drivers about this removal */
- 	mutex_lock(&core_lock);
- 	bus_for_each_drv(&i2c_bus_type, NULL, adap,
 -- 
 1.8.4.rc3
