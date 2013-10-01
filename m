@@ -1,87 +1,108 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue,  1 Oct 2013 11:28:22 +0900
-Subject: [PATCH 2/3] ARM: shmobile: Rename to r8a7790_init_early()
+Date: Tue,  1 Oct 2013 11:28:23 +0900
+Subject: [PATCH 3/3] ARM: shmobile: r8a7790: Constify platform data and
+ resources
 In-Reply-To: <cover.1380523393.git.horms+renesas@verge.net.au>
 References: <cover.1380523393.git.horms+renesas@verge.net.au>
-Message-ID: <0efd7faa6c611dab4ab8105473d2ffde7918cb69.1380523393.git.horms+renesas@verge.net.au>
+Message-ID: <cde214a890f81797a5eee94fffc89c1de21ed991.1380523393.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm@opensource.se>
+From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-Rename r8a7790_init_delay() into r8a7790_init_early()
-to make the function name show that more than just
-delay setup may happen in the future.
+Platform data and resources for core devices are kmemdup()ed when the
+corresponding devices are registered and can thus be declared as const.
+Do so.
 
-Signed-off-by: Magnus Damm <damm@opensource.se>
+Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/board-lager-reference.c | 2 +-
- arch/arm/mach-shmobile/board-lager.c           | 2 +-
- arch/arm/mach-shmobile/include/mach/r8a7790.h  | 2 +-
- arch/arm/mach-shmobile/setup-r8a7790.c         | 4 ++--
- 4 files changed, 5 insertions(+), 5 deletions(-)
+ arch/arm/mach-shmobile/setup-r8a7790.c | 21 +++++++++++----------
+ 1 file changed, 11 insertions(+), 10 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/board-lager-reference.c b/arch/arm/mach-shmobile/board-lager-reference.c
-index 9c316a1..2856f51 100644
---- a/arch/arm/mach-shmobile/board-lager-reference.c
-+++ b/arch/arm/mach-shmobile/board-lager-reference.c
-@@ -38,7 +38,7 @@ static const char *lager_boards_compat_dt[] __initdata = {
- };
- 
- DT_MACHINE_START(LAGER_DT, "lager")
--	.init_early	= r8a7790_init_delay,
-+	.init_early	= r8a7790_init_early,
- 	.init_machine	= lager_add_standard_devices,
- 	.init_time	= r8a7790_timer_init,
- 	.dt_compat	= lager_boards_compat_dt,
-diff --git a/arch/arm/mach-shmobile/board-lager.c b/arch/arm/mach-shmobile/board-lager.c
-index ffb6f0a..4047fac 100644
---- a/arch/arm/mach-shmobile/board-lager.c
-+++ b/arch/arm/mach-shmobile/board-lager.c
-@@ -161,7 +161,7 @@ static const char *lager_boards_compat_dt[] __initdata = {
- };
- 
- DT_MACHINE_START(LAGER_DT, "lager")
--	.init_early	= r8a7790_init_delay,
-+	.init_early	= r8a7790_init_early,
- 	.init_time	= r8a7790_timer_init,
- 	.init_machine	= lager_add_standard_devices,
- 	.dt_compat	= lager_boards_compat_dt,
-diff --git a/arch/arm/mach-shmobile/include/mach/r8a7790.h b/arch/arm/mach-shmobile/include/mach/r8a7790.h
-index 788d559..177a837 100644
---- a/arch/arm/mach-shmobile/include/mach/r8a7790.h
-+++ b/arch/arm/mach-shmobile/include/mach/r8a7790.h
-@@ -5,7 +5,7 @@ void r8a7790_add_standard_devices(void);
- void r8a7790_add_dt_devices(void);
- void r8a7790_clock_init(void);
- void r8a7790_pinmux_init(void);
--void r8a7790_init_delay(void);
-+void r8a7790_init_early(void);
- void r8a7790_timer_init(void);
- 
- #define MD(nr) BIT(nr)
 diff --git a/arch/arm/mach-shmobile/setup-r8a7790.c b/arch/arm/mach-shmobile/setup-r8a7790.c
-index d0f5c9f..a42d1f6 100644
+index a42d1f6..e0d29a2 100644
 --- a/arch/arm/mach-shmobile/setup-r8a7790.c
 +++ b/arch/arm/mach-shmobile/setup-r8a7790.c
-@@ -267,7 +267,7 @@ void __init r8a7790_timer_init(void)
- 	clocksource_of_init();
- }
+@@ -31,17 +31,18 @@
+ #include <mach/r8a7790.h>
+ #include <asm/mach/arch.h>
  
--void __init r8a7790_init_delay(void)
-+void __init r8a7790_init_early(void)
- {
- #ifndef CONFIG_ARM_ARCH_TIMER
- 	shmobile_setup_delay(1300, 2, 4); /* Cortex-A15 @ 1300MHz */
-@@ -282,7 +282,7 @@ static const char *r8a7790_boards_compat_dt[] __initdata = {
+-static struct resource pfc_resources[] __initdata = {
++static const struct resource pfc_resources[] __initconst = {
+ 	DEFINE_RES_MEM(0xe6060000, 0x250),
  };
  
- DT_MACHINE_START(R8A7790_DT, "Generic R8A7790 (Flattened Device Tree)")
--	.init_early	= r8a7790_init_delay,
-+	.init_early	= r8a7790_init_early,
- 	.init_time	= r8a7790_timer_init,
- 	.dt_compat	= r8a7790_boards_compat_dt,
- MACHINE_END
+ #define R8A7790_GPIO(idx)						\
+-static struct resource r8a7790_gpio##idx##_resources[] __initdata = {	\
++static const struct resource r8a7790_gpio##idx##_resources[] __initconst = { \
+ 	DEFINE_RES_MEM(0xe6050000 + 0x1000 * (idx), 0x50),		\
+ 	DEFINE_RES_IRQ(gic_spi(4 + (idx))),				\
+ };									\
+ 									\
+-static struct gpio_rcar_config r8a7790_gpio##idx##_platform_data __initdata = {	\
++static const struct gpio_rcar_config					\
++r8a7790_gpio##idx##_platform_data __initconst = {			\
+ 	.gpio_base	= 32 * (idx),					\
+ 	.irq_base	= 0,						\
+ 	.number_of_pins	= 32,						\
+@@ -112,7 +113,7 @@ void __init r8a7790_pinmux_init(void)
+ enum { SCIFA0, SCIFA1, SCIFB0, SCIFB1, SCIFB2, SCIFA2, SCIF0, SCIF1,
+        HSCIF0, HSCIF1 };
+ 
+-static struct plat_sci_port scif[] __initdata = {
++static const struct plat_sci_port scif[] __initconst = {
+ 	SCIFA_DATA(SCIFA0, 0xe6c40000, gic_spi(144)), /* SCIFA0 */
+ 	SCIFA_DATA(SCIFA1, 0xe6c50000, gic_spi(145)), /* SCIFA1 */
+ 	SCIFB_DATA(SCIFB0, 0xe6c20000, gic_spi(148)), /* SCIFB0 */
+@@ -131,11 +132,11 @@ static inline void r8a7790_register_scif(int idx)
+ 				      sizeof(struct plat_sci_port));
+ }
+ 
+-static struct renesas_irqc_config irqc0_data __initdata = {
++static const struct renesas_irqc_config irqc0_data __initconst = {
+ 	.irq_base = irq_pin(0), /* IRQ0 -> IRQ3 */
+ };
+ 
+-static struct resource irqc0_resources[] __initdata = {
++static const struct resource irqc0_resources[] __initconst = {
+ 	DEFINE_RES_MEM(0xe61c0000, 0x200), /* IRQC Event Detector Block_0 */
+ 	DEFINE_RES_IRQ(gic_spi(0)), /* IRQ0 */
+ 	DEFINE_RES_IRQ(gic_spi(1)), /* IRQ1 */
+@@ -150,7 +151,7 @@ static struct resource irqc0_resources[] __initdata = {
+ 					  &irqc##idx##_data,		\
+ 					  sizeof(struct renesas_irqc_config))
+ 
+-static struct resource thermal_resources[] __initdata = {
++static const struct resource thermal_resources[] __initconst = {
+ 	DEFINE_RES_MEM(0xe61f0000, 0x14),
+ 	DEFINE_RES_MEM(0xe61f0100, 0x38),
+ 	DEFINE_RES_IRQ(gic_spi(69)),
+@@ -161,13 +162,13 @@ static struct resource thermal_resources[] __initdata = {
+ 					thermal_resources,		\
+ 					ARRAY_SIZE(thermal_resources))
+ 
+-static struct sh_timer_config cmt00_platform_data __initdata = {
++static const struct sh_timer_config cmt00_platform_data __initconst = {
+ 	.name = "CMT00",
+ 	.timer_bit = 0,
+ 	.clockevent_rating = 80,
+ };
+ 
+-static struct resource cmt00_resources[] __initdata = {
++static const struct resource cmt00_resources[] __initconst = {
+ 	DEFINE_RES_MEM(0xffca0510, 0x0c),
+ 	DEFINE_RES_MEM(0xffca0500, 0x04),
+ 	DEFINE_RES_IRQ(gic_spi(142)), /* CMT0_0 */
+@@ -276,7 +277,7 @@ void __init r8a7790_init_early(void)
+ 
+ #ifdef CONFIG_USE_OF
+ 
+-static const char *r8a7790_boards_compat_dt[] __initdata = {
++static const char * const r8a7790_boards_compat_dt[] __initconst = {
+ 	"renesas,r8a7790",
+ 	NULL,
+ };
 -- 
 1.8.4
