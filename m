@@ -1,153 +1,104 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue,  1 Oct 2013 11:34:17 +0900
-Subject: [PATCH 6/8] ARM: shmobile: r8a7791 CMT support
+Date: Tue,  1 Oct 2013 11:34:19 +0900
+Subject: [PATCH 8/8] ARM: shmobile: r8a7778: add usb phy power control function
 In-Reply-To: <cover.1380530437.git.horms+renesas@verge.net.au>
 References: <cover.1380530437.git.horms+renesas@verge.net.au>
-Message-ID: <1bebd72a71e4ea1e9f68a9e71faee724c5e8f903.1380530437.git.horms+renesas@verge.net.au>
+Message-ID: <f39d35fcc2cd7a24ec3128adffd7876953999e1f.1380530437.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm@opensource.se>
+From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-Add r8a7791 CMT support via channel 0 of CMT0. At this
-point the CMT is used for clock event operation, but in
-the future the arch timer will be the main timer and the
-CMT will be used for deep sleep wake up only.
+USB phy initialisation function is needed from not only
+USB Host but also USB Function too.
+This patch adds usb phy common control function.
 
-Signed-off-by: Magnus Damm <damm@opensource.se>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-(cherry picked from commit a7663b88280d00359715817620798e99d54d401c)
+Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/clock-r8a7791.c        |  7 ++++++-
- arch/arm/mach-shmobile/include/mach/r8a7791.h |  1 +
- arch/arm/mach-shmobile/setup-r8a7791.c        | 29 +++++++++++++++++++++++++++
- 3 files changed, 36 insertions(+), 1 deletion(-)
+ arch/arm/mach-shmobile/include/mach/r8a7778.h |  2 ++
+ arch/arm/mach-shmobile/setup-r8a7778.c        | 37 +++++++++++++++++++--------
+ 2 files changed, 28 insertions(+), 11 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/clock-r8a7791.c b/arch/arm/mach-shmobile/clock-r8a7791.c
-index df3122e..c9a26f1 100644
---- a/arch/arm/mach-shmobile/clock-r8a7791.c
-+++ b/arch/arm/mach-shmobile/clock-r8a7791.c
-@@ -101,7 +101,7 @@ SH_FIXED_RATIO_CLK_SET(cp_clk,			extal_clk,	1, 2);
- SH_FIXED_RATIO_CLK_SET(pll1_div2_clk,		pll1_clk,	1, 2);
- SH_FIXED_RATIO_CLK_SET(hp_clk,			pll1_clk,	1, 12);
- SH_FIXED_RATIO_CLK_SET(p_clk,			pll1_clk,	1, 24);
--
-+SH_FIXED_RATIO_CLK_SET(rclk_clk,		pll1_clk,	1, (48 * 1024));
- SH_FIXED_RATIO_CLK_SET(mp_clk,			pll1_div2_clk,	1, 15);
+diff --git a/arch/arm/mach-shmobile/include/mach/r8a7778.h b/arch/arm/mach-shmobile/include/mach/r8a7778.h
+index adfcf51..ea1dca6 100644
+--- a/arch/arm/mach-shmobile/include/mach/r8a7778.h
++++ b/arch/arm/mach-shmobile/include/mach/r8a7778.h
+@@ -35,4 +35,6 @@ extern void r8a7778_clock_init(void);
+ extern void r8a7778_init_irq_extpin(int irlm);
+ extern void r8a7778_pinmux_init(void);
  
- static struct clk *main_clks[] = {
-@@ -113,6 +113,7 @@ static struct clk *main_clks[] = {
- 	&pll3_clk,
- 	&hp_clk,
- 	&p_clk,
-+	&rclk_clk,
- 	&mp_clk,
- 	&cp_clk,
- };
-@@ -123,6 +124,7 @@ enum {
- 	MSTP719, MSTP718, MSTP715, MSTP714,
- 	MSTP216, MSTP207, MSTP206,
- 	MSTP204, MSTP203, MSTP202, MSTP1105, MSTP1106, MSTP1107,
-+	MSTP124,
- 	MSTP_NR
- };
- 
-@@ -142,6 +144,7 @@ static struct clk mstp_clks[MSTP_NR] = {
- 	[MSTP1105] = SH_CLK_MSTP32(&mp_clk, SMSTPCR11, 5, 0), /* SCIFA3 */
- 	[MSTP1106] = SH_CLK_MSTP32(&mp_clk, SMSTPCR11, 6, 0), /* SCIFA4 */
- 	[MSTP1107] = SH_CLK_MSTP32(&mp_clk, SMSTPCR11, 7, 0), /* SCIFA5 */
-+	[MSTP124] = SH_CLK_MSTP32(&rclk_clk, SMSTPCR1, 24, 0), /* CMT0 */
- };
- 
- static struct clk_lookup lookups[] = {
-@@ -155,6 +158,7 @@ static struct clk_lookup lookups[] = {
- 	CLKDEV_CON_ID("pll3",		&pll3_clk),
- 	CLKDEV_CON_ID("hp",		&hp_clk),
- 	CLKDEV_CON_ID("p",		&p_clk),
-+	CLKDEV_CON_ID("rclk",		&rclk_clk),
- 	CLKDEV_CON_ID("mp",		&mp_clk),
- 	CLKDEV_CON_ID("cp",		&cp_clk),
- 	CLKDEV_CON_ID("peripheral_clk", &hp_clk),
-@@ -175,6 +179,7 @@ static struct clk_lookup lookups[] = {
- 	CLKDEV_DEV_ID("sh-sci.12", &mstp_clks[MSTP1105]), /* SCIFA3 */
- 	CLKDEV_DEV_ID("sh-sci.13", &mstp_clks[MSTP1106]), /* SCIFA4 */
- 	CLKDEV_DEV_ID("sh-sci.14", &mstp_clks[MSTP1107]), /* SCIFA5 */
-+	CLKDEV_DEV_ID("sh_cmt.0", &mstp_clks[MSTP124]),
- };
- 
- #define R8A7791_CLOCK_ROOT(e, m, p0, p1, p30, p31)		\
-diff --git a/arch/arm/mach-shmobile/include/mach/r8a7791.h b/arch/arm/mach-shmobile/include/mach/r8a7791.h
-index d234b8c..2e6d661 100644
---- a/arch/arm/mach-shmobile/include/mach/r8a7791.h
-+++ b/arch/arm/mach-shmobile/include/mach/r8a7791.h
-@@ -3,5 +3,6 @@
- 
- void r8a7791_add_dt_devices(void);
- void r8a7791_clock_init(void);
-+void r8a7791_init_early(void);
- 
- #endif /* __ASM_R8A7791_H__ */
-diff --git a/arch/arm/mach-shmobile/setup-r8a7791.c b/arch/arm/mach-shmobile/setup-r8a7791.c
-index 0de6aec..b56399d 100644
---- a/arch/arm/mach-shmobile/setup-r8a7791.c
-+++ b/arch/arm/mach-shmobile/setup-r8a7791.c
-@@ -23,6 +23,7 @@
- #include <linux/kernel.h>
- #include <linux/of_platform.h>
- #include <linux/serial_sci.h>
-+#include <linux/sh_timer.h>
- #include <mach/common.h>
- #include <mach/irqs.h>
- #include <mach/r8a7791.h>
-@@ -89,6 +90,25 @@ static inline void r8a7791_register_scif(int idx)
- 				      sizeof(struct plat_sci_port));
- }
- 
-+static const struct sh_timer_config cmt00_platform_data __initconst = {
-+	.name = "CMT00",
-+	.timer_bit = 0,
-+	.clockevent_rating = 80,
-+};
++extern int r8a7778_usb_phy_power(bool enable);
 +
-+static const struct resource cmt00_resources[] __initconst = {
-+	DEFINE_RES_MEM(0xffca0510, 0x0c),
-+	DEFINE_RES_MEM(0xffca0500, 0x04),
-+	DEFINE_RES_IRQ(gic_spi(142)), /* CMT0_0 */
-+};
+ #endif /* __ASM_R8A7778_H__ */
+diff --git a/arch/arm/mach-shmobile/setup-r8a7778.c b/arch/arm/mach-shmobile/setup-r8a7778.c
+index 6a2657e..e484d14 100644
+--- a/arch/arm/mach-shmobile/setup-r8a7778.c
++++ b/arch/arm/mach-shmobile/setup-r8a7778.c
+@@ -95,29 +95,46 @@ static struct sh_timer_config sh_tmu1_platform_data __initdata = {
+ 		&sh_tmu##idx##_platform_data,		\
+ 		sizeof(sh_tmu##idx##_platform_data))
+ 
+-/* USB */
+-static struct usb_phy *phy;
++int r8a7778_usb_phy_power(bool enable)
++{
++	static struct usb_phy *phy = NULL;
++	int ret = 0;
 +
-+#define r8a7791_register_cmt(idx)					\
-+	platform_device_register_resndata(&platform_bus, "sh_cmt",	\
-+					  idx, cmt##idx##_resources,	\
-+					  ARRAY_SIZE(cmt##idx##_resources), \
-+					  &cmt##idx##_platform_data,	\
-+					  sizeof(struct sh_timer_config))
++	if (!phy)
++		phy = usb_get_phy(USB_PHY_TYPE_USB2);
 +
- void __init r8a7791_add_dt_devices(void)
- {
- 	r8a7791_register_scif(SCIFA0);
-@@ -106,6 +126,14 @@ void __init r8a7791_add_dt_devices(void)
- 	r8a7791_register_scif(SCIFA3);
- 	r8a7791_register_scif(SCIFA4);
- 	r8a7791_register_scif(SCIFA5);
-+	r8a7791_register_cmt(00);
++	if (IS_ERR(phy)) {
++		pr_err("kernel doesn't have usb phy driver\n");
++		return PTR_ERR(phy);
++	}
++
++	if (enable)
++		ret = usb_phy_init(phy);
++	else
++		usb_phy_shutdown(phy);
+ 
++	return ret;
 +}
 +
-+void __init r8a7791_init_early(void)
-+{
-+#ifndef CONFIG_ARM_ARCH_TIMER
-+	shmobile_setup_delay(1300, 2, 4); /* Cortex-A15 @ 1300MHz */
-+#endif
++/* USB */
+ static int usb_power_on(struct platform_device *pdev)
+ {
+-	if (IS_ERR(phy))
+-		return PTR_ERR(phy);
++	int ret = r8a7778_usb_phy_power(true);
++
++	if (ret)
++		return ret;
+ 
+ 	pm_runtime_enable(&pdev->dev);
+ 	pm_runtime_get_sync(&pdev->dev);
+ 
+-	usb_phy_init(phy);
+-
+ 	return 0;
  }
  
- #ifdef CONFIG_USE_OF
-@@ -115,6 +143,7 @@ static const char *r8a7791_boards_compat_dt[] __initdata = {
- };
+ static void usb_power_off(struct platform_device *pdev)
+ {
+-	if (IS_ERR(phy))
++	if (r8a7778_usb_phy_power(false))
+ 		return;
  
- DT_MACHINE_START(R8A7791_DT, "Generic R8A7791 (Flattened Device Tree)")
-+	.init_early	= r8a7791_init_early,
- 	.dt_compat	= r8a7791_boards_compat_dt,
- MACHINE_END
- #endif /* CONFIG_USE_OF */
+-	usb_phy_shutdown(phy);
+-
+ 	pm_runtime_put_sync(&pdev->dev);
+ 	pm_runtime_disable(&pdev->dev);
+ }
+@@ -353,8 +370,6 @@ void __init r8a7778_add_standard_devices(void)
+ 
+ void __init r8a7778_init_late(void)
+ {
+-	phy = usb_get_phy(USB_PHY_TYPE_USB2);
+-
+ 	platform_device_register_full(&ehci_info);
+ 	platform_device_register_full(&ohci_info);
+ }
 -- 
 1.8.4
