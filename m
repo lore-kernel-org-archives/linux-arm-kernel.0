@@ -1,35 +1,46 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 1 Oct 2013 11:33:15 -0400
-Subject: [PATCH v3 2/2] ARM: kirkwood: Add standby support
-In-Reply-To: <1377186547-14284-3-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1377186547-14284-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1377186547-14284-3-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <20131001153315.GW31178@titan.lakedaemon.net>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 1 Oct 2013 17:33:58 +0200
+Subject: [PATCH 3/4] clk: kirkwood: Add CLK_IGNORE_UNUSED to ethernet
+ ge0 and ge1 clocks
+In-Reply-To: <20131001151528.GV31178@titan.lakedaemon.net>
+References: <1380575010-8573-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1380575010-8573-4-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20131001004009.GK31178@titan.lakedaemon.net>
+ <20131001134213.GC2448@localhost>
+ <20131001135800.GS31178@titan.lakedaemon.net>
+ <20131001141716.GE2448@localhost>
+ <20131001150130.GT31178@titan.lakedaemon.net>
+ <20131001170932.54d53aa4@skate>
+ <20131001151528.GV31178@titan.lakedaemon.net>
+Message-ID: <20131001173358.188968e2@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 22, 2013 at 12:49:07PM -0300, Ezequiel Garcia wrote:
-> Implements standby support for Kirkwood SoC. When the SoC enters
-> standby state the memory PM units are disabled, the DDR is set
-> in self-refresh mode, and the CPU is set in WFI.
+Dear Jason Cooper,
+
+On Tue, 1 Oct 2013 11:15:28 -0400, Jason Cooper wrote:
+
+> > Sorry for jumping into the discussion, but how does that solve the case
+> > when the driver is loaded as a module, and therefore unused clocks are
+> > disabled before the driver ->probe() function gets called?
 > 
-> At this point there's no clock gating, as that is considered each
-> driver's task.
+> Sorry, I wrote the reply to JasonG just moments before and assumed a
+> little knowledge of that in this reply.
 > 
-> Signed-off-by: Simon Guinot <sguinot@lacie.com>
-> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> ---
->  arch/arm/mach-kirkwood/Makefile                   |  2 +
->  arch/arm/mach-kirkwood/board-dt.c                 |  1 +
->  arch/arm/mach-kirkwood/common.c                   |  1 +
->  arch/arm/mach-kirkwood/common.h                   |  6 ++
->  arch/arm/mach-kirkwood/include/mach/bridge-regs.h |  2 +
->  arch/arm/mach-kirkwood/pm.c                       | 73 +++++++++++++++++++++++
->  6 files changed, 85 insertions(+)
->  create mode 100644 arch/arm/mach-kirkwood/pm.c
+> We would use Ezequiel's patch to ensure CLK_IGNORE_UNUSED is set for the
+> clock during boot, then, after boot, mv643xx_eth's probe would look for
+> the mac address in the DT.  If it's there, it would unset the flag
+> knowing that it can recover the mac address from the DT.  Then we could
+> get the power savings from suspend/unload.
 
-Applied to mvebu/soc
+Ah, ok. What was wrong with the idea of getting the MAC address from
+the hardware early at boot time, and adjust the in-memory Device Tree
+with this information, so that the mv643xx_eth driver can find them
+whenever it gets loaded, and regardless of whether clocks have been
+disabled or not?
 
-thx,
-
-Jason.
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
