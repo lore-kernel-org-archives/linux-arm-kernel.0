@@ -1,53 +1,38 @@
-From: yrehan@gmail.com (Mian Yousaf Kaukab)
-Date: Tue, 1 Oct 2013 10:11:17 +0200
-Subject: [PATCH] ARM: vexpress: ignore MIDR[0] for uart detection
-In-Reply-To: <1380449869-19911-1-git-send-email-yrehan@gmail.com>
-References: <1380449869-19911-1-git-send-email-yrehan@gmail.com>
-Message-ID: <CAC_HJnzfvi59i0e0-VwhUtKPxiPLU9o+Y6Dvts9HVkKC6gyqRw@mail.gmail.com>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Tue, 01 Oct 2013 17:11:43 +0900
+Subject: [PATCH 00/10] ARM: shmobile: r8a7791 SoC and Koelsch update V2
+Message-ID: <20131001081143.4136.46925.sendpatchset@w520>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pawel,
+ARM: shmobile: r8a7791 SoC and Koelsch update V2
 
-On Sun, Sep 29, 2013 at 12:17 PM, Mian Yousaf Kaukab <yrehan@gmail.com> wrote:
-> Qemu vexpress-a9 target reports id of ARM Cortex-A9 core as r0p0
-> and uses legacy map. That is UART0 at address 0x10009000. Ignore
-> MIDR[0] during uart detection so that r0p0 as well as r0p1 use
-> legacy map.
->
-> Signed-off-by: Mian Yousaf Kaukab <yrehan@gmail.com>
-> ---
->  arch/arm/include/debug/vexpress.S | 9 +++++++--
->  1 file changed, 7 insertions(+), 2 deletions(-)
->
-> diff --git a/arch/arm/include/debug/vexpress.S b/arch/arm/include/debug/vexpress.S
-> index 524acd5..932db8b 100644
-> --- a/arch/arm/include/debug/vexpress.S
-> +++ b/arch/arm/include/debug/vexpress.S
-> @@ -27,11 +27,16 @@
->
->                 @ Make an educated guess regarding the memory map:
->                 @ - the original A9 core tile (based on ARM Cortex-A9 r0p1)
-> -               @   should use UART at 0x10009000
-> +               @   should use UART at 0x10009000. Moreover, qemu vexpress-a9
-> +               @   target reports id of ARM Cortex-A9 core as r0p0 and uses
-> +               @   legacy map.
->                 @ - all other (RS1 complaint) tiles use UART mapped
->                 @   at 0x1c090000
->                 mrc     p15, 0, \rp, c0, c0, 0
-> -               movw    \rv, #0xc091
-> +               mov     \rv, #1
-> +               @ Ignore MIDR[0] during comparison
-> +               bic     \rp, \rp, \rv
-> +               movw    \rv, #0xc090
->                 movt    \rv, #0x410f
->                 cmp     \rp, \rv
+[PATCH 01/10] ARM: shmobile: Introduce r8a7791_add_standard_devices()
+[PATCH 02/10] ARM: shmobile: Use r8a7791_add_standard_devices() on Koelsch
+[PATCH 03/10] ARM: shmobile: r8a7791 IRQC platform device support
+[PATCH 04/10] ARM: shmobile: r8a7791 IRQC device tree node
+[PATCH 05/10] ARM: shmobile: r8a7791 Arch timer device tree node
+[PATCH 06/10] ARM: shmobile: r8a7791 Arch timer workaround
+[PATCH 07/10] ARM: shmobile: Use arch timer on Koelsch
+[PATCH 08/10] ARM: shmobile: r8a7791 SMP device tree node
+[PATCH 09/10] ARM: shmobile: r8a7791 SMP support
+[PATCH 10/10] ARM: shmobile: Use SMP on Koelsch
 
-Can you please take a look at this patch? Default vexpress_defconfig
-does not boot on qemu vexpress-a9 target without it.
-I apologize if you get this message twice. I have to resend because
-the previous message didn't reach the mailing list.
+This series includes updated and more broken out versions of patches
+implementing r8a7791 and Koelsch support for IRQC, Arch timer and SMP.
 
+Koelsch DT reference support needs to be rebuilt on top of this
+in the near future. After that will PFC and GPIO be layered on top.
 
-BR,
-Yousaf
+Signed-off-by: Magnus Damm <damm@opensource.se>
+---
+
+ Written against renesas.git tag renesas-devel-20131001
+
+ arch/arm/boot/dts/r8a7791.dtsi                |   33 +++++++++++++
+ arch/arm/mach-shmobile/Makefile               |    3 -
+ arch/arm/mach-shmobile/board-koelsch.c        |    5 +-
+ arch/arm/mach-shmobile/include/mach/r8a7791.h |    2 
+ arch/arm/mach-shmobile/setup-r8a7791.c        |   35 ++++++++++++++
+ arch/arm/mach-shmobile/smp-r8a7791.c          |   62 +++++++++++++++++++++++++
+ 6 files changed, 138 insertions(+), 2 deletions(-)
