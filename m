@@ -1,91 +1,31 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 1 Oct 2013 09:38:50 -0400
-Subject: [PATCH v3 1/2] ARM: feroceon: Add suspend/resume operation
-In-Reply-To: <1377186547-14284-2-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1377186547-14284-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1377186547-14284-2-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <20131001133850.GR31178@titan.lakedaemon.net>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 1 Oct 2013 14:40:16 +0100
+Subject: [PATCH v6 10/19] xen: introduce xen_alloc/free_coherent_pages
+In-Reply-To: <20130930153143.GQ3106@phenom.dumpdata.com>
+References: <alpine.DEB.2.02.1309271653420.5498@kaball.uk.xensource.com>
+ <1380298207-29151-10-git-send-email-stefano.stabellini@eu.citrix.com>
+ <20130930153143.GQ3106@phenom.dumpdata.com>
+Message-ID: <DB675896-3FF2-409B-A2C6-24295C197A3F@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+rmk (oops, forgot to add you the first time around)
-
-On Thu, Aug 22, 2013 at 12:49:06PM -0300, Ezequiel Garcia wrote:
-> Add support for suspend/resume operations. The implemented procedures
-> are identical to the ones for ARM926.
+On 30 Sep 2013, at 16:31, Konrad Rzeszutek Wilk <konrad.wilk@oracle.com> wrote:
+> On Fri, Sep 27, 2013 at 05:09:58PM +0100, Stefano Stabellini wrote:
+>> xen_swiotlb_alloc_coherent needs to allocate a coherent buffer for cpu
+>> and devices. On native x86 and ARMv8 is sufficient to call
+>> __get_free_pages in order to get a coherent buffer, while on ARM we need
+>> to call the native dma_ops->alloc implementation.
+>> 
+>> When arm64 stops using the swiotlb by default and starts having multiple
+>> dma_ops implementations, we'll use __get_dma_ops there too.
 > 
-> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> ---
->  arch/arm/Kconfig            |  2 +-
->  arch/arm/mm/proc-feroceon.S | 26 ++++++++++++++++++++++++++
->  2 files changed, 27 insertions(+), 1 deletion(-)
+> I presume this is a future TODO, not some further patch (in which
+> case you should say in here the title of it). If it is a TODO could
+> you stick that in the sentence here somewhere to make it crytal clear that
+> it is not implemented.
 
-Russell,
+Thanks for pointing this out.  The arm64 patch shouldn't be different
+from arm here.  I thought a subsequent patch already added
+__get_dma_ops() for arm64.
 
-This is pretty isolated, and the next patch in the series depends on it
-for building (it's changes are all in mach-kirkwood/).  Should Ezequiel
-push this into your patch tracker (and then could you create a public,
-non-rebasable branch containing it?), or can I take it with your Ack?
-
-thx,
-
-Jason.
-
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 43594d5..a5111ec 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -2199,7 +2199,7 @@ source "kernel/power/Kconfig"
->  
->  config ARCH_SUSPEND_POSSIBLE
->  	depends on !ARCH_S5PC100
-> -	depends on CPU_ARM920T || CPU_ARM926T || CPU_SA1100 || \
-> +	depends on CPU_ARM920T || CPU_ARM926T || CPU_FEROCEON || CPU_SA1100 || \
->  		CPU_V6 || CPU_V6K || CPU_V7 || CPU_XSC3 || CPU_XSCALE || CPU_MOHAWK
->  	def_bool y
->  
-> diff --git a/arch/arm/mm/proc-feroceon.S b/arch/arm/mm/proc-feroceon.S
-> index d5146b9..db79b62 100644
-> --- a/arch/arm/mm/proc-feroceon.S
-> +++ b/arch/arm/mm/proc-feroceon.S
-> @@ -514,6 +514,32 @@ ENTRY(cpu_feroceon_set_pte_ext)
->  #endif
->  	mov	pc, lr
->  
-> +/* Suspend/resume support: taken from arch/arm/mm/proc-arm926.S */
-> +.globl	cpu_feroceon_suspend_size
-> +.equ	cpu_feroceon_suspend_size, 4 * 3
-> +#ifdef CONFIG_ARM_CPU_SUSPEND
-> +ENTRY(cpu_feroceon_do_suspend)
-> +	stmfd	sp!, {r4 - r6, lr}
-> +	mrc	p15, 0, r4, c13, c0, 0	@ PID
-> +	mrc	p15, 0, r5, c3, c0, 0	@ Domain ID
-> +	mrc	p15, 0, r6, c1, c0, 0	@ Control register
-> +	stmia	r0, {r4 - r6}
-> +	ldmfd	sp!, {r4 - r6, pc}
-> +ENDPROC(cpu_feroceon_do_suspend)
-> +
-> +ENTRY(cpu_feroceon_do_resume)
-> +	mov	ip, #0
-> +	mcr	p15, 0, ip, c8, c7, 0	@ invalidate I+D TLBs
-> +	mcr	p15, 0, ip, c7, c7, 0	@ invalidate I+D caches
-> +	ldmia	r0, {r4 - r6}
-> +	mcr	p15, 0, r4, c13, c0, 0	@ PID
-> +	mcr	p15, 0, r5, c3, c0, 0	@ Domain ID
-> +	mcr	p15, 0, r1, c2, c0, 0	@ TTB address
-> +	mov	r0, r6			@ control register
-> +	b	cpu_resume_mmu
-> +ENDPROC(cpu_feroceon_do_resume)
-> +#endif
-> +
->  	.type	__feroceon_setup, #function
->  __feroceon_setup:
->  	mov	r0, #0
-> -- 
-> 1.8.1.5
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Catalin
