@@ -1,139 +1,27 @@
-From: afzal@ti.com (Afzal Mohammed)
-Date: Tue, 1 Oct 2013 12:37:17 +0530
-Subject: [PATCH v5 03/11] ARM: OMAP2+: hwmod: AM335x: runtime register update
-In-Reply-To: <cover.1380608719.git.afzal@ti.com>
-References: <cover.1380608719.git.afzal@ti.com>
-Message-ID: <75a5d4a6cfa7ade02ae9d143480b1cc3b252d90f.1380608720.git.afzal@ti.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 1 Oct 2013 09:07:24 +0200
+Subject: Status of ARM FIQ?
+In-Reply-To: <F5184659D418E34EA12B1903EE5EF5FD8538E865F6@seldmbx02.corpusers.net>
+References: <F5184659D418E34EA12B1903EE5EF5FD8538E865F6@seldmbx02.corpusers.net>
+Message-ID: <20131001070724.GH2548@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Most of IP's in AM335x is present on AM43x and so in those cases both
-will use same hwmod database (except for a few cases where clock related
-details differ), but there is difference w.r.t register offset between
-these. Update register offsets at runtime based on the SoC detected to
-help in sharing otherwise same hwmod.
+Hello Tim,
 
-Signed-off-by: Afzal Mohammed <afzal@ti.com>
----
- .../mach-omap2/omap_hwmod_33xx_43xx_common_data.h  |  2 +
- .../mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c | 77 ++++++++++++++++++++++
- arch/arm/mach-omap2/omap_hwmod_33xx_data.c         |  1 +
- 3 files changed, 80 insertions(+)
+On Mon, Sep 30, 2013 at 08:48:15PM +0200, Bird, Tim wrote:
+> I'm working through some proposals for contract work for the Consumer
+> Electronics Workgroup, and one of them involves use of ARM FIQ
+> as a debug activator.  I have heard a rumor that FIQ mode is not being
+> included in some modern ARM CPUs.
+> 
+> Is there any truth to this?  Can someone give me a pointer to information
+> about this?
+The ARMv7-M doesn't have an FIQ.
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod_33xx_43xx_common_data.h b/arch/arm/mach-omap2/omap_hwmod_33xx_43xx_common_data.h
-index e873e72..a9a7902 100644
---- a/arch/arm/mach-omap2/omap_hwmod_33xx_43xx_common_data.h
-+++ b/arch/arm/mach-omap2/omap_hwmod_33xx_43xx_common_data.h
-@@ -157,4 +157,6 @@ extern struct omap_hwmod_class am33xx_spi_hwmod_class;
- extern struct omap_gpio_dev_attr gpio_dev_attr;
- extern struct omap2_mcspi_dev_attr mcspi_attrib;
- 
-+void omap_hwmod_am33xx_reg(void);
-+
- #endif
-diff --git a/arch/arm/mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c b/arch/arm/mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c
-index 3e70e9c..da40252 100644
---- a/arch/arm/mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c
-@@ -24,6 +24,10 @@
- #include "prm33xx.h"
- #include "omap_hwmod_33xx_43xx_common_data.h"
- 
-+#define CLKCTRL(oh, clkctrl) ((oh).prcm.omap4.clkctrl_offs = (clkctrl))
-+#define RSTCTRL(oh, rstctrl) ((oh).prcm.omap4.rstctrl_offs = (rstctrl))
-+#define RSTST(oh, rstst) ((oh).prcm.omap4.rstst_offs = (rstst))
-+
- /*
-  * 'l3' class
-  * instance(s): l3_main, l3_s, l3_instr
-@@ -1360,3 +1364,76 @@ struct omap_hwmod am33xx_wd_timer1_hwmod = {
- 		},
- 	},
- };
-+
-+static void omap_hwmod_am33xx_clkctrl(void)
-+{
-+	CLKCTRL(am33xx_uart2_hwmod, AM33XX_CM_PER_UART1_CLKCTRL_OFFSET);
-+	CLKCTRL(am33xx_uart3_hwmod, AM33XX_CM_PER_UART2_CLKCTRL_OFFSET);
-+	CLKCTRL(am33xx_uart4_hwmod, AM33XX_CM_PER_UART3_CLKCTRL_OFFSET);
-+	CLKCTRL(am33xx_uart5_hwmod, AM33XX_CM_PER_UART4_CLKCTRL_OFFSET);
-+	CLKCTRL(am33xx_uart6_hwmod, AM33XX_CM_PER_UART5_CLKCTRL_OFFSET);
-+	CLKCTRL(am33xx_dcan0_hwmod, AM33XX_CM_PER_DCAN0_CLKCTRL_OFFSET);
-+	CLKCTRL(am33xx_dcan1_hwmod, AM33XX_CM_PER_DCAN1_CLKCTRL_OFFSET);
-+	CLKCTRL(am33xx_elm_hwmod, AM33XX_CM_PER_ELM_CLKCTRL_OFFSET);
-+	CLKCTRL(am33xx_epwmss0_hwmod, AM33XX_CM_PER_EPWMSS0_CLKCTRL_OFFSET);
-+	CLKCTRL(am33xx_epwmss1_hwmod, AM33XX_CM_PER_EPWMSS1_CLKCTRL_OFFSET);
-+	CLKCTRL(am33xx_epwmss2_hwmod, AM33XX_CM_PER_EPWMSS2_CLKCTRL_OFFSET);
-+	CLKCTRL(am33xx_gpio1_hwmod, AM33XX_CM_PER_GPIO1_CLKCTRL_OFFSET);
-+	CLKCTRL(am33xx_gpio2_hwmod, AM33XX_CM_PER_GPIO2_CLKCTRL_OFFSET);
-+	CLKCTRL(am33xx_gpio3_hwmod, AM33XX_CM_PER_GPIO3_CLKCTRL_OFFSET);
-+	CLKCTRL(am33xx_i2c2_hwmod, AM33XX_CM_PER_I2C1_CLKCTRL_OFFSET);
-+	CLKCTRL(am33xx_i2c3_hwmod, AM33XX_CM_PER_I2C2_CLKCTRL_OFFSET);
-+	CLKCTRL(am33xx_mailbox_hwmod, AM33XX_CM_PER_MAILBOX0_CLKCTRL_OFFSET);
-+	CLKCTRL(am33xx_mcasp0_hwmod, AM33XX_CM_PER_MCASP0_CLKCTRL_OFFSET);
-+	CLKCTRL(am33xx_mcasp1_hwmod, AM33XX_CM_PER_MCASP1_CLKCTRL_OFFSET);
-+	CLKCTRL(am33xx_mmc0_hwmod, AM33XX_CM_PER_MMC0_CLKCTRL_OFFSET);
-+	CLKCTRL(am33xx_mmc1_hwmod, AM33XX_CM_PER_MMC1_CLKCTRL_OFFSET);
-+	CLKCTRL(am33xx_spi0_hwmod, AM33XX_CM_PER_SPI0_CLKCTRL_OFFSET);
-+	CLKCTRL(am33xx_spi1_hwmod, AM33XX_CM_PER_SPI1_CLKCTRL_OFFSET);
-+	CLKCTRL(am33xx_spinlock_hwmod, AM33XX_CM_PER_SPINLOCK_CLKCTRL_OFFSET);
-+	CLKCTRL(am33xx_timer2_hwmod, AM33XX_CM_PER_TIMER2_CLKCTRL_OFFSET);
-+	CLKCTRL(am33xx_timer3_hwmod, AM33XX_CM_PER_TIMER3_CLKCTRL_OFFSET);
-+	CLKCTRL(am33xx_timer4_hwmod, AM33XX_CM_PER_TIMER4_CLKCTRL_OFFSET);
-+	CLKCTRL(am33xx_timer5_hwmod, AM33XX_CM_PER_TIMER5_CLKCTRL_OFFSET);
-+	CLKCTRL(am33xx_timer6_hwmod, AM33XX_CM_PER_TIMER6_CLKCTRL_OFFSET);
-+	CLKCTRL(am33xx_timer7_hwmod, AM33XX_CM_PER_TIMER7_CLKCTRL_OFFSET);
-+	CLKCTRL(am33xx_smartreflex0_hwmod,
-+		AM33XX_CM_WKUP_SMARTREFLEX0_CLKCTRL_OFFSET);
-+	CLKCTRL(am33xx_smartreflex1_hwmod,
-+		AM33XX_CM_WKUP_SMARTREFLEX1_CLKCTRL_OFFSET);
-+	CLKCTRL(am33xx_uart1_hwmod, AM33XX_CM_WKUP_UART0_CLKCTRL_OFFSET);
-+	CLKCTRL(am33xx_timer1_hwmod, AM33XX_CM_WKUP_TIMER1_CLKCTRL_OFFSET);
-+	CLKCTRL(am33xx_i2c1_hwmod, AM33XX_CM_WKUP_I2C0_CLKCTRL_OFFSET);
-+	CLKCTRL(am33xx_wd_timer1_hwmod, AM33XX_CM_WKUP_WDT1_CLKCTRL_OFFSET);
-+	CLKCTRL(am33xx_rtc_hwmod, AM33XX_CM_RTC_RTC_CLKCTRL_OFFSET);
-+	CLKCTRL(am33xx_mmc2_hwmod, AM33XX_CM_PER_MMC2_CLKCTRL_OFFSET);
-+	CLKCTRL(am33xx_gpmc_hwmod, AM33XX_CM_PER_GPMC_CLKCTRL_OFFSET);
-+	CLKCTRL(am33xx_l4_ls_hwmod, AM33XX_CM_PER_L4LS_CLKCTRL_OFFSET);
-+	CLKCTRL(am33xx_l4_wkup_hwmod, AM33XX_CM_WKUP_L4WKUP_CLKCTRL_OFFSET);
-+	CLKCTRL(am33xx_l3_main_hwmod, AM33XX_CM_PER_L3_CLKCTRL_OFFSET);
-+	CLKCTRL(am33xx_tpcc_hwmod, AM33XX_CM_PER_TPCC_CLKCTRL_OFFSET);
-+	CLKCTRL(am33xx_tptc0_hwmod, AM33XX_CM_PER_TPTC0_CLKCTRL_OFFSET);
-+	CLKCTRL(am33xx_tptc1_hwmod, AM33XX_CM_PER_TPTC1_CLKCTRL_OFFSET);
-+	CLKCTRL(am33xx_tptc2_hwmod, AM33XX_CM_PER_TPTC2_CLKCTRL_OFFSET);
-+	CLKCTRL(am33xx_gfx_hwmod, AM33XX_CM_GFX_GFX_CLKCTRL_OFFSET);
-+	CLKCTRL(am33xx_cpgmac0_hwmod, AM33XX_CM_PER_CPGMAC0_CLKCTRL_OFFSET);
-+	CLKCTRL(am33xx_pruss_hwmod, AM33XX_CM_PER_PRUSS_CLKCTRL_OFFSET);
-+	CLKCTRL(am33xx_mpu_hwmod , AM33XX_CM_MPU_MPU_CLKCTRL_OFFSET);
-+	CLKCTRL(am33xx_l3_instr_hwmod , AM33XX_CM_PER_L3_INSTR_CLKCTRL_OFFSET);
-+	CLKCTRL(am33xx_ocmcram_hwmod , AM33XX_CM_PER_OCMCRAM_CLKCTRL_OFFSET);
-+	CLKCTRL(am33xx_sha0_hwmod , AM33XX_CM_PER_SHA0_CLKCTRL_OFFSET);
-+	CLKCTRL(am33xx_aes0_hwmod , AM33XX_CM_PER_AES0_CLKCTRL_OFFSET);
-+}
-+
-+static void omap_hwmod_am33xx_rst(void)
-+{
-+	RSTCTRL(am33xx_pruss_hwmod, AM33XX_RM_PER_RSTCTRL_OFFSET);
-+	RSTCTRL(am33xx_gfx_hwmod, AM33XX_RM_GFX_RSTCTRL_OFFSET);
-+	RSTST(am33xx_gfx_hwmod, AM33XX_RM_GFX_RSTST_OFFSET);
-+}
-+
-+void omap_hwmod_am33xx_reg(void)
-+{
-+	omap_hwmod_am33xx_clkctrl();
-+	omap_hwmod_am33xx_rst();
-+}
-diff --git a/arch/arm/mach-omap2/omap_hwmod_33xx_data.c b/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
-index a7707ef..87cb9a8 100644
---- a/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
-@@ -601,6 +601,7 @@ static struct omap_hwmod_ocp_if *am33xx_hwmod_ocp_ifs[] __initdata = {
- 
- int __init am33xx_hwmod_init(void)
- {
-+	omap_hwmod_am33xx_reg();
- 	omap_hwmod_init();
- 	return omap_hwmod_register_links(am33xx_hwmod_ocp_ifs);
- }
+Best regards
+Uwe
+
 -- 
-1.8.3.4
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
