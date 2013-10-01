@@ -1,65 +1,67 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Tue, 01 Oct 2013 21:10:10 +0200
-Subject: [PATCH 3/4] clk: kirkwood: Add CLK_IGNORE_UNUSED to ethernet
- ge0 and ge1 clocks
-In-Reply-To: <20131001164556.GA23874@obsidianresearch.com>
-References: <1380575010-8573-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1380575010-8573-4-git-send-email-ezequiel.garcia@free-electrons.com>
- <20131001004009.GK31178@titan.lakedaemon.net>
- <20131001134213.GC2448@localhost> <524AD2F7.4090803@gmail.com>
- <20131001142205.GF2448@localhost> <524ADFAA.40805@gmail.com>
- <20131001164556.GA23874@obsidianresearch.com>
-Message-ID: <524B1E12.9080302@gmail.com>
+From: dinguyen@altera.com (Dinh Nguyen)
+Date: Tue, 1 Oct 2013 14:15:16 -0500
+Subject: [PATCH 1/2] arm: dts: socfpga: Change some types of gate-clk
+ type to periph-clk type
+In-Reply-To: <1379435486-25981-1-git-send-email-dinguyen@altera.com>
+References: <1379435486-25981-1-git-send-email-dinguyen@altera.com>
+Message-ID: <1380654916.13502.1.camel@linux-builds1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/01/2013 06:45 PM, Jason Gunthorpe wrote:
-> On Tue, Oct 01, 2013 at 04:43:54PM +0200, Sebastian Hesselbarth wrote:
->
->> The local-mac-address property is a placeholder for the real mac
->> address. Also, mv643xx_eth calls of_get_mac_address which fails for
->> the invalid local-mac-address value of [00 00 00 00 00 00].
->>
->> If you manage to setup local-mac-address in your bootloader, everything
->> should be fine.
->
-> FWIW, my environment is like this, and it works fine (this is recent,
-> 3.10 didn't work). The driver now properly sets the MAC from the DT.
->
-> The driver will also need an update to call of_get_phy_mode and set
-> the interface properly, and the board files will need update to
-> specify the phy-mode property. I'm guessing things are working for
-> most people because the POR value happens to match the board?
->
->> If we have a DT fixup that takes care of the above for non-DT
->> bootloaders, everything should be fine.
->
-> Exactly, the problem is a broken DT on input to the kernel, the proper
-> action, IMHO, is to correct the DT in the kernel, so the hacking is
-> contained. Similar to how pci-fixups.c centralizes fixing of broken
-> firmware for PCI, and how CONFIG_ARM_ATAG_DTB_COMPAT centralizes it
-> for ATAG conversion.
->
-> BTW, why doesn't CONFIG_ARM_ATAG_DTB_COMPAT fix this? Do the boot
-> loaders on these systems not pass the mac at all??
->
->> I still prefer Jason's approach and would give it a try on LAKML and
->> devtree ML: Backup register contents if of_get_mac_address does not
->> contain a valid address, and gate clocks.
->
-> FWIW, I would not use the language of 'backup' - this is a fixup
-> correcting an unsupported input DT.
->
-> IMHO, when this code triggers it should also:
->
-> printk(KERN_ERROR FW_BUG "local-mac-address is not set");
+Hi,
 
-Ezequiel,
+Just wondering if I can get any comments on this patch set?
 
-before you jump to prepare a patch for the above, I made one based on
-my previous work and JasonG's suggestions above. Testing it right now,
-looks promising.
-
-@JasonC: To avoid rebase mess again, where do you want it based against?
-
-Sebastian
+Thanks,
+Dinh
+On Tue, 2013-09-17 at 11:31 -0500, Dinh Nguyen wrote:
+> From: Dinh Nguyen <dinguyen@altera.com>
+> 
+> Some of the clocks that were designated gate-clk did not have a gate, so
+> change those clocks to be of periph-clk type.
+> 
+> Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
+> Cc: Rob Herring <rob.herring@calxeda.com>
+> Cc: Pawel Moll <pawel.moll@arm.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Stephen Warren <swarren@wwwdotorg.org>
+> Cc: Ian Campbell <ian.campbell@citrix.com>
+> Cc: Mike Turquette <mturquette@linaro.org>
+> Cc: devicetree at vger.kernel.org
+> CC: linux-arm-kernel at lists.infradead.org
+> ---
+>  arch/arm/boot/dts/socfpga.dtsi |    7 ++++---
+>  1 file changed, 4 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
+> index 1ee6079..acd6c3a 100644
+> --- a/arch/arm/boot/dts/socfpga.dtsi
+> +++ b/arch/arm/boot/dts/socfpga.dtsi
+> @@ -245,14 +245,14 @@
+>  
+>  				mpu_periph_clk: mpu_periph_clk {
+>  					#clock-cells = <0>;
+> -					compatible = "altr,socfpga-gate-clk";
+> +					compatible = "altr,socfpga-perip-clk";
+>  					clocks = <&mpuclk>;
+>  					fixed-divider = <4>;
+>  					};
+>  
+>  				mpu_l2_ram_clk: mpu_l2_ram_clk {
+>  					#clock-cells = <0>;
+> -					compatible = "altr,socfpga-gate-clk";
+> +					compatible = "altr,socfpga-perip-clk";
+>  					clocks = <&mpuclk>;
+>  					fixed-divider = <2>;
+>  					};
+> @@ -266,8 +266,9 @@
+>  
+>  				l3_main_clk: l3_main_clk {
+>  					#clock-cells = <0>;
+> -					compatible = "altr,socfpga-gate-clk";
+> +					compatible = "altr,socfpga-perip-clk";
+>  					clocks = <&mainclk>;
+> +					fixed-divider = <1>;
+>  					};
+>  
+>  				l3_mp_clk: l3_mp_clk {
