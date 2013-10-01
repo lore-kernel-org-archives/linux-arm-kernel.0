@@ -1,47 +1,43 @@
-From: seanpaul@chromium.org (Sean Paul)
-Date: Tue,  1 Oct 2013 19:40:56 -0400
-Subject: [PATCH 1/5] ARM: dts: Add fimd display-timings for exynos5250-snow
-In-Reply-To: <1380670860-17621-1-git-send-email-seanpaul@chromium.org>
-References: <1380670860-17621-1-git-send-email-seanpaul@chromium.org>
-Message-ID: <1380670860-17621-2-git-send-email-seanpaul@chromium.org>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Wed, 02 Oct 2013 08:44:01 +0900
+Subject: [PATCH] PCI: exynos: missing clk_disable_unprepare() on error in
+ exynos_pcie_probe()
+In-Reply-To: <524AD2E3.9010808@gmail.com>
+References: <CAPgLHd_RTNxi-OYhmTZ35NttjnAg-gQ_WKHkUQr5ueMhXVLTMg@mail.gmail.com>
+ <000301cebe46$42e86e00$c8b94a00$%han@samsung.com> <524AD2E3.9010808@gmail.com>
+Message-ID: <003501cebf00$1b57fee0$5207fca0$%han@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the internal panel timings to the exynos5250-snow board
-dts file.
+On Tuesday, October 01, 2013 10:49 PM, Sylwester Nawrocki wrote:
+> On 10/01/2013 03:33 AM, Jingoo Han wrote:
+> > On Sunday, September 29, 2013 11:29 AM, Wei Yongjun wrote:
+> >>
+> >> From: Wei Yongjun<yongjun_wei@trendmicro.com.cn>
+> >>
+> >> Add the missing clk_disable_unprepare() before return
+> >> from exynos_pcie_probe() in the error handling case.
+> >>
+> >> Signed-off-by: Wei Yongjun<yongjun_wei@trendmicro.com.cn>
+> >
+> > Acked-by: Jingoo Han<jg1.han@samsung.com>
+> >
+> > However, the commit name should be fixed as below:
+> > [PATCH] PCI: exynos: use missing clk_disable_unprepare() on error in exynos_pcie_probe()
+> 
+> Perhaps just:
+> 
+> "PCI: exynos: Add missing clk_disable_unprepare() on error path
+> 
+> How can something that is missing be used ? :)
 
-Signed-off-by: Sean Paul <seanpaul@chromium.org>
----
- arch/arm/boot/dts/exynos5250-snow.dts | 17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
+Hi Sylwester Nawrocki,
 
-diff --git a/arch/arm/boot/dts/exynos5250-snow.dts b/arch/arm/boot/dts/exynos5250-snow.dts
-index e79331d..e5af3f2 100644
---- a/arch/arm/boot/dts/exynos5250-snow.dts
-+++ b/arch/arm/boot/dts/exynos5250-snow.dts
-@@ -190,6 +190,23 @@
- 		samsung,vbus-gpio = <&gpx1 1 0>;
- 	};
- 
-+	fimd: fimd at 14400000 {
-+		display-timings {
-+			native-mode = <&lcd_timing>;
-+			lcd_timing: 1366x768 {
-+				clock-frequency = <70589280>;
-+				hactive = <1366>;
-+				vactive = <768>;
-+				hfront-porch = <40>;
-+				hback-porch = <40>;
-+				hsync-len = <32>;
-+				vback-porch = <10>;
-+				vfront-porch = <12>;
-+				vsync-len = <6>;
-+			};
-+		};
-+	};
-+
- 	fixed-rate-clocks {
- 		xxti {
- 			compatible = "samsung,clock-xxti";
--- 
-1.8.4
+OK, I see.
+The following looks good, as you mentioned.
+[PATCH] PCI: exynos: Add missing clk_disable_unprepare() on error path
+
+Thank you for your comment. :-)
+
+Best regards,
+Jingoo Han
