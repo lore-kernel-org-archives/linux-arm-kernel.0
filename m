@@ -1,49 +1,36 @@
 From: magnus.damm@gmail.com (Magnus Damm)
-Date: Tue, 01 Oct 2013 17:12:48 +0900
-Subject: [PATCH 06/10] ARM: shmobile: r8a7791 Arch timer workaround
+Date: Tue, 01 Oct 2013 17:12:57 +0900
+Subject: [PATCH 07/10] ARM: shmobile: Use arch timer on Koelsch
 In-Reply-To: <20131001081143.4136.46925.sendpatchset@w520>
 References: <20131001081143.4136.46925.sendpatchset@w520>
-Message-ID: <20131001081248.4136.41380.sendpatchset@w520>
+Message-ID: <20131001081257.4136.80053.sendpatchset@w520>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Magnus Damm <damm@opensource.se>
 
-Make use of the R-Car Gen2 arch timer workaround on r8a7791.
+Make use of the R-Car Gen2 arch timer workaround on Koelsch.
 
 Signed-off-by: Magnus Damm <damm@opensource.se>
 ---
 
- arch/arm/mach-shmobile/Makefile        |    2 +-
- arch/arm/mach-shmobile/setup-r8a7791.c |    2 ++
- 2 files changed, 3 insertions(+), 1 deletion(-)
+ arch/arm/mach-shmobile/board-koelsch.c |    2 ++
+ 1 file changed, 2 insertions(+)
 
---- 0001/arch/arm/mach-shmobile/Makefile
-+++ work/arch/arm/mach-shmobile/Makefile	2013-10-01 16:32:25.000000000 +0900
-@@ -16,7 +16,7 @@ obj-$(CONFIG_ARCH_R8A7778)	+= setup-r8a7
- obj-$(CONFIG_ARCH_R8A7779)	+= setup-r8a7779.o
- obj-$(CONFIG_ARCH_R8A7790)	+= setup-r8a7790.o
- obj-$(CONFIG_ARCH_R8A7790)	+= setup-r8a7790.o setup-rcar-gen2.o
--obj-$(CONFIG_ARCH_R8A7791)	+= setup-r8a7791.o
-+obj-$(CONFIG_ARCH_R8A7791)	+= setup-r8a7791.o setup-rcar-gen2.o
- obj-$(CONFIG_ARCH_EMEV2)	+= setup-emev2.o
- 
- # Clock objects
---- 0004/arch/arm/mach-shmobile/setup-r8a7791.c
-+++ work/arch/arm/mach-shmobile/setup-r8a7791.c	2013-10-01 16:34:15.000000000 +0900
-@@ -27,6 +27,7 @@
+--- 0003/arch/arm/mach-shmobile/board-koelsch.c
++++ work/arch/arm/mach-shmobile/board-koelsch.c	2013-10-01 16:35:52.000000000 +0900
+@@ -23,6 +23,7 @@
+ #include <linux/platform_device.h>
  #include <mach/common.h>
- #include <mach/irqs.h>
  #include <mach/r8a7791.h>
 +#include <mach/rcar-gen2.h>
+ #include <asm/mach-types.h>
  #include <asm/mach/arch.h>
  
- #define SCIF_COMMON(scif_type, baseaddr, irq)			\
-@@ -175,6 +176,7 @@ static const char *r8a7791_boards_compat
- 
- DT_MACHINE_START(R8A7791_DT, "Generic R8A7791 (Flattened Device Tree)")
+@@ -40,5 +41,6 @@ static const char * const koelsch_boards
+ DT_MACHINE_START(KOELSCH_DT, "koelsch")
  	.init_early	= r8a7791_init_early,
+ 	.init_machine	= koelsch_add_standard_devices,
 +	.init_time	= rcar_gen2_timer_init,
- 	.dt_compat	= r8a7791_boards_compat_dt,
+ 	.dt_compat	= koelsch_boards_compat_dt,
  MACHINE_END
- #endif /* CONFIG_USE_OF */
