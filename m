@@ -1,319 +1,178 @@
-From: vijay.kilari@gmail.com (Vijay Kilari)
-Date: Tue, 1 Oct 2013 16:23:01 +0530
-Subject: [PATCH v2 2/3] AArch64: KGDB: Add Basic KGDB support
-In-Reply-To: <20130930163654.GJ26036@mudshark.cambridge.arm.com>
-References: <1380534251-4464-1-git-send-email-vijay.kilari@gmail.com>
- <1380534251-4464-3-git-send-email-vijay.kilari@gmail.com>
- <20130930163654.GJ26036@mudshark.cambridge.arm.com>
-Message-ID: <CALicx6vpX6nm=zdBZTY57EgPRphcjMzwFxug6CAa_U21u4_4Cw@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue,  1 Oct 2013 12:57:20 +0200
+Subject: [PATCH] RFT: ARM: gemini: convert to GENERIC_CLOCKEVENTS
+Message-ID: <1380625040-25912-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 30, 2013 at 10:06 PM, Will Deacon <will.deacon@arm.com> wrote:
-> On Mon, Sep 30, 2013 at 10:44:10AM +0100, vijay.kilari at gmail.com wrote:
->> From: Vijaya Kumar K <Vijaya.Kumar@caviumnetworks.com>
->>
->> Add KGDB debug support for kernel debugging.
->> With this patch, basic KGDB debugging is possible.GDB register
->> layout is updated and GDB tool can establish connection with
->> target and can set/clear breakpoints.
->>
->> Signed-off-by: Vijaya Kumar K <Vijaya.Kumar@caviumnetworks.com>
->> ---
->>  arch/arm64/include/asm/debug-monitors.h |   10 ++
->>  arch/arm64/include/asm/kgdb.h           |   81 +++++++++
->>  arch/arm64/kernel/Makefile              |    1 +
->>  arch/arm64/kernel/kgdb.c                |  298 +++++++++++++++++++++++++++++++
->>  4 files changed, 390 insertions(+)
->>
->> diff --git a/arch/arm64/include/asm/debug-monitors.h b/arch/arm64/include/asm/debug-monitors.h
->> index 19e429e..ed376ce 100644
->> --- a/arch/arm64/include/asm/debug-monitors.h
->> +++ b/arch/arm64/include/asm/debug-monitors.h
->> @@ -28,6 +28,16 @@
->>  #define DBG_ESR_EVT_HWWP       0x2
->>  #define DBG_ESR_EVT_BRK                0x6
->>
->> +/*
->> + * Break point instruction encoding
->> + */
->> +#define BREAK_INSTR_SIZE               4
->> +#define KGDB_BREAKINST_ESR_VAL         0xf2000000
->> +#define KGDB_COMPILED_BREAK_ESR_VAL    0xf2000001
->> +#define KGDB_ARM64_COMPILE_BRK_IMM     1
->> +#define CACHE_FLUSH_IS_SAFE            1
->
-> #define DBG_BRK_KGDB_DYN        0
-> #define DBG_BRK_KGDB_COMPILED   1
->
-> #define DBG_ESR_VAL_BRK(x)      (0xf2000000 | ((x) & 0xffff))
->
-> Then you can use the latter to construct your ESR values dynamically and
-> adding a new brk handler is straightforward.
->
-OK, agreed
+This converts the gemini machine to use generic clockevents
+by rewriting the timer driver.
 
->> diff --git a/arch/arm64/include/asm/kgdb.h b/arch/arm64/include/asm/kgdb.h
->> new file mode 100644
->> index 0000000..15b36fd
->> --- /dev/null
->> +++ b/arch/arm64/include/asm/kgdb.h
->> @@ -0,0 +1,81 @@
->> +/*
->> + * AArch64 KGDB support
->> + *
->> + * Based on arch/arm/include/kgdb.h
->> + *
->> + * Copyright (C) 2013 Cavium Inc.
->> + * Author: Vijaya Kumar K <vijaya.kumar@caviumnetworks.com>
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> + *
->> + * This program is distributed in the hope that it will be useful,
->> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> + * GNU General Public License for more details.
->> + *
->> + * You should have received a copy of the GNU General Public License
->> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
->> + */
->> +
->> +#ifndef __ARM_KGDB_H__
->> +#define __ARM_KGDB_H__
->> +
->> +#include <linux/ptrace.h>
->> +#include <asm/debug-monitors.h>
->> +
->> +#ifndef        __ASSEMBLY__
->> +
->> +static inline void arch_kgdb_breakpoint(void)
->> +{
->> +       asm ("brk %0" :: "I" (KGDB_ARM64_COMPILE_BRK_IMM));
->> +}
->
-> Hmm, I need to find me a compiler guy, but I don't have much faith in this
-> function in the face of inlining. Sure a breakpoint needs to happen at a
-> specific point in the program? If so, why can't GCC re-order this asm block
-> as it likes?
->
-> Or is there a restricted use-case for compiled breakpoints in kgdb?
->
-As per Andrew,
-arch_kgdb_breakpoint is declared as static inline for the x86, arm, tile
-and powerpc.  Since the inline-asm does not have any output constraints
-it is considered volatile just like if you declare the inline-asm as volatile.
-The compiler might reorder some stuff around it due to all uses being explicit
-just like any other volatile inline-asm.
+Cc: arm at kernel.org
+Cc: Hans Ulli Kroll <ulli.kroll@googlemail.com>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+This is flagged as Request for Testing (RFT) as I have no Gemini
+platform. If I do not get help with testing this, the next step
+will be a patch series to delete the platform.
+---
+ arch/arm/Kconfig            |  3 +-
+ arch/arm/mach-gemini/time.c | 97 +++++++++++++++++++++++++++++++++++++++++----
+ 2 files changed, 91 insertions(+), 9 deletions(-)
 
-In fact, the arch_kgdb_breakpoint is called from only one place from
-kernel/debug/debug_core.c and there is no way for the compiler to
-reorder the block
-as it has two write barriers around it:
-        wmb(); /* Sync point before breakpoint */
-        arch_kgdb_breakpoint();
-        wmb(); /* Sync point after breakpoint */
-
->> +void
->> +sleeping_thread_to_gdb_regs(unsigned long *gdb_regs, struct task_struct *task)
->> +{
->> +       struct pt_regs *thread_regs;
->> +       int regno;
->> +       int i;
->> +
->> +       /* Just making sure... */
->> +       if (task == NULL)
->> +               return;
->
-> Erm... that comment just raises more questions. I appreciate ARM has the
-> same check, but why doesn't x86? Can task *actually* be NULL?
->
-generally, the task will not be NULL. The check made because the
-caller (gdbstub.c)
-fetches task information from gdb global structure and calls this function.
-This helps in case the caller fails to pass task info. I think should not be
-problem with this check. In fact this is legacy code
-
->> +
->> +       /* Initialize to zero */
->> +       for (regno = 0; regno < DBG_MAX_REG_NUM; regno++)
->> +               gdb_regs[regno] = 0;
->
-> memset?
-OK. agreed
->
->> +
->> +       thread_regs             = task_pt_regs(task);
->> +
->> +       for(i = 0; i < 31; i++)
->> +               gdb_regs[i] = thread_regs->regs[i];
->
-> memcpy?
->
-OK. agreed
->> +int kgdb_arch_handle_exception(int exception_vector, int signo,
->> +                              int err_code, char *remcom_in_buffer,
->> +                              char *remcom_out_buffer,
->> +                              struct pt_regs *linux_regs)
->> +{
->> +       unsigned long addr;
->> +       char *ptr;
->> +       int err;
->> +
->> +       switch (remcom_in_buffer[0]) {
->> +       case 'D':
->> +       case 'k':
->> +       case 'c':
->> +               /*
->> +                * Packet D (Detach), k (kill) & c (Continue) requires
->> +                * to continue executing. Set pc to required address.
->> +                * Try to read optional parameter, pc unchanged if no parm.
->> +                * If this was a compiled breakpoint, we need to move
->> +                * to the next instruction or we will just breakpoint
->> +                * over and over again.
->> +                */
->> +               ptr = &remcom_in_buffer[1];
->> +               if (kgdb_hex2long(&ptr, &addr))
->> +                       kgdb_arch_set_pc(linux_regs, addr);
->> +               else if (compiled_break == 1)
->> +                       kgdb_arch_set_pc(linux_regs, linux_regs->pc + 4);
->> +
->> +               compiled_break = 0;
->> +
->> +               err = 0;
->> +               break;
->> +       default:
->> +               err = -1;
->> +       }
->> +       return err;
->> +}
->> +
->> +static int
->> +kgdb_brk_fn(struct pt_regs *regs, unsigned int esr, unsigned long addr)
->> +{
->> +       kgdb_handle_exception(1, SIGTRAP, 0, regs);
->> +       return 0;
->> +}
->> +
->> +static int kgdb_compiled_brk_fn(struct pt_regs *regs, unsigned int esr,
->> +                               unsigned long addr)
->> +{
->> +       compiled_break = 1;
->> +       kgdb_handle_exception(1, SIGTRAP, 0, regs);
->> +
->> +       return 0;
->> +}
->> +
->> +static struct break_hook kgdb_brkpt_hook = {
->> +       .esr_mask               = 0xffffffff,
->> +       .esr_val                = KGDB_BREAKINST_ESR_VAL,
->> +       .fn                     = kgdb_brk_fn
->> +};
->> +
->> +static struct break_hook kgdb_compiled_brkpt_hook = {
->> +       .esr_mask               = 0xffffffff,
->> +       .esr_val                = KGDB_COMPILED_BREAK_ESR_VAL,
->> +       .fn                     = kgdb_compiled_brk_fn
->> +};
->> +
->> +static void kgdb_call_nmi_hook(void *ignored)
->> +{
->> +       kgdb_nmicallback(raw_smp_processor_id(), get_irq_regs());
->> +}
->> +
->> +void kgdb_roundup_cpus(unsigned long flags)
->> +{
->> +       local_irq_enable();
->> +       smp_call_function(kgdb_call_nmi_hook, NULL, 0);
->> +       local_irq_disable();
->> +}
->> +
->> +static int __kgdb_notify(struct die_args *args, unsigned long cmd)
->> +{
->> +       struct pt_regs *regs = args->regs;
->> +
->> +       if (kgdb_handle_exception(1, args->signr, cmd, regs))
->> +               return NOTIFY_DONE;
->> +       return NOTIFY_STOP;
->> +}
->> +
->> +static int
->> +kgdb_notify(struct notifier_block *self, unsigned long cmd, void *ptr)
->> +{
->> +       unsigned long flags;
->> +       int ret;
->> +
->> +       local_irq_save(flags);
->> +       ret = __kgdb_notify(ptr, cmd);
->> +       local_irq_restore(flags);
->> +
->> +       return ret;
->> +}
->> +
->> +static struct notifier_block kgdb_notifier = {
->> +       .notifier_call  = kgdb_notify,
->> +       .priority       = -INT_MAX,
->> +};
->> +
->> +
->> +/*
->> + *     kgdb_arch_init - Perform any architecture specific initalization.
->> + *
->> + *     This function will handle the initalization of any architecture
->> + *     specific callbacks.
->> + */
->> +int kgdb_arch_init(void)
->> +{
->> +       int ret = register_die_notifier(&kgdb_notifier);
->> +
->> +       if (ret != 0)
->> +               return ret;
->> +
->> +       register_break_hook(&kgdb_brkpt_hook);
->> +       register_break_hook(&kgdb_compiled_brkpt_hook);
->> +
->> +       return 0;
->> +}
->> +
->> +/*
->> + *     kgdb_arch_exit - Perform any architecture specific uninitalization.
->> + *
->> + *     This function will handle the uninitalization of any architecture
->> + *     specific callbacks, for dynamic registration and unregistration.
->> + */
->> +void kgdb_arch_exit(void)
->> +{
->> +       unregister_break_hook(&kgdb_brkpt_hook);
->> +       unregister_break_hook(&kgdb_compiled_brkpt_hook);
->> +       unregister_die_notifier(&kgdb_notifier);
->> +}
->> +
->> +/*
->> + * ARM instructions are always in LE.
->> + * Break instruction is encoded in LE format
->> + */
->> +struct kgdb_arch arch_kgdb_ops = {
->> +       .gdb_bpt_instr          = {0x00, 0x00, 0x20, 0xd4}
->
-> Again, you should probably try and encode the dynamic breakpoint immediate
-> in here (which is sadly offset by 5 bits in the instruction encoding).
->
-Yes, I propose to change like this
-
-#define  KGDB_DYN_BRK_INS_BYTE0  ((KGDB_DYN_DGB_BRK_IMM & 0x7) << 5)
-#define  KGDB_DYN_BRK_INS_BYTE1  ((KGDB_DYN_DGB_BRK_IMM & 0x7f8) >> 3)
-#define  KGDB_DYN_BRK_INS_BYTE2  (0x20 | \
-                                 ((KGDB_DYN_DGB_BRK_IMM & 0xf800) >> 11))
-#define  KGDB_DYN_BRK_INS_BYTE3  0xd4
-
-struct kgdb_arch arch_kgdb_ops = {
-        .gdb_bpt_instr          = {
-                KGDB_DYN_BRK_INS_BYTE0,
-                KGDB_DYN_BRK_INS_BYTE1,
-                KGDB_DYN_BRK_INS_BYTE2,
-                KGDB_DYN_BRK_INS_BYTE3
-        }
-};
-
-> Will
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 1ad6fb6..1a903e6 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -386,8 +386,9 @@ config ARCH_CLPS711X
+ config ARCH_GEMINI
+ 	bool "Cortina Systems Gemini"
+ 	select ARCH_REQUIRE_GPIOLIB
+-	select ARCH_USES_GETTIMEOFFSET
++	select CLKSRC_MMIO
+ 	select CPU_FA526
++	select GENERIC_CLOCKEVENTS
+ 	select NEED_MACH_GPIO_H
+ 	help
+ 	  Support for the Cortina Systems Gemini family SoCs
+diff --git a/arch/arm/mach-gemini/time.c b/arch/arm/mach-gemini/time.c
+index 21dc5a8..0a63c4d 100644
+--- a/arch/arm/mach-gemini/time.c
++++ b/arch/arm/mach-gemini/time.c
+@@ -13,6 +13,8 @@
+ #include <mach/hardware.h>
+ #include <mach/global_reg.h>
+ #include <asm/mach/time.h>
++#include <linux/clockchips.h>
++#include <linux/clocksource.h>
+ 
+ /*
+  * Register definitions for the timers
+@@ -33,19 +35,89 @@
+ #define TIMER_3_CR_CLOCK		(1 << 7)
+ #define TIMER_3_CR_INT			(1 << 8)
+ 
++static unsigned int tick_rate;
++
++static int gemini_timer_set_next_event(unsigned long cycles,
++				       struct clock_event_device *evt)
++{
++	u32 cr;
++
++	cr = readl(TIMER_CR(IO_ADDRESS(GEMINI_TIMER_BASE)));
++
++	/* This may be overdoing it, feel free to test without this */
++	cr &= ~TIMER_2_CR_ENABLE;
++	cr &= ~TIMER_2_CR_INT;
++	writel(cr, TIMER_CR(IO_ADDRESS(GEMINI_TIMER_BASE)));
++
++	/* Set next event */
++	writel(cycles, TIMER_COUNT(IO_ADDRESS(GEMINI_TIMER2_BASE)));
++	writel(cycles, TIMER_LOAD(IO_ADDRESS(GEMINI_TIMER2_BASE)));
++	cr |= TIMER_2_CR_ENABLE;
++	cr |= TIMER_2_CR_INT;
++	writel(cr, TIMER_CR(IO_ADDRESS(GEMINI_TIMER_BASE)));
++
++	return 0;
++}
++
++static void gemini_timer_set_mode(enum clock_event_mode mode,
++				  struct clock_event_device *evt)
++{
++	u32 period = DIV_ROUND_CLOSEST(tick_rate, HZ);
++	u32 cr;
++
++	switch (mode) {
++        case CLOCK_EVT_MODE_PERIODIC:
++		/* Start the timer */
++		writel(period,
++		       TIMER_COUNT(IO_ADDRESS(GEMINI_TIMER2_BASE)));
++		writel(period,
++		       TIMER_LOAD(IO_ADDRESS(GEMINI_TIMER2_BASE)));
++		cr = readl(TIMER_CR(IO_ADDRESS(GEMINI_TIMER_BASE)));
++		cr |= TIMER_2_CR_ENABLE;
++		cr |= TIMER_2_CR_INT;
++		writel(cr, TIMER_CR(IO_ADDRESS(GEMINI_TIMER_BASE)));
++		break;
++	case CLOCK_EVT_MODE_ONESHOT:
++	case CLOCK_EVT_MODE_UNUSED:
++        case CLOCK_EVT_MODE_SHUTDOWN:
++	case CLOCK_EVT_MODE_RESUME:
++		/*
++		 * Disable also for oneshot: the set_next() call will
++		 * arm the timer instead.
++		 */
++		cr = readl(TIMER_CR(IO_ADDRESS(GEMINI_TIMER_BASE)));
++		cr &= ~TIMER_2_CR_ENABLE;
++		cr &= ~TIMER_2_CR_INT;
++		writel(cr, TIMER_CR(IO_ADDRESS(GEMINI_TIMER_BASE)));
++		break;
++	default:
++                break;
++	}
++}
++
++/* Use TIMER2 as clock event */
++static struct clock_event_device gemini_clockevent = {
++	.name		= "TIMER2",
++	.rating		= 300, /* Reasonably fast and accurate clock event */
++	.features	= CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
++	.set_next_event	= gemini_timer_set_next_event,
++	.set_mode	= gemini_timer_set_mode,
++};
++
+ /*
+  * IRQ handler for the timer
+  */
+ static irqreturn_t gemini_timer_interrupt(int irq, void *dev_id)
+ {
+-	timer_tick();
++	struct clock_event_device *evt = &gemini_clockevent;
+ 
++	evt->event_handler(evt);
+ 	return IRQ_HANDLED;
+ }
+ 
+ static struct irqaction gemini_timer_irq = {
+ 	.name		= "Gemini Timer Tick",
+-	.flags		= IRQF_DISABLED | IRQF_TIMER,
++	.flags		= IRQF_TIMER,
+ 	.handler	= gemini_timer_interrupt,
+ };
+ 
+@@ -54,9 +126,9 @@ static struct irqaction gemini_timer_irq = {
+  */
+ void __init gemini_timer_init(void)
+ {
+-	unsigned int tick_rate, reg_v;
++	u32 reg_v;
+ 
+-	reg_v = __raw_readl(IO_ADDRESS(GEMINI_GLOBAL_BASE + GLOBAL_STATUS));
++	reg_v = readl(IO_ADDRESS(GEMINI_GLOBAL_BASE + GLOBAL_STATUS));
+ 	tick_rate = REG_TO_AHB_SPEED(reg_v) * 1000000;
+ 
+ 	printk(KERN_INFO "Bus: %dMHz", tick_rate / 1000000);
+@@ -82,8 +154,17 @@ void __init gemini_timer_init(void)
+ 	 * Make irqs happen for the system timer
+ 	 */
+ 	setup_irq(IRQ_TIMER2, &gemini_timer_irq);
+-	/* Start the timer */
+-	__raw_writel(tick_rate / HZ, TIMER_COUNT(IO_ADDRESS(GEMINI_TIMER2_BASE)));
+-	__raw_writel(tick_rate / HZ, TIMER_LOAD(IO_ADDRESS(GEMINI_TIMER2_BASE)));
+-	__raw_writel(TIMER_2_CR_ENABLE | TIMER_2_CR_INT, TIMER_CR(IO_ADDRESS(GEMINI_TIMER_BASE)));
++
++	/* Enable and use TIMER1 as clock source */
++	writel(0xffffffff, TIMER_COUNT(IO_ADDRESS(GEMINI_TIMER1_BASE)));
++	writel(0xffffffff, TIMER_LOAD(IO_ADDRESS(GEMINI_TIMER1_BASE)));
++	writel(TIMER_1_CR_ENABLE, TIMER_CR(IO_ADDRESS(GEMINI_TIMER_BASE)));
++	if (clocksource_mmio_init(TIMER_COUNT(IO_ADDRESS(GEMINI_TIMER1_BASE)),
++				  "TIMER1", tick_rate, 300, 32,
++				  clocksource_mmio_readl_up))
++		pr_err("timer: failed to initialize gemini clock source\n");
++
++	/* Configure and register the clockevent */
++	clockevents_config_and_register(&gemini_clockevent, tick_rate,
++					1, 0xffffffff);
+ }
+-- 
+1.8.3.1
