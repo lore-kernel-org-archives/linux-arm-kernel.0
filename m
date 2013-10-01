@@ -1,58 +1,63 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue,  1 Oct 2013 10:32:30 +0200
-Subject: [PATCH] ARM: w90x900: delete <mach/gpio.h>
-Message-ID: <1380616350-16924-1-git-send-email-linus.walleij@linaro.org>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Tue,  1 Oct 2013 10:38:12 +0200
+Subject: [PATCH] clocksource: dw_apb_timer_of: Mark a few more functions as
+ __init
+Message-ID: <1380616692-10253-1-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The local <mach/gpio.h> file on the w90x900 is completely unused
-and the platform does not define NEED_MACH_GPIO_H.
+These are all only called by dw_apb_timer_init which is an __init
+function, too
 
-Cc: Wan ZongShun <mcuos.com@gmail.com>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 ---
-This patch will be applied to the GPIO tree unless there are
-protests against this.
----
- arch/arm/mach-w90x900/include/mach/gpio.h | 30 ------------------------------
- 1 file changed, 30 deletions(-)
- delete mode 100644 arch/arm/mach-w90x900/include/mach/gpio.h
+ drivers/clocksource/dw_apb_timer_of.c | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/mach-w90x900/include/mach/gpio.h b/arch/arm/mach-w90x900/include/mach/gpio.h
-deleted file mode 100644
-index 5385a42..0000000
---- a/arch/arm/mach-w90x900/include/mach/gpio.h
-+++ /dev/null
-@@ -1,30 +0,0 @@
--/*
-- * linux/arch/arm/mach-w90p910/include/mach/gpio.h
-- *
-- * Generic w90p910 GPIO handling
-- *
-- *  Wan ZongShun <mcuos.com@gmail.com>
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- */
--
--#ifndef __ASM_ARCH_W90P910_GPIO_H
--#define __ASM_ARCH_W90P910_GPIO_H
--
--#include <mach/hardware.h>
--#include <asm/irq.h>
--
--static inline int gpio_to_irq(unsigned gpio)
--{
--	return gpio;
--}
--#define gpio_to_irq gpio_to_irq
--
--static inline int irq_to_gpio(unsigned irq)
--{
--	return irq;
--}
--
--#endif
+diff --git a/drivers/clocksource/dw_apb_timer_of.c b/drivers/clocksource/dw_apb_timer_of.c
+index 4cbae4f..993cdde 100644
+--- a/drivers/clocksource/dw_apb_timer_of.c
++++ b/drivers/clocksource/dw_apb_timer_of.c
+@@ -23,7 +23,7 @@
+ #include <linux/clk.h>
+ #include <linux/sched_clock.h>
+ 
+-static void timer_get_base_and_rate(struct device_node *np,
++static void __init timer_get_base_and_rate(struct device_node *np,
+ 				    void __iomem **base, u32 *rate)
+ {
+ 	struct clk *timer_clk;
+@@ -55,11 +55,11 @@ static void timer_get_base_and_rate(struct device_node *np,
+ 
+ try_clock_freq:
+ 	if (of_property_read_u32(np, "clock-freq", rate) &&
+-		of_property_read_u32(np, "clock-frequency", rate))
++	    of_property_read_u32(np, "clock-frequency", rate))
+ 		panic("No clock nor clock-frequency property for %s", np->name);
+ }
+ 
+-static void add_clockevent(struct device_node *event_timer)
++static void __init add_clockevent(struct device_node *event_timer)
+ {
+ 	void __iomem *iobase;
+ 	struct dw_apb_clock_event_device *ced;
+@@ -82,7 +82,7 @@ static void add_clockevent(struct device_node *event_timer)
+ static void __iomem *sched_io_base;
+ static u32 sched_rate;
+ 
+-static void add_clocksource(struct device_node *source_timer)
++static void __init add_clocksource(struct device_node *source_timer)
+ {
+ 	void __iomem *iobase;
+ 	struct dw_apb_clocksource *cs;
+@@ -117,7 +117,7 @@ static const struct of_device_id sptimer_ids[] __initconst = {
+ 	{ /* Sentinel */ },
+ };
+ 
+-static void init_sched_clock(void)
++static void __init init_sched_clock(void)
+ {
+ 	struct device_node *sched_timer;
+ 
 -- 
-1.8.3.1
+1.8.4.rc3
