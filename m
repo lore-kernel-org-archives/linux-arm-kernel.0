@@ -1,60 +1,34 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Tue, 1 Oct 2013 09:35:43 -0400
-Subject: [PATCH v2 3/5] dma: Allow TI_EDMA selectable for ARCH_KEYSTONE
-In-Reply-To: <20131001015454.GA16684@intel.com>
-References: <1380580887-24249-1-git-send-email-santosh.shilimkar@ti.com>
- <1380580887-24249-4-git-send-email-santosh.shilimkar@ti.com>
- <20131001015454.GA16684@intel.com>
-Message-ID: <524ACFAF.7020802@ti.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 1 Oct 2013 09:37:36 -0400
+Subject: [PATCH v3 2/2] ARM: kirkwood: Add standby support
+In-Reply-To: <20130831161918.GA2404@localhost>
+References: <1377186547-14284-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1377186547-14284-3-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20130830231003.GA2398@localhost>
+ <20130831155125.GY19598@titan.lakedaemon.net>
+ <20130831161918.GA2404@localhost>
+Message-ID: <20131001133736.GQ31178@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 30 September 2013 09:54 PM, Vinod Koul wrote:
-> On Mon, Sep 30, 2013 at 06:41:25PM -0400, Santosh Shilimkar wrote:
->> Allow the TI_EDMA to be built for ARCH_KEYSTONE which also supports
->> the EDMA IP.
->>
->> Cc: Vinod Koul <vinod.koul@intel.com>
->>
->> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
->> ---
->> Vinod,
->> I need your ack on this patch to carry $subject patch via arm-soc tree
->> to avoid the unmet dependency warnings.
-> Sure, but too many dependency fixes have been popoing up for this part and this
-> IIRC is third patch! Something doesn't seem right, hopefully am wrong..
->
-I think it mainly because EDMA support is just merged last cycle and few SOCs
-which use the EDMA trying to enable them now.
- 
-> I have a patch in my -next from Josh which selects TI_PRIV_EDMA for this...
+On Sat, Aug 31, 2013 at 01:19:19PM -0300, Ezequiel Garcia wrote:
+> On Sat, Aug 31, 2013 at 11:51:25AM -0400, Jason Cooper wrote:
+...
+> > How about expanding the series to add proper suspend/resume support to
+> > some of the more power hungry drivers
 > 
-I looked at your next patch which is fixing the TI_EDMA dependency.
-If you prefer to merge $subject patch via your tree, thats fine as well.
-Juts give me a stable branch targeted for 3.13 and I shall merge your branch
-and apply other patches on top of it.
-
-Since it was very trivial patch, I thought its easy to carry via arm-soc
-with your ack.
-
->>
->>  drivers/dma/Kconfig |    2 +-
->>  1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
->> index 526ec77..b1dde16 100644
->> --- a/drivers/dma/Kconfig
->> +++ b/drivers/dma/Kconfig
->> @@ -195,7 +195,7 @@ config SIRF_DMA
->>  
->>  config TI_EDMA
->>  	bool "TI EDMA support"
->> -	depends on ARCH_DAVINCI || ARCH_OMAP
->> +	depends on ARCH_DAVINCI || ARCH_OMAP || ARCH_KEYSTONE
->>  	select DMA_ENGINE
->>  	select DMA_VIRTUAL_CHANNELS
->>  	default n
->> -- 
->> 1.7.9.5
->>
+> So -just to check- you definitely prefer not to take the stand-by
+> support until we have some more suspend/resume support in other drivers?
 > 
+> If the stand-by is ready and it's working, I'd say we're ready to
+> include it, disregarding the drivers, but it's completely your call.
+
+Looking things over, most drivers we care about are missing
+suspend/resume.  At some point I think it's reasonable to assume that
+we'll do a sweep.  So I drop my objection to this.
+
+Let's see how rmk wants to handle #1 and go from there.
+
+thx,
+
+Jason.
