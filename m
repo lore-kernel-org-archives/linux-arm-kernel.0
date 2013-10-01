@@ -1,34 +1,83 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue,  1 Oct 2013 11:38:44 +0900
-Subject: [PATCH 3/4] ARM: shmobile: bockw defconfig: add Sound support
+Date: Tue,  1 Oct 2013 11:38:45 +0900
+Subject: [PATCH 4/4] ARM: shmobile: Add koelsch defconfig
 In-Reply-To: <cover.1380514316.git.horms+renesas@verge.net.au>
 References: <cover.1380514316.git.horms+renesas@verge.net.au>
-Message-ID: <dca778f1e470494019e41e9eef073eb981a64380.1380514316.git.horms+renesas@verge.net.au>
+Message-ID: <6bb2e347899b297eea26f2658eac8fdcd633fba5.1380514316.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+This is intended to be used until multi-arch is able to be
+used for the koelsch board at which time a more generic configuration
+will be used in place of this one.
 
-Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+This is based on the lager defconfig.
+
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/configs/bockw_defconfig | 4 ++++
- 1 file changed, 4 insertions(+)
+ arch/arm/configs/koelsch_defconfig | 54 ++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 54 insertions(+)
+ create mode 100644 arch/arm/configs/koelsch_defconfig
 
-diff --git a/arch/arm/configs/bockw_defconfig b/arch/arm/configs/bockw_defconfig
-index e7e9494..b38cd10 100644
---- a/arch/arm/configs/bockw_defconfig
-+++ b/arch/arm/configs/bockw_defconfig
-@@ -91,6 +91,10 @@ CONFIG_VIDEO_RCAR_VIN=y
- CONFIG_VIDEO_ML86V7667=y
- CONFIG_SPI=y
- CONFIG_SPI_SH_HSPI=y
-+CONFIG_SOUND=y
-+CONFIG_SND=y
-+CONFIG_SND_SOC=y
-+CONFIG_SND_SOC_RCAR=y
- CONFIG_USB=y
- CONFIG_USB_ANNOUNCE_NEW_DEVICES=y
- CONFIG_USB_EHCI_HCD=y
+diff --git a/arch/arm/configs/koelsch_defconfig b/arch/arm/configs/koelsch_defconfig
+new file mode 100644
+index 0000000..825c16d
+--- /dev/null
++++ b/arch/arm/configs/koelsch_defconfig
+@@ -0,0 +1,54 @@
++CONFIG_SYSVIPC=y
++CONFIG_NO_HZ=y
++CONFIG_IKCONFIG=y
++CONFIG_IKCONFIG_PROC=y
++CONFIG_LOG_BUF_SHIFT=16
++CONFIG_CC_OPTIMIZE_FOR_SIZE=y
++CONFIG_SYSCTL_SYSCALL=y
++CONFIG_EMBEDDED=y
++CONFIG_PERF_EVENTS=y
++CONFIG_SLAB=y
++# CONFIG_BLOCK is not set
++CONFIG_ARCH_SHMOBILE=y
++CONFIG_ARCH_R8A7791=y
++CONFIG_MACH_KOELSCH=y
++# CONFIG_SWP_EMULATE is not set
++CONFIG_CPU_BPREDICT_DISABLE=y
++CONFIG_PL310_ERRATA_588369=y
++CONFIG_ARM_ERRATA_754322=y
++CONFIG_SMP=y
++CONFIG_SCHED_MC=y
++CONFIG_NR_CPUS=8
++CONFIG_AEABI=y
++CONFIG_ZBOOT_ROM_TEXT=0x0
++CONFIG_ZBOOT_ROM_BSS=0x0
++CONFIG_ARM_APPENDED_DTB=y
++CONFIG_KEXEC=y
++CONFIG_AUTO_ZRELADDR=y
++CONFIG_VFP=y
++CONFIG_NEON=y
++# CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
++CONFIG_PM_RUNTIME=y
++CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
++# CONFIG_INPUT_MOUSEDEV_PSAUX is not set
++# CONFIG_INPUT_MOUSE is not set
++# CONFIG_LEGACY_PTYS is not set
++CONFIG_SERIAL_SH_SCI=y
++CONFIG_SERIAL_SH_SCI_NR_UARTS=20
++CONFIG_SERIAL_SH_SCI_CONSOLE=y
++# CONFIG_HWMON is not set
++CONFIG_THERMAL=y
++CONFIG_RCAR_THERMAL=y
++# CONFIG_HID is not set
++# CONFIG_USB_SUPPORT is not set
++CONFIG_NEW_LEDS=y
++CONFIG_LEDS_CLASS=y
++# CONFIG_IOMMU_SUPPORT is not set
++# CONFIG_DNOTIFY is not set
++# CONFIG_INOTIFY_USER is not set
++CONFIG_TMPFS=y
++CONFIG_CONFIGFS_FS=y
++# CONFIG_MISC_FILESYSTEMS is not set
++# CONFIG_ENABLE_WARN_DEPRECATED is not set
++# CONFIG_ENABLE_MUST_CHECK is not set
++# CONFIG_ARM_UNWIND is not set
 -- 
 1.8.4
