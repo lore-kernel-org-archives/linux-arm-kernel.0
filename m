@@ -1,24 +1,23 @@
 From: dinguyen@altera.com (Dinh Nguyen)
-Date: Tue, 1 Oct 2013 14:15:16 -0500
-Subject: [PATCH 1/2] arm: dts: socfpga: Change some types of gate-clk
- type to periph-clk type
-In-Reply-To: <1379435486-25981-1-git-send-email-dinguyen@altera.com>
-References: <1379435486-25981-1-git-send-email-dinguyen@altera.com>
-Message-ID: <1380654916.13502.1.camel@linux-builds1>
+Date: Tue, 1 Oct 2013 14:15:57 -0500
+Subject: [PATCH 1/2] arm: socfpga: Add clock for smp_twd timer
+In-Reply-To: <1379435541-26338-1-git-send-email-dinguyen@altera.com>
+References: <1379435541-26338-1-git-send-email-dinguyen@altera.com>
+Message-ID: <1380654957.13502.2.camel@linux-builds1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-Just wondering if I can get any comments on this patch set?
+Just wondering if I can get any comments on this patchset?
 
 Thanks,
 Dinh
-On Tue, 2013-09-17 at 11:31 -0500, Dinh Nguyen wrote:
+
+On Tue, 2013-09-17 at 11:32 -0500, Dinh Nguyen wrote:
 > From: Dinh Nguyen <dinguyen@altera.com>
 > 
-> Some of the clocks that were designated gate-clk did not have a gate, so
-> change those clocks to be of periph-clk type.
+> Assign a clock for the twd-timer.
 > 
 > Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
 > Cc: Rob Herring <rob.herring@calxeda.com>
@@ -26,42 +25,26 @@ On Tue, 2013-09-17 at 11:31 -0500, Dinh Nguyen wrote:
 > Cc: Mark Rutland <mark.rutland@arm.com>
 > Cc: Stephen Warren <swarren@wwwdotorg.org>
 > Cc: Ian Campbell <ian.campbell@citrix.com>
-> Cc: Mike Turquette <mturquette@linaro.org>
-> Cc: devicetree at vger.kernel.org
 > CC: linux-arm-kernel at lists.infradead.org
 > ---
->  arch/arm/boot/dts/socfpga.dtsi |    7 ++++---
->  1 file changed, 4 insertions(+), 3 deletions(-)
+>  arch/arm/boot/dts/socfpga.dtsi |    4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
 > 
 > diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
-> index 1ee6079..acd6c3a 100644
+> index acd6c3a..e28df94 100644
 > --- a/arch/arm/boot/dts/socfpga.dtsi
 > +++ b/arch/arm/boot/dts/socfpga.dtsi
-> @@ -245,14 +245,14 @@
+> @@ -480,11 +480,11 @@
+>  			clock-names = "biu", "ciu";
+>  		};
 >  
->  				mpu_periph_clk: mpu_periph_clk {
->  					#clock-cells = <0>;
-> -					compatible = "altr,socfpga-gate-clk";
-> +					compatible = "altr,socfpga-perip-clk";
->  					clocks = <&mpuclk>;
->  					fixed-divider = <4>;
->  					};
+> -		/* Local timer */
+> -		timer at fffec600 {
+> +		local-timer at fffec600 {
+>  			compatible = "arm,cortex-a9-twd-timer";
+>  			reg = <0xfffec600 0x100>;
+>  			interrupts = <1 13 0xf04>;
+> +			clocks = <&mpu_periph_clk>;
+>  		};
 >  
->  				mpu_l2_ram_clk: mpu_l2_ram_clk {
->  					#clock-cells = <0>;
-> -					compatible = "altr,socfpga-gate-clk";
-> +					compatible = "altr,socfpga-perip-clk";
->  					clocks = <&mpuclk>;
->  					fixed-divider = <2>;
->  					};
-> @@ -266,8 +266,9 @@
->  
->  				l3_main_clk: l3_main_clk {
->  					#clock-cells = <0>;
-> -					compatible = "altr,socfpga-gate-clk";
-> +					compatible = "altr,socfpga-perip-clk";
->  					clocks = <&mainclk>;
-> +					fixed-divider = <1>;
->  					};
->  
->  				l3_mp_clk: l3_mp_clk {
+>  		timer0: timer0 at ffc08000 {
