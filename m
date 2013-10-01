@@ -1,162 +1,74 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue,  1 Oct 2013 11:35:39 +0900
-Subject: [PATCH 07/14] ARM: shmobile: Add r8a7790 SMP support using APMU code
-In-Reply-To: <cover.1380532277.git.horms+renesas@verge.net.au>
-References: <cover.1380532277.git.horms+renesas@verge.net.au>
-Message-ID: <ad09cb83811b228eb6f98230d307bb837e6a758f.1380532277.git.horms+renesas@verge.net.au>
+Date: Tue,  1 Oct 2013 11:37:00 +0900
+Subject: [GIT PULL 00/12] Renesas ARM based SoC board updates for v3.13
+Message-ID: <cover.1380530519.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm@opensource.se>
+Hi Olof, Kevin and Arnd,
 
-Add r8a7790 SMP support using the shared APMU code. To enable
-SMP the r8a7790 specific DTS needs to be updated to include
-CPU cores, and this is happening in a separate patch.
+please consider these Renesas ARM based SoC board updates for v3.13.
 
-Signed-off-by: Magnus Damm <damm@opensource.se>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/mach-shmobile/Makefile                |  1 +
- arch/arm/mach-shmobile/board-lager-reference.c |  1 +
- arch/arm/mach-shmobile/board-lager.c           |  1 +
- arch/arm/mach-shmobile/include/mach/r8a7790.h  |  1 +
- arch/arm/mach-shmobile/setup-r8a7790.c         |  1 +
- arch/arm/mach-shmobile/smp-r8a7790.c           | 67 ++++++++++++++++++++++++++
- 6 files changed, 72 insertions(+)
- create mode 100644 arch/arm/mach-shmobile/smp-r8a7790.c
+This pull-request is based on renesas-soc-for-v3.13 which I will also send
+a pull-request for today.
 
-diff --git a/arch/arm/mach-shmobile/Makefile b/arch/arm/mach-shmobile/Makefile
-index 2705bfa..381fc97 100644
---- a/arch/arm/mach-shmobile/Makefile
-+++ b/arch/arm/mach-shmobile/Makefile
-@@ -34,6 +34,7 @@ endif
- smp-y				:= platsmp.o headsmp.o
- smp-$(CONFIG_ARCH_SH73A0)	+= smp-sh73a0.o headsmp-scu.o platsmp-scu.o
- smp-$(CONFIG_ARCH_R8A7779)	+= smp-r8a7779.o headsmp-scu.o platsmp-scu.o
-+smp-$(CONFIG_ARCH_R8A7790)	+= smp-r8a7790.o platsmp-apmu.o
- smp-$(CONFIG_ARCH_EMEV2)	+= smp-emev2.o headsmp-scu.o platsmp-scu.o
- 
- # IRQ objects
-diff --git a/arch/arm/mach-shmobile/board-lager-reference.c b/arch/arm/mach-shmobile/board-lager-reference.c
-index 2856f51..d39a91b 100644
---- a/arch/arm/mach-shmobile/board-lager-reference.c
-+++ b/arch/arm/mach-shmobile/board-lager-reference.c
-@@ -38,6 +38,7 @@ static const char *lager_boards_compat_dt[] __initdata = {
- };
- 
- DT_MACHINE_START(LAGER_DT, "lager")
-+	.smp		= smp_ops(r8a7790_smp_ops),
- 	.init_early	= r8a7790_init_early,
- 	.init_machine	= lager_add_standard_devices,
- 	.init_time	= r8a7790_timer_init,
-diff --git a/arch/arm/mach-shmobile/board-lager.c b/arch/arm/mach-shmobile/board-lager.c
-index 4047fac..ef3baaa 100644
---- a/arch/arm/mach-shmobile/board-lager.c
-+++ b/arch/arm/mach-shmobile/board-lager.c
-@@ -161,6 +161,7 @@ static const char *lager_boards_compat_dt[] __initdata = {
- };
- 
- DT_MACHINE_START(LAGER_DT, "lager")
-+	.smp		= smp_ops(r8a7790_smp_ops),
- 	.init_early	= r8a7790_init_early,
- 	.init_time	= r8a7790_timer_init,
- 	.init_machine	= lager_add_standard_devices,
-diff --git a/arch/arm/mach-shmobile/include/mach/r8a7790.h b/arch/arm/mach-shmobile/include/mach/r8a7790.h
-index 177a837..79e731c 100644
---- a/arch/arm/mach-shmobile/include/mach/r8a7790.h
-+++ b/arch/arm/mach-shmobile/include/mach/r8a7790.h
-@@ -7,6 +7,7 @@ void r8a7790_clock_init(void);
- void r8a7790_pinmux_init(void);
- void r8a7790_init_early(void);
- void r8a7790_timer_init(void);
-+extern struct smp_operations r8a7790_smp_ops;
- 
- #define MD(nr) BIT(nr)
- u32 r8a7790_read_mode_pins(void);
-diff --git a/arch/arm/mach-shmobile/setup-r8a7790.c b/arch/arm/mach-shmobile/setup-r8a7790.c
-index e0d29a2..c7e24ef 100644
---- a/arch/arm/mach-shmobile/setup-r8a7790.c
-+++ b/arch/arm/mach-shmobile/setup-r8a7790.c
-@@ -283,6 +283,7 @@ static const char * const r8a7790_boards_compat_dt[] __initconst = {
- };
- 
- DT_MACHINE_START(R8A7790_DT, "Generic R8A7790 (Flattened Device Tree)")
-+	.smp		= smp_ops(r8a7790_smp_ops),
- 	.init_early	= r8a7790_init_early,
- 	.init_time	= r8a7790_timer_init,
- 	.dt_compat	= r8a7790_boards_compat_dt,
-diff --git a/arch/arm/mach-shmobile/smp-r8a7790.c b/arch/arm/mach-shmobile/smp-r8a7790.c
-new file mode 100644
-index 0000000..015e275
---- /dev/null
-+++ b/arch/arm/mach-shmobile/smp-r8a7790.c
-@@ -0,0 +1,67 @@
-+/*
-+ * SMP support for r8a7790
-+ *
-+ * Copyright (C) 2012-2013 Renesas Solutions Corp.
-+ * Copyright (C) 2012 Takashi Yoshii <takashi.yoshii.ze@renesas.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; version 2 of the License.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+#include <linux/kernel.h>
-+#include <linux/init.h>
-+#include <linux/smp.h>
-+#include <linux/io.h>
-+#include <asm/smp_plat.h>
-+#include <mach/common.h>
-+
-+#define RST		0xe6160000
-+#define CA15BAR		0x0020
-+#define CA7BAR		0x0030
-+#define CA15RESCNT	0x0040
-+#define CA7RESCNT	0x0044
-+#define MERAM		0xe8080000
-+
-+static void __init r8a7790_smp_prepare_cpus(unsigned int max_cpus)
-+{
-+	void __iomem *p;
-+	u32 bar;
-+
-+	/* let APMU code install data related to shmobile_boot_vector */
-+	shmobile_smp_apmu_prepare_cpus(max_cpus);
-+
-+	/* MERAM for jump stub, because BAR requires 256KB aligned address */
-+	p = ioremap_nocache(MERAM, shmobile_boot_size);
-+	memcpy_toio(p, shmobile_boot_vector, shmobile_boot_size);
-+	iounmap(p);
-+
-+	/* setup reset vectors */
-+	p = ioremap_nocache(RST, 0x63);
-+	bar = (MERAM >> 8) & 0xfffffc00;
-+	writel_relaxed(bar, p + CA15BAR);
-+	writel_relaxed(bar, p + CA7BAR);
-+	writel_relaxed(bar | 0x10, p + CA15BAR);
-+	writel_relaxed(bar | 0x10, p + CA7BAR);
-+
-+	/* enable clocks to all CPUs */
-+	writel_relaxed((readl_relaxed(p + CA15RESCNT) & ~0x0f) | 0xa5a50000,
-+		       p + CA15RESCNT);
-+	writel_relaxed((readl_relaxed(p + CA7RESCNT) & ~0x0f) | 0x5a5a0000,
-+		       p + CA7RESCNT);
-+	iounmap(p);
-+}
-+
-+struct smp_operations r8a7790_smp_ops __initdata = {
-+	.smp_prepare_cpus	= r8a7790_smp_prepare_cpus,
-+	.smp_boot_secondary	= shmobile_smp_apmu_boot_secondary,
-+#ifdef CONFIG_HOTPLUG_CPU
-+	.cpu_disable		= shmobile_smp_cpu_disable,
-+	.cpu_die		= shmobile_smp_apmu_cpu_die,
-+	.cpu_kill		= shmobile_smp_apmu_cpu_kill,
-+#endif
-+};
--- 
-1.8.4
+The following changes since commit f39d35fcc2cd7a24ec3128adffd7876953999e1f:
+
+  ARM: shmobile: r8a7778: add usb phy power control function (2013-09-30 16:11:23 +0900)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git boards
+
+for you to fetch changes up to b77c6bcef2082a7cd96124daf15df8da5b670ebe:
+
+  ARM: shmobile: lager: disable MMCIF Command Completion Signal, add CLK_CTRL2 (2013-09-30 16:56:20 +0900)
+
+----------------------------------------------------------------
+Renesas ARM based SoC board updates for v3.13
+
+* Display Unit support for lager and marzen boards
+* Update regulators for MMC0, SDHI0 and SDHI1 on ape6evm board
+* Enable use of FPGA on bockw board
+* Add sounds support to bockw board
+* Add USB function support to bockw board
+* Add Koelsch board
+* Disable MMCIF command completion signal on ape6evm, armadillo800eva,
+  kzm9g and lager boards.
+
+----------------------------------------------------------------
+Guennadi Liakhovetski (5):
+      ARM: shmobile: ape6evm: update MMC0, SDHI0 and SDHI1 with correct regulators
+      ARM: shmobile: ape6evm: disable MMCIF Command Completion Signal
+      ARM: shmobile: armadillo800eva: disable MMCIF Command Completion Signal
+      ARM: shmobile: kzm9g: disable MMCIF Command Completion Signal
+      ARM: shmobile: lager: disable MMCIF Command Completion Signal, add CLK_CTRL2
+
+Hisashi Nakamura (1):
+      ARM: shmobile: Koelsch support
+
+Kuninori Morimoto (3):
+      ARM: shmobile: bockw: enable global use of FPGA
+      ARM: shmobile: bockw: add R-Car sound support (PIO)
+      ARM: shmobile: bockw: add USB Function support
+
+Laurent Pinchart (3):
+      ARM: shmobile: marzen: Add Display Unit support
+      ARM: shmobile: lager: Add Display Unit support
+      ARM: shmobile: lager: Fix Display Unit platform data
+
+ arch/arm/boot/dts/Makefile                     |   1 +
+ arch/arm/boot/dts/r8a7791-koelsch.dts          |  32 +++
+ arch/arm/mach-shmobile/Kconfig                 |   7 +
+ arch/arm/mach-shmobile/Makefile                |   1 +
+ arch/arm/mach-shmobile/Makefile.boot           |   1 +
+ arch/arm/mach-shmobile/board-ape6evm.c         |  55 +++-
+ arch/arm/mach-shmobile/board-armadillo800eva.c |   1 +
+ arch/arm/mach-shmobile/board-bockw.c           | 370 ++++++++++++++++++++++++-
+ arch/arm/mach-shmobile/board-koelsch.c         |  44 +++
+ arch/arm/mach-shmobile/board-kzm9g.c           |   1 +
+ arch/arm/mach-shmobile/board-lager.c           |  68 +++++
+ arch/arm/mach-shmobile/board-marzen.c          |  72 +++++
+ 12 files changed, 634 insertions(+), 19 deletions(-)
+ create mode 100644 arch/arm/boot/dts/r8a7791-koelsch.dts
+ create mode 100644 arch/arm/mach-shmobile/board-koelsch.c
