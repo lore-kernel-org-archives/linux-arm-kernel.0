@@ -1,80 +1,54 @@
 From: jic23@kernel.org (Jonathan Cameron)
-Date: Tue, 01 Oct 2013 10:25:46 +0100
-Subject: [PATCHv6] staging/iio/adc: change the MXS touchscreen driver
- implementation
-In-Reply-To: <1379946998-23041-1-git-send-email-jbe@pengutronix.de>
-References: <1379946998-23041-1-git-send-email-jbe@pengutronix.de>
-Message-ID: <524A951A.5050606@kernel.org>
+Date: Tue, 01 Oct 2013 10:32:56 +0100
+Subject: [PATCH v3 4/6] iio: at91: ADC start-up time calculation changed
+ since at91sam9x5
+In-Reply-To: <521FB660.8010607@kernel.org>
+References: <1377602932-1899-1-git-send-email-josh.wu@atmel.com>
+ <1377602932-1899-5-git-send-email-josh.wu@atmel.com>
+ <20130828090354.GP2695@lukather> <521FB660.8010607@kernel.org>
+Message-ID: <524A96C8.7010707@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I'm looking for some Tested-by: or Acks on this before applying the series.
-I got the impression from the comments on the previous version that the
-series has now been reasonably thoroughly tested on both i.MX28 and i.MX23 boards.
-This is not yet reflected in the sign off trail and in fact a couple of the patch
-descriptions say that they are untested on i.MX28.
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA1
 
-Jonathan
+On 08/29/13 22:00, Jonathan Cameron wrote:
+> On 08/28/13 10:03, Maxime Ripard wrote:
+>> Hi Josh,
+>> 
+>> On Tue, Aug 27, 2013 at 07:28:50PM +0800, Josh Wu wrote:
+>>> Since in at91sam9x5, sama5d3x chip. the start up time calucation is changed. This patch can choose different 
+>>> start up time calculation formula for different chips.
+>>> 
+>>> Signed-off-by: Josh Wu <josh.wu@atmel.com>
+>> 
+>> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+>> 
+> Unfortunately this one has a dependency on the fix patch which is going in through my fixes branch so will have to
+> wait until that hits my upstream.
+> 
+> I'd like 5 and 6 to sit a while longer anyway (and 6 needs Dmitry's sign off before I take that.)
+> 
+Hi All,
 
+This patch no longer applies unfortunately. Josh, could you bring
+it up to date and repost the last 3 patches of this series?
+-----BEGIN PGP SIGNATURE-----
+Version: GnuPG v2.0.21 (GNU/Linux)
+Comment: Using GnuPG with Thunderbird - http://www.enigmail.net/
 
-On 09/23/13 15:36, Juergen Beisert wrote:
-> The following series replaces the current busy loop touchscreen implementation
-> for i.MX28/i.MX23 SoCs by a fully interrupt driven implementation.
-> 
-> Since i.MX23 and i.MX28 silicon differs, the existing implementation can
-> be used for the i.MX28 SoC only.
-> 
-> The first patch adds proper clock handling. Various platforms seems to disable
-> the internal 2 kHz clock which is used by the LRADC delay units.
-> 
-> The next two patches of this series move the i.MX28 specific definitions
-> out of the way. The forth patch simplifies the register access to make it easier
-> to add the i.MX23 support. Then the i.MX23 specific definitions are added, also
-> the code to distinguish both SoCs at run-time.
-> Up to here the existing touchscreen driver will now run on an i.MX23 Soc as well.
-> 
-> When these i.MX SoCs are running from battery it seems not to be a good idea to
-> run a busy loop to detect touches and their location. The 6th patch adds a
-> fully interrupt driven implementation which makes use of the built-in delay
-> and multiple sample features of the touchscreen controller. This will reduce
-> the interrupt load to a minimum.
-> 
-> The remaining patches in this series just removes the existing busy loop
-> implementation, add a proposal for devicetree binding and a reminder what has
-> still to be done with the LRADC driver.
-> 
-> Changes since v5:
-> 
-> - add missing clock handling which prevents the delay units from work (this
->   should make it work on the MX28EVK and M28EVK as well)
-> 
-> Changes since v4:
-> 
-> - honor Jonathan's comments about function names
-> - honor Dmitry's comments about workqueue canceling and interrupts
-> - adding devicetree bindings proposal
-> 
-> Changes since v3:
-> 
-> - split adding register access functions and i.MX23 support into two patches
-> 
-> Changes since v2:
-> 
-> - useless debug output removed
-> 
-> Changes since v1:
-> 
-> - adding register access functions to make the existing code more readable
-> - adding some functions to distinguish the SoCs at run-time to avoid if-else
->   contructs whenever differences in the register layout between i.MX23 and
->   i.MX28 must be handled
-> 
-> Comments are welcome.
-> 
-> Juergen
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-iio" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+iQIcBAEBAgAGBQJSSpbIAAoJEFSFNJnE9BaIi48QALwC0aVUQNU94RpUBRBqFVkF
+H8AB2pLBLYV4JlLD1kg9/ksltZh9+xegd/mM/C/lqZoHaokbSSF0bcAPSV2E3lXN
+MJ3sRx0ubmGAMNWOYI22pqD1BQwEWMdjmS/BaZ2FxkOdJyIV/jkR8NpA3BrvL7e2
+iOv9k7nBkOI1B//0K/xr4B0MWotnbmq45KeHTR1VnItqGWHDG7gyB+sbnymyf53M
+XY99HUpkLggBJrbp05PYmp9RTvyV7NYlMvgMtwUWcM6VaA0YrSRR349P+UsIcmwV
+60yXRDRZCM5Vu3HDAVnbGDtumGjSFYsXXVkJQoN8izCBn0ZsbdSzc4bJyGzn90WK
+vpt5rpd4k+ne/TTuJSiIiz8g/7aZvlWWSQ17j2Qb+IOfh2yROHuA+yyikfFV8N4e
+8jkd5HSMMRoL1Bv1vsf8eOJVlIMTOkG/2Wa7rXJOiWwzmc09Fxp13SoOIOxEMqJY
+lCj8In1fYLryMBCjxR2C/ysnullAbTwBv9HtudPm3Lu80eR8GL7lB4VrrhJyHILP
+ROvJE4ETYpYQTxQZMJKgVAQBFUAhBmckdc1A/SXMcDJgZKraP9aFvJPYbFR4OlFz
+UfjWWS6TzHFgFe2r804DzT+A7fpdZNFrbxyM40ttg7kJ81DgT9aQncEM96dEmiWh
+nXz0iA/maOXKkqJluLWl
+=HbYR
+-----END PGP SIGNATURE-----
