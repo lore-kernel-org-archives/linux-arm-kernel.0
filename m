@@ -1,47 +1,53 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue,  1 Oct 2013 11:37:02 +0900
-Subject: [PATCH 02/12] ARM: shmobile: lager: Add Display Unit support
+Date: Tue,  1 Oct 2013 11:37:01 +0900
+Subject: [PATCH 01/12] ARM: shmobile: marzen: Add Display Unit support
 In-Reply-To: <cover.1380530519.git.horms+renesas@verge.net.au>
 References: <cover.1380530519.git.horms+renesas@verge.net.au>
-Message-ID: <c75a5afa44e71c99e1793824121608f0db48f014.1380530519.git.horms+renesas@verge.net.au>
+Message-ID: <df83d907348b41f40da83b267242b5dca041d4ef.1380530519.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-Only the VGA output is currently supported.
+Support the DU0 VGA and DU1 LVDS outputs. DU1 is connected to a
+Mitsubishi AA104XD12 panel (10.4" XGA).
 
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/board-lager.c | 66 ++++++++++++++++++++++++++++++++++++
- 1 file changed, 66 insertions(+)
+ arch/arm/mach-shmobile/board-marzen.c | 72 +++++++++++++++++++++++++++++++++++
+ 1 file changed, 72 insertions(+)
 
-diff --git a/arch/arm/mach-shmobile/board-lager.c b/arch/arm/mach-shmobile/board-lager.c
-index ffb6f0a..caec99e 100644
---- a/arch/arm/mach-shmobile/board-lager.c
-+++ b/arch/arm/mach-shmobile/board-lager.c
-@@ -28,6 +28,7 @@
- #include <linux/mmc/sh_mmcif.h>
+diff --git a/arch/arm/mach-shmobile/board-marzen.c b/arch/arm/mach-shmobile/board-marzen.c
+index 3f5044f..434b213 100644
+--- a/arch/arm/mach-shmobile/board-marzen.c
++++ b/arch/arm/mach-shmobile/board-marzen.c
+@@ -30,6 +30,7 @@
+ #include <linux/dma-mapping.h>
  #include <linux/pinctrl/machine.h>
  #include <linux/platform_data/gpio-rcar.h>
 +#include <linux/platform_data/rcar-du.h>
- #include <linux/platform_device.h>
+ #include <linux/platform_data/usb-rcar-phy.h>
  #include <linux/regulator/fixed.h>
  #include <linux/regulator/machine.h>
-@@ -38,6 +39,62 @@
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
+@@ -169,6 +170,63 @@ static struct platform_device hspi_device = {
+ 	.num_resources	= ARRAY_SIZE(hspi_resources),
+ };
  
-+/* DU */
-+static struct rcar_du_encoder_data lager_du_encoders[] = {
++/*
++ * DU
++ *
++ * The panel only specifies the [hv]display and [hv]total values. The position
++ * and width of the sync pulses don't matter, they're copied from VESA timings.
++ */
++static struct rcar_du_encoder_data du_encoders[] = {
 +	{
 +		.type = RCAR_DU_ENCODER_VGA,
 +		.output = RCAR_DU_OUTPUT_DPAD0,
 +	}, {
-+		.type = RCAR_DU_ENCODER_NONE,
-+		.output = RCAR_DU_OUTPUT_LVDS1,
++		.type = RCAR_DU_ENCODER_LVDS,
++		.output = RCAR_DU_OUTPUT_DPAD1,
 +		.connector.lvds.panel = {
 +			.width_mm = 210,
 +			.height_mm = 158,
@@ -61,29 +67,25 @@ index ffb6f0a..caec99e 100644
 +	},
 +};
 +
-+static const struct rcar_du_platform_data lager_du_pdata __initconst = {
-+	.encoders = lager_du_encoders,
-+	.num_encoders = ARRAY_SIZE(lager_du_encoders),
++static const struct rcar_du_platform_data du_pdata __initconst = {
++	.encoders = du_encoders,
++	.num_encoders = ARRAY_SIZE(du_encoders),
 +};
 +
 +static const struct resource du_resources[] __initconst = {
-+	DEFINE_RES_MEM(0xfeb00000, 0x70000),
-+	DEFINE_RES_MEM_NAMED(0xfeb90000, 0x1c, "lvds.0"),
-+	DEFINE_RES_MEM_NAMED(0xfeb94000, 0x1c, "lvds.1"),
-+	DEFINE_RES_IRQ(gic_spi(256)),
-+	DEFINE_RES_IRQ(gic_spi(268)),
-+	DEFINE_RES_IRQ(gic_spi(269)),
++	DEFINE_RES_MEM(0xfff80000, 0x40000),
++	DEFINE_RES_IRQ(gic_iid(0x3f)),
 +};
 +
-+static void __init lager_add_du_device(void)
++static void __init marzen_add_du_device(void)
 +{
 +	struct platform_device_info info = {
-+		.name = "rcar-du-r8a7790",
++		.name = "rcar-du-r8a7779",
 +		.id = -1,
 +		.res = du_resources,
 +		.num_res = ARRAY_SIZE(du_resources),
-+		.data = &du_resources,
-+		.size_data = sizeof(du_resources),
++		.data = &du_pdata,
++		.size_data = sizeof(du_pdata),
 +		.dma_mask = DMA_BIT_MASK(32),
 +	};
 +
@@ -91,30 +93,35 @@ index ffb6f0a..caec99e 100644
 +}
 +
  /* LEDS */
- static struct gpio_led lager_leds[] = {
+ static struct gpio_led marzen_leds[] = {
  	{
-@@ -106,6 +163,13 @@ static struct resource ether_resources[] __initdata = {
+@@ -237,6 +295,19 @@ static struct platform_device *marzen_devices[] __initdata = {
  };
  
- static const struct pinctrl_map lager_pinctrl_map[] = {
+ static const struct pinctrl_map marzen_pinctrl_map[] = {
 +	/* DU (CN10: ARGB0, CN13: LVDS) */
-+	PIN_MAP_MUX_GROUP_DEFAULT("rcar-du-r8a7790", "pfc-r8a7790",
-+				  "du_rgb666", "du"),
-+	PIN_MAP_MUX_GROUP_DEFAULT("rcar-du-r8a7790", "pfc-r8a7790",
-+				  "du_sync_1", "du"),
-+	PIN_MAP_MUX_GROUP_DEFAULT("rcar-du-r8a7790", "pfc-r8a7790",
-+				  "du_clk_out_0", "du"),
- 	/* SCIF0 (CN19: DEBUG SERIAL0) */
- 	PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.6", "pfc-r8a7790",
- 				  "scif0_data", "scif0"),
-@@ -153,6 +217,8 @@ static void __init lager_add_standard_devices(void)
- 					  ether_resources,
- 					  ARRAY_SIZE(ether_resources),
- 					  &ether_pdata, sizeof(ether_pdata));
-+
-+	lager_add_du_device();
++	PIN_MAP_MUX_GROUP_DEFAULT("rcar-du-r8a7779", "pfc-r8a7779",
++				  "du0_rgb888", "du0"),
++	PIN_MAP_MUX_GROUP_DEFAULT("rcar-du-r8a7779", "pfc-r8a7779",
++				  "du0_sync_1", "du0"),
++	PIN_MAP_MUX_GROUP_DEFAULT("rcar-du-r8a7779", "pfc-r8a7779",
++				  "du0_clk_out_0", "du0"),
++	PIN_MAP_MUX_GROUP_DEFAULT("rcar-du-r8a7779", "pfc-r8a7779",
++				  "du1_rgb666", "du1"),
++	PIN_MAP_MUX_GROUP_DEFAULT("rcar-du-r8a7779", "pfc-r8a7779",
++				  "du1_sync_1", "du1"),
++	PIN_MAP_MUX_GROUP_DEFAULT("rcar-du-r8a7779", "pfc-r8a7779",
++				  "du1_clk_out", "du1"),
+ 	/* HSPI0 */
+ 	PIN_MAP_MUX_GROUP_DEFAULT("sh-hspi.0", "pfc-r8a7779",
+ 				  "hspi0", "hspi0"),
+@@ -297,6 +368,7 @@ static void __init marzen_init(void)
+ 	r8a7779_add_vin_device(1, &vin_platform_data);
+ 	r8a7779_add_vin_device(3, &vin_platform_data);
+ 	platform_add_devices(marzen_devices, ARRAY_SIZE(marzen_devices));
++	marzen_add_du_device();
  }
  
- static const char *lager_boards_compat_dt[] __initdata = {
+ static const char *marzen_boards_compat_dt[] __initdata = {
 -- 
 1.8.4
