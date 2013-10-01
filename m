@@ -1,57 +1,118 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue,  1 Oct 2013 11:34:13 +0900
-Subject: [PATCH 2/8] ARM: shmobile: r8a7790: Add DU and LVDS clocks
+Date: Tue,  1 Oct 2013 11:34:14 +0900
+Subject: [PATCH 3/8] ARM: shmobile: r8a7778: add SSI/SRU clock support
 In-Reply-To: <cover.1380530437.git.horms+renesas@verge.net.au>
 References: <cover.1380530437.git.horms+renesas@verge.net.au>
-Message-ID: <9d8907c4e8c97127c562055ac7e1a8ea39ea589c.1380530437.git.horms+renesas@verge.net.au>
+Message-ID: <a93c2aaf18e0e10084c099a0ba2460ab8e3c0e05.1380530437.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Add a platform clock for the r8a7778 SRU/SSI sound.
+
+Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/clock-r8a7790.c | 12 +++++++++++-
- 1 file changed, 11 insertions(+), 1 deletion(-)
+ arch/arm/mach-shmobile/clock-r8a7778.c | 43 ++++++++++++++++++++++++++++++++--
+ 1 file changed, 41 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/clock-r8a7790.c b/arch/arm/mach-shmobile/clock-r8a7790.c
-index fc36d3d..d99b87b 100644
---- a/arch/arm/mach-shmobile/clock-r8a7790.c
-+++ b/arch/arm/mach-shmobile/clock-r8a7790.c
-@@ -182,7 +182,7 @@ static struct clk div6_clks[DIV6_NR] = {
- /* MSTP */
+diff --git a/arch/arm/mach-shmobile/clock-r8a7778.c b/arch/arm/mach-shmobile/clock-r8a7778.c
+index c4bf2d8..244a8de 100644
+--- a/arch/arm/mach-shmobile/clock-r8a7778.c
++++ b/arch/arm/mach-shmobile/clock-r8a7778.c
+@@ -69,6 +69,15 @@ static struct clk extal_clk = {
+ 	.mapping = &cpg_mapping,
+ };
+ 
++static struct clk audio_clk_a = {
++};
++
++static struct clk audio_clk_b = {
++};
++
++static struct clk audio_clk_c = {
++};
++
+ /*
+  * clock ratio of these clock will be updated
+  * on r8a7778_clock_init()
+@@ -100,18 +109,23 @@ static struct clk *main_clks[] = {
+ 	&p_clk,
+ 	&g_clk,
+ 	&z_clk,
++	&audio_clk_a,
++	&audio_clk_b,
++	&audio_clk_c,
+ };
+ 
  enum {
- 	MSTP813,
--	MSTP721, MSTP720,
-+	MSTP726, MSTP725, MSTP724, MSTP723, MSTP722, MSTP721, MSTP720,
- 	MSTP717, MSTP716,
- 	MSTP522,
- 	MSTP315, MSTP314, MSTP313, MSTP312, MSTP311, MSTP305, MSTP304,
-@@ -193,6 +193,11 @@ enum {
+ 	MSTP331,
+ 	MSTP323, MSTP322, MSTP321,
++	MSTP311, MSTP310,
++	MSTP309, MSTP308, MSTP307,
+ 	MSTP114,
+ 	MSTP110, MSTP109,
+ 	MSTP100,
+ 	MSTP030,
+ 	MSTP029, MSTP028, MSTP027, MSTP026, MSTP025, MSTP024, MSTP023, MSTP022, MSTP021,
+-	MSTP016, MSTP015,
+-	MSTP007,
++	MSTP016, MSTP015, MSTP012, MSTP011, MSTP010,
++	MSTP009, MSTP008, MSTP007,
+ 	MSTP_NR };
  
  static struct clk mstp_clks[MSTP_NR] = {
- 	[MSTP813] = SH_CLK_MSTP32(&p_clk, SMSTPCR8, 13, 0), /* Ether */
-+	[MSTP726] = SH_CLK_MSTP32(&zx_clk, SMSTPCR7, 26, 0), /* LVDS0 */
-+	[MSTP725] = SH_CLK_MSTP32(&zx_clk, SMSTPCR7, 25, 0), /* LVDS1 */
-+	[MSTP724] = SH_CLK_MSTP32(&zx_clk, SMSTPCR7, 24, 0), /* DU0 */
-+	[MSTP723] = SH_CLK_MSTP32(&zx_clk, SMSTPCR7, 23, 0), /* DU1 */
-+	[MSTP722] = SH_CLK_MSTP32(&zx_clk, SMSTPCR7, 22, 0), /* DU2 */
- 	[MSTP721] = SH_CLK_MSTP32(&p_clk, SMSTPCR7, 21, 0), /* SCIF0 */
- 	[MSTP720] = SH_CLK_MSTP32(&p_clk, SMSTPCR7, 20, 0), /* SCIF1 */
- 	[MSTP717] = SH_CLK_MSTP32(&zs_clk, SMSTPCR7, 17, 0), /* HSCIF0 */
-@@ -251,6 +256,11 @@ static struct clk_lookup lookups[] = {
- 	CLKDEV_CON_ID("ssprs",		&div6_clks[DIV6_SSPRS]),
+@@ -119,6 +133,11 @@ static struct clk mstp_clks[MSTP_NR] = {
+ 	[MSTP323] = SH_CLK_MSTP32(&p_clk, MSTPCR3, 23, 0), /* SDHI0 */
+ 	[MSTP322] = SH_CLK_MSTP32(&p_clk, MSTPCR3, 22, 0), /* SDHI1 */
+ 	[MSTP321] = SH_CLK_MSTP32(&p_clk, MSTPCR3, 21, 0), /* SDHI2 */
++	[MSTP311] = SH_CLK_MSTP32(&p_clk, MSTPCR3, 11, 0), /* SSI4 */
++	[MSTP310] = SH_CLK_MSTP32(&p_clk, MSTPCR3, 10, 0), /* SSI5 */
++	[MSTP309] = SH_CLK_MSTP32(&p_clk, MSTPCR3,  9, 0), /* SSI6 */
++	[MSTP308] = SH_CLK_MSTP32(&p_clk, MSTPCR3,  8, 0), /* SSI7 */
++	[MSTP307] = SH_CLK_MSTP32(&p_clk, MSTPCR3,  7, 0), /* SSI8 */
+ 	[MSTP114] = SH_CLK_MSTP32(&p_clk, MSTPCR1, 14, 0), /* Ether */
+ 	[MSTP110] = SH_CLK_MSTP32(&s_clk, MSTPCR1, 10, 0), /* VIN0 */
+ 	[MSTP109] = SH_CLK_MSTP32(&s_clk, MSTPCR1,  9, 0), /* VIN1 */
+@@ -135,11 +154,20 @@ static struct clk mstp_clks[MSTP_NR] = {
+ 	[MSTP021] = SH_CLK_MSTP32(&p_clk, MSTPCR0, 21, 0), /* SCIF5 */
+ 	[MSTP016] = SH_CLK_MSTP32(&p_clk, MSTPCR0, 16, 0), /* TMU0 */
+ 	[MSTP015] = SH_CLK_MSTP32(&p_clk, MSTPCR0, 15, 0), /* TMU1 */
++	[MSTP012] = SH_CLK_MSTP32(&p_clk, MSTPCR0, 12, 0), /* SSI0 */
++	[MSTP011] = SH_CLK_MSTP32(&p_clk, MSTPCR0, 11, 0), /* SSI1 */
++	[MSTP010] = SH_CLK_MSTP32(&p_clk, MSTPCR0, 10, 0), /* SSI2 */
++	[MSTP009] = SH_CLK_MSTP32(&p_clk, MSTPCR0,  9, 0), /* SSI3 */
++	[MSTP008] = SH_CLK_MSTP32(&p_clk, MSTPCR0,  8, 0), /* SRU */
+ 	[MSTP007] = SH_CLK_MSTP32(&p_clk, MSTPCR0,  7, 0), /* HSPI */
+ };
  
- 	/* MSTP */
-+	CLKDEV_ICK_ID("lvds.0", "rcar-du-r8a7790", &mstp_clks[MSTP726]),
-+	CLKDEV_ICK_ID("lvds.1", "rcar-du-r8a7790", &mstp_clks[MSTP725]),
-+	CLKDEV_ICK_ID("du.0", "rcar-du-r8a7790", &mstp_clks[MSTP724]),
-+	CLKDEV_ICK_ID("du.1", "rcar-du-r8a7790", &mstp_clks[MSTP723]),
-+	CLKDEV_ICK_ID("du.2", "rcar-du-r8a7790", &mstp_clks[MSTP722]),
- 	CLKDEV_DEV_ID("sh-sci.0", &mstp_clks[MSTP204]),
- 	CLKDEV_DEV_ID("sh-sci.1", &mstp_clks[MSTP203]),
- 	CLKDEV_DEV_ID("sh-sci.2", &mstp_clks[MSTP206]),
+ static struct clk_lookup lookups[] = {
+ 	/* main */
++	CLKDEV_CON_ID("audio_clk_a",	&audio_clk_a),
++	CLKDEV_CON_ID("audio_clk_b",	&audio_clk_b),
++	CLKDEV_CON_ID("audio_clk_c",	&audio_clk_c),
++	CLKDEV_CON_ID("audio_clk_internal",	&s1_clk),
+ 	CLKDEV_CON_ID("shyway_clk",	&s_clk),
+ 	CLKDEV_CON_ID("peripheral_clk",	&p_clk),
+ 
+@@ -168,6 +196,17 @@ static struct clk_lookup lookups[] = {
+ 	CLKDEV_DEV_ID("sh-hspi.0", &mstp_clks[MSTP007]), /* HSPI0 */
+ 	CLKDEV_DEV_ID("sh-hspi.1", &mstp_clks[MSTP007]), /* HSPI1 */
+ 	CLKDEV_DEV_ID("sh-hspi.2", &mstp_clks[MSTP007]), /* HSPI2 */
++	CLKDEV_DEV_ID("rcar_sound", &mstp_clks[MSTP008]), /* SRU */
++
++	CLKDEV_ICK_ID("ssi.0", "rcar_sound", &mstp_clks[MSTP012]),
++	CLKDEV_ICK_ID("ssi.1", "rcar_sound", &mstp_clks[MSTP011]),
++	CLKDEV_ICK_ID("ssi.2", "rcar_sound", &mstp_clks[MSTP010]),
++	CLKDEV_ICK_ID("ssi.3", "rcar_sound", &mstp_clks[MSTP009]),
++	CLKDEV_ICK_ID("ssi.4", "rcar_sound", &mstp_clks[MSTP311]),
++	CLKDEV_ICK_ID("ssi.5", "rcar_sound", &mstp_clks[MSTP310]),
++	CLKDEV_ICK_ID("ssi.6", "rcar_sound", &mstp_clks[MSTP309]),
++	CLKDEV_ICK_ID("ssi.7", "rcar_sound", &mstp_clks[MSTP308]),
++	CLKDEV_ICK_ID("ssi.8", "rcar_sound", &mstp_clks[MSTP307]),
+ };
+ 
+ void __init r8a7778_clock_init(void)
 -- 
 1.8.4
