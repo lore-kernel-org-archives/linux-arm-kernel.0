@@ -1,386 +1,148 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Tue, 1 Oct 2013 18:21:56 +0530
-Subject: [PATCH 2/3] Phy: Exynos: Add Exynos5250 sata phy driver
-In-Reply-To: <1380609183-21430-3-git-send-email-yuvaraj.cd@samsung.com>
-References: <1380609183-21430-1-git-send-email-yuvaraj.cd@samsung.com>
- <1380609183-21430-3-git-send-email-yuvaraj.cd@samsung.com>
-Message-ID: <524AC56C.1060501@ti.com>
+From: mika.westerberg@linux.intel.com (Mika Westerberg)
+Date: Tue,  1 Oct 2013 16:09:42 +0300
+Subject: [PATCH v4] i2c: enable runtime PM for I2C adapter devices enumerated
+ from ACPI
+In-Reply-To: <1380552228-23329-2-git-send-email-mika.westerberg@linux.intel.com>
+References: <1380552228-23329-2-git-send-email-mika.westerberg@linux.intel.com>
+Message-ID: <1380632982-10709-1-git-send-email-mika.westerberg@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 01 October 2013 12:03 PM, Yuvaraj Kumar C D wrote:
-> This patch adds the sata phy driver for Exynos5250.Exynos5250 sata
-> phy comprises of CMU and TRSV blocks which are of I2C register Map.
-> So this patch also adds a i2c client driver, which is used configure
-> the CMU and TRSV block of exynos5250 SATA PHY.
+The ACPI specification requires the parent device to be powered on before
+any of its children. It can be only powered off when all the children are
+already off.
 
-Why not make the Exynos5250 sata phy as a i2c client driver instead?
-> 
-> This patch incorporates the generic phy framework to deal with sata
-> phy.
-> 
-> This patch depends on the below patch
-> 	[1].drivers: phy: add generic PHY framework
-> 		by Kishon Vijay Abraham I<kishon@ti.com>
-> 
-> Signed-off-by: Yuvaraj Kumar C D <yuvaraj.cd@samsung.com>
-> Signed-off-by: Girish K S <ks.giri@samsung.com>
-> Signed-off-by: Vasanth Ananthan <vasanth.a@samsung.com>
-> ---
->  drivers/phy/Kconfig                      |    6 +
->  drivers/phy/Makefile                     |    1 +
->  drivers/phy/exynos/Kconfig               |    5 +
->  drivers/phy/exynos/Makefile              |    5 +
->  drivers/phy/exynos/exynos5250_phy_i2c.c  |   53 +++++++
->  drivers/phy/exynos/sata_phy_exynos5250.c |  248 ++++++++++++++++++++++++++++++
->  drivers/phy/exynos/sata_phy_exynos5250.h |   33 ++++
->  7 files changed, 351 insertions(+)
->  create mode 100644 drivers/phy/exynos/Kconfig
->  create mode 100644 drivers/phy/exynos/Makefile
->  create mode 100644 drivers/phy/exynos/exynos5250_phy_i2c.c
->  create mode 100644 drivers/phy/exynos/sata_phy_exynos5250.c
->  create mode 100644 drivers/phy/exynos/sata_phy_exynos5250.h
-> 
-> diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
-> index 5f85909..ab3d1c6 100644
-> --- a/drivers/phy/Kconfig
-> +++ b/drivers/phy/Kconfig
-> @@ -11,3 +11,9 @@ menuconfig GENERIC_PHY
->  	  devices present in the kernel. This layer will have the generic
->  	  API by which phy drivers can create PHY using the phy framework and
->  	  phy users can obtain reference to the PHY.
-> +
-> +if GENERIC_PHY
+Currently whenever there is no I2C traffic going on, the I2C controller
+driver can put the device into low power state transparently to its
+children (the I2C client devices). This violates the ACPI specification
+because now the parent device is in lower power state than its children.
 
-NAK. Just select GENERIC_PHY from your driver Kconfig.
-> +
-> +source "drivers/phy/exynos/Kconfig"
-> +
-> +endif
-> diff --git a/drivers/phy/Makefile b/drivers/phy/Makefile
-> index 9e9560f..e0223d7 100644
-> --- a/drivers/phy/Makefile
-> +++ b/drivers/phy/Makefile
-> @@ -3,3 +3,4 @@
->  #
->  
->  obj-$(CONFIG_GENERIC_PHY)	+= phy-core.o
-> +obj-$(CONFIG_PHY_SAMSUNG_SATA)	+= exynos/
+In order to keep ACPI happy we enable runtime PM for the I2C adapter device
+if we find out that the I2C controller was in fact an ACPI device. In
+addition to that we attach the I2C client devices to the ACPI power domain
+and make sure that they are powered on when the driver ->probe() is called.
 
-simply have phy-exynos5250 in drivers/phy.
-> diff --git a/drivers/phy/exynos/Kconfig b/drivers/phy/exynos/Kconfig
-> new file mode 100644
-> index 0000000..fa125fb
-> --- /dev/null
-> +++ b/drivers/phy/exynos/Kconfig
-> @@ -0,0 +1,5 @@
-> +config PHY_SAMSUNG_SATA
-> +	tristate "Samsung Sata SerDes/PHY driver"
-> +	help
-> +	  Support for Samsung sata SerDes/Phy found on Samsung
-> +	  SoCs.
-> diff --git a/drivers/phy/exynos/Makefile b/drivers/phy/exynos/Makefile
-> new file mode 100644
-> index 0000000..50dc7eb
-> --- /dev/null
-> +++ b/drivers/phy/exynos/Makefile
-> @@ -0,0 +1,5 @@
-> +#
-> +# Makefile for the exynos phy drivers.
-> +#
-> +ccflags-y := -Idrivers/phy/exynos
-> +obj-$(CONFIG_PHY_SAMSUNG_SATA)	+= sata_phy_exynos5250.o exynos5250_phy_i2c.o
-> diff --git a/drivers/phy/exynos/exynos5250_phy_i2c.c b/drivers/phy/exynos/exynos5250_phy_i2c.c
-> new file mode 100644
-> index 0000000..9c75d3b
-> --- /dev/null
-> +++ b/drivers/phy/exynos/exynos5250_phy_i2c.c
-> @@ -0,0 +1,53 @@
-> +/*
-> + * Copyright (C) 2013 Samsung Electronics Co.Ltd
-> + * Author:
-> + *	Yuvaraj C D <yuvaraj.cd@samsung.com>
-> + *
-> + * This program is free software; you can redistribute  it and/or modify it
-> + * under  the terms of  the GNU General  Public License as published by the
-> + * Free Software Foundation;  either version 2 of the  License, or (at your
-> + * option) any later version.
-> + *
-> + */
-> +
-> +#include <linux/kernel.h>
-> +#include <linux/i2c.h>
-> +#include <linux/module.h>
-> +#include "sata_phy_exynos5250.h"
-> +
-> +static int exynos_sata_i2c_probe(struct i2c_client *client,
-> +		const struct i2c_device_id *i2c_id)
-> +{
-> +	sataphy_attach_i2c_client(client);
-> +
-> +	dev_info(&client->adapter->dev,
-> +		"attached %s into i2c adapter successfully\n",
-> +		client->name);
-> +
-> +	return 0;
-> +}
-> +
-> +static int exynos_sata_i2c_remove(struct i2c_client *client)
-> +{
-> +	dev_info(&client->adapter->dev,
-> +		"detached %s from i2c adapter successfully\n",
-> +		client->name);
-> +
-> +	return 0;
-> +}
-> +
-> +static const struct i2c_device_id phy_i2c_device_match[] = {
-> +	{ "sata-phy-i2c", 0 },
-> +};
-> +MODULE_DEVICE_TABLE(of, phy_i2c_device_match);
-> +
-> +struct i2c_driver sataphy_i2c_driver = {
-> +	.probe    = exynos_sata_i2c_probe,
-> +	.id_table = phy_i2c_device_match,
-> +	.remove		= exynos_sata_i2c_remove,
-> +	.driver   = {
-> +		.name = "sata-phy-i2c",
-> +		.owner = THIS_MODULE,
-> +		.of_match_table = (void *)phy_i2c_device_match,
-> +		},
-> +};
+Non-ACPI devices are not affected by this change.
 
-As I just mentioned above, we can merge this driver with the below one.
-> diff --git a/drivers/phy/exynos/sata_phy_exynos5250.c b/drivers/phy/exynos/sata_phy_exynos5250.c
-> new file mode 100644
-> index 0000000..726c10e
-> --- /dev/null
-> +++ b/drivers/phy/exynos/sata_phy_exynos5250.c
-> @@ -0,0 +1,248 @@
-> +/*
-> + * Samsung SATA SerDes(PHY) driver
-> + *
-> + * Copyright (C) 2013 Samsung Electronics Co., Ltd.
-> + * Authors: Girish K S <ks.giri@samsung.com>
-> + *         Yuvaraj Kumar C D <yuvaraj.cd@samsung.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +#include <linux/delay.h>
-> +#include <linux/io.h>
-> +#include <linux/kernel.h>
-> +#include <linux/module.h>
-> +#include <linux/of.h>
-> +#include <linux/of_address.h>
-> +#include <linux/phy/phy.h>
-> +#include <linux/i2c.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/spinlock.h>
-> +#include <linux/clk.h>
-> +#include "sata_phy_exynos5250.h"
-> +
-> +static struct i2c_client *phy_i2c_client;
-> +
-> +struct exynos_sata_phy {
-> +	struct phy *phy;
-> +	struct clk *phyclk;
-> +	void __iomem *regs;
-> +	void __iomem *pmureg;
-> +};
-> +
-> +static bool wait_for_reg_status(void __iomem *base, u32 reg, u32 checkbit,
-> +				u32 status)
-> +{
-> +	unsigned long timeout = jiffies + usecs_to_jiffies(1000);
-> +	while (time_before(jiffies, timeout)) {
-> +		if ((readl(base + reg) & checkbit) == status)
-> +			return true;
-> +	}
-> +	return false;
-> +}
-> +
-> +void sataphy_attach_i2c_client(struct i2c_client *sata_phy)
-> +{
-> +	if (sata_phy)
-> +		phy_i2c_client = sata_phy;
-> +}
-> +
-> +static int __set_phy_state(struct exynos_sata_phy *state, unsigned int on)
-> +{
-> +	u32 reg;
-> +
-> +	reg = readl(state->pmureg);
-> +	if (on)
-> +		reg |= EXYNOS_SATA_PHY_EN;
-> +	else
-> +		reg &= ~EXYNOS_SATA_PHY_EN;
-> +	writel(reg, state->pmureg);
-> +
-> +	return 0;
-> +}
-> +
-> +static int exynos_sata_phy_power_on(struct phy *phy)
-> +{
-> +	struct exynos_sata_phy *state = phy_get_drvdata(phy);
-> +
-> +	return __set_phy_state(state, 1);
-> +}
-> +
-> +static int exynos_sata_phy_power_off(struct phy *phy)
-> +{
-> +	struct exynos_sata_phy *state = phy_get_drvdata(phy);
-> +
-> +	return __set_phy_state(state, 0);
-> +}
-> +
-> +static int exynos_sataphy_parse_dt(struct device *dev,
-> +				struct exynos_sata_phy *sata)
-> +{
-> +	struct device_node *np = dev->of_node;
-> +	struct device_node *sataphy_pmu;
-> +
-> +	sataphy_pmu = of_get_child_by_name(np, "sataphy-pmu");
-> +	if (!sataphy_pmu) {
-> +		dev_err(dev, "No PMU interface for sata-phy\n");
-> +		return -ENODEV;
-> +	}
-> +
-> +	sata->pmureg = of_iomap(sataphy_pmu, 0);
-> +	if (!sata->pmureg) {
-> +		dev_err(dev, "Can't get sata-phy pmu control register\n");
-> +		of_node_put(sataphy_pmu);
-> +		return -ENXIO;
-> +	}
-> +
-> +	of_node_put(sataphy_pmu);
-> +	return 0;
-> +}
-> +
-> +static int exynos_sata_phy_init(struct phy *phy)
-> +{
-> +	u32 val;
-> +	int ret = 0;
-> +	u8 buf[] = { 0x3A, 0x0B };
-> +	struct exynos_sata_phy *sata_phy = phy_get_drvdata(phy);
-> +
-> +	if (!phy_i2c_client)
-> +		return -EPROBE_DEFER;
-> +
-> +	writel(EXYNOS_SATA_PHY_EN, sata_phy->pmureg);
-> +
-> +	val = 0;
-> +	writel(val, sata_phy->regs + EXYNOS5_SATA_RESET);
-> +
-> +	val = readl(sata_phy->regs + EXYNOS5_SATA_RESET);
-> +	val |= 0xFF;
-> +	writel(val, sata_phy->regs + EXYNOS5_SATA_RESET);
-> +
-> +	val = readl(sata_phy->regs + EXYNOS5_SATA_RESET);
-> +	val |= LINK_RESET;
-> +	writel(val, sata_phy->regs + EXYNOS5_SATA_RESET);
-> +
-> +	val = readl(sata_phy->regs + EXYNOS5_SATA_RESET);
-> +	val |= RESET_CMN_RST_N;
-> +	writel(val, sata_phy->regs + EXYNOS5_SATA_RESET);
-> +	val = readl(sata_phy->regs + EXYNOS5_SATA_PHSATA_CTRLM);
-> +	val &= ~PHCTRLM_REF_RATE;
-> +	writel(val, sata_phy->regs + EXYNOS5_SATA_PHSATA_CTRLM);
-> +
-> +	/* High speed enable for Gen3 */
-> +	val = readl(sata_phy->regs + EXYNOS5_SATA_PHSATA_CTRLM);
-> +	val |= PHCTRLM_HIGH_SPEED;
-> +	writel(val, sata_phy->regs + EXYNOS5_SATA_PHSATA_CTRLM);
-> +
-> +	val |= CTRL0_P0_PHY_CALIBRATED_SEL | CTRL0_P0_PHY_CALIBRATED;
-> +	writel(val, sata_phy->regs + EXYNOS5_SATA_CTRL0);
-> +
-> +	writel(0x2, sata_phy->regs + EXYNOS5_SATA_MODE0);
-> +
-> +	ret = i2c_master_send(phy_i2c_client, buf, sizeof(buf));
-> +	if (ret < 0)
-> +		return -ENXIO;
-> +
-> +	/* release cmu reset */
-> +	val = readl(sata_phy->regs + EXYNOS5_SATA_RESET);
-> +	val &= ~RESET_CMN_RST_N;
-> +	writel(val, sata_phy->regs + EXYNOS5_SATA_RESET);
-> +
-> +	val = readl(sata_phy->regs + EXYNOS5_SATA_RESET);
-> +	val |= RESET_CMN_RST_N;
-> +	writel(val, sata_phy->regs + EXYNOS5_SATA_RESET);
-> +
-> +	return (wait_for_reg_status(sata_phy->regs, EXYNOS5_SATA_PHSATA_STATM,
-> +		PHSTATM_PLL_LOCKED, 1)) ? 0 : -EINVAL;
-> +
-> +}
-> +
-> +static struct phy_ops exynos_sata_phy_ops = {
-> +	.init		= exynos_sata_phy_init,
-> +	.power_on	= exynos_sata_phy_power_on,
-> +	.power_off	= exynos_sata_phy_power_off,
-> +	.owner		= THIS_MODULE,
-> +};
-> +
-> +static int exynos_sata_phy_probe(struct platform_device *pdev)
-> +{
-> +	struct exynos_sata_phy *sata;
-> +	struct device *dev = &pdev->dev;
-> +	struct resource *res;
-> +	struct phy_provider *phy_provider;
-> +	char label[9];
-> +	int ret = 0;
-> +
-> +	sata = devm_kzalloc(dev, sizeof(*sata), GFP_KERNEL);
-> +	if (!sata)
-> +		return -ENOMEM;
-> +
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +
-> +	sata->regs = devm_ioremap_resource(dev, res);
-> +	if (IS_ERR(sata->regs))
-> +		return PTR_ERR(sata->regs);
-> +
-> +	dev_set_drvdata(dev, sata);
-> +
-> +	if (i2c_add_driver(&sataphy_i2c_driver)) {
-> +		dev_err(dev, "failed to register sataphy i2c driver\n");
-> +		return -ENOENT;
-> +	}
-> +
-> +	sata->phyclk = devm_clk_get(dev, "sata_phyctrl");
-> +	if (IS_ERR(sata->phyclk)) {
-> +		dev_err(dev, "failed to get clk for PHY\n");
-> +		return PTR_ERR(sata->phyclk);
-> +	}
-> +
-> +	ret = clk_prepare_enable(sata->phyclk);
-> +	if (ret < 0) {
-> +		dev_err(dev, "failed to enable source clk\n");
-> +		return ret;
-> +	}
-> +
-> +	if (dev->of_node) {
-> +		ret = exynos_sataphy_parse_dt(dev, sata);
-> +		if (ret)
-> +			return ret;
-> +	}
-> +
-> +	phy_provider = devm_of_phy_provider_register(dev,
-> +					of_phy_simple_xlate);
-> +	if (IS_ERR(phy_provider))
-> +		return PTR_ERR(phy_provider);
-> +
-> +	snprintf(label, sizeof(label), "%s.%d", "sata-phy", pdev->id);
-> +
-> +	sata->phy = devm_phy_create(dev, pdev->id, &exynos_sata_phy_ops, label);
+This patch is based on the work by Aaron Lu and Lv Zheng.
 
-Alright. You are using a older version of PHY framework. I'll wait for you to
-adapt to the latest version of PHY framework [1] before reviewing any further.
+Signed-off-by: Mika Westerberg <mika.westerberg@linux.intel.com>
+---
+Changes to v3:
+ * Check only client ACPI_HANDLE().
+ * Fixed bug where we attach the device to ACPI power domain multiple
+   times.
+ * Functions are renamed to _get_attach/_put_attach to make it clear that
+   we do attach/detach as well.
 
-[1] git://git.kernel.org/pub/scm/linux/kernel/git/kishon/linux-phy.git next
+ drivers/i2c/i2c-core.c | 47 ++++++++++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 46 insertions(+), 1 deletion(-)
 
-Thanks
-Kishon
+diff --git a/drivers/i2c/i2c-core.c b/drivers/i2c/i2c-core.c
+index 29d3f04..e289b1d 100644
+--- a/drivers/i2c/i2c-core.c
++++ b/drivers/i2c/i2c-core.c
+@@ -236,6 +236,27 @@ int i2c_recover_bus(struct i2c_adapter *adap)
+ 	return adap->bus_recovery_info->recover_bus(adap);
+ }
+ 
++static void acpi_i2c_device_pm_get_attach(struct i2c_client *client,
++					  bool attach)
++{
++	if (ACPI_HANDLE(&client->dev)) {
++		/* Make sure the adapter is active */
++		pm_runtime_get_sync(&client->adapter->dev);
++		if (attach)
++			acpi_dev_pm_attach(&client->dev, true);
++	}
++}
++
++static void acpi_i2c_device_pm_put_detach(struct i2c_client *client,
++					  bool detach)
++{
++	if (ACPI_HANDLE(&client->dev)) {
++		if (detach)
++			acpi_dev_pm_detach(&client->dev, true);
++		pm_runtime_put(&client->adapter->dev);
++	}
++}
++
+ static int i2c_device_probe(struct device *dev)
+ {
+ 	struct i2c_client	*client = i2c_verify_client(dev);
+@@ -254,11 +275,15 @@ static int i2c_device_probe(struct device *dev)
+ 					client->flags & I2C_CLIENT_WAKE);
+ 	dev_dbg(dev, "probe\n");
+ 
++	acpi_i2c_device_pm_get_attach(client, true);
++
+ 	status = driver->probe(client, i2c_match_id(driver->id_table, client));
+ 	if (status) {
+ 		client->driver = NULL;
+ 		i2c_set_clientdata(client, NULL);
+ 	}
++
++	acpi_i2c_device_pm_put_detach(client, !!status);
+ 	return status;
+ }
+ 
+@@ -271,6 +296,8 @@ static int i2c_device_remove(struct device *dev)
+ 	if (!client || !dev->driver)
+ 		return 0;
+ 
++	acpi_i2c_device_pm_get_attach(client, false);
++
+ 	driver = to_i2c_driver(dev->driver);
+ 	if (driver->remove) {
+ 		dev_dbg(dev, "remove\n");
+@@ -283,6 +310,8 @@ static int i2c_device_remove(struct device *dev)
+ 		client->driver = NULL;
+ 		i2c_set_clientdata(client, NULL);
+ 	}
++
++	acpi_i2c_device_pm_put_detach(client, true);
+ 	return status;
+ }
+ 
+@@ -294,8 +323,11 @@ static void i2c_device_shutdown(struct device *dev)
+ 	if (!client || !dev->driver)
+ 		return;
+ 	driver = to_i2c_driver(dev->driver);
+-	if (driver->shutdown)
++	if (driver->shutdown) {
++		acpi_i2c_device_pm_get_attach(client, false);
+ 		driver->shutdown(client);
++		acpi_i2c_device_pm_put_detach(client, false);
++	}
+ }
+ 
+ #ifdef CONFIG_PM_SLEEP
+@@ -1263,6 +1295,16 @@ exit_recovery:
+ 	bus_for_each_drv(&i2c_bus_type, NULL, adap, __process_new_adapter);
+ 	mutex_unlock(&core_lock);
+ 
++	/*
++	 * For ACPI enumerated controllers we must make sure that the
++	 * controller is powered on before its children. Runtime PM handles
++	 * this for us once we have enabled it for the adapter device.
++	 */
++	if (ACPI_HANDLE(adap->dev.parent)) {
++		pm_runtime_no_callbacks(&adap->dev);
++		pm_runtime_enable(&adap->dev);
++	}
++
+ 	return 0;
+ 
+ out_list:
+@@ -1427,6 +1469,9 @@ void i2c_del_adapter(struct i2c_adapter *adap)
+ 		return;
+ 	}
+ 
++	if (ACPI_HANDLE(adap->dev.parent))
++		pm_runtime_disable(&adap->dev);
++
+ 	/* Tell drivers about this removal */
+ 	mutex_lock(&core_lock);
+ 	bus_for_each_drv(&i2c_bus_type, NULL, adap,
+-- 
+1.8.4.rc3
