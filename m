@@ -1,42 +1,70 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 1 Oct 2013 15:24:56 +0100
-Subject: [PATCH] i2c: s3c2410 : Add polling mode support
-In-Reply-To: <1380623620-31901-1-git-send-email-yuvaraj.cd@samsung.com>
-References: <1380623620-31901-1-git-send-email-yuvaraj.cd@samsung.com>
-Message-ID: <20131001142456.GP19304@sirena.org.uk>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 1 Oct 2013 10:35:10 -0400
+Subject: [PATCH 3/4] clk: kirkwood: Add CLK_IGNORE_UNUSED to ethernet
+ ge0 and ge1 clocks
+In-Reply-To: <20130930213131.GB10393@obsidianresearch.com>
+References: <1380575010-8573-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1380575010-8573-4-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20130930213131.GB10393@obsidianresearch.com>
+Message-ID: <20131001143510.GA3122@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 01, 2013 at 04:03:40PM +0530, Yuvaraj Kumar C D wrote:
+On Mon, Sep 30, 2013 at 03:31:31PM -0600, Jason Gunthorpe wrote:
+> On Mon, Sep 30, 2013 at 06:03:29PM -0300, Ezequiel Garcia wrote:
+> 
+> > These clocks should never be gated, since the ethernet interfaces
+> > forget the assigned MAC address assigned if their clock source is
+> > turned off.
+> 
+> Hrm, this hack is only needed to support the hack of passing the MAC
+> address from the bootloader to the kernel via the ethernet registers.
+> 
+> If local-mac-address is present in the DT (or fixed up via ATAGS) then
+> none of this is needed.
+> 
+> Boards that have well formed DT's don't need this.
+> 
+> The major downside to this patch is we never get power savings by
+> disabling the 2nd GE. On my boards it is not connected so we always
+> want to see it powered down.
+> 
+> Our bootloader gates the power and turns off the clock, having Linux
+> turn the clock back on without knowing how to control the power seems
+> like a possible problem.
+> 
+> I don't have code, but when this was first brought up it was suggested
+> to add local-mac-address to the DT nodes if it isn't present in the
+> common code and don't mess with the clocks.
+> 
+> Psudeo code:
+> 
+> void marvell_dt_ethernet_fixup(void)
+> {
+>  for_each_compatible_node(np, "marvell,kirkwood-eth-port")
+>  {
+>    if (of_get_mac_address(np) != NULL)
+>       continue;
+>    regs = ioremap(of_regs(np->parent,0));
+>    address = (readl(regs + MAC_ADDR_HIGH) << 32) | 
+>               readl(regs + MAC_ADDR_LOW))
+>    iounmap(regs);
+>    of_add_property(np, {"local-mac-address" = address});
+>  }
+> }
 
-> +static bool is_ack(struct s3c24xx_i2c *i2c)
-> +{
-> +	u32 time_out = i2c->tx_setup;
-> +
-> +	while (--time_out) {
-> +		if (readl(i2c->regs + S3C2410_IICCON)
-> +			& S3C2410_IICCON_IRQPEND) {
-> +			if (!(readl(i2c->regs + S3C2410_IICSTAT)
-> +				& S3C2410_IICSTAT_LASTBIT))
-> +				return true;
-> +		}
-> +		udelay(time_out);
-> +	}
-> +
-> +	return false;
+Or, could we test for the mac address in the driver's suspend routine
+and set the clock's IGNORE_UNUSED accordingly?  That wouldn't cover the
+case of the modules being loaded after boot, but it would get us power
+savings when we can.
 
-This is a bit weird - the amount of time the driver waits between polls
-shrinks as the timeout approaches.  It'd be more normal to see either an
-even period between polls or (ideally if the delay is non-trivial) a
-dead reckoning sleep based on the expected time to complete followed by
-polling at even intervals.
+It also has the benefit of being easily discoverable by future users
+wondering why the clock isn't gated when attempting to conserve power.
 
-Also consider usleep_range() for the delay, it's a bit nicer to the rest
-of the system than udelay().
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131001/5722264d/attachment.sig>
+To that end, we could set the bit as Ezequiel has done, and then change
+it in the eth driver's probe if there's a mac address in the DT.
+
+
+thx,
+
+Jason.
