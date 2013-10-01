@@ -1,50 +1,42 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Tue, 1 Oct 2013 13:01:36 -0300
-Subject: [PATCH 2/4] ARM: kirkwood: Remove unneeded PCIe clock adding
-In-Reply-To: <1380575010-8573-3-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1380575010-8573-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1380575010-8573-3-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <20131001160135.GA3998@localhost>
+From: jdl@jdl.com (Jon Loeliger)
+Date: Tue, 01 Oct 2013 10:17:53 -0500
+Subject: [RFC 00/15] Device Tree schemas and validation
+In-Reply-To: <524AE4FB.4080906@baylibre.com>
+References: <1380041541-17529-1-git-send-email-bcousson@baylibre.com>
+ <524A8289.3050107@baylibre.com> <524ACB76.1010001@gmail.com>
+ <524AE4FB.4080906@baylibre.com>
+Message-ID: <E1VR1hx-0000C1-6J@jdl.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 30, 2013 at 06:03:28PM -0300, Ezequiel Garcia wrote:
-> Since the PCIe devices is properly initialized from the DT, the clocks
-> are now referenced in the device tree nodes, and it's not needed
-> to have this hack to add them explicitly.
+> Hi Rob,
 > 
-> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> ---
->  arch/arm/mach-kirkwood/board-dt.c | 8 --------
->  1 file changed, 8 deletions(-)
-> 
-> diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
-> index ee6297e..1bbced8 100644
-> --- a/arch/arm/mach-kirkwood/board-dt.c
-> +++ b/arch/arm/mach-kirkwood/board-dt.c
-> @@ -44,14 +44,6 @@ static void __init kirkwood_legacy_clk_init(void)
->  	clkspec.np = np;
->  	clkspec.args_count = 1;
->  
-> -	clkspec.args[0] = CGC_BIT_PEX0;
-> -	orion_clkdev_add("0", "pcie",
-> -			 of_clk_get_from_provider(&clkspec));
-> -
-> -	clkspec.args[0] = CGC_BIT_PEX1;
-> -	orion_clkdev_add("1", "pcie",
-> -			 of_clk_get_from_provider(&clkspec));
-> -
->  	/*
->  	 * The ethernet interfaces forget the MAC address assigned by
->  	 * u-boot if the clocks are turned off. Until proper DT support
-> -- 
-> 1.8.1.5
-> 
+> On 01/10/2013 15:17, Rob Herring wrote:
+> > On 10/01/2013 03:06 AM, Benoit Cousson wrote:
+> >> + more DT maintainers folks
+> >>
+> >> Hi all,
+> >>
+> >> I know this is mostly boring user space code, but I was expecting a
+> >> little bit of comments about at least the bindings syntax:-(
+> >>
+> >> I'd like to know if this is the right direction and if it worth pursuing
+> >> in that direction.
+> >>
+> >> The idea was to have at least some base for further discussion during
+> >> ARM KS 2013.
+> >>
+> >> I feel alone :-(
+> >>
+> >> If you have any comment, go ahead!
 
-If anyone with a PCIe Kirkwood board can give this patch a try
-it would be great to have some Tested-by's.
 
--- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+Benoit,
+
+Sorry, I meant to ask earlier but forgot.
+Shouldn't this development be based on the
+upstream DTC repository and not the in-kernel
+copy of the DTC?
+
+Thanks,
+jdl
