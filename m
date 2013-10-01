@@ -1,17 +1,29 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 01 Oct 2013 13:56:26 -0600
-Subject: [PATCH] clk: tegra: PLLE spread spectrum control
-In-Reply-To: <1380209654-25458-1-git-send-email-pdeschrijver@nvidia.com>
-References: <1380209654-25458-1-git-send-email-pdeschrijver@nvidia.com>
-Message-ID: <524B28EA.40702@wwwdotorg.org>
+From: davidb@codeaurora.org (David Brown)
+Date: Tue, 1 Oct 2013 13:01:21 -0700
+Subject: [PATCH] clocksource: put nodes passed to CLOCKSOURCE_OF_DECLARE
+ callbacks centrally
+In-Reply-To: <1380618053-11159-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1380618053-11159-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <20131001200121.GA18640@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/26/2013 09:34 AM, Peter De Schrijver wrote:
-> Add spread spectrum control for PLLE in Tegra114.
+On Tue, Oct 01, 2013 at 11:00:53AM +0200, Uwe Kleine-K?nig wrote:
+>Instead of letting each driver call of_node_put do it centrally in the
+>loop that also calls the CLOCKSOURCE_OF_DECLARE callbacks. This is less
+>prone to error and also moves getting and putting the references into the
+>same function.
+>
+>Consequently all respective of_node_put calls in drivers are removed.
+>
+>Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+>---
+> arch/arm/mach-msm/timer.c             | 1 -
 
-It would be useful to have some description of the end-user-visible
-benefit of this change; why is it useful?
+Acked-by: David Brown <davidb@codeaurora.org>
 
-Tested-by: Stephen Warren <swarren@nvidia.com>
-(on Beaver and Harmony, a PCIe Ethernet NIC passes traffic just fine).
+
+-- 
+sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
