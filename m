@@ -1,39 +1,30 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 1 Oct 2013 12:37:17 -0400
-Subject: [PATCH 3/3] ARM: kirkwood: Move the nand node under the mbus node
-In-Reply-To: <20130917184433.GF21230@obsidianresearch.com>
-References: <20130917184433.GF21230@obsidianresearch.com>
-Message-ID: <20131001163717.GB31178@titan.lakedaemon.net>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Tue, 01 Oct 2013 17:39:15 +0100
+Subject: [PATCH] ARM: vexpress: ignore MIDR[0] for uart detection
+In-Reply-To: <CAC_HJnzfvi59i0e0-VwhUtKPxiPLU9o+Y6Dvts9HVkKC6gyqRw@mail.gmail.com>
+References: <1380449869-19911-1-git-send-email-yrehan@gmail.com>
+ <CAC_HJnzfvi59i0e0-VwhUtKPxiPLU9o+Y6Dvts9HVkKC6gyqRw@mail.gmail.com>
+Message-ID: <1380645555.30015.8.camel@hornet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 17, 2013 at 12:44:33PM -0600, Jason Gunthorpe wrote:
-> There should be no nodes that are not children of the mbus. Move
-> the nand node under the mbus, and rework the board .dts files
-> to use an & reference to the nand node.
-> 
-> Signed-off-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
-> ---
->  arch/arm/boot/dts/kirkwood-db.dtsi                 | 44 +++++------
->  arch/arm/boot/dts/kirkwood-dnskw.dtsi              | 76 +++++++++----------
->  arch/arm/boot/dts/kirkwood-dockstar.dts            | 40 +++++-----
->  arch/arm/boot/dts/kirkwood-goflexnet.dts           | 51 ++++++-------
->  .../arm/boot/dts/kirkwood-guruplug-server-plus.dts | 40 +++++-----
->  arch/arm/boot/dts/kirkwood-ib62x0.dts              | 44 +++++------
->  arch/arm/boot/dts/kirkwood-iconnect.dts            | 58 +++++++--------
->  arch/arm/boot/dts/kirkwood-iomega_ix2_200.dts      | 51 ++++++-------
->  arch/arm/boot/dts/kirkwood-km_kirkwood.dts         | 14 ++--
->  arch/arm/boot/dts/kirkwood-mplcec4.dts             | 62 ++++++++--------
->  .../boot/dts/kirkwood-netgear_readynas_duo_v2.dts  | 60 +++++++--------
->  arch/arm/boot/dts/kirkwood-nsa310-common.dtsi      | 86 +++++++++++-----------
->  arch/arm/boot/dts/kirkwood-openblocks_a6.dts       | 74 +++++++++----------
->  arch/arm/boot/dts/kirkwood-sheevaplug-common.dtsi  | 42 +++++------
->  arch/arm/boot/dts/kirkwood-topkick.dts             | 62 ++++++++--------
->  arch/arm/boot/dts/kirkwood.dtsi                    | 31 ++++----
->  16 files changed, 418 insertions(+), 417 deletions(-)
+On Tue, 2013-10-01 at 09:11 +0100, Mian Yousaf Kaukab wrote:
+> Can you please take a look at this patch? Default vexpress_defconfig
+> does not boot on qemu vexpress-a9 target without it.
 
-Applied to mvebu/dt with Ezequiel's Ack and Tested-by.
+Right, I think I've heard about it...
 
-thx,
+To be honest, I have rather mixed feelings about it. In particular I
+could say that if qemu returns r0p0, it doesn't model V2P-CA9, which has
+A9 r0p1 :-) Also, the DEBUG_LL and EARLY_PRINTK are pretty low level
+features and it seems that they simply shouldn't be enabled in the
+defconfig. As I'll be updating defconfig soon, I'll make sure they're
+disabled.
 
-Jason.
+Yes, I agree that the "detection" code is a hack. I'm not sure we have
+to make it even hackier. Let me have a think about it, as I can't really
+spend any time of the matter this week, sorry.
+
+Thanks for your efforts!
+
+Pawel
