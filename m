@@ -1,46 +1,148 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 1 Oct 2013 13:28:29 -0400
-Subject: [PATCH v2] bus: mvebu-mbus: Fix optional pcie-mem/io-aperture
- properties
-In-Reply-To: <20131001172259.GA19668@obsidianresearch.com>
-References: <20130917201104.GA5209@obsidianresearch.com>
- <20131001164409.GC31178@titan.lakedaemon.net>
- <20131001165045.GB23874@obsidianresearch.com>
- <20131001170918.GF31178@titan.lakedaemon.net>
- <20131001172259.GA19668@obsidianresearch.com>
-Message-ID: <20131001172829.GG31178@titan.lakedaemon.net>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 1 Oct 2013 13:35:17 -0400 (EDT)
+Subject: [PATCH v3 2/3] ARM: mcpm: Implement cpu_kill() to synchronise
+ on powerdown
+In-Reply-To: <1380647718-9178-3-git-send-email-Dave.Martin@arm.com>
+References: <1380647718-9178-1-git-send-email-Dave.Martin@arm.com>
+ <1380647718-9178-3-git-send-email-Dave.Martin@arm.com>
+Message-ID: <alpine.LFD.2.03.1310011334550.21228@syhkavp.arg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 01, 2013 at 11:22:59AM -0600, Jason Gunthorpe wrote:
-> On Tue, Oct 01, 2013 at 01:09:18PM -0400, Jason Cooper wrote:
-...
-> > > This patch is a necessary precondition to applying:
-> > > 
-> > > https://github.com/jgunthorpe/linux/commit/ef90b0bf7d8552dc7dfaad82d964446f6a9b6a3b
-> > > PCI: mvebu - Support a bridge with no IO port window
-> > 
-> > I don't see this one in my stack, have you submitted it yet?  When you
-> > do, please add a note mentioning the dependency on this commit in
-> > mvebu/fixes.
-> 
-> Yes, I posted it along with the other PCI patches:
-> 
-> http://permalink.gmane.org/gmane.linux.kernel.pci/25498
-> 
-> Just so we are on the same page, these are the Kirkwood/mvebu patches
-> I was hoping to progress for 3.13:
-> 
-> https://github.com/jgunthorpe/linux/commit/9f20eec4696627afe87bf0f6a204909004062e8e
-> PCI: mvebu: Dynamically detect if the PEX link is up to enable hot plug
-> (Thomas soft ack'd this @ http://www.spinics.net/lists/linux-pci/msg25323.html)
-> 
-> https://github.com/jgunthorpe/linux/commit/ef90b0bf7d8552dc7dfaad82d964446f6a9b6a3b
-> PCI: mvebu - Support a bridge with no IO port window
-> (no comments)
+On Tue, 1 Oct 2013, Dave Martin wrote:
 
-Could you resend the above patches to me?
+> CPU hotplug and kexec rely on smp_ops.cpu_kill(), which is supposed
+> to wait for the CPU to park or power down, and perform the last
+> rites (such as disabling clocks etc., where the platform doesn't do
+> this automatically).
+> 
+> kexec in particular is unsafe without performing this
+> synchronisation to park secondaries.  Without it, the secondaries
+> might not be parked when kexec trashes the kernel.
+> 
+> There is no generic way to do this synchronisation, so a new mcpm
+> platform_ops method power_down_finish() is added by this patch.
+> 
+> The new method is mandatory.  A platform which provides no way to
+> detect when CPUs are parked is likely broken.
+> 
+> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
 
-thx,
+Reviewed-by: Nicolas Pitre <nico@linaro.org>
 
-Jason.
+> ---
+>  arch/arm/common/mcpm_entry.c   |   15 +++++++++++++++
+>  arch/arm/common/mcpm_platsmp.c |   10 ++++++++++
+>  arch/arm/include/asm/mcpm.h    |   31 +++++++++++++++++++++++++++++++
+>  3 files changed, 56 insertions(+)
+> 
+> diff --git a/arch/arm/common/mcpm_entry.c b/arch/arm/common/mcpm_entry.c
+> index 9902509..6c03d01 100644
+> --- a/arch/arm/common/mcpm_entry.c
+> +++ b/arch/arm/common/mcpm_entry.c
+> @@ -90,6 +90,21 @@ void mcpm_cpu_power_down(void)
+>  	BUG();
+>  }
+>  
+> +int mcpm_cpu_power_down_finish(unsigned int cpu, unsigned int cluster)
+> +{
+> +	int ret;
+> +
+> +	if (WARN_ON_ONCE(!platform_ops || !platform_ops->power_down_finish))
+> +		return -EUNATCH;
+> +
+> +	ret = platform_ops->power_down_finish(cpu, cluster);
+> +	if (ret)
+> +		pr_warn("%s: cpu %u, cluster %u failed to power down (%d)\n",
+> +			__func__, cpu, cluster, ret);
+> +
+> +	return ret;
+> +}
+> +
+>  void mcpm_cpu_suspend(u64 expected_residency)
+>  {
+>  	phys_reset_t phys_reset;
+> diff --git a/arch/arm/common/mcpm_platsmp.c b/arch/arm/common/mcpm_platsmp.c
+> index c0c3cd7..177251a 100644
+> --- a/arch/arm/common/mcpm_platsmp.c
+> +++ b/arch/arm/common/mcpm_platsmp.c
+> @@ -56,6 +56,15 @@ static void mcpm_secondary_init(unsigned int cpu)
+>  
+>  #ifdef CONFIG_HOTPLUG_CPU
+>  
+> +static int mcpm_cpu_kill(unsigned int cpu)
+> +{
+> +	unsigned int pcpu, pcluster;
+> +
+> +	cpu_to_pcpu(cpu, &pcpu, &pcluster);
+> +
+> +	return !mcpm_cpu_power_down_finish(pcpu, pcluster);
+> +}
+> +
+>  static int mcpm_cpu_disable(unsigned int cpu)
+>  {
+>  	/*
+> @@ -82,6 +91,7 @@ static struct smp_operations __initdata mcpm_smp_ops = {
+>  	.smp_boot_secondary	= mcpm_boot_secondary,
+>  	.smp_secondary_init	= mcpm_secondary_init,
+>  #ifdef CONFIG_HOTPLUG_CPU
+> +	.cpu_kill		= mcpm_cpu_kill,
+>  	.cpu_disable		= mcpm_cpu_disable,
+>  	.cpu_die		= mcpm_cpu_die,
+>  #endif
+> diff --git a/arch/arm/include/asm/mcpm.h b/arch/arm/include/asm/mcpm.h
+> index fc82a88..1cf2601 100644
+> --- a/arch/arm/include/asm/mcpm.h
+> +++ b/arch/arm/include/asm/mcpm.h
+> @@ -81,10 +81,40 @@ int mcpm_cpu_power_up(unsigned int cpu, unsigned int cluster);
+>   *
+>   * This will return if mcpm_platform_register() has not been called
+>   * previously in which case the caller should take appropriate action.
+> + *
+> + * On success, the CPU is not guaranteed to be truly halted until
+> + * mcpm_cpu_power_down_finish() subsequently returns non-zero for the
+> + * specified cpu.  Until then, other CPUs should make sure they do not
+> + * trash memory the target CPU might be executing/accessing.
+>   */
+>  void mcpm_cpu_power_down(void);
+>  
+>  /**
+> + * mcpm_cpu_power_down_finish - wait for a specified CPU to halt, and
+> + *	make sure it is powered off
+> + *
+> + * @cpu: CPU number within given cluster
+> + * @cluster: cluster number for the CPU
+> + *
+> + * Call this function to ensure that a pending powerdown has taken
+> + * effect and the CPU is safely parked before performing non-mcpm
+> + * operations that may affect the CPU (such as kexec trashing the
+> + * kernel text).
+> + *
+> + * It is *not* necessary to call this function if you only need to
+> + * serialise a pending powerdown with mcpm_cpu_power_up() or a wakeup
+> + * event.
+> + *
+> + * Do not call this function unless the specified CPU has already
+> + * called mcpm_cpu_power_down() or has committed to doing so.
+> + *
+> + * @return:
+> + *	- zero if the CPU is in a safely parked state
+> + *	- nonzero otherwise (e.g., timeout)
+> + */
+> +int mcpm_cpu_power_down_finish(unsigned int cpu, unsigned int cluster);
+> +
+> +/**
+>   * mcpm_cpu_suspend - bring the calling CPU in a suspended state
+>   *
+>   * @expected_residency: duration in microseconds the CPU is expected
+> @@ -126,6 +156,7 @@ int mcpm_cpu_powered_up(void);
+>  struct mcpm_platform_ops {
+>  	int (*power_up)(unsigned int cpu, unsigned int cluster);
+>  	void (*power_down)(void);
+> +	int (*power_down_finish)(unsigned int cpu, unsigned int cluster);
+>  	void (*suspend)(u64);
+>  	void (*powered_up)(void);
+>  };
+> -- 
+> 1.7.9.5
+> 
