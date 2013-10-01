@@ -1,63 +1,78 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Tue,  1 Oct 2013 10:38:12 +0200
-Subject: [PATCH] clocksource: dw_apb_timer_of: Mark a few more functions as
- __init
-Message-ID: <1380616692-10253-1-git-send-email-u.kleine-koenig@pengutronix.de>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue,  1 Oct 2013 10:48:45 +0200
+Subject: [PATCH] ARM: gemini: delete <mach/gpio.h>
+Message-ID: <1380617325-7477-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These are all only called by dw_apb_timer_init which is an __init
-function, too
+The Gemini has no need of a <mach/gpio.h> header as this is only
+used by the machine-local gpio.c gpiochip driver, which is also
+only using the irq_to_gpio() macro. Delete the file, move the single
+macro into the driver and remove the NEED_MACH_GPIO_H flag.
 
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+Cc: Hans Ulli Kroll <ulli.kroll@googlemail.com>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- drivers/clocksource/dw_apb_timer_of.c | 10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
+This will be applied to the GPIO tree unless there are protests.
+---
+ arch/arm/Kconfig                         |  1 -
+ arch/arm/mach-gemini/gpio.c              |  2 +-
+ arch/arm/mach-gemini/include/mach/gpio.h | 20 --------------------
+ 3 files changed, 1 insertion(+), 22 deletions(-)
+ delete mode 100644 arch/arm/mach-gemini/include/mach/gpio.h
 
-diff --git a/drivers/clocksource/dw_apb_timer_of.c b/drivers/clocksource/dw_apb_timer_of.c
-index 4cbae4f..993cdde 100644
---- a/drivers/clocksource/dw_apb_timer_of.c
-+++ b/drivers/clocksource/dw_apb_timer_of.c
-@@ -23,7 +23,7 @@
- #include <linux/clk.h>
- #include <linux/sched_clock.h>
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 3f7714d..b46a078 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -388,7 +388,6 @@ config ARCH_GEMINI
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select ARCH_USES_GETTIMEOFFSET
+ 	select CPU_FA526
+-	select NEED_MACH_GPIO_H
+ 	help
+ 	  Support for the Cortina Systems Gemini family SoCs
  
--static void timer_get_base_and_rate(struct device_node *np,
-+static void __init timer_get_base_and_rate(struct device_node *np,
- 				    void __iomem **base, u32 *rate)
- {
- 	struct clk *timer_clk;
-@@ -55,11 +55,11 @@ static void timer_get_base_and_rate(struct device_node *np,
+diff --git a/arch/arm/mach-gemini/gpio.c b/arch/arm/mach-gemini/gpio.c
+index 70bfa57..f8cb571 100644
+--- a/arch/arm/mach-gemini/gpio.c
++++ b/arch/arm/mach-gemini/gpio.c
+@@ -21,9 +21,9 @@
  
- try_clock_freq:
- 	if (of_property_read_u32(np, "clock-freq", rate) &&
--		of_property_read_u32(np, "clock-frequency", rate))
-+	    of_property_read_u32(np, "clock-frequency", rate))
- 		panic("No clock nor clock-frequency property for %s", np->name);
- }
+ #include <mach/hardware.h>
+ #include <mach/irqs.h>
+-#include <mach/gpio.h>
  
--static void add_clockevent(struct device_node *event_timer)
-+static void __init add_clockevent(struct device_node *event_timer)
- {
- 	void __iomem *iobase;
- 	struct dw_apb_clock_event_device *ced;
-@@ -82,7 +82,7 @@ static void add_clockevent(struct device_node *event_timer)
- static void __iomem *sched_io_base;
- static u32 sched_rate;
+ #define GPIO_BASE(x)		IO_ADDRESS(GEMINI_GPIO_BASE(x))
++#define irq_to_gpio(x)		((x) - GPIO_IRQ_BASE)
  
--static void add_clocksource(struct device_node *source_timer)
-+static void __init add_clocksource(struct device_node *source_timer)
- {
- 	void __iomem *iobase;
- 	struct dw_apb_clocksource *cs;
-@@ -117,7 +117,7 @@ static const struct of_device_id sptimer_ids[] __initconst = {
- 	{ /* Sentinel */ },
- };
- 
--static void init_sched_clock(void)
-+static void __init init_sched_clock(void)
- {
- 	struct device_node *sched_timer;
- 
+ /* GPIO registers definition */
+ #define GPIO_DATA_OUT		0x0
+diff --git a/arch/arm/mach-gemini/include/mach/gpio.h b/arch/arm/mach-gemini/include/mach/gpio.h
+deleted file mode 100644
+index 40a0527..0000000
+--- a/arch/arm/mach-gemini/include/mach/gpio.h
++++ /dev/null
+@@ -1,20 +0,0 @@
+-/*
+- * Gemini gpiolib specific defines
+- *
+- * Copyright (C) 2008-2009 Paulius Zaleckas <paulius.zaleckas@teltonika.lt>
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- */
+-
+-#ifndef __MACH_GPIO_H__
+-#define __MACH_GPIO_H__
+-
+-#include <mach/irqs.h>
+-
+-#define gpio_to_irq(x)	((x) + GPIO_IRQ_BASE)
+-#define irq_to_gpio(x)	((x) - GPIO_IRQ_BASE)
+-
+-#endif /* __MACH_GPIO_H__ */
 -- 
-1.8.4.rc3
+1.8.3.1
