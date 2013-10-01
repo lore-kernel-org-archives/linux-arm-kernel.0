@@ -1,98 +1,47 @@
 From: seanpaul@chromium.org (Sean Paul)
-Date: Tue,  1 Oct 2013 19:40:59 -0400
-Subject: [PATCH 4/5] drm/exynos: Initialize ptn3460 if present
+Date: Tue,  1 Oct 2013 19:40:56 -0400
+Subject: [PATCH 1/5] ARM: dts: Add fimd display-timings for exynos5250-snow
 In-Reply-To: <1380670860-17621-1-git-send-email-seanpaul@chromium.org>
 References: <1380670860-17621-1-git-send-email-seanpaul@chromium.org>
-Message-ID: <1380670860-17621-5-git-send-email-seanpaul@chromium.org>
+Message-ID: <1380670860-17621-2-git-send-email-seanpaul@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds code to look for the ptn3460 in the device tree file on
-exynos initialization. If ptn node is found, the driver will initialize
-the ptn3460 driver and skip creating a DP connector (since the bridge
-driver will register its own connector).
+This patch adds the internal panel timings to the exynos5250-snow board
+dts file.
 
 Signed-off-by: Sean Paul <seanpaul@chromium.org>
 ---
- drivers/gpu/drm/exynos/exynos_drm_core.c | 44 +++++++++++++++++++++++++++++++-
- 1 file changed, 43 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/exynos5250-snow.dts | 17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
 
-diff --git a/drivers/gpu/drm/exynos/exynos_drm_core.c b/drivers/gpu/drm/exynos/exynos_drm_core.c
-index 1bef6dc..9cf4476 100644
---- a/drivers/gpu/drm/exynos/exynos_drm_core.c
-+++ b/drivers/gpu/drm/exynos/exynos_drm_core.c
-@@ -12,7 +12,9 @@
-  * option) any later version.
-  */
+diff --git a/arch/arm/boot/dts/exynos5250-snow.dts b/arch/arm/boot/dts/exynos5250-snow.dts
+index e79331d..e5af3f2 100644
+--- a/arch/arm/boot/dts/exynos5250-snow.dts
++++ b/arch/arm/boot/dts/exynos5250-snow.dts
+@@ -190,6 +190,23 @@
+ 		samsung,vbus-gpio = <&gpx1 1 0>;
+ 	};
  
-+#include <linux/of_i2c.h>
- #include <drm/drmP.h>
-+#include <drm/bridge/ptn3460.h>
- #include "exynos_drm_drv.h"
- #include "exynos_drm_encoder.h"
- #include "exynos_drm_connector.h"
-@@ -20,6 +22,40 @@
- 
- static LIST_HEAD(exynos_drm_subdrv_list);
- 
-+struct bridge_init {
-+	struct i2c_client *client;
-+	struct device_node *node;
-+};
++	fimd: fimd at 14400000 {
++		display-timings {
++			native-mode = <&lcd_timing>;
++			lcd_timing: 1366x768 {
++				clock-frequency = <70589280>;
++				hactive = <1366>;
++				vactive = <768>;
++				hfront-porch = <40>;
++				hback-porch = <40>;
++				hsync-len = <32>;
++				vback-porch = <10>;
++				vfront-porch = <12>;
++				vsync-len = <6>;
++			};
++		};
++	};
 +
-+static bool find_bridge(const char *name, struct bridge_init *bridge)
-+{
-+	bridge->client = NULL;
-+	bridge->node = of_find_node_by_name(NULL, name);
-+	if (!bridge->node)
-+		return false;
-+
-+	bridge->client = of_find_i2c_device_by_node(bridge->node);
-+	if (!bridge->client)
-+		return false;
-+
-+	return true;
-+}
-+
-+/* returns the number of bridges attached */
-+static int exynos_drm_attach_lcd_bridge(struct drm_device *dev,
-+		struct drm_encoder *encoder)
-+{
-+	struct bridge_init bridge;
-+	int ret;
-+
-+	if (find_bridge("ptn3460-bridge", &bridge)) {
-+		ret = ptn3460_init(dev, encoder, bridge.client, bridge.node);
-+		if (!ret)
-+			return 1;
-+	}
-+	return 0;
-+}
-+
- static int exynos_drm_create_enc_conn(struct drm_device *dev,
- 					struct exynos_drm_subdrv *subdrv)
- {
-@@ -36,6 +72,13 @@ static int exynos_drm_create_enc_conn(struct drm_device *dev,
- 		DRM_ERROR("failed to create encoder\n");
- 		return -EFAULT;
- 	}
-+	subdrv->encoder = encoder;
-+
-+	if (subdrv->manager->display_ops->type == EXYNOS_DISPLAY_TYPE_LCD) {
-+		ret = exynos_drm_attach_lcd_bridge(dev, encoder);
-+		if (ret)
-+			return 0;
-+	}
- 
- 	/*
- 	 * create and initialize a connector for this sub driver and
-@@ -48,7 +91,6 @@ static int exynos_drm_create_enc_conn(struct drm_device *dev,
- 		goto err_destroy_encoder;
- 	}
- 
--	subdrv->encoder = encoder;
- 	subdrv->connector = connector;
- 
- 	return 0;
+ 	fixed-rate-clocks {
+ 		xxti {
+ 			compatible = "samsung,clock-xxti";
 -- 
 1.8.4
