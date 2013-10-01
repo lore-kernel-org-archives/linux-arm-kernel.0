@@ -1,29 +1,59 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Tue, 1 Oct 2013 13:01:21 -0700
-Subject: [PATCH] clocksource: put nodes passed to CLOCKSOURCE_OF_DECLARE
- callbacks centrally
-In-Reply-To: <1380618053-11159-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1380618053-11159-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <20131001200121.GA18640@codeaurora.org>
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Tue, 01 Oct 2013 22:09:45 +0100
+Subject: [PATCH 07/20] Documentation: dt: iio: Add binding for LPS001WP
+In-Reply-To: <1379347346-823-8-git-send-email-lee.jones@linaro.org>
+References: <1379347346-823-1-git-send-email-lee.jones@linaro.org>
+ <1379347346-823-8-git-send-email-lee.jones@linaro.org>
+Message-ID: <524B3A19.9050509@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 01, 2013 at 11:00:53AM +0200, Uwe Kleine-K?nig wrote:
->Instead of letting each driver call of_node_put do it centrally in the
->loop that also calls the CLOCKSOURCE_OF_DECLARE callbacks. This is less
->prone to error and also moves getting and putting the references into the
->same function.
->
->Consequently all respective of_node_put calls in drivers are removed.
->
->Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
->---
-> arch/arm/mach-msm/timer.c             | 1 -
+On 09/16/13 17:02, Lee Jones wrote:
+> LPS001WP is a Pressure and Temperature sensor.
+> 
+> Cc: devicetree at vger.kernel.org
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+Hi Lee,
 
-Acked-by: David Brown <davidb@codeaurora.org>
+I'm planning to drop this set of bindings in favour of the unified ones
+proposed by Lukasz Czerwinski.
 
+Could you take a look at those and perhaps propose the additional bits and pieces
+needed to ensure everything is covered by the resulting files?
 
--- 
-sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+Thanks,
+
+Jonathan
+> ---
+>  .../devicetree/bindings/iio/pressure/lps001wp.txt   | 21 +++++++++++++++++++++
+>  1 file changed, 21 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/iio/pressure/lps001wp.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/iio/pressure/lps001wp.txt b/Documentation/devicetree/bindings/iio/pressure/lps001wp.txt
+> new file mode 100644
+> index 0000000..45cb45c
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/iio/pressure/lps001wp.txt
+> @@ -0,0 +1,21 @@
+> +* STMicroelectronics Pressure Sensor
+> +
+> +Required properties:
+> +  - compatible: Should be "st,lps001wp"
+> +  - reg: The I2C address of the sensor
+> +
+> +Optional properties:
+> +  - vdd-supply: Phandle to the Vdd supply regulator
+> +  - vddio-supply: Phandle to the Vdd-IO supply regulator
+> +
+> +Example:
+> +
+> +i2c at 80128000 {
+> +        lps001wp at 5c {
+> +                compatible = "st,lps001wp";
+> +                reg = <0x5c>;
+> +
+> +                vdd-supply = <&ab8500_ldo_aux1_reg>;
+> +                vddio-supply = <&db8500_vsmps2_reg>;
+> +        };
+> +};
+> 
