@@ -1,39 +1,32 @@
-From: afzal@ti.com (Afzal Mohammed)
-Date: Tue, 1 Oct 2013 12:44:21 +0530
-Subject: [PATCH v5 11/11] ARM: OMAP2+: AM43x PRCM init
-In-Reply-To: <cover.1380608719.git.afzal@ti.com>
-References: <cover.1380608719.git.afzal@ti.com>
-Message-ID: <c8e9da6cc48667af3b816f1b23bb1e9feb6eed72.1380608720.git.afzal@ti.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 1 Oct 2013 10:00:47 +0200
+Subject: [GIT PULL] ux500 device tree changes for v3.13 take 2
+In-Reply-To: <CAOesGMhi=3C1CACYKTdNxQfOi8NAzyuv5-jwBSYPRJU9mMdcWw@mail.gmail.com>
+References: <CACRpkdYdguwxau-NRRP1mEOzdRTecYuz+RV_j7-VCEUTK-NN3w@mail.gmail.com>
+ <CAOesGMgrX+j7UvtYuN68hk0-qaNtZ_-LkBqeXU1fTp86td4fkg@mail.gmail.com>
+ <CAOesGMhi=3C1CACYKTdNxQfOi8NAzyuv5-jwBSYPRJU9mMdcWw@mail.gmail.com>
+Message-ID: <CACRpkdaC3qoMQs+WDoGQJNh6idjZp5wt=e2Ki-N8i=Q4kLpkbA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ambresh K <ambresh@ti.com>
+On Mon, Sep 30, 2013 at 6:07 PM, Olof Johansson <olof@lixom.net> wrote:
 
-Initialise AM43x HWMOD, powerdomains and clockdomains.
+> I just noticed that snowball doesn't boot with u8500_defconfig due to
+> this branch. Not so strange maybe since appended dtb support isn't
+> enabled. I'll add a patch on top for that.
 
-Signed-off-by: Ambresh K <ambresh@ti.com>
-Signed-off-by: Afzal Mohammed <afzal@ti.com>
----
- arch/arm/mach-omap2/io.c | 6 ++++++
- 1 file changed, 6 insertions(+)
+Aha yes unless you know a way to update the U-boot to load
+each pice (I don't) then this is needed...
 
-diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
-index ff2113c..c90f647 100644
---- a/arch/arm/mach-omap2/io.c
-+++ b/arch/arm/mach-omap2/io.c
-@@ -594,7 +594,13 @@ void __init am43xx_init_early(void)
- 				  NULL);
- 	omap2_set_globals_prm(AM33XX_L4_WK_IO_ADDRESS(AM43XX_PRCM_BASE));
- 	omap2_set_globals_cm(AM33XX_L4_WK_IO_ADDRESS(AM43XX_PRCM_BASE), NULL);
-+	omap_prm_base_init();
-+	omap_cm_base_init();
- 	omap3xxx_check_revision();
-+	am43xx_powerdomains_init();
-+	am43xx_clockdomains_init();
-+	am43xx_hwmod_init();
-+	omap_hwmod_init_postsetup();
- }
- #endif
- 
--- 
-1.8.3.4
+> Also, snowball is spewing a lot of errors about i2c devices now, looks
+> like the device tree contents isn't correct. I think these have shown
+> up with multi_v7_defconfig in the past as well but I didn't notice.
+> Something to look at on a rainy day.
+
+I think Lee is looking into this, and I have the same problems on
+the HREF where I try to fix things up. It'd not harmful and mainly
+due to over-registration of a superset of devices, so the DTS files
+need to be made more specific for each hardware.
+
+Yours,
+Linus Walleij
