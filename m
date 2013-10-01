@@ -1,163 +1,205 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Tue, 01 Oct 2013 13:22:41 +0200
-Subject: [PATCH 1/3] irqchip: irq-dove: Add PMU interrupt controller.
-In-Reply-To: <1380577122-8841-1-git-send-email-andrew@lunn.ch>
-References: <1380577122-8841-1-git-send-email-andrew@lunn.ch>
-Message-ID: <524AB081.5030505@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 1 Oct 2013 13:28:57 +0200
+Subject: [PATCH] RFT: ARM: gemini: convert to GENERIC_CLOCKEVENTS
+In-Reply-To: <1380625040-25912-1-git-send-email-linus.walleij@linaro.org>
+References: <1380625040-25912-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <201310011328.57653.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/30/2013 11:38 PM, Andrew Lunn wrote:
-> Dove has a Power Management Unit with its own interrupt
-> controller. This is chained on the main interrupt controller.  Add a
-> driver, making use of generic chip where possible.
->
-> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+On Tuesday 01 October 2013, Linus Walleij wrote:
+> This converts the gemini machine to use generic clockevents
+> by rewriting the timer driver.
 
-Andrew,
+I've put a few more people on Cc that I think have access to hardware, according
+to the openwrt changelog for gemini.
 
-thanks for providing pmu irq driver. I also tested the whole patch set
-with the RTC driver example on CuBox:
+It would be great if someone could test the patch before we apply it.
 
-Tested-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+	Arnd
 
-Anyway, I have one little nit below.
+> Cc: arm at kernel.org
+> Cc: Hans Ulli Kroll <ulli.kroll@googlemail.com>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+> This is flagged as Request for Testing (RFT) as I have no Gemini
+> platform. If I do not get help with testing this, the next step
+> will be a patch series to delete the platform.
 
-[...]
-> diff --git a/drivers/irqchip/irq-dove.c b/drivers/irqchip/irq-dove.c
-> new file mode 100644
-> index 0000000..de66f02
-> --- /dev/null
-> +++ b/drivers/irqchip/irq-dove.c
-> @@ -0,0 +1,127 @@
-> +/*
-> + * Marvell Dove SoCs PMU IRQ chip driver.
-> + *
-> + * Andrew Lunn <andrew@lunn.ch>
-> + *
-> + * This file is licensed under the terms of the GNU General Public
-> + * License version 2.  This program is licensed "as is" without any
-> + * warranty of any kind, whether express or implied.
-> + */
+I've suggested removing the platform before, but got the feedback that it's
+actively maintained in openwrt. Unfortunately we didn't get much
+activity to upstream the patches from
+http://git.openwrt.org/?p=openwrt.git;a=tree;f=target/linux/gemini/patches
+which are apparently required.
+
+Rather than deleting the platform entirely, I'd be more inclined to accept
+any cleanup patches like yours, testing or not, and let the downstream
+users deal with fixing it up if it breaks. The ideal case of course would
+be for someone to actively maintain the platform again and submit any patches
+that are needed.
+
+	Arnd
+
+> ---
+>  arch/arm/Kconfig            |  3 +-
+>  arch/arm/mach-gemini/time.c | 97 +++++++++++++++++++++++++++++++++++++++++----
+>  2 files changed, 91 insertions(+), 9 deletions(-)
+> 
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 1ad6fb6..1a903e6 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -386,8 +386,9 @@ config ARCH_CLPS711X
+>  config ARCH_GEMINI
+>  	bool "Cortina Systems Gemini"
+>  	select ARCH_REQUIRE_GPIOLIB
+> -	select ARCH_USES_GETTIMEOFFSET
+> +	select CLKSRC_MMIO
+>  	select CPU_FA526
+> +	select GENERIC_CLOCKEVENTS
+>  	select NEED_MACH_GPIO_H
+>  	help
+>  	  Support for the Cortina Systems Gemini family SoCs
+> diff --git a/arch/arm/mach-gemini/time.c b/arch/arm/mach-gemini/time.c
+> index 21dc5a8..0a63c4d 100644
+> --- a/arch/arm/mach-gemini/time.c
+> +++ b/arch/arm/mach-gemini/time.c
+> @@ -13,6 +13,8 @@
+>  #include <mach/hardware.h>
+>  #include <mach/global_reg.h>
+>  #include <asm/mach/time.h>
+> +#include <linux/clockchips.h>
+> +#include <linux/clocksource.h>
+>  
+>  /*
+>   * Register definitions for the timers
+> @@ -33,19 +35,89 @@
+>  #define TIMER_3_CR_CLOCK		(1 << 7)
+>  #define TIMER_3_CR_INT			(1 << 8)
+>  
+> +static unsigned int tick_rate;
 > +
-> +#include <linux/io.h>
-> +#include <linux/irq.h>
-> +#include <linux/of.h>
-> +#include <linux/of_address.h>
-> +#include <linux/of_irq.h>
-> +#include <asm/exception.h>
-> +#include <asm/mach/irq.h>
-> +
-> +#include "irqchip.h"
-> +
-> +#define DOVE_PMU_IRQ_CAUSE	0x00
-> +#define DOVE_PMU_IRQ_MASK	0x04
-> +
-> +static void dove_pmu_irq_handler(unsigned int irq, struct irq_desc *desc)
+> +static int gemini_timer_set_next_event(unsigned long cycles,
+> +				       struct clock_event_device *evt)
 > +{
-> +	struct irq_domain *d = irq_get_handler_data(irq);
-> +	struct irq_chip_generic *gc = irq_get_domain_generic_chip(d, 0);
-> +	u32 stat = readl_relaxed(gc->reg_base + DOVE_PMU_IRQ_CAUSE) &
-> +		   gc->mask_cache;
+> +	u32 cr;
 > +
-> +	while (stat) {
-> +		u32 hwirq = ffs(stat) - 1;
+> +	cr = readl(TIMER_CR(IO_ADDRESS(GEMINI_TIMER_BASE)));
 > +
-> +		generic_handle_irq(irq_find_mapping(d, gc->irq_base + hwirq));
-> +		stat &= ~(1 << hwirq);
-> +	}
-> +}
+> +	/* This may be overdoing it, feel free to test without this */
+> +	cr &= ~TIMER_2_CR_ENABLE;
+> +	cr &= ~TIMER_2_CR_INT;
+> +	writel(cr, TIMER_CR(IO_ADDRESS(GEMINI_TIMER_BASE)));
 > +
-> +static void pmu_irq_ack(struct irq_data *d)
-> +{
-> +	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
-> +	struct irq_chip_type *ct = irq_data_get_chip_type(d);
-> +	u32 mask = ~d->mask;
-> +
-> +	/*
-> +	 * The PMU mask register is not RW0C: it is RW.	 This means that
-> +	 * the bits take whatever value is written to them; if you write
-> +	 * a '1', you will set the interrupt.
-> +	 *
-> +	 * Unfortunately this means there is NO race free way to clear
-> +	 * these interrupts.
-> +	 *
-> +	 * So, let's structure the code so that the window is as small as
-> +	 * possible.
-> +	 */
-> +	irq_gc_lock(gc);
-> +
-
-nit: superfluous empty line
-
-> +	mask &= irq_reg_readl(gc->reg_base +  ct->regs.ack);
-> +	irq_reg_writel(mask, gc->reg_base +  ct->regs.ack);
-> +	irq_gc_unlock(gc);
-> +}
-> +
-> +static int __init dove_pmu_irq_init(struct device_node *np,
-> +				    struct device_node *parent)
-> +{
-> +	unsigned int clr = IRQ_NOREQUEST | IRQ_NOPROBE | IRQ_NOAUTOEN;
-> +	struct resource r;
-> +	struct irq_domain *domain;
-> +	struct irq_chip_generic *gc;
-> +	int ret, irq, nrirqs = 7;
-> +
-> +	domain = irq_domain_add_linear(np, nrirqs,
-> +				       &irq_generic_chip_ops, NULL);
-> +	if (!domain) {
-> +		pr_err("%s: unable to add irq domain\n", np->name);
-> +		return -ENOMEM;
-> +	}
-> +
-> +	ret = irq_alloc_domain_generic_chips(domain, nrirqs, 1, np->name,
-> +			     handle_level_irq, clr, 0, IRQ_GC_INIT_MASK_CACHE);
-> +	if (ret) {
-> +		pr_err("%s: unable to alloc irq domain gc\n", np->name);
-> +		return ret;
-> +	}
-> +
-> +	ret = of_address_to_resource(np, 0, &r);
-> +	if (ret) {
-> +		pr_err("%s: unable to get resource\n", np->name);
-> +		return ret;
-> +	}
-> +
-> +	if (!request_mem_region(r.start, resource_size(&r), np->name)) {
-> +		pr_err("%s: unable to request mem region\n", np->name);
-> +		return -ENOMEM;
-> +	}
-> +
-> +	/* Map the parent interrupt for the chained handler */
-> +	irq = irq_of_parse_and_map(np, 0);
-> +	if (irq <= 0) {
-> +		pr_err("%s: unable to parse irq\n", np->name);
-> +		return -EINVAL;
-> +	}
-> +
-> +	gc = irq_get_domain_generic_chip(domain, 0);
-> +	gc->reg_base = ioremap(r.start, resource_size(&r));
-> +	if (!gc->reg_base) {
-> +		pr_err("%s: unable to map resource\n", np->name);
-> +		return -ENOMEM;
-> +	}
-> +
-> +	gc->chip_types[0].regs.ack = DOVE_PMU_IRQ_CAUSE;
-> +	gc->chip_types[0].regs.mask = DOVE_PMU_IRQ_MASK;
-> +	gc->chip_types[0].chip.irq_ack = pmu_irq_ack;
-> +	gc->chip_types[0].chip.irq_mask = irq_gc_mask_clr_bit;
-> +	gc->chip_types[0].chip.irq_unmask = irq_gc_mask_set_bit;
-> +
-> +	/* mask and clear all interrupts */
-> +	writel(0, gc->reg_base + DOVE_PMU_IRQ_MASK);
-> +	writel(0, gc->reg_base + DOVE_PMU_IRQ_CAUSE);
-> +
-> +	irq_set_handler_data(irq, domain);
-> +	irq_set_chained_handler(irq, dove_pmu_irq_handler);
+> +	/* Set next event */
+> +	writel(cycles, TIMER_COUNT(IO_ADDRESS(GEMINI_TIMER2_BASE)));
+> +	writel(cycles, TIMER_LOAD(IO_ADDRESS(GEMINI_TIMER2_BASE)));
+> +	cr |= TIMER_2_CR_ENABLE;
+> +	cr |= TIMER_2_CR_INT;
+> +	writel(cr, TIMER_CR(IO_ADDRESS(GEMINI_TIMER_BASE)));
 > +
 > +	return 0;
 > +}
-> +IRQCHIP_DECLARE(dove_pmu_intc,
-> +		"marvell,dove-pmu-intc", dove_pmu_irq_init);
->
+> +
+> +static void gemini_timer_set_mode(enum clock_event_mode mode,
+> +				  struct clock_event_device *evt)
+> +{
+> +	u32 period = DIV_ROUND_CLOSEST(tick_rate, HZ);
+> +	u32 cr;
+> +
+> +	switch (mode) {
+> +        case CLOCK_EVT_MODE_PERIODIC:
+> +		/* Start the timer */
+> +		writel(period,
+> +		       TIMER_COUNT(IO_ADDRESS(GEMINI_TIMER2_BASE)));
+> +		writel(period,
+> +		       TIMER_LOAD(IO_ADDRESS(GEMINI_TIMER2_BASE)));
+> +		cr = readl(TIMER_CR(IO_ADDRESS(GEMINI_TIMER_BASE)));
+> +		cr |= TIMER_2_CR_ENABLE;
+> +		cr |= TIMER_2_CR_INT;
+> +		writel(cr, TIMER_CR(IO_ADDRESS(GEMINI_TIMER_BASE)));
+> +		break;
+> +	case CLOCK_EVT_MODE_ONESHOT:
+> +	case CLOCK_EVT_MODE_UNUSED:
+> +        case CLOCK_EVT_MODE_SHUTDOWN:
+> +	case CLOCK_EVT_MODE_RESUME:
+> +		/*
+> +		 * Disable also for oneshot: the set_next() call will
+> +		 * arm the timer instead.
+> +		 */
+> +		cr = readl(TIMER_CR(IO_ADDRESS(GEMINI_TIMER_BASE)));
+> +		cr &= ~TIMER_2_CR_ENABLE;
+> +		cr &= ~TIMER_2_CR_INT;
+> +		writel(cr, TIMER_CR(IO_ADDRESS(GEMINI_TIMER_BASE)));
+> +		break;
+> +	default:
+> +                break;
+> +	}
+> +}
+> +
+> +/* Use TIMER2 as clock event */
+> +static struct clock_event_device gemini_clockevent = {
+> +	.name		= "TIMER2",
+> +	.rating		= 300, /* Reasonably fast and accurate clock event */
+> +	.features	= CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
+> +	.set_next_event	= gemini_timer_set_next_event,
+> +	.set_mode	= gemini_timer_set_mode,
+> +};
+> +
+>  /*
+>   * IRQ handler for the timer
+>   */
+>  static irqreturn_t gemini_timer_interrupt(int irq, void *dev_id)
+>  {
+> -	timer_tick();
+> +	struct clock_event_device *evt = &gemini_clockevent;
+>  
+> +	evt->event_handler(evt);
+>  	return IRQ_HANDLED;
+>  }
+>  
+>  static struct irqaction gemini_timer_irq = {
+>  	.name		= "Gemini Timer Tick",
+> -	.flags		= IRQF_DISABLED | IRQF_TIMER,
+> +	.flags		= IRQF_TIMER,
+>  	.handler	= gemini_timer_interrupt,
+>  };
+>  
+> @@ -54,9 +126,9 @@ static struct irqaction gemini_timer_irq = {
+>   */
+>  void __init gemini_timer_init(void)
+>  {
+> -	unsigned int tick_rate, reg_v;
+> +	u32 reg_v;
+>  
+> -	reg_v = __raw_readl(IO_ADDRESS(GEMINI_GLOBAL_BASE + GLOBAL_STATUS));
+> +	reg_v = readl(IO_ADDRESS(GEMINI_GLOBAL_BASE + GLOBAL_STATUS));
+>  	tick_rate = REG_TO_AHB_SPEED(reg_v) * 1000000;
+>  
+>  	printk(KERN_INFO "Bus: %dMHz", tick_rate / 1000000);
+> @@ -82,8 +154,17 @@ void __init gemini_timer_init(void)
+>  	 * Make irqs happen for the system timer
+>  	 */
+>  	setup_irq(IRQ_TIMER2, &gemini_timer_irq);
+> -	/* Start the timer */
+> -	__raw_writel(tick_rate / HZ, TIMER_COUNT(IO_ADDRESS(GEMINI_TIMER2_BASE)));
+> -	__raw_writel(tick_rate / HZ, TIMER_LOAD(IO_ADDRESS(GEMINI_TIMER2_BASE)));
+> -	__raw_writel(TIMER_2_CR_ENABLE | TIMER_2_CR_INT, TIMER_CR(IO_ADDRESS(GEMINI_TIMER_BASE)));
+> +
+> +	/* Enable and use TIMER1 as clock source */
+> +	writel(0xffffffff, TIMER_COUNT(IO_ADDRESS(GEMINI_TIMER1_BASE)));
+> +	writel(0xffffffff, TIMER_LOAD(IO_ADDRESS(GEMINI_TIMER1_BASE)));
+> +	writel(TIMER_1_CR_ENABLE, TIMER_CR(IO_ADDRESS(GEMINI_TIMER_BASE)));
+> +	if (clocksource_mmio_init(TIMER_COUNT(IO_ADDRESS(GEMINI_TIMER1_BASE)),
+> +				  "TIMER1", tick_rate, 300, 32,
+> +				  clocksource_mmio_readl_up))
+> +		pr_err("timer: failed to initialize gemini clock source\n");
+> +
+> +	/* Configure and register the clockevent */
+> +	clockevents_config_and_register(&gemini_clockevent, tick_rate,
+> +					1, 0xffffffff);
+>  }
+> -- 
+> 1.8.3.1
+> 
+> 
