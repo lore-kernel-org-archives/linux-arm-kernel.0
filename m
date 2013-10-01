@@ -1,48 +1,50 @@
-From: gerlando.falauto@keymile.com (Gerlando Falauto)
-Date: Tue, 01 Oct 2013 17:27:31 +0200
-Subject: [patch 0/8] genirq: Support for irq domains in generic irq chip
- - V2
-In-Reply-To: <20130506142348.321859745@linutronix.de>
-References: <20130506142348.321859745@linutronix.de>
-Message-ID: <524AE9E3.4080701@keymile.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 1 Oct 2013 11:36:31 -0400
+Subject: [PATCH 3/4] clk: kirkwood: Add CLK_IGNORE_UNUSED to ethernet
+ ge0 and ge1 clocks
+In-Reply-To: <20131001173358.188968e2@skate>
+References: <1380575010-8573-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1380575010-8573-4-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20131001004009.GK31178@titan.lakedaemon.net>
+ <20131001134213.GC2448@localhost>
+ <20131001135800.GS31178@titan.lakedaemon.net>
+ <20131001141716.GE2448@localhost>
+ <20131001150130.GT31178@titan.lakedaemon.net>
+ <20131001170932.54d53aa4@skate>
+ <20131001151528.GV31178@titan.lakedaemon.net>
+ <20131001173358.188968e2@skate>
+Message-ID: <20131001153631.GX31178@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas, Sebastian,
+On Tue, Oct 01, 2013 at 05:33:58PM +0200, Thomas Petazzoni wrote:
+> Dear Jason Cooper,
+> 
+> On Tue, 1 Oct 2013 11:15:28 -0400, Jason Cooper wrote:
+> 
+> > > Sorry for jumping into the discussion, but how does that solve the case
+> > > when the driver is loaded as a module, and therefore unused clocks are
+> > > disabled before the driver ->probe() function gets called?
+> > 
+> > Sorry, I wrote the reply to JasonG just moments before and assumed a
+> > little knowledge of that in this reply.
+> > 
+> > We would use Ezequiel's patch to ensure CLK_IGNORE_UNUSED is set for the
+> > clock during boot, then, after boot, mv643xx_eth's probe would look for
+> > the mac address in the DT.  If it's there, it would unset the flag
+> > knowing that it can recover the mac address from the DT.  Then we could
+> > get the power savings from suspend/unload.
+> 
+> Ah, ok. What was wrong with the idea of getting the MAC address from
+> the hardware early at boot time, and adjust the in-memory Device Tree
+> with this information, so that the mv643xx_eth driver can find them
+> whenever it gets loaded, and regardless of whether clocks have been
+> disabled or not?
 
-I see these changes made it to 3.11.
-AFAICT though, 3.10.9 still has the original bug (the one that got me to 
-write the patch for handling separate mask registers) and I am bit 
-confused as to how to integrate that back into 3.10 (or any previous 
-affected kernels, as they deserve a fix as well!).
+I'm personally not opposed to that at all.  iirc, there was some
+opposition (from Grant?) to modifying the DT from within the kernel.
+Sorry, I can't put my finger on the objection atm.
 
-The way I understand it, any mainstream patch would be based on this 
-work, which is not available on previous kernels. And I guess 
-backporting the whole thing would be overkill.
-So I believe the only way to fix it on older kernels would be to write 
-one (or more) minimal version-specific patch series.
-But then I wonder: would that be acceptable material for linux-stable?
+thx,
 
-Please correct me if I'm totally wrong here. I'm willing to help & test 
-but I need directions.
-
-Thanks,
-Gerlando
-
-On 05/06/2013 04:30 PM, Thomas Gleixner wrote:
-> Changes vs. V1:
->
-> 	- Fixed the generic chip pointer thinko (Sebastian Hesselbarth)
->
-> 	- Proper support for mask cache
->
-> 	- Read mask hardware only for the first map of an generic chip
->            instance
->
-> 	- sun4i prefix irq functions proper
->
-> Thanks,
->
-> 	tglx
->
->
+Jason.
