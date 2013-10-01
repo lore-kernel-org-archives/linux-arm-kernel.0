@@ -1,101 +1,177 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Tue, 01 Oct 2013 19:33:43 +0900
-Subject: [PATCH 05/05] ARM: shmobile: Remove KDM9D reference DTS
-In-Reply-To: <20131001103255.813.65710.sendpatchset@w520>
-References: <20131001103255.813.65710.sendpatchset@w520>
-Message-ID: <20131001103343.813.54921.sendpatchset@w520>
+From: yuvaraj.cd@gmail.com (Yuvaraj Kumar C D)
+Date: Tue,  1 Oct 2013 16:03:40 +0530
+Subject: [PATCH] i2c: s3c2410 : Add polling mode support
+Message-ID: <1380623620-31901-1-git-send-email-yuvaraj.cd@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm@opensource.se>
+From: Vasanth Ananthan <vasanthananthan@gmail.com>
 
-Now when the legacy DTS file emev2-kzm9d.dts can be
-used with board-kzm9d.c and board-kzm9d-reference.c
-proceed with removing emev-kzm9d-reference.dts.
+This patch adds polling mode support for i2c-s3c2410 driver.The
+SATA PHY controller's CMU and TRSV block's are of I2C register
+map in exynos5250.These blocks can be configured using i2c.
 
-Signed-off-by: Magnus Damm <damm@opensource.se>
+But i2c controller instance on which these block's sits lacks an
+interrupt line.Also the current i2c-s3c2410 driver is only interrupt
+driven, thus a polling mode support is required in the driver for
+supporting this controller. This patch adds this support to the driver.
+
+Signed-off-by: Vasanth Ananthan <vasanth.a@samsung.com>
+Signed-off-by: Yuvaraj Kumar C D <yuvaraj.cd@samsung.com>
 ---
+ .../devicetree/bindings/i2c/i2c-s3c2410.txt        |    2 +
+ drivers/i2c/busses/i2c-s3c2410.c                   |   68 ++++++++++++++++----
+ 2 files changed, 59 insertions(+), 11 deletions(-)
 
- arch/arm/boot/dts/Makefile                  |    3 -
- arch/arm/boot/dts/emev2-kzm9d-reference.dts |   57 ---------------------------
- 2 files changed, 1 insertion(+), 59 deletions(-)
-
---- 0001/arch/arm/boot/dts/Makefile
-+++ work/arch/arm/boot/dts/Makefile	2013-10-01 18:53:19.000000000 +0900
-@@ -195,7 +195,6 @@ dtb-$(CONFIG_ARCH_U8500) += ste-snowball
- 	ste-ccu9540.dtb
- dtb-$(CONFIG_ARCH_S3C24XX) += s3c2416-smdk2416.dtb
- dtb-$(CONFIG_ARCH_SHMOBILE) += emev2-kzm9d.dtb \
--	emev2-kzm9d-reference.dtb \
- 	r8a7740-armadillo800eva.dtb \
- 	r8a7778-bockw.dtb \
- 	r8a7778-bockw-reference.dtb \
-@@ -210,7 +209,7 @@ dtb-$(CONFIG_ARCH_SHMOBILE) += emev2-kzm
- 	r8a73a4-ape6evm.dtb \
- 	r8a73a4-ape6evm-reference.dtb \
- 	sh7372-mackerel.dtb
--dtb-$(CONFIG_ARCH_SHMOBILE_MULTI) += emev2-kzm9d-reference.dtb
-+dtb-$(CONFIG_ARCH_SHMOBILE_MULTI) += emev2-kzm9d.dtb
- dtb-$(CONFIG_ARCH_SOCFPGA) += socfpga_cyclone5.dtb \
- 	socfpga_vt.dtb
- dtb-$(CONFIG_ARCH_SPEAR13XX) += spear1310-evb.dtb \
---- 0001/arch/arm/boot/dts/emev2-kzm9d-reference.dts
-+++ /dev/null	2013-06-03 21:41:10.638032047 +0900
-@@ -1,57 +0,0 @@
--/*
-- * Device Tree Source for the KZM9D board
-- *
-- * Copyright (C) 2013 Renesas Solutions Corp.
-- *
-- * This file is licensed under the terms of the GNU General Public License
-- * version 2.  This program is licensed "as is" without any warranty of any
-- * kind, whether express or implied.
-- */
--/dts-v1/;
--
--/include/ "emev2.dtsi"
--
--/ {
--	model = "EMEV2 KZM9D Board";
--	compatible = "renesas,kzm9d-reference", "renesas,emev2";
--
--	memory {
--		device_type = "memory";
--		reg = <0x40000000 0x8000000>;
--	};
--
--	chosen {
--		bootargs = "console=ttyS1,115200n81 ignore_loglevel root=/dev/nfs ip=dhcp";
--	};
--
--	reg_1p8v: regulator at 0 {
--		compatible = "regulator-fixed";
--		regulator-name = "fixed-1.8V";
--		regulator-min-microvolt = <1800000>;
--		regulator-max-microvolt = <1800000>;
--		regulator-always-on;
--		regulator-boot-on;
--	};
--
--	reg_3p3v: regulator at 1 {
--		compatible = "regulator-fixed";
--		regulator-name = "fixed-3.3V";
--		regulator-min-microvolt = <3300000>;
--		regulator-max-microvolt = <3300000>;
--		regulator-always-on;
--		regulator-boot-on;
--	};
--
--	lan9220 at 20000000 {
--		compatible = "smsc,lan9220", "smsc,lan9115";
--		reg = <0x20000000 0x10000>;
--		phy-mode = "mii";
--		interrupt-parent = <&gpio0>;
--		interrupts = <1 1>;	/* active high */
--		reg-io-width = <4>;
--		smsc,irq-active-high;
--		smsc,irq-push-pull;
--		vddvario-supply = <&reg_1p8v>;
--		vdd33a-supply = <&reg_3p3v>;
--	};
--};
+diff --git a/Documentation/devicetree/bindings/i2c/i2c-s3c2410.txt b/Documentation/devicetree/bindings/i2c/i2c-s3c2410.txt
+index 296eb45..bc928a0 100644
+--- a/Documentation/devicetree/bindings/i2c/i2c-s3c2410.txt
++++ b/Documentation/devicetree/bindings/i2c/i2c-s3c2410.txt
+@@ -10,6 +10,8 @@ Required properties:
+           inside HDMIPHY block found on several samsung SoCs
+       (d) "samsung, exynos5440-i2c", for s3c2440-like i2c used
+ 	   on EXYNOS5440 which does not need GPIO configuration.
++      (e) "samsung,exynos5-sata-phy-i2c", for s3c2440-like i2c used as
++	   a host to SATA PHY controller on an internal bus.
+   - reg: physical base address of the controller and length of memory mapped
+     region.
+   - interrupts: interrupt number to the cpu.
+diff --git a/drivers/i2c/busses/i2c-s3c2410.c b/drivers/i2c/busses/i2c-s3c2410.c
+index 3535f3c..2b279d0 100644
+--- a/drivers/i2c/busses/i2c-s3c2410.c
++++ b/drivers/i2c/busses/i2c-s3c2410.c
+@@ -85,6 +85,7 @@
+ #define QUIRK_S3C2440		(1 << 0)
+ #define QUIRK_HDMIPHY		(1 << 1)
+ #define QUIRK_NO_GPIO		(1 << 2)
++#define QUIRK_POLL		(1 << 3)
+ 
+ /* Max time to wait for bus to become idle after a xfer (in us) */
+ #define S3C2410_IDLE_TIMEOUT	5000
+@@ -141,6 +142,8 @@ static struct platform_device_id s3c24xx_driver_ids[] = {
+ };
+ MODULE_DEVICE_TABLE(platform, s3c24xx_driver_ids);
+ 
++static int i2c_s3c_irq_nextbyte(struct s3c24xx_i2c *i2c, unsigned long iicstat);
++
+ #ifdef CONFIG_OF
+ static const struct of_device_id s3c24xx_i2c_match[] = {
+ 	{ .compatible = "samsung,s3c2410-i2c", .data = (void *)0 },
+@@ -149,6 +152,8 @@ static const struct of_device_id s3c24xx_i2c_match[] = {
+ 	  .data = (void *)(QUIRK_S3C2440 | QUIRK_HDMIPHY | QUIRK_NO_GPIO) },
+ 	{ .compatible = "samsung,exynos5440-i2c",
+ 	  .data = (void *)(QUIRK_S3C2440 | QUIRK_NO_GPIO) },
++	{ .compatible = "samsung,exynos5-sata-phy-i2c",
++	  .data = (void *)(QUIRK_S3C2440 | QUIRK_POLL | QUIRK_NO_GPIO) },
+ 	{},
+ };
+ MODULE_DEVICE_TABLE(of, s3c24xx_i2c_match);
+@@ -187,7 +192,8 @@ static inline void s3c24xx_i2c_master_complete(struct s3c24xx_i2c *i2c, int ret)
+ 	if (ret)
+ 		i2c->msg_idx = ret;
+ 
+-	wake_up(&i2c->wait);
++	if (!(i2c->quirks & QUIRK_POLL))
++		wake_up(&i2c->wait);
+ }
+ 
+ static inline void s3c24xx_i2c_disable_ack(struct s3c24xx_i2c *i2c)
+@@ -224,6 +230,22 @@ static inline void s3c24xx_i2c_enable_irq(struct s3c24xx_i2c *i2c)
+ 	writel(tmp | S3C2410_IICCON_IRQEN, i2c->regs + S3C2410_IICCON);
+ }
+ 
++static bool is_ack(struct s3c24xx_i2c *i2c)
++{
++	u32 time_out = i2c->tx_setup;
++
++	while (--time_out) {
++		if (readl(i2c->regs + S3C2410_IICCON)
++			& S3C2410_IICCON_IRQPEND) {
++			if (!(readl(i2c->regs + S3C2410_IICSTAT)
++				& S3C2410_IICSTAT_LASTBIT))
++				return true;
++		}
++		udelay(time_out);
++	}
++
++	return false;
++}
+ 
+ /* s3c24xx_i2c_message_start
+  *
+@@ -268,6 +290,16 @@ static void s3c24xx_i2c_message_start(struct s3c24xx_i2c *i2c,
+ 
+ 	stat |= S3C2410_IICSTAT_START;
+ 	writel(stat, i2c->regs + S3C2410_IICSTAT);
++
++	if (i2c->quirks & QUIRK_POLL) {
++		while ((i2c->msg_num != 0) && is_ack(i2c)) {
++			i2c_s3c_irq_nextbyte(i2c, stat);
++			stat = readl(i2c->regs + S3C2410_IICSTAT);
++
++			if (stat & S3C2410_IICSTAT_ARBITR)
++				dev_err(i2c->dev, "deal with arbitration loss\n");
++		}
++	}
+ }
+ 
+ static inline void s3c24xx_i2c_stop(struct s3c24xx_i2c *i2c, int ret)
+@@ -675,6 +707,15 @@ static int s3c24xx_i2c_doxfer(struct s3c24xx_i2c *i2c,
+ 	s3c24xx_i2c_enable_irq(i2c);
+ 	s3c24xx_i2c_message_start(i2c, msgs);
+ 
++	if (i2c->quirks & QUIRK_POLL) {
++		ret = i2c->msg_idx;
++
++		if (ret != num)
++			dev_dbg(i2c->dev, "incomplete xfer (%d)\n", ret);
++
++		goto out;
++	}
++
+ 	timeout = wait_event_timeout(i2c->wait, i2c->msg_num == 0, HZ * 5);
+ 
+ 	ret = i2c->msg_idx;
+@@ -820,6 +861,9 @@ static int s3c24xx_i2c_clockrate(struct s3c24xx_i2c *i2c, unsigned int *got)
+ 	if (div1 == 512)
+ 		iiccon |= S3C2410_IICCON_TXDIV_512;
+ 
++	if (i2c->quirks & QUIRK_POLL)
++		iiccon |= S3C2410_IICCON_SCALE(2);
++
+ 	writel(iiccon, i2c->regs + S3C2410_IICCON);
+ 
+ 	if (i2c->quirks & QUIRK_S3C2440) {
+@@ -1117,18 +1161,20 @@ static int s3c24xx_i2c_probe(struct platform_device *pdev)
+ 	 * ensure no current IRQs pending
+ 	 */
+ 
+-	i2c->irq = ret = platform_get_irq(pdev, 0);
+-	if (ret <= 0) {
+-		dev_err(&pdev->dev, "cannot find IRQ\n");
+-		return ret;
+-	}
++	if (!(i2c->quirks & QUIRK_POLL)) {
++		i2c->irq = ret = platform_get_irq(pdev, 0);
++		if (ret <= 0) {
++			dev_err(&pdev->dev, "cannot find IRQ\n");
++			return ret;
++		}
+ 
+-	ret = devm_request_irq(&pdev->dev, i2c->irq, s3c24xx_i2c_irq, 0,
+-			       dev_name(&pdev->dev), i2c);
++		ret = devm_request_irq(&pdev->dev, i2c->irq, s3c24xx_i2c_irq, 0,
++				dev_name(&pdev->dev), i2c);
+ 
+-	if (ret != 0) {
+-		dev_err(&pdev->dev, "cannot claim IRQ %d\n", i2c->irq);
+-		return ret;
++		if (ret != 0) {
++			dev_err(&pdev->dev, "cannot claim IRQ %d\n", i2c->irq);
++			return ret;
++		}
+ 	}
+ 
+ 	ret = s3c24xx_i2c_register_cpufreq(i2c);
+-- 
+1.7.9.5
