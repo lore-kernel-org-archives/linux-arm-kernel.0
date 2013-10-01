@@ -1,155 +1,61 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Tue, 01 Oct 2013 18:24:07 +0200
-Subject: [PATCH v4] i2c: enable runtime PM for I2C adapter devices
- enumerated from ACPI
-In-Reply-To: <1380632982-10709-1-git-send-email-mika.westerberg@linux.intel.com>
-References: <1380552228-23329-2-git-send-email-mika.westerberg@linux.intel.com>
- <1380632982-10709-1-git-send-email-mika.westerberg@linux.intel.com>
-Message-ID: <8760212.nXgBqaRVWQ@vostro.rjw.lan>
+From: v.tyrtov@samsung.com (Vyacheslav Tyrtov)
+Date: Tue, 01 Oct 2013 20:17:01 +0400
+Subject: [PATCH 0/6] Exynos 5410 Dual cluster support
+Message-ID: <1380644227-12244-1-git-send-email-v.tyrtov@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, October 01, 2013 04:09:42 PM Mika Westerberg wrote:
-> The ACPI specification requires the parent device to be powered on before
-> any of its children. It can be only powered off when all the children are
-> already off.
-> 
-> Currently whenever there is no I2C traffic going on, the I2C controller
-> driver can put the device into low power state transparently to its
-> children (the I2C client devices). This violates the ACPI specification
-> because now the parent device is in lower power state than its children.
-> 
-> In order to keep ACPI happy we enable runtime PM for the I2C adapter device
-> if we find out that the I2C controller was in fact an ACPI device. In
-> addition to that we attach the I2C client devices to the ACPI power domain
-> and make sure that they are powered on when the driver ->probe() is called.
-> 
-> Non-ACPI devices are not affected by this change.
-> 
-> This patch is based on the work by Aaron Lu and Lv Zheng.
-> 
-> Signed-off-by: Mika Westerberg <mika.westerberg@linux.intel.com>
+The series of patches represent support of Exynos 5410 SoC
+    
+The Exynos 5410 is the first Samsung SoC based on bigLITTLE architecture.
+Patches allow all 8 CPU cores (4 x A7 and 4 x A15) to run at the same time
+    
+Patches add new platform description, support of clock controller,
+dual cluster support, device tree for Exynos 5410 and minor fixes (CCI, MCT)
+   
+Has been builded on v3.12-rc3.
+Has been tested on Exynos 5410 reference board (smdk5410_defconfig).
+    
+Thanks,
+	Vyacheslav.
 
-Acked-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
+Tarek Dakhran (6):
+  ARM: EXYNOS: Add support for EXYNOS5410 SoC
+  clk: exynos5410: register clocks using common clock framework
+  ARM: EXYNOS: add Exynos Dual Cluster Support
+  ARM: dts: Add initial device tree support for EXYNOS5410
+  ARM: EXYNOS: Minor fixes to enable EXYNOS5410 support
+  ARM: smdk5410_defconfig: add defconfig for smdk5410
 
-> ---
-> Changes to v3:
->  * Check only client ACPI_HANDLE().
->  * Fixed bug where we attach the device to ACPI power domain multiple
->    times.
->  * Functions are renamed to _get_attach/_put_attach to make it clear that
->    we do attach/detach as well.
-> 
->  drivers/i2c/i2c-core.c | 47 ++++++++++++++++++++++++++++++++++++++++++++++-
->  1 file changed, 46 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/i2c/i2c-core.c b/drivers/i2c/i2c-core.c
-> index 29d3f04..e289b1d 100644
-> --- a/drivers/i2c/i2c-core.c
-> +++ b/drivers/i2c/i2c-core.c
-> @@ -236,6 +236,27 @@ int i2c_recover_bus(struct i2c_adapter *adap)
->  	return adap->bus_recovery_info->recover_bus(adap);
->  }
->  
-> +static void acpi_i2c_device_pm_get_attach(struct i2c_client *client,
-> +					  bool attach)
-> +{
-> +	if (ACPI_HANDLE(&client->dev)) {
-> +		/* Make sure the adapter is active */
-> +		pm_runtime_get_sync(&client->adapter->dev);
-> +		if (attach)
-> +			acpi_dev_pm_attach(&client->dev, true);
-> +	}
-> +}
-> +
-> +static void acpi_i2c_device_pm_put_detach(struct i2c_client *client,
-> +					  bool detach)
-> +{
-> +	if (ACPI_HANDLE(&client->dev)) {
-> +		if (detach)
-> +			acpi_dev_pm_detach(&client->dev, true);
-> +		pm_runtime_put(&client->adapter->dev);
-> +	}
-> +}
-> +
->  static int i2c_device_probe(struct device *dev)
->  {
->  	struct i2c_client	*client = i2c_verify_client(dev);
-> @@ -254,11 +275,15 @@ static int i2c_device_probe(struct device *dev)
->  					client->flags & I2C_CLIENT_WAKE);
->  	dev_dbg(dev, "probe\n");
->  
-> +	acpi_i2c_device_pm_get_attach(client, true);
-> +
->  	status = driver->probe(client, i2c_match_id(driver->id_table, client));
->  	if (status) {
->  		client->driver = NULL;
->  		i2c_set_clientdata(client, NULL);
->  	}
-> +
-> +	acpi_i2c_device_pm_put_detach(client, !!status);
->  	return status;
->  }
->  
-> @@ -271,6 +296,8 @@ static int i2c_device_remove(struct device *dev)
->  	if (!client || !dev->driver)
->  		return 0;
->  
-> +	acpi_i2c_device_pm_get_attach(client, false);
-> +
->  	driver = to_i2c_driver(dev->driver);
->  	if (driver->remove) {
->  		dev_dbg(dev, "remove\n");
-> @@ -283,6 +310,8 @@ static int i2c_device_remove(struct device *dev)
->  		client->driver = NULL;
->  		i2c_set_clientdata(client, NULL);
->  	}
-> +
-> +	acpi_i2c_device_pm_put_detach(client, true);
->  	return status;
->  }
->  
-> @@ -294,8 +323,11 @@ static void i2c_device_shutdown(struct device *dev)
->  	if (!client || !dev->driver)
->  		return;
->  	driver = to_i2c_driver(dev->driver);
-> -	if (driver->shutdown)
-> +	if (driver->shutdown) {
-> +		acpi_i2c_device_pm_get_attach(client, false);
->  		driver->shutdown(client);
-> +		acpi_i2c_device_pm_put_detach(client, false);
-> +	}
->  }
->  
->  #ifdef CONFIG_PM_SLEEP
-> @@ -1263,6 +1295,16 @@ exit_recovery:
->  	bus_for_each_drv(&i2c_bus_type, NULL, adap, __process_new_adapter);
->  	mutex_unlock(&core_lock);
->  
-> +	/*
-> +	 * For ACPI enumerated controllers we must make sure that the
-> +	 * controller is powered on before its children. Runtime PM handles
-> +	 * this for us once we have enabled it for the adapter device.
-> +	 */
-> +	if (ACPI_HANDLE(adap->dev.parent)) {
-> +		pm_runtime_no_callbacks(&adap->dev);
-> +		pm_runtime_enable(&adap->dev);
-> +	}
-> +
->  	return 0;
->  
->  out_list:
-> @@ -1427,6 +1469,9 @@ void i2c_del_adapter(struct i2c_adapter *adap)
->  		return;
->  	}
->  
-> +	if (ACPI_HANDLE(adap->dev.parent))
-> +		pm_runtime_disable(&adap->dev);
-> +
->  	/* Tell drivers about this removal */
->  	mutex_lock(&core_lock);
->  	bus_for_each_drv(&i2c_bus_type, NULL, adap,
-> 
+ .../devicetree/bindings/clock/exynos5410-clock.txt |  72 ++++++
+ arch/arm/Kconfig                                   |   2 +-
+ arch/arm/boot/dts/Makefile                         |   1 +
+ arch/arm/boot/dts/exynos5410-smdk5410.dts          |  67 +++++
+ arch/arm/boot/dts/exynos5410.dtsi                  | 189 ++++++++++++++
+ arch/arm/configs/smdk5410_defconfig                | 134 ++++++++++
+ arch/arm/mach-exynos/Kconfig                       |  10 +
+ arch/arm/mach-exynos/Makefile                      |   2 +
+ arch/arm/mach-exynos/common.c                      |  18 ++
+ arch/arm/mach-exynos/edcs.c                        | 217 ++++++++++++++++
+ arch/arm/mach-exynos/edcs.h                        |  41 +++
+ arch/arm/mach-exynos/edcs_status.c                 | 110 +++++++++
+ arch/arm/mach-exynos/include/mach/map.h            |   1 +
+ arch/arm/mach-exynos/mach-exynos5-dt.c             |   1 +
+ arch/arm/plat-samsung/include/plat/cpu.h           |   8 +
+ drivers/bus/arm-cci.c                              |   7 +
+ drivers/clk/samsung/Makefile                       |   1 +
+ drivers/clk/samsung/clk-exynos5410.c               | 274 +++++++++++++++++++++
+ drivers/clocksource/exynos_mct.c                   |   8 +-
+ drivers/irqchip/exynos-combiner.c                  |  12 +-
+ 20 files changed, 1172 insertions(+), 3 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/clock/exynos5410-clock.txt
+ create mode 100644 arch/arm/boot/dts/exynos5410-smdk5410.dts
+ create mode 100644 arch/arm/boot/dts/exynos5410.dtsi
+ create mode 100644 arch/arm/configs/smdk5410_defconfig
+ create mode 100644 arch/arm/mach-exynos/edcs.c
+ create mode 100644 arch/arm/mach-exynos/edcs.h
+ create mode 100644 arch/arm/mach-exynos/edcs_status.c
+ create mode 100644 drivers/clk/samsung/clk-exynos5410.c
+
 -- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+1.8.1.5
