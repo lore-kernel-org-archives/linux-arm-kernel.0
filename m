@@ -1,38 +1,48 @@
 From: nico@fluxnic.net (Nicolas Pitre)
-Date: Mon, 30 Sep 2013 22:40:24 -0400 (EDT)
+Date: Mon, 30 Sep 2013 23:14:49 -0400 (EDT)
 Subject: [PATCH RESEND] ARM: add dtbImage.<dt> and dtbuImage.<dt> rules
-In-Reply-To: <CA+bK7J7=x6=ZsWnSkGByvDLbht9nD6G3wQ5d05P-D96v6udDgg@mail.gmail.com>
+In-Reply-To: <1380575265.23932.11.camel@sakura.staff.proxad.net>
 References: <504DFBBF.5010202@free-electrons.com>
  <1348733441-11626-1-git-send-email-richard.genoud@gmail.com>
  <20120927082955.GR17667@game.jcrosoft.org>
  <CACQ1gAgwv4pBFZBrVZiWM2_=OneUO-s16LufSENx27gMC3DUig@mail.gmail.com>
  <52416F97.802@keymile.com> <20130924120152.GI11119@titan.lakedaemon.net>
  <20130924121939.GD12758@n2100.arm.linux.org.uk>
- <CA+bK7J7=x6=ZsWnSkGByvDLbht9nD6G3wQ5d05P-D96v6udDgg@mail.gmail.com>
-Message-ID: <alpine.LFD.2.03.1309302230440.6331@syhkavp.arg>
+ <1380572483.31472.51.camel@sakura.staff.proxad.net>
+ <20130930204223.GJ31178@titan.lakedaemon.net>
+ <1380575265.23932.11.camel@sakura.staff.proxad.net>
+Message-ID: <alpine.LFD.2.03.1309302241400.6331@syhkavp.arg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 30 Sep 2013, Tim Bird wrote:
+On Mon, 30 Sep 2013, Maxime Bizon wrote:
 
-> What is the long-term mechanism/methodology for creating a kernel
-> that runs on a single system?  So many drivers now have device-tree
-> dependencies that it seems unlikely we'll be able to avoid using
-> device tree.  But if we don't care or don't want to support more than
-> a single platform, what should we do (if appending DTB to the zImage
-> will eventually go away).  Will the requirement be that all future
-> Linux bootloaders will be DT-aware?
+> 
+> On Mon, 2013-09-30 at 16:42 -0400, Jason Cooper wrote:
+> 
+> > Nicolas Pitre already suggested an impedance matcher that keeps this
+> > kind of hacky code out of the kernel, and allows users to do exactly
+> 
+> I know that, my proposal was to bring this back into the kernel.
 
-The ability to append a DTB to zImage is not going away tomorrow, 
-although I encourage you to use another solution if possible.
+And obviously I disagree with such a proposal.
 
-What can be done on a simple single platform setup is to load the DTB 
-from flash into RAM just like another blob along with the ramdisk image 
-and the zImage itself.  Then you just have to branch into zImage with 
-the address of the DTB in RAM into r2.  Most bootloaders are able to 
-load arbitrary binaries into memory, and most bootloaders (except for 
-U-Boot) are able to set arbitrary values into r0-r3 before branching to 
-some location in memory.
+> That "kind of hacky" ATAG thing was actually the only supported way to
+> boot a platform not so long ago :)
+
+Strictly speaking, this was never supported in mainline.
+
+> In the end, people needing the impedance matcher will somehow integrate
+> it in the kernel build system anyway.
+
+As long as it remains their own cost to maintain then nobody will 
+object, which means "not in mainline".
+
+The ultimate idea with the impedance matcher was to augment existing 
+bootloaders with sort of a semi second stage bootloader that would be 
+separate from zImage and installed permanently, and then only the zImage 
+itself would be updateable.  This way you'd get a DT capable environment 
+without replacing the actual bootloader.
 
 
 Nicolas
