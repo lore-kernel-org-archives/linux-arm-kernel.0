@@ -1,45 +1,38 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Tue, 1 Oct 2013 10:26:30 +0100
-Subject: Status of ARM FIQ?
-In-Reply-To: <F5184659D418E34EA12B1903EE5EF5FD8538E865F6@seldmbx02.corpusers.net>
-References: <F5184659D418E34EA12B1903EE5EF5FD8538E865F6@seldmbx02.corpusers.net>
-Message-ID: <20131001092623.GA2640@localhost.localdomain>
+From: jbe@pengutronix.de (=?iso-8859-1?q?J=FCrgen_Beisert?=)
+Date: Tue, 1 Oct 2013 11:28:38 +0200
+Subject: [PATCH 6/9] Staging/iio/adc/touchscreen/MXS: add interrupt driven
+ touch detection
+In-Reply-To: <1379946998-23041-7-git-send-email-jbe@pengutronix.de>
+References: <1379946998-23041-1-git-send-email-jbe@pengutronix.de>
+ <1379946998-23041-7-git-send-email-jbe@pengutronix.de>
+Message-ID: <201310011128.38928.jbe@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 30, 2013 at 08:48:15PM +0200, Bird, Tim wrote:
-> I'm working through some proposals for contract work for the Consumer
-> Electronics Workgroup, and one of them involves use of ARM FIQ
-> as a debug activator.  I have heard a rumor that FIQ mode is not being
-> included in some modern ARM CPUs.
-> 
-> Is there any truth to this?  Can someone give me a pointer to information
-> about this?
+Hi Jonathan,
 
-All CPUs implement FIQ, except for the M-class CPUS in v7 onwards (which
-don't have an MMU, and thus could only run ucLinux).
+On Tuesday 01 October 2013 11:25:46 Jonathan Cameron wrote:
+> a couple of the patch descriptions say that they are untested on i.MX28.
 
+On Monday 23 September 2013 16:36:35 Juergen Beisert wrote:
+> For battery driven systems it is a very bad idea to collect the touchscreen
+> data within a kernel busy loop.
+>
+> This change uses the features of the hardware to delay and accumulate
+> samples in hardware to avoid a high interrupt and CPU load.
+>
+> Note: this is only tested on an i.MX23 SoC yet.
 
-As to whether you can use FIQ, "it depends":
+This note is no longer true. Marek tested it on his M28EVK, Lothar on his TX28 
+and myself also on an i.MX28EVK.
 
-Since the introduction of the Security Extensions in v6Z / v7,
-FIQ can be repurposed as a private interrupt for the Secure World, so
-if there is resident Secure World software, it may be impossible for
-Linux to use FIQ.
+For the IIO part of the driver I tested on my i.MX23 based ChumbyOne and some 
+customer hardware and it seems still to work (I can only guess if the values I 
+read from the sysfs entries are correct, sorry).
 
-Whether this does or doesn't apply depends on the SoC, and on how
-it has been integrated and set up.  Consumer device SoCs, especially
-anything coming to you via a mobile provider, will likely have this
-restriction.  Dev boards may be a bit more relaxed.
+Regards,
+Juergen
 
-
-John Stultz has been working on the FIQ debugger for Android and may
-have some ideas.
-
-I believe that the Virtualisation extensions allow virtual FIQs to be
-delivered to the guest, so that KVM could send fake FIQs to guests even
-if the KVM host cannot itself use FIQ.  I'm a bit hazy on this though,
-and haven't played with it.
-
-Cheers
----Dave
+-- 
+Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?| Juergen Beisert ? ? ? ? ? ? |
+Linux Solutions for Science and Industry ? ? ?| http://www.pengutronix.de/  |
