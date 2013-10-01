@@ -1,84 +1,65 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 01 Oct 2013 12:50:51 -0600
-Subject: [PATCH 10/10] pwm-backlight: Allow backlight to remain disabled
- on boot
-In-Reply-To: <1379972467-11243-11-git-send-email-treding@nvidia.com>
-References: <1379972467-11243-1-git-send-email-treding@nvidia.com>
- <1379972467-11243-11-git-send-email-treding@nvidia.com>
-Message-ID: <524B198B.3010609@wwwdotorg.org>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Tue, 01 Oct 2013 21:10:10 +0200
+Subject: [PATCH 3/4] clk: kirkwood: Add CLK_IGNORE_UNUSED to ethernet
+ ge0 and ge1 clocks
+In-Reply-To: <20131001164556.GA23874@obsidianresearch.com>
+References: <1380575010-8573-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1380575010-8573-4-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20131001004009.GK31178@titan.lakedaemon.net>
+ <20131001134213.GC2448@localhost> <524AD2F7.4090803@gmail.com>
+ <20131001142205.GF2448@localhost> <524ADFAA.40805@gmail.com>
+ <20131001164556.GA23874@obsidianresearch.com>
+Message-ID: <524B1E12.9080302@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/23/2013 03:41 PM, Thierry Reding wrote:
-> The default for backlight devices is to be enabled immediately when
-> registering with the backlight core. This can be useful for setups that
-> use a simple framebuffer device and where the backlight cannot otherwise
-> be hooked up to the panel.
-> 
-> However, when dealing with more complex setups, such as those of recent
-> ARM SoCs, this can be problematic. Since the backlight is usually setup
-> separately from the display controller, the probe order is not usually
-> deterministic. That can lead to situations where the backlight will be
-> powered up and the panel will show an uninitialized framebuffer.
-> 
-> Furthermore, subsystems such as DRM have advanced functionality to set
-> the power mode of a panel. In order to allow such setups to power up the
-> panel at exactly the right moment, a way is needed to prevent the
-> backlight core from powering the backlight up automatically when it is
-> registered.
-> 
-> This commit introduces a new boot_off field in the platform data (and
-> also implements getting the same information from device tree). When set
-> the initial backlight power mode will be set to "off".
+On 10/01/2013 06:45 PM, Jason Gunthorpe wrote:
+> On Tue, Oct 01, 2013 at 04:43:54PM +0200, Sebastian Hesselbarth wrote:
+>
+>> The local-mac-address property is a placeholder for the real mac
+>> address. Also, mv643xx_eth calls of_get_mac_address which fails for
+>> the invalid local-mac-address value of [00 00 00 00 00 00].
+>>
+>> If you manage to setup local-mac-address in your bootloader, everything
+>> should be fine.
+>
+> FWIW, my environment is like this, and it works fine (this is recent,
+> 3.10 didn't work). The driver now properly sets the MAC from the DT.
+>
+> The driver will also need an update to call of_get_phy_mode and set
+> the interface properly, and the board files will need update to
+> specify the phy-mode property. I'm guessing things are working for
+> most people because the POR value happens to match the board?
+>
+>> If we have a DT fixup that takes care of the above for non-DT
+>> bootloaders, everything should be fine.
+>
+> Exactly, the problem is a broken DT on input to the kernel, the proper
+> action, IMHO, is to correct the DT in the kernel, so the hacking is
+> contained. Similar to how pci-fixups.c centralizes fixing of broken
+> firmware for PCI, and how CONFIG_ARM_ATAG_DTB_COMPAT centralizes it
+> for ATAG conversion.
+>
+> BTW, why doesn't CONFIG_ARM_ATAG_DTB_COMPAT fix this? Do the boot
+> loaders on these systems not pass the mac at all??
+>
+>> I still prefer Jason's approach and would give it a try on LAKML and
+>> devtree ML: Backup register contents if of_get_mac_address does not
+>> contain a valid address, and gate clocks.
+>
+> FWIW, I would not use the language of 'backup' - this is a fixup
+> correcting an unsupported input DT.
+>
+> IMHO, when this code triggers it should also:
+>
+> printk(KERN_ERROR FW_BUG "local-mac-address is not set");
 
-> diff --git a/Documentation/devicetree/bindings/video/backlight/pwm-backlight.txt b/Documentation/devicetree/bindings/video/backlight/pwm-backlight.txt
+Ezequiel,
 
-> +  - backlight-boot-off: keep the backlight disabled on boot
+before you jump to prepare a patch for the above, I made one based on
+my previous work and JasonG's suggestions above. Testing it right now,
+looks promising.
 
-A few thoughts:
+@JasonC: To avoid rebase mess again, where do you want it based against?
 
-1) Does this property indicate that:
-
-a) The current state of the backlight at boot. In which case, this will
-need bootloader involvement to modify the value in the DT at boot time
-based on whether the bootloader turned on the backlight:-(
-
-b) That the driver should not turn on the backlight immediately? That
-seems to describe driver behaviour more than HW. Is it appropriate to
-put that into DT?
-
-Your suggestion to make the backlight not turn on by default might be a
-better fix?
-
-2) Should the driver instead attempt to read the current state of the
-GPIO output to determine whether the backlight is on? This may not be
-possible on all HW.
-
-3) Doesn't the following code in probe() (added in a previous patch)
-need to be updated?
-
-> +	if (gpio_is_valid(pb->enable_gpio)) {
-> +		if (pb->enable_gpio_flags & PWM_BACKLIGHT_GPIO_ACTIVE_LOW)
-> +			gpio_set_value(pb->enable_gpio, 0);
-> +		else
-> +			gpio_set_value(pb->enable_gpio, 1);
-> +	}
-
-... That assumes that the backlight is on at boot, and hence presumably
-after this patch still always turns on the backlight, only to turn it
-off very quickly once the following code in this patch executes:
-
-(and perhaps we also need to avoid turning the backlight off then on if
-it was already on at boot)
-
-> diff --git a/drivers/video/backlight/pwm_bl.c b/drivers/video/backlight/pwm_bl.c
-
-> @@ -318,6 +320,12 @@ static int pwm_backlight_probe(struct platform_device *pdev)
->  	}
->  
->  	bl->props.brightness = data->dft_brightness;
-> +
-> +	if (data->boot_off)
-> +		bl->props.power = FB_BLANK_POWERDOWN;
-> +	else
-> +		bl->props.power = FB_BLANK_UNBLANK;
+Sebastian
