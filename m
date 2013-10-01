@@ -1,101 +1,134 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Tue, 1 Oct 2013 22:49:26 +0200
-Subject: [PATCH 08/10] pwm-backlight: Use new enable_gpio field
-In-Reply-To: <524B16E8.5080506@wwwdotorg.org>
-References: <1379972467-11243-1-git-send-email-treding@nvidia.com>
- <1379972467-11243-9-git-send-email-treding@nvidia.com>
- <524B16E8.5080506@wwwdotorg.org>
-Message-ID: <20131001204925.GC9201@ulmo.nvidia.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 1 Oct 2013 15:54:20 -0500
+Subject: [RFC 00/15] Device Tree schemas and validation
+In-Reply-To: <524AE4FB.4080906@baylibre.com>
+References: <1380041541-17529-1-git-send-email-bcousson@baylibre.com>
+ <524A8289.3050107@baylibre.com> <524ACB76.1010001@gmail.com>
+ <524AE4FB.4080906@baylibre.com>
+Message-ID: <CAL_JsqJ31TGFJCSeSOqgee=OLVfSUTAYdF4nSn7X2DiCequVAw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 01, 2013 at 12:39:36PM -0600, Stephen Warren wrote:
-> On 09/23/2013 03:41 PM, Thierry Reding wrote:
-> > Make use of the new enable_gpio field and allow it to be set from DT as
-> > well. Now that all legacy users of platform data have been converted to
-> > initialize this field to an invalid value, it is safe to use the field
-> > from the driver.
-> 
-> > diff --git a/Documentation/devicetree/bindings/video/backlight/pwm-backlight.txt b/Documentation/devicetree/bindings/video/backlight/pwm-backlight.txt
-> 
-> >  Optional properties:
-> 
-> > +  - enable-gpios: a list of GPIOs to enable and disable the backlight
-> 
-> That seems to imply that multiple GPIOs are legal. Was that intended? If
-> not, I would suggest:
-> 
-> - enable-gpios: contains a single GPIO specifier for the GPIO which
-> 		enables/disables the backlight. See [1] for the format.
-> 
-> >  
-> >  [0]: Documentation/devicetree/bindings/pwm/pwm.txt
-> + [1]: Documentation/devicetree/bindings/gpio/gpio.txt
+On Tue, Oct 1, 2013 at 10:06 AM, Benoit Cousson <bcousson@baylibre.com> wrote:
+> Hi Rob,
+>
+>
+> On 01/10/2013 15:17, Rob Herring wrote:
+>>
+>> On 10/01/2013 03:06 AM, Benoit Cousson wrote:
+>>>
+>>> + more DT maintainers folks
+>>>
+>>> Hi all,
+>>>
+>>> I know this is mostly boring user space code, but I was expecting a
+>>> little bit of comments about at least the bindings syntax:-(
+>>>
+>>> I'd like to know if this is the right direction and if it worth pursuing
+>>> in that direction.
+>>>
+>>> The idea was to have at least some base for further discussion during
+>>> ARM KS 2013.
+>>>
+>>> I feel alone :-(
+>>>
+>>> If you have any comment, go ahead!
+>>
+>>
+>> Thanks for taking this on!
+>>
+>> This is interesting approach using the dts syntax,
+>
+>
+> Well, this was discussed a little bit on the list, and it has the big
+> advantage of re-using the parser already included in DTC for free.
+> In term or readability, it avoids to re-defining a brand new syntax for
+> people who are already familiar with the DTS one.
+>
+>
+>> but I worry that the
+>> validation will only be as good as the schema written and the review of
+>> the schema.
+>
+>
+> Well, sure, but unfortunately, that will always be the case :-(
+> The bindings definition being quite open, there is no easy way to ensure
+> proper schema / bindings without careful review of the schema. There is no
+> such thing as a free beer... Unfortunately :-)
+>
+>
+>> I think the schema needs to define the binding rather than
+>> define the checks. Then the schema can feed the validation checks.
+>
+>
+>> This format does not seem to me as easily being able to generate
+>> documentation from the schema which I believe is one of the goals.
+>
+>
+> Indeed, but I think is it easy to generate any kind of readable format for
+> the documentation purpose if needed from the actual format.
+> Otherwise, we should consider a schema format based on kerneldoc type of
+> syntax to improve readability. I'm just afraid it will become harder then to
+> define complex schema.
+>
+> BTW, what kind of documentation are you expecting here? Is is a text that
+> can be added on top of each schema?
 
-Yes, that sounds better. Indeed only a single GPIO is supported. Adding
-more than one would require representing the timing between the two and
-that will take us back to where we left off with the power sequences.
+I would expect the schema to replace
+Documentation/devicetree/bindings/* over time. I think the thing that
+needs to be worked out here is how to add free form multi-line text.
 
-> > diff --git a/drivers/video/backlight/pwm_bl.c b/drivers/video/backlight/pwm_bl.c
-> 
-> > @@ -51,12 +55,27 @@ static void pwm_backlight_power_on(struct pwm_bl_data *pb, int brightness,
-> >  		     pb->lth_brightness;
-> >  
-> >  	pwm_config(pb->pwm, duty_cycle, pb->period);
-> > +
-> > +	if (gpio_is_valid(pb->enable_gpio)) {
-> > +		if (pb->enable_gpio_flags & PWM_BACKLIGHT_GPIO_ACTIVE_LOW)
-> > +			gpio_set_value(pb->enable_gpio, 0);
-> > +		else
-> > +			gpio_set_value(pb->enable_gpio, 1);
-> > +	}
-> 
-> Feel completely free to ignore this, but when the difference in two
-> code-paths is solely in function parameters, I prefer to calculate the
-> parameter inside the if statement, then call the function outside the
-> conditional code, to highlight the common/different parts:
-> 
-> int value;
-> 
-> /* or an if statement for the next 1 line, if you don't like ?: */
-> value = (pb->enable_gpio_flags & PWM_BACKLIGHT_GPIO_ACTIVE_LOW) ? 0 : 1;
-> gpio_set_value((pb->enable_gpio, value);
+>> I for
+>> one don't care to review the documentation and the schema for every
+>> binding.
+>>
+>> I would like to ensure we can start with the basics and have some
+>> generic rules. Some examples:
+>>
+>> - flag compatible strings in dts files that are not documented
+>
+>
+> This is almost done with the last patch of the series. Nodes are already
+> checked, properties are missing.
+>
+>> - check required properties
+>
+>
+> Done as well.
+>
+>
+>> - check properties against cell sizes
+>
+>
+> Yeah, that one is still to be done.
+>
+>
+>> - a node with reg property must have a unit address
+>
+>
+> Easy to add.
+>
+>
+>> - flag properties with "_"
+>
+>
+> Easy to add as well.
+>
+>
+>> - check properties are the correct data type
+>
+>
+> Already done for a couple of data type.
 
-I actually tried that, but it looked cluttered, so I opted for the
-alternative. Not that this matters all that much, because beginning with
-3.13 the GPIO subsystem should be able to handle the active low flag
-internally using the new gpiod_*() API. I plan on converting the driver
-to use that during the next cycle.
+Good to know. It wasn't really clear what common items are checked. An
+example schema for clocks or gpio (or any other common) binding would
+be nice.
 
-> > @@ -148,11 +168,10 @@ static int pwm_backlight_parse_dt(struct device *dev,
-> 
-> > +	data->enable_gpio = of_get_named_gpio_flags(node, "enable-gpios", 0,
-> > +						    &flags);
-> > +	if (gpio_is_valid(data->enable_gpio) && (flags & OF_GPIO_ACTIVE_LOW))
-> > +		data->enable_gpio_flags |= PWM_BACKLIGHT_GPIO_ACTIVE_LOW;
-> 
-> This doesn't seem to handle deferred probe correctly; I would expect
-> something more like:
-> 
-> 	data->enable_gpio = of_get_named_gpio_flags(...);
-> 	if (data->enable_gpio == -EPROBE_DEFERRED)
-> 		return data->enable_gpio;
-> 	if (gpio_is_valid(...))
-> 		...
-> 	return 0;
-> 
-> I suppose it's possible that the value filters down to
-> gpio_request_one() and this actually does work out OK, but that feels
-> very accidental/implicit to me.
+Do you have a run with all the warnings found?
 
-Yes, I think it does indeed propagate to gpio_request_one(), but you're
-right, it should be caught explicitly.
+> Thanks for your comments. Being the very first one, you might get a free
+> beer... meaning there might be such thing as a free beer :-)
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131001/71667a87/attachment.sig>
+In that case, it all looks perfect. :)
+
+Rob
