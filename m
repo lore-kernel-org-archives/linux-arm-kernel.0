@@ -1,69 +1,37 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue,  1 Oct 2013 11:34:09 +0900
-Subject: [GIT PULL 0/8] Renesas ARM based SoC updates for v3.13
-Message-ID: <cover.1380530437.git.horms+renesas@verge.net.au>
+Date: Tue,  1 Oct 2013 11:34:12 +0900
+Subject: [PATCH 1/8] ARM: shmobile: r8a7779: Rename DU device in clock lookups
+ list
+In-Reply-To: <cover.1380530437.git.horms+renesas@verge.net.au>
+References: <cover.1380530437.git.horms+renesas@verge.net.au>
+Message-ID: <acf47ee741c4a5eb8a17438e8858f1cffa1e073a.1380530437.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kevin, Olof and Arnd,
+From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-please consider these Renesas ARM based SoC updates for v3.13.
+The DU device will be called rcar-du-r8a7779. Rename the clock lookup
+entry accordingly.
 
-This pull-request is based on v3.12-rc1.
+Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/mach-shmobile/clock-r8a7779.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-
-The following changes since commit 272b98c6455f00884f0350f775c5342358ebb73f:
-
-  Linux 3.12-rc1 (2013-09-16 16:17:51 -0400)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git soc
-
-for you to fetch changes up to f39d35fcc2cd7a24ec3128adffd7876953999e1f:
-
-  ARM: shmobile: r8a7778: add usb phy power control function (2013-09-30 16:11:23 +0900)
-
-----------------------------------------------------------------
-Renesas ARM based SoC updates for v3.13
-
-* Add support for r8a7791 SoC
-* Rename DU device in clock lookups list of r8a7779 SoC
-* USB and SSI/SRU clock support for r8a7778 SoC
-* USB phy power control function support for r8a7778 SoC
-
-----------------------------------------------------------------
-Hisashi Nakamura (1):
-      ARM: shmobile: Initial r8a7791 SoC support
-
-Kuninori Morimoto (3):
-      ARM: shmobile: r8a7778: add SSI/SRU clock support
-      ARM: shmobile: r8a7778: add USBHS clock
-      ARM: shmobile: r8a7778: add usb phy power control function
-
-Laurent Pinchart (2):
-      ARM: shmobile: r8a7779: Rename DU device in clock lookups list
-      ARM: shmobile: r8a7790: Add DU and LVDS clocks
-
-Magnus Damm (1):
-      ARM: shmobile: r8a7791 CMT support
-
-Yoshikazu Fujikawa (1):
-      ARM: shmobile: r8a7791 SCIF support
-
- arch/arm/boot/dts/r8a7791.dtsi                |  41 +++++
- arch/arm/mach-shmobile/Kconfig                |   6 +
- arch/arm/mach-shmobile/Makefile               |   2 +
- arch/arm/mach-shmobile/clock-r8a7778.c        |  44 ++++-
- arch/arm/mach-shmobile/clock-r8a7779.c        |   2 +-
- arch/arm/mach-shmobile/clock-r8a7790.c        |  12 +-
- arch/arm/mach-shmobile/clock-r8a7791.c        | 237 ++++++++++++++++++++++++++
- arch/arm/mach-shmobile/include/mach/r8a7778.h |   2 +
- arch/arm/mach-shmobile/include/mach/r8a7791.h |   8 +
- arch/arm/mach-shmobile/setup-r8a7778.c        |  37 ++--
- arch/arm/mach-shmobile/setup-r8a7791.c        | 149 ++++++++++++++++
- 11 files changed, 525 insertions(+), 15 deletions(-)
- create mode 100644 arch/arm/boot/dts/r8a7791.dtsi
- create mode 100644 arch/arm/mach-shmobile/clock-r8a7791.c
- create mode 100644 arch/arm/mach-shmobile/include/mach/r8a7791.h
- create mode 100644 arch/arm/mach-shmobile/setup-r8a7791.c
+diff --git a/arch/arm/mach-shmobile/clock-r8a7779.c b/arch/arm/mach-shmobile/clock-r8a7779.c
+index bd6ad92..1f7080f 100644
+--- a/arch/arm/mach-shmobile/clock-r8a7779.c
++++ b/arch/arm/mach-shmobile/clock-r8a7779.c
+@@ -200,7 +200,7 @@ static struct clk_lookup lookups[] = {
+ 	CLKDEV_DEV_ID("sh_mobile_sdhi.1", &mstp_clks[MSTP322]), /* SDHI1 */
+ 	CLKDEV_DEV_ID("sh_mobile_sdhi.2", &mstp_clks[MSTP321]), /* SDHI2 */
+ 	CLKDEV_DEV_ID("sh_mobile_sdhi.3", &mstp_clks[MSTP320]), /* SDHI3 */
+-	CLKDEV_DEV_ID("rcar-du.0", &mstp_clks[MSTP103]), /* DU */
++	CLKDEV_DEV_ID("rcar-du-r8a7779", &mstp_clks[MSTP103]), /* DU */
+ };
+ 
+ void __init r8a7779_clock_init(void)
+-- 
+1.8.4
