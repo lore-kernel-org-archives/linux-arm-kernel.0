@@ -1,64 +1,72 @@
 From: magnus.damm@gmail.com (Magnus Damm)
-Date: Tue, 01 Oct 2013 19:33:15 +0900
-Subject: [PATCH 02/05] ARM: shmobile: Use KZM9D without reference for
- multiplatform
+Date: Tue, 01 Oct 2013 19:33:24 +0900
+Subject: [PATCH 03/05] ARM: shmobile: Remove non-multiplatform KZM9D reference
+ support
 In-Reply-To: <20131001103255.813.65710.sendpatchset@w520>
 References: <20131001103255.813.65710.sendpatchset@w520>
-Message-ID: <20131001103315.813.80581.sendpatchset@w520>
+Message-ID: <20131001103324.813.82210.sendpatchset@w520>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Magnus Damm <damm@opensource.se>
 
-Change the multiplatform kconfig bits for KZM9D from
-CONFIG_MACH_KZM9D_REFERENCE into CONFIG_MACH_KZM9D
-to match the non-multiplatform case.
+Now when CCF is supported remove the legacy KZM9D reference
+Kconfig bits CONFIG_MACH_KZM9D_REFERENCE for the non-multiplatform
+case.
+
+Starting from this commit KZM9D board support is always enabled
+via CONFIG_MACH_KZM9D, and CONFIG_ARCH_MULTIPLATFORM is used
+to select between board-kzm9d.c and board-kzm9d-reference.c
+
+The file board-kzm9d-reference.c can no longer be used together
+with the legacy sh-clk clock framework, instead CCF is used.
 
 Signed-off-by: Magnus Damm <damm@opensource.se>
 ---
 
- arch/arm/mach-shmobile/Kconfig  |   10 ++--------
- arch/arm/mach-shmobile/Makefile |    4 ++++
- 2 files changed, 6 insertions(+), 8 deletions(-)
+ arch/arm/mach-shmobile/Kconfig       |   12 ------------
+ arch/arm/mach-shmobile/Makefile      |    1 -
+ arch/arm/mach-shmobile/Makefile.boot |    1 -
+ 3 files changed, 14 deletions(-)
 
---- 0001/arch/arm/mach-shmobile/Kconfig
-+++ work/arch/arm/mach-shmobile/Kconfig	2013-09-27 11:22:20.000000000 +0900
-@@ -22,16 +22,10 @@ config ARCH_EMEV2
- 
- comment "SH-Mobile Board Type"
+--- 0003/arch/arm/mach-shmobile/Kconfig
++++ work/arch/arm/mach-shmobile/Kconfig	2013-09-27 11:25:58.000000000 +0900
+@@ -226,18 +226,6 @@ config MACH_KZM9D
+ 	select REGULATOR_FIXED_VOLTAGE if REGULATOR
+ 	select USE_OF
  
 -config MACH_KZM9D_REFERENCE
 -	bool "KZM9D board - Reference Device Tree Implementation"
-+config MACH_KZM9D
-+	bool "KZM9D board"
- 	depends on ARCH_EMEV2
- 	select REGULATOR_FIXED_VOLTAGE if REGULATOR
+-	depends on ARCH_EMEV2
+-	select REGULATOR_FIXED_VOLTAGE if REGULATOR
+-	select USE_OF
 -	---help---
 -	   Use reference implementation of KZM9D board support
 -	   which makes a greater use of device tree at the expense
 -	   of not supporting a number of devices.
 -
 -	   This is intended to aid developers
- 
- comment "SH-Mobile System Configuration"
- endif
---- 0001/arch/arm/mach-shmobile/Makefile
-+++ work/arch/arm/mach-shmobile/Makefile	2013-09-27 11:23:32.000000000 +0900
-@@ -52,6 +52,9 @@ obj-$(CONFIG_ARCH_R8A7740)	+= pm-r8a7740
- obj-$(CONFIG_ARCH_R8A7779)	+= pm-r8a7779.o
- 
- # Board objects
-+ifdef CONFIG_ARCH_SHMOBILE_MULTI
-+obj-$(CONFIG_MACH_KZM9D)	+= board-kzm9d-reference.o
-+else
- obj-$(CONFIG_MACH_APE6EVM)	+= board-ape6evm.o
- obj-$(CONFIG_MACH_APE6EVM_REFERENCE)	+= board-ape6evm-reference.o
- obj-$(CONFIG_MACH_MACKEREL)	+= board-mackerel.o
-@@ -68,6 +71,7 @@ obj-$(CONFIG_MACH_KZM9D)	+= board-kzm9d.
- obj-$(CONFIG_MACH_KZM9D_REFERENCE)	+= board-kzm9d-reference.o
+-
+ config MACH_KZM9G
+ 	bool "KZM-A9-GT board"
+ 	depends on ARCH_SH73A0
+--- 0003/arch/arm/mach-shmobile/Makefile
++++ work/arch/arm/mach-shmobile/Makefile	2013-09-27 11:26:08.000000000 +0900
+@@ -68,7 +68,6 @@ obj-$(CONFIG_MACH_ARMADILLO800EVA)	+= bo
+ obj-$(CONFIG_MACH_ARMADILLO800EVA_REFERENCE)	+= board-armadillo800eva-reference.o
+ obj-$(CONFIG_MACH_KOELSCH)	+= board-koelsch.o
+ obj-$(CONFIG_MACH_KZM9D)	+= board-kzm9d.o
+-obj-$(CONFIG_MACH_KZM9D_REFERENCE)	+= board-kzm9d-reference.o
  obj-$(CONFIG_MACH_KZM9G)	+= board-kzm9g.o
  obj-$(CONFIG_MACH_KZM9G_REFERENCE)	+= board-kzm9g-reference.o
-+endif
- 
- # Framework support
- obj-$(CONFIG_SMP)		+= $(smp-y)
+ endif
+--- 0001/arch/arm/mach-shmobile/Makefile.boot
++++ work/arch/arm/mach-shmobile/Makefile.boot	2013-09-27 11:26:16.000000000 +0900
+@@ -8,7 +8,6 @@ loadaddr-$(CONFIG_MACH_BOCKW) += 0x60008
+ loadaddr-$(CONFIG_MACH_BOCKW_REFERENCE) += 0x60008000
+ loadaddr-$(CONFIG_MACH_KOELSCH) += 0x40008000
+ loadaddr-$(CONFIG_MACH_KZM9D) += 0x40008000
+-loadaddr-$(CONFIG_MACH_KZM9D_REFERENCE) += 0x40008000
+ loadaddr-$(CONFIG_MACH_KZM9G) += 0x41008000
+ loadaddr-$(CONFIG_MACH_KZM9G_REFERENCE) += 0x41008000
+ loadaddr-$(CONFIG_MACH_LAGER) += 0x40008000
