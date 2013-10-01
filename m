@@ -1,37 +1,27 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 01 Oct 2013 11:39:09 -0600
-Subject: [PATCH v2 00/12] Introduce common infra for tegra clocks
-In-Reply-To: <1379946381-20125-1-git-send-email-pdeschrijver@nvidia.com>
-References: <1379946381-20125-1-git-send-email-pdeschrijver@nvidia.com>
-Message-ID: <524B08BD.2020902@wwwdotorg.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 1 Oct 2013 19:42:02 +0200
+Subject: [PATCH] RFT: ARM: gemini: convert to GENERIC_CLOCKEVENTS
+In-Reply-To: <CACRpkdZygLfbE=kC6E+sRDRwZsY-Oi-HOB2mf6G7LeX-=XrcgQ@mail.gmail.com>
+References: <1380625040-25912-1-git-send-email-linus.walleij@linaro.org>
+ <201310011328.57653.arnd@arndb.de>
+ <CACRpkdZygLfbE=kC6E+sRDRwZsY-Oi-HOB2mf6G7LeX-=XrcgQ@mail.gmail.com>
+Message-ID: <201310011942.02965.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/23/2013 08:24 AM, Peter De Schrijver wrote:
-> This patchset introduces common infrastructure for clocks which exist in
-> several Tegra SoCs. We also move Tegra114 to this new infrastructure.
-> Tegra20 and Tegra30 will be moved later in separate patchsets.
-> 
-> Changes since v1:
-> + move common clks allocation to patch 2
-> + adapt also Tegra20 and Tegra30 to the changes in patch 2
-> 
-> Boottested on dalmore, beaverboard and seaboard.
+On Tuesday 01 October 2013, Linus Walleij wrote:
+> As with any other platform with an active community interested in
+> long-term support it'd be best if someone stepped up to do
+> the necessary conversion to DT and maybe also multiplatform
+> (no idea if that works with the FA526 CPU though) so we can get
+> the maintenance burden down for everone involved.
 
-What commit is this series based on? I applied the two pre-requisites:
+Regarding multiplatform, IIRC Jonas Jensen had some issues with
+ARM9 and FA526 being enabled at the same time (with mach-moxart),
+which is probably easy enough to fix if necessary. You should
+also be able to have a combined moxart+gemini kernel once someone
+looks into multiplatform gemini. The only nonobvious part I can
+see required for that is NEED_MACH_GPIO_H, and even that should
+be simpler than the clockevents patch you just sent.
 
-ARM: tegra114: add missing clocks to binding.eml
-clk: tegra: replace enum tegra114_clk by binding header.eml
-
-... but still got a bunch of conflicts when applying this. I guess at
-least commit 819c1de "clk: add CLK_SET_RATE_NO_REPARENT flag" isn't in
-the history of this series. Consequently, I gave up and didn't test this.
-
-Also, I had given a lot of feedback on v1. Admittedly I should have
-reviewed v2 since it appeared just before I reviewed v1, but I expect
-most of the feedback still applies given the limited list of changes
-listed above. Certainly, this series still removes the "dsib" clock yet
-I expect it shouldn't (patch 1, in the change to
-tegra114_periph_clk_init()), and that's the very first piece of feedback
-I gave on v1, and also causes the first "git am" conflict with
-CLK_SET_RATE_NO_REPARENT.
+	Arnd
