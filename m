@@ -1,43 +1,49 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue,  1 Oct 2013 11:39:15 +0900
-Subject: [GIT PULL 0/3] Renesas ARM-based SoC DT updates for v3.13
-Message-ID: <cover.1380530263.git.horms+renesas@verge.net.au>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Tue, 1 Oct 2013 07:24:54 +0530
+Subject: [PATCH v2 3/5] dma: Allow TI_EDMA selectable for ARCH_KEYSTONE
+In-Reply-To: <1380580887-24249-4-git-send-email-santosh.shilimkar@ti.com>
+References: <1380580887-24249-1-git-send-email-santosh.shilimkar@ti.com>
+ <1380580887-24249-4-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <20131001015454.GA16684@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kevin, Olof and Arnd,
+On Mon, Sep 30, 2013 at 06:41:25PM -0400, Santosh Shilimkar wrote:
+> Allow the TI_EDMA to be built for ARCH_KEYSTONE which also supports
+> the EDMA IP.
+> 
+> Cc: Vinod Koul <vinod.koul@intel.com>
+> 
+> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> ---
+> Vinod,
+> I need your ack on this patch to carry $subject patch via arm-soc tree
+> to avoid the unmet dependency warnings.
+Sure, but too many dependency fixes have been popoing up for this part and this
+IIRC is third patch! Something doesn't seem right, hopefully am wrong..
 
-please consider these Renesas ARM-based SoC DT updates for v3.13.
+I have a patch in my -next from Josh which selects TI_PRIV_EDMA for this...
 
-This pull-request is based on v3.12-rc1.
+~Vinod
+> 
+>  drivers/dma/Kconfig |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
+> index 526ec77..b1dde16 100644
+> --- a/drivers/dma/Kconfig
+> +++ b/drivers/dma/Kconfig
+> @@ -195,7 +195,7 @@ config SIRF_DMA
+>  
+>  config TI_EDMA
+>  	bool "TI EDMA support"
+> -	depends on ARCH_DAVINCI || ARCH_OMAP
+> +	depends on ARCH_DAVINCI || ARCH_OMAP || ARCH_KEYSTONE
+>  	select DMA_ENGINE
+>  	select DMA_VIRTUAL_CHANNELS
+>  	default n
+> -- 
+> 1.7.9.5
+> 
 
-
-The following changes since commit 272b98c6455f00884f0350f775c5342358ebb73f:
-
-  Linux 3.12-rc1 (2013-09-16 16:17:51 -0400)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-dt-for-v3.13
-
-for you to fetch changes up to 3da4c3039907b655e1758835d57b914a73ff7f5a:
-
-  ARM: shmobile: Add r8a7790 CA7 CPU cores to DTSI (2013-09-19 14:37:35 -0700)
-
-----------------------------------------------------------------
-Renesas ARM-based SoC DT updates for v3.13
-
-* Add CPU cores to DTSI of r8a7790 SoC
-* Add MMCIF and SDHI DT nodes for reference DTS of ape6evm board
-
-----------------------------------------------------------------
-Guennadi Liakhovetski (1):
-      ARM: shmobile: ape6evm-reference: add MMCIF and SDHI DT nodes
-
-Magnus Damm (2):
-      ARM: shmobile: Add r8a7790 CA15 CPU cores
-      ARM: shmobile: Add r8a7790 CA7 CPU cores to DTSI
-
- arch/arm/boot/dts/r8a73a4-ape6evm-reference.dts | 72 +++++++++++++++++++++++++
- arch/arm/boot/dts/r8a7790.dtsi                  | 49 +++++++++++++++++
- 2 files changed, 121 insertions(+)
+-- 
