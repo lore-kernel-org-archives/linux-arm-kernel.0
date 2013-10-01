@@ -1,46 +1,35 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue,  1 Oct 2013 11:35:34 +0900
-Subject: [PATCH 02/14] ARM: shmobile: Use shmobile_smp_cpu_disable() on sh73a0
+Date: Tue,  1 Oct 2013 11:35:36 +0900
+Subject: [PATCH 04/14] ARM: shmobile: Expose shmobile_invalidate_start()
 In-Reply-To: <cover.1380532277.git.horms+renesas@verge.net.au>
 References: <cover.1380532277.git.horms+renesas@verge.net.au>
-Message-ID: <a3b142a1a08af543473ae726e5d96a969c5b02b5.1380532277.git.horms+renesas@verge.net.au>
+Message-ID: <87a08ca0f7f99b3136c763377c547a89cf6d0996.1380532277.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Magnus Damm <damm@opensource.se>
 
-Use shmobile_smp_cpu_disable() on sh73a0 since it
-allows CPU Hotplug of any CPU.
+Expose shmobile_invalidate_start() in common.h for
+mach-shmobile. This function will be used for boot of
+secondary processors on future non-SCU SMP platforms.
 
 Signed-off-by: Magnus Damm <damm@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/smp-sh73a0.c | 9 +--------
- 1 file changed, 1 insertion(+), 8 deletions(-)
+ arch/arm/mach-shmobile/include/mach/common.h | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/mach-shmobile/smp-sh73a0.c b/arch/arm/mach-shmobile/smp-sh73a0.c
-index 0baa244..9a30a3f 100644
---- a/arch/arm/mach-shmobile/smp-sh73a0.c
-+++ b/arch/arm/mach-shmobile/smp-sh73a0.c
-@@ -71,18 +71,11 @@ static void __init sh73a0_smp_prepare_cpus(unsigned int max_cpus)
- 	shmobile_smp_scu_prepare_cpus(max_cpus);
- }
- 
--#ifdef CONFIG_HOTPLUG_CPU
--static int sh73a0_cpu_disable(unsigned int cpu)
--{
--	return 0; /* CPU0 and CPU1 supported */
--}
--#endif /* CONFIG_HOTPLUG_CPU */
--
- struct smp_operations sh73a0_smp_ops __initdata = {
- 	.smp_prepare_cpus	= sh73a0_smp_prepare_cpus,
- 	.smp_boot_secondary	= sh73a0_boot_secondary,
- #ifdef CONFIG_HOTPLUG_CPU
--	.cpu_disable		= sh73a0_cpu_disable,
-+	.cpu_disable		= shmobile_smp_cpu_disable,
- 	.cpu_die		= shmobile_smp_scu_cpu_die,
- 	.cpu_kill		= shmobile_smp_scu_cpu_kill,
- #endif
+diff --git a/arch/arm/mach-shmobile/include/mach/common.h b/arch/arm/mach-shmobile/include/mach/common.h
+index 26eaff1..a9df8f3 100644
+--- a/arch/arm/mach-shmobile/include/mach/common.h
++++ b/arch/arm/mach-shmobile/include/mach/common.h
+@@ -14,6 +14,7 @@ extern void shmobile_smp_sleep(void);
+ extern void shmobile_smp_hook(unsigned int cpu, unsigned long fn,
+ 			      unsigned long arg);
+ extern int shmobile_smp_cpu_disable(unsigned int cpu);
++extern void shmobile_invalidate_start(void);
+ extern void shmobile_boot_scu(void);
+ extern void shmobile_smp_scu_prepare_cpus(unsigned int max_cpus);
+ extern int shmobile_smp_scu_boot_secondary(unsigned int cpu,
 -- 
 1.8.4
