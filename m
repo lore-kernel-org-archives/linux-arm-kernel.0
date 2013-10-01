@@ -1,57 +1,40 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Tue,  1 Oct 2013 14:33:04 +0900
-Subject: [PATCH] arm64: check for number of arguments in
- syscall_get/set_arguments()
-Message-ID: <1380605584-22125-1-git-send-email-takahiro.akashi@linaro.org>
+From: yuvaraj.cd@gmail.com (Yuvaraj Kumar C D)
+Date: Tue,  1 Oct 2013 12:03:00 +0530
+Subject: [PATCH 0/3] Exynos5250 SATA Support
+Message-ID: <1380609183-21430-1-git-send-email-yuvaraj.cd@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In ftrace_syscall_enter(),
-    syscall_get_arguments(..., 0, n, ...)
-	if (i == 0) { <handle orig_x0> ...; n--;}
-	memcpy(..., n * sizeof(args[0]));
-If 'number of arguments(n)' is zero and 'argument index(i)' is also zero in
-syscall_get_arguments(), none of arguments should be copied by memcpy().
-Otherwise 'n--' can be a big positive number and unexpected amount of data
-will be copied. Tracing system calls which take no argument, say sync(void),
-may hit this case and eventually make the system corrupted.
-This patch fixes the issue both in syscall_get_arguments() and
-syscall_set_arguments().
+This series adds the SATA support on exynos5250 SOC.Also it 
+uses generic phy framework patch[1] posted by Kishon Vijay 
+Abraham I. 
+	[1].drivers: phy: add generic PHY framework.
 
-Please note, however, that asm-generic/syscall.h says,
- * syscall_get_arguments - extract system call parameter values
- * @i:          argument index [0,5]
- * @n:          number of arguments; n+i must be [1,6].
-and so we'd better change the caller's code(ftrace_syscall_enter).
+Yuvaraj Kumar C D (3):
+  ahci: exynos: add ahci sata support on Exynos platform
+  Phy: Exynos: Add Exynos5250 sata phy driver
+  ARM: dts: Enable ahci sata and sata phy
 
-Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
----
- arch/arm64/include/asm/syscall.h |    6 ++++++
- 1 file changed, 6 insertions(+)
+ arch/arm/boot/dts/exynos5250-arndale.dts  |    9 +-
+ arch/arm/boot/dts/exynos5250-smdk5250.dts |    6 +-
+ arch/arm/boot/dts/exynos5250.dtsi         |   21 ++-
+ drivers/ata/Kconfig                       |    9 ++
+ drivers/ata/Makefile                      |    1 +
+ drivers/ata/ahci_exynos.c                 |  226 ++++++++++++++++++++++++++
+ drivers/phy/Kconfig                       |    6 +
+ drivers/phy/Makefile                      |    1 +
+ drivers/phy/exynos/Kconfig                |    5 +
+ drivers/phy/exynos/Makefile               |    5 +
+ drivers/phy/exynos/exynos5250_phy_i2c.c   |   53 ++++++
+ drivers/phy/exynos/sata_phy_exynos5250.c  |  248 +++++++++++++++++++++++++++++
+ drivers/phy/exynos/sata_phy_exynos5250.h  |   33 ++++
+ 13 files changed, 613 insertions(+), 10 deletions(-)
+ create mode 100644 drivers/ata/ahci_exynos.c
+ create mode 100644 drivers/phy/exynos/Kconfig
+ create mode 100644 drivers/phy/exynos/Makefile
+ create mode 100644 drivers/phy/exynos/exynos5250_phy_i2c.c
+ create mode 100644 drivers/phy/exynos/sata_phy_exynos5250.c
+ create mode 100644 drivers/phy/exynos/sata_phy_exynos5250.h
 
-diff --git a/arch/arm64/include/asm/syscall.h b/arch/arm64/include/asm/syscall.h
-index c89821f..01bb8cc 100644
---- a/arch/arm64/include/asm/syscall.h
-+++ b/arch/arm64/include/asm/syscall.h
-@@ -63,6 +63,9 @@ static inline void syscall_get_arguments(struct task_struct *task,
- 					 unsigned int i, unsigned int n,
- 					 unsigned long *args)
- {
-+	if (n == 0)
-+		return;
-+
- 	if (i + n > SYSCALL_MAX_ARGS) {
- 		unsigned long *args_bad = args + SYSCALL_MAX_ARGS - i;
- 		unsigned int n_bad = n + i - SYSCALL_MAX_ARGS;
-@@ -86,6 +89,9 @@ static inline void syscall_set_arguments(struct task_struct *task,
- 					 unsigned int i, unsigned int n,
- 					 const unsigned long *args)
- {
-+	if (n == 0)
-+		return;
-+
- 	if (i + n > SYSCALL_MAX_ARGS) {
- 		pr_warning("%s called with max args %d, handling only %d\n",
- 			   __func__, i + n, SYSCALL_MAX_ARGS);
 -- 
 1.7.9.5
