@@ -1,37 +1,21 @@
-From: cinifr@gmail.com (Fan Rong)
-Date: Tue,  1 Oct 2013 23:42:25 +0800
-Subject: [Add SMP support for Allwinner A20: PATCH V4 3/3] Add arch count
- timer node in dts for Allwinner A20(sunxi 7i).
-In-Reply-To: <1380642145-17295-1-git-send-email-cinifr@gmail.com>
-References: <1380642145-17295-1-git-send-email-cinifr@gmail.com>
-Message-ID: <1380642145-17295-4-git-send-email-cinifr@gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 1 Oct 2013 16:50:09 +0100
+Subject: [PATCH 0/6] iommu/arm-smmu: Misc changes
+In-Reply-To: <1380631150-10783-1-git-send-email-andreas.herrmann@calxeda.com>
+References: <1380631150-10783-1-git-send-email-andreas.herrmann@calxeda.com>
+Message-ID: <20131001155008.GB17667@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Fan Rong <cinifr@gmail.com>
----
- arch/arm/boot/dts/sun7i-a20.dtsi | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+On Tue, Oct 01, 2013 at 01:39:04PM +0100, Andreas Herrmann wrote:
+> Hi,
+> 
+> here a reworked set of patches. Hopefully all comments addressed.
 
-diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
-index e1bff17..8d5e318 100644
---- a/arch/arm/boot/dts/sun7i-a20.dtsi
-+++ b/arch/arm/boot/dts/sun7i-a20.dtsi
-@@ -312,5 +312,15 @@
- 			#interrupt-cells = <3>;
- 			interrupts = <1 9 0xf04>;
- 		};
-+
-+		timer {
-+			compatible ="arm,armv7-timer";
-+			interrupts = <1 13 0x308>,
-+				     <1 14 0x308>,
-+				     <1 11 0x308>,
-+				     <1 10 0x308>;
-+			clock-frequency = <24000000>;
-+		};
-+
- 	};
- };
--- 
-1.8.1.2
+Cheers Andreas! I've taken the first 5. Whilst I like the cleanup you've
+made to the final patch, I'll need an Ack from Rob until I can take anything
+containing DT bindings.
+
+Thanks again,
+
+Will
