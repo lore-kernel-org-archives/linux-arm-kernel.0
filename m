@@ -1,66 +1,53 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 1 Oct 2013 07:55:38 -0400
-Subject: [PATCH 01/15] watchdog: orion: Remove unneeded BRIDGE_CAUSE clear
-In-Reply-To: <20130828163334.GB31381@obsidianresearch.com>
-References: <20130827163939.24636d80@skate> <20130827151136.GA10084@localhost>
- <20130827152535.GG19598@titan.lakedaemon.net>
- <20130827191337.GA2339@localhost> <521D063F.4040404@gmail.com>
- <20130827210248.GA19625@obsidianresearch.com>
- <20130827221729.GA25413@localhost>
- <20130827222532.GA1632@obsidianresearch.com>
- <20130828120801.GC2348@localhost>
- <20130828163334.GB31381@obsidianresearch.com>
-Message-ID: <20131001115538.GO31178@titan.lakedaemon.net>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 1 Oct 2013 13:56:35 +0200
+Subject: [PATCH] RFT: ARM: gemini: convert to GENERIC_CLOCKEVENTS
+In-Reply-To: <201310011328.57653.arnd@arndb.de>
+References: <1380625040-25912-1-git-send-email-linus.walleij@linaro.org>
+ <201310011328.57653.arnd@arndb.de>
+Message-ID: <CACRpkdZygLfbE=kC6E+sRDRwZsY-Oi-HOB2mf6G7LeX-=XrcgQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ezequiel,
+On Tue, Oct 1, 2013 at 1:28 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Tuesday 01 October 2013, Linus Walleij wrote:
+>> This converts the gemini machine to use generic clockevents
+>> by rewriting the timer driver.
+>
+> I've put a few more people on Cc that I think have access to hardware, according
+> to the openwrt changelog for gemini.
 
-On Wed, Aug 28, 2013 at 10:33:34AM -0600, Jason Gunthorpe wrote:
-> On Wed, Aug 28, 2013 at 09:08:02AM -0300, Ezequiel Garcia wrote:
-> 
-> > Hm.. but in order to make this work, we need the bridge interrupt
-> > controller introduced by Sebastian, but not available in the "older"
-> > platforms (right?).
-> 
-> TBH, I'm not sure of the state of this - I thought the last patches I
-> saw covered everything (though perhaps DT bindings are needed for some
-> platforms)?
-> 
-> Some platforms don't have a bridge cause register, the WDT comes
-> directly off the main interrupt controller and the write to a 'bridge
-> cause regsiter' in the wdt driver is already completely bogus. This is
-> why the irq chip driver needs to take care of this.
-> 
-> > So, in order to add support to Armada 370/XP watchdog (which was the
-> > initial goal of all of this) I think our sane option reduce to two:
-> > 
-> > * Drop watchdog support on non-DT platforms and add support for
-> >   A370/XP in the orion-wdt driver.
-> >   I don't quite like the idea of dropping support on anything,
-> >   so I can't say I'm thrilled by this idea.
-> 
-> Well, can you pass all the register addresess and interrupts in
-> through platform_data on these unconverted boards?
-> 
-> Maybe a config switch 'CONFIG_ARMADA_WATCHDOG_SINGLE_PLATFORM' to
-> enable the old behavior and include the mach headers, otherwise the
-> driver is multiplatform and DT only?
-> 
-> But I don't see alot of value in doing this work, since I doubt anyone
-> will ever use it :(
-> 
-> > * Support A370/AXP in a different and new armada-wdt driver.
-> >   The differences between the SoC might be small, but maybe
-> >   enough to justify a separate driver and avoid more problems.
-> 
-> But A370/AXP isn't really different, it just doesn't have to be
-> compatible with boards that haven't finished DT conversion..
+Thanks, if the fine OpenWRT folks can suggest a cheapo piece of equipment
+that is fully supported by OpenWRT and that I can eBay to test my patches on
+my own I'm all ears.
 
-Have you made any progress on this?  I know you've been working on other
-stuff lately, I just saw this series sitting on my stack and thought I'd
-poke you.
+> I've suggested removing the platform before, but got the feedback that it's
+> actively maintained in openwrt. Unfortunately we didn't get much
+> activity to upstream the patches from
+> http://git.openwrt.org/?p=openwrt.git;a=tree;f=target/linux/gemini/patches
+> which are apparently required.
 
-thx,
+Both with OpenWRT and OpenEmbedded we are seeing this forking
+instead of working with actively upstreaming and reducing the patch
+stack. This is not so nice, we need to discuss what can be done to
+reduce the patch stacks carried by other Open Source projects such
+as these.
 
-Jason.
+> Rather than deleting the platform entirely, I'd be more inclined to accept
+> any cleanup patches like yours, testing or not, and let the downstream
+> users deal with fixing it up if it breaks. The ideal case of course would
+> be for someone to actively maintain the platform again and submit any patches
+> that are needed.
+
+Yeah :-/
+
+As with any other platform with an active community interested in
+long-term support it'd be best if someone stepped up to do
+the necessary conversion to DT and maybe also multiplatform
+(no idea if that works with the FA526 CPU though) so we can get
+the maintenance burden down for everone involved.
+
+I suggested project like this for the advanced kernel newbies
+actually... let's see if it takes hold.
+
+Yours,
+Linus Walleij
