@@ -1,107 +1,78 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Tue,  1 Oct 2013 11:00:53 +0200
-Subject: [PATCH] clocksource: put nodes passed to CLOCKSOURCE_OF_DECLARE
- callbacks centrally
-Message-ID: <1380618053-11159-1-git-send-email-u.kleine-koenig@pengutronix.de>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Tue, 1 Oct 2013 12:01:08 +0300
+Subject: [PATCH] clocksource: dw_apb_timer_of: Mark a few more functions
+ as __init
+In-Reply-To: <1380616692-10253-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1380616692-10253-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <20131001090108.GL6918@tarshish>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Instead of letting each driver call of_node_put do it centrally in the
-loop that also calls the CLOCKSOURCE_OF_DECLARE callbacks. This is less
-prone to error and also moves getting and putting the references into the
-same function.
+Hi Uwe,
 
-Consequently all respective of_node_put calls in drivers are removed.
+On Tue, Oct 01, 2013 at 10:38:12AM +0200, Uwe Kleine-K?nig wrote:
+> These are all only called by dw_apb_timer_init which is an __init
+> function, too
+> 
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> ---
+>  drivers/clocksource/dw_apb_timer_of.c | 10 +++++-----
+>  1 file changed, 5 insertions(+), 5 deletions(-)
+> 
+> diff --git a/drivers/clocksource/dw_apb_timer_of.c b/drivers/clocksource/dw_apb_timer_of.c
+> index 4cbae4f..993cdde 100644
+> --- a/drivers/clocksource/dw_apb_timer_of.c
+> +++ b/drivers/clocksource/dw_apb_timer_of.c
+> @@ -23,7 +23,7 @@
+>  #include <linux/clk.h>
+>  #include <linux/sched_clock.h>
+>  
+> -static void timer_get_base_and_rate(struct device_node *np,
+> +static void __init timer_get_base_and_rate(struct device_node *np,
+>  				    void __iomem **base, u32 *rate)
+>  {
+>  	struct clk *timer_clk;
+> @@ -55,11 +55,11 @@ static void timer_get_base_and_rate(struct device_node *np,
+>  
+>  try_clock_freq:
+>  	if (of_property_read_u32(np, "clock-freq", rate) &&
+> -		of_property_read_u32(np, "clock-frequency", rate))
+> +	    of_property_read_u32(np, "clock-frequency", rate))
 
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
- arch/arm/mach-msm/timer.c             | 1 -
- drivers/clocksource/clksrc-of.c       | 1 +
- drivers/clocksource/dw_apb_timer_of.c | 2 --
- drivers/clocksource/tegra20_timer.c   | 4 ----
- drivers/clocksource/vt8500_timer.c    | 2 --
- 5 files changed, 1 insertion(+), 9 deletions(-)
+Unintended whitespace change?
 
-diff --git a/arch/arm/mach-msm/timer.c b/arch/arm/mach-msm/timer.c
-index 696fb73..1e9c338 100644
---- a/arch/arm/mach-msm/timer.c
-+++ b/arch/arm/mach-msm/timer.c
-@@ -274,7 +274,6 @@ static void __init msm_dt_timer_init(struct device_node *np)
- 		pr_err("Unknown frequency\n");
- 		return;
- 	}
--	of_node_put(np);
- 
- 	event_base = base + 0x4;
- 	sts_base = base + 0x88;
-diff --git a/drivers/clocksource/clksrc-of.c b/drivers/clocksource/clksrc-of.c
-index 37f5325..8b2ed14 100644
---- a/drivers/clocksource/clksrc-of.c
-+++ b/drivers/clocksource/clksrc-of.c
-@@ -32,5 +32,6 @@ void __init clocksource_of_init(void)
- 	for_each_matching_node_and_match(np, __clksrc_of_table, &match) {
- 		init_func = match->data;
- 		init_func(np);
-+		of_node_put(np);
- 	}
- }
-diff --git a/drivers/clocksource/dw_apb_timer_of.c b/drivers/clocksource/dw_apb_timer_of.c
-index 4cbae4f..294aeb7 100644
---- a/drivers/clocksource/dw_apb_timer_of.c
-+++ b/drivers/clocksource/dw_apb_timer_of.c
-@@ -138,12 +138,10 @@ static void __init dw_apb_timer_init(struct device_node *timer)
- 	case 0:
- 		pr_debug("%s: found clockevent timer\n", __func__);
- 		add_clockevent(timer);
--		of_node_put(timer);
- 		break;
- 	case 1:
- 		pr_debug("%s: found clocksource timer\n", __func__);
- 		add_clocksource(timer);
--		of_node_put(timer);
- 		init_sched_clock();
- 		break;
- 	default:
-diff --git a/drivers/clocksource/tegra20_timer.c b/drivers/clocksource/tegra20_timer.c
-index 9396170..fc173a6 100644
---- a/drivers/clocksource/tegra20_timer.c
-+++ b/drivers/clocksource/tegra20_timer.c
-@@ -181,8 +181,6 @@ static void __init tegra20_init_timer(struct device_node *np)
- 		rate = clk_get_rate(clk);
- 	}
- 
--	of_node_put(np);
--
- 	switch (rate) {
- 	case 12000000:
- 		timer_writel(0x000b, TIMERUS_USEC_CFG);
-@@ -241,8 +239,6 @@ static void __init tegra20_init_rtc(struct device_node *np)
- 	else
- 		clk_prepare_enable(clk);
- 
--	of_node_put(np);
--
- 	register_persistent_clock(NULL, tegra_read_persistent_clock);
- }
- CLOCKSOURCE_OF_DECLARE(tegra20_rtc, "nvidia,tegra20-rtc", tegra20_init_rtc);
-diff --git a/drivers/clocksource/vt8500_timer.c b/drivers/clocksource/vt8500_timer.c
-index 64f553f..ad3c0e8 100644
---- a/drivers/clocksource/vt8500_timer.c
-+++ b/drivers/clocksource/vt8500_timer.c
-@@ -137,14 +137,12 @@ static void __init vt8500_timer_init(struct device_node *np)
- 	if (!regbase) {
- 		pr_err("%s: Missing iobase description in Device Tree\n",
- 								__func__);
--		of_node_put(np);
- 		return;
- 	}
- 	timer_irq = irq_of_parse_and_map(np, 0);
- 	if (!timer_irq) {
- 		pr_err("%s: Missing irq description in Device Tree\n",
- 								__func__);
--		of_node_put(np);
- 		return;
- 	}
- 
+baruch
+
+>  		panic("No clock nor clock-frequency property for %s", np->name);
+>  }
+>  
+> -static void add_clockevent(struct device_node *event_timer)
+> +static void __init add_clockevent(struct device_node *event_timer)
+>  {
+>  	void __iomem *iobase;
+>  	struct dw_apb_clock_event_device *ced;
+> @@ -82,7 +82,7 @@ static void add_clockevent(struct device_node *event_timer)
+>  static void __iomem *sched_io_base;
+>  static u32 sched_rate;
+>  
+> -static void add_clocksource(struct device_node *source_timer)
+> +static void __init add_clocksource(struct device_node *source_timer)
+>  {
+>  	void __iomem *iobase;
+>  	struct dw_apb_clocksource *cs;
+> @@ -117,7 +117,7 @@ static const struct of_device_id sptimer_ids[] __initconst = {
+>  	{ /* Sentinel */ },
+>  };
+>  
+> -static void init_sched_clock(void)
+> +static void __init init_sched_clock(void)
+>  {
+>  	struct device_node *sched_timer;
+>  
+> -- 
+> 1.8.4.rc3
+
 -- 
-1.8.4.rc3
+     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
