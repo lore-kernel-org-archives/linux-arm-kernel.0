@@ -1,69 +1,49 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Tue,  1 Oct 2013 00:21:12 -0300
-Subject: [PATCH 1/3] ARM: mach-imx: clk-imx51-imx53: Retrieve base address and
- irq from dt
-Message-ID: <1380597674-31122-1-git-send-email-festevam@gmail.com>
+Date: Tue,  1 Oct 2013 00:21:13 -0300
+Subject: [PATCH 2/3] ARM: mach-imx: mm-imx5: Retrieve tzic base address from dt
+In-Reply-To: <1380597674-31122-1-git-send-email-festevam@gmail.com>
+References: <1380597674-31122-1-git-send-email-festevam@gmail.com>
+Message-ID: <1380597674-31122-2-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Fabio Estevam <fabio.estevam@freescale.com>
 
-As mx53 is a dt-only SoC, we should retrieve the gpt base address and irq
-from the device tree, instead of using the old MX53_IO_ADDRESS method.
+As mx53 is a dt-only SoC, we should retrieve the tzic base address from the 
+device tree, instead of using the old MX53_IO_ADDRESS method.
 
 Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 ---
- arch/arm/mach-imx/clk-imx51-imx53.c | 15 +++++++++++----
- 1 file changed, 11 insertions(+), 4 deletions(-)
+ arch/arm/mach-imx/mm-imx5.c | 10 +++++++++-
+ 1 file changed, 9 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-imx/clk-imx51-imx53.c b/arch/arm/mach-imx/clk-imx51-imx53.c
-index 7c0dc45..03ca2e3 100644
---- a/arch/arm/mach-imx/clk-imx51-imx53.c
-+++ b/arch/arm/mach-imx/clk-imx51-imx53.c
-@@ -13,6 +13,9 @@
- #include <linux/clkdev.h>
- #include <linux/of.h>
- #include <linux/err.h>
-+#include <linux/of.h>
+diff --git a/arch/arm/mach-imx/mm-imx5.c b/arch/arm/mach-imx/mm-imx5.c
+index eb3cce3..2cafcf0 100644
+--- a/arch/arm/mach-imx/mm-imx5.c
++++ b/arch/arm/mach-imx/mm-imx5.c
+@@ -15,6 +15,7 @@
+ #include <linux/init.h>
+ #include <linux/clk.h>
+ #include <linux/pinctrl/machine.h>
 +#include <linux/of_address.h>
-+#include <linux/of_irq.h>
  
- #include "crm-regs-imx5.h"
- #include "clk.h"
-@@ -468,9 +471,10 @@ int __init mx51_clocks_init(unsigned long rate_ckil, unsigned long rate_osc,
- int __init mx53_clocks_init(unsigned long rate_ckil, unsigned long rate_osc,
- 			unsigned long rate_ckih1, unsigned long rate_ckih2)
+ #include <asm/mach/map.h>
+ 
+@@ -100,7 +101,14 @@ void __init mx51_init_irq(void)
+ 
+ void __init mx53_init_irq(void)
  {
--	int i;
-+	int i, irq;
- 	unsigned long r;
- 	struct device_node *np;
+-	tzic_init_irq(MX53_IO_ADDRESS(MX53_TZIC_BASE_ADDR));
++	struct device_node *np;
 +	void __iomem *base;
- 
- 	clk[pll1_sw] = imx_clk_pllv2("pll1_sw", "osc", MX53_DPLL1_BASE);
- 	clk[pll2_sw] = imx_clk_pllv2("pll2_sw", "osc", MX53_DPLL2_BASE);
-@@ -557,9 +561,6 @@ int __init mx53_clocks_init(unsigned long rate_ckil, unsigned long rate_osc,
- 	clk_set_rate(clk[esdhc_a_podf], 200000000);
- 	clk_set_rate(clk[esdhc_b_podf], 200000000);
- 
--	/* System timer */
--	mxc_timer_init(MX53_IO_ADDRESS(MX53_GPT1_BASE_ADDR), MX53_INT_GPT);
--
- 	clk_prepare_enable(clk[iim_gate]);
- 	imx_print_silicon_rev("i.MX53", mx53_revision());
- 	clk_disable_unprepare(clk[iim_gate]);
-@@ -567,6 +568,12 @@ int __init mx53_clocks_init(unsigned long rate_ckil, unsigned long rate_osc,
- 	r = clk_round_rate(clk[usboh3_per_gate], 54000000);
- 	clk_set_rate(clk[usboh3_per_gate], r);
- 
-+	np = of_find_compatible_node(NULL, NULL, "fsl,imx53-gpt");
++
++	np = of_find_compatible_node(NULL, NULL, "fsl,imx53-tzic");
 +	base = of_iomap(np, 0);
 +	WARN_ON(!base);
-+	irq = irq_of_parse_and_map(np, 0);
-+	mxc_timer_init(base, irq);
 +
- 	return 0;
++	tzic_init_irq(base);
  }
  
+ static struct sdma_platform_data imx51_sdma_pdata __initdata = {
 -- 
 1.8.1.2
