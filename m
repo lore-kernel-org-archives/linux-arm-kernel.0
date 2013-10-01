@@ -1,42 +1,34 @@
-From: sachin.kamat@linaro.org (Sachin Kamat)
-Date: Tue, 1 Oct 2013 12:24:09 +0530
-Subject: [PATCH 1/3] ahci: exynos: add ahci sata support on Exynos platform
-In-Reply-To: <1380609183-21430-2-git-send-email-yuvaraj.cd@samsung.com>
-References: <1380609183-21430-1-git-send-email-yuvaraj.cd@samsung.com>
- <1380609183-21430-2-git-send-email-yuvaraj.cd@samsung.com>
-Message-ID: <CAK9yfHxF76YjrdGo0-Yty5QcaJKhvtikWhxySoA6-NxjFDsuTA@mail.gmail.com>
+From: mingo@kernel.org (Ingo Molnar)
+Date: Tue, 1 Oct 2013 08:57:28 +0200
+Subject: [PATCH 2/3] nohz: Drop generic vtime obsolete dependency on
+ CONFIG_64BIT
+In-Reply-To: <1380550012-7321-3-git-send-email-fweisbec@gmail.com>
+References: <1380550012-7321-1-git-send-email-fweisbec@gmail.com>
+ <1380550012-7321-3-git-send-email-fweisbec@gmail.com>
+Message-ID: <20131001065728.GB19718@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Yuvaraj,
 
-On 1 October 2013 12:03, Yuvaraj Kumar C D <yuvaraj.cd@gmail.com> wrote:
-> Exynos5250 contains one Synopsys AHCI SATA controller.The avalaible
-> ahci_platform driver is not sufficient to handle the AHCI PHY and PHY
-> clock related initialization.
+* Frederic Weisbecker <fweisbec@gmail.com> wrote:
 
-> +err_out:
-> +               platform_set_drvdata(pdev, NULL);
+>  config VIRT_CPU_ACCOUNTING_GEN
+>  	bool "Full dynticks CPU time accounting"
+> -	depends on HAVE_CONTEXT_TRACKING && 64BIT
+> +	depends on HAVE_CONTEXT_TRACKING
+>  	depends on HAVE_VIRT_CPU_ACCOUNTING_GEN
+>  	select VIRT_CPU_ACCOUNTING
+>  	select CONTEXT_TRACKING
 
-This is not necessary. Driver core clears it upon detach or failure.
+> @@ -100,7 +100,6 @@ config NO_HZ_FULL
+>  	# RCU_USER_QS dependency
+>  	depends on HAVE_CONTEXT_TRACKING
+>  	# VIRT_CPU_ACCOUNTING_GEN dependency
+> -	depends on 64BIT
+>  	depends on HAVE_VIRT_CPU_ACCOUNTING_GEN
 
-> +               platform_device_put(ahci_pdev);
-> +               return ret;
-> +       }
-> +
-> +       return 0;
-> +}
-> +
-> +static int exynos_ahci_remove(struct platform_device *pdev)
-> +{
-> +       struct exynos_ahci_priv *priv = platform_get_drvdata(pdev);
-> +       struct platform_device *ahci_pdev = priv->ahci_pdev;
-> +
-> +       platform_device_unregister(ahci_pdev);
-> +       platform_set_drvdata(pdev, NULL);
+Yay!
 
-ditto
+Thanks,
 
--- 
-With warm regards,
-Sachin
+	Ingo
