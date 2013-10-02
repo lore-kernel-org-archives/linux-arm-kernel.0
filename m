@@ -1,192 +1,58 @@
-From: slapdau@yahoo.com.au (Craig McGeachie)
-Date: Wed, 02 Oct 2013 22:52:12 +1300
-Subject: [RFC PATCH 2/3] Enable BCM2835 mailbox support
-In-Reply-To: <524B8D7A.6080204@wwwdotorg.org>
-References: <5232F7C2.3070408@yahoo.com.au> <524B8D7A.6080204@wwwdotorg.org>
-Message-ID: <524BECCC.6030804@yahoo.com.au>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 2 Oct 2013 11:59:21 +0200
+Subject: [PATCH] serial: mxs-auart: wait for DMA buffer to flush before
+ shutdown
+In-Reply-To: <524BDD64.70309@digi.com>
+References: <1380644315-31581-1-git-send-email-hector.palacios@digi.com>
+ <20131001194800.GL2548@pengutronix.de> <524BCBC4.5050708@digi.com>
+ <20131002074436.GM2548@pengutronix.de> <524BD4A6.5060208@digi.com>
+ <20131002083014.GN2548@pengutronix.de> <524BDD64.70309@digi.com>
+Message-ID: <20131002095921.GP2548@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/02/2013 04:05 PM, Stephen Warren wrote:
-> On 09/13/2013 05:32 AM, Craig McGeachie wrote:
->> I would prefer something like
->>
->>   mailbox {
->>   	compatible = "brcm,bcm2835-mbox";
->>    	reg = <0x7e00b800 0x400>;
->>   	reg = <0x7e00b880 0x40>;
->
-> You can only have one reg property. It could have two separate entries
-> if required, but I don't see a need for that.
+Hi Hector,
 
-Ooops.  Sorry, that was a typo.  Lubomir's orginal patch had 0x400, and 
-after I figured out 0x40 was a more reasonable size I corrected what I 
-thought was a typo by apparently creating a cut'n'paste error.
+On Wed, Oct 02, 2013 at 10:46:28AM +0200, Hector Palacios wrote:
+> On 10/02/2013 10:30 AM, Uwe Kleine-K?nig wrote:
+> >On Wed, Oct 02, 2013 at 10:09:10AM +0200, Hector Palacios wrote:
+> >>On 10/02/2013 09:44 AM, Uwe Kleine-K?nig wrote:
+> >>>Ah, right. (BTW, uart_update_timeout should better round up instead of
+> >>>round down, i.e.
+> >>>-	port->timeout = (HZ * bits) / baud + HZ/50;
+> >>>+	port->timeout = DIV_ROUND_UP(HZ * bits, baud) + HZ/50;
+> >>>)
+> >>>
+> >>>>UART_XMIT_SIZE is the number of bytes in the DMA buffer, so I divide
+> >>>>the max number of bytes in the FIFO by the FIFO size and multiply by
+> >>>>the FIFO timeout.
+> >>>ditto here, better round up. Although I think using a completion could
+> >>>shorten the timeout considerably because there are often less than
+> >>>UART_XMIT_SIZE chars in the buffer?!
+> >>
+> >>I'm not really waiting the full timeout. I'm checking for TX fifo
+> >>empty every 1ms and for a maximum of 'to' ms.
+> >Correct. Still using DIV_ROUND_UP would be better, right?
+> 
+> I think it is not really needed, after all the code is adding HZ/50
+> of slop which acts like a round up, doesn't it?
+> 
+> 	/*
+> 	 * Figure the timeout to send the above number of bits.
+> 	 * Add .02 seconds of slop
+> 	 */
+> 	port->timeout = (HZ * bits) / baud + HZ/50;
+According to my understanding (which could well be wrong) the slop of
+HZ/50 isn't there to fix rounding issues in the previous division. But
+yes, if it's calculated generously there is no technical need to fix the
+rounding issue.
 
->
->>   	interrupts = <0 1>;
->> 	#address-cells = <1>;
->
-> You'll need #size-cells too, probably with value 0 since the concept of
-> size doesn't really apply here.
+Still it might be worth to fix it to be a better reference. I don't care
+much.
 
-Yes, I discovered that.
+Best regards
+Uwe
 
-> I wonder if #address-cells might not need to be more than 1 in order to
-> generate unique addresses for the multiple devices that hang off the
-> property channel?
-
-See below.
-
->
-> And a blank line before the nodes.
->
->> 	brcm,channel at 0 = {
->
-> Node names don't have a vendor prefix.
-
-That's useful to know.  I was going by Power_ePAPR_APPROVED_v1.1.pdf 
-which has nothing standard about mailboxes or channels.
-
->> 		reg = <0>;
->> 		brcm,channel-name = "power";
->
-> I don't see a need for a channel name.
-
-There is no need for a channel name in the DTS other than documentation, 
-but I now think that a better way to do it is #define's for the numbers. 
-  That works for the reg values, but I'm not so sure about the node names.
-
->
->> 	};
->> 	[...etc...]
->>   };
->>
->> But I thought that might be too fussy, or too hard for a boot loader to
->> populate.
->
-> Why would the bootloader populate this? Presumably the entire mailbox
-> node (and its children) would be statically part of the DT that the
-> bootloader reads from disk.
-
-That seems like a probable implementation.  But I didn't want to second 
-guess the possibility of the boot loader just dynamically generating the 
-lot.  Even if that does like a far fetched idea.  I only thing that I 
-can be sure of is that the bootloader will have to modify parts of the 
-tree.  To the best of my knowledge, it's the only way to get HDMI 
-display dimensions and memory size. And I have both revisions of the 
-model B, so I'd like to get it right.
-
->> @@ -4,12 +4,19 @@ Required properties:
->>
->>   - compatible : should be "brcm,bcm2835-mbox"
->>   - reg : Specifies base physical address and size of the registers.
->> -- interrupts : the interrupt number
->> +- interrupts : the interrupt number. Must be <0 1>, the mailbox interrupt.
->
-> The binding should specify the schema, not the data. <0 1> is only true
-> in the case where the mailbox IP is hooked into a particular SoC. The
-> binding could theoretically be used on other SoCs with different
-> interrupt assignments.
-
-Noted.
-
->> +- brcm,channel-nums : The mailbox channels in use.
->> +- brcm,channel-names : list of symbolic channel names for mailbox clients to
->> +  use.
->> +
->> +The number of channel numbers must match the number of channel names.
->
-> As mentioned above, I see no reason to name/number the channels in this
-> way. I prefer using the reg address in child nodes to represent this
-> information.
-
-The channel names simply came about because that's how the mailbox 
-subsystem is implemented.  Not that this is a reason to expose names in 
-the DTS.  It occurs to me that the string "8" would be just as valid a 
-channel name internally as anything else.  Might be a bit cryptic in 
-kernel messages though.  As I said, I'm beginning to think that symbolic 
-defines for the channel numbers would be a better form of documentation. 
-  I'd only recently stumbled across a reference to them as something 
-that dtc now implements.
-
-> I would expect to see something like:
->
-> mailbox {
-> 	compatible = "brcm,bcm2835-mbox";
-> 	reg = <0x7e00b800 0x400>;
-> 	interrupts = <0 1>;
-> 	#address-cells = <1>;
-> 	#size-cells = <1>;
->
-> 	regulator at 0 {
-> 		compatible = "brcm,bcm2835-mbox-power";
-> 		reg = <0>;
-> 		... /* various regulator nodes */
-> 	};
->
-> 	/* or perhaps use @8 for the property FB interface */
-> 	framebuffer at 1 {
-> 		compatible = "brcm,bcm2835-mbox-fb";
-> 		reg = <1>;
-> 		...
-> 	};
->
-> 	serial at 2 {
-> 		compatible = "brcm,bcm2835-mbox-uart";
-> 		reg = <2>;
-> 		...
-> 	};
->
-> 	clock at 8 {
-> 		compatible = "brcm,bcm2835-mbox-clock";
-> 		reg = <1>;
-> 		#clock-cells = <1>;
-> 		...
-> 	};
->
-> 	...
-> };
-
-That's very interesting.  I'm not going to make any comments right now. 
-  I need to look at it an think for a few days.  But I will leave you 
-another idea that I started implementing last night:
-
-mailbox {
-	compatible = "brcm,bcm2835-mbox";
-	reg = <0x7e00b880 0x40>;
-	interrupts = <0 1>;
-	#address-cells = <1>;
-	#size-cells = <0>;
-	power at 0 {
-		reg = <0>;
-	};
-	fb at 1 {
-		reg = <1>;
-	};
-	vchiq at 1 {
-		reg = <3>;
-	};
-	props_mbox: property at 8 {
-		reg = <8>;
-	};
-};
-
-thermal {
-	compatible = "brcm,bcm2835-thermal";
-	brcm,channel = <&props_mbox>;
-};
-
-Other than that I have an unresolved bug with getting the right channel 
-number, it seems to work.  #address-cells and #size-cells are set as you 
-said, but because the mailbox is not a registered bus, I can't use any 
-of_ functions that rely on it being one.  Which means I have to loop 
-over the child node and process the reg properties directly.
-
-I have next to no knowledge about mailboxes on other systems, but I am 
-wondering if actually registering as a bus, or at least a class, would 
-be a good idea.  Or some standard of_ support for mailboxes.  If it does 
-get written, it won't be me.  All I've got is Raspberry Pi's.
-
-Cheers,
-Craig.
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
