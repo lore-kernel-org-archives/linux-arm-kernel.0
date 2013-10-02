@@ -1,103 +1,79 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Wed, 2 Oct 2013 18:31:57 +0100
-Subject: [PATCH v6 12/19] swiotlb: don't assume that
- io_tlb_start-io_tlb_end is coherent
-In-Reply-To: <20130930155617.GS3106@phenom.dumpdata.com>
-References: <alpine.DEB.2.02.1309271653420.5498@kaball.uk.xensource.com>
- <1380298207-29151-12-git-send-email-stefano.stabellini@eu.citrix.com>
- <20130930155617.GS3106@phenom.dumpdata.com>
-Message-ID: <alpine.DEB.2.02.1310021826410.26077@kaball.uk.xensource.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Wed, 2 Oct 2013 13:39:11 -0400
+Subject: [PATCH v2 00/12] CPU idle for Armada XP
+In-Reply-To: <1379066801-16276-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1379066801-16276-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20131002173911.GP31178@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 30 Sep 2013, Konrad Rzeszutek Wilk wrote:
-> On Fri, Sep 27, 2013 at 05:10:00PM +0100, Stefano Stabellini wrote:
-> > The swiotlb code has appropriate calls to dma_mark_clean in place for
-> > buffers passed to swiotlb_map_page as an argument. However it assumes
-> > that the swiotlb bounce buffer (io_tlb_start-io_tlb_end) is already
-> > coherent and doesn't need any calls to dma_mark_clean.
-> > 
-> > On ARM the swiotlb bounce buffer is not coherent (the memory is
-> > writealloc while it should be bufferable) and therefore we need to call
-> > dma_mark_clean appropriately on the bounce buffer code paths too.
-> > 
-> > Note that most architecures have an empty dma_mark_clean implementation
-> > anyway.
+Gregory,
+
+On Fri, Sep 13, 2013 at 12:06:29PM +0200, Gregory CLEMENT wrote:
+> Hello,
 > 
-> The other architecture that uses swiotlb is IA64 and that does have
-> an implementation where it touches on page attributes.
+> This patch set adds the CPU idle support for Armada XP and prepares
+> the support for Armada 370. This was based on the work of Nadav
+> Haklai.
 > 
-> Which means I have to figure out why my HP zx6000 won't boot with 3.11 now :-(
+> Most of the patches modify the mvebu code in order to prepare the
+> support for CPU idle, hence the patches 2 to 10 should go to mvebu
+> subsystem (and then arm-soc).
 > 
-
-Now this is a very thorny issue.
-
-Honestly I don't like the dma_mark_clean interface very much: it's one
-big hammer, when we actually need some finesse to handle coherency.
-
-For example on ARM some devices might not need the dma_mark_clean call,
-while others do. Calling it all the times is at the very best
-inefficient and incorrect at worst.
-
-I am thinking of calling the original map/unmap_page functions instead
-(arm_dma_map_page or arm_coherent_dma_map_page in the arm case).
-However in order to do that I would need to add more __get_dma_ops calls in
-both lib/swiotlb.c and drivers/xen/swiotlb-xen.c
-
-
-> > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> > ---
-> >  lib/swiotlb.c |   13 ++++++++++---
-> >  1 files changed, 10 insertions(+), 3 deletions(-)
-> > 
-> > diff --git a/lib/swiotlb.c b/lib/swiotlb.c
-> > index 4e8686c..eb45d17 100644
-> > --- a/lib/swiotlb.c
-> > +++ b/lib/swiotlb.c
-> > @@ -515,6 +515,7 @@ found:
-> >  		io_tlb_orig_addr[index+i] = orig_addr + (i << IO_TLB_SHIFT);
-> >  	if (dir == DMA_TO_DEVICE || dir == DMA_BIDIRECTIONAL)
-> >  		swiotlb_bounce(orig_addr, tlb_addr, size, DMA_TO_DEVICE);
-> > +	dma_mark_clean(phys_to_virt(tlb_addr), size);
-> >  
-> >  	return tlb_addr;
-> >  }
-> > @@ -547,7 +548,10 @@ void swiotlb_tbl_unmap_single(struct device *hwdev, phys_addr_t tlb_addr,
-> >  	 * First, sync the memory before unmapping the entry
-> >  	 */
-> >  	if (orig_addr && ((dir == DMA_FROM_DEVICE) || (dir == DMA_BIDIRECTIONAL)))
-> > +	{
-> > +		dma_mark_clean(phys_to_virt(tlb_addr), size);
-> >  		swiotlb_bounce(orig_addr, tlb_addr, size, DMA_FROM_DEVICE);
-> > +	}
-> >  
-> >  	/*
-> >  	 * Return the buffer to the free list by setting the corresponding
-> > @@ -587,17 +591,20 @@ void swiotlb_tbl_sync_single(struct device *hwdev, phys_addr_t tlb_addr,
-> >  
-> >  	switch (target) {
-> >  	case SYNC_FOR_CPU:
-> > -		if (likely(dir == DMA_FROM_DEVICE || dir == DMA_BIDIRECTIONAL))
-> > +		if (likely(dir == DMA_FROM_DEVICE || dir == DMA_BIDIRECTIONAL)) {
-> > +			dma_mark_clean(phys_to_virt(tlb_addr), size);
-> >  			swiotlb_bounce(orig_addr, tlb_addr,
-> >  				       size, DMA_FROM_DEVICE);
-> > +		}
-> >  		else
-> >  			BUG_ON(dir != DMA_TO_DEVICE);
-> >  		break;
-> >  	case SYNC_FOR_DEVICE:
-> > -		if (likely(dir == DMA_TO_DEVICE || dir == DMA_BIDIRECTIONAL))
-> > +		if (likely(dir == DMA_TO_DEVICE || dir == DMA_BIDIRECTIONAL)) {
-> >  			swiotlb_bounce(orig_addr, tlb_addr,
-> >  				       size, DMA_TO_DEVICE);
-> > -		else
-> > +			dma_mark_clean(phys_to_virt(tlb_addr), size);
-> > +		} else
-> >  			BUG_ON(dir != DMA_FROM_DEVICE);
-> >  		break;
-> >  	default:
-> > -- 
-> > 1.7.2.5
-> > 
+> The first patch should go through ARM subsystem and should be taken
+> by Russell King.
 > 
+> The 11th patch 'cpuidle: mvebu: Add initial cpu idle support for
+> Armada 370/XP SoC' is the only one who should go to the cpuidle
+> subsystem. But of course I would like that Daniel Lezcano or Rafael
+> J. Wysocki have a look on the whole series.
+> 
+> The last patch should also go to mvebu subsystem (and then arm-soc)
+> but with an Acked-by from on of the device tree maintainer.
+> 
+> The whole series is also available in the branch CPU-idle-ArmadaXP-v2
+> at https://github.com/MISL-EBU-System-SW/mainline-public.git
+> 
+> Thanks,
+> 
+> Changelog:
+> 
+> v1 -> v2:
+> 
+> * Removed the pm_level kernel parameter. As Kevin Hilman pointed, its
+>   usage can be replaced by using
+>   /sys/devices/system/cpu/cpu*/cpuidle/state*/disable or the kernel
+>   parameter cpuidle.off.
+> 
+> * Used BIT() macro (reported by Ezequiel)
+> 
+> * Made the function more readable the
+>   armada_370_xp_pmsu_idle_prepare() function (reported by Thomas)
+> 
+> * Moved the config entry in Kconfig.arm, and rename the config symbol
+>   according the pattern used by other arm cpu: ARM_"soc name"_CPUIDLE
+> 
+> * Moved the build rule under the new ARM SoC section in the Makefile
+> 
+> * Rebased on Linus Torvalds master branch of Thursday September 12
+> 
+> Gregory CLEMENT (12):
+>   ARM: PJ4B: Add cpu_suspend/cpu_resume hooks for PJ4B
+>   ARM: mvebu: ll_set_cpu_coherent no more uses the coherency address as
+>     parameter
+>   ARM: mvebu: ll_set_cpu_coherent always uses the current CPU
+>   ARM: mvebu: Remove the unused argument of set_cpu_coherent()
+>   ARM: mvebu: Make ll_set_cpu_coherent() more configurable
+>   ARM: mvebu: Low level functions to disable cache snooping
+>   ARM: mvebu: Add a new set of registers for pmsu
+>   ARM: mvebu: Allow to power down L2 cache controller in idle mode
+>   ARM: mvebu: Add the PMSU related part of the cpu idle functions
+>   ARM: mvebu: Set the start address of a CPU in a separate function
+>   cpuidle: mvebu: Add initial CPU idle support for Armada 370/XP SoC
+>   ARM: dts: mvebu: Add a new set of registers to the PMSU node
+
+Is a v3 of this series on it's way?
+
+thx,
+
+Jason.
