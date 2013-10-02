@@ -1,10 +1,10 @@
 From: b.brezillon@overkiz.com (Boris BREZILLON)
-Date: Wed,  2 Oct 2013 14:34:57 +0200
+Date: Wed,  2 Oct 2013 14:35:20 +0200
 Subject: [PATCH 1/3] ARM: at91/tc/clocksource: replace clk_enable/disable with
  clk_prepare_enable/disable_unprepare
 In-Reply-To: <1380717265-6497-1-git-send-email-b.brezillon@overkiz.com>
 References: <1380717265-6497-1-git-send-email-b.brezillon@overkiz.com>
-Message-ID: <1380717297-6537-1-git-send-email-b.brezillon@overkiz.com>
+Message-ID: <1380717320-6575-1-git-send-email-b.brezillon@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
