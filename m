@@ -1,27 +1,33 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 2 Oct 2013 13:58:16 -0400
-Subject: [PATCH v2 00/12] CPU idle for Armada XP
-In-Reply-To: <524C5B99.4080802@free-electrons.com>
-References: <1379066801-16276-1-git-send-email-gregory.clement@free-electrons.com>
- <20131002173911.GP31178@titan.lakedaemon.net>
- <524C5B99.4080802@free-electrons.com>
-Message-ID: <20131002175816.GS31178@titan.lakedaemon.net>
+From: dmurphy@ti.com (Dan Murphy)
+Date: Wed, 2 Oct 2013 12:58:33 -0500
+Subject: [PATCH] ARM: dts: AM33XX: add ethernet alias's for am33xx
+Message-ID: <1380736713-24678-1-git-send-email-dmurphy@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 02, 2013 at 08:44:57PM +0300, Gregory CLEMENT wrote:
-> On 02/10/2013 20:39, Jason Cooper wrote:
-...
-> > Is a v3 of this series on it's way?
-> 
-> Yes I got some feedback from the Marvell engineers about the tricky part.
-> 
-> However I am quite busy this week, I am not sure to be able to sent it
-> before Monday.
+Set the alias for ethernet0 and ethernet1 so that uBoot
+can set the MAC address appropriately.
 
-Ok, it was just sitting in my stack and wanted to make sure no one was
-assuming it should go in as is.  :)
+Currently uBoot cannot find the alias and there for does not set the
+MAC address.
 
-thx,
+Signed-off-by: Dan Murphy <dmurphy@ti.com>
+---
+ arch/arm/boot/dts/am33xx.dtsi |    2 ++
+ 1 file changed, 2 insertions(+)
 
-Jason.
+diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
+index 553adc6..8aabaa0 100644
+--- a/arch/arm/boot/dts/am33xx.dtsi
++++ b/arch/arm/boot/dts/am33xx.dtsi
+@@ -30,6 +30,8 @@
+ 		usb1 = &usb1;
+ 		phy0 = &usb0_phy;
+ 		phy1 = &usb1_phy;
++		ethernet0 = &cpsw_emac0;
++		ethernet1 = &cpsw_emac1;
+ 	};
+ 
+ 	cpus {
+-- 
+1.7.9.5
