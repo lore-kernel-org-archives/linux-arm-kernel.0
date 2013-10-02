@@ -1,66 +1,53 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 2 Oct 2013 11:44:47 +0100
-Subject: [PATCH 6/6] iommu/arm-smmu: Support buggy implemenations where
- all config accesses are secure
-In-Reply-To: <20131001181709.GZ3315@alberich>
-References: <1380631150-10783-1-git-send-email-andreas.herrmann@calxeda.com>
- <1380631150-10783-7-git-send-email-andreas.herrmann@calxeda.com>
- <524ACE13.4020309@gmail.com> <20131001181709.GZ3315@alberich>
-Message-ID: <20131002104447.GE28311@mudshark.cambridge.arm.com>
+Date: Wed, 2 Oct 2013 11:46:26 +0100
+Subject: [PATCH] arm64: check for number of arguments in
+ syscall_get/set_arguments()
+In-Reply-To: <524BC11D.2050003@linaro.org>
+References: <1380605584-22125-1-git-send-email-takahiro.akashi@linaro.org>
+ <20131001091919.GA17667@mudshark.cambridge.arm.com>
+ <524BC11D.2050003@linaro.org>
+Message-ID: <20131002104625.GF28311@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 01, 2013 at 07:17:09PM +0100, Andreas Herrmann wrote:
-> On Tue, Oct 01, 2013 at 09:28:51AM -0400, Rob Herring wrote:
-> > On 10/01/2013 07:39 AM, Andreas Herrmann wrote:
-> > > In such a case we have to use secure aliases of some non-secure
-> > > registers.
-> > > 
-> > > This behaviour is controlled via a flag in smmu->bugs. It is set
-> > > based on DT information when probing an SMMU device.
-> > 
-> > Perhaps quirks would be a nicer word...
+On Wed, Oct 02, 2013 at 07:45:49AM +0100, AKASHI Takahiro wrote:
+> On 10/01/2013 06:19 PM, Will Deacon wrote:
+> > On Tue, Oct 01, 2013 at 06:33:04AM +0100, AKASHI Takahiro wrote:
+> >> In ftrace_syscall_enter(),
+> >>      syscall_get_arguments(..., 0, n, ...)
+> >> 	if (i == 0) { <handle orig_x0> ...; n--;}
+> >> 	memcpy(..., n * sizeof(args[0]));
+> >> If 'number of arguments(n)' is zero and 'argument index(i)' is also zero in
+> >> syscall_get_arguments(), none of arguments should be copied by memcpy().
+> >> Otherwise 'n--' can be a big positive number and unexpected amount of data
+> >> will be copied. Tracing system calls which take no argument, say sync(void),
+> >> may hit this case and eventually make the system corrupted.
+> >> This patch fixes the issue both in syscall_get_arguments() and
+> >> syscall_set_arguments().
+> >>
+> >> Please note, however, that asm-generic/syscall.h says,
+> >>   * syscall_get_arguments - extract system call parameter values
+> >>   * @i:          argument index [0,5]
+> >>   * @n:          number of arguments; n+i must be [1,6].
+> >> and so we'd better change the caller's code(ftrace_syscall_enter).
+> >
+> > Since (most) other architectures deal with n+i == 0, please can you submit a
+> > separate patch updating that comment?
 > 
-> In fact it might be better to rename this as "options".
-> For device isolation I had added a flag to indicate this in
-> smmu->features.
-> But it might be better to not mix hardware features with software
-> features or options.
+> Yes, I will. But is the patch that only modifies a comment acceptable?
 
-Yes, I also didn't like the mixing of hardware and software features, but I
-couldn't think of a good way to separate them out. Sounds like you might be
-on to something.
+Well, if the comment is wrong is should either be fixed or removed. Leaving
+it alone just serves to confuse other architectures trying to implement the
+backend API.
 
-> So what do you (Will and Rob) think about a change like
+Of course, if the comment is *correct*, then the tracer is broken, but we
+can have that discussion off the back of the patch (just be sure to CC the
+right people).
+
+> > Looks sensible. Please can you fix arch/arm/ as well?
 > 
->  struct arm_smmu_device {
->    ...
-> 
->  #define ARM_SMMU_FEAT_COHERENT_WALK     (1 << 0)
->  #define ARM_SMMU_FEAT_STREAM_MATCH      (1 << 1)
->  #define ARM_SMMU_FEAT_TRANS_S1          (1 << 2)
->  #define ARM_SMMU_FEAT_TRANS_S2          (1 << 3)
->  #define ARM_SMMU_FEAT_TRANS_NESTED      (1 << 4)
->          u32                             features;
-> + #define ARM_SMMU_OPT_SECURE_CFG_ACCESS  (1 << 0)
-> + #define ARM_SMMU_OPT_ISOLATE_DEVICES    (1 << 1)
-> +        u32                             options;
->          int                             version;
+> Yes, I will.
 
-I'm ok with this change, but it gets you guys off the hook with your broken
-integration!
-
->    ...
->  }
-> 
-> DT property "calxeda,smmu-secure-cfg-access" would set
-> ARM_SMMU_OPT_SECURE_CFG_ACCESS and
-> DT property "linux,arm-smmu-isolate-devices" would set
-> ARM_SMMU_OPT_ISOLATE_DEVICES.
-> 
-> (Maybe in future there will be more driver options. )
-
-Yeah, and you could probably go all out with macros to generate this stuff
-based on compatible string and OPT #define too.
+Thanks!
 
 Will
