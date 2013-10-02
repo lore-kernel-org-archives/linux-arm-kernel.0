@@ -1,58 +1,37 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 2 Oct 2013 13:14:26 -0500
-Subject: [PATCH] sched_clock: fix postinit no sched_clock function check
-In-Reply-To: <524C5B10.20006@codeaurora.org>
-References: <1380732928-13897-1-git-send-email-santosh.shilimkar@ti.com>
- <20131002170917.GB30298@mudshark.cambridge.arm.com>
- <524C5484.5000601@ti.com> <524C565C.8010709@codeaurora.org>
- <524C5786.2090008@ti.com> <524C5B10.20006@codeaurora.org>
-Message-ID: <CAL_JsqLYArFsA2aX2fqTepXOenLzwM5HFfmYCDosBVWSaCmC1A@mail.gmail.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Wed, 2 Oct 2013 11:32:12 -0700
+Subject: [PATCH v5 0/4] Target CPU=Host implementation for KVM ARM/ARM64
+In-Reply-To: <524C4725.3060700@arm.com>
+References: <1380531008-15901-1-git-send-email-anup.patel@linaro.org>
+ <20131002160444.GA49034@lvm> <524C4725.3060700@arm.com>
+Message-ID: <20131002183212.GB5108@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 2, 2013 at 12:42 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> On 10/02/13 10:27, Santosh Shilimkar wrote:
->> On Wednesday 02 October 2013 01:22 PM, Stephen Boyd wrote:
->>> On 10/02/13 10:14, Santosh Shilimkar wrote:
->>>> On Wednesday 02 October 2013 01:09 PM, Will Deacon wrote:
->>>>> On Wed, Oct 02, 2013 at 05:55:28PM +0100, Santosh Shilimkar wrote:
->>>>>> The sched_clock code uses 2 levels of function pointers, sched_clock_func()
->>>>>> and read_sched_clock() but the no sched_clock check in postinit() just
->>>>>> checks read_sched_clock().
->>>>>>
->>>>>> This leads to kernel falling back to jiffy based sched clock even in
->>>>>> presence of sched_clock_func() which is not desirable.
->>>>>>
->>>>>> Fix the postinit() check to avoid the issue. Probably the issue is hidden
->>>>>> so far on most of the arm SOCs because of already existing sched_clock
->>>>>> registrations apart from arch_timer sched_clock. One can reproduce the
->>>>>> issue by just have arch_timer as sched_clock
->>>>> Isn't this just an issue with the arch timer driver not calling
->>>>> setup_sched_clock? Instead, we munge around with sched_clock_func directly,
->>>>> which doesn't appear to be the way anybody else deals with this.
->>>>>
->>>> I thought about that option as well but was not sure since even in that case
->>>> the check is not complete. We just ensure that function is popullated.
->>> Yes, nothing is actually broken because sched_clock_func() won't try to
->>> use the jiffy based read_sched_clock() function. I'm not sure we
->>> actually need this patch besides to remove a useless timer that updates
->>> the jiffy epoch. Can we wait until my 64-bit sched_clock patch series
->>> lands in 3.13? It looks like I still need an ack from Will or Catalin on
->>> the architected timer patch before the clocksource folks pick it up.
->>>
->> Really... I have not created patch out of fun.
->> Its broken on my keystone machine at least where the sched_clock is
->> falling back on jiffy based sched_clock even in presence of arch_timer
->> sched_clock.
->
-> How is that possible? sched_clock_func is only assigned by
-> arch/arm/kernel/arch_timer.c when the architected timer is detected and
-> sched_clock() in kernel/time/sched_clock.c calls that function pointer
-> unconditionally. The only way I see this happening is if the architected
-> timer rate is zero. I agree we will get two lines in the dmesg about
-> sched_clock and its not very clear which one is being used.
+On Wed, Oct 02, 2013 at 05:17:41PM +0100, Marc Zyngier wrote:
+> On 02/10/13 17:04, Christoffer Dall wrote:
+> > On Mon, Sep 30, 2013 at 02:20:04PM +0530, Anup Patel wrote:
+> >> It will be very useful for user space (QEMU/KVMTOOL) if it has a
+> >> method of querying VCPU target type matching to underlying Host.
+> >> We can use such querying mechanism and implement machine models
+> >> in user space where VCPU target type is always same-as/similar-to
+> >> underlying Host (i.e. Target CPU=Host).
+> >>
+> >> This patch series implements KVM_ARM_PREFERRED_TARGET vm ioclt for
+> >> querying VCPU target type matching underlying host. Using this new
+> >> ioctl we can implement VCPU target CPU=Host in user space.
+> >>
+> >> Also, it is not mandatory to call KVM_ARM_PREFERRED_TARGET vm ioctl
+> >> and the old method of trying all possible target types using the
+> >> KVM_ARM_VCPU_INIT ioctl to initialize VCPU works fine.
+> >>
+> > Looks good to me, as soon as Marc acks this one, I'll merge it.
+> 
+> Yup, go for it:
+> 
+> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+> 
+Cool, merged in kvm-arm-next, tested with changes to experimental qemu
+mach-virt patches on vexpress TC2.
 
-It does setup a timer to run to handle wrapping which should be
-harmless, but isn't needed.
-
-Rob
+-Christoffer
