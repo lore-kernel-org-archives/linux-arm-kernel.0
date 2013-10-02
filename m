@@ -1,53 +1,116 @@
-From: maxime.coquelin@st.com (Maxime COQUELIN)
-Date: Wed, 2 Oct 2013 15:56:39 +0200
-Subject: [PATCH 1/4] i2c: busses: i2c-st: Add ST I2C controller
-In-Reply-To: <524BE8FB.40000@st.com>
-References: <1380623952-4252-1-git-send-email-maxime.coquelin@st.com>
- <1380623952-4252-2-git-send-email-maxime.coquelin@st.com>
- <524B346C.8070607@wwwdotorg.org> <524BDB00.3010508@st.com>
- <20131002090257.GA3059@katana> <524BE8FB.40000@st.com>
-Message-ID: <524C2617.5070401@st.com>
+From: hector.palacios@digi.com (Hector Palacios)
+Date: Wed, 2 Oct 2013 16:01:47 +0200
+Subject: [PATCH v2 2/2] serial: mxs-auart: wait for FIFO to flush before
+ shutdown
+In-Reply-To: <20131002122222.GQ2548@pengutronix.de>
+References: <1380715364-8025-1-git-send-email-hector.palacios@digi.com>
+ <1380715364-8025-3-git-send-email-hector.palacios@digi.com>
+ <20131002122222.GQ2548@pengutronix.de>
+Message-ID: <524C274B.3020409@digi.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pawel,
+Hello Uwe,
 
-On 10/02/2013 11:35 AM, Maxime Coquelin wrote:
+On 10/02/2013 02:22 PM, Uwe Kleine-K?nig wrote:
+> Hello Hector,
 >
-> On 10/02/2013 11:02 AM, Wolfram Sang wrote:
->>>>> +Optional properties :
->>>>> +- i2c-min-scl-pulse-width-us : The minimum valid SCL pulse width 
->>>>> that is allowed
->>>>> +  through the deglitch circuit. In units of us.
->>>>> +- i2c-min-sda-pulse-width-us : The minimum valid SDA pulse width 
->>>>> that is allowed
->>>>> +  through the deglitch circuit. In units of us.
->>>> Are those properties specific to this binding, or intended to be
->>>> generic? If specific to this binding, a vendor prefix should be 
->>>> present
->>>> in the property name. If not, you probably want to document the
->>>> properties in some common file.
->>> Ok.
->>> In last revision, I put this properties as specific to this binding.
->>> Wolfram proposed to make this generic, but it looks like this IP is the
->>> only one
->>> needing such properties.
->>>
->>> Wolfram, what would you advise?
->> It might be the only SoC now, but I could imagine that other will have
->> something similar in the future. I am not perfectly sure, though. So, I
->> asked for opinions from DT experts when I suggested those bindings. We
->> could start with vendor specific bindings and generalize them later if
->> similar ones appear. Yet my experience is that old drivers rarely get
->> converted to the new bindings.
-> Ok.
-> But if I start with vendor specific bindings, we will have to support it
-> forever, right?
-I would be glad to have your opinion on this.
+> On Wed, Oct 02, 2013 at 02:02:44PM +0200, Hector Palacios wrote:
+>> The shutdown function was not waiting for the FIFO (which may be the
+>> real 16 byte FIFO or the DMA buffer, if DMA is enabled) to flush
+>> before disabling the AUART.
+>> This lead to many bytes not being transferred (specially at low
+>> baudrates), as they were still in the DMA buffer when the AUART was
+>> shutdown.
+>> This patch also adds the check for the BUSY flag before disabling
+>> the AUART.
+>>
+>> Signed-off-by: Hector Palacios <hector.palacios@digi.com>
+>> ---
+>>   drivers/tty/serial/mxs-auart.c | 13 +++++++++++++
+>>   1 file changed, 13 insertions(+)
+>>
+>> diff --git a/drivers/tty/serial/mxs-auart.c b/drivers/tty/serial/mxs-auart.c
+>> index 9f046177..589b595 100644
+>> --- a/drivers/tty/serial/mxs-auart.c
+>> +++ b/drivers/tty/serial/mxs-auart.c
+>> @@ -757,9 +757,22 @@ static int mxs_auart_startup(struct uart_port *u)
+>>   	return 0;
+>>   }
+>>
+>> +static unsigned int mxs_auart_tx_empty(struct uart_port *u);
+>> +
+>>   static void mxs_auart_shutdown(struct uart_port *u)
+>>   {
+>>   	struct mxs_auart_port *s = to_auart_port(u);
+>> +	unsigned int to;
+>> +
+>> +	/* Wait for the FIFO to flush */
+>> +	to = u->timeout;
+>> +	while (!mxs_auart_tx_empty(u) && to--)
+>> +		mdelay(1);
+>> +
+>> +	/* Wait for UART to become idle ... */
+>> +	to = u->timeout;
+>> +	while ((readl(u->membase + AUART_STAT) & AUART_STAT_BUSY) && to--)
+>> +		mdelay(1);
+> If the 2nd loop is needed the tx_empty callback is buggy. According to
+> Documentation/serial/driver tx_empty "tests whether the transmitter fifo
+> and shifter for the port [...] is empty". I guess it only tests for the
+> fifo part? Time for another fix ...
 
-Since there are no other vendors currently having this feature,
-should we put these properties vendor specific?
-Or put them generic in case of someone has the same feature in the future?
+Do you mean the tx_empty should check both for TX_FIFO and !BUSY, right?
+I did it so because I thought the BUSY was also set during rx, but it is really only 
+used to signal tx operation.
 
-Thanks,
-Maxime
+That would turn this patch into this:
+
+@@ -755,13 +755,21 @@ static int mxs_auart_startup(struct uart_port *u)
+  	writel(AUART_LINECTRL_FEN, u->membase + AUART_LINECTRL_SET);
+
+  	return 0;
+  }
+
++static unsigned int mxs_auart_tx_empty(struct uart_port *u);
++
+  static void mxs_auart_shutdown(struct uart_port *u)
+  {
+  	struct mxs_auart_port *s = to_auart_port(u);
++	unsigned int to;
++
++	/* Wait for the FIFO to flush */
++	to = u->timeout;
++	while (!mxs_auart_tx_empty(u) && to--)
++		mdelay(1);
+
+  	if (auart_dma_enabled(s))
+  		mxs_auart_dma_exit(s);
+
+  	writel(AUART_CTRL2_UARTEN, u->membase + AUART_CTRL2_CLR);
+@@ -774,14 +782,15 @@ static void mxs_auart_shutdown(struct uart_port *u)
+  	clk_disable_unprepare(s->clk);
+  }
+
+  static unsigned int mxs_auart_tx_empty(struct uart_port *u)
+  {
+-	if (readl(u->membase + AUART_STAT) & AUART_STAT_TXFE)
+-		return TIOCSER_TEMT;
+-	else
+-		return 0;
++	if (!((readl(u->membase + AUART_STAT) & AUART_STAT_BUSY)))
++		if (readl(u->membase + AUART_STAT) & AUART_STAT_TXFE)
++			return TIOCSER_TEMT;
++
++	return 0;
+  }
+
+  static void mxs_auart_start_tx(struct uart_port *u)
+  {
+  	struct mxs_auart_port *s = to_auart_port(u);
+
+
+Do you agree?
+
+Best regards,
+--
+Hector Palacios
