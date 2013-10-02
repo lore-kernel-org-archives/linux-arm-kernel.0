@@ -1,33 +1,42 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Wed, 02 Oct 2013 12:23:38 +0200
-Subject: [PATCH] clocksource: arm_arch_timer: Use clocksource for suspend
- timekeeping
-In-Reply-To: <1380312792-7275-1-git-send-email-sboyd@codeaurora.org>
-References: <1380312792-7275-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <524BF42A.7020509@linaro.org>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 2 Oct 2013 11:35:14 +0100
+Subject: [PATCH 09/10] pwm-backlight: Use an optional power supply
+In-Reply-To: <20131001213120.GG9201@ulmo.nvidia.com>
+References: <1379972467-11243-1-git-send-email-treding@nvidia.com>
+ <1379972467-11243-10-git-send-email-treding@nvidia.com>
+ <524B17ED.1080806@wwwdotorg.org>
+ <20131001205310.GD9201@ulmo.nvidia.com>
+ <524B37BF.2090300@wwwdotorg.org>
+ <20131001213120.GG9201@ulmo.nvidia.com>
+Message-ID: <20131002103514.GB4228@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/27/2013 10:13 PM, Stephen Boyd wrote:
-> The ARM architected timers keep counting during suspend so we can
-> mark this clocksource with the CLOCK_SOURCE_SUSPEND_NONSTOP flag.
-> This flag will indicate that this clocksource can be used for
-> calculating suspend time and injecting sleep time into the
-> timekeeping core. This should be more accurate than using an
-> external RTC or architecture specific persistent clock.
->
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> ---
+On Tue, Oct 01, 2013 at 11:31:27PM +0200, Thierry Reding wrote:
+> On Tue, Oct 01, 2013 at 02:59:43PM -0600, Stephen Warren wrote:
 
-Applied to my tree for 3.13
+> > OK, hopefully it (the regulator core) complains about the missing DT
+> > property though; I assume you're using regulator_get() not
+> > regulator_get_optional(), since the supply really is not optional.
 
-Thanks
-   -- Daniel
+> It doesn't always. There's a pr_warn() in _regulator_get(), but that's
+> only for non-DT (since for DT, has_full_constraints is set to true in
+> regulator_init_complete()). Actually that would mean that the regulator
+> core will complain as long as init isn't complete. But since, like many
+> other drivers, pwm-backlight could use deferred probing it's likely to
+> end up being probed after init.
 
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+So, part of the thing here is that nobody ever bothers actually creating
+the supplies even when the device fails to load without them - everyone
+is much more keen to complain about needing to do the work than actually
+provide the hookup even though it's generally pretty quick and simple to
+do so.
 
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+That said we probably should still moan, I'll go and do that.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131002/7c6b3a82/attachment.sig>
