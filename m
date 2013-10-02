@@ -1,99 +1,101 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 2 Oct 2013 11:18:46 +0100
-Subject: [PATCH v2 2/3] AArch64: KGDB: Add Basic KGDB support
-In-Reply-To: <CALicx6vpX6nm=zdBZTY57EgPRphcjMzwFxug6CAa_U21u4_4Cw@mail.gmail.com>
-References: <1380534251-4464-1-git-send-email-vijay.kilari@gmail.com>
- <1380534251-4464-3-git-send-email-vijay.kilari@gmail.com>
- <20130930163654.GJ26036@mudshark.cambridge.arm.com>
- <CALicx6vpX6nm=zdBZTY57EgPRphcjMzwFxug6CAa_U21u4_4Cw@mail.gmail.com>
-Message-ID: <20131002101846.GC28311@mudshark.cambridge.arm.com>
+From: rogerq@ti.com (Roger Quadros)
+Date: Wed, 2 Oct 2013 13:19:30 +0300
+Subject: [PATCH v3 03/10] ARM: OMAP2+: omap-usb-host: Get rid of
+ platform_data from struct usbhs_phy_data
+In-Reply-To: <1380012836-29900-4-git-send-email-rogerq@ti.com>
+References: <1380012836-29900-1-git-send-email-rogerq@ti.com>
+ <1380012836-29900-4-git-send-email-rogerq@ti.com>
+Message-ID: <524BF332.4080303@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 01, 2013 at 11:53:01AM +0100, Vijay Kilari wrote:
-> On Mon, Sep 30, 2013 at 10:06 PM, Will Deacon <will.deacon@arm.com> wrote:
-> > On Mon, Sep 30, 2013 at 10:44:10AM +0100, vijay.kilari at gmail.com wrote:
-> >> +static inline void arch_kgdb_breakpoint(void)
-> >> +{
-> >> +       asm ("brk %0" :: "I" (KGDB_ARM64_COMPILE_BRK_IMM));
-> >> +}
-> >
-> > Hmm, I need to find me a compiler guy, but I don't have much faith in this
-> > function in the face of inlining. Sure a breakpoint needs to happen at a
-> > specific point in the program? If so, why can't GCC re-order this asm block
-> > as it likes?
-> >
-> > Or is there a restricted use-case for compiled breakpoints in kgdb?
-> >
-> As per Andrew,
-> arch_kgdb_breakpoint is declared as static inline for the x86, arm, tile
-> and powerpc.  Since the inline-asm does not have any output constraints
-> it is considered volatile just like if you declare the inline-asm as volatile.
-> The compiler might reorder some stuff around it due to all uses being explicit
-> just like any other volatile inline-asm.
+Hi Tony,
+
+On 09/24/2013 11:53 AM, Roger Quadros wrote:
+> The platform data bits can be inferred from the other members of
+> struct usbhs_phy_data. So get rid of the platform_data member.
 > 
-> In fact, the arch_kgdb_breakpoint is called from only one place from
-> kernel/debug/debug_core.c and there is no way for the compiler to
-> reorder the block
-> as it has two write barriers around it:
->         wmb(); /* Sync point before breakpoint */
->         arch_kgdb_breakpoint();
->         wmb(); /* Sync point after breakpoint */
-
-A write barrier just looks like a memory clobber to the compiler, which
-isn't enough to stop this being reordered wrt breakpoints. In fact, I don't
-think is actually solvable with GCC since there is no way to emit a full
-scheduling barrier using asm constraints (we'd need an intrinsic I think).
-
-You could try clobbering every register, but that's filthy, and will likely
-cause reload to generate some dreadful spills.
-
-> >> +void
-> >> +sleeping_thread_to_gdb_regs(unsigned long *gdb_regs, struct task_struct *task)
-> >> +{
-> >> +       struct pt_regs *thread_regs;
-> >> +       int regno;
-> >> +       int i;
-> >> +
-> >> +       /* Just making sure... */
-> >> +       if (task == NULL)
-> >> +               return;
-> >
-> > Erm... that comment just raises more questions. I appreciate ARM has the
-> > same check, but why doesn't x86? Can task *actually* be NULL?
-> >
-> generally, the task will not be NULL. The check made because the
-> caller (gdbstub.c)
-> fetches task information from gdb global structure and calls this function.
-> This helps in case the caller fails to pass task info. I think should not be
-> problem with this check. In fact this is legacy code
-
-Generally or always? Afaict, either other architectures have a bug here or
-we have a redundant check. Regardless, it should be made consistent.
-
-> >> +/*
-> >> + * ARM instructions are always in LE.
-> >> + * Break instruction is encoded in LE format
-> >> + */
-> >> +struct kgdb_arch arch_kgdb_ops = {
-> >> +       .gdb_bpt_instr          = {0x00, 0x00, 0x20, 0xd4}
-> >
-> > Again, you should probably try and encode the dynamic breakpoint immediate
-> > in here (which is sadly offset by 5 bits in the instruction encoding).
-> >
-> Yes, I propose to change like this
+> Build the platform data for the PHY device in usbhs_init_phys() instead.
 > 
-> #define  KGDB_DYN_BRK_INS_BYTE0  ((KGDB_DYN_DGB_BRK_IMM & 0x7) << 5)
-> #define  KGDB_DYN_BRK_INS_BYTE1  ((KGDB_DYN_DGB_BRK_IMM & 0x7f8) >> 3)
-> #define  KGDB_DYN_BRK_INS_BYTE2  (0x20 | \
->                                  ((KGDB_DYN_DGB_BRK_IMM & 0xf800) >> 11))
-> #define  KGDB_DYN_BRK_INS_BYTE3  0xd4
+> Signed-off-by: Roger Quadros <rogerq@ti.com>
 
-This would be cleaner if you #defined the complete instruction encoding:
+Could you please Ack this if OK?
 
-#define AARCH64_BREAK_MON	0xd4200000
+cheers,
+-roger
 
-#define KGDB_DYN_BRK_BYTE(x)	\
-	(((AARCH64_BREAK_MON | KGDB_DYN_DGB_BRK_IMM) >> (x * 8)) & 0xff)
-
-Will
+> ---
+>  arch/arm/mach-omap2/board-omap3beagle.c |    6 ------
+>  arch/arm/mach-omap2/usb-host.c          |   11 ++++++++++-
+>  arch/arm/mach-omap2/usb.h               |    1 -
+>  3 files changed, 10 insertions(+), 8 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/board-omap3beagle.c b/arch/arm/mach-omap2/board-omap3beagle.c
+> index f269184..8b9cd06 100644
+> --- a/arch/arm/mach-omap2/board-omap3beagle.c
+> +++ b/arch/arm/mach-omap2/board-omap3beagle.c
+> @@ -289,18 +289,12 @@ static struct regulator_consumer_supply beagle_vsim_supply[] = {
+>  
+>  static struct gpio_led gpio_leds[];
+>  
+> -/* PHY's VCC regulator might be added later, so flag that we need it */
+> -static struct usb_phy_gen_xceiv_platform_data hsusb2_phy_data = {
+> -	.needs_vcc = true,
+> -};
+> -
+>  static struct usbhs_phy_data phy_data[] = {
+>  	{
+>  		.port = 2,
+>  		.reset_gpio = 147,
+>  		.vcc_gpio = -1,		/* updated in beagle_twl_gpio_setup */
+>  		.vcc_polarity = 1,	/* updated in beagle_twl_gpio_setup */
+> -		.platform_data = &hsusb2_phy_data,
+>  	},
+>  };
+>  
+> diff --git a/arch/arm/mach-omap2/usb-host.c b/arch/arm/mach-omap2/usb-host.c
+> index e83a6a4..78ac1c2 100644
+> --- a/arch/arm/mach-omap2/usb-host.c
+> +++ b/arch/arm/mach-omap2/usb-host.c
+> @@ -435,6 +435,7 @@ int usbhs_init_phys(struct usbhs_phy_data *phy, int num_phys)
+>  	struct platform_device *pdev;
+>  	char *phy_id;
+>  	struct platform_device_info pdevinfo;
+> +	struct usb_phy_gen_xceiv_platform_data nop_pdata;
+>  
+>  	for (i = 0; i < num_phys; i++) {
+>  
+> @@ -455,11 +456,19 @@ int usbhs_init_phys(struct usbhs_phy_data *phy, int num_phys)
+>  			return -ENOMEM;
+>  		}
+>  
+> +		/* set platform data */
+> +		memset(&nop_pdata, 0, sizeof(nop_pdata));
+> +		if (gpio_is_valid(phy->vcc_gpio))
+> +			nop_pdata.needs_vcc = true;
+> +		if (gpio_is_valid(phy->reset_gpio))
+> +			nop_pdata.needs_reset = true;
+> +		nop_pdata.type = USB_PHY_TYPE_USB2;
+> +
+>  		/* create a NOP PHY device */
+>  		memset(&pdevinfo, 0, sizeof(pdevinfo));
+>  		pdevinfo.name = nop_name;
+>  		pdevinfo.id = phy->port;
+> -		pdevinfo.data = phy->platform_data;
+> +		pdevinfo.data = &nop_pdata;
+>  		pdevinfo.size_data =
+>  			sizeof(struct usb_phy_gen_xceiv_platform_data);
+>  		scnprintf(phy_id, MAX_STR, "usb_phy_gen_xceiv.%d",
+> diff --git a/arch/arm/mach-omap2/usb.h b/arch/arm/mach-omap2/usb.h
+> index e7261eb..4ba2ae7 100644
+> --- a/arch/arm/mach-omap2/usb.h
+> +++ b/arch/arm/mach-omap2/usb.h
+> @@ -58,7 +58,6 @@ struct usbhs_phy_data {
+>  	int reset_gpio;
+>  	int vcc_gpio;
+>  	bool vcc_polarity;	/* 1 active high, 0 active low */
+> -	void *platform_data;
+>  };
+>  
+>  extern void usb_musb_init(struct omap_musb_board_data *board_data);
+> 
