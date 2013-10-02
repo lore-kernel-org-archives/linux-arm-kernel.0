@@ -1,241 +1,60 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Wed,  2 Oct 2013 15:45:55 +0100
-Subject: [PATCH v4] ARM: vexpress/TC2: Implement MCPM power_down_finish()
-Message-ID: <1380725155-3936-1-git-send-email-Dave.Martin@arm.com>
+From: david@gibson.dropbear.id.au (David Gibson)
+Date: Wed, 2 Oct 2013 23:52:21 +1000
+Subject: [RFC 00/15] Device Tree schemas and validation
+In-Reply-To: <524ACB76.1010001@gmail.com>
+References: <1380041541-17529-1-git-send-email-bcousson@baylibre.com>
+ <524A8289.3050107@baylibre.com> <524ACB76.1010001@gmail.com>
+Message-ID: <20131002135220.GG6506@voom.fritz.box>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch implements the power_down_finish() method for TC2, to
-enable the kernel to confirm when CPUs are safely powered down.
+On Tue, Oct 01, 2013 at 08:17:42AM -0500, Rob Herring wrote:
+> On 10/01/2013 03:06 AM, Benoit Cousson wrote:
+> > + more DT maintainers folks
+> > 
+> > Hi all,
+> > 
+> > I know this is mostly boring user space code, but I was expecting a
+> > little bit of comments about at least the bindings syntax:-(
+> > 
+> > I'd like to know if this is the right direction and if it worth pursuing
+> > in that direction.
+> > 
+> > The idea was to have at least some base for further discussion during
+> > ARM KS 2013.
+> > 
+> > I feel alone :-(
+> > 
+> > If you have any comment, go ahead!
+> 
+> Thanks for taking this on!
+> 
+> This is interesting approach using the dts syntax, but I worry that the
+> validation will only be as good as the schema written and the review of
+> the schema. I think the schema needs to define the binding rather than
+> define the checks. Then the schema can feed the validation checks. This
+> format does not seem to me as easily being able to generate
+> documentation from the schema which I believe is one of the goals. I for
+> one don't care to review the documentation and the schema for every binding.
 
-The information required for determining when a CPU is parked
-cannot be obtained from any single place, so a few sources of
-information must be combined:
+Hrm.  I'm less optimistic about entirely replacing human-readable
+bindings with machine-readable schemas.  But I do think the schema
+language needs to be substantially more flexible than the draft
+presented here.
 
-  * mcpm_cpu_power_down() must be pending for the CPU, so that we
-    don't get confused by false STANDBYWFI positives arising from
-    CPUidle.  This is detected by waiting for the tc2_pm use count
-    for the target CPU to reach 0.
+While I think a schema syntax which mirrors dts syntax makes a lot of
+sense, actually defining schemas as "device" trees doesn't seem quite
+right to me.
 
-  * Either the SPC must report that the CPU has asserted
-    STANDBYWFI, or the TC2 tile's reset control logic must be
-    holding the CPU in reset.
-
-    Just checking for STANDBYWFI is not sufficient, because this
-    signal is not latched when the the cluster is clamped off and
-    powered down: the relevant status bits just drop to zero.  This
-    means that STANDBYWFI status cannot be used for reliable
-    detection of the last CPU in a cluster reaching WFI.
-
-This patch is required in order for kexec to work with MCPM on TC2.
-
-Signed-off-by: Dave Martin <Dave.Martin@arm.com>
----
-Changes since v3:
-
- * Fix the location of the RESET_A7_NCORERESET() macro so that the
-   A7_NCORERESET bits in the reset control register start at bit 19,
-   not bit 19.
-
-   It looks like I misread the TRM on the first pass :/
-
-   Bits 19-21 are the A7_ETMRESET bits.  In practice the SPC sets/
-   clears all these bits simultaneously anyway, so the code still
-   worked regardless, but future versions of the SPC firmware could
-   behave differently.
-
-   The A15 NCORERESET bits do indeed start at bit 2, so that doesn't
-   need fixing.
-
- * Acks dropped -- Nico, if you can take a quick look to confirm I've
-   not gone insane, that would be appreciated, thanks.
-
- * The generic MCPM patches from previous postings are in Russell's
-   patch system pending his approval, so I've dropped them from this
-   repost.
-
- arch/arm/mach-vexpress/spc.c    |   39 +++++++++++++++++++++++
- arch/arm/mach-vexpress/spc.h    |    1 +
- arch/arm/mach-vexpress/tc2_pm.c |   66 ++++++++++++++++++++++++++++++++++++---
- 3 files changed, 101 insertions(+), 5 deletions(-)
-
-diff --git a/arch/arm/mach-vexpress/spc.c b/arch/arm/mach-vexpress/spc.c
-index eefb029..6f6ac56 100644
---- a/arch/arm/mach-vexpress/spc.c
-+++ b/arch/arm/mach-vexpress/spc.c
-@@ -35,6 +35,10 @@
- /* SPC per-CPU mailboxes */
- #define A15_BX_ADDR0		0x68
- #define A7_BX_ADDR0		0x78
-+/* SPC CPU/cluster reset statue */
-+#define STANDBYWFI_STAT		0x3c
-+#define STANDBYWFI_STAT_A15_CPU_MASK(cpu)	(1 << (cpu))
-+#define STANDBYWFI_STAT_A7_CPU_MASK(cpu)	(1 << (3 + (cpu)))
- 
- /* wake-up interrupt masks */
- #define GBL_WAKEUP_INT_MSK	(0x3 << 10)
-@@ -157,6 +161,41 @@ void ve_spc_powerdown(u32 cluster, bool enable)
- 	writel_relaxed(enable, info->baseaddr + pwdrn_reg);
- }
- 
-+static u32 standbywfi_cpu_mask(u32 cpu, u32 cluster)
-+{
-+	return cluster_is_a15(cluster) ?
-+		  STANDBYWFI_STAT_A15_CPU_MASK(cpu)
-+		: STANDBYWFI_STAT_A7_CPU_MASK(cpu);
-+}
-+
-+/**
-+ * ve_spc_cpu_in_wfi(u32 cpu, u32 cluster)
-+ *
-+ * @cpu: mpidr[7:0] bitfield describing CPU affinity level within cluster
-+ * @cluster: mpidr[15:8] bitfield describing cluster affinity level
-+ *
-+ * @return: non-zero if and only if the specified CPU is in WFI
-+ *
-+ * Take care when interpreting the result of this function: a CPU might
-+ * be in WFI temporarily due to idle, and is not necessarily safely
-+ * parked.
-+ */
-+int ve_spc_cpu_in_wfi(u32 cpu, u32 cluster)
-+{
-+	int ret;
-+	u32 mask = standbywfi_cpu_mask(cpu, cluster);
-+
-+	if (cluster >= MAX_CLUSTERS)
-+		return 1;
-+
-+	ret = readl_relaxed(info->baseaddr + STANDBYWFI_STAT);
-+
-+	pr_debug("%s: PCFGREG[0x%X] = 0x%08X, mask = 0x%X\n",
-+		 __func__, STANDBYWFI_STAT, ret, mask);
-+
-+	return ret & mask;
-+}
-+
- int __init ve_spc_init(void __iomem *baseaddr, u32 a15_clusid)
- {
- 	info = kzalloc(sizeof(*info), GFP_KERNEL);
-diff --git a/arch/arm/mach-vexpress/spc.h b/arch/arm/mach-vexpress/spc.h
-index 5f7e4a4..edb1b06 100644
---- a/arch/arm/mach-vexpress/spc.h
-+++ b/arch/arm/mach-vexpress/spc.h
-@@ -20,5 +20,6 @@ void ve_spc_global_wakeup_irq(bool set);
- void ve_spc_cpu_wakeup_irq(u32 cluster, u32 cpu, bool set);
- void ve_spc_set_resume_addr(u32 cluster, u32 cpu, u32 addr);
- void ve_spc_powerdown(u32 cluster, bool enable);
-+int ve_spc_cpu_in_wfi(u32 cpu, u32 cluster);
- 
- #endif
-diff --git a/arch/arm/mach-vexpress/tc2_pm.c b/arch/arm/mach-vexpress/tc2_pm.c
-index e6eb481..867eed8 100644
---- a/arch/arm/mach-vexpress/tc2_pm.c
-+++ b/arch/arm/mach-vexpress/tc2_pm.c
-@@ -12,6 +12,7 @@
-  * published by the Free Software Foundation.
-  */
- 
-+#include <linux/delay.h>
- #include <linux/init.h>
- #include <linux/io.h>
- #include <linux/kernel.h>
-@@ -31,11 +32,17 @@
- #include "spc.h"
- 
- /* SCC conf registers */
-+#define RESET_CTRL		0x018
-+#define RESET_A15_NCORERESET(cpu)	(1 << (2 + (cpu)))
-+#define RESET_A7_NCORERESET(cpu)	(1 << (16 + (cpu)))
-+
- #define A15_CONF		0x400
- #define A7_CONF			0x500
- #define SYS_INFO		0x700
- #define SPC_BASE		0xb00
- 
-+static void __iomem *scc;
-+
- /*
-  * We can't use regular spinlocks. In the switcher case, it is possible
-  * for an outbound CPU to call power_down() after its inbound counterpart
-@@ -233,6 +240,55 @@ static void tc2_pm_power_down(void)
- 	tc2_pm_down(0);
- }
- 
-+static int tc2_core_in_reset(unsigned int cpu, unsigned int cluster)
-+{
-+	u32 mask = cluster ?
-+		  RESET_A7_NCORERESET(cpu)
-+		: RESET_A15_NCORERESET(cpu);
-+
-+	return !(readl_relaxed(scc + RESET_CTRL) & mask);
-+}
-+
-+#define POLL_MSEC 10
-+#define TIMEOUT_MSEC 1000
-+
-+static int tc2_pm_power_down_finish(unsigned int cpu, unsigned int cluster)
-+{
-+	unsigned tries;
-+
-+	pr_debug("%s: cpu %u cluster %u\n", __func__, cpu, cluster);
-+	BUG_ON(cluster >= TC2_CLUSTERS || cpu >= TC2_MAX_CPUS_PER_CLUSTER);
-+
-+	for (tries = 0; tries < TIMEOUT_MSEC / POLL_MSEC; ++tries) {
-+		/*
-+		 * Only examine the hardware state if the target CPU has
-+		 * caught up@least as far as tc2_pm_down():
-+		 */
-+		if (ACCESS_ONCE(tc2_pm_use_count[cpu][cluster]) == 0) {
-+			pr_debug("%s(cpu=%u, cluster=%u): RESET_CTRL = 0x%08X\n",
-+				 __func__, cpu, cluster,
-+				 readl_relaxed(scc + RESET_CTRL));
-+
-+			/*
-+			 * We need the CPU to reach WFI, but the power
-+			 * controller may put the cluster in reset and
-+			 * power it off as soon as that happens, before
-+			 * we have a chance to see STANDBYWFI.
-+			 *
-+			 * So we need to check for both conditions:
-+			 */
-+			if (tc2_core_in_reset(cpu, cluster) ||
-+			    ve_spc_cpu_in_wfi(cpu, cluster))
-+				return 0; /* success: the CPU is halted */
-+		}
-+
-+		/* Otherwise, wait and retry: */
-+		msleep(POLL_MSEC);
-+	}
-+
-+	return -ETIMEDOUT; /* timeout */
-+}
-+
- static void tc2_pm_suspend(u64 residency)
- {
- 	unsigned int mpidr, cpu, cluster;
-@@ -275,10 +331,11 @@ static void tc2_pm_powered_up(void)
- }
- 
- static const struct mcpm_platform_ops tc2_pm_power_ops = {
--	.power_up	= tc2_pm_power_up,
--	.power_down	= tc2_pm_power_down,
--	.suspend	= tc2_pm_suspend,
--	.powered_up	= tc2_pm_powered_up,
-+	.power_up		= tc2_pm_power_up,
-+	.power_down		= tc2_pm_power_down,
-+	.power_down_finish	= tc2_pm_power_down_finish,
-+	.suspend		= tc2_pm_suspend,
-+	.powered_up		= tc2_pm_powered_up,
- };
- 
- static bool __init tc2_pm_usage_count_init(void)
-@@ -312,7 +369,6 @@ static void __naked tc2_pm_power_up_setup(unsigned int affinity_level)
- static int __init tc2_pm_init(void)
- {
- 	int ret;
--	void __iomem *scc;
- 	u32 a15_cluster_id, a7_cluster_id, sys_info;
- 	struct device_node *np;
- 
 -- 
-1.7.9.5
+David Gibson			| I'll have my music baroque, and my code
+david AT gibson.dropbear.id.au	| minimalist, thank you.  NOT _the_ _other_
+				| _way_ _around_!
+http://www.ozlabs.org/~dgibson
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131002/83f7e873/attachment.sig>
