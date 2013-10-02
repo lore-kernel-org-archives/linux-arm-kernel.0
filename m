@@ -1,77 +1,144 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 01 Oct 2013 20:50:44 -0600
-Subject: [RFC PATCH 1/3] Enable BCM2835 mailbox support
-In-Reply-To: <5232F7B7.4070206@yahoo.com.au>
-References: <5232F7B7.4070206@yahoo.com.au>
-Message-ID: <524B8A04.1020006@wwwdotorg.org>
+Date: Tue, 01 Oct 2013 21:05:30 -0600
+Subject: [RFC PATCH 2/3] Enable BCM2835 mailbox support
+In-Reply-To: <5232F7C2.3070408@yahoo.com.au>
+References: <5232F7C2.3070408@yahoo.com.au>
+Message-ID: <524B8D7A.6080204@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 09/13/2013 05:32 AM, Craig McGeachie wrote:
-> Cherry-picked selection of commits by Lubomir Rintel [1], Suman Anna and
-> Jassi Brar [2] on which to base the implementation.
+> Reimplement BCM2835 mailbox support as a device registered with the
+> general purpose mailbox framework.
 > 
-> Signed-off-by: Suman Ana <s-anna@ti.com>
-> Signed-off-by: Jassi Brar <jassisinghbrar@gmail.com>
-> Signed-off-by: Lubomir Rintel <lkundrak@v3.sk>
+> Signed-off-by: Craig McGeachie <slapdau@yahoo.com.au>
+> ---
 > 
-> [1] http://lists.infradead.org/pipermail/linux-rpi-kernel/2013-April/000528.html
-> [2] http://lists.infradead.org/pipermail/linux-rpi-kernel/2013-May/000546.html
+> One specific area that I am looking for comment on is the device tree
+> design.  I'm not happy with the two attributes for channel numbers
+> and names that have to be matched up in terms of number of elements.
 
-This needs a proper patch description. It should describe what the
-mailbox HW is, what services it provides, etc.
+That style is very common.
 
-There shouldn't be any text after the tag paragraph (i.e. the s-o-b
-lines) and the --- separator.
+However, I don't think there's any need for channel names at all;
+devices that exist on the VideoCore side of the mailbox protocol can be
+represented as child nodes of the main mailbox node, and then their reg
+property can be used to identify the communication channel; just numbers
+with no need for names, just like the actual HW (firmware) protocol.
 
-Are you able to generate patches using "git format-patch". That would
-included diffstat in the patch summary, which can be useful.
+> I would prefer something like
+> 
+>  mailbox {
+>  	compatible = "brcm,bcm2835-mbox";
+>   	reg = <0x7e00b800 0x400>;
+>  	reg = <0x7e00b880 0x40>;
 
-I'd prefer to see patch 1 and 2 squashed together, since the new mailbox
-driver should just be implemented in one shot, rather than added with
-one implementation, then reworked to be different in a separate patch.
+You can only have one reg property. It could have two separate entries
+if required, but I don't see a need for that.
 
-That said, the patches need to be split up based on subsystem divisions.
-The squashed patch 1 and 2, and the separate patch 3, should be split into:
+>  	interrupts = <0 1>;
+> 	#address-cells = <1>;
 
-a) A patch that adds the driver. This would touch just
-drivers/mailbox/... (or drivers/thermal/...) and
-Documentation/devicetree/bindings/...
+You'll need #size-cells too, probably with value 0 since the concept of
+size doesn't really apply here.
 
-b) A patch that adds the necessary entries to *.dts/*.dtsi
+I wonder if #address-cells might not need to be more than 1 in order to
+generate unique addresses for the multiple devices that hang off the
+property channel?
 
-c) A patch that enables any new entries in bcm2835_defconfig.
+And a blank line before the nodes.
 
-In my initial round of review, I'll only discuss the DT bindings, and
-only in response to patch 2 where they're complete rather than here.
-Once the bindings are finalized and the driver adjusted to implement the
-final bindings, then I'll look at the driver code.
+> 	brcm,channel at 0 = {
 
-Note that all new DT bindings should be CC'd to the DT bindings
-maintainers; see the following in MAINTAINERS:
+Node names don't have a vendor prefix.
 
-OPEN FIRMWARE AND FLATTENED DEVICE TREE BINDINGS
-M:      Rob Herring <rob.herring@calxeda.com>
-M:      Pawel Moll <pawel.moll@arm.com>
-M:      Mark Rutland <mark.rutland@arm.com>
-M:      Stephen Warren <swarren@wwwdotorg.org>
-M:      Ian Campbell <ijc+devicetree@hellion.org.uk>
-L:      devicetree at vger.kernel.org
-S:      Maintained
-F:      Documentation/devicetree/
-F:      arch/*/boot/dts/
-F:      include/dt-bindings/
+> 		reg = <0>;
+> 		brcm,channel-name = "power";
 
-> diff --git a/arch/arm/boot/dts/bcm2835.dtsi b/arch/arm/boot/dts/bcm2835.dtsi
-> index 1e12aef..4fc8a68 100644
-> --- a/arch/arm/boot/dts/bcm2835.dtsi
-> +++ b/arch/arm/boot/dts/bcm2835.dtsi
-> @@ -29,6 +29,12 @@
->  			#interrupt-cells = <2>;
->  		};
+I don't see a need for a channel name.
 
-There needs to be a blank line here.
+> 	};
+> 	[...etc...]
+>  };
+> 
+> But I thought that might be too fussy, or too hard for a boot loader to
+> populate.
 
->  +		mailbox {
+Why would the bootloader populate this? Presumably the entire mailbox
+node (and its children) would be statically part of the DT that the
+bootloader reads from disk.
 
-Patch corruption? + is indented!
+> diff --git a/Documentation/devicetree/bindings/mailbox/brcm,bcm2835-mbox.txt b/Documentation/devicetree/bindings/mailbox/brcm,bcm2835-mbox.txt
+> index 75dbb89..1779ad4 100644
+> --- a/Documentation/devicetree/bindings/mailbox/brcm,bcm2835-mbox.txt
+> +++ b/Documentation/devicetree/bindings/mailbox/brcm,bcm2835-mbox.txt
+> @@ -4,12 +4,19 @@ Required properties:
+>  
+>  - compatible : should be "brcm,bcm2835-mbox"
+>  - reg : Specifies base physical address and size of the registers.
+> -- interrupts : the interrupt number
+> +- interrupts : the interrupt number. Must be <0 1>, the mailbox interrupt.
+
+The binding should specify the schema, not the data. <0 1> is only true
+in the case where the mailbox IP is hooked into a particular SoC. The
+binding could theoretically be used on other SoCs with different
+interrupt assignments.
+
+> +- brcm,channel-nums : The mailbox channels in use.
+> +- brcm,channel-names : list of symbolic channel names for mailbox clients to
+> +  use.
+> +
+> +The number of channel numbers must match the number of channel names.
+
+As mentioned above, I see no reason to name/number the channels in this
+way. I prefer using the reg address in child nodes to represent this
+information.
+
+>  Example:
+>  
+>  mailbox {
+>  	compatible = "brcm,bcm2835-mbox";
+> -	reg = <0x7e00b800 0x400>;
+> +	reg = <0x7e00b880 0x40>;
+>  	interrupts = <0 1>;
+> +	brcm,channel-nums = <0 1 3 8>;
+> +	brcm,channel-names = "power", "fb", "vchiq", "property";
+>  };
+
+I would expect to see something like:
+
+mailbox {
+	compatible = "brcm,bcm2835-mbox";
+	reg = <0x7e00b800 0x400>;
+	interrupts = <0 1>;
+	#address-cells = <1>;
+	#size-cells = <1>;
+
+	regulator at 0 {
+		compatible = "brcm,bcm2835-mbox-power";
+		reg = <0>;
+		... /* various regulator nodes */
+	};
+
+	/* or perhaps use @8 for the property FB interface */
+	framebuffer at 1 {
+		compatible = "brcm,bcm2835-mbox-fb";
+		reg = <1>;
+		...
+	};
+
+	serial at 2 {
+		compatible = "brcm,bcm2835-mbox-uart";
+		reg = <2>;
+		...
+	};
+
+	clock at 8 {
+		compatible = "brcm,bcm2835-mbox-clock";
+		reg = <1>;
+		#clock-cells = <1>;
+		...
+	};
+
+	...
+};
