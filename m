@@ -1,88 +1,44 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed,  2 Oct 2013 12:07:04 -0700
-Subject: [PATCH v2 7/9] clk: msm: Add support for MSM8960's global clock
- controller (GCC)
+Date: Wed,  2 Oct 2013 12:07:02 -0700
+Subject: [PATCH v2 5/9] clk: msm: Add support for root clock generators (RCGs)
 In-Reply-To: <1380740826-29457-1-git-send-email-sboyd@codeaurora.org>
 References: <1380740826-29457-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1380740826-29457-8-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1380740826-29457-6-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a driver for the global clock controller found on MSM8960
-based platforms. This should allow most non-multimedia device
-drivers to probe and control their clocks.
+Add support for the root clock generators on MSM devices. RCGs
+are highly customizable mux/divider/counter clocks that can be
+used to generate almost any rate desired given some input source
+that is faster than the desired rate.
 
-TODO: Fill out reset of data and define all clocks
-
-Cc: <devicetree@vger.kernel.org>
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- .../devicetree/bindings/clock/qcom,gcc.txt         |  19 +
- drivers/clk/msm/Kconfig                            |   7 +
- drivers/clk/msm/Makefile                           |   2 +
- drivers/clk/msm/gcc-8960.c                         | 381 +++++++++++++++++++++
- include/dt-bindings/clk/msm-gcc-8960.h             |  28 ++
- 5 files changed, 437 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/clock/qcom,gcc.txt
- create mode 100644 drivers/clk/msm/gcc-8960.c
- create mode 100644 include/dt-bindings/clk/msm-gcc-8960.h
+ drivers/clk/msm/Makefile   |   2 +
+ drivers/clk/msm/clk-rcg.c  | 491 +++++++++++++++++++++++++++++++++++++++++++++
+ drivers/clk/msm/clk-rcg.h  | 149 ++++++++++++++
+ drivers/clk/msm/clk-rcg2.c | 272 +++++++++++++++++++++++++
+ 4 files changed, 914 insertions(+)
+ create mode 100644 drivers/clk/msm/clk-rcg.c
+ create mode 100644 drivers/clk/msm/clk-rcg.h
+ create mode 100644 drivers/clk/msm/clk-rcg2.c
 
-diff --git a/Documentation/devicetree/bindings/clock/qcom,gcc.txt b/Documentation/devicetree/bindings/clock/qcom,gcc.txt
-new file mode 100644
-index 0000000..e31423a
---- /dev/null
-+++ b/Documentation/devicetree/bindings/clock/qcom,gcc.txt
-@@ -0,0 +1,19 @@
-+MSM Global Clock Controller Binding
-+-----------------------------------
-+
-+Required properties :
-+- compatible : shall contain at least "qcom,gcc" and only one of the
-+	       following:
-+
-+			"qcom,gcc-8660"
-+			"qcom,gcc-8960"
-+
-+- reg : shall contain base register location and length
-+- #clock-cells : shall contain 1
-+
-+Example:
-+	clock-controller at 900000 {
-+		compatible = "qcom,gcc-8960", "qcom,gcc";
-+		reg = <0x900000 0x4000>;
-+		#clock-cells = <1>;
-+	};
-diff --git a/drivers/clk/msm/Kconfig b/drivers/clk/msm/Kconfig
-index 91558ce..241fafc 100644
---- a/drivers/clk/msm/Kconfig
-+++ b/drivers/clk/msm/Kconfig
-@@ -3,3 +3,10 @@ config COMMON_CLK_MSM
- 	depends on OF
- 	select REGMAP_MMIO
- 
-+config MSM_GCC_8960
-+	tristate "MSM8960 Global Clock Controller"
-+	depends on COMMON_CLK_MSM
-+	help
-+	  Support for the global clock controller on msm8960 devices.
-+	  Say Y if you want to use peripheral devices such as UART, SPI,
-+	  i2c, USB, SD/eMMC, SATA, PCIe, etc.
 diff --git a/drivers/clk/msm/Makefile b/drivers/clk/msm/Makefile
-index e1cee29..804fbe1 100644
+index 16b750f..fb78ac9 100644
 --- a/drivers/clk/msm/Makefile
 +++ b/drivers/clk/msm/Makefile
-@@ -4,3 +4,5 @@ clk-msm-$(CONFIG_COMMON_CLK_MSM) += clk-pll.o
- clk-msm-$(CONFIG_COMMON_CLK_MSM) += clk-rcg.o
- clk-msm-$(CONFIG_COMMON_CLK_MSM) += clk-rcg2.o
- clk-msm-$(CONFIG_COMMON_CLK_MSM) += clk-branch.o
-+
-+obj-$(CONFIG_MSM_GCC_8960) += gcc-8960.o
-diff --git a/drivers/clk/msm/gcc-8960.c b/drivers/clk/msm/gcc-8960.c
+@@ -1,3 +1,5 @@
+ obj-$(CONFIG_COMMON_CLK_MSM) += clk-msm.o
+ 
+ clk-msm-$(CONFIG_COMMON_CLK_MSM) += clk-pll.o
++clk-msm-$(CONFIG_COMMON_CLK_MSM) += clk-rcg.o
++clk-msm-$(CONFIG_COMMON_CLK_MSM) += clk-rcg2.o
+diff --git a/drivers/clk/msm/clk-rcg.c b/drivers/clk/msm/clk-rcg.c
 new file mode 100644
-index 0000000..41c8a2f
+index 0000000..15f52d5
 --- /dev/null
-+++ b/drivers/clk/msm/gcc-8960.c
-@@ -0,0 +1,381 @@
++++ b/drivers/clk/msm/clk-rcg.c
+@@ -0,0 +1,491 @@
 +/*
 + * Copyright (c) 2013, The Linux Foundation. All rights reserved.
 + *
@@ -96,380 +52,490 @@ index 0000000..41c8a2f
 + * GNU General Public License for more details.
 + */
 +
++#include <linux/kernel.h>
 +#include <linux/bitops.h>
 +#include <linux/err.h>
-+#include <linux/platform_device.h>
-+#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/of_device.h>
++#include <linux/export.h>
 +#include <linux/clk-provider.h>
 +#include <linux/regmap.h>
 +
-+#include <dt-bindings/clk/msm-gcc-8960.h>
++#include <asm/div64.h>
 +
-+#include "clk-pll.h"
 +#include "clk-rcg.h"
-+#include "clk-branch.h"
 +
-+static struct clk_pll pll8 = {
-+	.l_reg = 0x3144,
-+	.m_reg = 0x3148,
-+	.n_reg = 0x314c,
-+	.config_reg = 0x3154,
-+	.mode_reg = 0x3140,
-+	.status_reg = 0x3158,
-+	.status_bit = 16,
-+	.hw.init = &(struct clk_init_data){
-+		.name = "pll8",
-+		.parent_names = (const char *[]){ "pxo" },
-+		.num_parents = 1,
-+		.ops = &clk_pll_ops,
-+	},
-+};
++#define to_clk_rcg(_hw) container_of(_hw, struct clk_rcg, hw)
 +
-+static struct clk_hw pll8_vote = {
-+	.enable_reg = 0x34c0,
-+	.enable_mask = BIT(8),
-+	.init = &(struct clk_init_data){
-+		.name = "pll8_vote",
-+		.parent_names = (const char *[]){ "pll8" },
-+		.num_parents = 1,
-+		.ops = &clk_pll_vote_ops,
-+	},
-+};
++#define to_clk_dyn_rcg(_hw) container_of(_hw, struct clk_dyn_rcg, hw)
 +
-+#define P_PXO	0
-+#define P_PLL8	1
-+
-+static u8 gcc_pxo_pll8_map[] = {
-+	[P_PXO]		= 0,
-+	[P_PLL8]	= 3,
-+};
-+
-+static struct freq_tbl clk_tbl_gsbi_uart[] = {
-+	{  1843200, P_PLL8, 2,  6, 625 },
-+	{  3686400, P_PLL8, 2, 12, 625 },
-+	{  7372800, P_PLL8, 2, 24, 625 },
-+	{ 14745600, P_PLL8, 2, 48, 625 },
-+	{ 16000000, P_PLL8, 4,  1,   6 },
-+	{ 24000000, P_PLL8, 4,  1,   4 },
-+	{ 32000000, P_PLL8, 4,  1,   3 },
-+	{ 40000000, P_PLL8, 1,  5,  48 },
-+	{ 46400000, P_PLL8, 1, 29, 240 },
-+	{ 48000000, P_PLL8, 4,  1,   2 },
-+	{ 51200000, P_PLL8, 1,  2,  15 },
-+	{ 56000000, P_PLL8, 1,  7,  48 },
-+	{ 58982400, P_PLL8, 1, 96, 625 },
-+	{ 64000000, P_PLL8, 2,  1,   3 },
-+	{ }
-+};
-+
-+static struct clk_rcg gsbi5_uart_rcg = {
-+	.ns_reg = 0x2a54,
-+	.md_reg = 0x2a50,
-+	.mn = {
-+		.mnctr_en_bit = 8,
-+		.mnctr_reset_bit = 7,
-+		.mnctr_mode_shift = 5,
-+		.n_val_shift = 16,
-+		.m_val_shift = 16,
-+		.width = 16,
-+	},
-+	.p = {
-+		.pre_div_shift = 3,
-+		.pre_div_width = 2,
-+	},
-+	.s = {
-+		.src_sel_shift = 0,
-+		.parent_map = gcc_pxo_pll8_map,
-+	},
-+	.freq_tbl = clk_tbl_gsbi_uart,
-+	.hw = {
-+		.enable_reg = 0x2a54,
-+		.enable_mask = BIT(11),
-+		.init = &(struct clk_init_data){
-+			.name = "gsbi5_uart_rcg",
-+			.parent_names = (const char *[]){
-+				"pxo",
-+				"pll8_vote",
-+			},
-+			.num_parents = 2,
-+			.ops = &clk_rcg_ops,
-+		},
-+	},
-+};
-+
-+static struct clk_branch gsbi5_uart_cxc = {
-+	.halt_reg = 0x2fd0,
-+	.halt_bit = 22,
-+	.hw = {
-+		.enable_reg = 0x2a54,
-+		.enable_mask = BIT(9),
-+		.init = &(struct clk_init_data){
-+			.name = "gsbi5_uart_cxc",
-+			.parent_names = (const char *[]){
-+				"gsbi5_uart_rcg",
-+			},
-+			.num_parents = 1,
-+			.ops = &clk_branch_ops,
-+		},
-+	},
-+};
-+
-+static struct clk_rcg gsbi6_uart_rcg = {
-+	.ns_reg = 0x2a74,
-+	.md_reg = 0x2a70,
-+	.mn = {
-+		.mnctr_en_bit = 8,
-+		.mnctr_reset_bit = 7,
-+		.mnctr_mode_shift = 5,
-+		.n_val_shift = 16,
-+		.m_val_shift = 16,
-+		.width = 16,
-+	},
-+	.p = {
-+		.pre_div_shift = 3,
-+		.pre_div_width = 2,
-+	},
-+	.s = {
-+		.src_sel_shift = 0,
-+		.parent_map = gcc_pxo_pll8_map,
-+	},
-+	.freq_tbl = clk_tbl_gsbi_uart,
-+	.hw = {
-+		.enable_reg = 0x2a74,
-+		.enable_mask = BIT(11),
-+		.init = &(struct clk_init_data){
-+			.name = "gsbi6_uart_rcg",
-+			.parent_names = (const char *[]){
-+				"pxo",
-+				"pll8_vote",
-+			},
-+			.num_parents = 2,
-+			.ops = &clk_rcg_ops,
-+		},
-+	},
-+};
-+
-+static struct clk_branch gsbi6_uart_cxc = {
-+	.halt_reg = 0x2fd0,
-+	.halt_bit = 18,
-+	.hw = {
-+		.enable_reg = 0x2a74,
-+		.enable_mask = BIT(9),
-+		.init = &(struct clk_init_data){
-+			.name = "gsbi6_uart_cxc",
-+			.parent_names = (const char *[]){
-+				"gsbi6_uart_rcg",
-+			},
-+			.num_parents = 1,
-+			.ops = &clk_branch_ops,
-+		},
-+	},
-+};
-+
-+static struct clk_branch gsbi5_uart_ahb = {
-+	.halt_reg = 0x2fd0,
-+	.halt_bit = 23,
-+	.hwcg_reg = 0x2a40,
-+	.hwcg_bit = 6,
-+	.hw = {
-+		.enable_reg = 0x2a40,
-+		.enable_mask = BIT(4),
-+		.init = &(struct clk_init_data){
-+			.name = "gsbi5_uart_ahb",
-+			.ops = &clk_branch_ops,
-+		},
-+	},
-+};
-+
-+static struct freq_tbl clk_tbl_gsbi_qup[] = {
-+	{  1100000, P_PXO,  1, 2, 49 },
-+	{  5400000, P_PXO,  1, 1,  5 },
-+	{ 10800000, P_PXO,  1, 2,  5 },
-+	{ 15060000, P_PLL8, 1, 2, 51 },
-+	{ 24000000, P_PLL8, 4, 1,  4 },
-+	{ 25600000, P_PLL8, 1, 1, 15 },
-+	{ 27000000, P_PXO,  1, 0,  0 },
-+	{ 48000000, P_PLL8, 4, 1,  2 },
-+	{ 51200000, P_PLL8, 1, 2, 15 },
-+	{ }
-+};
-+
-+static struct clk_rcg gsbi5_qup_rcg = {
-+	.ns_reg = 0x2a4c,
-+	.md_reg = 0x2a48,
-+	.mn = {
-+		.mnctr_en_bit = 8,
-+		.mnctr_reset_bit = 7,
-+		.mnctr_mode_shift = 5,
-+		.n_val_shift = 16,
-+		.m_val_shift = 16,
-+		.width = 16,
-+	},
-+	.p = {
-+		.pre_div_shift = 3,
-+		.pre_div_width = 2,
-+	},
-+	.s = {
-+		.src_sel_shift = 0,
-+		.parent_map = gcc_pxo_pll8_map,
-+	},
-+	.freq_tbl = clk_tbl_gsbi_qup,
-+	.hw = {
-+		.enable_reg = 0x2a4c,
-+		.enable_mask = BIT(11),
-+		.init = &(struct clk_init_data){
-+			.name = "gsbi5_qup_rcg",
-+			.parent_names = (const char *[]){
-+				"pxo",
-+				"pll8_vote",
-+			},
-+			.num_parents = 2,
-+			.ops = &clk_rcg_ops,
-+		},
-+	},
-+};
-+
-+static struct clk_branch gsbi5_qup_cxc = {
-+	.halt_reg = 0x2fd0,
-+	.halt_bit = 20,
-+	.hw = {
-+		.enable_reg = 0x2a4c,
-+		.enable_mask = BIT(9),
-+		.init = &(struct clk_init_data){
-+			.name = "gsbi5_qup_cxc",
-+			.parent_names = (const char *[]){
-+				"gsbi5_qup_rcg",
-+			},
-+			.num_parents = 1,
-+			.ops = &clk_branch_ops,
-+		},
-+	},
-+};
-+
-+struct clk_map {
-+	unsigned long id;
-+	struct clk_hw *hw;
-+};
-+
-+#define MAP(i, h) [i] = { .id = i, .hw = h }
-+
-+static const struct clk_map map[] = {
-+	MAP(PLL8, &pll8.hw),
-+	MAP(PLL8_VOTE, &pll8_vote),
-+	MAP(GSBI5_UART_RCG, &gsbi5_uart_rcg.hw),
-+	MAP(GSBI5_UART_CXC, &gsbi5_uart_cxc.hw),
-+	MAP(GSBI6_UART_RCG, &gsbi6_uart_rcg.hw),
-+	MAP(GSBI6_UART_CXC, &gsbi6_uart_cxc.hw),
-+	MAP(GSBI5_UART_AHB, &gsbi5_uart_ahb.hw),
-+	MAP(GSBI5_QUP_RCG, &gsbi5_qup_rcg.hw),
-+	MAP(GSBI5_QUP_CXC, &gsbi5_qup_cxc.hw),
-+};
-+
-+static const struct regmap_config msm_gcc_8960_regmap_config = {
-+	.reg_bits	= 32,
-+	.reg_stride	= 4,
-+	.val_bits	= 32,
-+	.max_register	= 0x3660,
-+	.fast_io	= true,
-+};
-+
-+static const struct of_device_id msm_gcc_8960_match_table[] = {
-+	{ .compatible = "qcom,gcc-8960" },
-+	{ }
-+};
-+MODULE_DEVICE_TABLE(of, msm_gcc_8960_match_table);
-+
-+static int msm_gcc_8960_probe(struct platform_device *pdev)
++static u32 ns_to_src(struct src_sel *s, u32 ns)
 +{
-+	void __iomem *base;
-+	struct resource *res;
-+	int i;
-+	struct device *dev = &pdev->dev;
-+	struct clk *clk;
-+	struct clk_onecell_data *data;
-+	struct clk **clks;
-+	struct regmap *regmap;
-+	size_t num_clks;
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	base = devm_ioremap_resource(dev, res);
-+	if (IS_ERR(base))
-+		return PTR_ERR(base);
-+
-+	regmap = devm_regmap_init_mmio(dev, base, &msm_gcc_8960_regmap_config);
-+	if (IS_ERR(regmap))
-+		return PTR_ERR(regmap);
-+
-+	num_clks = ARRAY_SIZE(map);
-+	data = devm_kzalloc(dev, sizeof(*data) + sizeof(*clks) * num_clks,
-+			    GFP_KERNEL);
-+	if (!data)
-+		return -ENOMEM;
-+
-+	clks = (struct clk **)(data + 1);
-+	data->clks = clks;
-+	data->clk_num = num_clks;
-+
-+	/* Temporary until RPM clocks supported */
-+	clk = clk_register_fixed_rate(dev, "cxo", NULL, CLK_IS_ROOT, 19200000);
-+	if (IS_ERR(clk))
-+		return PTR_ERR(clk);
-+
-+	clk = clk_register_fixed_rate(dev, "pxo", NULL, CLK_IS_ROOT, 27000000);
-+	if (IS_ERR(clk))
-+		return PTR_ERR(clk);
-+
-+	for (i = 0; i < num_clks; i++) {
-+		if (!map[i].hw)
-+			continue;
-+		clk = devm_clk_register(dev, map[i].hw);
-+		if (IS_ERR(clk))
-+			return PTR_ERR(clk);
-+		clks[map[i].id] = clk;
-+	}
-+
-+	return of_clk_add_provider(dev->of_node, of_clk_src_onecell_get, data);
++	ns >>= s->src_sel_shift;
++	ns &= SRC_SEL_MASK;
++	return ns;
 +}
 +
-+static int msm_gcc_8960_remove(struct platform_device *pdev)
++static u32 src_to_ns(struct src_sel *s, u8 src, u32 ns)
 +{
-+	of_clk_del_provider(pdev->dev.of_node);
++	u32 mask;
++
++	mask = SRC_SEL_MASK;
++	mask <<= s->src_sel_shift;
++	ns &= ~mask;
++
++	ns |= src << s->src_sel_shift;
++	return ns;
++}
++
++static u8 clk_rcg_get_parent(struct clk_hw *hw)
++{
++	struct clk_rcg *rcg = to_clk_rcg(hw);
++	int num_parents = __clk_get_num_parents(hw->clk);
++	u32 ns;
++	int i;
++
++	regmap_read(hw->regmap, rcg->ns_reg, &ns);
++	ns = ns_to_src(&rcg->s, ns);
++	for (i = 0; i < num_parents; i++)
++		if (ns == rcg->s.parent_map[i])
++			return i;
++
++	return -EINVAL;
++}
++
++static int reg_to_bank(struct clk_dyn_rcg *rcg, u32 bank)
++{
++	bank &= BIT(rcg->mux_sel_bit);
++	return !!bank;
++}
++
++static u8 clk_dyn_rcg_get_parent(struct clk_hw *hw)
++{
++	struct clk_dyn_rcg *rcg = to_clk_dyn_rcg(hw);
++	int num_parents = __clk_get_num_parents(hw->clk);
++	u32 ns, ctl;
++	int bank;
++	int i;
++	struct src_sel *s;
++
++	regmap_read(hw->regmap, hw->enable_reg, &ctl);
++	bank = reg_to_bank(rcg, ctl);
++	s = &rcg->s[bank];
++
++	regmap_read(hw->regmap, rcg->ns_reg, &ns);
++	ns = ns_to_src(s, ns);
++
++	for (i = 0; i < num_parents; i++)
++		if (ns == s->parent_map[i])
++			return i;
++
++	return -EINVAL;
++}
++
++static int clk_rcg_set_parent(struct clk_hw *hw, u8 index)
++{
++	struct clk_rcg *rcg = to_clk_rcg(hw);
++	u32 ns;
++
++	regmap_read(hw->regmap, rcg->ns_reg, &ns);
++	ns = src_to_ns(&rcg->s, rcg->s.parent_map[index], ns);
++	regmap_write(hw->regmap, rcg->ns_reg, ns);
++
 +	return 0;
 +}
 +
-+static struct platform_driver msm_gcc_8960_driver = {
-+	.probe		= msm_gcc_8960_probe,
-+	.remove		= msm_gcc_8960_remove,
-+	.driver		= {
-+		.name	= "msm-gcc-8960",
-+		.owner	= THIS_MODULE,
-+		.of_match_table = msm_gcc_8960_match_table,
-+	},
++static u32 md_to_m(struct mn *mn, u32 md)
++{
++	md >>= mn->m_val_shift;
++	md &= BIT(mn->width) - 1;
++	return md;
++}
++
++static u32 ns_to_pre_div(struct pre_div *p, u32 ns)
++{
++	ns >>= p->pre_div_shift;
++	ns &= BIT(p->pre_div_width) - 1;
++	return ns;
++}
++
++static u32 pre_div_to_ns(struct pre_div *p, u8 pre_div, u32 ns)
++{
++	u32 mask;
++
++	mask = BIT(p->pre_div_width) - 1;
++	mask <<= p->pre_div_shift;
++	ns &= ~mask;
++
++	ns |= pre_div << p->pre_div_shift;
++	return ns;
++}
++
++static u32 mn_to_md(struct mn *mn, u32 m, u32 n, u32 md)
++{
++	u32 mask, mask_w;
++
++	mask_w = BIT(mn->width) - 1;
++	mask = (mask_w << mn->m_val_shift) | mask_w;
++	md &= ~mask;
++
++	if (n) {
++		m <<= mn->m_val_shift;
++		md |= m;
++		md |= ~n & mask_w;
++	}
++
++	return md;
++}
++
++static u32 ns_m_to_n(struct mn *mn, u32 ns, u32 m)
++{
++	ns = ~ns >> mn->n_val_shift;
++	ns &= BIT(mn->width) - 1;
++	return ns + m;
++}
++
++static u32 reg_to_mnctr_mode(struct mn *mn, u32 val)
++{
++	val >>= mn->mnctr_mode_shift;
++	val &= MNCTR_MODE_MASK;
++	return val;
++}
++
++static u32 mn_to_ns(struct mn *mn, u32 m, u32 n, u32 ns)
++{
++	u32 mask;
++
++	mask = BIT(mn->width) - 1;
++	mask <<= mn->n_val_shift;
++	ns &= ~mask;
++
++	if (n) {
++		n = n - m;
++		n = ~n;
++		n &= BIT(mn->width) - 1;
++		n <<= mn->n_val_shift;
++		ns |= n;
++	}
++
++	return ns;
++}
++
++static u32 mn_to_reg(struct mn *mn, u32 m, u32 n, u32 val)
++{
++	u32 mask;
++
++	mask = MNCTR_MODE_MASK << mn->mnctr_mode_shift;
++	mask |= BIT(mn->mnctr_en_bit);
++	val &= ~mask;
++
++	if (n) {
++		val |= BIT(mn->mnctr_en_bit);
++		val |= MNCTR_MODE_DUAL << mn->mnctr_mode_shift;
++	}
++
++	return val;
++}
++
++static void configure_bank(struct clk_dyn_rcg *rcg, const struct freq_tbl *f)
++{
++	u32 ns, md, ctl, *regp;
++	int bank, new_bank;
++	struct mn *mn;
++	struct pre_div *p;
++	struct src_sel *s;
++	bool enabled;
++	u32 md_reg;
++	u32 bank_reg;
++	bool banked_mn = !!rcg->mn[1].width;
++	struct clk_hw *hw = &rcg->hw;
++
++	enabled = __clk_is_enabled(rcg->hw.clk);
++
++	regmap_read(hw->regmap, rcg->ns_reg, &ns);
++	regmap_read(hw->regmap, hw->enable_reg, &ctl);
++
++	if (banked_mn) {
++		regp = &ctl;
++		bank_reg = hw->enable_reg;
++	} else {
++		regp = &ns;
++		bank_reg = rcg->ns_reg;
++	}
++
++	bank = reg_to_bank(rcg, *regp);
++	new_bank = enabled ? !bank : bank;
++
++	if (banked_mn) {
++		mn = &rcg->mn[new_bank];
++		md_reg = rcg->md_reg[new_bank];
++
++		ns |= BIT(mn->mnctr_reset_bit);
++		regmap_write(hw->regmap, rcg->ns_reg, ns);
++
++		regmap_read(hw->regmap, md_reg, &md);
++		md = mn_to_md(mn, f->m, f->n, md);
++		regmap_write(hw->regmap, md_reg, md);
++
++		ns = mn_to_ns(mn, f->m, f->n, ns);
++		regmap_write(hw->regmap, rcg->ns_reg, ns);
++
++		ctl = mn_to_reg(mn, f->m, f->n, ctl);
++		regmap_write(hw->regmap, hw->enable_reg, ctl);
++
++		ns &= ~BIT(mn->mnctr_reset_bit);
++		regmap_write(hw->regmap, rcg->ns_reg, ns);
++	} else {
++		p = &rcg->p[new_bank];
++		ns = pre_div_to_ns(p, f->pre_div - 1, ns);
++	}
++
++	s = &rcg->s[new_bank];
++	ns = src_to_ns(s, s->parent_map[f->src], ns);
++	regmap_write(hw->regmap, rcg->ns_reg, ns);
++
++	if (enabled) {
++		*regp ^= BIT(rcg->mux_sel_bit);
++		regmap_write(hw->regmap, bank_reg, *regp);
++	}
++}
++
++static int clk_dyn_rcg_set_parent(struct clk_hw *hw, u8 index)
++{
++	struct clk_dyn_rcg *rcg = to_clk_dyn_rcg(hw);
++	u32 ns, ctl, md, reg;
++	int bank;
++	struct freq_tbl f = { 0 };
++	bool banked_mn = !!rcg->mn[1].width;
++
++	regmap_read(hw->regmap, rcg->ns_reg, &ns);
++	regmap_read(hw->regmap, hw->enable_reg, &ctl);
++	reg = banked_mn ? ctl : ns;
++
++	bank = reg_to_bank(rcg, reg);
++
++	if (banked_mn) {
++		regmap_read(hw->regmap, rcg->md_reg[bank], &md);
++		f.m = md_to_m(&rcg->mn[bank], md);
++		f.n = ns_m_to_n(&rcg->mn[bank], ns, f.m);
++	} else {
++		f.pre_div = ns_to_pre_div(&rcg->p[bank], ns) + 1;
++	}
++	f.src = index;
++
++	configure_bank(rcg, &f);
++
++	return 0;
++}
++
++/*
++ * Calculate m/n:d rate
++ *
++ *          parent_rate     m
++ *   rate = ----------- x  ---
++ *            pre_div       n
++ */
++static unsigned long
++calc_rate(unsigned long rate, u32 m, u32 n, u32 mode, u32 pre_div)
++{
++	if (pre_div)
++		rate /= pre_div + 1;
++
++	if (mode) {
++		u64 tmp = rate;
++		tmp *= m;
++		do_div(tmp, n);
++		rate = tmp;
++	}
++
++	return rate;
++}
++
++static unsigned long
++clk_rcg_recalc_rate(struct clk_hw *hw, unsigned long parent_rate)
++{
++	struct clk_rcg *rcg = to_clk_rcg(hw);
++	u32 pre_div, m, n, ns, md, mode;
++	struct mn *mn = &rcg->mn;
++
++	regmap_read(hw->regmap, rcg->ns_reg, &ns);
++	regmap_read(hw->regmap, rcg->md_reg, &md);
++
++	pre_div = ns_to_pre_div(&rcg->p, ns);
++	m = md_to_m(mn, md);
++	n = ns_m_to_n(mn, ns, m);
++	/* MN counter mode is in hw.enable_reg sometimes */
++	if (hw->enable_reg != rcg->ns_reg)
++		regmap_read(hw->regmap, hw->enable_reg, &mode);
++	else
++		mode = ns;
++	mode = reg_to_mnctr_mode(mn, mode);
++
++	return calc_rate(parent_rate, m, n, mode, pre_div);
++}
++
++static unsigned long
++clk_dyn_rcg_recalc_rate(struct clk_hw *hw, unsigned long parent_rate)
++{
++	struct clk_dyn_rcg *rcg = to_clk_dyn_rcg(hw);
++	u32 m, n, pre_div, ns, md, mode, reg;
++	int bank;
++	struct mn *mn;
++	bool banked_mn = !!rcg->mn[1].width;
++
++	regmap_read(hw->regmap, rcg->ns_reg, &ns);
++
++	if (banked_mn)
++		regmap_read(hw->regmap, hw->enable_reg, &reg);
++	else
++		reg = ns;
++
++	bank = reg_to_bank(rcg, reg);
++
++	if (banked_mn) {
++		mn = &rcg->mn[bank];
++		regmap_read(hw->regmap, rcg->md_reg[bank], &md);
++		m = md_to_m(mn, md);
++		n = ns_m_to_n(mn, ns, m);
++		mode = reg_to_mnctr_mode(mn, reg);
++		return calc_rate(parent_rate, m, n, mode, 0);
++	} else {
++		pre_div = ns_to_pre_div(&rcg->p[bank], ns);
++		return calc_rate(parent_rate, 0, 0, 0, pre_div);
++	}
++}
++
++static const
++struct freq_tbl *find_freq(const struct freq_tbl *f, unsigned long rate)
++{
++	for (; f->freq; f++)
++		if (rate <= f->freq)
++			return f;
++
++	return NULL;
++}
++
++static long _freq_tbl_determine_rate(struct clk_hw *hw,
++		const struct freq_tbl *f, unsigned long rate,
++		unsigned long *p_rate, struct clk **p)
++{
++	f = find_freq(f, rate);
++	if (!f)
++		return -EINVAL;
++
++	*p = clk_get_parent_by_index(hw->clk, f->src);
++	*p_rate =  __clk_get_rate(*p);
++
++	return f->freq;
++}
++
++static long clk_rcg_determine_rate(struct clk_hw *hw, unsigned long rate,
++		unsigned long *p_rate, struct clk **p)
++{
++	struct clk_rcg *rcg = to_clk_rcg(hw);
++
++	return _freq_tbl_determine_rate(hw, rcg->freq_tbl, rate, p_rate, p);
++}
++
++static long clk_dyn_rcg_determine_rate(struct clk_hw *hw, unsigned long rate,
++		unsigned long *p_rate, struct clk **p)
++{
++	struct clk_dyn_rcg *rcg = to_clk_dyn_rcg(hw);
++
++	return _freq_tbl_determine_rate(hw, rcg->freq_tbl, rate, p_rate, p);
++}
++
++static int clk_rcg_set_rate(struct clk_hw *hw, unsigned long rate,
++			    unsigned long parent_rate)
++{
++	struct clk_rcg *rcg = to_clk_rcg(hw);
++	const struct freq_tbl *f;
++	u32 ns, md, ctl;
++	struct mn *mn = &rcg->mn;
++
++	f = find_freq(rcg->freq_tbl, rate);
++	if (!f)
++		return -EINVAL;
++
++	regmap_read(hw->regmap, rcg->ns_reg, &ns);
++	ns |= BIT(mn->mnctr_reset_bit);
++	regmap_write(hw->regmap, rcg->ns_reg, ns);
++
++	regmap_read(hw->regmap, rcg->md_reg, &md);
++	md = mn_to_md(mn, f->m, f->n, md);
++	regmap_write(hw->regmap, rcg->md_reg, md);
++
++	/* MN counter mode is in hw.enable_reg sometimes */
++	if (hw->enable_reg != rcg->ns_reg) {
++		regmap_read(hw->regmap, hw->enable_reg, &ctl);
++		ctl = mn_to_reg(mn, f->m, f->n, ctl);
++		regmap_write(hw->regmap, hw->enable_reg, ctl);
++	} else {
++		ns = mn_to_reg(mn, f->m, f->n, ns);
++	}
++	ns = mn_to_ns(mn, f->m, f->n, ns);
++	ns = pre_div_to_ns(&rcg->p, f->pre_div - 1, ns);
++	regmap_write(hw->regmap, rcg->ns_reg, ns);
++
++	ns &= ~BIT(mn->mnctr_reset_bit);
++	regmap_write(hw->regmap, rcg->ns_reg, ns);
++
++	return 0;
++}
++
++static int __clk_dyn_rcg_set_rate(struct clk_hw *hw, unsigned long rate)
++{
++	struct clk_dyn_rcg *rcg = to_clk_dyn_rcg(hw);
++	const struct freq_tbl *f;
++
++	f = find_freq(rcg->freq_tbl, rate);
++	if (!f)
++		return -EINVAL;
++
++	configure_bank(rcg, f);
++
++	return 0;
++}
++
++static int clk_dyn_rcg_set_rate(struct clk_hw *hw, unsigned long rate,
++			    unsigned long parent_rate)
++{
++	return __clk_dyn_rcg_set_rate(hw, rate);
++}
++
++static int clk_dyn_rcg_set_rate_and_parent(struct clk_hw *hw,
++		unsigned long rate, unsigned long parent_rate, u8 index)
++{
++	return __clk_dyn_rcg_set_rate(hw, rate);
++}
++
++const struct clk_ops clk_rcg_ops = {
++	.enable = clk_enable_regmap,
++	.disable = clk_disable_regmap,
++	.get_parent = clk_rcg_get_parent,
++	.set_parent = clk_rcg_set_parent,
++	.recalc_rate = clk_rcg_recalc_rate,
++	.determine_rate = clk_rcg_determine_rate,
++	.set_rate = clk_rcg_set_rate,
 +};
++EXPORT_SYMBOL_GPL(clk_rcg_ops);
 +
-+static int __init msm_gcc_8960_init(void)
-+{
-+	return platform_driver_register(&msm_gcc_8960_driver);
-+}
-+core_initcall(msm_gcc_8960_init);
-+
-+static void __exit msm_gcc_8960_exit(void)
-+{
-+	platform_driver_unregister(&msm_gcc_8960_driver);
-+}
-+module_exit(msm_gcc_8960_exit);
-+
-+MODULE_DESCRIPTION("MSM GCC 8960 Driver");
-+MODULE_LICENSE("GPL v2");
-+MODULE_ALIAS("platform:msm-gcc-8960");
-diff --git a/include/dt-bindings/clk/msm-gcc-8960.h b/include/dt-bindings/clk/msm-gcc-8960.h
++const struct clk_ops clk_dyn_rcg_ops = {
++	.enable = clk_enable_regmap,
++	.is_enabled = clk_is_enabled_regmap,
++	.disable = clk_disable_regmap,
++	.get_parent = clk_dyn_rcg_get_parent,
++	.set_parent = clk_dyn_rcg_set_parent,
++	.recalc_rate = clk_dyn_rcg_recalc_rate,
++	.determine_rate = clk_dyn_rcg_determine_rate,
++	.set_rate = clk_dyn_rcg_set_rate,
++	.set_rate_and_parent = clk_dyn_rcg_set_rate_and_parent,
++};
++EXPORT_SYMBOL_GPL(clk_dyn_rcg_ops);
+diff --git a/drivers/clk/msm/clk-rcg.h b/drivers/clk/msm/clk-rcg.h
 new file mode 100644
-index 0000000..685b118
+index 0000000..2335176
 --- /dev/null
-+++ b/include/dt-bindings/clk/msm-gcc-8960.h
-@@ -0,0 +1,28 @@
++++ b/drivers/clk/msm/clk-rcg.h
+@@ -0,0 +1,149 @@
 +/*
 + * Copyright (c) 2013, The Linux Foundation. All rights reserved.
 + *
@@ -483,21 +549,420 @@ index 0000000..685b118
 + * GNU General Public License for more details.
 + */
 +
-+#ifndef _DT_BINDINGS_CLK_MSM_GCC_8960_H
-+#define _DT_BINDINGS_CLK_MSM_GCC_8960_H
++#ifndef __MSM_CLK_RCG_H__
++#define __MSM_CLK_RCG_H__
 +
-+#define PLL8				0
-+#define PLL8_VOTE			1
-+#define GSBI5_UART_RCG			2
-+#define GSBI5_UART_CXC			3
-+#define GSBI6_UART_RCG			4
-+#define GSBI6_UART_CXC			5
-+#define GSBI6_UART_AHB			6
-+#define GSBI5_UART_AHB			7
-+#define GSBI5_QUP_RCG			8
-+#define GSBI5_QUP_CXC			9
++#include <linux/clk-provider.h>
++
++struct freq_tbl {
++	unsigned long freq;
++	u8 src;
++	u8 pre_div;
++	u16 m;
++	u16 n;
++};
++
++/**
++ * struct mn - M/N:D counter
++ * @mnctr_en_bit: bit to enable mn counter
++ * @mnctr_reset_bit: bit to assert mn counter reset
++ * @mnctr_mode_shift: lowest bit of mn counter mode field
++ * @n_val_shift: lowest bit of n value field
++ * @m_val_shift: lowest bit of m value field
++ * @width: number of bits in m/n/d values
++ */
++struct mn {
++	u8		mnctr_en_bit;
++	u8		mnctr_reset_bit;
++	u8		mnctr_mode_shift;
++#define MNCTR_MODE_DUAL 0x2
++#define MNCTR_MODE_MASK 0x3
++	u8		n_val_shift;
++	u8		m_val_shift;
++	u8		width;
++};
++
++/**
++ * struct pre_div - pre-divider
++ * @pre_div_shift: lowest bit of pre divider field
++ * @pre_div_width: number of bits in predivider
++ */
++struct pre_div {
++	u8		pre_div_shift;
++	u8		pre_div_width;
++};
++
++/**
++ * struct src_sel - source selector
++ * @src_sel_shift: lowest bit of source selection field
++ * @parent_map: map from software's parent index to hardware's src_sel field
++ */
++struct src_sel {
++	u8		src_sel_shift;
++#define SRC_SEL_MASK	0x7
++	u8		*parent_map;
++};
++
++/**
++ * struct clk_rcg - root clock generator
++ *
++ * @ns_reg: NS register
++ * @md_reg: MD register
++ * @mn: mn counter
++ * @p: pre divider
++ * @s: source selector
++ * @freq_tbl: frequency table
++ * @hw: handle between common and hardware-specific interfaces
++ * @lock: register lock
++ *
++ */
++struct clk_rcg {
++	u32		ns_reg;
++	u32		md_reg;
++
++	struct mn	mn;
++	struct pre_div	p;
++	struct src_sel	s;
++
++	const struct freq_tbl	*freq_tbl;
++
++	struct clk_hw	hw;
++};
++
++extern const struct clk_ops clk_rcg_ops;
++
++/**
++ * struct clk_dyn_rcg - root clock generator with glitch free mux
++ *
++ * @mux_sel_bit: bit to switch glitch free mux
++ * @ns_reg: NS register
++ * @md_reg: MD0 and MD1 register
++ * @mn: mn counter (banked)
++ * @s: source selector (banked)
++ * @freq_tbl: frequency table
++ * @hw: handle between common and hardware-specific interfaces
++ * @lock: register lock
++ *
++ */
++struct clk_dyn_rcg {
++	u32	ns_reg;
++	u32	md_reg[2];
++
++	u8	mux_sel_bit;
++
++	struct mn	mn[2];
++	struct pre_div	p[2];
++	struct src_sel	s[2];
++
++	const struct freq_tbl	*freq_tbl;
++
++	struct clk_hw	hw;
++};
++
++extern const struct clk_ops clk_dyn_rcg_ops;
++
++/**
++ * struct clk_rcg2 - root clock generator
++ *
++ * @cmd_rcgr: corresponds to *_CMD_RCGR
++ * @mnd_width: number of bits in m/n/d values
++ * @hid_width: number of bits in half integer divider
++ * @parent_map: map from software's parent index to hardware's src_sel field
++ * @freq_tbl: frequency table
++ * @hw: handle between common and hardware-specific interfaces
++ * @lock: register lock
++ *
++ */
++struct clk_rcg2 {
++	u32			cmd_rcgr;
++	u8			mnd_width;
++	u8			hid_width;
++	u8			*parent_map;
++	const struct freq_tbl	*freq_tbl;
++	struct clk_hw		hw;
++};
++
++extern const struct clk_ops clk_rcg2_ops;
 +
 +#endif
+diff --git a/drivers/clk/msm/clk-rcg2.c b/drivers/clk/msm/clk-rcg2.c
+new file mode 100644
+index 0000000..c970261
+--- /dev/null
++++ b/drivers/clk/msm/clk-rcg2.c
+@@ -0,0 +1,272 @@
++/*
++ * Copyright (c) 2013, The Linux Foundation. All rights reserved.
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include <linux/kernel.h>
++#include <linux/bitops.h>
++#include <linux/err.h>
++#include <linux/bug.h>
++#include <linux/export.h>
++#include <linux/clk-provider.h>
++#include <linux/delay.h>
++#include <linux/regmap.h>
++
++#include <asm/div64.h>
++
++#include "clk-rcg.h"
++
++#define CMD_REG			0x0
++#define CMD_UPDATE		BIT(0)
++#define CMD_ROOT_EN		BIT(1)
++#define CMD_DIRTY_CFG		BIT(4)
++#define CMD_DIRTY_N		BIT(5)
++#define CMD_DIRTY_M		BIT(6)
++#define CMD_DIRTY_D		BIT(7)
++#define CMD_ROOT_OFF		BIT(31)
++
++#define CFG_REG			0x4
++#define CFG_SRC_DIV_SHIFT	0
++#define CFG_SRC_SEL_SHIFT	8
++#define CFG_SRC_SEL_MASK	(0x7 << CFG_SRC_SEL_SHIFT)
++#define CFG_MODE_SHIFT		12
++#define CFG_MODE_MASK		(0x3 << CFG_MODE_SHIFT)
++#define CFG_MODE_DUAL_EDGE	(0x2 << CFG_MODE_SHIFT)
++
++#define M_REG			0x8
++#define N_REG			0xc
++#define D_REG			0x10
++
++#define to_clk_rcg2(_hw) container_of(_hw, struct clk_rcg2, hw)
++
++static int clk_rcg2_is_enabled(struct clk_hw *hw)
++{
++	struct clk_rcg2 *rcg = to_clk_rcg2(hw);
++	u32 cmd;
++	int ret;
++
++	ret = regmap_read(hw->regmap, rcg->cmd_rcgr + CMD_REG, &cmd);
++	if (ret)
++		return ret;
++
++	return (cmd & CMD_ROOT_OFF) != 0;
++}
++
++static u8 clk_rcg2_get_parent(struct clk_hw *hw)
++{
++	struct clk_rcg2 *rcg = to_clk_rcg2(hw);
++	int num_parents = __clk_get_num_parents(hw->clk);
++	u32 cfg;
++	int i, ret;
++
++	ret = regmap_read(hw->regmap, rcg->cmd_rcgr + CFG_REG, &cfg);
++	if (ret)
++		return ret;
++
++	cfg &= CFG_SRC_SEL_MASK;
++	cfg >>= CFG_SRC_SEL_SHIFT;
++
++	for (i = 0; i < num_parents; i++)
++		if (cfg == rcg->parent_map[i])
++			return i;
++
++	return -EINVAL;
++}
++
++static int update_config(struct clk_rcg2 *rcg)
++{
++	int count, ret;
++	u32 cmd;
++	struct clk_hw *hw = &rcg->hw;
++	const char *name = __clk_get_name(hw->clk);
++
++	ret = regmap_update_bits(hw->regmap, rcg->cmd_rcgr + CMD_REG,
++				 CMD_UPDATE, CMD_UPDATE);
++	if (ret)
++		return ret;
++
++	/* Wait for update to take effect */
++	for (count = 500; count > 0; count--) {
++		ret = regmap_read(hw->regmap, rcg->cmd_rcgr + CMD_REG, &cmd);
++		if (ret)
++			return ret;
++		if (!(cmd & CMD_UPDATE))
++			return 0;
++		udelay(1);
++	}
++
++	WARN(1, "%s: rcg didn't update its configuration.", name);
++	return 0;
++}
++
++static int clk_rcg2_set_parent(struct clk_hw *hw, u8 index)
++{
++	struct clk_rcg2 *rcg = to_clk_rcg2(hw);
++	int ret;
++
++	ret = regmap_update_bits(hw->regmap, rcg->cmd_rcgr + CFG_REG,
++				 CFG_SRC_SEL_MASK,
++				 rcg->parent_map[index] << CFG_SRC_SEL_SHIFT);
++	if (ret)
++		return ret;
++
++	return update_config(rcg);
++}
++
++/*
++ * Calculate m/n:d rate
++ *
++ *          parent_rate     m
++ *   rate = ----------- x  ---
++ *            hid_div       n
++ */
++static unsigned long
++calc_rate(unsigned long rate, u32 m, u32 n, u32 mode, u32 hid_div)
++{
++	if (hid_div) {
++		rate *= 2;
++		rate /= hid_div + 1;
++	}
++
++	if (mode) {
++		u64 tmp = rate;
++		tmp *= m;
++		do_div(tmp, n);
++		rate = tmp;
++	}
++
++	return rate;
++}
++
++static unsigned long
++clk_rcg2_recalc_rate(struct clk_hw *hw, unsigned long parent_rate)
++{
++	struct clk_rcg2 *rcg = to_clk_rcg2(hw);
++	u32 cfg, hid_div, m = 0, n = 0, mode = 0, mask;
++
++	regmap_read(hw->regmap, rcg->cmd_rcgr + CFG_REG, &cfg);
++
++	if (rcg->mnd_width) {
++		mask = BIT(rcg->mnd_width) - 1;
++		regmap_read(hw->regmap, rcg->cmd_rcgr + M_REG, &m);
++		m &= mask;
++		regmap_read(hw->regmap, rcg->cmd_rcgr + N_REG, &n);
++		n =  ~n;
++		n &= mask;
++		n += m;
++		mode = cfg & CFG_MODE_MASK;
++		mode >>= CFG_MODE_SHIFT;
++	}
++
++	mask = BIT(rcg->hid_width) - 1;
++	hid_div = cfg >> CFG_SRC_DIV_SHIFT;
++	hid_div &= mask;
++
++	return calc_rate(parent_rate, m, n, mode, hid_div);
++}
++
++static const
++struct freq_tbl *find_freq(const struct freq_tbl *f, unsigned long rate)
++{
++	for (; f->freq; f++)
++		if (rate <= f->freq)
++			return f;
++
++	return NULL;
++}
++
++static long _freq_tbl_determine_rate(struct clk_hw *hw,
++		const struct freq_tbl *f, unsigned long rate,
++		unsigned long *p_rate, struct clk **p)
++{
++	f = find_freq(f, rate);
++	if (!f)
++		return -EINVAL;
++
++	*p = clk_get_parent_by_index(hw->clk, f->src);
++	*p_rate =  __clk_get_rate(*p);
++
++	return f->freq;
++}
++
++static long clk_rcg2_determine_rate(struct clk_hw *hw, unsigned long rate,
++		unsigned long *p_rate, struct clk **p)
++{
++	struct clk_rcg2 *rcg = to_clk_rcg2(hw);
++
++	return _freq_tbl_determine_rate(hw, rcg->freq_tbl, rate, p_rate, p);
++}
++
++static int __clk_rcg2_set_rate(struct clk_hw *hw, unsigned long rate)
++{
++	struct clk_rcg2 *rcg = to_clk_rcg2(hw);
++	const struct freq_tbl *f;
++	u32 cfg, mask;
++	int ret;
++
++	f = find_freq(rcg->freq_tbl, rate);
++	if (!f)
++		return -EINVAL;
++
++	if (rcg->mnd_width && f->n) {
++		mask = BIT(rcg->mnd_width) - 1;
++		ret = regmap_update_bits(hw->regmap, rcg->cmd_rcgr + M_REG,
++					 mask, f->m);
++		if (ret)
++			return ret;
++
++		ret = regmap_update_bits(hw->regmap, rcg->cmd_rcgr + N_REG,
++					 mask, ~(f->n - f->m));
++		if (ret)
++			return ret;
++
++		ret = regmap_update_bits(hw->regmap, rcg->cmd_rcgr + D_REG,
++					 mask, ~f->n);
++		if (ret)
++			return ret;
++	}
++
++	mask = BIT(rcg->hid_width) - 1;
++	mask |= CFG_SRC_SEL_MASK | CFG_MODE_MASK;
++	cfg = f->pre_div << CFG_SRC_DIV_SHIFT;
++	cfg |= rcg->parent_map[f->src] << CFG_SRC_SEL_SHIFT;
++	if (rcg->mnd_width && f->n)
++		cfg |= CFG_MODE_DUAL_EDGE;
++	ret = regmap_update_bits(hw->regmap, rcg->cmd_rcgr + CFG_REG, mask,
++			cfg);
++	if (ret)
++		return ret;
++
++	return update_config(rcg);
++}
++
++static int clk_rcg2_set_rate(struct clk_hw *hw, unsigned long rate,
++			    unsigned long parent_rate)
++{
++	return __clk_rcg2_set_rate(hw, rate);
++}
++
++static int clk_rcg2_set_rate_and_parent(struct clk_hw *hw,
++		unsigned long rate, unsigned long parent_rate, u8 index)
++{
++	return __clk_rcg2_set_rate(hw, rate);
++}
++
++const struct clk_ops clk_rcg2_ops = {
++	.is_enabled = clk_rcg2_is_enabled,
++	.get_parent = clk_rcg2_get_parent,
++	.set_parent = clk_rcg2_set_parent,
++	.recalc_rate = clk_rcg2_recalc_rate,
++	.determine_rate = clk_rcg2_determine_rate,
++	.set_rate = clk_rcg2_set_rate,
++	.set_rate_and_parent = clk_rcg2_set_rate_and_parent,
++};
++EXPORT_SYMBOL_GPL(clk_rcg2_ops);
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
