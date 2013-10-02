@@ -1,89 +1,67 @@
-From: maxime.coquelin@st.com (Maxime COQUELIN)
-Date: Wed, 2 Oct 2013 10:36:16 +0200
-Subject: [PATCH 1/4] i2c: busses: i2c-st: Add ST I2C controller
-In-Reply-To: <524B346C.8070607@wwwdotorg.org>
-References: <1380623952-4252-1-git-send-email-maxime.coquelin@st.com>
- <1380623952-4252-2-git-send-email-maxime.coquelin@st.com>
- <524B346C.8070607@wwwdotorg.org>
-Message-ID: <524BDB00.3010508@st.com>
+From: hector.palacios@digi.com (Hector Palacios)
+Date: Wed, 2 Oct 2013 10:46:28 +0200
+Subject: [PATCH] serial: mxs-auart: wait for DMA buffer to flush before
+ shutdown
+In-Reply-To: <20131002083014.GN2548@pengutronix.de>
+References: <1380644315-31581-1-git-send-email-hector.palacios@digi.com>
+ <20131001194800.GL2548@pengutronix.de> <524BCBC4.5050708@digi.com>
+ <20131002074436.GM2548@pengutronix.de> <524BD4A6.5060208@digi.com>
+ <20131002083014.GN2548@pengutronix.de>
+Message-ID: <524BDD64.70309@digi.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Uwe,
 
-On 10/01/2013 10:45 PM, Stephen Warren wrote:
-> On 10/01/2013 04:39 AM, Maxime COQUELIN wrote:
->> This patch adds support to SSC (Synchronous Serial Controller)
->> I2C driver. This IP also supports SPI protocol, but this is not
->> the aim of this driver.
+On 10/02/2013 10:30 AM, Uwe Kleine-K?nig wrote:
+> Hello Hector,
+>
+> On Wed, Oct 02, 2013 at 10:09:10AM +0200, Hector Palacios wrote:
+>> On 10/02/2013 09:44 AM, Uwe Kleine-K?nig wrote:
+>>> On Wed, Oct 02, 2013 at 09:31:16AM +0200, Hector Palacios wrote:
+>>>> On 10/01/2013 09:48 PM, Uwe Kleine-K?nig wrote:
+>>>>> On Tue, Oct 01, 2013 at 06:18:35PM +0200, Hector Palacios wrote:
+>>>>>> +		/* Wait enough time to flush DMA buffer completely */
+>>>>>> +		to = u->timeout * UART_XMIT_SIZE / u->fifosize;
+>>>>> u->timeout is the time needed to send one char, right? UART_XMIT_SIZE is
+>>>>> the size of the circular buffer, fifosize is the size of the fifo. I
+>>>>> don't get what you get by dividing by the fifosize. I would have
+>>>>> expected something like:
+>>>>>
+>>>>> 	u->timeout * min(UART_XMIT_SIZE, u->fifosize)
+>>>>>
+>>>>> Can you explain, maybe in a comment along the code for the next person
+>>>>> not understanding?
+>>>>
+>>>> u->timeout is *not* the time needed to send one char but the time
+>>>> needed to flush the complete port fifo (see uart_update_timeout() in
+>>>> serial_core.c where it is set).
+>>> Ah, right. (BTW, uart_update_timeout should better round up instead of
+>>> round down, i.e.
+>>> -	port->timeout = (HZ * bits) / baud + HZ/50;
+>>> +	port->timeout = DIV_ROUND_UP(HZ * bits, baud) + HZ/50;
+>>> )
+>>>
+>>>> UART_XMIT_SIZE is the number of bytes in the DMA buffer, so I divide
+>>>> the max number of bytes in the FIFO by the FIFO size and multiply by
+>>>> the FIFO timeout.
+>>> ditto here, better round up. Although I think using a completion could
+>>> shorten the timeout considerably because there are often less than
+>>> UART_XMIT_SIZE chars in the buffer?!
 >>
->> This IP is embedded in all ST SoCs for Set-top box platorms, and
->> supports I2C Standard and Fast modes.
->> diff --git a/Documentation/devicetree/bindings/i2c/i2c-st.txt b/Documentation/devicetree/bindings/i2c/i2c-st.txt
->> +Required properties :
->> +- clocks : phandle to the I2C clock source
->> +- clock-names : from common clock binding: Shall be "ssc"
-> I'd prefer to define that as:
->
-> clock-names: Must contain "ssc".
-> clocks: Must contain an entry for each name in clock-names. See the
-> common clock bindings.
->
-> That way, it makes it clear that clock-names is the primary lookup
-> mechanism, rather than some auxiliary documentation.
-OK. This will be done in next series.
+>> I'm not really waiting the full timeout. I'm checking for TX fifo
+>> empty every 1ms and for a maximum of 'to' ms.
+> Correct. Still using DIV_ROUND_UP would be better, right?
 
->
->> +Recommended properties :
->> +- clock-frequency : Desired I2C bus clock frequency in Hz. Otherwise
-> s/Otherwise/If not specified,/
-Done.
->
->> +  the default 100 kHz frequency will be used. As only Normal and Fast modes
->> +  are supported, possible values are 100000 and 400000.
-> I think that's just optional. Since there's a well-defined sensible
-> default, there's no need to recommend it.
-OK, I move it to optional.
->> +Optional properties :
->> +- i2c-min-scl-pulse-width-us : The minimum valid SCL pulse width that is allowed
->> +  through the deglitch circuit. In units of us.
->> +- i2c-min-sda-pulse-width-us : The minimum valid SDA pulse width that is allowed
->> +  through the deglitch circuit. In units of us.
-> Are those properties specific to this binding, or intended to be
-> generic? If specific to this binding, a vendor prefix should be present
-> in the property name. If not, you probably want to document the
-> properties in some common file.
-Ok.
-In last revision, I put this properties as specific to this binding.
-Wolfram proposed to make this generic, but it looks like this IP is the 
-only one
-needing such properties.
+I think it is not really needed, after all the code is adding HZ/50 of slop which acts 
+like a round up, doesn't it?
 
-Wolfram, what would you advise?
-If you still prefer to make this properties generics, in which file should I
-document it? I don't see any common i2c binding document for now.
+	/*
+	 * Figure the timeout to send the above number of bits.
+	 * Add .02 seconds of slop
+	 */
+	port->timeout = (HZ * bits) / baud + HZ/50;
 
->
->> +Examples :
-> s/Examples/Example/ since there's just one.
-Ok.
->
->> +i2c0: i2c at fed40000 {
->> +	compatible	= "st,comms-ssc-i2c";
->> +	reg		= <0xfed40000 0x110>;
->> +	interrupts	=  <GIC_SPI 187 IRQ_TYPE_EDGE_RISING>;
->> +	clocks		= <&CLK_S_ICN_REG_0>;
->> +	clock-names	= "ssc";
->> +	clock-frequency = <400000>;
->> +	pinctrl-names	= "default";
->> +	pinctrl-0	= <&pinctrl_i2c0_default>;
-> That wasn't mentioned in the binding definition. You'd probably want to
-> document the requirement for those two properties by saying something like:
->
-> A pinctrl state named "default" must be defined, using the bindings in
-> ../pinctrl/pinctrl-binding.txt.
-Ok. I will also add the "sleep" state in the optional definitions.
-
-Thanks for the review Stephen.
-
-Regards,
-Maxime
+Best regards,
+--
+Hector Palacios
