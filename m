@@ -1,47 +1,65 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Wed, 2 Oct 2013 12:55:28 -0400
-Subject: [PATCH] sched_clock: fix postinit no sched_clock function check
-Message-ID: <1380732928-13897-1-git-send-email-santosh.shilimkar@ti.com>
+From: simon.guinot@sequanux.org (Simon Guinot)
+Date: Wed, 2 Oct 2013 18:57:54 +0200
+Subject: [PATCH] clk: armada-370: fix tclk frequencies
+In-Reply-To: <20131002162221.GN31178@titan.lakedaemon.net>
+References: <1380729418-14393-1-git-send-email-simon.guinot@sequanux.org>
+ <20131002162221.GN31178@titan.lakedaemon.net>
+Message-ID: <20131002165754.GE1356@kw.sim.vm.gnt>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The sched_clock code uses 2 levels of function pointers, sched_clock_func()
-and read_sched_clock() but the no sched_clock check in postinit() just
-checks read_sched_clock().
+On Wed, Oct 02, 2013 at 12:22:21PM -0400, Jason Cooper wrote:
+> Simon,
+> 
+> On Wed, Oct 02, 2013 at 05:56:58PM +0200, Simon Guinot wrote:
+> > Signed-off-by: Simon Guinot <simon.guinot@sequanux.org>
+> 
+> Could you elaborate on this?  What symptom did you notice?  How did this
+> fix it?  When was the regression introduced?
 
-This leads to kernel falling back to jiffy based sched clock even in
-presence of sched_clock_func() which is not desirable.
+Hi Jason,
 
-Fix the postinit() check to avoid the issue. Probably the issue is hidden
-so far on most of the arm SOCs because of already existing sched_clock
-registrations apart from arch_timer sched_clock. One can reproduce the
-issue by just have arch_timer as sched_clock
+While benchmarking Linux 3.12-rc3 on an Armada-370-RD, I noticed bad
+networking performances... After some investigations, I found out that
+the coalescence configuration (derived from the tclk) was suspect.
 
-Cc: Stephen Boyd <sboyd@codeaurora.org>
-Cc: John Stultz <john.stultz@linaro.org>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Rob Herring <rob.herring@calxeda.com>
-Cc: Thomas Gleixner <tglx@linutronix.de>
+While checking for the tclk value, I found this typo. There is not much
+to say about this patch except that the correct tclk frequencies for
+Armada-370 are 166 and 200MHz, not 16.6 and 20MHz.
 
-Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
----
- kernel/time/sched_clock.c |    3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+Simon
 
-diff --git a/kernel/time/sched_clock.c b/kernel/time/sched_clock.c
-index 0b479a6..15c4d78 100644
---- a/kernel/time/sched_clock.c
-+++ b/kernel/time/sched_clock.c
-@@ -179,7 +179,8 @@ void __init sched_clock_postinit(void)
- 	 * If no sched_clock function has been provided at that point,
- 	 * make it the final one one.
- 	 */
--	if (read_sched_clock == jiffy_sched_clock_read)
-+	if ((read_sched_clock == jiffy_sched_clock_read) &&
-+			(sched_clock_func == sched_clock_32))
- 		setup_sched_clock(jiffy_sched_clock_read, 32, HZ);
- 
- 	sched_clock_poll(sched_clock_timer.data);
--- 
-1.7.9.5
+> 
+> thx,
+> 
+> Jason.
+> 
+> > ---
+> >  drivers/clk/mvebu/armada-370.c |    4 ++--
+> >  1 file changed, 2 insertions(+), 2 deletions(-)
+> > 
+> > diff --git a/drivers/clk/mvebu/armada-370.c b/drivers/clk/mvebu/armada-370.c
+> > index fc777bd..81a202d 100644
+> > --- a/drivers/clk/mvebu/armada-370.c
+> > +++ b/drivers/clk/mvebu/armada-370.c
+> > @@ -39,8 +39,8 @@ static const struct coreclk_ratio a370_coreclk_ratios[] __initconst = {
+> >  };
+> >  
+> >  static const u32 a370_tclk_freqs[] __initconst = {
+> > -	16600000,
+> > -	20000000,
+> > +	166000000,
+> > +	200000000,
+> >  };
+> >  
+> >  static u32 __init a370_get_tclk_freq(void __iomem *sar)
+> > -- 
+> > 1.7.10.4
+> > 
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131002/b0c4d977/attachment.sig>
