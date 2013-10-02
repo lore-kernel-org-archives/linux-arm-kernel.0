@@ -1,32 +1,47 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Wed, 2 Oct 2013 13:42:01 -0300
-Subject: Armada XP doesn't boot in v3.12-rc3
-In-Reply-To: <20131002180702.702ce17b@skate>
-References: <CAFJTrDvNYa2g-TFPjii5WpCgnX8kc8r9v3+jzL7gkHCwRV-obg@mail.gmail.com>
- <20131002124320.GL31178@titan.lakedaemon.net>
- <CAFJTrDsTmSzFEX7XVqnw4=vYiBdqNeLDQuWFotSEZqGsFxT9sA@mail.gmail.com>
- <20131002180702.702ce17b@skate>
-Message-ID: <20131002164200.GA2365@localhost>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Wed, 2 Oct 2013 12:55:28 -0400
+Subject: [PATCH] sched_clock: fix postinit no sched_clock function check
+Message-ID: <1380732928-13897-1-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 02, 2013 at 06:07:02PM +0200, Thomas Petazzoni wrote:
-> 
-> It's a shame that 3.12-rc still isn't fixed, and that 3.12-rc1 was
-> broken in the first place :/
+The sched_clock code uses 2 levels of function pointers, sched_clock_func()
+and read_sched_clock() but the no sched_clock check in postinit() just
+checks read_sched_clock().
 
-Yeah, it's a damn shame. FWIW, I certainly learned a lesson from this
-and will be much careful in the future.
+This leads to kernel falling back to jiffy based sched clock even in
+presence of sched_clock_func() which is not desirable.
 
-> 
-> Ezequiel, Jason, can you ping the relevant maintainers to make sure the
-> relevant patches are merged quickly and land in the next -rc?
-> 
+Fix the postinit() check to avoid the issue. Probably the issue is hidden
+so far on most of the arm SOCs because of already existing sched_clock
+registrations apart from arch_timer sched_clock. One can reproduce the
+issue by just have arch_timer as sched_clock
 
-I already did earlier this morning. Jason sent the PR on September 19th
-so it was more or less in time for -rc2, I'm a bit puzzled about why
-it's not in Linus' yet.
+Cc: Stephen Boyd <sboyd@codeaurora.org>
+Cc: John Stultz <john.stultz@linaro.org>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Rob Herring <rob.herring@calxeda.com>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+
+Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+---
+ kernel/time/sched_clock.c |    3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/kernel/time/sched_clock.c b/kernel/time/sched_clock.c
+index 0b479a6..15c4d78 100644
+--- a/kernel/time/sched_clock.c
++++ b/kernel/time/sched_clock.c
+@@ -179,7 +179,8 @@ void __init sched_clock_postinit(void)
+ 	 * If no sched_clock function has been provided at that point,
+ 	 * make it the final one one.
+ 	 */
+-	if (read_sched_clock == jiffy_sched_clock_read)
++	if ((read_sched_clock == jiffy_sched_clock_read) &&
++			(sched_clock_func == sched_clock_32))
+ 		setup_sched_clock(jiffy_sched_clock_read, 32, HZ);
+ 
+ 	sched_clock_poll(sched_clock_timer.data);
 -- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+1.7.9.5
