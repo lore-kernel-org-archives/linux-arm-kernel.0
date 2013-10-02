@@ -1,129 +1,96 @@
-From: dgreid@chromium.org (Dylan Reid)
-Date: Tue, 1 Oct 2013 21:33:55 -0700
-Subject: [PATCH 1/3] dmaengine: pl330: Set residue in tx_status callback.
-In-Reply-To: <00b401ceafac$e3a88170$aaf98450$@samsung.com>
-References: <1378879685-5352-1-git-send-email-padma.v@samsung.com>
- <1378879685-5352-2-git-send-email-padma.v@samsung.com>
- <00b401ceafac$e3a88170$aaf98450$@samsung.com>
-Message-ID: <CAEUnVG72uTzHrQCoVtdT8UmkPcz2ks_qWT8QMbhHjUW-u3WnNQ@mail.gmail.com>
+From: iamjoonsoo.kim@lge.com (=?ks_c_5601-1987?B?sejB2Lz2?=)
+Date: Wed, 2 Oct 2013 14:05:03 +0900
+Subject: Why does unmap_area_sections() depend on !CONFIG_SMP?
+In-Reply-To: <alpine.LFD.2.03.1310011337450.21228@syhkavp.arg>
+References: <20131001095955.GA22859@lge.com>
+ <alpine.LFD.2.03.1310011337450.21228@syhkavp.arg>
+Message-ID: <018a01cebf2c$f44175c0$dcc46140$@lge.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 12, 2013 at 4:40 AM, Chanho Park <chanho61.park@samsung.com> wrote:
-> Hi Padmavathi,
->
->> -----Original Message-----
->> From: linux-arm-kernel [mailto:linux-arm-kernel-
->> bounces at lists.infradead.org] On Behalf Of Padmavathi Venna
->> Sent: Wednesday, September 11, 2013 3:08 PM
->> To: linux-samsung-soc at vger.kernel.org; linux-arm-
->> kernel at lists.infradead.org; padma.v at samsung.com; padma.kvr at gmail.com
->> Cc: kgene.kim at samsung.com; arnd at arndb.de; sbkim73 at samsung.com;
->> vinod.koul at intel.com; broonie at kernel.org; dgreid at chromium.org;
->> olofj at chromium.org
->> Subject: [PATCH 1/3] dmaengine: pl330: Set residue in tx_status callback.
->>
->> From: Dylan Reid <dgreid@chromium.org>
->>
->> Fill txstate.residue with the amount of bytes remaining in the current
->> transfer if the transfer is not complete.  This will be of particular use
->> to i2s DMA transfers, providing more accurate hw_ptr values to ASoC.
->>
->> Signed-off-by: Dylan Reid <dgreid@chromium.org>
->> Reviewed-by: Olof Johansson <olofj@chromium.org>
->> Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
->> ---
->>  drivers/dma/pl330.c |   55
->> ++++++++++++++++++++++++++++++++++++++++++++++++++-
->>  1 files changed, 54 insertions(+), 1 deletions(-)
->>
->> diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c index
->> 593827b..7ab9136 100644
->> --- a/drivers/dma/pl330.c
->> +++ b/drivers/dma/pl330.c
->> @@ -2476,11 +2476,64 @@ static void pl330_free_chan_resources(struct
->> dma_chan *chan)
->>       spin_unlock_irqrestore(&pch->lock, flags);  }
->>
->> +static inline int
->> +pl330_src_addr_in_desc(struct dma_pl330_desc *desc, unsigned int sar) {
->> +     return ((desc->px.src_addr <= sar) &&
->> +             (sar <= (desc->px.src_addr + desc->px.bytes))); }
->> +
->> +static inline int
->> +pl330_dst_addr_in_desc(struct dma_pl330_desc *desc, unsigned int dar) {
->> +     return ((desc->px.dst_addr <= dar) &&
->> +             (dar <= (desc->px.dst_addr + desc->px.bytes))); }
->> +
->> +static unsigned int pl330_tx_residue(struct dma_chan *chan) {
->> +     struct dma_pl330_chan *pch = to_pchan(chan);
->> +     void __iomem *regs = pch->dmac->pif.base;
->> +     struct pl330_thread *thrd = pch->pl330_chid;
->> +     struct dma_pl330_desc *desc;
->> +     unsigned int sar, dar;
->> +     unsigned int residue = 0;
->> +     unsigned long flags;
->> +
->> +     sar = readl(regs + SA(thrd->id));
->> +     dar = readl(regs + DA(thrd->id));
->> +
->> +     spin_lock_irqsave(&pch->lock, flags);
->> +
->> +     /* Find the desc related to the current buffer. */
->> +     list_for_each_entry(desc, &pch->work_list, node) {
->> +             if (desc->rqcfg.src_inc && pl330_src_addr_in_desc(desc,
->> sar)) {
->> +                     residue = desc->px.bytes - (sar -
-> desc->px.src_addr);
->> +                     goto found_unlock;
->> +             }
->> +             if (desc->rqcfg.dst_inc && pl330_dst_addr_in_desc(desc,
->> dar)) {
->> +                     residue = desc->px.bytes - (dar -
-> desc->px.dst_addr);
->> +                     goto found_unlock;
->> +             }
->> +     }
->> +
->> +found_unlock:
->> +     spin_unlock_irqrestore(&pch->lock, flags);
->> +
->> +     return residue;
->> +}
->> +
->>  static enum dma_status
->>  pl330_tx_status(struct dma_chan *chan, dma_cookie_t cookie,
->>                struct dma_tx_state *txstate)
->>  {
->> -     return dma_cookie_status(chan, cookie, txstate);
->> +     enum dma_status ret;
->> +
->> +     ret = dma_cookie_status(chan, cookie, txstate);
->> +     if (ret != DMA_SUCCESS) /* Not complete, check amount left. */
->> +             dma_set_residue(txstate, pl330_tx_residue(chan));
->> +
->> +     return ret;
->
-> Why didn't you use a cookie value to track the request?
-> The cookie is assigned when each transfer is submitted.
-> If you save the value in the desc, we can find the request easily.
 
-If there are several cyclic desc in the work list, is there a better
-way to find the "current" one?  The chan struct tracks the last
-completed and last submitted cookies, but these will be the first and
-last respectively as long as the cyclic transfer is active.  Is there
-an "active" cookie stored somewhere that I missed?
 
-Looking for the first buffer with status == BUSY is an improvement
-I'll make.  Any way to avoid looking through the list?
+> -----Original Message-----
+> From: Nicolas Pitre [mailto:nicolas.pitre at linaro.org]
+> Sent: Wednesday, October 02, 2013 3:24 AM
+> To: Joonsoo Kim
+> Cc: Russell King; linux-arm-kernel at lists.infradead.org
+> Subject: Re: Why does unmap_area_sections() depend on !CONFIG_SMP?
+> 
+> On Tue, 1 Oct 2013, Joonsoo Kim wrote:
+> 
+> > Hello, Russell.
+> >
+> > I looked at ioremap code in arm tree and found that
+> > unmap_area_sections() is enabled only if !CONFIG_SMP. I can't
+> > understand the comments above this function and it comes from you.
+> > Could you elaborate more on this?
+> >
+> > I guess that flush_cache_vunmap() before clearing page table and
+> > flush_tlb_kernel_range() after clearing page table is safe enough to
+> > cache consistency regardless CONFIG_SMP configuration. I think that 4K
+> > vunmap() also depends on this flushing logic.
+> >
+> > Please let me know what I am missing here.
+> 
+> This is all related to the page table level involved.
+> 
+> Each entry in the first level page table may refer to a second level page
+> table covering 1MB worth of virtual space, or it may be a direct mapping
+> corresponding to 1MB of contiguous physical memory.
+> 
+> In Linux, all tasks, including kernel threads, have their own first level
+> page table.  On process creation, the top entries covering TASK_SIZE and
+> above in the first level page table is copied from init_mm into the new
+> page table as the kernel address space is meant to be identical across all
+> tasks.
+> 
+> This is however not always the case though.  Consider one call to
+> ioremap() which does create a new entry in the kernel virtual space.
+> In order to ensure that the kernel virtual space is indeed the same across
+> all tasks, the ioremap code would have to walk the entire task list just
+> to update their own copy of the kernel virtual mapping.  So what we do
+> instead is to create the new page table entry in init_mm only, and lazily
+> update the other task's page table when they fault on access due to their
+> own page table being incomplete.
+> 
+> What about iounmap() then.  When a mapping is removed, we don't want it to
+> be accessible through some random task's page table.  Well, in the normal
+> ioremap() case, the actual mapping is created into a second level page
+> table which happens to be common to all tasks.  Hence the first level page
+> table entry being created is actually a pointer to that second level page
+> table, and when a mapping is removed it is only removed from that second
+> level page table.  The second level table itself remains in memory
+forever,
+> ready to be reused for any other call to ioremap().  Therefore there is no
+> need to update each task's first level table again.
+> 
+> So far so good.
+> 
+> Now comes the section mapping for ioremap().  Since this is handled into
+> the first level page table only with no common second level table, we
+> needed a mechanism to ensure that any mapping removal gets propagated to
+> all first level tables in the system.  This is accomplished with a
+> sequence counter namely vmalloc_seq which is incremented whenever such a
+> change occurs.  Upon every task switch, this counter is checked against
+> the master copy to detect when the next task to be scheduled has its first
+> level page table out of date, and if so it is updated before the new
+> memory context is instated.
+> 
+> But... this works only if not SMP.  On SMP, different tasks might be
+> running on the other CPUs and incrementing vmalloc_seq won't have any
+> effect on them.  This is why section mappings for ioremap() is not
+> available if SMP.
+> 
+> This could probably be fixed by sending an IPI to the other processors,
+> forcing them to resync their page table right after clearing the mapping
+> from the master table.  But no one implemented it so far.
 
-Thanks,
+Hello, Nicolas.
 
-Dylan
+Really thanks for kind explanation.
+Now, I totally understand why it is not available if SMP.
+I will investigate more on this and try to implement that section mapping
+for ioremap() works on SMP.
 
->
-> Thanks,
->
-> Best  Regards,
-> Chanho Park
->
+Thanks.
