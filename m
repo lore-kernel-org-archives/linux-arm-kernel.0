@@ -1,655 +1,697 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 2 Oct 2013 15:36:55 -0700
-Subject: [PATCH 3/3] KVM: ARM: Transparent huge pages and hugetlbfs support
-In-Reply-To: <524013BB.4090303@arm.com>
-References: <1376021239-10532-1-git-send-email-christoffer.dall@linaro.org>
- <1376021239-10532-4-git-send-email-christoffer.dall@linaro.org>
- <524013BB.4090303@arm.com>
-Message-ID: <20131002223655.GD5108@cbox>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Wed, 02 Oct 2013 16:17:51 -0700
+Subject: [PATCH v5] clk: si570: Add a driver for SI570 oscillators
+In-Reply-To: <b625092b-682c-4072-85a6-9f9d7f378ec0@VA3EHSMHS043.ehs.local>
+References: <1379806839-13762-1-git-send-email-soren.brinkmann@xilinx.com>
+ <b625092b-682c-4072-85a6-9f9d7f378ec0@VA3EHSMHS043.ehs.local>
+Message-ID: <20131002231751.4343.81234@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 23, 2013 at 11:11:07AM +0100, Marc Zyngier wrote:
-> Hi Christoffer,
+Quoting S?ren Brinkmann (2013-10-02 10:20:38)
+> Hi Mike,
 > 
-> Finally taking some time to review this patch. Sorry for the delay...
+> could you please comment on this/apply it to clk-next?
+
+It looks good and is in the queue. Will show up in clk-next in a few
+days.
+
+Thanks,
+Mike
+
 > 
-> On 09/08/13 05:07, Christoffer Dall wrote:
-> > From: Christoffer Dall <cdall@cs.columbia.edu>
+>         Thanks,
+>         S?ren
+> 
+> On Sat, Sep 21, 2013 at 04:40:39PM -0700, Soren Brinkmann wrote:
+> > Add a driver for SILabs 570, 571, 598, 599 programmable oscillators.
+> > The devices generate low-jitter clock signals and are reprogrammable via
+> > an I2C interface.
 > > 
-> > Support transparent huge pages in KVM/ARM 32-bit and 64-bit.  The whole
-> > transparent_hugepage_adjust stuff is far from pretty, but this is how
-> > it's solved on x86 so we duplicate their logic.  This should be shared
-> > across architectures if possible (like many other things), but can
-> > always be changed down the road.
-> > 
-> > The pud_huge checking on the unmap path may feel a bit silly as the
-> > pud_huge check is always defined to false, but the compiler should be
-> > smart about this.
-> > 
-> > Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> > Cc: Guenter Roeck <linux@roeck-us.net>
+> > Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
 > > ---
-> >  arch/arm/include/asm/kvm_mmu.h   |   17 +++-
-> >  arch/arm/kvm/mmu.c               |  200 ++++++++++++++++++++++++++++++++------
-> >  arch/arm64/include/asm/kvm_mmu.h |   12 ++-
-> >  3 files changed, 194 insertions(+), 35 deletions(-)
+> > v5:
+> >  - fix typo in bindings documentation
+> >  - mention the unit for the 'temperature-stability' property
+> >  - remove calls to clk_unregister() (the device managed code takes care
+> >    of it)
 > > 
-> > diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
-> > index 472ac70..ff3ff67 100644
-> > --- a/arch/arm/include/asm/kvm_mmu.h
-> > +++ b/arch/arm/include/asm/kvm_mmu.h
-> > @@ -62,6 +62,12 @@ phys_addr_t kvm_get_idmap_vector(void);
-> >  int kvm_mmu_init(void);
-> >  void kvm_clear_hyp_idmap(void);
+> > v4:
+> >  - actually check and handle error on clk_set_rate() call
 > > 
-> > +static inline void kvm_set_pmd(pmd_t *pmd, pmd_t new_pmd)
+> > v3:
+> >  - add delay in the path for small frequency changes, which can take up
+> >    to 100us according to the data sheet
+> >  - use real range for usleep_range() argument
+> >  - use dev_err() over dev_warn() in set_rate()
+> >  - add list of applicable devices for 7ppm DT prop
+> >  - remove comments regarding platform data
+> >  - ignore 7ppm DT prop for incompatible devices
+> >  - replace raw numbers with #defines
+> >  - convert DT prop 'temperature-stability' from boolean to u32
+> >  - make 'temperature-stability' DT prop required (actually not fully
+> >    true, for 59x it is ignored and the driver does not require its
+> >    presence)
+> > 
+> > v2:
+> >  - document clock-output-names in bindings documentation
+> >  - don't use wildcards in compatibility string
+> >  - change Kconfig entry to "... 570 and compatible devices"
+> >  - change some indentation flaws
+> >  - use 10000 as MIN and MAX value in usleep_range
+> >  - fail probe() if 'factory-fout' is not provided in DT
+> >    - default factory fout #defines removed
+> >  - use i2c driver_data instead of OF data
+> >    - remove some related structs and data
+> >  - rename DT property 'initial-fout' => 'clock-frequency' (like si5351
+> >    driver)
+> >  - add some more details regarding the 'factory-fout' DT property
+> > ---
+> >  .../devicetree/bindings/clock/silabs,si570.txt     |  39 ++
+> >  drivers/clk/Kconfig                                |  10 +
+> >  drivers/clk/Makefile                               |   1 +
+> >  drivers/clk/clk-si570.c                            | 531 +++++++++++++++++++++
+> >  4 files changed, 581 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/clock/silabs,si570.txt
+> >  create mode 100644 drivers/clk/clk-si570.c
+> > 
+> > diff --git a/Documentation/devicetree/bindings/clock/silabs,si570.txt b/Documentation/devicetree/bindings/clock/silabs,si570.txt
+> > new file mode 100644
+> > index 0000000..c09f21e
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/clock/silabs,si570.txt
+> > @@ -0,0 +1,39 @@
+> > +Binding for Silicon Labs 570, 571, 598 and 599 programmable
+> > +I2C clock generators.
+> > +
+> > +Reference
+> > +This binding uses the common clock binding[1]. Details about the devices can be
+> > +found in the data sheets[2][3].
+> > +
+> > +[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
+> > +[2] Si570/571 Data Sheet
+> > +    http://www.silabs.com/Support%20Documents/TechnicalDocs/si570.pdf
+> > +[3] Si598/599 Data Sheet
+> > +    http://www.silabs.com/Support%20Documents/TechnicalDocs/si598-99.pdf
+> > +
+> > +Required properties:
+> > + - compatible: Shall be one of "silabs,si570", "silabs,si571",
+> > +                            "silabs,si598", "silabs,si599"
+> > + - reg: I2C device address.
+> > + - #clock-cells: From common clock bindings: Shall be 0.
+> > + - factory-fout: Factory set default frequency. This frequency is part specific.
+> > +              The correct frequency for the part used has to be provided in
+> > +              order to generate the correct output frequencies. For more
+> > +              details, please refer to the data sheet.
+> > + - temperature-stability: Temperature stability of the device in PPM. Should be
+> > +                       one of: 7, 20, 50 or 100.
+> > +
+> > +Optional properties:
+> > + - clock-output-names: From common clock bindings. Recommended to be "si570".
+> > + - clock-frequency: Output frequency to generate. This defines the output
+> > +                 frequency set during boot. It can be reprogrammed during
+> > +                 runtime through the common clock framework.
+> > +
+> > +Example:
+> > +     si570: clock-generator at 5d {
+> > +             #clock-cells = <0>;
+> > +             compatible = "silabs,si570";
+> > +             temperature-stability = <50>;
+> > +             reg = <0x5d>;
+> > +             factory-fout = <156250000>;
+> > +     };
+> > diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
+> > index 279407a..349b88a 100644
+> > --- a/drivers/clk/Kconfig
+> > +++ b/drivers/clk/Kconfig
+> > @@ -64,6 +64,16 @@ config COMMON_CLK_SI5351
+> >         This driver supports Silicon Labs 5351A/B/C programmable clock
+> >         generators.
+> >  
+> > +config COMMON_CLK_SI570
+> > +     tristate "Clock driver for SiLabs 570 and compatible devices"
+> > +     depends on I2C
+> > +     depends on OF
+> > +     select REGMAP_I2C
+> > +     help
+> > +     ---help---
+> > +       This driver supports Silicon Labs 570/571/598/599 programmable
+> > +       clock generators.
+> > +
+> >  config COMMON_CLK_S2MPS11
+> >       tristate "Clock driver for S2MPS11 MFD"
+> >       depends on MFD_SEC_CORE
+> > diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
+> > index 7b11106..c0e94b3 100644
+> > --- a/drivers/clk/Makefile
+> > +++ b/drivers/clk/Makefile
+> > @@ -40,6 +40,7 @@ obj-$(CONFIG_COMMON_CLK_AXI_CLKGEN) += clk-axi-clkgen.o
+> >  obj-$(CONFIG_COMMON_CLK_WM831X) += clk-wm831x.o
+> >  obj-$(CONFIG_COMMON_CLK_MAX77686) += clk-max77686.o
+> >  obj-$(CONFIG_COMMON_CLK_SI5351) += clk-si5351.o
+> > +obj-$(CONFIG_COMMON_CLK_SI570) += clk-si570.o
+> >  obj-$(CONFIG_COMMON_CLK_S2MPS11) += clk-s2mps11.o
+> >  obj-$(CONFIG_CLK_TWL6040)    += clk-twl6040.o
+> >  obj-$(CONFIG_CLK_PPC_CORENET)        += clk-ppc-corenet.o
+> > diff --git a/drivers/clk/clk-si570.c b/drivers/clk/clk-si570.c
+> > new file mode 100644
+> > index 0000000..5d0ac9f
+> > --- /dev/null
+> > +++ b/drivers/clk/clk-si570.c
+> > @@ -0,0 +1,531 @@
+> > +/*
+> > + * Driver for Silicon Labs Si570/Si571 Programmable XO/VCXO
+> > + *
+> > + * Copyright (C) 2010, 2011 Ericsson AB.
+> > + * Copyright (C) 2011 Guenter Roeck.
+> > + * Copyright (C) 2011 - 2013 Xilinx Inc.
+> > + *
+> > + * Author: Guenter Roeck <guenter.roeck@ericsson.com>
+> > + *      S?ren Brinkmann <soren.brinkmann@xilinx.com>
+> > + *
+> > + * This program is free software; you can redistribute it and/or modify
+> > + * it under the terms of the GNU General Public License as published by
+> > + * the Free Software Foundation; either version 2 of the License, or
+> > + * (at your option) any later version.
+> > + *
+> > + * This program is distributed in the hope that it will be useful,
+> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> > + * GNU General Public License for more details.
+> > + */
+> > +
+> > +#include <linux/clk-provider.h>
+> > +#include <linux/delay.h>
+> > +#include <linux/module.h>
+> > +#include <linux/i2c.h>
+> > +#include <linux/regmap.h>
+> > +#include <linux/slab.h>
+> > +
+> > +/* Si570 registers */
+> > +#define SI570_REG_HS_N1              7
+> > +#define SI570_REG_N1_RFREQ0  8
+> > +#define SI570_REG_RFREQ1     9
+> > +#define SI570_REG_RFREQ2     10
+> > +#define SI570_REG_RFREQ3     11
+> > +#define SI570_REG_RFREQ4     12
+> > +#define SI570_REG_CONTROL    135
+> > +#define SI570_REG_FREEZE_DCO 137
+> > +#define SI570_DIV_OFFSET_7PPM        6
+> > +
+> > +#define HS_DIV_SHIFT         5
+> > +#define HS_DIV_MASK          0xe0
+> > +#define HS_DIV_OFFSET                4
+> > +#define N1_6_2_MASK          0x1f
+> > +#define N1_1_0_MASK          0xc0
+> > +#define RFREQ_37_32_MASK     0x3f
+> > +
+> > +#define SI570_MIN_FREQ               10000000L
+> > +#define SI570_MAX_FREQ               1417500000L
+> > +#define SI598_MAX_FREQ               525000000L
+> > +
+> > +#define FDCO_MIN             4850000000LL
+> > +#define FDCO_MAX             5670000000LL
+> > +
+> > +#define SI570_CNTRL_RECALL   (1 << 0)
+> > +#define SI570_CNTRL_FREEZE_M (1 << 5)
+> > +#define SI570_CNTRL_NEWFREQ  (1 << 6)
+> > +
+> > +#define SI570_FREEZE_DCO     (1 << 4)
+> > +
+> > +/**
+> > + * struct clk_si570:
+> > + * @hw:      Clock hw struct
+> > + * @regmap:  Device's regmap
+> > + * @div_offset:      Rgister offset for dividers
+> > + * @max_freq:        Maximum frequency for this device
+> > + * @fxtal:   Factory xtal frequency
+> > + * @n1:              Clock divider N1
+> > + * @hs_div:  Clock divider HSDIV
+> > + * @rfreq:   Clock multiplier RFREQ
+> > + * @frequency:       Current output frequency
+> > + * @i2c_client:      I2C client pointer
+> > + */
+> > +struct clk_si570 {
+> > +     struct clk_hw hw;
+> > +     struct regmap *regmap;
+> > +     unsigned int div_offset;
+> > +     u64 max_freq;
+> > +     u64 fxtal;
+> > +     unsigned int n1;
+> > +     unsigned int hs_div;
+> > +     u64 rfreq;
+> > +     u64 frequency;
+> > +     struct i2c_client *i2c_client;
+> > +};
+> > +#define to_clk_si570(_hw)    container_of(_hw, struct clk_si570, hw)
+> > +
+> > +enum clk_si570_variant {
+> > +     si57x,
+> > +     si59x
+> > +};
+> > +
+> > +/**
+> > + * si570_get_divs() - Read clock dividers from HW
+> > + * @data:    Pointer to struct clk_si570
+> > + * @rfreq:   Fractional multiplier (output)
+> > + * @n1:              Divider N1 (output)
+> > + * @hs_div:  Divider HSDIV (output)
+> > + * Returns 0 on success, negative errno otherwise.
+> > + *
+> > + * Retrieve clock dividers and multipliers from the HW.
+> > + */
+> > +static int si570_get_divs(struct clk_si570 *data, u64 *rfreq,
+> > +             unsigned int *n1, unsigned int *hs_div)
 > > +{
-> > +       *pmd = new_pmd;
-> > +       flush_pmd_entry(pmd);
+> > +     int err;
+> > +     u8 reg[6];
+> > +     u64 tmp;
+> > +
+> > +     err = regmap_bulk_read(data->regmap, SI570_REG_HS_N1 + data->div_offset,
+> > +                     reg, ARRAY_SIZE(reg));
+> > +     if (err)
+> > +             return err;
+> > +
+> > +     *hs_div = ((reg[0] & HS_DIV_MASK) >> HS_DIV_SHIFT) + HS_DIV_OFFSET;
+> > +     *n1 = ((reg[0] & N1_6_2_MASK) << 2) + ((reg[1] & N1_1_0_MASK) >> 6) + 1;
+> > +     /* Handle invalid cases */
+> > +     if (*n1 > 1)
+> > +             *n1 &= ~1;
+> > +
+> > +     tmp = reg[1] & RFREQ_37_32_MASK;
+> > +     tmp = (tmp << 8) + reg[2];
+> > +     tmp = (tmp << 8) + reg[3];
+> > +     tmp = (tmp << 8) + reg[4];
+> > +     tmp = (tmp << 8) + reg[5];
+> > +     *rfreq = tmp;
+> > +
+> > +     return 0;
 > > +}
 > > +
-> >  static inline void kvm_set_pte(pte_t *pte, pte_t new_pte)
-> >  {
-> >         pte_val(*pte) = new_pte;
-> > @@ -103,9 +109,15 @@ static inline void kvm_set_s2pte_writable(pte_t *pte)
-> >         pte_val(*pte) |= L_PTE_S2_RDWR;
-> >  }
-> > 
-> > +static inline void kvm_set_s2pmd_writable(pmd_t *pmd)
+> > +/**
+> > + * si570_get_defaults() - Get default values
+> > + * @data:    Driver data structure
+> > + * @fout:    Factory frequency output
+> > + * Returns 0 on success, negative errno otherwise.
+> > + */
+> > +static int si570_get_defaults(struct clk_si570 *data, u64 fout)
 > > +{
-> > +       pmd_val(*pmd) |= L_PTE_S2_RDWR;
+> > +     int err;
+> > +     u64 fdco;
+> > +
+> > +     regmap_write(data->regmap, SI570_REG_CONTROL, SI570_CNTRL_RECALL);
+> > +
+> > +     err = si570_get_divs(data, &data->rfreq, &data->n1, &data->hs_div);
+> > +     if (err)
+> > +             return err;
+> > +
+> > +     /*
+> > +      * Accept optional precision loss to avoid arithmetic overflows.
+> > +      * Acceptable per Silicon Labs Application Note AN334.
+> > +      */
+> > +     fdco = fout * data->n1 * data->hs_div;
+> > +     if (fdco >= (1LL << 36))
+> > +             data->fxtal = div64_u64(fdco << 24, data->rfreq >> 4);
+> > +     else
+> > +             data->fxtal = div64_u64(fdco << 28, data->rfreq);
+> > +
+> > +     data->frequency = fout;
+> > +
+> > +     return 0;
 > > +}
 > > +
-> >  struct kvm;
-> > 
-> > -static inline void coherent_icache_guest_page(struct kvm *kvm, gfn_t gfn)
-> > +static inline void coherent_icache_guest_page(struct kvm *kvm, hva_t hva,
-> > +                                             unsigned long size)
-> >  {
-> >         /*
-> >          * If we are going to insert an instruction page and the icache is
-> > @@ -120,8 +132,7 @@ static inline void coherent_icache_guest_page(struct kvm *kvm, gfn_t gfn)
-> >          * need any kind of flushing (DDI 0406C.b - Page B3-1392).
-> >          */
-> >         if (icache_is_pipt()) {
-> > -               unsigned long hva = gfn_to_hva(kvm, gfn);
-> > -               __cpuc_coherent_user_range(hva, hva + PAGE_SIZE);
-> > +               __cpuc_coherent_user_range(hva, hva + size);
-> >         } else if (!icache_is_vivt_asid_tagged()) {
-> >                 /* any kind of VIPT cache */
-> >                 __flush_icache_all();
-> > diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-> > index 0988d9e..26ced77 100644
-> > --- a/arch/arm/kvm/mmu.c
-> > +++ b/arch/arm/kvm/mmu.c
-> > @@ -19,6 +19,7 @@
-> >  #include <linux/mman.h>
-> >  #include <linux/kvm_host.h>
-> >  #include <linux/io.h>
-> > +#include <linux/hugetlb.h>
-> >  #include <trace/events/kvm.h>
-> >  #include <asm/pgalloc.h>
-> >  #include <asm/cacheflush.h>
-> > @@ -41,6 +42,8 @@ static unsigned long hyp_idmap_start;
-> >  static unsigned long hyp_idmap_end;
-> >  static phys_addr_t hyp_idmap_vector;
-> > 
-> > +#define kvm_pmd_huge(_x)       (pmd_huge(_x) || pmd_trans_huge(_x))
-> > +
-> >  static void kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa)
-> >  {
-> >         /*
-> > @@ -93,19 +96,27 @@ static bool page_empty(void *ptr)
-> > 
-> >  static void clear_pud_entry(struct kvm *kvm, pud_t *pud, phys_addr_t addr)
-> >  {
-> > -       pmd_t *pmd_table = pmd_offset(pud, 0);
-> > -       pud_clear(pud);
-> > -       kvm_tlb_flush_vmid_ipa(kvm, addr);
-> > -       pmd_free(NULL, pmd_table);
-> > +       if (pud_huge(*pud)) {
-> > +               pud_clear(pud);
-> > +       } else {
-> > +               pmd_t *pmd_table = pmd_offset(pud, 0);
-> > +               pud_clear(pud);
-> > +               kvm_tlb_flush_vmid_ipa(kvm, addr);
-> > +               pmd_free(NULL, pmd_table);
-> > +       }
-> 
-> Why don't we have any TLB invalidation on the huge path?
-> 
-
-Because this code was written before we fixed the TLB invalidation race.
-Good that you spotted this.
-
-> >         put_page(virt_to_page(pud));
-> >  }
-> > 
-> >  static void clear_pmd_entry(struct kvm *kvm, pmd_t *pmd, phys_addr_t addr)
-> >  {
-> > -       pte_t *pte_table = pte_offset_kernel(pmd, 0);
-> > -       pmd_clear(pmd);
-> > -       kvm_tlb_flush_vmid_ipa(kvm, addr);
-> > -       pte_free_kernel(NULL, pte_table);
-> > +       if (kvm_pmd_huge(*pmd)) {
-> > +               pmd_clear(pmd);
-> > +       } else {
-> > +               pte_t *pte_table = pte_offset_kernel(pmd, 0);
-> > +               pmd_clear(pmd);
-> > +               kvm_tlb_flush_vmid_ipa(kvm, addr);
-> > +               pte_free_kernel(NULL, pte_table);
-> > +       }
-> 
-> Same here.
-> 
-
-Same here.
-
-> >         put_page(virt_to_page(pmd));
-> >  }
-> > 
-> > @@ -136,12 +147,37 @@ static void unmap_range(struct kvm *kvm, pgd_t *pgdp,
-> >                         continue;
-> >                 }
-> > 
-> > +               if (pud_huge(*pud)) {
-> > +                       /*
-> > +                        * If we are dealing with a huge pud, just clear it and
-> > +                        * move on.
-> > +                        */
-> > +                       clear_pud_entry(kvm, pud, addr);
-> > +                       addr = pud_addr_end(addr, end);
-> > +                       continue;
-> > +               }
-> > +
-> >                 pmd = pmd_offset(pud, addr);
-> >                 if (pmd_none(*pmd)) {
-> >                         addr = pmd_addr_end(addr, end);
-> >                         continue;
-> >                 }
-> > 
-> > +               if (kvm_pmd_huge(*pmd)) {
-> > +                       /*
-> > +                        * If we are dealing with a huge pmd, just clear it and
-> > +                        * walk back up the ladder.
-> > +                        */
-> > +                       clear_pmd_entry(kvm, pmd, addr);
-> > +                       next = pmd_addr_end(addr, end);
-> > +                       if (page_empty(pmd) && !page_empty(pud)) {
-> > +                               clear_pud_entry(kvm, pud, addr);
-> > +                               next = pud_addr_end(addr, end);
-> > +                       }
-> > +                       addr = next;
-> > +                       continue;
-> > +               }
-> 
-> Looks like we already have the exact same sequence a few lines below.
-> Surely we can factor it out.
-> 
-
-Yeah, the thing is having a funciton here requires us to pass in a bunch
-of things, an either return the next addr or pass that by reference, and
-while it does save a few lines, I found the code harder to read.  This
-is another option:
-
-
-static void unmap_range(struct kvm *kvm, pgd_t *pgdp,
-			unsigned long long start, u64 size)
-{
-	pgd_t *pgd;
-	pud_t *pud;
-	pmd_t *pmd;
-	pte_t *pte;
-	unsigned long long addr = start, end = start + size;
-	u64 next;
-
-	while (addr < end) {
-		pgd = pgdp + pgd_index(addr);
-		pud = pud_offset(pgd, addr);
-		if (pud_none(*pud)) {
-			addr = pud_addr_end(addr, end);
-			continue;
-		}
-
-		if (pud_huge(*pud)) {
-			/*
-			 * If we are dealing with a huge pud, just clear it and
-			 * move on.
-			 */
-			clear_pud_entry(kvm, pud, addr);
-			addr = pud_addr_end(addr, end);
-			continue;
-		}
-
-		pmd = pmd_offset(pud, addr);
-		if (pmd_none(*pmd)) {
-			addr = pmd_addr_end(addr, end);
-			continue;
-		}
-
-		if (!kvm_pmd_huge(*pmd)) {
-			pte = pte_offset_kernel(pmd, addr);
-			clear_pte_entry(kvm, pte, addr);
-			next = addr + PAGE_SIZE;
-		}
-
-		/*
-		 * If the pmd entry is to be cleared, walk back up the ladder
-		 */
-		if (kvm_pmd_huge(*pmd) || page_empty(pte)) {
-			clear_pmd_entry(kvm, pmd, addr);
-			next = pmd_addr_end(addr, end);
-			if (page_empty(pmd) && !page_empty(pud)) {
-				clear_pud_entry(kvm, pud, addr);
-				next = pud_addr_end(addr, end);
-			}
-		}
-
-		addr = next;
-	}
-}
-
-> > +
-> >                 pte = pte_offset_kernel(pmd, addr);
-> >                 clear_pte_entry(kvm, pte, addr);
-> >                 next = addr + PAGE_SIZE;
-> > @@ -420,6 +456,46 @@ void kvm_free_stage2_pgd(struct kvm *kvm)
-> >         kvm->arch.pgd = NULL;
-> >  }
-> > 
-> > +/* Set a huge page pmd entry */
-> 
-> Is it only for huge PMDs? Or can we try to share that code with what is
-> in stage2_set_pte?
-> 
-
-We can share it, much nicer actually:
-
-
-diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-index e2c58f5..345eefc 100644
---- a/arch/arm/kvm/mmu.c
-+++ b/arch/arm/kvm/mmu.c
-@@ -456,26 +447,33 @@ void kvm_free_stage2_pgd(struct kvm *kvm)
- 	kvm->arch.pgd = NULL;
- }
- 
--/* Set a huge page pmd entry */
--static int stage2_set_pmd(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
--			  phys_addr_t addr, const pmd_t *new_pmd)
-+static pmd_t *stage2_get_pmd(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
-+			     phys_addr_t addr)
- {
- 	pgd_t *pgd;
- 	pud_t *pud;
--	pmd_t *pmd, old_pmd;
-+	pmd_t *pmd;
- 
--	/* Create stage-2 page table mapping - Level 1 */
- 	pgd = kvm->arch.pgd + pgd_index(addr);
- 	pud = pud_offset(pgd, addr);
- 	if (pud_none(*pud)) {
- 		if (!cache)
--			return 0; /* ignore calls from kvm_set_spte_hva */
-+			return NULL;
- 		pmd = mmu_memory_cache_alloc(cache);
- 		pud_populate(NULL, pud, pmd);
- 		get_page(virt_to_page(pud));
- 	}
- 
--	pmd = pmd_offset(pud, addr);
-+	return pmd_offset(pud, addr);
-+}
-+
-+static int stage2_set_pmd_huge(struct kvm *kvm, struct kvm_mmu_memory_cache
-+			       *cache, phys_addr_t addr, const pmd_t *new_pmd)
-+{
-+	pmd_t *pmd, old_pmd;
-+
-+	pmd = stage2_get_pmd(kvm, cache, addr);
-+	VM_BUG_ON(!pmd);
- 
- 	/*
- 	 * Mapping in huge pages should only happen through a fault.  If a
-@@ -500,25 +498,20 @@ static int stage2_set_pmd(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
- static int stage2_set_pte(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
- 			  phys_addr_t addr, const pte_t *new_pte, bool iomap)
- {
--	pgd_t *pgd;
--	pud_t *pud;
- 	pmd_t *pmd;
- 	pte_t *pte, old_pte;
- 
--	/* Create 2nd stage page table mapping - Level 1 */
--	pgd = kvm->arch.pgd + pgd_index(addr);
--	pud = pud_offset(pgd, addr);
--	if (pud_none(*pud)) {
--		if (!cache)
--			return 0; /* ignore calls from kvm_set_spte_hva */
--		pmd = mmu_memory_cache_alloc(cache);
--		pud_populate(NULL, pud, pmd);
--		get_page(virt_to_page(pud));
-+	/* Create stage-2 page table mapping - Level 1 */
-+	pmd = stage2_get_pmd(kvm, cache, addr);
-+	if (!pmd) {
-+		/*
-+		 * Ignore calls from kvm_set_spte_hva for unallocated
-+		 * address ranges.
-+		 */
-+		return 0;
- 	}
- 
--	pmd = pmd_offset(pud, addr);
--
--	/* Create 2nd stage page mappings - Level 2 */
-+	/* Create stage-2 page mappings - Level 2 */
- 	if (pmd_none(*pmd)) {
- 		if (!cache)
- 			return 0; /* ignore calls from kvm_set_spte_hva */
-@@ -688,7 +681,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
- 			kvm_set_s2pmd_writable(&new_pmd);
- 			kvm_set_pfn_dirty(pfn);
- 		}
--		ret = stage2_set_pmd(kvm, memcache, fault_ipa, &new_pmd);
-+		ret = stage2_set_pmd_huge(kvm, memcache, fault_ipa, &new_pmd);
- 	} else {
- 		pte_t new_pte = pfn_pte(pfn, PAGE_S2);
- 		if (writable) {
-
-> > +static int stage2_set_pmd(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
-> > +                         phys_addr_t addr, const pmd_t *new_pmd)
+> > +/**
+> > + * si570_update_rfreq() - Update clock multiplier
+> > + * @data:    Driver data structure
+> > + * Passes on regmap_bulk_write() return value.
+> > + */
+> > +static int si570_update_rfreq(struct clk_si570 *data)
 > > +{
-> > +       pgd_t *pgd;
-> > +       pud_t *pud;
-> > +       pmd_t *pmd, old_pmd;
+> > +     u8 reg[5];
 > > +
-> > +       /* Create stage-2 page table mapping - Level 1 */
-> > +       pgd = kvm->arch.pgd + pgd_index(addr);
-> > +       pud = pud_offset(pgd, addr);
-> > +       if (pud_none(*pud)) {
-> > +               if (!cache)
-> > +                       return 0; /* ignore calls from kvm_set_spte_hva */
-> 
-> Do we still need this?
-> 
-
-We didn't need it the way the code was structured in the initial
-verison, but we do with sharing the code with stage2_set_pte (see
-above).
-
-> > +               pmd = mmu_memory_cache_alloc(cache);
-> > +               pud_populate(NULL, pud, pmd);
-> > +               get_page(virt_to_page(pud));
-> > +       }
+> > +     reg[0] = ((data->n1 - 1) << 6) |
+> > +             ((data->rfreq >> 32) & RFREQ_37_32_MASK);
+> > +     reg[1] = (data->rfreq >> 24) & 0xff;
+> > +     reg[2] = (data->rfreq >> 16) & 0xff;
+> > +     reg[3] = (data->rfreq >> 8) & 0xff;
+> > +     reg[4] = data->rfreq & 0xff;
 > > +
-> > +       pmd = pmd_offset(pud, addr);
-> > +
-> > +       /*
-> > +        * Mapping in huge pages should only happen through a fault.  If a
-> > +        * page is merged into a transparent huge page, the individual
-> > +        * subpages of that huge page should be unmapped through MMU
-> > +        * notifiers before we get here.
-> > +        *
-> > +        * Merging of CompoundPages is not supported; they should become
-> > +        * splitting first, unmapped, merged, and mapped back in on-demand.
-> > +        */
-> > +       VM_BUG_ON(pmd_present(*pmd) && pmd_pfn(*pmd) != pmd_pfn(*new_pmd));
-> > +
-> > +       old_pmd = *pmd;
-> > +       kvm_set_pmd(pmd, *new_pmd);
-> > +       if (pmd_present(old_pmd))
-> > +               kvm_tlb_flush_vmid_ipa(kvm, addr);
-> > +       else
-> > +               get_page(virt_to_page(pmd));
-> > +       return 0;
-> > +}
-> > 
-> >  static int stage2_set_pte(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
-> >                           phys_addr_t addr, const pte_t *new_pte, bool iomap)
-> > @@ -442,7 +518,7 @@ static int stage2_set_pte(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
-> > 
-> >         pmd = pmd_offset(pud, addr);
-> > 
-> > -       /* Create 2nd stage page table mapping - Level 2 */
-> > +       /* Create 2nd stage page mappings - Level 2 */
-> >         if (pmd_none(*pmd)) {
-> >                 if (!cache)
-> >                         return 0; /* ignore calls from kvm_set_spte_hva */
-> > @@ -508,16 +584,53 @@ out:
-> >         return ret;
-> >  }
-> > 
-> > +static bool transparent_hugepage_adjust(pfn_t *pfnp, phys_addr_t *ipap)
-> > +{
-> > +       pfn_t pfn = *pfnp;
-> > +       gfn_t gfn = *ipap >> PAGE_SHIFT;
-> > +
-> > +       if (PageTransCompound(pfn_to_page(pfn))) {
-> > +               unsigned long mask;
-> > +               /*
-> > +                * mmu_notifier_retry was successful and we hold the
-> > +                * mmu_lock here, so the pmd can't become splitting
-> > +                * from under us, and in turn
-> > +                * __split_huge_page_refcount() can't run from under
-> > +                * us and we can safely transfer the refcount from
-> > +                * PG_tail to PG_head as we switch the pfn from tail to
-> > +                * head.
-> > +                */
-> 
-> -ECANTPARSE. Well, I sort of can, but this deserves a clearer explanation.
-> 
-
-I'll try to clarify.  (BTW. I stole this comment from Avi, blame the
-both of us :))
-
-
-> > +               mask = (PMD_SIZE / PAGE_SIZE) - 1;
-> 
-> 		mask = PTRS_PER_PMD -1;
-> 
-> > +               VM_BUG_ON((gfn & mask) != (pfn & mask));
-> > +               if (pfn & mask) {
-> > +                       gfn &= ~mask;
-> 
-> This doesn't seem to be used later on.
-> 
-> > +                       *ipap &= ~(PMD_SIZE - 1);
-> 
-> 			*ipap &= ~PMD_MASK;
-> 
-
-ack to all three
-
-> > +                       kvm_release_pfn_clean(pfn);
-> > +                       pfn &= ~mask;
-> > +                       kvm_get_pfn(pfn);
-> > +                       *pfnp = pfn;
-> > +               }
-> 
-> 
-> 
-> > +               return true;
-> > +       }
-> > +
-> > +       return false;
+> > +     return regmap_bulk_write(data->regmap, SI570_REG_N1_RFREQ0 +
+> > +                     data->div_offset, reg, ARRAY_SIZE(reg));
 > > +}
 > > +
-> >  static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
-> > -                         gfn_t gfn, struct kvm_memory_slot *memslot,
-> > +                         struct kvm_memory_slot *memslot,
-> >                           unsigned long fault_status)
-> >  {
-> > -       pte_t new_pte;
-> > -       pfn_t pfn;
-> >         int ret;
-> > -       bool write_fault, writable;
-> > +       bool write_fault, writable, hugetlb = false, force_pte = false;
-> >         unsigned long mmu_seq;
-> > +       gfn_t gfn = fault_ipa >> PAGE_SHIFT;
-> > +       unsigned long hva = gfn_to_hva(vcpu->kvm, gfn);
-> > +       struct kvm *kvm = vcpu->kvm;
-> >         struct kvm_mmu_memory_cache *memcache = &vcpu->arch.mmu_page_cache;
-> > +       struct vm_area_struct *vma;
-> > +       pfn_t pfn;
-> > +       unsigned long psize;
-> > 
-> >         write_fault = kvm_is_write_fault(kvm_vcpu_get_hsr(vcpu));
-> >         if (fault_status == FSC_PERM && !write_fault) {
-> > @@ -525,6 +638,27 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
-> >                 return -EFAULT;
-> >         }
-> > 
-> > +       /* Let's check if we will get back a huge page */
-> > +       down_read(&current->mm->mmap_sem);
-> > +       vma = find_vma_intersection(current->mm, hva, hva + 1);
-> > +       if (is_vm_hugetlb_page(vma)) {
-> > +               hugetlb = true;
-> > +               hva &= PMD_MASK;
-> > +               gfn = (fault_ipa & PMD_MASK) >> PAGE_SHIFT;
-> > +               psize = PMD_SIZE;
-> > +       } else {
-> > +               psize = PAGE_SIZE;
-> > +               if (vma->vm_start & ~PMD_MASK)
-> > +                       force_pte = true;
-> > +       }
-> > +       up_read(&current->mm->mmap_sem);
-> > +
-> > +       pfn = gfn_to_pfn_prot(kvm, gfn, write_fault, &writable);
-> > +       if (is_error_pfn(pfn))
-> > +               return -EFAULT;
-> 
-> How does this work with respect to the comment that talks about reading
-> mmu_seq before calling gfp_to_pfn_prot? Either the comment is wrong, or
-> we read this too early.
-> 
-
-It doesn't, the gfn_to_pfn_prot call should be moved below the smp_rmb,
-I must have simply messed this up when rebasing the patch.  Nice catch!
-
-> > +       coherent_icache_guest_page(kvm, hva, psize);
-> > +
-> >         /* We need minimum second+third level pages */
-> >         ret = mmu_topup_memory_cache(memcache, 2, KVM_NR_MEM_OBJS);
-> >         if (ret)
-> > @@ -542,26 +676,34 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
-> >          */
-> >         smp_rmb();
-> > 
-> > -       pfn = gfn_to_pfn_prot(vcpu->kvm, gfn, write_fault, &writable);
-> > -       if (is_error_pfn(pfn))
-> > -               return -EFAULT;
-> > -
-> > -       new_pte = pfn_pte(pfn, PAGE_S2);
-> > -       coherent_icache_guest_page(vcpu->kvm, gfn);
-> > -
-> > -       spin_lock(&vcpu->kvm->mmu_lock);
-> > -       if (mmu_notifier_retry(vcpu->kvm, mmu_seq))
-> > +       spin_lock(&kvm->mmu_lock);
-> > +       if (mmu_notifier_retry(kvm, mmu_seq))
-> >                 goto out_unlock;
-> > -       if (writable) {
-> > -               kvm_set_s2pte_writable(&new_pte);
-> > -               kvm_set_pfn_dirty(pfn);
-> > +       if (!hugetlb && !force_pte)
-> > +               hugetlb = transparent_hugepage_adjust(&pfn, &fault_ipa);
-> 
-> How do we ensure that there is no race between this pte being promoted
-> to a pmd and another page allocation in the same pmd somewhere else in
-> the system? We only hold the kvm lock here, so there must be some extra
-> implicit guarantee somewhere...
-> 
-
-Steve answered this one, but the point is that any page in this pmd
-cannot be allocated from anywhere, because those pages are not free.  At
-this point, if the anon user page is mapped as a THP, it will stay as
-such until we unlock the mmu_lock.
-
-> > +       if (hugetlb) {
-> > +               pmd_t new_pmd = pfn_pmd(pfn, PAGE_S2);
-> > +               new_pmd = pmd_mkhuge(new_pmd);
-> > +               if (writable) {
-> > +                       kvm_set_s2pmd_writable(&new_pmd);
-> > +                       kvm_set_pfn_dirty(pfn);
-> > +               }
-> > +               ret = stage2_set_pmd(kvm, memcache, fault_ipa, &new_pmd);
-> > +       } else {
-> > +               pte_t new_pte = pfn_pte(pfn, PAGE_S2);
-> > +               if (writable) {
-> > +                       kvm_set_s2pte_writable(&new_pte);
-> > +                       kvm_set_pfn_dirty(pfn);
-> > +               }
-> > +               ret = stage2_set_pte(kvm, memcache, fault_ipa, &new_pte, false);
-> >         }
-> > -       stage2_set_pte(vcpu->kvm, memcache, fault_ipa, &new_pte, false);
-> > +
-> > 
-> >  out_unlock:
-> > -       spin_unlock(&vcpu->kvm->mmu_lock);
-> > +       spin_unlock(&kvm->mmu_lock);
-> >         kvm_release_pfn_clean(pfn);
-> > -       return 0;
-> > +       return ret;
-> >  }
-> > 
-> >  /**
-> > @@ -630,7 +772,7 @@ int kvm_handle_guest_abort(struct kvm_vcpu *vcpu, struct kvm_run *run)
-> > 
-> >         memslot = gfn_to_memslot(vcpu->kvm, gfn);
-> > 
-> > -       ret = user_mem_abort(vcpu, fault_ipa, gfn, memslot, fault_status);
-> > +       ret = user_mem_abort(vcpu, fault_ipa, memslot, fault_status);
-> >         if (ret == 0)
-> >                 ret = 1;
-> >  out_unlock:
-> > diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-> > index efe609c..e7f3852 100644
-> > --- a/arch/arm64/include/asm/kvm_mmu.h
-> > +++ b/arch/arm64/include/asm/kvm_mmu.h
-> > @@ -91,6 +91,7 @@ int kvm_mmu_init(void);
-> >  void kvm_clear_hyp_idmap(void);
-> > 
-> >  #define        kvm_set_pte(ptep, pte)          set_pte(ptep, pte)
-> > +#define        kvm_set_pmd(pmdp, pmd)          set_pmd(pmdp, pmd)
-> > 
-> >  static inline bool kvm_is_write_fault(unsigned long esr)
-> >  {
-> > @@ -116,13 +117,18 @@ static inline void kvm_set_s2pte_writable(pte_t *pte)
-> >         pte_val(*pte) |= PTE_S2_RDWR;
-> >  }
-> > 
-> > +static inline void kvm_set_s2pmd_writable(pmd_t *pmd)
+> > +/**
+> > + * si570_calc_divs() - Caluclate clock dividers
+> > + * @frequency:       Target frequency
+> > + * @data:    Driver data structure
+> > + * @out_rfreq:       RFREG fractional multiplier (output)
+> > + * @out_n1:  Clock divider N1 (output)
+> > + * @out_hs_div:      Clock divider HSDIV (output)
+> > + * Returns 0 on success, negative errno otherwise.
+> > + *
+> > + * Calculate the clock dividers (@out_hs_div, @out_n1) and clock multiplier
+> > + * (@out_rfreq) for a given target @frequency.
+> > + */
+> > +static int si570_calc_divs(unsigned long frequency, struct clk_si570 *data,
+> > +             u64 *out_rfreq, unsigned int *out_n1, unsigned int *out_hs_div)
 > > +{
-> > +       pmd_val(*pmd) |= PTE_S2_RDWR;
+> > +     int i;
+> > +     unsigned int n1, hs_div;
+> > +     u64 fdco, best_fdco = ULLONG_MAX;
+> > +     static const uint8_t si570_hs_div_values[] = { 11, 9, 7, 6, 5, 4 };
+> > +
+> > +     for (i = 0; i < ARRAY_SIZE(si570_hs_div_values); i++) {
+> > +             hs_div = si570_hs_div_values[i];
+> > +             /* Calculate lowest possible value for n1 */
+> > +             n1 = div_u64(div_u64(FDCO_MIN, hs_div), frequency);
+> > +             if (!n1 || (n1 & 1))
+> > +                     n1++;
+> > +             while (n1 <= 128) {
+> > +                     fdco = (u64)frequency * (u64)hs_div * (u64)n1;
+> > +                     if (fdco > FDCO_MAX)
+> > +                             break;
+> > +                     if (fdco >= FDCO_MIN && fdco < best_fdco) {
+> > +                             *out_n1 = n1;
+> > +                             *out_hs_div = hs_div;
+> > +                             *out_rfreq = div64_u64(fdco << 28, data->fxtal);
+> > +                             best_fdco = fdco;
+> > +                     }
+> > +                     n1 += (n1 == 1 ? 1 : 2);
+> > +             }
+> > +     }
+> > +
+> > +     if (best_fdco == ULLONG_MAX)
+> > +             return -EINVAL;
+> > +
+> > +     return 0;
 > > +}
 > > +
-> >  struct kvm;
+> > +static unsigned long si570_recalc_rate(struct clk_hw *hw,
+> > +             unsigned long parent_rate)
+> > +{
+> > +     int err;
+> > +     u64 rfreq, rate;
+> > +     unsigned int n1, hs_div;
+> > +     struct clk_si570 *data = to_clk_si570(hw);
+> > +
+> > +     err = si570_get_divs(data, &rfreq, &n1, &hs_div);
+> > +     if (err) {
+> > +             dev_err(&data->i2c_client->dev, "unable to recalc rate\n");
+> > +             return data->frequency;
+> > +     }
+> > +
+> > +     rfreq = div_u64(rfreq, hs_div * n1);
+> > +     rate = (data->fxtal * rfreq) >> 28;
+> > +
+> > +     return rate;
+> > +}
+> > +
+> > +static long si570_round_rate(struct clk_hw *hw, unsigned long rate,
+> > +             unsigned long *parent_rate)
+> > +{
+> > +     int err;
+> > +     u64 rfreq;
+> > +     unsigned int n1, hs_div;
+> > +     struct clk_si570 *data = to_clk_si570(hw);
+> > +
+> > +     if (!rate)
+> > +             return 0;
+> > +
+> > +     if (div64_u64(abs(rate - data->frequency) * 10000LL,
+> > +                             data->frequency) < 35) {
+> > +             rfreq = div64_u64((data->rfreq * rate) +
+> > +                             div64_u64(data->frequency, 2), data->frequency);
+> > +             n1 = data->n1;
+> > +             hs_div = data->hs_div;
+> > +
+> > +     } else {
+> > +             err = si570_calc_divs(rate, data, &rfreq, &n1, &hs_div);
+> > +             if (err) {
+> > +                     dev_err(&data->i2c_client->dev,
+> > +                                     "unable to round rate\n");
+> > +                     return 0;
+> > +             }
+> > +     }
+> > +
+> > +     return rate;
+> > +}
+> > +
+> > +/**
+> > + * si570_set_frequency() - Adjust output frequency
+> > + * @data:    Driver data structure
+> > + * @frequency:       Target frequency
+> > + * Returns 0 on success.
+> > + *
+> > + * Update output frequency for big frequency changes (> 3,500 ppm).
+> > + */
+> > +static int si570_set_frequency(struct clk_si570 *data, unsigned long frequency)
+> > +{
+> > +     int err;
+> > +
+> > +     err = si570_calc_divs(frequency, data, &data->rfreq, &data->n1,
+> > +                     &data->hs_div);
+> > +     if (err)
+> > +             return err;
+> > +
+> > +     /*
+> > +      * The DCO reg should be accessed with a read-modify-write operation
+> > +      * per AN334
+> > +      */
+> > +     regmap_write(data->regmap, SI570_REG_FREEZE_DCO, SI570_FREEZE_DCO);
+> > +     regmap_write(data->regmap, SI570_REG_HS_N1 + data->div_offset,
+> > +                     ((data->hs_div - HS_DIV_OFFSET) << HS_DIV_SHIFT) |
+> > +                     (((data->n1 - 1) >> 2) & N1_6_2_MASK));
+> > +     si570_update_rfreq(data);
+> > +     regmap_write(data->regmap, SI570_REG_FREEZE_DCO, 0);
+> > +     regmap_write(data->regmap, SI570_REG_CONTROL, SI570_CNTRL_NEWFREQ);
+> > +
+> > +     /* Applying a new frequency can take up to 10ms */
+> > +     usleep_range(10000, 12000);
+> > +
+> > +     return 0;
+> > +}
+> > +
+> > +/**
+> > + * si570_set_frequency_small() - Adjust output frequency
+> > + * @data:    Driver data structure
+> > + * @frequency:       Target frequency
+> > + * Returns 0 on success.
+> > + *
+> > + * Update output frequency for small frequency changes (< 3,500 ppm).
+> > + */
+> > +static int si570_set_frequency_small(struct clk_si570 *data,
+> > +                                  unsigned long frequency)
+> > +{
+> > +     /*
+> > +      * This is a re-implementation of DIV_ROUND_CLOSEST
+> > +      * using the div64_u64 function lieu of letting the compiler
+> > +      * insert EABI calls
+> > +      */
+> > +     data->rfreq = div64_u64((data->rfreq * frequency) +
+> > +                     div_u64(data->frequency, 2), data->frequency);
+> > +     regmap_write(data->regmap, SI570_REG_CONTROL, SI570_CNTRL_FREEZE_M);
+> > +     si570_update_rfreq(data);
+> > +     regmap_write(data->regmap, SI570_REG_CONTROL, 0);
+> > +
+> > +     /* Applying a new frequency (small change) can take up to 100us */
+> > +     usleep_range(100, 200);
+> > +
+> > +     return 0;
+> > +}
+> > +
+> > +static int si570_set_rate(struct clk_hw *hw, unsigned long rate,
+> > +             unsigned long parent_rate)
+> > +{
+> > +     struct clk_si570 *data = to_clk_si570(hw);
+> > +     struct i2c_client *client = data->i2c_client;
+> > +     int err;
+> > +
+> > +     if (rate < SI570_MIN_FREQ || rate > data->max_freq) {
+> > +             dev_err(&client->dev,
+> > +                     "requested frequency %lu Hz is out of range\n", rate);
+> > +             return -EINVAL;
+> > +     }
+> > +
+> > +     if (div64_u64(abs(rate - data->frequency) * 10000LL,
+> > +                             data->frequency) < 35)
+> > +             err = si570_set_frequency_small(data, rate);
+> > +     else
+> > +             err = si570_set_frequency(data, rate);
+> > +
+> > +     if (err)
+> > +             return err;
+> > +
+> > +     data->frequency = rate;
+> > +
+> > +     return 0;
+> > +}
+> > +
+> > +static const struct clk_ops si570_clk_ops = {
+> > +     .recalc_rate = si570_recalc_rate,
+> > +     .round_rate = si570_round_rate,
+> > +     .set_rate = si570_set_rate,
+> > +};
+> > +
+> > +static bool si570_regmap_is_volatile(struct device *dev, unsigned int reg)
+> > +{
+> > +     switch (reg) {
+> > +     case SI570_REG_CONTROL:
+> > +             return true;
+> > +     default:
+> > +             return false;
+> > +     }
+> > +}
+> > +
+> > +static bool si570_regmap_is_writeable(struct device *dev, unsigned int reg)
+> > +{
+> > +     switch (reg) {
+> > +     case SI570_REG_HS_N1 ... (SI570_REG_RFREQ4 + SI570_DIV_OFFSET_7PPM):
+> > +     case SI570_REG_CONTROL:
+> > +     case SI570_REG_FREEZE_DCO:
+> > +             return true;
+> > +     default:
+> > +             return false;
+> > +     }
+> > +}
+> > +
+> > +static struct regmap_config si570_regmap_config = {
+> > +     .reg_bits = 8,
+> > +     .val_bits = 8,
+> > +     .cache_type = REGCACHE_RBTREE,
+> > +     .max_register = 137,
+> > +     .writeable_reg = si570_regmap_is_writeable,
+> > +     .volatile_reg = si570_regmap_is_volatile,
+> > +};
+> > +
+> > +static int si570_probe(struct i2c_client *client,
+> > +             const struct i2c_device_id *id)
+> > +{
+> > +     struct clk_si570 *data;
+> > +     struct clk_init_data init;
+> > +     struct clk *clk;
+> > +     u32 initial_fout, factory_fout, stability;
+> > +     int err;
+> > +     enum clk_si570_variant variant = id->driver_data;
+> > +
+> > +     data = devm_kzalloc(&client->dev, sizeof(*data), GFP_KERNEL);
+> > +     if (!data)
+> > +             return -ENOMEM;
+> > +
+> > +     init.ops = &si570_clk_ops;
+> > +     init.flags = CLK_IS_ROOT;
+> > +     init.num_parents = 0;
+> > +     data->hw.init = &init;
+> > +     data->i2c_client = client;
+> > +
+> > +     if (variant == si57x) {
+> > +             err = of_property_read_u32(client->dev.of_node,
+> > +                             "temperature-stability", &stability);
+> > +             if (err) {
+> > +                     dev_err(&client->dev,
+> > +                               "'temperature-stability' property missing\n");
+> > +                     return err;
+> > +             }
+> > +             /* adjust register offsets for 7ppm devices */
+> > +             if (stability == 7)
+> > +                     data->div_offset = SI570_DIV_OFFSET_7PPM;
+> > +
+> > +             data->max_freq = SI570_MAX_FREQ;
+> > +     } else {
+> > +             data->max_freq = SI598_MAX_FREQ;
+> > +     }
+> > +
+> > +     if (of_property_read_string(client->dev.of_node, "clock-output-names",
+> > +                     &init.name))
+> > +             init.name = client->dev.of_node->name;
+> > +
+> > +     err = of_property_read_u32(client->dev.of_node, "factory-fout",
+> > +                     &factory_fout);
+> > +     if (err) {
+> > +             dev_err(&client->dev, "'factory-fout' property missing\n");
+> > +             return err;
+> > +     }
+> > +
+> > +     data->regmap = devm_regmap_init_i2c(client, &si570_regmap_config);
+> > +     if (IS_ERR(data->regmap)) {
+> > +             dev_err(&client->dev, "failed to allocate register map\n");
+> > +             return PTR_ERR(data->regmap);
+> > +     }
+> > +
+> > +     i2c_set_clientdata(client, data);
+> > +     err = si570_get_defaults(data, factory_fout);
+> > +     if (err)
+> > +             return err;
+> > +
+> > +     clk = devm_clk_register(&client->dev, &data->hw);
+> > +     if (IS_ERR(clk)) {
+> > +             dev_err(&client->dev, "clock registration failed\n");
+> > +             return PTR_ERR(clk);
+> > +     }
+> > +     err = of_clk_add_provider(client->dev.of_node, of_clk_src_simple_get,
+> > +                     clk);
+> > +     if (err) {
+> > +             dev_err(&client->dev, "unable to add clk provider\n");
+> > +             return err;
+> > +     }
+> > +
+> > +     /* Read the requested initial output frequency from device tree */
+> > +     if (!of_property_read_u32(client->dev.of_node, "clock-frequency",
+> > +                             &initial_fout)) {
+> > +             err = clk_set_rate(clk, initial_fout);
+> > +             if (err) {
+> > +                     of_clk_del_provider(client->dev.of_node);
+> > +                     return err;
+> > +             }
+> > +     }
+> > +
+> > +     /* Display a message indicating that we've successfully registered */
+> > +     dev_info(&client->dev, "registered, current frequency %llu Hz\n",
+> > +                     data->frequency);
+> > +
+> > +     return 0;
+> > +}
+> > +
+> > +static int si570_remove(struct i2c_client *client)
+> > +{
+> > +     of_clk_del_provider(client->dev.of_node);
+> > +     return 0;
+> > +}
+> > +
+> > +static const struct i2c_device_id si570_id[] = {
+> > +     { "si570", si57x },
+> > +     { "si571", si57x },
+> > +     { "si598", si59x },
+> > +     { "si599", si59x },
+> > +     { }
+> > +};
+> > +MODULE_DEVICE_TABLE(i2c, si570_id);
+> > +
+> > +static const struct of_device_id clk_si570_of_match[] = {
+> > +     { .compatible = "silabs,si570" },
+> > +     { .compatible = "silabs,si571" },
+> > +     { .compatible = "silabs,si598" },
+> > +     { .compatible = "silabs,si599" },
+> > +     { },
+> > +};
+> > +MODULE_DEVICE_TABLE(of, clk_si570_of_match);
+> > +
+> > +static struct i2c_driver si570_driver = {
+> > +     .driver = {
+> > +             .name = "si570",
+> > +             .of_match_table = of_match_ptr(clk_si570_of_match),
+> > +     },
+> > +     .probe          = si570_probe,
+> > +     .remove         = si570_remove,
+> > +     .id_table       = si570_id,
+> > +};
+> > +module_i2c_driver(si570_driver);
+> > +
+> > +MODULE_AUTHOR("Guenter Roeck <guenter.roeck@ericsson.com>");
+> > +MODULE_AUTHOR("Soeren Brinkmann <soren.brinkmann@xilinx.com");
+> > +MODULE_DESCRIPTION("Si570 driver");
+> > +MODULE_LICENSE("GPL");
+> > -- 
+> > 1.8.4
 > > 
-> > -static inline void coherent_icache_guest_page(struct kvm *kvm, gfn_t gfn)
-> > +static inline void coherent_icache_guest_page(struct kvm *kvm, hva_t hva,
-> > +                                             unsigned long size)
-> >  {
-> >         if (!icache_is_aliasing()) {            /* PIPT */
-> > -               unsigned long hva = gfn_to_hva(kvm, gfn);
-> > -               flush_icache_range(hva, hva + PAGE_SIZE);
-> > +               flush_icache_range(hva, hva + size);
-> >         } else if (!icache_is_aivivt()) {       /* non ASID-tagged VIVT */
-> >                 /* any kind of VIPT cache */
-> >                 __flush_icache_all();
-> 
-> As a general comment about this patch, I think having both transparent
-> pages *and* hugetlbfs support in the same patch makes it fairly hard to
-> read.
-> 
-> I understand that is is actually convenient as most of the code is
-> shared, but I think it would make it easier to read if the patch was
-> split in two: first the basic hugetlb support, and then the THP madness.
-> 
-> What do you think?
-> 
-Sure, I can split them up.  I'm going to send out a v2 with the split
-patches so you can read that in its completeness instead of the
-fragments I posted above.  I can always spin a v3 if you have more
-comments, though I still hope to get this in for the next merge window.
-
-Thanks for the review!
--Christoffer
+> >
