@@ -1,33 +1,53 @@
-From: dmurphy@ti.com (Dan Murphy)
-Date: Wed, 2 Oct 2013 12:58:33 -0500
-Subject: [PATCH] ARM: dts: AM33XX: add ethernet alias's for am33xx
-Message-ID: <1380736713-24678-1-git-send-email-dmurphy@ti.com>
+From: markus.mayer@linaro.org (Markus Mayer)
+Date: Wed, 2 Oct 2013 11:00:16 -0700
+Subject: [PATCH v3] ARM: dts: bcm281xx: Add card detect GPIO
+Message-ID: <1380736816-16230-1-git-send-email-markus.mayer@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Set the alias for ethernet0 and ethernet1 so that uBoot
-can set the MAC address appropriately.
+Register GPIO 14 as card detect interrupt for the SD card slot.
 
-Currently uBoot cannot find the alias and there for does not set the
-MAC address.
-
-Signed-off-by: Dan Murphy <dmurphy@ti.com>
+Signed-off-by: Markus Mayer <markus.mayer@linaro.org>
 ---
- arch/arm/boot/dts/am33xx.dtsi |    2 ++
- 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
-index 553adc6..8aabaa0 100644
---- a/arch/arm/boot/dts/am33xx.dtsi
-+++ b/arch/arm/boot/dts/am33xx.dtsi
-@@ -30,6 +30,8 @@
- 		usb1 = &usb1;
- 		phy0 = &usb0_phy;
- 		phy1 = &usb1_phy;
-+		ethernet0 = &cpsw_emac0;
-+		ethernet1 = &cpsw_emac1;
+This patch depends on [PATCH v9 3/3] ARM: bcm281xx: Add device node for
+the GPIO controller
+(http://lists.infradead.org/pipermail/linux-arm-kernel/2013-September/197399.html)
+and should therefore likely go into Christian's tree.
+
+Changes since v2:
+- Add "cd-gpios" to the affected dts files, not the dtsi
+
+Changes since v1:
+- Corrected commit message to mention "card detect"
+
+ arch/arm/boot/dts/bcm11351-brt.dts |    1 +
+ arch/arm/boot/dts/bcm28155-ap.dts  |    1 +
+ 2 files changed, 2 insertions(+)
+
+diff --git a/arch/arm/boot/dts/bcm11351-brt.dts b/arch/arm/boot/dts/bcm11351-brt.dts
+index 9d36eb4..23cd16d 100644
+--- a/arch/arm/boot/dts/bcm11351-brt.dts
++++ b/arch/arm/boot/dts/bcm11351-brt.dts
+@@ -40,6 +40,7 @@
+ 
+ 	sdio4: sdio at 3f1b0000 {
+ 		max-frequency = <48000000>;
++		cd-gpios = <&gpio 14 0>;
+ 		status = "okay";
  	};
  
- 	cpus {
+diff --git a/arch/arm/boot/dts/bcm28155-ap.dts b/arch/arm/boot/dts/bcm28155-ap.dts
+index 96ae67a..08e47c2 100644
+--- a/arch/arm/boot/dts/bcm28155-ap.dts
++++ b/arch/arm/boot/dts/bcm28155-ap.dts
+@@ -40,6 +40,7 @@
+ 
+ 	sdio4: sdio at 3f1b0000 {
+ 		max-frequency = <48000000>;
++		cd-gpios = <&gpio 14 0>;
+ 		status = "okay";
+ 	};
+ };
 -- 
 1.7.9.5
