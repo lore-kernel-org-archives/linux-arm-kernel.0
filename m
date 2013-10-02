@@ -1,59 +1,35 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 2 Oct 2013 18:07:02 +0200
-Subject: Armada XP doesn't boot in v3.12-rc3
-In-Reply-To: <CAFJTrDsTmSzFEX7XVqnw4=vYiBdqNeLDQuWFotSEZqGsFxT9sA@mail.gmail.com>
-References: <CAFJTrDvNYa2g-TFPjii5WpCgnX8kc8r9v3+jzL7gkHCwRV-obg@mail.gmail.com>
- <20131002124320.GL31178@titan.lakedaemon.net>
- <CAFJTrDsTmSzFEX7XVqnw4=vYiBdqNeLDQuWFotSEZqGsFxT9sA@mail.gmail.com>
-Message-ID: <20131002180702.702ce17b@skate>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 02 Oct 2013 17:17:41 +0100
+Subject: [PATCH v5 0/4] Target CPU=Host implementation for KVM ARM/ARM64
+In-Reply-To: <20131002160444.GA49034@lvm>
+References: <1380531008-15901-1-git-send-email-anup.patel@linaro.org>
+ <20131002160444.GA49034@lvm>
+Message-ID: <524C4725.3060700@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Matthew Minter,
+On 02/10/13 17:04, Christoffer Dall wrote:
+> On Mon, Sep 30, 2013 at 02:20:04PM +0530, Anup Patel wrote:
+>> It will be very useful for user space (QEMU/KVMTOOL) if it has a
+>> method of querying VCPU target type matching to underlying Host.
+>> We can use such querying mechanism and implement machine models
+>> in user space where VCPU target type is always same-as/similar-to
+>> underlying Host (i.e. Target CPU=Host).
+>>
+>> This patch series implements KVM_ARM_PREFERRED_TARGET vm ioclt for
+>> querying VCPU target type matching underlying host. Using this new
+>> ioctl we can implement VCPU target CPU=Host in user space.
+>>
+>> Also, it is not mandatory to call KVM_ARM_PREFERRED_TARGET vm ioctl
+>> and the old method of trying all possible target types using the
+>> KVM_ARM_VCPU_INIT ioctl to initialize VCPU works fine.
+>>
+> Looks good to me, as soon as Marc acks this one, I'll merge it.
 
-On Wed, 2 Oct 2013 16:55:25 +0100, Matthew Minter wrote:
+Yup, go for it:
 
-> To give a little background the box is a Marvell DB-MV784MP-GP.
-> It also appears that it is a revision B0 which various materials seem
-> to imply matters but I am not sure of the significance.
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 
-I don't remember which version of the SoC we have here, but I can check
-this tomorrow. Also, which U-Boot version do you have on this machine?
-
-> I have tried a number of configurations including the defaults for the
-> mach and various settings including turning CONFIG_HAVE_ARM_ARCH_TIMER
-> on and off.
-> 
-> Some configurations result in no output after uBoot's booting kernel
-> line, but some reach theline "calibrating timer loop" then hang
-> indefinitely.
-
-The first case means the kernel really doesn't boot. It can be due to
-an incorrect earlyprintk configuration, for example (but also other
-things).
-
-The second case is due to the timer being broken, which normally the
-patches pointed by Ezequiel should be fixing.
-
-> I am now trying the fixes branch at
-> git://git.infradead.org/linux-mvebu.git (thanks Ezequiel) to see if
-> that contains a solution. Once I have tried that I shall see what
-> changes it made and mail back any results. (I am talking to the board
-> down a serial over USB connection so can get a fair amount of
-> diagnostics from the early printk system).
-
-It's a shame that 3.12-rc still isn't fixed, and that 3.12-rc1 was
-broken in the first place :/ We used to be quite good at having at
-least bootable quality even at -rc1 stage, and many people and
-reporting problems now that 3.12-rc1 doesn't even boot on Armada 370/XP.
-
-Ezequiel, Jason, can you ping the relevant maintainers to make sure the
-relevant patches are merged quickly and land in the next -rc?
-
-Thanks a lot!
-
-Thomas
+	M.
 -- 
-Thomas Petazzoni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Jazz is not dead. It just smells funny...
