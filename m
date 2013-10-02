@@ -1,42 +1,26 @@
-From: sachin.kamat@linaro.org (Sachin Kamat)
-Date: Wed, 2 Oct 2013 12:19:16 +0530
-Subject: [PATCH 01/10] clk: bcm2835: Remove duplicate inclusion of
- clk-provider.h
-In-Reply-To: <1379064232-10261-1-git-send-email-sachin.kamat@linaro.org>
-References: <1379064232-10261-1-git-send-email-sachin.kamat@linaro.org>
-Message-ID: <CAK9yfHxgW4u=queZZkkpz7YPjoz-58kD_JUrq47L1cEMCkUw7A@mail.gmail.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Wed, 02 Oct 2013 00:24:04 -0700
+Subject: [PATCH] clk: nomadik: set all timers to use 2.4 MHz TIMCLK
+In-Reply-To: <CACRpkdYfSfAFRD_s1UHfV-k+JS5G3B5tN9UAwxOEzWB4t7yibA@mail.gmail.com>
+References: <1379101551-2722-1-git-send-email-linus.walleij@linaro.org>
+ <CACRpkdYfSfAFRD_s1UHfV-k+JS5G3B5tN9UAwxOEzWB4t7yibA@mail.gmail.com>
+Message-ID: <20131002072404.9338.91365@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- Hi Mike,
+Quoting Linus Walleij (2013-09-26 12:40:35)
+> On Fri, Sep 13, 2013 at 9:45 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> 
+> > This fixes a regression for the Nomadik on the main system
+> > timers.
+> 
+> Ping Mike, are you picking this up for fixes?
 
-On 13 September 2013 14:53, Sachin Kamat <sachin.kamat@linaro.org> wrote:
-> clk-provider.h was included twice.
->
-> Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
-> Cc: Stephen Warren <swarren@wwwdotorg.org>
-> ---
->  drivers/clk/clk-bcm2835.c |    1 -
->  1 file changed, 1 deletion(-)
->
-> diff --git a/drivers/clk/clk-bcm2835.c b/drivers/clk/clk-bcm2835.c
-> index 5fb4ff5..676077d 100644
-> --- a/drivers/clk/clk-bcm2835.c
-> +++ b/drivers/clk/clk-bcm2835.c
-> @@ -20,7 +20,6 @@
->  #include <linux/clk-provider.h>
->  #include <linux/clkdev.h>
->  #include <linux/clk/bcm2835.h>
-> -#include <linux/clk-provider.h>
->  #include <linux/of.h>
->
->  static const struct of_device_id clk_match[] __initconst = {
-> --
-> 1.7.9.5
->
+I've taken this into clk-fixes.
 
- Gentle ping.
+Thanks,
+Mike
 
--- 
-With warm regards,
-Sachin
+> 
+> Yours,
+> Linus Walleij
