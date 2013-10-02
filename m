@@ -1,63 +1,47 @@
-From: hector.palacios@digi.com (Hector Palacios)
-Date: Thu, 3 Oct 2013 09:32:03 +0200
-Subject: [PATCH v3 1/2] serial: mxs-auart: set the FIFO size to DMA buffer size
-In-Reply-To: <1380785524-20490-1-git-send-email-hector.palacios@digi.com>
-References: <1380785524-20490-1-git-send-email-hector.palacios@digi.com>
-Message-ID: <1380785524-20490-2-git-send-email-hector.palacios@digi.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 2 Oct 2013 16:38:25 +0200
+Subject: [PATCH 06/10] clk: sunxi: mod0 support
+In-Reply-To: <524A0B4A.8080902@elopez.com.ar>
+References: <1380426579-32458-1-git-send-email-emilio@elopez.com.ar>
+ <1380426579-32458-7-git-send-email-emilio@elopez.com.ar>
+ <20130930173508.GF5287@lukather> <524A0B4A.8080902@elopez.com.ar>
+Message-ID: <20131002143825.GA32149@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When DMA is enabled (with hardware flow control enabled) the FIFO size
-must be set to the size of the DMA buffer, as this is the size the tty
-subsystem can use.
+Hi Emilio
 
-Signed-off-by: Hector Palacios <hector.palacios@digi.com>
-Reviewed-by: Marek Vasut <marex@denx.de>
-Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
- drivers/tty/serial/mxs-auart.c | 9 ++++++++-
- 1 file changed, 8 insertions(+), 1 deletion(-)
+On Mon, Sep 30, 2013 at 08:37:46PM -0300, Emilio L?pez wrote:
+> >>+static const struct factors_data sun4i_mod0_data __initconst = {
+> >>+	.enable = 31,
+> >>+	.mux = 24,
+> >>+	.table = &sun4i_mod0_config,
+> >>+	.getter = sun4i_get_mod0_factors,
+> >>+};
+> >
+> >How are the parents handled here for the mux part? Do you expect the
+> >different parents in a precise order in the device tree, so that you
+> >have a direct mapping to the value to put in the muxing registers, or do
+> >you have a smarter way to do it?
+> 
+> Indeed, the parents must be indicated on the DT using the same order
+> as on the register. In other words, it works the same as all the
+> other muxes we have implemented so far. The clock corresponding to
+> bits 00 goes first, then the one corresponding to 01, etc.
 
-diff --git a/drivers/tty/serial/mxs-auart.c b/drivers/tty/serial/mxs-auart.c
-index f85b8e6..9f046177 100644
---- a/drivers/tty/serial/mxs-auart.c
-+++ b/drivers/tty/serial/mxs-auart.c
-@@ -40,6 +40,7 @@
- #include <asm/cacheflush.h>
- 
- #define MXS_AUART_PORTS 5
-+#define MXS_AUART_FIFO_SIZE		16
- 
- #define AUART_CTRL0			0x00000000
- #define AUART_CTRL0_SET			0x00000004
-@@ -549,6 +550,9 @@ static int mxs_auart_dma_init(struct mxs_auart_port *s)
- 	s->flags |= MXS_AUART_DMA_ENABLED;
- 	dev_dbg(s->dev, "enabled the DMA support.");
- 
-+	/* The DMA buffer is now the FIFO the TTY subsystem can use */
-+	s->port.fifosize = UART_XMIT_SIZE;
-+
- 	return 0;
- 
- err_out:
-@@ -741,6 +745,9 @@ static int mxs_auart_startup(struct uart_port *u)
- 	writel(AUART_INTR_RXIEN | AUART_INTR_RTIEN | AUART_INTR_CTSMIEN,
- 			u->membase + AUART_INTR);
- 
-+	/* Reset FIFO size (it could have changed if DMA was enabled) */
-+	u->fifosize = MXS_AUART_FIFO_SIZE;
-+
- 	/*
- 	 * Enable fifo so all four bytes of a DMA word are written to
- 	 * output (otherwise, only the LSB is written, ie. 1 in 4 bytes)
-@@ -1062,7 +1069,7 @@ static int mxs_auart_probe(struct platform_device *pdev)
- 	s->port.membase = ioremap(r->start, resource_size(r));
- 	s->port.ops = &mxs_auart_ops;
- 	s->port.iotype = UPIO_MEM;
--	s->port.fifosize = 16;
-+	s->port.fifosize = MXS_AUART_FIFO_SIZE;
- 	s->port.uartclk = clk_get_rate(s->clk);
- 	s->port.type = PORT_IMX;
- 	s->port.dev = s->dev = &pdev->dev;
+Ok. It should be documented in the bindings doc then.
+
+Thanks!
+Maxime
+
 -- 
-1.8.4
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131002/0d81db3f/attachment.sig>
