@@ -1,48 +1,41 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 2 Oct 2013 13:49:03 +0100
-Subject: [RFC PATCH] ARM: Flush L2 cache on soft_restart
-In-Reply-To: <1380713656-24752-1-git-send-email-taras.kondratiuk@linaro.org>
-References: <1380713656-24752-1-git-send-email-taras.kondratiuk@linaro.org>
-Message-ID: <20131002124902.GB29213@mudshark.cambridge.arm.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Wed, 02 Oct 2013 15:01:15 +0200
+Subject: [RFC PATCH 0/2] ARM: at91: cpuidle: encapsulate and move the
+ driver to drivers/cpuidle
+In-Reply-To: <1380211567-2972-1-git-send-email-daniel.lezcano@linaro.org>
+References: <1380211567-2972-1-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <524C191B.30500@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 02, 2013 at 12:34:16PM +0100, Taras Kondratiuk wrote:
-> Kexec disables L2 cache before jumping to reboot code,
-> but it doesn't flush it. So often just copied reboot code
-> gets corrupted, because part of it is stored in L2 cache
-> and have not reached memory.
-> 
-> Flushing cache prevents this corruption.
-> 
-> I'm facing this issue on Pandaboard ES, but it looks like
-> similar issue is observed on TC2 board [1].
+On 09/26/2013 06:06 PM, Daniel Lezcano wrote:
+> Several patches were send to encapsulate the standby code.
+>
+> Creating a platform driver model allows to finish to encapsulate this code more
+> and make possible to move the driver to the drivers/cpuidle directory.
+>
+> I was not able to test the patchset, I don't have the hardware.
+>
+> Daniel Lezcano (2):
+>    ARM: at91: cpuidle: convert to platform driver
+>    ARM: at91: cpuidle: Move driver to drivers/cpuidle
+>
+>   arch/arm/mach-at91/Makefile    |    1 -
+>   arch/arm/mach-at91/cpuidle.c   |   68 ---------------------------------------
+>   arch/arm/mach-at91/pm.c        |   16 +++++++++-
+>   drivers/cpuidle/Kconfig.arm    |    6 ++++
+>   drivers/cpuidle/Makefile       |    1 +
+>   drivers/cpuidle/cpuidle-at91.c |   69 ++++++++++++++++++++++++++++++++++++++++
+>   6 files changed, 91 insertions(+), 70 deletions(-)
+>   delete mode 100644 arch/arm/mach-at91/cpuidle.c
+>   create mode 100644 drivers/cpuidle/cpuidle-at91.c
 
-TC2 doesn't have an outer cache, so that report is not relevant to this
-patch.
+ping ?
 
-> [1] http://www.spinics.net/lists/arm-kernel/msg264339.html
-> 
-> Signed-off-by: Taras Kondratiuk <taras.kondratiuk@linaro.org>
-> ---
->  arch/arm/kernel/process.c |    6 ++++--
->  1 file changed, 4 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
-> index 94f6b05..e359b62 100644
-> --- a/arch/arm/kernel/process.c
-> +++ b/arch/arm/kernel/process.c
-> @@ -103,9 +103,11 @@ void soft_restart(unsigned long addr)
->  	local_irq_disable();
->  	local_fiq_disable();
->  
-> -	/* Disable the L2 if we're the last man standing. */
-> -	if (num_online_cpus() == 1)
-> +	/* Flush and disable the L2 if we're the last man standing. */
-> +	if (num_online_cpus() == 1) {
-> +		outer_flush_all();
->  		outer_disable();
 
-l2x0_disable already contains a flush, so this doesn't change anything.
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
 
-Will
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
