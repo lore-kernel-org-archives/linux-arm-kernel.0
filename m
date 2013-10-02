@@ -1,376 +1,54 @@
 From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
-Date: Wed,  2 Oct 2013 09:35:32 +0200
-Subject: [PATCH 3/4] ARM: socfpga: dts: cleanup indentation
-In-Reply-To: <1380699333-558-1-git-send-email-s.trumtrar@pengutronix.de>
-References: <1380699333-558-1-git-send-email-s.trumtrar@pengutronix.de>
-Message-ID: <1380699333-558-4-git-send-email-s.trumtrar@pengutronix.de>
+Date: Wed,  2 Oct 2013 09:35:29 +0200
+Subject: [PATCH 0/4] SoCFPGA: dts cleanups and SoCkit support
+Message-ID: <1380699333-558-1-git-send-email-s.trumtrar@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some of the clock nodes and the rst-/sysmgr use wrong indentation.
-Fix it.
+Hi!
 
-Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
----
- arch/arm/boot/dts/socfpga.dtsi | 290 ++++++++++++++++++++---------------------
- 1 file changed, 145 insertions(+), 145 deletions(-)
+This series includes some minor cleanups (indentation and clock labels) and
+reorders the socfpga dts hierarchy from
+	socfpga.dtsi
+	-> socfpga_$board.dts
+	-> socfpga_$otherboard.dts
+to
+	socfpga.dtsi
+	-> socfpga_cyclone5.dtsi
+	--> socfpga_cyclone5_$board.dts
+	--> socfpga_cyclone5_$otherboard.dts
 
-diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
-index e273fa9..587096e 100644
---- a/arch/arm/boot/dts/socfpga.dtsi
-+++ b/arch/arm/boot/dts/socfpga.dtsi
-@@ -243,197 +243,197 @@
- 						};
- 					};
- 
--				mpu_periph_clk: mpu_periph_clk {
--					#clock-cells = <0>;
--					compatible = "altr,socfpga-gate-clk";
--					clocks = <&mpuclk>;
--					fixed-divider = <4>;
-+					mpu_periph_clk: mpu_periph_clk {
-+						#clock-cells = <0>;
-+						compatible = "altr,socfpga-gate-clk";
-+						clocks = <&mpuclk>;
-+						fixed-divider = <4>;
- 					};
- 
--				mpu_l2_ram_clk: mpu_l2_ram_clk {
--					#clock-cells = <0>;
--					compatible = "altr,socfpga-gate-clk";
--					clocks = <&mpuclk>;
--					fixed-divider = <2>;
-+					mpu_l2_ram_clk: mpu_l2_ram_clk {
-+						#clock-cells = <0>;
-+						compatible = "altr,socfpga-gate-clk";
-+						clocks = <&mpuclk>;
-+						fixed-divider = <2>;
- 					};
- 
--				l4_main_clk: l4_main_clk {
--					#clock-cells = <0>;
--					compatible = "altr,socfpga-gate-clk";
--					clocks = <&mainclk>;
--					clk-gate = <0x60 0>;
-+					l4_main_clk: l4_main_clk {
-+						#clock-cells = <0>;
-+						compatible = "altr,socfpga-gate-clk";
-+						clocks = <&mainclk>;
-+						clk-gate = <0x60 0>;
- 					};
- 
--				l3_main_clk: l3_main_clk {
--					#clock-cells = <0>;
--					compatible = "altr,socfpga-gate-clk";
--					clocks = <&mainclk>;
-+					l3_main_clk: l3_main_clk {
-+						#clock-cells = <0>;
-+						compatible = "altr,socfpga-gate-clk";
-+						clocks = <&mainclk>;
- 					};
- 
--				l3_mp_clk: l3_mp_clk {
--					#clock-cells = <0>;
--					compatible = "altr,socfpga-gate-clk";
--					clocks = <&mainclk>;
--					div-reg = <0x64 0 2>;
--					clk-gate = <0x60 1>;
-+					l3_mp_clk: l3_mp_clk {
-+						#clock-cells = <0>;
-+						compatible = "altr,socfpga-gate-clk";
-+						clocks = <&mainclk>;
-+						div-reg = <0x64 0 2>;
-+						clk-gate = <0x60 1>;
- 					};
- 
--				l3_sp_clk: l3_sp_clk {
--					#clock-cells = <0>;
--					compatible = "altr,socfpga-gate-clk";
--					clocks = <&mainclk>;
--					div-reg = <0x64 2 2>;
--				};
-+					l3_sp_clk: l3_sp_clk {
-+						#clock-cells = <0>;
-+						compatible = "altr,socfpga-gate-clk";
-+						clocks = <&mainclk>;
-+						div-reg = <0x64 2 2>;
-+					};
- 
--				l4_mp_clk: l4_mp_clk {
--					#clock-cells = <0>;
--					compatible = "altr,socfpga-gate-clk";
--					clocks = <&mainclk>, <&per_base_clk>;
--					div-reg = <0x64 4 3>;
--					clk-gate = <0x60 2>;
-+					l4_mp_clk: l4_mp_clk {
-+						#clock-cells = <0>;
-+						compatible = "altr,socfpga-gate-clk";
-+						clocks = <&mainclk>, <&per_base_clk>;
-+						div-reg = <0x64 4 3>;
-+						clk-gate = <0x60 2>;
- 					};
- 
--				l4_sp_clk: l4_sp_clk {
--					#clock-cells = <0>;
--					compatible = "altr,socfpga-gate-clk";
--					clocks = <&mainclk>, <&per_base_clk>;
--					div-reg = <0x64 7 3>;
--					clk-gate = <0x60 3>;
-+					l4_sp_clk: l4_sp_clk {
-+						#clock-cells = <0>;
-+						compatible = "altr,socfpga-gate-clk";
-+						clocks = <&mainclk>, <&per_base_clk>;
-+						div-reg = <0x64 7 3>;
-+						clk-gate = <0x60 3>;
- 					};
- 
--				dbg_at_clk: dbg_at_clk {
--					#clock-cells = <0>;
--					compatible = "altr,socfpga-gate-clk";
--					clocks = <&dbg_base_clk>;
--					div-reg = <0x68 0 2>;
--					clk-gate = <0x60 4>;
-+					dbg_at_clk: dbg_at_clk {
-+						#clock-cells = <0>;
-+						compatible = "altr,socfpga-gate-clk";
-+						clocks = <&dbg_base_clk>;
-+						div-reg = <0x68 0 2>;
-+						clk-gate = <0x60 4>;
- 					};
- 
--				dbg_clk: dbg_clk {
--					#clock-cells = <0>;
--					compatible = "altr,socfpga-gate-clk";
--					clocks = <&dbg_base_clk>;
--					div-reg = <0x68 2 2>;
--					clk-gate = <0x60 5>;
-+					dbg_clk: dbg_clk {
-+						#clock-cells = <0>;
-+						compatible = "altr,socfpga-gate-clk";
-+						clocks = <&dbg_base_clk>;
-+						div-reg = <0x68 2 2>;
-+						clk-gate = <0x60 5>;
- 					};
- 
--				dbg_trace_clk: dbg_trace_clk {
--					#clock-cells = <0>;
--					compatible = "altr,socfpga-gate-clk";
--					clocks = <&dbg_base_clk>;
--					div-reg = <0x6C 0 3>;
--					clk-gate = <0x60 6>;
-+					dbg_trace_clk: dbg_trace_clk {
-+						#clock-cells = <0>;
-+						compatible = "altr,socfpga-gate-clk";
-+						clocks = <&dbg_base_clk>;
-+						div-reg = <0x6C 0 3>;
-+						clk-gate = <0x60 6>;
- 					};
- 
--				dbg_timer_clk: dbg_timer_clk {
--					#clock-cells = <0>;
--					compatible = "altr,socfpga-gate-clk";
--					clocks = <&dbg_base_clk>;
--					clk-gate = <0x60 7>;
-+					dbg_timer_clk: dbg_timer_clk {
-+						#clock-cells = <0>;
-+						compatible = "altr,socfpga-gate-clk";
-+						clocks = <&dbg_base_clk>;
-+						clk-gate = <0x60 7>;
- 					};
- 
--				cfg_clk: cfg_clk {
--					#clock-cells = <0>;
--					compatible = "altr,socfpga-gate-clk";
--					clocks = <&cfg_s2f_usr0_clk>;
--					clk-gate = <0x60 8>;
-+					cfg_clk: cfg_clk {
-+						#clock-cells = <0>;
-+						compatible = "altr,socfpga-gate-clk";
-+						clocks = <&cfg_s2f_usr0_clk>;
-+						clk-gate = <0x60 8>;
- 					};
- 
--				s2f_user0_clk: s2f_user0_clk {
--					#clock-cells = <0>;
--					compatible = "altr,socfpga-gate-clk";
--					clocks = <&cfg_s2f_usr0_clk>;
--					clk-gate = <0x60 9>;
-+					s2f_user0_clk: s2f_user0_clk {
-+						#clock-cells = <0>;
-+						compatible = "altr,socfpga-gate-clk";
-+						clocks = <&cfg_s2f_usr0_clk>;
-+						clk-gate = <0x60 9>;
- 					};
- 
--				emac_0_clk: emac_0_clk {
--					#clock-cells = <0>;
--					compatible = "altr,socfpga-gate-clk";
--					clocks = <&emac0_clk>;
--					clk-gate = <0xa0 0>;
-+					emac_0_clk: emac_0_clk {
-+						#clock-cells = <0>;
-+						compatible = "altr,socfpga-gate-clk";
-+						clocks = <&emac0_clk>;
-+						clk-gate = <0xa0 0>;
- 					};
- 
--				emac_1_clk: emac_1_clk {
--					#clock-cells = <0>;
--					compatible = "altr,socfpga-gate-clk";
--					clocks = <&emac1_clk>;
--					clk-gate = <0xa0 1>;
-+					emac_1_clk: emac_1_clk {
-+						#clock-cells = <0>;
-+						compatible = "altr,socfpga-gate-clk";
-+						clocks = <&emac1_clk>;
-+						clk-gate = <0xa0 1>;
- 					};
- 
--				usb_mp_clk: usb_mp_clk {
--					#clock-cells = <0>;
--					compatible = "altr,socfpga-gate-clk";
--					clocks = <&per_base_clk>;
--					clk-gate = <0xa0 2>;
--					div-reg = <0xa4 0 3>;
-+					usb_mp_clk: usb_mp_clk {
-+						#clock-cells = <0>;
-+						compatible = "altr,socfpga-gate-clk";
-+						clocks = <&per_base_clk>;
-+						clk-gate = <0xa0 2>;
-+						div-reg = <0xa4 0 3>;
- 					};
- 
--				spi_m_clk: spi_m_clk {
--					#clock-cells = <0>;
--					compatible = "altr,socfpga-gate-clk";
--					clocks = <&per_base_clk>;
--					clk-gate = <0xa0 3>;
--					div-reg = <0xa4 3 3>;
-+					spi_m_clk: spi_m_clk {
-+						#clock-cells = <0>;
-+						compatible = "altr,socfpga-gate-clk";
-+						clocks = <&per_base_clk>;
-+						clk-gate = <0xa0 3>;
-+						div-reg = <0xa4 3 3>;
- 					};
- 
--				can0_clk: can0_clk {
--					#clock-cells = <0>;
--					compatible = "altr,socfpga-gate-clk";
--					clocks = <&per_base_clk>;
--					clk-gate = <0xa0 4>;
--					div-reg = <0xa4 6 3>;
-+					can0_clk: can0_clk {
-+						#clock-cells = <0>;
-+						compatible = "altr,socfpga-gate-clk";
-+						clocks = <&per_base_clk>;
-+						clk-gate = <0xa0 4>;
-+						div-reg = <0xa4 6 3>;
- 					};
- 
--				can1_clk: can1_clk {
--					#clock-cells = <0>;
--					compatible = "altr,socfpga-gate-clk";
--					clocks = <&per_base_clk>;
--					clk-gate = <0xa0 5>;
--					div-reg = <0xa4 9 3>;
-+					can1_clk: can1_clk {
-+						#clock-cells = <0>;
-+						compatible = "altr,socfpga-gate-clk";
-+						clocks = <&per_base_clk>;
-+						clk-gate = <0xa0 5>;
-+						div-reg = <0xa4 9 3>;
- 					};
- 
--				gpio_db_clk: gpio_db_clk {
--					#clock-cells = <0>;
--					compatible = "altr,socfpga-gate-clk";
--					clocks = <&per_base_clk>;
--					clk-gate = <0xa0 6>;
--					div-reg = <0xa8 0 24>;
-+					gpio_db_clk: gpio_db_clk {
-+						#clock-cells = <0>;
-+						compatible = "altr,socfpga-gate-clk";
-+						clocks = <&per_base_clk>;
-+						clk-gate = <0xa0 6>;
-+						div-reg = <0xa8 0 24>;
- 					};
- 
--				s2f_user1_clk: s2f_user1_clk {
--					#clock-cells = <0>;
--					compatible = "altr,socfpga-gate-clk";
--					clocks = <&s2f_usr1_clk>;
--					clk-gate = <0xa0 7>;
-+					s2f_user1_clk: s2f_user1_clk {
-+						#clock-cells = <0>;
-+						compatible = "altr,socfpga-gate-clk";
-+						clocks = <&s2f_usr1_clk>;
-+						clk-gate = <0xa0 7>;
- 					};
- 
--				sdmmc_clk: sdmmc_clk {
--					#clock-cells = <0>;
--					compatible = "altr,socfpga-gate-clk";
--					clocks = <&f2s_periph_ref_clk>, <&main_nand_sdmmc_clk>, <&per_nand_mmc_clk>;
--					clk-gate = <0xa0 8>;
-+					sdmmc_clk: sdmmc_clk {
-+						#clock-cells = <0>;
-+						compatible = "altr,socfpga-gate-clk";
-+						clocks = <&f2s_periph_ref_clk>, <&main_nand_sdmmc_clk>, <&per_nand_mmc_clk>;
-+						clk-gate = <0xa0 8>;
- 					};
- 
--				nand_x_clk: nand_x_clk {
--					#clock-cells = <0>;
--					compatible = "altr,socfpga-gate-clk";
--					clocks = <&f2s_periph_ref_clk>, <&main_nand_sdmmc_clk>, <&per_nand_mmc_clk>;
--					clk-gate = <0xa0 9>;
-+					nand_x_clk: nand_x_clk {
-+						#clock-cells = <0>;
-+						compatible = "altr,socfpga-gate-clk";
-+						clocks = <&f2s_periph_ref_clk>, <&main_nand_sdmmc_clk>, <&per_nand_mmc_clk>;
-+						clk-gate = <0xa0 9>;
- 					};
- 
--				nand_clk: nand_clk {
--					#clock-cells = <0>;
--					compatible = "altr,socfpga-gate-clk";
--					clocks = <&f2s_periph_ref_clk>, <&main_nand_sdmmc_clk>, <&per_nand_mmc_clk>;
--					clk-gate = <0xa0 10>;
--					fixed-divider = <4>;
-+					nand_clk: nand_clk {
-+						#clock-cells = <0>;
-+						compatible = "altr,socfpga-gate-clk";
-+						clocks = <&f2s_periph_ref_clk>, <&main_nand_sdmmc_clk>, <&per_nand_mmc_clk>;
-+						clk-gate = <0xa0 10>;
-+						fixed-divider = <4>;
- 					};
- 
--				qspi_clk: qspi_clk {
--					#clock-cells = <0>;
--					compatible = "altr,socfpga-gate-clk";
--					clocks = <&f2s_periph_ref_clk>, <&main_qspi_clk>, <&per_qspi_clk>;
--					clk-gate = <0xa0 11>;
-+					qspi_clk: qspi_clk {
-+						#clock-cells = <0>;
-+						compatible = "altr,socfpga-gate-clk";
-+						clocks = <&f2s_periph_ref_clk>, <&main_qspi_clk>, <&per_qspi_clk>;
-+						clk-gate = <0xa0 11>;
- 					};
- 				};
- 			};
-@@ -516,9 +516,9 @@
- 		};
- 
- 		rstmgr at ffd05000 {
--				compatible = "altr,rst-mgr";
--				reg = <0xffd05000 0x1000>;
--			};
-+			compatible = "altr,rst-mgr";
-+			reg = <0xffd05000 0x1000>;
-+		};
- 
- 		sysmgr at ffd08000 {
- 				compatible = "altr,sys-mgr";
+The Socfpga is a SoC with an FPGA on board. This FPGA does not have to be a
+Cyclone5.
+The current socfpga_cyclone5.dts is however not specific to a SoC with this
+combination, but describes one specific board: the Altera Cyclone5 Development Kit.
+Therefore, I propose moving the common stuff to socfpga_cyclone5.dtsi as long as
+it is as easy as now.
+
+Finally, the series adds minimal support for the terasic SoCkit.
+
+BTW: It seems there is no official maintainer(tree) for the socfpga dt stuff.
+So, I rebased onto next-20130927.
+
+Regards,
+Steffen
+
+
+Steffen Trumtrar (4):
+  ARM: socfpga: dts: Move common nodes to cyclone5 dtsi
+  ARM: socfpga: dts: Add support for terasic SoCkit
+  ARM: socfpga: dts: cleanup indentation
+  ARM: socfpga: dts: fix s2f_* clock name
+
+ arch/arm/boot/dts/Makefile                         |   3 +-
+ arch/arm/boot/dts/socfpga.dtsi                     | 296 ++++++++++-----------
+ ...{socfpga_cyclone5.dts => socfpga_cyclone5.dtsi} |  20 --
+ arch/arm/boot/dts/socfpga_cyclone5_socdk.dts       |  40 +++
+ arch/arm/boot/dts/socfpga_cyclone5_sockit.dts      |  37 +++
+ 5 files changed, 227 insertions(+), 169 deletions(-)
+ rename arch/arm/boot/dts/{socfpga_cyclone5.dts => socfpga_cyclone5.dtsi} (78%)
+ create mode 100644 arch/arm/boot/dts/socfpga_cyclone5_socdk.dts
+ create mode 100644 arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
+
 -- 
 1.8.4.rc3
