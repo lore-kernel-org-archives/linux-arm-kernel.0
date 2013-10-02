@@ -1,79 +1,55 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 2 Oct 2013 13:39:11 -0400
-Subject: [PATCH v2 00/12] CPU idle for Armada XP
-In-Reply-To: <1379066801-16276-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1379066801-16276-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20131002173911.GP31178@titan.lakedaemon.net>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 02 Oct 2013 10:42:40 -0700
+Subject: [PATCH] sched_clock: fix postinit no sched_clock function check
+In-Reply-To: <524C5786.2090008@ti.com>
+References: <1380732928-13897-1-git-send-email-santosh.shilimkar@ti.com>
+ <20131002170917.GB30298@mudshark.cambridge.arm.com> <524C5484.5000601@ti.com>
+ <524C565C.8010709@codeaurora.org> <524C5786.2090008@ti.com>
+Message-ID: <524C5B10.20006@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Gregory,
+On 10/02/13 10:27, Santosh Shilimkar wrote:
+> On Wednesday 02 October 2013 01:22 PM, Stephen Boyd wrote:
+>> On 10/02/13 10:14, Santosh Shilimkar wrote:
+>>> On Wednesday 02 October 2013 01:09 PM, Will Deacon wrote:
+>>>> On Wed, Oct 02, 2013 at 05:55:28PM +0100, Santosh Shilimkar wrote:
+>>>>> The sched_clock code uses 2 levels of function pointers, sched_clock_func()
+>>>>> and read_sched_clock() but the no sched_clock check in postinit() just
+>>>>> checks read_sched_clock().
+>>>>>
+>>>>> This leads to kernel falling back to jiffy based sched clock even in
+>>>>> presence of sched_clock_func() which is not desirable.
+>>>>>
+>>>>> Fix the postinit() check to avoid the issue. Probably the issue is hidden
+>>>>> so far on most of the arm SOCs because of already existing sched_clock
+>>>>> registrations apart from arch_timer sched_clock. One can reproduce the
+>>>>> issue by just have arch_timer as sched_clock
+>>>> Isn't this just an issue with the arch timer driver not calling
+>>>> setup_sched_clock? Instead, we munge around with sched_clock_func directly,
+>>>> which doesn't appear to be the way anybody else deals with this.
+>>>>
+>>> I thought about that option as well but was not sure since even in that case
+>>> the check is not complete. We just ensure that function is popullated.
+>> Yes, nothing is actually broken because sched_clock_func() won't try to
+>> use the jiffy based read_sched_clock() function. I'm not sure we
+>> actually need this patch besides to remove a useless timer that updates
+>> the jiffy epoch. Can we wait until my 64-bit sched_clock patch series
+>> lands in 3.13? It looks like I still need an ack from Will or Catalin on
+>> the architected timer patch before the clocksource folks pick it up.
+>>
+> Really... I have not created patch out of fun.
+> Its broken on my keystone machine at least where the sched_clock is
+> falling back on jiffy based sched_clock even in presence of arch_timer
+> sched_clock.
 
-On Fri, Sep 13, 2013 at 12:06:29PM +0200, Gregory CLEMENT wrote:
-> Hello,
-> 
-> This patch set adds the CPU idle support for Armada XP and prepares
-> the support for Armada 370. This was based on the work of Nadav
-> Haklai.
-> 
-> Most of the patches modify the mvebu code in order to prepare the
-> support for CPU idle, hence the patches 2 to 10 should go to mvebu
-> subsystem (and then arm-soc).
-> 
-> The first patch should go through ARM subsystem and should be taken
-> by Russell King.
-> 
-> The 11th patch 'cpuidle: mvebu: Add initial cpu idle support for
-> Armada 370/XP SoC' is the only one who should go to the cpuidle
-> subsystem. But of course I would like that Daniel Lezcano or Rafael
-> J. Wysocki have a look on the whole series.
-> 
-> The last patch should also go to mvebu subsystem (and then arm-soc)
-> but with an Acked-by from on of the device tree maintainer.
-> 
-> The whole series is also available in the branch CPU-idle-ArmadaXP-v2
-> at https://github.com/MISL-EBU-System-SW/mainline-public.git
-> 
-> Thanks,
-> 
-> Changelog:
-> 
-> v1 -> v2:
-> 
-> * Removed the pm_level kernel parameter. As Kevin Hilman pointed, its
->   usage can be replaced by using
->   /sys/devices/system/cpu/cpu*/cpuidle/state*/disable or the kernel
->   parameter cpuidle.off.
-> 
-> * Used BIT() macro (reported by Ezequiel)
-> 
-> * Made the function more readable the
->   armada_370_xp_pmsu_idle_prepare() function (reported by Thomas)
-> 
-> * Moved the config entry in Kconfig.arm, and rename the config symbol
->   according the pattern used by other arm cpu: ARM_"soc name"_CPUIDLE
-> 
-> * Moved the build rule under the new ARM SoC section in the Makefile
-> 
-> * Rebased on Linus Torvalds master branch of Thursday September 12
-> 
-> Gregory CLEMENT (12):
->   ARM: PJ4B: Add cpu_suspend/cpu_resume hooks for PJ4B
->   ARM: mvebu: ll_set_cpu_coherent no more uses the coherency address as
->     parameter
->   ARM: mvebu: ll_set_cpu_coherent always uses the current CPU
->   ARM: mvebu: Remove the unused argument of set_cpu_coherent()
->   ARM: mvebu: Make ll_set_cpu_coherent() more configurable
->   ARM: mvebu: Low level functions to disable cache snooping
->   ARM: mvebu: Add a new set of registers for pmsu
->   ARM: mvebu: Allow to power down L2 cache controller in idle mode
->   ARM: mvebu: Add the PMSU related part of the cpu idle functions
->   ARM: mvebu: Set the start address of a CPU in a separate function
->   cpuidle: mvebu: Add initial CPU idle support for Armada 370/XP SoC
->   ARM: dts: mvebu: Add a new set of registers to the PMSU node
+How is that possible? sched_clock_func is only assigned by
+arch/arm/kernel/arch_timer.c when the architected timer is detected and
+sched_clock() in kernel/time/sched_clock.c calls that function pointer
+unconditionally. The only way I see this happening is if the architected
+timer rate is zero. I agree we will get two lines in the dmesg about
+sched_clock and its not very clear which one is being used.
 
-Is a v3 of this series on it's way?
-
-thx,
-
-Jason.
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
