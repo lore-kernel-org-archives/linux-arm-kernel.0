@@ -1,43 +1,32 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 2 Oct 2013 12:22:21 -0400
-Subject: [PATCH] clk: armada-370: fix tclk frequencies
-In-Reply-To: <1380729418-14393-1-git-send-email-simon.guinot@sequanux.org>
-References: <1380729418-14393-1-git-send-email-simon.guinot@sequanux.org>
-Message-ID: <20131002162221.GN31178@titan.lakedaemon.net>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Wed, 2 Oct 2013 13:42:01 -0300
+Subject: Armada XP doesn't boot in v3.12-rc3
+In-Reply-To: <20131002180702.702ce17b@skate>
+References: <CAFJTrDvNYa2g-TFPjii5WpCgnX8kc8r9v3+jzL7gkHCwRV-obg@mail.gmail.com>
+ <20131002124320.GL31178@titan.lakedaemon.net>
+ <CAFJTrDsTmSzFEX7XVqnw4=vYiBdqNeLDQuWFotSEZqGsFxT9sA@mail.gmail.com>
+ <20131002180702.702ce17b@skate>
+Message-ID: <20131002164200.GA2365@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Simon,
-
-On Wed, Oct 02, 2013 at 05:56:58PM +0200, Simon Guinot wrote:
-> Signed-off-by: Simon Guinot <simon.guinot@sequanux.org>
-
-Could you elaborate on this?  What symptom did you notice?  How did this
-fix it?  When was the regression introduced?
-
-thx,
-
-Jason.
-
-> ---
->  drivers/clk/mvebu/armada-370.c |    4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
+On Wed, Oct 02, 2013 at 06:07:02PM +0200, Thomas Petazzoni wrote:
 > 
-> diff --git a/drivers/clk/mvebu/armada-370.c b/drivers/clk/mvebu/armada-370.c
-> index fc777bd..81a202d 100644
-> --- a/drivers/clk/mvebu/armada-370.c
-> +++ b/drivers/clk/mvebu/armada-370.c
-> @@ -39,8 +39,8 @@ static const struct coreclk_ratio a370_coreclk_ratios[] __initconst = {
->  };
->  
->  static const u32 a370_tclk_freqs[] __initconst = {
-> -	16600000,
-> -	20000000,
-> +	166000000,
-> +	200000000,
->  };
->  
->  static u32 __init a370_get_tclk_freq(void __iomem *sar)
-> -- 
-> 1.7.10.4
+> It's a shame that 3.12-rc still isn't fixed, and that 3.12-rc1 was
+> broken in the first place :/
+
+Yeah, it's a damn shame. FWIW, I certainly learned a lesson from this
+and will be much careful in the future.
+
 > 
+> Ezequiel, Jason, can you ping the relevant maintainers to make sure the
+> relevant patches are merged quickly and land in the next -rc?
+> 
+
+I already did earlier this morning. Jason sent the PR on September 19th
+so it was more or less in time for -rc2, I'm a bit puzzled about why
+it's not in Linus' yet.
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
