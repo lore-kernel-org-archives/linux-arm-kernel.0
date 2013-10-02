@@ -1,43 +1,41 @@
-From: john.stultz@linaro.org (John Stultz)
-Date: Wed, 02 Oct 2013 11:02:58 -0700
-Subject: [PATCH v4 00/17] 64-bit friendly generic sched_clock()
-In-Reply-To: <20131002174700.GF30298@mudshark.cambridge.arm.com>
-References: <1374189690-10810-1-git-send-email-sboyd@codeaurora.org>
- <51E88170.3080505@linaro.org>
- <20131002174700.GF30298@mudshark.cambridge.arm.com>
-Message-ID: <524C5FD2.5050406@linaro.org>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Wed, 2 Oct 2013 14:07:48 -0400
+Subject: [PATCH] sched_clock: fix postinit no sched_clock function check
+In-Reply-To: <20131002174841.GH30298@mudshark.cambridge.arm.com>
+References: <1380732928-13897-1-git-send-email-santosh.shilimkar@ti.com>
+ <20131002170917.GB30298@mudshark.cambridge.arm.com> <524C5484.5000601@ti.com>
+ <524C565C.8010709@codeaurora.org> <524C5786.2090008@ti.com>
+ <524C5B10.20006@codeaurora.org>
+ <20131002174841.GH30298@mudshark.cambridge.arm.com>
+Message-ID: <524C60F4.7000802@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/02/2013 10:47 AM, Will Deacon wrote:
-> On Fri, Jul 19, 2013 at 12:59:44AM +0100, John Stultz wrote:
->> On 07/18/2013 04:21 PM, Stephen Boyd wrote:
->>> This patchset adds support for 64 bit counters in the generic
->>> sched_clock code and converts drivers over to use it. Based
->>> on v3.11-rc1.
->>>
->>> Changes since v3:
->>>   * Move to use seqcount to fix issues with 64-bit cyc counters
->>>   * Move to hrtimer to fix underflow/overflow errors in wraparound
->>>     calculation
->>>   * Use of 1 hour in clocks_calc_mult_shift
->>>   * Converted over drivers in drivers/clocksource
->> I've not been able to take a deep review yet, but this looks pretty much 
->> like what we discussed last week, so I'm happy with it so far. Has this 
->> gotten much testing (on both 32 and 64bit systems?)
+On Wednesday 02 October 2013 01:48 PM, Will Deacon wrote:
+> On Wed, Oct 02, 2013 at 06:42:40PM +0100, Stephen Boyd wrote:
+>> On 10/02/13 10:27, Santosh Shilimkar wrote:
+>>> Really... I have not created patch out of fun.
+>>> Its broken on my keystone machine at least where the sched_clock is
+>>> falling back on jiffy based sched_clock even in presence of arch_timer
+>>> sched_clock.
 >>
->> One detail: Most of this is likely to go in via tip/timers/core, but the 
->> 5/17 "arch_timer: Move to generic sched_clock" will need some 
->> synchronization with Catalin to make sure its ok to go in via tip. Not 
->> sure what other arm64 changes are pending that would depend or collide 
->> with that change.
-> I wouldn't expect anything more than a trivial Kconfig clash with the arm64
-> tree, if that.
+>> How is that possible? sched_clock_func is only assigned by
+>> arch/arm/kernel/arch_timer.c when the architected timer is detected and
+>> sched_clock() in kernel/time/sched_clock.c calls that function pointer
+>> unconditionally. The only way I see this happening is if the architected
+>> timer rate is zero.
+>   ^^^^^^^^^^^^^^^^^^
+> 
+> *cough* CNTFRQ *cough*
+> 
+:) CNTFRQ as such is fine. I think the below print mis-lead me mostly. 
 
-So I also have a branch with these changes based on a branch with only
-the prereqs that are already merged, so I can provide a pull request
-that can go in via the aarch64 tree and won't collide with tip. Would
-that be preferrable?
+sched_clock: ARM arch timer >56 bits at 6144kHz, resolution 162ns
+sched_clock: 32 bits at 100 Hz, resolution 10000000ns, wraps every 4294967286ms
 
-thanks
--john
+So yes, now the subject patch actually just avoids the jiffy sched_clock()
+registration and nothing else. Even without the patch arch_timer sched_clock
+will be in use.
+
+Regards,
+Santosh
