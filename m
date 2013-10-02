@@ -1,284 +1,268 @@
 From: david@gibson.dropbear.id.au (David Gibson)
-Date: Wed, 2 Oct 2013 22:59:34 +1000
-Subject: [RFC 01/15] scripts/dtc: fix most memory leaks in dtc
-In-Reply-To: <1380041541-17529-2-git-send-email-bcousson@baylibre.com>
+Date: Thu, 3 Oct 2013 00:29:14 +1000
+Subject: [RFC 00/15] Device Tree schemas and validation
+In-Reply-To: <524B4B20.4020002@wwwdotorg.org>
 References: <1380041541-17529-1-git-send-email-bcousson@baylibre.com>
- <1380041541-17529-2-git-send-email-bcousson@baylibre.com>
-Message-ID: <20131002125934.GF6506@voom.fritz.box>
+ <524B4B20.4020002@wwwdotorg.org>
+Message-ID: <20131002142914.GI6506@voom.fritz.box>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 24, 2013 at 06:52:07PM +0200, Benoit Cousson wrote:
-> From: Fabien Parent <fparent@baylibre.com>
-
-As noted elsewhere, please write patches against upstream dtc, not the
-version in the kernel.  git://git.kernel.org/pub/scm/utils/dtc/dtc.git
-
-> There are a few memory leaks in dtc which until now were not that important
-> since they were all in the parser and only one instance of the parser was run
-> per instance of dtc. The following commits will add a validation of dts through
-> schema which have the same syntax as dts, i.e. the parser of dts will be reused
-> to parse schema. The consequence is that instead of having the parser running
-> only one time for an instance of the dtc process, the parser will run
-> many many times and thus the leak that were not important until now becomes
-> urgent to fix.
-
-Hrm, yeah.  I'm aware that I haven't been very careful with memory
-leaks within the parser.  Essentially, I've been treating the process
-as a pool allocator with exactly one pool - I've even considered
-getting rid of those free()s we do have.
-
-If the parser's going to be invoked repeatedly, then, yes, that
-certainly needs fixing.  Whether individually fixing each leak or
-using a explicit pool allocator is a better option is less clear.
-
-> dtc-lexer: Do not duplicate the string which contains literals because the
-> string is directly converted afterward to an integer and is never used again.
-> livetree: Add a bunch of free helper functions to clean properly the
-> dt.
-
-This is no good.  Making this assumption is a layering violation - if
-the parser was changed so that this literal wasn't converted until
-after another token was read, the yytext value copied in here would no
-longer be valid and would break horribly.
-
+On Tue, Oct 01, 2013 at 04:22:24PM -0600, Stephen Warren wrote:
+> On 09/24/2013 10:52 AM, Benoit Cousson wrote:
+> > Hi All,
+> > 
+> > Following the discussion that happened during LCE-2013 and the email
+> > thread started by Tomasz few months ago [1], here is a first attempt
+> > to introduce:
+> > - a schema language to define the bindings accurately
+> > - DTS validation during device tree compilation in DTC itself
 > 
-> Signed-off-by: Fabien Parent <fparent@baylibre.com>
-> Signed-off-by: Benoit Cousson <bcousson@baylibre.com>
-> ---
->  scripts/dtc/dtc-lexer.l             |   2 +-
->  scripts/dtc/dtc-lexer.lex.c_shipped |   2 +-
->  scripts/dtc/dtc.c                   |   1 +
->  scripts/dtc/dtc.h                   |   1 +
->  scripts/dtc/livetree.c              | 108 +++++++++++++++++++++++++++++++++---
->  5 files changed, 105 insertions(+), 9 deletions(-)
+> Sorry, this is probably going to sound a bit negative. Hopefully you
+> find it constructive though.
 > 
-> diff --git a/scripts/dtc/dtc-lexer.l b/scripts/dtc/dtc-lexer.l
-> index 3b41bfc..4f63fbf 100644
-> --- a/scripts/dtc/dtc-lexer.l
-> +++ b/scripts/dtc/dtc-lexer.l
-> @@ -146,7 +146,7 @@ static int pop_input_file(void);
->  		}
->  
->  <V1>([0-9]+|0[xX][0-9a-fA-F]+)(U|L|UL|LL|ULL)? {
-> -			yylval.literal = xstrdup(yytext);
-> +			yylval.literal = yytext;
->  			DPRINT("Literal: '%s'\n", yylval.literal);
->  			return DT_LITERAL;
->  		}
-> diff --git a/scripts/dtc/dtc-lexer.lex.c_shipped b/scripts/dtc/dtc-lexer.lex.c_shipped
-> index 2d30f41..5c0d27c 100644
-> --- a/scripts/dtc/dtc-lexer.lex.c_shipped
-> +++ b/scripts/dtc/dtc-lexer.lex.c_shipped
-> @@ -1054,7 +1054,7 @@ case 10:
->  YY_RULE_SETUP
->  #line 148 "dtc-lexer.l"
->  {
-> -			yylval.literal = xstrdup(yytext);
-> +			yylval.literal = yytext;
->  			DPRINT("Literal: '%s'\n", yylval.literal);
->  			return DT_LITERAL;
->  		}
-> diff --git a/scripts/dtc/dtc.c b/scripts/dtc/dtc.c
-> index a375683..215ae92 100644
-> --- a/scripts/dtc/dtc.c
-> +++ b/scripts/dtc/dtc.c
-> @@ -256,5 +256,6 @@ int main(int argc, char *argv[])
->  		die("Unknown output format \"%s\"\n", outform);
->  	}
->  
-> +	free_dt(bi);
->  	exit(0);
->  }
-> diff --git a/scripts/dtc/dtc.h b/scripts/dtc/dtc.h
-> index 3e42a07..9c45fd2 100644
-> --- a/scripts/dtc/dtc.h
-> +++ b/scripts/dtc/dtc.h
-> @@ -245,6 +245,7 @@ struct boot_info {
->  struct boot_info *build_boot_info(struct reserve_info *reservelist,
->  				  struct node *tree, uint32_t boot_cpuid_phys);
->  void sort_tree(struct boot_info *bi);
-> +void free_dt(struct boot_info *bi);
->  
->  /* Checks */
->  
-> diff --git a/scripts/dtc/livetree.c b/scripts/dtc/livetree.c
-> index b61465f..5c8692c 100644
-> --- a/scripts/dtc/livetree.c
-> +++ b/scripts/dtc/livetree.c
-> @@ -20,6 +20,10 @@
->  
->  #include "dtc.h"
->  
-> +static void free_node_list(struct node *n);
-> +static void free_node(struct node *n);
-> +static void free_property(struct property *p);
-> +
->  /*
->   * Tree building functions
->   */
-> @@ -144,7 +148,7 @@ struct node *merge_nodes(struct node *old_node, struct node *new_node)
->  
->  	/* Add new node labels to old node */
->  	for_each_label_withdel(new_node->labels, l)
-> -		add_label(&old_node->labels, l->label);
-> +		add_label(&old_node->labels, xstrdup(l->label));
->  
->  	/* Move properties from the new node to the old node.  If there
->  	 * is a collision, replace the old value with the new */
-> @@ -156,7 +160,7 @@ struct node *merge_nodes(struct node *old_node, struct node *new_node)
->  
->  		if (new_prop->deleted) {
->  			delete_property_by_name(old_node, new_prop->name);
-> -			free(new_prop);
-> +			free_property(new_prop);
->  			continue;
->  		}
->  
-> @@ -165,7 +169,7 @@ struct node *merge_nodes(struct node *old_node, struct node *new_node)
->  			if (streq(old_prop->name, new_prop->name)) {
->  				/* Add new labels to old property */
->  				for_each_label_withdel(new_prop->labels, l)
-> -					add_label(&old_prop->labels, l->label);
-> +					add_label(&old_prop->labels, xstrdup(l->label));
->  
->  				old_prop->val = new_prop->val;
->  				old_prop->deleted = 0;
-> @@ -191,7 +195,7 @@ struct node *merge_nodes(struct node *old_node, struct node *new_node)
->  
->  		if (new_child->deleted) {
->  			delete_node_by_name(old_node, new_child->name);
-> -			free(new_child);
-> +			free_node(new_child);
->  			continue;
->  		}
->  
-> @@ -211,7 +215,7 @@ struct node *merge_nodes(struct node *old_node, struct node *new_node)
->  
->  	/* The new node contents are now merged into the old node.  Free
->  	 * the new node. */
-> -	free(new_node);
-> +	free_node(new_node);
->  
->  	return old_node;
->  }
-> @@ -532,13 +536,13 @@ cell_t get_node_phandle(struct node *root, struct node *node)
->  	if (!get_property(node, "linux,phandle")
->  	    && (phandle_format & PHANDLE_LEGACY))
->  		add_property(node,
-> -			     build_property("linux,phandle",
-> +			     build_property(xstrdup("linux,phandle"),
->  					    data_append_cell(empty_data, phandle)));
->  
->  	if (!get_property(node, "phandle")
->  	    && (phandle_format & PHANDLE_EPAPR))
->  		add_property(node,
-> -			     build_property("phandle",
-> +			     build_property(xstrdup("phandle"),
->  					    data_append_cell(empty_data, phandle)));
->  
->  	/* If the node *does* have a phandle property, we must
-> @@ -707,3 +711,93 @@ void sort_tree(struct boot_info *bi)
->  	sort_reserve_entries(bi);
->  	sort_node(bi->dt);
->  }
-> +
-> +static void free_marker_list(struct marker *m)
-> +{
-> +	struct marker *marker, *marker_next;
-> +
-> +	if (!m)
-> +		return;
-> +
-> +	for (marker = m, marker_next = marker ? marker->next : NULL;
-> +	     marker;
-> +	     marker = marker_next, marker_next = marker ? marker->next : NULL) {
+> > The syntax for a schema is the same as the one for dts. This choice has
+> > been made to simplify its development, to maximize the code reuse and
+> > finally because the format is human-readable.
+> 
+> I'm not convinced that's a good decision.
+> 
+> DT is a language for representing data.
+> 
+> The validation checks described by schemas are rules, or code, and not
+> static data.
+> 
+> So, while I'm sure it's possible to shoe-horn at least some reasonable
+> subset of DT validation into DT syntax itself, I feel it's unlikely to
+> yield something that's scalable enough.
 
-Rather hard to read version of safe-against-free list iteration.
+I tend to agree.
 
-> +		free(marker->ref);
-> +		free(marker);
-> +	}
-> +}
-> +
-> +static void free_label_list(struct label *l)
-> +{
-> +	struct label *label, *label_next;
-> +
-> +	if (!l)
-> +		return;
-> +
-> +	for (label = l, label_next = label ? label->next : NULL;
-> +	     label;
-> +	     label = label_next, label_next = label ? label->next : NULL) {
-> +		free(label->label);
-> +		free(label);
-> +	}
-> +}
-> +
-> +static void free_property(struct property *p)
-> +{
-> +	if (!p)
-> +		return;
-> +
-> +	free_label_list(p->labels);
-> +	free_marker_list(p->val.markers);
-> +	free(p->val.val);
-> +	free(p->name);
-> +	free(p);
-> +}
-> +
-> +static void free_property_list(struct property *p)
-> +{
-> +	struct property *next;
-> +
-> +	if (!p)
-> +		return;
-> +
-> +	for (next = p->next; p; p = next, next = p ? p->next : NULL)
-> +		free_property(p);
-> +}
-> +
-> +static void free_node(struct node *n)
-> +{
-> +	if (!n)
-> +		return;
-> +
-> +	free_node_list(n->children);
-> +	free_label_list(n->labels);
-> +	free_property_list(n->proplist);
-> +	free(n->fullpath);
-> +	if (n->name && *n->name)
+> For example, it's easy to specify that a property must be 2 cells long.
+> What if it could be any multiple of two? That's a lot of numbers to
+> explicitly enumerate as data. Sure, you can then invent syntax to
+> represent that specific rule (parameterized by 2), but what about the
+> next similar-but-different rule? The only approach I can think of to
+> that is to allow the schema to contain arbitrary expressions, which
+> would likely need to morph into arbitary statements not just
+> expressions. Once you're there, I think the schema would be better
+> represented as a programming language rather than as a data structure
+> that could have code hooked into it.
+> 
+> > How to:
+> >  * Associate a schema to one or several nodes
+> > 
+> > As said earlier a schema can be used to validate one or several nodes
+> > from a dts. To do this the "compatible" properties from the nodes which
+> > should be validated must be present in the schema.
+> > 
+> > 	timer1: timer at 4a318000 {
+> > 		compatible = "ti,omap3430-timer";
+> ...
+> > To write a schema which will validate OMAP Timers like the one above,
+> > one may write the following schema:
+> > 
+> > 	/dts-v1/;
+> > 	/ {
+> > 		compatible = "ti,omap[0-9]+-timer";
+> 
+> What about DT nodes that don't have a compatible value? We certainly
+> have some of those already like /memory and /chosen. We should be able
+> to validate their schema too. This probably doesn't invalidate being
+> able to look things up by compatible value though; it just means we need
+> some additional mechanisms too.
 
-*n->name .. so, the name can (and must) be statically allocated if
-it's exactly "".  Not a useful optimization, I think.
+More to the point, what about the properties of a node whose format is
+defined not by this node's binding but by some other nodes binding.
+e.g. the exact format of reg and ranges is at least partially
+determined by the parent bus's binding, and interrupts is defined
+partially by the interrupt parent's binding.  gpio properties are
+defined by a combination of a global binding and the gpio parent,
+IIRC.
 
-> +		free(n->name);
-> +	free(n);
-> +}
-> +
-> +static void free_node_list(struct node *n)
-> +{
-> +	struct node *next;
-> +
-> +	if (!n)
-> +		return;
-> +
-> +	for (next = n->next_sibling;
-> +	     n;
-> +	     n = next, next = n ? n->next_sibling : NULL) {
-> +		free_node(n);
-> +	}
-> +}
-> +
-> +void free_dt(struct boot_info *bi)
-> +{
-> +	if (!bi)
-> +		return;
-> +
-> +	free_node_list(bi->dt);
-> +	free(bi);
-> +}
+> >  * Define constraints on properties
+> > 
+> > To define constraints on a property one has to create a node in a schema
+> > which has as name the name of the property that one want to validate.
+> > 
+> > To specify constraints on the property "ti,hwmods" of OMAP Timers one
+> > can write this schema:
+> > 
+> > 	/dts-v1/;
+> > 	/ {
+> > 		compatible = "ti,omap[0-9]+-timer";
+> > 		ti,hwmods {
+> > 			...
+> > 		};
+> 
+> compatible and ti,hwmods are both properties in the DT file. However, in
+> the schema above, one appears as a property, and one as a node. I don't
+> like that inconsistency. It'd be better if compatible was a node too.
+
+Essentially what's going on here is that to describe the constraint on
+a property, a node with corresponding name is defined to encode the
+parameters of that constraint.  It kind of works, but it's forced.  It
+also hits problems since nodes and properties are technically in
+different namespaces, although they rarely collide in real cases.
+
+> > If one want to use a regular as property name one can write this schema:
+> > 
+> > 	/dts-v1/;
+> > 	/ {
+> > 		compatible = "abc";
+> > 		def {
+> > 			name = "def[0-9]";
+> 
+> Isn't it valid to have a property named "name" within the node itself?
+> How do you differentiate between specifying the node name and the name
+> property?
+
+Or to look at it another way, how do you differentiate between nodes
+representing encoded constraints for a property, and nodes
+representing nodes directly.
+
+> What if the node name needs more validation than just a regex. For
+> example, suppose we want to validate the
+> unit-name-must-match-reg-address rule. We need to write some complex
+> expression using data extracted from reg to calculate the unit address.
+> Equally, the node name perhaps has to exist in some global list of
+> acceptable node names. It would be extremely tricky if not impossible to
+> do that with a regex.
+> 
+> > 			...
+> > 		};
+> > 	};
+> > 
+> > Above one can see that the "name" property override the node name.
+> 
+> Override implies that dtc would change the node name during compilation.
+> I think s/override/validate/ or s/override/overrides the validation
+> rules for/?
+
+Actually, dtc already contains checks that a "name" property (if
+present) matches the unit name.  Name properties vs. node names work a
+bit differently in the flat-tree world versus traditional OF, and this
+checks ensures that flat trees don't do (at least some) things which
+would break the OF traditional approach.
+
+> >  * Require the presence of a property inside a node or inside one of its
+> > parents
+> ...
+> > /dts-v1/;
+> > / {
+> >     compatible = "ti,twl[0-9]+-rtc";
+> >     interrupt-controller {
+> >         is-required;
+> >         can-be-inherited;
+> 
+> interrupt-controller isn't a good example here, since it isn't a
+> property that would typically be inherited. Why not use interrupt-parent
+> instead?
+> 
+> > One can check if 'node' has the following subnode 'subnode1', 'subnode2',
+> > and 'abc' with the schema below:
+> > 
+> > /dts-v1/;
+> > / {
+> >     compatible = "comp";
+> >     children = "abc", "subnode[0-9]";
+> > };
+> 
+> How is the schema for each sub-node specified?
+> 
+> What if some nodes are optional and some required? The conditions where
+> a sub-node is required might be complex, and I think we'd always want to
+> be able to represent them in whatever schema language we chose.
+> 
+> The most obvious way would be to make each sub-node's schema appear as a
+> sub-node within the main node's schema, but then how do you tell if a
+> schema node describes a property or a node?
+> 
+> Note that the following DT file is currently accepted by dtc even if it
+> may not be the best choice of property and node names:
+> 
+> ==========
+> /dts-v1/;
+> 
+> / {
+> 	foo = <1>;
+> 	foo {};
+> };
+> ==========
+
+Note that node / property name collisions are not entirely theoretical
+either.  They are permitted in IEEE1275 and there are real Apple
+device trees in the wild which have them.  It's rare and discouraged,
+obviously.
+
+> >  * Constraints on array size
+> > 
+> > One can specify the following constraints on array size:
+> >  - length: specify the exact length that an array must have.
+> >  - min-length: specify the minimum number of elements an array must have.
+> >  - max-length: specify the maximum number of elements an array must have.
+> 
+> This seems rather inflexible; it'll cover a lot of the simple cases, but
+> hit a wall pretty soon. For example, how would it validate a property
+> that is supposed to include 3 GPIO specifiers, where the GPIO specifiers
+> are going to have DT-specific lengths, since the length of each
+> specifier is defined by the node that the phandles reference?
+> 
+> 
+> Overall, I believe perhaps the single most important aspect of any DT
+> schema is schema inheritance or instancing, and this proposal doesn't
+> appear to address that issue at all.
+> 
+> Inheritance of schemas:
+> 
+> For example, any node that is addressed must contain a reg property. The
+> constraints on that property are identical in all bindings; it must
+> consist of #address-cells + #size-cells integer values (cells). We don't
+> want to have to cut/paste that rule into every single binding
+> definition. Rather, we should simply say something like "this binding
+> uses the reg property", and the schema validation tool will look up the
+> definition of "reg property", and hence know how to validate it.
+> 
+> Similarly, any binding that describes a GPIO controller will have some
+> similar requirements; the gpio-controller and #gpio-cells properties
+> must be present. The schema should simply say "I'm a GPIO controller",
+> and the schema tool should add some extra requirements to nodes of that
+> type.
+> 
+> Instancing of schemas:
+> 
+> Any binding that uses GPIOs should be able to say that a particular
+> property (e.g. "enable-gpios") is-a GPIO-specifier (with parameters
+> "enable" for the property name, min/max/expression length, etc.), and
+> then the schema validation tool would know to apply rules for a
+> specifier list to that property (and be able to check the property name).
+
+Yes, I agree both of those are important.
+
+
+So, here's a counter-proposal of at least a rough outline of how I
+think schemas could work, in a way that's still based generally on dt
+syntax.
+
+First, define the notion of dt "patterns" or "templates".  A dt
+pattern is to a dt node or subtree as a regex is to a string - it
+provides a reasonably expressive way of defining a family of dt
+nodes.  These would be defined in an extension / superset of dt
+syntax.
+
+A schema would then be defined as a set of implications:
+	If node X matches pattern A, => it must also match pattern B
+
+For example:
+	If a node has a compatible property with string "foodev"
+	 => it must have various foodev properties.
+
+	If a node has a "reg" property (at all)
+	 => it must have the format required by reg
+
+	If a node has an "interrupts" property
+	 => it must have either "interrupt-parent" or "interrupt-map"
+
 
 -- 
 David Gibson			| I'll have my music baroque, and my code
@@ -291,4 +275,4 @@ Name: not available
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131002/8ca918da/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131003/36be64f0/attachment.sig>
