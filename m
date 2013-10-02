@@ -1,46 +1,36 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Wed, 2 Oct 2013 18:14:47 +0100
-Subject: [PATCH v6 10/19] xen: introduce xen_alloc/free_coherent_pages
-In-Reply-To: <20131002170747.GG29794@arm.com>
-References: <alpine.DEB.2.02.1309271653420.5498@kaball.uk.xensource.com>
- <1380298207-29151-10-git-send-email-stefano.stabellini@eu.citrix.com>
- <20130930153143.GQ3106@phenom.dumpdata.com>
- <DB675896-3FF2-409B-A2C6-24295C197A3F@arm.com>
- <alpine.DEB.2.02.1310021754580.26077@kaball.uk.xensource.com>
- <20131002170747.GG29794@arm.com>
-Message-ID: <alpine.DEB.2.02.1310021814250.26077@kaball.uk.xensource.com>
+From: taras.kondratiuk@linaro.org (Taras Kondratiuk)
+Date: Wed, 2 Oct 2013 20:19:30 +0300
+Subject: [RFC PATCH] ARM: Flush L2 cache on soft_restart
+In-Reply-To: <20131002124902.GB29213@mudshark.cambridge.arm.com>
+References: <1380713656-24752-1-git-send-email-taras.kondratiuk@linaro.org>
+ <20131002124902.GB29213@mudshark.cambridge.arm.com>
+Message-ID: <CAArO44ufGbRxX8oWR8AFh5_iw0F4CodVp8M07e3FJ09EixpUOA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2 Oct 2013, Catalin Marinas wrote:
-> On Wed, Oct 02, 2013 at 06:03:46PM +0100, Stefano Stabellini wrote:
-> > On Tue, 1 Oct 2013, Catalin Marinas wrote:
-> > > On 30 Sep 2013, at 16:31, Konrad Rzeszutek Wilk <konrad.wilk@oracle.com> wrote:
-> > > > On Fri, Sep 27, 2013 at 05:09:58PM +0100, Stefano Stabellini wrote:
-> > > >> xen_swiotlb_alloc_coherent needs to allocate a coherent buffer for cpu
-> > > >> and devices. On native x86 and ARMv8 is sufficient to call
-> > > >> __get_free_pages in order to get a coherent buffer, while on ARM we need
-> > > >> to call the native dma_ops->alloc implementation.
-> > > >> 
-> > > >> When arm64 stops using the swiotlb by default and starts having multiple
-> > > >> dma_ops implementations, we'll use __get_dma_ops there too.
-> > > > 
-> > > > I presume this is a future TODO, not some further patch (in which
-> > > > case you should say in here the title of it). If it is a TODO could
-> > > > you stick that in the sentence here somewhere to make it crytal clear that
-> > > > it is not implemented.
-> > > 
-> > > Thanks for pointing this out.  The arm64 patch shouldn't be different
-> > > from arm here.  I thought a subsequent patch already added
-> > > __get_dma_ops() for arm64.
-> > 
-> > Yes, the arm64 patch already added __get_dma_ops.
-> > 
-> > However I am not using __get_dma_ops to implement
-> > xen_alloc_coherent_pages for arm64 because I can just use
-> > __get_free_pages for the moment:
-> 
-> So why do the work twice when we'll get coherency maintenance in the DMA
-> ops?
+On 2 October 2013 15:49, Will Deacon <will.deacon@arm.com> wrote:
+> On Wed, Oct 02, 2013 at 12:34:16PM +0100, Taras Kondratiuk wrote:
+>> diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
+>> index 94f6b05..e359b62 100644
+>> --- a/arch/arm/kernel/process.c
+>> +++ b/arch/arm/kernel/process.c
+>> @@ -103,9 +103,11 @@ void soft_restart(unsigned long addr)
+>>       local_irq_disable();
+>>       local_fiq_disable();
+>>
+>> -     /* Disable the L2 if we're the last man standing. */
+>> -     if (num_online_cpus() == 1)
+>> +     /* Flush and disable the L2 if we're the last man standing. */
+>> +     if (num_online_cpus() == 1) {
+>> +             outer_flush_all();
+>>               outer_disable();
+>
+> l2x0_disable already contains a flush, so this doesn't change anything.
 
-Yeah, good point.
+Unfortunately not everybody uses l2x0_disable().
+SoC's that use SMC calls for L2 cache maintenance have its own implementation
+of outer_cache.disable which usually doesn't flush cache implicitly.
+
+-- 
+Regards,
+Taras Kondratiuk
