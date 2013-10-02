@@ -1,107 +1,50 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Wed, 02 Oct 2013 12:49:59 +0200
-Subject: [GIT PULL - resend ] clocksource: new material for 3.13
-Message-ID: <524BFA57.6070506@linaro.org>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Wed,  2 Oct 2013 12:57:20 +0200
+Subject: [PATCH 1/3] net: mv643xx_eth: update statistics timer from timer
+ context only
+In-Reply-To: <1380711442-24735-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1380711442-24735-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1380711442-24735-2-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas, Ingo
+Each port driver installs a periodic timer to update port statistics
+by calling mib_counters_update. As mib_counters_update is also called
+from non-timer context, we should not reschedule the timer there but
+rather move it to timer-only context.
 
-this pull request has the following content:
+Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+---
+Cc: David Miller <davem@davemloft.net>
+Cc: Lennert Buytenhek <buytenh@wantstofly.org>
+Cc: Jason Cooper <jason@lakedaemon.net>
+Cc: netdev at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-kernel at vger.kernel.org
+---
+ drivers/net/ethernet/marvell/mv643xx_eth.c |    4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
 
-  - Soren added FEAT_PERCPU to a clock device when it is local per cpu.
-This feature prevents the clock framework to choose a per cpu timer as
-a broadcast timer. This problem arised when the ARM global timer is
-used when switching to the broadcast timer which is the case now on 
-Xillinx with its cpuidle driver.
-
-  - Stephen extended the generic sched_clock code to support 64bit
-counters and removes the setup_sched_clock deprecation, as that causes
-lots of warnings since there's still users in the arch/arm tree. He 
-added also the CLOCK_SOURCE_SUSPEND_NONSTOP flag on the architected 
-timer as they continue counting during suspend.
-
-  - Uwe added some missing __init sections and consolidated the code by 
-moving the of_node_put call from the drivers to the function 
-clocksource_of_init.
-
-Sorry for the last crappy pull request, I hope all is good now.
-
-Thanks !
-
-   -- Daniel
-
-ps: Is it possible to update timers/core to v3.12-rc2/3 ?
-
-The following changes since commit 389e067032fbb96e439abafae848dd447e4cafb4:
-
-   Merge branch 'fortglx/3.12/time' into fortglx/3.13/time (2013-09-16 
-18:54:07 -0700)
-
-are available in the git repository at:
-
-
-   git://git.linaro.org/people/dlezcano/linux.git clockevents/3.13
-
-for you to fetch changes up to 4fbcdc813fb9c0324fcff4c75414e717569d965e:
-
-   clocksource: arm_arch_timer: Use clocksource for suspend timekeeping 
-(2013-10-02 11:43:17 +0200)
-
-----------------------------------------------------------------
-John Stultz (1):
-       Merge remote-tracking branch 'tip/timers/core' into 
-fordlezcano/3.13/sched-clock64-conversion
-
-Soren Brinkmann (4):
-       clockchips: Add FEAT_PERCPU clockevent flag
-       clocksource/arm_global_timer: Set FEAT_PERCPU flag
-       tick: broadcast: Deny per-cpu clockevents from being broadcast 
-sources
-       arm: zynq: Enable arm_global_timer
-
-Stephen Boyd (11):
-       clocksource: bcm2835: Switch to sched_clock_register()
-       clocksource: dbx500-prcmu: Switch to sched_clock_register()
-       clocksource: dw_apb_timer_of: Switch to sched_clock_register()
-       clocksource: mxs_timer: Switch to sched_clock_register()
-       clocksource: nomadik: Switch to sched_clock_register()
-       clocksource: samsung_pwm_timer: Switch to sched_clock_register()
-       clocksource: tegra: Switch to sched_clock_register()
-       clocksource: time-armada-370-xp: Switch to sched_clock_register()
-       clocksource: sirf: Switch to sched_clock_register() and use 64 bits
-       clocksource: vf_pit_timer: Switch to sched_clock_register()
-       clocksource: arm_arch_timer: Use clocksource for suspend timekeeping
-
-Uwe Kleine-K?nig (2):
-       clocksource: Put nodes passed to CLOCKSOURCE_OF_DECLARE callbacks 
-centrally
-       clocksource: dw_apb_timer_of: Mark a few more functions as __init
-
-  arch/arm/boot/dts/zynq-7000.dtsi          |    8 ++++++++
-  arch/arm/mach-msm/timer.c                 |    1 -
-  arch/arm/mach-zynq/Kconfig                |    1 +
-  drivers/clocksource/arm_arch_timer.c      |    2 +-
-  drivers/clocksource/arm_global_timer.c    |    3 ++-
-  drivers/clocksource/bcm2835_timer.c       |    4 ++--
-  drivers/clocksource/clksrc-dbx500-prcmu.c |    5 ++---
-  drivers/clocksource/clksrc-of.c           |    1 +
-  drivers/clocksource/dw_apb_timer_of.c     |   16 +++++++---------
-  drivers/clocksource/mxs_timer.c           |    4 ++--
-  drivers/clocksource/nomadik-mtu.c         |    4 ++--
-  drivers/clocksource/samsung_pwm_timer.c   |    4 ++--
-  drivers/clocksource/tegra20_timer.c       |    8 ++------
-  drivers/clocksource/time-armada-370-xp.c  |    4 ++--
-  drivers/clocksource/timer-prima2.c        |    6 +++---
-  drivers/clocksource/vf_pit_timer.c        |    4 ++--
-  drivers/clocksource/vt8500_timer.c        |    2 --
-  include/linux/clockchips.h                |    1 +
-  kernel/time/tick-broadcast.c              |    1 +
-  19 files changed, 41 insertions(+), 38 deletions(-)
-
+diff --git a/drivers/net/ethernet/marvell/mv643xx_eth.c b/drivers/net/ethernet/marvell/mv643xx_eth.c
+index 7fb5677..44a87e4 100644
+--- a/drivers/net/ethernet/marvell/mv643xx_eth.c
++++ b/drivers/net/ethernet/marvell/mv643xx_eth.c
+@@ -1131,15 +1131,13 @@ static void mib_counters_update(struct mv643xx_eth_private *mp)
+ 	p->rx_discard += rdlp(mp, RX_DISCARD_FRAME_CNT);
+ 	p->rx_overrun += rdlp(mp, RX_OVERRUN_FRAME_CNT);
+ 	spin_unlock_bh(&mp->mib_counters_lock);
+-
+-	mod_timer(&mp->mib_counters_timer, jiffies + 30 * HZ);
+ }
+ 
+ static void mib_counters_timer_wrapper(unsigned long _mp)
+ {
+ 	struct mv643xx_eth_private *mp = (void *)_mp;
+-
+ 	mib_counters_update(mp);
++	mod_timer(&mp->mib_counters_timer, jiffies + 30 * HZ);
+ }
+ 
+ 
 -- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+1.7.10.4
