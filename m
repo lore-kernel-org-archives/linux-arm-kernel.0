@@ -1,37 +1,32 @@
-From: marex@denx.de (Marek Vasut)
-Date: Wed, 2 Oct 2013 15:30:22 +0200
-Subject: [PATCH v2 0/2] serial: mxs-auart: wait for DMA buffer to flush
- before shutdown
-In-Reply-To: <1380715364-8025-1-git-send-email-hector.palacios@digi.com>
-References: <1380715364-8025-1-git-send-email-hector.palacios@digi.com>
-Message-ID: <201310021530.22317.marex@denx.de>
+From: rogerq@ti.com (Roger Quadros)
+Date: Wed, 2 Oct 2013 16:41:53 +0300
+Subject: [PATCH v7 09/10] usb: dwc3: omap: manage "usb_otg_ss_refclk960m"
+ clock
+In-Reply-To: <20131002131113.GM1476@radagast>
+References: <1379508542-22389-1-git-send-email-rogerq@ti.com>
+ <1379508542-22389-10-git-send-email-rogerq@ti.com> <52403E02.4070208@ti.com>
+ <20131002131113.GM1476@radagast>
+Message-ID: <524C22A1.30200@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Hector Palacios,
-
-> This fixes a bug whereby the AUART was shutdown while bytes
-> were still waiting in the DMA buffer to be transmistted.
+On 10/02/2013 04:11 PM, Felipe Balbi wrote:
+> On Mon, Sep 23, 2013 at 04:11:30PM +0300, Roger Quadros wrote:
+>> Hi Felipe,
+>>
+>> On 09/18/2013 03:49 PM, Roger Quadros wrote:
+>>> "usb_otg_ss_refclk960m" is an optional functional clock to the
+>>> UBS_OTG_SS module. So manage it in the driver.
+>>>
+>>
+>> Just realized that "usb_otg_ss_refclk960m" is in fact functional clock to the 
+>> PHY and not USB_OTG_SS module. The name is misleading.
+>>
+>> So please ignore patch 9 and 10.
 > 
-> Changes since v1:
->  * Split the patch in two: one to set the fifosize to the
->    DMA buffer size, and another to wait for the FIFO to empty
->    before disabling the AUART.
->  * The wait for the fifo to empty is now independent of DMA
->    being enabled.
->  * Fix bug on readl() call
->  * Remove bad URL in commit log
+> ignored. All others are fine, right ?
 > 
-> Hector Palacios (2):
->   serial: mxs-auart: set the FIFO size to DMA buffer size
->   serial: mxs-auart: wait for FIFO to flush before shutdown
-> 
->  drivers/tty/serial/mxs-auart.c | 22 +++++++++++++++++++++-
->  1 file changed, 21 insertions(+), 1 deletion(-)
+Yes. But I might have to rebase this on top of Phy framework stuff.
 
-Looks OK
-
-Reviewed-by: Marek Vasut <marex@denx.de>
-
-Best regards,
-Marek Vasut
+cheers,
+-roger
