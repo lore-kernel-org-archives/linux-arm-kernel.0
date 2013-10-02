@@ -1,80 +1,52 @@
-From: hector.palacios@digi.com (Hector Palacios)
-Date: Wed, 2 Oct 2013 10:53:33 +0200
-Subject: [PATCH] serial: mxs-auart: wait for DMA buffer to flush before
- shutdown
-In-Reply-To: <20131002083608.GO2548@pengutronix.de>
-References: <1380644315-31581-1-git-send-email-hector.palacios@digi.com>
- <20131001194800.GL2548@pengutronix.de> <524BCBC4.5050708@digi.com>
- <20131002083608.GO2548@pengutronix.de>
-Message-ID: <524BDF0D.4040701@digi.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Wed, 2 Oct 2013 11:02:57 +0200
+Subject: [PATCH 1/4] i2c: busses: i2c-st: Add ST I2C controller
+In-Reply-To: <524BDB00.3010508@st.com>
+References: <1380623952-4252-1-git-send-email-maxime.coquelin@st.com>
+ <1380623952-4252-2-git-send-email-maxime.coquelin@st.com>
+ <524B346C.8070607@wwwdotorg.org> <524BDB00.3010508@st.com>
+Message-ID: <20131002090257.GA3059@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/02/2013 10:36 AM, Uwe Kleine-K?nig wrote:
-> Hello Hector,
->
-> On Wed, Oct 02, 2013 at 09:31:16AM +0200, Hector Palacios wrote:
->> On 10/01/2013 09:48 PM, Uwe Kleine-K?nig wrote:
->>> Hello Hector,
->>>
->>> On Tue, Oct 01, 2013 at 06:18:35PM +0200, Hector Palacios wrote:
->>>> The shutdown function was not waiting for the DMA buffer to flush
->>>> before disabling the AUART. This lead to many bytes not being
->>>> transferred (specially at low baudrates), as they were still in the
->>>> DMA buffer when the AUART was shutdown.
->>>> This patch also adds the check for the BUSY flag.
->>>>
->>>> Signed-off-by: Hector Palacios <hector.palacios@digi.com>
->>>> ---
->>>>   drivers/tty/serial/mxs-auart.c | 16 +++++++++++++++-
->>>>   1 file changed, 15 insertions(+), 1 deletion(-)
->>>>
->>>> diff --git a/drivers/tty/serial/mxs-auart.c b/drivers/tty/serial/mxs-auart.c
->>>> index f85b8e6..0d8b2ca 100644
->>>> --- a/drivers/tty/serial/mxs-auart.c
->>>> +++ b/drivers/tty/serial/mxs-auart.c
->>>> @@ -750,12 +750,26 @@ static int mxs_auart_startup(struct uart_port *u)
->>>>   	return 0;
->>>>   }
->>>>
->>>> +static unsigned int mxs_auart_tx_empty(struct uart_port *u);
->>>> +
->>>>   static void mxs_auart_shutdown(struct uart_port *u)
->>>>   {
->>>>   	struct mxs_auart_port *s = to_auart_port(u);
->>>> +	unsigned int to;
->>>> +
->>>> +	if (auart_dma_enabled(s)) {
->>>> +		/* Wait enough time to flush DMA buffer completely */
->>>> +		to = u->timeout * UART_XMIT_SIZE / u->fifosize;
->>> u->timeout is the time needed to send one char, right? UART_XMIT_SIZE is
->>> the size of the circular buffer, fifosize is the size of the fifo. I
->>> don't get what you get by dividing by the fifosize. I would have
->>> expected something like:
->>>
->>> 	u->timeout * min(UART_XMIT_SIZE, u->fifosize)
->>>
->>> Can you explain, maybe in a comment along the code for the next person
->>> not understanding?
->>
->> u->timeout is *not* the time needed to send one char but the time
->> needed to flush the complete port fifo (see uart_update_timeout() in
->> serial_core.c where it is set).
->> UART_XMIT_SIZE is the number of bytes in the DMA buffer, so I divide
->> the max number of bytes in the FIFO by the FIFO size and multiply by
->> the FIFO timeout.
-> Another thought: Does that mean that from the framework's POV the
-> fifosize is UART_XMIT_SIZE instead in the DMA case? That would enable
-> you to just use u->timeout.
 
-Hum, I think you hit the point.
-I just saw they do this in amba_pl011.c driver:
+> >> +Optional properties :
+> >> +- i2c-min-scl-pulse-width-us : The minimum valid SCL pulse width that is allowed
+> >> +  through the deglitch circuit. In units of us.
+> >> +- i2c-min-sda-pulse-width-us : The minimum valid SDA pulse width that is allowed
+> >> +  through the deglitch circuit. In units of us.
+> > Are those properties specific to this binding, or intended to be
+> > generic? If specific to this binding, a vendor prefix should be present
+> > in the property name. If not, you probably want to document the
+> > properties in some common file.
+> Ok.
+> In last revision, I put this properties as specific to this binding.
+> Wolfram proposed to make this generic, but it looks like this IP is the 
+> only one
+> needing such properties.
+> 
+> Wolfram, what would you advise?
 
-	/* The DMA buffer is now the FIFO the TTY subsystem can use */
-	uap->port.fifosize = PL011_DMA_BUFFER_SIZE;
+It might be the only SoC now, but I could imagine that other will have
+something similar in the future. I am not perfectly sure, though. So, I
+asked for opinions from DT experts when I suggested those bindings. We
+could start with vendor specific bindings and generalize them later if
+similar ones appear. Yet my experience is that old drivers rarely get
+converted to the new bindings.
 
-I'll rework the patch and try.
+> If you still prefer to make this properties generics, in which file should I
+> document it? I don't see any common i2c binding document for now.
 
-Best regards,
---
-Hector Palacios
+Yeah, it is missing sadly. That's on my todo-list, like many other
+things...
+
+Regards,
+
+   Wolfram
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131002/7ae1dd60/attachment.sig>
