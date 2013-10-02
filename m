@@ -1,58 +1,33 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 2 Oct 2013 14:10:18 -0700
-Subject: [PATCH 2/5] ARM: dts: Add dp-controller node to exynos5250-snow
-In-Reply-To: <1380670860-17621-3-git-send-email-seanpaul@chromium.org>
-References: <1380670860-17621-1-git-send-email-seanpaul@chromium.org>
- <1380670860-17621-3-git-send-email-seanpaul@chromium.org>
-Message-ID: <CAOesGMj3142o1B_33BqtLZMbObn2tjfBaBHvAB-2+O+XOuCjSw@mail.gmail.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Wed, 02 Oct 2013 23:10:52 +0200
+Subject: [PATCH 2/5] gpio: samsung: Use CONFIG_ARCH_S3C64XX to check for
+ S3C64xx support
+In-Reply-To: <CACRpkdZXOGpTspPucd=d0=Ws9Ccx19h4UYTTdgZceoofhuq0Kw@mail.gmail.com>
+References: <1380392497-27406-1-git-send-email-tomasz.figa@gmail.com>
+ <1380392497-27406-2-git-send-email-tomasz.figa@gmail.com>
+ <CACRpkdZXOGpTspPucd=d0=Ws9Ccx19h4UYTTdgZceoofhuq0Kw@mail.gmail.com>
+Message-ID: <3903161.Vxg4RcbQZc@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 1, 2013 at 4:40 PM, Sean Paul <seanpaul@chromium.org> wrote:
-> This patch adds the dp-controller node to the exynos5250-snow board dts
-> file.
->
-> Signed-off-by: Sean Paul <seanpaul@chromium.org>
-> ---
->  arch/arm/boot/dts/exynos5250-snow.dts | 12 ++++++++++++
->  1 file changed, 12 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/exynos5250-snow.dts b/arch/arm/boot/dts/exynos5250-snow.dts
-> index e5af3f2..780511a 100644
-> --- a/arch/arm/boot/dts/exynos5250-snow.dts
-> +++ b/arch/arm/boot/dts/exynos5250-snow.dts
-> @@ -190,6 +190,18 @@
->                 samsung,vbus-gpio = <&gpx1 1 0>;
->         };
->
-> +       dp-controller {
-> +               samsung,color-space = <0>;
-> +               samsung,dynamic-range = <0>;
-> +               samsung,ycbcr-coeff = <0>;
-> +               samsung,color-depth = <1>;
-> +               samsung,link-rate = <0x0a>;
-> +               samsung,lane-count = <2>;
-> +
-> +               pinctrl-names = "default";
-> +               pinctrl-0 = <&dp_hpd>;
-> +       };
+Hi Linus,
 
-This won't actually do what I think you want. Since the dtsi has the
-node name "dp-controller at 145B0000", you will end up duplicating a new
-node and not build on top of that one.
+On Wednesday 02 of October 2013 12:46:51 Linus Walleij wrote:
+> On Sat, Sep 28, 2013 at 8:21 PM, Tomasz Figa <tomasz.figa@gmail.com> 
+wrote:
+> > Since CONFIG_PLAT_S3C64XX is going to be removed, this patch modifies
+> > the gpio-samsung driver to use the proper way of checking for S3C64xx
+> > support - CONFIG_ARCH_S3C64XX.
+> > 
+> > Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
+> 
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-There's two ways to do it: Always include the unit address, or create
-a label in the dtsi such that:
+Thanks.
 
-dp_controller: dp-controller@ {....
-}
+> I assume that this will go through ARM SoC?
 
-Then in your dts you can, at the root level:
+I think so.
 
-&dp_controller {
-  ... new stuff and overrides ...
-};
-
-
-
--Olof
+Best regards,
+Tomasz
