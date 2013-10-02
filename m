@@ -1,37 +1,92 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 2 Oct 2013 11:32:12 -0700
-Subject: [PATCH v5 0/4] Target CPU=Host implementation for KVM ARM/ARM64
-In-Reply-To: <524C4725.3060700@arm.com>
-References: <1380531008-15901-1-git-send-email-anup.patel@linaro.org>
- <20131002160444.GA49034@lvm> <524C4725.3060700@arm.com>
-Message-ID: <20131002183212.GB5108@cbox>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed,  2 Oct 2013 12:06:58 -0700
+Subject: [PATCH v2 1/9] clk: Allow drivers to pass in a regmap
+In-Reply-To: <1380740826-29457-1-git-send-email-sboyd@codeaurora.org>
+References: <1380740826-29457-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1380740826-29457-2-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 02, 2013 at 05:17:41PM +0100, Marc Zyngier wrote:
-> On 02/10/13 17:04, Christoffer Dall wrote:
-> > On Mon, Sep 30, 2013 at 02:20:04PM +0530, Anup Patel wrote:
-> >> It will be very useful for user space (QEMU/KVMTOOL) if it has a
-> >> method of querying VCPU target type matching to underlying Host.
-> >> We can use such querying mechanism and implement machine models
-> >> in user space where VCPU target type is always same-as/similar-to
-> >> underlying Host (i.e. Target CPU=Host).
-> >>
-> >> This patch series implements KVM_ARM_PREFERRED_TARGET vm ioclt for
-> >> querying VCPU target type matching underlying host. Using this new
-> >> ioctl we can implement VCPU target CPU=Host in user space.
-> >>
-> >> Also, it is not mandatory to call KVM_ARM_PREFERRED_TARGET vm ioctl
-> >> and the old method of trying all possible target types using the
-> >> KVM_ARM_VCPU_INIT ioctl to initialize VCPU works fine.
-> >>
-> > Looks good to me, as soon as Marc acks this one, I'll merge it.
-> 
-> Yup, go for it:
-> 
-> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-> 
-Cool, merged in kvm-arm-next, tested with changes to experimental qemu
-mach-virt patches on vexpress TC2.
+Add support to the clock core so that drivers can pass in a
+regmap. If no regmap is specified try to query the device that's
+registering the clock for its regmap. This should allow drivers
+to use the core regmap helpers.
 
--Christoffer
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
+ drivers/clk/clk.c            | 8 ++++++++
+ include/linux/clk-provider.h | 7 +++++++
+ 2 files changed, 15 insertions(+)
+
+diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+index a004769..6107daa 100644
+--- a/drivers/clk/clk.c
++++ b/drivers/clk/clk.c
+@@ -20,6 +20,7 @@
+ #include <linux/device.h>
+ #include <linux/init.h>
+ #include <linux/sched.h>
++#include <linux/regmap.h>
+ 
+ static DEFINE_SPINLOCK(enable_lock);
+ static DEFINE_MUTEX(prepare_lock);
+@@ -1829,6 +1830,13 @@ static int _clk_register(struct device *dev, struct clk_hw *hw, struct clk *clk)
+ 	clk->num_parents = hw->init->num_parents;
+ 	hw->clk = clk;
+ 
++	if (hw->init->regmap)
++		hw->regmap = hw->init->regmap;
++	else if (dev && dev_get_regmap(dev, NULL))
++		hw->regmap = dev_get_regmap(dev, NULL);
++	else if (dev->parent)
++		hw->regmap = dev_get_regmap(dev->parent, NULL);
++
+ 	/* allocate local copy in case parent_names is __initdata */
+ 	clk->parent_names = kzalloc((sizeof(char*) * clk->num_parents),
+ 			GFP_KERNEL);
+diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+index 73bdb69..6ed62f1 100644
+--- a/include/linux/clk-provider.h
++++ b/include/linux/clk-provider.h
+@@ -142,6 +142,8 @@ struct clk_ops {
+ 	void		(*init)(struct clk_hw *hw);
+ };
+ 
++struct regmap;
++
+ /**
+  * struct clk_init_data - holds init data that's common to all clocks and is
+  * shared between the clock provider and the common clock framework.
+@@ -151,6 +153,7 @@ struct clk_ops {
+  * @parent_names: array of string names for all possible parents
+  * @num_parents: number of possible parents
+  * @flags: framework-level hints and quirks
++ * @regmap: regmap to use for regmap helpers and/or by providers
+  */
+ struct clk_init_data {
+ 	const char		*name;
+@@ -158,6 +161,7 @@ struct clk_init_data {
+ 	const char		**parent_names;
+ 	u8			num_parents;
+ 	unsigned long		flags;
++	struct regmap		*regmap;
+ };
+ 
+ /**
+@@ -171,10 +175,13 @@ struct clk_init_data {
+  *
+  * @init: pointer to struct clk_init_data that contains the init data shared
+  * with the common clock framework.
++ *
++ * @regmap: regmap to use for regmap helpers and/or by providers
+  */
+ struct clk_hw {
+ 	struct clk *clk;
+ 	const struct clk_init_data *init;
++	struct regmap *regmap;
+ };
+ 
+ /*
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
