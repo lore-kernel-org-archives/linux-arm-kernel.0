@@ -1,31 +1,29 @@
-From: b.brezillon@overkiz.com (Boris BREZILLON)
-Date: Wed,  2 Oct 2013 14:35:48 +0200
-Subject: [PATCH 3/3] ARM: at91/tc/clocksource: remove IRQF_DISABLED
-In-Reply-To: <1380717265-6497-1-git-send-email-b.brezillon@overkiz.com>
-References: <1380717265-6497-1-git-send-email-b.brezillon@overkiz.com>
-Message-ID: <1380717348-6650-1-git-send-email-b.brezillon@overkiz.com>
+From: fweisbec@gmail.com (Frederic Weisbecker)
+Date: Wed,  2 Oct 2013 14:37:52 +0200
+Subject: [GIT PULL] nohz: Full dynticks for 32 bits and arm support
+Message-ID: <1380717475-11505-1-git-send-email-fweisbec@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove the deprecated IRQF_DISABLED flag.
+Ingo,
 
-Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
+Please pull the timers/core branch that can be found at:
+
+git://git.kernel.org/pub/scm/linux/kernel/git/frederic/linux-dynticks.git
+	timers/core
+
+Thanks,
+	Frederic
 ---
- drivers/clocksource/tcb_clksrc.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/clocksource/tcb_clksrc.c b/drivers/clocksource/tcb_clksrc.c
-index 10a5d9e..00fdd11 100644
---- a/drivers/clocksource/tcb_clksrc.c
-+++ b/drivers/clocksource/tcb_clksrc.c
-@@ -180,7 +180,7 @@ static irqreturn_t ch2_irq(int irq, void *handle)
- 
- static struct irqaction tc_irqaction = {
- 	.name		= "tc_clkevt",
--	.flags		= IRQF_TIMER | IRQF_DISABLED,
-+	.flags		= IRQF_TIMER,
- 	.handler	= ch2_irq,
- };
- 
--- 
-1.7.9.5
+Kevin Hilman (3):
+      vtime: Add HAVE_VIRT_CPU_ACCOUNTING_GEN Kconfig
+      nohz: Drop generic vtime obsolete dependency on CONFIG_64BIT
+      ARM: Kconfig: allow full nohz CPU accounting
+
+
+ arch/Kconfig        | 12 ++++++++++++
+ arch/arm/Kconfig    |  1 +
+ init/Kconfig        |  3 ++-
+ kernel/time/Kconfig |  2 +-
+ 4 files changed, 16 insertions(+), 2 deletions(-)
