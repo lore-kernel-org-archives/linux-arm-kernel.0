@@ -1,98 +1,36 @@
 From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 2 Oct 2013 14:47:34 +0200
-Subject: [PATCH 2/3] ARM: at91/tc/clocksource: improve driver robustness
-In-Reply-To: <1380717341-6612-1-git-send-email-b.brezillon@overkiz.com>
+Date: Wed, 2 Oct 2013 14:47:49 +0200
+Subject: [PATCH 3/3] ARM: at91/tc/clocksource: remove IRQF_DISABLED
+In-Reply-To: <1380717348-6650-1-git-send-email-b.brezillon@overkiz.com>
 References: <1380717265-6497-1-git-send-email-b.brezillon@overkiz.com>
- <1380717341-6612-1-git-send-email-b.brezillon@overkiz.com>
-Message-ID: <524C15E6.7070500@atmel.com>
+ <1380717348-6650-1-git-send-email-b.brezillon@overkiz.com>
+Message-ID: <524C15F5.5030704@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 02/10/2013 14:35, Boris BREZILLON :
-> Check function return values to avoid false positive driver init.
+> Remove the deprecated IRQF_DISABLED flag.
 >
 > Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
 
 Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
 > ---
->   drivers/clocksource/tcb_clksrc.c |   33 ++++++++++++++++++++++++++++-----
->   1 file changed, 28 insertions(+), 5 deletions(-)
+>   drivers/clocksource/tcb_clksrc.c |    2 +-
+>   1 file changed, 1 insertion(+), 1 deletion(-)
 >
 > diff --git a/drivers/clocksource/tcb_clksrc.c b/drivers/clocksource/tcb_clksrc.c
-> index 0481562..10a5d9e 100644
+> index 10a5d9e..00fdd11 100644
 > --- a/drivers/clocksource/tcb_clksrc.c
 > +++ b/drivers/clocksource/tcb_clksrc.c
-> @@ -184,11 +184,18 @@ static struct irqaction tc_irqaction = {
+> @@ -180,7 +180,7 @@ static irqreturn_t ch2_irq(int irq, void *handle)
+>
+>   static struct irqaction tc_irqaction = {
+>   	.name		= "tc_clkevt",
+> -	.flags		= IRQF_TIMER | IRQF_DISABLED,
+> +	.flags		= IRQF_TIMER,
 >   	.handler	= ch2_irq,
 >   };
->
-> -static void __init setup_clkevents(struct atmel_tc *tc, int clk32k_divisor_idx)
-> +static int __init setup_clkevents(struct atmel_tc *tc, int clk32k_divisor_idx)
->   {
-> +	int ret;
->   	struct clk *t2_clk = tc->clk[2];
->   	int irq = tc->irq[2];
->
-> +	/* try to enable t2 clk to avoid future errors in mode change */
-> +	ret = clk_prepare_enable(t2_clk);
-> +	if (ret)
-> +		return ret;
-> +	clk_disable_unprepare(t2_clk);
-> +
->   	clkevt.regs = tc->regs;
->   	clkevt.clk = t2_clk;
->   	tc_irqaction.dev_id = &clkevt;
-> @@ -197,16 +204,21 @@ static void __init setup_clkevents(struct atmel_tc *tc, int clk32k_divisor_idx)
->
->   	clkevt.clkevt.cpumask = cpumask_of(0);
->
-> +	ret = setup_irq(irq, &tc_irqaction);
-> +	if (ret)
-> +		return ret;
-> +
->   	clockevents_config_and_register(&clkevt.clkevt, 32768, 1, 0xffff);
->
-> -	setup_irq(irq, &tc_irqaction);
-> +	return ret;
->   }
->
->   #else /* !CONFIG_GENERIC_CLOCKEVENTS */
->
-> -static void __init setup_clkevents(struct atmel_tc *tc, int clk32k_divisor_idx)
-> +static int __init setup_clkevents(struct atmel_tc *tc, int clk32k_divisor_idx)
->   {
->   	/* NOTHING */
-> +	return 0;
->   }
->
->   #endif
-> @@ -328,13 +340,24 @@ static int __init tcb_clksrc_init(void)
->   	}
->
->   	/* and away we go! */
-> -	clocksource_register_hz(&clksrc, divided_rate);
-> +	ret = clocksource_register_hz(&clksrc, divided_rate);
-> +	if (ret)
-> +		goto err_disable_t1;
->
->   	/* channel 2:  periodic and oneshot timer support */
-> -	setup_clkevents(tc, clk32k_divisor_idx);
-> +	ret = setup_clkevents(tc, clk32k_divisor_idx);
-> +	if (ret)
-> +		goto err_unregister_clksrc;
->
->   	return 0;
->
-> +err_unregister_clksrc:
-> +	clocksource_unregister(&clksrc);
-> +
-> +err_disable_t1:
-> +	if (!tc->tcb_config || tc->tcb_config->counter_width != 32)
-> +		clk_disable_unprepare(tc->clk[1]);
-> +
->   err_disable_t0:
->   	clk_disable_unprepare(t0_clk);
 >
 >
 
