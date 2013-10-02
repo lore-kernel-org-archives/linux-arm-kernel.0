@@ -1,53 +1,84 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Wed, 2 Oct 2013 10:51:16 -0300
-Subject: Armada XP doesn't boot in v3.12-rc3
-In-Reply-To: <20131002124320.GL31178@titan.lakedaemon.net>
-References: <CAFJTrDvNYa2g-TFPjii5WpCgnX8kc8r9v3+jzL7gkHCwRV-obg@mail.gmail.com>
- <20131002124320.GL31178@titan.lakedaemon.net>
-Message-ID: <20131002135115.GA2423@localhost>
+Date: Wed, 2 Oct 2013 10:51:13 -0300
+Subject: [GIT PULL] ARM: mvebu: fixes for v3.12
+In-Reply-To: <20130920034613.GB11119@titan.lakedaemon.net>
+References: <20130920034613.GB11119@titan.lakedaemon.net>
+Message-ID: <20131002135112.GA2621@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 02, 2013 at 08:43:20AM -0400, Jason Cooper wrote:
-> On Wed, Oct 02, 2013 at 11:39:53AM +0100, Matthew Minter wrote:
-> > Hi,
-> > 
-> > I am having the same issue as
-> > "Re: mvebu: Armada XP doesn't boot in v3.12-rc1".
-> > except that I am running rc3.
-> > 
-> > I am wondering if the mentioned patch was ever released as I currently
-> > have an un-bootable board.
+On Thu, Sep 19, 2013 at 11:46:13PM -0400, Jason Cooper wrote:
+> Guys,
 > 
-> Yes, it's:
+> We have a relatively long list of fixes this time around.  The two
+> of_node_put()'s were left over from before the merge window (part of
+> mvebu/fixes-non-critical).
 > 
->   7b0dd72 arm: clocksource: mvebu: Use the main timer as clock source from DT
+> The two for the Armada XP clocks are to fix booting v3.12-rc1 since the
+> corresponding driver changes were merged at the last minute.  These were
+> originally part of mvebu/dt for v3.12, but have since become fixes.
 > 
-> which made it into v3.12-rc3.
+> The other two just cropped up since v3.12-rc1 dropped.
 > 
-> We'll need more information in order to diagnose your problem.  You've
-> either stumbled across a different problem, or need to try a clean
-> build.  But I'm just guessing since I'm not in front of your box ;-)
+> thx,
+> 
+> Jason.
+> 
+> The following changes since commit 272b98c6455f00884f0350f775c5342358ebb73f:
+> 
+>   Linux 3.12-rc1 (2013-09-16 16:17:51 -0400)
+> 
+> are available in the git repository at:
+> 
+>   git://git.infradead.org/linux-mvebu.git tags/fixes-3.12
+> 
+> for you to fetch changes up to ddf7e399024aa908573a08d6339cefa6253b83db:
+> 
+>   ARM: kirkwood: Fix address of second XOR engine (2013-09-20 03:16:20 +0000)
+> 
+> ----------------------------------------------------------------
+> mvebu fixes for v3.12
+> 
+>  - mvebu
+>     - fix reference leaks by adding of_node_put()
+>     - update Armada XP DT clock properties to restore booting
+> 
+>  - kirkwood
+>     - add missing reg property for cpu at 0
+>     - fix typo in address of second XOR engine
+> 
+> ----------------------------------------------------------------
+> Andrew Lunn (1):
+>       ARM: Kirkwood: Add missing DT reg property to cpu at 0
+> 
+> Ezequiel Garcia (2):
+>       ARM: mvebu: Add the reference 25 MHz fixed-clock to Armada XP
+>       ARM: mvebu: Add clock properties to Armada XP timer node
 > 
 
-The latest DT timer fixes you pushed to arm-soc, doesn't appear to be
-in v3.12-rc3. I'll fetch the mail and ping Olof.
+For some reason, I'm not seeing the above two in v3.12-rc3.
 
-Matthew, in case you need the commits:
+Guys: what happened? We need these to boot successfully...
 
-commit c1bbd430d617faa2bc610c5404486b01d72c34bc
-Author: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-Date:   Tue Aug 20 12:45:50 2013 -0300
-
-    ARM: mvebu: Add the reference 25 MHz fixed-clock to Armada XP
-
-commit 3a3c07001b0d4a5eec83bb87284048cd75b81510
-Author: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-Date:   Tue Aug 20 12:45:51 2013 -0300
-
-    ARM: mvebu: Add clock properties to Armada XP timer node
-
-Which you can pick from git://git.infradead.org/linux-mvebu.git fixes.
+> Jisheng Zhang (2):
+>       ARM: mvebu: add missing of_node_put() to fix reference leak
+>       bus: mvebu: add missing of_node_put() to fix reference leak
+> 
+> Quentin Armitage (1):
+>       ARM: kirkwood: Fix address of second XOR engine
+> 
+>  arch/arm/boot/dts/armada-xp.dtsi        | 11 +++++++++++
+>  arch/arm/boot/dts/kirkwood.dtsi         |  3 ++-
+>  arch/arm/mach-mvebu/coherency.c         |  8 +++++++-
+>  arch/arm/mach-mvebu/pmsu.c              |  1 +
+>  arch/arm/mach-mvebu/system-controller.c |  1 +
+>  drivers/bus/mvebu-mbus.c                |  6 +++++-
+>  6 files changed, 27 insertions(+), 3 deletions(-)
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
 -- 
 Ezequiel Garc?a, Free Electrons
