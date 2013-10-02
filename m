@@ -1,45 +1,51 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Wed, 02 Oct 2013 10:32:42 +0200
-Subject: [Add SMP support for Allwinner A20: PATCH V4 0/3]
-In-Reply-To: <1380642145-17295-1-git-send-email-cinifr@gmail.com>
-References: <1380642145-17295-1-git-send-email-cinifr@gmail.com>
-Message-ID: <524BDA2A.7090108@linaro.org>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 2 Oct 2013 10:33:29 +0200
+Subject: [PATCH 1/1] dma: imx-sdma: setup dma mask
+In-Reply-To: <1380623464-24652-2-git-send-email-philippe.retornaz@epfl.ch>
+References: <1380623464-24652-1-git-send-email-philippe.retornaz@epfl.ch>
+ <1380623464-24652-2-git-send-email-philippe.retornaz@epfl.ch>
+Message-ID: <20131002083329.GJ30088@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/01/2013 05:42 PM, Fan Rong wrote:
+On Tue, Oct 01, 2013 at 12:31:04PM +0200, Philippe R?tornaz wrote:
+> The dma mask is not configured in the current code.
+> This was triggered by soc-dmaengine-pcm which allocate the dma
+> buffers with the imx-sdma as device.
+> This commit fix audio on imx31.
+> 
+> Signed-off-by: Philippe R?tornaz <philippe.retornaz@epfl.ch>
 
+Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
 
-> This is the version 4 patch. It use smp_prepare_cpus replacing early_init as cpuconfigure map init funcation caller and use sun7i replacing sunxi7i as funcation name and variable name.
+Sascha
 
-Hi Fan,
-
-your patchset does not have a changelog neither a description. You 
-should fix this first if you want a proper review.
-
-Thanks
-   -- Daniel
-
->
-> Fan Rong (3):
->    Add smp support for Allwinner A20(sunxi 7i).
->    Add cpuconfig nodes in dts for smp configure.
->    Add arch count timer node in dts for Allwinner A20(sunxi 7i).
->
->   arch/arm/boot/dts/sun7i-a20.dtsi |  15 ++++++
->   arch/arm/mach-sunxi/Makefile     |   2 +
->   arch/arm/mach-sunxi/headsmp.S    |  18 +++++++
->   arch/arm/mach-sunxi/platsmp.c    | 114 +++++++++++++++++++++++++++++++++++++++
->   arch/arm/mach-sunxi/sunxi.c      |   3 ++
->   5 files changed, 152 insertions(+)
->   create mode 100644 arch/arm/mach-sunxi/headsmp.S
->   create mode 100644 arch/arm/mach-sunxi/platsmp.c
->
-
+> ---
+>  drivers/dma/imx-sdma.c |    4 ++++
+>  1 file changed, 4 insertions(+)
+> 
+> diff --git a/drivers/dma/imx-sdma.c b/drivers/dma/imx-sdma.c
+> index fc43603..c1fd504 100644
+> --- a/drivers/dma/imx-sdma.c
+> +++ b/drivers/dma/imx-sdma.c
+> @@ -1432,6 +1432,10 @@ static int __init sdma_probe(struct platform_device *pdev)
+>  		return -EINVAL;
+>  	}
+>  
+> +	ret = dma_coerce_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(32));
+> +	if (ret)
+> +		return ret;
+> +
+>  	sdma = kzalloc(sizeof(*sdma), GFP_KERNEL);
+>  	if (!sdma)
+>  		return -ENOMEM;
+> -- 
+> 1.7.9.5
+> 
+> 
 
 -- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
