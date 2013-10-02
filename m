@@ -1,49 +1,34 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 2 Oct 2013 13:14:57 -0700
-Subject: [GIT PULL] KVM/ARM Fixes for 3.12-rc2
-In-Reply-To: <5242B1B0.1040408@redhat.com>
-References: <1380052160-20755-1-git-send-email-christoffer.dall@linaro.org>
- <5242B1B0.1040408@redhat.com>
-Message-ID: <CAOesGMgGTghYwaDB3uJTYBTOa73z+wcKfzfJGWWZyM-QjbijzQ@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 2 Oct 2013 21:13:50 +0100
+Subject: [PATCH V3: Add Smp support for Allwinner A20. 1/3] Add smp
+ support for Allwinner A20(sunxi 7i).
+In-Reply-To: <CAK3cCBwOpkk5ObeEm+by=RS6jSptPdGZM+fvpgGZpX9TPij5gg@mail.gmail.com>
+References: <1379852488-32147-1-git-send-email-cinifr@gmail.com>
+ <1379852488-32147-2-git-send-email-cinifr@gmail.com>
+ <20130923181707.GR2779@lukather>
+ <CAK3cCBwLrnV7L9WzJ+1P_62PEjEEtgzVjFH8m6SZzWG1O+2vEw@mail.gmail.com>
+ <20130925184435.GH2954@lukather>
+ <CAK3cCBwOpkk5ObeEm+by=RS6jSptPdGZM+fvpgGZpX9TPij5gg@mail.gmail.com>
+Message-ID: <20131002201350.GS12758@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Paolo,
+On Sat, Sep 28, 2013 at 09:48:11PM +0800, cinifr wrote:
+> Hi  Maxime,
+>     I have test it, but I found it does not work. If using
+> smp_prepare_cpus, the kernenl cannot find the secondary cpus because
+> that smp_prepare_cpus semms not be excuted before kernel is booting
+> secondary cpus. So I have to use early_initcall.
 
-On Wed, Sep 25, 2013 at 2:49 AM, Paolo Bonzini <pbonzini@redhat.com> wrote:
-> Il 24/09/2013 21:49, Christoffer Dall ha scritto:
->> The following changes since commit 62d228b8c676232eca579f91cc0782b060a59097:
->>
->>   Merge branch 'fixes' of git://git.kernel.org/pub/scm/virt/kvm/kvm (2013-09-17 22:20:30 -0400)
->>
->> are available in the git repository at:
->>
->>
->>   git://git.linaro.org/people/cdall/linux-kvm-arm.git tags/kvm-arm-fixes-3.12-rc2
->>
->> for you to fetch changes up to ac570e0493815e0b41681c89cb50d66421429d27:
->>
->>   ARM: kvm: rename cpu_reset to avoid name clash (2013-09-24 11:15:05 -0700)
->>
->> ----------------------------------------------------------------
->> KVM/ARM Fixes for 3.12-rc2
->>
->> Fixes compilation error with KVM/ARM enabled.
->>
->> ----------------------------------------------------------------
->> Olof Johansson (1):
->>       ARM: kvm: rename cpu_reset to avoid name clash
->>
->>  arch/arm/kvm/reset.c |    6 +++---
->>  1 file changed, 3 insertions(+), 3 deletions(-)
->>
->
-> Pulled, thanks.
+Please don't do this - you're hacking around what could be a real problem.
+Instead, please investigate what is going on and why your smp_prepare_cpus()
+function never gets called.
 
-When do you expect to send your branch to Linus? I haven't seen it
-land there yet, nor in linux-next. This is keeping us from even
-building KVM-enabled kernels on ARM.
+Quite honestly, whenever I see crap like the above, it just makes me want
+to tell the ARM-SoC people to forever /dev/null your emails because you
+really don't know how to deal with the Linux kernel.
 
-
-
--Olof
+Always *fully* investigate a problem that you find to determine whether
+it's your problem or some as yet undiscovered kernel bug.  Never hack
+around it and then submit a patch suggesting that your workaround is
+something that "has" to be done.
