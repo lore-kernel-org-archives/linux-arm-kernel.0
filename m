@@ -1,69 +1,66 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 2 Oct 2013 11:41:58 +0100
-Subject: [PATCH 2/2] ARM: include: asm: use 'int' instead of 'unsigned
- long' for normal register variables within atomic.h
-In-Reply-To: <524ABA20.6060106@asianux.com>
-References: <20130926100422.GE2855@mudshark.cambridge.arm.com>
- <5244148F.6080405@asianux.com>
- <20130927110618.GB9520@mudshark.cambridge.arm.com>
- <5247A1D1.6080505@asianux.com> <5247A1FA.4030305@asianux.com>
- <5247A3FC.9020508@asianux.com>
- <20130930161149.GI26036@mudshark.cambridge.arm.com>
- <524A2DE7.8040208@asianux.com>
- <20131001090119.GA17629@mudshark.cambridge.arm.com>
- <524ABA20.6060106@asianux.com>
-Message-ID: <20131002104158.GD28311@mudshark.cambridge.arm.com>
+Date: Wed, 2 Oct 2013 11:44:47 +0100
+Subject: [PATCH 6/6] iommu/arm-smmu: Support buggy implemenations where
+ all config accesses are secure
+In-Reply-To: <20131001181709.GZ3315@alberich>
+References: <1380631150-10783-1-git-send-email-andreas.herrmann@calxeda.com>
+ <1380631150-10783-7-git-send-email-andreas.herrmann@calxeda.com>
+ <524ACE13.4020309@gmail.com> <20131001181709.GZ3315@alberich>
+Message-ID: <20131002104447.GE28311@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 01, 2013 at 01:03:44PM +0100, Chen Gang wrote:
-> On 10/01/2013 05:01 PM, Will Deacon wrote:
-> > On Tue, Oct 01, 2013 at 03:05:27AM +0100, Chen Gang wrote:
-> >> OK, thanks. That means: "arm means arm 32-bit, arm64 means arm 64-bit.
-> >> The current Linux kernel main line does not support arm 16-bit".
-> >>
-> >> Since "bringing our atomic_t ... with the atomic_t type definition", can
-> >> we use 'atomic_t" instead of 'unsigned long'?
-> >>
-> >> And can we use 'atomic64_t" instead of 'unsigned long' in atomic64_*()?
+On Tue, Oct 01, 2013 at 07:17:09PM +0100, Andreas Herrmann wrote:
+> On Tue, Oct 01, 2013 at 09:28:51AM -0400, Rob Herring wrote:
+> > On 10/01/2013 07:39 AM, Andreas Herrmann wrote:
+> > > In such a case we have to use secure aliases of some non-secure
+> > > registers.
+> > > 
+> > > This behaviour is controlled via a flag in smmu->bugs. It is set
+> > > based on DT information when probing an SMMU device.
 > > 
-> > That's probably a bit dodgy, since they are typedefs to compound types
-> > which, if ever extended, would fall to bits if we tried to pack them into a
-> > single register.
-> > 
+> > Perhaps quirks would be a nicer word...
 > 
-> Excuse me, my English is not quite well, I guess your meaning is: "in
-> 'atomic.h', for arm/arm64, let register variables type equal to related
-> atomic type: use 64-bit type if 'atomic64_t', 32-bit type if 'atomic_t'.
+> In fact it might be better to rename this as "options".
+> For device isolation I had added a flag to indicate this in
+> smmu->features.
+> But it might be better to not mix hardware features with software
+> features or options.
 
-Sorry, I think I've confused you. This should be a simple change:
+Yes, I also didn't like the mixing of hardware and software features, but I
+couldn't think of a good way to separate them out. Sounds like you might be
+on to something.
 
-  On ARM:
+> So what do you (Will and Rob) think about a change like
+> 
+>  struct arm_smmu_device {
+>    ...
+> 
+>  #define ARM_SMMU_FEAT_COHERENT_WALK     (1 << 0)
+>  #define ARM_SMMU_FEAT_STREAM_MATCH      (1 << 1)
+>  #define ARM_SMMU_FEAT_TRANS_S1          (1 << 2)
+>  #define ARM_SMMU_FEAT_TRANS_S2          (1 << 3)
+>  #define ARM_SMMU_FEAT_TRANS_NESTED      (1 << 4)
+>          u32                             features;
+> + #define ARM_SMMU_OPT_SECURE_CFG_ACCESS  (1 << 0)
+> + #define ARM_SMMU_OPT_ISOLATE_DEVICES    (1 << 1)
+> +        u32                             options;
+>          int                             version;
 
-  - The atomic_t typedef is a struct containing an int.
-  - The atomic64_t typedef is a struct containing a long long.
+I'm ok with this change, but it gets you guys off the hook with your broken
+integration!
 
-  On arm64:
+>    ...
+>  }
+> 
+> DT property "calxeda,smmu-secure-cfg-access" would set
+> ARM_SMMU_OPT_SECURE_CFG_ACCESS and
+> DT property "linux,arm-smmu-isolate-devices" would set
+> ARM_SMMU_OPT_ISOLATE_DEVICES.
+> 
+> (Maybe in future there will be more driver options. )
 
-  - The atomic_t typedef is a struct containing an int.
-  - The atomic64_t typedef is a struct containing a long.
-
-Now, your first patch made the handling of atomic64_t on ARM use long long
-instead of u64. That's good, because it fixes a signedness bug.
-
-The second patch is just a clean-up, because our atomic_* functions on ARM
-interchangeably use int and unsigned long when working with atomic_t types.
-This can be tidied up by using int whenever we are reading or writing an
-atomic_t, thus matching the type definition for that structure member.
-
-So, for example, atomic_add does not need changing because it always uses
-int to hold the atomic_t variable (the unsigned long holds the status
-returned from the strex instruction). atomic_cmpxchg, however, loads the
-atomic_t into oldval, so that should be int.
-
-Given that this patch doesn't gain us anything in terms of functionality,
-feel free to ignore it and I can take a look when there's a rainy day (which
-should be real soon now). I also need to take a closer look at
-atomic_clear_mask for arm64, because it looks broken to me.
+Yeah, and you could probably go all out with macros to generate this stuff
+based on compatible string and OPT #define too.
 
 Will
