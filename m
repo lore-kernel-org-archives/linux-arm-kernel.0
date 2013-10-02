@@ -1,74 +1,42 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Wed, 02 Oct 2013 15:45:49 +0900
-Subject: [PATCH] arm64: check for number of arguments in
- syscall_get/set_arguments()
-In-Reply-To: <20131001091919.GA17667@mudshark.cambridge.arm.com>
-References: <1380605584-22125-1-git-send-email-takahiro.akashi@linaro.org>
- <20131001091919.GA17667@mudshark.cambridge.arm.com>
-Message-ID: <524BC11D.2050003@linaro.org>
+From: sachin.kamat@linaro.org (Sachin Kamat)
+Date: Wed, 2 Oct 2013 12:19:16 +0530
+Subject: [PATCH 01/10] clk: bcm2835: Remove duplicate inclusion of
+ clk-provider.h
+In-Reply-To: <1379064232-10261-1-git-send-email-sachin.kamat@linaro.org>
+References: <1379064232-10261-1-git-send-email-sachin.kamat@linaro.org>
+Message-ID: <CAK9yfHxgW4u=queZZkkpz7YPjoz-58kD_JUrq47L1cEMCkUw7A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/01/2013 06:19 PM, Will Deacon wrote:
-> On Tue, Oct 01, 2013 at 06:33:04AM +0100, AKASHI Takahiro wrote:
->> In ftrace_syscall_enter(),
->>      syscall_get_arguments(..., 0, n, ...)
->> 	if (i == 0) { <handle orig_x0> ...; n--;}
->> 	memcpy(..., n * sizeof(args[0]));
->> If 'number of arguments(n)' is zero and 'argument index(i)' is also zero in
->> syscall_get_arguments(), none of arguments should be copied by memcpy().
->> Otherwise 'n--' can be a big positive number and unexpected amount of data
->> will be copied. Tracing system calls which take no argument, say sync(void),
->> may hit this case and eventually make the system corrupted.
->> This patch fixes the issue both in syscall_get_arguments() and
->> syscall_set_arguments().
->>
->> Please note, however, that asm-generic/syscall.h says,
->>   * syscall_get_arguments - extract system call parameter values
->>   * @i:          argument index [0,5]
->>   * @n:          number of arguments; n+i must be [1,6].
->> and so we'd better change the caller's code(ftrace_syscall_enter).
+ Hi Mike,
+
+On 13 September 2013 14:53, Sachin Kamat <sachin.kamat@linaro.org> wrote:
+> clk-provider.h was included twice.
 >
-> Since (most) other architectures deal with n+i == 0, please can you submit a
-> separate patch updating that comment?
-
-Yes, I will. But is the patch that only modifies a comment acceptable?
-
-
->> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
->> ---
->>   arch/arm64/include/asm/syscall.h |    6 ++++++
->>   1 file changed, 6 insertions(+)
->>
->> diff --git a/arch/arm64/include/asm/syscall.h b/arch/arm64/include/asm/syscall.h
->> index c89821f..01bb8cc 100644
->> --- a/arch/arm64/include/asm/syscall.h
->> +++ b/arch/arm64/include/asm/syscall.h
->> @@ -63,6 +63,9 @@ static inline void syscall_get_arguments(struct task_struct *task,
->>   					 unsigned int i, unsigned int n,
->>   					 unsigned long *args)
->>   {
->> +	if (n == 0)
->> +		return;
->> +
->>   	if (i + n > SYSCALL_MAX_ARGS) {
->>   		unsigned long *args_bad = args + SYSCALL_MAX_ARGS - i;
->>   		unsigned int n_bad = n + i - SYSCALL_MAX_ARGS;
->> @@ -86,6 +89,9 @@ static inline void syscall_set_arguments(struct task_struct *task,
->>   					 unsigned int i, unsigned int n,
->>   					 const unsigned long *args)
->>   {
->> +	if (n == 0)
->> +		return;
->> +
+> Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
+> Cc: Stephen Warren <swarren@wwwdotorg.org>
+> ---
+>  drivers/clk/clk-bcm2835.c |    1 -
+>  1 file changed, 1 deletion(-)
 >
-> Looks sensible. Please can you fix arch/arm/ as well?
-
-Yes, I will.
-
--Takahiro AKASHI
-
-> Cheers,
+> diff --git a/drivers/clk/clk-bcm2835.c b/drivers/clk/clk-bcm2835.c
+> index 5fb4ff5..676077d 100644
+> --- a/drivers/clk/clk-bcm2835.c
+> +++ b/drivers/clk/clk-bcm2835.c
+> @@ -20,7 +20,6 @@
+>  #include <linux/clk-provider.h>
+>  #include <linux/clkdev.h>
+>  #include <linux/clk/bcm2835.h>
+> -#include <linux/clk-provider.h>
+>  #include <linux/of.h>
 >
-> Will
+>  static const struct of_device_id clk_match[] __initconst = {
+> --
+> 1.7.9.5
 >
+
+ Gentle ping.
+
+-- 
+With warm regards,
+Sachin
