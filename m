@@ -1,34 +1,49 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 2 Oct 2013 09:52:42 +0200
-Subject: [PATCH] RFT: ARM: gemini: convert to GENERIC_CLOCKEVENTS
-In-Reply-To: <201310011942.02965.arnd@arndb.de>
-References: <1380625040-25912-1-git-send-email-linus.walleij@linaro.org>
- <201310011328.57653.arnd@arndb.de>
- <CACRpkdZygLfbE=kC6E+sRDRwZsY-Oi-HOB2mf6G7LeX-=XrcgQ@mail.gmail.com>
- <201310011942.02965.arnd@arndb.de>
-Message-ID: <CACRpkdZM9k2V+VHxhp6gLtGGegU=+2nMGFg7rfHs6uwoqu=Hrg@mail.gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 2 Oct 2013 17:02:26 +0900
+Subject: [PATCH 00/03] ARM: shmobile: Initial r7s72100 SoC and Genmai
+ board support
+In-Reply-To: <CANqRtoRmNxDYxTz=onmuRK2qhqwn+gb0Cb+-Ot+EB9FervCJ6A@mail.gmail.com>
+References: <20130918201101.6319.97667.sendpatchset@w520>
+ <20130925043913.GA23347@verge.net.au>
+ <CANqRtoRmNxDYxTz=onmuRK2qhqwn+gb0Cb+-Ot+EB9FervCJ6A@mail.gmail.com>
+Message-ID: <20131002080222.GA28462@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 1, 2013 at 7:42 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Tuesday 01 October 2013, Linus Walleij wrote:
->> As with any other platform with an active community interested in
->> long-term support it'd be best if someone stepped up to do
->> the necessary conversion to DT and maybe also multiplatform
->> (no idea if that works with the FA526 CPU though) so we can get
->> the maintenance burden down for everone involved.
->
-> Regarding multiplatform, IIRC Jonas Jensen had some issues with
-> ARM9 and FA526 being enabled at the same time (with mach-moxart),
-> which is probably easy enough to fix if necessary. You should
-> also be able to have a combined moxart+gemini kernel once someone
-> looks into multiplatform gemini. The only nonobvious part I can
-> see required for that is NEED_MACH_GPIO_H, and even that should
-> be simpler than the clockevents patch you just sent.
+On Wed, Oct 02, 2013 at 03:07:41PM +0900, Magnus Damm wrote:
+> Hi Simon,
+> 
+> On Wed, Sep 25, 2013 at 1:39 PM, Simon Horman <horms@verge.net.au> wrote:
+> > On Thu, Sep 19, 2013 at 05:11:01AM +0900, Magnus Damm wrote:
+> >> ARM: shmobile: Initial r7s72100 SoC and Genmai board support
+> >>
+> >> [PATCH 01/03] ARM: shmobile: Initial r7s72100 SoC support
+> >> [PATCH 02/03] ARM: shmobile: r7s72100 SCIF support
+> >> [PATCH 03/03] ARM: shmobile: Genmai support
+> >>
+> >> This series adds initial support for r7s72100 and Genmai. The SoC
+> >> is known as r7s72100 which is based on a single core Cortex-A9
+> >> and makes use of SCIF for serial. Many other on-chip I/O devices
+> >> are available, and support for those will be added by incremental
+> >> feature patches.
+> >>
+> >> This initial SoC and board support is providing limited DT-only
+> >> support and a very basic C-version of board support. In the future
+> >> improved PINCTRL and common clock framework support will be added.
+> >>
+> >> Implemented in same style as r8a7790 and r8a7791.
+> >>
+> >> Signed-off-by: Magnus Damm <damm@opensource.se>
+> >
+> > Hi Magnus,
+> >
+> > please provide a defconfig if you would like this series merged.
+> > Otherwise this seems reasonable to me.
+> 
+> Thanks, yes, I'd like to see this series merged.
+> 
+> Please use the recently posted defconfig in:
+> 
+> [PATCH] ARM: shmobile: Genmai defconfig
 
-I sent a patch to delete NEED_MACH_GPIO_H as well and already
-applied it to the GPIO tree, it was a piece of cake (unless I have
-now unwittingly broken something).
-
-Yours,
-Linus Walleij
+Thanks, I see it.
