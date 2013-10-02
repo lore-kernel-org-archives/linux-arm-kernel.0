@@ -1,37 +1,55 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 2 Oct 2013 15:48:21 +0200
-Subject: [PATCH 0/1] fix MVEBU GPIO driver bug causing kernel hang
-In-Reply-To: <524C1C34.5050403@keymile.com>
-References: <1380717118-10860-1-git-send-email-gerlando.falauto@keymile.com>
- <20131002144550.7d28376c@skate> <524C1C34.5050403@keymile.com>
-Message-ID: <20131002154821.385e0921@skate>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Wed, 2 Oct 2013 10:51:16 -0300
+Subject: Armada XP doesn't boot in v3.12-rc3
+In-Reply-To: <20131002124320.GL31178@titan.lakedaemon.net>
+References: <CAFJTrDvNYa2g-TFPjii5WpCgnX8kc8r9v3+jzL7gkHCwRV-obg@mail.gmail.com>
+ <20131002124320.GL31178@titan.lakedaemon.net>
+Message-ID: <20131002135115.GA2423@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Gerlando Falauto,
-
-On Wed, 02 Oct 2013 15:14:28 +0200, Gerlando Falauto wrote:
-
-> > Hum? The driver you're touching is a GPIO driver, while
-> > drivers/irqchip/irq-orion.c is an interrupt controller driver. The
-> > gpio-mvebu driver can be used on all mvebu platforms that are DT
-> > capable, but the main interrupt controller is different from one
-> > platform to another: we already have irq-armada-370-xp.c for Armada
-> > 370/XP, while Sebastian's irq-orion.c is for older families of SoCs.
+On Wed, Oct 02, 2013 at 08:43:20AM -0400, Jason Cooper wrote:
+> On Wed, Oct 02, 2013 at 11:39:53AM +0100, Matthew Minter wrote:
+> > Hi,
+> > 
+> > I am having the same issue as
+> > "Re: mvebu: Armada XP doesn't boot in v3.12-rc1".
+> > except that I am running rc3.
+> > 
+> > I am wondering if the mentioned patch was ever released as I currently
+> > have an un-bootable board.
 > 
-> My foreword was "if I understand correctly", which I clearly didn't. ;-)
+> Yes, it's:
 > 
-> OK, so Sebastian's rework irq-orion.c is about the MAIN interrupt 
-> controller (replaces arch/arm/plat-orion/irq.c), which also cascades 
-> interrupts from GPIOs.
-> These are then either handled by gpio-mvebu.c (for all platforms which 
-> are DT capable) or by arch/arm/plat-orion/gpio.c (legacy).
-> Is that right?
+>   7b0dd72 arm: clocksource: mvebu: Use the main timer as clock source from DT
+> 
+> which made it into v3.12-rc3.
+> 
+> We'll need more information in order to diagnose your problem.  You've
+> either stumbled across a different problem, or need to try a clean
+> build.  But I'm just guessing since I'm not in front of your box ;-)
+> 
 
-Yes, that's right.
+The latest DT timer fixes you pushed to arm-soc, doesn't appear to be
+in v3.12-rc3. I'll fetch the mail and ping Olof.
 
-Thomas
+Matthew, in case you need the commits:
+
+commit c1bbd430d617faa2bc610c5404486b01d72c34bc
+Author: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+Date:   Tue Aug 20 12:45:50 2013 -0300
+
+    ARM: mvebu: Add the reference 25 MHz fixed-clock to Armada XP
+
+commit 3a3c07001b0d4a5eec83bb87284048cd75b81510
+Author: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+Date:   Tue Aug 20 12:45:51 2013 -0300
+
+    ARM: mvebu: Add clock properties to Armada XP timer node
+
+Which you can pick from git://git.infradead.org/linux-mvebu.git fixes.
+
 -- 
-Thomas Petazzoni, Free Electrons
-Embedded Linux, Kernel and Android engineering
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
 http://free-electrons.com
