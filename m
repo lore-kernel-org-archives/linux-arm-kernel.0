@@ -1,19 +1,44 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Wed,  2 Oct 2013 12:57:20 +0200
-Subject: [PATCH 1/3] net: mv643xx_eth: update statistics timer from timer
- context only
-In-Reply-To: <1380711442-24735-1-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1380711442-24735-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1380711442-24735-2-git-send-email-sebastian.hesselbarth@gmail.com>
+Date: Wed,  2 Oct 2013 12:57:19 +0200
+Subject: [PATCH 0/3] net: mv643xx_eth: various small fixes for v3.12
+Message-ID: <1380711442-24735-1-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Each port driver installs a periodic timer to update port statistics
-by calling mib_counters_update. As mib_counters_update is also called
-from non-timer context, we should not reschedule the timer there but
-rather move it to timer-only context.
+This patch set comprises some one-liners to fix issues with repeated
+loading and unloading of a modular mv643xx_eth driver.
 
-Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+First two patches take care of the periodic port statistic timer, that
+updates statistics by reading port registers using add_timer/mod_timer.
+
+Patch 1 moves timer re-schedule from mib_counters_update to the timer
+callback. As mib_counters_update is also called from non-timer context,
+this ensures the timer is reactivated from timer context only.
+
+Patch 2 moves initial timer schedule from _probe() time to right before
+the port is actually started as the corresponding del_timer_sync is at
+_stop() time. This fixes a regression, where unloading the driver from a
+non-started eth device can cause the timer to access deallocated mem.
+
+Patch 3 adds an assignment of the ports device_node to the corresponding
+self-created platform_device. This is required to allow fixups based on
+the device_node's compatible string later. Actually, it is also a potential
+regression because we already check compatible string for Kirkwood, but
+does not (yet) rely on the fixup.
+
+All patches are based on v3.12-rc3 and have been tested on Kirkwood-based
+Seagate Dockstar.
+
+Patches 1 and 2 can also possibly queued up for -stable.
+
+Sebastian Hesselbarth (3):
+  net: mv643xx_eth: update statistics timer from timer context only
+  net: mv643xx_eth: fix orphaned statistics timer crash
+  net: mv643xx_eth: fix missing device_node for port devices
+
+ drivers/net/ethernet/marvell/mv643xx_eth.c |    7 +++----
+ 1 file changed, 3 insertions(+), 4 deletions(-)
+
 ---
 Cc: David Miller <davem@davemloft.net>
 Cc: Lennert Buytenhek <buytenh@wantstofly.org>
@@ -21,30 +46,5 @@ Cc: Jason Cooper <jason@lakedaemon.net>
 Cc: netdev at vger.kernel.org
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-kernel at vger.kernel.org
----
- drivers/net/ethernet/marvell/mv643xx_eth.c |    4 +---
- 1 file changed, 1 insertion(+), 3 deletions(-)
-
-diff --git a/drivers/net/ethernet/marvell/mv643xx_eth.c b/drivers/net/ethernet/marvell/mv643xx_eth.c
-index 7fb5677..44a87e4 100644
---- a/drivers/net/ethernet/marvell/mv643xx_eth.c
-+++ b/drivers/net/ethernet/marvell/mv643xx_eth.c
-@@ -1131,15 +1131,13 @@ static void mib_counters_update(struct mv643xx_eth_private *mp)
- 	p->rx_discard += rdlp(mp, RX_DISCARD_FRAME_CNT);
- 	p->rx_overrun += rdlp(mp, RX_OVERRUN_FRAME_CNT);
- 	spin_unlock_bh(&mp->mib_counters_lock);
--
--	mod_timer(&mp->mib_counters_timer, jiffies + 30 * HZ);
- }
- 
- static void mib_counters_timer_wrapper(unsigned long _mp)
- {
- 	struct mv643xx_eth_private *mp = (void *)_mp;
--
- 	mib_counters_update(mp);
-+	mod_timer(&mp->mib_counters_timer, jiffies + 30 * HZ);
- }
- 
- 
 -- 
 1.7.10.4
