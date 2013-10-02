@@ -1,63 +1,655 @@
-From: zyy@motorola.com (Yuanyuan ZHONG)
-Date: Wed, 2 Oct 2013 17:21:48 -0500
-Subject: [PATCH] arm: vfp: always clear vfp_current_hw_state when forcing
- reload
-In-Reply-To: <20131002221123.GC12758@n2100.arm.linux.org.uk>
-References: <1380751187-11257-1-git-send-email-zyy@motorola.com>
- <20131002221123.GC12758@n2100.arm.linux.org.uk>
-Message-ID: <CAFUV4K3dsVDtHhQtuZ6yEQHxxHXaa9LODBZuGFipjAKumF4abQ@mail.gmail.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Wed, 2 Oct 2013 15:36:55 -0700
+Subject: [PATCH 3/3] KVM: ARM: Transparent huge pages and hugetlbfs support
+In-Reply-To: <524013BB.4090303@arm.com>
+References: <1376021239-10532-1-git-send-email-christoffer.dall@linaro.org>
+ <1376021239-10532-4-git-send-email-christoffer.dall@linaro.org>
+ <524013BB.4090303@arm.com>
+Message-ID: <20131002223655.GD5108@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 2, 2013 at 5:11 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Wed, Oct 02, 2013 at 04:59:47PM -0500, Yuanyuan Zhong wrote:
->> The current thread trying to clear the held vfp state may not be
->> the owner of hw state. For example,
->>       Core0                   Core1
->>                               Thread1 uses VFP.
->>                                 Thread1 vfpstate.hard.cpu = 1.
->>                                 vfp_current_hw_state[1] points to Thread1
->>                                   vfpstate.
->>       Going to suspend.
->>       Freeze Thread1.
->>                               Thread1 is switched out.
->>                               VFP HW registers saved to Thread1 vfpstate.
->
-> Correct so far.  At this point:
->
->                                 vfp_current_hw_state[1] = &thread1->vfpstate;
->                                 thread1->vfpstate.hard.cpu = 1;
->
->>       Core0 disables Core1.
->>                               Stopper thread calls vfp_force_reload().
->>                               Stopper thread vfpstate.hard.cpu = NR_CPUS.
->
-> Correct, except there's another part to this.  vfp_state_in_hw() returns
-> true here, since thread1->vfpstate.hard.cpu is the dying CPU (CPU 1), and
-> vfp_current_hw_state[1] is &thread1->vfpstate.  So we also do this:
->
->                                 clear FPEXC_EN
->                                 vfp_current_hw_state[1] = NULL;
->
-vfp_state_in_hw() returns false. It's checking current_thread_info()
-which is the stopper thread migration/1, not thread1.
->>                               ...
->>                               (No PM notifier for non-idle path. So
->>                                 vfp_pm_suspend() is NOT called on Core1.)
->>                               ...
->>                               Core1 is off and VFP HW registers are lost.
->>       ...
->>       Core0 enables Core1.
->>       Core0 thaw Thread1.
->>       Thread1 migrate to Core1
->>         before using VFP.
->>                               Thread1 starts using VFP.
->>                               Now we have vfp_current_hw_state[1] points
->>                                 to Thread1 vfpstate. And Thread1 has
->>                                 vfpstate.hard.cpu = 1.
->
-> No.  With my above correction:
->                                 vfp_current_hw_state[1] = NULL
->
-> and that forces a reload of the saved context.
+On Mon, Sep 23, 2013 at 11:11:07AM +0100, Marc Zyngier wrote:
+> Hi Christoffer,
+> 
+> Finally taking some time to review this patch. Sorry for the delay...
+> 
+> On 09/08/13 05:07, Christoffer Dall wrote:
+> > From: Christoffer Dall <cdall@cs.columbia.edu>
+> > 
+> > Support transparent huge pages in KVM/ARM 32-bit and 64-bit.  The whole
+> > transparent_hugepage_adjust stuff is far from pretty, but this is how
+> > it's solved on x86 so we duplicate their logic.  This should be shared
+> > across architectures if possible (like many other things), but can
+> > always be changed down the road.
+> > 
+> > The pud_huge checking on the unmap path may feel a bit silly as the
+> > pud_huge check is always defined to false, but the compiler should be
+> > smart about this.
+> > 
+> > Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> > ---
+> >  arch/arm/include/asm/kvm_mmu.h   |   17 +++-
+> >  arch/arm/kvm/mmu.c               |  200 ++++++++++++++++++++++++++++++++------
+> >  arch/arm64/include/asm/kvm_mmu.h |   12 ++-
+> >  3 files changed, 194 insertions(+), 35 deletions(-)
+> > 
+> > diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
+> > index 472ac70..ff3ff67 100644
+> > --- a/arch/arm/include/asm/kvm_mmu.h
+> > +++ b/arch/arm/include/asm/kvm_mmu.h
+> > @@ -62,6 +62,12 @@ phys_addr_t kvm_get_idmap_vector(void);
+> >  int kvm_mmu_init(void);
+> >  void kvm_clear_hyp_idmap(void);
+> > 
+> > +static inline void kvm_set_pmd(pmd_t *pmd, pmd_t new_pmd)
+> > +{
+> > +       *pmd = new_pmd;
+> > +       flush_pmd_entry(pmd);
+> > +}
+> > +
+> >  static inline void kvm_set_pte(pte_t *pte, pte_t new_pte)
+> >  {
+> >         pte_val(*pte) = new_pte;
+> > @@ -103,9 +109,15 @@ static inline void kvm_set_s2pte_writable(pte_t *pte)
+> >         pte_val(*pte) |= L_PTE_S2_RDWR;
+> >  }
+> > 
+> > +static inline void kvm_set_s2pmd_writable(pmd_t *pmd)
+> > +{
+> > +       pmd_val(*pmd) |= L_PTE_S2_RDWR;
+> > +}
+> > +
+> >  struct kvm;
+> > 
+> > -static inline void coherent_icache_guest_page(struct kvm *kvm, gfn_t gfn)
+> > +static inline void coherent_icache_guest_page(struct kvm *kvm, hva_t hva,
+> > +                                             unsigned long size)
+> >  {
+> >         /*
+> >          * If we are going to insert an instruction page and the icache is
+> > @@ -120,8 +132,7 @@ static inline void coherent_icache_guest_page(struct kvm *kvm, gfn_t gfn)
+> >          * need any kind of flushing (DDI 0406C.b - Page B3-1392).
+> >          */
+> >         if (icache_is_pipt()) {
+> > -               unsigned long hva = gfn_to_hva(kvm, gfn);
+> > -               __cpuc_coherent_user_range(hva, hva + PAGE_SIZE);
+> > +               __cpuc_coherent_user_range(hva, hva + size);
+> >         } else if (!icache_is_vivt_asid_tagged()) {
+> >                 /* any kind of VIPT cache */
+> >                 __flush_icache_all();
+> > diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+> > index 0988d9e..26ced77 100644
+> > --- a/arch/arm/kvm/mmu.c
+> > +++ b/arch/arm/kvm/mmu.c
+> > @@ -19,6 +19,7 @@
+> >  #include <linux/mman.h>
+> >  #include <linux/kvm_host.h>
+> >  #include <linux/io.h>
+> > +#include <linux/hugetlb.h>
+> >  #include <trace/events/kvm.h>
+> >  #include <asm/pgalloc.h>
+> >  #include <asm/cacheflush.h>
+> > @@ -41,6 +42,8 @@ static unsigned long hyp_idmap_start;
+> >  static unsigned long hyp_idmap_end;
+> >  static phys_addr_t hyp_idmap_vector;
+> > 
+> > +#define kvm_pmd_huge(_x)       (pmd_huge(_x) || pmd_trans_huge(_x))
+> > +
+> >  static void kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa)
+> >  {
+> >         /*
+> > @@ -93,19 +96,27 @@ static bool page_empty(void *ptr)
+> > 
+> >  static void clear_pud_entry(struct kvm *kvm, pud_t *pud, phys_addr_t addr)
+> >  {
+> > -       pmd_t *pmd_table = pmd_offset(pud, 0);
+> > -       pud_clear(pud);
+> > -       kvm_tlb_flush_vmid_ipa(kvm, addr);
+> > -       pmd_free(NULL, pmd_table);
+> > +       if (pud_huge(*pud)) {
+> > +               pud_clear(pud);
+> > +       } else {
+> > +               pmd_t *pmd_table = pmd_offset(pud, 0);
+> > +               pud_clear(pud);
+> > +               kvm_tlb_flush_vmid_ipa(kvm, addr);
+> > +               pmd_free(NULL, pmd_table);
+> > +       }
+> 
+> Why don't we have any TLB invalidation on the huge path?
+> 
+
+Because this code was written before we fixed the TLB invalidation race.
+Good that you spotted this.
+
+> >         put_page(virt_to_page(pud));
+> >  }
+> > 
+> >  static void clear_pmd_entry(struct kvm *kvm, pmd_t *pmd, phys_addr_t addr)
+> >  {
+> > -       pte_t *pte_table = pte_offset_kernel(pmd, 0);
+> > -       pmd_clear(pmd);
+> > -       kvm_tlb_flush_vmid_ipa(kvm, addr);
+> > -       pte_free_kernel(NULL, pte_table);
+> > +       if (kvm_pmd_huge(*pmd)) {
+> > +               pmd_clear(pmd);
+> > +       } else {
+> > +               pte_t *pte_table = pte_offset_kernel(pmd, 0);
+> > +               pmd_clear(pmd);
+> > +               kvm_tlb_flush_vmid_ipa(kvm, addr);
+> > +               pte_free_kernel(NULL, pte_table);
+> > +       }
+> 
+> Same here.
+> 
+
+Same here.
+
+> >         put_page(virt_to_page(pmd));
+> >  }
+> > 
+> > @@ -136,12 +147,37 @@ static void unmap_range(struct kvm *kvm, pgd_t *pgdp,
+> >                         continue;
+> >                 }
+> > 
+> > +               if (pud_huge(*pud)) {
+> > +                       /*
+> > +                        * If we are dealing with a huge pud, just clear it and
+> > +                        * move on.
+> > +                        */
+> > +                       clear_pud_entry(kvm, pud, addr);
+> > +                       addr = pud_addr_end(addr, end);
+> > +                       continue;
+> > +               }
+> > +
+> >                 pmd = pmd_offset(pud, addr);
+> >                 if (pmd_none(*pmd)) {
+> >                         addr = pmd_addr_end(addr, end);
+> >                         continue;
+> >                 }
+> > 
+> > +               if (kvm_pmd_huge(*pmd)) {
+> > +                       /*
+> > +                        * If we are dealing with a huge pmd, just clear it and
+> > +                        * walk back up the ladder.
+> > +                        */
+> > +                       clear_pmd_entry(kvm, pmd, addr);
+> > +                       next = pmd_addr_end(addr, end);
+> > +                       if (page_empty(pmd) && !page_empty(pud)) {
+> > +                               clear_pud_entry(kvm, pud, addr);
+> > +                               next = pud_addr_end(addr, end);
+> > +                       }
+> > +                       addr = next;
+> > +                       continue;
+> > +               }
+> 
+> Looks like we already have the exact same sequence a few lines below.
+> Surely we can factor it out.
+> 
+
+Yeah, the thing is having a funciton here requires us to pass in a bunch
+of things, an either return the next addr or pass that by reference, and
+while it does save a few lines, I found the code harder to read.  This
+is another option:
+
+
+static void unmap_range(struct kvm *kvm, pgd_t *pgdp,
+			unsigned long long start, u64 size)
+{
+	pgd_t *pgd;
+	pud_t *pud;
+	pmd_t *pmd;
+	pte_t *pte;
+	unsigned long long addr = start, end = start + size;
+	u64 next;
+
+	while (addr < end) {
+		pgd = pgdp + pgd_index(addr);
+		pud = pud_offset(pgd, addr);
+		if (pud_none(*pud)) {
+			addr = pud_addr_end(addr, end);
+			continue;
+		}
+
+		if (pud_huge(*pud)) {
+			/*
+			 * If we are dealing with a huge pud, just clear it and
+			 * move on.
+			 */
+			clear_pud_entry(kvm, pud, addr);
+			addr = pud_addr_end(addr, end);
+			continue;
+		}
+
+		pmd = pmd_offset(pud, addr);
+		if (pmd_none(*pmd)) {
+			addr = pmd_addr_end(addr, end);
+			continue;
+		}
+
+		if (!kvm_pmd_huge(*pmd)) {
+			pte = pte_offset_kernel(pmd, addr);
+			clear_pte_entry(kvm, pte, addr);
+			next = addr + PAGE_SIZE;
+		}
+
+		/*
+		 * If the pmd entry is to be cleared, walk back up the ladder
+		 */
+		if (kvm_pmd_huge(*pmd) || page_empty(pte)) {
+			clear_pmd_entry(kvm, pmd, addr);
+			next = pmd_addr_end(addr, end);
+			if (page_empty(pmd) && !page_empty(pud)) {
+				clear_pud_entry(kvm, pud, addr);
+				next = pud_addr_end(addr, end);
+			}
+		}
+
+		addr = next;
+	}
+}
+
+> > +
+> >                 pte = pte_offset_kernel(pmd, addr);
+> >                 clear_pte_entry(kvm, pte, addr);
+> >                 next = addr + PAGE_SIZE;
+> > @@ -420,6 +456,46 @@ void kvm_free_stage2_pgd(struct kvm *kvm)
+> >         kvm->arch.pgd = NULL;
+> >  }
+> > 
+> > +/* Set a huge page pmd entry */
+> 
+> Is it only for huge PMDs? Or can we try to share that code with what is
+> in stage2_set_pte?
+> 
+
+We can share it, much nicer actually:
+
+
+diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+index e2c58f5..345eefc 100644
+--- a/arch/arm/kvm/mmu.c
++++ b/arch/arm/kvm/mmu.c
+@@ -456,26 +447,33 @@ void kvm_free_stage2_pgd(struct kvm *kvm)
+ 	kvm->arch.pgd = NULL;
+ }
+ 
+-/* Set a huge page pmd entry */
+-static int stage2_set_pmd(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
+-			  phys_addr_t addr, const pmd_t *new_pmd)
++static pmd_t *stage2_get_pmd(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
++			     phys_addr_t addr)
+ {
+ 	pgd_t *pgd;
+ 	pud_t *pud;
+-	pmd_t *pmd, old_pmd;
++	pmd_t *pmd;
+ 
+-	/* Create stage-2 page table mapping - Level 1 */
+ 	pgd = kvm->arch.pgd + pgd_index(addr);
+ 	pud = pud_offset(pgd, addr);
+ 	if (pud_none(*pud)) {
+ 		if (!cache)
+-			return 0; /* ignore calls from kvm_set_spte_hva */
++			return NULL;
+ 		pmd = mmu_memory_cache_alloc(cache);
+ 		pud_populate(NULL, pud, pmd);
+ 		get_page(virt_to_page(pud));
+ 	}
+ 
+-	pmd = pmd_offset(pud, addr);
++	return pmd_offset(pud, addr);
++}
++
++static int stage2_set_pmd_huge(struct kvm *kvm, struct kvm_mmu_memory_cache
++			       *cache, phys_addr_t addr, const pmd_t *new_pmd)
++{
++	pmd_t *pmd, old_pmd;
++
++	pmd = stage2_get_pmd(kvm, cache, addr);
++	VM_BUG_ON(!pmd);
+ 
+ 	/*
+ 	 * Mapping in huge pages should only happen through a fault.  If a
+@@ -500,25 +498,20 @@ static int stage2_set_pmd(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
+ static int stage2_set_pte(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
+ 			  phys_addr_t addr, const pte_t *new_pte, bool iomap)
+ {
+-	pgd_t *pgd;
+-	pud_t *pud;
+ 	pmd_t *pmd;
+ 	pte_t *pte, old_pte;
+ 
+-	/* Create 2nd stage page table mapping - Level 1 */
+-	pgd = kvm->arch.pgd + pgd_index(addr);
+-	pud = pud_offset(pgd, addr);
+-	if (pud_none(*pud)) {
+-		if (!cache)
+-			return 0; /* ignore calls from kvm_set_spte_hva */
+-		pmd = mmu_memory_cache_alloc(cache);
+-		pud_populate(NULL, pud, pmd);
+-		get_page(virt_to_page(pud));
++	/* Create stage-2 page table mapping - Level 1 */
++	pmd = stage2_get_pmd(kvm, cache, addr);
++	if (!pmd) {
++		/*
++		 * Ignore calls from kvm_set_spte_hva for unallocated
++		 * address ranges.
++		 */
++		return 0;
+ 	}
+ 
+-	pmd = pmd_offset(pud, addr);
+-
+-	/* Create 2nd stage page mappings - Level 2 */
++	/* Create stage-2 page mappings - Level 2 */
+ 	if (pmd_none(*pmd)) {
+ 		if (!cache)
+ 			return 0; /* ignore calls from kvm_set_spte_hva */
+@@ -688,7 +681,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+ 			kvm_set_s2pmd_writable(&new_pmd);
+ 			kvm_set_pfn_dirty(pfn);
+ 		}
+-		ret = stage2_set_pmd(kvm, memcache, fault_ipa, &new_pmd);
++		ret = stage2_set_pmd_huge(kvm, memcache, fault_ipa, &new_pmd);
+ 	} else {
+ 		pte_t new_pte = pfn_pte(pfn, PAGE_S2);
+ 		if (writable) {
+
+> > +static int stage2_set_pmd(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
+> > +                         phys_addr_t addr, const pmd_t *new_pmd)
+> > +{
+> > +       pgd_t *pgd;
+> > +       pud_t *pud;
+> > +       pmd_t *pmd, old_pmd;
+> > +
+> > +       /* Create stage-2 page table mapping - Level 1 */
+> > +       pgd = kvm->arch.pgd + pgd_index(addr);
+> > +       pud = pud_offset(pgd, addr);
+> > +       if (pud_none(*pud)) {
+> > +               if (!cache)
+> > +                       return 0; /* ignore calls from kvm_set_spte_hva */
+> 
+> Do we still need this?
+> 
+
+We didn't need it the way the code was structured in the initial
+verison, but we do with sharing the code with stage2_set_pte (see
+above).
+
+> > +               pmd = mmu_memory_cache_alloc(cache);
+> > +               pud_populate(NULL, pud, pmd);
+> > +               get_page(virt_to_page(pud));
+> > +       }
+> > +
+> > +       pmd = pmd_offset(pud, addr);
+> > +
+> > +       /*
+> > +        * Mapping in huge pages should only happen through a fault.  If a
+> > +        * page is merged into a transparent huge page, the individual
+> > +        * subpages of that huge page should be unmapped through MMU
+> > +        * notifiers before we get here.
+> > +        *
+> > +        * Merging of CompoundPages is not supported; they should become
+> > +        * splitting first, unmapped, merged, and mapped back in on-demand.
+> > +        */
+> > +       VM_BUG_ON(pmd_present(*pmd) && pmd_pfn(*pmd) != pmd_pfn(*new_pmd));
+> > +
+> > +       old_pmd = *pmd;
+> > +       kvm_set_pmd(pmd, *new_pmd);
+> > +       if (pmd_present(old_pmd))
+> > +               kvm_tlb_flush_vmid_ipa(kvm, addr);
+> > +       else
+> > +               get_page(virt_to_page(pmd));
+> > +       return 0;
+> > +}
+> > 
+> >  static int stage2_set_pte(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
+> >                           phys_addr_t addr, const pte_t *new_pte, bool iomap)
+> > @@ -442,7 +518,7 @@ static int stage2_set_pte(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
+> > 
+> >         pmd = pmd_offset(pud, addr);
+> > 
+> > -       /* Create 2nd stage page table mapping - Level 2 */
+> > +       /* Create 2nd stage page mappings - Level 2 */
+> >         if (pmd_none(*pmd)) {
+> >                 if (!cache)
+> >                         return 0; /* ignore calls from kvm_set_spte_hva */
+> > @@ -508,16 +584,53 @@ out:
+> >         return ret;
+> >  }
+> > 
+> > +static bool transparent_hugepage_adjust(pfn_t *pfnp, phys_addr_t *ipap)
+> > +{
+> > +       pfn_t pfn = *pfnp;
+> > +       gfn_t gfn = *ipap >> PAGE_SHIFT;
+> > +
+> > +       if (PageTransCompound(pfn_to_page(pfn))) {
+> > +               unsigned long mask;
+> > +               /*
+> > +                * mmu_notifier_retry was successful and we hold the
+> > +                * mmu_lock here, so the pmd can't become splitting
+> > +                * from under us, and in turn
+> > +                * __split_huge_page_refcount() can't run from under
+> > +                * us and we can safely transfer the refcount from
+> > +                * PG_tail to PG_head as we switch the pfn from tail to
+> > +                * head.
+> > +                */
+> 
+> -ECANTPARSE. Well, I sort of can, but this deserves a clearer explanation.
+> 
+
+I'll try to clarify.  (BTW. I stole this comment from Avi, blame the
+both of us :))
+
+
+> > +               mask = (PMD_SIZE / PAGE_SIZE) - 1;
+> 
+> 		mask = PTRS_PER_PMD -1;
+> 
+> > +               VM_BUG_ON((gfn & mask) != (pfn & mask));
+> > +               if (pfn & mask) {
+> > +                       gfn &= ~mask;
+> 
+> This doesn't seem to be used later on.
+> 
+> > +                       *ipap &= ~(PMD_SIZE - 1);
+> 
+> 			*ipap &= ~PMD_MASK;
+> 
+
+ack to all three
+
+> > +                       kvm_release_pfn_clean(pfn);
+> > +                       pfn &= ~mask;
+> > +                       kvm_get_pfn(pfn);
+> > +                       *pfnp = pfn;
+> > +               }
+> 
+> 
+> 
+> > +               return true;
+> > +       }
+> > +
+> > +       return false;
+> > +}
+> > +
+> >  static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+> > -                         gfn_t gfn, struct kvm_memory_slot *memslot,
+> > +                         struct kvm_memory_slot *memslot,
+> >                           unsigned long fault_status)
+> >  {
+> > -       pte_t new_pte;
+> > -       pfn_t pfn;
+> >         int ret;
+> > -       bool write_fault, writable;
+> > +       bool write_fault, writable, hugetlb = false, force_pte = false;
+> >         unsigned long mmu_seq;
+> > +       gfn_t gfn = fault_ipa >> PAGE_SHIFT;
+> > +       unsigned long hva = gfn_to_hva(vcpu->kvm, gfn);
+> > +       struct kvm *kvm = vcpu->kvm;
+> >         struct kvm_mmu_memory_cache *memcache = &vcpu->arch.mmu_page_cache;
+> > +       struct vm_area_struct *vma;
+> > +       pfn_t pfn;
+> > +       unsigned long psize;
+> > 
+> >         write_fault = kvm_is_write_fault(kvm_vcpu_get_hsr(vcpu));
+> >         if (fault_status == FSC_PERM && !write_fault) {
+> > @@ -525,6 +638,27 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+> >                 return -EFAULT;
+> >         }
+> > 
+> > +       /* Let's check if we will get back a huge page */
+> > +       down_read(&current->mm->mmap_sem);
+> > +       vma = find_vma_intersection(current->mm, hva, hva + 1);
+> > +       if (is_vm_hugetlb_page(vma)) {
+> > +               hugetlb = true;
+> > +               hva &= PMD_MASK;
+> > +               gfn = (fault_ipa & PMD_MASK) >> PAGE_SHIFT;
+> > +               psize = PMD_SIZE;
+> > +       } else {
+> > +               psize = PAGE_SIZE;
+> > +               if (vma->vm_start & ~PMD_MASK)
+> > +                       force_pte = true;
+> > +       }
+> > +       up_read(&current->mm->mmap_sem);
+> > +
+> > +       pfn = gfn_to_pfn_prot(kvm, gfn, write_fault, &writable);
+> > +       if (is_error_pfn(pfn))
+> > +               return -EFAULT;
+> 
+> How does this work with respect to the comment that talks about reading
+> mmu_seq before calling gfp_to_pfn_prot? Either the comment is wrong, or
+> we read this too early.
+> 
+
+It doesn't, the gfn_to_pfn_prot call should be moved below the smp_rmb,
+I must have simply messed this up when rebasing the patch.  Nice catch!
+
+> > +       coherent_icache_guest_page(kvm, hva, psize);
+> > +
+> >         /* We need minimum second+third level pages */
+> >         ret = mmu_topup_memory_cache(memcache, 2, KVM_NR_MEM_OBJS);
+> >         if (ret)
+> > @@ -542,26 +676,34 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+> >          */
+> >         smp_rmb();
+> > 
+> > -       pfn = gfn_to_pfn_prot(vcpu->kvm, gfn, write_fault, &writable);
+> > -       if (is_error_pfn(pfn))
+> > -               return -EFAULT;
+> > -
+> > -       new_pte = pfn_pte(pfn, PAGE_S2);
+> > -       coherent_icache_guest_page(vcpu->kvm, gfn);
+> > -
+> > -       spin_lock(&vcpu->kvm->mmu_lock);
+> > -       if (mmu_notifier_retry(vcpu->kvm, mmu_seq))
+> > +       spin_lock(&kvm->mmu_lock);
+> > +       if (mmu_notifier_retry(kvm, mmu_seq))
+> >                 goto out_unlock;
+> > -       if (writable) {
+> > -               kvm_set_s2pte_writable(&new_pte);
+> > -               kvm_set_pfn_dirty(pfn);
+> > +       if (!hugetlb && !force_pte)
+> > +               hugetlb = transparent_hugepage_adjust(&pfn, &fault_ipa);
+> 
+> How do we ensure that there is no race between this pte being promoted
+> to a pmd and another page allocation in the same pmd somewhere else in
+> the system? We only hold the kvm lock here, so there must be some extra
+> implicit guarantee somewhere...
+> 
+
+Steve answered this one, but the point is that any page in this pmd
+cannot be allocated from anywhere, because those pages are not free.  At
+this point, if the anon user page is mapped as a THP, it will stay as
+such until we unlock the mmu_lock.
+
+> > +       if (hugetlb) {
+> > +               pmd_t new_pmd = pfn_pmd(pfn, PAGE_S2);
+> > +               new_pmd = pmd_mkhuge(new_pmd);
+> > +               if (writable) {
+> > +                       kvm_set_s2pmd_writable(&new_pmd);
+> > +                       kvm_set_pfn_dirty(pfn);
+> > +               }
+> > +               ret = stage2_set_pmd(kvm, memcache, fault_ipa, &new_pmd);
+> > +       } else {
+> > +               pte_t new_pte = pfn_pte(pfn, PAGE_S2);
+> > +               if (writable) {
+> > +                       kvm_set_s2pte_writable(&new_pte);
+> > +                       kvm_set_pfn_dirty(pfn);
+> > +               }
+> > +               ret = stage2_set_pte(kvm, memcache, fault_ipa, &new_pte, false);
+> >         }
+> > -       stage2_set_pte(vcpu->kvm, memcache, fault_ipa, &new_pte, false);
+> > +
+> > 
+> >  out_unlock:
+> > -       spin_unlock(&vcpu->kvm->mmu_lock);
+> > +       spin_unlock(&kvm->mmu_lock);
+> >         kvm_release_pfn_clean(pfn);
+> > -       return 0;
+> > +       return ret;
+> >  }
+> > 
+> >  /**
+> > @@ -630,7 +772,7 @@ int kvm_handle_guest_abort(struct kvm_vcpu *vcpu, struct kvm_run *run)
+> > 
+> >         memslot = gfn_to_memslot(vcpu->kvm, gfn);
+> > 
+> > -       ret = user_mem_abort(vcpu, fault_ipa, gfn, memslot, fault_status);
+> > +       ret = user_mem_abort(vcpu, fault_ipa, memslot, fault_status);
+> >         if (ret == 0)
+> >                 ret = 1;
+> >  out_unlock:
+> > diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+> > index efe609c..e7f3852 100644
+> > --- a/arch/arm64/include/asm/kvm_mmu.h
+> > +++ b/arch/arm64/include/asm/kvm_mmu.h
+> > @@ -91,6 +91,7 @@ int kvm_mmu_init(void);
+> >  void kvm_clear_hyp_idmap(void);
+> > 
+> >  #define        kvm_set_pte(ptep, pte)          set_pte(ptep, pte)
+> > +#define        kvm_set_pmd(pmdp, pmd)          set_pmd(pmdp, pmd)
+> > 
+> >  static inline bool kvm_is_write_fault(unsigned long esr)
+> >  {
+> > @@ -116,13 +117,18 @@ static inline void kvm_set_s2pte_writable(pte_t *pte)
+> >         pte_val(*pte) |= PTE_S2_RDWR;
+> >  }
+> > 
+> > +static inline void kvm_set_s2pmd_writable(pmd_t *pmd)
+> > +{
+> > +       pmd_val(*pmd) |= PTE_S2_RDWR;
+> > +}
+> > +
+> >  struct kvm;
+> > 
+> > -static inline void coherent_icache_guest_page(struct kvm *kvm, gfn_t gfn)
+> > +static inline void coherent_icache_guest_page(struct kvm *kvm, hva_t hva,
+> > +                                             unsigned long size)
+> >  {
+> >         if (!icache_is_aliasing()) {            /* PIPT */
+> > -               unsigned long hva = gfn_to_hva(kvm, gfn);
+> > -               flush_icache_range(hva, hva + PAGE_SIZE);
+> > +               flush_icache_range(hva, hva + size);
+> >         } else if (!icache_is_aivivt()) {       /* non ASID-tagged VIVT */
+> >                 /* any kind of VIPT cache */
+> >                 __flush_icache_all();
+> 
+> As a general comment about this patch, I think having both transparent
+> pages *and* hugetlbfs support in the same patch makes it fairly hard to
+> read.
+> 
+> I understand that is is actually convenient as most of the code is
+> shared, but I think it would make it easier to read if the patch was
+> split in two: first the basic hugetlb support, and then the THP madness.
+> 
+> What do you think?
+> 
+Sure, I can split them up.  I'm going to send out a v2 with the split
+patches so you can read that in its completeness instead of the
+fragments I posted above.  I can always spin a v3 if you have more
+comments, though I still hope to get this in for the next merge window.
+
+Thanks for the review!
+-Christoffer
