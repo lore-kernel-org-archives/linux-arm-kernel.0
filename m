@@ -1,38 +1,37 @@
-From: jdl@jdl.com (Jon Loeliger)
-Date: Wed, 02 Oct 2013 08:22:58 -0500
-Subject: [RFC 00/15] Device Tree schemas and validation
-In-Reply-To: <524BE66D.7060308@baylibre.com>
-References: <1380041541-17529-1-git-send-email-bcousson@baylibre.com>
- <524A8289.3050107@baylibre.com> <524ACB76.1010001@gmail.com>
- <524AE4FB.4080906@baylibre.com> <E1VR1hx-0000C1-6J@jdl.com>
- <524BE66D.7060308@baylibre.com>
-Message-ID: <E1VRMOI-0006iA-TF@jdl.com>
+From: marex@denx.de (Marek Vasut)
+Date: Wed, 2 Oct 2013 15:30:22 +0200
+Subject: [PATCH v2 0/2] serial: mxs-auart: wait for DMA buffer to flush
+ before shutdown
+In-Reply-To: <1380715364-8025-1-git-send-email-hector.palacios@digi.com>
+References: <1380715364-8025-1-git-send-email-hector.palacios@digi.com>
+Message-ID: <201310021530.22317.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> >
-> > Benoit,
-> >
-> > Sorry, I meant to ask earlier but forgot.
-> > Shouldn't this development be based on the
-> > upstream DTC repository and not the in-kernel
-> > copy of the DTC?
+Dear Hector Palacios,
+
+> This fixes a bug whereby the AUART was shutdown while bytes
+> were still waiting in the DMA buffer to be transmistted.
 > 
-> Eventually, yes,
+> Changes since v1:
+>  * Split the patch in two: one to set the fifosize to the
+>    DMA buffer size, and another to wait for the FIFO to empty
+>    before disabling the AUART.
+>  * The wait for the fifo to empty is now independent of DMA
+>    being enabled.
+>  * Fix bug on readl() call
+>  * Remove bad URL in commit log
+> 
+> Hector Palacios (2):
+>   serial: mxs-auart: set the FIFO size to DMA buffer size
+>   serial: mxs-auart: wait for FIFO to flush before shutdown
+> 
+>  drivers/tty/serial/mxs-auart.c | 22 +++++++++++++++++++++-
+>  1 file changed, 21 insertions(+), 1 deletion(-)
 
-We should *start* there, though.
+Looks OK
 
-> but here the main point is to discuss the schema that 
-> will be used to defined bindings.
-> In that case, the DTC patches code are mostly a proof of concept
+Reviewed-by: Marek Vasut <marex@denx.de>
 
-Sure; all that is fine.
-
-> using the Linux kernel as example.
-
-Example?(*)  We shouldn't churn the kernel.
-
-jdl
-
-(*) In the sense that *this* Universe is just
-    one example from all known Universes? :-)
+Best regards,
+Marek Vasut
