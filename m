@@ -1,90 +1,284 @@
 From: david@gibson.dropbear.id.au (David Gibson)
-Date: Wed, 2 Oct 2013 23:54:50 +1000
-Subject: [RFC 00/15] Device Tree schemas and validation
-In-Reply-To: <CAL_JsqJ31TGFJCSeSOqgee=OLVfSUTAYdF4nSn7X2DiCequVAw@mail.gmail.com>
+Date: Wed, 2 Oct 2013 22:59:34 +1000
+Subject: [RFC 01/15] scripts/dtc: fix most memory leaks in dtc
+In-Reply-To: <1380041541-17529-2-git-send-email-bcousson@baylibre.com>
 References: <1380041541-17529-1-git-send-email-bcousson@baylibre.com>
- <524A8289.3050107@baylibre.com> <524ACB76.1010001@gmail.com>
- <524AE4FB.4080906@baylibre.com>
- <CAL_JsqJ31TGFJCSeSOqgee=OLVfSUTAYdF4nSn7X2DiCequVAw@mail.gmail.com>
-Message-ID: <20131002135450.GH6506@voom.fritz.box>
+ <1380041541-17529-2-git-send-email-bcousson@baylibre.com>
+Message-ID: <20131002125934.GF6506@voom.fritz.box>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 01, 2013 at 03:54:20PM -0500, Rob Herring wrote:
-> On Tue, Oct 1, 2013 at 10:06 AM, Benoit Cousson <bcousson@baylibre.com> wrote:
-> > Hi Rob,
-> >
-> >
-> > On 01/10/2013 15:17, Rob Herring wrote:
-> >>
-> >> On 10/01/2013 03:06 AM, Benoit Cousson wrote:
-> >>>
-> >>> + more DT maintainers folks
-> >>>
-> >>> Hi all,
-> >>>
-> >>> I know this is mostly boring user space code, but I was expecting a
-> >>> little bit of comments about at least the bindings syntax:-(
-> >>>
-> >>> I'd like to know if this is the right direction and if it worth pursuing
-> >>> in that direction.
-> >>>
-> >>> The idea was to have at least some base for further discussion during
-> >>> ARM KS 2013.
-> >>>
-> >>> I feel alone :-(
-> >>>
-> >>> If you have any comment, go ahead!
-> >>
-> >>
-> >> Thanks for taking this on!
-> >>
-> >> This is interesting approach using the dts syntax,
-> >
-> >
-> > Well, this was discussed a little bit on the list, and it has the big
-> > advantage of re-using the parser already included in DTC for free.
-> > In term or readability, it avoids to re-defining a brand new syntax for
-> > people who are already familiar with the DTS one.
-> >
-> >
-> >> but I worry that the
-> >> validation will only be as good as the schema written and the review of
-> >> the schema.
-> >
-> >
-> > Well, sure, but unfortunately, that will always be the case :-(
-> > The bindings definition being quite open, there is no easy way to ensure
-> > proper schema / bindings without careful review of the schema. There is no
-> > such thing as a free beer... Unfortunately :-)
-> >
-> >
-> >> I think the schema needs to define the binding rather than
-> >> define the checks. Then the schema can feed the validation checks.
-> >
-> >
-> >> This format does not seem to me as easily being able to generate
-> >> documentation from the schema which I believe is one of the goals.
-> >
-> >
-> > Indeed, but I think is it easy to generate any kind of readable format for
-> > the documentation purpose if needed from the actual format.
-> > Otherwise, we should consider a schema format based on kerneldoc type of
-> > syntax to improve readability. I'm just afraid it will become harder then to
-> > define complex schema.
-> >
-> > BTW, what kind of documentation are you expecting here? Is is a text that
-> > can be added on top of each schema?
-> 
-> I would expect the schema to replace
-> Documentation/devicetree/bindings/* over time. I think the thing that
-> needs to be worked out here is how to add free form multi-line text.
+On Tue, Sep 24, 2013 at 06:52:07PM +0200, Benoit Cousson wrote:
+> From: Fabien Parent <fparent@baylibre.com>
 
-I'm not convinced that's a realistic goal.  As I see it, the
-fundamental difference between a binding document and a formal schema
-is that a binding defines both the syntax required of a node, and its
-semantics, whereas a schema defines only syntax - the semantics still
-need to be defined somewhere.
+As noted elsewhere, please write patches against upstream dtc, not the
+version in the kernel.  git://git.kernel.org/pub/scm/utils/dtc/dtc.git
+
+> There are a few memory leaks in dtc which until now were not that important
+> since they were all in the parser and only one instance of the parser was run
+> per instance of dtc. The following commits will add a validation of dts through
+> schema which have the same syntax as dts, i.e. the parser of dts will be reused
+> to parse schema. The consequence is that instead of having the parser running
+> only one time for an instance of the dtc process, the parser will run
+> many many times and thus the leak that were not important until now becomes
+> urgent to fix.
+
+Hrm, yeah.  I'm aware that I haven't been very careful with memory
+leaks within the parser.  Essentially, I've been treating the process
+as a pool allocator with exactly one pool - I've even considered
+getting rid of those free()s we do have.
+
+If the parser's going to be invoked repeatedly, then, yes, that
+certainly needs fixing.  Whether individually fixing each leak or
+using a explicit pool allocator is a better option is less clear.
+
+> dtc-lexer: Do not duplicate the string which contains literals because the
+> string is directly converted afterward to an integer and is never used again.
+> livetree: Add a bunch of free helper functions to clean properly the
+> dt.
+
+This is no good.  Making this assumption is a layering violation - if
+the parser was changed so that this literal wasn't converted until
+after another token was read, the yytext value copied in here would no
+longer be valid and would break horribly.
+
+> 
+> Signed-off-by: Fabien Parent <fparent@baylibre.com>
+> Signed-off-by: Benoit Cousson <bcousson@baylibre.com>
+> ---
+>  scripts/dtc/dtc-lexer.l             |   2 +-
+>  scripts/dtc/dtc-lexer.lex.c_shipped |   2 +-
+>  scripts/dtc/dtc.c                   |   1 +
+>  scripts/dtc/dtc.h                   |   1 +
+>  scripts/dtc/livetree.c              | 108 +++++++++++++++++++++++++++++++++---
+>  5 files changed, 105 insertions(+), 9 deletions(-)
+> 
+> diff --git a/scripts/dtc/dtc-lexer.l b/scripts/dtc/dtc-lexer.l
+> index 3b41bfc..4f63fbf 100644
+> --- a/scripts/dtc/dtc-lexer.l
+> +++ b/scripts/dtc/dtc-lexer.l
+> @@ -146,7 +146,7 @@ static int pop_input_file(void);
+>  		}
+>  
+>  <V1>([0-9]+|0[xX][0-9a-fA-F]+)(U|L|UL|LL|ULL)? {
+> -			yylval.literal = xstrdup(yytext);
+> +			yylval.literal = yytext;
+>  			DPRINT("Literal: '%s'\n", yylval.literal);
+>  			return DT_LITERAL;
+>  		}
+> diff --git a/scripts/dtc/dtc-lexer.lex.c_shipped b/scripts/dtc/dtc-lexer.lex.c_shipped
+> index 2d30f41..5c0d27c 100644
+> --- a/scripts/dtc/dtc-lexer.lex.c_shipped
+> +++ b/scripts/dtc/dtc-lexer.lex.c_shipped
+> @@ -1054,7 +1054,7 @@ case 10:
+>  YY_RULE_SETUP
+>  #line 148 "dtc-lexer.l"
+>  {
+> -			yylval.literal = xstrdup(yytext);
+> +			yylval.literal = yytext;
+>  			DPRINT("Literal: '%s'\n", yylval.literal);
+>  			return DT_LITERAL;
+>  		}
+> diff --git a/scripts/dtc/dtc.c b/scripts/dtc/dtc.c
+> index a375683..215ae92 100644
+> --- a/scripts/dtc/dtc.c
+> +++ b/scripts/dtc/dtc.c
+> @@ -256,5 +256,6 @@ int main(int argc, char *argv[])
+>  		die("Unknown output format \"%s\"\n", outform);
+>  	}
+>  
+> +	free_dt(bi);
+>  	exit(0);
+>  }
+> diff --git a/scripts/dtc/dtc.h b/scripts/dtc/dtc.h
+> index 3e42a07..9c45fd2 100644
+> --- a/scripts/dtc/dtc.h
+> +++ b/scripts/dtc/dtc.h
+> @@ -245,6 +245,7 @@ struct boot_info {
+>  struct boot_info *build_boot_info(struct reserve_info *reservelist,
+>  				  struct node *tree, uint32_t boot_cpuid_phys);
+>  void sort_tree(struct boot_info *bi);
+> +void free_dt(struct boot_info *bi);
+>  
+>  /* Checks */
+>  
+> diff --git a/scripts/dtc/livetree.c b/scripts/dtc/livetree.c
+> index b61465f..5c8692c 100644
+> --- a/scripts/dtc/livetree.c
+> +++ b/scripts/dtc/livetree.c
+> @@ -20,6 +20,10 @@
+>  
+>  #include "dtc.h"
+>  
+> +static void free_node_list(struct node *n);
+> +static void free_node(struct node *n);
+> +static void free_property(struct property *p);
+> +
+>  /*
+>   * Tree building functions
+>   */
+> @@ -144,7 +148,7 @@ struct node *merge_nodes(struct node *old_node, struct node *new_node)
+>  
+>  	/* Add new node labels to old node */
+>  	for_each_label_withdel(new_node->labels, l)
+> -		add_label(&old_node->labels, l->label);
+> +		add_label(&old_node->labels, xstrdup(l->label));
+>  
+>  	/* Move properties from the new node to the old node.  If there
+>  	 * is a collision, replace the old value with the new */
+> @@ -156,7 +160,7 @@ struct node *merge_nodes(struct node *old_node, struct node *new_node)
+>  
+>  		if (new_prop->deleted) {
+>  			delete_property_by_name(old_node, new_prop->name);
+> -			free(new_prop);
+> +			free_property(new_prop);
+>  			continue;
+>  		}
+>  
+> @@ -165,7 +169,7 @@ struct node *merge_nodes(struct node *old_node, struct node *new_node)
+>  			if (streq(old_prop->name, new_prop->name)) {
+>  				/* Add new labels to old property */
+>  				for_each_label_withdel(new_prop->labels, l)
+> -					add_label(&old_prop->labels, l->label);
+> +					add_label(&old_prop->labels, xstrdup(l->label));
+>  
+>  				old_prop->val = new_prop->val;
+>  				old_prop->deleted = 0;
+> @@ -191,7 +195,7 @@ struct node *merge_nodes(struct node *old_node, struct node *new_node)
+>  
+>  		if (new_child->deleted) {
+>  			delete_node_by_name(old_node, new_child->name);
+> -			free(new_child);
+> +			free_node(new_child);
+>  			continue;
+>  		}
+>  
+> @@ -211,7 +215,7 @@ struct node *merge_nodes(struct node *old_node, struct node *new_node)
+>  
+>  	/* The new node contents are now merged into the old node.  Free
+>  	 * the new node. */
+> -	free(new_node);
+> +	free_node(new_node);
+>  
+>  	return old_node;
+>  }
+> @@ -532,13 +536,13 @@ cell_t get_node_phandle(struct node *root, struct node *node)
+>  	if (!get_property(node, "linux,phandle")
+>  	    && (phandle_format & PHANDLE_LEGACY))
+>  		add_property(node,
+> -			     build_property("linux,phandle",
+> +			     build_property(xstrdup("linux,phandle"),
+>  					    data_append_cell(empty_data, phandle)));
+>  
+>  	if (!get_property(node, "phandle")
+>  	    && (phandle_format & PHANDLE_EPAPR))
+>  		add_property(node,
+> -			     build_property("phandle",
+> +			     build_property(xstrdup("phandle"),
+>  					    data_append_cell(empty_data, phandle)));
+>  
+>  	/* If the node *does* have a phandle property, we must
+> @@ -707,3 +711,93 @@ void sort_tree(struct boot_info *bi)
+>  	sort_reserve_entries(bi);
+>  	sort_node(bi->dt);
+>  }
+> +
+> +static void free_marker_list(struct marker *m)
+> +{
+> +	struct marker *marker, *marker_next;
+> +
+> +	if (!m)
+> +		return;
+> +
+> +	for (marker = m, marker_next = marker ? marker->next : NULL;
+> +	     marker;
+> +	     marker = marker_next, marker_next = marker ? marker->next : NULL) {
+
+Rather hard to read version of safe-against-free list iteration.
+
+> +		free(marker->ref);
+> +		free(marker);
+> +	}
+> +}
+> +
+> +static void free_label_list(struct label *l)
+> +{
+> +	struct label *label, *label_next;
+> +
+> +	if (!l)
+> +		return;
+> +
+> +	for (label = l, label_next = label ? label->next : NULL;
+> +	     label;
+> +	     label = label_next, label_next = label ? label->next : NULL) {
+> +		free(label->label);
+> +		free(label);
+> +	}
+> +}
+> +
+> +static void free_property(struct property *p)
+> +{
+> +	if (!p)
+> +		return;
+> +
+> +	free_label_list(p->labels);
+> +	free_marker_list(p->val.markers);
+> +	free(p->val.val);
+> +	free(p->name);
+> +	free(p);
+> +}
+> +
+> +static void free_property_list(struct property *p)
+> +{
+> +	struct property *next;
+> +
+> +	if (!p)
+> +		return;
+> +
+> +	for (next = p->next; p; p = next, next = p ? p->next : NULL)
+> +		free_property(p);
+> +}
+> +
+> +static void free_node(struct node *n)
+> +{
+> +	if (!n)
+> +		return;
+> +
+> +	free_node_list(n->children);
+> +	free_label_list(n->labels);
+> +	free_property_list(n->proplist);
+> +	free(n->fullpath);
+> +	if (n->name && *n->name)
+
+*n->name .. so, the name can (and must) be statically allocated if
+it's exactly "".  Not a useful optimization, I think.
+
+> +		free(n->name);
+> +	free(n);
+> +}
+> +
+> +static void free_node_list(struct node *n)
+> +{
+> +	struct node *next;
+> +
+> +	if (!n)
+> +		return;
+> +
+> +	for (next = n->next_sibling;
+> +	     n;
+> +	     n = next, next = n ? n->next_sibling : NULL) {
+> +		free_node(n);
+> +	}
+> +}
+> +
+> +void free_dt(struct boot_info *bi)
+> +{
+> +	if (!bi)
+> +		return;
+> +
+> +	free_node_list(bi->dt);
+> +	free(bi);
+> +}
 
 -- 
 David Gibson			| I'll have my music baroque, and my code
@@ -97,4 +291,4 @@ Name: not available
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131002/080a5fd4/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131002/8ca918da/attachment-0001.sig>
