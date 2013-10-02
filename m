@@ -1,34 +1,40 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Wed, 02 Oct 2013 14:05:59 +0200
-Subject: [PATCH 3/4] clk: kirkwood: Add CLK_IGNORE_UNUSED to ethernet
- ge0 and ge1 clocks
-In-Reply-To: <20131002120256.GH31178@titan.lakedaemon.net>
-References: <1380575010-8573-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1380575010-8573-4-git-send-email-ezequiel.garcia@free-electrons.com>
- <20131001004009.GK31178@titan.lakedaemon.net>
- <20131001134213.GC2448@localhost> <524AD2F7.4090803@gmail.com>
- <20131001142205.GF2448@localhost> <524ADFAA.40805@gmail.com>
- <20131001164556.GA23874@obsidianresearch.com> <524B1E12.9080302@gmail.com>
- <20131002120256.GH31178@titan.lakedaemon.net>
-Message-ID: <524C0C27.9070107@gmail.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Wed, 2 Oct 2013 08:17:01 -0400
+Subject: [PATCH 1/3] net: mv643xx_eth: update statistics timer from
+ timer context only
+In-Reply-To: <1380711442-24735-2-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1380711442-24735-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1380711442-24735-2-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <20131002121701.GI31178@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/02/2013 02:02 PM, Jason Cooper wrote:
-> On Tue, Oct 01, 2013 at 09:10:10PM +0200, Sebastian Hesselbarth wrote:
-> ...
->> before you jump to prepare a patch for the above, I made one based on
->> my previous work and JasonG's suggestions above. Testing it right now,
->> looks promising.
->>
->> @JasonC: To avoid rebase mess again, where do you want it based against?
->
-> Just base against v3.12-rc1 and we'll see there's going to be any issues
-> with it.  Hopefully, the mv643xx_eth changes can be independent of the
-> other changes...
+On Wed, Oct 02, 2013 at 12:57:20PM +0200, Sebastian Hesselbarth wrote:
+> Each port driver installs a periodic timer to update port statistics
+> by calling mib_counters_update. As mib_counters_update is also called
+> from non-timer context, we should not reschedule the timer there but
+> rather move it to timer-only context.
+> 
+> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> ---
+> Cc: David Miller <davem@davemloft.net>
+> Cc: Lennert Buytenhek <buytenh@wantstofly.org>
+> Cc: Jason Cooper <jason@lakedaemon.net>
+> Cc: netdev at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-kernel at vger.kernel.org
+> ---
+>  drivers/net/ethernet/marvell/mv643xx_eth.c |    4 +---
+>  1 file changed, 1 insertion(+), 3 deletions(-)
 
-Ok, the mv643xx_eth fixes have been sent as fixes for v3.12 while the
-corresponding kirkwood workaround should drop in v3.13. I hopefully find
-some time tonight to prepare workaround patches.
+Acked-by: Jason Cooper <jason@lakedaemon.net>
 
-Sebastian
+Introduced by:
+
+  4ff3495a mv643xx_eth: enforce frequent hardware statistics polling
+
+which goes all the way back to v2.6.28
+
+thx,
+
+Jason.
