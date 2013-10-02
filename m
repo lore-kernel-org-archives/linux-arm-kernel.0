@@ -1,41 +1,36 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Wed, 2 Oct 2013 14:07:48 -0400
-Subject: [PATCH] sched_clock: fix postinit no sched_clock function check
-In-Reply-To: <20131002174841.GH30298@mudshark.cambridge.arm.com>
-References: <1380732928-13897-1-git-send-email-santosh.shilimkar@ti.com>
- <20131002170917.GB30298@mudshark.cambridge.arm.com> <524C5484.5000601@ti.com>
- <524C565C.8010709@codeaurora.org> <524C5786.2090008@ti.com>
- <524C5B10.20006@codeaurora.org>
- <20131002174841.GH30298@mudshark.cambridge.arm.com>
-Message-ID: <524C60F4.7000802@ti.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 2 Oct 2013 19:08:41 +0100
+Subject: [RFC 00/15] Device Tree schemas and validation
+In-Reply-To: <20131002135450.GH6506@voom.fritz.box>
+References: <1380041541-17529-1-git-send-email-bcousson@baylibre.com>
+ <524A8289.3050107@baylibre.com> <524ACB76.1010001@gmail.com>
+ <524AE4FB.4080906@baylibre.com>
+ <CAL_JsqJ31TGFJCSeSOqgee=OLVfSUTAYdF4nSn7X2DiCequVAw@mail.gmail.com>
+ <20131002135450.GH6506@voom.fritz.box>
+Message-ID: <20131002180841.GG27287@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 02 October 2013 01:48 PM, Will Deacon wrote:
-> On Wed, Oct 02, 2013 at 06:42:40PM +0100, Stephen Boyd wrote:
->> On 10/02/13 10:27, Santosh Shilimkar wrote:
->>> Really... I have not created patch out of fun.
->>> Its broken on my keystone machine at least where the sched_clock is
->>> falling back on jiffy based sched_clock even in presence of arch_timer
->>> sched_clock.
->>
->> How is that possible? sched_clock_func is only assigned by
->> arch/arm/kernel/arch_timer.c when the architected timer is detected and
->> sched_clock() in kernel/time/sched_clock.c calls that function pointer
->> unconditionally. The only way I see this happening is if the architected
->> timer rate is zero.
->   ^^^^^^^^^^^^^^^^^^
-> 
-> *cough* CNTFRQ *cough*
-> 
-:) CNTFRQ as such is fine. I think the below print mis-lead me mostly. 
+On Wed, Oct 02, 2013 at 11:54:50PM +1000, David Gibson wrote:
+> On Tue, Oct 01, 2013 at 03:54:20PM -0500, Rob Herring wrote:
 
-sched_clock: ARM arch timer >56 bits at 6144kHz, resolution 162ns
-sched_clock: 32 bits at 100 Hz, resolution 10000000ns, wraps every 4294967286ms
+> > I would expect the schema to replace
+> > Documentation/devicetree/bindings/* over time. I think the thing that
+> > needs to be worked out here is how to add free form multi-line text.
 
-So yes, now the subject patch actually just avoids the jiffy sched_clock()
-registration and nothing else. Even without the patch arch_timer sched_clock
-will be in use.
+> I'm not convinced that's a realistic goal.  As I see it, the
+> fundamental difference between a binding document and a formal schema
+> is that a binding defines both the syntax required of a node, and its
+> semantics, whereas a schema defines only syntax - the semantics still
+> need to be defined somewhere.
 
-Regards,
-Santosh
+So long as the schema lets you include free form text to define the
+semantics I'm not sure there's an incompatibility there - the same
+document can cover both.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131002/af925648/attachment.sig>
