@@ -1,40 +1,44 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Wed,  2 Oct 2013 12:57:22 +0200
-Subject: [PATCH 3/3] net: mv643xx_eth: fix missing device_node for port devices
-In-Reply-To: <1380711442-24735-1-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1380711442-24735-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1380711442-24735-4-git-send-email-sebastian.hesselbarth@gmail.com>
+From: taras.kondratiuk@linaro.org (Taras Kondratiuk)
+Date: Wed,  2 Oct 2013 14:34:16 +0300
+Subject: [RFC PATCH] ARM: Flush L2 cache on soft_restart
+Message-ID: <1380713656-24752-1-git-send-email-taras.kondratiuk@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-DT-based mv643xx_eth probes and creates platform_devices for the
-port devices on its own. To allow fixups for ports based on the
-device_node, we need to set .of_node of the corresponding device
-with the correct node.
+Kexec disables L2 cache before jumping to reboot code,
+but it doesn't flush it. So often just copied reboot code
+gets corrupted, because part of it is stored in L2 cache
+and have not reached memory.
 
-Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
----
-Cc: David Miller <davem@davemloft.net>
-Cc: Lennert Buytenhek <buytenh@wantstofly.org>
-Cc: Jason Cooper <jason@lakedaemon.net>
-Cc: netdev at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
----
- drivers/net/ethernet/marvell/mv643xx_eth.c |    1 +
- 1 file changed, 1 insertion(+)
+Flushing cache prevents this corruption.
 
-diff --git a/drivers/net/ethernet/marvell/mv643xx_eth.c b/drivers/net/ethernet/marvell/mv643xx_eth.c
-index 2364707..2c210ec 100644
---- a/drivers/net/ethernet/marvell/mv643xx_eth.c
-+++ b/drivers/net/ethernet/marvell/mv643xx_eth.c
-@@ -2533,6 +2533,7 @@ static int mv643xx_eth_shared_of_add_port(struct platform_device *pdev,
- 	if (!ppdev)
- 		return -ENOMEM;
- 	ppdev->dev.coherent_dma_mask = DMA_BIT_MASK(32);
-+	ppdev->dev.of_node = pnp;
+I'm facing this issue on Pandaboard ES, but it looks like
+similar issue is observed on TC2 board [1].
+
+[1] http://www.spinics.net/lists/arm-kernel/msg264339.html
+
+Signed-off-by: Taras Kondratiuk <taras.kondratiuk@linaro.org>
+---
+ arch/arm/kernel/process.c |    6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
+index 94f6b05..e359b62 100644
+--- a/arch/arm/kernel/process.c
++++ b/arch/arm/kernel/process.c
+@@ -103,9 +103,11 @@ void soft_restart(unsigned long addr)
+ 	local_irq_disable();
+ 	local_fiq_disable();
  
- 	ret = platform_device_add_resources(ppdev, &res, 1);
- 	if (ret)
+-	/* Disable the L2 if we're the last man standing. */
+-	if (num_online_cpus() == 1)
++	/* Flush and disable the L2 if we're the last man standing. */
++	if (num_online_cpus() == 1) {
++		outer_flush_all();
+ 		outer_disable();
++	}
+ 
+ 	/* Change to the new stack and continue with the reset. */
+ 	call_with_stack(__soft_restart, (void *)addr, (void *)stack);
 -- 
-1.7.10.4
+1.7.9.5
