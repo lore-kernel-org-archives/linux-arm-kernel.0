@@ -1,61 +1,34 @@
-From: hector.palacios@digi.com (Hector Palacios)
-Date: Wed, 2 Oct 2013 14:02:43 +0200
-Subject: [PATCH v2 1/2] serial: mxs-auart: set the FIFO size to DMA buffer size
-In-Reply-To: <1380715364-8025-1-git-send-email-hector.palacios@digi.com>
-References: <1380715364-8025-1-git-send-email-hector.palacios@digi.com>
-Message-ID: <1380715364-8025-2-git-send-email-hector.palacios@digi.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Wed, 02 Oct 2013 14:05:59 +0200
+Subject: [PATCH 3/4] clk: kirkwood: Add CLK_IGNORE_UNUSED to ethernet
+ ge0 and ge1 clocks
+In-Reply-To: <20131002120256.GH31178@titan.lakedaemon.net>
+References: <1380575010-8573-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1380575010-8573-4-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20131001004009.GK31178@titan.lakedaemon.net>
+ <20131001134213.GC2448@localhost> <524AD2F7.4090803@gmail.com>
+ <20131001142205.GF2448@localhost> <524ADFAA.40805@gmail.com>
+ <20131001164556.GA23874@obsidianresearch.com> <524B1E12.9080302@gmail.com>
+ <20131002120256.GH31178@titan.lakedaemon.net>
+Message-ID: <524C0C27.9070107@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When DMA is enabled (with hardware flow control enabled) the FIFO size
-must be set to the size of the DMA buffer, as this is the size the tty
-subsystem can use.
+On 10/02/2013 02:02 PM, Jason Cooper wrote:
+> On Tue, Oct 01, 2013 at 09:10:10PM +0200, Sebastian Hesselbarth wrote:
+> ...
+>> before you jump to prepare a patch for the above, I made one based on
+>> my previous work and JasonG's suggestions above. Testing it right now,
+>> looks promising.
+>>
+>> @JasonC: To avoid rebase mess again, where do you want it based against?
+>
+> Just base against v3.12-rc1 and we'll see there's going to be any issues
+> with it.  Hopefully, the mv643xx_eth changes can be independent of the
+> other changes...
 
-Signed-off-by: Hector Palacios <hector.palacios@digi.com>
----
- drivers/tty/serial/mxs-auart.c | 9 ++++++++-
- 1 file changed, 8 insertions(+), 1 deletion(-)
+Ok, the mv643xx_eth fixes have been sent as fixes for v3.12 while the
+corresponding kirkwood workaround should drop in v3.13. I hopefully find
+some time tonight to prepare workaround patches.
 
-diff --git a/drivers/tty/serial/mxs-auart.c b/drivers/tty/serial/mxs-auart.c
-index f85b8e6..9f046177 100644
---- a/drivers/tty/serial/mxs-auart.c
-+++ b/drivers/tty/serial/mxs-auart.c
-@@ -40,6 +40,7 @@
- #include <asm/cacheflush.h>
- 
- #define MXS_AUART_PORTS 5
-+#define MXS_AUART_FIFO_SIZE		16
- 
- #define AUART_CTRL0			0x00000000
- #define AUART_CTRL0_SET			0x00000004
-@@ -549,6 +550,9 @@ static int mxs_auart_dma_init(struct mxs_auart_port *s)
- 	s->flags |= MXS_AUART_DMA_ENABLED;
- 	dev_dbg(s->dev, "enabled the DMA support.");
- 
-+	/* The DMA buffer is now the FIFO the TTY subsystem can use */
-+	s->port.fifosize = UART_XMIT_SIZE;
-+
- 	return 0;
- 
- err_out:
-@@ -741,6 +745,9 @@ static int mxs_auart_startup(struct uart_port *u)
- 	writel(AUART_INTR_RXIEN | AUART_INTR_RTIEN | AUART_INTR_CTSMIEN,
- 			u->membase + AUART_INTR);
- 
-+	/* Reset FIFO size (it could have changed if DMA was enabled) */
-+	u->fifosize = MXS_AUART_FIFO_SIZE;
-+
- 	/*
- 	 * Enable fifo so all four bytes of a DMA word are written to
- 	 * output (otherwise, only the LSB is written, ie. 1 in 4 bytes)
-@@ -1062,7 +1069,7 @@ static int mxs_auart_probe(struct platform_device *pdev)
- 	s->port.membase = ioremap(r->start, resource_size(r));
- 	s->port.ops = &mxs_auart_ops;
- 	s->port.iotype = UPIO_MEM;
--	s->port.fifosize = 16;
-+	s->port.fifosize = MXS_AUART_FIFO_SIZE;
- 	s->port.uartclk = clk_get_rate(s->clk);
- 	s->port.type = PORT_IMX;
- 	s->port.dev = s->dev = &pdev->dev;
--- 
-1.8.4
+Sebastian
