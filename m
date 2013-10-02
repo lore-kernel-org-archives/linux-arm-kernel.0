@@ -1,43 +1,38 @@
-From: gerlando.falauto@keymile.com (Gerlando Falauto)
-Date: Wed, 02 Oct 2013 15:14:28 +0200
-Subject: [PATCH 0/1] fix MVEBU GPIO driver bug causing kernel hang
-In-Reply-To: <20131002144550.7d28376c@skate>
-References: <1380717118-10860-1-git-send-email-gerlando.falauto@keymile.com>
- <20131002144550.7d28376c@skate>
-Message-ID: <524C1C34.5050403@keymile.com>
+From: jdl@jdl.com (Jon Loeliger)
+Date: Wed, 02 Oct 2013 08:22:58 -0500
+Subject: [RFC 00/15] Device Tree schemas and validation
+In-Reply-To: <524BE66D.7060308@baylibre.com>
+References: <1380041541-17529-1-git-send-email-bcousson@baylibre.com>
+ <524A8289.3050107@baylibre.com> <524ACB76.1010001@gmail.com>
+ <524AE4FB.4080906@baylibre.com> <E1VR1hx-0000C1-6J@jdl.com>
+ <524BE66D.7060308@baylibre.com>
+Message-ID: <E1VRMOI-0006iA-TF@jdl.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+> >
+> > Benoit,
+> >
+> > Sorry, I meant to ask earlier but forgot.
+> > Shouldn't this development be based on the
+> > upstream DTC repository and not the in-kernel
+> > copy of the DTC?
+> 
+> Eventually, yes,
 
-On 10/02/2013 02:45 PM, Thomas Petazzoni wrote:
-> Dear Gerlando Falauto,
->
-> On Wed,  2 Oct 2013 14:31:58 +0200, Gerlando Falauto wrote:
->
->> SIDE NOTE: If I understand correctly, a brand new driver from
->> Sebastian Hesselbarth (drivers/irqchip/irq-orion.c) may replace this driver
->> in the future, but it still misses the IRQ_GC_MASK_CACHE_PER_TYPE bit:
->
-> Hum? The driver you're touching is a GPIO driver, while
-> drivers/irqchip/irq-orion.c is an interrupt controller driver. The
-> gpio-mvebu driver can be used on all mvebu platforms that are DT
-> capable, but the main interrupt controller is different from one
-> platform to another: we already have irq-armada-370-xp.c for Armada
-> 370/XP, while Sebastian's irq-orion.c is for older families of SoCs.
+We should *start* there, though.
 
-My foreword was "if I understand correctly", which I clearly didn't. ;-)
+> but here the main point is to discuss the schema that 
+> will be used to defined bindings.
+> In that case, the DTC patches code are mostly a proof of concept
 
-OK, so Sebastian's rework irq-orion.c is about the MAIN interrupt 
-controller (replaces arch/arm/plat-orion/irq.c), which also cascades 
-interrupts from GPIOs.
-These are then either handled by gpio-mvebu.c (for all platforms which 
-are DT capable) or by arch/arm/plat-orion/gpio.c (legacy).
-Is that right?
+Sure; all that is fine.
 
-> Or maybe I'm missing something?
+> using the Linux kernel as example.
 
-Sorry, I'm the one missing something here... perhaps too much.
+Example?(*)  We shouldn't churn the kernel.
 
-Thanks!
-Gerlando
+jdl
+
+(*) In the sense that *this* Universe is just
+    one example from all known Universes? :-)
