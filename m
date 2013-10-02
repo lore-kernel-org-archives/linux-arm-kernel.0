@@ -1,35 +1,65 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 02 Oct 2013 17:17:41 +0100
-Subject: [PATCH v5 0/4] Target CPU=Host implementation for KVM ARM/ARM64
-In-Reply-To: <20131002160444.GA49034@lvm>
-References: <1380531008-15901-1-git-send-email-anup.patel@linaro.org>
- <20131002160444.GA49034@lvm>
-Message-ID: <524C4725.3060700@arm.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Wed, 2 Oct 2013 12:20:21 -0400
+Subject: [GIT PULL] ARM: mvebu: fixes for v3.12 (round 2)
+Message-ID: <20131002162021.GM31178@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/10/13 17:04, Christoffer Dall wrote:
-> On Mon, Sep 30, 2013 at 02:20:04PM +0530, Anup Patel wrote:
->> It will be very useful for user space (QEMU/KVMTOOL) if it has a
->> method of querying VCPU target type matching to underlying Host.
->> We can use such querying mechanism and implement machine models
->> in user space where VCPU target type is always same-as/similar-to
->> underlying Host (i.e. Target CPU=Host).
->>
->> This patch series implements KVM_ARM_PREFERRED_TARGET vm ioclt for
->> querying VCPU target type matching underlying host. Using this new
->> ioctl we can implement VCPU target CPU=Host in user space.
->>
->> Also, it is not mandatory to call KVM_ARM_PREFERRED_TARGET vm ioctl
->> and the old method of trying all possible target types using the
->> KVM_ARM_VCPU_INIT ioctl to initialize VCPU works fine.
->>
-> Looks good to me, as soon as Marc acks this one, I'll merge it.
+Folks,
 
-Yup, go for it:
+Here's the second round of fixes from mvebu-land for v3.12.  Mostly
+involving catching up the ReadyNAS 102 board from all the changes made
+last merge window.  All three of those are fixing boot/reboot problems
+with that board.
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Jason's patch is fixing the case where the PCIe driver can continue with
+a corrupted resource.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Also, we've noticed that the previous mvebu/fixes pull (tags/fixes-3.12)
+made it into arm-soc/fixes, but hasn't made it into mainline.  Do you
+intend to send a fixes pull to Linus in time for v3.12-rc4?
+
+I only mention it because v3.12-rc3 still hangs at 'calibrating delay
+loop' on the mirabox.  I thought the only fix needed for that made it
+into v3.12-rc3 (through the clocksource tree), but apparently the two
+fixes in arm-soc/fixes are needed as well.
+
+thx,
+
+Jason.
+
+
+The following changes since commit ddf7e399024aa908573a08d6339cefa6253b83db:
+
+  ARM: kirkwood: Fix address of second XOR engine (2013-09-20 03:16:20 +0000)
+
+are available in the git repository at:
+
+  git://git.infradead.org/linux-mvebu.git tags/fixes-3.12-2
+
+for you to fetch changes up to 8553bcad3eca6cdd19c4771c378bd2cf6e25c6b2:
+
+  bus: mvebu-mbus: Fix optional pcie-mem/io-aperture properties (2013-10-01 17:04:17 +0000)
+
+----------------------------------------------------------------
+mvebu fixes for v3.12 (round 2)
+
+ - mvebu
+    - fix ReadyNAS 102 power button (needs to be active high)
+    - fix ReadyNAS 102 automated rebooting (prevent hang) by add gpio-poweroff
+      node
+    - fix booting ReadyNAS 102 by adding MBus ranges and PCIe DT nodes
+    - mvebu-mbus: prevent PCIe driver from continuing with corrupted resource
+
+----------------------------------------------------------------
+Arnaud Ebalard (3):
+      ARM: mvebu: fix ReadyNAS 102 Power button GPIO to make it active high
+      ARM: mvebu: Add DT entry for ReadyNAS 102 to use gpio-poweroff driver
+      ARM: mvebu: add missing DT Mbus ranges and relocate PCIe DT nodes for RN102
+
+Jason Gunthorpe (1):
+      bus: mvebu-mbus: Fix optional pcie-mem/io-aperture properties
+
+ arch/arm/boot/dts/armada-370-netgear-rn102.dts | 49 +++++++++++++++++---------
+ drivers/bus/mvebu-mbus.c                       |  6 ++--
+ 2 files changed, 36 insertions(+), 19 deletions(-)
