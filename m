@@ -1,57 +1,45 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 2 Oct 2013 10:30:14 +0200
-Subject: [PATCH] serial: mxs-auart: wait for DMA buffer to flush before
- shutdown
-In-Reply-To: <524BD4A6.5060208@digi.com>
-References: <1380644315-31581-1-git-send-email-hector.palacios@digi.com>
- <20131001194800.GL2548@pengutronix.de> <524BCBC4.5050708@digi.com>
- <20131002074436.GM2548@pengutronix.de> <524BD4A6.5060208@digi.com>
-Message-ID: <20131002083014.GN2548@pengutronix.de>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Wed, 02 Oct 2013 10:32:42 +0200
+Subject: [Add SMP support for Allwinner A20: PATCH V4 0/3]
+In-Reply-To: <1380642145-17295-1-git-send-email-cinifr@gmail.com>
+References: <1380642145-17295-1-git-send-email-cinifr@gmail.com>
+Message-ID: <524BDA2A.7090108@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Hector,
+On 10/01/2013 05:42 PM, Fan Rong wrote:
 
-On Wed, Oct 02, 2013 at 10:09:10AM +0200, Hector Palacios wrote:
-> On 10/02/2013 09:44 AM, Uwe Kleine-K?nig wrote:
-> >On Wed, Oct 02, 2013 at 09:31:16AM +0200, Hector Palacios wrote:
-> >>On 10/01/2013 09:48 PM, Uwe Kleine-K?nig wrote:
-> >>>On Tue, Oct 01, 2013 at 06:18:35PM +0200, Hector Palacios wrote:
-> >>>>+		/* Wait enough time to flush DMA buffer completely */
-> >>>>+		to = u->timeout * UART_XMIT_SIZE / u->fifosize;
-> >>>u->timeout is the time needed to send one char, right? UART_XMIT_SIZE is
-> >>>the size of the circular buffer, fifosize is the size of the fifo. I
-> >>>don't get what you get by dividing by the fifosize. I would have
-> >>>expected something like:
-> >>>
-> >>>	u->timeout * min(UART_XMIT_SIZE, u->fifosize)
-> >>>
-> >>>Can you explain, maybe in a comment along the code for the next person
-> >>>not understanding?
-> >>
-> >>u->timeout is *not* the time needed to send one char but the time
-> >>needed to flush the complete port fifo (see uart_update_timeout() in
-> >>serial_core.c where it is set).
-> >Ah, right. (BTW, uart_update_timeout should better round up instead of
-> >round down, i.e.
-> >-	port->timeout = (HZ * bits) / baud + HZ/50;
-> >+	port->timeout = DIV_ROUND_UP(HZ * bits, baud) + HZ/50;
-> >)
-> >
-> >>UART_XMIT_SIZE is the number of bytes in the DMA buffer, so I divide
-> >>the max number of bytes in the FIFO by the FIFO size and multiply by
-> >>the FIFO timeout.
-> >ditto here, better round up. Although I think using a completion could
-> >shorten the timeout considerably because there are often less than
-> >UART_XMIT_SIZE chars in the buffer?!
-> 
-> I'm not really waiting the full timeout. I'm checking for TX fifo
-> empty every 1ms and for a maximum of 'to' ms.
-Correct. Still using DIV_ROUND_UP would be better, right?
 
-Best regards
-Uwe
+> This is the version 4 patch. It use smp_prepare_cpus replacing early_init as cpuconfigure map init funcation caller and use sun7i replacing sunxi7i as funcation name and variable name.
+
+Hi Fan,
+
+your patchset does not have a changelog neither a description. You 
+should fix this first if you want a proper review.
+
+Thanks
+   -- Daniel
+
+>
+> Fan Rong (3):
+>    Add smp support for Allwinner A20(sunxi 7i).
+>    Add cpuconfig nodes in dts for smp configure.
+>    Add arch count timer node in dts for Allwinner A20(sunxi 7i).
+>
+>   arch/arm/boot/dts/sun7i-a20.dtsi |  15 ++++++
+>   arch/arm/mach-sunxi/Makefile     |   2 +
+>   arch/arm/mach-sunxi/headsmp.S    |  18 +++++++
+>   arch/arm/mach-sunxi/platsmp.c    | 114 +++++++++++++++++++++++++++++++++++++++
+>   arch/arm/mach-sunxi/sunxi.c      |   3 ++
+>   5 files changed, 152 insertions(+)
+>   create mode 100644 arch/arm/mach-sunxi/headsmp.S
+>   create mode 100644 arch/arm/mach-sunxi/platsmp.c
+>
+
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
