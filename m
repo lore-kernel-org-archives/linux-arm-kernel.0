@@ -1,41 +1,79 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 02 Oct 2013 10:22:36 -0700
-Subject: [PATCH] sched_clock: fix postinit no sched_clock function check
-In-Reply-To: <524C5484.5000601@ti.com>
-References: <1380732928-13897-1-git-send-email-santosh.shilimkar@ti.com>
- <20131002170917.GB30298@mudshark.cambridge.arm.com> <524C5484.5000601@ti.com>
-Message-ID: <524C565C.8010709@codeaurora.org>
+From: konrad.wilk@oracle.com (Konrad Rzeszutek Wilk)
+Date: Wed, 2 Oct 2013 13:22:58 -0400
+Subject: [PATCH v6 15/19] swiotlb-xen: call dma_capable only if
+ dev->dma_mask is allocated
+In-Reply-To: <alpine.DEB.2.02.1310021811030.26077@kaball.uk.xensource.com>
+References: <alpine.DEB.2.02.1309271653420.5498@kaball.uk.xensource.com>
+ <1380298207-29151-15-git-send-email-stefano.stabellini@eu.citrix.com>
+ <20130930160223.GU3106@phenom.dumpdata.com>
+ <alpine.DEB.2.02.1310021811030.26077@kaball.uk.xensource.com>
+Message-ID: <20131002172258.GC24791@phenom.dumpdata.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/02/13 10:14, Santosh Shilimkar wrote:
-> On Wednesday 02 October 2013 01:09 PM, Will Deacon wrote:
->> On Wed, Oct 02, 2013 at 05:55:28PM +0100, Santosh Shilimkar wrote:
->>> The sched_clock code uses 2 levels of function pointers, sched_clock_func()
->>> and read_sched_clock() but the no sched_clock check in postinit() just
->>> checks read_sched_clock().
->>>
->>> This leads to kernel falling back to jiffy based sched clock even in
->>> presence of sched_clock_func() which is not desirable.
->>>
->>> Fix the postinit() check to avoid the issue. Probably the issue is hidden
->>> so far on most of the arm SOCs because of already existing sched_clock
->>> registrations apart from arch_timer sched_clock. One can reproduce the
->>> issue by just have arch_timer as sched_clock
->> Isn't this just an issue with the arch timer driver not calling
->> setup_sched_clock? Instead, we munge around with sched_clock_func directly,
->> which doesn't appear to be the way anybody else deals with this.
->>
-> I thought about that option as well but was not sure since even in that case
-> the check is not complete. We just ensure that function is popullated.
+On Wed, Oct 02, 2013 at 06:13:35PM +0100, Stefano Stabellini wrote:
+> The real issue is that some devices (xgmac, I am looking at you), don't
+> set the dma_mask, even though they are perfectly capable of doing dma.
 
-Yes, nothing is actually broken because sched_clock_func() won't try to
-use the jiffy based read_sched_clock() function. I'm not sure we
-actually need this patch besides to remove a useless timer that updates
-the jiffy epoch. Can we wait until my 64-bit sched_clock patch series
-lands in 3.13? It looks like I still need an ack from Will or Catalin on
-the architected timer patch before the clocksource folks pick it up.
+So this looks like a bug in the drivers. I thought I saw a huge patchset
+by the ARM maintainer that tries to fix the dma_mask and dma_mask_coherent
+bugs? And also fix the drivers to use the dma mask?
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+> 
+> Maybe I should modify the arm implementation of dma_capable (see
+> http://marc.info/?l=linux-kernel&m=138029832007821&w=2) to ignore the
+> dma_mask.
+
+Or fix the 'xgmac'?
+> 
+> On Mon, 30 Sep 2013, Konrad Rzeszutek Wilk wrote:
+> > On Fri, Sep 27, 2013 at 05:10:03PM +0100, Stefano Stabellini wrote:
+> > 
+> > Why? I am looking at X86 and IA64 and I see:
+> > 
+> >  79         if (!dev->dma_mask)                                                     
+> >  80                 return 0;           
+> > 
+> > 
+> > Why not port dma_capable over to ARM?
+> > 
+> > > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> > > ---
+> > >  drivers/xen/swiotlb-xen.c |    6 +++---
+> > >  1 files changed, 3 insertions(+), 3 deletions(-)
+> > > 
+> > > diff --git a/drivers/xen/swiotlb-xen.c b/drivers/xen/swiotlb-xen.c
+> > > index 790c2eb..3011736 100644
+> > > --- a/drivers/xen/swiotlb-xen.c
+> > > +++ b/drivers/xen/swiotlb-xen.c
+> > > @@ -512,7 +512,7 @@ dma_addr_t xen_swiotlb_map_page(struct device *dev, struct page *page,
+> > >  	 * buffering it.
+> > >  	 */
+> > >  	if (!xen_feature(XENFEAT_auto_translated_physmap) &&
+> > > -	    dma_capable(dev, dev_addr, size) &&
+> > > +	    dev->dma_mask && dma_capable(dev, dev_addr, size) &&
+> > >  	    !range_straddles_page_boundary(phys, size) && !swiotlb_force)
+> > >  		return dev_addr;
+> > >  
+> > > @@ -532,7 +532,7 @@ dma_addr_t xen_swiotlb_map_page(struct device *dev, struct page *page,
+> > >  	/*
+> > >  	 * Ensure that the address returned is DMA'ble
+> > >  	 */
+> > > -	if (!dma_capable(dev, dev_addr, size)) {
+> > > +	if (dev->dma_mask && !dma_capable(dev, dev_addr, size)) {
+> > >  		swiotlb_tbl_unmap_single(dev, map, size, dir);
+> > >  		dev_addr = 0;
+> > >  	}
+> > > @@ -660,7 +660,7 @@ xen_swiotlb_map_sg_attrs(struct device *hwdev, struct scatterlist *sgl,
+> > >  
+> > >  		if (swiotlb_force ||
+> > >  		    xen_feature(XENFEAT_auto_translated_physmap) ||
+> > > -		    !dma_capable(hwdev, dev_addr, sg->length) ||
+> > > +		    (hwdev->dma_mask && !dma_capable(hwdev, dev_addr, sg->length)) ||
+> > >  		    range_straddles_page_boundary(paddr, sg->length)) {
+> > >  			/*
+> > >  			 * Pass the dma_addr of the first slab in the iotlb buffer as
+> > > -- 
+> > > 1.7.2.5
+> > > 
+> > 
