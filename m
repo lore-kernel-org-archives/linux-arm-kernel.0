@@ -1,19 +1,19 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 2 Oct 2013 08:17:01 -0400
-Subject: [PATCH 1/3] net: mv643xx_eth: update statistics timer from
- timer context only
-In-Reply-To: <1380711442-24735-2-git-send-email-sebastian.hesselbarth@gmail.com>
+Date: Wed, 2 Oct 2013 08:20:41 -0400
+Subject: [PATCH 2/3] net: mv643xx_eth: fix orphaned statistics timer crash
+In-Reply-To: <1380711442-24735-3-git-send-email-sebastian.hesselbarth@gmail.com>
 References: <1380711442-24735-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1380711442-24735-2-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <20131002121701.GI31178@titan.lakedaemon.net>
+ <1380711442-24735-3-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <20131002122041.GJ31178@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 02, 2013 at 12:57:20PM +0200, Sebastian Hesselbarth wrote:
-> Each port driver installs a periodic timer to update port statistics
-> by calling mib_counters_update. As mib_counters_update is also called
-> from non-timer context, we should not reschedule the timer there but
-> rather move it to timer-only context.
+On Wed, Oct 02, 2013 at 12:57:21PM +0200, Sebastian Hesselbarth wrote:
+> The periodic statistics timer gets started at port _probe() time, but
+> is stopped on _stop() only. In a modular environment, this can cause
+> the timer to access already deallocated memory, if the module is unloaded
+> without starting the eth device. To fix this, we add the timer right
+> before the port is started, instead of at _probe() time.
 > 
 > Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 > ---
@@ -24,8 +24,8 @@ On Wed, Oct 02, 2013 at 12:57:20PM +0200, Sebastian Hesselbarth wrote:
 > Cc: linux-arm-kernel at lists.infradead.org
 > Cc: linux-kernel at vger.kernel.org
 > ---
->  drivers/net/ethernet/marvell/mv643xx_eth.c |    4 +---
->  1 file changed, 1 insertion(+), 3 deletions(-)
+>  drivers/net/ethernet/marvell/mv643xx_eth.c |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 
 Acked-by: Jason Cooper <jason@lakedaemon.net>
 
@@ -33,7 +33,7 @@ Introduced by:
 
   4ff3495a mv643xx_eth: enforce frequent hardware statistics polling
 
-which goes all the way back to v2.6.28
+which also goes all the way back to v2.6.28
 
 thx,
 
