@@ -1,37 +1,52 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 2 Oct 2013 21:56:04 +0100
-Subject: [PATCH] ARM: h3600: update defconfig
-In-Reply-To: <CAAQYJAtWf9UYW3Zxmd+4gW-8aPtWyT0kNqCfRO5MNT_5ig4qCg@mail.gmail.com>
-References: <1380532794-17277-1-git-send-email-linus.walleij@linaro.org>
- <20131002203219.GV12758@n2100.arm.linux.org.uk>
- <CAAQYJAtWf9UYW3Zxmd+4gW-8aPtWyT0kNqCfRO5MNT_5ig4qCg@mail.gmail.com>
-Message-ID: <20131002205604.GX12758@n2100.arm.linux.org.uk>
+Date: Wed, 2 Oct 2013 22:01:33 +0100
+Subject: [RFC PATCH] ARM: Flush L2 cache on soft_restart
+In-Reply-To: <20131002124902.GB29213@mudshark.cambridge.arm.com>
+References: <1380713656-24752-1-git-send-email-taras.kondratiuk@linaro.org>
+ <20131002124902.GB29213@mudshark.cambridge.arm.com>
+Message-ID: <20131002210133.GY12758@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 02, 2013 at 10:47:41PM +0200, Andrea Adami wrote:
-> On Wed, Oct 2, 2013 at 10:32 PM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > On Mon, Sep 30, 2013 at 11:19:54AM +0200, Linus Walleij wrote:
-> >> This updates the h3600 defconfig against the latest kernel with
-> >> some small options coming and going due to Kconfig structure,
-> >> then modernize it to:
-> >>
-> >> - Use EABI to compile the kernel
-> >
-> > EABI on ARMv4 *non-T* and without --fix-v4bx (a) added to the linker
-> > arguments, and (b) V4BX relocations added to the kernel module loader?
-> > Are you sure this is all that's required?
-> >
+On Wed, Oct 02, 2013 at 01:49:03PM +0100, Will Deacon wrote:
+> On Wed, Oct 02, 2013 at 12:34:16PM +0100, Taras Kondratiuk wrote:
+> > Kexec disables L2 cache before jumping to reboot code,
+> > but it doesn't flush it. So often just copied reboot code
+> > gets corrupted, because part of it is stored in L2 cache
+> > and have not reached memory.
+> > 
+> > Flushing cache prevents this corruption.
+> > 
+> > I'm facing this issue on Pandaboard ES, but it looks like
+> > similar issue is observed on TC2 board [1].
 > 
-> Yes, the toolchain built with OpenEmbedded / Yocto Project contains
-> the necessary fixes [1] since end 2012.
-> Runtime tested eglibc and klibc on Zaurus collie.
-> Same binaries even tested on armv5te.
+> TC2 doesn't have an outer cache, so that report is not relevant to this
+> patch.
 > 
-> [1] http://cgit.openembedded.org/openembedded-core/log/?qt=grep&q=armv4
+> > [1] http://www.spinics.net/lists/arm-kernel/msg264339.html
+> > 
+> > Signed-off-by: Taras Kondratiuk <taras.kondratiuk@linaro.org>
+> > ---
+> >  arch/arm/kernel/process.c |    6 ++++--
+> >  1 file changed, 4 insertions(+), 2 deletions(-)
+> > 
+> > diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
+> > index 94f6b05..e359b62 100644
+> > --- a/arch/arm/kernel/process.c
+> > +++ b/arch/arm/kernel/process.c
+> > @@ -103,9 +103,11 @@ void soft_restart(unsigned long addr)
+> >  	local_irq_disable();
+> >  	local_fiq_disable();
+> >  
+> > -	/* Disable the L2 if we're the last man standing. */
+> > -	if (num_online_cpus() == 1)
+> > +	/* Flush and disable the L2 if we're the last man standing. */
+> > +	if (num_online_cpus() == 1) {
+> > +		outer_flush_all();
+> >  		outer_disable();
+> 
+> l2x0_disable already contains a flush, so this doesn't change anything.
 
-Sorry, I don't accept this as an adequate "fix" for the kernel.  It's not
-up to the build environment to provide --fix-v4bx to the kernel makefiles
-to work around this problem.  That's just the sticky plaster fix and not
-proper engineering.
+The disable call _has_ to contain the flush as that's the only way it
+can be disabled to avoid any loss of data when the outer cache stops
+being searched for cache hits.
