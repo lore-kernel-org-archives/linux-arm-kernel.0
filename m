@@ -1,261 +1,37 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Wed, 02 Oct 2013 22:54:15 +0200
-Subject: [PATCH 4/6] ARM: dts: Add initial device tree support for
- EXYNOS5410
-In-Reply-To: <1380644227-12244-5-git-send-email-v.tyrtov@samsung.com>
-References: <1380644227-12244-1-git-send-email-v.tyrtov@samsung.com>
- <1380644227-12244-5-git-send-email-v.tyrtov@samsung.com>
-Message-ID: <14713455.3bE9d8ejOo@flatron>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 2 Oct 2013 21:56:04 +0100
+Subject: [PATCH] ARM: h3600: update defconfig
+In-Reply-To: <CAAQYJAtWf9UYW3Zxmd+4gW-8aPtWyT0kNqCfRO5MNT_5ig4qCg@mail.gmail.com>
+References: <1380532794-17277-1-git-send-email-linus.walleij@linaro.org>
+ <20131002203219.GV12758@n2100.arm.linux.org.uk>
+ <CAAQYJAtWf9UYW3Zxmd+4gW-8aPtWyT0kNqCfRO5MNT_5ig4qCg@mail.gmail.com>
+Message-ID: <20131002205604.GX12758@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vyacheslav, Tarek,
-
-On Tuesday 01 of October 2013 20:17:05 Vyacheslav Tyrtov wrote:
-> From: Tarek Dakhran <t.dakhran@samsung.com>
+On Wed, Oct 02, 2013 at 10:47:41PM +0200, Andrea Adami wrote:
+> On Wed, Oct 2, 2013 at 10:32 PM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > On Mon, Sep 30, 2013 at 11:19:54AM +0200, Linus Walleij wrote:
+> >> This updates the h3600 defconfig against the latest kernel with
+> >> some small options coming and going due to Kconfig structure,
+> >> then modernize it to:
+> >>
+> >> - Use EABI to compile the kernel
+> >
+> > EABI on ARMv4 *non-T* and without --fix-v4bx (a) added to the linker
+> > arguments, and (b) V4BX relocations added to the kernel module loader?
+> > Are you sure this is all that's required?
+> >
 > 
-> Add initial device tree nodes for EXYNOS5410 SoC and SMDK5410 board.
-[snip]
-> +/dts-v1/;
-> +#include "exynos5410.dtsi"
-> +/ {
-> +	model = "Samsung SMDK5410 board based on EXYNOS5410";
-> +	compatible = "samsung,smdk5410", "samsung,exynos5410";
-> +
-> +	memory {
-> +		reg = <0x40000000 0x80000000>;
-> +	};
-> +
-> +	chosen {
-> +		bootargs = "console=ttySAC2,115200";
-> +	};
-> +
-> +	fixed-rate-clocks {
-> +		oscclk {
-> +			compatible = "samsung,exynos5410-oscclk";
-> +			clock-frequency = <24000000>;
-> +		};
-> +	};
+> Yes, the toolchain built with OpenEmbedded / Yocto Project contains
+> the necessary fixes [1] since end 2012.
+> Runtime tested eglibc and klibc on Zaurus collie.
+> Same binaries even tested on armv5te.
+> 
+> [1] http://cgit.openembedded.org/openembedded-core/log/?qt=grep&q=armv4
 
-As I mentioned in my reply to the patch adding the clock driver, please 
-consider using generic fixed rate clock bindings instead of introducing 
-new platform specific ones. I know that previous Exynos SoCs do it this 
-way, but this is no good.
-
-> +
-> +	dwmmc0 at 12200000 {
-
-I believe there has been a patch series renaming these dwmmcX nodes to 
-follow correct DT conventions and doing some more clean-up. IMHO you 
-should consider basing your patch on top of that series.
-
-> +		num-slots = <1>;
-> +		supports-highspeed;
-> +		broken-cd;
-> +		fifo-depth = <0x80>;
-> +		card-detect-delay = <200>;
-> +		samsung,dw-mshc-ciu-div = <3>;
-> +		samsung,dw-mshc-sdr-timing = <2 3>;
-> +		samsung,dw-mshc-ddr-timing = <1 2>;
-
-nit: Please separate subnodes from properties with a blank line.
-
-> +		slot at 0 {
-> +			reg = <0>;
-> +			bus-width = <8>;
-> +		};
-> +	};
-> +
-> +	dwmmc1 at 12210000 {
-> +		status = "disabled";
-
-Oh, the series I mentioned above also corrected the way the status 
-property is used, so board level dtses need to enable nodes which they use 
-instead of disabling nodes they can't use, which makes much more sense, 
-since you don't need to specify nodes in board level dts just to say it's 
-disabled.
-
-> +	};
-> +
-> +	dwmmc2 at 12220000 {
-> +		num-slots = <1>;
-> +		supports-highspeed;
-> +		fifo-depth = <0x80>;
-> +		card-detect-delay = <200>;
-> +		samsung,dw-mshc-ciu-div = <3>;
-> +		samsung,dw-mshc-sdr-timing = <2 3>;
-> +		samsung,dw-mshc-ddr-timing = <1 2>;
-
-nit: A blank line would be nice here.
-
-> +		slot at 0 {
-> +			reg = <0>;
-> +			bus-width = <4>;
-> +			disable-wp;
-> +		};
-> +	};
-> +
-> +};
-> diff --git a/arch/arm/boot/dts/exynos5410.dtsi
-> b/arch/arm/boot/dts/exynos5410.dtsi new file mode 100644
-> index 0000000..c0ea166
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/exynos5410.dtsi
-> @@ -0,0 +1,189 @@
-> +/*
-> + * SAMSUNG EXYNOS5410 SoC device tree source
-> + *
-> + * Copyright (c) 2013 Samsung Electronics Co., Ltd.
-> + *		http://www.samsung.com
-> + *
-> + * SAMSUNG EXYNOS5410 SoC device nodes are listed in this file.
-> + * EXYNOS5410 based board files can include this file and provide
-> + * values for board specfic bindings.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as +
-> * published by the Free Software Foundation.
-> + */
-> +
-> +#include "exynos5.dtsi"
-> +/ {
-> +	compatible = "samsung,exynos5410";
-> +
-> +	cpus {
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +
-> +		CPU0: cpu at 0 {
-> +			device_type = "cpu";
-> +			compatible = "arm,cortex-a15";
-> +			reg = <0>;
-> +			cci-control-port = <&cci_control2>;
-> +			clock-frequency = <1600000000>;
-> +		};
-
-nit: Please keep spacing between nodes.
-
-> +		CPU1: cpu at 1 {
-> +			device_type = "cpu";
-> +			compatible = "arm,cortex-a15";
-> +			reg = <1>;
-> +			cci-control-port = <&cci_control2>;
-> +			clock-frequency = <1600000000>;
-> +		};
-> +		CPU2: cpu at 2 {
-> +			device_type = "cpu";
-> +			compatible = "arm,cortex-a15";
-> +			reg = <2>;
-> +			cci-control-port = <&cci_control2>;
-> +			clock-frequency = <1600000000>;
-> +		};
-> +		CPU3: cpu at 3 {
-> +			device_type = "cpu";
-> +			compatible = "arm,cortex-a15";
-> +			reg = <3>;
-> +			cci-control-port = <&cci_control2>;
-> +			clock-frequency = <1600000000>;
-> +		};
-> +		CPU4: cpu at 4 {
-
-The @unit-address suffix of node name must be equal to first address entry 
-of reg property.
-
-> +			device_type = "cpu";
-> +			compatible = "arm,cortex-a7";
-> +			reg = <0x100>;
-> +			cci-control-port = <&cci_control1>;
-> +			clock-frequency = <1200000000>;
-> +		};
-> +		CPU5: cpu at 5 {
-> +			device_type = "cpu";
-> +			compatible = "arm,cortex-a7";
-> +			reg = <0x101>;
-> +			cci-control-port = <&cci_control1>;
-> +			clock-frequency = <1200000000>;
-> +		};
-> +		CPU6: cpu at 6 {
-> +			device_type = "cpu";
-> +			compatible = "arm,cortex-a7";
-> +			reg = <0x102>;
-> +			cci-control-port = <&cci_control1>;
-> +			clock-frequency = <1200000000>;
-> +		};
-> +		CPU7: cpu at 7 {
-> +			device_type = "cpu";
-> +			compatible = "arm,cortex-a7";
-> +			reg = <0x103>;
-> +			cci-control-port = <&cci_control1>;
-> +			clock-frequency = <1200000000>;
-> +		};
-> +
-> +	};
-> +
-> +	edcs{
-
-nit: Missing space before the brace.
-
-> +		compatible = "samsung,edcs";
-> +	};
-
-Is this a real device? Are bindings for it documented somewhere?
-
-> +
-> +	cci at 10d20000 {
-
-nit: Please be consistent with case of hexadecimal characters.
-
-> +		compatible = "arm,cci-400";
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		reg = <0x10d20000 0x1000>;
-
-nit: Ditto.
-
-> +		ranges = <0 0x10d20000 0x6000>;
-
-nit: Ditto.
-
-> +
-> +		cci_control0: slave-if at 1000 {
-> +			compatible = "arm,cci-400-ctrl-if";
-> +			interface-type = "ace-lite";
-> +			reg = <0x1000 0x1000>;
-> +		};
-> +
-> +		cci_control1: slave-if at 4000 {
-> +			compatible = "arm,cci-400-ctrl-if";
-> +			interface-type = "ace";
-> +			reg = <0x4000 0x1000>;
-> +		};
-> +
-> +		cci_control2: slave-if at 5000 {
-> +			compatible = "arm,cci-400-ctrl-if";
-> +			interface-type = "ace";
-> +			reg = <0x5000 0x1000>;
-> +		};
-> +	};
-> +
-> +	clock: clock-controller at 10010000 {
-> +		compatible = "samsung,exynos5410-clock";
-> +		reg = <0x10010000 0x30000>;
-> +		#clock-cells = <1>;
-> +	};
-> +
-> +
-
-nit: Unnecessary extra blank line.
-
-> +	mct at 101C0000 {
-> +		compatible = "samsung,exynos4210-mct";
-> +		reg = <0x101C0000 0xb00>;
-
-nit: Inconsistent case of hexadecimal characters.
-
-> +		interrupt-controller;
-> +		#interrups-cells = <1>;
-
-I don't think MCT has ever been an interrupt controller.
-
-Best regards,
-Tomasz
+Sorry, I don't accept this as an adequate "fix" for the kernel.  It's not
+up to the build environment to provide --fix-v4bx to the kernel makefiles
+to work around this problem.  That's just the sticky plaster fix and not
+proper engineering.
