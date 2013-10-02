@@ -1,36 +1,47 @@
-From: liljegren.mats2@gmail.com (Mats Liljegren)
-Date: Wed, 2 Oct 2013 15:01:50 +0200
-Subject: Problems with IRQ affinity for timer64
-Message-ID: <CA+xJJ185yai2P0a=5D6boyk2cArtfrHFov7XAQDQ1NqCh9p+Mg@mail.gmail.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Wed, 2 Oct 2013 14:05:50 +0100
+Subject: [PATCH 3/6] ARM: EXYNOS: add Exynos Dual Cluster Support
+In-Reply-To: <alpine.LFD.2.03.1310011451390.21228@syhkavp.arg>
+References: <1380644227-12244-1-git-send-email-v.tyrtov@samsung.com>
+ <1380644227-12244-4-git-send-email-v.tyrtov@samsung.com>
+ <alpine.LFD.2.03.1310011451390.21228@syhkavp.arg>
+Message-ID: <20131002130550.GB3407@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I'm doing a timer driver for timer64 found on a tci6638k2k board. The
-idea is to use it as a generic interrupt source for testing purposes.
+On Tue, Oct 01, 2013 at 03:55:24PM -0400, Nicolas Pitre wrote:
+> On Tue, 1 Oct 2013, Vyacheslav Tyrtov wrote:
+> 
+> > From: Tarek Dakhran <t.dakhran@samsung.com>
 
-I want it to generate interrupts on a specific CPU that I decide. I
-therefore try the following command:
+[...]
 
-echo 8 > /proc/irq/148/smp_affinity
+> > +	kfs_use_count[cpu][cluster]++;
+> > +	if (kfs_use_count[cpu][cluster] == 1) {
+> > +		++core_count[cluster];
+> > +		if (core_count[cluster] == 1) {
+> > +			ret = exynos_cluster_power_up(cluster);
+> > +			if (ret) {
+> > +				pr_err("%s: cluster %u power up error\n",
+> > +					__func__, cluster);
+> > +				return ret;
+> > +			}
+> > +			__cci_control_port_by_index(MAX_NR_CLUSTERS
+> > +					 - cluster, true);
+> 
+> This is wrong and very racy.  The state machine implemented in 
+> mcpm-head.S is there already to handle proper synchronization for you.  
 
-But I get the following message:
+Maybe this issue didn't make itself obvious yet due to the lack of
+suspend support.
 
--sh: echo: write error: Input/output error
+Moving the CCI maintenance to power_up_setup() is essential for suspend/
+resume to work, because then CPUs can power up randomly in response to
+interrupts -- exynos_lock is not sufficient protection in that case.
 
-This is timer18, which is supposed to be dedicated for CPU2 according
-to the board documentation, but interrupts are taken on CPU0.
+The TC2 code should provide a good example of what to do.
 
-Looking at the specification for the driver itself, I cannot see
-anything that the driver itself can do about this. I would expect that
-the interrupt controller handles the affinity request.
+[...]
 
-I use the Arago version of Linux 3.8.4,
-git://arago-project.org/git/projects/linux-keystone.git.
-
-Board information: http://www.ti.com/product/tci6638k2k
-Timer64 device data sheet: http://www.ti.com/lit/ug/sprugv5a/sprugv5a.pdf
-
-What do I need to do to get this working?
-
-Regards
-Mats Liljegren
+Cheers
+---Dave
