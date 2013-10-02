@@ -1,87 +1,31 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Wed, 02 Oct 2013 13:34:34 +0200
-Subject: [PATCH 06/11] USB: OHCI: Properly handle ohci-exynos suspend
-In-Reply-To: <1380708947-15966-7-git-send-email-csmanjuvijay@gmail.com>
-References: <1380708947-15966-1-git-send-email-csmanjuvijay@gmail.com>
- <1380708947-15966-7-git-send-email-csmanjuvijay@gmail.com>
-Message-ID: <1846936.2HI9dODJ1D@amdc1032>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Wed, 2 Oct 2013 08:02:56 -0400
+Subject: [PATCH 3/4] clk: kirkwood: Add CLK_IGNORE_UNUSED to ethernet
+ ge0 and ge1 clocks
+In-Reply-To: <524B1E12.9080302@gmail.com>
+References: <1380575010-8573-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1380575010-8573-4-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20131001004009.GK31178@titan.lakedaemon.net>
+ <20131001134213.GC2448@localhost> <524AD2F7.4090803@gmail.com>
+ <20131001142205.GF2448@localhost> <524ADFAA.40805@gmail.com>
+ <20131001164556.GA23874@obsidianresearch.com>
+ <524B1E12.9080302@gmail.com>
+Message-ID: <20131002120256.GH31178@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-Hi,
-
-On Wednesday, October 02, 2013 03:45:42 PM Majunath Goudar wrote:
-> From: Manjunath Goudar <manjunath.goudar@linaro.org>
+On Tue, Oct 01, 2013 at 09:10:10PM +0200, Sebastian Hesselbarth wrote:
+...
+> before you jump to prepare a patch for the above, I made one based on
+> my previous work and JasonG's suggestions above. Testing it right now,
+> looks promising.
 > 
-> Suspend scenario in case of ohci-exynos glue was not
-> properly handled as it was not suspending generic part
-> of ohci controller. Alan Stern suggested, properly handle
-> ohci-exynos suspend scenario.
-> 
-> Calling explicitly the ohci_suspend() routine in
-> exynos_ohci_suspend() will ensure proper handling of suspend
-> scenario.
-> 
-> Signed-off-by: Manjunath Goudar <manjunath.goudar@linaro.org>
-> Signed-off-by: Manjunath Goudar <csmanjuvijay@gmail.com>
-> Acked-by: Alan Stern <stern@rowland.harvard.edu>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Greg KH <greg@kroah.com>
-> Cc: linux-usb at vger.kernel.org
-> ---
->  drivers/usb/host/ohci-exynos.c |   20 +++++---------------
->  1 file changed, 5 insertions(+), 15 deletions(-)
-> 
-> diff --git a/drivers/usb/host/ohci-exynos.c b/drivers/usb/host/ohci-exynos.c
-> index 3e4bc74..f5f372e 100644
-> --- a/drivers/usb/host/ohci-exynos.c
-> +++ b/drivers/usb/host/ohci-exynos.c
-> @@ -203,24 +203,15 @@ static int exynos_ohci_suspend(struct device *dev)
->  	struct exynos_ohci_hcd *exynos_ohci = to_exynos_ohci(hcd);
->  	struct ohci_hcd *ohci = hcd_to_ohci(hcd);
->  	struct platform_device *pdev = to_platform_device(dev);
-> +	bool do_wakeup = device_may_wakeup(dev);
->  	unsigned long flags;
->  	int rc = 0;
->  
-> -	/*
-> -	 * Root hub was already suspended. Disable irq emission and
-> -	 * mark HW unaccessible, bail out if RH has been resumed. Use
-> -	 * the spinlock to properly synchronize with possible pending
-> -	 * RH suspend or resume activity.
-> -	 */
-> -	spin_lock_irqsave(&ohci->lock, flags);
-> -	if (ohci->rh_state != OHCI_RH_SUSPENDED &&
-> -			ohci->rh_state != OHCI_RH_HALTED) {
-> -		rc = -EINVAL;
-> -		goto fail;
-> -	}
-> -
-> -	clear_bit(HCD_FLAG_HW_ACCESSIBLE, &hcd->flags);
-> +	rc = ohci_suspend(hcd, do_wakeup);
+> @JasonC: To avoid rebase mess again, where do you want it based against?
 
-Maybe it would make sense to cleanup ohci_suspend() first (before adding
-new ohci_suspend() users) and remove unused do_wakeup parameter?
+Just base against v3.12-rc1 and we'll see there's going to be any issues
+with it.  Hopefully, the mv643xx_eth changes can be independent of the
+other changes...
 
-> +	if (rc)
-> +		return rc;
->  
-> +	spin_lock_irqsave(&ohci->lock, flags);
->  	if (exynos_ohci->otg)
->  		exynos_ohci->otg->set_host(exynos_ohci->otg, &hcd->self);
->  
-> @@ -228,7 +219,6 @@ static int exynos_ohci_suspend(struct device *dev)
->  
->  	clk_disable_unprepare(exynos_ohci->clk);
->  
-> -fail:
->  	spin_unlock_irqrestore(&ohci->lock, flags);
->  
->  	return rc;
+thx,
 
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
+Jason.
