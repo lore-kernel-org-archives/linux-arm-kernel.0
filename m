@@ -1,44 +1,58 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Wed, 2 Oct 2013 14:07:49 -0700
-Subject: [PATCH 0/5] Add some missing bits for exynos5250-snow
-In-Reply-To: <1380670860-17621-1-git-send-email-seanpaul@chromium.org>
+Date: Wed, 2 Oct 2013 14:10:18 -0700
+Subject: [PATCH 2/5] ARM: dts: Add dp-controller node to exynos5250-snow
+In-Reply-To: <1380670860-17621-3-git-send-email-seanpaul@chromium.org>
 References: <1380670860-17621-1-git-send-email-seanpaul@chromium.org>
-Message-ID: <CAOesGMijLSoKz9DTmSLr3YY-8=NoB97brhC-rSPj1x8zs1NXKQ@mail.gmail.com>
+ <1380670860-17621-3-git-send-email-seanpaul@chromium.org>
+Message-ID: <CAOesGMj3142o1B_33BqtLZMbObn2tjfBaBHvAB-2+O+XOuCjSw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
 On Tue, Oct 1, 2013 at 4:40 PM, Sean Paul <seanpaul@chromium.org> wrote:
-> This set adds some missing devicetree nodes to the exynos5250-snow file as well
-> as adds a drm_bridge driver for the ptn3460 DP-LVDS chip. This chip is used in
-> the exynos5250-snow board.
+> This patch adds the dp-controller node to the exynos5250-snow board dts
+> file.
 >
-> Sean
+> Signed-off-by: Sean Paul <seanpaul@chromium.org>
+> ---
+>  arch/arm/boot/dts/exynos5250-snow.dts | 12 ++++++++++++
+>  1 file changed, 12 insertions(+)
 >
+> diff --git a/arch/arm/boot/dts/exynos5250-snow.dts b/arch/arm/boot/dts/exynos5250-snow.dts
+> index e5af3f2..780511a 100644
+> --- a/arch/arm/boot/dts/exynos5250-snow.dts
+> +++ b/arch/arm/boot/dts/exynos5250-snow.dts
+> @@ -190,6 +190,18 @@
+>                 samsung,vbus-gpio = <&gpx1 1 0>;
+>         };
 >
-> Sean Paul (5):
->  ARM: dts: Add fimd display-timings for exynos5250-snow
->  ARM: dts: Add dp-controller node to exynos5250-snow
->  drm/bridge: Add PTN3460 bridge driver
->  drm/exynos: Initialize ptn3460 if present
->  ARM: dts: Add ptn3460 to exynos5250-snow
->
-> Documentation/devicetree/bindings/drm/bridge/ptn3460.txt |  27 +++++++++++++++++++++++++
-> arch/arm/boot/dts/exynos5250-snow.dts                    |  48 ++++++++++++++++++++++++++++++++++++++++++++
+> +       dp-controller {
+> +               samsung,color-space = <0>;
+> +               samsung,dynamic-range = <0>;
+> +               samsung,ycbcr-coeff = <0>;
+> +               samsung,color-depth = <1>;
+> +               samsung,link-rate = <0x0a>;
+> +               samsung,lane-count = <2>;
+> +
+> +               pinctrl-names = "default";
+> +               pinctrl-0 = <&dp_hpd>;
+> +       };
 
-This should go in through Kukjin and the arm-soc tree, not through DRM
-(Looking at the actual patch shortly).
+This won't actually do what I think you want. Since the dtsi has the
+node name "dp-controller at 145B0000", you will end up duplicating a new
+node and not build on top of that one.
 
-> drivers/gpu/drm/Kconfig                                  |   2 ++
-> drivers/gpu/drm/Makefile                                 |   1 +
-> drivers/gpu/drm/bridge/Kconfig                           |   4 ++++
-> drivers/gpu/drm/bridge/Makefile                          |   3 +++
-> drivers/gpu/drm/bridge/ptn3460.c                         | 349 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+There's two ways to do it: Always include the unit address, or create
+a label in the dtsi such that:
 
-Tip: When you generate the diffstat, redirect to a file or size your
-window to something less than, oh, 300 characters wide or so. Maybe
-even down to 80. :)
+dp_controller: dp-controller@ {....
+}
+
+Then in your dts you can, at the root level:
+
+&dp_controller {
+  ... new stuff and overrides ...
+};
+
 
 
 -Olof
