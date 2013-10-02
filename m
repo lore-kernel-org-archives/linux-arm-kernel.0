@@ -1,53 +1,43 @@
-From: markus.mayer@linaro.org (Markus Mayer)
-Date: Wed, 2 Oct 2013 11:00:16 -0700
-Subject: [PATCH v3] ARM: dts: bcm281xx: Add card detect GPIO
-Message-ID: <1380736816-16230-1-git-send-email-markus.mayer@linaro.org>
+From: john.stultz@linaro.org (John Stultz)
+Date: Wed, 02 Oct 2013 11:02:58 -0700
+Subject: [PATCH v4 00/17] 64-bit friendly generic sched_clock()
+In-Reply-To: <20131002174700.GF30298@mudshark.cambridge.arm.com>
+References: <1374189690-10810-1-git-send-email-sboyd@codeaurora.org>
+ <51E88170.3080505@linaro.org>
+ <20131002174700.GF30298@mudshark.cambridge.arm.com>
+Message-ID: <524C5FD2.5050406@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Register GPIO 14 as card detect interrupt for the SD card slot.
+On 10/02/2013 10:47 AM, Will Deacon wrote:
+> On Fri, Jul 19, 2013 at 12:59:44AM +0100, John Stultz wrote:
+>> On 07/18/2013 04:21 PM, Stephen Boyd wrote:
+>>> This patchset adds support for 64 bit counters in the generic
+>>> sched_clock code and converts drivers over to use it. Based
+>>> on v3.11-rc1.
+>>>
+>>> Changes since v3:
+>>>   * Move to use seqcount to fix issues with 64-bit cyc counters
+>>>   * Move to hrtimer to fix underflow/overflow errors in wraparound
+>>>     calculation
+>>>   * Use of 1 hour in clocks_calc_mult_shift
+>>>   * Converted over drivers in drivers/clocksource
+>> I've not been able to take a deep review yet, but this looks pretty much 
+>> like what we discussed last week, so I'm happy with it so far. Has this 
+>> gotten much testing (on both 32 and 64bit systems?)
+>>
+>> One detail: Most of this is likely to go in via tip/timers/core, but the 
+>> 5/17 "arch_timer: Move to generic sched_clock" will need some 
+>> synchronization with Catalin to make sure its ok to go in via tip. Not 
+>> sure what other arm64 changes are pending that would depend or collide 
+>> with that change.
+> I wouldn't expect anything more than a trivial Kconfig clash with the arm64
+> tree, if that.
 
-Signed-off-by: Markus Mayer <markus.mayer@linaro.org>
----
+So I also have a branch with these changes based on a branch with only
+the prereqs that are already merged, so I can provide a pull request
+that can go in via the aarch64 tree and won't collide with tip. Would
+that be preferrable?
 
-This patch depends on [PATCH v9 3/3] ARM: bcm281xx: Add device node for
-the GPIO controller
-(http://lists.infradead.org/pipermail/linux-arm-kernel/2013-September/197399.html)
-and should therefore likely go into Christian's tree.
-
-Changes since v2:
-- Add "cd-gpios" to the affected dts files, not the dtsi
-
-Changes since v1:
-- Corrected commit message to mention "card detect"
-
- arch/arm/boot/dts/bcm11351-brt.dts |    1 +
- arch/arm/boot/dts/bcm28155-ap.dts  |    1 +
- 2 files changed, 2 insertions(+)
-
-diff --git a/arch/arm/boot/dts/bcm11351-brt.dts b/arch/arm/boot/dts/bcm11351-brt.dts
-index 9d36eb4..23cd16d 100644
---- a/arch/arm/boot/dts/bcm11351-brt.dts
-+++ b/arch/arm/boot/dts/bcm11351-brt.dts
-@@ -40,6 +40,7 @@
- 
- 	sdio4: sdio at 3f1b0000 {
- 		max-frequency = <48000000>;
-+		cd-gpios = <&gpio 14 0>;
- 		status = "okay";
- 	};
- 
-diff --git a/arch/arm/boot/dts/bcm28155-ap.dts b/arch/arm/boot/dts/bcm28155-ap.dts
-index 96ae67a..08e47c2 100644
---- a/arch/arm/boot/dts/bcm28155-ap.dts
-+++ b/arch/arm/boot/dts/bcm28155-ap.dts
-@@ -40,6 +40,7 @@
- 
- 	sdio4: sdio at 3f1b0000 {
- 		max-frequency = <48000000>;
-+		cd-gpios = <&gpio 14 0>;
- 		status = "okay";
- 	};
- };
--- 
-1.7.9.5
+thanks
+-john
