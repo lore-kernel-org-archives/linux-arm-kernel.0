@@ -1,22 +1,22 @@
 From: csmanjuvijay@gmail.com (Majunath Goudar)
-Date: Wed,  2 Oct 2013 15:45:45 +0530
-Subject: [PATCH 09/11] USB: OHCI: Properly handle ohci-pxa27x suspend
+Date: Wed,  2 Oct 2013 15:45:46 +0530
+Subject: [PATCH 10/11] USB: OHCI: Properly handle ohci-sm501 suspend
 In-Reply-To: <1380708947-15966-1-git-send-email-csmanjuvijay@gmail.com>
 References: <1380708947-15966-1-git-send-email-csmanjuvijay@gmail.com>
-Message-ID: <1380708947-15966-10-git-send-email-csmanjuvijay@gmail.com>
+Message-ID: <1380708947-15966-11-git-send-email-csmanjuvijay@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Manjunath Goudar <manjunath.goudar@linaro.org>
 
-Suspend scenario in case of ohci-pxa27x glue was not
+Suspend scenario in case of ohci-sm501 glue was not
 properly handled as it was not suspending generic part
 of ohci controller.  Alan Stern suggested, properly
-handle ohci-pxa27x suspend scenario.
+handle ohci-sm501 suspend scenario.
 
 Calling explicitly the ohci_suspend() routine in
-ohci_hcd_pxa27x_drv_suspend() will ensure proper
-handling of suspend scenario.
+ohci_sm501_suspend() will ensure proper handling of suspend
+scenario.
 
 Signed-off-by: Manjunath Goudar <manjunath.goudar@linaro.org>
 Signed-off-by: Manjunath Goudar <csmanjuvijay@gmail.com>
@@ -25,20 +25,22 @@ Cc: Arnd Bergmann <arnd@arndb.de>
 Cc: Greg KH <greg@kroah.com>
 Cc: linux-usb at vger.kernel.org
 ---
- drivers/usb/host/ohci-pxa27x.c |    9 ++++++++-
- 1 file changed, 8 insertions(+), 1 deletion(-)
+ drivers/usb/host/ohci-sm501.c |   11 +++++++++--
+ 1 file changed, 9 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/usb/host/ohci-pxa27x.c b/drivers/usb/host/ohci-pxa27x.c
-index c1b1fa3..deea5d1 100644
---- a/drivers/usb/host/ohci-pxa27x.c
-+++ b/drivers/usb/host/ohci-pxa27x.c
-@@ -509,13 +509,20 @@ static int ohci_hcd_pxa27x_drv_suspend(struct device *dev)
- 	struct usb_hcd *hcd = dev_get_drvdata(dev);
- 	struct pxa27x_ohci *pxa_ohci = to_pxa27x_ohci(hcd);
- 	struct ohci_hcd *ohci = hcd_to_ohci(hcd);
+diff --git a/drivers/usb/host/ohci-sm501.c b/drivers/usb/host/ohci-sm501.c
+index d479d5d..2a5de5f 100644
+--- a/drivers/usb/host/ohci-sm501.c
++++ b/drivers/usb/host/ohci-sm501.c
+@@ -216,14 +216,21 @@ static int ohci_hcd_sm501_drv_remove(struct platform_device *pdev)
+ static int ohci_sm501_suspend(struct platform_device *pdev, pm_message_t msg)
+ {
+ 	struct device *dev = &pdev->dev;
+-	struct ohci_hcd	*ohci = hcd_to_ohci(platform_get_drvdata(pdev));
++	struct usb_hcd  *hcd = platform_get_drvdata(pdev);
++	struct ohci_hcd	*ohci = hcd_to_ohci(hcd);
 +	bool do_wakeup = device_may_wakeup(dev);
 +	int ret;
-+
  
  	if (time_before(jiffies, ohci->next_statechange))
  		msleep(5);
@@ -48,11 +50,11 @@ index c1b1fa3..deea5d1 100644
 +	if (ret)
 +		return ret;
 +
- 	pxa27x_stop_hc(pxa_ohci, dev);
+ 	sm501_unit_power(dev->parent, SM501_GATE_USB_HOST, 0);
 -	return 0;
 +	return ret;
  }
  
- static int ohci_hcd_pxa27x_drv_resume(struct device *dev)
+ static int ohci_sm501_resume(struct platform_device *pdev)
 -- 
 1.7.9.5
