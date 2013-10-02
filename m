@@ -1,47 +1,41 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Wed, 2 Oct 2013 13:27:34 -0400
-Subject: [PATCH] sched_clock: fix postinit no sched_clock function check
-In-Reply-To: <524C565C.8010709@codeaurora.org>
-References: <1380732928-13897-1-git-send-email-santosh.shilimkar@ti.com>
- <20131002170917.GB30298@mudshark.cambridge.arm.com> <524C5484.5000601@ti.com>
- <524C565C.8010709@codeaurora.org>
-Message-ID: <524C5786.2090008@ti.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 2 Oct 2013 18:31:31 +0100
+Subject: [RFC PATCH] ARM: Flush L2 cache on soft_restart
+In-Reply-To: <CAArO44ufGbRxX8oWR8AFh5_iw0F4CodVp8M07e3FJ09EixpUOA@mail.gmail.com>
+References: <1380713656-24752-1-git-send-email-taras.kondratiuk@linaro.org>
+ <20131002124902.GB29213@mudshark.cambridge.arm.com>
+ <CAArO44ufGbRxX8oWR8AFh5_iw0F4CodVp8M07e3FJ09EixpUOA@mail.gmail.com>
+Message-ID: <20131002173131.GC30298@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 02 October 2013 01:22 PM, Stephen Boyd wrote:
-> On 10/02/13 10:14, Santosh Shilimkar wrote:
->> On Wednesday 02 October 2013 01:09 PM, Will Deacon wrote:
->>> On Wed, Oct 02, 2013 at 05:55:28PM +0100, Santosh Shilimkar wrote:
->>>> The sched_clock code uses 2 levels of function pointers, sched_clock_func()
->>>> and read_sched_clock() but the no sched_clock check in postinit() just
->>>> checks read_sched_clock().
->>>>
->>>> This leads to kernel falling back to jiffy based sched clock even in
->>>> presence of sched_clock_func() which is not desirable.
->>>>
->>>> Fix the postinit() check to avoid the issue. Probably the issue is hidden
->>>> so far on most of the arm SOCs because of already existing sched_clock
->>>> registrations apart from arch_timer sched_clock. One can reproduce the
->>>> issue by just have arch_timer as sched_clock
->>> Isn't this just an issue with the arch timer driver not calling
->>> setup_sched_clock? Instead, we munge around with sched_clock_func directly,
->>> which doesn't appear to be the way anybody else deals with this.
->>>
->> I thought about that option as well but was not sure since even in that case
->> the check is not complete. We just ensure that function is popullated.
+On Wed, Oct 02, 2013 at 06:19:30PM +0100, Taras Kondratiuk wrote:
+> On 2 October 2013 15:49, Will Deacon <will.deacon@arm.com> wrote:
+> > On Wed, Oct 02, 2013 at 12:34:16PM +0100, Taras Kondratiuk wrote:
+> >> diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
+> >> index 94f6b05..e359b62 100644
+> >> --- a/arch/arm/kernel/process.c
+> >> +++ b/arch/arm/kernel/process.c
+> >> @@ -103,9 +103,11 @@ void soft_restart(unsigned long addr)
+> >>       local_irq_disable();
+> >>       local_fiq_disable();
+> >>
+> >> -     /* Disable the L2 if we're the last man standing. */
+> >> -     if (num_online_cpus() == 1)
+> >> +     /* Flush and disable the L2 if we're the last man standing. */
+> >> +     if (num_online_cpus() == 1) {
+> >> +             outer_flush_all();
+> >>               outer_disable();
+> >
+> > l2x0_disable already contains a flush, so this doesn't change anything.
 > 
-> Yes, nothing is actually broken because sched_clock_func() won't try to
-> use the jiffy based read_sched_clock() function. I'm not sure we
-> actually need this patch besides to remove a useless timer that updates
-> the jiffy epoch. Can we wait until my 64-bit sched_clock patch series
-> lands in 3.13? It looks like I still need an ack from Will or Catalin on
-> the architected timer patch before the clocksource folks pick it up.
-> 
-Really... I have not created patch out of fun.
-Its broken on my keystone machine at least where the sched_clock is
-falling back on jiffy based sched_clock even in presence of arch_timer
-sched_clock.
+> Unfortunately not everybody uses l2x0_disable().
+> SoC's that use SMC calls for L2 cache maintenance have its own implementation
+> of outer_cache.disable which usually doesn't flush cache implicitly.
 
-Regards,
-Santosh
+In which case, we should probably fix the disabling code to make a flush
+then update callers not to bother with redundant flushing. The flushing
+during the disable code is likely required anyway if there's any
+synchronisation going on.
+
+Will
