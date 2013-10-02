@@ -1,96 +1,138 @@
-From: iamjoonsoo.kim@lge.com (=?ks_c_5601-1987?B?sejB2Lz2?=)
-Date: Wed, 2 Oct 2013 14:05:03 +0900
-Subject: Why does unmap_area_sections() depend on !CONFIG_SMP?
-In-Reply-To: <alpine.LFD.2.03.1310011337450.21228@syhkavp.arg>
-References: <20131001095955.GA22859@lge.com>
- <alpine.LFD.2.03.1310011337450.21228@syhkavp.arg>
-Message-ID: <018a01cebf2c$f44175c0$dcc46140$@lge.com>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Wed, 02 Oct 2013 15:06:25 +0900
+Subject: [PATCH] ARM: shmobile: Genmai defconfig
+Message-ID: <20131002060625.18434.218.sendpatchset@w520>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Magnus Damm <damm@opensource.se>
 
+Add a defconfig for the Genmai board. In the future this board will
+use a shared defconfig for multiplatform, but until CCF is implemented
+this will be used.
 
-> -----Original Message-----
-> From: Nicolas Pitre [mailto:nicolas.pitre at linaro.org]
-> Sent: Wednesday, October 02, 2013 3:24 AM
-> To: Joonsoo Kim
-> Cc: Russell King; linux-arm-kernel at lists.infradead.org
-> Subject: Re: Why does unmap_area_sections() depend on !CONFIG_SMP?
-> 
-> On Tue, 1 Oct 2013, Joonsoo Kim wrote:
-> 
-> > Hello, Russell.
-> >
-> > I looked at ioremap code in arm tree and found that
-> > unmap_area_sections() is enabled only if !CONFIG_SMP. I can't
-> > understand the comments above this function and it comes from you.
-> > Could you elaborate more on this?
-> >
-> > I guess that flush_cache_vunmap() before clearing page table and
-> > flush_tlb_kernel_range() after clearing page table is safe enough to
-> > cache consistency regardless CONFIG_SMP configuration. I think that 4K
-> > vunmap() also depends on this flushing logic.
-> >
-> > Please let me know what I am missing here.
-> 
-> This is all related to the page table level involved.
-> 
-> Each entry in the first level page table may refer to a second level page
-> table covering 1MB worth of virtual space, or it may be a direct mapping
-> corresponding to 1MB of contiguous physical memory.
-> 
-> In Linux, all tasks, including kernel threads, have their own first level
-> page table.  On process creation, the top entries covering TASK_SIZE and
-> above in the first level page table is copied from init_mm into the new
-> page table as the kernel address space is meant to be identical across all
-> tasks.
-> 
-> This is however not always the case though.  Consider one call to
-> ioremap() which does create a new entry in the kernel virtual space.
-> In order to ensure that the kernel virtual space is indeed the same across
-> all tasks, the ioremap code would have to walk the entire task list just
-> to update their own copy of the kernel virtual mapping.  So what we do
-> instead is to create the new page table entry in init_mm only, and lazily
-> update the other task's page table when they fault on access due to their
-> own page table being incomplete.
-> 
-> What about iounmap() then.  When a mapping is removed, we don't want it to
-> be accessible through some random task's page table.  Well, in the normal
-> ioremap() case, the actual mapping is created into a second level page
-> table which happens to be common to all tasks.  Hence the first level page
-> table entry being created is actually a pointer to that second level page
-> table, and when a mapping is removed it is only removed from that second
-> level page table.  The second level table itself remains in memory
-forever,
-> ready to be reused for any other call to ioremap().  Therefore there is no
-> need to update each task's first level table again.
-> 
-> So far so good.
-> 
-> Now comes the section mapping for ioremap().  Since this is handled into
-> the first level page table only with no common second level table, we
-> needed a mechanism to ensure that any mapping removal gets propagated to
-> all first level tables in the system.  This is accomplished with a
-> sequence counter namely vmalloc_seq which is incremented whenever such a
-> change occurs.  Upon every task switch, this counter is checked against
-> the master copy to detect when the next task to be scheduled has its first
-> level page table out of date, and if so it is updated before the new
-> memory context is instated.
-> 
-> But... this works only if not SMP.  On SMP, different tasks might be
-> running on the other CPUs and incrementing vmalloc_seq won't have any
-> effect on them.  This is why section mappings for ioremap() is not
-> available if SMP.
-> 
-> This could probably be fixed by sending an IPI to the other processors,
-> forcing them to resync their page table right after clearing the mapping
-> from the master table.  But no one implemented it so far.
+Signed-off-by: Magnus Damm <damm@opensource.se>
+---
 
-Hello, Nicolas.
+ arch/arm/configs/genmai_defconfig |  116 +++++++++++++++++++++++++++++++++++++
+ 1 file changed, 116 insertions(+)
 
-Really thanks for kind explanation.
-Now, I totally understand why it is not available if SMP.
-I will investigate more on this and try to implement that section mapping
-for ioremap() works on SMP.
-
-Thanks.
+--- /dev/null
++++ work/arch/arm/configs/genmai_defconfig	2013-10-02 14:18:10.000000000 +0900
+@@ -0,0 +1,116 @@
++CONFIG_SYSVIPC=y
++CONFIG_NO_HZ=y
++CONFIG_IKCONFIG=y
++CONFIG_IKCONFIG_PROC=y
++CONFIG_LOG_BUF_SHIFT=16
++CONFIG_CC_OPTIMIZE_FOR_SIZE=y
++CONFIG_SYSCTL_SYSCALL=y
++CONFIG_EMBEDDED=y
++CONFIG_PERF_EVENTS=y
++CONFIG_SLAB=y
++# CONFIG_LBDAF is not set
++# CONFIG_BLK_DEV_BSG is not set
++# CONFIG_IOSCHED_DEADLINE is not set
++# CONFIG_IOSCHED_CFQ is not set
++CONFIG_ARCH_SHMOBILE=y
++CONFIG_ARCH_R7S72100=y
++CONFIG_MACH_GENMAI=y
++# CONFIG_SH_TIMER_CMT is not set
++# CONFIG_SH_TIMER_MTU2 is not set
++# CONFIG_SH_TIMER_TMU is not set
++# CONFIG_EM_TIMER_STI is not set
++CONFIG_ARM_ERRATA_430973=y
++CONFIG_ARM_ERRATA_458693=y
++CONFIG_ARM_ERRATA_460075=y
++CONFIG_ARM_ERRATA_743622=y
++CONFIG_ARM_ERRATA_754322=y
++CONFIG_AEABI=y
++# CONFIG_OABI_COMPAT is not set
++CONFIG_FORCE_MAX_ZONEORDER=13
++CONFIG_ZBOOT_ROM_TEXT=0x0
++CONFIG_ZBOOT_ROM_BSS=0x0
++CONFIG_ARM_APPENDED_DTB=y
++CONFIG_KEXEC=y
++CONFIG_AUTO_ZRELADDR=y
++CONFIG_VFP=y
++CONFIG_NEON=y
++# CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
++CONFIG_PM_RUNTIME=y
++CONFIG_NET=y
++CONFIG_PACKET=y
++CONFIG_UNIX=y
++CONFIG_INET=y
++CONFIG_IP_PNP=y
++CONFIG_IP_PNP_DHCP=y
++# CONFIG_INET_XFRM_MODE_TRANSPORT is not set
++# CONFIG_INET_XFRM_MODE_TUNNEL is not set
++# CONFIG_INET_XFRM_MODE_BEET is not set
++# CONFIG_INET_LRO is not set
++# CONFIG_INET_DIAG is not set
++# CONFIG_IPV6 is not set
++# CONFIG_WIRELESS is not set
++CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
++CONFIG_NETDEVICES=y
++# CONFIG_NET_CORE is not set
++# CONFIG_NET_VENDOR_ARC is not set
++# CONFIG_NET_CADENCE is not set
++# CONFIG_NET_VENDOR_BROADCOM is not set
++# CONFIG_NET_VENDOR_CIRRUS is not set
++# CONFIG_NET_VENDOR_FARADAY is not set
++# CONFIG_NET_VENDOR_INTEL is not set
++# CONFIG_NET_VENDOR_MARVELL is not set
++# CONFIG_NET_VENDOR_MICREL is not set
++# CONFIG_NET_VENDOR_NATSEMI is not set
++CONFIG_SH_ETH=y
++# CONFIG_NET_VENDOR_SEEQ is not set
++# CONFIG_NET_VENDOR_SMSC is not set
++# CONFIG_NET_VENDOR_STMICRO is not set
++# CONFIG_NET_VENDOR_VIA is not set
++# CONFIG_NET_VENDOR_WIZNET is not set
++# CONFIG_WLAN is not set
++# CONFIG_INPUT_MOUSEDEV_PSAUX is not set
++CONFIG_INPUT_EVDEV=y
++# CONFIG_KEYBOARD_ATKBD is not set
++# CONFIG_INPUT_MOUSE is not set
++# CONFIG_SERIO is not set
++# CONFIG_LEGACY_PTYS is not set
++CONFIG_SERIAL_SH_SCI=y
++CONFIG_SERIAL_SH_SCI_NR_UARTS=10
++CONFIG_SERIAL_SH_SCI_CONSOLE=y
++# CONFIG_HW_RANDOM is not set
++CONFIG_I2C_SH_MOBILE=y
++# CONFIG_HWMON is not set
++CONFIG_THERMAL=y
++CONFIG_RCAR_THERMAL=y
++CONFIG_REGULATOR=y
++CONFIG_REGULATOR_FIXED_VOLTAGE=y
++CONFIG_DRM=y
++CONFIG_DRM_RCAR_DU=y
++# CONFIG_USB_SUPPORT is not set
++CONFIG_MMC=y
++CONFIG_MMC_SDHI=y
++CONFIG_MMC_SH_MMCIF=y
++CONFIG_NEW_LEDS=y
++CONFIG_LEDS_CLASS=y
++CONFIG_RTC_CLASS=y
++CONFIG_DMADEVICES=y
++CONFIG_SH_DMAE=y
++# CONFIG_IOMMU_SUPPORT is not set
++# CONFIG_DNOTIFY is not set
++CONFIG_MSDOS_FS=y
++CONFIG_VFAT_FS=y
++CONFIG_TMPFS=y
++CONFIG_CONFIGFS_FS=y
++# CONFIG_MISC_FILESYSTEMS is not set
++CONFIG_NFS_FS=y
++CONFIG_NFS_V3_ACL=y
++CONFIG_NFS_V4=y
++CONFIG_NFS_V4_1=y
++CONFIG_ROOT_NFS=y
++CONFIG_NLS_CODEPAGE_437=y
++CONFIG_NLS_ISO8859_1=y
++# CONFIG_ENABLE_WARN_DEPRECATED is not set
++# CONFIG_ENABLE_MUST_CHECK is not set
++# CONFIG_ARM_UNWIND is not set
++# CONFIG_CRYPTO_ANSI_CPRNG is not set
++# CONFIG_CRYPTO_HW is not set
