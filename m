@@ -1,41 +1,103 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 2 Oct 2013 18:31:31 +0100
-Subject: [RFC PATCH] ARM: Flush L2 cache on soft_restart
-In-Reply-To: <CAArO44ufGbRxX8oWR8AFh5_iw0F4CodVp8M07e3FJ09EixpUOA@mail.gmail.com>
-References: <1380713656-24752-1-git-send-email-taras.kondratiuk@linaro.org>
- <20131002124902.GB29213@mudshark.cambridge.arm.com>
- <CAArO44ufGbRxX8oWR8AFh5_iw0F4CodVp8M07e3FJ09EixpUOA@mail.gmail.com>
-Message-ID: <20131002173131.GC30298@mudshark.cambridge.arm.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Wed, 2 Oct 2013 18:31:57 +0100
+Subject: [PATCH v6 12/19] swiotlb: don't assume that
+ io_tlb_start-io_tlb_end is coherent
+In-Reply-To: <20130930155617.GS3106@phenom.dumpdata.com>
+References: <alpine.DEB.2.02.1309271653420.5498@kaball.uk.xensource.com>
+ <1380298207-29151-12-git-send-email-stefano.stabellini@eu.citrix.com>
+ <20130930155617.GS3106@phenom.dumpdata.com>
+Message-ID: <alpine.DEB.2.02.1310021826410.26077@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 02, 2013 at 06:19:30PM +0100, Taras Kondratiuk wrote:
-> On 2 October 2013 15:49, Will Deacon <will.deacon@arm.com> wrote:
-> > On Wed, Oct 02, 2013 at 12:34:16PM +0100, Taras Kondratiuk wrote:
-> >> diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
-> >> index 94f6b05..e359b62 100644
-> >> --- a/arch/arm/kernel/process.c
-> >> +++ b/arch/arm/kernel/process.c
-> >> @@ -103,9 +103,11 @@ void soft_restart(unsigned long addr)
-> >>       local_irq_disable();
-> >>       local_fiq_disable();
-> >>
-> >> -     /* Disable the L2 if we're the last man standing. */
-> >> -     if (num_online_cpus() == 1)
-> >> +     /* Flush and disable the L2 if we're the last man standing. */
-> >> +     if (num_online_cpus() == 1) {
-> >> +             outer_flush_all();
-> >>               outer_disable();
-> >
-> > l2x0_disable already contains a flush, so this doesn't change anything.
+On Mon, 30 Sep 2013, Konrad Rzeszutek Wilk wrote:
+> On Fri, Sep 27, 2013 at 05:10:00PM +0100, Stefano Stabellini wrote:
+> > The swiotlb code has appropriate calls to dma_mark_clean in place for
+> > buffers passed to swiotlb_map_page as an argument. However it assumes
+> > that the swiotlb bounce buffer (io_tlb_start-io_tlb_end) is already
+> > coherent and doesn't need any calls to dma_mark_clean.
+> > 
+> > On ARM the swiotlb bounce buffer is not coherent (the memory is
+> > writealloc while it should be bufferable) and therefore we need to call
+> > dma_mark_clean appropriately on the bounce buffer code paths too.
+> > 
+> > Note that most architecures have an empty dma_mark_clean implementation
+> > anyway.
 > 
-> Unfortunately not everybody uses l2x0_disable().
-> SoC's that use SMC calls for L2 cache maintenance have its own implementation
-> of outer_cache.disable which usually doesn't flush cache implicitly.
+> The other architecture that uses swiotlb is IA64 and that does have
+> an implementation where it touches on page attributes.
+> 
+> Which means I have to figure out why my HP zx6000 won't boot with 3.11 now :-(
+> 
 
-In which case, we should probably fix the disabling code to make a flush
-then update callers not to bother with redundant flushing. The flushing
-during the disable code is likely required anyway if there's any
-synchronisation going on.
+Now this is a very thorny issue.
 
-Will
+Honestly I don't like the dma_mark_clean interface very much: it's one
+big hammer, when we actually need some finesse to handle coherency.
+
+For example on ARM some devices might not need the dma_mark_clean call,
+while others do. Calling it all the times is at the very best
+inefficient and incorrect at worst.
+
+I am thinking of calling the original map/unmap_page functions instead
+(arm_dma_map_page or arm_coherent_dma_map_page in the arm case).
+However in order to do that I would need to add more __get_dma_ops calls in
+both lib/swiotlb.c and drivers/xen/swiotlb-xen.c
+
+
+> > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> > ---
+> >  lib/swiotlb.c |   13 ++++++++++---
+> >  1 files changed, 10 insertions(+), 3 deletions(-)
+> > 
+> > diff --git a/lib/swiotlb.c b/lib/swiotlb.c
+> > index 4e8686c..eb45d17 100644
+> > --- a/lib/swiotlb.c
+> > +++ b/lib/swiotlb.c
+> > @@ -515,6 +515,7 @@ found:
+> >  		io_tlb_orig_addr[index+i] = orig_addr + (i << IO_TLB_SHIFT);
+> >  	if (dir == DMA_TO_DEVICE || dir == DMA_BIDIRECTIONAL)
+> >  		swiotlb_bounce(orig_addr, tlb_addr, size, DMA_TO_DEVICE);
+> > +	dma_mark_clean(phys_to_virt(tlb_addr), size);
+> >  
+> >  	return tlb_addr;
+> >  }
+> > @@ -547,7 +548,10 @@ void swiotlb_tbl_unmap_single(struct device *hwdev, phys_addr_t tlb_addr,
+> >  	 * First, sync the memory before unmapping the entry
+> >  	 */
+> >  	if (orig_addr && ((dir == DMA_FROM_DEVICE) || (dir == DMA_BIDIRECTIONAL)))
+> > +	{
+> > +		dma_mark_clean(phys_to_virt(tlb_addr), size);
+> >  		swiotlb_bounce(orig_addr, tlb_addr, size, DMA_FROM_DEVICE);
+> > +	}
+> >  
+> >  	/*
+> >  	 * Return the buffer to the free list by setting the corresponding
+> > @@ -587,17 +591,20 @@ void swiotlb_tbl_sync_single(struct device *hwdev, phys_addr_t tlb_addr,
+> >  
+> >  	switch (target) {
+> >  	case SYNC_FOR_CPU:
+> > -		if (likely(dir == DMA_FROM_DEVICE || dir == DMA_BIDIRECTIONAL))
+> > +		if (likely(dir == DMA_FROM_DEVICE || dir == DMA_BIDIRECTIONAL)) {
+> > +			dma_mark_clean(phys_to_virt(tlb_addr), size);
+> >  			swiotlb_bounce(orig_addr, tlb_addr,
+> >  				       size, DMA_FROM_DEVICE);
+> > +		}
+> >  		else
+> >  			BUG_ON(dir != DMA_TO_DEVICE);
+> >  		break;
+> >  	case SYNC_FOR_DEVICE:
+> > -		if (likely(dir == DMA_TO_DEVICE || dir == DMA_BIDIRECTIONAL))
+> > +		if (likely(dir == DMA_TO_DEVICE || dir == DMA_BIDIRECTIONAL)) {
+> >  			swiotlb_bounce(orig_addr, tlb_addr,
+> >  				       size, DMA_TO_DEVICE);
+> > -		else
+> > +			dma_mark_clean(phys_to_virt(tlb_addr), size);
+> > +		} else
+> >  			BUG_ON(dir != DMA_FROM_DEVICE);
+> >  		break;
+> >  	default:
+> > -- 
+> > 1.7.2.5
+> > 
+> 
