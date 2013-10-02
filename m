@@ -1,37 +1,64 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 2 Oct 2013 18:47:00 +0100
-Subject: [PATCH v4 00/17] 64-bit friendly generic sched_clock()
-In-Reply-To: <51E88170.3080505@linaro.org>
-References: <1374189690-10810-1-git-send-email-sboyd@codeaurora.org>
- <51E88170.3080505@linaro.org>
-Message-ID: <20131002174700.GF30298@mudshark.cambridge.arm.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Wed, 2 Oct 2013 19:45:51 +0200
+Subject: [PATCH 10/10] pwm-backlight: Allow backlight to remain disabled
+ on boot
+In-Reply-To: <524B198B.3010609@wwwdotorg.org>
+References: <1379972467-11243-1-git-send-email-treding@nvidia.com>
+ <1379972467-11243-11-git-send-email-treding@nvidia.com>
+ <524B198B.3010609@wwwdotorg.org>
+Message-ID: <20131002174550.GA29973@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 19, 2013 at 12:59:44AM +0100, John Stultz wrote:
-> On 07/18/2013 04:21 PM, Stephen Boyd wrote:
-> > This patchset adds support for 64 bit counters in the generic
-> > sched_clock code and converts drivers over to use it. Based
-> > on v3.11-rc1.
-> >
-> > Changes since v3:
-> >   * Move to use seqcount to fix issues with 64-bit cyc counters
-> >   * Move to hrtimer to fix underflow/overflow errors in wraparound
-> >     calculation
-> >   * Use of 1 hour in clocks_calc_mult_shift
-> >   * Converted over drivers in drivers/clocksource
+On Tue, Oct 01, 2013 at 12:50:51PM -0600, Stephen Warren wrote:
+> On 09/23/2013 03:41 PM, Thierry Reding wrote:
+[...]
+> > +	if (gpio_is_valid(pb->enable_gpio)) {
+> > +		if (pb->enable_gpio_flags & PWM_BACKLIGHT_GPIO_ACTIVE_LOW)
+> > +			gpio_set_value(pb->enable_gpio, 0);
+> > +		else
+> > +			gpio_set_value(pb->enable_gpio, 1);
+> > +	}
 > 
-> I've not been able to take a deep review yet, but this looks pretty much 
-> like what we discussed last week, so I'm happy with it so far. Has this 
-> gotten much testing (on both 32 and 64bit systems?)
-> 
-> One detail: Most of this is likely to go in via tip/timers/core, but the 
-> 5/17 "arch_timer: Move to generic sched_clock" will need some 
-> synchronization with Catalin to make sure its ok to go in via tip. Not 
-> sure what other arm64 changes are pending that would depend or collide 
-> with that change.
+> ... That assumes that the backlight is on at boot, and hence presumably
+> after this patch still always turns on the backlight, only to turn it
+> off very quickly once the following code in this patch executes:
 
-I wouldn't expect anything more than a trivial Kconfig clash with the arm64
-tree, if that.
+I was just going to fix this, but then saw that the code in .probe() is
+actually this:
 
-Will
+	if (gpio_is_valid(pb->enable_gpio)) {
+		unsigned long flags;
+
+		if (pb->enable_gpio_flags & PWM_BACKLIGHT_GPIO_ACTIVE_LOW)
+			flags = GPIOF_OUT_INIT_HIGH;
+		else
+			flags = GPIOF_OUT_INIT_LOW;
+
+		ret = gpio_request_one(pb->enable_gpio, flags, "enable");
+		...
+	}
+
+Which sets the backlight up to be disabled by default and is consistent
+with the PWM and regulator setup. Only later, depending on the value of
+boot_off it gets enabled (or stays disabled).
+
+> (and perhaps we also need to avoid turning the backlight off then on if
+> it was already on at boot)
+
+That's true. Although I'm not sure if that's even possible. I think the
+pinctrl driver doesn't touch the registers, but what about the GPIO and
+PWM drivers. It might be impossible to always query the boot status and
+set the internal state based on that. The easiest would probably be if
+both the bootloader and the kernel use the same DT, in which case the
+bootloader could set the backlight-boot-on property, in which case we
+wouldn't need to do anything at .probe() time really.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131002/4cfcbc8f/attachment.sig>
