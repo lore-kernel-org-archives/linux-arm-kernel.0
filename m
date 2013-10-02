@@ -1,48 +1,57 @@
 From: csmanjuvijay@gmail.com (Majunath Goudar)
-Date: Wed,  2 Oct 2013 15:45:36 +0530
-Subject: [PATCH 00/11] USB: OHCI:Properly handle ohci_suspend()routine in bus
- glue
-Message-ID: <1380708947-15966-1-git-send-email-csmanjuvijay@gmail.com>
+Date: Wed,  2 Oct 2013 15:45:37 +0530
+Subject: [PATCH 01/11] USB: OHCI: Properly handle OHCI controller suspend
+In-Reply-To: <1380708947-15966-1-git-send-email-csmanjuvijay@gmail.com>
+References: <1380708947-15966-1-git-send-email-csmanjuvijay@gmail.com>
+Message-ID: <1380708947-15966-2-git-send-email-csmanjuvijay@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Manjunath Goudar <manjunath.goudar@linaro.org>
 
-Suspend scenario in case of ohci bus glue was not properly handled as
-it was not suspending generic part of ohci controller. Alan Stern suggested, 
-properly handle ohci suspend scenario. 
+Suspend scenario in case of OHCI was not properly
+handled in ochi_suspend()routine. Alan Stern
+suggested, properly handle OHCI suspend scenario.
 
-Calling explicitly the ohci_suspend()routine will ensure proper handling
-of suspend scenario.
+This does generic proper handling of suspend
+scenario to all OHCI SOC.
+
+Signed-off-by: Manjunath Goudar <manjunath.goudar@linaro.org>
+Signed-off-by: Manjunath Goudar <csmanjuvijay@gmail.com>
+Acked-by: Alan Stern <stern@rowland.harvard.edu>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Greg KH <greg@kroah.com>
+Cc: linux-usb at vger.kernel.org
+---
+ drivers/usb/host/ohci-hcd.c |    9 ++++++++-
+ 1 file changed, 8 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/usb/host/ohci-hcd.c b/drivers/usb/host/ohci-hcd.c
+index 8ada13f..310bcfe 100644
+--- a/drivers/usb/host/ohci-hcd.c
++++ b/drivers/usb/host/ohci-hcd.c
+@@ -1036,6 +1036,7 @@ int ohci_suspend(struct usb_hcd *hcd, bool do_wakeup)
+ {
+ 	struct ohci_hcd	*ohci = hcd_to_ohci (hcd);
+ 	unsigned long	flags;
++	int		rc = 0;
  
-
-*** BLURB HERE ***
-
-Manjunath Goudar (11):
-  USB: OHCI: Properly handle OHCI controller suspend
-  USB: OHCI: Properly handle ohci-at91 suspend
-  USB: OHCI: Properly handle ohci-s3c2410 suspend
-  USB: OHCI: Properly handle ohci-da8xx suspend
-  USB: OHCI: Properly handle ohci-ep93xx suspend
-  USB: OHCI: Properly handle ohci-exynos suspend
-  USB: OHCI: Properly handle ohci-omap suspend
-  USB: OHCI: Properly handle ohci-platform suspend
-  USB: OHCI: Properly handle ohci-pxa27x suspend
-  USB: OHCI: Properly handle ohci-sm501 suspend
-  USB: OHCI: Properly handle ohci-spear suspend
-
- drivers/usb/host/ohci-at91.c     |   10 ++++++++--
- drivers/usb/host/ohci-da8xx.c    |   15 +++++++++++----
- drivers/usb/host/ohci-ep93xx.c   |   11 +++++++++--
- drivers/usb/host/ohci-exynos.c   |   20 +++++---------------
- drivers/usb/host/ohci-hcd.c      |    9 ++++++++-
- drivers/usb/host/ohci-omap.c     |   13 ++++++++++---
- drivers/usb/host/ohci-platform.c |   11 +++++++++--
- drivers/usb/host/ohci-pxa27x.c   |    9 ++++++++-
- drivers/usb/host/ohci-s3c2410.c  |   21 ++++-----------------
- drivers/usb/host/ohci-sm501.c    |   11 +++++++++--
- drivers/usb/host/ohci-spear.c    |   12 +++++++++---
- 11 files changed, 90 insertions(+), 52 deletions(-)
-
+ 	/* Disable irq emission and mark HW unaccessible. Use
+ 	 * the spinlock to properly synchronize with possible pending
+@@ -1048,7 +1049,13 @@ int ohci_suspend(struct usb_hcd *hcd, bool do_wakeup)
+ 	clear_bit(HCD_FLAG_HW_ACCESSIBLE, &hcd->flags);
+ 	spin_unlock_irqrestore (&ohci->lock, flags);
+ 
+-	return 0;
++	synchronize_irq(hcd->irq);
++
++	if (do_wakeup && HCD_WAKEUP_PENDING(hcd)) {
++		ohci_resume(hcd, false);
++		rc = -EBUSY;
++	}
++	return rc;
+ }
+ EXPORT_SYMBOL_GPL(ohci_suspend);
+ 
 -- 
 1.7.9.5
