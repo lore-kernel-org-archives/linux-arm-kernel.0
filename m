@@ -1,118 +1,139 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Tue, 01 Oct 2013 18:40:31 -0700
-Subject: [PATCH 1/3] clk: Add error handling to clk_fetch_parent_index()
-In-Reply-To: <1380415036-15997-1-git-send-email-tomasz.figa@gmail.com>
-References: <1380415036-15997-1-git-send-email-tomasz.figa@gmail.com>
-Message-ID: <20131002014031.9338.76351@quantum>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 01 Oct 2013 20:01:52 -0600
+Subject: [PATCH] irq: bcm2835: Re-implement the hardware IRQ handler.
+In-Reply-To: <5241489D.4000709@yahoo.com.au>
+References: <1379751251-2799-1-git-send-email-slapdau@yahoo.com.au>
+ <1379755112-19446-1-git-send-email-slapdau@yahoo.com.au>
+ <52410949.8070403@wwwdotorg.org> <5241489D.4000709@yahoo.com.au>
+Message-ID: <524B7E90.30000@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Tomasz Figa (2013-09-28 17:37:14)
-> There are at least two different error cases that can happen in
-> clk_fetch_parent_index() function:
->  - allocation failure,
->  - parent clock lookup failure,
-> however it returns only an u8, which is supposed to contain parent clock
-> index.
+On 09/24/2013 02:09 AM, Craig McGeachie wrote:
+...
+> On 09/24/2013 03:38 PM, Stephen Warren wrote:
+>> On 09/21/2013 03:18 AM, Craig McGeachie wrote:
+>>> The justification for doing this is:
+>>>   * Simplify the decode and dispatch logic to make it easier to under-
+>>>     stand and maintain.
+>>>   * Re-arrange the hardware IRQ numbers to match the numbering scheme of
+>>>     the FIQ register.
+>>
+>> What's the benefit of that change? The bank numbers in the existing
+>> driver match the register naming in the HW (base/pend1/pend2 for bank
+>> 0/1/2).
 > 
-> This patch modified the function to return full int instead allowing
-> positive clock indices and negative error codes to be returned. All
-> users of this function are adjusted as well to handle the return value
-> correctly.
+> Not really. The different types registers from each bank have different
+> bank orderings.  The pending registers go
+> base=0x200/gpu0=0x204/gpu1=0x208.  The enable registers go
+> gpu0=0x210/gpu1=0x214/base=0x218. The disable registers go
+> gpu0=0x21C/gpu1=0x220/base=0x224.  The choice of bank numbering is
+> arbitrary, but given that the pending registers require special handling
+> anyway, I preferred that of the enable/disable registers. And it matches
+> the implied order given the numbering in the FIQ control register.
+
+Ah yes, I guess the enable/status registers are indeed in a different order.
+
+I think this highlights part of why I preferred some aspects of the
+original code; it used a set of lookup tables to map from the SW bank
+number to the register addresses. There were no complicated calculations
+here; just a simple table lookup. It would be possible to re-order the
+banks without changing this.
+
+>> Further on, one of your added comments says "This is the same
+>> numbering scheme used in bits 0..6 of the FIQ register."; what about any
+>> other bits in the FIQ register - do they still not match the renumbered
+>> scheme, or are there just fewer bits in the FIQ register? Either way, I
+>> don't understand why it's useful for the internal IRQ IDs to match the
+>> FIQ register.
 > 
-> Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
+> If you represent the UART interrupt as 57, then if you wish to treat the
+> UART as a FIQ you simply write to the FIQ register like so:
+>   writel_relaxed((BIT(7) | 57), ctrlr.iobase + 0x0C)
+> and write the appropriate bit to the disable registers.  Any other
+> numbering scheme for hardware IRQs requires translation to 57 first so
+> that you can write the correct 7 bit unsigned integer to bits 6:0.
 
-Thanks for the fixes. Taken into clk-next.
+Ah right, I see. Renumbering the banks internally may make sense then.
+You'd still end up needing to translate between the DT bank IDs and
+internal bank IDs though, so I don't know how useful this would be.
 
-Regards,
-Mike
+>> I guess the table of interrupt IDs in BCM2835_ARM_Peripherals.pdf
+>>
+>>>   * Restore the flow of control that re-reads the base pending register
+>>>     after handling any interrupt. The current version handles all
+>>>     interrupts found in a GPU pending register before re-reading the
+>>>     base pending register. In the original Broadcom assembly code, there
+>>>     appear to be defect tracking numbers next to code inserted to create
+>>>     this behaviour.
 
-> ---
->  drivers/clk/clk.c | 25 ++++++++++++++-----------
->  1 file changed, 14 insertions(+), 11 deletions(-)
+BTW, you mentioned "restore" above; while your patch did align the
+upstream Linux driver more closely with the sample code in the PDF, I'm
+not sure that any Linux port actually previously followed that example,
+did it? I'm nit-picking about the semantics of the word "restore" here:-)
+
+>> IIRC, the existing Linux
+>> driver already does this (ignores the bits in PEND1 that are
+>> duplicates).
 > 
-> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-> index a004769..9e0a837 100644
-> --- a/drivers/clk/clk.c
-> +++ b/drivers/clk/clk.c
-> @@ -1080,13 +1080,16 @@ unsigned long clk_get_rate(struct clk *clk)
->  }
->  EXPORT_SYMBOL_GPL(clk_get_rate);
->  
-> -static u8 clk_fetch_parent_index(struct clk *clk, struct clk *parent)
-> +static int clk_fetch_parent_index(struct clk *clk, struct clk *parent)
->  {
-> -       u8 i;
-> +       int i;
->  
-> -       if (!clk->parents)
-> +       if (!clk->parents) {
->                 clk->parents = kzalloc((sizeof(struct clk*) * clk->num_parents),
->                                                                 GFP_KERNEL);
-> +               if (!clk->parents)
-> +                       return -ENOMEM;
-> +       }
->  
->         /*
->          * find index of new parent clock using cached parent ptrs,
-> @@ -1095,15 +1098,15 @@ static u8 clk_fetch_parent_index(struct clk *clk, struct clk *parent)
->          */
->         for (i = 0; i < clk->num_parents; i++) {
->                 if (clk->parents && clk->parents[i] == parent)
-> -                       break;
-> +                       return i;
->                 else if (!strcmp(clk->parent_names[i], parent->name)) {
->                         if (clk->parents)
->                                 clk->parents[i] = __clk_lookup(parent->name);
-> -                       break;
-> +                       return i;
->                 }
->         }
->  
-> -       return i;
-> +       return -EINVAL;
->  }
->  
->  static void clk_reparent(struct clk *clk, struct clk *new_parent)
-> @@ -1265,7 +1268,7 @@ static struct clk *clk_calc_new_rates(struct clk *clk, unsigned long rate)
->         struct clk *old_parent, *parent;
->         unsigned long best_parent_rate = 0;
->         unsigned long new_rate;
-> -       u8 p_index = 0;
-> +       int p_index = 0;
->  
->         /* sanity */
->         if (IS_ERR_OR_NULL(clk))
-> @@ -1306,7 +1309,7 @@ static struct clk *clk_calc_new_rates(struct clk *clk, unsigned long rate)
->         /* try finding the new parent index */
->         if (parent) {
->                 p_index = clk_fetch_parent_index(clk, parent);
-> -               if (p_index == clk->num_parents) {
-> +               if (p_index < 0) {
->                         pr_debug("%s: clk %s can not be parent of clk %s\n",
->                                  __func__, parent->name, clk->name);
->                         return NULL;
-> @@ -1568,7 +1571,7 @@ void __clk_reparent(struct clk *clk, struct clk *new_parent)
->  int clk_set_parent(struct clk *clk, struct clk *parent)
->  {
->         int ret = 0;
-> -       u8 p_index = 0;
-> +       int p_index = 0;
->         unsigned long p_rate = 0;
->  
->         if (!clk)
-> @@ -1597,10 +1600,10 @@ int clk_set_parent(struct clk *clk, struct clk *parent)
->         if (parent) {
->                 p_index = clk_fetch_parent_index(clk, parent);
->                 p_rate = parent->rate;
-> -               if (p_index == clk->num_parents) {
-> +               if (p_index < 0) {
->                         pr_debug("%s: clk %s can not be parent of clk %s\n",
->                                         __func__, parent->name, clk->name);
-> -                       ret = -EINVAL;
-> +                       ret = p_index;
->                         goto out;
->                 }
->         }
-> -- 
-> 1.8.3.2
+> I don't think it does. If it doesn't find any other interrupts in the
+> base pending register it handles the first bank:
+>
+>         } else if (stat & BANK1_HWIRQ) {
+>             armctrl_handle_bank(1, regs);
+> 
+> Then it reads the bits in tight loop handling all that it finds.
+>     while ((stat = readl_relaxed(intc.pending[bank]))) {
+>         irq = MAKE_HWIRQ(bank, ffs(stat) - 1);
+>         handle_IRQ(irq_linear_revmap(intc.domain, irq), regs);
+>     }
+
+Oh yes, the bug is indeed present. That should indeed be fixed.
+
+> So long as new interrupts come in on this register, the base pending
+> register will never be re-read.  Still, there could be memory access
+> ordering and caching behaviour that I'm completely ignorant of, so I
+> could be completely wrong. And it's probably unlikely that interrupts
+> come in that fast.
+> 
+>> This logic doesn't imply that one can't loop reading the
+>> PEND1 register.
+> 
+> No. I just felt that always reading the base pending register and
+> processing the short cut interrupts there lent itself to a natural
+> interrupt prioritisation.
+
+True. I suppose the shortcuts are indeed there because they're
+theoretically higher priority .
+
+>> I'm not sure why a hwirq_xlat table lookup is needed; why not just
+>> return the HW IRQ number directly like the existing code?
+> 
+> Have I managed to cover this elsewhere?
+
+Well, the existing code manages without any kind of lookup table, since
+it numbers the banks in the same order as the enable/disable registers,
+and hard-codes the bank ID parameter to MAKE_HWIRQ() when handling IRQs.
+To my mind, this makes the code a lot simpler...
+
+>>> +static struct irq_chip bmc2835_chip = {
+>>> +    .name = "bmc2835-level",
+>>> +    .irq_mask = bmc2835_mask_irq,
+>>> +    .irq_unmask = bmc2835_unmask_irq,
+>>> +    .irq_ack =  bmc2835_mask_irq,
+>>> +};
+>>
+>> Why should an IRQ be masked by the ack operation?
+> 
+> To be honest, I don't know for sure.  I took my cue from
+> Documentation/arm/Interrupts.
+> 
+> ack    - required.  May be the same function as mask for IRQs
+>          handled by do_level_IRQ.
+> 
+> Some other irq_chips are set up the same way and I can't see any other
+> way of implementing an acknowledgement function.  And my experience with
+> a never ending flow of interrupts while writing the mailbox driver made
+> me think it might be good idea for the BMC2835 as well.
+
+OK, it makes sense to implement that.
