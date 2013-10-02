@@ -1,43 +1,118 @@
-From: bcm@fixthebug.org (Christian Daudt)
-Date: Tue, 1 Oct 2013 18:13:48 -0700
-Subject: [PATCH v2] ARM: dts: bcm281xx: Add card detect GPIO
-In-Reply-To: <1380566353-13815-1-git-send-email-markus.mayer@linaro.org>
-References: <1380566353-13815-1-git-send-email-markus.mayer@linaro.org>
-Message-ID: <CAEPRUYqO0tnXsxP+04cEsi9Bv3EZ0JpN+LwxWbNBQ=aOSwov0g@mail.gmail.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Tue, 01 Oct 2013 18:40:31 -0700
+Subject: [PATCH 1/3] clk: Add error handling to clk_fetch_parent_index()
+In-Reply-To: <1380415036-15997-1-git-send-email-tomasz.figa@gmail.com>
+References: <1380415036-15997-1-git-send-email-tomasz.figa@gmail.com>
+Message-ID: <20131002014031.9338.76351@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 30, 2013 at 11:39 AM, Markus Mayer <markus.mayer@linaro.org> wrote:
-> Register GPIO 14 as card detect interrupt for the SD card slot.
->
-> Signed-off-by: Markus Mayer <markus.mayer@linaro.org>
+Quoting Tomasz Figa (2013-09-28 17:37:14)
+> There are at least two different error cases that can happen in
+> clk_fetch_parent_index() function:
+>  - allocation failure,
+>  - parent clock lookup failure,
+> however it returns only an u8, which is supposed to contain parent clock
+> index.
+> 
+> This patch modified the function to return full int instead allowing
+> positive clock indices and negative error codes to be returned. All
+> users of this function are adjusted as well to handle the return value
+> correctly.
+> 
+> Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
+
+Thanks for the fixes. Taken into clk-next.
+
+Regards,
+Mike
+
 > ---
->
-> Changes since v1:
-> - Corrected commit message to mention "card detect"
->
->  arch/arm/boot/dts/bcm11351.dtsi |    1 +
->  1 file changed, 1 insertion(+)
->
-> diff --git a/arch/arm/boot/dts/bcm11351.dtsi b/arch/arm/boot/dts/bcm11351.dtsi
-> index 05a5aab..d384ed5 100644
-> --- a/arch/arm/boot/dts/bcm11351.dtsi
-> +++ b/arch/arm/boot/dts/bcm11351.dtsi
-> @@ -93,6 +93,7 @@
->                 compatible = "brcm,kona-sdhci";
->                 reg = <0x3f1b0000 0x10000>;
->                 interrupts = <0x0 73 0x4>;
-> +               cd-gpios = <&gpio 14 0>;
->                 status = "disabled";
->         };
->
-> --
-> 1.7.9.5
->
->
-
-Reviewed-by: Christian Daudt <bcm@fixthebug.org>
-Applied to armsoc/for-3.13/dt
-
- thanks,
-   csd
+>  drivers/clk/clk.c | 25 ++++++++++++++-----------
+>  1 file changed, 14 insertions(+), 11 deletions(-)
+> 
+> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+> index a004769..9e0a837 100644
+> --- a/drivers/clk/clk.c
+> +++ b/drivers/clk/clk.c
+> @@ -1080,13 +1080,16 @@ unsigned long clk_get_rate(struct clk *clk)
+>  }
+>  EXPORT_SYMBOL_GPL(clk_get_rate);
+>  
+> -static u8 clk_fetch_parent_index(struct clk *clk, struct clk *parent)
+> +static int clk_fetch_parent_index(struct clk *clk, struct clk *parent)
+>  {
+> -       u8 i;
+> +       int i;
+>  
+> -       if (!clk->parents)
+> +       if (!clk->parents) {
+>                 clk->parents = kzalloc((sizeof(struct clk*) * clk->num_parents),
+>                                                                 GFP_KERNEL);
+> +               if (!clk->parents)
+> +                       return -ENOMEM;
+> +       }
+>  
+>         /*
+>          * find index of new parent clock using cached parent ptrs,
+> @@ -1095,15 +1098,15 @@ static u8 clk_fetch_parent_index(struct clk *clk, struct clk *parent)
+>          */
+>         for (i = 0; i < clk->num_parents; i++) {
+>                 if (clk->parents && clk->parents[i] == parent)
+> -                       break;
+> +                       return i;
+>                 else if (!strcmp(clk->parent_names[i], parent->name)) {
+>                         if (clk->parents)
+>                                 clk->parents[i] = __clk_lookup(parent->name);
+> -                       break;
+> +                       return i;
+>                 }
+>         }
+>  
+> -       return i;
+> +       return -EINVAL;
+>  }
+>  
+>  static void clk_reparent(struct clk *clk, struct clk *new_parent)
+> @@ -1265,7 +1268,7 @@ static struct clk *clk_calc_new_rates(struct clk *clk, unsigned long rate)
+>         struct clk *old_parent, *parent;
+>         unsigned long best_parent_rate = 0;
+>         unsigned long new_rate;
+> -       u8 p_index = 0;
+> +       int p_index = 0;
+>  
+>         /* sanity */
+>         if (IS_ERR_OR_NULL(clk))
+> @@ -1306,7 +1309,7 @@ static struct clk *clk_calc_new_rates(struct clk *clk, unsigned long rate)
+>         /* try finding the new parent index */
+>         if (parent) {
+>                 p_index = clk_fetch_parent_index(clk, parent);
+> -               if (p_index == clk->num_parents) {
+> +               if (p_index < 0) {
+>                         pr_debug("%s: clk %s can not be parent of clk %s\n",
+>                                  __func__, parent->name, clk->name);
+>                         return NULL;
+> @@ -1568,7 +1571,7 @@ void __clk_reparent(struct clk *clk, struct clk *new_parent)
+>  int clk_set_parent(struct clk *clk, struct clk *parent)
+>  {
+>         int ret = 0;
+> -       u8 p_index = 0;
+> +       int p_index = 0;
+>         unsigned long p_rate = 0;
+>  
+>         if (!clk)
+> @@ -1597,10 +1600,10 @@ int clk_set_parent(struct clk *clk, struct clk *parent)
+>         if (parent) {
+>                 p_index = clk_fetch_parent_index(clk, parent);
+>                 p_rate = parent->rate;
+> -               if (p_index == clk->num_parents) {
+> +               if (p_index < 0) {
+>                         pr_debug("%s: clk %s can not be parent of clk %s\n",
+>                                         __func__, parent->name, clk->name);
+> -                       ret = -EINVAL;
+> +                       ret = p_index;
+>                         goto out;
+>                 }
+>         }
+> -- 
+> 1.8.3.2
