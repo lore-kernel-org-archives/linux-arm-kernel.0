@@ -1,44 +1,87 @@
-From: taras.kondratiuk@linaro.org (Taras Kondratiuk)
-Date: Wed,  2 Oct 2013 14:34:16 +0300
-Subject: [RFC PATCH] ARM: Flush L2 cache on soft_restart
-Message-ID: <1380713656-24752-1-git-send-email-taras.kondratiuk@linaro.org>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Wed, 02 Oct 2013 13:34:34 +0200
+Subject: [PATCH 06/11] USB: OHCI: Properly handle ohci-exynos suspend
+In-Reply-To: <1380708947-15966-7-git-send-email-csmanjuvijay@gmail.com>
+References: <1380708947-15966-1-git-send-email-csmanjuvijay@gmail.com>
+ <1380708947-15966-7-git-send-email-csmanjuvijay@gmail.com>
+Message-ID: <1846936.2HI9dODJ1D@amdc1032>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kexec disables L2 cache before jumping to reboot code,
-but it doesn't flush it. So often just copied reboot code
-gets corrupted, because part of it is stored in L2 cache
-and have not reached memory.
 
-Flushing cache prevents this corruption.
+Hi,
 
-I'm facing this issue on Pandaboard ES, but it looks like
-similar issue is observed on TC2 board [1].
+On Wednesday, October 02, 2013 03:45:42 PM Majunath Goudar wrote:
+> From: Manjunath Goudar <manjunath.goudar@linaro.org>
+> 
+> Suspend scenario in case of ohci-exynos glue was not
+> properly handled as it was not suspending generic part
+> of ohci controller. Alan Stern suggested, properly handle
+> ohci-exynos suspend scenario.
+> 
+> Calling explicitly the ohci_suspend() routine in
+> exynos_ohci_suspend() will ensure proper handling of suspend
+> scenario.
+> 
+> Signed-off-by: Manjunath Goudar <manjunath.goudar@linaro.org>
+> Signed-off-by: Manjunath Goudar <csmanjuvijay@gmail.com>
+> Acked-by: Alan Stern <stern@rowland.harvard.edu>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Greg KH <greg@kroah.com>
+> Cc: linux-usb at vger.kernel.org
+> ---
+>  drivers/usb/host/ohci-exynos.c |   20 +++++---------------
+>  1 file changed, 5 insertions(+), 15 deletions(-)
+> 
+> diff --git a/drivers/usb/host/ohci-exynos.c b/drivers/usb/host/ohci-exynos.c
+> index 3e4bc74..f5f372e 100644
+> --- a/drivers/usb/host/ohci-exynos.c
+> +++ b/drivers/usb/host/ohci-exynos.c
+> @@ -203,24 +203,15 @@ static int exynos_ohci_suspend(struct device *dev)
+>  	struct exynos_ohci_hcd *exynos_ohci = to_exynos_ohci(hcd);
+>  	struct ohci_hcd *ohci = hcd_to_ohci(hcd);
+>  	struct platform_device *pdev = to_platform_device(dev);
+> +	bool do_wakeup = device_may_wakeup(dev);
+>  	unsigned long flags;
+>  	int rc = 0;
+>  
+> -	/*
+> -	 * Root hub was already suspended. Disable irq emission and
+> -	 * mark HW unaccessible, bail out if RH has been resumed. Use
+> -	 * the spinlock to properly synchronize with possible pending
+> -	 * RH suspend or resume activity.
+> -	 */
+> -	spin_lock_irqsave(&ohci->lock, flags);
+> -	if (ohci->rh_state != OHCI_RH_SUSPENDED &&
+> -			ohci->rh_state != OHCI_RH_HALTED) {
+> -		rc = -EINVAL;
+> -		goto fail;
+> -	}
+> -
+> -	clear_bit(HCD_FLAG_HW_ACCESSIBLE, &hcd->flags);
+> +	rc = ohci_suspend(hcd, do_wakeup);
 
-[1] http://www.spinics.net/lists/arm-kernel/msg264339.html
+Maybe it would make sense to cleanup ohci_suspend() first (before adding
+new ohci_suspend() users) and remove unused do_wakeup parameter?
 
-Signed-off-by: Taras Kondratiuk <taras.kondratiuk@linaro.org>
----
- arch/arm/kernel/process.c |    6 ++++--
- 1 file changed, 4 insertions(+), 2 deletions(-)
+> +	if (rc)
+> +		return rc;
+>  
+> +	spin_lock_irqsave(&ohci->lock, flags);
+>  	if (exynos_ohci->otg)
+>  		exynos_ohci->otg->set_host(exynos_ohci->otg, &hcd->self);
+>  
+> @@ -228,7 +219,6 @@ static int exynos_ohci_suspend(struct device *dev)
+>  
+>  	clk_disable_unprepare(exynos_ohci->clk);
+>  
+> -fail:
+>  	spin_unlock_irqrestore(&ohci->lock, flags);
+>  
+>  	return rc;
 
-diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
-index 94f6b05..e359b62 100644
---- a/arch/arm/kernel/process.c
-+++ b/arch/arm/kernel/process.c
-@@ -103,9 +103,11 @@ void soft_restart(unsigned long addr)
- 	local_irq_disable();
- 	local_fiq_disable();
- 
--	/* Disable the L2 if we're the last man standing. */
--	if (num_online_cpus() == 1)
-+	/* Flush and disable the L2 if we're the last man standing. */
-+	if (num_online_cpus() == 1) {
-+		outer_flush_all();
- 		outer_disable();
-+	}
- 
- 	/* Change to the new stack and continue with the reset. */
- 	call_with_stack(__soft_restart, (void *)addr, (void *)stack);
--- 
-1.7.9.5
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
