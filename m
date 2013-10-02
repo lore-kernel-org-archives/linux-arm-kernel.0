@@ -1,89 +1,88 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed,  2 Oct 2013 12:07:05 -0700
-Subject: [PATCH v2 8/9] clk: msm: Add support for MSM8960's multimedia clock
- controller (MMCC)
+Date: Wed,  2 Oct 2013 12:07:04 -0700
+Subject: [PATCH v2 7/9] clk: msm: Add support for MSM8960's global clock
+ controller (GCC)
 In-Reply-To: <1380740826-29457-1-git-send-email-sboyd@codeaurora.org>
 References: <1380740826-29457-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1380740826-29457-9-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1380740826-29457-8-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a driver for the multimedia clock controller found on MSM
-8960 based platforms. This should allow multimedia device drivers
-to probe and control their clocks.
+Add a driver for the global clock controller found on MSM8960
+based platforms. This should allow most non-multimedia device
+drivers to probe and control their clocks.
 
 TODO: Fill out reset of data and define all clocks
 
 Cc: <devicetree@vger.kernel.org>
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- .../devicetree/bindings/clock/qcom,mmcc.txt        |  19 ++
- drivers/clk/msm/Kconfig                            |   9 +
- drivers/clk/msm/Makefile                           |   1 +
- drivers/clk/msm/mmcc-8960.c                        | 297 +++++++++++++++++++++
- include/dt-bindings/clk/msm-mmcc-8960.h            |  24 ++
- 5 files changed, 350 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/clock/qcom,mmcc.txt
- create mode 100644 drivers/clk/msm/mmcc-8960.c
- create mode 100644 include/dt-bindings/clk/msm-mmcc-8960.h
+ .../devicetree/bindings/clock/qcom,gcc.txt         |  19 +
+ drivers/clk/msm/Kconfig                            |   7 +
+ drivers/clk/msm/Makefile                           |   2 +
+ drivers/clk/msm/gcc-8960.c                         | 381 +++++++++++++++++++++
+ include/dt-bindings/clk/msm-gcc-8960.h             |  28 ++
+ 5 files changed, 437 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/clock/qcom,gcc.txt
+ create mode 100644 drivers/clk/msm/gcc-8960.c
+ create mode 100644 include/dt-bindings/clk/msm-gcc-8960.h
 
-diff --git a/Documentation/devicetree/bindings/clock/qcom,mmcc.txt b/Documentation/devicetree/bindings/clock/qcom,mmcc.txt
+diff --git a/Documentation/devicetree/bindings/clock/qcom,gcc.txt b/Documentation/devicetree/bindings/clock/qcom,gcc.txt
 new file mode 100644
-index 0000000..c29d472
+index 0000000..e31423a
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/clock/qcom,mmcc.txt
++++ b/Documentation/devicetree/bindings/clock/qcom,gcc.txt
 @@ -0,0 +1,19 @@
-+MSM Multimedia Clock Controller Binding
-+-----------------------------------------
++MSM Global Clock Controller Binding
++-----------------------------------
 +
 +Required properties :
-+- compatible : shall contain at least "qcom,mmcc" and only one of the
++- compatible : shall contain at least "qcom,gcc" and only one of the
 +	       following:
 +
-+			"qcom,mmcc-8660"
-+			"qcom,mmcc-8960"
++			"qcom,gcc-8660"
++			"qcom,gcc-8960"
 +
 +- reg : shall contain base register location and length
 +- #clock-cells : shall contain 1
 +
 +Example:
-+	clock-controller at 4000000 {
-+		compatible = "qcom,mmcc-8960", "qcom,mmcc";
-+		reg = <0x4000000 0x1000>;
++	clock-controller at 900000 {
++		compatible = "qcom,gcc-8960", "qcom,gcc";
++		reg = <0x900000 0x4000>;
 +		#clock-cells = <1>;
 +	};
 diff --git a/drivers/clk/msm/Kconfig b/drivers/clk/msm/Kconfig
-index 241fafc..66f5ccf 100644
+index 91558ce..241fafc 100644
 --- a/drivers/clk/msm/Kconfig
 +++ b/drivers/clk/msm/Kconfig
-@@ -10,3 +10,12 @@ config MSM_GCC_8960
- 	  Support for the global clock controller on msm8960 devices.
- 	  Say Y if you want to use peripheral devices such as UART, SPI,
- 	  i2c, USB, SD/eMMC, SATA, PCIe, etc.
-+
-+config MSM_MMCC_8960
-+	tristate "MSM8960 Multimedia Clock Controller"
-+	select MSM_GCC_8960
+@@ -3,3 +3,10 @@ config COMMON_CLK_MSM
+ 	depends on OF
+ 	select REGMAP_MMIO
+ 
++config MSM_GCC_8960
++	tristate "MSM8960 Global Clock Controller"
 +	depends on COMMON_CLK_MSM
 +	help
-+	  Support for the multimedia clock controller on msm8960 devices.
-+	  Say Y if you want to support multimedia devices such as display,
-+	  graphics, video encode/decode, camera, etc.
++	  Support for the global clock controller on msm8960 devices.
++	  Say Y if you want to use peripheral devices such as UART, SPI,
++	  i2c, USB, SD/eMMC, SATA, PCIe, etc.
 diff --git a/drivers/clk/msm/Makefile b/drivers/clk/msm/Makefile
-index 804fbe1..f6ceb52 100644
+index e1cee29..804fbe1 100644
 --- a/drivers/clk/msm/Makefile
 +++ b/drivers/clk/msm/Makefile
-@@ -6,3 +6,4 @@ clk-msm-$(CONFIG_COMMON_CLK_MSM) += clk-rcg2.o
+@@ -4,3 +4,5 @@ clk-msm-$(CONFIG_COMMON_CLK_MSM) += clk-pll.o
+ clk-msm-$(CONFIG_COMMON_CLK_MSM) += clk-rcg.o
+ clk-msm-$(CONFIG_COMMON_CLK_MSM) += clk-rcg2.o
  clk-msm-$(CONFIG_COMMON_CLK_MSM) += clk-branch.o
- 
- obj-$(CONFIG_MSM_GCC_8960) += gcc-8960.o
-+obj-$(CONFIG_MSM_MMCC_8960) += mmcc-8960.o
-diff --git a/drivers/clk/msm/mmcc-8960.c b/drivers/clk/msm/mmcc-8960.c
++
++obj-$(CONFIG_MSM_GCC_8960) += gcc-8960.o
+diff --git a/drivers/clk/msm/gcc-8960.c b/drivers/clk/msm/gcc-8960.c
 new file mode 100644
-index 0000000..ea660ab
+index 0000000..41c8a2f
 --- /dev/null
-+++ b/drivers/clk/msm/mmcc-8960.c
-@@ -0,0 +1,297 @@
++++ b/drivers/clk/msm/gcc-8960.c
+@@ -0,0 +1,381 @@
 +/*
 + * Copyright (c) 2013, The Linux Foundation. All rights reserved.
 + *
@@ -106,112 +105,110 @@ index 0000000..ea660ab
 +#include <linux/clk-provider.h>
 +#include <linux/regmap.h>
 +
-+#include <dt-bindings/clk/msm-mmcc-8960.h>
++#include <dt-bindings/clk/msm-gcc-8960.h>
 +
 +#include "clk-pll.h"
 +#include "clk-rcg.h"
 +#include "clk-branch.h"
 +
-+static struct clk_pll pll2 = {
-+	.l_reg = 0x320,
-+	.m_reg = 0x324,
-+	.n_reg = 0x328,
-+	.config_reg = 0x32c,
-+	.mode_reg = 0x31c,
-+	.status_reg = 0x334,
++static struct clk_pll pll8 = {
++	.l_reg = 0x3144,
++	.m_reg = 0x3148,
++	.n_reg = 0x314c,
++	.config_reg = 0x3154,
++	.mode_reg = 0x3140,
++	.status_reg = 0x3158,
 +	.status_bit = 16,
 +	.hw.init = &(struct clk_init_data){
-+		.name = "pll2",
++		.name = "pll8",
 +		.parent_names = (const char *[]){ "pxo" },
 +		.num_parents = 1,
 +		.ops = &clk_pll_ops,
 +	},
 +};
 +
-+#define P_PXO	0
-+#define P_PLL2	1
-+#define P_PLL8	2
-+
-+static u8 mmcc_pxo_pll2_pll8_map[] = {
-+	[P_PXO]		= 0,
-+	[P_PLL2]	= 1,
-+	[P_PLL8]	= 2,
++static struct clk_hw pll8_vote = {
++	.enable_reg = 0x34c0,
++	.enable_mask = BIT(8),
++	.init = &(struct clk_init_data){
++		.name = "pll8_vote",
++		.parent_names = (const char *[]){ "pll8" },
++		.num_parents = 1,
++		.ops = &clk_pll_vote_ops,
++	},
 +};
 +
-+static struct freq_tbl clk_tbl_mdp[] = {
-+	{   9600000, P_PLL8, 0, 1, 40 },
-+	{  13710000, P_PLL8, 0, 1, 28 },
-+	{  27000000, P_PXO,  0, 0,  0 },
-+	{  29540000, P_PLL8, 0, 1, 13 },
-+	{  34910000, P_PLL8, 0, 1, 11 },
-+	{  38400000, P_PLL8, 0, 1, 10 },
-+	{  59080000, P_PLL8, 0, 2, 13 },
-+	{  76800000, P_PLL8, 0, 1,  5 },
-+	{  85330000, P_PLL8, 0, 2,  9 },
-+	{  96000000, P_PLL8, 0, 1,  4 },
-+	{ 128000000, P_PLL8, 0, 1,  3 },
-+	{ 160000000, P_PLL2, 0, 1,  5 },
-+	{ 177780000, P_PLL2, 0, 2,  9 },
-+	{ 200000000, P_PLL2, 0, 1,  4 },
-+	{ 228571000, P_PLL2, 0, 2,  7 },
-+	{ 266667000, P_PLL2, 0, 1,  3 },
++#define P_PXO	0
++#define P_PLL8	1
++
++static u8 gcc_pxo_pll8_map[] = {
++	[P_PXO]		= 0,
++	[P_PLL8]	= 3,
++};
++
++static struct freq_tbl clk_tbl_gsbi_uart[] = {
++	{  1843200, P_PLL8, 2,  6, 625 },
++	{  3686400, P_PLL8, 2, 12, 625 },
++	{  7372800, P_PLL8, 2, 24, 625 },
++	{ 14745600, P_PLL8, 2, 48, 625 },
++	{ 16000000, P_PLL8, 4,  1,   6 },
++	{ 24000000, P_PLL8, 4,  1,   4 },
++	{ 32000000, P_PLL8, 4,  1,   3 },
++	{ 40000000, P_PLL8, 1,  5,  48 },
++	{ 46400000, P_PLL8, 1, 29, 240 },
++	{ 48000000, P_PLL8, 4,  1,   2 },
++	{ 51200000, P_PLL8, 1,  2,  15 },
++	{ 56000000, P_PLL8, 1,  7,  48 },
++	{ 58982400, P_PLL8, 1, 96, 625 },
++	{ 64000000, P_PLL8, 2,  1,   3 },
 +	{ }
 +};
 +
-+static struct clk_dyn_rcg mdp_rcg = {
-+	.ns_reg = 0xd0,
-+	.md_reg[0] = 0xc4,
-+	.md_reg[1] = 0xc8,
-+	.mn[0] = {
++static struct clk_rcg gsbi5_uart_rcg = {
++	.ns_reg = 0x2a54,
++	.md_reg = 0x2a50,
++	.mn = {
 +		.mnctr_en_bit = 8,
-+		.mnctr_reset_bit = 31,
-+		.mnctr_mode_shift = 9,
-+		.n_val_shift = 22,
-+		.m_val_shift = 8,
-+		.width = 8,
++		.mnctr_reset_bit = 7,
++		.mnctr_mode_shift = 5,
++		.n_val_shift = 16,
++		.m_val_shift = 16,
++		.width = 16,
 +	},
-+	.mn[1] = {
-+		.mnctr_en_bit = 5,
-+		.mnctr_reset_bit = 30,
-+		.mnctr_mode_shift = 6,
-+		.n_val_shift = 14,
-+		.m_val_shift = 8,
-+		.width = 8,
++	.p = {
++		.pre_div_shift = 3,
++		.pre_div_width = 2,
 +	},
-+	.s[0] = {
-+		.src_sel_shift = 3,
-+		.parent_map = mmcc_pxo_pll2_pll8_map,
-+	},
-+	.s[1] = {
++	.s = {
 +		.src_sel_shift = 0,
-+		.parent_map = mmcc_pxo_pll2_pll8_map,
++		.parent_map = gcc_pxo_pll8_map,
 +	},
-+	.mux_sel_bit = 11,
-+	.freq_tbl = clk_tbl_mdp,
++	.freq_tbl = clk_tbl_gsbi_uart,
 +	.hw = {
-+		.enable_reg = 0xc0,
-+		.enable_mask = BIT(2),
++		.enable_reg = 0x2a54,
++		.enable_mask = BIT(11),
 +		.init = &(struct clk_init_data){
-+			.name = "mdp_rcg",
++			.name = "gsbi5_uart_rcg",
 +			.parent_names = (const char *[]){
-+				"pxo", "pll2", "pll8_vote"
++				"pxo",
++				"pll8_vote",
 +			},
-+			.num_parents = 3,
-+			.ops = &clk_dyn_rcg_ops,
++			.num_parents = 2,
++			.ops = &clk_rcg_ops,
 +		},
 +	},
 +};
 +
-+static struct clk_branch mdp_cxc = {
-+	.halt_reg = 0x1d0,
-+	.halt_bit = 10,
++static struct clk_branch gsbi5_uart_cxc = {
++	.halt_reg = 0x2fd0,
++	.halt_bit = 22,
 +	.hw = {
-+		.enable_reg = 0xc0,
-+		.enable_mask = BIT(0),
++		.enable_reg = 0x2a54,
++		.enable_mask = BIT(9),
 +		.init = &(struct clk_init_data){
-+			.name = "mdp_cxc",
++			.name = "gsbi5_uart_cxc",
 +			.parent_names = (const char *[]){
-+				"mdp_rcg",
++				"gsbi5_uart_rcg",
 +			},
 +			.num_parents = 1,
 +			.ops = &clk_branch_ops,
@@ -219,68 +216,131 @@ index 0000000..ea660ab
 +	},
 +};
 +
-+static struct freq_tbl clk_tbl_rot[] = {
-+	{  27000000, P_PXO,   1 },
-+	{  29540000, P_PLL8, 13 },
-+	{  32000000, P_PLL8, 12 },
-+	{  38400000, P_PLL8, 10 },
-+	{  48000000, P_PLL8,  8 },
-+	{  54860000, P_PLL8,  7 },
-+	{  64000000, P_PLL8,  6 },
-+	{  76800000, P_PLL8,  5 },
-+	{  96000000, P_PLL8,  4 },
-+	{ 100000000, P_PLL2,  8 },
-+	{ 114290000, P_PLL2,  7 },
-+	{ 133330000, P_PLL2,  6 },
-+	{ 160000000, P_PLL2,  5 },
-+	{ 200000000, P_PLL2,  4 },
-+	{ }
-+};
-+
-+static struct clk_dyn_rcg rot_rcg = {
-+	.ns_reg = 0xe8,
-+	.p[0] = {
-+		.pre_div_shift = 22,
-+		.pre_div_width = 4,
++static struct clk_rcg gsbi6_uart_rcg = {
++	.ns_reg = 0x2a74,
++	.md_reg = 0x2a70,
++	.mn = {
++		.mnctr_en_bit = 8,
++		.mnctr_reset_bit = 7,
++		.mnctr_mode_shift = 5,
++		.n_val_shift = 16,
++		.m_val_shift = 16,
++		.width = 16,
 +	},
-+	.p[1] = {
-+		.pre_div_shift = 26,
-+		.pre_div_width = 4,
++	.p = {
++		.pre_div_shift = 3,
++		.pre_div_width = 2,
 +	},
-+	.s[0] = {
-+		.src_sel_shift = 16,
-+		.parent_map = mmcc_pxo_pll2_pll8_map,
++	.s = {
++		.src_sel_shift = 0,
++		.parent_map = gcc_pxo_pll8_map,
 +	},
-+	.s[1] = {
-+		.src_sel_shift = 19,
-+		.parent_map = mmcc_pxo_pll2_pll8_map,
-+	},
-+	.mux_sel_bit = 30,
-+	.freq_tbl = clk_tbl_rot,
++	.freq_tbl = clk_tbl_gsbi_uart,
 +	.hw = {
-+		.enable_reg = 0xe0,
-+		.enable_mask = BIT(2),
++		.enable_reg = 0x2a74,
++		.enable_mask = BIT(11),
 +		.init = &(struct clk_init_data){
-+			.name = "rot_rcg",
++			.name = "gsbi6_uart_rcg",
 +			.parent_names = (const char *[]){
-+				"pxo", "pll2", "pll8_vote"
++				"pxo",
++				"pll8_vote",
 +			},
-+			.num_parents = 3,
-+			.ops = &clk_dyn_rcg_ops,
++			.num_parents = 2,
++			.ops = &clk_rcg_ops,
 +		},
 +	},
 +};
 +
-+static struct clk_branch rot_cxc = {
-+	.halt_reg = 0x1d0,
-+	.halt_bit = 15,
++static struct clk_branch gsbi6_uart_cxc = {
++	.halt_reg = 0x2fd0,
++	.halt_bit = 18,
 +	.hw = {
-+		.enable_reg = 0xe0,
-+		.enable_mask = BIT(0),
++		.enable_reg = 0x2a74,
++		.enable_mask = BIT(9),
 +		.init = &(struct clk_init_data){
-+			.name = "rot_cxc",
++			.name = "gsbi6_uart_cxc",
 +			.parent_names = (const char *[]){
-+				"rot_rcg",
++				"gsbi6_uart_rcg",
++			},
++			.num_parents = 1,
++			.ops = &clk_branch_ops,
++		},
++	},
++};
++
++static struct clk_branch gsbi5_uart_ahb = {
++	.halt_reg = 0x2fd0,
++	.halt_bit = 23,
++	.hwcg_reg = 0x2a40,
++	.hwcg_bit = 6,
++	.hw = {
++		.enable_reg = 0x2a40,
++		.enable_mask = BIT(4),
++		.init = &(struct clk_init_data){
++			.name = "gsbi5_uart_ahb",
++			.ops = &clk_branch_ops,
++		},
++	},
++};
++
++static struct freq_tbl clk_tbl_gsbi_qup[] = {
++	{  1100000, P_PXO,  1, 2, 49 },
++	{  5400000, P_PXO,  1, 1,  5 },
++	{ 10800000, P_PXO,  1, 2,  5 },
++	{ 15060000, P_PLL8, 1, 2, 51 },
++	{ 24000000, P_PLL8, 4, 1,  4 },
++	{ 25600000, P_PLL8, 1, 1, 15 },
++	{ 27000000, P_PXO,  1, 0,  0 },
++	{ 48000000, P_PLL8, 4, 1,  2 },
++	{ 51200000, P_PLL8, 1, 2, 15 },
++	{ }
++};
++
++static struct clk_rcg gsbi5_qup_rcg = {
++	.ns_reg = 0x2a4c,
++	.md_reg = 0x2a48,
++	.mn = {
++		.mnctr_en_bit = 8,
++		.mnctr_reset_bit = 7,
++		.mnctr_mode_shift = 5,
++		.n_val_shift = 16,
++		.m_val_shift = 16,
++		.width = 16,
++	},
++	.p = {
++		.pre_div_shift = 3,
++		.pre_div_width = 2,
++	},
++	.s = {
++		.src_sel_shift = 0,
++		.parent_map = gcc_pxo_pll8_map,
++	},
++	.freq_tbl = clk_tbl_gsbi_qup,
++	.hw = {
++		.enable_reg = 0x2a4c,
++		.enable_mask = BIT(11),
++		.init = &(struct clk_init_data){
++			.name = "gsbi5_qup_rcg",
++			.parent_names = (const char *[]){
++				"pxo",
++				"pll8_vote",
++			},
++			.num_parents = 2,
++			.ops = &clk_rcg_ops,
++		},
++	},
++};
++
++static struct clk_branch gsbi5_qup_cxc = {
++	.halt_reg = 0x2fd0,
++	.halt_bit = 20,
++	.hw = {
++		.enable_reg = 0x2a4c,
++		.enable_mask = BIT(9),
++		.init = &(struct clk_init_data){
++			.name = "gsbi5_qup_cxc",
++			.parent_names = (const char *[]){
++				"gsbi5_qup_rcg",
 +			},
 +			.num_parents = 1,
 +			.ops = &clk_branch_ops,
@@ -296,28 +356,32 @@ index 0000000..ea660ab
 +#define MAP(i, h) [i] = { .id = i, .hw = h }
 +
 +static const struct clk_map map[] = {
-+	MAP(PLL2, &pll2.hw),
-+	MAP(MDP_RCG, &mdp_rcg.hw),
-+	MAP(MDP_CXC, &mdp_cxc.hw),
-+	MAP(ROT_RCG, &rot_rcg.hw),
-+	MAP(ROT_CXC, &rot_cxc.hw),
++	MAP(PLL8, &pll8.hw),
++	MAP(PLL8_VOTE, &pll8_vote),
++	MAP(GSBI5_UART_RCG, &gsbi5_uart_rcg.hw),
++	MAP(GSBI5_UART_CXC, &gsbi5_uart_cxc.hw),
++	MAP(GSBI6_UART_RCG, &gsbi6_uart_rcg.hw),
++	MAP(GSBI6_UART_CXC, &gsbi6_uart_cxc.hw),
++	MAP(GSBI5_UART_AHB, &gsbi5_uart_ahb.hw),
++	MAP(GSBI5_QUP_RCG, &gsbi5_qup_rcg.hw),
++	MAP(GSBI5_QUP_CXC, &gsbi5_qup_cxc.hw),
 +};
 +
-+static const struct regmap_config msm_mmcc_8960_regmap_config = {
++static const struct regmap_config msm_gcc_8960_regmap_config = {
 +	.reg_bits	= 32,
 +	.reg_stride	= 4,
 +	.val_bits	= 32,
-+	.max_register	= 0x334,
++	.max_register	= 0x3660,
 +	.fast_io	= true,
 +};
 +
-+static const struct of_device_id msm_mmcc_8960_match_table[] = {
-+	{ .compatible = "qcom,mmcc-8960" },
++static const struct of_device_id msm_gcc_8960_match_table[] = {
++	{ .compatible = "qcom,gcc-8960" },
 +	{ }
 +};
-+MODULE_DEVICE_TABLE(of, msm_mmcc_8960_match_table);
++MODULE_DEVICE_TABLE(of, msm_gcc_8960_match_table);
 +
-+static int msm_mmcc_8960_probe(struct platform_device *pdev)
++static int msm_gcc_8960_probe(struct platform_device *pdev)
 +{
 +	void __iomem *base;
 +	struct resource *res;
@@ -334,7 +398,7 @@ index 0000000..ea660ab
 +	if (IS_ERR(base))
 +		return PTR_ERR(base);
 +
-+	regmap = devm_regmap_init_mmio(dev, base, &msm_mmcc_8960_regmap_config);
++	regmap = devm_regmap_init_mmio(dev, base, &msm_gcc_8960_regmap_config);
 +	if (IS_ERR(regmap))
 +		return PTR_ERR(regmap);
 +
@@ -348,6 +412,15 @@ index 0000000..ea660ab
 +	data->clks = clks;
 +	data->clk_num = num_clks;
 +
++	/* Temporary until RPM clocks supported */
++	clk = clk_register_fixed_rate(dev, "cxo", NULL, CLK_IS_ROOT, 19200000);
++	if (IS_ERR(clk))
++		return PTR_ERR(clk);
++
++	clk = clk_register_fixed_rate(dev, "pxo", NULL, CLK_IS_ROOT, 27000000);
++	if (IS_ERR(clk))
++		return PTR_ERR(clk);
++
 +	for (i = 0; i < num_clks; i++) {
 +		if (!map[i].hw)
 +			continue;
@@ -360,33 +433,43 @@ index 0000000..ea660ab
 +	return of_clk_add_provider(dev->of_node, of_clk_src_onecell_get, data);
 +}
 +
-+static int msm_mmcc_8960_remove(struct platform_device *pdev)
++static int msm_gcc_8960_remove(struct platform_device *pdev)
 +{
 +	of_clk_del_provider(pdev->dev.of_node);
 +	return 0;
 +}
 +
-+static struct platform_driver msm_mmcc_8960_driver = {
-+	.probe		= msm_mmcc_8960_probe,
-+	.remove		= msm_mmcc_8960_remove,
++static struct platform_driver msm_gcc_8960_driver = {
++	.probe		= msm_gcc_8960_probe,
++	.remove		= msm_gcc_8960_remove,
 +	.driver		= {
-+		.name	= "msm-mmcc-8960",
++		.name	= "msm-gcc-8960",
 +		.owner	= THIS_MODULE,
-+		.of_match_table = msm_mmcc_8960_match_table,
++		.of_match_table = msm_gcc_8960_match_table,
 +	},
 +};
 +
-+module_platform_driver(msm_mmcc_8960_driver);
++static int __init msm_gcc_8960_init(void)
++{
++	return platform_driver_register(&msm_gcc_8960_driver);
++}
++core_initcall(msm_gcc_8960_init);
 +
-+MODULE_DESCRIPTION("MSM MMCC 8960 Driver");
++static void __exit msm_gcc_8960_exit(void)
++{
++	platform_driver_unregister(&msm_gcc_8960_driver);
++}
++module_exit(msm_gcc_8960_exit);
++
++MODULE_DESCRIPTION("MSM GCC 8960 Driver");
 +MODULE_LICENSE("GPL v2");
-+MODULE_ALIAS("platform:msm-mmcc-8960");
-diff --git a/include/dt-bindings/clk/msm-mmcc-8960.h b/include/dt-bindings/clk/msm-mmcc-8960.h
++MODULE_ALIAS("platform:msm-gcc-8960");
+diff --git a/include/dt-bindings/clk/msm-gcc-8960.h b/include/dt-bindings/clk/msm-gcc-8960.h
 new file mode 100644
-index 0000000..86eca3f
+index 0000000..685b118
 --- /dev/null
-+++ b/include/dt-bindings/clk/msm-mmcc-8960.h
-@@ -0,0 +1,24 @@
++++ b/include/dt-bindings/clk/msm-gcc-8960.h
+@@ -0,0 +1,28 @@
 +/*
 + * Copyright (c) 2013, The Linux Foundation. All rights reserved.
 + *
@@ -400,15 +483,19 @@ index 0000000..86eca3f
 + * GNU General Public License for more details.
 + */
 +
-+#ifndef _DT_BINDINGS_CLK_MSM_MMCC_8960_H
-+#define _DT_BINDINGS_CLK_MSM_MMCC_8960_H
++#ifndef _DT_BINDINGS_CLK_MSM_GCC_8960_H
++#define _DT_BINDINGS_CLK_MSM_GCC_8960_H
 +
-+
-+#define PLL2 			0
-+#define MDP_RCG			1
-+#define MDP_CXC			2
-+#define ROT_RCG			3
-+#define ROT_CXC			4
++#define PLL8				0
++#define PLL8_VOTE			1
++#define GSBI5_UART_RCG			2
++#define GSBI5_UART_CXC			3
++#define GSBI6_UART_RCG			4
++#define GSBI6_UART_CXC			5
++#define GSBI6_UART_AHB			6
++#define GSBI5_UART_AHB			7
++#define GSBI5_QUP_RCG			8
++#define GSBI5_QUP_CXC			9
 +
 +#endif
 -- 
