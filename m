@@ -1,57 +1,74 @@
-From: slapdau@yahoo.com.au (Craig McGeachie)
-Date: Wed, 02 Oct 2013 19:31:20 +1300
-Subject: [PATCH] irq: bcm2835: Re-implement the hardware IRQ handler.
-In-Reply-To: <524B7E90.30000@wwwdotorg.org>
-References: <1379751251-2799-1-git-send-email-slapdau@yahoo.com.au>
- <1379755112-19446-1-git-send-email-slapdau@yahoo.com.au>
- <52410949.8070403@wwwdotorg.org> <5241489D.4000709@yahoo.com.au>
- <524B7E90.30000@wwwdotorg.org>
-Message-ID: <524BBDB8.70301@yahoo.com.au>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Wed, 02 Oct 2013 15:45:49 +0900
+Subject: [PATCH] arm64: check for number of arguments in
+ syscall_get/set_arguments()
+In-Reply-To: <20131001091919.GA17667@mudshark.cambridge.arm.com>
+References: <1380605584-22125-1-git-send-email-takahiro.akashi@linaro.org>
+ <20131001091919.GA17667@mudshark.cambridge.arm.com>
+Message-ID: <524BC11D.2050003@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/02/2013 03:01 PM, Stephen Warren wrote:
->>>> +static struct irq_chip bmc2835_chip = {
->>>> +    .name = "bmc2835-level",
->>>> +    .irq_mask = bmc2835_mask_irq,
->>>> +    .irq_unmask = bmc2835_unmask_irq,
->>>> +    .irq_ack =  bmc2835_mask_irq,
->>>> +};
->>>
->>> Why should an IRQ be masked by the ack operation?
+On 10/01/2013 06:19 PM, Will Deacon wrote:
+> On Tue, Oct 01, 2013 at 06:33:04AM +0100, AKASHI Takahiro wrote:
+>> In ftrace_syscall_enter(),
+>>      syscall_get_arguments(..., 0, n, ...)
+>> 	if (i == 0) { <handle orig_x0> ...; n--;}
+>> 	memcpy(..., n * sizeof(args[0]));
+>> If 'number of arguments(n)' is zero and 'argument index(i)' is also zero in
+>> syscall_get_arguments(), none of arguments should be copied by memcpy().
+>> Otherwise 'n--' can be a big positive number and unexpected amount of data
+>> will be copied. Tracing system calls which take no argument, say sync(void),
+>> may hit this case and eventually make the system corrupted.
+>> This patch fixes the issue both in syscall_get_arguments() and
+>> syscall_set_arguments().
 >>
->> To be honest, I don't know for sure.  I took my cue from
->> Documentation/arm/Interrupts.
->>
->> ack    - required.  May be the same function as mask for IRQs
->>           handled by do_level_IRQ.
->>
->> Some other irq_chips are set up the same way and I can't see any other
->> way of implementing an acknowledgement function.  And my experience with
->> a never ending flow of interrupts while writing the mailbox driver made
->> me think it might be good idea for the BMC2835 as well.
+>> Please note, however, that asm-generic/syscall.h says,
+>>   * syscall_get_arguments - extract system call parameter values
+>>   * @i:          argument index [0,5]
+>>   * @n:          number of arguments; n+i must be [1,6].
+>> and so we'd better change the caller's code(ftrace_syscall_enter).
 >
-> OK, it makes sense to implement that.
+> Since (most) other architectures deal with n+i == 0, please can you submit a
+> separate patch updating that comment?
+
+Yes, I will. But is the patch that only modifies a comment acceptable?
+
+
+>> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+>> ---
+>>   arch/arm64/include/asm/syscall.h |    6 ++++++
+>>   1 file changed, 6 insertions(+)
+>>
+>> diff --git a/arch/arm64/include/asm/syscall.h b/arch/arm64/include/asm/syscall.h
+>> index c89821f..01bb8cc 100644
+>> --- a/arch/arm64/include/asm/syscall.h
+>> +++ b/arch/arm64/include/asm/syscall.h
+>> @@ -63,6 +63,9 @@ static inline void syscall_get_arguments(struct task_struct *task,
+>>   					 unsigned int i, unsigned int n,
+>>   					 unsigned long *args)
+>>   {
+>> +	if (n == 0)
+>> +		return;
+>> +
+>>   	if (i + n > SYSCALL_MAX_ARGS) {
+>>   		unsigned long *args_bad = args + SYSCALL_MAX_ARGS - i;
+>>   		unsigned int n_bad = n + i - SYSCALL_MAX_ARGS;
+>> @@ -86,6 +89,9 @@ static inline void syscall_set_arguments(struct task_struct *task,
+>>   					 unsigned int i, unsigned int n,
+>>   					 const unsigned long *args)
+>>   {
+>> +	if (n == 0)
+>> +		return;
+>> +
 >
+> Looks sensible. Please can you fix arch/arm/ as well?
 
-Possibly not.  I've dug a little deeper and followed the call chain 
-through handle_level_irq() to mask_ack_irq().
+Yes, I will.
 
-static inline void mask_ack_irq(struct irq_desc *desc)
-{
-	if (desc->irq_data.chip->irq_mask_ack)
-		desc->irq_data.chip->irq_mask_ack(&desc->irq_data);
-	else {
-		desc->irq_data.chip->irq_mask(&desc->irq_data);
-		if (desc->irq_data.chip->irq_ack)
-			desc->irq_data.chip->irq_ack(&desc->irq_data);
-	}
-	irq_state_set_masked(desc);
-}
+-Takahiro AKASHI
 
-I've not looked further to find out why code and documentation are 
-different, but it looks like the .irq_ack is unnecessary, but harmless 
-beyond an unneeded function call.  I plan to drop it.
-
-Cheers,
-Craig.
+> Cheers,
+>
+> Will
+>
