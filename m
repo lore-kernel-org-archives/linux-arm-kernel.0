@@ -1,33 +1,39 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Wed, 02 Oct 2013 23:10:52 +0200
-Subject: [PATCH 2/5] gpio: samsung: Use CONFIG_ARCH_S3C64XX to check for
- S3C64xx support
-In-Reply-To: <CACRpkdZXOGpTspPucd=d0=Ws9Ccx19h4UYTTdgZceoofhuq0Kw@mail.gmail.com>
-References: <1380392497-27406-1-git-send-email-tomasz.figa@gmail.com>
- <1380392497-27406-2-git-send-email-tomasz.figa@gmail.com>
- <CACRpkdZXOGpTspPucd=d0=Ws9Ccx19h4UYTTdgZceoofhuq0Kw@mail.gmail.com>
-Message-ID: <3903161.Vxg4RcbQZc@flatron>
+From: davem@davemloft.net (David Miller)
+Date: Wed, 02 Oct 2013 17:12:33 -0400 (EDT)
+Subject: [PATCH 0/3] net: mv643xx_eth: various small fixes for v3.12
+In-Reply-To: <1380711442-24735-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1380711442-24735-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <20131002.171233.1409614287842381990.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+From: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Date: Wed,  2 Oct 2013 12:57:19 +0200
 
-On Wednesday 02 of October 2013 12:46:51 Linus Walleij wrote:
-> On Sat, Sep 28, 2013 at 8:21 PM, Tomasz Figa <tomasz.figa@gmail.com> 
-wrote:
-> > Since CONFIG_PLAT_S3C64XX is going to be removed, this patch modifies
-> > the gpio-samsung driver to use the proper way of checking for S3C64xx
-> > support - CONFIG_ARCH_S3C64XX.
-> > 
-> > Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
+> This patch set comprises some one-liners to fix issues with repeated
+> loading and unloading of a modular mv643xx_eth driver.
 > 
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> First two patches take care of the periodic port statistic timer, that
+> updates statistics by reading port registers using add_timer/mod_timer.
+> 
+> Patch 1 moves timer re-schedule from mib_counters_update to the timer
+> callback. As mib_counters_update is also called from non-timer context,
+> this ensures the timer is reactivated from timer context only.
+> 
+> Patch 2 moves initial timer schedule from _probe() time to right before
+> the port is actually started as the corresponding del_timer_sync is at
+> _stop() time. This fixes a regression, where unloading the driver from a
+> non-started eth device can cause the timer to access deallocated mem.
+> 
+> Patch 3 adds an assignment of the ports device_node to the corresponding
+> self-created platform_device. This is required to allow fixups based on
+> the device_node's compatible string later. Actually, it is also a potential
+> regression because we already check compatible string for Kirkwood, but
+> does not (yet) rely on the fixup.
+> 
+> All patches are based on v3.12-rc3 and have been tested on Kirkwood-based
+> Seagate Dockstar.
+> 
+> Patches 1 and 2 can also possibly queued up for -stable.
 
-Thanks.
-
-> I assume that this will go through ARM SoC?
-
-I think so.
-
-Best regards,
-Tomasz
+Series applied, patch #1 and #2 queued up for -stable, thanks!
