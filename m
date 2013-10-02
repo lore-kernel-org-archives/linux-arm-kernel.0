@@ -1,33 +1,101 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 2 Oct 2013 14:45:50 +0200
-Subject: [PATCH 0/1] fix MVEBU GPIO driver bug causing kernel hang
-In-Reply-To: <1380717118-10860-1-git-send-email-gerlando.falauto@keymile.com>
-References: <1380717118-10860-1-git-send-email-gerlando.falauto@keymile.com>
-Message-ID: <20131002144550.7d28376c@skate>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 2 Oct 2013 14:47:34 +0200
+Subject: [PATCH 2/3] ARM: at91/tc/clocksource: improve driver robustness
+In-Reply-To: <1380717341-6612-1-git-send-email-b.brezillon@overkiz.com>
+References: <1380717265-6497-1-git-send-email-b.brezillon@overkiz.com>
+ <1380717341-6612-1-git-send-email-b.brezillon@overkiz.com>
+Message-ID: <524C15E6.7070500@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Gerlando Falauto,
+On 02/10/2013 14:35, Boris BREZILLON :
+> Check function return values to avoid false positive driver init.
+>
+> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
 
-On Wed,  2 Oct 2013 14:31:58 +0200, Gerlando Falauto wrote:
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-> SIDE NOTE: If I understand correctly, a brand new driver from
-> Sebastian Hesselbarth (drivers/irqchip/irq-orion.c) may replace this driver
-> in the future, but it still misses the IRQ_GC_MASK_CACHE_PER_TYPE bit:
+> ---
+>   drivers/clocksource/tcb_clksrc.c |   33 ++++++++++++++++++++++++++++-----
+>   1 file changed, 28 insertions(+), 5 deletions(-)
+>
+> diff --git a/drivers/clocksource/tcb_clksrc.c b/drivers/clocksource/tcb_clksrc.c
+> index 0481562..10a5d9e 100644
+> --- a/drivers/clocksource/tcb_clksrc.c
+> +++ b/drivers/clocksource/tcb_clksrc.c
+> @@ -184,11 +184,18 @@ static struct irqaction tc_irqaction = {
+>   	.handler	= ch2_irq,
+>   };
+>
+> -static void __init setup_clkevents(struct atmel_tc *tc, int clk32k_divisor_idx)
+> +static int __init setup_clkevents(struct atmel_tc *tc, int clk32k_divisor_idx)
+>   {
+> +	int ret;
+>   	struct clk *t2_clk = tc->clk[2];
+>   	int irq = tc->irq[2];
+>
+> +	/* try to enable t2 clk to avoid future errors in mode change */
+> +	ret = clk_prepare_enable(t2_clk);
+> +	if (ret)
+> +		return ret;
+> +	clk_disable_unprepare(t2_clk);
+> +
+>   	clkevt.regs = tc->regs;
+>   	clkevt.clk = t2_clk;
+>   	tc_irqaction.dev_id = &clkevt;
+> @@ -197,16 +204,21 @@ static void __init setup_clkevents(struct atmel_tc *tc, int clk32k_divisor_idx)
+>
+>   	clkevt.clkevt.cpumask = cpumask_of(0);
+>
+> +	ret = setup_irq(irq, &tc_irqaction);
+> +	if (ret)
+> +		return ret;
+> +
+>   	clockevents_config_and_register(&clkevt.clkevt, 32768, 1, 0xffff);
+>
+> -	setup_irq(irq, &tc_irqaction);
+> +	return ret;
+>   }
+>
+>   #else /* !CONFIG_GENERIC_CLOCKEVENTS */
+>
+> -static void __init setup_clkevents(struct atmel_tc *tc, int clk32k_divisor_idx)
+> +static int __init setup_clkevents(struct atmel_tc *tc, int clk32k_divisor_idx)
+>   {
+>   	/* NOTHING */
+> +	return 0;
+>   }
+>
+>   #endif
+> @@ -328,13 +340,24 @@ static int __init tcb_clksrc_init(void)
+>   	}
+>
+>   	/* and away we go! */
+> -	clocksource_register_hz(&clksrc, divided_rate);
+> +	ret = clocksource_register_hz(&clksrc, divided_rate);
+> +	if (ret)
+> +		goto err_disable_t1;
+>
+>   	/* channel 2:  periodic and oneshot timer support */
+> -	setup_clkevents(tc, clk32k_divisor_idx);
+> +	ret = setup_clkevents(tc, clk32k_divisor_idx);
+> +	if (ret)
+> +		goto err_unregister_clksrc;
+>
+>   	return 0;
+>
+> +err_unregister_clksrc:
+> +	clocksource_unregister(&clksrc);
+> +
+> +err_disable_t1:
+> +	if (!tc->tcb_config || tc->tcb_config->counter_width != 32)
+> +		clk_disable_unprepare(tc->clk[1]);
+> +
+>   err_disable_t0:
+>   	clk_disable_unprepare(t0_clk);
+>
+>
 
-Hum? The driver you're touching is a GPIO driver, while
-drivers/irqchip/irq-orion.c is an interrupt controller driver. The
-gpio-mvebu driver can be used on all mvebu platforms that are DT
-capable, but the main interrupt controller is different from one
-platform to another: we already have irq-armada-370-xp.c for Armada
-370/XP, while Sebastian's irq-orion.c is for older families of SoCs.
 
-Or maybe I'm missing something?
-
-Thanks!
-
-Thomas
 -- 
-Thomas Petazzoni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Nicolas Ferre
