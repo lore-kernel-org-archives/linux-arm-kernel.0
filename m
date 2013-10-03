@@ -1,28 +1,30 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Wed, 2 Oct 2013 20:57:57 -0700
-Subject: [PATCH, FIX] ARM: mvebu: add missing DT Mbus ranges and relocate
- PCIe DT nodes for RN102
-In-Reply-To: <87a9iuq7ff.fsf@natisbad.org>
-References: <87a9iuq7ff.fsf@natisbad.org>
-Message-ID: <CAOesGMjs=_USrFR9EkzksBj=7=1CgyujqvNhDZhpfdgkTt6gJQ@mail.gmail.com>
+Date: Wed, 2 Oct 2013 20:59:50 -0700
+Subject: [GIT PULL] ARM: mvebu: fixes for v3.12 (round 2)
+In-Reply-To: <20131002162021.GM31178@titan.lakedaemon.net>
+References: <20131002162021.GM31178@titan.lakedaemon.net>
+Message-ID: <CAOesGMgNaAsp-Hg=PerL1otQRbyXKYUJxJnA98gWtXH2Bpp3iQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Oct 2, 2013 at 9:20 AM, Jason Cooper <jason@lakedaemon.net> wrote:
 
-On Mon, Sep 30, 2013 at 3:19 PM, Arnaud Ebalard <arno@natisbad.org> wrote:
+> Also, we've noticed that the previous mvebu/fixes pull (tags/fixes-3.12)
+> made it into arm-soc/fixes, but hasn't made it into mainline.  Do you
+> intend to send a fixes pull to Linus in time for v3.12-rc4?
+
+Yes.
+
+
+> The following changes since commit ddf7e399024aa908573a08d6339cefa6253b83db:
 >
-> When 5e12a613 and 0cd3754a were introduced, Netgear ReadyNAS 102 .dts
-> file was queued for inclusion and missed the update to have Mbus (and
-> then BootROM) ranges properties declared. It also missed the relocation
-> of Armada 370/XP PCIe DT nodes introduced by 14fd8ed0 after de1af8d4.
-> This patch fixes that which makes 3.12-rc3 bootable on the NAS.
+>   ARM: kirkwood: Fix address of second XOR engine (2013-09-20 03:16:20 +0000)
+>
+> are available in the git repository at:
+>
+>   git://git.infradead.org/linux-mvebu.git tags/fixes-3.12-2
 
-In the future please don't just quote the SHAs, give the patch subject
-as well. It makes it easier to follow the patch description without
-looking them up (besides, there's a chance that the 8-character SHAs
-will not be unique at some point in the future, which makes the lookup
-harder).
+Pulled.
 
 
 -Olof
