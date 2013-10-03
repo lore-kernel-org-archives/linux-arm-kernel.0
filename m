@@ -1,33 +1,33 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 3 Oct 2013 01:58:58 +0200
-Subject: [PATCH] RFT: ARM: gemini: convert to GENERIC_CLOCKEVENTS
-In-Reply-To: <CACRpkdZM9k2V+VHxhp6gLtGGegU=+2nMGFg7rfHs6uwoqu=Hrg@mail.gmail.com>
-References: <1380625040-25912-1-git-send-email-linus.walleij@linaro.org>
- <201310011942.02965.arnd@arndb.de>
- <CACRpkdZM9k2V+VHxhp6gLtGGegU=+2nMGFg7rfHs6uwoqu=Hrg@mail.gmail.com>
-Message-ID: <201310030158.58437.arnd@arndb.de>
+From: emilio@elopez.com.ar (=?UTF-8?B?RW1pbGlvIEzDs3Bleg==?=)
+Date: Wed, 02 Oct 2013 21:24:00 -0300
+Subject: [PATCH] clk: composite: .determine_rate support
+In-Reply-To: <1379205479-26001-1-git-send-email-emilio@elopez.com.ar>
+References: <1379205479-26001-1-git-send-email-emilio@elopez.com.ar>
+Message-ID: <524CB920.2030901@elopez.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 02 October 2013, Linus Walleij wrote:
-> On Tue, Oct 1, 2013 at 7:42 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+Hi Mike,
+
+El 14/09/13 21:37, Emilio L?pez escribi?:
+> This commit adds .determine_rate support to the composite clock. It will
+> use the .determine_rate callback from the rate component if available,
+> and fall back on the mux component otherwise. This allows composite
+> clocks to enjoy the benefits of automatic clock reparenting.
 >
-> > Regarding multiplatform, IIRC Jonas Jensen had some issues with
-> > ARM9 and FA526 being enabled at the same time (with mach-moxart),
-> > which is probably easy enough to fix if necessary. You should
-> > also be able to have a combined moxart+gemini kernel once someone
-> > looks into multiplatform gemini. The only nonobvious part I can
-> > see required for that is NEED_MACH_GPIO_H, and even that should
-> > be simpler than the clockevents patch you just sent.
-> 
-> I sent a patch to delete NEED_MACH_GPIO_H as well and already
-> applied it to the GPIO tree, it was a piece of cake (unless I have
-> now unwittingly broken something).
+> Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
+> ---
+>
+> Hi Mike,
+>
+> This is a prerequisite patch for the sunxi driver changes that I'll send
+> shortly; I believe you already looked at this diff on IRC and agreed it
+> was sensible, so I hope it can be merged early for the 3.13 cycle
+> (unless someone else has any objections to the patch, that is).
 
-Ah, cool. Upon  brief look I could not find any users for the other
-header files, so I guess we can try to just go ahead and move them
-all out of include/mach/ to mach-gemini/*.h or to include/debug.
+A couple of weeks have passed now; can you please review and apply this 
+to your tree for 3.13 if you are ok with it?
 
-On second look, we need to convert it to MULTI_IRQ_HANDLER first.
+Thanks!
 
-	Arnd
+Emilio
