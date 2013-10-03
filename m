@@ -1,41 +1,32 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Thu, 03 Oct 2013 13:13:15 -0700
-Subject: [PATCH V5 0/6] ARM: OMAP3+: support cpufreq-cpu0 for device tree
- boot
-In-Reply-To: <524DA41C.7000809@ti.com> (Nishanth Menon's message of "Thu, 3
- Oct 2013 12:06:36 -0500")
-References: <1368039976-29648-1-git-send-email-nm@ti.com>
- <87pprmuwxg.fsf@linaro.org> <524DA41C.7000809@ti.com>
-Message-ID: <87d2nmun8k.fsf@linaro.org>
+From: tim.kryger@linaro.org (Tim Kryger)
+Date: Thu, 3 Oct 2013 13:13:08 -0700
+Subject: [PATCH 0/6] Update Kona drivers to use clocks
+Message-ID: <1380831194-27238-1-git-send-email-tim.kryger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Nishanth Menon <nm@ti.com> writes:
+This series declares the clocks present on bcm11351 (aka bcm281xx) SoCs
+to be fixed at the rates configured by development bootloaders and then
+updates the Kona drivers to make use of clock calls where appropriate.
 
-> fixing Benoit's mail ID.
-> On 10/03/2013 11:43 AM, Kevin Hilman wrote:
->> Hi Nishanth,
->> 
->> Nishanth Menon <nm@ti.com> writes:
->> 
->>> The following version 5 of the series arose from trying to use
->>> BeagleBoard-XM (OMAP3 variant) for doing CPU DVFS using cpufreq-cpu0.
->>> This series enables the generic cpufreq-cpu0 driver to be used in
->>> device tree enabled boot while maintaining support of the legacy
->>> omap-cpufreq driver when used in non device tree enabled boot.
->> 
->> What's the status of this series?  Is it still waiting on the clock DT
->> changes?
->
-> yes - i do have a new series lined up at the moment here[1] - trying
-> to ensure everything is dandy before public post. ofcourse, we'd like
-> to ensure we have feedback on tero's series[2]. I am now working on
-> ensuring ABB regulator[3](again depends on Tero's series) fits on top
-> of Mike's voltage notifier series[4]
->
-> So, yep, everything is blocked due to lack of feedback on Tero's
-> series [2].
+This patch series depends on the following three commits being present:
 
-OK, thanks for the update. 
+https://lkml.org/lkml/2013/9/18/409
+https://lkml.org/lkml/2013/9/20/305
+http://www.spinics.net/lists/arm-kernel/msg274973.html
 
-Kevin
+Tim Kryger (6):
+  ARM: dts: Declare clocks as fixed on bcm11351
+  ARM: dts: Specify clocks for UARTs on bcm11351
+  ARM: dts: Specify clocks for SDHCIs on bcm11351
+  clocksource: kona: Add basic use of external clock
+  ARM: dts: Specify clocks for timer on bcm11351
+  mmc: sdhci-bcm-kona: Add basic use of clocks
+
+ arch/arm/boot/dts/bcm11351.dtsi      | 111 +++++++++++++++++++++++++++++++++--
+ drivers/clocksource/bcm_kona_timer.c |  14 ++++-
+ drivers/mmc/host/sdhci-bcm-kona.c    |  30 +++++++++-
+ 3 files changed, 145 insertions(+), 10 deletions(-)
+
+-- 
+1.8.0.1
