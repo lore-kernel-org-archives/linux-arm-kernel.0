@@ -1,106 +1,79 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 3 Oct 2013 15:04:37 -0400
-Subject: [PATCH v2 1/2] ARM: kirkwood: retain MAC address for DT ethernet
-In-Reply-To: <20131003190201.GA2504@localhost>
-References: <1380804294-13726-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1380826568-18587-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <20131003190201.GA2504@localhost>
-Message-ID: <20131003190437.GY31178@titan.lakedaemon.net>
+From: b.brezillon@overkiz.com (Boris BREZILLON)
+Date: Thu,  3 Oct 2013 21:04:39 +0200
+Subject: [PATCH v4 0/4] watchdog: at91sam9_wdt: handle already configured wdt
+Message-ID: <1380827083-6872-1-git-send-email-b.brezillon@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 03, 2013 at 04:02:02PM -0300, Ezequiel Garcia wrote:
-> On Thu, Oct 03, 2013 at 08:56:08PM +0200, Sebastian Hesselbarth wrote:
-> > Ethernet IP on Kirkwood SoCs loose their MAC address register content
-> > if clock gated. To allow modular ethernet driver setups and gated clocks
-> > also on non-DT capable bootloaders, we fixup port device nodes with no
-> > valid MAC address property. This patch copies MAC address register
-> > contents set up by bootloaders early, notably before ethernet clocks
-> > are gated. While at it, also reorder call sequence in _dt_init.
-> > 
-> > Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> > ---
-> > Changelog:
-> > v1->v2:
-> > - check for gated clock before accessing eth registers
-> >   (Suggested by Andrew Lunn)
-> > 
-> > TBH, as there is no "official" clk_is_enabled but just the __clk_is_enabled
-> > one, this is close to abuse of CCF API. Actually, there should either be an
-> > clk_is_enabled or we enable the clock, copy a possible invalid MAC address
-> > and disable the clock again. (Added Mike, who might have an opinion about
-> > clk_is_enabled)
-> > 
-> > Cc: Jason Cooper <jason@lakedaemon.net>
-> > Cc: Andrew Lunn <andrew@lunn.ch>
-> > Cc: Russell King <linux@arm.linux.org.uk>
-> > Cc: Grant Likely <grant.likely@linaro.org>
-> > Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
-> > Cc: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
-> > Cc: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> > Cc: Mike Turquette <mturquette@linaro.org>
-> > Cc: linux-arm-kernel at lists.infradead.org
-> > Cc: linux-kernel at vger.kernel.org
-> > ---
-> >  arch/arm/mach-kirkwood/board-dt.c |   77 +++++++++++++++++++++++++++++++++++--
-> >  1 file changed, 74 insertions(+), 3 deletions(-)
-> > 
-> > diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
-> > index 82d3ad8..f5f35bb 100644
-> > --- a/arch/arm/mach-kirkwood/board-dt.c
-> > +++ b/arch/arm/mach-kirkwood/board-dt.c
-> > @@ -13,6 +13,8 @@
-> >  #include <linux/kernel.h>
-> >  #include <linux/init.h>
-> >  #include <linux/of.h>
-> > +#include <linux/of_address.h>
-> > +#include <linux/of_net.h>
-> >  #include <linux/of_platform.h>
-> >  #include <linux/clk-provider.h>
-> >  #include <linux/clocksource.h>
-> > @@ -66,6 +68,76 @@ static void __init kirkwood_legacy_clk_init(void)
-> >  	clk_prepare_enable(clk);
-> >  }
-> >  
-> > +#define MV643XX_ETH_MAC_ADDR_LOW	0x0414
-> > +#define MV643XX_ETH_MAC_ADDR_HIGH	0x0418
-> > +
-> > +static void __init kirkwood_dt_eth_fixup(void)
-> > +{
-> > +	struct device_node *np;
-> > +
-> > +	/*
-> > +	 * The ethernet interfaces forget the MAC address assigned by u-boot
-> > +	 * if the clocks are turned off. Usually, u-boot on kirkwood boards
-> > +	 * has no DT support to properly set local-mac-address property.
-> > +	 * As a workaround, we get the MAC address from mv643xx_eth registers
-> > +	 * and update the port device node if no valid MAC address is set.
-> > +	 */
-> > +	for_each_compatible_node(np, NULL, "marvell,kirkwood-eth-port") {
-> > +		struct device_node *pnp = of_get_parent(np);
-> > +		struct clk *clk;
-> > +		struct property *pmac;
-> > +		void __iomem *io;
-> > +		u8 *macaddr;
-> > +		u32 reg;
-> > +
-> > +		if (!pnp || !of_device_is_available(pnp))
-> > +			continue;
-> > +
-> > +		clk = of_clk_get(pnp, 0);
-> > +		if (!__clk_is_enabled(clk) || of_get_mac_address(np)) {
-> 
-> Mm.. just as you say this usage of __clk_is_enabled is awkard to say the
-> least.
-> 
-> I'm wondering: is the clock really disabled if the device is not
-> available (i.e. status == 'ok')? In other words: isn't the
-> !of_device_is_available() test enough?
+Hello,
 
-Well, this stemmed from JasonG's scenario where the second iface is
-shut off by the bootloader.  Although one could argue that the
-bootloader should then update the dtb to mark that node as disabled...
+This patch series is a porposal to enhance the sam9 watchdog timer support.
 
-thx,
+The at91sam9 watchdog timer can only be configured once, and the current
+implementation tries to configure it in a static way:
+- 2 seconds timeout
+- wdt restart every 500ms
 
-Jason.
+If the timer has already been configured with different values, it returns an
+error and do not create any watchdog device.
+
+This is not critical if the watchdog is disabled, but if it has been enabled
+with different timeout values it will lead to a SoC reset.
+
+This patch series tries to address this issue by adapting the heartbeat value
+according the WDT timer config:
+- it first tries to configure the timer as requested.
+- if it fails it fallbacks to the current config, adapting its heartbeat timer
+to the needs
+
+This patch series also move to a dynamically allocated at91wdt device instead
+of the static instance. I'm not sure this is the best solution, so please tell
+me if you prefer to keep static instance of watchdog.
+
+It adds a new at91 wdt type: software. This new type make use of the at91 wdt
+interrupt to trigger a software reboot.
+
+Finally it adds several properties to the device tree bindings.
+
+Best Regards,
+Boris
+
+Changes since v3:
+ - fix a bug in heartbeat time computation
+ - fix a bug in at91_wdt_set_timeout when new timeout is bigger than the old
+   one
+ - rename at91_wdt_ping into at91_wdt_start
+ - remove unneeded ping callback assignment
+
+Changes since v2:
+ - fix documentation
+ - rework the heartbeat computation to get a more flexible behaviour
+ - fix xx_to_yy macros
+ - modify warning and error messages
+ - remove unneeded parenthesis in arithmetic operations
+ - use devm functions to map io memory
+ - remove unneeded devm_kfree calls
+
+Change since v1:
+ - fix typo in documentaion
+ - fix irq dt definition for sama5d3 SoC
+
+Boris BREZILLON (4):
+  watchdog: at91sam9_wdt: better watchdog support
+  watchdog: at91sam9_wdt: update device tree doc
+  ARM: at91/dt: add sam9 watchdog default options to SoCs
+  ARM: at91/dt: add watchdog properties to kizbox board
+
+ .../devicetree/bindings/watchdog/atmel-wdt.txt     |   30 +-
+ arch/arm/boot/dts/at91sam9260.dtsi                 |    5 +
+ arch/arm/boot/dts/at91sam9263.dtsi                 |    5 +
+ arch/arm/boot/dts/at91sam9g45.dtsi                 |    5 +
+ arch/arm/boot/dts/at91sam9n12.dtsi                 |    5 +
+ arch/arm/boot/dts/at91sam9x5.dtsi                  |    5 +
+ arch/arm/boot/dts/kizbox.dts                       |    6 +
+ arch/arm/boot/dts/sama5d3.dtsi                     |    5 +
+ drivers/watchdog/at91sam9_wdt.c                    |  305 ++++++++++++++------
+ 9 files changed, 285 insertions(+), 86 deletions(-)
+
+-- 
+1.7.9.5
