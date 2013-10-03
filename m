@@ -1,24 +1,52 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 2 Oct 2013 21:03:47 -0700
-Subject: [PATCH v3 04/10] ARM: OMAP2+: usb-host: Adapt to USB phy-nop
- RESET line changes
-In-Reply-To: <524BF354.3000502@ti.com>
-References: <1380012836-29900-1-git-send-email-rogerq@ti.com>
- <1380012836-29900-5-git-send-email-rogerq@ti.com>
- <524BF354.3000502@ti.com>
-Message-ID: <20131003040346.GI8949@atomide.com>
+From: gleb@redhat.com (Gleb Natapov)
+Date: Thu, 3 Oct 2013 07:04:34 +0300
+Subject: [GIT PULL] KVM/ARM Fixes for 3.12-rc2
+In-Reply-To: <CAOesGMgGTghYwaDB3uJTYBTOa73z+wcKfzfJGWWZyM-QjbijzQ@mail.gmail.com>
+References: <1380052160-20755-1-git-send-email-christoffer.dall@linaro.org>
+ <5242B1B0.1040408@redhat.com>
+ <CAOesGMgGTghYwaDB3uJTYBTOa73z+wcKfzfJGWWZyM-QjbijzQ@mail.gmail.com>
+Message-ID: <20131003040434.GA31244@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Roger Quadros <rogerq@ti.com> [131002 03:28]:
-> Hi Tony,
+On Wed, Oct 02, 2013 at 01:14:57PM -0700, Olof Johansson wrote:
+> Paolo,
 > 
-> On 09/24/2013 11:53 AM, Roger Quadros wrote:
-> > The USB phy-nop nop driver expects the RESET line information
-> > to be sent as a GPIO number via platform data. Adapt to that.
-> > 
-> > Signed-off-by: Roger Quadros <rogerq@ti.com>
+> On Wed, Sep 25, 2013 at 2:49 AM, Paolo Bonzini <pbonzini@redhat.com> wrote:
+> > Il 24/09/2013 21:49, Christoffer Dall ha scritto:
+> >> The following changes since commit 62d228b8c676232eca579f91cc0782b060a59097:
+> >>
+> >>   Merge branch 'fixes' of git://git.kernel.org/pub/scm/virt/kvm/kvm (2013-09-17 22:20:30 -0400)
+> >>
+> >> are available in the git repository at:
+> >>
+> >>
+> >>   git://git.linaro.org/people/cdall/linux-kvm-arm.git tags/kvm-arm-fixes-3.12-rc2
+> >>
+> >> for you to fetch changes up to ac570e0493815e0b41681c89cb50d66421429d27:
+> >>
+> >>   ARM: kvm: rename cpu_reset to avoid name clash (2013-09-24 11:15:05 -0700)
+> >>
+> >> ----------------------------------------------------------------
+> >> KVM/ARM Fixes for 3.12-rc2
+> >>
+> >> Fixes compilation error with KVM/ARM enabled.
+> >>
+> >> ----------------------------------------------------------------
+> >> Olof Johansson (1):
+> >>       ARM: kvm: rename cpu_reset to avoid name clash
+> >>
+> >>  arch/arm/kvm/reset.c |    6 +++---
+> >>  1 file changed, 3 insertions(+), 3 deletions(-)
+> >>
+> >
+> > Pulled, thanks.
 > 
-> Need your Ack on this one as well.
+> When do you expect to send your branch to Linus? I haven't seen it
+> land there yet, nor in linux-next. This is keeping us from even
+> building KVM-enabled kernels on ARM.
+> 
+It is in Linus tree for a couple of days now.
 
-Acked-by: Tony Lindgren <tony@atomide.com>
+--
+			Gleb.
