@@ -1,187 +1,64 @@
-From: inki.dae@samsung.com (Inki Dae)
-Date: Fri, 4 Oct 2013 02:18:19 +0900
-Subject: [PATCH 4/5] drm/exynos: Initialize ptn3460 if present
-In-Reply-To: <CAOw6vbJVH4ePsJ5cOT0KcsZDBdM+MtqgTwmvYiM0EAExSLWWhQ@mail.gmail.com>
-References: <1380670860-17621-1-git-send-email-seanpaul@chromium.org>
- <1380670860-17621-5-git-send-email-seanpaul@chromium.org>
- <CAAQKjZPgtKf5UWZhHV-+Vv2c4uwuEUhZHV=r14es8eFC07PONg@mail.gmail.com>
- <CAOw6vbJVH4ePsJ5cOT0KcsZDBdM+MtqgTwmvYiM0EAExSLWWhQ@mail.gmail.com>
-Message-ID: <CAAQKjZPPWh1dzDxR+iH_TpTCj3mjjJgA5tSVZT2JXk5ZMDzAqA@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 3 Oct 2013 18:27:55 +0100
+Subject: [RFC] ARM: lockless get_user_pages_fast()
+In-Reply-To: <1380820515-21100-1-git-send-email-zishen.lim@linaro.org>
+References: <1380820515-21100-1-git-send-email-zishen.lim@linaro.org>
+Message-ID: <20131003172755.GG7408@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/10/4 Sean Paul <seanpaul@chromium.org>:
-> On Thu, Oct 3, 2013 at 10:43 AM, Inki Dae <inki.dae@samsung.com> wrote:
->> 2013/10/2 Sean Paul <seanpaul@chromium.org>:
->>> This patch adds code to look for the ptn3460 in the device tree file on
->>> exynos initialization. If ptn node is found, the driver will initialize
->>> the ptn3460 driver and skip creating a DP connector (since the bridge
->>> driver will register its own connector).
->>>
->>> Signed-off-by: Sean Paul <seanpaul@chromium.org>
->>> ---
->>>  drivers/gpu/drm/exynos/exynos_drm_core.c | 44 +++++++++++++++++++++++++++++++-
->>>  1 file changed, 43 insertions(+), 1 deletion(-)
->>>
->>> diff --git a/drivers/gpu/drm/exynos/exynos_drm_core.c b/drivers/gpu/drm/exynos/exynos_drm_core.c
->>> index 1bef6dc..9cf4476 100644
->>> --- a/drivers/gpu/drm/exynos/exynos_drm_core.c
->>> +++ b/drivers/gpu/drm/exynos/exynos_drm_core.c
->>> @@ -12,7 +12,9 @@
->>>   * option) any later version.
->>>   */
->>>
->>> +#include <linux/of_i2c.h>
->>>  #include <drm/drmP.h>
->>> +#include <drm/bridge/ptn3460.h>
->>>  #include "exynos_drm_drv.h"
->>>  #include "exynos_drm_encoder.h"
->>>  #include "exynos_drm_connector.h"
->>> @@ -20,6 +22,40 @@
->>>
->>>  static LIST_HEAD(exynos_drm_subdrv_list);
->>>
->>> +struct bridge_init {
->>> +       struct i2c_client *client;
->>> +       struct device_node *node;
->>> +};
->>> +
->>> +static bool find_bridge(const char *name, struct bridge_init *bridge)
->>> +{
->>> +       bridge->client = NULL;
->>> +       bridge->node = of_find_node_by_name(NULL, name);
->>
->> Not clear to me. Why do you try to handle device tree here, not real
->> device driver?. How about adding a output property to board specific
->> fimd dt node: i.e. output = <&ptn3460_bridge>?
->
-> The problem doing something like this is that we won't have a handle
-> to drm_device if it's just a standalone driver, and so we won't be
-> able to register the bridge or connector. We need this init call one
-> way or another.
->
+On Thu, Oct 03, 2013 at 06:15:15PM +0100, Zi Shen Lim wrote:
+> Futex uses GUP. Currently on ARM, the default __get_user_pages_fast
+> being used always returns 0, leading to a forever loop in get_futex_key :(
+> 
+> Implementing GUP solves this problem.
+> 
+> Tested on vexpress-A15 on QEMU.
+> 8<---------------------------------------------------->8
+> 
+> Implement get_user_pages_fast without locking in the fastpath on ARM.
+> This work is derived from the x86 version and adapted to ARM.
 
-At least, dt binding shoul be done in real device driver so this way
-is not good. Let's find a better way.
+This looks pretty much like an exact copy of the x86 version, which will
+likely also result in another exact copy for arm64. Can none of this code be
+made common? Furthermore, the fact that you've lifted the code and not
+provided much of an explanation in the cover letter hints that you might not
+be aware of all the subtleties involved here...
 
->
->> Actually, the output
->> device of fimd hw could be one of MIPI-DSI, eDP, mDNIe, LVDS bridge,
->> or LCD. And then, let's find ptn3460-bridge node in the fimd driver,
->> and initialize the ptn3460 bridge driver, and get power on or off
->> through  exynos_drm_display_ops of the fimd driver. And all these
->> codes could be hided from fimd driver by moving them into
->> exynos_drm_display_ops. Of course, for this, you would need additional
->> works. So let's do it if needed.
->>
->> The below is the outline of device tree I recommend,
->>
->> In board dts,
->>        i2c at I2CD000 {
->>              ptn3460_bridge: prn3460-bridge at 20 {
->>                     ...
->>              }
->>         }
->>
->>         fimd at 11c00000 {
->>              ...
->>              output_dev = <&ptn3460_bridge>;
->>         }
->>
->> With this, I believe that you can do all things you want for
->> controlling the LVDS bridge in fimd driver.
->>
->
-> No, this isn't what I want to do. The bridge should not hang off fimd
-> since it's a crtc. The bridge should only be initialized by the DP
-> driver (it doesn't make sense to initialize ptn when you're using
-> MIPI/LVDS/whatever).
+> +static int gup_pmd_range(pud_t pud, unsigned long addr, unsigned long end,
+> +		int write, struct page **pages, int *nr)
+> +{
+> +	unsigned long next;
+> +	pmd_t *pmdp;
+> +
+> +	pmdp = pmd_offset(&pud, addr);
+> +	do {
+> +		pmd_t pmd = *pmdp;
+> +
+> +		next = pmd_addr_end(addr, end);
+> +		/*
+> +		 * The pmd_trans_splitting() check below explains why
+> +		 * pmdp_splitting_flush has to flush the tlb, to stop
+> +		 * this gup-fast code from running while we set the
+> +		 * splitting bit in the pmd. Returning zero will take
+> +		 * the slow path that will call wait_split_huge_page()
+> +		 * if the pmd is still in splitting state. gup-fast
+> +		 * can't because it has irq disabled and
+> +		 * wait_split_huge_page() would never return as the
+> +		 * tlb flush IPI wouldn't run.
+> +		 */
+> +		if (pmd_none(pmd) || pmd_trans_splitting(pmd))
+> +			return 0;
+> +		if (unlikely(pmd_huge(pmd))) {
+> +			if (!gup_huge_pmd(pmd, addr, next, write, pages, nr))
+> +				return 0;
+> +		} else {
+> +			if (!gup_pte_range(pmd, addr, next, write, pages, nr))
+> +				return 0;
+> +		}
+> +	} while (pmdp++, addr = next, addr != end);
 
-I don't mean that the bridge device should be initialized by fimd
-directly but the fimd driver provides just interfaces abstracted to
-control the bridge device. And basically, the exynos_drm_display_ops
-shouldn't be in fimd driver but in real connector driver; i.e. lcd
-panel or LVDS driver. The reason I placed the exynos_drm_display_ops
-in fimd driver is that lcd panel driver is controlled by lcd class
-depended on Linux framebuffer, and I thought the panel driver should
-be shared with drm driver in case of ARM SoC. The
-exynos_drm_display_ops should be moved into right place if something
-better exists some time or other.
+...case in point: we don't (usually) require IPIs to shoot down TLB entries
+in SMP systems, so this is racy under thp splitting.
 
-So how can the DP driver control the bridge device as of now? the DP
-you mentioned would be eDP, and the eDP driver is placed in
-drivers/video/exynos/, and also MIPI-DSI driver.
-
->
-> Since the actual crtc/encoder drivers are abstracted through
-> exynos_drm_core/crtc/encoder, we need to initialize the ptn driver in
-> the abstraction layers in order to hook it directly into drm.
->
-> Sean
->
->
->> Thanks,
->> Inki Dae
->>
->>> +       if (!bridge->node)
->>> +               return false;
->>> +
->>> +       bridge->client = of_find_i2c_device_by_node(bridge->node);
->>> +       if (!bridge->client)
->>> +               return false;
->>> +
->>> +       return true;
->>> +}
->>> +
->>> +/* returns the number of bridges attached */
->>> +static int exynos_drm_attach_lcd_bridge(struct drm_device *dev,
->>> +               struct drm_encoder *encoder)
->>> +{
->>> +       struct bridge_init bridge;
->>> +       int ret;
->>> +
->>> +       if (find_bridge("ptn3460-bridge", &bridge)) {
->>> +               ret = ptn3460_init(dev, encoder, bridge.client, bridge.node);
->>> +               if (!ret)
->>> +                       return 1;
->>> +       }
->>> +       return 0;
->>> +}
->>> +
->>>  static int exynos_drm_create_enc_conn(struct drm_device *dev,
->>>                                         struct exynos_drm_subdrv *subdrv)
->>>  {
->>> @@ -36,6 +72,13 @@ static int exynos_drm_create_enc_conn(struct drm_device *dev,
->>>                 DRM_ERROR("failed to create encoder\n");
->>>                 return -EFAULT;
->>>         }
->>> +       subdrv->encoder = encoder;
->>> +
->>> +       if (subdrv->manager->display_ops->type == EXYNOS_DISPLAY_TYPE_LCD) {
->>> +               ret = exynos_drm_attach_lcd_bridge(dev, encoder);
->>> +               if (ret)
->>> +                       return 0;
->>> +       }
->>>
->>>         /*
->>>          * create and initialize a connector for this sub driver and
->>> @@ -48,7 +91,6 @@ static int exynos_drm_create_enc_conn(struct drm_device *dev,
->>>                 goto err_destroy_encoder;
->>>         }
->>>
->>> -       subdrv->encoder = encoder;
->>>         subdrv->connector = connector;
->>>
->>>         return 0;
->>> --
->>> 1.8.4
->>>
->>>
->>> _______________________________________________
->>> linux-arm-kernel mailing list
->>> linux-arm-kernel at lists.infradead.org
->>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> _______________________________________________
-> dri-devel mailing list
-> dri-devel at lists.freedesktop.org
-> http://lists.freedesktop.org/mailman/listinfo/dri-devel
+Will
