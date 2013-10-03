@@ -1,62 +1,81 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 3 Oct 2013 17:17:54 -0400
-Subject: [PATCH v3 0/6] ARM: mm: Extend the runtime patch stub for PAE systems
-Message-ID: <1380835081-12129-1-git-send-email-santosh.shilimkar@ti.com>
+Date: Thu, 3 Oct 2013 17:17:55 -0400
+Subject: [PATCH v3 1/6] ARM: mm: use phys_addr_t appropriately in p2v and v2p
+ conversions
+In-Reply-To: <1380835081-12129-1-git-send-email-santosh.shilimkar@ti.com>
+References: <1380835081-12129-1-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1380835081-12129-2-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is v3 of the series which addresses the comments/suggestions
-we received on v2[1]. The v1 version link is here [2]
+Fix remainder types used when converting back and forth between
+physical and virtual addresses.
 
-The series trying to extend the existing v2p runtime patching for
-LPAE machines which can have physical memory beyond 4 GB. Keystone
-is one such ARM machine.
-
-64 bit patching support patch is significantly revised with the inputs
-from Nicolas Pitre. The patch-set is tested in various modes like
-LPAE/non-LPAE, ARM/THMUB. For the THUMB2 build, we found an issue
-with devicemap_init() code sequence and the last patch in the series
-tries to address that. I missed that patch to be included in the
-last version.
-
-Special thanks to Nicolas for his valuable feedback on the earlier
-versions.
-
-There was a point about dual patching and avoiding two steps but there
-is no easy way at least we can think of apart from ripping out the
-current patch code and directly operating on pv_offsets which is
-already nacked while back. In either case, this will be an optimisation
-and can be carried out as a next step.
-
-Cc: Nicolas Pitre <nico@linaro.org>
 Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
 
-Santosh Shilimkar (4):
-  ARM: mm: use phys_addr_t appropriately in p2v and v2p conversions
-  ARM: mm: Introduce virt_to_idmap() with an arch hook
-  ARM: mm: Move the idmap print to appropriate place in the code
-  ARM: mm: Recreate kernel mappings in early_paging_init()
+Acked-by: Nicolas Pitre <nico@linaro.org>
+Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+---
+ arch/arm/include/asm/memory.h |   22 ++++++++++++++++------
+ 1 file changed, 16 insertions(+), 6 deletions(-)
 
-Sricharan R (2):
-  ARM: mm: Correct virt_to_phys patching for 64 bit physical addresses
-  ARM: mm: Change the order of TLB/cache maintenance operations.
-
- arch/arm/include/asm/mach/arch.h |    1 +
- arch/arm/include/asm/memory.h    |   73 +++++++++++++++++++++++++++++----
- arch/arm/kernel/armksyms.c       |    1 +
- arch/arm/kernel/head.S           |   60 +++++++++++++++++----------
- arch/arm/kernel/patch.c          |    3 ++
- arch/arm/kernel/setup.c          |    3 ++
- arch/arm/kernel/smp.c            |    2 +-
- arch/arm/mm/idmap.c              |    8 ++--
- arch/arm/mm/mmu.c                |   84 +++++++++++++++++++++++++++++++++++++-
- 9 files changed, 199 insertions(+), 36 deletions(-)
-
-Regards,
-Santosh
-
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2013-July/188108.html
-[2] http://lwn.net/Articles/556175/ 
+diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
+index e750a93..c133bd9 100644
+--- a/arch/arm/include/asm/memory.h
++++ b/arch/arm/include/asm/memory.h
+@@ -185,22 +185,32 @@ extern unsigned long __pv_phys_offset;
+ 	: "=r" (to)					\
+ 	: "r" (from), "I" (type))
+ 
+-static inline unsigned long __virt_to_phys(unsigned long x)
++static inline phys_addr_t __virt_to_phys(unsigned long x)
+ {
+ 	unsigned long t;
+ 	__pv_stub(x, t, "add", __PV_BITS_31_24);
+ 	return t;
+ }
+ 
+-static inline unsigned long __phys_to_virt(unsigned long x)
++static inline unsigned long __phys_to_virt(phys_addr_t x)
+ {
+ 	unsigned long t;
+ 	__pv_stub(x, t, "sub", __PV_BITS_31_24);
+ 	return t;
+ }
++
+ #else
+-#define __virt_to_phys(x)	((x) - PAGE_OFFSET + PHYS_OFFSET)
+-#define __phys_to_virt(x)	((x) - PHYS_OFFSET + PAGE_OFFSET)
++
++static inline phys_addr_t __virt_to_phys(unsigned long x)
++{
++	return (phys_addr_t)x - PAGE_OFFSET + PHYS_OFFSET;
++}
++
++static inline unsigned long __phys_to_virt(phys_addr_t x)
++{
++	return x - PHYS_OFFSET + PAGE_OFFSET;
++}
++
+ #endif
+ #endif
+ #endif /* __ASSEMBLY__ */
+@@ -238,14 +248,14 @@ static inline phys_addr_t virt_to_phys(const volatile void *x)
+ 
+ static inline void *phys_to_virt(phys_addr_t x)
+ {
+-	return (void *)(__phys_to_virt((unsigned long)(x)));
++	return (void *)__phys_to_virt(x);
+ }
+ 
+ /*
+  * Drivers should NOT use these either.
+  */
+ #define __pa(x)			__virt_to_phys((unsigned long)(x))
+-#define __va(x)			((void *)__phys_to_virt((unsigned long)(x)))
++#define __va(x)			((void *)__phys_to_virt((phys_addr_t)(x)))
+ #define pfn_to_kaddr(pfn)	__va((pfn) << PAGE_SHIFT)
+ 
+ /*
 -- 
 1.7.9.5
