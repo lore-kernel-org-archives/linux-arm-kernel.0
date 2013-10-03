@@ -1,47 +1,48 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 03 Oct 2013 11:37:52 -0500
-Subject: [PATCH] arm: Fix conversion to early_init_dt_scan() for non-DT
- platforms
-In-Reply-To: <1380804633-14130-1-git-send-email-broonie@kernel.org>
-References: <1380804633-14130-1-git-send-email-broonie@kernel.org>
-Message-ID: <524D9D60.7000804@gmail.com>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Thu, 3 Oct 2013 11:38:44 -0500
+Subject: Use of drivers/platform and matching include?
+In-Reply-To: <20131003162519.GA25042@kroah.com>
+References: <BC1C47B3-5412-4829-A1D9-AAB04694D1CC@codeaurora.org>
+ <20131003152715.GA15931@kroah.com>
+ <B674A07C-F8FE-4F4D-BB0A-87D5A50852D0@codeaurora.org>
+ <20131003162519.GA25042@kroah.com>
+Message-ID: <DAB5B812-4615-4107-AE29-FB8152634D9D@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/03/2013 07:50 AM, Mark Brown wrote:
-> From: Mark Brown <broonie@linaro.org>
-> 
-> Commit 67a964490bfd14 (arm: use early_init_dt_scan) in the OF tree in
-> -next converts ARM to use early_init_dt_scan(), factoring out some common
-> code. However it ignores the return value of the function meaning that on
-> non-DT platforms the kernel fails to boot as it attempts to configure
-> itself using DT.
-> 
-> Fix this by adding the appropriate return value check.
 
-I have this fixed already in my tree. I had not pushed out my -next
-branch with the fix, but have done so now.
+On Oct 3, 2013, at 11:25 AM, Greg Kroah-Hartman wrote:
 
-Rob
+> On Thu, Oct 03, 2013 at 11:21:10AM -0500, Kumar Gala wrote:
+>> 
+>> On Oct 3, 2013, at 10:27 AM, Greg Kroah-Hartman wrote:
+>> 
+>>> On Thu, Oct 03, 2013 at 09:45:38AM -0500, Kumar Gala wrote:
+>>>> As we look at upstreaming more support for the Qualcomm MSM SoCs there
+>>>> are a number of drivers or library like routines that are unique to
+>>>> the MSM platform, we are thinking that putting them under:
+>>>> 
+>>>> drivers/platform/qcom/
+>>> 
+>>> What type of drivers are these?  Shouldn't they really go under the
+>>> specific driver type directory instead?
+>> 
+>> If there isn't an existing driver/ dir for this I dont see how it can go there, I'm not also not really a fan of trying to artificial put something that is highly SoC specific into something generic of this nature.
+> 
+> Loose a line-wrap somewhere?...
+> 
+> Anyway, you didn't answer my question, so why do I need to answer yours?
 
-> 
-> Signed-off-by: Mark Brown <broonie@linaro.org>
-> ---
->  arch/arm/kernel/devtree.c | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/kernel/devtree.c b/arch/arm/kernel/devtree.c
-> index 04050f7..67f4ebe 100644
-> --- a/arch/arm/kernel/devtree.c
-> +++ b/arch/arm/kernel/devtree.c
-> @@ -198,7 +198,8 @@ const struct machine_desc * __init setup_machine_fdt(unsigned int dt_phys)
->  	if (!dt_phys)
->  		return NULL;
->  
-> -	early_init_dt_scan(phys_to_virt(dt_phys));
-> +	if (!early_init_dt_scan(phys_to_virt(dt_phys)))
-> +		return NULL;
->  
->  	/* Search the mdescs for the 'best' compatible value match */
->  	dt_root = of_get_flat_dt_root();
-> 
+Sorry about that.  I gave one example in the initial email about a driver that is used to get regions of memory used by processors or HW blocks on the SoC.
+
+I'm still sorting through the mass of code to figure out what all is there and where might be the best place for it.  However, I do think we will end up with some SoC specific bits that highly unique to qualcomm SoCs that just dont fit anywhere else and thus drivers/platforms seemed the best location.
+
+As we submit things upstream I'm more than happy to move stuff around based on feedback.
+
+One example you can look at is arch/arm/mach-msm/smd.c, this is a mix of the memory region support (which we've since split out) and some multiproc messaging functionality.
+
+- k
+
+-- 
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
