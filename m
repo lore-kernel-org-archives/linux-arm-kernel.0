@@ -1,87 +1,76 @@
-From: bcousson@baylibre.com (Benoit Cousson)
-Date: Thu, 03 Oct 2013 15:44:05 +0200
-Subject: [PATCH v3 05/10] ARM: dts: omap3-beagle: Use reset-gpios for
- hsusb2_reset
-In-Reply-To: <524D5D88.9020308@baylibre.com>
-References: <1380012836-29900-1-git-send-email-rogerq@ti.com>
- <1380012836-29900-6-git-send-email-rogerq@ti.com> <524D483D.9040907@ti.com>
- <524D5D88.9020308@baylibre.com>
-Message-ID: <524D74A5.7010604@baylibre.com>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Thu, 3 Oct 2013 10:50:58 -0300
+Subject: [PATCH 2/2] ARM: kirkwood: remove ethernet clock gate workaround
+In-Reply-To: <1380804294-13726-2-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1380804294-13726-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1380804294-13726-2-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <20131003135057.GB2388@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/10/2013 14:05, Benoit Cousson wrote:
-> Hi Roger,
->
-> Yes, I will. I've been waiting for these ones for so long :-)
+On Thu, Oct 03, 2013 at 02:44:54PM +0200, Sebastian Hesselbarth wrote:
+> With a proper fix for Kirkwood ethernet IP MAC address clock gating
+> issue, we can now remove the clock gating workaround that always
+> enabled ethernet clocks.
+> 
+> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> ---
+> Cc: Jason Cooper <jason@lakedaemon.net>
+> Cc: Andrew Lunn <andrew@lunn.ch>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
+> Cc: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-kernel at vger.kernel.org
+> ---
+>  arch/arm/mach-kirkwood/board-dt.c |   14 --------------
+>  1 file changed, 14 deletions(-)
+> 
+> diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
+> index a2974ad..a3bf0c7 100644
+> --- a/arch/arm/mach-kirkwood/board-dt.c
+> +++ b/arch/arm/mach-kirkwood/board-dt.c
+> @@ -41,7 +41,6 @@ static void __init kirkwood_legacy_clk_init(void)
+>  	struct device_node *np = of_find_compatible_node(
+>  		NULL, NULL, "marvell,kirkwood-gating-clock");
+>  	struct of_phandle_args clkspec;
+> -	struct clk *clk;
+>  
+>  	clkspec.np = np;
+>  	clkspec.args_count = 1;
+> @@ -53,19 +52,6 @@ static void __init kirkwood_legacy_clk_init(void)
+>  	clkspec.args[0] = CGC_BIT_PEX1;
+>  	orion_clkdev_add("1", "pcie",
+>  			 of_clk_get_from_provider(&clkspec));
+> -
+> -	/*
+> -	 * The ethernet interfaces forget the MAC address assigned by
+> -	 * u-boot if the clocks are turned off. Until proper DT support
+> -	 * is available we always enable them for now.
+> -	 */
+> -	clkspec.args[0] = CGC_BIT_GE0;
+> -	clk = of_clk_get_from_provider(&clkspec);
+> -	clk_prepare_enable(clk);
+> -
+> -	clkspec.args[0] = CGC_BIT_GE1;
+> -	clk = of_clk_get_from_provider(&clkspec);
+> -	clk_prepare_enable(clk);
+>  }
+>  
+>  #define MV643XX_ETH_MAC_ADDR_LOW	0x0414
+> -- 
+> 1.7.10.4
+> 
 
-In fact it does not apply correctly on my for_3.13/dts branch :-(
+Good!
 
-error: arch/arm/boot/dts/omap3-beagle.dts: patch does not apply
-Patch failed at 0004 ARM: dts: omap3-beagle: Make USB host pin naming 
-consistent
+And if this works, this patch effectively removes the
+kirkwood_legacy_clk_init() call from this file.
 
-Could you rebase it?
+I'll certainly give this a test later (not soon though).
 
-Thanks,
-Benoit
-
-
->
-> Thanks,
-> Benoit
->
-> On 03/10/2013 12:34, Roger Quadros wrote:
->> Hi Benoit,
->>
->> Could you please take the device tree related patches [5 to 10] in
->> this series?
->> Thanks.
->>
->> cheers,
->> -roger
->>
->> On 09/24/2013 11:53 AM, Roger Quadros wrote:
->>> We no longer need to model the RESET line as a regulator since
->>> the USB phy-nop driver accepts "reset-gpios" property.
->>>
->>> Signed-off-by: Roger Quadros <rogerq@ti.com>
->>> ---
->>>   arch/arm/boot/dts/omap3-beagle.dts |   13 +------------
->>>   1 files changed, 1 insertions(+), 12 deletions(-)
->>>
->>> diff --git a/arch/arm/boot/dts/omap3-beagle.dts
->>> b/arch/arm/boot/dts/omap3-beagle.dts
->>> index dfd8310..71bde47 100644
->>> --- a/arch/arm/boot/dts/omap3-beagle.dts
->>> +++ b/arch/arm/boot/dts/omap3-beagle.dts
->>> @@ -44,17 +44,6 @@
->>>           };
->>>       };
->>>
->>> -    /* HS USB Port 2 RESET */
->>> -    hsusb2_reset: hsusb2_reset_reg {
->>> -        compatible = "regulator-fixed";
->>> -        regulator-name = "hsusb2_reset";
->>> -        regulator-min-microvolt = <3300000>;
->>> -        regulator-max-microvolt = <3300000>;
->>> -        gpio = <&gpio5 19 0>;    /* gpio_147 */
->>> -        startup-delay-us = <70000>;
->>> -        enable-active-high;
->>> -    };
->>> -
->>>       /* HS USB Port 2 Power */
->>>       hsusb2_power: hsusb2_power_reg {
->>>           compatible = "regulator-fixed";
->>> @@ -68,7 +57,7 @@
->>>       /* HS USB Host PHY on PORT 2 */
->>>       hsusb2_phy: hsusb2_phy {
->>>           compatible = "usb-nop-xceiv";
->>> -        reset-supply = <&hsusb2_reset>;
->>> +        reset-gpios = <&gpio5 19 GPIO_ACTIVE_LOW>;    /* gpio_147 */
->>>           vcc-supply = <&hsusb2_power>;
->>>       };
->>>
->>>
->>
->
+Nice job!
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
