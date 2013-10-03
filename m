@@ -1,47 +1,27 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 3 Oct 2013 07:29:41 -0500
-Subject: [PATCH v7 09/10] usb: dwc3: omap: manage "usb_otg_ss_refclk960m"
- clock
-In-Reply-To: <524C22A1.30200@ti.com>
-References: <1379508542-22389-1-git-send-email-rogerq@ti.com>
- <1379508542-22389-10-git-send-email-rogerq@ti.com>
- <52403E02.4070208@ti.com> <20131002131113.GM1476@radagast>
- <524C22A1.30200@ti.com>
-Message-ID: <20131003122941.GD3230@radagast>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 3 Oct 2013 14:44:57 +0200
+Subject: [PATCH RESEND] PCI: mvebu: Dynamically detect if the PEX link
+ is up to enable hot plug
+In-Reply-To: <1380650281-16175-1-git-send-email-jgunthorpe@obsidianresearch.com>
+References: <1380650281-16175-1-git-send-email-jgunthorpe@obsidianresearch.com>
+Message-ID: <20131003144457.4131aea3@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Dear Jason Gunthorpe,
 
-On Wed, Oct 02, 2013 at 04:41:53PM +0300, Roger Quadros wrote:
-> On 10/02/2013 04:11 PM, Felipe Balbi wrote:
-> > On Mon, Sep 23, 2013 at 04:11:30PM +0300, Roger Quadros wrote:
-> >> Hi Felipe,
-> >>
-> >> On 09/18/2013 03:49 PM, Roger Quadros wrote:
-> >>> "usb_otg_ss_refclk960m" is an optional functional clock to the
-> >>> UBS_OTG_SS module. So manage it in the driver.
-> >>>
-> >>
-> >> Just realized that "usb_otg_ss_refclk960m" is in fact functional clock to the 
-> >> PHY and not USB_OTG_SS module. The name is misleading.
-> >>
-> >> So please ignore patch 9 and 10.
-> > 
-> > ignored. All others are fine, right ?
-> > 
-> Yes. But I might have to rebase this on top of Phy framework stuff.
+On Tue,  1 Oct 2013 11:58:00 -0600, Jason Gunthorpe wrote:
+> Otherwise hotplugging the PEX doesn't work at all since the driver
+> detects the link state at probe time. Simply replacing the two tests
+> of haslink with a register read is enough to fix it.
+> 
+> Tested on kirkwood with repeated plug/unplug of the link partner.
+> 
+> Signed-off-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
 
-alright, Greg already took the PHY framework, so maybe we need to just
-give him my Acked-by and he takes the patches directly as I don't have
-PYH framework.
-
+Acked-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Tested-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131003/987ac52c/attachment.sig>
+Thomas Petazzoni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
