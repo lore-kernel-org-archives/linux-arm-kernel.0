@@ -1,66 +1,66 @@
-From: dinguyen@altera.com (Dinh Nguyen)
-Date: Thu, 3 Oct 2013 10:12:01 -0500
-Subject: [PATCH 0/4] SoCFPGA: dts cleanups and SoCkit support
-In-Reply-To: <1380699333-558-1-git-send-email-s.trumtrar@pengutronix.de>
-References: <1380699333-558-1-git-send-email-s.trumtrar@pengutronix.de>
-Message-ID: <1380813121.7464.18.camel@linux-builds1>
+From: rogerq@ti.com (Roger Quadros)
+Date: Thu, 3 Oct 2013 18:12:30 +0300
+Subject: [PATCH v8 1/8] usb: phy: omap-control: Get rid of platform data
+In-Reply-To: <1380813157-22311-1-git-send-email-rogerq@ti.com>
+References: <1380813157-22311-1-git-send-email-rogerq@ti.com>
+Message-ID: <1380813157-22311-2-git-send-email-rogerq@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2013-10-02 at 09:35 +0200, Steffen Trumtrar wrote:
-> Hi!
-> 
-> This series includes some minor cleanups (indentation and clock labels) and
-> reorders the socfpga dts hierarchy from
-> 	socfpga.dtsi
-> 	-> socfpga_$board.dts
-> 	-> socfpga_$otherboard.dts
-> to
-> 	socfpga.dtsi
-> 	-> socfpga_cyclone5.dtsi
-> 	--> socfpga_cyclone5_$board.dts
-> 	--> socfpga_cyclone5_$otherboard.dts
-> 
-> The Socfpga is a SoC with an FPGA on board. This FPGA does not have to be a
-> Cyclone5.
-> The current socfpga_cyclone5.dts is however not specific to a SoC with this
-> combination, but describes one specific board: the Altera Cyclone5 Development Kit.
-> Therefore, I propose moving the common stuff to socfpga_cyclone5.dtsi as long as
-> it is as easy as now.
-> 
-> Finally, the series adds minimal support for the terasic SoCkit.
-> 
-> BTW: It seems there is no official maintainer(tree) for the socfpga dt stuff.
-> So, I rebased onto next-20130927.
+omap-control device is present from OMAP4 onwards which
+support device tree boots only. So get rid of platform data.
 
-I've pretty much Acked this whole series, with the minor comment of a
-baudrate change.
+Signed-off-by: Roger Quadros <rogerq@ti.com>
+---
+ drivers/usb/phy/phy-omap-control.c   |   12 +++---------
+ include/linux/usb/omap_control_usb.h |    4 ----
+ 2 files changed, 3 insertions(+), 13 deletions(-)
 
-I think Rob had mentioned in a another patch(that since the patch
-doesn't involve a binding change, it may not get too many comments), and
-since this patch series is not making a binding change at all, comments
-may not come, but we still need an Ack from a DTS binding maintainer
-before the arm-soc maintainer(s) will take it.
-
-Thanks,
-Dinh
-> Regards,
-> Steffen
-> 
-> 
-> Steffen Trumtrar (4):
->   ARM: socfpga: dts: Move common nodes to cyclone5 dtsi
->   ARM: socfpga: dts: Add support for terasic SoCkit
->   ARM: socfpga: dts: cleanup indentation
->   ARM: socfpga: dts: fix s2f_* clock name
-> 
->  arch/arm/boot/dts/Makefile                         |   3 +-
->  arch/arm/boot/dts/socfpga.dtsi                     | 296 ++++++++++-----------
->  ...{socfpga_cyclone5.dts => socfpga_cyclone5.dtsi} |  20 --
->  arch/arm/boot/dts/socfpga_cyclone5_socdk.dts       |  40 +++
->  arch/arm/boot/dts/socfpga_cyclone5_sockit.dts      |  37 +++
->  5 files changed, 227 insertions(+), 169 deletions(-)
->  rename arch/arm/boot/dts/{socfpga_cyclone5.dts => socfpga_cyclone5.dtsi} (78%)
->  create mode 100644 arch/arm/boot/dts/socfpga_cyclone5_socdk.dts
->  create mode 100644 arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
-> 
+diff --git a/drivers/usb/phy/phy-omap-control.c b/drivers/usb/phy/phy-omap-control.c
+index a4dda8e..9772592 100644
+--- a/drivers/usb/phy/phy-omap-control.c
++++ b/drivers/usb/phy/phy-omap-control.c
+@@ -197,8 +197,6 @@ static int omap_control_usb_probe(struct platform_device *pdev)
+ {
+ 	struct resource	*res;
+ 	struct device_node *np = pdev->dev.of_node;
+-	struct omap_control_usb_platform_data *pdata =
+-			dev_get_platdata(&pdev->dev);
+ 
+ 	control_usb = devm_kzalloc(&pdev->dev, sizeof(*control_usb),
+ 		GFP_KERNEL);
+@@ -207,14 +205,10 @@ static int omap_control_usb_probe(struct platform_device *pdev)
+ 		return -ENOMEM;
+ 	}
+ 
+-	if (np) {
++	if (np)
+ 		of_property_read_u32(np, "ti,type", &control_usb->type);
+-	} else if (pdata) {
+-		control_usb->type = pdata->type;
+-	} else {
+-		dev_err(&pdev->dev, "no pdata present\n");
+-		return -EINVAL;
+-	}
++	else
++		return -EINVAL;	/* We only support DT boot */
+ 
+ 	control_usb->dev	= &pdev->dev;
+ 
+diff --git a/include/linux/usb/omap_control_usb.h b/include/linux/usb/omap_control_usb.h
+index 27b5b8c..e2416b4 100644
+--- a/include/linux/usb/omap_control_usb.h
++++ b/include/linux/usb/omap_control_usb.h
+@@ -31,10 +31,6 @@ struct omap_control_usb {
+ 	u32 type;
+ };
+ 
+-struct omap_control_usb_platform_data {
+-	u8 type;
+-};
+-
+ enum omap_control_usb_mode {
+ 	USB_MODE_UNDEFINED = 0,
+ 	USB_MODE_HOST,
+-- 
+1.7.4.1
