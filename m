@@ -1,38 +1,38 @@
-From: arno@natisbad.org (Arnaud Ebalard)
-Date: Thu, 03 Oct 2013 07:54:43 +0200
-Subject: [PATCH,
- FIX] ARM: mvebu: add missing DT Mbus ranges and relocate PCIe DT
- nodes for RN102
-In-Reply-To: <CAOesGMjs=_USrFR9EkzksBj=7=1CgyujqvNhDZhpfdgkTt6gJQ@mail.gmail.com>
- (Olof Johansson's message of "Wed, 2 Oct 2013 20:57:57 -0700")
-References: <87a9iuq7ff.fsf@natisbad.org>
- <CAOesGMjs=_USrFR9EkzksBj=7=1CgyujqvNhDZhpfdgkTt6gJQ@mail.gmail.com>
-Message-ID: <87vc1eucf0.fsf@natisbad.org>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Thu,  3 Oct 2013 14:47:43 +0900
+Subject: [PATCH v2 0/3] arm,
+ arm64: check for number of arguments in syscall_get/set_arguments()
+In-Reply-To: <1380605584-22125-git-send-email-takahiro.akashi@linaro.org>
+References: <1380605584-22125-git-send-email-takahiro.akashi@linaro.org>
+Message-ID: <1380779266-11753-1-git-send-email-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+# added Roland <mcgrathr@chromium> in CC for asm-generic/syscall.h
 
-Olof Johansson <olof@lixom.net> writes:
+I modified my patch based on Will's comments.
+Speaking of arm, i + n is checked against SYSCALL_MAX_ARGS (== 7),
+but it seems that the kernel code assumes that the current max number of
+arguments would be 6. For example, SYSCALL_DEFINEn are defined from 0 to 6.
+Am i wrong?
 
-> Hi,
->
-> On Mon, Sep 30, 2013 at 3:19 PM, Arnaud Ebalard <arno@natisbad.org> wrote:
->>
->> When 5e12a613 and 0cd3754a were introduced, Netgear ReadyNAS 102 .dts
->> file was queued for inclusion and missed the update to have Mbus (and
->> then BootROM) ranges properties declared. It also missed the relocation
->> of Armada 370/XP PCIe DT nodes introduced by 14fd8ed0 after de1af8d4.
->> This patch fixes that which makes 3.12-rc3 bootable on the NAS.
->
-> In the future please don't just quote the SHAs, give the patch subject
-> as well. It makes it easier to follow the patch description without
-> looking them up (besides, there's a chance that the 8-character SHAs
-> will not be unique at some point in the future, which makes the lookup
-> harder).
+Changes:
+  * added a patch to arm as well
+  * added a patch to asm-generic/syscall.h; corrected the description on
+    syscall_get_arguments() and syscall_put_arguments()
+  * removed portion of commit message which referred to asm-generic/syscall.h
+    in arm64
 
-Dully noted. Will do it next time, olof.
+AKASHI Takahiro (3):
+  arm64: check for number of arguments in syscall_get/set_arguments()
+  arm: check for number of arguments in syscall_get/set_arguments()
+  asm-generic: syscall_get/set_arguments accept zero for number of
+    arguments
 
-Cheers,
+ arch/arm/include/asm/syscall.h   |    6 ++++++
+ arch/arm64/include/asm/syscall.h |    6 ++++++
+ include/asm-generic/syscall.h    |    4 ++--
+ 3 files changed, 14 insertions(+), 2 deletions(-)
 
-a+
+-- 
+1.7.9.5
