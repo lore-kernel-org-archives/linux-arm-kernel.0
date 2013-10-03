@@ -1,82 +1,122 @@
 From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
-Date: Thu,  3 Oct 2013 23:21:41 +0200
-Subject: [PATCH v2 5/5] ARM: socfpga: dts: fix s2f_* clock name
+Date: Thu,  3 Oct 2013 23:21:37 +0200
+Subject: [PATCH v2 1/5] ARM: socfpga: dts: Move common nodes to cyclone5 dtsi
 In-Reply-To: <1380835301-26512-1-git-send-email-s.trumtrar@pengutronix.de>
 References: <1380835301-26512-1-git-send-email-s.trumtrar@pengutronix.de>
-Message-ID: <1380835301-26512-6-git-send-email-s.trumtrar@pengutronix.de>
+Message-ID: <1380835301-26512-2-git-send-email-s.trumtrar@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The s2f_* clocks are called h2f_* in the datasheets.
-Rename them accordingly in the socfpga.dtsi.
+The current socfpga_cyclone5.dts describes the Altera Cyclone5 SoC Development
+Kit. The Cyclone5 includes a SoCFPGA, which itself can be included in other
+SoC+FPGA combinations.
+
+Instead of having to describe all Cyclone5 common nodes in every board specific
+dts, move socfpga_cyclone5.dts to a dtsi and include this in a new dts for the
+Development Kit.
 
 Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
 Acked-by: Dinh Nguyen <dinguyen@altera.com>
 ---
- arch/arm/boot/dts/socfpga.dtsi | 16 ++++++++--------
- 1 file changed, 8 insertions(+), 8 deletions(-)
+ arch/arm/boot/dts/Makefile                         |  2 +-
+ ...{socfpga_cyclone5.dts => socfpga_cyclone5.dtsi} | 20 -----------
+ arch/arm/boot/dts/socfpga_cyclone5_socdk.dts       | 40 ++++++++++++++++++++++
+ 3 files changed, 41 insertions(+), 21 deletions(-)
+ rename arch/arm/boot/dts/{socfpga_cyclone5.dts => socfpga_cyclone5.dtsi} (78%)
+ create mode 100644 arch/arm/boot/dts/socfpga_cyclone5_socdk.dts
 
-diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
-index 587096e..e245924 100644
---- a/arch/arm/boot/dts/socfpga.dtsi
-+++ b/arch/arm/boot/dts/socfpga.dtsi
-@@ -147,7 +147,7 @@
- 							reg = <0x58>;
- 						};
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index cf75889..fcace86 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -216,7 +216,7 @@ dtb-$(CONFIG_ARCH_SHMOBILE) += emev2-kzm9d.dtb \
+ 	r8a73a4-ape6evm-reference.dtb \
+ 	sh7372-mackerel.dtb
+ dtb-$(CONFIG_ARCH_SHMOBILE_MULTI) += emev2-kzm9d-reference.dtb
+-dtb-$(CONFIG_ARCH_SOCFPGA) += socfpga_cyclone5.dtb \
++dtb-$(CONFIG_ARCH_SOCFPGA) += socfpga_cyclone5_socdk.dtb \
+ 	socfpga_vt.dtb
+ dtb-$(CONFIG_ARCH_SPEAR13XX) += spear1310-evb.dtb \
+ 	spear1340-evb.dtb
+diff --git a/arch/arm/boot/dts/socfpga_cyclone5.dts b/arch/arm/boot/dts/socfpga_cyclone5.dtsi
+similarity index 78%
+rename from arch/arm/boot/dts/socfpga_cyclone5.dts
+rename to arch/arm/boot/dts/socfpga_cyclone5.dtsi
+index 973999d..a8716f6 100644
+--- a/arch/arm/boot/dts/socfpga_cyclone5.dts
++++ b/arch/arm/boot/dts/socfpga_cyclone5.dtsi
+@@ -19,26 +19,6 @@
+ /include/ "socfpga.dtsi"
  
--						cfg_s2f_usr0_clk: cfg_s2f_usr0_clk {
-+						cfg_h2f_usr0_clk: cfg_h2f_usr0_clk {
- 							#clock-cells = <0>;
- 							compatible = "altr,socfpga-perip-clk";
- 							clocks = <&main_pll>;
-@@ -198,7 +198,7 @@
- 							reg = <0x98>;
- 						};
- 
--						s2f_usr1_clk: s2f_usr1_clk {
-+						h2f_usr1_clk: h2f_usr1_clk {
- 							#clock-cells = <0>;
- 							compatible = "altr,socfpga-perip-clk";
- 							clocks = <&periph_pll>;
-@@ -235,7 +235,7 @@
- 							reg = <0xD0>;
- 						};
- 
--						s2f_usr2_clk: s2f_usr2_clk {
-+						h2f_usr2_clk: h2f_usr2_clk {
- 							#clock-cells = <0>;
- 							compatible = "altr,socfpga-perip-clk";
- 							clocks = <&sdram_pll>;
-@@ -335,14 +335,14 @@
- 					cfg_clk: cfg_clk {
- 						#clock-cells = <0>;
- 						compatible = "altr,socfpga-gate-clk";
--						clocks = <&cfg_s2f_usr0_clk>;
-+						clocks = <&cfg_h2f_usr0_clk>;
- 						clk-gate = <0x60 8>;
- 					};
- 
--					s2f_user0_clk: s2f_user0_clk {
-+					h2f_user0_clk: h2f_user0_clk {
- 						#clock-cells = <0>;
- 						compatible = "altr,socfpga-gate-clk";
--						clocks = <&cfg_s2f_usr0_clk>;
-+						clocks = <&cfg_h2f_usr0_clk>;
- 						clk-gate = <0x60 9>;
- 					};
- 
-@@ -400,10 +400,10 @@
- 						div-reg = <0xa8 0 24>;
- 					};
- 
--					s2f_user1_clk: s2f_user1_clk {
-+					h2f_user1_clk: h2f_user1_clk {
- 						#clock-cells = <0>;
- 						compatible = "altr,socfpga-gate-clk";
--						clocks = <&s2f_usr1_clk>;
-+						clocks = <&h2f_usr1_clk>;
- 						clk-gate = <0xa0 7>;
- 					};
- 
+ / {
+-	model = "Altera SOCFPGA Cyclone V";
+-	compatible = "altr,socfpga-cyclone5", "altr,socfpga";
+-
+-	chosen {
+-		bootargs = "console=ttyS0,57600";
+-	};
+-
+-	memory {
+-		name = "memory";
+-		device_type = "memory";
+-		reg = <0x0 0x40000000>; /* 1GB */
+-	};
+-
+-	aliases {
+-		/* this allow the ethaddr uboot environmnet variable contents
+-		 * to be added to the gmac1 device tree blob.
+-		 */
+-		ethernet0 = &gmac1;
+-	};
+-
+ 	soc {
+ 		clkmgr at ffd04000 {
+ 			clocks {
+diff --git a/arch/arm/boot/dts/socfpga_cyclone5_socdk.dts b/arch/arm/boot/dts/socfpga_cyclone5_socdk.dts
+new file mode 100644
+index 0000000..0ea6399
+--- /dev/null
++++ b/arch/arm/boot/dts/socfpga_cyclone5_socdk.dts
+@@ -0,0 +1,40 @@
++/*
++ *  Copyright (C) 2012 Altera Corporation <www.altera.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++/include/ "socfpga_cyclone5.dtsi"
++
++/ {
++	model = "Altera SOCFPGA Cyclone V SoC Development Kit";
++	compatible = "altr,socfpga-cyclone5", "altr,socfpga";
++
++	chosen {
++		bootargs = "console=ttyS0,57600";
++	};
++
++	memory {
++		name = "memory";
++		device_type = "memory";
++		reg = <0x0 0x40000000>; /* 1GB */
++	};
++
++	aliases {
++		/* this allow the ethaddr uboot environmnet variable contents
++		 * to be added to the gmac1 device tree blob.
++		 */
++		ethernet0 = &gmac1;
++	};
++};
 -- 
 1.8.4.rc3
