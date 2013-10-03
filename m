@@ -1,36 +1,50 @@
-From: lars.kurth@xen.org (Lars Kurth)
-Date: Thu, 03 Oct 2013 11:58:29 +0100
-Subject: Xen Project Developer Summit, Oct 24-25, Edinburgh : ARM Content
-Message-ID: <524D4DD5.1040405@xen.org>
+From: leif.lindholm@linaro.org (Leif Lindholm)
+Date: Thu,  3 Oct 2013 12:24:38 +0100
+Subject: [PATCH v2 0/3] arm: [U]EFI runtime services support
+Message-ID: <1380799481-5470-1-git-send-email-leif.lindholm@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+In systems based on [U]EFI-conformant firmware, runtime services provide
+a standardised way for the kernel to update firmware environment
+variables. This is used for example by efibootmgr to update which image
+should be loaded on next boot.
 
-Just a quick note to let you know that the schedule for the Xen Project 
-Developer Summit is finally available at: 
-http://xendevelopersummit2013.sched.org - This year there is a lot of 
-ARM related content which may be relevant to subscribers to this list, 
-which is why I am posting to this list.
+This patchset implements basic support for UEFI runtime services on ARM
+platforms, as well as the basic underlying EFI support. It also defines
+a mechanism by which the required information is passed from the
+bootloader to the kernel via FDT entries.
 
-* Xen on ARM Update, 
-http://xendevelopersummit2013.sched.org/event/63bb36cf3774fd7af02fd4b24d7a095f
-* Dual-Android on Nexus 10, 
-http://xendevelopersummit2013.sched.org/event/60e17f16dbc23076f052aa5144427a5a
-* Xen in OSS based In-Vehicle-Infotainment Systems, 
-http://xendevelopersummit2013.sched.org/event/bd34d62873ba22beb39deef9d3262f26
-* Performance optimization on Xen-based Android Device, 
-http://xendevelopersummit2013.sched.org/event/1579f83ed37e75c2130d836df0460cce
-* Performance Evaluation of Live Migration based on Xen ARM PVH, 
-http://xendevelopersummit2013.sched.org/event/9dda124fada6c5f65df89f1ec1cf5d67 
-<http://xendevelopersummit2013.sched.org/event/9dda124fada6c5f65df89f1ec1cf5d67#.Uk1NRtKkpac>
-* Enabling Fast, Dynamic Network Processing with ClickOS, 
-http://xendevelopersummit2013.sched.org/event/6cd447ea70f8e9c8058a5508d4f5a2a7
+This patchset depends on the previously submitted early_ioremap() and
+generic UEFI config table scanning patchsets.
 
-You can find more information about the summit on 
-http://events.linuxfoundation.org//events/xen-project-developer-summit/ 
-and 
-http://lists.xenproject.org/archives/html/xen-devel/2013-09/msg02434.html
+Changes from v1:
+- Updated FDT bindings, based on feedback.
+- Use common config table scanning and address lookup code.
+- Add dependency on !CPU_BIG_ENDIAN (for now).
+- Add proper efi_enabled() facility.
+- Documentation updates.
 
-Best Regards
-Lars
+Leif Lindholm (3):
+  Documentation: arm: add UEFI support documentation
+  arm: Add [U]EFI runtime services support
+  init: efi: arm: enable (U)EFI runtime services on arm
+
+ Documentation/arm/00-INDEX |    3 +
+ Documentation/arm/uefi.txt |   47 +++++
+ arch/arm/Kconfig           |   15 ++
+ arch/arm/include/asm/efi.h |   22 ++
+ arch/arm/kernel/Makefile   |    2 +
+ arch/arm/kernel/efi.c      |  485 ++++++++++++++++++++++++++++++++++++++++++++
+ arch/arm/kernel/efi_phys.S |   59 ++++++
+ arch/arm/kernel/setup.c    |    6 +
+ include/linux/efi.h        |    2 +-
+ init/main.c                |    4 +
+ 10 files changed, 644 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/arm/uefi.txt
+ create mode 100644 arch/arm/include/asm/efi.h
+ create mode 100644 arch/arm/kernel/efi.c
+ create mode 100644 arch/arm/kernel/efi_phys.S
+
+-- 
+1.7.10.4
