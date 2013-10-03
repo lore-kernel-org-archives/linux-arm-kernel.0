@@ -1,150 +1,141 @@
-From: gang.chen@asianux.com (Chen Gang)
-Date: Thu, 03 Oct 2013 18:05:31 +0800
-Subject: [PATCH 2/2] ARM: include: asm: use 'int' instead of 'unsigned
- long' for normal register variables within atomic.h
-In-Reply-To: <524C3981.20307@asianux.com>
-References: <20130926100422.GE2855@mudshark.cambridge.arm.com>
- <5244148F.6080405@asianux.com>
- <20130927110618.GB9520@mudshark.cambridge.arm.com>
- <5247A1D1.6080505@asianux.com> <5247A1FA.4030305@asianux.com>
- <5247A3FC.9020508@asianux.com>
- <20130930161149.GI26036@mudshark.cambridge.arm.com>
- <524A2DE7.8040208@asianux.com>
- <20131001090119.GA17629@mudshark.cambridge.arm.com>
- <524ABA20.6060106@asianux.com>
- <20131002104158.GD28311@mudshark.cambridge.arm.com>
- <524C3981.20307@asianux.com>
-Message-ID: <524D416B.5090709@asianux.com>
+From: r.sricharan@ti.com (Sricharan R)
+Date: Thu, 3 Oct 2013 15:49:37 +0530
+Subject: [PATCH V4] ARM: OMAP5/DRA7: realtime_counter: Configure CNTFRQ
+ register
+In-Reply-To: <1379520162-31932-1-git-send-email-r.sricharan@ti.com>
+References: <1379520162-31932-1-git-send-email-r.sricharan@ti.com>
+Message-ID: <524D44B9.30208@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Tony,
 
-If need send patch v2 for it, I should try (if so, need patch 1 also
-send again?).
-
-Thanks.
-
-On 10/02/2013 11:19 PM, Chen Gang wrote:
-> On 10/02/2013 06:41 PM, Will Deacon wrote:
->> On Tue, Oct 01, 2013 at 01:03:44PM +0100, Chen Gang wrote:
->>> On 10/01/2013 05:01 PM, Will Deacon wrote:
->>>> On Tue, Oct 01, 2013 at 03:05:27AM +0100, Chen Gang wrote:
->>>>> OK, thanks. That means: "arm means arm 32-bit, arm64 means arm 64-bit.
->>>>> The current Linux kernel main line does not support arm 16-bit".
->>>>>
->>>>> Since "bringing our atomic_t ... with the atomic_t type definition", can
->>>>> we use 'atomic_t" instead of 'unsigned long'?
->>>>>
->>>>> And can we use 'atomic64_t" instead of 'unsigned long' in atomic64_*()?
->>>>
->>>> That's probably a bit dodgy, since they are typedefs to compound types
->>>> which, if ever extended, would fall to bits if we tried to pack them into a
->>>> single register.
->>>>
->>>
->>> Excuse me, my English is not quite well, I guess your meaning is: "in
->>> 'atomic.h', for arm/arm64, let register variables type equal to related
->>> atomic type: use 64-bit type if 'atomic64_t', 32-bit type if 'atomic_t'.
->>
->> Sorry, I think I've confused you. This should be a simple change:
->>
-> 
-> Oh, no sorry, my English is really not quite well, and I am not quite
-> familiar with arm (even inline assembly language grammar, which I
-> should familiar).
-> 
-> I really should see the deals about it.
-> 
-> 
->>   On ARM:
->>
->>   - The atomic_t typedef is a struct containing an int.
->>   - The atomic64_t typedef is a struct containing a long long.
->>
->>   On arm64:
->>
->>   - The atomic_t typedef is a struct containing an int.
->>   - The atomic64_t typedef is a struct containing a long.
->>
-> 
-> Yeah.
-> 
->> Now, your first patch made the handling of atomic64_t on ARM use long long
->> instead of u64. That's good, because it fixes a signedness bug.
->>
-> 
-> OK, thanks.
-> 
->> The second patch is just a clean-up, because our atomic_* functions on ARM
->> interchangeably use int and unsigned long when working with atomic_t types.
->> This can be tidied up by using int whenever we are reading or writing an
->> atomic_t, thus matching the type definition for that structure member.
->>
->> So, for example, atomic_add does not need changing because it always uses
->> int to hold the atomic_t variable (the unsigned long holds the status
->> returned from the strex instruction). atomic_cmpxchg, however, loads the
->> atomic_t into oldval, so that should be int.
->>
-> 
-> OK, thank you for your details information, originally I did not check
-> the inline assembly code in details (which I should do).
-> 
-> And what you said above is reasonable to me.
-> 
-> After a check, I think for atomic64_*() in arm have no this kind of
-> issue.
-> 
-> 
->> Given that this patch doesn't gain us anything in terms of functionality,
->> feel free to ignore it and I can take a look when there's a rainy day (which
->> should be real soon now). I also need to take a closer look at
->> atomic_clear_mask for arm64, because it looks broken to me.
->>
-> 
-> OK, thanks. 
-> 
-> Hmm... after read arm64 again, at least for me, it has no this kind of
-> issue.
-> 
-> :-)
-> 
->> Will
->>
->>
-> 
-> 
-> So the related patch is below (still based on Patch 1):
-> 
-> -----------------------------patch begin--------------------------------
-> 
-> arm/include/asm/atomic.h: use 'int' instead of 'unsigned long' for 'oldval' in atomic_cmpxchg().
-> 
->   For atomic_cmpxchg(), the type of 'oldval' need be 'int' to match the
->   type of "*ptr" (used by 'ldrex' instruction) and 'old' (used by 'teq'
->   instruction).
-> 
-> 
-> Signed-off-by: Chen Gang <gang.chen@asianux.com>
+On Wednesday 18 September 2013 09:32 PM, Sricharan R wrote:
+> The realtime counter called master counter, produces the count
+> used by the private timer peripherals in the MPU_CLUSTER. The
+> CNTFRQ per cpu register is used to denote the frequency of the counter.
+> Currently the frequency value is passed from the
+> DT file, but this is not scalable when we have other non-DT guest
+> OS. This register must be set to the right value by the
+> secure rom code. Setting this register helps in propagating the right
+> frequency value across OSes.
+>
+> More discussions and the reason for adding this in a non-DT
+> way can be seen from below.
+> http://www.mail-archive.com/linux-omap at vger.kernel.org/msg93832.html
+>
+> So configuring this secure register for all the cpus here.
+>
+> While here, removing the clock-frequency DT entry for omap5 as
+> it is no more needed after this patch.
+>
+> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Cc: Nishanth Menon <nm@ti.com>
+> Cc: Rajendra Nayak <rnayak@ti.com>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Tested-by: Nishanth Menon <nm@ti.com>
+> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Signed-off-by: Sricharan R <r.sricharan@ti.com>
 > ---
->  arch/arm/include/asm/atomic.h |    3 ++-
->  1 files changed, 2 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/atomic.h b/arch/arm/include/asm/atomic.h
-> index a715ac0..9ee7e01 100644
-> --- a/arch/arm/include/asm/atomic.h
-> +++ b/arch/arm/include/asm/atomic.h
-> @@ -114,7 +114,8 @@ static inline int atomic_sub_return(int i, atomic_t *v)
+> [V4] Updated commit log, removed the redundant entry in OMAP5.dtsi and
+>      a unnecessary newline in timer.c
+>
+>  arch/arm/boot/dts/omap5.dtsi      |    1 -
+>  arch/arm/mach-omap2/omap-secure.h |    2 ++
+>  arch/arm/mach-omap2/omap-smp.c    |    9 +++++++++
+>  arch/arm/mach-omap2/timer.c       |    5 +++++
+>  4 files changed, 16 insertions(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
+> index 07be2cd..8a45512 100644
+> --- a/arch/arm/boot/dts/omap5.dtsi
+> +++ b/arch/arm/boot/dts/omap5.dtsi
+> @@ -52,7 +52,6 @@
+>  			     <GIC_PPI 14 (GIC_CPU_MASK_RAW(3) | IRQ_TYPE_LEVEL_LOW)>,
+>  			     <GIC_PPI 11 (GIC_CPU_MASK_RAW(3) | IRQ_TYPE_LEVEL_LOW)>,
+>  			     <GIC_PPI 10 (GIC_CPU_MASK_RAW(3) | IRQ_TYPE_LEVEL_LOW)>;
+> -		clock-frequency = <6144000>;
+>  	};
 >  
->  static inline int atomic_cmpxchg(atomic_t *ptr, int old, int new)
+>  	gic: interrupt-controller at 48211000 {
+> diff --git a/arch/arm/mach-omap2/omap-secure.h b/arch/arm/mach-omap2/omap-secure.h
+> index 0e72917..5f88824 100644
+> --- a/arch/arm/mach-omap2/omap-secure.h
+> +++ b/arch/arm/mach-omap2/omap-secure.h
+> @@ -42,6 +42,8 @@
+>  #define OMAP4_MON_L2X0_AUXCTRL_INDEX	0x109
+>  #define OMAP4_MON_L2X0_PREFETCH_INDEX	0x113
+>  
+> +#define OMAP5_DRA7_MON_SET_CNTFRQ_INDEX	0x109
+> +
+>  /* Secure PPA(Primary Protected Application) APIs */
+>  #define OMAP4_PPA_L2_POR_INDEX		0x23
+>  #define OMAP4_PPA_CPU_ACTRL_SMP_INDEX	0x25
+> diff --git a/arch/arm/mach-omap2/omap-smp.c b/arch/arm/mach-omap2/omap-smp.c
+> index 8708b2a..5a3c8d3 100644
+> --- a/arch/arm/mach-omap2/omap-smp.c
+> +++ b/arch/arm/mach-omap2/omap-smp.c
+> @@ -41,6 +41,8 @@
+>  
+>  u16 pm44xx_errata;
+>  
+> +extern unsigned long arch_timer_freq;
+> +
+>  /* SCU base address */
+>  static void __iomem *scu_base;
+>  
+> @@ -66,6 +68,13 @@ static void omap4_secondary_init(unsigned int cpu)
+>  							4, 0, 0, 0, 0, 0);
+>  
+>  	/*
+> +	 * Configure the CNTFRQ register for the secondary cpu's which
+> +	 * indicates the frequency of the cpu local timers.
+> +	 */
+> +	if (soc_is_omap54xx() || soc_is_dra7xx())
+> +		omap_smc1(OMAP5_DRA7_MON_SET_CNTFRQ_INDEX, arch_timer_freq);
+> +
+> +	/*
+>  	 * Synchronise with the boot thread.
+>  	 */
+>  	spin_lock(&boot_lock);
+> diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
+> index fa74a06..d0af9b2 100644
+> --- a/arch/arm/mach-omap2/timer.c
+> +++ b/arch/arm/mach-omap2/timer.c
+> @@ -55,6 +55,7 @@
+>  #include "soc.h"
+>  #include "common.h"
+>  #include "powerdomain.h"
+> +#include "omap-secure.h"
+>  
+>  #define REALTIME_COUNTER_BASE				0x48243200
+>  #define INCREMENTER_NUMERATOR_OFFSET			0x10
+> @@ -65,6 +66,7 @@
+>  
+>  static struct omap_dm_timer clkev;
+>  static struct clock_event_device clockevent_gpt;
+> +unsigned long arch_timer_freq;
+>  
+>  static irqreturn_t omap2_gp_timer_interrupt(int irq, void *dev_id)
 >  {
-> -	unsigned long oldval, res;
-> +	int oldval;
-> +	unsigned long res;
+> @@ -542,6 +544,9 @@ static void __init realtime_counter_init(void)
+>  	reg |= den;
+>  	__raw_writel(reg, base + INCREMENTER_DENUMERATOR_RELOAD_OFFSET);
 >  
->  	smp_mb();
->  
-> 
+> +	arch_timer_freq = (rate / den) * num;
+> +	omap_smc1(OMAP5_DRA7_MON_SET_CNTFRQ_INDEX, arch_timer_freq);
+> +
+>  	iounmap(base);
+>  }
+>  #else
+ Are you planning to pull this patch and the below $subject patch as well? They are
+ acked and tested.
 
+ ARM: DRA7: realtime_counter: Add ratio registers for 20MHZ sys-clk frequency
 
--- 
-Chen Gang
+  http://www.spinics.net/lists/linux-omap/msg97281.html
+
+ 
+Regards,
+ Sricharan
