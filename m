@@ -1,36 +1,44 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Thu, 3 Oct 2013 18:35:19 +0300
-Subject: [PATCH] clk: tegra: PLLE spread spectrum control
-In-Reply-To: <524D8C0B.90707@wwwdotorg.org>
-References: <1380209654-25458-1-git-send-email-pdeschrijver@nvidia.com>
- <524B28EA.40702@wwwdotorg.org>
- <20131003105228.GK3973@tbergstrom-lnx.Nvidia.com>
- <524D8C0B.90707@wwwdotorg.org>
-Message-ID: <20131003153519.GT3973@tbergstrom-lnx.Nvidia.com>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Thu, 3 Oct 2013 08:41:44 -0700
+Subject: [PATCH v7 09/10] usb: dwc3: omap: manage "usb_otg_ss_refclk960m"
+ clock
+In-Reply-To: <524D8516.8000107@ti.com>
+References: <1379508542-22389-1-git-send-email-rogerq@ti.com>
+ <1379508542-22389-10-git-send-email-rogerq@ti.com>
+ <52403E02.4070208@ti.com> <20131002131113.GM1476@radagast>
+ <524C22A1.30200@ti.com> <20131003122941.GD3230@radagast>
+ <524D8516.8000107@ti.com>
+Message-ID: <20131003154144.GA18189@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 03, 2013 at 05:23:55PM +0200, Stephen Warren wrote:
-> On 10/03/2013 04:52 AM, Peter De Schrijver wrote:
-> > On Tue, Oct 01, 2013 at 09:56:26PM +0200, Stephen Warren wrote:
-> >> On 09/26/2013 09:34 AM, Peter De Schrijver wrote:
-> >>> Add spread spectrum control for PLLE in Tegra114.
-> >>
-> >> It would be useful to have some description of the end-user-visible
-> >> benefit of this change; why is it useful?
+On Thu, Oct 03, 2013 at 05:54:14PM +0300, Roger Quadros wrote:
+> On 10/03/2013 03:29 PM, Felipe Balbi wrote:
+> > Hi,
 > > 
-> > spread spectrum clocking is a technique to reduce EMI caused by the clock
-> > signal by modulating the frequency with a low frequency signal. This should
-> > reduce interference with eg. Wifi or cellular modems on the same board.
-> 
-> Great. The intent of my request was for that information to be included
-> in the patch description.
-> 
+> > On Wed, Oct 02, 2013 at 04:41:53PM +0300, Roger Quadros wrote:
+> >> On 10/02/2013 04:11 PM, Felipe Balbi wrote:
+> >>> On Mon, Sep 23, 2013 at 04:11:30PM +0300, Roger Quadros wrote:
+> >>>> Hi Felipe,
+> >>>>
+> >>>> On 09/18/2013 03:49 PM, Roger Quadros wrote:
+> >>>>> "usb_otg_ss_refclk960m" is an optional functional clock to the
+> >>>>> UBS_OTG_SS module. So manage it in the driver.
+> >>>>>
+> >>>>
+> >>>> Just realized that "usb_otg_ss_refclk960m" is in fact functional clock to the 
+> >>>> PHY and not USB_OTG_SS module. The name is misleading.
+> >>>>
+> >>>> So please ignore patch 9 and 10.
+> >>>
+> >>> ignored. All others are fine, right ?
+> >>>
+> >> Yes. But I might have to rebase this on top of Phy framework stuff.
+> > 
+> > alright, Greg already took the PHY framework, so maybe we need to just
+> > give him my Acked-by and he takes the patches directly as I don't have
+> > PYH framework.
+> > 
+> OK. I'll resend this series to Greg in a while.
 
-Mike,
-
-Do you want a version 2 for this?
-
-Cheers,
-
-Peter.
+It looks like you did, but forgot Felipe's ack :(
