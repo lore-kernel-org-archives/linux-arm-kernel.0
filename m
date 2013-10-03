@@ -1,91 +1,49 @@
 From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Thu, 3 Oct 2013 15:51:26 -0300
-Subject: [PATCH v2 2/3] ARM: dts: imx6qdl-wandboard: Add HDMI support
+Date: Thu, 3 Oct 2013 15:51:27 -0300
+Subject: [PATCH v2 3/3] ARM: dts: imx6qdl-sabresd: Add HDMI support
 In-Reply-To: <1380826287-30253-1-git-send-email-fabio.estevam@freescale.com>
 References: <1380826287-30253-1-git-send-email-fabio.estevam@freescale.com>
-Message-ID: <1380826287-30253-2-git-send-email-fabio.estevam@freescale.com>
+Message-ID: <1380826287-30253-3-git-send-email-fabio.estevam@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 ---
 Changes since v1:
-- None
+- Put the dt entries in alphabetical order
 
- arch/arm/boot/dts/imx6dl.dtsi            |  4 ++++
- arch/arm/boot/dts/imx6q.dtsi             |  4 ++++
- arch/arm/boot/dts/imx6qdl-wandboard.dtsi | 13 +++++++++++++
- arch/arm/boot/dts/imx6qdl.dtsi           | 10 ++++++++++
- 4 files changed, 31 insertions(+)
+ arch/arm/boot/dts/imx6qdl-sabresd.dtsi | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-diff --git a/arch/arm/boot/dts/imx6dl.dtsi b/arch/arm/boot/dts/imx6dl.dtsi
-index 9e8ae11..65e54b4 100644
---- a/arch/arm/boot/dts/imx6dl.dtsi
-+++ b/arch/arm/boot/dts/imx6dl.dtsi
-@@ -88,3 +88,7 @@
- 		crtcs = <&ipu1 0>, <&ipu1 1>;
- 	};
- };
-+
-+&hdmi {
-+	crtcs = <&ipu1 0>, <&ipu1 1>;
-+}
-diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
-index f024ef2..d2467f5 100644
---- a/arch/arm/boot/dts/imx6q.dtsi
-+++ b/arch/arm/boot/dts/imx6q.dtsi
-@@ -159,3 +159,7 @@
- 		crtcs = <&ipu1 0>, <&ipu1 1>, <&ipu2 0>, <&ipu2 1>;
- 	};
- };
-+
-+&hdmi {
-+	crtcs = <&ipu1 0>, <&ipu1 1>, <&ipu2 0>, <&ipu2 1>;
-+};
-diff --git a/arch/arm/boot/dts/imx6qdl-wandboard.dtsi b/arch/arm/boot/dts/imx6qdl-wandboard.dtsi
-index a55113e..758c17f 100644
---- a/arch/arm/boot/dts/imx6qdl-wandboard.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-wandboard.dtsi
-@@ -51,6 +51,19 @@
+diff --git a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
+index 39eafc2..4df4432 100644
+--- a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
+@@ -111,6 +111,11 @@
  	status = "okay";
  };
  
-+
 +&hdmi {
-+	ddc = <&i2c1>;
++	ddc = <&i2c2>;
 +	status = "okay";
 +};
 +
-+&i2c1 {
-+	clock-frequency = <100000>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_i2c1_1>;
-+	status = "okay";
-+};
-+
- &i2c2 {
+ &i2c1 {
  	clock-frequency = <100000>;
  	pinctrl-names = "default";
-diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
-index ccd55c2..b148cb3 100644
---- a/arch/arm/boot/dts/imx6qdl.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl.dtsi
-@@ -1301,6 +1301,16 @@
- 				};
- 			};
+@@ -140,6 +145,13 @@
+        };
+ };
  
-+			hdmi: hdmi at 0120000 {
-+				compatible = "fsl,imx6q-hdmi";
-+				reg = <0x00120000 0x9000>;
-+				interrupts = <0 115 0x04>;
-+				gpr = <&gpr>;
-+				clocks = <&clks 123>, <&clks 124>;
-+				clock-names = "iahb", "isfr";
-+				status = "disabled";
-+			};
++&i2c2 {
++	clock-frequency = <100000>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2c2_2>;
++	status = "okay";
++};
 +
- 			dcic1: dcic at 020e4000 {
- 				reg = <0x020e4000 0x4000>;
- 				interrupts = <0 124 0x04>;
+ &i2c3 {
+ 	clock-frequency = <100000>;
+ 	pinctrl-names = "default";
 -- 
 1.8.1.2
