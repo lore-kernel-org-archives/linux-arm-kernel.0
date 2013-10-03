@@ -1,279 +1,49 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 3 Oct 2013 17:17:58 -0400
-Subject: [PATCH v3 4/6] ARM: mm: Correct virt_to_phys patching for 64 bit
- physical addresses
+Date: Thu, 3 Oct 2013 17:17:57 -0400
+Subject: [PATCH v3 3/6] ARM: mm: Move the idmap print to appropriate place in
+ the code
 In-Reply-To: <1380835081-12129-1-git-send-email-santosh.shilimkar@ti.com>
 References: <1380835081-12129-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1380835081-12129-5-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1380835081-12129-4-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sricharan R <r.sricharan@ti.com>
+Commit 9e9a367c29cebd2 {ARM: Section based HYP idmap} moved
+the address conversion inside identity_mapping_add() without
+respective print which carries useful idmap information.
 
-The current phys_to_virt patching mechanism works only for 32 bit
-physical addresses and this patch extends the idea for 64bit physical
-addresses.
+Move the print as well inside identity_mapping_add() to
+fix the same.
 
-The 64bit v2p patching mechanism patches the higher 8 bits of physical
-address with a constant using 'mov' instruction and lower 32bits are patched
-using 'add'. While this is correct, in those platforms where the lowmem addressable
-physical memory spawns across 4GB boundary, a carry bit can be produced as a
-result of addition of lower 32bits. This has to be taken in to account and added
-in to the upper. The patched __pv_offset and va are added in lower 32bits, where
-__pv_offset can be in two's complement form when PA_START < VA_START and that can
-result in a false carry bit.
-
-e.g
-    1) PA = 0x80000000; VA = 0xC0000000
-       __pv_offset = PA - VA = 0xC0000000 (2's complement)
-
-    2) PA = 0x2 80000000; VA = 0xC000000
-       __pv_offset = PA - VA = 0x1 C0000000
-
-So adding __pv_offset + VA should never result in a true overflow for (1).
-So in order to differentiate between a true carry, a __pv_offset is extended
-to 64bit and the upper 32bits will have 0xffffffff if __pv_offset is
-2's complement. So 'mvn #0' is inserted instead of 'mov' while patching
-for the same reason. Since mov, add, sub instruction are to patched
-with different constants inside the same stub, the rotation field
-of the opcode is using to differentiate between them.
-
-So the above examples for v2p translation becomes for VA=0xC0000000,
-    1) PA[63:32] = 0xffffffff
-       PA[31:0] = VA + 0xC0000000 --> results in a carry
-       PA[63:32] = PA[63:32] + carry
-
-       PA[63:0] = 0x0 80000000
-
-    2) PA[63:32] = 0x1
-       PA[31:0] = VA + 0xC0000000 --> results in a carry
-       PA[63:32] = PA[63:32] + carry
-
-       PA[63:0] = 0x2 80000000
-
-The above ideas were suggested by Nicolas Pitre <nico@linaro.org> as
-part of the review of first and second versions of the subject patch.
-
-There is no corresponding change on the phys_to_virt() side, because
-computations on the upper 32-bits would be discarded anyway.
-
-Cc: Nicolas Pitre <nico@linaro.org>
 Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Christoffer Dall <christoffer.dall@linaro.org>
+Cc: Nicolas Pitre <nico@linaro.org>
 
-Signed-off-by: Sricharan R <r.sricharan@ti.com>
 Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 ---
- arch/arm/include/asm/memory.h |   35 +++++++++++++++++++++---
- arch/arm/kernel/armksyms.c    |    1 +
- arch/arm/kernel/head.S        |   60 ++++++++++++++++++++++++++---------------
- arch/arm/kernel/patch.c       |    3 +++
- 4 files changed, 75 insertions(+), 24 deletions(-)
+ arch/arm/mm/idmap.c |    3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
-diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
-index d9b96c65..942ad84 100644
---- a/arch/arm/include/asm/memory.h
-+++ b/arch/arm/include/asm/memory.h
-@@ -172,9 +172,12 @@
-  * so that all we need to do is modify the 8-bit constant field.
-  */
- #define __PV_BITS_31_24	0x81000000
-+#define __PV_BITS_7_0	0x81
+diff --git a/arch/arm/mm/idmap.c b/arch/arm/mm/idmap.c
+index c0a1e48..8e0e52e 100644
+--- a/arch/arm/mm/idmap.c
++++ b/arch/arm/mm/idmap.c
+@@ -70,6 +70,7 @@ static void identity_mapping_add(pgd_t *pgd, const char *text_start,
  
- extern phys_addr_t (*arch_virt_to_idmap) (unsigned long x);
--extern unsigned long __pv_phys_offset;
-+extern u64 __pv_phys_offset;
-+extern u64 __pv_offset;
-+
- #define PHYS_OFFSET __pv_phys_offset
+ 	addr = virt_to_idmap(text_start);
+ 	end = virt_to_idmap(text_end);
++	pr_info("Setting up static identity map for 0x%lx - 0x%lx\n", addr, end);
  
- #define __pv_stub(from,to,instr,type)			\
-@@ -186,10 +189,36 @@ extern unsigned long __pv_phys_offset;
- 	: "=r" (to)					\
- 	: "r" (from), "I" (type))
+ 	prot |= PMD_TYPE_SECT | PMD_SECT_AP_WRITE | PMD_SECT_AF;
  
-+#define __pv_stub_mov_hi(t)				\
-+	__asm__ volatile("@ __pv_stub_mov\n"		\
-+	"1:	mov	%R0, %1\n"			\
-+	"	.pushsection .pv_table,\"a\"\n"		\
-+	"	.long	1b\n"				\
-+	"	.popsection\n"				\
-+	: "=r" (t)					\
-+	: "I" (__PV_BITS_7_0))
-+
-+#define __pv_add_carry_stub(x, y)			\
-+	__asm__ volatile("@ __pv_add_carry_stub\n"	\
-+	"1:	adds	%Q0, %1, %2\n"			\
-+	"	adc	%R0, %R0, #0\n"			\
-+	"	.pushsection .pv_table,\"a\"\n"		\
-+	"	.long	1b\n"				\
-+	"	.popsection\n"				\
-+	: "+r" (y)					\
-+	: "r" (x), "I" (__PV_BITS_31_24)		\
-+	: "cc")
-+
- static inline phys_addr_t __virt_to_phys(unsigned long x)
- {
--	unsigned long t;
--	__pv_stub(x, t, "add", __PV_BITS_31_24);
-+	phys_addr_t t;
-+
-+	if (sizeof(phys_addr_t) == 4) {
-+		__pv_stub(x, t, "add", __PV_BITS_31_24);
-+	} else {
-+		__pv_stub_mov_hi(t);
-+		__pv_add_carry_stub(x, t);
-+	}
- 	return t;
- }
+@@ -91,8 +92,6 @@ static int __init init_static_idmap(void)
+ 	if (!idmap_pgd)
+ 		return -ENOMEM;
  
-diff --git a/arch/arm/kernel/armksyms.c b/arch/arm/kernel/armksyms.c
-index 60d3b73..1f031dd 100644
---- a/arch/arm/kernel/armksyms.c
-+++ b/arch/arm/kernel/armksyms.c
-@@ -155,4 +155,5 @@ EXPORT_SYMBOL(__gnu_mcount_nc);
+-	pr_info("Setting up static identity map for 0x%p - 0x%p\n",
+-		__idmap_text_start, __idmap_text_end);
+ 	identity_mapping_add(idmap_pgd, __idmap_text_start,
+ 			     __idmap_text_end, 0);
  
- #ifdef CONFIG_ARM_PATCH_PHYS_VIRT
- EXPORT_SYMBOL(__pv_phys_offset);
-+EXPORT_SYMBOL(__pv_offset);
- #endif
-diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
-index 2c7cc1e..90d04d7 100644
---- a/arch/arm/kernel/head.S
-+++ b/arch/arm/kernel/head.S
-@@ -536,6 +536,14 @@ ENTRY(fixup_smp)
- 	ldmfd	sp!, {r4 - r6, pc}
- ENDPROC(fixup_smp)
- 
-+#ifdef __ARMEB_
-+#define LOW_OFFSET	0x4
-+#define HIGH_OFFSET	0x0
-+#else
-+#define LOW_OFFSET	0x0
-+#define HIGH_OFFSET	0x4
-+#endif
-+
- #ifdef CONFIG_ARM_PATCH_PHYS_VIRT
- 
- /* __fixup_pv_table - patch the stub instructions with the delta between
-@@ -546,17 +554,20 @@ ENDPROC(fixup_smp)
- 	__HEAD
- __fixup_pv_table:
- 	adr	r0, 1f
--	ldmia	r0, {r3-r5, r7}
--	sub	r3, r0, r3	@ PHYS_OFFSET - PAGE_OFFSET
-+	ldmia	r0, {r3-r7}
-+	mvn	ip, #0
-+	subs	r3, r0, r3	@ PHYS_OFFSET - PAGE_OFFSET
- 	add	r4, r4, r3	@ adjust table start address
- 	add	r5, r5, r3	@ adjust table end address
--	add	r7, r7, r3	@ adjust __pv_phys_offset address
--	str	r8, [r7]	@ save computed PHYS_OFFSET to __pv_phys_offset
-+	add	r6, r6, r3	@ adjust __pv_phys_offset address
-+	add	r7, r7, r3	@ adjust __pv_offset address
-+	str	r8, [r6, #LOW_OFFSET]	@ save computed PHYS_OFFSET to __pv_phys_offset
-+	strcc	ip, [r7, #HIGH_OFFSET]	@ save to __pv_offset high bits
- 	mov	r6, r3, lsr #24	@ constant for add/sub instructions
- 	teq	r3, r6, lsl #24 @ must be 16MiB aligned
- THUMB(	it	ne		@ cross section branch )
- 	bne	__error
--	str	r6, [r7, #4]	@ save to __pv_offset
-+	str	r3, [r7, #LOW_OFFSET]	@ save to __pv_offset low bits
- 	b	__fixup_a_pv_table
- ENDPROC(__fixup_pv_table)
- 
-@@ -565,9 +576,18 @@ ENDPROC(__fixup_pv_table)
- 	.long	__pv_table_begin
- 	.long	__pv_table_end
- 2:	.long	__pv_phys_offset
-+	.long	__pv_offset
- 
- 	.text
- __fixup_a_pv_table:
-+	adr	r0, 3f
-+	ldr	r6, [r0]
-+	add	r6, r6, r3
-+	ldr	r0, [r6, #HIGH_OFFSET]	@ pv_offset high word
-+	ldr	r6, [r6, #LOW_OFFSET]	@ pv_offset low word
-+	mov	r6, r6, lsr #24
-+	cmn	r0, #1
-+	moveq	r0, #0x400000	@ set bit 22, mov to mvn instruction
- #ifdef CONFIG_THUMB2_KERNEL
- 	lsls	r6, #24
- 	beq	2f
-@@ -582,9 +602,15 @@ __fixup_a_pv_table:
- 	b	2f
- 1:	add     r7, r3
- 	ldrh	ip, [r7, #2]
--	and	ip, 0x8f00
--	orr	ip, r6	@ mask in offset bits 31-24
-+	tst	ip, #0x4000
-+	and	ip, #0x8f00
-+	orrne	ip, r6	@ mask in offset bits 31-24
-+	orreq	ip, r0	@ mask in offset bits 7-0
- 	strh	ip, [r7, #2]
-+	ldrheq	ip, [r7]
-+	biceq	ip, #0x20
-+	orreq	ip, ip, r0, lsr #16
-+	strheq	ip, [r7]
- 2:	cmp	r4, r5
- 	ldrcc	r7, [r4], #4	@ use branch for delay slot
- 	bcc	1b
-@@ -593,7 +619,10 @@ __fixup_a_pv_table:
- 	b	2f
- 1:	ldr	ip, [r7, r3]
- 	bic	ip, ip, #0x000000ff
--	orr	ip, ip, r6	@ mask in offset bits 31-24
-+	tst	ip, #0xf00	@ check the rotation field
-+	orrne	ip, ip, r6	@ mask in offset bits 31-24
-+	biceq	ip, ip, #0x400000	@ clear bit 22
-+	orreq	ip, ip, r0	@ mask in offset bits 7-0
- 	str	ip, [r7, r3]
- 2:	cmp	r4, r5
- 	ldrcc	r7, [r4], #4	@ use branch for delay slot
-@@ -602,28 +631,17 @@ __fixup_a_pv_table:
- #endif
- ENDPROC(__fixup_a_pv_table)
- 
-+3:	.long __pv_offset
-+
- ENTRY(fixup_pv_table)
- 	stmfd	sp!, {r4 - r7, lr}
--	ldr	r2, 2f			@ get address of __pv_phys_offset
- 	mov	r3, #0			@ no offset
- 	mov	r4, r0			@ r0 = table start
- 	add	r5, r0, r1		@ r1 = table size
--	ldr	r6, [r2, #4]		@ get __pv_offset
- 	bl	__fixup_a_pv_table
- 	ldmfd	sp!, {r4 - r7, pc}
- ENDPROC(fixup_pv_table)
- 
--	.align
--2:	.long	__pv_phys_offset
--
--	.data
--	.globl	__pv_phys_offset
--	.type	__pv_phys_offset, %object
--__pv_phys_offset:
--	.long	0
--	.size	__pv_phys_offset, . - __pv_phys_offset
--__pv_offset:
--	.long	0
- #endif
- 
- #include "head-common.S"
-diff --git a/arch/arm/kernel/patch.c b/arch/arm/kernel/patch.c
-index 07314af..8356312 100644
---- a/arch/arm/kernel/patch.c
-+++ b/arch/arm/kernel/patch.c
-@@ -8,6 +8,9 @@
- 
- #include "patch.h"
- 
-+u64 __pv_phys_offset __attribute__((section(".data")));
-+u64 __pv_offset __attribute__((section(".data")));
-+
- struct patch {
- 	void *addr;
- 	unsigned int insn;
 -- 
 1.7.9.5
