@@ -1,35 +1,89 @@
 From: rvaswani@codeaurora.org (Rohit Vaswani)
-Date: Thu,  3 Oct 2013 16:05:53 -0700
-Subject: [PATCH 0/4]Re-organize DEBUG_UART for MSM and add support for MSM8974
-Message-ID: <1380841557-2673-1-git-send-email-rvaswani@codeaurora.org>
+Date: Thu,  3 Oct 2013 16:05:54 -0700
+Subject: [PATCH 1/4] ARM: debug: Create CONFIG_DEBUG_MSM_UART and re-organize
+ the selects for MSM
+In-Reply-To: <1380841557-2673-1-git-send-email-rvaswani@codeaurora.org>
+References: <1380841557-2673-1-git-send-email-rvaswani@codeaurora.org>
+Message-ID: <1380841557-2673-2-git-send-email-rvaswani@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As a pre-cursor, this series cleans-up the DEBUG_UART configs for msm and
-includes patches to add basic board support for MSM8974 and debug uart support
-for it as well.
-The debug uart patches will be added to Russell's patch tracker and hence were
-separated from the MSM8974 patch.
+Create the hidden config DEBUG_MSM_UART and clean-up the default selection
+for CONFIG_DEBUG_LL_INCLUDE.
 
-Rohit Vaswani (4):
-  ARM: debug: Create CONFIG_DEBUG_MSM_UART and re-organize the selects
-    for MSM
-  ARM: msm: Add support for APQ8074 Dragonboard
-  ARM: debug: msm: Add DEBUG_LL support for ARCH_MSM8974
-  defconfig: msm_defconfig: Enable CONFIG_ARCH_MSM8974
+Signed-off-by: Rohit Vaswani <rvaswani@codeaurora.org>
+---
+ arch/arm/Kconfig.debug | 15 ++++++++++-----
+ 1 file changed, 10 insertions(+), 5 deletions(-)
 
- arch/arm/Kconfig.debug                         | 24 ++++++++++++++----
- arch/arm/boot/dts/Makefile                     |  3 ++-
- arch/arm/boot/dts/qcom-apq8074-dragonboard.dts |  6 +++++
- arch/arm/boot/dts/qcom-msm8974.dtsi            | 35 ++++++++++++++++++++++++++
- arch/arm/configs/msm_defconfig                 |  1 +
- arch/arm/include/debug/msm.S                   |  5 ++++
- arch/arm/mach-msm/Kconfig                      | 13 ++++++++++
- arch/arm/mach-msm/board-dt.c                   |  9 +++++++
- 8 files changed, 90 insertions(+), 6 deletions(-)
- create mode 100644 arch/arm/boot/dts/qcom-apq8074-dragonboard.dts
- create mode 100644 arch/arm/boot/dts/qcom-msm8974.dtsi
-
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index 9762c84..e18a6fc 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -318,6 +318,7 @@ choice
+ 	config DEBUG_MSM_UART1
+ 		bool "Kernel low-level debugging messages via MSM UART1"
+ 		depends on ARCH_MSM7X00A || ARCH_MSM7X30 || ARCH_QSD8X50
++		select DEBUG_MSM_UART
+ 		help
+ 		  Say Y here if you want the debug print routines to direct
+ 		  their output to the first serial port on MSM devices.
+@@ -325,6 +326,7 @@ choice
+ 	config DEBUG_MSM_UART2
+ 		bool "Kernel low-level debugging messages via MSM UART2"
+ 		depends on ARCH_MSM7X00A || ARCH_MSM7X30 || ARCH_QSD8X50
++		select DEBUG_MSM_UART
+ 		help
+ 		  Say Y here if you want the debug print routines to direct
+ 		  their output to the second serial port on MSM devices.
+@@ -332,6 +334,7 @@ choice
+ 	config DEBUG_MSM_UART3
+ 		bool "Kernel low-level debugging messages via MSM UART3"
+ 		depends on ARCH_MSM7X00A || ARCH_MSM7X30 || ARCH_QSD8X50
++		select DEBUG_MSM_UART
+ 		help
+ 		  Say Y here if you want the debug print routines to direct
+ 		  their output to the third serial port on MSM devices.
+@@ -340,6 +343,7 @@ choice
+ 		bool "Kernel low-level debugging messages via MSM 8660 UART"
+ 		depends on ARCH_MSM8X60
+ 		select MSM_HAS_DEBUG_UART_HS
++		select DEBUG_MSM_UART
+ 		help
+ 		  Say Y here if you want the debug print routines to direct
+ 		  their output to the serial port on MSM 8660 devices.
+@@ -348,6 +352,7 @@ choice
+ 		bool "Kernel low-level debugging messages via MSM 8960 UART"
+ 		depends on ARCH_MSM8960
+ 		select MSM_HAS_DEBUG_UART_HS
++		select DEBUG_MSM_UART
+ 		help
+ 		  Say Y here if you want the debug print routines to direct
+ 		  their output to the serial port on MSM 8960 devices.
+@@ -880,6 +885,10 @@ config DEBUG_STI_UART
+ 	bool
+ 	depends on ARCH_STI
+ 
++config DEBUG_MSM_UART
++	bool
++	depends on ARCH_MSM
++
+ config DEBUG_LL_INCLUDE
+ 	string
+ 	default "debug/8250.S" if DEBUG_LL_UART_8250 || DEBUG_UART_8250
+@@ -895,11 +904,7 @@ config DEBUG_LL_INCLUDE
+ 				 DEBUG_IMX53_UART ||\
+ 				 DEBUG_IMX6Q_UART || \
+ 				 DEBUG_IMX6SL_UART
+-	default "debug/msm.S" if DEBUG_MSM_UART1 || \
+-				 DEBUG_MSM_UART2 || \
+-				 DEBUG_MSM_UART3 || \
+-				 DEBUG_MSM8660_UART || \
+-				 DEBUG_MSM8960_UART
++	default "debug/msm.S" if DEBUG_MSM_UART
+ 	default "debug/omap2plus.S" if DEBUG_OMAP2PLUS_UART
+ 	default "debug/sirf.S" if DEBUG_SIRFPRIMA2_UART1 || DEBUG_SIRFMARCO_UART1
+ 	default "debug/sti.S" if DEBUG_STI_UART
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
