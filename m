@@ -1,44 +1,55 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 2 Oct 2013 23:21:56 -0300
-Subject: device tree binding documentation outdated
-In-Reply-To: <20131002234911.GD12758@n2100.arm.linux.org.uk>
-References: <CAHCPf3t8=mJn-RCz3C1cY6zqsH9ds8UANKpKx9ZpwPM6WjJt3g@mail.gmail.com>
- <20130927174916.GD12758@n2100.arm.linux.org.uk>
- <CAHCPf3sC7bY=p4vpBQFpRUmyPspT_PVjx0rH9cm1ov=SqkO+Vg@mail.gmail.com>
- <20130927190546.GG12758@n2100.arm.linux.org.uk>
- <CAHCPf3vxGAzTnY360KC7Yt-DB1FB14Sv_Cn7DBTH6HGZ6y=stg@mail.gmail.com>
- <CAHCPf3sv3wSbUc9QFVhmYsPc1kqiWYRuOMO7rreuiGSrwyepBQ@mail.gmail.com>
- <20130927202110.GI12758@n2100.arm.linux.org.uk>
- <20130928083859.GQ12758@n2100.arm.linux.org.uk>
- <20130929061303.GB26156@S2101-09.ap.freescale.net>
- <20131002193316.GR12758@n2100.arm.linux.org.uk>
- <20131002234911.GD12758@n2100.arm.linux.org.uk>
-Message-ID: <CAOMZO5BjUryA2XYzyjFoCbGqwRNRhA6QUohy8v6o+rPd__qaCg@mail.gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 3 Oct 2013 11:36:15 +0900
+Subject: [PATCH 01/10] ARM: shmobile: Introduce
+ r8a7791_add_standard_devices()
+In-Reply-To: <20131001081153.4136.72073.sendpatchset@w520>
+References: <20131001081143.4136.46925.sendpatchset@w520>
+ <20131001081153.4136.72073.sendpatchset@w520>
+Message-ID: <20131003023614.GA28463@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 2, 2013 at 8:49 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
+On Tue, Oct 01, 2013 at 05:11:53PM +0900, Magnus Damm wrote:
+> From: Magnus Damm <damm@opensource.se>
+> 
+> Introduce the function r8a7791_add_standard_devices() that
+> follows the same style as other mach-shmobile SoC code and
+> allows C version of board code to add on-chip devices.
+> 
+> Signed-off-by: Magnus Damm <damm@opensource.se>
 
-> This apparantly is done by configuring the PLL on the IMX6 to 25MHz and
-> getting it to output it on this pin, and that is done in the freescale
-> BSP by this pin control setting:
->
->         MX6DL_PAD_GPIO_16__ENET_ANATOP_ETHERNET_REF_OUT
->
-> Now, if you look up that in the 4.1.0 BSP:
->
-> #define MX6DL_PAD_GPIO_16__ENET_ANATOP_ETHERNET_REF_OUT                        \
->                 IOMUX_PAD(0x05E4, 0x0214, 0x12, 0x080C, 0, NO_PAD_CTRL)
->
-> and that says to write 0x12 to 0x20e0000 + 0x214 - the
-> IOMUXC_SW_MUX_CTL_PAD_GPIO16 register.  This name clearly implies that
-> the IMX6 is _outputting_ the reference clock.  The register values here
-> selects MUX_MODE 2 (ENET_REF_CLK) _with_ SION set.  There is no
-> configuration in this BSP for GPIO 16 in mux mode 2 without SION set.
+Thanks, I have queued this up in the soc3 branch.
+It should make it into v3.13 but if not I'll rename the branch
+soc after rebasing it on v3.13-rcX which will then be targeted at v3.14.
 
-SION bit is set for this pad in mainline as well:
-
-MX6QDL_PAD_GPIO_16__ENET_REF_CLK      0x4001b0a8
-
-(bit 30 is set, which indicates SION).
+> ---
+> 
+>  arch/arm/mach-shmobile/include/mach/r8a7791.h |    1 +
+>  arch/arm/mach-shmobile/setup-r8a7791.c        |    5 +++++
+>  2 files changed, 6 insertions(+)
+> 
+> --- 0001/arch/arm/mach-shmobile/include/mach/r8a7791.h
+> +++ work/arch/arm/mach-shmobile/include/mach/r8a7791.h	2013-10-01 16:23:46.000000000 +0900
+> @@ -1,6 +1,7 @@
+>  #ifndef __ASM_R8A7791_H__
+>  #define __ASM_R8A7791_H__
+>  
+> +void r8a7791_add_standard_devices(void);
+>  void r8a7791_add_dt_devices(void);
+>  void r8a7791_clock_init(void);
+>  void r8a7791_init_early(void);
+> --- 0001/arch/arm/mach-shmobile/setup-r8a7791.c
+> +++ work/arch/arm/mach-shmobile/setup-r8a7791.c	2013-10-01 16:24:35.000000000 +0900
+> @@ -129,6 +129,11 @@ void __init r8a7791_add_dt_devices(void)
+>  	r8a7791_register_cmt(00);
+>  }
+>  
+> +void __init r8a7791_add_standard_devices(void)
+> +{
+> +	r8a7791_add_dt_devices();
+> +}
+> +
+>  void __init r8a7791_init_early(void)
+>  {
+>  #ifndef CONFIG_ARM_ARCH_TIMER
+> 
