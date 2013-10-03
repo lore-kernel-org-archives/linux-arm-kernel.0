@@ -1,39 +1,102 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 3 Oct 2013 11:01:30 -0700
-Subject: [PATCH 3/5] drm/bridge: Add PTN3460 bridge driver
-In-Reply-To: <CAAQKjZPwyKCpju4Ndd+MB_aN24-zA5xTHFsFsun2617h7YT6dw@mail.gmail.com>
-References: <1380670860-17621-1-git-send-email-seanpaul@chromium.org>
- <1380670860-17621-4-git-send-email-seanpaul@chromium.org>
- <CAAQKjZN_r-=-sj=Vb-o-KUS4ab5=cjCq1ni3VZeMeVc3NL=MMg@mail.gmail.com>
- <CAOw6vbLiJLLKn=gb1=j5TBeM0ijEK13+goG-=mw7MZTyNT1kpQ@mail.gmail.com>
- <CAAQKjZPwyKCpju4Ndd+MB_aN24-zA5xTHFsFsun2617h7YT6dw@mail.gmail.com>
-Message-ID: <CAOesGMgKastzdFHYQzyL8gxkBN=86wFZ4jbgP8BHxfkOuZvJxg@mail.gmail.com>
+From: zishen.lim@linaro.org (Zi Shen Lim)
+Date: Thu, 3 Oct 2013 11:07:44 -0700
+Subject: [RFC] ARM: lockless get_user_pages_fast()
+In-Reply-To: <20131003172755.GG7408@mudshark.cambridge.arm.com>
+References: <1380820515-21100-1-git-send-email-zishen.lim@linaro.org>
+ <20131003172755.GG7408@mudshark.cambridge.arm.com>
+Message-ID: <CAM1oe53oQ5OBww=89vqcyUt_NqsYfCHDVZkKv0p9=-TchhkHSA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 3, 2013 at 10:39 AM, Inki Dae <inki.dae@samsung.com> wrote:
-> 2013/10/3 Sean Paul <seanpaul@chromium.org>:
->> On Thu, Oct 3, 2013 at 9:55 AM, Inki Dae <inki.dae@samsung.com> wrote:
->>> Can a regulator be used instead of gpio in other board case?
->>>
+Thanks for your feedback Will.
+
+On Thu, Oct 3, 2013 at 10:27 AM, Will Deacon <will.deacon@arm.com> wrote:
+> On Thu, Oct 03, 2013 at 06:15:15PM +0100, Zi Shen Lim wrote:
+>> Futex uses GUP. Currently on ARM, the default __get_user_pages_fast
+>> being used always returns 0, leading to a forever loop in get_futex_key :(
 >>
->> No, not to my knowledge.
+>> Implementing GUP solves this problem.
 >>
+>> Tested on vexpress-A15 on QEMU.
+>> 8<---------------------------------------------------->8
+>>
+>> Implement get_user_pages_fast without locking in the fastpath on ARM.
+>> This work is derived from the x86 version and adapted to ARM.
 >
-> Hm.. plz check it out again. the gpio pin is specific to board, and
-> the the gpio be used as power source trigger could be replaced with a
-> regulator according to board design. So you should consider all
-> possibilities even though there are no other cases yet: other board
-> could  use a regulator instead.
+> This looks pretty much like an exact copy of the x86 version, which will
+> likely also result in another exact copy for arm64. Can none of this code be
+> made common? Furthermore, the fact that you've lifted the code and not
+> provided much of an explanation in the cover letter hints that you might not
+> be aware of all the subtleties involved here...
+>
 
-Take a look at the data sheet, it is publicly available.
+You are right. I was wondering the same too. Hopefully this RFC will
+lead to the desired solution.
 
-PD_N is not a power supply input, so modelling it as a regulator makes no sense:
+x86 does this:
+--8<-----
+        unsigned long mask;
+        pte_t *ptep;
 
-"If PD_N is LOW, then the device is in Deep power-down completely,
-even if supply rail is ON; for the device to be able to operate, the
-PD_N pin must be HIGH."
+        mask = _PAGE_PRESENT|_PAGE_USER;
+        if (write)
+                mask |= _PAGE_RW;
 
+        ptep = pte_offset_map(&pmd, addr);
+        do {
+                pte_t pte = gup_get_pte(ptep);
+                struct page *page;
 
+                if ((pte_flags(pte) & (mask | _PAGE_SPECIAL)) != mask) {
+                        pte_unmap(ptep);
+                        return 0;
+                }
+-->8-----
+The adaptation uses pte_* macros.
 
--Olof
+x86 also uses a more optimized version of pmd_large and pud_large,
+instead of reusing pmd_huge or pud_huge.
+
+>> +static int gup_pmd_range(pud_t pud, unsigned long addr, unsigned long end,
+>> +             int write, struct page **pages, int *nr)
+>> +{
+>> +     unsigned long next;
+>> +     pmd_t *pmdp;
+>> +
+>> +     pmdp = pmd_offset(&pud, addr);
+>> +     do {
+>> +             pmd_t pmd = *pmdp;
+>> +
+>> +             next = pmd_addr_end(addr, end);
+>> +             /*
+>> +              * The pmd_trans_splitting() check below explains why
+>> +              * pmdp_splitting_flush has to flush the tlb, to stop
+>> +              * this gup-fast code from running while we set the
+>> +              * splitting bit in the pmd. Returning zero will take
+>> +              * the slow path that will call wait_split_huge_page()
+>> +              * if the pmd is still in splitting state. gup-fast
+>> +              * can't because it has irq disabled and
+>> +              * wait_split_huge_page() would never return as the
+>> +              * tlb flush IPI wouldn't run.
+>> +              */
+>> +             if (pmd_none(pmd) || pmd_trans_splitting(pmd))
+>> +                     return 0;
+>> +             if (unlikely(pmd_huge(pmd))) {
+>> +                     if (!gup_huge_pmd(pmd, addr, next, write, pages, nr))
+>> +                             return 0;
+>> +             } else {
+>> +                     if (!gup_pte_range(pmd, addr, next, write, pages, nr))
+>> +                             return 0;
+>> +             }
+>> +     } while (pmdp++, addr = next, addr != end);
+>
+> ...case in point: we don't (usually) require IPIs to shoot down TLB entries
+> in SMP systems, so this is racy under thp splitting.
+>
+
+Ok. I learned something new :)
+Suggestions on how to proceed?
+
+Thanks for your patience.
+
+> Will
