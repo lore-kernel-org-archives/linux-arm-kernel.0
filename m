@@ -1,119 +1,33 @@
-From: bcousson@baylibre.com (Benoit Cousson)
-Date: Thu, 03 Oct 2013 08:52:13 +0200
-Subject: [RFC 00/15] Device Tree schemas and validation
-In-Reply-To: <20131002135450.GH6506@voom.fritz.box>
-References: <1380041541-17529-1-git-send-email-bcousson@baylibre.com>
- <524A8289.3050107@baylibre.com> <524ACB76.1010001@gmail.com>
- <524AE4FB.4080906@baylibre.com>
- <CAL_JsqJ31TGFJCSeSOqgee=OLVfSUTAYdF4nSn7X2DiCequVAw@mail.gmail.com>
- <20131002135450.GH6506@voom.fritz.box>
-Message-ID: <524D141D.3020807@baylibre.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 3 Oct 2013 08:21:53 +0100
+Subject: [PATCH v2] ARM: bcm: Add DEBUG_LL console support
+In-Reply-To: <1379462711-6957-1-git-send-email-csd@broadcom.com>
+References: <1379462711-6957-1-git-send-email-csd@broadcom.com>
+Message-ID: <20131003072153.GE12758@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/10/2013 15:54, David Gibson wrote:
-> On Tue, Oct 01, 2013 at 03:54:20PM -0500, Rob Herring wrote:
->> On Tue, Oct 1, 2013 at 10:06 AM, Benoit Cousson <bcousson@baylibre.com> wrote:
->>> Hi Rob,
->>>
->>>
->>> On 01/10/2013 15:17, Rob Herring wrote:
->>>>
->>>> On 10/01/2013 03:06 AM, Benoit Cousson wrote:
->>>>>
->>>>> + more DT maintainers folks
->>>>>
->>>>> Hi all,
->>>>>
->>>>> I know this is mostly boring user space code, but I was expecting a
->>>>> little bit of comments about at least the bindings syntax:-(
->>>>>
->>>>> I'd like to know if this is the right direction and if it worth pursuing
->>>>> in that direction.
->>>>>
->>>>> The idea was to have at least some base for further discussion during
->>>>> ARM KS 2013.
->>>>>
->>>>> I feel alone :-(
->>>>>
->>>>> If you have any comment, go ahead!
->>>>
->>>>
->>>> Thanks for taking this on!
->>>>
->>>> This is interesting approach using the dts syntax,
->>>
->>>
->>> Well, this was discussed a little bit on the list, and it has the big
->>> advantage of re-using the parser already included in DTC for free.
->>> In term or readability, it avoids to re-defining a brand new syntax for
->>> people who are already familiar with the DTS one.
->>>
->>>
->>>> but I worry that the
->>>> validation will only be as good as the schema written and the review of
->>>> the schema.
->>>
->>>
->>> Well, sure, but unfortunately, that will always be the case :-(
->>> The bindings definition being quite open, there is no easy way to ensure
->>> proper schema / bindings without careful review of the schema. There is no
->>> such thing as a free beer... Unfortunately :-)
->>>
->>>
->>>> I think the schema needs to define the binding rather than
->>>> define the checks. Then the schema can feed the validation checks.
->>>
->>>
->>>> This format does not seem to me as easily being able to generate
->>>> documentation from the schema which I believe is one of the goals.
->>>
->>>
->>> Indeed, but I think is it easy to generate any kind of readable format for
->>> the documentation purpose if needed from the actual format.
->>> Otherwise, we should consider a schema format based on kerneldoc type of
->>> syntax to improve readability. I'm just afraid it will become harder then to
->>> define complex schema.
->>>
->>> BTW, what kind of documentation are you expecting here? Is is a text that
->>> can be added on top of each schema?
->>
->> I would expect the schema to replace
->> Documentation/devicetree/bindings/* over time. I think the thing that
->> needs to be worked out here is how to add free form multi-line text.
->
-> I'm not convinced that's a realistic goal.  As I see it, the
-> fundamental difference between a binding document and a formal schema
-> is that a binding defines both the syntax required of a node, and its
-> semantics, whereas a schema defines only syntax - the semantics still
-> need to be defined somewhere.
->
+On Tue, Sep 17, 2013 at 05:05:11PM -0700, Christian Daudt wrote:
+> @@ -980,6 +991,7 @@ config DEBUG_UART_PHYS
+>  	default 0xffd82340 if ARCH_IOP13XX
+>  	default 0xfff36000 if DEBUG_HIGHBANK_UART
+>  	default 0xfffff700 if ARCH_IOP33X
+> +	default 0x3e000000 if DEBUG_BCM_KONA_UART
 
-Mmm, I do not really understand what is missing in the following schema 
-in term of semantic compared to the original interrupt-controller bindings?
+Please take a moment to think about this.
 
-     interrupt-controller {
-         description = "Identifies the node as an interrupt controller";
-         is-required;
-         type = "bool";
-     };
+>  	depends on DEBUG_LL_UART_8250 || DEBUG_LL_UART_PL01X || \
+>  		DEBUG_UART_8250 || DEBUG_UART_PL01X
+>  
+> @@ -1035,6 +1047,7 @@ config DEBUG_UART_VIRT
+>  	default 0xfef00003 if ARCH_IXP4XX && CPU_BIG_ENDIAN
+>  	default 0xfefff700 if ARCH_IOP33X
+>  	default 0xff003000 if DEBUG_U300_UART
+> +	default 0xfe300000 if DEBUG_BCM_KONA_UART
 
-     #interrupt-cells {
-         description = "Specifies the number of cells needed to encode an
-                        interrupt source. The type shall be a <u32>
-                        and the value shall be 1.
-                        The cell contains the interrupt number
-                        in the range [0-128].";
-         is-required;
-         type = "integer";
-         value = <1>;
-     };
+And this.
 
-As soon as you have a description you can keep the content of the 
-original binding. But on top of that, you do have the schema validation 
-information.
+In particular, study the list which you are adding to and see whether
+you can spot what you're doing wrong.
 
-I'm not sure to understand your point. Could you elaborate?
-
-Regards,
-Benoit
+Thanks.
