@@ -1,43 +1,60 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Thu, 3 Oct 2013 17:54:14 +0300
-Subject: [PATCH v7 09/10] usb: dwc3: omap: manage "usb_otg_ss_refclk960m"
- clock
-In-Reply-To: <20131003122941.GD3230@radagast>
-References: <1379508542-22389-1-git-send-email-rogerq@ti.com>
- <1379508542-22389-10-git-send-email-rogerq@ti.com> <52403E02.4070208@ti.com>
- <20131002131113.GM1476@radagast> <524C22A1.30200@ti.com>
- <20131003122941.GD3230@radagast>
-Message-ID: <524D8516.8000107@ti.com>
+From: msalter@redhat.com (Mark Salter)
+Date: Thu, 03 Oct 2013 10:57:35 -0400
+Subject: [PATCH 2/6] Add shared update_fdt() function for ARM/ARM64
+In-Reply-To: <20131003142721.GB2781@console-pimps.org>
+References: <1380385403-31904-1-git-send-email-roy.franz@linaro.org>
+ <1380385403-31904-3-git-send-email-roy.franz@linaro.org>
+ <20131003095224.GX21381@console-pimps.org>
+ <1380807804.17503.9.camel@deneb.redhat.com>
+ <20131003142721.GB2781@console-pimps.org>
+Message-ID: <1380812255.17503.19.camel@deneb.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/03/2013 03:29 PM, Felipe Balbi wrote:
-> Hi,
+On Thu, 2013-10-03 at 15:27 +0100, Matt Fleming wrote:
+> On Thu, 03 Oct, at 09:43:24AM, Mark Salter wrote:
+> > On Thu, 2013-10-03 at 10:52 +0100, Matt Fleming wrote:
+> > > > +#if defined(CONFIG_ARM) || defined(CONFIG_ARM64)
+> > > > +static efi_status_t update_fdt(efi_system_table_t *sys_table, void *orig_fdt,
+> > > > +                            void *fdt, int new_fdt_size, char *cmdline_ptr,
+> > > > +                            u64 initrd_addr, u64 initrd_size,
+> > > > +                            efi_memory_desc_t *memory_map,
+> > > > +                            unsigned long map_size, unsigned long desc_size,
+> > > > +                            u32 desc_ver)
+> > > 
+> > > Hmm... does this function really belong in efi-stub-helper.c? That file
+> > > should be for architecture independent functionality only.
+> > > 
+> > 
+> > It isn't really arm-specific although arm is the only user right now.
+> > We're using the FDT to pass EFI boot info that is passed in the boot
+> > params block on x86. So potentially other architectures could use the
+> > same code.
 > 
-> On Wed, Oct 02, 2013 at 04:41:53PM +0300, Roger Quadros wrote:
->> On 10/02/2013 04:11 PM, Felipe Balbi wrote:
->>> On Mon, Sep 23, 2013 at 04:11:30PM +0300, Roger Quadros wrote:
->>>> Hi Felipe,
->>>>
->>>> On 09/18/2013 03:49 PM, Roger Quadros wrote:
->>>>> "usb_otg_ss_refclk960m" is an optional functional clock to the
->>>>> UBS_OTG_SS module. So manage it in the driver.
->>>>>
->>>>
->>>> Just realized that "usb_otg_ss_refclk960m" is in fact functional clock to the 
->>>> PHY and not USB_OTG_SS module. The name is misleading.
->>>>
->>>> So please ignore patch 9 and 10.
->>>
->>> ignored. All others are fine, right ?
->>>
->> Yes. But I might have to rebase this on top of Phy framework stuff.
-> 
-> alright, Greg already took the PHY framework, so maybe we need to just
-> give him my Acked-by and he takes the patches directly as I don't have
-> PYH framework.
-> 
-OK. I'll resend this series to Greg in a while.
+> It's not EFI-specific either, apart from the fdt property names.
 
-cheers,
--roger
+Not EFI-specific in the sense that it uses the EFI services, but it is
+EFI-specific in its function.
+
+> 
+> > How about making it someting like:
+> > 
+> > #ifdef ARCH_NEEDS_EFI_FDT
+> > static efi_status_t update_fdt(efi_system_table_t *sys_table, void *orig_fdt,
+> > ...
+> > #endif
+> > 
+> > so the architecture can decide whether to include it or not.
+> 
+> Is one implementation of this function going to fit all architectures?
+> Can we be sure of that ahead of time?
+> 
+> I'd prefer this to be kept in arch/ for now, and possibly moved into
+> efi-stub-helper.c at a later date if indeed it turns out to be generally
+> useful.
+
+Fair enough. I don't have a strong opinion about it either way. Just a
+natural instinct to share the code if possible, but it is easy enough
+to change later if others want to use it.
+
+--Mark
