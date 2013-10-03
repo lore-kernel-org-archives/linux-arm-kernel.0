@@ -1,35 +1,24 @@
-From: chander.kashyap@linaro.org (Chander Kashyap)
-Date: Thu, 3 Oct 2013 11:51:52 +0530
-Subject: [PATCH v3 0/2] Enable all cpus in Exynos5420
-In-Reply-To: <1378380593-5305-1-git-send-email-chander.kashyap@linaro.org>
-References: <1378380593-5305-1-git-send-email-chander.kashyap@linaro.org>
-Message-ID: <CANuQgHFbnkDnizH02-PR4qeq8+s7ZTq7Rv3bsJQHWia7xKPOEw@mail.gmail.com>
+From: csd_b@daudt.org (Christian Daudt)
+Date: Wed, 2 Oct 2013 23:22:55 -0700
+Subject: [PATCH v2] ARM: bcm: Add DEBUG_LL console support
+In-Reply-To: <1379462711-6957-1-git-send-email-csd@broadcom.com>
+References: <1379462711-6957-1-git-send-email-csd@broadcom.com>
+Message-ID: <CAGFynZ8_=0pEZUWmfw4Rwg+PM47=4=w-vdTBpZ9zBxO+RanYsg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5 September 2013 16:59, Chander Kashyap <chander.kashyap@linaro.org> wrote:
-> Exynos5420 is an octacore SoC. This patch series enables the remaining 4 cores.
+On Tue, Sep 17, 2013 at 5:05 PM, Christian Daudt <csd@broadcom.com> wrote:
+> This patch adds low level debug uart support to Broadcom
+>  mobile based SOCs.
 >
-> Changes in v2:
->         - Changed the cpu node @unit-address value to reg property value.
-> Changes in v3:
->         - Removed leading 0x from @unit-address value.
+> Signed-off-by: Christian Daudt <csd@broadcom.com>
 >
-> Chander Kashyap (2):
->   clocksource: mct: extend mct to support 8 local interrupts for
->     Exynos5420
->   arm: dt: Exynos5420: populate cpu node enteries to 8 cpus
+> Changes from V1:
+>  - Switched to use the common 8250 debug introduced in 3.12-rc1
 >
->  arch/arm/boot/dts/exynos5420.dtsi |   37 +++++++++++++++++++++++++++++++++++--
->  drivers/clocksource/exynos_mct.c  |    4 ++++
->  2 files changed, 39 insertions(+), 2 deletions(-)
->
-> --
-> 1.7.9.5
->
+Hi Russell,
+ Are you okay with v2 of DEBUG_LL support for Broadcom mobile SoC ? If
+so, should I submit it through your patchqueue ?
 
-Hi Kukjin, can you please take these patches.
-
--- 
-with warm regards,
-Chander Kashyap
+ Thanks,
+   csd
