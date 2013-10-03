@@ -1,37 +1,87 @@
-From: msalter@redhat.com (Mark Salter)
-Date: Thu, 03 Oct 2013 09:43:24 -0400
-Subject: [PATCH 2/6] Add shared update_fdt() function for ARM/ARM64
-In-Reply-To: <20131003095224.GX21381@console-pimps.org>
-References: <1380385403-31904-1-git-send-email-roy.franz@linaro.org>
- <1380385403-31904-3-git-send-email-roy.franz@linaro.org>
- <20131003095224.GX21381@console-pimps.org>
-Message-ID: <1380807804.17503.9.camel@deneb.redhat.com>
+From: bcousson@baylibre.com (Benoit Cousson)
+Date: Thu, 03 Oct 2013 15:44:05 +0200
+Subject: [PATCH v3 05/10] ARM: dts: omap3-beagle: Use reset-gpios for
+ hsusb2_reset
+In-Reply-To: <524D5D88.9020308@baylibre.com>
+References: <1380012836-29900-1-git-send-email-rogerq@ti.com>
+ <1380012836-29900-6-git-send-email-rogerq@ti.com> <524D483D.9040907@ti.com>
+ <524D5D88.9020308@baylibre.com>
+Message-ID: <524D74A5.7010604@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2013-10-03 at 10:52 +0100, Matt Fleming wrote:
-> > +#if defined(CONFIG_ARM) || defined(CONFIG_ARM64)
-> > +static efi_status_t update_fdt(efi_system_table_t *sys_table, void *orig_fdt,
-> > +                            void *fdt, int new_fdt_size, char *cmdline_ptr,
-> > +                            u64 initrd_addr, u64 initrd_size,
-> > +                            efi_memory_desc_t *memory_map,
-> > +                            unsigned long map_size, unsigned long desc_size,
-> > +                            u32 desc_ver)
-> 
-> Hmm... does this function really belong in efi-stub-helper.c? That file
-> should be for architecture independent functionality only.
-> 
+On 03/10/2013 14:05, Benoit Cousson wrote:
+> Hi Roger,
+>
+> Yes, I will. I've been waiting for these ones for so long :-)
 
-It isn't really arm-specific although arm is the only user right now.
-We're using the FDT to pass EFI boot info that is passed in the boot
-params block on x86. So potentially other architectures could use the
-same code. How about making it someting like:
+In fact it does not apply correctly on my for_3.13/dts branch :-(
 
-#ifdef ARCH_NEEDS_EFI_FDT
-static efi_status_t update_fdt(efi_system_table_t *sys_table, void *orig_fdt,
-...
-#endif
+error: arch/arm/boot/dts/omap3-beagle.dts: patch does not apply
+Patch failed at 0004 ARM: dts: omap3-beagle: Make USB host pin naming 
+consistent
 
-so the architecture can decide whether to include it or not.
+Could you rebase it?
 
---Mark
+Thanks,
+Benoit
+
+
+>
+> Thanks,
+> Benoit
+>
+> On 03/10/2013 12:34, Roger Quadros wrote:
+>> Hi Benoit,
+>>
+>> Could you please take the device tree related patches [5 to 10] in
+>> this series?
+>> Thanks.
+>>
+>> cheers,
+>> -roger
+>>
+>> On 09/24/2013 11:53 AM, Roger Quadros wrote:
+>>> We no longer need to model the RESET line as a regulator since
+>>> the USB phy-nop driver accepts "reset-gpios" property.
+>>>
+>>> Signed-off-by: Roger Quadros <rogerq@ti.com>
+>>> ---
+>>>   arch/arm/boot/dts/omap3-beagle.dts |   13 +------------
+>>>   1 files changed, 1 insertions(+), 12 deletions(-)
+>>>
+>>> diff --git a/arch/arm/boot/dts/omap3-beagle.dts
+>>> b/arch/arm/boot/dts/omap3-beagle.dts
+>>> index dfd8310..71bde47 100644
+>>> --- a/arch/arm/boot/dts/omap3-beagle.dts
+>>> +++ b/arch/arm/boot/dts/omap3-beagle.dts
+>>> @@ -44,17 +44,6 @@
+>>>           };
+>>>       };
+>>>
+>>> -    /* HS USB Port 2 RESET */
+>>> -    hsusb2_reset: hsusb2_reset_reg {
+>>> -        compatible = "regulator-fixed";
+>>> -        regulator-name = "hsusb2_reset";
+>>> -        regulator-min-microvolt = <3300000>;
+>>> -        regulator-max-microvolt = <3300000>;
+>>> -        gpio = <&gpio5 19 0>;    /* gpio_147 */
+>>> -        startup-delay-us = <70000>;
+>>> -        enable-active-high;
+>>> -    };
+>>> -
+>>>       /* HS USB Port 2 Power */
+>>>       hsusb2_power: hsusb2_power_reg {
+>>>           compatible = "regulator-fixed";
+>>> @@ -68,7 +57,7 @@
+>>>       /* HS USB Host PHY on PORT 2 */
+>>>       hsusb2_phy: hsusb2_phy {
+>>>           compatible = "usb-nop-xceiv";
+>>> -        reset-supply = <&hsusb2_reset>;
+>>> +        reset-gpios = <&gpio5 19 GPIO_ACTIVE_LOW>;    /* gpio_147 */
+>>>           vcc-supply = <&hsusb2_power>;
+>>>       };
+>>>
+>>>
+>>
+>
