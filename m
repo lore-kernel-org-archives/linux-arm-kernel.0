@@ -1,60 +1,103 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Thu, 3 Oct 2013 13:34:37 +0300
-Subject: [PATCH v3 05/10] ARM: dts: omap3-beagle: Use reset-gpios for
- hsusb2_reset
-In-Reply-To: <1380012836-29900-6-git-send-email-rogerq@ti.com>
-References: <1380012836-29900-1-git-send-email-rogerq@ti.com>
- <1380012836-29900-6-git-send-email-rogerq@ti.com>
-Message-ID: <524D483D.9040907@ti.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 3 Oct 2013 12:32:13 +0200
+Subject: [PATCH 04/10] clk: sunxi: add PLL5 and PLL6 support
+In-Reply-To: <524A095A.9050306@elopez.com.ar>
+References: <1380426579-32458-1-git-send-email-emilio@elopez.com.ar>
+ <1380426579-32458-5-git-send-email-emilio@elopez.com.ar>
+ <20130930172137.GE5287@lukather> <524A095A.9050306@elopez.com.ar>
+Message-ID: <20131003103213.GE32149@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Benoit,
-
-Could you please take the device tree related patches [5 to 10] in this series?
-Thanks.
-
-cheers,
--roger
-
-On 09/24/2013 11:53 AM, Roger Quadros wrote:
-> We no longer need to model the RESET line as a regulator since
-> the USB phy-nop driver accepts "reset-gpios" property.
+On Mon, Sep 30, 2013 at 08:29:30PM -0300, Emilio L?pez wrote:
+> El 30/09/13 14:21, Maxime Ripard escribi?:
+> >On Sun, Sep 29, 2013 at 12:49:33AM -0300, Emilio L?pez wrote:
+> >>+/**
+> >>+ * sunxi_divs_clk_setup() - Setup function for leaf divisors on clocks
+> >>+ */
+> >
+> >This comment doesn't seem to be at the right place in your code.
 > 
-> Signed-off-by: Roger Quadros <rogerq@ti.com>
-> ---
->  arch/arm/boot/dts/omap3-beagle.dts |   13 +------------
->  1 files changed, 1 insertions(+), 12 deletions(-)
+> I use these comments as kind of a delimiter too, all the struct
+> definitions done below are used on sunxi_divs_clk_setup, which is
+> immediately after. Factors, mux, dividers and gates have the comment
+> that way too.
+
+Still, it looks odd that you're mostly commenting a function here, while
+the function is 20-ish lines below. Maybe you can just add a small
+comment here saying something like "Here come drag^Wclock dividers".
+
+> >>+	clks = kzalloc(SUNXI_DIVS_MAX_QTY * sizeof(struct clk *), GFP_KERNEL);
+> >>+	if (!clks) {
+> >>+		kfree(clk_data);
+> >>+		return;
+> >>+	}
+> >>+	clk_data->clks = clks;
+> >>+
+> >>+	/* It's not a good idea to have automatic reparenting changing
+> >>+	 * our RAM clock! */
+> >>+	clkflags = !strcmp("pll5", parent) ? 0 : CLK_SET_RATE_PARENT;
+> >>+
+> >>+	for (i = 0; i < SUNXI_DIVS_MAX_QTY; i++) {
+> >>+		if (of_property_read_string_index(node, "clock-output-names",
+> >>+						  i, &clk_name) != 0)
+> >>+			break;
+> >>+
+> >>+		if (data->div[i].fixed) {
+> >>+			clks[i] = clk_register_fixed_factor(NULL, clk_name,
+> >>+						parent, clkflags,
+> >>+						1, data->div[i].fixed);
+> >>+		} else {
+> >>+			flags = data->div[i].pow ? CLK_DIVIDER_POWER_OF_TWO : 0;
+> >>+			clks[i] = clk_register_divider_table(NULL, clk_name,
+> >>+						parent, clkflags, reg,
+> >>+						data->div[i].shift,
+> >>+						SUNXI_DIVISOR_WIDTH, flags,
+> >>+						data->div[i].table, &clk_lock);
+> >>+		}
+> >
+> >Hmmm, I don't get why you were calling sunxi_clk_factors_setup
+> >unconditionally, and now you put a condition on the registration?
 > 
-> diff --git a/arch/arm/boot/dts/omap3-beagle.dts b/arch/arm/boot/dts/omap3-beagle.dts
-> index dfd8310..71bde47 100644
-> --- a/arch/arm/boot/dts/omap3-beagle.dts
-> +++ b/arch/arm/boot/dts/omap3-beagle.dts
-> @@ -44,17 +44,6 @@
->  		};
->  	};
->  
-> -	/* HS USB Port 2 RESET */
-> -	hsusb2_reset: hsusb2_reset_reg {
-> -		compatible = "regulator-fixed";
-> -		regulator-name = "hsusb2_reset";
-> -		regulator-min-microvolt = <3300000>;
-> -		regulator-max-microvolt = <3300000>;
-> -		gpio = <&gpio5 19 0>;	/* gpio_147 */
-> -		startup-delay-us = <70000>;
-> -		enable-active-high;
-> -	};
-> -
->  	/* HS USB Port 2 Power */
->  	hsusb2_power: hsusb2_power_reg {
->  		compatible = "regulator-fixed";
-> @@ -68,7 +57,7 @@
->  	/* HS USB Host PHY on PORT 2 */
->  	hsusb2_phy: hsusb2_phy {
->  		compatible = "usb-nop-xceiv";
-> -		reset-supply = <&hsusb2_reset>;
-> +		reset-gpios = <&gpio5 19 GPIO_ACTIVE_LOW>;	/* gpio_147 */
->  		vcc-supply = <&hsusb2_power>;
->  	};
->  
+> The factor clock is the 'parent' part and the condition is there to
+> decide which kind of divisor gets registered under it. For example
 > 
+>                   PLL6 CLOCK
+>            ________________________
+>           |         ___pll6_sata---|----> to consumer
+> osc24M->--|  pll6--/___pll6_other--|----> to consumer
+>           |        \_______________|____> to consumer
+>           |________________________|
+> 
+> 
+> pll6 is the factor part, pll6_sata is a table divider, and
+> pll6_other is a fixed factor
+
+That should definitely go in the comments :)
+
+> 
+> >(Plus, your indentation here looks a bit odd.)
+> 
+> If I align the parameters with the starting (, I can fit at most 1
+> parameter per line and I end up with a pile of mostly unreadable
+> parameters which uses a lot of lines (and still some don't fit in
+> under 80 cols). I thought using one tab less was a good compromise,
+> and preferable to going over 80 chars. If you have any better
+> suggestion, I'm all ears :)
+
+Ok, whatever you feel best in that case.
+
+Thanks!
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131003/0c450dcc/attachment-0001.sig>
