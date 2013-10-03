@@ -1,47 +1,60 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 2 Oct 2013 16:38:25 +0200
-Subject: [PATCH 06/10] clk: sunxi: mod0 support
-In-Reply-To: <524A0B4A.8080902@elopez.com.ar>
-References: <1380426579-32458-1-git-send-email-emilio@elopez.com.ar>
- <1380426579-32458-7-git-send-email-emilio@elopez.com.ar>
- <20130930173508.GF5287@lukather> <524A0B4A.8080902@elopez.com.ar>
-Message-ID: <20131002143825.GA32149@lukather>
+From: simon.guinot@sequanux.org (Simon Guinot)
+Date: Thu, 3 Oct 2013 11:00:58 +0200
+Subject: [PATCH] clk: armada-370: fix tclk frequencies
+In-Reply-To: <20131002170448.GO31178@titan.lakedaemon.net>
+References: <1380729418-14393-1-git-send-email-simon.guinot@sequanux.org>
+ <20131002162221.GN31178@titan.lakedaemon.net>
+ <20131002165754.GE1356@kw.sim.vm.gnt>
+ <20131002170448.GO31178@titan.lakedaemon.net>
+Message-ID: <20131003090057.GF1356@kw.sim.vm.gnt>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Emilio
-
-On Mon, Sep 30, 2013 at 08:37:46PM -0300, Emilio L?pez wrote:
-> >>+static const struct factors_data sun4i_mod0_data __initconst = {
-> >>+	.enable = 31,
-> >>+	.mux = 24,
-> >>+	.table = &sun4i_mod0_config,
-> >>+	.getter = sun4i_get_mod0_factors,
-> >>+};
-> >
-> >How are the parents handled here for the mux part? Do you expect the
-> >different parents in a precise order in the device tree, so that you
-> >have a direct mapping to the value to put in the muxing registers, or do
-> >you have a smarter way to do it?
+On Wed, Oct 02, 2013 at 01:04:49PM -0400, Jason Cooper wrote:
+> On Wed, Oct 02, 2013 at 06:57:54PM +0200, Simon Guinot wrote:
+> > On Wed, Oct 02, 2013 at 12:22:21PM -0400, Jason Cooper wrote:
+> > > Simon,
+> > > 
+> > > On Wed, Oct 02, 2013 at 05:56:58PM +0200, Simon Guinot wrote:
+> > > > Signed-off-by: Simon Guinot <simon.guinot@sequanux.org>
+> > > 
+> > > Could you elaborate on this?  What symptom did you notice?  How did this
+> > > fix it?  When was the regression introduced?
+> > 
+> > Hi Jason,
+> > 
+> > While benchmarking Linux 3.12-rc3 on an Armada-370-RD, I noticed bad
+> > networking performances... After some investigations, I found out that
+> > the coalescence configuration (derived from the tclk) was suspect.
+> > 
+> > While checking for the tclk value, I found this typo. There is not much
+> > to say about this patch except that the correct tclk frequencies for
+> > Armada-370 are 166 and 200MHz, not 16.6 and 20MHz.
 > 
-> Indeed, the parents must be indicated on the DT using the same order
-> as on the register. In other words, it works the same as all the
-> other muxes we have implemented so far. The clock corresponding to
-> bits 00 goes first, then the one corresponding to 01, etc.
+> Yes, I know it's simple, but it's a huge help to us when trying to
+> decide whether or not to flag it for stable.  fwiw, the regression was
+> introduced by:
+> 
+>   6b72333d clk: mvebu: add Armada 370 SoC-centric clock init
+> 
+> and this should be applied from v3.11 onwards.
 
-Ok. It should be documented in the bindings doc then.
+Ok, I will reword this commit. Note that this bug can't be called a
+regression. The tclk frequencies array was wrong from the beginning:
 
-Thanks!
-Maxime
+  97fa4cf4: clk: mvebu: add mvebu core clocks
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+The commit you pointed out simply moves the typo. I am not familiar
+with the stable process but if needed I can provide a patch against
+some stable branches.
+
+Please let know how do you want handle this.
+
+Simon
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 836 bytes
+Size: 198 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131002/0d81db3f/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131003/61a9c13c/attachment.sig>
