@@ -1,59 +1,53 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 3 Oct 2013 17:18:00 -0400
-Subject: [PATCH v3 6/6] ARM: mm: Change the order of TLB/cache maintenance
- operations.
-In-Reply-To: <1380835081-12129-1-git-send-email-santosh.shilimkar@ti.com>
-References: <1380835081-12129-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1380835081-12129-7-git-send-email-santosh.shilimkar@ti.com>
+From: sebastian.capella@linaro.org (Sebastian Capella)
+Date: Thu,  3 Oct 2013 14:10:36 -0700
+Subject: [PATCH v3 0/2] PM / Hibernate: sysfs resume 
+Message-ID: <1380834638-24035-1-git-send-email-sebastian.capella@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sricharan R <r.sricharan@ti.com>
+Patchsets related to hibernation resume:
+  - enhancement to make the use of an existing resume file more general
+  - enhance name_to_dev_t to ignore trailing newlines coming from userspace.
 
-As per the arm ARMv7 manual, the sequence of TLB maintenance
-operations after making changes to the translation table is
-to clean the dcache first, then invalidate the TLB. With
-the current sequence we see cache corruption when the
-flush_cache_all is called after tlb_flush_all.
+Both patches are based on the 3.12-rc3 tag.  This was tested on a
+Pandaboard with partial hibernation support, and compiled for x86.
 
-STR rx, [Translation table entry]
-; write new entry to the translation table
-Clean cache line [Translation table entry]
-DSB
-; ensures visibility of the data cleaned from the D Cache
-Invalidate TLB entry by MVA (and ASID if non-global) [page address]
-Invalidate BTC
-DSB
-; ensure completion of the Invalidate TLB operation
-ISB
-; ensure table changes visible to instruction fetch
+[PATCH 1/2] init/do_mounts.c: ignore final \n in name_to_dev_t
+  init/do_mounts.c |   23 ++++++++++++++++++-----
+  1 file changed, 18 insertions(+), 5 deletions(-)
 
-The issue is seen only with LPAE + THUMB BUILT KERNEL + 64BIT patching,
-which is little bit weird.
+  Changes name_to_dev_t to handle a trailing newline in the
+  input buffer, which will allow name_to_dev_t to be used
+  directly with user buffers without requiring a copy.
+  Also adds a const to the name parameter which reflects
+  how name_to_dev_t is treating the input buffer currently.
+  This also allows direct use of user buffers
+  (from resume_store for example).
 
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
-Cc: Russell King - ARM Linux <linux@arm.linux.org.uk>
+[PATCH 2/2] PM / Hibernate: use name_to_dev_t to parse resume
+  kernel/power/hibernate.c |   15 ++++-----------
+  1 file changed, 4 insertions(+), 11 deletions(-)
 
-Signed-off-by: Sricharan R <r.sricharan@ti.com>
-Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
----
- arch/arm/mm/mmu.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+  Use name_to_dev_t to parse the /sys/power/resume file making the
+  syntax more flexible.  It supports the previous use syntax
+  and additionally can support other formats such as
+  /dev/devicenode and UUID= formats.
 
-diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-index 47c7497..49cba8a 100644
---- a/arch/arm/mm/mmu.c
-+++ b/arch/arm/mm/mmu.c
-@@ -1280,8 +1280,8 @@ static void __init devicemaps_init(const struct machine_desc *mdesc)
- 	 * any write-allocated cache lines in the vector page are written
- 	 * back.  After this point, we can start to touch devices again.
- 	 */
--	local_flush_tlb_all();
- 	flush_cache_all();
-+	local_flush_tlb_all();
- }
- 
- static void __init kmap_init(void)
--- 
-1.7.9.5
+  By changing /sys/debug/resume to accept the same syntax as
+  the resume=device parameter, we can parse the resume=device
+  in the initrd init script and use the resume device directly
+  from the kernel command line.
+
+Changes in v3:
+--------------
+* Dropped documentation patch as it went in through trivial
+* Added patch for name_to_dev_t to support directly parsing userspace
+  buffer
+
+Changes in v2:
+--------------
+* Added check for null return of kstrndup in hibernate.c
+
+Thanks,
+
+Sebastian
