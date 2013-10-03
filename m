@@ -1,69 +1,42 @@
-From: matt@console-pimps.org (Matt Fleming)
-Date: Thu, 3 Oct 2013 10:52:24 +0100
-Subject: [PATCH 2/6] Add shared update_fdt() function for ARM/ARM64
-In-Reply-To: <1380385403-31904-3-git-send-email-roy.franz@linaro.org>
-References: <1380385403-31904-1-git-send-email-roy.franz@linaro.org>
- <1380385403-31904-3-git-send-email-roy.franz@linaro.org>
-Message-ID: <20131003095224.GX21381@console-pimps.org>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Thu, 03 Oct 2013 11:56:40 +0200
+Subject: [PATCH 01/05] ARM: shmobile: Sync KZM9D DTS with KZM9D reference
+ DTS
+In-Reply-To: <20131003034947.GH28463@verge.net.au>
+References: <20131001103255.813.65710.sendpatchset@w520>
+ <20131001103305.813.70296.sendpatchset@w520>
+ <20131003034947.GH28463@verge.net.au>
+Message-ID: <2066391.GX4ZAHlWrz@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 28 Sep, at 09:23:19AM, Roy Franz wrote:
-> Both ARM and ARM64 stubs will update the device tree
-> that they pass to the kernel.  In both cases they
-> primarily need to add the same UEFI related information,
-> so the function can be shared.
+Hi Simon,
+
+On Thursday 03 October 2013 12:49:48 Simon Horman wrote:
+> On Tue, Oct 01, 2013 at 07:33:05PM +0900, Magnus Damm wrote:
+> > From: Magnus Damm <damm@opensource.se>
+> > 
+> > Copy the device nodes from KZM9D reference into the KZM9D
+> > device tree file. This will allow us to use a single DTS
+> > file regarless of kernel configuration. In case of legacy
+> > C board code the device nodes may or may not be used, but
+> > in the multiplatform case all the DT device nodes are used.
+> > 
+> > Signed-off-by: Magnus Damm <damm@opensource.se>
+> > ---
+> > 
+> >  arch/arm/boot/dts/emev2-kzm9d.dts |   33 +++++++++++++++++++++++++++++++-
+> >  1 file changed, 32 insertions(+), 1 deletion(-)
 > 
-> Signed-off-by: Roy Franz <roy.franz@linaro.org>
-> ---
->  drivers/firmware/efi/efi-stub-helper.c |   86 ++++++++++++++++++++++++++++++++
->  1 file changed, 86 insertions(+)
-> 
-> diff --git a/drivers/firmware/efi/efi-stub-helper.c b/drivers/firmware/efi/efi-stub-helper.c
-> index cc0581d..d3448a9 100644
-> --- a/drivers/firmware/efi/efi-stub-helper.c
-> +++ b/drivers/firmware/efi/efi-stub-helper.c
-> @@ -4,6 +4,7 @@
->   * implementation files.
->   *
->   * Copyright 2011 Intel Corporation; author Matt Fleming
-> + * Copyright 2013 Linaro Limited; author Roy Franz
->   *
->   * This file is part of the Linux kernel, and is made available
->   * under the terms of the GNU General Public License version 2.
-> @@ -636,3 +637,88 @@ static char *efi_convert_cmdline_to_ascii(efi_system_table_t *sys_table_arg,
->  	*cmd_line_len = options_size;
->  	return (char *)cmdline_addr;
->  }
-> +
-> +#if defined(CONFIG_ARM) || defined(CONFIG_ARM64)
-> +static efi_status_t update_fdt(efi_system_table_t *sys_table, void *orig_fdt,
-> +			       void *fdt, int new_fdt_size, char *cmdline_ptr,
-> +			       u64 initrd_addr, u64 initrd_size,
-> +			       efi_memory_desc_t *memory_map,
-> +			       unsigned long map_size, unsigned long desc_size,
-> +			       u32 desc_ver)
+> Thanks, I have queued this up in the dt3 branch.
 
-Hmm... does this function really belong in efi-stub-helper.c? That file
-should be for architecture independent functionality only.
+Splitting the series across two branches would result in bisection breakages 
+I'm afraid. Would it be an issue to queue all patches to a single branch ?
 
-While it currently does include this little snippet,
-
-#ifdef CONFIG_ARM
-	/*
-	 * For ARM, allocate at a high address to avoid reserved
-	 * regions at low addresses that we don't know the specfics of
-	 * at the time we are processing the command line.
-	 */
-	status = efi_high_alloc(sys_table_arg, options_size, 0,
-			    &cmdline_addr, 0xfffff000);
-#else
-	status = efi_low_alloc(sys_table_arg, options_size, 0,
-			    &cmdline_addr);
-#endif
-
-I think that single #ifdef is justifiable. But including entire
-functions that are only used by ARM/ARM64 or x86 isn't.
+> It should make it into v3.13 but if not I'll rename the branch
+> dt after rebasing it on v3.13-rcX which will then be targeted at v3.14.
 
 -- 
-Matt Fleming, Intel Open Source Technology Center
+Regards,
+
+Laurent Pinchart
