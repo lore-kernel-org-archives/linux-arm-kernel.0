@@ -1,61 +1,57 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Thu, 3 Oct 2013 10:31:53 -0400 (EDT)
-Subject: [PATCH 06/11] USB: OHCI: Properly handle ohci-exynos suspend
-In-Reply-To: <CAKsNYyws1m1kT4KiJ6GFcTSo0cT=cu+0nA0vwx=wu_SuRhAfhA@mail.gmail.com>
-Message-ID: <Pine.LNX.4.44L0.1310031027190.1287-100000@iolanthe.rowland.org>
+From: dinguyen@altera.com (Dinh Nguyen)
+Date: Thu, 3 Oct 2013 09:34:24 -0500
+Subject: socfpga-next
+In-Reply-To: <20131003141021.GA14042@pengutronix.de>
+References: <20131003130240.GS9632@pengutronix.de>
+ <1380807118.30559.3.camel@linux-builds1>
+ <20131003141021.GA14042@pengutronix.de>
+Message-ID: <1380810864.7464.1.camel@linux-builds1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 3 Oct 2013, manju goudar wrote:
-
-> On Wed, Oct 2, 2013 at 9:22 PM, Alan Stern <stern@rowland.harvard.edu>wrote:
+On Thu, 2013-10-03 at 16:10 +0200, Steffen Trumtrar wrote:
+> Hi Dinh,
 > 
-> > On Wed, 2 Oct 2013, Bartlomiej Zolnierkiewicz wrote:
-> >
-> > >
-> > > Hi,
-> > >
-> > > On Wednesday, October 02, 2013 10:38:58 AM Alan Stern wrote:
-> > > > On Wed, 2 Oct 2013, Bartlomiej Zolnierkiewicz wrote:
-> > > >
-> > > > > Maybe it would make sense to cleanup ohci_suspend() first (before
-> > adding
-> > > > > new ohci_suspend() users) and remove unused do_wakeup parameter?
-> > > >
-> > > > Not possible.  The do_wakeup parameter is part of a function prototype
-> > > > shared by other callback routines (such as ehci_suspend()) that _do_
-> > > > use the parameter.
-> > >
-> > > If you mean ohci-pci.c usage (which is currently the only usage of
-> > > ohci_suspend() looking at the latest -next kernel) than it is enough
-> > > to add a simple wrapper for it in ohci-pci.c:
-> > >
-> > > ...
-> > > static int ohci_pci_suspend(struct usb_hcd *hcd, bool do_wakeup)
-> > > {
-> > >       ohci_suspend(hcd);
-> > > }
-> > > ...
-> > >     ohci_pci_hc_driver.pci_suspend = ohci_pci_suspend;
-> > > ...
-> >
-> > Ah, now I see your point.  Yes, it's true; that parameter could be
-> > eliminated.
-> >
-> > Manjunath, would you like to update your patch series to get rid of the
-> > do_wakeup argument to ohci_suspend()?
-> >
-> > Yes I will do. I think we can also rid of ehci_suspend() do_wakeup
-> argument.
+> On Thu, Oct 03, 2013 at 08:31:58AM -0500, Dinh Nguyen wrote:
+> > Hi Robert,
+> > 
+> > On Thu, 2013-10-03 at 15:02 +0200, Robert Schwebel wrote:
+> > > Hi Dinh,
+> > > 
+> > > On Wed, Oct 02, 2013 at 09:35:29AM +0200, Steffen Trumtrar wrote:
+> > > > BTW: It seems there is no official maintainer(tree) for the socfpga dt stuff.
+> > > > So, I rebased onto next-20130927.
+> > > 
+> > > It would be great if you could establish some kind of socfpga-next tree,
+> > > where we can see what you have already taken, and which could be put
+> > > into linux-next.
+> > > 
+> > > What do you think?
+> > 
+> > Do you mean at kernel.org or just at any other place? I have a git repo
+> > that I'm managing with commits that are sent out for review or have
+> > Acks.
+> > 
+> > git://git.rocketboards.org/linux-socfpga-next.git
+> > 
+> > next-dt : DTS updates
+> 
+> It seems I overlooked this branch, last time I checked your repo...
+> 
+> > for-next : latest from Linus + patches(being reviewed)
+> > 
+> 
+> ...this was the only one I have seen.
+> Do you also collect the DTS(I) patches? If so, you should add that to the
+> MAINTAINERS file. I think, it might be a good idea to collect that stuff
+> in one place, because *.dts files really love to produce merge conflicts.
+> No need to bother the ARM or OF maintainers with that.
 
-Arrgh!  Manjunath, I was wrong.  I'm sorry to make you do all this
-extra work -- your original patch series was correct.
+Yes, I will be collecting DTS patches. I will add the git repo link to
+the MAINTAINERS file.
 
-Bartlomiej, we both failed to notice that the 1/11 patch in the 
-original series adds a usage of do_wakeup.  Therefore that argument 
-cannot be removed.
-
-Greg, please ignore Manjunath's V2 series (sent today) and merge the 
-original 11-patch series posted on October 2.
-
-Alan Stern
+Dinh
+> 
+> Regards,
+> Steffen
+> 
