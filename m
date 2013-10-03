@@ -1,67 +1,112 @@
-From: seanpaul@chromium.org (Sean Paul)
-Date: Thu, 3 Oct 2013 12:06:59 -0400
-Subject: [PATCH 2/5] ARM: dts: Add dp-controller node to exynos5250-snow
-In-Reply-To: <CAOesGMj3142o1B_33BqtLZMbObn2tjfBaBHvAB-2+O+XOuCjSw@mail.gmail.com>
-References: <1380670860-17621-1-git-send-email-seanpaul@chromium.org>
- <1380670860-17621-3-git-send-email-seanpaul@chromium.org>
- <CAOesGMj3142o1B_33BqtLZMbObn2tjfBaBHvAB-2+O+XOuCjSw@mail.gmail.com>
-Message-ID: <CAOw6vbJeD396f1LEN8SE5j+Rcc=962EcuUuJpxU87Daxfag=Fg@mail.gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 03 Oct 2013 11:11:18 -0500
+Subject: [PATCH v2 1/3] Documentation: arm: add UEFI support documentation
+In-Reply-To: <1380799481-5470-2-git-send-email-leif.lindholm@linaro.org>
+References: <1380799481-5470-1-git-send-email-leif.lindholm@linaro.org>
+ <1380799481-5470-2-git-send-email-leif.lindholm@linaro.org>
+Message-ID: <524D9726.6080501@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 2, 2013 at 5:10 PM, Olof Johansson <olof@lixom.net> wrote:
-> On Tue, Oct 1, 2013 at 4:40 PM, Sean Paul <seanpaul@chromium.org> wrote:
->> This patch adds the dp-controller node to the exynos5250-snow board dts
->> file.
->>
->> Signed-off-by: Sean Paul <seanpaul@chromium.org>
->> ---
->>  arch/arm/boot/dts/exynos5250-snow.dts | 12 ++++++++++++
->>  1 file changed, 12 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/exynos5250-snow.dts b/arch/arm/boot/dts/exynos5250-snow.dts
->> index e5af3f2..780511a 100644
->> --- a/arch/arm/boot/dts/exynos5250-snow.dts
->> +++ b/arch/arm/boot/dts/exynos5250-snow.dts
->> @@ -190,6 +190,18 @@
->>                 samsung,vbus-gpio = <&gpx1 1 0>;
->>         };
->>
->> +       dp-controller {
->> +               samsung,color-space = <0>;
->> +               samsung,dynamic-range = <0>;
->> +               samsung,ycbcr-coeff = <0>;
->> +               samsung,color-depth = <1>;
->> +               samsung,link-rate = <0x0a>;
->> +               samsung,lane-count = <2>;
->> +
->> +               pinctrl-names = "default";
->> +               pinctrl-0 = <&dp_hpd>;
->> +       };
->
-> This won't actually do what I think you want. Since the dtsi has the
-> node name "dp-controller at 145B0000", you will end up duplicating a new
-> node and not build on top of that one.
->
+Adding devicetree list since you are defining bindings...
 
-Thanks, Olof. I based this off Inki's exynos-drm-next tree which does
-not have the latest from arm-soc, I'll re-upload.
+On 10/03/2013 06:24 AM, Leif Lindholm wrote:
+> This patch provides documentation of the [U]EFI runtime services and
+> configuration features.
+> 
+> Cc: linux-doc at vger.kernel.org
+> Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
+> Acked-by: Rob Landley <rob@landley.net>
+> ---
+>  Documentation/arm/00-INDEX |    3 +++
+>  Documentation/arm/uefi.txt |   47 ++++++++++++++++++++++++++++++++++++++++++++
+>  2 files changed, 50 insertions(+)
+>  create mode 100644 Documentation/arm/uefi.txt
+> 
+> diff --git a/Documentation/arm/00-INDEX b/Documentation/arm/00-INDEX
+> index 4978456..87e01d1 100644
+> --- a/Documentation/arm/00-INDEX
+> +++ b/Documentation/arm/00-INDEX
+> @@ -36,3 +36,6 @@ nwfpe/
+>  	- NWFPE floating point emulator documentation
+>  swp_emulation
+>  	- SWP/SWPB emulation handler/logging description
+> +
+> +uefi.txt
+> +	- [U]EFI configuration and runtime services documentation
+> diff --git a/Documentation/arm/uefi.txt b/Documentation/arm/uefi.txt
+> new file mode 100644
+> index 0000000..e6e4d41
+> --- /dev/null
+> +++ b/Documentation/arm/uefi.txt
+> @@ -0,0 +1,47 @@
+> +UEFI, the Unified Extensible Firmware Interface is a speifcication
+> +governing the behaviours of compatible firmware interfaces. It is
+> +maintained by the UEFI Forum - http://www.uefi.org/.
+> +
+> +Since UEFI is an evolution of its predecessor 'EFI', the terms EFI and
+> +UEFI are used somewhat interchangeably in this document and associated
+> +source code.
+> +
+> +The implementation depends on receiving the UEFI runtime memory map and a
+> +pointer to the System Table in a Flattened Device Tree - so is only available
+> +with CONFIG_OF.
+> +
+> +It parses the FDT /chosen node for the following parameters:
 
-Sean
+DT bindings should be documented in Documentation/devicetree/bindings.
 
+I also wonder if this would be more appropriately placed in a /firmware
+node.
 
-> There's two ways to do it: Always include the unit address, or create
-> a label in the dtsi such that:
->
-> dp_controller: dp-controller@ {....
-> }
->
-> Then in your dts you can, at the root level:
->
-> &dp_controller {
->   ... new stuff and overrides ...
-> };
->
->
->
-> -Olof
+> +- 'linux,efi-system-table':
+> +  Physical address of the system table. (required)
+> +  64-bit value since an ARMv7 plattform may support LPAE, and to facilitate
+> +  code sharing with arm64. Top 32 bits will be ignored, since UEFI specification
+> +  mandates a 1:1 mapping of all RAM.
+> +- 'linux,efi-mmap':
+> +  The EFI memory map as an embedded property. (required)
+> +  An array of type EFI_MEMORY_DESCRIPTOR as described by the UEFI
+> +  specification, current version described in Linux by efi_memory_desc_t.
+
+Is that too complex to describe here?
+
+> +  The memory map is represented in little-endian, not DT, byte order.
+> +  This map needs to contain at least the regions to be preserved for runtime
+> +  services, but would normally just be the map retreieved by calling UEFI
+> +  GetMemoryMap() immediately before ExitBootServices().
+> +- 'linux,efi-mmap-desc-size':
+> +  Size of each descriptor in the memory map. (override default)
+
+32-bit value?
+
+> +- 'linux,efi-mmap-desc-ver':
+> +  Memory descriptor format version. (override default)
+
+String? Number?
+
+Are these all generated by UEFI at runtime or could they be statically
+set in a platform's DTB?
+
+How would other OS's get this information? Is this really linux specific?
+
+Rob
+
+> +
+> +It also depends on early_memremap() to parse the UEFI configuration tables.
+> +
+> +For actually enabling [U]EFI support, enable:
+> +- CONFIG_EFI=y
+> +- CONFIG_EFI_VARS=y or m
+> +
+> +After the kernel has mapped the required regions into its address space,
+> +a SetVirtualAddressMap() call is made into UEFI in order to update
+> +relocations. This call must be performed with all the code in a 1:1
+> +mapping. This implementation achieves this by temporarily disabling the
+> +MMU for the duration of this call. This can only be done safely:
+> +- before secondary CPUs are brought online.
+> +- after early_initcalls have completed, since it uses setup_mm_for_reboot().
+> +
+> +For verbose debug messages, specify 'uefi_debug' on the kernel command
+> +line.
+> 
