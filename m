@@ -1,66 +1,47 @@
-From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
-Date: Thu, 3 Oct 2013 18:37:43 +0200
-Subject: [PATCH 1/4] ARM: socfpga: dts: Move common nodes to cyclone5 dtsi
-In-Reply-To: <1380812321.7464.7.camel@linux-builds1>
-References: <1380699333-558-1-git-send-email-s.trumtrar@pengutronix.de>
- <1380699333-558-2-git-send-email-s.trumtrar@pengutronix.de>
- <1380812321.7464.7.camel@linux-builds1>
-Message-ID: <20131003163743.GB14042@pengutronix.de>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 03 Oct 2013 11:37:52 -0500
+Subject: [PATCH] arm: Fix conversion to early_init_dt_scan() for non-DT
+ platforms
+In-Reply-To: <1380804633-14130-1-git-send-email-broonie@kernel.org>
+References: <1380804633-14130-1-git-send-email-broonie@kernel.org>
+Message-ID: <524D9D60.7000804@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dinh,
-
-On Thu, Oct 03, 2013 at 09:58:41AM -0500, Dinh Nguyen wrote:
-> On Wed, 2013-10-02 at 09:35 +0200, Steffen Trumtrar wrote:
-> > +/include/ "socfpga_cyclone5.dtsi"
-> > +
-> > +/ {
-> > +	model = "Altera SOCFPGA Cyclone V SoC Development Kit";
-> > +	compatible = "altr,socfpga-cyclone5", "altr,socfpga";
-> > +
-> > +	chosen {
-> > +		bootargs = "console=ttyS0,57600";
+On 10/03/2013 07:50 AM, Mark Brown wrote:
+> From: Mark Brown <broonie@linaro.org>
 > 
-> Thanks for doing this. It looks good. While you're at it can you make
-> this 115200? 57600 was early in the bring-up stage.
+> Commit 67a964490bfd14 (arm: use early_init_dt_scan) in the OF tree in
+> -next converts ARM to use early_init_dt_scan(), factoring out some common
+> code. However it ignores the return value of the function meaning that on
+> non-DT platforms the kernel fails to boot as it attempts to configure
+> itself using DT.
 > 
+> Fix this by adding the appropriate return value check.
 
-I can also completely remove this. The question is: does u-boot need this
-line or does it add this line itself?
-We added basic support for SoCFPGA to barebox (well, it will go live with the
-october release AFAIK. With SoCKit and SoCrates boards) and we normally do not
-need to put the bootargs in the DT. So, I would be okay to remove this line
-OR if u-boot uses it, change it to 115200. What do you think?
+I have this fixed already in my tree. I had not pushed out my -next
+branch with the fix, but have done so now.
 
-> > +	};
-> > +
-> > +	memory {
-> > +		name = "memory";
-> > +		device_type = "memory";
-> > +		reg = <0x0 0x40000000>; /* 1GB */
-> > +	};
-> > +
-> > +	aliases {
-> > +		/* this allow the ethaddr uboot environmnet variable contents
-> > +		 * to be added to the gmac1 device tree blob.
-> > +		 */
-> > +		ethernet0 = &gmac1;
-> > +	};
-> > +};
+Rob
+
 > 
-> With the change to 115200,
+> Signed-off-by: Mark Brown <broonie@linaro.org>
+> ---
+>  arch/arm/kernel/devtree.c | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
 > 
-> Acked-by: Dinh Nguyen <dinguyen@altera.com>
+> diff --git a/arch/arm/kernel/devtree.c b/arch/arm/kernel/devtree.c
+> index 04050f7..67f4ebe 100644
+> --- a/arch/arm/kernel/devtree.c
+> +++ b/arch/arm/kernel/devtree.c
+> @@ -198,7 +198,8 @@ const struct machine_desc * __init setup_machine_fdt(unsigned int dt_phys)
+>  	if (!dt_phys)
+>  		return NULL;
+>  
+> -	early_init_dt_scan(phys_to_virt(dt_phys));
+> +	if (!early_init_dt_scan(phys_to_virt(dt_phys)))
+> +		return NULL;
+>  
+>  	/* Search the mdescs for the 'best' compatible value match */
+>  	dt_root = of_get_flat_dt_root();
 > 
-
-Thanks.
-
-Regards,
-Steffen
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
