@@ -1,37 +1,23 @@
-From: dan.carpenter@oracle.com (Dan Carpenter)
-Date: Thu, 3 Oct 2013 23:27:51 +0300
-Subject: [PATCH v2 1/3] imx-drm: Add mx6 hdmi transmitter support
-In-Reply-To: <1380826287-30253-1-git-send-email-fabio.estevam@freescale.com>
-References: <1380826287-30253-1-git-send-email-fabio.estevam@freescale.com>
-Message-ID: <20131003202751.GZ6192@mwanda>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Thu, 3 Oct 2013 22:24:56 +0200
+Subject: [PATCH v2 1/2] ARM: kirkwood: retain MAC address for DT ethernet
+In-Reply-To: <20131003194449.GB30298@obsidianresearch.com>
+References: <1380804294-13726-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1380826568-18587-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20131003190201.GA2504@localhost>
+ <20131003190437.GY31178@titan.lakedaemon.net>
+ <20131003194449.GB30298@obsidianresearch.com>
+Message-ID: <20131003202456.GH20056@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 03, 2013 at 03:51:25PM -0300, Fabio Estevam wrote:
-> This is based on the initial work done by Sascha Hauer and Tony Prisk.
-> 
-> Tested on imx6q-wandboard and imx6q-sabresd boards.
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> ---
-> Changes since v1:
-> - Rebased against 3.12-rc3 and fixed header file location
-> 
+> Sebastian, does __clk_enabled work properly for the mvebu clock
+> provider? I don't see a clk_ops.is_enabled for mvebu.. (don't know
+> much about clk)
 
-It should be done against linux-next as previously mentioned but the
-header still needs to be fixed in linux-next I think?
+Hi Jason
 
-Also it has the following Smatch warnings which are all basically
-correct.
+It is implemented in drivers/clk/clk-gate.c, which is what mvebu is
+using.
 
-drivers/staging/imx-drm/imx-hdmi.c:511 imx_hdmi_update_csc_coeffs() error: buffer overflow '(*csc_coeff)[0]' 4 <= 4
-drivers/staging/imx-drm/imx-hdmi.c:520 imx_hdmi_update_csc_coeffs() error: buffer overflow '(*csc_coeff)[1]' 4 <= 4
-drivers/staging/imx-drm/imx-hdmi.c:529 imx_hdmi_update_csc_coeffs() error: buffer overflow '(*csc_coeff)[2]' 4 <= 4
-drivers/staging/imx-drm/imx-hdmi.c:785 hdmi_phy_i2c_write() info: ignoring unreachable code.
-drivers/staging/imx-drm/imx-hdmi.c:873 hdmi_phy_configure() warn: unsigned 'hdmi->hdmi_data.video_mode.mpixelclock' is never less than zero.
-drivers/staging/imx-drm/imx-hdmi.c:1537 imx_hdmi_fb_registered() warn: inconsistent returns spin_lock:&hdmi->irq_lock: locked (1514 [s32min-(-1),1-s32max]) unlocked (1508 [0], 1537 [0])
-drivers/staging/imx-drm/imx-hdmi.c:1537 imx_hdmi_fb_registered() warn: inconsistent returns irqsave:flags: locked (1514 [s32min-(-1),1-s32max]) unlocked (1508 [0], 1537 [0])
-drivers/staging/imx-drm/imx-hdmi.c:1837 imx_hdmi_platform_probe() info: why not propagate 'irq' from platform_get_irq() instead of (-22)?
-
-regards,
-dan carpenter
+   Andrew
