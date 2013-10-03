@@ -1,141 +1,74 @@
-From: r.sricharan@ti.com (Sricharan R)
-Date: Thu, 3 Oct 2013 15:49:37 +0530
-Subject: [PATCH V4] ARM: OMAP5/DRA7: realtime_counter: Configure CNTFRQ
- register
-In-Reply-To: <1379520162-31932-1-git-send-email-r.sricharan@ti.com>
-References: <1379520162-31932-1-git-send-email-r.sricharan@ti.com>
-Message-ID: <524D44B9.30208@ti.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 3 Oct 2013 12:28:01 +0200
+Subject: Armada XP doesn't boot in v3.12-rc3
+In-Reply-To: <CAFJTrDsiOfG1rNWo3OXtzdcquP8kdS+_x2YYELOQDH96SLGm_A@mail.gmail.com>
+References: <CAFJTrDvNYa2g-TFPjii5WpCgnX8kc8r9v3+jzL7gkHCwRV-obg@mail.gmail.com>
+ <20131002124320.GL31178@titan.lakedaemon.net>
+ <CAFJTrDsTmSzFEX7XVqnw4=vYiBdqNeLDQuWFotSEZqGsFxT9sA@mail.gmail.com>
+ <20131002202547.GA10645@localhost>
+ <CAFJTrDsiOfG1rNWo3OXtzdcquP8kdS+_x2YYELOQDH96SLGm_A@mail.gmail.com>
+Message-ID: <20131003122801.7f72bc26@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+Dear Matthew Minter,
 
-On Wednesday 18 September 2013 09:32 PM, Sricharan R wrote:
-> The realtime counter called master counter, produces the count
-> used by the private timer peripherals in the MPU_CLUSTER. The
-> CNTFRQ per cpu register is used to denote the frequency of the counter.
-> Currently the frequency value is passed from the
-> DT file, but this is not scalable when we have other non-DT guest
-> OS. This register must be set to the right value by the
-> secure rom code. Setting this register helps in propagating the right
-> frequency value across OSes.
->
-> More discussions and the reason for adding this in a non-DT
-> way can be seen from below.
-> http://www.mail-archive.com/linux-omap at vger.kernel.org/msg93832.html
->
-> So configuring this secure register for all the cpus here.
->
-> While here, removing the clock-frequency DT entry for omap5 as
-> it is no more needed after this patch.
->
-> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Cc: Nishanth Menon <nm@ti.com>
-> Cc: Rajendra Nayak <rnayak@ti.com>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Tested-by: Nishanth Menon <nm@ti.com>
-> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Signed-off-by: Sricharan R <r.sricharan@ti.com>
-> ---
-> [V4] Updated commit log, removed the redundant entry in OMAP5.dtsi and
->      a unnecessary newline in timer.c
->
->  arch/arm/boot/dts/omap5.dtsi      |    1 -
->  arch/arm/mach-omap2/omap-secure.h |    2 ++
->  arch/arm/mach-omap2/omap-smp.c    |    9 +++++++++
->  arch/arm/mach-omap2/timer.c       |    5 +++++
->  4 files changed, 16 insertions(+), 1 deletion(-)
->
-> diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
-> index 07be2cd..8a45512 100644
-> --- a/arch/arm/boot/dts/omap5.dtsi
-> +++ b/arch/arm/boot/dts/omap5.dtsi
-> @@ -52,7 +52,6 @@
->  			     <GIC_PPI 14 (GIC_CPU_MASK_RAW(3) | IRQ_TYPE_LEVEL_LOW)>,
->  			     <GIC_PPI 11 (GIC_CPU_MASK_RAW(3) | IRQ_TYPE_LEVEL_LOW)>,
->  			     <GIC_PPI 10 (GIC_CPU_MASK_RAW(3) | IRQ_TYPE_LEVEL_LOW)>;
-> -		clock-frequency = <6144000>;
->  	};
->  
->  	gic: interrupt-controller at 48211000 {
-> diff --git a/arch/arm/mach-omap2/omap-secure.h b/arch/arm/mach-omap2/omap-secure.h
-> index 0e72917..5f88824 100644
-> --- a/arch/arm/mach-omap2/omap-secure.h
-> +++ b/arch/arm/mach-omap2/omap-secure.h
-> @@ -42,6 +42,8 @@
->  #define OMAP4_MON_L2X0_AUXCTRL_INDEX	0x109
->  #define OMAP4_MON_L2X0_PREFETCH_INDEX	0x113
->  
-> +#define OMAP5_DRA7_MON_SET_CNTFRQ_INDEX	0x109
-> +
->  /* Secure PPA(Primary Protected Application) APIs */
->  #define OMAP4_PPA_L2_POR_INDEX		0x23
->  #define OMAP4_PPA_CPU_ACTRL_SMP_INDEX	0x25
-> diff --git a/arch/arm/mach-omap2/omap-smp.c b/arch/arm/mach-omap2/omap-smp.c
-> index 8708b2a..5a3c8d3 100644
-> --- a/arch/arm/mach-omap2/omap-smp.c
-> +++ b/arch/arm/mach-omap2/omap-smp.c
-> @@ -41,6 +41,8 @@
->  
->  u16 pm44xx_errata;
->  
-> +extern unsigned long arch_timer_freq;
-> +
->  /* SCU base address */
->  static void __iomem *scu_base;
->  
-> @@ -66,6 +68,13 @@ static void omap4_secondary_init(unsigned int cpu)
->  							4, 0, 0, 0, 0, 0);
->  
->  	/*
-> +	 * Configure the CNTFRQ register for the secondary cpu's which
-> +	 * indicates the frequency of the cpu local timers.
-> +	 */
-> +	if (soc_is_omap54xx() || soc_is_dra7xx())
-> +		omap_smc1(OMAP5_DRA7_MON_SET_CNTFRQ_INDEX, arch_timer_freq);
-> +
-> +	/*
->  	 * Synchronise with the boot thread.
->  	 */
->  	spin_lock(&boot_lock);
-> diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
-> index fa74a06..d0af9b2 100644
-> --- a/arch/arm/mach-omap2/timer.c
-> +++ b/arch/arm/mach-omap2/timer.c
-> @@ -55,6 +55,7 @@
->  #include "soc.h"
->  #include "common.h"
->  #include "powerdomain.h"
-> +#include "omap-secure.h"
->  
->  #define REALTIME_COUNTER_BASE				0x48243200
->  #define INCREMENTER_NUMERATOR_OFFSET			0x10
-> @@ -65,6 +66,7 @@
->  
->  static struct omap_dm_timer clkev;
->  static struct clock_event_device clockevent_gpt;
-> +unsigned long arch_timer_freq;
->  
->  static irqreturn_t omap2_gp_timer_interrupt(int irq, void *dev_id)
->  {
-> @@ -542,6 +544,9 @@ static void __init realtime_counter_init(void)
->  	reg |= den;
->  	__raw_writel(reg, base + INCREMENTER_DENUMERATOR_RELOAD_OFFSET);
->  
-> +	arch_timer_freq = (rate / den) * num;
-> +	omap_smc1(OMAP5_DRA7_MON_SET_CNTFRQ_INDEX, arch_timer_freq);
-> +
->  	iounmap(base);
->  }
->  #else
- Are you planning to pull this patch and the below $subject patch as well? They are
- acked and tested.
+On Thu, 3 Oct 2013 10:41:07 +0100, Matthew Minter wrote:
 
- ARM: DRA7: realtime_counter: Add ratio registers for 20MHZ sys-clk frequency
+> It seems the latest build of "for-next" from
+> git://git.infradead.org/linux-mvebu.git works the charm.
+> For reference I have a version of uBoot that came with the board, I am
+> reluctant to reflash it as I would then have no way of recovering and
+> it has not seemed to cause any issues anyway. (the only drawback is
+> that it seems to prefer to appended dtb image and not explicit
+> passing).
 
-  http://www.spinics.net/lists/linux-omap/msg97281.html
+Don't worry: there is a way of recovering, through the UART, using the
+kwboot tool that Sebastian and I have added to the Barebox sources.
+Sebastian and I have already been able to run Barebox (a different
+bootloader) on Armada 370 and Armada XP platforms, though the support
+is limited to the serial port for the moment, so it's quite useless for
+any practical usage.
 
- 
-Regards,
- Sricharan
+As of today, there is no Armada 370/XP support in the mainline U-Boot,
+and Marvell has not yet released an U-Boot version that has Device Tree
+support, so we're stuck with appended DTB for now. However, Marvell is
+working on a DT-capable version of their U-Boot, which should arrive at
+some point in the future.
+
+> The version is as follows but is likely not useful as it seems to be a
+> build customised for the hardware, it does support uImages and the new
+> format however:
+> 
+> U-Boot 2011.12-00036-g664db9a-dirty (Oct 16 2012 - 14:12:23) Marvell
+> version: 2012_Q4.1
+
+It is useful for us, as we can compare it to the U-Boot version we're
+using, and we also have the possibility of upgrading our U-Boot to a
+different version if needed.
+
+> I am still working through some small driver issues (trying to mount
+> various SSDs) but the early boot failure is resolved with those
+> patches and the default configuration (plus early printk).
+
+Great. Regarding SSDs, we successfully tested the SATA support on
+Armada XP GP with hard drives, and the SATA support was also
+successfully tested on OpenBlocks AX3-4 (which has an Armada XP) using
+a SSD.
+
+> Thank you all so much for the help, I think this board is now working
+> fine but will report any other issues I come across later.
+
+Sure!
+
+As soon as the relevant fixes of mvebu/for-next hit mainline, you'll be
+able to switch back to using the mainline kernel. Note that you can
+also use 3.11 for the moment, which should also work on this platform.
+
+Thanks!
+
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
