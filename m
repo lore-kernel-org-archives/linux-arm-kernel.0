@@ -1,55 +1,100 @@
-From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
-Date: Thu, 3 Oct 2013 16:10:21 +0200
-Subject: socfpga-next
-In-Reply-To: <1380807118.30559.3.camel@linux-builds1>
-References: <20131003130240.GS9632@pengutronix.de>
- <1380807118.30559.3.camel@linux-builds1>
-Message-ID: <20131003141021.GA14042@pengutronix.de>
+From: bcousson@baylibre.com (Benoit Cousson)
+Date: Thu, 03 Oct 2013 16:25:03 +0200
+Subject: [PATCH v3 05/10] ARM: dts: omap3-beagle: Use reset-gpios for
+ hsusb2_reset
+In-Reply-To: <524D780C.1090708@ti.com>
+References: <1380012836-29900-1-git-send-email-rogerq@ti.com>
+ <1380012836-29900-6-git-send-email-rogerq@ti.com> <524D483D.9040907@ti.com>
+ <524D5D88.9020308@baylibre.com> <524D74A5.7010604@baylibre.com>
+ <524D780C.1090708@ti.com>
+Message-ID: <524D7E3F.6010609@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dinh,
+On 03/10/2013 15:58, Roger Quadros wrote:
+> Hi Benoit,
+>
+> On 10/03/2013 04:44 PM, Benoit Cousson wrote:
+>> On 03/10/2013 14:05, Benoit Cousson wrote:
+>>> Hi Roger,
+>>>
+>>> Yes, I will. I've been waiting for these ones for so long :-)
+>>
+>> In fact it does not apply correctly on my for_3.13/dts branch :-(
+>>
+>> error: arch/arm/boot/dts/omap3-beagle.dts: patch does not apply
+>> Patch failed at 0004 ARM: dts: omap3-beagle: Make USB host pin naming consistent
+>>
+>> Could you rebase it?
+>
+> Looks like it was already applied before. Could you please skip that and use the rest?
+> I've checked that the remaining patches apply fine on top of your for_3.13/dts
+> branch.
 
-On Thu, Oct 03, 2013 at 08:31:58AM -0500, Dinh Nguyen wrote:
-> Hi Robert,
-> 
-> On Thu, 2013-10-03 at 15:02 +0200, Robert Schwebel wrote:
-> > Hi Dinh,
-> > 
-> > On Wed, Oct 02, 2013 at 09:35:29AM +0200, Steffen Trumtrar wrote:
-> > > BTW: It seems there is no official maintainer(tree) for the socfpga dt stuff.
-> > > So, I rebased onto next-20130927.
-> > 
-> > It would be great if you could establish some kind of socfpga-next tree,
-> > where we can see what you have already taken, and which could be put
-> > into linux-next.
-> > 
-> > What do you think?
-> 
-> Do you mean at kernel.org or just at any other place? I have a git repo
-> that I'm managing with commits that are sent out for review or have
-> Acks.
-> 
-> git://git.rocketboards.org/linux-socfpga-next.git
-> 
-> next-dt : DTS updates
+Indeed, it was already there :-)
 
-It seems I overlooked this branch, last time I checked your repo...
+Sorry for the noise.
 
-> for-next : latest from Linus + patches(being reviewed)
-> 
+Benoit
 
-...this was the only one I have seen.
-Do you also collect the DTS(I) patches? If so, you should add that to the
-MAINTAINERS file. I think, it might be a good idea to collect that stuff
-in one place, because *.dts files really love to produce merge conflicts.
-No need to bother the ARM or OF maintainers with that.
-
-Regards,
-Steffen
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+>
+> cheers,
+> -roger
+>
+>>>
+>>> On 03/10/2013 12:34, Roger Quadros wrote:
+>>>> Hi Benoit,
+>>>>
+>>>> Could you please take the device tree related patches [5 to 10] in
+>>>> this series?
+>>>> Thanks.
+>>>>
+>>>> cheers,
+>>>> -roger
+>>>>
+>>>> On 09/24/2013 11:53 AM, Roger Quadros wrote:
+>>>>> We no longer need to model the RESET line as a regulator since
+>>>>> the USB phy-nop driver accepts "reset-gpios" property.
+>>>>>
+>>>>> Signed-off-by: Roger Quadros <rogerq@ti.com>
+>>>>> ---
+>>>>>    arch/arm/boot/dts/omap3-beagle.dts |   13 +------------
+>>>>>    1 files changed, 1 insertions(+), 12 deletions(-)
+>>>>>
+>>>>> diff --git a/arch/arm/boot/dts/omap3-beagle.dts
+>>>>> b/arch/arm/boot/dts/omap3-beagle.dts
+>>>>> index dfd8310..71bde47 100644
+>>>>> --- a/arch/arm/boot/dts/omap3-beagle.dts
+>>>>> +++ b/arch/arm/boot/dts/omap3-beagle.dts
+>>>>> @@ -44,17 +44,6 @@
+>>>>>            };
+>>>>>        };
+>>>>>
+>>>>> -    /* HS USB Port 2 RESET */
+>>>>> -    hsusb2_reset: hsusb2_reset_reg {
+>>>>> -        compatible = "regulator-fixed";
+>>>>> -        regulator-name = "hsusb2_reset";
+>>>>> -        regulator-min-microvolt = <3300000>;
+>>>>> -        regulator-max-microvolt = <3300000>;
+>>>>> -        gpio = <&gpio5 19 0>;    /* gpio_147 */
+>>>>> -        startup-delay-us = <70000>;
+>>>>> -        enable-active-high;
+>>>>> -    };
+>>>>> -
+>>>>>        /* HS USB Port 2 Power */
+>>>>>        hsusb2_power: hsusb2_power_reg {
+>>>>>            compatible = "regulator-fixed";
+>>>>> @@ -68,7 +57,7 @@
+>>>>>        /* HS USB Host PHY on PORT 2 */
+>>>>>        hsusb2_phy: hsusb2_phy {
+>>>>>            compatible = "usb-nop-xceiv";
+>>>>> -        reset-supply = <&hsusb2_reset>;
+>>>>> +        reset-gpios = <&gpio5 19 GPIO_ACTIVE_LOW>;    /* gpio_147 */
+>>>>>            vcc-supply = <&hsusb2_power>;
+>>>>>        };
+>>>>>
+>>>>>
+>>>>
+>>>
+>>
+>
