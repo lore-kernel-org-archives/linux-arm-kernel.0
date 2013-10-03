@@ -1,34 +1,30 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Thu, 3 Oct 2013 11:13:05 +0200
-Subject: [PATCH] amba: Ensure drvdata is NULL
-In-Reply-To: <20131002202521.GU12758@n2100.arm.linux.org.uk>
-References: <1b2479137287fa8dfda3089ca0cb9fba8c4b1f1d.1380524337.git.michal.simek@xilinx.com>
- <20131002202521.GU12758@n2100.arm.linux.org.uk>
-Message-ID: <d5a0aab9-f023-4464-b4a1-f7055e6c82d5@CO9EHSMHS010.ehs.local>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Thu, 3 Oct 2013 12:16:36 +0300
+Subject: [PATCH v2 00/12] Introduce common infra for tegra clocks
+In-Reply-To: <524B08BD.2020902@wwwdotorg.org>
+References: <1379946381-20125-1-git-send-email-pdeschrijver@nvidia.com>
+ <524B08BD.2020902@wwwdotorg.org>
+Message-ID: <20131003091636.GJ3973@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/02/2013 10:25 PM, Russell King - ARM Linux wrote:
-> On Mon, Sep 30, 2013 at 08:59:06AM +0200, Michal Simek wrote:
->> This patch is inpired by the patch for drvdata
->> "device-core: Ensure drvdata = NULL when no driver is bound"
->> (sha1: 0998d0631001288a5974afc0b2a5f568bcdecb4d)
->>
->> Also it fixes all occurences in drivers.
->>
->> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
->> ---
->> This patch has been sent as RFC in this thread.
->> http://lkml.org/lkml/2013/9/4/393
+On Tue, Oct 01, 2013 at 07:39:09PM +0200, Stephen Warren wrote:
+> On 09/23/2013 08:24 AM, Peter De Schrijver wrote:
+> > This patchset introduces common infrastructure for clocks which exist in
+> > several Tegra SoCs. We also move Tegra114 to this new infrastructure.
+> > Tegra20 and Tegra30 will be moved later in separate patchsets.
+> > 
+> > Changes since v1:
+> > + move common clks allocation to patch 2
+> > + adapt also Tegra20 and Tegra30 to the changes in patch 2
+> > 
+> > Boottested on dalmore, beaverboard and seaboard.
 > 
-> Why not have the driver core do this?  Then it gets applied to all bus
-> types uniformly.
+> What commit is this series based on? I applied the two pre-requisites:
+> 
 
-ok - I have checked that path and it should be already done
-in really_probe function which calls amba_probe() and then driver probe function.
+9f186fbe58c749e2d4c0b334818705aa622fc76b Add linux-next specific files for 20130822
 
-It means that the patch should contain just "amba_set_drvdata(dev, NULL);"
-removal and not touching bus.c file.
+Cheers,
 
-Thanks,
-Michal
+Peter.
