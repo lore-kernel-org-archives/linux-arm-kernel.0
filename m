@@ -1,65 +1,38 @@
-From: bcm@fixthebug.org (Christian Daudt)
-Date: Wed, 2 Oct 2013 22:54:30 -0700
-Subject: [PATCH] ARM: DT: Add missing UARTs for bcm11351 (bcm281xx)
-In-Reply-To: <1379958597-8554-1-git-send-email-tim.kryger@linaro.org>
-References: <1379958597-8554-1-git-send-email-tim.kryger@linaro.org>
-Message-ID: <CAEPRUYrFvJjSUeA_opTTy5-fErfVFD19BOx3H4C_0R-N903Fvw@mail.gmail.com>
+From: arno@natisbad.org (Arnaud Ebalard)
+Date: Thu, 03 Oct 2013 07:54:43 +0200
+Subject: [PATCH,
+ FIX] ARM: mvebu: add missing DT Mbus ranges and relocate PCIe DT
+ nodes for RN102
+In-Reply-To: <CAOesGMjs=_USrFR9EkzksBj=7=1CgyujqvNhDZhpfdgkTt6gJQ@mail.gmail.com>
+ (Olof Johansson's message of "Wed, 2 Oct 2013 20:57:57 -0700")
+References: <87a9iuq7ff.fsf@natisbad.org>
+ <CAOesGMjs=_USrFR9EkzksBj=7=1CgyujqvNhDZhpfdgkTt6gJQ@mail.gmail.com>
+Message-ID: <87vc1eucf0.fsf@natisbad.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 23, 2013 at 10:49 AM, Tim Kryger <tim.kryger@linaro.org> wrote:
-> This adds in three more UARTs that were not declared earlier.
->
-> Signed-off-by: Tim Kryger <tim.kryger@linaro.org>
-> Reviewed-by: Markus Mayer <markus.mayer@linaro.org>
-> Reviewed-by: Matt Porter <matt.porter@linaro.org>
-> ---
->  arch/arm/boot/dts/bcm11351.dtsi | 30 ++++++++++++++++++++++++++++++
->  1 file changed, 30 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/bcm11351.dtsi b/arch/arm/boot/dts/bcm11351.dtsi
-> index 05a5aab..98e6bc0 100644
-> --- a/arch/arm/boot/dts/bcm11351.dtsi
-> +++ b/arch/arm/boot/dts/bcm11351.dtsi
-> @@ -49,6 +49,36 @@
->                 reg-io-width = <4>;
->         };
->
-> +       uart at 3e001000 {
-> +               compatible = "brcm,bcm11351-dw-apb-uart", "snps,dw-apb-uart";
-> +               status = "disabled";
-> +               reg = <0x3e001000 0x1000>;
-> +               clock-frequency = <13000000>;
-> +               interrupts = <GIC_SPI 66 IRQ_TYPE_LEVEL_HIGH>;
-> +               reg-shift = <2>;
-> +               reg-io-width = <4>;
-> +       };
-> +
-> +       uart at 3e002000 {
-> +               compatible = "brcm,bcm11351-dw-apb-uart", "snps,dw-apb-uart";
-> +               status = "disabled";
-> +               reg = <0x3e002000 0x1000>;
-> +               clock-frequency = <13000000>;
-> +               interrupts = <GIC_SPI 65 IRQ_TYPE_LEVEL_HIGH>;
-> +               reg-shift = <2>;
-> +               reg-io-width = <4>;
-> +       };
-> +
-> +       uart at 3e003000 {
-> +               compatible = "brcm,bcm11351-dw-apb-uart", "snps,dw-apb-uart";
-> +               status = "disabled";
-> +               reg = <0x3e003000 0x1000>;
-> +               clock-frequency = <13000000>;
-> +               interrupts = <GIC_SPI 64 IRQ_TYPE_LEVEL_HIGH>;
-> +               reg-shift = <2>;
-> +               reg-io-width = <4>;
-> +       };
-> +
->         L2: l2-cache {
->                 compatible = "brcm,bcm11351-a2-pl310-cache";
->                 reg = <0x3ff20000 0x1000>;
-Reviewed-by: Christian Daudt <bcm@fixthebug.org>
-Applied to armsoc/for-3.13/dt.
+Hi,
 
- thanks,
-   csd
+Olof Johansson <olof@lixom.net> writes:
+
+> Hi,
+>
+> On Mon, Sep 30, 2013 at 3:19 PM, Arnaud Ebalard <arno@natisbad.org> wrote:
+>>
+>> When 5e12a613 and 0cd3754a were introduced, Netgear ReadyNAS 102 .dts
+>> file was queued for inclusion and missed the update to have Mbus (and
+>> then BootROM) ranges properties declared. It also missed the relocation
+>> of Armada 370/XP PCIe DT nodes introduced by 14fd8ed0 after de1af8d4.
+>> This patch fixes that which makes 3.12-rc3 bootable on the NAS.
+>
+> In the future please don't just quote the SHAs, give the patch subject
+> as well. It makes it easier to follow the patch description without
+> looking them up (besides, there's a chance that the 8-character SHAs
+> will not be unique at some point in the future, which makes the lookup
+> harder).
+
+Dully noted. Will do it next time, olof.
+
+Cheers,
+
+a+
