@@ -1,33 +1,80 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 3 Oct 2013 08:21:53 +0100
-Subject: [PATCH v2] ARM: bcm: Add DEBUG_LL console support
-In-Reply-To: <1379462711-6957-1-git-send-email-csd@broadcom.com>
-References: <1379462711-6957-1-git-send-email-csd@broadcom.com>
-Message-ID: <20131003072153.GE12758@n2100.arm.linux.org.uk>
+From: slapdau@yahoo.com.au (Craig McGeachie)
+Date: Thu, 03 Oct 2013 20:30:55 +1300
+Subject: [RFC PATCH 2/3] Enable BCM2835 mailbox support
+In-Reply-To: <524BECCC.6030804@yahoo.com.au>
+References: <5232F7C2.3070408@yahoo.com.au> <524B8D7A.6080204@wwwdotorg.org>
+ <524BECCC.6030804@yahoo.com.au>
+Message-ID: <524D1D2F.3020303@yahoo.com.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 17, 2013 at 05:05:11PM -0700, Christian Daudt wrote:
-> @@ -980,6 +991,7 @@ config DEBUG_UART_PHYS
->  	default 0xffd82340 if ARCH_IOP13XX
->  	default 0xfff36000 if DEBUG_HIGHBANK_UART
->  	default 0xfffff700 if ARCH_IOP33X
-> +	default 0x3e000000 if DEBUG_BCM_KONA_UART
+On 10/02/2013 10:52 PM, Craig McGeachie wrote:
+> mailbox {
+>      compatible = "brcm,bcm2835-mbox";
+>      reg = <0x7e00b880 0x40>;
+>      interrupts = <0 1>;
+>      #address-cells = <1>;
+>      #size-cells = <0>;
+>      power at 0 {
+>          reg = <0>;
+>      };
+>      fb at 1 {
+>          reg = <1>;
+>      };
+>      vchiq at 1 {
+>          reg = <3>;
+>      };
+>      props_mbox: property at 8 {
+>          reg = <8>;
+>      };
+> };
+>
+> thermal {
+>      compatible = "brcm,bcm2835-thermal";
+>      brcm,channel = <&props_mbox>;
+> };
+>
 
-Please take a moment to think about this.
+It's occurred to me that this might not be the best motivating example. 
+  thermal has no register address and does not belong under soc really, 
+even if it sort of works.  It does make more sense for it to live under 
+mailbox, maybe.  DMA is the other example that might make more sense.
 
->  	depends on DEBUG_LL_UART_8250 || DEBUG_LL_UART_PL01X || \
->  		DEBUG_UART_8250 || DEBUG_UART_PL01X
->  
-> @@ -1035,6 +1047,7 @@ config DEBUG_UART_VIRT
->  	default 0xfef00003 if ARCH_IXP4XX && CPU_BIG_ENDIAN
->  	default 0xfefff700 if ARCH_IOP33X
->  	default 0xff003000 if DEBUG_U300_UART
-> +	default 0xfe300000 if DEBUG_BCM_KONA_UART
+mailbox {
+	compatible = "brcm,bcm2835-mbox";
+	reg = <0x7e00b880 0x40>;
+	interrupts = <0 1>;
+	#address-cells = <1>;
+	#size-cells = <0>;
+	power at 0 {
+		reg = <0>;
+	};
+	fb at 1 {
+		reg = <1>;
+	};
+	vchiq at 1 {
+		reg = <3>;
+	};
+	props_mbox: property at 8 {
+		reg = <8>;
+	};
+};
 
-And this.
+dma {
+	compatible = "brcm,bcm2835-dma";
+	reg = <0x7e007000 0x1000>;
+	channel = <&props_mbox>;
+	interrupts =
+		<1 16>, <1 17>, <1 18>, <1 19>, <1 20>, <1 21>,
+		<1 22>, <1 23>, <1 24>, <1 25>, <1 26>, <1 27>,
+		<1 28>;
+	/* Maybe some other stuff. */
+};
 
-In particular, study the list which you are adding to and see whether
-you can spot what you're doing wrong.
+/* And thermal somewhere else, I don't know where. */
 
-Thanks.
+Access to the properties mailbox channel enables getting a bit mask of 
+DMA channels that the ARM core is permitted to use.
+
+Cheers,
+Craig.
