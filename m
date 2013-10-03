@@ -1,156 +1,412 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu,  3 Oct 2013 18:03:38 +0200
-Subject: [PATCH 4/6] ARM: integrator: decommission the <mach/irqs.h> header
-Message-ID: <1380816218-3168-1-git-send-email-linus.walleij@linaro.org>
+Date: Thu,  3 Oct 2013 18:03:48 +0200
+Subject: [PATCH 5/6] ARM: integrator: move CM base into device tree
+Message-ID: <1380816228-3209-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This header is no longer needed when we boot from the device tree.
+This moves the core module (CM) control base into the device
+tree. It is a simple memory range of 0x200 bytes. Move the
+cm header down into the machine directory and unexport the
+cm_control() symbol as no modules are using it.
 
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm/mach-integrator/core.c              |  1 -
- arch/arm/mach-integrator/include/mach/irqs.h | 81 ----------------------------
- arch/arm/mach-integrator/integrator_ap.c     |  1 -
- arch/arm/mach-integrator/integrator_cp.c     |  1 -
- arch/arm/mach-integrator/pci_v3.c            |  1 -
- 5 files changed, 85 deletions(-)
- delete mode 100644 arch/arm/mach-integrator/include/mach/irqs.h
+ Documentation/devicetree/bindings/arm/arm-boards |  17 +++-
+ arch/arm/boot/dts/integrator.dtsi                |   5 +
+ arch/arm/mach-integrator/cm.h                    |  40 ++++++++
+ arch/arm/mach-integrator/core.c                  | 120 +++++++++++++++--------
+ arch/arm/mach-integrator/include/mach/cm.h       |  38 -------
+ arch/arm/mach-integrator/integrator_ap.c         |   6 +-
+ arch/arm/mach-integrator/integrator_cp.c         |   3 +-
+ arch/arm/mach-integrator/leds.c                  |   3 +-
+ 8 files changed, 142 insertions(+), 90 deletions(-)
+ create mode 100644 arch/arm/mach-integrator/cm.h
+ delete mode 100644 arch/arm/mach-integrator/include/mach/cm.h
 
+diff --git a/Documentation/devicetree/bindings/arm/arm-boards b/Documentation/devicetree/bindings/arm/arm-boards
+index 06e5370..1a2a81d 100644
+--- a/Documentation/devicetree/bindings/arm/arm-boards
++++ b/Documentation/devicetree/bindings/arm/arm-boards
+@@ -10,11 +10,15 @@ Required properties (in root node):
+ FPGA type interrupt controllers, see the versatile-fpga-irq binding doc.
+ 
+ Required nodes:
++- core-module: the root node to the Integrator platforms must have
++  a core-module with regs and the compatible-string
++  "arm,core-module-integrator"
++- cpcon/syscon: the root node the Integrator/CP must have a /cpcon
++  node pointing to the CP control registers, and the Integrator/AP
++  must have a /syscon node pointing to the Integrator/AP system
++  controller. The AP syscon node must include the logical module
++  interrupts.
+ 
+-In the root node the Integrator/CP must have a /cpcon node pointing
+-to the CP control registers, and the Integrator/AP must have a
+-/syscon node pointing to the Integrator/AP system controller.
+-The AP syscon node must include the logical module interrupts,
+ example:
+ 
+ /dts-v1/;
+@@ -24,6 +28,11 @@ example:
+ 	model = "ARM Integrator/AP";
+ 	compatible = "arm,integrator-ap";
+ 
++	core-module at 10000000 {
++		compatible = "arm,core-module-integrator";
++		reg = <0x10000000 0x200>;
++	};
++
+ 	syscon {
+ 		/* AP system controller registers */
+ 		reg = <0x11000000 0x100>;
+diff --git a/arch/arm/boot/dts/integrator.dtsi b/arch/arm/boot/dts/integrator.dtsi
+index 813b91d..0f06f86 100644
+--- a/arch/arm/boot/dts/integrator.dtsi
++++ b/arch/arm/boot/dts/integrator.dtsi
+@@ -5,6 +5,11 @@
+ /include/ "skeleton.dtsi"
+ 
+ / {
++	core-module at 10000000 {
++		compatible = "arm,core-module-integrator";
++		reg = <0x10000000 0x200>;
++	};
++
+ 	timer at 13000000 {
+ 		reg = <0x13000000 0x100>;
+ 		interrupt-parent = <&pic>;
+diff --git a/arch/arm/mach-integrator/cm.h b/arch/arm/mach-integrator/cm.h
+new file mode 100644
+index 0000000..2ba8be0
+--- /dev/null
++++ b/arch/arm/mach-integrator/cm.h
+@@ -0,0 +1,40 @@
++/*
++ * update the core module control register.
++ */
++void cm_control(u32, u32);
++
++struct device_node;
++void cm_init(void);
++void cm_clear_irqs(void);
++
++#define CM_CTRL_LED			(1 << 0)
++#define CM_CTRL_nMBDET			(1 << 1)
++#define CM_CTRL_REMAP			(1 << 2)
++#define CM_CTRL_RESET			(1 << 3)
++
++/*
++ * Integrator/AP,PP2 specific
++ */
++#define CM_CTRL_HIGHVECTORS		(1 << 4)
++#define CM_CTRL_BIGENDIAN		(1 << 5)
++#define CM_CTRL_FASTBUS			(1 << 6)
++#define CM_CTRL_SYNC			(1 << 7)
++
++/*
++ * ARM926/946/966 Integrator/CP specific
++ */
++#define CM_CTRL_LCDBIASEN		(1 << 8)
++#define CM_CTRL_LCDBIASUP		(1 << 9)
++#define CM_CTRL_LCDBIASDN		(1 << 10)
++#define CM_CTRL_LCDMUXSEL_MASK		(7 << 11)
++#define CM_CTRL_LCDMUXSEL_GENLCD	(1 << 11)
++#define CM_CTRL_LCDMUXSEL_VGA565_TFT555	(2 << 11)
++#define CM_CTRL_LCDMUXSEL_SHARPLCD	(3 << 11)
++#define CM_CTRL_LCDMUXSEL_VGA555_TFT555	(4 << 11)
++#define CM_CTRL_LCDEN0			(1 << 14)
++#define CM_CTRL_LCDEN1			(1 << 15)
++#define CM_CTRL_STATIC1			(1 << 16)
++#define CM_CTRL_STATIC2			(1 << 17)
++#define CM_CTRL_STATIC			(1 << 18)
++#define CM_CTRL_n24BITEN		(1 << 19)
++#define CM_CTRL_EBIWP			(1 << 20)
 diff --git a/arch/arm/mach-integrator/core.c b/arch/arm/mach-integrator/core.c
-index c4f984d..e31483a 100644
+index e31483a..28bb033 100644
 --- a/arch/arm/mach-integrator/core.c
 +++ b/arch/arm/mach-integrator/core.c
-@@ -26,7 +26,6 @@
+@@ -22,18 +22,21 @@
+ #include <linux/amba/serial.h>
+ #include <linux/io.h>
+ #include <linux/stat.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
+ 
  #include <mach/hardware.h>
  #include <mach/platform.h>
- #include <mach/cm.h>
--#include <mach/irqs.h>
+-#include <mach/cm.h>
  
  #include <asm/mach-types.h>
  #include <asm/mach/time.h>
-diff --git a/arch/arm/mach-integrator/include/mach/irqs.h b/arch/arm/mach-integrator/include/mach/irqs.h
+ #include <asm/pgtable.h>
+ 
++#include "cm.h"
+ #include "common.h"
+ 
+ static DEFINE_RAW_SPINLOCK(cm_lock);
++static void __iomem *cm_base;
+ 
+ /**
+  * cm_control - update the CM_CTRL register.
+@@ -46,12 +49,80 @@ void cm_control(u32 mask, u32 set)
+ 	u32 val;
+ 
+ 	raw_spin_lock_irqsave(&cm_lock, flags);
+-	val = readl(CM_CTRL) & ~mask;
+-	writel(val | set, CM_CTRL);
++	val = readl(cm_base + INTEGRATOR_HDR_CTRL_OFFSET) & ~mask;
++	writel(val | set, cm_base + INTEGRATOR_HDR_CTRL_OFFSET);
+ 	raw_spin_unlock_irqrestore(&cm_lock, flags);
+ }
+ 
+-EXPORT_SYMBOL(cm_control);
++static const char *integrator_arch_str(u32 id)
++{
++	switch ((id >> 16) & 0xff) {
++	case 0x00:
++		return "ASB little-endian";
++	case 0x01:
++		return "AHB little-endian";
++	case 0x03:
++		return "AHB-Lite system bus, bi-endian";
++	case 0x04:
++		return "AHB";
++	case 0x08:
++		return "AHB system bus, ASB processor bus";
++	default:
++		return "Unknown";
++	}
++}
++
++static const char *integrator_fpga_str(u32 id)
++{
++	switch ((id >> 12) & 0xf) {
++	case 0x01:
++		return "XC4062";
++	case 0x02:
++		return "XC4085";
++	case 0x03:
++		return "XVC600";
++	case 0x04:
++		return "EPM7256AE (Altera PLD)";
++	default:
++		return "Unknown";
++	}
++}
++
++void cm_clear_irqs(void)
++{
++	/* disable core module IRQs */
++	writel(0xffffffffU, cm_base + INTEGRATOR_HDR_IC_OFFSET +
++		IRQ_ENABLE_CLEAR);
++}
++
++static const struct of_device_id cm_match[] = {
++	{ .compatible = "arm,core-module-integrator"},
++	{ },
++};
++
++void cm_init(void)
++{
++	struct device_node *cm = of_find_matching_node(NULL, cm_match);
++	u32 val;
++
++	if (!cm) {
++		pr_crit("no core module node found in device tree\n");
++		return;
++	}
++	cm_base = of_iomap(cm, 0);
++	if (!cm_base) {
++		pr_crit("could not remap core module\n");
++		return;
++	}
++	cm_clear_irqs();
++	val = readl(cm_base + INTEGRATOR_HDR_ID_OFFSET);
++	pr_info("Detected ARM core module:\n");
++	pr_info("    Manufacturer: %02x\n", (val >> 24));
++	pr_info("    Architecture: %s\n", integrator_arch_str(val));
++	pr_info("    FPGA: %s\n", integrator_fpga_str(val));
++	pr_info("    Build: %02x\n", (val >> 4) & 0xFF);
++	pr_info("    Rev: %c\n", ('A' + (val & 0x03)));
++}
+ 
+ /*
+  * We need to stop things allocating the low memory; ideally we need a
+@@ -87,27 +158,7 @@ static ssize_t intcp_get_arch(struct device *dev,
+ 			      struct device_attribute *attr,
+ 			      char *buf)
+ {
+-	const char *arch;
+-
+-	switch ((integrator_id >> 16) & 0xff) {
+-	case 0x00:
+-		arch = "ASB little-endian";
+-		break;
+-	case 0x01:
+-		arch = "AHB little-endian";
+-		break;
+-	case 0x03:
+-		arch = "AHB-Lite system bus, bi-endian";
+-		break;
+-	case 0x04:
+-		arch = "AHB";
+-		break;
+-	default:
+-		arch = "Unknown";
+-		break;
+-	}
+-
+-	return sprintf(buf, "%s\n", arch);
++	return sprintf(buf, "%s\n", integrator_arch_str(integrator_id));
+ }
+ 
+ static struct device_attribute intcp_arch_attr =
+@@ -117,24 +168,7 @@ static ssize_t intcp_get_fpga(struct device *dev,
+ 			      struct device_attribute *attr,
+ 			      char *buf)
+ {
+-	const char *fpga;
+-
+-	switch ((integrator_id >> 12) & 0xf) {
+-	case 0x01:
+-		fpga = "XC4062";
+-		break;
+-	case 0x02:
+-		fpga = "XC4085";
+-		break;
+-	case 0x04:
+-		fpga = "EPM7256AE (Altera PLD)";
+-		break;
+-	default:
+-		fpga = "Unknown";
+-		break;
+-	}
+-
+-	return sprintf(buf, "%s\n", fpga);
++	return sprintf(buf, "%s\n", integrator_fpga_str(integrator_id));
+ }
+ 
+ static struct device_attribute intcp_fpga_attr =
+diff --git a/arch/arm/mach-integrator/include/mach/cm.h b/arch/arm/mach-integrator/include/mach/cm.h
 deleted file mode 100644
-index eff0ada..0000000
---- a/arch/arm/mach-integrator/include/mach/irqs.h
+index 202e6a5..0000000
+--- a/arch/arm/mach-integrator/include/mach/cm.h
 +++ /dev/null
-@@ -1,81 +0,0 @@
+@@ -1,38 +0,0 @@
 -/*
-- *  arch/arm/mach-integrator/include/mach/irqs.h
-- *
-- *  Copyright (C) 1999 ARM Limited
-- *  Copyright (C) 2000 Deep Blue Solutions Ltd.
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; either version 2 of the License, or
-- * (at your option) any later version.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- *
-- * You should have received a copy of the GNU General Public License
-- * along with this program; if not, write to the Free Software
-- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+- * update the core module control register.
 - */
+-void cm_control(u32, u32);
+-
+-#define CM_CTRL	__io_address(INTEGRATOR_HDR_CTRL)
+-
+-#define CM_CTRL_LED			(1 << 0)
+-#define CM_CTRL_nMBDET			(1 << 1)
+-#define CM_CTRL_REMAP			(1 << 2)
+-#define CM_CTRL_RESET			(1 << 3)
 -
 -/*
-- * Interrupt numbers, all of the above are just static reservations
-- * used so they can be encoded into device resources. They will finally
-- * be done away with when switching to device tree.
+- * Integrator/AP,PP2 specific
 - */
--#define IRQ_PIC_START			64
--#define IRQ_SOFTINT			(IRQ_PIC_START+0)
--#define IRQ_UARTINT0			(IRQ_PIC_START+1)
--#define IRQ_UARTINT1			(IRQ_PIC_START+2)
--#define IRQ_KMIINT0			(IRQ_PIC_START+3)
--#define IRQ_KMIINT1			(IRQ_PIC_START+4)
--#define IRQ_TIMERINT0			(IRQ_PIC_START+5)
--#define IRQ_TIMERINT1			(IRQ_PIC_START+6)
--#define IRQ_TIMERINT2			(IRQ_PIC_START+7)
--#define IRQ_RTCINT			(IRQ_PIC_START+8)
--#define IRQ_AP_EXPINT0			(IRQ_PIC_START+9)
--#define IRQ_AP_EXPINT1			(IRQ_PIC_START+10)
--#define IRQ_AP_EXPINT2			(IRQ_PIC_START+11)
--#define IRQ_AP_EXPINT3			(IRQ_PIC_START+12)
--#define IRQ_AP_PCIINT0			(IRQ_PIC_START+13)
--#define IRQ_AP_PCIINT1			(IRQ_PIC_START+14)
--#define IRQ_AP_PCIINT2			(IRQ_PIC_START+15)
--#define IRQ_AP_PCIINT3			(IRQ_PIC_START+16)
--#define IRQ_AP_V3INT			(IRQ_PIC_START+17)
--#define IRQ_AP_CPINT0			(IRQ_PIC_START+18)
--#define IRQ_AP_CPINT1			(IRQ_PIC_START+19)
--#define IRQ_AP_LBUSTIMEOUT 		(IRQ_PIC_START+20)
--#define IRQ_AP_APCINT			(IRQ_PIC_START+21)
--#define IRQ_CP_CLCDCINT			(IRQ_PIC_START+22)
--#define IRQ_CP_MMCIINT0			(IRQ_PIC_START+23)
--#define IRQ_CP_MMCIINT1			(IRQ_PIC_START+24)
--#define IRQ_CP_AACIINT			(IRQ_PIC_START+25)
--#define IRQ_CP_CPPLDINT			(IRQ_PIC_START+26)
--#define IRQ_CP_ETHINT			(IRQ_PIC_START+27)
--#define IRQ_CP_TSPENINT			(IRQ_PIC_START+28)
--#define IRQ_PIC_END			(IRQ_PIC_START+28)
--
--#define IRQ_CIC_START			(IRQ_PIC_END+1)
--#define IRQ_CM_SOFTINT			(IRQ_CIC_START+0)
--#define IRQ_CM_COMMRX			(IRQ_CIC_START+1)
--#define IRQ_CM_COMMTX			(IRQ_CIC_START+2)
--#define IRQ_CIC_END			(IRQ_CIC_START+2)
+-#define CM_CTRL_HIGHVECTORS		(1 << 4)
+-#define CM_CTRL_BIGENDIAN		(1 << 5)
+-#define CM_CTRL_FASTBUS			(1 << 6)
+-#define CM_CTRL_SYNC			(1 << 7)
 -
 -/*
-- * IntegratorCP only
+- * ARM926/946/966 Integrator/CP specific
 - */
--#define IRQ_SIC_START			(IRQ_CIC_END+1)
--#define IRQ_SIC_CP_SOFTINT		(IRQ_SIC_START+0)
--#define IRQ_SIC_CP_RI0			(IRQ_SIC_START+1)
--#define IRQ_SIC_CP_RI1			(IRQ_SIC_START+2)
--#define IRQ_SIC_CP_CARDIN		(IRQ_SIC_START+3)
--#define IRQ_SIC_CP_LMINT0		(IRQ_SIC_START+4)
--#define IRQ_SIC_CP_LMINT1		(IRQ_SIC_START+5)
--#define IRQ_SIC_CP_LMINT2		(IRQ_SIC_START+6)
--#define IRQ_SIC_CP_LMINT3		(IRQ_SIC_START+7)
--#define IRQ_SIC_CP_LMINT4		(IRQ_SIC_START+8)
--#define IRQ_SIC_CP_LMINT5		(IRQ_SIC_START+9)
--#define IRQ_SIC_CP_LMINT6		(IRQ_SIC_START+10)
--#define IRQ_SIC_CP_LMINT7		(IRQ_SIC_START+11)
--#define IRQ_SIC_END			(IRQ_SIC_START+11)
+-#define CM_CTRL_LCDBIASEN		(1 << 8)
+-#define CM_CTRL_LCDBIASUP		(1 << 9)
+-#define CM_CTRL_LCDBIASDN		(1 << 10)
+-#define CM_CTRL_LCDMUXSEL_MASK		(7 << 11)
+-#define CM_CTRL_LCDMUXSEL_GENLCD	(1 << 11)
+-#define CM_CTRL_LCDMUXSEL_VGA565_TFT555	(2 << 11)
+-#define CM_CTRL_LCDMUXSEL_SHARPLCD	(3 << 11)
+-#define CM_CTRL_LCDMUXSEL_VGA555_TFT555	(4 << 11)
+-#define CM_CTRL_LCDEN0			(1 << 14)
+-#define CM_CTRL_LCDEN1			(1 << 15)
+-#define CM_CTRL_STATIC1			(1 << 16)
+-#define CM_CTRL_STATIC2			(1 << 17)
+-#define CM_CTRL_STATIC			(1 << 18)
+-#define CM_CTRL_n24BITEN		(1 << 19)
+-#define CM_CTRL_EBIWP			(1 << 20)
 diff --git a/arch/arm/mach-integrator/integrator_ap.c b/arch/arm/mach-integrator/integrator_ap.c
-index 563f1c6..88a62a5 100644
+index 88a62a5..ece4755 100644
 --- a/arch/arm/mach-integrator/integrator_ap.c
 +++ b/arch/arm/mach-integrator/integrator_ap.c
-@@ -51,7 +51,6 @@
- #include <asm/mach-types.h>
+@@ -57,6 +57,7 @@
+ #include <asm/mach/map.h>
+ #include <asm/mach/time.h>
  
- #include <mach/lm.h>
--#include <mach/irqs.h>
++#include "cm.h"
+ #include "common.h"
+ #include "pci_v3.h"
  
- #include <asm/mach/arch.h>
- #include <asm/mach/irq.h>
+@@ -145,7 +146,7 @@ static int irq_suspend(void)
+ static void irq_resume(void)
+ {
+ 	/* disable all irq sources */
+-	writel(-1, VA_CMIC_BASE + IRQ_ENABLE_CLEAR);
++	cm_clear_irqs();
+ 	writel(-1, VA_IC_BASE + IRQ_ENABLE_CLEAR);
+ 	writel(-1, VA_IC_BASE + FIQ_ENABLE_CLEAR);
+ 
+@@ -447,8 +448,7 @@ static const struct of_device_id fpga_irq_of_match[] __initconst = {
+ 
+ static void __init ap_init_irq_of(void)
+ {
+-	/* disable core module IRQs */
+-	writel(0xffffffffU, VA_CMIC_BASE + IRQ_ENABLE_CLEAR);
++	cm_init();
+ 	of_irq_init(fpga_irq_of_match);
+ 	integrator_clk_init(false);
+ }
 diff --git a/arch/arm/mach-integrator/integrator_cp.c b/arch/arm/mach-integrator/integrator_cp.c
-index 871c25d..26b3441 100644
+index 26b3441..422c3f9 100644
 --- a/arch/arm/mach-integrator/integrator_cp.c
 +++ b/arch/arm/mach-integrator/integrator_cp.c
-@@ -38,7 +38,6 @@
+@@ -36,7 +36,6 @@
+ #include <asm/hardware/arm_timer.h>
+ #include <asm/hardware/icst.h>
  
- #include <mach/cm.h>
+-#include <mach/cm.h>
  #include <mach/lm.h>
--#include <mach/irqs.h>
  
  #include <asm/mach/arch.h>
- #include <asm/mach/irq.h>
-diff --git a/arch/arm/mach-integrator/pci_v3.c b/arch/arm/mach-integrator/pci_v3.c
-index 67406fc..ce8d0ca 100644
---- a/arch/arm/mach-integrator/pci_v3.c
-+++ b/arch/arm/mach-integrator/pci_v3.c
-@@ -36,7 +36,6 @@
+@@ -49,6 +48,7 @@
+ #include <plat/clcd.h>
+ #include <plat/sched_clock.h>
  
++#include "cm.h"
+ #include "common.h"
+ 
+ /* Base address to the CP controller */
+@@ -255,6 +255,7 @@ static const struct of_device_id fpga_irq_of_match[] __initconst = {
+ 
+ static void __init intcp_init_irq_of(void)
+ {
++	cm_init();
+ 	of_irq_init(fpga_irq_of_match);
+ 	integrator_clk_init(true);
+ }
+diff --git a/arch/arm/mach-integrator/leds.c b/arch/arm/mach-integrator/leds.c
+index 7a7f6d3..98fb74e 100644
+--- a/arch/arm/mach-integrator/leds.c
++++ b/arch/arm/mach-integrator/leds.c
+@@ -11,10 +11,11 @@
+ #include <linux/slab.h>
+ #include <linux/leds.h>
+ 
+-#include <mach/cm.h>
  #include <mach/hardware.h>
  #include <mach/platform.h>
--#include <mach/irqs.h>
  
- #include <asm/mach/map.h>
- #include <asm/signal.h>
++#include "cm.h"
++
+ #if defined(CONFIG_NEW_LEDS) && defined(CONFIG_LEDS_CLASS)
+ 
+ #define ALPHA_REG __io_address(INTEGRATOR_DBG_BASE)
 -- 
 1.8.3.1
