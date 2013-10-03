@@ -1,161 +1,378 @@
-From: seanpaul@chromium.org (Sean Paul)
-Date: Thu, 3 Oct 2013 11:02:34 -0400
-Subject: [PATCH 4/5] drm/exynos: Initialize ptn3460 if present
-In-Reply-To: <CAAQKjZPgtKf5UWZhHV-+Vv2c4uwuEUhZHV=r14es8eFC07PONg@mail.gmail.com>
-References: <1380670860-17621-1-git-send-email-seanpaul@chromium.org>
- <1380670860-17621-5-git-send-email-seanpaul@chromium.org>
- <CAAQKjZPgtKf5UWZhHV-+Vv2c4uwuEUhZHV=r14es8eFC07PONg@mail.gmail.com>
-Message-ID: <CAOw6vbJVH4ePsJ5cOT0KcsZDBdM+MtqgTwmvYiM0EAExSLWWhQ@mail.gmail.com>
+From: dinguyen@altera.com (Dinh Nguyen)
+Date: Thu, 3 Oct 2013 10:04:22 -0500
+Subject: [PATCH 3/4] ARM: socfpga: dts: cleanup indentation
+In-Reply-To: <1380699333-558-4-git-send-email-s.trumtrar@pengutronix.de>
+References: <1380699333-558-1-git-send-email-s.trumtrar@pengutronix.de>
+ <1380699333-558-4-git-send-email-s.trumtrar@pengutronix.de>
+Message-ID: <1380812662.7464.10.camel@linux-builds1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 3, 2013 at 10:43 AM, Inki Dae <inki.dae@samsung.com> wrote:
-> 2013/10/2 Sean Paul <seanpaul@chromium.org>:
->> This patch adds code to look for the ptn3460 in the device tree file on
->> exynos initialization. If ptn node is found, the driver will initialize
->> the ptn3460 driver and skip creating a DP connector (since the bridge
->> driver will register its own connector).
->>
->> Signed-off-by: Sean Paul <seanpaul@chromium.org>
->> ---
->>  drivers/gpu/drm/exynos/exynos_drm_core.c | 44 +++++++++++++++++++++++++++++++-
->>  1 file changed, 43 insertions(+), 1 deletion(-)
->>
->> diff --git a/drivers/gpu/drm/exynos/exynos_drm_core.c b/drivers/gpu/drm/exynos/exynos_drm_core.c
->> index 1bef6dc..9cf4476 100644
->> --- a/drivers/gpu/drm/exynos/exynos_drm_core.c
->> +++ b/drivers/gpu/drm/exynos/exynos_drm_core.c
->> @@ -12,7 +12,9 @@
->>   * option) any later version.
->>   */
->>
->> +#include <linux/of_i2c.h>
->>  #include <drm/drmP.h>
->> +#include <drm/bridge/ptn3460.h>
->>  #include "exynos_drm_drv.h"
->>  #include "exynos_drm_encoder.h"
->>  #include "exynos_drm_connector.h"
->> @@ -20,6 +22,40 @@
->>
->>  static LIST_HEAD(exynos_drm_subdrv_list);
->>
->> +struct bridge_init {
->> +       struct i2c_client *client;
->> +       struct device_node *node;
->> +};
->> +
->> +static bool find_bridge(const char *name, struct bridge_init *bridge)
->> +{
->> +       bridge->client = NULL;
->> +       bridge->node = of_find_node_by_name(NULL, name);
->
-> Not clear to me. Why do you try to handle device tree here, not real
-> device driver?. How about adding a output property to board specific
-> fimd dt node: i.e. output = <&ptn3460_bridge>?
+On Wed, 2013-10-02 at 09:35 +0200, Steffen Trumtrar wrote:
+> Some of the clock nodes and the rst-/sysmgr use wrong indentation.
+> Fix it.
+> 
+> Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+> ---
+>  arch/arm/boot/dts/socfpga.dtsi | 290 ++++++++++++++++++++---------------------
+>  1 file changed, 145 insertions(+), 145 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
+> index e273fa9..587096e 100644
+> --- a/arch/arm/boot/dts/socfpga.dtsi
+> +++ b/arch/arm/boot/dts/socfpga.dtsi
+> @@ -243,197 +243,197 @@
+>  						};
+>  					};
+>  
+> -				mpu_periph_clk: mpu_periph_clk {
+> -					#clock-cells = <0>;
+> -					compatible = "altr,socfpga-gate-clk";
+> -					clocks = <&mpuclk>;
+> -					fixed-divider = <4>;
+> +					mpu_periph_clk: mpu_periph_clk {
+> +						#clock-cells = <0>;
+> +						compatible = "altr,socfpga-gate-clk";
+> +						clocks = <&mpuclk>;
+> +						fixed-divider = <4>;
+>  					};
+>  
+> -				mpu_l2_ram_clk: mpu_l2_ram_clk {
+> -					#clock-cells = <0>;
+> -					compatible = "altr,socfpga-gate-clk";
+> -					clocks = <&mpuclk>;
+> -					fixed-divider = <2>;
+> +					mpu_l2_ram_clk: mpu_l2_ram_clk {
+> +						#clock-cells = <0>;
+> +						compatible = "altr,socfpga-gate-clk";
+> +						clocks = <&mpuclk>;
+> +						fixed-divider = <2>;
+>  					};
+>  
+> -				l4_main_clk: l4_main_clk {
+> -					#clock-cells = <0>;
+> -					compatible = "altr,socfpga-gate-clk";
+> -					clocks = <&mainclk>;
+> -					clk-gate = <0x60 0>;
+> +					l4_main_clk: l4_main_clk {
+> +						#clock-cells = <0>;
+> +						compatible = "altr,socfpga-gate-clk";
+> +						clocks = <&mainclk>;
+> +						clk-gate = <0x60 0>;
+>  					};
+>  
+> -				l3_main_clk: l3_main_clk {
+> -					#clock-cells = <0>;
+> -					compatible = "altr,socfpga-gate-clk";
+> -					clocks = <&mainclk>;
+> +					l3_main_clk: l3_main_clk {
+> +						#clock-cells = <0>;
+> +						compatible = "altr,socfpga-gate-clk";
+> +						clocks = <&mainclk>;
+>  					};
+>  
+> -				l3_mp_clk: l3_mp_clk {
+> -					#clock-cells = <0>;
+> -					compatible = "altr,socfpga-gate-clk";
+> -					clocks = <&mainclk>;
+> -					div-reg = <0x64 0 2>;
+> -					clk-gate = <0x60 1>;
+> +					l3_mp_clk: l3_mp_clk {
+> +						#clock-cells = <0>;
+> +						compatible = "altr,socfpga-gate-clk";
+> +						clocks = <&mainclk>;
+> +						div-reg = <0x64 0 2>;
+> +						clk-gate = <0x60 1>;
+>  					};
+>  
+> -				l3_sp_clk: l3_sp_clk {
+> -					#clock-cells = <0>;
+> -					compatible = "altr,socfpga-gate-clk";
+> -					clocks = <&mainclk>;
+> -					div-reg = <0x64 2 2>;
+> -				};
+> +					l3_sp_clk: l3_sp_clk {
+> +						#clock-cells = <0>;
+> +						compatible = "altr,socfpga-gate-clk";
+> +						clocks = <&mainclk>;
+> +						div-reg = <0x64 2 2>;
+> +					};
+>  
+> -				l4_mp_clk: l4_mp_clk {
+> -					#clock-cells = <0>;
+> -					compatible = "altr,socfpga-gate-clk";
+> -					clocks = <&mainclk>, <&per_base_clk>;
+> -					div-reg = <0x64 4 3>;
+> -					clk-gate = <0x60 2>;
+> +					l4_mp_clk: l4_mp_clk {
+> +						#clock-cells = <0>;
+> +						compatible = "altr,socfpga-gate-clk";
+> +						clocks = <&mainclk>, <&per_base_clk>;
+> +						div-reg = <0x64 4 3>;
+> +						clk-gate = <0x60 2>;
+>  					};
+>  
+> -				l4_sp_clk: l4_sp_clk {
+> -					#clock-cells = <0>;
+> -					compatible = "altr,socfpga-gate-clk";
+> -					clocks = <&mainclk>, <&per_base_clk>;
+> -					div-reg = <0x64 7 3>;
+> -					clk-gate = <0x60 3>;
+> +					l4_sp_clk: l4_sp_clk {
+> +						#clock-cells = <0>;
+> +						compatible = "altr,socfpga-gate-clk";
+> +						clocks = <&mainclk>, <&per_base_clk>;
+> +						div-reg = <0x64 7 3>;
+> +						clk-gate = <0x60 3>;
+>  					};
+>  
+> -				dbg_at_clk: dbg_at_clk {
+> -					#clock-cells = <0>;
+> -					compatible = "altr,socfpga-gate-clk";
+> -					clocks = <&dbg_base_clk>;
+> -					div-reg = <0x68 0 2>;
+> -					clk-gate = <0x60 4>;
+> +					dbg_at_clk: dbg_at_clk {
+> +						#clock-cells = <0>;
+> +						compatible = "altr,socfpga-gate-clk";
+> +						clocks = <&dbg_base_clk>;
+> +						div-reg = <0x68 0 2>;
+> +						clk-gate = <0x60 4>;
+>  					};
+>  
+> -				dbg_clk: dbg_clk {
+> -					#clock-cells = <0>;
+> -					compatible = "altr,socfpga-gate-clk";
+> -					clocks = <&dbg_base_clk>;
+> -					div-reg = <0x68 2 2>;
+> -					clk-gate = <0x60 5>;
+> +					dbg_clk: dbg_clk {
+> +						#clock-cells = <0>;
+> +						compatible = "altr,socfpga-gate-clk";
+> +						clocks = <&dbg_base_clk>;
+> +						div-reg = <0x68 2 2>;
+> +						clk-gate = <0x60 5>;
+>  					};
+>  
+> -				dbg_trace_clk: dbg_trace_clk {
+> -					#clock-cells = <0>;
+> -					compatible = "altr,socfpga-gate-clk";
+> -					clocks = <&dbg_base_clk>;
+> -					div-reg = <0x6C 0 3>;
+> -					clk-gate = <0x60 6>;
+> +					dbg_trace_clk: dbg_trace_clk {
+> +						#clock-cells = <0>;
+> +						compatible = "altr,socfpga-gate-clk";
+> +						clocks = <&dbg_base_clk>;
+> +						div-reg = <0x6C 0 3>;
+> +						clk-gate = <0x60 6>;
+>  					};
+>  
+> -				dbg_timer_clk: dbg_timer_clk {
+> -					#clock-cells = <0>;
+> -					compatible = "altr,socfpga-gate-clk";
+> -					clocks = <&dbg_base_clk>;
+> -					clk-gate = <0x60 7>;
+> +					dbg_timer_clk: dbg_timer_clk {
+> +						#clock-cells = <0>;
+> +						compatible = "altr,socfpga-gate-clk";
+> +						clocks = <&dbg_base_clk>;
+> +						clk-gate = <0x60 7>;
+>  					};
+>  
+> -				cfg_clk: cfg_clk {
+> -					#clock-cells = <0>;
+> -					compatible = "altr,socfpga-gate-clk";
+> -					clocks = <&cfg_s2f_usr0_clk>;
+> -					clk-gate = <0x60 8>;
+> +					cfg_clk: cfg_clk {
+> +						#clock-cells = <0>;
+> +						compatible = "altr,socfpga-gate-clk";
+> +						clocks = <&cfg_s2f_usr0_clk>;
+> +						clk-gate = <0x60 8>;
+>  					};
+>  
+> -				s2f_user0_clk: s2f_user0_clk {
+> -					#clock-cells = <0>;
+> -					compatible = "altr,socfpga-gate-clk";
+> -					clocks = <&cfg_s2f_usr0_clk>;
+> -					clk-gate = <0x60 9>;
+> +					s2f_user0_clk: s2f_user0_clk {
+> +						#clock-cells = <0>;
+> +						compatible = "altr,socfpga-gate-clk";
+> +						clocks = <&cfg_s2f_usr0_clk>;
+> +						clk-gate = <0x60 9>;
+>  					};
+>  
+> -				emac_0_clk: emac_0_clk {
+> -					#clock-cells = <0>;
+> -					compatible = "altr,socfpga-gate-clk";
+> -					clocks = <&emac0_clk>;
+> -					clk-gate = <0xa0 0>;
+> +					emac_0_clk: emac_0_clk {
+> +						#clock-cells = <0>;
+> +						compatible = "altr,socfpga-gate-clk";
+> +						clocks = <&emac0_clk>;
+> +						clk-gate = <0xa0 0>;
+>  					};
+>  
+> -				emac_1_clk: emac_1_clk {
+> -					#clock-cells = <0>;
+> -					compatible = "altr,socfpga-gate-clk";
+> -					clocks = <&emac1_clk>;
+> -					clk-gate = <0xa0 1>;
+> +					emac_1_clk: emac_1_clk {
+> +						#clock-cells = <0>;
+> +						compatible = "altr,socfpga-gate-clk";
+> +						clocks = <&emac1_clk>;
+> +						clk-gate = <0xa0 1>;
+>  					};
+>  
+> -				usb_mp_clk: usb_mp_clk {
+> -					#clock-cells = <0>;
+> -					compatible = "altr,socfpga-gate-clk";
+> -					clocks = <&per_base_clk>;
+> -					clk-gate = <0xa0 2>;
+> -					div-reg = <0xa4 0 3>;
+> +					usb_mp_clk: usb_mp_clk {
+> +						#clock-cells = <0>;
+> +						compatible = "altr,socfpga-gate-clk";
+> +						clocks = <&per_base_clk>;
+> +						clk-gate = <0xa0 2>;
+> +						div-reg = <0xa4 0 3>;
+>  					};
+>  
+> -				spi_m_clk: spi_m_clk {
+> -					#clock-cells = <0>;
+> -					compatible = "altr,socfpga-gate-clk";
+> -					clocks = <&per_base_clk>;
+> -					clk-gate = <0xa0 3>;
+> -					div-reg = <0xa4 3 3>;
+> +					spi_m_clk: spi_m_clk {
+> +						#clock-cells = <0>;
+> +						compatible = "altr,socfpga-gate-clk";
+> +						clocks = <&per_base_clk>;
+> +						clk-gate = <0xa0 3>;
+> +						div-reg = <0xa4 3 3>;
+>  					};
+>  
+> -				can0_clk: can0_clk {
+> -					#clock-cells = <0>;
+> -					compatible = "altr,socfpga-gate-clk";
+> -					clocks = <&per_base_clk>;
+> -					clk-gate = <0xa0 4>;
+> -					div-reg = <0xa4 6 3>;
+> +					can0_clk: can0_clk {
+> +						#clock-cells = <0>;
+> +						compatible = "altr,socfpga-gate-clk";
+> +						clocks = <&per_base_clk>;
+> +						clk-gate = <0xa0 4>;
+> +						div-reg = <0xa4 6 3>;
+>  					};
+>  
+> -				can1_clk: can1_clk {
+> -					#clock-cells = <0>;
+> -					compatible = "altr,socfpga-gate-clk";
+> -					clocks = <&per_base_clk>;
+> -					clk-gate = <0xa0 5>;
+> -					div-reg = <0xa4 9 3>;
+> +					can1_clk: can1_clk {
+> +						#clock-cells = <0>;
+> +						compatible = "altr,socfpga-gate-clk";
+> +						clocks = <&per_base_clk>;
+> +						clk-gate = <0xa0 5>;
+> +						div-reg = <0xa4 9 3>;
+>  					};
+>  
+> -				gpio_db_clk: gpio_db_clk {
+> -					#clock-cells = <0>;
+> -					compatible = "altr,socfpga-gate-clk";
+> -					clocks = <&per_base_clk>;
+> -					clk-gate = <0xa0 6>;
+> -					div-reg = <0xa8 0 24>;
+> +					gpio_db_clk: gpio_db_clk {
+> +						#clock-cells = <0>;
+> +						compatible = "altr,socfpga-gate-clk";
+> +						clocks = <&per_base_clk>;
+> +						clk-gate = <0xa0 6>;
+> +						div-reg = <0xa8 0 24>;
+>  					};
+>  
+> -				s2f_user1_clk: s2f_user1_clk {
+> -					#clock-cells = <0>;
+> -					compatible = "altr,socfpga-gate-clk";
+> -					clocks = <&s2f_usr1_clk>;
+> -					clk-gate = <0xa0 7>;
+> +					s2f_user1_clk: s2f_user1_clk {
+> +						#clock-cells = <0>;
+> +						compatible = "altr,socfpga-gate-clk";
+> +						clocks = <&s2f_usr1_clk>;
+> +						clk-gate = <0xa0 7>;
+>  					};
+>  
+> -				sdmmc_clk: sdmmc_clk {
+> -					#clock-cells = <0>;
+> -					compatible = "altr,socfpga-gate-clk";
+> -					clocks = <&f2s_periph_ref_clk>, <&main_nand_sdmmc_clk>, <&per_nand_mmc_clk>;
+> -					clk-gate = <0xa0 8>;
+> +					sdmmc_clk: sdmmc_clk {
+> +						#clock-cells = <0>;
+> +						compatible = "altr,socfpga-gate-clk";
+> +						clocks = <&f2s_periph_ref_clk>, <&main_nand_sdmmc_clk>, <&per_nand_mmc_clk>;
+> +						clk-gate = <0xa0 8>;
+>  					};
+>  
+> -				nand_x_clk: nand_x_clk {
+> -					#clock-cells = <0>;
+> -					compatible = "altr,socfpga-gate-clk";
+> -					clocks = <&f2s_periph_ref_clk>, <&main_nand_sdmmc_clk>, <&per_nand_mmc_clk>;
+> -					clk-gate = <0xa0 9>;
+> +					nand_x_clk: nand_x_clk {
+> +						#clock-cells = <0>;
+> +						compatible = "altr,socfpga-gate-clk";
+> +						clocks = <&f2s_periph_ref_clk>, <&main_nand_sdmmc_clk>, <&per_nand_mmc_clk>;
+> +						clk-gate = <0xa0 9>;
+>  					};
+>  
+> -				nand_clk: nand_clk {
+> -					#clock-cells = <0>;
+> -					compatible = "altr,socfpga-gate-clk";
+> -					clocks = <&f2s_periph_ref_clk>, <&main_nand_sdmmc_clk>, <&per_nand_mmc_clk>;
+> -					clk-gate = <0xa0 10>;
+> -					fixed-divider = <4>;
+> +					nand_clk: nand_clk {
+> +						#clock-cells = <0>;
+> +						compatible = "altr,socfpga-gate-clk";
+> +						clocks = <&f2s_periph_ref_clk>, <&main_nand_sdmmc_clk>, <&per_nand_mmc_clk>;
+> +						clk-gate = <0xa0 10>;
+> +						fixed-divider = <4>;
+>  					};
+>  
+> -				qspi_clk: qspi_clk {
+> -					#clock-cells = <0>;
+> -					compatible = "altr,socfpga-gate-clk";
+> -					clocks = <&f2s_periph_ref_clk>, <&main_qspi_clk>, <&per_qspi_clk>;
+> -					clk-gate = <0xa0 11>;
+> +					qspi_clk: qspi_clk {
+> +						#clock-cells = <0>;
+> +						compatible = "altr,socfpga-gate-clk";
+> +						clocks = <&f2s_periph_ref_clk>, <&main_qspi_clk>, <&per_qspi_clk>;
+> +						clk-gate = <0xa0 11>;
+>  					};
+>  				};
+>  			};
+> @@ -516,9 +516,9 @@
+>  		};
+>  
+>  		rstmgr at ffd05000 {
+> -				compatible = "altr,rst-mgr";
+> -				reg = <0xffd05000 0x1000>;
+> -			};
+> +			compatible = "altr,rst-mgr";
+> +			reg = <0xffd05000 0x1000>;
+> +		};
+>  
+>  		sysmgr at ffd08000 {
+>  				compatible = "altr,sys-mgr";
 
-The problem doing something like this is that we won't have a handle
-to drm_device if it's just a standalone driver, and so we won't be
-able to register the bridge or connector. We need this init call one
-way or another.
-
-
-> Actually, the output
-> device of fimd hw could be one of MIPI-DSI, eDP, mDNIe, LVDS bridge,
-> or LCD. And then, let's find ptn3460-bridge node in the fimd driver,
-> and initialize the ptn3460 bridge driver, and get power on or off
-> through  exynos_drm_display_ops of the fimd driver. And all these
-> codes could be hided from fimd driver by moving them into
-> exynos_drm_display_ops. Of course, for this, you would need additional
-> works. So let's do it if needed.
->
-> The below is the outline of device tree I recommend,
->
-> In board dts,
->        i2c at I2CD000 {
->              ptn3460_bridge: prn3460-bridge at 20 {
->                     ...
->              }
->         }
->
->         fimd at 11c00000 {
->              ...
->              output_dev = <&ptn3460_bridge>;
->         }
->
-> With this, I believe that you can do all things you want for
-> controlling the LVDS bridge in fimd driver.
->
-
-No, this isn't what I want to do. The bridge should not hang off fimd
-since it's a crtc. The bridge should only be initialized by the DP
-driver (it doesn't make sense to initialize ptn when you're using
-MIPI/LVDS/whatever).
-
-Since the actual crtc/encoder drivers are abstracted through
-exynos_drm_core/crtc/encoder, we need to initialize the ptn driver in
-the abstraction layers in order to hook it directly into drm.
-
-Sean
-
-
-> Thanks,
-> Inki Dae
->
->> +       if (!bridge->node)
->> +               return false;
->> +
->> +       bridge->client = of_find_i2c_device_by_node(bridge->node);
->> +       if (!bridge->client)
->> +               return false;
->> +
->> +       return true;
->> +}
->> +
->> +/* returns the number of bridges attached */
->> +static int exynos_drm_attach_lcd_bridge(struct drm_device *dev,
->> +               struct drm_encoder *encoder)
->> +{
->> +       struct bridge_init bridge;
->> +       int ret;
->> +
->> +       if (find_bridge("ptn3460-bridge", &bridge)) {
->> +               ret = ptn3460_init(dev, encoder, bridge.client, bridge.node);
->> +               if (!ret)
->> +                       return 1;
->> +       }
->> +       return 0;
->> +}
->> +
->>  static int exynos_drm_create_enc_conn(struct drm_device *dev,
->>                                         struct exynos_drm_subdrv *subdrv)
->>  {
->> @@ -36,6 +72,13 @@ static int exynos_drm_create_enc_conn(struct drm_device *dev,
->>                 DRM_ERROR("failed to create encoder\n");
->>                 return -EFAULT;
->>         }
->> +       subdrv->encoder = encoder;
->> +
->> +       if (subdrv->manager->display_ops->type == EXYNOS_DISPLAY_TYPE_LCD) {
->> +               ret = exynos_drm_attach_lcd_bridge(dev, encoder);
->> +               if (ret)
->> +                       return 0;
->> +       }
->>
->>         /*
->>          * create and initialize a connector for this sub driver and
->> @@ -48,7 +91,6 @@ static int exynos_drm_create_enc_conn(struct drm_device *dev,
->>                 goto err_destroy_encoder;
->>         }
->>
->> -       subdrv->encoder = encoder;
->>         subdrv->connector = connector;
->>
->>         return 0;
->> --
->> 1.8.4
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Acked-by: Dinh Nguyen <dinguyen@altera.com>
