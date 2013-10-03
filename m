@@ -1,70 +1,33 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 3 Oct 2013 13:33:52 -0700
-Subject: [PATCH 3/3] KVM: ARM: Transparent huge pages and hugetlbfs support
-In-Reply-To: <524013BB.4090303@arm.com>
-References: <1376021239-10532-1-git-send-email-christoffer.dall@linaro.org>
- <1376021239-10532-4-git-send-email-christoffer.dall@linaro.org>
- <524013BB.4090303@arm.com>
-Message-ID: <20131003203352.GE5108@cbox>
+Date: Thu,  3 Oct 2013 13:36:29 -0700
+Subject: [PATCH v2 0/2] KVM/ARM Huge pages support
+Message-ID: <1380832591-4789-1-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 23, 2013 at 11:11:07AM +0100, Marc Zyngier wrote:
+This small series adds support for Transparent Huge Pages and hugetlbfs
+pages for KVM on the arm and arm64 architectures.
 
-[...]
+Measurements have shown that using huge pages in for stage-2 mappings
+provides up to more than 15% performance increase for some workloads.
 
-> > 
-> > +static bool transparent_hugepage_adjust(pfn_t *pfnp, phys_addr_t *ipap)
-> > +{
-> > +       pfn_t pfn = *pfnp;
-> > +       gfn_t gfn = *ipap >> PAGE_SHIFT;
-> > +
-> > +       if (PageTransCompound(pfn_to_page(pfn))) {
-> > +               unsigned long mask;
-> > +               /*
-> > +                * mmu_notifier_retry was successful and we hold the
-> > +                * mmu_lock here, so the pmd can't become splitting
-> > +                * from under us, and in turn
-> > +                * __split_huge_page_refcount() can't run from under
-> > +                * us and we can safely transfer the refcount from
-> > +                * PG_tail to PG_head as we switch the pfn from tail to
-> > +                * head.
-> > +                */
-> 
-> -ECANTPARSE. Well, I sort of can, but this deserves a clearer explanation.
-> 
-> > +               mask = (PMD_SIZE / PAGE_SIZE) - 1;
-> 
-> 		mask = PTRS_PER_PMD -1;
-> 
-> > +               VM_BUG_ON((gfn & mask) != (pfn & mask));
-> > +               if (pfn & mask) {
-> > +                       gfn &= ~mask;
-> 
-> This doesn't seem to be used later on.
-> 
-> > +                       *ipap &= ~(PMD_SIZE - 1);
-> 
-> 			*ipap &= ~PMD_MASK;
-> 
-damn, I trust you too much, you surely meant
-			*ipap &= PMD_MASK;
+The patch series applies to kvm/next, but depends on the patch sent
+earlier:
+http://marc.info/?l=kvm&m=138074894126934&w=2
 
-right?
+The whole thing can also be cloned from here:
+git://git.linaro.org/people/cdall/linux-kvm-arm.git kvm-arm-hugepages-v2
 
-> > +                       kvm_release_pfn_clean(pfn);
-> > +                       pfn &= ~mask;
-> > +                       kvm_get_pfn(pfn);
-> > +                       *pfnp = pfn;
-> > +               }
-> 
-> 
-> 
-> > +               return true;
-> > +       }
-> > +
-> > +       return false;
-> > +}
-> > +
+See the patches for changelogs.
 
--Christoffer
+Christoffer Dall (2):
+  KVM: ARM: Support hugetlbfs backed huge pages
+  KVM: ARM: Transparent huge page (THP) support
+
+ arch/arm/include/asm/kvm_mmu.h   |   17 ++-
+ arch/arm/kvm/mmu.c               |  215 +++++++++++++++++++++++++++++++-------
+ arch/arm64/include/asm/kvm_mmu.h |   12 ++-
+ 3 files changed, 200 insertions(+), 44 deletions(-)
+
+-- 
+1.7.10.4
