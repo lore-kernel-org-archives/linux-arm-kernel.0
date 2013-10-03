@@ -1,71 +1,43 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Thu, 03 Oct 2013 16:51:33 +0200
-Subject: [PATCH 06/11] USB: OHCI: Properly handle ohci-exynos suspend
-In-Reply-To: <Pine.LNX.4.44L0.1310031027190.1287-100000@iolanthe.rowland.org>
-References: <Pine.LNX.4.44L0.1310031027190.1287-100000@iolanthe.rowland.org>
-Message-ID: <3261938.1oFX1DW7pe@amdc1032>
+From: rogerq@ti.com (Roger Quadros)
+Date: Thu, 3 Oct 2013 17:54:14 +0300
+Subject: [PATCH v7 09/10] usb: dwc3: omap: manage "usb_otg_ss_refclk960m"
+ clock
+In-Reply-To: <20131003122941.GD3230@radagast>
+References: <1379508542-22389-1-git-send-email-rogerq@ti.com>
+ <1379508542-22389-10-git-send-email-rogerq@ti.com> <52403E02.4070208@ti.com>
+ <20131002131113.GM1476@radagast> <524C22A1.30200@ti.com>
+ <20131003122941.GD3230@radagast>
+Message-ID: <524D8516.8000107@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, October 03, 2013 10:31:53 AM Alan Stern wrote:
-> On Thu, 3 Oct 2013, manju goudar wrote:
+On 10/03/2013 03:29 PM, Felipe Balbi wrote:
+> Hi,
 > 
-> > On Wed, Oct 2, 2013 at 9:22 PM, Alan Stern <stern@rowland.harvard.edu>wrote:
-> > 
-> > > On Wed, 2 Oct 2013, Bartlomiej Zolnierkiewicz wrote:
-> > >
-> > > >
-> > > > Hi,
-> > > >
-> > > > On Wednesday, October 02, 2013 10:38:58 AM Alan Stern wrote:
-> > > > > On Wed, 2 Oct 2013, Bartlomiej Zolnierkiewicz wrote:
-> > > > >
-> > > > > > Maybe it would make sense to cleanup ohci_suspend() first (before
-> > > adding
-> > > > > > new ohci_suspend() users) and remove unused do_wakeup parameter?
-> > > > >
-> > > > > Not possible.  The do_wakeup parameter is part of a function prototype
-> > > > > shared by other callback routines (such as ehci_suspend()) that _do_
-> > > > > use the parameter.
-> > > >
-> > > > If you mean ohci-pci.c usage (which is currently the only usage of
-> > > > ohci_suspend() looking at the latest -next kernel) than it is enough
-> > > > to add a simple wrapper for it in ohci-pci.c:
-> > > >
-> > > > ...
-> > > > static int ohci_pci_suspend(struct usb_hcd *hcd, bool do_wakeup)
-> > > > {
-> > > >       ohci_suspend(hcd);
-> > > > }
-> > > > ...
-> > > >     ohci_pci_hc_driver.pci_suspend = ohci_pci_suspend;
-> > > > ...
-> > >
-> > > Ah, now I see your point.  Yes, it's true; that parameter could be
-> > > eliminated.
-> > >
-> > > Manjunath, would you like to update your patch series to get rid of the
-> > > do_wakeup argument to ohci_suspend()?
-> > >
-> > > Yes I will do. I think we can also rid of ehci_suspend() do_wakeup
-> > argument.
+> On Wed, Oct 02, 2013 at 04:41:53PM +0300, Roger Quadros wrote:
+>> On 10/02/2013 04:11 PM, Felipe Balbi wrote:
+>>> On Mon, Sep 23, 2013 at 04:11:30PM +0300, Roger Quadros wrote:
+>>>> Hi Felipe,
+>>>>
+>>>> On 09/18/2013 03:49 PM, Roger Quadros wrote:
+>>>>> "usb_otg_ss_refclk960m" is an optional functional clock to the
+>>>>> UBS_OTG_SS module. So manage it in the driver.
+>>>>>
+>>>>
+>>>> Just realized that "usb_otg_ss_refclk960m" is in fact functional clock to the 
+>>>> PHY and not USB_OTG_SS module. The name is misleading.
+>>>>
+>>>> So please ignore patch 9 and 10.
+>>>
+>>> ignored. All others are fine, right ?
+>>>
+>> Yes. But I might have to rebase this on top of Phy framework stuff.
 > 
-> Arrgh!  Manjunath, I was wrong.  I'm sorry to make you do all this
-> extra work -- your original patch series was correct.
+> alright, Greg already took the PHY framework, so maybe we need to just
+> give him my Acked-by and he takes the patches directly as I don't have
+> PYH framework.
 > 
-> Bartlomiej, we both failed to notice that the 1/11 patch in the 
-> original series adds a usage of do_wakeup.  Therefore that argument 
-> cannot be removed.
+OK. I'll resend this series to Greg in a while.
 
-Uhh, indeed. Sorry about that.
-
-> Greg, please ignore Manjunath's V2 series (sent today) and merge the 
-> original 11-patch series posted on October 2.
-
-Yep.
-
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
+cheers,
+-roger
