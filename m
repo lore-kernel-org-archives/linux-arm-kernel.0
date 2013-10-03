@@ -1,40 +1,36 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Thu, 3 Oct 2013 13:44:49 -0600
-Subject: [PATCH v2 1/2] ARM: kirkwood: retain MAC address for DT ethernet
-In-Reply-To: <20131003190437.GY31178@titan.lakedaemon.net>
-References: <1380804294-13726-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1380826568-18587-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <20131003190201.GA2504@localhost>
- <20131003190437.GY31178@titan.lakedaemon.net>
-Message-ID: <20131003194449.GB30298@obsidianresearch.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu,  3 Oct 2013 12:49:42 -0700
+Subject: [PATCH 1/2] ARM: clps711x: Use linux/sched_clock.h
+Message-ID: <1380829783-876-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 03, 2013 at 03:04:37PM -0400, Jason Cooper wrote:
+The sched_clock.h include is under include/linux now.
 
-> > I'm wondering: is the clock really disabled if the device is not
-> > available (i.e. status == 'ok')? In other words: isn't the
-> > !of_device_is_available() test enough?
-> 
-> Well, this stemmed from JasonG's scenario where the second iface is
-> shut off by the bootloader.  Although one could argue that the
-> bootloader should then update the dtb to mark that node as disabled...
+Cc: Alexander Shiyan <shc_work@mail.ru>
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
+ arch/arm/mach-clps711x/common.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Right, that is what we do here, only the first eth is present in the
-dt, the second is gated and powered down (noting that Linux doesn't
-know how to power it up :()
-
-This check is only to prevent CPU lockup if the firmware has included
-a DT node for ethernet, not included the MAC address and turned off
-the clock.
-
-Sebastian, does __clk_enabled work properly for the mvebu clock
-provider? I don't see a clk_ops.is_enabled for mvebu.. (don't know
-much about clk)
-
-Also, I think you should move the pr_err above the clock test, or make
-a special pr_err for the clock test as well. Having the clock gated,
-no mac address and a dt node is still a fw bug.
-
-Regards,
-Jason
+diff --git a/arch/arm/mach-clps711x/common.c b/arch/arm/mach-clps711x/common.c
+index 4ca2f3c..134641d 100644
+--- a/arch/arm/mach-clps711x/common.c
++++ b/arch/arm/mach-clps711x/common.c
+@@ -29,12 +29,12 @@
+ #include <linux/clockchips.h>
+ #include <linux/clocksource.h>
+ #include <linux/clk-provider.h>
++#include <linux/sched_clock.h>
+ 
+ #include <asm/exception.h>
+ #include <asm/mach/irq.h>
+ #include <asm/mach/map.h>
+ #include <asm/mach/time.h>
+-#include <asm/sched_clock.h>
+ #include <asm/system_misc.h>
+ 
+ #include <mach/hardware.h>
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
