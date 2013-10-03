@@ -1,101 +1,65 @@
-From: tim.kryger@linaro.org (Tim Kryger)
-Date: Thu, 3 Oct 2013 13:13:14 -0700
-Subject: [PATCH 6/6] mmc: sdhci-bcm-kona: Add basic use of clocks
-In-Reply-To: <1380831194-27238-1-git-send-email-tim.kryger@linaro.org>
-References: <1380831194-27238-1-git-send-email-tim.kryger@linaro.org>
-Message-ID: <1380831194-27238-7-git-send-email-tim.kryger@linaro.org>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Thu, 03 Oct 2013 22:14:42 +0200
+Subject: [PATCH v2 1/2] ARM: kirkwood: retain MAC address for DT ethernet
+In-Reply-To: <20131003194449.GB30298@obsidianresearch.com>
+References: <1380804294-13726-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1380826568-18587-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20131003190201.GA2504@localhost>
+ <20131003190437.GY31178@titan.lakedaemon.net>
+ <20131003194449.GB30298@obsidianresearch.com>
+Message-ID: <524DD032.4060308@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable the external clock needed by the host controller during the
-probe and disable it during the remove.
+On 10/03/2013 09:44 PM, Jason Gunthorpe wrote:
+> On Thu, Oct 03, 2013 at 03:04:37PM -0400, Jason Cooper wrote:
+>
+>>> I'm wondering: is the clock really disabled if the device is not
+>>> available (i.e. status == 'ok')? In other words: isn't the
+>>> !of_device_is_available() test enough?
+>>
+>> Well, this stemmed from JasonG's scenario where the second iface is
+>> shut off by the bootloader.  Although one could argue that the
+>> bootloader should then update the dtb to mark that node as disabled...
+>
+> Right, that is what we do here, only the first eth is present in the
+> dt, the second is gated and powered down (noting that Linux doesn't
+> know how to power it up :()
+>
+> This check is only to prevent CPU lockup if the firmware has included
+> a DT node for ethernet, not included the MAC address and turned off
+> the clock.
+>
+> Sebastian, does __clk_enabled work properly for the mvebu clock
+> provider? I don't see a clk_ops.is_enabled for mvebu.. (don't know
+> much about clk)
 
-Signed-off-by: Tim Kryger <tim.kryger@linaro.org>
-Reviewed-by: Markus Mayer <markus.mayer@linaro.org>
-Reviewed-by: Matt Porter <matt.porter@linaro.org>
----
- drivers/mmc/host/sdhci-bcm-kona.c | 30 ++++++++++++++++++++++++++++--
- 1 file changed, 28 insertions(+), 2 deletions(-)
+(joint answer for all three above)
 
-diff --git a/drivers/mmc/host/sdhci-bcm-kona.c b/drivers/mmc/host/sdhci-bcm-kona.c
-index 85472d3..91db099 100644
---- a/drivers/mmc/host/sdhci-bcm-kona.c
-+++ b/drivers/mmc/host/sdhci-bcm-kona.c
-@@ -54,6 +54,7 @@
- 
- struct sdhci_bcm_kona_dev {
- 	struct mutex	write_lock; /* protect back to back writes */
-+	struct clk	*external_clk;
- };
- 
- 
-@@ -252,11 +253,29 @@ static int sdhci_bcm_kona_probe(struct platform_device *pdev)
- 	mmc_of_parse(host->mmc);
- 
- 	if (!host->mmc->f_max) {
--		dev_err(&pdev->dev, "Missing max-freq for SDHCI cfg\n");
-+		dev_err(dev, "Missing max-freq for SDHCI cfg\n");
- 		ret = -ENXIO;
- 		goto err_pltfm_free;
- 	}
- 
-+	/* Get and enable the external clock */
-+	kona_dev->external_clk = devm_clk_get(dev, NULL);
-+	if (IS_ERR(kona_dev->external_clk)) {
-+		dev_err(dev, "Failed to get external clock\n");
-+		ret = PTR_ERR(kona_dev->external_clk);
-+		goto err_pltfm_free;
-+	}
-+
-+	if (clk_set_rate(kona_dev->external_clk, host->mmc->f_max) != 0) {
-+		dev_err(dev, "Failed to set rate external clock\n");
-+		goto err_pltfm_free;
-+	}
-+
-+	if (clk_prepare_enable(kona_dev->external_clk) != 0) {
-+		dev_err(dev, "Failed to enable external clock\n");
-+		goto err_pltfm_free;
-+	}
-+
- 	dev_dbg(dev, "non-removable=%c\n",
- 		(host->mmc->caps & MMC_CAP_NONREMOVABLE) ? 'Y' : 'N');
- 	dev_dbg(dev, "cd_gpio %c, wp_gpio %c\n",
-@@ -271,7 +290,7 @@ static int sdhci_bcm_kona_probe(struct platform_device *pdev)
- 
- 	ret = sdhci_bcm_kona_sd_reset(host);
- 	if (ret)
--		goto err_pltfm_free;
-+		goto err_clk_disable;
- 
- 	sdhci_bcm_kona_sd_init(host);
- 
-@@ -307,6 +326,9 @@ err_remove_host:
- err_reset:
- 	sdhci_bcm_kona_sd_reset(host);
- 
-+err_clk_disable:
-+	clk_disable_unprepare(kona_dev->external_clk);
-+
- err_pltfm_free:
- 	sdhci_pltfm_free(pdev);
- 
-@@ -317,6 +339,8 @@ err_pltfm_free:
- static int __exit sdhci_bcm_kona_remove(struct platform_device *pdev)
- {
- 	struct sdhci_host *host = platform_get_drvdata(pdev);
-+	struct sdhci_pltfm_host *pltfm_priv = sdhci_priv(host);
-+	struct sdhci_bcm_kona_dev *kona_dev = sdhci_pltfm_priv(pltfm_priv);
- 	int dead;
- 	u32 scratch;
- 
-@@ -326,6 +350,8 @@ static int __exit sdhci_bcm_kona_remove(struct platform_device *pdev)
- 		dead = 1;
- 	sdhci_remove_host(host, dead);
- 
-+	clk_disable_unprepare(kona_dev->external_clk);
-+
- 	sdhci_free_host(host);
- 
- 	return 0;
--- 
-1.8.0.1
+A node with status != "okay" means "hardware/board does not allow you
+to use that port at all, i.e. no ethernet jack"; disabling the clock
+just means "I don't expect _all_ users want to use this jack, but it
+is connected". So there _is_ a difference here.
+
+clk-gate, which is the underlying clk provider for our gates, does
+provide .is_enabled and reads the register. I haven't tested this,
+due to no KW hardware available right now, but it should test for
+disabled clocks as expected.
+
+> Also, I think you should move the pr_err above the clock test, or make
+> a special pr_err for the clock test as well. Having the clock gated,
+> no mac address and a dt node is still a fw bug.
+
+Well, we have 4 cases here:
+- status != "okay": skip
+- of_get_mac_address() != NULL: skip (no registers read)
+- !__clk_is_enabled(): skip and warn with FW_BUG about disabled
+   clocks but no valid MAC address set.
+- else, read registers, store MAC in DT, warn with FW_BUG about
+   enabled clocks and no valid MAC address set.
+
+Leaves missing public clk_is_enabled(), which I can provide a
+patch for if Mike agrees (and I haven't missed anything without
+really looking into CCF).
+
+Sebastian
