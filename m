@@ -1,59 +1,45 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 3 Oct 2013 17:19:49 +0100
-Subject: [PATCH v2 2/3] arm: check for number of arguments in
- syscall_get/set_arguments()
-In-Reply-To: <1380779266-11753-3-git-send-email-takahiro.akashi@linaro.org>
-References: <1380605584-22125-git-send-email-takahiro.akashi@linaro.org>
- <1380779266-11753-3-git-send-email-takahiro.akashi@linaro.org>
-Message-ID: <20131003161949.GD7408@mudshark.cambridge.arm.com>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Thu, 3 Oct 2013 11:21:10 -0500
+Subject: Use of drivers/platform and matching include?
+In-Reply-To: <20131003152715.GA15931@kroah.com>
+References: <BC1C47B3-5412-4829-A1D9-AAB04694D1CC@codeaurora.org>
+ <20131003152715.GA15931@kroah.com>
+Message-ID: <B674A07C-F8FE-4F4D-BB0A-87D5A50852D0@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 03, 2013 at 06:47:45AM +0100, AKASHI Takahiro wrote:
-> In ftrace_syscall_enter(),
->     syscall_get_arguments(..., 0, n, ...)
->         if (i == 0) { <handle ORIG_r0> ...; n--;}
->         memcpy(..., n * sizeof(args[0]));
-> If 'number of arguments(n)' is zero and 'argument index(i)' is also zero in
-> syscall_get_arguments(), none of arguments should be copied by memcpy().
-> Otherwise 'n--' can be a big positive number and unexpected amount of data
-> will be copied. Tracing system calls which take no argument, say sync(void),
-> may hit this case and eventually make the system corrupted.
-> This patch fixes the issue both in syscall_get_arguments() and
-> syscall_set_arguments().
+
+On Oct 3, 2013, at 10:27 AM, Greg Kroah-Hartman wrote:
+
+> On Thu, Oct 03, 2013 at 09:45:38AM -0500, Kumar Gala wrote:
+>> As we look at upstreaming more support for the Qualcomm MSM SoCs there
+>> are a number of drivers or library like routines that are unique to
+>> the MSM platform, we are thinking that putting them under:
+>> 
+>> drivers/platform/qcom/
 > 
-> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> ---
->  arch/arm/include/asm/syscall.h |    6 ++++++
->  1 file changed, 6 insertions(+)
+> What type of drivers are these?  Shouldn't they really go under the
+> specific driver type directory instead?
+
+If there isn't an existing driver/ dir for this I dont see how it can go there, I'm not also not really a fan of trying to artificial put something that is highly SoC specific into something generic of this nature.
+
+>> would make sense.  In addition there are headers that might need to
+>> get shared with drivers in other locations so I wanted to see what the
+>> take was on introducing:
+>> 
+>> include/linux/platform/qcom/
+>> 
+>> An example driver would be the means we utilize to communicate memory
+>> regions between various HW blocks on the SoC.  So a video/media core
+>> driver might need access to a header/functions from the memory region
+>> driver.
 > 
-> diff --git a/arch/arm/include/asm/syscall.h b/arch/arm/include/asm/syscall.h
-> index f1d96d4..73ddd72 100644
-> --- a/arch/arm/include/asm/syscall.h
-> +++ b/arch/arm/include/asm/syscall.h
-> @@ -57,6 +57,9 @@ static inline void syscall_get_arguments(struct task_struct *task,
->  					 unsigned int i, unsigned int n,
->  					 unsigned long *args)
->  {
-> +	if (n == 0)
-> +		return;
-> +
->  	if (i + n > SYSCALL_MAX_ARGS) {
->  		unsigned long *args_bad = args + SYSCALL_MAX_ARGS - i;
->  		unsigned int n_bad = n + i - SYSCALL_MAX_ARGS;
-> @@ -81,6 +84,9 @@ static inline void syscall_set_arguments(struct task_struct *task,
->  					 unsigned int i, unsigned int n,
->  					 const unsigned long *args)
->  {
-> +	if (n == 0)
-> +		return;
-> +
->  	if (i + n > SYSCALL_MAX_ARGS) {
->  		pr_warning("%s called with max args %d, handling only %d\n",
->  			   __func__, i + n, SYSCALL_MAX_ARGS);
+> Isn't there arch-specific include directories already that are good for
+> stuff like this?
 
-  Acked-by: Will Deacon <will.deacon@arm.com>
+Well, we expect at some point in needing to share with arm64 as well so that causes issues (one of the reason I'm not a fan of the split between the two arch's).
 
-Please can you put this into the patch system, with a CC stable tag?
-
-Will
+- k
+-- 
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
