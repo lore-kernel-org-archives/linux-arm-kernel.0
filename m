@@ -1,412 +1,136 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu,  3 Oct 2013 18:03:48 +0200
-Subject: [PATCH 5/6] ARM: integrator: move CM base into device tree
-Message-ID: <1380816228-3209-1-git-send-email-linus.walleij@linaro.org>
+Date: Thu,  3 Oct 2013 18:03:58 +0200
+Subject: [PATCH 6/6] cpufreq: probe the Integrator cpufreq driver from DT
+Message-ID: <1380816238-3255-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This moves the core module (CM) control base into the device
-tree. It is a simple memory range of 0x200 bytes. Move the
-cm header down into the machine directory and unexport the
-cm_control() symbol as no modules are using it.
+This makes the Integrator cpufreq driver probe from the core
+module device tree node through it's registered platforms
+device, getting the memory base from the device tree,
+remapping it and removing dependencies to <mach/platform.h>
+and <mach/hardware.h> by moving the two affected CM
+register offsets into the driver.
 
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- Documentation/devicetree/bindings/arm/arm-boards |  17 +++-
- arch/arm/boot/dts/integrator.dtsi                |   5 +
- arch/arm/mach-integrator/cm.h                    |  40 ++++++++
- arch/arm/mach-integrator/core.c                  | 120 +++++++++++++++--------
- arch/arm/mach-integrator/include/mach/cm.h       |  38 -------
- arch/arm/mach-integrator/integrator_ap.c         |   6 +-
- arch/arm/mach-integrator/integrator_cp.c         |   3 +-
- arch/arm/mach-integrator/leds.c                  |   3 +-
- 8 files changed, 142 insertions(+), 90 deletions(-)
- create mode 100644 arch/arm/mach-integrator/cm.h
- delete mode 100644 arch/arm/mach-integrator/include/mach/cm.h
+ drivers/cpufreq/integrator-cpufreq.c | 56 ++++++++++++++++++++++++------------
+ 1 file changed, 38 insertions(+), 18 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/arm/arm-boards b/Documentation/devicetree/bindings/arm/arm-boards
-index 06e5370..1a2a81d 100644
---- a/Documentation/devicetree/bindings/arm/arm-boards
-+++ b/Documentation/devicetree/bindings/arm/arm-boards
-@@ -10,11 +10,15 @@ Required properties (in root node):
- FPGA type interrupt controllers, see the versatile-fpga-irq binding doc.
- 
- Required nodes:
-+- core-module: the root node to the Integrator platforms must have
-+  a core-module with regs and the compatible-string
-+  "arm,core-module-integrator"
-+- cpcon/syscon: the root node the Integrator/CP must have a /cpcon
-+  node pointing to the CP control registers, and the Integrator/AP
-+  must have a /syscon node pointing to the Integrator/AP system
-+  controller. The AP syscon node must include the logical module
-+  interrupts.
- 
--In the root node the Integrator/CP must have a /cpcon node pointing
--to the CP control registers, and the Integrator/AP must have a
--/syscon node pointing to the Integrator/AP system controller.
--The AP syscon node must include the logical module interrupts,
- example:
- 
- /dts-v1/;
-@@ -24,6 +28,11 @@ example:
- 	model = "ARM Integrator/AP";
- 	compatible = "arm,integrator-ap";
- 
-+	core-module at 10000000 {
-+		compatible = "arm,core-module-integrator";
-+		reg = <0x10000000 0x200>;
-+	};
-+
- 	syscon {
- 		/* AP system controller registers */
- 		reg = <0x11000000 0x100>;
-diff --git a/arch/arm/boot/dts/integrator.dtsi b/arch/arm/boot/dts/integrator.dtsi
-index 813b91d..0f06f86 100644
---- a/arch/arm/boot/dts/integrator.dtsi
-+++ b/arch/arm/boot/dts/integrator.dtsi
-@@ -5,6 +5,11 @@
- /include/ "skeleton.dtsi"
- 
- / {
-+	core-module at 10000000 {
-+		compatible = "arm,core-module-integrator";
-+		reg = <0x10000000 0x200>;
-+	};
-+
- 	timer at 13000000 {
- 		reg = <0x13000000 0x100>;
- 		interrupt-parent = <&pic>;
-diff --git a/arch/arm/mach-integrator/cm.h b/arch/arm/mach-integrator/cm.h
-new file mode 100644
-index 0000000..2ba8be0
---- /dev/null
-+++ b/arch/arm/mach-integrator/cm.h
-@@ -0,0 +1,40 @@
-+/*
-+ * update the core module control register.
-+ */
-+void cm_control(u32, u32);
-+
-+struct device_node;
-+void cm_init(void);
-+void cm_clear_irqs(void);
-+
-+#define CM_CTRL_LED			(1 << 0)
-+#define CM_CTRL_nMBDET			(1 << 1)
-+#define CM_CTRL_REMAP			(1 << 2)
-+#define CM_CTRL_RESET			(1 << 3)
-+
-+/*
-+ * Integrator/AP,PP2 specific
-+ */
-+#define CM_CTRL_HIGHVECTORS		(1 << 4)
-+#define CM_CTRL_BIGENDIAN		(1 << 5)
-+#define CM_CTRL_FASTBUS			(1 << 6)
-+#define CM_CTRL_SYNC			(1 << 7)
-+
-+/*
-+ * ARM926/946/966 Integrator/CP specific
-+ */
-+#define CM_CTRL_LCDBIASEN		(1 << 8)
-+#define CM_CTRL_LCDBIASUP		(1 << 9)
-+#define CM_CTRL_LCDBIASDN		(1 << 10)
-+#define CM_CTRL_LCDMUXSEL_MASK		(7 << 11)
-+#define CM_CTRL_LCDMUXSEL_GENLCD	(1 << 11)
-+#define CM_CTRL_LCDMUXSEL_VGA565_TFT555	(2 << 11)
-+#define CM_CTRL_LCDMUXSEL_SHARPLCD	(3 << 11)
-+#define CM_CTRL_LCDMUXSEL_VGA555_TFT555	(4 << 11)
-+#define CM_CTRL_LCDEN0			(1 << 14)
-+#define CM_CTRL_LCDEN1			(1 << 15)
-+#define CM_CTRL_STATIC1			(1 << 16)
-+#define CM_CTRL_STATIC2			(1 << 17)
-+#define CM_CTRL_STATIC			(1 << 18)
-+#define CM_CTRL_n24BITEN		(1 << 19)
-+#define CM_CTRL_EBIWP			(1 << 20)
-diff --git a/arch/arm/mach-integrator/core.c b/arch/arm/mach-integrator/core.c
-index e31483a..28bb033 100644
---- a/arch/arm/mach-integrator/core.c
-+++ b/arch/arm/mach-integrator/core.c
-@@ -22,18 +22,21 @@
- #include <linux/amba/serial.h>
+diff --git a/drivers/cpufreq/integrator-cpufreq.c b/drivers/cpufreq/integrator-cpufreq.c
+index f7c99df..9faf0ca 100644
+--- a/drivers/cpufreq/integrator-cpufreq.c
++++ b/drivers/cpufreq/integrator-cpufreq.c
+@@ -15,18 +15,19 @@
+ #include <linux/smp.h>
+ #include <linux/init.h>
  #include <linux/io.h>
- #include <linux/stat.h>
++#include <linux/platform_device.h>
 +#include <linux/of.h>
 +#include <linux/of_address.h>
  
- #include <mach/hardware.h>
- #include <mach/platform.h>
--#include <mach/cm.h>
- 
+-#include <mach/hardware.h>
+-#include <mach/platform.h>
  #include <asm/mach-types.h>
- #include <asm/mach/time.h>
- #include <asm/pgtable.h>
+ #include <asm/hardware/icst.h>
  
-+#include "cm.h"
- #include "common.h"
- 
- static DEFINE_RAW_SPINLOCK(cm_lock);
+-static struct cpufreq_driver integrator_driver;
 +static void __iomem *cm_base;
++/* The cpufreq driver only use the OSC register */
++#define INTEGRATOR_HDR_OSC_OFFSET       0x08
++#define INTEGRATOR_HDR_LOCK_OFFSET      0x14
  
- /**
-  * cm_control - update the CM_CTRL register.
-@@ -46,12 +49,80 @@ void cm_control(u32 mask, u32 set)
- 	u32 val;
+-#define CM_ID  	__io_address(INTEGRATOR_HDR_ID)
+-#define CM_OSC	__io_address(INTEGRATOR_HDR_OSC)
+-#define CM_STAT __io_address(INTEGRATOR_HDR_STAT)
+-#define CM_LOCK __io_address(INTEGRATOR_HDR_LOCK)
++static struct cpufreq_driver integrator_driver;
  
- 	raw_spin_lock_irqsave(&cm_lock, flags);
--	val = readl(CM_CTRL) & ~mask;
--	writel(val | set, CM_CTRL);
-+	val = readl(cm_base + INTEGRATOR_HDR_CTRL_OFFSET) & ~mask;
-+	writel(val | set, cm_base + INTEGRATOR_HDR_CTRL_OFFSET);
- 	raw_spin_unlock_irqrestore(&cm_lock, flags);
+ static const struct icst_params lclk_params = {
+ 	.ref		= 24000000,
+@@ -100,7 +101,7 @@ static int integrator_set_target(struct cpufreq_policy *policy,
+ 	BUG_ON(cpu != smp_processor_id());
+ 
+ 	/* get current setting */
+-	cm_osc = __raw_readl(CM_OSC);
++	cm_osc = __raw_readl(cm_base + INTEGRATOR_HDR_OSC_OFFSET);
+ 
+ 	if (machine_is_integrator()) {
+ 		vco.s = (cm_osc >> 8) & 7;
+@@ -128,7 +129,7 @@ static int integrator_set_target(struct cpufreq_policy *policy,
+ 
+ 	cpufreq_notify_transition(policy, &freqs, CPUFREQ_PRECHANGE);
+ 
+-	cm_osc = __raw_readl(CM_OSC);
++	cm_osc = __raw_readl(cm_base + INTEGRATOR_HDR_OSC_OFFSET);
+ 
+ 	if (machine_is_integrator()) {
+ 		cm_osc &= 0xfffff800;
+@@ -138,9 +139,9 @@ static int integrator_set_target(struct cpufreq_policy *policy,
+ 	}
+ 	cm_osc |= vco.v;
+ 
+-	__raw_writel(0xa05f, CM_LOCK);
+-	__raw_writel(cm_osc, CM_OSC);
+-	__raw_writel(0, CM_LOCK);
++	__raw_writel(0xa05f, cm_base + INTEGRATOR_HDR_LOCK_OFFSET);
++	__raw_writel(cm_osc, cm_base + INTEGRATOR_HDR_OSC_OFFSET);
++	__raw_writel(0, cm_base + INTEGRATOR_HDR_LOCK_OFFSET);
+ 
+ 	/*
+ 	 * Restore the CPUs allowed mask.
+@@ -165,7 +166,7 @@ static unsigned int integrator_get(unsigned int cpu)
+ 	BUG_ON(cpu != smp_processor_id());
+ 
+ 	/* detect memory etc. */
+-	cm_osc = __raw_readl(CM_OSC);
++	cm_osc = __raw_readl(cm_base + INTEGRATOR_HDR_OSC_OFFSET);
+ 
+ 	if (machine_is_integrator()) {
+ 		vco.s = (cm_osc >> 8) & 7;
+@@ -202,19 +203,38 @@ static struct cpufreq_driver integrator_driver = {
+ 	.name		= "integrator",
+ };
+ 
+-static int __init integrator_cpu_init(void)
++static int __init integrator_cpufreq_probe(struct platform_device *pdev)
+ {
++	struct device_node *np = pdev->dev.of_node;
++
++	cm_base = of_iomap(np, 0);
++	if (!cm_base)
++		return -ENODEV;
+ 	return cpufreq_register_driver(&integrator_driver);
  }
  
--EXPORT_SYMBOL(cm_control);
-+static const char *integrator_arch_str(u32 id)
-+{
-+	switch ((id >> 16) & 0xff) {
-+	case 0x00:
-+		return "ASB little-endian";
-+	case 0x01:
-+		return "AHB little-endian";
-+	case 0x03:
-+		return "AHB-Lite system bus, bi-endian";
-+	case 0x04:
-+		return "AHB";
-+	case 0x08:
-+		return "AHB system bus, ASB processor bus";
-+	default:
-+		return "Unknown";
-+	}
-+}
-+
-+static const char *integrator_fpga_str(u32 id)
-+{
-+	switch ((id >> 12) & 0xf) {
-+	case 0x01:
-+		return "XC4062";
-+	case 0x02:
-+		return "XC4085";
-+	case 0x03:
-+		return "XVC600";
-+	case 0x04:
-+		return "EPM7256AE (Altera PLD)";
-+	default:
-+		return "Unknown";
-+	}
-+}
-+
-+void cm_clear_irqs(void)
-+{
-+	/* disable core module IRQs */
-+	writel(0xffffffffU, cm_base + INTEGRATOR_HDR_IC_OFFSET +
-+		IRQ_ENABLE_CLEAR);
-+}
-+
-+static const struct of_device_id cm_match[] = {
+-static void __exit integrator_cpu_exit(void)
++static void __exit integrator_cpufreq_remove(struct platform_device *pdev)
+ {
+ 	cpufreq_unregister_driver(&integrator_driver);
+ }
+ 
++static const struct of_device_id integrator_cpufreq_match[] = {
 +	{ .compatible = "arm,core-module-integrator"},
 +	{ },
 +};
 +
-+void cm_init(void)
-+{
-+	struct device_node *cm = of_find_matching_node(NULL, cm_match);
-+	u32 val;
++static struct platform_driver integrator_cpufreq_driver = {
++	.driver = {
++		.name = "integrator-cpufreq",
++		.owner = THIS_MODULE,
++		.of_match_table = integrator_cpufreq_match,
++	},
++	.remove = __exit_p(integrator_cpufreq_remove),
++};
 +
-+	if (!cm) {
-+		pr_crit("no core module node found in device tree\n");
-+		return;
-+	}
-+	cm_base = of_iomap(cm, 0);
-+	if (!cm_base) {
-+		pr_crit("could not remap core module\n");
-+		return;
-+	}
-+	cm_clear_irqs();
-+	val = readl(cm_base + INTEGRATOR_HDR_ID_OFFSET);
-+	pr_info("Detected ARM core module:\n");
-+	pr_info("    Manufacturer: %02x\n", (val >> 24));
-+	pr_info("    Architecture: %s\n", integrator_arch_str(val));
-+	pr_info("    FPGA: %s\n", integrator_fpga_str(val));
-+	pr_info("    Build: %02x\n", (val >> 4) & 0xFF);
-+	pr_info("    Rev: %c\n", ('A' + (val & 0x03)));
-+}
- 
- /*
-  * We need to stop things allocating the low memory; ideally we need a
-@@ -87,27 +158,7 @@ static ssize_t intcp_get_arch(struct device *dev,
- 			      struct device_attribute *attr,
- 			      char *buf)
- {
--	const char *arch;
--
--	switch ((integrator_id >> 16) & 0xff) {
--	case 0x00:
--		arch = "ASB little-endian";
--		break;
--	case 0x01:
--		arch = "AHB little-endian";
--		break;
--	case 0x03:
--		arch = "AHB-Lite system bus, bi-endian";
--		break;
--	case 0x04:
--		arch = "AHB";
--		break;
--	default:
--		arch = "Unknown";
--		break;
--	}
--
--	return sprintf(buf, "%s\n", arch);
-+	return sprintf(buf, "%s\n", integrator_arch_str(integrator_id));
- }
- 
- static struct device_attribute intcp_arch_attr =
-@@ -117,24 +168,7 @@ static ssize_t intcp_get_fpga(struct device *dev,
- 			      struct device_attribute *attr,
- 			      char *buf)
- {
--	const char *fpga;
--
--	switch ((integrator_id >> 12) & 0xf) {
--	case 0x01:
--		fpga = "XC4062";
--		break;
--	case 0x02:
--		fpga = "XC4085";
--		break;
--	case 0x04:
--		fpga = "EPM7256AE (Altera PLD)";
--		break;
--	default:
--		fpga = "Unknown";
--		break;
--	}
--
--	return sprintf(buf, "%s\n", fpga);
-+	return sprintf(buf, "%s\n", integrator_fpga_str(integrator_id));
- }
- 
- static struct device_attribute intcp_fpga_attr =
-diff --git a/arch/arm/mach-integrator/include/mach/cm.h b/arch/arm/mach-integrator/include/mach/cm.h
-deleted file mode 100644
-index 202e6a5..0000000
---- a/arch/arm/mach-integrator/include/mach/cm.h
-+++ /dev/null
-@@ -1,38 +0,0 @@
--/*
-- * update the core module control register.
-- */
--void cm_control(u32, u32);
--
--#define CM_CTRL	__io_address(INTEGRATOR_HDR_CTRL)
--
--#define CM_CTRL_LED			(1 << 0)
--#define CM_CTRL_nMBDET			(1 << 1)
--#define CM_CTRL_REMAP			(1 << 2)
--#define CM_CTRL_RESET			(1 << 3)
--
--/*
-- * Integrator/AP,PP2 specific
-- */
--#define CM_CTRL_HIGHVECTORS		(1 << 4)
--#define CM_CTRL_BIGENDIAN		(1 << 5)
--#define CM_CTRL_FASTBUS			(1 << 6)
--#define CM_CTRL_SYNC			(1 << 7)
--
--/*
-- * ARM926/946/966 Integrator/CP specific
-- */
--#define CM_CTRL_LCDBIASEN		(1 << 8)
--#define CM_CTRL_LCDBIASUP		(1 << 9)
--#define CM_CTRL_LCDBIASDN		(1 << 10)
--#define CM_CTRL_LCDMUXSEL_MASK		(7 << 11)
--#define CM_CTRL_LCDMUXSEL_GENLCD	(1 << 11)
--#define CM_CTRL_LCDMUXSEL_VGA565_TFT555	(2 << 11)
--#define CM_CTRL_LCDMUXSEL_SHARPLCD	(3 << 11)
--#define CM_CTRL_LCDMUXSEL_VGA555_TFT555	(4 << 11)
--#define CM_CTRL_LCDEN0			(1 << 14)
--#define CM_CTRL_LCDEN1			(1 << 15)
--#define CM_CTRL_STATIC1			(1 << 16)
--#define CM_CTRL_STATIC2			(1 << 17)
--#define CM_CTRL_STATIC			(1 << 18)
--#define CM_CTRL_n24BITEN		(1 << 19)
--#define CM_CTRL_EBIWP			(1 << 20)
-diff --git a/arch/arm/mach-integrator/integrator_ap.c b/arch/arm/mach-integrator/integrator_ap.c
-index 88a62a5..ece4755 100644
---- a/arch/arm/mach-integrator/integrator_ap.c
-+++ b/arch/arm/mach-integrator/integrator_ap.c
-@@ -57,6 +57,7 @@
- #include <asm/mach/map.h>
- #include <asm/mach/time.h>
- 
-+#include "cm.h"
- #include "common.h"
- #include "pci_v3.h"
- 
-@@ -145,7 +146,7 @@ static int irq_suspend(void)
- static void irq_resume(void)
- {
- 	/* disable all irq sources */
--	writel(-1, VA_CMIC_BASE + IRQ_ENABLE_CLEAR);
-+	cm_clear_irqs();
- 	writel(-1, VA_IC_BASE + IRQ_ENABLE_CLEAR);
- 	writel(-1, VA_IC_BASE + FIQ_ENABLE_CLEAR);
- 
-@@ -447,8 +448,7 @@ static const struct of_device_id fpga_irq_of_match[] __initconst = {
- 
- static void __init ap_init_irq_of(void)
- {
--	/* disable core module IRQs */
--	writel(0xffffffffU, VA_CMIC_BASE + IRQ_ENABLE_CLEAR);
-+	cm_init();
- 	of_irq_init(fpga_irq_of_match);
- 	integrator_clk_init(false);
- }
-diff --git a/arch/arm/mach-integrator/integrator_cp.c b/arch/arm/mach-integrator/integrator_cp.c
-index 26b3441..422c3f9 100644
---- a/arch/arm/mach-integrator/integrator_cp.c
-+++ b/arch/arm/mach-integrator/integrator_cp.c
-@@ -36,7 +36,6 @@
- #include <asm/hardware/arm_timer.h>
- #include <asm/hardware/icst.h>
- 
--#include <mach/cm.h>
- #include <mach/lm.h>
- 
- #include <asm/mach/arch.h>
-@@ -49,6 +48,7 @@
- #include <plat/clcd.h>
- #include <plat/sched_clock.h>
- 
-+#include "cm.h"
- #include "common.h"
- 
- /* Base address to the CP controller */
-@@ -255,6 +255,7 @@ static const struct of_device_id fpga_irq_of_match[] __initconst = {
- 
- static void __init intcp_init_irq_of(void)
- {
-+	cm_init();
- 	of_irq_init(fpga_irq_of_match);
- 	integrator_clk_init(true);
- }
-diff --git a/arch/arm/mach-integrator/leds.c b/arch/arm/mach-integrator/leds.c
-index 7a7f6d3..98fb74e 100644
---- a/arch/arm/mach-integrator/leds.c
-+++ b/arch/arm/mach-integrator/leds.c
-@@ -11,10 +11,11 @@
- #include <linux/slab.h>
- #include <linux/leds.h>
- 
--#include <mach/cm.h>
- #include <mach/hardware.h>
- #include <mach/platform.h>
- 
-+#include "cm.h"
++module_platform_driver_probe(integrator_cpufreq_driver,
++			     integrator_cpufreq_probe);
 +
- #if defined(CONFIG_NEW_LEDS) && defined(CONFIG_LEDS_CLASS)
- 
- #define ALPHA_REG __io_address(INTEGRATOR_DBG_BASE)
+ MODULE_AUTHOR ("Russell M. King");
+ MODULE_DESCRIPTION ("cpufreq driver for ARM Integrator CPUs");
+ MODULE_LICENSE ("GPL");
+-
+-module_init(integrator_cpu_init);
+-module_exit(integrator_cpu_exit);
 -- 
 1.8.3.1
