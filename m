@@ -1,62 +1,42 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 3 Oct 2013 22:04:02 +0200
-Subject: [PATCH 3/3] [RFC] ARM: prepare ARMv7-M for MULTIPLATFORM use
-In-Reply-To: <201309301234.25913.arnd@arndb.de>
-References: <1380534577-15076-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <1380534577-15076-4-git-send-email-u.kleine-koenig@pengutronix.de>
- <201309301234.25913.arnd@arndb.de>
-Message-ID: <20131003200402.GD10079@pengutronix.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 3 Oct 2013 21:07:12 +0100
+Subject: Detect presence of LPAE when not running an LPAE kernel?
+In-Reply-To: <1380829403.3804.56.camel@hastur.hellion.org.uk>
+References: <1380829403.3804.56.camel@hastur.hellion.org.uk>
+Message-ID: <20131003200712.GG12758@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 30, 2013 at 12:34:25PM +0200, Arnd Bergmann wrote:
-> On Monday 30 September 2013, Uwe Kleine-K?nig wrote:
-> > v7-M is a third group that is incompatible with both v4/v5 and v6/v7.
-> > 
-> > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> > ---
-> > This behaves strange but I think is robust not to allow broken configs:
-> > 
-> > When v4/v5 is selected, v6/v7 and v7m are available for enabling, too.
-> > When v6/v7 is selected the other choices are disabled
-> > When v7m is selected only v6/v7 are available for enabling.
+On Thu, Oct 03, 2013 at 08:43:23PM +0100, Ian Campbell wrote:
+> Is this possible?
 > 
-> The Kconfig stuff all looks good, 
-Actually this is a choice implemented using normal configs. Why not a
-using a choice here:
+> The Features field of /proc/cpuinfo only appears to reflect the presence
+> of LPAE if CONFIG_LPAE is actually on in the running kernel.
+> 
+> The reason I care is so that distro installers can ship a generic kernel
+> but select LPAE for the running system when appropriate.
+> 
+> On x86 for example I would check /proc/cpuinfo:flags which contains the
+> CPU features, regardless of whether they are currently enabled.
+> 
+> Is there any equivalent on ARM?
 
-choice
-	prompt "CPU Core family selection"
+Perversely, LPAE in there has nothing to do with LPAE being used by the
+kernel.  It's more to do with the presence of the double-word load/store
+exclusive.
 
-config ARCH_MULTI_V4_V5
-	bool "..."
+It went through lots of discussions about what to call this, whether it
+was "ATOMICD" (which is very perverse and vague) or LPAE (which is what
+it was keyed off of).
 
-config ARCH_MULTI_V6_V7
-	bool "..."
+Now, this LPAE flag is present whether or not the kernel has been built
+with CONFIG_LPAE enabled or not.  That's because its not about LPAE
+really, it's about those load/store exclusive instructions.
 
-config ARCH_MULTI_V7M
-	bool "..."
-
-endchoice
-
-config ARCH_MULTI_V4T
-	bool "ARMv4T based platforms (ARM720T, ARM920T, ...)"
-	depends on ARCH_MULTI_V4_V5
-
-config ARCH_MULTI_V5
-	bool "ARMv5 based platforms (ARM926T, XSCALE, PJ1, ...)" if ARCH_MULTI_V4T
-	depends on ARCH_MULTI_V4_V5
-	default y if !ARCH_MULTI_V4T
-
-config ARCH_MULTI_V6
-	...
-
-config ARCH_MULTI_V7
-	...
-
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Now, this isn't applied to all flags: we hide certain CPU facilities
+when the kernel support is missing, because the instructions can't be
+used without kernel support being present.  For instance, if the VFP
+support code is not present, support for VFP instructions will be
+hidden (and the instructions disabled) because there's nothing to
+context-switch the VFP state and stop one thread interfering with
+another.
