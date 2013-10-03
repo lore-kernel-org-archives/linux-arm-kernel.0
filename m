@@ -1,53 +1,44 @@
 From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Thu,  3 Oct 2013 14:47:45 +0900
-Subject: [PATCH v2 2/3] arm: check for number of arguments in
- syscall_get/set_arguments()
+Date: Thu,  3 Oct 2013 14:47:46 +0900
+Subject: [PATCH v2 3/3] asm-generic: syscall_get/set_arguments accept zero for
+ number of arguments
 In-Reply-To: <1380779266-11753-1-git-send-email-takahiro.akashi@linaro.org>
 References: <1380779266-11753-1-git-send-email-takahiro.akashi@linaro.org>
-Message-ID: <1380779266-11753-3-git-send-email-takahiro.akashi@linaro.org>
+Message-ID: <1380779266-11753-4-git-send-email-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In ftrace_syscall_enter(),
-    syscall_get_arguments(..., 0, n, ...)
-        if (i == 0) { <handle ORIG_r0> ...; n--;}
-        memcpy(..., n * sizeof(args[0]));
-If 'number of arguments(n)' is zero and 'argument index(i)' is also zero in
-syscall_get_arguments(), none of arguments should be copied by memcpy().
-Otherwise 'n--' can be a big positive number and unexpected amount of data
-will be copied. Tracing system calls which take no argument, say sync(void),
-may hit this case and eventually make the system corrupted.
-This patch fixes the issue both in syscall_get_arguments() and
-syscall_set_arguments().
+There is a possibility of calling syscall_get_arguments() with zero as
+'number of arguments(n)' in ftrace_syscall_enter().
+The comments in syscall_get_argumets() as well as syscall_set_arugments()
+are corrected to clarify that.
 
 Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
 ---
- arch/arm/include/asm/syscall.h |    6 ++++++
- 1 file changed, 6 insertions(+)
+ include/asm-generic/syscall.h |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/include/asm/syscall.h b/arch/arm/include/asm/syscall.h
-index f1d96d4..73ddd72 100644
---- a/arch/arm/include/asm/syscall.h
-+++ b/arch/arm/include/asm/syscall.h
-@@ -57,6 +57,9 @@ static inline void syscall_get_arguments(struct task_struct *task,
- 					 unsigned int i, unsigned int n,
- 					 unsigned long *args)
- {
-+	if (n == 0)
-+		return;
-+
- 	if (i + n > SYSCALL_MAX_ARGS) {
- 		unsigned long *args_bad = args + SYSCALL_MAX_ARGS - i;
- 		unsigned int n_bad = n + i - SYSCALL_MAX_ARGS;
-@@ -81,6 +84,9 @@ static inline void syscall_set_arguments(struct task_struct *task,
- 					 unsigned int i, unsigned int n,
- 					 const unsigned long *args)
- {
-+	if (n == 0)
-+		return;
-+
- 	if (i + n > SYSCALL_MAX_ARGS) {
- 		pr_warning("%s called with max args %d, handling only %d\n",
- 			   __func__, i + n, SYSCALL_MAX_ARGS);
+diff --git a/include/asm-generic/syscall.h b/include/asm-generic/syscall.h
+index 5b09392..49b35ab 100644
+--- a/include/asm-generic/syscall.h
++++ b/include/asm-generic/syscall.h
+@@ -106,7 +106,7 @@ void syscall_set_return_value(struct task_struct *task, struct pt_regs *regs,
+  * @task:	task of interest, must be blocked
+  * @regs:	task_pt_regs() of @task
+  * @i:		argument index [0,5]
+- * @n:		number of arguments; n+i must be [1,6].
++ * @n:		number of arguments; n+i must be [0,6].
+  * @args:	array filled with argument values
+  *
+  * Fetches @n arguments to the system call starting with the @i'th argument
+@@ -126,7 +126,7 @@ void syscall_get_arguments(struct task_struct *task, struct pt_regs *regs,
+  * @task:	task of interest, must be in system call entry tracing
+  * @regs:	task_pt_regs() of @task
+  * @i:		argument index [0,5]
+- * @n:		number of arguments; n+i must be [1,6].
++ * @n:		number of arguments; n+i must be [0,6].
+  * @args:	array of argument values to store
+  *
+  * Changes @n arguments to the system call starting with the @i'th argument.
 -- 
 1.7.9.5
