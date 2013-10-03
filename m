@@ -1,55 +1,56 @@
 From: tim.kryger@linaro.org (Tim Kryger)
-Date: Thu, 3 Oct 2013 13:13:12 -0700
-Subject: [PATCH 4/6] clocksource: kona: Add basic use of external clock
+Date: Thu, 3 Oct 2013 13:13:11 -0700
+Subject: [PATCH 3/6] ARM: dts: Specify clocks for SDHCIs on bcm11351
 In-Reply-To: <1380831194-27238-1-git-send-email-tim.kryger@linaro.org>
 References: <1380831194-27238-1-git-send-email-tim.kryger@linaro.org>
-Message-ID: <1380831194-27238-5-git-send-email-tim.kryger@linaro.org>
+Message-ID: <1380831194-27238-4-git-send-email-tim.kryger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When an clock handle is specified in the device tree, enable it and use
-it to determine the external clock frequency.
+Specify the external clock label in each SDHCI node.
 
 Signed-off-by: Tim Kryger <tim.kryger@linaro.org>
 Reviewed-by: Markus Mayer <markus.mayer@linaro.org>
 Reviewed-by: Matt Porter <matt.porter@linaro.org>
 ---
- drivers/clocksource/bcm_kona_timer.c | 14 +++++++++++---
- 1 file changed, 11 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/bcm11351.dtsi | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/drivers/clocksource/bcm_kona_timer.c b/drivers/clocksource/bcm_kona_timer.c
-index 0d7d8c3..fd11f96 100644
---- a/drivers/clocksource/bcm_kona_timer.c
-+++ b/drivers/clocksource/bcm_kona_timer.c
-@@ -17,6 +17,7 @@
- #include <linux/jiffies.h>
- #include <linux/clockchips.h>
- #include <linux/types.h>
-+#include <linux/clk.h>
- 
- #include <linux/io.h>
- #include <asm/mach/time.h>
-@@ -107,11 +108,18 @@ static const struct of_device_id bcm_timer_ids[] __initconst = {
- static void __init kona_timers_init(struct device_node *node)
- {
- 	u32 freq;
-+	struct clk *external_clk;
- 
--	if (!of_property_read_u32(node, "clock-frequency", &freq))
-+	external_clk = of_clk_get_by_name(node, NULL);
-+
-+	if (!IS_ERR(external_clk)) {
-+		arch_timer_rate = clk_get_rate(external_clk);
-+		clk_prepare_enable(external_clk);
-+	} else if (!of_property_read_u32(node, "clock-frequency", &freq)) {
- 		arch_timer_rate = freq;
--	else
--		panic("clock-frequency not set in the .dts file");
-+	} else {
-+		panic("neither clock-frequency or clocks handle in .dts file");
-+	}
- 
- 	/* Setup IRQ numbers */
- 	timers.tmr_irq = irq_of_parse_and_map(node, 0);
+diff --git a/arch/arm/boot/dts/bcm11351.dtsi b/arch/arm/boot/dts/bcm11351.dtsi
+index 406c050..d1ce441 100644
+--- a/arch/arm/boot/dts/bcm11351.dtsi
++++ b/arch/arm/boot/dts/bcm11351.dtsi
+@@ -101,6 +101,7 @@
+ 	sdio1: sdio at 3f180000 {
+ 		compatible = "brcm,kona-sdhci";
+ 		reg = <0x3f180000 0x10000>;
++		clocks = <&sdio1_clk>;
+ 		interrupts = <0x0 77 0x4>;
+ 		status = "disabled";
+ 	};
+@@ -108,6 +109,7 @@
+ 	sdio2: sdio at 3f190000 {
+ 		compatible = "brcm,kona-sdhci";
+ 		reg = <0x3f190000 0x10000>;
++		clocks = <&sdio2_clk>;
+ 		interrupts = <0x0 76 0x4>;
+ 		status = "disabled";
+ 	};
+@@ -115,6 +117,7 @@
+ 	sdio3: sdio at 3f1a0000 {
+ 		compatible = "brcm,kona-sdhci";
+ 		reg = <0x3f1a0000 0x10000>;
++		clocks = <&sdio3_clk>;
+ 		interrupts = <0x0 74 0x4>;
+ 		status = "disabled";
+ 	};
+@@ -122,6 +125,7 @@
+ 	sdio4: sdio at 3f1b0000 {
+ 		compatible = "brcm,kona-sdhci";
+ 		reg = <0x3f1b0000 0x10000>;
++		clocks = <&sdio4_clk>;
+ 		interrupts = <0x0 73 0x4>;
+ 		status = "disabled";
+ 	};
 -- 
 1.8.0.1
