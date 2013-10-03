@@ -1,65 +1,41 @@
-From: roy.franz@linaro.org (Roy Franz)
-Date: Thu, 3 Oct 2013 12:28:03 -0700
-Subject: [PATCH 2/6] Add shared update_fdt() function for ARM/ARM64
-In-Reply-To: <20131003142721.GB2781@console-pimps.org>
-References: <1380385403-31904-1-git-send-email-roy.franz@linaro.org>
- <1380385403-31904-3-git-send-email-roy.franz@linaro.org>
- <20131003095224.GX21381@console-pimps.org>
- <1380807804.17503.9.camel@deneb.redhat.com>
- <20131003142721.GB2781@console-pimps.org>
-Message-ID: <CAFECyb-=2osh_j_9FCnWjAjLX-xbzanQeFjCLNTz4JKAk5d30w@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 3 Oct 2013 20:36:23 +0100
+Subject: IMX6 USDHC card detection
+Message-ID: <20131003193623.GF12758@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 3, 2013 at 7:27 AM, Matt Fleming <matt@console-pimps.org> wrote:
-> On Thu, 03 Oct, at 09:43:24AM, Mark Salter wrote:
->> On Thu, 2013-10-03 at 10:52 +0100, Matt Fleming wrote:
->> > > +#if defined(CONFIG_ARM) || defined(CONFIG_ARM64)
->> > > +static efi_status_t update_fdt(efi_system_table_t *sys_table, void *orig_fdt,
->> > > +                            void *fdt, int new_fdt_size, char *cmdline_ptr,
->> > > +                            u64 initrd_addr, u64 initrd_size,
->> > > +                            efi_memory_desc_t *memory_map,
->> > > +                            unsigned long map_size, unsigned long desc_size,
->> > > +                            u32 desc_ver)
->> >
->> > Hmm... does this function really belong in efi-stub-helper.c? That file
->> > should be for architecture independent functionality only.
->> >
->>
->> It isn't really arm-specific although arm is the only user right now.
->> We're using the FDT to pass EFI boot info that is passed in the boot
->> params block on x86. So potentially other architectures could use the
->> same code.
->
-> It's not EFI-specific either, apart from the fdt property names.
->
->> How about making it someting like:
->>
->> #ifdef ARCH_NEEDS_EFI_FDT
->> static efi_status_t update_fdt(efi_system_table_t *sys_table, void *orig_fdt,
->> ...
->> #endif
->>
->> so the architecture can decide whether to include it or not.
->
-> Is one implementation of this function going to fit all architectures?
-> Can we be sure of that ahead of time?
->
-> I'd prefer this to be kept in arch/ for now, and possibly moved into
-> efi-stub-helper.c at a later date if indeed it turns out to be generally
-> useful.
->
-> --
-> Matt Fleming, Intel Open Source Technology Center
+Having spent many hours chasing around wondering why controller based
+card detection doesn't work on IMX6, I've finally found it.
 
-Hi Matt,
+The hardware is setup such that we have a card detect signal routed to
+GPIO 4.  If we try and use the host controller's built-in card detection,
+things go awry - the host controller believes that a card is always
+inserted.
 
-   This  function is shared between ARM and ARM64, which are separate
-architectures so to keep this in arch code would require it to be
-duplicated for ARM/ARM64.  Would moving this function to a new
-"efi-stub-fdt.c" file be satisfactory?  This file would just be used
-the ARM and ARM64, so this would remove
-the need for the top-level #ifdefs.
+This appears to be because the kernel sets the D3CD bit in the PROT_CTRL
+register.  This enables card detection via the DAT3 signal, which
+indicates a logic '1' level when a card is inserted.  SD cards have a 50k
+pullup internally which provides the card detection mechanism, and hosts
+are expected to have a weak pull-down on this signal.
 
-Thanks,
-Roy
+However, the default setup of the SD data lines in IOMUX is this (eg):
+
+             MX6QDL_PAD_SD2_DAT0__SD2_DATA0 0x17059
+             MX6QDL_PAD_SD2_DAT1__SD2_DATA1 0x17059
+             MX6QDL_PAD_SD2_DAT2__SD2_DATA2 0x17059
+             MX6QDL_PAD_SD2_DAT3__SD2_DATA3 0x17059
+
+Bits 14 and 15 indicate "pull this pin up via a 22K resistor".
+
+What you end up with is the SD controller believes that a card is always
+inserted no matter what you do.  You can see this through the PRES_STATE
+register - you see bit 18 assert/deassert appropriately on card insertion
+and removals indicating that the socket CD signal is changing state, but
+you don't see the card inserted bit (bit 16) ever change.  Neither does
+the kernel react in any way.
+
+So, are the defaults for DATA3 signals really appropriate, or should they
+be adjusted (in other words, 0x13059 for DATA3).  The alternative is to
+ignore the built-in host card detection, and configure the CD pin as a
+GPIO instead.
