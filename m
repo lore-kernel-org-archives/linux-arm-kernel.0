@@ -1,72 +1,63 @@
 From: csmanjuvijay@gmail.com (Majunath Goudar)
-Date: Thu,  3 Oct 2013 18:32:08 +0530
-Subject: [PATCH V2 06/11] USB: OHCI: Properly handle ohci-exynos suspend
+Date: Thu,  3 Oct 2013 18:32:09 +0530
+Subject: [PATCH V2 07/11] USB: OHCI: Properly handle ohci-omap suspend
 In-Reply-To: <1380805334-19934-1-git-send-email-csmanjuvijay@gmail.com>
 References: <1380708947-15966-1-git-send-email-csmanjuvijay@gmail.com>
  <1380805334-19934-1-git-send-email-csmanjuvijay@gmail.com>
-Message-ID: <1380805334-19934-7-git-send-email-csmanjuvijay@gmail.com>
+Message-ID: <1380805334-19934-8-git-send-email-csmanjuvijay@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Manjunath Goudar <manjunath.goudar@linaro.org>
 
-Suspend scenario in case of ohci-exynos glue was not
+Suspend scenario in case of ohci-omap glue was not
 properly handled as it was not suspending generic part
 of ohci controller. Alan Stern suggested, properly handle
-ohci-exynos suspend scenario.
+ohci-omap suspend scenario.
 
 Calling explicitly the ohci_suspend() routine in
-exynos_ohci_suspend() will ensure proper handling of suspend
+ohci_omap_suspend() will ensure proper handling of suspend
 scenario.
 
 Signed-off-by: Manjunath Goudar <manju.goudar@lge.com>
 Signed-off-by: Manjunath Goudar <csmanjuvijay@gmail.com>
 Cc: Alan Stern <stern@rowland.harvard.edu>
-Cc: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
 Cc: Arnd Bergmann <arnd@arndb.de>
 Cc: Greg KH <greg@kroah.com>
 Cc: linux-usb at vger.kernel.org
 ---
- drivers/usb/host/ohci-exynos.c |   19 ++++---------------
- 1 file changed, 4 insertions(+), 15 deletions(-)
+ drivers/usb/host/ohci-omap.c |   12 +++++++++---
+ 1 file changed, 9 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/usb/host/ohci-exynos.c b/drivers/usb/host/ohci-exynos.c
-index 3e4bc74..47e9c38 100644
---- a/drivers/usb/host/ohci-exynos.c
-+++ b/drivers/usb/host/ohci-exynos.c
-@@ -206,21 +206,11 @@ static int exynos_ohci_suspend(struct device *dev)
- 	unsigned long flags;
- 	int rc = 0;
+diff --git a/drivers/usb/host/ohci-omap.c b/drivers/usb/host/ohci-omap.c
+index 18b27a2..ec2d04c 100644
+--- a/drivers/usb/host/ohci-omap.c
++++ b/drivers/usb/host/ohci-omap.c
+@@ -431,16 +431,22 @@ static int ohci_hcd_omap_drv_remove(struct platform_device *dev)
  
--	/*
--	 * Root hub was already suspended. Disable irq emission and
--	 * mark HW unaccessible, bail out if RH has been resumed. Use
--	 * the spinlock to properly synchronize with possible pending
--	 * RH suspend or resume activity.
--	 */
--	spin_lock_irqsave(&ohci->lock, flags);
--	if (ohci->rh_state != OHCI_RH_SUSPENDED &&
--			ohci->rh_state != OHCI_RH_HALTED) {
--		rc = -EINVAL;
--		goto fail;
--	}
--
--	clear_bit(HCD_FLAG_HW_ACCESSIBLE, &hcd->flags);
-+	rc = ohci_suspend(hcd);
-+	if (rc)
-+		return rc;
+ #ifdef	CONFIG_PM
  
-+	spin_lock_irqsave(&ohci->lock, flags);
- 	if (exynos_ohci->otg)
- 		exynos_ohci->otg->set_host(exynos_ohci->otg, &hcd->self);
+-static int ohci_omap_suspend(struct platform_device *dev, pm_message_t message)
++static int ohci_omap_suspend(struct platform_device *pdev, pm_message_t message)
+ {
+-	struct ohci_hcd	*ohci = hcd_to_ohci(platform_get_drvdata(dev));
++	struct usb_hcd *hcd = platform_get_drvdata(pdev);
++	struct ohci_hcd *ohci = hcd_to_ohci(hcd);
++	int ret;
  
-@@ -228,7 +218,6 @@ static int exynos_ohci_suspend(struct device *dev)
+ 	if (time_before(jiffies, ohci->next_statechange))
+ 		msleep(5);
+ 	ohci->next_statechange = jiffies;
  
- 	clk_disable_unprepare(exynos_ohci->clk);
++	ret = ohci_suspend(hcd);
++	if (ret)
++		return ret;
++
+ 	omap_ohci_clock_power(0);
+-	return 0;
++	return ret;
+ }
  
--fail:
- 	spin_unlock_irqrestore(&ohci->lock, flags);
- 
- 	return rc;
+ static int ohci_omap_resume(struct platform_device *dev)
 -- 
 1.7.9.5
