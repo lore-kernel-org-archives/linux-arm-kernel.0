@@ -1,29 +1,37 @@
-From: liljegren.mats2@gmail.com (Mats Liljegren)
-Date: Thu, 3 Oct 2013 15:42:12 +0200
-Subject: [RFC][PATCH] tci6638: dts: Add timer64 definitions
-In-Reply-To: <1380807346-19395-1-git-send-email-mats.liljegren@enea.com>
-References: <1380807346-19395-1-git-send-email-mats.liljegren@enea.com>
-Message-ID: <CA+xJJ18kMqOZ+-5yjBzo8P=FnENKdfXMv9xj6eSfAQXUAmTMuA@mail.gmail.com>
+From: msalter@redhat.com (Mark Salter)
+Date: Thu, 03 Oct 2013 09:43:24 -0400
+Subject: [PATCH 2/6] Add shared update_fdt() function for ARM/ARM64
+In-Reply-To: <20131003095224.GX21381@console-pimps.org>
+References: <1380385403-31904-1-git-send-email-roy.franz@linaro.org>
+ <1380385403-31904-3-git-send-email-roy.franz@linaro.org>
+ <20131003095224.GX21381@console-pimps.org>
+Message-ID: <1380807804.17503.9.camel@deneb.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sorry for the spam, the patch itself got lost when I used git
-send-email feature. I also need to use it since GMail apparently
-destroys things when using the web GUI.
+On Thu, 2013-10-03 at 10:52 +0100, Matt Fleming wrote:
+> > +#if defined(CONFIG_ARM) || defined(CONFIG_ARM64)
+> > +static efi_status_t update_fdt(efi_system_table_t *sys_table, void *orig_fdt,
+> > +                            void *fdt, int new_fdt_size, char *cmdline_ptr,
+> > +                            u64 initrd_addr, u64 initrd_size,
+> > +                            efi_memory_desc_t *memory_map,
+> > +                            unsigned long map_size, unsigned long desc_size,
+> > +                            u32 desc_ver)
+> 
+> Hmm... does this function really belong in efi-stub-helper.c? That file
+> should be for architecture independent functionality only.
+> 
 
-Regards
-Mats
+It isn't really arm-specific although arm is the only user right now.
+We're using the FDT to pass EFI boot info that is passed in the boot
+params block on x86. So potentially other architectures could use the
+same code. How about making it someting like:
 
-On Thu, Oct 3, 2013 at 3:35 PM, Mats Liljegren <mats.liljegren@enea.com> wrote:
-> This patch applies on:
-> Repo: git://arago-project.org/git/projects/linux-keystone.git
-> Branch: sept-2013b/master
-> Commit: 5349052e6eb19f496fdf7b1734ce55b217010339
->
-> Open issue: Is clkmodrst0 the correct clock source for the timers?
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+#ifdef ARCH_NEEDS_EFI_FDT
+static efi_status_t update_fdt(efi_system_table_t *sys_table, void *orig_fdt,
+...
+#endif
+
+so the architecture can decide whether to include it or not.
+
+--Mark
