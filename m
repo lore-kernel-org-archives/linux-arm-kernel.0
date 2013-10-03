@@ -1,60 +1,34 @@
-From: simon.guinot@sequanux.org (Simon Guinot)
-Date: Thu, 3 Oct 2013 11:00:58 +0200
-Subject: [PATCH] clk: armada-370: fix tclk frequencies
-In-Reply-To: <20131002170448.GO31178@titan.lakedaemon.net>
-References: <1380729418-14393-1-git-send-email-simon.guinot@sequanux.org>
- <20131002162221.GN31178@titan.lakedaemon.net>
- <20131002165754.GE1356@kw.sim.vm.gnt>
- <20131002170448.GO31178@titan.lakedaemon.net>
-Message-ID: <20131003090057.GF1356@kw.sim.vm.gnt>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Thu, 3 Oct 2013 11:13:05 +0200
+Subject: [PATCH] amba: Ensure drvdata is NULL
+In-Reply-To: <20131002202521.GU12758@n2100.arm.linux.org.uk>
+References: <1b2479137287fa8dfda3089ca0cb9fba8c4b1f1d.1380524337.git.michal.simek@xilinx.com>
+ <20131002202521.GU12758@n2100.arm.linux.org.uk>
+Message-ID: <d5a0aab9-f023-4464-b4a1-f7055e6c82d5@CO9EHSMHS010.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 02, 2013 at 01:04:49PM -0400, Jason Cooper wrote:
-> On Wed, Oct 02, 2013 at 06:57:54PM +0200, Simon Guinot wrote:
-> > On Wed, Oct 02, 2013 at 12:22:21PM -0400, Jason Cooper wrote:
-> > > Simon,
-> > > 
-> > > On Wed, Oct 02, 2013 at 05:56:58PM +0200, Simon Guinot wrote:
-> > > > Signed-off-by: Simon Guinot <simon.guinot@sequanux.org>
-> > > 
-> > > Could you elaborate on this?  What symptom did you notice?  How did this
-> > > fix it?  When was the regression introduced?
-> > 
-> > Hi Jason,
-> > 
-> > While benchmarking Linux 3.12-rc3 on an Armada-370-RD, I noticed bad
-> > networking performances... After some investigations, I found out that
-> > the coalescence configuration (derived from the tclk) was suspect.
-> > 
-> > While checking for the tclk value, I found this typo. There is not much
-> > to say about this patch except that the correct tclk frequencies for
-> > Armada-370 are 166 and 200MHz, not 16.6 and 20MHz.
+On 10/02/2013 10:25 PM, Russell King - ARM Linux wrote:
+> On Mon, Sep 30, 2013 at 08:59:06AM +0200, Michal Simek wrote:
+>> This patch is inpired by the patch for drvdata
+>> "device-core: Ensure drvdata = NULL when no driver is bound"
+>> (sha1: 0998d0631001288a5974afc0b2a5f568bcdecb4d)
+>>
+>> Also it fixes all occurences in drivers.
+>>
+>> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+>> ---
+>> This patch has been sent as RFC in this thread.
+>> http://lkml.org/lkml/2013/9/4/393
 > 
-> Yes, I know it's simple, but it's a huge help to us when trying to
-> decide whether or not to flag it for stable.  fwiw, the regression was
-> introduced by:
-> 
->   6b72333d clk: mvebu: add Armada 370 SoC-centric clock init
-> 
-> and this should be applied from v3.11 onwards.
+> Why not have the driver core do this?  Then it gets applied to all bus
+> types uniformly.
 
-Ok, I will reword this commit. Note that this bug can't be called a
-regression. The tclk frequencies array was wrong from the beginning:
+ok - I have checked that path and it should be already done
+in really_probe function which calls amba_probe() and then driver probe function.
 
-  97fa4cf4: clk: mvebu: add mvebu core clocks
+It means that the patch should contain just "amba_set_drvdata(dev, NULL);"
+removal and not touching bus.c file.
 
-The commit you pointed out simply moves the typo. I am not familiar
-with the stable process but if needed I can provide a patch against
-some stable branches.
-
-Please let know how do you want handle this.
-
-Simon
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131003/61a9c13c/attachment.sig>
+Thanks,
+Michal
