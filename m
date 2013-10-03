@@ -1,89 +1,120 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu,  3 Oct 2013 23:59:25 +0200
-Subject: [PATCH v2 2/3] ARM: move AES typedefs and function prototypes to
- separate header
-In-Reply-To: <1380837566-18242-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1380837566-18242-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1380837566-18242-3-git-send-email-ard.biesheuvel@linaro.org>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 03 Oct 2013 17:23:46 -0500
+Subject: [PATCH|RFC] of: let of_match_device() always return best match
+In-Reply-To: <524DE6DB.1070003@pengutronix.de>
+References: <1380826284-18381-1-git-send-email-mkl@pengutronix.de>
+ <524DD5A6.6020204@gmail.com> <524DE6DB.1070003@pengutronix.de>
+Message-ID: <524DEE72.7080400@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Put the struct definitions for AES keys and the asm function prototypes in a
-separate header and export the asm functions from the module.
-This allows other drivers to use them directly.
+On 10/03/2013 04:51 PM, Marc Kleine-Budde wrote:
+> On 10/03/2013 10:37 PM, Rob Herring wrote:
+>> On 10/03/2013 01:51 PM, Marc Kleine-Budde wrote:
+>>> The function of_match_device() should tell if a struct device
+>>> matches an of_device_id list and return the specific entry of
+>>> that table matches the device best.
+>>> 
+>>> The underlying __of_match_node() implements the wrong search
+>>> algorithm. It iterates over the list of of_device_ids,
+>>> comparing the first compatible with _all_ compatibles of the
+>>> struct device, then the second compatible of of_device_id and
+>>> so on.
+>>> 
+>>> This leads to a problem, if the device has more than one
+>>> compatible that match the of_device_id list. The implemented
+>>> search algorithm may find not the "best" match. As the
+>>> compatible list in the device is sorted from most to least 
+>>> specific.
+>>> 
+>>> For example:
+>>> 
+>>> The imx28.dtsi gives this compatible string for its CAN core:
+>>> 
+>>>> compatible = "fsl,imx28-flexcan", "fsl,p1010-flexcan";
+>>> 
+>>> The flexcan driver defines:
+>>> 
+>>>> static const struct of_device_id flexcan_of_match[] = { {
+>>>> .compatible = "fsl,p1010-flexcan", .data =
+>>>> &fsl_p1010_devtype_data, }, { .compatible =
+>>>> "fsl,imx28-flexcan", .data = &fsl_imx28_devtype_data, }, {
+>>>> .compatible = "fsl,imx6q-flexcan", .data =
+>>>> &fsl_imx6q_devtype_data, }, { /* sentinel */ }, };
+>>> 
+>>> The "p1010" was the first Freescale SoC with the flexcan core.
+>>> But this SoC has a bug, so a workaround has to be enabled in
+>>> the driver. The mx28 has this bug fixed, so we don't need this
+>>> quite costly workaround.
+>>> 
+>>> The __of_match_node() will compare:
+>>> 
+>>> from  of_device_id		from device fsl,p1010-flexcan
+>>> fsl,imx28-flexcan fsl,p1010-flexcan		fsl,p1010-flexcan	->
+>>> MATCH
+>>> 
+>>> The of_match_device() function as it currently is implemented
+>>> will always return p1010 not the mx28.
+>>> 
+>>> This patch fixes the problem by exchanging outer and inner
+>>> loop. The first compatible of a device is compared against all
+>>> compatible from the of_device_id list, then the second device
+>>> compatible and so on.
+>> 
+>> This has been an issue for some time. A fix has been attempted
+>> before and reverted if you look at the git history:
+> 
+> ..should have done this before creating the patch.
+> 
+>> commit bc51b0c22cebf5c311a6f1895fcca9f78efd0478 Author: Linus
+>> Torvalds <torvalds@linux-foundation.org> Date:   Tue Jul 10
+>> 12:49:32 2012 -0700
+>> 
+>> Revert "of: match by compatible property first"
+>> 
+>> This reverts commit 107a84e61cdd3406c842a0e4be7efffd3a05dba6.
+>> 
+>> Meelis Roos reports a regression since 3.5-rc5 that stops Sun
+>> Fire V100 and Sun Netra X1 sparc64 machines from booting, hanging
+>> after enabling serial console.  He bisected it to commit
+>> 107a84e61cdd.
+>> 
+>> Rob Herring explains: "The problem is match combinations of
+>> compatible plus name and/or type fail to match correctly.  I have
+>> a fix for this, but given how late it is for 3.5 I think it is
+>> best to revert this for now.  There could be other cases that
+>> rely on the current although wrong behavior.  I will post an
+>> updated version for 3.6."
+>> 
+>> Bisected-and-reported-by: Meelis Roos <mroos@linux.ee> 
+>> Requested-by: Rob Herring <rob.herring@calxeda.com> Cc: Thierry
+>> Reding <thierry.reding@avionic-design.de> Cc: Grant Likely
+>> <grant.likely@secretlab.ca> Signed-off-by: Linus Torvalds
+>> <torvalds@linux-foundation.org>
+>> 
+>> There was also a fix attempted for this and the discussion here:
+>> 
+>> http://www.mail-archive.com/linuxppc-dev at lists.ozlabs.org/msg60163.html
+>>
+>>
+>> 
+You patch would hit the same issues I believe.
+> 
+> Yes probably, are the OF patterns from the failing sparcs
+> available somewhere, so that we can test a better implementation?
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm/crypto/aes_glue.c | 22 ++++++----------------
- arch/arm/crypto/aes_glue.h | 19 +++++++++++++++++++
- 2 files changed, 25 insertions(+), 16 deletions(-)
- create mode 100644 arch/arm/crypto/aes_glue.h
+Not that I'm aware of. It appeared to be the serial driver. It may be
+evident looking at the sparc serial driver match table.
 
-diff --git a/arch/arm/crypto/aes_glue.c b/arch/arm/crypto/aes_glue.c
-index 59f7877..3003fa1 100644
---- a/arch/arm/crypto/aes_glue.c
-+++ b/arch/arm/crypto/aes_glue.c
-@@ -6,22 +6,12 @@
- #include <linux/crypto.h>
- #include <crypto/aes.h>
- 
--#define AES_MAXNR 14
-+#include "aes_glue.h"
- 
--typedef struct {
--	unsigned int rd_key[4 *(AES_MAXNR + 1)];
--	int rounds;
--} AES_KEY;
--
--struct AES_CTX {
--	AES_KEY enc_key;
--	AES_KEY dec_key;
--};
--
--asmlinkage void AES_encrypt(const u8 *in, u8 *out, AES_KEY *ctx);
--asmlinkage void AES_decrypt(const u8 *in, u8 *out, AES_KEY *ctx);
--asmlinkage int private_AES_set_decrypt_key(const unsigned char *userKey, const int bits, AES_KEY *key);
--asmlinkage int private_AES_set_encrypt_key(const unsigned char *userKey, const int bits, AES_KEY *key);
-+EXPORT_SYMBOL(AES_encrypt);
-+EXPORT_SYMBOL(AES_decrypt);
-+EXPORT_SYMBOL(private_AES_set_encrypt_key);
-+EXPORT_SYMBOL(private_AES_set_decrypt_key);
- 
- static void aes_encrypt(struct crypto_tfm *tfm, u8 *dst, const u8 *src)
- {
-@@ -81,7 +71,7 @@ static struct crypto_alg aes_alg = {
- 		.cipher	= {
- 			.cia_min_keysize	= AES_MIN_KEY_SIZE,
- 			.cia_max_keysize	= AES_MAX_KEY_SIZE,
--			.cia_setkey			= aes_set_key,
-+			.cia_setkey		= aes_set_key,
- 			.cia_encrypt		= aes_encrypt,
- 			.cia_decrypt		= aes_decrypt
- 		}
-diff --git a/arch/arm/crypto/aes_glue.h b/arch/arm/crypto/aes_glue.h
-new file mode 100644
-index 0000000..cca3e51
---- /dev/null
-+++ b/arch/arm/crypto/aes_glue.h
-@@ -0,0 +1,19 @@
-+
-+#define AES_MAXNR 14
-+
-+struct AES_KEY {
-+	unsigned int rd_key[4 * (AES_MAXNR + 1)];
-+	int rounds;
-+};
-+
-+struct AES_CTX {
-+	struct AES_KEY enc_key;
-+	struct AES_KEY dec_key;
-+};
-+
-+asmlinkage void AES_encrypt(const u8 *in, u8 *out, struct AES_KEY *ctx);
-+asmlinkage void AES_decrypt(const u8 *in, u8 *out, struct AES_KEY *ctx);
-+asmlinkage int private_AES_set_decrypt_key(const unsigned char *userKey,
-+					   const int bits, struct AES_KEY *key);
-+asmlinkage int private_AES_set_encrypt_key(const unsigned char *userKey,
-+					   const int bits, struct AES_KEY *key);
--- 
-1.8.1.2
+> I'll rearrange the drivers instead. BTW: what about the patch you 
+> mentioned in the above revert?
+
+My position has been we should change the driver ordering, but others
+have disagreed.
+
+Scott had some issues with my patch and my assumptions may not be
+right. Probably re-applying the original patch plus Scott's fix is the
+right answer. We just need to review the combined change closely to
+ensure we maintain current behavior where needed.
+
+Rob
