@@ -1,67 +1,66 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 3 Oct 2013 17:32:00 +0100
-Subject: [PATCH 2/2] ARM: include: asm: use 'int' instead of 'unsigned
- long' for normal register variables within atomic.h
-In-Reply-To: <524D416B.5090709@asianux.com>
-References: <5247A1D1.6080505@asianux.com> <5247A1FA.4030305@asianux.com>
- <5247A3FC.9020508@asianux.com>
- <20130930161149.GI26036@mudshark.cambridge.arm.com>
- <524A2DE7.8040208@asianux.com>
- <20131001090119.GA17629@mudshark.cambridge.arm.com>
- <524ABA20.6060106@asianux.com>
- <20131002104158.GD28311@mudshark.cambridge.arm.com>
- <524C3981.20307@asianux.com> <524D416B.5090709@asianux.com>
-Message-ID: <20131003163200.GE7408@mudshark.cambridge.arm.com>
+From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
+Date: Thu, 3 Oct 2013 18:37:43 +0200
+Subject: [PATCH 1/4] ARM: socfpga: dts: Move common nodes to cyclone5 dtsi
+In-Reply-To: <1380812321.7464.7.camel@linux-builds1>
+References: <1380699333-558-1-git-send-email-s.trumtrar@pengutronix.de>
+ <1380699333-558-2-git-send-email-s.trumtrar@pengutronix.de>
+ <1380812321.7464.7.camel@linux-builds1>
+Message-ID: <20131003163743.GB14042@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 03, 2013 at 11:05:31AM +0100, Chen Gang wrote:
-> If need send patch v2 for it, I should try (if so, need patch 1 also
-> send again?).
+Hi Dinh,
 
-Almost, comments below.
+On Thu, Oct 03, 2013 at 09:58:41AM -0500, Dinh Nguyen wrote:
+> On Wed, 2013-10-02 at 09:35 +0200, Steffen Trumtrar wrote:
+> > +/include/ "socfpga_cyclone5.dtsi"
+> > +
+> > +/ {
+> > +	model = "Altera SOCFPGA Cyclone V SoC Development Kit";
+> > +	compatible = "altr,socfpga-cyclone5", "altr,socfpga";
+> > +
+> > +	chosen {
+> > +		bootargs = "console=ttyS0,57600";
+> 
+> Thanks for doing this. It looks good. While you're at it can you make
+> this 115200? 57600 was early in the bring-up stage.
+> 
 
-> > So the related patch is below (still based on Patch 1):
-> > 
-> > -----------------------------patch begin--------------------------------
-> > 
-> > arm/include/asm/atomic.h: use 'int' instead of 'unsigned long' for 'oldval' in atomic_cmpxchg().
-> > 
-> >   For atomic_cmpxchg(), the type of 'oldval' need be 'int' to match the
-> >   type of "*ptr" (used by 'ldrex' instruction) and 'old' (used by 'teq'
-> >   instruction).
-> > 
-> > 
-> > Signed-off-by: Chen Gang <gang.chen@asianux.com>
-> > ---
-> >  arch/arm/include/asm/atomic.h |    3 ++-
-> >  1 files changed, 2 insertions(+), 1 deletions(-)
-> > 
-> > diff --git a/arch/arm/include/asm/atomic.h b/arch/arm/include/asm/atomic.h
-> > index a715ac0..9ee7e01 100644
-> > --- a/arch/arm/include/asm/atomic.h
-> > +++ b/arch/arm/include/asm/atomic.h
-> > @@ -114,7 +114,8 @@ static inline int atomic_sub_return(int i, atomic_t *v)
-> >  
-> >  static inline int atomic_cmpxchg(atomic_t *ptr, int old, int new)
-> >  {
-> > -	unsigned long oldval, res;
-> > +	int oldval;
-> > +	unsigned long res;
-> >  
-> >  	smp_mb();
+I can also completely remove this. The question is: does u-boot need this
+line or does it add this line itself?
+We added basic support for SoCFPGA to barebox (well, it will go live with the
+october release AFAIK. With SoCKit and SoCrates boards) and we normally do not
+need to put the bootargs in the DT. So, I would be okay to remove this line
+OR if u-boot uses it, change it to 115200. What do you think?
 
-I think you should also fix atomic_clear_mask to take (unsigned int mask,
-atomic_t *v). That would require a third patch fixing asm-generic, where
-atomic_clear_mask and atomic_set_mask have different types for the mask
-parameter.
+> > +	};
+> > +
+> > +	memory {
+> > +		name = "memory";
+> > +		device_type = "memory";
+> > +		reg = <0x0 0x40000000>; /* 1GB */
+> > +	};
+> > +
+> > +	aliases {
+> > +		/* this allow the ethaddr uboot environmnet variable contents
+> > +		 * to be added to the gmac1 device tree blob.
+> > +		 */
+> > +		ethernet0 = &gmac1;
+> > +	};
+> > +};
+> 
+> With the change to 115200,
+> 
+> Acked-by: Dinh Nguyen <dinguyen@altera.com>
+> 
 
-The problem with arm64 is that we're using *unsigned long* for 32-bit
-clear_mask, which is definitely wrong because it's 64-bit (another patch to
-fix this!).
+Thanks.
 
-Finally, is atomic_clear_mask even used anywhere outside of
-drivers/s390/scsi/? If not, perhaps we can just drop this function from arm
-and arm64 after all.
+Regards,
+Steffen
 
-Will
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
