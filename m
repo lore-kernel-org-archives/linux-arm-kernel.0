@@ -1,57 +1,31 @@
 From: rvaswani@codeaurora.org (Rohit Vaswani)
-Date: Thu,  3 Oct 2013 16:05:56 -0700
-Subject: [PATCH 3/4] ARM: debug: msm: Add DEBUG_LL support for ARCH_MSM8974
+Date: Thu,  3 Oct 2013 16:05:57 -0700
+Subject: [PATCH 4/4] defconfig: msm_defconfig: Enable CONFIG_ARCH_MSM8974
 In-Reply-To: <1380841557-2673-1-git-send-email-rvaswani@codeaurora.org>
 References: <1380841557-2673-1-git-send-email-rvaswani@codeaurora.org>
-Message-ID: <1380841557-2673-4-git-send-email-rvaswani@codeaurora.org>
+Message-ID: <1380841557-2673-5-git-send-email-rvaswani@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add debug uart support for MSM8974. This patch adds a Kconfig
-entry and the base address for the debug uart.
+This patch enables MSM8974 build support.
 
 Signed-off-by: Rohit Vaswani <rvaswani@codeaurora.org>
 ---
- arch/arm/Kconfig.debug       | 9 +++++++++
- arch/arm/include/debug/msm.S | 5 +++++
- 2 files changed, 14 insertions(+)
+ arch/arm/configs/msm_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index e18a6fc..959b2c7 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -357,6 +357,15 @@ choice
- 		  Say Y here if you want the debug print routines to direct
- 		  their output to the serial port on MSM 8960 devices.
- 
-+	config DEBUG_MSM8974_UART
-+		bool "Kernel low-level debugging messages via MSM 8974 UART"
-+		depends on ARCH_MSM8974
-+		select MSM_HAS_DEBUG_UART_HS
-+		select DEBUG_MSM_UART
-+		help
-+		  Say Y here if you want the debug print routines to direct
-+		  their output to the serial port on MSM 8974 devices.
-+
- 	config DEBUG_MVEBU_UART
- 		bool "Kernel low-level debugging messages via MVEBU UART (old bootloaders)"
- 		depends on ARCH_MVEBU
-diff --git a/arch/arm/include/debug/msm.S b/arch/arm/include/debug/msm.S
-index 9166e1b..9d653d4 100644
---- a/arch/arm/include/debug/msm.S
-+++ b/arch/arm/include/debug/msm.S
-@@ -46,6 +46,11 @@
- #define MSM_DEBUG_UART_PHYS	0x16440000
- #endif
- 
-+#ifdef CONFIG_DEBUG_MSM8974_UART
-+#define MSM_DEBUG_UART_BASE	0xFA71E000
-+#define MSM_DEBUG_UART_PHYS	0xF991E000
-+#endif
-+
- 	.macro	addruart, rp, rv, tmp
- #ifdef MSM_DEBUG_UART_PHYS
- 	ldr	\rp, =MSM_DEBUG_UART_PHYS
+diff --git a/arch/arm/configs/msm_defconfig b/arch/arm/configs/msm_defconfig
+index 690b5f9..0ed32e5 100644
+--- a/arch/arm/configs/msm_defconfig
++++ b/arch/arm/configs/msm_defconfig
+@@ -20,6 +20,7 @@ CONFIG_PARTITION_ADVANCED=y
+ CONFIG_ARCH_MSM=y
+ CONFIG_ARCH_MSM8X60=y
+ CONFIG_ARCH_MSM8960=y
++CONFIG_ARCH_MSM8974=y
+ CONFIG_SMP=y
+ CONFIG_PREEMPT=y
+ CONFIG_AEABI=y
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
