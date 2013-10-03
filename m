@@ -1,69 +1,72 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 3 Oct 2013 08:17:32 -0400
-Subject: [PATCH] clk: armada-370: fix tclk frequencies
-In-Reply-To: <20131003090057.GF1356@kw.sim.vm.gnt>
-References: <1380729418-14393-1-git-send-email-simon.guinot@sequanux.org>
- <20131002162221.GN31178@titan.lakedaemon.net>
- <20131002165754.GE1356@kw.sim.vm.gnt>
- <20131002170448.GO31178@titan.lakedaemon.net>
- <20131003090057.GF1356@kw.sim.vm.gnt>
-Message-ID: <20131003121732.GU31178@titan.lakedaemon.net>
+From: b.brezillon@overkiz.com (Boris BREZILLON)
+Date: Thu,  3 Oct 2013 14:19:17 +0200
+Subject: [PATCH v3 0/4] watchdog: at91sam9_wdt: handle already configured wdt
+Message-ID: <1380802761-32279-1-git-send-email-b.brezillon@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 03, 2013 at 11:00:58AM +0200, Simon Guinot wrote:
-> On Wed, Oct 02, 2013 at 01:04:49PM -0400, Jason Cooper wrote:
-> > On Wed, Oct 02, 2013 at 06:57:54PM +0200, Simon Guinot wrote:
-> > > On Wed, Oct 02, 2013 at 12:22:21PM -0400, Jason Cooper wrote:
-> > > > Simon,
-> > > > 
-> > > > On Wed, Oct 02, 2013 at 05:56:58PM +0200, Simon Guinot wrote:
-> > > > > Signed-off-by: Simon Guinot <simon.guinot@sequanux.org>
-> > > > 
-> > > > Could you elaborate on this?  What symptom did you notice?  How did this
-> > > > fix it?  When was the regression introduced?
-> > > 
-> > > Hi Jason,
-> > > 
-> > > While benchmarking Linux 3.12-rc3 on an Armada-370-RD, I noticed bad
-> > > networking performances... After some investigations, I found out that
-> > > the coalescence configuration (derived from the tclk) was suspect.
-> > > 
-> > > While checking for the tclk value, I found this typo. There is not much
-> > > to say about this patch except that the correct tclk frequencies for
-> > > Armada-370 are 166 and 200MHz, not 16.6 and 20MHz.
-> > 
-> > Yes, I know it's simple, but it's a huge help to us when trying to
-> > decide whether or not to flag it for stable.  fwiw, the regression was
-> > introduced by:
-> > 
-> >   6b72333d clk: mvebu: add Armada 370 SoC-centric clock init
-> > 
-> > and this should be applied from v3.11 onwards.
-> 
-> Ok, I will reword this commit. Note that this bug can't be called a
-> regression. The tclk frequencies array was wrong from the beginning:
-> 
->   97fa4cf4: clk: mvebu: add mvebu core clocks
-> 
-> The commit you pointed out simply moves the typo.
+Hello,
 
-Ahh, good catch!  Yes, please reword the commit.
+This patch series is a porposal to enhance the sam9 watchdog timer support.
 
-> I am not familiar with the stable process but if needed I can provide
-> a patch against some stable branches.
+The at91sam9 watchdog timer can only be configured once, and the current
+implementation tries to configure it in a static way:
+- 2 seconds timeout
+- wdt restart every 500ms
 
-Usually, there should only need to be one patch against mainline.  But
-since the bad values were moved during the lifetime of the error, there
-may need to be two patches.  Depends on how magical git is.  I've seen
-it do some pretty amazing stuff.
+If the timer has already been configured with different values, it returns an
+error and do not create any watchdog device.
 
-Please find the original commit introducing the error, reference that in
-the commit, and use 'tag --contains ...' to see which versions need the
-fix.  You can mention that below the cutoff.  That's generally all we
-need to flag it for stable and help the stable guys figure out which
-trees to apply it to.
+This is not critical if the watchdog is disabled, but if it has been enabled
+with different timeout values it will lead to a SoC reset.
 
-hth,
+This patch series tries to address this issue by adapting the heartbeat value
+according the WDT timer config:
+- it first tries to configure the timer as requested.
+- if it fails it fallbacks to the current config, adapting its heartbeat timer
+to the needs
 
-Jason.
+This patch series also move to a dynamically allocated at91wdt device instead
+of the static instance. I'm not sure this is the best solution, so please tell
+me if you prefer to keep static instance of watchdog.
+
+It adds a new at91 wdt type: software. This new type make use of the at91 wdt
+interrupt to trigger a software reboot.
+
+Finally it adds several properties to the device tree bindings.
+
+Best Regards,
+Boris
+
+Changes since v2:
+ - fix documentation
+ - rework the heartbeat computation to get a more flexible behaviour
+ - fix xx_to_yy macros
+ - modify warning and error messages
+ - remove unneeded parenthesis in arithmetic operations
+ - use devm functions to map io memory
+ - remove unneeded devm_kfree calls
+
+Change since v1:
+ - fix typo in documentaion
+ - fix irq dt definition for sama5d3 SoC
+
+Boris BREZILLON (4):
+  watchdog: at91sam9_wdt: better watchdog support
+  watchdog: at91sam9_wdt: update device tree doc
+  ARM: at91/dt: add sam9 watchdog default options to SoCs
+  ARM: at91/dt: add watchdog properties to kizbox board
+
+ .../devicetree/bindings/watchdog/atmel-wdt.txt     |   30 +-
+ arch/arm/boot/dts/at91sam9260.dtsi                 |    5 +
+ arch/arm/boot/dts/at91sam9263.dtsi                 |    5 +
+ arch/arm/boot/dts/at91sam9g45.dtsi                 |    5 +
+ arch/arm/boot/dts/at91sam9n12.dtsi                 |    5 +
+ arch/arm/boot/dts/at91sam9x5.dtsi                  |    5 +
+ arch/arm/boot/dts/kizbox.dts                       |    6 +
+ arch/arm/boot/dts/sama5d3.dtsi                     |    5 +
+ drivers/watchdog/at91sam9_wdt.c                    |  301 ++++++++++++++------
+ 9 files changed, 282 insertions(+), 85 deletions(-)
+
+-- 
+1.7.9.5
