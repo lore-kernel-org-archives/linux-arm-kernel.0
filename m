@@ -1,43 +1,62 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 3 Oct 2013 08:23:07 -0400
-Subject: [PATCH v2] clk: armada-370: fix tclk frequencies
-In-Reply-To: <1380794702-6191-1-git-send-email-simon.guinot@sequanux.org>
-References: <1380794702-6191-1-git-send-email-simon.guinot@sequanux.org>
-Message-ID: <20131003122307.GV31178@titan.lakedaemon.net>
+From: b.brezillon@overkiz.com (Boris BREZILLON)
+Date: Thu,  3 Oct 2013 14:19:19 +0200
+Subject: [PATCH 2/4] watchdog: at91sam9_wdt: update device tree doc
+In-Reply-To: <1380802761-32279-1-git-send-email-b.brezillon@overkiz.com>
+References: <1380802761-32279-1-git-send-email-b.brezillon@overkiz.com>
+Message-ID: <1380802761-32279-3-git-send-email-b.brezillon@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Simon,
+Add new at91sam9 watchdog properties to the documentation.
 
-On Thu, Oct 03, 2013 at 12:05:02PM +0200, Simon Guinot wrote:
-> This patch fixes the tclk frequency array for the Armada-370 SoC.
-> This bug has been introduced by commit 6b72333d
-> ("clk: mvebu: add Armada 370 SoC-centric clock init").
-> 
-> A wrong tclk frequency affects the following drivers: mvsdio, mvneta,
-> i2c-mv64xxx and mvebu-devbus. This list may be incomplete.
-> 
-> About the mvneta Ethernet driver, note that the tclk frequency is used
-> to compute the Rx time coalescence. Then, this bug harms the coalescence
-> configuration and also degrades the networking performances with the
-> default values.
-> 
-> Signed-off-by: Simon Guinot <simon.guinot@sequanux.org>
-> Cc: Andrew Lunn <andrew@lunn.ch>
-> Cc: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> Cc: Jason Cooper <jason@lakedaemon.net>
-> Cc: stable at vger.kernel.org
-> ---
->  drivers/clk/mvebu/armada-370.c |    4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
+Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
+---
+ .../devicetree/bindings/watchdog/atmel-wdt.txt     |   30 ++++++++++++++++++--
+ 1 file changed, 28 insertions(+), 2 deletions(-)
 
-Much better, thanks!
-
-Acked-by: Jason Cooper <jason@lakedaemon.net>
-
-This can be applied to v3.11 onwards.
-
-thx,
-
-Jason.
+diff --git a/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt b/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt
+index fcdd48f..f90e294 100644
+--- a/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt
++++ b/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt
+@@ -9,11 +9,37 @@ Required properties:
+ 
+ Optional properties:
+ - timeout-sec: contains the watchdog timeout in seconds.
++- interrupts : Should contain WDT interrupt.
++- atmel,max-heartbeat-sec : Should contain the maximum heartbeat value in
++	seconds. This value should be less or equal to 16. It is used to
++	compute the WDV field.
++- atmel,min-heartbeat-sec : Should contain the minimum heartbeat value in
++	seconds. This value must be smaller than the max-heartbeat-sec value.
++	It is used to compute the WDD field.
++- atmel,watchdog-type : Should be "hardware" or "software". Hardware watchdog
++	use the at91 watchdog reset. Software watchdog use the watchdog
++	interrupt to trigger a software reset.
++- atmel,reset-type : Should be "proc" or "all".
++	"all" : assert peripherals and processor reset signals
++	"proc" : assert the processor reset signal
++	This is valid only when using "hardware" watchdog.
++- atmel,disable : Should be present if you want to disable the watchdog.
++- atmel,idle-halt : Should be present if you want to stop the watchdog when
++	entering idle state.
++- atmel,dbg-halt : Should be present if you want to stop the watchdog when
++	entering debug state.
+ 
+ Example:
+-
+ 	watchdog at fffffd40 {
+ 		compatible = "atmel,at91sam9260-wdt";
+ 		reg = <0xfffffd40 0x10>;
+-		timeout-sec = <10>;
++		interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
++		timeout-sec = <15>;
++		atmel,watchdog-type = "hardware";
++		atmel,reset-type = "all";
++		atmel,dbg-halt;
++		atmel,idle-halt;
++		atmel,max-heartbeat-sec = <16>;
++		atmel,min-heartbeat-sec = <0>;
++		status = "okay";
+ 	};
+-- 
+1.7.9.5
