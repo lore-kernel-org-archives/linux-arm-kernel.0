@@ -1,302 +1,551 @@
-From: bcousson@baylibre.com (Benoit Cousson)
-Date: Thu, 03 Oct 2013 15:53:35 +0200
-Subject: [RFC 00/15] Device Tree schemas and validation
-In-Reply-To: <20131002142914.GI6506@voom.fritz.box>
-References: <1380041541-17529-1-git-send-email-bcousson@baylibre.com>
- <524B4B20.4020002@wwwdotorg.org> <20131002142914.GI6506@voom.fritz.box>
-Message-ID: <524D76DF.9050800@baylibre.com>
+From: inki.dae@samsung.com (Inki Dae)
+Date: Thu, 3 Oct 2013 22:55:23 +0900
+Subject: [PATCH 3/5] drm/bridge: Add PTN3460 bridge driver
+In-Reply-To: <1380670860-17621-4-git-send-email-seanpaul@chromium.org>
+References: <1380670860-17621-1-git-send-email-seanpaul@chromium.org>
+ <1380670860-17621-4-git-send-email-seanpaul@chromium.org>
+Message-ID: <CAAQKjZN_r-=-sj=Vb-o-KUS4ab5=cjCq1ni3VZeMeVc3NL=MMg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi David,
+Hi, thank you for your contribution and the below is my short comments,
 
-On 02/10/2013 16:29, David Gibson wrote:
-> On Tue, Oct 01, 2013 at 04:22:24PM -0600, Stephen Warren wrote:
->> On 09/24/2013 10:52 AM, Benoit Cousson wrote:
->>> Hi All,
->>>
->>> Following the discussion that happened during LCE-2013 and the email
->>> thread started by Tomasz few months ago [1], here is a first attempt
->>> to introduce:
->>> - a schema language to define the bindings accurately
->>> - DTS validation during device tree compilation in DTC itself
->>
->> Sorry, this is probably going to sound a bit negative. Hopefully you
->> find it constructive though.
->>
->>> The syntax for a schema is the same as the one for dts. This choice has
->>> been made to simplify its development, to maximize the code reuse and
->>> finally because the format is human-readable.
->>
->> I'm not convinced that's a good decision.
->>
->> DT is a language for representing data.
->>
->> The validation checks described by schemas are rules, or code, and not
->> static data.
->>
->> So, while I'm sure it's possible to shoe-horn at least some reasonable
->> subset of DT validation into DT syntax itself, I feel it's unlikely to
->> yield something that's scalable enough.
+2013/10/2 Sean Paul <seanpaul@chromium.org>:
+> This patch adds a drm_bridge driver for the PTN3460 DisplayPort to LVDS
+> bridge chip.
 >
-> I tend to agree.
+> Signed-off-by: Sean Paul <seanpaul@chromium.org>
+> ---
+>  .../devicetree/bindings/drm/bridge/ptn3460.txt     |  27 ++
+>  drivers/gpu/drm/Kconfig                            |   2 +
+>  drivers/gpu/drm/Makefile                           |   1 +
+>  drivers/gpu/drm/bridge/Kconfig                     |   4 +
+>  drivers/gpu/drm/bridge/Makefile                    |   3 +
+>  drivers/gpu/drm/bridge/ptn3460.c                   | 349 +++++++++++++++++++++
+>  include/drm/bridge/ptn3460.h                       |  36 +++
+>  7 files changed, 422 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/drm/bridge/ptn3460.txt
+>  create mode 100644 drivers/gpu/drm/bridge/Kconfig
+>  create mode 100644 drivers/gpu/drm/bridge/Makefile
+>  create mode 100644 drivers/gpu/drm/bridge/ptn3460.c
+>  create mode 100644 include/drm/bridge/ptn3460.h
 >
->> For example, it's easy to specify that a property must be 2 cells long.
->> What if it could be any multiple of two? That's a lot of numbers to
->> explicitly enumerate as data. Sure, you can then invent syntax to
->> represent that specific rule (parameterized by 2), but what about the
->> next similar-but-different rule? The only approach I can think of to
->> that is to allow the schema to contain arbitrary expressions, which
->> would likely need to morph into arbitary statements not just
->> expressions. Once you're there, I think the schema would be better
->> represented as a programming language rather than as a data structure
->> that could have code hooked into it.
->>
->>> How to:
->>>   * Associate a schema to one or several nodes
->>>
->>> As said earlier a schema can be used to validate one or several nodes
->>> from a dts. To do this the "compatible" properties from the nodes which
->>> should be validated must be present in the schema.
->>>
->>> 	timer1: timer at 4a318000 {
->>> 		compatible = "ti,omap3430-timer";
->> ...
->>> To write a schema which will validate OMAP Timers like the one above,
->>> one may write the following schema:
->>>
->>> 	/dts-v1/;
->>> 	/ {
->>> 		compatible = "ti,omap[0-9]+-timer";
->>
->> What about DT nodes that don't have a compatible value? We certainly
->> have some of those already like /memory and /chosen. We should be able
->> to validate their schema too. This probably doesn't invalidate being
->> able to look things up by compatible value though; it just means we need
->> some additional mechanisms too.
+> diff --git a/Documentation/devicetree/bindings/drm/bridge/ptn3460.txt b/Documentation/devicetree/bindings/drm/bridge/ptn3460.txt
+> new file mode 100644
+> index 0000000..c1cd329
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/drm/bridge/ptn3460.txt
+> @@ -0,0 +1,27 @@
+> +ptn3460-bridge bindings
+> +
+> +Required properties:
+> +       - compatible: "nxp,ptn3460"
+> +       - reg: i2c address of the bridge
+> +       - powerdown-gpio: OF device-tree gpio specification
+
+Can a regulator be used instead of gpio in other board case?
+
+> +       - reset-gpio: OF device-tree gpio specification
+> +       - edid-emulation: The EDID emulation entry to use
+> +               +-------+------------+------------------+
+> +               | Value | Resolution | Description      |
+> +               |   0   |  1024x768  | NXP Generic      |
+> +               |   1   |  1920x1080 | NXP Generic      |
+> +               |   2   |  1920x1080 | NXP Generic      |
+> +               |   3   |  1600x900  | Samsung LTM200KT |
+> +               |   4   |  1920x1080 | Samsung LTM230HT |
+> +               |   5   |  1366x768  | NXP Generic      |
+> +               |   6   |  1600x900  | ChiMei M215HGE   |
+> +               +-------+------------+------------------+
+> +
+> +Example:
+> +       ptn3460-bridge at 20 {
+> +               compatible = "nxp,ptn3460";
+> +               reg = <0x20>;
+> +               powerdown-gpio = <&gpy2 5 1 0 0>;
+> +               reset-gpio = <&gpx1 5 1 0 0>;
+> +               edid-emulation = <5>;
+> +       };
+> diff --git a/drivers/gpu/drm/Kconfig b/drivers/gpu/drm/Kconfig
+> index 955555d..cd7bfb3 100644
+> --- a/drivers/gpu/drm/Kconfig
+> +++ b/drivers/gpu/drm/Kconfig
+> @@ -236,3 +236,5 @@ source "drivers/gpu/drm/tilcdc/Kconfig"
+>  source "drivers/gpu/drm/qxl/Kconfig"
 >
-> More to the point, what about the properties of a node whose format is
-> defined not by this node's binding but by some other nodes binding.
-> e.g. the exact format of reg and ranges is at least partially
-> determined by the parent bus's binding, and interrupts is defined
-> partially by the interrupt parent's binding.  gpio properties are
-> defined by a combination of a global binding and the gpio parent,
-> IIRC.
+>  source "drivers/gpu/drm/msm/Kconfig"
+> +
+> +source "drivers/gpu/drm/bridge/Kconfig"
+> diff --git a/drivers/gpu/drm/Makefile b/drivers/gpu/drm/Makefile
+> index f089adf..9234253 100644
+> --- a/drivers/gpu/drm/Makefile
+> +++ b/drivers/gpu/drm/Makefile
+> @@ -56,3 +56,4 @@ obj-$(CONFIG_DRM_TILCDC)      += tilcdc/
+>  obj-$(CONFIG_DRM_QXL) += qxl/
+>  obj-$(CONFIG_DRM_MSM) += msm/
+>  obj-y                  += i2c/
+> +obj-y                  += bridge/
+> diff --git a/drivers/gpu/drm/bridge/Kconfig b/drivers/gpu/drm/bridge/Kconfig
+> new file mode 100644
+> index 0000000..f8db069
+> --- /dev/null
+> +++ b/drivers/gpu/drm/bridge/Kconfig
+> @@ -0,0 +1,4 @@
+> +config DRM_PTN3460
+> +       tristate "PTN3460 DP/LVDS bridge"
+> +       depends on DRM && I2C
+> +       ---help---
+> diff --git a/drivers/gpu/drm/bridge/Makefile b/drivers/gpu/drm/bridge/Makefile
+> new file mode 100644
+> index 0000000..b4733e1
+> --- /dev/null
+> +++ b/drivers/gpu/drm/bridge/Makefile
+> @@ -0,0 +1,3 @@
+> +ccflags-y := -Iinclude/drm
+> +
+> +obj-$(CONFIG_DRM_PTN3460) += ptn3460.o
+> diff --git a/drivers/gpu/drm/bridge/ptn3460.c b/drivers/gpu/drm/bridge/ptn3460.c
+> new file mode 100644
+> index 0000000..a9e5c1a
+> --- /dev/null
+> +++ b/drivers/gpu/drm/bridge/ptn3460.c
+> @@ -0,0 +1,349 @@
+> +/*
+> + * NXP PTN3460 DP/LVDS bridge driver
+> + *
+> + * Copyright (C) 2013 Google, Inc.
+> + *
+> + * This software is licensed under the terms of the GNU General Public
+> + * License version 2, as published by the Free Software Foundation, and
+> + * may be copied, distributed, and modified under those terms.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#include <linux/module.h>
+> +#include <linux/of.h>
+> +#include <linux/of_gpio.h>
+> +#include <linux/i2c.h>
+> +#include <linux/gpio.h>
+> +#include <linux/delay.h>
+> +
+> +#include "drmP.h"
+> +#include "drm_edid.h"
+> +#include "drm_crtc.h"
+> +#include "drm_crtc_helper.h"
+> +
+> +#include "bridge/ptn3460.h"
+> +
+> +#define PTN3460_EDID_ADDR                      0x0
+> +#define PTN3460_EDID_EMULATION_ADDR            0x84
+> +#define PTN3460_EDID_ENABLE_EMULATION          0
+> +#define PTN3460_EDID_EMULATION_SELECTION       1
+> +#define PTN3460_EDID_SRAM_LOAD_ADDR            0x85
+> +
+> +struct ptn3460_bridge {
+> +       struct drm_connector connector;
+> +       struct i2c_client *client;
+> +       struct drm_encoder *encoder;
+> +       struct drm_bridge *bridge;
+> +       struct edid *edid;
+> +       int gpio_pd_n;
+> +       int gpio_rst_n;
+> +       u32 edid_emulation;
+> +       bool enabled;
+> +};
+> +
+> +static int ptn3460_read_bytes(struct ptn3460_bridge *ptn_bridge, char addr,
+> +               u8 *buf, int len)
+> +{
+> +       int ret;
+> +
+> +       ret = i2c_master_send(ptn_bridge->client, &addr, 1);
+> +       if (ret <= 0) {
+> +               DRM_ERROR("Failed to send i2c command, ret=%d\n", ret);
+> +               return ret;
+> +       }
+> +
+> +       ret = i2c_master_recv(ptn_bridge->client, buf, len);
+> +       if (ret <= 0) {
+> +               DRM_ERROR("Failed to recv i2c data, ret=%d\n", ret);
+> +               return ret;
+> +       }
+> +
+> +       return 0;
+> +}
+> +
+> +static int ptn3460_write_byte(struct ptn3460_bridge *ptn_bridge, char addr,
+> +               char val)
+> +{
+> +       int ret;
+> +       char buf[2];
+> +
+> +       buf[0] = addr;
+> +       buf[1] = val;
+> +
+> +       ret = i2c_master_send(ptn_bridge->client, buf, ARRAY_SIZE(buf));
+> +       if (ret <= 0) {
+> +               DRM_ERROR("Failed to send i2c command, ret=%d\n", ret);
+> +               return ret;
+> +       }
+> +
+> +       return 0;
+> +}
+> +
+> +static int ptn3460_select_edid(struct ptn3460_bridge *ptn_bridge)
+> +{
+> +       int ret;
+> +       char val;
+> +
+> +       /* Load the selected edid into SRAM (accessed at PTN3460_EDID_ADDR) */
+> +       ret = ptn3460_write_byte(ptn_bridge, PTN3460_EDID_SRAM_LOAD_ADDR,
+> +                       ptn_bridge->edid_emulation);
+> +       if (ret) {
+> +               DRM_ERROR("Failed to transfer edid to sram, ret=%d\n", ret);
+> +               return ret;
+> +       }
+> +
+> +       /* Enable EDID emulation and select the desired EDID */
+> +       val = 1 << PTN3460_EDID_ENABLE_EMULATION |
+> +               ptn_bridge->edid_emulation << PTN3460_EDID_EMULATION_SELECTION;
+> +
+> +       ret = ptn3460_write_byte(ptn_bridge, PTN3460_EDID_EMULATION_ADDR, val);
+> +       if (ret) {
+> +               DRM_ERROR("Failed to write edid value, ret=%d\n", ret);
+> +               return ret;
+> +       }
+> +
+> +       return 0;
+> +}
+> +
+> +static void ptn3460_pre_enable(struct drm_bridge *bridge)
+> +{
+> +       struct ptn3460_bridge *ptn_bridge = bridge->driver_private;
+> +       int ret;
+> +
+> +       if (ptn_bridge->enabled)
+> +               return;
+> +
+> +       if (gpio_is_valid(ptn_bridge->gpio_pd_n))
+> +               gpio_set_value(ptn_bridge->gpio_pd_n, 1);
 
-Yeah, that's a general concern that Stephen raised several time as well.
-We need to figure out some way to handle that.
+Ditto.
 
->>>   * Define constraints on properties
->>>
->>> To define constraints on a property one has to create a node in a schema
->>> which has as name the name of the property that one want to validate.
->>>
->>> To specify constraints on the property "ti,hwmods" of OMAP Timers one
->>> can write this schema:
->>>
->>> 	/dts-v1/;
->>> 	/ {
->>> 		compatible = "ti,omap[0-9]+-timer";
->>> 		ti,hwmods {
->>> 			...
->>> 		};
->>
->> compatible and ti,hwmods are both properties in the DT file. However, in
->> the schema above, one appears as a property, and one as a node. I don't
->> like that inconsistency. It'd be better if compatible was a node too.
+> +
+> +       if (gpio_is_valid(ptn_bridge->gpio_rst_n)) {
+> +               gpio_set_value(ptn_bridge->gpio_rst_n, 0);
+> +               udelay(10);
+> +               gpio_set_value(ptn_bridge->gpio_rst_n, 1);
+> +       }
+> +
+> +       /*
+> +        * There's a bug in the PTN chip where it falsely asserts hotplug before
+> +        * it is fully functional. We're forced to wait for the maximum start up
+> +        * time specified in the chip's datasheet to make sure we're really up.
+> +        */
+> +       msleep(90);
+> +
+> +       ret = ptn3460_select_edid(ptn_bridge);
+> +       if (ret)
+> +               DRM_ERROR("Select edid failed ret=%d\n", ret);
+> +
+> +       ptn_bridge->enabled = true;
+> +}
+> +
+> +static void ptn3460_enable(struct drm_bridge *bridge)
+> +{
+> +}
+> +
+> +static void ptn3460_disable(struct drm_bridge *bridge)
+> +{
+> +       struct ptn3460_bridge *ptn_bridge = bridge->driver_private;
+> +
+> +       if (!ptn_bridge->enabled)
+> +               return;
+> +
+> +       ptn_bridge->enabled = false;
+> +
+> +       if (gpio_is_valid(ptn_bridge->gpio_rst_n))
+> +               gpio_set_value(ptn_bridge->gpio_rst_n, 1);
+> +
+> +       if (gpio_is_valid(ptn_bridge->gpio_pd_n))
+> +               gpio_set_value(ptn_bridge->gpio_pd_n, 0);
+
+Ditto.
+
+> +}
+> +
+> +static void ptn3460_post_disable(struct drm_bridge *bridge)
+> +{
+> +}
+> +
+> +void ptn3460_bridge_destroy(struct drm_bridge *bridge)
+> +{
+> +       struct ptn3460_bridge *ptn_bridge = bridge->driver_private;
+> +
+> +       drm_bridge_cleanup(bridge);
+> +       if (gpio_is_valid(ptn_bridge->gpio_pd_n))
+> +               gpio_free(ptn_bridge->gpio_pd_n);
+
+Ditto.
+
+> +       if (gpio_is_valid(ptn_bridge->gpio_rst_n))
+> +               gpio_free(ptn_bridge->gpio_rst_n);
+> +       /* Nothing else to free, we've got devm allocated memory */
+> +}
+> +
+> +struct drm_bridge_funcs ptn3460_bridge_funcs = {
+> +       .pre_enable = ptn3460_pre_enable,
+> +       .enable = ptn3460_enable,
+> +       .disable = ptn3460_disable,
+> +       .post_disable = ptn3460_post_disable,
+> +       .destroy = ptn3460_bridge_destroy,
+> +};
+> +
+> +int ptn3460_get_modes(struct drm_connector *connector)
+> +{
+> +       struct ptn3460_bridge *ptn_bridge;
+> +       u8 *edid;
+> +       int ret, num_modes;
+> +       bool power_off;
+> +
+> +       ptn_bridge = container_of(connector, struct ptn3460_bridge, connector);
+> +
+> +       if (ptn_bridge->edid)
+> +               return drm_add_edid_modes(connector, ptn_bridge->edid);
+> +
+> +       power_off = !ptn_bridge->enabled;
+> +       ptn3460_pre_enable(ptn_bridge->bridge);
+> +
+> +       edid = kmalloc(EDID_LENGTH, GFP_KERNEL);
+> +       if (!edid) {
+> +               DRM_ERROR("Failed to allocate edid\n");
+> +               return 0;
+> +       }
+> +
+> +       ret = ptn3460_read_bytes(ptn_bridge, PTN3460_EDID_ADDR, edid,
+> +                       EDID_LENGTH);
+> +       if (ret) {
+> +               kfree(edid);
+> +               num_modes = 0;
+> +               goto out;
+> +       }
+> +
+> +       ptn_bridge->edid = (struct edid *)edid;
+> +       drm_mode_connector_update_edid_property(connector, ptn_bridge->edid);
+> +
+> +       num_modes = drm_add_edid_modes(connector, ptn_bridge->edid);
+> +
+> +out:
+> +       if (power_off)
+> +               ptn3460_disable(ptn_bridge->bridge);
+> +
+> +       return num_modes;
+> +}
+> +
+> +static int ptn3460_mode_valid(struct drm_connector *connector,
+> +               struct drm_display_mode *mode)
+> +{
+> +       return MODE_OK;
+> +}
+> +
+> +struct drm_encoder *ptn3460_best_encoder(struct drm_connector *connector)
+> +{
+> +       struct ptn3460_bridge *ptn_bridge;
+> +
+> +       ptn_bridge = container_of(connector, struct ptn3460_bridge, connector);
+> +
+> +       return ptn_bridge->encoder;
+> +}
+> +
+> +struct drm_connector_helper_funcs ptn3460_connector_helper_funcs = {
+> +       .get_modes = ptn3460_get_modes,
+> +       .mode_valid = ptn3460_mode_valid,
+> +       .best_encoder = ptn3460_best_encoder,
+> +};
+> +
+> +enum drm_connector_status ptn3460_detect(struct drm_connector *connector,
+> +               bool force)
+> +{
+> +       return connector_status_connected;
+> +}
+> +
+> +void ptn3460_connector_destroy(struct drm_connector *connector)
+> +{
+> +       drm_connector_cleanup(connector);
+> +}
+> +
+> +struct drm_connector_funcs ptn3460_connector_funcs = {
+> +       .dpms = drm_helper_connector_dpms,
+> +       .fill_modes = drm_helper_probe_single_connector_modes,
+> +       .detect = ptn3460_detect,
+> +       .destroy = ptn3460_connector_destroy,
+> +};
+
+Why do you try to add a new connector here? We already have the
+connector for LCD, and also provides some callbacks for it. For this,
+please see exynos_drm_display_ops of exynos_drm_fimd driver, and you
+can add new callbacks to there such as init callback for bridge device
+initialization if needed.
+
+> +
+> +int ptn3460_init(struct drm_device *dev, struct drm_encoder *encoder,
+> +               struct i2c_client *client, struct device_node *node)
+> +{
+> +       int ret;
+> +       struct drm_bridge *bridge;
+> +       struct ptn3460_bridge *ptn_bridge;
+> +
+> +       bridge = devm_kzalloc(dev->dev, sizeof(*bridge), GFP_KERNEL);
+> +       if (!bridge) {
+> +               DRM_ERROR("Failed to allocate drm bridge\n");
+> +               return -ENOMEM;
+> +       }
+> +
+> +       ptn_bridge = devm_kzalloc(dev->dev, sizeof(*ptn_bridge), GFP_KERNEL);
+> +       if (!ptn_bridge) {
+> +               DRM_ERROR("Failed to allocate ptn bridge\n");
+> +               return -ENOMEM;
+> +       }
+> +
+> +       ptn_bridge->client = client;
+> +       ptn_bridge->encoder = encoder;
+> +       ptn_bridge->bridge = bridge;
+> +       ptn_bridge->gpio_pd_n = of_get_named_gpio(node, "powerdown-gpio", 0);
+
+Also, if a regulator is used instead?
+
+> +       if (gpio_is_valid(ptn_bridge->gpio_pd_n)) {
+> +               ret = gpio_request_one(ptn_bridge->gpio_pd_n,
+> +                               GPIOF_OUT_INIT_HIGH, "PTN3460_PD_N");
+> +               if (ret) {
+> +                       DRM_ERROR("Request powerdown-gpio failed (%d)\n", ret);
+> +                       return ret;
+> +               }
+> +       }
+> +
+> +       ptn_bridge->gpio_rst_n = of_get_named_gpio(node, "reset-gpio", 0);
+> +       if (gpio_is_valid(ptn_bridge->gpio_rst_n)) {
+> +               /*
+> +                * Request the reset pin low to avoid the bridge being
+> +                * initialized prematurely
+> +                */
+> +               ret = gpio_request_one(ptn_bridge->gpio_rst_n,
+> +                               GPIOF_OUT_INIT_LOW, "PTN3460_RST_N");
+> +               if (ret) {
+> +                       DRM_ERROR("Request reset-gpio failed (%d)\n", ret);
+> +                       gpio_free(ptn_bridge->gpio_pd_n);
+> +                       return ret;
+> +               }
+> +       }
+> +
+> +       ret = of_property_read_u32(node, "edid-emulation",
+> +                       &ptn_bridge->edid_emulation);
+> +       if (ret) {
+> +               DRM_ERROR("Can't read edid emulation value\n");
+> +               goto err;
+> +       }
+> +
+> +       ret = drm_bridge_init(dev, bridge, &ptn3460_bridge_funcs);
+> +       if (ret) {
+> +               DRM_ERROR("Failed to initialize bridge with drm\n");
+> +               goto err;
+> +       }
+> +
+> +       bridge->driver_private = ptn_bridge;
+> +       encoder->bridge = bridge;
+> +
+> +       ret = drm_connector_init(dev, &ptn_bridge->connector,
+> +                       &ptn3460_connector_funcs, DRM_MODE_CONNECTOR_LVDS);
+
+So it seems that here's not right place to call drm_connector_init function.
+
+Display pipeline path could be one of,
+         Display Controller          Display bus
+         ---------------------------------------------------------------------------
+                  FIMD---------------------LVDS--------------------LCD,
+                                                 or
+                  FIMD----------------------eDP---------------------LCD,
+                                                 or
+                  FIMD------------------MIPI-DSI------------------LCD,
+                                                 or
+                  FIMD-------------------------------------------------LCD
+
+And also in case using image enhancement chip,
+mDNIe-------------FIMD-LITE between Display Controller and Display
+bus.
+
+So, wouldn't the right place below FIMD driver? :)
+
+
+> +       if (ret) {
+> +               DRM_ERROR("Failed to initialize connector with drm\n");
+> +               goto err;
+> +       }
+> +       drm_connector_helper_add(&ptn_bridge->connector,
+> +                       &ptn3460_connector_helper_funcs);
+> +       drm_sysfs_connector_add(&ptn_bridge->connector);
+> +       drm_mode_connector_attach_encoder(&ptn_bridge->connector, encoder);
+> +
+> +       return 0;
+> +
+> +err:
+> +       if (gpio_is_valid(ptn_bridge->gpio_pd_n))
+> +               gpio_free(ptn_bridge->gpio_pd_n);
+> +       if (gpio_is_valid(ptn_bridge->gpio_rst_n))
+> +               gpio_free(ptn_bridge->gpio_rst_n);
+> +       return ret;
+> +}
+> diff --git a/include/drm/bridge/ptn3460.h b/include/drm/bridge/ptn3460.h
+> new file mode 100644
+> index 0000000..157ffa1
+> --- /dev/null
+> +++ b/include/drm/bridge/ptn3460.h
+> @@ -0,0 +1,36 @@
+> +/*
+> + * Copyright (C) 2013 Google, Inc.
+> + *
+> + * This software is licensed under the terms of the GNU General Public
+> + * License version 2, as published by the Free Software Foundation, and
+> + * may be copied, distributed, and modified under those terms.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#ifndef _DRM_BRIDGE_PTN3460_H_
+> +#define _DRM_BRIDGE_PTN3460_H_
+> +
+> +struct drm_device;
+> +struct drm_encoder;
+> +struct i2c_client;
+> +struct device_node;
+> +
+> +#ifdef CONFIG_DRM_PTN3460
+> +
+> +int ptn3460_init(struct drm_device *dev, struct drm_encoder *encoder,
+> +               struct i2c_client *client, struct device_node *node);
+> +#else
+> +
+> +int ptn3460_init(struct drm_device *dev, struct drm_encoder *encoder,
+> +               struct i2c_client *client, struct device_node *node)
+> +{
+> +       return 0;
+> +}
+> +
+> +#endif
+> +
+> +#endif
+> --
+> 1.8.4
 >
-> Essentially what's going on here is that to describe the constraint on
-> a property, a node with corresponding name is defined to encode the
-> parameters of that constraint.  It kind of works, but it's forced.  It
-> also hits problems since nodes and properties are technically in
-> different namespaces, although they rarely collide in real cases.
-
-OK, so would you suggest keeping mapping between node / attribute in DTS 
-and in the schema?
-
->>> If one want to use a regular as property name one can write this schema:
->>>
->>> 	/dts-v1/;
->>> 	/ {
->>> 		compatible = "abc";
->>> 		def {
->>> 			name = "def[0-9]";
->>
->> Isn't it valid to have a property named "name" within the node itself?
->> How do you differentiate between specifying the node name and the name
->> property?
 >
-> Or to look at it another way, how do you differentiate between nodes
-> representing encoded constraints for a property, and nodes
-> representing nodes directly.
->
->> What if the node name needs more validation than just a regex. For
->> example, suppose we want to validate the
->> unit-name-must-match-reg-address rule. We need to write some complex
->> expression using data extracted from reg to calculate the unit address.
->> Equally, the node name perhaps has to exist in some global list of
->> acceptable node names. It would be extremely tricky if not impossible to
->> do that with a regex.
->>
->>> 			...
->>> 		};
->>> 	};
->>>
->>> Above one can see that the "name" property override the node name.
->>
->> Override implies that dtc would change the node name during compilation.
->> I think s/override/validate/ or s/override/overrides the validation
->> rules for/?
->
-> Actually, dtc already contains checks that a "name" property (if
-> present) matches the unit name.  Name properties vs. node names work a
-> bit differently in the flat-tree world versus traditional OF, and this
-> checks ensures that flat trees don't do (at least some) things which
-> would break the OF traditional approach.
->
->>>   * Require the presence of a property inside a node or inside one of its
->>> parents
->> ...
->>> /dts-v1/;
->>> / {
->>>      compatible = "ti,twl[0-9]+-rtc";
->>>      interrupt-controller {
->>>          is-required;
->>>          can-be-inherited;
->>
->> interrupt-controller isn't a good example here, since it isn't a
->> property that would typically be inherited. Why not use interrupt-parent
->> instead?
->>
->>> One can check if 'node' has the following subnode 'subnode1', 'subnode2',
->>> and 'abc' with the schema below:
->>>
->>> /dts-v1/;
->>> / {
->>>      compatible = "comp";
->>>      children = "abc", "subnode[0-9]";
->>> };
->>
->> How is the schema for each sub-node specified?
->>
->> What if some nodes are optional and some required? The conditions where
->> a sub-node is required might be complex, and I think we'd always want to
->> be able to represent them in whatever schema language we chose.
->>
->> The most obvious way would be to make each sub-node's schema appear as a
->> sub-node within the main node's schema, but then how do you tell if a
->> schema node describes a property or a node?
->>
->> Note that the following DT file is currently accepted by dtc even if it
->> may not be the best choice of property and node names:
->>
->> ==========
->> /dts-v1/;
->>
->> / {
->> 	foo = <1>;
->> 	foo {};
->> };
->> ==========
->
-> Note that node / property name collisions are not entirely theoretical
-> either.  They are permitted in IEEE1275 and there are real Apple
-> device trees in the wild which have them.  It's rare and discouraged,
-> obviously.
->
->>>   * Constraints on array size
->>>
->>> One can specify the following constraints on array size:
->>>   - length: specify the exact length that an array must have.
->>>   - min-length: specify the minimum number of elements an array must have.
->>>   - max-length: specify the maximum number of elements an array must have.
->>
->> This seems rather inflexible; it'll cover a lot of the simple cases, but
->> hit a wall pretty soon. For example, how would it validate a property
->> that is supposed to include 3 GPIO specifiers, where the GPIO specifiers
->> are going to have DT-specific lengths, since the length of each
->> specifier is defined by the node that the phandles reference?
->>
->>
->> Overall, I believe perhaps the single most important aspect of any DT
->> schema is schema inheritance or instancing, and this proposal doesn't
->> appear to address that issue at all.
->>
->> Inheritance of schemas:
->>
->> For example, any node that is addressed must contain a reg property. The
->> constraints on that property are identical in all bindings; it must
->> consist of #address-cells + #size-cells integer values (cells). We don't
->> want to have to cut/paste that rule into every single binding
->> definition. Rather, we should simply say something like "this binding
->> uses the reg property", and the schema validation tool will look up the
->> definition of "reg property", and hence know how to validate it.
->>
->> Similarly, any binding that describes a GPIO controller will have some
->> similar requirements; the gpio-controller and #gpio-cells properties
->> must be present. The schema should simply say "I'm a GPIO controller",
->> and the schema tool should add some extra requirements to nodes of that
->> type.
->>
->> Instancing of schemas:
->>
->> Any binding that uses GPIOs should be able to say that a particular
->> property (e.g. "enable-gpios") is-a GPIO-specifier (with parameters
->> "enable" for the property name, min/max/expression length, etc.), and
->> then the schema validation tool would know to apply rules for a
->> specifier list to that property (and be able to check the property name).
->
-> Yes, I agree both of those are important.
->
->
-> So, here's a counter-proposal of at least a rough outline of how I
-> think schemas could work, in a way that's still based generally on dt
-> syntax.
-
-That seems to be well aligned with what we tried to achieve, so I'm not 
-considering that as a counter-proposal but as a refinement. :-)
-
-> First, define the notion of dt "patterns" or "templates".  A dt
-> pattern is to a dt node or subtree as a regex is to a string - it
-> provides a reasonably expressive way of defining a family of dt
-> nodes.  These would be defined in an extension / superset of dt
-> syntax.
-
-OK, make sense. Are you considering a syntax similar to xpath in order 
-to match any node in the path, using the full path information instead 
-of the individual node?
-
-I'm a little bit rusty on xpath but AFAIR it could be something like that.
-
-match any node containing reg:
-
-"//reg/.."
-
-match only node containing reg for ti,omap4-gpio compatible
-
-"//*[@compatible='ti,omap4-gpio']/reg/.."
-
-match only node containing reg below the ocp parent node
-
-"//ocp/*/reg/.."
-
-
-> A schema would then be defined as a set of implications:
-> 	If node X matches pattern A, => it must also match pattern B
->
-> For example:
-> 	If a node has a compatible property with string "foodev"
-> 	 => it must have various foodev properties.
->
-> 	If a node has a "reg" property (at all)
-> 	 => it must have the format required by reg
->
-> 	If a node has an "interrupts" property
-> 	 => it must have either "interrupt-parent" or "interrupt-map"
->
-
-That's part is similar to what we had in mind. So we just need to find 
-how to express it properly using the DTS syntax.
-
-Thanks,
-Benoit
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
