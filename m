@@ -1,22 +1,41 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 3 Oct 2013 13:26:09 +0900
-Subject: [PATCH 05/05] ARM: shmobile: Remove KDM9D reference DTS
-In-Reply-To: <20131001103343.813.54921.sendpatchset@w520>
-References: <20131001103255.813.65710.sendpatchset@w520>
- <20131001103343.813.54921.sendpatchset@w520>
-Message-ID: <20131003042608.GQ7925@verge.net.au>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Wed,  2 Oct 2013 22:05:10 -0700
+Subject: [PATCH] arm: Select NOP_USB_XCEIV if MACH_OMAP3EVM is enabled
+Message-ID: <1380776710-27788-1-git-send-email-linux@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 01, 2013 at 07:33:43PM +0900, Magnus Damm wrote:
-> From: Magnus Damm <damm@opensource.se>
-> 
-> Now when the legacy DTS file emev2-kzm9d.dts can be
-> used with board-kzm9d.c and board-kzm9d-reference.c
-> proceed with removing emev-kzm9d-reference.dts.
-> 
-> Signed-off-by: Magnus Damm <damm@opensource.se>
+arm builds have been failing on and off with
 
-Thanks, I have queued this up in the dt3 branch.
-It should make it into v3.13 but if not I'll rename the branch
-dt after rebasing it on v3.13-rcX which will then be targeted at v3.14.
+arch/arm/mach-omap2/board-omap3evm.c:703: undefined reference to
+`usb_nop_xceiv_register'
+
+for several years. Current arm:allmodconfig build fails for this reason.
+
+Problem is that board-omap3evm.c is always build into the kernel.
+It calls usb_nop_xceiv_register(), which is built with NOP_USB_XCEIV,
+which in turn can be configured as module. This results in the observed
+build failure.
+
+Fix the problem once and for all by selecting NOP_USB_XCEIV if MACH_OMAP3EVM
+is enabled.
+
+Signed-off-by: Guenter Roeck <linux@roeck-us.net>
+---
+ arch/arm/mach-omap2/Kconfig |    1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
+index b5fb5f7..0bc2cf4 100644
+--- a/arch/arm/mach-omap2/Kconfig
++++ b/arch/arm/mach-omap2/Kconfig
+@@ -265,6 +265,7 @@ config MACH_OMAP3EVM
+ 	depends on ARCH_OMAP3
+ 	default y
+ 	select OMAP_PACKAGE_CBB
++	select NOP_USB_XCEIV
+ 
+ config MACH_OMAP3517EVM
+ 	bool "OMAP3517/ AM3517 EVM board"
+-- 
+1.7.9.7
