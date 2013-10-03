@@ -1,33 +1,82 @@
 From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
-Date: Thu,  3 Oct 2013 23:21:38 +0200
-Subject: [PATCH v2 2/5] ARM: socfpga: dts: Change baudrate for socdk
+Date: Thu,  3 Oct 2013 23:21:41 +0200
+Subject: [PATCH v2 5/5] ARM: socfpga: dts: fix s2f_* clock name
 In-Reply-To: <1380835301-26512-1-git-send-email-s.trumtrar@pengutronix.de>
 References: <1380835301-26512-1-git-send-email-s.trumtrar@pengutronix.de>
-Message-ID: <1380835301-26512-3-git-send-email-s.trumtrar@pengutronix.de>
+Message-ID: <1380835301-26512-6-git-send-email-s.trumtrar@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The baudrate for the SoCDK was lower in previous development stages.
-Change it to the more common 115200 baudrate.
+The s2f_* clocks are called h2f_* in the datasheets.
+Rename them accordingly in the socfpga.dtsi.
 
 Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
 Acked-by: Dinh Nguyen <dinguyen@altera.com>
 ---
- arch/arm/boot/dts/socfpga_cyclone5_socdk.dts | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/socfpga.dtsi | 16 ++++++++--------
+ 1 file changed, 8 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm/boot/dts/socfpga_cyclone5_socdk.dts b/arch/arm/boot/dts/socfpga_cyclone5_socdk.dts
-index 0ea6399..2ee52ab 100644
---- a/arch/arm/boot/dts/socfpga_cyclone5_socdk.dts
-+++ b/arch/arm/boot/dts/socfpga_cyclone5_socdk.dts
-@@ -22,7 +22,7 @@
- 	compatible = "altr,socfpga-cyclone5", "altr,socfpga";
+diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
+index 587096e..e245924 100644
+--- a/arch/arm/boot/dts/socfpga.dtsi
++++ b/arch/arm/boot/dts/socfpga.dtsi
+@@ -147,7 +147,7 @@
+ 							reg = <0x58>;
+ 						};
  
- 	chosen {
--		bootargs = "console=ttyS0,57600";
-+		bootargs = "console=ttyS0,115200";
- 	};
+-						cfg_s2f_usr0_clk: cfg_s2f_usr0_clk {
++						cfg_h2f_usr0_clk: cfg_h2f_usr0_clk {
+ 							#clock-cells = <0>;
+ 							compatible = "altr,socfpga-perip-clk";
+ 							clocks = <&main_pll>;
+@@ -198,7 +198,7 @@
+ 							reg = <0x98>;
+ 						};
  
- 	memory {
+-						s2f_usr1_clk: s2f_usr1_clk {
++						h2f_usr1_clk: h2f_usr1_clk {
+ 							#clock-cells = <0>;
+ 							compatible = "altr,socfpga-perip-clk";
+ 							clocks = <&periph_pll>;
+@@ -235,7 +235,7 @@
+ 							reg = <0xD0>;
+ 						};
+ 
+-						s2f_usr2_clk: s2f_usr2_clk {
++						h2f_usr2_clk: h2f_usr2_clk {
+ 							#clock-cells = <0>;
+ 							compatible = "altr,socfpga-perip-clk";
+ 							clocks = <&sdram_pll>;
+@@ -335,14 +335,14 @@
+ 					cfg_clk: cfg_clk {
+ 						#clock-cells = <0>;
+ 						compatible = "altr,socfpga-gate-clk";
+-						clocks = <&cfg_s2f_usr0_clk>;
++						clocks = <&cfg_h2f_usr0_clk>;
+ 						clk-gate = <0x60 8>;
+ 					};
+ 
+-					s2f_user0_clk: s2f_user0_clk {
++					h2f_user0_clk: h2f_user0_clk {
+ 						#clock-cells = <0>;
+ 						compatible = "altr,socfpga-gate-clk";
+-						clocks = <&cfg_s2f_usr0_clk>;
++						clocks = <&cfg_h2f_usr0_clk>;
+ 						clk-gate = <0x60 9>;
+ 					};
+ 
+@@ -400,10 +400,10 @@
+ 						div-reg = <0xa8 0 24>;
+ 					};
+ 
+-					s2f_user1_clk: s2f_user1_clk {
++					h2f_user1_clk: h2f_user1_clk {
+ 						#clock-cells = <0>;
+ 						compatible = "altr,socfpga-gate-clk";
+-						clocks = <&s2f_usr1_clk>;
++						clocks = <&h2f_usr1_clk>;
+ 						clk-gate = <0xa0 7>;
+ 					};
+ 
 -- 
 1.8.4.rc3
