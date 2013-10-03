@@ -1,29 +1,28 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 3 Oct 2013 12:49:48 +0900
-Subject: [PATCH 01/05] ARM: shmobile: Sync KZM9D DTS with KZM9D reference
- DTS
-In-Reply-To: <20131001103305.813.70296.sendpatchset@w520>
-References: <20131001103255.813.65710.sendpatchset@w520>
- <20131001103305.813.70296.sendpatchset@w520>
-Message-ID: <20131003034947.GH28463@verge.net.au>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 2 Oct 2013 20:57:57 -0700
+Subject: [PATCH, FIX] ARM: mvebu: add missing DT Mbus ranges and relocate
+ PCIe DT nodes for RN102
+In-Reply-To: <87a9iuq7ff.fsf@natisbad.org>
+References: <87a9iuq7ff.fsf@natisbad.org>
+Message-ID: <CAOesGMjs=_USrFR9EkzksBj=7=1CgyujqvNhDZhpfdgkTt6gJQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 01, 2013 at 07:33:05PM +0900, Magnus Damm wrote:
-> From: Magnus Damm <damm@opensource.se>
-> 
-> Copy the device nodes from KZM9D reference into the KZM9D
-> device tree file. This will allow us to use a single DTS
-> file regarless of kernel configuration. In case of legacy
-> C board code the device nodes may or may not be used, but
-> in the multiplatform case all the DT device nodes are used.
-> 
-> Signed-off-by: Magnus Damm <damm@opensource.se>
-> ---
-> 
->  arch/arm/boot/dts/emev2-kzm9d.dts |   33 ++++++++++++++++++++++++++++++++-
->  1 file changed, 32 insertions(+), 1 deletion(-)
+Hi,
 
-Thanks, I have queued this up in the dt3 branch.
-It should make it into v3.13 but if not I'll rename the branch
-dt after rebasing it on v3.13-rcX which will then be targeted at v3.14.
+On Mon, Sep 30, 2013 at 3:19 PM, Arnaud Ebalard <arno@natisbad.org> wrote:
+>
+> When 5e12a613 and 0cd3754a were introduced, Netgear ReadyNAS 102 .dts
+> file was queued for inclusion and missed the update to have Mbus (and
+> then BootROM) ranges properties declared. It also missed the relocation
+> of Armada 370/XP PCIe DT nodes introduced by 14fd8ed0 after de1af8d4.
+> This patch fixes that which makes 3.12-rc3 bootable on the NAS.
+
+In the future please don't just quote the SHAs, give the patch subject
+as well. It makes it easier to follow the patch description without
+looking them up (besides, there's a chance that the 8-character SHAs
+will not be unique at some point in the future, which makes the lookup
+harder).
+
+
+-Olof
