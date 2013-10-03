@@ -1,46 +1,104 @@
 From: seanpaul@chromium.org (Sean Paul)
-Date: Thu,  3 Oct 2013 18:28:20 -0400
-Subject: [PATCH v2 2/5] ARM: dts: Add dp-controller node to exynos5250-snow
+Date: Thu,  3 Oct 2013 18:28:22 -0400
+Subject: [PATCH v2 4/5] drm/exynos: Initialize ptn3460 if present
 In-Reply-To: <1380839303-4834-1-git-send-email-seanpaul@chromium.org>
 References: <1380670860-17621-1-git-send-email-seanpaul@chromium.org>
  <1380839303-4834-1-git-send-email-seanpaul@chromium.org>
-Message-ID: <1380839303-4834-3-git-send-email-seanpaul@chromium.org>
+Message-ID: <1380839303-4834-5-git-send-email-seanpaul@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the dp-controller node to the exynos5250-snow board dts
-file.
+This patch adds code to look for the ptn3460 in the device tree file on
+exynos initialization. If ptn node is found, the driver will initialize
+the ptn3460 driver and skip creating a DP connector (since the bridge
+driver will register its own connector).
 
 Signed-off-by: Sean Paul <seanpaul@chromium.org>
 ---
 
-v2: Added dp-controller address to node (rebased on linux-next)
+v2:
+	- Changed include from of_i2c.h to i2c.h
+	- Changed of_find_by_name to of_find_compatible
 
- arch/arm/boot/dts/exynos5250-snow.dts | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+ drivers/gpu/drm/exynos/exynos_drm_core.c | 44 +++++++++++++++++++++++++++++++-
+ 1 file changed, 43 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/exynos5250-snow.dts b/arch/arm/boot/dts/exynos5250-snow.dts
-index 2a0f0de..f1cf68e 100644
---- a/arch/arm/boot/dts/exynos5250-snow.dts
-+++ b/arch/arm/boot/dts/exynos5250-snow.dts
-@@ -186,6 +186,18 @@
- 		samsung,vbus-gpio = <&gpx1 1 0>;
- 	};
+diff --git a/drivers/gpu/drm/exynos/exynos_drm_core.c b/drivers/gpu/drm/exynos/exynos_drm_core.c
+index 1bef6dc..08ca4f9 100644
+--- a/drivers/gpu/drm/exynos/exynos_drm_core.c
++++ b/drivers/gpu/drm/exynos/exynos_drm_core.c
+@@ -12,7 +12,9 @@
+  * option) any later version.
+  */
  
-+	dp-controller at 145B0000 {
-+		samsung,color-space = <0>;
-+		samsung,dynamic-range = <0>;
-+		samsung,ycbcr-coeff = <0>;
-+		samsung,color-depth = <1>;
-+		samsung,link-rate = <0x0a>;
-+		samsung,lane-count = <2>;
++#include <linux/i2c.h>
+ #include <drm/drmP.h>
++#include <drm/bridge/ptn3460.h>
+ #include "exynos_drm_drv.h"
+ #include "exynos_drm_encoder.h"
+ #include "exynos_drm_connector.h"
+@@ -20,6 +22,40 @@
+ 
+ static LIST_HEAD(exynos_drm_subdrv_list);
+ 
++struct bridge_init {
++	struct i2c_client *client;
++	struct device_node *node;
++};
 +
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&dp_hpd>;
-+	};
++static bool find_bridge(const char *compat, struct bridge_init *bridge)
++{
++	bridge->client = NULL;
++	bridge->node = of_find_compatible_node(NULL, NULL, compat);
++	if (!bridge->node)
++		return false;
 +
- 	fimd: fimd at 14400000 {
- 		display-timings {
- 			native-mode = <&lcd_timing>;
++	bridge->client = of_find_i2c_device_by_node(bridge->node);
++	if (!bridge->client)
++		return false;
++
++	return true;
++}
++
++/* returns the number of bridges attached */
++static int exynos_drm_attach_lcd_bridge(struct drm_device *dev,
++		struct drm_encoder *encoder)
++{
++	struct bridge_init bridge;
++	int ret;
++
++	if (find_bridge("nxp,ptn3460", &bridge)) {
++		ret = ptn3460_init(dev, encoder, bridge.client, bridge.node);
++		if (!ret)
++			return 1;
++	}
++	return 0;
++}
++
+ static int exynos_drm_create_enc_conn(struct drm_device *dev,
+ 					struct exynos_drm_subdrv *subdrv)
+ {
+@@ -36,6 +72,13 @@ static int exynos_drm_create_enc_conn(struct drm_device *dev,
+ 		DRM_ERROR("failed to create encoder\n");
+ 		return -EFAULT;
+ 	}
++	subdrv->encoder = encoder;
++
++	if (subdrv->manager->display_ops->type == EXYNOS_DISPLAY_TYPE_LCD) {
++		ret = exynos_drm_attach_lcd_bridge(dev, encoder);
++		if (ret)
++			return 0;
++	}
+ 
+ 	/*
+ 	 * create and initialize a connector for this sub driver and
+@@ -48,7 +91,6 @@ static int exynos_drm_create_enc_conn(struct drm_device *dev,
+ 		goto err_destroy_encoder;
+ 	}
+ 
+-	subdrv->encoder = encoder;
+ 	subdrv->connector = connector;
+ 
+ 	return 0;
 -- 
 1.8.4
