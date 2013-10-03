@@ -1,50 +1,61 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu, 03 Oct 2013 16:31:02 +0200
-Subject: [PATCH 0/3] ARM: at91/tc/clocksource: various robustness
- improvements
-In-Reply-To: <1380717265-6497-1-git-send-email-b.brezillon@overkiz.com>
-References: <1380717265-6497-1-git-send-email-b.brezillon@overkiz.com>
-Message-ID: <524D7FA6.9050402@linaro.org>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Thu, 3 Oct 2013 10:31:53 -0400 (EDT)
+Subject: [PATCH 06/11] USB: OHCI: Properly handle ohci-exynos suspend
+In-Reply-To: <CAKsNYyws1m1kT4KiJ6GFcTSo0cT=cu+0nA0vwx=wu_SuRhAfhA@mail.gmail.com>
+Message-ID: <Pine.LNX.4.44L0.1310031027190.1287-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/02/2013 02:34 PM, Boris BREZILLON wrote:
-> Hello,
->
-> This series include several improvements regarding the at91 tc clocksource
-> driver:
->   - use clk_prepare/unprepare_enable/disable functions instead of the
->     clk_enable/disable functions to prepare the transition to the common clk
->     framework
->   - check several function return values instead of considering these functions
->     always suceed.
->   - remove the deprecated IRQF_DISABLED flag
->
-> Best Regards,
->
-> Boris
->
-> Boris BREZILLON (3):
->    ARM: at91/tc/clocksource: replace clk_enable/disable with
->      clk_prepare_enable/disable_unprepare
->    ARM: at91/tc/clocksource: improve driver robustness
->    ARM: at91/tc/clocksource: remove IRQF_DISABLED
->
->   drivers/clocksource/tcb_clksrc.c |   61 +++++++++++++++++++++++++++++++-------
->   1 file changed, 50 insertions(+), 11 deletions(-)
->
+On Thu, 3 Oct 2013, manju goudar wrote:
 
-Applied to my tree for 3.13 with the subsystem name and first letter 
-capitalized fixed:
+> On Wed, Oct 2, 2013 at 9:22 PM, Alan Stern <stern@rowland.harvard.edu>wrote:
+> 
+> > On Wed, 2 Oct 2013, Bartlomiej Zolnierkiewicz wrote:
+> >
+> > >
+> > > Hi,
+> > >
+> > > On Wednesday, October 02, 2013 10:38:58 AM Alan Stern wrote:
+> > > > On Wed, 2 Oct 2013, Bartlomiej Zolnierkiewicz wrote:
+> > > >
+> > > > > Maybe it would make sense to cleanup ohci_suspend() first (before
+> > adding
+> > > > > new ohci_suspend() users) and remove unused do_wakeup parameter?
+> > > >
+> > > > Not possible.  The do_wakeup parameter is part of a function prototype
+> > > > shared by other callback routines (such as ehci_suspend()) that _do_
+> > > > use the parameter.
+> > >
+> > > If you mean ohci-pci.c usage (which is currently the only usage of
+> > > ohci_suspend() looking at the latest -next kernel) than it is enough
+> > > to add a simple wrapper for it in ohci-pci.c:
+> > >
+> > > ...
+> > > static int ohci_pci_suspend(struct usb_hcd *hcd, bool do_wakeup)
+> > > {
+> > >       ohci_suspend(hcd);
+> > > }
+> > > ...
+> > >     ohci_pci_hc_driver.pci_suspend = ohci_pci_suspend;
+> > > ...
+> >
+> > Ah, now I see your point.  Yes, it's true; that parameter could be
+> > eliminated.
+> >
+> > Manjunath, would you like to update your patch series to get rid of the
+> > do_wakeup argument to ohci_suspend()?
+> >
+> > Yes I will do. I think we can also rid of ehci_suspend() do_wakeup
+> argument.
 
-clocksource: tcb_clksrc: [A-Z]*
+Arrgh!  Manjunath, I was wrong.  I'm sorry to make you do all this
+extra work -- your original patch series was correct.
 
-Thanks !
-   -- Daniel
+Bartlomiej, we both failed to notice that the 1/11 patch in the 
+original series adds a usage of do_wakeup.  Therefore that argument 
+cannot be removed.
 
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+Greg, please ignore Manjunath's V2 series (sent today) and merge the 
+original 11-patch series posted on October 2.
 
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Alan Stern
