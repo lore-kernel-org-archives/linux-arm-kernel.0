@@ -1,35 +1,65 @@
-From: b.brezillon@overkiz.com (Boris BREZILLON)
-Date: Thu,  3 Oct 2013 21:04:43 +0200
-Subject: [PATCH v4 4/4] ARM: at91/dt: add watchdog properties to kizbox board
-In-Reply-To: <1380827083-6872-1-git-send-email-b.brezillon@overkiz.com>
-References: <1380827083-6872-1-git-send-email-b.brezillon@overkiz.com>
-Message-ID: <1380827083-6872-5-git-send-email-b.brezillon@overkiz.com>
+From: roy.franz@linaro.org (Roy Franz)
+Date: Thu, 3 Oct 2013 12:28:03 -0700
+Subject: [PATCH 2/6] Add shared update_fdt() function for ARM/ARM64
+In-Reply-To: <20131003142721.GB2781@console-pimps.org>
+References: <1380385403-31904-1-git-send-email-roy.franz@linaro.org>
+ <1380385403-31904-3-git-send-email-roy.franz@linaro.org>
+ <20131003095224.GX21381@console-pimps.org>
+ <1380807804.17503.9.camel@deneb.redhat.com>
+ <20131003142721.GB2781@console-pimps.org>
+Message-ID: <CAFECyb-=2osh_j_9FCnWjAjLX-xbzanQeFjCLNTz4JKAk5d30w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add watchdog specific config for kizbox board.
+On Thu, Oct 3, 2013 at 7:27 AM, Matt Fleming <matt@console-pimps.org> wrote:
+> On Thu, 03 Oct, at 09:43:24AM, Mark Salter wrote:
+>> On Thu, 2013-10-03 at 10:52 +0100, Matt Fleming wrote:
+>> > > +#if defined(CONFIG_ARM) || defined(CONFIG_ARM64)
+>> > > +static efi_status_t update_fdt(efi_system_table_t *sys_table, void *orig_fdt,
+>> > > +                            void *fdt, int new_fdt_size, char *cmdline_ptr,
+>> > > +                            u64 initrd_addr, u64 initrd_size,
+>> > > +                            efi_memory_desc_t *memory_map,
+>> > > +                            unsigned long map_size, unsigned long desc_size,
+>> > > +                            u32 desc_ver)
+>> >
+>> > Hmm... does this function really belong in efi-stub-helper.c? That file
+>> > should be for architecture independent functionality only.
+>> >
+>>
+>> It isn't really arm-specific although arm is the only user right now.
+>> We're using the FDT to pass EFI boot info that is passed in the boot
+>> params block on x86. So potentially other architectures could use the
+>> same code.
+>
+> It's not EFI-specific either, apart from the fdt property names.
+>
+>> How about making it someting like:
+>>
+>> #ifdef ARCH_NEEDS_EFI_FDT
+>> static efi_status_t update_fdt(efi_system_table_t *sys_table, void *orig_fdt,
+>> ...
+>> #endif
+>>
+>> so the architecture can decide whether to include it or not.
+>
+> Is one implementation of this function going to fit all architectures?
+> Can we be sure of that ahead of time?
+>
+> I'd prefer this to be kept in arch/ for now, and possibly moved into
+> efi-stub-helper.c at a later date if indeed it turns out to be generally
+> useful.
+>
+> --
+> Matt Fleming, Intel Open Source Technology Center
 
-Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
----
- arch/arm/boot/dts/kizbox.dts |    6 ++++++
- 1 file changed, 6 insertions(+)
+Hi Matt,
 
-diff --git a/arch/arm/boot/dts/kizbox.dts b/arch/arm/boot/dts/kizbox.dts
-index 02df191..928f6ee 100644
---- a/arch/arm/boot/dts/kizbox.dts
-+++ b/arch/arm/boot/dts/kizbox.dts
-@@ -53,6 +53,12 @@
- 				status = "okay";
- 			};
- 
-+			watchdog at fffffd40 {
-+				timeout-sec = <15>;
-+				atmel,max-heartbeat-sec = <16>;
-+				atmel,min-heartbeat-sec = <0>;
-+				status = "okay";
-+			};
- 		};
- 
- 		nand0: nand at 40000000 {
--- 
-1.7.9.5
+   This  function is shared between ARM and ARM64, which are separate
+architectures so to keep this in arch code would require it to be
+duplicated for ARM/ARM64.  Would moving this function to a new
+"efi-stub-fdt.c" file be satisfactory?  This file would just be used
+the ARM and ARM64, so this would remove
+the need for the top-level #ifdefs.
+
+Thanks,
+Roy
