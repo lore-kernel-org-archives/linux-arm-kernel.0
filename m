@@ -1,42 +1,94 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Thu, 03 Oct 2013 11:56:40 +0200
-Subject: [PATCH 01/05] ARM: shmobile: Sync KZM9D DTS with KZM9D reference
- DTS
-In-Reply-To: <20131003034947.GH28463@verge.net.au>
-References: <20131001103255.813.65710.sendpatchset@w520>
- <20131001103305.813.70296.sendpatchset@w520>
- <20131003034947.GH28463@verge.net.au>
-Message-ID: <2066391.GX4ZAHlWrz@avalon>
+From: rogerq@ti.com (Roger Quadros)
+Date: Thu, 3 Oct 2013 12:58:58 +0300
+Subject: [PATCH v8 0/8] phy: omap-usb: Support multiple instances and new types
+Message-ID: <1380794346-30185-1-git-send-email-rogerq@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+Hi,
 
-On Thursday 03 October 2013 12:49:48 Simon Horman wrote:
-> On Tue, Oct 01, 2013 at 07:33:05PM +0900, Magnus Damm wrote:
-> > From: Magnus Damm <damm@opensource.se>
-> > 
-> > Copy the device nodes from KZM9D reference into the KZM9D
-> > device tree file. This will allow us to use a single DTS
-> > file regarless of kernel configuration. In case of legacy
-> > C board code the device nodes may or may not be used, but
-> > in the multiplatform case all the DT device nodes are used.
-> > 
-> > Signed-off-by: Magnus Damm <damm@opensource.se>
-> > ---
-> > 
-> >  arch/arm/boot/dts/emev2-kzm9d.dts |   33 +++++++++++++++++++++++++++++++-
-> >  1 file changed, 32 insertions(+), 1 deletion(-)
-> 
-> Thanks, I have queued this up in the dt3 branch.
+This patchset does the following:
 
-Splitting the series across two branches would result in bisection breakages 
-I'm afraid. Would it be an issue to queue all patches to a single branch ?
+* Get rid of omap_control_usb platform data as we support DT only.
 
-> It should make it into v3.13 but if not I'll rename the branch
-> dt after rebasing it on v3.13-rcX which will then be targeted at v3.14.
+* Restructure and add support for new PHY types. We now support the following
+four types
+
+ TYPE_OTGHS - if it has otghs_control mailbox register (e.g. on OMAP4)
+ TYPE_USB2 - if it has Power down bit in control_dev_conf register. e.g. USB2 PHY
+ TYPE_PIPE3 - if it has DPLL and individual Rx & Tx power control. e.g. USB3 PHY or SATA PHY
+ TYPE_DRA7USB2 - if it has both power down and power aux registers. e.g. USB2 PHY on DRA7
+
+* Get rid of "ti,type" DT property and introduce compatible strings for each type.
+
+* Have only one power control API "omap_control_usb_phy_power()" instead of a
+different one for each PHY type.
+
+* Get rid of omap_get_control_dev() so that we can support multiple instances
+of the control device. We take advantage of the fact that omap control USB device
+is only present on OMAP4 onwards and hence only supports DT boot. The users
+of control USB device can get a reference to it from the device node's phandle.
+
+Patches are based on greg/usb-next.
+
+Smoke tested on OMAP4 panda with MUSB in gadget mode (g_zero).
+
+You can find the patches in branch
+ usb-control-module
+in git tree
+ git://github.com/rogerq/linux.git
+
+v8:
+- Rebased on top of greg/usb-next to avoid conflicts
+- Removed patches 9 and 10 as they are not applicable
+
+v7:
+- Rebased on v3.12-rc1
+- Updated DT compatibility ID for better readability
+- Renamed TYPE_OMAP4 to TYPE_OTGHS, TYPE_USB3 to TYPE_PIPE3 and TYPE_DRA7 to
+  TYPE_DRA7USB2
+
+v6:
+- addressed review comment about usage of control_usb before allocation.
+
+v5:
+- fixed whitespace alignment issues.
+
+v4:
+- removed "ti,has-mailbox" from omap-usb binding document example.
+
+v3:
+- return -EINVAL instead of -ENODEV on probe failure.
+- pass device type data through of_device_id table.
+- get rid of "ti,mailbox" property and "has_mailbox" from musb platform data.
+
+v2:
+- get rid of "ti,type" property and introduce compatible strings for each device type.
+
+cheers,
+-roger
+
+Roger Quadros (8):
+  usb: phy: omap-control: Get rid of platform data
+  usb: phy: omap: Add new device types and remove
+    omap_control_usb3_phy_power()
+  usb: phy: omap-usb2: Don't use omap_get_control_dev()
+  usb: phy: omap-usb3: Don't use omap_get_control_dev()
+  usb: musb: omap2430: Don't use omap_get_control_dev()
+  ARM: dts: omap4: update omap-control-usb nodes
+  usb: phy: omap: get rid of omap_get_control_dev()
+  ARM: dts: omap5: update omap-control-usb node
+
+ Documentation/devicetree/bindings/usb/omap-usb.txt |   34 ++--
+ arch/arm/boot/dts/omap4.dtsi                       |   20 ++-
+ arch/arm/boot/dts/omap5.dtsi                       |   20 ++-
+ drivers/phy/phy-omap-usb2.c                        |   31 +++-
+ drivers/usb/musb/omap2430.c                        |   25 ++-
+ drivers/usb/phy/phy-omap-control.c                 |  208 ++++++++++---------
+ drivers/usb/phy/phy-omap-usb3.c                    |   32 +++-
+ include/linux/usb/musb.h                           |    2 -
+ include/linux/usb/omap_control_usb.h               |   33 ++--
+ 9 files changed, 220 insertions(+), 185 deletions(-)
 
 -- 
-Regards,
-
-Laurent Pinchart
+1.7.4.1
