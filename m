@@ -1,72 +1,63 @@
 From: hector.palacios@digi.com (Hector Palacios)
-Date: Thu, 3 Oct 2013 09:32:04 +0200
-Subject: [PATCH v3 2/2] serial: mxs-auart: wait for FIFO to flush before
- shutdown
+Date: Thu, 3 Oct 2013 09:32:03 +0200
+Subject: [PATCH v3 1/2] serial: mxs-auart: set the FIFO size to DMA buffer size
 In-Reply-To: <1380785524-20490-1-git-send-email-hector.palacios@digi.com>
 References: <1380785524-20490-1-git-send-email-hector.palacios@digi.com>
-Message-ID: <1380785524-20490-3-git-send-email-hector.palacios@digi.com>
+Message-ID: <1380785524-20490-2-git-send-email-hector.palacios@digi.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The shutdown function was not waiting for the FIFO (which may be the
-real 16 byte FIFO or the DMA buffer, if DMA is enabled) to flush
-before disabling the AUART.
-This lead to many bytes not being transferred (specially at low
-baudrates), as they were still in the DMA buffer when the AUART was
-shutdown.
-This patch also adds the check for the BUSY flag on the tx_empty
-callback.
+When DMA is enabled (with hardware flow control enabled) the FIFO size
+must be set to the size of the DMA buffer, as this is the size the tty
+subsystem can use.
 
 Signed-off-by: Hector Palacios <hector.palacios@digi.com>
+Reviewed-by: Marek Vasut <marex@denx.de>
+Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 ---
- drivers/tty/serial/mxs-auart.c | 25 +++++++++++++++++--------
- 1 file changed, 17 insertions(+), 8 deletions(-)
+ drivers/tty/serial/mxs-auart.c | 9 ++++++++-
+ 1 file changed, 8 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/tty/serial/mxs-auart.c b/drivers/tty/serial/mxs-auart.c
-index 9f046177..30edb91 100644
+index f85b8e6..9f046177 100644
 --- a/drivers/tty/serial/mxs-auart.c
 +++ b/drivers/tty/serial/mxs-auart.c
-@@ -757,9 +757,26 @@ static int mxs_auart_startup(struct uart_port *u)
+@@ -40,6 +40,7 @@
+ #include <asm/cacheflush.h>
+ 
+ #define MXS_AUART_PORTS 5
++#define MXS_AUART_FIFO_SIZE		16
+ 
+ #define AUART_CTRL0			0x00000000
+ #define AUART_CTRL0_SET			0x00000004
+@@ -549,6 +550,9 @@ static int mxs_auart_dma_init(struct mxs_auart_port *s)
+ 	s->flags |= MXS_AUART_DMA_ENABLED;
+ 	dev_dbg(s->dev, "enabled the DMA support.");
+ 
++	/* The DMA buffer is now the FIFO the TTY subsystem can use */
++	s->port.fifosize = UART_XMIT_SIZE;
++
  	return 0;
- }
  
-+static unsigned int mxs_auart_tx_empty(struct uart_port *u)
-+{
-+	unsigned long stat;
-+
-+	stat = readl(u->membase + AUART_STAT);
-+	if ((stat & (AUART_STAT_BUSY | AUART_STAT_TXFE)) == AUART_STAT_TXFE)
-+		return TIOCSER_TEMT;
-+
-+	return 0;
-+}
-+
- static void mxs_auart_shutdown(struct uart_port *u)
- {
- 	struct mxs_auart_port *s = to_auart_port(u);
-+	unsigned int to;
-+
-+	/* Wait for the FIFO to flush */
-+	to = u->timeout;
-+	while (!mxs_auart_tx_empty(u) && to--)
-+		mdelay(1);
+ err_out:
+@@ -741,6 +745,9 @@ static int mxs_auart_startup(struct uart_port *u)
+ 	writel(AUART_INTR_RXIEN | AUART_INTR_RTIEN | AUART_INTR_CTSMIEN,
+ 			u->membase + AUART_INTR);
  
- 	if (auart_dma_enabled(s))
- 		mxs_auart_dma_exit(s);
-@@ -774,14 +791,6 @@ static void mxs_auart_shutdown(struct uart_port *u)
- 	clk_disable_unprepare(s->clk);
- }
- 
--static unsigned int mxs_auart_tx_empty(struct uart_port *u)
--{
--	if (readl(u->membase + AUART_STAT) & AUART_STAT_TXFE)
--		return TIOCSER_TEMT;
--	else
--		return 0;
--}
--
- static void mxs_auart_start_tx(struct uart_port *u)
- {
- 	struct mxs_auart_port *s = to_auart_port(u);
++	/* Reset FIFO size (it could have changed if DMA was enabled) */
++	u->fifosize = MXS_AUART_FIFO_SIZE;
++
+ 	/*
+ 	 * Enable fifo so all four bytes of a DMA word are written to
+ 	 * output (otherwise, only the LSB is written, ie. 1 in 4 bytes)
+@@ -1062,7 +1069,7 @@ static int mxs_auart_probe(struct platform_device *pdev)
+ 	s->port.membase = ioremap(r->start, resource_size(r));
+ 	s->port.ops = &mxs_auart_ops;
+ 	s->port.iotype = UPIO_MEM;
+-	s->port.fifosize = 16;
++	s->port.fifosize = MXS_AUART_FIFO_SIZE;
+ 	s->port.uartclk = clk_get_rate(s->clk);
+ 	s->port.type = PORT_IMX;
+ 	s->port.dev = s->dev = &pdev->dev;
 -- 
 1.8.4
