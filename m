@@ -1,45 +1,22 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Thu, 3 Oct 2013 12:06:36 -0500
-Subject: [PATCH V5 0/6] ARM: OMAP3+: support cpufreq-cpu0 for device tree
- boot
-In-Reply-To: <87pprmuwxg.fsf@linaro.org>
-References: <1368039976-29648-1-git-send-email-nm@ti.com>
- <87pprmuwxg.fsf@linaro.org>
-Message-ID: <524DA41C.7000809@ti.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Thu, 3 Oct 2013 10:09:14 -0700
+Subject: Use of drivers/platform and matching include?
+In-Reply-To: <CAOesGMjJ6Uj0uGFJqtnWQyDW+tr6eLVWoHZ+B7uFna+L8N6E8Q@mail.gmail.com>
+References: <BC1C47B3-5412-4829-A1D9-AAB04694D1CC@codeaurora.org>
+ <CAOesGMjJ6Uj0uGFJqtnWQyDW+tr6eLVWoHZ+B7uFna+L8N6E8Q@mail.gmail.com>
+Message-ID: <20131003170914.GA11992@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-fixing Benoit's mail ID.
-On 10/03/2013 11:43 AM, Kevin Hilman wrote:
-> Hi Nishanth,
-> 
-> Nishanth Menon <nm@ti.com> writes:
-> 
->> The following version 5 of the series arose from trying to use
->> BeagleBoard-XM (OMAP3 variant) for doing CPU DVFS using cpufreq-cpu0.
->> This series enables the generic cpufreq-cpu0 driver to be used in
->> device tree enabled boot while maintaining support of the legacy
->> omap-cpufreq driver when used in non device tree enabled boot.
-> 
-> What's the status of this series?  Is it still waiting on the clock DT
-> changes?
+On Thu, Oct 03, 2013 at 09:46:30AM -0700, Olof Johansson wrote:
+> I don't have a good answer though. If it wasn't for the arm64 fork,
+> locating these under arch/arm somewhere would really be the reasonable
+> answer, like we used to do on powerpc. :(
 
-yes - i do have a new series lined up at the moment here[1] - trying
-to ensure everything is dandy before public post. ofcourse, we'd like
-to ensure we have feedback on tero's series[2]. I am now working on
-ensuring ABB regulator[3](again depends on Tero's series) fits on top
-of Mike's voltage notifier series[4]
+Sounds like yet-another-good reason why there shouldn't be an arm64
+"fork" at all :(
 
-So, yep, everything is blocked due to lack of feedback on Tero's
-series [2].
+The arm community created this mess, you all can fix it up, it's not too
+late.
 
-[1]
-https://github.com/nmenon/linux-2.6-playground/commits/devel/cpufreq-cpu0
-[2] http://marc.info/?t=138009899400001&r=1&w=2
-[3]
-https://github.com/nmenon/linux-2.6-playground/commits/push/abb-regulator-dts
-[4]
-http://git.linaro.org/gitweb?p=people/mturquette/linux.git;a=shortlog;h=refs/heads/clk-next-volt
--- 
-Regards,
-Nishanth Menon
+greg k-h
