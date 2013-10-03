@@ -1,58 +1,90 @@
-From: tipbot@zytor.com (tip-bot for Kevin Hilman)
-Date: Thu, 3 Oct 2013 06:57:53 -0700
-Subject: [tip:timers/core] nohz:
- Drop generic vtime obsolete dependency on CONFIG_64BIT
-Message-ID: <tip-ff3fb2541246a83ce56c61d14df30b7a22e4302b@git.kernel.org>
+From: rogerq@ti.com (Roger Quadros)
+Date: Thu, 3 Oct 2013 16:58:36 +0300
+Subject: [PATCH v3 05/10] ARM: dts: omap3-beagle: Use reset-gpios for
+ hsusb2_reset
+In-Reply-To: <524D74A5.7010604@baylibre.com>
+References: <1380012836-29900-1-git-send-email-rogerq@ti.com>
+ <1380012836-29900-6-git-send-email-rogerq@ti.com> <524D483D.9040907@ti.com>
+ <524D5D88.9020308@baylibre.com> <524D74A5.7010604@baylibre.com>
+Message-ID: <524D780C.1090708@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit-ID:  ff3fb2541246a83ce56c61d14df30b7a22e4302b
-Gitweb:     http://git.kernel.org/tip/ff3fb2541246a83ce56c61d14df30b7a22e4302b
-Author:     Kevin Hilman <khilman@linaro.org>
-AuthorDate: Mon, 16 Sep 2013 15:28:19 -0700
-Committer:  Frederic Weisbecker <fweisbec@gmail.com>
-CommitDate: Mon, 30 Sep 2013 15:37:01 +0200
+Hi Benoit,
 
-nohz: Drop generic vtime obsolete dependency on CONFIG_64BIT
+On 10/03/2013 04:44 PM, Benoit Cousson wrote:
+> On 03/10/2013 14:05, Benoit Cousson wrote:
+>> Hi Roger,
+>>
+>> Yes, I will. I've been waiting for these ones for so long :-)
+> 
+> In fact it does not apply correctly on my for_3.13/dts branch :-(
+> 
+> error: arch/arm/boot/dts/omap3-beagle.dts: patch does not apply
+> Patch failed at 0004 ARM: dts: omap3-beagle: Make USB host pin naming consistent
+> 
+> Could you rebase it?
 
-The CONFIG_64BIT requirement on vtime can finally be removed
-since we now depend on HAVE_VIRT_CPU_ACCOUNTING_GEN which
-already takes care of the arch ability to handle nsecs based
-cputime_t safely.
+Looks like it was already applied before. Could you please skip that and use the rest?
+I've checked that the remaining patches apply fine on top of your for_3.13/dts
+branch. 
 
-Signed-off-by: Kevin Hilman <khilman@linaro.org>
-Cc: Ingo Molnar <mingo@kernel.org>
-Cc: Russell King <rmk@arm.linux.org.uk>
-Cc: Paul E. McKenney <paulmck@linux.vnet.ibm.com>
-Cc: Arm Linux <linux-arm-kernel@lists.infradead.org>
-Signed-off-by: Frederic Weisbecker <fweisbec@gmail.com>
----
- init/Kconfig        | 2 +-
- kernel/time/Kconfig | 1 -
- 2 files changed, 1 insertion(+), 2 deletions(-)
+cheers,
+-roger
 
-diff --git a/init/Kconfig b/init/Kconfig
-index 68c1a0e..841e79c 100644
---- a/init/Kconfig
-+++ b/init/Kconfig
-@@ -354,7 +354,7 @@ config VIRT_CPU_ACCOUNTING_NATIVE
- 
- config VIRT_CPU_ACCOUNTING_GEN
- 	bool "Full dynticks CPU time accounting"
--	depends on HAVE_CONTEXT_TRACKING && 64BIT
-+	depends on HAVE_CONTEXT_TRACKING
- 	depends on HAVE_VIRT_CPU_ACCOUNTING_GEN
- 	select VIRT_CPU_ACCOUNTING
- 	select CONTEXT_TRACKING
-diff --git a/kernel/time/Kconfig b/kernel/time/Kconfig
-index f148475..3ce6e8c 100644
---- a/kernel/time/Kconfig
-+++ b/kernel/time/Kconfig
-@@ -100,7 +100,6 @@ config NO_HZ_FULL
- 	# RCU_USER_QS dependency
- 	depends on HAVE_CONTEXT_TRACKING
- 	# VIRT_CPU_ACCOUNTING_GEN dependency
--	depends on 64BIT
- 	depends on HAVE_VIRT_CPU_ACCOUNTING_GEN
- 	select NO_HZ_COMMON
- 	select RCU_USER_QS
+>>
+>> On 03/10/2013 12:34, Roger Quadros wrote:
+>>> Hi Benoit,
+>>>
+>>> Could you please take the device tree related patches [5 to 10] in
+>>> this series?
+>>> Thanks.
+>>>
+>>> cheers,
+>>> -roger
+>>>
+>>> On 09/24/2013 11:53 AM, Roger Quadros wrote:
+>>>> We no longer need to model the RESET line as a regulator since
+>>>> the USB phy-nop driver accepts "reset-gpios" property.
+>>>>
+>>>> Signed-off-by: Roger Quadros <rogerq@ti.com>
+>>>> ---
+>>>>   arch/arm/boot/dts/omap3-beagle.dts |   13 +------------
+>>>>   1 files changed, 1 insertions(+), 12 deletions(-)
+>>>>
+>>>> diff --git a/arch/arm/boot/dts/omap3-beagle.dts
+>>>> b/arch/arm/boot/dts/omap3-beagle.dts
+>>>> index dfd8310..71bde47 100644
+>>>> --- a/arch/arm/boot/dts/omap3-beagle.dts
+>>>> +++ b/arch/arm/boot/dts/omap3-beagle.dts
+>>>> @@ -44,17 +44,6 @@
+>>>>           };
+>>>>       };
+>>>>
+>>>> -    /* HS USB Port 2 RESET */
+>>>> -    hsusb2_reset: hsusb2_reset_reg {
+>>>> -        compatible = "regulator-fixed";
+>>>> -        regulator-name = "hsusb2_reset";
+>>>> -        regulator-min-microvolt = <3300000>;
+>>>> -        regulator-max-microvolt = <3300000>;
+>>>> -        gpio = <&gpio5 19 0>;    /* gpio_147 */
+>>>> -        startup-delay-us = <70000>;
+>>>> -        enable-active-high;
+>>>> -    };
+>>>> -
+>>>>       /* HS USB Port 2 Power */
+>>>>       hsusb2_power: hsusb2_power_reg {
+>>>>           compatible = "regulator-fixed";
+>>>> @@ -68,7 +57,7 @@
+>>>>       /* HS USB Host PHY on PORT 2 */
+>>>>       hsusb2_phy: hsusb2_phy {
+>>>>           compatible = "usb-nop-xceiv";
+>>>> -        reset-supply = <&hsusb2_reset>;
+>>>> +        reset-gpios = <&gpio5 19 GPIO_ACTIVE_LOW>;    /* gpio_147 */
+>>>>           vcc-supply = <&hsusb2_power>;
+>>>>       };
+>>>>
+>>>>
+>>>
+>>
+> 
