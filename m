@@ -1,65 +1,46 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Thu, 3 Oct 2013 12:59:06 +0300
-Subject: [PATCH v8 8/8] ARM: dts: omap5: update omap-control-usb node
-In-Reply-To: <1380794346-30185-1-git-send-email-rogerq@ti.com>
-References: <1380794346-30185-1-git-send-email-rogerq@ti.com>
-Message-ID: <1380794346-30185-9-git-send-email-rogerq@ti.com>
+From: simon.guinot@sequanux.org (Simon Guinot)
+Date: Thu,  3 Oct 2013 12:05:02 +0200
+Subject: [PATCH v2] clk: armada-370: fix tclk frequencies
+Message-ID: <1380794702-6191-1-git-send-email-simon.guinot@sequanux.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Split USB2 PHY and USB3 PHY into separate omap-control-usb
-nodes. Get rid of "ti,type" property.
+This patch fixes the tclk frequency array for the Armada-370 SoC.
+This bug has been introduced by commit 6b72333d
+("clk: mvebu: add Armada 370 SoC-centric clock init").
 
-CC: Benoit Cousson <bcousson@baylibre.com>
-Signed-off-by: Roger Quadros <rogerq@ti.com>
+A wrong tclk frequency affects the following drivers: mvsdio, mvneta,
+i2c-mv64xxx and mvebu-devbus. This list may be incomplete.
+
+About the mvneta Ethernet driver, note that the tclk frequency is used
+to compute the Rx time coalescence. Then, this bug harms the coalescence
+configuration and also degrades the networking performances with the
+default values.
+
+Signed-off-by: Simon Guinot <simon.guinot@sequanux.org>
+Cc: Andrew Lunn <andrew@lunn.ch>
+Cc: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Cc: Jason Cooper <jason@lakedaemon.net>
+Cc: stable at vger.kernel.org
 ---
- arch/arm/boot/dts/omap5.dtsi |   20 ++++++++++++--------
- 1 files changed, 12 insertions(+), 8 deletions(-)
+ drivers/clk/mvebu/armada-370.c |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
-index 7cdea1b..c0ec6dc 100644
---- a/arch/arm/boot/dts/omap5.dtsi
-+++ b/arch/arm/boot/dts/omap5.dtsi
-@@ -626,12 +626,16 @@
- 			hw-caps-temp-alert;
- 		};
+diff --git a/drivers/clk/mvebu/armada-370.c b/drivers/clk/mvebu/armada-370.c
+index fc777bd..81a202d 100644
+--- a/drivers/clk/mvebu/armada-370.c
++++ b/drivers/clk/mvebu/armada-370.c
+@@ -39,8 +39,8 @@ static const struct coreclk_ratio a370_coreclk_ratios[] __initconst = {
+ };
  
--		omap_control_usb: omap-control-usb at 4a002300 {
--			compatible = "ti,omap-control-usb";
--			reg = <0x4a002300 0x4>,
--			      <0x4a002370 0x4>;
--			reg-names = "control_dev_conf", "phy_power_usb";
--			ti,type = <2>;
-+		omap_control_usb2phy: control-phy at 4a002300 {
-+			compatible = "ti,control-phy-usb2";
-+			reg = <0x4a002300 0x4>;
-+			reg-names = "power";
-+		};
-+
-+		omap_control_usb3phy: control-phy at 4a002370 {
-+			compatible = "ti,control-phy-pipe3";
-+			reg = <0x4a002370 0x4>;
-+			reg-names = "power";
- 		};
+ static const u32 a370_tclk_freqs[] __initconst = {
+-	16600000,
+-	20000000,
++	166000000,
++	200000000,
+ };
  
- 		omap_dwc3 at 4a020000 {
-@@ -662,7 +666,7 @@
- 			usb2_phy: usb2phy at 4a084000 {
- 				compatible = "ti,omap-usb2";
- 				reg = <0x4a084000 0x7c>;
--				ctrl-module = <&omap_control_usb>;
-+				ctrl-module = <&omap_control_usb2phy>;
- 			};
- 
- 			usb3_phy: usb3phy at 4a084400 {
-@@ -671,7 +675,7 @@
- 				      <0x4a084800 0x64>,
- 				      <0x4a084c00 0x40>;
- 				reg-names = "phy_rx", "phy_tx", "pll_ctrl";
--				ctrl-module = <&omap_control_usb>;
-+				ctrl-module = <&omap_control_usb3phy>;
- 			};
- 		};
- 
+ static u32 __init a370_get_tclk_freq(void __iomem *sar)
 -- 
-1.7.4.1
+1.7.10.4
