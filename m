@@ -1,50 +1,34 @@
 From: chander.kashyap@linaro.org (Chander Kashyap)
-Date: Thu, 3 Oct 2013 11:49:12 +0530
-Subject: [PATCH v3 2/2] arm: dt: Exynos5420: populate cpu node enteries to
- 8 cpus
-In-Reply-To: <5228DA13.1020901@gmail.com>
+Date: Thu, 3 Oct 2013 11:51:52 +0530
+Subject: [PATCH v3 0/2] Enable all cpus in Exynos5420
+In-Reply-To: <1378380593-5305-1-git-send-email-chander.kashyap@linaro.org>
 References: <1378380593-5305-1-git-send-email-chander.kashyap@linaro.org>
- <1378380593-5305-3-git-send-email-chander.kashyap@linaro.org>
- <5228DA13.1020901@gmail.com>
-Message-ID: <CANuQgHEv8Q0dwMXFtnwY_DdXroqwhbGxe8HwVh3N4wQMTMo7tQ@mail.gmail.com>
+Message-ID: <CANuQgHFbnkDnizH02-PR4qeq8+s7ZTq7Rv3bsJQHWia7xKPOEw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kukgin,
-
-On 6 September 2013 00:52, Sylwester Nawrocki
-<sylvester.nawrocki@gmail.com> wrote:
-> On 09/05/2013 01:29 PM, Chander Kashyap wrote:
->>
->> Exynos5420 is octacore SoC from samsung.
+On 5 September 2013 16:59, Chander Kashyap <chander.kashyap@linaro.org> wrote:
+> Exynos5420 is an octacore SoC. This patch series enables the remaining 4 cores.
 >
+> Changes in v2:
+>         - Changed the cpu node @unit-address value to reg property value.
+> Changes in v3:
+>         - Removed leading 0x from @unit-address value.
 >
-> s/octacore/octa-core ?
-> s/samsung/Samsung
+> Chander Kashyap (2):
+>   clocksource: mct: extend mct to support 8 local interrupts for
+>     Exynos5420
+>   arm: dt: Exynos5420: populate cpu node enteries to 8 cpus
 >
->
->> Hence populate all the cpu node enteries.
->
->
-> s/cpu/CPU ?
-> s/enteries/entries
->
->> Signed-off-by: Chander Kashyap<chander.kashyap@linaro.org>
->
->
-> Subjects of the dts patches normally start with "ARM: dts:".
->
-> I guess this all could be corrected while the patch is being applied
-> to the platform maitainter's tree.
-
-Shall i send a version or you will take these.
-
+>  arch/arm/boot/dts/exynos5420.dtsi |   37 +++++++++++++++++++++++++++++++++++--
+>  drivers/clocksource/exynos_mct.c  |    4 ++++
+>  2 files changed, 39 insertions(+), 2 deletions(-)
 >
 > --
-> Thanks,
-> Sylwester
+> 1.7.9.5
+>
 
-
+Hi Kukjin, can you please take these patches.
 
 -- 
 with warm regards,
