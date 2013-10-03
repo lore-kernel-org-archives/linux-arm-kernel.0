@@ -1,65 +1,40 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Thu,  3 Oct 2013 11:46:27 +0200
-Subject: [PATCH 5/9] rtc: amba: Remove unnecessary amba_set_drvdata()
-In-Reply-To: <27e289763bbcb7d10f84081543cfc3a4dc770398.1380793579.git.michal.simek@xilinx.com>
-References: <27e289763bbcb7d10f84081543cfc3a4dc770398.1380793579.git.michal.simek@xilinx.com>
-Message-ID: <c9c7ff49f1f9b42a5cd31ce988102c067c9afaa1.1380793579.git.michal.simek@xilinx.com>
+From: leif.lindholm@linaro.org (Leif Lindholm)
+Date: Thu,  3 Oct 2013 10:49:14 +0100
+Subject: [PATCH v3 0/2] arm: add early_ioremap support
+Message-ID: <1380793756-2562-1-git-send-email-leif.lindholm@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Driver core clears the driver data to NULL after device_release
-or on probe failure, so just remove it from here.
+This patch adds support for early_ioremap and early_memremap, based
+on the existing mechanism in x86. Up to 7 regions of up to 128KB each
+can be temporarily mapped in before paging_init, regardless of later
+highmem status.
 
-Driver core change:
-"device-core: Ensure drvdata = NULL when no driver is bound"
-(sha1: 0998d0631001288a5974afc0b2a5f568bcdecb4d)
+New for this version:
+- Addressed feedback on v2
+- *cough* corrected early_memremap() to use MT_WRITEALLOC instead
+  of MT_UNCACHED.
 
-Signed-off-by: Michal Simek <michal.simek@xilinx.com>
----
- drivers/rtc/rtc-pl030.c | 2 --
- drivers/rtc/rtc-pl031.c | 2 --
- 2 files changed, 4 deletions(-)
+Cc: Nicolas Pitre <nico@linaro.org>
+Cc: Arnd Bergman <arnd@arndb.de>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
 
-diff --git a/drivers/rtc/rtc-pl030.c b/drivers/rtc/rtc-pl030.c
-index 22bacdb..a804f75 100644
---- a/drivers/rtc/rtc-pl030.c
-+++ b/drivers/rtc/rtc-pl030.c
-@@ -153,8 +153,6 @@ static int pl030_remove(struct amba_device *dev)
- {
- 	struct pl030_rtc *rtc = amba_get_drvdata(dev);
+Leif Lindholm (2):
+  Documentation: arm: early_ioremap/early_memremap
+  arm: add early_ioremap support
 
--	amba_set_drvdata(dev, NULL);
--
- 	writel(0, rtc->base + RTC_CR);
+ Documentation/arm/00-INDEX          |    2 +
+ Documentation/arm/early_ioremap.txt |   23 +++
+ arch/arm/Kconfig                    |    9 ++
+ arch/arm/include/asm/fixmap.h       |   29 +++-
+ arch/arm/include/asm/io.h           |   23 +++
+ arch/arm/kernel/setup.c             |    3 +
+ arch/arm/mm/Makefile                |    1 +
+ arch/arm/mm/early_ioremap.c         |  271 +++++++++++++++++++++++++++++++++++
+ arch/arm/mm/mmu.c                   |    2 +
+ 9 files changed, 362 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/arm/early_ioremap.txt
+ create mode 100644 arch/arm/mm/early_ioremap.c
 
- 	free_irq(dev->irq[0], rtc);
-diff --git a/drivers/rtc/rtc-pl031.c b/drivers/rtc/rtc-pl031.c
-index 0f0609b..c9ca86e 100644
---- a/drivers/rtc/rtc-pl031.c
-+++ b/drivers/rtc/rtc-pl031.c
-@@ -305,7 +305,6 @@ static int pl031_remove(struct amba_device *adev)
- {
- 	struct pl031_local *ldata = dev_get_drvdata(&adev->dev);
-
--	amba_set_drvdata(adev, NULL);
- 	free_irq(adev->irq[0], ldata);
- 	rtc_device_unregister(ldata->rtc);
- 	iounmap(ldata->base);
-@@ -392,7 +391,6 @@ out_no_irq:
- 	rtc_device_unregister(ldata->rtc);
- out_no_rtc:
- 	iounmap(ldata->base);
--	amba_set_drvdata(adev, NULL);
- out_no_remap:
- 	kfree(ldata);
- out:
---
-1.8.2.3
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131003/563d0f62/attachment.sig>
+-- 
+1.7.10.4
