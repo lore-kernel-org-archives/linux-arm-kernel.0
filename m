@@ -1,38 +1,63 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Thu, 3 Oct 2013 10:38:37 +0530
-Subject: [PATCH] cpufreq: highbank-cpufreq: Enable Midway/ECX-2000
-In-Reply-To: <1380641424-5666-1-git-send-email-mark.langsdorf@calxeda.com>
-References: <1380641424-5666-1-git-send-email-mark.langsdorf@calxeda.com>
-Message-ID: <CAOh2x=mZ__gYkhi6o_goUkw+JB==VY2PSk-T_1G+6QBxDZGFFg@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 02 Oct 2013 22:16:54 -0700
+Subject: [PATCH 0/6] add support for omap wake-up interrupts via pinctrl-single
+Message-ID: <20131003051049.8444.16913.stgit@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 1, 2013 at 9:00 PM, Mark Langsdorf
-<mark.langsdorf@calxeda.com> wrote:
-> Calxeda's new ECX-2000 part uses the same cpufreq interface as highbank,
-> so add it to the driver's compatibility list.
->
-> This is a minor change that can safely be applied to the 3.10 and 3.11
-> stable trees.
->
-> Signed-off-by: Mark Langsdorf <mark.langsdorf@calxeda.com>
-> ---
->  drivers/cpufreq/highbank-cpufreq.c | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/cpufreq/highbank-cpufreq.c b/drivers/cpufreq/highbank-cpufreq.c
-> index 794123f..bf8902a 100644
-> --- a/drivers/cpufreq/highbank-cpufreq.c
-> +++ b/drivers/cpufreq/highbank-cpufreq.c
-> @@ -66,7 +66,8 @@ static int hb_cpufreq_driver_init(void)
->         struct device_node *np;
->         int ret;
->
-> -       if (!of_machine_is_compatible("calxeda,highbank"))
-> +       if ((!of_machine_is_compatible("calxeda,highbank")) &&
-> +               (!of_machine_is_compatible("calxeda,ecx-2000")))
->                 return -ENODEV;
->
->         cpu_dev = get_cpu_device(0);
+Hi all,
 
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+Here's a respin of the pinctrl-single related patches to
+use chained irq as suggested by Linus W earlier. This series
+does not try to provide any generic automated solution yet,
+but works by doing a request_irq() for the wake-up pin, so
+it should be flexible enough for both manual control and
+automated solution.
+
+This series removes the last nasty blocker for making omap3
+to be device tree only without causing nasty PM regressions.
+
+Assuming Linus W acks the drivers/pinctrl parts, I can
+provide those three patches in a separate immutable branch
+against v3.12-rc3 for Linus W to pull so I can merge them in
+too.
+
+This series is based on my earlier series "[PATCH 0/4] Clean
+up legacy platform data handling for omaps for v3.13" as
+it has a dependency for the pdata quirks for passing the
+auxdata to the driver.
+
+Regards,
+
+Tony
+
+---
+
+Tony Lindgren (6):
+      ARM: dts: Fix pinctrl mask for omap3
+      ARM: OMAP2+: Add support for auxdata
+      pinctrl: single: Prepare for supporting SoC specific features
+      pinctrl: single: Add support for wake-up interrupts
+      pinctrl: single: Add support for auxdata
+      ARM: OMAP: Move DT wake-up event handling over to use pinctrl-single-omap
+
+
+ .../devicetree/bindings/pinctrl/pinctrl-single.txt |   11 +
+ arch/arm/boot/dts/omap3.dtsi                       |    8 
+ arch/arm/boot/dts/omap4.dtsi                       |    4 
+ arch/arm/mach-omap2/board-generic.c                |    5 
+ arch/arm/mach-omap2/common.h                       |    3 
+ arch/arm/mach-omap2/mux.c                          |    8 
+ arch/arm/mach-omap2/mux.h                          |    4 
+ arch/arm/mach-omap2/pdata-quirks.c                 |   29 +-
+ arch/arm/mach-omap2/prm3xxx.h                      |    8 
+ arch/arm/mach-omap2/prm44xx_54xx.h                 |    8 
+ arch/arm/mach-omap2/prm_common.c                   |   11 +
+ drivers/pinctrl/pinctrl-single.c                   |  386 ++++++++++++++++++++
+ include/dt-bindings/pinctrl/omap.h                 |    4 
+ include/linux/platform_data/pinctrl-single.h       |   12 +
+ 14 files changed, 474 insertions(+), 27 deletions(-)
+ create mode 100644 include/linux/platform_data/pinctrl-single.h
+
+-- 
+Signature
