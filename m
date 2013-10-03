@@ -1,99 +1,129 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 3 Oct 2013 13:35:22 -0500
-Subject: [PATCH v6 15/19] swiotlb-xen: call dma_capable only if
- dev->dma_mask is allocated
-In-Reply-To: <20131002172258.GC24791@phenom.dumpdata.com>
-References: <alpine.DEB.2.02.1309271653420.5498@kaball.uk.xensource.com>
- <1380298207-29151-15-git-send-email-stefano.stabellini@eu.citrix.com>
- <20130930160223.GU3106@phenom.dumpdata.com>
- <alpine.DEB.2.02.1310021811030.26077@kaball.uk.xensource.com>
- <20131002172258.GC24791@phenom.dumpdata.com>
-Message-ID: <CAL_JsqLGhNOZxAhuQMUdgmMLRxLakBpacfTufSWKGEGFSTqd3A@mail.gmail.com>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Thu,  3 Oct 2013 20:51:24 +0200
+Subject: [PATCH|RFC] of: let of_match_device() always return best match
+Message-ID: <1380826284-18381-1-git-send-email-mkl@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 2, 2013 at 12:22 PM, Konrad Rzeszutek Wilk
-<konrad.wilk@oracle.com> wrote:
-> On Wed, Oct 02, 2013 at 06:13:35PM +0100, Stefano Stabellini wrote:
->> The real issue is that some devices (xgmac, I am looking at you), don't
->> set the dma_mask, even though they are perfectly capable of doing dma.
->
-> So this looks like a bug in the drivers. I thought I saw a huge patchset
-> by the ARM maintainer that tries to fix the dma_mask and dma_mask_coherent
-> bugs? And also fix the drivers to use the dma mask?
+The function of_match_device() should tell if a struct device matches an
+of_device_id list and return the specific entry of that table matches the
+device best.
 
-I think Russell only fixed incorrect handling of masks, not missing handling.
+The underlying __of_match_node() implements the wrong search algorithm. It
+iterates over the list of of_device_ids, comparing the first compatible with
+_all_ compatibles of the struct device, then the second compatible of
+of_device_id and so on.
 
->>
->> Maybe I should modify the arm implementation of dma_capable (see
->> http://marc.info/?l=linux-kernel&m=138029832007821&w=2) to ignore the
->> dma_mask.
->
-> Or fix the 'xgmac'?
+This leads to a problem, if the device has more than one compatible that match
+the of_device_id list. The implemented search algorithm may find not the "best"
+match. As the compatible list in the device is sorted from most to least
+specific.
 
-There's really some core changes needed to fix this and I'd guess
-there are lots of other cases of missing dma_mask. The problem is
-platform devices don't create a mask to assign to dma_mask in the
-first place. I think the right solution is assigning dma_mask to
-&coherent_dma_mask by default as Russell did for AMBA devices. I don't
-know if doing that would break anything or not.
+For example:
 
-Rob
+The imx28.dtsi gives this compatible string for its CAN core:
 
->>
->> On Mon, 30 Sep 2013, Konrad Rzeszutek Wilk wrote:
->> > On Fri, Sep 27, 2013 at 05:10:03PM +0100, Stefano Stabellini wrote:
->> >
->> > Why? I am looking at X86 and IA64 and I see:
->> >
->> >  79         if (!dev->dma_mask)
->> >  80                 return 0;
->> >
->> >
->> > Why not port dma_capable over to ARM?
->> >
->> > > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
->> > > ---
->> > >  drivers/xen/swiotlb-xen.c |    6 +++---
->> > >  1 files changed, 3 insertions(+), 3 deletions(-)
->> > >
->> > > diff --git a/drivers/xen/swiotlb-xen.c b/drivers/xen/swiotlb-xen.c
->> > > index 790c2eb..3011736 100644
->> > > --- a/drivers/xen/swiotlb-xen.c
->> > > +++ b/drivers/xen/swiotlb-xen.c
->> > > @@ -512,7 +512,7 @@ dma_addr_t xen_swiotlb_map_page(struct device *dev, struct page *page,
->> > >    * buffering it.
->> > >    */
->> > >   if (!xen_feature(XENFEAT_auto_translated_physmap) &&
->> > > -     dma_capable(dev, dev_addr, size) &&
->> > > +     dev->dma_mask && dma_capable(dev, dev_addr, size) &&
->> > >       !range_straddles_page_boundary(phys, size) && !swiotlb_force)
->> > >           return dev_addr;
->> > >
->> > > @@ -532,7 +532,7 @@ dma_addr_t xen_swiotlb_map_page(struct device *dev, struct page *page,
->> > >   /*
->> > >    * Ensure that the address returned is DMA'ble
->> > >    */
->> > > - if (!dma_capable(dev, dev_addr, size)) {
->> > > + if (dev->dma_mask && !dma_capable(dev, dev_addr, size)) {
->> > >           swiotlb_tbl_unmap_single(dev, map, size, dir);
->> > >           dev_addr = 0;
->> > >   }
->> > > @@ -660,7 +660,7 @@ xen_swiotlb_map_sg_attrs(struct device *hwdev, struct scatterlist *sgl,
->> > >
->> > >           if (swiotlb_force ||
->> > >               xen_feature(XENFEAT_auto_translated_physmap) ||
->> > > -             !dma_capable(hwdev, dev_addr, sg->length) ||
->> > > +             (hwdev->dma_mask && !dma_capable(hwdev, dev_addr, sg->length)) ||
->> > >               range_straddles_page_boundary(paddr, sg->length)) {
->> > >                   /*
->> > >                    * Pass the dma_addr of the first slab in the iotlb buffer as
->> > > --
->> > > 1.7.2.5
->> > >
->> >
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 	compatible = "fsl,imx28-flexcan", "fsl,p1010-flexcan";
+
+The flexcan driver defines:
+
+> static const struct of_device_id flexcan_of_match[] = {
+> 	{ .compatible = "fsl,p1010-flexcan", .data = &fsl_p1010_devtype_data, },
+> 	{ .compatible = "fsl,imx28-flexcan", .data = &fsl_imx28_devtype_data, },
+> 	{ .compatible = "fsl,imx6q-flexcan", .data = &fsl_imx6q_devtype_data, },
+> 	{ /* sentinel */ },
+> };
+
+The "p1010" was the first Freescale SoC with the flexcan core. But this SoC has
+a bug, so a workaround has to be enabled in the driver. The mx28 has this bug
+fixed, so we don't need this quite costly workaround.
+
+The __of_match_node() will compare:
+
+    from  of_device_id		from device
+    fsl,p1010-flexcan		fsl,imx28-flexcan
+    fsl,p1010-flexcan		fsl,p1010-flexcan	-> MATCH
+
+The of_match_device() function as it currently is implemented will always
+return p1010 not the mx28.
+
+This patch fixes the problem by exchanging outer and inner loop. The first
+compatible of a device is compared against all compatible from the of_device_id
+list, then the second device compatible and so on.
+
+Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
+---
+ drivers/of/base.c | 40 +++++++++++++++++++++++++++++++++++-----
+ 1 file changed, 35 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/of/base.c b/drivers/of/base.c
+index 865d3f6..5bff2fe 100644
+--- a/drivers/of/base.c
++++ b/drivers/of/base.c
+@@ -349,6 +349,35 @@ static int __of_device_is_compatible(const struct device_node *device,
+ 	return 0;
+ }
+ 
++/** Returns the specific of_device_id, if the it matches one of the
++ * strings in the device's "compatible" property
++ */
++static
++const struct of_device_id *__of_device_matches_compatible(const struct device_node *device,
++							  const struct of_device_id *matches)
++{
++	const struct of_device_id *m;
++	const char* cp;
++	int cplen, l;
++
++	cp = __of_get_property(device, "compatible", &cplen);
++	if (cp == NULL)
++		return NULL;
++	while (cplen > 0) {
++		m = matches;
++		while (m->compatible[0]) {
++			if (of_compat_cmp(cp, m->compatible, strlen(m->compatible)) == 0)
++				return m;
++			m++;
++		}
++		l = strlen(cp) + 1;
++		cp += l;
++		cplen -= l;
++	}
++
++	return NULL;
++}
++
+ /** Checks if the given "compat" string matches one of the strings in
+  * the device's "compatible" property
+  */
+@@ -717,22 +746,23 @@ const struct of_device_id *__of_match_node(const struct of_device_id *matches,
+ {
+ 	if (!matches)
+ 		return NULL;
+-
+-	while (matches->name[0] || matches->type[0] || matches->compatible[0]) {
++	while (matches->name[0] || matches->type[0]) {
+ 		int match = 1;
++
+ 		if (matches->name[0])
+ 			match &= node->name
+ 				&& !strcmp(matches->name, node->name);
+ 		if (matches->type[0])
+ 			match &= node->type
+ 				&& !strcmp(matches->type, node->type);
+-		if (matches->compatible[0])
+-			match &= __of_device_is_compatible(node,
+-							   matches->compatible);
+ 		if (match)
+ 			return matches;
+ 		matches++;
+ 	}
++
++	if (matches->compatible[0])
++		return __of_device_matches_compatible(node, matches);
++
+ 	return NULL;
+ }
+ 
+-- 
+1.8.4.rc3
