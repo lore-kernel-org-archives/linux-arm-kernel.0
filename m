@@ -1,129 +1,91 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Thu,  3 Oct 2013 20:51:24 +0200
-Subject: [PATCH|RFC] of: let of_match_device() always return best match
-Message-ID: <1380826284-18381-1-git-send-email-mkl@pengutronix.de>
+From: fabio.estevam@freescale.com (Fabio Estevam)
+Date: Thu, 3 Oct 2013 15:51:26 -0300
+Subject: [PATCH v2 2/3] ARM: dts: imx6qdl-wandboard: Add HDMI support
+In-Reply-To: <1380826287-30253-1-git-send-email-fabio.estevam@freescale.com>
+References: <1380826287-30253-1-git-send-email-fabio.estevam@freescale.com>
+Message-ID: <1380826287-30253-2-git-send-email-fabio.estevam@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The function of_match_device() should tell if a struct device matches an
-of_device_id list and return the specific entry of that table matches the
-device best.
-
-The underlying __of_match_node() implements the wrong search algorithm. It
-iterates over the list of of_device_ids, comparing the first compatible with
-_all_ compatibles of the struct device, then the second compatible of
-of_device_id and so on.
-
-This leads to a problem, if the device has more than one compatible that match
-the of_device_id list. The implemented search algorithm may find not the "best"
-match. As the compatible list in the device is sorted from most to least
-specific.
-
-For example:
-
-The imx28.dtsi gives this compatible string for its CAN core:
-
-> 	compatible = "fsl,imx28-flexcan", "fsl,p1010-flexcan";
-
-The flexcan driver defines:
-
-> static const struct of_device_id flexcan_of_match[] = {
-> 	{ .compatible = "fsl,p1010-flexcan", .data = &fsl_p1010_devtype_data, },
-> 	{ .compatible = "fsl,imx28-flexcan", .data = &fsl_imx28_devtype_data, },
-> 	{ .compatible = "fsl,imx6q-flexcan", .data = &fsl_imx6q_devtype_data, },
-> 	{ /* sentinel */ },
-> };
-
-The "p1010" was the first Freescale SoC with the flexcan core. But this SoC has
-a bug, so a workaround has to be enabled in the driver. The mx28 has this bug
-fixed, so we don't need this quite costly workaround.
-
-The __of_match_node() will compare:
-
-    from  of_device_id		from device
-    fsl,p1010-flexcan		fsl,imx28-flexcan
-    fsl,p1010-flexcan		fsl,p1010-flexcan	-> MATCH
-
-The of_match_device() function as it currently is implemented will always
-return p1010 not the mx28.
-
-This patch fixes the problem by exchanging outer and inner loop. The first
-compatible of a device is compared against all compatible from the of_device_id
-list, then the second device compatible and so on.
-
-Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 ---
- drivers/of/base.c | 40 +++++++++++++++++++++++++++++++++++-----
- 1 file changed, 35 insertions(+), 5 deletions(-)
+Changes since v1:
+- None
 
-diff --git a/drivers/of/base.c b/drivers/of/base.c
-index 865d3f6..5bff2fe 100644
---- a/drivers/of/base.c
-+++ b/drivers/of/base.c
-@@ -349,6 +349,35 @@ static int __of_device_is_compatible(const struct device_node *device,
- 	return 0;
- }
- 
-+/** Returns the specific of_device_id, if the it matches one of the
-+ * strings in the device's "compatible" property
-+ */
-+static
-+const struct of_device_id *__of_device_matches_compatible(const struct device_node *device,
-+							  const struct of_device_id *matches)
-+{
-+	const struct of_device_id *m;
-+	const char* cp;
-+	int cplen, l;
+ arch/arm/boot/dts/imx6dl.dtsi            |  4 ++++
+ arch/arm/boot/dts/imx6q.dtsi             |  4 ++++
+ arch/arm/boot/dts/imx6qdl-wandboard.dtsi | 13 +++++++++++++
+ arch/arm/boot/dts/imx6qdl.dtsi           | 10 ++++++++++
+ 4 files changed, 31 insertions(+)
+
+diff --git a/arch/arm/boot/dts/imx6dl.dtsi b/arch/arm/boot/dts/imx6dl.dtsi
+index 9e8ae11..65e54b4 100644
+--- a/arch/arm/boot/dts/imx6dl.dtsi
++++ b/arch/arm/boot/dts/imx6dl.dtsi
+@@ -88,3 +88,7 @@
+ 		crtcs = <&ipu1 0>, <&ipu1 1>;
+ 	};
+ };
 +
-+	cp = __of_get_property(device, "compatible", &cplen);
-+	if (cp == NULL)
-+		return NULL;
-+	while (cplen > 0) {
-+		m = matches;
-+		while (m->compatible[0]) {
-+			if (of_compat_cmp(cp, m->compatible, strlen(m->compatible)) == 0)
-+				return m;
-+			m++;
-+		}
-+		l = strlen(cp) + 1;
-+		cp += l;
-+		cplen -= l;
-+	}
-+
-+	return NULL;
++&hdmi {
++	crtcs = <&ipu1 0>, <&ipu1 1>;
 +}
+diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
+index f024ef2..d2467f5 100644
+--- a/arch/arm/boot/dts/imx6q.dtsi
++++ b/arch/arm/boot/dts/imx6q.dtsi
+@@ -159,3 +159,7 @@
+ 		crtcs = <&ipu1 0>, <&ipu1 1>, <&ipu2 0>, <&ipu2 1>;
+ 	};
+ };
 +
- /** Checks if the given "compat" string matches one of the strings in
-  * the device's "compatible" property
-  */
-@@ -717,22 +746,23 @@ const struct of_device_id *__of_match_node(const struct of_device_id *matches,
- {
- 	if (!matches)
- 		return NULL;
--
--	while (matches->name[0] || matches->type[0] || matches->compatible[0]) {
-+	while (matches->name[0] || matches->type[0]) {
- 		int match = 1;
-+
- 		if (matches->name[0])
- 			match &= node->name
- 				&& !strcmp(matches->name, node->name);
- 		if (matches->type[0])
- 			match &= node->type
- 				&& !strcmp(matches->type, node->type);
--		if (matches->compatible[0])
--			match &= __of_device_is_compatible(node,
--							   matches->compatible);
- 		if (match)
- 			return matches;
- 		matches++;
- 	}
-+
-+	if (matches->compatible[0])
-+		return __of_device_matches_compatible(node, matches);
-+
- 	return NULL;
- }
++&hdmi {
++	crtcs = <&ipu1 0>, <&ipu1 1>, <&ipu2 0>, <&ipu2 1>;
++};
+diff --git a/arch/arm/boot/dts/imx6qdl-wandboard.dtsi b/arch/arm/boot/dts/imx6qdl-wandboard.dtsi
+index a55113e..758c17f 100644
+--- a/arch/arm/boot/dts/imx6qdl-wandboard.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-wandboard.dtsi
+@@ -51,6 +51,19 @@
+ 	status = "okay";
+ };
  
++
++&hdmi {
++	ddc = <&i2c1>;
++	status = "okay";
++};
++
++&i2c1 {
++	clock-frequency = <100000>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2c1_1>;
++	status = "okay";
++};
++
+ &i2c2 {
+ 	clock-frequency = <100000>;
+ 	pinctrl-names = "default";
+diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+index ccd55c2..b148cb3 100644
+--- a/arch/arm/boot/dts/imx6qdl.dtsi
++++ b/arch/arm/boot/dts/imx6qdl.dtsi
+@@ -1301,6 +1301,16 @@
+ 				};
+ 			};
+ 
++			hdmi: hdmi at 0120000 {
++				compatible = "fsl,imx6q-hdmi";
++				reg = <0x00120000 0x9000>;
++				interrupts = <0 115 0x04>;
++				gpr = <&gpr>;
++				clocks = <&clks 123>, <&clks 124>;
++				clock-names = "iahb", "isfr";
++				status = "disabled";
++			};
++
+ 			dcic1: dcic at 020e4000 {
+ 				reg = <0x020e4000 0x4000>;
+ 				interrupts = <0 124 0x04>;
 -- 
-1.8.4.rc3
+1.8.1.2
