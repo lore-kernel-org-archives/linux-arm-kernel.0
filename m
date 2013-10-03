@@ -1,30 +1,24 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Thu, 3 Oct 2013 12:16:36 +0300
-Subject: [PATCH v2 00/12] Introduce common infra for tegra clocks
-In-Reply-To: <524B08BD.2020902@wwwdotorg.org>
-References: <1379946381-20125-1-git-send-email-pdeschrijver@nvidia.com>
- <524B08BD.2020902@wwwdotorg.org>
-Message-ID: <20131003091636.GJ3973@tbergstrom-lnx.Nvidia.com>
+From: matt@console-pimps.org (Matt Fleming)
+Date: Thu, 3 Oct 2013 10:40:27 +0100
+Subject: [PATCH 1/6] efi-stub.txt updates for ARM
+In-Reply-To: <1380385403-31904-2-git-send-email-roy.franz@linaro.org>
+References: <1380385403-31904-1-git-send-email-roy.franz@linaro.org>
+ <1380385403-31904-2-git-send-email-roy.franz@linaro.org>
+Message-ID: <20131003094027.GW21381@console-pimps.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 01, 2013 at 07:39:09PM +0200, Stephen Warren wrote:
-> On 09/23/2013 08:24 AM, Peter De Schrijver wrote:
-> > This patchset introduces common infrastructure for clocks which exist in
-> > several Tegra SoCs. We also move Tegra114 to this new infrastructure.
-> > Tegra20 and Tegra30 will be moved later in separate patchsets.
-> > 
-> > Changes since v1:
-> > + move common clks allocation to patch 2
-> > + adapt also Tegra20 and Tegra30 to the changes in patch 2
-> > 
-> > Boottested on dalmore, beaverboard and seaboard.
+On Sat, 28 Sep, at 09:23:18AM, Roy Franz wrote:
+> Update efi-stub.txt documentation to be more general
+> and not x86 specific.  Add ARM only "dtb=" command
+> line option description.
 > 
-> What commit is this series based on? I applied the two pre-requisites:
-> 
+> Signed-off-by: Roy Franz <roy.franz@linaro.org>
+> ---
+>  Documentation/efi-stub.txt |   27 ++++++++++++++++++++-------
+>  1 file changed, 20 insertions(+), 7 deletions(-)
 
-9f186fbe58c749e2d4c0b334818705aa622fc76b Add linux-next specific files for 20130822
+Looks good to me.
 
-Cheers,
-
-Peter.
+-- 
+Matt Fleming, Intel Open Source Technology Center
