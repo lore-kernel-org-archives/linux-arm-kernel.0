@@ -1,120 +1,87 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 03 Oct 2013 17:23:46 -0500
-Subject: [PATCH|RFC] of: let of_match_device() always return best match
-In-Reply-To: <524DE6DB.1070003@pengutronix.de>
-References: <1380826284-18381-1-git-send-email-mkl@pengutronix.de>
- <524DD5A6.6020204@gmail.com> <524DE6DB.1070003@pengutronix.de>
-Message-ID: <524DEE72.7080400@gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Fri, 4 Oct 2013 00:28:01 +0200
+Subject: [PATCH 0/3] v7-M support using MULTIPLATFORM
+In-Reply-To: <20131003220037.GH12758@n2100.arm.linux.org.uk>
+References: <1380534577-15076-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <20131003220037.GH12758@n2100.arm.linux.org.uk>
+Message-ID: <20131003222801.GE10079@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/03/2013 04:51 PM, Marc Kleine-Budde wrote:
-> On 10/03/2013 10:37 PM, Rob Herring wrote:
->> On 10/03/2013 01:51 PM, Marc Kleine-Budde wrote:
->>> The function of_match_device() should tell if a struct device
->>> matches an of_device_id list and return the specific entry of
->>> that table matches the device best.
->>> 
->>> The underlying __of_match_node() implements the wrong search
->>> algorithm. It iterates over the list of of_device_ids,
->>> comparing the first compatible with _all_ compatibles of the
->>> struct device, then the second compatible of of_device_id and
->>> so on.
->>> 
->>> This leads to a problem, if the device has more than one
->>> compatible that match the of_device_id list. The implemented
->>> search algorithm may find not the "best" match. As the
->>> compatible list in the device is sorted from most to least 
->>> specific.
->>> 
->>> For example:
->>> 
->>> The imx28.dtsi gives this compatible string for its CAN core:
->>> 
->>>> compatible = "fsl,imx28-flexcan", "fsl,p1010-flexcan";
->>> 
->>> The flexcan driver defines:
->>> 
->>>> static const struct of_device_id flexcan_of_match[] = { {
->>>> .compatible = "fsl,p1010-flexcan", .data =
->>>> &fsl_p1010_devtype_data, }, { .compatible =
->>>> "fsl,imx28-flexcan", .data = &fsl_imx28_devtype_data, }, {
->>>> .compatible = "fsl,imx6q-flexcan", .data =
->>>> &fsl_imx6q_devtype_data, }, { /* sentinel */ }, };
->>> 
->>> The "p1010" was the first Freescale SoC with the flexcan core.
->>> But this SoC has a bug, so a workaround has to be enabled in
->>> the driver. The mx28 has this bug fixed, so we don't need this
->>> quite costly workaround.
->>> 
->>> The __of_match_node() will compare:
->>> 
->>> from  of_device_id		from device fsl,p1010-flexcan
->>> fsl,imx28-flexcan fsl,p1010-flexcan		fsl,p1010-flexcan	->
->>> MATCH
->>> 
->>> The of_match_device() function as it currently is implemented
->>> will always return p1010 not the mx28.
->>> 
->>> This patch fixes the problem by exchanging outer and inner
->>> loop. The first compatible of a device is compared against all
->>> compatible from the of_device_id list, then the second device
->>> compatible and so on.
->> 
->> This has been an issue for some time. A fix has been attempted
->> before and reverted if you look at the git history:
+Hello Russell,
+
+On Thu, Oct 03, 2013 at 11:00:38PM +0100, Russell King - ARM Linux wrote:
+> On Mon, Sep 30, 2013 at 11:49:34AM +0200, Uwe Kleine-K?nig wrote:
+> > Hello,
+> > 
+> > this series makes it possible to benefit from the MULTIPLATFORM stuff
+> > also for my v7-M machine (that is not yet supported in mainline).
 > 
-> ..should have done this before creating the patch.
+> The big problem I have with this is that the single zImage project is
+> forcing itself onto stuff like the small embedded stuff where it's not
+> appropriate for it to be.
 > 
->> commit bc51b0c22cebf5c311a6f1895fcca9f78efd0478 Author: Linus
->> Torvalds <torvalds@linux-foundation.org> Date:   Tue Jul 10
->> 12:49:32 2012 -0700
->> 
->> Revert "of: match by compatible property first"
->> 
->> This reverts commit 107a84e61cdd3406c842a0e4be7efffd3a05dba6.
->> 
->> Meelis Roos reports a regression since 3.5-rc5 that stops Sun
->> Fire V100 and Sun Netra X1 sparc64 machines from booting, hanging
->> after enabling serial console.  He bisected it to commit
->> 107a84e61cdd.
->> 
->> Rob Herring explains: "The problem is match combinations of
->> compatible plus name and/or type fail to match correctly.  I have
->> a fix for this, but given how late it is for 3.5 I think it is
->> best to revert this for now.  There could be other cases that
->> rely on the current although wrong behavior.  I will post an
->> updated version for 3.6."
->> 
->> Bisected-and-reported-by: Meelis Roos <mroos@linux.ee> 
->> Requested-by: Rob Herring <rob.herring@calxeda.com> Cc: Thierry
->> Reding <thierry.reding@avionic-design.de> Cc: Grant Likely
->> <grant.likely@secretlab.ca> Signed-off-by: Linus Torvalds
->> <torvalds@linux-foundation.org>
->> 
->> There was also a fix attempted for this and the discussion here:
->> 
->> http://www.mail-archive.com/linuxppc-dev at lists.ozlabs.org/msg60163.html
->>
->>
->> 
-You patch would hit the same issues I believe.
+> Much of the multiplatform infrastructure relies on the ability to do
+> tricks with the MMU - placing various peripherals at known virtual
+> addresses.  Such tricks don't work on no-MMU platforms.
+Actually it's not for the multi-platform ability itself I selected it
+for, but to benefit from other stuff that is currently only available
+for it, i.e. I don't need a Makefile.boot, I don't need some mach/
+headers.
+ 
+> NoMMU platforms are inherently much more restricted and specialised,
+> and having multiplatform on them just doesn't make sense.  Yes, it
+> may give you the ability to increase compilation coverage, but will
+> the resulting image even work on the platform you're trying to target,
+> or will one of the other multi-platforms take over some settings and
+> screw it for you - like the link address.
+Well, the way things are suggested in my patches you can only select
+other v7m machines alongside the efm32 platform. The bets are much
+better there not to screw it for me. But of course I cannot proof this
+as there is only one Cortex-M3 type supported in my tree.
+ 
+> XIP kernel is inherently limited to a single class of platforms.
+> Think about it - it's a very specialised.  XIP kernel needs several
+> things - it needs the kernel built in a special way such that the
+> data segment is separate from the text segment.  It needs to map the
+> flash memory storing the kernel code separately from the SDRAM.
+Right, but do we agree that it should be possible to create an XIP image
+for i.MX6? If so: You currently cannot, because i.MX6 isn't configurable
+without MULTIPLATFORM. Also in the times before MULTIPLATFORM XIP was
+special. Already back than you could create a kernel for 2 (or more)
+different machines (sharing the same SoC family) with XIP enabled. That
+didn't necessarily made it work on both machines, maybe only one of them
+had NOR flash.
+
+So maybe the only problem is that the symbol is misnamed or at least
+gives expectations that are not necessarily true. So you can configure a
+MULTIPLATFORM kernel for a single machine only just fine.
+
+> It needs to know where the IRQ controller is and how to access it
+> to check for pending interrupts.
+I didn't configure that, maybe this is only needed for writing to the
+flash holding the XIP image?
+
+> None of that is provided by the majority of multiplatform.
 > 
-> Yes probably, are the OF patterns from the failing sparcs
-> available somewhere, so that we can test a better implementation?
+> So, enabling the multiplatform Kconfig on such specialist platforms is
+> just opening up a huge can of worms.  Why anyone thinks this is a good
+> idea is way beyond me.
+> 
+> Also think about the argument you're making.  You need XIP kernel
+> because you have limited RAM, but you're willing to enable multiplatform
+> support which will allow you to build a kernel much larger than is
+> necessary for your platform by including other platforms in it.  Sorry,
+> that's just stupid.
+Right, it will allow me to build a much bigger kernel (but I don't need
+to). And it allows me a few more things (yes please).
 
-Not that I'm aware of. It appeared to be the serial driver. It may be
-evident looking at the sparc serial driver match table.
+Note I'm not 100% convinced that multiplatform is a sane idea for v7-M,
+but still I see some advantages so I wouldn't call it stupid.
 
-> I'll rearrange the drivers instead. BTW: what about the patch you 
-> mentioned in the above revert?
+Best regards
+Uwe
 
-My position has been we should change the driver ordering, but others
-have disagreed.
-
-Scott had some issues with my patch and my assumptions may not be
-right. Probably re-applying the original patch plus Scott's fix is the
-right answer. We just need to review the combined change closely to
-ensure we maintain current behavior where needed.
-
-Rob
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
