@@ -1,53 +1,89 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 3 Oct 2013 23:00:38 +0100
-Subject: [PATCH 0/3] v7-M support using MULTIPLATFORM
-In-Reply-To: <1380534577-15076-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1380534577-15076-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <20131003220037.GH12758@n2100.arm.linux.org.uk>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu,  3 Oct 2013 23:59:25 +0200
+Subject: [PATCH v2 2/3] ARM: move AES typedefs and function prototypes to
+ separate header
+In-Reply-To: <1380837566-18242-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1380837566-18242-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1380837566-18242-3-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 30, 2013 at 11:49:34AM +0200, Uwe Kleine-K?nig wrote:
-> Hello,
-> 
-> this series makes it possible to benefit from the MULTIPLATFORM stuff
-> also for my v7-M machine (that is not yet supported in mainline).
+Put the struct definitions for AES keys and the asm function prototypes in a
+separate header and export the asm functions from the module.
+This allows other drivers to use them directly.
 
-The big problem I have with this is that the single zImage project is
-forcing itself onto stuff like the small embedded stuff where it's not
-appropriate for it to be.
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ arch/arm/crypto/aes_glue.c | 22 ++++++----------------
+ arch/arm/crypto/aes_glue.h | 19 +++++++++++++++++++
+ 2 files changed, 25 insertions(+), 16 deletions(-)
+ create mode 100644 arch/arm/crypto/aes_glue.h
 
-Much of the multiplatform infrastructure relies on the ability to do
-tricks with the MMU - placing various peripherals at known virtual
-addresses.  Such tricks don't work on no-MMU platforms.
-
-NoMMU platforms are inherently much more restricted and specialised,
-and having multiplatform on them just doesn't make sense.  Yes, it
-may give you the ability to increase compilation coverage, but will
-the resulting image even work on the platform you're trying to target,
-or will one of the other multi-platforms take over some settings and
-screw it for you - like the link address.
-
-XIP kernel is inherently limited to a single class of platforms.
-Think about it - it's a very specialised.  XIP kernel needs several
-things - it needs the kernel built in a special way such that the
-data segment is separate from the text segment.  It needs to map the
-flash memory storing the kernel code separately from the SDRAM.
-It needs to know where the IRQ controller is and how to access it
-to check for pending interrupts.
-
-None of that is provided by the majority of multiplatform.
-
-So, enabling the multiplatform Kconfig on such specialist platforms is
-just opening up a huge can of worms.  Why anyone thinks this is a good
-idea is way beyond me.
-
-Also think about the argument you're making.  You need XIP kernel
-because you have limited RAM, but you're willing to enable multiplatform
-support which will allow you to build a kernel much larger than is
-necessary for your platform by including other platforms in it.  Sorry,
-that's just stupid.
-
-So no.  If multiplatform gets in the way on noMMU platforms, then
-multiplatform has ended up being done wrongly, and its multiplatform
-that needs to be fixed.
+diff --git a/arch/arm/crypto/aes_glue.c b/arch/arm/crypto/aes_glue.c
+index 59f7877..3003fa1 100644
+--- a/arch/arm/crypto/aes_glue.c
++++ b/arch/arm/crypto/aes_glue.c
+@@ -6,22 +6,12 @@
+ #include <linux/crypto.h>
+ #include <crypto/aes.h>
+ 
+-#define AES_MAXNR 14
++#include "aes_glue.h"
+ 
+-typedef struct {
+-	unsigned int rd_key[4 *(AES_MAXNR + 1)];
+-	int rounds;
+-} AES_KEY;
+-
+-struct AES_CTX {
+-	AES_KEY enc_key;
+-	AES_KEY dec_key;
+-};
+-
+-asmlinkage void AES_encrypt(const u8 *in, u8 *out, AES_KEY *ctx);
+-asmlinkage void AES_decrypt(const u8 *in, u8 *out, AES_KEY *ctx);
+-asmlinkage int private_AES_set_decrypt_key(const unsigned char *userKey, const int bits, AES_KEY *key);
+-asmlinkage int private_AES_set_encrypt_key(const unsigned char *userKey, const int bits, AES_KEY *key);
++EXPORT_SYMBOL(AES_encrypt);
++EXPORT_SYMBOL(AES_decrypt);
++EXPORT_SYMBOL(private_AES_set_encrypt_key);
++EXPORT_SYMBOL(private_AES_set_decrypt_key);
+ 
+ static void aes_encrypt(struct crypto_tfm *tfm, u8 *dst, const u8 *src)
+ {
+@@ -81,7 +71,7 @@ static struct crypto_alg aes_alg = {
+ 		.cipher	= {
+ 			.cia_min_keysize	= AES_MIN_KEY_SIZE,
+ 			.cia_max_keysize	= AES_MAX_KEY_SIZE,
+-			.cia_setkey			= aes_set_key,
++			.cia_setkey		= aes_set_key,
+ 			.cia_encrypt		= aes_encrypt,
+ 			.cia_decrypt		= aes_decrypt
+ 		}
+diff --git a/arch/arm/crypto/aes_glue.h b/arch/arm/crypto/aes_glue.h
+new file mode 100644
+index 0000000..cca3e51
+--- /dev/null
++++ b/arch/arm/crypto/aes_glue.h
+@@ -0,0 +1,19 @@
++
++#define AES_MAXNR 14
++
++struct AES_KEY {
++	unsigned int rd_key[4 * (AES_MAXNR + 1)];
++	int rounds;
++};
++
++struct AES_CTX {
++	struct AES_KEY enc_key;
++	struct AES_KEY dec_key;
++};
++
++asmlinkage void AES_encrypt(const u8 *in, u8 *out, struct AES_KEY *ctx);
++asmlinkage void AES_decrypt(const u8 *in, u8 *out, struct AES_KEY *ctx);
++asmlinkage int private_AES_set_decrypt_key(const unsigned char *userKey,
++					   const int bits, struct AES_KEY *key);
++asmlinkage int private_AES_set_encrypt_key(const unsigned char *userKey,
++					   const int bits, struct AES_KEY *key);
+-- 
+1.8.1.2
