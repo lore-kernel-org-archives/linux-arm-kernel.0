@@ -1,41 +1,38 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Wed,  2 Oct 2013 22:05:10 -0700
-Subject: [PATCH] arm: Select NOP_USB_XCEIV if MACH_OMAP3EVM is enabled
-Message-ID: <1380776710-27788-1-git-send-email-linux@roeck-us.net>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Thu, 3 Oct 2013 10:38:37 +0530
+Subject: [PATCH] cpufreq: highbank-cpufreq: Enable Midway/ECX-2000
+In-Reply-To: <1380641424-5666-1-git-send-email-mark.langsdorf@calxeda.com>
+References: <1380641424-5666-1-git-send-email-mark.langsdorf@calxeda.com>
+Message-ID: <CAOh2x=mZ__gYkhi6o_goUkw+JB==VY2PSk-T_1G+6QBxDZGFFg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-arm builds have been failing on and off with
+On Tue, Oct 1, 2013 at 9:00 PM, Mark Langsdorf
+<mark.langsdorf@calxeda.com> wrote:
+> Calxeda's new ECX-2000 part uses the same cpufreq interface as highbank,
+> so add it to the driver's compatibility list.
+>
+> This is a minor change that can safely be applied to the 3.10 and 3.11
+> stable trees.
+>
+> Signed-off-by: Mark Langsdorf <mark.langsdorf@calxeda.com>
+> ---
+>  drivers/cpufreq/highbank-cpufreq.c | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
+>
+> diff --git a/drivers/cpufreq/highbank-cpufreq.c b/drivers/cpufreq/highbank-cpufreq.c
+> index 794123f..bf8902a 100644
+> --- a/drivers/cpufreq/highbank-cpufreq.c
+> +++ b/drivers/cpufreq/highbank-cpufreq.c
+> @@ -66,7 +66,8 @@ static int hb_cpufreq_driver_init(void)
+>         struct device_node *np;
+>         int ret;
+>
+> -       if (!of_machine_is_compatible("calxeda,highbank"))
+> +       if ((!of_machine_is_compatible("calxeda,highbank")) &&
+> +               (!of_machine_is_compatible("calxeda,ecx-2000")))
+>                 return -ENODEV;
+>
+>         cpu_dev = get_cpu_device(0);
 
-arch/arm/mach-omap2/board-omap3evm.c:703: undefined reference to
-`usb_nop_xceiv_register'
-
-for several years. Current arm:allmodconfig build fails for this reason.
-
-Problem is that board-omap3evm.c is always build into the kernel.
-It calls usb_nop_xceiv_register(), which is built with NOP_USB_XCEIV,
-which in turn can be configured as module. This results in the observed
-build failure.
-
-Fix the problem once and for all by selecting NOP_USB_XCEIV if MACH_OMAP3EVM
-is enabled.
-
-Signed-off-by: Guenter Roeck <linux@roeck-us.net>
----
- arch/arm/mach-omap2/Kconfig |    1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-index b5fb5f7..0bc2cf4 100644
---- a/arch/arm/mach-omap2/Kconfig
-+++ b/arch/arm/mach-omap2/Kconfig
-@@ -265,6 +265,7 @@ config MACH_OMAP3EVM
- 	depends on ARCH_OMAP3
- 	default y
- 	select OMAP_PACKAGE_CBB
-+	select NOP_USB_XCEIV
- 
- config MACH_OMAP3517EVM
- 	bool "OMAP3517/ AM3517 EVM board"
--- 
-1.7.9.7
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
