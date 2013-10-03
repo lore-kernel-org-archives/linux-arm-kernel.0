@@ -1,34 +1,56 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Thu, 3 Oct 2013 09:25:19 -0700
-Subject: Use of drivers/platform and matching include?
-In-Reply-To: <B674A07C-F8FE-4F4D-BB0A-87D5A50852D0@codeaurora.org>
-References: <BC1C47B3-5412-4829-A1D9-AAB04694D1CC@codeaurora.org>
- <20131003152715.GA15931@kroah.com>
- <B674A07C-F8FE-4F4D-BB0A-87D5A50852D0@codeaurora.org>
-Message-ID: <20131003162519.GA25042@kroah.com>
+From: marex@denx.de (Marek Vasut)
+Date: Thu, 3 Oct 2013 18:26:11 +0200
+Subject: [PATCH] video: mxsfb: Add missing break
+In-Reply-To: <87bo362uvu.fsf@canonical.com>
+References: <1380601350-6665-1-git-send-email-marex@denx.de>
+ <87bo362uvu.fsf@canonical.com>
+Message-ID: <201310031826.11531.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 03, 2013 at 11:21:10AM -0500, Kumar Gala wrote:
-> 
-> On Oct 3, 2013, at 10:27 AM, Greg Kroah-Hartman wrote:
-> 
-> > On Thu, Oct 03, 2013 at 09:45:38AM -0500, Kumar Gala wrote:
-> >> As we look at upstreaming more support for the Qualcomm MSM SoCs there
-> >> are a number of drivers or library like routines that are unique to
-> >> the MSM platform, we are thinking that putting them under:
-> >> 
-> >> drivers/platform/qcom/
+Dear Luis Henriques,
+
+> Marek Vasut <marex@denx.de> writes:
+> > Add missing break into the restore function.
 > > 
-> > What type of drivers are these?  Shouldn't they really go under the
-> > specific driver type directory instead?
+> > Upstream commit: 6d0bb818041a02be682abadb3ba35ff608f7d60a
+> > 
+> > Signed-off-by: Marek Vasut <marex@denx.de>
+> > Cc: Fabio Estevam <fabio.estevam@freescale.com>
+> > Cc: Shawn Guo <shawn.guo@linaro.org>
+> > Cc: stable at vger.kernel.org
+> > 
+> > ---
+> > 
+> >  drivers/video/mxsfb.c | 1 +
+> >  1 file changed, 1 insertion(+)
+> > 
+> > diff --git a/drivers/video/mxsfb.c b/drivers/video/mxsfb.c
+> > index 21223d4..75c5b4e 100644
+> > --- a/drivers/video/mxsfb.c
+> > +++ b/drivers/video/mxsfb.c
+> > @@ -647,6 +647,7 @@ static int mxsfb_restore_mode(struct mxsfb_info
+> > *host)
+> > 
+> >  		break;
+> >  	
+> >  	case 3:
+> >  		bits_per_pixel = 32;
+> > 
+> > +		break;
+> > 
+> >  	case 1:
+> >  	
+> >  	default:
+> >  		return -EINVAL;
 > 
-> If there isn't an existing driver/ dir for this I dont see how it can go there, I'm not also not really a fan of trying to artificial put something that is highly SoC specific into something generic of this nature.
+> Thanks, I believe this fix is applicable to all the stable kernels.
+> I'm queuing it for the 3.5 kernel.
 
-Loose a line-wrap somewhere?...
+Thanks!
 
-Anyway, you didn't answer my question, so why do I need to answer yours?
+btw. it'd be nice if you could push the kernel.ubuntu.com admins to fix their 
+git server ( https://bugs.launchpad.net/ubuntu/+source/git/+bug/1228148 ) ;-)
 
-snarkily,
-
-greg k-h
+Best regards,
+Marek Vasut
