@@ -1,74 +1,97 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 3 Oct 2013 12:28:01 +0200
-Subject: Armada XP doesn't boot in v3.12-rc3
-In-Reply-To: <CAFJTrDsiOfG1rNWo3OXtzdcquP8kdS+_x2YYELOQDH96SLGm_A@mail.gmail.com>
-References: <CAFJTrDvNYa2g-TFPjii5WpCgnX8kc8r9v3+jzL7gkHCwRV-obg@mail.gmail.com>
- <20131002124320.GL31178@titan.lakedaemon.net>
- <CAFJTrDsTmSzFEX7XVqnw4=vYiBdqNeLDQuWFotSEZqGsFxT9sA@mail.gmail.com>
- <20131002202547.GA10645@localhost>
- <CAFJTrDsiOfG1rNWo3OXtzdcquP8kdS+_x2YYELOQDH96SLGm_A@mail.gmail.com>
-Message-ID: <20131003122801.7f72bc26@skate>
+From: rogerq@ti.com (Roger Quadros)
+Date: Thu, 3 Oct 2013 13:32:05 +0300
+Subject: [PATCH v3 00/10] USB: phy: phy-nop: Manage RESET GPIO in the
+ driver
+In-Reply-To: <1380012836-29900-1-git-send-email-rogerq@ti.com>
+References: <1380012836-29900-1-git-send-email-rogerq@ti.com>
+Message-ID: <524D47A5.8000108@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Matthew Minter,
+Hi,
 
-On Thu, 3 Oct 2013 10:41:07 +0100, Matthew Minter wrote:
-
-> It seems the latest build of "for-next" from
-> git://git.infradead.org/linux-mvebu.git works the charm.
-> For reference I have a version of uBoot that came with the board, I am
-> reluctant to reflash it as I would then have no way of recovering and
-> it has not seemed to cause any issues anyway. (the only drawback is
-> that it seems to prefer to appended dtb image and not explicit
-> passing).
-
-Don't worry: there is a way of recovering, through the UART, using the
-kwboot tool that Sebastian and I have added to the Barebox sources.
-Sebastian and I have already been able to run Barebox (a different
-bootloader) on Armada 370 and Armada XP platforms, though the support
-is limited to the serial port for the moment, so it's quite useless for
-any practical usage.
-
-As of today, there is no Armada 370/XP support in the mainline U-Boot,
-and Marvell has not yet released an U-Boot version that has Device Tree
-support, so we're stuck with appended DTB for now. However, Marvell is
-working on a DT-capable version of their U-Boot, which should arrive at
-some point in the future.
-
-> The version is as follows but is likely not useful as it seems to be a
-> build customised for the hardware, it does support uImages and the new
-> format however:
+On 09/24/2013 11:53 AM, Roger Quadros wrote:
+> Hi,
 > 
-> U-Boot 2011.12-00036-g664db9a-dirty (Oct 16 2012 - 14:12:23) Marvell
-> version: 2012_Q4.1
+> Modelling the RESET line as a regulator supply wasn't a good idea
+> as it abuses the regulator framework and makes adaptation
+> code/data more complex.
+> 
+> Instead, manage the RESET gpio line directly in the driver.
+> 
+> This also makes us easy to migrate to a dedicated GPIO RESET controller
+> whenever it becomes available.
+> 
+> Apart from RESET line changes this series also adds USB host support
+> fro beagle-xm and fixes USB OTG port on beagle.
+> 
+> The full series is avilable at
+> 	git://github.com/rogerq/linux.git
+> in branch
+> 	phy-reset
 
-It is useful for us, as we can compare it to the U-Boot version we're
-using, and we also have the possibility of upgrading our U-Boot to a
-different version if needed.
+The branch is now updated based on v3.12-rc3.
 
-> I am still working through some small driver issues (trying to mount
-> various SSDs) but the early boot failure is resolved with those
-> patches and the default configuration (plus early printk).
+cheers,
+-roger
 
-Great. Regarding SSDs, we successfully tested the SATA support on
-Armada XP GP with hard drives, and the SATA support was also
-successfully tested on OpenBlocks AX3-4 (which has an Armada XP) using
-a SSD.
-
-> Thank you all so much for the help, I think this board is now working
-> fine but will report any other issues I come across later.
-
-Sure!
-
-As soon as the relevant fixes of mvebu/for-next hit mainline, you'll be
-able to switch back to using the mainline kernel. Note that you can
-also use 3.11 for the moment, which should also work on this platform.
-
-Thanks!
-
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+> 
+> *NOTE:* As there are changes to platform data, Patch 1 needs to be shared
+> between the arm-soc tree and usb tree.
+> 
+> Patch 1 is available at repo
+> 	git://github.com/rogerq/linux.git
+> in branch
+> 	phy-reset-common
+> 
+> Patch 2 contains the phy-nop driver changes
+> Patches 3 and 4 adapt legacy boot code to the phy-nop driver changes.
+> Patches 5, 6 and 7 adapt DT data to the binding changes.
+> Patch 8 is cleanup of omap3-beagle DT.
+> Patch 9 adds USB host support to omap3-beagle-xm using the new binding.
+> Patch 10 fixes USB OTG port on beagle.
+> 
+> Patches are based on v3.12-rc1
+> 
+> Tested leacy boot on omap3-beagle and omap3-beagle-xm
+> Tested DT boot on omap3-beagle, omap3-beagle-xm and omap4-panda-es
+> 
+> v3:
+> - Fix the Initial state of RESET line at probe time.
+> - Update hsusb3_reset line on omap5-uevm as well.
+> - Add patch 10 that fixes USB OTG port on beagle.
+> 
+> v2:
+> - Added RESET GPIO polarity feature
+> - Changed to gpio_set_value_cansleep()
+> 
+> cheers,
+> -roger
+> 
+> Roger Quadros (10):
+>   usb: phy: generic: Add gpio_reset to platform data
+>   usb: phy: generic: Don't use regulator framework for RESET line
+>   ARM: OMAP2+: omap-usb-host: Get rid of platform_data from struct
+>     usbhs_phy_data
+>   ARM: OMAP2+: usb-host: Adapt to USB phy-nop RESET line changes
+>   ARM: dts: omap3-beagle: Use reset-gpios for hsusb2_reset
+>   ARM: dts: omap4-panda: Use reset-gpios for hsusb1_reset
+>   ARM: dts: omap5-uevm: Use reset-gpios for hsusb2/3_reset
+>   ARM: dts: omap3-beagle: Make USB host pin naming consistent
+>   ARM: dts: omap3-beagle-xm: Add USB Host support
+>   ARM: dts: omap3-beagle: Add USB OTG PHY details
+> 
+>  .../devicetree/bindings/usb/usb-nop-xceiv.txt      |    7 +-
+>  arch/arm/boot/dts/omap3-beagle-xm.dts              |   65 +++++++++++++--
+>  arch/arm/boot/dts/omap3-beagle.dts                 |   44 +++++------
+>  arch/arm/boot/dts/omap4-panda-common.dtsi          |   18 +----
+>  arch/arm/boot/dts/omap5-uevm.dts                   |   26 +------
+>  arch/arm/mach-omap2/board-omap3beagle.c            |    6 --
+>  arch/arm/mach-omap2/usb-host.c                     |   18 ++--
+>  arch/arm/mach-omap2/usb.h                          |    1 -
+>  drivers/usb/phy/phy-am335x.c                       |    2 +-
+>  drivers/usb/phy/phy-generic.c                      |   84 +++++++++++++-------
+>  drivers/usb/phy/phy-generic.h                      |    6 +-
+>  include/linux/usb/usb_phy_gen_xceiv.h              |    3 +-
+>  12 files changed, 153 insertions(+), 127 deletions(-)
+> 
