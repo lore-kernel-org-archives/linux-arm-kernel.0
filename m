@@ -1,25 +1,24 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Thu, 3 Oct 2013 13:48:05 -0700
-Subject: [PATCH v2 1/3] imx-drm: Add mx6 hdmi transmitter support
-In-Reply-To: <1380826287-30253-1-git-send-email-fabio.estevam@freescale.com>
-References: <1380826287-30253-1-git-send-email-fabio.estevam@freescale.com>
-Message-ID: <20131003204805.GA21187@kroah.com>
+From: Nathan_Lynch@mentor.com (Nathan Lynch)
+Date: Thu, 3 Oct 2013 15:52:17 -0500
+Subject: [PATCH] imx6q: fix emergency restart
+In-Reply-To: <1380832337-4637-1-git-send-email-nathan_lynch@mentor.com>
+References: <1380832337-4637-1-git-send-email-nathan_lynch@mentor.com>
+Message-ID: <524DD901.8090909@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 03, 2013 at 03:51:25PM -0300, Fabio Estevam wrote:
-> This is based on the initial work done by Sascha Hauer and Tony Prisk.
-> 
-> Tested on imx6q-wandboard and imx6q-sabresd boards.
+On 10/03/2013 03:32 PM, Nathan Lynch wrote:
+>  static void __init imx6q_init_machine(void)
+>  {
+> +	struct device_node *np;
+> +
+>  	imx6q_enet_phy_init();
+>  
+> +	np = of_find_compatible_node(NULL, NULL, "fsl,imx6q-wdt");
+> +	if (np)
+> +		wdog_base = of_iomap(np, 0);
+> +	pr_info("%s: wdog_base = %p\n", __func__, wdog_base);
+> +
 
-Why is _any_ new work going on here instead of working to get this code
-out of staging?
-
-I really don't want to accept this at all, as I'm not seeing any effort
-to get this out of staging and into the proper place in the drm tree,
-sorry.
-
-And I shouldn't have to be saying this at all, you all know better than
-to try to add new hardware support for staging drivers...
-
-greg k-h
+I'll remove this stray debug statement in v2 after waiting a while for
+any other comments.
