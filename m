@@ -1,46 +1,90 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 4 Oct 2013 12:00:53 +0200
-Subject: Timekeeping on at91rm9200 [Was: [PATCH v2] clockevents: Sanitize
- ticks to nsec conversion]
-In-Reply-To: <20130924211139.GE16106@pengutronix.de>
-References: <alpine.DEB.2.02.1309191629040.4089@ionos.tec.linutronix.de>
- <1380052223-24139-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <20130924211139.GE16106@pengutronix.de>
-Message-ID: <524E91D5.5020804@atmel.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Fri,  4 Oct 2013 12:08:30 +0200
+Subject: [PATCH] clk: provide public clk_is_enabled function
+Message-ID: <1380881310-24345-1-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/09/2013 23:11, Uwe Kleine-K?nig :
-> Hello Nicolas, hello Jean-Christophe,
->
-> I expect you should be able to revert
->
-> 	b7a8ca5 (ARM: at91: rm9200 fix time support)
->
-> which reverted
->
-> 	838a2ae (ARM: use clockevents_config_and_register() where possible)
->
-> for at91rm9200 on top of the patch this mail is a reply to.
->
-> Can you please test that?
+To determine if a clk has been previously enabled, provide a public
+clk_is_enabled function. This is especially helpful to check the state
+of clk-gate without actually changing the state of the gate.
 
-I have just tested that on at91rm9200-ek:
-- revert the revert (!)
-- experience the crash
-- then apply the v2 patch
-- and finally see it working nicely!
+Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+---
+Cc: Mike Turquette <mturquette@linaro.org>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Jason Cooper <jason@lakedaemon.net>
+Cc: Andrew Lunn <andrew@lunn.ch>
+Cc: Grant Likely <grant.likely@linaro.org>
+Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+Cc: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
+Cc: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-kernel at vger.kernel.org
+---
+ drivers/clk/clk.c   |   18 ++++++++++++++++++
+ include/linux/clk.h |   13 +++++++++++++
+ 2 files changed, 31 insertions(+)
 
-Thanks a lot for having corrected this. Now, do you want that I stack 
-this revert-of-revert on the AT91 git tree or you are able to apply it 
-through the clock git tree together with the patch that is fixing the 
-issue (it may prevent synchronization difficulties)? (BTW, I do not see 
-it yet in "next").
-
-Anyway, if it is required, you can add my:
-
-Tested-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-
-Thanks, bye,
+diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+index a004769..26698d3 100644
+--- a/drivers/clk/clk.c
++++ b/drivers/clk/clk.c
+@@ -929,6 +929,24 @@ int clk_enable(struct clk *clk)
+ EXPORT_SYMBOL_GPL(clk_enable);
+ 
+ /**
++ * clk_is_enabled - return the enabled state of a clk
++ * @clk: the clk whose enabled state gets returned
++ *
++ * Returns true if the clock is enabled, false otherwise.
++ */
++bool clk_is_enabled(struct clk *clk)
++{
++	bool is_en;
++
++	clk_prepare_lock();
++	is_en = __clk_is_enabled(clk);
++	clk_prepare_unlock();
++
++	return is_en;
++}
++EXPORT_SYMBOL_GPL(clk_is_enabled);
++
++/**
+  * __clk_round_rate - round the given rate for a clk
+  * @clk: round the rate of this clock
+  * @rate: the rate which is to be rounded
+diff --git a/include/linux/clk.h b/include/linux/clk.h
+index 9a6d045..8cbf2f7 100644
+--- a/include/linux/clk.h
++++ b/include/linux/clk.h
+@@ -187,6 +187,14 @@ int clk_enable(struct clk *clk);
+ void clk_disable(struct clk *clk);
+ 
+ /**
++ * clk_is_enabled - return the enabled state of a clk
++ * @clk: the clk whose enabled state gets returned
++ *
++ * Returns true if the clock is enabled, false otherwise.
++ */
++bool clk_is_enabled(struct clk *clk);
++
++/**
+  * clk_get_rate - obtain the current clock rate (in Hz) for a clock source.
+  *		  This is only valid once the clock source has been enabled.
+  * @clk: clock source
+@@ -299,6 +307,11 @@ static inline int clk_enable(struct clk *clk)
+ 
+ static inline void clk_disable(struct clk *clk) {}
+ 
++static inline bool clk_is_enabled(struct clk *clk)
++{
++	return false;
++}
++
+ static inline unsigned long clk_get_rate(struct clk *clk)
+ {
+ 	return 0;
 -- 
-Nicolas Ferre
+1.7.10.4
