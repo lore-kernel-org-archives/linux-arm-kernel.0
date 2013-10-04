@@ -1,59 +1,54 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 4 Oct 2013 16:58:25 +0100
-Subject: device tree binding documentation outdated
-In-Reply-To: <20131004154536.GB2734@S2101-09.ap.freescale.net>
-References: <CAHCPf3sC7bY=p4vpBQFpRUmyPspT_PVjx0rH9cm1ov=SqkO+Vg@mail.gmail.com>
- <20130927190546.GG12758@n2100.arm.linux.org.uk>
- <CAHCPf3vxGAzTnY360KC7Yt-DB1FB14Sv_Cn7DBTH6HGZ6y=stg@mail.gmail.com>
- <CAHCPf3sv3wSbUc9QFVhmYsPc1kqiWYRuOMO7rreuiGSrwyepBQ@mail.gmail.com>
- <20130927202110.GI12758@n2100.arm.linux.org.uk>
- <20130928083859.GQ12758@n2100.arm.linux.org.uk>
- <20130929061303.GB26156@S2101-09.ap.freescale.net>
- <20131002193316.GR12758@n2100.arm.linux.org.uk>
- <20131002234911.GD12758@n2100.arm.linux.org.uk>
- <20131004154536.GB2734@S2101-09.ap.freescale.net>
-Message-ID: <20131004155825.GO12758@n2100.arm.linux.org.uk>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Fri, 4 Oct 2013 12:03:59 -0400
+Subject: [PATCH v3 6/6] ARM: mm: Change the order of TLB/cache maintenance
+ operations.
+In-Reply-To: <20131004155243.GT24303@mudshark.cambridge.arm.com>
+References: <1380835081-12129-1-git-send-email-santosh.shilimkar@ti.com>
+ <1380835081-12129-7-git-send-email-santosh.shilimkar@ti.com>
+ <20131004155243.GT24303@mudshark.cambridge.arm.com>
+Message-ID: <524EE6EF.1@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 04, 2013 at 11:45:39PM +0800, Shawn Guo wrote:
-> On Thu, Oct 03, 2013 at 12:49:11AM +0100, Russell King - ARM Linux wrote:
-> > RGMII mode.
-> > 
-> > In current hardware, the phy has its own 25MHz crystal.  This provides
-> > the phy with its clocks, and the phy itself contains a PLL, which it
-> > uses to generate 125MHz.
-> > 
-> > The phy can be (and is) configured to generate this 125MHz clock on
-> > the CLK_25M pin, which is connected to the IMX6 ENET_REF_CLK pad (V22
-> > ball).
-> > 
-> > Hence, we have in DT:
-> > 	MX6QDL_PAD_ENET_REF_CLK__ENET_TX_CLK
-> > 
-> > So far, so good. 
-> > 
-> > 
-> > On current hardware, GPIO 16 is not connected to anything except some
-> > 0402 resistor pads where the resistor is not fitted.  On future hardware,
-> > the above crystal will be removed, and the appropriate 0402 resistor
-> > placed to supply a clock provided on GPIO 16 to the phy.
-> > 
-> > Hence, to support both hardware configurations transparently, GPIO 16
-> > should be configured to generate a 25MHz clock for use by the phy.
+On Friday 04 October 2013 11:52 AM, Will Deacon wrote:
+> On Thu, Oct 03, 2013 at 10:18:00PM +0100, Santosh Shilimkar wrote:
+>> From: Sricharan R <r.sricharan@ti.com>
+>>
+>> As per the arm ARMv7 manual, the sequence of TLB maintenance
+>> operations after making changes to the translation table is
+>> to clean the dcache first, then invalidate the TLB. With
+>> the current sequence we see cache corruption when the
+>> flush_cache_all is called after tlb_flush_all.
+>>
+>> STR rx, [Translation table entry]
+>> ; write new entry to the translation table
+>> Clean cache line [Translation table entry]
+>> DSB
+>> ; ensures visibility of the data cleaned from the D Cache
+>> Invalidate TLB entry by MVA (and ASID if non-global) [page address]
+>> Invalidate BTC
+>> DSB
+>> ; ensure completion of the Invalidate TLB operation
+>> ISB
+>> ; ensure table changes visible to instruction fetch
+>>
+>> The issue is seen only with LPAE + THUMB BUILT KERNEL + 64BIT patching,
+>> which is little bit weird.
 > 
-> On AR8035 XTLI pin?  Here is what I read from AR8035 data sheet.
+> NAK.
 > 
-> XTLI (Analog input signal): Crystal oscillator input. Requires a 27 pF
-> capacitor to GND.  Support external 25 MHz, 1.2V swing clock input
-> through this pin.
+> I don't buy your reasoning. All current LPAE implementations also implement
+> the multi-processing extensions, meaning that the cache flush isn't required
+> to make the PTEs visible to the table walker. The dsb from the TLB_WB flag
+> is sufficient, so I think you still have some debugging to do as this change
+> is likely masking a problem elsewhere.
 > 
-> XTLO (Analog output signal): Crystal oscillator output; 27 pF to GND.
+> On top of that, create_mapping does all the flushing you need (for the !SMP
+> case) when the tables are initialised, so this code doesn't need changing.
 > 
-> Will AR8035 just work if we provide a digital 25Mhz clock (from GPIO_16)
-> on its XTLI pin?
+Fair enough. We will drop this patch from this series and continue to look
+at the issue further. As such the patch has no hard dependency with rest of
+the series.
 
-Well, "Support external 25 MHz, 1.2V swing clock input through this pin."
-suggests the answer is yes.  The characterists suggest that if the supplied
-clock is within -0.3 to 0.15V for the low level, and 0.8 to 1.5V for the
-high level, it should work.
+Regards,
+Santosh
