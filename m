@@ -1,53 +1,73 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Fri, 4 Oct 2013 13:46:08 +0300
-Subject: [PATCH v7 09/10] usb: dwc3: omap: manage "usb_otg_ss_refclk960m"
- clock
-In-Reply-To: <20131003154144.GA18189@kroah.com>
-References: <1379508542-22389-1-git-send-email-rogerq@ti.com>
- <1379508542-22389-10-git-send-email-rogerq@ti.com> <52403E02.4070208@ti.com>
- <20131002131113.GM1476@radagast> <524C22A1.30200@ti.com>
- <20131003122941.GD3230@radagast> <524D8516.8000107@ti.com>
- <20131003154144.GA18189@kroah.com>
-Message-ID: <524E9C70.8050303@ti.com>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Fri,  4 Oct 2013 12:53:17 +0200
+Subject: [RFC] ASoC: pcm: Trigger all commands on error
+Message-ID: <1380883997-18236-1-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Greg,
+If a start command is triggered and an error occures in the first called
+function, e.g. DMA, all other functions are not executed and the error
+value is returned immediately.
 
-On 10/03/2013 06:41 PM, Greg KH wrote:
-> On Thu, Oct 03, 2013 at 05:54:14PM +0300, Roger Quadros wrote:
->> On 10/03/2013 03:29 PM, Felipe Balbi wrote:
->>> Hi,
->>>
->>> On Wed, Oct 02, 2013 at 04:41:53PM +0300, Roger Quadros wrote:
->>>> On 10/02/2013 04:11 PM, Felipe Balbi wrote:
->>>>> On Mon, Sep 23, 2013 at 04:11:30PM +0300, Roger Quadros wrote:
->>>>>> Hi Felipe,
->>>>>>
->>>>>> On 09/18/2013 03:49 PM, Roger Quadros wrote:
->>>>>>> "usb_otg_ss_refclk960m" is an optional functional clock to the
->>>>>>> UBS_OTG_SS module. So manage it in the driver.
->>>>>>>
->>>>>>
->>>>>> Just realized that "usb_otg_ss_refclk960m" is in fact functional clock to the 
->>>>>> PHY and not USB_OTG_SS module. The name is misleading.
->>>>>>
->>>>>> So please ignore patch 9 and 10.
->>>>>
->>>>> ignored. All others are fine, right ?
->>>>>
->>>> Yes. But I might have to rebase this on top of Phy framework stuff.
->>>
->>> alright, Greg already took the PHY framework, so maybe we need to just
->>> give him my Acked-by and he takes the patches directly as I don't have
->>> PYH framework.
->>>
->> OK. I'll resend this series to Greg in a while.
-> 
-> It looks like you did, but forgot Felipe's ack :(
-> 
-I was under the impression that Felipe will explicitly give his Ack there.
-Should I resend with his Acked-bys?
+In case of a start command, the calling function will call undo_start,
+calling this trigger function with the stop command. It will call stop
+for each function. But only the first function was started previously.
+The other functions may fail in the assumption that a stop command
+always comes after a start command.
 
-cheers,
--roger
+As the API does not specify the behaviour of trigger functionpointers, I
+think this should be fixed in the function calling the trigger
+functionpointers.
+
+This patch changes the behaviour. The trigger function calls all
+functionpointers independent of their returncodes. The first error-code
+is returned.
+
+Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+---
+ sound/soc/soc-pcm.c | 18 ++++++++++--------
+ 1 file changed, 10 insertions(+), 8 deletions(-)
+
+diff --git a/sound/soc/soc-pcm.c b/sound/soc/soc-pcm.c
+index 330c9a6..23fc25b 100644
+--- a/sound/soc/soc-pcm.c
++++ b/sound/soc/soc-pcm.c
+@@ -616,26 +616,28 @@ static int soc_pcm_trigger(struct snd_pcm_substream *substream, int cmd)
+ 	struct snd_soc_platform *platform = rtd->platform;
+ 	struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
+ 	struct snd_soc_dai *codec_dai = rtd->codec_dai;
+-	int ret;
++	int ret = 0;
++	int err = 0;
+ 
+ 	if (codec_dai->driver->ops->trigger) {
+ 		ret = codec_dai->driver->ops->trigger(substream, cmd, codec_dai);
+-		if (ret < 0)
+-			return ret;
++		if (!err && ret)
++			err = ret;
+ 	}
+ 
+ 	if (platform->driver->ops && platform->driver->ops->trigger) {
+ 		ret = platform->driver->ops->trigger(substream, cmd);
+-		if (ret < 0)
+-			return ret;
++		if (!err && ret)
++			err = ret;
+ 	}
+ 
+ 	if (cpu_dai->driver->ops->trigger) {
+ 		ret = cpu_dai->driver->ops->trigger(substream, cmd, cpu_dai);
+-		if (ret < 0)
+-			return ret;
++		if (!err && ret)
++			err = ret;
+ 	}
+-	return 0;
++
++	return err;
+ }
+ 
+ static int soc_pcm_bespoke_trigger(struct snd_pcm_substream *substream,
+-- 
+1.8.4.rc3
