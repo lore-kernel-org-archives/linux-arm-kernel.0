@@ -1,56 +1,100 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 4 Oct 2013 15:29:14 -0400
-Subject: Use of drivers/platform and matching include?
-In-Reply-To: <CAOesGMjxwmr0Vo0Puc-nZntgXLy6D1PTohz=C+fFukP_Eu1iQg@mail.gmail.com>
-References: <BC1C47B3-5412-4829-A1D9-AAB04694D1CC@codeaurora.org>
- <CAOesGMjJ6Uj0uGFJqtnWQyDW+tr6eLVWoHZ+B7uFna+L8N6E8Q@mail.gmail.com>
- <20131004114128.GL12758@n2100.arm.linux.org.uk>
- <20131004132209.GB23923@kroah.com>
- <CAOesGMjxwmr0Vo0Puc-nZntgXLy6D1PTohz=C+fFukP_Eu1iQg@mail.gmail.com>
-Message-ID: <524F170A.2010806@ti.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Fri, 04 Oct 2013 12:35:17 -0700
+Subject: [PATCH] clk: palmas: add clock driver for palmas
+In-Reply-To: <1380803407-15196-1-git-send-email-ldewangan@nvidia.com>
+References: <1380803407-15196-1-git-send-email-ldewangan@nvidia.com>
+Message-ID: <20131004193517.4343.96145@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 04 October 2013 12:48 PM, Olof Johansson wrote:
-> On Fri, Oct 4, 2013 at 6:22 AM, Greg Kroah-Hartman
-> <gregkh@linuxfoundation.org> wrote:
->> On Fri, Oct 04, 2013 at 12:41:28PM +0100, Russell King - ARM Linux wrote:
->>>
->>> So, no, there will be no new drivers under arch/arm.  They must be in the
->>> drivers subtree somewhere.
->>
->> I have no objection with this, and encourage it.
-> 
-> Ok, so these are some of the requirements as far as I see it:
-> 
-> * No per-vendor driver dumping ground under drivers/* (i.e. no
-> drivers/platform/<soc vendor>/)
-> * No weirdly constructed single-driver directories directly under
-> drivers/* (we already have a few and should look at moving those)
-> because nothing else fits
-> * We need some sort of convention on dependencies. Several of these
-> are more libraries than drivers, i.e. we'll have cross-calls for
-> things like queue management, resource allocation, etc. So having a
-> single location to hold most of these makes sense instead of
-> everything cross-depending on everything else.
-> 
-> Based on the above, how about we create something like
-> drivers/resourcemgr to hold these?   I think at least parts of the
-> mvebu-mbus driver that ended up under drivers/bus might be a fit to
-> move there. The APM queue allocator would likely be a fit, and maybe
-> some of the qualcomm stuff. Kumar, what are your thoughts on that?
+Quoting Laxman Dewangan (2013-10-03 05:30:07)
+> +static struct clk_ops palmas_clks_ops = {
+> +       .prepare        = palmas_clks_prepare,
+> +       .unprepare      = palmas_clks_unprepare,
+> +       .is_enabled     = palmas_clks_is_enabled,
 
-Slightly different question but relevant to th thread w.r.t the Queue
-allocator/manager. We are also interested for TI Keystone SOCs.
+Use .is_prepared if a call to clk_prepare for your clock will start
+generating a signal. No need for .is_enabled since you do not define
+your own .enable & .disable callbacks.
 
-Currently we have generic drivers/hwqueue/ with core hwqueue
-layer implementing the standard hardware queue descriptor push/pop
-and notification mechanisms and then Keystone specific
-driver using those core functionalities. I read most of the
-networking SOCs has some sort of hwqueues but not sure about
-the its implementations. So just thought of bringing
-it into the thread discussion to see if hwqueue core layer is
-of any interest to other SOCs.
+> +};
+> +
+> +static struct clk_init_data palmas_clks_hw_init[PALMAS_CLOCK32K_NR] = {
+> +       [PALMAS_CLOCK32KG] = {
+> +               .name = "clk32k_kg",
+> +               .ops = &palmas_clks_ops,
+> +               .flags = CLK_IS_ROOT | CLK_IGNORE_UNUSED,
+> +       },
+> +       [PALMAS_CLOCK32KG_AUDIO] = {
+> +               .name = "clk32k_kg_audio",
+> +               .ops = &palmas_clks_ops,
+> +               .flags = CLK_IS_ROOT | CLK_IGNORE_UNUSED,
+> +       },
+> +};
+> +
+> +static int palmas_clks_get_clk_data(struct platform_device *pdev,
+> +       struct palmas_clks *palmas_clks)
+> +{
+> +       struct device_node *node = pdev->dev.of_node;
+> +       struct device_node *child;
+> +       struct palmas_clock_info *cinfo;
+> +       unsigned int prop;
+> +       int ret;
+> +       int i;
+> +
+> +       for (i = 0; i < PALMAS_CLOCK32K_NR; ++i) {
+> +               child = of_get_child_by_name(node,
+> +                               palmas_clk32k_descs[i].clk_name);
+> +               if (!child)
+> +                       continue;
+> +
+> +               cinfo = &palmas_clks->clk_info[i];
+> +               cinfo->boot_enable = of_property_read_bool(child,
+> +                                               "ti,clock-boot-enable");
+> +               ret = of_property_read_u32(child, "ti,external-sleep-control",
+> +                                       &prop);
+> +               if (!ret) {
+> +                       switch (prop) {
+> +                       case 1:
+> +                               prop = PALMAS_EXT_CONTROL_ENABLE1;
+> +                               break;
+> +                       case 2:
+> +                               prop = PALMAS_EXT_CONTROL_ENABLE2;
+> +                               break;
+> +                       case 3:
+> +                               prop = PALMAS_EXT_CONTROL_NSLEEP;
+> +                               break;
+> +                       default:
+> +                               WARN_ON(1);
+> +                               dev_warn(&pdev->dev,
+> +                                       "%s: Invalid ext control option: %u\n",
+> +                                       child->name, prop);
+> +                               prop = 0;
+> +                               break;
+> +                       }
+> +                       cinfo->ext_control_pin = prop;
+> +               }
+> +       }
+> +
+> +       return 0;
+> +}
+> +
+> +static int palmas_clks_init_configure(struct palmas_clock_info *cinfo)
+> +{
+> +       struct palmas_clks *palmas_clks = cinfo->palmas_clk;
+> +       int ret;
+> +       unsigned int val = 0;
+> +       unsigned int mask;
+> +
+> +       if (cinfo->boot_enable || cinfo->ext_control_pin)
+> +               val |= cinfo->clk_desc->enable_mask;
+
+So if the ti,clock-boot-enable property exists then a clock signal will
+be generated by palmas but the Linux clock tree representation won't
+know it. This is bad.
+
+Better to call clk_get and clk_prepare_enable here instead of cheating
+and directly writing to the register.
 
 Regards,
-Santosh
+Mike
