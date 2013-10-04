@@ -1,66 +1,68 @@
 From: acourbot@nvidia.com (Alexandre Courbot)
-Date: Fri, 4 Oct 2013 09:37:14 -0700
-Subject: [PATCH v7 4/5] ARM: tegra: set CPU reset handler with firmware op
+Date: Fri, 4 Oct 2013 09:37:12 -0700
+Subject: [PATCH v7 2/5] ARM: tegra: add support for Trusted Foundations
 In-Reply-To: <1380904635-18113-1-git-send-email-acourbot@nvidia.com>
 References: <1380904635-18113-1-git-send-email-acourbot@nvidia.com>
-Message-ID: <1380904635-18113-5-git-send-email-acourbot@nvidia.com>
+Message-ID: <1380904635-18113-3-git-send-email-acourbot@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use a firmware operation to set the CPU reset handler and only resort to
-doing it ourselves if there is none defined.
-
-This supports the booting of secondary CPUs on devices using a TrustZone
-secure monitor.
+Register the firmware operations for Trusted Foundations if the device
+tree indicates it is active on the device.
 
 Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
 Reviewed-by: Tomasz Figa <t.figa@samsung.com>
 Reviewed-by: Stephen Warren <swarren@nvidia.com>
 ---
- arch/arm/mach-tegra/reset.c | 17 ++++++++++++++---
- 1 file changed, 14 insertions(+), 3 deletions(-)
+ Documentation/devicetree/bindings/arm/tegra.txt | 5 +++++
+ arch/arm/mach-tegra/Kconfig                     | 1 +
+ arch/arm/mach-tegra/common.c                    | 2 ++
+ 3 files changed, 8 insertions(+)
 
-diff --git a/arch/arm/mach-tegra/reset.c b/arch/arm/mach-tegra/reset.c
-index e282395..368af0a 100644
---- a/arch/arm/mach-tegra/reset.c
-+++ b/arch/arm/mach-tegra/reset.c
-@@ -21,6 +21,7 @@
+diff --git a/Documentation/devicetree/bindings/arm/tegra.txt b/Documentation/devicetree/bindings/arm/tegra.txt
+index ed9c853..8e51884 100644
+--- a/Documentation/devicetree/bindings/arm/tegra.txt
++++ b/Documentation/devicetree/bindings/arm/tegra.txt
+@@ -32,3 +32,8 @@ board-specific compatible values:
+   nvidia,whistler
+   toradex,colibri_t20-512
+   toradex,iris
++
++Trusted Foundations
++-------------------------------------------
++Tegra supports the Trusted Foundation secure monitor. See the
++"tl,trusted-foundations" binding's documentation for more details.
+diff --git a/arch/arm/mach-tegra/Kconfig b/arch/arm/mach-tegra/Kconfig
+index 67a76f2..4e51278 100644
+--- a/arch/arm/mach-tegra/Kconfig
++++ b/arch/arm/mach-tegra/Kconfig
+@@ -2,6 +2,7 @@ config ARCH_TEGRA
+ 	bool "NVIDIA Tegra" if ARCH_MULTI_V7
+ 	select ARCH_HAS_CPUFREQ
+ 	select ARCH_REQUIRE_GPIOLIB
++	select ARCH_SUPPORTS_TRUSTED_FOUNDATIONS
+ 	select ARM_GIC
+ 	select CLKDEV_LOOKUP
+ 	select CLKSRC_MMIO
+diff --git a/arch/arm/mach-tegra/common.c b/arch/arm/mach-tegra/common.c
+index 94a119a..b405e45 100644
+--- a/arch/arm/mach-tegra/common.c
++++ b/arch/arm/mach-tegra/common.c
+@@ -27,6 +27,7 @@
+ #include <linux/clk-provider.h>
  
- #include <asm/cacheflush.h>
  #include <asm/hardware/cache-l2x0.h>
-+#include <asm/firmware.h>
++#include <asm/trusted_foundations.h>
  
- #include "iomap.h"
- #include "irammap.h"
-@@ -65,6 +66,7 @@ static void __init tegra_cpu_reset_handler_enable(void)
- 	void __iomem *iram_base = IO_ADDRESS(TEGRA_IRAM_RESET_BASE);
- 	const u32 reset_address = TEGRA_IRAM_RESET_BASE +
- 						tegra_cpu_reset_handler_offset;
-+	int err;
+ #include "board.h"
+ #include "common.h"
+@@ -99,6 +100,7 @@ static void __init tegra_init_cache(void)
  
- 	BUG_ON(is_enabled);
- 	BUG_ON(tegra_cpu_reset_handler_size > TEGRA_IRAM_RESET_HANDLER_SIZE);
-@@ -72,9 +74,18 @@ static void __init tegra_cpu_reset_handler_enable(void)
- 	memcpy(iram_base, (void *)__tegra_cpu_reset_handler_start,
- 			tegra_cpu_reset_handler_size);
- 
--	tegra_cpu_reset_handler_set(reset_address);
--
--	is_enabled = true;
-+	err = call_firmware_op(set_cpu_boot_addr, 0, reset_address);
-+	switch (err) {
-+	case -ENOSYS:
-+		tegra_cpu_reset_handler_set(reset_address);
-+		/* pass-through */
-+	case 0:
-+		is_enabled = true;
-+		break;
-+	default:
-+		pr_crit("Cannot set CPU reset handler: %d\n", err);
-+		BUG();
-+	}
- }
- 
- void __init tegra_cpu_reset_handler_init(void)
+ void __init tegra_init_early(void)
+ {
++	of_register_trusted_foundations();
+ 	tegra_cpu_reset_handler_init();
+ 	tegra_apb_io_init();
+ 	tegra_init_fuse();
 -- 
 1.8.4
