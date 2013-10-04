@@ -1,44 +1,38 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Fri, 4 Oct 2013 14:39:29 -0400 (EDT)
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 4 Oct 2013 20:41:35 +0200
 Subject: [PATCH v2 0/3] ARM: NEON based fast(er) AES in CBC/CTR/XTS modes
-In-Reply-To: <20131004182353.GQ12758@n2100.arm.linux.org.uk>
+In-Reply-To: <alpine.LFD.2.03.1310041420520.3023@syhkavp.arg>
 References: <1380837566-18242-1-git-send-email-ard.biesheuvel@linaro.org>
  <20131004174853.GY24303@mudshark.cambridge.arm.com>
- <CAKv+Gu8RdiGw2+o-1ybGTx4fxaGnDQP7duhcFaLuxDphADjMaQ@mail.gmail.com>
- <20131004182353.GQ12758@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.03.1310041435570.3023@syhkavp.arg>
+ <alpine.LFD.2.03.1310041420520.3023@syhkavp.arg>
+Message-ID: <CAKv+Gu9Lnn4=ENMc1Q+9Bkwj1R+2yk91KK1iETaes_OWaTO+fw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 4 Oct 2013, Russell King - ARM Linux wrote:
+On 4 October 2013 20:34, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+> On Fri, 4 Oct 2013, Will Deacon wrote:
+[...]
+>>
+>> Why do you consider it unsuitable to ship the perl script with the kernel?
+>> Perl 5 is already documented as a build dependency in Documentation/Changes
+>
+> Do you have an example of something that does require perl to build the
+> kernel on ARM?  I was under the impression that people try to avoid it
+> as much as possible in general.
+>
+> I'm personally sitting on the fence between effectively adding a new
+> kernel build dependencies or carrying the output of the perl script.
+> But if the kernel build does already require perl in practice then this
+> might tip the balance.
+>
 
-> Also, remember that the GPL says:
-> 
-> "The source code for a work means the preferred form of the work for
-> making modifications to it."
-> 
-> So here's the question: is the assembly code the perferred form to make
-> modifications?  From what you're saying above, the answer to that seems
-> to be no.  Now, I'm not going to throw toys out of the pram and say
-> that this is a hard requirement, but just take a moment to think about
-> how we treat vendors who don't do this, instead supplying "non-preferred"
-> forms of source code, and think about whether there's double standards
-> here.
-> 
-> Now, while I can imagine that people have an ideological objection to
-> perl (using comments like "write only code" etc) that's not a good
-> enough excuse to avoid including the perferred form for future
-> modification.
-> 
-> Now, we have mechanisms in the kernel build where we can include a
-> prepared source which can be used to lessen the burden on the toolset
-> required to build the kernel.  So, including both the perl script and
-> the pre-generated assembly is entirely acceptable.  This tends to
-> nullify the excuse that "we don't want to add additional tool burden
-> to kbuild" argument.
+I like Russell's suggestion the most, in fact. In this case, the build
+time requirement for Perl effectively gets suspended until you start
+making modifications to the perl script, and the relation between the
+.S and the .pl files is made explicit by the make rule.
 
-Those are very good arguments.  And I agree with your recommendation as 
-well.
+Should I put the cmd_perl rule in scripts/Makefile.build ? Or can I
+just keep it under arch/arm/crypto ?
 
-
-Nicolas
+-- 
+Ard.
