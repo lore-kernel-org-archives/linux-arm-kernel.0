@@ -1,55 +1,75 @@
 From: mpa@pengutronix.de (Markus Pargmann)
-Date: Fri,  4 Oct 2013 12:44:07 +0200
-Subject: [PATCH v3 2/4] dma: mxs-dma: Report correct residue for cyclic DMA
+Date: Fri,  4 Oct 2013 12:44:08 +0200
+Subject: [PATCH v3 3/4] dma: mxs-dma: Fix channel reset hardware bug
 In-Reply-To: <1380883449-8649-1-git-send-email-mpa@pengutronix.de>
 References: <1380883449-8649-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <1380883449-8649-3-git-send-email-mpa@pengutronix.de>
+Message-ID: <1380883449-8649-4-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the channel's buffer address register to calculate correct residue
-value for tx_status.
+This is no official errata, but I noticed that the channel reset may
+stop working if the DMA state engine is in the READ_FLUSH state.
+
+This patch uses the channel debug1 register to wait for the DMA
+statemachine to leave the READ_FLUSH state. After that we can continue
+to reset the channel.
+
+Tested on i.MX28.
+
+Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
 ---
- drivers/dma/mxs-dma.c | 19 ++++++++++++++++++-
- 1 file changed, 18 insertions(+), 1 deletion(-)
+ drivers/dma/mxs-dma.c | 28 ++++++++++++++++++++++++++--
+ 1 file changed, 26 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/dma/mxs-dma.c b/drivers/dma/mxs-dma.c
-index 13198e5..8f48245 100644
+index 8f48245..98de9a7 100644
 --- a/drivers/dma/mxs-dma.c
 +++ b/drivers/dma/mxs-dma.c
-@@ -58,6 +58,8 @@
- 	(((dma_is_apbh(d) && apbh_is_old(d)) ? 0x050 : 0x110) + (n) * 0x70)
- #define HW_APBHX_CHn_SEMA(d, n) \
+@@ -60,6 +60,7 @@
  	(((dma_is_apbh(d) && apbh_is_old(d)) ? 0x080 : 0x140) + (n) * 0x70)
-+#define HW_APBHX_CHn_BAR(d, n) \
-+	(((dma_is_apbh(d) && apbh_is_old(d)) ? 0x070 : 0x130) + (n) * 0x70)
+ #define HW_APBHX_CHn_BAR(d, n) \
+ 	(((dma_is_apbh(d) && apbh_is_old(d)) ? 0x070 : 0x130) + (n) * 0x70)
++#define HW_APBX_CHn_DEBUG1(d, n) (0x150 + (n) * 0x70)
  
  /*
   * ccw bits definitions
-@@ -623,8 +625,23 @@ static enum dma_status mxs_dma_tx_status(struct dma_chan *chan,
- 			dma_cookie_t cookie, struct dma_tx_state *txstate)
- {
- 	struct mxs_dma_chan *mxs_chan = to_mxs_dma_chan(chan);
-+	struct mxs_dma_engine *mxs_dma = mxs_chan->mxs_dma;
-+	u32 residue = 0;
+@@ -204,12 +205,35 @@ static void mxs_dma_reset_chan(struct mxs_dma_chan *mxs_chan)
+ 	struct mxs_dma_engine *mxs_dma = mxs_chan->mxs_dma;
+ 	int chan_id = mxs_chan->chan.chan_id;
+ 
+-	if (dma_is_apbh(mxs_dma) && apbh_is_old(mxs_dma))
++	if (dma_is_apbh(mxs_dma) && apbh_is_old(mxs_dma)) {
+ 		writel(1 << (chan_id + BP_APBH_CTRL0_RESET_CHANNEL),
+ 			mxs_dma->base + HW_APBHX_CTRL0 + STMP_OFFSET_REG_SET);
+-	else
++	} else {
++		unsigned long elapsed = 0;
++		const unsigned long max_wait = 50000; /* 50ms */
++		void __iomem *reg_dbg1 = mxs_dma->base +
++				HW_APBX_CHn_DEBUG1(mxs_dma, chan_id);
 +
-+	if (mxs_chan->status == DMA_IN_PROGRESS &&
-+			mxs_chan->flags & MXS_DMA_SG_LOOP) {
-+		struct mxs_dma_ccw *last_ccw;
-+		u32 bar;
++		/*
++		 * On i.MX28 APBX, the DMA channel can stop working if we reset
++		 * the channel while it is in READ_FLUSH (0x08) state.
++		 * We wait here until we leave the state. Then we trigger the
++		 * reset. Waiting a maximum of 50ms, the kernel shouldn't crash
++		 * because of this.
++		 */
++		while ((readl(reg_dbg1) & 0xf) == 0x8 && elapsed < max_wait) {
++			udelay(100);
++			elapsed += 100;
++		}
 +
-+		last_ccw = &mxs_chan->ccw[mxs_chan->desc_count - 1];
-+		residue = last_ccw->xfer_bytes + last_ccw->bufaddr;
++		if (elapsed >= max_wait)
++			dev_err(&mxs_chan->mxs_dma->pdev->dev,
++					"Failed waiting for the DMA channel %d to leave state READ_FLUSH, trying to reset channel in READ_FLUSH state now\n", chan_id);
 +
-+		bar = readl(mxs_dma->base +
-+				HW_APBHX_CHn_BAR(mxs_dma, chan->chan_id));
-+		residue -= bar;
++
+ 		writel(1 << (chan_id + BP_APBHX_CHANNEL_CTRL_RESET_CHANNEL),
+ 			mxs_dma->base + HW_APBHX_CHANNEL_CTRL + STMP_OFFSET_REG_SET);
 +	}
- 
--	dma_set_tx_state(txstate, chan->completed_cookie, chan->cookie, 0);
-+	dma_set_tx_state(txstate, chan->completed_cookie, chan->cookie, residue);
- 
- 	return mxs_chan->status;
  }
+ 
+ static void mxs_dma_enable_chan(struct mxs_dma_chan *mxs_chan)
 -- 
 1.8.4.rc3
