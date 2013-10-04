@@ -1,111 +1,57 @@
-From: konrad.wilk@oracle.com (Konrad Rzeszutek Wilk)
-Date: Fri, 4 Oct 2013 09:23:01 -0400
-Subject: [PATCH v6 12/19] swiotlb: don't assume that
- io_tlb_start-io_tlb_end is coherent
-In-Reply-To: <alpine.DEB.2.02.1310021826410.26077@kaball.uk.xensource.com>
-References: <alpine.DEB.2.02.1309271653420.5498@kaball.uk.xensource.com>
- <1380298207-29151-12-git-send-email-stefano.stabellini@eu.citrix.com>
- <20130930155617.GS3106@phenom.dumpdata.com>
- <alpine.DEB.2.02.1310021826410.26077@kaball.uk.xensource.com>
-Message-ID: <20131004132301.GB26673@phenom.dumpdata.com>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Fri, 4 Oct 2013 06:23:29 -0700
+Subject: [PATCH v7 09/10] usb: dwc3: omap: manage "usb_otg_ss_refclk960m"
+ clock
+In-Reply-To: <524E9C70.8050303@ti.com>
+References: <1379508542-22389-1-git-send-email-rogerq@ti.com>
+ <1379508542-22389-10-git-send-email-rogerq@ti.com>
+ <52403E02.4070208@ti.com> <20131002131113.GM1476@radagast>
+ <524C22A1.30200@ti.com> <20131003122941.GD3230@radagast>
+ <524D8516.8000107@ti.com> <20131003154144.GA18189@kroah.com>
+ <524E9C70.8050303@ti.com>
+Message-ID: <20131004132329.GA25648@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 02, 2013 at 06:31:57PM +0100, Stefano Stabellini wrote:
-> On Mon, 30 Sep 2013, Konrad Rzeszutek Wilk wrote:
-> > On Fri, Sep 27, 2013 at 05:10:00PM +0100, Stefano Stabellini wrote:
-> > > The swiotlb code has appropriate calls to dma_mark_clean in place for
-> > > buffers passed to swiotlb_map_page as an argument. However it assumes
-> > > that the swiotlb bounce buffer (io_tlb_start-io_tlb_end) is already
-> > > coherent and doesn't need any calls to dma_mark_clean.
-> > > 
-> > > On ARM the swiotlb bounce buffer is not coherent (the memory is
-> > > writealloc while it should be bufferable) and therefore we need to call
-> > > dma_mark_clean appropriately on the bounce buffer code paths too.
-> > > 
-> > > Note that most architecures have an empty dma_mark_clean implementation
-> > > anyway.
+On Fri, Oct 04, 2013 at 01:46:08PM +0300, Roger Quadros wrote:
+> Greg,
+> 
+> On 10/03/2013 06:41 PM, Greg KH wrote:
+> > On Thu, Oct 03, 2013 at 05:54:14PM +0300, Roger Quadros wrote:
+> >> On 10/03/2013 03:29 PM, Felipe Balbi wrote:
+> >>> Hi,
+> >>>
+> >>> On Wed, Oct 02, 2013 at 04:41:53PM +0300, Roger Quadros wrote:
+> >>>> On 10/02/2013 04:11 PM, Felipe Balbi wrote:
+> >>>>> On Mon, Sep 23, 2013 at 04:11:30PM +0300, Roger Quadros wrote:
+> >>>>>> Hi Felipe,
+> >>>>>>
+> >>>>>> On 09/18/2013 03:49 PM, Roger Quadros wrote:
+> >>>>>>> "usb_otg_ss_refclk960m" is an optional functional clock to the
+> >>>>>>> UBS_OTG_SS module. So manage it in the driver.
+> >>>>>>>
+> >>>>>>
+> >>>>>> Just realized that "usb_otg_ss_refclk960m" is in fact functional clock to the 
+> >>>>>> PHY and not USB_OTG_SS module. The name is misleading.
+> >>>>>>
+> >>>>>> So please ignore patch 9 and 10.
+> >>>>>
+> >>>>> ignored. All others are fine, right ?
+> >>>>>
+> >>>> Yes. But I might have to rebase this on top of Phy framework stuff.
+> >>>
+> >>> alright, Greg already took the PHY framework, so maybe we need to just
+> >>> give him my Acked-by and he takes the patches directly as I don't have
+> >>> PYH framework.
+> >>>
+> >> OK. I'll resend this series to Greg in a while.
 > > 
-> > The other architecture that uses swiotlb is IA64 and that does have
-> > an implementation where it touches on page attributes.
+> > It looks like you did, but forgot Felipe's ack :(
 > > 
-> > Which means I have to figure out why my HP zx6000 won't boot with 3.11 now :-(
-> > 
-> 
-> Now this is a very thorny issue.
-> 
-> Honestly I don't like the dma_mark_clean interface very much: it's one
-> big hammer, when we actually need some finesse to handle coherency.
-> 
-> For example on ARM some devices might not need the dma_mark_clean call,
-> while others do. Calling it all the times is at the very best
-> inefficient and incorrect at worst.
-> 
-> I am thinking of calling the original map/unmap_page functions instead
-> (arm_dma_map_page or arm_coherent_dma_map_page in the arm case).
-> However in order to do that I would need to add more __get_dma_ops calls in
-> both lib/swiotlb.c and drivers/xen/swiotlb-xen.c
+> I was under the impression that Felipe will explicitly give his Ack there.
+> Should I resend with his Acked-bys?
 
-I think that is OK for the Xen-SWIOTLB case.
+No need, I took the patches yesterday, you should have seen the
+automated emails, right?
 
-For the lib/swiotlb - would that mean that non-Xen-ARM would use the
-SWIOTLB? If so, I am OK with that too.
-
-> 
-> 
-> > > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> > > ---
-> > >  lib/swiotlb.c |   13 ++++++++++---
-> > >  1 files changed, 10 insertions(+), 3 deletions(-)
-> > > 
-> > > diff --git a/lib/swiotlb.c b/lib/swiotlb.c
-> > > index 4e8686c..eb45d17 100644
-> > > --- a/lib/swiotlb.c
-> > > +++ b/lib/swiotlb.c
-> > > @@ -515,6 +515,7 @@ found:
-> > >  		io_tlb_orig_addr[index+i] = orig_addr + (i << IO_TLB_SHIFT);
-> > >  	if (dir == DMA_TO_DEVICE || dir == DMA_BIDIRECTIONAL)
-> > >  		swiotlb_bounce(orig_addr, tlb_addr, size, DMA_TO_DEVICE);
-> > > +	dma_mark_clean(phys_to_virt(tlb_addr), size);
-> > >  
-> > >  	return tlb_addr;
-> > >  }
-> > > @@ -547,7 +548,10 @@ void swiotlb_tbl_unmap_single(struct device *hwdev, phys_addr_t tlb_addr,
-> > >  	 * First, sync the memory before unmapping the entry
-> > >  	 */
-> > >  	if (orig_addr && ((dir == DMA_FROM_DEVICE) || (dir == DMA_BIDIRECTIONAL)))
-> > > +	{
-> > > +		dma_mark_clean(phys_to_virt(tlb_addr), size);
-> > >  		swiotlb_bounce(orig_addr, tlb_addr, size, DMA_FROM_DEVICE);
-> > > +	}
-> > >  
-> > >  	/*
-> > >  	 * Return the buffer to the free list by setting the corresponding
-> > > @@ -587,17 +591,20 @@ void swiotlb_tbl_sync_single(struct device *hwdev, phys_addr_t tlb_addr,
-> > >  
-> > >  	switch (target) {
-> > >  	case SYNC_FOR_CPU:
-> > > -		if (likely(dir == DMA_FROM_DEVICE || dir == DMA_BIDIRECTIONAL))
-> > > +		if (likely(dir == DMA_FROM_DEVICE || dir == DMA_BIDIRECTIONAL)) {
-> > > +			dma_mark_clean(phys_to_virt(tlb_addr), size);
-> > >  			swiotlb_bounce(orig_addr, tlb_addr,
-> > >  				       size, DMA_FROM_DEVICE);
-> > > +		}
-> > >  		else
-> > >  			BUG_ON(dir != DMA_TO_DEVICE);
-> > >  		break;
-> > >  	case SYNC_FOR_DEVICE:
-> > > -		if (likely(dir == DMA_TO_DEVICE || dir == DMA_BIDIRECTIONAL))
-> > > +		if (likely(dir == DMA_TO_DEVICE || dir == DMA_BIDIRECTIONAL)) {
-> > >  			swiotlb_bounce(orig_addr, tlb_addr,
-> > >  				       size, DMA_TO_DEVICE);
-> > > -		else
-> > > +			dma_mark_clean(phys_to_virt(tlb_addr), size);
-> > > +		} else
-> > >  			BUG_ON(dir != DMA_FROM_DEVICE);
-> > >  		break;
-> > >  	default:
-> > > -- 
-> > > 1.7.2.5
-> > > 
-> > 
+greg k-h
