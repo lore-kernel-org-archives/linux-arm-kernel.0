@@ -1,33 +1,63 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Fri, 4 Oct 2013 15:10:00 -0300
-Subject: [alsa-devel] [PATCH 1/2] ASoC: fsl: imx-ssi: fix probe on imx31
-In-Reply-To: <524D963F.5080507@epfl.ch>
-References: <1380630971-11431-1-git-send-email-philippe.retornaz@epfl.ch>
- <1380630971-11431-2-git-send-email-philippe.retornaz@epfl.ch>
- <20131003155954.GV27287@sirena.org.uk> <524D963F.5080507@epfl.ch>
-Message-ID: <CAOMZO5C_kjTJ8iVGc67pcLLaO43arTiyMRQ1822VkBLDm7hzPw@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 4 Oct 2013 19:23:53 +0100
+Subject: [PATCH v2 0/3] ARM: NEON based fast(er) AES in CBC/CTR/XTS modes
+In-Reply-To: <CAKv+Gu8RdiGw2+o-1ybGTx4fxaGnDQP7duhcFaLuxDphADjMaQ@mail.gmail.com>
+References: <1380837566-18242-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20131004174853.GY24303@mudshark.cambridge.arm.com>
+ <CAKv+Gu8RdiGw2+o-1ybGTx4fxaGnDQP7duhcFaLuxDphADjMaQ@mail.gmail.com>
+Message-ID: <20131004182353.GQ12758@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Philippe,
+On Fri, Oct 04, 2013 at 08:04:50PM +0200, Ard Biesheuvel wrote:
+> First of all, please note that the whole point of working so closely
+> with the OpenSSL maintainer on this is that the version I am
+> presenting here is the verbatim output of the Perl script that lives
+> in the OpenSSL tree. So just shipped, not shipped and hacked.
+> 
+> Personally, I would much prefer merging the .pl file as well, I just
+> thought (and I did poll some people informally) that this is not
+> something most people are happy about. If I am wrong about this, than
+> I am quite happy to respin so the .S is generated on the fly.
 
-On Thu, Oct 3, 2013 at 1:07 PM, Philippe R?tornaz
-<philippe.retornaz@epfl.ch> wrote:
+While it is desirable to keep the dependencies on external tools to a
+minimum, as perl is already on the list of required dependencies, there
+is no problem with including a script.
 
-> It was working but it is broken since a few release.
-> There is no need to rush for a fix, both patches can follow the standard
-> process.
+Also, remember that the GPL says:
 
-Thanks for the fix.
+"The source code for a work means the preferred form of the work for
+making modifications to it."
 
-If you have a chance, it would be really nice if mx31-moboard could be
-converted to device tree, as this would help us towards the goal of
-getting rid of the sound/soc/fsl/imx-ssi.c driver, which only supports
-the non-dt imx parts.
+So here's the question: is the assembly code the perferred form to make
+modifications?  From what you're saying above, the answer to that seems
+to be no.  Now, I'm not going to throw toys out of the pram and say
+that this is a hard requirement, but just take a moment to think about
+how we treat vendors who don't do this, instead supplying "non-preferred"
+forms of source code, and think about whether there's double standards
+here.
 
-We have been using  sound/soc/fsl/fsl_ssi.c for the dt imx and powerpc
-parts, and that's probably the reason we haven't noticed this bug.
+Now, while I can imagine that people have an ideological objection to
+perl (using comments like "write only code" etc) that's not a good
+enough excuse to avoid including the perferred form for future
+modification.
 
-Regards,
+Now, we have mechanisms in the kernel build where we can include a
+prepared source which can be used to lessen the burden on the toolset
+required to build the kernel.  So, including both the perl script and
+the pre-generated assembly is entirely acceptable.  This tends to
+nullify the excuse that "we don't want to add additional tool burden
+to kbuild" argument.
 
-Fabio Estevam
+So, what I'd strongly recommend is that we add both the pre-generated
+assembly with a _shipped suffix, the perl script, and include a rule
+like this:
+
+quiet_cmd_perl = PERL    $@
+      cmd_perl = perl $< > $@
+
+$(src)/blahblah.S_shipped: $(src)/myperlscript
+	$(call cmd,perl)
+
+and that should end up running "myperlscript" whenever it has a date
+stamp newer than the _shipped file, or if that file is missing.
