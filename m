@@ -1,25 +1,40 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Fri, 04 Oct 2013 12:35:45 -0700
-Subject: [PATCH] clk: palmas: add clock driver for palmas
-In-Reply-To: <20131004164139.GR27287@sirena.org.uk>
-References: <1380803407-15196-1-git-send-email-ldewangan@nvidia.com>
- <20131004164139.GR27287@sirena.org.uk>
-Message-ID: <20131004193545.4343.15596@quantum>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Fri, 4 Oct 2013 15:51:31 -0400 (EDT)
+Subject: [PATCH 3/6] ARM: EXYNOS: add Exynos Dual Cluster Support
+In-Reply-To: <20131002125458.GA3407@localhost.localdomain>
+References: <1380644227-12244-1-git-send-email-v.tyrtov@samsung.com>
+ <1380644227-12244-4-git-send-email-v.tyrtov@samsung.com>
+ <20131002125458.GA3407@localhost.localdomain>
+Message-ID: <alpine.LFD.2.03.1310041543090.3023@syhkavp.arg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Mark Brown (2013-10-04 09:41:39)
-> On Thu, Oct 03, 2013 at 06:00:07PM +0530, Laxman Dewangan wrote:
-> 
-> > +     Optional subnode properties:
-> > +     ti,clock-boot-enable: Enable clock at the time of booting.
-> 
-> Shouldn't this be a generic clock subsystem thing?  It seems like
-> something that might be desired for nearly any clock.
+On Wed, 2 Oct 2013, Dave Martin wrote:
 
-The best solution is to have a driver claim the clock with clk_get and
-enable it with clk_prepare_enable. I gave more detail in my reply to
-Laxman.
+> On Tue, Oct 01, 2013 at 08:17:04PM +0400, Vyacheslav Tyrtov wrote:
+> > +static int exynos_power_up(unsigned int cpu, unsigned int cluster)
+> > +{
+> > +     int ret;
+> > +     local_irq_disable();
+> 
+> Should there be a local_fiq_disable() here also?
 
-Regards,
-Mike
+No.  In fact this is paired with
+
+> > +     arch_spin_lock(&exynos_lock);
+
+to create the equivalent of a arch_spin_lock_irq().  And the reason is:
+
+/*
+ * We can't use regular spinlocks. In the switcher case, it is possible
+ * for an outbound CPU to call power_down() after its inbound counterpart
+ * is already live using the same logical CPU number which trips lockdep
+ * debugging.
+ */
+
+Otherwise we simply would have used spin_lock_irq().
+
+No FIQs are supposed to ever race with this code.
+
+
+Nicolas
