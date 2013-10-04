@@ -1,115 +1,144 @@
-From: matt.porter@linaro.org (Matt Porter)
-Date: Fri, 04 Oct 2013 08:51:18 -0400
-Subject: [PATCH 2/4] pinctrl: Add pinctrl binding for Broadcom Capri SoCs
-In-Reply-To: <1380846199-12829-3-git-send-email-syin@broadcom.com>
-References: <1380846199-12829-1-git-send-email-syin@broadcom.com>
- <1380846199-12829-3-git-send-email-syin@broadcom.com>
-Message-ID: <524EB9C6.4020901@linaro.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 4 Oct 2013 13:54:21 +0100
+Subject: [PATCH v2 1/3] Documentation: arm: add UEFI support documentation
+In-Reply-To: <20131003171800.GC1557@rocoto.smurfnet.nu>
+Message-ID: <20131004125420.GD6999@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/03/2013 08:23 PM, Sherman Yin wrote:
-> Adds pinctrl driver devicetree binding for Broadcom Capri (BCM281xx) SoCs.
->
-> Signed-off-by: Sherman Yin <syin@broadcom.com>
-> Reviewed-by: Christian Daudt <bcm@fixthebug.org>
-> Reviewed-by: Matt Porter <matt.porter@linaro.org>
-> ---
->   .../bindings/pinctrl/brcm,capri-pinctrl.txt        |  419 ++++++++++++++++++++
->   1 file changed, 419 insertions(+)
->   create mode 100644 Documentation/devicetree/bindings/pinctrl/brcm,capri-pinctrl.txt
->
-> diff --git a/Documentation/devicetree/bindings/pinctrl/brcm,capri-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/brcm,capri-pinctrl.txt
-> new file mode 100644
-> index 0000000..79e0e5a
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/pinctrl/brcm,capri-pinctrl.txt
-> @@ -0,0 +1,419 @@
-> +Broadcom Capri Pin Controller
-> +
-> +This is a pin controller for the Broadcom BCM281xx SoC family, which includes
-> +BCM11130, BCM11140, BCM11351, BCM28145, and BCM28155 SoCs.
-> +
-> +=== Pin Controller Node ===
-> +
-> +Required Properties:
-> +
-> +- compatible:	Must be "brcm,capri-pinctrl".
-> +- reg:		Base address of the PAD Controller register block and the size
-> +		of the block.
-> +
-> +For example, the following is the bare minimum node:
-> +
-> +	pinctrl at 35004800 {
-> +		compatible = "brcm,capri-pinctrl";
-> +		reg = <0x35004800 0x430>;
-> +	};
-> +
-> +As a Pin Controller Device, in addition to the required properties, this node
-> +should also contain the pin configuration nodes that client devices reference,
-> +if any.
-> +
-> +=== Pin Configuration Node ===
-> +
-> +Each pin configuration node is a sub-node of the pin controller node and is a
-> +container of an arbitrary number of subnodes, called group nodes.
-> +
-> +Please refer to the pinctrl-bindings.txt in this directory for details of the
-> +common pinctrl bindings used by client devices, including the definition of a
-> +"pin configuration node".
-> +
-> +=== Group Node ===
-> +
-> +A group node specifies the desired pin mux and/or pin configuration for an
-> +arbitrary number of pins.  The group node only affect the properties specified
-> +in the node, and has no effect on any properties that are omitted.
-> +
-> +The names of the group nodes are optional and not used. The group nodes have
-> +the following properties:
-> +
-> +Required Properties:
-> +
-> +- brcm,pins:	Multiple strings.  Specifies the name(s) of one or more pins to
-> +		be configured by this node.
-> +
-> +Optional Properties:
-> +
-> +- brcm,function: Multiple strings.  Specifies the pin mux selection.  Values are:
-> +		"alt1", "alt2", "alt3", "alt4"
-> +- brcm,hysteresis: Multiple integers, applicable to standard pins only.  Turns
-> +		on hysteresis of input.
-> +		0: TTL input, 1: Schmitt Trigger input
-> +- brcm,pull:	Multiple integers, applicable to standard pins only.  Specifies
-> +		pull-up or pull-down.
-> +		0: neither, 1: pull-up, 2: pull-down, 3: both
-> +- brcm,input_dis: Multiple integers, applicable to all pins.  Input disable
+Hi Leif,
 
-I missed this before. Hyphens are preferred over underscores in property 
-names.
+On Thu, Oct 03, 2013 at 06:18:02PM +0100, Leif Lindholm wrote:
+> On Thu, Oct 03, 2013 at 11:11:18AM -0500, Rob Herring wrote:
+> > Adding devicetree list since you are defining bindings...
+> > 
+> > > +with CONFIG_OF.
+> > > +
+> > > +It parses the FDT /chosen node for the following parameters:
+> > 
+> > DT bindings should be documented in Documentation/devicetree/bindings.
+> > 
+> > I also wonder if this would be more appropriately placed in a /firmware
+> > node.
+> 
+> This is information passed to the kernel by the bootloader - not
+> system descriptiont - so I don't quite see why it needs different
+> treatment from initrd and bootargs.
 
-> +		control.
-> +		0: off, 1: input disabled
-> +- brcm,slew:	Multiple integers.  Slew rate of output.
-> +		0: fast output, 1: normal output (most pins)
-> +		0: normal output, 1: fast output (IC_DM and IC_DP)
-> +		0: Fast mode, 1: High speed mode (I2C)
-> +- brcm,drive_str: Multiple integers.  Drive strength.
-> +		0: 2 mA
-> +		1: 4 mA
-> +		2: 6 mA
-> +		3: 8 mA
-> +		4: 10 mA
-> +		5: 12 mA
-> +		6: 14 mA
-> +		7: 16 mA
-> +- brcm,pull_up_str: Multiple integers.  Pull Up strength.
-> +		0: No pull-up
-> +		1: 1.2 kOhm
-> +		2: 1.8 kOhm
-> +		3: 720 Ohm
-> +		4: 2.7 kOhm
-> +		5: 831 Ohm
-> +		6: 1.08 kOhm
-> +		7: 568 Ohm
-> +- brcm,mode:	Multiple integers.  Mode select.
-> +		0: Fast mode, 1: High Speed mode (I2C)
+That's somewhat debatable -- the description isn't a configuration
+option (as bootargs and initrd are) so much as a description of the
+firmware.
+
+> 
+> Feedback on v1 was:
+> https://lkml.org/lkml/2013/6/26/378
+> and
+> https://lkml.org/lkml/2013/6/27/420
+> 
+> I don't really mind either way, but the current layout is now used
+> across 3 sets of kernel patches, so we need to reach some sort of
+> consensus. Interested parties so far: me, you, Grant, Arnd, Mark.
+> 
+> > > +- 'linux,efi-mmap':
+> > > +  The EFI memory map as an embedded property. (required)
+> > > +  An array of type EFI_MEMORY_DESCRIPTOR as described by the UEFI
+> > > +  specification, current version described in Linux by efi_memory_desc_t.
+> > 
+> > Is that too complex to describe here?
+>  
+> No, just felt a bit redundant, and also not architecture-specific.
+
+I'd point to the EFI spec and leave it at that. The particular encoding
+is defined by EFI and is beyond the scope of this document (endianness
+issues aside).
+
+If this were a device with a single window of registers we'd just
+describe the whole window and not the format of each individual register
+or bit within them. I see no reason to do differently here.
+
+As the efi-mmap is built by EFI, and is in a format defined by EFI, I'd
+also drop the "linux" vendor prefix -- Linux has had no hand in defining
+this property. It may make sense to have "efi" as a vendor prefix, but
+perhaps others won't like that?
+
+> 
+> > > +  The memory map is represented in little-endian, not DT, byte order.
+> > > +  This map needs to contain at least the regions to be preserved for runtime
+> > > +  services, but would normally just be the map retreieved by calling UEFI
+> > > +  GetMemoryMap() immediately before ExitBootServices().
+> > > +- 'linux,efi-mmap-desc-size':
+> > > +  Size of each descriptor in the memory map. (override default)
+> > 
+> > 32-bit value?
+> 
+> Value as returned by the above mentioned GetMemoryMap().
+> Defined in UEFI specification (and <linux/efi.h>) as 32-bit (native
+> int). But yes, I can be explicit.
+
+Please do. Something like:
+
+- efi-mmap-desc-size:
+  A single (u32) cell describing the size of each descriptor in the
+  memory map, if not the EFI default size of $EFI_MMAP_DESC_SIZE. See
+  $EFI_DOCUMENTATION for more information.
+  
+> 
+> > > +- 'linux,efi-mmap-desc-ver':
+> > > +  Memory descriptor format version. (override default)
+> > 
+> > String? Number?
+>  
+> Value as returned by the above mentioned GetMemoryMap().
+> Defined in the UEFI specification as 32-bit (uint32), not
+> architecture specific. And I can add that too.
+
+How about something like:
+
+- efi-mmap-desc-version:
+  A single (u32) cell describing the memory descriptor format version, 
+  if not 1 (the current EFI version). See $EFI_DOCUMENTATION for more
+  information.
+
+> 
+> > Are these all generated by UEFI at runtime or could they be statically
+> > set in a platform's DTB?
+> 
+> Generated at runtime.
+> This is not the platform memory map, this is the UEFI memory map,
+> which tells us which regions we need to preserve for runtime
+> services, ACPI and such.
+> 
+> > How would other OS's get this information? Is this really linux specific?
+> 
+> The way it is passed through DT is. Other operating systems might keep
+> boot services running for longer, and make calls into UEFI later, so
+> not needing to cache the data. Since boot services means the timer
+> interrupt is active, the ARM Linux boot protocol effectively prohibits
+> this.
+
+I suspect other OSs that may use DT are likely to have similar
+requirements, or could at least cope with this mechanism.
+
+I think before we can take any code in this area we need to define the
+boot protocol (i.e. do we use DT to describe EFI & ACPI, what gets
+described where) for EFI and/or ACPI. We have enough of a mess as it is,
+and we need to carefully control anything we add to the fray. We should
+discuss this at the upcoming LinuxCon, ELC, and Linaro Connect.
+
+Thanks,
+Mark.
+
+>
+> Many of these questions are about generic UEFI mechanisms.
+> If they need to be documented outside the UEFI specification,
+> Documentation/arm is not the right place for it.
+> 
+> If you want, I could give a basic Documentation/uefi.txt a shot.
+> 
+> /
+>     Leif
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
