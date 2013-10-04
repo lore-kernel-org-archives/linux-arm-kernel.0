@@ -1,40 +1,74 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri,  4 Oct 2013 13:16:13 +0100
-Subject: [RFC PATCH 0/5] arm/arm64: KVM: dynamic VGIC sizing
-Message-ID: <1380888978-27725-1-git-send-email-marc.zyngier@arm.com>
+Date: Fri,  4 Oct 2013 13:16:16 +0100
+Subject: [RFC PATCH 3/5] arm/arm64: KVM: vgic: kill VGIC_MAX_CPUS
+In-Reply-To: <1380888978-27725-1-git-send-email-marc.zyngier@arm.com>
+References: <1380888978-27725-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1380888978-27725-4-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-So far, the VGIC data structures have been statically sized, meaning
-that we always have to support more interrupts than we actually want,
-and more CPU interfaces than we should.
+We now have the information about the number of CPU interfaces in
+the distributor itself. Let's get rid of VGIC_MAX_CPUS, and just
+rely on KVM_MAX_VCPUS where we don't have the choice. Yet.
 
-This is a waste of resource, and is the kind of things that should be
-tuneable. This series partially addresses that issue by changing the
-data structures to be dynamically allocated.
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm/kvm/arm.c     | 2 +-
+ include/kvm/arm_vgic.h | 3 +--
+ virt/kvm/arm/vgic.c    | 4 ++--
+ 3 files changed, 4 insertions(+), 5 deletions(-)
 
-The various sizes are still static, but the VGIC code itself doesn't
-have any reference to these anymore. Once plugged into the new device
-API, we should be able to size it entierely dynamically.
-
-I'm hopping for this series to be merged with Christoffer's VGIC
-device control API.
-
-This has been (lightly) tested on both ARM (TC2) and arm64 (model).
-
-     M.
-
-Marc Zyngier (5):
-  arm/arm64: KVM: vgic: switch to dynamic allocation
-  arm/arm64: KVM: vgic: kill VGIC_NR_SHARED_IRQS
-  arm/arm64: KVM: vgic: kill VGIC_MAX_CPUS
-  arm/arm64: KVM: vgic: handle out-of-range MMIO accesses
-  arm/arm64: KVM: vgic: kill VGIC_NR_IRQS
-
- arch/arm/kvm/arm.c     |   5 +-
- include/kvm/arm_vgic.h |  49 ++++-----
- virt/kvm/arm/vgic.c    | 263 ++++++++++++++++++++++++++++++++++++++++---------
- 3 files changed, 249 insertions(+), 68 deletions(-)
-
+diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+index f0f7a8a..2f465fe 100644
+--- a/arch/arm/kvm/arm.c
++++ b/arch/arm/kvm/arm.c
+@@ -789,7 +789,7 @@ long kvm_arch_vm_ioctl(struct file *filp,
+ 	switch (ioctl) {
+ 	case KVM_CREATE_IRQCHIP: {
+ 		if (vgic_present)
+-			return kvm_vgic_create(kvm, VGIC_MAX_CPUS, VGIC_NR_IRQS);
++			return kvm_vgic_create(kvm, KVM_MAX_VCPUS, VGIC_NR_IRQS);
+ 		else
+ 			return -ENXIO;
+ 	}
+diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+index 8ce9c08..4d4ab2e 100644
+--- a/include/kvm/arm_vgic.h
++++ b/include/kvm/arm_vgic.h
+@@ -30,11 +30,10 @@
+ #define VGIC_NR_SGIS		16
+ #define VGIC_NR_PPIS		16
+ #define VGIC_NR_PRIVATE_IRQS	(VGIC_NR_SGIS + VGIC_NR_PPIS)
+-#define VGIC_MAX_CPUS		KVM_MAX_VCPUS
+ #define VGIC_MAX_LRS		(1 << 6)
+ 
+ /* Sanity checks... */
+-#if (VGIC_MAX_CPUS > 8)
++#if (KVM_MAX_VCPUS > 8)
+ #error	Invalid number of CPU interfaces
+ #endif
+ 
+diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+index 951b560..259b9dd 100644
+--- a/virt/kvm/arm/vgic.c
++++ b/virt/kvm/arm/vgic.c
+@@ -954,7 +954,7 @@ static bool vgic_queue_sgi(struct kvm_vcpu *vcpu, int irq)
+ 
+ 	sources = *vgic_get_sgi_sources(dist, vcpu_id, irq);
+ 
+-	for_each_set_bit(c, &sources, VGIC_MAX_CPUS) {
++	for_each_set_bit(c, &sources, dist->nr_cpus) {
+ 		if (vgic_queue_irq(vcpu, c, irq))
+ 			clear_bit(c, &sources);
+ 	}
+@@ -1326,7 +1326,7 @@ int kvm_vgic_vcpu_init(struct kvm_vcpu *vcpu)
+ 	if (ret)
+ 		return ret;
+ 
+-	if (vcpu->vcpu_id >= VGIC_MAX_CPUS)
++	if (vcpu->vcpu_id >= dist->nr_cpus)
+ 		return -EBUSY;
+ 
+ 	for (i = 0; i < VGIC_NR_IRQS; i++) {
 -- 
 1.8.2.3
