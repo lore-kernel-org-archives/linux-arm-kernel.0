@@ -1,63 +1,62 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Fri, 4 Oct 2013 16:50:39 -0600
-Subject: [PATCH] PCI: exynos: missing clk_disable_unprepare() on error in
- exynos_pcie_probe()
-In-Reply-To: <CAPgLHd_RTNxi-OYhmTZ35NttjnAg-gQ_WKHkUQr5ueMhXVLTMg@mail.gmail.com>
-References: <CAPgLHd_RTNxi-OYhmTZ35NttjnAg-gQ_WKHkUQr5ueMhXVLTMg@mail.gmail.com>
-Message-ID: <20131004225039.GA26108@google.com>
+From: gang.chen@asianux.com (Chen Gang)
+Date: Sat, 05 Oct 2013 07:55:18 +0800
+Subject: [PATCH 2/2] ARM: include: asm: use 'int' instead of 'unsigned
+ long' for normal register variables within atomic.h
+In-Reply-To: <20131004154208.GS24303@mudshark.cambridge.arm.com>
+References: <20130930161149.GI26036@mudshark.cambridge.arm.com>
+ <524A2DE7.8040208@asianux.com>
+ <20131001090119.GA17629@mudshark.cambridge.arm.com>
+ <524ABA20.6060106@asianux.com>
+ <20131002104158.GD28311@mudshark.cambridge.arm.com>
+ <524C3981.20307@asianux.com> <524D416B.5090709@asianux.com>
+ <20131003163200.GE7408@mudshark.cambridge.arm.com>
+ <524E8FBC.2080200@asianux.com>
+ <20131004153742.GR24303@mudshark.cambridge.arm.com>
+ <20131004154208.GS24303@mudshark.cambridge.arm.com>
+Message-ID: <524F5566.4010204@asianux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Sep 29, 2013 at 10:29:11AM +0800, Wei Yongjun wrote:
-> From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+On 10/04/2013 11:42 PM, Will Deacon wrote:
+> On Fri, Oct 04, 2013 at 04:37:42PM +0100, Will Deacon wrote:
+>> On Fri, Oct 04, 2013 at 10:51:56AM +0100, Chen Gang wrote:
+>>> On 10/04/2013 12:32 AM, Will Deacon wrote:
+>>>> The problem with arm64 is that we're using *unsigned long* for 32-bit
+>>>> clear_mask, which is definitely wrong because it's 64-bit (another patch to
+>>>> fix this!).
+>>>>
+>>>
+>>> At least, that is not a bug.
+>>
+>> Sure it is. What if the adjacent 32-bit value was being accessed by another
+>> CPU under a spinlock?
 > 
-> Add the missing clk_disable_unprepare() before return
-> from exynos_pcie_probe() in the error handling case.
-> 
-> Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+> (Oh, ok, that would still work on arm because of the way the exclusive
+> monitor is implemented, but we shouldn't rely on that).
+>
 
-Applied with Jingoo's ack and Sylwester's subject line to
-pci/host-exynos.  Thanks!
+Hmm... in my opinion, we need divide atomic_*_mask() into 32-bit and
+64-bit versions. We already have demands to only use 32-bit value to
+express mask (can save size), and may have demands to use 64-bit too.
 
-Bjorn
+If so, can easily standard all atomic_*_mask() which are in asm-generic
+and various architectures: use atomic_*_mask() for 32-bit mask, and use
+atomic64_*_mask() for 64-bit mask (can delayed before get real demands).
 
-> ---
->  drivers/pci/host/pci-exynos.c | 18 ++++++++++++------
->  1 file changed, 12 insertions(+), 6 deletions(-)
+Since it is about API, so it is related with asm-generic and all other
+architectures interfaces, it is better to consider about them firstly
+before the fix under arm64.
+
+
+And also, excuse me, I am not quite familiar with "exclusive monitor",
+could you please provide more details about it?
+
+
+> Will
 > 
-> diff --git a/drivers/pci/host/pci-exynos.c b/drivers/pci/host/pci-exynos.c
-> index 94e096b..e25598a 100644
-> --- a/drivers/pci/host/pci-exynos.c
-> +++ b/drivers/pci/host/pci-exynos.c
-> @@ -487,18 +487,24 @@ static int __init exynos_pcie_probe(struct platform_device *pdev)
->  
->  	elbi_base = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->  	exynos_pcie->elbi_base = devm_ioremap_resource(&pdev->dev, elbi_base);
-> -	if (IS_ERR(exynos_pcie->elbi_base))
-> -		return PTR_ERR(exynos_pcie->elbi_base);
-> +	if (IS_ERR(exynos_pcie->elbi_base)) {
-> +		ret = PTR_ERR(exynos_pcie->elbi_base);
-> +		goto fail_bus_clk;
-> +	}
->  
->  	phy_base = platform_get_resource(pdev, IORESOURCE_MEM, 1);
->  	exynos_pcie->phy_base = devm_ioremap_resource(&pdev->dev, phy_base);
-> -	if (IS_ERR(exynos_pcie->phy_base))
-> -		return PTR_ERR(exynos_pcie->phy_base);
-> +	if (IS_ERR(exynos_pcie->phy_base)) {
-> +		ret = PTR_ERR(exynos_pcie->phy_base);
-> +		goto fail_bus_clk;
-> +	}
->  
->  	block_base = platform_get_resource(pdev, IORESOURCE_MEM, 2);
->  	exynos_pcie->block_base = devm_ioremap_resource(&pdev->dev, block_base);
-> -	if (IS_ERR(exynos_pcie->block_base))
-> -		return PTR_ERR(exynos_pcie->block_base);
-> +	if (IS_ERR(exynos_pcie->block_base)) {
-> +		ret = PTR_ERR(exynos_pcie->block_base);
-> +		goto fail_bus_clk;
-> +	}
->  
->  	ret = add_pcie_port(pp, pdev);
->  	if (ret < 0)
 > 
+
+
+Thanks.
+-- 
+Chen Gang
