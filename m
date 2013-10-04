@@ -1,107 +1,130 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri,  4 Oct 2013 15:42:57 +0200
-Subject: [PATCH v2] ARM: h3600: update defconfig
-Message-ID: <1380894177-17748-1-git-send-email-linus.walleij@linaro.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 4 Oct 2013 14:53:06 +0100
+Subject: [RFC] ARM: lockless get_user_pages_fast()
+In-Reply-To: <20131004103140.GA4444@linaro.org>
+References: <1380820515-21100-1-git-send-email-zishen.lim@linaro.org>
+ <20131003172755.GG7408@mudshark.cambridge.arm.com>
+ <CAM1oe53oQ5OBww=89vqcyUt_NqsYfCHDVZkKv0p9=-TchhkHSA@mail.gmail.com>
+ <20131004103140.GA4444@linaro.org>
+Message-ID: <20131004135306.GK24303@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This updates the h3600 defconfig against the latest kernel with
-some small options coming and going due to Kconfig structure,
-then modernize it to:
+Hi Steve,
 
-- Configure for low latency preemptive kernel
-- Configure for tickless idle
-- Enable HRtimers
+[adding linux-mm, since this has turned into a discussion about THP
+splitting]
 
-Tested on the iPAQ h3630.
+On Fri, Oct 04, 2013 at 11:31:42AM +0100, Steve Capper wrote:
+> On Thu, Oct 03, 2013 at 11:07:44AM -0700, Zi Shen Lim wrote:
+> > On Thu, Oct 3, 2013 at 10:27 AM, Will Deacon <will.deacon@arm.com> wrote:
+> > > On Thu, Oct 03, 2013 at 06:15:15PM +0100, Zi Shen Lim wrote:
+> > >> Futex uses GUP. Currently on ARM, the default __get_user_pages_fast
+> > >> being used always returns 0, leading to a forever loop in get_futex_key :(
+> > >
+> > > This looks pretty much like an exact copy of the x86 version, which will
+> > > likely also result in another exact copy for arm64. Can none of this code be
+> > > made common? Furthermore, the fact that you've lifted the code and not
+> > > provided much of an explanation in the cover letter hints that you might not
+> > > be aware of all the subtleties involved here...
 
-Cc: Russell King <linux@arm.linux.org.uk>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
-ChangeLog v1->v2:
-- Skip switching on EABI compilation. This leads to errors when
-  loading modules.
----
- arch/arm/configs/h3600_defconfig | 22 ++++++----------------
- 1 file changed, 6 insertions(+), 16 deletions(-)
+[...]
 
-diff --git a/arch/arm/configs/h3600_defconfig b/arch/arm/configs/h3600_defconfig
-index 317960f..0142ec3 100644
---- a/arch/arm/configs/h3600_defconfig
-+++ b/arch/arm/configs/h3600_defconfig
-@@ -1,5 +1,6 @@
--CONFIG_EXPERIMENTAL=y
- CONFIG_SYSVIPC=y
-+CONFIG_NO_HZ_IDLE=y
-+CONFIG_HIGH_RES_TIMERS=y
- CONFIG_LOG_BUF_SHIFT=14
- CONFIG_BLK_DEV_INITRD=y
- CONFIG_MODULES=y
-@@ -11,11 +12,11 @@ CONFIG_ARCH_SA1100=y
- CONFIG_SA1100_H3600=y
- CONFIG_PCCARD=y
- CONFIG_PCMCIA_SA1100=y
-+CONFIG_PREEMPT=y
- CONFIG_ZBOOT_ROM_TEXT=0x0
- CONFIG_ZBOOT_ROM_BSS=0x0
- # CONFIG_CPU_FREQ_STAT is not set
- CONFIG_FPE_NWFPE=y
--CONFIG_PM=y
- CONFIG_NET=y
- CONFIG_UNIX=y
- CONFIG_INET=y
-@@ -24,13 +25,10 @@ CONFIG_IRDA=m
- CONFIG_IRLAN=m
- CONFIG_IRNET=m
- CONFIG_IRCOMM=m
--CONFIG_SA1100_FIR=m
- # CONFIG_WIRELESS is not set
- CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
- CONFIG_MTD=y
--CONFIG_MTD_PARTITIONS=y
- CONFIG_MTD_REDBOOT_PARTS=y
--CONFIG_MTD_CHAR=y
- CONFIG_MTD_BLOCK=y
- CONFIG_MTD_CFI=y
- CONFIG_MTD_CFI_ADV_OPTIONS=y
-@@ -41,19 +39,15 @@ CONFIG_MTD_SA1100=y
- CONFIG_BLK_DEV_LOOP=m
- CONFIG_BLK_DEV_RAM=y
- CONFIG_BLK_DEV_RAM_SIZE=8192
--# CONFIG_MISC_DEVICES is not set
- CONFIG_IDE=y
- CONFIG_BLK_DEV_IDECS=y
- CONFIG_NETDEVICES=y
--# CONFIG_NETDEV_1000 is not set
--# CONFIG_NETDEV_10000 is not set
--# CONFIG_WLAN is not set
--CONFIG_NET_PCMCIA=y
- CONFIG_PCMCIA_PCNET=y
- CONFIG_PPP=m
--CONFIG_PPP_ASYNC=m
--CONFIG_PPP_DEFLATE=m
- CONFIG_PPP_BSDCOMP=m
-+CONFIG_PPP_DEFLATE=m
-+CONFIG_PPP_ASYNC=m
-+# CONFIG_WLAN is not set
- # CONFIG_KEYBOARD_ATKBD is not set
- CONFIG_KEYBOARD_GPIO=y
- # CONFIG_INPUT_MOUSE is not set
-@@ -64,8 +58,6 @@ CONFIG_SERIAL_SA1100_CONSOLE=y
- # CONFIG_HWMON is not set
- CONFIG_FB=y
- CONFIG_FB_SA1100=y
--# CONFIG_VGA_CONSOLE is not set
--# CONFIG_HID_SUPPORT is not set
- # CONFIG_USB_SUPPORT is not set
- CONFIG_EXT2_FS=y
- CONFIG_MSDOS_FS=m
-@@ -74,6 +66,4 @@ CONFIG_JFFS2_FS=y
- CONFIG_CRAMFS=m
- CONFIG_NFS_FS=y
- CONFIG_NFSD=m
--CONFIG_SMB_FS=m
- CONFIG_NLS=y
--# CONFIG_RCU_CPU_STALL_DETECTOR is not set
--- 
-1.8.3.1
+> > >> +static int gup_pmd_range(pud_t pud, unsigned long addr, unsigned long end,
+> > >> +             int write, struct page **pages, int *nr)
+> > >> +{
+> > >> +     unsigned long next;
+> > >> +     pmd_t *pmdp;
+> > >> +
+> > >> +     pmdp = pmd_offset(&pud, addr);
+> > >> +     do {
+> > >> +             pmd_t pmd = *pmdp;
+> > >> +
+> > >> +             next = pmd_addr_end(addr, end);
+> > >> +             /*
+> > >> +              * The pmd_trans_splitting() check below explains why
+> > >> +              * pmdp_splitting_flush has to flush the tlb, to stop
+> > >> +              * this gup-fast code from running while we set the
+> > >> +              * splitting bit in the pmd. Returning zero will take
+> > >> +              * the slow path that will call wait_split_huge_page()
+> > >> +              * if the pmd is still in splitting state. gup-fast
+> > >> +              * can't because it has irq disabled and
+> > >> +              * wait_split_huge_page() would never return as the
+> > >> +              * tlb flush IPI wouldn't run.
+> > >> +              */
+> > >> +             if (pmd_none(pmd) || pmd_trans_splitting(pmd))
+> > >> +                     return 0;
+> > >> +             if (unlikely(pmd_huge(pmd))) {
+> > >> +                     if (!gup_huge_pmd(pmd, addr, next, write, pages, nr))
+> > >> +                             return 0;
+> > >> +             } else {
+> > >> +                     if (!gup_pte_range(pmd, addr, next, write, pages, nr))
+> > >> +                             return 0;
+> > >> +             }
+> > >> +     } while (pmdp++, addr = next, addr != end);
+> > >
+> > > ...case in point: we don't (usually) require IPIs to shoot down TLB entries
+> > > in SMP systems, so this is racy under thp splitting.
+
+[...]
+
+> As Will pointed out, ARM does not usually require IPIs to shoot down TLB
+> entries. So the local_irq_disable will not necessarily block pagetables being
+> freed when fast_gup is running.
+> 
+> Transparent huge pages when splitting will set the pmd splitting bit then
+> perform a tlb invalidate, then proceed with the split. Thus a splitting THP
+> will not always be blocked by local_irq_disable on ARM. This does not only
+> affect fast_gup, futexes are also affected. From my understanding of futex on
+> THP tail case in kernel/futex.c, it looks like an assumption is made there also
+> that splitting pmds can be blocked by disabling local irqs.
+> 
+> PowerPC and SPARC, like ARM do not necessarily require IPIs for TLB shootdown
+> either so they make use of tlb_remove_table (CONFIG_HAVE_RCU_TABLE_FREE). This
+> identifies pages backing pagetables that have multiple users and batches them
+> up, and then performs a dummy IPI before freeing them en masse. This reduces
+> the performance impact from the IPIs (by doing considerably fewer of them), and
+> guarantees that pagetables cannot be freed from under the fast_gup.
+> Unfortunately this also means that the fast_gup has to be aware of ptes/pmds
+> changing from under it.
+
+[...]
+
+> There's also the possibility of blocking without an IPI, but it's not obvious
+> to me how to do that (that would probably necessitate a change to
+> kernel/futex.c). I've just picked this up recently and am still trying to
+> understand it fully.
+
+The IPI solution looks like a hack to me and essentially moves the
+synchronisation down into the csd_lock on the splitting side as part of the
+cross-call to invalidate the TLB. Furthermore, the TLB doesn't even need to
+be invalidated afaict, since we're just updating software bits.
+
+Instead, I wonder whether this can be solved with a simple atomic_t:
+
+	- The fast GUP code (read side) does something like:
+
+		atomic_inc(readers);
+		smp_mb__after_atomic_inc();
+		__get_user_pages_fast(...);
+		smp_mb__before_atomic_dec();
+		atomic_dec(readers);
+
+	- The splitting code (write side) then polls the counter to reach
+	  zero:
+
+		pmd_t pmd = pmd_mksplitting(*pmdp);
+		set_pmd_at(vma->vm_mm, address, pmdp, pmd);
+		smp_mb();
+		while (atomic_read(readers) != 0)
+			cpu_relax();
+
+that way, we don't need to worry about IPIs, we don't need to disable
+interrupts on the read side and we still get away without heavyweight
+locking.
+
+Of course, I could well be missing something here, but what we currently
+have in mainline doesn't work for ARM anyway (since TLB invalidation is
+broadcast in hardware).
+
+Will
