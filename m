@@ -1,109 +1,225 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 04 Oct 2013 09:57:02 +0100
-Subject: [PATCH v2 2/2] KVM: ARM: Transparent huge page (THP) support
-In-Reply-To: <1380832591-4789-3-git-send-email-christoffer.dall@linaro.org>
-References: <1380832591-4789-1-git-send-email-christoffer.dall@linaro.org>
- <1380832591-4789-3-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <524E82DE.1080806@arm.com>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Fri, 4 Oct 2013 12:12:40 +0300
+Subject: [PATCH 1/5] clk: tegra: Add support for PLLSS
+In-Reply-To: <1380878014-22088-1-git-send-email-pdeschrijver@nvidia.com>
+References: <1380878014-22088-1-git-send-email-pdeschrijver@nvidia.com>
+Message-ID: <1380878014-22088-2-git-send-email-pdeschrijver@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/10/13 21:36, Christoffer Dall wrote:
-> Support transparent huge pages in KVM/ARM and KVM/ARM64.  The
-> transparent_hugepage_adjust is not very pretty, but this is also how
-> it's solved on x86 and seems to be simply an artifact on how THPs
-> behave.  This should eventually be shared across architectures if
-> possible, but that can always be changed down the road.
-> 
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> 
-> ---
-> Changelog[v2]:
->  - THP handling moved into separate patch.
->  - Minor changes and clarified comment in transparent_hugepage_adjust
->    from Marc Z's review.
-> ---
->  arch/arm/kvm/mmu.c |   45 ++++++++++++++++++++++++++++++++++++++++++++-
->  1 file changed, 44 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-> index cab031b..0a856a0 100644
-> --- a/arch/arm/kvm/mmu.c
-> +++ b/arch/arm/kvm/mmu.c
-> @@ -42,7 +42,7 @@ static unsigned long hyp_idmap_start;
->  static unsigned long hyp_idmap_end;
->  static phys_addr_t hyp_idmap_vector;
->  
-> -#define kvm_pmd_huge(_x)	(pmd_huge(_x))
-> +#define kvm_pmd_huge(_x)	(pmd_huge(_x) || pmd_trans_huge(_x))
->  
->  static void kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa)
->  {
-> @@ -576,6 +576,47 @@ out:
->  	return ret;
->  }
->  
-> +static bool transparent_hugepage_adjust(pfn_t *pfnp, phys_addr_t *ipap)
-> +{
-> +	pfn_t pfn = *pfnp;
-> +	gfn_t gfn = *ipap >> PAGE_SHIFT;
-> +
-> +	if (PageTransCompound(pfn_to_page(pfn))) {
-> +		unsigned long mask;
-> +		/*
-> +		 * The address we faulted on is backed by a transparent huge
-> +		 * page.  However, because we map the compound huge page and
-> +		 * not the individual tail page, we need to transfer the
-> +		 * refcount to the head page.  We have to be careful that the
-> +		 * THP doesn't start to split while we are adjusting the
-> +		 * refcounts.
-> +		 *
-> +		 * We are sure this doesn't happen, because mmu_notifier_retry
-> +		 * was succesful and we are holding the mmu_lock, so if this
+Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
+---
+ drivers/clk/tegra/clk-pll.c |  168 +++++++++++++++++++++++++++++++++++++++++++
+ drivers/clk/tegra/clk.h     |    7 ++
+ 2 files changed, 175 insertions(+), 0 deletions(-)
 
-successful
-
-> +		 * THP is trying to split, it will be blocked in the mmu
-> +		 * notifier before touching any of the pages, specifically
-> +		 * before being able to call __split_huge_page_refcount().
-> +		 *
-> +		 * We can therefore safely transfer the refcount from PG_tail
-> +		 * to PG_head and switch the pfn from a tail page to the head
-> +		 * page accordingly.
-> +		 */
-> +		mask = PTRS_PER_PMD - 1;
-> +		VM_BUG_ON((gfn & mask) != (pfn & mask));
-> +		if (pfn & mask) {
-> +			*ipap &= PMD_MASK;
-> +			kvm_release_pfn_clean(pfn);
-> +			pfn &= ~mask;
-> +			kvm_get_pfn(pfn);
-> +			*pfnp = pfn;
-> +		}
-> +
-> +		return true;
-> +	}
-> +
-> +	return false;
-> +}
-> +
->  static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
->  			  struct kvm_memory_slot *memslot,
->  			  unsigned long fault_status)
-> @@ -632,6 +673,8 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
->  	spin_lock(&kvm->mmu_lock);
->  	if (mmu_notifier_retry(kvm, mmu_seq))
->  		goto out_unlock;
-> +	if (!hugetlb && !force_pte)
-> +		hugetlb = transparent_hugepage_adjust(&pfn, &fault_ipa);
->  
->  	if (hugetlb) {
->  		pmd_t new_pmd = pfn_pmd(pfn, PAGE_S2);
-> 
-
-Looks good. I think that if you fix the minor issues I have with the
-previous patch, this is good to go.
-
-	M.
+diff --git a/drivers/clk/tegra/clk-pll.c b/drivers/clk/tegra/clk-pll.c
+index 4cb2cec..87f0533 100644
+--- a/drivers/clk/tegra/clk-pll.c
++++ b/drivers/clk/tegra/clk-pll.c
+@@ -121,6 +121,33 @@
+ #define PMC_SATA_PWRGT_PLLE_IDDQ_VALUE BIT(5)
+ #define PMC_SATA_PWRGT_PLLE_IDDQ_SWCTL BIT(4)
+ 
++#define PLLSS_MISC_KCP		0
++#define PLLSS_MISC_KVCO		0
++#define PLLSS_MISC_SETUP	0
++#define PLLSS_EN_SDM		0
++#define PLLSS_EN_SSC		0
++#define PLLSS_EN_DITHER2	0
++#define PLLSS_EN_DITHER		1
++#define PLLSS_SDM_RESET		0
++#define PLLSS_CLAMP		0
++#define PLLSS_SDM_SSC_MAX	0
++#define PLLSS_SDM_SSC_MIN	0
++#define PLLSS_SDM_SSC_STEP	0
++#define PLLSS_SDM_DIN		0
++#define PLLSS_MISC_DEFAULT ((PLLSS_MISC_KCP << 25) | \
++			    (PLLSS_MISC_KVCO << 24) | \
++			    PLLSS_MISC_SETUP)
++#define PLLSS_CFG_DEFAULT ((PLLSS_EN_SDM << 31) | \
++			   (PLLSS_EN_SSC << 30) | \
++			   (PLLSS_EN_DITHER2 << 29) | \
++			   (PLLSS_EN_DITHER << 28) | \
++			   (PLLSS_SDM_RESET) << 27 | \
++			   (PLLSS_CLAMP << 22))
++#define PLLSS_CTRL1_DEFAULT \
++			((PLLSS_SDM_SSC_MAX << 16) | PLLSS_SDM_SSC_MIN)
++#define PLLSS_CTRL2_DEFAULT \
++			((PLLSS_SDM_SSC_STEP << 16) | PLLSS_SDM_DIN)
++
+ #define pll_readl(offset, p) readl_relaxed(p->clk_base + offset)
+ #define pll_readl_base(p) pll_readl(p->params->base_reg, p)
+ #define pll_readl_misc(p) pll_readl(p->params->misc_reg, p)
+@@ -1289,6 +1316,51 @@ static void clk_plle_tegra114_disable(struct clk_hw *hw)
+ }
+ #endif
+ 
++static int clk_pllss_set_rate(struct clk_hw *hw, unsigned long rate,
++				unsigned long parent_rate)
++{
++	struct tegra_clk_pll *pll = to_clk_pll(hw);
++	struct tegra_clk_pll_freq_table cfg, old_cfg;
++	unsigned long flags = 0;
++	int ret = 0;
++
++	ret = _pll_ramp_calc_pll(hw, &cfg, rate, parent_rate);
++	if (ret < 0)
++		return ret;
++
++	if (pll->lock)
++		spin_lock_irqsave(pll->lock, flags);
++
++	_get_pll_mnp(pll, &old_cfg);
++
++	if (old_cfg.m != cfg.m || old_cfg.n != cfg.n || old_cfg.p != cfg.p) {
++		u32 val;
++		int state = clk_pll_is_enabled(hw);
++
++		if (state) {
++			val = pll_readl_base(pll);
++			val &= ~PLL_BASE_ENABLE;
++			pll_writel_base(val, pll);
++			udelay(1);
++		}
++
++		_update_pll_mnp(pll, &cfg);
++
++		if (state) {
++			val = pll_readl_base(pll);
++			val |= PLL_BASE_ENABLE;
++			pll_writel_base(val, pll);
++			udelay(2);
++			clk_pll_wait_for_lock(pll);
++		}
++	}
++
++	if (pll->lock)
++		spin_unlock_irqrestore(pll->lock, flags);
++
++	return ret;
++}
++
+ static struct tegra_clk_pll *_tegra_init_pll(void __iomem *clk_base,
+ 		void __iomem *pmc, unsigned long fixed_rate,
+ 		struct tegra_clk_pll_params *pll_params, u32 pll_flags,
+@@ -1690,3 +1762,99 @@ struct clk *tegra_clk_register_plle_tegra114(const char *name,
+ 	return clk;
+ }
+ #endif
++
++const struct clk_ops tegra_clk_pllss_ops = {
++	.is_enabled = clk_pll_is_enabled,
++	.enable = clk_pll_iddq_enable,
++	.disable = clk_pll_iddq_disable,
++	.recalc_rate = clk_pll_recalc_rate,
++	.round_rate = clk_pll_ramp_round_rate,
++	.set_rate = clk_pllss_set_rate,
++};
++
++struct clk *tegra_clk_register_pllss(const char *name, const char *parent_name,
++				void __iomem *clk_base, unsigned long flags,
++				unsigned long fixed_rate,
++				struct tegra_clk_pll_params *pll_params,
++				struct tegra_clk_pll_freq_table *freq_table,
++				spinlock_t *lock)
++{
++	struct tegra_clk_pll *pll;
++	struct clk *clk, *parent;
++	struct tegra_clk_pll_freq_table cfg;
++	unsigned long parent_rate;
++	u32 val, pll_flags;
++	int i;
++
++	if (!pll_params->div_nmp)
++		return ERR_PTR(-EINVAL);
++
++	parent = __clk_lookup(parent_name);
++	if (IS_ERR(parent)) {
++		WARN(1, "parent clk %s of %s must be registered first\n",
++			name, parent_name);
++		return ERR_PTR(-EINVAL);
++	}
++
++	pll_flags = TEGRA_PLL_HAS_LOCK_ENABLE | TEGRA_PLL_USE_LOCK;
++	pll = _tegra_init_pll(clk_base, NULL, fixed_rate, pll_params,
++				pll_flags, freq_table, lock);
++
++	if (IS_ERR(pll))
++		return ERR_CAST(pll);
++
++	val = pll_readl_base(pll);
++
++	if (val & (3 << 25)) {
++		WARN(1, "Unknown parent selected for %s: %d\n", name,
++			val >> 25);
++		kfree(pll);
++		return ERR_PTR(-EINVAL);
++	}
++	_get_pll_mnp(pll, &cfg);
++
++	if (cfg.n > 1) {
++		WARN(1, "%s should not be initialized\n", name);
++		kfree(pll);
++		return ERR_PTR(-EINVAL);
++	}
++
++	parent_rate = __clk_get_rate(parent);
++
++	pll_params->vco_min = _clip_vco_min(pll_params->vco_min, parent_rate);
++
++	cfg.m = _pll_fixed_mdiv(pll_params, parent_rate);
++	cfg.n = cfg.m * pll_params->vco_min / parent_rate;
++
++	for (i = 0; pll_params->pdiv_tohw[i].pdiv; i++)
++		;
++	cfg.p = pll_params->pdiv_tohw[i-1].hw_val;
++
++	_update_pll_mnp(pll, &cfg);
++
++	pll_writel_misc(PLLSS_MISC_DEFAULT, pll);
++	pll_writel(PLLSS_CFG_DEFAULT, pll_params->ext_misc_reg[0], pll);
++	pll_writel(PLLSS_CTRL1_DEFAULT, pll_params->ext_misc_reg[1], pll);
++	pll_writel(PLLSS_CTRL1_DEFAULT, pll_params->ext_misc_reg[2], pll);
++
++	val = pll_readl_base(pll);
++	if (val & PLL_BASE_ENABLE) {
++		if (val & BIT(pll_params->iddq_bit_idx)) {
++			WARN(1, "%s is on but IDDQ set\n", name);
++			kfree(pll);
++			return ERR_PTR(-EINVAL);
++		}
++	} else
++		val |= BIT(pll_params->iddq_bit_idx);
++
++	val &= ~BIT(24); /* disable lock override */
++	pll_writel_base(val, pll);
++
++	clk = _tegra_clk_register_pll(pll, name, parent_name, flags,
++					&tegra_clk_pllss_ops);
++
++	if (IS_ERR(clk))
++		kfree(pll);
++
++	return clk;
++}
+diff --git a/drivers/clk/tegra/clk.h b/drivers/clk/tegra/clk.h
+index 153d857..2912f57 100644
+--- a/drivers/clk/tegra/clk.h
++++ b/drivers/clk/tegra/clk.h
+@@ -310,6 +310,13 @@ struct clk *tegra_clk_register_plle_tegra114(const char *name,
+ 				struct tegra_clk_pll_freq_table *freq_table,
+ 				spinlock_t *lock);
+ 
++struct clk *tegra_clk_register_pllss(const char *name, const char *parent_name,
++			   void __iomem *clk_base, unsigned long flags,
++			   unsigned long fixed_rate,
++			   struct tegra_clk_pll_params *pll_params,
++			   struct tegra_clk_pll_freq_table *freq_table,
++			   spinlock_t *lock);
++
+ /**
+  * struct tegra_clk_pll_out - PLL divider down clock
+  *
 -- 
-Jazz is not dead. It just smells funny...
+1.7.7.rc0.72.g4b5ea.dirty
