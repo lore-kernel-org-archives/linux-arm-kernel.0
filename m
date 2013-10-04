@@ -1,66 +1,33 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Thu, 3 Oct 2013 20:25:35 -0400 (EDT)
-Subject: [PATCH v3 6/6] ARM: mm: Change the order of TLB/cache maintenance
- operations.
-In-Reply-To: <1380835081-12129-7-git-send-email-santosh.shilimkar@ti.com>
-References: <1380835081-12129-1-git-send-email-santosh.shilimkar@ti.com>
- <1380835081-12129-7-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <alpine.LFD.2.03.1310032025130.3023@syhkavp.arg>
+From: syin@broadcom.com (Sherman Yin)
+Date: Thu, 3 Oct 2013 17:23:19 -0700
+Subject: [PATCH 4/4] pinctrl: Enable pinctrl for Broadcom Capri SoCs
+In-Reply-To: <1380846199-12829-1-git-send-email-syin@broadcom.com>
+References: <1380846199-12829-1-git-send-email-syin@broadcom.com>
+Message-ID: <1380846199-12829-5-git-send-email-syin@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 3 Oct 2013, Santosh Shilimkar wrote:
+Enable pinctrl for Broadcom Capri (BCM281xx) SoCs.
 
-> From: Sricharan R <r.sricharan@ti.com>
-> 
-> As per the arm ARMv7 manual, the sequence of TLB maintenance
-> operations after making changes to the translation table is
-> to clean the dcache first, then invalidate the TLB. With
-> the current sequence we see cache corruption when the
-> flush_cache_all is called after tlb_flush_all.
-> 
-> STR rx, [Translation table entry]
-> ; write new entry to the translation table
-> Clean cache line [Translation table entry]
-> DSB
-> ; ensures visibility of the data cleaned from the D Cache
-> Invalidate TLB entry by MVA (and ASID if non-global) [page address]
-> Invalidate BTC
-> DSB
-> ; ensure completion of the Invalidate TLB operation
-> ISB
-> ; ensure table changes visible to instruction fetch
-> 
-> The issue is seen only with LPAE + THUMB BUILT KERNEL + 64BIT patching,
-> which is little bit weird.
-> 
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
-> Cc: Russell King - ARM Linux <linux@arm.linux.org.uk>
-> 
-> Signed-off-by: Sricharan R <r.sricharan@ti.com>
-> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Signed-off-by: Sherman Yin <syin@broadcom.com>
+Reviewed-by: Christian Daudt <bcm@fixthebug.org>
+Reviewed-by: Matt Porter <matt.porter@linaro.org>
+---
+ arch/arm/boot/dts/bcm11351.dtsi |    4 ++++
+ 1 file changed, 4 insertions(+)
 
-Acked-by: Nicolas Pitre <nico@linaro.org>
-
-> ---
->  arch/arm/mm/mmu.c |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-> index 47c7497..49cba8a 100644
-> --- a/arch/arm/mm/mmu.c
-> +++ b/arch/arm/mm/mmu.c
-> @@ -1280,8 +1280,8 @@ static void __init devicemaps_init(const struct machine_desc *mdesc)
->  	 * any write-allocated cache lines in the vector page are written
->  	 * back.  After this point, we can start to touch devices again.
->  	 */
-> -	local_flush_tlb_all();
->  	flush_cache_all();
-> +	local_flush_tlb_all();
->  }
->  
->  static void __init kmap_init(void)
-> -- 
-> 1.7.9.5
-> 
+diff --git a/arch/arm/boot/dts/bcm11351.dtsi b/arch/arm/boot/dts/bcm11351.dtsi
+index 05a5aab..f497a40 100644
+--- a/arch/arm/boot/dts/bcm11351.dtsi
++++ b/arch/arm/boot/dts/bcm11351.dtsi
+@@ -96,4 +96,8 @@
+ 		status = "disabled";
+ 	};
+ 
++	pinctrl at 35004800 {
++		compatible = "brcm,capri-pinctrl";
++		reg = <0x35004800 0x430>;
++	};
+ };
+-- 
+1.7.9.5
