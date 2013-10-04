@@ -1,57 +1,84 @@
-From: ijc@hellion.org.uk (Ian Campbell)
-Date: Fri, 04 Oct 2013 08:15:08 +0100
-Subject: Detect presence of LPAE when not running an LPAE kernel?
-In-Reply-To: <20131003200712.GG12758@n2100.arm.linux.org.uk>
-References: <1380829403.3804.56.camel@hastur.hellion.org.uk>
- <20131003200712.GG12758@n2100.arm.linux.org.uk>
-Message-ID: <1380870908.27765.24.camel@dagon.hellion.org.uk>
+From: b.brezillon@overkiz.com (Boris BREZILLON)
+Date: Fri,  4 Oct 2013 09:24:11 +0200
+Subject: [PATCH v5 0/4] watchdog: at91sam9_wdt: handle already configured wdt
+Message-ID: <1380871455-7324-1-git-send-email-b.brezillon@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2013-10-03 at 21:07 +0100, Russell King - ARM Linux wrote:
-> On Thu, Oct 03, 2013 at 08:43:23PM +0100, Ian Campbell wrote:
-> > Is this possible?
-> > 
-> > The Features field of /proc/cpuinfo only appears to reflect the presence
-> > of LPAE if CONFIG_LPAE is actually on in the running kernel.
-> > 
-> > The reason I care is so that distro installers can ship a generic kernel
-> > but select LPAE for the running system when appropriate.
-> > 
-> > On x86 for example I would check /proc/cpuinfo:flags which contains the
-> > CPU features, regardless of whether they are currently enabled.
-> > 
-> > Is there any equivalent on ARM?
-> 
-> Perversely, LPAE in there has nothing to do with LPAE being used by the
-> kernel.  It's more to do with the presence of the double-word load/store
-> exclusive.
+Hello,
 
-Ah, and I'm running 3.10 whereas this was added to 3.11-rc1.
+This patch series is a porposal to enhance the sam9 watchdog timer support.
 
-> It went through lots of discussions about what to call this, whether it
-> was "ATOMICD" (which is very perverse and vague) or LPAE (which is what
-> it was keyed off of).
-> 
-> Now, this LPAE flag is present whether or not the kernel has been built
-> with CONFIG_LPAE enabled or not.  That's because its not about LPAE
-> really, it's about those load/store exclusive instructions.
+The at91sam9 watchdog timer can only be configured once, and the current
+implementation tries to configure it in a static way:
+- 2 seconds timeout
+- wdt restart every 500ms
 
-So would it be sensible for userspace to use the presence of this lpae
-flag from 3.11 onwards to indicate the possibility of running lpae? It
-sounds like it might be theoretically a bit dodgy but in actual fact
-fine in reality?
+If the timer has already been configured with different values, it returns an
+error and do not create any watchdog device.
 
-Should/do we expose the actual CPU LPAE capability somewhere?
+This is not critical if the watchdog is disabled, but if it has been enabled
+with different timeout values it will lead to a SoC reset.
 
-> Now, this isn't applied to all flags: we hide certain CPU facilities
-> when the kernel support is missing, because the instructions can't be
-> used without kernel support being present.  For instance, if the VFP
-> support code is not present, support for VFP instructions will be
-> hidden (and the instructions disabled) because there's nothing to
-> context-switch the VFP state and stop one thread interfering with
-> another.
+This patch series tries to address this issue by adapting the heartbeat value
+according the WDT timer config:
+- it first tries to configure the timer as requested.
+- if it fails it fallbacks to the current config, adapting its heartbeat timer
+to the needs
 
-That's completely reasonable.
+This patch series also move to a dynamically allocated at91wdt device instead
+of the static instance. I'm not sure this is the best solution, so please tell
+me if you prefer to keep static instance of watchdog.
 
-Ian.
+It adds a new at91 wdt type: software. This new type make use of the at91 wdt
+interrupt to trigger a software reboot.
+
+Finally it adds several properties to the device tree bindings.
+
+Best Regards,
+Boris
+
+Changes since v4:
+ - fix coding style issues
+ - remove unneeded watchdog_active test
+
+Changes since v3:
+ - fix a bug in heartbeat time computation
+ - fix a bug in at91_wdt_set_timeout when new timeout is bigger than the old
+   one
+ - rename at91_wdt_ping into at91_wdt_start
+ - remove unneeded ping callback assignment
+
+Changes since v2:
+ - fix documentation
+ - rework the heartbeat computation to get a more flexible behaviour
+ - fix xx_to_yy macros
+ - modify warning and error messages
+ - remove unneeded parenthesis in arithmetic operations
+ - use devm functions to map io memory
+ - remove unneeded devm_kfree calls
+
+Change since v1:
+ - fix typo in documentaion
+ - fix irq dt definition for sama5d3 SoC
+
+
+Boris BREZILLON (4):
+  watchdog: at91sam9_wdt: better watchdog support
+  watchdog: at91sam9_wdt: update device tree doc
+  ARM: at91/dt: add sam9 watchdog default options to SoCs
+  ARM: at91/dt: add watchdog properties to kizbox board
+
+ .../devicetree/bindings/watchdog/atmel-wdt.txt     |   30 +-
+ arch/arm/boot/dts/at91sam9260.dtsi                 |    5 +
+ arch/arm/boot/dts/at91sam9263.dtsi                 |    5 +
+ arch/arm/boot/dts/at91sam9g45.dtsi                 |    5 +
+ arch/arm/boot/dts/at91sam9n12.dtsi                 |    5 +
+ arch/arm/boot/dts/at91sam9x5.dtsi                  |    5 +
+ arch/arm/boot/dts/kizbox.dts                       |    6 +
+ arch/arm/boot/dts/sama5d3.dtsi                     |    5 +
+ drivers/watchdog/at91sam9_wdt.c                    |  309 ++++++++++++++------
+ 9 files changed, 287 insertions(+), 88 deletions(-)
+
+-- 
+1.7.9.5
