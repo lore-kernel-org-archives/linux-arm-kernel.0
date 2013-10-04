@@ -1,48 +1,34 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Thu, 3 Oct 2013 22:26:03 -0300
-Subject: [PATCH] imx6q: fix emergency restart
-In-Reply-To: <1380832337-4637-1-git-send-email-nathan_lynch@mentor.com>
-References: <1380832337-4637-1-git-send-email-nathan_lynch@mentor.com>
-Message-ID: <CAOMZO5C1VBN_T0SQvNXg5x9BKOqoyPMu_v6QQ+E8-Ej94eJodg@mail.gmail.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Thu, 03 Oct 2013 21:46:42 -0400 (EDT)
+Subject: [PATCH 0/3] v7-M support using MULTIPLATFORM
+In-Reply-To: <20131003230535.GI12758@n2100.arm.linux.org.uk>
+References: <1380534577-15076-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <20131003220037.GH12758@n2100.arm.linux.org.uk>
+ <20131003222801.GE10079@pengutronix.de>
+ <20131003230535.GI12758@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.03.1310032143190.3023@syhkavp.arg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nathan,
+On Fri, 4 Oct 2013, Russell King - ARM Linux wrote:
 
-On Thu, Oct 3, 2013 at 5:32 PM, Nathan Lynch <nathan_lynch@mentor.com> wrote:
-> Emergency restart (e.g. sysrq-b) BUGs and panics on i.MX6Q SABRE Lite:
->
-> kernel BUG at mm/vmalloc.c:1305!
-> Internal error: Oops - BUG: 0 [#1] SMP ARM
-> CPU: 0 PID: 0 Comm: swapper/0 Not tainted 3.12.0-rc3-00059-g522d6d3-dirty #29
-> task: c0cf15d8 ti: c0ce6000 task.ti: c0ce6000
-> PC is at __get_vm_area_node.isra.36+0xe8/0xf8
-> LR is at get_vm_area_caller+0x40/0x48
-> pc : [<c00be184>]    lr : [<c00bed1c>]    psr: 20000193
-> sp : c0ce7db8  ip : c0ce6000  fp : 00004000
-> r10: c0cf2ab0  r9 : 020bc000  r8 : f0000000
-> r7 : 00000001  r6 : 000000d0  r5 : 00000001  r4 : c0ce7db8
-> r3 : 00010000  r2 : 00000001  r1 : 00000001  r0 : 00004000
-> Flags: nzCv  IRQs off  FIQs on  Mode SVC_32  ISA ARM  Segment kernel
-> Control: 10c5387d  Table: 3eec404a  DAC: 00000015
-> Process swapper/0 (pid: 0, stack limit = 0xc0ce6240)
+> On Fri, Oct 04, 2013 at 12:28:01AM +0200, Uwe Kleine-K?nig wrote:
+> > Right, but do we agree that it should be possible to create an XIP image
+> > for i.MX6? If so: You currently cannot, because i.MX6 isn't configurable
+> > without MULTIPLATFORM. Also in the times before MULTIPLATFORM XIP was
+> > special.
+> 
+> That's one of the consequences of pushing to multiplatform support - XIP
+> has fallen by the way side as a result of this effort (it was discussed
+> previously) and we had decided that almost no one uses it anymore and it
+> would not be part of the multiplatform stuff.  It was only really used
+> by very few SA11x0 and PXA platforms anyway.
 
-Not related to your patch, but when I run:
+Semantically, MULTIPLATFORM is incompatible with XIP as well as NOMMU.
 
-echo c > /proc/sysrq-trigger
+So if a platform exists only when MULTIPLATFORM is selected, preventing 
+it from being configured as NOMMU or XIP then something is broken with 
+MULTIPLATFORM.
 
-Then I wait sometime, but watchdog never resets the system.
 
-Also, if I pass an invalid root file system, system crashes as
-expected, but watchdog never resets.
-
-However, if I do:
-
-echo 0 > /dev/watchdog, then after 60 seconds the watchdog resets the board.
-
-I haven't debugged this yet, but I thought that the first two methods
-above should also trigger a watchdog reset.
-
-Regards,
-
-Fabio Estevam
+Nicolas
