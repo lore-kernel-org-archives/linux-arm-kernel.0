@@ -1,36 +1,35 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 4 Oct 2013 09:19:36 -0400
-Subject: [PATCH v3 6/6] ARM: mm: Change the order of TLB/cache maintenance
- operations.
-In-Reply-To: <alpine.LFD.2.03.1310040911240.3023@syhkavp.arg>
-References: <1380835081-12129-1-git-send-email-santosh.shilimkar@ti.com>
- <1380835081-12129-7-git-send-email-santosh.shilimkar@ti.com>
- <20131004084643.GJ12758@n2100.arm.linux.org.uk>
- <alpine.LFD.2.03.1310040911240.3023@syhkavp.arg>
-Message-ID: <524EC068.1060105@ti.com>
+From: matthew_minter@xyratex.com (Matthew Minter)
+Date: Fri, 4 Oct 2013 14:14:34 +0100
+Subject: Arm PCIe hotplugging
+Message-ID: <CAFJTrDs=fovP8nWVvH=-a9d_OTbmgQkMLPVeKAc4x6phsuZw9w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 04 October 2013 09:14 AM, Nicolas Pitre wrote:
-> On Fri, 4 Oct 2013, Russell King - ARM Linux wrote:
-> 
->> On Thu, Oct 03, 2013 at 05:18:00PM -0400, Santosh Shilimkar wrote:
->>> From: Sricharan R <r.sricharan@ti.com>
->>>
->>> As per the arm ARMv7 manual, the sequence of TLB maintenance
->>> operations after making changes to the translation table is
->>> to clean the dcache first, then invalidate the TLB. With
->>> the current sequence we see cache corruption when the
->>> flush_cache_all is called after tlb_flush_all.
->>
->> This needs testing on ARMv4 CPUs which don't have a way to flush the
->> cache except by reading memory - hence they need the new page table
->> entries to be visible to the MMU before calling flush_cache_all().
-> 
-> I suspect you might be one of the few individuals still having the 
-> ability to test new kernels on ARMv4 CPUs.
-> 
-At least I don't have any ARMv4 based system to validate it.
+Hi again,
 
-Regards,
-Santosh
+I have been doing some work with an Armada XP board (DB-MV784MP-GP)
+with PCIe support, along with using a PEX 8614 (AA) PCIe switch. The
+switch in question is said to have hot plug support with the PCIe
+downstream slots.
+
+However using both the generic "pcieport" and the proprietary kernel
+module used by PLX (this took some work to run on an ARM board and is
+very buggy on the platform buggy so the generic in tree drivers are
+preferable) the /sys/bus/pci/slots/ directory is always empty and
+/sys/bus/pci/rescan seems to do nothing.
+
+Looking closer it seems that in the ARM kernel the PCI hotplug code is
+all disabled. Am I just out of luck and should wait until there is a
+new driver for the PCI switch's hot plug controller and a general hot
+plug framework for ARM or is there some kind of work around?
+
+Best regards,
+Matthew
+
+-- 
+
+
+------------------------------
+For additional information including the registered office and the treatment of Xyratex confidential information please visit www.xyratex.com
+
+------------------------------
