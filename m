@@ -1,71 +1,32 @@
-From: rvaswani@codeaurora.org (Rohit Vaswani)
-Date: Fri, 04 Oct 2013 01:45:34 -0700
-Subject: [PATCHv4 2/4] ARM: msm: Add support for APQ8074 Dragonboard
-In-Reply-To: <1380875311.24031.17.camel@iivanov-dev.int.mm-sol.com>
-References: <1380841557-2673-1-git-send-email-rvaswani@codeaurora.org>
- <1380841557-2673-3-git-send-email-rvaswani@codeaurora.org>
- <1380875311.24031.17.camel@iivanov-dev.int.mm-sol.com>
-Message-ID: <524E802E.2060802@codeaurora.org>
+From: ludovic.desroches@atmel.com (ludovic.desroches at atmel.com)
+Date: Fri, 4 Oct 2013 10:46:51 +0200
+Subject: [PATCH] dma: atmel-dma: correct typo in the device tree bindings
+ documentation
+Message-ID: <1380876411-706-1-git-send-email-ludovic.desroches@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/4/2013 1:28 AM, Ivan T. Ivanov wrote:
-> Hi Rohit,
->
-> On Thu, 2013-10-03 at 16:05 -0700, Rohit Vaswani wrote:
->> This patch adds basic board support for APQ8074 Dragonboard
->> which belongs to the Snapdragon 800 family.
->> For now, just support a basic machine with device tree.
->>
->> Signed-off-by: Rohit Vaswani <rvaswani@codeaurora.org>
->> ---
->>   arch/arm/boot/dts/Makefile                     |  3 ++-
->>   arch/arm/boot/dts/qcom-apq8074-dragonboard.dts |  6 +++++
->>   arch/arm/boot/dts/qcom-msm8974.dtsi            | 35 ++++++++++++++++++++++++++
->>   arch/arm/mach-msm/Kconfig                      | 13 ++++++++++
->>   arch/arm/mach-msm/board-dt.c                   |  9 +++++++
->>   5 files changed, 65 insertions(+), 1 deletion(-)
->>   create mode 100644 arch/arm/boot/dts/qcom-apq8074-dragonboard.dts
->>   create mode 100644 arch/arm/boot/dts/qcom-msm8974.dtsi
->>
->> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
->> index 000cf76..e71a3ec 100644
->> --- a/arch/arm/boot/dts/Makefile
->> +++ b/arch/arm/boot/dts/Makefile
->> @@ -102,7 +102,8 @@ dtb-$(CONFIG_ARCH_KIRKWOOD) += kirkwood-cloudbox.dtb \
->>   	kirkwood-openblocks_a6.dtb
->>   dtb-$(CONFIG_ARCH_MARCO) += marco-evb.dtb
->>   dtb-$(CONFIG_ARCH_MSM) += msm8660-surf.dtb \
->> -	msm8960-cdp.dtb
->> +	msm8960-cdp.dtb \
->> +	qcom-apq8074-dragonboard.dtb
->>   dtb-$(CONFIG_ARCH_MVEBU) += armada-370-db.dtb \
->>   	armada-370-mirabox.dtb \
->>   	armada-370-netgear-rn102.dtb \
->> diff --git a/arch/arm/boot/dts/qcom-apq8074-dragonboard.dts b/arch/arm/boot/dts/qcom-apq8074-dragonboard.dts
->> new file mode 100644
->> index 0000000..bb6f3c4
->> --- /dev/null
->> +++ b/arch/arm/boot/dts/qcom-apq8074-dragonboard.dts
->> @@ -0,0 +1,6 @@
->> +/include/ "qcom-msm8974.dtsi"
-> Please, could you replace /include/ by #include. This will allow
-> us to use of #define features from C header files. Since[1] we have
-> clocks indexes definitions shared between C code and DT files.
+From: Ludovic Desroches <ludovic.desroches@atmel.com>
 
-Will do.
->
-> Thanks,
-> Ivan
->
-> [1] http://www.spinics.net/lists/arm-kernel/msg276937.html
->
->
->
+The value to set ASAP mode for FIFO configuration is 2 instead of 1.
 
+Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+---
+ Documentation/devicetree/bindings/dma/atmel-dma.txt | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Thanks,
-Rohit Vaswani
-
+diff --git a/Documentation/devicetree/bindings/dma/atmel-dma.txt b/Documentation/devicetree/bindings/dma/atmel-dma.txt
+index c280a0e..434f74e 100644
+--- a/Documentation/devicetree/bindings/dma/atmel-dma.txt
++++ b/Documentation/devicetree/bindings/dma/atmel-dma.txt
+@@ -28,7 +28,7 @@ The three cells in order are:
+ dependant:
+   - bit 7-0: peripheral identifier for the hardware handshaking interface. The
+   identifier can be different for tx and rx.
+-  - bit 11-8: FIFO configuration. 0 for half FIFO, 1 for ALAP, 1 for ASAP.
++  - bit 11-8: FIFO configuration. 0 for half FIFO, 1 for ALAP, 2 for ASAP.
+ 
+ Example:
+ 
 -- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum, hosted by The Linux Foundation
+1.7.11.3
