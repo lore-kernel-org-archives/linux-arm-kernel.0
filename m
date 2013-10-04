@@ -1,128 +1,56 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Fri,  4 Oct 2013 17:13:21 +0100
-Subject: [PATCH v3 2/2] KVM: ARM: Transparent huge page (THP) support
-In-Reply-To: <1380903201-32644-1-git-send-email-christoffer.dall@linaro.org>
-References: <1380903201-32644-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <1380903201-32644-3-git-send-email-christoffer.dall@linaro.org>
+From: ijc@hellion.org.uk (Ian Campbell)
+Date: Fri, 04 Oct 2013 17:23:22 +0100
+Subject: Detect presence of LPAE when not running an LPAE kernel?
+In-Reply-To: <20131004160944.GV24303@mudshark.cambridge.arm.com>
+References: <1380829403.3804.56.camel@hastur.hellion.org.uk>
+ <20131003200712.GG12758@n2100.arm.linux.org.uk>
+ <1380870908.27765.24.camel@dagon.hellion.org.uk>
+ <20131004160944.GV24303@mudshark.cambridge.arm.com>
+Message-ID: <1380903802.21562.46.camel@kazak.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Support transparent huge pages in KVM/ARM and KVM/ARM64.  The
-transparent_hugepage_adjust is not very pretty, but this is also how
-it's solved on x86 and seems to be simply an artifact on how THPs
-behave.  This should eventually be shared across architectures if
-possible, but that can always be changed down the road.
+On Fri, 2013-10-04 at 17:09 +0100, Will Deacon wrote:
+> On Fri, Oct 04, 2013 at 08:15:08AM +0100, Ian Campbell wrote:
+> > On Thu, 2013-10-03 at 21:07 +0100, Russell King - ARM Linux wrote:
+> > > On Thu, Oct 03, 2013 at 08:43:23PM +0100, Ian Campbell wrote:
+> > > > Is this possible?
+> > > > 
+> > > > The Features field of /proc/cpuinfo only appears to reflect the presence
+> > > > of LPAE if CONFIG_LPAE is actually on in the running kernel.
+> > > > 
+> > > > The reason I care is so that distro installers can ship a generic kernel
+> > > > but select LPAE for the running system when appropriate.
+> > > > 
+> > > > On x86 for example I would check /proc/cpuinfo:flags which contains the
+> > > > CPU features, regardless of whether they are currently enabled.
+> > > > 
+> > > > Is there any equivalent on ARM?
+> > > 
+> > > Perversely, LPAE in there has nothing to do with LPAE being used by the
+> > > kernel.  It's more to do with the presence of the double-word load/store
+> > > exclusive.
+> > 
+> > Ah, and I'm running 3.10 whereas this was added to 3.11-rc1.
+> 
+> Unless my memory is broken, if you see this HWCAP in a mainline kernel it
+> has always meant "the CPU you are running on is capable of LPAE". I don't
+> remember any dependency on CONFIG_LPAE.
 
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+I was just confused by it not appearing in 3.10 and assumed it was a
+dependency on CONFIG_LPAE when in reality the hwcap just wasn't added
+until 3.11-rc1.
 
----
-Changelog[v3]:
-     - Moved force_pte logic from previous patch
-     - Added comment about force_pte
-     - Fixed spelling mistake in comment
+> > Should/do we expose the actual CPU LPAE capability somewhere?
+> 
+> That's the whole point of the HWCAP.
 
-Changelog[v2]:
-     - THP handling moved into separate patch.
-     - Minor changes and clarified comment in
-       transparent_hugepage_adjust from Marc Z's review.
----
- arch/arm/kvm/mmu.c | 58 ++++++++++++++++++++++++++++++++++++++++++++++++++++--
- 1 file changed, 56 insertions(+), 2 deletions(-)
+Russell was saying it actually related to the presence of strd/ldrd, how
+tightly is that tied to the presence of LPAE in theory? In practise it
+seems closely related...
 
-diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-index 745d8b1..3719583 100644
---- a/arch/arm/kvm/mmu.c
-+++ b/arch/arm/kvm/mmu.c
-@@ -42,7 +42,7 @@ static unsigned long hyp_idmap_start;
- static unsigned long hyp_idmap_end;
- static phys_addr_t hyp_idmap_vector;
- 
--#define kvm_pmd_huge(_x)	(pmd_huge(_x))
-+#define kvm_pmd_huge(_x)	(pmd_huge(_x) || pmd_trans_huge(_x))
- 
- static void kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa)
- {
-@@ -576,12 +576,53 @@ out:
- 	return ret;
- }
- 
-+static bool transparent_hugepage_adjust(pfn_t *pfnp, phys_addr_t *ipap)
-+{
-+	pfn_t pfn = *pfnp;
-+	gfn_t gfn = *ipap >> PAGE_SHIFT;
-+
-+	if (PageTransCompound(pfn_to_page(pfn))) {
-+		unsigned long mask;
-+		/*
-+		 * The address we faulted on is backed by a transparent huge
-+		 * page.  However, because we map the compound huge page and
-+		 * not the individual tail page, we need to transfer the
-+		 * refcount to the head page.  We have to be careful that the
-+		 * THP doesn't start to split while we are adjusting the
-+		 * refcounts.
-+		 *
-+		 * We are sure this doesn't happen, because mmu_notifier_retry
-+		 * was successful and we are holding the mmu_lock, so if this
-+		 * THP is trying to split, it will be blocked in the mmu
-+		 * notifier before touching any of the pages, specifically
-+		 * before being able to call __split_huge_page_refcount().
-+		 *
-+		 * We can therefore safely transfer the refcount from PG_tail
-+		 * to PG_head and switch the pfn from a tail page to the head
-+		 * page accordingly.
-+		 */
-+		mask = PTRS_PER_PMD - 1;
-+		VM_BUG_ON((gfn & mask) != (pfn & mask));
-+		if (pfn & mask) {
-+			*ipap &= PMD_MASK;
-+			kvm_release_pfn_clean(pfn);
-+			pfn &= ~mask;
-+			kvm_get_pfn(pfn);
-+			*pfnp = pfn;
-+		}
-+
-+		return true;
-+	}
-+
-+	return false;
-+}
-+
- static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
- 			  struct kvm_memory_slot *memslot,
- 			  unsigned long fault_status)
- {
- 	int ret;
--	bool write_fault, writable, hugetlb = false;
-+	bool write_fault, writable, hugetlb = false, force_pte = false;
- 	unsigned long mmu_seq;
- 	gfn_t gfn = fault_ipa >> PAGE_SHIFT;
- 	unsigned long hva = gfn_to_hva(vcpu->kvm, gfn);
-@@ -602,6 +643,17 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
- 	if (is_vm_hugetlb_page(vma)) {
- 		hugetlb = true;
- 		gfn = (fault_ipa & PMD_MASK) >> PAGE_SHIFT;
-+	} else {
-+		/*
-+		 * Pages belonging to VMAs not aligned to the PMD mapping
-+		 * granularity cannot be mapped using block descriptors even
-+		 * if the pages belong to a THP for the process, because the
-+		 * stage-2 block descriptor will cover more than a single THP
-+		 * and we loose atomicity for unmapping, updates, and splits
-+		 * of the THP or other pages in the stage-2 block range.
-+		 */
-+		if (vma->vm_start & ~PMD_MASK)
-+			force_pte = true;
- 	}
- 	up_read(&current->mm->mmap_sem);
- 
-@@ -629,6 +681,8 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
- 	spin_lock(&kvm->mmu_lock);
- 	if (mmu_notifier_retry(kvm, mmu_seq))
- 		goto out_unlock;
-+	if (!hugetlb && !force_pte)
-+		hugetlb = transparent_hugepage_adjust(&pfn, &fault_ipa);
- 
- 	if (hugetlb) {
- 		pmd_t new_pmd = pfn_pmd(pfn, PAGE_S2);
--- 
-1.8.1.2
+> Are you sure your 3.10 hasn't got some extra magic?
+
+Yep ;-)
+
+Ian.
