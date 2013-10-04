@@ -1,40 +1,98 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Fri, 4 Oct 2013 15:51:31 -0400 (EDT)
-Subject: [PATCH 3/6] ARM: EXYNOS: add Exynos Dual Cluster Support
-In-Reply-To: <20131002125458.GA3407@localhost.localdomain>
-References: <1380644227-12244-1-git-send-email-v.tyrtov@samsung.com>
- <1380644227-12244-4-git-send-email-v.tyrtov@samsung.com>
- <20131002125458.GA3407@localhost.localdomain>
-Message-ID: <alpine.LFD.2.03.1310041543090.3023@syhkavp.arg>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri,  4 Oct 2013 14:10:11 -0600
+Subject: [PATCH stable] ARM: tegra: unify Tegra's Kconfig a bit more
+Message-ID: <1380917411-25869-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2 Oct 2013, Dave Martin wrote:
+From: Stephen Warren <swarren@nvidia.com>
 
-> On Tue, Oct 01, 2013 at 08:17:04PM +0400, Vyacheslav Tyrtov wrote:
-> > +static int exynos_power_up(unsigned int cpu, unsigned int cluster)
-> > +{
-> > +     int ret;
-> > +     local_irq_disable();
-> 
-> Should there be a local_fiq_disable() here also?
+Move all common select clauses from ARCH_TEGRA_*_SOC to ARCH_TEGRA to
+eliminate duplication. The USB-related selects all should have been
+common too, but were missing from Tegra114 previously. Move these to
+ARCH_TEGRA too. The latter fixes a build break when only Tegra114
+support was enabled, but not Tegra20 or Tegra30 support.
 
-No.  In fact this is paired with
+This is 20984c44b5a08620778ea14fa5807489170fd5ca in v3.12-rc1.
 
-> > +     arch_spin_lock(&exynos_lock);
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+Reported-by: Paul Walmsley <pwalmsley@nvidia.com>
+[auto-builders for 3.11.x are failing due to this]
+Cc: stable # v3.11
+---
+ arch/arm/mach-tegra/Kconfig | 21 ++++++---------------
+ 1 file changed, 6 insertions(+), 15 deletions(-)
 
-to create the equivalent of a arch_spin_lock_irq().  And the reason is:
-
-/*
- * We can't use regular spinlocks. In the switcher case, it is possible
- * for an outbound CPU to call power_down() after its inbound counterpart
- * is already live using the same logical CPU number which trips lockdep
- * debugging.
- */
-
-Otherwise we simply would have used spin_lock_irq().
-
-No FIQs are supposed to ever race with this code.
-
-
-Nicolas
+diff --git a/arch/arm/mach-tegra/Kconfig b/arch/arm/mach-tegra/Kconfig
+index add345e..e963db2 100644
+--- a/arch/arm/mach-tegra/Kconfig
++++ b/arch/arm/mach-tegra/Kconfig
+@@ -2,18 +2,24 @@ config ARCH_TEGRA
+ 	bool "NVIDIA Tegra" if ARCH_MULTI_V7
+ 	select ARCH_HAS_CPUFREQ
+ 	select ARCH_REQUIRE_GPIOLIB
++	select ARM_GIC
+ 	select CLKDEV_LOOKUP
+ 	select CLKSRC_MMIO
+ 	select CLKSRC_OF
+ 	select COMMON_CLK
++	select CPU_V7
+ 	select GENERIC_CLOCKEVENTS
+ 	select HAVE_ARM_SCU if SMP
+ 	select HAVE_ARM_TWD if LOCAL_TIMERS
+ 	select HAVE_CLK
+ 	select HAVE_SMP
+ 	select MIGHT_HAVE_CACHE_L2X0
++	select PINCTRL
+ 	select SOC_BUS
+ 	select SPARSE_IRQ
++	select USB_ARCH_HAS_EHCI if USB_SUPPORT
++	select USB_ULPI if USB_PHY
++	select USB_ULPI_VIEWPORT if USB_PHY
+ 	select USE_OF
+ 	help
+ 	  This enables support for NVIDIA Tegra based systems.
+@@ -27,15 +33,9 @@ config ARCH_TEGRA_2x_SOC
+ 	select ARM_ERRATA_720789
+ 	select ARM_ERRATA_754327 if SMP
+ 	select ARM_ERRATA_764369 if SMP
+-	select ARM_GIC
+-	select CPU_V7
+-	select PINCTRL
+ 	select PINCTRL_TEGRA20
+ 	select PL310_ERRATA_727915 if CACHE_L2X0
+ 	select PL310_ERRATA_769419 if CACHE_L2X0
+-	select USB_ARCH_HAS_EHCI if USB_SUPPORT
+-	select USB_ULPI if USB_PHY
+-	select USB_ULPI_VIEWPORT if USB_PHY
+ 	help
+ 	  Support for NVIDIA Tegra AP20 and T20 processors, based on the
+ 	  ARM CortexA9MP CPU and the ARM PL310 L2 cache controller
+@@ -44,14 +44,8 @@ config ARCH_TEGRA_3x_SOC
+ 	bool "Enable support for Tegra30 family"
+ 	select ARM_ERRATA_754322
+ 	select ARM_ERRATA_764369 if SMP
+-	select ARM_GIC
+-	select CPU_V7
+-	select PINCTRL
+ 	select PINCTRL_TEGRA30
+ 	select PL310_ERRATA_769419 if CACHE_L2X0
+-	select USB_ARCH_HAS_EHCI if USB_SUPPORT
+-	select USB_ULPI if USB_PHY
+-	select USB_ULPI_VIEWPORT if USB_PHY
+ 	help
+ 	  Support for NVIDIA Tegra T30 processor family, based on the
+ 	  ARM CortexA9MP CPU and the ARM PL310 L2 cache controller
+@@ -60,10 +54,7 @@ config ARCH_TEGRA_114_SOC
+ 	bool "Enable support for Tegra114 family"
+ 	select HAVE_ARM_ARCH_TIMER
+ 	select ARM_ERRATA_798181
+-	select ARM_GIC
+ 	select ARM_L1_CACHE_SHIFT_6
+-	select CPU_V7
+-	select PINCTRL
+ 	select PINCTRL_TEGRA114
+ 	help
+ 	  Support for NVIDIA Tegra T114 processor family, based on the
+-- 
+1.8.1.5
