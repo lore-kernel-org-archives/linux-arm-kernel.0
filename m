@@ -1,29 +1,32 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 4 Oct 2013 09:07:07 -0400
-Subject: [PATCH] MAINTAINERS: mv643xx_eth: take over maintainership
- from Lennart
-In-Reply-To: <1380884199-25025-1-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1380884199-25025-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <20131004130707.GZ31178@titan.lakedaemon.net>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Fri, 4 Oct 2013 09:14:40 -0400 (EDT)
+Subject: [PATCH v3 6/6] ARM: mm: Change the order of TLB/cache maintenance
+ operations.
+In-Reply-To: <20131004084643.GJ12758@n2100.arm.linux.org.uk>
+References: <1380835081-12129-1-git-send-email-santosh.shilimkar@ti.com>
+ <1380835081-12129-7-git-send-email-santosh.shilimkar@ti.com>
+ <20131004084643.GJ12758@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.03.1310040911240.3023@syhkavp.arg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 04, 2013 at 12:56:39PM +0200, Sebastian Hesselbarth wrote:
-> Lennart says: "I haven't been able to spend time on mv643xx_eth for a
-> while now, so if you want to take over maintainership, I'd be fine with
-> that."
+On Fri, 4 Oct 2013, Russell King - ARM Linux wrote:
+
+> On Thu, Oct 03, 2013 at 05:18:00PM -0400, Santosh Shilimkar wrote:
+> > From: Sricharan R <r.sricharan@ti.com>
+> > 
+> > As per the arm ARMv7 manual, the sequence of TLB maintenance
+> > operations after making changes to the translation table is
+> > to clean the dcache first, then invalidate the TLB. With
+> > the current sequence we see cache corruption when the
+> > flush_cache_all is called after tlb_flush_all.
 > 
-> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> Acked-by: Lennert Buytenhek <buytenh@wantstofly.org>
-> ---
-> TBH, I have no clue about netdev internals, yet. But if David and Jason
-> Cooper promise to have one eye each on the first Acks, I am willing to
-> take over maintainership.
+> This needs testing on ARMv4 CPUs which don't have a way to flush the
+> cache except by reading memory - hence they need the new page table
+> entries to be visible to the MMU before calling flush_cache_all().
 
-If David is ok with it,
+I suspect you might be one of the few individuals still having the 
+ability to test new kernels on ARMv4 CPUs.
 
-Acked-by: Jason Cooper <jason@lakedaemon.net>
 
-thx,
-
-Jason.
+Nicolas
