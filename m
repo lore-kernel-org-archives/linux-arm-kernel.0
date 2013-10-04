@@ -1,50 +1,28 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Fri, 4 Oct 2013 14:57:28 -0400 (EDT)
-Subject: [PATCH v2 0/3] ARM: NEON based fast(er) AES in CBC/CTR/XTS modes
-In-Reply-To: <20131004184625.GS12758@n2100.arm.linux.org.uk>
-References: <1380837566-18242-1-git-send-email-ard.biesheuvel@linaro.org>
- <20131004174853.GY24303@mudshark.cambridge.arm.com>
- <alpine.LFD.2.03.1310041420520.3023@syhkavp.arg>
- <CAKv+Gu9Lnn4=ENMc1Q+9Bkwj1R+2yk91KK1iETaes_OWaTO+fw@mail.gmail.com>
- <20131004184625.GS12758@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.03.1310041455170.3023@syhkavp.arg>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri,  4 Oct 2013 21:03:37 +0200
+Subject: [PATCH v3 1/3] ARM: pull in <asm/simd.h> from asm-generic
+In-Reply-To: <1380913419-13296-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1380913419-13296-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1380913419-13296-2-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 4 Oct 2013, Russell King - ARM Linux wrote:
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ arch/arm/include/asm/Kbuild | 1 +
+ 1 file changed, 1 insertion(+)
 
-> On Fri, Oct 04, 2013 at 08:41:35PM +0200, Ard Biesheuvel wrote:
-> > On 4 October 2013 20:34, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
-> > > On Fri, 4 Oct 2013, Will Deacon wrote:
-> > [...]
-> > >>
-> > >> Why do you consider it unsuitable to ship the perl script with the kernel?
-> > >> Perl 5 is already documented as a build dependency in Documentation/Changes
-> > >
-> > > Do you have an example of something that does require perl to build the
-> > > kernel on ARM?  I was under the impression that people try to avoid it
-> > > as much as possible in general.
-> > >
-> > > I'm personally sitting on the fence between effectively adding a new
-> > > kernel build dependencies or carrying the output of the perl script.
-> > > But if the kernel build does already require perl in practice then this
-> > > might tip the balance.
-> > >
-> > 
-> > I like Russell's suggestion the most, in fact. In this case, the build
-> > time requirement for Perl effectively gets suspended until you start
-> > making modifications to the perl script, and the relation between the
-> > .S and the .pl files is made explicit by the make rule.
-> > 
-> > Should I put the cmd_perl rule in scripts/Makefile.build ? Or can I
-> > just keep it under arch/arm/crypto ?
-> 
-> Just running through the Makefiles, it seems we have a fair amount
-> of stuff already using perl in various ways.  So I wouldn't worry too
-> much about where it's placed.  It's probably something that should
-> eventually end up in scripts/ at _some_ point.
-
-BTW, Russell's opinion has precedence over what I just said.
-
-
-Nicolas
+diff --git a/arch/arm/include/asm/Kbuild b/arch/arm/include/asm/Kbuild
+index d3db398..6577b8a 100644
+--- a/arch/arm/include/asm/Kbuild
++++ b/arch/arm/include/asm/Kbuild
+@@ -24,6 +24,7 @@ generic-y += sembuf.h
+ generic-y += serial.h
+ generic-y += shmbuf.h
+ generic-y += siginfo.h
++generic-y += simd.h
+ generic-y += sizes.h
+ generic-y += socket.h
+ generic-y += sockios.h
+-- 
+1.8.1.2
