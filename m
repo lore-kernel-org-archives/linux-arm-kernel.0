@@ -1,160 +1,248 @@
-From: inki.dae@samsung.com (Inki Dae)
-Date: Fri, 4 Oct 2013 13:18:41 +0900
-Subject: [PATCH v2 4/5] drm/exynos: Initialize ptn3460 if present
-In-Reply-To: <CAOw6vbKWjBL8jZ9iQ_Nk7-SmoTcTZ8TSMiwjOc2qT=HaJYFjAw@mail.gmail.com>
-References: <1380670860-17621-1-git-send-email-seanpaul@chromium.org>
- <1380839303-4834-1-git-send-email-seanpaul@chromium.org>
- <1380839303-4834-5-git-send-email-seanpaul@chromium.org>
- <CAAQKjZNKLtqKK8eoKukHwARBMBYdWfHwxdWS-aU=YjYW+KU+Gg@mail.gmail.com>
- <CAOw6vbKWjBL8jZ9iQ_Nk7-SmoTcTZ8TSMiwjOc2qT=HaJYFjAw@mail.gmail.com>
-Message-ID: <CAAQKjZMfP_Cgo5hPPTiwKa_+Ph+GUt2Fbdtipd5V=CQEDy3eSQ@mail.gmail.com>
+From: ast@plumgrid.com (Alexei Starovoitov)
+Date: Thu,  3 Oct 2013 21:11:15 -0700
+Subject: [PATCH v3 net-next] fix unsafe set_memory_rw from softirq
+Message-ID: <1380859875-31025-1-git-send-email-ast@plumgrid.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/10/4 Sean Paul <seanpaul@chromium.org>:
-> On Thu, Oct 3, 2013 at 10:29 PM, Inki Dae <inki.dae@samsung.com> wrote:
->> 2013/10/4 Sean Paul <seanpaul@chromium.org>:
->>> This patch adds code to look for the ptn3460 in the device tree file on
->>> exynos initialization. If ptn node is found, the driver will initialize
->>> the ptn3460 driver and skip creating a DP connector (since the bridge
->>> driver will register its own connector).
->>>
->>> Signed-off-by: Sean Paul <seanpaul@chromium.org>
->>> ---
->>>
->>> v2:
->>>         - Changed include from of_i2c.h to i2c.h
->>>         - Changed of_find_by_name to of_find_compatible
->>>
->>>  drivers/gpu/drm/exynos/exynos_drm_core.c | 44 +++++++++++++++++++++++++++++++-
->>>  1 file changed, 43 insertions(+), 1 deletion(-)
->>>
->>> diff --git a/drivers/gpu/drm/exynos/exynos_drm_core.c b/drivers/gpu/drm/exynos/exynos_drm_core.c
->>> index 1bef6dc..08ca4f9 100644
->>> --- a/drivers/gpu/drm/exynos/exynos_drm_core.c
->>> +++ b/drivers/gpu/drm/exynos/exynos_drm_core.c
->>> @@ -12,7 +12,9 @@
->>>   * option) any later version.
->>>   */
->>>
->>> +#include <linux/i2c.h>
->>>  #include <drm/drmP.h>
->>> +#include <drm/bridge/ptn3460.h>
->>>  #include "exynos_drm_drv.h"
->>>  #include "exynos_drm_encoder.h"
->>>  #include "exynos_drm_connector.h"
->>> @@ -20,6 +22,40 @@
->>>
->>>  static LIST_HEAD(exynos_drm_subdrv_list);
->>>
->>> +struct bridge_init {
->>> +       struct i2c_client *client;
->>> +       struct device_node *node;
->>> +};
->>> +
->>> +static bool find_bridge(const char *compat, struct bridge_init *bridge)
->>> +{
->>> +       bridge->client = NULL;
->>> +       bridge->node = of_find_compatible_node(NULL, NULL, compat);
->>
->> Then, shouldn't the lvds-bridge driver be implemented as i2c driver so
->> that such tricky isn't needed? Is there any reason you use such tricky
->> codes?
->>
->
-> This is what I was explaining earlier today. If the bridge driver is
-> just an i2c driver, it won't get a pointer to drm_device, and can't
-> register itself as a drm_bridge or drm_connector. To solve this, you
-> need the ptn3460_init callback.
->
+on x86 system with net.core.bpf_jit_enable = 1
 
-No, I think you can use sub driver. how about registering to exynos
-drm core that driver using exynos_drm_subdrv_register function after
-probed? Is there something I am missing?
+sudo tcpdump -i eth1 'tcp port 22'
 
+causes the warning:
+[   56.766097]  Possible unsafe locking scenario:
+[   56.766097]
+[   56.780146]        CPU0
+[   56.786807]        ----
+[   56.793188]   lock(&(&vb->lock)->rlock);
+[   56.799593]   <Interrupt>
+[   56.805889]     lock(&(&vb->lock)->rlock);
+[   56.812266]
+[   56.812266]  *** DEADLOCK ***
+[   56.812266]
+[   56.830670] 1 lock held by ksoftirqd/1/13:
+[   56.836838]  #0:  (rcu_read_lock){.+.+..}, at: [<ffffffff8118f44c>] vm_unmap_aliases+0x8c/0x380
+[   56.849757]
+[   56.849757] stack backtrace:
+[   56.862194] CPU: 1 PID: 13 Comm: ksoftirqd/1 Not tainted 3.12.0-rc3+ #45
+[   56.868721] Hardware name: System manufacturer System Product Name/P8Z77 WS, BIOS 3007 07/26/2012
+[   56.882004]  ffffffff821944c0 ffff88080bbdb8c8 ffffffff8175a145 0000000000000007
+[   56.895630]  ffff88080bbd5f40 ffff88080bbdb928 ffffffff81755b14 0000000000000001
+[   56.909313]  ffff880800000001 ffff880800000000 ffffffff8101178f 0000000000000001
+[   56.923006] Call Trace:
+[   56.929532]  [<ffffffff8175a145>] dump_stack+0x55/0x76
+[   56.936067]  [<ffffffff81755b14>] print_usage_bug+0x1f7/0x208
+[   56.942445]  [<ffffffff8101178f>] ? save_stack_trace+0x2f/0x50
+[   56.948932]  [<ffffffff810cc0a0>] ? check_usage_backwards+0x150/0x150
+[   56.955470]  [<ffffffff810ccb52>] mark_lock+0x282/0x2c0
+[   56.961945]  [<ffffffff810ccfed>] __lock_acquire+0x45d/0x1d50
+[   56.968474]  [<ffffffff810cce6e>] ? __lock_acquire+0x2de/0x1d50
+[   56.975140]  [<ffffffff81393bf5>] ? cpumask_next_and+0x55/0x90
+[   56.981942]  [<ffffffff810cef72>] lock_acquire+0x92/0x1d0
+[   56.988745]  [<ffffffff8118f52a>] ? vm_unmap_aliases+0x16a/0x380
+[   56.995619]  [<ffffffff817628f1>] _raw_spin_lock+0x41/0x50
+[   57.002493]  [<ffffffff8118f52a>] ? vm_unmap_aliases+0x16a/0x380
+[   57.009447]  [<ffffffff8118f52a>] vm_unmap_aliases+0x16a/0x380
+[   57.016477]  [<ffffffff8118f44c>] ? vm_unmap_aliases+0x8c/0x380
+[   57.023607]  [<ffffffff810436b0>] change_page_attr_set_clr+0xc0/0x460
+[   57.030818]  [<ffffffff810cfb8d>] ? trace_hardirqs_on+0xd/0x10
+[   57.037896]  [<ffffffff811a8330>] ? kmem_cache_free+0xb0/0x2b0
+[   57.044789]  [<ffffffff811b59c3>] ? free_object_rcu+0x93/0xa0
+[   57.051720]  [<ffffffff81043d9f>] set_memory_rw+0x2f/0x40
+[   57.058727]  [<ffffffff8104e17c>] bpf_jit_free+0x2c/0x40
+[   57.065577]  [<ffffffff81642cba>] sk_filter_release_rcu+0x1a/0x30
+[   57.072338]  [<ffffffff811108e2>] rcu_process_callbacks+0x202/0x7c0
+[   57.078962]  [<ffffffff81057f17>] __do_softirq+0xf7/0x3f0
+[   57.085373]  [<ffffffff81058245>] run_ksoftirqd+0x35/0x70
 
-> If it's an i2c driver with the ptn3460_init callback, where it parses
-> the dt in probe, then you have a race between the ptn probe and the
-> ptn init/drm hooks. ie: it's possible drm will initialize and call
-> disable/post_disable/pre_enable/enable before things have been probed.
+cannot reuse jited filter memory, since it's readonly,
+so use original bpf insns memory to hold work_struct
 
-And also, exynos drm core will call a probe callback of the sub driver
-after _drm is initialized_. Is there something I am missing?
+defer kfree of sk_filter until jit completed freeing
 
-> To solve this, you need to use some global state and/or locking.
->
-> So, to summarize. We can have this of_find_compatible with a init
-> callback, or we can have an i2c driver + global state/locking + init
-> callback. I chose the former, since it seemed easier.
->
-> If you have a better way to achieve this, I'm definitely interested,
-> but I saw this as the lesser of two evils.
->
-> Sean
->
->> I think you need to implement the lvds-bridge driver as i2c driver,
->> and then consider how to take care of this. I mean let's find a better
->> way how we could take care of the i2c based driver in exynos drm
->> framework or driver. In all cases, such tricky codes are not good.
->>
->>> +       if (!bridge->node)
->>> +               return false;
->>> +
->>> +       bridge->client = of_find_i2c_device_by_node(bridge->node);
->>> +       if (!bridge->client)
->>> +               return false;
->>> +
->>> +       return true;
->>> +}
->>> +
->>> +/* returns the number of bridges attached */
->>> +static int exynos_drm_attach_lcd_bridge(struct drm_device *dev,
->>> +               struct drm_encoder *encoder)
->>> +{
->>> +       struct bridge_init bridge;
->>> +       int ret;
->>> +
->>> +       if (find_bridge("nxp,ptn3460", &bridge)) {
->>> +               ret = ptn3460_init(dev, encoder, bridge.client, bridge.node);
->>> +               if (!ret)
->>> +                       return 1;
->>> +       }
->>> +       return 0;
->>> +}
->>> +
->>>  static int exynos_drm_create_enc_conn(struct drm_device *dev,
->>>                                         struct exynos_drm_subdrv *subdrv)
->>>  {
->>> @@ -36,6 +72,13 @@ static int exynos_drm_create_enc_conn(struct drm_device *dev,
->>>                 DRM_ERROR("failed to create encoder\n");
->>>                 return -EFAULT;
->>>         }
->>> +       subdrv->encoder = encoder;
->>> +
->>> +       if (subdrv->manager->display_ops->type == EXYNOS_DISPLAY_TYPE_LCD) {
->>> +               ret = exynos_drm_attach_lcd_bridge(dev, encoder);
->>> +               if (ret)
->>> +                       return 0;
->>> +       }
->>>
->>>         /*
->>>          * create and initialize a connector for this sub driver and
->>> @@ -48,7 +91,6 @@ static int exynos_drm_create_enc_conn(struct drm_device *dev,
->>>                 goto err_destroy_encoder;
->>>         }
->>>
->>> -       subdrv->encoder = encoder;
->>>         subdrv->connector = connector;
->>>
->>>         return 0;
->>> --
->>> 1.8.4
->>>
->>> --
->>> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
->>> the body of a message to majordomo at vger.kernel.org
->>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+tested on x86_64 and i386
+
+Signed-off-by: Alexei Starovoitov <ast@plumgrid.com>
+---
+ arch/arm/net/bpf_jit_32.c       |    1 +
+ arch/powerpc/net/bpf_jit_comp.c |    1 +
+ arch/s390/net/bpf_jit_comp.c    |    4 +++-
+ arch/sparc/net/bpf_jit_comp.c   |    1 +
+ arch/x86/net/bpf_jit_comp.c     |   20 +++++++++++++++-----
+ include/linux/filter.h          |   11 +++++++++--
+ net/core/filter.c               |   11 +++++++----
+ 7 files changed, 37 insertions(+), 12 deletions(-)
+
+diff --git a/arch/arm/net/bpf_jit_32.c b/arch/arm/net/bpf_jit_32.c
+index f50d223..99b44e0 100644
+--- a/arch/arm/net/bpf_jit_32.c
++++ b/arch/arm/net/bpf_jit_32.c
+@@ -930,4 +930,5 @@ void bpf_jit_free(struct sk_filter *fp)
+ {
+ 	if (fp->bpf_func != sk_run_filter)
+ 		module_free(NULL, fp->bpf_func);
++	kfree(fp);
+ }
+diff --git a/arch/powerpc/net/bpf_jit_comp.c b/arch/powerpc/net/bpf_jit_comp.c
+index bf56e33..2345bdb 100644
+--- a/arch/powerpc/net/bpf_jit_comp.c
++++ b/arch/powerpc/net/bpf_jit_comp.c
+@@ -691,4 +691,5 @@ void bpf_jit_free(struct sk_filter *fp)
+ {
+ 	if (fp->bpf_func != sk_run_filter)
+ 		module_free(NULL, fp->bpf_func);
++	kfree(fp);
+ }
+diff --git a/arch/s390/net/bpf_jit_comp.c b/arch/s390/net/bpf_jit_comp.c
+index 7092392..a5df511 100644
+--- a/arch/s390/net/bpf_jit_comp.c
++++ b/arch/s390/net/bpf_jit_comp.c
+@@ -881,7 +881,9 @@ void bpf_jit_free(struct sk_filter *fp)
+ 	struct bpf_binary_header *header = (void *)addr;
+ 
+ 	if (fp->bpf_func == sk_run_filter)
+-		return;
++		goto free_filter;
+ 	set_memory_rw(addr, header->pages);
+ 	module_free(NULL, header);
++free_filter:
++	kfree(fp);
+ }
+diff --git a/arch/sparc/net/bpf_jit_comp.c b/arch/sparc/net/bpf_jit_comp.c
+index 9c7be59..218b6b2 100644
+--- a/arch/sparc/net/bpf_jit_comp.c
++++ b/arch/sparc/net/bpf_jit_comp.c
+@@ -808,4 +808,5 @@ void bpf_jit_free(struct sk_filter *fp)
+ {
+ 	if (fp->bpf_func != sk_run_filter)
+ 		module_free(NULL, fp->bpf_func);
++	kfree(fp);
+ }
+diff --git a/arch/x86/net/bpf_jit_comp.c b/arch/x86/net/bpf_jit_comp.c
+index 79c216a..1396a0a 100644
+--- a/arch/x86/net/bpf_jit_comp.c
++++ b/arch/x86/net/bpf_jit_comp.c
+@@ -772,13 +772,23 @@ out:
+ 	return;
+ }
+ 
++static void bpf_jit_free_deferred(struct work_struct *work)
++{
++	struct sk_filter *fp = container_of((void *)work, struct sk_filter,
++					    insns);
++	unsigned long addr = (unsigned long)fp->bpf_func & PAGE_MASK;
++	struct bpf_binary_header *header = (void *)addr;
++
++	set_memory_rw(addr, header->pages);
++	module_free(NULL, header);
++	kfree(fp);
++}
++
+ void bpf_jit_free(struct sk_filter *fp)
+ {
+ 	if (fp->bpf_func != sk_run_filter) {
+-		unsigned long addr = (unsigned long)fp->bpf_func & PAGE_MASK;
+-		struct bpf_binary_header *header = (void *)addr;
+-
+-		set_memory_rw(addr, header->pages);
+-		module_free(NULL, header);
++		struct work_struct *work = (struct work_struct *)fp->insns;
++		INIT_WORK(work, bpf_jit_free_deferred);
++		schedule_work(work);
+ 	}
+ }
+diff --git a/include/linux/filter.h b/include/linux/filter.h
+index a6ac848..5d66cd9 100644
+--- a/include/linux/filter.h
++++ b/include/linux/filter.h
+@@ -25,15 +25,20 @@ struct sk_filter
+ {
+ 	atomic_t		refcnt;
+ 	unsigned int         	len;	/* Number of filter blocks */
++	struct rcu_head		rcu;
+ 	unsigned int		(*bpf_func)(const struct sk_buff *skb,
+ 					    const struct sock_filter *filter);
+-	struct rcu_head		rcu;
++	/* insns start right after bpf_func, so that sk_run_filter() fetches
++	 * first insn from the same cache line that was used to call into
++	 * sk_run_filter()
++	 */
+ 	struct sock_filter     	insns[0];
+ };
+ 
+ static inline unsigned int sk_filter_len(const struct sk_filter *fp)
+ {
+-	return fp->len * sizeof(struct sock_filter) + sizeof(*fp);
++	return max(fp->len * sizeof(struct sock_filter),
++		   sizeof(struct work_struct)) + sizeof(*fp);
+ }
+ 
+ extern int sk_filter(struct sock *sk, struct sk_buff *skb);
+@@ -67,11 +72,13 @@ static inline void bpf_jit_dump(unsigned int flen, unsigned int proglen,
+ }
+ #define SK_RUN_FILTER(FILTER, SKB) (*FILTER->bpf_func)(SKB, FILTER->insns)
+ #else
++#include <linux/slab.h>
+ static inline void bpf_jit_compile(struct sk_filter *fp)
+ {
+ }
+ static inline void bpf_jit_free(struct sk_filter *fp)
+ {
++	kfree(fp);
+ }
+ #define SK_RUN_FILTER(FILTER, SKB) sk_run_filter(SKB, FILTER->insns)
+ #endif
+diff --git a/net/core/filter.c b/net/core/filter.c
+index 6438f29..ad5eaba 100644
+--- a/net/core/filter.c
++++ b/net/core/filter.c
+@@ -644,7 +644,6 @@ void sk_filter_release_rcu(struct rcu_head *rcu)
+ 	struct sk_filter *fp = container_of(rcu, struct sk_filter, rcu);
+ 
+ 	bpf_jit_free(fp);
+-	kfree(fp);
+ }
+ EXPORT_SYMBOL(sk_filter_release_rcu);
+ 
+@@ -677,13 +676,15 @@ int sk_unattached_filter_create(struct sk_filter **pfp,
+ {
+ 	struct sk_filter *fp;
+ 	unsigned int fsize = sizeof(struct sock_filter) * fprog->len;
++	unsigned int sk_fsize = max_t(u32, fsize, sizeof(struct work_struct))
++		+ sizeof(*fp);
+ 	int err;
+ 
+ 	/* Make sure new filter is there and in the right amounts. */
+ 	if (fprog->filter == NULL)
+ 		return -EINVAL;
+ 
+-	fp = kmalloc(fsize + sizeof(*fp), GFP_KERNEL);
++	fp = kmalloc(sk_fsize, GFP_KERNEL);
+ 	if (!fp)
+ 		return -ENOMEM;
+ 	memcpy(fp->insns, fprog->filter, fsize);
+@@ -723,6 +724,8 @@ int sk_attach_filter(struct sock_fprog *fprog, struct sock *sk)
+ {
+ 	struct sk_filter *fp, *old_fp;
+ 	unsigned int fsize = sizeof(struct sock_filter) * fprog->len;
++	unsigned int sk_fsize = max_t(u32, fsize, sizeof(struct work_struct))
++		+ sizeof(*fp);
+ 	int err;
+ 
+ 	if (sock_flag(sk, SOCK_FILTER_LOCKED))
+@@ -732,11 +735,11 @@ int sk_attach_filter(struct sock_fprog *fprog, struct sock *sk)
+ 	if (fprog->filter == NULL)
+ 		return -EINVAL;
+ 
+-	fp = sock_kmalloc(sk, fsize+sizeof(*fp), GFP_KERNEL);
++	fp = sock_kmalloc(sk, sk_fsize, GFP_KERNEL);
+ 	if (!fp)
+ 		return -ENOMEM;
+ 	if (copy_from_user(fp->insns, fprog->filter, fsize)) {
+-		sock_kfree_s(sk, fp, fsize+sizeof(*fp));
++		sock_kfree_s(sk, fp, sk_fsize);
+ 		return -EFAULT;
+ 	}
+ 
+-- 
+1.7.9.5
