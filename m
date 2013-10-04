@@ -1,34 +1,36 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Thu, 03 Oct 2013 21:46:42 -0400 (EDT)
-Subject: [PATCH 0/3] v7-M support using MULTIPLATFORM
-In-Reply-To: <20131003230535.GI12758@n2100.arm.linux.org.uk>
-References: <1380534577-15076-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <20131003220037.GH12758@n2100.arm.linux.org.uk>
- <20131003222801.GE10079@pengutronix.de>
- <20131003230535.GI12758@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.03.1310032143190.3023@syhkavp.arg>
+From: joelf@ti.com (Joel Fernandes)
+Date: Thu, 3 Oct 2013 21:00:27 -0500
+Subject: [PATCH v2 0/9] ARM: dts: DT data for OMAP platforms for v3.13
+In-Reply-To: <524D7038.9070303@baylibre.com>
+References: <1380553986-15910-1-git-send-email-joelf@ti.com>
+ <524D7038.9070303@baylibre.com>
+Message-ID: <524E213B.6030306@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 4 Oct 2013, Russell King - ARM Linux wrote:
-
-> On Fri, Oct 04, 2013 at 12:28:01AM +0200, Uwe Kleine-K?nig wrote:
-> > Right, but do we agree that it should be possible to create an XIP image
-> > for i.MX6? If so: You currently cannot, because i.MX6 isn't configurable
-> > without MULTIPLATFORM. Also in the times before MULTIPLATFORM XIP was
-> > special.
+On 10/03/2013 08:25 AM, Benoit Cousson wrote:
+> + DT list and DT maintainers.
 > 
-> That's one of the consequences of pushing to multiplatform support - XIP
-> has fallen by the way side as a result of this effort (it was discussed
-> previously) and we had decided that almost no one uses it anymore and it
-> would not be part of the multiplatform stuff.  It was only really used
-> by very few SA11x0 and PXA platforms anyway.
+> Hi Joel,
+> 
+> Thanks for the update. It looks good to me.
+> 
+> For the new bindings added below;
+> 
+>>   .../devicetree/bindings/crypto/omap-aes.txt        | 34 ++++++++++
+>>   .../devicetree/bindings/crypto/omap-sham.txt       | 31 +++++++++
+> 
+> I will need the acked-by from one of the DT maintainers.
 
-Semantically, MULTIPLATFORM is incompatible with XIP as well as NOMMU.
+Sure. To help with giving Ack for this, I'd like to also mention these patches
+were due for long time and reposted. The supporting code is already in the kernel.
 
-So if a platform exists only when MULTIPLATFORM is selected, preventing 
-it from being configured as NOMMU or XIP then something is broken with 
-MULTIPLATFORM.
+Also bindings were reviewed by Mark Rutland comments in the following thread
+were addressed:
+http://www.spinics.net/lists/arm-kernel/msg269006.html
 
+Mark, could you give Ack for these patches if they look OK?
 
-Nicolas
+thanks,
+
+-Joel
