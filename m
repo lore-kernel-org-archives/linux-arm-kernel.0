@@ -1,33 +1,32 @@
 From: syin@broadcom.com (Sherman Yin)
-Date: Thu, 3 Oct 2013 17:23:19 -0700
-Subject: [PATCH 4/4] pinctrl: Enable pinctrl for Broadcom Capri SoCs
-In-Reply-To: <1380846199-12829-1-git-send-email-syin@broadcom.com>
-References: <1380846199-12829-1-git-send-email-syin@broadcom.com>
-Message-ID: <1380846199-12829-5-git-send-email-syin@broadcom.com>
+Date: Thu, 3 Oct 2013 17:23:15 -0700
+Subject: [PATCH 0/4] Add Broadcom Capri pinctrl driver
+Message-ID: <1380846199-12829-1-git-send-email-syin@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable pinctrl for Broadcom Capri (BCM281xx) SoCs.
+The following patches adds a pinctrl driver for Broadcom Capri (BCM281xx) SoCs.
+The first patch, adding the void * to pinctrl_pin_desc, has been previously
+discussed with LinusW.  See this thread:
 
-Signed-off-by: Sherman Yin <syin@broadcom.com>
-Reviewed-by: Christian Daudt <bcm@fixthebug.org>
-Reviewed-by: Matt Porter <matt.porter@linaro.org>
----
- arch/arm/boot/dts/bcm11351.dtsi |    4 ++++
- 1 file changed, 4 insertions(+)
+http://lists.infradead.org/pipermail/linux-arm-kernel/2013-April/165880.html
 
-diff --git a/arch/arm/boot/dts/bcm11351.dtsi b/arch/arm/boot/dts/bcm11351.dtsi
-index 05a5aab..f497a40 100644
---- a/arch/arm/boot/dts/bcm11351.dtsi
-+++ b/arch/arm/boot/dts/bcm11351.dtsi
-@@ -96,4 +96,8 @@
- 		status = "disabled";
- 	};
- 
-+	pinctrl at 35004800 {
-+		compatible = "brcm,capri-pinctrl";
-+		reg = <0x35004800 0x430>;
-+	};
- };
+Sherman Yin (4):
+  pinctrl: Add void * to pinctrl_pin_desc
+  pinctrl: Add pinctrl binding for Broadcom Capri SoCs
+  ARM: pinctrl: Add Broadcom Capri pinctrl driver
+  pinctrl: Enable pinctrl for Broadcom Capri SoCs
+
+ .../bindings/pinctrl/brcm,capri-pinctrl.txt        |  419 +++++
+ arch/arm/boot/dts/bcm11351.dtsi                    |    4 +
+ arch/arm/mach-bcm/Kconfig                          |    2 +
+ drivers/pinctrl/Kconfig                            |   10 +
+ drivers/pinctrl/Makefile                           |    1 +
+ drivers/pinctrl/pinctrl-capri.c                    | 1727 ++++++++++++++++++++
+ include/linux/pinctrl/pinctrl.h                    |    2 +
+ 7 files changed, 2165 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/pinctrl/brcm,capri-pinctrl.txt
+ create mode 100644 drivers/pinctrl/pinctrl-capri.c
+
 -- 
 1.7.9.5
