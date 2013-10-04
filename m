@@ -1,47 +1,140 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 4 Oct 2013 16:22:05 +0200
-Subject: Arm PCIe hotplugging
-In-Reply-To: <20131004135345.GA31178@titan.lakedaemon.net>
-References: <CAFJTrDs=fovP8nWVvH=-a9d_OTbmgQkMLPVeKAc4x6phsuZw9w@mail.gmail.com>
- <20131004135345.GA31178@titan.lakedaemon.net>
-Message-ID: <20131004162205.7a6f516f@skate>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 4 Oct 2013 15:26:45 +0100
+Subject: [PATCH v2 3/9] ARM: dts: Add SHAM data and documentation for
+ AM33XX
+In-Reply-To: <1380553986-15910-4-git-send-email-joelf@ti.com>
+References: <1380553986-15910-1-git-send-email-joelf@ti.com>
+ <1380553986-15910-4-git-send-email-joelf@ti.com>
+Message-ID: <20131004142644.GI6999@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Jason Cooper,
+On Mon, Sep 30, 2013 at 04:13:00PM +0100, Joel Fernandes wrote:
+> From: "Mark A. Greer" <mgreer@animalcreek.com>
+> 
+> Add the generic AM33XX SHAM module's device tree data and
+> enable it for the am335x-evm, am335x-evmsk, and am335x-bone
+> platforms.  Also add Documentation file describing the data
+> for the SHAM module.
+> 
+> [joelf at ti.com: Dropped interrupt-parrent property]
+> CC: Paul Walmsley <paul@pwsan.com>
+> Signed-off-by: Mark A. Greer <mgreer@animalcreek.com>
+> ---
+>  .../devicetree/bindings/crypto/omap-sham.txt       | 31 ++++++++++++++++++++++
+>  arch/arm/boot/dts/am335x-bone.dts                  |  4 +++
+>  arch/arm/boot/dts/am335x-evm.dts                   |  4 +++
+>  arch/arm/boot/dts/am335x-evmsk.dts                 |  4 +++
+>  arch/arm/boot/dts/am33xx.dtsi                      |  9 +++++++
+>  5 files changed, 52 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/crypto/omap-sham.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/crypto/omap-sham.txt b/Documentation/devicetree/bindings/crypto/omap-sham.txt
+> new file mode 100644
+> index 0000000..b97710f
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/crypto/omap-sham.txt
+> @@ -0,0 +1,31 @@
+> +OMAP SoC SHA crypto Module
+> +
+> +Required properties:
+> +
+> +- compatible : Should contain entries for this and backward compatible
+> +  SHAM versions:
+> +  - "ti,omap2-sham" for OMAP2 & OMAP3.
+> +  - "ti,omap4-sham" for OMAP4 and AM33XX.
+> +  Note that these two versions are incompatible.
+> +- ti,hwmods: Name of the hwmod associated with the SHAM module
+> +- reg : Offset and length of the register set for the module
+> +- interrupt-parent : the phandle for the interrupt controller that
+> +  services interrupts for this module.
 
-On Fri, 4 Oct 2013 09:53:45 -0400, Jason Cooper wrote:
+I don't think this is strictly speaking necessary -- it's mostly going
+to be implicit (it is in the dtsi below). As this is a standard
+property, you don't need to document it here.
 
-> Please Cc: the relevant maintainers, it helps us pick out emails needing
-> our attention out of the noise ;-)  I've added them to this reply.
+> +- interrupts : the interrupt number for the SHAM module.
 
-True!
+Sorry, I missed this last time, but this should be interrupt-specifier
+rather than interrupt number.
 
-> > I have been doing some work with an Armada XP board (DB-MV784MP-GP)
-> > with PCIe support, along with using a PEX 8614 (AA) PCIe switch. The
-> > switch in question is said to have hot plug support with the PCIe
-> > downstream slots.
-> > 
-> > However using both the generic "pcieport" and the proprietary kernel
-> > module used by PLX (this took some work to run on an ARM board and is
-> > very buggy on the platform buggy so the generic in tree drivers are
-> > preferable) the /sys/bus/pci/slots/ directory is always empty and
-> > /sys/bus/pci/rescan seems to do nothing.
-> > 
-> > Looking closer it seems that in the ARM kernel the PCI hotplug code is
-> > all disabled. Am I just out of luck and should wait until there is a
-> > new driver for the PCI switch's hot plug controller and a general hot
-> > plug framework for ARM or is there some kind of work around?
+Otherwise, this looks good to me. With the fixups above:
 
-I known Jason Gunthorpe has gotten hotplug to work on Kirkwood with the
-PCIe driver that is also used for Armada 370/XP (which in fact we
-originally wrote for 370/XP). I'll let him answer you, but I guess you
-would need to provide a few more details (lspci outputs, etc.).
+Acked-by: Mark Rutland <mark.rutland@arm.com>
 
-Best regards,
-
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+> +
+> +Optional properties:
+> +- dmas: DMA specifier for the rx dma. See the DMA client binding,
+> +	Documentation/devicetree/bindings/dma/dma.txt
+> +- dma-names: DMA request name. Should be "rx" if a dma is present.
+> +
+> +Example:
+> +	/* AM335x */
+> +	sham: sham at 53100000 {
+> +		compatible = "ti,omap4-sham";
+> +		ti,hwmods = "sham";
+> +		reg = <0x53100000 0x200>;
+> +		interrupt-parent = <&intc>;
+> +		interrupts = <109>;
+> +		dmas = <&edma 36>;
+> +		dma-names = "rx";
+> +	};
+> diff --git a/arch/arm/boot/dts/am335x-bone.dts b/arch/arm/boot/dts/am335x-bone.dts
+> index 0d63348..8a9802e 100644
+> --- a/arch/arm/boot/dts/am335x-bone.dts
+> +++ b/arch/arm/boot/dts/am335x-bone.dts
+> @@ -19,3 +19,7 @@
+>  &mmc1 {
+>  	vmmc-supply = <&ldo3_reg>;
+>  };
+> +
+> +&sham {
+> +	status = "okay";
+> +};
+> diff --git a/arch/arm/boot/dts/am335x-evm.dts b/arch/arm/boot/dts/am335x-evm.dts
+> index 23b0a3e..d59e51c 100644
+> --- a/arch/arm/boot/dts/am335x-evm.dts
+> +++ b/arch/arm/boot/dts/am335x-evm.dts
+> @@ -522,3 +522,7 @@
+>  	status = "okay";
+>  	vmmc-supply = <&vmmc_reg>;
+>  };
+> +
+> +&sham {
+> +	status = "okay";
+> +};
+> diff --git a/arch/arm/boot/dts/am335x-evmsk.dts b/arch/arm/boot/dts/am335x-evmsk.dts
+> index bc93895..d45a330 100644
+> --- a/arch/arm/boot/dts/am335x-evmsk.dts
+> +++ b/arch/arm/boot/dts/am335x-evmsk.dts
+> @@ -424,3 +424,7 @@
+>  	status = "okay";
+>  	vmmc-supply = <&vmmc_reg>;
+>  };
+> +
+> +&sham {
+> +	status = "okay";
+> +};
+> diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
+> index 553adc6..299710b 100644
+> --- a/arch/arm/boot/dts/am33xx.dtsi
+> +++ b/arch/arm/boot/dts/am33xx.dtsi
+> @@ -710,5 +710,14 @@
+>  			#size-cells = <1>;
+>  			status = "disabled";
+>  		};
+> +
+> +		sham: sham at 53100000 {
+> +			compatible = "ti,omap4-sham";
+> +			ti,hwmods = "sham";
+> +			reg = <0x53100000 0x200>;
+> +			interrupts = <109>;
+> +			dmas = <&edma 36>;
+> +			dma-names = "rx";
+> +		};
+>  	};
+>  };
+> -- 
+> 1.8.1.2
+> 
+> 
