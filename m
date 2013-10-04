@@ -1,27 +1,71 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 4 Oct 2013 21:52:52 +0100
-Subject: [PATCH] clk: palmas: add clock driver for palmas
-In-Reply-To: <20131004193545.4343.15596@quantum>
-References: <1380803407-15196-1-git-send-email-ldewangan@nvidia.com>
- <20131004164139.GR27287@sirena.org.uk>
- <20131004193545.4343.15596@quantum>
-Message-ID: <20131004205252.GU27287@sirena.org.uk>
+From: taras.kondratiuk@linaro.org (Taras Kondratiuk)
+Date: Fri,  4 Oct 2013 23:57:57 +0300
+Subject: [RFC PATCH v2] ARM: OMAP4/highbank: Flush L2 cache before disabling
+Message-ID: <1380920277-31622-1-git-send-email-taras.kondratiuk@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 04, 2013 at 12:35:45PM -0700, Mike Turquette wrote:
+Kexec disables outer cache before jumping to reboot code, but it doesn't
+flush it explicitly. Flush is done implicitly inside of l2x0_disable().
+But some SoC's override default .disable handler and don't flush cache.
+This may lead to a corrupted memory during Kexec reboot on these platforms.
 
-> The best solution is to have a driver claim the clock with clk_get and
-> enable it with clk_prepare_enable. I gave more detail in my reply to
-> Laxman.
+This patch adds cache flush inside of OMAP4 and Highbank outer_cache.disable()
+handlers to make it consistent with default l2x0_disable().
+Also it removes redundant outer_flush_all() call just before outer_disable().
 
-Yeah, definitely - though with regulators we did find that there were
-some passive things which didn't really warrant a driver for any purpose
-other than holding the reference to them.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131004/4bf8cf3d/attachment.sig>
+Signed-off-by: Taras Kondratiuk <taras.kondratiuk@linaro.org>
+---
+v2: Make the fix specific to platforms that don't use l2x0_disable().
+v1: https://patchwork.kernel.org/patch/2974431/
+---
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Rob Herring <rob.herring@calxeda.com>
+Cc: linaro-kernel at lists.linaro.org
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-omap at vger.kernel.org
+---
+arch/arm/mach-highbank/highbank.c  |    1 +
+arch/arm/mach-highbank/pm.c        |    1 -
+arch/arm/mach-omap2/omap4-common.c |    1 +
+ 3 files changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-highbank/highbank.c b/arch/arm/mach-highbank/highbank.c
+index 8e63ccd..22e6f34 100644
+--- a/arch/arm/mach-highbank/highbank.c
++++ b/arch/arm/mach-highbank/highbank.c
+@@ -63,6 +63,7 @@ void highbank_set_cpu_jump(int cpu, void *jump_addr)
+ 
+ static void highbank_l2x0_disable(void)
+ {
++	outer_flush_all();
+ 	/* Disable PL310 L2 Cache controller */
+ 	highbank_smc1(0x102, 0x0);
+ }
+diff --git a/arch/arm/mach-highbank/pm.c b/arch/arm/mach-highbank/pm.c
+index 04eddb4..9a5b8a7 100644
+--- a/arch/arm/mach-highbank/pm.c
++++ b/arch/arm/mach-highbank/pm.c
+@@ -28,7 +28,6 @@
+ 
+ static int highbank_suspend_finish(unsigned long val)
+ {
+-	outer_flush_all();
+ 	outer_disable();
+ 
+ 	highbank_set_pwr_suspend();
+diff --git a/arch/arm/mach-omap2/omap4-common.c b/arch/arm/mach-omap2/omap4-common.c
+index 5791143..3f44b16 100644
+--- a/arch/arm/mach-omap2/omap4-common.c
++++ b/arch/arm/mach-omap2/omap4-common.c
+@@ -163,6 +163,7 @@ void __iomem *omap4_get_l2cache_base(void)
+ 
+ static void omap4_l2x0_disable(void)
+ {
++	outer_flush_all();
+ 	/* Disable PL310 L2 Cache controller */
+ 	omap_smc1(0x102, 0x0);
+ }
+-- 
+1.7.9.5
