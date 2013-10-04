@@ -1,50 +1,65 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Fri, 4 Oct 2013 10:53:24 -0600
-Subject: Arm PCIe hotplugging
-In-Reply-To: <CAFJTrDs=fovP8nWVvH=-a9d_OTbmgQkMLPVeKAc4x6phsuZw9w@mail.gmail.com>
-References: <CAFJTrDs=fovP8nWVvH=-a9d_OTbmgQkMLPVeKAc4x6phsuZw9w@mail.gmail.com>
-Message-ID: <20131004165323.GB10315@obsidianresearch.com>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Fri, 4 Oct 2013 13:53:55 -0300
+Subject: [PATCH 0/3] net: mv643xx_eth: various small fixes for v3.12
+In-Reply-To: <1380711442-24735-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1380711442-24735-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <20131004165354.GA9065@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 04, 2013 at 02:14:34PM +0100, Matthew Minter wrote:
+On Wed, Oct 02, 2013 at 12:57:19PM +0200, Sebastian Hesselbarth wrote:
+> This patch set comprises some one-liners to fix issues with repeated
+> loading and unloading of a modular mv643xx_eth driver.
+> 
+> First two patches take care of the periodic port statistic timer, that
+> updates statistics by reading port registers using add_timer/mod_timer.
+> 
+> Patch 1 moves timer re-schedule from mib_counters_update to the timer
+> callback. As mib_counters_update is also called from non-timer context,
+> this ensures the timer is reactivated from timer context only.
+> 
+> Patch 2 moves initial timer schedule from _probe() time to right before
+> the port is actually started as the corresponding del_timer_sync is at
+> _stop() time. This fixes a regression, where unloading the driver from a
+> non-started eth device can cause the timer to access deallocated mem.
+> 
+> Patch 3 adds an assignment of the ports device_node to the corresponding
+> self-created platform_device. This is required to allow fixups based on
+> the device_node's compatible string later. Actually, it is also a potential
+> regression because we already check compatible string for Kirkwood, but
+> does not (yet) rely on the fixup.
+> 
+> All patches are based on v3.12-rc3 and have been tested on Kirkwood-based
+> Seagate Dockstar.
+> 
+> Patches 1 and 2 can also possibly queued up for -stable.
+> 
+> Sebastian Hesselbarth (3):
+>   net: mv643xx_eth: update statistics timer from timer context only
+>   net: mv643xx_eth: fix orphaned statistics timer crash
+>   net: mv643xx_eth: fix missing device_node for port devices
+> 
+>  drivers/net/ethernet/marvell/mv643xx_eth.c |    7 +++----
+>  1 file changed, 3 insertions(+), 4 deletions(-)
+> 
+> ---
+> Cc: David Miller <davem@davemloft.net>
+> Cc: Lennert Buytenhek <buytenh@wantstofly.org>
+> Cc: Jason Cooper <jason@lakedaemon.net>
+> Cc: netdev at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-kernel at vger.kernel.org
 
-> I have been doing some work with an Armada XP board (DB-MV784MP-GP)
-> with PCIe support, along with using a PEX 8614 (AA) PCIe switch. The
-> switch in question is said to have hot plug support with the PCIe
-> downstream slots.
+Sorry for missing this series, somehow my filters failed to catch it.
 
-PCI-E hot plug has several layers.
+Anyway, I would expect these patches to have my Reported-by, but I'm
+glad to see you've solved all the issues.
 
-The first is the PCI-E serial negotiation and bring up. This is just
-supported out of the box, and works fine with any compliant
-device. You don't need drivers, /sys/bus/pci/rescan is enough. This is
-what I'm doing on kirkwood.
+I see David has already applied them all, but I'll re-run my tests to
+check there aren't any more issues if I can find some time next week.
 
-The next is actual *physical* card removal/insertion. For in-box card
-edge connectors this requires power management. You must remove all
-power to the slot before removing/inserting a card. AFAIK, this is
-what the PCI hot plug items in the kernel are all doing, and they do
-this with help from firmware (eg ACPI on x86).
-
-If you have a mechanical system that has staged power connectors (and
-possibly inrush current limiters on the cards) then you don't really
-need to worry much at this point, just rely on the serial hot plug.
-
-PLX (AFIAK) has some 'GPIOs' on their switches dedicated to hot plug
-functions so if the board is properly wired they can control slot
-power/etc through their internal registers. I suspect it shouldn't be
-too hard to get this sort of system to work.. The DT can be augmented
-with slot chassis name properties so you have stable labels work with.
-
-If you have board-specific controls, then you need to start augmenting
-the DT with things like phandles to power regulators and other stuff.
-
-> Looking closer it seems that in the ARM kernel the PCI hotplug code is
-> all disabled. Am I just out of luck and should wait until there is a
-
-I doubt you'll see anything like this emerge in the near future. Fancy
-ARM64 servers with hot plug PCI might motivate the work, but they
-might also do it with ACPI...
-
-BTW,
+Thanks for taking care of it!
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
