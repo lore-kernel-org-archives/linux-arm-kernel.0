@@ -1,54 +1,48 @@
-From: mingo@kernel.org (Ingo Molnar)
-Date: Fri, 4 Oct 2013 19:35:40 +0200
-Subject: [PATCH v3 net-next] fix unsafe set_memory_rw from softirq
-In-Reply-To: <CANn89iKkbR0_HaofvC_OVvqRv_Hqj3rATx-Z_4xXeusOasa56g@mail.gmail.com>
-References: <1380853446-30537-1-git-send-email-ast@plumgrid.com>
- <20131004075133.GA12313@gmail.com>
- <CANn89iKkbR0_HaofvC_OVvqRv_Hqj3rATx-Z_4xXeusOasa56g@mail.gmail.com>
-Message-ID: <20131004173540.GB15689@gmail.com>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Fri, 04 Oct 2013 19:42:31 +0200
+Subject: [PATCH] ARM: SPEAr1340: static-ize SATA functions
+Message-ID: <2240706.IfNdWNvgId@amdc1032>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Make sata_miphy_exit(), sata_suspend() and sata_resume() static.
 
-* Eric Dumazet <edumazet@google.com> wrote:
+Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
+ arch/arm/mach-spear/spear1340.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-> 1)
-> >
-> > I took a brief look at arch/x86/net/bpf_jit_comp.c while reviewing this
-> > patch.
-> >
-> > You need to split up bpf_jit_compile(), it's an obscenely large, ~600
-> > lines long function. We don't do that in modern, maintainable kernel code.
-> >
-> > 2)
-> >
-> > This 128 bytes extra padding:
-> >
-> >         /* Most of BPF filters are really small,
-> >          * but if some of them fill a page, allow at least
-> >          * 128 extra bytes to insert a random section of int3
-> >          */
-> >         sz = round_up(proglen + sizeof(*header) + 128, PAGE_SIZE);
-> >
-> > why is it done? It's not clear to me from the comment.
-> >
-> 
-> commit 314beb9bcabfd6b4542ccbced2402af2c6f6142a
-> Author: Eric Dumazet <edumazet@google.com>
-> Date:   Fri May 17 16:37:03 2013 +0000
-> 
->     x86: bpf_jit_comp: secure bpf jit against spraying attacks
-> 
->     hpa bringed into my attention some security related issues
->     with BPF JIT on x86.
-> 
->     This patch makes sure the bpf generated code is marked read only,
->     as other kernel text sections.
-> 
->     It also splits the unused space (we vmalloc() and only use a fraction of
->     the page) in two parts, so that the generated bpf code not starts at a
->     known offset in the page, but a pseudo random one.
-
-Thanks for the explanation - that makes sense.
-
-	Ingo
+diff --git a/arch/arm/mach-spear/spear1340.c b/arch/arm/mach-spear/spear1340.c
+index 3fb6834..e0e4251 100644
+--- a/arch/arm/mach-spear/spear1340.c
++++ b/arch/arm/mach-spear/spear1340.c
+@@ -93,7 +93,7 @@ static int sata_miphy_init(struct device *dev, void __iomem *addr)
+ 	return 0;
+ }
+ 
+-void sata_miphy_exit(struct device *dev)
++static void sata_miphy_exit(struct device *dev)
+ {
+ 	writel(0, SPEAR1340_PCIE_SATA_CFG);
+ 	writel(0, SPEAR1340_PCIE_MIPHY_CFG);
+@@ -107,7 +107,7 @@ void sata_miphy_exit(struct device *dev)
+ 	msleep(20);
+ }
+ 
+-int sata_suspend(struct device *dev)
++static int sata_suspend(struct device *dev)
+ {
+ 	if (dev->power.power_state.event == PM_EVENT_FREEZE)
+ 		return 0;
+@@ -117,7 +117,7 @@ int sata_suspend(struct device *dev)
+ 	return 0;
+ }
+ 
+-int sata_resume(struct device *dev)
++static int sata_resume(struct device *dev)
+ {
+ 	if (dev->power.power_state.event == PM_EVENT_THAW)
+ 		return 0;
+-- 
+1.8.2.3
