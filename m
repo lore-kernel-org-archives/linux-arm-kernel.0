@@ -1,31 +1,66 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Fri, 4 Oct 2013 12:12:39 +0300
-Subject: [PATCH 0/5] Tegra124 clock support
-Message-ID: <1380878014-22088-1-git-send-email-pdeschrijver@nvidia.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 04 Oct 2013 10:23:06 +0100
+Subject: [PATCH 3/3] KVM: ARM: Transparent huge pages and hugetlbfs support
+In-Reply-To: <20131003203352.GE5108@cbox>
+References: <1376021239-10532-1-git-send-email-christoffer.dall@linaro.org>
+ <1376021239-10532-4-git-send-email-christoffer.dall@linaro.org>
+ <524013BB.4090303@arm.com> <20131003203352.GE5108@cbox>
+Message-ID: <cb49f4ef5309ae5825d649d14960d480@www.loen.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series introduces support for the Tegra124 CAR clocks.
-Based on '[PATCH v2 00/12] Introduce common infra for tegra clocks'
+On 2013-10-03 21:33, Christoffer Dall wrote:
+> On Mon, Sep 23, 2013 at 11:11:07AM +0100, Marc Zyngier wrote:
+>
+> [...]
+>
+>> >
+>> > +static bool transparent_hugepage_adjust(pfn_t *pfnp, phys_addr_t 
+>> *ipap)
+>> > +{
+>> > +       pfn_t pfn = *pfnp;
+>> > +       gfn_t gfn = *ipap >> PAGE_SHIFT;
+>> > +
+>> > +       if (PageTransCompound(pfn_to_page(pfn))) {
+>> > +               unsigned long mask;
+>> > +               /*
+>> > +                * mmu_notifier_retry was successful and we hold 
+>> the
+>> > +                * mmu_lock here, so the pmd can't become 
+>> splitting
+>> > +                * from under us, and in turn
+>> > +                * __split_huge_page_refcount() can't run from 
+>> under
+>> > +                * us and we can safely transfer the refcount from
+>> > +                * PG_tail to PG_head as we switch the pfn from 
+>> tail to
+>> > +                * head.
+>> > +                */
+>>
+>> -ECANTPARSE. Well, I sort of can, but this deserves a clearer 
+>> explanation.
+>>
+>> > +               mask = (PMD_SIZE / PAGE_SIZE) - 1;
+>>
+>> 		mask = PTRS_PER_PMD -1;
+>>
+>> > +               VM_BUG_ON((gfn & mask) != (pfn & mask));
+>> > +               if (pfn & mask) {
+>> > +                       gfn &= ~mask;
+>>
+>> This doesn't seem to be used later on.
+>>
+>> > +                       *ipap &= ~(PMD_SIZE - 1);
+>>
+>> 			*ipap &= ~PMD_MASK;
+>>
+> damn, I trust you too much, you surely meant
+> 			*ipap &= PMD_MASK;
+>
+> right?
 
-Peter De Schrijver (5):
-  clk: tegra: Add support for PLLSS
-  clk: tegra: Add periph regs bank X
-  clk: tegra124: Add common clk IDs to clk-id.h
-  clk: tegra124: Add new peripheral clocks
-  clk: tegra124: Add support for Tegra124 clocks
+Indeed. Just keeping you on your toes ;-)
 
- drivers/clk/tegra/Makefile               |    1 +
- drivers/clk/tegra/clk-id.h               |   27 +
- drivers/clk/tegra/clk-pll.c              |  168 +++++
- drivers/clk/tegra/clk-tegra-periph.c     |   61 ++
- drivers/clk/tegra/clk-tegra124.c         | 1206 ++++++++++++++++++++++++++++++
- drivers/clk/tegra/clk.c                  |   10 +
- drivers/clk/tegra/clk.h                  |    7 +
- include/dt-bindings/clock/tegra124-car.h |  342 +++++++++
- 8 files changed, 1822 insertions(+), 0 deletions(-)
- create mode 100644 drivers/clk/tegra/clk-tegra124.c
- create mode 100644 include/dt-bindings/clock/tegra124-car.h
-
+         M.
 -- 
-1.7.7.rc0.72.g4b5ea.dirty
+Fast, cheap, reliable. Pick two.
