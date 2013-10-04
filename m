@@ -1,220 +1,44 @@
-From: msalter@redhat.com (Mark Salter)
-Date: Fri, 04 Oct 2013 12:07:41 -0400
-Subject: [PATCH] arm64: add early_ioremap support
-In-Reply-To: <20131004150453.GG25137@arm.com>
-References: <1380890819-27831-1-git-send-email-msalter@redhat.com>
- <20131004150453.GG25137@arm.com>
-Message-ID: <1380902861.17503.57.camel@deneb.redhat.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 4 Oct 2013 17:09:44 +0100
+Subject: Detect presence of LPAE when not running an LPAE kernel?
+In-Reply-To: <1380870908.27765.24.camel@dagon.hellion.org.uk>
+References: <1380829403.3804.56.camel@hastur.hellion.org.uk>
+ <20131003200712.GG12758@n2100.arm.linux.org.uk>
+ <1380870908.27765.24.camel@dagon.hellion.org.uk>
+Message-ID: <20131004160944.GV24303@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2013-10-04 at 16:04 +0100, Catalin Marinas wrote:
-> Hi Mark,
-> 
-> > --- /dev/null
-> > +++ b/arch/arm64/include/asm/fixmap.h
-> > @@ -0,0 +1,117 @@
-> > +/*
-> > + * fixmap.h: compile-time virtual memory allocation
-> > + *
-> > + * This file is subject to the terms and conditions of the GNU General Public
-> > + * License.  See the file "COPYING" in the main directory of this archive
-> > + * for more details.
-> > + *
-> > + * Copyright (C) 1998 Ingo Molnar
-> > + *
-> > + */
-> 
-> I can see several architectures having very similar macros/functions in
-> fixmap.h. It would make sense to create a generic fixmap.h holding at
-> least the fix_to_virt and related macros, FIXADDR_START etc. with enum
-> fixed_addresses in arch code.
-
-Right, there are a quite a few using similar fixmap code. I actually 
-looked at consolidating them, but I gave up so that I could get
-something working for EFI work in progress. But yeah, I think I
-will step back and have another go at it. I think I can get at a
-few of the architectures using common code and make it so others
-can be converted as desired.
-
-> 
-> > --- a/arch/arm64/kernel/setup.c
-> > +++ b/arch/arm64/kernel/setup.c
-> > @@ -42,6 +42,7 @@
-> >  #include <linux/of_fdt.h>
-> >  #include <linux/of_platform.h>
+On Fri, Oct 04, 2013 at 08:15:08AM +0100, Ian Campbell wrote:
+> On Thu, 2013-10-03 at 21:07 +0100, Russell King - ARM Linux wrote:
+> > On Thu, Oct 03, 2013 at 08:43:23PM +0100, Ian Campbell wrote:
+> > > Is this possible?
+> > > 
+> > > The Features field of /proc/cpuinfo only appears to reflect the presence
+> > > of LPAE if CONFIG_LPAE is actually on in the running kernel.
+> > > 
+> > > The reason I care is so that distro installers can ship a generic kernel
+> > > but select LPAE for the running system when appropriate.
+> > > 
+> > > On x86 for example I would check /proc/cpuinfo:flags which contains the
+> > > CPU features, regardless of whether they are currently enabled.
+> > > 
+> > > Is there any equivalent on ARM?
 > > 
-> > +#include <asm/fixmap.h>
-> >  #include <asm/cputype.h>
-> >  #include <asm/elf.h>
-> >  #include <asm/cputable.h>
-> > @@ -252,6 +253,8 @@ void __init setup_arch(char **cmdline_p)
-> > 
-> >         *cmdline_p = boot_command_line;
-> > 
-> > +       early_ioremap_init();
-> > +
-> >         parse_early_param();
+> > Perversely, LPAE in there has nothing to do with LPAE being used by the
+> > kernel.  It's more to do with the presence of the double-word load/store
+> > exclusive.
 > 
-> Should the early_ioremap_init() call happen after parse_early_param()?
-> Is early_ioremap_debug initialised already?
+> Ah, and I'm running 3.10 whereas this was added to 3.11-rc1.
 
-No, early_ioremap_debug is not initialized which makes the debug
-prints in early_ioremap_init() unreachable. I'll fix that. On x86,
-the init comes first, but there is other code between that and
-parse_early_param() which uses early_ioremap(). Not the case for
-arm64.
+Unless my memory is broken, if you see this HWCAP in a mainline kernel it
+has always meant "the CPU you are running on is capable of LPAE". I don't
+remember any dependency on CONFIG_LPAE.
 
-> 
-> > --- a/arch/arm64/mm/ioremap.c
-> > +++ b/arch/arm64/mm/ioremap.c
-> > @@ -25,6 +25,10 @@
-> >  #include <linux/vmalloc.h>
-> >  #include <linux/io.h>
-> > 
-> > +#include <asm/fixmap.h>
-> > +#include <asm/tlbflush.h>
-> > +#include <asm/pgalloc.h>
-> > +
-> >  static void __iomem *__ioremap_caller(phys_addr_t phys_addr, size_t size,
-> >                                       pgprot_t prot, void *caller)
-> >  {
-> > @@ -82,3 +86,284 @@ void __iounmap(volatile void __iomem *io_addr)
-> >         vunmap(addr);
-> >  }
-> >  EXPORT_SYMBOL(__iounmap);
-> > +
-> > +static int early_ioremap_debug __initdata;
-> > +
-> > +static int __init early_ioremap_debug_setup(char *str)
-> > +{
-> > +       early_ioremap_debug = 1;
-> > +
-> > +       return 0;
-> > +}
-> > +early_param("early_ioremap_debug", early_ioremap_debug_setup);
-> > +
-> > +static int after_paging_init __initdata;
-> > +#ifndef CONFIG_ARM64_64K_PAGES
-> > +static pte_t bm_pte[PAGE_SIZE/sizeof(pte_t)] __page_aligned_bss;
-> > +#endif
-> 
-> bm_pte[PTRS_PER_PTE];
+> Should/do we expose the actual CPU LPAE capability somewhere?
 
-ok
+That's the whole point of the HWCAP.
 
-> 
-> > +
-> > +static inline pmd_t * __init early_ioremap_pmd(unsigned long addr)
-> > +{
-> > +       pgd_t *pgd = &swapper_pg_dir[pgd_index(addr)];
-> 
-> pgd_offset_k(addr);
+Are you sure your 3.10 hasn't got some extra magic?
 
-ok
-
-> 
-> > +       pud_t *pud = pud_offset(pgd, addr);
-> > +       pmd_t *pmd = pmd_offset(pud, addr);
-> > +
-> > +       return pmd;
-> > +}
-> > +
-> > +static inline pte_t * __init early_ioremap_pte(unsigned long addr)
-> > +{
-> > +#ifdef CONFIG_ARM64_64K_PAGES
-> > +       pmd_t *pmd = early_ioremap_pmd(addr);
-> > +       return pte_offset_kernel(pmd, addr);
-> > +#else
-> > +       return &bm_pte[pte_index(addr)];
-> > +#endif
-> 
-> If we populate the pmd correctly with 4K pages (and I think we do in
-> early_ioremap_init()), can we not just use this function without the
-> #ifdef-else part (always pte_offset_kernel())?
-
-Ah, yes. Nice!
-
-> 
-> > +static unsigned long slot_virt[FIX_BTMAPS_SLOTS] __initdata;
-> > +
-> > +void __init early_ioremap_init(void)
-> > +{
-> > +       pmd_t *pmd;
-> > +       int i;
-> > +
-> > +       if (early_ioremap_debug)
-> > +               pr_info("early_ioremap_init()\n");
-> > +
-> > +       for (i = 0; i < FIX_BTMAPS_SLOTS; i++)
-> > +               slot_virt[i] = __fix_to_virt(FIX_BTMAP_BEGIN - NR_FIX_BTMAPS*i);
-> > +
-> > +       pmd = early_ioremap_pmd(fix_to_virt(FIX_BTMAP_BEGIN));
-> > +#ifndef CONFIG_ARM64_64K_PAGES
-> > +       /* need to populate pmd for 4k pagesize only */
-> > +       memset(bm_pte, 0, sizeof(bm_pte));
-> 
-> Do we need memset() here? bm_pte[] is placed in the .bss section.
-
-No we don't. If .bss isn't cleared here, we have bigger problems.
-
-> 
-> > +       pmd_populate_kernel(&init_mm, pmd, bm_pte);
-> > +#endif
-> > +
-> > +       /*
-> > +        * The boot-ioremap range spans multiple pmds, for which
-> > +        * we are not prepared:
-> > +        */
-> > +#define __FIXADDR_TOP (-PAGE_SIZE)
-> > +       BUILD_BUG_ON((__fix_to_virt(FIX_BTMAP_BEGIN) >> PMD_SHIFT)
-> > +                    != (__fix_to_virt(FIX_BTMAP_END) >> PMD_SHIFT));
-> > +#undef __FIXADDR_TOP
-> 
-> Why this #define/#undef? FIXADDR_TOP is statically defined.
-
-Right. Copy and paste from x86 where is isn't static, so the trick to
-trigger a BUILD_BUG_ON isn't needed here.
-
-> 
-> > +void __init __set_fixmap(enum fixed_addresses idx,
-> > +                        phys_addr_t phys, pgprot_t flags)
-> > +{
-> > +       unsigned long addr = __fix_to_virt(idx);
-> > +       pte_t *pte;
-> > +
-> > +       if (idx >= __end_of_fixed_addresses) {
-> > +               BUG();
-> > +               return;
-> > +       }
-> > +       if (after_paging_init) {
-> > +               WARN_ON(1);
-> > +               return;
-> > +       }
-> > +
-> > +       pte = early_ioremap_pte(addr);
-> > +
-> > +       if (pgprot_val(flags))
-> > +               set_pte(pte, pfn_pte(phys >> PAGE_SHIFT, flags));
-> > +       else
-> > +               pte_clear(&init_mm, addr, pte);
-> > +       flush_tlb_kernel_range(addr, addr+PAGE_SIZE);
-> 
-> Would __set_fixmap be used to change valid ptes? If not, we could keep
-> the flush_tlb_kernel_range() call only under the 'else' block.
-
-A valid pte shouldn't be updated except for the unmap case. Nothing
-prevents it though. We could do the tlb flush only in the else block
-and add a BUG_ON to catch attempts to modify an already used pte.
-
-> 
-> As I was going through the patch, I realised that the early_ioremap()
-> looks really to the x86 implementation. Can we move it into a library to
-> be shared between the two?
-> 
-Yes, that's where I started. I will look at consolidating the common
-bits.
-
-Thanks.
-
---Mark
+Will
