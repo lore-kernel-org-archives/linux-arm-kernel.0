@@ -1,69 +1,32 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 4 Oct 2013 12:18:21 +0100
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 4 Oct 2013 12:41:28 +0100
 Subject: Use of drivers/platform and matching include?
-In-Reply-To: <CAOesGMhBaj14++kJ9tVko68MjC7D+JZrBRgoxa4zmZ9z186MQw@mail.gmail.com>
+In-Reply-To: <CAOesGMjJ6Uj0uGFJqtnWQyDW+tr6eLVWoHZ+B7uFna+L8N6E8Q@mail.gmail.com>
 References: <BC1C47B3-5412-4829-A1D9-AAB04694D1CC@codeaurora.org>
  <CAOesGMjJ6Uj0uGFJqtnWQyDW+tr6eLVWoHZ+B7uFna+L8N6E8Q@mail.gmail.com>
- <20131003170914.GA11992@kroah.com>
- <CAOesGMhBaj14++kJ9tVko68MjC7D+JZrBRgoxa4zmZ9z186MQw@mail.gmail.com>
-Message-ID: <20131004111820.GD25137@arm.com>
+Message-ID: <20131004114128.GL12758@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 03, 2013 at 06:54:07PM +0100, Olof Johansson wrote:
-> On Thu, Oct 3, 2013 at 10:09 AM, Greg Kroah-Hartman
-> <gregkh@linuxfoundation.org> wrote:
-> > On Thu, Oct 03, 2013 at 09:46:30AM -0700, Olof Johansson wrote:
-> >> I don't have a good answer though. If it wasn't for the arm64 fork,
-> >> locating these under arch/arm somewhere would really be the reasonable
-> >> answer, like we used to do on powerpc. :(
-> >
-> > Sounds like yet-another-good reason why there shouldn't be an arm64
-> > "fork" at all :(
-> 
-> Doing a fork gives a chance at a clean slate refresh of platform
-> support, which is in itself quite useful. But indeed it causes some
-> things to be more complicated.
+On Thu, Oct 03, 2013 at 09:46:30AM -0700, Olof Johansson wrote:
+> I don't have a good answer though. If it wasn't for the arm64 fork,
+> locating these under arch/arm somewhere would really be the reasonable
+> answer, like we used to do on powerpc. :(
 
-Also note that arm64 work started (internally) before the arm-soc was
-formed and it was nearing upstreaming at a time when the arm-soc was
-still undergoing heavy clean-up.
+Are you seriously suggesting going back to having drivers under arch/arm
+because we can't find a home for them in the drivers subtree?
 
-Of course, there is always a balance between advantages and
-disadvantages but the main benefits are a clean implementation of
-AArch64 architecture support (without legacy baggage) and forcing SoC
-people to clean up the code for AArch64 (e.g. default single Image,
-decoupling booting protocols from SoC initialisation, firmware interface
-standardisation, resisting the urge to add SoC code under arch/arm64/).
+Having made a big thing about things as small as clock source drivers,
+IRQ drivers and such like which "shouldn't be under arch/arm" and moving
+them out, to then say about finding somewhere under arch/arm for drivers
+is very much a case of double-standards.
 
-> It's a common complaint that "everybody who ever forked for 64-bit
-> have later merged", and that's true, but that doesn't mean there's no
-> value in forking (and perhaps later merging), instead of adding on top
-> to start with.
+I've heard this accusation that we have too many drivers in arch/arm
+many times, and although we've made some progress getting things like
+clock and IRQ drivers out of arch/arm, we're still a long way from
+sorting that out.  Or maybe that original accusation was baseless for
+modern kernels, based on the old 1.x days when we had a arch/arm/drivers
+subdirectory which people have a hard time forgetting?
 
-Exactly. Later merging is possible, but such process, to produce
-clean/maintainable/shareable code, needs additional clean-up in the
-32-bit ARM architecture code (at least breaking recent ARMv7 support
-from legacy architectures). Otherwise we end up with either a less than
-clean arm64 re-port on top of arm or just completely separate files
-artificially forced under the same arch directory.
-
-Where code sharing makes sense (e.g. ARM KVM and Xen), the arm64
-Makefiles already reference arch/arm/. It's not ideal but it's a
-trade-off for the time being.
-
-> > The arm community created this mess, you all can fix it up, it's not too
-> > late.
-> 
-> It wouldn't be a huge deal to add something like arch/arm/syslib and
-> give some of the system library-type code a home there -- stuff like
-> resource allocation libraries, etc. I don't think we want to collect
-> all the back-end drivers in there though, just libraries.
-
-On the SoC part, we need to analyse what exactly needs sharing, whether
-it's a library used by multiple drivers (and arguably the library could
-also go under drivers/) or whether it's some SoC initialisation that
-could be better done before Linux is started.
-
--- 
-Catalin
+So, no, there will be no new drivers under arch/arm.  They must be in the
+drivers subtree somewhere.
