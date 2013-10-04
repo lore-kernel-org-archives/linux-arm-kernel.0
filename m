@@ -1,36 +1,50 @@
-From: joelf@ti.com (Joel Fernandes)
-Date: Thu, 3 Oct 2013 21:00:27 -0500
-Subject: [PATCH v2 0/9] ARM: dts: DT data for OMAP platforms for v3.13
-In-Reply-To: <524D7038.9070303@baylibre.com>
-References: <1380553986-15910-1-git-send-email-joelf@ti.com>
- <524D7038.9070303@baylibre.com>
-Message-ID: <524E213B.6030306@ti.com>
+From: inki.dae@samsung.com (Inki Dae)
+Date: Fri, 4 Oct 2013 11:05:48 +0900
+Subject: [PATCH 3/5] drm/bridge: Add PTN3460 bridge driver
+In-Reply-To: <CAOesGMgKastzdFHYQzyL8gxkBN=86wFZ4jbgP8BHxfkOuZvJxg@mail.gmail.com>
+References: <1380670860-17621-1-git-send-email-seanpaul@chromium.org>
+ <1380670860-17621-4-git-send-email-seanpaul@chromium.org>
+ <CAAQKjZN_r-=-sj=Vb-o-KUS4ab5=cjCq1ni3VZeMeVc3NL=MMg@mail.gmail.com>
+ <CAOw6vbLiJLLKn=gb1=j5TBeM0ijEK13+goG-=mw7MZTyNT1kpQ@mail.gmail.com>
+ <CAAQKjZPwyKCpju4Ndd+MB_aN24-zA5xTHFsFsun2617h7YT6dw@mail.gmail.com>
+ <CAOesGMgKastzdFHYQzyL8gxkBN=86wFZ4jbgP8BHxfkOuZvJxg@mail.gmail.com>
+Message-ID: <CAAQKjZMhovKLxNfnXnbF-6diM2zF1cWyi+xHGyL3v83vBh4p6g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/03/2013 08:25 AM, Benoit Cousson wrote:
-> + DT list and DT maintainers.
-> 
-> Hi Joel,
-> 
-> Thanks for the update. It looks good to me.
-> 
-> For the new bindings added below;
-> 
->>   .../devicetree/bindings/crypto/omap-aes.txt        | 34 ++++++++++
->>   .../devicetree/bindings/crypto/omap-sham.txt       | 31 +++++++++
-> 
-> I will need the acked-by from one of the DT maintainers.
+2013/10/4 Olof Johansson <olof@lixom.net>:
+> On Thu, Oct 3, 2013 at 10:39 AM, Inki Dae <inki.dae@samsung.com> wrote:
+>> 2013/10/3 Sean Paul <seanpaul@chromium.org>:
+>>> On Thu, Oct 3, 2013 at 9:55 AM, Inki Dae <inki.dae@samsung.com> wrote:
+>>>> Can a regulator be used instead of gpio in other board case?
+>>>>
+>>>
+>>> No, not to my knowledge.
+>>>
+>>
+>> Hm.. plz check it out again. the gpio pin is specific to board, and
+>> the the gpio be used as power source trigger could be replaced with a
+>> regulator according to board design. So you should consider all
+>> possibilities even though there are no other cases yet: other board
+>> could  use a regulator instead.
+>
+> Take a look at the data sheet, it is publicly available.
+>
+> PD_N is not a power supply input, so modelling it as a regulator makes no sense:
+>
+> "If PD_N is LOW, then the device is in Deep power-down completely,
+> even if supply rail is ON; for the device to be able to operate, the
+> PD_N pin must be HIGH."
+>
 
-Sure. To help with giving Ack for this, I'd like to also mention these patches
-were due for long time and reposted. The supporting code is already in the kernel.
+I still think the pin could be replaced with a regulator. But
+lvds-bridge node has "powerdown-gpio" property - it say this board
+will use gpio pin - specific to board.  So it seems no problem.
 
-Also bindings were reviewed by Mark Rutland comments in the following thread
-were addressed:
-http://www.spinics.net/lists/arm-kernel/msg269006.html
-
-Mark, could you give Ack for these patches if they look OK?
-
-thanks,
-
--Joel
+>
+>
+> -Olof
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
