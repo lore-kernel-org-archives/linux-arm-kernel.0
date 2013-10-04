@@ -1,75 +1,53 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Fri,  4 Oct 2013 12:44:08 +0200
-Subject: [PATCH v3 3/4] dma: mxs-dma: Fix channel reset hardware bug
-In-Reply-To: <1380883449-8649-1-git-send-email-mpa@pengutronix.de>
-References: <1380883449-8649-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <1380883449-8649-4-git-send-email-mpa@pengutronix.de>
+From: rogerq@ti.com (Roger Quadros)
+Date: Fri, 4 Oct 2013 13:46:08 +0300
+Subject: [PATCH v7 09/10] usb: dwc3: omap: manage "usb_otg_ss_refclk960m"
+ clock
+In-Reply-To: <20131003154144.GA18189@kroah.com>
+References: <1379508542-22389-1-git-send-email-rogerq@ti.com>
+ <1379508542-22389-10-git-send-email-rogerq@ti.com> <52403E02.4070208@ti.com>
+ <20131002131113.GM1476@radagast> <524C22A1.30200@ti.com>
+ <20131003122941.GD3230@radagast> <524D8516.8000107@ti.com>
+ <20131003154144.GA18189@kroah.com>
+Message-ID: <524E9C70.8050303@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is no official errata, but I noticed that the channel reset may
-stop working if the DMA state engine is in the READ_FLUSH state.
+Greg,
 
-This patch uses the channel debug1 register to wait for the DMA
-statemachine to leave the READ_FLUSH state. After that we can continue
-to reset the channel.
+On 10/03/2013 06:41 PM, Greg KH wrote:
+> On Thu, Oct 03, 2013 at 05:54:14PM +0300, Roger Quadros wrote:
+>> On 10/03/2013 03:29 PM, Felipe Balbi wrote:
+>>> Hi,
+>>>
+>>> On Wed, Oct 02, 2013 at 04:41:53PM +0300, Roger Quadros wrote:
+>>>> On 10/02/2013 04:11 PM, Felipe Balbi wrote:
+>>>>> On Mon, Sep 23, 2013 at 04:11:30PM +0300, Roger Quadros wrote:
+>>>>>> Hi Felipe,
+>>>>>>
+>>>>>> On 09/18/2013 03:49 PM, Roger Quadros wrote:
+>>>>>>> "usb_otg_ss_refclk960m" is an optional functional clock to the
+>>>>>>> UBS_OTG_SS module. So manage it in the driver.
+>>>>>>>
+>>>>>>
+>>>>>> Just realized that "usb_otg_ss_refclk960m" is in fact functional clock to the 
+>>>>>> PHY and not USB_OTG_SS module. The name is misleading.
+>>>>>>
+>>>>>> So please ignore patch 9 and 10.
+>>>>>
+>>>>> ignored. All others are fine, right ?
+>>>>>
+>>>> Yes. But I might have to rebase this on top of Phy framework stuff.
+>>>
+>>> alright, Greg already took the PHY framework, so maybe we need to just
+>>> give him my Acked-by and he takes the patches directly as I don't have
+>>> PYH framework.
+>>>
+>> OK. I'll resend this series to Greg in a while.
+> 
+> It looks like you did, but forgot Felipe's ack :(
+> 
+I was under the impression that Felipe will explicitly give his Ack there.
+Should I resend with his Acked-bys?
 
-Tested on i.MX28.
-
-Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
----
- drivers/dma/mxs-dma.c | 28 ++++++++++++++++++++++++++--
- 1 file changed, 26 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/dma/mxs-dma.c b/drivers/dma/mxs-dma.c
-index 8f48245..98de9a7 100644
---- a/drivers/dma/mxs-dma.c
-+++ b/drivers/dma/mxs-dma.c
-@@ -60,6 +60,7 @@
- 	(((dma_is_apbh(d) && apbh_is_old(d)) ? 0x080 : 0x140) + (n) * 0x70)
- #define HW_APBHX_CHn_BAR(d, n) \
- 	(((dma_is_apbh(d) && apbh_is_old(d)) ? 0x070 : 0x130) + (n) * 0x70)
-+#define HW_APBX_CHn_DEBUG1(d, n) (0x150 + (n) * 0x70)
- 
- /*
-  * ccw bits definitions
-@@ -204,12 +205,35 @@ static void mxs_dma_reset_chan(struct mxs_dma_chan *mxs_chan)
- 	struct mxs_dma_engine *mxs_dma = mxs_chan->mxs_dma;
- 	int chan_id = mxs_chan->chan.chan_id;
- 
--	if (dma_is_apbh(mxs_dma) && apbh_is_old(mxs_dma))
-+	if (dma_is_apbh(mxs_dma) && apbh_is_old(mxs_dma)) {
- 		writel(1 << (chan_id + BP_APBH_CTRL0_RESET_CHANNEL),
- 			mxs_dma->base + HW_APBHX_CTRL0 + STMP_OFFSET_REG_SET);
--	else
-+	} else {
-+		unsigned long elapsed = 0;
-+		const unsigned long max_wait = 50000; /* 50ms */
-+		void __iomem *reg_dbg1 = mxs_dma->base +
-+				HW_APBX_CHn_DEBUG1(mxs_dma, chan_id);
-+
-+		/*
-+		 * On i.MX28 APBX, the DMA channel can stop working if we reset
-+		 * the channel while it is in READ_FLUSH (0x08) state.
-+		 * We wait here until we leave the state. Then we trigger the
-+		 * reset. Waiting a maximum of 50ms, the kernel shouldn't crash
-+		 * because of this.
-+		 */
-+		while ((readl(reg_dbg1) & 0xf) == 0x8 && elapsed < max_wait) {
-+			udelay(100);
-+			elapsed += 100;
-+		}
-+
-+		if (elapsed >= max_wait)
-+			dev_err(&mxs_chan->mxs_dma->pdev->dev,
-+					"Failed waiting for the DMA channel %d to leave state READ_FLUSH, trying to reset channel in READ_FLUSH state now\n", chan_id);
-+
-+
- 		writel(1 << (chan_id + BP_APBHX_CHANNEL_CTRL_RESET_CHANNEL),
- 			mxs_dma->base + HW_APBHX_CHANNEL_CTRL + STMP_OFFSET_REG_SET);
-+	}
- }
- 
- static void mxs_dma_enable_chan(struct mxs_dma_chan *mxs_chan)
--- 
-1.8.4.rc3
+cheers,
+-roger
