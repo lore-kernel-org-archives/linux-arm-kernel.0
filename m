@@ -1,35 +1,100 @@
-From: matthew_minter@xyratex.com (Matthew Minter)
-Date: Fri, 4 Oct 2013 14:14:34 +0100
-Subject: Arm PCIe hotplugging
-Message-ID: <CAFJTrDs=fovP8nWVvH=-a9d_OTbmgQkMLPVeKAc4x6phsuZw9w@mail.gmail.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Fri, 4 Oct 2013 15:17:56 +0200
+Subject: [PATCH] clk: provide public clk_is_enabled function
+In-Reply-To: <1380881310-24345-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1380881310-24345-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <20131004131756.GD23809@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi again,
+On Fri, Oct 04, 2013 at 12:08:30PM +0200, Sebastian Hesselbarth wrote:
+> To determine if a clk has been previously enabled, provide a public
+> clk_is_enabled function. This is especially helpful to check the state
+> of clk-gate without actually changing the state of the gate.
+> 
+> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 
-I have been doing some work with an Armada XP board (DB-MV784MP-GP)
-with PCIe support, along with using a PEX 8614 (AA) PCIe switch. The
-switch in question is said to have hot plug support with the PCIe
-downstream slots.
+Tested-by: Andrew Lunn <andrew@lunn.ch>
 
-However using both the generic "pcieport" and the proprietary kernel
-module used by PLX (this took some work to run on an ARM board and is
-very buggy on the platform buggy so the generic in tree drivers are
-preferable) the /sys/bus/pci/slots/ directory is always empty and
-/sys/bus/pci/rescan seems to do nothing.
-
-Looking closer it seems that in the ARM kernel the PCI hotplug code is
-all disabled. Am I just out of luck and should wait until there is a
-new driver for the PCI switch's hot plug controller and a general hot
-plug framework for ARM or is there some kind of work around?
-
-Best regards,
-Matthew
-
--- 
+	   Andrew
 
 
-------------------------------
-For additional information including the registered office and the treatment of Xyratex confidential information please visit www.xyratex.com
-
-------------------------------
+> ---
+> Cc: Mike Turquette <mturquette@linaro.org>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Jason Cooper <jason@lakedaemon.net>
+> Cc: Andrew Lunn <andrew@lunn.ch>
+> Cc: Grant Likely <grant.likely@linaro.org>
+> Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+> Cc: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
+> Cc: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-kernel at vger.kernel.org
+> ---
+>  drivers/clk/clk.c   |   18 ++++++++++++++++++
+>  include/linux/clk.h |   13 +++++++++++++
+>  2 files changed, 31 insertions(+)
+> 
+> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+> index a004769..26698d3 100644
+> --- a/drivers/clk/clk.c
+> +++ b/drivers/clk/clk.c
+> @@ -929,6 +929,24 @@ int clk_enable(struct clk *clk)
+>  EXPORT_SYMBOL_GPL(clk_enable);
+>  
+>  /**
+> + * clk_is_enabled - return the enabled state of a clk
+> + * @clk: the clk whose enabled state gets returned
+> + *
+> + * Returns true if the clock is enabled, false otherwise.
+> + */
+> +bool clk_is_enabled(struct clk *clk)
+> +{
+> +	bool is_en;
+> +
+> +	clk_prepare_lock();
+> +	is_en = __clk_is_enabled(clk);
+> +	clk_prepare_unlock();
+> +
+> +	return is_en;
+> +}
+> +EXPORT_SYMBOL_GPL(clk_is_enabled);
+> +
+> +/**
+>   * __clk_round_rate - round the given rate for a clk
+>   * @clk: round the rate of this clock
+>   * @rate: the rate which is to be rounded
+> diff --git a/include/linux/clk.h b/include/linux/clk.h
+> index 9a6d045..8cbf2f7 100644
+> --- a/include/linux/clk.h
+> +++ b/include/linux/clk.h
+> @@ -187,6 +187,14 @@ int clk_enable(struct clk *clk);
+>  void clk_disable(struct clk *clk);
+>  
+>  /**
+> + * clk_is_enabled - return the enabled state of a clk
+> + * @clk: the clk whose enabled state gets returned
+> + *
+> + * Returns true if the clock is enabled, false otherwise.
+> + */
+> +bool clk_is_enabled(struct clk *clk);
+> +
+> +/**
+>   * clk_get_rate - obtain the current clock rate (in Hz) for a clock source.
+>   *		  This is only valid once the clock source has been enabled.
+>   * @clk: clock source
+> @@ -299,6 +307,11 @@ static inline int clk_enable(struct clk *clk)
+>  
+>  static inline void clk_disable(struct clk *clk) {}
+>  
+> +static inline bool clk_is_enabled(struct clk *clk)
+> +{
+> +	return false;
+> +}
+> +
+>  static inline unsigned long clk_get_rate(struct clk *clk)
+>  {
+>  	return 0;
+> -- 
+> 1.7.10.4
+> 
