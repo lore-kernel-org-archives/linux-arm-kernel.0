@@ -1,47 +1,55 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 4 Oct 2013 16:52:43 +0100
-Subject: [PATCH v3 6/6] ARM: mm: Change the order of TLB/cache
- maintenance operations.
-In-Reply-To: <1380835081-12129-7-git-send-email-santosh.shilimkar@ti.com>
-References: <1380835081-12129-1-git-send-email-santosh.shilimkar@ti.com>
- <1380835081-12129-7-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <20131004155243.GT24303@mudshark.cambridge.arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 4 Oct 2013 16:57:31 +0100
+Subject: [GIT PULL] arm64 updates for 3.12
+Message-ID: <20131004155725.GA11953@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 03, 2013 at 10:18:00PM +0100, Santosh Shilimkar wrote:
-> From: Sricharan R <r.sricharan@ti.com>
-> 
-> As per the arm ARMv7 manual, the sequence of TLB maintenance
-> operations after making changes to the translation table is
-> to clean the dcache first, then invalidate the TLB. With
-> the current sequence we see cache corruption when the
-> flush_cache_all is called after tlb_flush_all.
-> 
-> STR rx, [Translation table entry]
-> ; write new entry to the translation table
-> Clean cache line [Translation table entry]
-> DSB
-> ; ensures visibility of the data cleaned from the D Cache
-> Invalidate TLB entry by MVA (and ASID if non-global) [page address]
-> Invalidate BTC
-> DSB
-> ; ensure completion of the Invalidate TLB operation
-> ISB
-> ; ensure table changes visible to instruction fetch
-> 
-> The issue is seen only with LPAE + THUMB BUILT KERNEL + 64BIT patching,
-> which is little bit weird.
+Hi Linus,
 
-NAK.
+Please pull the arm64 fixes/updates below. Thanks.
 
-I don't buy your reasoning. All current LPAE implementations also implement
-the multi-processing extensions, meaning that the cache flush isn't required
-to make the PTEs visible to the table walker. The dsb from the TLB_WB flag
-is sufficient, so I think you still have some debugging to do as this change
-is likely masking a problem elsewhere.
+The following changes since commit 25804e6a96681d5d2142058948e218999e4f547c:
 
-On top of that, create_mapping does all the flushing you need (for the !SMP
-case) when the tables are initialised, so this code doesn't need changing.
+  arm64: Widen hwcap to be 64 bit (2013-09-20 09:56:07 +0100)
 
-Will
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/cmarinas/linux-aarch64.git tags/arm64-stable
+
+for you to fetch changes up to 09d3ce74d7d60f37d1b030886ec659bbfe2e73bf:
+
+  arm64: Remove duplicate DEBUG_STACK_USAGE config (2013-10-02 18:03:26 +0100)
+
+----------------------------------------------------------------
+- Bug-fixes (get_user/put_user, incorrect register width for ASID,
+  FPSIMD initialisation)
+- Kconfig clean-up
+- defconfig update
+
+----------------------------------------------------------------
+AKASHI Takahiro (1):
+      arm64: avoid multiple evaluation of ptr in get_user/put_user()
+
+Jiang Liu (1):
+      arm64: fix possible invalid FPSIMD initialization state
+
+Matthew Leach (1):
+      arm64: use correct register width when retrieving ASID
+
+Ramkumar Ramachandra (2):
+      arm64: include EXT4 in defconfig
+      arm64: include VIRTIO_{MMIO,BLK} in defconfig
+
+Stephen Boyd (1):
+      arm64: Remove duplicate DEBUG_STACK_USAGE config
+
+ arch/arm64/Kconfig.debug         |  7 -------
+ arch/arm64/configs/defconfig     |  5 ++++-
+ arch/arm64/include/asm/uaccess.h | 10 ++++++----
+ arch/arm64/kernel/fpsimd.c       |  2 ++
+ arch/arm64/mm/tlb.S              |  2 +-
+ 5 files changed, 13 insertions(+), 13 deletions(-)
+
+-- 
+Catalin
