@@ -1,130 +1,52 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 4 Oct 2013 14:53:06 +0100
-Subject: [RFC] ARM: lockless get_user_pages_fast()
-In-Reply-To: <20131004103140.GA4444@linaro.org>
-References: <1380820515-21100-1-git-send-email-zishen.lim@linaro.org>
- <20131003172755.GG7408@mudshark.cambridge.arm.com>
- <CAM1oe53oQ5OBww=89vqcyUt_NqsYfCHDVZkKv0p9=-TchhkHSA@mail.gmail.com>
- <20131004103140.GA4444@linaro.org>
-Message-ID: <20131004135306.GK24303@mudshark.cambridge.arm.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Fri, 4 Oct 2013 09:53:45 -0400
+Subject: Arm PCIe hotplugging
+In-Reply-To: <CAFJTrDs=fovP8nWVvH=-a9d_OTbmgQkMLPVeKAc4x6phsuZw9w@mail.gmail.com>
+References: <CAFJTrDs=fovP8nWVvH=-a9d_OTbmgQkMLPVeKAc4x6phsuZw9w@mail.gmail.com>
+Message-ID: <20131004135345.GA31178@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Steve,
+Matthew,
 
-[adding linux-mm, since this has turned into a discussion about THP
-splitting]
+Please Cc: the relevant maintainers, it helps us pick out emails needing
+our attention out of the noise ;-)  I've added them to this reply.
 
-On Fri, Oct 04, 2013 at 11:31:42AM +0100, Steve Capper wrote:
-> On Thu, Oct 03, 2013 at 11:07:44AM -0700, Zi Shen Lim wrote:
-> > On Thu, Oct 3, 2013 at 10:27 AM, Will Deacon <will.deacon@arm.com> wrote:
-> > > On Thu, Oct 03, 2013 at 06:15:15PM +0100, Zi Shen Lim wrote:
-> > >> Futex uses GUP. Currently on ARM, the default __get_user_pages_fast
-> > >> being used always returns 0, leading to a forever loop in get_futex_key :(
-> > >
-> > > This looks pretty much like an exact copy of the x86 version, which will
-> > > likely also result in another exact copy for arm64. Can none of this code be
-> > > made common? Furthermore, the fact that you've lifted the code and not
-> > > provided much of an explanation in the cover letter hints that you might not
-> > > be aware of all the subtleties involved here...
+thx,
 
-[...]
+Jason.
 
-> > >> +static int gup_pmd_range(pud_t pud, unsigned long addr, unsigned long end,
-> > >> +             int write, struct page **pages, int *nr)
-> > >> +{
-> > >> +     unsigned long next;
-> > >> +     pmd_t *pmdp;
-> > >> +
-> > >> +     pmdp = pmd_offset(&pud, addr);
-> > >> +     do {
-> > >> +             pmd_t pmd = *pmdp;
-> > >> +
-> > >> +             next = pmd_addr_end(addr, end);
-> > >> +             /*
-> > >> +              * The pmd_trans_splitting() check below explains why
-> > >> +              * pmdp_splitting_flush has to flush the tlb, to stop
-> > >> +              * this gup-fast code from running while we set the
-> > >> +              * splitting bit in the pmd. Returning zero will take
-> > >> +              * the slow path that will call wait_split_huge_page()
-> > >> +              * if the pmd is still in splitting state. gup-fast
-> > >> +              * can't because it has irq disabled and
-> > >> +              * wait_split_huge_page() would never return as the
-> > >> +              * tlb flush IPI wouldn't run.
-> > >> +              */
-> > >> +             if (pmd_none(pmd) || pmd_trans_splitting(pmd))
-> > >> +                     return 0;
-> > >> +             if (unlikely(pmd_huge(pmd))) {
-> > >> +                     if (!gup_huge_pmd(pmd, addr, next, write, pages, nr))
-> > >> +                             return 0;
-> > >> +             } else {
-> > >> +                     if (!gup_pte_range(pmd, addr, next, write, pages, nr))
-> > >> +                             return 0;
-> > >> +             }
-> > >> +     } while (pmdp++, addr = next, addr != end);
-> > >
-> > > ...case in point: we don't (usually) require IPIs to shoot down TLB entries
-> > > in SMP systems, so this is racy under thp splitting.
-
-[...]
-
-> As Will pointed out, ARM does not usually require IPIs to shoot down TLB
-> entries. So the local_irq_disable will not necessarily block pagetables being
-> freed when fast_gup is running.
+On Fri, Oct 04, 2013 at 02:14:34PM +0100, Matthew Minter wrote:
+> Hi again,
 > 
-> Transparent huge pages when splitting will set the pmd splitting bit then
-> perform a tlb invalidate, then proceed with the split. Thus a splitting THP
-> will not always be blocked by local_irq_disable on ARM. This does not only
-> affect fast_gup, futexes are also affected. From my understanding of futex on
-> THP tail case in kernel/futex.c, it looks like an assumption is made there also
-> that splitting pmds can be blocked by disabling local irqs.
+> I have been doing some work with an Armada XP board (DB-MV784MP-GP)
+> with PCIe support, along with using a PEX 8614 (AA) PCIe switch. The
+> switch in question is said to have hot plug support with the PCIe
+> downstream slots.
 > 
-> PowerPC and SPARC, like ARM do not necessarily require IPIs for TLB shootdown
-> either so they make use of tlb_remove_table (CONFIG_HAVE_RCU_TABLE_FREE). This
-> identifies pages backing pagetables that have multiple users and batches them
-> up, and then performs a dummy IPI before freeing them en masse. This reduces
-> the performance impact from the IPIs (by doing considerably fewer of them), and
-> guarantees that pagetables cannot be freed from under the fast_gup.
-> Unfortunately this also means that the fast_gup has to be aware of ptes/pmds
-> changing from under it.
-
-[...]
-
-> There's also the possibility of blocking without an IPI, but it's not obvious
-> to me how to do that (that would probably necessitate a change to
-> kernel/futex.c). I've just picked this up recently and am still trying to
-> understand it fully.
-
-The IPI solution looks like a hack to me and essentially moves the
-synchronisation down into the csd_lock on the splitting side as part of the
-cross-call to invalidate the TLB. Furthermore, the TLB doesn't even need to
-be invalidated afaict, since we're just updating software bits.
-
-Instead, I wonder whether this can be solved with a simple atomic_t:
-
-	- The fast GUP code (read side) does something like:
-
-		atomic_inc(readers);
-		smp_mb__after_atomic_inc();
-		__get_user_pages_fast(...);
-		smp_mb__before_atomic_dec();
-		atomic_dec(readers);
-
-	- The splitting code (write side) then polls the counter to reach
-	  zero:
-
-		pmd_t pmd = pmd_mksplitting(*pmdp);
-		set_pmd_at(vma->vm_mm, address, pmdp, pmd);
-		smp_mb();
-		while (atomic_read(readers) != 0)
-			cpu_relax();
-
-that way, we don't need to worry about IPIs, we don't need to disable
-interrupts on the read side and we still get away without heavyweight
-locking.
-
-Of course, I could well be missing something here, but what we currently
-have in mainline doesn't work for ARM anyway (since TLB invalidation is
-broadcast in hardware).
-
-Will
+> However using both the generic "pcieport" and the proprietary kernel
+> module used by PLX (this took some work to run on an ARM board and is
+> very buggy on the platform buggy so the generic in tree drivers are
+> preferable) the /sys/bus/pci/slots/ directory is always empty and
+> /sys/bus/pci/rescan seems to do nothing.
+> 
+> Looking closer it seems that in the ARM kernel the PCI hotplug code is
+> all disabled. Am I just out of luck and should wait until there is a
+> new driver for the PCI switch's hot plug controller and a general hot
+> plug framework for ARM or is there some kind of work around?
+> 
+> Best regards,
+> Matthew
+> 
+> -- 
+> 
+> 
+> ------------------------------
+> For additional information including the registered office and the treatment of Xyratex confidential information please visit www.xyratex.com
+> 
+> ------------------------------
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
