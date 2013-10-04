@@ -1,95 +1,220 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Fri, 4 Oct 2013 13:07:03 -0300
-Subject: IMX6 USDHC card detection
-In-Reply-To: <20131003193623.GF12758@n2100.arm.linux.org.uk>
-References: <20131003193623.GF12758@n2100.arm.linux.org.uk>
-Message-ID: <CAOMZO5DrdXpWuULubSjSw7fhCm40JiXnVZwu=YMjzX1sW_tuuw@mail.gmail.com>
+From: msalter@redhat.com (Mark Salter)
+Date: Fri, 04 Oct 2013 12:07:41 -0400
+Subject: [PATCH] arm64: add early_ioremap support
+In-Reply-To: <20131004150453.GG25137@arm.com>
+References: <1380890819-27831-1-git-send-email-msalter@redhat.com>
+ <20131004150453.GG25137@arm.com>
+Message-ID: <1380902861.17503.57.camel@deneb.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 3, 2013 at 4:36 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> Having spent many hours chasing around wondering why controller based
-> card detection doesn't work on IMX6, I've finally found it.
->
-> The hardware is setup such that we have a card detect signal routed to
-> GPIO 4.  If we try and use the host controller's built-in card detection,
-> things go awry - the host controller believes that a card is always
-> inserted.
->
-> This appears to be because the kernel sets the D3CD bit in the PROT_CTRL
-> register.  This enables card detection via the DAT3 signal, which
-> indicates a logic '1' level when a card is inserted.  SD cards have a 50k
-> pullup internally which provides the card detection mechanism, and hosts
-> are expected to have a weak pull-down on this signal.
->
-> However, the default setup of the SD data lines in IOMUX is this (eg):
->
->              MX6QDL_PAD_SD2_DAT0__SD2_DATA0 0x17059
->              MX6QDL_PAD_SD2_DAT1__SD2_DATA1 0x17059
->              MX6QDL_PAD_SD2_DAT2__SD2_DATA2 0x17059
->              MX6QDL_PAD_SD2_DAT3__SD2_DATA3 0x17059
->
-> Bits 14 and 15 indicate "pull this pin up via a 22K resistor".
->
-> What you end up with is the SD controller believes that a card is always
-> inserted no matter what you do.  You can see this through the PRES_STATE
-> register - you see bit 18 assert/deassert appropriately on card insertion
-> and removals indicating that the socket CD signal is changing state, but
-> you don't see the card inserted bit (bit 16) ever change.  Neither does
-> the kernel react in any way.
->
-> So, are the defaults for DATA3 signals really appropriate, or should they
-> be adjusted (in other words, 0x13059 for DATA3).  The alternative is to
-> ignore the built-in host card detection, and configure the CD pin as a
-> GPIO instead.
+On Fri, 2013-10-04 at 16:04 +0100, Catalin Marinas wrote:
+> Hi Mark,
+> 
+> > --- /dev/null
+> > +++ b/arch/arm64/include/asm/fixmap.h
+> > @@ -0,0 +1,117 @@
+> > +/*
+> > + * fixmap.h: compile-time virtual memory allocation
+> > + *
+> > + * This file is subject to the terms and conditions of the GNU General Public
+> > + * License.  See the file "COPYING" in the main directory of this archive
+> > + * for more details.
+> > + *
+> > + * Copyright (C) 1998 Ingo Molnar
+> > + *
+> > + */
+> 
+> I can see several architectures having very similar macros/functions in
+> fixmap.h. It would make sense to create a generic fixmap.h holding at
+> least the fix_to_virt and related macros, FIXADDR_START etc. with enum
+> fixed_addresses in arch code.
 
-Ran a quick test on a mx6qsabresd.
+Right, there are a quite a few using similar fixmap code. I actually 
+looked at consolidating them, but I gave up so that I could get
+something working for EFI work in progress. But yeah, I think I
+will step back and have another go at it. I think I can get at a
+few of the architectures using common code and make it so others
+can be converted as desired.
 
-The original imx6qdl-sabresd.dtsi uses cd-gpio for sdhc3 port and I removed it:
+> 
+> > --- a/arch/arm64/kernel/setup.c
+> > +++ b/arch/arm64/kernel/setup.c
+> > @@ -42,6 +42,7 @@
+> >  #include <linux/of_fdt.h>
+> >  #include <linux/of_platform.h>
+> > 
+> > +#include <asm/fixmap.h>
+> >  #include <asm/cputype.h>
+> >  #include <asm/elf.h>
+> >  #include <asm/cputable.h>
+> > @@ -252,6 +253,8 @@ void __init setup_arch(char **cmdline_p)
+> > 
+> >         *cmdline_p = boot_command_line;
+> > 
+> > +       early_ioremap_init();
+> > +
+> >         parse_early_param();
+> 
+> Should the early_ioremap_init() call happen after parse_early_param()?
+> Is early_ioremap_debug initialised already?
 
---- a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-@@ -164,8 +164,6 @@
-                        fsl,pins = <
-                                MX6QDL_PAD_GPIO_4__GPIO1_IO04   0x80000000
-                                MX6QDL_PAD_GPIO_5__GPIO1_IO05   0x80000000
--                               MX6QDL_PAD_NANDF_D0__GPIO2_IO00 0x80000000
--                               MX6QDL_PAD_NANDF_D1__GPIO2_IO01 0x80000000
-                                MX6QDL_PAD_NANDF_D2__GPIO2_IO02 0x80000000
-                                MX6QDL_PAD_NANDF_D3__GPIO2_IO03 0x80000000
-                                MX6QDL_PAD_GPIO_0__CCM_CLKO1    0x130b0
-@@ -239,7 +237,5 @@
-        pinctrl-names = "default";
-        pinctrl-0 = <&pinctrl_usdhc3_1>;
-        bus-width = <8>;
--       cd-gpios = <&gpio2 0 0>;
--       wp-gpios = <&gpio2 1 0>;
-        status = "okay";
- };
+No, early_ioremap_debug is not initialized which makes the debug
+prints in early_ioremap_init() unreachable. I'll fix that. On x86,
+the init comes first, but there is other code between that and
+parse_early_param() which uses early_ioremap(). Not the case for
+arm64.
 
-After this change,  the SD controller internal card detection also worked fine.
+> 
+> > --- a/arch/arm64/mm/ioremap.c
+> > +++ b/arch/arm64/mm/ioremap.c
+> > @@ -25,6 +25,10 @@
+> >  #include <linux/vmalloc.h>
+> >  #include <linux/io.h>
+> > 
+> > +#include <asm/fixmap.h>
+> > +#include <asm/tlbflush.h>
+> > +#include <asm/pgalloc.h>
+> > +
+> >  static void __iomem *__ioremap_caller(phys_addr_t phys_addr, size_t size,
+> >                                       pgprot_t prot, void *caller)
+> >  {
+> > @@ -82,3 +86,284 @@ void __iounmap(volatile void __iomem *io_addr)
+> >         vunmap(addr);
+> >  }
+> >  EXPORT_SYMBOL(__iounmap);
+> > +
+> > +static int early_ioremap_debug __initdata;
+> > +
+> > +static int __init early_ioremap_debug_setup(char *str)
+> > +{
+> > +       early_ioremap_debug = 1;
+> > +
+> > +       return 0;
+> > +}
+> > +early_param("early_ioremap_debug", early_ioremap_debug_setup);
+> > +
+> > +static int after_paging_init __initdata;
+> > +#ifndef CONFIG_ARM64_64K_PAGES
+> > +static pte_t bm_pte[PAGE_SIZE/sizeof(pte_t)] __page_aligned_bss;
+> > +#endif
+> 
+> bm_pte[PTRS_PER_PTE];
 
-I see your point of SD3 needing a pull-down, so also tested:
+ok
 
---- a/arch/arm/boot/dts/imx6qdl.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl.dtsi
-@@ -1197,7 +1197,7 @@
+> 
+> > +
+> > +static inline pmd_t * __init early_ioremap_pmd(unsigned long addr)
+> > +{
+> > +       pgd_t *pgd = &swapper_pg_dir[pgd_index(addr)];
+> 
+> pgd_offset_k(addr);
 
-MX6QDL_PAD_SD3_DAT0__SD3_DATA0 0x17059
+ok
 
-MX6QDL_PAD_SD3_DAT1__SD3_DATA1 0x17059
+> 
+> > +       pud_t *pud = pud_offset(pgd, addr);
+> > +       pmd_t *pmd = pmd_offset(pud, addr);
+> > +
+> > +       return pmd;
+> > +}
+> > +
+> > +static inline pte_t * __init early_ioremap_pte(unsigned long addr)
+> > +{
+> > +#ifdef CONFIG_ARM64_64K_PAGES
+> > +       pmd_t *pmd = early_ioremap_pmd(addr);
+> > +       return pte_offset_kernel(pmd, addr);
+> > +#else
+> > +       return &bm_pte[pte_index(addr)];
+> > +#endif
+> 
+> If we populate the pmd correctly with 4K pages (and I think we do in
+> early_ioremap_init()), can we not just use this function without the
+> #ifdef-else part (always pte_offset_kernel())?
 
-MX6QDL_PAD_SD3_DAT2__SD3_DATA2 0x17059
--
-MX6QDL_PAD_SD3_DAT3__SD3_DATA3 0x17059
-+
-MX6QDL_PAD_SD3_DAT3__SD3_DATA3 0x13059
+Ah, yes. Nice!
 
-MX6QDL_PAD_SD3_DAT4__SD3_DATA4 0x17059
+> 
+> > +static unsigned long slot_virt[FIX_BTMAPS_SLOTS] __initdata;
+> > +
+> > +void __init early_ioremap_init(void)
+> > +{
+> > +       pmd_t *pmd;
+> > +       int i;
+> > +
+> > +       if (early_ioremap_debug)
+> > +               pr_info("early_ioremap_init()\n");
+> > +
+> > +       for (i = 0; i < FIX_BTMAPS_SLOTS; i++)
+> > +               slot_virt[i] = __fix_to_virt(FIX_BTMAP_BEGIN - NR_FIX_BTMAPS*i);
+> > +
+> > +       pmd = early_ioremap_pmd(fix_to_virt(FIX_BTMAP_BEGIN));
+> > +#ifndef CONFIG_ARM64_64K_PAGES
+> > +       /* need to populate pmd for 4k pagesize only */
+> > +       memset(bm_pte, 0, sizeof(bm_pte));
+> 
+> Do we need memset() here? bm_pte[] is placed in the .bss section.
 
-MX6QDL_PAD_SD3_DAT5__SD3_DATA5 0x17059
+No we don't. If .bss isn't cleared here, we have bigger problems.
 
-MX6QDL_PAD_SD3_DAT6__SD3_DATA6 0x17059
+> 
+> > +       pmd_populate_kernel(&init_mm, pmd, bm_pte);
+> > +#endif
+> > +
+> > +       /*
+> > +        * The boot-ioremap range spans multiple pmds, for which
+> > +        * we are not prepared:
+> > +        */
+> > +#define __FIXADDR_TOP (-PAGE_SIZE)
+> > +       BUILD_BUG_ON((__fix_to_virt(FIX_BTMAP_BEGIN) >> PMD_SHIFT)
+> > +                    != (__fix_to_virt(FIX_BTMAP_END) >> PMD_SHIFT));
+> > +#undef __FIXADDR_TOP
+> 
+> Why this #define/#undef? FIXADDR_TOP is statically defined.
 
-and the internal card detection also worked fine here.
+Right. Copy and paste from x86 where is isn't static, so the trick to
+trigger a BUILD_BUG_ON isn't needed here.
+
+> 
+> > +void __init __set_fixmap(enum fixed_addresses idx,
+> > +                        phys_addr_t phys, pgprot_t flags)
+> > +{
+> > +       unsigned long addr = __fix_to_virt(idx);
+> > +       pte_t *pte;
+> > +
+> > +       if (idx >= __end_of_fixed_addresses) {
+> > +               BUG();
+> > +               return;
+> > +       }
+> > +       if (after_paging_init) {
+> > +               WARN_ON(1);
+> > +               return;
+> > +       }
+> > +
+> > +       pte = early_ioremap_pte(addr);
+> > +
+> > +       if (pgprot_val(flags))
+> > +               set_pte(pte, pfn_pte(phys >> PAGE_SHIFT, flags));
+> > +       else
+> > +               pte_clear(&init_mm, addr, pte);
+> > +       flush_tlb_kernel_range(addr, addr+PAGE_SIZE);
+> 
+> Would __set_fixmap be used to change valid ptes? If not, we could keep
+> the flush_tlb_kernel_range() call only under the 'else' block.
+
+A valid pte shouldn't be updated except for the unmap case. Nothing
+prevents it though. We could do the tlb flush only in the else block
+and add a BUG_ON to catch attempts to modify an already used pte.
+
+> 
+> As I was going through the patch, I realised that the early_ioremap()
+> looks really to the x86 implementation. Can we move it into a library to
+> be shared between the two?
+> 
+Yes, that's where I started. I will look at consolidating the common
+bits.
+
+Thanks.
+
+--Mark
