@@ -1,82 +1,109 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Fri, 4 Oct 2013 17:55:47 +0900
-Subject: [PATCH 00/05] ARM: shmobile: KZM9D Multiplatform update
-In-Reply-To: <20131004082541.GA9988@verge.net.au>
-References: <20131001103255.813.65710.sendpatchset@w520>
- <19181221.pjTBb56TDE@avalon> <20131004082541.GA9988@verge.net.au>
-Message-ID: <CANqRtoTr44CXaeMaScp_33Z9Tm7mCwt2EPtfaMu5oPWE8Vkb0Q@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 04 Oct 2013 09:57:02 +0100
+Subject: [PATCH v2 2/2] KVM: ARM: Transparent huge page (THP) support
+In-Reply-To: <1380832591-4789-3-git-send-email-christoffer.dall@linaro.org>
+References: <1380832591-4789-1-git-send-email-christoffer.dall@linaro.org>
+ <1380832591-4789-3-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <524E82DE.1080806@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 4, 2013 at 5:25 PM, Simon Horman <horms@verge.net.au> wrote:
-> On Fri, Oct 04, 2013 at 09:47:34AM +0200, Laurent Pinchart wrote:
->> Hi Magnus,
->>
->> Thank you for the patches.
->>
->> On Tuesday 01 October 2013 19:32:55 Magnus Damm wrote:
->> > ARM: shmobile: KZM9D Multiplatform update
->> >
->> > [PATCH 01/05] ARM: shmobile: Sync KZM9D DTS with KZM9D reference DTS
->> > [PATCH 02/05] ARM: shmobile: Use KZM9D without reference for multiplatform
->> > [PATCH 03/05] ARM: shmobile: Remove non-multiplatform KZM9D reference
->> > support
->> > [PATCH 04/05] ARM: shmobile: Let KZM9D multiplatform boot with KZM9D DTB
->> > [PATCH 05/05] ARM: shmobile: Remove KDM9D reference DTS
->>
->> I've reviewed the patches and they look fine to me.
->>
->> Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
->>
->> Does this call for the following patch on top of 05/05 ?
->>
->> >From b167bcd3182f0310b91e502672547e58addf17ef Mon Sep 17 00:00:00 2001
->> From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
->> Date: Fri, 4 Oct 2013 09:44:34 +0200
->> Subject: [PATCH] ARM: shmobile: kzm9d-reference: Drop -reference compatible
->>  string
->>
->> The only system compatible string used for the KZM9D board is
->> "renesas,kzm9d". Drop support for the old "renesas,kzm9d-reference"
->> compatible string.
->>
->> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
->> ---
->>  arch/arm/mach-shmobile/board-kzm9d-reference.c | 1 -
->>  1 file changed, 1 deletion(-)
->>
->> diff --git a/arch/arm/mach-shmobile/board-kzm9d-reference.c b/arch/arm/mach-shmobile/board-kzm9d-reference.c
->> index 054d8d5..d2c6466 100644
->> --- a/arch/arm/mach-shmobile/board-kzm9d-reference.c
->> +++ b/arch/arm/mach-shmobile/board-kzm9d-reference.c
->> @@ -34,7 +34,6 @@ static void __init kzm9d_add_standard_devices(void)
->>
->>  static const char *kzm9d_boards_compat_dt[] __initdata = {
->>       "renesas,kzm9d",
->> -     "renesas,kzm9d-reference",
->>       NULL,
->>  };
->
-> In theory no because someone might be using a DTS with
-> renesas,kzm9d-reference in the wild. In practice I don't think
-> that is the case so I feel ok about this patch. Magnus, what
-> do you think?
+On 03/10/13 21:36, Christoffer Dall wrote:
+> Support transparent huge pages in KVM/ARM and KVM/ARM64.  The
+> transparent_hugepage_adjust is not very pretty, but this is also how
+> it's solved on x86 and seems to be simply an artifact on how THPs
+> behave.  This should eventually be shared across architectures if
+> possible, but that can always be changed down the road.
+> 
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> 
+> ---
+> Changelog[v2]:
+>  - THP handling moved into separate patch.
+>  - Minor changes and clarified comment in transparent_hugepage_adjust
+>    from Marc Z's review.
+> ---
+>  arch/arm/kvm/mmu.c |   45 ++++++++++++++++++++++++++++++++++++++++++++-
+>  1 file changed, 44 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+> index cab031b..0a856a0 100644
+> --- a/arch/arm/kvm/mmu.c
+> +++ b/arch/arm/kvm/mmu.c
+> @@ -42,7 +42,7 @@ static unsigned long hyp_idmap_start;
+>  static unsigned long hyp_idmap_end;
+>  static phys_addr_t hyp_idmap_vector;
+>  
+> -#define kvm_pmd_huge(_x)	(pmd_huge(_x))
+> +#define kvm_pmd_huge(_x)	(pmd_huge(_x) || pmd_trans_huge(_x))
+>  
+>  static void kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa)
+>  {
+> @@ -576,6 +576,47 @@ out:
+>  	return ret;
+>  }
+>  
+> +static bool transparent_hugepage_adjust(pfn_t *pfnp, phys_addr_t *ipap)
+> +{
+> +	pfn_t pfn = *pfnp;
+> +	gfn_t gfn = *ipap >> PAGE_SHIFT;
+> +
+> +	if (PageTransCompound(pfn_to_page(pfn))) {
+> +		unsigned long mask;
+> +		/*
+> +		 * The address we faulted on is backed by a transparent huge
+> +		 * page.  However, because we map the compound huge page and
+> +		 * not the individual tail page, we need to transfer the
+> +		 * refcount to the head page.  We have to be careful that the
+> +		 * THP doesn't start to split while we are adjusting the
+> +		 * refcounts.
+> +		 *
+> +		 * We are sure this doesn't happen, because mmu_notifier_retry
+> +		 * was succesful and we are holding the mmu_lock, so if this
 
-Hi Simon and Laurent,
+successful
 
-Thanks for the patch and the comments. I agree with Laurent that this
-patch series isn't complete without that patch, but at the same time I
-agree with Simon about current state. =) So I propose that this patch
-should be merged later on - in say half a year or so.
+> +		 * THP is trying to split, it will be blocked in the mmu
+> +		 * notifier before touching any of the pages, specifically
+> +		 * before being able to call __split_huge_page_refcount().
+> +		 *
+> +		 * We can therefore safely transfer the refcount from PG_tail
+> +		 * to PG_head and switch the pfn from a tail page to the head
+> +		 * page accordingly.
+> +		 */
+> +		mask = PTRS_PER_PMD - 1;
+> +		VM_BUG_ON((gfn & mask) != (pfn & mask));
+> +		if (pfn & mask) {
+> +			*ipap &= PMD_MASK;
+> +			kvm_release_pfn_clean(pfn);
+> +			pfn &= ~mask;
+> +			kvm_get_pfn(pfn);
+> +			*pfnp = pfn;
+> +		}
+> +
+> +		return true;
+> +	}
+> +
+> +	return false;
+> +}
+> +
+>  static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+>  			  struct kvm_memory_slot *memslot,
+>  			  unsigned long fault_status)
+> @@ -632,6 +673,8 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+>  	spin_lock(&kvm->mmu_lock);
+>  	if (mmu_notifier_retry(kvm, mmu_seq))
+>  		goto out_unlock;
+> +	if (!hugetlb && !force_pte)
+> +		hugetlb = transparent_hugepage_adjust(&pfn, &fault_ipa);
+>  
+>  	if (hugetlb) {
+>  		pmd_t new_pmd = pfn_pmd(pfn, PAGE_S2);
+> 
 
-Perhaps we should aim that the kernel used for the LTSI after
-LTSI-3.10 should include this fix?
+Looks good. I think that if you fix the minor issues I have with the
+previous patch, this is good to go.
 
-Another activity we need to deal with in the future is to depreciate
-the non-multiplatform board support. It's probably good to hear from
-the ARM SoC guys what kind of schedule they have in mind for the
-common ARM architecture bits.
-
-Cheers,
-
-/ magnus
+	M.
+-- 
+Jazz is not dead. It just smells funny...
