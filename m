@@ -1,43 +1,50 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 4 Oct 2013 09:48:41 -0700
-Subject: Use of drivers/platform and matching include?
-In-Reply-To: <20131004132209.GB23923@kroah.com>
-References: <BC1C47B3-5412-4829-A1D9-AAB04694D1CC@codeaurora.org>
- <CAOesGMjJ6Uj0uGFJqtnWQyDW+tr6eLVWoHZ+B7uFna+L8N6E8Q@mail.gmail.com>
- <20131004114128.GL12758@n2100.arm.linux.org.uk>
- <20131004132209.GB23923@kroah.com>
-Message-ID: <CAOesGMjxwmr0Vo0Puc-nZntgXLy6D1PTohz=C+fFukP_Eu1iQg@mail.gmail.com>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Fri, 4 Oct 2013 10:53:24 -0600
+Subject: Arm PCIe hotplugging
+In-Reply-To: <CAFJTrDs=fovP8nWVvH=-a9d_OTbmgQkMLPVeKAc4x6phsuZw9w@mail.gmail.com>
+References: <CAFJTrDs=fovP8nWVvH=-a9d_OTbmgQkMLPVeKAc4x6phsuZw9w@mail.gmail.com>
+Message-ID: <20131004165323.GB10315@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 4, 2013 at 6:22 AM, Greg Kroah-Hartman
-<gregkh@linuxfoundation.org> wrote:
-> On Fri, Oct 04, 2013 at 12:41:28PM +0100, Russell King - ARM Linux wrote:
->>
->> So, no, there will be no new drivers under arch/arm.  They must be in the
->> drivers subtree somewhere.
->
-> I have no objection with this, and encourage it.
+On Fri, Oct 04, 2013 at 02:14:34PM +0100, Matthew Minter wrote:
 
-Ok, so these are some of the requirements as far as I see it:
+> I have been doing some work with an Armada XP board (DB-MV784MP-GP)
+> with PCIe support, along with using a PEX 8614 (AA) PCIe switch. The
+> switch in question is said to have hot plug support with the PCIe
+> downstream slots.
 
-* No per-vendor driver dumping ground under drivers/* (i.e. no
-drivers/platform/<soc vendor>/)
-* No weirdly constructed single-driver directories directly under
-drivers/* (we already have a few and should look at moving those)
-because nothing else fits
-* We need some sort of convention on dependencies. Several of these
-are more libraries than drivers, i.e. we'll have cross-calls for
-things like queue management, resource allocation, etc. So having a
-single location to hold most of these makes sense instead of
-everything cross-depending on everything else.
+PCI-E hot plug has several layers.
 
-Based on the above, how about we create something like
-drivers/resourcemgr to hold these?   I think at least parts of the
-mvebu-mbus driver that ended up under drivers/bus might be a fit to
-move there. The APM queue allocator would likely be a fit, and maybe
-some of the qualcomm stuff. Kumar, what are your thoughts on that?
-Greg?
+The first is the PCI-E serial negotiation and bring up. This is just
+supported out of the box, and works fine with any compliant
+device. You don't need drivers, /sys/bus/pci/rescan is enough. This is
+what I'm doing on kirkwood.
 
+The next is actual *physical* card removal/insertion. For in-box card
+edge connectors this requires power management. You must remove all
+power to the slot before removing/inserting a card. AFAIK, this is
+what the PCI hot plug items in the kernel are all doing, and they do
+this with help from firmware (eg ACPI on x86).
 
--Olof
+If you have a mechanical system that has staged power connectors (and
+possibly inrush current limiters on the cards) then you don't really
+need to worry much at this point, just rely on the serial hot plug.
+
+PLX (AFIAK) has some 'GPIOs' on their switches dedicated to hot plug
+functions so if the board is properly wired they can control slot
+power/etc through their internal registers. I suspect it shouldn't be
+too hard to get this sort of system to work.. The DT can be augmented
+with slot chassis name properties so you have stable labels work with.
+
+If you have board-specific controls, then you need to start augmenting
+the DT with things like phandles to power regulators and other stuff.
+
+> Looking closer it seems that in the ARM kernel the PCI hotplug code is
+> all disabled. Am I just out of luck and should wait until there is a
+
+I doubt you'll see anything like this emerge in the near future. Fancy
+ARM64 servers with hot plug PCI might motivate the work, but they
+might also do it with ACPI...
+
+BTW,
