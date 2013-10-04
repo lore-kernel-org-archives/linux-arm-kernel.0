@@ -1,84 +1,411 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 4 Oct 2013 23:45:39 +0800
-Subject: device tree binding documentation outdated
-In-Reply-To: <20131002234911.GD12758@n2100.arm.linux.org.uk>
-References: <20130927174916.GD12758@n2100.arm.linux.org.uk>
- <CAHCPf3sC7bY=p4vpBQFpRUmyPspT_PVjx0rH9cm1ov=SqkO+Vg@mail.gmail.com>
- <20130927190546.GG12758@n2100.arm.linux.org.uk>
- <CAHCPf3vxGAzTnY360KC7Yt-DB1FB14Sv_Cn7DBTH6HGZ6y=stg@mail.gmail.com>
- <CAHCPf3sv3wSbUc9QFVhmYsPc1kqiWYRuOMO7rreuiGSrwyepBQ@mail.gmail.com>
- <20130927202110.GI12758@n2100.arm.linux.org.uk>
- <20130928083859.GQ12758@n2100.arm.linux.org.uk>
- <20130929061303.GB26156@S2101-09.ap.freescale.net>
- <20131002193316.GR12758@n2100.arm.linux.org.uk>
- <20131002234911.GD12758@n2100.arm.linux.org.uk>
-Message-ID: <20131004154536.GB2734@S2101-09.ap.freescale.net>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Fri, 4 Oct 2013 16:52:16 +0100
+Subject: [PATCH v2 1/2] KVM: ARM: Support hugetlbfs backed huge pages
+In-Reply-To: <524E815B.30107@arm.com>
+References: <1380832591-4789-1-git-send-email-christoffer.dall@linaro.org>
+ <1380832591-4789-2-git-send-email-christoffer.dall@linaro.org>
+ <524E815B.30107@arm.com>
+Message-ID: <20131004155216.GI3029@lvm>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 03, 2013 at 12:49:11AM +0100, Russell King - ARM Linux wrote:
-> RGMII mode.
+On Fri, Oct 04, 2013 at 09:50:35AM +0100, Marc Zyngier wrote:
+> Hi Christoffer,
 > 
-> In current hardware, the phy has its own 25MHz crystal.  This provides
-> the phy with its clocks, and the phy itself contains a PLL, which it
-> uses to generate 125MHz.
+> On 03/10/13 21:36, Christoffer Dall wrote:
+> > Support huge pages in KVM/ARM and KVM/ARM64.  The pud_huge checking on
+> > the unmap path may feel a bit silly as the pud_huge check is always
+> > defined to false, but the compiler should be smart about this.
+> > 
+> > Note: This deals only with VMAs marked as huge which are allocated by
+> > users through hugetlbfs only.  Transparent huge pages can only be
+> > detected by looking at the underlying pages (or the page tables
+> > themselves) and this patch so far simply maps these on a page-by-page
+> > level in the Stage-2 page tables.
+> > 
+> > Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> > 
+> > ---
+> > Changelog[v2]:
+> >  - Invaliate TLB on clearing stage-2 huge page entries
+> >  - Restructure unmap_range to share more code
+> >  - Share stage_2 pmd allocation
+> >  - Factor out THP support to separate patch
+> >  - Fix incorrect gfn_to_pfn_prot and mmu_seq ordering
+> > ---
+> >  arch/arm/include/asm/kvm_mmu.h   |   17 +++-
+> >  arch/arm/kvm/mmu.c               |  172 +++++++++++++++++++++++++++++---------
+> >  arch/arm64/include/asm/kvm_mmu.h |   12 ++-
+> >  3 files changed, 157 insertions(+), 44 deletions(-)
+> > 
+> > diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
+> > index 9b28c41..d629fb3 100644
+> > --- a/arch/arm/include/asm/kvm_mmu.h
+> > +++ b/arch/arm/include/asm/kvm_mmu.h
+> > @@ -62,6 +62,12 @@ phys_addr_t kvm_get_idmap_vector(void);
+> >  int kvm_mmu_init(void);
+> >  void kvm_clear_hyp_idmap(void);
+> > 
+> > +static inline void kvm_set_pmd(pmd_t *pmd, pmd_t new_pmd)
+> > +{
+> > +       *pmd = new_pmd;
+> > +       flush_pmd_entry(pmd);
+> > +}
+> > +
+> >  static inline void kvm_set_pte(pte_t *pte, pte_t new_pte)
+> >  {
+> >         *pte = new_pte;
+> > @@ -103,9 +109,15 @@ static inline void kvm_set_s2pte_writable(pte_t *pte)
+> >         pte_val(*pte) |= L_PTE_S2_RDWR;
+> >  }
+> > 
+> > +static inline void kvm_set_s2pmd_writable(pmd_t *pmd)
+> > +{
+> > +       pmd_val(*pmd) |= L_PTE_S2_RDWR;
 > 
-> The phy can be (and is) configured to generate this 125MHz clock on
-> the CLK_25M pin, which is connected to the IMX6 ENET_REF_CLK pad (V22
-> ball).
+> It feels a bit weird to use a PTE specific flag to mess with a PMD. Can
+> you define a new flag for this?
 > 
-> Hence, we have in DT:
-> 	MX6QDL_PAD_ENET_REF_CLK__ENET_TX_CLK
-> 
-> So far, so good. 
-> 
-> 
-> On current hardware, GPIO 16 is not connected to anything except some
-> 0402 resistor pads where the resistor is not fitted.  On future hardware,
-> the above crystal will be removed, and the appropriate 0402 resistor
-> placed to supply a clock provided on GPIO 16 to the phy.
-> 
-> Hence, to support both hardware configurations transparently, GPIO 16
-> should be configured to generate a 25MHz clock for use by the phy.
 
-On AR8035 XTLI pin?  Here is what I read from AR8035 data sheet.
+yup
 
-XTLI (Analog input signal): Crystal oscillator input. Requires a 27 pF
-capacitor to GND.  Support external 25 MHz, 1.2V swing clock input
-through this pin.
+> > +}
+> > +
+> >  struct kvm;
+> > 
+> > -static inline void coherent_icache_guest_page(struct kvm *kvm, gfn_t gfn)
+> > +static inline void coherent_icache_guest_page(struct kvm *kvm, hva_t hva,
+> > +                                             unsigned long size)
+> >  {
+> >         /*
+> >          * If we are going to insert an instruction page and the icache is
+> > @@ -120,8 +132,7 @@ static inline void coherent_icache_guest_page(struct kvm *kvm, gfn_t gfn)
+> >          * need any kind of flushing (DDI 0406C.b - Page B3-1392).
+> >          */
+> >         if (icache_is_pipt()) {
+> > -               unsigned long hva = gfn_to_hva(kvm, gfn);
+> > -               __cpuc_coherent_user_range(hva, hva + PAGE_SIZE);
+> > +               __cpuc_coherent_user_range(hva, hva + size);
+> >         } else if (!icache_is_vivt_asid_tagged()) {
+> >                 /* any kind of VIPT cache */
+> >                 __flush_icache_all();
+> > diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+> > index b0de86b..cab031b 100644
+> > --- a/arch/arm/kvm/mmu.c
+> > +++ b/arch/arm/kvm/mmu.c
+> > @@ -19,6 +19,7 @@
+> >  #include <linux/mman.h>
+> >  #include <linux/kvm_host.h>
+> >  #include <linux/io.h>
+> > +#include <linux/hugetlb.h>
+> >  #include <trace/events/kvm.h>
+> >  #include <asm/pgalloc.h>
+> >  #include <asm/cacheflush.h>
+> > @@ -41,6 +42,8 @@ static unsigned long hyp_idmap_start;
+> >  static unsigned long hyp_idmap_end;
+> >  static phys_addr_t hyp_idmap_vector;
+> > 
+> > +#define kvm_pmd_huge(_x)       (pmd_huge(_x))
+> > +
+> >  static void kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa)
+> >  {
+> >         /*
+> > @@ -93,19 +96,29 @@ static bool page_empty(void *ptr)
+> > 
+> >  static void clear_pud_entry(struct kvm *kvm, pud_t *pud, phys_addr_t addr)
+> >  {
+> > -       pmd_t *pmd_table = pmd_offset(pud, 0);
+> > -       pud_clear(pud);
+> > -       kvm_tlb_flush_vmid_ipa(kvm, addr);
+> > -       pmd_free(NULL, pmd_table);
+> > +       if (pud_huge(*pud)) {
+> > +               pud_clear(pud);
+> > +               kvm_tlb_flush_vmid_ipa(kvm, addr);
+> > +       } else {
+> > +               pmd_t *pmd_table = pmd_offset(pud, 0);
+> > +               pud_clear(pud);
+> > +               kvm_tlb_flush_vmid_ipa(kvm, addr);
+> > +               pmd_free(NULL, pmd_table);
+> > +       }
+> >         put_page(virt_to_page(pud));
+> >  }
+> > 
+> >  static void clear_pmd_entry(struct kvm *kvm, pmd_t *pmd, phys_addr_t addr)
+> >  {
+> > -       pte_t *pte_table = pte_offset_kernel(pmd, 0);
+> > -       pmd_clear(pmd);
+> > -       kvm_tlb_flush_vmid_ipa(kvm, addr);
+> > -       pte_free_kernel(NULL, pte_table);
+> > +       if (kvm_pmd_huge(*pmd)) {
+> > +               pmd_clear(pmd);
+> > +               kvm_tlb_flush_vmid_ipa(kvm, addr);
+> > +       } else {
+> > +               pte_t *pte_table = pte_offset_kernel(pmd, 0);
+> > +               pmd_clear(pmd);
+> > +               kvm_tlb_flush_vmid_ipa(kvm, addr);
+> > +               pte_free_kernel(NULL, pte_table);
+> > +       }
+> >         put_page(virt_to_page(pmd));
+> >  }
+> > 
+> > @@ -136,18 +149,32 @@ static void unmap_range(struct kvm *kvm, pgd_t *pgdp,
+> >                         continue;
+> >                 }
+> > 
+> > +               if (pud_huge(*pud)) {
+> > +                       /*
+> > +                        * If we are dealing with a huge pud, just clear it and
+> > +                        * move on.
+> > +                        */
+> > +                       clear_pud_entry(kvm, pud, addr);
+> > +                       addr = pud_addr_end(addr, end);
+> > +                       continue;
+> > +               }
+> > +
+> >                 pmd = pmd_offset(pud, addr);
+> >                 if (pmd_none(*pmd)) {
+> >                         addr = pmd_addr_end(addr, end);
+> >                         continue;
+> >                 }
+> > 
+> > -               pte = pte_offset_kernel(pmd, addr);
+> > -               clear_pte_entry(kvm, pte, addr);
+> > -               next = addr + PAGE_SIZE;
+> > +               if (!kvm_pmd_huge(*pmd)) {
+> > +                       pte = pte_offset_kernel(pmd, addr);
+> > +                       clear_pte_entry(kvm, pte, addr);
+> > +                       next = addr + PAGE_SIZE;
+> > +               }
+> > 
+> > -               /* If we emptied the pte, walk back up the ladder */
+> > -               if (page_empty(pte)) {
+> > +               /*
+> > +                * If the pmd entry is to be cleared, walk back up the ladder
+> > +                */
+> > +               if (kvm_pmd_huge(*pmd) || page_empty(pte)) {
+> >                         clear_pmd_entry(kvm, pmd, addr);
+> >                         next = pmd_addr_end(addr, end);
+> >                         if (page_empty(pmd) && !page_empty(pud)) {
+> > @@ -420,29 +447,71 @@ void kvm_free_stage2_pgd(struct kvm *kvm)
+> >         kvm->arch.pgd = NULL;
+> >  }
+> > 
+> > -
+> > -static int stage2_set_pte(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
+> > -                         phys_addr_t addr, const pte_t *new_pte, bool iomap)
+> > +static pmd_t *stage2_get_pmd(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
+> > +                            phys_addr_t addr)
+> >  {
+> >         pgd_t *pgd;
+> >         pud_t *pud;
+> >         pmd_t *pmd;
+> > -       pte_t *pte, old_pte;
+> > 
+> > -       /* Create 2nd stage page table mapping - Level 1 */
+> >         pgd = kvm->arch.pgd + pgd_index(addr);
+> >         pud = pud_offset(pgd, addr);
+> >         if (pud_none(*pud)) {
+> >                 if (!cache)
+> > -                       return 0; /* ignore calls from kvm_set_spte_hva */
+> > +                       return NULL;
+> >                 pmd = mmu_memory_cache_alloc(cache);
+> >                 pud_populate(NULL, pud, pmd);
+> >                 get_page(virt_to_page(pud));
+> >         }
+> > 
+> > -       pmd = pmd_offset(pud, addr);
+> > +       return pmd_offset(pud, addr);
+> > +}
+> > +
+> > +static int stage2_set_pmd_huge(struct kvm *kvm, struct kvm_mmu_memory_cache
+> > +                              *cache, phys_addr_t addr, const pmd_t *new_pmd)
+> > +{
+> > +       pmd_t *pmd, old_pmd;
+> > +
+> > +       pmd = stage2_get_pmd(kvm, cache, addr);
+> > +       VM_BUG_ON(!pmd);
+> > 
+> > -       /* Create 2nd stage page table mapping - Level 2 */
+> > +       /*
+> > +        * Mapping in huge pages should only happen through a fault.  If a
+> > +        * page is merged into a transparent huge page, the individual
+> > +        * subpages of that huge page should be unmapped through MMU
+> > +        * notifiers before we get here.
+> > +        *
+> > +        * Merging of CompoundPages is not supported; they should become
+> > +        * splitting first, unmapped, merged, and mapped back in on-demand.
+> > +        */
+> > +       VM_BUG_ON(pmd_present(*pmd) && pmd_pfn(*pmd) != pmd_pfn(*new_pmd));
+> > +
+> > +       old_pmd = *pmd;
+> > +       kvm_set_pmd(pmd, *new_pmd);
+> > +       if (pmd_present(old_pmd))
+> > +               kvm_tlb_flush_vmid_ipa(kvm, addr);
+> > +       else
+> > +               get_page(virt_to_page(pmd));
+> > +       return 0;
+> > +}
+> > +
+> > +static int stage2_set_pte(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
+> > +                         phys_addr_t addr, const pte_t *new_pte, bool iomap)
+> > +{
+> > +       pmd_t *pmd;
+> > +       pte_t *pte, old_pte;
+> > +
+> > +       /* Create stage-2 page table mapping - Level 1 */
+> > +       pmd = stage2_get_pmd(kvm, cache, addr);
+> > +       if (!pmd) {
+> > +               /*
+> > +                * Ignore calls from kvm_set_spte_hva for unallocated
+> > +                * address ranges.
+> > +                */
+> > +               return 0;
+> > +       }
+> > +
+> > +       /* Create stage-2 page mappings - Level 2 */
+> >         if (pmd_none(*pmd)) {
+> >                 if (!cache)
+> >                         return 0; /* ignore calls from kvm_set_spte_hva */
+> > @@ -508,15 +577,18 @@ out:
+> >  }
+> > 
+> >  static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+> > -                         gfn_t gfn, struct kvm_memory_slot *memslot,
+> > +                         struct kvm_memory_slot *memslot,
+> >                           unsigned long fault_status)
+> >  {
+> > -       pte_t new_pte;
+> > -       pfn_t pfn;
+> >         int ret;
+> > -       bool write_fault, writable;
+> > +       bool write_fault, writable, hugetlb = false, force_pte = false;
+> >         unsigned long mmu_seq;
+> > +       gfn_t gfn = fault_ipa >> PAGE_SHIFT;
+> > +       unsigned long hva = gfn_to_hva(vcpu->kvm, gfn);
+> > +       struct kvm *kvm = vcpu->kvm;
+> >         struct kvm_mmu_memory_cache *memcache = &vcpu->arch.mmu_page_cache;
+> > +       struct vm_area_struct *vma;
+> > +       pfn_t pfn;
+> > 
+> >         write_fault = kvm_is_write_fault(kvm_vcpu_get_hsr(vcpu));
+> >         if (fault_status == FSC_PERM && !write_fault) {
+> > @@ -524,6 +596,18 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+> >                 return -EFAULT;
+> >         }
+> > 
+> > +       /* Let's check if we will get back a huge page backed by hugetlbfs */
+> > +       down_read(&current->mm->mmap_sem);
+> > +       vma = find_vma_intersection(current->mm, hva, hva + 1);
+> > +       if (is_vm_hugetlb_page(vma)) {
+> > +               hugetlb = true;
+> > +               gfn = (fault_ipa & PMD_MASK) >> PAGE_SHIFT;
+> > +       } else {
+> > +               if (vma->vm_start & ~PMD_MASK)
+> > +                       force_pte = true;
+> 
+> What is this test for exactly? I have the feeling this is actually for
+> THP (since nothing in this patch is actually using force_pte), but I
+> don't really get it. It probably deserves a comment.
+> 
 
-XTLO (Analog output signal): Crystal oscillator output; 27 pF to GND.
+Yes, it's for THP, sorry it got into the wrong patch.  If your VMA is
+not 2M aligned then there's no correlation between a THP in the process
+page table being mapped on the PMD level and the same set of pages being
+mapped in the stage-2 page tables and we simply bail from using THP and
+map each page in a THP using individual page mappings.  (Note that this
+doesn't break in any way, we just don't get the benefit of huge pages in
+this case).
 
-Will AR8035 just work if we provide a digital 25Mhz clock (from GPIO_16)
-on its XTLI pin?
+> > +       }
+> > +       up_read(&current->mm->mmap_sem);
+> > +
+> >         /* We need minimum second+third level pages */
+> >         ret = mmu_topup_memory_cache(memcache, 2, KVM_NR_MEM_OBJS);
+> >         if (ret)
+> > @@ -541,26 +625,38 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+> >          */
+> >         smp_rmb();
+> > 
+> > -       pfn = gfn_to_pfn_prot(vcpu->kvm, gfn, write_fault, &writable);
+> > +       pfn = gfn_to_pfn_prot(kvm, gfn, write_fault, &writable);
+> >         if (is_error_pfn(pfn))
+> >                 return -EFAULT;
+> > 
+> > -       new_pte = pfn_pte(pfn, PAGE_S2);
+> > -       coherent_icache_guest_page(vcpu->kvm, gfn);
+> > -
+> > -       spin_lock(&vcpu->kvm->mmu_lock);
+> > -       if (mmu_notifier_retry(vcpu->kvm, mmu_seq))
+> > +       spin_lock(&kvm->mmu_lock);
+> > +       if (mmu_notifier_retry(kvm, mmu_seq))
+> >                 goto out_unlock;
+> > -       if (writable) {
+> > -               kvm_set_s2pte_writable(&new_pte);
+> > -               kvm_set_pfn_dirty(pfn);
+> > +
+> > +       if (hugetlb) {
+> > +               pmd_t new_pmd = pfn_pmd(pfn, PAGE_S2);
+> > +               new_pmd = pmd_mkhuge(new_pmd);
+> > +               if (writable) {
+> > +                       kvm_set_s2pmd_writable(&new_pmd);
+> > +                       kvm_set_pfn_dirty(pfn);
+> > +               }
+> > +               coherent_icache_guest_page(kvm, hva & PMD_MASK, PMD_SIZE);
+> > +               ret = stage2_set_pmd_huge(kvm, memcache, fault_ipa, &new_pmd);
+> > +       } else {
+> > +               pte_t new_pte = pfn_pte(pfn, PAGE_S2);
+> > +               if (writable) {
+> > +                       kvm_set_s2pte_writable(&new_pte);
+> > +                       kvm_set_pfn_dirty(pfn);
+> > +               }
+> > +               coherent_icache_guest_page(kvm, hva, PAGE_SIZE);
+> > +               ret = stage2_set_pte(kvm, memcache, fault_ipa, &new_pte, false);
+> >         }
+> > -       stage2_set_pte(vcpu->kvm, memcache, fault_ipa, &new_pte, false);
+> > +
+> > 
+> >  out_unlock:
+> > -       spin_unlock(&vcpu->kvm->mmu_lock);
+> > +       spin_unlock(&kvm->mmu_lock);
+> >         kvm_release_pfn_clean(pfn);
+> > -       return 0;
+> > +       return ret;
+> >  }
+> > 
+> >  /**
+> > @@ -629,7 +725,7 @@ int kvm_handle_guest_abort(struct kvm_vcpu *vcpu, struct kvm_run *run)
+> > 
+> >         memslot = gfn_to_memslot(vcpu->kvm, gfn);
+> > 
+> > -       ret = user_mem_abort(vcpu, fault_ipa, gfn, memslot, fault_status);
+> > +       ret = user_mem_abort(vcpu, fault_ipa, memslot, fault_status);
+> >         if (ret == 0)
+> >                 ret = 1;
+> >  out_unlock:
+> > diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+> > index efe609c..e7f3852 100644
+> > --- a/arch/arm64/include/asm/kvm_mmu.h
+> > +++ b/arch/arm64/include/asm/kvm_mmu.h
+> > @@ -91,6 +91,7 @@ int kvm_mmu_init(void);
+> >  void kvm_clear_hyp_idmap(void);
+> > 
+> >  #define        kvm_set_pte(ptep, pte)          set_pte(ptep, pte)
+> > +#define        kvm_set_pmd(pmdp, pmd)          set_pmd(pmdp, pmd)
+> > 
+> >  static inline bool kvm_is_write_fault(unsigned long esr)
+> >  {
+> > @@ -116,13 +117,18 @@ static inline void kvm_set_s2pte_writable(pte_t *pte)
+> >         pte_val(*pte) |= PTE_S2_RDWR;
+> >  }
+> > 
+> > +static inline void kvm_set_s2pmd_writable(pmd_t *pmd)
+> > +{
+> > +       pmd_val(*pmd) |= PTE_S2_RDWR;
+> > +}
+> 
+> Same comment as above.
+> 
 
-Shawn
+yup
 
-> This apparantly is done by configuring the PLL on the IMX6 to 25MHz and
-> getting it to output it on this pin, and that is done in the freescale
-> BSP by this pin control setting:
-> 
-> 	MX6DL_PAD_GPIO_16__ENET_ANATOP_ETHERNET_REF_OUT
-> 
-> Now, if you look up that in the 4.1.0 BSP:
-> 
-> #define MX6DL_PAD_GPIO_16__ENET_ANATOP_ETHERNET_REF_OUT                        \
-> 		IOMUX_PAD(0x05E4, 0x0214, 0x12, 0x080C, 0, NO_PAD_CTRL)
-> 
-> and that says to write 0x12 to 0x20e0000 + 0x214 - the
-> IOMUXC_SW_MUX_CTL_PAD_GPIO16 register.  This name clearly implies that
-> the IMX6 is _outputting_ the reference clock.  The register values here
-> selects MUX_MODE 2 (ENET_REF_CLK) _with_ SION set.  There is no
-> configuration in this BSP for GPIO 16 in mux mode 2 without SION set.
-> 
-> However, because we want this pad to produce a clock from the internal
-> PLL, GPR1 bit 21 has to be set.  Remember - the ENET_TX_CLK is configured
-> to come from the ENET_REF_CLK pad, not GPIO 16.
-> 
-> So, I contend that it _is_ valid to have both GPIO 16 SION set and GPR1
-> bit 21 set.
-> 
-> All in all, we don't want to clear GPR1 bit 21 ever on the Cubox-i SOM.
-> 
-> Whether SION should be set or not is another - separate - issue.  All
-> we really care about is getting GPIO 16 providing a 25MHz clock.
+-Christoffer
