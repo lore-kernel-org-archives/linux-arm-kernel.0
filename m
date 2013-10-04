@@ -1,172 +1,34 @@
-From: ast@plumgrid.com (Alexei Starovoitov)
-Date: Fri, 4 Oct 2013 10:49:23 -0700
-Subject: [PATCH v3 net-next] fix unsafe set_memory_rw from softirq
-In-Reply-To: <20131004075133.GA12313@gmail.com>
-References: <1380853446-30537-1-git-send-email-ast@plumgrid.com>
- <20131004075133.GA12313@gmail.com>
-Message-ID: <CAMEtUuy0mpdUHJjztK31mHjNVahnoZ8CHo2sLLyJmt=p5+gq0w@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 4 Oct 2013 18:48:53 +0100
+Subject: [PATCH v2 0/3] ARM: NEON based fast(er) AES in CBC/CTR/XTS modes
+In-Reply-To: <1380837566-18242-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1380837566-18242-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20131004174853.GY24303@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 4, 2013 at 12:51 AM, Ingo Molnar <mingo@kernel.org> wrote:
->> +static void bpf_jit_free_deferred(struct work_struct *work)
->> +{
->> +     struct sk_filter *fp = container_of((void *)work, struct sk_filter,
->> +                                         insns);
->> +     unsigned long addr = (unsigned long)fp->bpf_func & PAGE_MASK;
->> +     struct bpf_binary_header *header = (void *)addr;
->> +
->> +     set_memory_rw(addr, header->pages);
->> +     module_free(NULL, header);
->> +     kfree(fp);
->> +}
->
-> Using the data type suggestions I make further below, this could be
-> written in a simpler form, as:
->
->         struct sk_filter *fp = container_of(work, struct sk_filter, work);
+Hi Ard,
 
-yes. I've made it already as part of V4
+On Thu, Oct 03, 2013 at 10:59:23PM +0100, Ard Biesheuvel wrote:
+> Note to reviewers:
+> Reviewing the file aesbs-core.S may be a bit overwhelming, so if there are any
+> questions or concerns, please refer the file bsaes-armv7.pl which can be found
+> at the link below. This is the original Perl script that gets called by
+> OpenSSL's build system during their build to generate the .S file on the fly.
+> [In the case of OpenSSL, this is used in some cases to target different
+> assemblers or ABIs]. This arrangement is not suitable (or required) for the
+> kernel, so I have taken the generated .S file instead.
+> 
+>     http://git.openssl.org/gitweb/?p=openssl.git;a=commit;h=6f6a6130
+> 
+> This series still depends on commit a62b01cd (crypto: create generic version of
+> ablk_helper) which I omitted this time but which can be found in the cryptodev
+> tree or in linux-next.
 
-> Also, a question, why do you mask with PAGE_MASK here:
->
->         unsigned long addr = (unsigned long)fp->bpf_func & PAGE_MASK;
->
-> ?
->
-> AFAICS bpf_func is the module_alloc() result - and module code is page
-> aligned. So ->bpf_func is always page aligned here. (The sk_run_filter
-> special case cannot happen here.)
+Why do you consider it unsuitable to ship the perl script with the kernel?
+Perl 5 is already documented as a build dependency in Documentation/Changes
+and I'd *much* rather the .S file was generated rather than shipped and
+hacked. That amount of opaque assembly code for something like crypto feels really
+dangerous from both a review and a maintenance perspective.
 
-randomization of bpf_func start is a prevention of jit spraying
-attacks as Eric pointed out.
-
->>  void bpf_jit_free(struct sk_filter *fp)
->>  {
->>       if (fp->bpf_func != sk_run_filter) {
->> -             unsigned long addr = (unsigned long)fp->bpf_func & PAGE_MASK;
->> -             struct bpf_binary_header *header = (void *)addr;
->> -
->> -             set_memory_rw(addr, header->pages);
->> -             module_free(NULL, header);
->> +             struct work_struct *work = (struct work_struct *)fp->insns;
->> +             INIT_WORK(work, bpf_jit_free_deferred);
->
-> Missing newline between local variables and statements.
-
-yes. noted and fixed in V4.
-
->>       unsigned int            (*bpf_func)(const struct sk_buff *skb,
->>                                           const struct sock_filter *filter);
->> -     struct rcu_head         rcu;
->> +     /* insns start right after bpf_func, so that sk_run_filter() fetches
->> +      * first insn from the same cache line that was used to call into
->> +      * sk_run_filter()
->> +      */
->>       struct sock_filter      insns[0];
->
-> Please use the customary (multi-line) comment style:
->
->   /*
->    * Comment .....
->    * ...... goes here.
->    */
->
-> specified in Documentation/CodingStyle.
-
-I believe filter.h belongs to networking comment style, that's why
-checkpatch didn't complain.
-But I removed the comment in V4
-
->>  static inline unsigned int sk_filter_len(const struct sk_filter *fp)
->>  {
->> -     return fp->len * sizeof(struct sock_filter) + sizeof(*fp);
->> +     return max(fp->len * sizeof(struct sock_filter),
->> +                sizeof(struct work_struct)) + sizeof(*fp);
->
-> So, "sizeof(struct work_struct)) + sizeof(*fp)" is a pattern that repeats
-> a couple of times. Might make sense to stick that into a helper of its own
-> - but in general this open coded overlay allocation method looks a bit
-> fragile and not very obvious in isolation.
->
-> So it could be done a bit cleaner, using an anonymous union:
->
->         /*
->          * These two overlay, the work struct is used during workqueue
->          * driven teardown, when the instructions are not used anymore:
->          */
->         union {
->                 struct sock_filter      insns[0];
->                 struct work_struct      work;
->         };
->
-> And then all the sizeof() calculations become obvious and sk_filter_len()
-> could be eliminated - I've marked the conversions in the code further
-> below.
-
-Eric made exactly the same comment. Agreed and fixed in V4
-
->>  #else
->> +#include <linux/slab.h>
->
-> Inlines in the middle of header files are generally frowned upon.
->
-> The standard pattern is to put them at the top, that way it's easier to
-> see the dependencies and there's also less .config dependent inclusion,
-> which makes header hell cleanup work easier.
-
-Agree. I only followed the style that is already in filter.h 20 lines above.
-#ifdef CONFIG_BPF_JIT
-#include <stdarg.h>
-#include <linux/linkage.h>
-#include <linux/printk.h>
-
-as part of the cleanup can move all of them to the top. In the separate commit?
-
->>       struct sk_filter *fp;
->>       unsigned int fsize = sizeof(struct sock_filter) * fprog->len;
->> +     unsigned int sk_fsize = max_t(u32, fsize, sizeof(struct work_struct))
->> +             + sizeof(*fp);
->
-> Using the structure definition I suggested, this could be replaced with
-> the more obvious:
->
->         unsigned int sk_fsize = max(fsize, sizeof(*fp));
-
-with helper function it's even cleaner. Fixed in V4
-
-> A couple of questions/suggestions:
->
-> 1)
->
-> I took a brief look at arch/x86/net/bpf_jit_comp.c while reviewing this
-> patch.
->
-> You need to split up bpf_jit_compile(), it's an obscenely large, ~600
-> lines long function. We don't do that in modern, maintainable kernel code.
-
-I had the same thought, therefore in my proposed generalization of bpf:
-http://patchwork.ozlabs.org/patch/279280/
-It is split into two. do_jit() is still a bit large at 400 lines. Can
-split it further.
-
-> 3)
->
-> It's nice code altogether! Are there any plans to generalize its
-> interfaces, to allow arbitrary bytecode to be used by other kernel
-> subsystems as well? In particular tracing filters could make use of it,
-> but it would also allow safe probe points.
-
-That was exactly the reasons to generalize bpf as I proposed.
-"extended BPF is a set of pseudo instructions that stitch kernel provided
-data in the form of bpf_context with kernel provided set of functions in a safe
-and deterministic way with minimal performance overhead vs native code"
-Not sure what 'tracing filters' you have in mind, but I'm happy to try
-them with extended bpf model.
-imo existing bpf with two registers is too limiting for performance
-and argument passing.
-That's why going to 10 made it a lot more flexible and generically usable.
-Sorry to hijack the thread.
-
-Thanks
-Alexei
+Will
