@@ -1,55 +1,117 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 4 Oct 2013 16:57:31 +0100
-Subject: [GIT PULL] arm64 updates for 3.12
-Message-ID: <20131004155725.GA11953@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 4 Oct 2013 16:59:59 +0100
+Subject: [PATCH v3 5/6] ARM: mm: Recreate kernel mappings in
+ early_paging_init()
+In-Reply-To: <1380835081-12129-6-git-send-email-santosh.shilimkar@ti.com>
+References: <1380835081-12129-1-git-send-email-santosh.shilimkar@ti.com>
+ <1380835081-12129-6-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <20131004155958.GU24303@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On Thu, Oct 03, 2013 at 10:17:59PM +0100, Santosh Shilimkar wrote:
+> This patch adds a step in the init sequence, in order to recreate
+> the kernel code/data page table mappings prior to full paging
+> initialization.  This is necessary on LPAE systems that run out of
+> a physical address space outside the 4G limit.  On these systems,
+> this implementation provides a machine descriptor hook that allows
+> the PHYS_OFFSET to be overridden in a machine specific fashion.
 
-Please pull the arm64 fixes/updates below. Thanks.
+[...]
 
-The following changes since commit 25804e6a96681d5d2142058948e218999e4f547c:
+> diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+> index b1d17ee..47c7497 100644
+> --- a/arch/arm/mm/mmu.c
+> +++ b/arch/arm/mm/mmu.c
+> @@ -28,6 +28,7 @@
+>  #include <asm/highmem.h>
+>  #include <asm/system_info.h>
+>  #include <asm/traps.h>
+> +#include <asm/procinfo.h>
+>  
+>  #include <asm/mach/arch.h>
+>  #include <asm/mach/map.h>
+> @@ -1315,6 +1316,87 @@ static void __init map_lowmem(void)
+>  	}
+>  }
+>  
+> +#ifdef CONFIG_ARM_LPAE
+> +extern void fixup_pv_table(const void *, unsigned long);
+> +extern const void *__pv_table_begin, *__pv_table_end;
+> +
+> +/*
+> + * early_paging_init() recreates boot time page table setup, allowing machines
+> + * to switch over to a high (>4G) address space on LPAE systems
+> + */
+> +void __init early_paging_init(const struct machine_desc *mdesc,
+> +			      struct proc_info_list *procinfo)
+> +{
+> +	pmdval_t pmdprot = procinfo->__cpu_mm_mmu_flags;
+> +	unsigned long map_start, map_end;
+> +	pgd_t *pgd0, *pgdk;
+> +	pud_t *pud0, *pudk;
+> +	pmd_t *pmd0, *pmdk;
+> +	phys_addr_t phys;
+> +	int i;
+> +
+> +	/* remap kernel code and data */
+> +	map_start = init_mm.start_code;
+> +	map_end   = init_mm.brk;
+> +
+> +	/* get a handle on things... */
+> +	pgd0 = pgd_offset_k(0);
+> +	pud0 = pud_offset(pgd0, 0);
+> +	pmd0 = pmd_offset(pud0, 0);
+> +
+> +	pgdk = pgd_offset_k(map_start);
+> +	pudk = pud_offset(pgdk, map_start);
+> +	pmdk = pmd_offset(pudk, map_start);
+> +
+> +	phys = PHYS_OFFSET;
+> +
+> +	if (mdesc->init_meminfo) {
+> +		mdesc->init_meminfo();
+> +		/* Run the patch stub to update the constants */
+> +		fixup_pv_table(&__pv_table_begin,
+> +			(&__pv_table_end - &__pv_table_begin) << 2);
+> +
+> +		/*
+> +		 * Cache cleaning operations for self-modifying code
+> +		 * We should clean the entries by MVA but running a
+> +		 * for loop over every pv_table entry pointer would
+> +		 * just complicate the code.
+> +		 */
+> +		flush_cache_louis();
+> +		dsb();
+> +		isb();
 
-  arm64: Widen hwcap to be 64 bit (2013-09-20 09:56:07 +0100)
+You don't need either of these barriers.
 
-are available in the git repository at:
+> +	}
+> +
+> +	/* remap level 1 table */
+> +	for (i = 0; i < PTRS_PER_PGD; i++) {
+> +		*pud0++ = __pud(__pa(pmd0) | PMD_TYPE_TABLE | L_PGD_SWAPPER);
+> +		pmd0 += PTRS_PER_PMD;
+> +	}
+> +
+> +	/* remap pmds for kernel mapping */
+> +	phys = __pa(map_start) & PMD_MASK;
+> +	do {
+> +		*pmdk++ = __pmd(phys | pmdprot);
+> +		phys += PMD_SIZE;
+> +	} while (phys < map_end);
+> +
+> +	flush_cache_all();
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/cmarinas/linux-aarch64.git tags/arm64-stable
+Why are you being so heavyweight with your cacheflushing? If you're just
+interested in flushing the new page tables, then use the proper accessors to
+build them. The only case I think you need to flush the world is for VIVT,
+which you won't have with LPAE (you could have a BUG_ON here).
 
-for you to fetch changes up to 09d3ce74d7d60f37d1b030886ec659bbfe2e73bf:
+> +	cpu_set_ttbr(0, __pa(pgd0));
+> +	cpu_set_ttbr(1, __pa(pgd0) + TTBR1_OFFSET);
 
-  arm64: Remove duplicate DEBUG_STACK_USAGE config (2013-10-02 18:03:26 +0100)
+Can you not use cpu_switch_mm with the init_mm for this?
 
-----------------------------------------------------------------
-- Bug-fixes (get_user/put_user, incorrect register width for ASID,
-  FPSIMD initialisation)
-- Kconfig clean-up
-- defconfig update
-
-----------------------------------------------------------------
-AKASHI Takahiro (1):
-      arm64: avoid multiple evaluation of ptr in get_user/put_user()
-
-Jiang Liu (1):
-      arm64: fix possible invalid FPSIMD initialization state
-
-Matthew Leach (1):
-      arm64: use correct register width when retrieving ASID
-
-Ramkumar Ramachandra (2):
-      arm64: include EXT4 in defconfig
-      arm64: include VIRTIO_{MMIO,BLK} in defconfig
-
-Stephen Boyd (1):
-      arm64: Remove duplicate DEBUG_STACK_USAGE config
-
- arch/arm64/Kconfig.debug         |  7 -------
- arch/arm64/configs/defconfig     |  5 ++++-
- arch/arm64/include/asm/uaccess.h | 10 ++++++----
- arch/arm64/kernel/fpsimd.c       |  2 ++
- arch/arm64/mm/tlb.S              |  2 +-
- 5 files changed, 13 insertions(+), 13 deletions(-)
-
--- 
-Catalin
+Will
