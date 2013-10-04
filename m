@@ -1,18 +1,52 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 04 Oct 2013 11:00:38 -0600
-Subject: [PATCH 1/2] clk: tegra114: Rename gr_2d/gr_3d to gr2d/gr3d
-In-Reply-To: <1380748361-32459-1-git-send-email-treding@nvidia.com>
-References: <1380748361-32459-1-git-send-email-treding@nvidia.com>
-Message-ID: <524EF436.4000704@wwwdotorg.org>
+From: arokux@gmail.com (Arokux X)
+Date: Fri, 4 Oct 2013 19:24:48 +0200
+Subject: Commit breaks strace: ARM: entry: allow ARM-private syscalls to
+ be restarted
+In-Reply-To: <20130918095003.GB1783@mudshark.cambridge.arm.com>
+References: <20130917215749.GA11109@obsidianresearch.com>
+ <20130918091748.GA1783@mudshark.cambridge.arm.com>
+ <20130918095003.GB1783@mudshark.cambridge.arm.com>
+Message-ID: <CAPNxggZ0WesjMdi=Yy=QYd_ASrGRiosimqzqb++1=mgus3RRdA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/02/2013 03:12 PM, Thierry Reding wrote:
-> These clocks were named gr2d and gr3d on Tegra20 and Tegra30, so use the
-> same names on Tegra114 for consistency.
+On Wed, Sep 18, 2013 at 11:50 AM, Will Deacon <will.deacon@arm.com> wrote:
+> On Wed, Sep 18, 2013 at 10:17:48AM +0100, Will Deacon wrote:
+>> On Tue, Sep 17, 2013 at 10:57:49PM +0100, Jason Gunthorpe wrote:
+>> > This happens with the latest git head for strace, as well as the 4.7
+>> > release.
+>> >
+>> > Hopefully you can cook up a fix :)
+>>
+>> I'll take a look today, thanks.
+>
+> Ok, looks like the backwards branch to the syscall dispatching logic from
+> the trace entry is busted. Can you try the patch below please?
+>
+> I might also take a look at unifying the function prototypes for arm_syscall
+> and syscall_trace_enter, since it should help us remove some of the argument
+> shuffling in the trace path.
+>
+> Will
+>
+> --->8
+>
+> diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
+> index 74ad15d1..bc6bd96 100644
+> --- a/arch/arm/kernel/entry-common.S
+> +++ b/arch/arm/kernel/entry-common.S
+> @@ -442,10 +442,10 @@ local_restart:
+>         ldrcc   pc, [tbl, scno, lsl #2]         @ call sys_* routine
+>
+>         add     r1, sp, #S_OFF
+> -       cmp     scno, #(__ARM_NR_BASE - __NR_SYSCALL_BASE)
+> +2:     cmp     scno, #(__ARM_NR_BASE - __NR_SYSCALL_BASE)
+>         eor     r0, scno, #__NR_SYSCALL_BASE    @ put OS number back
+>         bcs     arm_syscall
+> -2:     mov     why, #0                         @ no longer a real syscall
+> +       mov     why, #0                         @ no longer a real syscall
+>         b       sys_ni_syscall                  @ not private func
+>
+>  #if defined(CONFIG_OABI_COMPAT) || !defined(CONFIG_AEABI)
 
-The series,
-Acked-by: Stephen Warren <swarren@nvidia.com>
-
-Although I wonder if there will be merge conflicts with Peter's "clk:
-tegra: replace enum tegra114_clk by binding header"?
+Just stumbled upon the same issue. The patch seems to cure the problem. Thanks.
