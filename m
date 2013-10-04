@@ -1,47 +1,33 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 4 Oct 2013 20:04:50 +0200
-Subject: [PATCH v2 0/3] ARM: NEON based fast(er) AES in CBC/CTR/XTS modes
-In-Reply-To: <20131004174853.GY24303@mudshark.cambridge.arm.com>
-References: <1380837566-18242-1-git-send-email-ard.biesheuvel@linaro.org>
- <20131004174853.GY24303@mudshark.cambridge.arm.com>
-Message-ID: <CAKv+Gu8RdiGw2+o-1ybGTx4fxaGnDQP7duhcFaLuxDphADjMaQ@mail.gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Fri, 4 Oct 2013 15:10:00 -0300
+Subject: [alsa-devel] [PATCH 1/2] ASoC: fsl: imx-ssi: fix probe on imx31
+In-Reply-To: <524D963F.5080507@epfl.ch>
+References: <1380630971-11431-1-git-send-email-philippe.retornaz@epfl.ch>
+ <1380630971-11431-2-git-send-email-philippe.retornaz@epfl.ch>
+ <20131003155954.GV27287@sirena.org.uk> <524D963F.5080507@epfl.ch>
+Message-ID: <CAOMZO5C_kjTJ8iVGc67pcLLaO43arTiyMRQ1822VkBLDm7hzPw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4 October 2013 19:48, Will Deacon <will.deacon@arm.com> wrote:
+Hi Philippe,
 
-> On Thu, Oct 03, 2013 at 10:59:23PM +0100, Ard Biesheuvel wrote:
->> Note to reviewers:
->> Reviewing the file aesbs-core.S may be a bit overwhelming, so if there are any
->> questions or concerns, please refer the file bsaes-armv7.pl which can be found
->> at the link below. This is the original Perl script that gets called by
->> OpenSSL's build system during their build to generate the .S file on the fly.
->> [In the case of OpenSSL, this is used in some cases to target different
->> assemblers or ABIs]. This arrangement is not suitable (or required) for the
->> kernel, so I have taken the generated .S file instead.
->>
->>     http://git.openssl.org/gitweb/?p=openssl.git;a=commit;h=6f6a6130
->>
->> This series still depends on commit a62b01cd (crypto: create generic version of
->> ablk_helper) which I omitted this time but which can be found in the cryptodev
->> tree or in linux-next.
->
-> Why do you consider it unsuitable to ship the perl script with the kernel?
-> Perl 5 is already documented as a build dependency in Documentation/Changes
-> and I'd *much* rather the .S file was generated rather than shipped and
-> hacked. That amount of opaque assembly code for something like crypto feels really
-> dangerous from both a review and a maintenance perspective.
->
+On Thu, Oct 3, 2013 at 1:07 PM, Philippe R?tornaz
+<philippe.retornaz@epfl.ch> wrote:
 
-First of all, please note that the whole point of working so closely
-with the OpenSSL maintainer on this is that the version I am
-presenting here is the verbatim output of the Perl script that lives
-in the OpenSSL tree. So just shipped, not shipped and hacked.
+> It was working but it is broken since a few release.
+> There is no need to rush for a fix, both patches can follow the standard
+> process.
 
-Personally, I would much prefer merging the .pl file as well, I just
-thought (and I did poll some people informally) that this is not
-something most people are happy about. If I am wrong about this, than
-I am quite happy to respin so the .S is generated on the fly.
+Thanks for the fix.
 
--- 
-Ard.
+If you have a chance, it would be really nice if mx31-moboard could be
+converted to device tree, as this would help us towards the goal of
+getting rid of the sound/soc/fsl/imx-ssi.c driver, which only supports
+the non-dt imx parts.
+
+We have been using  sound/soc/fsl/fsl_ssi.c for the dt imx and powerpc
+parts, and that's probably the reason we haven't noticed this bug.
+
+Regards,
+
+Fabio Estevam
