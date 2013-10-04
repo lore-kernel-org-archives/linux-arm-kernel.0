@@ -1,32 +1,20 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri,  4 Oct 2013 15:27:02 +0200
-Subject: [PATCH] ARM: integrator: pass parent IRQ to the SIC
-Message-ID: <1380893222-7716-1-git-send-email-linus.walleij@linaro.org>
+From: mugunthanvnm@ti.com (Mugunthan V N)
+Date: Fri, 4 Oct 2013 08:27:59 -0500
+Subject: [PATCH 1/2] net: ethernet: cpsw: Search childs for slave nodes
+In-Reply-To: <1380890680-30941-1-git-send-email-mpa@pengutronix.de>
+References: <1380890680-30941-1-git-send-email-mpa@pengutronix.de>
+Message-ID: <524EC25F.70301@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The SIC is cascaded off the PIC, so specify this in the device tree.
+On Friday 04 October 2013 07:44 AM, Markus Pargmann wrote:
+> The current implementation searches the whole DT for nodes named
+> "slave".
+>
+> This patch changes it to search only child nodes for slaves.
+>
+> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+Acked-by: Mugunthan V N <mugunthanvnm@ti.com>
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- arch/arm/boot/dts/integratorcp.dts | 3 +++
- 1 file changed, 3 insertions(+)
-
-diff --git a/arch/arm/boot/dts/integratorcp.dts b/arch/arm/boot/dts/integratorcp.dts
-index ff1aea0..f0ab05f 100644
---- a/arch/arm/boot/dts/integratorcp.dts
-+++ b/arch/arm/boot/dts/integratorcp.dts
-@@ -48,8 +48,11 @@
- 		valid-mask = <0x00000007>;
- 	};
- 
-+	/* The SIC is cascaded off IRQ 26 on the PIC */
- 	sic: sic at ca000000 {
- 		compatible = "arm,versatile-fpga-irq";
-+		interrupt-parent = <&pic>;
-+		interrupts = <26>;
- 		#interrupt-cells = <1>;
- 		interrupt-controller;
- 		reg = <0xca000000 0x100>;
--- 
-1.8.3.1
+Regards
+Mugunthan V N
