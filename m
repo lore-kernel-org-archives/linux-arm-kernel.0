@@ -1,43 +1,54 @@
-From: ijc@hellion.org.uk (Ian Campbell)
-Date: Fri, 04 Oct 2013 17:34:06 +0100
-Subject: Detect presence of LPAE when not running an LPAE kernel?
-In-Reply-To: <20131004162637.GW24303@mudshark.cambridge.arm.com>
-References: <1380829403.3804.56.camel@hastur.hellion.org.uk>
- <20131003200712.GG12758@n2100.arm.linux.org.uk>
- <1380870908.27765.24.camel@dagon.hellion.org.uk>
- <20131004160944.GV24303@mudshark.cambridge.arm.com>
- <1380903802.21562.46.camel@kazak.uk.xensource.com>
- <20131004162637.GW24303@mudshark.cambridge.arm.com>
-Message-ID: <1380904446.21562.50.camel@kazak.uk.xensource.com>
+From: acourbot@nvidia.com (Alexandre Courbot)
+Date: Fri, 4 Oct 2013 09:37:10 -0700
+Subject: [PATCH v7 0/5] ARM: support for Trusted Foundations secure monito
+Message-ID: <1380904635-18113-1-git-send-email-acourbot@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2013-10-04 at 17:26 +0100, Will Deacon wrote:
-> On Fri, Oct 04, 2013 at 05:23:22PM +0100, Ian Campbell wrote:
-> > On Fri, 2013-10-04 at 17:09 +0100, Will Deacon wrote:
-> > > On Fri, Oct 04, 2013 at 08:15:08AM +0100, Ian Campbell wrote:
-> > > > Should/do we expose the actual CPU LPAE capability somewhere?
-> > > 
-> > > That's the whole point of the HWCAP.
-> > 
-> > Russell was saying it actually related to the presence of strd/ldrd, how
-> > tightly is that tied to the presence of LPAE in theory? In practise it
-> > seems closely related...
-> 
-> Take a gander at the code: we're checking the VMSA version in one of the
-> MMFR registers. LPAE implies atomic ldrd/strd, so that's what this is all
-> about (and why it ended up being called "lpae").
+Hopefully final version of this patchset. If I'm not mistaken the last thing
+that prevents Stephen from merging it is Russel's Ack. Russel, could you check
+it?
 
-Yes, I see what you mean (check for VMSA >= 5, which is "adds support
-for the Long-descriptor translation table format").
+Trusted Foundations is an ARM secure monitor that is used by many Tegra-based
+retail devices (like SHIELD). Adding support to it allows these devices to boot
+on a purely upstream kernel.
 
-You can determine the presence of ldrd/strd from this but that's a bit
-of a red herring in the context. I thought Russell was saying the kernel
-was checking for a ldrd/strd bit in some feature register and inferring
-the lpae flag in /proc/cpuinfo from that, which was why I was concerned.
+Public documentation about Trusted Foundations is scarce, but over the various
+versions of this patch it has been established that it does not follow the ARM
+SMC convention and also has no connection whatsoever with PSCI. As such, it
+requires an implementation of its own and the firmware interface introduced by
+Tomasz provides an adequate framework for it.
 
-> In short, this HWCAP does exactly what you want.
+Changes since v6:
+- Improved and simplified header conditionals when TF support is compiled in
+  or not as advised by Stephen.
 
-Agreed, thanks.
+Alexandre Courbot (5):
+  ARM: add basic support for Trusted Foundations
+  ARM: tegra: add support for Trusted Foundations
+  ARM: tegra: split setting of CPU reset handler
+  ARM: tegra: set CPU reset handler with firmware op
+  ARM: tegra: support Trusted Foundations by default
 
-Ian
+ .../arm/firmware/tl,trusted-foundations.txt        | 17 +++++
+ Documentation/devicetree/bindings/arm/tegra.txt    |  5 ++
+ .../devicetree/bindings/vendor-prefixes.txt        |  1 +
+ arch/arm/Kconfig                                   |  2 +
+ arch/arm/Makefile                                  |  1 +
+ arch/arm/configs/tegra_defconfig                   |  1 +
+ arch/arm/firmware/Kconfig                          | 28 ++++++++
+ arch/arm/firmware/Makefile                         |  1 +
+ arch/arm/firmware/trusted_foundations.c            | 77 ++++++++++++++++++++++
+ arch/arm/include/asm/trusted_foundations.h         | 64 ++++++++++++++++++
+ arch/arm/mach-tegra/Kconfig                        |  1 +
+ arch/arm/mach-tegra/common.c                       |  2 +
+ arch/arm/mach-tegra/reset.c                        | 40 +++++++----
+ 13 files changed, 229 insertions(+), 11 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/firmware/tl,trusted-foundations.txt
+ create mode 100644 arch/arm/firmware/Kconfig
+ create mode 100644 arch/arm/firmware/Makefile
+ create mode 100644 arch/arm/firmware/trusted_foundations.c
+ create mode 100644 arch/arm/include/asm/trusted_foundations.h
+
+-- 
+1.8.4
