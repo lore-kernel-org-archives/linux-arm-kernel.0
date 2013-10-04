@@ -1,98 +1,27 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri,  4 Oct 2013 14:10:11 -0600
-Subject: [PATCH stable] ARM: tegra: unify Tegra's Kconfig a bit more
-Message-ID: <1380917411-25869-1-git-send-email-swarren@wwwdotorg.org>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 4 Oct 2013 21:52:52 +0100
+Subject: [PATCH] clk: palmas: add clock driver for palmas
+In-Reply-To: <20131004193545.4343.15596@quantum>
+References: <1380803407-15196-1-git-send-email-ldewangan@nvidia.com>
+ <20131004164139.GR27287@sirena.org.uk>
+ <20131004193545.4343.15596@quantum>
+Message-ID: <20131004205252.GU27287@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stephen Warren <swarren@nvidia.com>
+On Fri, Oct 04, 2013 at 12:35:45PM -0700, Mike Turquette wrote:
 
-Move all common select clauses from ARCH_TEGRA_*_SOC to ARCH_TEGRA to
-eliminate duplication. The USB-related selects all should have been
-common too, but were missing from Tegra114 previously. Move these to
-ARCH_TEGRA too. The latter fixes a build break when only Tegra114
-support was enabled, but not Tegra20 or Tegra30 support.
+> The best solution is to have a driver claim the clock with clk_get and
+> enable it with clk_prepare_enable. I gave more detail in my reply to
+> Laxman.
 
-This is 20984c44b5a08620778ea14fa5807489170fd5ca in v3.12-rc1.
-
-Signed-off-by: Stephen Warren <swarren@nvidia.com>
-Reported-by: Paul Walmsley <pwalmsley@nvidia.com>
-[auto-builders for 3.11.x are failing due to this]
-Cc: stable # v3.11
----
- arch/arm/mach-tegra/Kconfig | 21 ++++++---------------
- 1 file changed, 6 insertions(+), 15 deletions(-)
-
-diff --git a/arch/arm/mach-tegra/Kconfig b/arch/arm/mach-tegra/Kconfig
-index add345e..e963db2 100644
---- a/arch/arm/mach-tegra/Kconfig
-+++ b/arch/arm/mach-tegra/Kconfig
-@@ -2,18 +2,24 @@ config ARCH_TEGRA
- 	bool "NVIDIA Tegra" if ARCH_MULTI_V7
- 	select ARCH_HAS_CPUFREQ
- 	select ARCH_REQUIRE_GPIOLIB
-+	select ARM_GIC
- 	select CLKDEV_LOOKUP
- 	select CLKSRC_MMIO
- 	select CLKSRC_OF
- 	select COMMON_CLK
-+	select CPU_V7
- 	select GENERIC_CLOCKEVENTS
- 	select HAVE_ARM_SCU if SMP
- 	select HAVE_ARM_TWD if LOCAL_TIMERS
- 	select HAVE_CLK
- 	select HAVE_SMP
- 	select MIGHT_HAVE_CACHE_L2X0
-+	select PINCTRL
- 	select SOC_BUS
- 	select SPARSE_IRQ
-+	select USB_ARCH_HAS_EHCI if USB_SUPPORT
-+	select USB_ULPI if USB_PHY
-+	select USB_ULPI_VIEWPORT if USB_PHY
- 	select USE_OF
- 	help
- 	  This enables support for NVIDIA Tegra based systems.
-@@ -27,15 +33,9 @@ config ARCH_TEGRA_2x_SOC
- 	select ARM_ERRATA_720789
- 	select ARM_ERRATA_754327 if SMP
- 	select ARM_ERRATA_764369 if SMP
--	select ARM_GIC
--	select CPU_V7
--	select PINCTRL
- 	select PINCTRL_TEGRA20
- 	select PL310_ERRATA_727915 if CACHE_L2X0
- 	select PL310_ERRATA_769419 if CACHE_L2X0
--	select USB_ARCH_HAS_EHCI if USB_SUPPORT
--	select USB_ULPI if USB_PHY
--	select USB_ULPI_VIEWPORT if USB_PHY
- 	help
- 	  Support for NVIDIA Tegra AP20 and T20 processors, based on the
- 	  ARM CortexA9MP CPU and the ARM PL310 L2 cache controller
-@@ -44,14 +44,8 @@ config ARCH_TEGRA_3x_SOC
- 	bool "Enable support for Tegra30 family"
- 	select ARM_ERRATA_754322
- 	select ARM_ERRATA_764369 if SMP
--	select ARM_GIC
--	select CPU_V7
--	select PINCTRL
- 	select PINCTRL_TEGRA30
- 	select PL310_ERRATA_769419 if CACHE_L2X0
--	select USB_ARCH_HAS_EHCI if USB_SUPPORT
--	select USB_ULPI if USB_PHY
--	select USB_ULPI_VIEWPORT if USB_PHY
- 	help
- 	  Support for NVIDIA Tegra T30 processor family, based on the
- 	  ARM CortexA9MP CPU and the ARM PL310 L2 cache controller
-@@ -60,10 +54,7 @@ config ARCH_TEGRA_114_SOC
- 	bool "Enable support for Tegra114 family"
- 	select HAVE_ARM_ARCH_TIMER
- 	select ARM_ERRATA_798181
--	select ARM_GIC
- 	select ARM_L1_CACHE_SHIFT_6
--	select CPU_V7
--	select PINCTRL
- 	select PINCTRL_TEGRA114
- 	help
- 	  Support for NVIDIA Tegra T114 processor family, based on the
--- 
-1.8.1.5
+Yeah, definitely - though with regulators we did find that there were
+some passive things which didn't really warrant a driver for any purpose
+other than holding the reference to them.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131004/4bf8cf3d/attachment.sig>
