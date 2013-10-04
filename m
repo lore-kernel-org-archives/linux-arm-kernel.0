@@ -1,79 +1,37 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 4 Oct 2013 16:17:47 +0200
-Subject: at91sam9263 not booting on 3.12-rc1
-In-Reply-To: <5244364E.5060103@linaro.org>
-References: <5240A95F.8000604@linaro.org>
- <CAOMZO5D6Dfh3utsK8DRNHXUZpo4sk7UmOqVchGf2hvbpoFW6Lg@mail.gmail.com>
- <5244364E.5060103@linaro.org>
-Message-ID: <524ECE0B.5040200@atmel.com>
+From: bcousson@baylibre.com (Benoit Cousson)
+Date: Fri, 04 Oct 2013 16:19:48 +0200
+Subject: [PATCH v2 5/9] am33xx: dts: Fix AES interrupt number
+In-Reply-To: <1380553986-15910-6-git-send-email-joelf@ti.com>
+References: <1380553986-15910-1-git-send-email-joelf@ti.com>
+ <1380553986-15910-6-git-send-email-joelf@ti.com>
+Message-ID: <524ECE84.6030902@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
+On 30/09/2013 17:13, Joel Fernandes wrote:
+> Signed-off-by: Joel Fernandes <joelf@ti.com>
 
-On 26/09/2013 15:27, Daniel Lezcano :
-> On 09/23/2013 11:31 PM, Fabio Estevam wrote:
->> On Mon, Sep 23, 2013 at 5:49 PM, Daniel Lezcano
->> <daniel.lezcano@linaro.org> wrote:
->>
->>> So I enabled the CONFIG_USE_OF, the dtb are correctly generated.
->>>
->>> I tried to boot again, specifying the dtb address with bootm.
->>>
->>> tftp 0x20000000 /var/lib/tftpboot/at91/arch/arm/boot/usb_a9263.dtb
->>>
->>> tftp 0x21000000 /var/lib/tftpboot/at91/arch/arm/boot/uImage
->>>
->>> bootm 0x21000000 - 0x20000000
->>>
->>> but without success.
->>>
->>> I am wondering what I could be doing wrong ...
->>>
->>> Any help would be appreciate.
->>>
->>>     -- Daniel
->>>
->>>
->>> ps: u-boot is "U-Boot 2010.09 (Oct 27 2010 - 12:28:54)"
->>
->> I am not familiar with this board, but most likely this old U-boot
->> does not support dtb booting.
->> You can check whether "#define CONFIG_OF_LIBFDT" is included in your
->> board config file.
->>
->> You could also try to update the bootloader or try to generate a
->> kernel + dtb image (need to select CONFIG_ARM_APPENDED_DTB option in
->> the kernel).
+Even if this is obvious, a small changelog is always recommended.
+
+
+Thanks,
+Benoit
+
+> ---
+>   arch/arm/boot/dts/am33xx.dtsi | 2 +-
+>   1 file changed, 1 insertion(+), 1 deletion(-)
 >
-> Hi Fabio,
+> diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
+> index 0daa1b2..d7be90a 100644
+> --- a/arch/arm/boot/dts/am33xx.dtsi
+> +++ b/arch/arm/boot/dts/am33xx.dtsi
+> @@ -724,7 +724,7 @@
+>   			compatible = "ti,omap4-aes";
+>   			ti,hwmods = "aes";
+>   			reg = <0x53500000 0xa0>;
+> -			interrupts = <102>;
+> +			interrupts = <103>;
+>   			dmas = <&edma 6
+>   				&edma 5>;
+>   			dma-names = "tx", "rx";
 >
-> thanks for your answer. It took me awhile to setup everything and find
-> the right tools.
->
-> So I tried CONFIG_ARM_APPENDED_DTB but that does not work. I did not
-> give much credit to that as it is flagged experimental.
-
-Well I managed to use this technique successfully several of times. But 
-maybe you still have to modify the machine ID.
-
-> Then I tried to flash a more recent u-boot but something went wrong. I
-> have still the FlashRom prompt but the ttyACM0 where I can upload the
-> u-boot does not appear anymore on my system.
->
-> I am totally stuck at this point ...
-
-I hope that Jean-Christophe can help you with this as he is aware of the 
-Calao boards.
-
-There is probably a way to recover access to the SAM-BA prompt that will 
-allow you to regain access to the flashing process. I have just fount 
-this wiki page:
-http://www.calao-systems.com/mediawiki/index.php?title=USB-A9263_Software#How_to_install_SAM-BA_from_buildroot
-
-BTW, I think you should use barebox instead of u-boot as the support 
-should be more complete.
-
-Bye,
--- 
-Nicolas Ferre
