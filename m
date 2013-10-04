@@ -1,76 +1,31 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Fri, 4 Oct 2013 18:34:39 +0300
-Subject: [PATCHv7 00/36] ARM: OMAP: clock data conversion to DT
-In-Reply-To: <1380098922-30340-1-git-send-email-t-kristo@ti.com>
-References: <1380098922-30340-1-git-send-email-t-kristo@ti.com>
-Message-ID: <524EE00F.7010208@ti.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 4 Oct 2013 16:37:42 +0100
+Subject: [PATCH 2/2] ARM: include: asm: use 'int' instead of 'unsigned
+ long' for normal register variables within atomic.h
+In-Reply-To: <524E8FBC.2080200@asianux.com>
+References: <5247A3FC.9020508@asianux.com>
+ <20130930161149.GI26036@mudshark.cambridge.arm.com>
+ <524A2DE7.8040208@asianux.com>
+ <20131001090119.GA17629@mudshark.cambridge.arm.com>
+ <524ABA20.6060106@asianux.com>
+ <20131002104158.GD28311@mudshark.cambridge.arm.com>
+ <524C3981.20307@asianux.com> <524D416B.5090709@asianux.com>
+ <20131003163200.GE7408@mudshark.cambridge.arm.com>
+ <524E8FBC.2080200@asianux.com>
+Message-ID: <20131004153742.GR24303@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, Oct 04, 2013 at 10:51:56AM +0100, Chen Gang wrote:
+> On 10/04/2013 12:32 AM, Will Deacon wrote:
+> > The problem with arm64 is that we're using *unsigned long* for 32-bit
+> > clear_mask, which is definitely wrong because it's 64-bit (another patch to
+> > fix this!).
+> > 
+> 
+> At least, that is not a bug.
 
-Just a gentle reminder, anybody have any comments on this series or 
-should we start queuing stuff?
+Sure it is. What if the adjacent 32-bit value was being accessed by another
+CPU under a spinlock?
 
--Tero
-
-On 09/25/2013 11:48 AM, Tero Kristo wrote:
-> Hi all,
->
-> Version 7 contains following high level changes:
-> - Dropped support for basic bindings from Mike Turquette, instead using
->    vendor specific bindings for all clocks
-> - Mux clock + divider clock vendor specific bindings get rid of use
->    of the bit-masks, instead these are generated runtime based on parent
->    clock / divider min/max info, see individual patches for details
-> - Added support for dummy_ck nodes, was missing from previous version
-> - Fixed support for omap3630
-> - Added support for new clock node type: ti,mux-gate-clock (using composite
->    clock type)
-> - OMAP4 / OMAP5 only build fixes (compiler flag checks added to some files)
-> - most of the of_omap_* calls renamed to of_ti_*
-> - Rebased on top of v3.12-rc2
->
-> Some detailed comments about patch level changes (if no mention, no major
-> changes):
-> - Patch #1:
->    * removed use of reg-names property, instead registers mapped using
->      compatible string
->    * removed ti,modes property, instead uses DPLL mode flags now
->    * separated AM33XX DPLLs under their own compatible strings
-> - Patch #4 & #5: new patches
-> - Patch #6: merged basic gate support from Mike to this patch as vendor
->    specific gate clock support
-> - Patch #9 & #10: new patches
-> - Patch #11: dummy clocks added, USB / ABE DPLL setup ordering changed
-> - Patch #14: dummy clocks added
-> - Patch #20: dropped usage of reg-names property
-> - Patch #21: dummy clocks added
-> - Patch #22 & #23: new patches
-> - Patch #30: AM35XX clock data added to this patch
-> - Patch #31:
->    * dummy clocks added
->    * added missing 3630 clocks
->
-> Test branch available here:
-> https://github.com/t-kristo/linux-pm.git
-> branch: mainline-3.12-rc2-ti-dt-clks-v7
->
-> Testing done:
-> - am335x-bone : boot only
-> - omap5-sevm : boot only
-> - dra7-evm : boot only
-> - omap3-beagle : boot + suspend/resume (ret + off)
-> - omap4-panda-es : boot + suspend/resume
->
-> Nishanth has also been doing some tests with omap3-beagle-xm with some WIP
-> versions of this branch, but not with this latest one. Nishanth, maybe you
-> can provide test results to this one also?
->
-> -Tero
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->
+Will
