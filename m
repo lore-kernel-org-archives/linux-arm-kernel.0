@@ -1,40 +1,33 @@
-From: pwalmsley@nvidia.com (Paul Walmsley)
-Date: Thu, 3 Oct 2013 23:27:57 -0700
-Subject: Tegra baseline test results for v3.12-rc3
-Message-ID: <524E5FED.4010009@nvidia.com>
+From: alexei.starovoitov@gmail.com (Alexei Starovoitov)
+Date: Thu, 3 Oct 2013 23:30:41 -0700
+Subject: [PATCH v3 net-next] fix unsafe set_memory_rw from softirq
+In-Reply-To: <1380863798.3564.12.camel@edumazet-glaptop.roam.corp.google.com>
+References: <1380859875-31025-1-git-send-email-ast@plumgrid.com>
+ <1380863798.3564.12.camel@edumazet-glaptop.roam.corp.google.com>
+Message-ID: <CAADnVQJq7r-e=vQBcvMqxEkFVzMjn=EaZ99j2boPj+YJBAhKxw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here are some basic Tegra test results for Linux v3.12-rc3.
-Logs and other details at:
+On Thu, Oct 3, 2013 at 10:16 PM, Eric Dumazet <eric.dumazet@gmail.com> wrote:
+> On Thu, 2013-10-03 at 21:11 -0700, Alexei Starovoitov wrote:
+>
+> -static inline unsigned int sk_filter_len(const struct sk_filter *fp)
+> +static inline unsigned int sk_filter_size(const struct sk_filter *fp,
+> +                                         unsigned int proglen)
+>  {
+> -       return fp->len * sizeof(struct sock_filter) + sizeof(*fp);
+> +       return max(sizeof(*fp),
+> +                  offsetof(struct sk_filter, insns[proglen]));
+>  }
 
-     http://nvt.pwsan.com/pub/linux/testlogs/test_v3.12-rc3/20130929153116/
+indeed that's cleaner.
+Like this then:
+-static inline unsigned int sk_filter_len(const struct sk_filter *fp)
++static inline unsigned int sk_filter_size(unsigned int proglen)
+ {
+-       return fp->len * sizeof(struct sock_filter) + sizeof(*fp);
++       return max(sizeof(struct sk_filter),
++                  offsetof(struct sk_filter, insns[proglen]));
+ }
 
-
-Test summary
-------------
-
-Build: zImage:
-     Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
-
-Boot to userspace: multi_v7_defconfig:
-     Pass: ( 2/ 2): tegra114-dalmore-headless, tegra30-beaver
-
-Boot to userspace: tegra_defconfig:
-     Pass: ( 2/ 2): tegra114-dalmore-headless, tegra30-beaver
-
-
-vmlinux object size
-(delta in bytes from test_v3.12-rc2 (4a10c2ac2f368583138b774ca41fac4207911983)):
-    text     data      bss    total  kernel
-    +788        0        0     +788  multi_v7_defconfig
-    +744       +8        0     +752  tegra_defconfig
-
-
-Boot-time memory difference
-(delta in bytes from test_v3.12-rc2 (4a10c2ac2f368583138b774ca41fac4207911983))
-     avail    rsrvd     high    freed                board              kconfig                  dtb
-         .        .        .        . tegra114-dalmore-hea   multi_v7_defconfig     tegra114-dalmore
-         .        .        .        . tegra114-dalmore-hea      tegra_defconfig     tegra114-dalmore
-         .        .        .        .       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
-         .        .        .        .       tegra30-beaver      tegra_defconfig       tegra30-beaver
+testing it... will send v4 shortly
