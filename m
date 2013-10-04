@@ -1,43 +1,23 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 4 Oct 2013 10:50:49 +0200
-Subject: [PATCH] dma: atmel-dma: correct typo in the device tree bindings
- documentation
-In-Reply-To: <1380876411-706-1-git-send-email-ludovic.desroches@atmel.com>
-References: <1380876411-706-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <524E8169.6010801@atmel.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 4 Oct 2013 09:46:43 +0100
+Subject: [PATCH v3 6/6] ARM: mm: Change the order of TLB/cache
+ maintenance operations.
+In-Reply-To: <1380835081-12129-7-git-send-email-santosh.shilimkar@ti.com>
+References: <1380835081-12129-1-git-send-email-santosh.shilimkar@ti.com>
+ <1380835081-12129-7-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <20131004084643.GJ12758@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/10/2013 10:46, ludovic.desroches at atmel.com :
-> From: Ludovic Desroches <ludovic.desroches@atmel.com>
->
-> The value to set ASAP mode for FIFO configuration is 2 instead of 1.
->
-> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+On Thu, Oct 03, 2013 at 05:18:00PM -0400, Santosh Shilimkar wrote:
+> From: Sricharan R <r.sricharan@ti.com>
+> 
+> As per the arm ARMv7 manual, the sequence of TLB maintenance
+> operations after making changes to the translation table is
+> to clean the dcache first, then invalidate the TLB. With
+> the current sequence we see cache corruption when the
+> flush_cache_all is called after tlb_flush_all.
 
-Yes, sure: thanks for having corrected it!
-
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-
-> ---
->   Documentation/devicetree/bindings/dma/atmel-dma.txt | 2 +-
->   1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/Documentation/devicetree/bindings/dma/atmel-dma.txt b/Documentation/devicetree/bindings/dma/atmel-dma.txt
-> index c280a0e..434f74e 100644
-> --- a/Documentation/devicetree/bindings/dma/atmel-dma.txt
-> +++ b/Documentation/devicetree/bindings/dma/atmel-dma.txt
-> @@ -28,7 +28,7 @@ The three cells in order are:
->   dependant:
->     - bit 7-0: peripheral identifier for the hardware handshaking interface. The
->     identifier can be different for tx and rx.
-> -  - bit 11-8: FIFO configuration. 0 for half FIFO, 1 for ALAP, 1 for ASAP.
-> +  - bit 11-8: FIFO configuration. 0 for half FIFO, 1 for ALAP, 2 for ASAP.
->
->   Example:
->
->
-
-
--- 
-Nicolas Ferre
+This needs testing on ARMv4 CPUs which don't have a way to flush the
+cache except by reading memory - hence they need the new page table
+entries to be visible to the MMU before calling flush_cache_all().
