@@ -1,89 +1,54 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri,  4 Oct 2013 21:03:38 +0200
-Subject: [PATCH v3 2/3] ARM: move AES typedefs and function prototypes to
- separate header
-In-Reply-To: <1380913419-13296-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1380913419-13296-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1380913419-13296-3-git-send-email-ard.biesheuvel@linaro.org>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Fri, 4 Oct 2013 15:22:33 -0400 (EDT)
+Subject: [GIT PULL] big.LITTLE switcher support, part 2
+Message-ID: <alpine.LFD.2.03.1310041501380.3023@syhkavp.arg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Put the struct definitions for AES keys and the asm function prototypes in a
-separate header and export the asm functions from the module.
-This allows other drivers to use them directly.
+Russell, please pull the following:
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm/crypto/aes_glue.c | 22 ++++++----------------
- arch/arm/crypto/aes_glue.h | 19 +++++++++++++++++++
- 2 files changed, 25 insertions(+), 16 deletions(-)
- create mode 100644 arch/arm/crypto/aes_glue.h
+  git://git.linaro.org/people/nico/linux iks_for_rmk
 
-diff --git a/arch/arm/crypto/aes_glue.c b/arch/arm/crypto/aes_glue.c
-index 59f7877..3003fa1 100644
---- a/arch/arm/crypto/aes_glue.c
-+++ b/arch/arm/crypto/aes_glue.c
-@@ -6,22 +6,12 @@
- #include <linux/crypto.h>
- #include <crypto/aes.h>
- 
--#define AES_MAXNR 14
-+#include "aes_glue.h"
- 
--typedef struct {
--	unsigned int rd_key[4 *(AES_MAXNR + 1)];
--	int rounds;
--} AES_KEY;
--
--struct AES_CTX {
--	AES_KEY enc_key;
--	AES_KEY dec_key;
--};
--
--asmlinkage void AES_encrypt(const u8 *in, u8 *out, AES_KEY *ctx);
--asmlinkage void AES_decrypt(const u8 *in, u8 *out, AES_KEY *ctx);
--asmlinkage int private_AES_set_decrypt_key(const unsigned char *userKey, const int bits, AES_KEY *key);
--asmlinkage int private_AES_set_encrypt_key(const unsigned char *userKey, const int bits, AES_KEY *key);
-+EXPORT_SYMBOL(AES_encrypt);
-+EXPORT_SYMBOL(AES_decrypt);
-+EXPORT_SYMBOL(private_AES_set_encrypt_key);
-+EXPORT_SYMBOL(private_AES_set_decrypt_key);
- 
- static void aes_encrypt(struct crypto_tfm *tfm, u8 *dst, const u8 *src)
- {
-@@ -81,7 +71,7 @@ static struct crypto_alg aes_alg = {
- 		.cipher	= {
- 			.cia_min_keysize	= AES_MIN_KEY_SIZE,
- 			.cia_max_keysize	= AES_MAX_KEY_SIZE,
--			.cia_setkey			= aes_set_key,
-+			.cia_setkey		= aes_set_key,
- 			.cia_encrypt		= aes_encrypt,
- 			.cia_decrypt		= aes_decrypt
- 		}
-diff --git a/arch/arm/crypto/aes_glue.h b/arch/arm/crypto/aes_glue.h
-new file mode 100644
-index 0000000..cca3e51
---- /dev/null
-+++ b/arch/arm/crypto/aes_glue.h
-@@ -0,0 +1,19 @@
-+
-+#define AES_MAXNR 14
-+
-+struct AES_KEY {
-+	unsigned int rd_key[4 * (AES_MAXNR + 1)];
-+	int rounds;
-+};
-+
-+struct AES_CTX {
-+	struct AES_KEY enc_key;
-+	struct AES_KEY dec_key;
-+};
-+
-+asmlinkage void AES_encrypt(const u8 *in, u8 *out, struct AES_KEY *ctx);
-+asmlinkage void AES_decrypt(const u8 *in, u8 *out, struct AES_KEY *ctx);
-+asmlinkage int private_AES_set_decrypt_key(const unsigned char *userKey,
-+					   const int bits, struct AES_KEY *key);
-+asmlinkage int private_AES_set_encrypt_key(const unsigned char *userKey,
-+					   const int bits, struct AES_KEY *key);
--- 
-1.8.1.2
+This is the second set of patches towards a fully functional and 
+production quality switcher solution for big.LITTLE systems, 
+establishing a landmark to compare against for any scheduler based 
+solution meant to eventually surpass the switcher's power efficiency 
+available in the mainline kernel.
+
+This is based on your devel-stable as of now in order to get the first
+set of patches.
+
+The shortlog and diffstat follow:
+
+Dave Martin (7):
+      ARM: bL_switcher: Add synchronous enable/disable interface
+      ARM: bL_switcher: Add runtime control notifier
+      ARM: bL_switcher: Add switch completion callback for bL_switch_request()
+      ARM: bL_switcher: Basic trace events support
+      ARM: bL_switcher/trace: Add trace trigger for trace bootstrapping
+      ARM: bL_switcher/trace: Add kernel trace trigger interface
+      ARM: bL_switcher: Add query interface to discover CPU affinities
+
+Nicolas Pitre (6):
+      ARM: bL_switcher: synchronize the outbound with the inbound
+      ARM: SMP: basic IPI triggered completion support
+      ARM: mcpm: add a simple poke mechanism to the early entry code
+      ARM: GIC: function to retrieve the physical address of the SGIR
+      ARM: GIC: interface to send a SGI directly
+      ARM: bL_switcher: wait until inbound is alive before performing a switch
+
+ arch/arm/common/bL_switcher.c            | 264 ++++++++++++++++++++++---
+ arch/arm/common/mcpm_entry.c             |  12 ++
+ arch/arm/common/mcpm_head.S              |  16 +-
+ arch/arm/include/asm/bL_switcher.h       |  62 +++++-
+ arch/arm/include/asm/hardirq.h           |   2 +-
+ arch/arm/include/asm/mcpm.h              |   8 +
+ arch/arm/include/asm/smp.h               |   2 +
+ arch/arm/kernel/smp.c                    |  21 ++
+ drivers/irqchip/irq-gic.c                |  43 ++++
+ include/linux/irqchip/arm-gic.h          |   2 +
+ include/trace/events/power_cpu_migrate.h |  67 +++++++
+ 11 files changed, 471 insertions(+), 28 deletions(-)
+
+
+Nicolas
