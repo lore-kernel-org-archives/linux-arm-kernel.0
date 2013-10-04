@@ -1,42 +1,28 @@
 From: mpa@pengutronix.de (Markus Pargmann)
-Date: Fri,  4 Oct 2013 12:44:09 +0200
-Subject: [PATCH v3 4/4] dma: mxs-dma: Update state after channel reset
-In-Reply-To: <1380883449-8649-1-git-send-email-mpa@pengutronix.de>
-References: <1380883449-8649-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <1380883449-8649-5-git-send-email-mpa@pengutronix.de>
+Date: Fri,  4 Oct 2013 12:44:05 +0200
+Subject: [PATCH v3 0/4] dma: mxs-dma bugfixes and cleanup
+Message-ID: <1380883449-8649-1-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After a channel reset, the channel stops running automatically. The
-state update was missing so that a channel perperation right after a
-channel reset failed.
+in v3 I dropped patch 2 from v2 (dma: mxs-dma: Pause channel while prep_dma_cyclic).
+It seems to be fixed by one of the other patches.
 
-Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
----
- drivers/dma/mxs-dma.c | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+On i.MX28 a channel reset can cause a channel failure until DMA engine reset.
+I added a patch to observe the DMA state machine and wait for a suitable state.
+The other patch fixes the dma channel software state when a interrupt occures on
+a DMA channel that is not active after a reset.
 
-diff --git a/drivers/dma/mxs-dma.c b/drivers/dma/mxs-dma.c
-index 98de9a7..e284395 100644
---- a/drivers/dma/mxs-dma.c
-+++ b/drivers/dma/mxs-dma.c
-@@ -234,6 +234,8 @@ static void mxs_dma_reset_chan(struct mxs_dma_chan *mxs_chan)
- 		writel(1 << (chan_id + BP_APBHX_CHANNEL_CTRL_RESET_CHANNEL),
- 			mxs_dma->base + HW_APBHX_CHANNEL_CTRL + STMP_OFFSET_REG_SET);
- 	}
-+
-+	mxs_chan->status = DMA_SUCCESS;
- }
- 
- static void mxs_dma_enable_chan(struct mxs_dma_chan *mxs_chan)
-@@ -361,7 +363,7 @@ static irqreturn_t mxs_dma_int_handler(int irq, void *dev_id)
- 			chan);
- 		mxs_chan->status = DMA_ERROR;
- 		mxs_dma_reset_chan(mxs_chan);
--	} else {
-+	} else if (mxs_chan->status != DMA_SUCCESS) {
- 		if (mxs_chan->flags & MXS_DMA_SG_LOOP)
- 			mxs_chan->status = DMA_IN_PROGRESS;
- 		else
--- 
-1.8.4.rc3
+Regards,
+
+Markus
+
+
+Markus Pargmann (4):
+      dma: mxs-dma: Cleanup interrupt handler
+      dma: mxs-dma: Report correct residue for cyclic DMA
+      dma: mxs-dma: Fix channel reset hardware bug
+      dma: mxs-dma: Update state after channel reset
+
+ drivers/dma/mxs-dma.c | 145 ++++++++++++++++++++++++++++++++++++--------------
+ 1 file changed, 106 insertions(+), 39 deletions(-)
