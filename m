@@ -1,44 +1,44 @@
 From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Fri, 4 Oct 2013 14:34:01 -0400 (EDT)
+Date: Fri, 4 Oct 2013 14:39:29 -0400 (EDT)
 Subject: [PATCH v2 0/3] ARM: NEON based fast(er) AES in CBC/CTR/XTS modes
-In-Reply-To: <20131004174853.GY24303@mudshark.cambridge.arm.com>
+In-Reply-To: <20131004182353.GQ12758@n2100.arm.linux.org.uk>
 References: <1380837566-18242-1-git-send-email-ard.biesheuvel@linaro.org>
  <20131004174853.GY24303@mudshark.cambridge.arm.com>
-Message-ID: <alpine.LFD.2.03.1310041420520.3023@syhkavp.arg>
+ <CAKv+Gu8RdiGw2+o-1ybGTx4fxaGnDQP7duhcFaLuxDphADjMaQ@mail.gmail.com>
+ <20131004182353.GQ12758@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.03.1310041435570.3023@syhkavp.arg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 4 Oct 2013, Will Deacon wrote:
+On Fri, 4 Oct 2013, Russell King - ARM Linux wrote:
 
-> Hi Ard,
+> Also, remember that the GPL says:
 > 
-> On Thu, Oct 03, 2013 at 10:59:23PM +0100, Ard Biesheuvel wrote:
-> > Note to reviewers:
-> > Reviewing the file aesbs-core.S may be a bit overwhelming, so if there are any
-> > questions or concerns, please refer the file bsaes-armv7.pl which can be found
-> > at the link below. This is the original Perl script that gets called by
-> > OpenSSL's build system during their build to generate the .S file on the fly.
-> > [In the case of OpenSSL, this is used in some cases to target different
-> > assemblers or ABIs]. This arrangement is not suitable (or required) for the
-> > kernel, so I have taken the generated .S file instead.
-> > 
-> >     http://git.openssl.org/gitweb/?p=openssl.git;a=commit;h=6f6a6130
-> > 
-> > This series still depends on commit a62b01cd (crypto: create generic version of
-> > ablk_helper) which I omitted this time but which can be found in the cryptodev
-> > tree or in linux-next.
+> "The source code for a work means the preferred form of the work for
+> making modifications to it."
 > 
-> Why do you consider it unsuitable to ship the perl script with the kernel?
-> Perl 5 is already documented as a build dependency in Documentation/Changes
+> So here's the question: is the assembly code the perferred form to make
+> modifications?  From what you're saying above, the answer to that seems
+> to be no.  Now, I'm not going to throw toys out of the pram and say
+> that this is a hard requirement, but just take a moment to think about
+> how we treat vendors who don't do this, instead supplying "non-preferred"
+> forms of source code, and think about whether there's double standards
+> here.
+> 
+> Now, while I can imagine that people have an ideological objection to
+> perl (using comments like "write only code" etc) that's not a good
+> enough excuse to avoid including the perferred form for future
+> modification.
+> 
+> Now, we have mechanisms in the kernel build where we can include a
+> prepared source which can be used to lessen the burden on the toolset
+> required to build the kernel.  So, including both the perl script and
+> the pre-generated assembly is entirely acceptable.  This tends to
+> nullify the excuse that "we don't want to add additional tool burden
+> to kbuild" argument.
 
-Do you have an example of something that does require perl to build the 
-kernel on ARM?  I was under the impression that people try to avoid it 
-as much as possible in general.
-
-I'm personally sitting on the fence between effectively adding a new 
-kernel build dependencies or carrying the output of the perl script.  
-But if the kernel build does already require perl in practice then this 
-might tip the balance.
+Those are very good arguments.  And I agree with your recommendation as 
+well.
 
 
 Nicolas
