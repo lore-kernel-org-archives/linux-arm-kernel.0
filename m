@@ -1,10 +1,10 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sat,  5 Oct 2013 16:17:55 +0200
-Subject: [PATCH 3/4] Documentation: dt: Remove interrupt sources list for
+Date: Sat,  5 Oct 2013 16:17:56 +0200
+Subject: [PATCH 4/4] Documentation: dt: Remove clock gates IDs list for
  Allwinner SoCs
 In-Reply-To: <1380982676-10055-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1380982676-10055-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1380982676-10055-3-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1380982676-10055-4-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,182 +15,470 @@ this, since it should live in the DT anyway.
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 Cc: Mark Rutland <mark.rutland@arm.com>
 ---
- .../interrupt-controller/allwinner,sun4i-ic.txt    |  3 -
- .../interrupt-controller/sunxi/sun4i-a10.txt       | 89 ----------------------
- .../interrupt-controller/sunxi/sun5i-a13.txt       | 55 -------------
- 3 files changed, 147 deletions(-)
- delete mode 100644 Documentation/devicetree/bindings/interrupt-controller/sunxi/sun4i-a10.txt
- delete mode 100644 Documentation/devicetree/bindings/interrupt-controller/sunxi/sun5i-a13.txt
+ Documentation/devicetree/bindings/clock/sunxi.txt  |  4 +-
+ .../bindings/clock/sunxi/sun4i-a10-gates.txt       | 93 --------------------
+ .../bindings/clock/sunxi/sun5i-a10s-gates.txt      | 75 -----------------
+ .../bindings/clock/sunxi/sun5i-a13-gates.txt       | 58 -------------
+ .../bindings/clock/sunxi/sun6i-a31-gates.txt       | 83 ------------------
+ .../bindings/clock/sunxi/sun7i-a20-gates.txt       | 98 ----------------------
+ 6 files changed, 2 insertions(+), 409 deletions(-)
+ delete mode 100644 Documentation/devicetree/bindings/clock/sunxi/sun4i-a10-gates.txt
+ delete mode 100644 Documentation/devicetree/bindings/clock/sunxi/sun5i-a10s-gates.txt
+ delete mode 100644 Documentation/devicetree/bindings/clock/sunxi/sun5i-a13-gates.txt
+ delete mode 100644 Documentation/devicetree/bindings/clock/sunxi/sun6i-a31-gates.txt
+ delete mode 100644 Documentation/devicetree/bindings/clock/sunxi/sun7i-a20-gates.txt
 
-diff --git a/Documentation/devicetree/bindings/interrupt-controller/allwinner,sun4i-ic.txt b/Documentation/devicetree/bindings/interrupt-controller/allwinner,sun4i-ic.txt
-index 57edb30..3d3b2b9 100644
---- a/Documentation/devicetree/bindings/interrupt-controller/allwinner,sun4i-ic.txt
-+++ b/Documentation/devicetree/bindings/interrupt-controller/allwinner,sun4i-ic.txt
-@@ -8,9 +8,6 @@ Required properties:
- - #interrupt-cells : Specifies the number of cells needed to encode an
-   interrupt source. The value shall be 1.
+diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
+index 00a5c264..91a748f 100644
+--- a/Documentation/devicetree/bindings/clock/sunxi.txt
++++ b/Documentation/devicetree/bindings/clock/sunxi.txt
+@@ -45,8 +45,8 @@ Additionally, "allwinner,*-gates-clk" clocks require:
  
--For the valid interrupt sources for your SoC, see the documentation in
--sunxi/<soc>.txt
--
- Example:
+ Clock consumers should specify the desired clocks they use with a
+ "clocks" phandle cell. Consumers that are using a gated clock should
+-provide an additional ID in their clock property. The values of this
+-ID are documented in sunxi/<soc>-gates.txt.
++provide an additional ID in their clock property. This ID is the
++offset of the bit controlling this particular gate in the register.
  
- intc: interrupt-controller {
-diff --git a/Documentation/devicetree/bindings/interrupt-controller/sunxi/sun4i-a10.txt b/Documentation/devicetree/bindings/interrupt-controller/sunxi/sun4i-a10.txt
+ For example:
+ 
+diff --git a/Documentation/devicetree/bindings/clock/sunxi/sun4i-a10-gates.txt b/Documentation/devicetree/bindings/clock/sunxi/sun4i-a10-gates.txt
 deleted file mode 100644
-index 76b98c8..0000000
---- a/Documentation/devicetree/bindings/interrupt-controller/sunxi/sun4i-a10.txt
+index 6a03475..0000000
+--- a/Documentation/devicetree/bindings/clock/sunxi/sun4i-a10-gates.txt
 +++ /dev/null
-@@ -1,89 +0,0 @@
--Allwinner A10 (sun4i) interrupt sources
-----------------------------------------
+@@ -1,93 +0,0 @@
+-Gate clock outputs
+-------------------
 -
--The interrupt sources available for the Allwinner A10 SoC are the
--following one:
+-  * AXI gates ("allwinner,sun4i-axi-gates-clk")
 -
--0: ENMI
--1: UART0
--2: UART1
--3: UART2
--4: UART3
--5: IR0
--6: IR1
--7: I2C0
--8: I2C1
--9: I2C2
--10: SPI0
--11: SPI1
--12: SPI2
--13: SPDIF
--14: AC97
--15: TS
--16: I2S
--17: UART4
--18: UART5
--19: UART6
--20: UART7
--21: KEYPAD
--22: TIMER0
--23: TIMER1
--24: TIMER2
--25: TIMER3
--26: CAN
--27: DMA
--28: PIO
--29: TOUCH_PANEL
--30: AUDIO_CODEC
--31: LRADC
--32: MMC0
--33: MMC1
--34: MMC2
--35: MMC3
--36: MEMSTICK
--37: NAND
--38: USB0
--39: USB1
--40: USB2
--41: SCR
--42: CSI0
--43: CSI1
--44: LCDCTRL0
--45: LCDCTRL1
--46: MP
--47: DEFEBE0
--48: DEFEBE1
--49: PMU
--50: SPI3
--51: TZASC
--52: PATA
--53: VE
--54: SS
--55: EMAC
--56: SATA
--57: GPS
--58: HDMI
--59: TVE
--60: ACE
--61: TVD
--62: PS2_0
--63: PS2_1
--64: USB3
--65: USB4
--66: PLE_PFM
--67: TIMER4
--68: TIMER5
--69: GPU_GP
--70: GPU_GPMMU
--71: GPU_PP0
--72: GPU_PPMMU0
--73: GPU_PMU
--74: GPU_RSV0
--75: GPU_RSV1
--76: GPU_RSV2
--77: GPU_RSV3
--78: GPU_RSV4
--79: GPU_RSV5
--80: GPU_RSV6
--82: SYNC_TIMER0
--83: SYNC_TIMER1
-diff --git a/Documentation/devicetree/bindings/interrupt-controller/sunxi/sun5i-a13.txt b/Documentation/devicetree/bindings/interrupt-controller/sunxi/sun5i-a13.txt
+-    DRAM					0
+-
+-  * AHB gates ("allwinner,sun4i-ahb-gates-clk")
+-
+-    USB0					0
+-    EHCI0					1
+-    OHCI0					2*
+-    EHCI1					3
+-    OHCI1					4*
+-    SS						5
+-    DMA						6
+-    BIST					7
+-    MMC0					8
+-    MMC1					9
+-    MMC2					10
+-    MMC3					11
+-    MS						12**
+-    NAND					13
+-    SDRAM					14
+-
+-    ACE						16
+-    EMAC					17
+-    TS						18
+-
+-    SPI0					20
+-    SPI1					21
+-    SPI2					22
+-    SPI3					23
+-    PATA					24
+-    SATA					25**
+-    GPS						26*
+-
+-    VE						32
+-    TVD						33
+-    TVE0					34
+-    TVE1					35
+-    LCD0					36
+-    LCD1					37
+-
+-    CSI0					40
+-    CSI1					41
+-
+-    HDMI					43
+-    DE_BE0					44
+-    DE_BE1					45
+-    DE_FE1					46
+-    DE_FE1					47
+-
+-    MP						50
+-
+-    MALI400					52
+-
+-  * APB0 gates ("allwinner,sun4i-apb0-gates-clk")
+-
+-    CODEC					0
+-    SPDIF					1*
+-    AC97					2
+-    IIS						3
+-
+-    PIO						5
+-    IR0						6
+-    IR1						7
+-
+-    KEYPAD					10
+-
+-  * APB1 gates ("allwinner,sun4i-apb1-gates-clk")
+-
+-    I2C0					0
+-    I2C1					1
+-    I2C2					2
+-
+-    CAN						4
+-    SCR						5
+-    PS20					6
+-    PS21					7
+-
+-    UART0					16
+-    UART1					17
+-    UART2					18
+-    UART3					19
+-    UART4					20
+-    UART5					21
+-    UART6					22
+-    UART7					23
+-
+-Notation:
+- [*]:  The datasheet didn't mention these, but they are present on AW code
+- [**]: The datasheet had this marked as "NC" but they are used on AW code
+diff --git a/Documentation/devicetree/bindings/clock/sunxi/sun5i-a10s-gates.txt b/Documentation/devicetree/bindings/clock/sunxi/sun5i-a10s-gates.txt
 deleted file mode 100644
-index 2ec3b5c..0000000
---- a/Documentation/devicetree/bindings/interrupt-controller/sunxi/sun5i-a13.txt
+index d24279f..0000000
+--- a/Documentation/devicetree/bindings/clock/sunxi/sun5i-a10s-gates.txt
 +++ /dev/null
-@@ -1,55 +0,0 @@
--Allwinner A13 (sun5i) interrupt sources
-----------------------------------------
+@@ -1,75 +0,0 @@
+-Gate clock outputs
+-------------------
 -
--The interrupt sources available for the Allwinner A13 SoC are the
--following one:
+-  * AXI gates ("allwinner,sun4i-axi-gates-clk")
 -
--0: ENMI
--2: UART1
--4: UART3
--5: IR
--7: I2C0
--8: I2C1
--9: I2C2
--10: SPI0
--11: SPI1
--12: SPI2
--22: TIMER0
--23: TIMER1
--24: TIMER2
--25: TIMER3
--27: DMA
--28: PIO
--29: TOUCH_PANEL
--30: AUDIO_CODEC
--31: LRADC
--32: MMC0
--33: MMC1
--34: MMC2
--37: NAND
--38: USB OTG
--39: USB EHCI
--40: USB OHCI
--42: CSI
--44: LCDCTRL
--47: DEFEBE
--49: PMU
--53: VE
--54: SS
--66: PLE_PFM
--67: TIMER4
--68: TIMER5
--69: GPU_GP
--70: GPU_GPMMU
--71: GPU_PP0
--72: GPU_PPMMU0
--73: GPU_PMU
--74: GPU_RSV0
--75: GPU_RSV1
--76: GPU_RSV2
--77: GPU_RSV3
--78: GPU_RSV4
--79: GPU_RSV5
--80: GPU_RSV6
--82: SYNC_TIMER0
--83: SYNC_TIMER1
+-    DRAM					0
+-
+-  * AHB gates ("allwinner,sun5i-a10s-ahb-gates-clk")
+-
+-    USB0					0
+-    EHCI0					1
+-    OHCI0					2
+-
+-    SS						5
+-    DMA						6
+-    BIST					7
+-    MMC0					8
+-    MMC1					9
+-    MMC2					10
+-
+-    NAND					13
+-    SDRAM					14
+-
+-    EMAC					17
+-    TS						18
+-
+-    SPI0					20
+-    SPI1					21
+-    SPI2					22
+-
+-    GPS						26
+-
+-    HSTIMER					28
+-
+-    VE						32
+-
+-    TVE						34
+-
+-    LCD						36
+-
+-    CSI						40
+-
+-    HDMI					43
+-    DE_BE					44
+-
+-    DE_FE					46
+-
+-    IEP						51
+-    MALI400					52
+-
+-  * APB0 gates ("allwinner,sun5i-a10s-apb0-gates-clk")
+-
+-    CODEC					0
+-
+-    IIS						3
+-
+-    PIO						5
+-    IR						6
+-
+-    KEYPAD					10
+-
+-  * APB1 gates ("allwinner,sun5i-a10s-apb1-gates-clk")
+-
+-    I2C0					0
+-    I2C1					1
+-    I2C2					2
+-
+-    UART0					16
+-    UART1					17
+-    UART2					18
+-    UART3					19
+-
+-Notation:
+- [*]:  The datasheet didn't mention these, but they are present on AW code
+- [**]: The datasheet had this marked as "NC" but they are used on AW code
+diff --git a/Documentation/devicetree/bindings/clock/sunxi/sun5i-a13-gates.txt b/Documentation/devicetree/bindings/clock/sunxi/sun5i-a13-gates.txt
+deleted file mode 100644
+index 006b6df..0000000
+--- a/Documentation/devicetree/bindings/clock/sunxi/sun5i-a13-gates.txt
++++ /dev/null
+@@ -1,58 +0,0 @@
+-Gate clock outputs
+-------------------
+-
+-  * AXI gates ("allwinner,sun4i-axi-gates-clk")
+-
+-    DRAM					0
+-
+-  * AHB gates ("allwinner,sun5i-a13-ahb-gates-clk")
+-
+-    USBOTG					0
+-    EHCI					1
+-    OHCI					2
+-
+-    SS						5
+-    DMA						6
+-    BIST					7
+-    MMC0					8
+-    MMC1					9
+-    MMC2					10
+-
+-    NAND					13
+-    SDRAM					14
+-
+-    SPI0					20
+-    SPI1					21
+-    SPI2					22
+-
+-    STIMER					28
+-
+-    VE						32
+-
+-    LCD						36
+-
+-    CSI						40
+-
+-    DE_BE					44
+-
+-    DE_FE					46
+-
+-    IEP						51
+-    MALI400					52
+-
+-  * APB0 gates ("allwinner,sun5i-a13-apb0-gates-clk")
+-
+-    CODEC					0
+-
+-    PIO						5
+-    IR						6
+-
+-  * APB1 gates ("allwinner,sun5i-a13-apb1-gates-clk")
+-
+-    I2C0					0
+-    I2C1					1
+-    I2C2					2
+-
+-    UART1					17
+-
+-    UART3					19
+diff --git a/Documentation/devicetree/bindings/clock/sunxi/sun6i-a31-gates.txt b/Documentation/devicetree/bindings/clock/sunxi/sun6i-a31-gates.txt
+deleted file mode 100644
+index fe44932..0000000
+--- a/Documentation/devicetree/bindings/clock/sunxi/sun6i-a31-gates.txt
++++ /dev/null
+@@ -1,83 +0,0 @@
+-Gate clock outputs
+-------------------
+-
+-  * AHB1 gates ("allwinner,sun6i-a31-ahb1-gates-clk")
+-
+-    MIPI DSI					1
+-
+-    SS						5
+-    DMA						6
+-
+-    MMC0					8
+-    MMC1					9
+-    MMC2					10
+-    MMC3					11
+-
+-    NAND1					12
+-    NAND0					13
+-    SDRAM					14
+-
+-    GMAC					17
+-    TS						18
+-    HSTIMER					19
+-    SPI0					20
+-    SPI1					21
+-    SPI2					22
+-    SPI3					23
+-    USB_OTG					24
+-
+-    EHCI0					26
+-    EHCI1					27
+-
+-    OHCI0					29
+-    OHCI1					30
+-    OHCI2					31
+-    VE						32
+-
+-    LCD0					36
+-    LCD1					37
+-
+-    CSI						40
+-
+-    HDMI					43
+-    DE_BE0					44
+-    DE_BE1					45
+-    DE_FE1					46
+-    DE_FE1					47
+-
+-    MP						50
+-
+-    GPU						52
+-
+-    DEU0					55
+-    DEU1					56
+-    DRC0					57
+-    DRC1					58
+-
+-  * APB1 gates ("allwinner,sun6i-a31-apb1-gates-clk")
+-
+-    CODEC					0
+-
+-    DIGITAL MIC					4
+-    PIO						5
+-
+-    DAUDIO0					12
+-    DAUDIO1					13
+-
+-  * APB2 gates ("allwinner,sun6i-a31-apb2-gates-clk")
+-
+-    I2C0					0
+-    I2C1					1
+-    I2C2					2
+-    I2C3					3
+-
+-    UART0					16
+-    UART1					17
+-    UART2					18
+-    UART3					19
+-    UART4					20
+-    UART5					21
+-
+-Notation:
+- [*]:  The datasheet didn't mention these, but they are present on AW code
+- [**]: The datasheet had this marked as "NC" but they are used on AW code
+diff --git a/Documentation/devicetree/bindings/clock/sunxi/sun7i-a20-gates.txt b/Documentation/devicetree/bindings/clock/sunxi/sun7i-a20-gates.txt
+deleted file mode 100644
+index 357f4fd..0000000
+--- a/Documentation/devicetree/bindings/clock/sunxi/sun7i-a20-gates.txt
++++ /dev/null
+@@ -1,98 +0,0 @@
+-Gate clock outputs
+-------------------
+-
+-  * AXI gates ("allwinner,sun4i-axi-gates-clk")
+-
+-    DRAM					0
+-
+-  * AHB gates ("allwinner,sun7i-a20-ahb-gates-clk")
+-
+-    USB0					0
+-    EHCI0					1
+-    OHCI0					2
+-    EHCI1					3
+-    OHCI1					4
+-    SS						5
+-    DMA						6
+-    BIST					7
+-    MMC0					8
+-    MMC1					9
+-    MMC2					10
+-    MMC3					11
+-    MS						12
+-    NAND					13
+-    SDRAM					14
+-
+-    ACE						16
+-    EMAC					17
+-    TS						18
+-
+-    SPI0					20
+-    SPI1					21
+-    SPI2					22
+-    SPI3					23
+-
+-    SATA					25
+-
+-    HSTIMER					28
+-
+-    VE						32
+-    TVD						33
+-    TVE0					34
+-    TVE1					35
+-    LCD0					36
+-    LCD1					37
+-
+-    CSI0					40
+-    CSI1					41
+-
+-    HDMI1					42
+-    HDMI0					43
+-    DE_BE0					44
+-    DE_BE1					45
+-    DE_FE1					46
+-    DE_FE1					47
+-
+-    GMAC					49
+-    MP						50
+-
+-    MALI400					52
+-
+-  * APB0 gates ("allwinner,sun7i-a20-apb0-gates-clk")
+-
+-    CODEC					0
+-    SPDIF					1
+-    AC97					2
+-    IIS0					3
+-    IIS1					4
+-    PIO						5
+-    IR0						6
+-    IR1						7
+-    IIS2					8
+-
+-    KEYPAD					10
+-
+-  * APB1 gates ("allwinner,sun7i-a20-apb1-gates-clk")
+-
+-    I2C0					0
+-    I2C1					1
+-    I2C2					2
+-    I2C3					3
+-    CAN						4
+-    SCR						5
+-    PS20					6
+-    PS21					7
+-
+-    I2C4					15
+-    UART0					16
+-    UART1					17
+-    UART2					18
+-    UART3					19
+-    UART4					20
+-    UART5					21
+-    UART6					22
+-    UART7					23
+-
+-Notation:
+- [*]:  The datasheet didn't mention these, but they are present on AW code
+- [**]: The datasheet had this marked as "NC" but they are used on AW code
 -- 
 1.8.4
