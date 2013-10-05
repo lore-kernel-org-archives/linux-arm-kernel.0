@@ -1,168 +1,95 @@
-From: joelf@ti.com (Joel Fernandes)
-Date: Sat, 5 Oct 2013 13:29:18 -0500
-Subject: [PATCH v2 4/9] ARM: dts: Add AES data and documentation for AM33XX
-In-Reply-To: <20131004143348.GJ6999@e106331-lin.cambridge.arm.com>
-References: <1380553986-15910-1-git-send-email-joelf@ti.com>
- <1380553986-15910-5-git-send-email-joelf@ti.com>
- <20131004143348.GJ6999@e106331-lin.cambridge.arm.com>
-Message-ID: <52505A7E.80802@ti.com>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Sat, 05 Oct 2013 19:57:09 +0200
+Subject: [PATCH|RFC] of: let of_match_device() always return best match
+In-Reply-To: <CAOMZO5BekS_BvJzrt8vM1=7LjsiO=3hKL=mMfTjxkO3aZ4qwRQ@mail.gmail.com>
+References: <1380826284-18381-1-git-send-email-mkl@pengutronix.de>
+ <CAOMZO5BekS_BvJzrt8vM1=7LjsiO=3hKL=mMfTjxkO3aZ4qwRQ@mail.gmail.com>
+Message-ID: <525052F5.5080204@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These patches were not authored by me but I'll go ahead and fix them up anyway.
-
-On 10/04/2013 09:33 AM, Mark Rutland wrote:
-> On Mon, Sep 30, 2013 at 04:13:01PM +0100, Joel Fernandes wrote:
->> From: "Mark A. Greer" <mgreer@animalcreek.com>
+On 10/05/2013 07:46 PM, Fabio Estevam wrote:
+> Hi Marc,
+> 
+> On Thu, Oct 3, 2013 at 3:51 PM, Marc Kleine-Budde <mkl@pengutronix.de> wrote:
+> 
+>> For example:
 >>
->> Add the generic AM33XX AES module's device tree data and
->> enable it for the am335x-evm, am335x-evmsk, and am335x-bone
->> platforms.  Also add Documentation file describing the data
->> for the AES module.
+>> The imx28.dtsi gives this compatible string for its CAN core:
 >>
->> [joelf at ti.com: Dropped interrupt-parent propert]
+>>>       compatible = "fsl,imx28-flexcan", "fsl,p1010-flexcan";
 >>
->> CC: Paul Walmsley <paul@pwsan.com>
->> Signed-off-by: Mark A. Greer <mgreer@animalcreek.com>
->> ---
->>  .../devicetree/bindings/crypto/omap-aes.txt        | 34 ++++++++++++++++++++++
->>  arch/arm/boot/dts/am335x-bone.dts                  |  4 +++
->>  arch/arm/boot/dts/am335x-evm.dts                   |  4 +++
->>  arch/arm/boot/dts/am335x-evmsk.dts                 |  4 +++
->>  arch/arm/boot/dts/am33xx.dtsi                      | 10 +++++++
->>  5 files changed, 56 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/crypto/omap-aes.txt
+>> The flexcan driver defines:
 >>
->> diff --git a/Documentation/devicetree/bindings/crypto/omap-aes.txt b/Documentation/devicetree/bindings/crypto/omap-aes.txt
->> new file mode 100644
->> index 0000000..4bb1e27
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/crypto/omap-aes.txt
->> @@ -0,0 +1,34 @@
->> +OMAP SoC AES crypto Module
->> +
->> +Required properties:
->> +
->> +- compatible : Should contain entries for this and backward compatible
->> +  AES versions:
->> +  - "ti,omap2-aes" for OMAP2.
->> +  - "ti,omap3-aes" for OMAP3.
->> +  - "ti,omap4-aes" for OMAP4 and AM33XX.
->> +  Note that the OMAP2 and 3 versions are compatible (OMAP3 supports
->> +  more algorithms) but they are incompatible with OMAP4.
->> +- ti,hwmods: Name of the hwmod associated with the AES odule
->> +- reg : Offset and length of the register set for the module
->> +- interrupt-parent : the phandle for the interrupt controller that
->> +  services interrupts for this module.
->> +- interrupts : the interrupt number for the AES odule.
+>>> static const struct of_device_id flexcan_of_match[] = {
+>>>       { .compatible = "fsl,p1010-flexcan", .data = &fsl_p1010_devtype_data, },
+>>>       { .compatible = "fsl,imx28-flexcan", .data = &fsl_imx28_devtype_data, },
+>>>       { .compatible = "fsl,imx6q-flexcan", .data = &fsl_imx6q_devtype_data, },
+>>>       { /* sentinel */ },
+>>> };
+>>
+>> The "p1010" was the first Freescale SoC with the flexcan core. But this SoC has
+>> a bug, so a workaround has to be enabled in the driver. The mx28 has this bug
+>> fixed, so we don't need this quite costly workaround.
 > 
-> Similar comments to the SHAM module here:
+> What about defining in imx28.dtsi:
+> compatible = "fsl,imx28-flexcan".
+
+It already works with changing only the driver.
+
+> and the in the flexcan driver we could do the same as in the fec_main driver:
 > 
-> * s/interrupt number/interrupt-specifier/
-> * Drop interrupt-parent.
-> * s/AES odule/AES module/
+> static struct platform_device_id fec_devtype[] = {
 
-Ok, done.
+For DT based probing I need to modify the struct of_device_id, but I got
+the idea :)
 
->> +
->> +Optional properties:
->> +- dmas: DMA specifier for tx and rx dma. See the DMA client binding,
->> +	Documentation/devicetree/bindings/dma/dma.txt
+>     {
+>         /* keep it for coldfire */
+>         .name = DRIVER_NAME,
+>         .driver_data = 0,
+>     }, {
+>         .name = "imx25-fec",
+>         .driver_data = FEC_QUIRK_USE_GASKET,
+>     }, {
+>         .name = "imx27-fec",
+>         .driver_data = 0,
+>     }, {
+>         .name = "imx28-fec",
+>         .driver_data = FEC_QUIRK_ENET_MAC | FEC_QUIRK_SWAP_FRAME,
+>     }, {
+>         .name = "imx6q-fec",
+>         .driver_data = FEC_QUIRK_ENET_MAC | FEC_QUIRK_HAS_GBIT |
+>                 FEC_QUIRK_HAS_BUFDESC_EX | FEC_QUIRK_HAS_CSUM |
+>                 FEC_QUIRK_HAS_VLAN | FEC_QUIRK_ERR006358,
+>     }, {
+>         .name = "mvf600-fec",
+>         .driver_data = FEC_QUIRK_ENET_MAC,
+>     }, {
+>         /* sentinel */
+>     }
+> };
 > 
-> s/DMA specifier/DMA specifiers/
-> 
->> +- dma-names: DMA request names. Should be '"tx", "rx"' if dma is present.
-> 
-> Nit: I'd prefer 'Should include "tx" and "rx" if present' -- I hope the
+> So that we know which SoC needs to have the workaround applied or not.
 
-Ok, changed to the same.
-
-> driver's requesting these by name rather than relying on a specific
-> ordering (it makes future expansion and optional components far easier
-> to handle sanely).
-
-Yes, that's the case. Its handled by name using the
-dma_request_slave_channel_compat API.
-
->> +
->> +Example:
->> +	/* AM335x */
->> +	aes: aes at 53500000 {
->> +		compatible = "ti,omap4-aes";
->> +		ti,hwmods = "aes";
->> +		reg = <0x53500000 0xa0>;
->> +		interrupt-parent = <&intc>;
->> +		interrupts = <102>;
->> +		dmas = <&edma 6
->> +			&edma 5>;
->> +		dma-names = "tx", "rx";
->> +	};
-> 
-> Minor nit, but for consistency could you bracket the DMAs individually:
-> 
-> 		dmas = <&edma 6>,
-> 		       <&edma 5>;
-
-Ok changed as above.
-
-> 
->> diff --git a/arch/arm/boot/dts/am335x-bone.dts b/arch/arm/boot/dts/am335x-bone.dts
->> index 8a9802e..94ee427 100644
->> --- a/arch/arm/boot/dts/am335x-bone.dts
->> +++ b/arch/arm/boot/dts/am335x-bone.dts
->> @@ -23,3 +23,7 @@
->>  &sham {
->>  	status = "okay";
->>  };
->> +
->> +&aes {
->> +	status = "okay";
->> +};
->> diff --git a/arch/arm/boot/dts/am335x-evm.dts b/arch/arm/boot/dts/am335x-evm.dts
->> index d59e51c..86463fa 100644
->> --- a/arch/arm/boot/dts/am335x-evm.dts
->> +++ b/arch/arm/boot/dts/am335x-evm.dts
->> @@ -526,3 +526,7 @@
->>  &sham {
->>  	status = "okay";
->>  };
->> +
->> +&aes {
->> +	status = "okay";
->> +};
->> diff --git a/arch/arm/boot/dts/am335x-evmsk.dts b/arch/arm/boot/dts/am335x-evmsk.dts
->> index d45a330..f577e65 100644
->> --- a/arch/arm/boot/dts/am335x-evmsk.dts
->> +++ b/arch/arm/boot/dts/am335x-evmsk.dts
->> @@ -428,3 +428,7 @@
->>  &sham {
->>  	status = "okay";
->>  };
->> +
->> +&aes {
->> +	status = "okay";
->> +};
->> diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
->> index 299710b..0daa1b2 100644
->> --- a/arch/arm/boot/dts/am33xx.dtsi
->> +++ b/arch/arm/boot/dts/am33xx.dtsi
->> @@ -719,5 +719,15 @@
->>  			dmas = <&edma 36>;
->>  			dma-names = "rx";
->>  		};
->> +
->> +		aes: aes at 53500000 {
->> +			compatible = "ti,omap4-aes";
->> +			ti,hwmods = "aes";
->> +			reg = <0x53500000 0xa0>;
->> +			interrupts = <102>;
->> +			dmas = <&edma 6
->> +				&edma 5>;
-> 
-> Bracketing here too, please.
-
-Done.
+I've already created a patch that rearranges the struct of_device_id in
+the driver, works for me. I posted it (with another fix) for review on
+linux-can[1].
 
 Thanks,
+Marc
 
--Joel
+[1] http://comments.gmane.org/gmane.linux.can/4050
+-- 
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 259 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131005/12ed57bb/attachment.sig>
