@@ -1,69 +1,62 @@
-From: bcm@fixthebug.org (Christian Daudt)
-Date: Sat,  5 Oct 2013 08:43:29 -0700
-Subject: [PATCH v3] ARM: bcm: Add DEBUG_LL console support
-Message-ID: <1380987809-4886-1-git-send-email-bcm@fixthebug.org>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Sat, 5 Oct 2013 10:13:23 -0700
+Subject: Use of drivers/platform and matching include?
+In-Reply-To: <CAOesGMjxwmr0Vo0Puc-nZntgXLy6D1PTohz=C+fFukP_Eu1iQg@mail.gmail.com>
+References: <BC1C47B3-5412-4829-A1D9-AAB04694D1CC@codeaurora.org>
+ <CAOesGMjJ6Uj0uGFJqtnWQyDW+tr6eLVWoHZ+B7uFna+L8N6E8Q@mail.gmail.com>
+ <20131004114128.GL12758@n2100.arm.linux.org.uk>
+ <20131004132209.GB23923@kroah.com>
+ <CAOesGMjxwmr0Vo0Puc-nZntgXLy6D1PTohz=C+fFukP_Eu1iQg@mail.gmail.com>
+Message-ID: <20131005171323.GB5780@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds low level debug uart support to Broadcom
- mobile based SOCs.
+On Fri, Oct 04, 2013 at 09:48:41AM -0700, Olof Johansson wrote:
+> On Fri, Oct 4, 2013 at 6:22 AM, Greg Kroah-Hartman
+> <gregkh@linuxfoundation.org> wrote:
+> > On Fri, Oct 04, 2013 at 12:41:28PM +0100, Russell King - ARM Linux wrote:
+> >>
+> >> So, no, there will be no new drivers under arch/arm.  They must be in the
+> >> drivers subtree somewhere.
+> >
+> > I have no objection with this, and encourage it.
+> 
+> Ok, so these are some of the requirements as far as I see it:
+> 
+> * No per-vendor driver dumping ground under drivers/* (i.e. no
+> drivers/platform/<soc vendor>/)
 
-Signed-off-by: Christian Daudt <bcm@fixthebug.org>
+Yes.
 
-Changes from V2:
- - Changed to follow hex ordering on entries
- - Dropped defconfig changes
+> * No weirdly constructed single-driver directories directly under
+> drivers/* (we already have a few and should look at moving those)
+> because nothing else fits
 
-Changes from V1:
- - Switched to use the common 8250 debug introduced in 3.12-rc1
+Yes, we should see about moving some of the ones we currently have,
+drivers/ntb/ is one example that I couldn't think of a better place to
+put it.  I guess drivers/misc/ really would be best for a bunch of
+these.  As an example, drivers/misc/mic/ is way larger than
+drivers/ntb/.
 
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index 9762c84..0391691 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -94,6 +94,17 @@ choice
- 		depends on ARCH_BCM2835
- 		select DEBUG_UART_PL01X
- 
-+	config DEBUG_BCM_KONA_UART
-+		bool "Kernel low-level debugging messages via BCM KONA UART"
-+		depends on ARCH_BCM
-+		select DEBUG_UART_8250
-+		help
-+		  Say Y here if you want kernel low-level debugging support
-+		  on Broadcom SoC platforms.
-+		  This low level debug works for Broadcom
-+		  mobile SoCs in the Kona family of chips (e.g. bcm28155,
-+		  bcm11351, etc...)
-+
- 	config DEBUG_CLPS711X_UART1
- 		bool "Kernel low-level debugging messages via UART1"
- 		depends on ARCH_CLPS711X
-@@ -951,6 +962,7 @@ config DEBUG_UART_PHYS
- 	default 0x20064000 if DEBUG_RK29_UART1 || DEBUG_RK3X_UART2
- 	default 0x20068000 if DEBUG_RK29_UART2 || DEBUG_RK3X_UART3
- 	default 0x20201000 if DEBUG_BCM2835
-+	default 0x3e000000 if DEBUG_BCM_KONA_UART
- 	default 0x40090000 if ARCH_LPC32XX
- 	default 0x40100000 if DEBUG_PXA_UART1
- 	default 0x42000000 if ARCH_GEMINI
-@@ -1010,6 +1022,7 @@ config DEBUG_UART_VIRT
- 	default 0xfe018000 if DEBUG_MMP_UART3
- 	default 0xfe100000 if DEBUG_IMX23_UART || DEBUG_IMX28_UART
- 	default 0xfe230000 if DEBUG_PICOXCELL_UART
-+	default 0xfe300000 if DEBUG_BCM_KONA_UART
- 	default 0xfe800000 if ARCH_IOP32X
- 	default 0xfeb00000 if DEBUG_HI3620_UART || DEBUG_HI3716_UART
- 	default 0xfeb24000 if DEBUG_RK3X_UART0
-@@ -1052,7 +1065,8 @@ config DEBUG_UART_8250_WORD
- 	default y if DEBUG_PICOXCELL_UART || DEBUG_SOCFPGA_UART || \
- 		ARCH_KEYSTONE || \
- 		DEBUG_DAVINCI_DMx_UART0 || DEBUG_DAVINCI_DA8XX_UART1 || \
--		DEBUG_DAVINCI_DA8XX_UART2 || DEBUG_DAVINCI_TNETV107X_UART1
-+		DEBUG_DAVINCI_DA8XX_UART2 || DEBUG_DAVINCI_TNETV107X_UART1 || \
-+		DEBUG_BCM_KONA_UART
- 
- config DEBUG_UART_8250_FLOW_CONTROL
- 	bool "Enable flow control for 8250 UART"
--- 
-1.7.10.4
+> * We need some sort of convention on dependencies. Several of these
+> are more libraries than drivers, i.e. we'll have cross-calls for
+> things like queue management, resource allocation, etc. So having a
+> single location to hold most of these makes sense instead of
+> everything cross-depending on everything else.
+
+What's wrong with lib/ for that?  Isn't that supposed to be where this
+type of thing goes?
+
+> Based on the above, how about we create something like
+> drivers/resourcemgr to hold these?   I think at least parts of the
+> mvebu-mbus driver that ended up under drivers/bus might be a fit to
+> move there. The APM queue allocator would likely be a fit, and maybe
+> some of the qualcomm stuff. Kumar, what are your thoughts on that?
+> Greg?
+
+lib/ does look "big", but we also have kernel/ for the current resource
+stuff, as it is core code.  Why not use that?
+
+thanks,
+
+greg k-h
