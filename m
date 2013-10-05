@@ -1,26 +1,40 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 5 Oct 2013 12:21:47 +0100
-Subject: [PATCH RFC 0/2] Initial Solid Run Cubox-i carrier-1 support
-Message-ID: <20131005112147.GX12758@n2100.arm.linux.org.uk>
+Date: Sat, 5 Oct 2013 14:17:06 +0100
+Subject: Bug: kbuild always rebuilds compressed images on ARM
+Message-ID: <20131005131706.GY12758@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is where I am at the moment with the SolidRun Cubox-i Carrier-1
-board support with v3.12-rc3.  What's included and tested here is:
+Hi,
 
-- Consumer IR
-- SD card slot
-- AR8035 ethernet phy
-- HDMI DDC I2C
-- USB
+I've noticed that kbuild always rebuilds the compressed piggy image
+on ARM.  Here's the output from running make with V=2:
 
-What isn't included:
-- RTC (commented out) since the chip is not fitted to developer boards yet
-- HDMI output
-- SPDIF output
-- Audio output (codec not fitted)
-- Wireless (not fitted)
+  CALL    /home/rmk/git/linux-rmk/scripts/checksyscalls.sh - due to target missing
+  CHK     include/generated/compile.h
+  Kernel: arch/arm/boot/Image is ready
+  Building modules, stage 2.
+  LZO     arch/arm/boot/compressed/piggy.lzo - due to command line change
+  MODPOST 17 modules - due to target is PHONY
+  AS      arch/arm/boot/compressed/piggy.lzo.o - due to: arch/arm/boot/compressed/piggy.lzo
+  LD      arch/arm/boot/compressed/vmlinux - due to: arch/arm/boot/compressed/piggy.lzo.o
+  OBJCOPY arch/arm/boot/zImage - due to: arch/arm/boot/compressed/vmlinux
+  Kernel: arch/arm/boot/zImage is ready
 
-I'm sending this out as an RFC as it's not at the point for merging, but
-those with the developer board should find it useful to get their boards
-up and running with recent kernels.
+and with V=1:
+
+...
+make -f /home/rmk/git/linux-rmk/scripts/Makefile.build obj=arch/arm/boot/compressed arch/arm/boot/compressed/vmlinux
+make -f /home/rmk/git/linux-rmk/scripts/Makefile.modpost
+  find .tmp_versions -name '*.mod' | xargs -r grep -h '\.ko$' | sort -u | sed 's/\.ko$/.o/' | scripts/mod/modpost -m -a -o /home/rmk/git/build/imx6/Module.symvers    -S  -s -T -
+  (cat arch/arm/boot/compressed/../Image | lzop -9 && printf \\010\\224\\034\\002) > arch/arm/boot/compressed/piggy.lzo || (rm -f arch/arm/boot/compressed/piggy.lzo ; false)
+make -f /home/rmk/git/linux-rmk/scripts/Makefile.fwinst obj=firmware __fw_modbuild
+...
+
+The arch/arm/boot/compressed/.piggy.lzo.cmd file contains this:
+
+cmd_arch/arm/boot/compressed/piggy.lzo := (cat arch/arm/boot/compressed/../Image | lzop -9 && printf \\\\010\\\\224\\\\034\\\\002) > arch/arm/boot/compressed/piggy.lzo || (rm -f arch/arm/boot/compressed/piggy.lzo ; false)
+
+Any ideas why it thinks that the command has changed?
+
+Thanks.
