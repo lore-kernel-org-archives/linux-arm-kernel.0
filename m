@@ -1,54 +1,49 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Sat, 05 Oct 2013 11:16:56 +0900
-Subject: [PATCH v2 00/12] clk/exynos convert clock IDs to macros
-In-Reply-To: <20131002010953.9338.23436@quantum>
-References: <1378462361-13680-1-git-send-email-a.hajda@samsung.com>
- <8412301.YP2zzplWoe@amdc1227>
- <070001ceafa5$d4d81a40$7e884ec0$%kim@samsung.com>
- <523716C9.3000204@samsung.com> <20130916193709.27384.86101@quantum>
- <06c101cebdc5$75a83d10$60f8b730$%kim@samsung.com>
- <20131002010953.9338.23436@quantum>
-Message-ID: <0d8901cec170$f7230b50$e56921f0$%kim@samsung.com>
+From: slapdau@yahoo.com.au (Craig McGeachie)
+Date: Sat, 05 Oct 2013 15:19:00 +1300
+Subject: [PATCH] irq: bcm2835: Re-implement the hardware IRQ handler.
+In-Reply-To: <524B8117.9070309@wwwdotorg.org>
+References: <1379751251-2799-1-git-send-email-slapdau@yahoo.com.au>
+ <5e0b6222e8648fb0c63aa649ee70b29d11f4924f@8b5064a13e22126c1b9329f0dc35b8915774b7c3.invalid>
+ <5243EE06.1020200@yahoo.com.au> <524B8117.9070309@wwwdotorg.org>
+Message-ID: <524F7714.3070502@yahoo.com.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mike Turquette wrote:
-> 
-> Quoting Kukjin Kim (2013-09-30 03:11:41)
-> > Mike Turquette wrote:
-> > >
-> > > Quoting Sylwester Nawrocki (2013-09-16 07:33:45)
-> > > > On 09/12/2013 12:50 PM, Kukjin Kim wrote:
-> > > > > Well...I'm not sure changing to use macro is better or not at this
-> > > moment...
-> > > >
-> > > > I think it is. ;) It's really less error prone to have symbolic
-> names
-> > > instead
-> > > > of the plain numbers. The clock ids are defined in one place and it
-> is
-> > > more
-> > > > clear what a clock is by looking at symbolic name. It's especially
-> > > annoying
-> > > > to use plain numbers where are are many clock in a single node, like
-> 10
-> > > or
-> > > > more. What are you main concerns with this ?
-> > >
-> > > I think having the symbolic names is a win for readability.
-> > >
-> > Hmm...since Mike who is a maintainer for ccf agrees with Sylwester's
-> opinion, so I agree. Actually, I had no strong objection on this but still
-> I'm not sure using macro is really better because sometimes the name
-> doesn't give readability really I think though.
-> >
-> > Mike, can you give me your ack on clk stuff?
-> 
-> Yes, but I was thinking to take this change through the clk tree. The
-> new branch based on -rc3 will be published tonight.
-> 
-> Let me know if it causes problems for you for me to take it.
-> 
-Uhm, I think dt changes can make ugly conflicts because of spread dt changing?
+On 10/02/2013 03:12 PM, Stephen Warren wrote:
+> I do agree that it's likely best if the driver processes interrupts in
+> the priority order that the HW designers came up with. So, I'm open to
+> that change. This might make a difference to some time-critical
+> shortcuts like the PCM (audio) interrupt.
 
-- Kukjin
+FIQ would definitely make a difference.  I've tried playing audio out of 
+the 3.5mm audio jack.  It sounds rubbish.  I think the issue might be 
+the same as the one for getting decent PWM wave forms [1,2].  I found 
+the links while researching how to implement FIQ support. 
+Interestingly, a PWM driver is also a good candidate for FIQ.
+
+Implementing FIQ was nothing like I expected, but none the less, I'm 
+fairly certain that I've added FIQ support to the interrupt controller 
+driver.  Other than normal interrupts seem to continue to behave well, I 
+couldn't tell you how well FIQs behave.  That would require implementing 
+an FIQ handler for some driver, which looks conceptually straight 
+forward, but fiddly.
+
+The implementation of an FIQ handler follow as per instruction from the 
+introductory comment block in linux/arch/arm/kernel/fiq.c. The point 
+about a relinquish function disabling FIQ before the next driver enables 
+is important.  The interrupt controller driver only permits one FIQ 
+enabled at any one time, and attempting to enable a second FIQ causes a 
+kernel BUG().
+
+I have not submitted it in the form of a patch, because I'm not sure of 
+the current status of what you want changed or if you're even open to 
+the possibility of changing the driver.  Still, if you're interested, 
+you can always have a look at it here [3].
+
+Cheers,
+Craig.
+
+[1] http://free-electrons.com/blog/fiq-handlers-in-the-arm-linux-kernel/
+[2] http://elinux.org/images/2/27/0910-elce-fiq.pdf
+[3] 
+https://github.com/rickytarr/linux/blob/topic/interrupt/drivers/irqchip/irq-bcm2835.c
