@@ -1,73 +1,38 @@
-From: michael.opdenacker@free-electrons.com (Michael Opdenacker)
-Date: Sun,  6 Oct 2013 07:58:56 +0200
-Subject: [PATCH] [SCSI]: ARM: remove deprecated IRQF_DISABLED
-Message-ID: <1381039136-11749-1-git-send-email-michael.opdenacker@free-electrons.com>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Sat, 5 Oct 2013 16:38:33 -0700
+Subject: [PATCH stable] ARM: tegra: unify Tegra's Kconfig a bit more
+In-Reply-To: <1380917411-25869-1-git-send-email-swarren@wwwdotorg.org>
+References: <1380917411-25869-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <20131005233833.GA18223@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch proposes to remove the use of the IRQF_DISABLED flag
+On Fri, Oct 04, 2013 at 02:10:11PM -0600, Stephen Warren wrote:
+> From: Stephen Warren <swarren@nvidia.com>
+> 
+> Move all common select clauses from ARCH_TEGRA_*_SOC to ARCH_TEGRA to
+> eliminate duplication. The USB-related selects all should have been
+> common too, but were missing from Tegra114 previously. Move these to
+> ARCH_TEGRA too. The latter fixes a build break when only Tegra114
+> support was enabled, but not Tegra20 or Tegra30 support.
+> 
+> This is 20984c44b5a08620778ea14fa5807489170fd5ca in v3.12-rc1.
+> 
+> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+> Reported-by: Paul Walmsley <pwalmsley@nvidia.com>
+> [auto-builders for 3.11.x are failing due to this]
 
-It's a NOOP since 2.6.35 and it will be removed one day.
+What autobuilders?  I haven't heard of this before.
 
-Signed-off-by: Michael Opdenacker <michael.opdenacker@free-electrons.com>
----
- drivers/scsi/arm/acornscsi.c | 2 +-
- drivers/scsi/arm/cumana_1.c  | 2 +-
- drivers/scsi/arm/cumana_2.c  | 2 +-
- drivers/scsi/arm/powertec.c  | 2 +-
- 4 files changed, 4 insertions(+), 4 deletions(-)
+> Cc: stable # v3.11
+> ---
+>  arch/arm/mach-tegra/Kconfig | 21 ++++++---------------
+>  1 file changed, 6 insertions(+), 15 deletions(-)
 
-diff --git a/drivers/scsi/arm/acornscsi.c b/drivers/scsi/arm/acornscsi.c
-index 09ba186..059ff47 100644
---- a/drivers/scsi/arm/acornscsi.c
-+++ b/drivers/scsi/arm/acornscsi.c
-@@ -2971,7 +2971,7 @@ static int acornscsi_probe(struct expansion_card *ec, const struct ecard_id *id)
- 	ec->irqaddr	= ashost->fast + INT_REG;
- 	ec->irqmask	= 0x0a;
- 
--	ret = request_irq(host->irq, acornscsi_intr, IRQF_DISABLED, "acornscsi", ashost);
-+	ret = request_irq(host->irq, acornscsi_intr, 0, "acornscsi", ashost);
- 	if (ret) {
- 		printk(KERN_CRIT "scsi%d: IRQ%d not free: %d\n",
- 			host->host_no, ashost->scsi.irq, ret);
-diff --git a/drivers/scsi/arm/cumana_1.c b/drivers/scsi/arm/cumana_1.c
-index b679778..f8e0609 100644
---- a/drivers/scsi/arm/cumana_1.c
-+++ b/drivers/scsi/arm/cumana_1.c
-@@ -262,7 +262,7 @@ static int cumanascsi1_probe(struct expansion_card *ec,
- 		goto out_unmap;
- 	}
- 
--	ret = request_irq(host->irq, cumanascsi_intr, IRQF_DISABLED,
-+	ret = request_irq(host->irq, cumanascsi_intr, 0,
- 			  "CumanaSCSI-1", host);
- 	if (ret) {
- 		printk("scsi%d: IRQ%d not free: %d\n",
-diff --git a/drivers/scsi/arm/cumana_2.c b/drivers/scsi/arm/cumana_2.c
-index 58915f2..abc66f5 100644
---- a/drivers/scsi/arm/cumana_2.c
-+++ b/drivers/scsi/arm/cumana_2.c
-@@ -431,7 +431,7 @@ static int cumanascsi2_probe(struct expansion_card *ec,
- 		goto out_free;
- 
- 	ret = request_irq(ec->irq, cumanascsi_2_intr,
--			  IRQF_DISABLED, "cumanascsi2", info);
-+			  0, "cumanascsi2", info);
- 	if (ret) {
- 		printk("scsi%d: IRQ%d not free: %d\n",
- 		       host->host_no, ec->irq, ret);
-diff --git a/drivers/scsi/arm/powertec.c b/drivers/scsi/arm/powertec.c
-index abc9593..5e1b73e 100644
---- a/drivers/scsi/arm/powertec.c
-+++ b/drivers/scsi/arm/powertec.c
-@@ -358,7 +358,7 @@ static int powertecscsi_probe(struct expansion_card *ec,
- 		goto out_free;
- 
- 	ret = request_irq(ec->irq, powertecscsi_intr,
--			  IRQF_DISABLED, "powertec", info);
-+			  0, "powertec", info);
- 	if (ret) {
- 		printk("scsi%d: IRQ%d not free: %d\n",
- 		       host->host_no, ec->irq, ret);
--- 
-1.8.1.2
+This fails to apply to the 3.11-stable tree, if you want it there, can
+you provide a version that actually does apply, and that you have tested
+to work properly?
+
+thanks,
+
+greg k-h
