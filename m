@@ -1,95 +1,116 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Sat, 05 Oct 2013 19:57:09 +0200
-Subject: [PATCH|RFC] of: let of_match_device() always return best match
-In-Reply-To: <CAOMZO5BekS_BvJzrt8vM1=7LjsiO=3hKL=mMfTjxkO3aZ4qwRQ@mail.gmail.com>
-References: <1380826284-18381-1-git-send-email-mkl@pengutronix.de>
- <CAOMZO5BekS_BvJzrt8vM1=7LjsiO=3hKL=mMfTjxkO3aZ4qwRQ@mail.gmail.com>
-Message-ID: <525052F5.5080204@pengutronix.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 5 Oct 2013 20:02:00 +0100
+Subject: [PATCH] DMA: extend documentation to provide more API details
+In-Reply-To: <Pine.LNX.4.64.1310051925170.8097@axis700.grange>
+References: <Pine.LNX.4.64.1310051925170.8097@axis700.grange>
+Message-ID: <20131005190200.GZ12758@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/05/2013 07:46 PM, Fabio Estevam wrote:
-> Hi Marc,
+On Sat, Oct 05, 2013 at 07:36:20PM +0200, Guennadi Liakhovetski wrote:
+> This patch extends dmaengine documentation to provide more details
+> on descriptor prepare stage, transaction completion requirements
+> and DMA error processing.
 > 
-> On Thu, Oct 3, 2013 at 3:51 PM, Marc Kleine-Budde <mkl@pengutronix.de> wrote:
+> Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+> ---
 > 
->> For example:
->>
->> The imx28.dtsi gives this compatible string for its CAN core:
->>
->>>       compatible = "fsl,imx28-flexcan", "fsl,p1010-flexcan";
->>
->> The flexcan driver defines:
->>
->>> static const struct of_device_id flexcan_of_match[] = {
->>>       { .compatible = "fsl,p1010-flexcan", .data = &fsl_p1010_devtype_data, },
->>>       { .compatible = "fsl,imx28-flexcan", .data = &fsl_imx28_devtype_data, },
->>>       { .compatible = "fsl,imx6q-flexcan", .data = &fsl_imx6q_devtype_data, },
->>>       { /* sentinel */ },
->>> };
->>
->> The "p1010" was the first Freescale SoC with the flexcan core. But this SoC has
->> a bug, so a workaround has to be enabled in the driver. The mx28 has this bug
->> fixed, so we don't need this quite costly workaround.
+> These extensions reflect my understanding of some aspects of the dmaengine 
+> API. If it is wrong, I'd be happy if someone could correct me. If or where 
+> I'm right, I think, those aspects might want an update. Once we understand 
+> exactly the situation we can think about improvements to the API.
 > 
-> What about defining in imx28.dtsi:
-> compatible = "fsl,imx28-flexcan".
-
-It already works with changing only the driver.
-
-> and the in the flexcan driver we could do the same as in the fec_main driver:
+>  Documentation/dmaengine.txt |   58 ++++++++++++++++++++++++++++++++++++------
+>  1 files changed, 49 insertions(+), 9 deletions(-)
 > 
-> static struct platform_device_id fec_devtype[] = {
+> diff --git a/Documentation/dmaengine.txt b/Documentation/dmaengine.txt
+> index 879b6e3..21bb72d 100644
+> --- a/Documentation/dmaengine.txt
+> +++ b/Documentation/dmaengine.txt
+> @@ -133,8 +133,17 @@ The slave DMA usage consists of following steps:
+>  	locks before calling the callback function which may cause a
+>  	deadlock.
+>  
+> -	Note that callbacks will always be invoked from the DMA
+> -	engines tasklet, never from interrupt context.
+> +	Note that callbacks will always be invoked from the DMA engine's
+> +	interrupt processing bottom half, never from interrupt context.
+> +
+> +   Note 2:
+> +	A DMA transaction descriptor, returned to the user by one of "prep"
+> +	methods is considered as belogning to the user until it is submitted
+> +	to the dmaengine driver for transfer. However, it is recommended, that
+> +	the dmaengine driver keeps references to prepared descriptors too,
+> +	because if dmaengine_terminate_all() is called at that time, the driver
+> +	will have to recycle all allocated descriptors for the respective
+> +	channel.
 
-For DT based probing I need to modify the struct of_device_id, but I got
-the idea :)
+No.  That's quite dangerous.  think about what can happen.
 
->     {
->         /* keep it for coldfire */
->         .name = DRIVER_NAME,
->         .driver_data = 0,
->     }, {
->         .name = "imx25-fec",
->         .driver_data = FEC_QUIRK_USE_GASKET,
->     }, {
->         .name = "imx27-fec",
->         .driver_data = 0,
->     }, {
->         .name = "imx28-fec",
->         .driver_data = FEC_QUIRK_ENET_MAC | FEC_QUIRK_SWAP_FRAME,
->     }, {
->         .name = "imx6q-fec",
->         .driver_data = FEC_QUIRK_ENET_MAC | FEC_QUIRK_HAS_GBIT |
->                 FEC_QUIRK_HAS_BUFDESC_EX | FEC_QUIRK_HAS_CSUM |
->                 FEC_QUIRK_HAS_VLAN | FEC_QUIRK_ERR006358,
->     }, {
->         .name = "mvf600-fec",
->         .driver_data = FEC_QUIRK_ENET_MAC,
->     }, {
->         /* sentinel */
->     }
-> };
-> 
-> So that we know which SoC needs to have the workaround applied or not.
+Thread 1		Thread 2
+Driver calls prepare
+			dmaengine_terminate_all()
+				dmaengine driver frees prepared descriptor
+driver submits descriptor
 
-I've already created a patch that rearranges the struct of_device_id in
-the driver, works for me. I posted it (with another fix) for review on
-linux-can[1].
+You now have a descriptor which has been freed submitted to the DMA engine
+queue.  This will cause chaos.
 
-Thanks,
-Marc
+>  4. Submit the transaction
+>  
+> @@ -150,15 +159,27 @@ The slave DMA usage consists of following steps:
+>     dmaengine_submit() will not start the DMA operation, it merely adds
+>     it to the pending queue.  For this, see step 5, dma_async_issue_pending.
+>  
+> -5. Issue pending DMA requests and wait for callback notification
+> +5. Issue pending DMA requests and (optionally) request callback notification
+>  
+> -   The transactions in the pending queue can be activated by calling the
+> -   issue_pending API. If channel is idle then the first transaction in
+> -   queue is started and subsequent ones queued up.
+> +   Dmaengine drivers accumulate submitted transactions on a pending queue.
+> +   After this call all such pending transactions are activated. Transactions,
+> +   submitted after this call will be queued again in a deactivated state until
+> +   this function is called again. If at the time of this call the channel is
+> +   idle then the first transaction in queue is started and subsequent ones are
+> +   queued up.
+>  
+> -   On completion of each DMA operation, the next in queue is started and
+> -   a tasklet triggered. The tasklet will then call the client driver
+> -   completion callback routine for notification, if set.
+> +   On completion of each DMA operation, the next active transaction in queue is
+> +   started and the ISR bottom half, e.g. a tasklet or a kernel thread is
+> +   triggered.
 
-[1] http://comments.gmane.org/gmane.linux.can/4050
--- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+Or a kernel thread?  I don't think that's right.  It's always been
+specified that the callback will happen from tasklet context.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 259 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131005/12ed57bb/attachment.sig>
+> +   The dmaengine driver also has to check the DMA_CTRL_ACK flag by calling
+> +   async_tx_test_ack() on the transaction. If the function returns true, i.e.
+> +   if the transaction either has been flagged from the very beginning, or
+> +   the user has flagged it later, then the transaction descriptor can be
+> +   recycled immediately by the dmaengine driver.
+
+"has to check" I think is wrong.  This is optional for slave only drivers,
+because most slave stuff doesn't use the ACK stuff - that's more for the
+async_tx APIs.
+
+> If the function returns
+> +   false, the descriptor cannot be recycled yet and the dmaengine driver has
+> +   to keep polling the descriptor until it is acknowledged by the user.
+>  
+>     Interface:
+>  	void dma_async_issue_pending(struct dma_chan *chan);
+> @@ -171,6 +192,14 @@ Further APIs:
+>     discard data in the DMA FIFO which hasn't been fully transferred.
+>     No callback functions will be called for any incomplete transfers.
+>  
+> +   Note:
+> +	Transactions, aborted by this call are considered as failed. However,
+> +	if the user requests their status, using dma_async_is_complete() /
+> +	dma_async_is_complete(), as described below, one of DMA_IN_PROGRESS and
+> +	DMA_SUCCESS will be returned. So, drivers are advised not to use those
+> +	calls on transactions, submitted before a call to
+> +	dmaengine_terminate_all().
+
+The last sentence doesn't make sense.
