@@ -1,66 +1,163 @@
-From: afenkart@gmail.com (Andreas Fenkart)
-Date: Sat,  5 Oct 2013 13:17:10 +0200
-Subject: [PATCH v3 4/4] mmc: omap_hsmmc: debugfs entries for SDIO IRQ
- detection and GPIO remuxing.
-In-Reply-To: <1380971830-21492-1-git-send-email-afenkart@gmail.com>
-References: <1380971830-21492-1-git-send-email-afenkart@gmail.com>
-Message-ID: <1380971830-21492-5-git-send-email-afenkart@gmail.com>
+From: rmk+kernel@arm.linux.org.uk (Russell King)
+Date: Sat, 05 Oct 2013 12:22:17 +0100
+Subject: [PATCH RFC 1/2] ARM: imx6qdl: provide pinctrl configurations for
+ DAT3 pull-down
+In-Reply-To: <20131005112147.GX12758@n2100.arm.linux.org.uk>
+References: <20131005112147.GX12758@n2100.arm.linux.org.uk>
+Message-ID: <E1VSPw9-0004Ug-BF@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update the debugfs related code for the SDIO IRQ support.
-Note that PSTATE shows current state of data lines, incl.
-SDIO IRQ pending
+DAT3 needs to be pulled down if the USDHC card detection facility is
+used rather than GPIO mode.  This is due to there being two methods
+to detect a card - one via the card detect signal, and the other via
+DAT3 being pulled up by the inserted card via an internal 50k resistor.
 
-Signed-off-by: Andreas Fenkart <afenkart@gmail.com>
+This requires DAT3 to be pulled down to hold the signal in the "no
+card" state, using a 100k pull down setting.
 
-diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
-index a8894ee..f7fe06f 100644
---- a/drivers/mmc/host/omap_hsmmc.c
-+++ b/drivers/mmc/host/omap_hsmmc.c
-@@ -81,6 +81,7 @@ static void apply_clk_hack(struct device *dev)
- #define OMAP_HSMMC_RSP54	0x0118
- #define OMAP_HSMMC_RSP76	0x011C
- #define OMAP_HSMMC_DATA		0x0120
-+#define OMAP_HSMMC_PSTATE	0x0124
- #define OMAP_HSMMC_HCTL		0x0128
- #define OMAP_HSMMC_SYSCTL	0x012C
- #define OMAP_HSMMC_STAT		0x0130
-@@ -1812,6 +1813,22 @@ static int omap_hsmmc_regs_show(struct seq_file *s, void *data)
- {
- 	struct mmc_host *mmc = s->private;
- 	struct omap_hsmmc_host *host = mmc_priv(mmc);
-+	unsigned long flags;
+Provide pinctrl settings for this for all USDHC controllers.
+
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ arch/arm/boot/dts/imx6qdl.dtsi |  104 ++++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 104 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+index ccd55c2..199fdab 100644
+--- a/arch/arm/boot/dts/imx6qdl.dtsi
++++ b/arch/arm/boot/dts/imx6qdl.dtsi
+@@ -1138,6 +1138,32 @@
+ 							MX6QDL_PAD_SD1_DAT3__SD1_DATA3 0x17059
+ 						>;
+ 					};
 +
-+	spin_lock_irqsave(&host->irq_lock, flags);
-+	seq_puts(s, "\n");
-+	seq_printf(s, "sdio irq\t%s\n", ((host->flags & HSMMC_SDIO_IRQ_ENABLED)
-+					 ? "enabled" : "disabled"));
-+	if (host->flags & HSMMC_SWAKEUP_QUIRK) {
-+		seq_printf(s, "pinmux config\t%s\n", ((host->flags &
-+						       HSMMC_RUNTIME_SUSPENDED)
-+						      ?  "gpio" : "sdio"));
-+		if (host->flags & HSMMC_RUNTIME_SUSPENDED)
-+			seq_printf(s, "sdio irq pin\t%s\n",
-+				   gpio_get_value(mmc_slot(host).gpio_cirq) ?
-+				   "high" : "low");
-+	}
-+	spin_unlock_irqrestore(&host->irq_lock, flags);
++					pinctrl_usdhc1_1_dat3cd: usdhc1grp-3 {
++						fsl,pins = <
++							MX6QDL_PAD_SD1_CMD__SD1_CMD    0x17059
++							MX6QDL_PAD_SD1_CLK__SD1_CLK    0x10059
++							MX6QDL_PAD_SD1_DAT0__SD1_DATA0 0x17059
++							MX6QDL_PAD_SD1_DAT1__SD1_DATA1 0x17059
++							MX6QDL_PAD_SD1_DAT2__SD1_DATA2 0x17059
++							MX6QDL_PAD_SD1_DAT3__SD1_DATA3 0x13059
++							MX6QDL_PAD_NANDF_D0__SD1_DATA4 0x17059
++							MX6QDL_PAD_NANDF_D1__SD1_DATA5 0x17059
++							MX6QDL_PAD_NANDF_D2__SD1_DATA6 0x17059
++							MX6QDL_PAD_NANDF_D3__SD1_DATA7 0x17059
++						>;
++					};
++
++					pinctrl_usdhc1_2_dat3cd: usdhc1grp-4 {
++						fsl,pins = <
++							MX6QDL_PAD_SD1_CMD__SD1_CMD    0x17059
++							MX6QDL_PAD_SD1_CLK__SD1_CLK    0x10059
++							MX6QDL_PAD_SD1_DAT0__SD1_DATA0 0x17059
++							MX6QDL_PAD_SD1_DAT1__SD1_DATA1 0x17059
++							MX6QDL_PAD_SD1_DAT2__SD1_DATA2 0x17059
++							MX6QDL_PAD_SD1_DAT3__SD1_DATA3 0x13059
++						>;
++					};
+ 				};
  
- 	if (host->suspended) {
- 		seq_printf(s, "host suspended, can't read registers\n");
-@@ -1819,9 +1836,11 @@ static int omap_hsmmc_regs_show(struct seq_file *s, void *data)
- 	}
+ 				usdhc2 {
+@@ -1166,6 +1192,32 @@
+ 							MX6QDL_PAD_SD2_DAT3__SD2_DATA3 0x17059
+ 						>;
+ 					};
++
++					pinctrl_usdhc2_1_dat3cd: usdhc2grp-3 {
++						fsl,pins = <
++							MX6QDL_PAD_SD2_CMD__SD2_CMD    0x17059
++							MX6QDL_PAD_SD2_CLK__SD2_CLK    0x10059
++							MX6QDL_PAD_SD2_DAT0__SD2_DATA0 0x17059
++							MX6QDL_PAD_SD2_DAT1__SD2_DATA1 0x17059
++							MX6QDL_PAD_SD2_DAT2__SD2_DATA2 0x17059
++							MX6QDL_PAD_SD2_DAT3__SD2_DATA3 0x13059
++							MX6QDL_PAD_NANDF_D4__SD2_DATA4 0x17059
++							MX6QDL_PAD_NANDF_D5__SD2_DATA5 0x17059
++							MX6QDL_PAD_NANDF_D6__SD2_DATA6 0x17059
++							MX6QDL_PAD_NANDF_D7__SD2_DATA7 0x17059
++						>;
++					};
++
++					pinctrl_usdhc2_2_dat3cd: usdhc2grp-4 {
++						fsl,pins = <
++							MX6QDL_PAD_SD2_CMD__SD2_CMD    0x17059
++							MX6QDL_PAD_SD2_CLK__SD2_CLK    0x10059
++							MX6QDL_PAD_SD2_DAT0__SD2_DATA0 0x17059
++							MX6QDL_PAD_SD2_DAT1__SD2_DATA1 0x17059
++							MX6QDL_PAD_SD2_DAT2__SD2_DATA2 0x17059
++							MX6QDL_PAD_SD2_DAT3__SD2_DATA3 0x13059
++						>;
++					};
+ 				};
  
- 	pm_runtime_get_sync(host->dev);
--
-+	seq_puts(s, "\nregs:\n");
- 	seq_printf(s, "CON:\t\t0x%08x\n",
- 			OMAP_HSMMC_READ(host->base, CON));
-+	seq_printf(s, "PSTATE:\t\t0x%08x\n",
-+		   OMAP_HSMMC_READ(host->base, PSTATE));
- 	seq_printf(s, "HCTL:\t\t0x%08x\n",
- 			OMAP_HSMMC_READ(host->base, HCTL));
- 	seq_printf(s, "SYSCTL:\t\t0x%08x\n",
+ 				usdhc3 {
+@@ -1194,6 +1246,32 @@
+ 							MX6QDL_PAD_SD3_DAT3__SD3_DATA3 0x17059
+ 						>;
+ 					};
++
++					pinctrl_usdhc3_1_dat3cd: usdhc3grp-3 {
++						fsl,pins = <
++							MX6QDL_PAD_SD3_CMD__SD3_CMD    0x17059
++							MX6QDL_PAD_SD3_CLK__SD3_CLK    0x10059
++							MX6QDL_PAD_SD3_DAT0__SD3_DATA0 0x17059
++							MX6QDL_PAD_SD3_DAT1__SD3_DATA1 0x17059
++							MX6QDL_PAD_SD3_DAT2__SD3_DATA2 0x17059
++							MX6QDL_PAD_SD3_DAT3__SD3_DATA3 0x13059
++							MX6QDL_PAD_SD3_DAT4__SD3_DATA4 0x17059
++							MX6QDL_PAD_SD3_DAT5__SD3_DATA5 0x17059
++							MX6QDL_PAD_SD3_DAT6__SD3_DATA6 0x17059
++							MX6QDL_PAD_SD3_DAT7__SD3_DATA7 0x17059
++						>;
++					};
++
++					pinctrl_usdhc3_2_dat3cd: usdhc3grp-4 {
++						fsl,pins = <
++							MX6QDL_PAD_SD3_CMD__SD3_CMD    0x17059
++							MX6QDL_PAD_SD3_CLK__SD3_CLK    0x10059
++							MX6QDL_PAD_SD3_DAT0__SD3_DATA0 0x17059
++							MX6QDL_PAD_SD3_DAT1__SD3_DATA1 0x17059
++							MX6QDL_PAD_SD3_DAT2__SD3_DATA2 0x17059
++							MX6QDL_PAD_SD3_DAT3__SD3_DATA3 0x13059
++						>;
++					};
+ 				};
+ 
+ 				usdhc4 {
+@@ -1222,6 +1300,32 @@
+ 							MX6QDL_PAD_SD4_DAT3__SD4_DATA3 0x17059
+ 						>;
+ 					};
++
++					pinctrl_usdhc4_1_dat3cd: usdhc4grp-3 {
++						fsl,pins = <
++							MX6QDL_PAD_SD4_CMD__SD4_CMD    0x17059
++							MX6QDL_PAD_SD4_CLK__SD4_CLK    0x10059
++							MX6QDL_PAD_SD4_DAT0__SD4_DATA0 0x17059
++							MX6QDL_PAD_SD4_DAT1__SD4_DATA1 0x17059
++							MX6QDL_PAD_SD4_DAT2__SD4_DATA2 0x17059
++							MX6QDL_PAD_SD4_DAT3__SD4_DATA3 0x13059
++							MX6QDL_PAD_SD4_DAT4__SD4_DATA4 0x17059
++							MX6QDL_PAD_SD4_DAT5__SD4_DATA5 0x17059
++							MX6QDL_PAD_SD4_DAT6__SD4_DATA6 0x17059
++							MX6QDL_PAD_SD4_DAT7__SD4_DATA7 0x17059
++						>;
++					};
++
++					pinctrl_usdhc4_2_dat3cd: usdhc4grp-4 {
++						fsl,pins = <
++							MX6QDL_PAD_SD4_CMD__SD4_CMD    0x17059
++							MX6QDL_PAD_SD4_CLK__SD4_CLK    0x10059
++							MX6QDL_PAD_SD4_DAT0__SD4_DATA0 0x17059
++							MX6QDL_PAD_SD4_DAT1__SD4_DATA1 0x17059
++							MX6QDL_PAD_SD4_DAT2__SD4_DATA2 0x17059
++							MX6QDL_PAD_SD4_DAT3__SD4_DATA3 0x13059
++						>;
++					};
+ 				};
+ 
+ 				weim {
 -- 
-1.7.10.4
+1.7.4.4
