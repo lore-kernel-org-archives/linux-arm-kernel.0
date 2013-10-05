@@ -1,31 +1,19 @@
-From: michael.opdenacker@free-electrons.com (Michael Opdenacker)
-Date: Sat,  5 Oct 2013 06:06:04 +0200
-Subject: [PATCH] ARM: gemini: remove obsolete IRQF_DISABLED
-Message-ID: <1380945964-3086-1-git-send-email-michael.opdenacker@free-electrons.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Sat, 5 Oct 2013 14:52:44 +0800
+Subject: [PATCH 1/3] ARM: mach-imx: clk-imx51-imx53: Retrieve base
+ address and irq from dt
+In-Reply-To: <1380597674-31122-1-git-send-email-festevam@gmail.com>
+References: <1380597674-31122-1-git-send-email-festevam@gmail.com>
+Message-ID: <20131005065242.GH2734@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch proposes to remove the use of the IRQF_DISABLED flag
+On Tue, Oct 01, 2013 at 12:21:12AM -0300, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@freescale.com>
+> 
+> As mx53 is a dt-only SoC, we should retrieve the gpt base address and irq
+> from the device tree, instead of using the old MX53_IO_ADDRESS method.
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 
-It's a NOOP since 2.6.35 and it will be removed one day.
-
-Signed-off-by: Michael Opdenacker <michael.opdenacker@free-electrons.com>
----
- arch/arm/mach-gemini/time.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/mach-gemini/time.c b/arch/arm/mach-gemini/time.c
-index 21dc5a8..cc996ec 100644
---- a/arch/arm/mach-gemini/time.c
-+++ b/arch/arm/mach-gemini/time.c
-@@ -45,7 +45,7 @@ static irqreturn_t gemini_timer_interrupt(int irq, void *dev_id)
- 
- static struct irqaction gemini_timer_irq = {
- 	.name		= "Gemini Timer Tick",
--	.flags		= IRQF_DISABLED | IRQF_TIMER,
-+	.flags		= IRQF_TIMER,
- 	.handler	= gemini_timer_interrupt,
- };
- 
--- 
-1.8.1.2
+Applied all 3, thanks.
