@@ -1,50 +1,50 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sat, 5 Oct 2013 16:45:44 +0800
+Date: Sat, 5 Oct 2013 17:20:01 +0800
 Subject: IMX6 USDHC card detection
-In-Reply-To: <20131003193623.GF12758@n2100.arm.linux.org.uk>
+In-Reply-To: <CAOMZO5DrdXpWuULubSjSw7fhCm40JiXnVZwu=YMjzX1sW_tuuw@mail.gmail.com>
 References: <20131003193623.GF12758@n2100.arm.linux.org.uk>
-Message-ID: <20131005084542.GK2734@S2101-09.ap.freescale.net>
+ <CAOMZO5DrdXpWuULubSjSw7fhCm40JiXnVZwu=YMjzX1sW_tuuw@mail.gmail.com>
+Message-ID: <20131005092000.GL2734@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 03, 2013 at 08:36:23PM +0100, Russell King - ARM Linux wrote:
-> Having spent many hours chasing around wondering why controller based
-> card detection doesn't work on IMX6, I've finally found it.
+On Fri, Oct 04, 2013 at 01:07:03PM -0300, Fabio Estevam wrote:
+> Ran a quick test on a mx6qsabresd.
 > 
-> The hardware is setup such that we have a card detect signal routed to
-> GPIO 4.  If we try and use the host controller's built-in card detection,
-> things go awry - the host controller believes that a card is always
-> inserted.
+> The original imx6qdl-sabresd.dtsi uses cd-gpio for sdhc3 port and I removed it:
 > 
-> This appears to be because the kernel sets the D3CD bit in the PROT_CTRL
-> register.  This enables card detection via the DAT3 signal, which
-> indicates a logic '1' level when a card is inserted.  SD cards have a 50k
-> pullup internally which provides the card detection mechanism, and hosts
-> are expected to have a weak pull-down on this signal.
+> --- a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
+> +++ b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
+> @@ -164,8 +164,6 @@
+>                         fsl,pins = <
+>                                 MX6QDL_PAD_GPIO_4__GPIO1_IO04   0x80000000
+>                                 MX6QDL_PAD_GPIO_5__GPIO1_IO05   0x80000000
+> -                               MX6QDL_PAD_NANDF_D0__GPIO2_IO00 0x80000000
+> -                               MX6QDL_PAD_NANDF_D1__GPIO2_IO01 0x80000000
+>                                 MX6QDL_PAD_NANDF_D2__GPIO2_IO02 0x80000000
+>                                 MX6QDL_PAD_NANDF_D3__GPIO2_IO03 0x80000000
+>                                 MX6QDL_PAD_GPIO_0__CCM_CLKO1    0x130b0
+> @@ -239,7 +237,5 @@
+>         pinctrl-names = "default";
+>         pinctrl-0 = <&pinctrl_usdhc3_1>;
+>         bus-width = <8>;
+> -       cd-gpios = <&gpio2 0 0>;
+> -       wp-gpios = <&gpio2 1 0>;
+>         status = "okay";
+>  };
 > 
-> However, the default setup of the SD data lines in IOMUX is this (eg):
-> 
->              MX6QDL_PAD_SD2_DAT0__SD2_DATA0 0x17059
->              MX6QDL_PAD_SD2_DAT1__SD2_DATA1 0x17059
->              MX6QDL_PAD_SD2_DAT2__SD2_DATA2 0x17059
->              MX6QDL_PAD_SD2_DAT3__SD2_DATA3 0x17059
-> 
-> Bits 14 and 15 indicate "pull this pin up via a 22K resistor".
-> 
-> What you end up with is the SD controller believes that a card is always
-> inserted no matter what you do.  You can see this through the PRES_STATE
-> register - you see bit 18 assert/deassert appropriately on card insertion
-> and removals indicating that the socket CD signal is changing state, but
-> you don't see the card inserted bit (bit 16) ever change.  Neither does
-> the kernel react in any way.
-> 
-> So, are the defaults for DATA3 signals really appropriate, or should they
-> be adjusted (in other words, 0x13059 for DATA3).  The alternative is to
-> ignore the built-in host card detection, and configure the CD pin as a
-> GPIO instead.
+> After this change,  the SD controller internal card detection also worked fine.
 
-Unless we're sure that 0x13059 will not cause any ill effect, I would
-suggest you configure the CD pin as GPIO and keep 0x17059 as pad
-configuration, since it's been validated by various boards.
+I guess you are not using the controller internal card detection at all
+in this case, because pad NANDF_D0 has no function of any SD_CD_B.  The
+card detection may just happen to work via DAT3 (D3CD).  But same as
+what Russell has seen, the description of D3CD bit suggests that DAT3
+should be pulled down in this case.
+
+DATA3 as Card Detection Pin:
+If this bit is set, DATA3 should be pulled down to act as a card
+detection pin. Be cautious when using this feature, because DATA3 is
+also a chip-select for the SPI mode. A pull-down on this pin and CMD0
+may set the card into the SPI mode, which the uSDHC does not support.
 
 Shawn
