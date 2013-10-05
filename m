@@ -1,40 +1,27 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 5 Oct 2013 14:17:06 +0100
-Subject: Bug: kbuild always rebuilds compressed images on ARM
-Message-ID: <20131005131706.GY12758@n2100.arm.linux.org.uk>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Sat, 5 Oct 2013 15:33:12 +0200
+Subject: [PATCH] ARM: sunxi: Order Kconfig options alphabetically
+In-Reply-To: <1380120995-9242-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1380120995-9242-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20131005133312.GA3106@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Sep 25, 2013 at 05:56:35PM +0300, Maxime Ripard wrote:
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-I've noticed that kbuild always rebuilds the compressed piggy image
-on ARM.  Here's the output from running make with V=2:
+Applied to my sunxi/core-for-3.13 branch.
 
-  CALL    /home/rmk/git/linux-rmk/scripts/checksyscalls.sh - due to target missing
-  CHK     include/generated/compile.h
-  Kernel: arch/arm/boot/Image is ready
-  Building modules, stage 2.
-  LZO     arch/arm/boot/compressed/piggy.lzo - due to command line change
-  MODPOST 17 modules - due to target is PHONY
-  AS      arch/arm/boot/compressed/piggy.lzo.o - due to: arch/arm/boot/compressed/piggy.lzo
-  LD      arch/arm/boot/compressed/vmlinux - due to: arch/arm/boot/compressed/piggy.lzo.o
-  OBJCOPY arch/arm/boot/zImage - due to: arch/arm/boot/compressed/vmlinux
-  Kernel: arch/arm/boot/zImage is ready
+Maxime
 
-and with V=1:
-
-...
-make -f /home/rmk/git/linux-rmk/scripts/Makefile.build obj=arch/arm/boot/compressed arch/arm/boot/compressed/vmlinux
-make -f /home/rmk/git/linux-rmk/scripts/Makefile.modpost
-  find .tmp_versions -name '*.mod' | xargs -r grep -h '\.ko$' | sort -u | sed 's/\.ko$/.o/' | scripts/mod/modpost -m -a -o /home/rmk/git/build/imx6/Module.symvers    -S  -s -T -
-  (cat arch/arm/boot/compressed/../Image | lzop -9 && printf \\010\\224\\034\\002) > arch/arm/boot/compressed/piggy.lzo || (rm -f arch/arm/boot/compressed/piggy.lzo ; false)
-make -f /home/rmk/git/linux-rmk/scripts/Makefile.fwinst obj=firmware __fw_modbuild
-...
-
-The arch/arm/boot/compressed/.piggy.lzo.cmd file contains this:
-
-cmd_arch/arm/boot/compressed/piggy.lzo := (cat arch/arm/boot/compressed/../Image | lzop -9 && printf \\\\010\\\\224\\\\034\\\\002) > arch/arm/boot/compressed/piggy.lzo || (rm -f arch/arm/boot/compressed/piggy.lzo ; false)
-
-Any ideas why it thinks that the command has changed?
-
-Thanks.
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131005/90f432c5/attachment.sig>
