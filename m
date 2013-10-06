@@ -1,90 +1,110 @@
-From: sre@debian.org (Sebastian Reichel)
-Date: Sun,  6 Oct 2013 22:27:08 +0200
-Subject: [RFCv3 0/7] OMAP SSI driver
-Message-ID: <1381091235-18293-1-git-send-email-sre@debian.org>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Sun, 6 Oct 2013 14:04:08 -0700
+Subject: [PATCH] clk: provide public clk_is_enabled function
+In-Reply-To: <5251E334.2070008@gmail.com>
+References: <1380881310-24345-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20131005202430.GI10079@pengutronix.de> <20131005204208.GB28106@lunn.ch>
+ <20131006090609.GK14747@book.gsilab.sittig.org>
+ <20131006163011.GA30818@lunn.ch>
+ <5251BD09.3050900@gmail.com> <20131006200223.32214.4440@quantum>
+ <5251E334.2070008@gmail.com>
+Message-ID: <CAPtuhTiaTX1VX0OnkJN6AeqtT+FW+uK7022iJ2wOCirQmMXH4Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Sun, Oct 6, 2013 at 3:24 PM, Sebastian Hesselbarth
+<sebastian.hesselbarth@gmail.com> wrote:
+> On 10/06/2013 10:02 PM, Mike Turquette wrote:
+>>
+>> Quoting Sebastian Hesselbarth (2013-10-06 12:42:01)
+>>>
+>>> On 10/06/2013 06:30 PM, Andrew Lunn wrote:
+>>>>
+>>>> On Sun, Oct 06, 2013 at 11:06:09AM +0200, Gerhard Sittig wrote:
+>>>>>
+>>>>> What's wrong with an explicit enable/disable around the data
+>>>>> acquisition?
+>>>>
+>>>>
+>>>> It avoids the CPU locking hard, but will not get us a valid MAC
+>>>> address, which is the point of the exercise.
+>>>
+>>>
+>>> While I agree to all Andew explained above, I somehow have the strong
+>>> feeling that an clk_is_enabled will just be abused where possible. We
+>>> already have two ppl complaining about it - even though a quick look at
+>>> clk/core.c should have cleared out most of it.
+>>>
+>>> Maybe we should just enable the clock, get the (possibly bogus) MAC
+>>> and disable it again. We loose one possible FW_BUG report and overwrite
+>>> an invalid local-mac-address property with another invalid one.
+>>
+>>
+>> Firstly, I'm OK with adding a new clk_is_enabled API for The Right
+>> Reasons, if we can figure out what those reasons are. A major concern is
+>> the lack of locks/barriers around that call that create a critical
+>> section where the enabled state is guaranteed not to change. Those locks
+>> are not exported to drivers nor do I want them to be.
+>>
+>> Secondly, this specific Ethernet/MAC address issue seems like another
+>> case of "the driver should be calling clk_get and clk_prepare_enable but
+>> for some reason it doesn't". This seems to be a common pattern and I'm
+>> not sure why. Does calling clk_enable on your clock which has been
+>
+>
+> Ok, the driver is doing clk_prepare_enable/disable_unprepare just fine.
+> It has nothing to do with the driver but the workaround for broken HW
+> explained below.
+>
+>
+>> already enabled by the bootloader cause issues for you? If not then it
+>> is better to just call clk_enable and have the clock framework book
+>> keeping in-sync with the hardware state.
+>>
+>> Is it possible in your case to only detect the invalid MAC address
+>> without sniffing the state of the clock hardware? Isn't it valid to
+>> report a bootloader bug after only looking at the MAC address and not
+>> the clock enabled state?
+>
+>
+> The ethernet IP used on Kirkwood (mv643xx_eth) is loosing the MAC
+> address register contents on gated clocks. Everything was fine without
+> DT and CCF, because clocks had to be enabled by bootloader. With DT and
+> CCF, we gained clock gating but realized that IP has this flaw. For
+> built-in ethernet driver usually everything is just fine, because driver
+> picks up clock early and it never gets gated.
+>
+> As people were complaining about modular ethernet driver, we thought
+> about how to (a) work around non-DT aware boot loaders, which we have
+> a lot of and its not likely to change soon nor quick and (b) gate those
+> clocks if possible.
+>
+> The workaround until now was to always enable the clocks in board init
+> code, leaving clocks running. Now we want to switch to update the DT
+> with the MAC address possibly found in those registers. It is also done
+> on some other machs and archs, so I guess it is not uncommon do
+> workaround broken/unaware bootloaders this way.
+>
+> The idea is to check nodes status and skip already disabled nodes. For
+> enabled nodes, check the MAC address properties and skip those with
+> valid MAC. Now, my initial workaround was to read registers for those
+> left and copy the MAC address to local-mac-address property.
+>
+> Andrew has mentioned, that some bootloaders might disable clocks but
+> leave the nodes enabled. Reading those registers would lock up
+> the HW, of course. So we thought about to check clk gate status first,
+> which this patch is about.
+>
+> Of course, we can do clk_enable, read, clk_disable as said before - and
+> given the amount of questions and misinterpretation, I think it is the
+> saner way.
 
-Here is the third round of the OMAP SSI driver patches.
+Sorry for any misinterpretation on my end. I agree reading the
+register(s) within a clk_enable/clk_disable-protected section is the
+most sane option.
 
-Changes since RFCv2:
-* Move DT data from omap34xx.dtsi to omap3.dtsi
-  Nokia N9 uses an omap3630 and ssi for modem connection, thus SSI
-  seems to be part of all OMAP3 SoCs.
-* Move DT documentation to the driver patch
-* Update wording in DT documentation
-  I just applied Stephen Warrens suggestions
-* Removal of omap_pm_get_dev_context_loss_count as demanded by Tony Lindgren
-  For now there is no context loss support in the driver, since I do not
-  have enough information about the chip to support this via registers.
-* Dropped useless "default n" from KConfig
-* Add support for HSI client registration via DT
-* Register hsi-char as ssi client for Nokia N900
-  Currently only hsi-char client is available in the mainline kernel,
-  but for the Nokia N900 two more clients will be needed: ssi-protocol
-  and cmt-speech. Those will be added with their own patchset.
-* Use ida_simple_get for device id, since DT does not setup pd->id
-* Fixed SSI interrupt numbers in omap3.dtsi
-  I subtracted OMAP_INTC_START before, but the original patch did
-  not yet have OMAP_INTC_START added.
-* Fixed compilation as kernel modules
-* Fixed reload of kernel modules
-* Added module dependency: omap_ssi_port needs omap_port
+Regards,
+Mike
 
-TODO:
-* Central Message Queue
-  I did not yet implement a central message queue in the HSI framework.
-  I will do this after Nokia N900 modem is working in the mainline kernel,
-  since that makes testing easier.
-* Get clock data from DT
-  This depends on a patchset, which is not yet part of any kernel tree.
-  Apart from that I don't know which clocks will be needed. That depends
-  on the implementation of the hwmod DTification (see next point)
-* Remove the hwmod DT hack
-  This depends on some future work merging hwmod data into DT.
-
-Version 2 of the patchset: https://lkml.org/lkml/2013/9/15/98
-
--- Sebastian
-
-Sebastian Reichel (7):
-  ARM: OMAP2+: hwmod-data: Add SSI information
-  HSI: add Device Tree support for HSI clients
-  HSI: method to unregister clients from an hsi port
-  HSI: hsi-char: add Device Tree support
-  HSI: hsi-char: fix driver for multiport scenarios
-  ARM: OMAP2+: HSI: Introduce OMAP SSI driver
-  ARM: dts: N900: Add SSI information
-
- Documentation/devicetree/bindings/hsi/omap_ssi.txt |   69 +
- .../devicetree/bindings/hsi/trivial-devices.txt    |   36 +
- arch/arm/boot/dts/omap3-n900.dts                   |   12 +
- arch/arm/boot/dts/omap3.dtsi                       |   47 +
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c         |   48 +
- drivers/hsi/Kconfig                                |    1 +
- drivers/hsi/Makefile                               |    1 +
- drivers/hsi/clients/hsi_char.c                     |   15 +-
- drivers/hsi/controllers/Kconfig                    |   19 +
- drivers/hsi/controllers/Makefile                   |    6 +
- drivers/hsi/controllers/omap_ssi.c                 |  618 +++++++++
- drivers/hsi/controllers/omap_ssi.h                 |  166 +++
- drivers/hsi/controllers/omap_ssi_port.c            | 1400 ++++++++++++++++++++
- drivers/hsi/controllers/omap_ssi_regs.h            |  171 +++
- drivers/hsi/hsi.c                                  |   80 +-
- include/dt-bindings/hsi/hsi.h                      |   17 +
- include/linux/hsi/hsi.h                            |    3 +
- 17 files changed, 2707 insertions(+), 2 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/hsi/omap_ssi.txt
- create mode 100644 Documentation/devicetree/bindings/hsi/trivial-devices.txt
- create mode 100644 drivers/hsi/controllers/Kconfig
- create mode 100644 drivers/hsi/controllers/Makefile
- create mode 100644 drivers/hsi/controllers/omap_ssi.c
- create mode 100644 drivers/hsi/controllers/omap_ssi.h
- create mode 100644 drivers/hsi/controllers/omap_ssi_port.c
- create mode 100644 drivers/hsi/controllers/omap_ssi_regs.h
- create mode 100644 include/dt-bindings/hsi/hsi.h
-
--- 
-1.8.4.rc3
+>
+> Sebastian
