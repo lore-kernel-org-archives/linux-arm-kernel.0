@@ -1,22 +1,53 @@
-From: zbr@ioremap.net (Evgeniy Polyakov)
-Date: Sun, 06 Oct 2013 17:32:55 +0400
-Subject: [PATCH 1/2] w1-gpio: Detect of_gpio_error for first gpio
-In-Reply-To: <1380633330-2534-1-git-send-email-mpa@pengutronix.de>
-References: <1380633330-2534-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <117291381066375@web3j.yandex.ru>
+From: gwenhael.goavec-merou@armadeus.com (Gwenhael Goavec-Merou)
+Date: Sun,  6 Oct 2013 13:48:52 +0200
+Subject: [PATCH] ARM: imx51-apf51dev: Add parallel display support
+Message-ID: <1381060132-30340-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
+Signed-off-by: Gwenhael Goavec-Merou <gwenhael.goavec-merou@armadeus.com>
+---
+ arch/arm/boot/dts/imx51-apf51dev.dts | 27 +++++++++++++++++++++++++++
+ 1 file changed, 27 insertions(+)
 
-01.10.2013, 17:16, "Markus Pargmann" <mpa@pengutronix.de>:
-> The first DT gpio is necessary for this driver, but errors returned for
-> of_get_gpio are ignored.
->
-> This patch adds a return value check for the first of_get_gpio.
->
-> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-
-Both patches look good, thank you
-
-Acked-by: Evgeniy Polyakov <zbr@ioremap.net>
+diff --git a/arch/arm/boot/dts/imx51-apf51dev.dts b/arch/arm/boot/dts/imx51-apf51dev.dts
+index 123fe84..5a7f552 100644
+--- a/arch/arm/boot/dts/imx51-apf51dev.dts
++++ b/arch/arm/boot/dts/imx51-apf51dev.dts
+@@ -16,6 +16,33 @@
+ 	model = "Armadeus Systems APF51Dev docking/development board";
+ 	compatible = "armadeus,imx51-apf51dev", "armadeus,imx51-apf51", "fsl,imx51";
+ 
++	display at di1 {
++		compatible = "fsl,imx-parallel-display";
++		crtcs = <&ipu 0>;
++		interface-pix-fmt = "bgr666";
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_ipu_disp1_1>;
++
++		display-timings {
++			lw700 {
++				native-mode;
++				clock-frequency = <33000033>;
++				hactive = <800>;
++				vactive = <480>;
++				hback-porch = <96>;
++				hfront-porch = <96>;
++				vback-porch = <20>;
++				vfront-porch = <21>;
++				hsync-len = <64>;
++				vsync-len = <4>;
++				hsync-active = <1>;
++				vsync-active = <1>;
++				de-active = <1>;
++				pixelclk-active = <0>;
++			};
++		};
++	};
++
+ 	gpio-keys {
+ 		compatible = "gpio-keys";
+ 
+-- 
+1.8.1.5
