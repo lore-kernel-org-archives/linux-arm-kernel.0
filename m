@@ -1,53 +1,45 @@
-From: gwenhael.goavec-merou@armadeus.com (Gwenhael Goavec-Merou)
-Date: Sun,  6 Oct 2013 13:48:52 +0200
-Subject: [PATCH] ARM: imx51-apf51dev: Add parallel display support
-Message-ID: <1381060132-30340-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Sun, 6 Oct 2013 15:51:35 +0200
+Subject: [PATCH 2/3 V4] i2c: mxs: Rework the PIO mode operation
+In-Reply-To: <1381060933-11111-1-git-send-email-marex@denx.de>
+References: <20131004052052.GA3194@katana>
+ <1381060933-11111-1-git-send-email-marex@denx.de>
+Message-ID: <20131006135135.GB4173@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Sun, Oct 06, 2013 at 02:02:13PM +0200, Marek Vasut wrote:
+> Analyze and rework the PIO mode operation. The PIO mode operation
+> was unreliable on MX28, by analyzing the bus with LA, the checks
+> for when data were available or were to be sent were wrong.
+> 
+> The PIO WRITE has to be completely reworked as it multiple problems.
+> The MX23 datasheet helped here, see comments in the code for details.
+> The problems boil down to:
+> - RUN bit in CTRL0 must be set after DATA register was written
+> - The PIO transfer must be 4 bytes long tops, otherwise use
+>   clock stretching.
+> Both of these fixes are implemented.
+> 
+> The PIO READ operation can only be done for up to four bytes as
+> we are unable to read out the data from the DATA register fast
+> enough.
+> 
+> This patch also tries to document the investigation within the
+> code.
+> 
+> Signed-off-by: Marek Vasut <marex@denx.de>
 
-Signed-off-by: Gwenhael Goavec-Merou <gwenhael.goavec-merou@armadeus.com>
----
- arch/arm/boot/dts/imx51-apf51dev.dts | 27 +++++++++++++++++++++++++++
- 1 file changed, 27 insertions(+)
+Applied the series to for-next, thanks!
 
-diff --git a/arch/arm/boot/dts/imx51-apf51dev.dts b/arch/arm/boot/dts/imx51-apf51dev.dts
-index 123fe84..5a7f552 100644
---- a/arch/arm/boot/dts/imx51-apf51dev.dts
-+++ b/arch/arm/boot/dts/imx51-apf51dev.dts
-@@ -16,6 +16,33 @@
- 	model = "Armadeus Systems APF51Dev docking/development board";
- 	compatible = "armadeus,imx51-apf51dev", "armadeus,imx51-apf51", "fsl,imx51";
- 
-+	display at di1 {
-+		compatible = "fsl,imx-parallel-display";
-+		crtcs = <&ipu 0>;
-+		interface-pix-fmt = "bgr666";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_ipu_disp1_1>;
-+
-+		display-timings {
-+			lw700 {
-+				native-mode;
-+				clock-frequency = <33000033>;
-+				hactive = <800>;
-+				vactive = <480>;
-+				hback-porch = <96>;
-+				hfront-porch = <96>;
-+				vback-porch = <20>;
-+				vfront-porch = <21>;
-+				hsync-len = <64>;
-+				vsync-len = <4>;
-+				hsync-active = <1>;
-+				vsync-active = <1>;
-+				de-active = <1>;
-+				pixelclk-active = <0>;
-+			};
-+		};
-+	};
-+
- 	gpio-keys {
- 		compatible = "gpio-keys";
- 
--- 
-1.8.1.5
+>     (and fixed my local pre-commit hook)
+
+Yay :)
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131006/524b93c1/attachment.sig>
