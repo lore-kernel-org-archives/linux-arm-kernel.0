@@ -1,79 +1,134 @@
-From: gsi@denx.de (Gerhard Sittig)
-Date: Sun, 6 Oct 2013 11:06:09 +0200
-Subject: [PATCH] clk: provide public clk_is_enabled function
-In-Reply-To: <20131005204208.GB28106@lunn.ch>
-References: <1380881310-24345-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <20131005202430.GI10079@pengutronix.de>
- <20131005204208.GB28106@lunn.ch>
-Message-ID: <20131006090609.GK14747@book.gsilab.sittig.org>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Sun, 6 Oct 2013 17:06:10 +0800
+Subject: [PATCH] ARM: imx: replace imx6q_restart() with mxc_restart()
+Message-ID: <1381050370-3301-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 05, 2013 at 22:42 +0200, Andrew Lunn wrote:
-> 
-> On Sat, Oct 05, 2013 at 10:24:30PM +0200, Uwe Kleine-K?nig wrote:
-> > On Fri, Oct 04, 2013 at 12:08:30PM +0200, Sebastian Hesselbarth wrote:
-> > > To determine if a clk has been previously enabled, provide a public
-> > > clk_is_enabled function. This is especially helpful to check the state
-> > > of clk-gate without actually changing the state of the gate.
-> > I wonder what you want to do with the return value.
-> > 
-> > When doing
-> > 
-> > 	if (clk_is_enabled(someclk))
-> > 		do_something();
-> > 
-> > you cannot in general know if the clock is still on when you start to
-> > do_something.
-> 
-> Hi Uwe
-> 
-> At least in the use case Sebastian needs it for, we don't need an "in
-> general" solution. It is used early boot time to see if the boot
-> loader left the clock running.
+The imx6q_restart() works fine with normal reboot but will run into
+problem with emergency reboot like sysrq-b.  In that case, of_iomap()
+gets called from interrupt context and hence triggers the BUG_ON in
+__get_vm_area_node().
 
-Wait, unless I'm missing something, the clk_is_enabled() call
-_won't_ determine whether the clock is enabled in hardware
-(whether the boot loader created or left this condition), instead
-it only determines whether clk_enable() was called previously and
-thus the clock _shall_ be enabled.
+Actually, since commit c1e31d1 (ARM: imx: create
+mxc_arch_reset_init_dt() for DT boot), imx6q/dl should try to use
+mxc_restart() by calling mxc_arch_reset_init_dt() beforehand, where
+things like of_iomap() can be done.
 
-AFAIK the kernel's CCF support is "self contained" and does not
-consider any data or state that was "inherited" from boot staged
-before the kernel.  That's why the "disable unused" step disables
-everything that wasn't acquired _in the kernel_ regardless of
-what the boot loader may have done or what is enabled at reset.
+The patch updates mxc_restart() a little bit to get it work for imx6q/dl
+and kill imx6q_restart() completely.
 
-> The other user of the clock is the
-> ethernet driver, which we know cannot change it yet, because driver
-> probing has not started yet.
+Reported-by: Nathan Lynch <nathan_lynch@mentor.com>
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
+ arch/arm/mach-imx/common.h     |    4 ++++
+ arch/arm/mach-imx/mach-imx6q.c |   35 +++--------------------------------
+ arch/arm/mach-imx/system.c     |    5 +++++
+ 3 files changed, 12 insertions(+), 32 deletions(-)
 
-I understand that the situation here is, that the ethernet driver
-hasn't probed yet, but the clock driver did.  You are in early
-setup code and want to (check and) fetch data from the hardware
-which the ethernet driver later needs.
-
-What's wrong with an explicit enable/disable around the data
-acquisition?  This allows to reliably fetch and store the
-information (into the device tree data?) for later use, and is
-neutral to the enable counter.  If the clock was enabled before,
-it remains enabled.  If the clock was disabled before, it will
-get disabled again.  In any case clock only may be turned off
-after you have grabbed the data, the data is only taken when it's
-available and valid.
-
-This approach of explicit enable/disable around data access only
-breaks if the ethernet driver won't acquire its related clock
-appropriately, which would be a bug in the ethernet driver that
-should be easy to fix.  (Strictly speaking it's not the data
-gathering that breaks, but the already broken network driver
-which accesses the hardware without acquiring the clock, and not
-finds the clock disabled.)
-
-
-virtually yours
-Gerhard Sittig
+diff --git a/arch/arm/mach-imx/common.h b/arch/arm/mach-imx/common.h
+index 7230cf8..9ebca9e 100644
+--- a/arch/arm/mach-imx/common.h
++++ b/arch/arm/mach-imx/common.h
+@@ -130,7 +130,11 @@ static inline void imx_smp_prepare(void) {}
+ static inline void imx_scu_standby_enable(void) {}
+ #endif
+ extern void imx_src_init(void);
++#ifdef CONFIG_HAVE_IMX_SRC
+ extern void imx_src_prepare_restart(void);
++#else
++extern inline void imx_src_prepare_restart(void) {}
++#endif
+ extern void imx_gpc_init(void);
+ extern void imx_gpc_pre_suspend(void);
+ extern void imx_gpc_post_resume(void);
+diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
+index 398858b..53e70f4 100644
+--- a/arch/arm/mach-imx/mach-imx6q.c
++++ b/arch/arm/mach-imx/mach-imx6q.c
+@@ -15,7 +15,6 @@
+ #include <linux/clkdev.h>
+ #include <linux/clocksource.h>
+ #include <linux/cpu.h>
+-#include <linux/delay.h>
+ #include <linux/export.h>
+ #include <linux/init.h>
+ #include <linux/io.h>
+@@ -40,36 +39,6 @@
+ #include "cpuidle.h"
+ #include "hardware.h"
+ 
+-static void imx6q_restart(enum reboot_mode mode, const char *cmd)
+-{
+-	struct device_node *np;
+-	void __iomem *wdog_base;
+-
+-	np = of_find_compatible_node(NULL, NULL, "fsl,imx6q-wdt");
+-	wdog_base = of_iomap(np, 0);
+-	if (!wdog_base)
+-		goto soft;
+-
+-	imx_src_prepare_restart();
+-
+-	/* enable wdog */
+-	writew_relaxed(1 << 2, wdog_base);
+-	/* write twice to ensure the request will not get ignored */
+-	writew_relaxed(1 << 2, wdog_base);
+-
+-	/* wait for reset to assert ... */
+-	mdelay(500);
+-
+-	pr_err("Watchdog reset failed to assert reset\n");
+-
+-	/* delay to allow the serial port to show the message */
+-	mdelay(50);
+-
+-soft:
+-	/* we'll take a jump through zero as a poor second */
+-	soft_restart(0);
+-}
+-
+ /* For imx6q sabrelite board: set KSZ9021RN RGMII pad skew */
+ static int ksz9021rn_phy_fixup(struct phy_device *phydev)
+ {
+@@ -166,6 +135,8 @@ static void __init imx6q_init_machine(void)
+ {
+ 	struct device *parent;
+ 
++	mxc_arch_reset_init_dt();
++
+ 	parent = imx_soc_device_init();
+ 	if (parent == NULL)
+ 		pr_warn("failed to initialize soc device\n");
+@@ -293,5 +264,5 @@ DT_MACHINE_START(IMX6Q, "Freescale i.MX6 Quad/DualLite (Device Tree)")
+ 	.init_machine	= imx6q_init_machine,
+ 	.init_late      = imx6q_init_late,
+ 	.dt_compat	= imx6q_dt_compat,
+-	.restart	= imx6q_restart,
++	.restart	= mxc_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-imx/system.c b/arch/arm/mach-imx/system.c
+index 80c177c..e6edcd3 100644
+--- a/arch/arm/mach-imx/system.c
++++ b/arch/arm/mach-imx/system.c
+@@ -42,6 +42,9 @@ void mxc_restart(enum reboot_mode mode, const char *cmd)
+ {
+ 	unsigned int wcr_enable;
+ 
++	if (cpu_is_imx6q() || cpu_is_imx6dl())
++		imx_src_prepare_restart();
++
+ 	if (wdog_clk)
+ 		clk_enable(wdog_clk);
+ 
+@@ -52,6 +55,8 @@ void mxc_restart(enum reboot_mode mode, const char *cmd)
+ 
+ 	/* Assert SRS signal */
+ 	__raw_writew(wcr_enable, wdog_base);
++	/* write twice to ensure the request will not get ignored */
++	__raw_writew(wcr_enable, wdog_base);
+ 
+ 	/* wait for reset to assert... */
+ 	mdelay(500);
 -- 
-DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
-HRB 165235 Munich, Office: Kirchenstr. 5, D-82194 Groebenzell, Germany
-Phone: +49-8142-66989-0 Fax: +49-8142-66989-80  Email: office at denx.de
+1.7.9.5
