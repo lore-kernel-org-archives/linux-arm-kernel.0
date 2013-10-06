@@ -1,39 +1,94 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Sun, 06 Oct 2013 09:11:59 +0900
-Subject: [PATCH V5 1/5] ARM: dts: Add MIPI PHY node to exynos4.dtsi
-In-Reply-To: <5250AA3F.6030701@samsung.com>
-References: <1380396467-29278-1-git-send-email-s.nawrocki@samsung.com>
- <1380396467-29278-2-git-send-email-s.nawrocki@samsung.com>
- <524A5D68.8080904@ti.com> <524B3B04.3000704@gmail.com>
- <524AE9BC.6060103@ti.com> <5250AA3F.6030701@samsung.com>
-Message-ID: <5250AACF.1030003@samsung.com>
+From: Alison_Chaiken@mentor.com (Chaiken, Alison)
+Date: Sun, 6 Oct 2013 03:02:53 +0000
+Subject: [RFC 00/15] Device Tree schemas and validation
+In-Reply-To: <524D76DF.9050800@baylibre.com>
+References: <1380041541-17529-1-git-send-email-bcousson@baylibre.com>
+ <524B4B20.4020002@wwwdotorg.org>
+ <20131002142914.GI6506@voom.fritz.box>,<524D76DF.9050800@baylibre.com>
+Message-ID: <60BA5429A0E1584BA3633194F6F993B50E960588@NA-MBX-03.mgc.mentorg.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/06/13 09:09, Kukjin Kim wrote:
->
-> On 10/02/13 00:26, Kishon Vijay Abraham I wrote:
->> On Wednesday 02 October 2013 02:43 AM, Sylwester Nawrocki wrote:
->>> On 10/01/2013 07:28 AM, Kishon Vijay Abraham I wrote:
->>>> On Sunday 29 September 2013 12:57 AM, Sylwester Nawrocki wrote:
->>>>>> Add PHY provider node for the MIPI CSIS and MIPI DSIM PHYs.
->>>>>>
->>>>>> Signed-off-by: Sylwester Nawrocki<s.nawrocki@samsung.com>
->>>>>> Signed-off-by: Kyungmin Park<kyungmin.park@samsung.com>
->>>>>> Acked-by: Felipe Balbi<balbi@ti.com>
->>>>
->>>> Can this patch be taken through exynos dt tree?
->>>
->>> Yes, that makes more sense indeed. Kukjin, would you mind taking
->>> this patch to your tree ?
->>
-> Sure. Applied this whole series.
->
-Oops, sorry. Only this patch ;-)
+Rob Herring in devicetree/msg06598.html
+> This is interesting approach using the dts syntax,
 
->> FWIW
->> Acked-by: Kishon Vijay Abraham I<kishon@ti.com>
->>>
+Benoit Cousson in devicetree/msg06617.html
+> it has the big advantage of re-using the parser already included in DTC for
+> free. In term or readability, it avoids to re-defining a brand new syntax for
+> people who are already familiar with the DTS one.
 
-Thanks,
-Kukjin
+Stephen Warren wrote in devicetree/msg06676.html:
+> DT is a language for representing data.
+> The validation checks described by schemas are rules, or code, and not static
+> data.
+
+The syntax of the existing device-tree source is strikingly similar to that of
+the widely used JavaScript Object Notation, better known as JSON.  JSON has many
+parsers, validators and schemata already in existence.  Assuredly as many coders
+know how to program JSON as know C.
+
+JSON makes some sense for representation of device-trees, because, as the
+authoritative json.org explains, "JSON is a text format that is completely
+language independent but uses conventions that are familiar to programmers of
+the C-family of languages . . . JSON is a natural representation of data for the
+C family of programming languages."
+
+Benoit Cousson remarks in devicetree/msg06617.html:
+> The bindings definition being quite open, there is no easy way to
+> ensure proper schema / bindings without careful review of the
+> schema.
+
+Stephen Warren continues in devicetree/msg06676.html:
+> Overall, I believe perhaps the single most important aspect of any DT
+> schema is schema inheritance or instancing,
+
+David Gibson comments in devicetree/msg06725.html:
+> define the notion of dt "patterns" or "templates".  A dt
+> pattern is to a dt node or subtree as a regex is to a string - it
+> provides a reasonably expressive way of defining a family of dt
+> nodes.  These would be defined in an extension / superset of dt
+> syntax.
+
+I violently agree with Stephen and David and believe that inheritance
+offers a partial solution to the problem Benoit describes.  What about
+improving compliance by explicitly making use of inheritance with
+device-tree include files?  Suppose we consider supplementing the ARM
+tree's skeleton.dtsi tree-root with board.dtsi, cpu.dtsi,
+daughtercard.dtsi . . .  Suppose then we require board-level dts files
+to include board.dtsi, and furthermore that the CPU node for the board
+to be described in a DTSI file that must itself include cpu.dtsi.
+Then the dtc itself could in effect check perform some constraint
+checking.  Device vendors could offer <arch>.dtsi and <particular
+chip>.dtsi that users of those products would be required to include.
+
+A related question: what DTS files will a validator compare against a schema?
+Assuredly given the existing ability of nodes and properties in a
+hierarchy of include files to override and modify one another, the
+post C-preprocessed and compiled single-file is the one wanted, that
+is, the output from
+
+	       $CC $CPP_FLAGS -o foo.tmp foo.dts
+	       dtc -O dts -i arch/arm/boot/dts foo.tmp
+
+Some other suggestions:
+
+   Let's not make the documentation derived from schemata and DTS files
+tree-structured.    Otherwise we end up with GNU info, ahem.
+
+   Stephen Warren previously contributed a useful bindings checklist.  We should
+try to roll that checklist into any validator.
+
+Benoit promises in  devicetree/msg06617.html:
+> Being the very first one, you might get a free beer... meaning there
+> might be such thing as a free beer :-)
+
+I'm presenting a talk about device-tree for Embedded Linux Conference
+Europe, http://sched.co/17ozhPE, and hope that some of you come flame
+me in person there.  If so, I will actually buy you a free beer, but
+not until after the second seminar I must give that afternoon!
+
+-- 
+Alison Chaiken
+Mentor Embedded Software Division
+Fremont, CA
+GMT-8
