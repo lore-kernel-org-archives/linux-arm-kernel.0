@@ -1,62 +1,59 @@
-From: anurag19aggarwal@gmail.com (Anurag Aggarwal)
-Date: Sun, 6 Oct 2013 12:44:32 +0530
-Subject: [Query] Stack Overflow in "arch/arm/kernel/unwind.c" while
- unwinding frame
-In-Reply-To: <20131002181116.GH29794@arm.com>
-References: <CAPoNrtuuMn=Bm9Mo=PsJfJp6DMQaM-Eaz5An+0+DXL2=uObndg@mail.gmail.com>
- <CAFrcx1m=3_74SiVecGF14DF827UzAwprNZMVVGRa46aqqVGATw@mail.gmail.com>
- <20131002181116.GH29794@arm.com>
-Message-ID: <CAPoNrttwS9TdEij_6iDzyHheq+o=nGMV48RaqzayeKCCcqcdjA@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Sun, 6 Oct 2013 10:29:17 +0200
+Subject: [linux-sunxi] [PATCH 0/4] Add support for the Allwinner A31
+ Reset Controllers
+In-Reply-To: <CAPNxggaUW1B8Ea-gSo+XV2P9s4MRa1L25_ZAvOWyLN6VqQ6wsQ@mail.gmail.com>
+References: <1380983960-11087-1-git-send-email-maxime.ripard@free-electrons.com>
+ <CAPNxggaUW1B8Ea-gSo+XV2P9s4MRa1L25_ZAvOWyLN6VqQ6wsQ@mail.gmail.com>
+Message-ID: <20131006082917.GD3106@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->From what I saw, it happened when the next page is not mapped to
-physical memory.
+Hi Roman,
 
-I don't think that stack corruption can cause this.
+On Sun, Oct 06, 2013 at 01:32:13AM +0200, Arokux X wrote:
+> On Sat, Oct 5, 2013 at 4:39 PM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+> > Hi everyone,
+> >
+> > This patchset adds support for the reset controllers found in the Allwinner A31
+> > SoCs. Since these controllers are pretty simple, basically just a few MMIO
+> > registers, with a single bit controlling the reset state of the other devices
+> > it asserts in reset, the driver is quite simple as well.
+> 
+> I think we need something smarter here. There are reset bits all over
+> the place. After a hint by Emilio and small chat with Oliver I've
+> realized I have 3 reset bits in USB host clock module [0].
 
->From what I could understand about of the code there is not check if
-the memory beyond stack is physically mapped or not.
+I wasn't aware there were other IPs behaving like this in older SoCs.
+Thanks for pointing this out.
 
-To handle the problem I thought that checks can also be added in
-unwind_exec_insn() function for stack overflow.
+Something smarter in what sense? It's just one bit to put in one
+register, I don't really see how it can be "smart".
 
-On Wed, Oct 2, 2013 at 11:41 PM, Catalin Marinas
-<catalin.marinas@arm.com> wrote:
-> On 24 September 2013 07:23, Anurag Aggarwal <anurag19aggarwal@gmail.com> wrote:
->> While executing unwind backtrace instructions in ARM, in the function
->> unwind_exec_insn()
->> there are chances that SP overflows from stack.
->>
->>
->> For example while executing instruction with opcode 0xAE, vsp can go
->> beyond stack to area that has not been allocated till now.
->>
->> unsigned long *vsp = (unsigned long *)ctrl->vrs[SP];
->> int reg;
->>
->> /* pop R4-R[4+bbb] */
->> for (reg = 4; reg <= 4 + (insn & 7); reg++)
->> ctrl->vrs[reg] = *vsp++;
->>
->> The above scenario can happen while executing any of the unwind instruction.
->>
->> One of the ways to fix the problem is to check for vsp with stack
->> limits before we increment it, but doing it for all the instructions
->> seems a little bad.
->>
->> I just want to know that if anyone has faced the problem before
->
-> I haven't seen it but I think with some stack (or unwind bytecode)
-> corruption it could happen.
->
-> I think we could place some checks only when vsp is assigned and return
-> -URC_FAILURE, together with some warning.
->
-> --
-> Catalin
+> Maybe implementation like this one [1] where a mask can be passed as a
+> parameter will be more appropriate? (Those reset bits behave the same
+> as gatable clocks really.)
 
+No, they don't behave like gatable clocks, and they shouldn't be
+implemented with the clock framework. Whenever you disable a clock, the
+child device will retain its configuration, while with the reset part,
+well, it will just be reset. This makes one huge difference.
 
+We have a shiny new reset framework for this, made exactly for these
+cases, why not use it?
+
+Thanks,
+Maxime
 
 -- 
-Anurag Aggarwal
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131006/a347db60/attachment.sig>
