@@ -1,40 +1,31 @@
 From: wsa@the-dreams.de (Wolfram Sang)
-Date: Sun, 6 Oct 2013 15:51:35 +0200
-Subject: [PATCH 2/3 V4] i2c: mxs: Rework the PIO mode operation
-In-Reply-To: <1381060933-11111-1-git-send-email-marex@denx.de>
-References: <20131004052052.GA3194@katana>
- <1381060933-11111-1-git-send-email-marex@denx.de>
-Message-ID: <20131006135135.GB4173@katana>
+Date: Sun, 6 Oct 2013 15:54:53 +0200
+Subject: [PATCH 1/3 V2] i2c: mxs: distinguish i.MX23 and i.MX28 based I2C
+ controller
+In-Reply-To: <1380497035-7457-1-git-send-email-marex@denx.de>
+References: <1380497035-7457-1-git-send-email-marex@denx.de>
+Message-ID: <20131006135453.GC4173@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 06, 2013 at 02:02:13PM +0200, Marek Vasut wrote:
-> Analyze and rework the PIO mode operation. The PIO mode operation
-> was unreliable on MX28, by analyzing the bus with LA, the checks
-> for when data were available or were to be sent were wrong.
+On Mon, Sep 30, 2013 at 01:23:53AM +0200, Marek Vasut wrote:
+> From: Juergen Beisert <jbe@pengutronix.de>
 > 
-> The PIO WRITE has to be completely reworked as it multiple problems.
-> The MX23 datasheet helped here, see comments in the code for details.
-> The problems boil down to:
-> - RUN bit in CTRL0 must be set after DATA register was written
-> - The PIO transfer must be 4 bytes long tops, otherwise use
->   clock stretching.
-> Both of these fixes are implemented.
+> It seems the PIO mode does not work, or at least not like it works
+> on a i.MX28. Each short transfer needs about one second (without an
+> error message) but does not send anything on the I2C lines.
 > 
-> The PIO READ operation can only be done for up to four bytes as
-> we are unable to read out the data from the DATA register fast
-> enough.
-> 
-> This patch also tries to document the investigation within the
-> code.
-> 
-> Signed-off-by: Marek Vasut <marex@denx.de>
+> From: Juergen Beisert <jbe@pengutronix.de>
+> Signed-off-by: Juergen Beisert <jbe@pengutronix.de>
+> Cc: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> Cc: Christoph Baumann <cb@sgoc.de>
+> Cc: Fabio Estevam <r49496@freescale.com>
+> Cc: Shawn Guo <shawn.guo@linaro.org>
+> Cc: Torsten Fleischer <to-fleischer@t-online.de>
+> Cc: Wolfram Sang <wsa@the-dreams.de>
 
-Applied the series to for-next, thanks!
-
->     (and fixed my local pre-commit hook)
-
-Yay :)
+This lacked your SoB. To ease things, I added it here. Please shout if
+you don't like me adding it...
 
 -------------- next part --------------
 A non-text attachment was scrubbed...
@@ -42,4 +33,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131006/524b93c1/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131006/6e578fd9/attachment-0001.sig>
