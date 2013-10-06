@@ -1,64 +1,90 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Sun, 06 Oct 2013 13:27:09 -0700
-Subject: [PATCH v2 00/12] clk/exynos convert clock IDs to macros
-In-Reply-To: <0d8901cec170$f7230b50$e56921f0$%kim@samsung.com>
-References: <1378462361-13680-1-git-send-email-a.hajda@samsung.com>
- <8412301.YP2zzplWoe@amdc1227>
- <070001ceafa5$d4d81a40$7e884ec0$%kim@samsung.com>
- <523716C9.3000204@samsung.com> <20130916193709.27384.86101@quantum>
- <06c101cebdc5$75a83d10$60f8b730$%kim@samsung.com>
- <20131002010953.9338.23436@quantum>
- <0d8901cec170$f7230b50$e56921f0$%kim@samsung.com>
-Message-ID: <20131006202709.32214.75572@quantum>
+From: sre@debian.org (Sebastian Reichel)
+Date: Sun,  6 Oct 2013 22:27:08 +0200
+Subject: [RFCv3 0/7] OMAP SSI driver
+Message-ID: <1381091235-18293-1-git-send-email-sre@debian.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Kukjin Kim (2013-10-04 19:16:56)
-> Mike Turquette wrote:
-> > 
-> > Quoting Kukjin Kim (2013-09-30 03:11:41)
-> > > Mike Turquette wrote:
-> > > >
-> > > > Quoting Sylwester Nawrocki (2013-09-16 07:33:45)
-> > > > > On 09/12/2013 12:50 PM, Kukjin Kim wrote:
-> > > > > > Well...I'm not sure changing to use macro is better or not at this
-> > > > moment...
-> > > > >
-> > > > > I think it is. ;) It's really less error prone to have symbolic
-> > names
-> > > > instead
-> > > > > of the plain numbers. The clock ids are defined in one place and it
-> > is
-> > > > more
-> > > > > clear what a clock is by looking at symbolic name. It's especially
-> > > > annoying
-> > > > > to use plain numbers where are are many clock in a single node, like
-> > 10
-> > > > or
-> > > > > more. What are you main concerns with this ?
-> > > >
-> > > > I think having the symbolic names is a win for readability.
-> > > >
-> > > Hmm...since Mike who is a maintainer for ccf agrees with Sylwester's
-> > opinion, so I agree. Actually, I had no strong objection on this but still
-> > I'm not sure using macro is really better because sometimes the name
-> > doesn't give readability really I think though.
-> > >
-> > > Mike, can you give me your ack on clk stuff?
-> > 
-> > Yes, but I was thinking to take this change through the clk tree. The
-> > new branch based on -rc3 will be published tonight.
-> > 
-> > Let me know if it causes problems for you for me to take it.
-> > 
-> Uhm, I think dt changes can make ugly conflicts because of spread dt changing?
+Hi,
 
-Sure, go ahead and take the patches then.
+Here is the third round of the OMAP SSI driver patches.
 
-Acked-by: Mike Turquette <mturquette@linaro.org>
+Changes since RFCv2:
+* Move DT data from omap34xx.dtsi to omap3.dtsi
+  Nokia N9 uses an omap3630 and ssi for modem connection, thus SSI
+  seems to be part of all OMAP3 SoCs.
+* Move DT documentation to the driver patch
+* Update wording in DT documentation
+  I just applied Stephen Warrens suggestions
+* Removal of omap_pm_get_dev_context_loss_count as demanded by Tony Lindgren
+  For now there is no context loss support in the driver, since I do not
+  have enough information about the chip to support this via registers.
+* Dropped useless "default n" from KConfig
+* Add support for HSI client registration via DT
+* Register hsi-char as ssi client for Nokia N900
+  Currently only hsi-char client is available in the mainline kernel,
+  but for the Nokia N900 two more clients will be needed: ssi-protocol
+  and cmt-speech. Those will be added with their own patchset.
+* Use ida_simple_get for device id, since DT does not setup pd->id
+* Fixed SSI interrupt numbers in omap3.dtsi
+  I subtracted OMAP_INTC_START before, but the original patch did
+  not yet have OMAP_INTC_START added.
+* Fixed compilation as kernel modules
+* Fixed reload of kernel modules
+* Added module dependency: omap_ssi_port needs omap_port
 
-Regards,
-Mike
+TODO:
+* Central Message Queue
+  I did not yet implement a central message queue in the HSI framework.
+  I will do this after Nokia N900 modem is working in the mainline kernel,
+  since that makes testing easier.
+* Get clock data from DT
+  This depends on a patchset, which is not yet part of any kernel tree.
+  Apart from that I don't know which clocks will be needed. That depends
+  on the implementation of the hwmod DTification (see next point)
+* Remove the hwmod DT hack
+  This depends on some future work merging hwmod data into DT.
 
-> 
-> - Kukjin
+Version 2 of the patchset: https://lkml.org/lkml/2013/9/15/98
+
+-- Sebastian
+
+Sebastian Reichel (7):
+  ARM: OMAP2+: hwmod-data: Add SSI information
+  HSI: add Device Tree support for HSI clients
+  HSI: method to unregister clients from an hsi port
+  HSI: hsi-char: add Device Tree support
+  HSI: hsi-char: fix driver for multiport scenarios
+  ARM: OMAP2+: HSI: Introduce OMAP SSI driver
+  ARM: dts: N900: Add SSI information
+
+ Documentation/devicetree/bindings/hsi/omap_ssi.txt |   69 +
+ .../devicetree/bindings/hsi/trivial-devices.txt    |   36 +
+ arch/arm/boot/dts/omap3-n900.dts                   |   12 +
+ arch/arm/boot/dts/omap3.dtsi                       |   47 +
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c         |   48 +
+ drivers/hsi/Kconfig                                |    1 +
+ drivers/hsi/Makefile                               |    1 +
+ drivers/hsi/clients/hsi_char.c                     |   15 +-
+ drivers/hsi/controllers/Kconfig                    |   19 +
+ drivers/hsi/controllers/Makefile                   |    6 +
+ drivers/hsi/controllers/omap_ssi.c                 |  618 +++++++++
+ drivers/hsi/controllers/omap_ssi.h                 |  166 +++
+ drivers/hsi/controllers/omap_ssi_port.c            | 1400 ++++++++++++++++++++
+ drivers/hsi/controllers/omap_ssi_regs.h            |  171 +++
+ drivers/hsi/hsi.c                                  |   80 +-
+ include/dt-bindings/hsi/hsi.h                      |   17 +
+ include/linux/hsi/hsi.h                            |    3 +
+ 17 files changed, 2707 insertions(+), 2 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/hsi/omap_ssi.txt
+ create mode 100644 Documentation/devicetree/bindings/hsi/trivial-devices.txt
+ create mode 100644 drivers/hsi/controllers/Kconfig
+ create mode 100644 drivers/hsi/controllers/Makefile
+ create mode 100644 drivers/hsi/controllers/omap_ssi.c
+ create mode 100644 drivers/hsi/controllers/omap_ssi.h
+ create mode 100644 drivers/hsi/controllers/omap_ssi_port.c
+ create mode 100644 drivers/hsi/controllers/omap_ssi_regs.h
+ create mode 100644 include/dt-bindings/hsi/hsi.h
+
+-- 
+1.8.4.rc3
