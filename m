@@ -1,32 +1,62 @@
-From: michael.opdenacker@free-electrons.com (Michael Opdenacker)
-Date: Sun,  6 Oct 2013 08:47:55 +0200
-Subject: [PATCH] usb: host: uhci-platform: remove deprecated IRQF_DISABLED
-Message-ID: <1381042075-13011-1-git-send-email-michael.opdenacker@free-electrons.com>
+From: anurag19aggarwal@gmail.com (Anurag Aggarwal)
+Date: Sun, 6 Oct 2013 12:44:32 +0530
+Subject: [Query] Stack Overflow in "arch/arm/kernel/unwind.c" while
+ unwinding frame
+In-Reply-To: <20131002181116.GH29794@arm.com>
+References: <CAPoNrtuuMn=Bm9Mo=PsJfJp6DMQaM-Eaz5An+0+DXL2=uObndg@mail.gmail.com>
+ <CAFrcx1m=3_74SiVecGF14DF827UzAwprNZMVVGRa46aqqVGATw@mail.gmail.com>
+ <20131002181116.GH29794@arm.com>
+Message-ID: <CAPoNrttwS9TdEij_6iDzyHheq+o=nGMV48RaqzayeKCCcqcdjA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch proposes to remove the use of the IRQF_DISABLED flag
+>From what I saw, it happened when the next page is not mapped to
+physical memory.
 
-It's a NOOP since 2.6.35 and it will be removed one day.
+I don't think that stack corruption can cause this.
 
-Signed-off-by: Michael Opdenacker <michael.opdenacker@free-electrons.com>
----
- drivers/usb/host/uhci-platform.c | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+>From what I could understand about of the code there is not check if
+the memory beyond stack is physically mapped or not.
 
-diff --git a/drivers/usb/host/uhci-platform.c b/drivers/usb/host/uhci-platform.c
-index d033a0e..ded842b 100644
---- a/drivers/usb/host/uhci-platform.c
-+++ b/drivers/usb/host/uhci-platform.c
-@@ -105,8 +105,7 @@ static int uhci_hcd_platform_probe(struct platform_device *pdev)
- 
- 	uhci->regs = hcd->regs;
- 
--	ret = usb_add_hcd(hcd, pdev->resource[1].start, IRQF_DISABLED |
--								IRQF_SHARED);
-+	ret = usb_add_hcd(hcd, pdev->resource[1].start, IRQF_SHARED);
- 	if (ret)
- 		goto err_uhci;
- 
+To handle the problem I thought that checks can also be added in
+unwind_exec_insn() function for stack overflow.
+
+On Wed, Oct 2, 2013 at 11:41 PM, Catalin Marinas
+<catalin.marinas@arm.com> wrote:
+> On 24 September 2013 07:23, Anurag Aggarwal <anurag19aggarwal@gmail.com> wrote:
+>> While executing unwind backtrace instructions in ARM, in the function
+>> unwind_exec_insn()
+>> there are chances that SP overflows from stack.
+>>
+>>
+>> For example while executing instruction with opcode 0xAE, vsp can go
+>> beyond stack to area that has not been allocated till now.
+>>
+>> unsigned long *vsp = (unsigned long *)ctrl->vrs[SP];
+>> int reg;
+>>
+>> /* pop R4-R[4+bbb] */
+>> for (reg = 4; reg <= 4 + (insn & 7); reg++)
+>> ctrl->vrs[reg] = *vsp++;
+>>
+>> The above scenario can happen while executing any of the unwind instruction.
+>>
+>> One of the ways to fix the problem is to check for vsp with stack
+>> limits before we increment it, but doing it for all the instructions
+>> seems a little bad.
+>>
+>> I just want to know that if anyone has faced the problem before
+>
+> I haven't seen it but I think with some stack (or unwind bytecode)
+> corruption it could happen.
+>
+> I think we could place some checks only when vsp is assigned and return
+> -URC_FAILURE, together with some warning.
+>
+> --
+> Catalin
+
+
+
 -- 
-1.8.1.2
+Anurag Aggarwal
