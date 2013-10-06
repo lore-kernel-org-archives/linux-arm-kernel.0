@@ -1,47 +1,22 @@
-From: marex@denx.de (Marek Vasut)
-Date: Sun, 6 Oct 2013 15:54:50 +0200
-Subject: [PATCH 2/3 V4] i2c: mxs: Rework the PIO mode operation
-In-Reply-To: <20131006135135.GB4173@katana>
-References: <20131004052052.GA3194@katana>
- <1381060933-11111-1-git-send-email-marex@denx.de>
- <20131006135135.GB4173@katana>
-Message-ID: <201310061554.50583.marex@denx.de>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Sun, 6 Oct 2013 23:56:05 +0900
+Subject: [PATCH 3/3] KVM: ARM: Add support for Cortex-A7
+In-Reply-To: <CA+eFSM1YdhBDMAvyXknMA62Ao3CEntMptdi7RD=NXis1F-BmfQ@mail.gmail.com>
+References: <1380210568-23175-1-git-send-email-jonathan.austin@arm.com>
+ <1380210568-23175-4-git-send-email-jonathan.austin@arm.com>
+ <20130926161743.GD1389@cbox> <52446A48.9070501@arm.com>
+ <CA+eFSM1YdhBDMAvyXknMA62Ao3CEntMptdi7RD=NXis1F-BmfQ@mail.gmail.com>
+Message-ID: <CAFEAcA9muNxMtSQHqrByk6Gjw4iWS=vF33T=R42tvAQSTLiAeA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Wolfram,
+On 6 October 2013 23:03, Gavin Guo <gavin.guo@canonical.com> wrote:
+> Does it mean the currently qemu can't support A15 vcpu running on host A7?
 
-> On Sun, Oct 06, 2013 at 02:02:13PM +0200, Marek Vasut wrote:
-> > Analyze and rework the PIO mode operation. The PIO mode operation
-> > was unreliable on MX28, by analyzing the bus with LA, the checks
-> > for when data were available or were to be sent were wrong.
-> > 
-> > The PIO WRITE has to be completely reworked as it multiple problems.
-> > The MX23 datasheet helped here, see comments in the code for details.
-> > The problems boil down to:
-> > - RUN bit in CTRL0 must be set after DATA register was written
-> > - The PIO transfer must be 4 bytes long tops, otherwise use
-> > 
-> >   clock stretching.
-> > 
-> > Both of these fixes are implemented.
-> > 
-> > The PIO READ operation can only be done for up to four bytes as
-> > we are unable to read out the data from the DATA register fast
-> > enough.
-> > 
-> > This patch also tries to document the investigation within the
-> > code.
-> > 
-> > Signed-off-by: Marek Vasut <marex@denx.de>
-> 
-> Applied the series to for-next, thanks!
-> 
-> >     (and fixed my local pre-commit hook)
-> 
-> Yay :)
+No, that's a kernel restriction. That is why the patch description reads:
+# This patch adds support for running Cortex-A7 guests on Cortex-A7 hosts.
 
-Thanks! It was quite a lengthy gig here ;-)
+(What QEMU is currently missing is A7 support, so you can't ask it to
+run an A7 guest CPU.)
 
-Best regards,
-Marek Vasut
+-- PMM
