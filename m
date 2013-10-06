@@ -1,156 +1,391 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Sun, 06 Oct 2013 23:10:56 +0100
-Subject: [PATCH 4/5] DRM: Armada: start of MMP2/MMP3 support
+Date: Sun, 06 Oct 2013 23:09:56 +0100
+Subject: [PATCH 3/5] DRM: Armada: Add support for ARGB 32x64 or 64x32
+ hardware cursors
 In-Reply-To: <20131006220728.GG12758@n2100.arm.linux.org.uk>
 References: <20131006220728.GG12758@n2100.arm.linux.org.uk>
-Message-ID: <E1VSwXQ-0000iL-8N@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1VSwWS-0000i7-4f@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This patch adds ARGB hardware cursor support to the DRM driver for the
+Marvell Armada SoCs.  ARGB cursors are supported at either 32x64 or
+64x32 resolutions.
+
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/gpu/drm/armada/Makefile      |    1 +
- drivers/gpu/drm/armada/armada_610.c  |   49 ++++++++++++++++++++++++++++++++++
- drivers/gpu/drm/armada/armada_crtc.c |    1 +
+ drivers/gpu/drm/armada/armada_510.c  |    1 +
+ drivers/gpu/drm/armada/armada_crtc.c |  245 +++++++++++++++++++++++++++++++++-
+ drivers/gpu/drm/armada/armada_crtc.h |    9 ++
  drivers/gpu/drm/armada/armada_drm.h  |    1 +
- drivers/gpu/drm/armada/armada_drv.c  |    6 ++++
- drivers/gpu/drm/armada/armada_hw.h   |    8 +++++
- 6 files changed, 66 insertions(+), 0 deletions(-)
- create mode 100644 drivers/gpu/drm/armada/armada_610.c
+ drivers/gpu/drm/armada/armada_hw.h   |    6 +-
+ 5 files changed, 256 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/gpu/drm/armada/Makefile b/drivers/gpu/drm/armada/Makefile
-index d6f43e0..088db4a 100644
---- a/drivers/gpu/drm/armada/Makefile
-+++ b/drivers/gpu/drm/armada/Makefile
-@@ -2,6 +2,7 @@ armada-y	:= armada_crtc.o armada_drv.o armada_fb.o armada_fbdev.o \
- 		   armada_gem.o armada_output.o armada_overlay.o \
- 		   armada_slave.o
- armada-y	+= armada_510.o
-+armada-y	+= armada_610.o
- armada-$(CONFIG_DEBUG_FS) += armada_debugfs.o
+diff --git a/drivers/gpu/drm/armada/armada_510.c b/drivers/gpu/drm/armada/armada_510.c
+index a016888..59948ef 100644
+--- a/drivers/gpu/drm/armada/armada_510.c
++++ b/drivers/gpu/drm/armada/armada_510.c
+@@ -80,6 +80,7 @@ static int armada510_crtc_compute_clock(struct armada_crtc *dcrtc,
  
- obj-$(CONFIG_DRM_ARMADA) := armada.o
-diff --git a/drivers/gpu/drm/armada/armada_610.c b/drivers/gpu/drm/armada/armada_610.c
-new file mode 100644
-index 0000000..36a10e3
---- /dev/null
-+++ b/drivers/gpu/drm/armada/armada_610.c
-@@ -0,0 +1,49 @@
-+/*
-+ * Copyright (C) 2012 Russell King
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * Armada 610/MMP2/MMP3 variant support
-+ */
-+#include <linux/clk.h>
-+#include <linux/io.h>
-+#include <drm/drmP.h>
-+#include <drm/drm_crtc_helper.h>
-+#include "armada_crtc.h"
-+#include "armada_drm.h"
-+#include "armada_hw.h"
+ const struct armada_variant armada510_ops = {
+ 	.has_spu_adv_reg = true,
++	.spu_adv_reg = ADV_HWC32ENABLE | ADV_HWC32ARGB | ADV_HWC32BLEND,
+ 	.init = armada510_init,
+ 	.crtc_init = armada510_crtc_init,
+ 	.crtc_compute_clock = armada510_crtc_compute_clock,
+diff --git a/drivers/gpu/drm/armada/armada_crtc.c b/drivers/gpu/drm/armada/armada_crtc.c
+index 7b379fd..e8605bf 100644
+--- a/drivers/gpu/drm/armada/armada_crtc.c
++++ b/drivers/gpu/drm/armada/armada_crtc.c
+@@ -381,8 +381,21 @@ void armada_drm_crtc_irq(struct armada_crtc *dcrtc, u32 stat)
+ 		val = readl_relaxed(base + LCD_SPU_ADV_REG);
+ 		val &= ~(ADV_VSYNC_L_OFF | ADV_VSYNC_H_OFF | ADV_VSYNCOFFEN);
+ 		val |= dcrtc->v[i].spu_adv_reg;
+-		writel_relaxed(val, dcrtc->base + LCD_SPU_ADV_REG);
++		writel_relaxed(val, base + LCD_SPU_ADV_REG);
+ 	}
 +
-+static int mmp23_init(struct armada_private *priv, struct device *dev)
++	if (stat & DUMB_FRAMEDONE && dcrtc->cursor_update) {
++		writel_relaxed(dcrtc->cursor_hw_pos,
++			       base + LCD_SPU_HWC_OVSA_HPXL_VLN);
++		writel_relaxed(dcrtc->cursor_hw_sz,
++			       base + LCD_SPU_HWC_HPXL_VLN);
++		armada_updatel(CFG_HWC_ENA,
++			       CFG_HWC_ENA | CFG_HWC_1BITMOD | CFG_HWC_1BITENA,
++			       base + LCD_SPU_DMA_CTRL0);
++		dcrtc->cursor_update = false;
++		armada_drm_crtc_disable_irq(dcrtc, DUMB_FRAMEDONE_ENA);
++	}
++
+ 	spin_unlock(&dcrtc->irq_lock);
+ 
+ 	if (stat & GRA_FRAME_IRQ) {
+@@ -522,7 +535,8 @@ static int armada_drm_crtc_mode_set(struct drm_crtc *crtc,
+ 				    adj->crtc_htotal;
+ 	dcrtc->v[1].spu_v_porch = tm << 16 | bm;
+ 	val = adj->crtc_hsync_start;
+-	dcrtc->v[1].spu_adv_reg = val << 20 | val | ADV_VSYNCOFFEN;
++	dcrtc->v[1].spu_adv_reg = val << 20 | val | ADV_VSYNCOFFEN |
++		priv->variant->spu_adv_reg;
+ 
+ 	if (interlaced) {
+ 		/* Odd interlaced frame */
+@@ -530,7 +544,8 @@ static int armada_drm_crtc_mode_set(struct drm_crtc *crtc,
+ 						(1 << 16);
+ 		dcrtc->v[0].spu_v_porch = dcrtc->v[1].spu_v_porch + 1;
+ 		val = adj->crtc_hsync_start - adj->crtc_htotal / 2;
+-		dcrtc->v[0].spu_adv_reg = val << 20 | val | ADV_VSYNCOFFEN;
++		dcrtc->v[0].spu_adv_reg = val << 20 | val | ADV_VSYNCOFFEN |
++			priv->variant->spu_adv_reg;
+ 	} else {
+ 		dcrtc->v[0] = dcrtc->v[1];
+ 	}
+@@ -545,10 +560,11 @@ static int armada_drm_crtc_mode_set(struct drm_crtc *crtc,
+ 	armada_reg_queue_set(regs, i, dcrtc->v[0].spu_v_h_total,
+ 			   LCD_SPUT_V_H_TOTAL);
+ 
+-	if (priv->variant->has_spu_adv_reg)
++	if (priv->variant->has_spu_adv_reg) {
+ 		armada_reg_queue_mod(regs, i, dcrtc->v[0].spu_adv_reg,
+ 				     ADV_VSYNC_L_OFF | ADV_VSYNC_H_OFF |
+ 				     ADV_VSYNCOFFEN, LCD_SPU_ADV_REG);
++	}
+ 
+ 	val = CFG_GRA_ENA | CFG_GRA_HSMOOTH;
+ 	val |= CFG_GRA_FMT(drm_fb_to_armada_fb(dcrtc->crtc.fb)->fmt);
+@@ -640,11 +656,230 @@ static const struct drm_crtc_helper_funcs armada_crtc_helper_funcs = {
+ 	.disable	= armada_drm_crtc_disable,
+ };
+ 
++static void armada_load_cursor_argb(void __iomem *base, uint32_t *pix,
++	unsigned stride, unsigned width, unsigned height)
 +{
-+	priv->extclk[0] = devm_clk_get(dev, NULL);
++	uint32_t addr;
++	unsigned y;
 +
-+	if (IS_ERR(priv->extclk[0]) && PTR_ERR(priv->extclk[0]) == -ENOENT)
-+		priv->extclk[0] = ERR_PTR(-EPROBE_DEFER);
++	addr = SRAM_HWC32_RAM1;
++	for (y = 0; y < height; y++) {
++		uint32_t *p = &pix[y * stride];
++		unsigned x;
 +
-+	return PTR_RET(priv->extclk[0]);
++		for (x = 0; x < width; x++, p++) {
++			uint32_t val = *p;
++
++			val = (val & 0xff00ff00) |
++			      (val & 0x000000ff) << 16 |
++			      (val & 0x00ff0000) >> 16;
++
++			writel_relaxed(val,
++				       base + LCD_SPU_SRAM_WRDAT);
++			writel_relaxed(addr | SRAM_WRITE,
++				       base + LCD_SPU_SRAM_CTRL);
++			addr += 1;
++			if ((addr & 0x00ff) == 0)
++				addr += 0xf00;
++			if ((addr & 0x30ff) == 0)
++				addr = SRAM_HWC32_RAM2;
++		}
++	}
 +}
 +
-+/*
-+ * This gets called with sclk = NULL to test whether the mode is
-+ * supportable, and again with sclk != NULL to set the clocks up for
-+ * that.  The former can return an error, but the latter is expected
-+ * not to.
-+ */
-+static int mmp23_crtc_compute_clock(struct armada_crtc *dcrtc,
-+	const struct drm_display_mode *mode, uint32_t *sclk)
++static void armada_drm_crtc_cursor_tran(void __iomem *base)
 +{
++	unsigned addr;
++
++	for (addr = 0; addr < 256; addr++) {
++		/* write the default value */
++		writel_relaxed(0x55555555, base + LCD_SPU_SRAM_WRDAT);
++		writel_relaxed(addr | SRAM_WRITE | SRAM_HWC32_TRAN,
++			       base + LCD_SPU_SRAM_CTRL);
++	}
++}
++
++static int armada_drm_crtc_cursor_update(struct armada_crtc *dcrtc, bool reload)
++{
++	uint32_t xoff, xscr, w = dcrtc->cursor_w, s;
++	uint32_t yoff, yscr, h = dcrtc->cursor_h;
++	uint32_t para1;
++
 +	/*
-+	 * on MMP3 bits 31:29 select the clock, OLPC wants 0x1 here, LCD clock 1
-+	 * on MMP2 bits 31:30 select the clock, OLPC wants 0x1 here, LCD clock 1
++	 * Calculate the visible width and height of the cursor,
++	 * screen position, and the position in the cursor bitmap.
 +	 */
-+	*sclk = 0x20001100; // FIXME hardcoded mmp3 value
++	if (dcrtc->cursor_x < 0) {
++		xoff = -dcrtc->cursor_x;
++		xscr = 0;
++		w -= min(xoff, w);
++	} else if (dcrtc->cursor_x + w > dcrtc->crtc.mode.hdisplay) {
++		xoff = 0;
++		xscr = dcrtc->cursor_x;
++		w = max_t(int, dcrtc->crtc.mode.hdisplay - dcrtc->cursor_x, 0);
++	} else {
++		xoff = 0;
++		xscr = dcrtc->cursor_x;
++	}
++
++	if (dcrtc->cursor_y < 0) {
++		yoff = -dcrtc->cursor_y;
++		yscr = 0;
++		h -= min(yoff, h);
++	} else if (dcrtc->cursor_y + h > dcrtc->crtc.mode.vdisplay) {
++		yoff = 0;
++		yscr = dcrtc->cursor_y;
++		h = max_t(int, dcrtc->crtc.mode.vdisplay - dcrtc->cursor_y, 0);
++	} else {
++		yoff = 0;
++		yscr = dcrtc->cursor_y;
++	}
++
++	/* On interlaced modes, the vertical cursor size must be halved */
++	s = dcrtc->cursor_w;
++	if (dcrtc->interlaced) {
++		s *= 2;
++		yscr /= 2;
++		h /= 2;
++	}
++
++	if (!dcrtc->cursor_obj || !h || !w) {
++		spin_lock_irq(&dcrtc->irq_lock);
++		armada_drm_crtc_disable_irq(dcrtc, DUMB_FRAMEDONE_ENA);
++		dcrtc->cursor_update = false;
++		armada_updatel(0, CFG_HWC_ENA, dcrtc->base + LCD_SPU_DMA_CTRL0);
++		spin_unlock_irq(&dcrtc->irq_lock);
++		return 0;
++	}
++
++	para1 = readl_relaxed(dcrtc->base + LCD_SPU_SRAM_PARA1);
++	armada_updatel(CFG_CSB_256x32, CFG_CSB_256x32 | CFG_PDWN256x32,
++		       dcrtc->base + LCD_SPU_SRAM_PARA1);
++
++	/*
++	 * Initialize the transparency if the SRAM was powered down.
++	 * We must also reload the cursor data as well.
++	 */
++	if (!(para1 & CFG_CSB_256x32)) {
++		armada_drm_crtc_cursor_tran(dcrtc->base);
++		reload = true;
++	}
++
++	if (dcrtc->cursor_hw_sz != (h << 16 | w)) {
++		spin_lock_irq(&dcrtc->irq_lock);
++		armada_drm_crtc_disable_irq(dcrtc, DUMB_FRAMEDONE_ENA);
++		dcrtc->cursor_update = false;
++		armada_updatel(0, CFG_HWC_ENA, dcrtc->base + LCD_SPU_DMA_CTRL0);
++		spin_unlock_irq(&dcrtc->irq_lock);
++		reload = true;
++	}
++	if (reload) {
++		struct armada_gem_object *obj = dcrtc->cursor_obj;
++		uint32_t *pix;
++		/* Set the top-left corner of the cursor image */
++		pix = obj->addr;
++		pix += yoff * s + xoff;
++		armada_load_cursor_argb(dcrtc->base, pix, s, w, h);
++	}
++
++	/* Reload the cursor position, size and enable in the IRQ handler */
++	spin_lock_irq(&dcrtc->irq_lock);
++	dcrtc->cursor_hw_pos = yscr << 16 | xscr;
++	dcrtc->cursor_hw_sz = h << 16 | w;
++	dcrtc->cursor_update = true;
++	armada_drm_crtc_enable_irq(dcrtc, DUMB_FRAMEDONE_ENA);
++	spin_unlock_irq(&dcrtc->irq_lock);
 +
 +	return 0;
 +}
 +
-+const struct armada_variant mmp23_ops = {
-+	.init = mmp23_init,
-+	.crtc_compute_clock = mmp23_crtc_compute_clock,
-+};
-diff --git a/drivers/gpu/drm/armada/armada_crtc.c b/drivers/gpu/drm/armada/armada_crtc.c
-index e8605bf..b5877ee 100644
---- a/drivers/gpu/drm/armada/armada_crtc.c
-+++ b/drivers/gpu/drm/armada/armada_crtc.c
-@@ -1054,6 +1054,7 @@ int armada_drm_crtc_create(struct drm_device *dev, unsigned num,
- 	dcrtc->clk = ERR_PTR(-EINVAL);
- 	dcrtc->csc_yuv_mode = CSC_AUTO;
- 	dcrtc->csc_rgb_mode = CSC_AUTO;
-+	/* FIXME: MMP2/MMP3: OLPC panel is RGB666 */
- 	dcrtc->cfg_dumb_ctrl = DUMB24_RGB888_0;
- 	dcrtc->spu_iopad_ctrl = CFG_VSCALE_LN_EN | CFG_IOPAD_DUMB24;
- 	spin_lock_init(&dcrtc->irq_lock);
++static void cursor_update(void *data)
++{
++	armada_drm_crtc_cursor_update(data, true);
++}
++
++static int armada_drm_crtc_cursor_set(struct drm_crtc *crtc,
++	struct drm_file *file, uint32_t handle, uint32_t w, uint32_t h)
++{
++	struct drm_device *dev = crtc->dev;
++	struct armada_crtc *dcrtc = drm_to_armada_crtc(crtc);
++	struct armada_private *priv = crtc->dev->dev_private;
++	struct armada_gem_object *obj = NULL;
++	int ret;
++
++	/* If no cursor support, replicate drm's return value */
++	if (!priv->variant->has_spu_adv_reg)
++		return -ENXIO;
++
++	if (handle && w > 0 && h > 0) {
++		/* maximum size is 64x32 or 32x64 */
++		if (w > 64 || h > 64 || (w > 32 && h > 32))
++			return -ENOMEM;
++
++		obj = armada_gem_object_lookup(dev, file, handle);
++		if (!obj)
++			return -ENOENT;
++
++		/* Must be a kernel-mapped object */
++		if (!obj->addr) {
++			drm_gem_object_unreference_unlocked(&obj->obj);
++			return -EINVAL;
++		}
++
++		if (obj->obj.size < w * h * 4) {
++			DRM_ERROR("buffer is too small\n");
++			drm_gem_object_unreference_unlocked(&obj->obj);
++			return -ENOMEM;
++		}
++	}
++
++	mutex_lock(&dev->struct_mutex);
++	if (dcrtc->cursor_obj) {
++		dcrtc->cursor_obj->update = NULL;
++		dcrtc->cursor_obj->update_data = NULL;
++		drm_gem_object_unreference(&dcrtc->cursor_obj->obj);
++	}
++	dcrtc->cursor_obj = obj;
++	dcrtc->cursor_w = w;
++	dcrtc->cursor_h = h;
++	ret = armada_drm_crtc_cursor_update(dcrtc, true);
++	if (obj) {
++		obj->update_data = dcrtc;
++		obj->update = cursor_update;
++	}
++	mutex_unlock(&dev->struct_mutex);
++
++	return ret;
++}
++
++static int armada_drm_crtc_cursor_move(struct drm_crtc *crtc, int x, int y)
++{
++	struct drm_device *dev = crtc->dev;
++	struct armada_crtc *dcrtc = drm_to_armada_crtc(crtc);
++	struct armada_private *priv = crtc->dev->dev_private;
++	int ret;
++
++	/* If no cursor support, replicate drm's return value */
++	if (!priv->variant->has_spu_adv_reg)
++		return -EFAULT;
++
++	mutex_lock(&dev->struct_mutex);
++	dcrtc->cursor_x = x;
++	dcrtc->cursor_y = y;
++	ret = armada_drm_crtc_cursor_update(dcrtc, false);
++	mutex_unlock(&dev->struct_mutex);
++
++	return ret;
++}
++
+ static void armada_drm_crtc_destroy(struct drm_crtc *crtc)
+ {
+ 	struct armada_crtc *dcrtc = drm_to_armada_crtc(crtc);
+ 	struct armada_private *priv = crtc->dev->dev_private;
+ 
++	if (dcrtc->cursor_obj)
++		drm_gem_object_unreference(&dcrtc->cursor_obj->obj);
++
+ 	priv->dcrtc[dcrtc->num] = NULL;
+ 	drm_crtc_cleanup(&dcrtc->crtc);
+ 
+@@ -750,6 +985,8 @@ armada_drm_crtc_set_property(struct drm_crtc *crtc,
+ }
+ 
+ static struct drm_crtc_funcs armada_crtc_funcs = {
++	.cursor_set	= armada_drm_crtc_cursor_set,
++	.cursor_move	= armada_drm_crtc_cursor_move,
+ 	.destroy	= armada_drm_crtc_destroy,
+ 	.set_config	= drm_crtc_helper_set_config,
+ 	.page_flip	= armada_drm_crtc_page_flip,
+diff --git a/drivers/gpu/drm/armada/armada_crtc.h b/drivers/gpu/drm/armada/armada_crtc.h
+index 972da53..9c10a07 100644
+--- a/drivers/gpu/drm/armada/armada_crtc.h
++++ b/drivers/gpu/drm/armada/armada_crtc.h
+@@ -44,11 +44,20 @@ struct armada_crtc {
+ 		uint32_t	spu_adv_reg;
+ 	} v[2];
+ 	bool			interlaced;
++	bool			cursor_update;
+ 	uint8_t			csc_yuv_mode;
+ 	uint8_t			csc_rgb_mode;
+ 
+ 	struct drm_plane	*plane;
+ 
++	struct armada_gem_object	*cursor_obj;
++	int			cursor_x;
++	int			cursor_y;
++	uint32_t		cursor_hw_pos;
++	uint32_t		cursor_hw_sz;
++	uint32_t		cursor_w;
++	uint32_t		cursor_h;
++
+ 	int			dpms;
+ 	uint32_t		cfg_dumb_ctrl;
+ 	uint32_t		dumb_ctrl;
 diff --git a/drivers/gpu/drm/armada/armada_drm.h b/drivers/gpu/drm/armada/armada_drm.h
-index eef09ec..f52fccb 100644
+index e8c4f80..eef09ec 100644
 --- a/drivers/gpu/drm/armada/armada_drm.h
 +++ b/drivers/gpu/drm/armada/armada_drm.h
-@@ -70,6 +70,7 @@ struct armada_variant {
+@@ -60,6 +60,7 @@ struct armada_private;
  
- /* Variant ops */
- extern const struct armada_variant armada510_ops;
-+extern const struct armada_variant mmp23_ops;
- 
- struct armada_private {
- 	const struct armada_variant *variant;
-diff --git a/drivers/gpu/drm/armada/armada_drv.c b/drivers/gpu/drm/armada/armada_drv.c
-index 7bfab9a..db62f1b 100644
---- a/drivers/gpu/drm/armada/armada_drv.c
-+++ b/drivers/gpu/drm/armada/armada_drv.c
-@@ -344,6 +344,12 @@ static const struct platform_device_id armada_drm_platform_ids[] = {
- 		.name		= "armada-drm",
- 		.driver_data	= (unsigned long)&armada510_ops,
- 	}, {
-+		.name		= "armada-610-drm", /* aka MMP2 */
-+		.driver_data	= (unsigned long)&mmp23_ops,
-+	}, {
-+		.name		= "mmp3-drm",
-+		.driver_data	= (unsigned long)&mmp23_ops,
-+	}, {
- 		.name		= "armada-510-drm",
- 		.driver_data	= (unsigned long)&armada510_ops,
- 	},
+ struct armada_variant {
+ 	bool	has_spu_adv_reg;
++	uint32_t spu_adv_reg;
+ 	int (*init)(struct armada_private *, struct device *);
+ 	int (*crtc_init)(struct armada_crtc *);
+ 	int (*crtc_compute_clock)(struct armada_crtc *,
 diff --git a/drivers/gpu/drm/armada/armada_hw.h b/drivers/gpu/drm/armada/armada_hw.h
-index 27319a8..1688716 100644
+index 216a4b5..27319a8 100644
 --- a/drivers/gpu/drm/armada/armada_hw.h
 +++ b/drivers/gpu/drm/armada/armada_hw.h
-@@ -74,6 +74,7 @@ enum {
- 	LCD_SPU_IOPAD_CONTROL		= 0x01bc,
- 	LCD_SPU_IRQ_ENA			= 0x01c0,
- 	LCD_SPU_IRQ_ISR			= 0x01c4,
-+	LCD_MISC_CNTL			= 0x01c8,	/* Armada 168 */
- };
- 
- /* For LCD_SPU_ADV_REG */
-@@ -211,6 +212,13 @@ enum {
- 	SCLK_16X_PLL		= 0x8 << 28,
- 	SCLK_16X_FRAC_DIV_MASK	= 0xfff << 16,
- 	SCLK_16X_INT_DIV_MASK	= 0xffff << 0,
-+
-+	/* PXA910 / MMP2 (Armada 610) / MMP3 / PXA988 */
-+	SCLK_MMP_SRC_SEL	= 1 << 31,
-+	SCLK_MMP_DISABLE	= 1 << 28,
-+	SCLK_MMP_FRAC_DIV_MASK	= 0xfff << 16,
-+	SCLK_MMP_DSI_DIV_MASK	= 0xf << 8,
-+	SCLK_MMP_INT_DIV_MASK	= 0xff << 0,
- };
- 
- /* For LCD_SPU_DUMB_CTRL */
+@@ -168,8 +168,10 @@ enum {
+ 	SRAM_READ	= 0 << 14,
+ 	SRAM_WRITE	= 2 << 14,
+ 	SRAM_INIT	= 3 << 14,
+-	SRAM_HWC32_RAMR	= 0xc << 8,
+-	SRAM_HWC32_RAMG	= 0xd << 8,
++	SRAM_HWC32_RAM1	= 0xc << 8,
++	SRAM_HWC32_RAM2	= 0xd << 8,
++	SRAM_HWC32_RAMR	= SRAM_HWC32_RAM1,
++	SRAM_HWC32_RAMG	= SRAM_HWC32_RAM2,
+ 	SRAM_HWC32_RAMB	= 0xe << 8,
+ 	SRAM_HWC32_TRAN	= 0xf << 8,
+ 	SRAM_HWC	= 0xf << 8,
 -- 
 1.7.4.4
