@@ -1,134 +1,74 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sun, 6 Oct 2013 17:06:10 +0800
-Subject: [PATCH] ARM: imx: replace imx6q_restart() with mxc_restart()
-Message-ID: <1381050370-3301-1-git-send-email-shawn.guo@linaro.org>
+Date: Sun, 6 Oct 2013 17:09:48 +0800
+Subject: [PATCH] imx6q: fix emergency restart
+In-Reply-To: <1380832337-4637-1-git-send-email-nathan_lynch@mentor.com>
+References: <1380832337-4637-1-git-send-email-nathan_lynch@mentor.com>
+Message-ID: <20131006090946.GN2734@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The imx6q_restart() works fine with normal reboot but will run into
-problem with emergency reboot like sysrq-b.  In that case, of_iomap()
-gets called from interrupt context and hence triggers the BUG_ON in
-__get_vm_area_node().
+On Thu, Oct 03, 2013 at 03:32:17PM -0500, Nathan Lynch wrote:
+> Emergency restart (e.g. sysrq-b) BUGs and panics on i.MX6Q SABRE Lite:
 
-Actually, since commit c1e31d1 (ARM: imx: create
-mxc_arch_reset_init_dt() for DT boot), imx6q/dl should try to use
-mxc_restart() by calling mxc_arch_reset_init_dt() beforehand, where
-things like of_iomap() can be done.
+<snip>
 
-The patch updates mxc_restart() a little bit to get it work for imx6q/dl
-and kill imx6q_restart() completely.
+> Mapping the watchdog via of_iomap() in imx6q_restart() is okay during
+> normal shutdown, but this code runs in interrupt context in response
+> to sysrq-b, which triggers the BUG_ON in __get_vm_area_node().
 
-Reported-by: Nathan Lynch <nathan_lynch@mentor.com>
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
----
- arch/arm/mach-imx/common.h     |    4 ++++
- arch/arm/mach-imx/mach-imx6q.c |   35 +++--------------------------------
- arch/arm/mach-imx/system.c     |    5 +++++
- 3 files changed, 12 insertions(+), 32 deletions(-)
+We should try to get mxc_restart() work for imx6q/dl.  I just sent a
+patch (you on copy) to do that.
 
-diff --git a/arch/arm/mach-imx/common.h b/arch/arm/mach-imx/common.h
-index 7230cf8..9ebca9e 100644
---- a/arch/arm/mach-imx/common.h
-+++ b/arch/arm/mach-imx/common.h
-@@ -130,7 +130,11 @@ static inline void imx_smp_prepare(void) {}
- static inline void imx_scu_standby_enable(void) {}
- #endif
- extern void imx_src_init(void);
-+#ifdef CONFIG_HAVE_IMX_SRC
- extern void imx_src_prepare_restart(void);
-+#else
-+extern inline void imx_src_prepare_restart(void) {}
-+#endif
- extern void imx_gpc_init(void);
- extern void imx_gpc_pre_suspend(void);
- extern void imx_gpc_post_resume(void);
-diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
-index 398858b..53e70f4 100644
---- a/arch/arm/mach-imx/mach-imx6q.c
-+++ b/arch/arm/mach-imx/mach-imx6q.c
-@@ -15,7 +15,6 @@
- #include <linux/clkdev.h>
- #include <linux/clocksource.h>
- #include <linux/cpu.h>
--#include <linux/delay.h>
- #include <linux/export.h>
- #include <linux/init.h>
- #include <linux/io.h>
-@@ -40,36 +39,6 @@
- #include "cpuidle.h"
- #include "hardware.h"
- 
--static void imx6q_restart(enum reboot_mode mode, const char *cmd)
--{
--	struct device_node *np;
--	void __iomem *wdog_base;
--
--	np = of_find_compatible_node(NULL, NULL, "fsl,imx6q-wdt");
--	wdog_base = of_iomap(np, 0);
--	if (!wdog_base)
--		goto soft;
--
--	imx_src_prepare_restart();
--
--	/* enable wdog */
--	writew_relaxed(1 << 2, wdog_base);
--	/* write twice to ensure the request will not get ignored */
--	writew_relaxed(1 << 2, wdog_base);
--
--	/* wait for reset to assert ... */
--	mdelay(500);
--
--	pr_err("Watchdog reset failed to assert reset\n");
--
--	/* delay to allow the serial port to show the message */
--	mdelay(50);
--
--soft:
--	/* we'll take a jump through zero as a poor second */
--	soft_restart(0);
--}
--
- /* For imx6q sabrelite board: set KSZ9021RN RGMII pad skew */
- static int ksz9021rn_phy_fixup(struct phy_device *phydev)
- {
-@@ -166,6 +135,8 @@ static void __init imx6q_init_machine(void)
- {
- 	struct device *parent;
- 
-+	mxc_arch_reset_init_dt();
-+
- 	parent = imx_soc_device_init();
- 	if (parent == NULL)
- 		pr_warn("failed to initialize soc device\n");
-@@ -293,5 +264,5 @@ DT_MACHINE_START(IMX6Q, "Freescale i.MX6 Quad/DualLite (Device Tree)")
- 	.init_machine	= imx6q_init_machine,
- 	.init_late      = imx6q_init_late,
- 	.dt_compat	= imx6q_dt_compat,
--	.restart	= imx6q_restart,
-+	.restart	= mxc_restart,
- MACHINE_END
-diff --git a/arch/arm/mach-imx/system.c b/arch/arm/mach-imx/system.c
-index 80c177c..e6edcd3 100644
---- a/arch/arm/mach-imx/system.c
-+++ b/arch/arm/mach-imx/system.c
-@@ -42,6 +42,9 @@ void mxc_restart(enum reboot_mode mode, const char *cmd)
- {
- 	unsigned int wcr_enable;
- 
-+	if (cpu_is_imx6q() || cpu_is_imx6dl())
-+		imx_src_prepare_restart();
-+
- 	if (wdog_clk)
- 		clk_enable(wdog_clk);
- 
-@@ -52,6 +55,8 @@ void mxc_restart(enum reboot_mode mode, const char *cmd)
- 
- 	/* Assert SRS signal */
- 	__raw_writew(wcr_enable, wdog_base);
-+	/* write twice to ensure the request will not get ignored */
-+	__raw_writew(wcr_enable, wdog_base);
- 
- 	/* wait for reset to assert... */
- 	mdelay(500);
--- 
-1.7.9.5
+Shawn
+
+> Fix this by mapping the watchdog in imx6q_init_machine() and caching
+> the pointer for use by imx6q_restart().
+> 
+> Signed-off-by: Nathan Lynch <nathan_lynch@mentor.com>
+> ---
+>  arch/arm/mach-imx/mach-imx6q.c | 13 ++++++++-----
+>  1 file changed, 8 insertions(+), 5 deletions(-)
+> 
+> diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
+> index 90372a2..e16b723 100644
+> --- a/arch/arm/mach-imx/mach-imx6q.c
+> +++ b/arch/arm/mach-imx/mach-imx6q.c
+> @@ -41,6 +41,7 @@
+>  #include "hardware.h"
+>  
+>  static u32 chip_revision;
+> +static void __iomem *wdog_base;
+>  
+>  int imx6q_revision(void)
+>  {
+> @@ -70,11 +71,6 @@ static void __init imx6q_init_revision(void)
+>  
+>  static void imx6q_restart(enum reboot_mode mode, const char *cmd)
+>  {
+> -	struct device_node *np;
+> -	void __iomem *wdog_base;
+> -
+> -	np = of_find_compatible_node(NULL, NULL, "fsl,imx6q-wdt");
+> -	wdog_base = of_iomap(np, 0);
+>  	if (!wdog_base)
+>  		goto soft;
+>  
+> @@ -192,8 +188,15 @@ static void __init imx6q_1588_init(void)
+>  
+>  static void __init imx6q_init_machine(void)
+>  {
+> +	struct device_node *np;
+> +
+>  	imx6q_enet_phy_init();
+>  
+> +	np = of_find_compatible_node(NULL, NULL, "fsl,imx6q-wdt");
+> +	if (np)
+> +		wdog_base = of_iomap(np, 0);
+> +	pr_info("%s: wdog_base = %p\n", __func__, wdog_base);
+> +
+>  	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+>  
+>  	imx_anatop_init();
+> -- 
+> 1.8.3.1
+> 
