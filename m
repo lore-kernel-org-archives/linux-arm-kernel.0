@@ -1,94 +1,73 @@
-From: Alison_Chaiken@mentor.com (Chaiken, Alison)
-Date: Sun, 6 Oct 2013 03:02:53 +0000
-Subject: [RFC 00/15] Device Tree schemas and validation
-In-Reply-To: <524D76DF.9050800@baylibre.com>
-References: <1380041541-17529-1-git-send-email-bcousson@baylibre.com>
- <524B4B20.4020002@wwwdotorg.org>
- <20131002142914.GI6506@voom.fritz.box>,<524D76DF.9050800@baylibre.com>
-Message-ID: <60BA5429A0E1584BA3633194F6F993B50E960588@NA-MBX-03.mgc.mentorg.com>
+From: michael.opdenacker@free-electrons.com (Michael Opdenacker)
+Date: Sun,  6 Oct 2013 07:58:56 +0200
+Subject: [PATCH] [SCSI]: ARM: remove deprecated IRQF_DISABLED
+Message-ID: <1381039136-11749-1-git-send-email-michael.opdenacker@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rob Herring in devicetree/msg06598.html
-> This is interesting approach using the dts syntax,
+This patch proposes to remove the use of the IRQF_DISABLED flag
 
-Benoit Cousson in devicetree/msg06617.html
-> it has the big advantage of re-using the parser already included in DTC for
-> free. In term or readability, it avoids to re-defining a brand new syntax for
-> people who are already familiar with the DTS one.
+It's a NOOP since 2.6.35 and it will be removed one day.
 
-Stephen Warren wrote in devicetree/msg06676.html:
-> DT is a language for representing data.
-> The validation checks described by schemas are rules, or code, and not static
-> data.
+Signed-off-by: Michael Opdenacker <michael.opdenacker@free-electrons.com>
+---
+ drivers/scsi/arm/acornscsi.c | 2 +-
+ drivers/scsi/arm/cumana_1.c  | 2 +-
+ drivers/scsi/arm/cumana_2.c  | 2 +-
+ drivers/scsi/arm/powertec.c  | 2 +-
+ 4 files changed, 4 insertions(+), 4 deletions(-)
 
-The syntax of the existing device-tree source is strikingly similar to that of
-the widely used JavaScript Object Notation, better known as JSON.  JSON has many
-parsers, validators and schemata already in existence.  Assuredly as many coders
-know how to program JSON as know C.
-
-JSON makes some sense for representation of device-trees, because, as the
-authoritative json.org explains, "JSON is a text format that is completely
-language independent but uses conventions that are familiar to programmers of
-the C-family of languages . . . JSON is a natural representation of data for the
-C family of programming languages."
-
-Benoit Cousson remarks in devicetree/msg06617.html:
-> The bindings definition being quite open, there is no easy way to
-> ensure proper schema / bindings without careful review of the
-> schema.
-
-Stephen Warren continues in devicetree/msg06676.html:
-> Overall, I believe perhaps the single most important aspect of any DT
-> schema is schema inheritance or instancing,
-
-David Gibson comments in devicetree/msg06725.html:
-> define the notion of dt "patterns" or "templates".  A dt
-> pattern is to a dt node or subtree as a regex is to a string - it
-> provides a reasonably expressive way of defining a family of dt
-> nodes.  These would be defined in an extension / superset of dt
-> syntax.
-
-I violently agree with Stephen and David and believe that inheritance
-offers a partial solution to the problem Benoit describes.  What about
-improving compliance by explicitly making use of inheritance with
-device-tree include files?  Suppose we consider supplementing the ARM
-tree's skeleton.dtsi tree-root with board.dtsi, cpu.dtsi,
-daughtercard.dtsi . . .  Suppose then we require board-level dts files
-to include board.dtsi, and furthermore that the CPU node for the board
-to be described in a DTSI file that must itself include cpu.dtsi.
-Then the dtc itself could in effect check perform some constraint
-checking.  Device vendors could offer <arch>.dtsi and <particular
-chip>.dtsi that users of those products would be required to include.
-
-A related question: what DTS files will a validator compare against a schema?
-Assuredly given the existing ability of nodes and properties in a
-hierarchy of include files to override and modify one another, the
-post C-preprocessed and compiled single-file is the one wanted, that
-is, the output from
-
-	       $CC $CPP_FLAGS -o foo.tmp foo.dts
-	       dtc -O dts -i arch/arm/boot/dts foo.tmp
-
-Some other suggestions:
-
-   Let's not make the documentation derived from schemata and DTS files
-tree-structured.    Otherwise we end up with GNU info, ahem.
-
-   Stephen Warren previously contributed a useful bindings checklist.  We should
-try to roll that checklist into any validator.
-
-Benoit promises in  devicetree/msg06617.html:
-> Being the very first one, you might get a free beer... meaning there
-> might be such thing as a free beer :-)
-
-I'm presenting a talk about device-tree for Embedded Linux Conference
-Europe, http://sched.co/17ozhPE, and hope that some of you come flame
-me in person there.  If so, I will actually buy you a free beer, but
-not until after the second seminar I must give that afternoon!
-
+diff --git a/drivers/scsi/arm/acornscsi.c b/drivers/scsi/arm/acornscsi.c
+index 09ba186..059ff47 100644
+--- a/drivers/scsi/arm/acornscsi.c
++++ b/drivers/scsi/arm/acornscsi.c
+@@ -2971,7 +2971,7 @@ static int acornscsi_probe(struct expansion_card *ec, const struct ecard_id *id)
+ 	ec->irqaddr	= ashost->fast + INT_REG;
+ 	ec->irqmask	= 0x0a;
+ 
+-	ret = request_irq(host->irq, acornscsi_intr, IRQF_DISABLED, "acornscsi", ashost);
++	ret = request_irq(host->irq, acornscsi_intr, 0, "acornscsi", ashost);
+ 	if (ret) {
+ 		printk(KERN_CRIT "scsi%d: IRQ%d not free: %d\n",
+ 			host->host_no, ashost->scsi.irq, ret);
+diff --git a/drivers/scsi/arm/cumana_1.c b/drivers/scsi/arm/cumana_1.c
+index b679778..f8e0609 100644
+--- a/drivers/scsi/arm/cumana_1.c
++++ b/drivers/scsi/arm/cumana_1.c
+@@ -262,7 +262,7 @@ static int cumanascsi1_probe(struct expansion_card *ec,
+ 		goto out_unmap;
+ 	}
+ 
+-	ret = request_irq(host->irq, cumanascsi_intr, IRQF_DISABLED,
++	ret = request_irq(host->irq, cumanascsi_intr, 0,
+ 			  "CumanaSCSI-1", host);
+ 	if (ret) {
+ 		printk("scsi%d: IRQ%d not free: %d\n",
+diff --git a/drivers/scsi/arm/cumana_2.c b/drivers/scsi/arm/cumana_2.c
+index 58915f2..abc66f5 100644
+--- a/drivers/scsi/arm/cumana_2.c
++++ b/drivers/scsi/arm/cumana_2.c
+@@ -431,7 +431,7 @@ static int cumanascsi2_probe(struct expansion_card *ec,
+ 		goto out_free;
+ 
+ 	ret = request_irq(ec->irq, cumanascsi_2_intr,
+-			  IRQF_DISABLED, "cumanascsi2", info);
++			  0, "cumanascsi2", info);
+ 	if (ret) {
+ 		printk("scsi%d: IRQ%d not free: %d\n",
+ 		       host->host_no, ec->irq, ret);
+diff --git a/drivers/scsi/arm/powertec.c b/drivers/scsi/arm/powertec.c
+index abc9593..5e1b73e 100644
+--- a/drivers/scsi/arm/powertec.c
++++ b/drivers/scsi/arm/powertec.c
+@@ -358,7 +358,7 @@ static int powertecscsi_probe(struct expansion_card *ec,
+ 		goto out_free;
+ 
+ 	ret = request_irq(ec->irq, powertecscsi_intr,
+-			  IRQF_DISABLED, "powertec", info);
++			  0, "powertec", info);
+ 	if (ret) {
+ 		printk("scsi%d: IRQ%d not free: %d\n",
+ 		       host->host_no, ec->irq, ret);
 -- 
-Alison Chaiken
-Mentor Embedded Software Division
-Fremont, CA
-GMT-8
+1.8.1.2
