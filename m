@@ -1,31 +1,44 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon, 7 Oct 2013 09:30:58 -0700
-Subject: [GIT PULL] DaVinci GPIO changes for v3.13
-In-Reply-To: <52421BF5.6020206@ti.com>
-References: <52421BF5.6020206@ti.com>
-Message-ID: <20131007163058.GA15413@quad.lixom.net>
+Date: Mon, 7 Oct 2013 09:31:47 -0700
+Subject: [GIT PULL] DaVinci SoC updates for v3.13
+In-Reply-To: <5244C2B4.7060900@ti.com>
+References: <524228F9.50104@ti.com>
+ <5244C2B4.7060900@ti.com>
+Message-ID: <20131007163147.GB15413@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 25, 2013 at 04:40:45AM +0530, Sekhar Nori wrote:
-> Hi Arnd, Olof, Kevin,
+On Fri, Sep 27, 2013 at 04:56:44AM +0530, Sekhar Nori wrote:
+> Hi Olof,
 > 
-> Please pull the following changes for DaVinci GPIO driver for v3.13.
-> The changes have been acked by Linus W. They were sent for last merge
-> window as well, but did not get pulled due to the late request.
+> On Wednesday 25 September 2013 05:36 AM, Sekhar Nori wrote:
+> > The following changes since commit 4a10c2ac2f368583138b774ca41fac4207911983:
+> > 
+> >   Linux 3.12-rc2 (2013-09-23 15:41:09 -0700)
+> > 
+> > are available in the git repository at:
+> > 
+> >   git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v3.13/soc
+> > 
+> > for you to fetch changes up to 5093f84e708574142ce26fa4a6c4558176436c86:
+> > 
+> >   ARM: edma: dt: create unused channel list (2013-09-25 05:04:28 +0530)
+> > 
+> > ----------------------------------------------------------------
+> > This pull request contains a patch to remove
+> > a long deprecated irq flag and completes the
+> > DT support in EDMA library.
+> > 
+> > ----------------------------------------------------------------
+> > Joel Fernandes (1):
+> >       ARM: edma: dt: create unused channel list
 > 
-> Thanks,
-> Sekhar
-> 
-> The following changes since commit 4a10c2ac2f368583138b774ca41fac4207911983:
-> 
->   Linux 3.12-rc2 (2013-09-23 15:41:09 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v3.13/gpio
-> 
+> If you are picking Joel's patch "ARM: EDMA: Fix clearing of unused list
+> for DT DMA resources" for v3.12-rc then this patch can be dropped from
+> the pull request. Let me know if you want an updated request or will be
+> able to drop the patch yourself.
 
-Pulled into next/driver, thanks.
+I did, so I've cherry-picked the other patch into next/soc.
+
 
 -Olof
