@@ -1,94 +1,28 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 07 Oct 2013 11:36:39 +0200
-Subject: at91sam9263 not booting on 3.12-rc1
-In-Reply-To: <524ECE0B.5040200@atmel.com>
-References: <5240A95F.8000604@linaro.org>
- <CAOMZO5D6Dfh3utsK8DRNHXUZpo4sk7UmOqVchGf2hvbpoFW6Lg@mail.gmail.com>
- <5244364E.5060103@linaro.org> <524ECE0B.5040200@atmel.com>
-Message-ID: <525280A7.6070708@linaro.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 7 Oct 2013 10:40:08 +0100
+Subject: [PATCH 3/5] DRM: Armada: Add support for ARGB 32x64 or 64x32
+ hardware cursors
+In-Reply-To: <20131007110141.27f1ac25@armhf>
+References: <20131006220728.GG12758@n2100.arm.linux.org.uk>
+ <E1VSwWS-0000i7-4f@rmk-PC.arm.linux.org.uk> <20131007110141.27f1ac25@armhf>
+Message-ID: <20131007094008.GH12758@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/04/2013 04:17 PM, Nicolas Ferre wrote:
-> Hi Daniel,
->
-> On 26/09/2013 15:27, Daniel Lezcano :
->> On 09/23/2013 11:31 PM, Fabio Estevam wrote:
->>> On Mon, Sep 23, 2013 at 5:49 PM, Daniel Lezcano
->>> <daniel.lezcano@linaro.org> wrote:
->>>
->>>> So I enabled the CONFIG_USE_OF, the dtb are correctly generated.
->>>>
->>>> I tried to boot again, specifying the dtb address with bootm.
->>>>
->>>> tftp 0x20000000 /var/lib/tftpboot/at91/arch/arm/boot/usb_a9263.dtb
->>>>
->>>> tftp 0x21000000 /var/lib/tftpboot/at91/arch/arm/boot/uImage
->>>>
->>>> bootm 0x21000000 - 0x20000000
->>>>
->>>> but without success.
->>>>
->>>> I am wondering what I could be doing wrong ...
->>>>
->>>> Any help would be appreciate.
->>>>
->>>>     -- Daniel
->>>>
->>>>
->>>> ps: u-boot is "U-Boot 2010.09 (Oct 27 2010 - 12:28:54)"
->>>
->>> I am not familiar with this board, but most likely this old U-boot
->>> does not support dtb booting.
->>> You can check whether "#define CONFIG_OF_LIBFDT" is included in your
->>> board config file.
->>>
->>> You could also try to update the bootloader or try to generate a
->>> kernel + dtb image (need to select CONFIG_ARM_APPENDED_DTB option in
->>> the kernel).
->>
->> Hi Fabio,
->>
->> thanks for your answer. It took me awhile to setup everything and find
->> the right tools.
->>
->> So I tried CONFIG_ARM_APPENDED_DTB but that does not work. I did not
->> give much credit to that as it is flagged experimental.
->
-> Well I managed to use this technique successfully several of times. But
-> maybe you still have to modify the machine ID.
->
->> Then I tried to flash a more recent u-boot but something went wrong. I
->> have still the FlashRom prompt but the ttyACM0 where I can upload the
->> u-boot does not appear anymore on my system.
->>
->> I am totally stuck at this point ...
->
-> I hope that Jean-Christophe can help you with this as he is aware of the
-> Calao boards.
->
-> There is probably a way to recover access to the SAM-BA prompt that will
-> allow you to regain access to the flashing process. I have just fount
-> this wiki page:
-> http://www.calao-systems.com/mediawiki/index.php?title=USB-A9263_Software#How_to_install_SAM-BA_from_buildroot
+On Mon, Oct 07, 2013 at 11:01:41AM +0200, Jean-Francois Moine wrote:
+> On Sun, 06 Oct 2013 23:09:56 +0100
+> Russell King <rmk+kernel@arm.linux.org.uk> wrote:
+> 
+> > This patch adds ARGB hardware cursor support to the DRM driver for the
+> > Marvell Armada SoCs.  ARGB cursors are supported at either 32x64 or
+> > 64x32 resolutions.
+> 	[snip]
+> 
+> I don't see the interest of such cursors. Actually, most often, the
+> cursors are 64x64 and 'A' is either 0 or 0xff. As the Armada 510
+> supports 64x64 cursors with transparency, it would be more useful to
+> implement these ones...
 
-Yeah, I used this link to reflash the USB-A9263 and this is where a I 
-believe I corrupted somehow the bootloader.
-
-I don't know how, but I must find a way to recover the old bootloader.
-
-> BTW, I think you should use barebox instead of u-boot as the support
-> should be more complete.
-
-Ok, good to know. I will look at it.
-
-Thanks
-   -- Daniel
-
-
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Sorry, you're completely wrong there.  Xorg uses an alphablended cursor.
+This patch is a result of trialling each of the Armada's cursor options
+and this is the only one which results in a reasonable looking cursor.
