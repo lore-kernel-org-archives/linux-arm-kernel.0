@@ -1,53 +1,51 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Mon, 7 Oct 2013 17:45:22 +0200 (CEST)
-Subject: [PATCH] DMA: extend documentation to provide more API details
-In-Reply-To: <20131007144335.GL2954@intel.com>
-References: <20131005190200.GZ12758@n2100.arm.linux.org.uk>
- <Pine.LNX.4.64.1310052203060.8097@axis700.grange>
- <20131005233137.GA12758@n2100.arm.linux.org.uk>
- <20131006052029.GE2954@intel.com>
- <Pine.LNX.4.64.1310071233340.20796@axis700.grange>
- <20131007111728.GM12758@n2100.arm.linux.org.uk>
- <20131007103936.GH2954@intel.com>
- <Pine.LNX.4.64.1310071409080.20796@axis700.grange>
- <20131007142511.GJ2954@intel.com>
- <Pine.LNX.4.64.1310071725300.20796@axis700.grange>
- <20131007144335.GL2954@intel.com>
-Message-ID: <Pine.LNX.4.64.1310071739590.20796@axis700.grange>
+From: marex@denx.de (Marek Vasut)
+Date: Mon, 7 Oct 2013 17:48:26 +0200
+Subject: [PATCH 2/3] ARM: mxs: crypto: Add Freescale MXS DCP driver
+In-Reply-To: <632804650.191291.1381139440065.open-xchange@email.1und1.de>
+References: <1380194306-5243-1-git-send-email-marex@denx.de>
+ <201309280535.33672.marex@denx.de>
+ <632804650.191291.1381139440065.open-xchange@email.1und1.de>
+Message-ID: <201310071748.27150.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 7 Oct 2013, Vinod Koul wrote:
+Hello Christoph,
 
-> On Mon, Oct 07, 2013 at 05:28:37PM +0200, Guennadi Liakhovetski wrote:
-> > > > > > > No, not something in the middle. I was thinking about
-> > > > > > > 
-> > > > > > > (1) cookie 1-3 are submitted
-> > > > > > > (2) cookie 1 succeeds
-> > > > > > > (3) a DMA error occurs, cookies 2-3 are discarded
-> > > > > discarded using terminate_all right?
-> > > > 
-> > > > No, by the dmaengine driver as a part of the error processing.
-> > > And how will that be done...?
+> Hello Marek,
+> 
+> > Marek Vasut <marex@denx.de> hat am 28. September 2013 um 05:35 geschrieben:
+> > [...]
+> >
+> > > > 3) What are those ugly new IOCTLs in the dcp.c driver?
+> > > 
+> > > When I firstly posted the driver in the mailinglist, there where one
+> > > person who actually used this interface (it was introduced in
+> > > Freescale's SDK) to use the OTP keys for crypto. As far as I have
+> > > seen, the crypto API does not support such keys (i.e. there seems to
+> > > be no way to tell a driver to use some kind of special keys - which
+> > > are not delivered by the user - via the API).
+> > > Therefore I added this miscdevice and adopted Freescale's interface.
 > > 
-> > Sorry, I meant - DMA descriptors with cookies #2 and #3 will be cancelled 
-> > and recycled by the dmaengine driver. That's what you have to do, when 
-> > processing DMA error IRQ.
-> Well how do you that?
+> > The keys are programmed into the OTP registers, correct? There is OCOTP d
+> >river 
+> >for the MX23/MX28 OTP hardware. This is what should have been used then. 
+> > NOTE: This IOCTL interface seems like quite an abusive way to allow userl
+> >and to 
+> >access the crypto API in kernel. I understand this is used by some Freesc
+> >ale tool, but won't it be better to fix the Freescale tool instead ?
+> 
+> the IOCTL interface is used to AES encrypt a bootstream with the AES key in
+> OCOTP.
+> The idea is that only the DCP can read/access the key once it has been
+> programmed
+> into the OCOTP. If the crypto API has means to tell the DCP to use the key
+> from OCOTP, the tool from Freescale is a minor problem.
 
-Mmmh, maybe I'm missing something, but isn't it a part of the common DMA 
-processing? You get an error IRQ; on some DMAC types this means, that you 
-have to reset the hardware, so, you perform whatever actions you have to 
-do to reset the controller; you remove any descriptors from the pending 
-queue; reinsert them into the free queue and let any clients run on a 
-timeout. I don't think it would be a good idea to do anything more smart 
-like trying to restart the current transfer or drop it and continue with 
-the queue, because we don't know in what state the client hardware is, so, 
-we can only let the client driver try to recover.
+Ah right. I suspect the crypto API services shall not be exported into userland 
+at all, yes ? So there has to be some kind of workaround here for this freescale 
+tool, which is rather unfortunate.
 
-Thanks
-Guennadi
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+Thanks for clearing this up.
+
+Best regards,
+Marek Vasut
