@@ -1,33 +1,56 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 7 Oct 2013 10:06:40 -0700
-Subject: [GIT PULL] ARM: mvebu: soc changes for v3.13
-In-Reply-To: <20130930154208.GG31178@titan.lakedaemon.net>
-References: <20130930154208.GG31178@titan.lakedaemon.net>
-Message-ID: <20131007170640.GF15413@quad.lixom.net>
+From: john.stultz@linaro.org (John Stultz)
+Date: Mon, 07 Oct 2013 10:10:58 -0700
+Subject: [GIT PULL]clocksource: dw_apb_timer_of: Fix read_sched_clock
+In-Reply-To: <5252DCB6.3070805@linaro.org>
+References: <1381159679-6528-1-git-send-email-dinguyen@altera.com>
+ <5252DCB6.3070805@linaro.org>
+Message-ID: <5252EB22.2050506@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 30, 2013 at 11:42:08AM -0400, Jason Cooper wrote:
-> Guys,
-> 
-> These are the SoC changes that didn't make it during the last merge
-> window.  As with mvebu/drivers, these have been in -next since 3.12-rc1
-> without issue.
+On 10/07/2013 09:09 AM, Daniel Lezcano wrote:
+> On 10/07/2013 05:27 PM, dinguyen at altera.com wrote:
+>> From: Dinh Nguyen <dinguyen@altera.com>
+>>
+>> Hi Thomas, John,
+>>
+>> I am hoping you can pull in these 2 patches. These 2 patches have
+>> been floating
+>> around for almost 2 months now. They are needed to get the Altera
+>> SOCFPGA
+>> booting again because of a DTS binding change in 3.12.
+>>
+>> The other change was correctly return the current clock counter.
+>>
+>> The discussion thread can be found here:
+>>
+>> http://lists.infradead.org/pipermail/linux-arm-kernel/2013-September/198818.html
+>>
+>> http://lists.infradead.org/pipermail/linux-arm-kernel/2013-September/198903.html
+>>
+>>
+>> This patch does not attempt or change the behaviour of the ordering
+>> of how a
+>> clocksource or clockevent is use. These 2 patches only enables a
+>> platform to boot.
+>
+> John,
+>
+> I agree with Dinh, these patches fixes a boot issue on Altera SOCFPGA
+> and should be merged.
+>
 
-I should have looked closer at this before I commented on the PCI branch.
+Hey Dinh,
+    Thanks for persisting here! Sorry this has taken awhile. Just as an
+FYI, Daniel is maintaining the drivers/clocksource dir these days.
 
-> Sebastian Hesselbarth (2):
->       ARM: dove: switch to DT probed mbus address windows
->       ARM: dove: remove legacy pcie and clock init
+So, I've not been following this closely, but if I recall we had a merge
+conflict that we backed out, since it seemed that everyone involved in
+this driver weren't working together. Then Thomas had some objections,
+but it *looks* like that's been resolved. So I don't have any objections
+at this point.
 
-It looks to me like this second patch will need to be based on the PCI branch,
-or you will have broken PCI if this is applied and not the drivers/pci patches,
-right? If so, you need to base this branch on top of the other one, not send
-them separately -- otherwise a git bisect that lands between these two will
-result in a non-booting kernel.
+Daniel: if you want to pull these in to your tree, that's fine by me.
 
-This also explains why you need the PCI patches through arm-soc, so I answered
-my own question. :-)
-
-
--Olof
+thanks
+-john
