@@ -1,36 +1,54 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Mon, 7 Oct 2013 16:11:32 +0530
-Subject: [PATCH] DMA: extend documentation to provide more API details
-In-Reply-To: <Pine.LNX.4.64.1310071233340.20796@axis700.grange>
-References: <Pine.LNX.4.64.1310051925170.8097@axis700.grange>
- <20131005190200.GZ12758@n2100.arm.linux.org.uk>
- <Pine.LNX.4.64.1310052203060.8097@axis700.grange>
- <20131005233137.GA12758@n2100.arm.linux.org.uk>
- <20131006052029.GE2954@intel.com>
- <Pine.LNX.4.64.1310071233340.20796@axis700.grange>
-Message-ID: <20131007104132.GI2954@intel.com>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Mon, 7 Oct 2013 14:03:27 +0200
+Subject: [PATCH 5/5] DRM: Armada: add support for drm tda19988 driver
+In-Reply-To: <20131007110902.GL12758@n2100.arm.linux.org.uk>
+References: <20131006220728.GG12758@n2100.arm.linux.org.uk>
+ <E1VSwYO-0000iT-CU@rmk-PC.arm.linux.org.uk>
+ <20131007111807.5e86ea6e@armhf>
+ <20131007094404.GI12758@n2100.arm.linux.org.uk>
+ <20131007124820.2189a4c3@armhf>
+ <20131007110902.GL12758@n2100.arm.linux.org.uk>
+Message-ID: <20131007140327.5bb4863b@armhf>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 07, 2013 at 12:45:33PM +0200, Guennadi Liakhovetski wrote:
-> On Sun, 6 Oct 2013, Vinod Koul wrote:
-> > > > Do you see any problems using, say, a threaded interrupt handler, apart 
-> > > > from possible performance issues? That seems to be pretty convenient. 
-> > > > Otherwise we should really mandate somewhere, that bottom half processing 
-> > > > should take place in a tasklet?
-> > > 
-> > > The documentation has always stated that callbacks will be made from
-> > > tasklet context.  The problem with allowing different contexts from
-> > > different drivers is taht spinlocking becomes problematical.  Remember
-> > > that we have _bh() variants which lock against tasklets but allow IRQs.
-> 
-> Vinod, Dan, what do you think about the bottom half interrupt processing? 
-> Do we want to make the use of a tasklet compulsory or can we also allow 
-> other contexts?
-I dont see any advantage of using threaded handler as compared to tasklet, As
-Russell pointed out its going to make locking and common handling very
-complicated to be invoked from different contexts. What will be benefit from
-this?
+On Mon, 7 Oct 2013 12:09:02 +0100
+Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
 
---
-~Vinod
+> > Here is a small story about i2s/spdif: once, I set the tda998x to use
+> > the spdif input, and at this time, I was using the dummy codec.
+> > This codec accepts the format 32_LE, as does the audio device, but the
+> > output cannot go to spdif. Result: no hdmi sound.  
+> 
+> How ASoC works in this regard is that the capabilities are the _union_ of
+> the codec and the cpu DAIs.
+> 
+> The SPDIF transmitter codec supports 16, 20 and 24 bits per sample but not
+> 32.  Quite simply, that's because the SPDIF format does not allow 32-bits
+> per sample.  Therefore, 32_LE is not available for use with audio output,
+> and userspace must convert down to something which the hardware does
+> support.
+> 
+> "Because I2S can support 32-bit audio" is a poor reason, because you can't
+> pass 32-bit audio via HDMI due to a subframe being limited to 28 bits - up
+> to 24 bits for the sample and 4 bits of control/status information.
+
+OK. So, to resume, if both i2s and spdif are furnished by the audio
+subsystem, the tda998x must use spdif only (with the spdif codec).
+
+Then, the declaration of the tda998x in the DT will include an
+optional audio property, say 'audio-input' with the values "i2s" or
+"spdif" which corresponds to your parameter 'audio_format'.
+
+Also, from your video swap explanation, the DT will contain some video
+property(ies) TBD.
+
+The remaining question is: do we need more audio parameters?
+
+- the audio_cfg value is defined by i2s/spdif (3 or 4)
+- the audio_frame[1] value is always 1 (2 channels)
+- audio_sample_rate is useless
+
+-- 
+Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
+Jef		|		http://moinejf.free.fr/
