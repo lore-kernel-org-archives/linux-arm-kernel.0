@@ -1,50 +1,32 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 7 Oct 2013 14:04:38 -0400
-Subject: [GIT PULL] ARM: mvebu: driver changes for v3.13
-In-Reply-To: <20131007170206.GE15413@quad.lixom.net>
-References: <20130930153643.GF31178@titan.lakedaemon.net>
- <20131007170206.GE15413@quad.lixom.net>
-Message-ID: <20131007180438.GB5402@titan.lakedaemon.net>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 7 Oct 2013 19:03:57 +0100
+Subject: [PATCH RFC 1/2] ARM: imx6qdl: provide pinctrl configurations
+ for DAT3 pull-down
+In-Reply-To: <20131007055340.GB3739@S2101-09.ap.freescale.net>
+References: <20131005112147.GX12758@n2100.arm.linux.org.uk>
+ <E1VSPw9-0004Ug-BF@rmk-PC.arm.linux.org.uk>
+ <20131007055340.GB3739@S2101-09.ap.freescale.net>
+Message-ID: <20131007180357.GS12758@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
-
-On Mon, Oct 07, 2013 at 10:02:06AM -0700, Olof Johansson wrote:
-> Hi Jason,
+On Mon, Oct 07, 2013 at 01:53:43PM +0800, Shawn Guo wrote:
+> I think we can redefine only pad DAT3 in pinctrl_usdhc1_1_dat3cd, and
+> overwrite the DAT3 configuration in pinctrl_usdhc1_1 to save the
+> redundant data of other pads, something like the following.
 > 
-> On Mon, Sep 30, 2013 at 11:36:43AM -0400, Jason Cooper wrote:
-> > Guys,
-> > 
-> > Here are all of the driver changes that didn't make it during the last
-> > merge window.  They've been in -next since v3.12-rc1, without
-> > merge-conflicts or build issues.
+> pinctrl_usdhc1_1_dat3cd: usdhc1grp-3 {
+> 	fsl,pins = <
+> 		MX6QDL_PAD_SD1_DAT3__SD1_DATA3 0x13059
+> 	>;
+> };
 > 
-> It looks like the PCI pieces here are all independent now and can go through
-> Bjorn's tree instead of arm-soc. Or do you anticipate having something
-> dependent on this later on such that we should take it?
+> &usdhc1 {
+> 	pinctrl-names = "default";
+> 	pinctrl-0 = <&pinctrl_usdhc1_1 &pinctrl_usdhc1_1_dat3cd>;
+> 	...
+> 	status = "okay";
+> };
 
-I chose to keep them on the same path as last window because of the
-dependency between the irqchip changes:
-
-  627dfcc irqchip: armada-370-xp: properly request resources
-  31f614e irqchip: armada-370-xp: implement MSI support
-
-which the pci/msi changes depend on.
-
-> For 3.12 it was easier to take through arm-soc since this built on top of the
-> other PCI/MSI work we were queueing.
-
-As well as the irqchip changes...
-
-> If you want us to take it, see if you can shake an ack out of Bjorn, mostly to
-> make sure he's aware that there's PCI code going through our tree.
-
-Here's a link to where Bjorn agreed to the strategy for this merge
-window:
-
-http://lkml.org/lkml/2013/9/27/474
-
-hth,
-
-Jason.
+Are you sure that this will always be the case?  This would assume that
+the pinctrl entries are always processed sequentially.
