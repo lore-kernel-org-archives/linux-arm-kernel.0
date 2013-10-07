@@ -1,24 +1,45 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Mon, 07 Oct 2013 00:58:31 -0700
-Subject: [PATCH v5 3/3] Documentation: Add documentation for APM X-Gene
- clock binding
-In-Reply-To: <CAPw-ZT=8TL2bJABd6_76JyZcDS+NTk+vJzj0YCGNNujKx+JqOA@mail.gmail.com>
-References: <1372269371-22992-1-git-send-email-lho@apm.com>
- <1372269371-22992-2-git-send-email-lho@apm.com>
- <1372269371-22992-3-git-send-email-lho@apm.com>
- <1372269371-22992-4-git-send-email-lho@apm.com>
- <20130725205953.7598.15913@quantum>
- <CAPw-ZT=8TL2bJABd6_76JyZcDS+NTk+vJzj0YCGNNujKx+JqOA@mail.gmail.com>
-Message-ID: <20131007075831.7445.49431@quantum>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 07 Oct 2013 09:07:56 +0100
+Subject: [PATCH 3/3] KVM: ARM: Add support for Cortex-A7
+In-Reply-To: <CA+eFSM0k3mA4uOiEvmE_tfVjnpq8DpXV-=nJXhucUDePJRTYXw@mail.gmail.com>
+References: <1380210568-23175-1-git-send-email-jonathan.austin@arm.com>
+ <1380210568-23175-4-git-send-email-jonathan.austin@arm.com>
+ <20130926161743.GD1389@cbox>	<52446A48.9070501@arm.com>
+ <CA+eFSM1YdhBDMAvyXknMA62Ao3CEntMptdi7RD=NXis1F-BmfQ@mail.gmail.com>
+ <CAFEAcA9muNxMtSQHqrByk6Gjw4iWS=vF33T=R42tvAQSTLiAeA@mail.gmail.com>
+ <CA+eFSM0k3mA4uOiEvmE_tfVjnpq8DpXV-=nJXhucUDePJRTYXw@mail.gmail.com>
+Message-ID: <52526BDC.3050305@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Loc Ho (2013-07-31 11:49:07)
->    With the latest version, this is used to determine whether it is
->    divider register or csr register. In the file clk-xgene.c, grep for
->    "div-reg". It is around line 521.
+On 07/10/13 07:16, Gavin Guo wrote:
+> On Sun, Oct 6, 2013 at 10:56 PM, Peter Maydell <peter.maydell@linaro.org
+> <mailto:peter.maydell@linaro.org>> wrote:
+> 
+>     On 6 October 2013 23:03, Gavin Guo <gavin.guo@canonical.com
+>     <mailto:gavin.guo@canonical.com>> wrote:
+>     > Does it mean the currently qemu can't support A15 vcpu running on
+>     host A7?
+> 
+>     No, that's a kernel restriction. That is why the patch description
+>     reads:
+>     # This patch adds support for running Cortex-A7 guests on Cortex-A7
+>     hosts.
+> 
+>     (What QEMU is currently missing is A7 support, so you can't ask it to
+>     run an A7 guest CPU.)
+> 
+>     -- PMM
+> 
+> 
+> Thanks, I saw the checking in the kvm_vcpu_set_target(). I'm confused
+> that what is the concern to run the same cpu type? Does it matter to run
+> A15 on A7 or inverse?
 
-Thanks for the rework, I've taken this for 3.13.
+It does. MIDR registers are different. Cache size is different. It may
+work, or it may not. And at the very least, you should present a
+consistent view of the underlying system to the unsuspecting OS.
 
-Regards,
-Mike
+	M.
+-- 
+Jazz is not dead. It just smells funny...
