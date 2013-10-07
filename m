@@ -1,55 +1,96 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 7 Oct 2013 08:41:03 -0700
-Subject: [PATCHv7 00/36] ARM: OMAP: clock data conversion to DT
-In-Reply-To: <52525642.8010307@ti.com>
-References: <1380098922-30340-1-git-send-email-t-kristo@ti.com>
- <524EE00F.7010208@ti.com> <20131007021556.GV8949@atomide.com>
- <52525642.8010307@ti.com>
-Message-ID: <20131007154103.GW8949@atomide.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon,  7 Oct 2013 16:40:30 +0100
+Subject: [PATCH 2/2] arm64: KVM: Yield CPU when vcpu executes a WFE
+In-Reply-To: <1381160430-11790-1-git-send-email-marc.zyngier@arm.com>
+References: <1381160430-11790-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1381160430-11790-3-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tero Kristo <t-kristo@ti.com> [131006 23:43]:
-> On 10/07/2013 05:15 AM, Tony Lindgren wrote:
-> >* Tero Kristo <t-kristo@ti.com> [131004 08:42]:
-> >>Hi,
-> >>
-> >>Just a gentle reminder, anybody have any comments on this series or
-> >>should we start queuing stuff?
-> >
-> >Well omap4 seems to work for me just fine, and omap3 in legacy
-> >mode. But looks like omap3 device tree based booting is breaking
-> >after I pulled in your test branch. I get the following on
-> >3630 based dm3730.
-> 
-> Uart4 breaks because of the issue with basic DT blobs. You need at
-> least this patch:
-> 
-> http://linux-kernel.2935.n7.nabble.com/RFC-PATCH-ARM-OMAP3630-Add-generic-machine-descriptor-td722791.html
-> 
-> ... from Nishanth to get it to work right. Otherwise the clock init
-> tries to use omap3430 clock data for omap3630 which leaves uart4
-> nodes out.
+On an (even slightly) oversubscribed system, spinlocks are quickly
+becoming a bottleneck, as some vcpus are spinning, waiting for a
+lock to be released, while the vcpu holding the lock may not be
+running at all.
 
-OK thanks yes that solves it, I was missing the compatible flag
-for my not quite ready test boards (3730-evm and zoom3).
-I'll apply Nishant's fix with some changes.
+The solution is to trap blocking WFEs and tell KVM that we're
+now spinning. This ensures that other vpus will get a scheduling
+boost, allowing the lock to be released more quickly.
 
-Then for this series, once you have the necessary acks, can you
-please split into following two separate immutable branches
-against v3.12-rc3:
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm64/include/asm/kvm_arm.h |  8 ++++++--
+ arch/arm64/kvm/handle_exit.c     | 18 +++++++++++++-----
+ 2 files changed, 19 insertions(+), 7 deletions(-)
 
-1. clock code changes
-
-2. dts changes
-
-Then those can be pulled in as needed by Benoit, Mike and I.
-
-For the whole series, I think this quite nicely removes some
-nasty kernel data dependencies for omaps, so feel free to add:
-
-Acked-by: Tony Lindgren <tony@atomide.com>
-
-Regards,
-
-Tony
+diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
+index a5f28e2..c98ef47 100644
+--- a/arch/arm64/include/asm/kvm_arm.h
++++ b/arch/arm64/include/asm/kvm_arm.h
+@@ -63,6 +63,7 @@
+  * TAC:		Trap ACTLR
+  * TSC:		Trap SMC
+  * TSW:		Trap cache operations by set/way
++ * TWE:		Trap WFE
+  * TWI:		Trap WFI
+  * TIDCP:	Trap L2CTLR/L2ECTLR
+  * BSU_IS:	Upgrade barriers to the inner shareable domain
+@@ -72,8 +73,9 @@
+  * FMO:		Override CPSR.F and enable signaling with VF
+  * SWIO:	Turn set/way invalidates into set/way clean+invalidate
+  */
+-#define HCR_GUEST_FLAGS (HCR_TSC | HCR_TSW | HCR_TWI | HCR_VM | HCR_BSU_IS | \
+-			 HCR_FB | HCR_TAC | HCR_AMO | HCR_IMO | HCR_FMO | \
++#define HCR_GUEST_FLAGS (HCR_TSC | HCR_TSW | HCR_TWE | HCR_TWI | HCR_VM | \
++			 HCR_BSU_IS | HCR_FB | HCR_TAC | \
++			 HCR_AMO | HCR_IMO | HCR_FMO | \
+ 			 HCR_SWIO | HCR_TIDCP | HCR_RW)
+ #define HCR_VIRT_EXCP_MASK (HCR_VA | HCR_VI | HCR_VF)
+ 
+@@ -242,4 +244,6 @@
+ 
+ #define ESR_EL2_EC_xABT_xFSR_EXTABT	0x10
+ 
++#define ESR_EL2_EC_WFI_ISS_WFE	(1 << 0)
++
+ #endif /* __ARM64_KVM_ARM_H__ */
+diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
+index 9beaca03..8da5606 100644
+--- a/arch/arm64/kvm/handle_exit.c
++++ b/arch/arm64/kvm/handle_exit.c
+@@ -47,21 +47,29 @@ static int handle_smc(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ }
+ 
+ /**
+- * kvm_handle_wfi - handle a wait-for-interrupts instruction executed by a guest
++ * kvm_handle_wfx - handle a wait-for-interrupts or wait-for-event
++ *		    instruction executed by a guest
++ *
+  * @vcpu:	the vcpu pointer
+  *
+- * Simply call kvm_vcpu_block(), which will halt execution of
++ * WFE: Yield the CPU and come back to this vcpu when the scheduler
++ * decides to.
++ * WFI: Simply call kvm_vcpu_block(), which will halt execution of
+  * world-switches and schedule other host processes until there is an
+  * incoming IRQ or FIQ to the VM.
+  */
+-static int kvm_handle_wfi(struct kvm_vcpu *vcpu, struct kvm_run *run)
++static int kvm_handle_wfx(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ {
+-	kvm_vcpu_block(vcpu);
++	if (kvm_vcpu_get_hsr(vcpu) & ESR_EL2_EC_WFI_ISS_WFE)
++		kvm_vcpu_on_spin(vcpu);
++	else
++		kvm_vcpu_block(vcpu);
++
+ 	return 1;
+ }
+ 
+ static exit_handle_fn arm_exit_handlers[] = {
+-	[ESR_EL2_EC_WFI]	= kvm_handle_wfi,
++	[ESR_EL2_EC_WFI]	= kvm_handle_wfx,
+ 	[ESR_EL2_EC_CP15_32]	= kvm_handle_cp15_32,
+ 	[ESR_EL2_EC_CP15_64]	= kvm_handle_cp15_64,
+ 	[ESR_EL2_EC_CP14_MR]	= kvm_handle_cp14_access,
+-- 
+1.8.2.3
