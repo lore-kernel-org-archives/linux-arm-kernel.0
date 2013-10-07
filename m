@@ -1,28 +1,20 @@
 From: davem@davemloft.net (David Miller)
-Date: Mon, 07 Oct 2013 15:17:23 -0400 (EDT)
-Subject: [PATCH v4 net-next] fix unsafe set_memory_rw from softirq
-In-Reply-To: <1381078592.12191.0.camel@edumazet-glaptop.roam.corp.google.com>
-References: <1380870846-3357-1-git-send-email-ast@plumgrid.com>
- <1381078592.12191.0.camel@edumazet-glaptop.roam.corp.google.com>
-Message-ID: <20131007.151723.1874328502711969492.davem@davemloft.net>
+Date: Mon, 07 Oct 2013 15:19:50 -0400 (EDT)
+Subject: [PATCH 1/2] net: ethernet: cpsw: Search childs for slave nodes
+In-Reply-To: <1380890680-30941-1-git-send-email-mpa@pengutronix.de>
+References: <1380890680-30941-1-git-send-email-mpa@pengutronix.de>
+Message-ID: <20131007.151950.425314304695719989.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Eric Dumazet <eric.dumazet@gmail.com>
-Date: Sun, 06 Oct 2013 09:56:32 -0700
+From: Markus Pargmann <mpa@pengutronix.de>
+Date: Fri,  4 Oct 2013 14:44:39 +0200
 
-> On Fri, 2013-10-04 at 00:14 -0700, Alexei Starovoitov wrote:
->> on x86 system with net.core.bpf_jit_enable = 1
+> The current implementation searches the whole DT for nodes named
+> "slave".
 > 
->> cannot reuse jited filter memory, since it's readonly,
->> so use original bpf insns memory to hold work_struct
->> 
->> defer kfree of sk_filter until jit completed freeing
->> 
->> tested on x86_64 and i386
->> 
->> Signed-off-by: Alexei Starovoitov <ast@plumgrid.com>
+> This patch changes it to search only child nodes for slaves.
 > 
-> Acked-by: Eric Dumazet <edumazet@google.com>
+> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
 
-I've decided to apply this to 'net', thanks.
+Applied.
