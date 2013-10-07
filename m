@@ -1,77 +1,26 @@
-From: taras.kondratiuk@linaro.org (Taras Kondratiuk)
-Date: Mon,  7 Oct 2013 13:27:01 +0300
-Subject: [PATCH] ARM: OMAP4/highbank: Flush L2 cache before disabling
-Message-ID: <1381141621-29001-1-git-send-email-taras.kondratiuk@linaro.org>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon, 7 Oct 2013 07:29:29 -0300
+Subject: [alsa-devel] [PATCH 1/2] ASoC: fsl: imx-ssi: fix probe on imx31
+In-Reply-To: <525279CC.8080309@epfl.ch>
+References: <1380630971-11431-1-git-send-email-philippe.retornaz@epfl.ch>
+ <1380630971-11431-2-git-send-email-philippe.retornaz@epfl.ch>
+ <20131003155954.GV27287@sirena.org.uk> <524D963F.5080507@epfl.ch>
+ <CAOMZO5C_kjTJ8iVGc67pcLLaO43arTiyMRQ1822VkBLDm7hzPw@mail.gmail.com>
+ <525279CC.8080309@epfl.ch>
+Message-ID: <CAOMZO5B8uHE1F2AKt9QA_b=9gbDb-RDQshk17nJs-q68r_6iKQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kexec disables outer cache before jumping to reboot code, but it doesn't
-flush it explicitly. Flush is done implicitly inside of l2x0_disable().
-But some SoC's override default .disable handler and don't flush cache.
-This may lead to a corrupted memory during Kexec reboot on these platforms.
+On Mon, Oct 7, 2013 at 6:07 AM, Philippe R?tornaz
+<philippe.retornaz@epfl.ch> wrote:
 
-This patch adds cache flush inside of OMAP4 and Highbank outer_cache.disable()
-handlers to make it consistent with default l2x0_disable().
-Also it removes redundant outer_flush_all() call just before outer_disable().
+> Well, I don't think it's fair to break boards just because they are not
+> (yet) converted to DT ... this board was merged before the DT era on ARM.
 
-Acked-by: Rob Herring <rob.herring@calxeda.com>
-Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Signed-off-by: Taras Kondratiuk <taras.kondratiuk@linaro.org>
----
-Based on v3.12-rc3
+Sure, I agree. Just trying to avoid to keep two drivers for the same hardware.
 
-RFC v2: https://patchwork.kernel.org/patch/2990231/
-        Make the fix specific to platforms that don't use l2x0_disable().
-RFC v1: https://patchwork.kernel.org/patch/2974431/
----
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Rob Herring <rob.herring@calxeda.com>
-Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Cc: linaro-kernel at lists.linaro.org
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-omap at vger.kernel.org
----
- arch/arm/mach-highbank/highbank.c  |    1 +
- arch/arm/mach-highbank/pm.c        |    1 -
- arch/arm/mach-omap2/omap4-common.c |    1 +
- 3 files changed, 2 insertions(+), 1 deletion(-)
+I will try to convert mx31 to use sound/soc/fsl/fsl_ssi.c when time allows.
 
-diff --git a/arch/arm/mach-highbank/highbank.c b/arch/arm/mach-highbank/highbank.c
-index 8e63ccd..22e6f34 100644
---- a/arch/arm/mach-highbank/highbank.c
-+++ b/arch/arm/mach-highbank/highbank.c
-@@ -63,6 +63,7 @@ void highbank_set_cpu_jump(int cpu, void *jump_addr)
- 
- static void highbank_l2x0_disable(void)
- {
-+	outer_flush_all();
- 	/* Disable PL310 L2 Cache controller */
- 	highbank_smc1(0x102, 0x0);
- }
-diff --git a/arch/arm/mach-highbank/pm.c b/arch/arm/mach-highbank/pm.c
-index 04eddb4..9a5b8a7 100644
---- a/arch/arm/mach-highbank/pm.c
-+++ b/arch/arm/mach-highbank/pm.c
-@@ -28,7 +28,6 @@
- 
- static int highbank_suspend_finish(unsigned long val)
- {
--	outer_flush_all();
- 	outer_disable();
- 
- 	highbank_set_pwr_suspend();
-diff --git a/arch/arm/mach-omap2/omap4-common.c b/arch/arm/mach-omap2/omap4-common.c
-index 2840d1e..f6ccab61 100644
---- a/arch/arm/mach-omap2/omap4-common.c
-+++ b/arch/arm/mach-omap2/omap4-common.c
-@@ -163,6 +163,7 @@ void __iomem *omap4_get_l2cache_base(void)
- 
- static void omap4_l2x0_disable(void)
- {
-+	outer_flush_all();
- 	/* Disable PL310 L2 Cache controller */
- 	omap_smc1(0x102, 0x0);
- }
--- 
-1.7.9.5
+Regards,
+
+Fabio Estevam
