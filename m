@@ -1,56 +1,90 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 7 Oct 2013 11:32:50 +0100
-Subject: [PATCH 3/5] DRM: Armada: Add support for ARGB 32x64 or 64x32
- hardware cursors
-In-Reply-To: <20131007120922.47df03b6@armhf>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Mon, 7 Oct 2013 12:48:20 +0200
+Subject: [PATCH 5/5] DRM: Armada: add support for drm tda19988 driver
+In-Reply-To: <20131007094404.GI12758@n2100.arm.linux.org.uk>
 References: <20131006220728.GG12758@n2100.arm.linux.org.uk>
- <E1VSwWS-0000i7-4f@rmk-PC.arm.linux.org.uk> <20131007110141.27f1ac25@armhf>
- <20131007094008.GH12758@n2100.arm.linux.org.uk>
- <20131007120922.47df03b6@armhf>
-Message-ID: <20131007103250.GJ12758@n2100.arm.linux.org.uk>
+ <E1VSwYO-0000iT-CU@rmk-PC.arm.linux.org.uk>
+ <20131007111807.5e86ea6e@armhf>
+ <20131007094404.GI12758@n2100.arm.linux.org.uk>
+Message-ID: <20131007124820.2189a4c3@armhf>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 07, 2013 at 12:09:22PM +0200, Jean-Francois Moine wrote:
-> On Mon, 7 Oct 2013 10:40:08 +0100
-> Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+On Mon, 7 Oct 2013 10:44:04 +0100
+Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+
+> On Mon, Oct 07, 2013 at 11:18:07AM +0200, Jean-Francois Moine wrote:
+	[snip]
+> > It seems we are going backwards: as the Armada based boards will soon
+> > move to full DT (mvebu), you are making an exception for the Cubox, so
+> > that there should be Cubox specific kernels. I don't like that...
 > 
-> > > > This patch adds ARGB hardware cursor support to the DRM driver for the
-> > > > Marvell Armada SoCs.  ARGB cursors are supported at either 32x64 or
-> > > > 64x32 resolutions.  
-> > > 	[snip]
-> > > 
-> > > I don't see the interest of such cursors. Actually, most often, the
-> > > cursors are 64x64 and 'A' is either 0 or 0xff. As the Armada 510
-> > > supports 64x64 cursors with transparency, it would be more useful to
-> > > implement these ones...  
+> *Ignored*.  You know why.
+
+Sorry. I don't see why. May you explain again?
+
+> > > diff --git a/drivers/gpu/drm/armada/armada_drv.c b/drivers/gpu/drm/armada/armada_drv.c
+	[snip]
+> > > +static struct tda998x_encoder_params params = {
+> > > +	/* With 0x24, there is no translation between vp_out and int_vp
+> > > +	FB	LCD out	Pins	VIP	Int Vp
+> > > +	R:23:16	R:7:0	VPC7:0	7:0	7:0[R]
+> > > +	G:15:8	G:15:8	VPB7:0	23:16	23:16[G]
+> > > +	B:7:0	B:23:16	VPA7:0	15:8	15:8[B]
+> > > +	*/
+> > > +	.swap_a = 2,
+> > > +	.swap_b = 3,
+> > > +	.swap_c = 4,
+> > > +	.swap_d = 5,
+> > > +	.swap_e = 0,
+> > > +	.swap_f = 1,
 > > 
-> > Sorry, you're completely wrong there.  Xorg uses an alphablended cursor.
-> > This patch is a result of trialling each of the Armada's cursor options
-> > and this is the only one which results in a reasonable looking cursor.
+> > I still don't agree. You don't need to invert R <-> B for the Cubox at
+> > the tda998x level: this may be done setting as it should be the
+> > CFG_GRA_SWAPRB flag of the lcd register LCD_SPU_DMA_CTRL0.
 > 
-> Strange. I am using the 64x64 cursor with transparency of the 510 for
-> many months and I never saw any problem.
+> You are totally and utterly wrong there.  We need R and B presented on
+> their correct lanes to the TDA998x so that the Armadas YUV->RGB
+> conversion works.  Setting CFG_GRA_SWAPRB does not swap the YUV output
+> to match, neither does setting any of the other bits.
+> 
+> CFG_GRA_SWAPRB is all about the _graphics_ _framebuffer_ format, it's got
+> nothing to do at all with how the output is wired.
 
-When I tried it, all cursors had variable alpha, and converting the
-alpha to a single transparency bit made the cursor look rubbish against
-certain backgrounds.
+Then, may you explain why you must swap R/B on simple RGB output?
 
-> If you absolutely want to have all transparency shades, you should
-> accept 64x64 cursors and test if they may be rendered as 64x32 or
-> 32x64, i.e. test that there is only pure transparency in the non-
-> rendered rectangles...
+>From your [PATCH 2/5] DRM: Armada: Add Armada DRM driver:
 
-That is policy, and that is something which can be done by the X server
-rather than the kernel.  The kernel exposes the hardware capabilities,
-which are to allow a 64x32 or a 32x64 cursor.  Userspace can make the
-decision dynamically which it wishes to use.
++	FMT(RGB888,	888PACK,	CFG_SWAPRB);
++	FMT(BGR888,	888PACK,	0);
 
-However, what you're suggesting is dangerous.  What do you do when you're
-presented with a cursor which is 64x64 ?  Do you:
++	FMT(YUYV,	422PACK,	CFG_YUV2RGB | CFG_SWAPYU | CFG_SWAPUV);
 
-(a) not display it
-(b) crash the X server
+> > > +	.audio_cfg = BIT(2),
+> > > +	.audio_frame[1] = 1,
+> > > +	.audio_format = AFMT_SPDIF,
+> > > +	.audio_sample_rate = 44100,
+> > 
+> > These values are rather mysterious!
+> 
+> Also I'm going to ignore this comment, because quite honestly, I think
+> this is worthless.  You haven't investigated how the TDA998x actually
+> gets setup by Rabeeh.
 
-There isn't a fallback to using software cursors available in the X server
-because there's no error reporting for a failed hardware cursor update.
+Rabeeh did the most he could to have a working Cubox. He used bad
+written drivers and he had not the time to think about how the drivers
+could be enhanced.
+
+Here is a small story about i2s/spdif: once, I set the tda998x to use
+the spdif input, and at this time, I was using the dummy codec.
+This codec accepts the format 32_LE, as does the audio device, but the
+output cannot go to spdif. Result: no hdmi sound.
+
+Should we restrict the hdmi transmitter to spdif (thus 'no 32 bits
+stream') or to i2s (thus 'no compressed stream') only, or accept both
+i2s and spdif and allow a full range of supported audio streams?
+
+-- 
+Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
+Jef		|		http://moinejf.free.fr/
++
