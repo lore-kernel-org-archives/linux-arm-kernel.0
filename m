@@ -1,23 +1,28 @@
 From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Mon, 7 Oct 2013 18:03:01 -0400 (EDT)
-Subject: [RFC PATCH 1/5] ARM64: allow limited use of some NEON registers
- in exceptions
-In-Reply-To: <1381147951-7609-2-git-send-email-ard.biesheuvel@linaro.org>
-References: <1381147951-7609-1-git-send-email-ard.biesheuvel@linaro.org>
- <1381147951-7609-2-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <alpine.LFD.2.03.1310071759190.3023@syhkavp.arg>
+Date: Mon, 7 Oct 2013 18:06:27 -0400 (EDT)
+Subject: [PATCH 3/6] ARM: EXYNOS: add Exynos Dual Cluster Support
+In-Reply-To: <20131007140343.GA12030@localhost.localdomain>
+References: <20131007140343.GA12030@localhost.localdomain>
+Message-ID: <alpine.LFD.2.03.1310071804030.3023@syhkavp.arg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 7 Oct 2013, Ard Biesheuvel wrote:
+On Mon, 7 Oct 2013, Dave Martin wrote:
 
-> Stack/unstack the bottom 4 NEON registers on exception entry/exit
-> so we can use them in places where we are not allowed to sleep.
+> On Fri, Oct 04, 2013 at 03:51:31PM -0400, Nicolas Pitre wrote:
+> > No FIQs are supposed to ever race with this code.
+> 
+> There is an anomaly though: FIQ and external abort don't seem to get
+> explicitly masked anywhere, either on the suspend or powerdown paths.
+> Sometimes either or both remains unmasked (I tried some trace in the
+> TC2 MCPM backend to confirm this.)
+> 
+> Looks like a possible omission in the arch/arm/ suspend and shutdown
+> code, rather than a problem specific to MCPM.
 
-If you want to use Neon in places where you're not allowed to sleep, 
-this also means you are not going to be scheduled away unexpectedly.  
-Why not simply save/restore those Neon regs locally instead?  Same goes 
-for interrupt context.
+Possibly, yes.
+
+Feel free to post a patch.
 
 
 Nicolas
