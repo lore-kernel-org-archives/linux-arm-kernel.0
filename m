@@ -1,41 +1,65 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 7 Oct 2013 14:13:54 -0400
-Subject: [GIT PULL] ARM: mvebu: soc changes for v3.13
-In-Reply-To: <20131007170640.GF15413@quad.lixom.net>
-References: <20130930154208.GG31178@titan.lakedaemon.net>
- <20131007170640.GF15413@quad.lixom.net>
-Message-ID: <20131007181354.GC5402@titan.lakedaemon.net>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Mon, 07 Oct 2013 11:16:59 -0700
+Subject: [PATCH v7 1/5] ARM: add basic support for Trusted Foundations
+In-Reply-To: <1380904635-18113-2-git-send-email-acourbot@nvidia.com>
+ (Alexandre Courbot's message of "Fri, 4 Oct 2013 09:37:11 -0700")
+References: <1380904635-18113-1-git-send-email-acourbot@nvidia.com>
+ <1380904635-18113-2-git-send-email-acourbot@nvidia.com>
+Message-ID: <871u3xdjz8.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 07, 2013 at 10:06:40AM -0700, Olof Johansson wrote:
-> On Mon, Sep 30, 2013 at 11:42:08AM -0400, Jason Cooper wrote:
-> > Guys,
-> > 
-> > These are the SoC changes that didn't make it during the last merge
-> > window.  As with mvebu/drivers, these have been in -next since 3.12-rc1
-> > without issue.
-> 
-> I should have looked closer at this before I commented on the PCI branch.
+Alexandre Courbot <acourbot@nvidia.com> writes:
 
-No problem. :)
+> Trusted Foundations is a TrustZone-based secure monitor for ARM that
+> can be invoked using the same SMC-based API on all supported
+> platforms. This patch adds initial basic support for Trusted
+> Foundations using the ARM firmware API. Current features are limited
+> to the ability to boot secondary processors.
+>
+> Note: The API followed by Trusted Foundations does *not* follow the SMC
+> calling conventions. It has nothing to do with PSCI neither and is only
+> relevant to devices that use Trusted Foundations (like most Tegra-based
+> retail devices).
+>
+> Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
+> Reviewed-by: Tomasz Figa <t.figa@samsung.com>
+> Reviewed-by: Stephen Warren <swarren@nvidia.com>
 
-> > Sebastian Hesselbarth (2):
-> >       ARM: dove: switch to DT probed mbus address windows
-> >       ARM: dove: remove legacy pcie and clock init
-> 
-> It looks to me like this second patch will need to be based on the PCI branch,
-> or you will have broken PCI if this is applied and not the drivers/pci patches,
-> right? If so, you need to base this branch on top of the other one, not send
-> them separately -- otherwise a git bisect that lands between these two will
-> result in a non-booting kernel.
+[...]
 
-Hmm, I'd like to avoid the branch dependency if possible.  I'll just
-move the patch over from mvebu/soc to mvebu/drivers.  There might be a
-trivial merge conflict later on, but I seriously doubt it.
+> +void register_trusted_foundations(struct trusted_foundations_platform_data *pd)
+> +{
+> +	/* we are not using version information for now since currently
+> +	 * supported SMCs are compatible with all TF releases */
 
-v2 on it's way...
+nit: multi-line comment style...
 
-thx,
+[...]
 
-Jason.
+> +static inline void register_trusted_foundations(
+> +				   struct trusted_foundations_platform_data *pd)
+> +{
+> +	/* If we try to register TF, this means the system needs it to continue.
+> +	 * Its absence if thus a fatal error. */
+
+...and here...
+
+> +	panic("No support for Trusted Foundations, stopping...\n");
+> +}
+> +
+> +static inline void of_register_trusted_foundations(void)
+> +{
+> +	/* If we find the target should enable TF but does not support it,
+> +	 * fail as the system won't be able to do much anyway */
+
+...and here.
+
+> +	if (of_find_compatible_node(NULL, NULL, "tl,trusted-foundations"))
+> +		register_trusted_foundations(NULL);
+> +}
+> +#endif /* CONFIG_TRUSTED_FOUNDATIONS */
+> +
+> +#endif
+
+Kevin
