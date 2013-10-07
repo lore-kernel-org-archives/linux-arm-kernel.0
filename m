@@ -1,62 +1,59 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 7 Oct 2013 17:17:57 +0200
-Subject: [PATCH v3 04/19] clk: at91: add PMC macro file for dt definitions
-In-Reply-To: <1375938270-3965-1-git-send-email-b.brezillon@overkiz.com>
-References: <1375937608-3773-1-git-send-email-b.brezillon@overkiz.com>
- <1375938270-3965-1-git-send-email-b.brezillon@overkiz.com>
-Message-ID: <5252D0A5.60304@atmel.com>
+From: dinguyen@altera.com (dinguyen at altera.com)
+Date: Mon, 7 Oct 2013 10:27:59 -0500
+Subject: [GIT PULL]clocksource: dw_apb_timer_of: Fix read_sched_clock
+Message-ID: <1381159679-6528-1-git-send-email-dinguyen@altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/08/2013 07:04, Boris BREZILLON :
-> This patch adds a new macro file for PMC macros.
->
-> This macro file includes the definitions of SR (status register) bit
-> offsets and will be use to reference PMC irqs.
->
-> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
-> ---
->   include/dt-bindings/clk/at91/common/pmc.h |   20 ++++++++++++++++++++
->   1 file changed, 20 insertions(+)
->   create mode 100644 include/dt-bindings/clk/at91/common/pmc.h
->
-> diff --git a/include/dt-bindings/clk/at91/common/pmc.h b/include/dt-bindings/clk/at91/common/pmc.h
-> new file mode 100644
-> index 0000000..edc51d6
-> --- /dev/null
-> +++ b/include/dt-bindings/clk/at91/common/pmc.h
-> @@ -0,0 +1,20 @@
-> +/*
-> + * This header provides constants for AT91 pmc status.
-> + *
-> + * The constants defined in this header are being used in dts.
+From: Dinh Nguyen <dinguyen@altera.com>
 
-It is better to add one line about license: for example:
+Hi Thomas, John,
 
-  * Licensed under GPLv2 or later.
+I am hoping you can pull in these 2 patches. These 2 patches have been floating
+around for almost 2 months now. They are needed to get the Altera SOCFPGA
+booting again because of a DTS binding change in 3.12.
 
+The other change was correctly return the current clock counter.
 
-> + */
-> +
-> +#ifndef _DT_BINDINGS_CLK_AT91_PMC_H
-> +#define _DT_BINDINGS_CLK_AT91_PMC_H
-> +
-> +#define AT91_PMC_MOSCS		0		/* MOSCS Flag */
-> +#define AT91_PMC_LOCKA		1		/* PLLA Lock */
-> +#define AT91_PMC_LOCKB		2		/* PLLB Lock */
-> +#define AT91_PMC_MCKRDY		3		/* Master Clock */
-> +#define AT91_PMC_LOCKU		6		/* UPLL Lock */
-> +#define AT91_PMC_PCKRDY(id)	(8 + id)	/* Programmable Clock */
+The discussion thread can be found here:
 
-I prefer with parenthesis around "id" (8 + (id))
+http://lists.infradead.org/pipermail/linux-arm-kernel/2013-September/198818.html
+http://lists.infradead.org/pipermail/linux-arm-kernel/2013-September/198903.html
 
-> +#define AT91_PMC_MOSCSELS	16		/* Main Oscillator Selection */
-> +#define AT91_PMC_MOSCRCS	17		/* Main On-Chip RC */
-> +#define AT91_PMC_CFDEV		18		/* Clock Failure Detector Event */
-> +
-> +#endif
->
+This patch does not attempt or change the behaviour of the ordering of how a
+clocksource or clockevent is use. These 2 patches only enables a platform to boot.
 
+Thanks,
+Dinh
 
--- 
-Nicolas Ferre
+The following changes since commit 272b98c6455f00884f0350f775c5342358ebb73f:
+
+  Linux 3.12-rc1 (2013-09-16 16:17:51 -0400)
+
+are available in the git repository at:
+
+  git://git.rocketboards.org/linux-socfpga-next.git tags/dw_apb_timer_fix_for_jstultz
+
+for you to fetch changes up to c3c3e0d0fee2f4e1a9897094107dd8eae87503fb:
+
+  clocksource: dw_apb_timer_of: Fix read_sched_clock (2013-10-07 09:57:15 -0500)
+
+----------------------------------------------------------------
+dw_apb_timer changes:
+	- Move defines from dw_apb_timer.c to include/linux/dw_apb_timer.h
+	- The dw_apb_timer implementation is a countdown timer. Fix the code
+		to return the correct current counter.
+	- Add backwards compatibilty for deprecated "snps,dw-apb-timer-osc"
+		and "snps,dw-apb-timer-sp"
+	- Add compatiblity for "snps,dw-apb-timer". This is the new binding
+		to be used going forward.
+
+----------------------------------------------------------------
+Dinh Nguyen (2):
+      clocksource: dw_apb_timer: Move timer defines to header file.
+      clocksource: dw_apb_timer_of: Fix read_sched_clock
+
+ drivers/clocksource/dw_apb_timer.c    |   19 -------------------
+ drivers/clocksource/dw_apb_timer_of.c |    9 +++++----
+ include/linux/dw_apb_timer.h          |   19 +++++++++++++++++++
+ 3 files changed, 24 insertions(+), 23 deletions(-)
