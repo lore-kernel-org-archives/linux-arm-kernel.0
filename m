@@ -1,27 +1,59 @@
 From: chander.kashyap@linaro.org (Chander Kashyap)
-Date: Mon,  7 Oct 2013 09:47:08 +0530
-Subject: [Patch v4 0/2] Enable all cpus in Exynos5420
-Message-ID: <1381119431-12697-1-git-send-email-chander.kashyap@linaro.org>
+Date: Mon,  7 Oct 2013 09:47:10 +0530
+Subject: [Patch v4 2/2] ARM: dts: Exynos5420: populate cpu node entries to 8
+ cpus
+In-Reply-To: <1381119431-12697-1-git-send-email-chander.kashyap@linaro.org>
+References: <1381119431-12697-1-git-send-email-chander.kashyap@linaro.org>
+Message-ID: <1381119431-12697-3-git-send-email-chander.kashyap@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Exynos5420 is an octa-core SoC. This patch series enables the remaining 4 cores.
+Exynos5420 is octa-core SoC from Samsung.
+Hence populate all the CPU node entries.
 
-Changes in v2:
-	- Changed the cpu node @unit-address value to reg property value.
-Changes in v3:
-	- Removed leading 0x from @unit-address value.
-Changes in v4:
-	- Fixed typo and patch subject from "arm: dt" to "ARM: dt".
+Signed-off-by: Chander Kashyap <chander.kashyap@linaro.org>
+---
+ arch/arm/boot/dts/exynos5420.dtsi |   28 ++++++++++++++++++++++++++++
+ 1 file changed, 28 insertions(+)
 
-Chander Kashyap (2):
-  clocksource: mct: extend mct to support 8 local interrupts for
-    Exynos5420
-  arm: dt: Exynos5420: populate cpu node enteries to 8 cpus
-
- arch/arm/boot/dts/exynos5420.dtsi |   37 +++++++++++++++++++++++++++++++++++--
- drivers/clocksource/exynos_mct.c  |    4 ++++
- 2 files changed, 39 insertions(+), 2 deletions(-)
-
+diff --git a/arch/arm/boot/dts/exynos5420.dtsi b/arch/arm/boot/dts/exynos5420.dtsi
+index e97c87b..a28cc40 100644
+--- a/arch/arm/boot/dts/exynos5420.dtsi
++++ b/arch/arm/boot/dts/exynos5420.dtsi
+@@ -57,6 +57,34 @@
+ 			reg = <0x3>;
+ 			clock-frequency = <1800000000>;
+ 		};
++
++		cpu4: cpu at 100 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a7";
++			reg = <0x100>;
++			clock-frequency = <1000000000>;
++		};
++
++		cpu5: cpu at 101 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a7";
++			reg = <0x101>;
++			clock-frequency = <1000000000>;
++		};
++
++		cpu6: cpu at 102 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a7";
++			reg = <0x102>;
++			clock-frequency = <1000000000>;
++		};
++
++		cpu7: cpu at 103 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a7";
++			reg = <0x103>;
++			clock-frequency = <1000000000>;
++		};
+ 	};
+ 
+ 	clock: clock-controller at 0x10010000 {
 -- 
 1.7.9.5
