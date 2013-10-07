@@ -1,52 +1,169 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Mon, 07 Oct 2013 13:12:54 -0700
-Subject: [PATCH] arm: socfpga: Fix incorrect sdmmc clock name
-In-Reply-To: <1376492274.8715.2.camel@linux-builds1>
-References: <1376322134-17408-1-git-send-email-dinguyen@altera.com>
- <20130814054810.GF16635@quad.lixom.net>
- <1376492274.8715.2.camel@linux-builds1>
-Message-ID: <20131007201254.7445.8105@quantum>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Mon,  7 Oct 2013 22:25:11 +0200
+Subject: [PATCH v4] ARM: kirkwood: retain MAC address for DT ethernet
+In-Reply-To: <1380881842-24605-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1380881842-24605-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1381177511-1100-1-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Dinh Nguyen (2013-08-14 07:57:54)
-> On Tue, 2013-08-13 at 22:48 -0700, Olof Johansson wrote:
-> > On Mon, Aug 12, 2013 at 10:42:14AM -0500, dinguyen at altera.com wrote:
-> > > From: Dinh Nguyen <dinguyen@altera.com>
-> > > 
-> > > The SD/MMC clock is named "sdmmc_clk", and NOT "mmc_clk".
-> > > 
-> > > Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
-> > > Cc: Mike Turquette <mturquette@linaro.org>
-> > > CC: Arnd Bergmann <arnd@arndb.de>
-> > > CC: Olof Johansson <olof@lixom.net>
-> > > Cc: Pavel Machek <pavel@denx.de>
-> > > Cc: linux-arm-kernel at lists.infradead.org
-> > 
-> > Hi Dinh,
-> > 
-> > Do you want this applied in fixes for 3.11? If so, can you give me a oneliner
-> > on what the impact here is? mmc doesn't come up at all, or something more
-> > subtle?
-> 
-> Hi Olof,
-> 
-> No, this is go into 3.12 as I am still working on the bindings for
-> SD/MMC.
-> 
-> The oneliner: "The SD/MMC driver was intermittently not coming up
-> because it was not able to get the correct clock."
+Ethernet IP on Kirkwood SoCs loose their MAC address register content
+if clock gated. To allow modular ethernet driver setups and gated clocks
+also on non-DT capable bootloaders, we fixup port device nodes with no
+valid MAC address property. This patch copies MAC address register
+contents set up by bootloaders early, notably before ethernet clocks
+are gated. While at it, also reorder call sequence in _dt_init.
 
-Olof, did you take this? If not I'll put it into my next batch of fixes
-for 3.12.
+Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Reviewed-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
+Reviewed-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+Tested-by: Andrew Lunn <andrew@lunn.ch>
+---
+Just to make sure they don't get lost this time:
+Added Jason's and Ezequiel's Reviewed-by to honor their constant reviews,
+and Andrew's last Tested-by because I know he will be testing again.
 
-Regards,
-Mike
+Changelog:
+v3->v4:
+- drop clk_is_enabled (and dependency) due to possible abuse of the
+  new function; enable/disable clk instead, remove gated clock warning
+  (Suggested by Andrew Lunn, Uwe Kleine-Koenig, Mike Turquette)
+- reduce FW_BUG to FW_INFO (Suggested by Andrew Lunn)
+- proper cleanup of iomap, clk, nodes
+v2->v3:
+- make use of new public clk_is_enabled (adds dependency)
+- add warning about gated clock && missing MAC property
+  (Suggested by Jason Gunthorpe)
+v1->v2:
+- check for gated clock before accessing eth registers
+  (Suggested by Andrew Lunn)
 
-> 
-> Thanks,
-> Dinh
-> > 
-> > 
-> > -Olof
-> >
+Cc: Jason Cooper <jason@lakedaemon.net>
+Cc: Andrew Lunn <andrew@lunn.ch>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Grant Likely <grant.likely@linaro.org>
+Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+Cc: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
+Cc: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+Cc: Mike Turquette <mturquette@linaro.org>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-kernel at vger.kernel.org
+---
+ arch/arm/mach-kirkwood/board-dt.c |   86 +++++++++++++++++++++++++++++++++++--
+ 1 file changed, 83 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
+index 82d3ad8..3ddd194 100644
+--- a/arch/arm/mach-kirkwood/board-dt.c
++++ b/arch/arm/mach-kirkwood/board-dt.c
+@@ -13,6 +13,8 @@
+ #include <linux/kernel.h>
+ #include <linux/init.h>
+ #include <linux/of.h>
++#include <linux/of_address.h>
++#include <linux/of_net.h>
+ #include <linux/of_platform.h>
+ #include <linux/clk-provider.h>
+ #include <linux/clocksource.h>
+@@ -66,6 +68,85 @@ static void __init kirkwood_legacy_clk_init(void)
+ 	clk_prepare_enable(clk);
+ }
+ 
++#define MV643XX_ETH_MAC_ADDR_LOW	0x0414
++#define MV643XX_ETH_MAC_ADDR_HIGH	0x0418
++
++static void __init kirkwood_dt_eth_fixup(void)
++{
++	struct device_node *np;
++
++	/*
++	 * The ethernet interfaces forget the MAC address assigned by u-boot
++	 * if the clocks are turned off. Usually, u-boot on kirkwood boards
++	 * has no DT support to properly set local-mac-address property.
++	 * As a workaround, we get the MAC address from mv643xx_eth registers
++	 * and update the port device node if no valid MAC address is set.
++	 */
++	for_each_compatible_node(np, NULL, "marvell,kirkwood-eth-port") {
++		struct device_node *pnp = of_get_parent(np);
++		struct clk *clk;
++		struct property *pmac;
++		void __iomem *io;
++		u8 *macaddr;
++		u32 reg;
++
++		if (!pnp)
++			continue;
++
++		/* skip disabled nodes or nodes with valid MAC address*/
++		if (!of_device_is_available(pnp) || of_get_mac_address(np))
++			goto eth_fixup_skip;
++
++		clk = of_clk_get(pnp, 0);
++		if (IS_ERR(clk))
++			goto eth_fixup_skip;
++
++		io = of_iomap(pnp, 0);
++		if (!io)
++			goto eth_fixup_no_map;
++
++		/* ensure port clock is not gated to not hang CPU */
++		clk_prepare_enable(clk);
++
++		/* store MAC address register contents in local-mac-address */
++		pr_err(FW_INFO "%s: local-mac-address is not set\n",
++		       np->full_name);
++
++		pmac = kzalloc(sizeof(*pmac) + 6, GFP_KERNEL);
++		if (!pmac)
++			goto eth_fixup_no_mem;
++
++		pmac->value = pmac + 1;
++		pmac->length = 6;
++		pmac->name = kstrdup("local-mac-address", GFP_KERNEL);
++		if (!pmac->name) {
++			kfree(pmac);
++			goto eth_fixup_no_mem;
++		}
++
++		macaddr = pmac->value;
++		reg = readl(io + MV643XX_ETH_MAC_ADDR_HIGH);
++		macaddr[0] = (reg >> 24) & 0xff;
++		macaddr[1] = (reg >> 16) & 0xff;
++		macaddr[2] = (reg >> 8) & 0xff;
++		macaddr[3] = reg & 0xff;
++
++		reg = readl(io + MV643XX_ETH_MAC_ADDR_LOW);
++		macaddr[4] = (reg >> 8) & 0xff;
++		macaddr[5] = reg & 0xff;
++
++		of_update_property(np, pmac);
++
++eth_fixup_no_mem:
++		iounmap(io);
++		clk_disable_unprepare(clk);
++eth_fixup_no_map:
++		clk_put(clk);
++eth_fixup_skip:
++		of_node_put(pnp);
++	}
++}
++
+ static void __init kirkwood_dt_time_init(void)
+ {
+ 	of_clk_init(NULL);
+@@ -97,11 +178,10 @@ static void __init kirkwood_dt_init(void)
+ 	kirkwood_l2_init();
+ 
+ 	kirkwood_cpufreq_init();
+-
++	kirkwood_cpuidle_init();
+ 	/* Setup clocks for legacy devices */
+ 	kirkwood_legacy_clk_init();
+-
+-	kirkwood_cpuidle_init();
++	kirkwood_dt_eth_fixup();
+ 
+ #ifdef CONFIG_KEXEC
+ 	kexec_reinit = kirkwood_enable_pcie;
+-- 
+1.7.10.4
