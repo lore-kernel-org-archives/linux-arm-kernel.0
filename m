@@ -1,69 +1,148 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Mon, 7 Oct 2013 17:28:39 +0300
-Subject: [PATCH 1/2] clk: tegra114: Rename gr_2d/gr_3d to gr2d/gr3d
-In-Reply-To: <20131007001433.7445.7915@quantum>
-References: <1380748361-32459-1-git-send-email-treding@nvidia.com>
- <524EF436.4000704@wwwdotorg.org> <20131007001433.7445.7915@quantum>
-Message-ID: <20131007142839.GC3973@tbergstrom-lnx.Nvidia.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 7 Oct 2013 16:26:03 +0200
+Subject: [linux-sunxi] [PATCH 0/4] Add support for the Allwinner A31
+ Reset Controllers
+In-Reply-To: <CAPNxggb_dhQWPDkO_7LVyyn5537tDThtBU5SY1oZfZhri0QacQ@mail.gmail.com>
+References: <1380983960-11087-1-git-send-email-maxime.ripard@free-electrons.com>
+ <CAPNxggaUW1B8Ea-gSo+XV2P9s4MRa1L25_ZAvOWyLN6VqQ6wsQ@mail.gmail.com>
+ <20131006082917.GD3106@lukather>
+ <CAPNxggb_dhQWPDkO_7LVyyn5537tDThtBU5SY1oZfZhri0QacQ@mail.gmail.com>
+Message-ID: <20131007142603.GE3106@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 07, 2013 at 02:14:33AM +0200, Mike Turquette wrote:
-> Quoting Stephen Warren (2013-10-04 10:00:38)
-> > On 10/02/2013 03:12 PM, Thierry Reding wrote:
-> > > These clocks were named gr2d and gr3d on Tegra20 and Tegra30, so use the
-> > > same names on Tegra114 for consistency.
-> > 
-> > The series,
-> > Acked-by: Stephen Warren <swarren@nvidia.com>
-> > 
-> > Although I wonder if there will be merge conflicts with Peter's "clk:
-> > tegra: replace enum tegra114_clk by binding header"?
+On Sun, Oct 06, 2013 at 11:42:10AM +0200, Arokux X wrote:
+> Hi Maxime,
 > 
-> There are merge conflicts in other places too. The latest clk-next
-> branch is based on -rc3 with only a few patches (publicly) applied so
-> far. As of the time of this writing the top-most commit is
-> 96a7ed9079a3483c5681b17f4713c37c1cf2b1c9.
-> 
-> Can the Tegra folks send me a pull request with the following
-> patches applied? (likely in this order):
-> 
-> ARM: tegra114: add missing clocks to binding
-> clk: tegra: replace enum tegra114_clk by binding header
-> [PATCH v2] clk: tegra: Correct sbc mux width & parent
-> clk: tegra: Fix vde/2d/3d clock src offset
-> clk: tegra: Set the clock parent of gr2d/gr3d to pll_c2
-> clk: tegra: Set the clk parent of host1x to pll_p
-> clk: tegra114: Rename gr_2d/gr_3d to gr2d/gr3d
-> clk: tegra114: Initialize gr2d clock
+> On Sun, Oct 6, 2013 at 10:29 AM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+> > Hi Roman,
+> >
+> > On Sun, Oct 06, 2013 at 01:32:13AM +0200, Arokux X wrote:
+> >> On Sat, Oct 5, 2013 at 4:39 PM, Maxime Ripard
+> >> <maxime.ripard@free-electrons.com> wrote:
+> >> > Hi everyone,
+> >> >
+> >> > This patchset adds support for the reset controllers found in the Allwinner A31
+> >> > SoCs. Since these controllers are pretty simple, basically just a few MMIO
+> >> > registers, with a single bit controlling the reset state of the other devices
+> >> > it asserts in reset, the driver is quite simple as well.
+> >>
+> >> I think we need something smarter here. There are reset bits all over
+> >> the place. After a hint by Emilio and small chat with Oliver I've
+> >> realized I have 3 reset bits in USB host clock module [0].
+> >
+> > I wasn't aware there were other IPs behaving like this in older SoCs.
+> > Thanks for pointing this out.
+> >
+> > Something smarter in what sense? It's just one bit to put in one
+> > register, I don't really see how it can be "smart".
+> By something smarter I meant something that prevents you from using
+> wrong bits for reset. For example in the USB clock module there are
+> only 3 reset bits in a register.
 
-This conflicts with 'clk: tegra: Set the clock parent of gr2d/gr3d to pll_c2'
-I suggest we drop 'clk: tegra114: Initialize gr2d clock' and use pll_c2 to clock gr2d.
+Nothing will ever prevent you from poking in the wrong bits. If your
+clock driver has a bug, or if the data coming from device tree are
+bogus, it will happen, and there will be no safeguard.
 
-> The set of patches above (with their functional dependencies) were
-> giving me some conflict resolution issues (e.g. large data tables that
-> needed to be updated in clk-tegra-114.c) against the latest clk-next.
+> >> Maybe implementation like this one [1] where a mask can be passed as a
+> >> parameter will be more appropriate? (Those reset bits behave the same
+> >> as gatable clocks really.)
+> >
+> > No, they don't behave like gatable clocks, and they shouldn't be
+> > implemented with the clock framework. Whenever you disable a clock, the
+> > child device will retain its configuration, while with the reset part,
+> > well, it will just be reset. This makes one huge difference.
 > 
-> Additionally I've looked at the following patches on the list which can
-> be added to the pull request if you want (these patches all look fine
-> but I haven't yet Acked each individually):
-> 
-> clk: tegra30: Don't wait for PLL_U lock bit
+> I'm sorry I wasn't clear. I did not meant to use clock framework for
+> reset bits. I was suggesting to implement your driver in a similar
+> way. You remember gatable clocks also take several bits per register.
+> We are managing them with one function which accepts a mask - ones at
+> the positions of the gatable clocks. Now after a closer look at reset
+> framework I see that nothing is registered, so the approach taken by
+> us with clocks is not possible indeed.
 
-This is already part of next-20130927.
+We could do that by overriding the default of_xlate function. I'm not
+exactly convinced it makes sense in that case, since bogus data will
+possibly come from the DT, and in that case, you are screwed.
 
-> clk: tegra114: Initialize host1x and related clocks
+> Let me now ask how I should go about my reset bits.
+> 
+> So far you were dealing with the registers where all the bits were
+> used for reset bits. In the case of USB clock module (and several
+> others) only several bits are reset bits. So I will proceed to use
+> your new driver like this (here, for the sake of clarity I use names
+> for registers and reset bits)
+> 
+> +               usb_rst: reset at USB_CLK_REG {
+> +                       #reset-cells = <1>;
+> +                       compatible = "allwinner,sun4i-a10-usb-reset";
+> +                       reg = <USB_CLK_REG 0x4>;
+> +               };
+> 
+> And somewhere in the EHCI/OHCI binding:
+> 
+>                  ohci0: .... {
+>                           ...
+> +                       resets = <&usb_rst USB0_RESET_BIT>;
+>                           ...
+>                 }
+> 
+>                  ehci0: .... {
+>                           ...
+> +                       resets = <&usb_rst USB0_RESET_BIT>;
+>                           ...
+>                 }
+> 
+> If I understand right, here is the problem with this approach. As you
+> see ohci0/ehci0 are sharing the very same bit. So if device_reset is
+> used in both ohci0/ehci0 kernel modules we will have a situation where
+> one kernel module will reset the hardware used by the other kernel
+> module. The problem is that reset bit really belongs to a USB PHY,
+> which is shared between ohci0/ehci0. So as it looks like I would need
+> to add another module that handles USB PHY?
+> 
+>                  usb0-phy: {
+>                           resets = <&usb_rst USB0_RESET_BIT>;
+>                  }
+> 
+>                  ohci0: .... {
+>                           ...
+> +                       phy = <&usb0-phy>
+>                           ...
+>                 }
+> 
+>                  ehci0: .... {
+>                           ...
+> +                       phy = <&usb0-phy>
+>                           ...
+>                 }
 
-This conflicts with 'clk: tegra: Set the clk parent of host1x to pll_p'. I
-suggest we drop 'clk: tegra: Set the clk parent of host1x to pll_p' and run
-host1x from pll_c. Mark, Thierry, is this ok?
+Are those ohci and ehci nodes the same IP?
 
-> clk: tegra: PLLE spread spectrum control (with updated changelog)
-> 
-> If there are plans to spin a v3 of "Introduce common infra for tegra
-> clocks" then basing it on top of this tegra pull request would be nice.
-> 
-> Let me know if this is a problem for you.
-> 
-> Regards,
-> Mike
+Anyway, it seems like it's the way to go, yes. There's a USB PHY
+framework in review right now: https://lwn.net/Articles/548814/
+
+> By the way, now you can see the advantages of the semantics that clock
+> framework is offering. If several devices want to disable a clock it
+> will only be disabled if no other devices are using it. Reset
+> framework does not offer this feature.
+
+Good thing we have the code and that we can patch it then. However, it's
+not much of a problem in our case, since both drivers will only want to
+deassert the reset.
+
+Thanks,
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131007/8d8bbf23/attachment.sig>
