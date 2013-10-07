@@ -1,38 +1,33 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 07 Oct 2013 10:47:01 -0600
-Subject: [PATCH stable] ARM: tegra: unify Tegra's Kconfig a bit more
-In-Reply-To: <20131005233833.GA18223@kroah.com>
-References: <1380917411-25869-1-git-send-email-swarren@wwwdotorg.org>
- <20131005233833.GA18223@kroah.com>
-Message-ID: <5252E585.8000602@wwwdotorg.org>
+From: nm@ti.com (Nishanth Menon)
+Date: Mon, 7 Oct 2013 11:49:41 -0500
+Subject: [PATCH 0/2] ARM: dts: OMAP: standardize SoC specific bindings
+In-Reply-To: <523C9D8B.2000701@ti.com>
+References: <523C9D8B.2000701@ti.com>
+Message-ID: <1381164584-4008-1-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/05/2013 05:38 PM, Greg KH wrote:
-> On Fri, Oct 04, 2013 at 02:10:11PM -0600, Stephen Warren wrote:
->> From: Stephen Warren <swarren@nvidia.com>
->>
->> Move all common select clauses from ARCH_TEGRA_*_SOC to ARCH_TEGRA to
->> eliminate duplication. The USB-related selects all should have been
->> common too, but were missing from Tegra114 previously. Move these to
->> ARCH_TEGRA too. The latter fixes a build break when only Tegra114
->> support was enabled, but not Tegra20 or Tegra30 support.
->>
->> This is 20984c44b5a08620778ea14fa5807489170fd5ca in v3.12-rc1.
->>
->> Signed-off-by: Stephen Warren <swarren@nvidia.com>
->> Reported-by: Paul Walmsley <pwalmsley@nvidia.com>
->> [auto-builders for 3.11.x are failing due to this]
-> 
-> What autobuilders?  I haven't heard of this before.
-> 
->> Cc: stable # v3.11
->> ---
->>  arch/arm/mach-tegra/Kconfig | 21 ++++++---------------
->>  1 file changed, 6 insertions(+), 15 deletions(-)
-> 
-> This fails to apply to the 3.11-stable tree, if you want it there, can
-> you provide a version that actually does apply, and that you have tested
-> to work properly?
+This is a respin of [1] based on of Olof's comments to introduce a
+generic SoC binding. This standardizes the binding definitions for
+SoCs based on existing "implied" bindings and based on existing usage
+in arch/arm/mach-omap2/soc.h. Eventually we should be able to get rid
+of soc_is_xyz() functions and allow machine descriptors to seamlessly
+handle the deltas.
 
-Sorry about that. I've sent V2.
+The series is based on [2] and was triggered primarily due to the bug
+seen with [3] - clock dts conversion.
+
+Nishanth Menon (2):
+  Documentation: dt: OMAP: standardize SoC naming definition
+  ARM: dts: omap3-beagle: use 3630 definitions
+
+ .../devicetree/bindings/arm/omap/omap.txt          |   45 ++++++++++++++++++++
+ arch/arm/boot/dts/omap3-beagle-xm.dts              |    2 +-
+ arch/arm/mach-omap2/board-generic.c                |   23 ++++++++++
+ 3 files changed, 69 insertions(+), 1 deletion(-)
+
+[1] https://patchwork.kernel.org/patch/2919661/
+[2] https://git.kernel.org/cgit/linux/kernel/git/bcousson/linux-omap-dt.git/log/?h=for_3.13/dts
+[3] http://marc.info/?t=138009899400001&r=1&w=2
+-- 
+1.7.9.5
