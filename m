@@ -1,379 +1,301 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon,  7 Oct 2013 14:12:28 +0200
-Subject: [RFC PATCH 2/5] ARM64: add quick-n-dirty emulation for AES
- instructions
+Date: Mon,  7 Oct 2013 14:12:31 +0200
+Subject: [RFC PATCH 5/5] mac80211: Use CCM crypto driver for CCMP
 In-Reply-To: <1381147951-7609-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1381147951-7609-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1381147951-7609-3-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1381147951-7609-6-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Let the crypto layer supply the CCM implementation rather than
+coding it directly on top of the core AES cipher.
+
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm64/Makefile            |   1 +
- arch/arm64/crypto/Makefile     |  11 ++
- arch/arm64/crypto/aesce-emu.c  | 221 +++++++++++++++++++++++++++++++++++++++++
- arch/arm64/include/asm/traps.h |  10 ++
- arch/arm64/kernel/entry.S      |   4 +-
- arch/arm64/kernel/traps.c      |  49 +++++++++
- 6 files changed, 295 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm64/crypto/Makefile
- create mode 100644 arch/arm64/crypto/aesce-emu.c
+ net/mac80211/Kconfig   |   1 +
+ net/mac80211/aes_ccm.c | 159 +++++++++++++++----------------------------------
+ net/mac80211/aes_ccm.h |   8 +--
+ net/mac80211/key.h     |   2 +-
+ net/mac80211/wpa.c     |  21 ++++---
+ 5 files changed, 64 insertions(+), 127 deletions(-)
 
-diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
-index d90cf79..c864bb5 100644
---- a/arch/arm64/Makefile
-+++ b/arch/arm64/Makefile
-@@ -39,6 +39,7 @@ export	TEXT_OFFSET GZFLAGS
- core-y		+= arch/arm64/kernel/ arch/arm64/mm/
- core-$(CONFIG_KVM) += arch/arm64/kvm/
- core-$(CONFIG_XEN) += arch/arm64/xen/
-+core-$(CONFIG_CRYPTO) += arch/arm64/crypto/
- libs-y		:= arch/arm64/lib/ $(libs-y)
- libs-y		+= $(LIBGCC)
+diff --git a/net/mac80211/Kconfig b/net/mac80211/Kconfig
+index 62535fe..dc31ec3 100644
+--- a/net/mac80211/Kconfig
++++ b/net/mac80211/Kconfig
+@@ -4,6 +4,7 @@ config MAC80211
+ 	select CRYPTO
+ 	select CRYPTO_ARC4
+ 	select CRYPTO_AES
++	select CRYPTO_CCM
+ 	select CRC32
+ 	select AVERAGE
+ 	---help---
+diff --git a/net/mac80211/aes_ccm.c b/net/mac80211/aes_ccm.c
+index be7614b9..c17f3a3 100644
+--- a/net/mac80211/aes_ccm.c
++++ b/net/mac80211/aes_ccm.c
+@@ -17,134 +17,71 @@
+ #include "key.h"
+ #include "aes_ccm.h"
  
-diff --git a/arch/arm64/crypto/Makefile b/arch/arm64/crypto/Makefile
-new file mode 100644
-index 0000000..f87ec80
---- /dev/null
-+++ b/arch/arm64/crypto/Makefile
-@@ -0,0 +1,11 @@
-+#
-+# linux/arch/arm64/crypto/Makefile
-+#
-+# Copyright (C) 2013 Linaro Ltd <ard.biesheuvel@linaro.org>
-+#
-+# This program is free software; you can redistribute it and/or modify
-+# it under the terms of the GNU General Public License version 2 as
-+# published by the Free Software Foundation.
-+#
-+
-+obj-y += aesce-emu.o
-diff --git a/arch/arm64/crypto/aesce-emu.c b/arch/arm64/crypto/aesce-emu.c
-new file mode 100644
-index 0000000..4cc7ee9
---- /dev/null
-+++ b/arch/arm64/crypto/aesce-emu.c
-@@ -0,0 +1,221 @@
-+/*
-+ * aesce-emu-c - emulate aese/aesd/aesmc/aesimc instructions
-+ *
-+ * Copyright (C) 2013 Linaro Ltd <ard.biesheuvel@linaro.org>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <linux/init.h>
-+#include <linux/printk.h>
-+#include <linux/ptrace.h>
-+#include <linux/types.h>
-+#include <linux/uaccess.h>
-+#include <asm/traps.h>
-+
-+union AES_STATE {
-+	u8	bytes[16];
-+	u64	l[2];
-+} __aligned(8);
-+
-+static void add_sub_shift(union AES_STATE *st, union AES_STATE *rk, int inv);
-+static void mix_columns(union AES_STATE *out, union AES_STATE *in);
-+static void inv_mix_columns_pre(union AES_STATE *out);
-+
-+#define REG_ACCESS(op, r, mem) \
-+	do { case r: asm(#op " {v" #r ".16b}, [%0]" : : "r"(mem)); goto out; \
-+	} while (0)
-+
-+#define REG_SWITCH(reg, op, m) do { switch (reg) { \
-+	REG_ACCESS(op,  0, m);	REG_ACCESS(op,  1, m);	REG_ACCESS(op,  2, m); \
-+	REG_ACCESS(op,  3, m);	REG_ACCESS(op,  4, m);	REG_ACCESS(op,  5, m); \
-+	REG_ACCESS(op,  6, m);	REG_ACCESS(op,  7, m);	REG_ACCESS(op,  8, m); \
-+	REG_ACCESS(op,  9, m);	REG_ACCESS(op, 10, m);	REG_ACCESS(op, 11, m); \
-+	REG_ACCESS(op, 12, m);	REG_ACCESS(op, 13, m);	REG_ACCESS(op, 14, m); \
-+	REG_ACCESS(op, 15, m);	REG_ACCESS(op, 16, m);	REG_ACCESS(op, 17, m); \
-+	REG_ACCESS(op, 18, m);	REG_ACCESS(op, 19, m);	REG_ACCESS(op, 20, m); \
-+	REG_ACCESS(op, 21, m);	REG_ACCESS(op, 22, m);	REG_ACCESS(op, 23, m); \
-+	REG_ACCESS(op, 24, m);	REG_ACCESS(op, 25, m);	REG_ACCESS(op, 26, m); \
-+	REG_ACCESS(op, 27, m);	REG_ACCESS(op, 28, m);	REG_ACCESS(op, 29, m); \
-+	REG_ACCESS(op, 30, m);	REG_ACCESS(op, 31, m); \
-+	} out:; } while (0)
-+
-+static void load_neon_reg(union AES_STATE *st, int reg)
-+{
-+	REG_SWITCH(reg, st1, st->bytes);
-+}
-+
-+static void save_neon_reg(union AES_STATE *st, int reg, struct pt_regs *regs)
-+{
-+	REG_SWITCH(reg, ld1, st->bytes);
-+
-+#ifdef CONFIG_STACK_NEON_REGS_ON_EXCEPTION
-+	if (reg < 4)
-+		/* update the stacked reg as well */
-+		memcpy((u8 *)&regs->qregs[reg], st->bytes, 16);
-+#endif
-+}
-+
-+static void aesce_do_emulate(unsigned int instr, struct pt_regs *regs)
-+{
-+	enum { AESE, AESD, AESMC, AESIMC } kind = (instr >> 12) & 3;
-+	int rn = (instr >> 5) & 0x1f;
-+	int rd = instr & 0x1f;
-+	union AES_STATE in, out;
-+
-+	load_neon_reg(&in, rn);
-+
-+	switch (kind) {
-+	case AESE:
-+	case AESD:
-+		load_neon_reg(&out, rd);
-+		add_sub_shift(&out, &in, kind);
-+		break;
-+	case AESIMC:
-+		inv_mix_columns_pre(&in);
-+	case AESMC:
-+		mix_columns(&out, &in);
-+	}
-+	save_neon_reg(&out, rd, regs);
-+}
-+
-+static int aesce_emu_instr(struct pt_regs *regs, unsigned int instr);
-+
-+static struct undef_hook aesce_emu_uh = {
-+	.instr_val	= 0x4e284800,
-+	.instr_mask	= 0xffffcc00,
-+	.fn		= aesce_emu_instr,
-+};
-+
-+static int aesce_emu_instr(struct pt_regs *regs, unsigned int instr)
-+{
-+	do {
-+		aesce_do_emulate(instr, regs);
-+		regs->pc += 4;
-+		get_user(instr, (u32 __user *)regs->pc);
-+	} while ((instr & aesce_emu_uh.instr_mask) == aesce_emu_uh.instr_val);
-+
-+	return 0;
-+}
-+
-+static int aesce_emu_init(void)
-+{
-+	register_undef_hook(&aesce_emu_uh);
-+	return 0;
-+}
-+
-+arch_initcall(aesce_emu_init);
-+
-+#define gf8_mul_x(a) \
-+	(((a) << 1) ^ (((a) & 0x80) ? 0x1b : 0))
-+
-+static void mix_columns(union AES_STATE *out, union AES_STATE *in)
-+{
-+	int i;
-+
-+	for (i = 0; i < 16; i++)
-+		out->bytes[i] =
-+			gf8_mul_x(in->bytes[i]) ^
-+			gf8_mul_x(in->bytes[((i + 1) % 4) | (i & ~3)]) ^
-+				in->bytes[((i + 1) % 4) | (i & ~3)] ^
-+				in->bytes[((i + 2) % 4) | (i & ~3)] ^
-+				in->bytes[((i + 3) % 4) | (i & ~3)];
-+}
-+
-+#define gf8_mul_x2(a) \
-+	(((a) << 2) ^ (((a) & 0x80) ? 0x36 : 0) ^ (((a) & 0x40) ? 0x1b : 0))
-+
-+static void inv_mix_columns_pre(union AES_STATE *out)
-+{
-+	union AES_STATE in = *out;
-+	int i;
-+
-+	for (i = 0; i < 16; i++)
-+		out->bytes[i] = gf8_mul_x2(in.bytes[i]) ^ in.bytes[i] ^
-+				gf8_mul_x2(in.bytes[i ^ 2]);
-+}
-+
-+static void add_sub_shift(union AES_STATE *st, union AES_STATE *rk, int inv)
-+{
-+	static u8 const sbox[][256] = { {
-+		0x63, 0x7c, 0x77, 0x7b, 0xf2, 0x6b, 0x6f, 0xc5,
-+		0x30, 0x01, 0x67, 0x2b, 0xfe, 0xd7, 0xab, 0x76,
-+		0xca, 0x82, 0xc9, 0x7d, 0xfa, 0x59, 0x47, 0xf0,
-+		0xad, 0xd4, 0xa2, 0xaf, 0x9c, 0xa4, 0x72, 0xc0,
-+		0xb7, 0xfd, 0x93, 0x26, 0x36, 0x3f, 0xf7, 0xcc,
-+		0x34, 0xa5, 0xe5, 0xf1, 0x71, 0xd8, 0x31, 0x15,
-+		0x04, 0xc7, 0x23, 0xc3, 0x18, 0x96, 0x05, 0x9a,
-+		0x07, 0x12, 0x80, 0xe2, 0xeb, 0x27, 0xb2, 0x75,
-+		0x09, 0x83, 0x2c, 0x1a, 0x1b, 0x6e, 0x5a, 0xa0,
-+		0x52, 0x3b, 0xd6, 0xb3, 0x29, 0xe3, 0x2f, 0x84,
-+		0x53, 0xd1, 0x00, 0xed, 0x20, 0xfc, 0xb1, 0x5b,
-+		0x6a, 0xcb, 0xbe, 0x39, 0x4a, 0x4c, 0x58, 0xcf,
-+		0xd0, 0xef, 0xaa, 0xfb, 0x43, 0x4d, 0x33, 0x85,
-+		0x45, 0xf9, 0x02, 0x7f, 0x50, 0x3c, 0x9f, 0xa8,
-+		0x51, 0xa3, 0x40, 0x8f, 0x92, 0x9d, 0x38, 0xf5,
-+		0xbc, 0xb6, 0xda, 0x21, 0x10, 0xff, 0xf3, 0xd2,
-+		0xcd, 0x0c, 0x13, 0xec, 0x5f, 0x97, 0x44, 0x17,
-+		0xc4, 0xa7, 0x7e, 0x3d, 0x64, 0x5d, 0x19, 0x73,
-+		0x60, 0x81, 0x4f, 0xdc, 0x22, 0x2a, 0x90, 0x88,
-+		0x46, 0xee, 0xb8, 0x14, 0xde, 0x5e, 0x0b, 0xdb,
-+		0xe0, 0x32, 0x3a, 0x0a, 0x49, 0x06, 0x24, 0x5c,
-+		0xc2, 0xd3, 0xac, 0x62, 0x91, 0x95, 0xe4, 0x79,
-+		0xe7, 0xc8, 0x37, 0x6d, 0x8d, 0xd5, 0x4e, 0xa9,
-+		0x6c, 0x56, 0xf4, 0xea, 0x65, 0x7a, 0xae, 0x08,
-+		0xba, 0x78, 0x25, 0x2e, 0x1c, 0xa6, 0xb4, 0xc6,
-+		0xe8, 0xdd, 0x74, 0x1f, 0x4b, 0xbd, 0x8b, 0x8a,
-+		0x70, 0x3e, 0xb5, 0x66, 0x48, 0x03, 0xf6, 0x0e,
-+		0x61, 0x35, 0x57, 0xb9, 0x86, 0xc1, 0x1d, 0x9e,
-+		0xe1, 0xf8, 0x98, 0x11, 0x69, 0xd9, 0x8e, 0x94,
-+		0x9b, 0x1e, 0x87, 0xe9, 0xce, 0x55, 0x28, 0xdf,
-+		0x8c, 0xa1, 0x89, 0x0d, 0xbf, 0xe6, 0x42, 0x68,
-+		0x41, 0x99, 0x2d, 0x0f, 0xb0, 0x54, 0xbb, 0x16
-+	}, {
-+		0x52, 0x09, 0x6a, 0xd5, 0x30, 0x36, 0xa5, 0x38,
-+		0xbf, 0x40, 0xa3, 0x9e, 0x81, 0xf3, 0xd7, 0xfb,
-+		0x7c, 0xe3, 0x39, 0x82, 0x9b, 0x2f, 0xff, 0x87,
-+		0x34, 0x8e, 0x43, 0x44, 0xc4, 0xde, 0xe9, 0xcb,
-+		0x54, 0x7b, 0x94, 0x32, 0xa6, 0xc2, 0x23, 0x3d,
-+		0xee, 0x4c, 0x95, 0x0b, 0x42, 0xfa, 0xc3, 0x4e,
-+		0x08, 0x2e, 0xa1, 0x66, 0x28, 0xd9, 0x24, 0xb2,
-+		0x76, 0x5b, 0xa2, 0x49, 0x6d, 0x8b, 0xd1, 0x25,
-+		0x72, 0xf8, 0xf6, 0x64, 0x86, 0x68, 0x98, 0x16,
-+		0xd4, 0xa4, 0x5c, 0xcc, 0x5d, 0x65, 0xb6, 0x92,
-+		0x6c, 0x70, 0x48, 0x50, 0xfd, 0xed, 0xb9, 0xda,
-+		0x5e, 0x15, 0x46, 0x57, 0xa7, 0x8d, 0x9d, 0x84,
-+		0x90, 0xd8, 0xab, 0x00, 0x8c, 0xbc, 0xd3, 0x0a,
-+		0xf7, 0xe4, 0x58, 0x05, 0xb8, 0xb3, 0x45, 0x06,
-+		0xd0, 0x2c, 0x1e, 0x8f, 0xca, 0x3f, 0x0f, 0x02,
-+		0xc1, 0xaf, 0xbd, 0x03, 0x01, 0x13, 0x8a, 0x6b,
-+		0x3a, 0x91, 0x11, 0x41, 0x4f, 0x67, 0xdc, 0xea,
-+		0x97, 0xf2, 0xcf, 0xce, 0xf0, 0xb4, 0xe6, 0x73,
-+		0x96, 0xac, 0x74, 0x22, 0xe7, 0xad, 0x35, 0x85,
-+		0xe2, 0xf9, 0x37, 0xe8, 0x1c, 0x75, 0xdf, 0x6e,
-+		0x47, 0xf1, 0x1a, 0x71, 0x1d, 0x29, 0xc5, 0x89,
-+		0x6f, 0xb7, 0x62, 0x0e, 0xaa, 0x18, 0xbe, 0x1b,
-+		0xfc, 0x56, 0x3e, 0x4b, 0xc6, 0xd2, 0x79, 0x20,
-+		0x9a, 0xdb, 0xc0, 0xfe, 0x78, 0xcd, 0x5a, 0xf4,
-+		0x1f, 0xdd, 0xa8, 0x33, 0x88, 0x07, 0xc7, 0x31,
-+		0xb1, 0x12, 0x10, 0x59, 0x27, 0x80, 0xec, 0x5f,
-+		0x60, 0x51, 0x7f, 0xa9, 0x19, 0xb5, 0x4a, 0x0d,
-+		0x2d, 0xe5, 0x7a, 0x9f, 0x93, 0xc9, 0x9c, 0xef,
-+		0xa0, 0xe0, 0x3b, 0x4d, 0xae, 0x2a, 0xf5, 0xb0,
-+		0xc8, 0xeb, 0xbb, 0x3c, 0x83, 0x53, 0x99, 0x61,
-+		0x17, 0x2b, 0x04, 0x7e, 0xba, 0x77, 0xd6, 0x26,
-+		0xe1, 0x69, 0x14, 0x63, 0x55, 0x21, 0x0c, 0x7d
-+	} };
-+	static u8 const permute[][16] = { {
-+		0,  5, 10, 15, 4, 9, 14,  3, 8, 13, 2,  7, 12, 1, 6, 11
-+	}, {
-+		0, 13, 10,  7, 4, 1, 14, 11, 8,  5, 2, 15, 12, 9, 6,  3
-+	} };
-+	int i;
-+
-+	rk->l[0] ^= st->l[0];
-+	rk->l[1] ^= st->l[1];
-+
-+	for (i = 0; i < 16; i++)
-+		st->bytes[i] = sbox[inv][rk->bytes[permute[inv][i]]];
-+}
-diff --git a/arch/arm64/include/asm/traps.h b/arch/arm64/include/asm/traps.h
-index 10ca8ff..781e50cb2 100644
---- a/arch/arm64/include/asm/traps.h
-+++ b/arch/arm64/include/asm/traps.h
-@@ -27,4 +27,14 @@ static inline int in_exception_text(unsigned long ptr)
- 	       ptr < (unsigned long)&__exception_text_end;
- }
- 
-+struct undef_hook {
-+	struct list_head node;
-+	u32 instr_mask;
-+	u32 instr_val;
-+	int (*fn)(struct pt_regs *regs, unsigned int instr);
-+};
-+
-+void register_undef_hook(struct undef_hook *hook);
-+void unregister_undef_hook(struct undef_hook *hook);
-+
- #endif
-diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index c74dcca..e4d89df 100644
---- a/arch/arm64/kernel/entry.S
-+++ b/arch/arm64/kernel/entry.S
-@@ -291,7 +291,9 @@ el1_undef:
- 	 * Undefined instruction
- 	 */
- 	mov	x0, sp
--	b	do_undefinstr
-+	bl	do_undefinstr
-+
-+	kernel_exit 1
- el1_dbg:
- 	/*
- 	 * Debug exception handling
-diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
-index 7ffaddd..3cc4c91 100644
---- a/arch/arm64/kernel/traps.c
-+++ b/arch/arm64/kernel/traps.c
-@@ -257,11 +257,60 @@ void arm64_notify_die(const char *str, struct pt_regs *regs,
- 		die(str, regs, err);
- }
- 
-+static LIST_HEAD(undef_hook);
-+static DEFINE_RAW_SPINLOCK(undef_lock);
-+
-+void register_undef_hook(struct undef_hook *hook)
-+{
-+	unsigned long flags;
-+
-+	raw_spin_lock_irqsave(&undef_lock, flags);
-+	list_add(&hook->node, &undef_hook);
-+	raw_spin_unlock_irqrestore(&undef_lock, flags);
-+}
-+
-+void unregister_undef_hook(struct undef_hook *hook)
-+{
-+	unsigned long flags;
-+
-+	raw_spin_lock_irqsave(&undef_lock, flags);
-+	list_del(&hook->node);
-+	raw_spin_unlock_irqrestore(&undef_lock, flags);
-+}
-+
-+static int call_undef_hook(struct pt_regs *regs, void __user *pc)
-+{
-+	struct undef_hook *hook;
-+	unsigned long flags;
-+	int (*fn)(struct pt_regs *regs, unsigned int instr) = NULL;
-+	unsigned int instr;
-+	mm_segment_t fs;
-+	int ret;
-+
-+	fs = get_fs();
-+	set_fs(KERNEL_DS);
-+
-+	get_user(instr, (u32 __user *)pc);
-+
-+	raw_spin_lock_irqsave(&undef_lock, flags);
-+	list_for_each_entry(hook, &undef_hook, node)
-+		if ((instr & hook->instr_mask) == hook->instr_val)
-+			fn = hook->fn;
-+	raw_spin_unlock_irqrestore(&undef_lock, flags);
-+
-+	ret = fn ? fn(regs, instr) : 1;
-+	set_fs(fs);
-+	return ret;
-+}
-+
- asmlinkage void __exception do_undefinstr(struct pt_regs *regs)
+-static void aes_ccm_prepare(struct crypto_cipher *tfm, u8 *scratch, u8 *a)
+-{
+-	int i;
+-	u8 *b_0, *aad, *b, *s_0;
+-
+-	b_0 = scratch + 3 * AES_BLOCK_SIZE;
+-	aad = scratch + 4 * AES_BLOCK_SIZE;
+-	b = scratch;
+-	s_0 = scratch + AES_BLOCK_SIZE;
+-
+-	crypto_cipher_encrypt_one(tfm, b, b_0);
+-
+-	/* Extra Authenticate-only data (always two AES blocks) */
+-	for (i = 0; i < AES_BLOCK_SIZE; i++)
+-		aad[i] ^= b[i];
+-	crypto_cipher_encrypt_one(tfm, b, aad);
+-
+-	aad += AES_BLOCK_SIZE;
+-
+-	for (i = 0; i < AES_BLOCK_SIZE; i++)
+-		aad[i] ^= b[i];
+-	crypto_cipher_encrypt_one(tfm, a, aad);
+-
+-	/* Mask out bits from auth-only-b_0 */
+-	b_0[0] &= 0x07;
+-
+-	/* S_0 is used to encrypt T (= MIC) */
+-	b_0[14] = 0;
+-	b_0[15] = 0;
+-	crypto_cipher_encrypt_one(tfm, s_0, b_0);
+-}
+-
+-
+-void ieee80211_aes_ccm_encrypt(struct crypto_cipher *tfm, u8 *scratch,
++void ieee80211_aes_ccm_encrypt(struct crypto_aead *tfm, u8 *scratch,
+ 			       u8 *data, size_t data_len,
+ 			       u8 *cdata, u8 *mic)
  {
- 	siginfo_t info;
- 	void __user *pc = (void __user *)instruction_pointer(regs);
+-	int i, j, last_len, num_blocks;
+-	u8 *pos, *cpos, *b, *s_0, *e, *b_0;
++	struct scatterlist aad, pt, ct;
++	struct aead_request req;
++	u8 *iv = scratch + 3 * AES_BLOCK_SIZE; /* b0 */
  
-+	if (call_undef_hook(regs, pc) == 0)
-+		return;
+-	b = scratch;
+-	s_0 = scratch + AES_BLOCK_SIZE;
+-	e = scratch + 2 * AES_BLOCK_SIZE;
+-	b_0 = scratch + 3 * AES_BLOCK_SIZE;
++	sg_init_one(&pt, data, data_len);
++	sg_init_one(&ct, cdata, data_len + IEEE80211_CCMP_MIC_LEN);
++	sg_init_one(&aad, scratch + 4 * AES_BLOCK_SIZE, 2 * AES_BLOCK_SIZE - 2);
+ 
+-	num_blocks = DIV_ROUND_UP(data_len, AES_BLOCK_SIZE);
+-	last_len = data_len % AES_BLOCK_SIZE;
+-	aes_ccm_prepare(tfm, scratch, b);
++	aead_request_set_crypt(&req, &pt, &ct, data_len, iv);
++	aead_request_set_assoc(&req, &aad, 2 * AES_BLOCK_SIZE - 2);
+ 
+-	/* Process payload blocks */
+-	pos = data;
+-	cpos = cdata;
+-	for (j = 1; j <= num_blocks; j++) {
+-		int blen = (j == num_blocks && last_len) ?
+-			last_len : AES_BLOCK_SIZE;
+-
+-		/* Authentication followed by encryption */
+-		for (i = 0; i < blen; i++)
+-			b[i] ^= pos[i];
+-		crypto_cipher_encrypt_one(tfm, b, b);
+-
+-		b_0[14] = (j >> 8) & 0xff;
+-		b_0[15] = j & 0xff;
+-		crypto_cipher_encrypt_one(tfm, e, b_0);
+-		for (i = 0; i < blen; i++)
+-			*cpos++ = *pos++ ^ e[i];
+-	}
+-
+-	for (i = 0; i < IEEE80211_CCMP_MIC_LEN; i++)
+-		mic[i] = b[i] ^ s_0[i];
++	crypto_aead_encrypt(&req);
+ }
+ 
+-
+-int ieee80211_aes_ccm_decrypt(struct crypto_cipher *tfm, u8 *scratch,
++int ieee80211_aes_ccm_decrypt(struct crypto_aead *tfm, u8 *scratch,
+ 			      u8 *cdata, size_t data_len, u8 *mic, u8 *data)
+ {
+-	int i, j, last_len, num_blocks;
+-	u8 *pos, *cpos, *b, *s_0, *a, *b_0;
+-
+-	b = scratch;
+-	s_0 = scratch + AES_BLOCK_SIZE;
+-	a = scratch + 2 * AES_BLOCK_SIZE;
+-	b_0 = scratch + 3 * AES_BLOCK_SIZE;
+-
+-	num_blocks = DIV_ROUND_UP(data_len, AES_BLOCK_SIZE);
+-	last_len = data_len % AES_BLOCK_SIZE;
+-	aes_ccm_prepare(tfm, scratch, a);
++	struct scatterlist aad, pt, ct;
++	struct aead_request req;
++	u8 *iv = scratch + 3 * AES_BLOCK_SIZE; /* b0 */
+ 
+-	/* Process payload blocks */
+-	cpos = cdata;
+-	pos = data;
+-	for (j = 1; j <= num_blocks; j++) {
+-		int blen = (j == num_blocks && last_len) ?
+-			last_len : AES_BLOCK_SIZE;
++	sg_init_one(&pt, data, data_len);
++	sg_init_one(&ct, cdata, data_len + IEEE80211_CCMP_MIC_LEN);
++	sg_init_one(&aad, scratch + 4 * AES_BLOCK_SIZE, 2 * AES_BLOCK_SIZE - 2);
+ 
+-		/* Decryption followed by authentication */
+-		b_0[14] = (j >> 8) & 0xff;
+-		b_0[15] = j & 0xff;
+-		crypto_cipher_encrypt_one(tfm, b, b_0);
+-		for (i = 0; i < blen; i++) {
+-			*pos = *cpos++ ^ b[i];
+-			a[i] ^= *pos++;
+-		}
+-		crypto_cipher_encrypt_one(tfm, a, a);
+-	}
++	aead_request_set_crypt(&req, &ct, &pt, data_len, iv);
++	aead_request_set_assoc(&req, &aad, 2 * AES_BLOCK_SIZE - 2);
+ 
+-	for (i = 0; i < IEEE80211_CCMP_MIC_LEN; i++) {
+-		if ((mic[i] ^ s_0[i]) != a[i])
+-			return -1;
+-	}
+-
+-	return 0;
++	return crypto_aead_decrypt(&req);
+ }
+ 
+-
+-struct crypto_cipher *ieee80211_aes_key_setup_encrypt(const u8 key[])
++struct crypto_aead *ieee80211_aes_key_setup_encrypt(const u8 key[])
+ {
+-	struct crypto_cipher *tfm;
+-
+-	tfm = crypto_alloc_cipher("aes", 0, CRYPTO_ALG_ASYNC);
+-	if (!IS_ERR(tfm))
+-		crypto_cipher_setkey(tfm, key, WLAN_KEY_LEN_CCMP);
+-
+-	return tfm;
++	struct crypto_aead *tfm;
++	int err;
 +
- 	/* check for AArch32 breakpoint instructions */
- 	if (!aarch32_break_handler(regs))
- 		return;
++	tfm = crypto_alloc_aead("ccm(aes)", 0, CRYPTO_ALG_ASYNC);
++	if (IS_ERR(tfm))
++		return tfm;
++
++	/* HACK: we use an auto variable for aead_request in the functions above
++	 * but this only works if the reqsize is 0, i.e., the aead alg does not
++	 * need additional space in the req struct to track its operations.
++	 * This is a proof of concept for the Crypto Extensions based AES/CCM,
++	 * so for now we just hack around it.
++	 */
++	err = -EINVAL;
++	if (crypto_aead_reqsize(tfm))
++		goto out;
++
++	err = crypto_aead_setkey(tfm, key, WLAN_KEY_LEN_CCMP);
++	if (!err)
++		err = crypto_aead_setauthsize(tfm, IEEE80211_CCMP_MIC_LEN);
++	if (!err)
++		return tfm;
++out:
++	crypto_free_aead(tfm);
++	return ERR_PTR(err);
+ }
+ 
+-
+-void ieee80211_aes_key_free(struct crypto_cipher *tfm)
++void ieee80211_aes_key_free(struct crypto_aead *tfm)
+ {
+-	crypto_free_cipher(tfm);
++	crypto_free_aead(tfm);
+ }
+diff --git a/net/mac80211/aes_ccm.h b/net/mac80211/aes_ccm.h
+index 5b7d744..797f3f0 100644
+--- a/net/mac80211/aes_ccm.h
++++ b/net/mac80211/aes_ccm.h
+@@ -12,13 +12,13 @@
+ 
+ #include <linux/crypto.h>
+ 
+-struct crypto_cipher *ieee80211_aes_key_setup_encrypt(const u8 key[]);
+-void ieee80211_aes_ccm_encrypt(struct crypto_cipher *tfm, u8 *scratch,
++struct crypto_aead *ieee80211_aes_key_setup_encrypt(const u8 key[]);
++void ieee80211_aes_ccm_encrypt(struct crypto_aead *tfm, u8 *scratch,
+ 			       u8 *data, size_t data_len,
+ 			       u8 *cdata, u8 *mic);
+-int ieee80211_aes_ccm_decrypt(struct crypto_cipher *tfm, u8 *scratch,
++int ieee80211_aes_ccm_decrypt(struct crypto_aead *tfm, u8 *scratch,
+ 			      u8 *cdata, size_t data_len,
+ 			      u8 *mic, u8 *data);
+-void ieee80211_aes_key_free(struct crypto_cipher *tfm);
++void ieee80211_aes_key_free(struct crypto_aead *tfm);
+ 
+ #endif /* AES_CCM_H */
+diff --git a/net/mac80211/key.h b/net/mac80211/key.h
+index 036d57e..aaae0ed 100644
+--- a/net/mac80211/key.h
++++ b/net/mac80211/key.h
+@@ -83,7 +83,7 @@ struct ieee80211_key {
+ 			 * Management frames.
+ 			 */
+ 			u8 rx_pn[IEEE80211_NUM_TIDS + 1][IEEE80211_CCMP_PN_LEN];
+-			struct crypto_cipher *tfm;
++			struct crypto_aead *tfm;
+ 			u32 replays; /* dot11RSNAStatsCCMPReplays */
+ 		} ccmp;
+ 		struct {
+diff --git a/net/mac80211/wpa.c b/net/mac80211/wpa.c
+index c9edfcb..c3df1d7 100644
+--- a/net/mac80211/wpa.c
++++ b/net/mac80211/wpa.c
+@@ -343,7 +343,7 @@ static void ccmp_special_blocks(struct sk_buff *skb, u8 *pn, u8 *scratch,
+ 		data_len -= IEEE80211_CCMP_MIC_LEN;
+ 
+ 	/* First block, b_0 */
+-	b_0[0] = 0x59; /* flags: Adata: 1, M: 011, L: 001 */
++	b_0[0] = 0x1; /* L == 1 */
+ 	/* Nonce: Nonce Flags | A2 | PN
+ 	 * Nonce Flags: Priority (b0..b3) | Management (b4) | Reserved (b5..b7)
+ 	 */
+@@ -355,21 +355,20 @@ static void ccmp_special_blocks(struct sk_buff *skb, u8 *pn, u8 *scratch,
+ 
+ 	/* AAD (extra authenticate-only data) / masked 802.11 header
+ 	 * FC | A1 | A2 | A3 | SC | [A4] | [QC] */
+-	put_unaligned_be16(len_a, &aad[0]);
+-	put_unaligned(mask_fc, (__le16 *)&aad[2]);
+-	memcpy(&aad[4], &hdr->addr1, 3 * ETH_ALEN);
++	put_unaligned(mask_fc, (__le16 *)&aad[0]);
++	memcpy(&aad[2], &hdr->addr1, 3 * ETH_ALEN);
+ 
+ 	/* Mask Seq#, leave Frag# */
+-	aad[22] = *((u8 *) &hdr->seq_ctrl) & 0x0f;
+-	aad[23] = 0;
++	aad[20] = *((u8 *) &hdr->seq_ctrl) & 0x0f;
++	aad[21] = 0;
+ 
+ 	if (a4_included) {
+-		memcpy(&aad[24], hdr->addr4, ETH_ALEN);
+-		aad[30] = qos_tid;
+-		aad[31] = 0;
++		memcpy(&aad[22], hdr->addr4, ETH_ALEN);
++		aad[28] = qos_tid;
++		aad[29] = 0;
+ 	} else {
+-		memset(&aad[24], 0, ETH_ALEN + IEEE80211_QOS_CTL_LEN);
+-		aad[24] = qos_tid;
++		memset(&aad[22], 0, ETH_ALEN + IEEE80211_QOS_CTL_LEN);
++		aad[22] = qos_tid;
+ 	}
+ }
+ 
 -- 
 1.8.1.2
