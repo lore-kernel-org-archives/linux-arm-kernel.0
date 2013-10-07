@@ -1,61 +1,40 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Mon, 7 Oct 2013 11:19:32 +0300
-Subject: [PATCH v7 09/10] usb: dwc3: omap: manage "usb_otg_ss_refclk960m"
- clock
-In-Reply-To: <20131004132329.GA25648@kroah.com>
-References: <1379508542-22389-1-git-send-email-rogerq@ti.com>
- <1379508542-22389-10-git-send-email-rogerq@ti.com> <52403E02.4070208@ti.com>
- <20131002131113.GM1476@radagast> <524C22A1.30200@ti.com>
- <20131003122941.GD3230@radagast> <524D8516.8000107@ti.com>
- <20131003154144.GA18189@kroah.com> <524E9C70.8050303@ti.com>
- <20131004132329.GA25648@kroah.com>
-Message-ID: <52526E94.7080605@ti.com>
+From: pwalmsley@nvidia.com (Paul Walmsley)
+Date: Mon, 7 Oct 2013 01:26:39 -0700
+Subject: Tegra baseline test results for v3.12-rc4
+Message-ID: <5252703F.40303@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/04/2013 04:23 PM, Greg KH wrote:
-> On Fri, Oct 04, 2013 at 01:46:08PM +0300, Roger Quadros wrote:
->> Greg,
->>
->> On 10/03/2013 06:41 PM, Greg KH wrote:
->>> On Thu, Oct 03, 2013 at 05:54:14PM +0300, Roger Quadros wrote:
->>>> On 10/03/2013 03:29 PM, Felipe Balbi wrote:
->>>>> Hi,
->>>>>
->>>>> On Wed, Oct 02, 2013 at 04:41:53PM +0300, Roger Quadros wrote:
->>>>>> On 10/02/2013 04:11 PM, Felipe Balbi wrote:
->>>>>>> On Mon, Sep 23, 2013 at 04:11:30PM +0300, Roger Quadros wrote:
->>>>>>>> Hi Felipe,
->>>>>>>>
->>>>>>>> On 09/18/2013 03:49 PM, Roger Quadros wrote:
->>>>>>>>> "usb_otg_ss_refclk960m" is an optional functional clock to the
->>>>>>>>> UBS_OTG_SS module. So manage it in the driver.
->>>>>>>>>
->>>>>>>>
->>>>>>>> Just realized that "usb_otg_ss_refclk960m" is in fact functional clock to the 
->>>>>>>> PHY and not USB_OTG_SS module. The name is misleading.
->>>>>>>>
->>>>>>>> So please ignore patch 9 and 10.
->>>>>>>
->>>>>>> ignored. All others are fine, right ?
->>>>>>>
->>>>>> Yes. But I might have to rebase this on top of Phy framework stuff.
->>>>>
->>>>> alright, Greg already took the PHY framework, so maybe we need to just
->>>>> give him my Acked-by and he takes the patches directly as I don't have
->>>>> PYH framework.
->>>>>
->>>> OK. I'll resend this series to Greg in a while.
->>>
->>> It looks like you did, but forgot Felipe's ack :(
->>>
->> I was under the impression that Felipe will explicitly give his Ack there.
->> Should I resend with his Acked-bys?
-> 
-> No need, I took the patches yesterday, you should have seen the
-> automated emails, right?
-> 
-Thanks. Yes, I got the automated e-mails.
+Here are some basic Tegra test results for Linux v3.12-rc4.
+Logs and other details at:
 
-cheers,
--roger
+     http://nvt.pwsan.com/pub/linux/testlogs/test_v3.12-rc4/20131007004737/
+
+
+Test summary
+------------
+
+Build: zImage:
+     Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
+
+Boot to userspace: multi_v7_defconfig:
+     Pass: ( 2/ 2): tegra114-dalmore-headless, tegra30-beaver
+
+Boot to userspace: tegra_defconfig:
+     Pass: ( 2/ 2): tegra114-dalmore-headless, tegra30-beaver
+
+
+vmlinux object size
+(delta in bytes from test_v3.12-rc3 (15c03dd4859ab16f9212238f29dd315654aa94f6)):
+    text     data      bss    total  kernel
+   +5384     +176        0    +5560  multi_v7_defconfig
+   +5009       +8        0    +5017  tegra_defconfig
+
+
+Boot-time memory difference
+(delta in bytes from test_v3.12-rc3 (15c03dd4859ab16f9212238f29dd315654aa94f6))
+     avail    rsrvd     high    freed                board              kconfig                  dtb
+         .        .        .      -4k tegra114-dalmore-hea   multi_v7_defconfig     tegra114-dalmore
+       -8k       8k        .        . tegra114-dalmore-hea      tegra_defconfig     tegra114-dalmore
+         .        .        .      -4k       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
+       -8k       8k        .        .       tegra30-beaver      tegra_defconfig       tegra30-beaver
