@@ -1,35 +1,81 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon,  7 Oct 2013 16:40:28 +0100
-Subject: [PATCH 0/2] ARM/arm64: KVM: Yield CPU when vcpu executes a WFE
-Message-ID: <1381160430-11790-1-git-send-email-marc.zyngier@arm.com>
+Date: Mon,  7 Oct 2013 16:40:29 +0100
+Subject: [PATCH 1/2] ARM: KVM: Yield CPU when vcpu executes a WFE
+In-Reply-To: <1381160430-11790-1-git-send-email-marc.zyngier@arm.com>
+References: <1381160430-11790-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1381160430-11790-2-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is a respin of a patch I posted a long while ago, this time with
-numbers that I hope to be convincing enough.
+On an (even slightly) oversubscribed system, spinlocks are quickly
+becoming a bottleneck, as some vcpus are spinning, waiting for a
+lock to be released, while the vcpu holding the lock may not be
+running at all.
 
-The basic idea is that spinning on WFE in a guest is a waste of
-resource, and that we're better of running another vcpu instead. This
-specially shows when the system is oversubscribed. The guest vcpus can
-be seen spinning, waiting for a lock to be released while the lock
-holder is nowhere near a physical CPU.
+This creates contention, and the observed slowdown is 40x for
+hackbench. No, this isn't a typo.
 
-This patch series just enables WFE trapping on both ARM and arm64, and
-calls kvm_vcpu_on_spin(). This is enough to boost other vcpus, and
-dramatically reduce the overhead.
+The solution is to trap blocking WFEs and tell KVM that we're
+now spinning. This ensures that other vpus will get a scheduling
+boost, allowing the lock to be released more quickly.
 
-Branch available at:
-git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git kvm-arm64/wfe-trap
+>From a performance point of view: hackbench 1 process 1000
 
-Marc Zyngier (2):
-  ARM: KVM: Yield CPU when vcpu executes a WFE
-  arm64: KVM: Yield CPU when vcpu executes a WFE
+2xA15 host (baseline):	1.843s
 
- arch/arm/include/asm/kvm_arm.h   |  4 +++-
- arch/arm/kvm/handle_exit.c       |  6 +++++-
- arch/arm64/include/asm/kvm_arm.h |  8 ++++++--
- arch/arm64/kvm/handle_exit.c     | 18 +++++++++++++-----
- 4 files changed, 27 insertions(+), 9 deletions(-)
+2xA15 guest w/o patch:	2.083s
+4xA15 guest w/o patch:	80.212s
 
+2xA15 guest w/ patch:	2.072s
+4xA15 guest w/ patch:	3.202s
+
+So we go from a 40x degradation to 1.5x, which is vaguely more
+acceptable.
+
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm/include/asm/kvm_arm.h | 4 +++-
+ arch/arm/kvm/handle_exit.c     | 6 +++++-
+ 2 files changed, 8 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/include/asm/kvm_arm.h b/arch/arm/include/asm/kvm_arm.h
+index 64e9696..693d5b2 100644
+--- a/arch/arm/include/asm/kvm_arm.h
++++ b/arch/arm/include/asm/kvm_arm.h
+@@ -67,7 +67,7 @@
+  */
+ #define HCR_GUEST_MASK (HCR_TSC | HCR_TSW | HCR_TWI | HCR_VM | HCR_BSU_IS | \
+ 			HCR_FB | HCR_TAC | HCR_AMO | HCR_IMO | HCR_FMO | \
+-			HCR_SWIO | HCR_TIDCP)
++			HCR_TWE | HCR_SWIO | HCR_TIDCP)
+ #define HCR_VIRT_EXCP_MASK (HCR_VA | HCR_VI | HCR_VF)
+ 
+ /* System Control Register (SCTLR) bits */
+@@ -208,6 +208,8 @@
+ #define HSR_EC_DABT	(0x24)
+ #define HSR_EC_DABT_HYP	(0x25)
+ 
++#define HSR_WFI_IS_WFE		(1U << 0)
++
+ #define HSR_HVC_IMM_MASK	((1UL << 16) - 1)
+ 
+ #define HSR_DABT_S1PTW		(1U << 7)
+diff --git a/arch/arm/kvm/handle_exit.c b/arch/arm/kvm/handle_exit.c
+index df4c82d..c4c496f 100644
+--- a/arch/arm/kvm/handle_exit.c
++++ b/arch/arm/kvm/handle_exit.c
+@@ -84,7 +84,11 @@ static int handle_dabt_hyp(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ static int kvm_handle_wfi(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ {
+ 	trace_kvm_wfi(*vcpu_pc(vcpu));
+-	kvm_vcpu_block(vcpu);
++	if (kvm_vcpu_get_hsr(vcpu) & HSR_WFI_IS_WFE)
++		kvm_vcpu_on_spin(vcpu);
++	else
++		kvm_vcpu_block(vcpu);
++
+ 	return 1;
+ }
+ 
 -- 
 1.8.2.3
