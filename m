@@ -1,52 +1,56 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Mon,  7 Oct 2013 11:29:35 -0500
-Subject: [PATCH v2 27/29] arm64: use common of_flat_dt_get_machine_name
+Date: Mon,  7 Oct 2013 11:29:28 -0500
+Subject: [PATCH v2 20/29] arm: set initrd_start/initrd_end for fdt scan
 In-Reply-To: <1381163377-21044-1-git-send-email-robherring2@gmail.com>
 References: <1381163377-21044-1-git-send-email-robherring2@gmail.com>
-Message-ID: <1381163377-21044-28-git-send-email-robherring2@gmail.com>
+Message-ID: <1381163377-21044-21-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Rob Herring <rob.herring@calxeda.com>
 
-Convert arm64 to use the common of_flat_dt_get_machine_name function.
+In order to unify the initrd scanning for DT across architectures, make
+arm set initrd_start and initrd_end instead of the physical addresses.
+This is aligned with all other architectures.
 
 Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
+Cc: Russell King <linux@arm.linux.org.uk>
 Cc: linux-arm-kernel at lists.infradead.org
+Acked-by: Grant Likely <grant.likely@linaro.org>
 ---
- arch/arm64/kernel/setup.c | 11 +----------
- 1 file changed, 1 insertion(+), 10 deletions(-)
+ arch/arm/mm/init.c | 11 ++++++++---
+ 1 file changed, 8 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-index 7feb0c9..a4ed2d3 100644
---- a/arch/arm64/kernel/setup.c
-+++ b/arch/arm64/kernel/setup.c
-@@ -124,8 +124,6 @@ static void __init setup_processor(void)
+diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+index febaee7..9eeb1cd 100644
+--- a/arch/arm/mm/init.c
++++ b/arch/arm/mm/init.c
+@@ -77,11 +77,11 @@ static int __init parse_tag_initrd2(const struct tag *tag)
  
- static void __init setup_machine_fdt(phys_addr_t dt_phys)
+ __tagtable(ATAG_INITRD2, parse_tag_initrd2);
+ 
+-#ifdef CONFIG_OF_FLATTREE
++#if defined(CONFIG_OF_FLATTREE) && defined(CONFIG_BLK_DEV_INITRD)
+ void __init early_init_dt_setup_initrd_arch(u64 start, u64 end)
  {
--	unsigned long dt_root;
--
- 	if (!dt_phys || !early_init_dt_scan(phys_to_virt(dt_phys))) {
- 		early_print("\n"
- 			"Error: invalid device tree blob at physical address 0x%p (virtual address 0x%p)\n"
-@@ -137,14 +135,7 @@ static void __init setup_machine_fdt(phys_addr_t dt_phys)
- 			cpu_relax();
- 	}
- 
--	dt_root = of_get_flat_dt_root();
--
--	machine_name = of_get_flat_dt_prop(dt_root, "model", NULL);
--	if (!machine_name)
--		machine_name = of_get_flat_dt_prop(dt_root, "compatible", NULL);
--	if (!machine_name)
--		machine_name = "<unknown>";
--	pr_info("Machine: %s\n", machine_name);
-+	machine_name = of_flat_dt_get_machine_name();
+-	phys_initrd_start = start;
+-	phys_initrd_size = end - start;
++	initrd_start = (unsigned long)__va(start);
++	initrd_end = (unsigned long)__va(end);
  }
+ #endif /* CONFIG_OF_FLATTREE */
  
- /*
+@@ -351,6 +351,11 @@ void __init arm_memblock_init(struct meminfo *mi,
+ 	memblock_reserve(__pa(_stext), _end - _stext);
+ #endif
+ #ifdef CONFIG_BLK_DEV_INITRD
++	/* FDT scan will populate initrd_start */
++	if (initrd_start) {
++		phys_initrd_start = __virt_to_phys(initrd_start);
++		phys_initrd_size = initrd_end - initrd_start;
++	}
+ 	if (phys_initrd_size &&
+ 	    !memblock_is_region_memory(phys_initrd_start, phys_initrd_size)) {
+ 		pr_err("INITRD: 0x%08llx+0x%08lx is not a memory region - disabling initrd\n",
 -- 
 1.8.1.2
