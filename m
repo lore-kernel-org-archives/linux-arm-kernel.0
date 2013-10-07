@@ -1,64 +1,42 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 07 Oct 2013 13:28:44 -0600
-Subject: [PATCH v7 1/5] ARM: add basic support for Trusted Foundations
-In-Reply-To: <1380904635-18113-2-git-send-email-acourbot@nvidia.com>
-References: <1380904635-18113-1-git-send-email-acourbot@nvidia.com>
- <1380904635-18113-2-git-send-email-acourbot@nvidia.com>
-Message-ID: <52530B6C.8050605@wwwdotorg.org>
+From: syin@broadcom.com (Sherman Yin)
+Date: Mon, 7 Oct 2013 12:28:25 -0700
+Subject: [PATCH v2 1/4] pinctrl: Add void * to pinctrl_pin_desc
+In-Reply-To: <1381174108-25168-1-git-send-email-syin@broadcom.com>
+References: <1380846199-12829-1-git-send-email-syin@broadcom.com>
+ <1381174108-25168-1-git-send-email-syin@broadcom.com>
+Message-ID: <1381174108-25168-2-git-send-email-syin@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/04/2013 10:37 AM, Alexandre Courbot wrote:
-> Trusted Foundations is a TrustZone-based secure monitor for ARM that
-> can be invoked using the same SMC-based API on all supported
-> platforms. This patch adds initial basic support for Trusted
-> Foundations using the ARM firmware API. Current features are limited
-> to the ability to boot secondary processors.
-> 
-> Note: The API followed by Trusted Foundations does *not* follow the SMC
-> calling conventions. It has nothing to do with PSCI neither and is only
-> relevant to devices that use Trusted Foundations (like most Tegra-based
-> retail devices).
+drv_data is added to the pinctrl_pin_desc for drivers to define additional
+driver-specific per-pin data.
 
-Hmmm. This patch didn't get sent to the DT maintainers. I'm CC'ing them
-all in this reply, and hence quoting the two relevant files in full. I'm
-looking for an ack to take this patch through the Tegra tree.
+Signed-off-by: Sherman Yin <syin@broadcom.com>
+Reviewed-by: Christian Daudt <bcm@fixthebug.org>
+Reviewed-by: Matt Porter <matt.porter@linaro.org>
+---
+Change-Id: I78b2c44b93d88b04897fd0af80ffce213e338d6b
+v2: Use hyphens instead of underscore in DT property names.
+---
+ include/linux/pinctrl/pinctrl.h |    2 ++
+ 1 file changed, 2 insertions(+)
 
-I'm also looking for an ack from perhaps Russell on the code changes in
-the patch.
-
-> diff --git a/Documentation/devicetree/bindings/arm/firmware/tl,trusted-foundations.txt b/Documentation/devicetree/bindings/arm/firmware/tl,trusted-foundations.txt
-> new file mode 100644
-> index 0000000..3954bbd
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/firmware/tl,trusted-foundations.txt
-> @@ -0,0 +1,17 @@
-> +Trusted Foundations
-> +
-> +Boards that use the Trusted Foundations secure monitor can signal its
-> +presence by declaring a node compatible with "tl,trusted-foundations"
-> +under the root node.
-> +
-> +Required properties:
-> +- compatible : "tl,trusted-foundations"
-> +- version-major : major version number of Trusted Foundations firmware
-> +- version-minor: minor version number of Trusted Foundations firmware
-> +
-> +Example:
-> +	firmware {
-> +		compatible = "tl,trusted-foundations";
-> +		version-major = <2>;
-> +		version-minor = <8>;
-> +	};
-> diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-> index 2956800..a374eaa 100644
-> --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
-> +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-> @@ -66,6 +66,7 @@ ste	ST-Ericsson
->  stericsson	ST-Ericsson
->  toumaz	Toumaz
->  ti	Texas Instruments
-> +tl	Trusted Logic
->  toshiba	Toshiba Corporation
->  v3	V3 Semiconductor
->  via	VIA Technologies, Inc.
+diff --git a/include/linux/pinctrl/pinctrl.h b/include/linux/pinctrl/pinctrl.h
+index 5979147..c8e42c4 100644
+--- a/include/linux/pinctrl/pinctrl.h
++++ b/include/linux/pinctrl/pinctrl.h
+@@ -32,10 +32,12 @@ struct device_node;
+  * pins, pads or other muxable units in this struct
+  * @number: unique pin number from the global pin number space
+  * @name: a name for this pin
++ * @drv_data: driver-defined per-pin data. pinctrl core does not touch this
+  */
+ struct pinctrl_pin_desc {
+ 	unsigned number;
+ 	const char *name;
++	void *drv_data;
+ };
+ 
+ /* Convenience macro to define a single named or anonymous pin descriptor */
+-- 
+1.7.9.5
