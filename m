@@ -1,52 +1,50 @@
 From: josephl@nvidia.com (Joseph Lo)
-Date: Mon, 7 Oct 2013 15:31:18 +0800
-Subject: [PATCH 0/7] ARM: tegra: basic support for Tegra124 SoC
-Message-ID: <1381131085-26116-1-git-send-email-josephl@nvidia.com>
+Date: Mon, 7 Oct 2013 15:31:19 +0800
+Subject: [PATCH 1/7] ARM: tegra: add Tegra124 SoC support
+In-Reply-To: <1381131085-26116-1-git-send-email-josephl@nvidia.com>
+References: <1381131085-26116-1-git-send-email-josephl@nvidia.com>
+Message-ID: <1381131085-26116-2-git-send-email-josephl@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Add Tegra124 SoC support that base on CortexA15MP Core.
 
-This series adds basic support for the new Tegra SoC, Tegra124. To bring
-up the system, it also needs an initrd as rootfs. Because most of the
-peripheral not be enabled yet in this series, it depends on the clock and
-pinctrl driver.
+Signed-off-by: Joseph Lo <josephl@nvidia.com>
+---
+ arch/arm/mach-tegra/Kconfig | 8 ++++++++
+ arch/arm/mach-tegra/tegra.c | 1 +
+ 2 files changed, 9 insertions(+)
 
-Here are the commands for U-Boot that I used for booting system to
-console prompt:
-* preparing kernel & initrd image
-mkimage -A arm -T kernel_noload -C none -a 0 -e 0 -d zImage kernel.img
-mkimage -A arm -C none -T ramdisk -a ${initrd_addr} -d rootfs.img.gz rootfs.img
-
-* boot cmd for U-Boot
-setenv bootargs console=ttyS0,115200 loglevel=8 init=/bin/sh
-ext2load mmc ${mmc_dev}:${boot_part} ${kernel_addr_r} kernel.img
-ext2load mmc ${mmc_dev}:${boot_part} ${ramdisk_addr_r} rootfs.img
-ext2load mmc ${mmc_dev}:${boot_part} ${fdt_addr_r} tegra124-venice2.dtb
-bootm ${kernel_addr_r} ${ramdisk_addr_r} ${fdt_addr_r}
-
-Verified on Venice2.
-
-Joseph Lo (7):
-  ARM: tegra: add Tegra124 SoC support
-  ARM: tegra: add chip ID of Tegra124
-  ARM: tegra: add SMP support for Tegra124
-  ARM: tegra: Add initial device tree for Tegra124
-  ARM: tegra: add Venice2 board support
-  HACK: arm: tegra: reuse the Tegra114 clock driver for Tegra124 UART-A
-  ARM: tegra: enable Tegra124 support
-
- arch/arm/boot/dts/Makefile             |   3 +-
- arch/arm/boot/dts/tegra124-venice2.dts |  21 +++++
- arch/arm/boot/dts/tegra124.dtsi        | 140 +++++++++++++++++++++++++++++++++
- arch/arm/configs/tegra_defconfig       |   1 +
- arch/arm/mach-tegra/Kconfig            |   8 ++
- arch/arm/mach-tegra/fuse.h             |   1 +
- arch/arm/mach-tegra/platsmp.c          |   2 +
- arch/arm/mach-tegra/tegra.c            |   1 +
- 8 files changed, 176 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/boot/dts/tegra124-venice2.dts
- create mode 100644 arch/arm/boot/dts/tegra124.dtsi
-
+diff --git a/arch/arm/mach-tegra/Kconfig b/arch/arm/mach-tegra/Kconfig
+index 67a76f2..92272e0 100644
+--- a/arch/arm/mach-tegra/Kconfig
++++ b/arch/arm/mach-tegra/Kconfig
+@@ -61,6 +61,14 @@ config ARCH_TEGRA_114_SOC
+ 	  Support for NVIDIA Tegra T114 processor family, based on the
+ 	  ARM CortexA15MP CPU
+ 
++config ARCH_TEGRA_124_SOC
++	bool "Enable support for Tegra124 family"
++	select ARM_L1_CACHE_SHIFT_6
++	select HAVE_ARM_ARCH_TIMER
++	help
++	  Support for NVIDIA Tegra T124 processor family, based on the
++	  ARM CortexA15MP CPU
++
+ config TEGRA_AHB
+ 	bool "Enable AHB driver for NVIDIA Tegra SoCs"
+ 	default y
+diff --git a/arch/arm/mach-tegra/tegra.c b/arch/arm/mach-tegra/tegra.c
+index 40b031c..80b801a 100644
+--- a/arch/arm/mach-tegra/tegra.c
++++ b/arch/arm/mach-tegra/tegra.c
+@@ -181,6 +181,7 @@ static void __init tegra_dt_init_late(void)
+ }
+ 
+ static const char * const tegra_dt_board_compat[] = {
++	"nvidia,tegra124",
+ 	"nvidia,tegra114",
+ 	"nvidia,tegra30",
+ 	"nvidia,tegra20",
 -- 
 1.8.4
