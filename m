@@ -1,81 +1,41 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon,  7 Oct 2013 15:19:53 +0200
-Subject: [PATCH] ARM: integrator: deactivate timer0 on the Integrator/CP
-Message-ID: <1381151993-5450-1-git-send-email-linus.walleij@linaro.org>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon,  7 Oct 2013 15:19:58 +0200
+Subject: [GIT PULL] ARM: NEON accelerated AES
+Message-ID: <1381151998-7936-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This fixes a long-standing Integrator/CP regression from
-commit 870e2928cf3368ca9b06bc925d0027b0a56bcd8e
-"ARM: integrator-cp: convert use CLKSRC_OF for timer init"
+!! NOTE !!: this series build-depends on patch a62b01cd (crypto: create generic
+version of ablk_helper) which is in linux-next but not yet in mainline.
 
-When this code was introduced, the both aliases pointing the
-system to use timer1 as primary (clocksource) and timer2
-as secondary (clockevent) was ignored, and the system would
-simply use the first two timers found as clocksource and
-clockevent.
+The following changes since commit 15c03dd4859ab16f9212238f29dd315654aa94f6:
 
-However this made the system timeline accelerate by a
-factor x25, as it turns out that the way the clocking
-actually works (totally undocumented and found after some
-trial-and-error) is that timer0 runs @ 25MHz and timer1
-and timer2 runs @ 1MHz. Presumably this divider setting
-is a boot-on default and configurable albeit the way to
-configure it is not documented.
+  Linux 3.12-rc3 (2013-09-29 15:02:38 -0700)
 
-So as a quick fix to the problem, let's mark timer0 as
-disabled, so the code will chose timer1 and timer2 as it
-used to.
+are available in the git repository at:
 
-This also deletes the two aliases for the primary and
-secondary timer as they have been superceded by the
-auto-selection
+  git://git.linaro.org/people/ardbiesheuvel/linux-arm.git arm-aesbs
 
-Cc: stable at vger.kernel.org
-Cc: Rob Herring <rob.herring@calxeda.com>
-Cc: Russell King <linux@arm.linux.org.uk>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
-ARM SoC folks: can you please apply this directly for fixes
-if noone complains? Thanks.
----
- arch/arm/boot/dts/integratorcp.dts | 9 ++++-----
- 1 file changed, 4 insertions(+), 5 deletions(-)
+for you to fetch changes up to e4e7f10bfc4069925e99cc4b428c3434e30b6c3f:
 
-diff --git a/arch/arm/boot/dts/integratorcp.dts b/arch/arm/boot/dts/integratorcp.dts
-index ff1aea0..72693a6 100644
---- a/arch/arm/boot/dts/integratorcp.dts
-+++ b/arch/arm/boot/dts/integratorcp.dts
-@@ -9,11 +9,6 @@
- 	model = "ARM Integrator/CP";
- 	compatible = "arm,integrator-cp";
- 
--	aliases {
--		arm,timer-primary = &timer2;
--		arm,timer-secondary = &timer1;
--	};
--
- 	chosen {
- 		bootargs = "root=/dev/ram0 console=ttyAMA0,38400n8 earlyprintk";
- 	};
-@@ -24,14 +19,18 @@
- 	};
- 
- 	timer0: timer at 13000000 {
-+		/* TIMER0 runs @ 25MHz */
- 		compatible = "arm,integrator-cp-timer";
-+		status = "disabled";
- 	};
- 
- 	timer1: timer at 13000100 {
-+		/* TIMER1 runs @ 1MHz */
- 		compatible = "arm,integrator-cp-timer";
- 	};
- 
- 	timer2: timer at 13000200 {
-+		/* TIMER2 runs @ 1MHz */
- 		compatible = "arm,integrator-cp-timer";
- 	};
- 
--- 
-1.8.3.1
+  ARM: add support for bit sliced AES using NEON instructions (2013-10-04 20:48:38 +0200)
+
+----------------------------------------------------------------
+Ard Biesheuvel (3):
+      ARM: pull in <asm/simd.h> from asm-generic
+      ARM: move AES typedefs and function prototypes to separate header
+      ARM: add support for bit sliced AES using NEON instructions
+
+ arch/arm/crypto/Makefile             |   14 +-
+ arch/arm/crypto/aes_glue.c           |   22 +-
+ arch/arm/crypto/aes_glue.h           |   19 +
+ arch/arm/crypto/aesbs-core.S_shipped | 2544 ++++++++++++++++++++++++++++++++++
+ arch/arm/crypto/aesbs-glue.c         |  434 ++++++
+ arch/arm/crypto/bsaes-armv7.pl       | 2467 +++++++++++++++++++++++++++++++++
+ arch/arm/include/asm/Kbuild          |    1 +
+ crypto/Kconfig                       |   16 +
+ 8 files changed, 5499 insertions(+), 18 deletions(-)
+ create mode 100644 arch/arm/crypto/aes_glue.h
+ create mode 100644 arch/arm/crypto/aesbs-core.S_shipped
+ create mode 100644 arch/arm/crypto/aesbs-glue.c
+ create mode 100644 arch/arm/crypto/bsaes-armv7.pl
