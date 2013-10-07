@@ -1,35 +1,33 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 7 Oct 2013 18:05:48 +0100
-Subject: [PATCH 5/5] DRM: Armada: add support for drm tda19988 driver
-In-Reply-To: <5252DC6C.9060503@gmail.com>
-References: <20131006220728.GG12758@n2100.arm.linux.org.uk>
- <E1VSwYO-0000iT-CU@rmk-PC.arm.linux.org.uk>
- <20131007111807.5e86ea6e@armhf>
- <20131007094404.GI12758@n2100.arm.linux.org.uk>
- <20131007124820.2189a4c3@armhf>
- <20131007110902.GL12758@n2100.arm.linux.org.uk>
- <52529B1A.7060306@gmail.com> <20131007155326.GP21581@sirena.org.uk>
- <5252DC6C.9060503@gmail.com>
-Message-ID: <20131007170548.GR21581@sirena.org.uk>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 7 Oct 2013 10:06:40 -0700
+Subject: [GIT PULL] ARM: mvebu: soc changes for v3.13
+In-Reply-To: <20130930154208.GG31178@titan.lakedaemon.net>
+References: <20130930154208.GG31178@titan.lakedaemon.net>
+Message-ID: <20131007170640.GF15413@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 07, 2013 at 06:08:12PM +0200, Sebastian Hesselbarth wrote:
+On Mon, Sep 30, 2013 at 11:42:08AM -0400, Jason Cooper wrote:
+> Guys,
+> 
+> These are the SoC changes that didn't make it during the last merge
+> window.  As with mvebu/drivers, these have been in -next since 3.12-rc1
+> without issue.
 
-> True, I didn't mention TDM modes squeezing multiple channels into one
-> L/R frame. Neither Dove nor TDA998x support this, but thanks for the
-> clarification.
+I should have looked closer at this before I commented on the PCI branch.
 
-Depending on how the DMA and so on is done you can sometimes still do it
-on the CPU side by lying to the CPU about the data format (eg, tell it
-that two 16 bit samples are actually a 32 bit one) though it gets messy
-for I2S since you need to be able to gather all the left samples and all
-the right samples.  Though given that your CODEC doesn't support it it's
-still all moot anyway as you say.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131007/bd99b77f/attachment.sig>
+> Sebastian Hesselbarth (2):
+>       ARM: dove: switch to DT probed mbus address windows
+>       ARM: dove: remove legacy pcie and clock init
+
+It looks to me like this second patch will need to be based on the PCI branch,
+or you will have broken PCI if this is applied and not the drivers/pci patches,
+right? If so, you need to base this branch on top of the other one, not send
+them separately -- otherwise a git bisect that lands between these two will
+result in a non-booting kernel.
+
+This also explains why you need the PCI patches through arm-soc, so I answered
+my own question. :-)
+
+
+-Olof
