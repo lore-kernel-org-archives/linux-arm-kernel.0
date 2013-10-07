@@ -1,177 +1,28 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 7 Oct 2013 12:17:01 -0700
-Subject: [PATCH 1/2] Documentation: dt: OMAP: standardize SoC naming
- definition
-In-Reply-To: <1381164584-4008-2-git-send-email-nm@ti.com>
-References: <523C9D8B.2000701@ti.com>
- <1381164584-4008-1-git-send-email-nm@ti.com>
- <1381164584-4008-2-git-send-email-nm@ti.com>
-Message-ID: <20131007191700.GZ8949@atomide.com>
+From: davem@davemloft.net (David Miller)
+Date: Mon, 07 Oct 2013 15:17:23 -0400 (EDT)
+Subject: [PATCH v4 net-next] fix unsafe set_memory_rw from softirq
+In-Reply-To: <1381078592.12191.0.camel@edumazet-glaptop.roam.corp.google.com>
+References: <1380870846-3357-1-git-send-email-ast@plumgrid.com>
+ <1381078592.12191.0.camel@edumazet-glaptop.roam.corp.google.com>
+Message-ID: <20131007.151723.1874328502711969492.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Eric Dumazet <eric.dumazet@gmail.com>
+Date: Sun, 06 Oct 2013 09:56:32 -0700
 
-Few comments below.
+> On Fri, 2013-10-04 at 00:14 -0700, Alexei Starovoitov wrote:
+>> on x86 system with net.core.bpf_jit_enable = 1
+> 
+>> cannot reuse jited filter memory, since it's readonly,
+>> so use original bpf insns memory to hold work_struct
+>> 
+>> defer kfree of sk_filter until jit completed freeing
+>> 
+>> tested on x86_64 and i386
+>> 
+>> Signed-off-by: Alexei Starovoitov <ast@plumgrid.com>
+> 
+> Acked-by: Eric Dumazet <edumazet@google.com>
 
-* Nishanth Menon <nm@ti.com> [131007 09:57]:
-> SoC family definitions at the moment are reactive to board needs
-> as a result, beagle-xm would matchup with ti,omap3 which invokes
-> omap3430_init_early instead of omap3630_init_early. Obviously, this is
-> the wrong behavior.
-
-It seems that we should try to queue this as a fix to avoid
-debugging it multiple times as it's actually quite easy to hit this
-one.
-
-So maybe use a subject along lines of:
-
-"ARM: OMAP3: Fix hardware detection for omap3630 when booted with device tree"
-
-And also include these warnings you can get:
-
-omap_hwmod: uart4: cannot clk_get main_clk uart4_fck
-omap_hwmod: uart4: cannot _init_clocks
-
-WARNING: CPU: 0 PID: 1 at arch/arm/mach-omap2/omap_hwmod.c:2434 _init+0x6c/0x80()
-omap_hwmod: uart4: couldn't init clocks
-...
-
-WARNING: CPU: 0 PID: 1 at arch/arm/mach-omap2/omap_hwmod.c:2126 _enable+0x254/0x280()
-omap_hwmod: timer12: enabled state can only be entered from initialized, idle, or disabled state
-...
-
-WARNING: CPU: 0 PID: 46 at arch/arm/mach-omap2/omap_hwmod.c:2224 _idle+0xd4/0xf8()
-omap_hwmod: timer12: idle state can only be entered from enabled state
-
-WARNING: CPU: 0 PID: 1 at arch/arm/mach-omap2/omap_hwmod.c:2126 _enable+0x254/0x280()
-omap_hwmod: uart4: enabled state can only be entered from initialized, idle, or disabled state
-
-And also describe that the outcome is that the system fails to boot.
- 
-> --- a/Documentation/devicetree/bindings/arm/omap/omap.txt
-> +++ b/Documentation/devicetree/bindings/arm/omap/omap.txt
-> @@ -30,6 +30,51 @@ spinlock at 1 {
->      ti,hwmods = "spinlock";
->  };
->  
-> +SoC Type(optional):
-> +- ti,gp	- General Purpose devices
-> +- ti,hs	- High Security devices
-> +
-> +SoC Families:
-> +
-> +- OMAP2 generic - defaults to OMAP2420
-> +  compatible = "ti,omap2"
-> +- OMAP3 generic - defaults to OMAP3430
-> +  compatible = "ti,omap3"
-> +- OMAP4 generic - defaults to OMAP4430
-> +  compatible = "ti,omap4"
-> +- OMAP5 generic - defaults to OMAP5430
-> +  compatible = "ti,omap5"
-> +- DRA7 generic - defaults to DRA742
-> +  compatible = "ti,dra7"
-> +- AM43x generic - defaults to AM437x
-> +  compatible = "ti,am43"
-> +
-> +SoCs:
-> +
-> +- OMAP2420
-> +  compatible = "ti,omap2420", "ti,omap2"
-> +- OMAP2430
-> +  compatible = "ti,omap2430", "ti,omap2"
-> +
-> +- OMAP3430
-> +  compatible = "ti,omap343x", "ti,omap3"
-> +- OMAP3630
-> +  compatible = "ti,omap363x", "ti,omap3"
-> +- AM33xx
-> +  compatible = "ti,am33xx", "ti,omap3"
-> +
-> +- OMAP4430
-> +  compatible = "ti,omap443x", "ti,omap4"
-> +- OMAP4460
-> +  compatible = "ti,omap446x", "ti,omap4"
-> +
-> +- OMAP5430
-> +  compatible = "ti,omap5430", "ti,omap5"
-> +- OMAP5432
-> +  compatible = "ti,omap5432", "ti,omap5"
-> +
-> +- DRA742
-> +  compatible = "ti,dra7xx", "ti,dra7"
->  
->  Boards:
-
-And I would leave the documentation parts out of the fix as
-we're pretty late into the -rc cycle.
-  
-> +++ b/arch/arm/mach-omap2/board-generic.c
-> @@ -113,6 +113,7 @@ MACHINE_END
->  #ifdef CONFIG_ARCH_OMAP3
->  static const char *omap3_boards_compat[] __initdata = {
->  	"ti,omap3",
-> +	"ti,omap343x",
->  	NULL,
->  };
->  
-> @@ -129,6 +130,24 @@ DT_MACHINE_START(OMAP3_DT, "Generic OMAP3 (Flattened Device Tree)")
->  	.restart	= omap3xxx_restart,
->  MACHINE_END
->  
-> +static const char *omap36xx_boards_compat[] __initdata = {
-> +	"ti,omap363x",
-> +	NULL,
-> +};
-
-Why not make it just "ti,omap36xx"? This also applies to 3703
-where the 3 is missing as it does not have the DSP.
-
-> +DT_MACHINE_START(OMAP36xx_DT, "Generic OMAP363x (Flattened Device Tree)")
-
-Upper case OMAP36XX_DT here please like the others have.
-
-> +	.reserve	= omap_reserve,
-> +	.map_io		= omap3_map_io,
-> +	.init_early	= omap3630_init_early,
-> +	.init_irq	= omap_intc_of_init,
-> +	.handle_irq	= omap3_intc_handle_irq,
-> +	.init_machine	= omap_generic_init,
-> +	.init_late	= omap3_init_late,
-> +	.init_time	= omap3_sync32k_timer_init,
-
-Looks like this version has the correct init_time function too :)
-
-> +	.dt_compat	= omap36xx_boards_compat,
-> +	.restart	= omap3xxx_restart,
-> +MACHINE_END
-
-This looks correct to me.
-
->  static const char *omap3_gp_boards_compat[] __initdata = {
->  	"ti,omap3-beagle",
->  	"timll,omap3-devkit8000",
-> @@ -171,6 +190,8 @@ MACHINE_END
->  #ifdef CONFIG_ARCH_OMAP4
->  static const char *omap4_boards_compat[] __initdata = {
->  	"ti,omap4",
-> +	"ti,omap4430",
-> +	"ti,omap4460",
->  	NULL,
->  };
->  
-> @@ -191,6 +212,8 @@ MACHINE_END
->  #ifdef CONFIG_SOC_OMAP5
->  static const char *omap5_boards_compat[] __initdata = {
->  	"ti,omap5",
-> +	"ti,omap5430",
-> +	"ti,omap5432",
->  	NULL,
->  };
-
-I would leave these parts for later, maybe with the documentation
-changes?
-
-Regards,
-
-Tony
+I've decided to apply this to 'net', thanks.
