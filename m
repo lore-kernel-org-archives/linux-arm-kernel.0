@@ -1,77 +1,164 @@
 From: pullip.cho@samsung.com (Cho KyongHo)
-Date: Mon, 07 Oct 2013 10:58:00 +0900
-Subject: [PATCH v10 16/20] iommu/exynos: turn on useful configuration options
-Message-ID: <20131007105800.ab2c86aa52528614188e0719@samsung.com>
+Date: Mon, 07 Oct 2013 10:58:18 +0900
+Subject: [PATCH v10 18/20] iommu/exynos: change rwlock to spinlock
+Message-ID: <20131007105818.916595496f5fa52c5bf372bf@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This turns on ACGEN and SYSSEL.
+Since acquiring read_lock is not more frequent than write_lock, it is
+not beneficial to use rwlock, this commit changes rwlock to spinlock.
 
-ACGEN is architectural clock gating that gates clocks by System MMU
-itself if it is not active. Note that ACGEN is different from clock
-gating by the CPU. ACGEN just gates clocks to the internal logic of
-System MMU while clock gating by the CPU gates clocks to the System
-MMU.
-
-SYSSEL selects System MMU version in some Exynos SoCs. Some Exynos
-SoCs have an option to select System MMU versions exclusively because
-the SoCs adopts new System MMU version experimentally.
-
-This also always selects LRU as TLB replacement policy. Selecting TLB
-replacement policy is deprecated from System MMU 3.2. TLB in System
-MMU 3.3 has single TLB replacement policy, LRU. The bit of MMU_CFG
-selecting TLB replacement policy is remained as reserved.
-
-QoS value of page table walking is set to 15 (highst value). System
-MMU 3.3 can inherit QoS value of page table walking from its master
-H/W's transaction. This new feature is enabled by default and QoS
-value written to MMU_CFG is ignored.
-
+Reviewed-by: Grant Grundler <grundler@chromium.org>
 Signed-off-by: Cho KyongHo <pullip.cho@samsung.com>
 ---
- drivers/iommu/exynos-iommu.c |   20 +++++++++++++++++---
- 1 files changed, 17 insertions(+), 3 deletions(-)
+ drivers/iommu/exynos-iommu.c |   35 ++++++++++++++++++-----------------
+ 1 files changed, 18 insertions(+), 17 deletions(-)
 
 diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
-index d9c5416..03031dc 100644
+index e48c2fb..26ba554 100644
 --- a/drivers/iommu/exynos-iommu.c
 +++ b/drivers/iommu/exynos-iommu.c
-@@ -82,6 +82,11 @@
- #define CTRL_BLOCK	0x7
- #define CTRL_DISABLE	0x0
+@@ -183,7 +183,7 @@ struct sysmmu_drvdata {
+ 	struct clk *clk;
+ 	struct clk *clk_master;
+ 	int activations;
+-	rwlock_t lock;
++	spinlock_t lock;
+ 	struct iommu_domain *domain;
+ 	bool runtime_active;
+ 	unsigned long pgtable;
+@@ -298,11 +298,12 @@ static irqreturn_t exynos_sysmmu_irq(int irq, void *dev_id)
+ 	unsigned long addr = -1;
+ 	int ret = -ENOSYS;
  
-+#define CFG_LRU		0x1
-+#define CFG_QOS(n)	((n & 0xF) << 7)
-+#define CFG_MASK	0x0150FFFF /* Selecting bit 0-15, 20, 22 and 24 */
-+#define CFG_ACGEN	(1 << 24) /* System MMU 3.3 only */
-+#define CFG_SYSSEL	(1 << 22) /* System MMU 3.2 only */
- #define CFG_FLPDCACHE	(1 << 20) /* System MMU 3.2+ only */
+-	read_lock(&data->lock);
+-
+ 	WARN_ON(!is_sysmmu_active(data));
  
- #define REG_MMU_CTRL		0x000
-@@ -372,12 +377,21 @@ static bool __sysmmu_disable(struct sysmmu_drvdata *data)
+ 	clk_enable(data->clk_master);
++
++	spin_lock(&data->lock);
++
+ 	itype = (enum exynos_sysmmu_inttype)
+ 		__ffs(__raw_readl(data->sfrbase + REG_INT_STATUS));
+ 	if (WARN_ON(!((itype >= 0) && (itype < SYSMMU_FAULT_UNKNOWN))))
+@@ -335,7 +336,7 @@ static irqreturn_t exynos_sysmmu_irq(int irq, void *dev_id)
  
- static void __sysmmu_init_config(struct sysmmu_drvdata *data)
- {
--	unsigned long cfg = 0;
-+	unsigned long cfg = CFG_LRU | CFG_QOS(15);
- 	int maj, min = 0;
+ 	clk_disable(data->clk_master);
  
- 	maj = __sysmmu_version(data, &min);
--	if ((maj == 3) && (min > 1))
--		cfg |= CFG_FLPDCACHE;
-+	if (maj == 3) {
-+		if (min >= 2) {
-+			cfg |= CFG_FLPDCACHE;
-+			if (min == 3) {
-+				cfg |= CFG_ACGEN;
-+				cfg &= ~CFG_LRU;
-+			} else {
-+				cfg |= CFG_SYSSEL;
-+			}
-+		}
-+	}
+-	read_unlock(&data->lock);
++	spin_unlock(&data->lock);
  
- 	__raw_writel(cfg, data->sfrbase + REG_MMU_CFG);
+ 	return IRQ_HANDLED;
  }
+@@ -356,7 +357,7 @@ static bool __sysmmu_disable(struct sysmmu_drvdata *data)
+ 	bool disabled;
+ 	unsigned long flags;
+ 
+-	write_lock_irqsave(&data->lock, flags);
++	spin_lock_irqsave(&data->lock, flags);
+ 
+ 	disabled = set_sysmmu_inactive(data);
+ 
+@@ -373,7 +374,7 @@ static bool __sysmmu_disable(struct sysmmu_drvdata *data)
+ 					data->activations);
+ 	}
+ 
+-	write_unlock_irqrestore(&data->lock, flags);
++	spin_unlock_irqrestore(&data->lock, flags);
+ 
+ 	return disabled;
+ }
+@@ -421,7 +422,7 @@ static int __sysmmu_enable(struct sysmmu_drvdata *data,
+ 	int ret = 0;
+ 	unsigned long flags;
+ 
+-	write_lock_irqsave(&data->lock, flags);
++	spin_lock_irqsave(&data->lock, flags);
+ 	if (set_sysmmu_active(data)) {
+ 		data->pgtable = pgtable;
+ 		data->domain = domain;
+@@ -439,7 +440,7 @@ static int __sysmmu_enable(struct sysmmu_drvdata *data,
+ 	if (WARN_ON(ret < 0))
+ 		set_sysmmu_inactive(data); /* decrement count */
+ 
+-	write_unlock_irqrestore(&data->lock, flags);
++	spin_unlock_irqrestore(&data->lock, flags);
+ 
+ 	return ret;
+ }
+@@ -503,7 +504,7 @@ static void sysmmu_tlb_invalidate_entry(struct device *dev, unsigned long iova,
+ 
+ 	data = dev_get_drvdata(client->sysmmu);
+ 
+-	read_lock_irqsave(&data->lock, flags);
++	spin_lock_irqsave(&data->lock, flags);
+ 	if (is_sysmmu_active(data) && data->runtime_active) {
+ 		unsigned int num_inv = 1;
+ 		/*
+@@ -526,7 +527,7 @@ static void sysmmu_tlb_invalidate_entry(struct device *dev, unsigned long iova,
+ 		dev_dbg(dev, "disabled. Skipping TLB invalidation @ %#lx\n",
+ 			iova);
+ 	}
+-	read_unlock_irqrestore(&data->lock, flags);
++	spin_unlock_irqrestore(&data->lock, flags);
+ }
+ 
+ void exynos_sysmmu_tlb_invalidate(struct device *dev)
+@@ -537,7 +538,7 @@ void exynos_sysmmu_tlb_invalidate(struct device *dev)
+ 
+ 	data = dev_get_drvdata(client->sysmmu);
+ 
+-	read_lock_irqsave(&data->lock, flags);
++	spin_lock_irqsave(&data->lock, flags);
+ 	if (is_sysmmu_active(data) && data->runtime_active) {
+ 		clk_enable(data->clk_master);
+ 		if (sysmmu_block(data->sfrbase)) {
+@@ -548,7 +549,7 @@ void exynos_sysmmu_tlb_invalidate(struct device *dev)
+ 	} else {
+ 		dev_dbg(dev, "disabled. Skipping TLB invalidation\n");
+ 	}
+-	read_unlock_irqrestore(&data->lock, flags);
++	spin_unlock_irqrestore(&data->lock, flags);
+ }
+ 
+ static int __init exynos_sysmmu_probe(struct platform_device *pdev)
+@@ -609,7 +610,7 @@ static int __init exynos_sysmmu_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	data->sysmmu = dev;
+-	rwlock_init(&data->lock);
++	spin_lock_init(&data->lock);
+ 
+ 	platform_set_drvdata(pdev, data);
+ 
+@@ -625,11 +626,11 @@ static int sysmmu_suspend(struct device *dev)
+ {
+ 	struct sysmmu_drvdata *data = dev_get_drvdata(dev);
+ 	unsigned long flags;
+-	read_lock_irqsave(&data->lock, flags);
++	spin_lock_irqsave(&data->lock, flags);
+ 	if (is_sysmmu_active(data) &&
+ 		(!pm_runtime_enabled(dev) || data->runtime_active))
+ 		__sysmmu_disable_nocount(data);
+-	read_unlock_irqrestore(&data->lock, flags);
++	spin_unlock_irqrestore(&data->lock, flags);
+ 	return 0;
+ }
+ 
+@@ -637,11 +638,11 @@ static int sysmmu_resume(struct device *dev)
+ {
+ 	struct sysmmu_drvdata *data = dev_get_drvdata(dev);
+ 	unsigned long flags;
+-	read_lock_irqsave(&data->lock, flags);
++	spin_lock_irqsave(&data->lock, flags);
+ 	if (is_sysmmu_active(data) &&
+ 		(!pm_runtime_enabled(dev) || data->runtime_active))
+ 		__sysmmu_enable_nocount(data);
+-	read_unlock_irqrestore(&data->lock, flags);
++	spin_unlock_irqrestore(&data->lock, flags);
+ 	return 0;
+ }
+ #endif
 -- 
 1.7.2.5
