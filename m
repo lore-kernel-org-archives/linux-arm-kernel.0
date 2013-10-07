@@ -1,78 +1,136 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon,  7 Oct 2013 14:12:26 +0200
-Subject: [RFC PATCH 0/5] ARM64: NEON/CE based crypto in atomic contexts
-Message-ID: <1381147951-7609-1-git-send-email-ard.biesheuvel@linaro.org>
+Date: Mon,  7 Oct 2013 14:12:29 +0200
+Subject: [RFC PATCH 3/5] ARM64: add Crypto Extensions based synchronous core
+ AES cipher
+In-Reply-To: <1381147951-7609-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1381147951-7609-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1381147951-7609-4-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I am probably going to be flamed for bringing this up, but here it goes ...
+This implements the core AES cipher using the Crypto Extensions,
+using only NEON register q0 and q1.
 
-This is more of a request for discussion rather than a request for comments on
-these patches.
-
-After floating point and SIMD we now have a third class of instructions that use
-the NEON register file, the AES and SHA instructions that are present in the v8
-Crypto Extensions.
-
-This series uses CCMP as an example to make the case for having limited support
-for the use of the NEON register file in atomic context. CCMP is the encryption
-standard used in WPA2, and it is based on AES in CCM mode, which is basically
-both encryption and authentication by passing all the data through AES twice.
-
-The mac80211 layer, which performs this encryption and decryption, does so in a
-context which does not allow the use of asynchronous ciphers, which in practice
-means that it uses the C implementation (on ARM64), which I expect to be around
-an order of magnitude slower than the dedicated instructions(*).
-
-I have included two ways of working around this: patch #3 implements the core
-AES cipher using only registers q0 and q1. Patch #4 implements the CCM chaining
-mode using registers q0 - q3. (The significance of the latter is that I expect a
-certain degree of interleaving to be required to run the AES instructions at
-full speed, and CCM -while difficult to parallelize- can easily be implemented
-with a 2-way interleave of the encryption and authentication parts.)
-
-Patch #1 implements the stacking of 4 NEON registers (but note that patch #3
-only needs 2 registers). Patch #2 implements emulation of the AES instructions
-(considering how few of us have access to the Fast Model plugin). Patch #5
-modifies the mac80211 code so it relies on the crypto api to supply a CCM
-implementation rather than cooking up its own (latter is compile tested only and
-included for reference)
-
-* On ARM, we have the C implementation which runs in ~64 cycles per round and
-  an accelerated synchronous implementation which runs in ~32 cycles per round
-  (on Cortex-A15), but the latter relies heavily on the barrel shifter so its
-  performance is difficult to extrapolate to ARMv8. It should also be noted that
-  the table based C implementation uses 16kB in lookup tables (8 kB each way).
-
-
-Ard Biesheuvel (5):
-  ARM64: allow limited use of some NEON registers in exceptions
-  ARM64: add quick-n-dirty emulation for AES instructions
-  ARM64: add Crypto Extensions based synchronous core AES cipher
-  ARM64: add Crypto Extensions based synchronous AES in CCM mode
-  mac80211: Use CCM crypto driver for CCMP
-
- arch/arm64/Kconfig              |  14 ++
- arch/arm64/Makefile             |   1 +
- arch/arm64/crypto/Makefile      |  16 ++
- arch/arm64/crypto/aes-sync.c    | 410 ++++++++++++++++++++++++++++++++++++++++
- arch/arm64/crypto/aesce-ccm.S   | 159 ++++++++++++++++
- arch/arm64/crypto/aesce-emu.c   | 221 ++++++++++++++++++++++
- arch/arm64/include/asm/ptrace.h |   3 +
- arch/arm64/include/asm/traps.h  |  10 +
- arch/arm64/kernel/asm-offsets.c |   3 +
- arch/arm64/kernel/entry.S       |  12 +-
- arch/arm64/kernel/traps.c       |  49 +++++
- net/mac80211/Kconfig            |   1 +
- net/mac80211/aes_ccm.c          | 159 +++++-----------
- net/mac80211/aes_ccm.h          |   8 +-
- net/mac80211/key.h              |   2 +-
- net/mac80211/wpa.c              |  21 +-
- 16 files changed, 961 insertions(+), 128 deletions(-)
- create mode 100644 arch/arm64/crypto/Makefile
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ arch/arm64/crypto/Makefile   |  5 +++
+ arch/arm64/crypto/aes-sync.c | 95 ++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 100 insertions(+)
  create mode 100644 arch/arm64/crypto/aes-sync.c
- create mode 100644 arch/arm64/crypto/aesce-ccm.S
- create mode 100644 arch/arm64/crypto/aesce-emu.c
 
+diff --git a/arch/arm64/crypto/Makefile b/arch/arm64/crypto/Makefile
+index f87ec80..e598c0a 100644
+--- a/arch/arm64/crypto/Makefile
++++ b/arch/arm64/crypto/Makefile
+@@ -9,3 +9,8 @@
+ #
+ 
+ obj-y += aesce-emu.o
++
++ifeq ($(CONFIG_KERNEL_MODE_SYNC_CE_CRYPTO),y)
++aesce-sync-y	:= aes-sync.o
++obj-m		+= aesce-sync.o
++endif
+diff --git a/arch/arm64/crypto/aes-sync.c b/arch/arm64/crypto/aes-sync.c
+new file mode 100644
+index 0000000..5c5d641
+--- /dev/null
++++ b/arch/arm64/crypto/aes-sync.c
+@@ -0,0 +1,95 @@
++/*
++ * linux/arch/arm64/crypto/aes-sync.c
++ *
++ * Copyright (C) 2013 Linaro Ltd <ard.biesheuvel@linaro.org>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#include <crypto/aes.h>
++#include <linux/crypto.h>
++#include <linux/module.h>
++
++static void aes_cipher_encrypt(struct crypto_tfm *tfm, u8 dst[], u8 const src[])
++{
++	struct crypto_aes_ctx *ctx = crypto_tfm_ctx(tfm);
++	int rounds = 6 + ctx->key_length / 4;
++
++	__asm__("	.arch		armv8-a+crypto			\n\t"
++		"	ld1		{v0.16b}, [%[in]]		\n\t"
++		"	ld1		{v1.16b}, [%[key]], #16		\n\t"
++		"0:	aese		v0.16b, v1.16b			\n\t"
++		"	subs		%[rounds], %[rounds], #1	\n\t"
++		"	ld1		{v1.16b}, [%[key]], #16		\n\t"
++		"	beq		1f				\n\t"
++		"	aesmc		v0.16b, v0.16b			\n\t"
++		"	b		0b				\n\t"
++		"1:	eor		v0.16b, v0.16b, v1.16b		\n\t"
++		"	st1		{v0.16b}, [%[out]]		\n\t"
++	: :
++		[out]		"r"(dst),
++		[in]		"r"(src),
++		[rounds]	"r"(rounds),
++		[key]		"r"(ctx->key_enc));
++}
++
++static void aes_cipher_decrypt(struct crypto_tfm *tfm, u8 dst[], u8 const src[])
++{
++	struct crypto_aes_ctx *ctx = crypto_tfm_ctx(tfm);
++	int rounds = 6 + ctx->key_length / 4;
++
++	__asm__("	.arch		armv8-a+crypto			\n\t"
++		"	ld1		{v0.16b}, [%[in]]		\n\t"
++		"	ld1		{v1.16b}, [%[key]], #16		\n\t"
++		"0:	aesd		v0.16b, v1.16b			\n\t"
++		"	ld1		{v1.16b}, [%[key]], #16		\n\t"
++		"	subs		%[rounds], %[rounds], #1	\n\t"
++		"	beq		1f				\n\t"
++		"	aesimc		v0.16b, v0.16b			\n\t"
++		"	b		0b				\n\t"
++		"1:	eor		v0.16b, v0.16b, v1.16b		\n\t"
++		"	st1		{v0.16b}, [%[out]]		\n\t"
++	: :
++		[out]		"r"(dst),
++		[in]		"r"(src),
++		[rounds]	"r"(rounds),
++		[key]		"r"(ctx->key_dec));
++}
++
++static struct crypto_alg aes_alg = {
++	.cra_name		= "aes",
++	.cra_driver_name	= "aes-ce",
++	.cra_priority		= 300,
++	.cra_flags		= CRYPTO_ALG_TYPE_CIPHER,
++	.cra_blocksize		= AES_BLOCK_SIZE,
++	.cra_ctxsize		= sizeof(struct crypto_aes_ctx),
++	.cra_module		= THIS_MODULE,
++	.cra_cipher = {
++		.cia_min_keysize	= AES_MIN_KEY_SIZE,
++		.cia_max_keysize	= AES_MAX_KEY_SIZE,
++		.cia_setkey		= crypto_aes_set_key,
++		.cia_encrypt		= aes_cipher_encrypt,
++		.cia_decrypt		= aes_cipher_decrypt
++	}
++};
++
++static int __init aes_mod_init(void)
++{
++	if (0) // TODO check for crypto extensions
++		return -ENODEV;
++	return crypto_register_alg(&aes_alg);
++}
++
++static void __exit aes_mod_exit(void)
++{
++	crypto_unregister_alg(&aes_alg);
++}
++
++module_init(aes_mod_init);
++module_exit(aes_mod_exit);
++
++MODULE_DESCRIPTION("Synchronous AES using ARMv8 Crypto Extensions");
++MODULE_AUTHOR("Ard Biesheuvel <ard.biesheuvel@linaro.org>");
++MODULE_LICENSE("GPL");
 -- 
 1.8.1.2
