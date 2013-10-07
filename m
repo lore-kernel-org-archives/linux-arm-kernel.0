@@ -1,77 +1,85 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Mon, 7 Oct 2013 22:55:56 +0200 (CEST)
-Subject: [PATCH] DMA: extend documentation to provide more API details
-In-Reply-To: <20131007155229.GN2954@intel.com>
-References: <20131005233137.GA12758@n2100.arm.linux.org.uk>
- <20131006052029.GE2954@intel.com>
- <Pine.LNX.4.64.1310071233340.20796@axis700.grange>
- <20131007111728.GM12758@n2100.arm.linux.org.uk>
- <20131007103936.GH2954@intel.com>
- <Pine.LNX.4.64.1310071409080.20796@axis700.grange>
- <20131007142511.GJ2954@intel.com>
- <Pine.LNX.4.64.1310071725300.20796@axis700.grange>
- <20131007144335.GL2954@intel.com>
- <Pine.LNX.4.64.1310071739590.20796@axis700.grange>
- <20131007155229.GN2954@intel.com>
-Message-ID: <Pine.LNX.4.64.1310072244030.27047@axis700.grange>
+From: joshc@codeaurora.org (Josh Cartwright)
+Date: Mon, 7 Oct 2013 16:17:56 -0500
+Subject: [PATCH RFC v2 3/5] spmi: add generic SPMI controller binding
+ documentation
+In-Reply-To: <CAJAp7Oi-bPytsLtsppdanOi_p0Y5vfBriGB-B5by7w5Z7SGU-Q@mail.gmail.com>
+References: <cover.1377202730.git.joshc@codeaurora.org>
+ <e42576b69ef3d4e624fbfa2f32f6f79a931b55d6.1377202730.git.joshc@codeaurora.org>
+ <5217DB0C.7000101@wwwdotorg.org>
+ <20130827170120.GR4035@joshc.qualcomm.com>
+ <521D2047.8030300@wwwdotorg.org>
+ <CAJAp7Oi-bPytsLtsppdanOi_p0Y5vfBriGB-B5by7w5Z7SGU-Q@mail.gmail.com>
+Message-ID: <20131007211756.GA1036@joshc.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 7 Oct 2013, Vinod Koul wrote:
+Hey Bjorn-
 
-> On Mon, Oct 07, 2013 at 05:45:22PM +0200, Guennadi Liakhovetski wrote:
-> > On Mon, 7 Oct 2013, Vinod Koul wrote:
-> > 
-> > > On Mon, Oct 07, 2013 at 05:28:37PM +0200, Guennadi Liakhovetski wrote:
-> > > > > > > > > No, not something in the middle. I was thinking about
-> > > > > > > > > 
-> > > > > > > > > (1) cookie 1-3 are submitted
-> > > > > > > > > (2) cookie 1 succeeds
-> > > > > > > > > (3) a DMA error occurs, cookies 2-3 are discarded
-> > > > > > > discarded using terminate_all right?
-> > > > > > 
-> > > > > > No, by the dmaengine driver as a part of the error processing.
-> > > > > And how will that be done...?
-> > > > 
-> > > > Sorry, I meant - DMA descriptors with cookies #2 and #3 will be cancelled 
-> > > > and recycled by the dmaengine driver. That's what you have to do, when 
-> > > > processing DMA error IRQ.
-> > > Well how do you that?
-> > 
-> > Mmmh, maybe I'm missing something, but isn't it a part of the common DMA 
-> > processing? You get an error IRQ; on some DMAC types this means, that you 
-> > have to reset the hardware, so, you perform whatever actions you have to 
-> > do to reset the controller; you remove any descriptors from the pending 
-> > queue; reinsert them into the free queue and let any clients run on a 
-> > timeout. I don't think it would be a good idea to do anything more smart 
-> > like trying to restart the current transfer or drop it and continue with 
-> > the queue, because we don't know in what state the client hardware is, so, 
-> > we can only let the client driver try to recover.
-> No that would be very wrong thing to do behind clients back. Suppose you got a
-> trasaction which returned error irq and it was generated one half of the
-> requested transfer was done. Redoing the entrie transaction wont be right!
-> 
-> So I think you need to let client know the error status.
-> 
-> But again, is this usage fiarly common?
+On Sat, Oct 05, 2013 at 11:11:36PM -0700, Bjorn Andersson wrote:
+> On Tue, Aug 27, 2013 at 2:55 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> > On 08/27/2013 11:01 AM, Josh Cartwright wrote:
+> > ...
+> > cell 0 - address type (0: master, 1: unique ID, 2: group ID, ...)
+>
+> I think it would make sense to have the master id as a property of the
+> bus,
 
-Hm, I think, the question is different: is this possible and realistic? If 
-there's just one DMAC and one platform, I think, there should be a way to 
-support it? There are controllers, that actually have separate error IRQ 
-outputs and special status bits for them. Actually, see commit
+Except that SPMI supports bus configurations with multiple masters.
+Unless by 'bus' you meant 'bus controller' here?
 
-commit 47a4dc26eeb89a3746f9b1e2092602b40469640a
-Author: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
-Date:   Thu Feb 11 16:50:05 2010 +0000
+> as you could consider this to indicate different buses and then
+> usid, gsid and base being part of the reg.
+>
+> > cell 1 - address value
+>
+> I did hack up Josh patchset to read a reg touple of <usid, base>
+> instead of just usid. I stored the second value in the spmi_device
+> struct for easy access, but maybe it should be done like on
+> codeaurora; in a resource?
+> I believe this looks nice, but as I haven't read the mipi spec I
+> wonder, will there be a case where you don't have an offset/base?
+> Should it just be made optional?
 
-    dmaengine: shdma: fix DMA error handling.
+The SPMI spec says nothing about partitioning up the slave address to
+support multiple functions.  AFAICT, this is a Qualcomm-created
+construct (QPNP) for the 8x41 PMICs.  It's difficult to tell at this
+point whether or not other vendors might implement a similarly
+partitioned scheme.
 
-Which means, there are indeed real life situations when such error IRQs 
-trigger.
+I suspect the intent is that implementations make use of logical slave
+ID for each function in a multi-function device.
 
-Thanks
-Guennadi
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+> Can we make the address <usid, [base]> and have the code populate a
+> resource based on a reg-names property? That way it would be possible
+> to extend it to support gsid in case we want to (would require
+> reg-names though).
+
+It is certainly possible, and, as you've seen, is how the current
+codeaurora.org tree implements SPMI.  But, I'm actually actively trying
+to avoid doing so, as it conflates Qualcomm-implementation details and
+what is actually in the spec (and not just the address space
+partitioning, but also the of_spmi.c[2] parsing must know about
+interrupts, which are _also_ completely outside the SPMI spec).
+
+Instead what I hope to do for v3 is either:
+  A) Make QPNP its own bus type (for which I have a prototyped
+     implementation).  A PMIC driver sits on the SPMI bus and registers
+     itself as a QPNP controller.  QPNP controllers have very
+     simple 8-bit register read/write operations used by QPNP devices.
+  B) Effectively the same as A, but gets rid of a special QPNP bus type
+     and uses mfd/platform devices, similar to other in-tree PMIC drivers
+     (currently working on prototyping this approach)
+
+> With the hack to Josh's patchset I quickly ported qpnp-revision and
+> qpnp-vibrator, and it seems to work quite nicely.
+
+Great! Thanks for testing.
+
+  Josh
+
+1: https://www.codeaurora.org/cgit/quic/la/kernel/msm-3.10/tree/drivers/spmi
+2: https://www.codeaurora.org/cgit/quic/la/kernel/msm-3.10/tree/drivers/of/of_spmi.c
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
