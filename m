@@ -1,64 +1,116 @@
-From: dinguyen@altera.com (Dinh Nguyen)
-Date: Mon, 7 Oct 2013 15:37:29 -0500
-Subject: [PATCH] arm: socfpga: Fix incorrect sdmmc clock name
-In-Reply-To: <20131007201254.7445.8105@quantum>
-References: <1376322134-17408-1-git-send-email-dinguyen@altera.com>
- <20130814054810.GF16635@quad.lixom.net>
- <1376492274.8715.2.camel@linux-builds1> <20131007201254.7445.8105@quantum>
-Message-ID: <1381178249.1584.1.camel@linux-builds1>
+From: nm@ti.com (Nishanth Menon)
+Date: Mon, 7 Oct 2013 15:43:49 -0500
+Subject: [PATCH V3] ARM: OMAP3: Fix hardware detection for omap3630 when
+ booted with device tree
+In-Reply-To: <20131007192009.GA8949@atomide.com>
+References: <20131007192009.GA8949@atomide.com>
+Message-ID: <1381178629-13488-1-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
+SoC family definitions at the moment are reactive to board needs
+as a result, beagle-xm would matchup with ti,omap3 which invokes
+omap3430_init_early instead of omap3630_init_early. Obviously, this is
+the wrong behavior.
 
-On Mon, 2013-10-07 at 13:12 -0700, Mike Turquette wrote:
-> Quoting Dinh Nguyen (2013-08-14 07:57:54)
-> > On Tue, 2013-08-13 at 22:48 -0700, Olof Johansson wrote:
-> > > On Mon, Aug 12, 2013 at 10:42:14AM -0500, dinguyen at altera.com wrote:
-> > > > From: Dinh Nguyen <dinguyen@altera.com>
-> > > > 
-> > > > The SD/MMC clock is named "sdmmc_clk", and NOT "mmc_clk".
-> > > > 
-> > > > Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
-> > > > Cc: Mike Turquette <mturquette@linaro.org>
-> > > > CC: Arnd Bergmann <arnd@arndb.de>
-> > > > CC: Olof Johansson <olof@lixom.net>
-> > > > Cc: Pavel Machek <pavel@denx.de>
-> > > > Cc: linux-arm-kernel at lists.infradead.org
-> > > 
-> > > Hi Dinh,
-> > > 
-> > > Do you want this applied in fixes for 3.11? If so, can you give me a oneliner
-> > > on what the impact here is? mmc doesn't come up at all, or something more
-> > > subtle?
-> > 
-> > Hi Olof,
-> > 
-> > No, this is go into 3.12 as I am still working on the bindings for
-> > SD/MMC.
-> > 
-> > The oneliner: "The SD/MMC driver was intermittently not coming up
-> > because it was not able to get the correct clock."
-> 
-> Olof, did you take this? If not I'll put it into my next batch of fixes
-> for 3.12.
+With clock node dts conversion, we get the following warnings as a
+result and 3630 based platforms fails to boot (uart4 clocks are only
+present in OMAP3630 and not present in OMAP3430):
 
-No, Olof did not get a chance to pick this up for 3.12. I resent the
-patch with the updated commit message for 3.13:
+...
+omap_hwmod: uart4: cannot clk_get main_clk uart4_fck
+omap_hwmod: uart4: cannot _init_clocks
 
-http://lists.infradead.org/pipermail/linux-arm-kernel/2013-September/198824.html
+WARNING: CPU: 0 PID: 1 at arch/arm/mach-omap2/omap_hwmod.c:2434
+_init+0x6c/0x80()
+omap_hwmod: uart4: couldn't init clocks
+...
 
-Thanks,
-Dinh
-> 
-> Regards,
-> Mike
-> 
-> > 
-> > Thanks,
-> > Dinh
-> > > 
-> > > 
-> > > -Olof
-> > >
-> 
+WARNING: CPU: 0 PID: 1 at arch/arm/mach-omap2/omap_hwmod.c:2126
+_enable+0x254/0x280()
+omap_hwmod: timer12: enabled state can only be entered from
+initialized, idle, or disabled state
+...
+
+WARNING: CPU: 0 PID: 46 at arch/arm/mach-omap2/omap_hwmod.c:2224
+_idle+0xd4/0xf8()
+omap_hwmod: timer12: idle state can only be entered from enabled state
+
+WARNING: CPU: 0 PID: 1 at arch/arm/mach-omap2/omap_hwmod.c:2126
+_enable+0x254/0x280()
+omap_hwmod: uart4: enabled state can only be entered from
+initialized, idle, or disabled state
+
+So, add specific compatiblity for 3630 to allow match for Beagle-XM
+platform.
+
+Signed-off-by: Nishanth Menon <nm@ti.com>
+---
+
+Changes in V3 (since v2):
+	- Fix typo in dts :(
+
+V2: https://patchwork.kernel.org/patch/2999111/
+	- based on v3.12-rc4 tag
+	- Update based on Tony's review comments.
+
+V1: http://marc.info/?l=linux-omap&m=138117342909375&w=2
+
+RFC: https://patchwork.kernel.org/patch/2919661/
+
+ arch/arm/boot/dts/omap3-beagle-xm.dts |    2 +-
+ arch/arm/mach-omap2/board-generic.c   |   19 +++++++++++++++++++
+ 2 files changed, 20 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/boot/dts/omap3-beagle-xm.dts b/arch/arm/boot/dts/omap3-beagle-xm.dts
+index 0c514dc..2816bf6 100644
+--- a/arch/arm/boot/dts/omap3-beagle-xm.dts
++++ b/arch/arm/boot/dts/omap3-beagle-xm.dts
+@@ -11,7 +11,7 @@
+ 
+ / {
+ 	model = "TI OMAP3 BeagleBoard xM";
+-	compatible = "ti,omap3-beagle-xm", "ti,omap3-beagle", "ti,omap3";
++	compatible = "ti,omap3-beagle-xm", "ti,omap36xx", "ti,omap3";
+ 
+ 	cpus {
+ 		cpu at 0 {
+diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
+index 39c7838..4fe5b9c 100644
+--- a/arch/arm/mach-omap2/board-generic.c
++++ b/arch/arm/mach-omap2/board-generic.c
+@@ -113,6 +113,7 @@ MACHINE_END
+ #ifdef CONFIG_ARCH_OMAP3
+ static const char *omap3_boards_compat[] __initdata = {
+ 	"ti,omap3",
++	"ti,omap343x",
+ 	NULL,
+ };
+ 
+@@ -129,6 +130,24 @@ DT_MACHINE_START(OMAP3_DT, "Generic OMAP3 (Flattened Device Tree)")
+ 	.restart	= omap3xxx_restart,
+ MACHINE_END
+ 
++static const char *omap36xx_boards_compat[] __initdata = {
++	"ti,omap36xx",
++	NULL,
++};
++
++DT_MACHINE_START(OMAP36XX_DT, "Generic OMAP36xx (Flattened Device Tree)")
++	.reserve	= omap_reserve,
++	.map_io		= omap3_map_io,
++	.init_early	= omap3630_init_early,
++	.init_irq	= omap_intc_of_init,
++	.handle_irq	= omap3_intc_handle_irq,
++	.init_machine	= omap_generic_init,
++	.init_late	= omap3_init_late,
++	.init_time	= omap3_sync32k_timer_init,
++	.dt_compat	= omap36xx_boards_compat,
++	.restart	= omap3xxx_restart,
++MACHINE_END
++
+ static const char *omap3_gp_boards_compat[] __initdata = {
+ 	"ti,omap3-beagle",
+ 	"timll,omap3-devkit8000",
+-- 
+1.7.9.5
