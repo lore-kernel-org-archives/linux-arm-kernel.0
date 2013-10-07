@@ -1,31 +1,76 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Mon, 07 Oct 2013 18:08:12 +0200
-Subject: [PATCH 5/5] DRM: Armada: add support for drm tda19988 driver
-In-Reply-To: <20131007155326.GP21581@sirena.org.uk>
-References: <20131006220728.GG12758@n2100.arm.linux.org.uk>
- <E1VSwYO-0000iT-CU@rmk-PC.arm.linux.org.uk> <20131007111807.5e86ea6e@armhf>
- <20131007094404.GI12758@n2100.arm.linux.org.uk>
- <20131007124820.2189a4c3@armhf>
- <20131007110902.GL12758@n2100.arm.linux.org.uk> <52529B1A.7060306@gmail.com>
- <20131007155326.GP21581@sirena.org.uk>
-Message-ID: <5252DC6C.9060503@gmail.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Mon, 07 Oct 2013 18:09:26 +0200
+Subject: [GIT PULL]clocksource: dw_apb_timer_of: Fix read_sched_clock
+In-Reply-To: <1381159679-6528-1-git-send-email-dinguyen@altera.com>
+References: <1381159679-6528-1-git-send-email-dinguyen@altera.com>
+Message-ID: <5252DCB6.3070805@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/07/2013 05:53 PM, Mark Brown wrote:
-> On Mon, Oct 07, 2013 at 01:29:30PM +0200, Sebastian Hesselbarth wrote:
+On 10/07/2013 05:27 PM, dinguyen at altera.com wrote:
+> From: Dinh Nguyen <dinguyen@altera.com>
 >
->> I2S _can_ support more than two channels, but only if you wire up more
->> DATA lines. Those are not available on Dove, so its I2S is limited to
->> two channel audio.
+> Hi Thomas, John,
 >
-> A lot of devices implement extra channels with TDM rather than with
-> extra wires - you get all the left channels and all the right channels
-> grouped together (like with DSP/PCM modes except the channels are
-> ordered differently).  I'm never sure that's actually useful, though,
-> since it's not something that just works with most hosts that don't
-> understand it in hardware and most of those can do DSP/PCM anyway.
+> I am hoping you can pull in these 2 patches. These 2 patches have been floating
+> around for almost 2 months now. They are needed to get the Altera SOCFPGA
+> booting again because of a DTS binding change in 3.12.
+>
+> The other change was correctly return the current clock counter.
+>
+> The discussion thread can be found here:
+>
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2013-September/198818.html
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2013-September/198903.html
+>
+> This patch does not attempt or change the behaviour of the ordering of how a
+> clocksource or clockevent is use. These 2 patches only enables a platform to boot.
 
-True, I didn't mention TDM modes squeezing multiple channels into one
-L/R frame. Neither Dove nor TDA998x support this, but thanks for the
-clarification.
+John,
+
+I agree with Dinh, these patches fixes a boot issue on Altera SOCFPGA 
+and should be merged.
+
+Thanks
+   -- Daniel
+
+> The following changes since commit 272b98c6455f00884f0350f775c5342358ebb73f:
+>
+>    Linux 3.12-rc1 (2013-09-16 16:17:51 -0400)
+>
+> are available in the git repository at:
+>
+>    git://git.rocketboards.org/linux-socfpga-next.git tags/dw_apb_timer_fix_for_jstultz
+>
+> for you to fetch changes up to c3c3e0d0fee2f4e1a9897094107dd8eae87503fb:
+>
+>    clocksource: dw_apb_timer_of: Fix read_sched_clock (2013-10-07 09:57:15 -0500)
+>
+> ----------------------------------------------------------------
+> dw_apb_timer changes:
+> 	- Move defines from dw_apb_timer.c to include/linux/dw_apb_timer.h
+> 	- The dw_apb_timer implementation is a countdown timer. Fix the code
+> 		to return the correct current counter.
+> 	- Add backwards compatibilty for deprecated "snps,dw-apb-timer-osc"
+> 		and "snps,dw-apb-timer-sp"
+> 	- Add compatiblity for "snps,dw-apb-timer". This is the new binding
+> 		to be used going forward.
+>
+> ----------------------------------------------------------------
+> Dinh Nguyen (2):
+>        clocksource: dw_apb_timer: Move timer defines to header file.
+>        clocksource: dw_apb_timer_of: Fix read_sched_clock
+>
+>   drivers/clocksource/dw_apb_timer.c    |   19 -------------------
+>   drivers/clocksource/dw_apb_timer_of.c |    9 +++++----
+>   include/linux/dw_apb_timer.h          |   19 +++++++++++++++++++
+>   3 files changed, 24 insertions(+), 23 deletions(-)
+>
+
+
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
