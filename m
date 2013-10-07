@@ -1,71 +1,47 @@
-From: victor.kamensky@linaro.org (Victor Kamensky)
-Date: Mon, 7 Oct 2013 09:37:13 -0700
-Subject: [PATCH v2] ARM: tlb: ASID macro should give 32bit result for BE
- correct operation
-In-Reply-To: <5252DA06.8000303@codethink.co.uk>
-References: <1381160903-1248-1-git-send-email-victor.kamensky@linaro.org>
- <5252DA06.8000303@codethink.co.uk>
-Message-ID: <CAA3XUr2wYFL9WAQd9uAJSKK5KhWF3bPzYbh-3x=B3oLVXk79og@mail.gmail.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Mon, 7 Oct 2013 21:18:54 +0530
+Subject: [PATCH] DMA: extend documentation to provide more API details
+In-Reply-To: <Pine.LNX.4.64.1310071725300.20796@axis700.grange>
+References: <20131005190200.GZ12758@n2100.arm.linux.org.uk>
+ <Pine.LNX.4.64.1310052203060.8097@axis700.grange>
+ <20131005233137.GA12758@n2100.arm.linux.org.uk>
+ <20131006052029.GE2954@intel.com>
+ <Pine.LNX.4.64.1310071233340.20796@axis700.grange>
+ <20131007111728.GM12758@n2100.arm.linux.org.uk>
+ <20131007103936.GH2954@intel.com>
+ <Pine.LNX.4.64.1310071409080.20796@axis700.grange>
+ <20131007142511.GJ2954@intel.com>
+ <Pine.LNX.4.64.1310071725300.20796@axis700.grange>
+Message-ID: <20131007154854.GM2954@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7 October 2013 08:57, Ben Dooks <ben.dooks@codethink.co.uk> wrote:
-> On 07/10/13 17:48, Victor Kamensky wrote:
->>
->> Hi Will, Ben, Russell, Thomas,
->>
->> Please review second version of patch that fixes TLB asid issue in big
->> endian
->> V7 image.
->>
->> Changes from v1:
->>     Note previous patch subject line was 'ARM: tlb:
->>     __flush_tlb_mm need to use int asid var for BE correct operation'
->>
->>     Added 'unsigned int' cast into ASID macro itself rather
->>     then use intermediate 'int' variable in __flush_tlb_mm function.
->>     This is done per v1 patch discussion at
->>
->>
->> http://lists.infradead.org/pipermail/linux-arm-kernel/2013-October/202583.html
->>
->> Tested with Linaro BE topic branch on Arndale board. Both LE and BE
->> images were tested.
->
->
-> If you are booting on the Arndale board, is there a patch to mark
-> the relevant Exynos devices as BE capable?
+On Mon, Oct 07, 2013 at 05:28:37PM +0200, Guennadi Liakhovetski wrote:
+> > > > > > No, not something in the middle. I was thinking about
+> > > > > > 
+> > > > > > (1) cookie 1-3 are submitted
+> > > > > > (2) cookie 1 succeeds
+> > > > > > (3) a DMA error occurs, cookies 2-3 are discarded
+> > > > discarded using terminate_all right?
+> > > 
+> > > No, by the dmaengine driver as a part of the error processing.
+> > And how will that be done...?
+> 
+> Sorry, I meant - DMA descriptors with cookies #2 and #3 will be cancelled 
+> and recycled by the dmaengine driver. That's what you have to do, when 
+> processing DMA error IRQ.
+well the term cancel means someone went ahead and requested abort/terminate of a
+transaction...
 
-Arndale need massive fixes in their BSP layer to be endian agnostic
-ARM V7 platform. Unfortunate it is not as simple as with few others
-that already marked as BE capable.
+As we discussed in other mail on this thread the most common occurrence will be
+timeout on client side and client cant cancel selectively.
 
-Please see
-https://git.linaro.org/gitweb?p=people/victor.kamensky/linux-linaro-tracking-be.git;a=shortlog;h=refs/heads/llct-be-topic
-Mostly it is __raw_xxx conversion to xxx_relaxed, but there are
-more subtle changes (some of them similar to changs that you've
-done for other platforms). Also there are known unfixed issues like
-disabling CONFIG_MMC_DW_IDMAC config because idmac
-DMA related code is not endian agnostic yet (btw interesting class
-of BE related problem that was not seen before).
+For dma driver detection error, which is quite rare in slave usages, if people
+think its common for them we cna indicate this thru status in callback. Then
+client will know and doesnt need to query.
 
-In Linaro we use Arndale and Pandaboard as reference platforms
-therefore we have BE BSP fixes in our tree. But I am not sure
-what is fate of those in long term. Also we consider these as
-example of BSP changes that other BSP need to do.
+Recycling cookie has a large space so i dont think we will get confused
+with a recycled one
 
-If Exynos and OMAP owners will have any interest for BE images,
-and would like to see these changes in main line, we gladly
-will work on this. Otherwise changes like this can mess up with
-BSP ongoing drivers development.
-
-I think above position is consistent with similar discussion on
-some of BE related threads - changing BSP to support BE mode
-is BSP owners call.
-
-Thanks,
-Victor
-
-> --
-> Ben Dooks                               http://www.codethink.co.uk/
-> Senior Engineer                         Codethink - Providing Genius
+--
+~Vinod
