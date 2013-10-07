@@ -1,90 +1,189 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Mon, 7 Oct 2013 12:48:20 +0200
-Subject: [PATCH 5/5] DRM: Armada: add support for drm tda19988 driver
-In-Reply-To: <20131007094404.GI12758@n2100.arm.linux.org.uk>
-References: <20131006220728.GG12758@n2100.arm.linux.org.uk>
- <E1VSwYO-0000iT-CU@rmk-PC.arm.linux.org.uk>
- <20131007111807.5e86ea6e@armhf>
- <20131007094404.GI12758@n2100.arm.linux.org.uk>
-Message-ID: <20131007124820.2189a4c3@armhf>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Mon, 7 Oct 2013 12:45:33 +0200 (CEST)
+Subject: [PATCH] DMA: extend documentation to provide more API details
+In-Reply-To: <20131006052029.GE2954@intel.com>
+References: <Pine.LNX.4.64.1310051925170.8097@axis700.grange>
+ <20131005190200.GZ12758@n2100.arm.linux.org.uk>
+ <Pine.LNX.4.64.1310052203060.8097@axis700.grange>
+ <20131005233137.GA12758@n2100.arm.linux.org.uk>
+ <20131006052029.GE2954@intel.com>
+Message-ID: <Pine.LNX.4.64.1310071233340.20796@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 7 Oct 2013 10:44:04 +0100
-Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+On Sun, 6 Oct 2013, Vinod Koul wrote:
 
-> On Mon, Oct 07, 2013 at 11:18:07AM +0200, Jean-Francois Moine wrote:
-	[snip]
-> > It seems we are going backwards: as the Armada based boards will soon
-> > move to full DT (mvebu), you are making an exception for the Cubox, so
-> > that there should be Cubox specific kernels. I don't like that...
-> 
-> *Ignored*.  You know why.
+> Pls keep Dan cced!
 
-Sorry. I don't see why. May you explain again?
+Sure, sorry.
 
-> > > diff --git a/drivers/gpu/drm/armada/armada_drv.c b/drivers/gpu/drm/armada/armada_drv.c
-	[snip]
-> > > +static struct tda998x_encoder_params params = {
-> > > +	/* With 0x24, there is no translation between vp_out and int_vp
-> > > +	FB	LCD out	Pins	VIP	Int Vp
-> > > +	R:23:16	R:7:0	VPC7:0	7:0	7:0[R]
-> > > +	G:15:8	G:15:8	VPB7:0	23:16	23:16[G]
-> > > +	B:7:0	B:23:16	VPA7:0	15:8	15:8[B]
-> > > +	*/
-> > > +	.swap_a = 2,
-> > > +	.swap_b = 3,
-> > > +	.swap_c = 4,
-> > > +	.swap_d = 5,
-> > > +	.swap_e = 0,
-> > > +	.swap_f = 1,
+> On Sun, Oct 06, 2013 at 12:31:37AM +0100, Russell King - ARM Linux wrote:
+> > On Sat, Oct 05, 2013 at 11:00:45PM +0200, Guennadi Liakhovetski wrote:
+> > > On Sat, 5 Oct 2013, Russell King - ARM Linux wrote:
+> > > 
+> > > > On Sat, Oct 05, 2013 at 07:36:20PM +0200, Guennadi Liakhovetski wrote:
+> > > > > +	A DMA transaction descriptor, returned to the user by one of "prep"
+> > > > > +	methods is considered as belogning to the user until it is submitted
+> > > > > +	to the dmaengine driver for transfer. However, it is recommended, that
+> > > > > +	the dmaengine driver keeps references to prepared descriptors too,
+> > > > > +	because if dmaengine_terminate_all() is called at that time, the driver
+> > > > > +	will have to recycle all allocated descriptors for the respective
+> > > > > +	channel.
+> > > > 
+> > > > No.  That's quite dangerous.  think about what can happen.
+> > > > 
+> > > > Thread 1		Thread 2
+> > > > Driver calls prepare
+> > > > 			dmaengine_terminate_all()
+> > > > 				dmaengine driver frees prepared descriptor
+> > > > driver submits descriptor
+> > > > 
+> > > > You now have a descriptor which has been freed submitted to the DMA engine
+> > > > queue.  This will cause chaos.
+> > > 
+> > > Yes, I understand this. So, it is intentional, that after a *_prep_* a 
+> > > descriptor belongs to the user and - if the user fails - it will simply be 
+> > > leaked. A terminate-all shouldn't recycle them and dmaengine driver 
+> > > unbinding is impossible at that time, as long as the user hasn't released 
+> > > the channel. Ok, I can rework the above just to explain this.
 > > 
-> > I still don't agree. You don't need to invert R <-> B for the Cubox at
-> > the tda998x level: this may be done setting as it should be the
-> > CFG_GRA_SWAPRB flag of the lcd register LCD_SPU_DMA_CTRL0.
-> 
-> You are totally and utterly wrong there.  We need R and B presented on
-> their correct lanes to the TDA998x so that the Armadas YUV->RGB
-> conversion works.  Setting CFG_GRA_SWAPRB does not swap the YUV output
-> to match, neither does setting any of the other bits.
-> 
-> CFG_GRA_SWAPRB is all about the _graphics_ _framebuffer_ format, it's got
-> nothing to do at all with how the output is wired.
-
-Then, may you explain why you must swap R/B on simple RGB output?
-
->From your [PATCH 2/5] DRM: Armada: Add Armada DRM driver:
-
-+	FMT(RGB888,	888PACK,	CFG_SWAPRB);
-+	FMT(BGR888,	888PACK,	0);
-
-+	FMT(YUYV,	422PACK,	CFG_YUV2RGB | CFG_SWAPYU | CFG_SWAPUV);
-
-> > > +	.audio_cfg = BIT(2),
-> > > +	.audio_frame[1] = 1,
-> > > +	.audio_format = AFMT_SPDIF,
-> > > +	.audio_sample_rate = 44100,
+> > "the user fails" should be very difficult.  One of the requirements here
+> > is that any "user" submits the prepared descriptor as soon as possible
+> > after preparation.  Some DMA engine implementations hold a spinlock
+> > between preparation and submission so this is absolutely necessary.
 > > 
-> > These values are rather mysterious!
+> > As Dan Williams explained to me, the reason for the separate submission
+> > step is there to allow the callback information to be set.  So literally
+> > any "user" of this should do this:
+> > 
+> > 	desc = prepare();
+> > 	if (!desc)
+> > 		goto failed_to_prepare;
+> > 
+> > 	desc->callback = function;
+> > 	desc->callback_param = param;
+> > 	dmaengine_submit(desc);
+> > 
+> > There should be very little possiblity of the user failing between those
+> > two calls.
+> > 
+> > > > > -   On completion of each DMA operation, the next in queue is started and
+> > > > > -   a tasklet triggered. The tasklet will then call the client driver
+> >           ^^^^^^^^^^^^^^^^^^^^
+> > > > > -   completion callback routine for notification, if set.
+> > > > > +   On completion of each DMA operation, the next active transaction in queue is
+> > > > > +   started and the ISR bottom half, e.g. a tasklet or a kernel thread is
+> > > > > +   triggered.
+> > > > 
+> > > > Or a kernel thread?  I don't think that's right.  It's always been
+> > > > specified that the callback will happen from tasklet context.
+> > > 
+> > > Do you see any problems using, say, a threaded interrupt handler, apart 
+> > > from possible performance issues? That seems to be pretty convenient. 
+> > > Otherwise we should really mandate somewhere, that bottom half processing 
+> > > should take place in a tasklet?
+> > 
+> > The documentation has always stated that callbacks will be made from
+> > tasklet context.  The problem with allowing different contexts from
+> > different drivers is taht spinlocking becomes problematical.  Remember
+> > that we have _bh() variants which lock against tasklets but allow IRQs.
+
+Vinod, Dan, what do you think about the bottom half interrupt processing? 
+Do we want to make the use of a tasklet compulsory or can we also allow 
+other contexts?
+
+> > > > > +   The dmaengine driver also has to check the DMA_CTRL_ACK flag by calling
+> > > > > +   async_tx_test_ack() on the transaction. If the function returns true, i.e.
+> > > > > +   if the transaction either has been flagged from the very beginning, or
+> > > > > +   the user has flagged it later, then the transaction descriptor can be
+> > > > > +   recycled immediately by the dmaengine driver.
+> > > > 
+> > > > "has to check" I think is wrong.  This is optional for slave only drivers,
+> > > > because most slave stuff doesn't use the ACK stuff - that's more for the
+> > > > async_tx APIs.
+> > > 
+> > > "most," but some do? E.g. the mx3_camera driver. Ok, that one is very 
+> > > tightly bound to the respective dmaengine driver. But if there are other 
+> > > slave drivers, using that, that can run on different platforms and use 
+> > > various dmaengine drivers?
+> > 
+> > I'm not aware of any which actually make use of the ack stuff.  Only those
+> > which implement the async_tx must implement this because it gets used for
+> > chaining and dependency stuff.  However, there was a plan to remove this
+> > and replace it with proper refcounting.
+> > 
+> > > > > If the function returns
+> > > > > +   false, the descriptor cannot be recycled yet and the dmaengine driver has
+> > > > > +   to keep polling the descriptor until it is acknowledged by the user.
+> > > > >  
+> > > > >     Interface:
+> > > > >  	void dma_async_issue_pending(struct dma_chan *chan);
+> > > > > @@ -171,6 +192,14 @@ Further APIs:
+> > > > >     discard data in the DMA FIFO which hasn't been fully transferred.
+> > > > >     No callback functions will be called for any incomplete transfers.
+> > > > >  
+> > > > > +   Note:
+> > > > > +	Transactions, aborted by this call are considered as failed. However,
+> > > > > +	if the user requests their status, using dma_async_is_complete() /
+> > > > > +	dma_async_is_complete(), as described below, one of DMA_IN_PROGRESS and
+> > > > > +	DMA_SUCCESS will be returned. So, drivers are advised not to use those
+> > > > > +	calls on transactions, submitted before a call to
+> > > > > +	dmaengine_terminate_all().
+> > > > 
+> > > > The last sentence doesn't make sense.
+> > > 
+> > > Right, sorry, there is a typo in the second line (to remind: this note is 
+> > > for the dmaengine_terminate_all() function):
+> > > 
+> > > +   Note:
+> > > +	Transactions, aborted by this call are considered as failed. However,
+> > > +	if the user requests their status, using dma_async_is_tx_complete() /
+> > > +	dma_async_is_complete(), as described below, one of DMA_IN_PROGRESS and
+> > > +	DMA_SUCCESS will be returned. So, drivers are advised not to use those
+> > > +	calls on transactions, submitted before a call to
+> > > +	dmaengine_terminate_all().
+> If you submit a bunch of descriptors then I see no reason when something in
+> middle failed, the status for first descriptor which succedded is returned as an
+> error even if user aborted the channel. The status query happens for a cookie
+> which represents a descriptor. It doesnt return channel status.
+
+No, not something in the middle. I was thinking about
+
+(1) cookie 1-3 are submitted
+(2) cookie 1 succeeds
+(3) a DMA error occurs, cookies 2-3 are discarded
+(4) cookie 4 is submitted and succeeds
+(5) the user requests status of cookie 2 and gets success back, AFAICS
+
+> > > What I was trying to say, is that if you submit transactions, then 
+> > > terminate them, then try to retrieve their status using 
+> > > dma_async_is_tx_complete() / dma_async_is_complete(), this won't produce 
+> > > the expected DMA_ERROR result, instead, one of DMA_IN_PROGRESS and 
+> > > DMA_SUCCESS will be returned, unless the driver implements some 
+> > > sophisticated .device_tx_status() method.
+> Well the moment you aborted the channel all the previously submitted descriptors
+> can be freed by the driver. So you cant do anything with these. In the client
+> driver care should be taken to drop all the references of descriptors and then
+> terminate the channel.
 > 
-> Also I'm going to ignore this comment, because quite honestly, I think
-> this is worthless.  You haven't investigated how the TDA998x actually
-> gets setup by Rabeeh.
+> > Remember that dmaengine_terminate_all() is targetted to a specific
+> > channel - it terminates all submitted transactions on that channel
+> > and stops any in-process transaction.  It doesn't affect any other
+> > channel on the controller.
+> > 
+> > In the case of slave DMA users, you have to "own" the channel.  This
+> > means it's up to the user to sort out what happens should _they_ call
+> > dmaengine_terminate_all() on it.
+> > 
+> > For non-slave DMA users, I don't believe that terminating transactions
+> > is permitted - they're expected to complete.
+> 
+> -- 
+> ~Vinod
 
-Rabeeh did the most he could to have a working Cubox. He used bad
-written drivers and he had not the time to think about how the drivers
-could be enhanced.
-
-Here is a small story about i2s/spdif: once, I set the tda998x to use
-the spdif input, and at this time, I was using the dummy codec.
-This codec accepts the format 32_LE, as does the audio device, but the
-output cannot go to spdif. Result: no hdmi sound.
-
-Should we restrict the hdmi transmitter to spdif (thus 'no 32 bits
-stream') or to i2s (thus 'no compressed stream') only, or accept both
-i2s and spdif and allow a full range of supported audio streams?
-
--- 
-Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
-Jef		|		http://moinejf.free.fr/
-+
+Thanks
+Guennadi
+---
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
