@@ -1,137 +1,34 @@
 From: nm@ti.com (Nishanth Menon)
-Date: Mon, 7 Oct 2013 11:49:42 -0500
-Subject: [PATCH 1/2] Documentation: dt: OMAP: standardize SoC naming definition
+Date: Mon, 7 Oct 2013 11:49:43 -0500
+Subject: [PATCH 2/2] ARM: dts: omap3-beagle: use 3630 definitions
 In-Reply-To: <1381164584-4008-1-git-send-email-nm@ti.com>
 References: <523C9D8B.2000701@ti.com>
  <1381164584-4008-1-git-send-email-nm@ti.com>
-Message-ID: <1381164584-4008-2-git-send-email-nm@ti.com>
+Message-ID: <1381164584-4008-3-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-SoC family definitions at the moment are reactive to board needs
-as a result, beagle-xm would matchup with ti,omap3 which invokes
-omap3430_init_early instead of omap3630_init_early. Obviously, this is
-the wrong behavior.
-
-Eventually, we will have descriptors match only with SoC types and
-should not contain anything specific to board handling.
+beagle-xm currently would matchup with ti,omap3 which invokes
+omap3430_init_early instead of omap3630_init_early. So add
+compatiblity for 3630 to allow match
 
 Signed-off-by: Nishanth Menon <nm@ti.com>
 ---
- .../devicetree/bindings/arm/omap/omap.txt          |   45 ++++++++++++++++++++
- arch/arm/mach-omap2/board-generic.c                |   23 ++++++++++
- 2 files changed, 68 insertions(+)
+ arch/arm/boot/dts/omap3-beagle-xm.dts |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/arm/omap/omap.txt b/Documentation/devicetree/bindings/arm/omap/omap.txt
-index 91b7049..28b20a2 100644
---- a/Documentation/devicetree/bindings/arm/omap/omap.txt
-+++ b/Documentation/devicetree/bindings/arm/omap/omap.txt
-@@ -30,6 +30,51 @@ spinlock at 1 {
-     ti,hwmods = "spinlock";
- };
+diff --git a/arch/arm/boot/dts/omap3-beagle-xm.dts b/arch/arm/boot/dts/omap3-beagle-xm.dts
+index 0f7cfc5..2079e22 100644
+--- a/arch/arm/boot/dts/omap3-beagle-xm.dts
++++ b/arch/arm/boot/dts/omap3-beagle-xm.dts
+@@ -11,7 +11,7 @@
  
-+SoC Type(optional):
-+- ti,gp	- General Purpose devices
-+- ti,hs	- High Security devices
-+
-+SoC Families:
-+
-+- OMAP2 generic - defaults to OMAP2420
-+  compatible = "ti,omap2"
-+- OMAP3 generic - defaults to OMAP3430
-+  compatible = "ti,omap3"
-+- OMAP4 generic - defaults to OMAP4430
-+  compatible = "ti,omap4"
-+- OMAP5 generic - defaults to OMAP5430
-+  compatible = "ti,omap5"
-+- DRA7 generic - defaults to DRA742
-+  compatible = "ti,dra7"
-+- AM43x generic - defaults to AM437x
-+  compatible = "ti,am43"
-+
-+SoCs:
-+
-+- OMAP2420
-+  compatible = "ti,omap2420", "ti,omap2"
-+- OMAP2430
-+  compatible = "ti,omap2430", "ti,omap2"
-+
-+- OMAP3430
-+  compatible = "ti,omap343x", "ti,omap3"
-+- OMAP3630
-+  compatible = "ti,omap363x", "ti,omap3"
-+- AM33xx
-+  compatible = "ti,am33xx", "ti,omap3"
-+
-+- OMAP4430
-+  compatible = "ti,omap443x", "ti,omap4"
-+- OMAP4460
-+  compatible = "ti,omap446x", "ti,omap4"
-+
-+- OMAP5430
-+  compatible = "ti,omap5430", "ti,omap5"
-+- OMAP5432
-+  compatible = "ti,omap5432", "ti,omap5"
-+
-+- DRA742
-+  compatible = "ti,dra7xx", "ti,dra7"
+ / {
+ 	model = "TI OMAP3 BeagleBoard xM";
+-	compatible = "ti,omap3-beagle-xm", "ti,omap3-beagle", "ti,omap3";
++	compatible = "ti,omap3-beagle-xm", "ti,omap363x", "ti,omap3-beagle", "ti,omap3";
  
- Boards:
- 
-diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
-index 39c7838..c78b070 100644
---- a/arch/arm/mach-omap2/board-generic.c
-+++ b/arch/arm/mach-omap2/board-generic.c
-@@ -113,6 +113,7 @@ MACHINE_END
- #ifdef CONFIG_ARCH_OMAP3
- static const char *omap3_boards_compat[] __initdata = {
- 	"ti,omap3",
-+	"ti,omap343x",
- 	NULL,
- };
- 
-@@ -129,6 +130,24 @@ DT_MACHINE_START(OMAP3_DT, "Generic OMAP3 (Flattened Device Tree)")
- 	.restart	= omap3xxx_restart,
- MACHINE_END
- 
-+static const char *omap36xx_boards_compat[] __initdata = {
-+	"ti,omap363x",
-+	NULL,
-+};
-+
-+DT_MACHINE_START(OMAP36xx_DT, "Generic OMAP363x (Flattened Device Tree)")
-+	.reserve	= omap_reserve,
-+	.map_io		= omap3_map_io,
-+	.init_early	= omap3630_init_early,
-+	.init_irq	= omap_intc_of_init,
-+	.handle_irq	= omap3_intc_handle_irq,
-+	.init_machine	= omap_generic_init,
-+	.init_late	= omap3_init_late,
-+	.init_time	= omap3_sync32k_timer_init,
-+	.dt_compat	= omap36xx_boards_compat,
-+	.restart	= omap3xxx_restart,
-+MACHINE_END
-+
- static const char *omap3_gp_boards_compat[] __initdata = {
- 	"ti,omap3-beagle",
- 	"timll,omap3-devkit8000",
-@@ -171,6 +190,8 @@ MACHINE_END
- #ifdef CONFIG_ARCH_OMAP4
- static const char *omap4_boards_compat[] __initdata = {
- 	"ti,omap4",
-+	"ti,omap4430",
-+	"ti,omap4460",
- 	NULL,
- };
- 
-@@ -191,6 +212,8 @@ MACHINE_END
- #ifdef CONFIG_SOC_OMAP5
- static const char *omap5_boards_compat[] __initdata = {
- 	"ti,omap5",
-+	"ti,omap5430",
-+	"ti,omap5432",
- 	NULL,
- };
- 
+ 	cpus {
+ 		cpu at 0 {
 -- 
 1.7.9.5
