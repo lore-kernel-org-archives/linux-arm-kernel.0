@@ -1,81 +1,128 @@
-From: siarhei.siamashka@gmail.com (Siarhei Siamashka)
-Date: Mon, 7 Oct 2013 15:29:15 +0300
-Subject: [PATCH 3/5] DRM: Armada: Add support for ARGB 32x64 or 64x32
- hardware cursors
-In-Reply-To: <20131007103250.GJ12758@n2100.arm.linux.org.uk>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 7 Oct 2013 13:36:50 +0100
+Subject: [PATCH 5/5] DRM: Armada: add support for drm tda19988 driver
+In-Reply-To: <20131007140327.5bb4863b@armhf>
 References: <20131006220728.GG12758@n2100.arm.linux.org.uk>
- <E1VSwWS-0000i7-4f@rmk-PC.arm.linux.org.uk>
- <20131007110141.27f1ac25@armhf>
- <20131007094008.GH12758@n2100.arm.linux.org.uk>
- <20131007120922.47df03b6@armhf>
- <20131007103250.GJ12758@n2100.arm.linux.org.uk>
-Message-ID: <20131007152915.352cc4b2@i7>
+ <E1VSwYO-0000iT-CU@rmk-PC.arm.linux.org.uk> <20131007111807.5e86ea6e@armhf>
+ <20131007094404.GI12758@n2100.arm.linux.org.uk>
+ <20131007124820.2189a4c3@armhf>
+ <20131007110902.GL12758@n2100.arm.linux.org.uk>
+ <20131007140327.5bb4863b@armhf>
+Message-ID: <20131007123650.GN12758@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 7 Oct 2013 11:32:50 +0100
-Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
-
-> On Mon, Oct 07, 2013 at 12:09:22PM +0200, Jean-Francois Moine wrote:
-> > On Mon, 7 Oct 2013 10:40:08 +0100
-> > Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+On Mon, Oct 07, 2013 at 02:03:27PM +0200, Jean-Francois Moine wrote:
+> On Mon, 7 Oct 2013 12:09:02 +0100
+> Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+> 
+> > > Here is a small story about i2s/spdif: once, I set the tda998x to use
+> > > the spdif input, and at this time, I was using the dummy codec.
+> > > This codec accepts the format 32_LE, as does the audio device, but the
+> > > output cannot go to spdif. Result: no hdmi sound.  
 > > 
-> > > > > This patch adds ARGB hardware cursor support to the DRM driver for the
-> > > > > Marvell Armada SoCs.  ARGB cursors are supported at either 32x64 or
-> > > > > 64x32 resolutions.  
-> > > > 	[snip]
-> > > > 
-> > > > I don't see the interest of such cursors. Actually, most often, the
-> > > > cursors are 64x64 and 'A' is either 0 or 0xff. As the Armada 510
-> > > > supports 64x64 cursors with transparency, it would be more useful to
-> > > > implement these ones...  
-> > > 
-> > > Sorry, you're completely wrong there.  Xorg uses an alphablended cursor.
-> > > This patch is a result of trialling each of the Armada's cursor options
-> > > and this is the only one which results in a reasonable looking cursor.
+> > How ASoC works in this regard is that the capabilities are the _union_ of
+> > the codec and the cpu DAIs.
 > > 
-> > Strange. I am using the 64x64 cursor with transparency of the 510 for
-> > many months and I never saw any problem.
+> > The SPDIF transmitter codec supports 16, 20 and 24 bits per sample but not
+> > 32.  Quite simply, that's because the SPDIF format does not allow 32-bits
+> > per sample.  Therefore, 32_LE is not available for use with audio output,
+> > and userspace must convert down to something which the hardware does
+> > support.
+> > 
+> > "Because I2S can support 32-bit audio" is a poor reason, because you can't
+> > pass 32-bit audio via HDMI due to a subframe being limited to 28 bits - up
+> > to 24 bits for the sample and 4 bits of control/status information.
 > 
-> When I tried it, all cursors had variable alpha, and converting the
-> alpha to a single transparency bit made the cursor look rubbish against
-> certain backgrounds.
-> 
-> > If you absolutely want to have all transparency shades, you should
-> > accept 64x64 cursors and test if they may be rendered as 64x32 or
-> > 32x64, i.e. test that there is only pure transparency in the non-
-> > rendered rectangles...
-> 
-> That is policy, and that is something which can be done by the X server
-> rather than the kernel.  The kernel exposes the hardware capabilities,
-> which are to allow a 64x32 or a 32x64 cursor.  Userspace can make the
-> decision dynamically which it wishes to use.
-> 
-> However, what you're suggesting is dangerous.  What do you do when you're
-> presented with a cursor which is 64x64 ?  Do you:
-> 
-> (a) not display it
-> (b) crash the X server
-> 
-> There isn't a fallback to using software cursors available in the X server
-> because there's no error reporting for a failed hardware cursor update.
+> OK. So, to resume, if both i2s and spdif are furnished by the audio
+> subsystem, the tda998x must use spdif only (with the spdif codec).
 
-Hmm, maybe I'm missing something, but doesn't returning FALSE from
-UseHWCursorARGB just make the X server fallback to using a software
-cursor?
+This is going off-topic because the TDA998x bindings are a subject for
+the TDA998x driver, not the Armada driver.  This data structure merely
+exists to provide the required data for the TDA998x in absence of DT
+information.
 
-https://github.com/ssvb/xf86-video-fbturbo/blob/689c08256555/src/sunxi_disp_hwcursor.c#L72
+To do the job properly - which is what should be done _whenever_ DT
+bindings are being considered - you have to look at the hardware with
+an overview of its capabilities, never at the implementation.
 
-I'm just doing this. And also have hooks to notify the DRI2 code about
-the status of the cursor. In the case if the hardware cursor is not
-enabled, hardware overlays can't be safely used with the software
-cursor and we need to fallback to CPU/GPU copy instead of zero-copy
-buffers swapping.
+So, the TDA998x family needs to be looked at in isolation, and its DT
+bindings need to be considered on its own merit.
 
-And I fully agree that it is the responsibility of the kernel to expose
-as much of the hardware capabilities as possible (without compromising
-reliability and/or security).
+The TDA998x can accept a SPDIF signal on a single pin (on AP6), with or
+without a clock (on AP5), or it can accept I2S: I2S clock in APCLK, I2S
+word select on AP0, and up to four I2S streams on AP1..4 and auxillary
+("internal test") data in AP7.  AP7 should therefore not be used.
 
--- 
-Best regards,
-Siarhei Siamashka
+The TDA19988 is slightly different, because it doesn't have soo many
+AP pins.  Here, SPDIF can be supplied on either AP1 or AP2 with the
+optional clock on AP3.  I2S is similar to the above but only AP1 and
+AP2 accept streams.
+
+I think the I2S is a special case - I'm not aware of anything which
+outputs _four_ synchronised I2S data streams with a common word select.
+Nevertheless, it's something that needs to be considered when creating
+DT bindings.
+
+So, we have some quite different capabilities depending on the device.
+For I2S, we can get away with this:
+
+	tda998x {
+		compatible = "nxp,tda19988", "nxp,tda998x";
+		i2s-source = <&i2s_source N>;
+	};
+
+where N is the number of coherent I2S streams supplied.  For the TDA998x,
+N can be 1 to 4.  For TDA19988, N can be 1 or 2 but no more.
+
+For SPDIF, the situation is more complex.  The TDA19988 could in theory
+have two streams connected, and one of those streams can be selected.
+So, maybe:
+
+	tda998x {
+		compatible = "nxp,tda998x";
+		spdif-source = <&spdif_source>;
+		spdif-has-mclk;
+	};
+
+and for the 19988:
+
+	tda19988 {
+		compatible = "nxp,tda19988";
+		spdif0-source = <&spdif_source0>;
+		spdif0-has-mclk;
+		spdif1-source = <&spdif_source1>;
+		spdif1-has-mclk;
+	};
+
+> Also, from your video swap explanation, the DT will contain some video
+> property(ies) TBD.
+
+The TDA998x needs some properties to define how it is connected to the
+rest of the hardware - which pins are connected to what in terms of the
+colour channel information.  As I hope I've made clear to you, this has
+no bearing on the settings in the Dove for the SWAPRB bits.  This is
+purely only to do with the TDA998x.
+
+So, this also needs to be presented as properties for the TDA998x driver.
+
+> The remaining question is: do we need more audio parameters?
+> 
+> - the audio_cfg value is defined by i2s/spdif (3 or 4)
+
+This should be discovered from the DT binding information, because which
+AP pins get used depends on the signals being supplied to it.
+
+> - the audio_frame[1] value is always 1 (2 channels)
+> - audio_sample_rate is useless
+
+audio_sample_rate comes in if we wish to use a fixed sample rate and
+have coherent video and audio clocks derived from a common source.  That
+allows fixed CTS and N values to be used based on the audio sample rate
+being supplied as the clocks have a fixed known relationship (and aren't
+going to drift.)
+
+However, you are right that this should not be specified in DT - it
+should come from the audio subsystem.  However, that's something which
+is a very very long way away from being possible (if ever) with Linux
+since I don't see the DPCM issues ever getting resolved.
