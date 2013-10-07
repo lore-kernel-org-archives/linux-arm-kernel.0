@@ -1,45 +1,57 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Mon, 7 Oct 2013 11:13:43 -0500
-Subject: [PATCHv7 00/36] ARM: OMAP: clock data conversion to DT
-In-Reply-To: <20131007154103.GW8949@atomide.com>
-References: <1380098922-30340-1-git-send-email-t-kristo@ti.com>
- <524EE00F.7010208@ti.com> <20131007021556.GV8949@atomide.com>
- <52525642.8010307@ti.com> <20131007154103.GW8949@atomide.com>
-Message-ID: <5252DDB7.9080603@ti.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 07 Oct 2013 17:16:30 +0100
+Subject: [PATCH 1/2] ARM: KVM: Yield CPU when vcpu executes a WFE
+In-Reply-To: <52F72A87-9CC3-4B38-ACDA-F5EA66FA7375@suse.de>
+References: <1381160430-11790-1-git-send-email-marc.zyngier@arm.com>
+ <1381160430-11790-2-git-send-email-marc.zyngier@arm.com>
+ <52F72A87-9CC3-4B38-ACDA-F5EA66FA7375@suse.de>
+Message-ID: <5252DE5E.6060700@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/07/2013 10:41 AM, Tony Lindgren wrote:
-> * Tero Kristo <t-kristo@ti.com> [131006 23:43]:
->> On 10/07/2013 05:15 AM, Tony Lindgren wrote:
->>> * Tero Kristo <t-kristo@ti.com> [131004 08:42]:
->>>> Hi,
->>>>
->>>> Just a gentle reminder, anybody have any comments on this series or
->>>> should we start queuing stuff?
->>>
->>> Well omap4 seems to work for me just fine, and omap3 in legacy
->>> mode. But looks like omap3 device tree based booting is breaking
->>> after I pulled in your test branch. I get the following on
->>> 3630 based dm3730.
->>
->> Uart4 breaks because of the issue with basic DT blobs. You need at
->> least this patch:
->>
->> http://linux-kernel.2935.n7.nabble.com/RFC-PATCH-ARM-OMAP3630-Add-generic-machine-descriptor-td722791.html
->>
->> ... from Nishanth to get it to work right. Otherwise the clock init
->> tries to use omap3430 clock data for omap3630 which leaves uart4
->> nodes out.
+On 07/10/13 17:04, Alexander Graf wrote:
 > 
-> OK thanks yes that solves it, I was missing the compatible flag
-> for my not quite ready test boards (3730-evm and zoom3).
-> I'll apply Nishant's fix with some changes.
+> On 07.10.2013, at 17:40, Marc Zyngier <marc.zyngier@arm.com> wrote:
 > 
-I will post out an RFC based on Olof's suggestion in a few mins. will
-be nice to see any deltas needed.
+>> On an (even slightly) oversubscribed system, spinlocks are quickly 
+>> becoming a bottleneck, as some vcpus are spinning, waiting for a 
+>> lock to be released, while the vcpu holding the lock may not be 
+>> running at all.
+>> 
+>> This creates contention, and the observed slowdown is 40x for 
+>> hackbench. No, this isn't a typo.
+>> 
+>> The solution is to trap blocking WFEs and tell KVM that we're now
+>> spinning. This ensures that other vpus will get a scheduling boost,
+>> allowing the lock to be released more quickly.
+>> 
+>>> From a performance point of view: hackbench 1 process 1000
+>> 
+>> 2xA15 host (baseline):	1.843s
+>> 
+>> 2xA15 guest w/o patch:	2.083s 4xA15 guest w/o patch:	80.212s
+>> 
+>> 2xA15 guest w/ patch:	2.072s 4xA15 guest w/ patch:	3.202s
+> 
+> I'm confused. You got from 2.083s when not exiting on spin locks to
+> 2.072 when exiting on _every_ spin lock that didn't immediately
+> succeed. I would've expected to second number to be worse rather than
+> better. I assume it's within jitter, I'm still puzzled why you don't
+> see any significant drop in performance.
 
+The key is in the ARM ARM:
 
+B1.14.9: "When HCR.TWE is set to 1, and the processor is in a Non-secure
+mode other than Hyp mode, execution of a WFE instruction generates a Hyp
+Trap exception if, ignoring the value of the HCR.TWE bit, conditions
+permit the processor to suspend execution."
+
+So, on a non-overcommitted system, you rarely hit a blocking spinlock,
+hence not trapping. Otherwise, performance would go down the drain very
+quickly.
+
+And yes, the difference is pretty much noise.
+
+	M.
 -- 
-Regards,
-Nishanth Menon
+Jazz is not dead. It just smells funny...
