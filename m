@@ -1,136 +1,109 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon,  7 Oct 2013 14:12:29 +0200
-Subject: [RFC PATCH 3/5] ARM64: add Crypto Extensions based synchronous core
- AES cipher
+Date: Mon,  7 Oct 2013 14:12:27 +0200
+Subject: [RFC PATCH 1/5] ARM64: allow limited use of some NEON registers in
+ exceptions
 In-Reply-To: <1381147951-7609-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1381147951-7609-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1381147951-7609-4-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1381147951-7609-2-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This implements the core AES cipher using the Crypto Extensions,
-using only NEON register q0 and q1.
+Stack/unstack the bottom 4 NEON registers on exception entry/exit
+so we can use them in places where we are not allowed to sleep.
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm64/crypto/Makefile   |  5 +++
- arch/arm64/crypto/aes-sync.c | 95 ++++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 100 insertions(+)
- create mode 100644 arch/arm64/crypto/aes-sync.c
+ arch/arm64/Kconfig              | 14 ++++++++++++++
+ arch/arm64/include/asm/ptrace.h |  3 +++
+ arch/arm64/kernel/asm-offsets.c |  3 +++
+ arch/arm64/kernel/entry.S       |  8 ++++++++
+ 4 files changed, 28 insertions(+)
 
-diff --git a/arch/arm64/crypto/Makefile b/arch/arm64/crypto/Makefile
-index f87ec80..e598c0a 100644
---- a/arch/arm64/crypto/Makefile
-+++ b/arch/arm64/crypto/Makefile
-@@ -9,3 +9,8 @@
- #
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index c044548..b97a458 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -98,6 +98,9 @@ config IOMMU_HELPER
+ config KERNEL_MODE_NEON
+ 	def_bool y
  
- obj-y += aesce-emu.o
++config STACK_NEON_REGS_ON_EXCEPTION
++	def_bool n
 +
-+ifeq ($(CONFIG_KERNEL_MODE_SYNC_CE_CRYPTO),y)
-+aesce-sync-y	:= aes-sync.o
-+obj-m		+= aesce-sync.o
-+endif
-diff --git a/arch/arm64/crypto/aes-sync.c b/arch/arm64/crypto/aes-sync.c
-new file mode 100644
-index 0000000..5c5d641
---- /dev/null
-+++ b/arch/arm64/crypto/aes-sync.c
-@@ -0,0 +1,95 @@
-+/*
-+ * linux/arch/arm64/crypto/aes-sync.c
-+ *
-+ * Copyright (C) 2013 Linaro Ltd <ard.biesheuvel@linaro.org>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
+ source "init/Kconfig"
+ 
+ source "kernel/Kconfig.freezer"
+@@ -219,6 +222,17 @@ config FORCE_MAX_ZONEORDER
+ 	default "14" if (ARM64_64K_PAGES && TRANSPARENT_HUGEPAGE)
+ 	default "11"
+ 
++config KERNEL_MODE_SYNC_CE_CRYPTO
++	bool "Support for synchronous crypto ciphers using Crypto Extensions"
++	depends on KERNEL_MODE_NEON
++	select STACK_NEON_REGS_ON_EXCEPTION
++	help
++	  This enables support for using ARMv8 Crypto Extensions instructions
++	  in places where sleeping is not allowed. The synchronous ciphers are
++	  only allowed to use the bottom 4 NEON register q0 - q3, as stacking
++	  the entire NEON register file at every exception is too costly.
 +
-+#include <crypto/aes.h>
-+#include <linux/crypto.h>
-+#include <linux/module.h>
 +
-+static void aes_cipher_encrypt(struct crypto_tfm *tfm, u8 dst[], u8 const src[])
-+{
-+	struct crypto_aes_ctx *ctx = crypto_tfm_ctx(tfm);
-+	int rounds = 6 + ctx->key_length / 4;
-+
-+	__asm__("	.arch		armv8-a+crypto			\n\t"
-+		"	ld1		{v0.16b}, [%[in]]		\n\t"
-+		"	ld1		{v1.16b}, [%[key]], #16		\n\t"
-+		"0:	aese		v0.16b, v1.16b			\n\t"
-+		"	subs		%[rounds], %[rounds], #1	\n\t"
-+		"	ld1		{v1.16b}, [%[key]], #16		\n\t"
-+		"	beq		1f				\n\t"
-+		"	aesmc		v0.16b, v0.16b			\n\t"
-+		"	b		0b				\n\t"
-+		"1:	eor		v0.16b, v0.16b, v1.16b		\n\t"
-+		"	st1		{v0.16b}, [%[out]]		\n\t"
-+	: :
-+		[out]		"r"(dst),
-+		[in]		"r"(src),
-+		[rounds]	"r"(rounds),
-+		[key]		"r"(ctx->key_enc));
-+}
-+
-+static void aes_cipher_decrypt(struct crypto_tfm *tfm, u8 dst[], u8 const src[])
-+{
-+	struct crypto_aes_ctx *ctx = crypto_tfm_ctx(tfm);
-+	int rounds = 6 + ctx->key_length / 4;
-+
-+	__asm__("	.arch		armv8-a+crypto			\n\t"
-+		"	ld1		{v0.16b}, [%[in]]		\n\t"
-+		"	ld1		{v1.16b}, [%[key]], #16		\n\t"
-+		"0:	aesd		v0.16b, v1.16b			\n\t"
-+		"	ld1		{v1.16b}, [%[key]], #16		\n\t"
-+		"	subs		%[rounds], %[rounds], #1	\n\t"
-+		"	beq		1f				\n\t"
-+		"	aesimc		v0.16b, v0.16b			\n\t"
-+		"	b		0b				\n\t"
-+		"1:	eor		v0.16b, v0.16b, v1.16b		\n\t"
-+		"	st1		{v0.16b}, [%[out]]		\n\t"
-+	: :
-+		[out]		"r"(dst),
-+		[in]		"r"(src),
-+		[rounds]	"r"(rounds),
-+		[key]		"r"(ctx->key_dec));
-+}
-+
-+static struct crypto_alg aes_alg = {
-+	.cra_name		= "aes",
-+	.cra_driver_name	= "aes-ce",
-+	.cra_priority		= 300,
-+	.cra_flags		= CRYPTO_ALG_TYPE_CIPHER,
-+	.cra_blocksize		= AES_BLOCK_SIZE,
-+	.cra_ctxsize		= sizeof(struct crypto_aes_ctx),
-+	.cra_module		= THIS_MODULE,
-+	.cra_cipher = {
-+		.cia_min_keysize	= AES_MIN_KEY_SIZE,
-+		.cia_max_keysize	= AES_MAX_KEY_SIZE,
-+		.cia_setkey		= crypto_aes_set_key,
-+		.cia_encrypt		= aes_cipher_encrypt,
-+		.cia_decrypt		= aes_cipher_decrypt
-+	}
-+};
-+
-+static int __init aes_mod_init(void)
-+{
-+	if (0) // TODO check for crypto extensions
-+		return -ENODEV;
-+	return crypto_register_alg(&aes_alg);
-+}
-+
-+static void __exit aes_mod_exit(void)
-+{
-+	crypto_unregister_alg(&aes_alg);
-+}
-+
-+module_init(aes_mod_init);
-+module_exit(aes_mod_exit);
-+
-+MODULE_DESCRIPTION("Synchronous AES using ARMv8 Crypto Extensions");
-+MODULE_AUTHOR("Ard Biesheuvel <ard.biesheuvel@linaro.org>");
-+MODULE_LICENSE("GPL");
+ endmenu
+ 
+ menu "Boot options"
+diff --git a/arch/arm64/include/asm/ptrace.h b/arch/arm64/include/asm/ptrace.h
+index 0dacbbf..17ea483 100644
+--- a/arch/arm64/include/asm/ptrace.h
++++ b/arch/arm64/include/asm/ptrace.h
+@@ -103,6 +103,9 @@ struct pt_regs {
+ 	};
+ 	u64 orig_x0;
+ 	u64 syscallno;
++#ifdef CONFIG_STACK_NEON_REGS_ON_EXCEPTION
++	struct { u64 l, h; } qregs[4];
++#endif
+ };
+ 
+ #define arch_has_single_step()	(1)
+diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
+index 666e231..73c944a 100644
+--- a/arch/arm64/kernel/asm-offsets.c
++++ b/arch/arm64/kernel/asm-offsets.c
+@@ -58,6 +58,9 @@ int main(void)
+   DEFINE(S_PC,			offsetof(struct pt_regs, pc));
+   DEFINE(S_ORIG_X0,		offsetof(struct pt_regs, orig_x0));
+   DEFINE(S_SYSCALLNO,		offsetof(struct pt_regs, syscallno));
++#ifdef CONFIG_STACK_NEON_REGS_ON_EXCEPTION
++  DEFINE(S_QREGS,		offsetof(struct pt_regs, qregs));
++#endif
+   DEFINE(S_FRAME_SIZE,		sizeof(struct pt_regs));
+   BLANK();
+   DEFINE(MM_CONTEXT_ID,		offsetof(struct mm_struct, context.id));
+diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+index 3881fd1..c74dcca 100644
+--- a/arch/arm64/kernel/entry.S
++++ b/arch/arm64/kernel/entry.S
+@@ -58,6 +58,10 @@
+ 	push	x4, x5
+ 	push	x2, x3
+ 	push	x0, x1
++#ifdef CONFIG_STACK_NEON_REGS_ON_EXCEPTION
++	add	x21, sp, #S_QREGS
++	st1	{v0.16b-v3.16b}, [x21]
++#endif
+ 	.if	\el == 0
+ 	mrs	x21, sp_el0
+ 	.else
+@@ -86,6 +90,10 @@
+ 	.endm
+ 
+ 	.macro	kernel_exit, el, ret = 0
++#ifdef CONFIG_STACK_NEON_REGS_ON_EXCEPTION
++	add	x21, sp, #S_QREGS
++	ld1	{v0.16b-v3.16b}, [x21]
++#endif
+ 	ldp	x21, x22, [sp, #S_PC]		// load ELR, SPSR
+ 	.if	\el == 0
+ 	ldr	x23, [sp, #S_SP]		// load return stack pointer
 -- 
 1.8.1.2
