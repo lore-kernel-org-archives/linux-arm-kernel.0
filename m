@@ -1,105 +1,68 @@
-From: arokux@gmail.com (Arokux X)
-Date: Mon, 7 Oct 2013 21:57:50 +0200
-Subject: [linux-sunxi] [PATCH 0/4] Add support for the Allwinner A31 Reset
- Controllers
-In-Reply-To: <20131007142603.GE3106@lukather>
-References: <1380983960-11087-1-git-send-email-maxime.ripard@free-electrons.com>
- <CAPNxggaUW1B8Ea-gSo+XV2P9s4MRa1L25_ZAvOWyLN6VqQ6wsQ@mail.gmail.com>
- <20131006082917.GD3106@lukather>
- <CAPNxggb_dhQWPDkO_7LVyyn5537tDThtBU5SY1oZfZhri0QacQ@mail.gmail.com>
- <20131007142603.GE3106@lukather>
-Message-ID: <CAPNxggZX+cXpXL4DZstaNm=68=pc=kLUYYZpERLMO9=i3en5Gw@mail.gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 07 Oct 2013 13:03:13 -0700
+Subject: Bug: kbuild always rebuilds compressed images on ARM
+In-Reply-To: <20131005131706.GY12758@n2100.arm.linux.org.uk>
+References: <20131005131706.GY12758@n2100.arm.linux.org.uk>
+Message-ID: <52531381.8070607@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> We could do that by overriding the default of_xlate function. I'm not
-> exactly convinced it makes sense in that case, since bogus data will
-> possibly come from the DT, and in that case, you are screwed.
+On 10/05/13 06:17, Russell King - ARM Linux wrote:
+> Hi,
+>
+> I've noticed that kbuild always rebuilds the compressed piggy image
+> on ARM.  Here's the output from running make with V=2:
+>
+>   CALL    /home/rmk/git/linux-rmk/scripts/checksyscalls.sh - due to target missing
+>   CHK     include/generated/compile.h
+>   Kernel: arch/arm/boot/Image is ready
+>   Building modules, stage 2.
+>   LZO     arch/arm/boot/compressed/piggy.lzo - due to command line change
+>   MODPOST 17 modules - due to target is PHONY
+>   AS      arch/arm/boot/compressed/piggy.lzo.o - due to: arch/arm/boot/compressed/piggy.lzo
+>   LD      arch/arm/boot/compressed/vmlinux - due to: arch/arm/boot/compressed/piggy.lzo.o
+>   OBJCOPY arch/arm/boot/zImage - due to: arch/arm/boot/compressed/vmlinux
+>   Kernel: arch/arm/boot/zImage is ready
+>
+> and with V=1:
+>
+> ...
+> make -f /home/rmk/git/linux-rmk/scripts/Makefile.build obj=arch/arm/boot/compressed arch/arm/boot/compressed/vmlinux
+> make -f /home/rmk/git/linux-rmk/scripts/Makefile.modpost
+>   find .tmp_versions -name '*.mod' | xargs -r grep -h '\.ko$' | sort -u | sed 's/\.ko$/.o/' | scripts/mod/modpost -m -a -o /home/rmk/git/build/imx6/Module.symvers    -S  -s -T -
+>   (cat arch/arm/boot/compressed/../Image | lzop -9 && printf \\010\\224\\034\\002) > arch/arm/boot/compressed/piggy.lzo || (rm -f arch/arm/boot/compressed/piggy.lzo ; false)
 
-Yes, I agree it makes little sense to override of_xlate function.
+There are double slashes here '\\'
+
+> make -f /home/rmk/git/linux-rmk/scripts/Makefile.fwinst obj=firmware __fw_modbuild
+> ...
+>
+> The arch/arm/boot/compressed/.piggy.lzo.cmd file contains this:
+>
+> cmd_arch/arm/boot/compressed/piggy.lzo := (cat arch/arm/boot/compressed/../Image | lzop -9 && printf \\\\010\\\\224\\\\034\\\\002) > arch/arm/boot/compressed/piggy.lzo || (rm -f arch/arm/boot/compressed/piggy.lzo ; false)
+
+But then there are quadruple slashes here '\\\\'. That seems to be
+causing kbuild to rebuild each time.
 
 >
->> Let me now ask how I should go about my reset bits.
->>
->> So far you were dealing with the registers where all the bits were
->> used for reset bits. In the case of USB clock module (and several
->> others) only several bits are reset bits. So I will proceed to use
->> your new driver like this (here, for the sake of clarity I use names
->> for registers and reset bits)
->>
->> +               usb_rst: reset at USB_CLK_REG {
->> +                       #reset-cells = <1>;
->> +                       compatible = "allwinner,sun4i-a10-usb-reset";
->> +                       reg = <USB_CLK_REG 0x4>;
->> +               };
->>
->> And somewhere in the EHCI/OHCI binding:
->>
->>                  ohci0: .... {
->>                           ...
->> +                       resets = <&usb_rst USB0_RESET_BIT>;
->>                           ...
->>                 }
->>
->>                  ehci0: .... {
->>                           ...
->> +                       resets = <&usb_rst USB0_RESET_BIT>;
->>                           ...
->>                 }
->>
->> If I understand right, here is the problem with this approach. As you
->> see ohci0/ehci0 are sharing the very same bit. So if device_reset is
->> used in both ohci0/ehci0 kernel modules we will have a situation where
->> one kernel module will reset the hardware used by the other kernel
->> module. The problem is that reset bit really belongs to a USB PHY,
->> which is shared between ohci0/ehci0. So as it looks like I would need
->> to add another module that handles USB PHY?
->>
->>                  usb0-phy: {
->>                           resets = <&usb_rst USB0_RESET_BIT>;
->>                  }
->>
->>                  ohci0: .... {
->>                           ...
->> +                       phy = <&usb0-phy>
->>                           ...
->>                 }
->>
->>                  ehci0: .... {
->>                           ...
->> +                       phy = <&usb0-phy>
->>                           ...
->>                 }
->
-> Are those ohci and ehci nodes the same IP?
-As far as I understand - yes.
+> Any ideas why it thinks that the command has changed?
 
-> Anyway, it seems like it's the way to go, yes. There's a USB PHY
-> framework in review right now: https://lwn.net/Articles/548814/
+This hack seems to work, but I'm not convinced it's the right solution.
 
-Thanks a lot for this pointer. This is actually merged already and is
-currently in Greg's usb-next tree
+diff --git a/scripts/Kbuild.include b/scripts/Kbuild.include
+index 547e15d..bfc0b79 100644
+--- a/scripts/Kbuild.include
++++ b/scripts/Kbuild.include
+@@ -209,7 +209,7 @@ endif
+ # >$< substitution to preserve $ when reloading .cmd file
+ # note: when using inline perl scripts [perl -e '...$$t=1;...']
+ # in $(cmd_xxx) double $$ your perl vars
+-make-cmd = $(subst \\,\\\\,$(subst \#,\\\#,$(subst $$,$$$$,$(call escsq,$(cmd_$(1))))))
++make-cmd = $(subst \#,\\\#,$(subst $$,$$$$,$(call escsq,$(cmd_$(1)))))
+ 
+ # Find any prerequisites that is newer than target or that does not exist.
+ # PHONY targets skipped in both cases.
 
-https://git.kernel.org/cgit/linux/kernel/git/gregkh/usb.git/commit/?h=usb-next&id=ff764963479a1b18721ab96e531404c50fefe8b1
-
-So I'd need to use yet another framework in my miniature glue
-driver... it actually only touches a bunch of registers. :)
-
->> By the way, now you can see the advantages of the semantics that clock
->> framework is offering. If several devices want to disable a clock it
->> will only be disabled if no other devices are using it. Reset
->> framework does not offer this feature.
->
-> Good thing we have the code and that we can patch it then.
-What do you mean?
-
-> However, it's
-> not much of a problem in our case, since both drivers will only want to
-> deassert the reset.
-
-It is a problem, since there will be two different modules one for
-ohci and the other for ehci. So if you unload ohci for example it will
-assert (write 0 to) the reset register. The ehci module will get into
-trouble then.
-
-Best regards
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
