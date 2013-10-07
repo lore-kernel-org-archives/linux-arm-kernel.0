@@ -1,75 +1,33 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 7 Oct 2013 08:44:54 -0500
-Subject: [PATCH v8 06/12] ARM: dts: Add description of System MMU of
- Exynos SoCs
-In-Reply-To: <003c01ce89f3$3abc4bc0$b034e340$@samsung.com>
-References: <003c01ce89f3$3abc4bc0$b034e340$@samsung.com>
-Message-ID: <CAL_JsqLny8sOgn9y0Tm9-Vq_3YPdtqkr5nTJ67Y0Zx1hDmduNQ@mail.gmail.com>
+From: rogerq@ti.com (Roger Quadros)
+Date: Mon, 7 Oct 2013 16:49:41 +0300
+Subject: [PATCH 1/1] ARM: dts: omap3: Adapt USB OTG to generic PHY
+ framework
+In-Reply-To: <5252B9C7.5040109@linutronix.de>
+References: <1381152493-28055-1-git-send-email-rogerq@ti.com>
+ <1381152493-28055-2-git-send-email-rogerq@ti.com>
+ <5252B9C7.5040109@linutronix.de>
+Message-ID: <5252BBF5.1060406@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 26, 2013 at 6:28 AM, Cho KyongHo <pullip.cho@samsung.com> wrote:
-> Signed-off-by: Cho KyongHo <pullip.cho@samsung.com>
-> ---
->  .../bindings/iommu/samsung,exynos4210-sysmmu.txt   |  103 +++++++
->  arch/arm/boot/dts/exynos4.dtsi                     |  122 ++++++++
->  arch/arm/boot/dts/exynos4210.dtsi                  |   25 ++
->  arch/arm/boot/dts/exynos4x12.dtsi                  |   76 +++++
->  arch/arm/boot/dts/exynos5250.dtsi                  |  291 ++++++++++++++++++++
->  5 files changed, 617 insertions(+), 0 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/iommu/samsung,exynos4210-sysmmu.txt
->
-> diff --git a/Documentation/devicetree/bindings/iommu/samsung,exynos4210-sysmmu.txt
-> b/Documentation/devicetree/bindings/iommu/samsung,exynos4210-sysmmu.txt
-> new file mode 100644
-> index 0000000..92f0a33
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/iommu/samsung,exynos4210-sysmmu.txt
-> @@ -0,0 +1,103 @@
-> +Samsung Exynos4210 IOMMU H/W, System MMU (System Memory Management Unit)
-> +
-> +Samsung's Exynos architecture contains System MMU that enables scattered
-> +physical memory chunks visible as a contiguous region to DMA-capable peripheral
-> +devices like MFC, FIMC, FIMD, GScaler, FIMC-IS and so forth.
-> +
-> +System MMU is a sort of IOMMU and support identical translation table format to
-> +ARMv7 translation tables with minimum set of page properties including access
-> +permissions, shareability and security protection. In addition, System MMU has
-> +another capabilities like L2 TLB or block-fetch buffers to minimize translation
-> +latency.
-> +
-> +A System MMU is dedicated to a single master peripheral device.  Thus, it is
-> +important to specify the correct System MMU in the device node of its master
-> +device. Whereas a System MMU is dedicated to a master device, the master device
-> +may have more than one System MMU.
-> +
-> +Required properties:
-> +- compatible: Should be "samsung,exynos4210-sysmmu"
-> +- reg: A tuple of base address and size of System MMU registers.
-> +- interrupt-parent: The phandle of the interrupt controller of System MMU
-> +- interrupts: A tuple of numbers that indicates the interrupt source.
-> +- clock-names: Should be "sysmmu" if the System MMU is needed to gate its clock.
-> +               Please refer to the following documents:
-> +              Documentation/devicetree/bindings/clock/clock-bindings.txt
-> +              Documentation/devicetree/bindings/clock/exynos4-clock.txt
-> +              Documentation/devicetree/bindings/clock/exynos5250-clock.txt
-> +              Optional "master" if the clock to the System MMU is gated by
-> +              another gate clock other than "sysmmu". The System MMU driver
-> +              sets "master" the parent of "sysmmu".
-> +              Exynos4 SoCs, there needs no "master" clocks.
-> +              Exynos5 SoCs, some System MMUs must have "master" clocks.
-> +- clocks: Required if the System MMU is needed to gate its clock.
-> +         Please refer to the documents listed above.
-> +- samsung,power-domain: Required if the System MMU is needed to gate its power.
-> +         Please refer to the following document:
-> +         Documentation/devicetree/bindings/arm/exynos/power_domain.txt
-> +
-> +Required properties for the master peripheral devices:
-> +- iommu: phandles to the System MMUs of the device
+On 10/07/2013 04:40 PM, Sebastian Andrzej Siewior wrote:
+> On 10/07/2013 03:28 PM, Roger Quadros wrote:
+>> The generic PHY framewrok expects different properties than the
+>> old USB PHY framework. Supply those properties.
+>>
+>> Fixes USB OTG port on GAT04 and N900 after the Generic PHY framework was
+>> merged in greg/usb-next. [1]
+> 
+> Would it be much pain (and do we want this at all) to add a fallback
+> into the kernel or at least a printk pointing out to update the .dts
+> for two releases or so? So the user does not need to spent hours to
+> figure out why it suddenly stopped working.
+> 
 
-You have not addressed my comments from the last version. We do not
-need 2 (or more) different ways to describe the connection between
-masters and iommu's. Use mmu-masters property here to describe the
-connection.
+I agree with you. 
 
-Rob
+Also, figuring out which kernel configs to enable for
+USB OTG to work on OMAP is a pain in itself to the user.
+
+cheers,
+-roger
