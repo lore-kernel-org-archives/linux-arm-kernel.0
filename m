@@ -1,44 +1,29 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 7 Oct 2013 09:31:47 -0700
-Subject: [GIT PULL] DaVinci SoC updates for v3.13
-In-Reply-To: <5244C2B4.7060900@ti.com>
-References: <524228F9.50104@ti.com>
- <5244C2B4.7060900@ti.com>
-Message-ID: <20131007163147.GB15413@quad.lixom.net>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 7 Oct 2013 17:32:20 +0100
+Subject: [PATCH v2 19/29] of: create default early_init_dt_add_memory_arch
+In-Reply-To: <1381163377-21044-20-git-send-email-robherring2@gmail.com>
+References: <1381163377-21044-1-git-send-email-robherring2@gmail.com>
+ <1381163377-21044-20-git-send-email-robherring2@gmail.com>
+Message-ID: <20131007163220.GJ32012@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 27, 2013 at 04:56:44AM +0530, Sekhar Nori wrote:
-> Hi Olof,
+On Mon, Oct 07, 2013 at 05:29:27PM +0100, Rob Herring wrote:
+> From: Rob Herring <rob.herring@calxeda.com>
 > 
-> On Wednesday 25 September 2013 05:36 AM, Sekhar Nori wrote:
-> > The following changes since commit 4a10c2ac2f368583138b774ca41fac4207911983:
-> > 
-> >   Linux 3.12-rc2 (2013-09-23 15:41:09 -0700)
-> > 
-> > are available in the git repository at:
-> > 
-> >   git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v3.13/soc
-> > 
-> > for you to fetch changes up to 5093f84e708574142ce26fa4a6c4558176436c86:
-> > 
-> >   ARM: edma: dt: create unused channel list (2013-09-25 05:04:28 +0530)
-> > 
-> > ----------------------------------------------------------------
-> > This pull request contains a patch to remove
-> > a long deprecated irq flag and completes the
-> > DT support in EDMA library.
-> > 
-> > ----------------------------------------------------------------
-> > Joel Fernandes (1):
-> >       ARM: edma: dt: create unused channel list
+> Create a weak version of early_init_dt_add_memory_arch which uses
+> memblock. This will unify all architectures except ones with custom
+> memory bank structs.
 > 
-> If you are picking Joel's patch "ARM: EDMA: Fix clearing of unused list
-> for DT DMA resources" for v3.12-rc then this patch can be dropped from
-> the pull request. Let me know if you want an updated request or will be
-> able to drop the patch yourself.
+> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Michal Simek <monstr@monstr.eu>
+> Cc: Jonas Bonn <jonas@southpole.se>
+> Acked-by: Grant Likely <grant.likely@linaro.org>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: microblaze-uclinux at itee.uq.edu.au
+> Cc: linux at lists.openrisc.net
+> Cc: devicetree at vger.kernel.org
 
-I did, so I've cherry-picked the other patch into next/soc.
-
-
--Olof
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
