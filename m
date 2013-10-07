@@ -1,59 +1,54 @@
 From: matt.porter@linaro.org (Matt Porter)
-Date: Mon,  7 Oct 2013 06:12:27 -0400
-Subject: [PATCH 0/5] USB Device Controller support for BCM281xx
-Message-ID: <1381140752-312-1-git-send-email-matt.porter@linaro.org>
+Date: Mon,  7 Oct 2013 06:12:28 -0400
+Subject: [PATCH 1/5] usb: gadget: s3c-hsotg: enable build for other platforms
+In-Reply-To: <1381140752-312-1-git-send-email-matt.porter@linaro.org>
+References: <1381140752-312-1-git-send-email-matt.porter@linaro.org>
+Message-ID: <1381140752-312-2-git-send-email-matt.porter@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series adds USB Device Controller support for the Broadcom
-BCM281xx family of parts. BCM281xx contains a DWC2 OTG block and
-s3c-hsotg is used to support UDC operation.
+Remove unused Samsung-specific machine include and Kconfig
+dependency on S3C.
 
-Parts 1-2 allows s3c-hsotg to build on non-Samsung platforms and
-adds support for a configurable UTMI PHY width. s3c-hsotg is extended
-to also support the dwc2 binding as that binding should describe the
-hardware independently of there being two different drivers (dwc2 in
-staging and s3c-hsotg) for the same device.
+Signed-off-by: Matt Porter <matt.porter@linaro.org>
+Reviewed-by: Markus Mayer <markus.mayer@linaro.org>
+Reviewed-by: Tim Kryger <tim.kryger@linaro.org>
+---
+ drivers/usb/gadget/Kconfig     | 7 +++----
+ drivers/usb/gadget/s3c-hsotg.c | 2 --
+ 2 files changed, 3 insertions(+), 6 deletions(-)
 
-Parts 3-4 add a PHY control driver for the Broadcom USB control block
-as well as a PHY driver that calls the exported API from the control
-driver. This approach is borrowed directly from the phy-omap-control.c
-driver.
-
-Patch 5 adds the DT nodes to enable UDC support on both BCM281xx boards
-in the kernel.
-
-This series depends on the "Update Kona drivers to use clocks" series
-(https://lkml.org/lkml/2013/10/3/645). The dependencies noted for that
-series are already queued for 3.13.
-
-Matt Porter (5):
-  usb: gadget: s3c-hsotg: enable build for other platforms
-  usb: gadget: s3c-hsotg: support configurable UTMI PHY width
-  usb: phy: add Broadcom Kona USB control driver
-  usb: phy: add Broadcom Kona USB PHY driver
-  ARM: dts: add usb udc support to bcm281xx
-
- Documentation/devicetree/bindings/staging/dwc2.txt |   4 +
- .../devicetree/bindings/usb/bcm-kona-usb-ctrl.txt  |  12 ++
- .../devicetree/bindings/usb/bcm-kona-usb-phy.txt   |  10 ++
- arch/arm/boot/dts/bcm11351-brt.dts                 |  10 ++
- arch/arm/boot/dts/bcm11351.dtsi                    |  21 +++
- arch/arm/boot/dts/bcm28155-ap.dts                  |  12 ++
- drivers/usb/gadget/Kconfig                         |   7 +-
- drivers/usb/gadget/s3c-hsotg.c                     |  20 ++-
- drivers/usb/gadget/s3c-hsotg.h                     |   1 +
- drivers/usb/phy/Kconfig                            |  12 ++
- drivers/usb/phy/Makefile                           |   2 +
- drivers/usb/phy/bcm-kona-usb.h                     |  31 +++++
- drivers/usb/phy/phy-bcm-kona-ctrl.c                | 151 +++++++++++++++++++++
- drivers/usb/phy/phy-bcm-kona-usb2.c                |  99 ++++++++++++++
- 14 files changed, 385 insertions(+), 7 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/usb/bcm-kona-usb-ctrl.txt
- create mode 100644 Documentation/devicetree/bindings/usb/bcm-kona-usb-phy.txt
- create mode 100644 drivers/usb/phy/bcm-kona-usb.h
- create mode 100644 drivers/usb/phy/phy-bcm-kona-ctrl.c
- create mode 100644 drivers/usb/phy/phy-bcm-kona-usb2.c
-
+diff --git a/drivers/usb/gadget/Kconfig b/drivers/usb/gadget/Kconfig
+index 48cddf3..2e69fa0 100644
+--- a/drivers/usb/gadget/Kconfig
++++ b/drivers/usb/gadget/Kconfig
+@@ -280,11 +280,10 @@ config USB_PXA27X
+ 	   gadget drivers to also be dynamically linked.
+ 
+ config USB_S3C_HSOTG
+-	tristate "S3C HS/OtG USB Device controller"
+-	depends on S3C_DEV_USB_HSOTG
++	tristate "Designware/S3C HS/OtG USB Device controller"
+ 	help
+-	  The Samsung S3C64XX USB2.0 high-speed gadget controller
+-	  integrated into the S3C64XX series SoC.
++	  The Designware USB2.0 high-speed gadget controller
++	  integrated into the S3C64XX and BCM281xx series SoC.
+ 
+ config USB_S3C2410
+ 	tristate "S3C2410 USB Device Controller"
+diff --git a/drivers/usb/gadget/s3c-hsotg.c b/drivers/usb/gadget/s3c-hsotg.c
+index 6bddf1a..34d80f3 100644
+--- a/drivers/usb/gadget/s3c-hsotg.c
++++ b/drivers/usb/gadget/s3c-hsotg.c
+@@ -36,8 +36,6 @@
+ #include <linux/usb/phy.h>
+ #include <linux/platform_data/s3c-hsotg.h>
+ 
+-#include <mach/map.h>
+-
+ #include "s3c-hsotg.h"
+ 
+ static const char * const s3c_hsotg_supply_names[] = {
 -- 
 1.8.4
