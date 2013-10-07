@@ -1,21 +1,35 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 7 Oct 2013 16:52:30 +0100
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Mon, 07 Oct 2013 17:57:58 +0200
 Subject: [PATCH v2] ARM: tlb: ASID macro should give 32bit result for
  BE correct operation
-In-Reply-To: <1381160903-1248-2-git-send-email-victor.kamensky@linaro.org>
+In-Reply-To: <1381160903-1248-1-git-send-email-victor.kamensky@linaro.org>
 References: <1381160903-1248-1-git-send-email-victor.kamensky@linaro.org>
- <1381160903-1248-2-git-send-email-victor.kamensky@linaro.org>
-Message-ID: <20131007155230.GQ12758@n2100.arm.linux.org.uk>
+Message-ID: <5252DA06.8000303@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 07, 2013 at 08:48:23AM -0700, Victor Kamensky wrote:
-> -#define ASID(mm)	((mm)->context.id.counter & ~ASID_MASK)
-> +#define ASID(mm)	((unsigned int)((mm)->context.id.counter & ~ASID_MASK))
+On 07/10/13 17:48, Victor Kamensky wrote:
+> Hi Will, Ben, Russell, Thomas,
+>
+> Please review second version of patch that fixes TLB asid issue in big endian
+> V7 image.
+>
+> Changes from v1:
+>     Note previous patch subject line was 'ARM: tlb:
+>     __flush_tlb_mm need to use int asid var for BE correct operation'
+>
+>     Added 'unsigned int' cast into ASID macro itself rather
+>     then use intermediate 'int' variable in __flush_tlb_mm function.
+>     This is done per v1 patch discussion at
+>
+>     http://lists.infradead.org/pipermail/linux-arm-kernel/2013-October/202583.html
+>
+> Tested with Linaro BE topic branch on Arndale board. Both LE and BE
+> images were tested.
 
-Not a big problem, but "unsigned" is sufficient as per my suggestion.
-See:
+If you are booting on the Arndale board, is there a patch to mark
+the relevant Exynos devices as BE capable?
 
-	http://en.wikipedia.org/wiki/C_data_types
-
-or look it up in the C standards. :)  I'll take it either way.
+-- 
+Ben Dooks				http://www.codethink.co.uk/
+Senior Engineer				Codethink - Providing Genius
