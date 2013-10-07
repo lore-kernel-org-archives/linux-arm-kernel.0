@@ -1,50 +1,74 @@
-From: balajitk@ti.com (Balaji T K)
-Date: Mon, 7 Oct 2013 21:55:04 +0530
-Subject: [PATCH 2/2] ARM: dts: dra7-evm: Add mmc2 node for eMMC support
-In-Reply-To: <1381163104-6318-1-git-send-email-balajitk@ti.com>
-References: <1381163104-6318-1-git-send-email-balajitk@ti.com>
-Message-ID: <1381163104-6318-2-git-send-email-balajitk@ti.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Mon, 7 Oct 2013 17:25:48 +0100
+Subject: [GIT PULL] ARM: NEON accelerated AES
+In-Reply-To: <1381151998-7936-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1381151998-7936-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20131007162548.GB12030@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add mmc2 dt node to dra7-evm board
-and model eMMC vcc as fixed regulator.
+On Mon, Oct 07, 2013 at 03:19:58PM +0200, Ard Biesheuvel wrote:
+> !! NOTE !!: this series build-depends on patch a62b01cd (crypto: create generic
+> version of ablk_helper) which is in linux-next but not yet in mainline.
+> 
+> The following changes since commit 15c03dd4859ab16f9212238f29dd315654aa94f6:
+> 
+>   Linux 3.12-rc3 (2013-09-29 15:02:38 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://git.linaro.org/people/ardbiesheuvel/linux-arm.git arm-aesbs
+> 
+> for you to fetch changes up to e4e7f10bfc4069925e99cc4b428c3434e30b6c3f:
+> 
+>   ARM: add support for bit sliced AES using NEON instructions (2013-10-04 20:48:38 +0200)
 
-Signed-off-by: Balaji T K <balajitk@ti.com>
----
-Rebase to for_3.13/dts
-and removed ti,non-removable
+Since nobody has stepped up to review this in detail, it appears there
+may be nobody on the relvant lists who is sufficiently expert in AES and
+NEON/v8 to review it.
 
- arch/arm/boot/dts/dra7-evm.dts |   13 +++++++++++++
- 1 files changed, 13 insertions(+), 0 deletions(-)
+To trust the openssl community on this doubtless makes sense (I notice
+that, by an astonishing coincidence, the relevant changes to that project
+have been made a certain Ard Biesheuvel).
 
-diff --git a/arch/arm/boot/dts/dra7-evm.dts b/arch/arm/boot/dts/dra7-evm.dts
-index 65cd15a..3abf5f4 100644
---- a/arch/arm/boot/dts/dra7-evm.dts
-+++ b/arch/arm/boot/dts/dra7-evm.dts
-@@ -17,6 +17,13 @@
- 		device_type = "memory";
- 		reg = <0x80000000 0x60000000>; /* 1536 MB */
- 	};
-+
-+	mmc2_3v3: fixedregulator-mmc2 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "mmc2_3v3";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+	};
- };
- 
- &dra7_pmx_core {
-@@ -256,3 +263,9 @@
- 	vmmc-supply = <&ldo1_reg>;
- 	bus-width = <4>;
- };
-+
-+&mmc2 {
-+	status = "okay";
-+	vmmc-supply = <&mmc2_3v3>;
-+	bus-width = <8>;
-+};
--- 
-1.7.5.4
+How do you propose this code should be maintained in the kernel?
+
+Adding a script which automatically diffs the files in the kernel
+against openssl might be a good idea -- not every time the kernel is
+built, but as a maintainer activity someone can script up.  This has the
+advantage that ordinary kernel developers will be able to comprehend,
+review, and use it, unlike the AES code itself.
+
+Otherwise, important upstream fixes may not reach the kernel, or the
+two codebases might diverge, especially if a significant code refactoring
+occurs in openssl.  (I don't know whether that's likely or not)
+
+Cheers
+---Dave
+
+
+> 
+> ----------------------------------------------------------------
+> Ard Biesheuvel (3):
+>       ARM: pull in <asm/simd.h> from asm-generic
+>       ARM: move AES typedefs and function prototypes to separate header
+>       ARM: add support for bit sliced AES using NEON instructions
+> 
+>  arch/arm/crypto/Makefile             |   14 +-
+>  arch/arm/crypto/aes_glue.c           |   22 +-
+>  arch/arm/crypto/aes_glue.h           |   19 +
+>  arch/arm/crypto/aesbs-core.S_shipped | 2544 ++++++++++++++++++++++++++++++++++
+>  arch/arm/crypto/aesbs-glue.c         |  434 ++++++
+>  arch/arm/crypto/bsaes-armv7.pl       | 2467 +++++++++++++++++++++++++++++++++
+>  arch/arm/include/asm/Kbuild          |    1 +
+>  crypto/Kconfig                       |   16 +
+>  8 files changed, 5499 insertions(+), 18 deletions(-)
+>  create mode 100644 arch/arm/crypto/aes_glue.h
+>  create mode 100644 arch/arm/crypto/aesbs-core.S_shipped
+>  create mode 100644 arch/arm/crypto/aesbs-glue.c
+>  create mode 100644 arch/arm/crypto/bsaes-armv7.pl
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
