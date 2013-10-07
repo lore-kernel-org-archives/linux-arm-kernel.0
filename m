@@ -1,135 +1,77 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 7 Oct 2013 22:44:09 +0200
-Subject: [PATCH] ARM: sunxi: dts: Add support for the cubieboard3, the
- CubieTruck
-In-Reply-To: <1380986247-29112-2-git-send-email-oliver+list@schinagl.nl>
-References: <1380986247-29112-1-git-send-email-oliver+list@schinagl.nl>
- <1380986247-29112-2-git-send-email-oliver+list@schinagl.nl>
-Message-ID: <20131007204409.GB3041@lukather>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Mon, 7 Oct 2013 22:55:56 +0200 (CEST)
+Subject: [PATCH] DMA: extend documentation to provide more API details
+In-Reply-To: <20131007155229.GN2954@intel.com>
+References: <20131005233137.GA12758@n2100.arm.linux.org.uk>
+ <20131006052029.GE2954@intel.com>
+ <Pine.LNX.4.64.1310071233340.20796@axis700.grange>
+ <20131007111728.GM12758@n2100.arm.linux.org.uk>
+ <20131007103936.GH2954@intel.com>
+ <Pine.LNX.4.64.1310071409080.20796@axis700.grange>
+ <20131007142511.GJ2954@intel.com>
+ <Pine.LNX.4.64.1310071725300.20796@axis700.grange>
+ <20131007144335.GL2954@intel.com>
+ <Pine.LNX.4.64.1310071739590.20796@axis700.grange>
+ <20131007155229.GN2954@intel.com>
+Message-ID: <Pine.LNX.4.64.1310072244030.27047@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Oliver,
+On Mon, 7 Oct 2013, Vinod Koul wrote:
 
-On Sat, Oct 05, 2013 at 05:17:27PM +0200, oliver+list at schinagl.nl wrote:
-> From: Oliver Schinagl <oliver@schinagl.nl>
+> On Mon, Oct 07, 2013 at 05:45:22PM +0200, Guennadi Liakhovetski wrote:
+> > On Mon, 7 Oct 2013, Vinod Koul wrote:
+> > 
+> > > On Mon, Oct 07, 2013 at 05:28:37PM +0200, Guennadi Liakhovetski wrote:
+> > > > > > > > > No, not something in the middle. I was thinking about
+> > > > > > > > > 
+> > > > > > > > > (1) cookie 1-3 are submitted
+> > > > > > > > > (2) cookie 1 succeeds
+> > > > > > > > > (3) a DMA error occurs, cookies 2-3 are discarded
+> > > > > > > discarded using terminate_all right?
+> > > > > > 
+> > > > > > No, by the dmaengine driver as a part of the error processing.
+> > > > > And how will that be done...?
+> > > > 
+> > > > Sorry, I meant - DMA descriptors with cookies #2 and #3 will be cancelled 
+> > > > and recycled by the dmaengine driver. That's what you have to do, when 
+> > > > processing DMA error IRQ.
+> > > Well how do you that?
+> > 
+> > Mmmh, maybe I'm missing something, but isn't it a part of the common DMA 
+> > processing? You get an error IRQ; on some DMAC types this means, that you 
+> > have to reset the hardware, so, you perform whatever actions you have to 
+> > do to reset the controller; you remove any descriptors from the pending 
+> > queue; reinsert them into the free queue and let any clients run on a 
+> > timeout. I don't think it would be a good idea to do anything more smart 
+> > like trying to restart the current transfer or drop it and continue with 
+> > the queue, because we don't know in what state the client hardware is, so, 
+> > we can only let the client driver try to recover.
+> No that would be very wrong thing to do behind clients back. Suppose you got a
+> trasaction which returned error irq and it was generated one half of the
+> requested transfer was done. Redoing the entrie transaction wont be right!
 > 
-> Cubieboard3, CT
-
-Please change the commit log to something meaningful.
-
-> Signed-off-by: Oliver Schinagl <oliver@schinagl.nl>
-> ---
->  arch/arm/boot/dts/Makefile                 |  1 +
->  arch/arm/boot/dts/sun7i-a20-cubietruck.dts | 60 ++++++++++++++++++++++++++++++
->  2 files changed, 61 insertions(+)
->  create mode 100644 arch/arm/boot/dts/sun7i-a20-cubietruck.dts
+> So I think you need to let client know the error status.
 > 
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index cc0f1fb..171e6c7 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -232,6 +232,7 @@ dtb-$(CONFIG_ARCH_SUNXI) += \
->  	sun5i-a13-olinuxino.dtb \
->  	sun6i-a31-colombus.dtb \
->  	sun7i-a20-cubieboard2.dtb \
-> +	sun7i-a20-cubietruck.dtb \
->  	sun7i-a20-olinuxino-micro.dtb
->  dtb-$(CONFIG_ARCH_TEGRA) += tegra20-harmony.dtb \
->  	tegra20-iris-512.dtb \
-> diff --git a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
-> new file mode 100644
-> index 0000000..0167afe
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
-> @@ -0,0 +1,60 @@
-> +/*
-> + * Copyright 2013 Oliver Schinagl
-> + *
-> + * Oliver Schinagl <oliver@schinagl.nl>
-> + *
-> + * The code contained herein is licensed under the GNU General Public
-> + * License. You may obtain a copy of the GNU General Public License
-> + * Version 2 or later at the following locations:
-> + *
-> + * http://www.opensource.org/licenses/gpl-license.html
-> + * http://www.gnu.org/copyleft/gpl.html
-> + */
-> +
-> +/dts-v1/;
-> +/include/ "sun7i-a20.dtsi"
-> +
-> +/ {
-> +	model = "Cubietech Cubietruck";
-> +	compatible = "cubietech,cubietech", "allwinner,sun7i-a20";
+> But again, is this usage fiarly common?
 
-cubietech,cubietruck :)
+Hm, I think, the question is different: is this possible and realistic? If 
+there's just one DMAC and one platform, I think, there should be a way to 
+support it? There are controllers, that actually have separate error IRQ 
+outputs and special status bits for them. Actually, see commit
 
-> +
-> +	soc at 01c00000 {
-> +		pinctrl at 01c20800 {
-> +			led_pins_cubietruck: led_pins at 0 {
-> +				allwinner,pins = "PH7", "PH11", "PH20", "PH21";
-> +				allwinner,function = "gpio_out";
-> +				allwinner,drive = <0>;
-> +				allwinner,pull = <0>;
-> +			};
-> +		};
-> +
-> +		uart0: serial at 01c28000 {
-> +			pinctrl-names = "default";
-> +			pinctrl-0 = <&uart0_pins_a>;
-> +			status = "okay";
-> +		};
-> +	};
-> +
-> +	leds {
-> +		compatible = "gpio-leds";
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&led_pins_cubietruck>;
-> +
-> +		blue {
-> +			label = "cubietruck:blue:usr";
-> +			gpios = <&pio 7 21 0>;
-> +		};
+commit 47a4dc26eeb89a3746f9b1e2092602b40469640a
+Author: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+Date:   Thu Feb 11 16:50:05 2010 +0000
 
-Newline
+    dmaengine: shdma: fix DMA error handling.
 
-> +		orange {
-> +			label = "cubietruck:orange:usr";
-> +			gpios = <&pio 7 20 0>;
-> +		};
+Which means, there are indeed real life situations when such error IRQs 
+trigger.
 
-Ditto.
-
-> +		white {
-> +			label = "cubietruck:white:usr";
-> +			gpios = <&pio 7 11 0>;
-> +		};
-
-Ditto.
-
-> +		green {
-> +			label = "cubietruck:green:usr";
-> +			gpios = <&pio 7 7 0>;
-> +		};
-> +	};
-> +};
-> -- 
-> 1.8.1.5
-> 
-
-Thanks!
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131007/b7cc59aa/attachment-0001.sig>
+Thanks
+Guennadi
+---
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
