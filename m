@@ -1,27 +1,35 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 7 Oct 2013 11:45:24 +0100
-Subject: [PATCH] ARM: tlb: __flush_tlb_mm need to use int asid var for
- BE correct operation
-In-Reply-To: <1381128458-32140-2-git-send-email-victor.kamensky@linaro.org>
-References: <1381128458-32140-1-git-send-email-victor.kamensky@linaro.org>
- <1381128458-32140-2-git-send-email-victor.kamensky@linaro.org>
-Message-ID: <20131007104524.GK12758@n2100.arm.linux.org.uk>
+From: rogerq@ti.com (Roger Quadros)
+Date: Mon, 7 Oct 2013 13:46:50 +0300
+Subject: [PATCH] ARM: dts: omap3-beagle: Adapt USB OTG to generic PHY framework
+Message-ID: <1381142810-14541-1-git-send-email-rogerq@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 06, 2013 at 11:47:38PM -0700, Victor Kamensky wrote:
-> __flush_tlb_mm function need to use intermediate 'int' type 'asid'
-> variable int tlb_op macro call. Direct use of ASID macro produces
-> 64 bit unsigned long long type passed to inline assembler statement
-> as 'r' operand (32bit), and resulting behavior is not well specified.
-> It works in little endian case, but is broken in big endian case. In
-> big endian case gcc generate such code that 0 is passed to
-> 'mcr	15, 0, r4, cr8, cr3, {2}' operation.
-> 
-> Note other functions like __local_flush_tlb_mm, and local_flush_tlb_mm
-> already use intermediate 'asid' variable in similar code.
+The generic PHY framewrok expects different properties than the
+old USB PHY framework. Supply those properties.
 
-A much better solution would be to ensure that ASID() only returns
-the 'unsigned' type, not a long long type.
+Fixes USB OTG port on beagle after the Generic PHY framework was
+merged in greg/usb-next. [1]
 
-#define ASID(mm)        ((unsigned)(mm)->context.id.counter & ~ASID_MASK)
+[1] - https://lkml.org/lkml/2013/9/27/581
+
+Signed-off-by: Roger Quadros <rogerq@ti.com>
+---
+ arch/arm/boot/dts/omap3-beagle.dts |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/boot/dts/omap3-beagle.dts b/arch/arm/boot/dts/omap3-beagle.dts
+index 7669c16..fa532aa 100644
+--- a/arch/arm/boot/dts/omap3-beagle.dts
++++ b/arch/arm/boot/dts/omap3-beagle.dts
+@@ -173,6 +173,8 @@
+ &usb_otg_hs {
+ 	interface-type = <0>;
+ 	usb-phy = <&usb2_phy>;
++	phys = <&usb2_phy>;
++	phy-names = "usb2-phy";
+ 	mode = <3>;
+ 	power = <50>;
+ };
+-- 
+1.7.4.1
