@@ -1,228 +1,113 @@
 From: mturquette@linaro.org (Mike Turquette)
-Date: Mon, 07 Oct 2013 14:23:54 -0700
-Subject: [PATCH] clk: new driver for efm32 SoC
-In-Reply-To: <1376510693-12491-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1376510693-12491-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <20131007212354.7445.84276@quantum>
+Date: Mon, 07 Oct 2013 14:29:04 -0700
+Subject: [PATCH] clk: debugfs add clk_rate_fops with DEBUG
+In-Reply-To: <1376890457-17871-1-git-send-email-zhangfei.gao@linaro.org>
+References: <1376875884-13459-1-git-send-email-zhangfei.gao@linaro.org>
+ <1376890457-17871-1-git-send-email-zhangfei.gao@linaro.org>
+Message-ID: <20131007212904.7445.60382@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Uwe Kleine-K?nig (2013-08-14 13:04:53)
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> ---
-> Hello,
+Quoting Zhangfei Gao (2013-08-18 22:34:17)
+> clk_rate_fops is added to debug
+> 1. set_rate (e.g. PLL)
+> 2. Choose mux parent, since mux could choose parent accordingly when set_rate.
 > 
-> I'm not sure if there is a naming convention for #defines in headers below
-> dt-bindings. I named my clocks clk_$namefromreferencemanual to have some
-> namespacing.
+> Causion: set_rate can be called directly from user space
 > 
-> The clock stuff on the different variants of efm32 are similar, but
-> different enough to not be able to use the same driver, so this is only
-> for the Giant Gecko (efm32gg) variant, still I used "efm32" in some
-> places because the other variants would fit there, too. (For
-> include/dt-bindings/clock/efm32-cmu.h I would need some #ifdefs, is that
-> OK or should the name of the defines include efm32gg? (That would make
-> the names still longer and so more ugly.))
+> Example:
+> sfc_mux have two parents: 24M and 200M
+> 
+> cat clk_summary
+>    clock                        enable_cnt  prepare_cnt  rate
+> ---------------------------------------------------------------------
+>  osc24mhz                       3           3            24000000
+>     bpll_fout3                  0           0            200000000
+>        sfc_mux                  0           0            200000000
+>           sfc                   0           0            200000000
+> 
+> cat osc24mhz/bpll/bpll_fout3/sfc_mux/sfc/clk_rate
+> 200000000
+> 
+> echo 24000000 >  osc24mhz/bpll/bpll_fout3/sfc_mux/sfc/clk_rate
+> cat clk_summary
+>    clock                        enable_cnt  prepare_cnt  rate
+> ---------------------------------------------------------------------
+>  osc24mhz                       3           3            24000000
+>     sfc_mux                     0           0            24000000
+>        sfc                      0           0            24000000
+>     bpll_fout3                  0           0            200000000
+> 
+> cat osc24mhz/sfc_mux/sfc/clk_rate
+> 24000000
+> 
+> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
 
-The DT experts should weigh in on having #ifdef's in the header, but I
-think we should avoid that. Better to explicitly list the clocks for the
-variant used. You can add "gg" to this or not, I don't care, but the
-future variants will need some suffix, or maybe their own header.
-
-I'm happy with this patch and can take it for 3.13. Care to add a
-changelog?
+Thanks for the patch. It is trivial enough where I think we can leave it
+on the list and let developers apply it if they need it for debug. I
+don't want to merge it since it exposes hardware control to userspace
+and could be abused in a way that could damage a device.
 
 Regards,
 Mike
 
+> ---
+>  drivers/clk/clk.c |   34 ++++++++++++++++++++++++++++++++++
+>  1 file changed, 34 insertions(+)
 > 
-> Best regards
-> Uwe
-> 
->  .../devicetree/bindings/clock/efm32-clock.txt      | 11 +++
->  drivers/clk/Makefile                               |  1 +
->  drivers/clk/clk-efm32gg.c                          | 79 ++++++++++++++++++++++
->  include/dt-bindings/clock/efm32-cmu.h              | 42 ++++++++++++
->  include/linux/clk/efm32.h                          |  6 ++
->  5 files changed, 139 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/clock/efm32-clock.txt
->  create mode 100644 drivers/clk/clk-efm32gg.c
->  create mode 100644 include/dt-bindings/clock/efm32-cmu.h
->  create mode 100644 include/linux/clk/efm32.h
-> 
-> diff --git a/Documentation/devicetree/bindings/clock/efm32-clock.txt b/Documentation/devicetree/bindings/clock/efm32-clock.txt
-> new file mode 100644
-> index 0000000..263d293
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/clock/efm32-clock.txt
-> @@ -0,0 +1,11 @@
-> +* Clock bindings for Energy Micro efm32 Giant Gecko's Clock Management Unit
-> +
-> +Required properties:
-> +- compatible: Should be "efm32gg,cmu"
-> +- reg: Base address and length of the register set
-> +- interrupts: Interrupt used by the CMU
-> +- #clock-cells: Should be <1>
-> +
-> +The clock consumer should specify the desired clock by having the clock ID in
-> +its "clocks" phandle cell. The header efm32-clk.h contains a list of available
-> +IDs.
-> diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
-> index 4038c2b..99d9ad0 100644
-> --- a/drivers/clk/Makefile
-> +++ b/drivers/clk/Makefile
-> @@ -11,6 +11,7 @@ obj-$(CONFIG_COMMON_CLK)      += clk-composite.o
+> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+> index 373cd54..6b582f7 100644
+> --- a/drivers/clk/clk.c
+> +++ b/drivers/clk/clk.c
+> @@ -226,6 +226,35 @@ static const struct file_operations clk_dump_fops = {
+>         .release        = single_release,
+>  };
 >  
->  # SoCs specific
->  obj-$(CONFIG_ARCH_BCM2835)     += clk-bcm2835.o
-> +obj-$(CONFIG_ARCH_EFM32)       += clk-efm32gg.o
->  obj-$(CONFIG_ARCH_NOMADIK)     += clk-nomadik.o
->  obj-$(CONFIG_ARCH_HIGHBANK)    += clk-highbank.o
->  obj-$(CONFIG_ARCH_NSPIRE)      += clk-nspire.o
-> diff --git a/drivers/clk/clk-efm32gg.c b/drivers/clk/clk-efm32gg.c
-> new file mode 100644
-> index 0000000..2e63584
-> --- /dev/null
-> +++ b/drivers/clk/clk-efm32gg.c
-> @@ -0,0 +1,79 @@
-> +#include <linux/clk.h>
-> +#include <linux/io.h>
-> +#include <linux/clk-provider.h>
-> +#include <linux/of.h>
-> +#include <linux/of_address.h>
+> +#ifdef DEBUG
+> +static int clk_rate_fops_get(void *data, u64 *rate)
+> +{
+> +       struct clk *clk = data;
 > +
-> +#include <dt-bindings/clock/efm32-cmu.h>
+> +       *rate = clk->rate;
 > +
-> +#define CMU_HFPERCLKEN0                0x44
-> +
-> +static struct clk *clk[37];
-> +static struct clk_onecell_data clk_data = {
-> +       .clks = clk,
-> +       .clk_num = ARRAY_SIZE(clk),
+> +       return 0;
 > +};
 > +
-> +int __init efm32gg_clk_init(void)
+> +static int clk_rate_fops_set(void *data, u64 rate)
 > +{
-> +       int i;
-> +       struct device_node *np;
-> +       void __iomem *base;
+> +       struct clk *clk = data;
+> +       int ret = 0;
 > +
-> +       for (i = 0; i < ARRAY_SIZE(clk); ++i)
-> +               clk[i] = ERR_PTR(-ENOENT);
+> +       ret = clk_prepare_enable(clk);
+> +       if (ret)
+> +               goto out;
+> +       clk_set_rate(clk, rate);
+> +       clk_disable_unprepare(clk);
 > +
-> +       np = of_find_compatible_node(NULL, NULL, "efm32gg,cmu");
-> +       if (!np) {
-> +               pr_warn("No efm32gg,cmu node found in device tree\n");
-> +               return -ENOENT;
-> +       }
+> +out:
+> +       return ret;
+> +};
 > +
-> +       base = of_iomap(np, 0);
-> +       if (!base) {
-> +               pr_warn("Failed to map address range for efm32gg,cmu node\n");
-> +               return -EADDRNOTAVAIL;
-> +       }
+> +DEFINE_SIMPLE_ATTRIBUTE(clk_rate_fops, clk_rate_fops_get,
+> +                       clk_rate_fops_set, "%llu\n");
+> +#endif
 > +
-> +       clk[clk_HFXO] = clk_register_fixed_rate(NULL, "HFXO", NULL,
-> +                       CLK_IS_ROOT, 48000000);
-> +
-> +       clk[clk_HFPERCLKUSART0] = clk_register_gate(NULL, "HFPERCLK.USART0",
-> +                       "HFXO", 0, base + CMU_HFPERCLKEN0, 0, 0, NULL);
-> +       clk[clk_HFPERCLKUSART1] = clk_register_gate(NULL, "HFPERCLK.USART1",
-> +                       "HFXO", 0, base + CMU_HFPERCLKEN0, 1, 0, NULL);
-> +       clk[clk_HFPERCLKUSART2] = clk_register_gate(NULL, "HFPERCLK.USART2",
-> +                       "HFXO", 0, base + CMU_HFPERCLKEN0, 2, 0, NULL);
-> +       clk[clk_HFPERCLKUART0] = clk_register_gate(NULL, "HFPERCLK.UART0",
-> +                       "HFXO", 0, base + CMU_HFPERCLKEN0, 3, 0, NULL);
-> +       clk[clk_HFPERCLKUART1] = clk_register_gate(NULL, "HFPERCLK.UART1",
-> +                       "HFXO", 0, base + CMU_HFPERCLKEN0, 4, 0, NULL);
-> +       clk[clk_HFPERCLKTIMER0] = clk_register_gate(NULL, "HFPERCLK.TIMER0",
-> +                       "HFXO", 0, base + CMU_HFPERCLKEN0, 5, 0, NULL);
-> +       clk[clk_HFPERCLKTIMER1] = clk_register_gate(NULL, "HFPERCLK.TIMER1",
-> +                       "HFXO", 0, base + CMU_HFPERCLKEN0, 6, 0, NULL);
-> +       clk[clk_HFPERCLKTIMER2] = clk_register_gate(NULL, "HFPERCLK.TIMER2",
-> +                       "HFXO", 0, base + CMU_HFPERCLKEN0, 7, 0, NULL);
-> +       clk[clk_HFPERCLKTIMER3] = clk_register_gate(NULL, "HFPERCLK.TIMER3",
-> +                       "HFXO", 0, base + CMU_HFPERCLKEN0, 8, 0, NULL);
-> +       clk[clk_HFPERCLKACMP0] = clk_register_gate(NULL, "HFPERCLK.ACMP0",
-> +                       "HFXO", 0, base + CMU_HFPERCLKEN0, 9, 0, NULL);
-> +       clk[clk_HFPERCLKACMP1] = clk_register_gate(NULL, "HFPERCLK.ACMP1",
-> +                       "HFXO", 0, base + CMU_HFPERCLKEN0, 10, 0, NULL);
-> +       clk[clk_HFPERCLKI2C0] = clk_register_gate(NULL, "HFPERCLK.I2C0",
-> +                       "HFXO", 0, base + CMU_HFPERCLKEN0, 11, 0, NULL);
-> +       clk[clk_HFPERCLKI2C1] = clk_register_gate(NULL, "HFPERCLK.I2C1",
-> +                       "HFXO", 0, base + CMU_HFPERCLKEN0, 12, 0, NULL);
-> +       clk[clk_HFPERCLKGPIO] = clk_register_gate(NULL, "HFPERCLK.GPIO",
-> +                       "HFXO", 0, base + CMU_HFPERCLKEN0, 13, 0, NULL);
-> +       clk[clk_HFPERCLKVCMP] = clk_register_gate(NULL, "HFPERCLK.VCMP",
-> +                       "HFXO", 0, base + CMU_HFPERCLKEN0, 14, 0, NULL);
-> +       clk[clk_HFPERCLKPRS] = clk_register_gate(NULL, "HFPERCLK.PRS",
-> +                       "HFXO", 0, base + CMU_HFPERCLKEN0, 15, 0, NULL);
-> +       clk[clk_HFPERCLKADC0] = clk_register_gate(NULL, "HFPERCLK.ADC0",
-> +                       "HFXO", 0, base + CMU_HFPERCLKEN0, 16, 0, NULL);
-> +       clk[clk_HFPERCLKDAC0] = clk_register_gate(NULL, "HFPERCLK.DAC0",
-> +                       "HFXO", 0, base + CMU_HFPERCLKEN0, 17, 0, NULL);
-> +
-> +       return of_clk_add_provider(np, of_clk_src_onecell_get, &clk_data);
-> +}
-> diff --git a/include/dt-bindings/clock/efm32-cmu.h b/include/dt-bindings/clock/efm32-cmu.h
-> new file mode 100644
-> index 0000000..b21b91e
-> --- /dev/null
-> +++ b/include/dt-bindings/clock/efm32-cmu.h
-> @@ -0,0 +1,42 @@
-> +#ifndef __DT_BINDINGS_CLOCK_EFM32_CMU_H
-> +#define __DT_BINDINGS_CLOCK_EFM32_CMU_H
-> +
-> +#define clk_HFXO               0
-> +#define clk_HFRCO              1
-> +#define clk_LFXO               2
-> +#define clk_LFRCO              3
-> +#define clk_ULFRCO             4
-> +#define clk_AUXHFRCO           5
-> +#define clk_HFCLKNODIV         6
-> +#define clk_HFCLK              7
-> +#define clk_HFPERCLK           8
-> +#define clk_HFCORECLK          9
-> +#define clk_LFACLK             10
-> +#define clk_LFBCLK             11
-> +#define clk_WDOGCLK            12
-> +#define clk_HFCORECLKDMA       13
-> +#define clk_HFCORECLKAES       14
-> +#define clk_HFCORECLKUSBC      15
-> +#define clk_HFCORECLKUSB       16
-> +#define clk_HFCORECLKLE                17
-> +#define clk_HFCORECLKEBI       18
-> +#define clk_HFPERCLKUSART0     19
-> +#define clk_HFPERCLKUSART1     20
-> +#define clk_HFPERCLKUSART2     21
-> +#define clk_HFPERCLKUART0      22
-> +#define clk_HFPERCLKUART1      23
-> +#define clk_HFPERCLKTIMER0     24
-> +#define clk_HFPERCLKTIMER1     25
-> +#define clk_HFPERCLKTIMER2     26
-> +#define clk_HFPERCLKTIMER3     27
-> +#define clk_HFPERCLKACMP0      28
-> +#define clk_HFPERCLKACMP1      29
-> +#define clk_HFPERCLKI2C0       30
-> +#define clk_HFPERCLKI2C1       31
-> +#define clk_HFPERCLKGPIO       32
-> +#define clk_HFPERCLKVCMP       33
-> +#define clk_HFPERCLKPRS                34
-> +#define clk_HFPERCLKADC0       35
-> +#define clk_HFPERCLKDAC0       36
-> +
-> +#endif /* __DT_BINDINGS_CLOCK_EFM32_CMU_H */
-> diff --git a/include/linux/clk/efm32.h b/include/linux/clk/efm32.h
-> new file mode 100644
-> index 0000000..4032dc0
-> --- /dev/null
-> +++ b/include/linux/clk/efm32.h
-> @@ -0,0 +1,6 @@
-> +#ifndef __LINUX_CLK_EFM32_H__
-> +#define __LINUX_CLK_EFM32_H__
-> +
-> +int efm32gg_clk_init(void);
-> +
-> +#endif /* __LINUX_CLK_EFM32_H__ */
+>  /* caller must hold prepare_lock */
+>  static int clk_debug_create_one(struct clk *clk, struct dentry *pdentry)
+>  {
+> @@ -243,8 +272,13 @@ static int clk_debug_create_one(struct clk *clk, struct dentry *pdentry)
+>  
+>         clk->dentry = d;
+>  
+> +#ifdef DEBUG
+> +       d = debugfs_create_file("clk_rate", S_IWUSR | S_IRUGO, clk->dentry,
+> +                               clk, &clk_rate_fops);
+> +#else
+>         d = debugfs_create_u32("clk_rate", S_IRUGO, clk->dentry,
+>                         (u32 *)&clk->rate);
+> +#endif
+>         if (!d)
+>                 goto err_out;
+>  
 > -- 
-> 1.8.4.rc0
+> 1.7.9.5
