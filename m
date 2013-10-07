@@ -1,31 +1,35 @@
-From: victor.kamensky@linaro.org (Victor Kamensky)
-Date: Mon, 7 Oct 2013 09:19:17 -0700
-Subject: [PATCH v2] ARM: tlb: ASID macro should give 32bit result for BE
- correct operation
-In-Reply-To: <20131007155230.GQ12758@n2100.arm.linux.org.uk>
-References: <1381160903-1248-1-git-send-email-victor.kamensky@linaro.org>
- <1381160903-1248-2-git-send-email-victor.kamensky@linaro.org>
- <20131007155230.GQ12758@n2100.arm.linux.org.uk>
-Message-ID: <CAA3XUr1GRcK=dEmhJ=U4vsQcwSdAuE3W78=KSjjE_pwCev2MnA@mail.gmail.com>
+From: balajitk@ti.com (Balaji T K)
+Date: Mon, 7 Oct 2013 21:55:03 +0530
+Subject: [PATCH v2 1/2] ARM: dts: dra7-evm: Add mmc1 node for micro-sd support
+Message-ID: <1381163104-6318-1-git-send-email-balajitk@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7 October 2013 08:52, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Mon, Oct 07, 2013 at 08:48:23AM -0700, Victor Kamensky wrote:
->> -#define ASID(mm)     ((mm)->context.id.counter & ~ASID_MASK)
->> +#define ASID(mm)     ((unsigned int)((mm)->context.id.counter & ~ASID_MASK))
->
-> Not a big problem, but "unsigned" is sufficient as per my suggestion.
-> See:
->
->         http://en.wikipedia.org/wiki/C_data_types
->
-> or look it up in the C standards. :)  I'll take it either way.
+Add mmc1 dt node to dra7-evm board.
+Input for ldo1 regulator is controlled by gpio 5 of pcf8575 chip (0x21)
+on i2c1 bus. When dt support for gpio-pcf857x is available, input supply
+will be modelled as cascaded regulator.
 
-Understood, I just tried to be consistent with the rest of file -
-'unsigned int' was
-used just few lines above place that got changed.
+Signed-off-by: Balaji T K <balajitk@ti.com>
+---
+Rebase to for_3.13/dts
 
-Thanks,
-Victor
+ arch/arm/boot/dts/dra7-evm.dts |    6 ++++++
+ 1 files changed, 6 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/boot/dts/dra7-evm.dts b/arch/arm/boot/dts/dra7-evm.dts
+index fbbe406..65cd15a 100644
+--- a/arch/arm/boot/dts/dra7-evm.dts
++++ b/arch/arm/boot/dts/dra7-evm.dts
+@@ -250,3 +250,9 @@
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&uart3_pins>;
+ };
++
++&mmc1 {
++	status = "okay";
++	vmmc-supply = <&ldo1_reg>;
++	bus-width = <4>;
++};
+-- 
+1.7.5.4
