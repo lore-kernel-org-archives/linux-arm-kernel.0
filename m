@@ -1,40 +1,36 @@
-From: pwalmsley@nvidia.com (Paul Walmsley)
-Date: Mon, 7 Oct 2013 01:26:39 -0700
-Subject: Tegra baseline test results for v3.12-rc4
-Message-ID: <5252703F.40303@nvidia.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Mon, 07 Oct 2013 10:39:21 +0200
+Subject: [PATCH] clk: provide public clk_is_enabled function
+In-Reply-To: <CAPtuhTiaTX1VX0OnkJN6AeqtT+FW+uK7022iJ2wOCirQmMXH4Q@mail.gmail.com>
+References: <1380881310-24345-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20131005202430.GI10079@pengutronix.de> <20131005204208.GB28106@lunn.ch>
+ <20131006090609.GK14747@book.gsilab.sittig.org>
+ <20131006163011.GA30818@lunn.ch> <5251BD09.3050900@gmail.com>
+ <20131006200223.32214.4440@quantum> <5251E334.2070008@gmail.com>
+ <CAPtuhTiaTX1VX0OnkJN6AeqtT+FW+uK7022iJ2wOCirQmMXH4Q@mail.gmail.com>
+Message-ID: <52527339.9090701@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here are some basic Tegra test results for Linux v3.12-rc4.
-Logs and other details at:
+On 10/06/2013 11:04 PM, Mike Turquette wrote:
+> On Sun, Oct 6, 2013 at 3:24 PM, Sebastian Hesselbarth
+> <sebastian.hesselbarth@gmail.com> wrote:
+>> Of course, we can do clk_enable, read, clk_disable as said before - and
+>> given the amount of questions and misinterpretation, I think it is the
+>> saner way.
+>
+> Sorry for any misinterpretation on my end. I agree reading the
+> register(s) within a clk_enable/clk_disable-protected section is the
+> most sane option.
 
-     http://nvt.pwsan.com/pub/linux/testlogs/test_v3.12-rc4/20131007004737/
+Well, as you are not the only one misinterpreting the purpose, I
+guess it is more about the clk_is_enabled() function itself. Uwe was
+very right, that it will lead to patches using it in a wrong way.
 
+Using the common enable/disable functions does no harm to our workaround
+and we will use it.
 
-Test summary
-------------
+Thanks for taking the time to raise those questions and surface those
+critical interpretations early!
 
-Build: zImage:
-     Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
-
-Boot to userspace: multi_v7_defconfig:
-     Pass: ( 2/ 2): tegra114-dalmore-headless, tegra30-beaver
-
-Boot to userspace: tegra_defconfig:
-     Pass: ( 2/ 2): tegra114-dalmore-headless, tegra30-beaver
-
-
-vmlinux object size
-(delta in bytes from test_v3.12-rc3 (15c03dd4859ab16f9212238f29dd315654aa94f6)):
-    text     data      bss    total  kernel
-   +5384     +176        0    +5560  multi_v7_defconfig
-   +5009       +8        0    +5017  tegra_defconfig
-
-
-Boot-time memory difference
-(delta in bytes from test_v3.12-rc3 (15c03dd4859ab16f9212238f29dd315654aa94f6))
-     avail    rsrvd     high    freed                board              kconfig                  dtb
-         .        .        .      -4k tegra114-dalmore-hea   multi_v7_defconfig     tegra114-dalmore
-       -8k       8k        .        . tegra114-dalmore-hea      tegra_defconfig     tegra114-dalmore
-         .        .        .      -4k       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
-       -8k       8k        .        .       tegra30-beaver      tegra_defconfig       tegra30-beaver
+Sebastian
