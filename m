@@ -1,53 +1,57 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Mon, 7 Oct 2013 16:51:44 -0600
-Subject: [PATCH RESEND] PCI: mvebu: Dynamically detect if the PEX link is
- up to enable hot plug
-In-Reply-To: <20131007224006.GA27499@obsidianresearch.com>
-References: <1380650281-16175-1-git-send-email-jgunthorpe@obsidianresearch.com>
- <CAErSpo6pvAQ9exEUsB0p8nmoqs0s5yzfYsstx7wh-2bqDtzBOQ@mail.gmail.com>
- <20131007224006.GA27499@obsidianresearch.com>
-Message-ID: <CAErSpo6_bVKbBKXix0qCQObrAGf-pUgXYXBZ=5ykX2QsEECQ5A@mail.gmail.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Mon, 07 Oct 2013 16:27:57 -0700
+Subject: [PATCH] arm: socfpga: Fix incorrect sdmmc clock name
+In-Reply-To: <1380655736.13502.6.camel@linux-builds1>
+References: <1379434985-25294-1-git-send-email-dinguyen@altera.com>
+ <1380655736.13502.6.camel@linux-builds1>
+Message-ID: <20131007232757.7445.21576@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 7, 2013 at 4:40 PM, Jason Gunthorpe
-<jgunthorpe@obsidianresearch.com> wrote:
-> On Mon, Oct 07, 2013 at 04:28:52PM -0600, Bjorn Helgaas wrote:
->> [+cc Seungwon]
->>
->> On Tue, Oct 1, 2013 at 11:58 AM, Jason Gunthorpe
->> <jgunthorpe@obsidianresearch.com> wrote:
->> > Otherwise hotplugging the PEX doesn't work at all since the driver
->> > detects the link state at probe time. Simply replacing the two tests
->> > of haslink with a register read is enough to fix it.
->> >
->> > Tested on kirkwood with repeated plug/unplug of the link partner.
->> >
->> > Signed-off-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
->>
->> Last I heard (Sep 26), you had some mvebu changes in your tree
->> already, Jason, so I was assuming you'd handle pci-mvebu.c changes, at
->> least for the v3.13 merge window.  But you marked this "resend"; does
->> that mean you're waiting for me to do something with it?
->
-> Are you thinking of Jason C.? He is handling much of the mvebu stuff.
+Quoting Dinh Nguyen (2013-10-01 12:28:56)
+> Hi,
+> 
+> Just wondering if I can solicit any comments for this patch? It's small,
+> so I'm not sure if I need at least a good Ack-by and put it in my tree
+> for a pull request, or ask to be applied to the arm-soc or Mike's clock
+> tree?
 
-Oops, sorry, yep, indeed I meant Jason C.  Sorry about confusing you guys :)
+I've taken this into clk-fixes for 3.12.
 
-> Hopefully Jason C. can clarify which route these patches should take
-> to hit the 3.13 merge window.
->
-> This was reposted at the request of Thomas, IIRC.
->
->>   PCI: mvebu - Support a bridge with no IO port window
->
-> This one is broken, I have yet to fix it still.
->
->>   PCI: mvebu: add I/O access wrappers
->
-> This isn't one of mine ..
+Regards,
+Mike
 
-That's Seungwon's.  I just wanted to collect all the mvebu patches
-from the PCI patchwork.
-
-Bjorn
+> 
+> Thanks,
+> Dinh
+> 
+> On Tue, 2013-09-17 at 11:23 -0500, Dinh Nguyen wrote:
+> > From: Dinh Nguyen <dinguyen@altera.com>
+> > 
+> > The SD/MMC clock is named "sdmmc_clk", and NOT "mmc_clk". Because of this,
+> > the SD driver was getting the incorrect clock value. This prevented the
+> > SD driver from initializing correctly.
+> > 
+> > Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
+> > Cc: Mike Turquette <mturquette@linaro.org>
+> > CC: Arnd Bergmann <arnd@arndb.de>
+> > CC: Olof Johansson <olof@lixom.net>
+> > Cc: Pavel Machek <pavel@denx.de>
+> > Cc: linux-arm-kernel at lists.infradead.org
+> > ---
+> >  drivers/clk/socfpga/clk.c |    2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> > 
+> > diff --git a/drivers/clk/socfpga/clk.c b/drivers/clk/socfpga/clk.c
+> > index 5bb848c..81dd31a 100644
+> > --- a/drivers/clk/socfpga/clk.c
+> > +++ b/drivers/clk/socfpga/clk.c
+> > @@ -49,7 +49,7 @@
+> >  #define SOCFPGA_L4_SP_CLK            "l4_sp_clk"
+> >  #define SOCFPGA_NAND_CLK             "nand_clk"
+> >  #define SOCFPGA_NAND_X_CLK           "nand_x_clk"
+> > -#define SOCFPGA_MMC_CLK                      "mmc_clk"
+> > +#define SOCFPGA_MMC_CLK                      "sdmmc_clk"
+> >  #define SOCFPGA_DB_CLK                       "gpio_db_clk"
+> >  
+> >  #define div_mask(width)      ((1 << (width)) - 1)
