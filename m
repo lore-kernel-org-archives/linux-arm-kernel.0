@@ -1,169 +1,122 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Mon,  7 Oct 2013 22:25:11 +0200
-Subject: [PATCH v4] ARM: kirkwood: retain MAC address for DT ethernet
-In-Reply-To: <1380881842-24605-1-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1380881842-24605-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1381177511-1100-1-git-send-email-sebastian.hesselbarth@gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 7 Oct 2013 22:25:22 +0200
+Subject: [linux-sunxi] [PATCH 0/4] Add support for the Allwinner A31
+ Reset Controllers
+In-Reply-To: <CAPNxggZX+cXpXL4DZstaNm=68=pc=kLUYYZpERLMO9=i3en5Gw@mail.gmail.com>
+References: <1380983960-11087-1-git-send-email-maxime.ripard@free-electrons.com>
+ <CAPNxggaUW1B8Ea-gSo+XV2P9s4MRa1L25_ZAvOWyLN6VqQ6wsQ@mail.gmail.com>
+ <20131006082917.GD3106@lukather>
+ <CAPNxggb_dhQWPDkO_7LVyyn5537tDThtBU5SY1oZfZhri0QacQ@mail.gmail.com>
+ <20131007142603.GE3106@lukather>
+ <CAPNxggZX+cXpXL4DZstaNm=68=pc=kLUYYZpERLMO9=i3en5Gw@mail.gmail.com>
+Message-ID: <20131007202522.GA3041@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ethernet IP on Kirkwood SoCs loose their MAC address register content
-if clock gated. To allow modular ethernet driver setups and gated clocks
-also on non-DT capable bootloaders, we fixup port device nodes with no
-valid MAC address property. This patch copies MAC address register
-contents set up by bootloaders early, notably before ethernet clocks
-are gated. While at it, also reorder call sequence in _dt_init.
+On Mon, Oct 07, 2013 at 09:57:50PM +0200, Arokux X wrote:
+> >> Let me now ask how I should go about my reset bits.
+> >>
+> >> So far you were dealing with the registers where all the bits were
+> >> used for reset bits. In the case of USB clock module (and several
+> >> others) only several bits are reset bits. So I will proceed to use
+> >> your new driver like this (here, for the sake of clarity I use names
+> >> for registers and reset bits)
+> >>
+> >> +               usb_rst: reset at USB_CLK_REG {
+> >> +                       #reset-cells = <1>;
+> >> +                       compatible = "allwinner,sun4i-a10-usb-reset";
+> >> +                       reg = <USB_CLK_REG 0x4>;
+> >> +               };
+> >>
+> >> And somewhere in the EHCI/OHCI binding:
+> >>
+> >>                  ohci0: .... {
+> >>                           ...
+> >> +                       resets = <&usb_rst USB0_RESET_BIT>;
+> >>                           ...
+> >>                 }
+> >>
+> >>                  ehci0: .... {
+> >>                           ...
+> >> +                       resets = <&usb_rst USB0_RESET_BIT>;
+> >>                           ...
+> >>                 }
+> >>
+> >> If I understand right, here is the problem with this approach. As you
+> >> see ohci0/ehci0 are sharing the very same bit. So if device_reset is
+> >> used in both ohci0/ehci0 kernel modules we will have a situation where
+> >> one kernel module will reset the hardware used by the other kernel
+> >> module. The problem is that reset bit really belongs to a USB PHY,
+> >> which is shared between ohci0/ehci0. So as it looks like I would need
+> >> to add another module that handles USB PHY?
+> >>
+> >>                  usb0-phy: {
+> >>                           resets = <&usb_rst USB0_RESET_BIT>;
+> >>                  }
+> >>
+> >>                  ohci0: .... {
+> >>                           ...
+> >> +                       phy = <&usb0-phy>
+> >>                           ...
+> >>                 }
+> >>
+> >>                  ehci0: .... {
+> >>                           ...
+> >> +                       phy = <&usb0-phy>
+> >>                           ...
+> >>                 }
+> >
+> > Are those ohci and ehci nodes the same IP?
+> As far as I understand - yes.
 
-Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-Reviewed-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
-Reviewed-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-Tested-by: Andrew Lunn <andrew@lunn.ch>
----
-Just to make sure they don't get lost this time:
-Added Jason's and Ezequiel's Reviewed-by to honor their constant reviews,
-and Andrew's last Tested-by because I know he will be testing again.
+Then, it should be the same DT node. And you get only one driver, that
+can handle both the ehci and ohci cases, and problem solved.
 
-Changelog:
-v3->v4:
-- drop clk_is_enabled (and dependency) due to possible abuse of the
-  new function; enable/disable clk instead, remove gated clock warning
-  (Suggested by Andrew Lunn, Uwe Kleine-Koenig, Mike Turquette)
-- reduce FW_BUG to FW_INFO (Suggested by Andrew Lunn)
-- proper cleanup of iomap, clk, nodes
-v2->v3:
-- make use of new public clk_is_enabled (adds dependency)
-- add warning about gated clock && missing MAC property
-  (Suggested by Jason Gunthorpe)
-v1->v2:
-- check for gated clock before accessing eth registers
-  (Suggested by Andrew Lunn)
+> > Anyway, it seems like it's the way to go, yes. There's a USB PHY
+> > framework in review right now: https://lwn.net/Articles/548814/
+> 
+> Thanks a lot for this pointer. This is actually merged already and is
+> currently in Greg's usb-next tree
+> 
+> https://git.kernel.org/cgit/linux/kernel/git/gregkh/usb.git/commit/?h=usb-next&id=ff764963479a1b18721ab96e531404c50fefe8b1
 
-Cc: Jason Cooper <jason@lakedaemon.net>
-Cc: Andrew Lunn <andrew@lunn.ch>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Grant Likely <grant.likely@linaro.org>
-Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
-Cc: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
-Cc: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-Cc: Mike Turquette <mturquette@linaro.org>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
----
- arch/arm/mach-kirkwood/board-dt.c |   86 +++++++++++++++++++++++++++++++++++--
- 1 file changed, 83 insertions(+), 3 deletions(-)
+Oh, ok :)
 
-diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
-index 82d3ad8..3ddd194 100644
---- a/arch/arm/mach-kirkwood/board-dt.c
-+++ b/arch/arm/mach-kirkwood/board-dt.c
-@@ -13,6 +13,8 @@
- #include <linux/kernel.h>
- #include <linux/init.h>
- #include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/of_net.h>
- #include <linux/of_platform.h>
- #include <linux/clk-provider.h>
- #include <linux/clocksource.h>
-@@ -66,6 +68,85 @@ static void __init kirkwood_legacy_clk_init(void)
- 	clk_prepare_enable(clk);
- }
- 
-+#define MV643XX_ETH_MAC_ADDR_LOW	0x0414
-+#define MV643XX_ETH_MAC_ADDR_HIGH	0x0418
-+
-+static void __init kirkwood_dt_eth_fixup(void)
-+{
-+	struct device_node *np;
-+
-+	/*
-+	 * The ethernet interfaces forget the MAC address assigned by u-boot
-+	 * if the clocks are turned off. Usually, u-boot on kirkwood boards
-+	 * has no DT support to properly set local-mac-address property.
-+	 * As a workaround, we get the MAC address from mv643xx_eth registers
-+	 * and update the port device node if no valid MAC address is set.
-+	 */
-+	for_each_compatible_node(np, NULL, "marvell,kirkwood-eth-port") {
-+		struct device_node *pnp = of_get_parent(np);
-+		struct clk *clk;
-+		struct property *pmac;
-+		void __iomem *io;
-+		u8 *macaddr;
-+		u32 reg;
-+
-+		if (!pnp)
-+			continue;
-+
-+		/* skip disabled nodes or nodes with valid MAC address*/
-+		if (!of_device_is_available(pnp) || of_get_mac_address(np))
-+			goto eth_fixup_skip;
-+
-+		clk = of_clk_get(pnp, 0);
-+		if (IS_ERR(clk))
-+			goto eth_fixup_skip;
-+
-+		io = of_iomap(pnp, 0);
-+		if (!io)
-+			goto eth_fixup_no_map;
-+
-+		/* ensure port clock is not gated to not hang CPU */
-+		clk_prepare_enable(clk);
-+
-+		/* store MAC address register contents in local-mac-address */
-+		pr_err(FW_INFO "%s: local-mac-address is not set\n",
-+		       np->full_name);
-+
-+		pmac = kzalloc(sizeof(*pmac) + 6, GFP_KERNEL);
-+		if (!pmac)
-+			goto eth_fixup_no_mem;
-+
-+		pmac->value = pmac + 1;
-+		pmac->length = 6;
-+		pmac->name = kstrdup("local-mac-address", GFP_KERNEL);
-+		if (!pmac->name) {
-+			kfree(pmac);
-+			goto eth_fixup_no_mem;
-+		}
-+
-+		macaddr = pmac->value;
-+		reg = readl(io + MV643XX_ETH_MAC_ADDR_HIGH);
-+		macaddr[0] = (reg >> 24) & 0xff;
-+		macaddr[1] = (reg >> 16) & 0xff;
-+		macaddr[2] = (reg >> 8) & 0xff;
-+		macaddr[3] = reg & 0xff;
-+
-+		reg = readl(io + MV643XX_ETH_MAC_ADDR_LOW);
-+		macaddr[4] = (reg >> 8) & 0xff;
-+		macaddr[5] = reg & 0xff;
-+
-+		of_update_property(np, pmac);
-+
-+eth_fixup_no_mem:
-+		iounmap(io);
-+		clk_disable_unprepare(clk);
-+eth_fixup_no_map:
-+		clk_put(clk);
-+eth_fixup_skip:
-+		of_node_put(pnp);
-+	}
-+}
-+
- static void __init kirkwood_dt_time_init(void)
- {
- 	of_clk_init(NULL);
-@@ -97,11 +178,10 @@ static void __init kirkwood_dt_init(void)
- 	kirkwood_l2_init();
- 
- 	kirkwood_cpufreq_init();
--
-+	kirkwood_cpuidle_init();
- 	/* Setup clocks for legacy devices */
- 	kirkwood_legacy_clk_init();
--
--	kirkwood_cpuidle_init();
-+	kirkwood_dt_eth_fixup();
- 
- #ifdef CONFIG_KEXEC
- 	kexec_reinit = kirkwood_enable_pcie;
+> So I'd need to use yet another framework in my miniature glue
+> driver... it actually only touches a bunch of registers. :)
+> 
+> >> By the way, now you can see the advantages of the semantics that clock
+> >> framework is offering. If several devices want to disable a clock it
+> >> will only be disabled if no other devices are using it. Reset
+> >> framework does not offer this feature.
+> >
+> > Good thing we have the code and that we can patch it then.
+> What do you mean?
+
+If that behaviour doesn't fit your needs, change the behaviour, and send
+the patches. It's the way things go here.
+
+> > However, it's
+> > not much of a problem in our case, since both drivers will only want to
+> > deassert the reset.
+> 
+> It is a problem, since there will be two different modules one for
+> ohci and the other for ehci. So if you unload ohci for example it will
+> assert (write 0 to) the reset register. The ehci module will get into
+> trouble then.
+
+And if no one put the device back into reset, it just works.
+
+Maxime
+
 -- 
-1.7.10.4
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131007/7091aede/attachment-0001.sig>
