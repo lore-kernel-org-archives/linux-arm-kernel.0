@@ -1,27 +1,92 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Mon, 7 Oct 2013 11:01:41 +0200
-Subject: [PATCH 3/5] DRM: Armada: Add support for ARGB 32x64 or 64x32
- hardware cursors
-In-Reply-To: <E1VSwWS-0000i7-4f@rmk-PC.arm.linux.org.uk>
-References: <20131006220728.GG12758@n2100.arm.linux.org.uk>
- <E1VSwWS-0000i7-4f@rmk-PC.arm.linux.org.uk>
-Message-ID: <20131007110141.27f1ac25@armhf>
+From: l.krishna@samsung.com (Leela Krishna Amudala)
+Date: Mon, 07 Oct 2013 14:55:44 +0530
+Subject: [RESEND] [PATCH V3] ARM: dts: Add DMA controller node info on
+ Exynos5420.
+Message-ID: <1381137944-30503-1-git-send-email-l.krishna@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 06 Oct 2013 23:09:56 +0100
-Russell King <rmk+kernel@arm.linux.org.uk> wrote:
+From: Padmavathi Venna <padma.v@samsung.com>
 
-> This patch adds ARGB hardware cursor support to the DRM driver for the
-> Marvell Armada SoCs.  ARGB cursors are supported at either 32x64 or
-> 64x32 resolutions.
-	[snip]
+This patch adds dma controller node info on Exynos5420.
+Exynos5420 has adma for audio IPs. As adma clk is dependent
+on audss clk provider that will be added later.
 
-I don't see the interest of such cursors. Actually, most often, the
-cursors are 64x64 and 'A' is either 0 or 0xff. As the Armada 510
-supports 64x64 cursors with transparency, it would be more useful to
-implement these ones...
+Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
+Signed-off-by: Leela Krishna Amudala <l.krishna@samsung.com>
+---
+Change since V2:
+	- Removed adma node as adma clock is dependent audss clock provider.
 
+Changes since V1:
+        - In V1, dma node common stuff was added in common exynos5.dtsi file.
+          This was removed as per Kukjin comment and added in exynos5420.dtsi.
+
+ arch/arm/boot/dts/exynos5420.dtsi |   52 +++++++++++++++++++++++++++++++++++++
+ 1 file changed, 52 insertions(+)
+
+diff --git a/arch/arm/boot/dts/exynos5420.dtsi b/arch/arm/boot/dts/exynos5420.dtsi
+index d537cd7..15465f8 100644
+--- a/arch/arm/boot/dts/exynos5420.dtsi
++++ b/arch/arm/boot/dts/exynos5420.dtsi
+@@ -186,6 +186,58 @@
+ 		status = "okay";
+ 	};
+ 
++	amba {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		compatible = "arm,amba-bus";
++		interrupt-parent = <&gic>;
++		ranges;
++
++		pdma0: pdma at 121A0000 {
++			compatible = "arm,pl330", "arm,primecell";
++			reg = <0x121A0000 0x1000>;
++			interrupts = <0 34 0>;
++			clocks = <&clock 362>;
++			clock-names = "apb_pclk";
++			#dma-cells = <1>;
++			#dma-channels = <8>;
++			#dma-requests = <32>;
++		};
++
++		pdma1: pdma at 121B0000 {
++			compatible = "arm,pl330", "arm,primecell";
++			reg = <0x121B0000 0x1000>;
++			interrupts = <0 35 0>;
++			clocks = <&clock 363>;
++			clock-names = "apb_pclk";
++			#dma-cells = <1>;
++			#dma-channels = <8>;
++			#dma-requests = <32>;
++		};
++
++		mdma0: mdma at 10800000 {
++			compatible = "arm,pl330", "arm,primecell";
++			reg = <0x10800000 0x1000>;
++			interrupts = <0 33 0>;
++			clocks = <&clock 473>;
++			clock-names = "apb_pclk";
++			#dma-cells = <1>;
++			#dma-channels = <8>;
++			#dma-requests = <1>;
++		};
++
++		mdma1: mdma at 11C10000 {
++			compatible = "arm,pl330", "arm,primecell";
++			reg = <0x11C10000 0x1000>;
++			interrupts = <0 124 0>;
++			clocks = <&clock 442>;
++			clock-names = "apb_pclk";
++			#dma-cells = <1>;
++			#dma-channels = <8>;
++			#dma-requests = <1>;
++		};
++	};
++
+ 	serial at 12C00000 {
+ 		clocks = <&clock 257>, <&clock 128>;
+ 		clock-names = "uart", "clk_uart_baud0";
 -- 
-Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
-Jef		|		http://moinejf.free.fr/
+1.7.10.4
