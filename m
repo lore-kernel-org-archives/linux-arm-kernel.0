@@ -1,92 +1,34 @@
-From: l.krishna@samsung.com (Leela Krishna Amudala)
-Date: Mon, 07 Oct 2013 14:55:44 +0530
-Subject: [RESEND] [PATCH V3] ARM: dts: Add DMA controller node info on
- Exynos5420.
-Message-ID: <1381137944-30503-1-git-send-email-l.krishna@samsung.com>
+From: philippe.retornaz@epfl.ch (=?UTF-8?B?UGhpbGlwcGUgUsOpdG9ybmF6?=)
+Date: Mon, 07 Oct 2013 11:07:24 +0200
+Subject: [alsa-devel] [PATCH 1/2] ASoC: fsl: imx-ssi: fix probe on imx31
+In-Reply-To: <CAOMZO5C_kjTJ8iVGc67pcLLaO43arTiyMRQ1822VkBLDm7hzPw@mail.gmail.com>
+References: <1380630971-11431-1-git-send-email-philippe.retornaz@epfl.ch>
+ <1380630971-11431-2-git-send-email-philippe.retornaz@epfl.ch>
+ <20131003155954.GV27287@sirena.org.uk> <524D963F.5080507@epfl.ch>
+ <CAOMZO5C_kjTJ8iVGc67pcLLaO43arTiyMRQ1822VkBLDm7hzPw@mail.gmail.com>
+Message-ID: <525279CC.8080309@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Padmavathi Venna <padma.v@samsung.com>
+Hello
 
-This patch adds dma controller node info on Exynos5420.
-Exynos5420 has adma for audio IPs. As adma clk is dependent
-on audss clk provider that will be added later.
+Le 04/10/2013 20:10, Fabio Estevam a ?crit :
+> On Thu, Oct 3, 2013 at 1:07 PM, Philippe R?tornaz wrote
+>> It was working but it is broken since a few release. There is no
+>> need to rush for a fix, both patches can follow the standard
+>> process.
+>
+> We have been using  sound/soc/fsl/fsl_ssi.c for the dt imx and
+> powerpc parts, and that's probably the reason we haven't noticed this
+> bug.
 
-Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
-Signed-off-by: Leela Krishna Amudala <l.krishna@samsung.com>
----
-Change since V2:
-	- Removed adma node as adma clock is dependent audss clock provider.
+Well, I don't think it's fair to break boards just because they are not
+(yet) converted to DT ... this board was merged before the DT era on ARM.
 
-Changes since V1:
-        - In V1, dma node common stuff was added in common exynos5.dtsi file.
-          This was removed as per Kukjin comment and added in exynos5420.dtsi.
+Anyway even on DT it's broken: before the switch to the common asoc pcm
+code, the dma API was misused to let it think that the audio part of the
+SoC was doing the bus mastering, while in fact the sdma was doing it.
 
- arch/arm/boot/dts/exynos5420.dtsi |   52 +++++++++++++++++++++++++++++++++++++
- 1 file changed, 52 insertions(+)
+Regards,
 
-diff --git a/arch/arm/boot/dts/exynos5420.dtsi b/arch/arm/boot/dts/exynos5420.dtsi
-index d537cd7..15465f8 100644
---- a/arch/arm/boot/dts/exynos5420.dtsi
-+++ b/arch/arm/boot/dts/exynos5420.dtsi
-@@ -186,6 +186,58 @@
- 		status = "okay";
- 	};
- 
-+	amba {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		compatible = "arm,amba-bus";
-+		interrupt-parent = <&gic>;
-+		ranges;
-+
-+		pdma0: pdma at 121A0000 {
-+			compatible = "arm,pl330", "arm,primecell";
-+			reg = <0x121A0000 0x1000>;
-+			interrupts = <0 34 0>;
-+			clocks = <&clock 362>;
-+			clock-names = "apb_pclk";
-+			#dma-cells = <1>;
-+			#dma-channels = <8>;
-+			#dma-requests = <32>;
-+		};
-+
-+		pdma1: pdma at 121B0000 {
-+			compatible = "arm,pl330", "arm,primecell";
-+			reg = <0x121B0000 0x1000>;
-+			interrupts = <0 35 0>;
-+			clocks = <&clock 363>;
-+			clock-names = "apb_pclk";
-+			#dma-cells = <1>;
-+			#dma-channels = <8>;
-+			#dma-requests = <32>;
-+		};
-+
-+		mdma0: mdma at 10800000 {
-+			compatible = "arm,pl330", "arm,primecell";
-+			reg = <0x10800000 0x1000>;
-+			interrupts = <0 33 0>;
-+			clocks = <&clock 473>;
-+			clock-names = "apb_pclk";
-+			#dma-cells = <1>;
-+			#dma-channels = <8>;
-+			#dma-requests = <1>;
-+		};
-+
-+		mdma1: mdma at 11C10000 {
-+			compatible = "arm,pl330", "arm,primecell";
-+			reg = <0x11C10000 0x1000>;
-+			interrupts = <0 124 0>;
-+			clocks = <&clock 442>;
-+			clock-names = "apb_pclk";
-+			#dma-cells = <1>;
-+			#dma-channels = <8>;
-+			#dma-requests = <1>;
-+		};
-+	};
-+
- 	serial at 12C00000 {
- 		clocks = <&clock 257>, <&clock 128>;
- 		clock-names = "uart", "clk_uart_baud0";
--- 
-1.7.10.4
+Philippe
