@@ -1,75 +1,24 @@
 From: mturquette@linaro.org (Mike Turquette)
-Date: Mon, 07 Oct 2013 00:44:24 -0700
-Subject: [RFC] clk: add flags to distinguish xtal clocks
-In-Reply-To: <1375105842.20048.18.camel@cumari.coelho.fi>
-References: <1372971912-10877-1-git-send-email-coelho@ti.com>
- <20130704222538.10823.2559@quantum>
- <1372977465.21065.136.camel@cumari.coelho.fi>
- <20130704231953.10823.94331@quantum>
- <1373010853.21065.159.camel@cumari.coelho.fi>
- <1375105842.20048.18.camel@cumari.coelho.fi>
-Message-ID: <20131007074424.7445.52119@quantum>
+Date: Mon, 07 Oct 2013 00:58:31 -0700
+Subject: [PATCH v5 3/3] Documentation: Add documentation for APM X-Gene
+ clock binding
+In-Reply-To: <CAPw-ZT=8TL2bJABd6_76JyZcDS+NTk+vJzj0YCGNNujKx+JqOA@mail.gmail.com>
+References: <1372269371-22992-1-git-send-email-lho@apm.com>
+ <1372269371-22992-2-git-send-email-lho@apm.com>
+ <1372269371-22992-3-git-send-email-lho@apm.com>
+ <1372269371-22992-4-git-send-email-lho@apm.com>
+ <20130725205953.7598.15913@quantum>
+ <CAPw-ZT=8TL2bJABd6_76JyZcDS+NTk+vJzj0YCGNNujKx+JqOA@mail.gmail.com>
+Message-ID: <20131007075831.7445.49431@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Luciano Coelho (2013-07-29 06:50:42)
-> Hi Mike,
-> 
-> On Fri, 2013-07-05 at 10:54 +0300, Luciano Coelho wrote:
-> > On Thu, 2013-07-04 at 16:19 -0700, Mike Turquette wrote:
-> > > Quoting Luciano Coelho (2013-07-04 15:37:45)
-> > > > On Thu, 2013-07-04 at 15:25 -0700, Mike Turquette wrote:
-> > > > > Or is it the same clock input and basically the problem is that you need
-> > > > > to know what kind of waveform to expect (e.g. square versus sine)?
-> > > > 
-> > > > It's the same clock input in the chip's perspective.  One clock input
-> > > > that can be any of the combinations I mentioned above.  Again, I'm not
-> > > > familiar with clocks, so I guess the square vs. sine explanation is
-> > > > plausible.  What I could see in the firmware is that it handles the
-> > > > clocks differently if they're xtal or not.
-> > > 
-> > > OMAP has a similar thing where sys_clkin (the fast reference clock for
-> > > the chip) can be 19.2, 26, 38.4, etc. This is easy to handle since only
-> > > the rates matter.
-> > 
-> > Right, this part is easy and I already have the code for that.  What I'm
-> > missing is a way to pass this XTAL flag to the chip.
-> > 
-> > 
-> > > In your case you need some extra metadata to know what to do. I'm really
-> > > not sure if CLK_IS_TYPE_XTAL is the most useful form this metadata can
-> > > take. It would be best to know if the waveform is what you really need
-> > > to know, or perhaps something else. For instance you might be affected
-> > > by some clock signal stabilization time. Can you talk to your hardware
-> > > guys and figure it out? I'd rather model the actual needs instead of
-> > > just tossing a flag in there.
-> > 
-> > I get your point.  I have tried to investigate how this flag is used by
-> > the firmware and I could see that it is used to set different "buffer
-> > gains" and "delays" when waking up (I guess this means when the clock is
-> > starting, so probably related to stabilization time).  They specify two
-> > "modes", "boost" and "normal" and use different delay values for each.
-> 
-> I tried but I couldn't find any more information on how exactly this
-> works.  But since this change is really simple and there seems to be
-> other people who need the same information, couldn't we add it as is and
-> try to figure out more specific information about the clocks later on?
-> 
-> Even if XTAL is not that useful if we know the other details, at least
-> it wouldn't hurt to have the flag there anyway.
+Quoting Loc Ho (2013-07-31 11:49:07)
+>    With the latest version, this is used to determine whether it is
+>    divider register or csr register. In the file clk-xgene.c, grep for
+>    "div-reg". It is around line 521.
 
-Luca,
-
-By any chance did you come to a different solution for this problem? I
-can take the patch, but I do not feel like we're solving the right
-problem the right way.
-
-If not I will take it for 3.13.
+Thanks for the rework, I've taken this for 3.13.
 
 Regards,
 Mike
-
-> 
-> --
-> Cheers,
-> Luca.
