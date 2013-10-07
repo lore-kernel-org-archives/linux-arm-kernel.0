@@ -1,79 +1,104 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Mon,  7 Oct 2013 11:29:29 -0500
-Subject: [PATCH v2 21/29] arm64: set initrd_start/initrd_end for fdt scan
+Date: Mon,  7 Oct 2013 11:29:34 -0500
+Subject: [PATCH v2 26/29] arm: use common of_flat_dt_match_machine
 In-Reply-To: <1381163377-21044-1-git-send-email-robherring2@gmail.com>
 References: <1381163377-21044-1-git-send-email-robherring2@gmail.com>
-Message-ID: <1381163377-21044-22-git-send-email-robherring2@gmail.com>
+Message-ID: <1381163377-21044-27-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Rob Herring <rob.herring@calxeda.com>
 
-In order to unify the initrd scanning for DT across architectures, make
-arm64 use initrd_start and initrd_end instead of the physical addresses.
+Convert arm to use the common of_flat_dt_match_machine function.
 
 Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
+Cc: Russell King <linux@arm.linux.org.uk>
 Cc: linux-arm-kernel at lists.infradead.org
 ---
- arch/arm64/mm/init.c | 24 ++++++------------------
- 1 file changed, 6 insertions(+), 18 deletions(-)
+ arch/arm/kernel/devtree.c | 42 ++++++++++++++++++++----------------------
+ 1 file changed, 20 insertions(+), 22 deletions(-)
 
-diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-index de2de5d..8261f4e 100644
---- a/arch/arm64/mm/init.c
-+++ b/arch/arm64/mm/init.c
-@@ -39,17 +39,9 @@
- 
- #include "mm.h"
- 
--static unsigned long phys_initrd_start __initdata = 0;
--static unsigned long phys_initrd_size __initdata = 0;
--
- phys_addr_t memstart_addr __read_mostly = 0;
- 
--void __init early_init_dt_setup_initrd_arch(u64 start, u64 end)
--{
--	phys_initrd_start = start;
--	phys_initrd_size = end - start;
--}
--
-+#ifdef CONFIG_BLK_DEV_INITRD
- static int __init early_initrd(char *p)
- {
- 	unsigned long start, size;
-@@ -59,12 +51,13 @@ static int __init early_initrd(char *p)
- 	if (*endp == ',') {
- 		size = memparse(endp + 1, NULL);
- 
--		phys_initrd_start = start;
--		phys_initrd_size = size;
-+		initrd_start = (unsigned long)__va(start);
-+		initrd_end = (unsigned long)__va(start + size);
- 	}
- 	return 0;
+diff --git a/arch/arm/kernel/devtree.c b/arch/arm/kernel/devtree.c
+index e7ce175..0541f36 100644
+--- a/arch/arm/kernel/devtree.c
++++ b/arch/arm/kernel/devtree.c
+@@ -174,6 +174,19 @@ bool arch_match_cpu_phys_id(int cpu, u64 phys_id)
+ 	return (phys_id & MPIDR_HWID_BITMASK) == cpu_logical_map(cpu);
  }
- early_param("initrd", early_initrd);
-+#endif
  
- #define MAX_DMA32_PFN ((4UL * 1024 * 1024 * 1024) >> PAGE_SHIFT)
++static const void * __init arch_get_next_mach(const char *const **match)
++{
++	static const struct machine_desc *mdesc = __arch_info_begin;
++	const struct machine_desc *m = mdesc;
++
++	if (m >= __arch_info_end)
++		return NULL;
++
++	mdesc++;
++	*match = m->dt_compat;
++	return m;
++}
++
+ /**
+  * setup_machine_fdt - Machine setup when an dtb was passed to the kernel
+  * @dt_phys: physical address of dt blob
+@@ -184,9 +197,6 @@ bool arch_match_cpu_phys_id(int cpu, u64 phys_id)
+ const struct machine_desc * __init setup_machine_fdt(unsigned int dt_phys)
+ {
+ 	const struct machine_desc *mdesc, *mdesc_best = NULL;
+-	unsigned int score, mdesc_score = ~1;
+-	unsigned long dt_root;
+-	const char *model;
  
-@@ -137,13 +130,8 @@ void __init arm64_memblock_init(void)
- 	/* Register the kernel text, kernel data and initrd with memblock */
- 	memblock_reserve(__pa(_text), _end - _text);
- #ifdef CONFIG_BLK_DEV_INITRD
--	if (phys_initrd_size) {
--		memblock_reserve(phys_initrd_start, phys_initrd_size);
--
--		/* Now convert initrd to virtual addresses */
--		initrd_start = __phys_to_virt(phys_initrd_start);
--		initrd_end = initrd_start + phys_initrd_size;
+ #ifdef CONFIG_ARCH_MULTIPLATFORM
+ 	DT_MACHINE_START(GENERIC_DT, "Generic DT based system")
+@@ -198,23 +208,17 @@ const struct machine_desc * __init setup_machine_fdt(unsigned int dt_phys)
+ 	if (!dt_phys || !early_init_dt_scan(phys_to_virt(dt_phys)))
+ 		return NULL;
+ 
++	mdesc = of_flat_dt_match_machine(mdesc_best, arch_get_next_mach);
+ 
+-	/* Search the mdescs for the 'best' compatible value match */
+-	dt_root = of_get_flat_dt_root();
+-	for_each_machine_desc(mdesc) {
+-		score = of_flat_dt_match(dt_root, mdesc->dt_compat);
+-		if (score > 0 && score < mdesc_score) {
+-			mdesc_best = mdesc;
+-			mdesc_score = score;
+-		}
 -	}
-+	if (initrd_start)
-+		memblock_reserve(__virt_to_phys(initrd_start), initrd_end - initrd_start);
- #endif
+-	if (!mdesc_best) {
++	if (!mdesc) {
+ 		const char *prop;
+ 		long size;
++		unsigned long dt_root;
  
- 	/*
+ 		early_print("\nError: unrecognized/unsupported "
+ 			    "device tree compatible list:\n[ ");
+ 
++		dt_root = of_get_flat_dt_root();
+ 		prop = of_get_flat_dt_prop(dt_root, "compatible", &size);
+ 		while (size > 0) {
+ 			early_print("'%s' ", prop);
+@@ -225,16 +229,10 @@ const struct machine_desc * __init setup_machine_fdt(unsigned int dt_phys)
+ 
+ 		dump_machine_table(); /* does not return */
+ 	}
+-
+-	model = of_get_flat_dt_prop(dt_root, "model", NULL);
+-	if (!model)
+-		model = of_get_flat_dt_prop(dt_root, "compatible", NULL);
+-	if (!model)
+-		model = "<unknown>";
+-	pr_info("Machine: %s, model: %s\n", mdesc_best->name, model);
++	early_print("matched mach %s\n", mdesc->name);
+ 
+ 	/* Change machine number to match the mdesc we're using */
+-	__machine_arch_type = mdesc_best->nr;
++	__machine_arch_type = mdesc->nr;
+ 
+-	return mdesc_best;
++	return mdesc;
+ }
 -- 
 1.8.1.2
