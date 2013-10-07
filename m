@@ -1,66 +1,61 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Mon, 07 Oct 2013 10:18:14 +0200
-Subject: [PATCH|RFC] of: let of_match_device() always return best match
-In-Reply-To: <21074.28159.130293.169699@ipc1.ka-ro>
-References: <1380826284-18381-1-git-send-email-mkl@pengutronix.de>
- <CAOMZO5BekS_BvJzrt8vM1=7LjsiO=3hKL=mMfTjxkO3aZ4qwRQ@mail.gmail.com>
- <525052F5.5080204@pengutronix.de> <21074.28159.130293.169699@ipc1.ka-ro>
-Message-ID: <52526E46.4030205@pengutronix.de>
+From: rogerq@ti.com (Roger Quadros)
+Date: Mon, 7 Oct 2013 11:19:32 +0300
+Subject: [PATCH v7 09/10] usb: dwc3: omap: manage "usb_otg_ss_refclk960m"
+ clock
+In-Reply-To: <20131004132329.GA25648@kroah.com>
+References: <1379508542-22389-1-git-send-email-rogerq@ti.com>
+ <1379508542-22389-10-git-send-email-rogerq@ti.com> <52403E02.4070208@ti.com>
+ <20131002131113.GM1476@radagast> <524C22A1.30200@ti.com>
+ <20131003122941.GD3230@radagast> <524D8516.8000107@ti.com>
+ <20131003154144.GA18189@kroah.com> <524E9C70.8050303@ti.com>
+ <20131004132329.GA25648@kroah.com>
+Message-ID: <52526E94.7080605@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/07/2013 10:17 AM, Lothar Wa?mann wrote:
-> Hi,
+On 10/04/2013 04:23 PM, Greg KH wrote:
+> On Fri, Oct 04, 2013 at 01:46:08PM +0300, Roger Quadros wrote:
+>> Greg,
+>>
+>> On 10/03/2013 06:41 PM, Greg KH wrote:
+>>> On Thu, Oct 03, 2013 at 05:54:14PM +0300, Roger Quadros wrote:
+>>>> On 10/03/2013 03:29 PM, Felipe Balbi wrote:
+>>>>> Hi,
+>>>>>
+>>>>> On Wed, Oct 02, 2013 at 04:41:53PM +0300, Roger Quadros wrote:
+>>>>>> On 10/02/2013 04:11 PM, Felipe Balbi wrote:
+>>>>>>> On Mon, Sep 23, 2013 at 04:11:30PM +0300, Roger Quadros wrote:
+>>>>>>>> Hi Felipe,
+>>>>>>>>
+>>>>>>>> On 09/18/2013 03:49 PM, Roger Quadros wrote:
+>>>>>>>>> "usb_otg_ss_refclk960m" is an optional functional clock to the
+>>>>>>>>> UBS_OTG_SS module. So manage it in the driver.
+>>>>>>>>>
+>>>>>>>>
+>>>>>>>> Just realized that "usb_otg_ss_refclk960m" is in fact functional clock to the 
+>>>>>>>> PHY and not USB_OTG_SS module. The name is misleading.
+>>>>>>>>
+>>>>>>>> So please ignore patch 9 and 10.
+>>>>>>>
+>>>>>>> ignored. All others are fine, right ?
+>>>>>>>
+>>>>>> Yes. But I might have to rebase this on top of Phy framework stuff.
+>>>>>
+>>>>> alright, Greg already took the PHY framework, so maybe we need to just
+>>>>> give him my Acked-by and he takes the patches directly as I don't have
+>>>>> PYH framework.
+>>>>>
+>>>> OK. I'll resend this series to Greg in a while.
+>>>
+>>> It looks like you did, but forgot Felipe's ack :(
+>>>
+>> I was under the impression that Felipe will explicitly give his Ack there.
+>> Should I resend with his Acked-bys?
 > 
-> Marc Kleine-Budde writes:
->> On 10/05/2013 07:46 PM, Fabio Estevam wrote:
->>> Hi Marc,
->>>
->>> On Thu, Oct 3, 2013 at 3:51 PM, Marc Kleine-Budde <mkl@pengutronix.de> wrote:
->>>
->>>> For example:
->>>>
->>>> The imx28.dtsi gives this compatible string for its CAN core:
->>>>
->>>>>       compatible = "fsl,imx28-flexcan", "fsl,p1010-flexcan";
->>>>
->>>> The flexcan driver defines:
->>>>
->>>>> static const struct of_device_id flexcan_of_match[] = {
->>>>>       { .compatible = "fsl,p1010-flexcan", .data = &fsl_p1010_devtype_data, },
->>>>>       { .compatible = "fsl,imx28-flexcan", .data = &fsl_imx28_devtype_data, },
->>>>>       { .compatible = "fsl,imx6q-flexcan", .data = &fsl_imx6q_devtype_data, },
->>>>>       { /* sentinel */ },
->>>>> };
->>>>
->>>> The "p1010" was the first Freescale SoC with the flexcan core. But this SoC has
->>>> a bug, so a workaround has to be enabled in the driver. The mx28 has this bug
->>>> fixed, so we don't need this quite costly workaround.
->>>
->>> What about defining in imx28.dtsi:
->>> compatible = "fsl,imx28-flexcan".
->>
->> It already works with changing only the driver.
->>
-> IMO the change proposed by Fabio is much more sensible. If the imx28
-> implementation of the CAN controller is not compatible to p1010 (which
-> is obviously true) there is no point in having the "fsl,p1010-flexcan"
-> in the DT for imx28.
+> No need, I took the patches yesterday, you should have seen the
+> automated emails, right?
+> 
+Thanks. Yes, I got the automated e-mails.
 
-But it is compatible with the "fsl,p1010-flexcan".
-
-Marc
-
--- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 259 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131007/218b740d/attachment.sig>
+cheers,
+-roger
