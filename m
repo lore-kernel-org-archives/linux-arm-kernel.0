@@ -1,33 +1,31 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Mon, 7 Oct 2013 16:49:41 +0300
-Subject: [PATCH 1/1] ARM: dts: omap3: Adapt USB OTG to generic PHY
- framework
-In-Reply-To: <5252B9C7.5040109@linutronix.de>
-References: <1381152493-28055-1-git-send-email-rogerq@ti.com>
- <1381152493-28055-2-git-send-email-rogerq@ti.com>
- <5252B9C7.5040109@linutronix.de>
-Message-ID: <5252BBF5.1060406@ti.com>
+From: ldewangan@nvidia.com (Laxman Dewangan)
+Date: Mon, 7 Oct 2013 19:53:29 +0530
+Subject: [PATCH V2] clk: palmas: add clock driver for palmas
+In-Reply-To: <1381154751-4565-1-git-send-email-ldewangan@nvidia.com>
+References: <1381154751-4565-1-git-send-email-ldewangan@nvidia.com>
+Message-ID: <5252C3E1.5010509@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/07/2013 04:40 PM, Sebastian Andrzej Siewior wrote:
-> On 10/07/2013 03:28 PM, Roger Quadros wrote:
->> The generic PHY framewrok expects different properties than the
->> old USB PHY framework. Supply those properties.
->>
->> Fixes USB OTG port on GAT04 and N900 after the Generic PHY framework was
->> merged in greg/usb-next. [1]
-> 
-> Would it be much pain (and do we want this at all) to add a fallback
-> into the kernel or at least a printk pointing out to update the .dts
-> for two releases or so? So the user does not need to spent hours to
-> figure out why it suddenly stopped working.
-> 
+On Monday 07 October 2013 07:35 PM, Laxman Dewangan wrote:
+> --- a/drivers/clk/Makefile
+> +++ b/drivers/clk/Makefile
+> @@ -43,3 +43,5 @@ obj-$(CONFIG_COMMON_CLK_SI5351) += clk-si5351.o
+>   obj-$(CONFIG_COMMON_CLK_S2MPS11) += clk-s2mps11.o
+>   obj-$(CONFIG_CLK_TWL6040)	+= clk-twl6040.o
+>   obj-$(CONFIG_CLK_PPC_CORENET)	+= clk-ppc-corenet.o
+> +obj-$(CONFIG_COMMON_CLK_PALMAS)	+= clk-palmas.o
+> +obj-y += clk-test.o
+>
 
-I agree with you. 
+Sorry, silly mistake, the line
 
-Also, figuring out which kernel configs to enable for
-USB OTG to work on OMAP is a pain in itself to the user.
++obj-y += clk-test.o
 
-cheers,
--roger
+is not require. This was done for testing only.
+
+I will respin the patch but wait for some more feedback if any to add on 
+next version.
+
+Thanks,
+Laxman
