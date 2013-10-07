@@ -1,92 +1,43 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 7 Oct 2013 10:44:04 +0100
-Subject: [PATCH 5/5] DRM: Armada: add support for drm tda19988 driver
-In-Reply-To: <20131007111807.5e86ea6e@armhf>
-References: <20131006220728.GG12758@n2100.arm.linux.org.uk>
- <E1VSwYO-0000iT-CU@rmk-PC.arm.linux.org.uk> <20131007111807.5e86ea6e@armhf>
-Message-ID: <20131007094404.GI12758@n2100.arm.linux.org.uk>
+From: cb@sgoc.de (Christoph G. Baumann)
+Date: Mon, 7 Oct 2013 11:50:39 +0200 (CEST)
+Subject: [PATCH 2/3] ARM: mxs: crypto: Add Freescale MXS DCP driver
+In-Reply-To: <201309280535.33672.marex@denx.de>
+References: <1380194306-5243-1-git-send-email-marex@denx.de>
+ <201309261407.33923.marex@denx.de> <5245AC5B.80800@gmail.com>
+ <201309280535.33672.marex@denx.de>
+Message-ID: <632804650.191291.1381139440065.open-xchange@email.1und1.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 07, 2013 at 11:18:07AM +0200, Jean-Francois Moine wrote:
-> On Sun, 06 Oct 2013 23:11:56 +0100
-> Russell King <rmk+kernel@arm.linux.org.uk> wrote:
-> 
-> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> > ---
-> >  drivers/gpu/drm/armada/Kconfig      |    9 +++++++
-> >  drivers/gpu/drm/armada/armada_drv.c |   42 +++++++++++++++++++++++++++++++++++
-> >  2 files changed, 51 insertions(+), 0 deletions(-)
-> > 
-> > diff --git a/drivers/gpu/drm/armada/Kconfig b/drivers/gpu/drm/armada/Kconfig
-> > index c7a0a94..87e62dd 100644
-> > --- a/drivers/gpu/drm/armada/Kconfig
-> > +++ b/drivers/gpu/drm/armada/Kconfig
-> > @@ -13,3 +13,12 @@ config DRM_ARMADA
-> >  	  This driver provides no built-in acceleration; acceleration is
-> >  	  performed by other IP found on the SoC.  This driver provides
-> >  	  kernel mode setting and buffer management to userspace.
-> > +
-> > +config DRM_ARMADA_TDA1998X
-> > +	bool "Support TDA1998X HDMI output"
-> > +	depends on DRM_ARMADA != n
-> > +	depends on I2C && DRM_I2C_NXP_TDA998X = y
-> > +	default y
-> > +	help
-> > +	  Support the TDA1998x HDMI output device found on the Solid-Run
-> > +	  CuBox.
-> 
-> It seems we are going backwards: as the Armada based boards will soon
-> move to full DT (mvebu), you are making an exception for the Cubox, so
-> that there should be Cubox specific kernels. I don't like that...
+Hello Marek,
 
-*Ignored*.  You know why.
+>?Marek?Vasut?<marex@denx.de>?hat?am?28.?September?2013?um?05:35?geschrieben:
+> [...]
+>?>?>?3)?What?are?those?ugly?new?IOCTLs?in?the?dcp.c?driver?
+>?>?
+>?>?When?I?firstly?posted?the?driver?in?the?mailinglist,?there?where?one
+>?>?person?who?actually?used?this?interface?(it?was?introduced?in
+>?>?Freescale's?SDK)?to?use?the?OTP?keys?for?crypto.?As?far?as?I?have
+>?>?seen,?the?crypto?API?does?not?support?such?keys?(i.e.?there?seems?to
+>?>?be?no?way?to?tell?a?driver?to?use?some?kind?of?special?keys?-?which
+>?>?are?not?delivered?by?the?user?-?via?the?API).
+>?>?Therefore?I?added?this?miscdevice?and?adopted?Freescale's?interface.
+>?
+>?The?keys?are?programmed?into?the?OTP?registers,?correct??There?is?OCOTP?driver?
+>?for?the?MX23/MX28?OTP?hardware.?This?is?what?should?have?been?used?then.
+>?
+>?NOTE:?This?IOCTL?interface?seems?like?quite?an?abusive?way?to?allow?userland?to?
+>?access?the?crypto?API?in?kernel.?I?understand?this?is?used?by?some?Freescale?
+>?tool,?but?won't?it?be?better?to?fix?the?Freescale?tool?instead??
 
-> > diff --git a/drivers/gpu/drm/armada/armada_drv.c b/drivers/gpu/drm/armada/armada_drv.c
-> > index db62f1b..69517cf 100644
-> > --- a/drivers/gpu/drm/armada/armada_drv.c
-> > +++ b/drivers/gpu/drm/armada/armada_drv.c
-> > @@ -16,6 +16,42 @@
-> >  #include <drm/armada_drm.h>
-> >  #include "armada_ioctlP.h"
-> >  
-> > +#ifdef CONFIG_DRM_ARMADA_TDA1998X
-> > +#include <drm/i2c/tda998x.h>
-> > +#include "armada_slave.h"
-> > +
-> > +static struct tda998x_encoder_params params = {
-> > +	/* With 0x24, there is no translation between vp_out and int_vp
-> > +	FB	LCD out	Pins	VIP	Int Vp
-> > +	R:23:16	R:7:0	VPC7:0	7:0	7:0[R]
-> > +	G:15:8	G:15:8	VPB7:0	23:16	23:16[G]
-> > +	B:7:0	B:23:16	VPA7:0	15:8	15:8[B]
-> > +	*/
-> > +	.swap_a = 2,
-> > +	.swap_b = 3,
-> > +	.swap_c = 4,
-> > +	.swap_d = 5,
-> > +	.swap_e = 0,
-> > +	.swap_f = 1,
-> 
-> I still don't agree. You don't need to invert R <-> B for the Cubox at
-> the tda998x level: this may be done setting as it should be the
-> CFG_GRA_SWAPRB flag of the lcd register LCD_SPU_DMA_CTRL0.
 
-You are totally and utterly wrong there.  We need R and B presented on
-their correct lanes to the TDA998x so that the Armadas YUV->RGB
-conversion works.  Setting CFG_GRA_SWAPRB does not swap the YUV output
-to match, neither does setting any of the other bits.
+the IOCTL interface is used to AES encrypt a bootstream with the AES key in
+OCOTP.
+The idea is that only the DCP can read/access the key once it has been
+programmed
+into the OCOTP. If the crypto API has means to tell the DCP to use the key from
+OCOTP, the tool from Freescale is a minor problem.
 
-CFG_GRA_SWAPRB is all about the _graphics_ _framebuffer_ format, it's got
-nothing to do at all with how the output is wired.
 
-> > +	.audio_cfg = BIT(2),
-> > +	.audio_frame[1] = 1,
-> > +	.audio_format = AFMT_SPDIF,
-> > +	.audio_sample_rate = 44100,
-> 
-> These values are rather mysterious!
-
-Also I'm going to ignore this comment, because quite honestly, I think
-this is worthless.  You haven't investigated how the TDA998x actually
-gets setup by Rabeeh.
+Regards,
+Christoph
