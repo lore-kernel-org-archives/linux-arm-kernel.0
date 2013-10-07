@@ -1,65 +1,32 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Mon, 07 Oct 2013 11:16:59 -0700
-Subject: [PATCH v7 1/5] ARM: add basic support for Trusted Foundations
-In-Reply-To: <1380904635-18113-2-git-send-email-acourbot@nvidia.com>
- (Alexandre Courbot's message of "Fri, 4 Oct 2013 09:37:11 -0700")
-References: <1380904635-18113-1-git-send-email-acourbot@nvidia.com>
- <1380904635-18113-2-git-send-email-acourbot@nvidia.com>
-Message-ID: <871u3xdjz8.fsf@linaro.org>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 7 Oct 2013 11:22:45 -0700
+Subject: [GIT PULL 0/8] Renesas ARM based SoC updates for v3.13
+In-Reply-To: <cover.1380530437.git.horms+renesas@verge.net.au>
+References: <cover.1380530437.git.horms+renesas@verge.net.au>
+Message-ID: <20131007182245.GE17592@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Alexandre Courbot <acourbot@nvidia.com> writes:
+On Tue, Oct 01, 2013 at 11:34:09AM +0900, Simon Horman wrote:
+> Hi Kevin, Olof and Arnd,
+> 
+> please consider these Renesas ARM based SoC updates for v3.13.
+> 
+> This pull-request is based on v3.12-rc1.
+> 
+> 
+> The following changes since commit 272b98c6455f00884f0350f775c5342358ebb73f:
+> 
+>   Linux 3.12-rc1 (2013-09-16 16:17:51 -0400)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git soc
 
-> Trusted Foundations is a TrustZone-based secure monitor for ARM that
-> can be invoked using the same SMC-based API on all supported
-> platforms. This patch adds initial basic support for Trusted
-> Foundations using the ARM firmware API. Current features are limited
-> to the ability to boot secondary processors.
->
-> Note: The API followed by Trusted Foundations does *not* follow the SMC
-> calling conventions. It has nothing to do with PSCI neither and is only
-> relevant to devices that use Trusted Foundations (like most Tegra-based
-> retail devices).
->
-> Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
-> Reviewed-by: Tomasz Figa <t.figa@samsung.com>
-> Reviewed-by: Stephen Warren <swarren@nvidia.com>
+Pulled. As discussed earlier, the new platforms for 3.13 should be
+the last ones of the legacy kind; from here on out we should see
+multi-platform enabled new platforms from day one (i.e. once CCF and
+other pieces land).
 
-[...]
 
-> +void register_trusted_foundations(struct trusted_foundations_platform_data *pd)
-> +{
-> +	/* we are not using version information for now since currently
-> +	 * supported SMCs are compatible with all TF releases */
-
-nit: multi-line comment style...
-
-[...]
-
-> +static inline void register_trusted_foundations(
-> +				   struct trusted_foundations_platform_data *pd)
-> +{
-> +	/* If we try to register TF, this means the system needs it to continue.
-> +	 * Its absence if thus a fatal error. */
-
-...and here...
-
-> +	panic("No support for Trusted Foundations, stopping...\n");
-> +}
-> +
-> +static inline void of_register_trusted_foundations(void)
-> +{
-> +	/* If we find the target should enable TF but does not support it,
-> +	 * fail as the system won't be able to do much anyway */
-
-...and here.
-
-> +	if (of_find_compatible_node(NULL, NULL, "tl,trusted-foundations"))
-> +		register_trusted_foundations(NULL);
-> +}
-> +#endif /* CONFIG_TRUSTED_FOUNDATIONS */
-> +
-> +#endif
-
-Kevin
+-Olof
