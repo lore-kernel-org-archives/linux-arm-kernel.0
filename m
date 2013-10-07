@@ -1,79 +1,101 @@
-From: dinguyen@altera.com (dinguyen at altera.com)
-Date: Mon, 7 Oct 2013 17:16:57 -0500
-Subject: socfpga: DTS updates for v3.13
-Message-ID: <1381184217-31249-1-git-send-email-dinguyen@altera.com>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Mon, 7 Oct 2013 16:28:52 -0600
+Subject: [PATCH RESEND] PCI: mvebu: Dynamically detect if the PEX link is
+ up to enable hot plug
+In-Reply-To: <1380650281-16175-1-git-send-email-jgunthorpe@obsidianresearch.com>
+References: <1380650281-16175-1-git-send-email-jgunthorpe@obsidianresearch.com>
+Message-ID: <CAErSpo6pvAQ9exEUsB0p8nmoqs0s5yzfYsstx7wh-2bqDtzBOQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dinh Nguyen <dinguyen@altera.com>
+[+cc Seungwon]
 
-Hi Kevin, Olof, and Arnd:
+On Tue, Oct 1, 2013 at 11:58 AM, Jason Gunthorpe
+<jgunthorpe@obsidianresearch.com> wrote:
+> Otherwise hotplugging the PEX doesn't work at all since the driver
+> detects the link state at probe time. Simply replacing the two tests
+> of haslink with a register read is enough to fix it.
+>
+> Tested on kirkwood with repeated plug/unplug of the link partner.
+>
+> Signed-off-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
 
-Please consider these DTS updates for the Altera SOCFPGA for v3.13:
+Last I heard (Sep 26), you had some mvebu changes in your tree
+already, Jason, so I was assuming you'd handle pci-mvebu.c changes, at
+least for the v3.13 merge window.  But you marked this "resend"; does
+that mean you're waiting for me to do something with it?
 
-Five of the six patches do NOT have an Ack from the DTS maintainers. I have
-sent the patches out for review, but since these patches do not change
-bindings nor add new ones, I don't think they will get too much attention.
+I see the following mvebu patches in patchwork:
 
-Please advise if you think I need to wait for Ack(s) from them.
+  PCI: mvebu: Dynamically detect if the PEX link is up to enable hot plug
+  PCI: mvebu - Support a bridge with no IO port window
+  PCI: mvebu: add I/O access wrappers
 
-Thanks,
+Let me know if I need to do anything with any of them.
 
-Dinh
+Bjorn
 
-The following changes since commit 4a10c2ac2f368583138b774ca41fac4207911983:
-
-  Linux 3.12-rc2 (2013-09-23 15:41:09 -0700)
-
-are available in the git repository at:
-
-  git://git.rocketboards.org/linux-socfpga-next.git tags/socfpga-dts-updates-for-v3.13
-
-for you to fetch changes up to d28e284dbee1f81daef762faf980a2260c2c120e:
-
-  dts: socfpga: Add support for Altera's SOCFPGA Arria V board (2013-10-07 14:16:49 -0500)
-
-----------------------------------------------------------------
-Updates to dts file structure for Altera's SOCFPGA
-
-* Does not include any new bindings or bindings change
-* Add dts file for a SOCFPGA with an Arria V FPGA
-* Add a clocks property for the TWD timer
-* Add support for Terasic SocKit Board which has Cyclone5 FPGA
-* From Steffen Trumtrar:
-"This series includes some minor cleanups (indentation and clock labels) and
-reorders the socfpga dts hierarchy from:
-	socfpga.dtsi
-	-> socfpga_$board.dts
-	-> socfpga_$otherboard.dts
-to
-	socfpga.dtsi
-	-> socfpga_cyclone5.dtsi
-	--> socfpga_cyclone5_$board.dts
-	--> socfpga_cyclone5_$otherboard.dts
-"
-
-----------------------------------------------------------------
-Dinh Nguyen (2):
-      arm: socfpga: Add clock for smp_twd timer
-      dts: socfpga: Add support for Altera's SOCFPGA Arria V board
-
-Steffen Trumtrar (4):
-      ARM: socfpga: dts: Move common nodes to cyclone5 dtsi
-      ARM: socfpga: dts: Add support for terasic SoCkit
-      ARM: socfpga: dts: cleanup indentation
-      ARM: socfpga: dts: fix s2f_* clock name
-
- arch/arm/boot/dts/Makefile                         |    4 +-
- arch/arm/boot/dts/socfpga.dtsi                     |  297 ++++++++++----------
- arch/arm/boot/dts/socfpga_arria5.dtsi              |   58 ++++
- arch/arm/boot/dts/socfpga_arria5_socdk.dts         |   40 +++
- ...{socfpga_cyclone5.dts => socfpga_cyclone5.dtsi} |   20 --
- arch/arm/boot/dts/socfpga_cyclone5_socdk.dts       |   40 +++
- arch/arm/boot/dts/socfpga_cyclone5_sockit.dts      |   37 +++
- 7 files changed, 327 insertions(+), 169 deletions(-)
- create mode 100644 arch/arm/boot/dts/socfpga_arria5.dtsi
- create mode 100644 arch/arm/boot/dts/socfpga_arria5_socdk.dts
- rename arch/arm/boot/dts/{socfpga_cyclone5.dts => socfpga_cyclone5.dtsi} (78%)
- create mode 100644 arch/arm/boot/dts/socfpga_cyclone5_socdk.dts
- create mode 100644 arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
+> ---
+>  drivers/pci/host/pci-mvebu.c | 16 ++--------------
+>  1 file changed, 2 insertions(+), 14 deletions(-)
+>
+> diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
+> index 729d5a1..f2d61f5 100644
+> --- a/drivers/pci/host/pci-mvebu.c
+> +++ b/drivers/pci/host/pci-mvebu.c
+> @@ -115,7 +115,6 @@ struct mvebu_pcie_port {
+>         char *name;
+>         void __iomem *base;
+>         spinlock_t conf_lock;
+> -       int haslink;
+>         u32 port;
+>         u32 lane;
+>         int devfn;
+> @@ -552,7 +551,7 @@ static int mvebu_pcie_wr_conf(struct pci_bus *bus, u32 devfn,
+>         if (bus->number == 0)
+>                 return mvebu_sw_pci_bridge_write(port, where, size, val);
+>
+> -       if (!port->haslink)
+> +       if (!mvebu_pcie_link_up(port))
+>                 return PCIBIOS_DEVICE_NOT_FOUND;
+>
+>         /*
+> @@ -594,7 +593,7 @@ static int mvebu_pcie_rd_conf(struct pci_bus *bus, u32 devfn, int where,
+>         if (bus->number == 0)
+>                 return mvebu_sw_pci_bridge_read(port, where, size, val);
+>
+> -       if (!port->haslink) {
+> +       if (!mvebu_pcie_link_up(port)) {
+>                 *val = 0xffffffff;
+>                 return PCIBIOS_DEVICE_NOT_FOUND;
+>         }
+> @@ -883,22 +882,11 @@ static int __init mvebu_pcie_probe(struct platform_device *pdev)
+>
+>                 mvebu_pcie_set_local_dev_nr(port, 1);
+>
+> -               if (mvebu_pcie_link_up(port)) {
+> -                       port->haslink = 1;
+> -                       dev_info(&pdev->dev, "PCIe%d.%d: link up\n",
+> -                                port->port, port->lane);
+> -               } else {
+> -                       port->haslink = 0;
+> -                       dev_info(&pdev->dev, "PCIe%d.%d: link down\n",
+> -                                port->port, port->lane);
+> -               }
+> -
+>                 port->clk = of_clk_get_by_name(child, NULL);
+>                 if (IS_ERR(port->clk)) {
+>                         dev_err(&pdev->dev, "PCIe%d.%d: cannot get clock\n",
+>                                port->port, port->lane);
+>                         iounmap(port->base);
+> -                       port->haslink = 0;
+>                         continue;
+>                 }
+>
+> --
+> 1.8.1.2
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
