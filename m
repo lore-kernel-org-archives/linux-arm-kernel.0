@@ -1,68 +1,196 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 07 Oct 2013 13:03:13 -0700
-Subject: Bug: kbuild always rebuilds compressed images on ARM
-In-Reply-To: <20131005131706.GY12758@n2100.arm.linux.org.uk>
-References: <20131005131706.GY12758@n2100.arm.linux.org.uk>
-Message-ID: <52531381.8070607@codeaurora.org>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Mon, 07 Oct 2013 13:06:00 -0700
+Subject: [PATCH v3 00/19] ARM: at91: move to common clk framework
+In-Reply-To: <52134321.8000806@overkiz.com>
+References: <1375937608-3773-1-git-send-email-b.brezillon@overkiz.com>
+ <52134321.8000806@overkiz.com>
+Message-ID: <20131007200600.7445.23876@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/05/13 06:17, Russell King - ARM Linux wrote:
-> Hi,
->
-> I've noticed that kbuild always rebuilds the compressed piggy image
-> on ARM.  Here's the output from running make with V=2:
->
->   CALL    /home/rmk/git/linux-rmk/scripts/checksyscalls.sh - due to target missing
->   CHK     include/generated/compile.h
->   Kernel: arch/arm/boot/Image is ready
->   Building modules, stage 2.
->   LZO     arch/arm/boot/compressed/piggy.lzo - due to command line change
->   MODPOST 17 modules - due to target is PHONY
->   AS      arch/arm/boot/compressed/piggy.lzo.o - due to: arch/arm/boot/compressed/piggy.lzo
->   LD      arch/arm/boot/compressed/vmlinux - due to: arch/arm/boot/compressed/piggy.lzo.o
->   OBJCOPY arch/arm/boot/zImage - due to: arch/arm/boot/compressed/vmlinux
->   Kernel: arch/arm/boot/zImage is ready
->
-> and with V=1:
->
-> ...
-> make -f /home/rmk/git/linux-rmk/scripts/Makefile.build obj=arch/arm/boot/compressed arch/arm/boot/compressed/vmlinux
-> make -f /home/rmk/git/linux-rmk/scripts/Makefile.modpost
->   find .tmp_versions -name '*.mod' | xargs -r grep -h '\.ko$' | sort -u | sed 's/\.ko$/.o/' | scripts/mod/modpost -m -a -o /home/rmk/git/build/imx6/Module.symvers    -S  -s -T -
->   (cat arch/arm/boot/compressed/../Image | lzop -9 && printf \\010\\224\\034\\002) > arch/arm/boot/compressed/piggy.lzo || (rm -f arch/arm/boot/compressed/piggy.lzo ; false)
+Quoting boris brezillon (2013-08-20 03:21:21)
+> Hello Mike,
+> 
+> Could you take a look at this patch series ?
+> 
+> I'd like to have your opinion on some key points:
+> 
+> - at91 clk dt bindings
+> - in some clk_prepare (pll clks, main clk) callbacks I make use of 
+> wait_event to wait for an interrupt.
+>    Should I do it this way or instead use the cpu_relax function ?
 
-There are double slashes here '\\'
+wait_event requires a workqueue, which is fine if your work fits
+naturally into that model. Otherwise cpu_relax can be used with your own
+loop if you prefer, which seems to be a common busy-wait mechanism.
 
-> make -f /home/rmk/git/linux-rmk/scripts/Makefile.fwinst obj=firmware __fw_modbuild
-> ...
->
-> The arch/arm/boot/compressed/.piggy.lzo.cmd file contains this:
->
-> cmd_arch/arm/boot/compressed/piggy.lzo := (cat arch/arm/boot/compressed/../Image | lzop -9 && printf \\\\010\\\\224\\\\034\\\\002) > arch/arm/boot/compressed/piggy.lzo || (rm -f arch/arm/boot/compressed/piggy.lzo ; false)
+How long do you expect to wait for your condition to change in hardware?
+How quickly do you want to respond to that condition once the interrupt
+has been handled?
 
-But then there are quadruple slashes here '\\\\'. That seems to be
-causing kbuild to rebuild each time.
+I don't really care but I guess others might have strong opinions.
 
->
-> Any ideas why it thinks that the command has changed?
+> - some clks define clk_prepare but not clk_enable (enabling work is done 
+> in clk_prepare).
 
-This hack seems to work, but I'm not convinced it's the right solution.
+That's great, just make sure to provide .is_prepared for those clocks.
+Likewise if you populate .enable & .disable callbacks then also provide
+a .is_enabled callback.
 
-diff --git a/scripts/Kbuild.include b/scripts/Kbuild.include
-index 547e15d..bfc0b79 100644
---- a/scripts/Kbuild.include
-+++ b/scripts/Kbuild.include
-@@ -209,7 +209,7 @@ endif
- # >$< substitution to preserve $ when reloading .cmd file
- # note: when using inline perl scripts [perl -e '...$$t=1;...']
- # in $(cmd_xxx) double $$ your perl vars
--make-cmd = $(subst \\,\\\\,$(subst \#,\\\#,$(subst $$,$$$$,$(call escsq,$(cmd_$(1))))))
-+make-cmd = $(subst \#,\\\#,$(subst $$,$$$$,$(call escsq,$(cmd_$(1)))))
- 
- # Find any prerequisites that is newer than target or that does not exist.
- # PHONY targets skipped in both cases.
+>    Is it okay to leave this callback empty and rely on the default 
+> behaviour (enable count increment) ?
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+Yes.
+
+The rest of my comments I'll put in replies to the patches.
+
+Thanks,
+Mike
+
+> - at91 clk implemetation in its whole
+> 
+> 
+> Best Regards,
+> 
+> Boris
+> 
+> On 08/08/2013 06:53, Boris BREZILLON wrote:
+> > Hello,
+> >
+> > This patch series is the 3rd version of the new at91 clock implementation
+> > (using common clk framework).
+> >
+> > Most of the clock provided by the PMC (Power Management Controller) are
+> > implemented :
+> > - main clock (main oscillator)
+> > - pll clocks
+> > - master clock
+> > - programmable clocks
+> > - utmi clock
+> > - peripheral clocks
+> > - system clocks
+> >
+> > This implementation is only compatible with device tree definition.
+> > The goal is to define the whole clock tree in the device tree.
+> >
+> > Please feel free to comment the dt bindinds.
+> >
+> > This patch series is based on linux-next and has been tested on sama5d31ek
+> > board using device tree. It compiles for other SoCs and both with and
+> > but it has not been tested (Richard, I did not add your Tested-by because
+> > a lot of things have changed since v2).
+> >
+> > BTW could other people test it on other boards (I only have a kizbox and
+> > a sama5d31ek dev kit).
+> >
+> > Best Regards,
+> > Boris
+> >
+> > Changes since v2:
+> >   - fix several bugs in clk implementations
+> >   - drop non-dt boards support
+> >   - split the series to ease review and tests:
+> >     * 1 patch series for new clk implementations (this series)
+> >     * 1 patch series to move each at91 SoC to common clk framework (coming soon)
+> >   - modify dt-bindings (add atmel,clk- prefix to atmel specific properties)
+> >   - add clk macros for dt-bindings
+> >   - add pmc framework (helper function to access pmc registers)
+> >   - add interrupt support to enable passive wait in clk_prepare functions
+> >
+> > Changes since v1:
+> >   - fix bugs in pll, programmable and system clock implementations
+> >     (wrong bit position).
+> >   - add usb clock configuration support (ohci and udc drivers +
+> >     clk_lookup for non dt boards)
+> >   - rework of the system clock interfaces (no need to define a parent clock,
+> >     system clock is a gate with no rate info)
+> >   - change system, peripheral and programmable clk dt bindings (1 master node
+> >     and multiple child nodes each defining a system/peripheral or prog clock)
+> >   - fix bugs in sama5 dt definition
+> >
+> > Boris BREZILLON (19):
+> >    ARM: at91: move at91_pmc.h to include/linux/clk/at91_pmc.h
+> >    ARM: at91: add Kconfig options for common clk support
+> >    clk: at91: add PMC base support
+> >    clk: at91: add PMC macro file for dt definitions
+> >    clk: at91: add PMC main clock
+> >    clk: at91: add PMC pll clocks
+> >    clk: at91: add pll id macros for pll dt bindings
+> >    clk: at91: add PMC master clock
+> >    clk: at91: add PMC system clocks
+> >    ARM: at91/dt: add system clk id definitions in dt-bindings include
+> >      dir
+> >    clk: at91: add PMC peripheral clocks
+> >    clk: at91: add peripheral clk macros for peripheral clk dt bindings
+> >    clk: at91: add PMC programmable clocks
+> >    clk: at91: add PMC utmi clock
+> >    clk: at91: add PMC usb clock
+> >    clk: at91: add PMC smd clock
+> >    clk: at91: add PMC clk device tree binding doc.
+> >    ARM: at91: move pit timer to common clk framework
+> >    ARM: at91: add new compatible strings for pmc driver
+> >
+> >   .../devicetree/bindings/clock/at91-clock.txt       |  312 ++++++++++++
+> >   arch/arm/mach-at91/Kconfig                         |   44 ++
+> >   arch/arm/mach-at91/Kconfig.non_dt                  |    6 +
+> >   arch/arm/mach-at91/Makefile                        |    2 +-
+> >   arch/arm/mach-at91/at91rm9200.c                    |    2 +-
+> >   arch/arm/mach-at91/at91sam9260.c                   |    2 +-
+> >   arch/arm/mach-at91/at91sam9261.c                   |    2 +-
+> >   arch/arm/mach-at91/at91sam9263.c                   |    2 +-
+> >   arch/arm/mach-at91/at91sam926x_time.c              |   14 +-
+> >   arch/arm/mach-at91/at91sam9g45.c                   |    2 +-
+> >   arch/arm/mach-at91/at91sam9n12.c                   |    2 +-
+> >   arch/arm/mach-at91/at91sam9rl.c                    |    2 +-
+> >   arch/arm/mach-at91/at91sam9x5.c                    |    2 +-
+> >   arch/arm/mach-at91/clock.c                         |    8 +-
+> >   arch/arm/mach-at91/generic.h                       |    3 +-
+> >   arch/arm/mach-at91/pm.c                            |    2 +-
+> >   arch/arm/mach-at91/pm_slowclock.S                  |    2 +-
+> >   arch/arm/mach-at91/sama5d3.c                       |    2 +-
+> >   arch/arm/mach-at91/setup.c                         |    8 +-
+> >   drivers/clk/Makefile                               |    1 +
+> >   drivers/clk/at91/Makefile                          |   12 +
+> >   drivers/clk/at91/clk-main.c                        |  171 +++++++
+> >   drivers/clk/at91/clk-master.c                      |  386 +++++++++++++++
+> >   drivers/clk/at91/clk-peripheral.c                  |  401 ++++++++++++++++
+> >   drivers/clk/at91/clk-pll.c                         |  506 ++++++++++++++++++++
+> >   drivers/clk/at91/clk-plldiv.c                      |  137 ++++++
+> >   drivers/clk/at91/clk-programmable.c                |  419 ++++++++++++++++
+> >   drivers/clk/at91/clk-smd.c                         |  171 +++++++
+> >   drivers/clk/at91/clk-system.c                      |  191 ++++++++
+> >   drivers/clk/at91/clk-usb.c                         |  323 +++++++++++++
+> >   drivers/clk/at91/clk-utmi.c                        |  161 +++++++
+> >   drivers/clk/at91/pmc.c                             |  387 +++++++++++++++
+> >   drivers/clk/at91/pmc.h                             |  111 +++++
+> >   drivers/usb/gadget/atmel_usba_udc.c                |    2 +-
+> >   .../dt-bindings/clk/at91/at91rm9200/clk-system.h   |   16 +
+> >   .../dt-bindings/clk/at91/at91sam9261/clk-system.h  |   15 +
+> >   .../clk/at91/at91sam9x5/clk-peripheral.h           |   15 +
+> >   include/dt-bindings/clk/at91/common/clk-pll.h      |   13 +
+> >   include/dt-bindings/clk/at91/common/clk-system.h   |   21 +
+> >   include/dt-bindings/clk/at91/common/pmc.h          |   20 +
+> >   .../include/mach => include/linux/clk}/at91_pmc.h  |    4 +-
+> >   41 files changed, 3882 insertions(+), 20 deletions(-)
+> >   create mode 100644 Documentation/devicetree/bindings/clock/at91-clock.txt
+> >   create mode 100644 drivers/clk/at91/Makefile
+> >   create mode 100644 drivers/clk/at91/clk-main.c
+> >   create mode 100644 drivers/clk/at91/clk-master.c
+> >   create mode 100644 drivers/clk/at91/clk-peripheral.c
+> >   create mode 100644 drivers/clk/at91/clk-pll.c
+> >   create mode 100644 drivers/clk/at91/clk-plldiv.c
+> >   create mode 100644 drivers/clk/at91/clk-programmable.c
+> >   create mode 100644 drivers/clk/at91/clk-smd.c
+> >   create mode 100644 drivers/clk/at91/clk-system.c
+> >   create mode 100644 drivers/clk/at91/clk-usb.c
+> >   create mode 100644 drivers/clk/at91/clk-utmi.c
+> >   create mode 100644 drivers/clk/at91/pmc.c
+> >   create mode 100644 drivers/clk/at91/pmc.h
+> >   create mode 100644 include/dt-bindings/clk/at91/at91rm9200/clk-system.h
+> >   create mode 100644 include/dt-bindings/clk/at91/at91sam9261/clk-system.h
+> >   create mode 100644 include/dt-bindings/clk/at91/at91sam9x5/clk-peripheral.h
+> >   create mode 100644 include/dt-bindings/clk/at91/common/clk-pll.h
+> >   create mode 100644 include/dt-bindings/clk/at91/common/clk-system.h
+> >   create mode 100644 include/dt-bindings/clk/at91/common/pmc.h
+> >   rename {arch/arm/mach-at91/include/mach => include/linux/clk}/at91_pmc.h (98%)
+> >
