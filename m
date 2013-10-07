@@ -1,26 +1,65 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Mon, 7 Oct 2013 08:24:40 +0530
-Subject: [PATCH] cpufreq: sa11x0: Fix build
-In-Reply-To: <1381056329-3382-1-git-send-email-broonie@kernel.org>
-References: <1381056329-3382-1-git-send-email-broonie@kernel.org>
-Message-ID: <CAKohpo=9t2BZsiDowKei9w7Mi92g41ZWNe7R9-G=vf0JS3X8Uw@mail.gmail.com>
+From: chander.kashyap@linaro.org (Chander Kashyap)
+Date: Mon,  7 Oct 2013 09:47:09 +0530
+Subject: [Patch v4 1/2] clocksource: mct: extend mct to support 8 local
+ interrupts for Exynos5420
+In-Reply-To: <1381119431-12697-1-git-send-email-chander.kashyap@linaro.org>
+References: <1381119431-12697-1-git-send-email-chander.kashyap@linaro.org>
+Message-ID: <1381119431-12697-2-git-send-email-chander.kashyap@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/10/2013, Mark Brown <broonie@kernel.org> wrote:
-> From: Mark Brown <broonie@linaro.org>
->
-> Commit 22c8b4f140 (cpufreq: sa11x0: Expose frequency table) added use of
-> struct cpufreq_frequency_table to mach-sa1100/generic.h but did not ensure
-> that the struct was declared, causing build failures on machines using that
-> header. Fix this.
->
-> Reported-by: Olof's autobuilder <build@lixom.net>
-> Signed-off-by: Mark Brown <broonie@linaro.org>
-> ---
->
-> The relevant commit is in the cpufreq tree in -next.
+Exynos5420 is octa-core SoC from Samsung. Hence extend exynos-mct clocksource
+driver to support 8 local interrupts.
 
-I have already sent relevant fix to Rafael for this, which
-looks similar to this.. And I am waiting for Rafael to merge
-it with offending commit...
+Also extend dts entries for 8 interrupts.
+
+Signed-off-by: Chander Kashyap <chander.kashyap@linaro.org>
+---
+ arch/arm/boot/dts/exynos5420.dtsi |    9 +++++++--
+ drivers/clocksource/exynos_mct.c  |    4 ++++
+ 2 files changed, 11 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/boot/dts/exynos5420.dtsi b/arch/arm/boot/dts/exynos5420.dtsi
+index 6ce2f94..e97c87b 100644
+--- a/arch/arm/boot/dts/exynos5420.dtsi
++++ b/arch/arm/boot/dts/exynos5420.dtsi
+@@ -69,7 +69,8 @@
+ 		compatible = "samsung,exynos4210-mct";
+ 		reg = <0x101C0000 0x800>;
+ 		interrupt-parent = <&mct_map>;
+-		interrupts = <0>, <1>, <2>, <3>, <4>, <5>, <6>, <7>;
++		interrupts = <0>, <1>, <2>, <3>, <4>, <5>, <6>, <7>,
++				<8>, <9>, <10>, <11>;
+ 		clocks = <&clock 1>, <&clock 315>;
+ 		clock-names = "fin_pll", "mct";
+ 
+@@ -84,7 +85,11 @@
+ 					<4 &gic 0 120 0>,
+ 					<5 &gic 0 121 0>,
+ 					<6 &gic 0 122 0>,
+-					<7 &gic 0 123 0>;
++					<7 &gic 0 123 0>,
++					<8 &gic 0 128 0>,
++					<9 &gic 0 129 0>,
++					<10 &gic 0 130 0>,
++					<11 &gic 0 131 0>;
+ 		};
+ 	};
+ 
+diff --git a/drivers/clocksource/exynos_mct.c b/drivers/clocksource/exynos_mct.c
+index b2bbc41..ff4711e 100644
+--- a/drivers/clocksource/exynos_mct.c
++++ b/drivers/clocksource/exynos_mct.c
+@@ -71,6 +71,10 @@ enum {
+ 	MCT_L1_IRQ,
+ 	MCT_L2_IRQ,
+ 	MCT_L3_IRQ,
++	MCT_L4_IRQ,
++	MCT_L5_IRQ,
++	MCT_L6_IRQ,
++	MCT_L7_IRQ,
+ 	MCT_NR_IRQS,
+ };
+ 
+-- 
+1.7.9.5
