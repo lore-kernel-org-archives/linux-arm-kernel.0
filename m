@@ -1,66 +1,135 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Mon, 7 Oct 2013 22:43:51 +0200 (CEST)
-Subject: [PATCH] DMA: extend documentation to provide more API details
-In-Reply-To: <20131007154854.GM2954@intel.com>
-References: <20131005190200.GZ12758@n2100.arm.linux.org.uk>
- <Pine.LNX.4.64.1310052203060.8097@axis700.grange>
- <20131005233137.GA12758@n2100.arm.linux.org.uk>
- <20131006052029.GE2954@intel.com>
- <Pine.LNX.4.64.1310071233340.20796@axis700.grange>
- <20131007111728.GM12758@n2100.arm.linux.org.uk>
- <20131007103936.GH2954@intel.com>
- <Pine.LNX.4.64.1310071409080.20796@axis700.grange>
- <20131007142511.GJ2954@intel.com>
- <Pine.LNX.4.64.1310071725300.20796@axis700.grange>
- <20131007154854.GM2954@intel.com>
-Message-ID: <Pine.LNX.4.64.1310072235360.27047@axis700.grange>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 7 Oct 2013 22:44:09 +0200
+Subject: [PATCH] ARM: sunxi: dts: Add support for the cubieboard3, the
+ CubieTruck
+In-Reply-To: <1380986247-29112-2-git-send-email-oliver+list@schinagl.nl>
+References: <1380986247-29112-1-git-send-email-oliver+list@schinagl.nl>
+ <1380986247-29112-2-git-send-email-oliver+list@schinagl.nl>
+Message-ID: <20131007204409.GB3041@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 7 Oct 2013, Vinod Koul wrote:
+Hi Oliver,
 
-> On Mon, Oct 07, 2013 at 05:28:37PM +0200, Guennadi Liakhovetski wrote:
-> > > > > > > No, not something in the middle. I was thinking about
-> > > > > > > 
-> > > > > > > (1) cookie 1-3 are submitted
-> > > > > > > (2) cookie 1 succeeds
-> > > > > > > (3) a DMA error occurs, cookies 2-3 are discarded
-> > > > > discarded using terminate_all right?
-> > > > 
-> > > > No, by the dmaengine driver as a part of the error processing.
-> > > And how will that be done...?
-> > 
-> > Sorry, I meant - DMA descriptors with cookies #2 and #3 will be cancelled 
-> > and recycled by the dmaengine driver. That's what you have to do, when 
-> > processing DMA error IRQ.
-> well the term cancel means someone went ahead and requested abort/terminate of a
-> transaction...
+On Sat, Oct 05, 2013 at 05:17:27PM +0200, oliver+list at schinagl.nl wrote:
+> From: Oliver Schinagl <oliver@schinagl.nl>
 > 
-> As we discussed in other mail on this thread the most common occurrence will be
-> timeout on client side and client cant cancel selectively.
+> Cubieboard3, CT
+
+Please change the commit log to something meaningful.
+
+> Signed-off-by: Oliver Schinagl <oliver@schinagl.nl>
+> ---
+>  arch/arm/boot/dts/Makefile                 |  1 +
+>  arch/arm/boot/dts/sun7i-a20-cubietruck.dts | 60 ++++++++++++++++++++++++++++++
+>  2 files changed, 61 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/sun7i-a20-cubietruck.dts
 > 
-> For dma driver detection error, which is quite rare in slave usages, if people
-> think its common for them we cna indicate this thru status in callback. Then
-> client will know and doesnt need to query.
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index cc0f1fb..171e6c7 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -232,6 +232,7 @@ dtb-$(CONFIG_ARCH_SUNXI) += \
+>  	sun5i-a13-olinuxino.dtb \
+>  	sun6i-a31-colombus.dtb \
+>  	sun7i-a20-cubieboard2.dtb \
+> +	sun7i-a20-cubietruck.dtb \
+>  	sun7i-a20-olinuxino-micro.dtb
+>  dtb-$(CONFIG_ARCH_TEGRA) += tegra20-harmony.dtb \
+>  	tegra20-iris-512.dtb \
+> diff --git a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
+> new file mode 100644
+> index 0000000..0167afe
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
+> @@ -0,0 +1,60 @@
+> +/*
+> + * Copyright 2013 Oliver Schinagl
+> + *
+> + * Oliver Schinagl <oliver@schinagl.nl>
+> + *
+> + * The code contained herein is licensed under the GNU General Public
+> + * License. You may obtain a copy of the GNU General Public License
+> + * Version 2 or later at the following locations:
+> + *
+> + * http://www.opensource.org/licenses/gpl-license.html
+> + * http://www.gnu.org/copyleft/gpl.html
+> + */
+> +
+> +/dts-v1/;
+> +/include/ "sun7i-a20.dtsi"
+> +
+> +/ {
+> +	model = "Cubietech Cubietruck";
+> +	compatible = "cubietech,cubietech", "allwinner,sun7i-a20";
+
+cubietech,cubietruck :)
+
+> +
+> +	soc at 01c00000 {
+> +		pinctrl at 01c20800 {
+> +			led_pins_cubietruck: led_pins at 0 {
+> +				allwinner,pins = "PH7", "PH11", "PH20", "PH21";
+> +				allwinner,function = "gpio_out";
+> +				allwinner,drive = <0>;
+> +				allwinner,pull = <0>;
+> +			};
+> +		};
+> +
+> +		uart0: serial at 01c28000 {
+> +			pinctrl-names = "default";
+> +			pinctrl-0 = <&uart0_pins_a>;
+> +			status = "okay";
+> +		};
+> +	};
+> +
+> +	leds {
+> +		compatible = "gpio-leds";
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&led_pins_cubietruck>;
+> +
+> +		blue {
+> +			label = "cubietruck:blue:usr";
+> +			gpios = <&pio 7 21 0>;
+> +		};
+
+Newline
+
+> +		orange {
+> +			label = "cubietruck:orange:usr";
+> +			gpios = <&pio 7 20 0>;
+> +		};
+
+Ditto.
+
+> +		white {
+> +			label = "cubietruck:white:usr";
+> +			gpios = <&pio 7 11 0>;
+> +		};
+
+Ditto.
+
+> +		green {
+> +			label = "cubietruck:green:usr";
+> +			gpios = <&pio 7 7 0>;
+> +		};
+> +	};
+> +};
+> -- 
+> 1.8.1.5
 > 
-> Recycling cookie has a large space so i dont think we will get confused
-> with a recycled one
 
-If you reset cookies, as you proposed, IMHO, this can very well lead to a 
-confusion: suppose cookie #1000 caused an error. We drop queued transfers 
-with cookies #1001-1005 and reset to #1. When we're at #100 the user asks 
-for a status of cookie #1003, which we have aborted. However, the 
-following check in dma_async_is_complete():
+Thanks!
+Maxime
 
-	if (last_complete <= last_used) {
-		if ((cookie <= last_complete) || (cookie > last_used))
-			return DMA_SUCCESS;
-
-will confirm success to the user.
-
-Thanks
-Guennadi
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131007/b7cc59aa/attachment-0001.sig>
