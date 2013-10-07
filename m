@@ -1,31 +1,56 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Mon, 07 Oct 2013 12:33:03 +0200
-Subject: [PATCH] ARM: tlb: __flush_tlb_mm need to use int asid var for
- BE correct operation
-In-Reply-To: <1381128458-32140-2-git-send-email-victor.kamensky@linaro.org>
-References: <1381128458-32140-1-git-send-email-victor.kamensky@linaro.org>
- <1381128458-32140-2-git-send-email-victor.kamensky@linaro.org>
-Message-ID: <52528DDF.4080209@codethink.co.uk>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 7 Oct 2013 11:32:50 +0100
+Subject: [PATCH 3/5] DRM: Armada: Add support for ARGB 32x64 or 64x32
+ hardware cursors
+In-Reply-To: <20131007120922.47df03b6@armhf>
+References: <20131006220728.GG12758@n2100.arm.linux.org.uk>
+ <E1VSwWS-0000i7-4f@rmk-PC.arm.linux.org.uk> <20131007110141.27f1ac25@armhf>
+ <20131007094008.GH12758@n2100.arm.linux.org.uk>
+ <20131007120922.47df03b6@armhf>
+Message-ID: <20131007103250.GJ12758@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/10/13 08:47, Victor Kamensky wrote:
-> __flush_tlb_mm function need to use intermediate 'int' type 'asid'
-> variable int tlb_op macro call. Direct use of ASID macro produces
-> 64 bit unsigned long long type passed to inline assembler statement
-> as 'r' operand (32bit), and resulting behavior is not well specified.
-> It works in little endian case, but is broken in big endian case. In
-> big endian case gcc generate such code that 0 is passed to
-> 'mcr	15, 0, r4, cr8, cr3, {2}' operation.
->
-> Note other functions like __local_flush_tlb_mm, and local_flush_tlb_mm
-> already use intermediate 'asid' variable in similar code.
->
-> Signed-off-by: Victor Kamensky<victor.kamensky@linaro.org>
+On Mon, Oct 07, 2013 at 12:09:22PM +0200, Jean-Francois Moine wrote:
+> On Mon, 7 Oct 2013 10:40:08 +0100
+> Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+> 
+> > > > This patch adds ARGB hardware cursor support to the DRM driver for the
+> > > > Marvell Armada SoCs.  ARGB cursors are supported at either 32x64 or
+> > > > 64x32 resolutions.  
+> > > 	[snip]
+> > > 
+> > > I don't see the interest of such cursors. Actually, most often, the
+> > > cursors are 64x64 and 'A' is either 0 or 0xff. As the Armada 510
+> > > supports 64x64 cursors with transparency, it would be more useful to
+> > > implement these ones...  
+> > 
+> > Sorry, you're completely wrong there.  Xorg uses an alphablended cursor.
+> > This patch is a result of trialling each of the Armada's cursor options
+> > and this is the only one which results in a reasonable looking cursor.
+> 
+> Strange. I am using the 64x64 cursor with transparency of the 510 for
+> many months and I never saw any problem.
 
-do the __local_flush_tlb_mm() macros need to be changed to always
-ensure they take the lowest word of the two?
+When I tried it, all cursors had variable alpha, and converting the
+alpha to a single transparency bit made the cursor look rubbish against
+certain backgrounds.
 
--- 
-Ben Dooks				http://www.codethink.co.uk/
-Senior Engineer				Codethink - Providing Genius
+> If you absolutely want to have all transparency shades, you should
+> accept 64x64 cursors and test if they may be rendered as 64x32 or
+> 32x64, i.e. test that there is only pure transparency in the non-
+> rendered rectangles...
+
+That is policy, and that is something which can be done by the X server
+rather than the kernel.  The kernel exposes the hardware capabilities,
+which are to allow a 64x32 or a 32x64 cursor.  Userspace can make the
+decision dynamically which it wishes to use.
+
+However, what you're suggesting is dangerous.  What do you do when you're
+presented with a cursor which is 64x64 ?  Do you:
+
+(a) not display it
+(b) crash the X server
+
+There isn't a fallback to using software cursors available in the X server
+because there's no error reporting for a failed hardware cursor update.
