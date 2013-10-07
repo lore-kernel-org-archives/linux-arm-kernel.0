@@ -1,22 +1,56 @@
 From: mturquette@linaro.org (Mike Turquette)
-Date: Mon, 07 Oct 2013 16:27:57 -0700
+Date: Mon, 07 Oct 2013 16:28:57 -0700
 Subject: [PATCH] arm: socfpga: Fix incorrect sdmmc clock name
-In-Reply-To: <1380655736.13502.6.camel@linux-builds1>
-References: <1379434985-25294-1-git-send-email-dinguyen@altera.com>
- <1380655736.13502.6.camel@linux-builds1>
-Message-ID: <20131007232757.7445.21576@quantum>
+In-Reply-To: <1381178249.1584.1.camel@linux-builds1>
+References: <1376322134-17408-1-git-send-email-dinguyen@altera.com>
+ <20130814054810.GF16635@quad.lixom.net>
+ <1376492274.8715.2.camel@linux-builds1> <20131007201254.7445.8105@quantum>
+ <1381178249.1584.1.camel@linux-builds1>
+Message-ID: <20131007232857.7445.3041@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Dinh Nguyen (2013-10-01 12:28:56)
-> Hi,
+Quoting Dinh Nguyen (2013-10-07 13:37:29)
+> Hi Mike,
 > 
-> Just wondering if I can solicit any comments for this patch? It's small,
-> so I'm not sure if I need at least a good Ack-by and put it in my tree
-> for a pull request, or ask to be applied to the arm-soc or Mike's clock
-> tree?
+> On Mon, 2013-10-07 at 13:12 -0700, Mike Turquette wrote:
+> > Quoting Dinh Nguyen (2013-08-14 07:57:54)
+> > > On Tue, 2013-08-13 at 22:48 -0700, Olof Johansson wrote:
+> > > > On Mon, Aug 12, 2013 at 10:42:14AM -0500, dinguyen at altera.com wrote:
+> > > > > From: Dinh Nguyen <dinguyen@altera.com>
+> > > > > 
+> > > > > The SD/MMC clock is named "sdmmc_clk", and NOT "mmc_clk".
+> > > > > 
+> > > > > Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
+> > > > > Cc: Mike Turquette <mturquette@linaro.org>
+> > > > > CC: Arnd Bergmann <arnd@arndb.de>
+> > > > > CC: Olof Johansson <olof@lixom.net>
+> > > > > Cc: Pavel Machek <pavel@denx.de>
+> > > > > Cc: linux-arm-kernel at lists.infradead.org
+> > > > 
+> > > > Hi Dinh,
+> > > > 
+> > > > Do you want this applied in fixes for 3.11? If so, can you give me a oneliner
+> > > > on what the impact here is? mmc doesn't come up at all, or something more
+> > > > subtle?
+> > > 
+> > > Hi Olof,
+> > > 
+> > > No, this is go into 3.12 as I am still working on the bindings for
+> > > SD/MMC.
+> > > 
+> > > The oneliner: "The SD/MMC driver was intermittently not coming up
+> > > because it was not able to get the correct clock."
+> > 
+> > Olof, did you take this? If not I'll put it into my next batch of fixes
+> > for 3.12.
+> 
+> No, Olof did not get a chance to pick this up for 3.12. I resent the
+> patch with the updated commit message for 3.13:
+> 
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2013-September/198824.html
 
-I've taken this into clk-fixes for 3.12.
+Thanks for the link. I've taken that version into clk-fixes for 3.12.
 
 Regards,
 Mike
@@ -24,34 +58,15 @@ Mike
 > 
 > Thanks,
 > Dinh
-> 
-> On Tue, 2013-09-17 at 11:23 -0500, Dinh Nguyen wrote:
-> > From: Dinh Nguyen <dinguyen@altera.com>
 > > 
-> > The SD/MMC clock is named "sdmmc_clk", and NOT "mmc_clk". Because of this,
-> > the SD driver was getting the incorrect clock value. This prevented the
-> > SD driver from initializing correctly.
+> > Regards,
+> > Mike
 > > 
-> > Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
-> > Cc: Mike Turquette <mturquette@linaro.org>
-> > CC: Arnd Bergmann <arnd@arndb.de>
-> > CC: Olof Johansson <olof@lixom.net>
-> > Cc: Pavel Machek <pavel@denx.de>
-> > Cc: linux-arm-kernel at lists.infradead.org
-> > ---
-> >  drivers/clk/socfpga/clk.c |    2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > 
-> > diff --git a/drivers/clk/socfpga/clk.c b/drivers/clk/socfpga/clk.c
-> > index 5bb848c..81dd31a 100644
-> > --- a/drivers/clk/socfpga/clk.c
-> > +++ b/drivers/clk/socfpga/clk.c
-> > @@ -49,7 +49,7 @@
-> >  #define SOCFPGA_L4_SP_CLK            "l4_sp_clk"
-> >  #define SOCFPGA_NAND_CLK             "nand_clk"
-> >  #define SOCFPGA_NAND_X_CLK           "nand_x_clk"
-> > -#define SOCFPGA_MMC_CLK                      "mmc_clk"
-> > +#define SOCFPGA_MMC_CLK                      "sdmmc_clk"
-> >  #define SOCFPGA_DB_CLK                       "gpio_db_clk"
-> >  
-> >  #define div_mask(width)      ((1 << (width)) - 1)
+> > > 
+> > > Thanks,
+> > > Dinh
+> > > > 
+> > > > 
+> > > > -Olof
+> > > >
+> >
