@@ -1,31 +1,64 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Mon, 7 Oct 2013 15:32:37 -0500
-Subject: [PATCH V2] ARM: OMAP3: Fix hardware detection for omap3630 when
- booted with device tree
-In-Reply-To: <1381177842-2678-1-git-send-email-nm@ti.com>
-References: <20131007192009.GA8949@atomide.com>
- <1381177842-2678-1-git-send-email-nm@ti.com>
-Message-ID: <52531A65.5070803@ti.com>
+From: dinguyen@altera.com (Dinh Nguyen)
+Date: Mon, 7 Oct 2013 15:37:29 -0500
+Subject: [PATCH] arm: socfpga: Fix incorrect sdmmc clock name
+In-Reply-To: <20131007201254.7445.8105@quantum>
+References: <1376322134-17408-1-git-send-email-dinguyen@altera.com>
+ <20130814054810.GF16635@quad.lixom.net>
+ <1376492274.8715.2.camel@linux-builds1> <20131007201254.7445.8105@quantum>
+Message-ID: <1381178249.1584.1.camel@linux-builds1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/07/2013 03:30 PM, Nishanth Menon wrote:
-[...]
-> diff --git a/arch/arm/boot/dts/omap3-beagle-xm.dts b/arch/arm/boot/dts/omap3-beagle-xm.dts
-> index 0c514dc..02dd4a9 100644
-> --- a/arch/arm/boot/dts/omap3-beagle-xm.dts
-> +++ b/arch/arm/boot/dts/omap3-beagle-xm.dts
-> @@ -11,7 +11,7 @@
->  
->  / {
->  	model = "TI OMAP3 BeagleBoard xM";
-> -	compatible = "ti,omap3-beagle-xm", "ti,omap3-beagle", "ti,omap3";
-> +	compatible = "ti,omap3-beagle-xm", "ti,omap363x", "ti,omap3";
+Hi Mike,
 
-^^^ yikes - should have been ti,omap36xx -> apologies, my fix was not
-committed in local branch :( - will update and resend - grr..
+On Mon, 2013-10-07 at 13:12 -0700, Mike Turquette wrote:
+> Quoting Dinh Nguyen (2013-08-14 07:57:54)
+> > On Tue, 2013-08-13 at 22:48 -0700, Olof Johansson wrote:
+> > > On Mon, Aug 12, 2013 at 10:42:14AM -0500, dinguyen at altera.com wrote:
+> > > > From: Dinh Nguyen <dinguyen@altera.com>
+> > > > 
+> > > > The SD/MMC clock is named "sdmmc_clk", and NOT "mmc_clk".
+> > > > 
+> > > > Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
+> > > > Cc: Mike Turquette <mturquette@linaro.org>
+> > > > CC: Arnd Bergmann <arnd@arndb.de>
+> > > > CC: Olof Johansson <olof@lixom.net>
+> > > > Cc: Pavel Machek <pavel@denx.de>
+> > > > Cc: linux-arm-kernel at lists.infradead.org
+> > > 
+> > > Hi Dinh,
+> > > 
+> > > Do you want this applied in fixes for 3.11? If so, can you give me a oneliner
+> > > on what the impact here is? mmc doesn't come up at all, or something more
+> > > subtle?
+> > 
+> > Hi Olof,
+> > 
+> > No, this is go into 3.12 as I am still working on the bindings for
+> > SD/MMC.
+> > 
+> > The oneliner: "The SD/MMC driver was intermittently not coming up
+> > because it was not able to get the correct clock."
+> 
+> Olof, did you take this? If not I'll put it into my next batch of fixes
+> for 3.12.
 
+No, Olof did not get a chance to pick this up for 3.12. I resent the
+patch with the updated commit message for 3.13:
 
--- 
-Regards,
-Nishanth Menon
+http://lists.infradead.org/pipermail/linux-arm-kernel/2013-September/198824.html
+
+Thanks,
+Dinh
+> 
+> Regards,
+> Mike
+> 
+> > 
+> > Thanks,
+> > Dinh
+> > > 
+> > > 
+> > > -Olof
+> > >
+> 
