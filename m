@@ -1,77 +1,94 @@
-From: matthew_minter@xyratex.com (Matthew Minter)
-Date: Mon, 7 Oct 2013 10:30:37 +0100
-Subject: Arm PCIe hotplugging
-In-Reply-To: <20131004165323.GB10315@obsidianresearch.com>
-References: <CAFJTrDs=fovP8nWVvH=-a9d_OTbmgQkMLPVeKAc4x6phsuZw9w@mail.gmail.com>
- <20131004165323.GB10315@obsidianresearch.com>
-Message-ID: <CAFJTrDtw4v51_2XvOfNKnMaeVu5g_cT1KLuJNVufWQx50PiSsw@mail.gmail.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Mon, 07 Oct 2013 11:36:39 +0200
+Subject: at91sam9263 not booting on 3.12-rc1
+In-Reply-To: <524ECE0B.5040200@atmel.com>
+References: <5240A95F.8000604@linaro.org>
+ <CAOMZO5D6Dfh3utsK8DRNHXUZpo4sk7UmOqVchGf2hvbpoFW6Lg@mail.gmail.com>
+ <5244364E.5060103@linaro.org> <524ECE0B.5040200@atmel.com>
+Message-ID: <525280A7.6070708@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks for the help with this. Looking at the design of the board
-being worked on it seems that rescan should be enough hopefully (the
-pci bus is powered from a separate supply than the SOC so it should be
-possible to shut it down during changes.)
+On 10/04/2013 04:17 PM, Nicolas Ferre wrote:
+> Hi Daniel,
+>
+> On 26/09/2013 15:27, Daniel Lezcano :
+>> On 09/23/2013 11:31 PM, Fabio Estevam wrote:
+>>> On Mon, Sep 23, 2013 at 5:49 PM, Daniel Lezcano
+>>> <daniel.lezcano@linaro.org> wrote:
+>>>
+>>>> So I enabled the CONFIG_USE_OF, the dtb are correctly generated.
+>>>>
+>>>> I tried to boot again, specifying the dtb address with bootm.
+>>>>
+>>>> tftp 0x20000000 /var/lib/tftpboot/at91/arch/arm/boot/usb_a9263.dtb
+>>>>
+>>>> tftp 0x21000000 /var/lib/tftpboot/at91/arch/arm/boot/uImage
+>>>>
+>>>> bootm 0x21000000 - 0x20000000
+>>>>
+>>>> but without success.
+>>>>
+>>>> I am wondering what I could be doing wrong ...
+>>>>
+>>>> Any help would be appreciate.
+>>>>
+>>>>     -- Daniel
+>>>>
+>>>>
+>>>> ps: u-boot is "U-Boot 2010.09 (Oct 27 2010 - 12:28:54)"
+>>>
+>>> I am not familiar with this board, but most likely this old U-boot
+>>> does not support dtb booting.
+>>> You can check whether "#define CONFIG_OF_LIBFDT" is included in your
+>>> board config file.
+>>>
+>>> You could also try to update the bootloader or try to generate a
+>>> kernel + dtb image (need to select CONFIG_ARM_APPENDED_DTB option in
+>>> the kernel).
+>>
+>> Hi Fabio,
+>>
+>> thanks for your answer. It took me awhile to setup everything and find
+>> the right tools.
+>>
+>> So I tried CONFIG_ARM_APPENDED_DTB but that does not work. I did not
+>> give much credit to that as it is flagged experimental.
+>
+> Well I managed to use this technique successfully several of times. But
+> maybe you still have to modify the machine ID.
+>
+>> Then I tried to flash a more recent u-boot but something went wrong. I
+>> have still the FlashRom prompt but the ttyACM0 where I can upload the
+>> u-boot does not appear anymore on my system.
+>>
+>> I am totally stuck at this point ...
+>
+> I hope that Jean-Christophe can help you with this as he is aware of the
+> Calao boards.
+>
+> There is probably a way to recover access to the SAM-BA prompt that will
+> allow you to regain access to the flashing process. I have just fount
+> this wiki page:
+> http://www.calao-systems.com/mediawiki/index.php?title=USB-A9263_Software#How_to_install_SAM-BA_from_buildroot
 
-However I might also look into the controls provided by PLX to see if
-there is anything simple to use to control power per slot.
-I shall also look into what the driver support is like fir the PLX
-board to see how much work it will be. I am still a novice as far as
-PCIe registers go and reading through some specifications so will do
-some study and see what I find.
+Yeah, I used this link to reflash the USB-A9263 and this is where a I 
+believe I corrupted somehow the bootloader.
 
-Thank you very much for the advice and help with this. I will
-hopefully reply again later if I find or make anything of use for
-hotplugging.
+I don't know how, but I must find a way to recover the old bootloader.
 
-On 4 October 2013 17:53, Jason Gunthorpe
-<jgunthorpe@obsidianresearch.com> wrote:
-> On Fri, Oct 04, 2013 at 02:14:34PM +0100, Matthew Minter wrote:
->
->> I have been doing some work with an Armada XP board (DB-MV784MP-GP)
->> with PCIe support, along with using a PEX 8614 (AA) PCIe switch. The
->> switch in question is said to have hot plug support with the PCIe
->> downstream slots.
->
-> PCI-E hot plug has several layers.
->
-> The first is the PCI-E serial negotiation and bring up. This is just
-> supported out of the box, and works fine with any compliant
-> device. You don't need drivers, /sys/bus/pci/rescan is enough. This is
-> what I'm doing on kirkwood.
->
-> The next is actual *physical* card removal/insertion. For in-box card
-> edge connectors this requires power management. You must remove all
-> power to the slot before removing/inserting a card. AFAIK, this is
-> what the PCI hot plug items in the kernel are all doing, and they do
-> this with help from firmware (eg ACPI on x86).
->
-> If you have a mechanical system that has staged power connectors (and
-> possibly inrush current limiters on the cards) then you don't really
-> need to worry much at this point, just rely on the serial hot plug.
->
-> PLX (AFIAK) has some 'GPIOs' on their switches dedicated to hot plug
-> functions so if the board is properly wired they can control slot
-> power/etc through their internal registers. I suspect it shouldn't be
-> too hard to get this sort of system to work.. The DT can be augmented
-> with slot chassis name properties so you have stable labels work with.
->
-> If you have board-specific controls, then you need to start augmenting
-> the DT with things like phandles to power regulators and other stuff.
->
->> Looking closer it seems that in the ARM kernel the PCI hotplug code is
->> all disabled. Am I just out of luck and should wait until there is a
->
-> I doubt you'll see anything like this emerge in the near future. Fancy
-> ARM64 servers with hot plug PCI might motivate the work, but they
-> might also do it with ACPI...
->
-> BTW,
+> BTW, I think you should use barebox instead of u-boot as the support
+> should be more complete.
+
+Ok, good to know. I will look at it.
+
+Thanks
+   -- Daniel
+
 
 -- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
 
-
-------------------------------
-For additional information including the registered office and the treatment of Xyratex confidential information please visit www.xyratex.com
-
-------------------------------
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
