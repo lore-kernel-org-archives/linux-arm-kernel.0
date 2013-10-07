@@ -1,41 +1,29 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon,  7 Oct 2013 15:19:58 +0200
-Subject: [GIT PULL] ARM: NEON accelerated AES
-Message-ID: <1381151998-7936-1-git-send-email-ard.biesheuvel@linaro.org>
+From: rogerq@ti.com (Roger Quadros)
+Date: Mon, 7 Oct 2013 16:28:12 +0300
+Subject: [PATCH 0/1] Possibly fix USB OTG on GTA04 and N900
+Message-ID: <1381152493-28055-1-git-send-email-rogerq@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-!! NOTE !!: this series build-depends on patch a62b01cd (crypto: create generic
-version of ablk_helper) which is in linux-next but not yet in mainline.
+Hi,
 
-The following changes since commit 15c03dd4859ab16f9212238f29dd315654aa94f6:
+USB OTG on these boards might be broken on Greg's usb-next branch [1]
+after the Generic PHY framework and associated patches were merged.
 
-  Linux 3.12-rc3 (2013-09-29 15:02:38 -0700)
+This is a probable fix but I'm not able to test these boards. Please
+give it a try and your Ack if it works. Thanks.
 
-are available in the git repository at:
+[1] - git://git.kernel.org/pub/scm/linux/kernel/git/gregkh/usb.git
 
-  git://git.linaro.org/people/ardbiesheuvel/linux-arm.git arm-aesbs
+cheers,
+-roger
 
-for you to fetch changes up to e4e7f10bfc4069925e99cc4b428c3434e30b6c3f:
+Roger Quadros (1):
+  ARM: dts: omap3:  Adapt USB OTG to generic PHY framework
 
-  ARM: add support for bit sliced AES using NEON instructions (2013-10-04 20:48:38 +0200)
+ arch/arm/boot/dts/omap3-gta04.dts |    2 ++
+ arch/arm/boot/dts/omap3-n900.dts  |    2 ++
+ 2 files changed, 4 insertions(+), 0 deletions(-)
 
-----------------------------------------------------------------
-Ard Biesheuvel (3):
-      ARM: pull in <asm/simd.h> from asm-generic
-      ARM: move AES typedefs and function prototypes to separate header
-      ARM: add support for bit sliced AES using NEON instructions
-
- arch/arm/crypto/Makefile             |   14 +-
- arch/arm/crypto/aes_glue.c           |   22 +-
- arch/arm/crypto/aes_glue.h           |   19 +
- arch/arm/crypto/aesbs-core.S_shipped | 2544 ++++++++++++++++++++++++++++++++++
- arch/arm/crypto/aesbs-glue.c         |  434 ++++++
- arch/arm/crypto/bsaes-armv7.pl       | 2467 +++++++++++++++++++++++++++++++++
- arch/arm/include/asm/Kbuild          |    1 +
- crypto/Kconfig                       |   16 +
- 8 files changed, 5499 insertions(+), 18 deletions(-)
- create mode 100644 arch/arm/crypto/aes_glue.h
- create mode 100644 arch/arm/crypto/aesbs-core.S_shipped
- create mode 100644 arch/arm/crypto/aesbs-glue.c
- create mode 100644 arch/arm/crypto/bsaes-armv7.pl
+-- 
+1.7.4.1
