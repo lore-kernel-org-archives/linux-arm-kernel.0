@@ -1,96 +1,35 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon,  7 Oct 2013 16:40:30 +0100
-Subject: [PATCH 2/2] arm64: KVM: Yield CPU when vcpu executes a WFE
-In-Reply-To: <1381160430-11790-1-git-send-email-marc.zyngier@arm.com>
-References: <1381160430-11790-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1381160430-11790-3-git-send-email-marc.zyngier@arm.com>
+Date: Mon,  7 Oct 2013 16:40:28 +0100
+Subject: [PATCH 0/2] ARM/arm64: KVM: Yield CPU when vcpu executes a WFE
+Message-ID: <1381160430-11790-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On an (even slightly) oversubscribed system, spinlocks are quickly
-becoming a bottleneck, as some vcpus are spinning, waiting for a
-lock to be released, while the vcpu holding the lock may not be
-running at all.
+This is a respin of a patch I posted a long while ago, this time with
+numbers that I hope to be convincing enough.
 
-The solution is to trap blocking WFEs and tell KVM that we're
-now spinning. This ensures that other vpus will get a scheduling
-boost, allowing the lock to be released more quickly.
+The basic idea is that spinning on WFE in a guest is a waste of
+resource, and that we're better of running another vcpu instead. This
+specially shows when the system is oversubscribed. The guest vcpus can
+be seen spinning, waiting for a lock to be released while the lock
+holder is nowhere near a physical CPU.
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
+This patch series just enables WFE trapping on both ARM and arm64, and
+calls kvm_vcpu_on_spin(). This is enough to boost other vcpus, and
+dramatically reduce the overhead.
+
+Branch available at:
+git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git kvm-arm64/wfe-trap
+
+Marc Zyngier (2):
+  ARM: KVM: Yield CPU when vcpu executes a WFE
+  arm64: KVM: Yield CPU when vcpu executes a WFE
+
+ arch/arm/include/asm/kvm_arm.h   |  4 +++-
+ arch/arm/kvm/handle_exit.c       |  6 +++++-
  arch/arm64/include/asm/kvm_arm.h |  8 ++++++--
  arch/arm64/kvm/handle_exit.c     | 18 +++++++++++++-----
- 2 files changed, 19 insertions(+), 7 deletions(-)
+ 4 files changed, 27 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
-index a5f28e2..c98ef47 100644
---- a/arch/arm64/include/asm/kvm_arm.h
-+++ b/arch/arm64/include/asm/kvm_arm.h
-@@ -63,6 +63,7 @@
-  * TAC:		Trap ACTLR
-  * TSC:		Trap SMC
-  * TSW:		Trap cache operations by set/way
-+ * TWE:		Trap WFE
-  * TWI:		Trap WFI
-  * TIDCP:	Trap L2CTLR/L2ECTLR
-  * BSU_IS:	Upgrade barriers to the inner shareable domain
-@@ -72,8 +73,9 @@
-  * FMO:		Override CPSR.F and enable signaling with VF
-  * SWIO:	Turn set/way invalidates into set/way clean+invalidate
-  */
--#define HCR_GUEST_FLAGS (HCR_TSC | HCR_TSW | HCR_TWI | HCR_VM | HCR_BSU_IS | \
--			 HCR_FB | HCR_TAC | HCR_AMO | HCR_IMO | HCR_FMO | \
-+#define HCR_GUEST_FLAGS (HCR_TSC | HCR_TSW | HCR_TWE | HCR_TWI | HCR_VM | \
-+			 HCR_BSU_IS | HCR_FB | HCR_TAC | \
-+			 HCR_AMO | HCR_IMO | HCR_FMO | \
- 			 HCR_SWIO | HCR_TIDCP | HCR_RW)
- #define HCR_VIRT_EXCP_MASK (HCR_VA | HCR_VI | HCR_VF)
- 
-@@ -242,4 +244,6 @@
- 
- #define ESR_EL2_EC_xABT_xFSR_EXTABT	0x10
- 
-+#define ESR_EL2_EC_WFI_ISS_WFE	(1 << 0)
-+
- #endif /* __ARM64_KVM_ARM_H__ */
-diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
-index 9beaca03..8da5606 100644
---- a/arch/arm64/kvm/handle_exit.c
-+++ b/arch/arm64/kvm/handle_exit.c
-@@ -47,21 +47,29 @@ static int handle_smc(struct kvm_vcpu *vcpu, struct kvm_run *run)
- }
- 
- /**
-- * kvm_handle_wfi - handle a wait-for-interrupts instruction executed by a guest
-+ * kvm_handle_wfx - handle a wait-for-interrupts or wait-for-event
-+ *		    instruction executed by a guest
-+ *
-  * @vcpu:	the vcpu pointer
-  *
-- * Simply call kvm_vcpu_block(), which will halt execution of
-+ * WFE: Yield the CPU and come back to this vcpu when the scheduler
-+ * decides to.
-+ * WFI: Simply call kvm_vcpu_block(), which will halt execution of
-  * world-switches and schedule other host processes until there is an
-  * incoming IRQ or FIQ to the VM.
-  */
--static int kvm_handle_wfi(struct kvm_vcpu *vcpu, struct kvm_run *run)
-+static int kvm_handle_wfx(struct kvm_vcpu *vcpu, struct kvm_run *run)
- {
--	kvm_vcpu_block(vcpu);
-+	if (kvm_vcpu_get_hsr(vcpu) & ESR_EL2_EC_WFI_ISS_WFE)
-+		kvm_vcpu_on_spin(vcpu);
-+	else
-+		kvm_vcpu_block(vcpu);
-+
- 	return 1;
- }
- 
- static exit_handle_fn arm_exit_handlers[] = {
--	[ESR_EL2_EC_WFI]	= kvm_handle_wfi,
-+	[ESR_EL2_EC_WFI]	= kvm_handle_wfx,
- 	[ESR_EL2_EC_CP15_32]	= kvm_handle_cp15_32,
- 	[ESR_EL2_EC_CP15_64]	= kvm_handle_cp15_64,
- 	[ESR_EL2_EC_CP14_MR]	= kvm_handle_cp14_access,
 -- 
 1.8.2.3
