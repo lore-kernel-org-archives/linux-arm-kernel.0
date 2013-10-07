@@ -1,32 +1,26 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon,  7 Oct 2013 16:44:25 -0500
-Subject: [PATCH] arm64: add asm-generic parport.h
-Message-ID: <1381182265-11271-1-git-send-email-robherring2@gmail.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Mon, 07 Oct 2013 23:47:55 +0200
+Subject: [PATCH 0/5] Armada DRM stuff
+In-Reply-To: <20131006220728.GG12758@n2100.arm.linux.org.uk>
+References: <20131006220728.GG12758@n2100.arm.linux.org.uk>
+Message-ID: <52532C0B.3090503@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rob Herring <rob.herring@calxeda.com>
+On 10/07/2013 12:07 AM, Russell King - ARM Linux wrote:
+> The Armada DRM drivers again, along with the TDA998x HDMI output support,
+> and an illustration to show how to add Armada 610 support (and others.)
+>
+> Rob has looked at this a couple of times since its last posting, and
+> has provided additional useful feedback which has been incorporated.
+> I believe all the major issues have been addressed now.
 
-Add asm-generic/parport.h to help fix allyesconfig builds.
+Tested-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 
-Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/include/asm/Kbuild | 1 +
- 1 file changed, 1 insertion(+)
+on Marvell Armada 510, SolidRun CuBox with quick-hack DT support added.
 
-diff --git a/arch/arm64/include/asm/Kbuild b/arch/arm64/include/asm/Kbuild
-index 79a642d..9005e81 100644
---- a/arch/arm64/include/asm/Kbuild
-+++ b/arch/arm64/include/asm/Kbuild
-@@ -25,6 +25,7 @@ generic-y += local64.h
- generic-y += mman.h
- generic-y += msgbuf.h
- generic-y += mutex.h
-+generic-y += parport.h
- generic-y += pci.h
- generic-y += percpu.h
- generic-y += poll.h
--- 
-1.8.1.2
+Let's please get this driver mainlined and start working on proper DT
+support for it. Thanks for driver and the patience to work out all
+issues!
+
+Sebastian
