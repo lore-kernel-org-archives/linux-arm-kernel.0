@@ -1,37 +1,81 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 7 Oct 2013 15:15:53 +0200
-Subject: [PATCH] ARM: tlb: __flush_tlb_mm need to use int asid var for
- BE correct operation
-In-Reply-To: <52529305.5050306@codethink.co.uk>
-References: <1381128458-32140-1-git-send-email-victor.kamensky@linaro.org>
- <1381128458-32140-2-git-send-email-victor.kamensky@linaro.org>
- <20131007104524.GK12758@n2100.arm.linux.org.uk>
- <20131007104936.GG465@mudshark.cambridge.arm.com>
- <52529305.5050306@codethink.co.uk>
-Message-ID: <20131007151553.60c0739a@skate>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon,  7 Oct 2013 15:19:53 +0200
+Subject: [PATCH] ARM: integrator: deactivate timer0 on the Integrator/CP
+Message-ID: <1381151993-5450-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Ben Dooks,
+This fixes a long-standing Integrator/CP regression from
+commit 870e2928cf3368ca9b06bc925d0027b0a56bcd8e
+"ARM: integrator-cp: convert use CLKSRC_OF for timer init"
 
-On Mon, 07 Oct 2013 12:55:01 +0200, Ben Dooks wrote:
+When this code was introduced, the both aliases pointing the
+system to use timer1 as primary (clocksource) and timer2
+as secondary (clockevent) was ignored, and the system would
+simply use the first two timers found as clocksource and
+clockevent.
 
-> > Speaking of which -- it's probably a good time to refresh and repost that if
-> > we're aiming for 3.13...
-> 
-> I intended on rebasing the branch over the weekend, but ran out of
-> time due to illness. I will try and look at a re-base tonight and
-> if we can replace this ASID() issue then I can produce a new branch
-> with it in.
+However this made the system timeline accelerate by a
+factor x25, as it turns out that the way the clocking
+actually works (totally undocumented and found after some
+trial-and-error) is that timer0 runs @ 25MHz and timer1
+and timer2 runs @ 1MHz. Presumably this divider setting
+is a boot-on default and configurable albeit the way to
+configure it is not documented.
 
-Great. I remain interested in seeing the BE support merged, so if you
-could Cc me on your future patch set, I could give it a test on Armada
-XP hardware. It would be really nice to see it merged for 3.13.
+So as a quick fix to the problem, let's mark timer0 as
+disabled, so the code will chose timer1 and timer2 as it
+used to.
 
-Thanks,
+This also deletes the two aliases for the primary and
+secondary timer as they have been superceded by the
+auto-selection
 
-Thomas
+Cc: stable at vger.kernel.org
+Cc: Rob Herring <rob.herring@calxeda.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ARM SoC folks: can you please apply this directly for fixes
+if noone complains? Thanks.
+---
+ arch/arm/boot/dts/integratorcp.dts | 9 ++++-----
+ 1 file changed, 4 insertions(+), 5 deletions(-)
+
+diff --git a/arch/arm/boot/dts/integratorcp.dts b/arch/arm/boot/dts/integratorcp.dts
+index ff1aea0..72693a6 100644
+--- a/arch/arm/boot/dts/integratorcp.dts
++++ b/arch/arm/boot/dts/integratorcp.dts
+@@ -9,11 +9,6 @@
+ 	model = "ARM Integrator/CP";
+ 	compatible = "arm,integrator-cp";
+ 
+-	aliases {
+-		arm,timer-primary = &timer2;
+-		arm,timer-secondary = &timer1;
+-	};
+-
+ 	chosen {
+ 		bootargs = "root=/dev/ram0 console=ttyAMA0,38400n8 earlyprintk";
+ 	};
+@@ -24,14 +19,18 @@
+ 	};
+ 
+ 	timer0: timer at 13000000 {
++		/* TIMER0 runs @ 25MHz */
+ 		compatible = "arm,integrator-cp-timer";
++		status = "disabled";
+ 	};
+ 
+ 	timer1: timer at 13000100 {
++		/* TIMER1 runs @ 1MHz */
+ 		compatible = "arm,integrator-cp-timer";
+ 	};
+ 
+ 	timer2: timer at 13000200 {
++		/* TIMER2 runs @ 1MHz */
+ 		compatible = "arm,integrator-cp-timer";
+ 	};
+ 
 -- 
-Thomas Petazzoni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+1.8.3.1
