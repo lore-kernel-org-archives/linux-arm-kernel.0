@@ -1,26 +1,41 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 7 Oct 2013 10:53:22 +0100
-Subject: [PATCH v3 1/2] KVM: ARM: Support hugetlbfs backed huge pages
-In-Reply-To: <1380903201-32644-2-git-send-email-christoffer.dall@linaro.org>
-References: <1380903201-32644-1-git-send-email-christoffer.dall@linaro.org>
- <1380903201-32644-2-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <20131007095321.GB32012@arm.com>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Mon, 7 Oct 2013 12:09:22 +0200
+Subject: [PATCH 3/5] DRM: Armada: Add support for ARGB 32x64 or 64x32
+ hardware cursors
+In-Reply-To: <20131007094008.GH12758@n2100.arm.linux.org.uk>
+References: <20131006220728.GG12758@n2100.arm.linux.org.uk>
+ <E1VSwWS-0000i7-4f@rmk-PC.arm.linux.org.uk>
+ <20131007110141.27f1ac25@armhf>
+ <20131007094008.GH12758@n2100.arm.linux.org.uk>
+Message-ID: <20131007120922.47df03b6@armhf>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 04, 2013 at 05:13:20PM +0100, Christoffer Dall wrote:
-> --- a/arch/arm64/include/asm/pgtable-hwdef.h
-> +++ b/arch/arm64/include/asm/pgtable-hwdef.h
-> @@ -85,6 +85,8 @@
->  #define PTE_S2_RDONLY          (_AT(pteval_t, 1) << 6)   /* HAP[2:1] */
->  #define PTE_S2_RDWR            (_AT(pteval_t, 3) << 6)   /* HAP[2:1] */
+On Mon, 7 Oct 2013 10:40:08 +0100
+Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+
+> > > This patch adds ARGB hardware cursor support to the DRM driver for the
+> > > Marvell Armada SoCs.  ARGB cursors are supported at either 32x64 or
+> > > 64x32 resolutions.  
+> > 	[snip]
+> > 
+> > I don't see the interest of such cursors. Actually, most often, the
+> > cursors are 64x64 and 'A' is either 0 or 0xff. As the Armada 510
+> > supports 64x64 cursors with transparency, it would be more useful to
+> > implement these ones...  
 > 
-> +#define PMD_S2_RDWR            (_AT(pmdval_t, 3) << 6)   /* HAP[2:1] */
-> +
->  /*
->   * Memory Attribute override for Stage-2 (MemAttr[3:0])
->   */
+> Sorry, you're completely wrong there.  Xorg uses an alphablended cursor.
+> This patch is a result of trialling each of the Armada's cursor options
+> and this is the only one which results in a reasonable looking cursor.
 
-For the arm64 part:
+Strange. I am using the 64x64 cursor with transparency of the 510 for
+many months and I never saw any problem.
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+If you absolutely want to have all transparency shades, you should
+accept 64x64 cursors and test if they may be rendered as 64x32 or 32x64,
+i.e. test that there is only pure transparency in the non-rendered
+rectangles...
+
+-- 
+Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
+Jef		|		http://moinejf.free.fr/
