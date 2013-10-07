@@ -1,56 +1,38 @@
-From: john.stultz@linaro.org (John Stultz)
-Date: Mon, 07 Oct 2013 10:10:58 -0700
-Subject: [GIT PULL]clocksource: dw_apb_timer_of: Fix read_sched_clock
-In-Reply-To: <5252DCB6.3070805@linaro.org>
-References: <1381159679-6528-1-git-send-email-dinguyen@altera.com>
- <5252DCB6.3070805@linaro.org>
-Message-ID: <5252EB22.2050506@linaro.org>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 07 Oct 2013 11:18:55 -0600
+Subject: [PATCH 4/7] ARM: tegra: Add initial device tree for Tegra124
+In-Reply-To: <1381131085-26116-5-git-send-email-josephl@nvidia.com>
+References: <1381131085-26116-1-git-send-email-josephl@nvidia.com>
+ <1381131085-26116-5-git-send-email-josephl@nvidia.com>
+Message-ID: <5252ECFF.404@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/07/2013 09:09 AM, Daniel Lezcano wrote:
-> On 10/07/2013 05:27 PM, dinguyen at altera.com wrote:
->> From: Dinh Nguyen <dinguyen@altera.com>
->>
->> Hi Thomas, John,
->>
->> I am hoping you can pull in these 2 patches. These 2 patches have
->> been floating
->> around for almost 2 months now. They are needed to get the Altera
->> SOCFPGA
->> booting again because of a DTS binding change in 3.12.
->>
->> The other change was correctly return the current clock counter.
->>
->> The discussion thread can be found here:
->>
->> http://lists.infradead.org/pipermail/linux-arm-kernel/2013-September/198818.html
->>
->> http://lists.infradead.org/pipermail/linux-arm-kernel/2013-September/198903.html
->>
->>
->> This patch does not attempt or change the behaviour of the ordering
->> of how a
->> clocksource or clockevent is use. These 2 patches only enables a
->> platform to boot.
->
-> John,
->
-> I agree with Dinh, these patches fixes a boot issue on Altera SOCFPGA
-> and should be merged.
->
+On 10/07/2013 01:31 AM, Joseph Lo wrote:
+> Initial support for Tegra 124 SoC. This is expected to be included in
+> the board DTS files.
 
-Hey Dinh,
-    Thanks for persisting here! Sorry this has taken awhile. Just as an
-FYI, Daniel is maintaining the drivers/clocksource dir these days.
+> diff --git a/arch/arm/boot/dts/tegra124.dtsi b/arch/arm/boot/dts/tegra124.dtsi
 
-So, I've not been following this closely, but if I recall we had a merge
-conflict that we backed out, since it seemed that everyone involved in
-this driver weren't working together. Then Thomas had some objections,
-but it *looks* like that's been resolved. So I don't have any objections
-at this point.
+> +	rtc {
+> +		compatible = "nvidia,tegra124-rtc", "nvidia,tegra20-rtc";
+> +		reg = <0x7000e000 0x100>;
 
-Daniel: if you want to pull these in to your tree, that's fine by me.
+We recently decided that all nodes that have a reg property must have a
+matching unit address in the node name. Hence, the node should be named
+"rtc at 7000e000" not just "rtc". We haven't decided how to clean this up
+for existing DTs, but I'd like to enforce the new rule for all new DTs.
 
-thanks
--john
+The pmc node should also be fixed.
+
+> +	pmc {
+> +		compatible = "nvidia,tegra124-pmc", "nvidia,tegra114-pmc";
+> +		reg = <0x7000e400 0x400>;
+> +	};
+
+Is the Tegra124 PMC really identical to the Tegra114 PMC in hardware?
+That would be a departure from history, where the PMC has changed
+significantly and incompatibly for each chip. Can you please investigate
+the details of the PMC changes; I suspect this should simply be:
+
+		compatible = "nvidia,tegra124-pmc";
