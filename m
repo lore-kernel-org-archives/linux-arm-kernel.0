@@ -1,41 +1,59 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Mon, 7 Oct 2013 12:09:22 +0200
-Subject: [PATCH 3/5] DRM: Armada: Add support for ARGB 32x64 or 64x32
- hardware cursors
-In-Reply-To: <20131007094008.GH12758@n2100.arm.linux.org.uk>
-References: <20131006220728.GG12758@n2100.arm.linux.org.uk>
- <E1VSwWS-0000i7-4f@rmk-PC.arm.linux.org.uk>
- <20131007110141.27f1ac25@armhf>
- <20131007094008.GH12758@n2100.arm.linux.org.uk>
-Message-ID: <20131007120922.47df03b6@armhf>
+From: matt.porter@linaro.org (Matt Porter)
+Date: Mon,  7 Oct 2013 06:12:27 -0400
+Subject: [PATCH 0/5] USB Device Controller support for BCM281xx
+Message-ID: <1381140752-312-1-git-send-email-matt.porter@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 7 Oct 2013 10:40:08 +0100
-Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+This series adds USB Device Controller support for the Broadcom
+BCM281xx family of parts. BCM281xx contains a DWC2 OTG block and
+s3c-hsotg is used to support UDC operation.
 
-> > > This patch adds ARGB hardware cursor support to the DRM driver for the
-> > > Marvell Armada SoCs.  ARGB cursors are supported at either 32x64 or
-> > > 64x32 resolutions.  
-> > 	[snip]
-> > 
-> > I don't see the interest of such cursors. Actually, most often, the
-> > cursors are 64x64 and 'A' is either 0 or 0xff. As the Armada 510
-> > supports 64x64 cursors with transparency, it would be more useful to
-> > implement these ones...  
-> 
-> Sorry, you're completely wrong there.  Xorg uses an alphablended cursor.
-> This patch is a result of trialling each of the Armada's cursor options
-> and this is the only one which results in a reasonable looking cursor.
+Parts 1-2 allows s3c-hsotg to build on non-Samsung platforms and
+adds support for a configurable UTMI PHY width. s3c-hsotg is extended
+to also support the dwc2 binding as that binding should describe the
+hardware independently of there being two different drivers (dwc2 in
+staging and s3c-hsotg) for the same device.
 
-Strange. I am using the 64x64 cursor with transparency of the 510 for
-many months and I never saw any problem.
+Parts 3-4 add a PHY control driver for the Broadcom USB control block
+as well as a PHY driver that calls the exported API from the control
+driver. This approach is borrowed directly from the phy-omap-control.c
+driver.
 
-If you absolutely want to have all transparency shades, you should
-accept 64x64 cursors and test if they may be rendered as 64x32 or 32x64,
-i.e. test that there is only pure transparency in the non-rendered
-rectangles...
+Patch 5 adds the DT nodes to enable UDC support on both BCM281xx boards
+in the kernel.
+
+This series depends on the "Update Kona drivers to use clocks" series
+(https://lkml.org/lkml/2013/10/3/645). The dependencies noted for that
+series are already queued for 3.13.
+
+Matt Porter (5):
+  usb: gadget: s3c-hsotg: enable build for other platforms
+  usb: gadget: s3c-hsotg: support configurable UTMI PHY width
+  usb: phy: add Broadcom Kona USB control driver
+  usb: phy: add Broadcom Kona USB PHY driver
+  ARM: dts: add usb udc support to bcm281xx
+
+ Documentation/devicetree/bindings/staging/dwc2.txt |   4 +
+ .../devicetree/bindings/usb/bcm-kona-usb-ctrl.txt  |  12 ++
+ .../devicetree/bindings/usb/bcm-kona-usb-phy.txt   |  10 ++
+ arch/arm/boot/dts/bcm11351-brt.dts                 |  10 ++
+ arch/arm/boot/dts/bcm11351.dtsi                    |  21 +++
+ arch/arm/boot/dts/bcm28155-ap.dts                  |  12 ++
+ drivers/usb/gadget/Kconfig                         |   7 +-
+ drivers/usb/gadget/s3c-hsotg.c                     |  20 ++-
+ drivers/usb/gadget/s3c-hsotg.h                     |   1 +
+ drivers/usb/phy/Kconfig                            |  12 ++
+ drivers/usb/phy/Makefile                           |   2 +
+ drivers/usb/phy/bcm-kona-usb.h                     |  31 +++++
+ drivers/usb/phy/phy-bcm-kona-ctrl.c                | 151 +++++++++++++++++++++
+ drivers/usb/phy/phy-bcm-kona-usb2.c                |  99 ++++++++++++++
+ 14 files changed, 385 insertions(+), 7 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/usb/bcm-kona-usb-ctrl.txt
+ create mode 100644 Documentation/devicetree/bindings/usb/bcm-kona-usb-phy.txt
+ create mode 100644 drivers/usb/phy/bcm-kona-usb.h
+ create mode 100644 drivers/usb/phy/phy-bcm-kona-ctrl.c
+ create mode 100644 drivers/usb/phy/phy-bcm-kona-usb2.c
 
 -- 
-Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
-Jef		|		http://moinejf.free.fr/
+1.8.4
