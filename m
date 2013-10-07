@@ -1,56 +1,101 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Mon, 7 Oct 2013 21:22:29 +0530
-Subject: [PATCH] DMA: extend documentation to provide more API details
-In-Reply-To: <Pine.LNX.4.64.1310071739590.20796@axis700.grange>
-References: <20131005233137.GA12758@n2100.arm.linux.org.uk>
- <20131006052029.GE2954@intel.com>
- <Pine.LNX.4.64.1310071233340.20796@axis700.grange>
- <20131007111728.GM12758@n2100.arm.linux.org.uk>
- <20131007103936.GH2954@intel.com>
- <Pine.LNX.4.64.1310071409080.20796@axis700.grange>
- <20131007142511.GJ2954@intel.com>
- <Pine.LNX.4.64.1310071725300.20796@axis700.grange>
- <20131007144335.GL2954@intel.com>
- <Pine.LNX.4.64.1310071739590.20796@axis700.grange>
-Message-ID: <20131007155229.GN2954@intel.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon,  7 Oct 2013 10:45:49 -0600
+Subject: [PATCH V2] ARM: tegra: unify Tegra's Kconfig a bit more
+Message-ID: <1381164349-23130-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 07, 2013 at 05:45:22PM +0200, Guennadi Liakhovetski wrote:
-> On Mon, 7 Oct 2013, Vinod Koul wrote:
-> 
-> > On Mon, Oct 07, 2013 at 05:28:37PM +0200, Guennadi Liakhovetski wrote:
-> > > > > > > > No, not something in the middle. I was thinking about
-> > > > > > > > 
-> > > > > > > > (1) cookie 1-3 are submitted
-> > > > > > > > (2) cookie 1 succeeds
-> > > > > > > > (3) a DMA error occurs, cookies 2-3 are discarded
-> > > > > > discarded using terminate_all right?
-> > > > > 
-> > > > > No, by the dmaengine driver as a part of the error processing.
-> > > > And how will that be done...?
-> > > 
-> > > Sorry, I meant - DMA descriptors with cookies #2 and #3 will be cancelled 
-> > > and recycled by the dmaengine driver. That's what you have to do, when 
-> > > processing DMA error IRQ.
-> > Well how do you that?
-> 
-> Mmmh, maybe I'm missing something, but isn't it a part of the common DMA 
-> processing? You get an error IRQ; on some DMAC types this means, that you 
-> have to reset the hardware, so, you perform whatever actions you have to 
-> do to reset the controller; you remove any descriptors from the pending 
-> queue; reinsert them into the free queue and let any clients run on a 
-> timeout. I don't think it would be a good idea to do anything more smart 
-> like trying to restart the current transfer or drop it and continue with 
-> the queue, because we don't know in what state the client hardware is, so, 
-> we can only let the client driver try to recover.
-No that would be very wrong thing to do behind clients back. Suppose you got a
-trasaction which returned error irq and it was generated one half of the
-requested transfer was done. Redoing the entrie transaction wont be right!
+From: Stephen Warren <swarren@nvidia.com>
 
-So I think you need to let client know the error status.
+Move all common select clauses from ARCH_TEGRA_*_SOC to ARCH_TEGRA to
+eliminate duplication. The USB-related selects all should have been
+common too, but were missing from Tegra114 previously. Move these to
+ARCH_TEGRA too. The latter fixes a build break when only Tegra114
+support was enabled, but not Tegra20 or Tegra30 support.
 
-But again, is this usage fiarly common?
+This is 20984c44b5a08620778ea14fa5807489170fd5ca in v3.12-rc1, with
+a merge conflict resolved.
 
---
-~Vinod
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+Reported-by: Paul Walmsley <pwalmsley@nvidia.com>
+[our auto-builders for 3.11.x are failing due to this]
+---
+v2: I actually applied the patch this time, resolving the merge conflict
+    while I was at it. I built and booted the result too.
+
+ arch/arm/mach-tegra/Kconfig | 21 ++++++---------------
+ 1 file changed, 6 insertions(+), 15 deletions(-)
+
+diff --git a/arch/arm/mach-tegra/Kconfig b/arch/arm/mach-tegra/Kconfig
+index ef3a8da..2f1bcc6 100644
+--- a/arch/arm/mach-tegra/Kconfig
++++ b/arch/arm/mach-tegra/Kconfig
+@@ -2,18 +2,24 @@ config ARCH_TEGRA
+ 	bool "NVIDIA Tegra" if ARCH_MULTI_V7
+ 	select ARCH_HAS_CPUFREQ
+ 	select ARCH_REQUIRE_GPIOLIB
++	select ARM_GIC
+ 	select CLKDEV_LOOKUP
+ 	select CLKSRC_MMIO
+ 	select CLKSRC_OF
+ 	select COMMON_CLK
++	select CPU_V7
+ 	select GENERIC_CLOCKEVENTS
+ 	select HAVE_ARM_SCU if SMP
+ 	select HAVE_ARM_TWD if LOCAL_TIMERS
+ 	select HAVE_CLK
+ 	select HAVE_SMP
+ 	select MIGHT_HAVE_CACHE_L2X0
++	select PINCTRL
+ 	select SOC_BUS
+ 	select SPARSE_IRQ
++	select USB_ARCH_HAS_EHCI if USB_SUPPORT
++	select USB_ULPI if USB_PHY
++	select USB_ULPI_VIEWPORT if USB_PHY
+ 	select USE_OF
+ 	help
+ 	  This enables support for NVIDIA Tegra based systems.
+@@ -27,15 +33,9 @@ config ARCH_TEGRA_2x_SOC
+ 	select ARM_ERRATA_720789
+ 	select ARM_ERRATA_754327 if SMP
+ 	select ARM_ERRATA_764369 if SMP
+-	select ARM_GIC
+-	select CPU_V7
+-	select PINCTRL
+ 	select PINCTRL_TEGRA20
+ 	select PL310_ERRATA_727915 if CACHE_L2X0
+ 	select PL310_ERRATA_769419 if CACHE_L2X0
+-	select USB_ARCH_HAS_EHCI if USB_SUPPORT
+-	select USB_ULPI if USB_PHY
+-	select USB_ULPI_VIEWPORT if USB_PHY
+ 	help
+ 	  Support for NVIDIA Tegra AP20 and T20 processors, based on the
+ 	  ARM CortexA9MP CPU and the ARM PL310 L2 cache controller
+@@ -44,14 +44,8 @@ config ARCH_TEGRA_3x_SOC
+ 	bool "Enable support for Tegra30 family"
+ 	select ARM_ERRATA_754322
+ 	select ARM_ERRATA_764369 if SMP
+-	select ARM_GIC
+-	select CPU_V7
+-	select PINCTRL
+ 	select PINCTRL_TEGRA30
+ 	select PL310_ERRATA_769419 if CACHE_L2X0
+-	select USB_ARCH_HAS_EHCI if USB_SUPPORT
+-	select USB_ULPI if USB_PHY
+-	select USB_ULPI_VIEWPORT if USB_PHY
+ 	help
+ 	  Support for NVIDIA Tegra T30 processor family, based on the
+ 	  ARM CortexA9MP CPU and the ARM PL310 L2 cache controller
+@@ -59,10 +53,7 @@ config ARCH_TEGRA_3x_SOC
+ config ARCH_TEGRA_114_SOC
+ 	bool "Enable support for Tegra114 family"
+ 	select HAVE_ARM_ARCH_TIMER
+-	select ARM_GIC
+ 	select ARM_L1_CACHE_SHIFT_6
+-	select CPU_V7
+-	select PINCTRL
+ 	select PINCTRL_TEGRA114
+ 	help
+ 	  Support for NVIDIA Tegra T114 processor family, based on the
+-- 
+1.8.1.5
