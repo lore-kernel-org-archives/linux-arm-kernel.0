@@ -1,78 +1,41 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Mon, 07 Oct 2013 19:24:57 +0200
-Subject: [PATCH v2] ARM: tlb: ASID macro should give 32bit result for
- BE correct operation
-In-Reply-To: <CAA3XUr2wYFL9WAQd9uAJSKK5KhWF3bPzYbh-3x=B3oLVXk79og@mail.gmail.com>
-References: <1381160903-1248-1-git-send-email-victor.kamensky@linaro.org>
- <5252DA06.8000303@codethink.co.uk>
- <CAA3XUr2wYFL9WAQd9uAJSKK5KhWF3bPzYbh-3x=B3oLVXk79og@mail.gmail.com>
-Message-ID: <5252EE69.3030805@codethink.co.uk>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 7 Oct 2013 18:27:06 +0100
+Subject: [RFC] ASoC: pcm: Trigger all commands on error
+In-Reply-To: <1380883997-18236-1-git-send-email-mpa@pengutronix.de>
+References: <1380883997-18236-1-git-send-email-mpa@pengutronix.de>
+Message-ID: <20131007172706.GS21581@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/10/13 18:37, Victor Kamensky wrote:
-> On 7 October 2013 08:57, Ben Dooks<ben.dooks@codethink.co.uk>  wrote:
->> On 07/10/13 17:48, Victor Kamensky wrote:
->>>
->>> Hi Will, Ben, Russell, Thomas,
->>>
->>> Please review second version of patch that fixes TLB asid issue in big
->>> endian
->>> V7 image.
->>>
->>> Changes from v1:
->>>      Note previous patch subject line was 'ARM: tlb:
->>>      __flush_tlb_mm need to use int asid var for BE correct operation'
->>>
->>>      Added 'unsigned int' cast into ASID macro itself rather
->>>      then use intermediate 'int' variable in __flush_tlb_mm function.
->>>      This is done per v1 patch discussion at
->>>
->>>
->>> http://lists.infradead.org/pipermail/linux-arm-kernel/2013-October/202583.html
->>>
->>> Tested with Linaro BE topic branch on Arndale board. Both LE and BE
->>> images were tested.
->>
->>
->> If you are booting on the Arndale board, is there a patch to mark
->> the relevant Exynos devices as BE capable?
->
-> Arndale need massive fixes in their BSP layer to be endian agnostic
-> ARM V7 platform. Unfortunate it is not as simple as with few others
-> that already marked as BE capable.
->
-> Please see
-> https://git.linaro.org/gitweb?p=people/victor.kamensky/linux-linaro-tracking-be.git;a=shortlog;h=refs/heads/llct-be-topic
-> Mostly it is __raw_xxx conversion to xxx_relaxed, but there are
-> more subtle changes (some of them similar to changs that you've
-> done for other platforms). Also there are known unfixed issues like
-> disabling CONFIG_MMC_DW_IDMAC config because idmac
-> DMA related code is not endian agnostic yet (btw interesting class
-> of BE related problem that was not seen before).
+On Fri, Oct 04, 2013 at 12:53:17PM +0200, Markus Pargmann wrote:
 
-Ok, will have a look. I'm interested as I may be able to
-update my techcon paper and possibly insert a slide or two.
+> In case of a start command, the calling function will call undo_start,
+> calling this trigger function with the stop command. It will call stop
+> for each function. But only the first function was started previously.
+> The other functions may fail in the assumption that a stop command
+> always comes after a start command.
 
-> In Linaro we use Arndale and Pandaboard as reference platforms
-> therefore we have BE BSP fixes in our tree. But I am not sure
-> what is fate of those in long term. Also we consider these as
-> example of BSP changes that other BSP need to do.
->
-> If Exynos and OMAP owners will have any interest for BE images,
-> and would like to see these changes in main line, we gladly
-> will work on this. Otherwise changes like this can mess up with
-> BSP ongoing drivers development.
->
-> I think above position is consistent with similar discussion on
-> some of BE related threads - changing BSP to support BE mode
-> is BSP owners call.
+> As the API does not specify the behaviour of trigger functionpointers, I
+> think this should be fixed in the function calling the trigger
+> functionpointers.
 
-I'm not sure if it will ever be interesting to OMAP, especially
-as it is pretty much a dead-end.
+> This patch changes the behaviour. The trigger function calls all
+> functionpointers independent of their returncodes. The first error-code
+> is returned.
 
-It would be nice to see the Exynos support it.
-
--- 
-Ben Dooks				http://www.codethink.co.uk/
-Senior Engineer				Codethink - Providing Genius
+I'm not sure if this will resolve the problem robustly - if something is
+going to get confused about this it seems just as likely that the
+trigger that failed will get upset because it gets a _STOP after
+returning an error from _START.  I think what I'd expect here is that
+the unwind on error would unwind only the triggers that it successfully
+ran.  Equally well I'd be a bit surprised if a trigger function actually
+had a problem with extra _STOPs since they mostly just do register
+writes...  did you see this from code inspection or were you resolving a
+practical problem in your system?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131007/f6867cdc/attachment.sig>
