@@ -1,36 +1,23 @@
-From: joelf@ti.com (Joel Fernandes)
-Date: Mon, 7 Oct 2013 11:28:03 -0500
-Subject: [RFC] ARM: kernel: irq: Simplify allocation of stack frame
-In-Reply-To: <20131006224150.GA25647@n2100.arm.linux.org.uk>
-References: <1381098649-21417-1-git-send-email-joelf@ti.com>
- <20131006224150.GA25647@n2100.arm.linux.org.uk>
-Message-ID: <5252E113.3080301@ti.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 7 Oct 2013 18:28:19 +0200
+Subject: [RFC PATCH 2/5] ARM64: add quick-n-dirty emulation for AES
+ instructions
+In-Reply-To: <20131007161835.GI32012@arm.com>
+References: <1381147951-7609-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1381147951-7609-3-git-send-email-ard.biesheuvel@linaro.org>
+ <20131007161835.GI32012@arm.com>
+Message-ID: <CAKv+Gu93A8WX5G0T-2j3wG73vrF6_GQA-3Q_wAJ-ABJ+o2Zoyw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/06/2013 05:41 PM, Russell King - ARM Linux wrote:
-> On Sun, Oct 06, 2013 at 05:30:47PM -0500, Joel Fernandes wrote:
->> On receiving IRQ exception in SVC mode, all the SVC mode registers are saved
->> onto the stack very early on.
->>
->> The stack frame allocation code for IRQ entry during SVC mode (svc_entry) is
->> hard to read as 4-less is allocated initially only to be allocated later
->> implicity using the mov r3, [sp, #-4]! instruction. We make code easier to read
->> by allocating the 4 bytes on the stack frame in the beginning itself and remove
->> all instances where 4 bytes is adjusted.
-> 
-> You omit to say that this results in saving one additional register
-> unnecessarily in the stmia.  We could use a stmib there instead which
-> would avoid that issue while keeping the rest of the change.
-> 
+On 7 October 2013 18:18, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> On Mon, Oct 07, 2013 at 01:12:28PM +0100, Ard Biesheuvel wrote:
+>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>
+> It's missing a commit message with an explanation. In the meantime, NAK
+> ;)
+>
 
-Hi Russel,
-
-BTW I used ETM to check the number of cycles used to store the extra register
-with and without this patch and with both cases it takes 7 cycles.
-
-My platform uses Cortex-A8 (AM335x SoC).
-
-Thanks,
-
--Joel
+Well, I just included it for completeness sake, not for upstreaming,
+but if all it takes to get you to accept it is a commit message, than
+maybe I will reconsider :-)
