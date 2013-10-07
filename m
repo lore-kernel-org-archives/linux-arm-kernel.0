@@ -1,42 +1,36 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 7 Oct 2013 12:17:28 +0100
-Subject: [PATCH] DMA: extend documentation to provide more API details
-In-Reply-To: <Pine.LNX.4.64.1310071233340.20796@axis700.grange>
-References: <Pine.LNX.4.64.1310051925170.8097@axis700.grange>
- <20131005190200.GZ12758@n2100.arm.linux.org.uk>
- <Pine.LNX.4.64.1310052203060.8097@axis700.grange>
- <20131005233137.GA12758@n2100.arm.linux.org.uk>
- <20131006052029.GE2954@intel.com>
- <Pine.LNX.4.64.1310071233340.20796@axis700.grange>
-Message-ID: <20131007111728.GM12758@n2100.arm.linux.org.uk>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Mon, 07 Oct 2013 13:29:30 +0200
+Subject: [PATCH 5/5] DRM: Armada: add support for drm tda19988 driver
+In-Reply-To: <20131007110902.GL12758@n2100.arm.linux.org.uk>
+References: <20131006220728.GG12758@n2100.arm.linux.org.uk>
+ <E1VSwYO-0000iT-CU@rmk-PC.arm.linux.org.uk> <20131007111807.5e86ea6e@armhf>
+ <20131007094404.GI12758@n2100.arm.linux.org.uk>
+ <20131007124820.2189a4c3@armhf>
+ <20131007110902.GL12758@n2100.arm.linux.org.uk>
+Message-ID: <52529B1A.7060306@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 07, 2013 at 12:45:33PM +0200, Guennadi Liakhovetski wrote:
-> No, not something in the middle. I was thinking about
-> 
-> (1) cookie 1-3 are submitted
-> (2) cookie 1 succeeds
-> (3) a DMA error occurs, cookies 2-3 are discarded
-> (4) cookie 4 is submitted and succeeds
-> (5) the user requests status of cookie 2 and gets success back, AFAICS
+On 10/07/2013 01:09 PM, Russell King - ARM Linux wrote:
+> On Mon, Oct 07, 2013 at 12:48:20PM +0200, Jean-Francois Moine wrote:
+>> On Mon, 7 Oct 2013 10:44:04 +0100
+>> Rabeeh did the most he could to have a working Cubox. He used bad
+>> written drivers and he had not the time to think about how the drivers
+>> could be enhanced.
+>
+> What does I2S give us in terms of "enhancement" which SPDIF does not,
+> remembering that audio is transmitted over HDMI in a format which closely
+> resembles SPDIF (but with a 28-bit subframe size.)
 
-This is a side effect of using a sequential cookie based system to indicate
-whether a descriptor has succeeded or not.
+With respect to what _most_ users want, we should use SPDIF and ignore
+I2S. Consumer audio fits well into SPDIF and we get pass-through, which
+we loose on I2S.
 
-What may be better is to change the wording here: not DMA_SUCCESS but
-DMA_COMPLETED.  That doesn't imply that it has been successful, merely
-that the DMA engine has finished with the transaction.
+I2S _can_ support more than two channels, but only if you wire up more
+DATA lines. Those are not available on Dove, so its I2S is limited to
+two channel audio.
 
-How a transaction gets to notify that it's been in error is a problem -
-there is no mechanism to do that (part of that is because DMA engine slave
-support grew out of the async_tx stuff which doesn't really have the
-notion of failure.)
+The CuBox is simply not designed for HBR or multi-channel PCM, it is a
+_consumer_ settop box replacement.
 
-We can't fetch the descriptor after it has been completed, because it will
-have been freed or recycled depending on the implementation.
-
-If we want to have some way to report errors against descriptors, I think
-we should augment the descriptor with another callback which gets called
-(again from tasklet context) so that drivers which care about this can be
-notified of errors.
+Sebastian
