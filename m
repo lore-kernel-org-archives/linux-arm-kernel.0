@@ -1,32 +1,128 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 7 Oct 2013 11:22:45 -0700
-Subject: [GIT PULL 0/8] Renesas ARM based SoC updates for v3.13
-In-Reply-To: <cover.1380530437.git.horms+renesas@verge.net.au>
-References: <cover.1380530437.git.horms+renesas@verge.net.au>
-Message-ID: <20131007182245.GE17592@quad.lixom.net>
+From: tim.kryger@linaro.org (Tim Kryger)
+Date: Mon, 7 Oct 2013 11:23:55 -0700
+Subject: [PATCH v2 1/6] ARM: dts: Declare clocks as fixed on bcm11351
+In-Reply-To: <1381170240-23227-1-git-send-email-tim.kryger@linaro.org>
+References: <1381170240-23227-1-git-send-email-tim.kryger@linaro.org>
+Message-ID: <1381170240-23227-2-git-send-email-tim.kryger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 01, 2013 at 11:34:09AM +0900, Simon Horman wrote:
-> Hi Kevin, Olof and Arnd,
-> 
-> please consider these Renesas ARM based SoC updates for v3.13.
-> 
-> This pull-request is based on v3.12-rc1.
-> 
-> 
-> The following changes since commit 272b98c6455f00884f0350f775c5342358ebb73f:
-> 
->   Linux 3.12-rc1 (2013-09-16 16:17:51 -0400)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git soc
+Declare clocks that are enabled and configured by bootloaders as fixed
+rate clocks in the DTS such that device drivers may use standard clock
+function calls.
 
-Pulled. As discussed earlier, the new platforms for 3.13 should be
-the last ones of the legacy kind; from here on out we should see
-multi-platform enabled new platforms from day one (i.e. once CCF and
-other pieces land).
+Signed-off-by: Tim Kryger <tim.kryger@linaro.org>
+Reviewed-by: Markus Mayer <markus.mayer@linaro.org>
+Reviewed-by: Matt Porter <matt.porter@linaro.org>
+---
+ arch/arm/boot/dts/bcm11351.dtsi | 97 +++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 97 insertions(+)
 
-
--Olof
+diff --git a/arch/arm/boot/dts/bcm11351.dtsi b/arch/arm/boot/dts/bcm11351.dtsi
+index 98e6bc0..c6464fb 100644
+--- a/arch/arm/boot/dts/bcm11351.dtsi
++++ b/arch/arm/boot/dts/bcm11351.dtsi
+@@ -126,4 +126,101 @@
+ 		status = "disabled";
+ 	};
+ 
++	clocks {
++		bsc1_clk: bsc1 {
++			compatible = "fixed-clock";
++			clock-frequency = <13000000>;
++			#clock-cells = <0>;
++		};
++
++		bsc2_clk: bsc2 {
++			compatible = "fixed-clock";
++			clock-frequency = <13000000>;
++			#clock-cells = <0>;
++		};
++
++		bsc3_clk: bsc3 {
++			compatible = "fixed-clock";
++			clock-frequency = <13000000>;
++			#clock-cells = <0>;
++		};
++
++		pmu_bsc_clk: pmu_bsc {
++			compatible = "fixed-clock";
++			clock-frequency = <13000000>;
++			#clock-cells = <0>;
++		};
++
++		hub_timer_clk: hub_timer {
++			compatible = "fixed-clock";
++			clock-frequency = <32768>;
++			#clock-cells = <0>;
++		};
++
++		pwm_clk: pwm {
++			compatible = "fixed-clock";
++			clock-frequency = <26000000>;
++			#clock-cells = <0>;
++		};
++
++		sdio1_clk: sdio1 {
++			compatible = "fixed-clock";
++			clock-frequency = <48000000>;
++			#clock-cells = <0>;
++		};
++
++		sdio2_clk: sdio2 {
++			compatible = "fixed-clock";
++			clock-frequency = <48000000>;
++			#clock-cells = <0>;
++		};
++
++		sdio3_clk: sdio3 {
++			compatible = "fixed-clock";
++			clock-frequency = <48000000>;
++			#clock-cells = <0>;
++		};
++
++		sdio4_clk: sdio4 {
++			compatible = "fixed-clock";
++			clock-frequency = <48000000>;
++			#clock-cells = <0>;
++		};
++
++		tmon_1m_clk: tmon_1m {
++			compatible = "fixed-clock";
++			clock-frequency = <1000000>;
++			#clock-cells = <0>;
++		};
++
++		uartb_clk: uartb {
++			compatible = "fixed-clock";
++			clock-frequency = <13000000>;
++			#clock-cells = <0>;
++		};
++
++		uartb2_clk: uartb2 {
++			compatible = "fixed-clock";
++			clock-frequency = <13000000>;
++			#clock-cells = <0>;
++		};
++
++		uartb3_clk: uartb3 {
++			compatible = "fixed-clock";
++			clock-frequency = <13000000>;
++			#clock-cells = <0>;
++		};
++
++		uartb4_clk: uartb4 {
++			compatible = "fixed-clock";
++			clock-frequency = <13000000>;
++			#clock-cells = <0>;
++		};
++
++		usb_otg_ahb_clk: usb_otg_ahb {
++			compatible = "fixed-clock";
++			clock-frequency = <52000000>;
++			#clock-cells = <0>;
++		};
++	};
+ };
+-- 
+1.8.0.1
