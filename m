@@ -1,29 +1,71 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 7 Oct 2013 17:32:20 +0100
-Subject: [PATCH v2 19/29] of: create default early_init_dt_add_memory_arch
-In-Reply-To: <1381163377-21044-20-git-send-email-robherring2@gmail.com>
-References: <1381163377-21044-1-git-send-email-robherring2@gmail.com>
- <1381163377-21044-20-git-send-email-robherring2@gmail.com>
-Message-ID: <20131007163220.GJ32012@arm.com>
+From: victor.kamensky@linaro.org (Victor Kamensky)
+Date: Mon, 7 Oct 2013 09:37:13 -0700
+Subject: [PATCH v2] ARM: tlb: ASID macro should give 32bit result for BE
+ correct operation
+In-Reply-To: <5252DA06.8000303@codethink.co.uk>
+References: <1381160903-1248-1-git-send-email-victor.kamensky@linaro.org>
+ <5252DA06.8000303@codethink.co.uk>
+Message-ID: <CAA3XUr2wYFL9WAQd9uAJSKK5KhWF3bPzYbh-3x=B3oLVXk79og@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 07, 2013 at 05:29:27PM +0100, Rob Herring wrote:
-> From: Rob Herring <rob.herring@calxeda.com>
-> 
-> Create a weak version of early_init_dt_add_memory_arch which uses
-> memblock. This will unify all architectures except ones with custom
-> memory bank structs.
-> 
-> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Michal Simek <monstr@monstr.eu>
-> Cc: Jonas Bonn <jonas@southpole.se>
-> Acked-by: Grant Likely <grant.likely@linaro.org>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: microblaze-uclinux at itee.uq.edu.au
-> Cc: linux at lists.openrisc.net
-> Cc: devicetree at vger.kernel.org
+On 7 October 2013 08:57, Ben Dooks <ben.dooks@codethink.co.uk> wrote:
+> On 07/10/13 17:48, Victor Kamensky wrote:
+>>
+>> Hi Will, Ben, Russell, Thomas,
+>>
+>> Please review second version of patch that fixes TLB asid issue in big
+>> endian
+>> V7 image.
+>>
+>> Changes from v1:
+>>     Note previous patch subject line was 'ARM: tlb:
+>>     __flush_tlb_mm need to use int asid var for BE correct operation'
+>>
+>>     Added 'unsigned int' cast into ASID macro itself rather
+>>     then use intermediate 'int' variable in __flush_tlb_mm function.
+>>     This is done per v1 patch discussion at
+>>
+>>
+>> http://lists.infradead.org/pipermail/linux-arm-kernel/2013-October/202583.html
+>>
+>> Tested with Linaro BE topic branch on Arndale board. Both LE and BE
+>> images were tested.
+>
+>
+> If you are booting on the Arndale board, is there a patch to mark
+> the relevant Exynos devices as BE capable?
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Arndale need massive fixes in their BSP layer to be endian agnostic
+ARM V7 platform. Unfortunate it is not as simple as with few others
+that already marked as BE capable.
+
+Please see
+https://git.linaro.org/gitweb?p=people/victor.kamensky/linux-linaro-tracking-be.git;a=shortlog;h=refs/heads/llct-be-topic
+Mostly it is __raw_xxx conversion to xxx_relaxed, but there are
+more subtle changes (some of them similar to changs that you've
+done for other platforms). Also there are known unfixed issues like
+disabling CONFIG_MMC_DW_IDMAC config because idmac
+DMA related code is not endian agnostic yet (btw interesting class
+of BE related problem that was not seen before).
+
+In Linaro we use Arndale and Pandaboard as reference platforms
+therefore we have BE BSP fixes in our tree. But I am not sure
+what is fate of those in long term. Also we consider these as
+example of BSP changes that other BSP need to do.
+
+If Exynos and OMAP owners will have any interest for BE images,
+and would like to see these changes in main line, we gladly
+will work on this. Otherwise changes like this can mess up with
+BSP ongoing drivers development.
+
+I think above position is consistent with similar discussion on
+some of BE related threads - changing BSP to support BE mode
+is BSP owners call.
+
+Thanks,
+Victor
+
+> --
+> Ben Dooks                               http://www.codethink.co.uk/
+> Senior Engineer                         Codethink - Providing Genius
