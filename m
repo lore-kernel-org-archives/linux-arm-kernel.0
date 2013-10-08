@@ -1,48 +1,36 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Wed,  9 Oct 2013 00:34:34 +0200
-Subject: [PATCH 18/23] ARM: kdgb: use <asm/opcodes.h> for data to be assembled
- as intruction
-In-Reply-To: <1381271679-27804-1-git-send-email-ben.dooks@codethink.co.uk>
-References: <1381271679-27804-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <1381271679-27804-19-git-send-email-ben.dooks@codethink.co.uk>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Tue, 8 Oct 2013 16:01:52 -0700
+Subject: [PATCHv2] Route kbd LEDs through the generic LEDs layer
+In-Reply-To: <20130904172621.GA5957@type.bordeaux.inria.fr>
+References: <20130717152916.GI5883@type.bordeaux.inria.fr>
+ <20130904172621.GA5957@type.bordeaux.inria.fr>
+Message-ID: <20131008160152.a98961b9e54bf1c45c1818dc@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The arch_kgdb_breakpoint() function uses an inline assembly directive
-to assemble a specific instruction using .word. This means the linker
-will not treat is as an instruction, and therefore incorrectly swap
-the endian-ness if running BE8.
+On Wed, 4 Sep 2013 19:26:21 +0200 Samuel Thibault <samuel.thibault@ens-lyon.org> wrote:
 
-As noted, this code means that kgdb is really only usable on arm32
-kernels, and should be made dependant on not being a thumb2 kernel
-until fixed. However this is not something to be added to this patch.
+> This permits to reassign keyboard LEDs to something else than keyboard "leds"
+> state, by adding keyboard led and modifier triggers connected to a series
+> of VT input LEDs, themselves connected to VT input triggers, which
+> per-input device LEDs use by default.  Userland can thus easily change the LED
+> behavior of (a priori) all input devices, or of particular input devices.
+> 
+> This also permits to fix #7063 from userland by using a modifier to implement
+> proper CapsLock behavior and have the keyboard caps lock led show that modifier
+> state.
 
-Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
-Reviewed-by: Dave Martin <Dave.Martin@arm.com>
----
- arch/arm/include/asm/kgdb.h | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+I had a version of this in -mm for a long time and there was a
+1000-message email discussion which I didn't have a hope of following.
 
-diff --git a/arch/arm/include/asm/kgdb.h b/arch/arm/include/asm/kgdb.h
-index 48066ce..0a9d5dd 100644
---- a/arch/arm/include/asm/kgdb.h
-+++ b/arch/arm/include/asm/kgdb.h
-@@ -11,6 +11,7 @@
- #define __ARM_KGDB_H__
- 
- #include <linux/ptrace.h>
-+#include <asm/opcodes.h>
- 
- /*
-  * GDB assumes that we're a user process being debugged, so
-@@ -41,7 +42,7 @@
- 
- static inline void arch_kgdb_breakpoint(void)
- {
--	asm(".word 0xe7ffdeff");
-+	asm(__inst_arm(0xe7ffdeff));
- }
- 
- extern void kgdb_handle_bus_error(void);
--- 
-1.8.4.rc3
+Do you believe that the earlier controversies are now addressed and if
+so, how?  Have the earlier participants in that discussion been cc'ed
+and have they commented?
+
+In other words, how are we generally getting along with those things?  
+
+I'll put this version into -mm to get it a bit of linux-next exposure,
+but I'm hoping that Dmitry will process it?
+
+The one-line change to drivers/tty/vt/keyboard.c no longer applies -
+LED_SHOW_MEM has vanished altogether.
