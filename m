@@ -1,30 +1,67 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 8 Oct 2013 14:27:18 -0700
-Subject: [PATCH] ARM: DRA7: realtime_counter: Add ratio registers for
- 20MHZ sys-clk frequency
-In-Reply-To: <5239A98E.3060908@ti.com>
-References: <1379503211-26229-1-git-send-email-r.sricharan@ti.com>
- <5239A98E.3060908@ti.com>
-Message-ID: <20131008212718.GS8313@atomide.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Tue, 8 Oct 2013 17:29:00 -0400
+Subject: [GIT PULL] Keystone SOC updates for v3.13
+Message-ID: <1381267740-31874-1-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Santosh Shilimkar <santosh.shilimkar@ti.com> [130918 06:32]:
-> On Wednesday 18 September 2013 07:20 AM, Sricharan R wrote:
-> > The real time counter also called master counter, is a free-running
-> > counter. It produces the count used by the CPU local timer peripherals
-> > in the MPU cluster. The timer counts at a rate of 6.144 MHz.
-> > 
-> > The ratio registers are missing for a sys-clk of 20MHZ which is used
-> > by DRA7 socs. So because of this, the counter was getting wrongly
-> > programmed for a sys-clk of 38.4Mhz(default). So adding the ratio
-> > registers for 20MHZ sys-clk.
-> > 
-> > Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> > Signed-off-by: Sricharan R <r.sricharan@ti.com>
-> > ---
-> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Olof,
 
-Applying into omap-for-v3.13/soc thanks.
+Please pull below Keystone SOC updates for v3.13. As discussed on irc, the
+pull request is build on top of v3.13-rc4 because of dependent commit
+c2b9e974{dma/Kconfig: Make TI_EDMA select TI_PRIV_EDMA}. The pull request
+carries Kconfig update patch {dma: Allow TI_EDMA selectable for ARCH_KEYSTONE}
+with Vinod Koul's ack as per alignment on the mailing list[1]. The clock
+driver support is already applied by Mike to his 3.13 clk-next [2]
 
-Tony
+The following changes since commit ef887009524c3631d804a2587ec204c4ff61a5b8:
+
+  ARM: keystone: Enable I2C and SPI bus support (2013-10-08 15:37:41 -0400)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git tags/keystone-soc-for-arm-soc
+
+for you to fetch changes up to ef887009524c3631d804a2587ec204c4ff61a5b8:
+
+  ARM: keystone: Enable I2C and SPI bus support (2013-10-08 15:37:41 -0400)
+
+----------------------------------------------------------------
+SOC updates for Keystone II devices:
+
+- Clock tree support
+- Clock management support using PM core
+- Keystone config update for EMDA with ack from Vinod
+- Enable SPI and I2C drivers
+
+----------------------------------------------------------------
+
+Santosh Shilimkar (9):
+  ARM: dts: keystone: Add clock tree data to devicetree
+  ARM: dts: keystone: Add clock phandle to UART nodes
+  ARM: keystone: Enable clock drivers
+  ARM: keystone: add PM bus support for clock management
+  ARM: dts: keystone: Add i2c device nodes
+  ARM: dts: keystone: Add the SPI nodes
+  dma: Allow TI_EDMA selectable for ARCH_KEYSTONE
+  ARM: keystone: Select TI_EDMA to be able to enable SPI driver
+  ARM: keystone: Enable I2C and SPI bus support
+
+ arch/arm/boot/dts/keystone-clocks.dtsi |  821 ++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/keystone.dts         |   63 ++-
+ arch/arm/configs/keystone_defconfig    |    2 +
+ arch/arm/mach-keystone/Kconfig         |    2 +
+ drivers/bus/Makefile                   |    2 +
+ drivers/bus/keystone_pm_bus.c          |   70 +++
+ drivers/dma/Kconfig                    |    2 +-
+ 7 files changed, 959 insertions(+), 3 deletions(-)
+ create mode 100644 arch/arm/boot/dts/keystone-clocks.dtsi
+ create mode 100644 drivers/bus/keystone_pm_bus.c
+
+Regards,
+Santosh
+
+[1] http://www.spinics.net/lists/arm-kernel/msg277174.html
+[2] http://www.spinics.net/lists/arm-kernel/msg277924.html
+-- 
+1.7.9.5
