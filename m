@@ -1,90 +1,68 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Tue, 8 Oct 2013 18:05:22 -0400
-Subject: [PATCH V4] ARM: OMAP5/DRA7: realtime_counter: Configure CNTFRQ
- register
-In-Reply-To: <20131008214523.GU8313@atomide.com>
-References: <1379520162-31932-1-git-send-email-r.sricharan@ti.com>
- <524D44B9.30208@ti.com> <20131008214523.GU8313@atomide.com>
-Message-ID: <525481A2.4020900@ti.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 8 Oct 2013 15:10:56 -0700
+Subject: getting rid of subsys_initcall usage? (was: Re: [PATCH RESEND]
+ i2c: designware: use module_platform_driver)
+In-Reply-To: <20131008205304.GA29121@katana>
+References: <1376987548-12366-1-git-send-email-zhangfei.gao@linaro.org>
+ <20130828095706.GH4086@katana>
+ <CACRpkdb1p1=3a0PM+r2ZrMN+ECv5BAZFdv2omDK5npaer4ddcw@mail.gmail.com>
+ <CAMj5BkhQkwb+T9VepN7UrWNRSgtv=Dw-Sa-gv0orOANo55iqNw@mail.gmail.com>
+ <20130830054858.GR7656@atomide.com>
+ <CAMj5BkiDExikXi3JcVhO7RN8_82eGYhq3i6oPf5Wbipy=N+iHQ@mail.gmail.com>
+ <20130830082712.GT7656@atomide.com> <20131008205304.GA29121@katana>
+Message-ID: <20131008221056.GW8313@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 08 October 2013 05:45 PM, Tony Lindgren wrote:
-> * Sricharan R <r.sricharan@ti.com> [131003 03:27]:
->> On Wednesday 18 September 2013 09:32 PM, Sricharan R wrote:
->>> --- a/arch/arm/boot/dts/omap5.dtsi
->>> +++ b/arch/arm/boot/dts/omap5.dtsi
->>> @@ -52,7 +52,6 @@
->>>  			     <GIC_PPI 14 (GIC_CPU_MASK_RAW(3) | IRQ_TYPE_LEVEL_LOW)>,
->>>  			     <GIC_PPI 11 (GIC_CPU_MASK_RAW(3) | IRQ_TYPE_LEVEL_LOW)>,
->>>  			     <GIC_PPI 10 (GIC_CPU_MASK_RAW(3) | IRQ_TYPE_LEVEL_LOW)>;
->>> -		clock-frequency = <6144000>;
->>>  	};
->>>  
->>>  	gic: interrupt-controller at 48211000 {
+* Wolfram Sang <wsa@the-dreams.de> [131008 14:01]:
+> On Fri, Aug 30, 2013 at 01:27:13AM -0700, Tony Lindgren wrote:
+> > * zhangfei gao <zhangfei.gao@gmail.com> [130829 23:36]:
+> > > What about concerns from Wolfram:
+> > > " Other people might be
+> > > depending on subsys_initcall to get I2C active before they want to
+> > > activate, say, PMICs. So, I fear regressions, since deferred probing
+> > > might not be available in the needed places to avoid these regressions."
+> > 
+> > There should not be any reason to get a PMIC activated
+> > early on. The system should be booting already at that point,
+> > and the PMIC related init can be done later on.
 > 
-> Can the above be done later on in a separate clean-up patch?
-> If so I can drop that part as that removes a dependency to the
-> .dts patches queued by Benoit.
->
-This can be applied separately. 
+> Okay, here is a more concrete example:
+> 
+> Consider the amplifier driver 'sound/soc/codecs/max9768.c'. Back then, unaware
+> of deferred probing, I wrote the following code to get the GPIOs (which are
+> optional):
+> 
+> 	err = gpio_request_one(pdata->mute_gpio, GPIOF_INIT_HIGH, "MAX9768 Mute");
+> 	max9768->mute_gpio = err ?: pdata->mute_gpio;
+> 
+> And later in the process:
+> 
+>         if (gpio_is_valid(max9768->mute_gpio)) {
+>                 ret = snd_soc_add_codec_controls(codec, max9768_mute,
+>                                 ARRAY_SIZE(max9768_mute));
+>                 if (ret)
+>                         return ret;
+>         }
+> 
+> So, the mute control will only be added if the gpio_request succeeded. On that
+> particular board, the mute GPIO was wired to an I2C GPIO controller. If I now
+> change the I2C (or GPIO) driver from subsys_initcall to module_init, then the
+> gpio_request in the amplifier driver could hit -EPROBE_DEFER and the mute
+> control will then disappear. Yes, the driver can be fixed easily, yet I fear a
+> number of regressions like this. Instead of people digging into why things
+> disappear after a kernel update, I wonder if there is a way to guide users if
+> this happens. I didn't have time for that, though, sadly. Still, it makes me
+> wonder how easily we could shift from subsys_initcall to module_init, although
+> I'd really love to get away from subsys_initcall in device drivers.
 
- 
->>> --- a/arch/arm/mach-omap2/omap-smp.c
->>> +++ b/arch/arm/mach-omap2/omap-smp.c
->>> @@ -41,6 +41,8 @@
->>>  
->>>  u16 pm44xx_errata;
->>>  
->>> +extern unsigned long arch_timer_freq;
->>> +
->>>  /* SCU base address */
->>>  static void __iomem *scu_base;
->>>  
-> 
-> No externs in *.c files please, checkpatch.pl and sparse should warn
-> about this.
-> 
->>  Are you planning to pull this patch and the below $subject patch as well? They are
->>  acked and tested.
->>
->>  ARM: DRA7: realtime_counter: Add ratio registers for 20MHZ sys-clk frequency
->>
->>   http://www.spinics.net/lists/linux-omap/msg97281.html
-> 
-> The 20MHz patch I've applied, just noticed the above things
-> when was about to apply this.
-> 
-Now re-looking at the patch, I think this extern stuff can be and
-should be avoided. It needs order change though like below. Not
-tested but should work.
+Well it should be pretty trivial to update drivers to use deferred
+probing. Maybe some spatch to check for that in driver probes would
+help getting an idea how many might be affected?
 
-diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
-index fa74a06..c8d8308 100644
---- a/arch/arm/mach-omap2/timer.c
-+++ b/arch/arm/mach-omap2/timer.c
-@@ -631,10 +631,9 @@ void __init omap4_local_timer_init(void)
- #ifdef CONFIG_SOC_OMAP5
- void __init omap5_realtime_timer_init(void)
- {
--	omap4_sync32k_timer_init();
- 	realtime_counter_init();
--
- 	clocksource_of_init();
-+	omap4_sync32k_timer_init();
- }
- #endif /* CONFIG_SOC_OMAP5 */
- 
-Then, the CNTFREQ programming needs to be moved to
-realtime_counter_init(). It should be actually part of that
-first place instead of timer_init().
-
-On secondary CPU then a simple asm accessor can
-read the CNTFREQ and pass that to SMC.
-
-Sricharan,
-Can you try above and see if everything works as expected.
-If it does, please post an updated patch based on above.
+Anyways, it should be fixed as otherwise we'll just dig ourselves
+deeper into the mess of things not working as loadable modules.
 
 Regards,
-santosh
+
+Tony
