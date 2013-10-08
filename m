@@ -1,60 +1,68 @@
-From: csmanjuvijay@gmail.com (Majunath Goudar)
-Date: Tue,  8 Oct 2013 20:21:42 +0530
-Subject: [PATCH] VEXPRESS: Fix VEXPRESS implicit declarations dependence
- errors.
-In-Reply-To: <1381228895-24814-1-git-send-email-csmanjuvijay@gmail.com>
-References: <1381228895-24814-1-git-send-email-csmanjuvijay@gmail.com>
-Message-ID: <1381243903-27952-1-git-send-email-csmanjuvijay@gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 8 Oct 2013 16:57:23 +0200
+Subject: [PATCH] ARM: davinci: convert to clockevents_config_and_register
+In-Reply-To: <1380060159-12008-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1380060159-12008-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <20131008145723.GQ10079@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds a inline dummy implementations of_find_node_by_phandle()
-and of_get_next_parent() in "#ifdef CONFIG_OF" else part. Without
-this patch,build system can lead to issues. This was discovered during
-randconfig testing,in which VEXPRESS_CONFIG was enabled w/o CONFIG_OF
-being enabled,leading to the following error:
+Hello,
 
-CC      drivers/mfd/vexpress-config.o
-drivers/mfd/vexpress-config.c: In function ?__vexpress_config_func_get?:
-drivers/mfd/vexpress-config.c:117:4: error: implicit declaration of function
-?of_find_node_by_phandle? [-Werror=implicit-function-declaration]
-    bridge_node = of_find_node_by_phandle(
-    ^
-drivers/mfd/vexpress-config.c:117:16: warning: assignment makes pointer from
-integer without a cast [enabled by default]
-    bridge_node = of_find_node_by_phandle(
+On Wed, Sep 25, 2013 at 12:02:39AM +0200, Uwe Kleine-K?nig wrote:
+> clockevents_config_and_register is superior compared to setting
+> shift/mult and {min,max}_delta_ns by hand.
+> 
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 
-Signed-off-by: Manjunath Goudar <csmanjuvijay@gmail.com>
-Cc: Grant Likely <grant.likely@linaro.org>
-Cc: Rob Herring <rob.herring@calxeda.com>
-Cc: Pawel Moll <pawel.moll@arm.com>
-Cc: Samuel Ortiz <sameo@linux.intel.com>
-Cc: Lee Jones <lee.jones@linaro.org>
-Cc: devicetree at vger.kernel.org
-Cc: linux-kernel at vger.kernel.org
----
- include/linux/of.h |    9 +++++++++
- 1 file changed, 9 insertions(+)
+> ---
+> Hello,
+> 
+> I wonder where the 50 us limit comes from. This is not a hardware limit,
+> is it?
+ping; I didn't get any feedback on this yet, also it's not in next.
 
-diff --git a/include/linux/of.h b/include/linux/of.h
-index f95aee3..968787d 100644
---- a/include/linux/of.h
-+++ b/include/linux/of.h
-@@ -340,6 +340,15 @@ int of_device_is_stdout_path(struct device_node *dn);
- 
- #else /* CONFIG_OF */
- 
-+static inline struct device_node *of_find_node_by_phandle(phandle handle)
-+{
-+	return NULL;
-+}
-+static inline struct device_node *of_get_next_parent(struct device_node *node)
-+{
-+	return NULL;
-+}
-+
- static inline const char* of_node_full_name(struct device_node *np)
- {
- 	return "<no-node>";
+Best regards
+Uwe
+
+>  arch/arm/mach-davinci/time.c | 10 +++-------
+>  1 file changed, 3 insertions(+), 7 deletions(-)
+> 
+> diff --git a/arch/arm/mach-davinci/time.c b/arch/arm/mach-davinci/time.c
+> index 7a55b5c..627bf8b 100644
+> --- a/arch/arm/mach-davinci/time.c
+> +++ b/arch/arm/mach-davinci/time.c
+> @@ -331,7 +331,6 @@ static void davinci_set_mode(enum clock_event_mode mode,
+>  
+>  static struct clock_event_device clockevent_davinci = {
+>  	.features       = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
+> -	.shift		= 32,
+>  	.set_next_event	= davinci_set_next_event,
+>  	.set_mode	= davinci_set_mode,
+>  };
+> @@ -397,14 +396,11 @@ void __init davinci_timer_init(void)
+>  
+>  	/* setup clockevent */
+>  	clockevent_davinci.name = id_to_name[timers[TID_CLOCKEVENT].id];
+> -	clockevent_davinci.mult = div_sc(davinci_clock_tick_rate, NSEC_PER_SEC,
+> -					 clockevent_davinci.shift);
+> -	clockevent_davinci.max_delta_ns =
+> -		clockevent_delta2ns(0xfffffffe, &clockevent_davinci);
+> -	clockevent_davinci.min_delta_ns = 50000; /* 50 usec */
+>  
+>  	clockevent_davinci.cpumask = cpumask_of(0);
+> -	clockevents_register_device(&clockevent_davinci);
+> +	/* min tick corresponds to 50 usec assuming a 24 MHz clock */
+> +	clockevents_config_and_register(&clockevent_davinci,
+> +		davinci_clock_tick_rate, 1200, 0xfffffffe);
+>  
+>  	for (i=0; i< ARRAY_SIZE(timers); i++)
+>  		timer32_config(&timers[i]);
+> -- 
+> 1.8.4.rc3
+> 
+> 
+
 -- 
-1.7.9.5
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
