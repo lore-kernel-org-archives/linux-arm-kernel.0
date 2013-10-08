@@ -1,46 +1,70 @@
 From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Wed,  9 Oct 2013 00:34:31 +0200
-Subject: [PATCH 15/23] ARM: hardware: fix endian-ness in <hardware/coresight.h>
+Date: Wed,  9 Oct 2013 00:34:17 +0200
+Subject: [PATCH 01/23] ARM: fix ARCH_IXP4xx usage of ARCH_SUPPORTS_BIG_ENDIAN
 In-Reply-To: <1381271679-27804-1-git-send-email-ben.dooks@codethink.co.uk>
 References: <1381271679-27804-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <1381271679-27804-16-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <1381271679-27804-2-git-send-email-ben.dooks@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The <hardware/coresight.h> needs to take into account the endian-ness
-of the processor when reading and writing data, so change to using
-the readl/writel relaxed variants from the raw ones.
+The Kconfig for arch/arm/mach-ixp4xx has a local definition
+of ARCH_SUPPORTS_BIG_ENDIAN which could be used elsewhere.
+This means that if IXP4xx is selected and this symbol is
+selected eleswhere then an warning is produced.
+
+Clean the following error up by making the symbol be
+selected by the main ARCH_IXP4XX definition and have a
+common definition in arch/arm/mm/Kconfig
+
+warning: (ARCH_xxx) selects ARCH_SUPPORTS_BIG_ENDIAN which has unmet direct dependencies (ARCH_IXP4XX)
+warning: (ARCH_xxx) selects ARCH_SUPPORTS_BIG_ENDIAN which has unmet direct dependencies (ARCH_IXP4XX)
 
 Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
 ---
- arch/arm/include/asm/hardware/coresight.h | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ arch/arm/Kconfig             | 1 +
+ arch/arm/mach-ixp4xx/Kconfig | 4 ----
+ arch/arm/mm/Kconfig          | 6 ++++++
+ 3 files changed, 7 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/include/asm/hardware/coresight.h b/arch/arm/include/asm/hardware/coresight.h
-index 0cf7a6b..ad774f3 100644
---- a/arch/arm/include/asm/hardware/coresight.h
-+++ b/arch/arm/include/asm/hardware/coresight.h
-@@ -24,8 +24,8 @@
- #define TRACER_TIMEOUT 10000
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 1ad6fb6..f048e14 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -481,6 +481,7 @@ config ARCH_IXP4XX
+ 	bool "IXP4xx-based"
+ 	depends on MMU
+ 	select ARCH_HAS_DMA_SET_COHERENT_MASK
++	select ARCH_SUPPORTS_BIG_ENDIAN
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select CLKSRC_MMIO
+ 	select CPU_XSCALE
+diff --git a/arch/arm/mach-ixp4xx/Kconfig b/arch/arm/mach-ixp4xx/Kconfig
+index 30e1ebe..c342dc4 100644
+--- a/arch/arm/mach-ixp4xx/Kconfig
++++ b/arch/arm/mach-ixp4xx/Kconfig
+@@ -1,9 +1,5 @@
+ if ARCH_IXP4XX
  
- #define etm_writel(t, v, x) \
--	(__raw_writel((v), (t)->etm_regs + (x)))
--#define etm_readl(t, x) (__raw_readl((t)->etm_regs + (x)))
-+	(writel_relaxed((v), (t)->etm_regs + (x)))
-+#define etm_readl(t, x) (readl_relaxed((t)->etm_regs + (x)))
+-config ARCH_SUPPORTS_BIG_ENDIAN
+-	bool
+-	default y
+-
+ menu "Intel IXP4xx Implementation Options"
  
- /* CoreSight Management Registers */
- #define CSMR_LOCKACCESS 0xfb0
-@@ -142,8 +142,8 @@
- #define ETBFF_TRIGFL		BIT(10)
- 
- #define etb_writel(t, v, x) \
--	(__raw_writel((v), (t)->etb_regs + (x)))
--#define etb_readl(t, x) (__raw_readl((t)->etb_regs + (x)))
-+	(writel_relaxed((v), (t)->etb_regs + (x)))
-+#define etb_readl(t, x) (readl_relaxed((t)->etb_regs + (x)))
- 
- #define etm_lock(t) do { etm_writel((t), 0, CSMR_LOCKACCESS); } while (0)
- #define etm_unlock(t) \
+ comment "IXP4xx Platforms"
+diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
+index cd2c88e..1f8fed9 100644
+--- a/arch/arm/mm/Kconfig
++++ b/arch/arm/mm/Kconfig
+@@ -952,3 +952,9 @@ config ARCH_HAS_BARRIERS
+ 	help
+ 	  This option allows the use of custom mandatory barriers
+ 	  included via the mach/barriers.h file.
++
++config ARCH_SUPPORTS_BIG_ENDIAN
++	bool
++	help
++	  This option specifies the architecture can support big endian
++	  operation.
 -- 
 1.8.4.rc3
