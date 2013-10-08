@@ -1,21 +1,79 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 8 Oct 2013 11:45:33 -0700
-Subject: [PATCH v2 3/3] ARM: OMAP2: delete board-rm680
-In-Reply-To: <1380050897-6605-4-git-send-email-aaro.koskinen@iki.fi>
-References: <1380050897-6605-1-git-send-email-aaro.koskinen@iki.fi>
- <1380050897-6605-4-git-send-email-aaro.koskinen@iki.fi>
-Message-ID: <20131008184532.GL8313@atomide.com>
+From: fabio.estevam@freescale.com (Fabio Estevam)
+Date: Tue, 8 Oct 2013 15:52:12 -0300
+Subject: [PATCH] ARM: dts: imx51-babbage: Make DVI and WVGA panel functional
+Message-ID: <1381258332-6208-1-git-send-email-fabio.estevam@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Aaro Koskinen <aaro.koskinen@iki.fi> [130924 12:36]:
-> Delete board file for Nokia RM-680/RM-696 (N950/N9). DT-based booting
-> should be used for further development on this HW.
+Currently we get the following errors on imx51-babbage:
 
-I'll apply this into omap-for-v3.13/board-removal that I
-will rebase on Benoit's .dts changes before I push out
-that branch.
+/display at di0: could not find display-timings node
+/display at di0: no timings specified
+/display at di1: could not find display-timings node
+/display at di1: no timings specified
+imx-drm imx-drm: failed to allocate buffer with size 0
 
-Regards,
+Provide timing values for IPU1, which is connected to a DVI bridge and
+to IPU2, which can be connected to the WVGA panel, so that both of them can
+be functional.
 
-Tony
+While at it, disable the WVGA panel, so that DVI output becomes the default one.
+
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/boot/dts/imx51-babbage.dts | 33 +++++++++++++++++++++++++++++++++
+ 1 file changed, 33 insertions(+)
+
+diff --git a/arch/arm/boot/dts/imx51-babbage.dts b/arch/arm/boot/dts/imx51-babbage.dts
+index f13f339..be1407c 100644
+--- a/arch/arm/boot/dts/imx51-babbage.dts
++++ b/arch/arm/boot/dts/imx51-babbage.dts
+@@ -27,6 +27,20 @@
+ 		interface-pix-fmt = "rgb24";
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&pinctrl_ipu_disp1_1>;
++		display-timings {
++			native-mode = <&timing0>;
++			timing0: dvi {
++				clock-frequency = <65000000>;
++				hactive = <1024>;
++				vactive = <768>;
++				hback-porch = <220>;
++				hfront-porch = <40>;
++				vback-porch = <21>;
++				vfront-porch = <7>;
++				hsync-len = <60>;
++				vsync-len = <10>;
++			};
++		};
+ 	};
+ 
+ 	display at di1 {
+@@ -35,6 +49,25 @@
+ 		interface-pix-fmt = "rgb565";
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&pinctrl_ipu_disp2_1>;
++		status = "disabled";
++		display-timings {
++			native-mode = <&timing1>;
++			timing1: claawvga {
++				clock-frequency = <27000000>;
++				hactive = <800>;
++				vactive = <480>;
++				hback-porch = <40>;
++				hfront-porch = <60>;
++				vback-porch = <10>;
++				vfront-porch = <10>;
++				hsync-len = <20>;
++				vsync-len = <10>;
++				hsync-active = <0>;
++				vsync-active = <0>;
++				de-active = <1>;
++				pixelclk-active = <0>;
++			};
++		};
+ 	};
+ 
+ 	gpio-keys {
+-- 
+1.8.1.2
