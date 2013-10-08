@@ -1,32 +1,32 @@
 From: sachin.kamat@linaro.org (Sachin Kamat)
-Date: Tue,  8 Oct 2013 16:47:43 +0530
-Subject: [PATCH 05/10] clk: socfpga: Use NULL instead of 0
+Date: Tue,  8 Oct 2013 16:47:45 +0530
+Subject: [PATCH 07/10] clk: mvebu: Staticize of_cpu_clk_setup
 In-Reply-To: <1381231068-6053-1-git-send-email-sachin.kamat@linaro.org>
 References: <1381231068-6053-1-git-send-email-sachin.kamat@linaro.org>
-Message-ID: <1381231068-6053-5-git-send-email-sachin.kamat@linaro.org>
+Message-ID: <1381231068-6053-7-git-send-email-sachin.kamat@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-'div_reg' is a pointer. Assign NULL instead of 0.
+'of_cpu_clk_setup' is used only in this file. Make it static.
 
 Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
-Acked-by: Dinh Nguyen <dinguyen@altera.com>
+Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- drivers/clk/socfpga/clk.c |    2 +-
+ drivers/clk/mvebu/clk-cpu.c |    2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/clk/socfpga/clk.c b/drivers/clk/socfpga/clk.c
-index 5bb848c..454ddc1 100644
---- a/drivers/clk/socfpga/clk.c
-+++ b/drivers/clk/socfpga/clk.c
-@@ -292,7 +292,7 @@ static void __init socfpga_gate_clk_init(struct device_node *node,
- 		socfpga_clk->shift = div_reg[1];
- 		socfpga_clk->width = div_reg[2];
- 	} else {
--		socfpga_clk->div_reg = 0;
-+		socfpga_clk->div_reg = NULL;
- 	}
+diff --git a/drivers/clk/mvebu/clk-cpu.c b/drivers/clk/mvebu/clk-cpu.c
+index 1466865..8ebf757 100644
+--- a/drivers/clk/mvebu/clk-cpu.c
++++ b/drivers/clk/mvebu/clk-cpu.c
+@@ -101,7 +101,7 @@ static const struct clk_ops cpu_ops = {
+ 	.set_rate = clk_cpu_set_rate,
+ };
  
- 	of_property_read_string(node, "clock-output-names", &clk_name);
+-void __init of_cpu_clk_setup(struct device_node *node)
++static void __init of_cpu_clk_setup(struct device_node *node)
+ {
+ 	struct cpu_clk *cpuclk;
+ 	void __iomem *clock_complex_base = of_iomap(node, 0);
 -- 
 1.7.9.5
