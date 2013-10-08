@@ -1,104 +1,48 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Tue, 8 Oct 2013 14:59:29 +0300
-Subject: [PATCH 1/3] ahci: exynos: add ahci sata support on Exynos platform
-In-Reply-To: <CAKuRcOJi5C1C63Y41dSJ0-YsaTni1AL=d3qH2Cjz74C8ardEpQ@mail.gmail.com>
-References: <1380609183-21430-1-git-send-email-yuvaraj.cd@samsung.com>
- <1380609183-21430-2-git-send-email-yuvaraj.cd@samsung.com>
- <1534631.KrL0vInDuc@amdc1032>
- <003f01cec099$4eb706b0$ec251410$%han@samsung.com>
- <CAKuRcOJi5C1C63Y41dSJ0-YsaTni1AL=d3qH2Cjz74C8ardEpQ@mail.gmail.com>
-Message-ID: <5253F3A1.8090906@ti.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Tue, 8 Oct 2013 07:00:22 -0500
+Subject: [PATCH V3] ARM: OMAP3: Fix hardware detection for omap3630 when
+ booted with device tree
+In-Reply-To: <20131008000515.GA2097@earth.universe>
+References: <20131007192009.GA8949@atomide.com>
+ <1381178629-13488-1-git-send-email-nm@ti.com>
+ <20131008000515.GA2097@earth.universe>
+Message-ID: <5253F3D6.5060403@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 10/07/2013 07:05 PM, Sebastian Reichel wrote:
+> On Mon, Oct 07, 2013 at 03:43:49PM -0500, Nishanth Menon wrote:
+>> diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
+>> index 39c7838..4fe5b9c 100644
+>> --- a/arch/arm/mach-omap2/board-generic.c
+>> +++ b/arch/arm/mach-omap2/board-generic.c
+>> @@ -113,6 +113,7 @@ MACHINE_END
+>>  #ifdef CONFIG_ARCH_OMAP3
+>>  static const char *omap3_boards_compat[] __initdata = {
+>>  	"ti,omap3",
+>> +	"ti,omap343x",
+>             ^^^^
+> You used omap36xx everywhere, so I guess this should be
+> "ti,omap34xx"?
 
-On 10/08/2013 02:44 PM, Yuvaraj Kumar wrote:
-> On Fri, Oct 4, 2013 at 6:03 AM, Jingoo Han <jg1.han@samsung.com> wrote:
->> On Thursday, October 03, 2013 8:32 PM, Bartlomiej Zolnierkiewicz wrote:
->>> On Tuesday, October 01, 2013 12:03:01 PM Yuvaraj Kumar C D wrote:
->>>> Exynos5250 contains one Synopsys AHCI SATA controller.The avalaible
->>>> ahci_platform driver is not sufficient to handle the AHCI PHY and PHY
->>>> clock related initialization.
->>>>
->>>> This patch adds exynos specific ahci sata driver,contained the exynos
->>>> specific initialized codes, re-use the generic ahci_platform driver, and
->>>> keep the generic ahci_platform driver clean as much as possible.
->>>>
->>>> This patch depends on the below patch
->>>>     [1].drivers: phy: add generic PHY framework
->>>>             by Kishon Vijay Abraham I<kishon@ti.com>
->>>>
->>>> Signed-off-by: Yuvaraj Kumar C D <yuvaraj.cd@samsung.com>
->>>> ---
->>>>  drivers/ata/Kconfig       |    9 ++
->>>>  drivers/ata/Makefile      |    1 +
->>>>  drivers/ata/ahci_exynos.c |  226 +++++++++++++++++++++++++++++++++++++++++++++
->>>>  3 files changed, 236 insertions(+)
->>>>  create mode 100644 drivers/ata/ahci_exynos.c
->>>>
->>
->>
->> [.....]
->>
->>>> +   priv->phy = devm_phy_get(dev , "sata-phy");
->>>> +   if (IS_ERR(priv->phy))
->>>> +           return PTR_ERR(priv->phy);
->>
->> [.....]
->>
->>> Also please take a look at the following patch:
->>>
->>> https://lkml.org/lkml/2013/9/19/173
->>>
->>> it adds PHY support to ahci_platform driver, maybe it can be used
->>> for your needs as well.
->>
->> I also agree with Bartlomiej Zolnierkiewicz's opinion.
->> 'ahci_exynos.c' just calls PHY API, without any additional control
->> for Exynos AHCI IP.
-> In addition to PHY handling,it also deals with the special clock
-> sclk_sata which is not dealt in ahci_platform.c(certainly exynos
-> specific).
-> 
-> Morever there is a wrapper driver to handle the platform specific
-> things for the sata.Please refer the  patch[1]
-> [1]ata: ti_sata: Add Texas Instruments SATA Wrapper driver
-> https://lkml.org/lkml/2013/9/19/166
+3630 has at least two variants:
+http://www.ti.com/product/omap3621
+http://www.ti.com/product/omap3630
 
-This driver doesn't do anything at the moment since the OMAP hwmod layer
-takes care of enabling the relevant clocks. So I was planning to drop it
-for now.
+It got further spun off in 37xx family:
+http://www.ti.com/product/dm3730 (DM3730 and DM3725)
 
-> 
-> [2]ahci_imx: add ahci sata support on imx platforms
-> 
-> I think, if we have platform specific driver like ahci_xxx.c , it
-> would be better to handle the sata PHY in ahci_xxx.c so that we can
-> retain and re-use the ahci_platform.c as it is.
-> 
+3430 is no longer in production - but just had a single version (at
+least what I can remember).
 
-The Generic PHY framework [3] has been merged into Greg's usb-next branch.
-The operations there are pretty generic and IMO the PHY can be handled in
-the ahci_platform driver.
+3530 variant of 3430 on the other hand has a few:
+http://processors.wiki.ti.com/index.php/OMAP3_Overview
 
-[3] Generic PHY framework
-    https://lkml.org/lkml/2013/9/27/581
 
-cheers,
--roger
+I am ok to change to ti,omap34xx if folks think that is the right
+thing to do. Personally, I might prefer to handle 35xx family slightly
+differently considering deltas.
 
-> Further comments will be much appreciated.
-> 
->>
->> Best regards,
->> Jingoo Han
->>
->>>
->>>> +   ret = phy_init(priv->phy);
->>>> +   if (ret < 0) {
->>>> +                   dev_err(dev, "failed to init SATA PHY\n");
->>>> +                   return ret;
->>>> +   }
->>>> +
->>
+-- 
+Regards,
+Nishanth Menon
