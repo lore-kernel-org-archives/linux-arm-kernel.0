@@ -1,26 +1,74 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 8 Oct 2013 13:28:49 -0400
-Subject: [PATCH] Documentation: arm/Marvell: clarify Armada SoCs that
- match 78xx0 pattern
-In-Reply-To: <1381157553-14351-1-git-send-email-khilman@linaro.org>
-References: <1381157553-14351-1-git-send-email-khilman@linaro.org>
-Message-ID: <20131008172849.GR5402@titan.lakedaemon.net>
+From: nm@ti.com (Nishanth Menon)
+Date: Tue, 8 Oct 2013 12:33:17 -0500
+Subject: [PATCH V3] clk: palmas: add clock driver for palmas
+In-Reply-To: <52543C1B.3000403@wwwdotorg.org>
+References: <1381238480-18852-1-git-send-email-ldewangan@nvidia.com>
+ <525408B3.1000107@ti.com> <5254193A.70104@nvidia.com> <52542F69.30407@ti.com>
+ <52543C1B.3000403@wwwdotorg.org>
+Message-ID: <525441DD.2090109@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 07, 2013 at 07:52:33AM -0700, Kevin Hilman wrote:
-> New users of Marvell SoCs will potentially be confused by the MVEBU
-> SoCs that match the 78xx0 pattern and thus which defconfig and mach-*
-> directory to be looking at.  Add a bit of clarification to README for
-> this.
+On 10/08/2013 12:08 PM, Stephen Warren wrote:
+> On 10/08/2013 10:14 AM, Nishanth Menon wrote:
+>> On 10/08/2013 09:39 AM, Laxman Dewangan wrote:
+>>> Thanks Nishanth for review.
+>>>
+>>> On Tuesday 08 October 2013 06:59 PM, Nishanth Menon wrote:
+>>>> On 10/08/2013 08:21 AM, Laxman Dewangan wrote:
+>>>>> Palmas devices has two clock output CLK32K_KG and CLK32K_KG_AUDIO
+>>>> not all palmas devices have 2 clocks - example: tps659038
+>>>
+>>> This is for generic palmas and I have seen it for TPS65913, TPS65914, 
+>>> TPS80036. If the generic one is not compatible then it need to add  
+>>> device specific and at that time, it is require to update the binding 
+>>> document accordingly.
+>>
+>> ?? you do have two clocks inside the device they should be represented
+>> as two compatible entities - that simplifies everyone's life.
 > 
-> Signed-off-by: Kevin Hilman <khilman@linaro.org>
-> ---
->  Documentation/arm/Marvell/README | 1 +
->  1 file changed, 1 insertion(+)
+> I think the terminology you're using here is quite confusing.
+> 
+> Are you talking about having two different compatible values for two
+> different HW designs, where those different designs implement different
+> sets of clocks (which makes sense), or two different DT nodes for two
+> different clocks (which IMHO doesn't always, unless those different
+> clocks *truly* are separate IP blocks with completely independent
+> register regions, and where those IP blocks are likely to be re-used
+> as-is in other chips).
+> 
+clk32k and clk32k_audio are two different resources and since these
+are two different resource instances - a "compatible" matching an
+actual device is my suggestion.
 
-Applied to mvebu/soc with Thomas' Ack
+clk32k and clk32k_audio are two different resources because they have
+their specific set of controls registers and may even be independently
+present in a Palmas variant.
 
-thx,
+To highlight this: The example of tps659038 where clk32k is not
+present, but clk32k_audio is present (and happens to be disabled by
+default - thanks to an OTP on the chip - on platform like DRA7-evm, it
+is used to for 32k clk for wlan -currently hacked in u-boot using
+plain i2c writes[1] - yes it is yucky).
 
-Jason.
+Obviously, there are many ways to implement this. based on the current
+implementation, it indicates that if i create a node with
+"ti,palmas-clk" -i'd create two clocks - that is wrong for tps659038.
+
+Now (with the current approach), if I have to create a one clock for
+tps659038, i have to fix the for adding clock providers, add up
+"ti,tps659038-clk" etc.. it is doable - but IMHO, I dont need to do it
+with only the relevant nodes in dts.
+
+Further, it has no way to indicate that device X uses clock Y using
+clocks =<&xyz> either.
+
+[1] DRA7-evm u-boot hack.
+i2c dev 0
+i2c probe
+i2c mw 0x58 0xfb 0x2b (select secondary function for GPIO_5)
+i2c mw 0x58 0xd5 0x01 (enable audio clock)
+
+-- 
+Regards,
+Nishanth Menon
