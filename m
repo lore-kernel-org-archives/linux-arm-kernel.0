@@ -1,149 +1,75 @@
 From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Wed,  9 Oct 2013 00:34:18 +0200
-Subject: [PATCH 02/23] ARM: asm: Add ARM_BE8() assembly helper
+Date: Wed,  9 Oct 2013 00:34:20 +0200
+Subject: [PATCH 04/23] ARM: set BE8 if LE in head code
 In-Reply-To: <1381271679-27804-1-git-send-email-ben.dooks@codethink.co.uk>
 References: <1381271679-27804-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <1381271679-27804-3-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <1381271679-27804-5-git-send-email-ben.dooks@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add ARM_BE8() helper to wrap any code conditional on being
-compile when CONFIG_ARM_ENDIAN_BE8 is selected and convert
-existing places where this is to use it.
+If we are booting in LE and compiled for BE8, then add code to
+set the state to bE8. Since the instruction stream is always LE,
+we do not need to do anything special to the instruction.
 
-Acked-by: Nicolas Pitre <nico@linaro.org>
-Reviewed-by: Will Deacon <will.deacon@arm.com>
+Also ensure that the secondary processors are started in the same mode.
+
+Note, we do add about 20 bytes to the kernel image, but it seems easier
+to do this than adding another configuration to change.
+
 Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+Reviewed-by: Dave Martin <Dave.Martin@arm.com>
+Tested-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm/boot/compressed/head.S  | 8 ++------
- arch/arm/include/asm/assembler.h | 7 +++++++
- arch/arm/kernel/entry-armv.S     | 5 ++---
- arch/arm/kernel/entry-common.S   | 4 +---
- arch/arm/mm/abort-ev6.S          | 5 ++---
- arch/arm/mm/proc-v6.S            | 4 +---
- arch/arm/mm/proc-v7.S            | 4 +---
- 7 files changed, 16 insertions(+), 21 deletions(-)
+ arch/arm/boot/compressed/head.S | 1 +
+ arch/arm/kernel/head.S          | 4 ++++
+ arch/arm/kernel/sleep.S         | 1 +
+ 3 files changed, 6 insertions(+)
 
 diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
-index 75189f1..c912c2a 100644
+index c912c2a..066b034 100644
 --- a/arch/arm/boot/compressed/head.S
 +++ b/arch/arm/boot/compressed/head.S
-@@ -699,9 +699,7 @@ __armv4_mmu_cache_on:
- 		mrc	p15, 0, r0, c1, c0, 0	@ read control reg
- 		orr	r0, r0, #0x5000		@ I-cache enable, RR cache replacement
- 		orr	r0, r0, #0x0030
--#ifdef CONFIG_CPU_ENDIAN_BE8
--		orr	r0, r0, #1 << 25	@ big-endian page tables
--#endif
-+ ARM_BE8(	orr	r0, r0, #1 << 25 )	@ big-endian page tables
- 		bl	__common_mmu_cache_on
- 		mov	r0, #0
- 		mcr	p15, 0, r0, c8, c7, 0	@ flush I,D TLBs
-@@ -728,9 +726,7 @@ __armv7_mmu_cache_on:
- 		orr	r0, r0, #1 << 22	@ U (v6 unaligned access model)
- 						@ (needed for ARM1176)
- #ifdef CONFIG_MMU
--#ifdef CONFIG_CPU_ENDIAN_BE8
--		orr	r0, r0, #1 << 25	@ big-endian page tables
--#endif
-+ ARM_BE8(	orr	r0, r0, #1 << 25 )	@ big-endian page tables
- 		mrcne   p15, 0, r6, c2, c0, 2   @ read ttb control reg
- 		orrne	r0, r0, #1		@ MMU enabled
- 		movne	r1, #0xfffffffd		@ domain 0 = client
-diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
-index fcc1b5b..5c22851 100644
---- a/arch/arm/include/asm/assembler.h
-+++ b/arch/arm/include/asm/assembler.h
-@@ -53,6 +53,13 @@
- #define put_byte_3      lsl #0
- #endif
+@@ -135,6 +135,7 @@ start:
+ 		.word	_edata			@ zImage end address
+  THUMB(		.thumb			)
+ 1:
++ ARM_BE8(	setend	be )			@ go BE8 if compiled for BE8
+ 		mrs	r9, cpsr
+ #ifdef CONFIG_ARM_VIRT_EXT
+ 		bl	__hyp_stub_install	@ get into SVC mode, reversibly
+diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
+index 9e5906c..a047acf 100644
+--- a/arch/arm/kernel/head.S
++++ b/arch/arm/kernel/head.S
+@@ -77,6 +77,7 @@
  
-+/* Select code for any configuration running in BE8 mode */
-+#ifdef CONFIG_CPU_ENDIAN_BE8
-+#define ARM_BE8(code...) code
-+#else
-+#define ARM_BE8(code...)
-+#endif
-+
- /*
-  * Data preload for architectures that support it
-  */
-diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
-index 9cbe70c..55090fb 100644
---- a/arch/arm/kernel/entry-armv.S
-+++ b/arch/arm/kernel/entry-armv.S
-@@ -416,9 +416,8 @@ __und_usr:
- 	bne	__und_usr_thumb
- 	sub	r4, r2, #4			@ ARM instr@LR - 4
- 1:	ldrt	r0, [r4]
--#ifdef CONFIG_CPU_ENDIAN_BE8
--	rev	r0, r0				@ little endian instruction
--#endif
-+ ARM_BE8(rev	r0, r0)				@ little endian instruction
-+
- 	@ r0 = 32-bit ARM instruction which caused the exception
- 	@ r2 = PC value for the following instruction (:= regs->ARM_pc)
- 	@ r4 = PC value for the faulting instruction
-diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
-index bc6bd96..a2dcafd 100644
---- a/arch/arm/kernel/entry-common.S
-+++ b/arch/arm/kernel/entry-common.S
-@@ -393,9 +393,7 @@ ENTRY(vector_swi)
- #else
-  USER(	ldr	r10, [lr, #-4]		)	@ get SWI instruction
- #endif
--#ifdef CONFIG_CPU_ENDIAN_BE8
--	rev	r10, r10			@ little endian instruction
--#endif
-+ ARM_BE8(rev	r10, r10)			@ little endian instruction
+ 	__HEAD
+ ENTRY(stext)
++ ARM_BE8(setend	be )			@ ensure we are in BE8 mode
  
- #elif defined(CONFIG_AEABI)
- 
-diff --git a/arch/arm/mm/abort-ev6.S b/arch/arm/mm/abort-ev6.S
-index 8074199..3815a82 100644
---- a/arch/arm/mm/abort-ev6.S
-+++ b/arch/arm/mm/abort-ev6.S
-@@ -38,9 +38,8 @@ ENTRY(v6_early_abort)
- 	bne	do_DataAbort
- 	bic	r1, r1, #1 << 11		@ clear bit 11 of FSR
- 	ldr	r3, [r4]			@ read aborted ARM instruction
--#ifdef CONFIG_CPU_ENDIAN_BE8
--	rev	r3, r3
--#endif
-+ ARM_BE8(rev	r3, r3)
+  THUMB(	adr	r9, BSYM(1f)	)	@ Kernel is always entered in ARM.
+  THUMB(	bx	r9		)	@ If this is a Thumb-2 kernel,
+@@ -352,6 +353,9 @@ ENTRY(secondary_startup)
+ 	 * the processor type - there is no need to check the machine type
+ 	 * as it has already been validated by the primary processor.
+ 	 */
 +
- 	do_ldrd_abort tmp=ip, insn=r3
- 	tst	r3, #1 << 20			@ L = 0 -> write
- 	orreq	r1, r1, #1 << 11		@ yes.
-diff --git a/arch/arm/mm/proc-v6.S b/arch/arm/mm/proc-v6.S
-index 1128064..45dc29f 100644
---- a/arch/arm/mm/proc-v6.S
-+++ b/arch/arm/mm/proc-v6.S
-@@ -220,9 +220,7 @@ __v6_setup:
- #endif /* CONFIG_MMU */
- 	adr	r5, v6_crval
- 	ldmia	r5, {r5, r6}
--#ifdef CONFIG_CPU_ENDIAN_BE8
--	orr	r6, r6, #1 << 25		@ big-endian page tables
--#endif
-+ ARM_BE8(orr	r6, r6, #1 << 25)		@ big-endian page tables
- 	mrc	p15, 0, r0, c1, c0, 0		@ read control register
- 	bic	r0, r0, r5			@ clear bits them
- 	orr	r0, r0, r6			@ set them
-diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
-index c63d9bd..60920f6 100644
---- a/arch/arm/mm/proc-v7.S
-+++ b/arch/arm/mm/proc-v7.S
-@@ -367,9 +367,7 @@ __v7_setup:
++ ARM_BE8(setend	be)				@ ensure we are in BE8 mode
++
+ #ifdef CONFIG_ARM_VIRT_EXT
+ 	bl	__hyp_stub_install_secondary
  #endif
- 	adr	r5, v7_crval
- 	ldmia	r5, {r5, r6}
--#ifdef CONFIG_CPU_ENDIAN_BE8
--	orr	r6, r6, #1 << 25		@ big-endian page tables
--#endif
-+ ARM_BE8(orr	r6, r6, #1 << 25)		@ big-endian page tables
- #ifdef CONFIG_SWP_EMULATE
- 	orr     r5, r5, #(1 << 10)              @ set SW bit in "clear"
- 	bic     r6, r6, #(1 << 10)              @ clear it in "mmuset"
+diff --git a/arch/arm/kernel/sleep.S b/arch/arm/kernel/sleep.S
+index db1536b..716343c 100644
+--- a/arch/arm/kernel/sleep.S
++++ b/arch/arm/kernel/sleep.S
+@@ -130,6 +130,7 @@ ENDPROC(cpu_resume_after_mmu)
+ 	.data
+ 	.align
+ ENTRY(cpu_resume)
++ARM_BE8(setend be)			@ ensure we are in BE mode
+ 	mov	r1, #0
+ 	ALT_SMP(mrc p15, 0, r0, c0, c0, 5)
+ 	ALT_UP_B(1f)
 -- 
 1.8.4.rc3
