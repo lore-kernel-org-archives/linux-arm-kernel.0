@@ -1,64 +1,39 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Tue, 08 Oct 2013 12:40:08 +0900
-Subject: [PATCH 08/08] ARM: shmobile: Add Koelsch SW2 support
-In-Reply-To: <20131008033851.20455.68845.sendpatchset@w520>
-References: <20131008033851.20455.68845.sendpatchset@w520>
-Message-ID: <20131008034008.20455.77595.sendpatchset@w520>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 8 Oct 2013 11:40:51 +0800
+Subject: [PATCH RFC 1/2] ARM: imx6qdl: provide pinctrl configurations for
+ DAT3 pull-down
+In-Reply-To: <52537378.1020904@wwwdotorg.org>
+References: <20131005112147.GX12758@n2100.arm.linux.org.uk>
+ <E1VSPw9-0004Ug-BF@rmk-PC.arm.linux.org.uk>
+ <20131007055340.GB3739@S2101-09.ap.freescale.net>
+ <20131007180357.GS12758@n2100.arm.linux.org.uk>
+ <20131008015426.GA7480@S2101-09.ap.freescale.net>
+ <52537378.1020904@wwwdotorg.org>
+Message-ID: <20131008034048.GB7480@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm@opensource.se>
+On Mon, Oct 07, 2013 at 08:52:40PM -0600, Stephen Warren wrote:
+> >>> &usdhc1 {
+> >>> 	pinctrl-names = "default";
+> >>> 	pinctrl-0 = <&pinctrl_usdhc1_1 &pinctrl_usdhc1_1_dat3cd>;
+> >>> 	...
+> >>> 	status = "okay";
+> >>> };
+> >>
+> >> Are you sure that this will always be the case?  This would assume that
+> >> the pinctrl entries are always processed sequentially.
+> > 
+> > That will always be the case per my understanding.  Otherwise, I would
+> > be so surprised.  Are you seeing any case that the entries are not
+> > processed sequentially?
+> 
+> Given the way the Linux code currently works, I think that will
+> currently happen in practice. However, there's nothing in the pinctrl DT
+> binding documentation that guarantees (or even mentions) such semantics.
 
-Enable Koelsch GPIO switch for GPIO input and IRQ testing purpose.
+Ah, that's Russell's point, I guess.  I think it makes perfect sense to
+make this clear in the binding doc, as this "overwrite mechanism" can be
+very helpful.  I will send a patch for it.
 
-Signed-off-by: Magnus Damm <damm@opensource.se>
----
-
- arch/arm/mach-shmobile/board-koelsch.c |   22 ++++++++++++++++++++++
- 1 file changed, 22 insertions(+)
-
---- 0012/arch/arm/mach-shmobile/board-koelsch.c
-+++ work/arch/arm/mach-shmobile/board-koelsch.c	2013-10-07 14:05:22.000000000 +0900
-@@ -19,6 +19,9 @@
-  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
-  */
- 
-+#include <linux/gpio.h>
-+#include <linux/gpio_keys.h>
-+#include <linux/input.h>
- #include <linux/kernel.h>
- #include <linux/leds.h>
- #include <linux/platform_data/gpio-rcar.h>
-@@ -51,6 +54,22 @@ static const struct gpio_led_platform_da
- 	.num_leds	= ARRAY_SIZE(koelsch_leds),
- };
- 
-+/* GPIO KEY */
-+#define GPIO_KEY(c, g, d, ...) \
-+	{ .code = c, .gpio = g, .desc = d, .active_low = 1 }
-+
-+static struct gpio_keys_button gpio_buttons[] = {
-+	GPIO_KEY(KEY_4,		RCAR_GP_PIN(5, 3),	"SW2-pin4"),
-+	GPIO_KEY(KEY_3,		RCAR_GP_PIN(5, 2),	"SW2-pin3"),
-+	GPIO_KEY(KEY_2,		RCAR_GP_PIN(5, 1),	"SW2-pin2"),
-+	GPIO_KEY(KEY_1,		RCAR_GP_PIN(5, 0),	"SW2-pin1"),
-+};
-+
-+static const struct gpio_keys_platform_data koelsch_keys_pdata __initconst = {
-+	.buttons	= gpio_buttons,
-+	.nbuttons	= ARRAY_SIZE(gpio_buttons),
-+};
-+
- static void __init koelsch_add_standard_devices(void)
- {
- 	r8a7791_clock_init();
-@@ -59,6 +78,9 @@ static void __init koelsch_add_standard_
- 	platform_device_register_data(&platform_bus, "leds-gpio", -1,
- 				      &koelsch_leds_pdata,
- 				      sizeof(koelsch_leds_pdata));
-+	platform_device_register_data(&platform_bus, "gpio-keys", -1,
-+				      &koelsch_keys_pdata,
-+				      sizeof(koelsch_keys_pdata));
- }
- 
- static const char * const koelsch_boards_compat_dt[] __initconst = {
+Shawn
