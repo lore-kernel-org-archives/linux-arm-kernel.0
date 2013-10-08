@@ -1,55 +1,47 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Tue, 8 Oct 2013 20:20:27 +0200
-Subject: [PATCH v2] ARM: Dove: fix bad properties of the si5351 clkout2 used
- by Cubox audio
-Message-ID: <20131008202027.6d9f0bd2@armhf>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 8 Oct 2013 11:17:24 -0700
+Subject: [PATCH RFC 4/6] ARM: OMAP2+: AM43x/AM335x: have reset controller
+In-Reply-To: <54ef6f33272dfe2bbf3596da05579a7305fb0cff.1378129416.git.afzal@ti.com>
+References: <cover.1378129416.git.afzal@ti.com>
+ <54ef6f33272dfe2bbf3596da05579a7305fb0cff.1378129416.git.afzal@ti.com>
+Message-ID: <20131008181723.GG8313@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As defined in the DT, clkout2 is not allowed to change the pll inside
-si5351.
+* Afzal Mohammed <afzal@ti.com> [130902 07:27]:
+> AM43x, AM335x have reset block as part of prcm, let reset driver be
+> usable with these SoC's.
 
-This patch extends the properties of clkout2 so that it works as the
-external clock of the audio device in the Cubox.
+Once the driver is ready, this can be merged along with the 
+reset driver:
 
-Also, as the second si5351 clock is not used in the Cubox, its
-definition is removed.
-
-Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
----
-v2:
-- remove clkout1 which is not used in the Cubox (Sebastian Hesselbarth)
----
- arch/arm/boot/dts/dove-cubox.dts | 10 ++--------
- 1 file changed, 2 insertions(+), 8 deletions(-)
-
-diff --git a/arch/arm/boot/dts/dove-cubox.dts b/arch/arm/boot/dts/dove-cubox.dts
-index bb38a24..3dd8844 100644
---- a/arch/arm/boot/dts/dove-cubox.dts
-+++ b/arch/arm/boot/dts/dove-cubox.dts
-@@ -99,18 +99,12 @@
- 			silabs,pll-master;
- 		};
+Acked-by: Tony Lindgren <tony@atomide.com>
  
--		clkout1 {
--			reg = <1>;
--			silabs,drive-strength = <8>;
--			silabs,multisynth-source = <1>;
--			silabs,clock-source = <0>;
--			silabs,pll-master;
--		};
--
- 		clkout2 {
- 			reg = <2>;
-+			silabs,drive-strength = <8>;
- 			silabs,multisynth-source = <1>;
- 			silabs,clock-source = <0>;
-+			silabs,pll-master;
- 		};
- 	};
- };
-
-
--- 
-Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
-Jef		|		http://moinejf.free.fr/
+> Signed-off-by: Afzal Mohammed <afzal@ti.com>
+> ---
+>  arch/arm/mach-omap2/Kconfig | 2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
+> index 3eed000..fa28d1d 100644
+> --- a/arch/arm/mach-omap2/Kconfig
+> +++ b/arch/arm/mach-omap2/Kconfig
+> @@ -72,6 +72,7 @@ config SOC_AM33XX
+>  	select CPU_V7
+>  	select MULTI_IRQ_HANDLER
+>  	select COMMON_CLK
+> +	select ARCH_HAS_RESET_CONTROLLER
+>  
+>  config SOC_AM43XX
+>  	bool "TI AM43x"
+> @@ -82,6 +83,7 @@ config SOC_AM43XX
+>  	select ARM_GIC
+>  	select COMMON_CLK
+>  	select MACH_OMAP_GENERIC
+> +	select ARCH_HAS_RESET_CONTROLLER
+>  
+>  config ARCH_OMAP2PLUS
+>  	bool
+> -- 
+> 1.8.3.4
+> 
