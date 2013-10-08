@@ -1,137 +1,352 @@
-From: victor.kamensky@linaro.org (Victor Kamensky)
-Date: Mon, 7 Oct 2013 17:53:02 -0700
-Subject: [PATCH v2] ARM: tlb: ASID macro should give 32bit result for BE
- correct operation
-In-Reply-To: <52533A70.5040705@ti.com>
-References: <1381160903-1248-1-git-send-email-victor.kamensky@linaro.org>
- <5252DA06.8000303@codethink.co.uk>
- <CAA3XUr2wYFL9WAQd9uAJSKK5KhWF3bPzYbh-3x=B3oLVXk79og@mail.gmail.com>
- <52533A70.5040705@ti.com>
-Message-ID: <CAA3XUr0PGL=j4h3EaLACiax5EuY+CQYP8ZYq7gB_Rk4b9nTk+A@mail.gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 8 Oct 2013 09:54:35 +0900
+Subject: [PATCH] ARM: shmobile: Break out R-Car Gen2 setup code
+In-Reply-To: <20130925051928.GH24243@verge.net.au>
+References: <20130912003249.24015.41583.sendpatchset@w520>
+ <20130912004730.GG23279@verge.net.au>
+ <20130912005504.GH23279@verge.net.au>
+ <20130925051928.GH24243@verge.net.au>
+Message-ID: <20131008005433.GA3304@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Santosh,
+On Wed, Sep 25, 2013 at 02:19:29PM +0900, Simon Horman wrote:
+> On Thu, Sep 12, 2013 at 09:55:06AM +0900, Simon Horman wrote:
+> > On Thu, Sep 12, 2013 at 09:47:32AM +0900, Simon Horman wrote:
+> > > On Thu, Sep 12, 2013 at 09:32:49AM +0900, Magnus Damm wrote:
+> > > > From: Magnus Damm <damm@opensource.se>
+> > > > 
+> > > > Move arch timer workaround code and boot mode pin
+> > > > handling from setup-r8a7790.c to setup-rcar-gen2.c.
+> > > > 
+> > > > With this in place the same code can be used on
+> > > > other R-Car Generation 2 devices such as r8a7791.
+> > > 
+> > > This seems reasonable to me.
+> > > 
+> > > Am I correct in thinking that you plan a follow-up patch to make use of
+> > > this on the r8a7771 in the not to distant future.
+> > 
+> > I see my reply was too hasty and you have sent such a patch.
+> > Sorry for the noise!
+> 
+> I have queued up the following as a cleanup and
+> I plan to push it later this afternoon.
+> 
+> There were some minor conflicts in arch/arm/mach-shmobile/Makefile
+> and arch/arm/mach-shmobile/include/mach/r8a7790.h.
+> Please let me know if I messed things up.
 
-Please see inline.
+I have been working at reducing conflicts in branches
+that I intend to post. As such I have rebased this patch as follows.
+The only change should be to boards.lager.c.
 
-On 7 October 2013 15:49, Santosh Shilimkar <santosh.shilimkar@ti.com> wrote:
-> Victor,
->
-> On Monday 07 October 2013 12:37 PM, Victor Kamensky wrote:
->> On 7 October 2013 08:57, Ben Dooks <ben.dooks@codethink.co.uk> wrote:
->>> On 07/10/13 17:48, Victor Kamensky wrote:
->>>>
->>>> Hi Will, Ben, Russell, Thomas,
->>>>
->>>> Please review second version of patch that fixes TLB asid issue in big
->>>> endian
->>>> V7 image.
->>>>
->>>> Changes from v1:
->>>>     Note previous patch subject line was 'ARM: tlb:
->>>>     __flush_tlb_mm need to use int asid var for BE correct operation'
->>>>
->>>>     Added 'unsigned int' cast into ASID macro itself rather
->>>>     then use intermediate 'int' variable in __flush_tlb_mm function.
->>>>     This is done per v1 patch discussion at
->>>>
->>>>
->>>> http://lists.infradead.org/pipermail/linux-arm-kernel/2013-October/202583.html
->>>>
->>>> Tested with Linaro BE topic branch on Arndale board. Both LE and BE
->>>> images were tested.
->>>
->>>
->>> If you are booting on the Arndale board, is there a patch to mark
->>> the relevant Exynos devices as BE capable?
->>
->> Arndale need massive fixes in their BSP layer to be endian agnostic
->> ARM V7 platform. Unfortunate it is not as simple as with few others
->> that already marked as BE capable.
->>
->> Please see
->> https://git.linaro.org/gitweb?p=people/victor.kamensky/linux-linaro-tracking-be.git;a=shortlog;h=refs/heads/llct-be-topic
->> Mostly it is __raw_xxx conversion to xxx_relaxed, but there are
->> more subtle changes (some of them similar to changs that you've
->> done for other platforms). Also there are known unfixed issues like
->> disabling CONFIG_MMC_DW_IDMAC config because idmac
->> DMA related code is not endian agnostic yet (btw interesting class
->> of BE related problem that was not seen before).
->>
->> In Linaro we use Arndale and Pandaboard as reference platforms
->> therefore we have BE BSP fixes in our tree. But I am not sure
->> what is fate of those in long term. Also we consider these as
->> example of BSP changes that other BSP need to do.
->>
->> If Exynos and OMAP owners will have any interest for BE images,
->> and would like to see these changes in main line, we gladly
->> will work on this. Otherwise changes like this can mess up with
->> BSP ongoing drivers development.
->>
-> BE support in mainline is definitely we are interested for OMAP
-> and rest of the TI SoCs.
+If I have messed something up please let me know.
 
-OK, let's get agreement on __raw_xxx issue as per your note below.
-We will have discussion about OMAP BE changes in mainline,
-within LNG BE group and I think we could try to push OMAP BE
-changes out.
 
->> I think above position is consistent with similar discussion on
->> some of BE related threads - changing BSP to support BE mode
->> is BSP owners call.
->>
-> Am just wondering a better method than the patch [1] which touches
-> many drivers for readl/writel() replacement. Drivers are using
-> that as standard based on device driver guide
+From: Magnus Damm <damm@opensource.se>
 
-Do you have pointer for above?
+[PATCH] ARM: shmobile: Break out R-Car Gen2 setup code
 
-> and was thinking
-> we should not change that rule to support BE. We definitely need
-> to get the byte swap achieved but probably through some other
-> means.
+Move arch timer workaround code and boot mode pin
+handling from setup-r8a7790.c to setup-rcar-gen2.c.
 
-__raw_read[lw] and __raw_write[lw] change idea for BE images was
-already discussed in [1]. Semantics of __raw_xxx function, vs xxx,
-vs xxx_relaxed, somewhat explained at [2]. [2] references LKML
-thread on similar subject.
+With this in place the same code can be used on
+other R-Car Generation 2 devices such as r8a7791.
 
-As it stands now (at least in my understanding):
-__raw_xxx - is native byte order operations, non mem barriers, cannot
-      be used to read LE hw in endian agnostic way
-xxx - reads/writes LE h/w byteswapa to target byte order if needed, uses
-      mem barriers, it is already endian agnostic
-xxx_relaxed - read LE h/w,  byteswapa to target byte order if needed,
-      no mem barriers, should be used to read LE h/w in endian agnostic
-      way, they are the same as __raw_xxx plus proper byteswaps.
+Signed-off-by: Magnus Damm <damm@opensource.se>
+[horms+renesas at verge.net.au trivial rebase of board-lager.c
+ for introduction of lager_add_standard_devices()]
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/mach-shmobile/Makefile                 |  1 +
+ arch/arm/mach-shmobile/board-lager-reference.c  |  2 +-
+ arch/arm/mach-shmobile/board-lager.c            |  2 +-
+ arch/arm/mach-shmobile/clock-r8a7790.c          |  2 +-
+ arch/arm/mach-shmobile/include/mach/r8a7790.h   |  6 +-
+ arch/arm/mach-shmobile/include/mach/rcar-gen2.h |  8 +++
+ arch/arm/mach-shmobile/setup-r8a7790.c          | 68 +-----------------
+ arch/arm/mach-shmobile/setup-rcar-gen2.c        | 91 +++++++++++++++++++++++++
+ 8 files changed, 106 insertions(+), 74 deletions(-)
+ create mode 100644 arch/arm/mach-shmobile/include/mach/rcar-gen2.h
+ create mode 100644 arch/arm/mach-shmobile/setup-rcar-gen2.c
 
-That should go for all CPU types. As Will wrote on [1] it will be really
-hard to change it. I agree with that.
-
-Having said above I would like to notice that practically all cases where
-__raw_xxx are used directly in Pandaboard and Exynos drivers
-should be replaced with xxx_relaxed variant. I run into only one exception [3].
-
-In fact when I get update, I apply hack patch that makes all inline functions
-in arch/arm/include/asm/io.h instead of __raw_xxx function to use
-_raw_xxx function which are added as exact copies of __raw_xxx, and
-then I run small script with 'readelf --debug-dump vmlinux' and awk
-that catches all direct uses of __raw_xxx functions, except [3] I
-never saw case where __raw_xxx should not be replaced with xxx_relaxed.
-
-I agree on your sentiment that when big diff with just
-simple rename in many places will go in, it could be very disruptive,
-and it will take time to change people's habits, but personally I  don't
-see any other way.
-
-Thanks,
-Victor
-
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2013-July/186000.html
-[2] http://stackoverflow.com/questions/9818657/whats-the-difference-b-w-raw-readl-raw-writel-and-readl-writel-in-linux-ker
-[3] https://git.linaro.org/gitweb?p=people/victor.kamensky/linux-linaro-tracking-be.git;a=commitdiff;h=7c78d140b4a3a46e7fa2979889c341f297e3fd6c
-
-> Regards,
-> Santosh
-> [1] https://git.linaro.org/gitweb?p=people/victor.kamensky/linux-linaro-tracking-be.git;a=commit;h=9074a67ab082c62545683e5ec909368a23c33655
+diff --git a/arch/arm/mach-shmobile/Makefile b/arch/arm/mach-shmobile/Makefile
+index d30ec1a..6b7a02e 100644
+--- a/arch/arm/mach-shmobile/Makefile
++++ b/arch/arm/mach-shmobile/Makefile
+@@ -15,6 +15,7 @@ obj-$(CONFIG_ARCH_R8A7740)	+= setup-r8a7740.o
+ obj-$(CONFIG_ARCH_R8A7778)	+= setup-r8a7778.o
+ obj-$(CONFIG_ARCH_R8A7779)	+= setup-r8a7779.o
+ obj-$(CONFIG_ARCH_R8A7790)	+= setup-r8a7790.o
++obj-$(CONFIG_ARCH_R8A7790)	+= setup-r8a7790.o setup-rcar-gen2.o
+ obj-$(CONFIG_ARCH_R8A7791)	+= setup-r8a7791.o
+ obj-$(CONFIG_ARCH_EMEV2)	+= setup-emev2.o
+ 
+diff --git a/arch/arm/mach-shmobile/board-lager-reference.c b/arch/arm/mach-shmobile/board-lager-reference.c
+index d39a91b..1a1a4a8 100644
+--- a/arch/arm/mach-shmobile/board-lager-reference.c
++++ b/arch/arm/mach-shmobile/board-lager-reference.c
+@@ -40,7 +40,7 @@ static const char *lager_boards_compat_dt[] __initdata = {
+ DT_MACHINE_START(LAGER_DT, "lager")
+ 	.smp		= smp_ops(r8a7790_smp_ops),
+ 	.init_early	= r8a7790_init_early,
++	.init_time	= rcar_gen2_timer_init,
+ 	.init_machine	= lager_add_standard_devices,
+-	.init_time	= r8a7790_timer_init,
+ 	.dt_compat	= lager_boards_compat_dt,
+ MACHINE_END
+diff --git a/arch/arm/mach-shmobile/board-lager.c b/arch/arm/mach-shmobile/board-lager.c
+index 6d1026e..4e040e4 100644
+--- a/arch/arm/mach-shmobile/board-lager.c
++++ b/arch/arm/mach-shmobile/board-lager.c
+@@ -188,7 +188,7 @@ static const char *lager_boards_compat_dt[] __initdata = {
+ DT_MACHINE_START(LAGER_DT, "lager")
+ 	.smp		= smp_ops(r8a7790_smp_ops),
+ 	.init_early	= r8a7790_init_early,
+-	.init_time	= r8a7790_timer_init,
++	.init_time	= rcar_gen2_timer_init,
+ 	.init_machine	= lager_init,
+ 	.dt_compat	= lager_boards_compat_dt,
+ MACHINE_END
+diff --git a/arch/arm/mach-shmobile/clock-r8a7790.c b/arch/arm/mach-shmobile/clock-r8a7790.c
+index 7661e89..a64f965 100644
+--- a/arch/arm/mach-shmobile/clock-r8a7790.c
++++ b/arch/arm/mach-shmobile/clock-r8a7790.c
+@@ -310,7 +310,7 @@ static struct clk_lookup lookups[] = {
+ 
+ void __init r8a7790_clock_init(void)
+ {
+-	u32 mode = r8a7790_read_mode_pins();
++	u32 mode = rcar_gen2_read_mode_pins();
+ 	int k, ret = 0;
+ 
+ 	switch (mode & (MD(14) | MD(13))) {
+diff --git a/arch/arm/mach-shmobile/include/mach/r8a7790.h b/arch/arm/mach-shmobile/include/mach/r8a7790.h
+index 79e731c..5fbfa28 100644
+--- a/arch/arm/mach-shmobile/include/mach/r8a7790.h
++++ b/arch/arm/mach-shmobile/include/mach/r8a7790.h
+@@ -1,15 +1,13 @@
+ #ifndef __ASM_R8A7790_H__
+ #define __ASM_R8A7790_H__
+ 
++#include <mach/rcar-gen2.h>
++
+ void r8a7790_add_standard_devices(void);
+ void r8a7790_add_dt_devices(void);
+ void r8a7790_clock_init(void);
+ void r8a7790_pinmux_init(void);
+ void r8a7790_init_early(void);
+-void r8a7790_timer_init(void);
+ extern struct smp_operations r8a7790_smp_ops;
+ 
+-#define MD(nr) BIT(nr)
+-u32 r8a7790_read_mode_pins(void);
+-
+ #endif /* __ASM_R8A7790_H__ */
+diff --git a/arch/arm/mach-shmobile/include/mach/rcar-gen2.h b/arch/arm/mach-shmobile/include/mach/rcar-gen2.h
+new file mode 100644
+index 0000000..43f606e
+--- /dev/null
++++ b/arch/arm/mach-shmobile/include/mach/rcar-gen2.h
+@@ -0,0 +1,8 @@
++#ifndef __ASM_RCAR_GEN2_H__
++#define __ASM_RCAR_GEN2_H__
++
++void rcar_gen2_timer_init(void);
++#define MD(nr) BIT(nr)
++u32 rcar_gen2_read_mode_pins(void);
++
++#endif /* __ASM_RCAR_GEN2_H__ */
+diff --git a/arch/arm/mach-shmobile/setup-r8a7790.c b/arch/arm/mach-shmobile/setup-r8a7790.c
+index c7e24ef..c47bceb 100644
+--- a/arch/arm/mach-shmobile/setup-r8a7790.c
++++ b/arch/arm/mach-shmobile/setup-r8a7790.c
+@@ -18,7 +18,6 @@
+  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
+  */
+ 
+-#include <linux/clocksource.h>
+ #include <linux/irq.h>
+ #include <linux/kernel.h>
+ #include <linux/of_platform.h>
+@@ -203,71 +202,6 @@ void __init r8a7790_add_standard_devices(void)
+ 	r8a7790_register_thermal();
+ }
+ 
+-#define MODEMR 0xe6160060
+-
+-u32 __init r8a7790_read_mode_pins(void)
+-{
+-	void __iomem *modemr = ioremap_nocache(MODEMR, 4);
+-	u32 mode;
+-
+-	BUG_ON(!modemr);
+-	mode = ioread32(modemr);
+-	iounmap(modemr);
+-
+-	return mode;
+-}
+-
+-#define CNTCR 0
+-#define CNTFID0 0x20
+-
+-void __init r8a7790_timer_init(void)
+-{
+-#ifdef CONFIG_ARM_ARCH_TIMER
+-	u32 mode = r8a7790_read_mode_pins();
+-	void __iomem *base;
+-	int extal_mhz = 0;
+-	u32 freq;
+-
+-	/* At Linux boot time the r8a7790 arch timer comes up
+-	 * with the counter disabled. Moreover, it may also report
+-	 * a potentially incorrect fixed 13 MHz frequency. To be
+-	 * correct these registers need to be updated to use the
+-	 * frequency EXTAL / 2 which can be determined by the MD pins.
+-	 */
+-
+-	switch (mode & (MD(14) | MD(13))) {
+-	case 0:
+-		extal_mhz = 15;
+-		break;
+-	case MD(13):
+-		extal_mhz = 20;
+-		break;
+-	case MD(14):
+-		extal_mhz = 26;
+-		break;
+-	case MD(13) | MD(14):
+-		extal_mhz = 30;
+-		break;
+-	}
+-
+-	/* The arch timer frequency equals EXTAL / 2 */
+-	freq = extal_mhz * (1000000 / 2);
+-
+-	/* Remap "armgcnt address map" space */
+-	base = ioremap(0xe6080000, PAGE_SIZE);
+-
+-	/* Update registers with correct frequency */
+-	iowrite32(freq, base + CNTFID0);
+-	asm volatile("mcr p15, 0, %0, c14, c0, 0" : : "r" (freq));
+-
+-	/* make sure arch timer is started by setting bit 0 of CNTCR */
+-	iowrite32(1, base + CNTCR);
+-	iounmap(base);
+-#endif /* CONFIG_ARM_ARCH_TIMER */
+-
+-	clocksource_of_init();
+-}
+-
+ void __init r8a7790_init_early(void)
+ {
+ #ifndef CONFIG_ARM_ARCH_TIMER
+@@ -285,7 +219,7 @@ static const char * const r8a7790_boards_compat_dt[] __initconst = {
+ DT_MACHINE_START(R8A7790_DT, "Generic R8A7790 (Flattened Device Tree)")
+ 	.smp		= smp_ops(r8a7790_smp_ops),
+ 	.init_early	= r8a7790_init_early,
+-	.init_time	= r8a7790_timer_init,
++	.init_time	= rcar_gen2_timer_init,
+ 	.dt_compat	= r8a7790_boards_compat_dt,
+ MACHINE_END
+ #endif /* CONFIG_USE_OF */
+diff --git a/arch/arm/mach-shmobile/setup-rcar-gen2.c b/arch/arm/mach-shmobile/setup-rcar-gen2.c
+new file mode 100644
+index 0000000..5734c24
+--- /dev/null
++++ b/arch/arm/mach-shmobile/setup-rcar-gen2.c
+@@ -0,0 +1,91 @@
++/*
++ * R-Car Generation 2 support
++ *
++ * Copyright (C) 2013  Renesas Solutions Corp.
++ * Copyright (C) 2013  Magnus Damm
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; version 2 of the License.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
++ */
++
++#include <linux/clocksource.h>
++#include <linux/io.h>
++#include <linux/kernel.h>
++#include <mach/common.h>
++#include <mach/rcar-gen2.h>
++#include <asm/mach/arch.h>
++
++#define MODEMR 0xe6160060
++
++u32 __init rcar_gen2_read_mode_pins(void)
++{
++	void __iomem *modemr = ioremap_nocache(MODEMR, 4);
++	u32 mode;
++
++	BUG_ON(!modemr);
++	mode = ioread32(modemr);
++	iounmap(modemr);
++
++	return mode;
++}
++
++#define CNTCR 0
++#define CNTFID0 0x20
++
++void __init rcar_gen2_timer_init(void)
++{
++#ifdef CONFIG_ARM_ARCH_TIMER
++	u32 mode = rcar_gen2_read_mode_pins();
++	void __iomem *base;
++	int extal_mhz = 0;
++	u32 freq;
++
++	/* At Linux boot time the r8a7790 arch timer comes up
++	 * with the counter disabled. Moreover, it may also report
++	 * a potentially incorrect fixed 13 MHz frequency. To be
++	 * correct these registers need to be updated to use the
++	 * frequency EXTAL / 2 which can be determined by the MD pins.
++	 */
++
++	switch (mode & (MD(14) | MD(13))) {
++	case 0:
++		extal_mhz = 15;
++		break;
++	case MD(13):
++		extal_mhz = 20;
++		break;
++	case MD(14):
++		extal_mhz = 26;
++		break;
++	case MD(13) | MD(14):
++		extal_mhz = 30;
++		break;
++	}
++
++	/* The arch timer frequency equals EXTAL / 2 */
++	freq = extal_mhz * (1000000 / 2);
++
++	/* Remap "armgcnt address map" space */
++	base = ioremap(0xe6080000, PAGE_SIZE);
++
++	/* Update registers with correct frequency */
++	iowrite32(freq, base + CNTFID0);
++	asm volatile("mcr p15, 0, %0, c14, c0, 0" : : "r" (freq));
++
++	/* make sure arch timer is started by setting bit 0 of CNTCR */
++	iowrite32(1, base + CNTCR);
++	iounmap(base);
++#endif /* CONFIG_ARM_ARCH_TIMER */
++
++	clocksource_of_init();
++}
+-- 
+1.8.4
