@@ -1,33 +1,28 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 8 Oct 2013 20:37:15 +0530
-Subject: [PATCH] ARM: davinci: convert to clockevents_config_and_register
-In-Reply-To: <20131008145723.GQ10079@pengutronix.de>
-References: <1380060159-12008-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <20131008145723.GQ10079@pengutronix.de>
-Message-ID: <52541FA3.4040207@ti.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 8 Oct 2013 16:10:07 +0100
+Subject: [PATCH 3/5] iommu/arm-smmu: Introduce stream ID masking
+In-Reply-To: <1381224444-27303-4-git-send-email-andreas.herrmann@calxeda.com>
+References: <1381224444-27303-1-git-send-email-andreas.herrmann@calxeda.com>
+ <1381224444-27303-4-git-send-email-andreas.herrmann@calxeda.com>
+Message-ID: <20131008151007.GD21189@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Uwe,
-
-On Tuesday 08 October 2013 08:27 PM, Uwe Kleine-K?nig wrote:
-> Hello,
+On Tue, Oct 08, 2013 at 10:27:22AM +0100, Andreas Herrmann wrote:
+> Ie. use a mask based on smr_mask_bits to map all stream IDs of an SMMU
+> to one context.
 > 
-> On Wed, Sep 25, 2013 at 12:02:39AM +0200, Uwe Kleine-K?nig wrote:
->> clockevents_config_and_register is superior compared to setting
->> shift/mult and {min,max}_delta_ns by hand.
->>
->> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> This behaviour is controlled per SMMU node with DT property
+> "arm,smmu-mask-stream-ids" and is only allowed if just a single master
+> is attached to an SMMU. If the option is specified, all stream-ids
+> that are provided in DT for the single master have no relevance.
 > 
->> ---
->> Hello,
->>
->> I wonder where the 50 us limit comes from. This is not a hardware limit,
->> is it?
-> ping; I didn't get any feedback on this yet, also it's not in next.
+> This is useful/convenient if a master has more than 8 stream-ids or if
+> not all stream-ids are known for a master device.
 
-Apologies for the delay. I am yet to look at it because I am traveling
-ATM. I will look at it during this week and provide feedback.
+Hmmm, this really scares me. What's the use-case? I worry about people
+inadvertently putting devices into an iommu domain because they happen to be
+included in a mask. Your solution seems to be targetting a single master
+with lots of IDs -- is this a PCI RC?
 
-Thanks,
-Sekhar
+Will
