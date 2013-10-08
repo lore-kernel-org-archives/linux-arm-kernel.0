@@ -1,40 +1,77 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 8 Oct 2013 09:54:28 +0800
-Subject: [PATCH RFC 1/2] ARM: imx6qdl: provide pinctrl configurations for
- DAT3 pull-down
-In-Reply-To: <20131007180357.GS12758@n2100.arm.linux.org.uk>
-References: <20131005112147.GX12758@n2100.arm.linux.org.uk>
- <E1VSPw9-0004Ug-BF@rmk-PC.arm.linux.org.uk>
- <20131007055340.GB3739@S2101-09.ap.freescale.net>
- <20131007180357.GS12758@n2100.arm.linux.org.uk>
-Message-ID: <20131008015426.GA7480@S2101-09.ap.freescale.net>
+From: dinguyen@altera.com (dinguyen at altera.com)
+Date: Mon, 7 Oct 2013 21:13:54 -0500
+Subject: [GIT PULL]socfpga: DTS updates for v3.13
+Message-ID: <1381198434-9583-1-git-send-email-dinguyen@altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 07, 2013 at 07:03:57PM +0100, Russell King - ARM Linux wrote:
-> On Mon, Oct 07, 2013 at 01:53:43PM +0800, Shawn Guo wrote:
-> > I think we can redefine only pad DAT3 in pinctrl_usdhc1_1_dat3cd, and
-> > overwrite the DAT3 configuration in pinctrl_usdhc1_1 to save the
-> > redundant data of other pads, something like the following.
-> > 
-> > pinctrl_usdhc1_1_dat3cd: usdhc1grp-3 {
-> > 	fsl,pins = <
-> > 		MX6QDL_PAD_SD1_DAT3__SD1_DATA3 0x13059
-> > 	>;
-> > };
-> > 
-> > &usdhc1 {
-> > 	pinctrl-names = "default";
-> > 	pinctrl-0 = <&pinctrl_usdhc1_1 &pinctrl_usdhc1_1_dat3cd>;
-> > 	...
-> > 	status = "okay";
-> > };
-> 
-> Are you sure that this will always be the case?  This would assume that
-> the pinctrl entries are always processed sequentially.
+Hi Kevin, Olof, and Arnd:
 
-That will always be the case per my understanding.  Otherwise, I would
-be so surprised.  Are you seeing any case that the entries are not
-processed sequentially?
+Please consider these DTS updates for the Altera SOCFPGA platform for v3.13:
 
-Shawn
+Five of the six patches do NOT have an Ack from the DTS maintainers. I have
+sent the patches out for review, but since these patches do not change
+bindings nor add new ones, I don't think they will get too much attention.
+
+Please advise if you think I need to wait for Ack(s) from them.
+
+Thanks,
+
+Dinh
+
+The following changes since commit 4a10c2ac2f368583138b774ca41fac4207911983:
+
+  Linux 3.12-rc2 (2013-09-23 15:41:09 -0700)
+
+are available in the git repository at:
+
+  git://git.rocketboards.org/linux-socfpga-next.git tags/socfpga-dts-updates-for-v3.13
+
+for you to fetch changes up to d28e284dbee1f81daef762faf980a2260c2c120e:
+
+  dts: socfpga: Add support for Altera's SOCFPGA Arria V board (2013-10-07 14:16:49 -0500)
+
+----------------------------------------------------------------
+Updates to dts file structure for Altera's SOCFPGA
+
+* Does not include any new bindings or bindings change
+* Add dts file for a SOCFPGA with an Arria V FPGA
+* Add a clocks property for the TWD timer
+* Add support for Terasic SocKit Board which has Cyclone5 FPGA
+* From Steffen Trumtrar:
+"This series includes some minor cleanups (indentation and clock labels) and
+reorders the socfpga dts hierarchy from:
+	socfpga.dtsi
+	-> socfpga_$board.dts
+	-> socfpga_$otherboard.dts
+to
+	socfpga.dtsi
+	-> socfpga_cyclone5.dtsi
+	--> socfpga_cyclone5_$board.dts
+	--> socfpga_cyclone5_$otherboard.dts
+"
+
+----------------------------------------------------------------
+Dinh Nguyen (2):
+      arm: socfpga: Add clock for smp_twd timer
+      dts: socfpga: Add support for Altera's SOCFPGA Arria V board
+
+Steffen Trumtrar (4):
+      ARM: socfpga: dts: Move common nodes to cyclone5 dtsi
+      ARM: socfpga: dts: Add support for terasic SoCkit
+      ARM: socfpga: dts: cleanup indentation
+      ARM: socfpga: dts: fix s2f_* clock name
+
+ arch/arm/boot/dts/Makefile                         |    4 +-
+ arch/arm/boot/dts/socfpga.dtsi                     |  297 ++++++++++----------
+ arch/arm/boot/dts/socfpga_arria5.dtsi              |   58 ++++
+ arch/arm/boot/dts/socfpga_arria5_socdk.dts         |   40 +++
+ ...{socfpga_cyclone5.dts => socfpga_cyclone5.dtsi} |   20 --
+ arch/arm/boot/dts/socfpga_cyclone5_socdk.dts       |   40 +++
+ arch/arm/boot/dts/socfpga_cyclone5_sockit.dts      |   37 +++
+ 7 files changed, 327 insertions(+), 169 deletions(-)
+ create mode 100644 arch/arm/boot/dts/socfpga_arria5.dtsi
+ create mode 100644 arch/arm/boot/dts/socfpga_arria5_socdk.dts
+ rename arch/arm/boot/dts/{socfpga_cyclone5.dts => socfpga_cyclone5.dtsi} (78%)
+ create mode 100644 arch/arm/boot/dts/socfpga_cyclone5_socdk.dts
+ create mode 100644 arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
