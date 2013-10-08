@@ -1,107 +1,126 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 8 Oct 2013 17:36:59 +0200
-Subject: [PATCH v3 10/19] ARM: at91/dt: add system clk id definitions
- in dt-bindings include dir
-In-Reply-To: <1375942504-9010-1-git-send-email-b.brezillon@overkiz.com>
-References: <1375937608-3773-1-git-send-email-b.brezillon@overkiz.com>
- <1375942504-9010-1-git-send-email-b.brezillon@overkiz.com>
-Message-ID: <5254269B.9020109@atmel.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 8 Oct 2013 16:38:17 +0100
+Subject: [PATCH 1/2] clk/zynq/clkc: Add 'fclk-enable' feature
+In-Reply-To: <1381242972-14752-1-git-send-email-soren.brinkmann@xilinx.com>
+References: <1381242972-14752-1-git-send-email-soren.brinkmann@xilinx.com>
+Message-ID: <20131008153816.GB4981@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/08/2013 08:15, Boris BREZILLON :
-> This patch adds system clk ids definitions into dt-bindinds include dir
-> (include/dt-bindings/clk/at91/'soc-name'/system-clk.h).
->
-> These definitions will be used by dt definition to define and reference
-> system clks.
+On Tue, Oct 08, 2013 at 03:36:11PM +0100, Soren Brinkmann wrote:
+> In some use cases Zynq's FPGA clocks are used as static clock
+> generators for IP in the FPGA part of the SOC for which no Linux driver
+> exists and would control those clocks. To avoid automatic
+> gating of these clocks in such cases a new property - fclk-enable - is
+> added to the clock controller's DT description to accomodate such use
+> cases. It's value is a bitmask, where a set bit results in enabling
+> the corresponding FCLK through the clkc.
+> 
+> FPGA clocks are handled following the rules below:
+> 
+> If an FCLK is not enabled by bootloaders, that FCLK will be disabled in
+> Linux. Drivers can enable and control it through the CCF as usual.
+> 
+> If an FCLK is enabled by bootloaders AND the corresponding bit in the
+> 'fclk-enable' DT property is set, that FCLK will be enabled by the clkc,
+> resulting in an off by one reference count for that clock. Ensuring it
+> will always be running.
+> 
+> The default value for 'fclk-enable' is '0xf' (all FCLK's enabled by the
+> bootloader are enabled through the clkc.
 
-As said earlier, I think that these definitions can be removed. We can 
-stick with raw numbers and just document that we are using the offset of 
-the coresponding bit in the register.
+Why? Juding by the diff that's not what the code currently does, so why
+not leave it as 0, and only set it where required as a work-around?
 
-> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
+Thans,
+Mark.
+
+> 
+> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
 > ---
->   .../dt-bindings/clk/at91/at91rm9200/clk-system.h   |   16 +++++++++++++++
->   .../dt-bindings/clk/at91/at91sam9261/clk-system.h  |   15 ++++++++++++++
->   include/dt-bindings/clk/at91/common/clk-system.h   |   21 ++++++++++++++++++++
->   3 files changed, 52 insertions(+)
->   create mode 100644 include/dt-bindings/clk/at91/at91rm9200/clk-system.h
->   create mode 100644 include/dt-bindings/clk/at91/at91sam9261/clk-system.h
->   create mode 100644 include/dt-bindings/clk/at91/common/clk-system.h
->
-> diff --git a/include/dt-bindings/clk/at91/at91rm9200/clk-system.h b/include/dt-bindings/clk/at91/at91rm9200/clk-system.h
-> new file mode 100644
-> index 0000000..43bccd5
-> --- /dev/null
-> +++ b/include/dt-bindings/clk/at91/at91rm9200/clk-system.h
-> @@ -0,0 +1,16 @@
-> +/*
-> + * This header provides constants for AT91RM9200 system clocks.
-> + *
-> + * The constants defined in this header are being used in dts.
-> + */
+>  .../devicetree/bindings/clock/zynq-7000.txt          |  4 ++++
+>  drivers/clk/zynq/clkc.c                              | 20 +++++++++++++++++---
+>  2 files changed, 21 insertions(+), 3 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/clock/zynq-7000.txt b/Documentation/devicetree/bindings/clock/zynq-7000.txt
+> index d99af878f5d7..11fdd146ec83 100644
+> --- a/Documentation/devicetree/bindings/clock/zynq-7000.txt
+> +++ b/Documentation/devicetree/bindings/clock/zynq-7000.txt
+> @@ -22,6 +22,10 @@ Required properties:
+>  Optional properties:
+>   - clocks : as described in the clock bindings
+>   - clock-names : as described in the clock bindings
+> + - fclk-enable : Bit mask to enable FCLKs in cases no proper CCF compatible
+> +		 driver is available. Bit [0..3] correspond to FCLK0..FCLK3. The
+> +		 corresponding FCLK will only be enabled if it is actually
+> +		 running at boot time. (default = 0xf)
+>  
+>  Clock inputs:
+>  The following strings are optional parameters to the 'clock-names' property in
+> diff --git a/drivers/clk/zynq/clkc.c b/drivers/clk/zynq/clkc.c
+> index 10772aa72e4e..a36fc0f47634 100644
+> --- a/drivers/clk/zynq/clkc.c
+> +++ b/drivers/clk/zynq/clkc.c
+> @@ -102,9 +102,10 @@ static const char *swdt_ext_clk_input_names[] __initdata = {"swdt_ext_clk"};
+>  
+>  static void __init zynq_clk_register_fclk(enum zynq_clk fclk,
+>  		const char *clk_name, void __iomem *fclk_ctrl_reg,
+> -		const char **parents)
+> +		const char **parents, int enable)
+>  {
+>  	struct clk *clk;
+> +	u32 enable_reg;
+>  	char *mux_name;
+>  	char *div0_name;
+>  	char *div1_name;
+> @@ -147,6 +148,12 @@ static void __init zynq_clk_register_fclk(enum zynq_clk fclk,
+>  	clks[fclk] = clk_register_gate(NULL, clk_name,
+>  			div1_name, CLK_SET_RATE_PARENT, fclk_gate_reg,
+>  			0, CLK_GATE_SET_TO_DISABLE, fclk_gate_lock);
+> +	enable_reg = readl(fclk_gate_reg) & 1;
+> +	if (enable & !enable_reg) {
+> +		if (clk_prepare_enable(clks[fclk]))
+> +			pr_warn("%s: FCLK%u enable failed\n", __func__,
+> +					fclk - fclk0);
+> +	}
+>  	kfree(mux_name);
+>  	kfree(div0_name);
+>  	kfree(div1_name);
+> @@ -213,6 +220,7 @@ static void __init zynq_clk_setup(struct device_node *np)
+>  	int ret;
+>  	struct clk *clk;
+>  	char *clk_name;
+> +	unsigned int fclk_enable;
+>  	const char *clk_output_name[clk_max];
+>  	const char *cpu_parents[4];
+>  	const char *periph_parents[4];
+> @@ -247,6 +255,10 @@ static void __init zynq_clk_setup(struct device_node *np)
+>  	ps_clk = clk_register_fixed_rate(NULL, "ps_clk", NULL, CLK_IS_ROOT,
+>  			tmp);
+>  
+> +	ret = of_property_read_u32(np, "fclk-enable", &fclk_enable);
+> +	if (ret)
+> +		fclk_enable = 0xf;
 > +
-> +#ifndef _DT_BINDINGS_CLK_AT91RM9200_SYSTEM_H
-> +#define _DT_BINDINGS_CLK_AT91RM9200_SYSTEM_H
-> +
-> +#include <dt-bindings/clk/at91/common/system-clk.h>
-> +
-> +#define AT91RM9200_UDP_SYS_CLK		1
-> +#define AT91RM9200_MCKUDP_SYS_CLK	2
-> +#define AT91RM9200_UHP_SYS_CLK		4
-> +
-> +#endif
-> diff --git a/include/dt-bindings/clk/at91/at91sam9261/clk-system.h b/include/dt-bindings/clk/at91/at91sam9261/clk-system.h
-> new file mode 100644
-> index 0000000..28a140a
-> --- /dev/null
-> +++ b/include/dt-bindings/clk/at91/at91sam9261/clk-system.h
-> @@ -0,0 +1,15 @@
-> +/*
-> + * This header provides constants for AT91SAM9261 system clocks.
-> + *
-> + * The constants defined in this header are being used in dts.
-> + */
-> +
-> +#ifndef _DT_BINDINGS_CLK_AT91SAM9261_SYSTEM_H
-> +#define _DT_BINDINGS_CLK_AT91SAM9261_SYSTEM_H
-> +
-> +#include <dt-bindings/clk/at91/common/system-clk.h>
-> +
-> +#define AT91SAM9261_HCK0_SYS_CLK	16
-> +#define AT91SAM9261_HCK1_SYS_CLK	17
-> +
-> +#endif
-> diff --git a/include/dt-bindings/clk/at91/common/clk-system.h b/include/dt-bindings/clk/at91/common/clk-system.h
-> new file mode 100644
-> index 0000000..c0fb124
-> --- /dev/null
-> +++ b/include/dt-bindings/clk/at91/common/clk-system.h
-> @@ -0,0 +1,21 @@
-> +/*
-> + * This header provides constants for AT91 system clocks.
-> + *
-> + * The constants defined in this header are being used in dts.
-> + */
-> +
-> +#ifndef _DT_BINDINGS_CLK_AT91_SYSTEM_H
-> +#define _DT_BINDINGS_CLK_AT91_SYSTEM_H
-> +
-> +#define AT91_PCK_SYS_CLK	0
-> +#define AT91_DDRCK_SYS_CLK	2
-> +#define AT91_LCDCK_SYS_CLK	3
-> +#define AT91_SMDCK_SYS_CLK	4
-> +#define AT91_UHP_SYS_CLK	6
-> +#define AT91_UDP_SYS_CLK	7
-> +
-> +#define AT91_PROG_SYS_CLK(id)	(8 + id)
-> +
-> +#define AT91_MAX_SYS_CLKS	32
-> +
-> +#endif
->
-
-
--- 
-Nicolas Ferre
+>  	/* PLLs */
+>  	clk = clk_register_zynq_pll("armpll_int", "ps_clk", SLCR_ARMPLL_CTRL,
+>  			SLCR_PLL_STATUS, 0, &armpll_lock);
+> @@ -340,10 +352,12 @@ static void __init zynq_clk_setup(struct device_node *np)
+>  	clk_prepare_enable(clks[dci]);
+>  
+>  	/* Peripheral clocks */
+> -	for (i = fclk0; i <= fclk3; i++)
+> +	for (i = fclk0; i <= fclk3; i++) {
+> +		int enable = !!(fclk_enable & BIT(i - fclk0));
+>  		zynq_clk_register_fclk(i, clk_output_name[i],
+>  				SLCR_FPGA0_CLK_CTRL + 0x10 * (i - fclk0),
+> -				periph_parents);
+> +				periph_parents, enable);
+> +	}
+>  
+>  	zynq_clk_register_periph_clk(lqspi, 0, clk_output_name[lqspi], NULL,
+>  			SLCR_LQSPI_CLK_CTRL, periph_parents, 0);
+> -- 
+> 1.8.4
+> 
+> 
