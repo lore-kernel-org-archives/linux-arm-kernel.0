@@ -1,43 +1,66 @@
-From: csmanjuvijay@gmail.com (Majunath Goudar)
-Date: Tue,  8 Oct 2013 16:02:15 +0530
-Subject: [PATCH] zsmalloc: Fix "map_vm_area" undefined reference errors.
-Message-ID: <1381228335-18213-1-git-send-email-csmanjuvijay@gmail.com>
+From: marex@denx.de (Marek Vasut)
+Date: Tue, 8 Oct 2013 12:33:36 +0200
+Subject: [PATCH 2/3] ARM: mxs: crypto: Add Freescale MXS DCP driver
+In-Reply-To: <20131008043631.GA18365@gondor.apana.org.au>
+References: <1380194306-5243-1-git-send-email-marex@denx.de>
+ <201310071748.27150.marex@denx.de>
+ <20131008043631.GA18365@gondor.apana.org.au>
+Message-ID: <201310081233.37136.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds a MMU dependency to configure the ZSMALLOC in
-drivers/staging/zsmalloc/Kconfig. Without this patch, build
-system can lead to build failure. This was observed during
-randconfig testing, in which ZSMALLOC was enabled w/o MMU being
-enabled. Following was the error:
+Hello Herbert,
 
-LD      vmlinux
-drivers/built-in.o: In function `__zs_map_object':
-drivers/staging/zsmalloc/zsmalloc-main.c:650: undefined reference to `map_vm_area'
-make: *** [vmlinux] Error 1
+> On Mon, Oct 07, 2013 at 05:48:26PM +0200, Marek Vasut wrote:
+> > Hello Christoph,
+> > 
+> > > Hello Marek,
+> > > 
+> > > > Marek Vasut <marex@denx.de> hat am 28. September 2013 um 05:35
+> > > > geschrieben: [...]
+> > > > 
+> > > > > > 3) What are those ugly new IOCTLs in the dcp.c driver?
+> > > > > 
+> > > > > When I firstly posted the driver in the mailinglist, there where
+> > > > > one person who actually used this interface (it was introduced in
+> > > > > Freescale's SDK) to use the OTP keys for crypto. As far as I have
+> > > > > seen, the crypto API does not support such keys (i.e. there seems
+> > > > > to be no way to tell a driver to use some kind of special keys -
+> > > > > which are not delivered by the user - via the API).
+> > > > > Therefore I added this miscdevice and adopted Freescale's
+> > > > > interface.
+> > > > 
+> > > > The keys are programmed into the OTP registers, correct? There is
+> > > > OCOTP d
+> > > >
+> > > >river
+> > > >for the MX23/MX28 OTP hardware. This is what should have been used
+> > > >then.
+> > > >
+> > > > NOTE: This IOCTL interface seems like quite an abusive way to allow
+> > > > userl
+> > > >
+> > > >and to
+> > > >access the crypto API in kernel. I understand this is used by some
+> > > >Freesc ale tool, but won't it be better to fix the Freescale tool
+> > > >instead ?
+> > > 
+> > > the IOCTL interface is used to AES encrypt a bootstream with the AES
+> > > key in OCOTP.
+> > > The idea is that only the DCP can read/access the key once it has been
+> > > programmed
+> > > into the OCOTP. If the crypto API has means to tell the DCP to use the
+> > > key from OCOTP, the tool from Freescale is a minor problem.
+> > 
+> > Ah right. I suspect the crypto API services shall not be exported into
+> > userland at all, yes ? So there has to be some kind of workaround here
+> > for this freescale tool, which is rather unfortunate.
+> 
+> These ioctls have to go.  I should have never let them through in
+> the first place.  Can someone cook up a patch to kill them please?
 
-Signed-off-by: Manjunath Goudar <csmanjuvijay@gmail.com>
-Cc: Nitin Gupta <ngupta@vflare.org>
-Cc: Seth Jennings <sjenning@linux.vnet.ibm.com>
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: Minchan Kim <minchan@kernel.org>
-Cc: Joerg Roedel <joro@8bytes.org>
-Cc: devel at driverdev.osuosl.org
-Cc: linux-kernel at vger.kernel.org
----
- drivers/staging/zsmalloc/Kconfig |    1 +
- 1 file changed, 1 insertion(+)
+I can do that. I wonder if we can't agree to nuke the in-tree driver altogether 
+instead and replace it by this one though. Does it not sound more reasonable?
 
-diff --git a/drivers/staging/zsmalloc/Kconfig b/drivers/staging/zsmalloc/Kconfig
-index 7fab032..0ae13cd 100644
---- a/drivers/staging/zsmalloc/Kconfig
-+++ b/drivers/staging/zsmalloc/Kconfig
-@@ -1,5 +1,6 @@
- config ZSMALLOC
- 	bool "Memory allocator for compressed pages"
-+	depends on MMU
- 	default n
- 	help
- 	  zsmalloc is a slab-based memory allocator designed to store
--- 
-1.7.9.5
+Best regards,
+Marek Vasut
