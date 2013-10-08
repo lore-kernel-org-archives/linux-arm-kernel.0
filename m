@@ -1,64 +1,66 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 8 Oct 2013 18:49:45 +0100
-Subject: [PATCH 2/2] ARM: include: asm: use 'int' instead of 'unsigned
- long' for normal register variables within atomic.h
-In-Reply-To: <5253EC8A.2030305@asianux.com>
-References: <20131002104158.GD28311@mudshark.cambridge.arm.com>
- <524C3981.20307@asianux.com> <524D416B.5090709@asianux.com>
- <20131003163200.GE7408@mudshark.cambridge.arm.com>
- <524E8FBC.2080200@asianux.com>
- <20131004153742.GR24303@mudshark.cambridge.arm.com>
- <20131004154208.GS24303@mudshark.cambridge.arm.com>
- <524F5566.4010204@asianux.com>
- <20131008103331.GE17148@mudshark.cambridge.arm.com>
- <5253EC8A.2030305@asianux.com>
-Message-ID: <20131008174945.GJ21189@mudshark.cambridge.arm.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Tue, 8 Oct 2013 18:51:42 +0100
+Subject: [PATCH 2/2] ARM: cci: driver need big endian fixes in asm code
+In-Reply-To: <1381207040-1623-3-git-send-email-victor.kamensky@linaro.org>
+References: <1381207040-1623-1-git-send-email-victor.kamensky@linaro.org>
+ <1381207040-1623-3-git-send-email-victor.kamensky@linaro.org>
+Message-ID: <20131008175136.GA3866@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 08, 2013 at 12:29:14PM +0100, Chen Gang wrote:
-> On 10/08/2013 06:33 PM, Will Deacon wrote:
-> > On Sat, Oct 05, 2013 at 12:55:18AM +0100, Chen Gang wrote:
-> >> Hmm... in my opinion, we need divide atomic_*_mask() into 32-bit and
-> >> 64-bit versions. We already have demands to only use 32-bit value to
-> >> express mask (can save size), and may have demands to use 64-bit too.
-> > 
-> > Right, but isn't this code only used by that s390 SCSI driver? Why do other
-> > architectures even need to bother implementing it?
-> > 
-> Hmm... for atomic_set_mask(), "drivers/gpu/drm/i915/i915_irq.c" also
-> uses it (it is about Intel Graphics).
+On Mon, Oct 07, 2013 at 09:37:20PM -0700, Victor Kamensky wrote:
+> cci_enable_port_for_self written in asm and it works with h/w
+> registers that are in little endian format. When run in big
+> endian mode it needs byte swap before/after it writes/reads
+> to/from such registers
 
-I don't think we care too much about the Intel graphics driver on ARM at the
-moment.
+Lorenzo should comment on this if he's not already seen it.
 
-> For some architectures (e.g. frv, mn10300, mr32r, blackfin, and of cause
-> s390), still use atomic_[set/clear]_mask().
-
-We don't care about those either.
-
-> And they are inline functions in atomic.h, individual kernel modules may
-> use them (which source code is not merged into kernel). Can we skip
-> these individual modules? (I guess we can, but need think of carefully).
-
-or those. If somebody starts complaining, then we can add things back.
-
-> >> And also, excuse me, I am not quite familiar with "exclusive monitor",
-> >> could you please provide more details about it?
-> > 
-> > You'll need to take a look at the ARM ARM, in particular the section about
-> > `Synchronisation and Semaphores'.
-> > 
 > 
-> Do you mean "ARM ARM" is a book name? (at least, I really need read more
-> things to familiar with ARM)
+> Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
+> ---
+>  drivers/bus/arm-cci.c | 6 ++++++
+>  1 file changed, 6 insertions(+)
+> 
+> diff --git a/drivers/bus/arm-cci.c b/drivers/bus/arm-cci.c
+> index 2009266..6db173e 100644
+> --- a/drivers/bus/arm-cci.c
+> +++ b/drivers/bus/arm-cci.c
+> @@ -281,6 +281,9 @@ asmlinkage void __naked cci_enable_port_for_self(void)
+>  	/* Enable the CCI port */
+>  "	ldr	r0, [r0, %[offsetof_port_phys]] \n"
+>  "	mov	r3, #"__stringify(CCI_ENABLE_REQ)" \n"
+> +#ifdef __ARMEB__
+> +"	rev	r3, r3 \n"
+> +#endif /* __ARMEB__ */
 
-Yes, the hilariouly titled "ARM Architecture Reference Manual". You can find
-it on arm.com, but you have to register:
+Hmmm, this is a bit ugly, but we can't easily use ARM_BE8() here.
 
-ARMv7: https://silver.arm.com/download/download.tm?pv=1299246
-ARMv8 (beta): https://silver.arm.com/download/download.tm?pv=1448511
+That would be more easily solved if this was a separate .S file...
 
-Enjoy!
+Maybe it's not worth it.
 
-Will
+Cheers
+---Dave
+
+>  "	str	r3, [r0, #"__stringify(CCI_PORT_CTRL)"] \n"
+>  
+>  	/* poll the status reg for completion */
+> @@ -288,6 +291,9 @@ asmlinkage void __naked cci_enable_port_for_self(void)
+>  "	ldr	r0, [r1] \n"
+>  "	ldr	r0, [r0, r1]		@ cci_ctrl_base \n"
+>  "4:	ldr	r1, [r0, #"__stringify(CCI_CTRL_STATUS)"] \n"
+> +#ifdef __ARMEB__
+> +"	rev	r1, r1 \n"
+> +#endif /* __ARMEB__ */
+>  "	tst	r1, #1 \n"
+>  "	bne	4b \n"
+>  
+> -- 
+> 1.8.1.4
+> 
+> 
+> _______________________________________________
+> linaro-kernel mailing list
+> linaro-kernel at lists.linaro.org
+> http://lists.linaro.org/mailman/listinfo/linaro-kernel
