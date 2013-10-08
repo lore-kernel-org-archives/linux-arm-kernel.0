@@ -1,51 +1,42 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 8 Oct 2013 10:00:15 +0100
-Subject: [PATCH RFC 1/2] ARM: imx6qdl: provide pinctrl configurations
- for DAT3 pull-down
-In-Reply-To: <20131008034048.GB7480@S2101-09.ap.freescale.net>
-References: <20131005112147.GX12758@n2100.arm.linux.org.uk>
- <E1VSPw9-0004Ug-BF@rmk-PC.arm.linux.org.uk>
- <20131007055340.GB3739@S2101-09.ap.freescale.net>
- <20131007180357.GS12758@n2100.arm.linux.org.uk>
- <20131008015426.GA7480@S2101-09.ap.freescale.net>
- <52537378.1020904@wwwdotorg.org>
- <20131008034048.GB7480@S2101-09.ap.freescale.net>
-Message-ID: <20131008090015.GC25034@n2100.arm.linux.org.uk>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Tue, 8 Oct 2013 11:19:13 +0200
+Subject: [PATCH 5/5] DRM: Armada: add support for drm tda19988 driver
+In-Reply-To: <CAF6AEGsqGYj7_tZdzrsmUxExs6wm838dYPFhBdc8wqVC6mTxmg@mail.gmail.com>
+References: <20131006220728.GG12758@n2100.arm.linux.org.uk>
+ <E1VSwYO-0000iT-CU@rmk-PC.arm.linux.org.uk>
+ <20131007111807.5e86ea6e@armhf>
+ <20131007094404.GI12758@n2100.arm.linux.org.uk>
+ <20131007124820.2189a4c3@armhf>
+ <20131007110902.GL12758@n2100.arm.linux.org.uk>
+ <CAF6AEGsqGYj7_tZdzrsmUxExs6wm838dYPFhBdc8wqVC6mTxmg@mail.gmail.com>
+Message-ID: <20131008111913.09bfe93e@armhf>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 08, 2013 at 11:40:51AM +0800, Shawn Guo wrote:
-> On Mon, Oct 07, 2013 at 08:52:40PM -0600, Stephen Warren wrote:
-> > >>> &usdhc1 {
-> > >>> 	pinctrl-names = "default";
-> > >>> 	pinctrl-0 = <&pinctrl_usdhc1_1 &pinctrl_usdhc1_1_dat3cd>;
-> > >>> 	...
-> > >>> 	status = "okay";
-> > >>> };
-> > >>
-> > >> Are you sure that this will always be the case?  This would assume that
-> > >> the pinctrl entries are always processed sequentially.
-> > > 
-> > > That will always be the case per my understanding.  Otherwise, I would
-> > > be so surprised.  Are you seeing any case that the entries are not
-> > > processed sequentially?
-> > 
-> > Given the way the Linux code currently works, I think that will
-> > currently happen in practice. However, there's nothing in the pinctrl DT
-> > binding documentation that guarantees (or even mentions) such semantics.
+On Mon, 7 Oct 2013 10:59:39 -0400
+Rob Clark <robdclark@gmail.com> wrote:
+
+> Jean-Fran?ois, just as an aside, I really don't think code that can be
+> shared, like tda998x, should encode a DT requirement.. there are
+> plenty of platforms that don't use DT (arm isn't everything, and last
+> I heard aarch64 was going to be ACPI).
 > 
-> Ah, that's Russell's point, I guess.  I think it makes perfect sense to
-> make this clear in the binding doc, as this "overwrite mechanism" can be
-> very helpful.  I will send a patch for it.
+> Beyond that, it is a driver decision whether or not to support only-DT
+> or DT + other.. and as long as there is a common board which can use
+> the driver but which is not DT, there is probably a compelling reason
+> to still support the non-DT case.
 
-Exactly - otherwise we're just relying on implementation details.
-There's nothing at present which mandates starting at the first entry
-and working through sequentially to the last entry, which means another
-implementation can choose to operate in the opposite order.  If it does,
-what you're suggesting won't work so well.
+Rob,
 
-However, there's another point to consider.  In cases like this, we will
-cause a glitch on the pin.  When we process the initial set, we will set
-the pull-up high, and then later set it low.  That may not be a problem
-in this case, but that's not to say it won't be in every case, and that's
-something which also needs to be considered.
+The Cubox is an open platform, and I use it just like a desktop PC.
+When its required drivers will be in the mainline, I will do the same
+as I do with PCs: I will not recompile a specific kernel each time
+there are kernel bugs or security issues. Instead, I will just upgrade
+my system from my distributor (Debian), and, in the packages, there
+will be a generic mvebu kernel as there is already one for Marvell
+Armada 370/xp, Freescale iMX5x/iMX6 (linux-image-3.10-3-armmp).
+But, for that, all the Cubox specific stuff must be described in a DT.
+
+-- 
+Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
+Jef		|		http://moinejf.free.fr/
