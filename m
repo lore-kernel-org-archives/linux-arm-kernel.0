@@ -1,106 +1,68 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 8 Oct 2013 16:28:12 +0100
-Subject: [PATCH V3] clk: palmas: add clock driver for palmas
-In-Reply-To: <5254193A.70104@nvidia.com>
-References: <1381238480-18852-1-git-send-email-ldewangan@nvidia.com>
- <525408B3.1000107@ti.com> <5254193A.70104@nvidia.com>
-Message-ID: <20131008152812.GA4981@e106331-lin.cambridge.arm.com>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Tue, 8 Oct 2013 17:34:18 +0200
+Subject: [PATCH 5/5] DRM: Armada: add support for drm tda19988 driver
+In-Reply-To: <20131008094939.GD25034@n2100.arm.linux.org.uk>
+References: <20131006220728.GG12758@n2100.arm.linux.org.uk>
+ <E1VSwYO-0000iT-CU@rmk-PC.arm.linux.org.uk>
+ <20131007111807.5e86ea6e@armhf>
+ <20131007094404.GI12758@n2100.arm.linux.org.uk>
+ <20131007124820.2189a4c3@armhf>
+ <20131007110902.GL12758@n2100.arm.linux.org.uk>
+ <CAF6AEGsqGYj7_tZdzrsmUxExs6wm838dYPFhBdc8wqVC6mTxmg@mail.gmail.com>
+ <20131008111913.09bfe93e@armhf>
+ <20131008094939.GD25034@n2100.arm.linux.org.uk>
+Message-ID: <20131008173418.0fc21d60@armhf>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 08, 2013 at 03:39:54PM +0100, Laxman Dewangan wrote:
-> Thanks Nishanth for review.
+On Tue, 8 Oct 2013 10:49:39 +0100
+Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+
+> On Tue, Oct 08, 2013 at 11:19:13AM +0200, Jean-Francois Moine wrote:
+> > The Cubox is an open platform, and I use it just like a desktop PC.
+> > When its required drivers will be in the mainline, I will do the same
+> > as I do with PCs: I will not recompile a specific kernel each time
+> > there are kernel bugs or security issues. Instead, I will just upgrade
+> > my system from my distributor (Debian), and, in the packages, there
+> > will be a generic mvebu kernel as there is already one for Marvell
+> > Armada 370/xp, Freescale iMX5x/iMX6 (linux-image-3.10-3-armmp).
+> > But, for that, all the Cubox specific stuff must be described in a DT.
 > 
-> On Tuesday 08 October 2013 06:59 PM, Nishanth Menon wrote:
-> > On 10/08/2013 08:21 AM, Laxman Dewangan wrote:
-> >> Palmas devices has two clock output CLK32K_KG and CLK32K_KG_AUDIO
-> > not all palmas devices have 2 clocks - example: tps659038
+> Which scenario is better:
 > 
-> This is for generic palmas and I have seen it for TPS65913, TPS65914, 
-> TPS80036. If the generic one is not compatible then it need to add  
-> device specific and at that time, it is require to update the binding 
-> document accordingly.
-
-We've just been given an example of where it's not compatible.
-
+> 1. To have something in mainline which is capable of driving the hardware,
+>    but may need some additional work to make it useful for DT based setups.
 > 
-> >           |    7 +
-> >   drivers/clk/Makefile                               |    1 +
-> >   drivers/clk/clk-palmas.c                           |  340 ++++++++++++++++++++
-> >
-> > http://www.spinics.net/lists/devicetree/msg04855.html
-> > Do we do 2 patches now? one seperate for binding and implementation?
-> > What is our current preference now a days?
+> or
 > 
-> Currently it is implementation + binding doc in one patch.
-
-I believe the general consensus is that separate DT patches are
-preferred.
-
+> 2. To have nothing.
 > 
-> >
-> >>   Palmas device has two clock output pins for 32KHz, KG and KG_AUDIO.
-> >> +
-> >> +This binding uses the common clock binding ./clock-bindings.txt.
-> > proper link would be to provide
-> > Documentation/devicetree/bindings/clock/clock-bindings.txt ?
+> Now, you may prefer to have nothing, but personally, I prefer there to be
+> forward progress.  Forward progress means getting some kind of DRM driver
+> into mainline.  Yes, it may not work with DT setups yet, but - as per
+> the discussions that have happened _endlessly_ on this topic, it's
+> something that can be resolved at a later date.
 > 
-> Hmm, other patch I got feedback from DT maintainers to do not use the 
-> absolute path as document directory may change
-
-I'd not seen this, but I don't have a strong preference either way. This
-document will go under Documentation/devicetree/bindings/clock, so a
-relative path seems Ok.
-
+> We _still_ haven't worked out how to properly deal with the TDA998x
+> driver (or indeed any DRM based outputs) in a DT based setup, and all
+> the time that problem exists, it won't be possible to write a proper
+> stable DT binding for this.
 > 
-> >> +
-> >> +Clock 32KHz KG is output 0 of the driver and clock 32KHz is output 1.
-> >> +
-> >> +Required properties:
-> >> +- compatible : shall be "ti,palmas-clk".
-> > To handle variants of Palmas chips in production, you'd want to be
-> > specific here clk32k_kg and clk32k_kg_audio.
-> 
-> The compatible is the device sub module level, not the clock level. Same 
-> thing we are following on regulators.
+> So please, get off your hobby horse about this and allow us to make some
+> modicum of progress.
 
-Yes, we don't need a separate compatible string for each clock within a
-block providing those clocks.
+You forgot:
 
-> 
-> 
-> >
-> >> +
-> >> +     Optional subnode properties:
-> >> +     ti,clock-boot-enable: Enable clock at the time of booting.
-> > Dumb question: Why is this needed? should'nt relevant drivers do a
-> > clk_get to enable the relevant clocks?
-> 
-> If some board needs this clock to be always available for rest of system 
-> to work without any specific driver then this flag is useful.
+3. To have all patches ready for submission and have a working DT driven
+   Cubox kernel.
 
-Do we _actually_ need this right now, or is this hypothetical?
+I will submit a patch to add DT to the tda998x driver as soon as I have
+checked the new audio properties we talked about yesterday.
 
-If we don't need it now, remove it. If you think we need it know, please
-describe exactly why (i.e. what device needs the clock to work, why does
-this affect the rest of the board if we don't ahve a driver for that
-device, why don't we just write a driver for that device).
+Normally, this should have no impact on your Armada drm driver, and,
+yes, I will add DT to your driver as soon as it will be accepted
+(sorry to not ack it now: I had no time yet to have a look at it).
 
-> 
-> 
-> >
-> >> +     ti,external-sleep-control: The clock is enable/disabled by state
-> >> +             of external enable input pins ENABLE, ENABLE2 and NSLEEP.
-> >> +             The valid value for the external pins are:
-> >> +                     1 for ENABLE1
-> >> +                     2 for ENABLE2
-> >> +                     3 for NSLEEP.
-
-I asked this on the last version (before having noticed this one). What
-actually drives those pins to control the clock(s)?
-
-Is this for setting the clock to be controlled by the external pin, or
-is the clock hard-wired to a particular pin?
-
-Thanks,
-Mark.
+-- 
+Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
+Jef		|		http://moinejf.free.fr/
