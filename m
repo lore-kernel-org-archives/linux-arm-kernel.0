@@ -1,32 +1,76 @@
-From: pwalmsley@nvidia.com (Paul Walmsley)
-Date: Mon, 7 Oct 2013 23:00:56 -0700
-Subject: [PATCH stable] ARM: tegra: unify Tegra's Kconfig a bit more
-In-Reply-To: <52525247.9060609@nvidia.com>
-References: <1380917411-25869-1-git-send-email-swarren@wwwdotorg.org>
- <20131005233833.GA18223@kroah.com> <52525247.9060609@nvidia.com>
-Message-ID: <52539F98.2030307@nvidia.com>
+From: arno@natisbad.org (Arnaud Ebalard)
+Date: Tue, 08 Oct 2013 08:10:39 +0200
+Subject: [BUG,REGRESSION] SATA regression on 12.0-rc4 kernel
+References: <87vc1ahyft.fsf@natisbad.org>
+ <20131007125943.GA1332@titan.lakedaemon.net>
+ <87bo303nfe.fsf@natisbad.org> <52537015.6040200@gmail.com>
+Message-ID: <87y564waw0.fsf@natisbad.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Robert,
 
-On 10/06/2013 11:18 PM, Paul Walmsley wrote:
-> Hi Greg,
+Robert Hancock <hancockrwd@gmail.com> writes:
+
+> On 10/07/2013 01:12 PM, Arnaud Ebalard wrote:
+>> Hi guys,
+>>
+>> yesterday, I reported on arm kernel mailing list what looked like a sata
+>> regression on my platform (Marvell Armada 370-based NETGEAR ReadyNAS
+>> 102). I initially thought this was an ARM-related issue. My initial
+>> email, provided below, contains various details on the platform and the
+>> error encountered.
+>>
+>> Today, before starting a painful git bisect, I decided to git log
+>> sata_mv.c code and then more generally drivers/ata to quickly end up on
+>> commit ed36911c747c (libata: Add support for SEND/RECEIVE FPDMA QUEUED)
+>> against which I got suspicious after looking again at the errors I had:
+>>
+>> [  417.288155] ata1.00: exception Emask 0x0 SAct 0x1fff6001 SErr 0x0 action 0x6 frozen
+>> [  417.295838] ata1.00: failed command: WRITE FPDMA QUEUED
+>> [  417.301097] ata1.00: cmd 61/48:00:80:ad:0b/00:00:0c:00:00/40 tag 0 ncq 36864 out
+>> [  417.315896] ata1.00: status: { DRDY }
+>> [  417.319570] ata1.00: failed command: WRITE FPDMA QUEUED
+>> [  417.324814] ata1.00: cmd 61/08:68:70:a1:87/00:00:0d:00:00/40 tag 13 ncq 4096 out
+>> [  417.339619] ata1.00: status: { DRDY }
+>> [  417.343288] ata1.00: failed command: WRITE FPDMA QUEUED
+>> [  417.348536] ata1.00: cmd 61/08:70:28:a2:87/00:00:0d:00:00/40 tag 14 ncq 4096 out
+>> [  417.363341] ata1.00: status: { DRDY }
+>> [  417.367010] ata1.00: failed command: WRITE FPDMA QUEUED
+>> [  417.372257] ata1.00: cmd 61/08:80:80:a3:87/00:00:0d:00:00/40 tag 16 ncq 4096 out
+>> [  417.387061] ata1.00: status: { DRDY }
+>> [  417.390733] ata1.00: failed command: WRITE FPDMA QUEUED
+>> [  417.395977] ata1.00: cmd 61/08:88:58:a1:c7/00:00:0d:00:00/40 tag 17 ncq 4096 out
+>> [  417.410782] ata1.00: status: { DRDY }
+>>
+>> Reverting both 87fb6c31b9 (libata: Add support for queued DSM TRIM) and
+>> ed36911c74 (libata: Add support for SEND/RECEIVE FPDMA QUEUED) makes the
+>> problem disappear. Note: reverting 87fb6c31b9 is not enough and I cannot
+>> compile the kernel with only the latter reverted.
+>>
+>> If you need more info on the platform or want me to test something some
+>> fix, do not hesitate.
 >
-> On 10/05/2013 04:38 PM, Greg KH wrote:
->> On Fri, Oct 04, 2013 at 02:10:11PM -0600, Stephen Warren wrote:
->>> [auto-builders for 3.11.x are failing due to this]
->> What autobuilders?  I haven't heard of this before.
-> There's an experimental system here that automatically builds and
-> test-boots -stable kernels on some Tegra platforms.
+> I assume that it consistently fails on a non-working kernel and
+> consistently works with those patches reverted? Given that both of
+> those patches seem to only be touching SSDs with NCQ trim support, it
+> seems odd they would be breaking a normal hard drive, but maybe there
+> is some unexpected side effect..
 
-Well, here's a public link for it:
+With two different disks (same model though, i.e. 250GB 3.5" WD blue), it
+consistently works on a 3.11.4 and consistently fails on 3.12-rc3 and
+3.12-rc4 (not tested others 3.12-rc). The problem is easy to reproduce,
+i.e. I just need to perform some disk operations. With the two commits
+reverted from 3.12-rc4, I can consistently do a "find / -exec sha256sum
+'{}' \;" w/o anything happening.
 
-http://nvt.pwsan.com/pub/linux-stable/testlogs/
+What I do not understand is why the log report failed FPDMA commands if
+the feature is supposed to be SSD-related (looking only at commit
+messages: 87fb6c31b9 seems SSD-related, ed36911c74 does not). Is it
+possible that the feature detection is what is causing the issue? Or
+that the hardware report support w/o having? I can test with a different
+disk if you think it would help.
 
-So far it's seeded with v3.11.[34].  It should update automatically as 
-new releases come out.  So far the tests are quite basic (build + boot 
-to minimal userspace).  Please let Stephen and I know if you have any 
-comments or suggestions.
+Cheers,
 
-
-- Paul
+a+
