@@ -1,47 +1,42 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Tue, 8 Oct 2013 19:41:19 +0200
-Subject: [PATCH v2 1/2] ARM: Dove: Add the audio devices in DT
-Message-ID: <20131008194119.0cebbe26@armhf>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue,  8 Oct 2013 18:38:12 +0100
+Subject: [PATCH v2 0/2] KVM: Yield CPU when vcpu executes a WFE
+Message-ID: <1381253894-18114-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the nodes to instantiate the audio devices of the Dove
-boards.
+This is a respin of a patch I posted a long while ago, this time with
+numbers that I hope to be convincing enough.
 
-Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
----
- arch/arm/boot/dts/dove.dtsi | 18 ++++++++++++++++++
- 1 file changed, 18 insertions(+)
+The basic idea is that spinning on WFE in a guest is a waste of
+resource, and that we're better of running another vcpu instead. This
+specially shows when the system is oversubscribed. The guest vcpus can
+be seen spinning, waiting for a lock to be released while the lock
+holder is nowhere near a physical CPU.
 
-diff --git a/arch/arm/boot/dts/dove.dtsi b/arch/arm/boot/dts/dove.dtsi
-index cc27916..e177e66 100644
---- a/arch/arm/boot/dts/dove.dtsi
-+++ b/arch/arm/boot/dts/dove.dtsi
-@@ -505,5 +505,23 @@
- 				phy-handle = <&ethphy>;
- 			};
- 		};
-+
-+		audio0: audio-controller at b0000 {
-+			compatible = "marvell,dove-audio";
-+			reg = <0xb0000 0x2210>;
-+			interrupts = <19>, <20>;
-+			clocks = <&gate_clk 12>;
-+			clock-names = "internal";
-+			status = "disabled";
-+		};
-+
-+		audio1: audio-controller at b4000 {
-+			compatible = "marvell,dove-audio";
-+			reg = <0xb4000 0x2210>;
-+			interrupts = <21>, <22>;
-+			clocks = <&gate_clk 13>;
-+			clock-names = "internal";
-+			status = "disabled";
-+		};
- 	};
- };
+This patch series just enables WFE trapping on both ARM and arm64, and
+calls kvm_vcpu_on_spin(). This is enough to boost other vcpus, and
+dramatically reduce the overhead.
+
+Branch available at:
+git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git kvm-arm64/wfe-trap
+
+Changes from v1:
+- Added CONFIG_HAVE_KVM_CPU_RELAX_INTERCEPT, as it seems to give
+  slightly better results (Thanks to Raghavendra K T)
+- Updated commit message with results of 8x configuration
+
+Marc Zyngier (2):
+  ARM: KVM: Yield CPU when vcpu executes a WFE
+  arm64: KVM: Yield CPU when vcpu executes a WFE
+
+ arch/arm/include/asm/kvm_arm.h   |  4 +++-
+ arch/arm/kvm/Kconfig             |  1 +
+ arch/arm/kvm/handle_exit.c       |  6 +++++-
+ arch/arm64/include/asm/kvm_arm.h |  8 ++++++--
+ arch/arm64/kvm/Kconfig           |  1 +
+ arch/arm64/kvm/handle_exit.c     | 18 +++++++++++++-----
+ 6 files changed, 29 insertions(+), 9 deletions(-)
 
 -- 
-Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
-Jef		|		http://moinejf.free.fr/
+1.8.2.3
