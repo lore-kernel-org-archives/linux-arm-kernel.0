@@ -1,98 +1,40 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Tue, 08 Oct 2013 10:17:18 +0200
-Subject: [PATCH v7 1/5] ARM: add basic support for Trusted Foundations
-In-Reply-To: <1380904635-18113-2-git-send-email-acourbot@nvidia.com>
-References: <1380904635-18113-1-git-send-email-acourbot@nvidia.com>
- <1380904635-18113-2-git-send-email-acourbot@nvidia.com>
-Message-ID: <5253BF8E.4050802@monstr.eu>
+From: simon.pe.barth@gmail.com (Simon Barth)
+Date: Tue, 08 Oct 2013 10:50:33 +0200
+Subject: [PATCH] ARM: mach-omap2: board-generic: fix undefined symbol
+Message-ID: <5253C759.5020406@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Since dra7 reuses the  function 'omap5_realtime_timer_init' in
+arch/arm/mach-omap2/board-generic.c as timer init function, it has to be
+built for this SoC as well.
 
-On 10/04/2013 06:37 PM, Alexandre Courbot wrote:
-> Trusted Foundations is a TrustZone-based secure monitor for ARM that
-> can be invoked using the same SMC-based API on all supported
-> platforms. This patch adds initial basic support for Trusted
-> Foundations using the ARM firmware API. Current features are limited
-> to the ability to boot secondary processors.
-> 
-> Note: The API followed by Trusted Foundations does *not* follow the SMC
-> calling conventions. It has nothing to do with PSCI neither and is only
-> relevant to devices that use Trusted Foundations (like most Tegra-based
-> retail devices).
-> 
-> Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
-> Reviewed-by: Tomasz Figa <t.figa@samsung.com>
-> Reviewed-by: Stephen Warren <swarren@nvidia.com>
-> ---
->  .../arm/firmware/tl,trusted-foundations.txt        | 17 +++++
->  .../devicetree/bindings/vendor-prefixes.txt        |  1 +
->  arch/arm/Kconfig                                   |  2 +
->  arch/arm/Makefile                                  |  1 +
->  arch/arm/firmware/Kconfig                          | 28 ++++++++
->  arch/arm/firmware/Makefile                         |  1 +
->  arch/arm/firmware/trusted_foundations.c            | 77 ++++++++++++++++++++++
->  arch/arm/include/asm/trusted_foundations.h         | 64 ++++++++++++++++++
->  8 files changed, 191 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/arm/firmware/tl,trusted-foundations.txt
->  create mode 100644 arch/arm/firmware/Kconfig
->  create mode 100644 arch/arm/firmware/Makefile
->  create mode 100644 arch/arm/firmware/trusted_foundations.c
->  create mode 100644 arch/arm/include/asm/trusted_foundations.h
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/firmware/tl,trusted-foundations.txt b/Documentation/devicetree/bindings/arm/firmware/tl,trusted-foundations.txt
-> new file mode 100644
-> index 0000000..3954bbd
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/firmware/tl,trusted-foundations.txt
-> @@ -0,0 +1,17 @@
-> +Trusted Foundations
-> +
-> +Boards that use the Trusted Foundations secure monitor can signal its
-> +presence by declaring a node compatible with "tl,trusted-foundations"
-> +under the root node.
-> +
-> +Required properties:
-> +- compatible : "tl,trusted-foundations"
-> +- version-major : major version number of Trusted Foundations firmware
-> +- version-minor: minor version number of Trusted Foundations firmware
-> +
-> +Example:
-> +	firmware {
-> +		compatible = "tl,trusted-foundations";
-> +		version-major = <2>;
-> +		version-minor = <8>;
-> +	};
+Signed-off-by: Simon Barth <Simon.Pe.Barth@gmail.com>
+---
+ arch/arm/mach-omap2/timer.c |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-This is just another example how to add sw description to dts.
-I have briefly looked at tegra20.dtsi and there are IPs like timer, intc, etc
-which are in the DTS without any bus.
+diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
+index fa74a06..ead48fa 100644
+--- a/arch/arm/mach-omap2/timer.c
++++ b/arch/arm/mach-omap2/timer.c
+@@ -628,7 +628,7 @@ void __init omap4_local_timer_init(void)
+ #endif /* CONFIG_HAVE_ARM_TWD */
+ #endif /* CONFIG_ARCH_OMAP4 */
 
-Add this firmware node to the root is just +1 case to this mess
-but IMHO will be good to have specific DT part which will be used for
-this sw setting which are coming to DTS all the time.
+-#ifdef CONFIG_SOC_OMAP5
++#if defined(CONFIG_SOC_OMAP5) || defined(CONFIG_SOC_DRA7XX)
+ void __init omap5_realtime_timer_init(void)
+ {
+ 	omap4_sync32k_timer_init();
+@@ -636,7 +636,7 @@ void __init omap5_realtime_timer_init(void)
 
-Grant, Rob: Where is the proper location for these type of description?
+ 	clocksource_of_init();
+ }
+-#endif /* CONFIG_SOC_OMAP5 */
++#endif /* CONFIG_SOC_OMAP5 || CONFIG_SOC_DRA7XX */
 
-Thanks,
-Michal
-
-
-
-
+ /**
+  * omap_timer_init - build and register timer device with an
 -- 
-Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
-Maintainer of Linux kernel - Xilinx Zynq ARM architecture
-Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 263 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131008/7d9a9ae7/attachment-0001.sig>
+1.7.9.5
