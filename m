@@ -1,71 +1,69 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Tue, 8 Oct 2013 09:05:23 -0400
-Subject: [PATCH v3 3/3] clk: keystone: Build Keystone clock drivers
-In-Reply-To: <20131008012859.7445.26447@quantum>
-References: <1380158295-30629-1-git-send-email-santosh.shilimkar@ti.com>
- <1380158295-30629-4-git-send-email-santosh.shilimkar@ti.com>
- <20131008012859.7445.26447@quantum>
-Message-ID: <52540313.1040205@ti.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 08 Oct 2013 08:07:20 -0500
+Subject: [PATCH] VEXPRESS: Fix VEXPRESS implicit declarations dependence
+ errors.
+In-Reply-To: <1381228895-24814-1-git-send-email-csmanjuvijay@gmail.com>
+References: <1381228895-24814-1-git-send-email-csmanjuvijay@gmail.com>
+Message-ID: <52540388.8090709@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 07 October 2013 09:28 PM, Mike Turquette wrote:
-> Quoting Santosh Shilimkar (2013-09-25 18:18:15)
->> Now build the keystone common clock drivers. The build is made
->> conditional based on COMMON_CLK_KEYSTONE
->>
->> Cc: Mike Turquette <mturquette@linaro.org>
->>
->> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
->> ---
->>  drivers/clk/Kconfig           |    7 +++++++
->>  drivers/clk/Makefile          |    1 +
->>  drivers/clk/keystone/Makefile |    1 +
->>  3 files changed, 9 insertions(+)
->>  create mode 100644 drivers/clk/keystone/Makefile
->>
->> diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
->> index 279407a..10f85cc 100644
->> --- a/drivers/clk/Kconfig
->> +++ b/drivers/clk/Kconfig
->> @@ -93,6 +93,13 @@ config CLK_PPC_CORENET
->>           This adds the clock driver support for Freescale PowerPC corenet
->>           platforms using common clock framework.
->>  
->> +config COMMON_CLK_KEYSTONE
->> +       tristate "Clock drivers for Keystone based SOCs"
->> +       depends on ARCH_KEYSTONE && OF
->> +       ---help---
->> +          Supports clock drivers for Keystone based SOCs. These SOCs have local
->> +         a power sleep control module that gate the clock to the IPs and PLLs.
->> +
->>  endmenu
->>  
->>  source "drivers/clk/mvebu/Kconfig"
->> diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
->> index 7b11106..2a44d533 100644
->> --- a/drivers/clk/Makefile
->> +++ b/drivers/clk/Makefile
->> @@ -32,6 +32,7 @@ obj-$(CONFIG_ARCH_VT8500)     += clk-vt8500.o
->>  obj-$(CONFIG_ARCH_ZYNQ)                += zynq/
->>  obj-$(CONFIG_ARCH_TEGRA)       += tegra/
->>  obj-$(CONFIG_PLAT_SAMSUNG)     += samsung/
->> +obj-$(CONFIG_COMMON_CLK_KEYSTONE)      += keystone/
-> 
-> Thanks for respinning these patches Santosh. They look good and I've
-> taken them into clk-next for 3.13.
-> 
-Great.
+On 10/08/2013 05:41 AM, Majunath Goudar wrote:
+> This patch adds a of_find_node_by_phandle() and of_get_next_parent()
+> function declaration dependence on"#ifdef CONFIG_OF" in "include/linux/of.h"
+> else part return inline dummy implementations (returning NULL). Without
+> this patch,build system can lead to issues. This was discovered during
+> randconfig testing,in which VEXPRESS_CONFIG was enabled w/o CONFIG_OF
+> being enabled,leading to the following error:
 
-> My only question: why CONFIG_COMMON_CLK_KEYSTONE and not just
-> CONFIG_ARCH_KEYSTONE above? This is not a blocking issue and can be
-> revisited later.
+What is blocking making VExpress DT only?
+
+The subject should reflect the subsystem you are changing and the
+description is missing spaces at a minimum.
+
+Rob
+
 > 
-The clock Kconfig had few arch using directly ARCH defines as few creating
-arch CCF. I gone ahead with CCF bunch. Probably we can just make that
-consistent for all other arch in future as you said.
-
-Thanks a lot Mike.
-
-Regards,
-Santosh
+> CC      drivers/mfd/vexpress-config.o
+> drivers/mfd/vexpress-config.c: In function ?__vexpress_config_func_get?:
+> drivers/mfd/vexpress-config.c:117:4: error: implicit declaration of function
+> ?of_find_node_by_phandle? [-Werror=implicit-function-declaration]
+>     bridge_node = of_find_node_by_phandle(
+>     ^
+> drivers/mfd/vexpress-config.c:117:16: warning: assignment makes pointer from
+> integer without a cast [enabled by default]
+>     bridge_node = of_find_node_by_phandle(
+> 
+> Signed-off-by: Manjunath Goudar <csmanjuvijay@gmail.com>
+> Cc: Grant Likely <grant.likely@linaro.org>
+> Cc: Rob Herring <rob.herring@calxeda.com>
+> Cc: Pawel Moll <pawel.moll@arm.com>
+> Cc: Samuel Ortiz <sameo@linux.intel.com>
+> Cc: Lee Jones <lee.jones@linaro.org>
+> Cc: devicetree at vger.kernel.org
+> Cc: linux-kernel at vger.kernel.org
+> ---
+>  include/linux/of.h |    9 +++++++++
+>  1 file changed, 9 insertions(+)
+> 
+> diff --git a/include/linux/of.h b/include/linux/of.h
+> index f95aee3..968787d 100644
+> --- a/include/linux/of.h
+> +++ b/include/linux/of.h
+> @@ -340,6 +340,15 @@ int of_device_is_stdout_path(struct device_node *dn);
+>  
+>  #else /* CONFIG_OF */
+>  
+> +static inline struct device_node *of_find_node_by_phandle(phandle handle)
+> +{
+> +	return NULL;
+> +}
+> +static inline struct device_node *of_get_next_parent(struct device_node *node)
+> +{
+> +	return NULL;
+> +}
+> +
+>  static inline const char* of_node_full_name(struct device_node *np)
+>  {
+>  	return "<no-node>";
+> 
