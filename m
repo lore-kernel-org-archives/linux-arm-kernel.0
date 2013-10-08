@@ -1,68 +1,33 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 8 Oct 2013 16:57:23 +0200
-Subject: [PATCH] ARM: davinci: convert to clockevents_config_and_register
-In-Reply-To: <1380060159-12008-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1380060159-12008-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <20131008145723.GQ10079@pengutronix.de>
+From: raghavendra.kt@linux.vnet.ibm.com (Raghavendra K T)
+Date: Tue, 08 Oct 2013 20:32:59 +0530
+Subject: [PATCH 1/2] ARM: KVM: Yield CPU when vcpu executes a WFE
+In-Reply-To: <5253FDDD.6050008@arm.com>
+References: <1381160430-11790-1-git-send-email-marc.zyngier@arm.com>
+ <1381160430-11790-2-git-send-email-marc.zyngier@arm.com>
+ <CAC4Lta14xZNnEUXxZiaF4=PQQTjq4efjsNDAK2oBH4-Uqh_d0A@mail.gmail.com>
+ <5253FDDD.6050008@arm.com>
+Message-ID: <52541EA3.7010403@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+[...]
+>>> +               kvm_vcpu_on_spin(vcpu);
+>>
+>> Could you also enable CONFIG_HAVE_KVM_CPU_RELAX_INTERCEPT for arm and
+>> check if ple handler logic helps further?
+>> we would ideally get one more optimization folded into ple handler if
+>> you enable that.
+>
+> Just gave it a go, and the results are slightly (but consistently)
+> worse. Over 10 runs:
+>
+> Without RELAX_INTERCEPT: Average run 3.3623s
+> With RELAX_INTERCEPT: Average run 3.4226s
+>
+> Not massive, but still noticeable. Any clue?
 
-On Wed, Sep 25, 2013 at 12:02:39AM +0200, Uwe Kleine-K?nig wrote:
-> clockevents_config_and_register is superior compared to setting
-> shift/mult and {min,max}_delta_ns by hand.
-> 
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+Is it  a 4x overcommit? Probably we would have hit the code
+overhead if it were small guests.
 
-> ---
-> Hello,
-> 
-> I wonder where the 50 us limit comes from. This is not a hardware limit,
-> is it?
-ping; I didn't get any feedback on this yet, also it's not in next.
-
-Best regards
-Uwe
-
->  arch/arm/mach-davinci/time.c | 10 +++-------
->  1 file changed, 3 insertions(+), 7 deletions(-)
-> 
-> diff --git a/arch/arm/mach-davinci/time.c b/arch/arm/mach-davinci/time.c
-> index 7a55b5c..627bf8b 100644
-> --- a/arch/arm/mach-davinci/time.c
-> +++ b/arch/arm/mach-davinci/time.c
-> @@ -331,7 +331,6 @@ static void davinci_set_mode(enum clock_event_mode mode,
->  
->  static struct clock_event_device clockevent_davinci = {
->  	.features       = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
-> -	.shift		= 32,
->  	.set_next_event	= davinci_set_next_event,
->  	.set_mode	= davinci_set_mode,
->  };
-> @@ -397,14 +396,11 @@ void __init davinci_timer_init(void)
->  
->  	/* setup clockevent */
->  	clockevent_davinci.name = id_to_name[timers[TID_CLOCKEVENT].id];
-> -	clockevent_davinci.mult = div_sc(davinci_clock_tick_rate, NSEC_PER_SEC,
-> -					 clockevent_davinci.shift);
-> -	clockevent_davinci.max_delta_ns =
-> -		clockevent_delta2ns(0xfffffffe, &clockevent_davinci);
-> -	clockevent_davinci.min_delta_ns = 50000; /* 50 usec */
->  
->  	clockevent_davinci.cpumask = cpumask_of(0);
-> -	clockevents_register_device(&clockevent_davinci);
-> +	/* min tick corresponds to 50 usec assuming a 24 MHz clock */
-> +	clockevents_config_and_register(&clockevent_davinci,
-> +		davinci_clock_tick_rate, 1200, 0xfffffffe);
->  
->  	for (i=0; i< ARRAY_SIZE(timers); i++)
->  		timer32_config(&timers[i]);
-> -- 
-> 1.8.4.rc3
-> 
-> 
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+RELAX_INTERCEPT is worth enabling for large guests with
+overcommits.
