@@ -1,47 +1,140 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 8 Oct 2013 13:57:48 -0400 (EDT)
-Subject: [PATCH 2/2] ARM: cci: driver need big endian fixes in asm code
-In-Reply-To: <20131008175136.GA3866@localhost.localdomain>
-References: <1381207040-1623-1-git-send-email-victor.kamensky@linaro.org>
- <1381207040-1623-3-git-send-email-victor.kamensky@linaro.org>
- <20131008175136.GA3866@localhost.localdomain>
-Message-ID: <alpine.LFD.2.03.1310081356280.3023@syhkavp.arg>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 8 Oct 2013 10:58:19 -0700
+Subject: [PATCH V3] ARM: OMAP3: Fix hardware detection for omap3630
+ when booted with device tree
+In-Reply-To: <5253F3D6.5060403@ti.com>
+References: <20131007192009.GA8949@atomide.com>
+ <1381178629-13488-1-git-send-email-nm@ti.com>
+ <20131008000515.GA2097@earth.universe> <5253F3D6.5060403@ti.com>
+Message-ID: <20131008175818.GC8313@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 8 Oct 2013, Dave Martin wrote:
-
-> On Mon, Oct 07, 2013 at 09:37:20PM -0700, Victor Kamensky wrote:
-> > cci_enable_port_for_self written in asm and it works with h/w
-> > registers that are in little endian format. When run in big
-> > endian mode it needs byte swap before/after it writes/reads
-> > to/from such registers
+* Nishanth Menon <nm@ti.com> [131008 05:08]:
+> On 10/07/2013 07:05 PM, Sebastian Reichel wrote:
+> > On Mon, Oct 07, 2013 at 03:43:49PM -0500, Nishanth Menon wrote:
+> >> diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
+> >> index 39c7838..4fe5b9c 100644
+> >> --- a/arch/arm/mach-omap2/board-generic.c
+> >> +++ b/arch/arm/mach-omap2/board-generic.c
+> >> @@ -113,6 +113,7 @@ MACHINE_END
+> >>  #ifdef CONFIG_ARCH_OMAP3
+> >>  static const char *omap3_boards_compat[] __initdata = {
+> >>  	"ti,omap3",
+> >> +	"ti,omap343x",
+> >             ^^^^
+> > You used omap36xx everywhere, so I guess this should be
+> > "ti,omap34xx"?
 > 
-> Lorenzo should comment on this if he's not already seen it.
+> 3630 has at least two variants:
+> http://www.ti.com/product/omap3621
+> http://www.ti.com/product/omap3630
 > 
-> > 
-> > Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
-> > ---
-> >  drivers/bus/arm-cci.c | 6 ++++++
-> >  1 file changed, 6 insertions(+)
-> > 
-> > diff --git a/drivers/bus/arm-cci.c b/drivers/bus/arm-cci.c
-> > index 2009266..6db173e 100644
-> > --- a/drivers/bus/arm-cci.c
-> > +++ b/drivers/bus/arm-cci.c
-> > @@ -281,6 +281,9 @@ asmlinkage void __naked cci_enable_port_for_self(void)
-> >  	/* Enable the CCI port */
-> >  "	ldr	r0, [r0, %[offsetof_port_phys]] \n"
-> >  "	mov	r3, #"__stringify(CCI_ENABLE_REQ)" \n"
-> > +#ifdef __ARMEB__
-> > +"	rev	r3, r3 \n"
-> > +#endif /* __ARMEB__ */
+> It got further spun off in 37xx family:
+> http://www.ti.com/product/dm3730 (DM3730 and DM3725)
 > 
-> Hmmm, this is a bit ugly, but we can't easily use ARM_BE8() here.
+> 3430 is no longer in production - but just had a single version (at
+> least what I can remember).
+> 
+> 3530 variant of 3430 on the other hand has a few:
+> http://processors.wiki.ti.com/index.php/OMAP3_Overview
+> 
+> 
+> I am ok to change to ti,omap34xx if folks think that is the right
+> thing to do. Personally, I might prefer to handle 35xx family slightly
+> differently considering deltas.
 
-In any case, it would be more efficient to swap the CCI_ENABLE_REQ 
-constant at compile time rather than doing it at run time with an extra 
-instruction.
+I've dropped that part as that's not needed for the fix AFAIK.
+Here's what I've applied and pushed out to omap-for-v3.12/fixes.
 
+Regards,
 
-Nicolas
+Tony
+
+From: Nishanth Menon <nm@ti.com>
+Date: Mon, 7 Oct 2013 15:43:49 -0500
+Subject: [PATCH] ARM: OMAP3: Fix hardware detection for omap3630 when booted with device tree
+
+SoC family definitions at the moment are reactive to board needs
+as a result, beagle-xm would matchup with ti,omap3 which invokes
+omap3430_init_early instead of omap3630_init_early. Obviously, this is
+the wrong behavior.
+
+With clock node dts conversion, we get the following warnings before
+system hangs as a result and 3630 based platforms fails to boot
+(uart4 clocks are only present in OMAP3630 and not present in
+OMAP3430):
+
+...
+omap_hwmod: uart4: cannot clk_get main_clk uart4_fck
+omap_hwmod: uart4: cannot _init_clocks
+
+WARNING: CPU: 0 PID: 1 at arch/arm/mach-omap2/omap_hwmod.c:2434
+_init+0x6c/0x80()
+omap_hwmod: uart4: couldn't init clocks
+...
+
+WARNING: CPU: 0 PID: 1 at arch/arm/mach-omap2/omap_hwmod.c:2126
+_enable+0x254/0x280()
+omap_hwmod: timer12: enabled state can only be entered from
+initialized, idle, or disabled state
+...
+
+WARNING: CPU: 0 PID: 46 at arch/arm/mach-omap2/omap_hwmod.c:2224
+_idle+0xd4/0xf8()
+omap_hwmod: timer12: idle state can only be entered from enabled state
+
+WARNING: CPU: 0 PID: 1 at arch/arm/mach-omap2/omap_hwmod.c:2126
+_enable+0x254/0x280()
+omap_hwmod: uart4: enabled state can only be entered from
+initialized, idle, or disabled state
+
+So, add specific compatiblity for 3630 to allow match for Beagle-XM
+platform.
+
+Signed-off-by: Nishanth Menon <nm@ti.com>
+[tony at atomide.com: left out ti,omap343x, updated comments]
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+
+diff --git a/arch/arm/boot/dts/omap3-beagle-xm.dts b/arch/arm/boot/dts/omap3-beagle-xm.dts
+index 0c514dc..2816bf6 100644
+--- a/arch/arm/boot/dts/omap3-beagle-xm.dts
++++ b/arch/arm/boot/dts/omap3-beagle-xm.dts
+@@ -11,7 +11,7 @@
+ 
+ / {
+ 	model = "TI OMAP3 BeagleBoard xM";
+-	compatible = "ti,omap3-beagle-xm", "ti,omap3-beagle", "ti,omap3";
++	compatible = "ti,omap3-beagle-xm", "ti,omap36xx", "ti,omap3";
+ 
+ 	cpus {
+ 		cpu at 0 {
+diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
+index 39c7838..87162e1 100644
+--- a/arch/arm/mach-omap2/board-generic.c
++++ b/arch/arm/mach-omap2/board-generic.c
+@@ -129,6 +129,24 @@ DT_MACHINE_START(OMAP3_DT, "Generic OMAP3 (Flattened Device Tree)")
+ 	.restart	= omap3xxx_restart,
+ MACHINE_END
+ 
++static const char *omap36xx_boards_compat[] __initdata = {
++	"ti,omap36xx",
++	NULL,
++};
++
++DT_MACHINE_START(OMAP36XX_DT, "Generic OMAP36xx (Flattened Device Tree)")
++	.reserve	= omap_reserve,
++	.map_io		= omap3_map_io,
++	.init_early	= omap3630_init_early,
++	.init_irq	= omap_intc_of_init,
++	.handle_irq	= omap3_intc_handle_irq,
++	.init_machine	= omap_generic_init,
++	.init_late	= omap3_init_late,
++	.init_time	= omap3_sync32k_timer_init,
++	.dt_compat	= omap36xx_boards_compat,
++	.restart	= omap3xxx_restart,
++MACHINE_END
++
+ static const char *omap3_gp_boards_compat[] __initdata = {
+ 	"ti,omap3-beagle",
+ 	"timll,omap3-devkit8000",
