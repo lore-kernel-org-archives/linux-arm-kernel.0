@@ -1,19 +1,21 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 8 Oct 2013 11:44:44 -0700
-Subject: [PATCH v2 2/3] ARM: dts: add minimal DT support for Nokia N950
- & N9 phones
-In-Reply-To: <1380050897-6605-3-git-send-email-aaro.koskinen@iki.fi>
+Date: Tue, 8 Oct 2013 11:45:33 -0700
+Subject: [PATCH v2 3/3] ARM: OMAP2: delete board-rm680
+In-Reply-To: <1380050897-6605-4-git-send-email-aaro.koskinen@iki.fi>
 References: <1380050897-6605-1-git-send-email-aaro.koskinen@iki.fi>
- <1380050897-6605-3-git-send-email-aaro.koskinen@iki.fi>
-Message-ID: <20131008184444.GK8313@atomide.com>
+ <1380050897-6605-4-git-send-email-aaro.koskinen@iki.fi>
+Message-ID: <20131008184532.GL8313@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 * Aaro Koskinen <aaro.koskinen@iki.fi> [130924 12:36]:
-> Add minimal DT support for Nokia N950 & N9 phones. The same functionality
-> that is provided by the current board file should work: serial console,
-> USB, OneNAND and MMC.
+> Delete board file for Nokia RM-680/RM-696 (N950/N9). DT-based booting
+> should be used for further development on this HW.
 
-Assuming Benoit will pick this one up:
+I'll apply this into omap-for-v3.13/board-removal that I
+will rebase on Benoit's .dts changes before I push out
+that branch.
 
-Acked-by: Tony Lindgren <tony@atomide.com>
+Regards,
+
+Tony
