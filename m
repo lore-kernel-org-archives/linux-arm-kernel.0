@@ -1,59 +1,61 @@
-From: csmanjuvijay@gmail.com (Majunath Goudar)
-Date: Tue,  8 Oct 2013 16:11:35 +0530
-Subject: [PATCH] VEXPRESS: Fix VEXPRESS implicit declarations dependence
- errors.
-Message-ID: <1381228895-24814-1-git-send-email-csmanjuvijay@gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 8 Oct 2013 11:43:04 +0100
+Subject: [PATCH 7/9] iommu/arm-smmu: Add function that conditionally
+ isolates all masters of all SMMUs
+In-Reply-To: <20131007154227.GC2935@alberich>
+References: <1380234982-1677-1-git-send-email-andreas.herrmann@calxeda.com>
+ <1380234982-1677-8-git-send-email-andreas.herrmann@calxeda.com>
+ <20130927130001.GF9520@mudshark.cambridge.arm.com>
+ <20131007154227.GC2935@alberich>
+Message-ID: <20131008104304.GH17148@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds a of_find_node_by_phandle() and of_get_next_parent()
-function declaration dependence on"#ifdef CONFIG_OF" in "include/linux/of.h"
-else part return inline dummy implementations (returning NULL). Without
-this patch,build system can lead to issues. This was discovered during
-randconfig testing,in which VEXPRESS_CONFIG was enabled w/o CONFIG_OF
-being enabled,leading to the following error:
+On Mon, Oct 07, 2013 at 04:42:27PM +0100, Andreas Herrmann wrote:
+> On Fri, Sep 27, 2013 at 09:00:01AM -0400, Will Deacon wrote:
+> > On Thu, Sep 26, 2013 at 11:36:19PM +0100, Andreas Herrmann wrote:
+> > > +	list_for_each_entry(smmu, &arm_smmu_devices, list) {
+> > > +		if (arm_smmu_disable_isolation ||
+> > > +			(!(smmu->features & ARM_SMMU_FEAT_ISOLATE_DEVICES)
+> > > +				&& !arm_smmu_force_isolation))
+> > > +			continue;
+> > > +		rbn = rb_first(&smmu->masters);
+> > > +		while (rbn) {
+> > > +			master = container_of(rbn, struct arm_smmu_master, node);
+> > > +			pdev = of_find_device_by_node(master->of_node);
+> > > +			if (!pdev)
+> > > +				break;
+> > > +			dev = &pdev->dev;
+> > > +
+> > > +			size = (size_t) dev->coherent_dma_mask;
+> > > +			size = size ? : (unsigned long) dev->dma_mask;
+> > 
+> > Hmm, this could be *huge* with 64-bit capable DMA controllers (think LPAE).
+> 
+> Yes, agreed.
+> (And even for 32-bit DMA this requires a large bitmap_size for the
+> mapping.)
+> 
+> > Russell also has some pending dma mask cleanup, which might break some
+> > assumptions here:
+> >
+> > http://lists.infradead.org/pipermail/linux-arm-kernel/2013-September/199397.html
+> > 
+> > (namely that we're offsetting everything from zero).
+> 
+> What do you think is a reasonable general value for the size of a
+> mapping? (Do we need a DT property to specify this?)
+> 
+> What about a size of 128 MB -- if I'm not mistaken this requires a
+> bitmap_size of 4K.
 
-CC      drivers/mfd/vexpress-config.o
-drivers/mfd/vexpress-config.c: In function ?__vexpress_config_func_get?:
-drivers/mfd/vexpress-config.c:117:4: error: implicit declaration of function
-?of_find_node_by_phandle? [-Werror=implicit-function-declaration]
-    bridge_node = of_find_node_by_phandle(
-    ^
-drivers/mfd/vexpress-config.c:117:16: warning: assignment makes pointer from
-integer without a cast [enabled by default]
-    bridge_node = of_find_node_by_phandle(
+I don't think we can reasonably pick a sane number for this. We *could* try
+doing it lazily (i.e. driving the mapping off a fault handler) but that's
+pretty scary and probably doesn't interact well with endpoints incompatible
+with the stall model (e.g. PCIe).
 
-Signed-off-by: Manjunath Goudar <csmanjuvijay@gmail.com>
-Cc: Grant Likely <grant.likely@linaro.org>
-Cc: Rob Herring <rob.herring@calxeda.com>
-Cc: Pawel Moll <pawel.moll@arm.com>
-Cc: Samuel Ortiz <sameo@linux.intel.com>
-Cc: Lee Jones <lee.jones@linaro.org>
-Cc: devicetree at vger.kernel.org
-Cc: linux-kernel at vger.kernel.org
----
- include/linux/of.h |    9 +++++++++
- 1 file changed, 9 insertions(+)
+So the right solution is probably to get this information from the device
+drivers, but I don't know what the interaction is with the dma_mask...
+You'll need to do some digging.
 
-diff --git a/include/linux/of.h b/include/linux/of.h
-index f95aee3..968787d 100644
---- a/include/linux/of.h
-+++ b/include/linux/of.h
-@@ -340,6 +340,15 @@ int of_device_is_stdout_path(struct device_node *dn);
- 
- #else /* CONFIG_OF */
- 
-+static inline struct device_node *of_find_node_by_phandle(phandle handle)
-+{
-+	return NULL;
-+}
-+static inline struct device_node *of_get_next_parent(struct device_node *node)
-+{
-+	return NULL;
-+}
-+
- static inline const char* of_node_full_name(struct device_node *np)
- {
- 	return "<no-node>";
--- 
-1.7.9.5
+Will
