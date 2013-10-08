@@ -1,56 +1,54 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Tue, 8 Oct 2013 13:01:26 -0500
-Subject: [PATCH 2/2] ARM: dts: omap3-beagle: use 3630 definitions
-In-Reply-To: <20131008174721.GH13128@radagast>
-References: <523C9D8B.2000701@ti.com>
- <1381164584-4008-1-git-send-email-nm@ti.com>
- <1381164584-4008-3-git-send-email-nm@ti.com>
- <20131007192009.GA8949@atomide.com> <20131008174721.GH13128@radagast>
-Message-ID: <52544876.8000904@ti.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Tue, 8 Oct 2013 19:03:11 +0100
+Subject: [PATCH 2/2] ARM: cci: driver need big endian fixes in asm code
+In-Reply-To: <alpine.LFD.2.03.1310081356280.3023@syhkavp.arg>
+References: <1381207040-1623-1-git-send-email-victor.kamensky@linaro.org>
+ <1381207040-1623-3-git-send-email-victor.kamensky@linaro.org>
+ <20131008175136.GA3866@localhost.localdomain>
+ <alpine.LFD.2.03.1310081356280.3023@syhkavp.arg>
+Message-ID: <20131008180305.GA3919@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/08/2013 12:47 PM, Felipe Balbi wrote:
-> Hi,
+On Tue, Oct 08, 2013 at 01:57:48PM -0400, Nicolas Pitre wrote:
+> On Tue, 8 Oct 2013, Dave Martin wrote:
 > 
-> On Mon, Oct 07, 2013 at 12:20:09PM -0700, Tony Lindgren wrote:
->> * Nishanth Menon <nm@ti.com> [131007 09:57]:
->>> beagle-xm currently would matchup with ti,omap3 which invokes
->>> omap3430_init_early instead of omap3630_init_early. So add
->>> compatiblity for 3630 to allow match
->>>
->>> Signed-off-by: Nishanth Menon <nm@ti.com>
->>> ---
->>>  arch/arm/boot/dts/omap3-beagle-xm.dts |    2 +-
->>>  1 file changed, 1 insertion(+), 1 deletion(-)
->>>
->>> diff --git a/arch/arm/boot/dts/omap3-beagle-xm.dts b/arch/arm/boot/dts/omap3-beagle-xm.dts
->>> index 0f7cfc5..2079e22 100644
->>> --- a/arch/arm/boot/dts/omap3-beagle-xm.dts
->>> +++ b/arch/arm/boot/dts/omap3-beagle-xm.dts
->>> @@ -11,7 +11,7 @@
->>>  
->>>  / {
->>>  	model = "TI OMAP3 BeagleBoard xM";
->>> -	compatible = "ti,omap3-beagle-xm", "ti,omap3-beagle", "ti,omap3";
->>> +	compatible = "ti,omap3-beagle-xm", "ti,omap363x", "ti,omap3-beagle", "ti,omap3";
->>>  
->>>  	cpus {
->>>  		cpu at 0 {
->>
->> This compatible string looks hacky.. How about just make it
->>
->> "ti,omap3-beagle-xm", "ti,omap363x", "ti,omap3";
->>
->> How about just leave out "ti,omap3-beagle" here?
+> > On Mon, Oct 07, 2013 at 09:37:20PM -0700, Victor Kamensky wrote:
+> > > cci_enable_port_for_self written in asm and it works with h/w
+> > > registers that are in little endian format. When run in big
+> > > endian mode it needs byte swap before/after it writes/reads
+> > > to/from such registers
+> > 
+> > Lorenzo should comment on this if he's not already seen it.
+> > 
+> > > 
+> > > Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
+> > > ---
+> > >  drivers/bus/arm-cci.c | 6 ++++++
+> > >  1 file changed, 6 insertions(+)
+> > > 
+> > > diff --git a/drivers/bus/arm-cci.c b/drivers/bus/arm-cci.c
+> > > index 2009266..6db173e 100644
+> > > --- a/drivers/bus/arm-cci.c
+> > > +++ b/drivers/bus/arm-cci.c
+> > > @@ -281,6 +281,9 @@ asmlinkage void __naked cci_enable_port_for_self(void)
+> > >  	/* Enable the CCI port */
+> > >  "	ldr	r0, [r0, %[offsetof_port_phys]] \n"
+> > >  "	mov	r3, #"__stringify(CCI_ENABLE_REQ)" \n"
+> > > +#ifdef __ARMEB__
+> > > +"	rev	r3, r3 \n"
+> > > +#endif /* __ARMEB__ */
+> > 
+> > Hmmm, this is a bit ugly, but we can't easily use ARM_BE8() here.
 > 
-> ti,omap3-beagle was already part of the original file, we can definitely
-> remove but I'd expect us to maintain support for that string
-> indefinitely should anybody continue to use older dtbs.
-> 
-it already is supported (we still have a beagleboard) - the current
-patch rev does nothing to break existing code or bindings.
+> In any case, it would be more efficient to swap the CCI_ENABLE_REQ 
+> constant at compile time rather than doing it at run time with an extra 
+> instruction.
 
--- 
-Regards,
-Nishanth Menon
+Indeed, but we can't stringify that.
+
+A different way of wedging it into the assembler would be needed...
+We might need to use ldr= too, which doesn't pay nice with inline asm.
+
+Cheers
+---Dave
