@@ -1,149 +1,51 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue,  8 Oct 2013 18:05:40 +0900
-Subject: [PATCH 1/4] ARM: shmobile: r8a7778: cleanup registration of vin
-In-Reply-To: <cover.1381222967.git.horms+renesas@verge.net.au>
-References: <cover.1381222967.git.horms+renesas@verge.net.au>
-Message-ID: <fd131d0d4024a39259c41290451e728515ed7300.1381222967.git.horms+renesas@verge.net.au>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 8 Oct 2013 10:00:15 +0100
+Subject: [PATCH RFC 1/2] ARM: imx6qdl: provide pinctrl configurations
+ for DAT3 pull-down
+In-Reply-To: <20131008034048.GB7480@S2101-09.ap.freescale.net>
+References: <20131005112147.GX12758@n2100.arm.linux.org.uk>
+ <E1VSPw9-0004Ug-BF@rmk-PC.arm.linux.org.uk>
+ <20131007055340.GB3739@S2101-09.ap.freescale.net>
+ <20131007180357.GS12758@n2100.arm.linux.org.uk>
+ <20131008015426.GA7480@S2101-09.ap.freescale.net>
+ <52537378.1020904@wwwdotorg.org>
+ <20131008034048.GB7480@S2101-09.ap.freescale.net>
+Message-ID: <20131008090015.GC25034@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+On Tue, Oct 08, 2013 at 11:40:51AM +0800, Shawn Guo wrote:
+> On Mon, Oct 07, 2013 at 08:52:40PM -0600, Stephen Warren wrote:
+> > >>> &usdhc1 {
+> > >>> 	pinctrl-names = "default";
+> > >>> 	pinctrl-0 = <&pinctrl_usdhc1_1 &pinctrl_usdhc1_1_dat3cd>;
+> > >>> 	...
+> > >>> 	status = "okay";
+> > >>> };
+> > >>
+> > >> Are you sure that this will always be the case?  This would assume that
+> > >> the pinctrl entries are always processed sequentially.
+> > > 
+> > > That will always be the case per my understanding.  Otherwise, I would
+> > > be so surprised.  Are you seeing any case that the entries are not
+> > > processed sequentially?
+> > 
+> > Given the way the Linux code currently works, I think that will
+> > currently happen in practice. However, there's nothing in the pinctrl DT
+> > binding documentation that guarantees (or even mentions) such semantics.
+> 
+> Ah, that's Russell's point, I guess.  I think it makes perfect sense to
+> make this clear in the binding doc, as this "overwrite mechanism" can be
+> very helpful.  I will send a patch for it.
 
-vin driver which needs platform data at the time of
-registration is used from BockW only.
-Now, ARM/shmobile aims to support DT,
-and the C code base board support will be removed
-if DT support is completed.
-Current driver registration method which needs platform data
-and which is not shared complicates codes.
-This means legacy C code cleanup after DT supporting
-will be more complicated
-This patch registers it on board code as cleanup C code
+Exactly - otherwise we're just relying on implementation details.
+There's nothing at present which mandates starting at the first entry
+and working through sequentially to the last entry, which means another
+implementation can choose to operate in the opposite order.  If it does,
+what you're suggesting won't work so well.
 
-Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/mach-shmobile/board-bockw.c          | 32 ++++++++++++++++++++-----
- arch/arm/mach-shmobile/include/mach/r8a7778.h |  2 --
- arch/arm/mach-shmobile/setup-r8a7778.c        | 34 ---------------------------
- 3 files changed, 26 insertions(+), 42 deletions(-)
-
-diff --git a/arch/arm/mach-shmobile/board-bockw.c b/arch/arm/mach-shmobile/board-bockw.c
-index 6b9faf3..4b696ce 100644
---- a/arch/arm/mach-shmobile/board-bockw.c
-+++ b/arch/arm/mach-shmobile/board-bockw.c
-@@ -162,10 +162,6 @@ static struct sh_mmcif_plat_data sh_mmcif_plat __initdata = {
- 			  MMC_CAP_NEEDS_POLL,
- };
- 
--static struct rcar_vin_platform_data vin_platform_data __initdata = {
--	.flags	= RCAR_VIN_BT656,
--};
--
- /* In the default configuration both decoders reside on I2C bus 0 */
- #define BOCKW_CAMERA(idx)						\
- static struct i2c_board_info camera##idx##_info = {			\
-@@ -181,6 +177,30 @@ static struct soc_camera_link iclink##idx##_ml86v7667 __initdata = {	\
- BOCKW_CAMERA(0);
- BOCKW_CAMERA(1);
- 
-+/* VIN */
-+static struct rcar_vin_platform_data vin_platform_data __initdata = {
-+	.flags	= RCAR_VIN_BT656,
-+};
-+
-+#define R8A7778_VIN(idx)						\
-+static struct resource vin##idx##_resources[] __initdata = {		\
-+	DEFINE_RES_MEM(0xffc50000 + 0x1000 * (idx), 0x1000),		\
-+	DEFINE_RES_IRQ(gic_iid(0x5a)),					\
-+};									\
-+									\
-+static struct platform_device_info vin##idx##_info __initdata = {	\
-+	.parent		= &platform_bus,				\
-+	.name		= "r8a7778-vin",				\
-+	.id		= idx,						\
-+	.res		= vin##idx##_resources,				\
-+	.num_res	= ARRAY_SIZE(vin##idx##_resources),		\
-+	.dma_mask	= DMA_BIT_MASK(32),				\
-+	.data		= &vin_platform_data,				\
-+	.size_data	= sizeof(vin_platform_data),			\
-+}
-+R8A7778_VIN(0);
-+R8A7778_VIN(1);
-+
- static const struct pinctrl_map bockw_pinctrl_map[] = {
- 	/* Ether */
- 	PIN_MAP_MUX_GROUP_DEFAULT("r8a777x-ether", "pfc-r8a7778",
-@@ -236,10 +256,10 @@ static void __init bockw_init(void)
- 	r8a7778_init_irq_extpin(1);
- 	r8a7778_add_standard_devices();
- 	r8a7778_add_ether_device(&ether_platform_data);
--	r8a7778_add_vin_device(0, &vin_platform_data);
-+	platform_device_register_full(&vin0_info);
- 	/* VIN1 has a pin conflict with Ether */
- 	if (!IS_ENABLED(CONFIG_SH_ETH))
--		r8a7778_add_vin_device(1, &vin_platform_data);
-+		platform_device_register_full(&vin1_info);
- 	platform_device_register_data(&platform_bus, "soc-camera-pdrv", 0,
- 				      &iclink0_ml86v7667,
- 				      sizeof(iclink0_ml86v7667));
-diff --git a/arch/arm/mach-shmobile/include/mach/r8a7778.h b/arch/arm/mach-shmobile/include/mach/r8a7778.h
-index adfcf51..9838608 100644
---- a/arch/arm/mach-shmobile/include/mach/r8a7778.h
-+++ b/arch/arm/mach-shmobile/include/mach/r8a7778.h
-@@ -24,8 +24,6 @@
- extern void r8a7778_add_standard_devices(void);
- extern void r8a7778_add_standard_devices_dt(void);
- extern void r8a7778_add_ether_device(struct sh_eth_plat_data *pdata);
--extern void r8a7778_add_vin_device(int id,
--				   struct rcar_vin_platform_data *pdata);
- extern void r8a7778_add_dt_devices(void);
- 
- extern void r8a7778_init_late(void);
-diff --git a/arch/arm/mach-shmobile/setup-r8a7778.c b/arch/arm/mach-shmobile/setup-r8a7778.c
-index 6a2657e..604cf36 100644
---- a/arch/arm/mach-shmobile/setup-r8a7778.c
-+++ b/arch/arm/mach-shmobile/setup-r8a7778.c
-@@ -281,40 +281,6 @@ void __init r8a7778_register_hspi(int id)
- 		hspi_resources + (2 * id), 2);
- }
- 
--/* VIN */
--#define R8A7778_VIN(idx)						\
--static struct resource vin##idx##_resources[] __initdata = {		\
--	DEFINE_RES_MEM(0xffc50000 + 0x1000 * (idx), 0x1000),		\
--	DEFINE_RES_IRQ(gic_iid(0x5a)),					\
--};									\
--									\
--static struct platform_device_info vin##idx##_info __initdata = {	\
--	.parent		= &platform_bus,				\
--	.name		= "r8a7778-vin",				\
--	.id		= idx,						\
--	.res		= vin##idx##_resources,				\
--	.num_res	= ARRAY_SIZE(vin##idx##_resources),		\
--	.dma_mask	= DMA_BIT_MASK(32),				\
--}
--
--R8A7778_VIN(0);
--R8A7778_VIN(1);
--
--static struct platform_device_info *vin_info_table[] __initdata = {
--	&vin0_info,
--	&vin1_info,
--};
--
--void __init r8a7778_add_vin_device(int id, struct rcar_vin_platform_data *pdata)
--{
--	BUG_ON(id < 0 || id > 1);
--
--	vin_info_table[id]->data = pdata;
--	vin_info_table[id]->size_data = sizeof(*pdata);
--
--	platform_device_register_full(vin_info_table[id]);
--}
--
- void __init r8a7778_add_dt_devices(void)
- {
- 	int i;
--- 
-1.8.4
+However, there's another point to consider.  In cases like this, we will
+cause a glitch on the pin.  When we process the initial set, we will set
+the pull-up high, and then later set it low.  That may not be a problem
+in this case, but that's not to say it won't be in every case, and that's
+something which also needs to be considered.
