@@ -1,43 +1,107 @@
-From: Nathan_Lynch@mentor.com (Nathan Lynch)
-Date: Tue, 8 Oct 2013 10:32:53 -0500
-Subject: [PATCH] ARM: imx: replace imx6q_restart() with mxc_restart()
-In-Reply-To: <1381050370-3301-1-git-send-email-shawn.guo@linaro.org>
-References: <1381050370-3301-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <525425A5.2020500@mentor.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 8 Oct 2013 17:36:59 +0200
+Subject: [PATCH v3 10/19] ARM: at91/dt: add system clk id definitions
+ in dt-bindings include dir
+In-Reply-To: <1375942504-9010-1-git-send-email-b.brezillon@overkiz.com>
+References: <1375937608-3773-1-git-send-email-b.brezillon@overkiz.com>
+ <1375942504-9010-1-git-send-email-b.brezillon@overkiz.com>
+Message-ID: <5254269B.9020109@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/06/2013 04:06 AM, Shawn Guo wrote:
-> The imx6q_restart() works fine with normal reboot but will run into
-> problem with emergency reboot like sysrq-b.  In that case, of_iomap()
-> gets called from interrupt context and hence triggers the BUG_ON in
-> __get_vm_area_node().
-> 
-> Actually, since commit c1e31d1 (ARM: imx: create
-> mxc_arch_reset_init_dt() for DT boot), imx6q/dl should try to use
-> mxc_restart() by calling mxc_arch_reset_init_dt() beforehand, where
-> things like of_iomap() can be done.
-> 
-> The patch updates mxc_restart() a little bit to get it work for imx6q/dl
-> and kill imx6q_restart() completely.
-> 
-> Reported-by: Nathan Lynch <nathan_lynch@mentor.com>
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+On 08/08/2013 08:15, Boris BREZILLON :
+> This patch adds system clk ids definitions into dt-bindinds include dir
+> (include/dt-bindings/clk/at91/'soc-name'/system-clk.h).
+>
+> These definitions will be used by dt definition to define and reference
+> system clks.
 
-Thanks Shawn, works for me.  One minor comment on the patch below.
+As said earlier, I think that these definitions can be removed. We can 
+stick with raw numbers and just document that we are using the offset of 
+the coresponding bit in the register.
+
+> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
+> ---
+>   .../dt-bindings/clk/at91/at91rm9200/clk-system.h   |   16 +++++++++++++++
+>   .../dt-bindings/clk/at91/at91sam9261/clk-system.h  |   15 ++++++++++++++
+>   include/dt-bindings/clk/at91/common/clk-system.h   |   21 ++++++++++++++++++++
+>   3 files changed, 52 insertions(+)
+>   create mode 100644 include/dt-bindings/clk/at91/at91rm9200/clk-system.h
+>   create mode 100644 include/dt-bindings/clk/at91/at91sam9261/clk-system.h
+>   create mode 100644 include/dt-bindings/clk/at91/common/clk-system.h
+>
+> diff --git a/include/dt-bindings/clk/at91/at91rm9200/clk-system.h b/include/dt-bindings/clk/at91/at91rm9200/clk-system.h
+> new file mode 100644
+> index 0000000..43bccd5
+> --- /dev/null
+> +++ b/include/dt-bindings/clk/at91/at91rm9200/clk-system.h
+> @@ -0,0 +1,16 @@
+> +/*
+> + * This header provides constants for AT91RM9200 system clocks.
+> + *
+> + * The constants defined in this header are being used in dts.
+> + */
+> +
+> +#ifndef _DT_BINDINGS_CLK_AT91RM9200_SYSTEM_H
+> +#define _DT_BINDINGS_CLK_AT91RM9200_SYSTEM_H
+> +
+> +#include <dt-bindings/clk/at91/common/system-clk.h>
+> +
+> +#define AT91RM9200_UDP_SYS_CLK		1
+> +#define AT91RM9200_MCKUDP_SYS_CLK	2
+> +#define AT91RM9200_UHP_SYS_CLK		4
+> +
+> +#endif
+> diff --git a/include/dt-bindings/clk/at91/at91sam9261/clk-system.h b/include/dt-bindings/clk/at91/at91sam9261/clk-system.h
+> new file mode 100644
+> index 0000000..28a140a
+> --- /dev/null
+> +++ b/include/dt-bindings/clk/at91/at91sam9261/clk-system.h
+> @@ -0,0 +1,15 @@
+> +/*
+> + * This header provides constants for AT91SAM9261 system clocks.
+> + *
+> + * The constants defined in this header are being used in dts.
+> + */
+> +
+> +#ifndef _DT_BINDINGS_CLK_AT91SAM9261_SYSTEM_H
+> +#define _DT_BINDINGS_CLK_AT91SAM9261_SYSTEM_H
+> +
+> +#include <dt-bindings/clk/at91/common/system-clk.h>
+> +
+> +#define AT91SAM9261_HCK0_SYS_CLK	16
+> +#define AT91SAM9261_HCK1_SYS_CLK	17
+> +
+> +#endif
+> diff --git a/include/dt-bindings/clk/at91/common/clk-system.h b/include/dt-bindings/clk/at91/common/clk-system.h
+> new file mode 100644
+> index 0000000..c0fb124
+> --- /dev/null
+> +++ b/include/dt-bindings/clk/at91/common/clk-system.h
+> @@ -0,0 +1,21 @@
+> +/*
+> + * This header provides constants for AT91 system clocks.
+> + *
+> + * The constants defined in this header are being used in dts.
+> + */
+> +
+> +#ifndef _DT_BINDINGS_CLK_AT91_SYSTEM_H
+> +#define _DT_BINDINGS_CLK_AT91_SYSTEM_H
+> +
+> +#define AT91_PCK_SYS_CLK	0
+> +#define AT91_DDRCK_SYS_CLK	2
+> +#define AT91_LCDCK_SYS_CLK	3
+> +#define AT91_SMDCK_SYS_CLK	4
+> +#define AT91_UHP_SYS_CLK	6
+> +#define AT91_UDP_SYS_CLK	7
+> +
+> +#define AT91_PROG_SYS_CLK(id)	(8 + id)
+> +
+> +#define AT91_MAX_SYS_CLKS	32
+> +
+> +#endif
+>
 
 
-> diff --git a/arch/arm/mach-imx/common.h b/arch/arm/mach-imx/common.h
-> index 7230cf8..9ebca9e 100644
-> --- a/arch/arm/mach-imx/common.h
-> +++ b/arch/arm/mach-imx/common.h
-> @@ -130,7 +130,11 @@ static inline void imx_smp_prepare(void) {}
->  static inline void imx_scu_standby_enable(void) {}
->  #endif
->  extern void imx_src_init(void);
-> +#ifdef CONFIG_HAVE_IMX_SRC
->  extern void imx_src_prepare_restart(void);
-> +#else
-> +extern inline void imx_src_prepare_restart(void) {}
-
-Should be static inline?
+-- 
+Nicolas Ferre
