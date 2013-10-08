@@ -1,77 +1,149 @@
 From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Wed,  9 Oct 2013 00:34:25 +0200
-Subject: [PATCH 09/23] ARM: mvebu: support running big-endian
+Date: Wed,  9 Oct 2013 00:34:18 +0200
+Subject: [PATCH 02/23] ARM: asm: Add ARM_BE8() assembly helper
 In-Reply-To: <1381271679-27804-1-git-send-email-ben.dooks@codethink.co.uk>
 References: <1381271679-27804-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <1381271679-27804-10-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <1381271679-27804-3-git-send-email-ben.dooks@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add indication we can run these cores in BE mode, and ensure that the
-secondary CPU is set to big-endian mode in the initialisation code as
-the initial code runs little-endian.
+Add ARM_BE8() helper to wrap any code conditional on being
+compile when CONFIG_ARM_ENDIAN_BE8 is selected and convert
+existing places where this is to use it.
 
+Acked-by: Nicolas Pitre <nico@linaro.org>
+Reviewed-by: Will Deacon <will.deacon@arm.com>
 Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
-Tested-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Acked-by: Jason Cooper <jason@lakedaemon.net>
 ---
- arch/arm/mach-mvebu/Kconfig        | 1 +
- arch/arm/mach-mvebu/coherency_ll.S | 3 +++
- arch/arm/mach-mvebu/headsmp.S      | 4 ++++
- 3 files changed, 8 insertions(+)
+ arch/arm/boot/compressed/head.S  | 8 ++------
+ arch/arm/include/asm/assembler.h | 7 +++++++
+ arch/arm/kernel/entry-armv.S     | 5 ++---
+ arch/arm/kernel/entry-common.S   | 4 +---
+ arch/arm/mm/abort-ev6.S          | 5 ++---
+ arch/arm/mm/proc-v6.S            | 4 +---
+ arch/arm/mm/proc-v7.S            | 4 +---
+ 7 files changed, 16 insertions(+), 21 deletions(-)
 
-diff --git a/arch/arm/mach-mvebu/Kconfig b/arch/arm/mach-mvebu/Kconfig
-index 9eb63d7..5e269d7 100644
---- a/arch/arm/mach-mvebu/Kconfig
-+++ b/arch/arm/mach-mvebu/Kconfig
-@@ -1,5 +1,6 @@
- config ARCH_MVEBU
- 	bool "Marvell SOCs with Device Tree support" if ARCH_MULTI_V7
-+	select ARCH_SUPPORTS_BIG_ENDIAN
- 	select CLKSRC_MMIO
- 	select COMMON_CLK
- 	select GENERIC_CLOCKEVENTS
-diff --git a/arch/arm/mach-mvebu/coherency_ll.S b/arch/arm/mach-mvebu/coherency_ll.S
-index 5476669..ee7598f 100644
---- a/arch/arm/mach-mvebu/coherency_ll.S
-+++ b/arch/arm/mach-mvebu/coherency_ll.S
-@@ -20,6 +20,8 @@
- #define ARMADA_XP_CFB_CTL_REG_OFFSET 0x0
- #define ARMADA_XP_CFB_CFG_REG_OFFSET 0x4
+diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
+index 75189f1..c912c2a 100644
+--- a/arch/arm/boot/compressed/head.S
++++ b/arch/arm/boot/compressed/head.S
+@@ -699,9 +699,7 @@ __armv4_mmu_cache_on:
+ 		mrc	p15, 0, r0, c1, c0, 0	@ read control reg
+ 		orr	r0, r0, #0x5000		@ I-cache enable, RR cache replacement
+ 		orr	r0, r0, #0x0030
+-#ifdef CONFIG_CPU_ENDIAN_BE8
+-		orr	r0, r0, #1 << 25	@ big-endian page tables
+-#endif
++ ARM_BE8(	orr	r0, r0, #1 << 25 )	@ big-endian page tables
+ 		bl	__common_mmu_cache_on
+ 		mov	r0, #0
+ 		mcr	p15, 0, r0, c8, c7, 0	@ flush I,D TLBs
+@@ -728,9 +726,7 @@ __armv7_mmu_cache_on:
+ 		orr	r0, r0, #1 << 22	@ U (v6 unaligned access model)
+ 						@ (needed for ARM1176)
+ #ifdef CONFIG_MMU
+-#ifdef CONFIG_CPU_ENDIAN_BE8
+-		orr	r0, r0, #1 << 25	@ big-endian page tables
+-#endif
++ ARM_BE8(	orr	r0, r0, #1 << 25 )	@ big-endian page tables
+ 		mrcne   p15, 0, r6, c2, c0, 2   @ read ttb control reg
+ 		orrne	r0, r0, #1		@ MMU enabled
+ 		movne	r1, #0xfffffffd		@ domain 0 = client
+diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
+index fcc1b5b..5c22851 100644
+--- a/arch/arm/include/asm/assembler.h
++++ b/arch/arm/include/asm/assembler.h
+@@ -53,6 +53,13 @@
+ #define put_byte_3      lsl #0
+ #endif
  
-+#include <asm/assembler.h>
++/* Select code for any configuration running in BE8 mode */
++#ifdef CONFIG_CPU_ENDIAN_BE8
++#define ARM_BE8(code...) code
++#else
++#define ARM_BE8(code...)
++#endif
 +
- 	.text
  /*
-  * r0: Coherency fabric base register address
-@@ -29,6 +31,7 @@ ENTRY(ll_set_cpu_coherent)
- 	/* Create bit by cpu index */
- 	mov	r3, #(1 << 24)
- 	lsl	r1, r3, r1
-+ARM_BE8(rev	r1, r1)
- 
- 	/* Add CPU to SMP group - Atomic */
- 	add	r3, r0, #ARMADA_XP_CFB_CTL_REG_OFFSET
-diff --git a/arch/arm/mach-mvebu/headsmp.S b/arch/arm/mach-mvebu/headsmp.S
-index 8a1b0c9..3dd80df4 100644
---- a/arch/arm/mach-mvebu/headsmp.S
-+++ b/arch/arm/mach-mvebu/headsmp.S
-@@ -21,12 +21,16 @@
- #include <linux/linkage.h>
- #include <linux/init.h>
- 
-+#include <asm/assembler.h>
-+
- /*
-  * Armada XP specific entry point for secondary CPUs.
-  * We add the CPU to the coherency fabric and then jump to secondary
-  * startup
+  * Data preload for architectures that support it
   */
- ENTRY(armada_xp_secondary_startup)
-+ ARM_BE8(setend	be )			@ go BE8 if entered LE
+diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
+index 9cbe70c..55090fb 100644
+--- a/arch/arm/kernel/entry-armv.S
++++ b/arch/arm/kernel/entry-armv.S
+@@ -416,9 +416,8 @@ __und_usr:
+ 	bne	__und_usr_thumb
+ 	sub	r4, r2, #4			@ ARM instr@LR - 4
+ 1:	ldrt	r0, [r4]
+-#ifdef CONFIG_CPU_ENDIAN_BE8
+-	rev	r0, r0				@ little endian instruction
+-#endif
++ ARM_BE8(rev	r0, r0)				@ little endian instruction
 +
- 	/* Get coherency fabric base physical address */
- 	adr	r0, 1f
- 	ldr	r1, [r0]
+ 	@ r0 = 32-bit ARM instruction which caused the exception
+ 	@ r2 = PC value for the following instruction (:= regs->ARM_pc)
+ 	@ r4 = PC value for the faulting instruction
+diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
+index bc6bd96..a2dcafd 100644
+--- a/arch/arm/kernel/entry-common.S
++++ b/arch/arm/kernel/entry-common.S
+@@ -393,9 +393,7 @@ ENTRY(vector_swi)
+ #else
+  USER(	ldr	r10, [lr, #-4]		)	@ get SWI instruction
+ #endif
+-#ifdef CONFIG_CPU_ENDIAN_BE8
+-	rev	r10, r10			@ little endian instruction
+-#endif
++ ARM_BE8(rev	r10, r10)			@ little endian instruction
+ 
+ #elif defined(CONFIG_AEABI)
+ 
+diff --git a/arch/arm/mm/abort-ev6.S b/arch/arm/mm/abort-ev6.S
+index 8074199..3815a82 100644
+--- a/arch/arm/mm/abort-ev6.S
++++ b/arch/arm/mm/abort-ev6.S
+@@ -38,9 +38,8 @@ ENTRY(v6_early_abort)
+ 	bne	do_DataAbort
+ 	bic	r1, r1, #1 << 11		@ clear bit 11 of FSR
+ 	ldr	r3, [r4]			@ read aborted ARM instruction
+-#ifdef CONFIG_CPU_ENDIAN_BE8
+-	rev	r3, r3
+-#endif
++ ARM_BE8(rev	r3, r3)
++
+ 	do_ldrd_abort tmp=ip, insn=r3
+ 	tst	r3, #1 << 20			@ L = 0 -> write
+ 	orreq	r1, r1, #1 << 11		@ yes.
+diff --git a/arch/arm/mm/proc-v6.S b/arch/arm/mm/proc-v6.S
+index 1128064..45dc29f 100644
+--- a/arch/arm/mm/proc-v6.S
++++ b/arch/arm/mm/proc-v6.S
+@@ -220,9 +220,7 @@ __v6_setup:
+ #endif /* CONFIG_MMU */
+ 	adr	r5, v6_crval
+ 	ldmia	r5, {r5, r6}
+-#ifdef CONFIG_CPU_ENDIAN_BE8
+-	orr	r6, r6, #1 << 25		@ big-endian page tables
+-#endif
++ ARM_BE8(orr	r6, r6, #1 << 25)		@ big-endian page tables
+ 	mrc	p15, 0, r0, c1, c0, 0		@ read control register
+ 	bic	r0, r0, r5			@ clear bits them
+ 	orr	r0, r0, r6			@ set them
+diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
+index c63d9bd..60920f6 100644
+--- a/arch/arm/mm/proc-v7.S
++++ b/arch/arm/mm/proc-v7.S
+@@ -367,9 +367,7 @@ __v7_setup:
+ #endif
+ 	adr	r5, v7_crval
+ 	ldmia	r5, {r5, r6}
+-#ifdef CONFIG_CPU_ENDIAN_BE8
+-	orr	r6, r6, #1 << 25		@ big-endian page tables
+-#endif
++ ARM_BE8(orr	r6, r6, #1 << 25)		@ big-endian page tables
+ #ifdef CONFIG_SWP_EMULATE
+ 	orr     r5, r5, #(1 << 10)              @ set SW bit in "clear"
+ 	bic     r6, r6, #(1 << 10)              @ clear it in "mmuset"
 -- 
 1.8.4.rc3
