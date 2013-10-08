@@ -1,43 +1,33 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 08 Oct 2013 16:06:59 +0100
-Subject: [PATCH 1/2] ARM: KVM: Yield CPU when vcpu executes a WFE
-In-Reply-To: <52541EA3.7010403@linux.vnet.ibm.com>
-References: <1381160430-11790-1-git-send-email-marc.zyngier@arm.com>
- <1381160430-11790-2-git-send-email-marc.zyngier@arm.com>
- <CAC4Lta14xZNnEUXxZiaF4=PQQTjq4efjsNDAK2oBH4-Uqh_d0A@mail.gmail.com>
- <5253FDDD.6050008@arm.com> <52541EA3.7010403@linux.vnet.ibm.com>
-Message-ID: <52541F93.4070503@arm.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Tue, 8 Oct 2013 20:37:15 +0530
+Subject: [PATCH] ARM: davinci: convert to clockevents_config_and_register
+In-Reply-To: <20131008145723.GQ10079@pengutronix.de>
+References: <1380060159-12008-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <20131008145723.GQ10079@pengutronix.de>
+Message-ID: <52541FA3.4040207@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/10/13 16:02, Raghavendra K T wrote:
-> [...]
->>>> +               kvm_vcpu_on_spin(vcpu);
->>>
->>> Could you also enable CONFIG_HAVE_KVM_CPU_RELAX_INTERCEPT for arm and
->>> check if ple handler logic helps further?
->>> we would ideally get one more optimization folded into ple handler if
->>> you enable that.
->>
->> Just gave it a go, and the results are slightly (but consistently)
->> worse. Over 10 runs:
->>
->> Without RELAX_INTERCEPT: Average run 3.3623s
->> With RELAX_INTERCEPT: Average run 3.4226s
->>
->> Not massive, but still noticeable. Any clue?
+Uwe,
+
+On Tuesday 08 October 2013 08:27 PM, Uwe Kleine-K?nig wrote:
+> Hello,
 > 
-> Is it  a 4x overcommit? Probably we would have hit the code
-> overhead if it were small guests.
+> On Wed, Sep 25, 2013 at 12:02:39AM +0200, Uwe Kleine-K?nig wrote:
+>> clockevents_config_and_register is superior compared to setting
+>> shift/mult and {min,max}_delta_ns by hand.
+>>
+>> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> 
+>> ---
+>> Hello,
+>>
+>> I wonder where the 50 us limit comes from. This is not a hardware limit,
+>> is it?
+> ping; I didn't get any feedback on this yet, also it's not in next.
 
-Only 2x overcommit (dual core host, quad vcpu guests).
+Apologies for the delay. I am yet to look at it because I am traveling
+ATM. I will look at it during this week and provide feedback.
 
-> RELAX_INTERCEPT is worth enabling for large guests with
-> overcommits.
-
-I'll try something more aggressive as soon as I get the time. What do
-you call a large guest? So far, the hard limit on ARM is 8 vcpus.
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Thanks,
+Sekhar
