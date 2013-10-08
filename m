@@ -1,235 +1,496 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 8 Oct 2013 14:24:22 +0100
-Subject: [PATCH 1/8] irqchip: add DesignWare APB ICTL interrupt controller
-In-Reply-To: <1381235073-17134-2-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1381235073-17134-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1381235073-17134-2-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <20131008132421.GC1412@e106331-lin.cambridge.arm.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Tue, 8 Oct 2013 08:29:23 -0500
+Subject: [PATCH V3] clk: palmas: add clock driver for palmas
+In-Reply-To: <1381238480-18852-1-git-send-email-ldewangan@nvidia.com>
+References: <1381238480-18852-1-git-send-email-ldewangan@nvidia.com>
+Message-ID: <525408B3.1000107@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 08, 2013 at 01:24:26PM +0100, Sebastian Hesselbarth wrote:
-> This adds an irqchip driver and corresponding devicetree binding for the
-> secondary interrupt controllers based on Synopsys DesignWare IP dw_apb_ictl.
+On 10/08/2013 08:21 AM, Laxman Dewangan wrote:
+> Palmas devices has two clock output CLK32K_KG and CLK32K_KG_AUDIO
+not all palmas devices have 2 clocks - example: tps659038
+> which can be enable/disable through software.
+
 > 
-> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> Add clock driver support for the Palmas 32KHz clocks.
+> 
+> Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
 > ---
-> Changelog:
-> RFCv1->RFCv2:
-> - added copyright reference
+> Changes from V1: 
+> - Call prepare if the clk is needed for boot-enable or sleep control.
+> - change is_enabled to is_prepared.
+> - Added ops palmas_clks_recalc_rate.
+> - Added of_clk_add_provider().
 > 
-> Cc: Jason Cooper <jason@lakedaemon.net>
-> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Cc: devicetree at vger.kernel.org
-> Cc: linux-doc at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-kernel at vger.kernel.org
-> ---
->  .../interrupt-controller/snps,dw-apb-ictl.txt      |   29 ++++
->  drivers/irqchip/Kconfig                            |    4 +
->  drivers/irqchip/Makefile                           |    1 +
->  drivers/irqchip/irq-dw-apb-ictl.c                  |  142 ++++++++++++++++++++
->  4 files changed, 176 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/interrupt-controller/snps,dw-apb-ictl.txt
->  create mode 100644 drivers/irqchip/irq-dw-apb-ictl.c
+> Changes from V2:
+> - Convert magic number to defines.
 > 
-> diff --git a/Documentation/devicetree/bindings/interrupt-controller/snps,dw-apb-ictl.txt b/Documentation/devicetree/bindings/interrupt-controller/snps,dw-apb-ictl.txt
+>  .../devicetree/bindings/clock/clk-palmas.txt       |   45 +++
+>  drivers/clk/Kconfig                                |    7 +
+>  drivers/clk/Makefile                               |    1 +
+>  drivers/clk/clk-palmas.c                           |  340 ++++++++++++++++++++
+
+
+http://www.spinics.net/lists/devicetree/msg04855.html
+Do we do 2 patches now? one seperate for binding and implementation?
+What is our current preference now a days?
+
+>  4 files changed, 393 insertions(+), 0 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/clock/clk-palmas.txt
+>  create mode 100644 drivers/clk/clk-palmas.c
+> 
+> diff --git a/Documentation/devicetree/bindings/clock/clk-palmas.txt b/Documentation/devicetree/bindings/clock/clk-palmas.txt
 > new file mode 100644
-> index 0000000..7ccd1ba
+> index 0000000..c247538
 > --- /dev/null
-> +++ b/Documentation/devicetree/bindings/interrupt-controller/snps,dw-apb-ictl.txt
-> @@ -0,0 +1,29 @@
-> +Synopsys DesignWare APB interrupt controller (dw_apb_ictl)
+> +++ b/Documentation/devicetree/bindings/clock/clk-palmas.txt
+> @@ -0,0 +1,45 @@
+> +* Palmas 32KHz clocks *
 > +
-> +Synopsys DesignWare provides interrupt controller IP for APB known as
-> +dw_apb_ictl. The IP is used as secondary interrupt controller in some SoCs with
-> +APB bus, e.g. Marvell Armada 1500.
+> +Palmas device has two clock output pins for 32KHz, KG and KG_AUDIO.
+> +
+> +This binding uses the common clock binding ./clock-bindings.txt.
+proper link would be to provide
+Documentation/devicetree/bindings/clock/clock-bindings.txt ?
+> +
+> +Clock 32KHz KG is output 0 of the driver and clock 32KHz is output 1.
 > +
 > +Required properties:
-> +- compatible: shall be "snps,dw-apb-ictl"
-> +- reg: base address of interrupt registers starting with ENABLE_LOW register
+> +- compatible : shall be "ti,palmas-clk".
+To handle variants of Palmas chips in production, you'd want to be
+specific here clk32k_kg and clk32k_kg_audio.
 
-Is ENABLE_LOW the first register? Or are there registers before?
-
-Is there only one bank of registers that needs to be defined?
-
-This isn't just a base address, as it has a size too. The terminology's
-rather inconsistent for reg properties in general...
-
-> +- interrupt-controller: identifies the node as an interrupt controller
-> +- #interrupt-cells: number of cells to encode an interrupt source, shall be 1
-
-s/interrupt source/interrupt-specifier/
-
-> +- interrupts: interrupt reference to primary interrupt controller
-
-- interrupts: interrupts specifier for the sole interrupt fed to the
-              parent interrupt controller.
-
-Is there only a single output interrupt?
-
-Is this required? Is it possible for this to be wired directly into a
-CPU rather than another interrupt controller?
-
-> +- interrupt-parent: (optional) reference specific primary interrupt controller
+> +- #clock-cells : from common clock binding; shall be set to 1.
 > +
-> +The interrupt sources map to the corresponding bits in the interrupt
-> +registers, i.e.
-> +- 0 maps to bit 0 of low interrupts,
-> +- 1 maps to bit 1 of low interrupts,
-> +- 32 maps to bit 0 of high interrupts, and so on.
+> +Optional subnode:
+> +	The clock node has optional subnode to provide the init configuration of
+> +	clocks like boot enable, sleep control.
+> +
+> +	The subnode name is fixed and it should be
+> +		clk32k_kg for the 32KHz KG clock.
+> +		clk32k_kg_audio for the 32KHz KG_AUDIO clock.
+> +
+> +	Optional subnode properties:
+> +	ti,clock-boot-enable: Enable clock at the time of booting.
 
-I couldn't see any public documentation for this, so I can't really
-follow the "and so on", but I saw that this had optional FIQ support so
-I assume there are more interrupt values that can be encoded?
+Dumb question: Why is this needed? should'nt relevant drivers do a
+clk_get to enable the relevant clocks?
 
+> +	ti,external-sleep-control: The clock is enable/disabled by state
+> +		of external enable input pins ENABLE, ENABLE2 and NSLEEP.
+> +		The valid value for the external pins are:
+> +			1 for ENABLE1
+> +			2 for ENABLE2
+> +			3 for NSLEEP.
+could we not have macros for readability?
+
+> +		Option 0 or missing this property means the clock is
+> +		enabled/disabled via register access and these pins do
+> +		not have any control.
 > +
 > +Example:
-> +	aic: interrupt-controller at 3000 {
-> +		compatible = "snps,dw-apb-ictl";
-> +		reg = <0x3000 0xc00>;
-> +		interrupt-controller;
-> +		#interrupt-cells = <1>;
-> +		interrupt-parent = <&gic>;
-> +		interrupts = <GIC_SPI 3 IRQ_TYPE_LEVEL_HIGH>;
-> +	};
-> diff --git a/drivers/irqchip/Kconfig b/drivers/irqchip/Kconfig
-> index 3792a1a..940638d 100644
-> --- a/drivers/irqchip/Kconfig
-> +++ b/drivers/irqchip/Kconfig
-> @@ -30,6 +30,10 @@ config ARM_VIC_NR
->  	  The maximum number of VICs available in the system, for
->  	  power management.
->  
-> +config DW_APB_ICTL
-> +	bool
-> +	select IRQ_DOMAIN
+> +	clock {
+> +		compatible = "ti,palmas-clk";
+> +		#clock-cells = <1>;
+> +		clk32k_kg {
+> +			ti,clock-boot-enable;
+> +			ti,external-sleep-control = <3>;
+> +		};
 > +
->  config IMGPDC_IRQ
->  	bool
->  	select GENERIC_IRQ_CHIP
-> diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
-> index c60b901..6427323 100644
-> --- a/drivers/irqchip/Makefile
-> +++ b/drivers/irqchip/Makefile
-> @@ -6,6 +6,7 @@ obj-$(CONFIG_ARCH_MMP)			+= irq-mmp.o
->  obj-$(CONFIG_ARCH_MVEBU)		+= irq-armada-370-xp.o
->  obj-$(CONFIG_ARCH_MXS)			+= irq-mxs.o
->  obj-$(CONFIG_ARCH_S3C24XX)		+= irq-s3c24xx.o
-> +obj-$(CONFIG_DW_APB_ICTL)		+= irq-dw-apb-ictl.o
->  obj-$(CONFIG_METAG)			+= irq-metag-ext.o
->  obj-$(CONFIG_METAG_PERFCOUNTER_IRQS)	+= irq-metag.o
->  obj-$(CONFIG_ARCH_MOXART)		+= irq-moxart.o
-> diff --git a/drivers/irqchip/irq-dw-apb-ictl.c b/drivers/irqchip/irq-dw-apb-ictl.c
+> +		clk32k_kg_audio {
+> +			ti,clock-boot-enable;
+> +		};
+> +	};
+> diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
+> index 279407a..6b8c233 100644
+> --- a/drivers/clk/Kconfig
+> +++ b/drivers/clk/Kconfig
+> @@ -93,6 +93,13 @@ config CLK_PPC_CORENET
+>  	  This adds the clock driver support for Freescale PowerPC corenet
+>  	  platforms using common clock framework.
+>  
+> +config COMMON_CLK_PALMAS
+> +	tristate "Clock driver for TI Palmas devices"
+> +	depends on MFD_PALMAS
+> +	---help---
+> +	  This driver supports TI Palmas devices 32KHz output KG and KG_AUDIO
+> +	  using common clock framework.
+> +
+>  endmenu
+>  
+>  source "drivers/clk/mvebu/Kconfig"
+> diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
+> index 7b11106..32e04cf 100644
+> --- a/drivers/clk/Makefile
+> +++ b/drivers/clk/Makefile
+> @@ -43,3 +43,4 @@ obj-$(CONFIG_COMMON_CLK_SI5351) += clk-si5351.o
+>  obj-$(CONFIG_COMMON_CLK_S2MPS11) += clk-s2mps11.o
+>  obj-$(CONFIG_CLK_TWL6040)	+= clk-twl6040.o
+>  obj-$(CONFIG_CLK_PPC_CORENET)	+= clk-ppc-corenet.o
+> +obj-$(CONFIG_COMMON_CLK_PALMAS)	+= clk-palmas.o
+> diff --git a/drivers/clk/clk-palmas.c b/drivers/clk/clk-palmas.c
 > new file mode 100644
-> index 0000000..bbcacee
+> index 0000000..3e070b2
 > --- /dev/null
-> +++ b/drivers/irqchip/irq-dw-apb-ictl.c
-> @@ -0,0 +1,142 @@
+> +++ b/drivers/clk/clk-palmas.c
+> @@ -0,0 +1,340 @@
 > +/*
-> + * Synopsys DW APB ICTL irqchip driver.
+> + * Clock driver for Palmas device.
 > + *
-> + * Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> + * Copyright (c) 2013, NVIDIA Corporation.
 > + *
-> + * based on GPL'ed 2.6 kernel sources
-> + *  (c) Marvell International Ltd.
+> + * Author: Laxman Dewangan <ldewangan@nvidia.com>
 > + *
-> + * This file is licensed under the terms of the GNU General Public
-> + * License version 2.  This program is licensed "as is" without any
-> + * warranty of any kind, whether express or implied.
+> + * This program is free software; you can redistribute it and/or
+> + * modify it under the terms of the GNU General Public License as
+> + * published by the Free Software Foundation version 2.
+> + *
+> + * This program is distributed "as is" WITHOUT ANY WARRANTY of any kind,
+> + * whether express or implied; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+> + * General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program; if not, write to the Free Software
+> + * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
+> + * 02111-1307, USA
 > + */
 > +
-> +#include <linux/io.h>
-> +#include <linux/irq.h>
-> +#include <linux/irqchip/chained_irq.h>
-> +#include <linux/of_address.h>
-> +#include <linux/of_irq.h>
+> +#include <linux/clk.h>
+> +#include <linux/clkdev.h>
+> +#include <linux/clk-provider.h>
+> +#include <linux/mfd/palmas.h>
+> +#include <linux/module.h>
+> +#include <linux/of.h>
+> +#include <linux/of_device.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/slab.h>
 > +
-> +#include "irqchip.h"
+> +enum PALMAS_CLOCK32K {
+> +	PALMAS_CLOCK32KG,
+> +	PALMAS_CLOCK32KG_AUDIO,
 > +
-> +#define APB_INT_ENABLE_L	0x00
-> +#define APB_INT_ENABLE_H	0x04
-> +#define APB_INT_MASK_L		0x08
-> +#define APB_INT_MASK_H		0x0c
-> +#define APB_INT_FINALSTATUS_L	0x30
-> +#define APB_INT_FINALSTATUS_H	0x34
+> +	/* Last entry */
+> +	PALMAS_CLOCK32K_NR,
+> +};
+you should be able to get rid of this entirely
+
 > +
-> +static void dw_apb_ictl_handler(unsigned int irq, struct irq_desc *desc)
+> +#define PALMAS_CLOCK_DT_EXT_CONTROL_ENABLE1	1
+> +#define PALMAS_CLOCK_DT_EXT_CONTROL_ENABLE2	2
+> +#define PALMAS_CLOCK_DT_EXT_CONTROL_NSLEEP	3
+> +
+> +struct palmas_clks;
+> +
+> +struct palmas_clk32k_desc {
+> +	const char *clk_name;
+> +	unsigned int control_reg;
+> +	unsigned int enable_mask;
+> +	unsigned int sleep_mask;
+> +	unsigned int sleep_reqstr_id;
+> +};
+> +
+> +struct palmas_clock_info {
+> +	struct clk *clk;
+> +	struct clk_hw hw;
+> +	struct palmas_clk32k_desc *clk_desc;
+> +	struct palmas_clks *palmas_clk;
+> +	int ext_control_pin;
+> +	bool boot_enable;
+> +};
+> +
+> +struct palmas_clks {
+> +	struct device *dev;
+> +	struct palmas *palmas;
+> +	struct clk_onecell_data clk_data;
+> +	struct palmas_clock_info clk_info[PALMAS_CLOCK32K_NR];
+
+> +};
+> +
+> +static struct palmas_clk32k_desc palmas_clk32k_descs[] = {
+> +	{
+> +		.clk_name = "clk32k_kg",
+> +		.control_reg = PALMAS_CLK32KG_CTRL,
+> +		.enable_mask = PALMAS_CLK32KG_CTRL_MODE_ACTIVE,
+> +		.sleep_mask = PALMAS_CLK32KG_CTRL_MODE_SLEEP,
+> +		.sleep_reqstr_id = PALMAS_EXTERNAL_REQSTR_ID_CLK32KG,
+> +	}, {
+> +		.clk_name = "clk32k_kg_audio",
+> +		.control_reg = PALMAS_CLK32KGAUDIO_CTRL,
+> +		.enable_mask = PALMAS_CLK32KG_CTRL_MODE_ACTIVE,
+> +		.sleep_mask = PALMAS_CLK32KG_CTRL_MODE_SLEEP,
+> +		.sleep_reqstr_id = PALMAS_EXTERNAL_REQSTR_ID_CLK32KGAUDIO,
+> +	},
+> +};
+> +
+> +static inline struct palmas_clock_info *to_palmas_clks_info(struct clk_hw *hw)
 > +{
-> +	struct irq_chip *chip = irq_get_chip(irq);
-> +	struct irq_chip_generic *gc = irq_get_handler_data(irq);
-> +	struct irq_domain *d = gc->private;
-> +	u32 stat;
-> +	int n;
+> +	return container_of(hw, struct palmas_clock_info, hw);
+> +}
 > +
-> +	chained_irq_enter(chip, desc);
+> +static unsigned long palmas_clks_recalc_rate(struct clk_hw *hw,
+> +	unsigned long parent_rate)
+> +{
+> +	return 32768;
+> +}
 > +
-> +	for (n = 0; n < gc->num_ct; n++) {
-> +		stat = readl_relaxed(gc->reg_base +
-> +				     APB_INT_FINALSTATUS_L + 4 * n);
-> +		while (stat) {
-> +			u32 hwirq = ffs(stat) - 1;
-> +			generic_handle_irq(irq_find_mapping(d,
-> +					    gc->irq_base + hwirq + 32 * n));
-> +			stat &= ~(1 << hwirq);
+> +static int palmas_clks_prepare(struct clk_hw *hw)
+> +{
+> +	struct palmas_clock_info *cinfo = to_palmas_clks_info(hw);
+> +	struct palmas_clks *palmas_clks = cinfo->palmas_clk;
+> +	int ret;
+> +
+> +	ret = palmas_update_bits(palmas_clks->palmas, PALMAS_RESOURCE_BASE,
+> +			cinfo->clk_desc->control_reg,
+> +			cinfo->clk_desc->enable_mask,
+> +			cinfo->clk_desc->enable_mask);
+> +	if (ret < 0)
+> +		dev_err(palmas_clks->dev, "Reg 0x%02x update failed, %d\n",
+> +			cinfo->clk_desc->control_reg, ret);
+> +
+> +	return ret;
+> +}
+> +
+> +static void palmas_clks_unprepare(struct clk_hw *hw)
+> +{
+> +	struct palmas_clock_info *cinfo = to_palmas_clks_info(hw);
+> +	struct palmas_clks *palmas_clks = cinfo->palmas_clk;
+> +	int ret;
+> +
+> +	/*
+> +	 * Clock can be disabled through external pin if it is externally
+> +	 * controlled.
+> +	 */
+> +	if (cinfo->ext_control_pin)
+> +		return;
+> +
+> +	ret = palmas_update_bits(palmas_clks->palmas, PALMAS_RESOURCE_BASE,
+> +			cinfo->clk_desc->control_reg,
+> +			cinfo->clk_desc->enable_mask, 0);
+> +	if (ret < 0)
+> +		dev_err(palmas_clks->dev, "Reg 0x%02x update failed, %d\n",
+> +			cinfo->clk_desc->control_reg, ret);
+> +
+> +}
+> +
+> +static int palmas_clks_is_prepared(struct clk_hw *hw)
+> +{
+> +	struct palmas_clock_info *cinfo = to_palmas_clks_info(hw);
+> +	struct palmas_clks *palmas_clks = cinfo->palmas_clk;
+> +	int ret;
+> +	u32 val;
+> +
+> +	if (cinfo->ext_control_pin)
+> +		return 1;
+> +
+> +	ret = palmas_read(palmas_clks->palmas, PALMAS_RESOURCE_BASE,
+> +			cinfo->clk_desc->control_reg, &val);
+> +	if (ret < 0) {
+> +		dev_err(palmas_clks->dev, "Reg 0x%02x read failed, %d\n",
+> +				cinfo->clk_desc->control_reg, ret);
+> +		return ret;
+> +	}
+> +	return !!(val & cinfo->clk_desc->enable_mask);
+> +}
+> +
+> +static struct clk_ops palmas_clks_ops = {
+> +	.prepare	= palmas_clks_prepare,
+> +	.unprepare	= palmas_clks_unprepare,
+> +	.is_prepared	= palmas_clks_is_prepared,
+> +	.recalc_rate	= palmas_clks_recalc_rate,
+> +};
+> +
+> +static struct clk_init_data palmas_clks_hw_init[PALMAS_CLOCK32K_NR] = {
+> +	[PALMAS_CLOCK32KG] = {
+> +		.name = "clk32k_kg",
+> +		.ops = &palmas_clks_ops,
+> +		.flags = CLK_IS_ROOT | CLK_IGNORE_UNUSED,
+> +	},
+> +	[PALMAS_CLOCK32KG_AUDIO] = {
+> +		.name = "clk32k_kg_audio",
+> +		.ops = &palmas_clks_ops,
+> +		.flags = CLK_IS_ROOT | CLK_IGNORE_UNUSED,
+> +	},
+> +};
+
+if we had two compatible properties, then we would not need this.
+
+> +
+> +static int palmas_clks_get_clk_data(struct platform_device *pdev,
+> +	struct palmas_clks *palmas_clks)
+> +{
+> +	struct device_node *node = pdev->dev.of_node;
+> +	struct device_node *child;
+> +	struct palmas_clock_info *cinfo;
+> +	unsigned int prop;
+> +	int ret;
+> +	int i;
+> +
+> +	for (i = 0; i < PALMAS_CLOCK32K_NR; ++i) {
+> +		child = of_get_child_by_name(node,
+> +				palmas_clk32k_descs[i].clk_name);
+> +		if (!child)
+> +			continue;
+> +
+> +		cinfo = &palmas_clks->clk_info[i];
+> +		cinfo->boot_enable = of_property_read_bool(child,
+> +						"ti,clock-boot-enable");
+> +		ret = of_property_read_u32(child, "ti,external-sleep-control",
+> +					&prop);
+> +		if (!ret) {
+> +			switch (prop) {
+> +			case PALMAS_CLOCK_DT_EXT_CONTROL_ENABLE1:
+> +				prop = PALMAS_EXT_CONTROL_ENABLE1;
+> +				break;
+> +			case PALMAS_CLOCK_DT_EXT_CONTROL_ENABLE2:
+> +				prop = PALMAS_EXT_CONTROL_ENABLE2;
+> +				break;
+> +			case PALMAS_CLOCK_DT_EXT_CONTROL_NSLEEP:
+> +				prop = PALMAS_EXT_CONTROL_NSLEEP;
+> +				break;
+> +			default:
+> +				WARN_ON(1);
+> +				dev_warn(&pdev->dev,
+> +					"%s: Invalid ext control option: %u\n",
+> +					child->name, prop);
+> +				prop = 0;
+> +				break;
+> +			}
+> +			cinfo->ext_control_pin = prop;
 > +		}
 > +	}
 > +
-> +	chained_irq_exit(chip, desc);
+> +	return 0;
 > +}
 > +
-> +static int __init dw_apb_ictl_init(struct device_node *np,
-> +				   struct device_node *parent)
+> +static int palmas_clks_init_configure(struct palmas_clock_info *cinfo)
 > +{
-> +	unsigned int clr = IRQ_NOREQUEST | IRQ_NOPROBE | IRQ_NOAUTOEN;
-> +	struct resource r;
-> +	struct irq_domain *domain;
-> +	struct irq_chip_generic *gc;
-> +	void __iomem *iobase;
-> +	int ret, nrirqs, irq;
-> +	u32 reg;
+> +	struct palmas_clks *palmas_clks = cinfo->palmas_clk;
+> +	int ret;
 > +
-> +	/* Map the parent interrupt for the chained handler */
-> +	irq = irq_of_parse_and_map(np, 0);
-> +	if (irq <= 0) {
-> +		pr_err("%s: unable to parse irq\n", np->name);
-> +		return -EINVAL;
+> +	if (cinfo->boot_enable || cinfo->ext_control_pin) {
+> +		ret = clk_prepare(cinfo->clk);
+> +		if (ret < 0) {
+> +			dev_err(palmas_clks->dev,
+> +				"Clock prep failed, %d\n", ret);
+> +			return ret;
+> +		}
 > +	}
 > +
-> +	ret = of_address_to_resource(np, 0, &r);
-> +	if (ret) {
-> +		pr_err("%s: unable to get resource\n", np->name);
+> +	ret = palmas_update_bits(palmas_clks->palmas, PALMAS_RESOURCE_BASE,
+> +			cinfo->clk_desc->control_reg,
+> +			cinfo->clk_desc->sleep_mask, 0);
+> +	if (ret < 0) {
+> +		dev_err(palmas_clks->dev, "Reg 0x%02x update failed, %d\n",
+> +			cinfo->clk_desc->control_reg, ret);
 > +		return ret;
 > +	}
 > +
-> +	if (!request_mem_region(r.start, resource_size(&r), np->name)) {
-> +		pr_err("%s: unable to request mem region\n", np->name);
-> +		return -ENOMEM;
+> +	if (cinfo->ext_control_pin) {
+> +		ret = palmas_ext_control_req_config(palmas_clks->palmas,
+> +				cinfo->clk_desc->sleep_reqstr_id,
+> +				cinfo->ext_control_pin, true);
+> +		if (ret < 0) {
+> +			dev_err(palmas_clks->dev,
+> +				"Ext config for %s failed, %d\n",
+> +				cinfo->clk_desc->clk_name, ret);
+> +			return ret;
+> +		}
 > +	}
 > +
-> +	iobase = ioremap(r.start, resource_size(&r));
-> +	if (!iobase) {
-> +		pr_err("%s: unable to map resource\n", np->name);
-> +		return -ENOMEM;
-> +	}
-
-Could you not use of_iomap?
-
-Also, I'd recommend using np->full_name for error messages, as that
-gives you the full path for the node, which is far more helpful for
-debugging than just the unqualified node name.
-
+> +	return ret;
+> +}
 > +
-> +	/*
-> +	 * DW IP can be configured to allow 2-64 irqs. We can determine
-> +	 * the number of irqs supported by writing into enable register
-> +	 * and look for bits not set, as corresponding flip-flops will
-> +	 * have been removed by sythesis tool.
-> +	 */
+> +static int palmas_clks_probe(struct platform_device *pdev)
+> +{
+> +	struct palmas *palmas = dev_get_drvdata(pdev->dev.parent);
+> +	struct palmas_clock_info *cinfo;
+> +	struct palmas_clks *palmas_clks;
+> +	struct clk *clk;
+> +	int i, ret;
+> +
+> +	palmas_clks = devm_kzalloc(&pdev->dev, sizeof(*palmas_clks),
+> +				GFP_KERNEL);
+> +	if (!palmas_clks)
+> +		return -ENOMEM;
+> +
+> +	palmas_clks->clk_data.clks = devm_kzalloc(&pdev->dev,
+> +			PALMAS_CLOCK32K_NR * sizeof(palmas_clks->clk_data.clks),
+> +			GFP_KERNEL);
+> +	if (!palmas_clks->clk_data.clks)
+> +		return -ENOMEM;
+> +
+> +	palmas_clks_get_clk_data(pdev, palmas_clks);
+> +	platform_set_drvdata(pdev, palmas_clks);
+> +
+> +	palmas_clks->dev = &pdev->dev;
+> +	palmas_clks->palmas = palmas;
+> +
+> +	for (i = 0; i < PALMAS_CLOCK32K_NR; i++) {
+> +		cinfo = &palmas_clks->clk_info[i];
+> +		cinfo->clk_desc = &palmas_clk32k_descs[i];
+> +		cinfo->hw.init = &palmas_clks_hw_init[i];
+> +		cinfo->palmas_clk = palmas_clks;
+> +		clk = devm_clk_register(&pdev->dev, &cinfo->hw);
+> +		if (IS_ERR(clk)) {
+> +			ret = PTR_ERR(clk);
+> +			dev_err(&pdev->dev, "Fail to register clock %s, %d\n",
+> +				palmas_clk32k_descs[i].clk_name, ret);
+> +			return ret;
+> +		}
+> +
+> +		cinfo->clk = clk;
+> +		palmas_clks->clk_data.clks[i] = clk;
+> +		palmas_clks->clk_data.clk_num++;
+> +		palmas_clks_init_configure(cinfo);
 
-Is that always true?
+we dont handle error here?
 
-Cheers,
-Mark.
+> +	}
+> +
+> +	ret = of_clk_add_provider(pdev->dev.of_node, of_clk_src_simple_get,
+> +			&palmas_clks->clk_data);
+> +	if (ret < 0)
+> +		dev_err(&pdev->dev, "Fail to add clock driver, %d\n", ret);
+> +	return ret;
+> +}
+> +
+> +static int palmas_clks_remove(struct platform_device *pdev)
+> +{
+> +	of_clk_del_provider(pdev->dev.of_node);
+> +	return 0;
+> +}
+> +
+> +static struct of_device_id of_palmas_clks_match_tbl[] = {
+> +	{ .compatible = "ti,palmas-clk", },
+you could use match_data to map required data into the system..
+
+> +	{},
+> +};
+> +MODULE_DEVICE_TABLE(of, of_palmas_clks_match_tbl);
+> +
+> +static struct platform_driver palmas_clks_driver = {
+> +	.driver = {
+> +		.name = "palmas-clk",
+> +		.owner = THIS_MODULE,
+> +		.of_match_table = of_palmas_clks_match_tbl,
+> +	},
+> +	.probe = palmas_clks_probe,
+> +	.remove = palmas_clks_remove,
+> +};
+> +
+> +module_platform_driver(palmas_clks_driver);
+> +
+> +MODULE_DESCRIPTION("Clock driver for Palmas Series Devices");
+> +MODULE_ALIAS("platform:palmas-clk");
+> +MODULE_AUTHOR("Laxman Dewangan <ldewangan@nvidia.com>");
+> +MODULE_LICENSE("GPL v2");
+> 
+
+I wonder if we can simplify this with CLK_OF_DECLARE - I suppose it
+wont work if of_clk_init(NULL); was invoked previously.
+
+-- 
+Regards,
+Nishanth Menon
