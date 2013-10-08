@@ -1,29 +1,91 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Tue, 8 Oct 2013 07:26:24 +0200
-Subject: getting rid of subsys_initcall usage? (was: Re: [PATCH RESEND]
- i2c: designware: use module_platform_driver)
-In-Reply-To: <CAMj5Bki+BS=3sWCRdrDOEKpt6Bj+4vm0zKCJ4YBAudcqbAZySw@mail.gmail.com>
-References: <1376987548-12366-1-git-send-email-zhangfei.gao@linaro.org>
- <20130828095706.GH4086@katana>
- <CACRpkdb1p1=3a0PM+r2ZrMN+ECv5BAZFdv2omDK5npaer4ddcw@mail.gmail.com>
- <CAMj5BkhQkwb+T9VepN7UrWNRSgtv=Dw-Sa-gv0orOANo55iqNw@mail.gmail.com>
- <20130830054858.GR7656@atomide.com>
- <CAMj5BkiDExikXi3JcVhO7RN8_82eGYhq3i6oPf5Wbipy=N+iHQ@mail.gmail.com>
- <20130830082712.GT7656@atomide.com>
- <CAMj5BkgqBCh0316NmoP_XMXvJTVQxxvUvs63wZfS_TvNLdqAfg@mail.gmail.com>
- <CAMj5Bki+BS=3sWCRdrDOEKpt6Bj+4vm0zKCJ4YBAudcqbAZySw@mail.gmail.com>
-Message-ID: <20131008052623.GA2833@katana>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Mon, 07 Oct 2013 22:40:34 -0700
+Subject: [PATCHv7 00/36] ARM: OMAP: clock data conversion to DT
+In-Reply-To: <1380098922-30340-1-git-send-email-t-kristo@ti.com>
+References: <1380098922-30340-1-git-send-email-t-kristo@ti.com>
+Message-ID: <20131008054034.7445.48080@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Any plan about the patch?
+Quoting Tero Kristo (2013-09-25 01:48:06)
+> Hi all,
+> 
+> Version 7 contains following high level changes:
+> - Dropped support for basic bindings from Mike Turquette, instead using
+>   vendor specific bindings for all clocks
+> - Mux clock + divider clock vendor specific bindings get rid of use
+>   of the bit-masks, instead these are generated runtime based on parent
+>   clock / divider min/max info, see individual patches for details
+> - Added support for dummy_ck nodes, was missing from previous version
+> - Fixed support for omap3630
+> - Added support for new clock node type: ti,mux-gate-clock (using composite
+>   clock type)
+> - OMAP4 / OMAP5 only build fixes (compiler flag checks added to some files)
+> - most of the of_omap_* calls renamed to of_ti_*
+> - Rebased on top of v3.12-rc2
 
-I am right now working on a patch series dealing with this.
+Hi Tero,
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131008/42aee5ba/attachment-0001.sig>
+I had one really minor request for one of the patches, otherwise I'm
+pretty happy with this series and I can take in the clock parts for
+3.13. A few general comments:
+
+1) I think I mentioned some time back that it would be
+wise to put a disclaimer at the top of each DT binding description
+stating something to the effect: "Binding status: Unstable - ABI
+compatibility may be broken in the future". Are you OK merging these
+bindings as-is without that kind of a disclaimer?
+
+2) I hope to see the clockdomain stuff go away in the future. I'm OK to
+take it for now to aid in this DT transition but I would like some
+commitment that it will not stay in drivers/clk/omap forever. I guess
+for clockdomain you'll need to figure out how to handle those in a
+generic driver way.
+
+3) Same concern as above but for the DT clkdev alias stuff. I guess
+you'll need to make all of the dependent drivers play nice with DT. Do
+you plan to remove it within a reasonable timeframe? It would be a nice
+reduction in LoC and more importantly it would mean that drivers were
+using clkdev in a more-correct fashion.
+
+Regards,
+Mike
+
+> 
+> Some detailed comments about patch level changes (if no mention, no major
+> changes):
+> - Patch #1:
+>   * removed use of reg-names property, instead registers mapped using
+>     compatible string
+>   * removed ti,modes property, instead uses DPLL mode flags now
+>   * separated AM33XX DPLLs under their own compatible strings
+> - Patch #4 & #5: new patches
+> - Patch #6: merged basic gate support from Mike to this patch as vendor
+>   specific gate clock support
+> - Patch #9 & #10: new patches
+> - Patch #11: dummy clocks added, USB / ABE DPLL setup ordering changed
+> - Patch #14: dummy clocks added
+> - Patch #20: dropped usage of reg-names property
+> - Patch #21: dummy clocks added
+> - Patch #22 & #23: new patches
+> - Patch #30: AM35XX clock data added to this patch
+> - Patch #31:
+>   * dummy clocks added
+>   * added missing 3630 clocks
+> 
+> Test branch available here:
+> https://github.com/t-kristo/linux-pm.git
+> branch: mainline-3.12-rc2-ti-dt-clks-v7
+> 
+> Testing done:
+> - am335x-bone : boot only
+> - omap5-sevm : boot only
+> - dra7-evm : boot only
+> - omap3-beagle : boot + suspend/resume (ret + off)
+> - omap4-panda-es : boot + suspend/resume
+> 
+> Nishanth has also been doing some tests with omap3-beagle-xm with some WIP
+> versions of this branch, but not with this latest one. Nishanth, maybe you
+> can provide test results to this one also?
+> 
+> -Tero
