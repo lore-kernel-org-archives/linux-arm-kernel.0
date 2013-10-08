@@ -1,40 +1,44 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 08 Oct 2013 13:30:15 +0200
-Subject: [PATCH v2] clocksource: Provide timekeeping for efm32 SoCs
-In-Reply-To: <1380830189-21553-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1380830189-21553-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <5253ECC7.30700@linaro.org>
+From: r.sricharan@ti.com (Sricharan R)
+Date: Tue, 8 Oct 2013 17:13:46 +0530
+Subject: [PATCH v3 4/6] ARM: mm: Correct virt_to_phys patching for 64
+ bit physical addresses
+In-Reply-To: <alpine.LFD.2.03.1310071537040.3023@syhkavp.arg>
+References: <1380835081-12129-1-git-send-email-santosh.shilimkar@ti.com>
+ <1380835081-12129-5-git-send-email-santosh.shilimkar@ti.com>
+ <alpine.LFD.2.03.1310031952060.3023@syhkavp.arg> <524E541D.2030509@ti.com>
+ <alpine.LFD.2.03.1310040857530.3023@syhkavp.arg> <52530A98.1030708@ti.com>
+ <alpine.LFD.2.03.1310071537040.3023@syhkavp.arg>
+Message-ID: <5253EFF2.5030600@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/03/2013 09:56 PM, Uwe Kleine-K?nig wrote:
-> An efm32 features 4 16-bit timers with a 10-bit prescaler. This driver
-> provides clocksource and clock event device using one timer instance
-> each.
+On Tuesday 08 October 2013 01:12 AM, Nicolas Pitre wrote:
+> On Mon, 7 Oct 2013, Santosh Shilimkar wrote:
 >
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> ---
-
-Applied to my tree for 3.13
-
-Thanks !
-   -- Daniel
-
-> Changes since (implicit) v1, sent with
-> Message-id:1379324644-20934-1-git-send-email-u.kleine-koenig at pengutronix.de:
+>> Update patch below with your review tag for records.
+>>
+>> Regards,
+>> Santosh
+> Micronit:
 >
->   - drop unused #defines
->   - add __init to efm32_clocksource_init
->   - fix indention
->   - add a comment describing the reason for the construct in efm32_timer_init
->   - add device tree binding document
->     I created a new directory "timer" below the binding directory.
+>>  	.data
+>>  	.globl	__pv_phys_offset
+>>  	.type	__pv_phys_offset, %object
+>>  __pv_phys_offset:
+>> -	.long	0
+>> -	.size	__pv_phys_offset, . - __pv_phys_offset
+>> +	.quad	0
+>> +
+>> +	.data
+>> +	.globl	__pv_offset
+>> +	.type	__pv_offset, %object
+>>  __pv_offset:
+>> -	.long	0
+>> +	.quad	0
+> Please keep the .size statement for __pv_phys_offset, and adding one for 
+> __pv_offset wouldn't hurt either.  And the second .data is redundant.
+>
+Ok, will update this.
 
-Why do you say you created a new directory ?
-
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Regards,
+ Sricharan
