@@ -1,65 +1,52 @@
-From: victor.kamensky@linaro.org (Victor Kamensky)
-Date: Tue, 8 Oct 2013 11:14:55 -0700
-Subject: [PATCH 2/2] ARM: cci: driver need big endian fixes in asm code
-In-Reply-To: <alpine.LFD.2.03.1310081356280.3023@syhkavp.arg>
-References: <1381207040-1623-1-git-send-email-victor.kamensky@linaro.org>
- <1381207040-1623-3-git-send-email-victor.kamensky@linaro.org>
- <20131008175136.GA3866@localhost.localdomain>
- <alpine.LFD.2.03.1310081356280.3023@syhkavp.arg>
-Message-ID: <CAA3XUr1tuS1CcJ5Mxp7h2Knigm0EZe5H47gSoP=aOnL-V7jX0w@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 8 Oct 2013 11:15:35 -0700
+Subject: [PATCH v5 00/11] ARM: OMAP2+: AM43x PRCM basic support
+In-Reply-To: <524E6346.2080208@ti.com>
+References: <cover.1380608719.git.afzal@ti.com>
+ <524E6346.2080208@ti.com>
+Message-ID: <20131008181535.GF8313@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nicolas,
+* Rajendra Nayak <rnayak@ti.com> [131003 23:50]:
+> On Tuesday 01 October 2013 12:34 PM, Afzal Mohammed wrote:
+> > Hi Paul, Benoit, Tony,
+> > 
+> > This series adds PRCM support (except clock tree) for AM43x SoC's.
+> > Please consider this for inclusion in the coming merge window.
+> > 
+> > Patch 02/11 "ARM: OMAP2+: hwmod: AM335x/AM43x: move common data" may
+> > not reach mailing lists due to bigger size, this series is also present
+> > @git://gitorious.org/x0148406-public/linux-kernel.git tags/am43x-prcm-v5
+> > 
+> > Compared to v4, only change is in fixing the powerdomain data.
+> > 
+> > Major changes compared to rfc v3:
+> > 1. All register offsets properly taken care for AM43x (with rfc v3, a
+> >    couple of issues was detected while testing on pre-silicon)
+> > 2. There were two patches for common hwmod data movement (one for
+> >    interconnect and other for ip block data), both were combined to have
+> >    a cleaner series that is bisectable.
+> > 3. Cleaner seperation of common data
+> > 
+> > Major changes compared to v2 (v3 was only an rfc for current approach):
+> > 1. omap_hwmod_33xx_43xx_interconnect_data.c has the common interconnect
+> >    ocp's structs shared between AM335x and AM43x
+> > 2. omap_hwmod_33xx_43xx_ipblock_data.c has the common hwmod structs
+> >    shared between AM335x and AM43x
+> 
+> This split and reuse looks much better and readable now.
+> 
+> For the complete series,
+> Acked-by: Rajendra Nayak <rnayak@ti.com>
 
-On 8 October 2013 10:57, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
-> On Tue, 8 Oct 2013, Dave Martin wrote:
->
->> On Mon, Oct 07, 2013 at 09:37:20PM -0700, Victor Kamensky wrote:
->> > cci_enable_port_for_self written in asm and it works with h/w
->> > registers that are in little endian format. When run in big
->> > endian mode it needs byte swap before/after it writes/reads
->> > to/from such registers
->>
->> Lorenzo should comment on this if he's not already seen it.
->>
->> >
->> > Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
->> > ---
->> >  drivers/bus/arm-cci.c | 6 ++++++
->> >  1 file changed, 6 insertions(+)
->> >
->> > diff --git a/drivers/bus/arm-cci.c b/drivers/bus/arm-cci.c
->> > index 2009266..6db173e 100644
->> > --- a/drivers/bus/arm-cci.c
->> > +++ b/drivers/bus/arm-cci.c
->> > @@ -281,6 +281,9 @@ asmlinkage void __naked cci_enable_port_for_self(void)
->> >     /* Enable the CCI port */
->> >  "  ldr     r0, [r0, %[offsetof_port_phys]] \n"
->> >  "  mov     r3, #"__stringify(CCI_ENABLE_REQ)" \n"
->> > +#ifdef __ARMEB__
->> > +"  rev     r3, r3 \n"
->> > +#endif /* __ARMEB__ */
->>
->> Hmmm, this is a bit ugly, but we can't easily use ARM_BE8() here.
->
-> In any case, it would be more efficient to swap the CCI_ENABLE_REQ
-> constant at compile time rather than doing it at run time with an extra
-> instruction.
+Looks good to me too. I'm assuming that Paul will queue this.
 
-I could try to do this but it would require introducing another constant,
-because CCI_ENABLE_REQ is used in another place in writel_relaxed
-call which will do byteswap inside. Is such run-time optimization really
-worth it compared to code readability. Please let me know.
-I am OK either way. Personally I thought that run-time byteswap would
-be more readable.
+And let's everybody make note that this will be the _last_ set of
+hwmod data we'll _ever_ merge as this all should be replaced with
+device tree + bus driver based approach for future SoCs.
 
-Also I am concerned how can I compile time byteswap CCI_ENABLE_REQ
-in context of its being used with __stringify ...  Wondering it should be
-stringfied into real number not long expression
+But let's get the common clock framework conversion done first, so
+this can wait until after that.
 
-Thanks,
-Victor
-
->
-> Nicolas
+Acked-by: Tony Lindgren <tony@atomide.com>
