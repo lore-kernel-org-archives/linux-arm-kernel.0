@@ -1,52 +1,80 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 8 Oct 2013 11:15:35 -0700
-Subject: [PATCH v5 00/11] ARM: OMAP2+: AM43x PRCM basic support
-In-Reply-To: <524E6346.2080208@ti.com>
-References: <cover.1380608719.git.afzal@ti.com>
- <524E6346.2080208@ti.com>
-Message-ID: <20131008181535.GF8313@atomide.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 8 Oct 2013 14:16:47 -0400
+Subject: [PATCH v2 2/2] ARM: Dove: Add the audio device to the Cubox DT
+In-Reply-To: <525448DE.5030004@gmail.com>
+References: <20131008194232.7d74b9e6@armhf>
+ <525448DE.5030004@gmail.com>
+Message-ID: <20131008181647.GW5402@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Rajendra Nayak <rnayak@ti.com> [131003 23:50]:
-> On Tuesday 01 October 2013 12:34 PM, Afzal Mohammed wrote:
-> > Hi Paul, Benoit, Tony,
-> > 
-> > This series adds PRCM support (except clock tree) for AM43x SoC's.
-> > Please consider this for inclusion in the coming merge window.
-> > 
-> > Patch 02/11 "ARM: OMAP2+: hwmod: AM335x/AM43x: move common data" may
-> > not reach mailing lists due to bigger size, this series is also present
-> > @git://gitorious.org/x0148406-public/linux-kernel.git tags/am43x-prcm-v5
-> > 
-> > Compared to v4, only change is in fixing the powerdomain data.
-> > 
-> > Major changes compared to rfc v3:
-> > 1. All register offsets properly taken care for AM43x (with rfc v3, a
-> >    couple of issues was detected while testing on pre-silicon)
-> > 2. There were two patches for common hwmod data movement (one for
-> >    interconnect and other for ip block data), both were combined to have
-> >    a cleaner series that is bisectable.
-> > 3. Cleaner seperation of common data
-> > 
-> > Major changes compared to v2 (v3 was only an rfc for current approach):
-> > 1. omap_hwmod_33xx_43xx_interconnect_data.c has the common interconnect
-> >    ocp's structs shared between AM335x and AM43x
-> > 2. omap_hwmod_33xx_43xx_ipblock_data.c has the common hwmod structs
-> >    shared between AM335x and AM43x
+On Tue, Oct 08, 2013 at 08:03:10PM +0200, Sebastian Hesselbarth wrote:
+> On 10/08/2013 07:42 PM, Jean-Francois Moine wrote:
+> >This patch activates the audio device of the Cubox.
+> >
+> >The audio flow (pin mpp_audio1) is output on both I2S and S/PDIF.
+> >
+> >The third si5351 clock (#2, pin mpp13) is used as the external clock.
+> >
+> >Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
+> >---
+> >  arch/arm/boot/dts/dove-cubox.dts | 20 ++++++++++++++++++++
+> >  1 file changed, 20 insertions(+)
+> >
+> >diff --git a/arch/arm/boot/dts/dove-cubox.dts b/arch/arm/boot/dts/dove-cubox.dts
+> >index 022646e..bb38a24 100644
+> >--- a/arch/arm/boot/dts/dove-cubox.dts
+> >+++ b/arch/arm/boot/dts/dove-cubox.dts
+> >@@ -132,3 +132,23 @@
+> >  		reg = <0>;
+> >  	};
+> >  };
+> >+
+> >+&pinctrl {
+> >+	pmx_gpio_13_audio1: pmx-gpio-13-audio1 {
 > 
-> This split and reuse looks much better and readable now.
+> Jean-Francois,
 > 
-> For the complete series,
-> Acked-by: Rajendra Nayak <rnayak@ti.com>
+> please name the node "pmx_audio1_extclk: pmx-audio1-extclk"
+> and move both to the corresponding section in dove.dtsi.
+> We can reuse them on other Dove boards for sure.
+> 
+> >+		marvell,pins = "mpp13";
+> >+		marvell,function = "audio1";
+> >+	};
+> >+
+> >+	pmx_audio1_i2s1_spdifo: pmx-audio1-i2s1-spdifo {
+> >+		marvell,pins = "mpp_audio1";
+> >+		marvell,function = "i2s1/spdifo";
+> >+	};
+> >+};
+> >+
+> >+&audio1 {
+> >+	status = "okay";
+> >+	clocks = <&gate_clk 13>, <&si5351 2>;
+> >+	clock-names = "internal", "extclk";
+> >+	pinctrl-0 = <&pmx_audio1_i2s1_spdifo &pmx_gpio_13_audio1>;
+> 
+> The above needs updated phandles then.
+> 
+> Otherwise,
+> 
+> Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 
-Looks good to me too. I'm assuming that Paul will queue this.
+Once you make the above changes, just send a v3 in-reply-to this patch
+and I'll pick it up with the other two.
 
-And let's everybody make note that this will be the _last_ set of
-hwmod data we'll _ever_ merge as this all should be replaced with
-device tree + bus driver based approach for future SoCs.
+thx,
 
-But let's get the common clock framework conversion done first, so
-this can wait until after that.
+Jason.
 
-Acked-by: Tony Lindgren <tony@atomide.com>
+> 
+> >+	pinctrl-names = "default";
+> >+};
+> >
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
