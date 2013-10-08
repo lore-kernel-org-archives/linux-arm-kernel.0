@@ -1,47 +1,60 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Tue, 8 Oct 2013 11:48:39 +0200
-Subject: [RFC] ASoC: pcm: Trigger all commands on error
-In-Reply-To: <20131008093413.GX21581@sirena.org.uk>
-References: <1380883997-18236-1-git-send-email-mpa@pengutronix.de>
- <20131007172706.GS21581@sirena.org.uk>
- <20131008082933.GA19005@pengutronix.de>
- <20131008093413.GX21581@sirena.org.uk>
-Message-ID: <20131008094839.GB19005@pengutronix.de>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 8 Oct 2013 10:51:48 +0100
+Subject: [PATCH 3/6] ARM: integrator: delete non-devicetree boot path
+In-Reply-To: <1380816202-3128-1-git-send-email-linus.walleij@linaro.org>
+References: <1380816202-3128-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <20131008095148.GD28972@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 08, 2013 at 10:34:13AM +0100, Mark Brown wrote:
-> On Tue, Oct 08, 2013 at 10:29:33AM +0200, Markus Pargmann wrote:
+[Adding devicetree to Cc]
+
+On Thu, Oct 03, 2013 at 05:03:22PM +0100, Linus Walleij wrote:
+> The Device Tree boot path now supports everything the ATAG
+> boot can provide, and the two are equivalent. This deletes
+> the ATAG boot path from the Integrator/AP and
+> Integrator/CP platforms to move them on to the future.
 > 
-> > To make proper error handling and only STOP functions that successfully
-> > started, we have to store the state of each function. The command error
-> > handling is done in pcm_native.c so we don't have any influence on that.
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+>  arch/arm/Kconfig                         |   1 +
+>  arch/arm/mach-integrator/core.c          |  57 ----------
+>  arch/arm/mach-integrator/integrator_ap.c | 135 ------------------------
+>  arch/arm/mach-integrator/integrator_cp.c | 173 -------------------------------
+>  arch/arm/mach-integrator/pci_v3.c        | 122 +++++-----------------
+>  5 files changed, 25 insertions(+), 463 deletions(-)
 > 
-> I meant just unwinding the things done in the trigger call.
 
-You mean unwinding when we detect the error? If we return the
-error code from the trigger function, the pcm_native.c will still
-trigger a STOP command which is executed on all components.
+[...]
 
+> +static int __init pci_v3_probe(struct platform_device *pdev)
+>  {
+> +       struct device_node *np = pdev->dev.of_node;
+>         struct of_pci_range_parser parser;
+>         struct of_pci_range range;
+>         struct resource *res;
+>         int irq, ret;
 > 
-> > Another possibility is to explicitly allow multiple _STOPs. Then I could
-> > fix the driver to store the clock state. But I would prefer a generic
-> > solution.
-> 
-> You're going to have to handle this anyway to be robust - what happens
-> if it's the clock enable that fails?
+> +       /* Remap the Integrator system controller */
+> +       ap_syscon_base = ioremap(INTEGRATOR_SC_BASE, 0x100);
 
-If clk_enable fails, we can return an error code in the mxs-saif trigger
-function. Of course the error handling is missing here, but it is not
-necessary to store the state of the clock to handle errors properly.
+It seems a shame that this didn't get described in the DT. This hasn't
+been fully moved over...
 
-Regards,
+> +       if (!ap_syscon_base) {
+> +               dev_err(&pdev->dev, "unable to remap the AP syscon for PCIv3\n");
+> +               return -ENODEV;
+> +       }
+> +
+> +       /* Device tree probe path */
+> +       if (!np) {
+> +               dev_err(&pdev->dev, "no device tree node for PCIv3\n");
+> +               return -ENODEV;
+> +       }
 
-Markus
+We didn't unmap the syscon registers, yet we mapped them here. Either
+we've got a useless mapping, or we're mapping it from the wrong block of
+code...
 
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Cheers,
+Mark.
