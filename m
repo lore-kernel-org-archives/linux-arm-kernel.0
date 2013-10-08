@@ -1,84 +1,58 @@
-From: dinh.linux@gmail.com (Dinh Nguyen)
-Date: Mon, 07 Oct 2013 21:40:16 -0500
-Subject: [PATCH] arm: socfpga: Fix incorrect sdmmc clock name
-In-Reply-To: <20131008013954.7445.27392@quantum>
-References: <1376322134-17408-1-git-send-email-dinguyen@altera.com>
- <20130814054810.GF16635@quad.lixom.net>
- <1376492274.8715.2.camel@linux-builds1> <20131007201254.7445.8105@quantum>
- <1381178249.1584.1.camel@linux-builds1> <20131007232857.7445.3041@quantum>
- <CAOesGMjC7rOghacXUEp6bE=8pXWGMBZ-M637ZiLMKBp+-KUPug@mail.gmail.com>
- <20131008013954.7445.27392@quantum>
-Message-ID: <52537090.9030704@gmail.com>
+From: zhangfei.gao@gmail.com (zhangfei gao)
+Date: Tue, 8 Oct 2013 10:46:04 +0800
+Subject: getting rid of subsys_initcall usage? (was: Re: [PATCH RESEND]
+ i2c: designware: use module_platform_driver)
+In-Reply-To: <CAMj5BkgqBCh0316NmoP_XMXvJTVQxxvUvs63wZfS_TvNLdqAfg@mail.gmail.com>
+References: <1376987548-12366-1-git-send-email-zhangfei.gao@linaro.org>
+ <20130828095706.GH4086@katana>
+ <CACRpkdb1p1=3a0PM+r2ZrMN+ECv5BAZFdv2omDK5npaer4ddcw@mail.gmail.com>
+ <CAMj5BkhQkwb+T9VepN7UrWNRSgtv=Dw-Sa-gv0orOANo55iqNw@mail.gmail.com>
+ <20130830054858.GR7656@atomide.com>
+ <CAMj5BkiDExikXi3JcVhO7RN8_82eGYhq3i6oPf5Wbipy=N+iHQ@mail.gmail.com>
+ <20130830082712.GT7656@atomide.com>
+ <CAMj5BkgqBCh0316NmoP_XMXvJTVQxxvUvs63wZfS_TvNLdqAfg@mail.gmail.com>
+Message-ID: <CAMj5Bki+BS=3sWCRdrDOEKpt6Bj+4vm0zKCJ4YBAudcqbAZySw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On 10/7/13 8:39 PM, Mike Turquette wrote:
-> Quoting Olof Johansson (2013-10-07 16:43:14)
->> On Mon, Oct 7, 2013 at 4:28 PM, Mike Turquette <mturquette@linaro.org> wrote:
->>> Quoting Dinh Nguyen (2013-10-07 13:37:29)
->>>> Hi Mike,
->>>>
->>>> On Mon, 2013-10-07 at 13:12 -0700, Mike Turquette wrote:
->>>>> Quoting Dinh Nguyen (2013-08-14 07:57:54)
->>>>>> On Tue, 2013-08-13 at 22:48 -0700, Olof Johansson wrote:
->>>>>>> On Mon, Aug 12, 2013 at 10:42:14AM -0500, dinguyen at altera.com wrote:
->>>>>>>> From: Dinh Nguyen <dinguyen@altera.com>
->>>>>>>>
->>>>>>>> The SD/MMC clock is named "sdmmc_clk", and NOT "mmc_clk".
->>>>>>>>
->>>>>>>> Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
->>>>>>>> Cc: Mike Turquette <mturquette@linaro.org>
->>>>>>>> CC: Arnd Bergmann <arnd@arndb.de>
->>>>>>>> CC: Olof Johansson <olof@lixom.net>
->>>>>>>> Cc: Pavel Machek <pavel@denx.de>
->>>>>>>> Cc: linux-arm-kernel at lists.infradead.org
->>>>>>> Hi Dinh,
->>>>>>>
->>>>>>> Do you want this applied in fixes for 3.11? If so, can you give me a oneliner
->>>>>>> on what the impact here is? mmc doesn't come up at all, or something more
->>>>>>> subtle?
->>>>>> Hi Olof,
->>>>>>
->>>>>> No, this is go into 3.12 as I am still working on the bindings for
->>>>>> SD/MMC.
->>>>>>
->>>>>> The oneliner: "The SD/MMC driver was intermittently not coming up
->>>>>> because it was not able to get the correct clock."
->>>>> Olof, did you take this? If not I'll put it into my next batch of fixes
->>>>> for 3.12.
->>>> No, Olof did not get a chance to pick this up for 3.12. I resent the
->>>> patch with the updated commit message for 3.13:
->>>>
->>>> http://lists.infradead.org/pipermail/linux-arm-kernel/2013-September/198824.html
->>> Thanks for the link. I've taken that version into clk-fixes for 3.12.
+On Thu, Sep 12, 2013 at 9:12 AM, zhangfei gao <zhangfei.gao@gmail.com> wrote:
+> On Fri, Aug 30, 2013 at 4:27 PM, Tony Lindgren <tony@atomide.com> wrote:
+>> * zhangfei gao <zhangfei.gao@gmail.com> [130829 23:36]:
+>>> What about concerns from Wolfram:
+>>> " Other people might be
+>>> depending on subsys_initcall to get I2C active before they want to
+>>> activate, say, PMICs. So, I fear regressions, since deferred probing
+>>> might not be available in the needed places to avoid these regressions."
 >>
->> Thanks Mike, and sorry for dropping the ball Dinh. Next time feel free
->> to remind me if it happens. A week is the normal grace period. :)
-No problem Olof! The patches to enable SDMMC is still floating out there 
-so there wasn't a huge
-hurry for 3.12.
-
-Any chance you might take a look? I'll ping Chris Ball again tomorrow.
-
-http://lists.infradead.org/pipermail/linux-arm-kernel/2013-September/198824.html
-
-Thanks...
-> No problem ;-)
->
-> Dinh,
->
-> I changed your $SUBJECT line to:
->
-> "clk: socfpga: Fix incorrect sdmmc clock name"
->
-> Just a simple s/arm/clk/
-Thanks Mike!
-
-Dinh
->
-> Regards,
-> Mike
->
+>> There should not be any reason to get a PMIC activated
+>> early on. The system should be booting already at that point,
+>> and the PMIC related init can be done later on.
 >>
->> -Olof
+>>> Is it too late using module_init for PMIC?
+>>
+>> You can probably do it as a fix early on during the -rc
+>> cycle too. Of course it needs to be verified to work first :)
+>>
+>
+> Dear Wolfram
+>
+> What's your suggestion about this issue.
+> Use subsys_initcall, deferred probing still exist if base on pin control driver.
+>
+> Thanks
+
+Dear Wolfram
+
+Any plan about the patch?
+
+On one hand, module_X_driver is trend to replace subsys_initcall
+
+Refer from Mark
+"We're trying to move away from needing to do this and to using deferred
+probing to resolve init ordering issues.  Should we not be able to
+convert the drivers to module_X_driver()?"
+
+On the other hand, subsys_initcall still been defered if pin
+controller driver been relied on.
+
+Thanks
