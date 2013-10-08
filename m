@@ -1,58 +1,64 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 8 Oct 2013 12:47:21 -0500
-Subject: [PATCH 2/2] ARM: dts: omap3-beagle: use 3630 definitions
-In-Reply-To: <20131007192009.GA8949@atomide.com>
-References: <523C9D8B.2000701@ti.com>
- <1381164584-4008-1-git-send-email-nm@ti.com>
- <1381164584-4008-3-git-send-email-nm@ti.com>
- <20131007192009.GA8949@atomide.com>
-Message-ID: <20131008174721.GH13128@radagast>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 8 Oct 2013 18:49:45 +0100
+Subject: [PATCH 2/2] ARM: include: asm: use 'int' instead of 'unsigned
+ long' for normal register variables within atomic.h
+In-Reply-To: <5253EC8A.2030305@asianux.com>
+References: <20131002104158.GD28311@mudshark.cambridge.arm.com>
+ <524C3981.20307@asianux.com> <524D416B.5090709@asianux.com>
+ <20131003163200.GE7408@mudshark.cambridge.arm.com>
+ <524E8FBC.2080200@asianux.com>
+ <20131004153742.GR24303@mudshark.cambridge.arm.com>
+ <20131004154208.GS24303@mudshark.cambridge.arm.com>
+ <524F5566.4010204@asianux.com>
+ <20131008103331.GE17148@mudshark.cambridge.arm.com>
+ <5253EC8A.2030305@asianux.com>
+Message-ID: <20131008174945.GJ21189@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Mon, Oct 07, 2013 at 12:20:09PM -0700, Tony Lindgren wrote:
-> * Nishanth Menon <nm@ti.com> [131007 09:57]:
-> > beagle-xm currently would matchup with ti,omap3 which invokes
-> > omap3430_init_early instead of omap3630_init_early. So add
-> > compatiblity for 3630 to allow match
+On Tue, Oct 08, 2013 at 12:29:14PM +0100, Chen Gang wrote:
+> On 10/08/2013 06:33 PM, Will Deacon wrote:
+> > On Sat, Oct 05, 2013 at 12:55:18AM +0100, Chen Gang wrote:
+> >> Hmm... in my opinion, we need divide atomic_*_mask() into 32-bit and
+> >> 64-bit versions. We already have demands to only use 32-bit value to
+> >> express mask (can save size), and may have demands to use 64-bit too.
 > > 
-> > Signed-off-by: Nishanth Menon <nm@ti.com>
-> > ---
-> >  arch/arm/boot/dts/omap3-beagle-xm.dts |    2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> > Right, but isn't this code only used by that s390 SCSI driver? Why do other
+> > architectures even need to bother implementing it?
 > > 
-> > diff --git a/arch/arm/boot/dts/omap3-beagle-xm.dts b/arch/arm/boot/dts/omap3-beagle-xm.dts
-> > index 0f7cfc5..2079e22 100644
-> > --- a/arch/arm/boot/dts/omap3-beagle-xm.dts
-> > +++ b/arch/arm/boot/dts/omap3-beagle-xm.dts
-> > @@ -11,7 +11,7 @@
-> >  
-> >  / {
-> >  	model = "TI OMAP3 BeagleBoard xM";
-> > -	compatible = "ti,omap3-beagle-xm", "ti,omap3-beagle", "ti,omap3";
-> > +	compatible = "ti,omap3-beagle-xm", "ti,omap363x", "ti,omap3-beagle", "ti,omap3";
-> >  
-> >  	cpus {
-> >  		cpu at 0 {
-> 
-> This compatible string looks hacky.. How about just make it
-> 
-> "ti,omap3-beagle-xm", "ti,omap363x", "ti,omap3";
-> 
-> How about just leave out "ti,omap3-beagle" here?
+> Hmm... for atomic_set_mask(), "drivers/gpu/drm/i915/i915_irq.c" also
+> uses it (it is about Intel Graphics).
 
-ti,omap3-beagle was already part of the original file, we can definitely
-remove but I'd expect us to maintain support for that string
-indefinitely should anybody continue to use older dtbs.
+I don't think we care too much about the Intel graphics driver on ARM at the
+moment.
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131008/618857fb/attachment.sig>
+> For some architectures (e.g. frv, mn10300, mr32r, blackfin, and of cause
+> s390), still use atomic_[set/clear]_mask().
+
+We don't care about those either.
+
+> And they are inline functions in atomic.h, individual kernel modules may
+> use them (which source code is not merged into kernel). Can we skip
+> these individual modules? (I guess we can, but need think of carefully).
+
+or those. If somebody starts complaining, then we can add things back.
+
+> >> And also, excuse me, I am not quite familiar with "exclusive monitor",
+> >> could you please provide more details about it?
+> > 
+> > You'll need to take a look at the ARM ARM, in particular the section about
+> > `Synchronisation and Semaphores'.
+> > 
+> 
+> Do you mean "ARM ARM" is a book name? (at least, I really need read more
+> things to familiar with ARM)
+
+Yes, the hilariouly titled "ARM Architecture Reference Manual". You can find
+it on arm.com, but you have to register:
+
+ARMv7: https://silver.arm.com/download/download.tm?pv=1299246
+ARMv8 (beta): https://silver.arm.com/download/download.tm?pv=1448511
+
+Enjoy!
+
+Will
