@@ -1,28 +1,114 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 8 Oct 2013 10:17:20 +0200
-Subject: [PATCH 1/3] pinctrl: sirf: add lost uart0-no-stream-control
- pingroup for prima2
-In-Reply-To: <1380464879-19897-1-git-send-email-Baohua.Song@csr.com>
-References: <1380464879-19897-1-git-send-email-Baohua.Song@csr.com>
-Message-ID: <CACRpkdbTdaAb35PVZMju=0MjtopVe4VKKSWW-TmuvnxtqZZjxw@mail.gmail.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Tue, 8 Oct 2013 11:17:55 +0300
+Subject: [PATCHv7 00/36] ARM: OMAP: clock data conversion to DT
+In-Reply-To: <20131008054034.7445.48080@quantum>
+References: <1380098922-30340-1-git-send-email-t-kristo@ti.com>
+ <20131008054034.7445.48080@quantum>
+Message-ID: <5253BFB3.9040807@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Sep 29, 2013 at 4:27 PM, Barry Song <21cnbao@gmail.com> wrote:
-
-> From: Qipan Li <Qipan.Li@csr.com>
+On 10/08/2013 08:40 AM, Mike Turquette wrote:
+> Quoting Tero Kristo (2013-09-25 01:48:06)
+>> Hi all,
+>>
+>> Version 7 contains following high level changes:
+>> - Dropped support for basic bindings from Mike Turquette, instead using
+>>    vendor specific bindings for all clocks
+>> - Mux clock + divider clock vendor specific bindings get rid of use
+>>    of the bit-masks, instead these are generated runtime based on parent
+>>    clock / divider min/max info, see individual patches for details
+>> - Added support for dummy_ck nodes, was missing from previous version
+>> - Fixed support for omap3630
+>> - Added support for new clock node type: ti,mux-gate-clock (using composite
+>>    clock type)
+>> - OMAP4 / OMAP5 only build fixes (compiler flag checks added to some files)
+>> - most of the of_omap_* calls renamed to of_ti_*
+>> - Rebased on top of v3.12-rc2
 >
-> the old codes defined uart0_nostreamctrl_pins, but missed pingroup
-> and padmux definition for it. this patch fixes it.
+> Hi Tero,
 >
-> Signed-off-by: Qipan Li <Qipan.Li@csr.com>
-> Signed-off-by: Barry Song <Baohua.Song@csr.com>
-> ---
->  arch/arm/boot/dts/prima2.dtsi         | 6 ++++++
->  drivers/pinctrl/sirf/pinctrl-prima2.c | 3 +++
+> I had one really minor request for one of the patches, otherwise I'm
+> pretty happy with this series and I can take in the clock parts for
+> 3.13. A few general comments:
 
-Usually I'd split off the DT changes separately and take these
-through ARM SoC, but whatever, no big deal. Patch applied.
+Yea, I'll add the is_enabled check to the APLL and repost.
 
-Yours,
-Linus Walleij
+>
+> 1) I think I mentioned some time back that it would be
+> wise to put a disclaimer at the top of each DT binding description
+> stating something to the effect: "Binding status: Unstable - ABI
+> compatibility may be broken in the future". Are you OK merging these
+> bindings as-is without that kind of a disclaimer?
+
+Well, personally I don't mind, but if you think this would be good, I'll 
+add this to next rev.
+
+> 2) I hope to see the clockdomain stuff go away in the future. I'm OK to
+> take it for now to aid in this DT transition but I would like some
+> commitment that it will not stay in drivers/clk/omap forever. I guess
+> for clockdomain you'll need to figure out how to handle those in a
+> generic driver way.
+
+I think the clockdomain stuff should be possible to move to wherever CM 
+driver is going to move. drivers/power/omap/... or something maybe. I 
+have been starting some initial work on the CM driver cleanup for this 
+purpose.
+
+> 3) Same concern as above but for the DT clkdev alias stuff. I guess
+> you'll need to make all of the dependent drivers play nice with DT. Do
+> you plan to remove it within a reasonable timeframe? It would be a nice
+> reduction in LoC and more importantly it would mean that drivers were
+> using clkdev in a more-correct fashion.
+
+This is probably harder, I think Tony is better to comment here, but my 
+idea is that in the worst case we can just break non-conforming drivers 
+by dropping the clkdev tables if nothing else helps. :) Most of the 
+tables are currently needed by hwmod, and there are already patches 
+around for adding DT clock support for hwmods, so once these go in, we 
+can at least reduce the table sizes considerably already.
+
+-Tero
+
+>
+> Regards,
+> Mike
+>
+>>
+>> Some detailed comments about patch level changes (if no mention, no major
+>> changes):
+>> - Patch #1:
+>>    * removed use of reg-names property, instead registers mapped using
+>>      compatible string
+>>    * removed ti,modes property, instead uses DPLL mode flags now
+>>    * separated AM33XX DPLLs under their own compatible strings
+>> - Patch #4 & #5: new patches
+>> - Patch #6: merged basic gate support from Mike to this patch as vendor
+>>    specific gate clock support
+>> - Patch #9 & #10: new patches
+>> - Patch #11: dummy clocks added, USB / ABE DPLL setup ordering changed
+>> - Patch #14: dummy clocks added
+>> - Patch #20: dropped usage of reg-names property
+>> - Patch #21: dummy clocks added
+>> - Patch #22 & #23: new patches
+>> - Patch #30: AM35XX clock data added to this patch
+>> - Patch #31:
+>>    * dummy clocks added
+>>    * added missing 3630 clocks
+>>
+>> Test branch available here:
+>> https://github.com/t-kristo/linux-pm.git
+>> branch: mainline-3.12-rc2-ti-dt-clks-v7
+>>
+>> Testing done:
+>> - am335x-bone : boot only
+>> - omap5-sevm : boot only
+>> - dra7-evm : boot only
+>> - omap3-beagle : boot + suspend/resume (ret + off)
+>> - omap4-panda-es : boot + suspend/resume
+>>
+>> Nishanth has also been doing some tests with omap3-beagle-xm with some WIP
+>> versions of this branch, but not with this latest one. Nishanth, maybe you
+>> can provide test results to this one also?
+>>
+>> -Tero
