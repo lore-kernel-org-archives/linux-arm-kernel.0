@@ -1,43 +1,51 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Tue, 8 Oct 2013 10:43:15 -0500
-Subject: [PATCH] ARM: dts: omap5-uevm: mark TWL6037 as
- system-power-controller
-In-Reply-To: <1379617896-15213-1-git-send-email-nm@ti.com>
-References: <1379617896-15213-1-git-send-email-nm@ti.com>
-Message-ID: <52542813.7020208@ti.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 8 Oct 2013 17:44:56 +0200
+Subject: [PATCH v3 12/19] clk: at91: add peripheral clk macros for
+ peripheral clk dt bindings
+In-Reply-To: <1375945839-9573-1-git-send-email-b.brezillon@overkiz.com>
+References: <1375937608-3773-1-git-send-email-b.brezillon@overkiz.com>
+ <1375945839-9573-1-git-send-email-b.brezillon@overkiz.com>
+Message-ID: <52542878.5050503@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/19/2013 02:11 PM, Nishanth Menon wrote:
-> This allows the palmas pm_power_off to kick in on power off command
-> and switch off the board.
-> 
-> Signed-off-by: Nishanth Menon <nm@ti.com>
+On 08/08/2013 09:10, Boris BREZILLON :
+> This patch adds the peripheral divisors macros (for sam9x5 compatible IPs)
+> which will be used by peripheral clk dt definitions.
+
+I am in favor for these definitions. So let's keep them (with raw 
+numbers toguether with these macros in documentation).
+
+>
+> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
 > ---
-> Based on: (benoit's for_3.13/dts branch)
-> https://git.kernel.org/cgit/linux/kernel/git/bcousson/linux-omap-dt.git/log/?h=for_3.13/dts
-> This uses the support introduced by:
-> http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=b81eec09a484c588ead035003ce7555ca8a9963a
-> 
->  arch/arm/boot/dts/omap5-uevm.dts |    1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/boot/dts/omap5-uevm.dts b/arch/arm/boot/dts/omap5-uevm.dts
-> index da25a14..8227386 100644
-> --- a/arch/arm/boot/dts/omap5-uevm.dts
-> +++ b/arch/arm/boot/dts/omap5-uevm.dts
-> @@ -271,6 +271,7 @@
->  		reg = <0x48>;
->  		interrupt-controller;
->  		#interrupt-cells = <2>;
-> +		ti,system-power-controller;
->  
->  		extcon_usb3: palmas_usb {
->  			compatible = "ti,palmas-usb-vid";
-> 
-Gentle ping.
-patchworks link: https://patchwork.kernel.org/patch/2913111/
+>   .../clk/at91/at91sam9x5/clk-peripheral.h           |   15 +++++++++++++++
+>   1 file changed, 15 insertions(+)
+>   create mode 100644 include/dt-bindings/clk/at91/at91sam9x5/clk-peripheral.h
+>
+> diff --git a/include/dt-bindings/clk/at91/at91sam9x5/clk-peripheral.h b/include/dt-bindings/clk/at91/at91sam9x5/clk-peripheral.h
+> new file mode 100644
+> index 0000000..a6dd506
+> --- /dev/null
+> +++ b/include/dt-bindings/clk/at91/at91sam9x5/clk-peripheral.h
+> @@ -0,0 +1,15 @@
+> +/*
+> + * This header provides constants for AT91 peripheral clks.
+> + *
+> + * The constants defined in this header are being used in dts.
+> + */
+> +
+> +#ifndef _DT_BINDINGS_CLK_AT91SAM9X5_PERIPH_H
+> +#define _DT_BINDINGS_CLK_AT91SAM9X5_PERIPH_H
+> +
+> +#define AT91SAM9X5_PERIPH_CLK_DIV1	0
+> +#define AT91SAM9X5_PERIPH_CLK_DIV2	1
+> +#define AT91SAM9X5_PERIPH_CLK_DIV4	2
+> +#define AT91SAM9X5_PERIPH_CLK_DIV8	3
+> +
+> +#endif
+>
+
 
 -- 
-Regards,
-Nishanth Menon
+Nicolas Ferre
