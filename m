@@ -1,77 +1,47 @@
-From: dinguyen@altera.com (dinguyen at altera.com)
-Date: Mon, 7 Oct 2013 21:13:54 -0500
-Subject: [GIT PULL]socfpga: DTS updates for v3.13
-Message-ID: <1381198434-9583-1-git-send-email-dinguyen@altera.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Mon, 7 Oct 2013 19:19:41 -0700
+Subject: Use of drivers/platform and matching include?
+In-Reply-To: <52535151.2000508@codeaurora.org>
+References: <BC1C47B3-5412-4829-A1D9-AAB04694D1CC@codeaurora.org>
+ <CAOesGMjJ6Uj0uGFJqtnWQyDW+tr6eLVWoHZ+B7uFna+L8N6E8Q@mail.gmail.com>
+ <20131004114128.GL12758@n2100.arm.linux.org.uk>
+ <20131004132209.GB23923@kroah.com>
+ <CAOesGMjxwmr0Vo0Puc-nZntgXLy6D1PTohz=C+fFukP_Eu1iQg@mail.gmail.com>
+ <20131005171323.GB5780@kroah.com> <52535151.2000508@codeaurora.org>
+Message-ID: <20131008021941.GA9427@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kevin, Olof, and Arnd:
+On Mon, Oct 07, 2013 at 05:26:57PM -0700, Rohit Vaswani wrote:
+> On 10/5/2013 10:13 AM, Greg Kroah-Hartman wrote:
+> > On Fri, Oct 04, 2013 at 09:48:41AM -0700, Olof Johansson wrote:
+> >> On Fri, Oct 4, 2013 at 6:22 AM, Greg Kroah-Hartman
+> >> <gregkh@linuxfoundation.org> wrote:
+> >>> On Fri, Oct 04, 2013 at 12:41:28PM +0100, Russell King - ARM Linux wrote:
+> >>>> So, no, there will be no new drivers under arch/arm.  They must be in the
+> >>>> drivers subtree somewhere.
+> >>> I have no objection with this, and encourage it.
+> >> Ok, so these are some of the requirements as far as I see it:
+> >>
+> >> * No per-vendor driver dumping ground under drivers/* (i.e. no
+> >> drivers/platform/<soc vendor>/)
+> > Yes.
+> 
+> We agree that there is no need for a dump *all* drivers under 
+> arm/mach-foo in drivers/platform/foo/. The msm bus driver would be added 
+> under drivers/bus/. But, we still have some drivers which are quite SoC 
+> specific and not in the general category of the sub-directories present 
+> under drivers.
+> As Kumar mentioned earlier -
+> 
+> An example driver would be the means we utilize to communicate memory
+> regions between various HW blocks on the SoC.  So a video/media core
+> driver might need access to a header/functions from the memory region
+> driver.
+> 
+> Would drivers/misc/qcom-* or drivers/misc/qcom/* be a reasonable place
+> to add them ? and the headers could go into include/linux/qcom-*.h
 
-Please consider these DTS updates for the Altera SOCFPGA platform for v3.13:
+That seems reasonable, but I'd have to see the code to verify this.
 
-Five of the six patches do NOT have an Ack from the DTS maintainers. I have
-sent the patches out for review, but since these patches do not change
-bindings nor add new ones, I don't think they will get too much attention.
-
-Please advise if you think I need to wait for Ack(s) from them.
-
-Thanks,
-
-Dinh
-
-The following changes since commit 4a10c2ac2f368583138b774ca41fac4207911983:
-
-  Linux 3.12-rc2 (2013-09-23 15:41:09 -0700)
-
-are available in the git repository at:
-
-  git://git.rocketboards.org/linux-socfpga-next.git tags/socfpga-dts-updates-for-v3.13
-
-for you to fetch changes up to d28e284dbee1f81daef762faf980a2260c2c120e:
-
-  dts: socfpga: Add support for Altera's SOCFPGA Arria V board (2013-10-07 14:16:49 -0500)
-
-----------------------------------------------------------------
-Updates to dts file structure for Altera's SOCFPGA
-
-* Does not include any new bindings or bindings change
-* Add dts file for a SOCFPGA with an Arria V FPGA
-* Add a clocks property for the TWD timer
-* Add support for Terasic SocKit Board which has Cyclone5 FPGA
-* From Steffen Trumtrar:
-"This series includes some minor cleanups (indentation and clock labels) and
-reorders the socfpga dts hierarchy from:
-	socfpga.dtsi
-	-> socfpga_$board.dts
-	-> socfpga_$otherboard.dts
-to
-	socfpga.dtsi
-	-> socfpga_cyclone5.dtsi
-	--> socfpga_cyclone5_$board.dts
-	--> socfpga_cyclone5_$otherboard.dts
-"
-
-----------------------------------------------------------------
-Dinh Nguyen (2):
-      arm: socfpga: Add clock for smp_twd timer
-      dts: socfpga: Add support for Altera's SOCFPGA Arria V board
-
-Steffen Trumtrar (4):
-      ARM: socfpga: dts: Move common nodes to cyclone5 dtsi
-      ARM: socfpga: dts: Add support for terasic SoCkit
-      ARM: socfpga: dts: cleanup indentation
-      ARM: socfpga: dts: fix s2f_* clock name
-
- arch/arm/boot/dts/Makefile                         |    4 +-
- arch/arm/boot/dts/socfpga.dtsi                     |  297 ++++++++++----------
- arch/arm/boot/dts/socfpga_arria5.dtsi              |   58 ++++
- arch/arm/boot/dts/socfpga_arria5_socdk.dts         |   40 +++
- ...{socfpga_cyclone5.dts => socfpga_cyclone5.dtsi} |   20 --
- arch/arm/boot/dts/socfpga_cyclone5_socdk.dts       |   40 +++
- arch/arm/boot/dts/socfpga_cyclone5_sockit.dts      |   37 +++
- 7 files changed, 327 insertions(+), 169 deletions(-)
- create mode 100644 arch/arm/boot/dts/socfpga_arria5.dtsi
- create mode 100644 arch/arm/boot/dts/socfpga_arria5_socdk.dts
- rename arch/arm/boot/dts/{socfpga_cyclone5.dts => socfpga_cyclone5.dtsi} (78%)
- create mode 100644 arch/arm/boot/dts/socfpga_cyclone5_socdk.dts
- create mode 100644 arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
+greg k-h
