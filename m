@@ -1,71 +1,67 @@
 From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 8 Oct 2013 14:26:47 -0400 (EDT)
-Subject: [PATCH 2/2] ARM: cci: driver need big endian fixes in asm code
-In-Reply-To: <CAA3XUr1tuS1CcJ5Mxp7h2Knigm0EZe5H47gSoP=aOnL-V7jX0w@mail.gmail.com>
-References: <1381207040-1623-1-git-send-email-victor.kamensky@linaro.org>
- <1381207040-1623-3-git-send-email-victor.kamensky@linaro.org>
- <20131008175136.GA3866@localhost.localdomain>
- <alpine.LFD.2.03.1310081356280.3023@syhkavp.arg>
- <CAA3XUr1tuS1CcJ5Mxp7h2Knigm0EZe5H47gSoP=aOnL-V7jX0w@mail.gmail.com>
-Message-ID: <alpine.LFD.2.03.1310081423270.3023@syhkavp.arg>
+Date: Tue, 8 Oct 2013 14:28:31 -0400 (EDT)
+Subject: [PATCH 1/2] ARM: mcpm: fix big endian issue in mcpm startup code
+In-Reply-To: <20131008175553.GB3866@localhost.localdomain>
+References: <20131008175553.GB3866@localhost.localdomain>
+Message-ID: <alpine.LFD.2.03.1310081427350.3023@syhkavp.arg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 8 Oct 2013, Victor Kamensky wrote:
+On Tue, 8 Oct 2013, Dave Martin wrote:
 
-> Hi Nicolas,
+> On Mon, Oct 07, 2013 at 09:37:19PM -0700, Victor Kamensky wrote:
+> > In big endian mode mcpm_entry_point is first function
+> > that called on secondaries CPU. First it should switch
+> > CPU into big endian code.
+> > 
+> > Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
 > 
-> On 8 October 2013 10:57, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
-> > On Tue, 8 Oct 2013, Dave Martin wrote:
-> >
-> >> On Mon, Oct 07, 2013 at 09:37:20PM -0700, Victor Kamensky wrote:
-> >> > cci_enable_port_for_self written in asm and it works with h/w
-> >> > registers that are in little endian format. When run in big
-> >> > endian mode it needs byte swap before/after it writes/reads
-> >> > to/from such registers
-> >>
-> >> Lorenzo should comment on this if he's not already seen it.
-> >>
-> >> >
-> >> > Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
-> >> > ---
-> >> >  drivers/bus/arm-cci.c | 6 ++++++
-> >> >  1 file changed, 6 insertions(+)
-> >> >
-> >> > diff --git a/drivers/bus/arm-cci.c b/drivers/bus/arm-cci.c
-> >> > index 2009266..6db173e 100644
-> >> > --- a/drivers/bus/arm-cci.c
-> >> > +++ b/drivers/bus/arm-cci.c
-> >> > @@ -281,6 +281,9 @@ asmlinkage void __naked cci_enable_port_for_self(void)
-> >> >     /* Enable the CCI port */
-> >> >  "  ldr     r0, [r0, %[offsetof_port_phys]] \n"
-> >> >  "  mov     r3, #"__stringify(CCI_ENABLE_REQ)" \n"
-> >> > +#ifdef __ARMEB__
-> >> > +"  rev     r3, r3 \n"
-> >> > +#endif /* __ARMEB__ */
-> >>
-> >> Hmmm, this is a bit ugly, but we can't easily use ARM_BE8() here.
-> >
-> > In any case, it would be more efficient to swap the CCI_ENABLE_REQ
-> > constant at compile time rather than doing it at run time with an extra
-> > instruction.
+> Providing Nico's also OK with it, I don't see a problem with this.
 > 
-> I could try to do this but it would require introducing another constant,
-> because CCI_ENABLE_REQ is used in another place in writel_relaxed
-> call which will do byteswap inside. Is such run-time optimization really
-> worth it compared to code readability. Please let me know.
-> I am OK either way. Personally I thought that run-time byteswap would
-> be more readable.
+> Minor cosmetic nit: please line up the ) after be with the others.
+> Not the end of the world, though.
+> 
+> Reviewed-by: Dave Martin <Dave.Martin@arm.com>
 
-You're probably right.
+No problem here.
 
-> Also I am concerned how can I compile time byteswap CCI_ENABLE_REQ
-> in context of its being used with __stringify ...  Wondering it should be
-> stringfied into real number not long expression
-
-The assembler can accept a subset of the simple C operands so it is 
-possible that this could just work.  Otherwise it is best to go with a 
-runtime swap.
+Acked-by: Nicolas Pitre <nico@linaro.org>
 
 
-Nicolas
+> 
+> Cheers
+> ---Dave
+> 
+> > ---
+> >  arch/arm/common/mcpm_head.S | 2 ++
+> >  1 file changed, 2 insertions(+)
+> > 
+> > diff --git a/arch/arm/common/mcpm_head.S b/arch/arm/common/mcpm_head.S
+> > index 39c96df..4f88f5e 100644
+> > --- a/arch/arm/common/mcpm_head.S
+> > +++ b/arch/arm/common/mcpm_head.S
+> > @@ -15,6 +15,7 @@
+> >  
+> >  #include <linux/linkage.h>
+> >  #include <asm/mcpm.h>
+> > +#include <asm/assembler.h>
+> >  
+> >  #include "vlock.h"
+> >  
+> > @@ -47,6 +48,7 @@
+> >  
+> >  ENTRY(mcpm_entry_point)
+> >  
+> > + ARM_BE8(setend        be)
+> >   THUMB(	adr	r12, BSYM(1f)	)
+> >   THUMB(	bx	r12		)
+> >   THUMB(	.thumb			)
+> > -- 
+> > 1.8.1.4
+> > 
+> > 
+> > _______________________________________________
+> > linaro-kernel mailing list
+> > linaro-kernel at lists.linaro.org
+> > http://lists.linaro.org/mailman/listinfo/linaro-kernel
+> 
