@@ -1,37 +1,59 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 8 Oct 2013 11:54:40 -0400
-Subject: [GIT PULL] ARM: mvebu: soc changes for v3.13
-In-Reply-To: <20131007170640.GF15413@quad.lixom.net>
-References: <20130930154208.GG31178@titan.lakedaemon.net>
- <20131007170640.GF15413@quad.lixom.net>
-Message-ID: <20131008155440.GI5402@titan.lakedaemon.net>
+From: b.brezillon@overkiz.com (boris brezillon)
+Date: Tue, 08 Oct 2013 18:01:16 +0200
+Subject: [PATCH v3 12/19] clk: at91: add peripheral clk macros for
+ peripheral clk dt bindings
+In-Reply-To: <52542878.5050503@atmel.com>
+References: <1375937608-3773-1-git-send-email-b.brezillon@overkiz.com>
+ <1375945839-9573-1-git-send-email-b.brezillon@overkiz.com>
+ <52542878.5050503@atmel.com>
+Message-ID: <52542C4C.5080409@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 07, 2013 at 10:06:40AM -0700, Olof Johansson wrote:
-> On Mon, Sep 30, 2013 at 11:42:08AM -0400, Jason Cooper wrote:
-> > Guys,
-> > 
-> > These are the SoC changes that didn't make it during the last merge
-> > window.  As with mvebu/drivers, these have been in -next since 3.12-rc1
-> > without issue.
-> 
-> I should have looked closer at this before I commented on the PCI branch.
-> 
-> > Sebastian Hesselbarth (2):
-> >       ARM: dove: switch to DT probed mbus address windows
-> >       ARM: dove: remove legacy pcie and clock init
-> 
-> It looks to me like this second patch will need to be based on the PCI branch,
-> or you will have broken PCI if this is applied and not the drivers/pci patches,
-> right? If so, you need to base this branch on top of the other one, not send
-> them separately -- otherwise a git bisect that lands between these two will
-> result in a non-booting kernel.
+On 08/10/2013 17:44, Nicolas Ferre wrote:
+> On 08/08/2013 09:10, Boris BREZILLON :
+>> This patch adds the peripheral divisors macros (for sam9x5 compatible 
+>> IPs)
+>> which will be used by peripheral clk dt definitions.
+>
+> I am in favor for these definitions. So let's keep them (with raw 
+> numbers toguether with these macros in documentation).
 
-I've moved both patches over to mvebu/drivers.  This leaves one patch in
-mvebu/soc.  I'll hold off on the pull request for it until I have some
-more (looks like there's some stuff pending).
+I guess we should move them elsewhere if these are the only macros we keep.
 
-thx,
-
-Jason.
+What about "include/dt-bindings/clk/at91sam9x5-periph.h" ?
+>
+>>
+>> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
+>> ---
+>>   .../clk/at91/at91sam9x5/clk-peripheral.h           |   15 
+>> +++++++++++++++
+>>   1 file changed, 15 insertions(+)
+>>   create mode 100644 
+>> include/dt-bindings/clk/at91/at91sam9x5/clk-peripheral.h
+>>
+>> diff --git a/include/dt-bindings/clk/at91/at91sam9x5/clk-peripheral.h 
+>> b/include/dt-bindings/clk/at91/at91sam9x5/clk-peripheral.h
+>> new file mode 100644
+>> index 0000000..a6dd506
+>> --- /dev/null
+>> +++ b/include/dt-bindings/clk/at91/at91sam9x5/clk-peripheral.h
+>> @@ -0,0 +1,15 @@
+>> +/*
+>> + * This header provides constants for AT91 peripheral clks.
+>> + *
+>> + * The constants defined in this header are being used in dts.
+>> + */
+>> +
+>> +#ifndef _DT_BINDINGS_CLK_AT91SAM9X5_PERIPH_H
+>> +#define _DT_BINDINGS_CLK_AT91SAM9X5_PERIPH_H
+>> +
+>> +#define AT91SAM9X5_PERIPH_CLK_DIV1    0
+>> +#define AT91SAM9X5_PERIPH_CLK_DIV2    1
+>> +#define AT91SAM9X5_PERIPH_CLK_DIV4    2
+>> +#define AT91SAM9X5_PERIPH_CLK_DIV8    3
+>> +
+>> +#endif
+>>
+>
+>
