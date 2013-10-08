@@ -1,79 +1,25 @@
-From: msalter@redhat.com (Mark Salter)
-Date: Tue,  8 Oct 2013 01:10:30 -0400
-Subject: [PATCH v2 14/14] Kconfig cleanup (PARPORT_PC dependencies)
-In-Reply-To: <1381209030-351-1-git-send-email-msalter@redhat.com>
-References: <1381209030-351-1-git-send-email-msalter@redhat.com>
-Message-ID: <1381209030-351-15-git-send-email-msalter@redhat.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Mon, 07 Oct 2013 22:16:24 -0700
+Subject: [PATCHv7 20/36] CLK: TI: DRA7: Add APLL support
+In-Reply-To: <1380098922-30340-21-git-send-email-t-kristo@ti.com>
+References: <1380098922-30340-1-git-send-email-t-kristo@ti.com>
+ <1380098922-30340-21-git-send-email-t-kristo@ti.com>
+Message-ID: <20131008051624.7445.56807@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove messy dependencies from PARPORT_PC by having it depend on one
-Kconfig symbol (ARCH_MAY_HAVE_PC_PARPORT) and having architectures
-which need it, select ARCH_MAY_HAVE_PC_PARPORT in arch/*/Kconfig.
-New architectures are unlikely to need PARPORT_PC, so this avoids
-having an ever growing list of architectures to exclude. Those
-architectures which do select ARCH_MAY_HAVE_PC_PARPORT in this
-patch are the ones which have an asm/parport.h (or use the generic
-version).
+Quoting Tero Kristo (2013-09-25 01:48:26)
+> +
+> +static const struct clk_ops apll_ck_ops = {
+> +       .enable         = &dra7_apll_enable,
+> +       .disable        = &dra7_apll_disable,
 
-Signed-off-by: Mark Salter <msalter@redhat.com>
-CC: Richard Henderson <rth@twiddle.net>
-CC: linux-alpha at vger.kernel.org
-CC: Vineet Gupta <vgupta@synopsys.com>
-CC: Russell King <linux@arm.linux.org.uk>
-CC: linux-arm-kernel at lists.infradead.org
-CC: Tony Luck <tony.luck@intel.com>
-CC: Fenghua Yu <fenghua.yu@intel.com>
-CC: linux-ia64 at vger.kernel.org
-CC: Geert Uytterhoeven <geert@linux-m68k.org>
-CC: linux-m68k at lists.linux-m68k.org
-CC: Michal Simek <monstr@monstr.eu>
-CC: microblaze-uclinux at itee.uq.edu.au
-CC: Ralf Baechle <ralf@linux-mips.org>
-CC: linux-mips at linux-mips.org
-CC: "James E.J. Bottomley" <jejb@parisc-linux.org>
-CC: Helge Deller <deller@gmx.de>
-CC: linux-parisc at vger.kernel.org
-CC: Benjamin Herrenschmidt <benh@kernel.crashing.org>
-CC: Paul Mackerras <paulus@samba.org>
-CC: linuxppc-dev at lists.ozlabs.org
-CC: Paul Mundt <lethal@linux-sh.org>
-CC: linux-sh at vger.kernel.org
-CC: "David S. Miller" <davem@davemloft.net>
-CC: sparclinux at vger.kernel.org
-CC: Guan Xuetao <gxt@mprc.pku.edu.cn>
-CC: Thomas Gleixner <tglx@linutronix.de>
-CC: Ingo Molnar <mingo@redhat.com>
-CC: "H. Peter Anvin" <hpa@zytor.com>
-CC: x86 at kernel.org
----
- drivers/parport/Kconfig | 10 +++++++---
- 1 file changed, 7 insertions(+), 3 deletions(-)
+Looks like .is_enabled is missing?
 
-diff --git a/drivers/parport/Kconfig b/drivers/parport/Kconfig
-index 70694ce..a079b18 100644
---- a/drivers/parport/Kconfig
-+++ b/drivers/parport/Kconfig
-@@ -31,13 +31,17 @@ menuconfig PARPORT
- 
- 	  If unsure, say Y.
- 
-+config ARCH_MAY_HAVE_PC_PARPORT
-+	bool
-+	help
-+	  Select this config option from the architecture Kconfig if
-+	  the architecture may have PC parallel port hardware.
-+
- if PARPORT
- 
- config PARPORT_PC
- 	tristate "PC-style hardware"
--	depends on (!SPARC64 || PCI) && !SPARC32 && !M32R && !FRV && !S390 && \
--		(!M68K || ISA) && !MN10300 && !AVR32 && !BLACKFIN && \
--		!XTENSA && !CRIS && !H8300
-+	depends on ARCH_MAY_HAVE_PC_PARPORT
- 
- 	---help---
- 	  You should say Y here if you have a PC-style parallel port. All
--- 
-1.8.3.1
+Also have you thought about using .prepare or .unprepare for these PLLs
+which might take some time to lock? The code there doesn't sleep or
+schedule, but it does poll for some time while under a spinlock.
+Something to think about for a future patch.
+
+Regards,
+Mike
