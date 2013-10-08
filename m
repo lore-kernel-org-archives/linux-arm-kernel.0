@@ -1,80 +1,76 @@
-From: raghavendra.kt.linux@gmail.com (Raghavendra KT)
-Date: Tue, 8 Oct 2013 16:56:11 +0530
-Subject: [PATCH 1/2] ARM: KVM: Yield CPU when vcpu executes a WFE
-In-Reply-To: <1381160430-11790-2-git-send-email-marc.zyngier@arm.com>
-References: <1381160430-11790-1-git-send-email-marc.zyngier@arm.com>
- <1381160430-11790-2-git-send-email-marc.zyngier@arm.com>
-Message-ID: <CAC4Lta14xZNnEUXxZiaF4=PQQTjq4efjsNDAK2oBH4-Uqh_d0A@mail.gmail.com>
+From: gang.chen@asianux.com (Chen Gang)
+Date: Tue, 08 Oct 2013 19:29:14 +0800
+Subject: [PATCH 2/2] ARM: include: asm: use 'int' instead of 'unsigned
+ long' for normal register variables within atomic.h
+In-Reply-To: <20131008103331.GE17148@mudshark.cambridge.arm.com>
+References: <20131001090119.GA17629@mudshark.cambridge.arm.com>
+ <524ABA20.6060106@asianux.com>
+ <20131002104158.GD28311@mudshark.cambridge.arm.com>
+ <524C3981.20307@asianux.com> <524D416B.5090709@asianux.com>
+ <20131003163200.GE7408@mudshark.cambridge.arm.com>
+ <524E8FBC.2080200@asianux.com>
+ <20131004153742.GR24303@mudshark.cambridge.arm.com>
+ <20131004154208.GS24303@mudshark.cambridge.arm.com>
+ <524F5566.4010204@asianux.com>
+ <20131008103331.GE17148@mudshark.cambridge.arm.com>
+Message-ID: <5253EC8A.2030305@asianux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 7, 2013 at 9:10 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> On an (even slightly) oversubscribed system, spinlocks are quickly
-> becoming a bottleneck, as some vcpus are spinning, waiting for a
-> lock to be released, while the vcpu holding the lock may not be
-> running at all.
->
-> This creates contention, and the observed slowdown is 40x for
-> hackbench. No, this isn't a typo.
->
-> The solution is to trap blocking WFEs and tell KVM that we're
-> now spinning. This ensures that other vpus will get a scheduling
-> boost, allowing the lock to be released more quickly.
->
-> From a performance point of view: hackbench 1 process 1000
->
-> 2xA15 host (baseline):  1.843s
->
-> 2xA15 guest w/o patch:  2.083s
-> 4xA15 guest w/o patch:  80.212s
->
-> 2xA15 guest w/ patch:   2.072s
-> 4xA15 guest w/ patch:   3.202s
->
-> So we go from a 40x degradation to 1.5x, which is vaguely more
-> acceptable.
->
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  arch/arm/include/asm/kvm_arm.h | 4 +++-
->  arch/arm/kvm/handle_exit.c     | 6 +++++-
->  2 files changed, 8 insertions(+), 2 deletions(-)
->
-> diff --git a/arch/arm/include/asm/kvm_arm.h b/arch/arm/include/asm/kvm_arm.h
-> index 64e9696..693d5b2 100644
-> --- a/arch/arm/include/asm/kvm_arm.h
-> +++ b/arch/arm/include/asm/kvm_arm.h
-> @@ -67,7 +67,7 @@
->   */
->  #define HCR_GUEST_MASK (HCR_TSC | HCR_TSW | HCR_TWI | HCR_VM | HCR_BSU_IS | \
->                         HCR_FB | HCR_TAC | HCR_AMO | HCR_IMO | HCR_FMO | \
-> -                       HCR_SWIO | HCR_TIDCP)
-> +                       HCR_TWE | HCR_SWIO | HCR_TIDCP)
->  #define HCR_VIRT_EXCP_MASK (HCR_VA | HCR_VI | HCR_VF)
->
->  /* System Control Register (SCTLR) bits */
-> @@ -208,6 +208,8 @@
->  #define HSR_EC_DABT    (0x24)
->  #define HSR_EC_DABT_HYP        (0x25)
->
-> +#define HSR_WFI_IS_WFE         (1U << 0)
-> +
->  #define HSR_HVC_IMM_MASK       ((1UL << 16) - 1)
->
->  #define HSR_DABT_S1PTW         (1U << 7)
-> diff --git a/arch/arm/kvm/handle_exit.c b/arch/arm/kvm/handle_exit.c
-> index df4c82d..c4c496f 100644
-> --- a/arch/arm/kvm/handle_exit.c
-> +++ b/arch/arm/kvm/handle_exit.c
-> @@ -84,7 +84,11 @@ static int handle_dabt_hyp(struct kvm_vcpu *vcpu, struct kvm_run *run)
->  static int kvm_handle_wfi(struct kvm_vcpu *vcpu, struct kvm_run *run)
->  {
->         trace_kvm_wfi(*vcpu_pc(vcpu));
-> -       kvm_vcpu_block(vcpu);
-> +       if (kvm_vcpu_get_hsr(vcpu) & HSR_WFI_IS_WFE)
-> +               kvm_vcpu_on_spin(vcpu);
+On 10/08/2013 06:33 PM, Will Deacon wrote:
+> On Sat, Oct 05, 2013 at 12:55:18AM +0100, Chen Gang wrote:
+>> On 10/04/2013 11:42 PM, Will Deacon wrote:
+>>> On Fri, Oct 04, 2013 at 04:37:42PM +0100, Will Deacon wrote:
+>>>> On Fri, Oct 04, 2013 at 10:51:56AM +0100, Chen Gang wrote:
+>>>>> On 10/04/2013 12:32 AM, Will Deacon wrote:
+>>>>>> The problem with arm64 is that we're using *unsigned long* for 32-bit
+>>>>>> clear_mask, which is definitely wrong because it's 64-bit (another patch to
+>>>>>> fix this!).
+>>>>>>
+>>>>>
+>>>>> At least, that is not a bug.
+>>>>
+>>>> Sure it is. What if the adjacent 32-bit value was being accessed by another
+>>>> CPU under a spinlock?
+>>>
+>>> (Oh, ok, that would still work on arm because of the way the exclusive
+>>> monitor is implemented, but we shouldn't rely on that).
+>>>
+>>
+>> Hmm... in my opinion, we need divide atomic_*_mask() into 32-bit and
+>> 64-bit versions. We already have demands to only use 32-bit value to
+>> express mask (can save size), and may have demands to use 64-bit too.
+> 
+> Right, but isn't this code only used by that s390 SCSI driver? Why do other
+> architectures even need to bother implementing it?
+> 
 
-Could you also enable CONFIG_HAVE_KVM_CPU_RELAX_INTERCEPT for arm and
-check if ple handler logic helps further?
-we would ideally get one more optimization folded into ple handler if
-you enable that.
+Hmm... for atomic_set_mask(), "drivers/gpu/drm/i915/i915_irq.c" also
+uses it (it is about Intel Graphics).
+
+For some architectures (e.g. frv, mn10300, mr32r, blackfin, and of cause
+s390), still use atomic_[set/clear]_mask().
+
+And they are inline functions in atomic.h, individual kernel modules may
+use them (which source code is not merged into kernel). Can we skip
+these individual modules? (I guess we can, but need think of carefully).
+
+
+>> And also, excuse me, I am not quite familiar with "exclusive monitor",
+>> could you please provide more details about it?
+> 
+> You'll need to take a look at the ARM ARM, in particular the section about
+> `Synchronisation and Semaphores'.
+> 
+
+Do you mean "ARM ARM" is a book name? (at least, I really need read more
+things to familiar with ARM)
+
+
+> Will
+> 
+> 
+
+Thanks.
+-- 
+Chen Gang
