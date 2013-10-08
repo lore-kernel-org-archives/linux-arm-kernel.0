@@ -1,58 +1,61 @@
 From: zhangfei.gao@gmail.com (zhangfei gao)
-Date: Tue, 8 Oct 2013 10:46:04 +0800
-Subject: getting rid of subsys_initcall usage? (was: Re: [PATCH RESEND]
- i2c: designware: use module_platform_driver)
-In-Reply-To: <CAMj5BkgqBCh0316NmoP_XMXvJTVQxxvUvs63wZfS_TvNLdqAfg@mail.gmail.com>
-References: <1376987548-12366-1-git-send-email-zhangfei.gao@linaro.org>
- <20130828095706.GH4086@katana>
- <CACRpkdb1p1=3a0PM+r2ZrMN+ECv5BAZFdv2omDK5npaer4ddcw@mail.gmail.com>
- <CAMj5BkhQkwb+T9VepN7UrWNRSgtv=Dw-Sa-gv0orOANo55iqNw@mail.gmail.com>
- <20130830054858.GR7656@atomide.com>
- <CAMj5BkiDExikXi3JcVhO7RN8_82eGYhq3i6oPf5Wbipy=N+iHQ@mail.gmail.com>
- <20130830082712.GT7656@atomide.com>
- <CAMj5BkgqBCh0316NmoP_XMXvJTVQxxvUvs63wZfS_TvNLdqAfg@mail.gmail.com>
-Message-ID: <CAMj5Bki+BS=3sWCRdrDOEKpt6Bj+4vm0zKCJ4YBAudcqbAZySw@mail.gmail.com>
+Date: Tue, 8 Oct 2013 10:48:24 +0800
+Subject: [PATCH] clk: debugfs add clk_rate_fops with DEBUG
+In-Reply-To: <20131007212904.7445.60382@quantum>
+References: <1376875884-13459-1-git-send-email-zhangfei.gao@linaro.org>
+ <1376890457-17871-1-git-send-email-zhangfei.gao@linaro.org>
+ <20131007212904.7445.60382@quantum>
+Message-ID: <CAMj5BkhH64QxHxotCkmWhh0OohmRqXtHc9UCE8vXwG0SG6PUyw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 12, 2013 at 9:12 AM, zhangfei gao <zhangfei.gao@gmail.com> wrote:
-> On Fri, Aug 30, 2013 at 4:27 PM, Tony Lindgren <tony@atomide.com> wrote:
->> * zhangfei gao <zhangfei.gao@gmail.com> [130829 23:36]:
->>> What about concerns from Wolfram:
->>> " Other people might be
->>> depending on subsys_initcall to get I2C active before they want to
->>> activate, say, PMICs. So, I fear regressions, since deferred probing
->>> might not be available in the needed places to avoid these regressions."
+On Tue, Oct 8, 2013 at 5:29 AM, Mike Turquette <mturquette@linaro.org> wrote:
+> Quoting Zhangfei Gao (2013-08-18 22:34:17)
+>> clk_rate_fops is added to debug
+>> 1. set_rate (e.g. PLL)
+>> 2. Choose mux parent, since mux could choose parent accordingly when set_rate.
 >>
->> There should not be any reason to get a PMIC activated
->> early on. The system should be booting already at that point,
->> and the PMIC related init can be done later on.
+>> Causion: set_rate can be called directly from user space
 >>
->>> Is it too late using module_init for PMIC?
+>> Example:
+>> sfc_mux have two parents: 24M and 200M
 >>
->> You can probably do it as a fix early on during the -rc
->> cycle too. Of course it needs to be verified to work first :)
+>> cat clk_summary
+>>    clock                        enable_cnt  prepare_cnt  rate
+>> ---------------------------------------------------------------------
+>>  osc24mhz                       3           3            24000000
+>>     bpll_fout3                  0           0            200000000
+>>        sfc_mux                  0           0            200000000
+>>           sfc                   0           0            200000000
 >>
+>> cat osc24mhz/bpll/bpll_fout3/sfc_mux/sfc/clk_rate
+>> 200000000
+>>
+>> echo 24000000 >  osc24mhz/bpll/bpll_fout3/sfc_mux/sfc/clk_rate
+>> cat clk_summary
+>>    clock                        enable_cnt  prepare_cnt  rate
+>> ---------------------------------------------------------------------
+>>  osc24mhz                       3           3            24000000
+>>     sfc_mux                     0           0            24000000
+>>        sfc                      0           0            24000000
+>>     bpll_fout3                  0           0            200000000
+>>
+>> cat osc24mhz/sfc_mux/sfc/clk_rate
+>> 24000000
+>>
+>> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
 >
-> Dear Wolfram
+> Thanks for the patch. It is trivial enough where I think we can leave it
+> on the list and let developers apply it if they need it for debug. I
+> don't want to merge it since it exposes hardware control to userspace
+> and could be abused in a way that could damage a device.
 >
-> What's your suggestion about this issue.
-> Use subsys_initcall, deferred probing still exist if base on pin control driver.
+> Regards,
+> Mike
 >
-> Thanks
 
-Dear Wolfram
+Thanks Mike
 
-Any plan about the patch?
-
-On one hand, module_X_driver is trend to replace subsys_initcall
-
-Refer from Mark
-"We're trying to move away from needing to do this and to using deferred
-probing to resolve init ordering issues.  Should we not be able to
-convert the drivers to module_X_driver()?"
-
-On the other hand, subsys_initcall still been defered if pin
-controller driver been relied on.
+Understand the risk, it is fine.
 
 Thanks
