@@ -1,37 +1,60 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 8 Oct 2013 16:51:47 +0200
-Subject: [PATCH v2] clocksource: Provide timekeeping for efm32 SoCs
-In-Reply-To: <5253ECC7.30700@linaro.org>
-References: <1380830189-21553-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <5253ECC7.30700@linaro.org>
-Message-ID: <20131008145147.GP10079@pengutronix.de>
+From: csmanjuvijay@gmail.com (Majunath Goudar)
+Date: Tue,  8 Oct 2013 20:21:42 +0530
+Subject: [PATCH] VEXPRESS: Fix VEXPRESS implicit declarations dependence
+ errors.
+In-Reply-To: <1381228895-24814-1-git-send-email-csmanjuvijay@gmail.com>
+References: <1381228895-24814-1-git-send-email-csmanjuvijay@gmail.com>
+Message-ID: <1381243903-27952-1-git-send-email-csmanjuvijay@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Daniel,
+This patch adds a inline dummy implementations of_find_node_by_phandle()
+and of_get_next_parent() in "#ifdef CONFIG_OF" else part. Without
+this patch,build system can lead to issues. This was discovered during
+randconfig testing,in which VEXPRESS_CONFIG was enabled w/o CONFIG_OF
+being enabled,leading to the following error:
 
-On Tue, Oct 08, 2013 at 01:30:15PM +0200, Daniel Lezcano wrote:
-> On 10/03/2013 09:56 PM, Uwe Kleine-K?nig wrote:
-> >An efm32 features 4 16-bit timers with a 10-bit prescaler. This driver
-> >provides clocksource and clock event device using one timer instance
-> >each.
-> >
-> >Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> >---
-> 
-> Applied to my tree for 3.13
-Thanks
-> >  - add device tree binding document
-> >    I created a new directory "timer" below the binding directory.
-> 
-> Why do you say you created a new directory ?
-That's because there was no directory for clockevent devices and clock
-sources before. So there is a new task to check where (if at all) the
-other drivers document their binding.
+CC      drivers/mfd/vexpress-config.o
+drivers/mfd/vexpress-config.c: In function ?__vexpress_config_func_get?:
+drivers/mfd/vexpress-config.c:117:4: error: implicit declaration of function
+?of_find_node_by_phandle? [-Werror=implicit-function-declaration]
+    bridge_node = of_find_node_by_phandle(
+    ^
+drivers/mfd/vexpress-config.c:117:16: warning: assignment makes pointer from
+integer without a cast [enabled by default]
+    bridge_node = of_find_node_by_phandle(
 
-Best regards
-Uwe
+Signed-off-by: Manjunath Goudar <csmanjuvijay@gmail.com>
+Cc: Grant Likely <grant.likely@linaro.org>
+Cc: Rob Herring <rob.herring@calxeda.com>
+Cc: Pawel Moll <pawel.moll@arm.com>
+Cc: Samuel Ortiz <sameo@linux.intel.com>
+Cc: Lee Jones <lee.jones@linaro.org>
+Cc: devicetree at vger.kernel.org
+Cc: linux-kernel at vger.kernel.org
+---
+ include/linux/of.h |    9 +++++++++
+ 1 file changed, 9 insertions(+)
 
+diff --git a/include/linux/of.h b/include/linux/of.h
+index f95aee3..968787d 100644
+--- a/include/linux/of.h
++++ b/include/linux/of.h
+@@ -340,6 +340,15 @@ int of_device_is_stdout_path(struct device_node *dn);
+ 
+ #else /* CONFIG_OF */
+ 
++static inline struct device_node *of_find_node_by_phandle(phandle handle)
++{
++	return NULL;
++}
++static inline struct device_node *of_get_next_parent(struct device_node *node)
++{
++	return NULL;
++}
++
+ static inline const char* of_node_full_name(struct device_node *np)
+ {
+ 	return "<no-node>";
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+1.7.9.5
