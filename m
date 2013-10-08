@@ -1,18 +1,30 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 8 Oct 2013 11:48:01 +0100
-Subject: [PATCH 1/1] iommu: arm-smmu: Use devm_ioremap_resource
-In-Reply-To: <1381228955-24313-1-git-send-email-sachin.kamat@linaro.org>
-References: <1381228955-24313-1-git-send-email-sachin.kamat@linaro.org>
-Message-ID: <20131008104801.GK17148@mudshark.cambridge.arm.com>
+From: gang.chen@asianux.com (Chen Gang)
+Date: Tue, 08 Oct 2013 18:56:51 +0800
+Subject: [PATCH v2 0/2] ARM: include: asm: change functions' and variables'
+ types in atomic.h
+In-Reply-To: <20131008103455.GF17148@mudshark.cambridge.arm.com>
+References: <20131002104158.GD28311@mudshark.cambridge.arm.com>
+ <524C3981.20307@asianux.com> <524D416B.5090709@asianux.com>
+ <20131003163200.GE7408@mudshark.cambridge.arm.com>
+ <524E8FBC.2080200@asianux.com>
+ <20131004153742.GR24303@mudshark.cambridge.arm.com>
+ <20131004154208.GS24303@mudshark.cambridge.arm.com>
+ <524F5566.4010204@asianux.com> <524F594B.1070106@asianux.com>
+ <525385A4.5050200@asianux.com>
+ <20131008103455.GF17148@mudshark.cambridge.arm.com>
+Message-ID: <5253E4F3.4090205@asianux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 08, 2013 at 11:42:35AM +0100, Sachin Kamat wrote:
-> devm_request_and_ioremap is deprecated. Use devm_ioremap_resource
-> instead.
+It contents 2 patches:
 
-I already have an identical patch from Julia, queued for 3.13.
+Patch 1: use 'long long' instead of 'u64' for within atomic.h.
 
-Thanks,
+Patch 2: use 'int' instead of 'unsigned long' for 'oldval' in
+atomic_cmpxchg().
 
-Will
+
+Signed-off-by: Chen Gang <gang.chen@asianux.com>
+---
+ arch/arm/include/asm/atomic.h |   52 +++++++++++++++++++++-------------------
+ 1 files changed, 27 insertions(+), 25 deletions(-)
