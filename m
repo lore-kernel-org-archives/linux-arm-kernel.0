@@ -1,52 +1,60 @@
-From: robdclark@gmail.com (Rob Clark)
-Date: Tue, 8 Oct 2013 08:07:23 -0400
-Subject: [PATCH 5/5] DRM: Armada: add support for drm tda19988 driver
-In-Reply-To: <20131008111913.09bfe93e@armhf>
-References: <20131006220728.GG12758@n2100.arm.linux.org.uk>
- <E1VSwYO-0000iT-CU@rmk-PC.arm.linux.org.uk>
- <20131007111807.5e86ea6e@armhf>
- <20131007094404.GI12758@n2100.arm.linux.org.uk>
- <20131007124820.2189a4c3@armhf>
- <20131007110902.GL12758@n2100.arm.linux.org.uk>
- <CAF6AEGsqGYj7_tZdzrsmUxExs6wm838dYPFhBdc8wqVC6mTxmg@mail.gmail.com>
- <20131008111913.09bfe93e@armhf>
-Message-ID: <CAF6AEGtQLL_c3zLS+S83jm505O_fcCm2mKW+Kd-oWP8EgpwzSw@mail.gmail.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Tue, 8 Oct 2013 14:05:17 +0200
+Subject: [PATCH v2] PWM: atmel-pwm: use request/free instead of
+ enable/disable
+In-Reply-To: <1380554553-25676-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1380554553-25676-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <20131008120516.GA16196@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 8, 2013 at 5:19 AM, Jean-Francois Moine <moinejf@free.fr> wrote:
-> On Mon, 7 Oct 2013 10:59:39 -0400
-> Rob Clark <robdclark@gmail.com> wrote:
->
->> Jean-Fran?ois, just as an aside, I really don't think code that can be
->> shared, like tda998x, should encode a DT requirement.. there are
->> plenty of platforms that don't use DT (arm isn't everything, and last
->> I heard aarch64 was going to be ACPI).
->>
->> Beyond that, it is a driver decision whether or not to support only-DT
->> or DT + other.. and as long as there is a common board which can use
->> the driver but which is not DT, there is probably a compelling reason
->> to still support the non-DT case.
->
-> Rob,
->
-> The Cubox is an open platform, and I use it just like a desktop PC.
-> When its required drivers will be in the mainline, I will do the same
-> as I do with PCs: I will not recompile a specific kernel each time
-> there are kernel bugs or security issues. Instead, I will just upgrade
-> my system from my distributor (Debian), and, in the packages, there
-> will be a generic mvebu kernel as there is already one for Marvell
-> Armada 370/xp, Freescale iMX5x/iMX6 (linux-image-3.10-3-armmp).
-> But, for that, all the Cubox specific stuff must be described in a DT.
+On Mon, Sep 30, 2013 at 05:22:33PM +0200, Alexandre Belloni wrote:
+> I found that disabling a pwm while it is at a low level will actually put it
+> back at a high level. The main symptom is that leds-pwm is calling pwm_disable()
+> after setting the duty cycle to 0. Hence, instead of getting a switched off LED,
+> you get an LED lit up at full brightness.
 
-sure, I'm not saying *not* to support DT (send patches if need be).
-I'm just saying that it should be ok to also support non-DT case and
-that shared components (like tda998x) should also still work in non-DT
-case.
+I wonder why that's the case. What's causing the PWM to go back to full
+duty cycle when disabled? There was a similar issue with some other PWM
+driver a while back and the cause was tracked down to be that you had to
+wait for a full period to make sure the signal was constantly low before
+switching off the clock. Perhaps something similar is the issue here?
 
-BR,
--R
+> Solve that by using the request and free callbacks to enable and disable the
+> pwm channels and the clock.
 
-> --
-> Ken ar c'henta? |             ** Breizh ha Linux atav! **
-> Jef             |               http://moinejf.free.fr/
+"pwm" -> "PWM",  please.
+
+> diff --git a/drivers/pwm/pwm-atmel.c b/drivers/pwm/pwm-atmel.c
+[...]
+> +static int atmel_pwm_enable(struct pwm_chip *chip, struct pwm_device *pwm)
+> +{
+> +	/*
+> +	 * This is a dummy function, required to be able to register the pwm
+> +	 * chip, see pwmadd_chip() in pwm/core.c
+> +	 */
+> +	return 0;
+> +}
+> +
+> +static void atmel_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
+> +{
+> +	/*
+> +	 * This is a dummy function, required to be able to register the pwm
+> +	 * chip, see pwmadd_chip() in pwm/core.c
+> +	 */
+> +}
+
+This just doesn't feel right. Can somebody please investigate what the
+real reason is for the behaviour described in the commit message and see
+if we can't solve this in some other way? .request() and .free() are
+typically called very early or very late, respectively, so this patch
+will keep the PWM clock on forever (pretty much).
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131008/e603fb7f/attachment.sig>
