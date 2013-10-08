@@ -1,120 +1,110 @@
-From: ldewangan@nvidia.com (Laxman Dewangan)
-Date: Tue, 8 Oct 2013 20:09:54 +0530
-Subject: [PATCH V3] clk: palmas: add clock driver for palmas
-In-Reply-To: <525408B3.1000107@ti.com>
-References: <1381238480-18852-1-git-send-email-ldewangan@nvidia.com>
- <525408B3.1000107@ti.com>
-Message-ID: <5254193A.70104@nvidia.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 8 Oct 2013 15:15:12 +0100
+Subject: [PATCH V2] clk: palmas: add clock driver for palmas
+In-Reply-To: <1381154751-4565-1-git-send-email-ldewangan@nvidia.com>
+References: <1381154751-4565-1-git-send-email-ldewangan@nvidia.com>
+Message-ID: <20131008141512.GE1412@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks Nishanth for review.
+On Mon, Oct 07, 2013 at 03:05:51PM +0100, Laxman Dewangan wrote:
+> Palmas devices has two clock output CLK32K_KG and CLK32K_KG_AUDIO
+> which can be nebale/disable through software.
+> 
+> Add clock driver support for the Palmas 32k clocks.
+> 
+> Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
+> ---
+> Changes from V1:
+> - Call prepare if the clk is needed for boot-enable or sleep control.
+> - change is_enabled to is_prepared.
+> - Added ops palmas_clks_recalc_rate.
+> - Added of_clk_add_provider().
+> 
+>  .../devicetree/bindings/clock/clk-palmas.txt       |   45 +++
+>  drivers/clk/Kconfig                                |    7 +
+>  drivers/clk/Makefile                               |    2 +
+>  drivers/clk/clk-palmas.c                           |  336 ++++++++++++++++++++
+>  4 files changed, 390 insertions(+), 0 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/clock/clk-palmas.txt
+>  create mode 100644 drivers/clk/clk-palmas.c
+> 
+> diff --git a/Documentation/devicetree/bindings/clock/clk-palmas.txt b/Documentation/devicetree/bindings/clock/clk-palmas.txt
+> new file mode 100644
+> index 0000000..c247538
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/clock/clk-palmas.txt
+> @@ -0,0 +1,45 @@
+> +* Palmas 32KHz clocks *
+> +
+> +Palmas device has two clock output pins for 32KHz, KG and KG_AUDIO.
+> +
+> +This binding uses the common clock binding ./clock-bindings.txt.
+> +
+> +Clock 32KHz KG is output 0 of the driver and clock 32KHz is output 1.
+> +
+> +Required properties:
+> +- compatible : shall be "ti,palmas-clk".
+> +- #clock-cells : from common clock binding; shall be set to 1.
 
-On Tuesday 08 October 2013 06:59 PM, Nishanth Menon wrote:
-> On 10/08/2013 08:21 AM, Laxman Dewangan wrote:
->> Palmas devices has two clock output CLK32K_KG and CLK32K_KG_AUDIO
-> not all palmas devices have 2 clocks - example: tps659038
+It would make sense to describe the value values here, rather than
+above.
 
-This is for generic palmas and I have seen it for TPS65913, TPS65914, 
-TPS80036. If the generic one is not compatible then it need to add  
-device specific and at that time, it is require to update the binding 
-document accordingly.
+> +
+> +Optional subnode:
+> +       The clock node has optional subnode to provide the init configuration of
+> +       clocks like boot enable, sleep control.
+> +
+> +       The subnode name is fixed and it should be
+> +               clk32k_kg for the 32KHz KG clock.
+> +               clk32k_kg_audio for the 32KHz KG_AUDIO clock.
+> +
+> +       Optional subnode properties:
+> +       ti,clock-boot-enable: Enable clock at the time of booting.
 
->           |    7 +
->   drivers/clk/Makefile                               |    1 +
->   drivers/clk/clk-palmas.c                           |  340 ++++++++++++++++++++
->
-> http://www.spinics.net/lists/devicetree/msg04855.html
-> Do we do 2 patches now? one seperate for binding and implementation?
-> What is our current preference now a days?
+Why is this needed?
 
-Currently it is implementation + binding doc in one patch.
+If drivers need clocks, they should request them. If they don't
+currently, that's a bug in the driver.
 
->
->>   Palmas device has two clock output pins for 32KHz, KG and KG_AUDIO.
->> +
->> +This binding uses the common clock binding ./clock-bindings.txt.
-> proper link would be to provide
-> Documentation/devicetree/bindings/clock/clock-bindings.txt ?
+> +       ti,external-sleep-control: The clock is enable/disabled by state
+> +               of external enable input pins ENABLE, ENABLE2 and NSLEEP.
+> +               The valid value for the external pins are:
+> +                       1 for ENABLE1
+> +                       2 for ENABLE2
+> +                       3 for NSLEEP.
+> +               Option 0 or missing this property means the clock is
+> +               enabled/disabled via register access and these pins do
+> +               not have any control.
 
-Hmm, other patch I got feedback from DT maintainers to do not use the 
-absolute path as document directory may change
+What actually drives these pins to control the clock?
 
->> +
->> +Clock 32KHz KG is output 0 of the driver and clock 32KHz is output 1.
->> +
->> +Required properties:
->> +- compatible : shall be "ti,palmas-clk".
-> To handle variants of Palmas chips in production, you'd want to be
-> specific here clk32k_kg and clk32k_kg_audio.
+> +
+> +Example:
+> +       clock {
+> +               compatible = "ti,palmas-clk";
+> +               #clock-cells = <1>;
+> +               clk32k_kg {
+> +                       ti,clock-boot-enable;
+> +                       ti,external-sleep-control = <3>;
+> +               };
+> +
+> +               clk32k_kg_audio {
+> +                       ti,clock-boot-enable;
+> +               };
+> +       };
 
-The compatible is the device sub module level, not the clock level. Same 
-thing we are following on regulators.
+How does the palmas-clk driver control these? No description of
+registers, gpio, or any other component that could be used for control
+is dfined.
 
+Is the palmas-clk intended to be a subnode of the palmas mfd (the
+palmas-rtc binding example suggests this)? It seems odd to describe
+components of a device separately with no linkage between them.
 
->
->> +
->> +     Optional subnode properties:
->> +     ti,clock-boot-enable: Enable clock at the time of booting.
-> Dumb question: Why is this needed? should'nt relevant drivers do a
-> clk_get to enable the relevant clocks?
+I also note that the palmas MFD appears to be an I2C slave, but the
+binding doesn't define that (which makes it somewhat confuding for
+someone unfamiliar with the hardware).
 
-If some board needs this clock to be always available for rest of system 
-to work without any specific driver then this flag is useful.
-
-
->
->> +     ti,external-sleep-control: The clock is enable/disabled by state
->> +             of external enable input pins ENABLE, ENABLE2 and NSLEEP.
->> +             The valid value for the external pins are:
->> +                     1 for ENABLE1
->> +                     2 for ENABLE2
->> +                     3 for NSLEEP.
-> could we not have macros for readability?
-
-I am thinking of adding the palmas for dt-binding and then change on 
-multiple places. I will post patches for this.
-the patch will go on dt tree as include/dt-bindings and then on 
-documents file and then on actually DTS. I will work towards this but 
-scoping out of this patch.
-
-
->
->> +
->> +
->> +enum PALMAS_CLOCK32K {
->> +     PALMAS_CLOCK32KG,
->> +     PALMAS_CLOCK32KG_AUDIO,
->> +
->> +     /* Last entry */
->> +     PALMAS_CLOCK32K_NR,
->> +};
-> you should be able to get rid of this entirely
-
-Probably yes but it is easy to read (atleast for me).
-
-
->
-> +             cinfo->clk = clk;
-> +             palmas_clks->clk_data.clks[i] = clk;
-> +             palmas_clks->clk_data.clk_num++;
-> +             palmas_clks_init_configure(cinfo);
-> we dont handle error here?
-
-Intentionally I ignore error, just print and continue the registration.
-
-
->
->> +
->> +MODULE_AUTHOR("Laxman Dewangan <ldewangan@nvidia.com>");
->> +MODULE_LICENSE("GPL v2");
->>
-> I wonder if we can simplify this with CLK_OF_DECLARE - I suppose it
-> wont work if of_clk_init(NULL); was invoked previously.
-
-This driver has dependency over the mfd driver and hence until mfd 
-driver invoked and get registered, this driver should not be called. The 
-platform driver registration is done in mfd.
-As per my understanding and referring the other code, CLK_OF_DECLARE is 
-useful if there is no such dependency. Please correct me if this is not 
-true.
+Thanks,
+Mark.
