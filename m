@@ -1,36 +1,104 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Tue, 8 Oct 2013 16:01:52 -0700
-Subject: [PATCHv2] Route kbd LEDs through the generic LEDs layer
-In-Reply-To: <20130904172621.GA5957@type.bordeaux.inria.fr>
-References: <20130717152916.GI5883@type.bordeaux.inria.fr>
- <20130904172621.GA5957@type.bordeaux.inria.fr>
-Message-ID: <20131008160152.a98961b9e54bf1c45c1818dc@linux-foundation.org>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Wed,  9 Oct 2013 00:34:22 +0200
+Subject: [PATCH 06/23] ARM: twd: data endian fix
+In-Reply-To: <1381271679-27804-1-git-send-email-ben.dooks@codethink.co.uk>
+References: <1381271679-27804-1-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <1381271679-27804-7-git-send-email-ben.dooks@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 4 Sep 2013 19:26:21 +0200 Samuel Thibault <samuel.thibault@ens-lyon.org> wrote:
+Ensure the twd driver uses the correct calls to access the hardware
+to ensure that we do not end up with data in the wrong endian format.
 
-> This permits to reassign keyboard LEDs to something else than keyboard "leds"
-> state, by adding keyboard led and modifier triggers connected to a series
-> of VT input LEDs, themselves connected to VT input triggers, which
-> per-input device LEDs use by default.  Userland can thus easily change the LED
-> behavior of (a priori) all input devices, or of particular input devices.
-> 
-> This also permits to fix #7063 from userland by using a modifier to implement
-> proper CapsLock behavior and have the keyboard caps lock led show that modifier
-> state.
+Reviewed-by: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+---
+ arch/arm/kernel/smp_twd.c | 24 ++++++++++++------------
+ 1 file changed, 12 insertions(+), 12 deletions(-)
 
-I had a version of this in -mm for a long time and there was a
-1000-message email discussion which I didn't have a hope of following.
-
-Do you believe that the earlier controversies are now addressed and if
-so, how?  Have the earlier participants in that discussion been cc'ed
-and have they commented?
-
-In other words, how are we generally getting along with those things?  
-
-I'll put this version into -mm to get it a bit of linux-next exposure,
-but I'm hoping that Dmitry will process it?
-
-The one-line change to drivers/tty/vt/keyboard.c no longer applies -
-LED_SHOW_MEM has vanished altogether.
+diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
+index 2985c9f..6591e26 100644
+--- a/arch/arm/kernel/smp_twd.c
++++ b/arch/arm/kernel/smp_twd.c
+@@ -45,7 +45,7 @@ static void twd_set_mode(enum clock_event_mode mode,
+ 	case CLOCK_EVT_MODE_PERIODIC:
+ 		ctrl = TWD_TIMER_CONTROL_ENABLE | TWD_TIMER_CONTROL_IT_ENABLE
+ 			| TWD_TIMER_CONTROL_PERIODIC;
+-		__raw_writel(DIV_ROUND_CLOSEST(twd_timer_rate, HZ),
++		writel_relaxed(DIV_ROUND_CLOSEST(twd_timer_rate, HZ),
+ 			twd_base + TWD_TIMER_LOAD);
+ 		break;
+ 	case CLOCK_EVT_MODE_ONESHOT:
+@@ -58,18 +58,18 @@ static void twd_set_mode(enum clock_event_mode mode,
+ 		ctrl = 0;
+ 	}
+ 
+-	__raw_writel(ctrl, twd_base + TWD_TIMER_CONTROL);
++	writel_relaxed(ctrl, twd_base + TWD_TIMER_CONTROL);
+ }
+ 
+ static int twd_set_next_event(unsigned long evt,
+ 			struct clock_event_device *unused)
+ {
+-	unsigned long ctrl = __raw_readl(twd_base + TWD_TIMER_CONTROL);
++	unsigned long ctrl = readl_relaxed(twd_base + TWD_TIMER_CONTROL);
+ 
+ 	ctrl |= TWD_TIMER_CONTROL_ENABLE;
+ 
+-	__raw_writel(evt, twd_base + TWD_TIMER_COUNTER);
+-	__raw_writel(ctrl, twd_base + TWD_TIMER_CONTROL);
++	writel_relaxed(evt, twd_base + TWD_TIMER_COUNTER);
++	writel_relaxed(ctrl, twd_base + TWD_TIMER_CONTROL);
+ 
+ 	return 0;
+ }
+@@ -82,8 +82,8 @@ static int twd_set_next_event(unsigned long evt,
+  */
+ static int twd_timer_ack(void)
+ {
+-	if (__raw_readl(twd_base + TWD_TIMER_INTSTAT)) {
+-		__raw_writel(1, twd_base + TWD_TIMER_INTSTAT);
++	if (readl_relaxed(twd_base + TWD_TIMER_INTSTAT)) {
++		writel_relaxed(1, twd_base + TWD_TIMER_INTSTAT);
+ 		return 1;
+ 	}
+ 
+@@ -211,15 +211,15 @@ static void twd_calibrate_rate(void)
+ 		waitjiffies += 5;
+ 
+ 				 /* enable, no interrupt or reload */
+-		__raw_writel(0x1, twd_base + TWD_TIMER_CONTROL);
++		writel_relaxed(0x1, twd_base + TWD_TIMER_CONTROL);
+ 
+ 				 /* maximum value */
+-		__raw_writel(0xFFFFFFFFU, twd_base + TWD_TIMER_COUNTER);
++		writel_relaxed(0xFFFFFFFFU, twd_base + TWD_TIMER_COUNTER);
+ 
+ 		while (get_jiffies_64() < waitjiffies)
+ 			udelay(10);
+ 
+-		count = __raw_readl(twd_base + TWD_TIMER_COUNTER);
++		count = readl_relaxed(twd_base + TWD_TIMER_COUNTER);
+ 
+ 		twd_timer_rate = (0xFFFFFFFFU - count) * (HZ / 5);
+ 
+@@ -277,7 +277,7 @@ static void twd_timer_setup(void)
+ 	 * bother with the below.
+ 	 */
+ 	if (per_cpu(percpu_setup_called, cpu)) {
+-		__raw_writel(0, twd_base + TWD_TIMER_CONTROL);
++		writel_relaxed(0, twd_base + TWD_TIMER_CONTROL);
+ 		clockevents_register_device(clk);
+ 		enable_percpu_irq(clk->irq, 0);
+ 		return;
+@@ -290,7 +290,7 @@ static void twd_timer_setup(void)
+ 	 * The following is done once per CPU the first time .setup() is
+ 	 * called.
+ 	 */
+-	__raw_writel(0, twd_base + TWD_TIMER_CONTROL);
++	writel_relaxed(0, twd_base + TWD_TIMER_CONTROL);
+ 
+ 	clk->name = "local_timer";
+ 	clk->features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT |
+-- 
+1.8.4.rc3
