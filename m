@@ -1,69 +1,175 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 08 Oct 2013 08:07:20 -0500
-Subject: [PATCH] VEXPRESS: Fix VEXPRESS implicit declarations dependence
- errors.
-In-Reply-To: <1381228895-24814-1-git-send-email-csmanjuvijay@gmail.com>
-References: <1381228895-24814-1-git-send-email-csmanjuvijay@gmail.com>
-Message-ID: <52540388.8090709@gmail.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Tue, 8 Oct 2013 15:12:15 +0200
+Subject: [PATCH RESEND v5 1/2] PWM: PXA: add device tree support to PWM
+ driver
+In-Reply-To: <1379791174-2369-2-git-send-email-mikedunn@newsguy.com>
+References: <1379791174-2369-1-git-send-email-mikedunn@newsguy.com>
+ <1379791174-2369-2-git-send-email-mikedunn@newsguy.com>
+Message-ID: <20131008131214.GA12839@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/08/2013 05:41 AM, Majunath Goudar wrote:
-> This patch adds a of_find_node_by_phandle() and of_get_next_parent()
-> function declaration dependence on"#ifdef CONFIG_OF" in "include/linux/of.h"
-> else part return inline dummy implementations (returning NULL). Without
-> this patch,build system can lead to issues. This was discovered during
-> randconfig testing,in which VEXPRESS_CONFIG was enabled w/o CONFIG_OF
-> being enabled,leading to the following error:
-
-What is blocking making VExpress DT only?
-
-The subject should reflect the subsystem you are changing and the
-description is missing spaces at a minimum.
-
-Rob
-
+On Sat, Sep 21, 2013 at 12:19:33PM -0700, Mike Dunn wrote:
+> This patch adds device tree support to the PXA's PWM driver.  Nothing
+> needs to be extracted from the device tree node by the PWM device.
+> Client devices need only specify the period; the per-chip index is
+> implicitly zero because one device node must be present for each PWM
+> output in use.  This approach is more convenient due to the wide
+> variability in the number of PWM channels present across the various PXA
+> variants, and is made possible by the fact that the register sets for
+> each PWM channel are segregated from each other.  An of_xlate() method
+> is added to parse this single-cell node.  The existing ID table is
+> reused for the match table data.
 > 
-> CC      drivers/mfd/vexpress-config.o
-> drivers/mfd/vexpress-config.c: In function ?__vexpress_config_func_get?:
-> drivers/mfd/vexpress-config.c:117:4: error: implicit declaration of function
-> ?of_find_node_by_phandle? [-Werror=implicit-function-declaration]
->     bridge_node = of_find_node_by_phandle(
->     ^
-> drivers/mfd/vexpress-config.c:117:16: warning: assignment makes pointer from
-> integer without a cast [enabled by default]
->     bridge_node = of_find_node_by_phandle(
+> Tested on a Palm Treo 680 (both platform data and DT cases).
 > 
-> Signed-off-by: Manjunath Goudar <csmanjuvijay@gmail.com>
-> Cc: Grant Likely <grant.likely@linaro.org>
-> Cc: Rob Herring <rob.herring@calxeda.com>
-> Cc: Pawel Moll <pawel.moll@arm.com>
-> Cc: Samuel Ortiz <sameo@linux.intel.com>
-> Cc: Lee Jones <lee.jones@linaro.org>
-> Cc: devicetree at vger.kernel.org
-> Cc: linux-kernel at vger.kernel.org
+> Signed-off-by: Mike Dunn <mikedunn@newsguy.com>
 > ---
->  include/linux/of.h |    9 +++++++++
->  1 file changed, 9 insertions(+)
+>  Documentation/devicetree/bindings/pwm/pxa-pwm.txt | 30 +++++++++++++
+>  drivers/pwm/pwm-pxa.c                             | 52 ++++++++++++++++++++++-
+>  2 files changed, 81 insertions(+), 1 deletion(-)
+>  create mode 100644 Documentation/devicetree/bindings/pwm/pxa-pwm.txt
+
+This looks good to me, but I'd like to get an Acked-by: from one of the
+device tree bindings maintainers.
+
+Thierry
+
 > 
-> diff --git a/include/linux/of.h b/include/linux/of.h
-> index f95aee3..968787d 100644
-> --- a/include/linux/of.h
-> +++ b/include/linux/of.h
-> @@ -340,6 +340,15 @@ int of_device_is_stdout_path(struct device_node *dn);
->  
->  #else /* CONFIG_OF */
->  
-> +static inline struct device_node *of_find_node_by_phandle(phandle handle)
-> +{
-> +	return NULL;
+> diff --git a/Documentation/devicetree/bindings/pwm/pxa-pwm.txt b/Documentation/devicetree/bindings/pwm/pxa-pwm.txt
+> new file mode 100644
+> index 0000000..5ae9f1e
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/pwm/pxa-pwm.txt
+> @@ -0,0 +1,30 @@
+> +Marvell PWM controller
+> +
+> +Required properties:
+> +- compatible: should be one or more of:
+> +  - "marvell,pxa250-pwm"
+> +  - "marvell,pxa270-pwm"
+> +  - "marvell,pxa168-pwm"
+> +  - "marvell,pxa910-pwm"
+> +- reg: Physical base address and length of the registers used by the PWM channel
+> +  Note that one device instance must be created for each PWM that is used, so the
+> +  length covers only the register window for one PWM output, not that of the
+> +  entire PWM controller.  Currently length is 0x10 for all supported devices.
+> +- #pwm-cells: Should be 1.  This cell is used to specify the period in
+> +  nanoseconds.
+> +
+> +Example PWM device node:
+> +
+> +pwm0: pwm at 40b00000 {
+> +	compatible = "marvell,pxa250-pwm";
+> +	reg = <0x40b00000 0x10>;
+> +	#pwm-cells = <1>;
+> +};
+> +
+> +Example PWM client node:
+> +
+> +backlight {
+> +	compatible = "pwm-backlight";
+> +	pwms = <&pwm0 5000000>;
+> +	...
 > +}
-> +static inline struct device_node *of_get_next_parent(struct device_node *node)
+> diff --git a/drivers/pwm/pwm-pxa.c b/drivers/pwm/pwm-pxa.c
+> index a4d2164..e928cc8 100644
+> --- a/drivers/pwm/pwm-pxa.c
+> +++ b/drivers/pwm/pwm-pxa.c
+> @@ -19,6 +19,7 @@
+>  #include <linux/clk.h>
+>  #include <linux/io.h>
+>  #include <linux/pwm.h>
+> +#include <linux/of_device.h>
+>  
+>  #include <asm/div64.h>
+>  
+> @@ -124,6 +125,45 @@ static struct pwm_ops pxa_pwm_ops = {
+>  	.owner = THIS_MODULE,
+>  };
+>  
+> +#ifdef CONFIG_OF
+> +/*
+> + * Device tree users must create one device instance for each pwm channel.
+> + * Hence we dispense with the HAS_SECONDARY_PWM and "tell" the original driver
+> + * code that this is a single channel pxa25x-pwm.  Currently all devices are
+> + * supported identically.
+> + */
+> +static struct of_device_id pwm_of_match[] = {
+> +	{ .compatible = "marvell,pxa250-pwm", .data = &pwm_id_table[0]},
+> +	{ .compatible = "marvell,pxa270-pwm", .data = &pwm_id_table[0]},
+> +	{ .compatible = "marvell,pxa168-pwm", .data = &pwm_id_table[0]},
+> +	{ .compatible = "marvell,pxa910-pwm", .data = &pwm_id_table[0]},
+> +	{ }
+> +};
+> +MODULE_DEVICE_TABLE(of, pwm_of_match);
+> +#else
+> +static struct of_device_id *pwm_of_match;
+> +#endif
+> +
+> +static const struct platform_device_id *pxa_pwm_get_id_dt(struct device *dev)
 > +{
-> +	return NULL;
+> +	const struct of_device_id *id = of_match_device(pwm_of_match, dev);
+> +	return id ? id->data : NULL;
 > +}
 > +
->  static inline const char* of_node_full_name(struct device_node *np)
+> +static struct pwm_device *
+> +pxa_pwm_of_xlate(struct pwm_chip *pc, const struct of_phandle_args *args)
+> +{
+> +	struct pwm_device *pwm;
+> +
+> +	pwm = pwm_request_from_chip(pc, 0, NULL);
+> +	if (IS_ERR(pwm))
+> +		return pwm;
+> +
+> +	pwm_set_period(pwm, args->args[0]);
+> +
+> +	return pwm;
+> +}
+> +
+>  static int pwm_probe(struct platform_device *pdev)
 >  {
->  	return "<no-node>";
+>  	const struct platform_device_id *id = platform_get_device_id(pdev);
+> @@ -131,6 +171,12 @@ static int pwm_probe(struct platform_device *pdev)
+>  	struct resource *r;
+>  	int ret = 0;
+>  
+> +	if (IS_ENABLED(CONFIG_OF) && id == NULL)
+> +		id = pxa_pwm_get_id_dt(&pdev->dev);
+> +
+> +	if (id == NULL)
+> +		return -EINVAL;
+> +
+>  	pwm = devm_kzalloc(&pdev->dev, sizeof(*pwm), GFP_KERNEL);
+>  	if (pwm == NULL) {
+>  		dev_err(&pdev->dev, "failed to allocate memory\n");
+> @@ -145,7 +191,10 @@ static int pwm_probe(struct platform_device *pdev)
+>  	pwm->chip.ops = &pxa_pwm_ops;
+>  	pwm->chip.base = -1;
+>  	pwm->chip.npwm = (id->driver_data & HAS_SECONDARY_PWM) ? 2 : 1;
+> -
+> +	if (IS_ENABLED(CONFIG_OF)) {
+> +		pwm->chip.of_xlate = pxa_pwm_of_xlate;
+> +		pwm->chip.of_pwm_n_cells = 1;
+> +	}
+>  	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>  	pwm->mmio_base = devm_ioremap_resource(&pdev->dev, r);
+>  	if (IS_ERR(pwm->mmio_base))
+> @@ -176,6 +225,7 @@ static struct platform_driver pwm_driver = {
+>  	.driver		= {
+>  		.name	= "pxa25x-pwm",
+>  		.owner	= THIS_MODULE,
+> +		.of_match_table	= of_match_ptr(pwm_of_match),
+>  	},
+>  	.probe		= pwm_probe,
+>  	.remove		= pwm_remove,
+> -- 
+> 1.8.1.5
 > 
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131008/cd5f6b92/attachment.sig>
