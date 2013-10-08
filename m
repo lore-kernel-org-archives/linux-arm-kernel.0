@@ -1,54 +1,84 @@
-From: hancockrwd@gmail.com (Robert Hancock)
-Date: Mon, 07 Oct 2013 20:38:13 -0600
-Subject: [BUG,REGRESSION] SATA regression on 12.0-rc4 kernel
-In-Reply-To: <87bo303nfe.fsf@natisbad.org>
-References: <87vc1ahyft.fsf@natisbad.org>
- <20131007125943.GA1332@titan.lakedaemon.net> <87bo303nfe.fsf@natisbad.org>
-Message-ID: <52537015.6040200@gmail.com>
+From: dinh.linux@gmail.com (Dinh Nguyen)
+Date: Mon, 07 Oct 2013 21:40:16 -0500
+Subject: [PATCH] arm: socfpga: Fix incorrect sdmmc clock name
+In-Reply-To: <20131008013954.7445.27392@quantum>
+References: <1376322134-17408-1-git-send-email-dinguyen@altera.com>
+ <20130814054810.GF16635@quad.lixom.net>
+ <1376492274.8715.2.camel@linux-builds1> <20131007201254.7445.8105@quantum>
+ <1381178249.1584.1.camel@linux-builds1> <20131007232857.7445.3041@quantum>
+ <CAOesGMjC7rOghacXUEp6bE=8pXWGMBZ-M637ZiLMKBp+-KUPug@mail.gmail.com>
+ <20131008013954.7445.27392@quantum>
+Message-ID: <52537090.9030704@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/07/2013 01:12 PM, Arnaud Ebalard wrote:
-> Hi guys,
->
-> yesterday, I reported on arm kernel mailing list what looked like a sata
-> regression on my platform (Marvell Armada 370-based NETGEAR ReadyNAS
-> 102). I initially thought this was an ARM-related issue. My initial
-> email, provided below, contains various details on the platform and the
-> error encountered.
->
-> Today, before starting a painful git bisect, I decided to git log
-> sata_mv.c code and then more generally drivers/ata to quickly end up on
-> commit ed36911c747c (libata: Add support for SEND/RECEIVE FPDMA QUEUED)
-> against which I got suspicious after looking again at the errors I had:
->
-> [  417.288155] ata1.00: exception Emask 0x0 SAct 0x1fff6001 SErr 0x0 action 0x6 frozen
-> [  417.295838] ata1.00: failed command: WRITE FPDMA QUEUED
-> [  417.301097] ata1.00: cmd 61/48:00:80:ad:0b/00:00:0c:00:00/40 tag 0 ncq 36864 out
-> [  417.315896] ata1.00: status: { DRDY }
-> [  417.319570] ata1.00: failed command: WRITE FPDMA QUEUED
-> [  417.324814] ata1.00: cmd 61/08:68:70:a1:87/00:00:0d:00:00/40 tag 13 ncq 4096 out
-> [  417.339619] ata1.00: status: { DRDY }
-> [  417.343288] ata1.00: failed command: WRITE FPDMA QUEUED
-> [  417.348536] ata1.00: cmd 61/08:70:28:a2:87/00:00:0d:00:00/40 tag 14 ncq 4096 out
-> [  417.363341] ata1.00: status: { DRDY }
-> [  417.367010] ata1.00: failed command: WRITE FPDMA QUEUED
-> [  417.372257] ata1.00: cmd 61/08:80:80:a3:87/00:00:0d:00:00/40 tag 16 ncq 4096 out
-> [  417.387061] ata1.00: status: { DRDY }
-> [  417.390733] ata1.00: failed command: WRITE FPDMA QUEUED
-> [  417.395977] ata1.00: cmd 61/08:88:58:a1:c7/00:00:0d:00:00/40 tag 17 ncq 4096 out
-> [  417.410782] ata1.00: status: { DRDY }
->
-> Reverting both 87fb6c31b9 (libata: Add support for queued DSM TRIM) and
-> ed36911c74 (libata: Add support for SEND/RECEIVE FPDMA QUEUED) makes the
-> problem disappear. Note: reverting 87fb6c31b9 is not enough and I cannot
-> compile the kernel with only the latter reverted.
->
-> If you need more info on the platform or want me to test something some
-> fix, do not hesitate.
 
-I assume that it consistently fails on a non-working kernel and 
-consistently works with those patches reverted? Given that both of those 
-patches seem to only be touching SSDs with NCQ trim support, it seems 
-odd they would be breaking a normal hard drive, but maybe there is some 
-unexpected side effect..
+On 10/7/13 8:39 PM, Mike Turquette wrote:
+> Quoting Olof Johansson (2013-10-07 16:43:14)
+>> On Mon, Oct 7, 2013 at 4:28 PM, Mike Turquette <mturquette@linaro.org> wrote:
+>>> Quoting Dinh Nguyen (2013-10-07 13:37:29)
+>>>> Hi Mike,
+>>>>
+>>>> On Mon, 2013-10-07 at 13:12 -0700, Mike Turquette wrote:
+>>>>> Quoting Dinh Nguyen (2013-08-14 07:57:54)
+>>>>>> On Tue, 2013-08-13 at 22:48 -0700, Olof Johansson wrote:
+>>>>>>> On Mon, Aug 12, 2013 at 10:42:14AM -0500, dinguyen at altera.com wrote:
+>>>>>>>> From: Dinh Nguyen <dinguyen@altera.com>
+>>>>>>>>
+>>>>>>>> The SD/MMC clock is named "sdmmc_clk", and NOT "mmc_clk".
+>>>>>>>>
+>>>>>>>> Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
+>>>>>>>> Cc: Mike Turquette <mturquette@linaro.org>
+>>>>>>>> CC: Arnd Bergmann <arnd@arndb.de>
+>>>>>>>> CC: Olof Johansson <olof@lixom.net>
+>>>>>>>> Cc: Pavel Machek <pavel@denx.de>
+>>>>>>>> Cc: linux-arm-kernel at lists.infradead.org
+>>>>>>> Hi Dinh,
+>>>>>>>
+>>>>>>> Do you want this applied in fixes for 3.11? If so, can you give me a oneliner
+>>>>>>> on what the impact here is? mmc doesn't come up at all, or something more
+>>>>>>> subtle?
+>>>>>> Hi Olof,
+>>>>>>
+>>>>>> No, this is go into 3.12 as I am still working on the bindings for
+>>>>>> SD/MMC.
+>>>>>>
+>>>>>> The oneliner: "The SD/MMC driver was intermittently not coming up
+>>>>>> because it was not able to get the correct clock."
+>>>>> Olof, did you take this? If not I'll put it into my next batch of fixes
+>>>>> for 3.12.
+>>>> No, Olof did not get a chance to pick this up for 3.12. I resent the
+>>>> patch with the updated commit message for 3.13:
+>>>>
+>>>> http://lists.infradead.org/pipermail/linux-arm-kernel/2013-September/198824.html
+>>> Thanks for the link. I've taken that version into clk-fixes for 3.12.
+>>
+>> Thanks Mike, and sorry for dropping the ball Dinh. Next time feel free
+>> to remind me if it happens. A week is the normal grace period. :)
+No problem Olof! The patches to enable SDMMC is still floating out there 
+so there wasn't a huge
+hurry for 3.12.
+
+Any chance you might take a look? I'll ping Chris Ball again tomorrow.
+
+http://lists.infradead.org/pipermail/linux-arm-kernel/2013-September/198824.html
+
+Thanks...
+> No problem ;-)
+>
+> Dinh,
+>
+> I changed your $SUBJECT line to:
+>
+> "clk: socfpga: Fix incorrect sdmmc clock name"
+>
+> Just a simple s/arm/clk/
+Thanks Mike!
+
+Dinh
+>
+> Regards,
+> Mike
+>
+>>
+>> -Olof
