@@ -1,71 +1,93 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Tue, 08 Oct 2013 09:13:16 +0200
-Subject: [PATCH v4 1/2] ARM: OMAP: Add secure function omap_smc3() which
- calling instruction smc #1
-In-Reply-To: <201309080943.30542@pali>
-References: <20130904124303.GA2369@localhost.localdomain>
- <201309080943.30542@pali>
-Message-ID: <5253B08C.4020305@codethink.co.uk>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Tue, 8 Oct 2013 09:17:35 +0200 (CEST)
+Subject: [PATCH] DMA: extend documentation to provide more API details
+In-Reply-To: <20131008035852.GP2954@intel.com>
+References: <20131005233137.GA12758@n2100.arm.linux.org.uk>
+ <20131006052029.GE2954@intel.com>
+ <Pine.LNX.4.64.1310071233340.20796@axis700.grange>
+ <20131007111728.GM12758@n2100.arm.linux.org.uk>
+ <20131007103936.GH2954@intel.com>
+ <Pine.LNX.4.64.1310071409080.20796@axis700.grange>
+ <20131007142511.GJ2954@intel.com>
+ <Pine.LNX.4.64.1310071725300.20796@axis700.grange>
+ <20131007154854.GM2954@intel.com>
+ <Pine.LNX.4.64.1310072235360.27047@axis700.grange>
+ <20131008035852.GP2954@intel.com>
+Message-ID: <Pine.LNX.4.64.1310080914390.31629@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/09/13 09:43, Pali Roh?r wrote:
-> Here is new version (v4) of omap secure part patch:
->
-> Other secure functions omap_smc1() and omap_smc2() calling instruction smc #0
-> but Nokia RX-51 board needs to call smc #1 for PPA access.
->
-> Signed-off-by: Ivaylo Dimitrov<freemangordon@abv.bg>
-> Signed-off-by: Pali Roh?r<pali.rohar@gmail.com>
-> ---
-> diff --git a/arch/arm/mach-omap2/omap-secure.h b/arch/arm/mach-omap2/omap-secure.h
-> index 0e72917..c4586f4 100644
-> --- a/arch/arm/mach-omap2/omap-secure.h
-> +++ b/arch/arm/mach-omap2/omap-secure.h
-> @@ -51,6 +51,7 @@
->   extern u32 omap_secure_dispatcher(u32 idx, u32 flag, u32 nargs,
->   				u32 arg1, u32 arg2, u32 arg3, u32 arg4);
->   extern u32 omap_smc2(u32 id, u32 falg, u32 pargs);
-> +extern u32 omap_smc3(u32 id, u32 process, u32 flag, u32 pargs);
->   extern phys_addr_t omap_secure_ram_mempool_base(void);
->   extern int omap_secure_ram_reserve_memblock(void);
->
-> diff --git a/arch/arm/mach-omap2/omap-smc.S b/arch/arm/mach-omap2/omap-smc.S
-> index f6441c1..fd90125 100644
-> --- a/arch/arm/mach-omap2/omap-smc.S
-> +++ b/arch/arm/mach-omap2/omap-smc.S
-> @@ -1,9 +1,11 @@
->   /*
-> - * OMAP44xx secure APIs file.
-> + * OMAP34xx and OMAP44xx secure APIs file.
->    *
->    * Copyright (C) 2010 Texas Instruments, Inc.
->    * Written by Santosh Shilimkar<santosh.shilimkar@ti.com>
->    *
-> + * Copyright (C) 2012 Ivaylo Dimitrov<freemangordon@abv.bg>
-> + * Copyright (C) 2013 Pali Roh?r<pali.rohar@gmail.com>
->    *
->    * This program is free software,you can redistribute it and/or modify
->    * it under the terms of the GNU General Public License version 2 as
-> @@ -54,6 +56,23 @@ ENTRY(omap_smc2)
->   	ldmfd   sp!, {r4-r12, pc}
->   ENDPROC(omap_smc2)
->
-> +/**
-> + * u32 omap_smc3(u32 service_id, u32 process_id, u32 flag, u32 pargs)
-> + * Low level common routine for secure HAL and PPA APIs via smc #1
-> + * r0 - @service_id: Secure Service ID
-> + * r1 - @process_id: Process ID
-> + * r2 - @flag: Flag to indicate the criticality of operation
-> + * r3 - @pargs: Physical address of parameter list
-> + */
-> +ENTRY(omap_smc3)
-> +	stmfd	sp!, {r4-r11, lr}
-> +	mov	r12, r0		@ Copy the secure service ID
+On Tue, 8 Oct 2013, Vinod Koul wrote:
 
-I think you should save r12 in the call.
+> On Mon, Oct 07, 2013 at 10:43:51PM +0200, Guennadi Liakhovetski wrote:
+> > On Mon, 7 Oct 2013, Vinod Koul wrote:
+> > 
+> > > On Mon, Oct 07, 2013 at 05:28:37PM +0200, Guennadi Liakhovetski wrote:
+> > > > > > > > > No, not something in the middle. I was thinking about
+> > > > > > > > > 
+> > > > > > > > > (1) cookie 1-3 are submitted
+> > > > > > > > > (2) cookie 1 succeeds
+> > > > > > > > > (3) a DMA error occurs, cookies 2-3 are discarded
+> > > > > > > discarded using terminate_all right?
+> > > > > > 
+> > > > > > No, by the dmaengine driver as a part of the error processing.
+> > > > > And how will that be done...?
+> > > > 
+> > > > Sorry, I meant - DMA descriptors with cookies #2 and #3 will be cancelled 
+> > > > and recycled by the dmaengine driver. That's what you have to do, when 
+> > > > processing DMA error IRQ.
+> > > well the term cancel means someone went ahead and requested abort/terminate of a
+> > > transaction...
+> > > 
+> > > As we discussed in other mail on this thread the most common occurrence will be
+> > > timeout on client side and client cant cancel selectively.
+> > > 
+> > > For dma driver detection error, which is quite rare in slave usages, if people
+> > > think its common for them we cna indicate this thru status in callback. Then
+> > > client will know and doesnt need to query.
+> > > 
+> > > Recycling cookie has a large space so i dont think we will get confused
+> > > with a recycled one
+> > 
+> > If you reset cookies, as you proposed, IMHO, this can very well lead to a 
+> > confusion: suppose cookie #1000 caused an error. We drop queued transfers 
+> > with cookies #1001-1005 and reset to #1. When we're at #100 the user asks 
+> > for a status of cookie #1003, which we have aborted. However, the 
+> > following check in dma_async_is_complete():
+> Well you are missing an important point. Who is doing abort. It is the client
+> driver, the user.
 
+No. "cookie #1000 caused an error" - a DMA error. The dmaengine driver 
+detects it. The user knows nothing about it, so, they cannot call 
+terminate_all(). The "we" above refers to the dmaengine driver.
 
--- 
-Ben Dooks				http://www.codethink.co.uk/
-Senior Engineer				Codethink - Providing Genius
+So, that's exactly the case, discussed in the other mail too. And your 
+proposed error / status reporting callback will fix this, so, let's do 
+that!
+
+Thanks
+Guennadi
+
+> And as i said previously before calling terminate_all he will forget about the
+> cookies allocated previosuly, So after that he cant invoke any of the old
+> cookie. If he is, then that is wrong and needs to be fixed :)
+> 
+> So while user is dealing with new transactions (cookies), he doesnt know
+> anything about old ones and cant query as in above example 1003!
+> > 
+> > 	if (last_complete <= last_used) {
+> > 		if ((cookie <= last_complete) || (cookie > last_used))
+> > 			return DMA_SUCCESS;
+> > 
+> > will confirm success to the user.
+> Not in above example!, if you are at #100, query for #1003 will return
+> DMA_IN_PROGRESS.
+> 
+> --
+> ~Vinod
+> 
+
+---
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
