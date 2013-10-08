@@ -1,87 +1,68 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 08 Oct 2013 14:43:49 -0600
-Subject: [PATCH V3] clk: palmas: add clock driver for palmas
-In-Reply-To: <525441DD.2090109@ti.com>
-References: <1381238480-18852-1-git-send-email-ldewangan@nvidia.com>
- <525408B3.1000107@ti.com> <5254193A.70104@nvidia.com> <52542F69.30407@ti.com>
- <52543C1B.3000403@wwwdotorg.org> <525441DD.2090109@ti.com>
-Message-ID: <52546E85.3070407@wwwdotorg.org>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Tue, 8 Oct 2013 22:53:04 +0200
+Subject: getting rid of subsys_initcall usage? (was: Re: [PATCH RESEND]
+ i2c: designware: use module_platform_driver)
+In-Reply-To: <20130830082712.GT7656@atomide.com>
+References: <1376987548-12366-1-git-send-email-zhangfei.gao@linaro.org>
+ <20130828095706.GH4086@katana>
+ <CACRpkdb1p1=3a0PM+r2ZrMN+ECv5BAZFdv2omDK5npaer4ddcw@mail.gmail.com>
+ <CAMj5BkhQkwb+T9VepN7UrWNRSgtv=Dw-Sa-gv0orOANo55iqNw@mail.gmail.com>
+ <20130830054858.GR7656@atomide.com>
+ <CAMj5BkiDExikXi3JcVhO7RN8_82eGYhq3i6oPf5Wbipy=N+iHQ@mail.gmail.com>
+ <20130830082712.GT7656@atomide.com>
+Message-ID: <20131008205304.GA29121@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/08/2013 11:33 AM, Nishanth Menon wrote:
-> On 10/08/2013 12:08 PM, Stephen Warren wrote:
->> On 10/08/2013 10:14 AM, Nishanth Menon wrote:
->>> On 10/08/2013 09:39 AM, Laxman Dewangan wrote:
->>>> Thanks Nishanth for review.
->>>>
->>>> On Tuesday 08 October 2013 06:59 PM, Nishanth Menon wrote:
->>>>> On 10/08/2013 08:21 AM, Laxman Dewangan wrote:
->>>>>> Palmas devices has two clock output CLK32K_KG and CLK32K_KG_AUDIO
->>>>> not all palmas devices have 2 clocks - example: tps659038
->>>>
->>>> This is for generic palmas and I have seen it for TPS65913, TPS65914, 
->>>> TPS80036. If the generic one is not compatible then it need to add  
->>>> device specific and at that time, it is require to update the binding 
->>>> document accordingly.
->>>
->>> ?? you do have two clocks inside the device they should be represented
->>> as two compatible entities - that simplifies everyone's life.
->>
->> I think the terminology you're using here is quite confusing.
->>
->> Are you talking about having two different compatible values for two
->> different HW designs, where those different designs implement different
->> sets of clocks (which makes sense), or two different DT nodes for two
->> different clocks (which IMHO doesn't always, unless those different
->> clocks *truly* are separate IP blocks with completely independent
->> register regions, and where those IP blocks are likely to be re-used
->> as-is in other chips).
->
-> clk32k and clk32k_audio are two different resources and since these
-> are two different resource instances - a "compatible" matching an
-> actual device is my suggestion.
-
-The fact that two clocks are two different resources isn't at all
-relevant to DT structure. HW module design is what's relevant.
-
-> clk32k and clk32k_audio are two different resources because they have
-> their specific set of controls registers and may even be independently
-> present in a Palmas variant.
-
-That's a better argument, assuming that: The registers for those two
-clocks aren't randomly interleaved with other registers within the HW
-module. That would imply that the clock registers aren't independant HW
-blocks.
-
-> To highlight this: The example of tps659038 where clk32k is not
-> present, but clk32k_audio is present (and happens to be disabled by
-> default - thanks to an OTP on the chip - on platform like DRA7-evm, it
-> is used to for 32k clk for wlan -currently hacked in u-boot using
-> plain i2c writes[1] - yes it is yucky).
-
-That can easily be handled by having separate compatible values for a
-monolithic overall Palmas or Palmas-clock node/HW-block. The fact that
-different chips are different doesn't, in and of itself, need to
-influence whether the different clocks are represented as different DT
-nodes.
-
-> Obviously, there are many ways to implement this. based on the current
-> implementation, it indicates that if i create a node with
-> "ti,palmas-clk" -i'd create two clocks - that is wrong for tps659038.
+On Fri, Aug 30, 2013 at 01:27:13AM -0700, Tony Lindgren wrote:
+> * zhangfei gao <zhangfei.gao@gmail.com> [130829 23:36]:
+> > What about concerns from Wolfram:
+> > " Other people might be
+> > depending on subsys_initcall to get I2C active before they want to
+> > activate, say, PMICs. So, I fear regressions, since deferred probing
+> > might not be available in the needed places to avoid these regressions."
 > 
-> Now (with the current approach), if I have to create a one clock for
-> tps659038, i have to fix the for adding clock providers, add up
-> "ti,tps659038-clk" etc.. it is doable - but IMHO, I dont need to do it
-> with only the relevant nodes in dts.
->
-> Further, it has no way to indicate that device X uses clock Y using
-> clocks =<&xyz> either.
+> There should not be any reason to get a PMIC activated
+> early on. The system should be booting already at that point,
+> and the PMIC related init can be done later on.
 
-Sorry, I just don't understand that.
+Okay, here is a more concrete example:
 
-If a clock provider provides two clocks, it could number then e.g. 0 and
-1. Clock consumers would reference those IDs. If a different chip that
-uses the same binding only supports one of those two clocks, just have
-the driver return an error if the DT attempts to use/reference the
-invalid clock ID; nothign could be simpler.
+Consider the amplifier driver 'sound/soc/codecs/max9768.c'. Back then, unaware
+of deferred probing, I wrote the following code to get the GPIOs (which are
+optional):
+
+	err = gpio_request_one(pdata->mute_gpio, GPIOF_INIT_HIGH, "MAX9768 Mute");
+	max9768->mute_gpio = err ?: pdata->mute_gpio;
+
+And later in the process:
+
+        if (gpio_is_valid(max9768->mute_gpio)) {
+                ret = snd_soc_add_codec_controls(codec, max9768_mute,
+                                ARRAY_SIZE(max9768_mute));
+                if (ret)
+                        return ret;
+        }
+
+So, the mute control will only be added if the gpio_request succeeded. On that
+particular board, the mute GPIO was wired to an I2C GPIO controller. If I now
+change the I2C (or GPIO) driver from subsys_initcall to module_init, then the
+gpio_request in the amplifier driver could hit -EPROBE_DEFER and the mute
+control will then disappear. Yes, the driver can be fixed easily, yet I fear a
+number of regressions like this. Instead of people digging into why things
+disappear after a kernel update, I wonder if there is a way to guide users if
+this happens. I didn't have time for that, though, sadly. Still, it makes me
+wonder how easily we could shift from subsys_initcall to module_init, although
+I'd really love to get away from subsys_initcall in device drivers.
+
+Regards,
+
+   Wolfram
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131008/2d209bf9/attachment.sig>
