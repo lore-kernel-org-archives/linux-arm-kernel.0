@@ -1,48 +1,41 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 8 Oct 2013 11:00:44 +0100
-Subject: [PATCH 6/6] cpufreq: probe the Integrator cpufreq driver from DT
-In-Reply-To: <1380816238-3255-1-git-send-email-linus.walleij@linaro.org>
-References: <1380816238-3255-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <20131008100044.GF28972@e106331-lin.cambridge.arm.com>
+From: rogerq@ti.com (Roger Quadros)
+Date: Tue, 8 Oct 2013 13:06:33 +0300
+Subject: [PATCH v2 0/6] Add USB Host support for OMAP5 uevm for 3.13
+Message-ID: <1381226799-29158-1-git-send-email-rogerq@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[adding devicetree to Cc]
+Hi,
 
-Hi Linus,
+This patch series provide USB host support for the OMAP5 uEVM board.
+As ethernet port is over USB, it brings up ethernet as well.
 
-[...]
+Series depends on the OMAP clock tree DT data series by Tero Kristo [1]
 
-> +static int __init integrator_cpufreq_probe(struct platform_device *pdev)
->  {
-> +	struct device_node *np = pdev->dev.of_node;
-> +
-> +	cm_base = of_iomap(np, 0);
-> +	if (!cm_base)
-> +		return -ENODEV;
->  	return cpufreq_register_driver(&integrator_driver);
+Tested on OMAP5 uEVM and OMAP4 Panda.
 
-If we fail to register the driver we could unmap cm_base, no?
+cheers,
+-roger
 
->  }
->  
-> -static void __exit integrator_cpu_exit(void)
-> +static void __exit integrator_cpufreq_remove(struct platform_device *pdev)
->  {
->  	cpufreq_unregister_driver(&integrator_driver);
+[1] - 	OMAP Clock DT conversion
+	http://www.spinics.net/lists/arm-kernel/msg275311.html
 
-Unmap here?
+Roger Quadros (6):
+  ARM: OMAP5: hwmod data: Add USB Host and TLL modules
+  ARM: dts: OMAP5: Add 60MHz clock reference to USB Host module
+  ARM: dts: omap4-panda: Provide USB PHY clock
+  ARM: dts: omap5-uevm: Provide USB PHY clock
+  Revert "ARM: OMAP2+: Provide alias to USB PHY clock"
+  mfd: omap-usb: prepare/unprepare clock while enable/disable
 
->  }
->  
-> +static const struct of_device_id integrator_cpufreq_match[] = {
-> +	{ .compatible = "arm,core-module-integrator"},
-> +	{ },
-> +};
+ arch/arm/boot/dts/omap4-panda-common.dtsi  |    8 +--
+ arch/arm/boot/dts/omap5-uevm.dts           |    8 +--
+ arch/arm/boot/dts/omap5.dtsi               |    2 +
+ arch/arm/mach-omap2/board-generic.c        |   23 +-----
+ arch/arm/mach-omap2/omap_hwmod_54xx_data.c |  135 ++++++++++++++++++++++++++++
+ drivers/mfd/omap-usb-host.c                |   16 ++--
+ drivers/mfd/omap-usb-tll.c                 |    4 +-
+ 7 files changed, 152 insertions(+), 44 deletions(-)
 
-It feels a little scary that this also got handled by some other code in
-the previous patch. Is no arbitrarion required between the two when
-accessing the core module registers?
-
-Cheers,
-Mark.
+-- 
+1.7.4.1
