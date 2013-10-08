@@ -1,84 +1,101 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue,  8 Oct 2013 18:05:43 +0900
-Subject: [PATCH 4/4] ARM: shmobile: lager: Constify platform data and resources
+Date: Tue,  8 Oct 2013 18:05:41 +0900
+Subject: [PATCH 2/4] ARM: shmobile: r8a7778: cleanup registration of sh_eth
 In-Reply-To: <cover.1381222967.git.horms+renesas@verge.net.au>
 References: <cover.1381222967.git.horms+renesas@verge.net.au>
-Message-ID: <27113d63daac0aacaa26b1fabfc23391de4284f4.1381222967.git.horms+renesas@verge.net.au>
+Message-ID: <cd4ab0420fd6233766fd87fa295d6e3cfb719c01.1381222967.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-Platform data and resources for Lager devices are kmemdup()ed when the
-corresponding devices are registered and can thus be declared as const.
-Do so.
+sh_eth driver which needs platform data at the time of
+registration is used from BockW only.
+Now, ARM/shmobile aims to support DT,
+and the C code base board support will be removed
+if DT support is completed.
+Current driver registration method which needs platform data
+and which is not shared complicates codes.
+This means legacy C code cleanup after DT supporting
+will be more complicated
+This patch registers it on board code as cleanup C code
 
-Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/board-lager.c | 14 +++++++-------
- 1 file changed, 7 insertions(+), 7 deletions(-)
+ arch/arm/mach-shmobile/board-bockw.c          | 14 +++++++++++++-
+ arch/arm/mach-shmobile/include/mach/r8a7778.h |  1 -
+ arch/arm/mach-shmobile/setup-r8a7778.c        | 14 --------------
+ 3 files changed, 13 insertions(+), 16 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/board-lager.c b/arch/arm/mach-shmobile/board-lager.c
-index 4047fac..afd5137 100644
---- a/arch/arm/mach-shmobile/board-lager.c
-+++ b/arch/arm/mach-shmobile/board-lager.c
-@@ -55,7 +55,7 @@ static struct gpio_led lager_leds[] = {
- 	},
+diff --git a/arch/arm/mach-shmobile/board-bockw.c b/arch/arm/mach-shmobile/board-bockw.c
+index 4b696ce..f2bf61b 100644
+--- a/arch/arm/mach-shmobile/board-bockw.c
++++ b/arch/arm/mach-shmobile/board-bockw.c
+@@ -101,6 +101,12 @@ static struct resource sdhi0_resources[] __initdata = {
+ 	DEFINE_RES_IRQ(gic_iid(0x77)),
  };
  
--static __initdata struct gpio_led_platform_data lager_leds_pdata = {
-+static const struct gpio_led_platform_data lager_leds_pdata __initconst = {
- 	.leds		= lager_leds,
- 	.num_leds	= ARRAY_SIZE(lager_leds),
- };
-@@ -71,7 +71,7 @@ static struct gpio_keys_button gpio_buttons[] = {
- 	GPIO_KEY(KEY_1,		RCAR_GP_PIN(1, 14),	"SW2-pin1"),
- };
++/* Ether */
++static struct resource ether_resources[] __initdata = {
++	DEFINE_RES_MEM(0xfde00000, 0x400),
++	DEFINE_RES_IRQ(gic_iid(0x89)),
++};
++
+ static struct sh_eth_plat_data ether_platform_data __initdata = {
+ 	.phy		= 0x01,
+ 	.edmac_endian	= EDMAC_LITTLE_ENDIAN,
+@@ -255,7 +261,13 @@ static void __init bockw_init(void)
+ 	r8a7778_clock_init();
+ 	r8a7778_init_irq_extpin(1);
+ 	r8a7778_add_standard_devices();
+-	r8a7778_add_ether_device(&ether_platform_data);
++
++	platform_device_register_resndata(&platform_bus, "r8a777x-ether", -1,
++					  ether_resources,
++					  ARRAY_SIZE(ether_resources),
++					  &ether_platform_data,
++					  sizeof(ether_platform_data));
++
+ 	platform_device_register_full(&vin0_info);
+ 	/* VIN1 has a pin conflict with Ether */
+ 	if (!IS_ENABLED(CONFIG_SH_ETH))
+diff --git a/arch/arm/mach-shmobile/include/mach/r8a7778.h b/arch/arm/mach-shmobile/include/mach/r8a7778.h
+index 9838608..48933def 100644
+--- a/arch/arm/mach-shmobile/include/mach/r8a7778.h
++++ b/arch/arm/mach-shmobile/include/mach/r8a7778.h
+@@ -23,7 +23,6 @@
  
--static __initdata struct gpio_keys_platform_data lager_keys_pdata = {
-+static const struct gpio_keys_platform_data lager_keys_pdata __initconst = {
- 	.buttons	= gpio_buttons,
- 	.nbuttons	= ARRAY_SIZE(gpio_buttons),
- };
-@@ -83,24 +83,24 @@ static struct regulator_consumer_supply fixed3v3_power_consumers[] =
- };
+ extern void r8a7778_add_standard_devices(void);
+ extern void r8a7778_add_standard_devices_dt(void);
+-extern void r8a7778_add_ether_device(struct sh_eth_plat_data *pdata);
+ extern void r8a7778_add_dt_devices(void);
  
- /* MMCIF */
--static struct sh_mmcif_plat_data mmcif1_pdata __initdata = {
-+static const struct sh_mmcif_plat_data mmcif1_pdata __initconst = {
- 	.caps		= MMC_CAP_8_BIT_DATA | MMC_CAP_NONREMOVABLE,
- };
+ extern void r8a7778_init_late(void);
+diff --git a/arch/arm/mach-shmobile/setup-r8a7778.c b/arch/arm/mach-shmobile/setup-r8a7778.c
+index 604cf36..f5e15c9 100644
+--- a/arch/arm/mach-shmobile/setup-r8a7778.c
++++ b/arch/arm/mach-shmobile/setup-r8a7778.c
+@@ -174,20 +174,6 @@ static struct platform_device_info hci##_info __initdata = {	\
+ USB_PLATFORM_INFO(ehci);
+ USB_PLATFORM_INFO(ohci);
  
--static struct resource mmcif1_resources[] __initdata = {
-+static const struct resource mmcif1_resources[] __initconst = {
- 	DEFINE_RES_MEM_NAMED(0xee220000, 0x80, "MMCIF1"),
- 	DEFINE_RES_IRQ(gic_spi(170)),
- };
- 
- /* Ether */
--static struct sh_eth_plat_data ether_pdata __initdata = {
-+static const struct sh_eth_plat_data ether_pdata __initconst = {
- 	.phy			= 0x1,
- 	.edmac_endian		= EDMAC_LITTLE_ENDIAN,
- 	.phy_interface		= PHY_INTERFACE_MODE_RMII,
- 	.ether_link_active_low	= 1,
- };
- 
+-/* Ether */
 -static struct resource ether_resources[] __initdata = {
-+static const struct resource ether_resources[] __initconst = {
- 	DEFINE_RES_MEM(0xee700000, 0x400),
- 	DEFINE_RES_IRQ(gic_spi(162)),
- };
-@@ -155,7 +155,7 @@ static void __init lager_add_standard_devices(void)
- 					  &ether_pdata, sizeof(ether_pdata));
- }
- 
--static const char *lager_boards_compat_dt[] __initdata = {
-+static const char * const lager_boards_compat_dt[] __initconst = {
- 	"renesas,lager",
- 	NULL,
- };
+-	DEFINE_RES_MEM(0xfde00000, 0x400),
+-	DEFINE_RES_IRQ(gic_iid(0x89)),
+-};
+-
+-void __init r8a7778_add_ether_device(struct sh_eth_plat_data *pdata)
+-{
+-	platform_device_register_resndata(&platform_bus, "r8a777x-ether", -1,
+-					  ether_resources,
+-					  ARRAY_SIZE(ether_resources),
+-					  pdata, sizeof(*pdata));
+-}
+-
+ /* PFC/GPIO */
+ static struct resource pfc_resources[] __initdata = {
+ 	DEFINE_RES_MEM(0xfffc0000, 0x118),
 -- 
 1.8.4
