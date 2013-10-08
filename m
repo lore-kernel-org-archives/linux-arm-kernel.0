@@ -1,44 +1,59 @@
 From: takasi-y@ops.dti.ne.jp (takasi-y at ops.dti.ne.jp)
-Date: Tue, 8 Oct 2013 14:34:03 +0900
-Subject: [PATCH v2 3/3] ARM: shmobile: kzm9d: Use common clock framework
-In-Reply-To: <20131008143040.52f36df8edb7ab63224d8433@ops.dti.ne.jp>
-References: <20131008143040.52f36df8edb7ab63224d8433@ops.dti.ne.jp>
-Message-ID: <20131008143403.c11f294c8a1701a2ab3bc5fd@ops.dti.ne.jp>
+Date: Tue, 8 Oct 2013 14:30:40 +0900
+Subject: [PATCH v2 0/3] ARM: shmobile: kzm9d: migrate to common clock
+ framework with DT
+Message-ID: <20131008143040.52f36df8edb7ab63224d8433@ops.dti.ne.jp>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use common clock framework version of clock
- drivers/clk/shmobile/clk-emev2.c
-instead of sh-clkfwk version
- arch/arm/mach-shmobile/clock-emev2.c
-when it is configured as a part of multi-platform.
+This patch series makes kzm9d to move to new clk implementation
+ based on the common clock framework and device tree, when configured
+ as a part of multi-platform.
 
-Signed-off-by: Takashi Yoshii <takasi-y@ops.dti.ne.jp>
----
- arch/arm/mach-shmobile/board-kzm9d-reference.c | 5 ++---
- 1 file changed, 2 insertions(+), 3 deletions(-)
+These patches do not remove sh-clkfwk version, even on emev2.
+Non multi-platform configuration still uses sh-clkfwk.
 
-diff --git a/arch/arm/mach-shmobile/board-kzm9d-reference.c b/arch/arm/mach-shmobile/board-kzm9d-reference.c
-index 054d8d5..853003c 100644
---- a/arch/arm/mach-shmobile/board-kzm9d-reference.c
-+++ b/arch/arm/mach-shmobile/board-kzm9d-reference.c
-@@ -20,15 +20,14 @@
- 
- #include <linux/init.h>
- #include <linux/of_platform.h>
-+#include <linux/clk-provider.h>
- #include <mach/emev2.h>
- #include <mach/common.h>
- #include <asm/mach/arch.h>
- 
- static void __init kzm9d_add_standard_devices(void)
- {
--	if (!IS_ENABLED(CONFIG_COMMON_CLK))
--		emev2_clock_init();
--
-+	of_clk_init(NULL);
- 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
- }
- 
--- 
-1.8.1.5
+Should be applied and compiled on
+ kernel/git/horms/renesas.git tag:renesas-devel-20131008
+
+Confirmed for boot up to command prompt.
+- kzm9d board / multi-platform + kzm9d configuration
+- kzm9d board / kzm9d configuration for regression
+for compilation
+- ape6evm(non-multi-platform) configuration for regression.
+
+Changes since v1:
+
+Generally, simplified, depending on
+ [PATCH 00/05] ARM: shmobile: KZM9D Multiplatform update
+series posted recently by Magnus.
+
+[PATCH 1/6] clocksource: em_sti: convert to clk_prepare/unprepare
+[PATCH 2/6] serial8250-em: convert to clk_prepare/unprepare
+Removed because the new base includes it.
+Thank you for your review, Daniel, Greg, Laurent, and Magnus.
+
+[PATCH 3/6] sh: clkfwk: Select sh-/common- clkfwk alternatively
+Removed because "KZM9D Multiplatform update" had made this not needed.
+
+[PATCH v2 1/3] clk: emev2: Add support for emev2 SMU clocks with DT
+[PATCH v2 2/3] ARM: shmobile: emev2: Add clock tree description in DT
+(was 3/6, 4/6)
+Add @unit-address to smu in dts.
+Reassemble patches to (.txt + .c) + .dts from .txt + (.c + .dts).
+Only used when multi-platform configuration.
+Extra blank line removed.
+
+[PATCH v2 3/3] ARM: shmobile: kzm9d: Use common clock framework
+(was 6/6)
+No Kconfig modification because of "KZM9D Multiplatform update".
+
+
+Takashi YOSHII (3):
+  clk: emev2: Add support for emev2 SMU clocks with DT
+  ARM: shmobile: emev2: Add clock tree description in DT
+  ARM: shmobile: kzm9d: Use common clock framework
+
+ .../devicetree/bindings/clock/emev2-clock.txt      |  98 +++++++++++++++++++
+ arch/arm/boot/dts/emev2.dtsi                       |  84 +++++++++++++++++
+ arch/arm/mach-shmobile/board-kzm9d-reference.c     |   5 +-
