@@ -1,79 +1,77 @@
-From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Tue, 8 Oct 2013 15:52:12 -0300
-Subject: [PATCH] ARM: dts: imx51-babbage: Make DVI and WVGA panel functional
-Message-ID: <1381258332-6208-1-git-send-email-fabio.estevam@freescale.com>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Tue, 8 Oct 2013 20:56:17 +0200
+Subject: [PATCH v3 2/2] ARM: Dove: Add the audio device to the Cubox DT
+In-Reply-To: <20131008181647.GW5402@titan.lakedaemon.net>
+References: <20131008194232.7d74b9e6@armhf> <525448DE.5030004@gmail.com>
+ <20131008181647.GW5402@titan.lakedaemon.net>
+Message-ID: <20131008205617.079142b6@armhf>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently we get the following errors on imx51-babbage:
+This patch activates the audio device of the Cubox.
 
-/display at di0: could not find display-timings node
-/display at di0: no timings specified
-/display at di1: could not find display-timings node
-/display at di1: no timings specified
-imx-drm imx-drm: failed to allocate buffer with size 0
+The audio flow (pin mpp_audio1) is output on both I2S and S/PDIF.
 
-Provide timing values for IPU1, which is connected to a DVI bridge and
-to IPU2, which can be connected to the WVGA panel, so that both of them can
-be functional.
+The third si5351 clock (#2, pin mpp13) is used as the external clock.
 
-While at it, disable the WVGA panel, so that DVI output becomes the default one.
-
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
 ---
- arch/arm/boot/dts/imx51-babbage.dts | 33 +++++++++++++++++++++++++++++++++
- 1 file changed, 33 insertions(+)
+Jason,
 
-diff --git a/arch/arm/boot/dts/imx51-babbage.dts b/arch/arm/boot/dts/imx51-babbage.dts
-index f13f339..be1407c 100644
---- a/arch/arm/boot/dts/imx51-babbage.dts
-+++ b/arch/arm/boot/dts/imx51-babbage.dts
-@@ -27,6 +27,20 @@
- 		interface-pix-fmt = "rgb24";
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&pinctrl_ipu_disp1_1>;
-+		display-timings {
-+			native-mode = <&timing0>;
-+			timing0: dvi {
-+				clock-frequency = <65000000>;
-+				hactive = <1024>;
-+				vactive = <768>;
-+				hback-porch = <220>;
-+				hfront-porch = <40>;
-+				vback-porch = <21>;
-+				vfront-porch = <7>;
-+				hsync-len = <60>;
-+				vsync-len = <10>;
-+			};
-+		};
- 	};
+this patch replaces the previous patch v2 2/2
+
+v3:
+- move the pins declaration to dove.dtsi (Sebastian Hesselbarth)
+---
+ arch/arm/boot/dts/dove.dtsi      | 10 ++++++++++
+ arch/arm/boot/dts/dove-cubox.dts |  8 ++++++++
+ 2 files changed, 18 insertions(+)
+
+diff --git a/arch/arm/boot/dts/dove.dtsi b/arch/arm/boot/dts/dove.dtsi
+index e177e66..772b15e 100644
+--- a/arch/arm/boot/dts/dove.dtsi
++++ b/arch/arm/boot/dts/dove.dtsi
+@@ -227,6 +227,11 @@
+ 				marvell,function = "gpio";
+ 			};
  
- 	display at di1 {
-@@ -35,6 +49,25 @@
- 		interface-pix-fmt = "rgb565";
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&pinctrl_ipu_disp2_1>;
-+		status = "disabled";
-+		display-timings {
-+			native-mode = <&timing1>;
-+			timing1: claawvga {
-+				clock-frequency = <27000000>;
-+				hactive = <800>;
-+				vactive = <480>;
-+				hback-porch = <40>;
-+				hfront-porch = <60>;
-+				vback-porch = <10>;
-+				vfront-porch = <10>;
-+				hsync-len = <20>;
-+				vsync-len = <10>;
-+				hsync-active = <0>;
-+				vsync-active = <0>;
-+				de-active = <1>;
-+				pixelclk-active = <0>;
++			pmx_audio1_extclk: pmx-audio1-extclk {
++				marvell,pins = "mpp13";
++				marvell,function = "audio1";
 +			};
-+		};
- 	};
++
+ 			pmx_gpio_14: pmx-gpio-14 {
+ 				marvell,pins = "mpp14";
+ 				marvell,function = "gpio";
+@@ -302,6 +307,11 @@
+ 				marvell,function = "gpio";
+ 			};
  
- 	gpio-keys {
++			pmx_audio1_i2s1_spdifo: pmx-audio1-i2s1-spdifo {
++				marvell,pins = "mpp_audio1";
++				marvell,function = "i2s1/spdifo";
++			};
++
+ 			pmx_spi0: pmx-spi0 {
+ 				marvell,pins = "mpp_spi0";
+ 				marvell,function = "spi0";
+diff --git a/arch/arm/boot/dts/dove-cubox.dts b/arch/arm/boot/dts/dove-cubox.dts
+index 022646e..78b0057 100644
+--- a/arch/arm/boot/dts/dove-cubox.dts
++++ b/arch/arm/boot/dts/dove-cubox.dts
+@@ -132,3 +132,11 @@
+ 		reg = <0>;
+ 	};
+ };
++
++&audio1 {
++	status = "okay";
++	clocks = <&gate_clk 13>, <&si5351 2>;
++	clock-names = "internal", "extclk";
++	pinctrl-0 = <&pmx_audio1_i2s1_spdifo &pmx_audio1_extclk>;
++	pinctrl-names = "default";
++};
+
 -- 
-1.8.1.2
+Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
+Jef		|		http://moinejf.free.fr/
