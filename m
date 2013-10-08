@@ -1,32 +1,32 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 8 Oct 2013 10:21:19 +0200
-Subject: [PATCH 3/3] pinctrl: sirf: add USB1/UART1 pinmux usb/uart share
-In-Reply-To: <1380464879-19897-3-git-send-email-Baohua.Song@csr.com>
-References: <1380464879-19897-1-git-send-email-Baohua.Song@csr.com>
- <1380464879-19897-3-git-send-email-Baohua.Song@csr.com>
-Message-ID: <CACRpkdaX5jtA2O52zTG-3skZzO3KznRMfxFc16uL88nLQ1MG2A@mail.gmail.com>
+From: josephl@nvidia.com (Joseph Lo)
+Date: Tue, 8 Oct 2013 16:23:03 +0800
+Subject: [PATCH 0/4] ARM: tegra: add CPU hot-plug and idle support for Tegra124
+Message-ID: <1381220587-29697-1-git-send-email-josephl@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Sep 29, 2013 at 4:27 PM, Barry Song <21cnbao@gmail.com> wrote:
+The CPU hot-plug and idle function for Tegra124 was identical to Tegra114,
+so we share the driver with it.
 
-> From: Rong Wang <Rong.Wang@csr.com>
->
-> dn and dp of USB1 can share with UART1(UART1 can route rx,tx to dn and dp pins of USB1).
-> here we add this pinmux capability.
-> USB1/UART1 mode selection has dedicated control register in RSC module, here we attach
-> the register offset of private data of related pin groups.
->
-> Signed-off-by: Rong Wang <Rong.Wang@csr.com>
-> Signed-off-by: Barry Song <Baohua.Song@csr.com>
+Note:
+This patch series depends on the patch series below.
+* [PATCH 0/5] Tegra124 clock support
+* [PATCH V2 0/6] ARM: tegra: basic support for Tegra124 SoC
+* [PATCH] ARM: tegra: add clock properties for devices of Tegra124
 
-Patch applied to the pinctrl tree as well.
+Joseph Lo (4):
+  clk: tegra124: add wait_for_reset and disable_clock for
+    tegra_cpu_car_ops
+  ARM: tegra: CPU hotplug support for Tegra124
+  ARM: tegra: make tegra_resume can work with current and later chips
+  ARM: tegra: enable CPU idle for Tegra124
 
-Now I *really* hope you're not going to send something
-upstream through the ARM SoC tree that collides with this
-because then it's better if I ACK the patches instead.
+ arch/arm/mach-tegra/Makefile        |  4 ++++
+ arch/arm/mach-tegra/cpuidle.c       |  4 +++-
+ arch/arm/mach-tegra/hotplug.c       |  2 ++
+ arch/arm/mach-tegra/reset-handler.S |  9 +++------
+ drivers/clk/tegra/clk-tegra124.c    | 26 ++++++++++++++++++++++++++
+ 5 files changed, 38 insertions(+), 7 deletions(-)
 
-But for now they are in the pinctrl tree.
-
-Yours,
-Linus Walleij
+-- 
+1.8.4
