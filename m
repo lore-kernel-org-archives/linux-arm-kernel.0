@@ -1,94 +1,196 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 08 Oct 2013 13:43:09 +0100
-Subject: [PATCH 1/2] ARM: KVM: Yield CPU when vcpu executes a WFE
-In-Reply-To: <CAC4Lta14xZNnEUXxZiaF4=PQQTjq4efjsNDAK2oBH4-Uqh_d0A@mail.gmail.com>
-References: <1381160430-11790-1-git-send-email-marc.zyngier@arm.com>
- <1381160430-11790-2-git-send-email-marc.zyngier@arm.com>
- <CAC4Lta14xZNnEUXxZiaF4=PQQTjq4efjsNDAK2oBH4-Uqh_d0A@mail.gmail.com>
-Message-ID: <5253FDDD.6050008@arm.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Tue,  8 Oct 2013 14:49:51 +0200
+Subject: [PATCH RESEND TAKE2] clk: si5351: remove variant from platform_data
+Message-ID: <1381236591-19144-1-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/10/13 12:26, Raghavendra KT wrote:
-> On Mon, Oct 7, 2013 at 9:10 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
->> On an (even slightly) oversubscribed system, spinlocks are quickly
->> becoming a bottleneck, as some vcpus are spinning, waiting for a
->> lock to be released, while the vcpu holding the lock may not be
->> running at all.
->>
->> This creates contention, and the observed slowdown is 40x for
->> hackbench. No, this isn't a typo.
->>
->> The solution is to trap blocking WFEs and tell KVM that we're
->> now spinning. This ensures that other vpus will get a scheduling
->> boost, allowing the lock to be released more quickly.
->>
->> From a performance point of view: hackbench 1 process 1000
->>
->> 2xA15 host (baseline):  1.843s
->>
->> 2xA15 guest w/o patch:  2.083s
->> 4xA15 guest w/o patch:  80.212s
->>
->> 2xA15 guest w/ patch:   2.072s
->> 4xA15 guest w/ patch:   3.202s
->>
->> So we go from a 40x degradation to 1.5x, which is vaguely more
->> acceptable.
->>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> ---
->>  arch/arm/include/asm/kvm_arm.h | 4 +++-
->>  arch/arm/kvm/handle_exit.c     | 6 +++++-
->>  2 files changed, 8 insertions(+), 2 deletions(-)
->>
->> diff --git a/arch/arm/include/asm/kvm_arm.h b/arch/arm/include/asm/kvm_arm.h
->> index 64e9696..693d5b2 100644
->> --- a/arch/arm/include/asm/kvm_arm.h
->> +++ b/arch/arm/include/asm/kvm_arm.h
->> @@ -67,7 +67,7 @@
->>   */
->>  #define HCR_GUEST_MASK (HCR_TSC | HCR_TSW | HCR_TWI | HCR_VM | HCR_BSU_IS | \
->>                         HCR_FB | HCR_TAC | HCR_AMO | HCR_IMO | HCR_FMO | \
->> -                       HCR_SWIO | HCR_TIDCP)
->> +                       HCR_TWE | HCR_SWIO | HCR_TIDCP)
->>  #define HCR_VIRT_EXCP_MASK (HCR_VA | HCR_VI | HCR_VF)
->>
->>  /* System Control Register (SCTLR) bits */
->> @@ -208,6 +208,8 @@
->>  #define HSR_EC_DABT    (0x24)
->>  #define HSR_EC_DABT_HYP        (0x25)
->>
->> +#define HSR_WFI_IS_WFE         (1U << 0)
->> +
->>  #define HSR_HVC_IMM_MASK       ((1UL << 16) - 1)
->>
->>  #define HSR_DABT_S1PTW         (1U << 7)
->> diff --git a/arch/arm/kvm/handle_exit.c b/arch/arm/kvm/handle_exit.c
->> index df4c82d..c4c496f 100644
->> --- a/arch/arm/kvm/handle_exit.c
->> +++ b/arch/arm/kvm/handle_exit.c
->> @@ -84,7 +84,11 @@ static int handle_dabt_hyp(struct kvm_vcpu *vcpu, struct kvm_run *run)
->>  static int kvm_handle_wfi(struct kvm_vcpu *vcpu, struct kvm_run *run)
->>  {
->>         trace_kvm_wfi(*vcpu_pc(vcpu));
->> -       kvm_vcpu_block(vcpu);
->> +       if (kvm_vcpu_get_hsr(vcpu) & HSR_WFI_IS_WFE)
->> +               kvm_vcpu_on_spin(vcpu);
-> 
-> Could you also enable CONFIG_HAVE_KVM_CPU_RELAX_INTERCEPT for arm and
-> check if ple handler logic helps further?
-> we would ideally get one more optimization folded into ple handler if
-> you enable that.
+Commit 9807362bfe1748d9bb48eecb9261f1b1aaafea1c
+  "clk: si5351: declare all device IDs for module loading"
+removed the common i2c_device_id and introduced new ones for each variant
+of the clock generator. Instead of exploiting that information in the driver,
+it still depends on platform_data passing the chips .variant.
 
-Just gave it a go, and the results are slightly (but consistently)
-worse. Over 10 runs:
+This removes the now redundant .variant from the platform_data and puts it in
+i2c_device_id's .driver_data instead.
 
-Without RELAX_INTERCEPT: Average run 3.3623s
-With RELAX_INTERCEPT: Average run 3.4226s
+Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+---
+Cc: Mike Turquette <mturquette@linaro.org>
+Cc: Jason Cooper <jason@lakedaemon.net>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-kernel at vger.kernel.org
+---
+ drivers/clk/clk-si5351.c             |   28 ++++++++++++----------------
+ drivers/clk/clk-si5351.h             |   14 ++++++++++++++
+ include/linux/platform_data/si5351.h |   16 ----------------
+ 3 files changed, 26 insertions(+), 32 deletions(-)
 
-Not massive, but still noticeable. Any clue?
-
-	M.
+diff --git a/drivers/clk/clk-si5351.c b/drivers/clk/clk-si5351.c
+index c50e837..b95aa09 100644
+--- a/drivers/clk/clk-si5351.c
++++ b/drivers/clk/clk-si5351.c
+@@ -1111,11 +1111,11 @@ static const struct of_device_id si5351_dt_ids[] = {
+ };
+ MODULE_DEVICE_TABLE(of, si5351_dt_ids);
+ 
+-static int si5351_dt_parse(struct i2c_client *client)
++static int si5351_dt_parse(struct i2c_client *client,
++			   enum si5351_variant variant)
+ {
+ 	struct device_node *child, *np = client->dev.of_node;
+ 	struct si5351_platform_data *pdata;
+-	const struct of_device_id *match;
+ 	struct property *prop;
+ 	const __be32 *p;
+ 	int num = 0;
+@@ -1124,15 +1124,10 @@ static int si5351_dt_parse(struct i2c_client *client)
+ 	if (np == NULL)
+ 		return 0;
+ 
+-	match = of_match_node(si5351_dt_ids, np);
+-	if (match == NULL)
+-		return -EINVAL;
+-
+ 	pdata = devm_kzalloc(&client->dev, sizeof(*pdata), GFP_KERNEL);
+ 	if (!pdata)
+ 		return -ENOMEM;
+ 
+-	pdata->variant = (enum si5351_variant)match->data;
+ 	pdata->clk_xtal = of_clk_get(np, 0);
+ 	if (!IS_ERR(pdata->clk_xtal))
+ 		clk_put(pdata->clk_xtal);
+@@ -1163,7 +1158,7 @@ static int si5351_dt_parse(struct i2c_client *client)
+ 			pdata->pll_src[num] = SI5351_PLL_SRC_XTAL;
+ 			break;
+ 		case 1:
+-			if (pdata->variant != SI5351_VARIANT_C) {
++			if (variant != SI5351_VARIANT_C) {
+ 				dev_err(&client->dev,
+ 					"invalid parent %d for pll %d\n",
+ 					val, num);
+@@ -1187,7 +1182,7 @@ static int si5351_dt_parse(struct i2c_client *client)
+ 		}
+ 
+ 		if (num >= 8 ||
+-		    (pdata->variant == SI5351_VARIANT_A3 && num >= 3)) {
++		    (variant == SI5351_VARIANT_A3 && num >= 3)) {
+ 			dev_err(&client->dev, "invalid clkout %d\n", num);
+ 			return -EINVAL;
+ 		}
+@@ -1226,7 +1221,7 @@ static int si5351_dt_parse(struct i2c_client *client)
+ 					SI5351_CLKOUT_SRC_XTAL;
+ 				break;
+ 			case 3:
+-				if (pdata->variant != SI5351_VARIANT_C) {
++				if (variant != SI5351_VARIANT_C) {
+ 					dev_err(&client->dev,
+ 						"invalid parent %d for clkout %d\n",
+ 						val, num);
+@@ -1307,6 +1302,7 @@ static int si5351_dt_parse(struct i2c_client *client)
+ static int si5351_i2c_probe(struct i2c_client *client,
+ 			    const struct i2c_device_id *id)
+ {
++	enum si5351_variant variant = (enum si5351_variant)id->driver_data;
+ 	struct si5351_platform_data *pdata;
+ 	struct si5351_driver_data *drvdata;
+ 	struct clk_init_data init;
+@@ -1315,7 +1311,7 @@ static int si5351_i2c_probe(struct i2c_client *client,
+ 	u8 num_parents, num_clocks;
+ 	int ret, n;
+ 
+-	ret = si5351_dt_parse(client);
++	ret = si5351_dt_parse(client, variant);
+ 	if (ret)
+ 		return ret;
+ 
+@@ -1331,7 +1327,7 @@ static int si5351_i2c_probe(struct i2c_client *client,
+ 
+ 	i2c_set_clientdata(client, drvdata);
+ 	drvdata->client = client;
+-	drvdata->variant = pdata->variant;
++	drvdata->variant = variant;
+ 	drvdata->pxtal = pdata->clk_xtal;
+ 	drvdata->pclkin = pdata->clk_clkin;
+ 
+@@ -1568,10 +1564,10 @@ static int si5351_i2c_probe(struct i2c_client *client,
+ }
+ 
+ static const struct i2c_device_id si5351_i2c_ids[] = {
+-	{ "si5351a", 0 },
+-	{ "si5351a-msop", 0 },
+-	{ "si5351b", 0 },
+-	{ "si5351c", 0 },
++	{ "si5351a", SI5351_VARIANT_A },
++	{ "si5351a-msop", SI5351_VARIANT_A3 },
++	{ "si5351b", SI5351_VARIANT_B },
++	{ "si5351c", SI5351_VARIANT_C },
+ 	{ }
+ };
+ MODULE_DEVICE_TABLE(i2c, si5351_i2c_ids);
+diff --git a/drivers/clk/clk-si5351.h b/drivers/clk/clk-si5351.h
+index c0dbf26..4d0746b 100644
+--- a/drivers/clk/clk-si5351.h
++++ b/drivers/clk/clk-si5351.h
+@@ -153,4 +153,18 @@
+ #define  SI5351_XTAL_ENABLE			(1<<6)
+ #define  SI5351_MULTISYNTH_ENABLE		(1<<4)
+ 
++/**
++ * enum si5351_variant - SiLabs Si5351 chip variant
++ * @SI5351_VARIANT_A: Si5351A (8 output clocks, XTAL input)
++ * @SI5351_VARIANT_A3: Si5351A MSOP10 (3 output clocks, XTAL input)
++ * @SI5351_VARIANT_B: Si5351B (8 output clocks, XTAL/VXCO input)
++ * @SI5351_VARIANT_C: Si5351C (8 output clocks, XTAL/CLKIN input)
++ */
++enum si5351_variant {
++	SI5351_VARIANT_A = 1,
++	SI5351_VARIANT_A3 = 2,
++	SI5351_VARIANT_B = 3,
++	SI5351_VARIANT_C = 4,
++};
++
+ #endif
+diff --git a/include/linux/platform_data/si5351.h b/include/linux/platform_data/si5351.h
+index 5433439..a947ab8 100644
+--- a/include/linux/platform_data/si5351.h
++++ b/include/linux/platform_data/si5351.h
+@@ -8,20 +8,6 @@
+ struct clk;
+ 
+ /**
+- * enum si5351_variant - SiLabs Si5351 chip variant
+- * @SI5351_VARIANT_A: Si5351A (8 output clocks, XTAL input)
+- * @SI5351_VARIANT_A3: Si5351A MSOP10 (3 output clocks, XTAL input)
+- * @SI5351_VARIANT_B: Si5351B (8 output clocks, XTAL/VXCO input)
+- * @SI5351_VARIANT_C: Si5351C (8 output clocks, XTAL/CLKIN input)
+- */
+-enum si5351_variant {
+-	SI5351_VARIANT_A = 1,
+-	SI5351_VARIANT_A3 = 2,
+-	SI5351_VARIANT_B = 3,
+-	SI5351_VARIANT_C = 4,
+-};
+-
+-/**
+  * enum si5351_pll_src - Si5351 pll clock source
+  * @SI5351_PLL_SRC_DEFAULT: default, do not change eeprom config
+  * @SI5351_PLL_SRC_XTAL: pll source clock is XTAL input
+@@ -115,14 +101,12 @@ struct si5351_clkout_config {
+ 
+ /**
+  * struct si5351_platform_data - Platform data for the Si5351 clock driver
+- * @variant: Si5351 chip variant
+  * @clk_xtal: xtal input clock
+  * @clk_clkin: clkin input clock
+  * @pll_src: array of pll source clock setting
+  * @clkout: array of clkout configuration
+  */
+ struct si5351_platform_data {
+-	enum si5351_variant variant;
+ 	struct clk *clk_xtal;
+ 	struct clk *clk_clkin;
+ 	enum si5351_pll_src pll_src[2];
 -- 
-Jazz is not dead. It just smells funny...
+1.7.10.4
