@@ -1,47 +1,47 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 8 Oct 2013 11:17:24 -0700
-Subject: [PATCH RFC 4/6] ARM: OMAP2+: AM43x/AM335x: have reset controller
-In-Reply-To: <54ef6f33272dfe2bbf3596da05579a7305fb0cff.1378129416.git.afzal@ti.com>
+Date: Tue, 8 Oct 2013 11:18:27 -0700
+Subject: [PATCH RFC 5/6] ARM: dts: AM335x: prcm node (for reset)
+In-Reply-To: <00675d65eef61eb4222e6a461ef479ebbd1d4787.1378129416.git.afzal@ti.com>
 References: <cover.1378129416.git.afzal@ti.com>
- <54ef6f33272dfe2bbf3596da05579a7305fb0cff.1378129416.git.afzal@ti.com>
-Message-ID: <20131008181723.GG8313@atomide.com>
+ <00675d65eef61eb4222e6a461ef479ebbd1d4787.1378129416.git.afzal@ti.com>
+Message-ID: <20131008181827.GH8313@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Afzal Mohammed <afzal@ti.com> [130902 07:27]:
-> AM43x, AM335x have reset block as part of prcm, let reset driver be
-> usable with these SoC's.
+* Afzal Mohammed <afzal@ti.com> [130902 07:30]:
+> Add AM335x prcm node with reset binding.
 
-Once the driver is ready, this can be merged along with the 
-reset driver:
+Please put the .dts changes into a separate series from
+driver changes so the driver maintainers don't accidentally
+queue also the .dts changes. This is to avoid pointless
+self-inflicted merge conflicts.
 
-Acked-by: Tony Lindgren <tony@atomide.com>
+Regards,
+
+Tony
  
 > Signed-off-by: Afzal Mohammed <afzal@ti.com>
 > ---
->  arch/arm/mach-omap2/Kconfig | 2 ++
->  1 file changed, 2 insertions(+)
+>  arch/arm/boot/dts/am33xx.dtsi | 6 ++++++
+>  1 file changed, 6 insertions(+)
 > 
-> diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-> index 3eed000..fa28d1d 100644
-> --- a/arch/arm/mach-omap2/Kconfig
-> +++ b/arch/arm/mach-omap2/Kconfig
-> @@ -72,6 +72,7 @@ config SOC_AM33XX
->  	select CPU_V7
->  	select MULTI_IRQ_HANDLER
->  	select COMMON_CLK
-> +	select ARCH_HAS_RESET_CONTROLLER
+> diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
+> index 4701e3c..c2ccf94 100644
+> --- a/arch/arm/boot/dts/am33xx.dtsi
+> +++ b/arch/arm/boot/dts/am33xx.dtsi
+> @@ -530,6 +530,12 @@
+>  			#size-cells = <1>;
+>  			status = "disabled";
+>  		};
+> +
+> +		prcm: prcm at 44e00000 {
+> +			compatible = "ti,am3352-prcm";
+> +			reg = <0x44e00000 0x1300>;
+> +			#reset-cells = <1>;
+> +		};
+>  	};
 >  
->  config SOC_AM43XX
->  	bool "TI AM43x"
-> @@ -82,6 +83,7 @@ config SOC_AM43XX
->  	select ARM_GIC
->  	select COMMON_CLK
->  	select MACH_OMAP_GENERIC
-> +	select ARCH_HAS_RESET_CONTROLLER
->  
->  config ARCH_OMAP2PLUS
->  	bool
+>  	clocks {
 > -- 
 > 1.8.3.4
 > 
