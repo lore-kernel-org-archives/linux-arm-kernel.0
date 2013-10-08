@@ -1,47 +1,63 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 8 Oct 2013 12:30:21 +0200
-Subject: [PATCH v3 07/19] clk: at91: add pll id macros for pll dt bindings
-In-Reply-To: <1375942160-8881-1-git-send-email-b.brezillon@overkiz.com>
-References: <1375937608-3773-1-git-send-email-b.brezillon@overkiz.com>
- <1375942160-8881-1-git-send-email-b.brezillon@overkiz.com>
-Message-ID: <5253DEBD.7010904@atmel.com>
+From: andreas.herrmann@calxeda.com (Andreas Herrmann)
+Date: Tue,  8 Oct 2013 12:31:05 +0200
+Subject: [PATCH] documentation/iommu: Update description of ARM System MMU
+ binding
+In-Reply-To: <1381224444-27303-1-git-send-email-andreas.herrmann@calxeda.com>
+References: <1381224444-27303-1-git-send-email-andreas.herrmann@calxeda.com>
+Message-ID: <1381228265-29313-1-git-send-email-andreas.herrmann@calxeda.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/08/2013 08:09, Boris BREZILLON :
-> This patch adds the PLL id macros which will be used by pll dt definitions.
+This patch adds descriptions fore new properties of device tree
+binding for the ARM SMMU architecture. These properties control
+arm-smmu driver options.
 
-It is not needed, drop it. Just document the values in the DT biding and 
-it will be fine.
+Cc: Rob Herring <robherring2@gmail.com>
+Cc: Grant Likely <grant.likely@linaro.org>
+Cc: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Andreas Herrmann <andreas.herrmann@calxeda.com>
+---
+ .../devicetree/bindings/iommu/arm,smmu.txt         |   23 ++++++++++++++++++++
+ 1 file changed, 23 insertions(+)
 
->
-> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
-> ---
->   include/dt-bindings/clk/at91/common/clk-pll.h |   13 +++++++++++++
->   1 file changed, 13 insertions(+)
->   create mode 100644 include/dt-bindings/clk/at91/common/clk-pll.h
->
-> diff --git a/include/dt-bindings/clk/at91/common/clk-pll.h b/include/dt-bindings/clk/at91/common/clk-pll.h
-> new file mode 100644
-> index 0000000..93ec849
-> --- /dev/null
-> +++ b/include/dt-bindings/clk/at91/common/clk-pll.h
-> @@ -0,0 +1,13 @@
-> +/*
-> + * This header provides constants for AT91 pll ids.
-> + *
-> + * The constants defined in this header are being used in dts.
-> + */
-> +
-> +#ifndef _DT_BINDINGS_CLK_AT91_PLL_H
-> +#define _DT_BINDINGS_CLK_AT91_PLL_H
-> +
-> +#define AT91_PLLA_CLK		0	/* PLLA clk id */
-> +#define AT91_PLLB_CLK		1	/* PLLB clk id */
-> +
-> +#endif
->
-
-
+diff --git a/Documentation/devicetree/bindings/iommu/arm,smmu.txt b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
+index e34c6cd..6415a88 100644
+--- a/Documentation/devicetree/bindings/iommu/arm,smmu.txt
++++ b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
+@@ -48,6 +48,28 @@ conditions.
+                   from the mmu-masters towards memory) node for this
+                   SMMU.
+ 
++- arm,smmu-isolate-devices : Enable device isolation for all masters
++                             of this SMMU. Ie. each master will be
++                             attached to its own iommu domain.
++
++- arm,smmu-mask-stream-ids : Enable mapping of all StreamIDs to one
++                             context for this SMMU. It is only allowed
++                             if there is one single master. It saves
++                             the need to know and specify all
++                             StreamIDs in cases where just one master
++                             is attached to an SMMU. If StreamIDs are
++                             specified in the mmu-masters property
++                             those are ignored. (The referred device
++                             node must still have a "#stream-id-cells"
++                             property. But it can be set to 0.)
++
++- arm,smmu-secure-config-access : Enable proper handling of buggy
++                                  implementations that always use
++                                  secure access to SMMU configuration
++                                  registers. In this case non-secure
++                                  aliases of secure registers have to
++                                  be used during SMMU configuration.
++
+ Example:
+ 
+         smmu {
+@@ -67,4 +89,5 @@ Example:
+                  */
+                 mmu-masters = <&dma0 0xd01d 0xd01e>,
+                               <&dma1 0xd11c>;
++                arm,smmu-isolate-devices;
+         };
 -- 
-Nicolas Ferre
+1.7.9.5
