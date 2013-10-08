@@ -1,86 +1,66 @@
-From: pullip.cho@samsung.com (Cho KyongHo)
-Date: Tue, 08 Oct 2013 13:38:53 +0900
-Subject: [PATCH v8 06/12] ARM: dts: Add description of System MMU of Exynos
- SoCs
-In-Reply-To: <CAL_JsqLny8sOgn9y0Tm9-Vq_3YPdtqkr5nTJ67Y0Zx1hDmduNQ@mail.gmail.com>
-References: <003c01ce89f3$3abc4bc0$b034e340$@samsung.com>
- <CAL_JsqLny8sOgn9y0Tm9-Vq_3YPdtqkr5nTJ67Y0Zx1hDmduNQ@mail.gmail.com>
-Message-ID: <20131008133853.8b8277b70d69e05edd011945@samsung.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Tue, 8 Oct 2013 09:22:43 +0530
+Subject: [PATCH] DMA: extend documentation to provide more API details
+In-Reply-To: <Pine.LNX.4.64.1310072244030.27047@axis700.grange>
+References: <Pine.LNX.4.64.1310071233340.20796@axis700.grange>
+ <20131007111728.GM12758@n2100.arm.linux.org.uk>
+ <20131007103936.GH2954@intel.com>
+ <Pine.LNX.4.64.1310071409080.20796@axis700.grange>
+ <20131007142511.GJ2954@intel.com>
+ <Pine.LNX.4.64.1310071725300.20796@axis700.grange>
+ <20131007144335.GL2954@intel.com>
+ <Pine.LNX.4.64.1310071739590.20796@axis700.grange>
+ <20131007155229.GN2954@intel.com>
+ <Pine.LNX.4.64.1310072244030.27047@axis700.grange>
+Message-ID: <20131008035243.GO2954@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 07 Oct 2013 08:44:54 -0500, Rob Herring wrote:
-> On Fri, Jul 26, 2013 at 6:28 AM, Cho KyongHo <pullip.cho@samsung.com> wrote:
-> > Signed-off-by: Cho KyongHo <pullip.cho@samsung.com>
-> > ---
-> >  .../bindings/iommu/samsung,exynos4210-sysmmu.txt   |  103 +++++++
-> >  arch/arm/boot/dts/exynos4.dtsi                     |  122 ++++++++
-> >  arch/arm/boot/dts/exynos4210.dtsi                  |   25 ++
-> >  arch/arm/boot/dts/exynos4x12.dtsi                  |   76 +++++
-> >  arch/arm/boot/dts/exynos5250.dtsi                  |  291 ++++++++++++++++++++
-> >  5 files changed, 617 insertions(+), 0 deletions(-)
-> >  create mode 100644 Documentation/devicetree/bindings/iommu/samsung,exynos4210-sysmmu.txt
-> >
-> > diff --git a/Documentation/devicetree/bindings/iommu/samsung,exynos4210-sysmmu.txt
-> > b/Documentation/devicetree/bindings/iommu/samsung,exynos4210-sysmmu.txt
-> > new file mode 100644
-> > index 0000000..92f0a33
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/iommu/samsung,exynos4210-sysmmu.txt
-> > @@ -0,0 +1,103 @@
-> > +Samsung Exynos4210 IOMMU H/W, System MMU (System Memory Management Unit)
-> > +
-> > +Samsung's Exynos architecture contains System MMU that enables scattered
-> > +physical memory chunks visible as a contiguous region to DMA-capable peripheral
-> > +devices like MFC, FIMC, FIMD, GScaler, FIMC-IS and so forth.
-> > +
-> > +System MMU is a sort of IOMMU and support identical translation table format to
-> > +ARMv7 translation tables with minimum set of page properties including access
-> > +permissions, shareability and security protection. In addition, System MMU has
-> > +another capabilities like L2 TLB or block-fetch buffers to minimize translation
-> > +latency.
-> > +
-> > +A System MMU is dedicated to a single master peripheral device.  Thus, it is
-> > +important to specify the correct System MMU in the device node of its master
-> > +device. Whereas a System MMU is dedicated to a master device, the master device
-> > +may have more than one System MMU.
-> > +
-> > +Required properties:
-> > +- compatible: Should be "samsung,exynos4210-sysmmu"
-> > +- reg: A tuple of base address and size of System MMU registers.
-> > +- interrupt-parent: The phandle of the interrupt controller of System MMU
-> > +- interrupts: A tuple of numbers that indicates the interrupt source.
-> > +- clock-names: Should be "sysmmu" if the System MMU is needed to gate its clock.
-> > +               Please refer to the following documents:
-> > +              Documentation/devicetree/bindings/clock/clock-bindings.txt
-> > +              Documentation/devicetree/bindings/clock/exynos4-clock.txt
-> > +              Documentation/devicetree/bindings/clock/exynos5250-clock.txt
-> > +              Optional "master" if the clock to the System MMU is gated by
-> > +              another gate clock other than "sysmmu". The System MMU driver
-> > +              sets "master" the parent of "sysmmu".
-> > +              Exynos4 SoCs, there needs no "master" clocks.
-> > +              Exynos5 SoCs, some System MMUs must have "master" clocks.
-> > +- clocks: Required if the System MMU is needed to gate its clock.
-> > +         Please refer to the documents listed above.
-> > +- samsung,power-domain: Required if the System MMU is needed to gate its power.
-> > +         Please refer to the following document:
-> > +         Documentation/devicetree/bindings/arm/exynos/power_domain.txt
-> > +
-> > +Required properties for the master peripheral devices:
-> > +- iommu: phandles to the System MMUs of the device
+On Mon, Oct 07, 2013 at 10:55:56PM +0200, Guennadi Liakhovetski wrote:
+> > > > > > > > > > No, not something in the middle. I was thinking about
+> > > > > > > > > > 
+> > > > > > > > > > (1) cookie 1-3 are submitted
+> > > > > > > > > > (2) cookie 1 succeeds
+> > > > > > > > > > (3) a DMA error occurs, cookies 2-3 are discarded
+> > > > > > > > discarded using terminate_all right?
+> > > > > > > 
+> > > > > > > No, by the dmaengine driver as a part of the error processing.
+> > > > > > And how will that be done...?
+> > > > > 
+> > > > > Sorry, I meant - DMA descriptors with cookies #2 and #3 will be cancelled 
+> > > > > and recycled by the dmaengine driver. That's what you have to do, when 
+> > > > > processing DMA error IRQ.
+> > > > Well how do you that?
+> > > 
+> > > Mmmh, maybe I'm missing something, but isn't it a part of the common DMA 
+> > > processing? You get an error IRQ; on some DMAC types this means, that you 
+> > > have to reset the hardware, so, you perform whatever actions you have to 
+> > > do to reset the controller; you remove any descriptors from the pending 
+> > > queue; reinsert them into the free queue and let any clients run on a 
+> > > timeout. I don't think it would be a good idea to do anything more smart 
+> > > like trying to restart the current transfer or drop it and continue with 
+> > > the queue, because we don't know in what state the client hardware is, so, 
+> > > we can only let the client driver try to recover.
+> > No that would be very wrong thing to do behind clients back. Suppose you got a
+> > trasaction which returned error irq and it was generated one half of the
+> > requested transfer was done. Redoing the entrie transaction wont be right!
+> > 
+> > So I think you need to let client know the error status.
+> > 
+> > But again, is this usage fiarly common?
 > 
-> You have not addressed my comments from the last version. We do not
-> need 2 (or more) different ways to describe the connection between
-> masters and iommu's. Use mmu-masters property here to describe the
-> connection.
-> 
+> Hm, I think, the question is different: is this possible and realistic? If 
+> there's just one DMAC and one platform, I think, there should be a way to 
+> support it? There are controllers, that actually have separate error IRQ 
+> outputs and special status bits for them. Actually, see commit
+Fair enough, if this is something you commonly need to deal with then lets add a
+new callback for error reporting. I think this would be simpler and then client
+will know about the failure
 
-Sorry, I forgot to reply.
-I just thought the meaning of your comment that it should be align with ARM System MMU.
-I now understand and it should be changed to mmu-masters property
-because it is now in the kernel.
+On failure reporting the client should query the status to know what is pending
+for this transaction then recover accordingly
 
-Thank you.
+Will send patch for this and moving to DMA_COMPLETE as status
 
-
-> Rob
+--
+~Vinod
