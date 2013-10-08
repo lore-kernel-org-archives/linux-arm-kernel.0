@@ -1,28 +1,71 @@
 From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Wed,  9 Oct 2013 00:34:16 +0200
-Subject: New big-endian patch series against 3.12-rc4
-Message-ID: <1381271679-27804-1-git-send-email-ben.dooks@codethink.co.uk>
+Date: Wed,  9 Oct 2013 00:34:27 +0200
+Subject: [PATCH 11/23] ARM: alignment: correctly decode instructions in BE8
+ mode.
+In-Reply-To: <1381271679-27804-1-git-send-email-ben.dooks@codethink.co.uk>
+References: <1381271679-27804-1-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <1381271679-27804-12-git-send-email-ben.dooks@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is a new series for big-endian on ARM re-based onto 3.12-rc4
-and updated with new patches from Victor to fix regressions since 3.11.
+If we are in BE8 mode, we must deal with the instruction stream being
+in LE order when data is being loaded in BE order. Ensure the data is
+swapped before processing to avoid thre following:
 
-I have not been able to test this further than building it as I do not
-currently have access to any hardware, however there where no big issues
-when re-basing. Thanks to Marc Zyngier for pointing out the need for a
-rebase.
+Change to using <asm/opcodes.h> to provide the necessary conversion
+functions to change the byte ordering.
 
-The branch is at:
+This stops the following warning messages from the kernel on a fault:
 
-  git://git.baserock.org/delta/linux baserock/bjdooks/3.12-rc4/core
+Unhandled fault: alignment exception (0x001) at 0xbfa09567
+Alignment trap: not handling instruction 030091e8 at [<80333e8c>]
 
-Russell, if possible could this go into -next and then if everything
-I can issue a pull request for it.
+Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+Reviewed-by: Dave Martin <Dave.Martin@arm.com>
+Tested-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+ arch/arm/mm/alignment.c | 9 +++++++--
+ 1 file changed, 7 insertions(+), 2 deletions(-)
 
-Changes since last:
-
-- Updated to 3.12-rc4 to be closer to mainline
-- Added Victor's patches for CCI and TC2 boot
-- Added Victor's patch for ASID extraction
-- Updated Victor's patch with fix for building on older kernels
+diff --git a/arch/arm/mm/alignment.c b/arch/arm/mm/alignment.c
+index 6f4585b..9240364 100644
+--- a/arch/arm/mm/alignment.c
++++ b/arch/arm/mm/alignment.c
+@@ -25,6 +25,7 @@
+ #include <asm/cp15.h>
+ #include <asm/system_info.h>
+ #include <asm/unaligned.h>
++#include <asm/opcodes.h>
+ 
+ #include "fault.h"
+ 
+@@ -762,21 +763,25 @@ do_alignment(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
+ 	if (thumb_mode(regs)) {
+ 		u16 *ptr = (u16 *)(instrptr & ~1);
+ 		fault = probe_kernel_address(ptr, tinstr);
++		tinstr = __mem_to_opcode_thumb16(tinstr);
+ 		if (!fault) {
+ 			if (cpu_architecture() >= CPU_ARCH_ARMv7 &&
+ 			    IS_T32(tinstr)) {
+ 				/* Thumb-2 32-bit */
+ 				u16 tinst2 = 0;
+ 				fault = probe_kernel_address(ptr + 1, tinst2);
+-				instr = (tinstr << 16) | tinst2;
++				tinst2 = __mem_to_opcode_thumb16(tinst2);
++				instr = __opcode_thumb32_compose(tinstr, tinst2);
+ 				thumb2_32b = 1;
+ 			} else {
+ 				isize = 2;
+ 				instr = thumb2arm(tinstr);
+ 			}
+ 		}
+-	} else
++	} else {
+ 		fault = probe_kernel_address(instrptr, instr);
++		instr = __mem_to_opcode_arm(instr);
++	}
+ 
+ 	if (fault) {
+ 		type = TYPE_FAULT;
+-- 
+1.8.4.rc3
