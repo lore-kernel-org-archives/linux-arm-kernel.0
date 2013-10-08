@@ -1,62 +1,57 @@
-From: gavin.guo@canonical.com (Gavin Guo)
-Date: Tue, 8 Oct 2013 22:16:58 +0800
-Subject: [PATCH 0/3] KVM: ARM: Cortex-A7 support and fixes
-In-Reply-To: <1380210568-23175-1-git-send-email-jonathan.austin@arm.com>
-References: <1380210568-23175-1-git-send-email-jonathan.austin@arm.com>
-Message-ID: <CA+eFSM1Gp4ZrEysN-ib3FxBbVYMrKZO2TdP0XwkF=p68PEyq6Q@mail.gmail.com>
+From: acme@ghostprotocols.net (Arnaldo Carvalho de Melo)
+Date: Tue, 8 Oct 2013 11:28:30 -0300
+Subject: [PATCH 3/4] perf tools: Check libunwind for availability of
+ dwarf parsing feature
+In-Reply-To: <CAFrcx1kNONpBcsEHX1PN0kNUCOAkBCid+bgbv3mc0TPu=F+MYg@mail.gmail.com>
+References: <1380195398-4402-1-git-send-email-jean.pihet@linaro.org>
+ <1380195398-4402-4-git-send-email-jean.pihet@linaro.org>
+ <20130926124829.GA3284@krava.brq.redhat.com>
+ <CAFrcx1nDe6mhxEuU4ROJGOmGFaYtVnnhXYirkmhRb1NEecNhtw@mail.gmail.com>
+ <20131008104740.GU3081@twins.programming.kicks-ass.net>
+ <CAFrcx1kNONpBcsEHX1PN0kNUCOAkBCid+bgbv3mc0TPu=F+MYg@mail.gmail.com>
+Message-ID: <20131008142830.GI4018@ghostprotocols.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 26, 2013 at 11:49 PM, Jonathan Austin
-<jonathan.austin@arm.com> wrote:
-> This series adds support for using KVM on ARM Cortex-A7 CPUs. As the Cortex-A7
-> is architecturally identical to the A15 there is not a huge amount of code
-> required, however there are a number of fixups necessary to core KVM code that
-> testing on A7 has revealed.
->
-> I'm open to comments about other ways to share the functionality between A7/A15
-> while still maintaining the architectural/implementation defined split that
-> existed between coproc.c and coproc_a15.c - The approach in this series avoids
-> adding '3 levels' of abstraction and feels like a good compromise that doesn't
-> require duplication of a lot of the A15 code for A7 but still permits
-> implementation differences to be fully expressed in coproc_X files.
->
-> This patch series has been developed/tested on TC2 with the A15 cluster held in
-> reset.
->
-> Jonathan Austin (3):
->   KVM: ARM: fix the size of TTBCR_{T0SZ,T1SZ} masks
->   KVM: ARM: Fix calculation of virtual CPU ID
->   KVM: ARM: Add support for Cortex-A7
->
->  arch/arm/include/asm/kvm_arm.h  |    4 +-
->  arch/arm/include/asm/kvm_asm.h  |    2 +-
->  arch/arm/include/uapi/asm/kvm.h |    3 +-
->  arch/arm/kvm/Makefile           |    2 +-
->  arch/arm/kvm/coproc.c           |  114 ++++++++++++++++++++++++++++++++++++++
->  arch/arm/kvm/coproc_a15.c       |  117 +--------------------------------------
->  arch/arm/kvm/coproc_a7.c        |   54 ++++++++++++++++++
->  arch/arm/kvm/guest.c            |    4 +-
->  arch/arm/kvm/reset.c            |   15 ++---
->  9 files changed, 186 insertions(+), 129 deletions(-)
->  create mode 100644 arch/arm/kvm/coproc_a7.c
->
-> --
-> 1.7.9.5
->
->
->
-> _______________________________________________
-> kvmarm mailing list
-> kvmarm at lists.cs.columbia.edu
-> https://lists.cs.columbia.edu/cucslists/listinfo/kvmarm
+Em Tue, Oct 08, 2013 at 04:15:40PM +0200, Jean Pihet escreveu:
+> On 8 October 2013 12:47, Peter Zijlstra <peterz@infradead.org> wrote:
+> > On Tue, Oct 08, 2013 at 12:44:32PM +0200, Jean Pihet wrote:
+> >> On 26 September 2013 14:48, Jiri Olsa <jolsa@redhat.com> wrote:
+> >> > On Thu, Sep 26, 2013 at 01:36:37PM +0200, Jean Pihet wrote:
+> >> >> The newly added dwarf unwinding feature [1] requires:
+> >> >> . a recent version (>= 1.1) of libunwind,
+> >> >> . libunwind to be configured with --enable-debug-frame.
 
-Hi Jonathan,
+> >> >> [1] http://www.spinics.net/lists/kernel/msg1598951.html
 
-I'd like to help test the kvm on Cortex-A7. I've applied your 3 kernel
-patches, and download the Virtual Open Systems's kvmtools to test. But
-the guest os can't be brought up. Could you provide the steps about
-where to download kvmtools and the command to bring up the guest?
+> >> >> Add the corresponding API tests in the feature check list.
 
-Thanks,
-Gavin
+> >> > Acked-by: Jiri Olsa <jolsa@redhat.com>
+
+> >> Thanks for the ack!
+
+> >> Is it possible to get an ack from the perf core maintainers?
+> >> Also, is the patch going in Will's tree?
+
+> > This being a tools patch you'd have to ask acme; also I know next to
+> > nothing about all this unwind business except that its stupid expensive
+> > ;-)
+> You are right! It brings some more info on the trace though.
+
+> -- adding Arnaldo in the loop --
+> Arnaldo, are you OK with the changes [1]? Jiri acked the patches
+> already; Will is willing (no pun intended) to take the ARM specific
+> patches [2] in his tree.
+
+As Jiri acked, go ahead and pick as much as you can via Will's tree, I'd
+say. :-)
+
+- Arnaldo
+ 
+> [1] http://www.spinics.net/lists/kernel/msg1608921.html and
+> http://www.spinics.net/lists/kernel/msg1608922.html
+> [2] http://www.spinics.net/lists/kernel/msg1608920.html and
+> http://www.spinics.net/lists/kernel/msg1608923.html
+> 
+> Regards,
+> Jean
