@@ -1,93 +1,37 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Tue, 8 Oct 2013 09:17:35 +0200 (CEST)
-Subject: [PATCH] DMA: extend documentation to provide more API details
-In-Reply-To: <20131008035852.GP2954@intel.com>
-References: <20131005233137.GA12758@n2100.arm.linux.org.uk>
- <20131006052029.GE2954@intel.com>
- <Pine.LNX.4.64.1310071233340.20796@axis700.grange>
- <20131007111728.GM12758@n2100.arm.linux.org.uk>
- <20131007103936.GH2954@intel.com>
- <Pine.LNX.4.64.1310071409080.20796@axis700.grange>
- <20131007142511.GJ2954@intel.com>
- <Pine.LNX.4.64.1310071725300.20796@axis700.grange>
- <20131007154854.GM2954@intel.com>
- <Pine.LNX.4.64.1310072235360.27047@axis700.grange>
- <20131008035852.GP2954@intel.com>
-Message-ID: <Pine.LNX.4.64.1310080914390.31629@axis700.grange>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Tue, 08 Oct 2013 09:27:49 +0200
+Subject: [PATCH 0/2] additional vexpress-tc2 big endian fixes
+In-Reply-To: <1381207040-1623-1-git-send-email-victor.kamensky@linaro.org>
+References: <1381207040-1623-1-git-send-email-victor.kamensky@linaro.org>
+Message-ID: <5253B3F5.1020704@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 8 Oct 2013, Vinod Koul wrote:
+On 08/10/13 06:37, Victor Kamensky wrote:
+> Hi Ben,
+>
+> Here are couple more big endian related fixes. We run into these
+> with vexpress TC2 board, when CONFIG_MCPM and CONFIG_ARM_CCI configs
+> are enabled. Big endian image fails to boot. With fixes BE TC2
+> boots and it sees all 5 cores (2xA15, 3xA7).
+>
+> These were tested with vexpress TC2 on latest linux-linaro
+> branch (include BE patch series) and it was tested on very
+> recent rmk/fixes branch along with BE series on top of it.
+>
+> Thanks,
+> Victor
+>
+> Victor Kamensky (2):
+>    ARM: mcpm: fix big endian issue in mcpm startup code
+>    ARM: cci: driver need big endian fixes in asm code
+>
+>   arch/arm/common/mcpm_head.S | 2 ++
+>   drivers/bus/arm-cci.c       | 6 ++++++
+>   2 files changed, 8 insertions(+)
 
-> On Mon, Oct 07, 2013 at 10:43:51PM +0200, Guennadi Liakhovetski wrote:
-> > On Mon, 7 Oct 2013, Vinod Koul wrote:
-> > 
-> > > On Mon, Oct 07, 2013 at 05:28:37PM +0200, Guennadi Liakhovetski wrote:
-> > > > > > > > > No, not something in the middle. I was thinking about
-> > > > > > > > > 
-> > > > > > > > > (1) cookie 1-3 are submitted
-> > > > > > > > > (2) cookie 1 succeeds
-> > > > > > > > > (3) a DMA error occurs, cookies 2-3 are discarded
-> > > > > > > discarded using terminate_all right?
-> > > > > > 
-> > > > > > No, by the dmaengine driver as a part of the error processing.
-> > > > > And how will that be done...?
-> > > > 
-> > > > Sorry, I meant - DMA descriptors with cookies #2 and #3 will be cancelled 
-> > > > and recycled by the dmaengine driver. That's what you have to do, when 
-> > > > processing DMA error IRQ.
-> > > well the term cancel means someone went ahead and requested abort/terminate of a
-> > > transaction...
-> > > 
-> > > As we discussed in other mail on this thread the most common occurrence will be
-> > > timeout on client side and client cant cancel selectively.
-> > > 
-> > > For dma driver detection error, which is quite rare in slave usages, if people
-> > > think its common for them we cna indicate this thru status in callback. Then
-> > > client will know and doesnt need to query.
-> > > 
-> > > Recycling cookie has a large space so i dont think we will get confused
-> > > with a recycled one
-> > 
-> > If you reset cookies, as you proposed, IMHO, this can very well lead to a 
-> > confusion: suppose cookie #1000 caused an error. We drop queued transfers 
-> > with cookies #1001-1005 and reset to #1. When we're at #100 the user asks 
-> > for a status of cookie #1003, which we have aborted. However, the 
-> > following check in dma_async_is_complete():
-> Well you are missing an important point. Who is doing abort. It is the client
-> driver, the user.
+Thanks, anyone any objections if these go into my 312-rc4 branch?
 
-No. "cookie #1000 caused an error" - a DMA error. The dmaengine driver 
-detects it. The user knows nothing about it, so, they cannot call 
-terminate_all(). The "we" above refers to the dmaengine driver.
-
-So, that's exactly the case, discussed in the other mail too. And your 
-proposed error / status reporting callback will fix this, so, let's do 
-that!
-
-Thanks
-Guennadi
-
-> And as i said previously before calling terminate_all he will forget about the
-> cookies allocated previosuly, So after that he cant invoke any of the old
-> cookie. If he is, then that is wrong and needs to be fixed :)
-> 
-> So while user is dealing with new transactions (cookies), he doesnt know
-> anything about old ones and cant query as in above example 1003!
-> > 
-> > 	if (last_complete <= last_used) {
-> > 		if ((cookie <= last_complete) || (cookie > last_used))
-> > 			return DMA_SUCCESS;
-> > 
-> > will confirm success to the user.
-> Not in above example!, if you are at #100, query for #1003 will return
-> DMA_IN_PROGRESS.
-> 
-> --
-> ~Vinod
-> 
-
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+-- 
+Ben Dooks				http://www.codethink.co.uk/
+Senior Engineer				Codethink - Providing Genius
