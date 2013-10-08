@@ -1,81 +1,64 @@
 From: josephl@nvidia.com (Joseph Lo)
-Date: Tue, 8 Oct 2013 12:50:03 +0800
-Subject: [PATCH V2 1/6] ARM: tegra: add Tegra124 SoC support
+Date: Tue, 8 Oct 2013 12:50:06 +0800
+Subject: [PATCH V2 4/6] ARM: tegra: add Venice2 board support
 In-Reply-To: <1381207808-14734-1-git-send-email-josephl@nvidia.com>
 References: <1381207808-14734-1-git-send-email-josephl@nvidia.com>
-Message-ID: <1381207808-14734-2-git-send-email-josephl@nvidia.com>
+Message-ID: <1381207808-14734-5-git-send-email-josephl@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add Tegra124 SoC support that base on CortexA15MP Core. And enable the
-SMP function that can re-use the same procedure with Tegra114.
+Add support for the Tegra124 based Venice2 reference board.
 
 Signed-off-by: Joseph Lo <josephl@nvidia.com>
 ---
 V2:
-* squash the [v1 1/7] ~ [v2 3/7] into the 1st patch in v2
+* fix the device node name with register address
+* remove an extra blank line
 ---
- arch/arm/mach-tegra/Kconfig   | 8 ++++++++
- arch/arm/mach-tegra/fuse.h    | 1 +
- arch/arm/mach-tegra/platsmp.c | 2 ++
- arch/arm/mach-tegra/tegra.c   | 1 +
- 4 files changed, 12 insertions(+)
+ arch/arm/boot/dts/Makefile             |  3 ++-
+ arch/arm/boot/dts/tegra124-venice2.dts | 20 ++++++++++++++++++++
+ 2 files changed, 22 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/boot/dts/tegra124-venice2.dts
 
-diff --git a/arch/arm/mach-tegra/Kconfig b/arch/arm/mach-tegra/Kconfig
-index 67a76f2..92272e0 100644
---- a/arch/arm/mach-tegra/Kconfig
-+++ b/arch/arm/mach-tegra/Kconfig
-@@ -61,6 +61,14 @@ config ARCH_TEGRA_114_SOC
- 	  Support for NVIDIA Tegra T114 processor family, based on the
- 	  ARM CortexA15MP CPU
- 
-+config ARCH_TEGRA_124_SOC
-+	bool "Enable support for Tegra124 family"
-+	select ARM_L1_CACHE_SHIFT_6
-+	select HAVE_ARM_ARCH_TIMER
-+	help
-+	  Support for NVIDIA Tegra T124 processor family, based on the
-+	  ARM CortexA15MP CPU
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index cf75889..1c3b871 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -252,7 +252,8 @@ dtb-$(CONFIG_ARCH_TEGRA) += tegra20-harmony.dtb \
+ 	tegra30-beaver.dtb \
+ 	tegra30-cardhu-a02.dtb \
+ 	tegra30-cardhu-a04.dtb \
+-	tegra114-dalmore.dtb
++	tegra114-dalmore.dtb \
++	tegra124-venice2.dtb
+ dtb-$(CONFIG_ARCH_VERSATILE) += versatile-ab.dtb \
+ 	versatile-pb.dtb
+ dtb-$(CONFIG_ARCH_U300) += ste-u300.dtb
+diff --git a/arch/arm/boot/dts/tegra124-venice2.dts b/arch/arm/boot/dts/tegra124-venice2.dts
+new file mode 100644
+index 0000000..2bfc7ab
+--- /dev/null
++++ b/arch/arm/boot/dts/tegra124-venice2.dts
+@@ -0,0 +1,20 @@
++/dts-v1/;
 +
- config TEGRA_AHB
- 	bool "Enable AHB driver for NVIDIA Tegra SoCs"
- 	default y
-diff --git a/arch/arm/mach-tegra/fuse.h b/arch/arm/mach-tegra/fuse.h
-index def7968..c01d047 100644
---- a/arch/arm/mach-tegra/fuse.h
-+++ b/arch/arm/mach-tegra/fuse.h
-@@ -29,6 +29,7 @@
- #define TEGRA20		0x20
- #define TEGRA30		0x30
- #define TEGRA114	0x35
-+#define TEGRA124	0x40
- 
- #ifndef __ASSEMBLY__
- enum tegra_revision {
-diff --git a/arch/arm/mach-tegra/platsmp.c b/arch/arm/mach-tegra/platsmp.c
-index 2d02036..eb72ae7 100644
---- a/arch/arm/mach-tegra/platsmp.c
-+++ b/arch/arm/mach-tegra/platsmp.c
-@@ -176,6 +176,8 @@ static int tegra_boot_secondary(unsigned int cpu,
- 		return tegra30_boot_secondary(cpu, idle);
- 	if (IS_ENABLED(CONFIG_ARCH_TEGRA_114_SOC) && tegra_chip_id == TEGRA114)
- 		return tegra114_boot_secondary(cpu, idle);
-+	if (IS_ENABLED(CONFIG_ARCH_TEGRA_124_SOC) && tegra_chip_id == TEGRA124)
-+		return tegra114_boot_secondary(cpu, idle);
- 
- 	return -EINVAL;
- }
-diff --git a/arch/arm/mach-tegra/tegra.c b/arch/arm/mach-tegra/tegra.c
-index 40b031c..80b801a 100644
---- a/arch/arm/mach-tegra/tegra.c
-+++ b/arch/arm/mach-tegra/tegra.c
-@@ -181,6 +181,7 @@ static void __init tegra_dt_init_late(void)
- }
- 
- static const char * const tegra_dt_board_compat[] = {
-+	"nvidia,tegra124",
- 	"nvidia,tegra114",
- 	"nvidia,tegra30",
- 	"nvidia,tegra20",
++#include "tegra124.dtsi"
++
++/ {
++	model = "NVIDIA Tegra124 Venice2";
++	compatible = "nvidia,venice2", "nvidia,tegra124";
++
++	memory {
++		reg = <0x80000000 0x80000000>;
++	};
++
++	serial at 70006000 {
++		status = "okay";
++	};
++
++	pmc at 7000e400 {
++		nvidia,invert-interrupt;
++	};
++};
 -- 
 1.8.4
