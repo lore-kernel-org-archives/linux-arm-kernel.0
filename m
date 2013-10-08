@@ -1,47 +1,36 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue,  8 Oct 2013 18:05:24 +0900
-Subject: [GIT PULL] Second round of Renesas ARM based SoC cleanups for v3.13
-Message-ID: <cover.1381222967.git.horms+renesas@verge.net.au>
+Date: Tue,  8 Oct 2013 18:05:42 +0900
+Subject: [PATCH 3/4] ARM: shmobile: r8a7778: r8a7778_register_hspi() become
+ static
+In-Reply-To: <cover.1381222967.git.horms+renesas@verge.net.au>
+References: <cover.1381222967.git.horms+renesas@verge.net.au>
+Message-ID: <117378e58365a44b568655e5aa49b3f6daf900c4.1381222967.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kevin, Olof and Arnd,
+From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-please consider this Second round of Renesas ARM based SoC cleanups for v3.13.
-It is based on renesas-cleanup-for-v3.13 which you have previously pulled.
+r8a7778_register_hspi() used only from setup-r8a7778.c
+it can be static
 
+Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/mach-shmobile/setup-r8a7778.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-The following changes since commit cde214a890f81797a5eee94fffc89c1de21ed991:
-
-  ARM: shmobile: r8a7790: Constify platform data and resources (2013-09-19 14:33:44 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-cleanup2-for-v3.13
-
-for you to fetch changes up to 27113d63daac0aacaa26b1fabfc23391de4284f4:
-
-  ARM: shmobile: lager: Constify platform data and resources (2013-09-30 16:33:17 +0900)
-
-----------------------------------------------------------------
-Second round of Renesas ARM based SoC cleanups for v3.13
-
-* Constify platform data and resources in lager board code
-* Clean up registration of VIN and sh_eth in r8a7778 SoC and
-   bockw board code
-* Make r8a7778_register_hspi() static in r8a7778 SoC code
-
-----------------------------------------------------------------
-Kuninori Morimoto (3):
-      ARM: shmobile: r8a7778: cleanup registration of vin
-      ARM: shmobile: r8a7778: cleanup registration of sh_eth
-      ARM: shmobile: r8a7778: r8a7778_register_hspi() become static
-
-Laurent Pinchart (1):
-      ARM: shmobile: lager: Constify platform data and resources
-
- arch/arm/mach-shmobile/board-bockw.c          | 46 ++++++++++++++++++++----
- arch/arm/mach-shmobile/board-lager.c          | 14 ++++----
- arch/arm/mach-shmobile/include/mach/r8a7778.h |  3 --
- arch/arm/mach-shmobile/setup-r8a7778.c        | 50 +--------------------------
- 4 files changed, 47 insertions(+), 66 deletions(-)
+diff --git a/arch/arm/mach-shmobile/setup-r8a7778.c b/arch/arm/mach-shmobile/setup-r8a7778.c
+index f5e15c9..468ee65 100644
+--- a/arch/arm/mach-shmobile/setup-r8a7778.c
++++ b/arch/arm/mach-shmobile/setup-r8a7778.c
+@@ -258,7 +258,7 @@ static struct resource hspi_resources[] __initdata = {
+ 	DEFINE_RES_IRQ(gic_iid(0x75)),
+ };
+ 
+-void __init r8a7778_register_hspi(int id)
++static void __init r8a7778_register_hspi(int id)
+ {
+ 	BUG_ON(id < 0 || id > 2);
+ 
+-- 
+1.8.4
