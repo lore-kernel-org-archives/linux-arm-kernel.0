@@ -1,77 +1,89 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Mon, 07 Oct 2013 18:39:54 -0700
-Subject: [PATCH] arm: socfpga: Fix incorrect sdmmc clock name
-In-Reply-To: <CAOesGMjC7rOghacXUEp6bE=8pXWGMBZ-M637ZiLMKBp+-KUPug@mail.gmail.com>
-References: <1376322134-17408-1-git-send-email-dinguyen@altera.com>
- <20130814054810.GF16635@quad.lixom.net>
- <1376492274.8715.2.camel@linux-builds1> <20131007201254.7445.8105@quantum>
- <1381178249.1584.1.camel@linux-builds1> <20131007232857.7445.3041@quantum>
- <CAOesGMjC7rOghacXUEp6bE=8pXWGMBZ-M637ZiLMKBp+-KUPug@mail.gmail.com>
-Message-ID: <20131008013954.7445.27392@quantum>
+From: dinh.linux@gmail.com (Dinh Nguyen)
+Date: Mon, 07 Oct 2013 20:42:01 -0500
+Subject: socfpga: DTS updates for v3.13
+In-Reply-To: <1381184217-31249-1-git-send-email-dinguyen@altera.com>
+References: <1381184217-31249-1-git-send-email-dinguyen@altera.com>
+Message-ID: <525362E9.4020907@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Olof Johansson (2013-10-07 16:43:14)
-> On Mon, Oct 7, 2013 at 4:28 PM, Mike Turquette <mturquette@linaro.org> wrote:
-> > Quoting Dinh Nguyen (2013-10-07 13:37:29)
-> >> Hi Mike,
-> >>
-> >> On Mon, 2013-10-07 at 13:12 -0700, Mike Turquette wrote:
-> >> > Quoting Dinh Nguyen (2013-08-14 07:57:54)
-> >> > > On Tue, 2013-08-13 at 22:48 -0700, Olof Johansson wrote:
-> >> > > > On Mon, Aug 12, 2013 at 10:42:14AM -0500, dinguyen at altera.com wrote:
-> >> > > > > From: Dinh Nguyen <dinguyen@altera.com>
-> >> > > > >
-> >> > > > > The SD/MMC clock is named "sdmmc_clk", and NOT "mmc_clk".
-> >> > > > >
-> >> > > > > Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
-> >> > > > > Cc: Mike Turquette <mturquette@linaro.org>
-> >> > > > > CC: Arnd Bergmann <arnd@arndb.de>
-> >> > > > > CC: Olof Johansson <olof@lixom.net>
-> >> > > > > Cc: Pavel Machek <pavel@denx.de>
-> >> > > > > Cc: linux-arm-kernel at lists.infradead.org
-> >> > > >
-> >> > > > Hi Dinh,
-> >> > > >
-> >> > > > Do you want this applied in fixes for 3.11? If so, can you give me a oneliner
-> >> > > > on what the impact here is? mmc doesn't come up at all, or something more
-> >> > > > subtle?
-> >> > >
-> >> > > Hi Olof,
-> >> > >
-> >> > > No, this is go into 3.12 as I am still working on the bindings for
-> >> > > SD/MMC.
-> >> > >
-> >> > > The oneliner: "The SD/MMC driver was intermittently not coming up
-> >> > > because it was not able to get the correct clock."
-> >> >
-> >> > Olof, did you take this? If not I'll put it into my next batch of fixes
-> >> > for 3.12.
-> >>
-> >> No, Olof did not get a chance to pick this up for 3.12. I resent the
-> >> patch with the updated commit message for 3.13:
-> >>
-> >> http://lists.infradead.org/pipermail/linux-arm-kernel/2013-September/198824.html
-> >
-> > Thanks for the link. I've taken that version into clk-fixes for 3.12.
-> 
-> 
-> Thanks Mike, and sorry for dropping the ball Dinh. Next time feel free
-> to remind me if it happens. A week is the normal grace period. :)
+Please ignore this message, I forgot to include the [GIT PULL] in the 
+subject.
 
-No problem ;-)
+Sorry for any inconvenience. Let me re-send.
 
-Dinh,
-
-I changed your $SUBJECT line to:
-
-"clk: socfpga: Fix incorrect sdmmc clock name"
-
-Just a simple s/arm/clk/
-
-Regards,
-Mike
-
-> 
-> 
-> -Olof
+Dinh
+On 10/7/13 5:16 PM, dinguyen at altera.com wrote:
+> From: Dinh Nguyen <dinguyen@altera.com>
+>
+> Hi Kevin, Olof, and Arnd:
+>
+> Please consider these DTS updates for the Altera SOCFPGA for v3.13:
+>
+> Five of the six patches do NOT have an Ack from the DTS maintainers. I have
+> sent the patches out for review, but since these patches do not change
+> bindings nor add new ones, I don't think they will get too much attention.
+>
+> Please advise if you think I need to wait for Ack(s) from them.
+>
+> Thanks,
+>
+> Dinh
+>
+> The following changes since commit 4a10c2ac2f368583138b774ca41fac4207911983:
+>
+>    Linux 3.12-rc2 (2013-09-23 15:41:09 -0700)
+>
+> are available in the git repository at:
+>
+>    git://git.rocketboards.org/linux-socfpga-next.git tags/socfpga-dts-updates-for-v3.13
+>
+> for you to fetch changes up to d28e284dbee1f81daef762faf980a2260c2c120e:
+>
+>    dts: socfpga: Add support for Altera's SOCFPGA Arria V board (2013-10-07 14:16:49 -0500)
+>
+> ----------------------------------------------------------------
+> Updates to dts file structure for Altera's SOCFPGA
+>
+> * Does not include any new bindings or bindings change
+> * Add dts file for a SOCFPGA with an Arria V FPGA
+> * Add a clocks property for the TWD timer
+> * Add support for Terasic SocKit Board which has Cyclone5 FPGA
+> * From Steffen Trumtrar:
+> "This series includes some minor cleanups (indentation and clock labels) and
+> reorders the socfpga dts hierarchy from:
+> 	socfpga.dtsi
+> 	-> socfpga_$board.dts
+> 	-> socfpga_$otherboard.dts
+> to
+> 	socfpga.dtsi
+> 	-> socfpga_cyclone5.dtsi
+> 	--> socfpga_cyclone5_$board.dts
+> 	--> socfpga_cyclone5_$otherboard.dts
+> "
+>
+> ----------------------------------------------------------------
+> Dinh Nguyen (2):
+>        arm: socfpga: Add clock for smp_twd timer
+>        dts: socfpga: Add support for Altera's SOCFPGA Arria V board
+>
+> Steffen Trumtrar (4):
+>        ARM: socfpga: dts: Move common nodes to cyclone5 dtsi
+>        ARM: socfpga: dts: Add support for terasic SoCkit
+>        ARM: socfpga: dts: cleanup indentation
+>        ARM: socfpga: dts: fix s2f_* clock name
+>
+>   arch/arm/boot/dts/Makefile                         |    4 +-
+>   arch/arm/boot/dts/socfpga.dtsi                     |  297 ++++++++++----------
+>   arch/arm/boot/dts/socfpga_arria5.dtsi              |   58 ++++
+>   arch/arm/boot/dts/socfpga_arria5_socdk.dts         |   40 +++
+>   ...{socfpga_cyclone5.dts => socfpga_cyclone5.dtsi} |   20 --
+>   arch/arm/boot/dts/socfpga_cyclone5_socdk.dts       |   40 +++
+>   arch/arm/boot/dts/socfpga_cyclone5_sockit.dts      |   37 +++
+>   7 files changed, 327 insertions(+), 169 deletions(-)
+>   create mode 100644 arch/arm/boot/dts/socfpga_arria5.dtsi
+>   create mode 100644 arch/arm/boot/dts/socfpga_arria5_socdk.dts
+>   rename arch/arm/boot/dts/{socfpga_cyclone5.dts => socfpga_cyclone5.dtsi} (78%)
+>   create mode 100644 arch/arm/boot/dts/socfpga_cyclone5_socdk.dts
+>   create mode 100644 arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
+>
