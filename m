@@ -1,61 +1,36 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 8 Oct 2013 13:03:08 -0400
-Subject: [PATCH v4] ARM: kirkwood: retain MAC address for DT ethernet
-In-Reply-To: <1381177511-1100-1-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1380881842-24605-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1381177511-1100-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <20131008170308.GP5402@titan.lakedaemon.net>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 08 Oct 2013 11:08:43 -0600
+Subject: [PATCH V3] clk: palmas: add clock driver for palmas
+In-Reply-To: <52542F69.30407@ti.com>
+References: <1381238480-18852-1-git-send-email-ldewangan@nvidia.com>
+ <525408B3.1000107@ti.com> <5254193A.70104@nvidia.com> <52542F69.30407@ti.com>
+Message-ID: <52543C1B.3000403@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 07, 2013 at 10:25:11PM +0200, Sebastian Hesselbarth wrote:
-> Ethernet IP on Kirkwood SoCs loose their MAC address register content
-> if clock gated. To allow modular ethernet driver setups and gated clocks
-> also on non-DT capable bootloaders, we fixup port device nodes with no
-> valid MAC address property. This patch copies MAC address register
-> contents set up by bootloaders early, notably before ethernet clocks
-> are gated. While at it, also reorder call sequence in _dt_init.
+On 10/08/2013 10:14 AM, Nishanth Menon wrote:
+> On 10/08/2013 09:39 AM, Laxman Dewangan wrote:
+>> Thanks Nishanth for review.
+>>
+>> On Tuesday 08 October 2013 06:59 PM, Nishanth Menon wrote:
+>>> On 10/08/2013 08:21 AM, Laxman Dewangan wrote:
+>>>> Palmas devices has two clock output CLK32K_KG and CLK32K_KG_AUDIO
+>>> not all palmas devices have 2 clocks - example: tps659038
+>>
+>> This is for generic palmas and I have seen it for TPS65913, TPS65914, 
+>> TPS80036. If the generic one is not compatible then it need to add  
+>> device specific and at that time, it is require to update the binding 
+>> document accordingly.
 > 
-> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> Reviewed-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
-> Reviewed-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> Tested-by: Andrew Lunn <andrew@lunn.ch>
-> ---
-> Just to make sure they don't get lost this time:
-> Added Jason's and Ezequiel's Reviewed-by to honor their constant reviews,
-> and Andrew's last Tested-by because I know he will be testing again.
-> 
-> Changelog:
-> v3->v4:
-> - drop clk_is_enabled (and dependency) due to possible abuse of the
->   new function; enable/disable clk instead, remove gated clock warning
->   (Suggested by Andrew Lunn, Uwe Kleine-Koenig, Mike Turquette)
-> - reduce FW_BUG to FW_INFO (Suggested by Andrew Lunn)
-> - proper cleanup of iomap, clk, nodes
-> v2->v3:
-> - make use of new public clk_is_enabled (adds dependency)
-> - add warning about gated clock && missing MAC property
->   (Suggested by Jason Gunthorpe)
-> v1->v2:
-> - check for gated clock before accessing eth registers
->   (Suggested by Andrew Lunn)
-> 
-> Cc: Jason Cooper <jason@lakedaemon.net>
-> Cc: Andrew Lunn <andrew@lunn.ch>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Grant Likely <grant.likely@linaro.org>
-> Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
-> Cc: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
-> Cc: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> Cc: Mike Turquette <mturquette@linaro.org>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-kernel at vger.kernel.org
-> ---
->  arch/arm/mach-kirkwood/board-dt.c |   86 +++++++++++++++++++++++++++++++++++--
->  1 file changed, 83 insertions(+), 3 deletions(-)
+> ?? you do have two clocks inside the device they should be represented
+> as two compatible entities - that simplifies everyone's life.
 
-Applied to mvebu/soc with Mike's Reviewed-by:
+I think the terminology you're using here is quite confusing.
 
-thx,
-
-Jason.
+Are you talking about having two different compatible values for two
+different HW designs, where those different designs implement different
+sets of clocks (which makes sense), or two different DT nodes for two
+different clocks (which IMHO doesn't always, unless those different
+clocks *truly* are separate IP blocks with completely independent
+register regions, and where those IP blocks are likely to be re-used
+as-is in other chips).
