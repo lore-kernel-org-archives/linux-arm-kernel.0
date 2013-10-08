@@ -1,91 +1,190 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Tue, 8 Oct 2013 10:53:56 +0300
-Subject: [PATCH 1/2] clk: tegra114: Rename gr_2d/gr_3d to gr2d/gr3d
-In-Reply-To: <20131007145343.GA19045@ulmo.nvidia.com>
-References: <1380748361-32459-1-git-send-email-treding@nvidia.com>
- <524EF436.4000704@wwwdotorg.org> <20131007001433.7445.7915@quantum>
- <20131007142839.GC3973@tbergstrom-lnx.Nvidia.com>
- <20131007145343.GA19045@ulmo.nvidia.com>
-Message-ID: <20131008075356.GD3973@tbergstrom-lnx.Nvidia.com>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Tue,  8 Oct 2013 09:57:20 +0200
+Subject: [PATCH v2] clk: new driver for efm32 SoC
+In-Reply-To: <20131008074003.GL10079@pengutronix.de>
+References: <20131008074003.GL10079@pengutronix.de>
+Message-ID: <1381219040-7378-1-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 07, 2013 at 04:53:44PM +0200, Thierry Reding wrote:
-> * PGP Signed by an unknown key
-> 
-> On Mon, Oct 07, 2013 at 05:28:39PM +0300, Peter De Schrijver wrote:
-> > On Mon, Oct 07, 2013 at 02:14:33AM +0200, Mike Turquette wrote:
-> > > Quoting Stephen Warren (2013-10-04 10:00:38)
-> > > > On 10/02/2013 03:12 PM, Thierry Reding wrote:
-> > > > > These clocks were named gr2d and gr3d on Tegra20 and Tegra30, so use the
-> > > > > same names on Tegra114 for consistency.
-> > > > 
-> > > > The series,
-> > > > Acked-by: Stephen Warren <swarren@nvidia.com>
-> > > > 
-> > > > Although I wonder if there will be merge conflicts with Peter's "clk:
-> > > > tegra: replace enum tegra114_clk by binding header"?
-> > > 
-> > > There are merge conflicts in other places too. The latest clk-next
-> > > branch is based on -rc3 with only a few patches (publicly) applied so
-> > > far. As of the time of this writing the top-most commit is
-> > > 96a7ed9079a3483c5681b17f4713c37c1cf2b1c9.
-> > > 
-> > > Can the Tegra folks send me a pull request with the following
-> > > patches applied? (likely in this order):
-> > > 
-> > > ARM: tegra114: add missing clocks to binding
-> > > clk: tegra: replace enum tegra114_clk by binding header
-> > > [PATCH v2] clk: tegra: Correct sbc mux width & parent
-> > > clk: tegra: Fix vde/2d/3d clock src offset
-> > > clk: tegra: Set the clock parent of gr2d/gr3d to pll_c2
-> > > clk: tegra: Set the clk parent of host1x to pll_p
-> > > clk: tegra114: Rename gr_2d/gr_3d to gr2d/gr3d
-> > > clk: tegra114: Initialize gr2d clock
-> > 
-> > This conflicts with 'clk: tegra: Set the clock parent of gr2d/gr3d to pll_c2'
-> > I suggest we drop 'clk: tegra114: Initialize gr2d clock' and use pll_c2 to clock gr2d.
-> 
-> What's wrong with pll_c? We've used it for Tegra20 and Tegra30 and I
-> have at least tested that gr2d works properly with it. It will also
-> cause both host1x and gr2d to run off the same clock, which I guess may
-> not matter at all.
-> 
+This patch adds support for the clocks provided by the Clock Management
+Unit of Energy Micro's efm32 Giant Gecko SoCs including device tree
+bindings.
 
-Using pll_c2 is consistent with our policy in downstream. It allows more
-freedom in scaling gr2d independently from host1x.
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+---
+ .../devicetree/bindings/clock/efm32-clock.txt      | 11 +++
+ drivers/clk/Makefile                               |  1 +
+ drivers/clk/clk-efm32gg.c                          | 81 ++++++++++++++++++++++
+ include/dt-bindings/clock/efm32-cmu.h              | 42 +++++++++++
+ 4 files changed, 135 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/clock/efm32-clock.txt
+ create mode 100644 drivers/clk/clk-efm32gg.c
+ create mode 100644 include/dt-bindings/clock/efm32-cmu.h
 
-> Furthermore we've usually only added clock initialization when a driver
-> became available to use it. There is currently no driver for gr3d in the
-> upstream kernel, so perhaps we should leave the gr3d clock unconfigured
-> for now?
-> 
-
-I don't have a strong opinion if we want the gr3d clock in or not. Mark?
-
-> > > The set of patches above (with their functional dependencies) were
-> > > giving me some conflict resolution issues (e.g. large data tables that
-> > > needed to be updated in clk-tegra-114.c) against the latest clk-next.
-> > > 
-> > > Additionally I've looked at the following patches on the list which can
-> > > be added to the pull request if you want (these patches all look fine
-> > > but I haven't yet Acked each individually):
-> > > 
-> > > clk: tegra30: Don't wait for PLL_U lock bit
-> > 
-> > This is already part of next-20130927.
-> > 
-> > > clk: tegra114: Initialize host1x and related clocks
-> > 
-> > This conflicts with 'clk: tegra: Set the clk parent of host1x to pll_p'. I
-> > suggest we drop 'clk: tegra: Set the clk parent of host1x to pll_p' and run
-> > host1x from pll_c. Mark, Thierry, is this ok?
-> 
-> Sounds good to me. We use pll_c for host1x on earlier SoC generations as
-> well.
-
-Ok.
-
-Cheers,
-
-Peter.
+diff --git a/Documentation/devicetree/bindings/clock/efm32-clock.txt b/Documentation/devicetree/bindings/clock/efm32-clock.txt
+new file mode 100644
+index 0000000..263d293
+--- /dev/null
++++ b/Documentation/devicetree/bindings/clock/efm32-clock.txt
+@@ -0,0 +1,11 @@
++* Clock bindings for Energy Micro efm32 Giant Gecko's Clock Management Unit
++
++Required properties:
++- compatible: Should be "efm32gg,cmu"
++- reg: Base address and length of the register set
++- interrupts: Interrupt used by the CMU
++- #clock-cells: Should be <1>
++
++The clock consumer should specify the desired clock by having the clock ID in
++its "clocks" phandle cell. The header efm32-clk.h contains a list of available
++IDs.
+diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
+index 7b11106..40c2225 100644
+--- a/drivers/clk/Makefile
++++ b/drivers/clk/Makefile
+@@ -11,6 +11,7 @@ obj-$(CONFIG_COMMON_CLK)	+= clk-composite.o
+ 
+ # SoCs specific
+ obj-$(CONFIG_ARCH_BCM2835)	+= clk-bcm2835.o
++obj-$(CONFIG_ARCH_EFM32)	+= clk-efm32gg.o
+ obj-$(CONFIG_ARCH_NOMADIK)	+= clk-nomadik.o
+ obj-$(CONFIG_ARCH_HIGHBANK)	+= clk-highbank.o
+ obj-$(CONFIG_ARCH_NSPIRE)	+= clk-nspire.o
+diff --git a/drivers/clk/clk-efm32gg.c b/drivers/clk/clk-efm32gg.c
+new file mode 100644
+index 0000000..bac2ddf
+--- /dev/null
++++ b/drivers/clk/clk-efm32gg.c
+@@ -0,0 +1,81 @@
++/*
++ * Copyright (C) 2013 Pengutronix
++ * Uwe Kleine-Koenig <u.kleine-koenig@pengutronix.de>
++ *
++ * This program is free software; you can redistribute it and/or modify it under
++ * the terms of the GNU General Public License version 2 as published by the
++ * Free Software Foundation.
++ */
++#include <linux/clk.h>
++#include <linux/io.h>
++#include <linux/clk-provider.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
++
++#include <dt-bindings/clock/efm32-cmu.h>
++
++#define CMU_HFPERCLKEN0		0x44
++
++static struct clk *clk[37];
++static struct clk_onecell_data clk_data = {
++	.clks = clk,
++	.clk_num = ARRAY_SIZE(clk),
++};
++
++static int __init efm32gg_cmu_init(struct device_node *np)
++{
++	int i;
++	void __iomem *base;
++
++	for (i = 0; i < ARRAY_SIZE(clk); ++i)
++		clk[i] = ERR_PTR(-ENOENT);
++
++	base = of_iomap(np, 0);
++	if (!base) {
++		pr_warn("Failed to map address range for efm32gg,cmu node\n");
++		return -EADDRNOTAVAIL;
++	}
++
++	clk[clk_HFXO] = clk_register_fixed_rate(NULL, "HFXO", NULL,
++			CLK_IS_ROOT, 48000000);
++
++	clk[clk_HFPERCLKUSART0] = clk_register_gate(NULL, "HFPERCLK.USART0",
++			"HFXO", 0, base + CMU_HFPERCLKEN0, 0, 0, NULL);
++	clk[clk_HFPERCLKUSART1] = clk_register_gate(NULL, "HFPERCLK.USART1",
++			"HFXO", 0, base + CMU_HFPERCLKEN0, 1, 0, NULL);
++	clk[clk_HFPERCLKUSART2] = clk_register_gate(NULL, "HFPERCLK.USART2",
++			"HFXO", 0, base + CMU_HFPERCLKEN0, 2, 0, NULL);
++	clk[clk_HFPERCLKUART0] = clk_register_gate(NULL, "HFPERCLK.UART0",
++			"HFXO", 0, base + CMU_HFPERCLKEN0, 3, 0, NULL);
++	clk[clk_HFPERCLKUART1] = clk_register_gate(NULL, "HFPERCLK.UART1",
++			"HFXO", 0, base + CMU_HFPERCLKEN0, 4, 0, NULL);
++	clk[clk_HFPERCLKTIMER0] = clk_register_gate(NULL, "HFPERCLK.TIMER0",
++			"HFXO", 0, base + CMU_HFPERCLKEN0, 5, 0, NULL);
++	clk[clk_HFPERCLKTIMER1] = clk_register_gate(NULL, "HFPERCLK.TIMER1",
++			"HFXO", 0, base + CMU_HFPERCLKEN0, 6, 0, NULL);
++	clk[clk_HFPERCLKTIMER2] = clk_register_gate(NULL, "HFPERCLK.TIMER2",
++			"HFXO", 0, base + CMU_HFPERCLKEN0, 7, 0, NULL);
++	clk[clk_HFPERCLKTIMER3] = clk_register_gate(NULL, "HFPERCLK.TIMER3",
++			"HFXO", 0, base + CMU_HFPERCLKEN0, 8, 0, NULL);
++	clk[clk_HFPERCLKACMP0] = clk_register_gate(NULL, "HFPERCLK.ACMP0",
++			"HFXO", 0, base + CMU_HFPERCLKEN0, 9, 0, NULL);
++	clk[clk_HFPERCLKACMP1] = clk_register_gate(NULL, "HFPERCLK.ACMP1",
++			"HFXO", 0, base + CMU_HFPERCLKEN0, 10, 0, NULL);
++	clk[clk_HFPERCLKI2C0] = clk_register_gate(NULL, "HFPERCLK.I2C0",
++			"HFXO", 0, base + CMU_HFPERCLKEN0, 11, 0, NULL);
++	clk[clk_HFPERCLKI2C1] = clk_register_gate(NULL, "HFPERCLK.I2C1",
++			"HFXO", 0, base + CMU_HFPERCLKEN0, 12, 0, NULL);
++	clk[clk_HFPERCLKGPIO] = clk_register_gate(NULL, "HFPERCLK.GPIO",
++			"HFXO", 0, base + CMU_HFPERCLKEN0, 13, 0, NULL);
++	clk[clk_HFPERCLKVCMP] = clk_register_gate(NULL, "HFPERCLK.VCMP",
++			"HFXO", 0, base + CMU_HFPERCLKEN0, 14, 0, NULL);
++	clk[clk_HFPERCLKPRS] = clk_register_gate(NULL, "HFPERCLK.PRS",
++			"HFXO", 0, base + CMU_HFPERCLKEN0, 15, 0, NULL);
++	clk[clk_HFPERCLKADC0] = clk_register_gate(NULL, "HFPERCLK.ADC0",
++			"HFXO", 0, base + CMU_HFPERCLKEN0, 16, 0, NULL);
++	clk[clk_HFPERCLKDAC0] = clk_register_gate(NULL, "HFPERCLK.DAC0",
++			"HFXO", 0, base + CMU_HFPERCLKEN0, 17, 0, NULL);
++
++	return of_clk_add_provider(np, of_clk_src_onecell_get, &clk_data);
++}
++CLK_OF_DECLARE(efm32ggcmu, "efm32gg,cmu", efm32gg_cmu_init);
+diff --git a/include/dt-bindings/clock/efm32-cmu.h b/include/dt-bindings/clock/efm32-cmu.h
+new file mode 100644
+index 0000000..b21b91e
+--- /dev/null
++++ b/include/dt-bindings/clock/efm32-cmu.h
+@@ -0,0 +1,42 @@
++#ifndef __DT_BINDINGS_CLOCK_EFM32_CMU_H
++#define __DT_BINDINGS_CLOCK_EFM32_CMU_H
++
++#define clk_HFXO		0
++#define clk_HFRCO		1
++#define clk_LFXO		2
++#define clk_LFRCO		3
++#define clk_ULFRCO		4
++#define clk_AUXHFRCO		5
++#define clk_HFCLKNODIV		6
++#define clk_HFCLK		7
++#define clk_HFPERCLK		8
++#define clk_HFCORECLK		9
++#define clk_LFACLK		10
++#define clk_LFBCLK		11
++#define clk_WDOGCLK		12
++#define clk_HFCORECLKDMA	13
++#define clk_HFCORECLKAES	14
++#define clk_HFCORECLKUSBC	15
++#define clk_HFCORECLKUSB	16
++#define clk_HFCORECLKLE		17
++#define clk_HFCORECLKEBI	18
++#define clk_HFPERCLKUSART0	19
++#define clk_HFPERCLKUSART1	20
++#define clk_HFPERCLKUSART2	21
++#define clk_HFPERCLKUART0	22
++#define clk_HFPERCLKUART1	23
++#define clk_HFPERCLKTIMER0	24
++#define clk_HFPERCLKTIMER1	25
++#define clk_HFPERCLKTIMER2	26
++#define clk_HFPERCLKTIMER3	27
++#define clk_HFPERCLKACMP0	28
++#define clk_HFPERCLKACMP1	29
++#define clk_HFPERCLKI2C0	30
++#define clk_HFPERCLKI2C1	31
++#define clk_HFPERCLKGPIO	32
++#define clk_HFPERCLKVCMP	33
++#define clk_HFPERCLKPRS		34
++#define clk_HFPERCLKADC0	35
++#define clk_HFPERCLKDAC0	36
++
++#endif /* __DT_BINDINGS_CLOCK_EFM32_CMU_H */
+-- 
+1.8.4.rc3
