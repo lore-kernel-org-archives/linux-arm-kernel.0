@@ -1,76 +1,40 @@
-From: gang.chen@asianux.com (Chen Gang)
-Date: Tue, 08 Oct 2013 19:29:14 +0800
-Subject: [PATCH 2/2] ARM: include: asm: use 'int' instead of 'unsigned
- long' for normal register variables within atomic.h
-In-Reply-To: <20131008103331.GE17148@mudshark.cambridge.arm.com>
-References: <20131001090119.GA17629@mudshark.cambridge.arm.com>
- <524ABA20.6060106@asianux.com>
- <20131002104158.GD28311@mudshark.cambridge.arm.com>
- <524C3981.20307@asianux.com> <524D416B.5090709@asianux.com>
- <20131003163200.GE7408@mudshark.cambridge.arm.com>
- <524E8FBC.2080200@asianux.com>
- <20131004153742.GR24303@mudshark.cambridge.arm.com>
- <20131004154208.GS24303@mudshark.cambridge.arm.com>
- <524F5566.4010204@asianux.com>
- <20131008103331.GE17148@mudshark.cambridge.arm.com>
-Message-ID: <5253EC8A.2030305@asianux.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Tue, 08 Oct 2013 13:30:15 +0200
+Subject: [PATCH v2] clocksource: Provide timekeeping for efm32 SoCs
+In-Reply-To: <1380830189-21553-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1380830189-21553-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <5253ECC7.30700@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/08/2013 06:33 PM, Will Deacon wrote:
-> On Sat, Oct 05, 2013 at 12:55:18AM +0100, Chen Gang wrote:
->> On 10/04/2013 11:42 PM, Will Deacon wrote:
->>> On Fri, Oct 04, 2013 at 04:37:42PM +0100, Will Deacon wrote:
->>>> On Fri, Oct 04, 2013 at 10:51:56AM +0100, Chen Gang wrote:
->>>>> On 10/04/2013 12:32 AM, Will Deacon wrote:
->>>>>> The problem with arm64 is that we're using *unsigned long* for 32-bit
->>>>>> clear_mask, which is definitely wrong because it's 64-bit (another patch to
->>>>>> fix this!).
->>>>>>
->>>>>
->>>>> At least, that is not a bug.
->>>>
->>>> Sure it is. What if the adjacent 32-bit value was being accessed by another
->>>> CPU under a spinlock?
->>>
->>> (Oh, ok, that would still work on arm because of the way the exclusive
->>> monitor is implemented, but we shouldn't rely on that).
->>>
->>
->> Hmm... in my opinion, we need divide atomic_*_mask() into 32-bit and
->> 64-bit versions. We already have demands to only use 32-bit value to
->> express mask (can save size), and may have demands to use 64-bit too.
-> 
-> Right, but isn't this code only used by that s390 SCSI driver? Why do other
-> architectures even need to bother implementing it?
-> 
+On 10/03/2013 09:56 PM, Uwe Kleine-K?nig wrote:
+> An efm32 features 4 16-bit timers with a 10-bit prescaler. This driver
+> provides clocksource and clock event device using one timer instance
+> each.
+>
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> ---
 
-Hmm... for atomic_set_mask(), "drivers/gpu/drm/i915/i915_irq.c" also
-uses it (it is about Intel Graphics).
+Applied to my tree for 3.13
 
-For some architectures (e.g. frv, mn10300, mr32r, blackfin, and of cause
-s390), still use atomic_[set/clear]_mask().
+Thanks !
+   -- Daniel
 
-And they are inline functions in atomic.h, individual kernel modules may
-use them (which source code is not merged into kernel). Can we skip
-these individual modules? (I guess we can, but need think of carefully).
+> Changes since (implicit) v1, sent with
+> Message-id:1379324644-20934-1-git-send-email-u.kleine-koenig at pengutronix.de:
+>
+>   - drop unused #defines
+>   - add __init to efm32_clocksource_init
+>   - fix indention
+>   - add a comment describing the reason for the construct in efm32_timer_init
+>   - add device tree binding document
+>     I created a new directory "timer" below the binding directory.
 
+Why do you say you created a new directory ?
 
->> And also, excuse me, I am not quite familiar with "exclusive monitor",
->> could you please provide more details about it?
-> 
-> You'll need to take a look at the ARM ARM, in particular the section about
-> `Synchronisation and Semaphores'.
-> 
-
-Do you mean "ARM ARM" is a book name? (at least, I really need read more
-things to familiar with ARM)
-
-
-> Will
-> 
-> 
-
-Thanks.
 -- 
-Chen Gang
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
