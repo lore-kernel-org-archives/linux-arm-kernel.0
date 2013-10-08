@@ -1,10 +1,10 @@
 From: wsa@the-dreams.de (Wolfram Sang)
-Date: Tue,  8 Oct 2013 22:35:37 +0200
-Subject: [PATCH 5/9] spi: spi-au1550: replace platform_driver_probe to support
- deferred probing
+Date: Tue,  8 Oct 2013 22:35:40 +0200
+Subject: [PATCH 8/9] spi: spi-s3c64xx: replace platform_driver_probe to
+ support deferred probing
 In-Reply-To: <1381264542-29396-1-git-send-email-wsa@the-dreams.de>
 References: <1381264542-29396-1-git-send-email-wsa@the-dreams.de>
-Message-ID: <1381264542-29396-6-git-send-email-wsa@the-dreams.de>
+Message-ID: <1381264542-29396-9-git-send-email-wsa@the-dreams.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,29 +15,29 @@ devices it supports won't get lost in a deferred probe.
 
 Signed-off-by: Wolfram Sang <wsa@the-dreams.de>
 ---
- drivers/spi/spi-au1550.c | 3 ++-
+ drivers/spi/spi-s3c64xx.c | 3 ++-
  1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/spi/spi-au1550.c b/drivers/spi/spi-au1550.c
-index 1d00d9b3..313dd49 100644
---- a/drivers/spi/spi-au1550.c
-+++ b/drivers/spi/spi-au1550.c
-@@ -985,6 +985,7 @@ static int au1550_spi_remove(struct platform_device *pdev)
- MODULE_ALIAS("platform:au1550-spi");
+diff --git a/drivers/spi/spi-s3c64xx.c b/drivers/spi/spi-s3c64xx.c
+index 512b889..3df81c6 100644
+--- a/drivers/spi/spi-s3c64xx.c
++++ b/drivers/spi/spi-s3c64xx.c
+@@ -1633,6 +1633,7 @@ static struct platform_driver s3c64xx_spi_driver = {
+ 		.pm = &s3c64xx_spi_pm,
+ 		.of_match_table = of_match_ptr(s3c64xx_spi_dt_match),
+ 	},
++	.probe = s3c64xx_spi_probe,
+ 	.remove = s3c64xx_spi_remove,
+ 	.id_table = s3c64xx_spi_driver_ids,
+ };
+@@ -1640,7 +1641,7 @@ MODULE_ALIAS("platform:s3c64xx-spi");
  
- static struct platform_driver au1550_spi_drv = {
-+	.probe = au1550_spi_probe,
- 	.remove = au1550_spi_remove,
- 	.driver = {
- 		.name = "au1550-spi",
-@@ -1004,7 +1005,7 @@ static int __init au1550_spi_init(void)
- 			printk(KERN_ERR "au1550-spi: cannot add memory"
- 					"dbdma device\n");
- 	}
--	return platform_driver_probe(&au1550_spi_drv, au1550_spi_probe);
-+	return platform_driver_register(&au1550_spi_drv);
+ static int __init s3c64xx_spi_init(void)
+ {
+-	return platform_driver_probe(&s3c64xx_spi_driver, s3c64xx_spi_probe);
++	return platform_driver_register(&s3c64xx_spi_driver);
  }
- module_init(au1550_spi_init);
+ subsys_initcall(s3c64xx_spi_init);
  
 -- 
 1.8.4.rc3
