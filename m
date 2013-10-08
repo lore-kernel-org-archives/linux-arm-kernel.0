@@ -1,68 +1,52 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Tue, 8 Oct 2013 17:34:18 +0200
-Subject: [PATCH 5/5] DRM: Armada: add support for drm tda19988 driver
-In-Reply-To: <20131008094939.GD25034@n2100.arm.linux.org.uk>
-References: <20131006220728.GG12758@n2100.arm.linux.org.uk>
- <E1VSwYO-0000iT-CU@rmk-PC.arm.linux.org.uk>
- <20131007111807.5e86ea6e@armhf>
- <20131007094404.GI12758@n2100.arm.linux.org.uk>
- <20131007124820.2189a4c3@armhf>
- <20131007110902.GL12758@n2100.arm.linux.org.uk>
- <CAF6AEGsqGYj7_tZdzrsmUxExs6wm838dYPFhBdc8wqVC6mTxmg@mail.gmail.com>
- <20131008111913.09bfe93e@armhf>
- <20131008094939.GD25034@n2100.arm.linux.org.uk>
-Message-ID: <20131008173418.0fc21d60@armhf>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 8 Oct 2013 17:31:47 +0200
+Subject: [GIT PULL] fixes for integer rounding in timer core (Was: [PATCH v2]
+ clockevents: Sanitize ticks to nsec conversion)
+In-Reply-To: <5253D9A1.1080106@pengutronix.de>
+References: <alpine.DEB.2.02.1309191629040.4089@ionos.tec.linutronix.de>
+ <1380052223-24139-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <5253D9A1.1080106@pengutronix.de>
+Message-ID: <20131008153147.GR10079@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 8 Oct 2013 10:49:39 +0100
-Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+Hello,
 
-> On Tue, Oct 08, 2013 at 11:19:13AM +0200, Jean-Francois Moine wrote:
-> > The Cubox is an open platform, and I use it just like a desktop PC.
-> > When its required drivers will be in the mainline, I will do the same
-> > as I do with PCs: I will not recompile a specific kernel each time
-> > there are kernel bugs or security issues. Instead, I will just upgrade
-> > my system from my distributor (Debian), and, in the packages, there
-> > will be a generic mvebu kernel as there is already one for Marvell
-> > Armada 370/xp, Freescale iMX5x/iMX6 (linux-image-3.10-3-armmp).
-> > But, for that, all the Cubox specific stuff must be described in a DT.
-> 
-> Which scenario is better:
-> 
-> 1. To have something in mainline which is capable of driving the hardware,
->    but may need some additional work to make it useful for DT based setups.
-> 
-> or
-> 
-> 2. To have nothing.
-> 
-> Now, you may prefer to have nothing, but personally, I prefer there to be
-> forward progress.  Forward progress means getting some kind of DRM driver
-> into mainline.  Yes, it may not work with DT setups yet, but - as per
-> the discussions that have happened _endlessly_ on this topic, it's
-> something that can be resolved at a later date.
-> 
-> We _still_ haven't worked out how to properly deal with the TDA998x
-> driver (or indeed any DRM based outputs) in a DT based setup, and all
-> the time that problem exists, it won't be possible to write a proper
-> stable DT binding for this.
-> 
-> So please, get off your hobby horse about this and allow us to make some
-> modicum of progress.
+> What's the status of this patch?
+I pinged Thomas about it already via irc, but I didn't get a response up
+to now. It would be great to get that into 3.12. To make it easy for
+Thomas, here is a pull request that includes the fix and converts
+at91rm9200 back to clockevents_config_and_register dropping one of the
+workarounds for the fixed bug.
 
-You forgot:
+The following changes since commit 4a10c2ac2f368583138b774ca41fac4207911983:
 
-3. To have all patches ready for submission and have a working DT driven
-   Cubox kernel.
+  Linux 3.12-rc2 (2013-09-23 15:41:09 -0700)
 
-I will submit a patch to add DT to the tda998x driver as soon as I have
-checked the new audio properties we talked about yesterday.
+are available in the git repository at:
 
-Normally, this should have no impact on your Armada drm driver, and,
-yes, I will add DT to your driver as soon as it will be accepted
-(sorry to not ack it now: I had no time yet to have a look at it).
+  git://git.pengutronix.de/git/ukl/linux.git tags/timer-for-tip
+
+for you to fetch changes up to b58c4b70121070f45eefa739ecbb58d57da1c4d9:
+
+  ARM: at91: rm9200: switch back to clockevents_config_and_register (2013-10-08 16:58:22 +0200)
+
+----------------------------------------------------------------
+The first patch in this pull request fixes an old integer rounding bug in the
+timer core that was (and still is) worked around in a few arch's timer code.
+The second patch drops such a work around now that the core is fixed.
+
+----------------------------------------------------------------
+Thomas Gleixner (1):
+      clockevents: Sanitize ticks to nsec conversion
+
+Uwe Kleine-K?nig (1):
+      ARM: at91: rm9200: switch back to clockevents_config_and_register
+
+ arch/arm/mach-at91/at91rm9200_time.c |  7 ++--
+ kernel/time/clockevents.c            | 65 +++++++++++++++++++++++++++---------
+ 2 files changed, 52 insertions(+), 20 deletions(-)
 
 -- 
-Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
-Jef		|		http://moinejf.free.fr/
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
