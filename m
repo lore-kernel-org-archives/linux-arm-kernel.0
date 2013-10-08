@@ -1,190 +1,69 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Tue,  8 Oct 2013 09:57:20 +0200
-Subject: [PATCH v2] clk: new driver for efm32 SoC
-In-Reply-To: <20131008074003.GL10079@pengutronix.de>
-References: <20131008074003.GL10079@pengutronix.de>
-Message-ID: <1381219040-7378-1-git-send-email-u.kleine-koenig@pengutronix.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 8 Oct 2013 09:09:08 +0100
+Subject: [PATCH v4 1/2] ARM: OMAP: Add secure function omap_smc3()
+ which calling instruction smc #1
+In-Reply-To: <5253B08C.4020305@codethink.co.uk>
+References: <20130904124303.GA2369@localhost.localdomain>
+ <201309080943.30542@pali> <5253B08C.4020305@codethink.co.uk>
+Message-ID: <20131008080908.GA25039@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for the clocks provided by the Clock Management
-Unit of Energy Micro's efm32 Giant Gecko SoCs including device tree
-bindings.
+On Tue, Oct 08, 2013 at 09:13:16AM +0200, Ben Dooks wrote:
+> On 08/09/13 09:43, Pali Roh?r wrote:
+>> Here is new version (v4) of omap secure part patch:
+>>
+>> Other secure functions omap_smc1() and omap_smc2() calling instruction smc #0
+>> but Nokia RX-51 board needs to call smc #1 for PPA access.
+>>
+>> Signed-off-by: Ivaylo Dimitrov<freemangordon@abv.bg>
+>> Signed-off-by: Pali Roh?r<pali.rohar@gmail.com>
+>> ---
+>> diff --git a/arch/arm/mach-omap2/omap-secure.h b/arch/arm/mach-omap2/omap-secure.h
+>> index 0e72917..c4586f4 100644
+>> --- a/arch/arm/mach-omap2/omap-secure.h
+>> +++ b/arch/arm/mach-omap2/omap-secure.h
+>> @@ -51,6 +51,7 @@
+>>   extern u32 omap_secure_dispatcher(u32 idx, u32 flag, u32 nargs,
+>>   				u32 arg1, u32 arg2, u32 arg3, u32 arg4);
+>>   extern u32 omap_smc2(u32 id, u32 falg, u32 pargs);
+>> +extern u32 omap_smc3(u32 id, u32 process, u32 flag, u32 pargs);
+>>   extern phys_addr_t omap_secure_ram_mempool_base(void);
+>>   extern int omap_secure_ram_reserve_memblock(void);
+>>
+>> diff --git a/arch/arm/mach-omap2/omap-smc.S b/arch/arm/mach-omap2/omap-smc.S
+>> index f6441c1..fd90125 100644
+>> --- a/arch/arm/mach-omap2/omap-smc.S
+>> +++ b/arch/arm/mach-omap2/omap-smc.S
+>> @@ -1,9 +1,11 @@
+>>   /*
+>> - * OMAP44xx secure APIs file.
+>> + * OMAP34xx and OMAP44xx secure APIs file.
+>>    *
+>>    * Copyright (C) 2010 Texas Instruments, Inc.
+>>    * Written by Santosh Shilimkar<santosh.shilimkar@ti.com>
+>>    *
+>> + * Copyright (C) 2012 Ivaylo Dimitrov<freemangordon@abv.bg>
+>> + * Copyright (C) 2013 Pali Roh?r<pali.rohar@gmail.com>
+>>    *
+>>    * This program is free software,you can redistribute it and/or modify
+>>    * it under the terms of the GNU General Public License version 2 as
+>> @@ -54,6 +56,23 @@ ENTRY(omap_smc2)
+>>   	ldmfd   sp!, {r4-r12, pc}
+>>   ENDPROC(omap_smc2)
+>>
+>> +/**
+>> + * u32 omap_smc3(u32 service_id, u32 process_id, u32 flag, u32 pargs)
+>> + * Low level common routine for secure HAL and PPA APIs via smc #1
+>> + * r0 - @service_id: Secure Service ID
+>> + * r1 - @process_id: Process ID
+>> + * r2 - @flag: Flag to indicate the criticality of operation
+>> + * r3 - @pargs: Physical address of parameter list
+>> + */
+>> +ENTRY(omap_smc3)
+>> +	stmfd	sp!, {r4-r11, lr}
+>> +	mov	r12, r0		@ Copy the secure service ID
+>
+> I think you should save r12 in the call.
 
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
- .../devicetree/bindings/clock/efm32-clock.txt      | 11 +++
- drivers/clk/Makefile                               |  1 +
- drivers/clk/clk-efm32gg.c                          | 81 ++++++++++++++++++++++
- include/dt-bindings/clock/efm32-cmu.h              | 42 +++++++++++
- 4 files changed, 135 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/clock/efm32-clock.txt
- create mode 100644 drivers/clk/clk-efm32gg.c
- create mode 100644 include/dt-bindings/clock/efm32-cmu.h
-
-diff --git a/Documentation/devicetree/bindings/clock/efm32-clock.txt b/Documentation/devicetree/bindings/clock/efm32-clock.txt
-new file mode 100644
-index 0000000..263d293
---- /dev/null
-+++ b/Documentation/devicetree/bindings/clock/efm32-clock.txt
-@@ -0,0 +1,11 @@
-+* Clock bindings for Energy Micro efm32 Giant Gecko's Clock Management Unit
-+
-+Required properties:
-+- compatible: Should be "efm32gg,cmu"
-+- reg: Base address and length of the register set
-+- interrupts: Interrupt used by the CMU
-+- #clock-cells: Should be <1>
-+
-+The clock consumer should specify the desired clock by having the clock ID in
-+its "clocks" phandle cell. The header efm32-clk.h contains a list of available
-+IDs.
-diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
-index 7b11106..40c2225 100644
---- a/drivers/clk/Makefile
-+++ b/drivers/clk/Makefile
-@@ -11,6 +11,7 @@ obj-$(CONFIG_COMMON_CLK)	+= clk-composite.o
- 
- # SoCs specific
- obj-$(CONFIG_ARCH_BCM2835)	+= clk-bcm2835.o
-+obj-$(CONFIG_ARCH_EFM32)	+= clk-efm32gg.o
- obj-$(CONFIG_ARCH_NOMADIK)	+= clk-nomadik.o
- obj-$(CONFIG_ARCH_HIGHBANK)	+= clk-highbank.o
- obj-$(CONFIG_ARCH_NSPIRE)	+= clk-nspire.o
-diff --git a/drivers/clk/clk-efm32gg.c b/drivers/clk/clk-efm32gg.c
-new file mode 100644
-index 0000000..bac2ddf
---- /dev/null
-+++ b/drivers/clk/clk-efm32gg.c
-@@ -0,0 +1,81 @@
-+/*
-+ * Copyright (C) 2013 Pengutronix
-+ * Uwe Kleine-Koenig <u.kleine-koenig@pengutronix.de>
-+ *
-+ * This program is free software; you can redistribute it and/or modify it under
-+ * the terms of the GNU General Public License version 2 as published by the
-+ * Free Software Foundation.
-+ */
-+#include <linux/clk.h>
-+#include <linux/io.h>
-+#include <linux/clk-provider.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+
-+#include <dt-bindings/clock/efm32-cmu.h>
-+
-+#define CMU_HFPERCLKEN0		0x44
-+
-+static struct clk *clk[37];
-+static struct clk_onecell_data clk_data = {
-+	.clks = clk,
-+	.clk_num = ARRAY_SIZE(clk),
-+};
-+
-+static int __init efm32gg_cmu_init(struct device_node *np)
-+{
-+	int i;
-+	void __iomem *base;
-+
-+	for (i = 0; i < ARRAY_SIZE(clk); ++i)
-+		clk[i] = ERR_PTR(-ENOENT);
-+
-+	base = of_iomap(np, 0);
-+	if (!base) {
-+		pr_warn("Failed to map address range for efm32gg,cmu node\n");
-+		return -EADDRNOTAVAIL;
-+	}
-+
-+	clk[clk_HFXO] = clk_register_fixed_rate(NULL, "HFXO", NULL,
-+			CLK_IS_ROOT, 48000000);
-+
-+	clk[clk_HFPERCLKUSART0] = clk_register_gate(NULL, "HFPERCLK.USART0",
-+			"HFXO", 0, base + CMU_HFPERCLKEN0, 0, 0, NULL);
-+	clk[clk_HFPERCLKUSART1] = clk_register_gate(NULL, "HFPERCLK.USART1",
-+			"HFXO", 0, base + CMU_HFPERCLKEN0, 1, 0, NULL);
-+	clk[clk_HFPERCLKUSART2] = clk_register_gate(NULL, "HFPERCLK.USART2",
-+			"HFXO", 0, base + CMU_HFPERCLKEN0, 2, 0, NULL);
-+	clk[clk_HFPERCLKUART0] = clk_register_gate(NULL, "HFPERCLK.UART0",
-+			"HFXO", 0, base + CMU_HFPERCLKEN0, 3, 0, NULL);
-+	clk[clk_HFPERCLKUART1] = clk_register_gate(NULL, "HFPERCLK.UART1",
-+			"HFXO", 0, base + CMU_HFPERCLKEN0, 4, 0, NULL);
-+	clk[clk_HFPERCLKTIMER0] = clk_register_gate(NULL, "HFPERCLK.TIMER0",
-+			"HFXO", 0, base + CMU_HFPERCLKEN0, 5, 0, NULL);
-+	clk[clk_HFPERCLKTIMER1] = clk_register_gate(NULL, "HFPERCLK.TIMER1",
-+			"HFXO", 0, base + CMU_HFPERCLKEN0, 6, 0, NULL);
-+	clk[clk_HFPERCLKTIMER2] = clk_register_gate(NULL, "HFPERCLK.TIMER2",
-+			"HFXO", 0, base + CMU_HFPERCLKEN0, 7, 0, NULL);
-+	clk[clk_HFPERCLKTIMER3] = clk_register_gate(NULL, "HFPERCLK.TIMER3",
-+			"HFXO", 0, base + CMU_HFPERCLKEN0, 8, 0, NULL);
-+	clk[clk_HFPERCLKACMP0] = clk_register_gate(NULL, "HFPERCLK.ACMP0",
-+			"HFXO", 0, base + CMU_HFPERCLKEN0, 9, 0, NULL);
-+	clk[clk_HFPERCLKACMP1] = clk_register_gate(NULL, "HFPERCLK.ACMP1",
-+			"HFXO", 0, base + CMU_HFPERCLKEN0, 10, 0, NULL);
-+	clk[clk_HFPERCLKI2C0] = clk_register_gate(NULL, "HFPERCLK.I2C0",
-+			"HFXO", 0, base + CMU_HFPERCLKEN0, 11, 0, NULL);
-+	clk[clk_HFPERCLKI2C1] = clk_register_gate(NULL, "HFPERCLK.I2C1",
-+			"HFXO", 0, base + CMU_HFPERCLKEN0, 12, 0, NULL);
-+	clk[clk_HFPERCLKGPIO] = clk_register_gate(NULL, "HFPERCLK.GPIO",
-+			"HFXO", 0, base + CMU_HFPERCLKEN0, 13, 0, NULL);
-+	clk[clk_HFPERCLKVCMP] = clk_register_gate(NULL, "HFPERCLK.VCMP",
-+			"HFXO", 0, base + CMU_HFPERCLKEN0, 14, 0, NULL);
-+	clk[clk_HFPERCLKPRS] = clk_register_gate(NULL, "HFPERCLK.PRS",
-+			"HFXO", 0, base + CMU_HFPERCLKEN0, 15, 0, NULL);
-+	clk[clk_HFPERCLKADC0] = clk_register_gate(NULL, "HFPERCLK.ADC0",
-+			"HFXO", 0, base + CMU_HFPERCLKEN0, 16, 0, NULL);
-+	clk[clk_HFPERCLKDAC0] = clk_register_gate(NULL, "HFPERCLK.DAC0",
-+			"HFXO", 0, base + CMU_HFPERCLKEN0, 17, 0, NULL);
-+
-+	return of_clk_add_provider(np, of_clk_src_onecell_get, &clk_data);
-+}
-+CLK_OF_DECLARE(efm32ggcmu, "efm32gg,cmu", efm32gg_cmu_init);
-diff --git a/include/dt-bindings/clock/efm32-cmu.h b/include/dt-bindings/clock/efm32-cmu.h
-new file mode 100644
-index 0000000..b21b91e
---- /dev/null
-+++ b/include/dt-bindings/clock/efm32-cmu.h
-@@ -0,0 +1,42 @@
-+#ifndef __DT_BINDINGS_CLOCK_EFM32_CMU_H
-+#define __DT_BINDINGS_CLOCK_EFM32_CMU_H
-+
-+#define clk_HFXO		0
-+#define clk_HFRCO		1
-+#define clk_LFXO		2
-+#define clk_LFRCO		3
-+#define clk_ULFRCO		4
-+#define clk_AUXHFRCO		5
-+#define clk_HFCLKNODIV		6
-+#define clk_HFCLK		7
-+#define clk_HFPERCLK		8
-+#define clk_HFCORECLK		9
-+#define clk_LFACLK		10
-+#define clk_LFBCLK		11
-+#define clk_WDOGCLK		12
-+#define clk_HFCORECLKDMA	13
-+#define clk_HFCORECLKAES	14
-+#define clk_HFCORECLKUSBC	15
-+#define clk_HFCORECLKUSB	16
-+#define clk_HFCORECLKLE		17
-+#define clk_HFCORECLKEBI	18
-+#define clk_HFPERCLKUSART0	19
-+#define clk_HFPERCLKUSART1	20
-+#define clk_HFPERCLKUSART2	21
-+#define clk_HFPERCLKUART0	22
-+#define clk_HFPERCLKUART1	23
-+#define clk_HFPERCLKTIMER0	24
-+#define clk_HFPERCLKTIMER1	25
-+#define clk_HFPERCLKTIMER2	26
-+#define clk_HFPERCLKTIMER3	27
-+#define clk_HFPERCLKACMP0	28
-+#define clk_HFPERCLKACMP1	29
-+#define clk_HFPERCLKI2C0	30
-+#define clk_HFPERCLKI2C1	31
-+#define clk_HFPERCLKGPIO	32
-+#define clk_HFPERCLKVCMP	33
-+#define clk_HFPERCLKPRS		34
-+#define clk_HFPERCLKADC0	35
-+#define clk_HFPERCLKDAC0	36
-+
-+#endif /* __DT_BINDINGS_CLOCK_EFM32_CMU_H */
--- 
-1.8.4.rc3
+Not necessary.
