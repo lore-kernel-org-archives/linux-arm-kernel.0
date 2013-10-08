@@ -1,38 +1,30 @@
-From: jonas.jensen@gmail.com (Jonas Jensen)
-Date: Tue,  8 Oct 2013 15:46:47 +0200
-Subject: [PATCH v2] Documentation: add moxa vendor prefix
-In-Reply-To: <1381237000-8398-1-git-send-email-jonas.jensen@gmail.com>
-References: <1381237000-8398-1-git-send-email-jonas.jensen@gmail.com>
-Message-ID: <1381240007-9321-1-git-send-email-jonas.jensen@gmail.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 8 Oct 2013 09:57:43 -0400
+Subject: [PATCH 2/8] MAINTAINERS: add ARM Marvell Berlin SoC
+In-Reply-To: <1381235073-17134-3-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1381235073-17134-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1381235073-17134-3-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <20131008135743.GE5402@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add moxa vendor prefix.
+On Tue, Oct 08, 2013 at 02:24:27PM +0200, Sebastian Hesselbarth wrote:
+> This adds Marvell Berlin SoC to the list of maintainers. I am taking
+> maintainership for arch/arm/mach-berlin/.
+> 
+> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> ---
+> Cc: Jason Cooper <jason@lakedaemon.net>
+> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-kernel at vger.kernel.org
+> ---
+>  MAINTAINERS |    6 ++++++
+>  1 file changed, 6 insertions(+)
 
-Signed-off-by: Jonas Jensen <jonas.jensen@gmail.com>
----
+Acked-by: Jason Cooper <jason@lakedaemon.net>
 
-Notes:
-    Changes since v1:
-    
-    1. use the correct vendor name "Moxa Technologies Co., Ltd."
-    
-    Applies to next-20130927
+thx,
 
- Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-index 2956800..3b9e056 100644
---- a/Documentation/devicetree/bindings/vendor-prefixes.txt
-+++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-@@ -40,6 +40,7 @@ marvell	Marvell Technology Group Ltd.
- maxim	Maxim Integrated Products
- microchip	Microchip Technology Inc.
- mosaixtech	Mosaix Technologies, Inc.
-+moxa	Moxa Technologies Co., Ltd.
- national	National Semiconductor
- nintendo	Nintendo
- nvidia	NVIDIA
--- 
-1.8.2.1
+Jason.
