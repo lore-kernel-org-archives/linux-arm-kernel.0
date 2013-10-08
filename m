@@ -1,76 +1,39 @@
-From: arno@natisbad.org (Arnaud Ebalard)
-Date: Tue, 08 Oct 2013 08:10:39 +0200
-Subject: [BUG,REGRESSION] SATA regression on 12.0-rc4 kernel
-References: <87vc1ahyft.fsf@natisbad.org>
- <20131007125943.GA1332@titan.lakedaemon.net>
- <87bo303nfe.fsf@natisbad.org> <52537015.6040200@gmail.com>
-Message-ID: <87y564waw0.fsf@natisbad.org>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Tue, 08 Oct 2013 15:30:00 +0900
+Subject: [PATCH 00/02] ARM: shmobile: r8a7791 Koelsch DT reference support V2
+Message-ID: <20131008063000.24789.7845.sendpatchset@w520>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robert,
+ARM: shmobile: r8a7791 Koelsch DT reference support V2
 
-Robert Hancock <hancockrwd@gmail.com> writes:
+[PATCH 01/02] ARM: shmobile: r8a7791 Koelsch DT reference DTS bits
+[PATCH 02/02] ARM: shmobile: r8a7791 Koelsch DT reference C bits
 
-> On 10/07/2013 01:12 PM, Arnaud Ebalard wrote:
->> Hi guys,
->>
->> yesterday, I reported on arm kernel mailing list what looked like a sata
->> regression on my platform (Marvell Armada 370-based NETGEAR ReadyNAS
->> 102). I initially thought this was an ARM-related issue. My initial
->> email, provided below, contains various details on the platform and the
->> error encountered.
->>
->> Today, before starting a painful git bisect, I decided to git log
->> sata_mv.c code and then more generally drivers/ata to quickly end up on
->> commit ed36911c747c (libata: Add support for SEND/RECEIVE FPDMA QUEUED)
->> against which I got suspicious after looking again at the errors I had:
->>
->> [  417.288155] ata1.00: exception Emask 0x0 SAct 0x1fff6001 SErr 0x0 action 0x6 frozen
->> [  417.295838] ata1.00: failed command: WRITE FPDMA QUEUED
->> [  417.301097] ata1.00: cmd 61/48:00:80:ad:0b/00:00:0c:00:00/40 tag 0 ncq 36864 out
->> [  417.315896] ata1.00: status: { DRDY }
->> [  417.319570] ata1.00: failed command: WRITE FPDMA QUEUED
->> [  417.324814] ata1.00: cmd 61/08:68:70:a1:87/00:00:0d:00:00/40 tag 13 ncq 4096 out
->> [  417.339619] ata1.00: status: { DRDY }
->> [  417.343288] ata1.00: failed command: WRITE FPDMA QUEUED
->> [  417.348536] ata1.00: cmd 61/08:70:28:a2:87/00:00:0d:00:00/40 tag 14 ncq 4096 out
->> [  417.363341] ata1.00: status: { DRDY }
->> [  417.367010] ata1.00: failed command: WRITE FPDMA QUEUED
->> [  417.372257] ata1.00: cmd 61/08:80:80:a3:87/00:00:0d:00:00/40 tag 16 ncq 4096 out
->> [  417.387061] ata1.00: status: { DRDY }
->> [  417.390733] ata1.00: failed command: WRITE FPDMA QUEUED
->> [  417.395977] ata1.00: cmd 61/08:88:58:a1:c7/00:00:0d:00:00/40 tag 17 ncq 4096 out
->> [  417.410782] ata1.00: status: { DRDY }
->>
->> Reverting both 87fb6c31b9 (libata: Add support for queued DSM TRIM) and
->> ed36911c74 (libata: Add support for SEND/RECEIVE FPDMA QUEUED) makes the
->> problem disappear. Note: reverting 87fb6c31b9 is not enough and I cannot
->> compile the kernel with only the latter reverted.
->>
->> If you need more info on the platform or want me to test something some
->> fix, do not hesitate.
->
-> I assume that it consistently fails on a non-working kernel and
-> consistently works with those patches reverted? Given that both of
-> those patches seem to only be touching SSDs with NCQ trim support, it
-> seems odd they would be breaking a normal hard drive, but maybe there
-> is some unexpected side effect..
+This series is V2 of Koelsch DT reference support. At this point the
+board file is separated from the legacy Koelsch board support, and in
+the not so distant future this DT reference board file will be converted
+into MULTIPLATFORM only. This can only happen after r8a7791 CCF support
+has been added.
 
-With two different disks (same model though, i.e. 250GB 3.5" WD blue), it
-consistently works on a 3.11.4 and consistently fails on 3.12-rc3 and
-3.12-rc4 (not tested others 3.12-rc). The problem is easy to reproduce,
-i.e. I just need to perform some disk operations. With the two commits
-reverted from 3.12-rc4, I can consistently do a "find / -exec sha256sum
-'{}' \;" w/o anything happening.
+After CCF and MULTIPLATFORM are done for r8a7791 the board support code
+will be converted into same style as EMEV2, for more details please
+see the following series:
 
-What I do not understand is why the log report failed FPDMA commands if
-the feature is supposed to be SSD-related (looking only at commit
-messages: 87fb6c31b9 seems SSD-related, ed36911c74 does not). Is it
-possible that the feature detection is what is causing the issue? Or
-that the hardware report support w/o having? I can test with a different
-disk if you think it would help.
+[PATCH 00/05] ARM: shmobile: KZM9D Multiplatform update
 
-Cheers,
+Changes since V1 are DT_MACHINE update to sync with legacy board
+code and patch splitting to simplify merge dependencies.
 
-a+
+Signed-off-by: Magnus Damm <damm@opensource.se>
+---
+
+ Written against renesas.git tag renesas-devel-20131008
+
+ arch/arm/boot/dts/Makefile                       |    1 
+ arch/arm/boot/dts/r8a7791-koelsch-reference.dts  |   32 +++++++++++++++
+ arch/arm/mach-shmobile/Kconfig                   |   11 +++++
+ arch/arm/mach-shmobile/Makefile                  |    1 
+ arch/arm/mach-shmobile/Makefile.boot             |    1 
+ arch/arm/mach-shmobile/board-koelsch-reference.c |   46 ++++++++++++++++++++++
+ 6 files changed, 92 insertions(+)
