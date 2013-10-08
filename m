@@ -1,68 +1,247 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Tue,  8 Oct 2013 14:24:31 +0200
-Subject: [PATCH 6/8] ARM: add Marvell Berlin UART0 lowlevel debug
+Date: Tue,  8 Oct 2013 14:24:26 +0200
+Subject: [PATCH 1/8] irqchip: add DesignWare APB ICTL interrupt controller
 In-Reply-To: <1381235073-17134-1-git-send-email-sebastian.hesselbarth@gmail.com>
 References: <1381235073-17134-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1381235073-17134-7-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1381235073-17134-2-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds UART0 as found on Marvell 88DE3xxx SoCs, e.g. Armada 1500
-to the list of possible lowlevel debug options.
+This adds an irqchip driver and corresponding devicetree binding for the
+secondary interrupt controllers based on Synopsys DesignWare IP dw_apb_ictl.
 
 Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-Reviewed-by: Jason Cooper <jason@lakedaemon.net>
-Reviewed-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Reviewed-by: Arnd Bergmann <arnd@arndb.de>
 ---
 Changelog:
 RFCv1->RFCv2:
-- have separate DEBUG option due to separate mach- directory
+- added copyright reference
 
 Cc: Jason Cooper <jason@lakedaemon.net>
 Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: devicetree at vger.kernel.org
+Cc: linux-doc at vger.kernel.org
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-kernel at vger.kernel.org
 ---
- arch/arm/Kconfig.debug |   10 ++++++++++
- 1 file changed, 10 insertions(+)
+ .../interrupt-controller/snps,dw-apb-ictl.txt      |   29 ++++
+ drivers/irqchip/Kconfig                            |    4 +
+ drivers/irqchip/Makefile                           |    1 +
+ drivers/irqchip/irq-dw-apb-ictl.c                  |  142 ++++++++++++++++++++
+ 4 files changed, 176 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/interrupt-controller/snps,dw-apb-ictl.txt
+ create mode 100644 drivers/irqchip/irq-dw-apb-ictl.c
 
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index 9762c84..712a96a 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -94,6 +94,14 @@ choice
- 		depends on ARCH_BCM2835
- 		select DEBUG_UART_PL01X
- 
-+	config DEBUG_BERLIN_UART
-+		bool "Marvell Berlin (88DE3xxx) Debug UART"
-+		depends on ARCH_BERLIN
-+		select DEBUG_UART_8250
-+		help
-+		  Say Y here if you want kernel low-level debugging support
-+		  on Marvell Berlin (88DE3xxx) based platforms.
+diff --git a/Documentation/devicetree/bindings/interrupt-controller/snps,dw-apb-ictl.txt b/Documentation/devicetree/bindings/interrupt-controller/snps,dw-apb-ictl.txt
+new file mode 100644
+index 0000000..7ccd1ba
+--- /dev/null
++++ b/Documentation/devicetree/bindings/interrupt-controller/snps,dw-apb-ictl.txt
+@@ -0,0 +1,29 @@
++Synopsys DesignWare APB interrupt controller (dw_apb_ictl)
 +
- 	config DEBUG_CLPS711X_UART1
- 		bool "Kernel low-level debugging messages via UART1"
- 		depends on ARCH_CLPS711X
-@@ -973,6 +981,7 @@ config DEBUG_UART_PHYS
- 	default 0xf1012000 if DEBUG_MVEBU_UART_ALTERNATE
- 	default 0xf1012000 if ARCH_DOVE || ARCH_KIRKWOOD || ARCH_MV78XX0 || \
- 				ARCH_ORION5X
-+	default 0xf7fc9000 if DEBUG_BERLIN_UART
- 	default 0xf8b00000 if DEBUG_HI3716_UART
- 	default 0xfcb00000 if DEBUG_HI3620_UART
- 	default 0xfe800000 if ARCH_IOP32X
-@@ -997,6 +1006,7 @@ config DEBUG_UART_VIRT
- 	default 0xf2100000 if DEBUG_PXA_UART1
- 	default 0xf4090000 if ARCH_LPC32XX
- 	default 0xf4200000 if ARCH_GEMINI
-+	default 0xf7fc9000 if DEBUG_BERLIN_UART
- 	default 0xf8009000 if DEBUG_VEXPRESS_UART0_CA9
- 	default 0xf8090000 if DEBUG_VEXPRESS_UART0_RS1
- 	default 0xfb009000 if DEBUG_REALVIEW_STD_PORT
++Synopsys DesignWare provides interrupt controller IP for APB known as
++dw_apb_ictl. The IP is used as secondary interrupt controller in some SoCs with
++APB bus, e.g. Marvell Armada 1500.
++
++Required properties:
++- compatible: shall be "snps,dw-apb-ictl"
++- reg: base address of interrupt registers starting with ENABLE_LOW register
++- interrupt-controller: identifies the node as an interrupt controller
++- #interrupt-cells: number of cells to encode an interrupt source, shall be 1
++- interrupts: interrupt reference to primary interrupt controller
++- interrupt-parent: (optional) reference specific primary interrupt controller
++
++The interrupt sources map to the corresponding bits in the interrupt
++registers, i.e.
++- 0 maps to bit 0 of low interrupts,
++- 1 maps to bit 1 of low interrupts,
++- 32 maps to bit 0 of high interrupts, and so on.
++
++Example:
++	aic: interrupt-controller at 3000 {
++		compatible = "snps,dw-apb-ictl";
++		reg = <0x3000 0xc00>;
++		interrupt-controller;
++		#interrupt-cells = <1>;
++		interrupt-parent = <&gic>;
++		interrupts = <GIC_SPI 3 IRQ_TYPE_LEVEL_HIGH>;
++	};
+diff --git a/drivers/irqchip/Kconfig b/drivers/irqchip/Kconfig
+index 3792a1a..940638d 100644
+--- a/drivers/irqchip/Kconfig
++++ b/drivers/irqchip/Kconfig
+@@ -30,6 +30,10 @@ config ARM_VIC_NR
+ 	  The maximum number of VICs available in the system, for
+ 	  power management.
+ 
++config DW_APB_ICTL
++	bool
++	select IRQ_DOMAIN
++
+ config IMGPDC_IRQ
+ 	bool
+ 	select GENERIC_IRQ_CHIP
+diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
+index c60b901..6427323 100644
+--- a/drivers/irqchip/Makefile
++++ b/drivers/irqchip/Makefile
+@@ -6,6 +6,7 @@ obj-$(CONFIG_ARCH_MMP)			+= irq-mmp.o
+ obj-$(CONFIG_ARCH_MVEBU)		+= irq-armada-370-xp.o
+ obj-$(CONFIG_ARCH_MXS)			+= irq-mxs.o
+ obj-$(CONFIG_ARCH_S3C24XX)		+= irq-s3c24xx.o
++obj-$(CONFIG_DW_APB_ICTL)		+= irq-dw-apb-ictl.o
+ obj-$(CONFIG_METAG)			+= irq-metag-ext.o
+ obj-$(CONFIG_METAG_PERFCOUNTER_IRQS)	+= irq-metag.o
+ obj-$(CONFIG_ARCH_MOXART)		+= irq-moxart.o
+diff --git a/drivers/irqchip/irq-dw-apb-ictl.c b/drivers/irqchip/irq-dw-apb-ictl.c
+new file mode 100644
+index 0000000..bbcacee
+--- /dev/null
++++ b/drivers/irqchip/irq-dw-apb-ictl.c
+@@ -0,0 +1,142 @@
++/*
++ * Synopsys DW APB ICTL irqchip driver.
++ *
++ * Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
++ *
++ * based on GPL'ed 2.6 kernel sources
++ *  (c) Marvell International Ltd.
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2.  This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
++
++#include <linux/io.h>
++#include <linux/irq.h>
++#include <linux/irqchip/chained_irq.h>
++#include <linux/of_address.h>
++#include <linux/of_irq.h>
++
++#include "irqchip.h"
++
++#define APB_INT_ENABLE_L	0x00
++#define APB_INT_ENABLE_H	0x04
++#define APB_INT_MASK_L		0x08
++#define APB_INT_MASK_H		0x0c
++#define APB_INT_FINALSTATUS_L	0x30
++#define APB_INT_FINALSTATUS_H	0x34
++
++static void dw_apb_ictl_handler(unsigned int irq, struct irq_desc *desc)
++{
++	struct irq_chip *chip = irq_get_chip(irq);
++	struct irq_chip_generic *gc = irq_get_handler_data(irq);
++	struct irq_domain *d = gc->private;
++	u32 stat;
++	int n;
++
++	chained_irq_enter(chip, desc);
++
++	for (n = 0; n < gc->num_ct; n++) {
++		stat = readl_relaxed(gc->reg_base +
++				     APB_INT_FINALSTATUS_L + 4 * n);
++		while (stat) {
++			u32 hwirq = ffs(stat) - 1;
++			generic_handle_irq(irq_find_mapping(d,
++					    gc->irq_base + hwirq + 32 * n));
++			stat &= ~(1 << hwirq);
++		}
++	}
++
++	chained_irq_exit(chip, desc);
++}
++
++static int __init dw_apb_ictl_init(struct device_node *np,
++				   struct device_node *parent)
++{
++	unsigned int clr = IRQ_NOREQUEST | IRQ_NOPROBE | IRQ_NOAUTOEN;
++	struct resource r;
++	struct irq_domain *domain;
++	struct irq_chip_generic *gc;
++	void __iomem *iobase;
++	int ret, nrirqs, irq;
++	u32 reg;
++
++	/* Map the parent interrupt for the chained handler */
++	irq = irq_of_parse_and_map(np, 0);
++	if (irq <= 0) {
++		pr_err("%s: unable to parse irq\n", np->name);
++		return -EINVAL;
++	}
++
++	ret = of_address_to_resource(np, 0, &r);
++	if (ret) {
++		pr_err("%s: unable to get resource\n", np->name);
++		return ret;
++	}
++
++	if (!request_mem_region(r.start, resource_size(&r), np->name)) {
++		pr_err("%s: unable to request mem region\n", np->name);
++		return -ENOMEM;
++	}
++
++	iobase = ioremap(r.start, resource_size(&r));
++	if (!iobase) {
++		pr_err("%s: unable to map resource\n", np->name);
++		return -ENOMEM;
++	}
++
++	/*
++	 * DW IP can be configured to allow 2-64 irqs. We can determine
++	 * the number of irqs supported by writing into enable register
++	 * and look for bits not set, as corresponding flip-flops will
++	 * have been removed by sythesis tool.
++	 */
++
++	/* mask and enable all interrupts */
++	writel(~0, iobase + APB_INT_MASK_L);
++	writel(~0, iobase + APB_INT_MASK_H);
++	writel(~0, iobase + APB_INT_ENABLE_L);
++	writel(~0, iobase + APB_INT_ENABLE_H);
++
++	reg = readl(iobase + APB_INT_ENABLE_H);
++	if (reg)
++		nrirqs = 32 + fls(reg);
++	else
++		nrirqs = fls(readl(iobase + APB_INT_ENABLE_L));
++
++	domain = irq_domain_add_linear(np, nrirqs,
++				       &irq_generic_chip_ops, NULL);
++	if (!domain) {
++		pr_err("%s: unable to add irq domain\n", np->name);
++		return -ENOMEM;
++	}
++
++	ret = irq_alloc_domain_generic_chips(domain, 32, (nrirqs > 32) ? 2 : 1,
++					     np->name, handle_level_irq, clr, 0,
++					     IRQ_GC_INIT_MASK_CACHE);
++	if (ret) {
++		pr_err("%s: unable to alloc irq domain gc\n", np->name);
++		return ret;
++	}
++
++	gc = irq_get_domain_generic_chip(domain, 0);
++	gc->private = domain;
++	gc->reg_base = iobase;
++
++	gc->chip_types[0].regs.mask = APB_INT_MASK_L;
++	gc->chip_types[0].chip.irq_mask = irq_gc_mask_set_bit;
++	gc->chip_types[0].chip.irq_unmask = irq_gc_mask_clr_bit;
++
++	if (nrirqs > 32) {
++		gc->chip_types[1].regs.mask = APB_INT_MASK_H;
++		gc->chip_types[1].chip.irq_mask = irq_gc_mask_set_bit;
++		gc->chip_types[1].chip.irq_unmask = irq_gc_mask_clr_bit;
++	}
++
++	irq_set_handler_data(irq, gc);
++	irq_set_chained_handler(irq, dw_apb_ictl_handler);
++
++	return 0;
++}
++IRQCHIP_DECLARE(dw_apb_ictl,
++		"snps,dw-apb-ictl", dw_apb_ictl_init);
 -- 
 1.7.10.4
