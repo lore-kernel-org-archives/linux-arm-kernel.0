@@ -1,42 +1,44 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Tue,  8 Oct 2013 14:24:27 +0200
-Subject: [PATCH 2/8] MAINTAINERS: add ARM Marvell Berlin SoC
+Date: Tue,  8 Oct 2013 14:24:30 +0200
+Subject: [PATCH 5/8] ARM: add Marvell Berlin and Armada 1500 to
+ multi_v7_defconfig
 In-Reply-To: <1381235073-17134-1-git-send-email-sebastian.hesselbarth@gmail.com>
 References: <1381235073-17134-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1381235073-17134-3-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1381235073-17134-6-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds Marvell Berlin SoC to the list of maintainers. I am taking
-maintainership for arch/arm/mach-berlin/.
+This adds the Marvell Berlin (88DE3xxx) SoC family and Marvell Armada 1500
+(88DE3100) to the multi_v7_defconfig.
 
 Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Reviewed-by: Jason Cooper <jason@lakedaemon.net>
+Reviewed-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Reviewed-by: Arnd Bergmann <arnd@arndb.de>
 ---
 Cc: Jason Cooper <jason@lakedaemon.net>
 Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Olof Johansson <olof@lixom.net>
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-kernel at vger.kernel.org
 ---
- MAINTAINERS |    6 ++++++
- 1 file changed, 6 insertions(+)
+ arch/arm/configs/multi_v7_defconfig |    2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 8a0cbf3..7964fe4 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -1013,6 +1013,12 @@ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
- S:	Maintained
- F:	arch/arm/mach-mvebu/
- 
-+ARM/Marvell Berlin SoC support
-+M:	Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-+L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-+S:	Maintained
-+F:	arch/arm/mach-berlin/
-+
- ARM/Marvell Dove/Kirkwood/MV78xx0/Orion SOC support
- M:	Jason Cooper <jason@lakedaemon.net>
- M:	Andrew Lunn <andrew@lunn.ch>
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index 119fc37..bc12fc3 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -6,6 +6,8 @@ CONFIG_ARCH_MVEBU=y
+ CONFIG_MACH_ARMADA_370=y
+ CONFIG_MACH_ARMADA_XP=y
+ CONFIG_ARCH_BCM=y
++CONFIG_ARCH_BERLIN=y
++CONFIG_MACH_MV88DE3100=y
+ CONFIG_GPIO_PCA953X=y
+ CONFIG_ARCH_HIGHBANK=y
+ CONFIG_ARCH_KEYSTONE=y
 -- 
 1.7.10.4
