@@ -1,45 +1,32 @@
 From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Wed,  9 Oct 2013 00:34:39 +0200
-Subject: [PATCH 23/23] ARM: tlb: ASID macro should give 32bit result for BE
- correct operation
+Date: Wed,  9 Oct 2013 00:34:24 +0200
+Subject: [PATCH 08/23] ARM: highbank: enable big-endian
 In-Reply-To: <1381271679-27804-1-git-send-email-ben.dooks@codethink.co.uk>
 References: <1381271679-27804-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <1381271679-27804-24-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <1381271679-27804-9-git-send-email-ben.dooks@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Victor Kamensky <victor.kamensky@linaro.org>
+Apart from a xgmac driver issue, the highbank seems to work correctly in
+big-endian mode. Allow the selection of big-endian in the system.
 
-In order for ASID macro to be used as expression passed to
-inline asm as 'r' operand it needs to give 32 bit unsigned result,
-not unsigned 64bit expression.
-
-Otherwise when 64bit ASID is passed to inline assembler statement
-as 'r' operand (32bit) compiler behavior is not well specified.
-For example when __flush_tlb_mm function compiled in big endian
-case, and ASID is passed to tlb_op macro directly, 0 will be passed
-as 'mcr	15, 0, r4, cr8, cr3, {2}' argument in r4, unless ASID
-macro changed to produce 32 bit result.
-
-Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
-Acked-by: Will Deacon <will.deacon@arm.com>
 Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+Acked-by: Rob Herring <rob.herring@calxeda.com>
 ---
- arch/arm/include/asm/mmu.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/mach-highbank/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/include/asm/mmu.h b/arch/arm/include/asm/mmu.h
-index 6f18da0..64fd151 100644
---- a/arch/arm/include/asm/mmu.h
-+++ b/arch/arm/include/asm/mmu.h
-@@ -16,7 +16,7 @@ typedef struct {
- #ifdef CONFIG_CPU_HAS_ASID
- #define ASID_BITS	8
- #define ASID_MASK	((~0ULL) << ASID_BITS)
--#define ASID(mm)	((mm)->context.id.counter & ~ASID_MASK)
-+#define ASID(mm)	((unsigned int)((mm)->context.id.counter & ~ASID_MASK))
- #else
- #define ASID(mm)	(0)
- #endif
+diff --git a/arch/arm/mach-highbank/Kconfig b/arch/arm/mach-highbank/Kconfig
+index 8e8437d..3c3bff7 100644
+--- a/arch/arm/mach-highbank/Kconfig
++++ b/arch/arm/mach-highbank/Kconfig
+@@ -4,6 +4,7 @@ config ARCH_HIGHBANK
+ 	select ARCH_HAS_CPUFREQ
+ 	select ARCH_HAS_HOLES_MEMORYMODEL
+ 	select ARCH_HAS_OPP
++	select ARCH_SUPPORTS_BIG_ENDIAN
+ 	select ARCH_WANT_OPTIONAL_GPIOLIB
+ 	select ARM_AMBA
+ 	select ARM_ERRATA_764369
 -- 
 1.8.4.rc3
