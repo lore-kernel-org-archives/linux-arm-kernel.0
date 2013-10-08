@@ -1,76 +1,49 @@
 From: josephl@nvidia.com (Joseph Lo)
-Date: Tue, 8 Oct 2013 16:23:04 +0800
-Subject: [PATCH 1/4] clk: tegra124: add wait_for_reset and disable_clock for
- tegra_cpu_car_ops
+Date: Tue, 8 Oct 2013 16:23:07 +0800
+Subject: [PATCH 4/4] ARM: tegra: enable CPU idle for Tegra124
 In-Reply-To: <1381220587-29697-1-git-send-email-josephl@nvidia.com>
 References: <1381220587-29697-1-git-send-email-josephl@nvidia.com>
-Message-ID: <1381220587-29697-2-git-send-email-josephl@nvidia.com>
+Message-ID: <1381220587-29697-5-git-send-email-josephl@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hook the functions for CPU hotplug support. After the CPU is hot
-unplugged, the flow controller will handle to clock gate the CPU clock.
-But still need to implement an empty function to avoid warning message.
+The CPUIdle function of Tegra124 is identical to Tegra114, so we share
+the same driver with Tegra114.
 
-Cc: Mike Turquette <mturquette@linaro.org>
-Cc: Peter De Schrijver <pdeschrijver@nvidia.com>
+Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
 Signed-off-by: Joseph Lo <josephl@nvidia.com>
 ---
-This patch depends on the patch series "[PATCH 0/5] Tegra124 clock support"
-that sent by Peter on 10/4/2013.
----
- drivers/clk/tegra/clk-tegra124.c | 26 ++++++++++++++++++++++++++
- 1 file changed, 26 insertions(+)
+ arch/arm/mach-tegra/Makefile  | 3 +++
+ arch/arm/mach-tegra/cpuidle.c | 4 +++-
+ 2 files changed, 6 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/clk/tegra/clk-tegra124.c b/drivers/clk/tegra/clk-tegra124.c
-index 26ba059..c1c9330 100644
---- a/drivers/clk/tegra/clk-tegra124.c
-+++ b/drivers/clk/tegra/clk-tegra124.c
-@@ -106,6 +106,9 @@
- #define UTMIPLL_HW_PWRDN_CFG0_IDDQ_OVERRIDE	BIT(1)
- #define UTMIPLL_HW_PWRDN_CFG0_IDDQ_SWCTL	BIT(0)
+diff --git a/arch/arm/mach-tegra/Makefile b/arch/arm/mach-tegra/Makefile
+index 04ca2b3..de3748e 100644
+--- a/arch/arm/mach-tegra/Makefile
++++ b/arch/arm/mach-tegra/Makefile
+@@ -36,5 +36,8 @@ ifeq ($(CONFIG_CPU_IDLE),y)
+ obj-$(CONFIG_ARCH_TEGRA_114_SOC)	+= cpuidle-tegra114.o
+ endif
+ obj-$(CONFIG_ARCH_TEGRA_124_SOC)	+= sleep-tegra30.o
++ifeq ($(CONFIG_CPU_IDLE),y)
++obj-$(CONFIG_ARCH_TEGRA_124_SOC)	+= cpuidle-tegra114.o
++endif
  
-+/* Tegra CPU clock and reset control regs */
-+#define CLK_RST_CONTROLLER_CPU_CMPLX_STATUS	0x470
-+
- static void __iomem *clk_base;
- static void __iomem *pmc_base;
- 
-@@ -1120,6 +1123,27 @@ static void __init tegra124_pll_init(void __iomem *clk_base,
- 
- }
- 
-+/* Tegra124 CPU clock and reset control functions */
-+static void tegra124_wait_cpu_in_reset(u32 cpu)
-+{
-+	unsigned int reg;
-+
-+	do {
-+		reg = readl(clk_base + CLK_RST_CONTROLLER_CPU_CMPLX_STATUS);
-+		cpu_relax();
-+	} while (!(reg & (1 << cpu)));  /* check CPU been reset or not */
-+}
-+
-+static void tegra124_disable_cpu_clock(u32 cpu)
-+{
-+	/* flow controller would take care in the power sequence. */
-+}
-+
-+static struct tegra_cpu_car_ops tegra124_cpu_car_ops = {
-+	.wait_for_reset	= tegra124_wait_cpu_in_reset,
-+	.disable_clock	= tegra124_disable_cpu_clock,
-+};
-+
- static const struct of_device_id pmc_match[] __initconst = {
- 	{ .compatible = "nvidia,tegra124-pmc" },
- 	{},
-@@ -1202,5 +1226,7 @@ static void __init tegra124_clock_init(struct device_node *np)
- 	tegra_add_of_provider(np);
- 
- 	tegra_clk_apply_init_table = tegra124_clock_apply_init_table;
-+
-+	tegra_cpu_car_ops = &tegra124_cpu_car_ops;
- }
- CLK_OF_DECLARE(tegra124, "nvidia,tegra124-car", tegra124_clock_init);
+ obj-$(CONFIG_ARCH_TEGRA_2x_SOC)		+= board-paz00.o
+diff --git a/arch/arm/mach-tegra/cpuidle.c b/arch/arm/mach-tegra/cpuidle.c
+index 0961dfc..7bc5d8d 100644
+--- a/arch/arm/mach-tegra/cpuidle.c
++++ b/arch/arm/mach-tegra/cpuidle.c
+@@ -39,7 +39,9 @@ void __init tegra_cpuidle_init(void)
+ 			tegra30_cpuidle_init();
+ 		break;
+ 	case TEGRA114:
+-		if (IS_ENABLED(CONFIG_ARCH_TEGRA_114_SOC))
++	case TEGRA124:
++		if (IS_ENABLED(CONFIG_ARCH_TEGRA_114_SOC) ||
++		    IS_ENABLED(CONFIG_ARCH_TEGRA_124_SOC))
+ 			tegra114_cpuidle_init();
+ 		break;
+ 	}
 -- 
 1.8.4
