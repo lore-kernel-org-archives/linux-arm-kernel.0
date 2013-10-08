@@ -1,75 +1,46 @@
 From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Wed,  9 Oct 2013 00:34:20 +0200
-Subject: [PATCH 04/23] ARM: set BE8 if LE in head code
+Date: Wed,  9 Oct 2013 00:34:32 +0200
+Subject: [PATCH 16/23] ARM: net: fix arm instruction endian-ness in
+ bpf_jit_32.c
 In-Reply-To: <1381271679-27804-1-git-send-email-ben.dooks@codethink.co.uk>
 References: <1381271679-27804-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <1381271679-27804-5-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <1381271679-27804-17-git-send-email-ben.dooks@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If we are booting in LE and compiled for BE8, then add code to
-set the state to bE8. Since the instruction stream is always LE,
-we do not need to do anything special to the instruction.
-
-Also ensure that the secondary processors are started in the same mode.
-
-Note, we do add about 20 bytes to the kernel image, but it seems easier
-to do this than adding another configuration to change.
+Use <asm/opcodes.h> to correctly transform instruction byte ordering
+into in-memory ordering.
 
 Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
 Reviewed-by: Dave Martin <Dave.Martin@arm.com>
-Tested-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm/boot/compressed/head.S | 1 +
- arch/arm/kernel/head.S          | 4 ++++
- arch/arm/kernel/sleep.S         | 1 +
- 3 files changed, 6 insertions(+)
+ arch/arm/net/bpf_jit_32.c | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
-index c912c2a..066b034 100644
---- a/arch/arm/boot/compressed/head.S
-+++ b/arch/arm/boot/compressed/head.S
-@@ -135,6 +135,7 @@ start:
- 		.word	_edata			@ zImage end address
-  THUMB(		.thumb			)
- 1:
-+ ARM_BE8(	setend	be )			@ go BE8 if compiled for BE8
- 		mrs	r9, cpsr
- #ifdef CONFIG_ARM_VIRT_EXT
- 		bl	__hyp_stub_install	@ get into SVC mode, reversibly
-diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
-index 9e5906c..a047acf 100644
---- a/arch/arm/kernel/head.S
-+++ b/arch/arm/kernel/head.S
-@@ -77,6 +77,7 @@
+diff --git a/arch/arm/net/bpf_jit_32.c b/arch/arm/net/bpf_jit_32.c
+index f50d223..510d923 100644
+--- a/arch/arm/net/bpf_jit_32.c
++++ b/arch/arm/net/bpf_jit_32.c
+@@ -19,6 +19,7 @@
+ #include <linux/if_vlan.h>
+ #include <asm/cacheflush.h>
+ #include <asm/hwcap.h>
++#include <asm/opcodes.h>
  
- 	__HEAD
- ENTRY(stext)
-+ ARM_BE8(setend	be )			@ ensure we are in BE8 mode
+ #include "bpf_jit_32.h"
  
-  THUMB(	adr	r9, BSYM(1f)	)	@ Kernel is always entered in ARM.
-  THUMB(	bx	r9		)	@ If this is a Thumb-2 kernel,
-@@ -352,6 +353,9 @@ ENTRY(secondary_startup)
- 	 * the processor type - there is no need to check the machine type
- 	 * as it has already been validated by the primary processor.
- 	 */
+@@ -113,8 +114,11 @@ static u32 jit_udiv(u32 dividend, u32 divisor)
+ 
+ static inline void _emit(int cond, u32 inst, struct jit_ctx *ctx)
+ {
++	inst |= (cond << 28);
++	inst = __opcode_to_mem_arm(inst);
 +
-+ ARM_BE8(setend	be)				@ ensure we are in BE8 mode
-+
- #ifdef CONFIG_ARM_VIRT_EXT
- 	bl	__hyp_stub_install_secondary
- #endif
-diff --git a/arch/arm/kernel/sleep.S b/arch/arm/kernel/sleep.S
-index db1536b..716343c 100644
---- a/arch/arm/kernel/sleep.S
-+++ b/arch/arm/kernel/sleep.S
-@@ -130,6 +130,7 @@ ENDPROC(cpu_resume_after_mmu)
- 	.data
- 	.align
- ENTRY(cpu_resume)
-+ARM_BE8(setend be)			@ ensure we are in BE mode
- 	mov	r1, #0
- 	ALT_SMP(mrc p15, 0, r0, c0, c0, 5)
- 	ALT_UP_B(1f)
+ 	if (ctx->target != NULL)
+-		ctx->target[ctx->idx] = inst | (cond << 28);
++		ctx->target[ctx->idx] = inst;
+ 
+ 	ctx->idx++;
+ }
 -- 
 1.8.4.rc3
