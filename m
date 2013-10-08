@@ -1,54 +1,64 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Tue, 8 Oct 2013 19:03:11 +0100
-Subject: [PATCH 2/2] ARM: cci: driver need big endian fixes in asm code
-In-Reply-To: <alpine.LFD.2.03.1310081356280.3023@syhkavp.arg>
-References: <1381207040-1623-1-git-send-email-victor.kamensky@linaro.org>
- <1381207040-1623-3-git-send-email-victor.kamensky@linaro.org>
- <20131008175136.GA3866@localhost.localdomain>
- <alpine.LFD.2.03.1310081356280.3023@syhkavp.arg>
-Message-ID: <20131008180305.GA3919@localhost.localdomain>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Tue, 08 Oct 2013 20:03:10 +0200
+Subject: [PATCH v2 2/2] ARM: Dove: Add the audio device to the Cubox DT
+In-Reply-To: <20131008194232.7d74b9e6@armhf>
+References: <20131008194232.7d74b9e6@armhf>
+Message-ID: <525448DE.5030004@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 08, 2013 at 01:57:48PM -0400, Nicolas Pitre wrote:
-> On Tue, 8 Oct 2013, Dave Martin wrote:
-> 
-> > On Mon, Oct 07, 2013 at 09:37:20PM -0700, Victor Kamensky wrote:
-> > > cci_enable_port_for_self written in asm and it works with h/w
-> > > registers that are in little endian format. When run in big
-> > > endian mode it needs byte swap before/after it writes/reads
-> > > to/from such registers
-> > 
-> > Lorenzo should comment on this if he's not already seen it.
-> > 
-> > > 
-> > > Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
-> > > ---
-> > >  drivers/bus/arm-cci.c | 6 ++++++
-> > >  1 file changed, 6 insertions(+)
-> > > 
-> > > diff --git a/drivers/bus/arm-cci.c b/drivers/bus/arm-cci.c
-> > > index 2009266..6db173e 100644
-> > > --- a/drivers/bus/arm-cci.c
-> > > +++ b/drivers/bus/arm-cci.c
-> > > @@ -281,6 +281,9 @@ asmlinkage void __naked cci_enable_port_for_self(void)
-> > >  	/* Enable the CCI port */
-> > >  "	ldr	r0, [r0, %[offsetof_port_phys]] \n"
-> > >  "	mov	r3, #"__stringify(CCI_ENABLE_REQ)" \n"
-> > > +#ifdef __ARMEB__
-> > > +"	rev	r3, r3 \n"
-> > > +#endif /* __ARMEB__ */
-> > 
-> > Hmmm, this is a bit ugly, but we can't easily use ARM_BE8() here.
-> 
-> In any case, it would be more efficient to swap the CCI_ENABLE_REQ 
-> constant at compile time rather than doing it at run time with an extra 
-> instruction.
+On 10/08/2013 07:42 PM, Jean-Francois Moine wrote:
+> This patch activates the audio device of the Cubox.
+>
+> The audio flow (pin mpp_audio1) is output on both I2S and S/PDIF.
+>
+> The third si5351 clock (#2, pin mpp13) is used as the external clock.
+>
+> Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
+> ---
+>   arch/arm/boot/dts/dove-cubox.dts | 20 ++++++++++++++++++++
+>   1 file changed, 20 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/dove-cubox.dts b/arch/arm/boot/dts/dove-cubox.dts
+> index 022646e..bb38a24 100644
+> --- a/arch/arm/boot/dts/dove-cubox.dts
+> +++ b/arch/arm/boot/dts/dove-cubox.dts
+> @@ -132,3 +132,23 @@
+>   		reg = <0>;
+>   	};
+>   };
+> +
+> +&pinctrl {
+> +	pmx_gpio_13_audio1: pmx-gpio-13-audio1 {
 
-Indeed, but we can't stringify that.
+Jean-Francois,
 
-A different way of wedging it into the assembler would be needed...
-We might need to use ldr= too, which doesn't pay nice with inline asm.
+please name the node "pmx_audio1_extclk: pmx-audio1-extclk"
+and move both to the corresponding section in dove.dtsi.
+We can reuse them on other Dove boards for sure.
 
-Cheers
----Dave
+> +		marvell,pins = "mpp13";
+> +		marvell,function = "audio1";
+> +	};
+> +
+> +	pmx_audio1_i2s1_spdifo: pmx-audio1-i2s1-spdifo {
+> +		marvell,pins = "mpp_audio1";
+> +		marvell,function = "i2s1/spdifo";
+> +	};
+> +};
+> +
+> +&audio1 {
+> +	status = "okay";
+> +	clocks = <&gate_clk 13>, <&si5351 2>;
+> +	clock-names = "internal", "extclk";
+> +	pinctrl-0 = <&pmx_audio1_i2s1_spdifo &pmx_gpio_13_audio1>;
+
+The above needs updated phandles then.
+
+Otherwise,
+
+Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+
+> +	pinctrl-names = "default";
+> +};
+>
