@@ -1,49 +1,45 @@
 From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Wed,  9 Oct 2013 00:34:38 +0200
-Subject: [PATCH 22/23] ARM: cci: driver need big endian fixes in asm code
+Date: Wed,  9 Oct 2013 00:34:39 +0200
+Subject: [PATCH 23/23] ARM: tlb: ASID macro should give 32bit result for BE
+ correct operation
 In-Reply-To: <1381271679-27804-1-git-send-email-ben.dooks@codethink.co.uk>
 References: <1381271679-27804-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <1381271679-27804-23-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <1381271679-27804-24-git-send-email-ben.dooks@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Victor Kamensky <victor.kamensky@linaro.org>
 
-cci_enable_port_for_self written in asm and it works with h/w
-registers that are in little endian format. When run in big
-endian mode it needs byte swap before/after it writes/reads
-to/from such registers
+In order for ASID macro to be used as expression passed to
+inline asm as 'r' operand it needs to give 32 bit unsigned result,
+not unsigned 64bit expression.
 
-CC: Lorenzon Pieralisi <lorenzo.pieralisi@arm.com>
+Otherwise when 64bit ASID is passed to inline assembler statement
+as 'r' operand (32bit) compiler behavior is not well specified.
+For example when __flush_tlb_mm function compiled in big endian
+case, and ASID is passed to tlb_op macro directly, 0 will be passed
+as 'mcr	15, 0, r4, cr8, cr3, {2}' argument in r4, unless ASID
+macro changed to produce 32 bit result.
+
 Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
+Acked-by: Will Deacon <will.deacon@arm.com>
 Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
 ---
- drivers/bus/arm-cci.c | 6 ++++++
- 1 file changed, 6 insertions(+)
+ arch/arm/include/asm/mmu.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/bus/arm-cci.c b/drivers/bus/arm-cci.c
-index 2009266..6db173e 100644
---- a/drivers/bus/arm-cci.c
-+++ b/drivers/bus/arm-cci.c
-@@ -281,6 +281,9 @@ asmlinkage void __naked cci_enable_port_for_self(void)
- 	/* Enable the CCI port */
- "	ldr	r0, [r0, %[offsetof_port_phys]] \n"
- "	mov	r3, #"__stringify(CCI_ENABLE_REQ)" \n"
-+#ifdef __ARMEB__
-+"	rev	r3, r3 \n"
-+#endif /* __ARMEB__ */
- "	str	r3, [r0, #"__stringify(CCI_PORT_CTRL)"] \n"
- 
- 	/* poll the status reg for completion */
-@@ -288,6 +291,9 @@ asmlinkage void __naked cci_enable_port_for_self(void)
- "	ldr	r0, [r1] \n"
- "	ldr	r0, [r0, r1]		@ cci_ctrl_base \n"
- "4:	ldr	r1, [r0, #"__stringify(CCI_CTRL_STATUS)"] \n"
-+#ifdef __ARMEB__
-+"	rev	r1, r1 \n"
-+#endif /* __ARMEB__ */
- "	tst	r1, #1 \n"
- "	bne	4b \n"
- 
+diff --git a/arch/arm/include/asm/mmu.h b/arch/arm/include/asm/mmu.h
+index 6f18da0..64fd151 100644
+--- a/arch/arm/include/asm/mmu.h
++++ b/arch/arm/include/asm/mmu.h
+@@ -16,7 +16,7 @@ typedef struct {
+ #ifdef CONFIG_CPU_HAS_ASID
+ #define ASID_BITS	8
+ #define ASID_MASK	((~0ULL) << ASID_BITS)
+-#define ASID(mm)	((mm)->context.id.counter & ~ASID_MASK)
++#define ASID(mm)	((unsigned int)((mm)->context.id.counter & ~ASID_MASK))
+ #else
+ #define ASID(mm)	(0)
+ #endif
 -- 
 1.8.4.rc3
