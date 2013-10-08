@@ -1,118 +1,228 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 08 Oct 2013 18:33:23 +0200
-Subject: [PATCH 3/8] ARM: l2x0: add Marvell Tauros3 compatible
-In-Reply-To: <52542D64.5010800@gmail.com>
-References: <1381235073-17134-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1381235073-17134-4-git-send-email-sebastian.hesselbarth@gmail.com>
- <20131008134100.GD1412@e106331-lin.cambridge.arm.com>
- <52542D64.5010800@gmail.com>
-Message-ID: <525433D3.2090906@free-electrons.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 8 Oct 2013 12:34:01 -0400
+Subject: [PATCH 1/3] irqchip: irq-dove: Add PMU interrupt controller.
+In-Reply-To: <20131001005441.GM31178@titan.lakedaemon.net>
+References: <1380577122-8841-1-git-send-email-andrew@lunn.ch>
+ <20131001005441.GM31178@titan.lakedaemon.net>
+Message-ID: <20131008163401.GN5402@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/10/2013 18:05, Sebastian Hesselbarth wrote:
-> On 10/08/2013 03:41 PM, Mark Rutland wrote:
->> On Tue, Oct 08, 2013 at 01:24:28PM +0100, Sebastian Hesselbarth wrote:
->>> This add a compatible for the Marvell Tauros3 cache controller which
->>> is compatible with l2x0 cache controllers. While updating the binding
->>> documentation, clean up the list of possible compatibles.
->>>
->>> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
->>> ---
-> [...]
->>> diff --git a/Documentation/devicetree/bindings/arm/l2cc.txt b/Documentation/devicetree/bindings/arm/l2cc.txt
->>> index c0c7626..a1d0cbd 100644
->>> --- a/Documentation/devicetree/bindings/arm/l2cc.txt
->>> +++ b/Documentation/devicetree/bindings/arm/l2cc.txt
->>> @@ -7,20 +7,20 @@ The ARM L2 cache representation in the device tree should be done as follows:
->>>   Required properties:
->>>
->>>   - compatible : should be one of:
->>> -	"arm,pl310-cache"
->>> -	"arm,l220-cache"
->>> -	"arm,l210-cache"
->>> -	"marvell,aurora-system-cache": Marvell Controller designed to be
->>> +  "arm,pl310-cache"
->>> +  "arm,l220-cache"
->>> +  "arm,l210-cache"
->>> +  "bcm,bcm11351-a2-pl310-cache": DEPRECATED by "brcm,bcm11351-a2-pl310-cache"
->>> +  "brcm,bcm11351-a2-pl310-cache": For Broadcom bcm11351 chipset where an
->>> +     offset needs to be added to the address before passing down to the L2
->>> +     cache controller
->>> +  "marvell,aurora-system-cache": Marvell Controller designed to be
->>>        compatible with the ARM one, with system cache mode (meaning
->>>        maintenance operations on L1 are broadcasted to the L2 and L2
->>>        performs the same operation).
->>> -	"marvell,"aurora-outer-cache: Marvell Controller designed to be
->>> -	 compatible with the ARM one with outer cache mode.
->>> -	"brcm,bcm11351-a2-pl310-cache": For Broadcom bcm11351 chipset where an
->>> -	offset needs to be added to the address before passing down to the L2
->>> -	cache controller
->>> -	"bcm,bcm11351-a2-pl310-cache": DEPRECATED by
->>> -	                               "brcm,bcm11351-a2-pl310-cache"
->>> +  "marvell,aurora-outer-cache": Marvell Controller designed to be
->>> +     compatible with the ARM one with outer cache mode.
->>> +  "marvell,tauros3-cache": Marvell Tauros3 cache controller.
->>
->> How does the tauros3 cache differ from the other caches supported by the
->> l2x0 driver?
-> 
-> [added Gregory to Cc]
-> 
-> Good question. I cannot say at this time. I would have guessed that l2cc
-> on Armada 1500 and Armada 370/XP are more or less the same, as both use
-> Marvell's PJ4B CPU. Maybe, Gregory or Thomas can shed some light into
-> this.
-> 
->>>   - cache-unified : Specifies the cache is a unified cache.
->>>   - cache-level : Should be set to 2 for a level 2 cache.
->>>   - reg : Physical base address and size of cache controller's memory mapped
->>> diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
->>> index 447da6f..90c776e 100644
->>> --- a/arch/arm/mm/cache-l2x0.c
->>> +++ b/arch/arm/mm/cache-l2x0.c
->>> @@ -929,6 +929,7 @@ static const struct of_device_id l2x0_ids[] __initconst = {
->>>   	  .data = (void *)&aurora_no_outer_data},
->>>   	{ .compatible = "marvell,aurora-outer-cache",
->>>   	  .data = (void *)&aurora_with_outer_data},
->>> +	{ .compatible = "marvell,tauros3-cache", .data = (void *)&l2x0_data },
->>
->> Are we intending to handle this differently later?
->>
->> Or is it 100% compatible with the pl210 or pl220? We could just require
->> an entry later in the compatible string list instead...
-> 
-> No public documentation, no clear answer.
-> 
-> Tauros3 isn't 100% compatible with any of the ARM l2cc above, it has
-> additional "features" or "bugs" - call it whatever you want.
-> 
-> I am not an l2cc expert, but basically I see two options:
-> a) use (possibly) wrong existing compatible in current mv88de3100.dtsi
->     now and fix later.
-> b) add tauros3 compatible now and add (possible) quirks/marvell-specific
->     properties later.
-> 
-> IMHO b) is very likely to happen as l2x0_of_init in patch 8/8 already 
-> sets bits, I wasn't able to verify in public ARM l2cc docu.
+Thomas (tglx),
 
-I agree with Sebastian. I don't have more information that Sebastian, but
-as it is definitely a different controller of the ones from ARM, it should
-have its own compatible string. Then latter when we will discover new feature
-and/or bugs, we will be able to manage them without requiring people to update
-their dtb. If I understood well it is the philosophy behind the device tree.
-
-Regards,
-
+On Mon, Sep 30, 2013 at 08:54:41PM -0400, Jason Cooper wrote:
+> Thomas et al,
 > 
-> But again, I am very open for suggestions here.
-> 
-> Sebastian
-> 
+> Once you folks are happy with this driver, I can take patches 2 and 3
+> (the dove dts changes).  We have quite a bit of flux in those files this
+> window.
 
+This has a Tested-by now, and we'd like to see this merged for v3.13.
+Do you intend to merge it, or would you like me to take it with your
+Ack?
 
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+thx,
+
+Jason.
+
+> On Mon, Sep 30, 2013 at 11:38:40PM +0200, Andrew Lunn wrote:
+> > Dove has a Power Management Unit with its own interrupt
+> > controller. This is chained on the main interrupt controller.  Add a
+> > driver, making use of generic chip where possible.
+> > 
+> > Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+> > 
+> > cc: devicetree at vger.kernel.org
+> > cc: pawel.moll at arm.com
+> > cc: mark.rutland at arm.com
+> > cc: swarren at wwwdotorg.org
+> > cc: ian.campbell at citrix.com
+> > ---
+> >  .../interrupt-controller/marvell,dove-pmu-intc.txt |  17 +++
+> >  drivers/irqchip/Makefile                           |   1 +
+> >  drivers/irqchip/irq-dove.c                         | 127 +++++++++++++++++++++
+> >  3 files changed, 145 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/interrupt-controller/marvell,dove-pmu-intc.txt
+> >  create mode 100644 drivers/irqchip/irq-dove.c
+> > 
+> > diff --git a/Documentation/devicetree/bindings/interrupt-controller/marvell,dove-pmu-intc.txt b/Documentation/devicetree/bindings/interrupt-controller/marvell,dove-pmu-intc.txt
+> > new file mode 100644
+> > index 0000000..1feb582
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/interrupt-controller/marvell,dove-pmu-intc.txt
+> > @@ -0,0 +1,17 @@
+> > +Marvell Dove Power Management Unit interrupt controller
+> > +
+> > +Required properties:
+> > +- compatible: shall be "marvell,dove-pmu-intc"
+> > +- reg: base address of PMU interrupt registers starting with CAUSE register
+> > +- interrupts: PMU interrupt of the main interrupt controller
+> > +- interrupt-controller: identifies the node as an interrupt controller
+> > +- #interrupt-cells: number of cells to encode an interrupt source, shall be 1
+> > +
+> > +Example:
+> > +	pmu_intc: pmu-interrupt-ctrl at d0050 {
+> > +		compatible = "marvell,dove-pmu-intc";
+> > +		interrupt-controller;
+> > +		#interrupt-cells = <1>;
+> > +		reg = <0xd0050 0x8>;
+> > +		interrupts = <33>;
+> > +	};
+> > diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
+> > index c60b901..f743006 100644
+> > --- a/drivers/irqchip/Makefile
+> > +++ b/drivers/irqchip/Makefile
+> > @@ -1,6 +1,7 @@
+> >  obj-$(CONFIG_IRQCHIP)			+= irqchip.o
+> >  
+> >  obj-$(CONFIG_ARCH_BCM2835)		+= irq-bcm2835.o
+> > +obj-$(CONFIG_ARCH_DOVE)			+= irq-dove.o
+> >  obj-$(CONFIG_ARCH_EXYNOS)		+= exynos-combiner.o
+> >  obj-$(CONFIG_ARCH_MMP)			+= irq-mmp.o
+> >  obj-$(CONFIG_ARCH_MVEBU)		+= irq-armada-370-xp.o
+> > diff --git a/drivers/irqchip/irq-dove.c b/drivers/irqchip/irq-dove.c
+> > new file mode 100644
+> > index 0000000..de66f02
+> > --- /dev/null
+> > +++ b/drivers/irqchip/irq-dove.c
+> > @@ -0,0 +1,127 @@
+> > +/*
+> > + * Marvell Dove SoCs PMU IRQ chip driver.
+> > + *
+> > + * Andrew Lunn <andrew@lunn.ch>
+> > + *
+> > + * This file is licensed under the terms of the GNU General Public
+> > + * License version 2.  This program is licensed "as is" without any
+> > + * warranty of any kind, whether express or implied.
+> > + */
+> > +
+> > +#include <linux/io.h>
+> > +#include <linux/irq.h>
+> > +#include <linux/of.h>
+> > +#include <linux/of_address.h>
+> > +#include <linux/of_irq.h>
+> > +#include <asm/exception.h>
+> > +#include <asm/mach/irq.h>
+> > +
+> > +#include "irqchip.h"
+> > +
+> > +#define DOVE_PMU_IRQ_CAUSE	0x00
+> > +#define DOVE_PMU_IRQ_MASK	0x04
+> > +
+> > +static void dove_pmu_irq_handler(unsigned int irq, struct irq_desc *desc)
+> > +{
+> > +	struct irq_domain *d = irq_get_handler_data(irq);
+> > +	struct irq_chip_generic *gc = irq_get_domain_generic_chip(d, 0);
+> > +	u32 stat = readl_relaxed(gc->reg_base + DOVE_PMU_IRQ_CAUSE) &
+> > +		   gc->mask_cache;
+> > +
+> > +	while (stat) {
+> > +		u32 hwirq = ffs(stat) - 1;
+> > +
+> > +		generic_handle_irq(irq_find_mapping(d, gc->irq_base + hwirq));
+> > +		stat &= ~(1 << hwirq);
+> > +	}
+> > +}
+> > +
+> > +static void pmu_irq_ack(struct irq_data *d)
+> > +{
+> > +	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
+> > +	struct irq_chip_type *ct = irq_data_get_chip_type(d);
+> > +	u32 mask = ~d->mask;
+> > +
+> > +	/*
+> > +	 * The PMU mask register is not RW0C: it is RW.	 This means that
+> > +	 * the bits take whatever value is written to them; if you write
+> > +	 * a '1', you will set the interrupt.
+> > +	 *
+> > +	 * Unfortunately this means there is NO race free way to clear
+> > +	 * these interrupts.
+> > +	 *
+> > +	 * So, let's structure the code so that the window is as small as
+> > +	 * possible.
+> > +	 */
+> > +	irq_gc_lock(gc);
+> > +
+> > +	mask &= irq_reg_readl(gc->reg_base +  ct->regs.ack);
+> > +	irq_reg_writel(mask, gc->reg_base +  ct->regs.ack);
+> > +	irq_gc_unlock(gc);
+> > +}
+> > +
+> > +static int __init dove_pmu_irq_init(struct device_node *np,
+> > +				    struct device_node *parent)
+> > +{
+> > +	unsigned int clr = IRQ_NOREQUEST | IRQ_NOPROBE | IRQ_NOAUTOEN;
+> > +	struct resource r;
+> > +	struct irq_domain *domain;
+> > +	struct irq_chip_generic *gc;
+> > +	int ret, irq, nrirqs = 7;
+> > +
+> > +	domain = irq_domain_add_linear(np, nrirqs,
+> > +				       &irq_generic_chip_ops, NULL);
+> > +	if (!domain) {
+> > +		pr_err("%s: unable to add irq domain\n", np->name);
+> > +		return -ENOMEM;
+> > +	}
+> > +
+> > +	ret = irq_alloc_domain_generic_chips(domain, nrirqs, 1, np->name,
+> > +			     handle_level_irq, clr, 0, IRQ_GC_INIT_MASK_CACHE);
+> > +	if (ret) {
+> > +		pr_err("%s: unable to alloc irq domain gc\n", np->name);
+> > +		return ret;
+> > +	}
+> > +
+> > +	ret = of_address_to_resource(np, 0, &r);
+> > +	if (ret) {
+> > +		pr_err("%s: unable to get resource\n", np->name);
+> > +		return ret;
+> > +	}
+> > +
+> > +	if (!request_mem_region(r.start, resource_size(&r), np->name)) {
+> > +		pr_err("%s: unable to request mem region\n", np->name);
+> > +		return -ENOMEM;
+> > +	}
+> > +
+> > +	/* Map the parent interrupt for the chained handler */
+> > +	irq = irq_of_parse_and_map(np, 0);
+> > +	if (irq <= 0) {
+> > +		pr_err("%s: unable to parse irq\n", np->name);
+> > +		return -EINVAL;
+> > +	}
+> > +
+> > +	gc = irq_get_domain_generic_chip(domain, 0);
+> > +	gc->reg_base = ioremap(r.start, resource_size(&r));
+> > +	if (!gc->reg_base) {
+> > +		pr_err("%s: unable to map resource\n", np->name);
+> > +		return -ENOMEM;
+> > +	}
+> > +
+> > +	gc->chip_types[0].regs.ack = DOVE_PMU_IRQ_CAUSE;
+> > +	gc->chip_types[0].regs.mask = DOVE_PMU_IRQ_MASK;
+> > +	gc->chip_types[0].chip.irq_ack = pmu_irq_ack;
+> > +	gc->chip_types[0].chip.irq_mask = irq_gc_mask_clr_bit;
+> > +	gc->chip_types[0].chip.irq_unmask = irq_gc_mask_set_bit;
+> > +
+> > +	/* mask and clear all interrupts */
+> > +	writel(0, gc->reg_base + DOVE_PMU_IRQ_MASK);
+> > +	writel(0, gc->reg_base + DOVE_PMU_IRQ_CAUSE);
+> > +
+> > +	irq_set_handler_data(irq, domain);
+> > +	irq_set_chained_handler(irq, dove_pmu_irq_handler);
+> > +
+> > +	return 0;
+> > +}
+> > +IRQCHIP_DECLARE(dove_pmu_intc,
+> > +		"marvell,dove-pmu-intc", dove_pmu_irq_init);
+> > -- 
+> > 1.8.4.rc3
+> > 
+> > 
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
