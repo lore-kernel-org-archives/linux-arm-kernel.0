@@ -1,46 +1,46 @@
 From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Wed,  9 Oct 2013 00:34:32 +0200
-Subject: [PATCH 16/23] ARM: net: fix arm instruction endian-ness in
- bpf_jit_32.c
+Date: Wed,  9 Oct 2013 00:34:37 +0200
+Subject: [PATCH 21/23] ARM: mcpm: fix big endian issue in mcpm startup code
 In-Reply-To: <1381271679-27804-1-git-send-email-ben.dooks@codethink.co.uk>
 References: <1381271679-27804-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <1381271679-27804-17-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <1381271679-27804-22-git-send-email-ben.dooks@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use <asm/opcodes.h> to correctly transform instruction byte ordering
-into in-memory ordering.
+From: Victor Kamensky <victor.kamensky@linaro.org>
 
-Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+In big endian mode mcpm_entry_point is first function
+that called on secondaries CPU. First it should switch
+CPU into big endian code.
+
+[ben.dooks at codethink.co.uk: merge fix patch from Victor into this]
+Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
+Acked-by: Nicolas Pitre <nico@linaro.org>
 Reviewed-by: Dave Martin <Dave.Martin@arm.com>
+Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
 ---
- arch/arm/net/bpf_jit_32.c | 6 +++++-
- 1 file changed, 5 insertions(+), 1 deletion(-)
+ arch/arm/common/mcpm_head.S | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/net/bpf_jit_32.c b/arch/arm/net/bpf_jit_32.c
-index f50d223..510d923 100644
---- a/arch/arm/net/bpf_jit_32.c
-+++ b/arch/arm/net/bpf_jit_32.c
-@@ -19,6 +19,7 @@
- #include <linux/if_vlan.h>
- #include <asm/cacheflush.h>
- #include <asm/hwcap.h>
-+#include <asm/opcodes.h>
+diff --git a/arch/arm/common/mcpm_head.S b/arch/arm/common/mcpm_head.S
+index 39c96df..4f88f5e 100644
+--- a/arch/arm/common/mcpm_head.S
++++ b/arch/arm/common/mcpm_head.S
+@@ -15,6 +15,7 @@
  
- #include "bpf_jit_32.h"
+ #include <linux/linkage.h>
+ #include <asm/mcpm.h>
++#include <asm/assembler.h>
  
-@@ -113,8 +114,11 @@ static u32 jit_udiv(u32 dividend, u32 divisor)
+ #include "vlock.h"
  
- static inline void _emit(int cond, u32 inst, struct jit_ctx *ctx)
- {
-+	inst |= (cond << 28);
-+	inst = __opcode_to_mem_arm(inst);
-+
- 	if (ctx->target != NULL)
--		ctx->target[ctx->idx] = inst | (cond << 28);
-+		ctx->target[ctx->idx] = inst;
+@@ -47,6 +48,7 @@
  
- 	ctx->idx++;
- }
+ ENTRY(mcpm_entry_point)
+ 
++ ARM_BE8(setend        be)
+  THUMB(	adr	r12, BSYM(1f)	)
+  THUMB(	bx	r12		)
+  THUMB(	.thumb			)
 -- 
 1.8.4.rc3
