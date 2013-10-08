@@ -1,20 +1,46 @@
 From: moinejf@free.fr (Jean-Francois Moine)
-Date: Tue, 8 Oct 2013 19:40:55 +0200
-Subject: [PATCH v2 0/2] ARM: Dove: Add audio to the DT
-Message-ID: <20131008194055.00fc93c2@armhf>
+Date: Tue, 8 Oct 2013 19:41:19 +0200
+Subject: [PATCH v2 1/2] ARM: Dove: Add the audio devices in DT
+Message-ID: <20131008194119.0cebbe26@armhf>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series adds audio DT to the Dove boards and activates the
-Cubox audio device.
+This patch adds the nodes to instantiate the audio devices of the Dove
+boards.
 
-Full audio in the Cubox will work when the DT extension of the generic
-simple audio card will be complete.
+Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
+---
+ arch/arm/boot/dts/dove.dtsi | 18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
 
-v2:
-- dove.dtsi: change the audio controller compatible string to
-	"marvell,dove-audio" (Thomas Petazzoni)
-- dove-cubox: add the external clock (Sebastian Hesselbarth)
+diff --git a/arch/arm/boot/dts/dove.dtsi b/arch/arm/boot/dts/dove.dtsi
+index cc27916..e177e66 100644
+--- a/arch/arm/boot/dts/dove.dtsi
++++ b/arch/arm/boot/dts/dove.dtsi
+@@ -505,5 +505,23 @@
+ 				phy-handle = <&ethphy>;
+ 			};
+ 		};
++
++		audio0: audio-controller at b0000 {
++			compatible = "marvell,dove-audio";
++			reg = <0xb0000 0x2210>;
++			interrupts = <19>, <20>;
++			clocks = <&gate_clk 12>;
++			clock-names = "internal";
++			status = "disabled";
++		};
++
++		audio1: audio-controller at b4000 {
++			compatible = "marvell,dove-audio";
++			reg = <0xb4000 0x2210>;
++			interrupts = <21>, <22>;
++			clocks = <&gate_clk 13>;
++			clock-names = "internal";
++			status = "disabled";
++		};
+ 	};
+ };
 
 -- 
 Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
