@@ -1,69 +1,77 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 8 Oct 2013 14:10:27 +0200
-Subject: [PATCH 4/6] pinctrl: single: Add support for wake-up interrupts
-In-Reply-To: <20131003054221.8941.87801.stgit@localhost>
-References: <20131003054104.8941.88857.stgit@localhost>
- <20131003054221.8941.87801.stgit@localhost>
-Message-ID: <CACRpkda5-dxD+-4mgY6v90awxQhHpNePb5uhWHusb7jf-j5s-g@mail.gmail.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Tue,  8 Oct 2013 14:24:25 +0200
+Subject: [PATCH 0/8] ARM: Initial support for Marvell Berlin SoCs
+Message-ID: <1381235073-17134-1-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 3, 2013 at 7:42 AM, Tony Lindgren <tony@atomide.com> wrote:
+This patch set add initial support for Marvell Berlin SoCs (88DE3xxx),
+e.g. Armada 1000, Armada 1500, Armada 1500-mini. It is based on two
+RFCs [1][2] sent earlier.
 
-> This patch adds support for interrupts in a way that
-> should be pretty generic, and works for the omaps that
-> support wake-up interrupts. On omaps, there's an
-> interrupt enable and interrupt status bit for each pin.
+Currently, initial support just means that the kernel boots on one
+CPU, sets up irq, timers, and UART. As Berlin SoCs share some amount
+of IP with Marvell PXA/MMP[23] SoCs plus some Synopsys DW IP, I expect
+functionality to grow quite quickly.
 
-So to be clear: is this enable and status bit in the *same*
-register as all other settings? Then it warrants having this
-under pinctrl-single still and I feel a bit better about this.
+Compared to last RFC sent, this patch set now depends on ARM's arch-wide
+call to of_clk_init [3] plus some fixes already pulled for Synopsys DW
+timers [4]. It is based on v3.12-rc4 with those two dependencies pulled
+in.
 
-Second: how does this relate to the case where say
-gpio-omap is using the same pins as a back-end (this
-is a real usecase right)?
+I also prepared a branch for those able to test on a jail-broken GoogleTV
+or similar with open boot loader at
+https://github.com/shesselba/linux-berlin.git berlin-v1
 
-So gpio-omap already supports gpio_to_irq() and
-it does not support enable_irq_wake() on the GPIO
-lines as well.
+[1] https://lkml.org/lkml/2013/8/16/626
+[2] https://lkml.org/lkml/2013/8/27/608
+[3] http://www.spinics.net/lists/arm-kernel/msg276175.html
+[4] http://www.spinics.net/lists/arm-kernel/msg277763.html
 
-How does this play together? Is it like the pins have a set
-of wakeup IRQs and then the GPIO block has *another*
-set of wakeup IRQs?
+Sebastian Hesselbarth (8):
+  irqchip: add DesignWare APB ICTL interrupt controller
+  MAINTAINERS: add ARM Marvell Berlin SoC
+  ARM: l2x0: add Marvell Tauros3 compatible
+  ARM: add Marvell Berlin SoC familiy to Marvell doc
+  ARM: add Marvell Berlin and Armada 1500 to multi_v7_defconfig
+  ARM: add Marvell Berlin UART0 lowlevel debug
+  ARM: add Armada 1500 and Sony NSZ-GS7 device tree files
+  ARM: add initial support for Marvell Berlin SoCs
 
-And if you do enable_irq_wake() on the GPIO line,
-should this not fall through to the pinctrl driver, so we
-should add pinctrl_gpio_enable_wake() and
-pinctrl_gpio_disable_wake() just like we have
-pinctrl_gpio_direction_input() and friends today,
-so that this request falls through to the pinctrl driver
-when a wakeup on a certain GPIO line is requested?
+ Documentation/arm/Marvell/README                   |   29 +++
+ Documentation/devicetree/bindings/arm/l2cc.txt     |   22 +-
+ .../devicetree/bindings/arm/marvell,berlin.txt     |   23 ++
+ .../interrupt-controller/snps,dw-apb-ictl.txt      |   29 +++
+ MAINTAINERS                                        |    6 +
+ arch/arm/Kconfig                                   |    2 +
+ arch/arm/Kconfig.debug                             |   10 +
+ arch/arm/Makefile                                  |    1 +
+ arch/arm/boot/dts/Makefile                         |    2 +
+ arch/arm/boot/dts/mv88de3100-sony-nsz-gs7.dts      |   29 +++
+ arch/arm/boot/dts/mv88de3100.dtsi                  |  227 ++++++++++++++++++++
+ arch/arm/configs/multi_v7_defconfig                |    2 +
+ arch/arm/mach-berlin/Kconfig                       |   24 +++
+ arch/arm/mach-berlin/Makefile                      |    1 +
+ arch/arm/mach-berlin/berlin.c                      |   39 ++++
+ arch/arm/mm/cache-l2x0.c                           |    1 +
+ drivers/irqchip/Kconfig                            |    4 +
+ drivers/irqchip/Makefile                           |    1 +
+ drivers/irqchip/irq-dw-apb-ictl.c                  |  142 ++++++++++++
+ 19 files changed, 583 insertions(+), 11 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/marvell,berlin.txt
+ create mode 100644 Documentation/devicetree/bindings/interrupt-controller/snps,dw-apb-ictl.txt
+ create mode 100644 arch/arm/boot/dts/mv88de3100-sony-nsz-gs7.dts
+ create mode 100644 arch/arm/boot/dts/mv88de3100.dtsi
+ create mode 100644 arch/arm/mach-berlin/Kconfig
+ create mode 100644 arch/arm/mach-berlin/Makefile
+ create mode 100644 arch/arm/mach-berlin/berlin.c
+ create mode 100644 drivers/irqchip/irq-dw-apb-ictl.c
 
-Now gpio-omap.c does not seem to use the pinctrl
-back-end commands, instead of using e.g.
-pinctrl_gpio_request() and GPIO to pin ranges it
-seems to use this hack:
-
-static void _enable_gpio_module(struct gpio_bank *bank, unsigned offset)
-{
-        if (bank->regs->pinctrl) {
-                void __iomem *reg = bank->base + bank->regs->pinctrl;
-
-                /* Claim the pin for MPU */
-                __raw_writel(__raw_readl(reg) | (1 << offset), reg);
-        }
-
-Can't we please make the OMAP GPIO driver use the
-pinctrl back-end with gpio ranges properly *before* we proceed
-to doing this kind of stuff? I think it is already looking
-like a bit of layered hacks :-(
-
-Haojian is already using the pinctrl-single as backend to
-another GPIO controller (I think it's pinctrl-pl061.c) so surely
-this should be possible to do right.
-
-IIRC there are also other OMAP GPIO blocks so we need
-to look@the large picture here, for all of them.
-
-Yours,
-Linus Walleij
+---
+Cc: Jason Cooper <jason@lakedaemon.net>
+Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-kernel at vger.kernel.org
+-- 
+1.7.10.4
