@@ -1,34 +1,36 @@
-From: sachin.kamat@linaro.org (Sachin Kamat)
-Date: Tue,  8 Oct 2013 16:12:35 +0530
-Subject: [PATCH 1/1] iommu: arm-smmu: Use devm_ioremap_resource
-Message-ID: <1381228955-24313-1-git-send-email-sachin.kamat@linaro.org>
+From: jean.pihet@linaro.org (Jean Pihet)
+Date: Tue, 8 Oct 2013 12:44:32 +0200
+Subject: [PATCH 3/4] perf tools: Check libunwind for availability of dwarf
+ parsing feature
+In-Reply-To: <20130926124829.GA3284@krava.brq.redhat.com>
+References: <1380195398-4402-1-git-send-email-jean.pihet@linaro.org>
+ <1380195398-4402-4-git-send-email-jean.pihet@linaro.org>
+ <20130926124829.GA3284@krava.brq.redhat.com>
+Message-ID: <CAFrcx1nDe6mhxEuU4ROJGOmGFaYtVnnhXYirkmhRb1NEecNhtw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-devm_request_and_ioremap is deprecated. Use devm_ioremap_resource
-instead.
+Hi,
 
-Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
----
- drivers/iommu/arm-smmu.c |    6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+On 26 September 2013 14:48, Jiri Olsa <jolsa@redhat.com> wrote:
+> On Thu, Sep 26, 2013 at 01:36:37PM +0200, Jean Pihet wrote:
+>> The newly added dwarf unwinding feature [1] requires:
+>> . a recent version (>= 1.1) of libunwind,
+>> . libunwind to be configured with --enable-debug-frame.
+>>
+>> [1] http://www.spinics.net/lists/kernel/msg1598951.html
+>>
+>> Add the corresponding API tests in the feature check list.
+>
+> Acked-by: Jiri Olsa <jolsa@redhat.com>
+>
+> thanks,
+> jirka
 
-diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index 181c9ba..b564930 100644
---- a/drivers/iommu/arm-smmu.c
-+++ b/drivers/iommu/arm-smmu.c
-@@ -1787,9 +1787,9 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
- 	}
- 
- 	smmu->size = resource_size(res);
--	smmu->base = devm_request_and_ioremap(dev, res);
--	if (!smmu->base)
--		return -EADDRNOTAVAIL;
-+	smmu->base = devm_ioremap_resource(dev, res);
-+	if (IS_ERR(smmu->base))
-+		return PTR_ERR(smmu->base);
- 
- 	if (of_property_read_u32(dev->of_node, "#global-interrupts",
- 				 &smmu->num_global_irqs)) {
--- 
-1.7.9.5
+Thanks for the ack!
+
+Is it possible to get an ack from the perf core maintainers?
+Also, is the patch going in Will's tree?
+
+Regards,
+Jean
