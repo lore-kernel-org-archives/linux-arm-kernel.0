@@ -1,39 +1,91 @@
-From: andreas.herrmann@calxeda.com (Andreas Herrmann)
-Date: Tue, 8 Oct 2013 17:20:08 +0200
-Subject: [PATCH 3/5] iommu/arm-smmu: Introduce stream ID masking
-In-Reply-To: <20131008151007.GD21189@mudshark.cambridge.arm.com>
-References: <1381224444-27303-1-git-send-email-andreas.herrmann@calxeda.com>
- <1381224444-27303-4-git-send-email-andreas.herrmann@calxeda.com>
- <20131008151007.GD21189@mudshark.cambridge.arm.com>
-Message-ID: <20131008152008.GE2935@alberich>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 8 Oct 2013 10:27:44 -0500
+Subject: [RFC] clk: add flags to distinguish xtal clocks
+In-Reply-To: <20131007074424.7445.52119@quantum>
+References: <1372971912-10877-1-git-send-email-coelho@ti.com>
+ <20130704222538.10823.2559@quantum>
+ <1372977465.21065.136.camel@cumari.coelho.fi>
+ <20130704231953.10823.94331@quantum>
+ <1373010853.21065.159.camel@cumari.coelho.fi>
+ <1375105842.20048.18.camel@cumari.coelho.fi>
+ <20131007074424.7445.52119@quantum>
+Message-ID: <20131008152743.GB13128@radagast>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 08, 2013 at 11:10:07AM -0400, Will Deacon wrote:
-> On Tue, Oct 08, 2013 at 10:27:22AM +0100, Andreas Herrmann wrote:
-> > Ie. use a mask based on smr_mask_bits to map all stream IDs of an SMMU
-> > to one context.
+Hi,
+
+Fixing Luca's address since he left TI
+
+On Mon, Oct 07, 2013 at 12:44:24AM -0700, Mike Turquette wrote:
+> Quoting Luciano Coelho (2013-07-29 06:50:42)
+> > Hi Mike,
 > > 
-> > This behaviour is controlled per SMMU node with DT property
-> > "arm,smmu-mask-stream-ids" and is only allowed if just a single master
-> > is attached to an SMMU. If the option is specified, all stream-ids
-> > that are provided in DT for the single master have no relevance.
+> > On Fri, 2013-07-05 at 10:54 +0300, Luciano Coelho wrote:
+> > > On Thu, 2013-07-04 at 16:19 -0700, Mike Turquette wrote:
+> > > > Quoting Luciano Coelho (2013-07-04 15:37:45)
+> > > > > On Thu, 2013-07-04 at 15:25 -0700, Mike Turquette wrote:
+> > > > > > Or is it the same clock input and basically the problem is that you need
+> > > > > > to know what kind of waveform to expect (e.g. square versus sine)?
+> > > > > 
+> > > > > It's the same clock input in the chip's perspective.  One clock input
+> > > > > that can be any of the combinations I mentioned above.  Again, I'm not
+> > > > > familiar with clocks, so I guess the square vs. sine explanation is
+> > > > > plausible.  What I could see in the firmware is that it handles the
+> > > > > clocks differently if they're xtal or not.
+> > > > 
+> > > > OMAP has a similar thing where sys_clkin (the fast reference clock for
+> > > > the chip) can be 19.2, 26, 38.4, etc. This is easy to handle since only
+> > > > the rates matter.
+> > > 
+> > > Right, this part is easy and I already have the code for that.  What I'm
+> > > missing is a way to pass this XTAL flag to the chip.
+> > > 
+> > > 
+> > > > In your case you need some extra metadata to know what to do. I'm really
+> > > > not sure if CLK_IS_TYPE_XTAL is the most useful form this metadata can
+> > > > take. It would be best to know if the waveform is what you really need
+> > > > to know, or perhaps something else. For instance you might be affected
+> > > > by some clock signal stabilization time. Can you talk to your hardware
+> > > > guys and figure it out? I'd rather model the actual needs instead of
+> > > > just tossing a flag in there.
+> > > 
+> > > I get your point.  I have tried to investigate how this flag is used by
+> > > the firmware and I could see that it is used to set different "buffer
+> > > gains" and "delays" when waking up (I guess this means when the clock is
+> > > starting, so probably related to stabilization time).  They specify two
+> > > "modes", "boost" and "normal" and use different delay values for each.
 > > 
-> > This is useful/convenient if a master has more than 8 stream-ids or if
-> > not all stream-ids are known for a master device.
+> > I tried but I couldn't find any more information on how exactly this
+> > works.  But since this change is really simple and there seems to be
+> > other people who need the same information, couldn't we add it as is and
+> > try to figure out more specific information about the clocks later on?
+> > 
+> > Even if XTAL is not that useful if we know the other details, at least
+> > it wouldn't hurt to have the flag there anyway.
 > 
-> Hmmm, this really scares me. What's the use-case? I worry about people
-> inadvertently putting devices into an iommu domain because they happen to be
-> included in a mask. Your solution seems to be targetting a single master
-> with lots of IDs -- is this a PCI RC?
+> Luca,
+> 
+> By any chance did you come to a different solution for this problem? I
+> can take the patch, but I do not feel like we're solving the right
+> problem the right way.
+> 
+> If not I will take it for 3.13.
+> 
+> Regards,
+> Mike
+> 
+> > 
+> > --
+> > Cheers,
+> > Luca.
 
-No, it's the sata device. It has 0xf as smr_mask_bits.
-
-But it's just one device and it (usually) should be mapped to one
-context -- no matter how many StreamIDs are really used.
-
-(PCI RC has also 0xf but there it's clear there can be multiple devices
-and the masking should not be done.)
-
-
-Andreas
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131008/d06bb43a/attachment.sig>
