@@ -1,32 +1,36 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 8 Oct 2013 10:34:13 +0100
-Subject: [RFC] ASoC: pcm: Trigger all commands on error
-In-Reply-To: <20131008082933.GA19005@pengutronix.de>
-References: <1380883997-18236-1-git-send-email-mpa@pengutronix.de>
- <20131007172706.GS21581@sirena.org.uk>
- <20131008082933.GA19005@pengutronix.de>
-Message-ID: <20131008093413.GX21581@sirena.org.uk>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 8 Oct 2013 11:36:21 +0200
+Subject: [PATCH v2] ARM: sunxi: dts: Add support for the cubieboard3, the
+ CubieTruck
+In-Reply-To: <1381220552-3123-1-git-send-email-oliver+list@schinagl.nl>
+References: <1381220552-3123-1-git-send-email-oliver+list@schinagl.nl>
+Message-ID: <20131008093621.GC3041@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 08, 2013 at 10:29:33AM +0200, Markus Pargmann wrote:
+On Tue, Oct 08, 2013 at 10:22:32AM +0200, oliver+list at schinagl.nl wrote:
+> From: Oliver Schinagl <oliver@schinagl.nl>
+> 
+> Cubietech introduced a new cubieboard, the CubieTruck. This board added
+> more output connectors and features 2 GiB of RAM and a Gigabit PHY.
+> 
+> Tested are are uart0 and LEDS which both work as expected.
+> 
+> Signed-off-by: Oliver Schinagl <oliver@schinagl.nl>
 
-> To make proper error handling and only STOP functions that successfully
-> started, we have to store the state of each function. The command error
-> handling is done in pcm_native.c so we don't have any influence on that.
+Applied to my sunxi/dt-for-3.13 branch.
 
-I meant just unwinding the things done in the trigger call.
+Thanks!
+Maxime
 
-> Another possibility is to explicitly allow multiple _STOPs. Then I could
-> fix the driver to store the clock state. But I would prefer a generic
-> solution.
-
-You're going to have to handle this anyway to be robust - what happens
-if it's the clock enable that fails?
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131008/bebd02dd/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131008/28d0afa5/attachment-0001.sig>
