@@ -1,46 +1,98 @@
 From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Wed,  9 Oct 2013 00:34:37 +0200
-Subject: [PATCH 21/23] ARM: mcpm: fix big endian issue in mcpm startup code
+Date: Wed,  9 Oct 2013 00:34:33 +0200
+Subject: [PATCH 17/23] ARM: Correct BUG() assembly to ensure it is
+ endian-agnostic
 In-Reply-To: <1381271679-27804-1-git-send-email-ben.dooks@codethink.co.uk>
 References: <1381271679-27804-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <1381271679-27804-22-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <1381271679-27804-18-git-send-email-ben.dooks@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Victor Kamensky <victor.kamensky@linaro.org>
+Currently BUG() uses .word or .hword to create the necessary illegal
+instructions. However if we are building BE8 then these get swapped
+by the linker into different illegal instructions in the text. This
+means that the BUG() macro does not get trapped properly.
 
-In big endian mode mcpm_entry_point is first function
-that called on secondaries CPU. First it should switch
-CPU into big endian code.
+Change to using <asm/opcodes.h> to provide the necessary ARM instruction
+building as we cannot rely on gcc/gas having the `.inst` instructions
+which where added to try and resolve this issue (reported by Dave Martin
+<Dave.Martin@arm.com>).
 
-[ben.dooks at codethink.co.uk: merge fix patch from Victor into this]
-Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
-Acked-by: Nicolas Pitre <nico@linaro.org>
-Reviewed-by: Dave Martin <Dave.Martin@arm.com>
 Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+Reviewed-by: Dave Martin <Dave.Martin@arm.com>
 ---
- arch/arm/common/mcpm_head.S | 2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm/include/asm/bug.h | 10 ++++++----
+ arch/arm/kernel/traps.c    |  8 +++++---
+ 2 files changed, 11 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/common/mcpm_head.S b/arch/arm/common/mcpm_head.S
-index 39c96df..4f88f5e 100644
---- a/arch/arm/common/mcpm_head.S
-+++ b/arch/arm/common/mcpm_head.S
-@@ -15,6 +15,7 @@
+diff --git a/arch/arm/include/asm/bug.h b/arch/arm/include/asm/bug.h
+index 7af5c6c..b274bde 100644
+--- a/arch/arm/include/asm/bug.h
++++ b/arch/arm/include/asm/bug.h
+@@ -2,6 +2,8 @@
+ #define _ASMARM_BUG_H
  
  #include <linux/linkage.h>
- #include <asm/mcpm.h>
-+#include <asm/assembler.h>
++#include <linux/types.h>
++#include <asm/opcodes.h>
  
- #include "vlock.h"
+ #ifdef CONFIG_BUG
  
-@@ -47,6 +48,7 @@
+@@ -12,10 +14,10 @@
+  */
+ #ifdef CONFIG_THUMB2_KERNEL
+ #define BUG_INSTR_VALUE 0xde02
+-#define BUG_INSTR_TYPE ".hword "
++#define BUG_INSTR(__value) __inst_thumb16(__value)
+ #else
+ #define BUG_INSTR_VALUE 0xe7f001f2
+-#define BUG_INSTR_TYPE ".word "
++#define BUG_INSTR(__value) __inst_arm(__value)
+ #endif
  
- ENTRY(mcpm_entry_point)
  
-+ ARM_BE8(setend        be)
-  THUMB(	adr	r12, BSYM(1f)	)
-  THUMB(	bx	r12		)
-  THUMB(	.thumb			)
+@@ -33,7 +35,7 @@
+ 
+ #define __BUG(__file, __line, __value)				\
+ do {								\
+-	asm volatile("1:\t" BUG_INSTR_TYPE #__value "\n"	\
++	asm volatile("1:\t" BUG_INSTR(__value) "\n"  \
+ 		".pushsection .rodata.str, \"aMS\", %progbits, 1\n" \
+ 		"2:\t.asciz " #__file "\n" 			\
+ 		".popsection\n" 				\
+@@ -48,7 +50,7 @@ do {								\
+ 
+ #define __BUG(__file, __line, __value)				\
+ do {								\
+-	asm volatile(BUG_INSTR_TYPE #__value);			\
++	asm volatile(BUG_INSTR(__value) "\n");			\
+ 	unreachable();						\
+ } while (0)
+ #endif  /* CONFIG_DEBUG_BUGVERBOSE */
+diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
+index caf96da..6125f25 100644
+--- a/arch/arm/kernel/traps.c
++++ b/arch/arm/kernel/traps.c
+@@ -342,15 +342,17 @@ void arm_notify_die(const char *str, struct pt_regs *regs,
+ int is_valid_bugaddr(unsigned long pc)
+ {
+ #ifdef CONFIG_THUMB2_KERNEL
+-	unsigned short bkpt;
++	u16 bkpt;
++	u16 insn = __opcode_to_mem_thumb16(BUG_INSTR_VALUE);
+ #else
+-	unsigned long bkpt;
++	u32 bkpt;
++	u32 insn = __opcode_to_mem_arm(BUG_INSTR_VALUE);
+ #endif
+ 
+ 	if (probe_kernel_address((unsigned *)pc, bkpt))
+ 		return 0;
+ 
+-	return bkpt == BUG_INSTR_VALUE;
++	return bkpt == insn;
+ }
+ 
+ #endif
 -- 
 1.8.4.rc3
