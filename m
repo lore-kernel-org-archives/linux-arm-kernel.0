@@ -1,35 +1,35 @@
-From: sachin.kamat@linaro.org (Sachin Kamat)
-Date: Tue,  8 Oct 2013 16:47:48 +0530
-Subject: [PATCH 10/10] clk: max77686: Remove redundant break
-In-Reply-To: <1381231068-6053-1-git-send-email-sachin.kamat@linaro.org>
-References: <1381231068-6053-1-git-send-email-sachin.kamat@linaro.org>
-Message-ID: <1381231068-6053-10-git-send-email-sachin.kamat@linaro.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 8 Oct 2013 13:23:00 +0200
+Subject: [RFC PATCH 1/6] DRIVERS: IRQCHIP: IRQ-GIC: Add support for
+ routable irqs
+In-Reply-To: <524987A3.4090204@arm.com>
+References: <1380549564-31045-1-git-send-email-r.sricharan@ti.com>
+ <1380549564-31045-2-git-send-email-r.sricharan@ti.com>
+ <524987A3.4090204@arm.com>
+Message-ID: <CACRpkdac5iPqwv2Wb2uksn=cYtS0r=1+tSr4Cre2Xun0JBKzpA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-'break' after 'goto' is redundant. Remove it.
+On Mon, Sep 30, 2013 at 4:16 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> On 30/09/13 14:59, Sricharan R wrote:
+>> In some socs the gic can be preceded by a crossbar IP which
+>> routes the peripheral interrupts to the gic inputs. The peripheral
+>> interrupts are associated with a fixed crossbar input line and the
+>> crossbar routes that to one of the free gic input line.
+>>
+>> The DT entries for peripherals provides the fixed crossbar input line
+>> as its interrupt number and the mapping code should associate this with
+>> a free gic input line. This patch adds the support inside the gic irqchip
+>> to handle such routable irqs. The routable irqs are registered in a linear
+>> domain. The registered routable domain's callback should be implemented
+>> to get a free irq and to configure the IP to route it.
+>
+> Isn't this just another chained interrupt controller? How is it GIC
+> specific?
 
-Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
-Cc: Jonghwa Lee <jonghwa3.lee@samsung.com>
----
- drivers/clk/clk-max77686.c |    2 --
- 1 file changed, 2 deletions(-)
+I thought so from the beginning but I was dead wrong, as pointed out
+by tglx it is basically a hardware .map function, so its usecase will map
+to the irqdomain .map/.unmap so to say.
 
-diff --git a/drivers/clk/clk-max77686.c b/drivers/clk/clk-max77686.c
-index 9f57bc3..b4a1a97 100644
---- a/drivers/clk/clk-max77686.c
-+++ b/drivers/clk/clk-max77686.c
-@@ -157,11 +157,9 @@ static int max77686_clk_probe(struct platform_device *pdev)
- 			case MAX77686_CLK_AP:
- 				dev_err(&pdev->dev, "Fail to register CLK_AP\n");
- 				goto err_clk_ap;
--				break;
- 			case MAX77686_CLK_CP:
- 				dev_err(&pdev->dev, "Fail to register CLK_CP\n");
- 				goto err_clk_cp;
--				break;
- 			case MAX77686_CLK_PMIC:
- 				dev_err(&pdev->dev, "Fail to register CLK_PMIC\n");
- 				goto err_clk_pmic;
--- 
-1.7.9.5
+Yours,
+Linus Walleij
