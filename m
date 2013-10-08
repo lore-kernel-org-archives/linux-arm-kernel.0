@@ -1,60 +1,47 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 8 Oct 2013 10:51:48 +0100
-Subject: [PATCH 3/6] ARM: integrator: delete non-devicetree boot path
-In-Reply-To: <1380816202-3128-1-git-send-email-linus.walleij@linaro.org>
-References: <1380816202-3128-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <20131008095148.GD28972@e106331-lin.cambridge.arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 8 Oct 2013 10:49:39 +0100
+Subject: [PATCH 5/5] DRM: Armada: add support for drm tda19988 driver
+In-Reply-To: <20131008111913.09bfe93e@armhf>
+References: <20131006220728.GG12758@n2100.arm.linux.org.uk>
+ <E1VSwYO-0000iT-CU@rmk-PC.arm.linux.org.uk> <20131007111807.5e86ea6e@armhf>
+ <20131007094404.GI12758@n2100.arm.linux.org.uk>
+ <20131007124820.2189a4c3@armhf>
+ <20131007110902.GL12758@n2100.arm.linux.org.uk>
+ <CAF6AEGsqGYj7_tZdzrsmUxExs6wm838dYPFhBdc8wqVC6mTxmg@mail.gmail.com>
+ <20131008111913.09bfe93e@armhf>
+Message-ID: <20131008094939.GD25034@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[Adding devicetree to Cc]
+On Tue, Oct 08, 2013 at 11:19:13AM +0200, Jean-Francois Moine wrote:
+> The Cubox is an open platform, and I use it just like a desktop PC.
+> When its required drivers will be in the mainline, I will do the same
+> as I do with PCs: I will not recompile a specific kernel each time
+> there are kernel bugs or security issues. Instead, I will just upgrade
+> my system from my distributor (Debian), and, in the packages, there
+> will be a generic mvebu kernel as there is already one for Marvell
+> Armada 370/xp, Freescale iMX5x/iMX6 (linux-image-3.10-3-armmp).
+> But, for that, all the Cubox specific stuff must be described in a DT.
 
-On Thu, Oct 03, 2013 at 05:03:22PM +0100, Linus Walleij wrote:
-> The Device Tree boot path now supports everything the ATAG
-> boot can provide, and the two are equivalent. This deletes
-> the ATAG boot path from the Integrator/AP and
-> Integrator/CP platforms to move them on to the future.
-> 
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
->  arch/arm/Kconfig                         |   1 +
->  arch/arm/mach-integrator/core.c          |  57 ----------
->  arch/arm/mach-integrator/integrator_ap.c | 135 ------------------------
->  arch/arm/mach-integrator/integrator_cp.c | 173 -------------------------------
->  arch/arm/mach-integrator/pci_v3.c        | 122 +++++-----------------
->  5 files changed, 25 insertions(+), 463 deletions(-)
-> 
+Which scenario is better:
 
-[...]
+1. To have something in mainline which is capable of driving the hardware,
+   but may need some additional work to make it useful for DT based setups.
 
-> +static int __init pci_v3_probe(struct platform_device *pdev)
->  {
-> +       struct device_node *np = pdev->dev.of_node;
->         struct of_pci_range_parser parser;
->         struct of_pci_range range;
->         struct resource *res;
->         int irq, ret;
-> 
-> +       /* Remap the Integrator system controller */
-> +       ap_syscon_base = ioremap(INTEGRATOR_SC_BASE, 0x100);
+or
 
-It seems a shame that this didn't get described in the DT. This hasn't
-been fully moved over...
+2. To have nothing.
 
-> +       if (!ap_syscon_base) {
-> +               dev_err(&pdev->dev, "unable to remap the AP syscon for PCIv3\n");
-> +               return -ENODEV;
-> +       }
-> +
-> +       /* Device tree probe path */
-> +       if (!np) {
-> +               dev_err(&pdev->dev, "no device tree node for PCIv3\n");
-> +               return -ENODEV;
-> +       }
+Now, you may prefer to have nothing, but personally, I prefer there to be
+forward progress.  Forward progress means getting some kind of DRM driver
+into mainline.  Yes, it may not work with DT setups yet, but - as per
+the discussions that have happened _endlessly_ on this topic, it's
+something that can be resolved at a later date.
 
-We didn't unmap the syscon registers, yet we mapped them here. Either
-we've got a useless mapping, or we're mapping it from the wrong block of
-code...
+We _still_ haven't worked out how to properly deal with the TDA998x
+driver (or indeed any DRM based outputs) in a DT based setup, and all
+the time that problem exists, it won't be possible to write a proper
+stable DT binding for this.
 
-Cheers,
-Mark.
+So please, get off your hobby horse about this and allow us to make some
+modicum of progress.
