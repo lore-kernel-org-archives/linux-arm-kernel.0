@@ -1,35 +1,35 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 8 Oct 2013 13:23:00 +0200
-Subject: [RFC PATCH 1/6] DRIVERS: IRQCHIP: IRQ-GIC: Add support for
- routable irqs
-In-Reply-To: <524987A3.4090204@arm.com>
-References: <1380549564-31045-1-git-send-email-r.sricharan@ti.com>
- <1380549564-31045-2-git-send-email-r.sricharan@ti.com>
- <524987A3.4090204@arm.com>
-Message-ID: <CACRpkdac5iPqwv2Wb2uksn=cYtS0r=1+tSr4Cre2Xun0JBKzpA@mail.gmail.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Tue, 08 Oct 2013 13:24:44 +0200
+Subject: [PATCH] clocksource: em_sti: convert to clk_prepare/unprepare
+In-Reply-To: <1381222888-4199-2-git-send-email-horms+renesas@verge.net.au>
+References: <1381222888-4199-1-git-send-email-horms+renesas@verge.net.au>
+ <1381222888-4199-2-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <5253EB7C.9070700@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 30, 2013 at 4:16 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> On 30/09/13 14:59, Sricharan R wrote:
->> In some socs the gic can be preceded by a crossbar IP which
->> routes the peripheral interrupts to the gic inputs. The peripheral
->> interrupts are associated with a fixed crossbar input line and the
->> crossbar routes that to one of the free gic input line.
->>
->> The DT entries for peripherals provides the fixed crossbar input line
->> as its interrupt number and the mapping code should associate this with
->> a free gic input line. This patch adds the support inside the gic irqchip
->> to handle such routable irqs. The routable irqs are registered in a linear
->> domain. The registered routable domain's callback should be implemented
->> to get a free irq and to configure the IP to route it.
+On 10/08/2013 11:01 AM, Simon Horman wrote:
+> From: Shinya Kuribayashi <shinya.kuribayashi.px@renesas.com>
 >
-> Isn't this just another chained interrupt controller? How is it GIC
-> specific?
+> Add calls to clk_prepare and unprepare so that EMMA Mobile EV2 can
+> migrate to the common clock framework.
+>
+> Signed-off-by: Shinya Kuribayashi <shinya.kuribayashi.px@renesas.com>
+> Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+> Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+> Acked-by: Magnus Damm <damm@opensource.se>
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> ---
 
-I thought so from the beginning but I was dead wrong, as pointed out
-by tglx it is basically a hardware .map function, so its usecase will map
-to the irqdomain .map/.unmap so to say.
+Applied to my tree for 3.13
 
-Yours,
-Linus Walleij
+Thanks !
+
+   -- Daniel
+
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
