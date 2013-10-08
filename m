@@ -1,64 +1,51 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Tue, 08 Oct 2013 20:03:10 +0200
-Subject: [PATCH v2 2/2] ARM: Dove: Add the audio device to the Cubox DT
-In-Reply-To: <20131008194232.7d74b9e6@armhf>
-References: <20131008194232.7d74b9e6@armhf>
-Message-ID: <525448DE.5030004@gmail.com>
+Date: Tue, 08 Oct 2013 20:03:44 +0200
+Subject: [PATCH v2 1/2] ARM: Dove: Add the audio devices in DT
+In-Reply-To: <20131008194119.0cebbe26@armhf>
+References: <20131008194119.0cebbe26@armhf>
+Message-ID: <52544900.3020600@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/08/2013 07:42 PM, Jean-Francois Moine wrote:
-> This patch activates the audio device of the Cubox.
->
-> The audio flow (pin mpp_audio1) is output on both I2S and S/PDIF.
->
-> The third si5351 clock (#2, pin mpp13) is used as the external clock.
+On 10/08/2013 07:41 PM, Jean-Francois Moine wrote:
+> This patch adds the nodes to instantiate the audio devices of the Dove
+> boards.
 >
 > Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
 > ---
->   arch/arm/boot/dts/dove-cubox.dts | 20 ++++++++++++++++++++
->   1 file changed, 20 insertions(+)
+>   arch/arm/boot/dts/dove.dtsi | 18 ++++++++++++++++++
+>   1 file changed, 18 insertions(+)
 >
-> diff --git a/arch/arm/boot/dts/dove-cubox.dts b/arch/arm/boot/dts/dove-cubox.dts
-> index 022646e..bb38a24 100644
-> --- a/arch/arm/boot/dts/dove-cubox.dts
-> +++ b/arch/arm/boot/dts/dove-cubox.dts
-> @@ -132,3 +132,23 @@
->   		reg = <0>;
+> diff --git a/arch/arm/boot/dts/dove.dtsi b/arch/arm/boot/dts/dove.dtsi
+> index cc27916..e177e66 100644
+> --- a/arch/arm/boot/dts/dove.dtsi
+> +++ b/arch/arm/boot/dts/dove.dtsi
+> @@ -505,5 +505,23 @@
+>   				phy-handle = <&ethphy>;
+>   			};
+>   		};
+> +
+> +		audio0: audio-controller at b0000 {
+> +			compatible = "marvell,dove-audio";
+> +			reg = <0xb0000 0x2210>;
+> +			interrupts = <19>, <20>;
+> +			clocks = <&gate_clk 12>;
+> +			clock-names = "internal";
+> +			status = "disabled";
+> +		};
+> +
+> +		audio1: audio-controller at b4000 {
+> +			compatible = "marvell,dove-audio";
+> +			reg = <0xb4000 0x2210>;
+> +			interrupts = <21>, <22>;
+> +			clocks = <&gate_clk 13>;
+> +			clock-names = "internal";
+> +			status = "disabled";
+> +		};
 >   	};
 >   };
-> +
-> +&pinctrl {
-> +	pmx_gpio_13_audio1: pmx-gpio-13-audio1 {
+>
 
-Jean-Francois,
-
-please name the node "pmx_audio1_extclk: pmx-audio1-extclk"
-and move both to the corresponding section in dove.dtsi.
-We can reuse them on other Dove boards for sure.
-
-> +		marvell,pins = "mpp13";
-> +		marvell,function = "audio1";
-> +	};
-> +
-> +	pmx_audio1_i2s1_spdifo: pmx-audio1-i2s1-spdifo {
-> +		marvell,pins = "mpp_audio1";
-> +		marvell,function = "i2s1/spdifo";
-> +	};
-> +};
-> +
-> +&audio1 {
-> +	status = "okay";
-> +	clocks = <&gate_clk 13>, <&si5351 2>;
-> +	clock-names = "internal", "extclk";
-> +	pinctrl-0 = <&pmx_audio1_i2s1_spdifo &pmx_gpio_13_audio1>;
-
-The above needs updated phandles then.
-
-Otherwise,
+Thanks for the series,
 
 Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-
-> +	pinctrl-names = "default";
-> +};
->
