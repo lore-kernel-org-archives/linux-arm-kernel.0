@@ -1,51 +1,118 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 8 Oct 2013 18:29:44 +0200
-Subject: [PATCH v3 19/19] ARM: at91: add new compatible strings for pmc
- driver
-In-Reply-To: <1375949965-10586-1-git-send-email-b.brezillon@overkiz.com>
-References: <1375937608-3773-1-git-send-email-b.brezillon@overkiz.com>
- <1375949965-10586-1-git-send-email-b.brezillon@overkiz.com>
-Message-ID: <525432F8.9060600@atmel.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 08 Oct 2013 18:33:23 +0200
+Subject: [PATCH 3/8] ARM: l2x0: add Marvell Tauros3 compatible
+In-Reply-To: <52542D64.5010800@gmail.com>
+References: <1381235073-17134-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1381235073-17134-4-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20131008134100.GD1412@e106331-lin.cambridge.arm.com>
+ <52542D64.5010800@gmail.com>
+Message-ID: <525433D3.2090906@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/08/2013 10:19, Boris BREZILLON :
-> This patch adds new compatible string for PMC node to prepare the
-> transition to common clk.
->
-> These compatible string come from pmc driver in clk subsystem and are
-> needed to provide new device tree compatibility with old at91 clks
-> (device tree using common clks will use the new compatible strings).
->
-> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
-> ---
->   arch/arm/mach-at91/clock.c |    6 ++++++
->   1 file changed, 6 insertions(+)
->
-> diff --git a/arch/arm/mach-at91/clock.c b/arch/arm/mach-at91/clock.c
-> index 5f02aea..4d4463a 100644
-> --- a/arch/arm/mach-at91/clock.c
-> +++ b/arch/arm/mach-at91/clock.c
-> @@ -884,6 +884,12 @@ static int __init at91_pmc_init(unsigned long main_clock)
->   #if defined(CONFIG_OF)
->   static struct of_device_id pmc_ids[] = {
->   	{ .compatible = "atmel,at91rm9200-pmc" },
-> +	{ .compatible = "atmel,at91sam9260-pmc" },
-> +	{ .compatible = "atmel,at91sam9g45-pmc" },
-> +	{ .compatible = "atmel,at91sam9n12-pmc" },
-> +	{ .compatible = "atmel,at91sam9x5-pmc" },
-> +	{ .compatible = "atmel,at91sam9g35-pmc" },
+On 08/10/2013 18:05, Sebastian Hesselbarth wrote:
+> On 10/08/2013 03:41 PM, Mark Rutland wrote:
+>> On Tue, Oct 08, 2013 at 01:24:28PM +0100, Sebastian Hesselbarth wrote:
+>>> This add a compatible for the Marvell Tauros3 cache controller which
+>>> is compatible with l2x0 cache controllers. While updating the binding
+>>> documentation, clean up the list of possible compatibles.
+>>>
+>>> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+>>> ---
+> [...]
+>>> diff --git a/Documentation/devicetree/bindings/arm/l2cc.txt b/Documentation/devicetree/bindings/arm/l2cc.txt
+>>> index c0c7626..a1d0cbd 100644
+>>> --- a/Documentation/devicetree/bindings/arm/l2cc.txt
+>>> +++ b/Documentation/devicetree/bindings/arm/l2cc.txt
+>>> @@ -7,20 +7,20 @@ The ARM L2 cache representation in the device tree should be done as follows:
+>>>   Required properties:
+>>>
+>>>   - compatible : should be one of:
+>>> -	"arm,pl310-cache"
+>>> -	"arm,l220-cache"
+>>> -	"arm,l210-cache"
+>>> -	"marvell,aurora-system-cache": Marvell Controller designed to be
+>>> +  "arm,pl310-cache"
+>>> +  "arm,l220-cache"
+>>> +  "arm,l210-cache"
+>>> +  "bcm,bcm11351-a2-pl310-cache": DEPRECATED by "brcm,bcm11351-a2-pl310-cache"
+>>> +  "brcm,bcm11351-a2-pl310-cache": For Broadcom bcm11351 chipset where an
+>>> +     offset needs to be added to the address before passing down to the L2
+>>> +     cache controller
+>>> +  "marvell,aurora-system-cache": Marvell Controller designed to be
+>>>        compatible with the ARM one, with system cache mode (meaning
+>>>        maintenance operations on L1 are broadcasted to the L2 and L2
+>>>        performs the same operation).
+>>> -	"marvell,"aurora-outer-cache: Marvell Controller designed to be
+>>> -	 compatible with the ARM one with outer cache mode.
+>>> -	"brcm,bcm11351-a2-pl310-cache": For Broadcom bcm11351 chipset where an
+>>> -	offset needs to be added to the address before passing down to the L2
+>>> -	cache controller
+>>> -	"bcm,bcm11351-a2-pl310-cache": DEPRECATED by
+>>> -	                               "brcm,bcm11351-a2-pl310-cache"
+>>> +  "marvell,aurora-outer-cache": Marvell Controller designed to be
+>>> +     compatible with the ARM one with outer cache mode.
+>>> +  "marvell,tauros3-cache": Marvell Tauros3 cache controller.
+>>
+>> How does the tauros3 cache differ from the other caches supported by the
+>> l2x0 driver?
+> 
+> [added Gregory to Cc]
+> 
+> Good question. I cannot say at this time. I would have guessed that l2cc
+> on Armada 1500 and Armada 370/XP are more or less the same, as both use
+> Marvell's PJ4B CPU. Maybe, Gregory or Thomas can shed some light into
+> this.
+> 
+>>>   - cache-unified : Specifies the cache is a unified cache.
+>>>   - cache-level : Should be set to 2 for a level 2 cache.
+>>>   - reg : Physical base address and size of cache controller's memory mapped
+>>> diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+>>> index 447da6f..90c776e 100644
+>>> --- a/arch/arm/mm/cache-l2x0.c
+>>> +++ b/arch/arm/mm/cache-l2x0.c
+>>> @@ -929,6 +929,7 @@ static const struct of_device_id l2x0_ids[] __initconst = {
+>>>   	  .data = (void *)&aurora_no_outer_data},
+>>>   	{ .compatible = "marvell,aurora-outer-cache",
+>>>   	  .data = (void *)&aurora_with_outer_data},
+>>> +	{ .compatible = "marvell,tauros3-cache", .data = (void *)&l2x0_data },
+>>
+>> Are we intending to handle this differently later?
+>>
+>> Or is it 100% compatible with the pl210 or pl220? We could just require
+>> an entry later in the compatible string list instead...
+> 
+> No public documentation, no clear answer.
+> 
+> Tauros3 isn't 100% compatible with any of the ARM l2cc above, it has
+> additional "features" or "bugs" - call it whatever you want.
+> 
+> I am not an l2cc expert, but basically I see two options:
+> a) use (possibly) wrong existing compatible in current mv88de3100.dtsi
+>     now and fix later.
+> b) add tauros3 compatible now and add (possible) quirks/marvell-specific
+>     properties later.
+> 
+> IMHO b) is very likely to happen as l2x0_of_init in patch 8/8 already 
+> sets bits, I wasn't able to verify in public ARM l2cc docu.
 
-With removal of this compatibility string:
+I agree with Sebastian. I don't have more information that Sebastian, but
+as it is definitely a different controller of the ones from ARM, it should
+have its own compatible string. Then latter when we will discover new feature
+and/or bugs, we will be able to manage them without requiring people to update
+their dtb. If I understood well it is the philosophy behind the device tree.
 
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Regards,
 
-> +	{ .compatible = "atmel,sama5d3-pmc" },
->   	{ /*sentinel*/ }
->   };
->
->
+> 
+> But again, I am very open for suggestions here.
+> 
+> Sebastian
+> 
 
 
 -- 
-Nicolas Ferre
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
