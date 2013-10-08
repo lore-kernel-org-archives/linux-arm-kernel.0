@@ -1,126 +1,510 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 8 Oct 2013 16:38:17 +0100
-Subject: [PATCH 1/2] clk/zynq/clkc: Add 'fclk-enable' feature
-In-Reply-To: <1381242972-14752-1-git-send-email-soren.brinkmann@xilinx.com>
-References: <1381242972-14752-1-git-send-email-soren.brinkmann@xilinx.com>
-Message-ID: <20131008153816.GB4981@e106331-lin.cambridge.arm.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 8 Oct 2013 17:43:07 +0200
+Subject: [PATCH v3 11/19] clk: at91: add PMC peripheral clocks
+In-Reply-To: <1375942611-9048-1-git-send-email-b.brezillon@overkiz.com>
+References: <1375937608-3773-1-git-send-email-b.brezillon@overkiz.com>
+ <1375942611-9048-1-git-send-email-b.brezillon@overkiz.com>
+Message-ID: <5254280B.6050705@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 08, 2013 at 03:36:11PM +0100, Soren Brinkmann wrote:
-> In some use cases Zynq's FPGA clocks are used as static clock
-> generators for IP in the FPGA part of the SOC for which no Linux driver
-> exists and would control those clocks. To avoid automatic
-> gating of these clocks in such cases a new property - fclk-enable - is
-> added to the clock controller's DT description to accomodate such use
-> cases. It's value is a bitmask, where a set bit results in enabling
-> the corresponding FCLK through the clkc.
-> 
-> FPGA clocks are handled following the rules below:
-> 
-> If an FCLK is not enabled by bootloaders, that FCLK will be disabled in
-> Linux. Drivers can enable and control it through the CCF as usual.
-> 
-> If an FCLK is enabled by bootloaders AND the corresponding bit in the
-> 'fclk-enable' DT property is set, that FCLK will be enabled by the clkc,
-> resulting in an off by one reference count for that clock. Ensuring it
-> will always be running.
-> 
-> The default value for 'fclk-enable' is '0xf' (all FCLK's enabled by the
-> bootloader are enabled through the clkc.
-
-Why? Juding by the diff that's not what the code currently does, so why
-not leave it as 0, and only set it where required as a work-around?
-
-Thans,
-Mark.
-
-> 
-> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+On 08/08/2013 08:16, Boris BREZILLON :
+> This patch adds new at91 peripheral clock implementation using common clk
+> framework.
+>
+> Almost all peripherals provided by at91 SoCs need a clock to work properly.
+> This clock is enabled/disabled using PCER/PCDR resgisters.
+>
+> Each peripheral is given an id (see atmel's datasheets) which is used to
+> define and reference peripheral clocks.
+>
+> Some new SoCs (at91sam9x5 and sama5d3) provide a new register (PCR) where you
+> can configure the peripheral clock as a division of the master clock.
+> This will help reducing the peripherals power comsumption.
+>
+> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
 > ---
->  .../devicetree/bindings/clock/zynq-7000.txt          |  4 ++++
->  drivers/clk/zynq/clkc.c                              | 20 +++++++++++++++++---
->  2 files changed, 21 insertions(+), 3 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/clock/zynq-7000.txt b/Documentation/devicetree/bindings/clock/zynq-7000.txt
-> index d99af878f5d7..11fdd146ec83 100644
-> --- a/Documentation/devicetree/bindings/clock/zynq-7000.txt
-> +++ b/Documentation/devicetree/bindings/clock/zynq-7000.txt
-> @@ -22,6 +22,10 @@ Required properties:
->  Optional properties:
->   - clocks : as described in the clock bindings
->   - clock-names : as described in the clock bindings
-> + - fclk-enable : Bit mask to enable FCLKs in cases no proper CCF compatible
-> +		 driver is available. Bit [0..3] correspond to FCLK0..FCLK3. The
-> +		 corresponding FCLK will only be enabled if it is actually
-> +		 running at boot time. (default = 0xf)
->  
->  Clock inputs:
->  The following strings are optional parameters to the 'clock-names' property in
-> diff --git a/drivers/clk/zynq/clkc.c b/drivers/clk/zynq/clkc.c
-> index 10772aa72e4e..a36fc0f47634 100644
-> --- a/drivers/clk/zynq/clkc.c
-> +++ b/drivers/clk/zynq/clkc.c
-> @@ -102,9 +102,10 @@ static const char *swdt_ext_clk_input_names[] __initdata = {"swdt_ext_clk"};
->  
->  static void __init zynq_clk_register_fclk(enum zynq_clk fclk,
->  		const char *clk_name, void __iomem *fclk_ctrl_reg,
-> -		const char **parents)
-> +		const char **parents, int enable)
->  {
->  	struct clk *clk;
-> +	u32 enable_reg;
->  	char *mux_name;
->  	char *div0_name;
->  	char *div1_name;
-> @@ -147,6 +148,12 @@ static void __init zynq_clk_register_fclk(enum zynq_clk fclk,
->  	clks[fclk] = clk_register_gate(NULL, clk_name,
->  			div1_name, CLK_SET_RATE_PARENT, fclk_gate_reg,
->  			0, CLK_GATE_SET_TO_DISABLE, fclk_gate_lock);
-> +	enable_reg = readl(fclk_gate_reg) & 1;
-> +	if (enable & !enable_reg) {
-> +		if (clk_prepare_enable(clks[fclk]))
-> +			pr_warn("%s: FCLK%u enable failed\n", __func__,
-> +					fclk - fclk0);
-> +	}
->  	kfree(mux_name);
->  	kfree(div0_name);
->  	kfree(div1_name);
-> @@ -213,6 +220,7 @@ static void __init zynq_clk_setup(struct device_node *np)
->  	int ret;
->  	struct clk *clk;
->  	char *clk_name;
-> +	unsigned int fclk_enable;
->  	const char *clk_output_name[clk_max];
->  	const char *cpu_parents[4];
->  	const char *periph_parents[4];
-> @@ -247,6 +255,10 @@ static void __init zynq_clk_setup(struct device_node *np)
->  	ps_clk = clk_register_fixed_rate(NULL, "ps_clk", NULL, CLK_IS_ROOT,
->  			tmp);
->  
-> +	ret = of_property_read_u32(np, "fclk-enable", &fclk_enable);
-> +	if (ret)
-> +		fclk_enable = 0xf;
+>   drivers/clk/at91/Makefile         |    2 +-
+>   drivers/clk/at91/clk-peripheral.c |  401 +++++++++++++++++++++++++++++++++++++
+>   drivers/clk/at91/pmc.c            |    9 +
+>   drivers/clk/at91/pmc.h            |    5 +
+>   4 files changed, 416 insertions(+), 1 deletion(-)
+>   create mode 100644 drivers/clk/at91/clk-peripheral.c
+>
+> diff --git a/drivers/clk/at91/Makefile b/drivers/clk/at91/Makefile
+> index c2b7068..04deba3 100644
+> --- a/drivers/clk/at91/Makefile
+> +++ b/drivers/clk/at91/Makefile
+> @@ -4,4 +4,4 @@
+>
+>   obj-y += pmc.o
+>   obj-y += clk-main.o clk-pll.o clk-plldiv.o clk-master.o
+> -obj-y += clk-system.o
+> +obj-y += clk-system.o clk-peripheral.o
+> diff --git a/drivers/clk/at91/clk-peripheral.c b/drivers/clk/at91/clk-peripheral.c
+> new file mode 100644
+> index 0000000..1612739
+> --- /dev/null
+> +++ b/drivers/clk/at91/clk-peripheral.c
+> @@ -0,0 +1,401 @@
+> +/*
+> + * drivers/clk/at91/clk-peripheral.c
+> + *
+> + *  Copyright (C) 2013 Boris BREZILLON <b.brezillon@overkiz.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + *
+> + */
 > +
->  	/* PLLs */
->  	clk = clk_register_zynq_pll("armpll_int", "ps_clk", SLCR_ARMPLL_CTRL,
->  			SLCR_PLL_STATUS, 0, &armpll_lock);
-> @@ -340,10 +352,12 @@ static void __init zynq_clk_setup(struct device_node *np)
->  	clk_prepare_enable(clks[dci]);
->  
->  	/* Peripheral clocks */
-> -	for (i = fclk0; i <= fclk3; i++)
-> +	for (i = fclk0; i <= fclk3; i++) {
-> +		int enable = !!(fclk_enable & BIT(i - fclk0));
->  		zynq_clk_register_fclk(i, clk_output_name[i],
->  				SLCR_FPGA0_CLK_CTRL + 0x10 * (i - fclk0),
-> -				periph_parents);
-> +				periph_parents, enable);
+> +#include <linux/clk-provider.h>
+> +#include <linux/clkdev.h>
+> +#include <linux/clk/at91_pmc.h>
+> +#include <linux/of.h>
+> +#include <linux/of_address.h>
+> +#include <linux/io.h>
+> +
+> +#include "pmc.h"
+> +
+> +#define PERIPHERAL_MAX		64
+> +
+> +#define PERIPHERAL_AT91RM9200	0
+> +#define PERIPHERAL_AT91SAM9X5	1
+> +
+> +#define to_clk_peripheral(hw) container_of(hw, struct clk_peripheral, hw)
+> +struct clk_peripheral {
+> +	struct clk_hw hw;
+> +	struct at91_pmc *pmc;
+> +	u32 id;
+> +};
+> +
+> +#define to_clk_sam9x5_peripheral(hw) \
+> +	container_of(hw, struct clk_sam9x5_peripheral, hw)
+> +struct clk_sam9x5_peripheral {
+> +	struct clk_hw hw;
+> +	struct at91_pmc *pmc;
+> +	u32 id;
+> +	u8 div;
+> +	u8 have_div_support;
+> +};
+> +
+> +static int clk_peripheral_enable(struct clk_hw *hw)
+> +{
+> +	struct clk_peripheral *periph = to_clk_peripheral(hw);
+> +	struct at91_pmc *pmc = periph->pmc;
+> +	int offset = AT91_PMC_PCER;
+> +
+> +	if (periph->id < 2)
+> +		return 0;
+> +	if (periph->id > 31)
+
+define constants
+
+> +		offset = AT91_PMC_PCER1;
+> +	pmc_write(pmc, offset, 1 << (periph->id & 31));
+
+A little macro here.
+
+> +	return 0;
+> +}
+> +
+> +static void clk_peripheral_disable(struct clk_hw *hw)
+> +{
+> +	struct clk_peripheral *periph = to_clk_peripheral(hw);
+> +	struct at91_pmc *pmc = periph->pmc;
+> +	int offset = AT91_PMC_PCDR;
+> +
+> +	if (periph->id < 2)
+> +		return;
+> +	if (periph->id > 31)
+> +		offset = AT91_PMC_PCDR1;
+> +	pmc_write(pmc, offset, 1 << (periph->id & 31));
+
+Ditto
+
+> +}
+> +
+> +static int clk_peripheral_is_enabled(struct clk_hw *hw)
+> +{
+> +	struct clk_peripheral *periph = to_clk_peripheral(hw);
+> +	struct at91_pmc *pmc = periph->pmc;
+> +	int offset = AT91_PMC_PCSR;
+> +
+> +	if (periph->id < 2)
+> +		return 1;
+> +	if (periph->id > 31)
+> +		offset = AT91_PMC_PCSR1;
+> +	return !!(pmc_read(pmc, offset) & (1 << (periph->id & 31)));
+
+Ditto
+
+> +}
+> +
+> +static const struct clk_ops peripheral_ops = {
+> +	.enable = clk_peripheral_enable,
+> +	.disable = clk_peripheral_disable,
+> +	.is_enabled = clk_peripheral_is_enabled,
+> +};
+> +
+> +static struct clk * __init
+> +at91_clk_register_peripheral(struct at91_pmc *pmc, const char *name,
+> +			     const char *parent_name, u32 id)
+> +{
+> +	struct clk_peripheral *periph;
+> +	struct clk *clk = NULL;
+> +	struct clk_init_data init;
+> +
+> +	if (!pmc || !name || !parent_name)
+> +		return ERR_PTR(-EINVAL);
+> +
+> +	id &= 31;
+
+Ditto
+
+> +	periph = kzalloc(sizeof(*periph), GFP_KERNEL);
+> +	if (!periph)
+> +		return ERR_PTR(-ENOMEM);
+> +
+> +	init.name = name;
+> +	init.ops = &peripheral_ops;
+> +	init.parent_names = (parent_name ? &parent_name : NULL);
+> +	init.num_parents = (parent_name ? 1 : 0);
+> +	init.flags = 0;
+> +
+> +	periph->id = id;
+> +	periph->hw.init = &init;
+> +	periph->pmc = pmc;
+> +
+> +	clk = clk_register(NULL, &periph->hw);
+> +	if (IS_ERR(clk))
+> +		kfree(periph);
+> +
+> +	return clk;
+> +}
+> +
+> +static int clk_sam9x5_peripheral_enable(struct clk_hw *hw)
+> +{
+> +	struct clk_sam9x5_peripheral *periph = to_clk_sam9x5_peripheral(hw);
+> +	struct at91_pmc *pmc = periph->pmc;
+> +
+> +	if (periph->id < 2)
+> +		return 0;
+> +	pmc_write(pmc, AT91_PMC_PCR,
+> +		       (periph->id & AT91_PMC_PCR_PID) |
+> +		       AT91_PMC_PCR_CMD |
+> +		       AT91_PMC_PCR_DIV(periph->div) |
+> +		       AT91_PMC_PCR_EN);
+> +	return 0;
+> +}
+> +
+> +static void clk_sam9x5_peripheral_disable(struct clk_hw *hw)
+> +{
+> +	struct clk_sam9x5_peripheral *periph = to_clk_sam9x5_peripheral(hw);
+> +	struct at91_pmc *pmc = periph->pmc;
+> +
+> +	if (periph->id < 2)
+> +		return;
+> +
+> +	pmc_write(pmc, AT91_PMC_PCR,
+> +		       (periph->id & AT91_PMC_PCR_PID) |
+> +		       AT91_PMC_PCR_CMD);
+> +}
+> +
+> +static int clk_sam9x5_peripheral_is_enabled(struct clk_hw *hw)
+> +{
+> +	struct clk_sam9x5_peripheral *periph = to_clk_sam9x5_peripheral(hw);
+> +	struct at91_pmc *pmc = periph->pmc;
+> +	int ret;
+> +
+> +	if (periph->id < 2)
+> +		return 1;
+> +	pmc_lock(pmc);
+> +	pmc_write(pmc, AT91_PMC_PCR,
+> +		  (periph->id & AT91_PMC_PCR_PID));
+> +	ret = !!(pmc_read(pmc, AT91_PMC_PCR) & AT91_PMC_PCR_EN);
+> +	pmc_unlock(pmc);
+> +
+> +	return ret;
+> +}
+> +
+> +static unsigned long
+> +clk_sam9x5_peripheral_recalc_rate(struct clk_hw *hw,
+> +				  unsigned long parent_rate)
+> +{
+> +	struct clk_sam9x5_peripheral *periph = to_clk_sam9x5_peripheral(hw);
+> +	struct at91_pmc *pmc = periph->pmc;
+> +	u32 shift;
+> +
+> +	if (periph->id < 2 || !periph->have_div_support)
+> +		return parent_rate;
+> +	pmc_lock(pmc);
+> +	pmc_write(pmc, AT91_PMC_PCR,
+> +		       (periph->id & AT91_PMC_PCR_PID));
+> +	shift = (pmc_read(pmc, AT91_PMC_PCR) >> 16) & 0x3;
+
+define constants
+
+> +	pmc_unlock(pmc);
+> +	return parent_rate >> shift;
+> +}
+> +
+> +static long clk_sam9x5_peripheral_round_rate(struct clk_hw *hw,
+> +					     unsigned long rate,
+> +					     unsigned long *parent_rate)
+> +{
+> +	int shift;
+> +	unsigned long best_rate;
+> +	unsigned long best_diff;
+> +	unsigned long cur_rate;
+> +	unsigned long cur_diff;
+> +	struct clk_sam9x5_peripheral *periph = to_clk_sam9x5_peripheral(hw);
+> +
+> +	if (periph->id < 2 || !periph->have_div_support)
+> +		return *parent_rate;
+> +	if (rate >= *parent_rate)
+> +		return rate;
+> +	best_diff = *parent_rate - rate;
+> +	best_rate = *parent_rate;
+> +	for (shift = 1; shift < 4; shift++) {
+> +		cur_rate = *parent_rate >> shift;
+> +		if (cur_rate < rate)
+> +			cur_diff = rate - cur_rate;
+> +		else
+> +			cur_diff = cur_rate - rate;
+> +		if (cur_diff < best_diff) {
+> +			best_diff = cur_diff;
+> +			best_rate = cur_rate;
+> +		}
+> +		if (!best_diff || cur_rate < rate)
+> +			break;
 > +	}
->  
->  	zynq_clk_register_periph_clk(lqspi, 0, clk_output_name[lqspi], NULL,
->  			SLCR_LQSPI_CLK_CTRL, periph_parents, 0);
-> -- 
-> 1.8.4
-> 
-> 
+> +	return best_rate;
+> +}
+> +
+> +static int clk_sam9x5_peripheral_set_rate(struct clk_hw *hw,
+> +					  unsigned long rate,
+> +					  unsigned long parent_rate)
+> +{
+> +	int shift;
+> +	struct clk_sam9x5_peripheral *periph = to_clk_sam9x5_peripheral(hw);
+> +	if (periph->id < 2 || !periph->have_div_support) {
+> +		if (parent_rate == rate)
+> +			return 0;
+> +		else
+> +			return -EINVAL;
+> +	}
+> +
+> +	for (shift = 0; shift < 4; shift++) {
+> +		if (parent_rate >> shift == rate) {
+> +			periph->div = shift;
+> +			return 0;
+> +		}
+> +	}
+> +
+> +	return -EINVAL;
+> +}
+> +
+> +static const struct clk_ops sam9x5_peripheral_ops = {
+> +	.enable = clk_sam9x5_peripheral_enable,
+> +	.disable = clk_sam9x5_peripheral_disable,
+> +	.is_enabled = clk_sam9x5_peripheral_is_enabled,
+> +	.recalc_rate = clk_sam9x5_peripheral_recalc_rate,
+> +	.round_rate = clk_sam9x5_peripheral_round_rate,
+> +	.set_rate = clk_sam9x5_peripheral_set_rate,
+> +};
+> +
+> +static struct clk * __init
+> +at91_clk_register_sam9x5_peripheral(struct at91_pmc *pmc, const char *name,
+> +				    const char *parent_name, u32 id,
+> +				    u32 default_div)
+> +{
+> +	struct clk_sam9x5_peripheral *periph;
+> +	struct clk *clk = NULL;
+> +	struct clk_init_data init;
+> +
+> +	if (!pmc || !name || !parent_name)
+> +		return ERR_PTR(-EINVAL);
+> +
+> +	periph = kzalloc(sizeof(*periph), GFP_KERNEL);
+> +	if (!periph)
+> +		return ERR_PTR(-ENOMEM);
+> +
+> +	init.name = name;
+> +	init.ops = &sam9x5_peripheral_ops;
+> +	init.parent_names = (parent_name ? &parent_name : NULL);
+> +	init.num_parents = (parent_name ? 1 : 0);
+> +	init.flags = CLK_SET_RATE_GATE;
+> +
+> +	periph->id = id;
+> +	periph->hw.init = &init;
+> +	periph->div = default_div;
+> +	periph->pmc = pmc;
+> +
+> +	clk = clk_register(NULL, &periph->hw);
+> +
+
+Ditto
+
+> +	if (IS_ERR(clk))
+> +		kfree(periph);
+> +
+> +	return clk;
+> +}
+> +
+> +struct clk_periph_data {
+> +	struct clk **clks;
+> +	u8 *ids;
+> +	unsigned int clk_num;
+> +};
+> +
+> +static struct clk * __init
+> +of_clk_src_periph_get(struct of_phandle_args *clkspec, void *data)
+> +{
+> +	struct clk_periph_data *clk_data = data;
+> +	unsigned int id = clkspec->args[0];
+> +	int i;
+> +
+> +	if (id >= PERIPHERAL_MAX)
+> +		goto err;
+> +
+> +	for (i = 0; i < clk_data->clk_num; i++) {
+> +		if (clk_data->ids[i] == id)
+> +			return clk_data->clks[i];
+> +	}
+> +
+> +err:
+> +	pr_err("%s: invalid clock id %d\n", __func__, id);
+> +	return ERR_PTR(-EINVAL);
+> +}
+> +
+> +static void __init
+> +of_at91_clk_periph_setup(struct device_node *np, struct at91_pmc *pmc, u8 type)
+> +{
+> +	int num;
+> +	int i;
+> +	u32 id;
+> +	struct clk *clk;
+> +	const char *parent_name;
+> +	const char *name;
+> +	u32 divisor;
+> +	struct clk **clks;
+> +	u8 *ids;
+> +	struct clk_periph_data *clktab;
+> +	struct device_node *periphclknp;
+> +
+> +	parent_name = of_clk_get_parent_name(np, 0);
+> +	if (!parent_name)
+> +		return;
+> +
+> +	num = of_get_child_count(np);
+> +	if (!num || num > PERIPHERAL_MAX)
+> +		return;
+> +
+> +	clktab = kzalloc(sizeof(*clktab), GFP_KERNEL);
+> +	if (!clktab)
+> +		return;
+> +
+> +	ids = kzalloc(num * sizeof(*ids), GFP_KERNEL);
+> +	if (!ids)
+> +		goto out_free_clktab;
+> +
+> +	clks = kzalloc(num * sizeof(*clks), GFP_KERNEL);
+> +	if (!clks)
+> +		goto out_free_ids;
+> +
+> +	i = 0;
+> +	for_each_child_of_node(np, periphclknp) {
+> +		name = periphclknp->name;
+> +
+> +		if (of_property_read_u32(periphclknp, "atmel,clk-id", &id))
+> +			goto out_free_clks;
+> +		if (id >= PERIPHERAL_MAX)
+> +			goto out_free_clks;
+> +
+> +		if (type == PERIPHERAL_AT91RM9200) {
+> +			clk = at91_clk_register_peripheral(pmc, name,
+> +							   parent_name, id);
+> +		} else {
+> +			if (of_property_read_u32(periphclknp,
+> +						 "atmel,clk-default-divisor",
+> +						 &divisor))
+> +				divisor = 0;
+> +
+> +			clk = at91_clk_register_sam9x5_peripheral(pmc, name,
+> +								  parent_name,
+> +								  id,
+> +								  divisor);
+> +		}
+> +		if (IS_ERR(clk))
+> +			goto out_free_clks;
+> +
+> +		clks[i] = clk;
+> +		ids[i++] = id;
+> +	}
+> +
+> +	clktab->clk_num = num;
+> +	clktab->clks = clks;
+> +	clktab->ids = ids;
+> +	of_clk_add_provider(np, of_clk_src_periph_get, clktab);
+> +	return;
+> +
+> +out_free_clks:
+> +	kfree(clks);
+> +out_free_ids:
+> +	kfree(ids);
+> +out_free_clktab:
+> +	kfree(clktab);
+> +}
+> +
+> +void __init of_at91rm9200_clk_periph_setup(struct device_node *np,
+> +					   struct at91_pmc *pmc)
+> +{
+> +	of_at91_clk_periph_setup(np, pmc, PERIPHERAL_AT91RM9200);
+> +}
+> +
+> +void __init of_at91sam9x5_clk_periph_setup(struct device_node *np,
+> +					   struct at91_pmc *pmc)
+> +{
+> +	of_at91_clk_periph_setup(np, pmc, PERIPHERAL_AT91SAM9X5);
+> +}
+> diff --git a/drivers/clk/at91/pmc.c b/drivers/clk/at91/pmc.c
+> index c674ef2..1a56f1c 100644
+> --- a/drivers/clk/at91/pmc.c
+> +++ b/drivers/clk/at91/pmc.c
+> @@ -256,6 +256,15 @@ static const struct of_device_id pmc_clk_ids[] __initdata = {
+>   		.compatible = "atmel,at91rm9200-clk-system",
+>   		.data = of_at91rm9200_clk_sys_setup,
+>   	},
+> +	/* Peripheral clocks */
+> +	{
+> +		.compatible = "atmel,at91rm9200-clk-peripheral",
+> +		.data = of_at91rm9200_clk_periph_setup,
+> +	},
+> +	{
+> +		.compatible = "atmel,at91sam9x5-clk-peripheral",
+> +		.data = of_at91sam9x5_clk_periph_setup,
+> +	},
+>   	{ /*sentinel*/ }
+>   };
+>
+> diff --git a/drivers/clk/at91/pmc.h b/drivers/clk/at91/pmc.h
+> index f88ef41..08c30fb 100644
+> --- a/drivers/clk/at91/pmc.h
+> +++ b/drivers/clk/at91/pmc.h
+> @@ -77,4 +77,9 @@ extern void __init of_at91sam9x5_clk_master_setup(struct device_node *np,
+>   extern void __init of_at91rm9200_clk_sys_setup(struct device_node *np,
+>   					       struct at91_pmc *pmc);
+>
+> +extern void __init of_at91rm9200_clk_periph_setup(struct device_node *np,
+> +						  struct at91_pmc *pmc);
+> +extern void __init of_at91sam9x5_clk_periph_setup(struct device_node *np,
+> +						  struct at91_pmc *pmc);
+> +
+>   #endif /* __PMC_H_ */
+>
+
+
+-- 
+Nicolas Ferre
