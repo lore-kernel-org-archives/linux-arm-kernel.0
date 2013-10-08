@@ -1,69 +1,37 @@
 From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Wed,  9 Oct 2013 00:34:28 +0200
-Subject: [PATCH 12/23] ARM: traps: use <asm/opcodes.h> to get correct
- instruction order
+Date: Wed,  9 Oct 2013 00:34:30 +0200
+Subject: [PATCH 14/23] ARM: set --be8 when linking modules
 In-Reply-To: <1381271679-27804-1-git-send-email-ben.dooks@codethink.co.uk>
 References: <1381271679-27804-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <1381271679-27804-13-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <1381271679-27804-15-git-send-email-ben.dooks@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The trap handler needs to take into account the endian configuration of
-the system when loading instructions. Use <asm/opcodes.h> to provide the
-necessary conversion functions.
+To avoid having to make every text section swap the instruction order
+of all instructions, make sure modules are built also built with --be8
+(as is the current kernel final link).
+
+If we do not do this, we would end up having to swap all instructions
+when loading a module, instead of just the instructions that we are
+applying ELF relocations to.
 
 Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
-Tested-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Reviewed-by: Dave Martin <Dave.Martin@arm.com>
 ---
- arch/arm/kernel/traps.c | 16 ++++++++++------
- 1 file changed, 10 insertions(+), 6 deletions(-)
+ arch/arm/Makefile | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
-index 8fcda14..caf96da 100644
---- a/arch/arm/kernel/traps.c
-+++ b/arch/arm/kernel/traps.c
-@@ -34,6 +34,7 @@
- #include <asm/unwind.h>
- #include <asm/tls.h>
- #include <asm/system_misc.h>
-+#include <asm/opcodes.h>
+diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+index a37a50f..0069697 100644
+--- a/arch/arm/Makefile
++++ b/arch/arm/Makefile
+@@ -16,6 +16,7 @@ LDFLAGS		:=
+ LDFLAGS_vmlinux	:=-p --no-undefined -X
+ ifeq ($(CONFIG_CPU_ENDIAN_BE8),y)
+ LDFLAGS_vmlinux	+= --be8
++LDFLAGS_MODULE	+= --be8
+ endif
  
- static const char *handler[]= { "prefetch abort", "data abort", "address exception", "interrupt" };
- 
-@@ -402,25 +403,28 @@ asmlinkage void __exception do_undefinstr(struct pt_regs *regs)
- 	if (processor_mode(regs) == SVC_MODE) {
- #ifdef CONFIG_THUMB2_KERNEL
- 		if (thumb_mode(regs)) {
--			instr = ((u16 *)pc)[0];
-+			instr = __mem_to_opcode_thumb16(((u16 *)pc)[0]);
- 			if (is_wide_instruction(instr)) {
--				instr <<= 16;
--				instr |= ((u16 *)pc)[1];
-+				u16 inst2;
-+				inst2 = __mem_to_opcode_thumb16(((u16 *)pc)[1]);
-+				instr = __opcode_thumb32_compose(instr, inst2);
- 			}
- 		} else
- #endif
--			instr = *(u32 *) pc;
-+			instr = __mem_to_opcode_arm(*(u32 *) pc);
- 	} else if (thumb_mode(regs)) {
- 		if (get_user(instr, (u16 __user *)pc))
- 			goto die_sig;
-+		instr = __mem_to_opcode_thumb16(instr);
- 		if (is_wide_instruction(instr)) {
- 			unsigned int instr2;
- 			if (get_user(instr2, (u16 __user *)pc+1))
- 				goto die_sig;
--			instr <<= 16;
--			instr |= instr2;
-+			instr2 = __mem_to_opcode_thumb16(instr2);
-+			instr = __opcode_thumb32_compose(instr, instr2);
- 		}
- 	} else if (get_user(instr, (u32 __user *)pc)) {
-+		instr = __mem_to_opcode_arm(instr);
- 		goto die_sig;
- 	}
- 
+ OBJCOPYFLAGS	:=-O binary -R .comment -S
 -- 
 1.8.4.rc3
