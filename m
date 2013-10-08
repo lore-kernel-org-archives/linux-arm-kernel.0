@@ -1,47 +1,49 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 8 Oct 2013 13:55:16 +0200
-Subject: [PATCH 3/6] pinctrl: single: Prepare for supporting SoC specific
- features
-In-Reply-To: <20131007173531.GX8949@atomide.com>
-References: <20131003054104.8941.88857.stgit@localhost>
- <20131003054218.8941.19273.stgit@localhost>
- <20131007173531.GX8949@atomide.com>
-Message-ID: <CACRpkdbx+vJEqz3KQ0EHGt0axRB4JeJh3FF4e+7snbR0HoqKRg@mail.gmail.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 8 Oct 2013 07:57:27 -0400
+Subject: [PATCH RESEND] PCI: mvebu: Dynamically detect if the PEX link
+ is up to enable hot plug
+In-Reply-To: <CAErSpo6pvAQ9exEUsB0p8nmoqs0s5yzfYsstx7wh-2bqDtzBOQ@mail.gmail.com>
+References: <1380650281-16175-1-git-send-email-jgunthorpe@obsidianresearch.com>
+ <CAErSpo6pvAQ9exEUsB0p8nmoqs0s5yzfYsstx7wh-2bqDtzBOQ@mail.gmail.com>
+Message-ID: <20131008115727.GD5402@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 7, 2013 at 7:35 PM, Tony Lindgren <tony@atomide.com> wrote:
+On Mon, Oct 07, 2013 at 04:28:52PM -0600, Bjorn Helgaas wrote:
+> [+cc Seungwon]
+> 
+> On Tue, Oct 1, 2013 at 11:58 AM, Jason Gunthorpe
+> <jgunthorpe@obsidianresearch.com> wrote:
+> > Otherwise hotplugging the PEX doesn't work at all since the driver
+> > detects the link state at probe time. Simply replacing the two tests
+> > of haslink with a register read is enough to fix it.
+> >
+> > Tested on kirkwood with repeated plug/unplug of the link partner.
+> >
+> > Signed-off-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
+> 
+> Last I heard (Sep 26), you had some mvebu changes in your tree
+> already, Jason, so I was assuming you'd handle pci-mvebu.c changes, at
+> least for the v3.13 merge window.  But you marked this "resend"; 
 
-> Hi Linus W,
->
-> Any comments on the pinctrl patches 3 - 5 in this series?
+That's correct.  I somehow missed these two and I asked JasonG to resend
+them to me.
 
-I have no problems with this patch #3, as it is just changing syntax,
-not semantics.
+> does that mean you're waiting for me to do something with it?
 
-The problems start with patch #4.
+Nope, It means I'm looking for a slice of time to get caught up :-P
 
-I am tormented with mixed feelings about this, because from one point of
-view I feel it is breaking the promise of pinctrl-single being a
-driver for platforms
-where a pin is controlled by a *single* register.
+> I see the following mvebu patches in patchwork:
+> 
+>   PCI: mvebu: Dynamically detect if the PEX link is up to enable hot plug
+>   PCI: mvebu - Support a bridge with no IO port window
+>   PCI: mvebu: add I/O access wrappers
+> 
+> Let me know if I need to do anything with any of them.
 
-If this was pinctrl-foo.c I would not have been so much bothered,
-but now it is something that was supposed to be self-contained and
-simple, pertaining to a single register, starting to look like something
-else.
+I always appreciate an extra set of eyes ;-)  Hopefully, after v3.13, we
+can get back to normal wrt patches going through proper trees.
 
-This is a bit like: "oh yeah just one register controls the pins, but under
-some circumstances I also want to mess with this register over here,
-and then this register over there ..." etc.
+thx,
 
-I'd like Haojian to ACK this to proceed since he's also using this driver
-now. Then I feel better on continuing down this road ...
-
-Then I have a lesser comment on patch #4 since it makes it possible
-for this pin controller to support wake-up interrupt, as I don't see how
-this plays out with front-end GPIO controllers, but let's discuss that
-in the context of that patch.
-
-Yours,
-Linus Walleij
+Jason.
