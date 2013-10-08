@@ -1,62 +1,122 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 8 Oct 2013 09:40:03 +0200
-Subject: [PATCH] clk: new driver for efm32 SoC
-In-Reply-To: <20131007212354.7445.84276@quantum>
-References: <1376510693-12491-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <20131007212354.7445.84276@quantum>
-Message-ID: <20131008074003.GL10079@pengutronix.de>
+From: josephl@nvidia.com (Joseph Lo)
+Date: Tue, 8 Oct 2013 15:47:40 +0800
+Subject: [PATCH] ARM: tegra: add clock properties for devices of Tegra124
+Message-ID: <1381218460-23123-1-git-send-email-josephl@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Mike,
+This patch adds clock properties for devices in the DT for basic support
+of Tegra124 SoC.
 
-On Mon, Oct 07, 2013 at 02:23:54PM -0700, Mike Turquette wrote:
-> Quoting Uwe Kleine-K?nig (2013-08-14 13:04:53)
-> > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> > ---
-> > Hello,
-> > 
-> > I'm not sure if there is a naming convention for #defines in headers below
-> > dt-bindings. I named my clocks clk_$namefromreferencemanual to have some
-> > namespacing.
-> > 
-> > The clock stuff on the different variants of efm32 are similar, but
-> > different enough to not be able to use the same driver, so this is only
-> > for the Giant Gecko (efm32gg) variant, still I used "efm32" in some
-> > places because the other variants would fit there, too. (For
-> > include/dt-bindings/clock/efm32-cmu.h I would need some #ifdefs, is that
-> > OK or should the name of the defines include efm32gg? (That would make
-> > the names still longer and so more ugly.))
-> 
-> The DT experts should weigh in on having #ifdef's in the header, but I
-> think we should avoid that. Better to explicitly list the clocks for the
-> variant used. You can add "gg" to this or not, I don't care, but the
-> future variants will need some suffix, or maybe their own header.
-I thought the way to go is to move the clocks into the device tree. That
-would get rid of the need to add #ifdefs. OTOH even if the corresponding
-clocks are using different register offsets and bit locations, I don't
-see a need to also take a different clock index, so currently I think it
-should be possible to not need #ifdefs even if we're going with this
-patch's approach.
+Signed-off-by: Joseph Lo <josephl@nvidia.com>
+---
+This patch was based on the series of Tegra124 clock driver and the basic
+support of Tegra124. It coulud be used to replace the "HACK" patch in the
+basic support of Tegra124 series.
+---
+ arch/arm/boot/dts/tegra124-venice2.dts | 13 +++++++++++++
+ arch/arm/boot/dts/tegra124.dtsi        | 16 ++++++++++++++++
+ 2 files changed, 29 insertions(+)
 
-So if you are happy with my patch as is, it would be great if you'd take
-it. We could also switch to in-dt-defined clocks later when it becomes
-easier while maintaining this interface for compatibility.
-
-> I'm happy with this patch and can take it for 3.13. Care to add a
-> changelog?
-What do you want? I could add:
-
-	This patch adds support for the clocks provided by the Clock
-	Management Unit of Energy Micro's efm32 Giant Gecko SoCs
-	including device tree bindings.
-
-I will send a v2 that makes use of the CLK_OF_DECLARE macro and so saves
-the external init function.
-
-Best regards
-Uwe
-
+diff --git a/arch/arm/boot/dts/tegra124-venice2.dts b/arch/arm/boot/dts/tegra124-venice2.dts
+index 2bfc7ab..5859ec2 100644
+--- a/arch/arm/boot/dts/tegra124-venice2.dts
++++ b/arch/arm/boot/dts/tegra124-venice2.dts
+@@ -17,4 +17,17 @@
+ 	pmc at 7000e400 {
+ 		nvidia,invert-interrupt;
+ 	};
++
++	clocks {
++		compatible = "simple-bus";
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		clk32k_in: clock {
++			compatible = "fixed-clock";
++			reg=<0>;
++			#clock-cells = <0>;
++			clock-frequency = <32768>;
++		};
++	};
+ };
+diff --git a/arch/arm/boot/dts/tegra124.dtsi b/arch/arm/boot/dts/tegra124.dtsi
+index 905f148..7862024 100644
+--- a/arch/arm/boot/dts/tegra124.dtsi
++++ b/arch/arm/boot/dts/tegra124.dtsi
+@@ -1,3 +1,4 @@
++#include <dt-bindings/clock/tegra124-car.h>
+ #include <dt-bindings/interrupt-controller/arm-gic.h>
+ 
+ #include "skeleton.dtsi"
+@@ -27,6 +28,13 @@
+ 			     <GIC_SPI 42 IRQ_TYPE_LEVEL_HIGH>,
+ 			     <GIC_SPI 121 IRQ_TYPE_LEVEL_HIGH>,
+ 			     <GIC_SPI 122 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&tegra_car TEGRA124_CLK_TIMER>;
++	};
++
++	tegra_car: clock at 60006000 {
++		compatible = "nvidia,tegra124-car";
++		reg = <0x60006000 0x1000>;
++		#clock-cells = <1>;
+ 	};
+ 
+ 	/*
+@@ -43,6 +51,7 @@
+ 		reg-shift = <2>;
+ 		interrupts = <GIC_SPI 36 IRQ_TYPE_LEVEL_HIGH>;
+ 		status = "disabled";
++		clocks = <&tegra_car TEGRA124_CLK_UARTA>;
+ 	};
+ 
+ 	serial at 70006040 {
+@@ -51,6 +60,7 @@
+ 		reg-shift = <2>;
+ 		interrupts = <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>;
+ 		status = "disabled";
++		clocks = <&tegra_car TEGRA124_CLK_UARTB>;
+ 	};
+ 
+ 	serial at 70006200 {
+@@ -59,6 +69,7 @@
+ 		reg-shift = <2>;
+ 		interrupts = <GIC_SPI 46 IRQ_TYPE_LEVEL_HIGH>;
+ 		status = "disabled";
++		clocks = <&tegra_car TEGRA124_CLK_UARTC>;
+ 	};
+ 
+ 	serial at 70006300 {
+@@ -67,6 +78,7 @@
+ 		reg-shift = <2>;
+ 		interrupts = <GIC_SPI 90 IRQ_TYPE_LEVEL_HIGH>;
+ 		status = "disabled";
++		clocks = <&tegra_car TEGRA124_CLK_UARTD>;
+ 	};
+ 
+ 	serial at 70006400 {
+@@ -75,6 +87,7 @@
+ 		reg-shift = <2>;
+ 		interrupts = <GIC_SPI 91 IRQ_TYPE_LEVEL_HIGH>;
+ 		status = "disabled";
++		clocks = <&tegra_car TEGRA124_CLK_UARTE>;
+ 	};
+ 
+ 	rtc at 7000e000 {
+@@ -82,11 +95,14 @@
+ 		reg = <0x7000e000 0x100>;
+ 		interrupts = <GIC_SPI 2 IRQ_TYPE_LEVEL_HIGH>;
+ 		status = "disabled";
++		clocks = <&tegra_car TEGRA124_CLK_RTC>;
+ 	};
+ 
+ 	pmc at 7000e400 {
+ 		compatible = "nvidia,tegra124-pmc";
+ 		reg = <0x7000e400 0x400>;
++		clocks = <&tegra_car TEGRA124_CLK_PCLK>, <&clk32k_in>;
++		clock-names = "pclk", "clk32k_in";
+ 	};
+ 
+ 	cpus {
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+1.8.4
