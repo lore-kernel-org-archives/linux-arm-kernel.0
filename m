@@ -1,44 +1,40 @@
 From: csmanjuvijay@gmail.com (Majunath Goudar)
-Date: Tue,  8 Oct 2013 16:09:17 +0530
-Subject: [PATCH] SHMOBILE: DRM: Fix backlight_device register and unregister
- undefined errors.
-Message-ID: <1381228757-23144-1-git-send-email-csmanjuvijay@gmail.com>
+Date: Tue,  8 Oct 2013 16:10:33 +0530
+Subject: [PATCH] SOUND/SPI: Fix "clk_round_rate" undefined reference error.
+Message-ID: <1381228833-24082-1-git-send-email-csmanjuvijay@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds a BACKLIGHT_CLASS_DEVICE dependency to configure the
-DRM_SHMOBILE. Without this patch, build system can lead to build failure.
-This was observed during randconfig testing, in which DRM_SHMOBILE was
-enabled w/o BACKLIGHT_CLASS_DEVICE being enabled. Following was the error:
+This patch adds a COMMON_CLK dependency to configure the
+SND_AT73C213 for Atmel AT73C213 DAC driver. Without this patch,
+build system can lead to build failure. This was observed during
+randconfig testing, in which SND_AT73C213 was enabled w/o COMMON_CLK
+being enabled. leading to the following error:
 
- Building modules, stage 2.
-  MODPOST 516 modules
-ERROR: "backlight_device_register" [drivers/gpu/drm/shmobile/shmob-drm.ko] undefined!
-ERROR: "backlight_device_unregister" [drivers/gpu/drm/shmobile/shmob-drm.ko] undefined!
-make[1]: *** [__modpost] Error 1
-make: *** [modules] Error 2
+sound/built-in.o: In function `snd_at73c213_probe':
+:(.text+0x328c4): undefined reference to `clk_round_rate'
+make: *** [vmlinux] Error 1
 
 Signed-off-by: Manjunath Goudar <csmanjuvijay@gmail.com>
-Cc: David Airlie <airlied@linux.ie>
-Cc: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-Cc: Sascha Hauer <s.hauer@pengutronix.de>
-Cc: dri-devel at lists.freedesktop.org
+Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+Cc: linux-input at vger.kernel.org
 Cc: linux-kernel at vger.kernel.org
 ---
- drivers/gpu/drm/shmobile/Kconfig |    2 +-
+ sound/spi/Kconfig |    2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/gpu/drm/shmobile/Kconfig b/drivers/gpu/drm/shmobile/Kconfig
-index ca498d1..eaf822e 100644
---- a/drivers/gpu/drm/shmobile/Kconfig
-+++ b/drivers/gpu/drm/shmobile/Kconfig
-@@ -1,6 +1,6 @@
- config DRM_SHMOBILE
- 	tristate "DRM Support for SH Mobile"
--	depends on DRM && (ARM || SUPERH)
-+	depends on DRM && (ARM || SUPERH) && BACKLIGHT_CLASS_DEVICE
- 	select DRM_KMS_HELPER
- 	select DRM_KMS_CMA_HELPER
- 	select DRM_GEM_CMA_HELPER
+diff --git a/sound/spi/Kconfig b/sound/spi/Kconfig
+index e6485be..798d1ee 100644
+--- a/sound/spi/Kconfig
++++ b/sound/spi/Kconfig
+@@ -11,7 +11,7 @@ if SND_SPI
+ 
+ config SND_AT73C213
+ 	tristate "Atmel AT73C213 DAC driver"
+-	depends on ATMEL_SSC
++	depends on ATMEL_SSC && COMMON_CLK
+ 	select SND_PCM
+ 	help
+ 	  Say Y here if you want to use the Atmel AT73C213 external DAC. This
 -- 
 1.7.9.5
