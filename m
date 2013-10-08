@@ -1,73 +1,68 @@
 From: wsa@the-dreams.de (Wolfram Sang)
-Date: Tue,  8 Oct 2013 22:35:34 +0200
-Subject: [PATCH 2/9] i2c: i2c-imx: replace platform_driver_probe to support
- deferred probing
-In-Reply-To: <1381264542-29396-1-git-send-email-wsa@the-dreams.de>
-References: <1381264542-29396-1-git-send-email-wsa@the-dreams.de>
-Message-ID: <1381264542-29396-3-git-send-email-wsa@the-dreams.de>
+Date: Tue,  8 Oct 2013 22:35:32 +0200
+Subject: [PATCH 0/9] fix deferred probing issue of platform_driver_probe
+Message-ID: <1381264542-29396-1-git-send-email-wsa@the-dreams.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
+
+We had some issues with deferred probing in the I2C subsystem. This series
+attempts to fix a part of it. From the patch description:
+
+===
 
 Subsystems like pinctrl and gpio rightfully make use of deferred probing at
 core level. Now, deferred drivers won't be retried if they don't have a .probe
 function specified in the driver struct. Fix this driver to have that, so the
 devices it supports won't get lost in a deferred probe.
 
-Signed-off-by: Wolfram Sang <wsa@the-dreams.de>
-Cc: kernel at pengutronix.de
----
- drivers/i2c/busses/i2c-imx.c | 11 ++++++-----
- 1 file changed, 6 insertions(+), 5 deletions(-)
+===
 
-diff --git a/drivers/i2c/busses/i2c-imx.c b/drivers/i2c/busses/i2c-imx.c
-index ccf4665..1d7efa3 100644
---- a/drivers/i2c/busses/i2c-imx.c
-+++ b/drivers/i2c/busses/i2c-imx.c
-@@ -365,7 +365,7 @@ static void i2c_imx_stop(struct imx_i2c_struct *i2c_imx)
- 	clk_disable_unprepare(i2c_imx->clk);
- }
- 
--static void __init i2c_imx_set_clk(struct imx_i2c_struct *i2c_imx,
-+static void i2c_imx_set_clk(struct imx_i2c_struct *i2c_imx,
- 							unsigned int rate)
- {
- 	struct imx_i2c_clk_pair *i2c_clk_div = i2c_imx->hwdata->clk_div;
-@@ -589,7 +589,7 @@ static struct i2c_algorithm i2c_imx_algo = {
- 	.functionality	= i2c_imx_func,
- };
- 
--static int __init i2c_imx_probe(struct platform_device *pdev)
-+static int i2c_imx_probe(struct platform_device *pdev)
- {
- 	const struct of_device_id *of_id = of_match_device(i2c_imx_dt_ids,
- 							   &pdev->dev);
-@@ -697,7 +697,7 @@ static int __init i2c_imx_probe(struct platform_device *pdev)
- 	return 0;   /* Return OK */
- }
- 
--static int __exit i2c_imx_remove(struct platform_device *pdev)
-+static int i2c_imx_remove(struct platform_device *pdev)
- {
- 	struct imx_i2c_struct *i2c_imx = platform_get_drvdata(pdev);
- 
-@@ -715,7 +715,8 @@ static int __exit i2c_imx_remove(struct platform_device *pdev)
- }
- 
- static struct platform_driver i2c_imx_driver = {
--	.remove		= __exit_p(i2c_imx_remove),
-+	.probe = i2c_imx_probe,
-+	.remove = i2c_imx_remove,
- 	.driver	= {
- 		.name	= DRIVER_NAME,
- 		.owner	= THIS_MODULE,
-@@ -726,7 +727,7 @@ static struct platform_driver i2c_imx_driver = {
- 
- static int __init i2c_adap_imx_init(void)
- {
--	return platform_driver_probe(&i2c_imx_driver, i2c_imx_probe);
-+	return platform_driver_register(&i2c_imx_driver);
- }
- subsys_initcall(i2c_adap_imx_init);
- 
+I think it makes sense to remove platform_driver_probe from bus masters like
+i2c and spi (especially since they are dependant on pinctrl these days). This
+is what this series does. I had a look at dma drivers as well, but there are
+more things to be considered, so delayed for now.
+
+Please comment. If no objections are raised, I'd like to bring at least the I2C
+patches into v3.12, so deferred devices will then be correctly probed. The
+series is based on 3.12-rc4 and was compile-tested. It is available at
+
+git://git.kernel.org/pub/scm/linux/kernel/git/wsa/linux.git platform_driver_probe_drop
+
+Regards,
+
+   Wolfram
+
+
+Wolfram Sang (9):
+  i2c: i2c-designware-platdrv: replace platform_driver_probe to support
+    deferred probing
+  i2c: i2c-imx: replace platform_driver_probe to support deferred
+    probing
+  i2c: i2c-mxs: replace platform_driver_probe to support deferred
+    probing
+  i2c: i2c-stu300: replace platform_driver_probe to support deferred
+    probing
+  spi: spi-au1550: replace platform_driver_probe to support deferred
+    probing
+  spi: spi-bfin5xx: replace platform_driver_probe to support deferred
+    probing
+  spi: spi-omap-uwire: replace platform_driver_probe to support deferred
+    probing
+  spi: spi-s3c64xx: replace platform_driver_probe to support deferred
+    probing
+  spi: spi-txx9: replace platform_driver_probe to support deferred
+    probing
+
+ drivers/i2c/busses/i2c-designware-platdrv.c |  5 +++--
+ drivers/i2c/busses/i2c-imx.c                | 11 ++++++-----
+ drivers/i2c/busses/i2c-mxs.c                |  3 ++-
+ drivers/i2c/busses/i2c-stu300.c             | 11 +++++------
+ drivers/spi/spi-au1550.c                    |  3 ++-
+ drivers/spi/spi-bfin5xx.c                   |  5 +++--
+ drivers/spi/spi-omap-uwire.c                |  5 +++--
+ drivers/spi/spi-s3c64xx.c                   |  3 ++-
+ drivers/spi/spi-txx9.c                      |  3 ++-
+ 9 files changed, 28 insertions(+), 21 deletions(-)
+
 -- 
 1.8.4.rc3
