@@ -1,99 +1,49 @@
 From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Wed,  9 Oct 2013 00:34:35 +0200
-Subject: [PATCH 19/23] ARM: atomic64: fix endian-ness in atomic.h
+Date: Wed,  9 Oct 2013 00:34:38 +0200
+Subject: [PATCH 22/23] ARM: cci: driver need big endian fixes in asm code
 In-Reply-To: <1381271679-27804-1-git-send-email-ben.dooks@codethink.co.uk>
 References: <1381271679-27804-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <1381271679-27804-20-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <1381271679-27804-23-git-send-email-ben.dooks@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Victor Kamensky <victor.kamensky@linaro.org>
 
-Fix inline asm for atomic64_xxx functions in arm atomic.h. Instead of
-%H operand specifiers code should use %Q for least significant part
-of the value, and %R for the most significant part of the value. %H
-always returns the higher of the two register numbers, and therefore
-it is not endian neutral. %H should be used with ldrexd and strexd
-instructions.
+cci_enable_port_for_self written in asm and it works with h/w
+registers that are in little endian format. When run in big
+endian mode it needs byte swap before/after it writes/reads
+to/from such registers
 
+CC: Lorenzon Pieralisi <lorenzo.pieralisi@arm.com>
 Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
-Acked-by: Will Deacon <will.deacon@arm.com>
 Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
 ---
- arch/arm/include/asm/atomic.h | 26 +++++++++++++-------------
- 1 file changed, 13 insertions(+), 13 deletions(-)
+ drivers/bus/arm-cci.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/arch/arm/include/asm/atomic.h b/arch/arm/include/asm/atomic.h
-index da1c77d..6447a0b 100644
---- a/arch/arm/include/asm/atomic.h
-+++ b/arch/arm/include/asm/atomic.h
-@@ -301,8 +301,8 @@ static inline void atomic64_add(u64 i, atomic64_t *v)
+diff --git a/drivers/bus/arm-cci.c b/drivers/bus/arm-cci.c
+index 2009266..6db173e 100644
+--- a/drivers/bus/arm-cci.c
++++ b/drivers/bus/arm-cci.c
+@@ -281,6 +281,9 @@ asmlinkage void __naked cci_enable_port_for_self(void)
+ 	/* Enable the CCI port */
+ "	ldr	r0, [r0, %[offsetof_port_phys]] \n"
+ "	mov	r3, #"__stringify(CCI_ENABLE_REQ)" \n"
++#ifdef __ARMEB__
++"	rev	r3, r3 \n"
++#endif /* __ARMEB__ */
+ "	str	r3, [r0, #"__stringify(CCI_PORT_CTRL)"] \n"
  
- 	__asm__ __volatile__("@ atomic64_add\n"
- "1:	ldrexd	%0, %H0, [%3]\n"
--"	adds	%0, %0, %4\n"
--"	adc	%H0, %H0, %H4\n"
-+"	adds	%Q0, %Q0, %Q4\n"
-+"	adc	%R0, %R0, %R4\n"
- "	strexd	%1, %0, %H0, [%3]\n"
- "	teq	%1, #0\n"
- "	bne	1b"
-@@ -320,8 +320,8 @@ static inline u64 atomic64_add_return(u64 i, atomic64_t *v)
+ 	/* poll the status reg for completion */
+@@ -288,6 +291,9 @@ asmlinkage void __naked cci_enable_port_for_self(void)
+ "	ldr	r0, [r1] \n"
+ "	ldr	r0, [r0, r1]		@ cci_ctrl_base \n"
+ "4:	ldr	r1, [r0, #"__stringify(CCI_CTRL_STATUS)"] \n"
++#ifdef __ARMEB__
++"	rev	r1, r1 \n"
++#endif /* __ARMEB__ */
+ "	tst	r1, #1 \n"
+ "	bne	4b \n"
  
- 	__asm__ __volatile__("@ atomic64_add_return\n"
- "1:	ldrexd	%0, %H0, [%3]\n"
--"	adds	%0, %0, %4\n"
--"	adc	%H0, %H0, %H4\n"
-+"	adds	%Q0, %Q0, %Q4\n"
-+"	adc	%R0, %R0, %R4\n"
- "	strexd	%1, %0, %H0, [%3]\n"
- "	teq	%1, #0\n"
- "	bne	1b"
-@@ -341,8 +341,8 @@ static inline void atomic64_sub(u64 i, atomic64_t *v)
- 
- 	__asm__ __volatile__("@ atomic64_sub\n"
- "1:	ldrexd	%0, %H0, [%3]\n"
--"	subs	%0, %0, %4\n"
--"	sbc	%H0, %H0, %H4\n"
-+"	subs	%Q0, %Q0, %Q4\n"
-+"	sbc	%R0, %R0, %R4\n"
- "	strexd	%1, %0, %H0, [%3]\n"
- "	teq	%1, #0\n"
- "	bne	1b"
-@@ -360,8 +360,8 @@ static inline u64 atomic64_sub_return(u64 i, atomic64_t *v)
- 
- 	__asm__ __volatile__("@ atomic64_sub_return\n"
- "1:	ldrexd	%0, %H0, [%3]\n"
--"	subs	%0, %0, %4\n"
--"	sbc	%H0, %H0, %H4\n"
-+"	subs	%Q0, %Q0, %Q4\n"
-+"	sbc	%R0, %R0, %R4\n"
- "	strexd	%1, %0, %H0, [%3]\n"
- "	teq	%1, #0\n"
- "	bne	1b"
-@@ -428,9 +428,9 @@ static inline u64 atomic64_dec_if_positive(atomic64_t *v)
- 
- 	__asm__ __volatile__("@ atomic64_dec_if_positive\n"
- "1:	ldrexd	%0, %H0, [%3]\n"
--"	subs	%0, %0, #1\n"
--"	sbc	%H0, %H0, #0\n"
--"	teq	%H0, #0\n"
-+"	subs	%Q0, %Q0, #1\n"
-+"	sbc	%R0, %R0, #0\n"
-+"	teq	%R0, #0\n"
- "	bmi	2f\n"
- "	strexd	%1, %0, %H0, [%3]\n"
- "	teq	%1, #0\n"
-@@ -459,8 +459,8 @@ static inline int atomic64_add_unless(atomic64_t *v, u64 a, u64 u)
- "	teqeq	%H0, %H5\n"
- "	moveq	%1, #0\n"
- "	beq	2f\n"
--"	adds	%0, %0, %6\n"
--"	adc	%H0, %H0, %H6\n"
-+"	adds	%Q0, %Q0, %Q6\n"
-+"	adc	%R0, %R0, %R6\n"
- "	strexd	%2, %0, %H0, [%4]\n"
- "	teq	%2, #0\n"
- "	bne	1b\n"
 -- 
 1.8.4.rc3
