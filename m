@@ -1,91 +1,106 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 8 Oct 2013 10:27:44 -0500
-Subject: [RFC] clk: add flags to distinguish xtal clocks
-In-Reply-To: <20131007074424.7445.52119@quantum>
-References: <1372971912-10877-1-git-send-email-coelho@ti.com>
- <20130704222538.10823.2559@quantum>
- <1372977465.21065.136.camel@cumari.coelho.fi>
- <20130704231953.10823.94331@quantum>
- <1373010853.21065.159.camel@cumari.coelho.fi>
- <1375105842.20048.18.camel@cumari.coelho.fi>
- <20131007074424.7445.52119@quantum>
-Message-ID: <20131008152743.GB13128@radagast>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 8 Oct 2013 16:28:12 +0100
+Subject: [PATCH V3] clk: palmas: add clock driver for palmas
+In-Reply-To: <5254193A.70104@nvidia.com>
+References: <1381238480-18852-1-git-send-email-ldewangan@nvidia.com>
+ <525408B3.1000107@ti.com> <5254193A.70104@nvidia.com>
+Message-ID: <20131008152812.GA4981@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, Oct 08, 2013 at 03:39:54PM +0100, Laxman Dewangan wrote:
+> Thanks Nishanth for review.
+> 
+> On Tuesday 08 October 2013 06:59 PM, Nishanth Menon wrote:
+> > On 10/08/2013 08:21 AM, Laxman Dewangan wrote:
+> >> Palmas devices has two clock output CLK32K_KG and CLK32K_KG_AUDIO
+> > not all palmas devices have 2 clocks - example: tps659038
+> 
+> This is for generic palmas and I have seen it for TPS65913, TPS65914, 
+> TPS80036. If the generic one is not compatible then it need to add  
+> device specific and at that time, it is require to update the binding 
+> document accordingly.
 
-Fixing Luca's address since he left TI
+We've just been given an example of where it's not compatible.
 
-On Mon, Oct 07, 2013 at 12:44:24AM -0700, Mike Turquette wrote:
-> Quoting Luciano Coelho (2013-07-29 06:50:42)
-> > Hi Mike,
-> > 
-> > On Fri, 2013-07-05 at 10:54 +0300, Luciano Coelho wrote:
-> > > On Thu, 2013-07-04 at 16:19 -0700, Mike Turquette wrote:
-> > > > Quoting Luciano Coelho (2013-07-04 15:37:45)
-> > > > > On Thu, 2013-07-04 at 15:25 -0700, Mike Turquette wrote:
-> > > > > > Or is it the same clock input and basically the problem is that you need
-> > > > > > to know what kind of waveform to expect (e.g. square versus sine)?
-> > > > > 
-> > > > > It's the same clock input in the chip's perspective.  One clock input
-> > > > > that can be any of the combinations I mentioned above.  Again, I'm not
-> > > > > familiar with clocks, so I guess the square vs. sine explanation is
-> > > > > plausible.  What I could see in the firmware is that it handles the
-> > > > > clocks differently if they're xtal or not.
-> > > > 
-> > > > OMAP has a similar thing where sys_clkin (the fast reference clock for
-> > > > the chip) can be 19.2, 26, 38.4, etc. This is easy to handle since only
-> > > > the rates matter.
-> > > 
-> > > Right, this part is easy and I already have the code for that.  What I'm
-> > > missing is a way to pass this XTAL flag to the chip.
-> > > 
-> > > 
-> > > > In your case you need some extra metadata to know what to do. I'm really
-> > > > not sure if CLK_IS_TYPE_XTAL is the most useful form this metadata can
-> > > > take. It would be best to know if the waveform is what you really need
-> > > > to know, or perhaps something else. For instance you might be affected
-> > > > by some clock signal stabilization time. Can you talk to your hardware
-> > > > guys and figure it out? I'd rather model the actual needs instead of
-> > > > just tossing a flag in there.
-> > > 
-> > > I get your point.  I have tried to investigate how this flag is used by
-> > > the firmware and I could see that it is used to set different "buffer
-> > > gains" and "delays" when waking up (I guess this means when the clock is
-> > > starting, so probably related to stabilization time).  They specify two
-> > > "modes", "boost" and "normal" and use different delay values for each.
-> > 
-> > I tried but I couldn't find any more information on how exactly this
-> > works.  But since this change is really simple and there seems to be
-> > other people who need the same information, couldn't we add it as is and
-> > try to figure out more specific information about the clocks later on?
-> > 
-> > Even if XTAL is not that useful if we know the other details, at least
-> > it wouldn't hurt to have the flag there anyway.
 > 
-> Luca,
+> >           |    7 +
+> >   drivers/clk/Makefile                               |    1 +
+> >   drivers/clk/clk-palmas.c                           |  340 ++++++++++++++++++++
+> >
+> > http://www.spinics.net/lists/devicetree/msg04855.html
+> > Do we do 2 patches now? one seperate for binding and implementation?
+> > What is our current preference now a days?
 > 
-> By any chance did you come to a different solution for this problem? I
-> can take the patch, but I do not feel like we're solving the right
-> problem the right way.
-> 
-> If not I will take it for 3.13.
-> 
-> Regards,
-> Mike
-> 
-> > 
-> > --
-> > Cheers,
-> > Luca.
+> Currently it is implementation + binding doc in one patch.
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131008/d06bb43a/attachment.sig>
+I believe the general consensus is that separate DT patches are
+preferred.
+
+> 
+> >
+> >>   Palmas device has two clock output pins for 32KHz, KG and KG_AUDIO.
+> >> +
+> >> +This binding uses the common clock binding ./clock-bindings.txt.
+> > proper link would be to provide
+> > Documentation/devicetree/bindings/clock/clock-bindings.txt ?
+> 
+> Hmm, other patch I got feedback from DT maintainers to do not use the 
+> absolute path as document directory may change
+
+I'd not seen this, but I don't have a strong preference either way. This
+document will go under Documentation/devicetree/bindings/clock, so a
+relative path seems Ok.
+
+> 
+> >> +
+> >> +Clock 32KHz KG is output 0 of the driver and clock 32KHz is output 1.
+> >> +
+> >> +Required properties:
+> >> +- compatible : shall be "ti,palmas-clk".
+> > To handle variants of Palmas chips in production, you'd want to be
+> > specific here clk32k_kg and clk32k_kg_audio.
+> 
+> The compatible is the device sub module level, not the clock level. Same 
+> thing we are following on regulators.
+
+Yes, we don't need a separate compatible string for each clock within a
+block providing those clocks.
+
+> 
+> 
+> >
+> >> +
+> >> +     Optional subnode properties:
+> >> +     ti,clock-boot-enable: Enable clock at the time of booting.
+> > Dumb question: Why is this needed? should'nt relevant drivers do a
+> > clk_get to enable the relevant clocks?
+> 
+> If some board needs this clock to be always available for rest of system 
+> to work without any specific driver then this flag is useful.
+
+Do we _actually_ need this right now, or is this hypothetical?
+
+If we don't need it now, remove it. If you think we need it know, please
+describe exactly why (i.e. what device needs the clock to work, why does
+this affect the rest of the board if we don't ahve a driver for that
+device, why don't we just write a driver for that device).
+
+> 
+> 
+> >
+> >> +     ti,external-sleep-control: The clock is enable/disabled by state
+> >> +             of external enable input pins ENABLE, ENABLE2 and NSLEEP.
+> >> +             The valid value for the external pins are:
+> >> +                     1 for ENABLE1
+> >> +                     2 for ENABLE2
+> >> +                     3 for NSLEEP.
+
+I asked this on the last version (before having noticed this one). What
+actually drives those pins to control the clock(s)?
+
+Is this for setting the clock to be controlled by the external pin, or
+is the clock hard-wired to a particular pin?
+
+Thanks,
+Mark.
