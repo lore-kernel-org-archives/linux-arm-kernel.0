@@ -1,23 +1,34 @@
-From: msalter@redhat.com (Mark Salter)
-Date: Tue, 08 Oct 2013 08:56:41 -0400
-Subject: [PATCH] arm64: add asm-generic parport.h
-In-Reply-To: <1381182265-11271-1-git-send-email-robherring2@gmail.com>
-References: <1381182265-11271-1-git-send-email-robherring2@gmail.com>
-Message-ID: <1381237001.17503.72.camel@deneb.redhat.com>
+From: jonas.jensen@gmail.com (Jonas Jensen)
+Date: Tue,  8 Oct 2013 14:56:40 +0200
+Subject: [PATCH] Documentation: add moxa vendor prefix
+Message-ID: <1381237000-8398-1-git-send-email-jonas.jensen@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2013-10-07 at 16:44 -0500, Rob Herring wrote:
-> From: Rob Herring <rob.herring@calxeda.com>
-> 
-> Add asm-generic/parport.h to help fix allyesconfig builds.
-> 
+Add moxa vendor prefix.
 
-See:
+Signed-off-by: Jonas Jensen <jonas.jensen@gmail.com>
+---
 
-http://www.spinics.net/lists/arm-kernel/msg267957.html
-http://www.spinics.net/lists/linux-arch/msg23167.html
+Notes:
+    Submitting this per Mark Rutland's request.
+    
+    Applies to next-20130927
 
-and finally,
+ Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
-https://lkml.org/lkml/2013/10/8/12
+diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+index 2956800..0a04e89 100644
+--- a/Documentation/devicetree/bindings/vendor-prefixes.txt
++++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+@@ -40,6 +40,7 @@ marvell	Marvell Technology Group Ltd.
+ maxim	Maxim Integrated Products
+ microchip	Microchip Technology Inc.
+ mosaixtech	Mosaix Technologies, Inc.
++moxa	Moxa Technology Co., Ltd.
+ national	National Semiconductor
+ nintendo	Nintendo
+ nvidia	NVIDIA
+-- 
+1.8.2.1
