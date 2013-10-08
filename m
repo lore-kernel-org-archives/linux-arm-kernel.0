@@ -1,48 +1,77 @@
-From: bcousson@baylibre.com (Benoit Cousson)
-Date: Wed, 09 Oct 2013 00:40:10 +0200
-Subject: [PATCH] ARM: dts: omap5-uevm: mark TWL6037 as
- system-power-controller
-In-Reply-To: <52542813.7020208@ti.com>
-References: <1379617896-15213-1-git-send-email-nm@ti.com>
- <52542813.7020208@ti.com>
-Message-ID: <525489CA.10906@baylibre.com>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Wed,  9 Oct 2013 00:34:25 +0200
+Subject: [PATCH 09/23] ARM: mvebu: support running big-endian
+In-Reply-To: <1381271679-27804-1-git-send-email-ben.dooks@codethink.co.uk>
+References: <1381271679-27804-1-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <1381271679-27804-10-git-send-email-ben.dooks@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nishanth,
+Add indication we can run these cores in BE mode, and ensure that the
+secondary CPU is set to big-endian mode in the initialisation code as
+the initial code runs little-endian.
 
-On 08/10/2013 17:43, Nishanth Menon wrote:
-> On 09/19/2013 02:11 PM, Nishanth Menon wrote:
->> This allows the palmas pm_power_off to kick in on power off command
->> and switch off the board.
->>
->> Signed-off-by: Nishanth Menon <nm@ti.com>
->> ---
->> Based on: (benoit's for_3.13/dts branch)
->> https://git.kernel.org/cgit/linux/kernel/git/bcousson/linux-omap-dt.git/log/?h=for_3.13/dts
->> This uses the support introduced by:
->> http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=b81eec09a484c588ead035003ce7555ca8a9963a
->>
->>   arch/arm/boot/dts/omap5-uevm.dts |    1 +
->>   1 file changed, 1 insertion(+)
->>
->> diff --git a/arch/arm/boot/dts/omap5-uevm.dts b/arch/arm/boot/dts/omap5-uevm.dts
->> index da25a14..8227386 100644
->> --- a/arch/arm/boot/dts/omap5-uevm.dts
->> +++ b/arch/arm/boot/dts/omap5-uevm.dts
->> @@ -271,6 +271,7 @@
->>   		reg = <0x48>;
->>   		interrupt-controller;
->>   		#interrupt-cells = <2>;
->> +		ti,system-power-controller;
->>
->>   		extcon_usb3: palmas_usb {
->>   			compatible = "ti,palmas-usb-vid";
->>
-> Gentle ping.
-> patchworks link: https://patchwork.kernel.org/patch/2913111/
+Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+Tested-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Acked-by: Jason Cooper <jason@lakedaemon.net>
+---
+ arch/arm/mach-mvebu/Kconfig        | 1 +
+ arch/arm/mach-mvebu/coherency_ll.S | 3 +++
+ arch/arm/mach-mvebu/headsmp.S      | 4 ++++
+ 3 files changed, 8 insertions(+)
 
-I've just applied it and pushed it to my branch.
-
-Thanks,
-Benoit
+diff --git a/arch/arm/mach-mvebu/Kconfig b/arch/arm/mach-mvebu/Kconfig
+index 9eb63d7..5e269d7 100644
+--- a/arch/arm/mach-mvebu/Kconfig
++++ b/arch/arm/mach-mvebu/Kconfig
+@@ -1,5 +1,6 @@
+ config ARCH_MVEBU
+ 	bool "Marvell SOCs with Device Tree support" if ARCH_MULTI_V7
++	select ARCH_SUPPORTS_BIG_ENDIAN
+ 	select CLKSRC_MMIO
+ 	select COMMON_CLK
+ 	select GENERIC_CLOCKEVENTS
+diff --git a/arch/arm/mach-mvebu/coherency_ll.S b/arch/arm/mach-mvebu/coherency_ll.S
+index 5476669..ee7598f 100644
+--- a/arch/arm/mach-mvebu/coherency_ll.S
++++ b/arch/arm/mach-mvebu/coherency_ll.S
+@@ -20,6 +20,8 @@
+ #define ARMADA_XP_CFB_CTL_REG_OFFSET 0x0
+ #define ARMADA_XP_CFB_CFG_REG_OFFSET 0x4
+ 
++#include <asm/assembler.h>
++
+ 	.text
+ /*
+  * r0: Coherency fabric base register address
+@@ -29,6 +31,7 @@ ENTRY(ll_set_cpu_coherent)
+ 	/* Create bit by cpu index */
+ 	mov	r3, #(1 << 24)
+ 	lsl	r1, r3, r1
++ARM_BE8(rev	r1, r1)
+ 
+ 	/* Add CPU to SMP group - Atomic */
+ 	add	r3, r0, #ARMADA_XP_CFB_CTL_REG_OFFSET
+diff --git a/arch/arm/mach-mvebu/headsmp.S b/arch/arm/mach-mvebu/headsmp.S
+index 8a1b0c9..3dd80df4 100644
+--- a/arch/arm/mach-mvebu/headsmp.S
++++ b/arch/arm/mach-mvebu/headsmp.S
+@@ -21,12 +21,16 @@
+ #include <linux/linkage.h>
+ #include <linux/init.h>
+ 
++#include <asm/assembler.h>
++
+ /*
+  * Armada XP specific entry point for secondary CPUs.
+  * We add the CPU to the coherency fabric and then jump to secondary
+  * startup
+  */
+ ENTRY(armada_xp_secondary_startup)
++ ARM_BE8(setend	be )			@ go BE8 if entered LE
++
+ 	/* Get coherency fabric base physical address */
+ 	adr	r0, 1f
+ 	ldr	r1, [r0]
+-- 
+1.8.4.rc3
