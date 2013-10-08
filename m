@@ -1,37 +1,89 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Tue, 08 Oct 2013 09:27:49 +0200
-Subject: [PATCH 0/2] additional vexpress-tc2 big endian fixes
-In-Reply-To: <1381207040-1623-1-git-send-email-victor.kamensky@linaro.org>
-References: <1381207040-1623-1-git-send-email-victor.kamensky@linaro.org>
-Message-ID: <5253B3F5.1020704@codethink.co.uk>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Tue, 8 Oct 2013 09:28:00 +0200 (CEST)
+Subject: [PATCH] DMA: extend documentation to provide more API details
+In-Reply-To: <20131008035243.GO2954@intel.com>
+References: <Pine.LNX.4.64.1310071233340.20796@axis700.grange>
+ <20131007111728.GM12758@n2100.arm.linux.org.uk>
+ <20131007103936.GH2954@intel.com>
+ <Pine.LNX.4.64.1310071409080.20796@axis700.grange>
+ <20131007142511.GJ2954@intel.com>
+ <Pine.LNX.4.64.1310071725300.20796@axis700.grange>
+ <20131007144335.GL2954@intel.com>
+ <Pine.LNX.4.64.1310071739590.20796@axis700.grange>
+ <20131007155229.GN2954@intel.com>
+ <Pine.LNX.4.64.1310072244030.27047@axis700.grange>
+ <20131008035243.GO2954@intel.com>
+Message-ID: <Pine.LNX.4.64.1310080917480.31629@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/10/13 06:37, Victor Kamensky wrote:
-> Hi Ben,
->
-> Here are couple more big endian related fixes. We run into these
-> with vexpress TC2 board, when CONFIG_MCPM and CONFIG_ARM_CCI configs
-> are enabled. Big endian image fails to boot. With fixes BE TC2
-> boots and it sees all 5 cores (2xA15, 3xA7).
->
-> These were tested with vexpress TC2 on latest linux-linaro
-> branch (include BE patch series) and it was tested on very
-> recent rmk/fixes branch along with BE series on top of it.
->
-> Thanks,
-> Victor
->
-> Victor Kamensky (2):
->    ARM: mcpm: fix big endian issue in mcpm startup code
->    ARM: cci: driver need big endian fixes in asm code
->
->   arch/arm/common/mcpm_head.S | 2 ++
->   drivers/bus/arm-cci.c       | 6 ++++++
->   2 files changed, 8 insertions(+)
+Hi Vinod,
 
-Thanks, anyone any objections if these go into my 312-rc4 branch?
+On Tue, 8 Oct 2013, Vinod Koul wrote:
 
--- 
-Ben Dooks				http://www.codethink.co.uk/
-Senior Engineer				Codethink - Providing Genius
+> On Mon, Oct 07, 2013 at 10:55:56PM +0200, Guennadi Liakhovetski wrote:
+> > > > > > > > > > > No, not something in the middle. I was thinking about
+> > > > > > > > > > > 
+> > > > > > > > > > > (1) cookie 1-3 are submitted
+> > > > > > > > > > > (2) cookie 1 succeeds
+> > > > > > > > > > > (3) a DMA error occurs, cookies 2-3 are discarded
+> > > > > > > > > discarded using terminate_all right?
+> > > > > > > > 
+> > > > > > > > No, by the dmaengine driver as a part of the error processing.
+> > > > > > > And how will that be done...?
+> > > > > > 
+> > > > > > Sorry, I meant - DMA descriptors with cookies #2 and #3 will be cancelled 
+> > > > > > and recycled by the dmaengine driver. That's what you have to do, when 
+> > > > > > processing DMA error IRQ.
+> > > > > Well how do you that?
+> > > > 
+> > > > Mmmh, maybe I'm missing something, but isn't it a part of the common DMA 
+> > > > processing? You get an error IRQ; on some DMAC types this means, that you 
+> > > > have to reset the hardware, so, you perform whatever actions you have to 
+> > > > do to reset the controller; you remove any descriptors from the pending 
+> > > > queue; reinsert them into the free queue and let any clients run on a 
+> > > > timeout. I don't think it would be a good idea to do anything more smart 
+> > > > like trying to restart the current transfer or drop it and continue with 
+> > > > the queue, because we don't know in what state the client hardware is, so, 
+> > > > we can only let the client driver try to recover.
+> > > No that would be very wrong thing to do behind clients back. Suppose you got a
+> > > trasaction which returned error irq and it was generated one half of the
+> > > requested transfer was done. Redoing the entrie transaction wont be right!
+> > > 
+> > > So I think you need to let client know the error status.
+> > > 
+> > > But again, is this usage fiarly common?
+> > 
+> > Hm, I think, the question is different: is this possible and realistic? If 
+> > there's just one DMAC and one platform, I think, there should be a way to 
+> > support it? There are controllers, that actually have separate error IRQ 
+> > outputs and special status bits for them. Actually, see commit
+> Fair enough, if this is something you commonly need to deal with then lets add a
+> new callback for error reporting. I think this would be simpler and then client
+> will know about the failure
+> 
+> On failure reporting the client should query the status to know what is pending
+> for this transaction then recover accordingly
+
+Yes, this should help, thanks!
+
+> Will send patch for this and moving to DMA_COMPLETE as status
+
+As for statuses: AFAICS in a non-cyclic case a dmaengine driver can 
+distinguish between the following states:
+
+1. queued: after .tx_submit(), before .device_issue_pending()
+2. active: after .device_issue_pending(), before actually sending to the 
+   hardware
+3. in progress: sent to the hardware, waiting for completion
+4. waiting for ack: completed successfully, waiting for async_tx_ack()
+5. unknown: the cookie cannot be found in any of the driver's lists
+
+Makes sense?
+
+Thanks
+Guennadi
+---
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
