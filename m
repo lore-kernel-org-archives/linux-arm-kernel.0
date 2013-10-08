@@ -1,25 +1,39 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 8 Oct 2013 11:34:56 +0100
-Subject: [PATCH 2/2] ARM: include: asm: use 'int' instead of 'unsigned
- long' for normal register variables within atomic.h
-In-Reply-To: <525385A4.5050200@asianux.com>
-References: <20131002104158.GD28311@mudshark.cambridge.arm.com>
- <524C3981.20307@asianux.com> <524D416B.5090709@asianux.com>
- <20131003163200.GE7408@mudshark.cambridge.arm.com>
- <524E8FBC.2080200@asianux.com>
- <20131004153742.GR24303@mudshark.cambridge.arm.com>
- <20131004154208.GS24303@mudshark.cambridge.arm.com>
- <524F5566.4010204@asianux.com> <524F594B.1070106@asianux.com>
- <525385A4.5050200@asianux.com>
-Message-ID: <20131008103455.GF17148@mudshark.cambridge.arm.com>
+From: csmanjuvijay@gmail.com (Majunath Goudar)
+Date: Tue,  8 Oct 2013 16:06:04 +0530
+Subject: [PATCH] DRM: TTM: Fix memory leak issue in ttm_agp_tt_create().
+Message-ID: <1381228565-20846-1-git-send-email-csmanjuvijay@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 08, 2013 at 05:10:12AM +0100, Chen Gang wrote:
-> Excluding current discussion, the 2 patches (patch 1/2, patch 2/2) for
-> arm are both OK?
+This patch adds kfree() in ttm_agp_tt_create() to avoide the
+memory leak, without this there is a chance of memory leak in
+ttm_tt_init() fail case.
 
-I've kind of lost track. Could you send those patches again (as a fresh
-series) please?
+Signed-off-by: Jeyaraman R <jeyaraman.rangasamy@lge.com>
+Signed-off-by: Manjunath Goudar <csmanjuvijay@gmail.com>
+Cc: David Airlie <airlied@linux.ie>
+Cc: "Paul E. McKenney" <paulmck@linux.vnet.ibm.com>
+Cc: David Howells <dhowells@redhat.com>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: Dave Jones <davej@redhat.com>
+Cc: Dave Airlie <airlied@redhat.com>
+Cc: dri-devel at lists.freedesktop.org
+Cc: linux-kernel at vger.kernel.org
+---
+ drivers/gpu/drm/ttm/ttm_agp_backend.c |    1 +
+ 1 file changed, 1 insertion(+)
 
-Will
+diff --git a/drivers/gpu/drm/ttm/ttm_agp_backend.c b/drivers/gpu/drm/ttm/ttm_agp_backend.c
+index 3302f99..764be36 100644
+--- a/drivers/gpu/drm/ttm/ttm_agp_backend.c
++++ b/drivers/gpu/drm/ttm/ttm_agp_backend.c
+@@ -126,6 +126,7 @@ struct ttm_tt *ttm_agp_tt_create(struct ttm_bo_device *bdev,
+ 	agp_be->ttm.func = &ttm_agp_func;
+ 
+ 	if (ttm_tt_init(&agp_be->ttm, bdev, size, page_flags, dummy_read_page)) {
++		kfree(agp_be);
+ 		return NULL;
+ 	}
+ 
+-- 
+1.7.9.5
