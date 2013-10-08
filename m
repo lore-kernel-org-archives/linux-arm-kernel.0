@@ -1,107 +1,92 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Tue, 8 Oct 2013 16:05:59 -0500
-Subject: [PATCH V3] clk: palmas: add clock driver for palmas
-In-Reply-To: <52546E85.3070407@wwwdotorg.org>
-References: <1381238480-18852-1-git-send-email-ldewangan@nvidia.com>
- <525408B3.1000107@ti.com> <5254193A.70104@nvidia.com>
- <52542F69.30407@ti.com> <52543C1B.3000403@wwwdotorg.org>
- <525441DD.2090109@ti.com> <52546E85.3070407@wwwdotorg.org>
-Message-ID: <CAGo_u6p2uHf3f5qdSqfXqqKR4NaMvFyk02qTd7qK3jGOSeZ-Jw@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 8 Oct 2013 14:24:36 -0700
+Subject: [PATCH] ARM: OMAP2+: wakeupgen: AM43x adaptation
+In-Reply-To: <1378378535-2967-1-git-send-email-afzal@ti.com>
+References: <1378378535-2967-1-git-send-email-afzal@ti.com>
+Message-ID: <20131008212436.GR8313@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 8, 2013 at 3:43 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> On 10/08/2013 11:33 AM, Nishanth Menon wrote:
->> On 10/08/2013 12:08 PM, Stephen Warren wrote:
->>> On 10/08/2013 10:14 AM, Nishanth Menon wrote:
->>>> On 10/08/2013 09:39 AM, Laxman Dewangan wrote:
->>>>> Thanks Nishanth for review.
->>>>>
->>>>> On Tuesday 08 October 2013 06:59 PM, Nishanth Menon wrote:
->>>>>> On 10/08/2013 08:21 AM, Laxman Dewangan wrote:
->>>>>>> Palmas devices has two clock output CLK32K_KG and CLK32K_KG_AUDIO
->>>>>> not all palmas devices have 2 clocks - example: tps659038
->>>>>
->>>>> This is for generic palmas and I have seen it for TPS65913, TPS65914,
->>>>> TPS80036. If the generic one is not compatible then it need to add
->>>>> device specific and at that time, it is require to update the binding
->>>>> document accordingly.
->>>>
->>>> ?? you do have two clocks inside the device they should be represented
->>>> as two compatible entities - that simplifies everyone's life.
->>>
->>> I think the terminology you're using here is quite confusing.
->>>
->>> Are you talking about having two different compatible values for two
->>> different HW designs, where those different designs implement different
->>> sets of clocks (which makes sense), or two different DT nodes for two
->>> different clocks (which IMHO doesn't always, unless those different
->>> clocks *truly* are separate IP blocks with completely independent
->>> register regions, and where those IP blocks are likely to be re-used
->>> as-is in other chips).
->>
->> clk32k and clk32k_audio are two different resources and since these
->> are two different resource instances - a "compatible" matching an
->> actual device is my suggestion.
->
-> The fact that two clocks are two different resources isn't at all
-> relevant to DT structure. HW module design is what's relevant.
->
->> clk32k and clk32k_audio are two different resources because they have
->> their specific set of controls registers and may even be independently
->> present in a Palmas variant.
->
-> That's a better argument, assuming that: The registers for those two
-> clocks aren't randomly interleaved with other registers within the HW
-> module. That would imply that the clock registers aren't independant HW
-> blocks.
+Hi,
 
-You would be unpleasantly surprised if register offsets is a standard
-to determine if IP blocks are independent instances or not. it is just
-integration level decision, and unfortunately, not all h/w integration
-guys care a lot about s/w :(.
+Few minor comments below.
 
->
->> To highlight this: The example of tps659038 where clk32k is not
->> present, but clk32k_audio is present (and happens to be disabled by
->> default - thanks to an OTP on the chip - on platform like DRA7-evm, it
->> is used to for 32k clk for wlan -currently hacked in u-boot using
->> plain i2c writes[1] - yes it is yucky).
->
-> That can easily be handled by having separate compatible values for a
-> monolithic overall Palmas or Palmas-clock node/HW-block. The fact that
-> different chips are different doesn't, in and of itself, need to
-> influence whether the different clocks are represented as different DT
-> nodes.
+* Afzal Mohammed <afzal@ti.com> [130905 04:03]:
+> AM43x has 224 interrupts and 7 banks, make it as maximum values. Keep
+> default values as earlier, if am43x is detected, update interrupts and
+> banks to maximum.
+> 
+> Also AM43x has only one cpu, ensure that clearing bitmask at wakeupgen
+> is done only for the single existing cpu, existing code assumes that
+> there are two cpu's.
+> 
+> If bitmask is cleared in wakeupgen for the nonexistent second cpu,
+> an imprecise abort happens as soon as Kernel switches to user space.
+> It was rootcaused by Sekhar Nori <nsekhar@ti.com>.
+> 
+> Signed-off-by: Afzal Mohammed <afzal@ti.com>
+> ---
+>  arch/arm/mach-omap2/omap-wakeupgen.c | 18 +++++++++++++-----
+>  1 file changed, 13 insertions(+), 5 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/omap-wakeupgen.c b/arch/arm/mach-omap2/omap-wakeupgen.c
+> index 813c615..899d4946 100644
+> --- a/arch/arm/mach-omap2/omap-wakeupgen.c
+> +++ b/arch/arm/mach-omap2/omap-wakeupgen.c
+> @@ -33,8 +33,11 @@
+>  #include "omap4-sar-layout.h"
+>  #include "common.h"
+>  
+> -#define MAX_NR_REG_BANKS	5
+> -#define MAX_IRQS		160
+> +/* maximum value correspond to that of AM43x */
+> +#define MAX_NR_REG_BANKS	7
+> +#define MAX_IRQS		224
+> +#define DEFAULT_NR_REG_BANKS	5
+> +#define DEFAULT_IRQS		160
+>  #define WKG_MASK_ALL		0x00000000
+>  #define WKG_UNMASK_ALL		0xffffffff
+>  #define CPU_ENA_OFFSET		0x400
 
-So, the fact that a clock does not exist on a variation of palmas is
-not sufficient proof that the blocks are independent.
+How about define it like this to avoid updating things
+in multiple places for new SoCs:
 
-I am not sure, given the lack of public documentation, short of
-sharing rtl (which I cant ;) ), i might let this debate flame out..
+#define AM43X_NR_REG_BANKS	7
+#define MAX_NR_REG_BANKS	AM43X_NR_REG_BANKS
+...
 
->
->> Obviously, there are many ways to implement this. based on the current
->> implementation, it indicates that if i create a node with
->> "ti,palmas-clk" -i'd create two clocks - that is wrong for tps659038.
->>
->> Now (with the current approach), if I have to create a one clock for
->> tps659038, i have to fix the for adding clock providers, add up
->> "ti,tps659038-clk" etc.. it is doable - but IMHO, I dont need to do it
->> with only the relevant nodes in dts.
->>
->> Further, it has no way to indicate that device X uses clock Y using
->> clocks =<&xyz> either.
->
-> Sorry, I just don't understand that.
->
-> If a clock provider provides two clocks, it could number then e.g. 0 and
-> 1. Clock consumers would reference those IDs. If a different chip that
-> uses the same binding only supports one of those two clocks, just have
-> the driver return an error if the DT attempts to use/reference the
-> invalid clock ID; nothign could be simpler.
+> @@ -402,6 +405,7 @@ int __init omap_wakeupgen_init(void)
+>  {
+>  	int i;
+>  	unsigned int boot_cpu = smp_processor_id();
+> +	bool am43x = soc_is_am43xx() ? true : false;
+>  
+>  	/* Not supported on OMAP4 ES1.0 silicon */
+>  	if (omap_rev() == OMAP4430_REV_ES1_0) {
+> @@ -418,12 +422,16 @@ int __init omap_wakeupgen_init(void)
+>  		irq_banks = OMAP4_NR_BANKS;
+>  		max_irqs = OMAP4_NR_IRQS;
+>  		omap_secure_apis = 1;
+> +	} else if (am43x) {
+> +		irq_banks = MAX_NR_REG_BANKS;
+> +		max_irqs = MAX_IRQS;
+>  	}
 
-fair enough.
+Then here you can have:
+
+		irq_bankse = AM43X_NR_REG_BANKS
+		...
+  
+>  	/* Clear all IRQ bitmasks at wakeupGen level */
+>  	for (i = 0; i < irq_banks; i++) {
+>  		wakeupgen_writel(0, i, CPU0_ID);
+> -		wakeupgen_writel(0, i, CPU1_ID);
+> +		if (!am43x)
+> +			wakeupgen_writel(0, i, CPU1_ID);
+>  	}
+
+Why not use soc_is_am43xx() directly here?
 
 Regards,
-Nishanth Menon
+
+Tony
