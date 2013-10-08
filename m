@@ -1,110 +1,57 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 8 Oct 2013 15:15:12 +0100
-Subject: [PATCH V2] clk: palmas: add clock driver for palmas
-In-Reply-To: <1381154751-4565-1-git-send-email-ldewangan@nvidia.com>
-References: <1381154751-4565-1-git-send-email-ldewangan@nvidia.com>
-Message-ID: <20131008141512.GE1412@e106331-lin.cambridge.arm.com>
+From: jean.pihet@linaro.org (Jean Pihet)
+Date: Tue, 8 Oct 2013 16:15:40 +0200
+Subject: [PATCH 3/4] perf tools: Check libunwind for availability of dwarf
+ parsing feature
+In-Reply-To: <20131008104740.GU3081@twins.programming.kicks-ass.net>
+References: <1380195398-4402-1-git-send-email-jean.pihet@linaro.org>
+ <1380195398-4402-4-git-send-email-jean.pihet@linaro.org>
+ <20130926124829.GA3284@krava.brq.redhat.com>
+ <CAFrcx1nDe6mhxEuU4ROJGOmGFaYtVnnhXYirkmhRb1NEecNhtw@mail.gmail.com>
+ <20131008104740.GU3081@twins.programming.kicks-ass.net>
+Message-ID: <CAFrcx1kNONpBcsEHX1PN0kNUCOAkBCid+bgbv3mc0TPu=F+MYg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 07, 2013 at 03:05:51PM +0100, Laxman Dewangan wrote:
-> Palmas devices has two clock output CLK32K_KG and CLK32K_KG_AUDIO
-> which can be nebale/disable through software.
-> 
-> Add clock driver support for the Palmas 32k clocks.
-> 
-> Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
-> ---
-> Changes from V1:
-> - Call prepare if the clk is needed for boot-enable or sleep control.
-> - change is_enabled to is_prepared.
-> - Added ops palmas_clks_recalc_rate.
-> - Added of_clk_add_provider().
-> 
->  .../devicetree/bindings/clock/clk-palmas.txt       |   45 +++
->  drivers/clk/Kconfig                                |    7 +
->  drivers/clk/Makefile                               |    2 +
->  drivers/clk/clk-palmas.c                           |  336 ++++++++++++++++++++
->  4 files changed, 390 insertions(+), 0 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/clock/clk-palmas.txt
->  create mode 100644 drivers/clk/clk-palmas.c
-> 
-> diff --git a/Documentation/devicetree/bindings/clock/clk-palmas.txt b/Documentation/devicetree/bindings/clock/clk-palmas.txt
-> new file mode 100644
-> index 0000000..c247538
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/clock/clk-palmas.txt
-> @@ -0,0 +1,45 @@
-> +* Palmas 32KHz clocks *
-> +
-> +Palmas device has two clock output pins for 32KHz, KG and KG_AUDIO.
-> +
-> +This binding uses the common clock binding ./clock-bindings.txt.
-> +
-> +Clock 32KHz KG is output 0 of the driver and clock 32KHz is output 1.
-> +
-> +Required properties:
-> +- compatible : shall be "ti,palmas-clk".
-> +- #clock-cells : from common clock binding; shall be set to 1.
+Hi,
 
-It would make sense to describe the value values here, rather than
-above.
+On 8 October 2013 12:47, Peter Zijlstra <peterz@infradead.org> wrote:
+> On Tue, Oct 08, 2013 at 12:44:32PM +0200, Jean Pihet wrote:
+>> Hi,
+>>
+>> On 26 September 2013 14:48, Jiri Olsa <jolsa@redhat.com> wrote:
+>> > On Thu, Sep 26, 2013 at 01:36:37PM +0200, Jean Pihet wrote:
+>> >> The newly added dwarf unwinding feature [1] requires:
+>> >> . a recent version (>= 1.1) of libunwind,
+>> >> . libunwind to be configured with --enable-debug-frame.
+>> >>
+>> >> [1] http://www.spinics.net/lists/kernel/msg1598951.html
+>> >>
+>> >> Add the corresponding API tests in the feature check list.
+>> >
+>> > Acked-by: Jiri Olsa <jolsa@redhat.com>
+>> >
+>> > thanks,
+>> > jirka
+>>
+>> Thanks for the ack!
+>>
+>> Is it possible to get an ack from the perf core maintainers?
+>> Also, is the patch going in Will's tree?
+>
+> This being a tools patch you'd have to ask acme; also I know next to
+> nothing about all this unwind business except that its stupid expensive
+> ;-)
+You are right! It brings some more info on the trace though.
 
-> +
-> +Optional subnode:
-> +       The clock node has optional subnode to provide the init configuration of
-> +       clocks like boot enable, sleep control.
-> +
-> +       The subnode name is fixed and it should be
-> +               clk32k_kg for the 32KHz KG clock.
-> +               clk32k_kg_audio for the 32KHz KG_AUDIO clock.
-> +
-> +       Optional subnode properties:
-> +       ti,clock-boot-enable: Enable clock at the time of booting.
+-- adding Arnaldo in the loop --
+Arnaldo, are you OK with the changes [1]? Jiri acked the patches
+already; Will is willing (no pun intended) to take the ARM specific
+patches [2] in his tree.
 
-Why is this needed?
+[1] http://www.spinics.net/lists/kernel/msg1608921.html and
+http://www.spinics.net/lists/kernel/msg1608922.html
+[2] http://www.spinics.net/lists/kernel/msg1608920.html and
+http://www.spinics.net/lists/kernel/msg1608923.html
 
-If drivers need clocks, they should request them. If they don't
-currently, that's a bug in the driver.
-
-> +       ti,external-sleep-control: The clock is enable/disabled by state
-> +               of external enable input pins ENABLE, ENABLE2 and NSLEEP.
-> +               The valid value for the external pins are:
-> +                       1 for ENABLE1
-> +                       2 for ENABLE2
-> +                       3 for NSLEEP.
-> +               Option 0 or missing this property means the clock is
-> +               enabled/disabled via register access and these pins do
-> +               not have any control.
-
-What actually drives these pins to control the clock?
-
-> +
-> +Example:
-> +       clock {
-> +               compatible = "ti,palmas-clk";
-> +               #clock-cells = <1>;
-> +               clk32k_kg {
-> +                       ti,clock-boot-enable;
-> +                       ti,external-sleep-control = <3>;
-> +               };
-> +
-> +               clk32k_kg_audio {
-> +                       ti,clock-boot-enable;
-> +               };
-> +       };
-
-How does the palmas-clk driver control these? No description of
-registers, gpio, or any other component that could be used for control
-is dfined.
-
-Is the palmas-clk intended to be a subnode of the palmas mfd (the
-palmas-rtc binding example suggests this)? It seems odd to describe
-components of a device separately with no linkage between them.
-
-I also note that the palmas MFD appears to be an I2C slave, but the
-binding doesn't define that (which makes it somewhat confuding for
-someone unfamiliar with the hardware).
-
-Thanks,
-Mark.
+Regards,
+Jean
