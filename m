@@ -1,49 +1,46 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Tue, 8 Oct 2013 17:34:35 -0400
-Subject: [PATCH] ARM: OMAP5: id: Remove ES1.0 support
-In-Reply-To: <20131008213129.GT8313@atomide.com>
-References: <5239AE35.8030406@ti.com>
- <1379513142-11125-1-git-send-email-nm@ti.com> <5239B3B1.5000004@ti.com>
- <20131008213129.GT8313@atomide.com>
-Message-ID: <52547A6B.4010803@ti.com>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Tue, 08 Oct 2013 23:37:58 +0200
+Subject: [PATCH v2] ARM: tlb: ASID macro should give 32bit result for
+ BE correct operation
+In-Reply-To: <20131007195525.f56083f0d91df6a6396cc494@linaro.org>
+References: <1381160903-1248-1-git-send-email-victor.kamensky@linaro.org>
+ <5252DA06.8000303@codethink.co.uk>
+ <CAA3XUr2wYFL9WAQd9uAJSKK5KhWF3bPzYbh-3x=B3oLVXk79og@mail.gmail.com>
+ <52533A70.5040705@ti.com>
+ <20131007195525.f56083f0d91df6a6396cc494@linaro.org>
+Message-ID: <52547B36.2060407@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 08 October 2013 05:31 PM, Tony Lindgren wrote:
-> * Santosh Shilimkar <santosh.shilimkar@ti.com> [130918 07:15]:
->> On Wednesday 18 September 2013 10:05 AM, Nishanth Menon wrote:
->>> OMAP5 ES1.0 was intended as a test chip and has major register level
->>> differences w.r.t ES2.0 revision of the chip. All register defines,
->>> dts support has been solely added for ES2.0 version of the chip.
->>> Further, all ES1.0 chips and platforms are supposed to have been
->>> removed from circulation. Hence, there is no need to further retain
->>> any resemblence of ES1.0 support in id detection code.
+On 08/10/13 02:55, Kim Phillips wrote:
+> On Mon, 7 Oct 2013 18:49:20 -0400
+> Santosh Shilimkar<santosh.shilimkar@ti.com>  wrote:
+>
+>> On Monday 07 October 2013 12:37 PM, Victor Kamensky wrote:
+>>> On 7 October 2013 08:57, Ben Dooks<ben.dooks@codethink.co.uk>  wrote:
+>>>> On 07/10/13 17:48, Victor Kamensky wrote:
+>>>> If you are booting on the Arndale board, is there a patch to mark
+>>>> the relevant Exynos devices as BE capable?
 >>>
->>> Remove the omap_revision handling and BUG() instead to prevent folks
->>> who mistakenly try an older unsupported chip and report bogus errors.
+>>> Arndale need massive fixes in their BSP layer to be endian agnostic
+>>> ARM V7 platform. Unfortunate it is not as simple as with few others
+>>> that already marked as BE capable.
 >>>
->>> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
->>> Signed-off-by: Nishanth Menon <nm@ti.com>
->>> ---
->>> ref: http://marc.info/?l=linux-omap&m=137951198232339&w=2
->>> based on 3.12-rc1 tag
->>>
->> That was quick ...
->> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> 
-> Heh, it was made, but not supposed to be used, and still merged
-> to mainline kernel..
-> 
-You know the history. At least for this silicon we avoided
-tons of datafiles merges for ES1.0 which changed completely for
-ES2.0. At least during that period people had choice to merge
-the data-files based on the board they have to test out ;-)
+>>> Please see
+>>> https://git.linaro.org/gitweb?p=people/victor.kamensky/linux-linaro-tracking-be.git;a=shortlog;h=refs/heads/llct-be-topic
+>>> Mostly it is __raw_xxx conversion to xxx_relaxed, but there are
+>
+> apologies if this was explained earlier in the thread, but what has
+> __raw_xxx ->  xxx_relaxed have to do with endianness?  the relaxed
+> accessor variants allow the compiler to reorder the instruction: it's
+> got nothing to do with byte swapping the data, no?
 
-> I guess this is the way to deal with this issue as we don't have
-> really any omap5 es1 support in place. So applying into
-> omap-for-v3.13/soc branch.
-> 
-Thanks !!
+the __raw have similar properties, however the readl/writel relaxed
+are basically __raw with byte-swapping and no attempt to do any other
+flush/drain/etc.
 
-Regards,
-Santosh
+Thus I thought these would be the best ones to go for.
+
+-- 
+Ben Dooks				http://www.codethink.co.uk/
+Senior Engineer				Codethink - Providing Genius
