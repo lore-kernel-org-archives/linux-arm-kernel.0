@@ -1,39 +1,65 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 8 Oct 2013 11:40:51 +0800
-Subject: [PATCH RFC 1/2] ARM: imx6qdl: provide pinctrl configurations for
- DAT3 pull-down
-In-Reply-To: <52537378.1020904@wwwdotorg.org>
-References: <20131005112147.GX12758@n2100.arm.linux.org.uk>
- <E1VSPw9-0004Ug-BF@rmk-PC.arm.linux.org.uk>
- <20131007055340.GB3739@S2101-09.ap.freescale.net>
- <20131007180357.GS12758@n2100.arm.linux.org.uk>
- <20131008015426.GA7480@S2101-09.ap.freescale.net>
- <52537378.1020904@wwwdotorg.org>
-Message-ID: <20131008034048.GB7480@S2101-09.ap.freescale.net>
+From: josh.wu@atmel.com (Josh Wu)
+Date: Tue, 8 Oct 2013 11:44:35 +0800
+Subject: [PATCH v3 4/6] iio: at91: ADC start-up time calculation changed
+ since at91sam9x5
+In-Reply-To: <524A96C8.7010707@kernel.org>
+References: <1377602932-1899-1-git-send-email-josh.wu@atmel.com>
+ <1377602932-1899-5-git-send-email-josh.wu@atmel.com>
+ <20130828090354.GP2695@lukather> <521FB660.8010607@kernel.org>
+ <524A96C8.7010707@kernel.org>
+Message-ID: <52537FA3.10205@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 07, 2013 at 08:52:40PM -0600, Stephen Warren wrote:
-> >>> &usdhc1 {
-> >>> 	pinctrl-names = "default";
-> >>> 	pinctrl-0 = <&pinctrl_usdhc1_1 &pinctrl_usdhc1_1_dat3cd>;
-> >>> 	...
-> >>> 	status = "okay";
-> >>> };
-> >>
-> >> Are you sure that this will always be the case?  This would assume that
-> >> the pinctrl entries are always processed sequentially.
-> > 
-> > That will always be the case per my understanding.  Otherwise, I would
-> > be so surprised.  Are you seeing any case that the entries are not
-> > processed sequentially?
-> 
-> Given the way the Linux code currently works, I think that will
-> currently happen in practice. However, there's nothing in the pinctrl DT
-> binding documentation that guarantees (or even mentions) such semantics.
+Hi, Jonathan
 
-Ah, that's Russell's point, I guess.  I think it makes perfect sense to
-make this clear in the binding doc, as this "overwrite mechanism" can be
-very helpful.  I will send a patch for it.
+On 10/1/2013 5:32 PM, Jonathan Cameron wrote:
+> -----BEGIN PGP SIGNED MESSAGE-----
+> Hash: SHA1
+>
+> On 08/29/13 22:00, Jonathan Cameron wrote:
+>> On 08/28/13 10:03, Maxime Ripard wrote:
+>>> Hi Josh,
+>>>
+>>> On Tue, Aug 27, 2013 at 07:28:50PM +0800, Josh Wu wrote:
+>>>> Since in at91sam9x5, sama5d3x chip. the start up time calucation is changed. This patch can choose different
+>>>> start up time calculation formula for different chips.
+>>>>
+>>>> Signed-off-by: Josh Wu <josh.wu@atmel.com>
+>>> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+>>>
+>> Unfortunately this one has a dependency on the fix patch which is going in through my fixes branch so will have to
+>> wait until that hits my upstream.
+>>
+>> I'd like 5 and 6 to sit a while longer anyway (and 6 needs Dmitry's sign off before I take that.)
+>>
+> Hi All,
+>
+> This patch no longer applies unfortunately. Josh, could you bring
+> it up to date and repost the last 3 patches of this series?
 
-Shawn
+Sorry for the later reply since I just come back from the holiday.
+I will send the last 3 patches of this series (include this one) base on 
+the mainline Linux. Thanks.
+
+Best Regards,
+Josh Wu
+
+> -----BEGIN PGP SIGNATURE-----
+> Version: GnuPG v2.0.21 (GNU/Linux)
+> Comment: Using GnuPG with Thunderbird - http://www.enigmail.net/
+>
+> iQIcBAEBAgAGBQJSSpbIAAoJEFSFNJnE9BaIi48QALwC0aVUQNU94RpUBRBqFVkF
+> H8AB2pLBLYV4JlLD1kg9/ksltZh9+xegd/mM/C/lqZoHaokbSSF0bcAPSV2E3lXN
+> MJ3sRx0ubmGAMNWOYI22pqD1BQwEWMdjmS/BaZ2FxkOdJyIV/jkR8NpA3BrvL7e2
+> iOv9k7nBkOI1B//0K/xr4B0MWotnbmq45KeHTR1VnItqGWHDG7gyB+sbnymyf53M
+> XY99HUpkLggBJrbp05PYmp9RTvyV7NYlMvgMtwUWcM6VaA0YrSRR349P+UsIcmwV
+> 60yXRDRZCM5Vu3HDAVnbGDtumGjSFYsXXVkJQoN8izCBn0ZsbdSzc4bJyGzn90WK
+> vpt5rpd4k+ne/TTuJSiIiz8g/7aZvlWWSQ17j2Qb+IOfh2yROHuA+yyikfFV8N4e
+> 8jkd5HSMMRoL1Bv1vsf8eOJVlIMTOkG/2Wa7rXJOiWwzmc09Fxp13SoOIOxEMqJY
+> lCj8In1fYLryMBCjxR2C/ysnullAbTwBv9HtudPm3Lu80eR8GL7lB4VrrhJyHILP
+> ROvJE4ETYpYQTxQZMJKgVAQBFUAhBmckdc1A/SXMcDJgZKraP9aFvJPYbFR4OlFz
+> UfjWWS6TzHFgFe2r804DzT+A7fpdZNFrbxyM40ttg7kJ81DgT9aQncEM96dEmiWh
+> nXz0iA/maOXKkqJluLWl
+> =HbYR
+> -----END PGP SIGNATURE-----
