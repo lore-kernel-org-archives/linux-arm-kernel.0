@@ -1,77 +1,151 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Tue,  8 Oct 2013 14:24:28 +0200
-Subject: [PATCH 3/8] ARM: l2x0: add Marvell Tauros3 compatible
+Date: Tue,  8 Oct 2013 14:24:33 +0200
+Subject: [PATCH 8/8] ARM: add initial support for Marvell Berlin SoCs
 In-Reply-To: <1381235073-17134-1-git-send-email-sebastian.hesselbarth@gmail.com>
 References: <1381235073-17134-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1381235073-17134-4-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1381235073-17134-9-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This add a compatible for the Marvell Tauros3 cache controller which
-is compatible with l2x0 cache controllers. While updating the binding
-documentation, clean up the list of possible compatibles.
+This adds initial support for the Marvell Berlin (88DE3xxx) SoC family
+and basic machine setup for Armada 1500 (88DE3100) SoCs.
 
 Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Reviewed-by: Jason Cooper <jason@lakedaemon.net>
+Reviewed-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Reviewed-by: Arnd Bergmann <arnd@arndb.de>
 ---
+Changelog:
+RFCv2->v1:
+- remove custom .init_time, adds dependency for arch-wide of_clk_init call
+RFCv1->RFCv2:
+- nuke .map_io (Reported by Arnd Bergmann)
+- add copyright reference
+- switch to mach-berlin instead of mach-mvebu
+
 Cc: Jason Cooper <jason@lakedaemon.net>
 Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: devicetree at vger.kernel.org
-Cc: linux-doc at vger.kernel.org
+Cc: Russell King <linux@arm.linux.org.uk>
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-kernel at vger.kernel.org
 ---
- Documentation/devicetree/bindings/arm/l2cc.txt |   22 +++++++++++-----------
- arch/arm/mm/cache-l2x0.c                       |    1 +
- 2 files changed, 12 insertions(+), 11 deletions(-)
+ arch/arm/Kconfig              |    2 ++
+ arch/arm/Makefile             |    1 +
+ arch/arm/mach-berlin/Kconfig  |   24 ++++++++++++++++++++++++
+ arch/arm/mach-berlin/Makefile |    1 +
+ arch/arm/mach-berlin/berlin.c |   39 +++++++++++++++++++++++++++++++++++++++
+ 5 files changed, 67 insertions(+)
+ create mode 100644 arch/arm/mach-berlin/Kconfig
+ create mode 100644 arch/arm/mach-berlin/Makefile
+ create mode 100644 arch/arm/mach-berlin/berlin.c
 
-diff --git a/Documentation/devicetree/bindings/arm/l2cc.txt b/Documentation/devicetree/bindings/arm/l2cc.txt
-index c0c7626..a1d0cbd 100644
---- a/Documentation/devicetree/bindings/arm/l2cc.txt
-+++ b/Documentation/devicetree/bindings/arm/l2cc.txt
-@@ -7,20 +7,20 @@ The ARM L2 cache representation in the device tree should be done as follows:
- Required properties:
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 1ad6fb6..5692426 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -932,6 +932,8 @@ source "arch/arm/mach-bcm/Kconfig"
  
- - compatible : should be one of:
--	"arm,pl310-cache"
--	"arm,l220-cache"
--	"arm,l210-cache"
--	"marvell,aurora-system-cache": Marvell Controller designed to be
-+  "arm,pl310-cache"
-+  "arm,l220-cache"
-+  "arm,l210-cache"
-+  "bcm,bcm11351-a2-pl310-cache": DEPRECATED by "brcm,bcm11351-a2-pl310-cache"
-+  "brcm,bcm11351-a2-pl310-cache": For Broadcom bcm11351 chipset where an
-+     offset needs to be added to the address before passing down to the L2
-+     cache controller
-+  "marvell,aurora-system-cache": Marvell Controller designed to be
-      compatible with the ARM one, with system cache mode (meaning
-      maintenance operations on L1 are broadcasted to the L2 and L2
-      performs the same operation).
--	"marvell,"aurora-outer-cache: Marvell Controller designed to be
--	 compatible with the ARM one with outer cache mode.
--	"brcm,bcm11351-a2-pl310-cache": For Broadcom bcm11351 chipset where an
--	offset needs to be added to the address before passing down to the L2
--	cache controller
--	"bcm,bcm11351-a2-pl310-cache": DEPRECATED by
--	                               "brcm,bcm11351-a2-pl310-cache"
-+  "marvell,aurora-outer-cache": Marvell Controller designed to be
-+     compatible with the ARM one with outer cache mode.
-+  "marvell,tauros3-cache": Marvell Tauros3 cache controller.
- - cache-unified : Specifies the cache is a unified cache.
- - cache-level : Should be set to 2 for a level 2 cache.
- - reg : Physical base address and size of cache controller's memory mapped
-diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-index 447da6f..90c776e 100644
---- a/arch/arm/mm/cache-l2x0.c
-+++ b/arch/arm/mm/cache-l2x0.c
-@@ -929,6 +929,7 @@ static const struct of_device_id l2x0_ids[] __initconst = {
- 	  .data = (void *)&aurora_no_outer_data},
- 	{ .compatible = "marvell,aurora-outer-cache",
- 	  .data = (void *)&aurora_with_outer_data},
-+	{ .compatible = "marvell,tauros3-cache", .data = (void *)&l2x0_data },
- 	{ .compatible = "brcm,bcm11351-a2-pl310-cache",
- 	  .data = (void *)&bcm_l2x0_data},
- 	{ .compatible = "bcm,bcm11351-a2-pl310-cache", /* deprecated name */
+ source "arch/arm/mach-bcm2835/Kconfig"
+ 
++source "arch/arm/mach-berlin/Kconfig"
++
+ source "arch/arm/mach-clps711x/Kconfig"
+ 
+ source "arch/arm/mach-cns3xxx/Kconfig"
+diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+index a37a50f..3ba332b 100644
+--- a/arch/arm/Makefile
++++ b/arch/arm/Makefile
+@@ -147,6 +147,7 @@ textofs-$(CONFIG_ARCH_MSM8960) := 0x00208000
+ machine-$(CONFIG_ARCH_AT91)		+= at91
+ machine-$(CONFIG_ARCH_BCM)		+= bcm
+ machine-$(CONFIG_ARCH_BCM2835)		+= bcm2835
++machine-$(CONFIG_ARCH_BERLIN)		+= berlin
+ machine-$(CONFIG_ARCH_CLPS711X)		+= clps711x
+ machine-$(CONFIG_ARCH_CNS3XXX)		+= cns3xxx
+ machine-$(CONFIG_ARCH_DAVINCI)		+= davinci
+diff --git a/arch/arm/mach-berlin/Kconfig b/arch/arm/mach-berlin/Kconfig
+new file mode 100644
+index 0000000..56a671e
+--- /dev/null
++++ b/arch/arm/mach-berlin/Kconfig
+@@ -0,0 +1,24 @@
++config ARCH_BERLIN
++	bool "Marvell Berlin (88DE3xxx) SoCs" if ARCH_MULTI_V7
++	select GENERIC_CLOCKEVENTS
++	select GENERIC_IRQ_CHIP
++	select COMMON_CLK
++	select DW_APB_ICTL
++	select DW_APB_TIMER_OF
++
++if ARCH_BERLIN
++
++menu "Marvell Berlin (88DE3xxx) SoC variants"
++
++config MACH_MV88DE3100
++	bool "Marvell 88DE3100 (Armada 1500)"
++	select ARM_GIC
++	select CACHE_L2X0
++	select CPU_PJ4B
++	select HAVE_ARM_TWD if LOCAL_TIMERS
++	select HAVE_SMP
++	select LOCAL_TIMERS if SMP
++
++endmenu
++
++endif
+diff --git a/arch/arm/mach-berlin/Makefile b/arch/arm/mach-berlin/Makefile
+new file mode 100644
+index 0000000..ab69fe9
+--- /dev/null
++++ b/arch/arm/mach-berlin/Makefile
+@@ -0,0 +1 @@
++obj-y += berlin.o
+diff --git a/arch/arm/mach-berlin/berlin.c b/arch/arm/mach-berlin/berlin.c
+new file mode 100644
+index 0000000..54b3ba7
+--- /dev/null
++++ b/arch/arm/mach-berlin/berlin.c
+@@ -0,0 +1,39 @@
++/*
++ * Device Tree support for Marvell Berlin (88DE3xxx) platforms.
++ *
++ * Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
++ *
++ * based on GPL'ed 2.6 kernel sources
++ *  (c) Marvell International Ltd.
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2.  This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
++
++#include <linux/init.h>
++#include <linux/io.h>
++#include <linux/kernel.h>
++#include <linux/of_platform.h>
++#include <asm/hardware/cache-l2x0.h>
++#include <asm/mach/arch.h>
++
++static void __init berlin_init_machine(void)
++{
++	/*
++	 * with DT probing for L2CCs, berlin_init_machine can be removed.
++	 * Note: 88DE3005 (Armada 1500-mini) uses pl310 l2cc
++	 */
++	l2x0_of_init(0x70c00000, 0xfeffffff);
++	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
++}
++
++static const char * const berlin_dt_compat[] = {
++	"marvell,berlin",
++	NULL,
++};
++
++DT_MACHINE_START(BERLIN_DT, "Marvell Berlin (88DE3xxx)")
++	.dt_compat      = berlin_dt_compat,
++	.init_machine   = berlin_init_machine,
++MACHINE_END
 -- 
 1.7.10.4
