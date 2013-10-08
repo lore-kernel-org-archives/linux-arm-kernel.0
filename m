@@ -1,42 +1,24 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Tue, 8 Oct 2013 11:19:13 +0200
-Subject: [PATCH 5/5] DRM: Armada: add support for drm tda19988 driver
-In-Reply-To: <CAF6AEGsqGYj7_tZdzrsmUxExs6wm838dYPFhBdc8wqVC6mTxmg@mail.gmail.com>
-References: <20131006220728.GG12758@n2100.arm.linux.org.uk>
- <E1VSwYO-0000iT-CU@rmk-PC.arm.linux.org.uk>
- <20131007111807.5e86ea6e@armhf>
- <20131007094404.GI12758@n2100.arm.linux.org.uk>
- <20131007124820.2189a4c3@armhf>
- <20131007110902.GL12758@n2100.arm.linux.org.uk>
- <CAF6AEGsqGYj7_tZdzrsmUxExs6wm838dYPFhBdc8wqVC6mTxmg@mail.gmail.com>
-Message-ID: <20131008111913.09bfe93e@armhf>
+From: richard.zhuhongxing@gmail.com (Richard Zhu)
+Date: Tue,  8 Oct 2013 17:29:21 +0800
+Subject: [PATCH v2 0/1] ahci: imx: setup power saving methods
+Message-ID: <1381224562-2378-1-git-send-email-Hong-Xing.Zhu@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 7 Oct 2013 10:59:39 -0400
-Rob Clark <robdclark@gmail.com> wrote:
+v2: ahci: imx: setup power saving methods
+ - kernel build option is replaced by the module parameter(ahci-imx.hp) 
 
-> Jean-Fran?ois, just as an aside, I really don't think code that can be
-> shared, like tda998x, should encode a DT requirement.. there are
-> plenty of platforms that don't use DT (arm isn't everything, and last
-> I heard aarch64 was going to be ACPI).
-> 
-> Beyond that, it is a driver decision whether or not to support only-DT
-> or DT + other.. and as long as there is a common board which can use
-> the driver but which is not DT, there is probably a compelling reason
-> to still support the non-DT case.
+v1: http://www.spinics.net/lists/linux-ide/msg46389.html
+ * Disable sata phy internal pll reference clock when
+ sysetem enter into suspend mode, enable it after resume.
+ * Enter into test power down mode when there is no sata disk
+ detected on the port and 'AHCI_IMX_PHY_POWER_DOWN_MODE' is
+ enabled.
 
-Rob,
+This patche is based on for-next branch of
+"http://git.kernel.org/pub/scm/linux/kernel/git/tj/libata.git"
 
-The Cubox is an open platform, and I use it just like a desktop PC.
-When its required drivers will be in the mainline, I will do the same
-as I do with PCs: I will not recompile a specific kernel each time
-there are kernel bugs or security issues. Instead, I will just upgrade
-my system from my distributor (Debian), and, in the packages, there
-will be a generic mvebu kernel as there is already one for Marvell
-Armada 370/xp, Freescale iMX5x/iMX6 (linux-image-3.10-3-armmp).
-But, for that, all the Cubox specific stuff must be described in a DT.
 
--- 
-Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
-Jef		|		http://moinejf.free.fr/
+[v2] ahci: imx: setup power saving methods
+drivers/ata/ahci_imx.c |   85 ++++++++++++++++++++++++++++++++++++++++++++++--
+1 files changed, 82 insertions(+), 3 deletions(-)
