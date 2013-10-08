@@ -1,31 +1,32 @@
 From: sachin.kamat@linaro.org (Sachin Kamat)
-Date: Tue,  8 Oct 2013 16:47:39 +0530
-Subject: [PATCH Resend 01/10] clk: bcm2835: Remove duplicate inclusion of
- clk-provider.h
-Message-ID: <1381231068-6053-1-git-send-email-sachin.kamat@linaro.org>
+Date: Tue,  8 Oct 2013 16:47:40 +0530
+Subject: [PATCH 02/10] clk: SPEAr: Staticize clk_frac_ops
+In-Reply-To: <1381231068-6053-1-git-send-email-sachin.kamat@linaro.org>
+References: <1381231068-6053-1-git-send-email-sachin.kamat@linaro.org>
+Message-ID: <1381231068-6053-2-git-send-email-sachin.kamat@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-clk-provider.h was included twice.
+clk_frac_ops is local to this file. Make it static.
 
 Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
-Added all the acquired acks to respective patches.
----
- drivers/clk/clk-bcm2835.c |    1 -
- 1 file changed, 1 deletion(-)
+ drivers/clk/spear/clk-frac-synth.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/clk/clk-bcm2835.c b/drivers/clk/clk-bcm2835.c
-index 5fb4ff5..676077d 100644
---- a/drivers/clk/clk-bcm2835.c
-+++ b/drivers/clk/clk-bcm2835.c
-@@ -20,7 +20,6 @@
- #include <linux/clk-provider.h>
- #include <linux/clkdev.h>
- #include <linux/clk/bcm2835.h>
--#include <linux/clk-provider.h>
- #include <linux/of.h>
+diff --git a/drivers/clk/spear/clk-frac-synth.c b/drivers/clk/spear/clk-frac-synth.c
+index 958aa3a..dffd4ce 100644
+--- a/drivers/clk/spear/clk-frac-synth.c
++++ b/drivers/clk/spear/clk-frac-synth.c
+@@ -116,7 +116,7 @@ static int clk_frac_set_rate(struct clk_hw *hw, unsigned long drate,
+ 	return 0;
+ }
  
- static const struct of_device_id clk_match[] __initconst = {
+-struct clk_ops clk_frac_ops = {
++static struct clk_ops clk_frac_ops = {
+ 	.recalc_rate = clk_frac_recalc_rate,
+ 	.round_rate = clk_frac_round_rate,
+ 	.set_rate = clk_frac_set_rate,
 -- 
 1.7.9.5
