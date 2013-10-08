@@ -1,24 +1,29 @@
-From: richard.zhuhongxing@gmail.com (Richard Zhu)
-Date: Tue,  8 Oct 2013 17:29:21 +0800
-Subject: [PATCH v2 0/1] ahci: imx: setup power saving methods
-Message-ID: <1381224562-2378-1-git-send-email-Hong-Xing.Zhu@freescale.com>
+From: andreas.herrmann@calxeda.com (Andreas Herrmann)
+Date: Tue,  8 Oct 2013 11:27:19 +0200
+Subject: [PATCH 0/5] iommu/arm-smmu: Misc modifications to support SMMUs on
+ Calxeda ECX-2000
+Message-ID: <1381224444-27303-1-git-send-email-andreas.herrmann@calxeda.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-v2: ahci: imx: setup power saving methods
- - kernel build option is replaced by the module parameter(ahci-imx.hp) 
+Hi Will,
 
-v1: http://www.spinics.net/lists/linux-ide/msg46389.html
- * Disable sata phy internal pll reference clock when
- sysetem enter into suspend mode, enable it after resume.
- * Enter into test power down mode when there is no sata disk
- detected on the port and 'AHCI_IMX_PHY_POWER_DOWN_MODE' is
- enabled.
+Here is a reworked patch set
+- to introduce device isolation (using bus-notifier).
+- to work around secure-only config access to SMMU registers
+- (new) to support masking of all streamIDs for an SMMU
+- add DT information for SMMUs on Calxeda ECX-2000
 
-This patche is based on for-next branch of
-"http://git.kernel.org/pub/scm/linux/kernel/git/tj/libata.git"
+I've also separated out the introduction of driver options handling.
+(Just in case it doesn't please you...)
+
+I still need to add the documentation for the introduced SMMU options
+to Documentation/devicetree/bindings/iommu/arm,smmu.txt. But first I'd
+like to know whether addition of the 3 options is acceptable.
+
+Comments welcome.
 
 
-[v2] ahci: imx: setup power saving methods
-drivers/ata/ahci_imx.c |   85 ++++++++++++++++++++++++++++++++++++++++++++++--
-1 files changed, 82 insertions(+), 3 deletions(-)
+Thanks,
+
+Andreas
