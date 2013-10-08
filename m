@@ -1,124 +1,78 @@
 From: magnus.damm@gmail.com (Magnus Damm)
-Date: Tue, 08 Oct 2013 12:39:30 +0900
-Subject: [PATCH 04/08] ARM: shmobile: r8a7791 GPIO device tree node
+Date: Tue, 08 Oct 2013 12:39:39 +0900
+Subject: [PATCH 05/08] ARM: shmobile: r8a7791 GPIO platform device support
 In-Reply-To: <20131008033851.20455.68845.sendpatchset@w520>
 References: <20131008033851.20455.68845.sendpatchset@w520>
-Message-ID: <20131008033930.20455.43459.sendpatchset@w520>
+Message-ID: <20131008033939.20455.66118.sendpatchset@w520>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Magnus Damm <damm@opensource.se>
 
-Add GPIO controllers to the r8a7791 DTSI file.
+Add GPIO controller platform devices for the r8a7791 SoC.
 
 Signed-off-by: Magnus Damm <damm@opensource.se>
 ---
 
- arch/arm/boot/dts/r8a7791.dtsi |   96 ++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 96 insertions(+)
+ arch/arm/mach-shmobile/setup-r8a7791.c |   40 ++++++++++++++++++++++++++++++++
+ 1 file changed, 40 insertions(+)
 
---- 0002/arch/arm/boot/dts/r8a7791.dtsi
-+++ work/arch/arm/boot/dts/r8a7791.dtsi	2013-10-04 18:59:36.000000000 +0900
-@@ -46,6 +46,102 @@
- 		interrupts = <1 9 0xf04>;
- 	};
+--- 0003/arch/arm/mach-shmobile/setup-r8a7791.c
++++ work/arch/arm/mach-shmobile/setup-r8a7791.c	2013-10-04 18:55:09.000000000 +0900
+@@ -22,6 +22,7 @@
+ #include <linux/irq.h>
+ #include <linux/kernel.h>
+ #include <linux/of_platform.h>
++#include <linux/platform_data/gpio-rcar.h>
+ #include <linux/platform_data/irq-renesas-irqc.h>
+ #include <linux/serial_sci.h>
+ #include <linux/sh_timer.h>
+@@ -39,9 +40,48 @@ static const struct resource pfc_resourc
+ 	platform_device_register_simple("pfc-r8a7791", -1, pfc_resources, \
+ 					ARRAY_SIZE(pfc_resources))
  
-+	gpio0: gpio at ffc40000 {
-+		compatible = "renesas,gpio-r8a7791", "renesas,gpio-rcar";
-+		reg = <0 0xffc40000 0 0x50>;
-+		interrupt-parent = <&gic>;
-+		interrupts = <0 4 0x4>;
-+		#gpio-cells = <2>;
-+		gpio-controller;
-+		gpio-ranges = <&pfc 0 0 32>;
-+		#interrupt-cells = <2>;
-+		interrupt-controller;
-+	};
++#define R8A7791_GPIO(idx, base, nr)					\
++static const struct resource r8a7791_gpio##idx##_resources[] __initconst = { \
++	DEFINE_RES_MEM((base), 0x50),					\
++	DEFINE_RES_IRQ(gic_spi(4 + (idx))),				\
++};									\
++									\
++static const struct gpio_rcar_config					\
++r8a7791_gpio##idx##_platform_data __initconst = {			\
++	.gpio_base	= 32 * (idx),					\
++	.irq_base	= 0,						\
++	.number_of_pins	= (nr),						\
++	.pctl_name	= "pfc-r8a7791",				\
++	.has_both_edge_trigger = 1,					\
++};									\
 +
-+	gpio1: gpio at ffc41000 {
-+		compatible = "renesas,gpio-r8a7791", "renesas,gpio-rcar";
-+		reg = <0 0xffc41000 0 0x50>;
-+		interrupt-parent = <&gic>;
-+		interrupts = <0 5 0x4>;
-+		#gpio-cells = <2>;
-+		gpio-controller;
-+		gpio-ranges = <&pfc 0 32 32>;
-+		#interrupt-cells = <2>;
-+		interrupt-controller;
-+	};
++R8A7791_GPIO(0, 0xe6050000, 32);
++R8A7791_GPIO(1, 0xe6051000, 32);
++R8A7791_GPIO(2, 0xe6052000, 32);
++R8A7791_GPIO(3, 0xe6053000, 32);
++R8A7791_GPIO(4, 0xe6054000, 32);
++R8A7791_GPIO(5, 0xe6055000, 32);
++R8A7791_GPIO(6, 0xe6055400, 32);
++R8A7791_GPIO(7, 0xe6055800, 26);
 +
-+	gpio2: gpio at ffc42000 {
-+		compatible = "renesas,gpio-r8a7791", "renesas,gpio-rcar";
-+		reg = <0 0xffc42000 0 0x50>;
-+		interrupt-parent = <&gic>;
-+		interrupts = <0 6 0x4>;
-+		#gpio-cells = <2>;
-+		gpio-controller;
-+		gpio-ranges = <&pfc 0 64 32>;
-+		#interrupt-cells = <2>;
-+		interrupt-controller;
-+	};
++#define r8a7791_register_gpio(idx)					\
++	platform_device_register_resndata(&platform_bus, "gpio_rcar", idx, \
++		r8a7791_gpio##idx##_resources,				\
++		ARRAY_SIZE(r8a7791_gpio##idx##_resources),		\
++		&r8a7791_gpio##idx##_platform_data,			\
++		sizeof(r8a7791_gpio##idx##_platform_data))
 +
-+	gpio3: gpio at ffc43000 {
-+		compatible = "renesas,gpio-r8a7791", "renesas,gpio-rcar";
-+		reg = <0 0xffc43000 0 0x50>;
-+		interrupt-parent = <&gic>;
-+		interrupts = <0 7 0x4>;
-+		#gpio-cells = <2>;
-+		gpio-controller;
-+		gpio-ranges = <&pfc 0 96 32>;
-+		#interrupt-cells = <2>;
-+		interrupt-controller;
-+	};
-+
-+	gpio4: gpio at ffc44000 {
-+		compatible = "renesas,gpio-r8a7791", "renesas,gpio-rcar";
-+		reg = <0 0xffc44000 0 0x50>;
-+		interrupt-parent = <&gic>;
-+		interrupts = <0 8 0x4>;
-+		#gpio-cells = <2>;
-+		gpio-controller;
-+		gpio-ranges = <&pfc 0 128 32>;
-+		#interrupt-cells = <2>;
-+		interrupt-controller;
-+	};
-+
-+	gpio5: gpio at ffc45000 {
-+		compatible = "renesas,gpio-r8a7791", "renesas,gpio-rcar";
-+		reg = <0 0xffc45000 0 0x50>;
-+		interrupt-parent = <&gic>;
-+		interrupts = <0 9 0x4>;
-+		#gpio-cells = <2>;
-+		gpio-controller;
-+		gpio-ranges = <&pfc 0 160 32>;
-+		#interrupt-cells = <2>;
-+		interrupt-controller;
-+	};
-+
-+	gpio6: gpio at ffc45400 {
-+		compatible = "renesas,gpio-r8a7791", "renesas,gpio-rcar";
-+		reg = <0 0xffc45400 0 0x50>;
-+		interrupt-parent = <&gic>;
-+		interrupts = <0 10 0x4>;
-+		#gpio-cells = <2>;
-+		gpio-controller;
-+		gpio-ranges = <&pfc 0 192 32>;
-+		#interrupt-cells = <2>;
-+		interrupt-controller;
-+	};
-+
-+	gpio7: gpio at ffc45800 {
-+		compatible = "renesas,gpio-r8a7791", "renesas,gpio-rcar";
-+		reg = <0 0xffc45800 0 0x50>;
-+		interrupt-parent = <&gic>;
-+		interrupts = <0 11 0x4>;
-+		#gpio-cells = <2>;
-+		gpio-controller;
-+		gpio-ranges = <&pfc 0 224 26>;
-+		#interrupt-cells = <2>;
-+		interrupt-controller;
-+	};
-+
- 	timer {
- 		compatible = "arm,armv7-timer";
- 		interrupts = <1 13 0xf08>,
+ void __init r8a7791_pinmux_init(void)
+ {
+ 	r8a7791_register_pfc();
++	r8a7791_register_gpio(0);
++	r8a7791_register_gpio(1);
++	r8a7791_register_gpio(2);
++	r8a7791_register_gpio(3);
++	r8a7791_register_gpio(4);
++	r8a7791_register_gpio(5);
++	r8a7791_register_gpio(6);
++	r8a7791_register_gpio(7);
+ }
+ 
+ #define SCIF_COMMON(scif_type, baseaddr, irq)			\
