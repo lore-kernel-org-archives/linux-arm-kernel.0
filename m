@@ -1,77 +1,78 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Tue, 8 Oct 2013 20:56:17 +0200
-Subject: [PATCH v3 2/2] ARM: Dove: Add the audio device to the Cubox DT
-In-Reply-To: <20131008181647.GW5402@titan.lakedaemon.net>
-References: <20131008194232.7d74b9e6@armhf> <525448DE.5030004@gmail.com>
- <20131008181647.GW5402@titan.lakedaemon.net>
-Message-ID: <20131008205617.079142b6@armhf>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 8 Oct 2013 12:05:55 -0700
+Subject: [PATCH v4 1/2] ARM: OMAP: Add secure function omap_smc3()
+ which calling instruction smc #1
+In-Reply-To: <20131008080908.GA25039@n2100.arm.linux.org.uk>
+References: <20130904124303.GA2369@localhost.localdomain>
+ <201309080943.30542@pali> <5253B08C.4020305@codethink.co.uk>
+ <20131008080908.GA25039@n2100.arm.linux.org.uk>
+Message-ID: <20131008190555.GN8313@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch activates the audio device of the Cubox.
+* Russell King - ARM Linux <linux@arm.linux.org.uk> [131008 01:17]:
+> On Tue, Oct 08, 2013 at 09:13:16AM +0200, Ben Dooks wrote:
+> > On 08/09/13 09:43, Pali Roh?r wrote:
+> >> Here is new version (v4) of omap secure part patch:
+> >>
+> >> Other secure functions omap_smc1() and omap_smc2() calling instruction smc #0
+> >> but Nokia RX-51 board needs to call smc #1 for PPA access.
+> >>
+> >> Signed-off-by: Ivaylo Dimitrov<freemangordon@abv.bg>
+> >> Signed-off-by: Pali Roh?r<pali.rohar@gmail.com>
+> >> ---
+> >> diff --git a/arch/arm/mach-omap2/omap-secure.h b/arch/arm/mach-omap2/omap-secure.h
+> >> index 0e72917..c4586f4 100644
+> >> --- a/arch/arm/mach-omap2/omap-secure.h
+> >> +++ b/arch/arm/mach-omap2/omap-secure.h
+> >> @@ -51,6 +51,7 @@
+> >>   extern u32 omap_secure_dispatcher(u32 idx, u32 flag, u32 nargs,
+> >>   				u32 arg1, u32 arg2, u32 arg3, u32 arg4);
+> >>   extern u32 omap_smc2(u32 id, u32 falg, u32 pargs);
+> >> +extern u32 omap_smc3(u32 id, u32 process, u32 flag, u32 pargs);
+> >>   extern phys_addr_t omap_secure_ram_mempool_base(void);
+> >>   extern int omap_secure_ram_reserve_memblock(void);
+> >>
+> >> diff --git a/arch/arm/mach-omap2/omap-smc.S b/arch/arm/mach-omap2/omap-smc.S
+> >> index f6441c1..fd90125 100644
+> >> --- a/arch/arm/mach-omap2/omap-smc.S
+> >> +++ b/arch/arm/mach-omap2/omap-smc.S
+> >> @@ -1,9 +1,11 @@
+> >>   /*
+> >> - * OMAP44xx secure APIs file.
+> >> + * OMAP34xx and OMAP44xx secure APIs file.
+> >>    *
+> >>    * Copyright (C) 2010 Texas Instruments, Inc.
+> >>    * Written by Santosh Shilimkar<santosh.shilimkar@ti.com>
+> >>    *
+> >> + * Copyright (C) 2012 Ivaylo Dimitrov<freemangordon@abv.bg>
+> >> + * Copyright (C) 2013 Pali Roh?r<pali.rohar@gmail.com>
+> >>    *
+> >>    * This program is free software,you can redistribute it and/or modify
+> >>    * it under the terms of the GNU General Public License version 2 as
+> >> @@ -54,6 +56,23 @@ ENTRY(omap_smc2)
+> >>   	ldmfd   sp!, {r4-r12, pc}
+> >>   ENDPROC(omap_smc2)
+> >>
+> >> +/**
+> >> + * u32 omap_smc3(u32 service_id, u32 process_id, u32 flag, u32 pargs)
+> >> + * Low level common routine for secure HAL and PPA APIs via smc #1
+> >> + * r0 - @service_id: Secure Service ID
+> >> + * r1 - @process_id: Process ID
+> >> + * r2 - @flag: Flag to indicate the criticality of operation
+> >> + * r3 - @pargs: Physical address of parameter list
+> >> + */
+> >> +ENTRY(omap_smc3)
+> >> +	stmfd	sp!, {r4-r11, lr}
+> >> +	mov	r12, r0		@ Copy the secure service ID
+> >
+> > I think you should save r12 in the call.
+> 
+> Not necessary.
 
-The audio flow (pin mpp_audio1) is output on both I2S and S/PDIF.
+Assuming there are no other comments I'll apply these into
+omap-for-v3.13/n900 branch.
 
-The third si5351 clock (#2, pin mpp13) is used as the external clock.
+Regards,
 
-Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
----
-Jason,
-
-this patch replaces the previous patch v2 2/2
-
-v3:
-- move the pins declaration to dove.dtsi (Sebastian Hesselbarth)
----
- arch/arm/boot/dts/dove.dtsi      | 10 ++++++++++
- arch/arm/boot/dts/dove-cubox.dts |  8 ++++++++
- 2 files changed, 18 insertions(+)
-
-diff --git a/arch/arm/boot/dts/dove.dtsi b/arch/arm/boot/dts/dove.dtsi
-index e177e66..772b15e 100644
---- a/arch/arm/boot/dts/dove.dtsi
-+++ b/arch/arm/boot/dts/dove.dtsi
-@@ -227,6 +227,11 @@
- 				marvell,function = "gpio";
- 			};
- 
-+			pmx_audio1_extclk: pmx-audio1-extclk {
-+				marvell,pins = "mpp13";
-+				marvell,function = "audio1";
-+			};
-+
- 			pmx_gpio_14: pmx-gpio-14 {
- 				marvell,pins = "mpp14";
- 				marvell,function = "gpio";
-@@ -302,6 +307,11 @@
- 				marvell,function = "gpio";
- 			};
- 
-+			pmx_audio1_i2s1_spdifo: pmx-audio1-i2s1-spdifo {
-+				marvell,pins = "mpp_audio1";
-+				marvell,function = "i2s1/spdifo";
-+			};
-+
- 			pmx_spi0: pmx-spi0 {
- 				marvell,pins = "mpp_spi0";
- 				marvell,function = "spi0";
-diff --git a/arch/arm/boot/dts/dove-cubox.dts b/arch/arm/boot/dts/dove-cubox.dts
-index 022646e..78b0057 100644
---- a/arch/arm/boot/dts/dove-cubox.dts
-+++ b/arch/arm/boot/dts/dove-cubox.dts
-@@ -132,3 +132,11 @@
- 		reg = <0>;
- 	};
- };
-+
-+&audio1 {
-+	status = "okay";
-+	clocks = <&gate_clk 13>, <&si5351 2>;
-+	clock-names = "internal", "extclk";
-+	pinctrl-0 = <&pmx_audio1_i2s1_spdifo &pmx_audio1_extclk>;
-+	pinctrl-names = "default";
-+};
-
--- 
-Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
-Jef		|		http://moinejf.free.fr/
+Tony
