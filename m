@@ -1,95 +1,44 @@
-From: mingo@kernel.org (Ingo Molnar)
-Date: Tue, 8 Oct 2013 07:46:10 +0200
-Subject: [PATCH v2 14/14] Kconfig cleanup (PARPORT_PC dependencies)
-In-Reply-To: <1381209030-351-15-git-send-email-msalter@redhat.com>
-References: <1381209030-351-1-git-send-email-msalter@redhat.com>
- <1381209030-351-15-git-send-email-msalter@redhat.com>
-Message-ID: <20131008054610.GE14353@gmail.com>
+From: takasi-y@ops.dti.ne.jp (takasi-y at ops.dti.ne.jp)
+Date: Tue, 8 Oct 2013 14:34:03 +0900
+Subject: [PATCH v2 3/3] ARM: shmobile: kzm9d: Use common clock framework
+In-Reply-To: <20131008143040.52f36df8edb7ab63224d8433@ops.dti.ne.jp>
+References: <20131008143040.52f36df8edb7ab63224d8433@ops.dti.ne.jp>
+Message-ID: <20131008143403.c11f294c8a1701a2ab3bc5fd@ops.dti.ne.jp>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Use common clock framework version of clock
+ drivers/clk/shmobile/clk-emev2.c
+instead of sh-clkfwk version
+ arch/arm/mach-shmobile/clock-emev2.c
+when it is configured as a part of multi-platform.
 
-* Mark Salter <msalter@redhat.com> wrote:
+Signed-off-by: Takashi Yoshii <takasi-y@ops.dti.ne.jp>
+---
+ arch/arm/mach-shmobile/board-kzm9d-reference.c | 5 ++---
+ 1 file changed, 2 insertions(+), 3 deletions(-)
 
-> Remove messy dependencies from PARPORT_PC by having it depend on one
-> Kconfig symbol (ARCH_MAY_HAVE_PC_PARPORT) and having architectures
-> which need it, select ARCH_MAY_HAVE_PC_PARPORT in arch/*/Kconfig.
-> New architectures are unlikely to need PARPORT_PC, so this avoids
-> having an ever growing list of architectures to exclude. Those
-> architectures which do select ARCH_MAY_HAVE_PC_PARPORT in this
-> patch are the ones which have an asm/parport.h (or use the generic
-> version).
-> 
-> Signed-off-by: Mark Salter <msalter@redhat.com>
-> CC: Richard Henderson <rth@twiddle.net>
-> CC: linux-alpha at vger.kernel.org
-> CC: Vineet Gupta <vgupta@synopsys.com>
-> CC: Russell King <linux@arm.linux.org.uk>
-> CC: linux-arm-kernel at lists.infradead.org
-> CC: Tony Luck <tony.luck@intel.com>
-> CC: Fenghua Yu <fenghua.yu@intel.com>
-> CC: linux-ia64 at vger.kernel.org
-> CC: Geert Uytterhoeven <geert@linux-m68k.org>
-> CC: linux-m68k at lists.linux-m68k.org
-> CC: Michal Simek <monstr@monstr.eu>
-> CC: microblaze-uclinux at itee.uq.edu.au
-> CC: Ralf Baechle <ralf@linux-mips.org>
-> CC: linux-mips at linux-mips.org
-> CC: "James E.J. Bottomley" <jejb@parisc-linux.org>
-> CC: Helge Deller <deller@gmx.de>
-> CC: linux-parisc at vger.kernel.org
-> CC: Benjamin Herrenschmidt <benh@kernel.crashing.org>
-> CC: Paul Mackerras <paulus@samba.org>
-> CC: linuxppc-dev at lists.ozlabs.org
-> CC: Paul Mundt <lethal@linux-sh.org>
-> CC: linux-sh at vger.kernel.org
-> CC: "David S. Miller" <davem@davemloft.net>
-> CC: sparclinux at vger.kernel.org
-> CC: Guan Xuetao <gxt@mprc.pku.edu.cn>
-> CC: Thomas Gleixner <tglx@linutronix.de>
-> CC: Ingo Molnar <mingo@redhat.com>
-> CC: "H. Peter Anvin" <hpa@zytor.com>
-> CC: x86 at kernel.org
-> ---
->  drivers/parport/Kconfig | 10 +++++++---
->  1 file changed, 7 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/parport/Kconfig b/drivers/parport/Kconfig
-> index 70694ce..a079b18 100644
-> --- a/drivers/parport/Kconfig
-> +++ b/drivers/parport/Kconfig
-> @@ -31,13 +31,17 @@ menuconfig PARPORT
->  
->  	  If unsure, say Y.
->  
-> +config ARCH_MAY_HAVE_PC_PARPORT
-> +	bool
-> +	help
-> +	  Select this config option from the architecture Kconfig if
-> +	  the architecture may have PC parallel port hardware.
-> +
->  if PARPORT
->  
->  config PARPORT_PC
->  	tristate "PC-style hardware"
-> -	depends on (!SPARC64 || PCI) && !SPARC32 && !M32R && !FRV && !S390 && \
-> -		(!M68K || ISA) && !MN10300 && !AVR32 && !BLACKFIN && \
-> -		!XTENSA && !CRIS && !H8300
-> +	depends on ARCH_MAY_HAVE_PC_PARPORT
->  
->  	---help---
->  	  You should say Y here if you have a PC-style parallel port. All
-
-Since it's not a permission to have a parallel port but a possibility,
-I suspect the whole series needs a:
-
-  s/MAY_HAVE/MIGHT_HAVE
-  s/may have/might have
-
-Otherwise:
-
-  Acked-by: Ingo Molnar <mingo@kernel.org>
-
-Thanks,
-
-	Ingo
+diff --git a/arch/arm/mach-shmobile/board-kzm9d-reference.c b/arch/arm/mach-shmobile/board-kzm9d-reference.c
+index 054d8d5..853003c 100644
+--- a/arch/arm/mach-shmobile/board-kzm9d-reference.c
++++ b/arch/arm/mach-shmobile/board-kzm9d-reference.c
+@@ -20,15 +20,14 @@
+ 
+ #include <linux/init.h>
+ #include <linux/of_platform.h>
++#include <linux/clk-provider.h>
+ #include <mach/emev2.h>
+ #include <mach/common.h>
+ #include <asm/mach/arch.h>
+ 
+ static void __init kzm9d_add_standard_devices(void)
+ {
+-	if (!IS_ENABLED(CONFIG_COMMON_CLK))
+-		emev2_clock_init();
+-
++	of_clk_init(NULL);
+ 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+ }
+ 
+-- 
+1.8.1.5
