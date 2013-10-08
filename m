@@ -1,58 +1,54 @@
-From: felipensp@gmail.com (Felipe Pena)
-Date: Mon,  7 Oct 2013 23:25:44 -0300
-Subject: =?UTF-8?q?=5BPATCHv2=201/1=5D=20clk/zynq=3A=20Fix=20possible=20memory=20leak?=
-Message-ID: <1381199144-5827-1-git-send-email-felipensp@gmail.com>
+From: hancockrwd@gmail.com (Robert Hancock)
+Date: Mon, 07 Oct 2013 20:38:13 -0600
+Subject: [BUG,REGRESSION] SATA regression on 12.0-rc4 kernel
+In-Reply-To: <87bo303nfe.fsf@natisbad.org>
+References: <87vc1ahyft.fsf@natisbad.org>
+ <20131007125943.GA1332@titan.lakedaemon.net> <87bo303nfe.fsf@natisbad.org>
+Message-ID: <52537015.6040200@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The zynq_clk_register_fclk function can leak memory (fclk_lock) when unable
-to alloc memory for fclk_gate_lock
+On 10/07/2013 01:12 PM, Arnaud Ebalard wrote:
+> Hi guys,
+>
+> yesterday, I reported on arm kernel mailing list what looked like a sata
+> regression on my platform (Marvell Armada 370-based NETGEAR ReadyNAS
+> 102). I initially thought this was an ARM-related issue. My initial
+> email, provided below, contains various details on the platform and the
+> error encountered.
+>
+> Today, before starting a painful git bisect, I decided to git log
+> sata_mv.c code and then more generally drivers/ata to quickly end up on
+> commit ed36911c747c (libata: Add support for SEND/RECEIVE FPDMA QUEUED)
+> against which I got suspicious after looking again at the errors I had:
+>
+> [  417.288155] ata1.00: exception Emask 0x0 SAct 0x1fff6001 SErr 0x0 action 0x6 frozen
+> [  417.295838] ata1.00: failed command: WRITE FPDMA QUEUED
+> [  417.301097] ata1.00: cmd 61/48:00:80:ad:0b/00:00:0c:00:00/40 tag 0 ncq 36864 out
+> [  417.315896] ata1.00: status: { DRDY }
+> [  417.319570] ata1.00: failed command: WRITE FPDMA QUEUED
+> [  417.324814] ata1.00: cmd 61/08:68:70:a1:87/00:00:0d:00:00/40 tag 13 ncq 4096 out
+> [  417.339619] ata1.00: status: { DRDY }
+> [  417.343288] ata1.00: failed command: WRITE FPDMA QUEUED
+> [  417.348536] ata1.00: cmd 61/08:70:28:a2:87/00:00:0d:00:00/40 tag 14 ncq 4096 out
+> [  417.363341] ata1.00: status: { DRDY }
+> [  417.367010] ata1.00: failed command: WRITE FPDMA QUEUED
+> [  417.372257] ata1.00: cmd 61/08:80:80:a3:87/00:00:0d:00:00/40 tag 16 ncq 4096 out
+> [  417.387061] ata1.00: status: { DRDY }
+> [  417.390733] ata1.00: failed command: WRITE FPDMA QUEUED
+> [  417.395977] ata1.00: cmd 61/08:88:58:a1:c7/00:00:0d:00:00/40 tag 17 ncq 4096 out
+> [  417.410782] ata1.00: status: { DRDY }
+>
+> Reverting both 87fb6c31b9 (libata: Add support for queued DSM TRIM) and
+> ed36911c74 (libata: Add support for SEND/RECEIVE FPDMA QUEUED) makes the
+> problem disappear. Note: reverting 87fb6c31b9 is not enough and I cannot
+> compile the kernel with only the latter reverted.
+>
+> If you need more info on the platform or want me to test something some
+> fix, do not hesitate.
 
-Signed-off-by: Felipe Pena <felipensp@gmail.com>
-Acked-by: S?ren Brinkmann <soren.brinkmann@xilinx.com>
----
- drivers/clk/zynq/clkc.c |   16 +++++++++++++++-
- 1 file changed, 15 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/clk/zynq/clkc.c b/drivers/clk/zynq/clkc.c
-index cc40fe6..10772aa 100644
---- a/drivers/clk/zynq/clkc.c
-+++ b/drivers/clk/zynq/clkc.c
-@@ -117,13 +117,19 @@ static void __init zynq_clk_register_fclk(enum zynq_clk fclk,
- 		goto err;
- 	fclk_gate_lock = kmalloc(sizeof(*fclk_gate_lock), GFP_KERNEL);
- 	if (!fclk_gate_lock)
--		goto err;
-+		goto err_fclk_gate_lock;
- 	spin_lock_init(fclk_lock);
- 	spin_lock_init(fclk_gate_lock);
-
- 	mux_name = kasprintf(GFP_KERNEL, "%s_mux", clk_name);
-+	if (!mux_name)
-+		goto err_mux_name;
- 	div0_name = kasprintf(GFP_KERNEL, "%s_div0", clk_name);
-+	if (!div0_name)
-+		goto err_div0_name;
- 	div1_name = kasprintf(GFP_KERNEL, "%s_div1", clk_name);
-+	if (!div1_name)
-+		goto err_div1_name;
-
- 	clk = clk_register_mux(NULL, mux_name, parents, 4,
- 			CLK_SET_RATE_NO_REPARENT, fclk_ctrl_reg, 4, 2, 0,
-@@ -147,6 +153,14 @@ static void __init zynq_clk_register_fclk(enum zynq_clk fclk,
-
- 	return;
-
-+err_div1_name:
-+	kfree(div0_name);
-+err_div0_name:
-+	kfree(mux_name);
-+err_mux_name:
-+	kfree(fclk_gate_lock);
-+err_fclk_gate_lock:
-+	kfree(fclk_lock);
- err:
- 	clks[fclk] = ERR_PTR(-ENOMEM);
- }
---
-1.7.10.4
+I assume that it consistently fails on a non-working kernel and 
+consistently works with those patches reverted? Given that both of those 
+patches seem to only be touching SSDs with NCQ trim support, it seems 
+odd they would be breaking a normal hard drive, but maybe there is some 
+unexpected side effect..
