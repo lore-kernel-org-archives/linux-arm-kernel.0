@@ -1,91 +1,67 @@
 From: mturquette@linaro.org (Mike Turquette)
-Date: Mon, 07 Oct 2013 22:40:34 -0700
-Subject: [PATCHv7 00/36] ARM: OMAP: clock data conversion to DT
-In-Reply-To: <1380098922-30340-1-git-send-email-t-kristo@ti.com>
-References: <1380098922-30340-1-git-send-email-t-kristo@ti.com>
-Message-ID: <20131008054034.7445.48080@quantum>
+Date: Mon, 07 Oct 2013 22:43:53 -0700
+Subject: [PATCHv2 1/1] clk/zynq: Fix possible memory leak
+In-Reply-To: <1381199144-5827-1-git-send-email-felipensp@gmail.com>
+References: <1381199144-5827-1-git-send-email-felipensp@gmail.com>
+Message-ID: <20131008054353.7445.57617@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Tero Kristo (2013-09-25 01:48:06)
-> Hi all,
+Quoting Felipe Pena (2013-10-07 19:25:44)
+> The zynq_clk_register_fclk function can leak memory (fclk_lock) when unable
+> to alloc memory for fclk_gate_lock
 > 
-> Version 7 contains following high level changes:
-> - Dropped support for basic bindings from Mike Turquette, instead using
->   vendor specific bindings for all clocks
-> - Mux clock + divider clock vendor specific bindings get rid of use
->   of the bit-masks, instead these are generated runtime based on parent
->   clock / divider min/max info, see individual patches for details
-> - Added support for dummy_ck nodes, was missing from previous version
-> - Fixed support for omap3630
-> - Added support for new clock node type: ti,mux-gate-clock (using composite
->   clock type)
-> - OMAP4 / OMAP5 only build fixes (compiler flag checks added to some files)
-> - most of the of_omap_* calls renamed to of_ti_*
-> - Rebased on top of v3.12-rc2
+> Signed-off-by: Felipe Pena <felipensp@gmail.com>
+> Acked-by: S?ren Brinkmann <soren.brinkmann@xilinx.com>
 
-Hi Tero,
+Taken into clk-next.
 
-I had one really minor request for one of the patches, otherwise I'm
-pretty happy with this series and I can take in the clock parts for
-3.13. A few general comments:
-
-1) I think I mentioned some time back that it would be
-wise to put a disclaimer at the top of each DT binding description
-stating something to the effect: "Binding status: Unstable - ABI
-compatibility may be broken in the future". Are you OK merging these
-bindings as-is without that kind of a disclaimer?
-
-2) I hope to see the clockdomain stuff go away in the future. I'm OK to
-take it for now to aid in this DT transition but I would like some
-commitment that it will not stay in drivers/clk/omap forever. I guess
-for clockdomain you'll need to figure out how to handle those in a
-generic driver way.
-
-3) Same concern as above but for the DT clkdev alias stuff. I guess
-you'll need to make all of the dependent drivers play nice with DT. Do
-you plan to remove it within a reasonable timeframe? It would be a nice
-reduction in LoC and more importantly it would mean that drivers were
-using clkdev in a more-correct fashion.
-
-Regards,
+Thanks!
 Mike
 
+> ---
+>  drivers/clk/zynq/clkc.c |   16 +++++++++++++++-
+>  1 file changed, 15 insertions(+), 1 deletion(-)
 > 
-> Some detailed comments about patch level changes (if no mention, no major
-> changes):
-> - Patch #1:
->   * removed use of reg-names property, instead registers mapped using
->     compatible string
->   * removed ti,modes property, instead uses DPLL mode flags now
->   * separated AM33XX DPLLs under their own compatible strings
-> - Patch #4 & #5: new patches
-> - Patch #6: merged basic gate support from Mike to this patch as vendor
->   specific gate clock support
-> - Patch #9 & #10: new patches
-> - Patch #11: dummy clocks added, USB / ABE DPLL setup ordering changed
-> - Patch #14: dummy clocks added
-> - Patch #20: dropped usage of reg-names property
-> - Patch #21: dummy clocks added
-> - Patch #22 & #23: new patches
-> - Patch #30: AM35XX clock data added to this patch
-> - Patch #31:
->   * dummy clocks added
->   * added missing 3630 clocks
+> diff --git a/drivers/clk/zynq/clkc.c b/drivers/clk/zynq/clkc.c
+> index cc40fe6..10772aa 100644
+> --- a/drivers/clk/zynq/clkc.c
+> +++ b/drivers/clk/zynq/clkc.c
+> @@ -117,13 +117,19 @@ static void __init zynq_clk_register_fclk(enum zynq_clk fclk,
+>                 goto err;
+>         fclk_gate_lock = kmalloc(sizeof(*fclk_gate_lock), GFP_KERNEL);
+>         if (!fclk_gate_lock)
+> -               goto err;
+> +               goto err_fclk_gate_lock;
+>         spin_lock_init(fclk_lock);
+>         spin_lock_init(fclk_gate_lock);
 > 
-> Test branch available here:
-> https://github.com/t-kristo/linux-pm.git
-> branch: mainline-3.12-rc2-ti-dt-clks-v7
+>         mux_name = kasprintf(GFP_KERNEL, "%s_mux", clk_name);
+> +       if (!mux_name)
+> +               goto err_mux_name;
+>         div0_name = kasprintf(GFP_KERNEL, "%s_div0", clk_name);
+> +       if (!div0_name)
+> +               goto err_div0_name;
+>         div1_name = kasprintf(GFP_KERNEL, "%s_div1", clk_name);
+> +       if (!div1_name)
+> +               goto err_div1_name;
 > 
-> Testing done:
-> - am335x-bone : boot only
-> - omap5-sevm : boot only
-> - dra7-evm : boot only
-> - omap3-beagle : boot + suspend/resume (ret + off)
-> - omap4-panda-es : boot + suspend/resume
+>         clk = clk_register_mux(NULL, mux_name, parents, 4,
+>                         CLK_SET_RATE_NO_REPARENT, fclk_ctrl_reg, 4, 2, 0,
+> @@ -147,6 +153,14 @@ static void __init zynq_clk_register_fclk(enum zynq_clk fclk,
 > 
-> Nishanth has also been doing some tests with omap3-beagle-xm with some WIP
-> versions of this branch, but not with this latest one. Nishanth, maybe you
-> can provide test results to this one also?
+>         return;
 > 
-> -Tero
+> +err_div1_name:
+> +       kfree(div0_name);
+> +err_div0_name:
+> +       kfree(mux_name);
+> +err_mux_name:
+> +       kfree(fclk_gate_lock);
+> +err_fclk_gate_lock:
+> +       kfree(fclk_lock);
+>  err:
+>         clks[fclk] = ERR_PTR(-ENOMEM);
+>  }
+> --
+> 1.7.10.4
