@@ -1,39 +1,61 @@
 From: csmanjuvijay@gmail.com (Majunath Goudar)
-Date: Tue,  8 Oct 2013 16:06:04 +0530
-Subject: [PATCH] DRM: TTM: Fix memory leak issue in ttm_agp_tt_create().
-Message-ID: <1381228565-20846-1-git-send-email-csmanjuvijay@gmail.com>
+Date: Tue,  8 Oct 2013 16:07:34 +0530
+Subject: [PATCH] INPUT/MISC: Fix input/misc PWM related undefined reference
+ errors.
+Message-ID: <1381228654-21947-1-git-send-email-csmanjuvijay@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds kfree() in ttm_agp_tt_create() to avoide the
-memory leak, without this there is a chance of memory leak in
-ttm_tt_init() fail case.
+This patch adds a PWM dependency to configure the INPUT_MAX8997_HAPTIC
+and INPUT_PWM_BEEPER. Without this patch, build system can lead to build
+failure. This was observed during randconfig testing, in which
+INPUT_MAX8997_HAPTIC or INPUT_PWM_BEEPER was enabled w/o PWM being
+enabled. leading to the following error:
 
-Signed-off-by: Jeyaraman R <jeyaraman.rangasamy@lge.com>
+init/built-in.o
+drivers/built-in.o: In function `max8997_haptic_disable':
+:(.text+0x1073a0): undefined reference to `pwm_disable'
+drivers/built-in.o: In function `max8997_haptic_remove':
+:(.text+0x1073fc): undefined reference to `pwm_free'
+drivers/built-in.o: In function `max8997_haptic_play_effect_work':
+:(.text+0x1074f0): undefined reference to `pwm_config'
+:(.text+0x1075b0): undefined reference to `pwm_enable'
+drivers/built-in.o: In function `max8997_haptic_probe':
+:(.text+0x1076f8): undefined reference to `pwm_request'
+:(.text+0x1077e8): undefined reference to `pwm_free'
+drivers/built-in.o: In function `pwm_beeper_resume':
+:(.text+0x1081a4): undefined reference to `pwm_config'
+make: *** [vmlinux] Error 1
+
 Signed-off-by: Manjunath Goudar <csmanjuvijay@gmail.com>
-Cc: David Airlie <airlied@linux.ie>
-Cc: "Paul E. McKenney" <paulmck@linux.vnet.ibm.com>
-Cc: David Howells <dhowells@redhat.com>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: Dave Jones <davej@redhat.com>
-Cc: Dave Airlie <airlied@redhat.com>
-Cc: dri-devel at lists.freedesktop.org
+Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+Cc: linux-input at vger.kernel.org
 Cc: linux-kernel at vger.kernel.org
 ---
- drivers/gpu/drm/ttm/ttm_agp_backend.c |    1 +
- 1 file changed, 1 insertion(+)
+ drivers/input/misc/Kconfig |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/gpu/drm/ttm/ttm_agp_backend.c b/drivers/gpu/drm/ttm/ttm_agp_backend.c
-index 3302f99..764be36 100644
---- a/drivers/gpu/drm/ttm/ttm_agp_backend.c
-+++ b/drivers/gpu/drm/ttm/ttm_agp_backend.c
-@@ -126,6 +126,7 @@ struct ttm_tt *ttm_agp_tt_create(struct ttm_bo_device *bdev,
- 	agp_be->ttm.func = &ttm_agp_func;
+diff --git a/drivers/input/misc/Kconfig b/drivers/input/misc/Kconfig
+index aa51baa..265240b 100644
+--- a/drivers/input/misc/Kconfig
++++ b/drivers/input/misc/Kconfig
+@@ -156,7 +156,7 @@ config INPUT_MAX8925_ONKEY
  
- 	if (ttm_tt_init(&agp_be->ttm, bdev, size, page_flags, dummy_read_page)) {
-+		kfree(agp_be);
- 		return NULL;
- 	}
+ config INPUT_MAX8997_HAPTIC
+ 	tristate "MAXIM MAX8997 haptic controller support"
+-	depends on HAVE_PWM && MFD_MAX8997
++	depends on HAVE_PWM && MFD_MAX8997 && PWM
+ 	select INPUT_FF_MEMLESS
+ 	help
+ 	  This option enables device driver support for the haptic controller
+@@ -461,7 +461,7 @@ config INPUT_PCF8574
+ 
+ config INPUT_PWM_BEEPER
+ 	tristate "PWM beeper support"
+-	depends on HAVE_PWM || PWM
++	depends on HAVE_PWM && PWM
+ 	help
+ 	  Say Y here to get support for PWM based beeper devices.
  
 -- 
 1.7.9.5
