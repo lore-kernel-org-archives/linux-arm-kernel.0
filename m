@@ -1,66 +1,51 @@
-From: marex@denx.de (Marek Vasut)
-Date: Tue, 8 Oct 2013 12:33:36 +0200
-Subject: [PATCH 2/3] ARM: mxs: crypto: Add Freescale MXS DCP driver
-In-Reply-To: <20131008043631.GA18365@gondor.apana.org.au>
-References: <1380194306-5243-1-git-send-email-marex@denx.de>
- <201310071748.27150.marex@denx.de>
- <20131008043631.GA18365@gondor.apana.org.au>
-Message-ID: <201310081233.37136.marex@denx.de>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 8 Oct 2013 11:33:31 +0100
+Subject: [PATCH 2/2] ARM: include: asm: use 'int' instead of 'unsigned
+ long' for normal register variables within atomic.h
+In-Reply-To: <524F5566.4010204@asianux.com>
+References: <20131001090119.GA17629@mudshark.cambridge.arm.com>
+ <524ABA20.6060106@asianux.com>
+ <20131002104158.GD28311@mudshark.cambridge.arm.com>
+ <524C3981.20307@asianux.com> <524D416B.5090709@asianux.com>
+ <20131003163200.GE7408@mudshark.cambridge.arm.com>
+ <524E8FBC.2080200@asianux.com>
+ <20131004153742.GR24303@mudshark.cambridge.arm.com>
+ <20131004154208.GS24303@mudshark.cambridge.arm.com>
+ <524F5566.4010204@asianux.com>
+Message-ID: <20131008103331.GE17148@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Herbert,
-
-> On Mon, Oct 07, 2013 at 05:48:26PM +0200, Marek Vasut wrote:
-> > Hello Christoph,
+On Sat, Oct 05, 2013 at 12:55:18AM +0100, Chen Gang wrote:
+> On 10/04/2013 11:42 PM, Will Deacon wrote:
+> > On Fri, Oct 04, 2013 at 04:37:42PM +0100, Will Deacon wrote:
+> >> On Fri, Oct 04, 2013 at 10:51:56AM +0100, Chen Gang wrote:
+> >>> On 10/04/2013 12:32 AM, Will Deacon wrote:
+> >>>> The problem with arm64 is that we're using *unsigned long* for 32-bit
+> >>>> clear_mask, which is definitely wrong because it's 64-bit (another patch to
+> >>>> fix this!).
+> >>>>
+> >>>
+> >>> At least, that is not a bug.
+> >>
+> >> Sure it is. What if the adjacent 32-bit value was being accessed by another
+> >> CPU under a spinlock?
 > > 
-> > > Hello Marek,
-> > > 
-> > > > Marek Vasut <marex@denx.de> hat am 28. September 2013 um 05:35
-> > > > geschrieben: [...]
-> > > > 
-> > > > > > 3) What are those ugly new IOCTLs in the dcp.c driver?
-> > > > > 
-> > > > > When I firstly posted the driver in the mailinglist, there where
-> > > > > one person who actually used this interface (it was introduced in
-> > > > > Freescale's SDK) to use the OTP keys for crypto. As far as I have
-> > > > > seen, the crypto API does not support such keys (i.e. there seems
-> > > > > to be no way to tell a driver to use some kind of special keys -
-> > > > > which are not delivered by the user - via the API).
-> > > > > Therefore I added this miscdevice and adopted Freescale's
-> > > > > interface.
-> > > > 
-> > > > The keys are programmed into the OTP registers, correct? There is
-> > > > OCOTP d
-> > > >
-> > > >river
-> > > >for the MX23/MX28 OTP hardware. This is what should have been used
-> > > >then.
-> > > >
-> > > > NOTE: This IOCTL interface seems like quite an abusive way to allow
-> > > > userl
-> > > >
-> > > >and to
-> > > >access the crypto API in kernel. I understand this is used by some
-> > > >Freesc ale tool, but won't it be better to fix the Freescale tool
-> > > >instead ?
-> > > 
-> > > the IOCTL interface is used to AES encrypt a bootstream with the AES
-> > > key in OCOTP.
-> > > The idea is that only the DCP can read/access the key once it has been
-> > > programmed
-> > > into the OCOTP. If the crypto API has means to tell the DCP to use the
-> > > key from OCOTP, the tool from Freescale is a minor problem.
-> > 
-> > Ah right. I suspect the crypto API services shall not be exported into
-> > userland at all, yes ? So there has to be some kind of workaround here
-> > for this freescale tool, which is rather unfortunate.
+> > (Oh, ok, that would still work on arm because of the way the exclusive
+> > monitor is implemented, but we shouldn't rely on that).
+> >
 > 
-> These ioctls have to go.  I should have never let them through in
-> the first place.  Can someone cook up a patch to kill them please?
+> Hmm... in my opinion, we need divide atomic_*_mask() into 32-bit and
+> 64-bit versions. We already have demands to only use 32-bit value to
+> express mask (can save size), and may have demands to use 64-bit too.
 
-I can do that. I wonder if we can't agree to nuke the in-tree driver altogether 
-instead and replace it by this one though. Does it not sound more reasonable?
+Right, but isn't this code only used by that s390 SCSI driver? Why do other
+architectures even need to bother implementing it?
 
-Best regards,
-Marek Vasut
+> And also, excuse me, I am not quite familiar with "exclusive monitor",
+> could you please provide more details about it?
+
+You'll need to take a look at the ARM ARM, in particular the section about
+`Synchronisation and Semaphores'.
+
+Will
