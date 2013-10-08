@@ -1,46 +1,97 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Tue, 08 Oct 2013 23:37:58 +0200
-Subject: [PATCH v2] ARM: tlb: ASID macro should give 32bit result for
- BE correct operation
-In-Reply-To: <20131007195525.f56083f0d91df6a6396cc494@linaro.org>
-References: <1381160903-1248-1-git-send-email-victor.kamensky@linaro.org>
- <5252DA06.8000303@codethink.co.uk>
- <CAA3XUr2wYFL9WAQd9uAJSKK5KhWF3bPzYbh-3x=B3oLVXk79og@mail.gmail.com>
- <52533A70.5040705@ti.com>
- <20131007195525.f56083f0d91df6a6396cc494@linaro.org>
-Message-ID: <52547B36.2060407@codethink.co.uk>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 8 Oct 2013 21:41:24 +0000 (UTC)
+Subject: OMAP baseline test results for v3.12-rc4
+Message-ID: <alpine.DEB.2.02.1310082140250.24955@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/10/13 02:55, Kim Phillips wrote:
-> On Mon, 7 Oct 2013 18:49:20 -0400
-> Santosh Shilimkar<santosh.shilimkar@ti.com>  wrote:
->
->> On Monday 07 October 2013 12:37 PM, Victor Kamensky wrote:
->>> On 7 October 2013 08:57, Ben Dooks<ben.dooks@codethink.co.uk>  wrote:
->>>> On 07/10/13 17:48, Victor Kamensky wrote:
->>>> If you are booting on the Arndale board, is there a patch to mark
->>>> the relevant Exynos devices as BE capable?
->>>
->>> Arndale need massive fixes in their BSP layer to be endian agnostic
->>> ARM V7 platform. Unfortunate it is not as simple as with few others
->>> that already marked as BE capable.
->>>
->>> Please see
->>> https://git.linaro.org/gitweb?p=people/victor.kamensky/linux-linaro-tracking-be.git;a=shortlog;h=refs/heads/llct-be-topic
->>> Mostly it is __raw_xxx conversion to xxx_relaxed, but there are
->
-> apologies if this was explained earlier in the thread, but what has
-> __raw_xxx ->  xxx_relaxed have to do with endianness?  the relaxed
-> accessor variants allow the compiler to reorder the instruction: it's
-> got nothing to do with byte swapping the data, no?
 
-the __raw have similar properties, however the readl/writel relaxed
-are basically __raw with byte-swapping and no attempt to do any other
-flush/drain/etc.
+Here are some basic OMAP test results for Linux v3.12-rc4.
+Logs and other details at:
 
-Thus I thought these would be the best ones to go for.
+    http://www.pwsan.com/omap/testlogs/test_v3.12-rc4/20131007013715/
 
--- 
-Ben Dooks				http://www.codethink.co.uk/
-Senior Engineer				Codethink - Providing Genius
+
+Test summary
+------------
+
+Build: zImage:
+    Pass ( 2/ 2): omap2plus_defconfig, omap2plus_defconfig_am33xx_only
+
+Build: uImage+dtb:
+    Pass ( 3/ 3): omap2plus_defconfig_am33xx_only/am335x-bone,
+		  omap2plus_defconfig/omap4-panda,
+		  omap2plus_defconfig/omap4-panda-es
+
+Build: uImage:
+    Pass (14/14): omap1_defconfig, omap1_defconfig_1510innovator_only,
+		  omap1_defconfig_5912osk_only, omap2plus_defconfig,
+		  omap2plus_defconfig_2430sdp_only,
+		  omap2plus_defconfig_cpupm, omap2plus_defconfig_no_pm,
+		  omap2plus_defconfig_n800_only_a,
+		  omap2plus_defconfig_n800_multi_omap2xxx,
+		  omap2plus_defconfig_omap2_4_only,
+		  omap2plus_defconfig_omap3_4_only,
+		  rmk_omap3430_ldp_allnoconfig,
+		  rmk_omap3430_ldp_oldconfig,
+		  rmk_omap4430_sdp_allnoconfig
+
+Boot to userspace:
+    skip ( 1/ 1): 5912osk
+    Pass (11/11): 2430sdp, 3517evm, 3530es3beagle, 3730beaglexm,
+		  37xxevm, 4430es2panda, 4460pandaes, am335xbone,
+		  am335xbonelt, cmt3517, 4460varsomom
+
+PM: chip retention via suspend:
+    FAIL ( 3/ 7): 2430sdp, 4430es2panda, 4460varsomom
+    Pass ( 4/ 7): 3530es3beagle, 3730beaglexm, 37xxevm, 4460pandaes
+
+PM: chip retention via dynamic idle:
+    FAIL ( 4/ 7): 2430sdp, 4430es2panda, 4460pandaes, 4460varsomom
+    Pass ( 3/ 7): 3530es3beagle, 3730beaglexm, 37xxevm
+
+PM: chip off except CORE via suspend:
+    Pass ( 1/ 1): 3730beaglexm
+
+PM: chip off except CORE via dynamic idle:
+    Pass ( 1/ 1): 3730beaglexm
+
+PM: chip off via suspend:
+    FAIL ( 3/ 5): 4430es2panda, 4460pandaes, 4460varsomom
+    Pass ( 2/ 5): 3530es3beagle, 37xxevm
+
+PM: chip off via dynamic idle:
+    FAIL ( 3/ 5): 4430es2panda, 4460pandaes, 4460varsomom
+    Pass ( 2/ 5): 3530es3beagle, 37xxevm
+
+
+vmlinux object size
+(delta in bytes from test_v3.12-rc3 (15c03dd4859ab16f9212238f29dd315654aa94f6)):
+   text     data      bss    total  kernel
+  +2349      +40        0    +2389  omap1_defconfig
+  +2313      +40        0    +2353  omap1_defconfig_1510innovator_only
+  +2317      +16        0    +2333  omap1_defconfig_5912osk_only
+  +5734      +24        0    +5758  omap2plus_defconfig
+  +1414      +24        0    +1438  omap2plus_defconfig_2430sdp_only
+  +1638        0        0    +1638  omap2plus_defconfig_cpupm
+   +638        0        0     +638  omap2plus_defconfig_n800_multi_omap2xxx
+   +606        0        0     +606  omap2plus_defconfig_n800_only_a
+  +1638       -8        0    +1630  omap2plus_defconfig_no_pm
+  +1638        0        0    +1638  omap2plus_defconfig_omap2_4_only
+  +1638       -8        0    +1630  omap2plus_defconfig_omap3_4_only
+  +1336        0     -112    +1224  rmk_omap3430_ldp_allnoconfig
+   +994        0        0     +994  rmk_omap3430_ldp_oldconfig
+  +1288        0      -96    +1192  rmk_omap4430_sdp_allnoconfig
+
+Boot-time memory difference
+(delta in bytes from test_v3.12-rc3 (15c03dd4859ab16f9212238f29dd315654aa94f6))
+  avail  rsrvd   high  freed  board          kconfig
+    -8k     8k      .      .  2430sdp        omap2plus_defconfig
+    -8k     8k      .      .  3517evm        omap2plus_defconfig
+    -8k     8k      .      .  3530es3beagle  omap2plus_defconfig
+    -8k     8k      .      .  3730beaglexm   omap2plus_defconfig
+    -8k     8k      .      .  37xxevm        omap2plus_defconfig
+    -8k     8k      .      .  4430es2panda   omap2plus_defconfig
+    -8k     8k      .      .  4460pandaes    omap2plus_defconfig
+    -8k     8k      .      .  4460varsomom   omap2plus_defconfig
+    -8k     8k      .      .  am335xbonelt   omap2plus_defconfig_am33xx_only
