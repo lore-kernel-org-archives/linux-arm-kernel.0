@@ -1,32 +1,89 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 8 Oct 2013 09:47:35 -0700
-Subject: [PATCHv7 00/36] ARM: OMAP: clock data conversion to DT
-In-Reply-To: <5253BFB3.9040807@ti.com>
-References: <1380098922-30340-1-git-send-email-t-kristo@ti.com>
- <20131008054034.7445.48080@quantum> <5253BFB3.9040807@ti.com>
-Message-ID: <20131008164735.GC7773@atomide.com>
+Date: Tue, 8 Oct 2013 09:51:11 -0700
+Subject: [PATCH] ARM: OMAP4/highbank: Flush L2 cache before disabling
+In-Reply-To: <1381141621-29001-1-git-send-email-taras.kondratiuk@linaro.org>
+References: <1381141621-29001-1-git-send-email-taras.kondratiuk@linaro.org>
+Message-ID: <20131008165111.GD7773@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tero Kristo <t-kristo@ti.com> [131008 01:26]:
-> On 10/08/2013 08:40 AM, Mike Turquette wrote:
+* Taras Kondratiuk <taras.kondratiuk@linaro.org> [131007 03:35]:
+> Kexec disables outer cache before jumping to reboot code, but it doesn't
+> flush it explicitly. Flush is done implicitly inside of l2x0_disable().
+> But some SoC's override default .disable handler and don't flush cache.
+> This may lead to a corrupted memory during Kexec reboot on these platforms.
 > 
-> >3) Same concern as above but for the DT clkdev alias stuff. I guess
-> >you'll need to make all of the dependent drivers play nice with DT. Do
-> >you plan to remove it within a reasonable timeframe? It would be a nice
-> >reduction in LoC and more importantly it would mean that drivers were
-> >using clkdev in a more-correct fashion.
+> This patch adds cache flush inside of OMAP4 and Highbank outer_cache.disable()
+> handlers to make it consistent with default l2x0_disable().
+> Also it removes redundant outer_flush_all() call just before outer_disable().
+
+Sounds correct to me:
+
+Acked-by: Tony Lindgren <tony@atomide.com>
+
+> Acked-by: Rob Herring <rob.herring@calxeda.com>
+> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Signed-off-by: Taras Kondratiuk <taras.kondratiuk@linaro.org>
+> ---
+> Based on v3.12-rc3
 > 
-> This is probably harder, I think Tony is better to comment here, but
-> my idea is that in the worst case we can just break non-conforming
-> drivers by dropping the clkdev tables if nothing else helps. :) Most
-> of the tables are currently needed by hwmod, and there are already
-> patches around for adding DT clock support for hwmods, so once these
-> go in, we can at least reduce the table sizes considerably already.
-
-It should be possible to remove these as we go as things become DT only.
-Probably the biggest blocker right now is making omap3 DT only.
-
-But let's not start breaking things intentionally!
-
-Tony
+> RFC v2: https://patchwork.kernel.org/patch/2990231/
+>         Make the fix specific to platforms that don't use l2x0_disable().
+> RFC v1: https://patchwork.kernel.org/patch/2974431/
+> ---
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Rob Herring <rob.herring@calxeda.com>
+> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Cc: linaro-kernel at lists.linaro.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-omap at vger.kernel.org
+> ---
+>  arch/arm/mach-highbank/highbank.c  |    1 +
+>  arch/arm/mach-highbank/pm.c        |    1 -
+>  arch/arm/mach-omap2/omap4-common.c |    1 +
+>  3 files changed, 2 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/mach-highbank/highbank.c b/arch/arm/mach-highbank/highbank.c
+> index 8e63ccd..22e6f34 100644
+> --- a/arch/arm/mach-highbank/highbank.c
+> +++ b/arch/arm/mach-highbank/highbank.c
+> @@ -63,6 +63,7 @@ void highbank_set_cpu_jump(int cpu, void *jump_addr)
+>  
+>  static void highbank_l2x0_disable(void)
+>  {
+> +	outer_flush_all();
+>  	/* Disable PL310 L2 Cache controller */
+>  	highbank_smc1(0x102, 0x0);
+>  }
+> diff --git a/arch/arm/mach-highbank/pm.c b/arch/arm/mach-highbank/pm.c
+> index 04eddb4..9a5b8a7 100644
+> --- a/arch/arm/mach-highbank/pm.c
+> +++ b/arch/arm/mach-highbank/pm.c
+> @@ -28,7 +28,6 @@
+>  
+>  static int highbank_suspend_finish(unsigned long val)
+>  {
+> -	outer_flush_all();
+>  	outer_disable();
+>  
+>  	highbank_set_pwr_suspend();
+> diff --git a/arch/arm/mach-omap2/omap4-common.c b/arch/arm/mach-omap2/omap4-common.c
+> index 2840d1e..f6ccab61 100644
+> --- a/arch/arm/mach-omap2/omap4-common.c
+> +++ b/arch/arm/mach-omap2/omap4-common.c
+> @@ -163,6 +163,7 @@ void __iomem *omap4_get_l2cache_base(void)
+>  
+>  static void omap4_l2x0_disable(void)
+>  {
+> +	outer_flush_all();
+>  	/* Disable PL310 L2 Cache controller */
+>  	omap_smc1(0x102, 0x0);
+>  }
+> -- 
+> 1.7.9.5
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
