@@ -1,32 +1,48 @@
 From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Wed,  9 Oct 2013 00:34:24 +0200
-Subject: [PATCH 08/23] ARM: highbank: enable big-endian
+Date: Wed,  9 Oct 2013 00:34:34 +0200
+Subject: [PATCH 18/23] ARM: kdgb: use <asm/opcodes.h> for data to be assembled
+ as intruction
 In-Reply-To: <1381271679-27804-1-git-send-email-ben.dooks@codethink.co.uk>
 References: <1381271679-27804-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <1381271679-27804-9-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <1381271679-27804-19-git-send-email-ben.dooks@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Apart from a xgmac driver issue, the highbank seems to work correctly in
-big-endian mode. Allow the selection of big-endian in the system.
+The arch_kgdb_breakpoint() function uses an inline assembly directive
+to assemble a specific instruction using .word. This means the linker
+will not treat is as an instruction, and therefore incorrectly swap
+the endian-ness if running BE8.
+
+As noted, this code means that kgdb is really only usable on arm32
+kernels, and should be made dependant on not being a thumb2 kernel
+until fixed. However this is not something to be added to this patch.
 
 Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
-Acked-by: Rob Herring <rob.herring@calxeda.com>
+Reviewed-by: Dave Martin <Dave.Martin@arm.com>
 ---
- arch/arm/mach-highbank/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/include/asm/kgdb.h | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-highbank/Kconfig b/arch/arm/mach-highbank/Kconfig
-index 8e8437d..3c3bff7 100644
---- a/arch/arm/mach-highbank/Kconfig
-+++ b/arch/arm/mach-highbank/Kconfig
-@@ -4,6 +4,7 @@ config ARCH_HIGHBANK
- 	select ARCH_HAS_CPUFREQ
- 	select ARCH_HAS_HOLES_MEMORYMODEL
- 	select ARCH_HAS_OPP
-+	select ARCH_SUPPORTS_BIG_ENDIAN
- 	select ARCH_WANT_OPTIONAL_GPIOLIB
- 	select ARM_AMBA
- 	select ARM_ERRATA_764369
+diff --git a/arch/arm/include/asm/kgdb.h b/arch/arm/include/asm/kgdb.h
+index 48066ce..0a9d5dd 100644
+--- a/arch/arm/include/asm/kgdb.h
++++ b/arch/arm/include/asm/kgdb.h
+@@ -11,6 +11,7 @@
+ #define __ARM_KGDB_H__
+ 
+ #include <linux/ptrace.h>
++#include <asm/opcodes.h>
+ 
+ /*
+  * GDB assumes that we're a user process being debugged, so
+@@ -41,7 +42,7 @@
+ 
+ static inline void arch_kgdb_breakpoint(void)
+ {
+-	asm(".word 0xe7ffdeff");
++	asm(__inst_arm(0xe7ffdeff));
+ }
+ 
+ extern void kgdb_handle_bus_error(void);
 -- 
 1.8.4.rc3
