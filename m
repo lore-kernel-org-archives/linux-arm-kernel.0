@@ -1,86 +1,38 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 8 Oct 2013 14:41:00 +0100
-Subject: [PATCH 3/8] ARM: l2x0: add Marvell Tauros3 compatible
-In-Reply-To: <1381235073-17134-4-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1381235073-17134-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1381235073-17134-4-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <20131008134100.GD1412@e106331-lin.cambridge.arm.com>
+From: jonas.jensen@gmail.com (Jonas Jensen)
+Date: Tue,  8 Oct 2013 15:46:47 +0200
+Subject: [PATCH v2] Documentation: add moxa vendor prefix
+In-Reply-To: <1381237000-8398-1-git-send-email-jonas.jensen@gmail.com>
+References: <1381237000-8398-1-git-send-email-jonas.jensen@gmail.com>
+Message-ID: <1381240007-9321-1-git-send-email-jonas.jensen@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 08, 2013 at 01:24:28PM +0100, Sebastian Hesselbarth wrote:
-> This add a compatible for the Marvell Tauros3 cache controller which
-> is compatible with l2x0 cache controllers. While updating the binding
-> documentation, clean up the list of possible compatibles.
-> 
-> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> ---
-> Cc: Jason Cooper <jason@lakedaemon.net>
-> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: devicetree at vger.kernel.org
-> Cc: linux-doc at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-kernel at vger.kernel.org
-> ---
->  Documentation/devicetree/bindings/arm/l2cc.txt |   22 +++++++++++-----------
->  arch/arm/mm/cache-l2x0.c                       |    1 +
->  2 files changed, 12 insertions(+), 11 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/l2cc.txt b/Documentation/devicetree/bindings/arm/l2cc.txt
-> index c0c7626..a1d0cbd 100644
-> --- a/Documentation/devicetree/bindings/arm/l2cc.txt
-> +++ b/Documentation/devicetree/bindings/arm/l2cc.txt
-> @@ -7,20 +7,20 @@ The ARM L2 cache representation in the device tree should be done as follows:
->  Required properties:
->  
->  - compatible : should be one of:
-> -	"arm,pl310-cache"
-> -	"arm,l220-cache"
-> -	"arm,l210-cache"
-> -	"marvell,aurora-system-cache": Marvell Controller designed to be
-> +  "arm,pl310-cache"
-> +  "arm,l220-cache"
-> +  "arm,l210-cache"
-> +  "bcm,bcm11351-a2-pl310-cache": DEPRECATED by "brcm,bcm11351-a2-pl310-cache"
-> +  "brcm,bcm11351-a2-pl310-cache": For Broadcom bcm11351 chipset where an
-> +     offset needs to be added to the address before passing down to the L2
-> +     cache controller
-> +  "marvell,aurora-system-cache": Marvell Controller designed to be
->       compatible with the ARM one, with system cache mode (meaning
->       maintenance operations on L1 are broadcasted to the L2 and L2
->       performs the same operation).
-> -	"marvell,"aurora-outer-cache: Marvell Controller designed to be
-> -	 compatible with the ARM one with outer cache mode.
-> -	"brcm,bcm11351-a2-pl310-cache": For Broadcom bcm11351 chipset where an
-> -	offset needs to be added to the address before passing down to the L2
-> -	cache controller
-> -	"bcm,bcm11351-a2-pl310-cache": DEPRECATED by
-> -	                               "brcm,bcm11351-a2-pl310-cache"
-> +  "marvell,aurora-outer-cache": Marvell Controller designed to be
-> +     compatible with the ARM one with outer cache mode.
-> +  "marvell,tauros3-cache": Marvell Tauros3 cache controller.
+Add moxa vendor prefix.
 
-How does the tauros3 cache differ from the other caches supported by the
-l2x0 driver?
+Signed-off-by: Jonas Jensen <jonas.jensen@gmail.com>
+---
 
->  - cache-unified : Specifies the cache is a unified cache.
->  - cache-level : Should be set to 2 for a level 2 cache.
->  - reg : Physical base address and size of cache controller's memory mapped
-> diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-> index 447da6f..90c776e 100644
-> --- a/arch/arm/mm/cache-l2x0.c
-> +++ b/arch/arm/mm/cache-l2x0.c
-> @@ -929,6 +929,7 @@ static const struct of_device_id l2x0_ids[] __initconst = {
->  	  .data = (void *)&aurora_no_outer_data},
->  	{ .compatible = "marvell,aurora-outer-cache",
->  	  .data = (void *)&aurora_with_outer_data},
-> +	{ .compatible = "marvell,tauros3-cache", .data = (void *)&l2x0_data },
+Notes:
+    Changes since v1:
+    
+    1. use the correct vendor name "Moxa Technologies Co., Ltd."
+    
+    Applies to next-20130927
 
-Are we intending to handle this differently later? 
+ Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
-Or is it 100% compatible with the pl210 or pl220? We could just require
-an entry later in the compatible string list instead...
-
-Cheers,
-Mark.
+diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+index 2956800..3b9e056 100644
+--- a/Documentation/devicetree/bindings/vendor-prefixes.txt
++++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+@@ -40,6 +40,7 @@ marvell	Marvell Technology Group Ltd.
+ maxim	Maxim Integrated Products
+ microchip	Microchip Technology Inc.
+ mosaixtech	Mosaix Technologies, Inc.
++moxa	Moxa Technologies Co., Ltd.
+ national	National Semiconductor
+ nintendo	Nintendo
+ nvidia	NVIDIA
+-- 
+1.8.2.1
