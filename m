@@ -1,40 +1,40 @@
-From: simon.pe.barth@gmail.com (Simon Barth)
-Date: Tue, 08 Oct 2013 10:50:33 +0200
-Subject: [PATCH] ARM: mach-omap2: board-generic: fix undefined symbol
-Message-ID: <5253C759.5020406@gmail.com>
+From: josephl@nvidia.com (Joseph Lo)
+Date: Tue, 8 Oct 2013 17:01:09 +0800
+Subject: [PATCH 0/4] ARM: tegra: add CPU hot-plug and idle support for
+ Tegra124
+In-Reply-To: <1381220587-29697-1-git-send-email-josephl@nvidia.com>
+References: <1381220587-29697-1-git-send-email-josephl@nvidia.com>
+Message-ID: <1381222869.10568.6.camel@jlo-ubuntu-64.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since dra7 reuses the  function 'omap5_realtime_timer_init' in
-arch/arm/mach-omap2/board-generic.c as timer init function, it has to be
-built for this SoC as well.
+On Tue, 2013-10-08 at 16:23 +0800, Joseph Lo wrote:
+> The CPU hot-plug and idle function for Tegra124 was identical to Tegra114,
+> so we share the driver with it.
+> 
+Because this series touches common CPU resume function across Tegra
+chips, I forgot to mention.
 
-Signed-off-by: Simon Barth <Simon.Pe.Barth@gmail.com>
----
- arch/arm/mach-omap2/timer.c |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+Verified on Seaboard, Cardhu, Dalmore and Venice2 and with THUMB2_KERNEL
+as well.
 
-diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
-index fa74a06..ead48fa 100644
---- a/arch/arm/mach-omap2/timer.c
-+++ b/arch/arm/mach-omap2/timer.c
-@@ -628,7 +628,7 @@ void __init omap4_local_timer_init(void)
- #endif /* CONFIG_HAVE_ARM_TWD */
- #endif /* CONFIG_ARCH_OMAP4 */
-
--#ifdef CONFIG_SOC_OMAP5
-+#if defined(CONFIG_SOC_OMAP5) || defined(CONFIG_SOC_DRA7XX)
- void __init omap5_realtime_timer_init(void)
- {
- 	omap4_sync32k_timer_init();
-@@ -636,7 +636,7 @@ void __init omap5_realtime_timer_init(void)
-
- 	clocksource_of_init();
- }
--#endif /* CONFIG_SOC_OMAP5 */
-+#endif /* CONFIG_SOC_OMAP5 || CONFIG_SOC_DRA7XX */
-
- /**
-  * omap_timer_init - build and register timer device with an
--- 
-1.7.9.5
+> Note:
+> This patch series depends on the patch series below.
+> * [PATCH 0/5] Tegra124 clock support
+> * [PATCH V2 0/6] ARM: tegra: basic support for Tegra124 SoC
+> * [PATCH] ARM: tegra: add clock properties for devices of Tegra124
+> 
+> Joseph Lo (4):
+>   clk: tegra124: add wait_for_reset and disable_clock for
+>     tegra_cpu_car_ops
+>   ARM: tegra: CPU hotplug support for Tegra124
+>   ARM: tegra: make tegra_resume can work with current and later chips
+>   ARM: tegra: enable CPU idle for Tegra124
+> 
+>  arch/arm/mach-tegra/Makefile        |  4 ++++
+>  arch/arm/mach-tegra/cpuidle.c       |  4 +++-
+>  arch/arm/mach-tegra/hotplug.c       |  2 ++
+>  arch/arm/mach-tegra/reset-handler.S |  9 +++------
+>  drivers/clk/tegra/clk-tegra124.c    | 26 ++++++++++++++++++++++++++
+>  5 files changed, 38 insertions(+), 7 deletions(-)
+> 
