@@ -1,32 +1,52 @@
 From: magnus.damm@gmail.com (Magnus Damm)
-Date: Tue, 08 Oct 2013 12:39:01 +0900
-Subject: [PATCH 01/08] ARM: shmobile: r8a7791 PFC device tree node
+Date: Tue, 08 Oct 2013 12:39:10 +0900
+Subject: [PATCH 02/08] ARM: shmobile: r8a7791 PFC platform device support
 In-Reply-To: <20131008033851.20455.68845.sendpatchset@w520>
 References: <20131008033851.20455.68845.sendpatchset@w520>
-Message-ID: <20131008033901.20455.32324.sendpatchset@w520>
+Message-ID: <20131008033910.20455.63317.sendpatchset@w520>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Magnus Damm <damm@opensource.se>
 
-Add a DT node for the r8a7791 PFC device.
+Add a platform device for the r8a7791 PFC device.
 
 Signed-off-by: Magnus Damm <damm@opensource.se>
 ---
 
- arch/arm/boot/dts/r8a7791.dtsi |    6 ++++++
- 1 file changed, 6 insertions(+)
+ arch/arm/mach-shmobile/include/mach/r8a7791.h |    1 +
+ arch/arm/mach-shmobile/setup-r8a7791.c        |   13 +++++++++++++
+ 2 files changed, 14 insertions(+)
 
---- 0001/arch/arm/boot/dts/r8a7791.dtsi
-+++ work/arch/arm/boot/dts/r8a7791.dtsi	2013-10-04 18:31:44.000000000 +0900
-@@ -71,4 +71,10 @@
- 			      <0 16 4>,
- 			      <0 17 4>;
- 	};
+--- 0001/arch/arm/mach-shmobile/include/mach/r8a7791.h
++++ work/arch/arm/mach-shmobile/include/mach/r8a7791.h	2013-10-04 18:31:02.000000000 +0900
+@@ -4,6 +4,7 @@
+ void r8a7791_add_standard_devices(void);
+ void r8a7791_add_dt_devices(void);
+ void r8a7791_clock_init(void);
++void r8a7791_pinmux_init(void);
+ void r8a7791_init_early(void);
+ extern struct smp_operations r8a7791_smp_ops;
+ 
+--- 0001/arch/arm/mach-shmobile/setup-r8a7791.c
++++ work/arch/arm/mach-shmobile/setup-r8a7791.c	2013-10-04 18:31:02.000000000 +0900
+@@ -31,6 +31,19 @@
+ #include <mach/rcar-gen2.h>
+ #include <asm/mach/arch.h>
+ 
++static const struct resource pfc_resources[] __initconst = {
++	DEFINE_RES_MEM(0xe6060000, 0x250),
++};
 +
-+	pfc: pfc at e6060000 {
-+		compatible = "renesas,pfc-r8a7791";
-+		reg = <0 0xe6060000 0 0x250>;
-+		#gpio-range-cells = <3>;
-+	};
- };
++#define r8a7791_register_pfc()						\
++	platform_device_register_simple("pfc-r8a7791", -1, pfc_resources, \
++					ARRAY_SIZE(pfc_resources))
++
++void __init r8a7791_pinmux_init(void)
++{
++	r8a7791_register_pfc();
++}
++
+ #define SCIF_COMMON(scif_type, baseaddr, irq)			\
+ 	.type		= scif_type,				\
+ 	.mapbase	= baseaddr,				\
