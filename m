@@ -1,87 +1,58 @@
-From: b.brezillon@overkiz.com (boris brezillon)
-Date: Tue, 08 Oct 2013 18:19:27 +0200
-Subject: [PATCH v3 12/19] clk: at91: add peripheral clk macros for
- peripheral clk dt bindings
-In-Reply-To: <52542F95.5050603@atmel.com>
-References: <1375937608-3773-1-git-send-email-b.brezillon@overkiz.com>
- <1375945839-9573-1-git-send-email-b.brezillon@overkiz.com>
- <52542878.5050503@atmel.com> <52542C4C.5080409@overkiz.com>
- <52542F95.5050603@atmel.com>
-Message-ID: <5254308F.8030607@overkiz.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 8 Oct 2013 09:21:28 -0700
+Subject: [PATCH 3/6] pinctrl: single: Prepare for supporting SoC
+ specific features
+In-Reply-To: <CACRpkdbx+vJEqz3KQ0EHGt0axRB4JeJh3FF4e+7snbR0HoqKRg@mail.gmail.com>
+References: <20131003054104.8941.88857.stgit@localhost>
+ <20131003054218.8941.19273.stgit@localhost>
+ <20131007173531.GX8949@atomide.com>
+ <CACRpkdbx+vJEqz3KQ0EHGt0axRB4JeJh3FF4e+7snbR0HoqKRg@mail.gmail.com>
+Message-ID: <20131008162128.GB7773@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/10/2013 18:15, Nicolas Ferre wrote:
-> On 08/10/2013 18:01, boris brezillon :
->> On 08/10/2013 17:44, Nicolas Ferre wrote:
->>> On 08/08/2013 09:10, Boris BREZILLON :
->>>> This patch adds the peripheral divisors macros (for sam9x5 compatible
->>>> IPs)
->>>> which will be used by peripheral clk dt definitions.
->>>
->>> I am in favor for these definitions. So let's keep them (with raw
->>> numbers toguether with these macros in documentation).
->>
->> I guess we should move them elsewhere if these are the only macros we 
->> keep.
->>
->> What about "include/dt-bindings/clk/at91sam9x5-periph.h" ?
->
-> Well, what about a more generic clk binding file for all at91-related 
-> definitions (if more come). We can still differentiate among devices 
-> into the file itself...
->
-> What do you think about:
-> include/dt-bindings/clk/at91.h
-> is it too generic?
+* Linus Walleij <linus.walleij@linaro.org> [131008 05:03]:
+> On Mon, Oct 7, 2013 at 7:35 PM, Tony Lindgren <tony@atomide.com> wrote:
+> 
+> > Hi Linus W,
+> >
+> > Any comments on the pinctrl patches 3 - 5 in this series?
+> 
+> I have no problems with this patch #3, as it is just changing syntax,
+> not semantics.
+> 
+> The problems start with patch #4.
+> 
+> I am tormented with mixed feelings about this, because from one point of
+> view I feel it is breaking the promise of pinctrl-single being a
+> driver for platforms
+> where a pin is controlled by a *single* register.
 
-No, this is fine.
+It is still in that same *single* register. There are interrupt enable
+and interrupt status bits for *every* pin register on most omaps.
+ 
+> If this was pinctrl-foo.c I would not have been so much bothered,
+> but now it is something that was supposed to be self-contained and
+> simple, pertaining to a single register, starting to look like something
+> else.
+>
+> This is a bit like: "oh yeah just one register controls the pins, but under
+> some circumstances I also want to mess with this register over here,
+> and then this register over there ..." etc.
 
->
-> BTW, I see the clk and clock directories. What is the difference?
->
+Not true. If it was some other register I would have set it up as
+a separate driver under drivers/irqchip.
+ 
+> I'd like Haojian to ACK this to proceed since he's also using this driver
+> now. Then I feel better on continuing down this road ...
+> 
+> Then I have a lesser comment on patch #4 since it makes it possible
+> for this pin controller to support wake-up interrupt, as I don't see how
+> this plays out with front-end GPIO controllers, but let's discuss that
+> in the context of that patch.
 
-I don't know, but they both store clk (signals) specific bindings, and 
-as the framework is called "clk", I choose this directory.
+It's completely separate from the GPIO controller wake-up events.
 
-Could a dt maintainer (or Mike) help us choosing the appropriate directory ?
+Regards,
 
->
->>>> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
->>>> ---
->>>>    .../clk/at91/at91sam9x5/clk-peripheral.h           |   15
->>>> +++++++++++++++
->>>>    1 file changed, 15 insertions(+)
->>>>    create mode 100644
->>>> include/dt-bindings/clk/at91/at91sam9x5/clk-peripheral.h
->>>>
->>>> diff --git a/include/dt-bindings/clk/at91/at91sam9x5/clk-peripheral.h
->>>> b/include/dt-bindings/clk/at91/at91sam9x5/clk-peripheral.h
->>>> new file mode 100644
->>>> index 0000000..a6dd506
->>>> --- /dev/null
->>>> +++ b/include/dt-bindings/clk/at91/at91sam9x5/clk-peripheral.h
->>>> @@ -0,0 +1,15 @@
->>>> +/*
->>>> + * This header provides constants for AT91 peripheral clks.
->>>> + *
->>>> + * The constants defined in this header are being used in dts.
->>>> + */
->>>> +
->>>> +#ifndef _DT_BINDINGS_CLK_AT91SAM9X5_PERIPH_H
->>>> +#define _DT_BINDINGS_CLK_AT91SAM9X5_PERIPH_H
->>>> +
->>>> +#define AT91SAM9X5_PERIPH_CLK_DIV1    0
->>>> +#define AT91SAM9X5_PERIPH_CLK_DIV2    1
->>>> +#define AT91SAM9X5_PERIPH_CLK_DIV4    2
->>>> +#define AT91SAM9X5_PERIPH_CLK_DIV8    3
->>>> +
->>>> +#endif
->>>>
->>>
->>>
->>
->>
->>
->
->
+Tony
