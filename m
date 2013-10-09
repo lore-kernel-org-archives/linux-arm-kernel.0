@@ -1,38 +1,52 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed,  9 Oct 2013 13:55:00 -0300
-Subject: [PATCH v2] ARM: mach-imx: clk-imx51-imx53: Remove return value from
- mx53_clocks_init()
-Message-ID: <1381337700-22465-1-git-send-email-festevam@gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 9 Oct 2013 18:02:39 +0100
+Subject: [GIT PULL] iommu/arm-smmu: updates for 3.13
+Message-ID: <20131009170238.GH8378@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+Hi Joerg,
 
-Commit 915cc59130b (Merge remote-tracking branch 'imx-mxs/for-next') tried to
-fix a conflict, but missed to remove the return value from mx53_clocks_init(),
-which causes the following build warning:
+Please pull these ARM SMMU updates for 3.13. The bulk of the changes are
+from Andreas, who has been having fun running the driver on real hardware. I
+expect some additional patches from him in the future to add support for
+things like device isolation once we've ironed out the wrinkles in the
+current proposals.
 
-arch/arm/mach-imx/clk-imx51-imx53.c:579:2: warning: 'return' with a value, in function returning void [enabled by default]
+I've successfully tested this lot in my modelled environments without any
+observed regressions.
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
-Changes since v1:
-- Explain that the warning came from conflict resolution instead.
+Cheers,
 
- arch/arm/mach-imx/clk-imx51-imx53.c | 2 --
- 1 file changed, 2 deletions(-)
+Will
 
-diff --git a/arch/arm/mach-imx/clk-imx51-imx53.c b/arch/arm/mach-imx/clk-imx51-imx53.c
-index fa4de9a..ce37af2 100644
---- a/arch/arm/mach-imx/clk-imx51-imx53.c
-+++ b/arch/arm/mach-imx/clk-imx51-imx53.c
-@@ -575,7 +575,5 @@ static void __init mx53_clocks_init(struct device_node *np)
- 	WARN_ON(!base);
- 	irq = irq_of_parse_and_map(np, 0);
- 	mxc_timer_init(base, irq);
--
--	return 0;
- }
- CLK_OF_DECLARE(imx53_ccm, "fsl,imx53-ccm", mx53_clocks_init);
--- 
-1.8.1.2
+--->8
+
+The following changes since commit d0e639c9e06d44e713170031fe05fb60ebe680af:
+
+  Linux 3.12-rc4 (2013-10-06 14:00:20 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git for-joerg/arm-smmu/updates
+
+for you to fetch changes up to 659db6f6beacae6fe49b5566debc4e82f678ff63:
+
+  iommu/arm-smmu: Clear global and context bank fault status registers (2013-10-09 14:14:41 +0100)
+
+----------------------------------------------------------------
+Andreas Herrmann (5):
+      iommu/arm-smmu: Switch to subsys_initcall for driver registration
+      iommu/arm-smmu: Refine check for proper size of mapped region
+      iommu/arm-smmu: Check for num_context_irqs > 0 to avoid divide by zero exception
+      iommu/arm-smmu: Print context fault information
+      iommu/arm-smmu: Clear global and context bank fault status registers
+
+Julia Lawall (1):
+      iommu/arm-smmu: replace devm_request_and_ioremap by devm_ioremap_resource
+
+Will Deacon (1):
+      iommu/arm-smmu: use relaxed accessors where possible
+
+ drivers/iommu/arm-smmu.c | 69 ++++++++++++++++++++++++++----------------------
+ 1 file changed, 37 insertions(+), 32 deletions(-)
