@@ -1,170 +1,64 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 9 Oct 2013 21:32:18 +0200
-Subject: [RFC v2 PATCH 1/4] ARM: add support for kernel mode NEON in
- atomic context
-In-Reply-To: <alpine.LFD.2.03.1310091509400.3023@syhkavp.arg>
-References: <1381344634-14917-1-git-send-email-ard.biesheuvel@linaro.org>
- <1381344634-14917-2-git-send-email-ard.biesheuvel@linaro.org>
- <alpine.LFD.2.03.1310091509400.3023@syhkavp.arg>
-Message-ID: <CAKv+Gu_h_q0WRUo0e0kpeocgjONLDpTpWGWq=tzZhKYR8w3LyQ@mail.gmail.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Wed, 9 Oct 2013 13:04:14 -0700
+Subject: [RFC PATCH 1/5] arm: mm: add CONFIG_STRICT_MEMORY_RWX
+In-Reply-To: <1381282292-25251-2-git-send-email-lauraa@codeaurora.org>
+References: <1381282292-25251-1-git-send-email-lauraa@codeaurora.org>
+ <1381282292-25251-2-git-send-email-lauraa@codeaurora.org>
+Message-ID: <CAGXu5jJiS0vGBLjSmT37TaAn9xx+ov0QFqkZ0DaqGa0k3ffP0Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9 October 2013 21:24, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
-> On Wed, 9 Oct 2013, Ard Biesheuvel wrote:
+On Tue, Oct 8, 2013 at 6:31 PM, Laura Abbott <lauraa@codeaurora.org> wrote:
+> From: Larry Bassel <lbassel@codeaurora.org>
 >
->> Some applications, such as WPA CCMP encryption, do substantial
->> amounts of work in non-process context. In order to support
->> accelerated NEON implementations under these circumstances, we
->> need a way to preserve the NEON context that may
->> (a) belong to a completely unrelated userland process (if the
->>     NEON unit is turned off atm);
->> (b) belong to current userland;
->> (c) belong to current kernel mode in process context.
->>
->> The best way to deal with this is to just stack whatever registers
->> we are going to use, and unstack them when we are done.
->>
->> This patch adds kernel_neon_begin_atomic() and kernel_neon_end_atomic(),
->> which may be called from any context. In !in_interrupt() case, they
->> just call their non-_atomic counterparts. In atomic context, they
->> stack resp. unstack the number of NEON registers declared when setting
->> up the stack area using DEFINE_NEON_REG_STACK().
->>
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> ---
->>  arch/arm/include/asm/fpstate.h | 15 +++++++++++++-
->>  arch/arm/include/asm/neon.h    | 34 +++++++++++++++++++++++++++++++
->>  arch/arm/vfp/vfphw.S           | 46 ++++++++++++++++++++++++++++++++++++++++++
->>  arch/arm/vfp/vfpmodule.c       |  3 +++
->>  4 files changed, 97 insertions(+), 1 deletion(-)
->>
->> diff --git a/arch/arm/include/asm/fpstate.h b/arch/arm/include/asm/fpstate.h
->> index 3ad4c10..7a6e100 100644
->> --- a/arch/arm/include/asm/fpstate.h
->> +++ b/arch/arm/include/asm/fpstate.h
->> @@ -19,7 +19,7 @@
->>   *  - FPEXC, FPSCR, FPINST and FPINST2.
->>   *  - 16 or 32 double precision data registers
->>   *  - an implementation-dependent word of state for FLDMX/FSTMX (pre-ARMv6)
->> - *
->> + *
->>   *  FPEXC will always be non-zero once the VFP has been used in this process.
->>   */
->>
->> @@ -52,6 +52,19 @@ union vfp_state {
->>  extern void vfp_flush_thread(union vfp_state *);
->>  extern void vfp_release_thread(union vfp_state *);
->>
->> +/*
->> + * Variable sized struct for stacking the bottom 'n' NEON registers.
->> + */
->> +struct vfp_partial_state {
->> +     const __u32     num_regs;
->> +     __u32           fpexc;
->> +     __u32           fpscr;
->> +     __u8            qregs[] __aligned(16);
->> +} __aligned(16);
->> +
->> +extern void vfp_load_partial_state(struct vfp_partial_state *);
->> +extern void vfp_save_partial_state(struct vfp_partial_state *);
->> +
->>  #define FP_HARD_SIZE 35
->>
->>  struct fp_hard_struct {
->> diff --git a/arch/arm/include/asm/neon.h b/arch/arm/include/asm/neon.h
->> index 8f730fe..1efd9fc 100644
->> --- a/arch/arm/include/asm/neon.h
->> +++ b/arch/arm/include/asm/neon.h
->> @@ -8,10 +8,21 @@
->>   * published by the Free Software Foundation.
->>   */
->>
->> +#include <linux/types.h>
->> +#include <linux/hardirq.h>
->> +#include <asm/fpstate.h>
->>  #include <asm/hwcap.h>
->>
->>  #define cpu_has_neon()               (!!(elf_hwcap & HWCAP_NEON))
->>
->> +#define DEFINE_NEON_STACK_REGS(v, num)                                       \
->> +     struct {                                                        \
->> +             struct vfp_partial_state regs;                          \
->> +             u8 qregs[(num) > 16 ? 256 : 16 * (((num) + 1) & ~1U)];  \
->> +     } v = { .regs.num_regs = sizeof(v.qregs)/16 }
->> +
->> +#define DEFINE_NEON_STACK_REGS_ALL(name)     DEFINE_NEON_STACK_REGS(name,16)
->> +
->>  #ifdef __ARM_NEON__
->>
->>  /*
->> @@ -30,7 +41,30 @@
->>  #define kernel_neon_begin() \
->>       BUILD_BUG_ON_MSG(1, "kernel_neon_begin() called from NEON code")
->>
->> +#define kernel_neon_begin_atomic(a) \
->> +     BUILD_BUG_ON_MSG(1, "kernel_neon_begin_atomic() called from NEON code")
->> +
->>  #else
->>  void kernel_neon_begin(void);
->> +#define kernel_neon_begin_atomic(name) __kernel_neon_begin_atomic(&(name).regs)
->>  #endif
->> +
->> +#define kernel_neon_end_atomic(name) __kernel_neon_end_atomic(&(name).regs)
->> +
->>  void kernel_neon_end(void);
->> +
->> +static inline void __kernel_neon_begin_atomic(struct vfp_partial_state *regs)
->> +{
->> +     if (!in_interrupt())
->> +             kernel_neon_begin();
+> If this is set, kernel text will be made RX, kernel data and stack
+> RW, rodata R so that writing to kernel text, executing kernel data
+> or stack, or writing to read-only data or kernel text will not
+> succeed.
 >
-> Surely you want "if (!in_atomic())" here?
+> Signed-off-by: Larry Bassel <lbassel@codeaurora.org>
+> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+> ---
+>  arch/arm/mm/Kconfig |   12 ++++++++++++
+>  1 files changed, 12 insertions(+), 0 deletions(-)
 >
->> +     else
->> +             vfp_save_partial_state(regs);
->> +}
->> +
->> +static inline void __kernel_neon_end_atomic(struct vfp_partial_state *regs)
->> +{
->> +     if (!in_interrupt())
->> +             kernel_neon_end();
->
-> Ditto.
+> diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
+> index cd2c88e..c223d5c 100644
+> --- a/arch/arm/mm/Kconfig
+> +++ b/arch/arm/mm/Kconfig
+> @@ -952,3 +952,15 @@ config ARCH_HAS_BARRIERS
+>         help
+>           This option allows the use of custom mandatory barriers
+>           included via the mach/barriers.h file.
+> +
+> +config STRICT_MEMORY_RWX
+> +       bool "restrict kernel memory permissions as much as possible"
+> +       default n
+> +       help
+> +         If this is set, kernel text will be made RX, kernel data and stack
+> +         RW, rodata R (otherwise all of the kernel 1-to-1 mapping is
+> +         made RWX).
+> +         The tradeoff is that several sections are padded to
+> +         1M boundaries (because their permissions are different and
+> +         splitting the 1M pages into 4K ones causes TLB performance
+> +         problems), wasting memory.
+> --
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+> hosted by The Linux Foundation
 >
 
-If I am reading (and understanding) the source correctly, in_atomic()
-is also true when running with preemption disabled, and in that case,
-you should be able to just do a normal preserve / lazy restore.
+As a bike-shedding aside, would it make sense to attempt to follow the
+x86 CONFIG naming convention for this? I don't like that x86's has
+"DEBUG" in the name, but it might be nice for people looking for a
+single name for these things. Unfortunately, x86 already has two:
+
+CONFIG_DEBUG_RODATA
+CONFIG_DEBUG_SET_MODULE_RONX
+
+It'd be nice to have a common set, I think.
+
+-Kees
 
 -- 
-Ard.
-
-
->> +     else
->> +             vfp_load_partial_state(regs);
->> +}
->> diff --git a/arch/arm/vfp/vfphw.S b/arch/arm/vfp/vfphw.S
->> +     VFPFMXR FPSCR, r3
->> +     VFPFMXR FPEXC, r2
->> +     bx      lr
->> +ENDPROC(vfp_load_partial_state)
->> +
->> +#endif
->> diff --git a/arch/arm/vfp/vfpmodule.c b/arch/arm/vfp/vfpmodule.c
->> index 52b8f40..3dea5ba 100644
->> --- a/arch/arm/vfp/vfpmodule.c
->> +++ b/arch/arm/vfp/vfpmodule.c
->> @@ -713,6 +713,9 @@ void kernel_neon_end(void)
->>  }
->>  EXPORT_SYMBOL(kernel_neon_end);
->>
->> +EXPORT_SYMBOL(vfp_save_partial_state);
->> +EXPORT_SYMBOL(vfp_load_partial_state);
->> +
->>  #endif /* CONFIG_KERNEL_MODE_NEON */
->>
->>  /*
->> --
->> 1.8.1.2
->>
+Kees Cook
+Chrome OS Security
