@@ -1,22 +1,46 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 9 Oct 2013 07:03:17 +0000 (UTC)
-Subject: [PATCH v2 1/6] ARM: OMAP5: hwmod data: Add USB Host and TLL
- modules
-In-Reply-To: <1381226799-29158-2-git-send-email-rogerq@ti.com>
-References: <1381226799-29158-1-git-send-email-rogerq@ti.com>
- <1381226799-29158-2-git-send-email-rogerq@ti.com>
-Message-ID: <alpine.DEB.2.02.1310090703040.30199@utopia.booyaka.com>
+Date: Wed, 9 Oct 2013 07:05:16 +0000 (UTC)
+Subject: [PATCH] ARM: OMAP4: clock: Initialize USB DPLL
+In-Reply-To: <514B1553.6030701@ti.com>
+References: <1363873705-3224-1-git-send-email-rogerq@ti.com>
+ <514B1553.6030701@ti.com>
+Message-ID: <alpine.DEB.2.02.1310090704180.30199@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 8 Oct 2013, Roger Quadros wrote:
+Hi Roger,
 
-> Add hwmod data for High Speed USB host and TLL modules
+On Thu, 21 Mar 2013, Roger Quadros wrote:
+
+> +Paul
 > 
-> CC: Paul Walmsley <paul@pwsan.com>
-> Signed-off-by: Roger Quadros <rogerq@ti.com>
+> On 03/21/2013 03:48 PM, Roger Quadros wrote:
+> > If the bootloader doesn't configure USB DPLL (e.g. in u-boot,
+> > disable CONFIG_USB_EHCI_OMAP), then we get all sorts of problems
+> > like
+> > - division by zero errors at boot [1]
+> > - USB DPLL fails to enter locked state
+> > - USB EHCI Host is non functional
+> > - Device can't enter OFF mode
+> > 
+> > Initializing the USB DPLL fixes all these issues.
 
-Thanks, queued.
+Looks like I may have lost track of this - do we still need this one?
+
+Also:
+
+> > diff --git a/arch/arm/mach-omap2/cclock44xx_data.c b/arch/arm/mach-omap2/cclock44xx_data.c
+> > index bfc46c1..6127bb9 100644
+> > --- a/arch/arm/mach-omap2/cclock44xx_data.c
+> > +++ b/arch/arm/mach-omap2/cclock44xx_data.c
+> > @@ -53,6 +53,12 @@
+> >   */
+> >  #define OMAP4_DPLL_ABE_DEFFREQ				98304000
+> >  
+> > +/*
+> > + * OMAP4450 TRM Rev X, section "3.6.3.9.5 DPLL_USB Preferred Settings"
+
+4450?
 
 
 - Paul
