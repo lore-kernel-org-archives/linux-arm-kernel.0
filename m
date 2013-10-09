@@ -1,34 +1,26 @@
-From: arno@natisbad.org (Arnaud Ebalard)
-Date: Wed, 09 Oct 2013 20:56:39 +0200
-Subject: [BUG,REGRESSION] SATA regression on 12.0-rc4 kernel
-In-Reply-To: <202B57C13565C241A5ED05E38B705C82012397EC@IRVEXCHMB08.corp.ad.broadcom.com>
- (Marc Carino's message of "Wed, 9 Oct 2013 15:22:48 +0000")
-References: <87vc1ahyft.fsf@natisbad.org>
- <20131007125943.GA1332@titan.lakedaemon.net>
- <87bo303nfe.fsf@natisbad.org> <52537015.6040200@gmail.com>
- <87y564waw0.fsf@natisbad.org>
- <CADLC3L3EYU0VSfLMYjo013jSTWm4yZw24y+4HdvOOoEkOc6uhQ@mail.gmail.com>
- <202B57C13565C241A5ED05E38B705C82012397EC@IRVEXCHMB08.corp.ad.broadcom.com>
-Message-ID: <87a9iiuvbs.fsf@natisbad.org>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 9 Oct 2013 18:59:53 +0000 (UTC)
+Subject: [PATCHv7 00/36] ARM: OMAP: clock data conversion to DT
+In-Reply-To: <alpine.DEB.2.02.1310091551540.30199@utopia.booyaka.com>
+References: <1380098922-30340-1-git-send-email-t-kristo@ti.com>
+ <524EE00F.7010208@ti.com> <20131007021556.GV8949@atomide.com>
+ <52525642.8010307@ti.com> <20131007154103.GW8949@atomide.com>
+ <20131007190322.GY8949@atomide.com>
+ <alpine.DEB.2.02.1310091551540.30199@utopia.booyaka.com>
+Message-ID: <alpine.DEB.2.02.1310091858411.30199@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi guys,
+Eh, one correction:
 
-I went crazy on that one: I managed to reproduce the bug w/ another disk
-(Seagate barracuda 7200.9). Then after a 'make clean' on the tree and a
-compilation from ground of the stock 3.12-rc4, I never managed to
-reproduce the error I had. I tested again with a WD30EFRX, the
-WD2500AAJS and the Seagate barracuda 7200.9, all the three in two
-different instances of the NAS: the error is gone.
+On Wed, 9 Oct 2013, Paul Walmsley wrote:
 
-The only logical conclusion is that it was due to some missing 'make
-clean' on my tree.
+> We could easily wind up with kernels that won't boot at all when used 
+> with newer DT data.
 
-I guess I owe you all some apologies for the noise.
+This is a misstatement of the issue: the concern here is that newer 
+kernels may not boot at all with older DT data - which could easily be in 
+locked areas of the flash or firmware.
 
-Cheers,
 
-a+
-
-ps: and yes, I hate myself for having overwritten the erroneous image
+- Paul
