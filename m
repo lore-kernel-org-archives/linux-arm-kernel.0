@@ -1,66 +1,43 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Wed, 09 Oct 2013 08:10:57 +0200
-Subject: [PATCH v2 1/3] clk: emev2: Add support for emev2 SMU clocks with
- DT
-In-Reply-To: <20131009033807.GM15065@verge.net.au>
-References: <20131008143040.52f36df8edb7ab63224d8433@ops.dti.ne.jp>
- <20131008143217.0611fba0c0d27d9c622759f3@ops.dti.ne.jp>
- <CANqRtoRZM=5FYG7+fq5c+TQEuHtJRmcGP1CmMq5kO5Ayvg=W6w@mail.gmail.com>
- <20131009033807.GM15065@verge.net.au>
-Message-ID: <5254F371.2020704@codethink.co.uk>
+From: victor.kamensky@linaro.org (Victor Kamensky)
+Date: Tue, 8 Oct 2013 23:20:06 -0700
+Subject: New big-endian patch series against 3.12-rc4
+In-Reply-To: <1381271679-27804-1-git-send-email-ben.dooks@codethink.co.uk>
+References: <1381271679-27804-1-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <CAA3XUr31CON02T66_nrV-PsrjyLgzCbXC2WokQeC58z6APAbVQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/10/13 05:38, Simon Horman wrote:
-> On Tue, Oct 08, 2013 at 02:58:08PM +0900, Magnus Damm wrote:
->> On Tue, Oct 8, 2013 at 2:32 PM,<takasi-y@ops.dti.ne.jp>  wrote:
->>> Device tree clock binding document for EMMA Mobile EV2 SMU,
->>> And Common clock framework based implementation of it.
->>> Following nodes are defined to describe clock tree.
->>> - renesas,emev2-smu
->>> - renesas,emev2-smu-clkdiv
->>> - renesas,emev2-smu-gclk
->>>
->>> These bindings are designed manually based on
->>>   19UH0037EJ1000_SMU : System Management Unit User's Manual
->>>
->>> So far, reparent is not implemented, and is fixed to index #0.
->>> Clock tree description is not included, and should be provided
->>> by device-tree.
->>>
->>> Signed-off-by: Takashi Yoshii<takasi-y@ops.dti.ne.jp>
->>> ---
->>>   .../devicetree/bindings/clock/emev2-clock.txt      |  98 +++++++++++++++++++
->>>   drivers/clk/Makefile                               |   1 +
->>>   drivers/clk/shmobile/Makefile                      |   3 +
->>>   drivers/clk/shmobile/clk-emev2.c                   | 104 +++++++++++++++++++++
->>>   4 files changed, 206 insertions(+)
->>
->> Thanks for cleaning up the Makefile bits, Yoshii-san.
->>
->> This patch and the bindings look fine to me from a SoC point of view.
->> Using these together with the topology information in emev2.dtsi makes
->> it possible for us to use CCF and multiplatform as expected on the
->> EMEV2 SoC.
->>
->> Acked-by: Magnus Damm<damm@opensource.se>
+Hi Ben,
+
+On 8 October 2013 15:34, Ben Dooks <ben.dooks@codethink.co.uk> wrote:
+> This is a new series for big-endian on ARM re-based onto 3.12-rc4
+> and updated with new patches from Victor to fix regressions since 3.11.
 >
-> Thanks. I will send a pull request for this change to Mike Turquette.
+> I have not been able to test this further than building it as I do not
+> currently have access to any hardware, however there where no big issues
+> when re-basing. Thanks to Marc Zyngier for pointing out the need for a
+> rebase.
+>
+> The branch is at:
+>
+>   git://git.baserock.org/delta/linux baserock/bjdooks/3.12-rc4/core
 
-I was going to comment on the last set but forgot.
+It is rather baserock/312-rc4/be/core isn't it?
 
-My set dealt with the following issues
+I've tested baserock/312-rc4/be/core from
+git://git.baserock.org/delta/linux on TC2. Both LE and BE images.
+Done full LTP runs on both. LTP BE results match LE one.
 
-This set does not have any of the module clocks, which I added
-in mine. This is also an issue with the clock and serial drivers
-which do not ensure the bus/module clocks have been enabled in
-the driver.
+Thanks,
+Victor
 
-Mine also dealt with the multiple parents that some of these
-clocks have.
-
-I can try and re-post tonight for discussion.
-
--- 
-Ben Dooks				http://www.codethink.co.uk/
-Senior Engineer				Codethink - Providing Genius
+> Russell, if possible could this go into -next and then if everything
+> I can issue a pull request for it.
+>
+> Changes since last:
+>
+> - Updated to 3.12-rc4 to be closer to mainline
+> - Added Victor's patches for CCI and TC2 boot
+> - Added Victor's patch for ASID extraction
+> - Updated Victor's patch with fix for building on older kernels
+>
