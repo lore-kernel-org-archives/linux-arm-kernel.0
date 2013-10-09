@@ -1,114 +1,171 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Wed, 09 Oct 2013 22:42:54 +0200
-Subject: [PATCH v2] ARM: tlb: ASID macro should give 32bit result for
- BE correct operation
-In-Reply-To: <20131008202207.8f66d24415079f0cff98ab7d@linaro.org>
-References: <1381160903-1248-1-git-send-email-victor.kamensky@linaro.org>
- <5252DA06.8000303@codethink.co.uk>
- <CAA3XUr2wYFL9WAQd9uAJSKK5KhWF3bPzYbh-3x=B3oLVXk79og@mail.gmail.com>
- <52533A70.5040705@ti.com>
- <20131007195525.f56083f0d91df6a6396cc494@linaro.org>
- <5253AFBF.7040002@codethink.co.uk>
- <20131008202207.8f66d24415079f0cff98ab7d@linaro.org>
-Message-ID: <5255BFCE.7020708@codethink.co.uk>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Wed, 9 Oct 2013 21:47:46 +0100
+Subject: [PATCH v7 0/17] enable swiotlb-xen on arm and arm64
+Message-ID: <alpine.DEB.2.02.1310092109190.26077@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/10/13 03:22, Kim Phillips wrote:
-> On Tue, 08 Oct 2013 09:09:51 +0200
-> Ben Dooks<ben.dooks@codethink.co.uk>  wrote:
->
->> On 08/10/13 02:55, Kim Phillips wrote:
->>> On Mon, 7 Oct 2013 18:49:20 -0400
->>> Santosh Shilimkar<santosh.shilimkar@ti.com>   wrote:
->>>
->>>> On Monday 07 October 2013 12:37 PM, Victor Kamensky wrote:
->>>>> On 7 October 2013 08:57, Ben Dooks<ben.dooks@codethink.co.uk>   wrote:
->>>>>> On 07/10/13 17:48, Victor Kamensky wrote:
->>> apologies if this was explained earlier in the thread, but what has
->>> __raw_xxx ->   xxx_relaxed have to do with endianness?  the relaxed
->>> accessor variants allow the compiler to reorder the instruction: it's
->>> got nothing to do with byte swapping the data, no?
->
-> [I've since read the thread explaining this, thanks Victor]
->
->>>>> I think above position is consistent with similar discussion on
->>>>> some of BE related threads - changing BSP to support BE mode
->>>>> is BSP owners call.
->>>>>
->>>> Am just wondering a better method than the patch [1] which touches
->>>> many drivers for readl/writel() replacement. Drivers are using
->>>> that as standard based on device driver guide and was thinking
->>>> we should not change that rule to support BE. We definitely need
->>>
->>> I think readl/writel were originally devised for accessing PCI devices
->>> (else why would readl's definition include an __le32_to_cpu byteswap)?
->>> In any case, this makes read/writel incompatible with big endian
->>> devices.
->>
->> Generally, in ARM, the devices stay little endian when the CPU is
->> running big endian, therefore we need this in there.
->
-> generally, yes, but with SoC vendors switching to arch ARM, more ARM
-> cores will be having to access legacy big endian devices :)
->
->> If we end up having to change all the drivers, then this series
->> is going to become a huge incovenience to everyone and at that
->> point it will probably be better to drop it.
->
-> well that depends on the change: a simple search and replace vs. one
-> requiring more knowledge of the device, and what you mean by 'all
-> drivers' (the devices the arm defconfigs configure are mostly drivers
-> for LE devices, at least for the time being).  If we need to transition
-> from an old set of accessors to new ones, drivers can be changed
-> incrementally, and by their maintainers - we just need to establish a
-> standard set of guidelines.
->
->>>> to get the byte swap achieved but probably through some other
->>>> means.
->>>
->>> back when I looked into this, I found in/out_be32() accessors were Power
->>> arch centric, read/writel ARM arch centric, whereas ioread/writebe32
->>> were available in other arches.  See e.g., upstream commit
->>> 0c69fb037a6bb1faf06ea776872da54a6705c154 "mtd: fsl_ifc_nand: use more
->>> portable i/o accessors".
->>
->> readl and writel should work pretty much everywhere.
->
-> well, they currently work unfavourably for big endian devices on
-> arch/arm.
+Hi all,
+this patch series enables xen-swiotlb on arm and arm64.
 
-I've not see any big endian devices on ARM as of yet. Pretty much
-everything I have seen is little endian.
+It has been heavily reworked compared to the previous versions in order
+to achieve better performances and to address review comments.
 
-In this case, read/writel are not the issue, it is the __raw versions
-that get used in bits of ARM that are. I'm still not sure of how many
-are of `native endian` devices or just little endian devices that have
-never been tested with a big endian cpu core.
+We are not using dma_mark_clean to ensure coherency anymore. We call the
+platform implementation of map_page and unmap_page.
 
->> I'm not sure if device drivers /should/ know much about what
->> endian bus or the endian-ness of the peripheral they are managing,
->> especially if we have the case the bus-bus bridge is doing a swap.
->>
->> Personally, I'd just like to rip out the IO accessors we have at
->> the moment and just replace it with a much more BSD like system
->> where the device struct provides a set of accessor functions. Then
->> if we are on strange busses, or multi-function devices, or the
->> latest in inter-periphreal connect we don't have to keep re-working
->> drivers.
->>
->> It'd even make regmap nicer as it could sit in a layer below any
->> device and would not need and explicit changes for a driver to use
->> it.
->
-> yes, some devices can be endianness programmable at runtime - and with
-> mixed-endian VMs having direct access to devices, it may be better to
-> leave it to a combination of the driver and its bus.
+We assume that dom0 has been mapped 1:1 (physical address ==
+machine address), that is what Xen on ARM currently does.
+As a consequence we only use the swiotlb to handle dma
+requests involving pages corresponding to grant refs. Obviously these
+pages cannot be part of the 1:1 because they belong to another domain.
 
-It doesn't really matter what endian-ness the VM is as long as it
-treats device memory as little-endian just as it would have to do
-if it was running on a device.
+To improve code readability this version of the series introduces a
+"p2m" for arm and arm64, implemented using two red-black trees.  The p2m
+tracks physical to machine and machine to physical mappings. Given that
+we assume a 1:1 mapping in dom0, the only entries in both trees are
+grant refs that have been mapped in dom0.
 
--- 
-Ben Dooks				http://www.codethink.co.uk/
-Senior Engineer				Codethink - Providing Genius
+Another consequence of the new approach is that the hypercalls we were
+previously introducing (XENMEM_exchange_and_pin, XENMEM_pin,
+XENMEM_unpin) are not needed anymore. The patch series still needs a
+small change to the hypervisor: XENMEM_exchanged doesn't currently
+return the mfn of the exchanged pages for autotranslate guests. This
+work needs Xen to return the mfns as it would normally do with
+non-autotranslate guests. This change to the hypervisor is not upstream
+yet.
+
+Cheers,
+
+Stefano
+
+
+Changes in v7:
+- dma_mark_clean: switch to an empty implementation (we are going to use
+  the platform map_page and unmap_page to ensure coherency);
+- dma_capable: use coherent_dma_mask if dma_mask hasn't been
+  allocated;
+- introduce a p2m for xen on arm and arm64;
+- call __set_phys_to_machine_multi from xen_create_contiguous_region to
+  update the p2m;
+- remove XENMEM_unpin and XENMEM_exchange_and_pin;
+- set nr_exchanged to 0 before calling the hypercall;
+- return xen_dma_ops only if we are the initial domain;
+- rename __get_dma_ops to __generic_dma_ops;
+- call __generic_dma_ops(hwdev)->alloc/free on arm64 too;
+- introduce xen_dma_map/unmap_page and xen_dma_sync_single_for_cpu/device;
+- use xen_dma_map/unmap_page, xen_dma_sync_single_for_cpu/device in
+  swiotlb-xen;
+- use dev_warn instead of pr_warn;
+- remove the extra autotranslate check in biomerge.c;
+- call set_phys_to_machine after mapping grant refs in gnttab_map_refs;
+- call set_phys_to_machine after unmapping grant refs in gnttab_unmap_refs;
+- allow __set_phys_to_machine to be called for autotranslate guests on
+  x86.
+
+Changes in v6:
+- check for dev->dma_mask being NULL in dma_capable;
+- update the comments and the hypercalls structures;
+- add a xen_dma_info entry to the rbtree in xen_swiotlb_alloc_coherent
+to keep track of the new mapping. Free the entry in xen_swiotlb_free_coherent;
+- rename xen_dma_seg to dma_info in xen_swiotlb_alloc/free_coherent to
+avoid confusions;
+- introduce and export xen_dma_ops;
+- call xen_mm_init from as arch_initcall;
+- call __get_dma_ops to get the native dma_ops pointer on arm;
+- do not merge biovecs;
+- add single page optimization: pin the page rather than bouncing.
+
+Changes in v5:
+- dropped the first two patches, already in the Xen tree;
+- implement dma_mark_clean using dmac_flush_range on arm;
+- add "arm64: define DMA_ERROR_CODE"
+- better comment for XENMEM_exchange_and_pin return codes;
+- fix xen_dma_add_entry error path;
+- remove the spin_lock: the red-black tree is not modified at run time;
+- add "swiotlb-xen: introduce xen_swiotlb_set_dma_mask";
+- add "xen: introduce xen_alloc/free_coherent_pages";
+- add "swiotlb-xen: use xen_alloc/free_coherent_pages";
+- add "swiotlb: don't assume that io_tlb_start-io_tlb_end is coherent".
+
+Changes in v4:
+- rename XENMEM_get_dma_buf to XENMEM_exchange_and_pin;
+- rename XENMEM_put_dma_buf to XENMEM_unpin;
+- improve the documentation of the new hypercalls;
+- add a note about out.address_bits for XENMEM_exchange;
+- code style fixes;
+- add err_out label in xen_dma_add_entry;
+- remove INVALID_ADDRESS, use DMA_ERROR_CODE instead;
+- add in-code comments regarding the usage of xen_dma_seg[0].dma_addr.
+
+Changes in v3:
+- add a patch to compile SWIOTLB without CONFIG_NEED_SG_DMA_LENGTH;
+- add a patch to compile SWIOTLB_XEN without CONFIG_NEED_SG_DMA_LENGTH;
+- arm/dma_capable: do not treat dma_mask as a limit;
+- arm/dmabounce: keep using arm_dma_ops;
+- add missing __init in xen_early_init declaration;
+- many code style and name changes in swiotlb-xen.c;
+- improve error checks in xen_dma_add_entry;
+- warn on XENMEM_put_dma_buf failures.
+
+Changes in v2:
+- fixed a couple of errors in xen_bus_to_phys, xen_phys_to_bus and
+xen_swiotlb_fixup.
+
+
+
+
+
+Julien Grall (1):
+      ASoC: Samsung: Rename dma_ops by samsung_dma_ops
+
+
+Julien Grall (1):
+      ASoC: Samsung: Rename dma_ops by samsung_dma_ops
+
+Stefano Stabellini (16):
+      arm: make SWIOTLB available
+      arm64: define DMA_ERROR_CODE
+      arm/xen,arm64/xen: introduce p2m
+      xen/x86: allow __set_phys_to_machine for autotranslate guests
+      xen: make xen_create_contiguous_region return the dma address
+      xen/arm,arm64: enable SWIOTLB_XEN
+      swiotlb-xen: introduce xen_swiotlb_set_dma_mask
+      arm/xen: get_dma_ops: return xen_dma_ops if we are running as xen_initial_domain
+      arm64/xen: get_dma_ops: return xen_dma_ops if we are running as xen_initial_domain
+      xen: introduce xen_alloc/free_coherent_pages
+      swiotlb-xen: use xen_alloc/free_coherent_pages
+      xen: introduce xen_dma_map/unmap_page and xen_dma_sync_single_for_cpu/device
+      swiotlb-xen: use xen_dma_map/unmap_page, xen_dma_sync_single_for_cpu/device
+      swiotlb: print a warning when the swiotlb is full
+      arm,arm64: do not always merge biovec if we are running on Xen
+      grant-table: call set_phys_to_machine after mapping grant refs
+
+ arch/arm/Kconfig                           |    7 +
+ arch/arm/include/asm/dma-mapping.h         |   50 ++++++-
+ arch/arm/include/asm/io.h                  |    8 +
+ arch/arm/include/asm/xen/hypervisor.h      |    2 +
+ arch/arm/include/asm/xen/page-coherent.h   |   50 ++++++
+ arch/arm/include/asm/xen/page.h            |   15 +-
+ arch/arm/xen/Makefile                      |    2 +-
+ arch/arm/xen/mm.c                          |  116 ++++++++++++++
+ arch/arm/xen/p2m.c                         |  237 ++++++++++++++++++++++++++++
+ arch/arm64/Kconfig                         |    1 +
+ arch/arm64/include/asm/dma-mapping.h       |   14 ++-
+ arch/arm64/include/asm/io.h                |    9 +
+ arch/arm64/include/asm/xen/page-coherent.h |   47 ++++++
+ arch/arm64/xen/Makefile                    |    2 +-
+ arch/ia64/include/asm/xen/page-coherent.h  |   38 +++++
+ arch/x86/include/asm/xen/page-coherent.h   |   38 +++++
+ arch/x86/xen/mmu.c                         |   11 +-
+ arch/x86/xen/p2m.c                         |    6 +-
+ drivers/xen/Kconfig                        |    1 -
+ drivers/xen/grant-table.c                  |   17 ++-
+ drivers/xen/swiotlb-xen.c                  |  104 ++++++++++---
+ include/xen/swiotlb-xen.h                  |    2 +
+ include/xen/xen-ops.h                      |    7 +-
+ lib/swiotlb.c                              |    1 +
+ sound/soc/samsung/dma.c                    |    4 +-
+ 25 files changed, 743 insertions(+), 46 deletions(-)
+
+git://git.kernel.org/pub/scm/linux/kernel/git/sstabellini/xen.git swiotlb-xen-7
