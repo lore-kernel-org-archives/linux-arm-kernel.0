@@ -1,47 +1,40 @@
-From: ldewangan@nvidia.com (Laxman Dewangan)
-Date: Wed, 9 Oct 2013 15:13:41 +0530
-Subject: [PATCH V3] clk: palmas: add clock driver for palmas
-In-Reply-To: <20131008152812.GA4981@e106331-lin.cambridge.arm.com>
-References: <1381238480-18852-1-git-send-email-ldewangan@nvidia.com>
- <525408B3.1000107@ti.com> <5254193A.70104@nvidia.com>
- <20131008152812.GA4981@e106331-lin.cambridge.arm.com>
-Message-ID: <5255254D.4090108@nvidia.com>
+From: josephl@nvidia.com (Joseph Lo)
+Date: Wed, 9 Oct 2013 17:20:04 +0800
+Subject: [PATCH 0/7] ARM: tegra: support LP1 suspend mode for Tegra124
+Message-ID: <1381310411-11391-1-git-send-email-josephl@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 08 October 2013 08:58 PM, Mark Rutland wrote:
-> On Tue, Oct 08, 2013 at 03:39:54PM +0100, Laxman Dewangan wrote:
->>
->>>> +
->>>> +     Optional subnode properties:
->>>> +     ti,clock-boot-enable: Enable clock at the time of booting.
->>> Dumb question: Why is this needed? should'nt relevant drivers do a
->>> clk_get to enable the relevant clocks?
->> If some board needs this clock to be always available for rest of system
->> to work without any specific driver then this flag is useful.
-> Do we _actually_ need this right now, or is this hypothetical?
->
-> If we don't need it now, remove it. If you think we need it know, please
-> describe exactly why (i.e. what device needs the clock to work, why does
-> this affect the rest of the board if we don't ahve a driver for that
-> device, why don't we just write a driver for that device).
->
+This series adds the LP1 support for Tegra124. (suspend to LP2 also
+supported in this series)
 
-Ok, I will remove it. Going with nothing free of cost for the 
-driver/system and client need to call the proper APIs.
+Note:
+This patch series depends on the patch series below.
+* [PATCH 0/5] Tegra124 clock support
+* [PATCH V2 0/6] ARM: tegra: basic support for Tegra124 SoC
+* [PATCH] ARM: tegra: add clock properties for devices of Tegra124
+* [PATCH 0/4] ARM: tegra: add CPU hot-plug and idle support for Tegra124
 
->>
->>>> +     ti,external-sleep-control: The clock is enable/disabled by state
->>>> +             of external enable input pins ENABLE, ENABLE2 and NSLEEP.
->>>> +             The valid value for the external pins are:
->>>> +                     1 for ENABLE1
->>>> +                     2 for ENABLE2
->>>> +                     3 for NSLEEP.
-> I asked this on the last version (before having noticed this one). What
-> actually drives those pins to control the clock(s)?
->
-> Is this for setting the clock to be controlled by the external pin, or
-> is the clock hard-wired to a particular pin?
->
+Verified on Cardhu, Dalmore and Venice2 and with THUMB2_KERNEL as well.
 
-This is for setting the clock to be controlled by the external pin.
+Joseph Lo (7):
+  clk: tegra124: add suspend/resume function for tegra_cpu_car_ops
+  ARM: tegra: add flow controller to support suspend for Tegra124
+  ARM: tegra: hook tegra_cpu_tear_down for Tegra124
+  ARM: tegra: add LP1 support code for Tegra124
+  ARM: tegra: hook the LP1 iram code area and sleep_core function for
+    Tegra124
+  ARM: tegra: enable Tegra RTC for Venice2
+  ARM: tegra: enable LP1 suspend mode for Venice2
+
+ arch/arm/boot/dts/tegra124-venice2.dts | 11 +++++++++++
+ arch/arm/mach-tegra/Makefile           |  1 +
+ arch/arm/mach-tegra/flowctrl.c         |  2 ++
+ arch/arm/mach-tegra/iomap.h            |  3 +++
+ arch/arm/mach-tegra/pm.c               | 12 +++++++++---
+ arch/arm/mach-tegra/sleep-tegra30.S    | 36 +++++++++++++++++++++++++++-------
+ drivers/clk/tegra/clk-tegra124.c       | 27 +++++++++++++++++++++++++
+ 7 files changed, 82 insertions(+), 10 deletions(-)
+
+-- 
+1.8.4
