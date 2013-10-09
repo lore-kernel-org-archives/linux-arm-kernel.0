@@ -1,31 +1,60 @@
-From: john.tobias.ph@gmail.com (John Tobias)
-Date: Tue, 8 Oct 2013 21:33:49 -0700
-Subject: eMMC 4.51
-In-Reply-To: <20131009034944.GA8861@S2101-09.ap.freescale.net>
-References: <CACUGKYPDQJPvtXj3NBm8=eYCioWmq=pRVSORNYNZjD13N5ceeg@mail.gmail.com>
- <20131009034944.GA8861@S2101-09.ap.freescale.net>
-Message-ID: <CACUGKYP1TXMe5bqAb5Ro5N3ZDQU-QZMiJnOrHuQArxf_am-k2w@mail.gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 9 Oct 2013 13:53:54 +0900
+Subject: [GIT PULL] Second round of Renesas ARM based SoC cleanups for
+ v3.13
+In-Reply-To: <cover.1381222967.git.horms+renesas@verge.net.au>
+References: <cover.1381222967.git.horms+renesas@verge.net.au>
+Message-ID: <20131009045354.GA8369@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks for the info.
+On Tue, Oct 08, 2013 at 06:05:24PM +0900, Simon Horman wrote:
+> Hi Kevin, Olof and Arnd,
+> 
+> please consider this Second round of Renesas ARM based SoC cleanups for v3.13.
+> It is based on renesas-cleanup-for-v3.13 which you have previously pulled.
 
-Regards,
+This pull-request causes some conflicts in
+arch/arm/mach-shmobile/board-bockw.c. In general the resolution
+strategy should be to take everything.
 
-john
+A sample merge is provided in the renesas-next-20131008 tag
+of my renesas tree.
 
-On Tue, Oct 8, 2013 at 8:49 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
-> On Tue, Oct 08, 2013 at 07:00:58PM -0700, John Tobias wrote:
->> Hello,
->>
->> I am using git://gitorious.org/thierryreding/linux-next.git to boot my
->> custom board based on iMX6 sololite. My board has SanDisk iNAND 4.51
->> I/F and wifi module (Marvel SD8797). The latest update of
->> sdhci-esdhc-imx.c supports DDR50/SDR50/SDR104 and I would like to use
->> it for my device.
->
-> The latest update on sdhci-esdhc-imx.c only enables the support of UHS SD card in
-> SDR104 mode.  Neither DDR50 nor eMMC is supported so far.
->
-> Shawn
->
+> 
+> 
+> The following changes since commit cde214a890f81797a5eee94fffc89c1de21ed991:
+> 
+>   ARM: shmobile: r8a7790: Constify platform data and resources (2013-09-19 14:33:44 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-cleanup2-for-v3.13
+> 
+> for you to fetch changes up to 27113d63daac0aacaa26b1fabfc23391de4284f4:
+> 
+>   ARM: shmobile: lager: Constify platform data and resources (2013-09-30 16:33:17 +0900)
+> 
+> ----------------------------------------------------------------
+> Second round of Renesas ARM based SoC cleanups for v3.13
+> 
+> * Constify platform data and resources in lager board code
+> * Clean up registration of VIN and sh_eth in r8a7778 SoC and
+>    bockw board code
+> * Make r8a7778_register_hspi() static in r8a7778 SoC code
+> 
+> ----------------------------------------------------------------
+> Kuninori Morimoto (3):
+>       ARM: shmobile: r8a7778: cleanup registration of vin
+>       ARM: shmobile: r8a7778: cleanup registration of sh_eth
+>       ARM: shmobile: r8a7778: r8a7778_register_hspi() become static
+> 
+> Laurent Pinchart (1):
+>       ARM: shmobile: lager: Constify platform data and resources
+> 
+>  arch/arm/mach-shmobile/board-bockw.c          | 46 ++++++++++++++++++++----
+>  arch/arm/mach-shmobile/board-lager.c          | 14 ++++----
+>  arch/arm/mach-shmobile/include/mach/r8a7778.h |  3 --
+>  arch/arm/mach-shmobile/setup-r8a7778.c        | 50 +--------------------------
+>  4 files changed, 47 insertions(+), 66 deletions(-)
+> 
