@@ -1,34 +1,25 @@
-From: b29396@freescale.com (Dong Aisheng)
-Date: Wed, 9 Oct 2013 19:20:16 +0800
-Subject: [PATCH 10/10] mmc: sdhci: remove unneeded call when have preset value
- quirk
-In-Reply-To: <1381317616-1229-1-git-send-email-b29396@freescale.com>
-References: <1381317616-1229-1-git-send-email-b29396@freescale.com>
-Message-ID: <1381317616-1229-11-git-send-email-b29396@freescale.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 9 Oct 2013 12:42:31 +0100
+Subject: [PATCH 12/23] ARM: traps: use <asm/opcodes.h> to get correct
+ instruction order
+In-Reply-To: <1381271679-27804-13-git-send-email-ben.dooks@codethink.co.uk>
+References: <1381271679-27804-1-git-send-email-ben.dooks@codethink.co.uk>
+ <1381271679-27804-13-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <20131009114231.GE6564@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove unneeded call of call sdhci_enable_preset_value when having
-SDHCI_QUIRK2_PRESET_VALUE_BROKEN.
+On Tue, Oct 08, 2013 at 11:34:28PM +0100, Ben Dooks wrote:
+> The trap handler needs to take into account the endian configuration of
+> the system when loading instructions. Use <asm/opcodes.h> to provide the
+> necessary conversion functions.
+> 
+> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+> Tested-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> ---
+>  arch/arm/kernel/traps.c | 16 ++++++++++------
+>  1 file changed, 10 insertions(+), 6 deletions(-)
 
-Signed-off-by: Dong Aisheng <b29396@freescale.com>
----
- drivers/mmc/host/sdhci.c |    3 ++-
- 1 files changed, 2 insertions(+), 1 deletions(-)
+Reviewed-by: Will Deacon <will.deacon@arm.com>
 
-diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
-index cbde17d..a21a710 100644
---- a/drivers/mmc/host/sdhci.c
-+++ b/drivers/mmc/host/sdhci.c
-@@ -1435,7 +1435,8 @@ static void sdhci_do_set_ios(struct sdhci_host *host, struct mmc_ios *ios)
- 	}
- 
- 	if (host->version >= SDHCI_SPEC_300 &&
--		(ios->power_mode == MMC_POWER_UP))
-+		(ios->power_mode == MMC_POWER_UP) &&
-+		!(host->quirks2 & SDHCI_QUIRK2_PRESET_VALUE_BROKEN))
- 		sdhci_enable_preset_value(host, false);
- 
- 	sdhci_set_clock(host, ios->clock);
--- 
-1.7.2.rc3
+Will
