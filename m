@@ -1,89 +1,91 @@
 From: r.sricharan@ti.com (Sricharan R)
-Date: Wed, 9 Oct 2013 18:45:09 +0530
+Date: Wed, 9 Oct 2013 18:46:42 +0530
 Subject: [PATCH V4] ARM: OMAP5/DRA7: realtime_counter: Configure CNTFRQ
  register
-In-Reply-To: <525481A2.4020900@ti.com>
+In-Reply-To: <525556DD.7040200@ti.com>
 References: <1379520162-31932-1-git-send-email-r.sricharan@ti.com>
  <524D44B9.30208@ti.com> <20131008214523.GU8313@atomide.com>
- <525481A2.4020900@ti.com>
-Message-ID: <525556DD.7040200@ti.com>
+ <525481A2.4020900@ti.com> <525556DD.7040200@ti.com>
+Message-ID: <5255573A.8050805@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Santosh,
-
-On Wednesday 09 October 2013 03:35 AM, Santosh Shilimkar wrote:
-> On Tuesday 08 October 2013 05:45 PM, Tony Lindgren wrote:
->> * Sricharan R <r.sricharan@ti.com> [131003 03:27]:
->>> On Wednesday 18 September 2013 09:32 PM, Sricharan R wrote:
->>>> --- a/arch/arm/boot/dts/omap5.dtsi
->>>> +++ b/arch/arm/boot/dts/omap5.dtsi
->>>> @@ -52,7 +52,6 @@
->>>>  			     <GIC_PPI 14 (GIC_CPU_MASK_RAW(3) | IRQ_TYPE_LEVEL_LOW)>,
->>>>  			     <GIC_PPI 11 (GIC_CPU_MASK_RAW(3) | IRQ_TYPE_LEVEL_LOW)>,
->>>>  			     <GIC_PPI 10 (GIC_CPU_MASK_RAW(3) | IRQ_TYPE_LEVEL_LOW)>;
->>>> -		clock-frequency = <6144000>;
->>>>  	};
->>>>  
->>>>  	gic: interrupt-controller at 48211000 {
->> Can the above be done later on in a separate clean-up patch?
->> If so I can drop that part as that removes a dependency to the
->> .dts patches queued by Benoit.
->>
-> This can be applied separately. 
+On Wednesday 09 October 2013 06:45 PM, Sricharan R wrote:
+> Santosh,
 >
->  
->>>> --- a/arch/arm/mach-omap2/omap-smp.c
->>>> +++ b/arch/arm/mach-omap2/omap-smp.c
->>>> @@ -41,6 +41,8 @@
->>>>  
->>>>  u16 pm44xx_errata;
->>>>  
->>>> +extern unsigned long arch_timer_freq;
->>>> +
->>>>  /* SCU base address */
->>>>  static void __iomem *scu_base;
->>>>  
->> No externs in *.c files please, checkpatch.pl and sparse should warn
->> about this.
->>
->>>  Are you planning to pull this patch and the below $subject patch as well? They are
->>>  acked and tested.
+> On Wednesday 09 October 2013 03:35 AM, Santosh Shilimkar wrote:
+>> On Tuesday 08 October 2013 05:45 PM, Tony Lindgren wrote:
+>>> * Sricharan R <r.sricharan@ti.com> [131003 03:27]:
+>>>> On Wednesday 18 September 2013 09:32 PM, Sricharan R wrote:
+>>>>> --- a/arch/arm/boot/dts/omap5.dtsi
+>>>>> +++ b/arch/arm/boot/dts/omap5.dtsi
+>>>>> @@ -52,7 +52,6 @@
+>>>>>  			     <GIC_PPI 14 (GIC_CPU_MASK_RAW(3) | IRQ_TYPE_LEVEL_LOW)>,
+>>>>>  			     <GIC_PPI 11 (GIC_CPU_MASK_RAW(3) | IRQ_TYPE_LEVEL_LOW)>,
+>>>>>  			     <GIC_PPI 10 (GIC_CPU_MASK_RAW(3) | IRQ_TYPE_LEVEL_LOW)>;
+>>>>> -		clock-frequency = <6144000>;
+>>>>>  	};
+>>>>>  
+>>>>>  	gic: interrupt-controller at 48211000 {
+>>> Can the above be done later on in a separate clean-up patch?
+>>> If so I can drop that part as that removes a dependency to the
+>>> .dts patches queued by Benoit.
 >>>
->>>  ARM: DRA7: realtime_counter: Add ratio registers for 20MHZ sys-clk frequency
->>>
->>>   http://www.spinics.net/lists/linux-omap/msg97281.html
->> The 20MHz patch I've applied, just noticed the above things
->> when was about to apply this.
+>> This can be applied separately. 
 >>
-> Now re-looking at the patch, I think this extern stuff can be and
-> should be avoided. It needs order change though like below. Not
-> tested but should work.
->
-> diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
-> index fa74a06..c8d8308 100644
-> --- a/arch/arm/mach-omap2/timer.c
-> +++ b/arch/arm/mach-omap2/timer.c
-> @@ -631,10 +631,9 @@ void __init omap4_local_timer_init(void)
->  #ifdef CONFIG_SOC_OMAP5
->  void __init omap5_realtime_timer_init(void)
->  {
-> -	omap4_sync32k_timer_init();
->  	realtime_counter_init();
-> -
->  	clocksource_of_init();
-> +	omap4_sync32k_timer_init();
->  }
->  #endif /* CONFIG_SOC_OMAP5 */
->  
-> Then, the CNTFREQ programming needs to be moved to
-> realtime_counter_init(). It should be actually part of that
-> first place instead of timer_init().
->
-> On secondary CPU then a simple asm accessor can
-> read the CNTFREQ and pass that to SMC.
-Sorry,  I did not quite get you here. You mean an asm accessor to
- the read the variable that is set in timer.c ?
+>>  
+>>>>> --- a/arch/arm/mach-omap2/omap-smp.c
+>>>>> +++ b/arch/arm/mach-omap2/omap-smp.c
+>>>>> @@ -41,6 +41,8 @@
+>>>>>  
+>>>>>  u16 pm44xx_errata;
+>>>>>  
+>>>>> +extern unsigned long arch_timer_freq;
+>>>>> +
+>>>>>  /* SCU base address */
+>>>>>  static void __iomem *scu_base;
+>>>>>  
+>>> No externs in *.c files please, checkpatch.pl and sparse should warn
+>>> about this.
+>>>
+>>>>  Are you planning to pull this patch and the below $subject patch as well? They are
+>>>>  acked and tested.
+>>>>
+>>>>  ARM: DRA7: realtime_counter: Add ratio registers for 20MHZ sys-clk frequency
+>>>>
+>>>>   http://www.spinics.net/lists/linux-omap/msg97281.html
+>>> The 20MHz patch I've applied, just noticed the above things
+>>> when was about to apply this.
+>>>
+>> Now re-looking at the patch, I think this extern stuff can be and
+>> should be avoided. It needs order change though like below. Not
+>> tested but should work.
+>>
+>> diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
+>> index fa74a06..c8d8308 100644
+>> --- a/arch/arm/mach-omap2/timer.c
+>> +++ b/arch/arm/mach-omap2/timer.c
+>> @@ -631,10 +631,9 @@ void __init omap4_local_timer_init(void)
+>>  #ifdef CONFIG_SOC_OMAP5
+>>  void __init omap5_realtime_timer_init(void)
+>>  {
+>> -	omap4_sync32k_timer_init();
+>>  	realtime_counter_init();
+>> -
+>>  	clocksource_of_init();
+>> +	omap4_sync32k_timer_init();
+>>  }
+>>  #endif /* CONFIG_SOC_OMAP5 */
+>>  
+>> Then, the CNTFREQ programming needs to be moved to
+>> realtime_counter_init(). It should be actually part of that
+>> first place instead of timer_init().
+>>
+>> On secondary CPU then a simple asm accessor can
+>> read the CNTFREQ and pass that to SMC.
+> Sorry,  I did not quite get you here. You mean an asm accessor to
+>  the read the variable that is set in timer.c ?
+ Also, is it not ok to move the extern to a .h file instead ?
 
 Regards,
  Sricharan
