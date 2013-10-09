@@ -1,36 +1,42 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 9 Oct 2013 09:21:49 -0400
-Subject: [PATCH v3 2/2] ARM: Dove: Add the audio device to the Cubox DT
-In-Reply-To: <20131008205617.079142b6@armhf>
-References: <20131008194232.7d74b9e6@armhf> <525448DE.5030004@gmail.com>
- <20131008181647.GW5402@titan.lakedaemon.net>
- <20131008205617.079142b6@armhf>
-Message-ID: <20131009132149.GA5402@titan.lakedaemon.net>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Wed, 9 Oct 2013 16:22:07 +0300
+Subject: [PATCH 1/3] ARM: OMAP4: use CLK_SET_RATE_PARENT for dss_dss_clk
+In-Reply-To: <1381324359-28825-1-git-send-email-tomi.valkeinen@ti.com>
+References: <1381324359-28825-1-git-send-email-tomi.valkeinen@ti.com>
+Message-ID: <5255587F.5010601@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 08, 2013 at 08:56:17PM +0200, Jean-Francois Moine wrote:
-> This patch activates the audio device of the Cubox.
-> 
-> The audio flow (pin mpp_audio1) is output on both I2S and S/PDIF.
-> 
-> The third si5351 clock (#2, pin mpp13) is used as the external clock.
-> 
-> Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
+On 10/09/2013 04:12 PM, Tomi Valkeinen wrote:
+> Set CLK_SET_RATE_PARENT flag for dss_dss_clk so that the DSS's fclk can
+> be configured without the need to get the parent of the fclk.
+
+I wouldn't touch this file right now, as we are trying to move the clock 
+data over to DT. Legacy boot support probably requires to do this 
+update, but I would rather wait a bit and do the modifications to both 
+DT clock data and this file in the same patch. Same applies for other 
+patches also.
+
+-Tero
+
+>
+> Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
 > ---
-> Jason,
-> 
-> this patch replaces the previous patch v2 2/2
-> 
-> v3:
-> - move the pins declaration to dove.dtsi (Sebastian Hesselbarth)
-> ---
->  arch/arm/boot/dts/dove.dtsi      | 10 ++++++++++
->  arch/arm/boot/dts/dove-cubox.dts |  8 ++++++++
->  2 files changed, 18 insertions(+)
-
-Applied to mvebu/dt with Sebastian's Ack
-
-thx,
-
-Jason.
+>   arch/arm/mach-omap2/cclock44xx_data.c | 3 ++-
+>   1 file changed, 2 insertions(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/mach-omap2/cclock44xx_data.c b/arch/arm/mach-omap2/cclock44xx_data.c
+> index b237950..ec0dc0b 100644
+> --- a/arch/arm/mach-omap2/cclock44xx_data.c
+> +++ b/arch/arm/mach-omap2/cclock44xx_data.c
+> @@ -830,7 +830,8 @@ DEFINE_CLK_GATE(dss_tv_clk, "extalt_clkin_ck", &extalt_clkin_ck, 0x0,
+>   		OMAP4430_CM_DSS_DSS_CLKCTRL,
+>   		OMAP4430_OPTFCLKEN_TV_CLK_SHIFT, 0x0, NULL);
+>
+> -DEFINE_CLK_GATE(dss_dss_clk, "dpll_per_m5x2_ck", &dpll_per_m5x2_ck, 0x0,
+> +DEFINE_CLK_GATE(dss_dss_clk, "dpll_per_m5x2_ck", &dpll_per_m5x2_ck,
+> +		CLK_SET_RATE_PARENT,
+>   		OMAP4430_CM_DSS_DSS_CLKCTRL, OMAP4430_OPTFCLKEN_DSSCLK_SHIFT,
+>   		0x0, NULL);
+>
+>
