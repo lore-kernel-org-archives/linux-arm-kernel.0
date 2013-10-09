@@ -1,92 +1,110 @@
 From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Wed, 9 Oct 2013 21:48:16 +0100
-Subject: [PATCH v8 03/17] arm/xen,arm64/xen: introduce p2m
+Date: Wed, 9 Oct 2013 21:48:19 +0100
+Subject: [PATCH v8 06/17] xen/arm,arm64: enable SWIOTLB_XEN
 In-Reply-To: <alpine.DEB.2.02.1310092109190.26077@kaball.uk.xensource.com>
 References: <alpine.DEB.2.02.1310092109190.26077@kaball.uk.xensource.com>
-Message-ID: <1381351710-1876-3-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <1381351710-1876-6-git-send-email-stefano.stabellini@eu.citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Introduce physical to machine and machine to physical tracking
-mechanisms based on rbtrees for arm/xen and arm64/xen.
+Xen on arm and arm64 needs SWIOTLB_XEN: when running on Xen we need to
+program the hardware with mfns rather than pfns for dma addresses.
+Remove SWIOTLB_XEN dependency on X86 and PCI and make XEN select
+SWIOTLB_XEN on arm and arm64.
 
-We need it because any guests on ARM are an autotranslate guests,
-therefore a physical address is potentially different from a machine
-address. When programming a device to do DMA, we need to be
-extra-careful to use machine addresses rather than physical addresses to
-program the device. Therefore we need to know the physical to machine
-mappings.
+At the moment always rely on swiotlb-xen, but when Xen starts supporting
+hardware IOMMUs we'll be able to avoid it conditionally on the presence
+of an IOMMU on the platform.
 
-For the moment we assume that dom0 starts with a 1:1 physical to machine
-mapping, in other words physical addresses correspond to machine
-addresses. However when mapping a foreign grant reference, obviously the
-1:1 model doesn't work anymore. So at the very least we need to be able
-to track grant mappings.
+Implement xen_create_contiguous_region on arm and arm64 by using
+XENMEM_exchange.
 
-We need locking to protect accesses to the two trees.
+Initialize the xen-swiotlb from xen_early_init (before the native
+dma_ops are initialized), set xen_dma_ops to &xen_swiotlb_dma_ops.
 
 Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
----
- arch/arm/include/asm/xen/page.h |   14 +-
- arch/arm/xen/Makefile           |    2 +-
- arch/arm/xen/p2m.c              |  237 +++++++++++++++++++++++++++++++++++++++
- arch/arm64/xen/Makefile         |    2 +-
- 4 files changed, 246 insertions(+), 9 deletions(-)
- create mode 100644 arch/arm/xen/p2m.c
 
+
+Changes in v7:
+- call __set_phys_to_machine_multi from xen_create_contiguous_region and
+xen_destroy_contiguous_region to update the P2M;
+- don't call XENMEM_unpin, it has been removed;
+- call XENMEM_exchange instead of XENMEM_exchange_and_pin;
+- set nr_exchanged to 0 before calling the hypercall.
+
+Changes in v6:
+- introduce and export xen_dma_ops;
+- call xen_mm_init from as arch_initcall.
+
+Changes in v4:
+- remove redefinition of DMA_ERROR_CODE;
+- update the code to use XENMEM_exchange_and_pin and XENMEM_unpin;
+- add a note about hardware IOMMU in the commit message.
+
+Changes in v3:
+- code style changes;
+- warn on XENMEM_put_dma_buf failures.
+---
+ arch/arm/Kconfig                      |    1 +
+ arch/arm/include/asm/xen/hypervisor.h |    2 +
+ arch/arm/include/asm/xen/page.h       |    1 +
+ arch/arm/xen/Makefile                 |    2 +-
+ arch/arm/xen/mm.c                     |  116 +++++++++++++++++++++++++++++++++
+ arch/arm64/Kconfig                    |    1 +
+ arch/arm64/xen/Makefile               |    2 +-
+ drivers/xen/Kconfig                   |    1 -
+ drivers/xen/swiotlb-xen.c             |   15 ++++
+ 9 files changed, 138 insertions(+), 3 deletions(-)
+ create mode 100644 arch/arm/xen/mm.c
+
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index c0bfb33..2c9d112 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1848,6 +1848,7 @@ config XEN
+ 	depends on CPU_V7 && !CPU_V6
+ 	depends on !GENERIC_ATOMIC64
+ 	select ARM_PSCI
++	select SWIOTLB_XEN
+ 	help
+ 	  Say Y if you want to run Linux in a Virtual Machine on Xen on ARM.
+ 
+diff --git a/arch/arm/include/asm/xen/hypervisor.h b/arch/arm/include/asm/xen/hypervisor.h
+index d7ab99a..1317ee4 100644
+--- a/arch/arm/include/asm/xen/hypervisor.h
++++ b/arch/arm/include/asm/xen/hypervisor.h
+@@ -16,4 +16,6 @@ static inline enum paravirt_lazy_mode paravirt_get_lazy_mode(void)
+ 	return PARAVIRT_LAZY_NONE;
+ }
+ 
++extern struct dma_map_ops *xen_dma_ops;
++
+ #endif /* _ASM_ARM_XEN_HYPERVISOR_H */
 diff --git a/arch/arm/include/asm/xen/page.h b/arch/arm/include/asm/xen/page.h
-index 359a7b5..8edc674 100644
+index 8edc674..515368c 100644
 --- a/arch/arm/include/asm/xen/page.h
 +++ b/arch/arm/include/asm/xen/page.h
-@@ -9,9 +9,7 @@
+@@ -6,6 +6,7 @@
+ 
+ #include <linux/pfn.h>
+ #include <linux/types.h>
++#include <linux/dma-mapping.h>
  
  #include <xen/interface/grant_table.h>
  
--#define pfn_to_mfn(pfn)			(pfn)
- #define phys_to_machine_mapping_valid(pfn) (1)
--#define mfn_to_pfn(mfn)			(mfn)
- #define mfn_to_virt(m)			(__va(mfn_to_pfn(m) << PAGE_SHIFT))
- 
- #define pte_mfn	    pte_pfn
-@@ -32,6 +30,10 @@ typedef struct xpaddr {
- 
- #define INVALID_P2M_ENTRY      (~0UL)
- 
-+unsigned long pfn_to_mfn(unsigned long pfn);
-+unsigned long mfn_to_pfn(unsigned long mfn);
-+unsigned long mfn_to_local_pfn(unsigned long mfn);
-+
- static inline xmaddr_t phys_to_machine(xpaddr_t phys)
- {
- 	unsigned offset = phys.paddr & ~PAGE_MASK;
-@@ -76,11 +78,9 @@ static inline int m2p_remove_override(struct page *page, bool clear_pte)
- 	return 0;
- }
- 
--static inline bool __set_phys_to_machine(unsigned long pfn, unsigned long mfn)
--{
--	BUG_ON(pfn != mfn && mfn != INVALID_P2M_ENTRY);
--	return true;
--}
-+bool __set_phys_to_machine(unsigned long pfn, unsigned long mfn);
-+bool __set_phys_to_machine_multi(unsigned long pfn, unsigned long mfn,
-+		unsigned long nr_pages);
- 
- static inline bool set_phys_to_machine(unsigned long pfn, unsigned long mfn)
- {
 diff --git a/arch/arm/xen/Makefile b/arch/arm/xen/Makefile
-index 4384103..21e6ff5 100644
+index 21e6ff5..1296952 100644
 --- a/arch/arm/xen/Makefile
 +++ b/arch/arm/xen/Makefile
 @@ -1 +1 @@
--obj-y		:= enlighten.o hypercall.o grant-table.o
-+obj-y		:= enlighten.o hypercall.o grant-table.o p2m.o
-diff --git a/arch/arm/xen/p2m.c b/arch/arm/xen/p2m.c
+-obj-y		:= enlighten.o hypercall.o grant-table.o p2m.o
++obj-y		:= enlighten.o hypercall.o grant-table.o p2m.o mm.o
+diff --git a/arch/arm/xen/mm.c b/arch/arm/xen/mm.c
 new file mode 100644
-index 0000000..49c2b57
+index 0000000..68d082e
 --- /dev/null
-+++ b/arch/arm/xen/p2m.c
-@@ -0,0 +1,237 @@
++++ b/arch/arm/xen/mm.c
+@@ -0,0 +1,116 @@
 +#include <linux/bootmem.h>
 +#include <linux/gfp.h>
 +#include <linux/export.h>
@@ -105,232 +123,167 @@ index 0000000..49c2b57
 +#include <asm/xen/hypercall.h>
 +#include <asm/xen/interface.h>
 +
-+struct xen_p2m_entry {
-+	unsigned long pfn;
-+	unsigned long mfn;
-+	unsigned long nr_pages;
-+	struct rb_node rbnode_mach;
-+	struct rb_node rbnode_phys;
++static int xen_exchange_memory(xen_ulong_t extents_in,
++			       unsigned int order_in,
++			       xen_pfn_t *pfns_in,
++			       xen_ulong_t extents_out,
++			       unsigned int order_out,
++			       xen_pfn_t *mfns_out,
++			       unsigned int address_bits)
++{
++	long rc;
++	int success;
++
++	struct xen_memory_exchange exchange = {
++		.in = {
++			.nr_extents   = extents_in,
++			.extent_order = order_in,
++			.domid        = DOMID_SELF
++		},
++		.out = {
++			.nr_extents   = extents_out,
++			.extent_order = order_out,
++			.address_bits = address_bits,
++			.domid        = DOMID_SELF
++		},
++		.nr_exchanged = 0
++	};
++	set_xen_guest_handle(exchange.in.extent_start, pfns_in);
++	set_xen_guest_handle(exchange.out.extent_start, mfns_out);
++
++	BUG_ON(extents_in << order_in != extents_out << order_out);
++
++
++	rc = HYPERVISOR_memory_op(XENMEM_exchange, &exchange);
++	success = (exchange.nr_exchanged == extents_in);
++
++	BUG_ON(!success && ((exchange.nr_exchanged != 0) || (rc == 0)));
++	BUG_ON(success && (rc != 0));
++
++	return success;
++}
++
++int xen_create_contiguous_region(unsigned long vstart, unsigned int order,
++				 unsigned int address_bits,
++				 dma_addr_t *dma_handle)
++{
++	phys_addr_t pstart = __pa(vstart);
++	xen_pfn_t in_frame, out_frame;
++	int success;
++
++	/* Get a new contiguous memory extent. */
++	in_frame = out_frame = pstart >> PAGE_SHIFT;
++	success = xen_exchange_memory(1, order, &in_frame,
++				      1, order, &out_frame,
++				      address_bits);
++
++	if (!success)
++		return -ENOMEM;
++	else
++		__set_phys_to_machine_multi(pstart >> PAGE_SHIFT, out_frame, (1 << order));
++
++	*dma_handle = out_frame << PAGE_SHIFT;
++
++	return success ? 0 : -ENOMEM;
++}
++EXPORT_SYMBOL_GPL(xen_create_contiguous_region);
++
++void xen_destroy_contiguous_region(unsigned long vstart, unsigned int order)
++{
++	return;
++}
++EXPORT_SYMBOL_GPL(xen_destroy_contiguous_region);
++
++struct dma_map_ops *xen_dma_ops;
++EXPORT_SYMBOL_GPL(xen_dma_ops);
++
++static struct dma_map_ops xen_swiotlb_dma_ops = {
++	.mapping_error = xen_swiotlb_dma_mapping_error,
++	.alloc = xen_swiotlb_alloc_coherent,
++	.free = xen_swiotlb_free_coherent,
++	.sync_single_for_cpu = xen_swiotlb_sync_single_for_cpu,
++	.sync_single_for_device = xen_swiotlb_sync_single_for_device,
++	.sync_sg_for_cpu = xen_swiotlb_sync_sg_for_cpu,
++	.sync_sg_for_device = xen_swiotlb_sync_sg_for_device,
++	.map_sg = xen_swiotlb_map_sg_attrs,
++	.unmap_sg = xen_swiotlb_unmap_sg_attrs,
++	.map_page = xen_swiotlb_map_page,
++	.unmap_page = xen_swiotlb_unmap_page,
++	.dma_supported = xen_swiotlb_dma_supported,
 +};
 +
-+spinlock_t p2m_lock;
-+static struct rb_root phys_to_mach = RB_ROOT;
-+static struct rb_root mach_to_phys = RB_ROOT;
-+
-+static int xen_add_phys_to_mach_entry(struct xen_p2m_entry *new)
++int __init xen_mm_init(void)
 +{
-+	struct rb_node **link = &phys_to_mach.rb_node;
-+	struct rb_node *parent = NULL;
-+	struct xen_p2m_entry *entry;
-+	int rc = 0;
-+
-+	while (*link) {
-+		parent = *link;
-+		entry = rb_entry(parent, struct xen_p2m_entry, rbnode_phys);
-+
-+		if (new->mfn == entry->mfn)
-+			goto err_out;
-+		if (new->pfn == entry->pfn)
-+			goto err_out;
-+
-+		if (new->pfn < entry->pfn)
-+			link = &(*link)->rb_left;
-+		else
-+			link = &(*link)->rb_right;
-+	}
-+	rb_link_node(&new->rbnode_phys, parent, link);
-+	rb_insert_color(&new->rbnode_phys, &phys_to_mach);
-+	goto out;
-+
-+err_out:
-+	rc = -EINVAL;
-+	pr_warn("%s: cannot add pfn=%pa -> mfn=%pa: pfn=%pa -> mfn=%pa already exists\n",
-+			__func__, &new->pfn, &new->mfn, &entry->pfn, &entry->mfn);
-+out:
-+	return rc;
-+}
-+
-+static struct xen_p2m_entry *xen_get_p2m_entry_from_phys(unsigned long phys)
-+{
-+	struct rb_node *n = phys_to_mach.rb_node;
-+	struct xen_p2m_entry *entry;
-+	unsigned long irqflags;
-+
-+	spin_lock_irqsave(&p2m_lock, irqflags);
-+	while (n) {
-+		entry = rb_entry(n, struct xen_p2m_entry, rbnode_phys);
-+		if (entry->pfn <= phys &&
-+				entry->pfn + entry->nr_pages > phys) {
-+			spin_unlock_irqrestore(&p2m_lock, irqflags);
-+			return entry;
-+		}
-+		if (phys < entry->pfn)
-+			n = n->rb_left;
-+		else
-+			n = n->rb_right;
-+	}
-+	spin_unlock_irqrestore(&p2m_lock, irqflags);
-+
-+	return NULL;
-+}
-+
-+static int xen_add_mach_to_phys_entry(struct xen_p2m_entry *new)
-+{
-+	struct rb_node **link = &mach_to_phys.rb_node;
-+	struct rb_node *parent = NULL;
-+	struct xen_p2m_entry *entry;
-+	int rc = 0;
-+
-+	while (*link) {
-+		parent = *link;
-+		entry = rb_entry(parent, struct xen_p2m_entry, rbnode_mach);
-+
-+		if (new->mfn == entry->mfn)
-+			goto err_out;
-+		if (new->pfn == entry->pfn)
-+			goto err_out;
-+
-+		if (new->mfn < entry->mfn)
-+			link = &(*link)->rb_left;
-+		else
-+			link = &(*link)->rb_right;
-+	}
-+	rb_link_node(&new->rbnode_mach, parent, link);
-+	rb_insert_color(&new->rbnode_mach, &mach_to_phys);
-+	goto out;
-+
-+err_out:
-+	rc = -EINVAL;
-+	pr_warn("%s: cannot add pfn=%pa -> mfn=%pa: pfn=%pa -> mfn=%pa already exists\n",
-+			__func__, &new->pfn, &new->mfn, &entry->pfn, &entry->mfn);
-+out:
-+	return rc;
-+}
-+
-+static struct xen_p2m_entry *xen_get_p2m_entry_from_mach(unsigned long mfn)
-+{
-+	struct rb_node *n = mach_to_phys.rb_node;
-+	struct xen_p2m_entry *entry;
-+	unsigned long irqflags;
-+
-+	spin_lock_irqsave(&p2m_lock, irqflags);
-+	while (n) {
-+		entry = rb_entry(n, struct xen_p2m_entry, rbnode_mach);
-+		if (entry->mfn <= mfn &&
-+				entry->mfn + entry->nr_pages > mfn) {
-+			spin_unlock_irqrestore(&p2m_lock, irqflags);
-+			return entry;
-+		}
-+		if (mfn < entry->mfn)
-+			n = n->rb_left;
-+		else
-+			n = n->rb_right;
-+	}
-+	spin_unlock_irqrestore(&p2m_lock, irqflags);
-+
-+	return NULL;
-+}
-+
-+unsigned long pfn_to_mfn(unsigned long pfn)
-+{
-+	struct xen_p2m_entry *p2m_entry;
-+
-+	p2m_entry = xen_get_p2m_entry_from_phys(pfn);
-+	if (p2m_entry != NULL)
-+		return p2m_entry->mfn;
-+
-+	if (xen_initial_domain())
-+		return pfn;
-+	else
-+		return INVALID_P2M_ENTRY;
-+}
-+
-+unsigned long mfn_to_pfn(unsigned long mfn)
-+{
-+	struct xen_p2m_entry *p2m_entry;
-+
-+	p2m_entry = xen_get_p2m_entry_from_mach(mfn);
-+	if (p2m_entry != NULL)
-+		return p2m_entry->pfn;
-+
-+	if (xen_initial_domain())
-+		return mfn;
-+	else
-+		return INVALID_P2M_ENTRY;
-+}
-+
-+unsigned long mfn_to_local_pfn(unsigned long mfn)
-+{
-+	struct xen_p2m_entry *p2m_entry;
-+
 +	if (!xen_initial_domain())
-+		return INVALID_P2M_ENTRY;
-+
-+	p2m_entry = xen_get_p2m_entry_from_mach(mfn);
-+	if (p2m_entry != NULL)
-+		return INVALID_P2M_ENTRY;
-+
-+	return mfn;
-+}
-+
-+bool __set_phys_to_machine_multi(unsigned long pfn,
-+		unsigned long mfn, unsigned long nr_pages)
-+{
-+	int rc;
-+	unsigned long irqflags;
-+	struct xen_p2m_entry *p2m_entry;
-+
-+	p2m_entry = xen_get_p2m_entry_from_phys(pfn);
-+	if (p2m_entry != NULL) {
-+		BUG_ON(pfn != mfn && mfn != INVALID_P2M_ENTRY);
-+		spin_lock_irqsave(&p2m_lock, irqflags);
-+		rb_erase(&p2m_entry->rbnode_mach, &mach_to_phys);
-+		rb_erase(&p2m_entry->rbnode_phys, &phys_to_mach);
-+		spin_unlock_irqrestore(&p2m_lock, irqflags);
-+		kfree(p2m_entry);	
-+		return true;
-+	} else if (mfn == INVALID_P2M_ENTRY)
-+		return true;
-+
-+	p2m_entry = kzalloc(sizeof(struct xen_p2m_entry), GFP_NOWAIT);
-+	if (!p2m_entry) {
-+		pr_warn("cannot allocate xen_p2m_entry\n");
-+		return false;
-+	}
-+	p2m_entry->pfn = pfn;
-+	p2m_entry->nr_pages = nr_pages;
-+	p2m_entry->mfn = mfn;
-+
-+	spin_lock_irqsave(&p2m_lock, irqflags);
-+	if ((rc = xen_add_phys_to_mach_entry(p2m_entry) < 0) ||
-+		(rc = xen_add_mach_to_phys_entry(p2m_entry) < 0)) {
-+		spin_unlock_irqrestore(&p2m_lock, irqflags);
-+		return false;
-+	}
-+	spin_unlock_irqrestore(&p2m_lock, irqflags);
-+	return true;
-+}
-+EXPORT_SYMBOL_GPL(__set_phys_to_machine_multi);
-+
-+bool __set_phys_to_machine(unsigned long pfn, unsigned long mfn)
-+{
-+	return __set_phys_to_machine_multi(pfn, mfn, 1);
-+}
-+EXPORT_SYMBOL_GPL(__set_phys_to_machine);
-+
-+int p2m_init(void)
-+{
-+	spin_lock_init(&p2m_lock);
++		return 0;
++	xen_swiotlb_init(1, false);
++	xen_dma_ops = &xen_swiotlb_dma_ops;
 +	return 0;
 +}
-+arch_initcall(p2m_init);
++arch_initcall(xen_mm_init);
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 9737e97..aa1f6fb 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -209,6 +209,7 @@ config XEN_DOM0
+ config XEN
+ 	bool "Xen guest support on ARM64 (EXPERIMENTAL)"
+ 	depends on ARM64 && OF
++	select SWIOTLB_XEN
+ 	help
+ 	  Say Y if you want to run Linux in a Virtual Machine on Xen on ARM64.
+ 
 diff --git a/arch/arm64/xen/Makefile b/arch/arm64/xen/Makefile
-index be24040..cd866b0 100644
+index cd866b0..74a8d87 100644
 --- a/arch/arm64/xen/Makefile
 +++ b/arch/arm64/xen/Makefile
 @@ -1,2 +1,2 @@
--xen-arm-y	+= $(addprefix ../../arm/xen/, enlighten.o grant-table.o)
-+xen-arm-y	+= $(addprefix ../../arm/xen/, enlighten.o grant-table.o p2m.o)
+-xen-arm-y	+= $(addprefix ../../arm/xen/, enlighten.o grant-table.o p2m.o)
++xen-arm-y	+= $(addprefix ../../arm/xen/, enlighten.o grant-table.o p2m.o mm.o)
  obj-y		:= xen-arm.o hypercall.o
+diff --git a/drivers/xen/Kconfig b/drivers/xen/Kconfig
+index 9e02d60..7e83688 100644
+--- a/drivers/xen/Kconfig
++++ b/drivers/xen/Kconfig
+@@ -140,7 +140,6 @@ config XEN_GRANT_DEV_ALLOC
+ 
+ config SWIOTLB_XEN
+ 	def_bool y
+-	depends on PCI && X86
+ 	select SWIOTLB
+ 
+ config XEN_TMEM
+diff --git a/drivers/xen/swiotlb-xen.c b/drivers/xen/swiotlb-xen.c
+index b72f31c..f0fc1a4 100644
+--- a/drivers/xen/swiotlb-xen.c
++++ b/drivers/xen/swiotlb-xen.c
+@@ -42,12 +42,27 @@
+ #include <xen/page.h>
+ #include <xen/xen-ops.h>
+ #include <xen/hvc-console.h>
++#include <asm/dma-mapping.h>
+ /*
+  * Used to do a quick range check in swiotlb_tbl_unmap_single and
+  * swiotlb_tbl_sync_single_*, to see if the memory was in fact allocated by this
+  * API.
+  */
+ 
++#ifndef CONFIG_X86
++static unsigned long dma_alloc_coherent_mask(struct device *dev,
++					    gfp_t gfp)
++{
++	unsigned long dma_mask = 0;
++
++	dma_mask = dev->coherent_dma_mask;
++	if (!dma_mask)
++		dma_mask = (gfp & GFP_DMA) ? DMA_BIT_MASK(24) : DMA_BIT_MASK(32);
++
++	return dma_mask;
++}
++#endif
++
+ static char *xen_io_tlb_start, *xen_io_tlb_end;
+ static unsigned long xen_io_tlb_nslabs;
+ /*
 -- 
 1.7.2.5
