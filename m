@@ -1,17 +1,49 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 09 Oct 2013 17:21:14 -0600
-Subject: [PATCH 2/7] ARM: tegra: add flow controller to support suspend
- for Tegra124
-In-Reply-To: <1381310411-11391-3-git-send-email-josephl@nvidia.com>
-References: <1381310411-11391-1-git-send-email-josephl@nvidia.com>
- <1381310411-11391-3-git-send-email-josephl@nvidia.com>
-Message-ID: <5255E4EA.8060002@wwwdotorg.org>
+From: nm@ti.com (Nishanth Menon)
+Date: Wed, 9 Oct 2013 18:24:51 -0500
+Subject: [PATCH V6 08/15] ARM: dts: dra7-evm: add smps123 supply for CPU
+In-Reply-To: <1381361098-8283-1-git-send-email-nm@ti.com>
+References: <1381354144-7134-1-git-send-email-nm@ti.com>
+ <1381361098-8283-1-git-send-email-nm@ti.com>
+Message-ID: <1381361098-8283-7-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/09/2013 03:20 AM, Joseph Lo wrote:
-> Enable the configuration of flow controller to support the last CPU
-> (CPU0) suspend function with cluster power down.
+From: J Keerthy <j-keerthy@ti.com>
 
-I'd be tempted to squash together patches 2 and 3 since they're
-basically doing the same kind of thing and are pretty trivial.
+regulator smps123 supply from Palmas PMIC powers CPU0 on DRA7 EVM.
+
+[nm at ti.com: rebase to latest]
+Signed-off-by: Nishanth Menon <nm@ti.com>
+Signed-off-by: J Keerthy <j-keerthy@ti.com>
+---
+ arch/arm/boot/dts/dra7-evm.dts |    4 ++++
+ arch/arm/boot/dts/dra7.dtsi    |    2 +-
+ 2 files changed, 5 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/boot/dts/dra7-evm.dts b/arch/arm/boot/dts/dra7-evm.dts
+index 3abf5f4..5babba0 100644
+--- a/arch/arm/boot/dts/dra7-evm.dts
++++ b/arch/arm/boot/dts/dra7-evm.dts
+@@ -269,3 +269,7 @@
+ 	vmmc-supply = <&mmc2_3v3>;
+ 	bus-width = <8>;
+ };
++
++&cpu0 {
++	cpu0-supply = <&smps123_reg>;
++};
+diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
+index c98997b..02e430b 100644
+--- a/arch/arm/boot/dts/dra7.dtsi
++++ b/arch/arm/boot/dts/dra7.dtsi
+@@ -32,7 +32,7 @@
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+ 
+-		cpu at 0 {
++		cpu0: cpu at 0 {
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a15";
+ 			reg = <0>;
+-- 
+1.7.9.5
