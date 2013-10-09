@@ -1,49 +1,37 @@
 From: nm@ti.com (Nishanth Menon)
-Date: Wed, 9 Oct 2013 18:30:08 -0500
-Subject: [PATCH V6 08/15] ARM: dts: dra7-evm: add smps123 supply for CPU
+Date: Wed, 9 Oct 2013 18:30:11 -0500
+Subject: [PATCH V6 12/15] ARM: dts: OMAP4: add clock nodes for CPU
 In-Reply-To: <1381361414-8851-1-git-send-email-nm@ti.com>
 References: <1381354144-7134-1-git-send-email-nm@ti.com>
  <1381361414-8851-1-git-send-email-nm@ti.com>
-Message-ID: <1381361414-8851-7-git-send-email-nm@ti.com>
+Message-ID: <1381361414-8851-10-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: J Keerthy <j-keerthy@ti.com>
+OMAP443x, OMAP446x and OMAP447x platforms use dpll_mpu clock.
+Add same to common definition.
 
-regulator smps123 supply from Palmas PMIC powers CPU0 on DRA7 EVM.
-
-[nm at ti.com: rebase to latest]
+Cc: Benoit Cousson <bcousson@baylibre.com>
 Signed-off-by: Nishanth Menon <nm@ti.com>
-Signed-off-by: J Keerthy <j-keerthy@ti.com>
 ---
- arch/arm/boot/dts/dra7-evm.dts |    4 ++++
- arch/arm/boot/dts/dra7.dtsi    |    2 +-
- 2 files changed, 5 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/omap4.dtsi |    5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/arch/arm/boot/dts/dra7-evm.dts b/arch/arm/boot/dts/dra7-evm.dts
-index 3abf5f4..5babba0 100644
---- a/arch/arm/boot/dts/dra7-evm.dts
-+++ b/arch/arm/boot/dts/dra7-evm.dts
-@@ -269,3 +269,7 @@
- 	vmmc-supply = <&mmc2_3v3>;
- 	bus-width = <8>;
- };
-+
-+&cpu0 {
-+	cpu0-supply = <&smps123_reg>;
-+};
-diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
-index c98997b..02e430b 100644
---- a/arch/arm/boot/dts/dra7.dtsi
-+++ b/arch/arm/boot/dts/dra7.dtsi
-@@ -32,7 +32,7 @@
- 		#address-cells = <1>;
- 		#size-cells = <0>;
- 
--		cpu at 0 {
-+		cpu0: cpu at 0 {
+diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
+index 6be1f56..27f1f3a 100644
+--- a/arch/arm/boot/dts/omap4.dtsi
++++ b/arch/arm/boot/dts/omap4.dtsi
+@@ -32,6 +32,11 @@
  			device_type = "cpu";
- 			compatible = "arm,cortex-a15";
- 			reg = <0>;
+ 			next-level-cache = <&L2>;
+ 			reg = <0x0>;
++
++			clocks = <&dpll_mpu_ck>;
++			clock-names = "cpu";
++
++			clock-latency = <300000>; /* From omap-cpufreq driver */
+ 		};
+ 		cpu at 1 {
+ 			compatible = "arm,cortex-a9";
 -- 
 1.7.9.5
