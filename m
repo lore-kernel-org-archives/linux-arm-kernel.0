@@ -1,22 +1,23 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 09 Oct 2013 16:17:24 +0100
+From: anup@brainfault.org (Anup Patel)
+Date: Wed, 9 Oct 2013 20:47:36 +0530
 Subject: [PATCH 1/2] ARM: KVM: Yield CPU when vcpu executes a WFE
 In-Reply-To: <CAAhSdy3n24qDC1v7NTHFtJ2wN2A=ssFWAKEvG1P-n1hndOK71g@mail.gmail.com>
 References: <1381160430-11790-1-git-send-email-marc.zyngier@arm.com>
  <1381160430-11790-2-git-send-email-marc.zyngier@arm.com>
- <52F72A87-9CC3-4B38-ACDA-F5EA66FA7375@suse.de>	<5252DE5E.6060700@arm.com>
+ <52F72A87-9CC3-4B38-ACDA-F5EA66FA7375@suse.de>
+ <5252DE5E.6060700@arm.com>
  <1BCAA4EA-CD0A-4E2A-9D22-5B9BD98F2ECD@suse.de>
  <20131007165352.GC9127@redhat.com>
  <169A6E7C-B188-4A4C-B5B7-D2DC94ED70EB@suse.de>
- <20131009132611.GL3574@redhat.com>	<525565A7.1080602@arm.com>
+ <20131009132611.GL3574@redhat.com> <525565A7.1080602@arm.com>
  <CAAhSdy2iO8ejX=Z8pzbOemGoEdeW+dkBqvCS9VS9ZMesyARKAg@mail.gmail.com>
  <52556F5F.6040801@arm.com>
  <CAAhSdy3n24qDC1v7NTHFtJ2wN2A=ssFWAKEvG1P-n1hndOK71g@mail.gmail.com>
-Message-ID: <52557384.9080308@arm.com>
+Message-ID: <CAAhSdy3_JGAiCyzkG+wN22XKsCQ2EWoU7RCpwUfCro6omjhUrw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/10/13 16:10, Anup Patel wrote:
+On Wed, Oct 9, 2013 at 8:40 PM, Anup Patel <anup@brainfault.org> wrote:
 > On Wed, Oct 9, 2013 at 8:29 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
 >> On 09/10/13 15:50, Anup Patel wrote:
 >>> On Wed, Oct 9, 2013 at 7:48 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
@@ -103,26 +104,33 @@ On 09/10/13 16:10, Anup Patel wrote:
 >> workload. If your guest OS is executing WFE (I'm not implying a lock
 >> here), *and* that WFE is blocking, then I maintain it will be a gain in
 >> the vast majority of the cases.
-> 
+>
 > What if VCPU A was about to release lock and VCPU B tries to grab
 > same lock. In this case VCPU B gets Yielded due to WFE causing
 > unnecessary delay for VCPU B in acquiring lock. This situation can
 > happen quite often because spin locks are generally used for protecting
 > very small portion of code.
-> 
+
+It will be interesting to see what hackbench number you get if you
+don't restrict all Guest VCPUs to same Host CPU? Lets say a Guest
+with 8 VCPUs running on Host (with > 2 CPUs).
+
+>
 >>
 >>> It will be good if we can enable/disable "Yield CPU when vcpu executes a WFE
 >>
 >> Not until someone has shown me a (real) workload when this is actually
 >> detrimental.
-> 
+>
 > The gains by "Yield CPU when vcpu executes a WFE" are not-significant
 > and we dont have consistent improvement when tried multiple times. Please
 > look at number you reported for multiple runs. Due to this fact it makes
 > more sense to have Kconfig option for this.
-
-Not significant? I don't know if I should cry or laugh here...
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+>
+> --Anup
+>
+>>
+>>         M.
+>> --
+>> Jazz is not dead. It just smells funny...
+>>
