@@ -1,64 +1,63 @@
 From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Wed, 9 Oct 2013 21:48:22 +0100
-Subject: [PATCH v8 09/17] arm64/xen: get_dma_ops: return xen_dma_ops if we are
- running as xen_initial_domain
+Date: Wed, 9 Oct 2013 21:48:20 +0100
+Subject: [PATCH v8 07/17] swiotlb-xen: introduce xen_swiotlb_set_dma_mask
 In-Reply-To: <alpine.DEB.2.02.1310092109190.26077@kaball.uk.xensource.com>
 References: <alpine.DEB.2.02.1310092109190.26077@kaball.uk.xensource.com>
-Message-ID: <1381351710-1876-9-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <1381351710-1876-7-git-send-email-stefano.stabellini@eu.citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We can't simply override arm_dma_ops with xen_dma_ops because devices
-are allowed to have their own dma_ops and they take precedence over
-arm_dma_ops. When running on Xen as initial domain, we always want
-xen_dma_ops to be the one in use.
+Implement xen_swiotlb_set_dma_mask, use it for set_dma_mask on arm.
 
 Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-CC: will.deacon at arm.com
-
-Changes in v7:
-- return xen_dma_ops only if we are the initial domain;
-- rename __get_dma_ops to __generic_dma_ops.
 ---
- arch/arm64/include/asm/dma-mapping.h |   13 ++++++++++++-
- 1 files changed, 12 insertions(+), 1 deletions(-)
+ arch/arm/xen/mm.c         |    1 +
+ drivers/xen/swiotlb-xen.c |   12 ++++++++++++
+ include/xen/swiotlb-xen.h |    2 ++
+ 3 files changed, 15 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm64/include/asm/dma-mapping.h b/arch/arm64/include/asm/dma-mapping.h
-index c2cb8a0..6763c29 100644
---- a/arch/arm64/include/asm/dma-mapping.h
-+++ b/arch/arm64/include/asm/dma-mapping.h
-@@ -23,12 +23,15 @@
+diff --git a/arch/arm/xen/mm.c b/arch/arm/xen/mm.c
+index 68d082e..042c43a 100644
+--- a/arch/arm/xen/mm.c
++++ b/arch/arm/xen/mm.c
+@@ -103,6 +103,7 @@ static struct dma_map_ops xen_swiotlb_dma_ops = {
+ 	.map_page = xen_swiotlb_map_page,
+ 	.unmap_page = xen_swiotlb_unmap_page,
+ 	.dma_supported = xen_swiotlb_dma_supported,
++	.set_dma_mask = xen_swiotlb_set_dma_mask,
+ };
  
- #include <asm-generic/dma-coherent.h>
- 
-+#include <xen/xen.h>
-+#include <asm/xen/hypervisor.h>
-+
- #define ARCH_HAS_DMA_GET_REQUIRED_MASK
- 
- #define DMA_ERROR_CODE	(~0)
- extern struct dma_map_ops *dma_ops;
- 
--static inline struct dma_map_ops *get_dma_ops(struct device *dev)
-+static inline struct dma_map_ops *__generic_dma_ops(struct device *dev)
- {
- 	if (unlikely(!dev) || !dev->archdata.dma_ops)
- 		return dma_ops;
-@@ -36,6 +39,14 @@ static inline struct dma_map_ops *get_dma_ops(struct device *dev)
- 		return dev->archdata.dma_ops;
+ int __init xen_mm_init(void)
+diff --git a/drivers/xen/swiotlb-xen.c b/drivers/xen/swiotlb-xen.c
+index f0fc1a4..d8ef0bf 100644
+--- a/drivers/xen/swiotlb-xen.c
++++ b/drivers/xen/swiotlb-xen.c
+@@ -608,3 +608,15 @@ xen_swiotlb_dma_supported(struct device *hwdev, u64 mask)
+ 	return xen_virt_to_bus(xen_io_tlb_end - 1) <= mask;
  }
- 
-+static inline struct dma_map_ops *get_dma_ops(struct device *dev)
-+{
-+	if (xen_initial_domain())
-+		return xen_dma_ops;
-+	else
-+		return __generic_dma_ops(dev);
-+}
+ EXPORT_SYMBOL_GPL(xen_swiotlb_dma_supported);
 +
- #include <asm-generic/dma-mapping-common.h>
++int
++xen_swiotlb_set_dma_mask(struct device *dev, u64 dma_mask)
++{
++	if (!dev->dma_mask || !xen_swiotlb_dma_supported(dev, dma_mask))
++		return -EIO;
++
++	*dev->dma_mask = dma_mask;
++
++	return 0;
++}
++EXPORT_SYMBOL_GPL(xen_swiotlb_set_dma_mask);
+diff --git a/include/xen/swiotlb-xen.h b/include/xen/swiotlb-xen.h
+index de8bcc6..7b64465 100644
+--- a/include/xen/swiotlb-xen.h
++++ b/include/xen/swiotlb-xen.h
+@@ -55,4 +55,6 @@ xen_swiotlb_dma_mapping_error(struct device *hwdev, dma_addr_t dma_addr);
+ extern int
+ xen_swiotlb_dma_supported(struct device *hwdev, u64 mask);
  
- static inline dma_addr_t phys_to_dma(struct device *dev, phys_addr_t paddr)
++extern int
++xen_swiotlb_set_dma_mask(struct device *dev, u64 dma_mask);
+ #endif /* __LINUX_SWIOTLB_XEN_H */
 -- 
 1.7.2.5
