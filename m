@@ -1,10 +1,10 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Wed, 9 Oct 2013 11:03:58 +0900
+Date: Wed, 9 Oct 2013 11:05:23 +0900
 Subject: [PATCH 05/08] ARM: shmobile: r8a7791 GPIO platform device support
 In-Reply-To: <20131008033939.20455.66118.sendpatchset@w520>
 References: <20131008033851.20455.68845.sendpatchset@w520>
  <20131008033939.20455.66118.sendpatchset@w520>
-Message-ID: <20131009020356.GF15065@verge.net.au>
+Message-ID: <20131009020522.GG15065@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
