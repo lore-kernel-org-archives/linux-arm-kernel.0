@@ -1,64 +1,22 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 9 Oct 2013 15:54:42 +0900
-Subject: [PATCH v2 3/3] ARM: shmobile: kzm9d: Use common clock framework
-In-Reply-To: <CANqRtoQs+31mv0ZULOd3SGshkBkvp-kGoaVOSb10+Ncdp+WNXw@mail.gmail.com>
-References: <20131008143040.52f36df8edb7ab63224d8433@ops.dti.ne.jp>
- <20131008143403.c11f294c8a1701a2ab3bc5fd@ops.dti.ne.jp>
- <20131009034057.GO15065@verge.net.au>
- <CANqRtoQs+31mv0ZULOd3SGshkBkvp-kGoaVOSb10+Ncdp+WNXw@mail.gmail.com>
-Message-ID: <20131009065438.GA7220@verge.net.au>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 9 Oct 2013 07:03:17 +0000 (UTC)
+Subject: [PATCH v2 1/6] ARM: OMAP5: hwmod data: Add USB Host and TLL
+ modules
+In-Reply-To: <1381226799-29158-2-git-send-email-rogerq@ti.com>
+References: <1381226799-29158-1-git-send-email-rogerq@ti.com>
+ <1381226799-29158-2-git-send-email-rogerq@ti.com>
+Message-ID: <alpine.DEB.2.02.1310090703040.30199@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 09, 2013 at 01:59:46PM +0900, Magnus Damm wrote:
-> Hi Simon,
-> 
-> On Wed, Oct 9, 2013 at 12:40 PM, Simon Horman <horms@verge.net.au> wrote:
-> > On Tue, Oct 08, 2013 at 02:34:03PM +0900, takasi-y at ops.dti.ne.jp wrote:
-> >> Use common clock framework version of clock
-> >>  drivers/clk/shmobile/clk-emev2.c
-> >> instead of sh-clkfwk version
-> >>  arch/arm/mach-shmobile/clock-emev2.c
-> >> when it is configured as a part of multi-platform.
-> >>
-> >> Signed-off-by: Takashi Yoshii <takasi-y@ops.dti.ne.jp>
-> >
-> > Thanks.
-> >
-> > I plan to add this patch to a new topic branch,
-> > topic/emev2-common-clock, in the renesas tree and
-> > queue it up from there for inclusion in mainline
-> > if/when the first patch of this series is accepted
-> > by Mike Turquette.
-> 
-> Thanks for picking up patches, Simon.
-> 
-> I think you can simply merge this patch after the following series:
-> 
-> [PATCH 00/05] ARM: shmobile: KZM9D Multiplatform update
+On Tue, 8 Oct 2013, Roger Quadros wrote:
 
-This is already queued up.
-
-> There are no build time dependencies on patch 1 and 2 so this patch
-> can be merged independently. Regarding run-time operation, the
-> multiplatform series above makes KZM9D DT reference only build for
-> multiplatform, and in such case CCF is required.
+> Add hwmod data for High Speed USB host and TLL modules
 > 
-> So if you want to keep KZM9D DT reference working until Mike Turquette
-> accepts the CCF bits, then I recommend you to wait with "[PATCH 00/05]
-> ARM: shmobile: KZM9D Multiplatform update" until all EMEV2 CCF bits
-> have been merged.
-> 
-> Another way is to merge "[PATCH 00/05] ARM: shmobile: KZM9D
-> Multiplatform update" before the EMEV2 CCF bits, but if so you may as
-> well merge this patch as well IMO. This
-> multiplatform-update-series-merge-before-CCF plan will result in
-> untestable KZM9D DT reference until EMEV2 CCF is merged. Either way is
-> fine with me.
+> CC: Paul Walmsley <paul@pwsan.com>
+> Signed-off-by: Roger Quadros <rogerq@ti.com>
 
-I am mainly concerned that the bindings may change before
-they are finally merged. And I thought it would be nice to avoid
-having to fix up the usage of the bindings if they change.
+Thanks, queued.
 
-But I'm happy to just queue-up patches 2 and 3 of this series
-now if you prefer.
+
+- Paul
