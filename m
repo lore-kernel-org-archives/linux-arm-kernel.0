@@ -1,75 +1,167 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  9 Oct 2013 15:50:55 +0900
-Subject: [PATCH 07/14] ARM: shmobile: Sync KZM9D DTS with KZM9D reference DTS
+Date: Wed,  9 Oct 2013 15:50:52 +0900
+Subject: [PATCH 04/14] ARM: shmobile: Genmai support
 In-Reply-To: <cover.1381299817.git.horms+renesas@verge.net.au>
 References: <cover.1381299817.git.horms+renesas@verge.net.au>
-Message-ID: <9e8b48b61aeb2eb9a02e81021bfb8d89ea4645a4.1381299817.git.horms+renesas@verge.net.au>
+Message-ID: <a4ed412ed5934127ba88ba007b9a00617ae47f75.1381299817.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Magnus Damm <damm@opensource.se>
 
-Copy the device nodes from KZM9D reference into the KZM9D
-device tree file. This will allow us to use a single DTS
-file regarless of kernel configuration. In case of legacy
-C board code the device nodes may or may not be used, but
-in the multiplatform case all the DT device nodes are used.
+Genmai base board support making use of 128 MiB of memory,
+the r7s7211 SoC with the SCIF2 serial port and CA9 core.
 
 Signed-off-by: Magnus Damm <damm@opensource.se>
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/emev2-kzm9d.dts | 33 ++++++++++++++++++++++++++++++++-
- 1 file changed, 32 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/Makefile            |  1 +
+ arch/arm/boot/dts/r7s72100-genmai.dts | 31 +++++++++++++++++++++++++
+ arch/arm/mach-shmobile/Kconfig        |  5 ++++
+ arch/arm/mach-shmobile/Makefile       |  1 +
+ arch/arm/mach-shmobile/Makefile.boot  |  1 +
+ arch/arm/mach-shmobile/board-genmai.c | 43 +++++++++++++++++++++++++++++++++++
+ 6 files changed, 82 insertions(+)
+ create mode 100644 arch/arm/boot/dts/r7s72100-genmai.dts
+ create mode 100644 arch/arm/mach-shmobile/board-genmai.c
 
-diff --git a/arch/arm/boot/dts/emev2-kzm9d.dts b/arch/arm/boot/dts/emev2-kzm9d.dts
-index f92e812..861aa7d 100644
---- a/arch/arm/boot/dts/emev2-kzm9d.dts
-+++ b/arch/arm/boot/dts/emev2-kzm9d.dts
-@@ -1,7 +1,7 @@
- /*
-  * Device Tree Source for the KZM9D board
-  *
-- * Copyright (C) 2012 Renesas Solutions Corp.
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 3b1c462..295824d 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -196,6 +196,7 @@ dtb-$(CONFIG_ARCH_U8500) += ste-snowball.dtb \
+ dtb-$(CONFIG_ARCH_S3C24XX) += s3c2416-smdk2416.dtb
+ dtb-$(CONFIG_ARCH_SHMOBILE) += emev2-kzm9d.dtb \
+ 	emev2-kzm9d-reference.dtb \
++	r7s72100-genmai.dtb \
+ 	r8a7740-armadillo800eva.dtb \
+ 	r8a7778-bockw.dtb \
+ 	r8a7778-bockw-reference.dtb \
+diff --git a/arch/arm/boot/dts/r7s72100-genmai.dts b/arch/arm/boot/dts/r7s72100-genmai.dts
+new file mode 100644
+index 0000000..1fb20f2
+--- /dev/null
++++ b/arch/arm/boot/dts/r7s72100-genmai.dts
+@@ -0,0 +1,31 @@
++/*
++ * Device Tree Source for the Genmai board
++ *
 + * Copyright (C) 2013 Renesas Solutions Corp.
-  *
-  * This file is licensed under the terms of the GNU General Public License
-  * version 2.  This program is licensed "as is" without any warranty of any
-@@ -23,4 +23,35 @@
- 	chosen {
- 		bootargs = "console=ttyS1,115200n81 ignore_loglevel root=/dev/nfs ip=dhcp";
- 	};
++ *
++ * This file is licensed under the terms of the GNU General Public License
++ * version 2.  This program is licensed "as is" without any warranty of any
++ * kind, whether express or implied.
++ */
 +
-+	reg_1p8v: regulator at 0 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "fixed-1.8V";
-+		regulator-min-microvolt = <1800000>;
-+		regulator-max-microvolt = <1800000>;
-+		regulator-always-on;
-+		regulator-boot-on;
++/dts-v1/;
++/include/ "r7s72100.dtsi"
++
++/ {
++	model = "Genmai";
++	compatible = "renesas,genmai", "renesas,r7s72100";
++
++	chosen {
++		bootargs = "console=ttySC2,115200 ignore_loglevel rw root=/dev/nfs ip=dhcp";
 +	};
 +
-+	reg_3p3v: regulator at 1 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "fixed-3.3V";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		regulator-always-on;
-+		regulator-boot-on;
++	memory {
++		device_type = "memory";
++		reg = <0x08000000 0x08000000>;
 +	};
 +
-+	lan9220 at 20000000 {
-+		compatible = "smsc,lan9220", "smsc,lan9115";
-+		reg = <0x20000000 0x10000>;
-+		phy-mode = "mii";
-+		interrupt-parent = <&gpio0>;
-+		interrupts = <1 1>;	/* active high */
-+		reg-io-width = <4>;
-+		smsc,irq-active-high;
-+		smsc,irq-push-pull;
-+		vddvario-supply = <&reg_1p8v>;
-+		vdd33a-supply = <&reg_3p3v>;
++	lbsc {
++		#address-cells = <1>;
++		#size-cells = <1>;
 +	};
- };
++};
+diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
+index 6e7d0a9..6a684ff 100644
+--- a/arch/arm/mach-shmobile/Kconfig
++++ b/arch/arm/mach-shmobile/Kconfig
+@@ -191,6 +191,11 @@ config MACH_BOCKW_REFERENCE
+ 
+ 	   This is intended to aid developers
+ 
++config MACH_GENMAI
++	bool "Genmai board"
++	depends on ARCH_R7S72100
++	select USE_OF
++
+ config MACH_MARZEN
+ 	bool "MARZEN board"
+ 	depends on ARCH_R8A7779
+diff --git a/arch/arm/mach-shmobile/Makefile b/arch/arm/mach-shmobile/Makefile
+index 663f894..b3840ba 100644
+--- a/arch/arm/mach-shmobile/Makefile
++++ b/arch/arm/mach-shmobile/Makefile
+@@ -60,6 +60,7 @@ obj-$(CONFIG_MACH_APE6EVM_REFERENCE)	+= board-ape6evm-reference.o
+ obj-$(CONFIG_MACH_MACKEREL)	+= board-mackerel.o
+ obj-$(CONFIG_MACH_BOCKW)	+= board-bockw.o
+ obj-$(CONFIG_MACH_BOCKW_REFERENCE)	+= board-bockw-reference.o
++obj-$(CONFIG_MACH_GENMAI)	+= board-genmai.o
+ obj-$(CONFIG_MACH_MARZEN)	+= board-marzen.o
+ obj-$(CONFIG_MACH_MARZEN_REFERENCE)	+= board-marzen-reference.o
+ obj-$(CONFIG_MACH_LAGER)	+= board-lager.o
+diff --git a/arch/arm/mach-shmobile/Makefile.boot b/arch/arm/mach-shmobile/Makefile.boot
+index 60e29e6..c690b50 100644
+--- a/arch/arm/mach-shmobile/Makefile.boot
++++ b/arch/arm/mach-shmobile/Makefile.boot
+@@ -6,6 +6,7 @@ loadaddr-$(CONFIG_MACH_ARMADILLO800EVA) += 0x40008000
+ loadaddr-$(CONFIG_MACH_ARMADILLO800EVA_REFERENCE) += 0x40008000
+ loadaddr-$(CONFIG_MACH_BOCKW) += 0x60008000
+ loadaddr-$(CONFIG_MACH_BOCKW_REFERENCE) += 0x60008000
++loadaddr-$(CONFIG_MACH_GENMAI) += 0x8008000
+ loadaddr-$(CONFIG_MACH_KOELSCH) += 0x40008000
+ loadaddr-$(CONFIG_MACH_KZM9D) += 0x40008000
+ loadaddr-$(CONFIG_MACH_KZM9D_REFERENCE) += 0x40008000
+diff --git a/arch/arm/mach-shmobile/board-genmai.c b/arch/arm/mach-shmobile/board-genmai.c
+new file mode 100644
+index 0000000..3e92e3c
+--- /dev/null
++++ b/arch/arm/mach-shmobile/board-genmai.c
+@@ -0,0 +1,43 @@
++/*
++ * Genmai board support
++ *
++ * Copyright (C) 2013  Renesas Solutions Corp.
++ * Copyright (C) 2013  Magnus Damm
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; version 2 of the License.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
++ */
++
++#include <linux/kernel.h>
++#include <linux/platform_device.h>
++#include <mach/common.h>
++#include <mach/r7s72100.h>
++#include <asm/mach-types.h>
++#include <asm/mach/arch.h>
++
++static void __init genmai_add_standard_devices(void)
++{
++	r7s72100_clock_init();
++	r7s72100_add_dt_devices();
++}
++
++static const char * const genmai_boards_compat_dt[] __initconst = {
++	"renesas,genmai",
++	NULL,
++};
++
++DT_MACHINE_START(GENMAI_DT, "genmai")
++	.init_early	= r7s72100_init_early,
++	.init_machine	= genmai_add_standard_devices,
++	.dt_compat	= genmai_boards_compat_dt,
++MACHINE_END
 -- 
 1.8.4
