@@ -1,20 +1,16 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 9 Oct 2013 18:08:19 +0100
-Subject: [GIT PULL] perf updates for 3.13
-Message-ID: <20131009170819.GI8378@mudshark.cambridge.arm.com>
+Date: Wed, 9 Oct 2013 18:13:13 +0100
+Subject: [GIT PULL] prefetch support for 3.13
+Message-ID: <20131009171312.GJ8378@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Russell,
 
-Please pull the following perf updates for 3.13. The most noticeable change
-is adding user unwinding support, which relies on libunwind in the perf tool
-for ARM, but there is also a group validation cleanup following on from
-fixes made in 3.11.
-
-The perf tools maintainers are happy for these changes to go via this route:
-
-  http://lists.infradead.org/pipermail/linux-arm-kernel/2013-October/203077.html
+Please pull the following patches for 3.13. They add support for the pldw
+instruction (prefetch with intent to modify) in ARMv7 SMP cores, which is
+then used to gain a measurable performance boost for particular atomic
+sequences.
 
 Cheers,
 
@@ -28,36 +24,25 @@ The following changes since commit 15c03dd4859ab16f9212238f29dd315654aa94f6:
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git for-rmk/perf
+  git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git for-rmk/prefetch
 
-for you to fetch changes up to 2dfcb802d6bd54a2353678c6434846d94b058f2c:
+for you to fetch changes up to d779c07dd72098a7416d907494f958213b7726f3:
 
-  ARM: perf: fix group validation for mixed software and hardware groups (2013-10-09 14:33:07 +0100)
+  ARM: bitops: prefetch the destination word for write prior to strex (2013-09-30 16:42:56 +0100)
 
 ----------------------------------------------------------------
-Jean Pihet (2):
-      perf tools: Check libunwind for availability of dwarf parsing feature
-      perf: parse the .debug_frame section in case .eh_frame is not present
+Will Deacon (6):
+      ARM: prefetch: remove redundant "cc" clobber
+      ARM: smp_on_up: move inline asm ALT_SMP patching macro out of spinlock.h
+      ARM: prefetch: add support for prefetchw using pldw on SMP ARMv7+ CPUs
+      ARM: locks: prefetch the destination word for write prior to strex
+      ARM: atomics: prefetch the destination word for write prior to strex
+      ARM: bitops: prefetch the destination word for write prior to strex
 
-Will Deacon (3):
-      ARM: perf: add support for perf registers API
-      ARM: perf: wire up perf_regs and unwind support for ARM
-      ARM: perf: fix group validation for mixed software and hardware groups
-
- arch/arm/Kconfig                        |  2 +
- arch/arm/include/uapi/asm/Kbuild        |  1 +
- arch/arm/include/uapi/asm/perf_regs.h   | 23 ++++++++++
- arch/arm/kernel/Makefile                |  1 +
- arch/arm/kernel/perf_event.c            |  3 +-
- arch/arm/kernel/perf_regs.c             | 30 +++++++++++++
- tools/perf/arch/arm/Makefile            |  3 ++
- tools/perf/arch/arm/include/perf_regs.h | 54 ++++++++++++++++++++++++
- tools/perf/arch/arm/util/unwind.c       | 48 +++++++++++++++++++++
- tools/perf/config/Makefile              | 13 ++++--
- tools/perf/config/feature-tests.mak     | 21 ++++++++-
- tools/perf/util/unwind.c                | 75 ++++++++++++++++++++++++++-------
- 12 files changed, 252 insertions(+), 22 deletions(-)
- create mode 100644 arch/arm/include/uapi/asm/perf_regs.h
- create mode 100644 arch/arm/kernel/perf_regs.c
- create mode 100644 tools/perf/arch/arm/include/perf_regs.h
- create mode 100644 tools/perf/arch/arm/util/unwind.c
+ arch/arm/include/asm/atomic.h         |  7 +++++++
+ arch/arm/include/asm/processor.h      | 33 +++++++++++++++++++++++++--------
+ arch/arm/include/asm/spinlock.h       | 28 ++++++++++++++--------------
+ arch/arm/include/asm/spinlock_types.h |  2 +-
+ arch/arm/include/asm/unified.h        |  4 ++++
+ arch/arm/lib/bitops.h                 |  5 +++++
+ 6 files changed, 56 insertions(+), 23 deletions(-)
