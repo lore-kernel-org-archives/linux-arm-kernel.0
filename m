@@ -1,112 +1,93 @@
-From: kim.phillips@linaro.org (Kim Phillips)
-Date: Tue, 8 Oct 2013 20:22:07 -0500
-Subject: [PATCH v2] ARM: tlb: ASID macro should give 32bit result for BE
- correct operation
-In-Reply-To: <5253AFBF.7040002@codethink.co.uk>
-References: <1381160903-1248-1-git-send-email-victor.kamensky@linaro.org>
- <5252DA06.8000303@codethink.co.uk>
- <CAA3XUr2wYFL9WAQd9uAJSKK5KhWF3bPzYbh-3x=B3oLVXk79og@mail.gmail.com>
- <52533A70.5040705@ti.com>
- <20131007195525.f56083f0d91df6a6396cc494@linaro.org>
- <5253AFBF.7040002@codethink.co.uk>
-Message-ID: <20131008202207.8f66d24415079f0cff98ab7d@linaro.org>
+From: gang.chen@asianux.com (Chen Gang)
+Date: Wed, 09 Oct 2013 09:22:25 +0800
+Subject: [PATCH 2/2] ARM: include: asm: use 'int' instead of 'unsigned
+ long' for normal register variables within atomic.h
+In-Reply-To: <5254A0E1.9090703@asianux.com>
+References: <20131002104158.GD28311@mudshark.cambridge.arm.com>
+ <524C3981.20307@asianux.com> <524D416B.5090709@asianux.com>
+ <20131003163200.GE7408@mudshark.cambridge.arm.com>
+ <524E8FBC.2080200@asianux.com>
+ <20131004153742.GR24303@mudshark.cambridge.arm.com>
+ <20131004154208.GS24303@mudshark.cambridge.arm.com>
+ <524F5566.4010204@asianux.com>
+ <20131008103331.GE17148@mudshark.cambridge.arm.com>
+ <5253EC8A.2030305@asianux.com>
+ <20131008174945.GJ21189@mudshark.cambridge.arm.com>
+ <5254A0E1.9090703@asianux.com>
+Message-ID: <5254AFD1.7070006@asianux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 08 Oct 2013 09:09:51 +0200
-Ben Dooks <ben.dooks@codethink.co.uk> wrote:
-
-> On 08/10/13 02:55, Kim Phillips wrote:
-> > On Mon, 7 Oct 2013 18:49:20 -0400
-> > Santosh Shilimkar<santosh.shilimkar@ti.com>  wrote:
-> >
-> >> On Monday 07 October 2013 12:37 PM, Victor Kamensky wrote:
-> >>> On 7 October 2013 08:57, Ben Dooks<ben.dooks@codethink.co.uk>  wrote:
-> >>>> On 07/10/13 17:48, Victor Kamensky wrote:
-> > apologies if this was explained earlier in the thread, but what has
-> > __raw_xxx ->  xxx_relaxed have to do with endianness?  the relaxed
-> > accessor variants allow the compiler to reorder the instruction: it's
-> > got nothing to do with byte swapping the data, no?
-
-[I've since read the thread explaining this, thanks Victor]
-
-> >>> I think above position is consistent with similar discussion on
-> >>> some of BE related threads - changing BSP to support BE mode
-> >>> is BSP owners call.
-> >>>
-> >> Am just wondering a better method than the patch [1] which touches
-> >> many drivers for readl/writel() replacement. Drivers are using
-> >> that as standard based on device driver guide and was thinking
-> >> we should not change that rule to support BE. We definitely need
-> >
-> > I think readl/writel were originally devised for accessing PCI devices
-> > (else why would readl's definition include an __le32_to_cpu byteswap)?
-> > In any case, this makes read/writel incompatible with big endian
-> > devices.
+On 10/09/2013 08:18 AM, Chen Gang wrote:
+> On 10/09/2013 01:49 AM, Will Deacon wrote:
+>> On Tue, Oct 08, 2013 at 12:29:14PM +0100, Chen Gang wrote:
+>>> Hmm... for atomic_set_mask(), "drivers/gpu/drm/i915/i915_irq.c" also
+>>> uses it (it is about Intel Graphics).
+>>
+>> I don't think we care too much about the Intel graphics driver on ARM at the
+>> moment.
+>>
+>>> For some architectures (e.g. frv, mn10300, mr32r, blackfin, and of cause
+>>> s390), still use atomic_[set/clear]_mask().
+>>
+>> We don't care about those either.
+>>
+>>> And they are inline functions in atomic.h, individual kernel modules may
+>>> use them (which source code is not merged into kernel). Can we skip
+>>> these individual modules? (I guess we can, but need think of carefully).
+>>
+>> or those. If somebody starts complaining, then we can add things back.
+>>
 > 
-> Generally, in ARM, the devices stay little endian when the CPU is
-> running big endian, therefore we need this in there.
-
-generally, yes, but with SoC vendors switching to arch ARM, more ARM
-cores will be having to access legacy big endian devices :)
-
-> If we end up having to change all the drivers, then this series
-> is going to become a huge incovenience to everyone and at that
-> point it will probably be better to drop it.
-
-well that depends on the change: a simple search and replace vs. one
-requiring more knowledge of the device, and what you mean by 'all
-drivers' (the devices the arm defconfigs configure are mostly drivers
-for LE devices, at least for the time being).  If we need to transition
-from an old set of accessors to new ones, drivers can be changed
-incrementally, and by their maintainers - we just need to establish a
-standard set of guidelines.
-
-> >> to get the byte swap achieved but probably through some other
-> >> means.
-> >
-> > back when I looked into this, I found in/out_be32() accessors were Power
-> > arch centric, read/writel ARM arch centric, whereas ioread/writebe32
-> > were available in other arches.  See e.g., upstream commit
-> > 0c69fb037a6bb1faf06ea776872da54a6705c154 "mtd: fsl_ifc_nand: use more
-> > portable i/o accessors".
+> OK, thanks. For s390, it need use 'unsigned int' instead of 'unsigned
+> long' (which already acked by related maintainers).
 > 
-> readl and writel should work pretty much everywhere.
-
-well, they currently work unfavourably for big endian devices on
-arch/arm.
-
-> I'm not sure if device drivers /should/ know much about what
-> endian bus or the endian-ness of the peripheral they are managing,
-> especially if we have the case the bus-bus bridge is doing a swap.
+> So at least, we can use "unsigned int" instead of "unsigned long" for
+> our arm64. :-)
 > 
-> Personally, I'd just like to rip out the IO accessors we have at
-> the moment and just replace it with a much more BSD like system
-> where the device struct provides a set of accessor functions. Then
-> if we are on strange busses, or multi-function devices, or the
-> latest in inter-periphreal connect we don't have to keep re-working
-> drivers.
+> I will send related patch for arm64 (also re-send related patch for s390).
 > 
-> It'd even make regmap nicer as it could sit in a layer below any
-> device and would not need and explicit changes for a driver to use
-> it.
 
-yes, some devices can be endianness programmable at runtime - and with
-mixed-endian VMs having direct access to devices, it may be better to
-leave it to a combination of the driver and its bus.
+For arm, we still can do like this (but recommend after the 2 current
+patches applied).
 
-OTOH, the compiler would lose the ability to inline the accessor
-functions for the simple, more popular cases.
+For arm64, related inline assembly code also need be changed  (for
+'bic', 'ldxr' and 'stxr', need use '%w0' instead of '%0', and  '%w3'
+instead of '%3'), and 'tmp' also need be changed to unsigned int.
 
-> >> [1] https://git.linaro.org/gitweb?p=people/victor.kamensky/linux-linaro-tracking-be.git;a=commit;h=9074a67ab082c62545683e5ec909368a23c33655
-> >
-> > if anything, a patch with 'endian fix' in the subject would be
-> > *removing* sparse endianness warnings, not leaving them the same.
+
+Thanks.
+
+> Thanks.
 > 
-> A few warnings are better than a system that does not work.
+>>>>> And also, excuse me, I am not quite familiar with "exclusive monitor",
+>>>>> could you please provide more details about it?
+>>>>
+>>>> You'll need to take a look at the ARM ARM, in particular the section about
+>>>> `Synchronisation and Semaphores'.
+>>>>
+>>>
+>>> Do you mean "ARM ARM" is a book name? (at least, I really need read more
+>>> things to familiar with ARM)
+>>
+>> Yes, the hilariouly titled "ARM Architecture Reference Manual". You can find
+>> it on arm.com, but you have to register:
+>>
+>> ARMv7: https://silver.arm.com/download/download.tm?pv=1299246
+>> ARMv8 (beta): https://silver.arm.com/download/download.tm?pv=1448511
+>>
+> 
+> Thank you very much for your information.
+> 
+>> Enjoy!
+>>
+>> Will
+>>
+>>
+> 
+> Thanks.
+> 
 
-sure, I'm saying let's try and improve the situation for the sake of
-future development - endianness developers using and conforming to
-sparse warnings is an easy way to accomplish that.
 
-Kim
+-- 
+Chen Gang
