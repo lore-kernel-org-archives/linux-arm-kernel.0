@@ -1,50 +1,48 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 9 Oct 2013 11:09:17 +0100
-Subject: [PATCH 3/5] iommu/arm-smmu: Introduce stream ID masking
-In-Reply-To: <52545266.6010400@gmail.com>
-References: <1381224444-27303-1-git-send-email-andreas.herrmann@calxeda.com>
- <1381224444-27303-4-git-send-email-andreas.herrmann@calxeda.com>
- <20131008151007.GD21189@mudshark.cambridge.arm.com>
- <20131008152008.GE2935@alberich> <20131008164021.GH2935@alberich>
- <20131008165920.GG21189@mudshark.cambridge.arm.com>
- <52545266.6010400@gmail.com>
-Message-ID: <20131009100917.GB5985@mudshark.cambridge.arm.com>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Wed, 9 Oct 2013 15:41:56 +0530
+Subject: [PATCH v2 0/5] OMAP: Add DT bindings to specify when devices should
+ not be idled or reset
+Message-ID: <1381313521-10422-1-git-send-email-rnayak@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 08, 2013 at 07:43:50PM +0100, Rob Herring wrote:
-> On 10/08/2013 11:59 AM, Will Deacon wrote:
-> > On Tue, Oct 08, 2013 at 05:40:21PM +0100, Andreas Herrmann wrote:
-> >> On Tue, Oct 08, 2013 at 05:20:08PM +0200, Andreas Herrmann wrote:
-> >> To be more specific: For SATA I'd need to specify 10 StreamIds. This
-> >> would
-> >>
-> >> (1) exceed MAX_MASTER_STREAMIDS (currently it's 8)
-> >>
-> >>    (Can easily be fixed by adapting a macro.)
-> >>
-> >> (2) exceed number of available SMR groups to map the IDs to a context.
-> >>
-> >>    This can be solved by caclulating an appropriate mask for the
-> >>    mapping (but with a non-power-of-two number of StreamIds that's
-> >>    already non-trivial -- for the trivial case I have some code to do
-> >>    this).
-> >>
-> >> Both problems are avoided by introducing this patch -- use
-> >> smr_mask_bits to map all StreamIDs to the same context and be done
-> >> with it. (for the "single-master-SMMU" case)
-> > 
-> > The problem is, this information *really* doesn't belong in the device tree,
-> > but I think computing the general case dynamically is incredibly difficult
-> > too (and requires *complete* topological information in the device-tree, so
-> > you don't accidentally pull in other devices).
-> 
-> Couldn't this information be implied from the DT when you have no
-> streamID and only a single mmu-master?
+Changes in v2:
+* Patches are split in such a way that DT and hwmod changes are kept in
+seperate patches so they can be pulled in by Benoit and Paul seperately.
+* Binding names are slightly updated to address the concern from Tony and Benoit [1]
+* Added a patch [5/5] to prevent GPIO reset on AM335x EVM-SK board, which
+was also the original motivation of this series since the board fails to
+boot from mainline despite support for AM335x and a am335x-evmsk.dts file
+existing in mainline for quite a while.
 
-It's still fairly fragile though, since you (a) don't know that the stream
-IDs of the master are matchable by the SMRs (if we had the stream IDs, we
-can check this) and (b) you can still end up pulling devices into your
-address space that would otherwise happily operate using passthrough.
+We have devices like co-processors, SoC internal busses, memory controllers
+etc which should not be idled or reset. In some cases erratas around IP blocks
+prevent them from either being idled or reset. Have a way to pass this
+information from Device tree, and get rid of similar information that
+exists as part of the omap_hwmod data files for various DT only OMAP SoCs.
 
-Will
+Boot tested on OMAP4 panda es, AM335x EVM and AM335x EVM-SK
+
+[1] http://www.mail-archive.com/linux-omap at vger.kernel.org/msg94349.html
+
+Rajendra Nayak (5):
+  ARM: OMAP2+: hwmod: cleanup HWMOD_INIT_NO_RESET usage
+  ARM: dts: omap: Add new bindings for OMAP
+  ARM: OMAP2+: hwmod: Extract no-idle and no-reset info from DT
+  ARM: OMAP2+: hwmod: Cleanup usage of HWMOD_INIT_NO_RESET and
+    HWMOD_INIT_NO_IDLE
+  ARM: dts: AM335x-evmsk: Do not reset gpio0
+
+ .../devicetree/bindings/arm/omap/omap.txt          |    3 ++-
+ arch/arm/boot/dts/am335x-evmsk.dts                 |    4 ++++
+ arch/arm/boot/dts/am33xx.dtsi                      |    2 ++
+ arch/arm/boot/dts/omap4.dtsi                       |    3 +++
+ arch/arm/boot/dts/omap5.dtsi                       |    2 ++
+ arch/arm/mach-omap2/omap_hwmod.c                   |   23 ++++++++++++++------
+ arch/arm/mach-omap2/omap_hwmod_33xx_data.c         |   22 +++++++++----------
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c         |    6 ++---
+ arch/arm/mach-omap2/omap_hwmod_54xx_data.c         |    4 +---
+ 9 files changed, 43 insertions(+), 26 deletions(-)
+
+-- 
+1.7.9.5
