@@ -1,146 +1,82 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  9 Oct 2013 15:51:34 +0900
-Subject: [PATCH] ARM: shmobile: Genmai defconfig
-In-Reply-To: <cover.1381300141.git.horms+renesas@verge.net.au>
-References: <cover.1381300141.git.horms+renesas@verge.net.au>
-Message-ID: <bb416e1d7416861bece0335f543c590d9af09c79.1381300141.git.horms+renesas@verge.net.au>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 9 Oct 2013 14:52:11 +0800
+Subject: [PATCH] pinctrl: imx: update fsl,pins description in bindings doc
+Message-ID: <1381301531-19212-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm@opensource.se>
+While commit e164153 (pinctrl: imx: move hard-coding data into device
+tree) moves to use DTC macro for imx pinctrl device tree setting, it
+changes the semantics of fsl,pins without updating the bindings doc
+properly.  Let's update the fsl,pins description to stop confusing
+people.
 
-Add a defconfig for the Genmai board. In the future this board will
-use a shared defconfig for multiplatform, but until CCF is implemented
-this will be used.
+While at it, the example in the document is updated, and the stale TODO
+gets removed.
 
-Signed-off-by: Magnus Damm <damm@opensource.se>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 ---
- arch/arm/configs/genmai_defconfig | 116 ++++++++++++++++++++++++++++++++++++++
- 1 file changed, 116 insertions(+)
- create mode 100644 arch/arm/configs/genmai_defconfig
+ .../bindings/pinctrl/fsl,imx-pinctrl.txt           |   37 ++++++++++----------
+ 1 file changed, 18 insertions(+), 19 deletions(-)
 
-diff --git a/arch/arm/configs/genmai_defconfig b/arch/arm/configs/genmai_defconfig
-new file mode 100644
-index 0000000..69b1531
---- /dev/null
-+++ b/arch/arm/configs/genmai_defconfig
-@@ -0,0 +1,116 @@
-+CONFIG_SYSVIPC=y
-+CONFIG_NO_HZ=y
-+CONFIG_IKCONFIG=y
-+CONFIG_IKCONFIG_PROC=y
-+CONFIG_LOG_BUF_SHIFT=16
-+CONFIG_CC_OPTIMIZE_FOR_SIZE=y
-+CONFIG_SYSCTL_SYSCALL=y
-+CONFIG_EMBEDDED=y
-+CONFIG_PERF_EVENTS=y
-+CONFIG_SLAB=y
-+# CONFIG_LBDAF is not set
-+# CONFIG_BLK_DEV_BSG is not set
-+# CONFIG_IOSCHED_DEADLINE is not set
-+# CONFIG_IOSCHED_CFQ is not set
-+CONFIG_ARCH_SHMOBILE=y
-+CONFIG_ARCH_R7S72100=y
-+CONFIG_MACH_GENMAI=y
-+# CONFIG_SH_TIMER_CMT is not set
-+# CONFIG_SH_TIMER_MTU2 is not set
-+# CONFIG_SH_TIMER_TMU is not set
-+# CONFIG_EM_TIMER_STI is not set
-+CONFIG_ARM_ERRATA_430973=y
-+CONFIG_ARM_ERRATA_458693=y
-+CONFIG_ARM_ERRATA_460075=y
-+CONFIG_ARM_ERRATA_743622=y
-+CONFIG_ARM_ERRATA_754322=y
-+CONFIG_AEABI=y
-+# CONFIG_OABI_COMPAT is not set
-+CONFIG_FORCE_MAX_ZONEORDER=13
-+CONFIG_ZBOOT_ROM_TEXT=0x0
-+CONFIG_ZBOOT_ROM_BSS=0x0
-+CONFIG_ARM_APPENDED_DTB=y
-+CONFIG_KEXEC=y
-+CONFIG_AUTO_ZRELADDR=y
-+CONFIG_VFP=y
-+CONFIG_NEON=y
-+# CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
-+CONFIG_PM_RUNTIME=y
-+CONFIG_NET=y
-+CONFIG_PACKET=y
-+CONFIG_UNIX=y
-+CONFIG_INET=y
-+CONFIG_IP_PNP=y
-+CONFIG_IP_PNP_DHCP=y
-+# CONFIG_INET_XFRM_MODE_TRANSPORT is not set
-+# CONFIG_INET_XFRM_MODE_TUNNEL is not set
-+# CONFIG_INET_XFRM_MODE_BEET is not set
-+# CONFIG_INET_LRO is not set
-+# CONFIG_INET_DIAG is not set
-+# CONFIG_IPV6 is not set
-+# CONFIG_WIRELESS is not set
-+CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
-+CONFIG_NETDEVICES=y
-+# CONFIG_NET_CORE is not set
-+# CONFIG_NET_VENDOR_ARC is not set
-+# CONFIG_NET_CADENCE is not set
-+# CONFIG_NET_VENDOR_BROADCOM is not set
-+# CONFIG_NET_VENDOR_CIRRUS is not set
-+# CONFIG_NET_VENDOR_FARADAY is not set
-+# CONFIG_NET_VENDOR_INTEL is not set
-+# CONFIG_NET_VENDOR_MARVELL is not set
-+# CONFIG_NET_VENDOR_MICREL is not set
-+# CONFIG_NET_VENDOR_NATSEMI is not set
-+CONFIG_SH_ETH=y
-+# CONFIG_NET_VENDOR_SEEQ is not set
-+# CONFIG_NET_VENDOR_SMSC is not set
-+# CONFIG_NET_VENDOR_STMICRO is not set
-+# CONFIG_NET_VENDOR_VIA is not set
-+# CONFIG_NET_VENDOR_WIZNET is not set
-+# CONFIG_WLAN is not set
-+# CONFIG_INPUT_MOUSEDEV_PSAUX is not set
-+CONFIG_INPUT_EVDEV=y
-+# CONFIG_KEYBOARD_ATKBD is not set
-+# CONFIG_INPUT_MOUSE is not set
-+# CONFIG_SERIO is not set
-+# CONFIG_LEGACY_PTYS is not set
-+CONFIG_SERIAL_SH_SCI=y
-+CONFIG_SERIAL_SH_SCI_NR_UARTS=10
-+CONFIG_SERIAL_SH_SCI_CONSOLE=y
-+# CONFIG_HW_RANDOM is not set
-+CONFIG_I2C_SH_MOBILE=y
-+# CONFIG_HWMON is not set
-+CONFIG_THERMAL=y
-+CONFIG_RCAR_THERMAL=y
-+CONFIG_REGULATOR=y
-+CONFIG_REGULATOR_FIXED_VOLTAGE=y
-+CONFIG_DRM=y
-+CONFIG_DRM_RCAR_DU=y
-+# CONFIG_USB_SUPPORT is not set
-+CONFIG_MMC=y
-+CONFIG_MMC_SDHI=y
-+CONFIG_MMC_SH_MMCIF=y
-+CONFIG_NEW_LEDS=y
-+CONFIG_LEDS_CLASS=y
-+CONFIG_RTC_CLASS=y
-+CONFIG_DMADEVICES=y
-+CONFIG_SH_DMAE=y
-+# CONFIG_IOMMU_SUPPORT is not set
-+# CONFIG_DNOTIFY is not set
-+CONFIG_MSDOS_FS=y
-+CONFIG_VFAT_FS=y
-+CONFIG_TMPFS=y
-+CONFIG_CONFIGFS_FS=y
-+# CONFIG_MISC_FILESYSTEMS is not set
-+CONFIG_NFS_FS=y
-+CONFIG_NFS_V3_ACL=y
-+CONFIG_NFS_V4=y
-+CONFIG_NFS_V4_1=y
-+CONFIG_ROOT_NFS=y
-+CONFIG_NLS_CODEPAGE_437=y
-+CONFIG_NLS_ISO8859_1=y
-+# CONFIG_ENABLE_WARN_DEPRECATED is not set
-+# CONFIG_ENABLE_MUST_CHECK is not set
-+# CONFIG_ARM_UNWIND is not set
-+# CONFIG_CRYPTO_ANSI_CPRNG is not set
-+# CONFIG_CRYPTO_HW is not set
+diff --git a/Documentation/devicetree/bindings/pinctrl/fsl,imx-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/fsl,imx-pinctrl.txt
+index 3a7caf7..9fde25f 100644
+--- a/Documentation/devicetree/bindings/pinctrl/fsl,imx-pinctrl.txt
++++ b/Documentation/devicetree/bindings/pinctrl/fsl,imx-pinctrl.txt
+@@ -22,11 +22,12 @@ Required properties for iomux controller:
+   Please refer to each fsl,<soc>-pinctrl.txt binding doc for supported SoCs.
+ 
+ Required properties for pin configuration node:
+-- fsl,pins: two integers array, represents a group of pins mux and config
+-  setting. The format is fsl,pins = <PIN_FUNC_ID CONFIG>, PIN_FUNC_ID is a
+-  pin working on a specific function, which consists of a tuple of
+-  <mux_reg conf_reg input_reg mux_val input_val>.  CONFIG is the pad setting
+-  value like pull-up on this pin.
++- fsl,pins: each entry consists of 6 integers and represents the mux and config
++  setting for one pin. The first 5 integers <mux_reg conf_reg input_reg mux_val
++  input_val> are specified using a PIN_FUNC_ID macro, which can be found in
++  imx*-pinfunc.h under device tree source folder. The last integer CONFIG is
++  the pad setting value like pull-up on this pin. And that's why fsl,pins entry
++  looks like <PIN_FUNC_ID CONFIG> in the example below.
+ 
+ Bits used for CONFIG:
+ NO_PAD_CTL(1 << 31): indicate this pin does not need config.
+@@ -72,17 +73,18 @@ iomuxc@020e0000 {
+ 	/* shared pinctrl settings */
+ 	usdhc4 {
+ 		pinctrl_usdhc4_1: usdhc4grp-1 {
+-			fsl,pins = <1386 0x17059	/* MX6Q_PAD_SD4_CMD__USDHC4_CMD */
+-				    1392 0x10059	/* MX6Q_PAD_SD4_CLK__USDHC4_CLK	*/
+-				    1462 0x17059	/* MX6Q_PAD_SD4_DAT0__USDHC4_DAT0 */
+-				    1470 0x17059	/* MX6Q_PAD_SD4_DAT1__USDHC4_DAT1 */
+-				    1478 0x17059	/* MX6Q_PAD_SD4_DAT2__USDHC4_DAT2 */
+-				    1486 0x17059	/* MX6Q_PAD_SD4_DAT3__USDHC4_DAT3 */
+-				    1493 0x17059	/* MX6Q_PAD_SD4_DAT4__USDHC4_DAT4 */
+-				    1501 0x17059	/* MX6Q_PAD_SD4_DAT5__USDHC4_DAT5 */
+-				    1509 0x17059	/* MX6Q_PAD_SD4_DAT6__USDHC4_DAT6 */
+-				    1517 0x17059>;	/* MX6Q_PAD_SD4_DAT7__USDHC4_DAT7 */
+-		};
++			fsl,pins = <
++				MX6QDL_PAD_SD4_CMD__SD4_CMD    0x17059
++				MX6QDL_PAD_SD4_CLK__SD4_CLK    0x10059
++				MX6QDL_PAD_SD4_DAT0__SD4_DATA0 0x17059
++				MX6QDL_PAD_SD4_DAT1__SD4_DATA1 0x17059
++				MX6QDL_PAD_SD4_DAT2__SD4_DATA2 0x17059
++				MX6QDL_PAD_SD4_DAT3__SD4_DATA3 0x17059
++				MX6QDL_PAD_SD4_DAT4__SD4_DATA4 0x17059
++				MX6QDL_PAD_SD4_DAT5__SD4_DATA5 0x17059
++				MX6QDL_PAD_SD4_DAT6__SD4_DATA6 0x17059
++				MX6QDL_PAD_SD4_DAT7__SD4_DATA7 0x17059
++			>;
+ 	};
+ 	....
+ };
+@@ -90,6 +92,3 @@ Refer to the IOMUXC controller chapter in imx6q datasheet,
+ 0x17059 means enable hysteresis, 47KOhm Pull Up, 50Mhz speed,
+ 80Ohm driver strength and Fast Slew Rate.
+ User should refer to each SoC spec to set the correct value.
+-
+-TODO: when dtc macro support is available, we can change above raw data
+-to dt macro which can get better readability in dts file.
 -- 
-1.8.4
+1.7.9.5
