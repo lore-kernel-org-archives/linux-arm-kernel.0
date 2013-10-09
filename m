@@ -1,57 +1,55 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Wed, 9 Oct 2013 13:59:46 +0900
-Subject: [PATCH v2 3/3] ARM: shmobile: kzm9d: Use common clock framework
-In-Reply-To: <20131009034057.GO15065@verge.net.au>
-References: <20131008143040.52f36df8edb7ab63224d8433@ops.dti.ne.jp>
- <20131008143403.c11f294c8a1701a2ab3bc5fd@ops.dti.ne.jp>
- <20131009034057.GO15065@verge.net.au>
-Message-ID: <CANqRtoQs+31mv0ZULOd3SGshkBkvp-kGoaVOSb10+Ncdp+WNXw@mail.gmail.com>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Wed, 9 Oct 2013 13:03:17 +0800
+Subject: [PATCH 3/6] pinctrl: single: Prepare for supporting SoC specific
+ features
+In-Reply-To: <CACRpkdbx+vJEqz3KQ0EHGt0axRB4JeJh3FF4e+7snbR0HoqKRg@mail.gmail.com>
+References: <20131003054104.8941.88857.stgit@localhost>
+ <20131003054218.8941.19273.stgit@localhost>
+ <20131007173531.GX8949@atomide.com>
+ <CACRpkdbx+vJEqz3KQ0EHGt0axRB4JeJh3FF4e+7snbR0HoqKRg@mail.gmail.com>
+Message-ID: <CAN1soZwXn5SSgTFQ11PJGK19ZQ==uKcPCF2COpEE_eiMAM13uw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
-
-On Wed, Oct 9, 2013 at 12:40 PM, Simon Horman <horms@verge.net.au> wrote:
-> On Tue, Oct 08, 2013 at 02:34:03PM +0900, takasi-y at ops.dti.ne.jp wrote:
->> Use common clock framework version of clock
->>  drivers/clk/shmobile/clk-emev2.c
->> instead of sh-clkfwk version
->>  arch/arm/mach-shmobile/clock-emev2.c
->> when it is configured as a part of multi-platform.
+On Tue, Oct 8, 2013 at 7:55 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> On Mon, Oct 7, 2013 at 7:35 PM, Tony Lindgren <tony@atomide.com> wrote:
+>
+>> Hi Linus W,
 >>
->> Signed-off-by: Takashi Yoshii <takasi-y@ops.dti.ne.jp>
+>> Any comments on the pinctrl patches 3 - 5 in this series?
 >
-> Thanks.
+> I have no problems with this patch #3, as it is just changing syntax,
+> not semantics.
 >
-> I plan to add this patch to a new topic branch,
-> topic/emev2-common-clock, in the renesas tree and
-> queue it up from there for inclusion in mainline
-> if/when the first patch of this series is accepted
-> by Mike Turquette.
+> The problems start with patch #4.
+>
+> I am tormented with mixed feelings about this, because from one point of
+> view I feel it is breaking the promise of pinctrl-single being a
+> driver for platforms
+> where a pin is controlled by a *single* register.
+>
+> If this was pinctrl-foo.c I would not have been so much bothered,
+> but now it is something that was supposed to be self-contained and
+> simple, pertaining to a single register, starting to look like something
+> else.
+>
+> This is a bit like: "oh yeah just one register controls the pins, but under
+> some circumstances I also want to mess with this register over here,
+> and then this register over there ..." etc.
+>
+> I'd like Haojian to ACK this to proceed since he's also using this driver
+> now. Then I feel better on continuing down this road ...
+>
+> Then I have a lesser comment on patch #4 since it makes it possible
+> for this pin controller to support wake-up interrupt, as I don't see how
+> this plays out with front-end GPIO controllers, but let's discuss that
+> in the context of that patch.
+>
+> Yours,
+> Linus Walleij
+>
 
-Thanks for picking up patches, Simon.
+I'm OK on both #3 & #4. So Acked-by: Haojian Zhuang <haojian.zhuang@gmail.com>
 
-I think you can simply merge this patch after the following series:
-
-[PATCH 00/05] ARM: shmobile: KZM9D Multiplatform update
-
-There are no build time dependencies on patch 1 and 2 so this patch
-can be merged independently. Regarding run-time operation, the
-multiplatform series above makes KZM9D DT reference only build for
-multiplatform, and in such case CCF is required.
-
-So if you want to keep KZM9D DT reference working until Mike Turquette
-accepts the CCF bits, then I recommend you to wait with "[PATCH 00/05]
-ARM: shmobile: KZM9D Multiplatform update" until all EMEV2 CCF bits
-have been merged.
-
-Another way is to merge "[PATCH 00/05] ARM: shmobile: KZM9D
-Multiplatform update" before the EMEV2 CCF bits, but if so you may as
-well merge this patch as well IMO. This
-multiplatform-update-series-merge-before-CCF plan will result in
-untestable KZM9D DT reference until EMEV2 CCF is merged. Either way is
-fine with me.
-
-Cheers,
-
-/ magnus
+Regards
+Haojian
