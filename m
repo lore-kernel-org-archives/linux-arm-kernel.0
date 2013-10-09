@@ -1,69 +1,31 @@
 From: nm@ti.com (Nishanth Menon)
-Date: Wed, 9 Oct 2013 18:30:03 -0500
-Subject: [PATCH V6 03/15] ARM: OMAP2+: AM43XX: add lateinit hook for calling
- pm late init
-In-Reply-To: <1381361414-8851-1-git-send-email-nm@ti.com>
+Date: Wed, 9 Oct 2013 18:31:44 -0500
+Subject: [PATCH V6 00/15] ARM: OMAP3+: support cpufreq-cpu0 for device
+ tree boot
+In-Reply-To: <1381354144-7134-1-git-send-email-nm@ti.com>
 References: <1381354144-7134-1-git-send-email-nm@ti.com>
- <1381361414-8851-1-git-send-email-nm@ti.com>
-Message-ID: <1381361414-8851-2-git-send-email-nm@ti.com>
+Message-ID: <5255E760.8010104@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Call OMAP2+ generic lateinit hook from AM43x specific late init hook.
-This allows the generic late initializations such as cpufreq hooks
-to be active.
+On 10/09/2013 04:28 PM, Nishanth Menon wrote:
+> Hi,
+> 
+> The series is based on Tero's V8 of patches[1] - enables the use of
+> cpufreq-cpu0 generic driver for all OMAP and related derivatives.
+> 
+> I will stop copy pasting the series complete history and point at [2].
+> 
+> Main changes since V5:
+> - no more clock driver as part of this series[3] - instead depend on clock
+>   conversion[1].
+> - added DRA7/OMAP5
+> 
 
-Cc: Benoit Cousson <bcousson@baylibre.com>
-Cc: Kevin Hilman <khilman@deeprootsystems.com>
-Cc: Paul Walmsley <paul@pwsan.com>
-Cc: Tony Lindgren <tony@atomide.com>
-Signed-off-by: Nishanth Menon <nm@ti.com>
----
- arch/arm/mach-omap2/board-generic.c |    1 +
- arch/arm/mach-omap2/common.h        |    1 +
- arch/arm/mach-omap2/io.c            |    6 ++++++
- 3 files changed, 8 insertions(+)
+I am having all kind of problems with my git mail setup atm -
+apologies if any patches have arrived twice/in weird sequence :(
 
-diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
-index b474498..d4371c7 100644
---- a/arch/arm/mach-omap2/board-generic.c
-+++ b/arch/arm/mach-omap2/board-generic.c
-@@ -235,6 +235,7 @@ static const char *am43_boards_compat[] __initdata = {
- DT_MACHINE_START(AM43_DT, "Generic AM43 (Flattened Device Tree)")
- 	.map_io		= am33xx_map_io,
- 	.init_early	= am43xx_init_early,
-+	.init_late	= am43xx_init_late,
- 	.init_irq	= omap_gic_of_init,
- 	.init_machine	= omap_generic_init,
- 	.init_time	= omap3_sync32k_timer_init,
-diff --git a/arch/arm/mach-omap2/common.h b/arch/arm/mach-omap2/common.h
-index 049c58d..09f6736 100644
---- a/arch/arm/mach-omap2/common.h
-+++ b/arch/arm/mach-omap2/common.h
-@@ -98,6 +98,7 @@ void am35xx_init_early(void);
- void ti81xx_init_early(void);
- void am33xx_init_early(void);
- void am43xx_init_early(void);
-+void am43xx_init_late(void);
- void omap4430_init_early(void);
- void omap5_init_early(void);
- void omap3_init_late(void);	/* Do not use this one */
-diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
-index 38678bf..300eac0 100644
---- a/arch/arm/mach-omap2/io.c
-+++ b/arch/arm/mach-omap2/io.c
-@@ -613,6 +613,12 @@ void __init am43xx_init_early(void)
- 	omap2_set_globals_cm(AM33XX_L4_WK_IO_ADDRESS(AM43XX_PRCM_BASE), NULL);
- 	omap3xxx_check_revision();
- }
-+
-+void __init am43xx_init_late(void)
-+{
-+	omap2_common_pm_late_init();
-+}
-+
- #endif
- 
- #ifdef CONFIG_ARCH_OMAP4
+
 -- 
-1.7.9.5
+Regards,
+Nishanth Menon
