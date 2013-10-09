@@ -1,49 +1,138 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Wed, 9 Oct 2013 11:32:13 -0400 (EDT)
-Subject: [RFC PATCH 1/4] ARM: Allow assembler.h to be used with inline asm
-In-Reply-To: <20131009150054.GB2306@localhost.localdomain>
-References: <1381328993-12724-1-git-send-email-Dave.Martin@arm.com>
- <1381328993-12724-2-git-send-email-Dave.Martin@arm.com>
- <20131009144211.GJ25034@n2100.arm.linux.org.uk>
- <20131009150054.GB2306@localhost.localdomain>
-Message-ID: <alpine.LFD.2.03.1310091124120.3023@syhkavp.arg>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Wed, 9 Oct 2013 18:30:36 +0300
+Subject: [PATCHv8 05/36] clk: ti: add support for TI fixed factor clock
+In-Reply-To: <1381332668-962-1-git-send-email-t-kristo@ti.com>
+References: <1381332668-962-1-git-send-email-t-kristo@ti.com>
+Message-ID: <1381332668-962-6-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 9 Oct 2013, Dave Martin wrote:
+This behaves exactly in similar manner to basic fixed-factor-clock, but
+adds a few properties on top for handling clock hardware autoidling.
 
-> On Wed, Oct 09, 2013 at 03:42:11PM +0100, Russell King - ARM Linux wrote:
-> > On Wed, Oct 09, 2013 at 03:29:50PM +0100, Dave Martin wrote:
-> > > There are a few things in assembler.h that would be useful with
-> > > inline asm, but currently assembler.h refuses to be included into C
-> > > files.
-> > > 
-> > > In particular, the optional feature macros (PLD() and friends) can
-> > > be used sensibly with inline asm, with a string argument.
-> > > 
-> > > This patch enables the relevant parts of aassembler.h to be
-> > > included in C files and used in inline asm.
-> > > 
-> > > Since assembler.h by definition can't be included in any C file up
-> > > to now, this should not introduce any namespace clashes.
-> > 
-> > I think it would be better to move the two macros (PLD and CALGN) out of
-> > this file, rather than covering almost the entire file with this #ifdef.
-> 
-> Certainly we could do that.  When I started this hack, I though that a
-> larger proportion of the file would be relevant...
-> 
-> Any thoughts on a sensible name?  asm/asm-common.h, maybe?
+Signed-off-by: Tero Kristo <t-kristo@ti.com>
+Tested-by: Nishanth Menon <nm@ti.com>
+Acked-by: Tony Lindgren <tony@atomide.com>
+---
+ .../bindings/clock/ti/fixed-factor-clock.txt       |   29 +++++++++
+ drivers/clk/ti/Makefile                            |    3 +-
+ drivers/clk/ti/fixed-factor.c                      |   62 ++++++++++++++++++++
+ 3 files changed, 93 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/clock/ti/fixed-factor-clock.txt
+ create mode 100644 drivers/clk/ti/fixed-factor.c
 
-Since there is no need for CALGN() or PLD() in C code yet, maybe it is 
-best to leave them where they are for the time being.
-
-And then adding __asm_swab32() to opcodes.h feels quite natural with the 
-purpose of that file's content.  Then including that fine to solve the 
-CCI code endianness should be fine.
-
-If anything, maybe it is the name opcodes.h which is misrepresenting the 
-scope of its content.
-
-
-Nicolas
+diff --git a/Documentation/devicetree/bindings/clock/ti/fixed-factor-clock.txt b/Documentation/devicetree/bindings/clock/ti/fixed-factor-clock.txt
+new file mode 100644
+index 0000000..beb77d1
+--- /dev/null
++++ b/Documentation/devicetree/bindings/clock/ti/fixed-factor-clock.txt
+@@ -0,0 +1,29 @@
++Binding for TI fixed factor rate clock sources.
++
++Binding status: Unstable - ABI compatibility may be broken in the future
++
++This binding uses the common clock binding[1].
++
++[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
++
++Required properties:
++- compatible : shall be "ti,fixed-factor-clock".
++- #clock-cells : from common clock binding; shall be set to 0.
++- ti,clock-div: fixed divider.
++- ti,clock-mult: fixed multiplier.
++- clocks: parent clock.
++
++Optional properties:
++- ti,autoidle-shift: bit shift of the autoidle enable bit for the clock
++- reg: base address for the autoidle register of this clock
++- ti,autoidle-low: autoidle is enabled by setting the bit to 0
++- ti,set-rate-parent: clk_set_rate is propagated to parent
++
++Example:
++	clock {
++		compatible = "ti,fixed-factor-clock";
++		clocks = <&parentclk>;
++		#clock-cells = <0>;
++		ti,clock-div = <2>;
++		ti,clock-mult = <1>;
++	};
+diff --git a/drivers/clk/ti/Makefile b/drivers/clk/ti/Makefile
+index 72a410b..a9b986a 100644
+--- a/drivers/clk/ti/Makefile
++++ b/drivers/clk/ti/Makefile
+@@ -1,3 +1,4 @@
+ ifneq ($(CONFIG_OF),)
+-obj-y					+= clk.o dpll.o autoidle.o divider.o
++obj-y					+= clk.o dpll.o autoidle.o divider.o \
++					   fixed-factor.o
+ endif
+diff --git a/drivers/clk/ti/fixed-factor.c b/drivers/clk/ti/fixed-factor.c
+new file mode 100644
+index 0000000..c3814ae
+--- /dev/null
++++ b/drivers/clk/ti/fixed-factor.c
+@@ -0,0 +1,62 @@
++/*
++ * TI Fixed Factor Clock
++ *
++ * Copyright (C) 2013 Texas Instruments, Inc.
++ *
++ * Tero Kristo <t-kristo@ti.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed "as is" WITHOUT ANY WARRANTY of any
++ * kind, whether express or implied; without even the implied warranty
++ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include <linux/clk-provider.h>
++#include <linux/slab.h>
++#include <linux/err.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
++#include <linux/clk/ti.h>
++
++/**
++ * of_ti_fixed_factor_clk_setup() - Setup function for TI fixed factor clock
++ */
++static void __init of_ti_fixed_factor_clk_setup(struct device_node *node)
++{
++	struct clk *clk;
++	const char *clk_name = node->name;
++	const char *parent_name;
++	u32 div, mult;
++	u32 flags = 0;
++
++	if (of_property_read_u32(node, "ti,clock-div", &div)) {
++		pr_err("%s Fixed factor clock <%s> must have a clock-div property\n",
++		       __func__, node->name);
++		return;
++	}
++
++	if (of_property_read_u32(node, "ti,clock-mult", &mult)) {
++		pr_err("%s Fixed factor clock <%s> must have a clokc-mult property\n",
++		       __func__, node->name);
++		return;
++	}
++
++	if (of_property_read_bool(node, "ti,set-rate-parent"))
++		flags |= CLK_SET_RATE_PARENT;
++
++	parent_name = of_clk_get_parent_name(node, 0);
++
++	clk = clk_register_fixed_factor(NULL, clk_name, parent_name, flags,
++					mult, div);
++
++	if (!IS_ERR(clk)) {
++		of_clk_add_provider(node, of_clk_src_simple_get, clk);
++		of_ti_autoidle_setup(node);
++	}
++}
++CLK_OF_DECLARE(ti_fixed_factor_clk, "ti,fixed-factor-clock",
++	       of_ti_fixed_factor_clk_setup);
+-- 
+1.7.9.5
