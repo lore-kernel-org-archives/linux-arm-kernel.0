@@ -1,62 +1,47 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 9 Oct 2013 12:46:59 +0200
-Subject: [PATCH] arm, kbuild: make "make install" not depend on vmlinux
-In-Reply-To: <52552FBA.7040806@suse.cz>
-References: <CA+55aFxtvT3Yvbxe5JGBThZS13payymFJ7jCLyEiE2iNDvsZtQ@mail.gmail.com>
- <20130711135445.GA21500@sepie.suse.cz>
- <CA+55aFyVjugxM7cUDWi0ASWttYthCxa6e7X3CADknBcSFxWgew@mail.gmail.com>
- <20130712105721.GF8731@rric.localhost>
- <20130717160506.GI8731@rric.localhost>
- <CA+55aFx4G5gME3ByqE0Wr-_t2x_6WkP3Ta4k1z4jfW+PrcK0og@mail.gmail.com>
- <20130717165743.GK8731@rric.localhost>
- <CA+55aFzhmV7iq+Pv37trMCmdNzk53ORAoj0a6rV14fzKta3Dhw@mail.gmail.com>
- <51E7B3D0.4060609@suse.cz> <20130930084945.GA1963@rric.localhost>
- <20130930163139.GA12450@free.fr>
- <CAMuHMdW-YWGgZjR9ow6FMW7BrOorbbVAEm9sYsVvPkfg-_=jag@mail.gmail.com>
- <52552FBA.7040806@suse.cz>
-Message-ID: <CAMuHMdXwdYACK_yvH3=OrO+MWkvOXQCzZ6f35hNq-k-7gieFLQ@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 9 Oct 2013 11:48:59 +0100
+Subject: [PATCH v2 2/2] ARM: include: asm: use 'int' instead of 'unsigned
+ long' for 'oldval' in atomic_cmpxchg().
+In-Reply-To: <5253E583.5020805@asianux.com>
+References: <524E8FBC.2080200@asianux.com>
+ <20131004153742.GR24303@mudshark.cambridge.arm.com>
+ <20131004154208.GS24303@mudshark.cambridge.arm.com>
+ <524F5566.4010204@asianux.com> <524F594B.1070106@asianux.com>
+ <525385A4.5050200@asianux.com>
+ <20131008103455.GF17148@mudshark.cambridge.arm.com>
+ <5253E4F3.4090205@asianux.com> <5253E533.4070803@asianux.com>
+ <5253E583.5020805@asianux.com>
+Message-ID: <20131009104858.GB6564@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 9, 2013 at 12:28 PM, Michal Marek <mmarek@suse.cz> wrote:
-> On 9.10.2013 09:18, Geert Uytterhoeven wrote:
->> Sorry for chiming in that late, but I didn't think of this when reading the
->> original submission.
->>
->> Just doing "make oldconfig; make install" used to work.
->
-> On ARM and maybe other architectures.
+On Tue, Oct 08, 2013 at 11:59:15AM +0100, Chen Gang wrote:
+> For atomic_cmpxchg(), the type of 'oldval' need be 'int' to match the
+> type of "*ptr" (used by 'ldrex' instruction) and 'old' (used by 'teq'
+> instruction).
+> 
+> Signed-off-by: Chen Gang <gang.chen@asianux.com>
+> ---
+>  arch/arm/include/asm/atomic.h |    3 ++-
+>  1 files changed, 2 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/atomic.h b/arch/arm/include/asm/atomic.h
+> index a715ac0..9ee7e01 100644
+> --- a/arch/arm/include/asm/atomic.h
+> +++ b/arch/arm/include/asm/atomic.h
+> @@ -114,7 +114,8 @@ static inline int atomic_sub_return(int i, atomic_t *v)
+>  
+>  static inline int atomic_cmpxchg(atomic_t *ptr, int old, int new)
+>  {
+> -	unsigned long oldval, res;
+> +	int oldval;
+> +	unsigned long res;
+>  
+>  	smp_mb();
 
-Until 2009 it also worked on x86 ;-)
+As discussed, this is completely cosmetic, but does at least keep the file
+consistent.
 
->> Removing the dependency of "make vmlinux" on vmlinux breaks this, doesn't it?
->
->> Not that I'm strongly attached to it, but there may be other users...
->
-> We can't eat the cake and have it :). What can be done is to make
+  Reviewed-by: Will Deacon <will.deacon@arm.com>
 
-Sure.
-
-> arch/arm/boot/install.sh print a friendlier error message, like the x86
-> version does:
->
-> if [ ! -f "$1" ]; then
->         echo ""                                                   1>&2
->         echo " *** Missing file: $1"                              1>&2
->         echo ' *** You need to run "make" before "make install".' 1>&2
->         echo ""                                                   1>&2
->         exit 1
-> fi
-
-Definitely!
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Will
