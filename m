@@ -1,82 +1,79 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Wed, 9 Oct 2013 10:10:56 +0300
-Subject: [PATCH v2 5/6] Revert "ARM: OMAP2+: Provide alias to USB PHY
- clock"
-In-Reply-To: <1381226799-29158-6-git-send-email-rogerq@ti.com>
-References: <1381226799-29158-1-git-send-email-rogerq@ti.com>
- <1381226799-29158-6-git-send-email-rogerq@ti.com>
-Message-ID: <52550180.1000506@ti.com>
+From: afzal@ti.com (Afzal Mohammed)
+Date: Wed, 9 Oct 2013 12:42:33 +0530
+Subject: [PATCH v2] ARM: OMAP2+: wakeupgen: AM43x adaptation
+Message-ID: <1381302753-7045-1-git-send-email-afzal@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+AM43x has 224 interrupts and 7 banks, make it as maximum values. Keep
+default values as earlier, if am43x is detected, update interrupts and
+banks accordingly.
 
-On 10/08/2013 01:06 PM, Roger Quadros wrote:
-> This reverts commit 741532c4a995be11815cb72d4d7a48f442a22fea.
-> 
-> The proper clock reference is provided in device tree so we
-> no longer need this.
+Also AM43x has only one cpu, ensure that clearing bitmask at wakeupgen
+is done only for the single existing cpu, existing code assumes that
+there are two cpu's.
 
-Could you please Ack this one? I think it is best if it goes through Benoit's tree.
+If bitmask is cleared in wakeupgen for the nonexistent second cpu,
+an imprecise abort happens as soon as Kernel switches to user space.
+It was rootcaused by Sekhar Nori <nsekhar@ti.com>.
 
-cheers,
--roger
+Signed-off-by: Afzal Mohammed <afzal@ti.com>
+---
 
-> 
-> Signed-off-by: Roger Quadros <rogerq@ti.com>
-> ---
->  arch/arm/mach-omap2/board-generic.c |   23 +----------------------
->  1 files changed, 1 insertions(+), 22 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
-> index cd85b36..da4e9b2 100644
-> --- a/arch/arm/mach-omap2/board-generic.c
-> +++ b/arch/arm/mach-omap2/board-generic.c
-> @@ -15,7 +15,6 @@
->  #include <linux/of_irq.h>
->  #include <linux/of_platform.h>
->  #include <linux/irqdomain.h>
-> -#include <linux/clk.h>
->  
->  #include <asm/mach/arch.h>
->  
-> @@ -36,21 +35,6 @@ static struct of_device_id omap_dt_match_table[] __initdata = {
->  	{ }
->  };
->  
-> -/*
-> - * Create alias for USB host PHY clock.
-> - * Remove this when clock phandle can be provided via DT
-> - */
-> -static void __init legacy_init_ehci_clk(char *clkname)
-> -{
-> -	int ret;
-> -
-> -	ret = clk_add_alias("main_clk", NULL, clkname, NULL);
-> -	if (ret) {
-> -		pr_err("%s:Failed to add main_clk alias to %s :%d\n",
-> -						__func__, clkname, ret);
-> -	}
-> -}
-> -
->  static void __init omap_generic_init(void)
->  {
->  	omap_sdrc_init(NULL, NULL);
-> @@ -61,15 +45,10 @@ static void __init omap_generic_init(void)
->  	 * HACK: call display setup code for selected boards to enable omapdss.
->  	 * This will be removed when omapdss supports DT.
->  	 */
-> -	if (of_machine_is_compatible("ti,omap4-panda")) {
-> +	if (of_machine_is_compatible("ti,omap4-panda"))
->  		omap4_panda_display_init_of();
-> -		legacy_init_ehci_clk("auxclk3_ck");
-> -
-> -	}
->  	else if (of_machine_is_compatible("ti,omap4-sdp"))
->  		omap_4430sdp_display_init_of();
-> -	else if (of_machine_is_compatible("ti,omap5-uevm"))
-> -		legacy_init_ehci_clk("auxclk1_ck");
->  }
->  
->  #ifdef CONFIG_SOC_OMAP2420
-> 
+v2:
+1. make AM43x adaptation such that changes required for new SoC addition is less
+2. avoid usage of am43x local variable, use soc_is_am43xx() instead
+
+ arch/arm/mach-omap2/omap-wakeupgen.c | 18 +++++++++++++-----
+ 1 file changed, 13 insertions(+), 5 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/omap-wakeupgen.c b/arch/arm/mach-omap2/omap-wakeupgen.c
+index 813c615..3664562 100644
+--- a/arch/arm/mach-omap2/omap-wakeupgen.c
++++ b/arch/arm/mach-omap2/omap-wakeupgen.c
+@@ -33,8 +33,12 @@
+ #include "omap4-sar-layout.h"
+ #include "common.h"
+ 
+-#define MAX_NR_REG_BANKS	5
+-#define MAX_IRQS		160
++#define AM43XX_NR_REG_BANKS	7
++#define AM43XX_IRQS		224
++#define MAX_NR_REG_BANKS	AM43XX_NR_REG_BANKS
++#define MAX_IRQS		AM43XX_IRQS
++#define DEFAULT_NR_REG_BANKS	5
++#define DEFAULT_IRQS		160
+ #define WKG_MASK_ALL		0x00000000
+ #define WKG_UNMASK_ALL		0xffffffff
+ #define CPU_ENA_OFFSET		0x400
+@@ -47,8 +51,8 @@ static void __iomem *wakeupgen_base;
+ static void __iomem *sar_base;
+ static DEFINE_RAW_SPINLOCK(wakeupgen_lock);
+ static unsigned int irq_target_cpu[MAX_IRQS];
+-static unsigned int irq_banks = MAX_NR_REG_BANKS;
+-static unsigned int max_irqs = MAX_IRQS;
++static unsigned int irq_banks = DEFAULT_NR_REG_BANKS;
++static unsigned int max_irqs = DEFAULT_IRQS;
+ static unsigned int omap_secure_apis;
+ 
+ /*
+@@ -418,12 +422,16 @@ int __init omap_wakeupgen_init(void)
+ 		irq_banks = OMAP4_NR_BANKS;
+ 		max_irqs = OMAP4_NR_IRQS;
+ 		omap_secure_apis = 1;
++	} else if (soc_is_am43xx()) {
++		irq_banks = AM43XX_NR_REG_BANKS;
++		max_irqs = AM43XX_IRQS;
+ 	}
+ 
+ 	/* Clear all IRQ bitmasks at wakeupGen level */
+ 	for (i = 0; i < irq_banks; i++) {
+ 		wakeupgen_writel(0, i, CPU0_ID);
+-		wakeupgen_writel(0, i, CPU1_ID);
++		if (!soc_is_am43xx())
++			wakeupgen_writel(0, i, CPU1_ID);
+ 	}
+ 
+ 	/*
+-- 
+1.8.3.4
