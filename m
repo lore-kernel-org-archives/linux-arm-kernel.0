@@ -1,56 +1,48 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 9 Oct 2013 15:14:28 +0200
-Subject: [PATCH 6/6] ARM: at91/dt: remove old main clk definition from
- sama5d3xcm.dtsi
-In-Reply-To: <1375957837-11600-1-git-send-email-b.brezillon@overkiz.com>
-References: <1375951572-10829-1-git-send-email-b.brezillon@overkiz.com>
- <1375957837-11600-1-git-send-email-b.brezillon@overkiz.com>
-Message-ID: <525556B4.4020809@atmel.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Wed, 9 Oct 2013 08:14:40 -0500
+Subject: [PATCH v2 1/2] ARM: dts: dra7-evm: Add mmc1 node for micro-sd
+ support
+In-Reply-To: <1381163104-6318-1-git-send-email-balajitk@ti.com>
+References: <1381163104-6318-1-git-send-email-balajitk@ti.com>
+Message-ID: <525556C0.1060100@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/08/2013 12:30, Boris BREZILLON :
-> This patch removes the old main clk node which is now useless as sama5d3
-> SoCs and boards are no longer compatible with the old at91 clk
-> implementations.
->
-> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
-
-As said earlier, removal of old clock definitions is needed in this 
-patch. You can even squash all this cleanup stuff in a single patch to 
-remove all old material.
-
-otherwise:
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-
+On 10/07/2013 11:25 AM, Balaji T K wrote:
+> Add mmc1 dt node to dra7-evm board.
+> Input for ldo1 regulator is controlled by gpio 5 of pcf8575 chip (0x21)
+> on i2c1 bus. When dt support for gpio-pcf857x is available, input supply
+> will be modelled as cascaded regulator.
+> 
+> Signed-off-by: Balaji T K <balajitk@ti.com>
 > ---
->   arch/arm/boot/dts/sama5d3xcm.dtsi |   11 -----------
->   1 file changed, 11 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/sama5d3xcm.dtsi b/arch/arm/boot/dts/sama5d3xcm.dtsi
-> index f19d5bf..81c3957 100644
-> --- a/arch/arm/boot/dts/sama5d3xcm.dtsi
-> +++ b/arch/arm/boot/dts/sama5d3xcm.dtsi
-> @@ -18,17 +18,6 @@
->   		reg = <0x20000000 0x20000000>;
->   	};
->
-> -	clocks {
-> -		#address-cells = <1>;
-> -		#size-cells = <1>;
-> -		ranges;
-> -
-> -		main_clock: clock at 0 {
-> -			compatible = "atmel,osc", "fixed-clock";
-> -			clock-frequency = <12000000>;
-> -		};
-> -	};
-> -
->   	ahb {
->   		apb {
->   			spi0: spi at f0004000 {
->
+> Rebase to for_3.13/dts
+> 
+>  arch/arm/boot/dts/dra7-evm.dts |    6 ++++++
+>  1 files changed, 6 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/dra7-evm.dts b/arch/arm/boot/dts/dra7-evm.dts
+> index fbbe406..65cd15a 100644
+> --- a/arch/arm/boot/dts/dra7-evm.dts
+> +++ b/arch/arm/boot/dts/dra7-evm.dts
+> @@ -250,3 +250,9 @@
+>  	pinctrl-names = "default";
+>  	pinctrl-0 = <&uart3_pins>;
+>  };
+> +
+> +&mmc1 {
+> +	status = "okay";
+> +	vmmc-supply = <&ldo1_reg>;
+> +	bus-width = <4>;
+> +};
+> 
+boot tested on DRA7-EVM
+voltage rail is correct based on schematics(rev d1) too
+(LDO1->MMC1_3V3->SDcard).
 
+Reviewed-by: Nishanth Menon <nm@ti.com>
+Tested-by: Nishanth Menon <nm@ti.com>
 
 -- 
-Nicolas Ferre
+Regards,
+Nishanth Menon
