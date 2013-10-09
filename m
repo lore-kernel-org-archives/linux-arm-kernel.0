@@ -1,136 +1,115 @@
-From: anup@brainfault.org (Anup Patel)
-Date: Wed, 9 Oct 2013 20:47:36 +0530
-Subject: [PATCH 1/2] ARM: KVM: Yield CPU when vcpu executes a WFE
-In-Reply-To: <CAAhSdy3n24qDC1v7NTHFtJ2wN2A=ssFWAKEvG1P-n1hndOK71g@mail.gmail.com>
-References: <1381160430-11790-1-git-send-email-marc.zyngier@arm.com>
- <1381160430-11790-2-git-send-email-marc.zyngier@arm.com>
- <52F72A87-9CC3-4B38-ACDA-F5EA66FA7375@suse.de>
- <5252DE5E.6060700@arm.com>
- <1BCAA4EA-CD0A-4E2A-9D22-5B9BD98F2ECD@suse.de>
- <20131007165352.GC9127@redhat.com>
- <169A6E7C-B188-4A4C-B5B7-D2DC94ED70EB@suse.de>
- <20131009132611.GL3574@redhat.com> <525565A7.1080602@arm.com>
- <CAAhSdy2iO8ejX=Z8pzbOemGoEdeW+dkBqvCS9VS9ZMesyARKAg@mail.gmail.com>
- <52556F5F.6040801@arm.com>
- <CAAhSdy3n24qDC1v7NTHFtJ2wN2A=ssFWAKEvG1P-n1hndOK71g@mail.gmail.com>
-Message-ID: <CAAhSdy3_JGAiCyzkG+wN22XKsCQ2EWoU7RCpwUfCro6omjhUrw@mail.gmail.com>
+From: mcarino@broadcom.com (Marc (Marc-Angelo) Carino)
+Date: Wed, 9 Oct 2013 15:22:48 +0000
+Subject: [BUG,REGRESSION] SATA regression on 12.0-rc4 kernel
+References: <87vc1ahyft.fsf@natisbad.org>
+ <20131007125943.GA1332@titan.lakedaemon.net>
+ <87bo303nfe.fsf@natisbad.org> <52537015.6040200@gmail.com>
+ <87y564waw0.fsf@natisbad.org>
+ <CADLC3L3EYU0VSfLMYjo013jSTWm4yZw24y+4HdvOOoEkOc6uhQ@mail.gmail.com>
+Message-ID: <202B57C13565C241A5ED05E38B705C82012397EC@IRVEXCHMB08.corp.ad.broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 9, 2013 at 8:40 PM, Anup Patel <anup@brainfault.org> wrote:
-> On Wed, Oct 9, 2013 at 8:29 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
->> On 09/10/13 15:50, Anup Patel wrote:
->>> On Wed, Oct 9, 2013 at 7:48 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
->>>> On 09/10/13 14:26, Gleb Natapov wrote:
->>>>> On Wed, Oct 09, 2013 at 03:09:54PM +0200, Alexander Graf wrote:
->>>>>>
->>>>>> On 07.10.2013, at 18:53, Gleb Natapov <gleb@redhat.com> wrote:
->>>>>>
->>>>>>> On Mon, Oct 07, 2013 at 06:30:04PM +0200, Alexander Graf wrote:
->>>>>>>>
->>>>>>>> On 07.10.2013, at 18:16, Marc Zyngier <marc.zyngier@arm.com> wrote:
->>>>>>>>
->>>>>>>>> On 07/10/13 17:04, Alexander Graf wrote:
->>>>>>>>>>
->>>>>>>>>> On 07.10.2013, at 17:40, Marc Zyngier <marc.zyngier@arm.com> wrote:
->>>>>>>>>>
->>>>>>>>>>> On an (even slightly) oversubscribed system, spinlocks are quickly
->>>>>>>>>>> becoming a bottleneck, as some vcpus are spinning, waiting for a
->>>>>>>>>>> lock to be released, while the vcpu holding the lock may not be
->>>>>>>>>>> running at all.
->>>>>>>>>>>
->>>>>>>>>>> This creates contention, and the observed slowdown is 40x for
->>>>>>>>>>> hackbench. No, this isn't a typo.
->>>>>>>>>>>
->>>>>>>>>>> The solution is to trap blocking WFEs and tell KVM that we're now
->>>>>>>>>>> spinning. This ensures that other vpus will get a scheduling boost,
->>>>>>>>>>> allowing the lock to be released more quickly.
->>>>>>>>>>>
->>>>>>>>>>>> From a performance point of view: hackbench 1 process 1000
->>>>>>>>>>>
->>>>>>>>>>> 2xA15 host (baseline):  1.843s
->>>>>>>>>>>
->>>>>>>>>>> 2xA15 guest w/o patch:  2.083s 4xA15 guest w/o patch:   80.212s
->>>>>>>>>>>
->>>>>>>>>>> 2xA15 guest w/ patch:   2.072s 4xA15 guest w/ patch:    3.202s
->>>>>>>>>>
->>>>>>>>>> I'm confused. You got from 2.083s when not exiting on spin locks to
->>>>>>>>>> 2.072 when exiting on _every_ spin lock that didn't immediately
->>>>>>>>>> succeed. I would've expected to second number to be worse rather than
->>>>>>>>>> better. I assume it's within jitter, I'm still puzzled why you don't
->>>>>>>>>> see any significant drop in performance.
->>>>>>>>>
->>>>>>>>> The key is in the ARM ARM:
->>>>>>>>>
->>>>>>>>> B1.14.9: "When HCR.TWE is set to 1, and the processor is in a Non-secure
->>>>>>>>> mode other than Hyp mode, execution of a WFE instruction generates a Hyp
->>>>>>>>> Trap exception if, ignoring the value of the HCR.TWE bit, conditions
->>>>>>>>> permit the processor to suspend execution."
->>>>>>>>>
->>>>>>>>> So, on a non-overcommitted system, you rarely hit a blocking spinlock,
->>>>>>>>> hence not trapping. Otherwise, performance would go down the drain very
->>>>>>>>> quickly.
->>>>>>>>
->>>>>>>> Well, it's the same as pause/loop exiting on x86, but there we have special hardware features to only ever exit after n number of turnarounds. I wonder why we have those when we could just as easily exit on every blocking path.
->>>>>>>>
->>>>>>> It will hurt performance if vcpu that holds the lock is running.
->>>>>>
->>>>>> Apparently not so on ARM. At least that's what Marc's numbers are showing. I'm not sure what exactly that means. Basically his logic is "if we spin, the holder must have been preempted". And it seems to work out surprisingly well.
+Hello all,
+
+>> What I do not understand is why the log report failed FPDMA commands if
+>> the feature is supposed to be SSD-related (looking only at commit
+>> messages: 87fb6c31b9 seems SSD-related, ed36911c74 does not). Is it
+>> possible that the feature detection is what is causing the issue? Or
+>> that the hardware report support w/o having? I can test with a different
+>> disk if you think it would help.
+
+Drive misreporting is likely to be the case. Oddly enough, even if the
+drive's firmware did misreport support for the new SEND/RECV commands, it
+appears that a discard/trim request is being made by the block layer.
+
+In addition to the hdparm dump, could you also provide a full kernel boot
+log? The driver should complain if there were any issues retrieving the NCQ
+send/receive log page.
+
+Lastly, could you give another drive brand a try, if possible? I had tested
+the changes on an Intel SATA AHCI controller and a Micron M500 SSD. I should
+be able to scrounge up a Marvell PCIe AHCI controller.
+
+Thanks!
+Marc
+
+On 10/8/2013 10:51 PM, Robert Hancock wrote:
+> On Tue, Oct 8, 2013 at 12:10 AM, Arnaud Ebalard <arno@natisbad.org> wrote:
+>> Hi Robert,
+>>
+>> Robert Hancock <hancockrwd@gmail.com> writes:
+>>
+>>> On 10/07/2013 01:12 PM, Arnaud Ebalard wrote:
+>>>> Hi guys,
 >>>>
->>>> Yes. I basically assume that contention should be rare, and that ending
->>>> up in a *blocking* WFE is a sign that we're in thrashing mode already
->>>> (no event is pending).
+>>>> yesterday, I reported on arm kernel mailing list what looked like a sata
+>>>> regression on my platform (Marvell Armada 370-based NETGEAR ReadyNAS
+>>>> 102). I initially thought this was an ARM-related issue. My initial
+>>>> email, provided below, contains various details on the platform and the
+>>>> error encountered.
 >>>>
->>>>>>
->>>>> For not contended locks it make sense. We need to recheck if x86
->>>>> assumption is still true there, but x86 lock is ticketing which
->>>>> has not only lock holder preemption, but also lock waiter
->>>>> preemption problem which make overcommit problem even worse.
+>>>> Today, before starting a painful git bisect, I decided to git log
+>>>> sata_mv.c code and then more generally drivers/ata to quickly end up on
+>>>> commit ed36911c747c (libata: Add support for SEND/RECEIVE FPDMA QUEUED)
+>>>> against which I got suspicious after looking again at the errors I had:
 >>>>
->>>> Locks are ticketing on ARM as well. But there is one key difference here
->>>> with x86 (or at least what I understand of it, which is very close to
->>>> none): We only trap if we would have blocked anyway. In our case, it is
->>>> almost always better to give up the CPU to someone else rather than
->>>> waiting for some event to take the CPU out of sleep.
+>>>> [  417.288155] ata1.00: exception Emask 0x0 SAct 0x1fff6001 SErr 0x0 action 0x6 frozen
+>>>> [  417.295838] ata1.00: failed command: WRITE FPDMA QUEUED
+>>>> [  417.301097] ata1.00: cmd 61/48:00:80:ad:0b/00:00:0c:00:00/40 tag 0 ncq 36864 out
+>>>> [  417.315896] ata1.00: status: { DRDY }
+>>>> [  417.319570] ata1.00: failed command: WRITE FPDMA QUEUED
+>>>> [  417.324814] ata1.00: cmd 61/08:68:70:a1:87/00:00:0d:00:00/40 tag 13 ncq 4096 out
+>>>> [  417.339619] ata1.00: status: { DRDY }
+>>>> [  417.343288] ata1.00: failed command: WRITE FPDMA QUEUED
+>>>> [  417.348536] ata1.00: cmd 61/08:70:28:a2:87/00:00:0d:00:00/40 tag 14 ncq 4096 out
+>>>> [  417.363341] ata1.00: status: { DRDY }
+>>>> [  417.367010] ata1.00: failed command: WRITE FPDMA QUEUED
+>>>> [  417.372257] ata1.00: cmd 61/08:80:80:a3:87/00:00:0d:00:00/40 tag 16 ncq 4096 out
+>>>> [  417.387061] ata1.00: status: { DRDY }
+>>>> [  417.390733] ata1.00: failed command: WRITE FPDMA QUEUED
+>>>> [  417.395977] ata1.00: cmd 61/08:88:58:a1:c7/00:00:0d:00:00/40 tag 17 ncq 4096 out
+>>>> [  417.410782] ata1.00: status: { DRDY }
+>>>>
+>>>> Reverting both 87fb6c31b9 (libata: Add support for queued DSM TRIM) and
+>>>> ed36911c74 (libata: Add support for SEND/RECEIVE FPDMA QUEUED) makes the
+>>>> problem disappear. Note: reverting 87fb6c31b9 is not enough and I cannot
+>>>> compile the kernel with only the latter reverted.
+>>>>
+>>>> If you need more info on the platform or want me to test something some
+>>>> fix, do not hesitate.
 >>>
->>> Benefits of "Yield CPU when vcpu executes a WFE" seems to depend on:
->>> 1. How spin lock is implemented in Guest OS?
->>> we cannot assume
->>>     that underlying Guest OS is always Linux.
->>> 2. How bad/good is spin
+>>> I assume that it consistently fails on a non-working kernel and
+>>> consistently works with those patches reverted? Given that both of
+>>> those patches seem to only be touching SSDs with NCQ trim support, it
+>>> seems odd they would be breaking a normal hard drive, but maybe there
+>>> is some unexpected side effect..
 >>
->> We do *not* spin. We *sleep*. So instead of taking a nap on a physical
->> CPU (which is slightly less than useful), we go and run some real
->> workload. If your guest OS is executing WFE (I'm not implying a lock
->> here), *and* that WFE is blocking, then I maintain it will be a gain in
->> the vast majority of the cases.
->
-> What if VCPU A was about to release lock and VCPU B tries to grab
-> same lock. In this case VCPU B gets Yielded due to WFE causing
-> unnecessary delay for VCPU B in acquiring lock. This situation can
-> happen quite often because spin locks are generally used for protecting
-> very small portion of code.
-
-It will be interesting to see what hackbench number you get if you
-don't restrict all Guest VCPUs to same Host CPU? Lets say a Guest
-with 8 VCPUs running on Host (with > 2 CPUs).
-
->
+>> With two different disks (same model though, i.e. 250GB 3.5" WD blue), it
+>> consistently works on a 3.11.4 and consistently fails on 3.12-rc3 and
+>> 3.12-rc4 (not tested others 3.12-rc). The problem is easy to reproduce,
+>> i.e. I just need to perform some disk operations. With the two commits
+>> reverted from 3.12-rc4, I can consistently do a "find / -exec sha256sum
+>> '{}' \;" w/o anything happening.
 >>
->>> It will be good if we can enable/disable "Yield CPU when vcpu executes a WFE
->>
->> Not until someone has shown me a (real) workload when this is actually
->> detrimental.
->
-> The gains by "Yield CPU when vcpu executes a WFE" are not-significant
-> and we dont have consistent improvement when tried multiple times. Please
-> look at number you reported for multiple runs. Due to this fact it makes
-> more sense to have Kconfig option for this.
->
-> --Anup
->
->>
->>         M.
->> --
->> Jazz is not dead. It just smells funny...
->>
+>> What I do not understand is why the log report failed FPDMA commands if
+>> the feature is supposed to be SSD-related (looking only at commit
+>> messages: 87fb6c31b9 seems SSD-related, ed36911c74 does not). Is it
+>> possible that the feature detection is what is causing the issue? Or
+>> that the hardware report support w/o having? I can test with a different
+>> disk if you think it would help.
+> 
+> The commands that are failing are WRITE FPDMA QUEUED which is a
+> regular NCQ write command. The ones that these commits add support for
+> are FPDMA_SEND and FPDMA_RECV which are used for NCQ trim commands.
+> 
+> It's possible that the feature detection for this is picking up
+> support for FPDMA SEND/RECV on this drive when it shouldn't be. Can
+> you post the output of "hdparm --Istdout /dev/sdX" for one of these
+> drives (where X matches the drive in question)?
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-ide" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
+> 
