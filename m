@@ -1,47 +1,78 @@
-From: emilio@elopez.com.ar (=?UTF-8?B?RW1pbGlvIEzDs3Bleg==?=)
-Date: Wed, 09 Oct 2013 09:51:01 -0300
-Subject: [PATCH 0/3] sunxi clock fixes
-In-Reply-To: <1379725392-30202-1-git-send-email-emilio@elopez.com.ar>
-References: <1379725392-30202-1-git-send-email-emilio@elopez.com.ar>
-Message-ID: <52555135.1080501@elopez.com.ar>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 9 Oct 2013 15:04:21 +0200
+Subject: [PATCH 1/6] ARM: at91: prepare sama5 dt boards transition to
+ common clk
+In-Reply-To: <1375953654-11168-1-git-send-email-b.brezillon@overkiz.com>
+References: <1375951572-10829-1-git-send-email-b.brezillon@overkiz.com>
+ <1375953654-11168-1-git-send-email-b.brezillon@overkiz.com>
+Message-ID: <52555455.7080605@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
+On 08/08/2013 11:20, Boris BREZILLON :
+> This patch prepare the transition to common clk for sama5 dt boards by
+> replacing the timer init callback.
+>
+> Clocks registration cannot be done in early init callback (as formerly done
+> by the old clk implementation) because it requires dynamic allocation
+> which is not ready yet during early init.
+>
+> In the other hand, at91 clocks must be registered before
+> at91sam926x_pit_init is called because PIT (Periodic Interval Timer) driver
+> request the master clk (mck).
+>
+> A new function (at91sama5_dt_timer_init) is created to fullfil these needs.
+> This function registers all at91 clks using the dt definition before
+> calling the PIT init function.
+> The device tree clock registration is enabled only if common clk is
+> selected. Else the old clk registration is been done during
+> at91_dt_initialize call.
+>
+> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
 
-El 20/09/13 22:03, Emilio L?pez escribi?:
-> Hi,
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+
+> ---
+>   arch/arm/mach-at91/board-dt-sama5.c |   10 +++++++++-
+>   1 file changed, 9 insertions(+), 1 deletion(-)
 >
-> This small series contains two bug fixes and a patch to solve the issue
-> of accidental clock gating, as discussed earlier on my RFC patch, "of:
-> add a basic memory driver".
+> diff --git a/arch/arm/mach-at91/board-dt-sama5.c b/arch/arm/mach-at91/board-dt-sama5.c
+> index ad95f6a..10b6913 100644
+> --- a/arch/arm/mach-at91/board-dt-sama5.c
+> +++ b/arch/arm/mach-at91/board-dt-sama5.c
+> @@ -16,6 +16,7 @@
+>   #include <linux/of_irq.h>
+>   #include <linux/of_platform.h>
+>   #include <linux/phy.h>
+> +#include <linux/clk-provider.h>
 >
-> I believe the two first patches should go into -rcN, although I have not
-> noticed any issues so far coming from the bugs themselves.
+>   #include <asm/setup.h>
+>   #include <asm/irq.h>
+> @@ -26,6 +27,13 @@
+>   #include "at91_aic.h"
+>   #include "generic.h"
 >
-> The third patch should be a no-op for now, and I'd like to have it
-> merged before these clocks actually appear on the driver; in this way
-> they will never be gated accidentally, and it remains bisectable. I will
-> be sending PLL5/6 support patches in short order.
+> +static void __init sama5_dt_timer_init(void)
+> +{
+> +#if defined(CONFIG_COMMON_CLK)
+> +	of_clk_init(NULL);
+> +#endif
+> +	at91sam926x_pit_init();
+> +}
 >
-> Cheers,
+>   static const struct of_device_id irq_of_match[] __initconst = {
 >
-> Emilio
+> @@ -77,7 +85,7 @@ static const char *sama5_dt_board_compat[] __initdata = {
 >
-> Emilio L?pez (3):
->    clk: sunxi: factors: fix off-by-one masks
->    clk: sunxi: factors: clear variables before using them
->    clk: sunxi: protect core clocks from accidental shutdown
->
->   drivers/clk/sunxi/clk-factors.c |  4 ++--
->   drivers/clk/sunxi/clk-sunxi.c   | 28 ++++++++++++++++++++++++++++
->   2 files changed, 30 insertions(+), 2 deletions(-)
+>   DT_MACHINE_START(sama5_dt, "Atmel SAMA5 (Device Tree)")
+>   	/* Maintainer: Atmel */
+> -	.init_time	= at91sam926x_pit_init,
+> +	.init_time	= sama5_dt_timer_init,
+>   	.map_io		= at91_map_io,
+>   	.handle_irq	= at91_aic5_handle_irq,
+>   	.init_early	= at91_dt_initialize,
 >
 
-Can you please take a look at this series and pick the patches if you 
-are ok with them? It would be nice to see the first two fixes on -rcN by 
-the way.
 
-Thanks!
-
-Emilio
+-- 
+Nicolas Ferre
