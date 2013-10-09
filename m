@@ -1,49 +1,79 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 9 Oct 2013 07:24:53 +0000 (UTC)
-Subject: [PATCH 3/3] ARM: OMAP2+: Let DT say what devices should not to
- idled or reset
-In-Reply-To: <1376983966-16490-4-git-send-email-rnayak@ti.com>
-References: <1376983966-16490-1-git-send-email-rnayak@ti.com>
- <1376983966-16490-4-git-send-email-rnayak@ti.com>
-Message-ID: <alpine.DEB.2.02.1310090720230.30199@utopia.booyaka.com>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Wed, 9 Oct 2013 16:29:56 +0900
+Subject: [PATCH v2 3/3] ARM: shmobile: kzm9d: Use common clock framework
+In-Reply-To: <20131009065438.GA7220@verge.net.au>
+References: <20131008143040.52f36df8edb7ab63224d8433@ops.dti.ne.jp>
+ <20131008143403.c11f294c8a1701a2ab3bc5fd@ops.dti.ne.jp>
+ <20131009034057.GO15065@verge.net.au>
+ <CANqRtoQs+31mv0ZULOd3SGshkBkvp-kGoaVOSb10+Ncdp+WNXw@mail.gmail.com>
+ <20131009065438.GA7220@verge.net.au>
+Message-ID: <CANqRtoSGFEjcBPDAtq3YCDbkiFCftyr8b=qniYqyMafng=zurw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Beno?t, Rajendra,
+Hi Simon,
 
-On Tue, 20 Aug 2013, Rajendra Nayak wrote:
+On Wed, Oct 9, 2013 at 3:54 PM, Simon Horman <horms@verge.net.au> wrote:
+> On Wed, Oct 09, 2013 at 01:59:46PM +0900, Magnus Damm wrote:
+>> Hi Simon,
+>>
+>> On Wed, Oct 9, 2013 at 12:40 PM, Simon Horman <horms@verge.net.au> wrote:
+>> > On Tue, Oct 08, 2013 at 02:34:03PM +0900, takasi-y at ops.dti.ne.jp wrote:
+>> >> Use common clock framework version of clock
+>> >>  drivers/clk/shmobile/clk-emev2.c
+>> >> instead of sh-clkfwk version
+>> >>  arch/arm/mach-shmobile/clock-emev2.c
+>> >> when it is configured as a part of multi-platform.
+>> >>
+>> >> Signed-off-by: Takashi Yoshii <takasi-y@ops.dti.ne.jp>
+>> >
+>> > Thanks.
+>> >
+>> > I plan to add this patch to a new topic branch,
+>> > topic/emev2-common-clock, in the renesas tree and
+>> > queue it up from there for inclusion in mainline
+>> > if/when the first patch of this series is accepted
+>> > by Mike Turquette.
+>>
+>> Thanks for picking up patches, Simon.
+>>
+>> I think you can simply merge this patch after the following series:
+>>
+>> [PATCH 00/05] ARM: shmobile: KZM9D Multiplatform update
+>
+> This is already queued up.
 
-> Now that we have DT bindings to specify which devices on the SoC should not
-> be reset or idled, get rid of the same information existing as part of the
-> hwmod data files and pass this info from DT instead.
-> 
-> For GPMC, the HWMOD_INIT_NO_RESET flag seems to be added in hwmod not due to
-> any errata around the GPMC IP, but rather because any timings
-> set by the bootloader are not being correctly programmed by the kernel.
-> This seems like something that needs to be fixed as part of GPMC driver
-> in the kernel, and hence the flag is left as is in hwmod, which can be
-> removed once the driver does what its expected to.
-> 
-> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
-> ---
->  arch/arm/boot/dts/am33xx.dtsi              |    2 ++
->  arch/arm/boot/dts/omap4.dtsi               |    3 +++
->  arch/arm/boot/dts/omap5.dtsi               |    2 ++
->  arch/arm/mach-omap2/omap_hwmod_33xx_data.c |    4 ++--
->  arch/arm/mach-omap2/omap_hwmod_44xx_data.c |    4 +---
->  arch/arm/mach-omap2/omap_hwmod_54xx_data.c |    2 --
->  6 files changed, 10 insertions(+), 7 deletions(-)
+Yes, I know, thanks for that. I tried to explain the dependency in the
+00/00 cover letter but I will try to be more clear next time!
 
-Looking at this one, maybe the best thing for this patch is for Rajendra 
-to split it into two patches.  Beno?t can merge the DTS patch first, then 
-I can merge the hwmod side as a cleanup once the first one goes in.  That 
-will avoid conflicts from other DTS and hwmod changes going into the tree.
+>> There are no build time dependencies on patch 1 and 2 so this patch
+>> can be merged independently. Regarding run-time operation, the
+>> multiplatform series above makes KZM9D DT reference only build for
+>> multiplatform, and in such case CCF is required.
+>>
+>> So if you want to keep KZM9D DT reference working until Mike Turquette
+>> accepts the CCF bits, then I recommend you to wait with "[PATCH 00/05]
+>> ARM: shmobile: KZM9D Multiplatform update" until all EMEV2 CCF bits
+>> have been merged.
+>>
+>> Another way is to merge "[PATCH 00/05] ARM: shmobile: KZM9D
+>> Multiplatform update" before the EMEV2 CCF bits, but if so you may as
+>> well merge this patch as well IMO. This
+>> multiplatform-update-series-merge-before-CCF plan will result in
+>> untestable KZM9D DT reference until EMEV2 CCF is merged. Either way is
+>> fine with me.
+>
+> I am mainly concerned that the bindings may change before
+> they are finally merged. And I thought it would be nice to avoid
+> having to fix up the usage of the bindings if they change.
 
-Rajendra, when you do the split, please add in the DT documentation part 
-from patch 2.  Am going to strip that out from the second patch and just 
-merge the hwmod changes.
+Sure, but the code in this patch looks like it simply starts DT CCF
+probing regardless of what the bindings look like. So I don't think
+you will have to worry about actual bindings detail.
 
-Sound good?
+> But I'm happy to just queue-up patches 2 and 3 of this series
+> now if you prefer.
 
+Well, I meant patch 3 only. Patch 1 and 2 are tied together by dependencies. =)
 
-- Paul
+/ magnus
