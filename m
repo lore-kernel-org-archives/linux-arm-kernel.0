@@ -1,28 +1,36 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Wed, 9 Oct 2013 19:22:02 +0100
-Subject: [alsa-devel] [RFC v2] ASoC: pcm: Store component running state
-In-Reply-To: <1381329076-12022-1-git-send-email-mpa@pengutronix.de>
-References: <20131009141242.GE19005@pengutronix.de>
- <1381329076-12022-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <20131009182202.GX21581@sirena.org.uk>
+Date: Wed, 9 Oct 2013 19:29:05 +0100
+Subject: [PATCH 3/5] drm/bridge: Add PTN3460 bridge driver
+In-Reply-To: <CAAQKjZMhovKLxNfnXnbF-6diM2zF1cWyi+xHGyL3v83vBh4p6g@mail.gmail.com>
+References: <1380670860-17621-1-git-send-email-seanpaul@chromium.org>
+ <1380670860-17621-4-git-send-email-seanpaul@chromium.org>
+ <CAAQKjZN_r-=-sj=Vb-o-KUS4ab5=cjCq1ni3VZeMeVc3NL=MMg@mail.gmail.com>
+ <CAOw6vbLiJLLKn=gb1=j5TBeM0ijEK13+goG-=mw7MZTyNT1kpQ@mail.gmail.com>
+ <CAAQKjZPwyKCpju4Ndd+MB_aN24-zA5xTHFsFsun2617h7YT6dw@mail.gmail.com>
+ <CAOesGMgKastzdFHYQzyL8gxkBN=86wFZ4jbgP8BHxfkOuZvJxg@mail.gmail.com>
+ <CAAQKjZMhovKLxNfnXnbF-6diM2zF1cWyi+xHGyL3v83vBh4p6g@mail.gmail.com>
+Message-ID: <20131009182905.GY21581@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 09, 2013 at 04:31:16PM +0200, Markus Pargmann wrote:
-> Store the state of the components to detect not matching START/STOP
-> command pairs. Otherwise a component's trigger function may be called
-> twice with the same command which can lead to problems.
+On Fri, Oct 04, 2013 at 11:05:48AM +0900, Inki Dae wrote:
+> 2013/10/4 Olof Johansson <olof@lixom.net>:
 
-> This is a patch which stores the state of platform, cpu_dai and codec_dai to
-> call their trigger functions only if they are not already in the correct state.
+> > "If PD_N is LOW, then the device is in Deep power-down completely,
+> > even if supply rail is ON; for the device to be able to operate, the
+> > PD_N pin must be HIGH."
 
-No, this seems way too complex and fragile.  The original idea was
-better though I'm still not convinced it actually fixes the problem you
-think it fixes.
+> I still think the pin could be replaced with a regulator. But
+> lvds-bridge node has "powerdown-gpio" property - it say this board
+> will use gpio pin - specific to board.  So it seems no problem.
+
+No, don't model things that aren't regulators as regulators - it's just
+confusing from a usability standpoint and causes breakage when the pins
+don't behave like regulators.
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131009/b86e9fd1/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131009/153cbd4a/attachment.sig>
