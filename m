@@ -1,79 +1,34 @@
-From: afzal@ti.com (Afzal Mohammed)
-Date: Wed, 9 Oct 2013 12:42:33 +0530
-Subject: [PATCH v2] ARM: OMAP2+: wakeupgen: AM43x adaptation
-Message-ID: <1381302753-7045-1-git-send-email-afzal@ti.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Wed, 09 Oct 2013 09:08:13 +0200
+Subject: [PATCH 8/8] ARM: add initial support for Marvell Berlin SoCs
+In-Reply-To: <1381274699.5184.2.camel@linux-builds1>
+References: <1381235073-17134-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1381235073-17134-9-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1381274699.5184.2.camel@linux-builds1>
+Message-ID: <525500DD.8050204@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-AM43x has 224 interrupts and 7 banks, make it as maximum values. Keep
-default values as earlier, if am43x is detected, update interrupts and
-banks accordingly.
+On 10/09/2013 01:24 AM, Dinh Nguyen wrote:
+> Hi Sebastian,
+>
+> On Tue, 2013-10-08 at 14:24 +0200, Sebastian Hesselbarth wrote:
+>> This adds initial support for the Marvell Berlin (88DE3xxx) SoC family
+>> and basic machine setup for Armada 1500 (88DE3100) SoCs.
+[...]
+>> +config MACH_MV88DE3100
+>> +	bool "Marvell 88DE3100 (Armada 1500)"
+>> +	select ARM_GIC
+>> +	select CACHE_L2X0
+>> +	select CPU_PJ4B
+>> +	select HAVE_ARM_TWD if LOCAL_TIMERS
+>> +	select HAVE_SMP
+>> +	select LOCAL_TIMERS if SMP
+>
+> I think because of commit:
+>
+> a894fcc2d [ARM: smp_twd: Divorce smp_twd from local timer API]
+>
+> you can remove the LOCAL_TIMERS for HAVE_ARM_TWD.
 
-Also AM43x has only one cpu, ensure that clearing bitmask at wakeupgen
-is done only for the single existing cpu, existing code assumes that
-there are two cpu's.
-
-If bitmask is cleared in wakeupgen for the nonexistent second cpu,
-an imprecise abort happens as soon as Kernel switches to user space.
-It was rootcaused by Sekhar Nori <nsekhar@ti.com>.
-
-Signed-off-by: Afzal Mohammed <afzal@ti.com>
----
-
-v2:
-1. make AM43x adaptation such that changes required for new SoC addition is less
-2. avoid usage of am43x local variable, use soc_is_am43xx() instead
-
- arch/arm/mach-omap2/omap-wakeupgen.c | 18 +++++++++++++-----
- 1 file changed, 13 insertions(+), 5 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/omap-wakeupgen.c b/arch/arm/mach-omap2/omap-wakeupgen.c
-index 813c615..3664562 100644
---- a/arch/arm/mach-omap2/omap-wakeupgen.c
-+++ b/arch/arm/mach-omap2/omap-wakeupgen.c
-@@ -33,8 +33,12 @@
- #include "omap4-sar-layout.h"
- #include "common.h"
- 
--#define MAX_NR_REG_BANKS	5
--#define MAX_IRQS		160
-+#define AM43XX_NR_REG_BANKS	7
-+#define AM43XX_IRQS		224
-+#define MAX_NR_REG_BANKS	AM43XX_NR_REG_BANKS
-+#define MAX_IRQS		AM43XX_IRQS
-+#define DEFAULT_NR_REG_BANKS	5
-+#define DEFAULT_IRQS		160
- #define WKG_MASK_ALL		0x00000000
- #define WKG_UNMASK_ALL		0xffffffff
- #define CPU_ENA_OFFSET		0x400
-@@ -47,8 +51,8 @@ static void __iomem *wakeupgen_base;
- static void __iomem *sar_base;
- static DEFINE_RAW_SPINLOCK(wakeupgen_lock);
- static unsigned int irq_target_cpu[MAX_IRQS];
--static unsigned int irq_banks = MAX_NR_REG_BANKS;
--static unsigned int max_irqs = MAX_IRQS;
-+static unsigned int irq_banks = DEFAULT_NR_REG_BANKS;
-+static unsigned int max_irqs = DEFAULT_IRQS;
- static unsigned int omap_secure_apis;
- 
- /*
-@@ -418,12 +422,16 @@ int __init omap_wakeupgen_init(void)
- 		irq_banks = OMAP4_NR_BANKS;
- 		max_irqs = OMAP4_NR_IRQS;
- 		omap_secure_apis = 1;
-+	} else if (soc_is_am43xx()) {
-+		irq_banks = AM43XX_NR_REG_BANKS;
-+		max_irqs = AM43XX_IRQS;
- 	}
- 
- 	/* Clear all IRQ bitmasks at wakeupGen level */
- 	for (i = 0; i < irq_banks; i++) {
- 		wakeupgen_writel(0, i, CPU0_ID);
--		wakeupgen_writel(0, i, CPU1_ID);
-+		if (!soc_is_am43xx())
-+			wakeupgen_writel(0, i, CPU1_ID);
- 	}
- 
- 	/*
--- 
-1.8.3.4
+Thanks, Dinh, I will have a look at this.
