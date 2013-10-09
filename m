@@ -1,55 +1,97 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Wed, 9 Oct 2013 13:03:17 +0800
-Subject: [PATCH 3/6] pinctrl: single: Prepare for supporting SoC specific
- features
-In-Reply-To: <CACRpkdbx+vJEqz3KQ0EHGt0axRB4JeJh3FF4e+7snbR0HoqKRg@mail.gmail.com>
-References: <20131003054104.8941.88857.stgit@localhost>
- <20131003054218.8941.19273.stgit@localhost>
- <20131007173531.GX8949@atomide.com>
- <CACRpkdbx+vJEqz3KQ0EHGt0axRB4JeJh3FF4e+7snbR0HoqKRg@mail.gmail.com>
-Message-ID: <CAN1soZwXn5SSgTFQ11PJGK19ZQ==uKcPCF2COpEE_eiMAM13uw@mail.gmail.com>
+From: r65037@freescale.com (Zhu Richard-R65037)
+Date: Wed, 9 Oct 2013 05:23:45 +0000
+Subject: [PATCH v7 0/2] Add PCIe support for i.MX6q
+In-Reply-To: <201310082256.28474.marex@denx.de>
+References: <1380165887-13506-1-git-send-email-shawn.guo@linaro.org>
+ <CAErSpo4JhjW5a-74eJp5bajmAMKSn4Vxknk8NoVdD462N=Ncug@mail.gmail.com>
+ <201310082256.28474.marex@denx.de>
+Message-ID: <0E83723C55F66F43A6041464FE31119D401869@039-SN2MPN1-011.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 8, 2013 at 7:55 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> On Mon, Oct 7, 2013 at 7:35 PM, Tony Lindgren <tony@atomide.com> wrote:
->
->> Hi Linus W,
->>
->> Any comments on the pinctrl patches 3 - 5 in this series?
->
-> I have no problems with this patch #3, as it is just changing syntax,
-> not semantics.
->
-> The problems start with patch #4.
->
-> I am tormented with mixed feelings about this, because from one point of
-> view I feel it is breaking the promise of pinctrl-single being a
-> driver for platforms
-> where a pin is controlled by a *single* register.
->
-> If this was pinctrl-foo.c I would not have been so much bothered,
-> but now it is something that was supposed to be self-contained and
-> simple, pertaining to a single register, starting to look like something
-> else.
->
-> This is a bit like: "oh yeah just one register controls the pins, but under
-> some circumstances I also want to mess with this register over here,
-> and then this register over there ..." etc.
->
-> I'd like Haojian to ACK this to proceed since he's also using this driver
-> now. Then I feel better on continuing down this road ...
->
-> Then I have a lesser comment on patch #4 since it makes it possible
-> for this pin controller to support wake-up interrupt, as I don't see how
-> this plays out with front-end GPIO controllers, but let's discuss that
-> in the context of that patch.
->
-> Yours,
-> Linus Walleij
->
+Hi Marek:
+Thanks for your kindly tests.
 
-I'm OK on both #3 & #4. So Acked-by: Haojian Zhuang <haojian.zhuang@gmail.com>
+Regarding to my experience on 3.0.35 kernel, besides the programming the RdWr0 vs. RdWr1 mode into the iATU.
+The INTx should be configured properly, for example, like the following one:
 
-Regards
-Haojian
+static int __init imx_pcie_map_irq(struct pci_dev *dev, u8 slot, u8 pin)
+{
+       switch (pin) {
+       case 1: return MXC_INT_PCIE_3;
+       case 2: return MXC_INT_PCIE_2;
+       case 3: return MXC_INT_PCIE_1;
+       case 4: return MXC_INT_PCIE_0;
+       default: return -1;
+       }
+}
+
+static struct hw_pci imx_pci __initdata = {
+        .nr_controllers = 1,
+        .swizzle        = pci_std_swizzle,
+        .setup          = imx_pcie_setup,
+        .scan           = imx_pcie_scan_bus,
+        .map_irq        = imx_pcie_map_irq,
+};
+Best Regards
+Richard Zhu
+
+
+-----Original Message-----
+From: linux-pci-owner@vger.kernel.org [mailto:linux-pci-owner at vger.kernel.org] On Behalf Of Marek Vasut
+Sent: Wednesday, October 09, 2013 4:56 AM
+To: linux-arm-kernel at lists.infradead.org
+Cc: Bjorn Helgaas; Shawn Guo; Zhu Richard-R65037; linux-pci at vger.kernel.org; tharvey at gateworks.com; Frank Li; Sean Cross; Sascha Hauer
+Subject: Re: [PATCH v7 0/2] Add PCIe support for i.MX6q
+
+Hi,
+
+> On Wed, Sep 25, 2013 at 9:24 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> > Hi Bjorn,
+> > 
+> > This is basically a resend of imx6 pcie driver patch for inclusion 
+> > into PCI tree.  Since we expect you apply the patch with your SoB, I 
+> > dropped your ACK tag there.
+> > 
+> > I have to ask you to carry the first patch which adds some macros to 
+> > be used by pcie driver patch.  Since imx6q-iomuxc-gpr.h gets rare 
+> > updates recently, it should be less likely we will run into merge conflict on it.
+> > 
+> > Changes since v6:
+> > 
+> > * Drop arch bits from driver patch, and will handle arch bits 
+> > through
+> > 
+> >   arm-soc separately.
+> > 
+> > * Use devm_clk_get() instead of clk_get().
+> > * Drop unnecessary (val != exp_val) check in pcie_phy_poll_ack() loop.
+> > * Rename function imx6_init() to imx6_pcie_init().
+> > 
+> > Shawn
+> > 
+> > Sean Cross (2):
+> >   ARM: imx6q: Add PCIe bits to GPR syscon definition
+> >   PCI: imx6: Add support for i.MX6 PCIe controller
+> >  
+> >  .../devicetree/bindings/pci/designware-pcie.txt    |    7 +-
+> >  drivers/pci/host/Kconfig                           |    6 +
+> >  drivers/pci/host/Makefile                          |    1 +
+> >  drivers/pci/host/pci-imx6.c                        |  576
+> >  ++++++++++++++++++++ include/linux/mfd/syscon/imx6q-iomuxc-gpr.h       
+> >  |    8 +
+> >  5 files changed, 597 insertions(+), 1 deletion(-)  create mode 
+> > 100644 drivers/pci/host/pci-imx6.c
+> 
+> I merged both of these to my pci/host-imx6 branch for v3.13.
+> 
+> I made a couple minor spelling and whitespace corrections.
+
+I have MX6 hardware with a PCIe switch, so I can test that stuff. Thus far, of course, the switch doesn't work. Is getting the switch to work only a matter of programming the RdWr0 vs. RdWr1 mode into the iATU or is there something more ?
+
+Thanks!
+
+Best regards,
+Marek Vasut
+--
+To unsubscribe from this list: send the line "unsubscribe linux-pci" in the body of a message to majordomo at vger.kernel.org More majordomo info at  http://vger.kernel.org/majordomo-info.html
