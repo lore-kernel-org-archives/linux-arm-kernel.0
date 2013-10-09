@@ -1,82 +1,64 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 9 Oct 2013 14:52:11 +0800
-Subject: [PATCH] pinctrl: imx: update fsl,pins description in bindings doc
-Message-ID: <1381301531-19212-1-git-send-email-shawn.guo@linaro.org>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 9 Oct 2013 15:54:42 +0900
+Subject: [PATCH v2 3/3] ARM: shmobile: kzm9d: Use common clock framework
+In-Reply-To: <CANqRtoQs+31mv0ZULOd3SGshkBkvp-kGoaVOSb10+Ncdp+WNXw@mail.gmail.com>
+References: <20131008143040.52f36df8edb7ab63224d8433@ops.dti.ne.jp>
+ <20131008143403.c11f294c8a1701a2ab3bc5fd@ops.dti.ne.jp>
+ <20131009034057.GO15065@verge.net.au>
+ <CANqRtoQs+31mv0ZULOd3SGshkBkvp-kGoaVOSb10+Ncdp+WNXw@mail.gmail.com>
+Message-ID: <20131009065438.GA7220@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-While commit e164153 (pinctrl: imx: move hard-coding data into device
-tree) moves to use DTC macro for imx pinctrl device tree setting, it
-changes the semantics of fsl,pins without updating the bindings doc
-properly.  Let's update the fsl,pins description to stop confusing
-people.
+On Wed, Oct 09, 2013 at 01:59:46PM +0900, Magnus Damm wrote:
+> Hi Simon,
+> 
+> On Wed, Oct 9, 2013 at 12:40 PM, Simon Horman <horms@verge.net.au> wrote:
+> > On Tue, Oct 08, 2013 at 02:34:03PM +0900, takasi-y at ops.dti.ne.jp wrote:
+> >> Use common clock framework version of clock
+> >>  drivers/clk/shmobile/clk-emev2.c
+> >> instead of sh-clkfwk version
+> >>  arch/arm/mach-shmobile/clock-emev2.c
+> >> when it is configured as a part of multi-platform.
+> >>
+> >> Signed-off-by: Takashi Yoshii <takasi-y@ops.dti.ne.jp>
+> >
+> > Thanks.
+> >
+> > I plan to add this patch to a new topic branch,
+> > topic/emev2-common-clock, in the renesas tree and
+> > queue it up from there for inclusion in mainline
+> > if/when the first patch of this series is accepted
+> > by Mike Turquette.
+> 
+> Thanks for picking up patches, Simon.
+> 
+> I think you can simply merge this patch after the following series:
+> 
+> [PATCH 00/05] ARM: shmobile: KZM9D Multiplatform update
 
-While at it, the example in the document is updated, and the stale TODO
-gets removed.
+This is already queued up.
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
----
- .../bindings/pinctrl/fsl,imx-pinctrl.txt           |   37 ++++++++++----------
- 1 file changed, 18 insertions(+), 19 deletions(-)
+> There are no build time dependencies on patch 1 and 2 so this patch
+> can be merged independently. Regarding run-time operation, the
+> multiplatform series above makes KZM9D DT reference only build for
+> multiplatform, and in such case CCF is required.
+> 
+> So if you want to keep KZM9D DT reference working until Mike Turquette
+> accepts the CCF bits, then I recommend you to wait with "[PATCH 00/05]
+> ARM: shmobile: KZM9D Multiplatform update" until all EMEV2 CCF bits
+> have been merged.
+> 
+> Another way is to merge "[PATCH 00/05] ARM: shmobile: KZM9D
+> Multiplatform update" before the EMEV2 CCF bits, but if so you may as
+> well merge this patch as well IMO. This
+> multiplatform-update-series-merge-before-CCF plan will result in
+> untestable KZM9D DT reference until EMEV2 CCF is merged. Either way is
+> fine with me.
 
-diff --git a/Documentation/devicetree/bindings/pinctrl/fsl,imx-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/fsl,imx-pinctrl.txt
-index 3a7caf7..9fde25f 100644
---- a/Documentation/devicetree/bindings/pinctrl/fsl,imx-pinctrl.txt
-+++ b/Documentation/devicetree/bindings/pinctrl/fsl,imx-pinctrl.txt
-@@ -22,11 +22,12 @@ Required properties for iomux controller:
-   Please refer to each fsl,<soc>-pinctrl.txt binding doc for supported SoCs.
- 
- Required properties for pin configuration node:
--- fsl,pins: two integers array, represents a group of pins mux and config
--  setting. The format is fsl,pins = <PIN_FUNC_ID CONFIG>, PIN_FUNC_ID is a
--  pin working on a specific function, which consists of a tuple of
--  <mux_reg conf_reg input_reg mux_val input_val>.  CONFIG is the pad setting
--  value like pull-up on this pin.
-+- fsl,pins: each entry consists of 6 integers and represents the mux and config
-+  setting for one pin. The first 5 integers <mux_reg conf_reg input_reg mux_val
-+  input_val> are specified using a PIN_FUNC_ID macro, which can be found in
-+  imx*-pinfunc.h under device tree source folder. The last integer CONFIG is
-+  the pad setting value like pull-up on this pin. And that's why fsl,pins entry
-+  looks like <PIN_FUNC_ID CONFIG> in the example below.
- 
- Bits used for CONFIG:
- NO_PAD_CTL(1 << 31): indicate this pin does not need config.
-@@ -72,17 +73,18 @@ iomuxc@020e0000 {
- 	/* shared pinctrl settings */
- 	usdhc4 {
- 		pinctrl_usdhc4_1: usdhc4grp-1 {
--			fsl,pins = <1386 0x17059	/* MX6Q_PAD_SD4_CMD__USDHC4_CMD */
--				    1392 0x10059	/* MX6Q_PAD_SD4_CLK__USDHC4_CLK	*/
--				    1462 0x17059	/* MX6Q_PAD_SD4_DAT0__USDHC4_DAT0 */
--				    1470 0x17059	/* MX6Q_PAD_SD4_DAT1__USDHC4_DAT1 */
--				    1478 0x17059	/* MX6Q_PAD_SD4_DAT2__USDHC4_DAT2 */
--				    1486 0x17059	/* MX6Q_PAD_SD4_DAT3__USDHC4_DAT3 */
--				    1493 0x17059	/* MX6Q_PAD_SD4_DAT4__USDHC4_DAT4 */
--				    1501 0x17059	/* MX6Q_PAD_SD4_DAT5__USDHC4_DAT5 */
--				    1509 0x17059	/* MX6Q_PAD_SD4_DAT6__USDHC4_DAT6 */
--				    1517 0x17059>;	/* MX6Q_PAD_SD4_DAT7__USDHC4_DAT7 */
--		};
-+			fsl,pins = <
-+				MX6QDL_PAD_SD4_CMD__SD4_CMD    0x17059
-+				MX6QDL_PAD_SD4_CLK__SD4_CLK    0x10059
-+				MX6QDL_PAD_SD4_DAT0__SD4_DATA0 0x17059
-+				MX6QDL_PAD_SD4_DAT1__SD4_DATA1 0x17059
-+				MX6QDL_PAD_SD4_DAT2__SD4_DATA2 0x17059
-+				MX6QDL_PAD_SD4_DAT3__SD4_DATA3 0x17059
-+				MX6QDL_PAD_SD4_DAT4__SD4_DATA4 0x17059
-+				MX6QDL_PAD_SD4_DAT5__SD4_DATA5 0x17059
-+				MX6QDL_PAD_SD4_DAT6__SD4_DATA6 0x17059
-+				MX6QDL_PAD_SD4_DAT7__SD4_DATA7 0x17059
-+			>;
- 	};
- 	....
- };
-@@ -90,6 +92,3 @@ Refer to the IOMUXC controller chapter in imx6q datasheet,
- 0x17059 means enable hysteresis, 47KOhm Pull Up, 50Mhz speed,
- 80Ohm driver strength and Fast Slew Rate.
- User should refer to each SoC spec to set the correct value.
--
--TODO: when dtc macro support is available, we can change above raw data
--to dt macro which can get better readability in dts file.
--- 
-1.7.9.5
+I am mainly concerned that the bindings may change before
+they are finally merged. And I thought it would be nice to avoid
+having to fix up the usage of the bindings if they change.
+
+But I'm happy to just queue-up patches 2 and 3 of this series
+now if you prefer.
