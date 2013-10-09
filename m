@@ -1,62 +1,60 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 9 Oct 2013 16:14:15 +0200
-Subject: [PATCH] pinctrl: phandle entries will be applied sequentially
-In-Reply-To: <20131009134529.GH25034@n2100.arm.linux.org.uk>
-References: <1381297324-19006-1-git-send-email-shawn.guo@linaro.org>
- <CACRpkdazPK6SNg9PdWCrjB8nwho1rCueumJWAN=STXdN1zNnMA@mail.gmail.com>
- <20131009124425.GG25034@n2100.arm.linux.org.uk>
- <CACRpkda3J4cCTnFaQFrmZ=box6EeJ8WQZpuQpi2p_BFX+W2vuw@mail.gmail.com>
- <20131009134529.GH25034@n2100.arm.linux.org.uk>
-Message-ID: <CACRpkdaZra5HASUzL4uUb-xgCY665SQmDMHmxrDQzuNDy=mBbQ@mail.gmail.com>
+From: steve.capper@linaro.org (Steve Capper)
+Date: Wed,  9 Oct 2013 15:15:22 +0100
+Subject: [RFC RESEND 0/2] ARM: mm: HugeTLB + THP support for non-LPAE
+Message-ID: <1381328124-8165-1-git-send-email-steve.capper@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 9, 2013 at 3:45 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
+Hello,
 
-> Right, so that means doing this:
->
->                         pinctrl_usdhc1_1: usdhc1grp-1 {
->                                 fsl,pins = <
-> ...
->                                         MX6QDL_PAD_SD1_DAT3__SD1_DATA3 0x17059
-> ...
->                                 >;
->                         };
->
->                         pinctrl_usdhc1_1_dat3cd: usdhc1grp-3 {
->                                 fsl,pins = <
->                                         MX6QDL_PAD_SD1_DAT3__SD1_DATA3 0x13059
->                                 >;
->                         };
->
-> and then:
->
->         pinctrl-0 = <&pinctrl_usdhc1_1 &pinctrl_usdhc1_1_dat3cd>;
->
-> can result in either "MX6QDL_PAD_SD1_DAT3__SD1_DATA3 0x17059" or
-> "MX6QDL_PAD_SD1_DAT3__SD1_DATA3 0x13059" being the final configuration
-> for that pin.
+I'm resending this series again, to try and provoke some discussion on
+them.
 
-I'm uncertain about the device tree case. I guess it is indeed
-an array of handles indexed [0,1], the framework will only
-send that array down to the driver, no strings attached.
+Cheers,
+--
+Steve
 
-> What that means is that for any pinctrl setting, pins to be configured
-> must be mentioned exactly once and once only.
+---  
 
-Either that (and the above does seem very ambigous) or the driver
-need to combine and handle the conflicting configurations,
-maintaining a state for the pin and so on ...
+The following patches bring both HugeTLB support and Transparent
+HugePage (THP) support to ARM for 2 levels of paging (i.e. without
+LPAE).
 
-This seems like two *complete* configs fighting over the same pin
-rather than two complementary configs that we could | together
-and write, and that is indeed ambigous. The array passed to
-the config function is supposed to be individual settings like
-[ pull-up, schmitt-trigger ] not two complete sets of config.
+This code has been tested on an Arndale board (Exynos 5250), and
+is based on 3.11-rc1, with the hugepage simplification patch:
+http://lists.infradead.org/pipermail/linux-arm-kernel/2013-July/184117.html
 
-The generic pin config binding is luckily  more clear than this
-i.MX-specific handling.
+HugeTLB and THP support for LPAE has already been merged in 3.11-rc1.
 
-Yours,
-Linus Walleij
+Hugepages can give nice performance boosts to workloads that put
+pressure on the TLBs. I've observed uplifts of ~5% to some tasks
+just by enabling hugepages via the libhugetlbfs tools. Other
+people have observed decent performance boosts when huge pages
+are enabled:
+http://lists.infradead.org/pipermail/linux-arm-kernel/2013-February/148835.html
+
+I would appreciate any discussion on these patches, as there are
+people who have an interest in having huge page support in
+non-LPAE kernels.
+
+Steve Capper (2):
+  ARM: mm: HugeTLB support for non-LPAE systems.
+  ARM: mm: Transparent huge page support for non-LPAE systems.
+
+ arch/arm/Kconfig                      |   4 +-
+ arch/arm/include/asm/hugetlb-2level.h | 126 +++++++++++++++++++++++++
+ arch/arm/include/asm/hugetlb.h        |   4 +
+ arch/arm/include/asm/pgtable-2level.h | 170 ++++++++++++++++++++++++++++++++++
+ arch/arm/include/asm/pgtable-3level.h |   6 ++
+ arch/arm/include/asm/pgtable.h        |   7 +-
+ arch/arm/include/asm/tlb.h            |  10 +-
+ arch/arm/kernel/head.S                |  10 +-
+ arch/arm/mm/fault.c                   |  13 ---
+ arch/arm/mm/fsr-2level.c              |   4 +-
+ arch/arm/mm/hugetlbpage.c             |   2 +-
+ arch/arm/mm/mmu.c                     |  27 ++++++
+ 12 files changed, 360 insertions(+), 23 deletions(-)
+ create mode 100644 arch/arm/include/asm/hugetlb-2level.h
+
+-- 
+1.8.1.4
