@@ -1,64 +1,34 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Wed, 9 Oct 2013 14:56:10 -0400
-Subject: [PATCH v3 6/6] ARM: mm: Change the order of TLB/cache maintenance
- operations.
-In-Reply-To: <524EE6EF.1@ti.com>
-References: <1380835081-12129-1-git-send-email-santosh.shilimkar@ti.com>
- <1380835081-12129-7-git-send-email-santosh.shilimkar@ti.com>
- <20131004155243.GT24303@mudshark.cambridge.arm.com> <524EE6EF.1@ti.com>
-Message-ID: <5255A6CA.80304@ti.com>
+From: arno@natisbad.org (Arnaud Ebalard)
+Date: Wed, 09 Oct 2013 20:56:39 +0200
+Subject: [BUG,REGRESSION] SATA regression on 12.0-rc4 kernel
+In-Reply-To: <202B57C13565C241A5ED05E38B705C82012397EC@IRVEXCHMB08.corp.ad.broadcom.com>
+ (Marc Carino's message of "Wed, 9 Oct 2013 15:22:48 +0000")
+References: <87vc1ahyft.fsf@natisbad.org>
+ <20131007125943.GA1332@titan.lakedaemon.net>
+ <87bo303nfe.fsf@natisbad.org> <52537015.6040200@gmail.com>
+ <87y564waw0.fsf@natisbad.org>
+ <CADLC3L3EYU0VSfLMYjo013jSTWm4yZw24y+4HdvOOoEkOc6uhQ@mail.gmail.com>
+ <202B57C13565C241A5ED05E38B705C82012397EC@IRVEXCHMB08.corp.ad.broadcom.com>
+Message-ID: <87a9iiuvbs.fsf@natisbad.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Will,
+Hi guys,
 
-Will,
+I went crazy on that one: I managed to reproduce the bug w/ another disk
+(Seagate barracuda 7200.9). Then after a 'make clean' on the tree and a
+compilation from ground of the stock 3.12-rc4, I never managed to
+reproduce the error I had. I tested again with a WD30EFRX, the
+WD2500AAJS and the Seagate barracuda 7200.9, all the three in two
+different instances of the NAS: the error is gone.
 
-On Friday 04 October 2013 12:03 PM, Santosh Shilimkar wrote:
-> On Friday 04 October 2013 11:52 AM, Will Deacon wrote:
->> On Thu, Oct 03, 2013 at 10:18:00PM +0100, Santosh Shilimkar wrote:
->>> From: Sricharan R <r.sricharan@ti.com>
->>>
->>> As per the arm ARMv7 manual, the sequence of TLB maintenance
->>> operations after making changes to the translation table is
->>> to clean the dcache first, then invalidate the TLB. With
->>> the current sequence we see cache corruption when the
->>> flush_cache_all is called after tlb_flush_all.
->>>
->>> STR rx, [Translation table entry]
->>> ; write new entry to the translation table
->>> Clean cache line [Translation table entry]
->>> DSB
->>> ; ensures visibility of the data cleaned from the D Cache
->>> Invalidate TLB entry by MVA (and ASID if non-global) [page address]
->>> Invalidate BTC
->>> DSB
->>> ; ensure completion of the Invalidate TLB operation
->>> ISB
->>> ; ensure table changes visible to instruction fetch
->>>
->>> The issue is seen only with LPAE + THUMB BUILT KERNEL + 64BIT patching,
->>> which is little bit weird.
->>
->> NAK.
->>
->> I don't buy your reasoning. All current LPAE implementations also implement
->> the multi-processing extensions, meaning that the cache flush isn't required
->> to make the PTEs visible to the table walker. The dsb from the TLB_WB flag
->> is sufficient, so I think you still have some debugging to do as this change
->> is likely masking a problem elsewhere.
->>
->> On top of that, create_mapping does all the flushing you need (for the !SMP
->> case) when the tables are initialised, so this code doesn't need changing.
->>
-> Fair enough. We will drop this patch from this series and continue to look
-> at the issue further. As such the patch has no hard dependency with rest of
-> the series.
-> 
-Just to update the thread, Sricharan tracked down this issue now and
-the 64 bit patch is fixed.
+The only logical conclusion is that it was due to some missing 'make
+clean' on my tree.
 
-Thanks for NAK ;)
+I guess I owe you all some apologies for the noise.
 
-Regards,
-Santosh
+Cheers,
+
+a+
+
+ps: and yes, I hate myself for having overwritten the erroneous image
