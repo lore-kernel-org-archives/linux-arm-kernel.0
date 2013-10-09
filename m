@@ -1,56 +1,34 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Wed, 9 Oct 2013 13:07:08 +0530
-Subject: [PATCH 3/3] ARM: OMAP2+: Let DT say what devices should not to
- idled or reset
-In-Reply-To: <alpine.DEB.2.02.1310090720230.30199@utopia.booyaka.com>
-References: <1376983966-16490-1-git-send-email-rnayak@ti.com>
- <1376983966-16490-4-git-send-email-rnayak@ti.com>
- <alpine.DEB.2.02.1310090720230.30199@utopia.booyaka.com>
-Message-ID: <525507A4.9010308@ti.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 9 Oct 2013 15:42:42 +0800
+Subject: [PATCH] ARM: imx: do not return from imx_cpu_die() call
+Message-ID: <1381304562-22852-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 09 October 2013 12:54 PM, Paul Walmsley wrote:
-> Hi Beno?t, Rajendra,
-> 
-> On Tue, 20 Aug 2013, Rajendra Nayak wrote:
-> 
->> Now that we have DT bindings to specify which devices on the SoC should not
->> be reset or idled, get rid of the same information existing as part of the
->> hwmod data files and pass this info from DT instead.
->>
->> For GPMC, the HWMOD_INIT_NO_RESET flag seems to be added in hwmod not due to
->> any errata around the GPMC IP, but rather because any timings
->> set by the bootloader are not being correctly programmed by the kernel.
->> This seems like something that needs to be fixed as part of GPMC driver
->> in the kernel, and hence the flag is left as is in hwmod, which can be
->> removed once the driver does what its expected to.
->>
->> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
->> ---
->>  arch/arm/boot/dts/am33xx.dtsi              |    2 ++
->>  arch/arm/boot/dts/omap4.dtsi               |    3 +++
->>  arch/arm/boot/dts/omap5.dtsi               |    2 ++
->>  arch/arm/mach-omap2/omap_hwmod_33xx_data.c |    4 ++--
->>  arch/arm/mach-omap2/omap_hwmod_44xx_data.c |    4 +---
->>  arch/arm/mach-omap2/omap_hwmod_54xx_data.c |    2 --
->>  6 files changed, 10 insertions(+), 7 deletions(-)
-> 
-> Looking at this one, maybe the best thing for this patch is for Rajendra 
-> to split it into two patches.  Beno?t can merge the DTS patch first, then 
-> I can merge the hwmod side as a cleanup once the first one goes in.  That 
-> will avoid conflicts from other DTS and hwmod changes going into the tree.
-> 
-> Rajendra, when you do the split, please add in the DT documentation part 
-> from patch 2.  Am going to strip that out from the second patch and just 
-> merge the hwmod changes.
-> 
-> Sound good?
+When imx_cpu_die() is being called, the cpu should never return from the
+call but just in WFI and wait for hardware to take it down.  So let's
+do cpu_do_idle() repeatly in the call.  Doing this help improve the
+relibility of hotplug operation.
 
-Sure Paul, I'll repost the complete series with proper splits such that its
-easier for you and Benoit to pick them up independently.
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
+ arch/arm/mach-imx/hotplug.c |    4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-> 
-> 
-> - Paul
-> 
+diff --git a/arch/arm/mach-imx/hotplug.c b/arch/arm/mach-imx/hotplug.c
+index 3daf1ed..b35e99c 100644
+--- a/arch/arm/mach-imx/hotplug.c
++++ b/arch/arm/mach-imx/hotplug.c
+@@ -52,7 +52,9 @@ void imx_cpu_die(unsigned int cpu)
+ 	 * the register being cleared to kill the cpu.
+ 	 */
+ 	imx_set_cpu_arg(cpu, ~0);
+-	cpu_do_idle();
++
++	while (1)
++		cpu_do_idle();
+ }
+ 
+ int imx_cpu_kill(unsigned int cpu)
+-- 
+1.7.9.5
