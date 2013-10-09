@@ -1,46 +1,81 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 9 Oct 2013 07:05:16 +0000 (UTC)
-Subject: [PATCH] ARM: OMAP4: clock: Initialize USB DPLL
-In-Reply-To: <514B1553.6030701@ti.com>
-References: <1363873705-3224-1-git-send-email-rogerq@ti.com>
- <514B1553.6030701@ti.com>
-Message-ID: <alpine.DEB.2.02.1310090704180.30199@utopia.booyaka.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Wed,  9 Oct 2013 15:50:57 +0900
+Subject: [PATCH 09/14] ARM: shmobile: Remove non-multiplatform KZM9D reference
+ support
+In-Reply-To: <cover.1381299817.git.horms+renesas@verge.net.au>
+References: <cover.1381299817.git.horms+renesas@verge.net.au>
+Message-ID: <df8ee58d73ae8590bc4c9ddbe19211e4485f9d17.1381299817.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Roger,
+From: Magnus Damm <damm@opensource.se>
 
-On Thu, 21 Mar 2013, Roger Quadros wrote:
+Now when CCF is supported remove the legacy KZM9D reference
+Kconfig bits CONFIG_MACH_KZM9D_REFERENCE for the non-multiplatform
+case.
 
-> +Paul
-> 
-> On 03/21/2013 03:48 PM, Roger Quadros wrote:
-> > If the bootloader doesn't configure USB DPLL (e.g. in u-boot,
-> > disable CONFIG_USB_EHCI_OMAP), then we get all sorts of problems
-> > like
-> > - division by zero errors at boot [1]
-> > - USB DPLL fails to enter locked state
-> > - USB EHCI Host is non functional
-> > - Device can't enter OFF mode
-> > 
-> > Initializing the USB DPLL fixes all these issues.
+Starting from this commit KZM9D board support is always enabled
+via CONFIG_MACH_KZM9D, and CONFIG_ARCH_MULTIPLATFORM is used
+to select between board-kzm9d.c and board-kzm9d-reference.c
 
-Looks like I may have lost track of this - do we still need this one?
+The file board-kzm9d-reference.c can no longer be used together
+with the legacy sh-clk clock framework, instead CCF is used.
 
-Also:
+Signed-off-by: Magnus Damm <damm@opensource.se>
+Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/mach-shmobile/Kconfig       | 12 ------------
+ arch/arm/mach-shmobile/Makefile      |  1 -
+ arch/arm/mach-shmobile/Makefile.boot |  1 -
+ 3 files changed, 14 deletions(-)
 
-> > diff --git a/arch/arm/mach-omap2/cclock44xx_data.c b/arch/arm/mach-omap2/cclock44xx_data.c
-> > index bfc46c1..6127bb9 100644
-> > --- a/arch/arm/mach-omap2/cclock44xx_data.c
-> > +++ b/arch/arm/mach-omap2/cclock44xx_data.c
-> > @@ -53,6 +53,12 @@
-> >   */
-> >  #define OMAP4_DPLL_ABE_DEFFREQ				98304000
-> >  
-> > +/*
-> > + * OMAP4450 TRM Rev X, section "3.6.3.9.5 DPLL_USB Preferred Settings"
-
-4450?
-
-
-- Paul
+diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
+index c9c4f15..a4a4b75 100644
+--- a/arch/arm/mach-shmobile/Kconfig
++++ b/arch/arm/mach-shmobile/Kconfig
+@@ -237,18 +237,6 @@ config MACH_KZM9D
+ 	select REGULATOR_FIXED_VOLTAGE if REGULATOR
+ 	select USE_OF
+ 
+-config MACH_KZM9D_REFERENCE
+-	bool "KZM9D board - Reference Device Tree Implementation"
+-	depends on ARCH_EMEV2
+-	select REGULATOR_FIXED_VOLTAGE if REGULATOR
+-	select USE_OF
+-	---help---
+-	   Use reference implementation of KZM9D board support
+-	   which makes a greater use of device tree at the expense
+-	   of not supporting a number of devices.
+-
+-	   This is intended to aid developers
+-
+ config MACH_KZM9G
+ 	bool "KZM-A9-GT board"
+ 	depends on ARCH_SH73A0
+diff --git a/arch/arm/mach-shmobile/Makefile b/arch/arm/mach-shmobile/Makefile
+index b11466d..51db2bc 100644
+--- a/arch/arm/mach-shmobile/Makefile
++++ b/arch/arm/mach-shmobile/Makefile
+@@ -72,7 +72,6 @@ obj-$(CONFIG_MACH_ARMADILLO800EVA)	+= board-armadillo800eva.o
+ obj-$(CONFIG_MACH_ARMADILLO800EVA_REFERENCE)	+= board-armadillo800eva-reference.o
+ obj-$(CONFIG_MACH_KOELSCH)	+= board-koelsch.o
+ obj-$(CONFIG_MACH_KZM9D)	+= board-kzm9d.o
+-obj-$(CONFIG_MACH_KZM9D_REFERENCE)	+= board-kzm9d-reference.o
+ obj-$(CONFIG_MACH_KZM9G)	+= board-kzm9g.o
+ obj-$(CONFIG_MACH_KZM9G_REFERENCE)	+= board-kzm9g-reference.o
+ endif
+diff --git a/arch/arm/mach-shmobile/Makefile.boot b/arch/arm/mach-shmobile/Makefile.boot
+index c690b50..391d72a 100644
+--- a/arch/arm/mach-shmobile/Makefile.boot
++++ b/arch/arm/mach-shmobile/Makefile.boot
+@@ -9,7 +9,6 @@ loadaddr-$(CONFIG_MACH_BOCKW_REFERENCE) += 0x60008000
+ loadaddr-$(CONFIG_MACH_GENMAI) += 0x8008000
+ loadaddr-$(CONFIG_MACH_KOELSCH) += 0x40008000
+ loadaddr-$(CONFIG_MACH_KZM9D) += 0x40008000
+-loadaddr-$(CONFIG_MACH_KZM9D_REFERENCE) += 0x40008000
+ loadaddr-$(CONFIG_MACH_KZM9G) += 0x41008000
+ loadaddr-$(CONFIG_MACH_KZM9G_REFERENCE) += 0x41008000
+ loadaddr-$(CONFIG_MACH_LAGER) += 0x40008000
+-- 
+1.8.4
