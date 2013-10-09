@@ -1,126 +1,94 @@
 From: jic23@kernel.org (Jonathan Cameron)
-Date: Wed, 09 Oct 2013 21:12:29 +0100
-Subject: [PATCH 1/3] iio: at91: ADC start-up time calculation changed
- since at91sam9x5
-In-Reply-To: <1381204136-32322-2-git-send-email-josh.wu@atmel.com>
+Date: Wed, 09 Oct 2013 21:13:33 +0100
+Subject: [PATCH 2/3] iio: at91: move the num_channels from DT to driver
+ itself
+In-Reply-To: <1381204136-32322-3-git-send-email-josh.wu@atmel.com>
 References: <1381204136-32322-1-git-send-email-josh.wu@atmel.com>
- <1381204136-32322-2-git-send-email-josh.wu@atmel.com>
-Message-ID: <5255B8AD.3040109@kernel.org>
+ <1381204136-32322-3-git-send-email-josh.wu@atmel.com>
+Message-ID: <5255B8ED.6080307@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 10/08/13 04:48, Josh Wu wrote:
-> Since in at91sam9x5, sama5d3x chip. the start up time calucation is changed.
-> This patch can choose different start up time calculation formula for different
-> chips.
-> 
+> CC: devicetree at vger.kernel.org
 > Signed-off-by: Josh Wu <josh.wu@atmel.com>
-> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> Acked-by: Ludovic Desroches <ludovic.desroches@atmel.com>
 Applied to the togreg branch of iio.git
 
-Thanks
+Thanks,
+
 > ---
->  drivers/iio/adc/at91_adc.c |   53 ++++++++++++++++++++++++++++++++++++++------
->  1 file changed, 46 insertions(+), 7 deletions(-)
+>  .../devicetree/bindings/arm/atmel-adc.txt          |    1 -
+>  drivers/iio/adc/at91_adc.c                         |   12 +++++-------
+>  2 files changed, 5 insertions(+), 8 deletions(-)
 > 
+> diff --git a/Documentation/devicetree/bindings/arm/atmel-adc.txt b/Documentation/devicetree/bindings/arm/atmel-adc.txt
+> index 723c205..0e65e01 100644
+> --- a/Documentation/devicetree/bindings/arm/atmel-adc.txt
+> +++ b/Documentation/devicetree/bindings/arm/atmel-adc.txt
+> @@ -7,7 +7,6 @@ Required properties:
+>    - interrupts: Should contain the IRQ line for the ADC
+>    - atmel,adc-channels-used: Bitmask of the channels muxed and enable for this
+>      device
+> -  - atmel,adc-num-channels: Number of channels available in the ADC
+>    - atmel,adc-startup-time: Startup Time of the ADC in microseconds as
+>      defined in the datasheet
+>    - atmel,adc-vref: Reference voltage in millivolts for the conversions
 > diff --git a/drivers/iio/adc/at91_adc.c b/drivers/iio/adc/at91_adc.c
-> index 0f16b55..cee04a4 100644
+> index cee04a4..22cf61d2 100644
 > --- a/drivers/iio/adc/at91_adc.c
 > +++ b/drivers/iio/adc/at91_adc.c
-> @@ -40,6 +40,9 @@
->  	(writel_relaxed(val, st->reg_base + reg))
+> @@ -43,6 +43,7 @@ struct at91_adc_caps {
+>  	/* startup time calculate function */
+>  	u32 (*calc_startup_ticks)(u8 startup_time, u32 adc_clk_khz);
 >  
->  struct at91_adc_caps {
-> +	/* startup time calculate function */
-> +	u32 (*calc_startup_ticks)(u8 startup_time, u32 adc_clk_khz);
-> +
+> +	u8	num_channels;
 >  	struct at91_adc_reg_desc registers;
 >  };
 >  
-> @@ -434,6 +437,45 @@ ret:
->  	return ret;
->  }
->  
-> +static u32 calc_startup_ticks_9260(u8 startup_time, u32 adc_clk_khz)
-> +{
-> +	/*
-> +	 * Number of ticks needed to cover the startup time of the ADC
-> +	 * as defined in the electrical characteristics of the board,
-> +	 * divided by 8. The formula thus is :
-> +	 *   Startup Time = (ticks + 1) * 8 / ADC Clock
-> +	 */
-> +	return round_up((startup_time * adc_clk_khz / 1000) - 1, 8) / 8;
-> +}
-> +
-> +static u32 calc_startup_ticks_9x5(u8 startup_time, u32 adc_clk_khz)
-> +{
-> +	/*
-> +	 * For sama5d3x and at91sam9x5, the formula changes to:
-> +	 * Startup Time = <lookup_table_value> / ADC Clock
-> +	 */
-> +	const int startup_lookup[] = {
-> +		0  , 8  , 16 , 24 ,
-> +		64 , 80 , 96 , 112,
-> +		512, 576, 640, 704,
-> +		768, 832, 896, 960
-> +		};
-> +	int i, size = ARRAY_SIZE(startup_lookup);
-> +	unsigned int ticks;
-> +
-> +	ticks = startup_time * adc_clk_khz / 1000;
-> +	for (i = 0; i < size; i++)
-> +		if (ticks < startup_lookup[i])
-> +			break;
-> +
-> +	ticks = i;
-> +	if (ticks == size)
-> +		/* Reach the end of lookup table */
-> +		ticks = size - 1;
-> +
-> +	return ticks;
-> +}
-> +
->  static const struct of_device_id at91_adc_dt_ids[];
->  
->  static int at91_adc_probe_dt(struct at91_adc_state *st,
-> @@ -657,15 +699,9 @@ static int at91_adc_probe(struct platform_device *pdev)
->  		ret = -EINVAL;
->  		goto error_disable_adc_clk;
+> @@ -502,13 +503,6 @@ static int at91_adc_probe_dt(struct at91_adc_state *st,
 >  	}
-> +	ticks = (*st->caps->calc_startup_ticks)(st->startup_time, adc_clk_khz);
+>  	st->channels_mask = prop;
 >  
->  	/*
-> -	 * Number of ticks needed to cover the startup time of the ADC as
-> -	 * defined in the electrical characteristics of the board, divided by 8.
-> -	 * The formula thus is : Startup Time = (ticks + 1) * 8 / ADC Clock
-> -	 */
-> -	ticks = round_up((st->startup_time * adc_clk_khz /
-> -			  1000) - 1, 8) / 8;
-> -	/*
->  	 * a minimal Sample and Hold Time is necessary for the ADC to guarantee
->  	 * the best converted final value between two channels selection
->  	 * The formula thus is : Sample and Hold Time = (shtim + 1) / ADCClock
-> @@ -742,6 +778,7 @@ static int at91_adc_remove(struct platform_device *pdev)
+> -	if (of_property_read_u32(node, "atmel,adc-num-channels", &prop)) {
+> -		dev_err(&idev->dev, "Missing adc-num-channels property in the DT.\n");
+> -		ret = -EINVAL;
+> -		goto error_ret;
+> -	}
+> -	st->num_channels = prop;
+> -
+>  	st->sleep_mode = of_property_read_bool(node, "atmel,adc-sleep-mode");
 >  
+>  	if (of_property_read_u32(node, "atmel,adc-startup-time", &prop)) {
+> @@ -534,6 +528,7 @@ static int at91_adc_probe_dt(struct at91_adc_state *st,
+>  		goto error_ret;
+>  
+>  	st->registers = &st->caps->registers;
+> +	st->num_channels = st->caps->num_channels;
+>  	st->trigger_number = of_get_child_count(node);
+>  	st->trigger_list = devm_kzalloc(&idev->dev, st->trigger_number *
+>  					sizeof(struct at91_adc_trigger),
+> @@ -779,6 +774,7 @@ static int at91_adc_remove(struct platform_device *pdev)
 >  #ifdef CONFIG_OF
 >  static struct at91_adc_caps at91sam9260_caps = {
-> +	.calc_startup_ticks = calc_startup_ticks_9260,
+>  	.calc_startup_ticks = calc_startup_ticks_9260,
+> +	.num_channels = 4,
 >  	.registers = {
 >  		.channel_base = AT91_ADC_CHR(0),
 >  		.drdy_mask = AT91_ADC_DRDY,
-> @@ -753,6 +790,7 @@ static struct at91_adc_caps at91sam9260_caps = {
->  };
+> @@ -791,6 +787,7 @@ static struct at91_adc_caps at91sam9260_caps = {
 >  
 >  static struct at91_adc_caps at91sam9g45_caps = {
-> +	.calc_startup_ticks = calc_startup_ticks_9260,	/* same as 9260 */
+>  	.calc_startup_ticks = calc_startup_ticks_9260,	/* same as 9260 */
+> +	.num_channels = 8,
 >  	.registers = {
 >  		.channel_base = AT91_ADC_CHR(0),
 >  		.drdy_mask = AT91_ADC_DRDY,
-> @@ -764,6 +802,7 @@ static struct at91_adc_caps at91sam9g45_caps = {
->  };
+> @@ -803,6 +800,7 @@ static struct at91_adc_caps at91sam9g45_caps = {
 >  
 >  static struct at91_adc_caps at91sam9x5_caps = {
-> +	.calc_startup_ticks = calc_startup_ticks_9x5,
+>  	.calc_startup_ticks = calc_startup_ticks_9x5,
+> +	.num_channels = 12,
 >  	.registers = {
 >  		.channel_base = AT91_ADC_CDR0_9X5,
 >  		.drdy_mask = AT91_ADC_SR_DRDY_9X5,
