@@ -1,30 +1,39 @@
 From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Wed, 9 Oct 2013 21:48:15 +0100
-Subject: [PATCH v8 02/17] arm64: define DMA_ERROR_CODE
+Date: Wed, 9 Oct 2013 21:48:17 +0100
+Subject: [PATCH v8 04/17] xen/x86: allow __set_phys_to_machine for
+ autotranslate guests
 In-Reply-To: <alpine.DEB.2.02.1310092109190.26077@kaball.uk.xensource.com>
 References: <alpine.DEB.2.02.1310092109190.26077@kaball.uk.xensource.com>
-Message-ID: <1381351710-1876-2-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <1381351710-1876-4-git-send-email-stefano.stabellini@eu.citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-CC: will.deacon at arm.com
----
- arch/arm64/include/asm/dma-mapping.h |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+Allow __set_phys_to_machine to be called for autotranslate guests.
+It can be used to keep track of phys_to_machine changes, however we
+don't do anything with the information at the moment.
 
-diff --git a/arch/arm64/include/asm/dma-mapping.h b/arch/arm64/include/asm/dma-mapping.h
-index 8d18100..c2cb8a0 100644
---- a/arch/arm64/include/asm/dma-mapping.h
-+++ b/arch/arm64/include/asm/dma-mapping.h
-@@ -25,6 +25,7 @@
+Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+---
+ arch/x86/xen/p2m.c |    6 +++---
+ 1 files changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/arch/x86/xen/p2m.c b/arch/x86/xen/p2m.c
+index 95fb2aa..59d9e70 100644
+--- a/arch/x86/xen/p2m.c
++++ b/arch/x86/xen/p2m.c
+@@ -798,10 +798,10 @@ bool __set_phys_to_machine(unsigned long pfn, unsigned long mfn)
+ {
+ 	unsigned topidx, mididx, idx;
  
- #define ARCH_HAS_DMA_GET_REQUIRED_MASK
- 
-+#define DMA_ERROR_CODE	(~0)
- extern struct dma_map_ops *dma_ops;
- 
- static inline struct dma_map_ops *get_dma_ops(struct device *dev)
+-	if (unlikely(xen_feature(XENFEAT_auto_translated_physmap))) {
+-		BUG_ON(pfn != mfn && mfn != INVALID_P2M_ENTRY);
++	/* don't track P2M changes in autotranslate guests */
++	if (unlikely(xen_feature(XENFEAT_auto_translated_physmap)))
+ 		return true;
+-	}
++
+ 	if (unlikely(pfn >= MAX_P2M_PFN)) {
+ 		BUG_ON(mfn != INVALID_P2M_ENTRY);
+ 		return true;
 -- 
 1.7.2.5
