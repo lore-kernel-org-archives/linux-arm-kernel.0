@@ -1,33 +1,38 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  9 Oct 2013 15:51:04 +0900
-Subject: [PATCH 12/14] ARM: shmobile: Use SMP on Koelsch
-In-Reply-To: <cover.1381299817.git.horms+renesas@verge.net.au>
-References: <cover.1381299817.git.horms+renesas@verge.net.au>
-Message-ID: <b6d5a1b1c3476225e897a2f706c0e7eca7b05984.1381299817.git.horms+renesas@verge.net.au>
+Date: Wed,  9 Oct 2013 15:51:24 +0900
+Subject: [GIT PULL] Second Round of Renesas ARM based SoC defconfig updates
+ for v3.13
+Message-ID: <cover.1381300141.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm@opensource.se>
+Hi Olof, Hi Arnd, Hi Kevin,
 
-Enable r8a7791 SMP support code on the Koelsch board.
+please consider this second round of Renesas ARM based SoC defconfig
+updates for v3.13.
 
-Signed-off-by: Magnus Damm <damm@opensource.se>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/mach-shmobile/board-koelsch.c | 1 +
- 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/mach-shmobile/board-koelsch.c b/arch/arm/mach-shmobile/board-koelsch.c
-index ea5846e..ace1711 100644
---- a/arch/arm/mach-shmobile/board-koelsch.c
-+++ b/arch/arm/mach-shmobile/board-koelsch.c
-@@ -39,6 +39,7 @@ static const char * const koelsch_boards_compat_dt[] __initconst = {
- };
- 
- DT_MACHINE_START(KOELSCH_DT, "koelsch")
-+	.smp		= smp_ops(r8a7791_smp_ops),
- 	.init_early	= r8a7791_init_early,
- 	.init_machine	= koelsch_add_standard_devices,
- 	.init_time	= rcar_gen2_timer_init,
--- 
-1.8.4
+The following changes since commit 6bb2e347899b297eea26f2658eac8fdcd633fba5:
+
+  ARM: shmobile: Add koelsch defconfig (2013-09-20 17:46:15 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-defconfig2-for-v3.13
+
+for you to fetch changes up to bb416e1d7416861bece0335f543c590d9af09c79:
+
+  ARM: shmobile: Genmai defconfig (2013-10-03 13:01:30 +0900)
+
+----------------------------------------------------------------
+Second Round of Renesas ARM based SoC defconfig updates for v3.13
+
+* Add defconfig for Genmai board
+
+----------------------------------------------------------------
+Magnus Damm (1):
+      ARM: shmobile: Genmai defconfig
+
+ arch/arm/configs/genmai_defconfig | 116 ++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 116 insertions(+)
+ create mode 100644 arch/arm/configs/genmai_defconfig
