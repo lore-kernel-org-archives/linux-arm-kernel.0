@@ -1,37 +1,36 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  9 Oct 2013 15:50:51 +0900
-Subject: [PATCH 03/14] ARM: shmobile: marzen: enable DMA for SDHI0
+Date: Wed,  9 Oct 2013 15:50:53 +0900
+Subject: [PATCH 05/14] ARM: shmobile: Use r8a7791_add_standard_devices() on
+ Koelsch
 In-Reply-To: <cover.1381299817.git.horms+renesas@verge.net.au>
 References: <cover.1381299817.git.horms+renesas@verge.net.au>
-Message-ID: <e6a8b11b82fdeaa78dad52552f945b772ee1a5c9.1381299817.git.horms+renesas@verge.net.au>
+Message-ID: <0749bead08db4e01588437a05a126bf4774dae23.1381299817.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Max Filippov <max.filippov@cogentembedded.com>
+From: Magnus Damm <damm@opensource.se>
 
-Pass HPB-DMA slave IDs in the SDHI0 platform data to enable DMA in the SDHI
-driver.
+Use r8a7791_add_standard_devices() on Koelsch to let
+the C version of the board code add on-chip devices.
 
-Signed-off-by: Max Filippov <max.filippov@cogentembedded.com>
-[Sergei: removed #include <mach/dma.h>]
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Signed-off-by: Magnus Damm <damm@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/board-marzen.c | 2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm/mach-shmobile/board-koelsch.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-shmobile/board-marzen.c b/arch/arm/mach-shmobile/board-marzen.c
-index 434b213..da1352f 100644
---- a/arch/arm/mach-shmobile/board-marzen.c
-+++ b/arch/arm/mach-shmobile/board-marzen.c
-@@ -125,6 +125,8 @@ static struct resource sdhi0_resources[] = {
- };
+diff --git a/arch/arm/mach-shmobile/board-koelsch.c b/arch/arm/mach-shmobile/board-koelsch.c
+index cc2d5e8..278f12e 100644
+--- a/arch/arm/mach-shmobile/board-koelsch.c
++++ b/arch/arm/mach-shmobile/board-koelsch.c
+@@ -29,7 +29,7 @@
+ static void __init koelsch_add_standard_devices(void)
+ {
+ 	r8a7791_clock_init();
+-	r8a7791_add_dt_devices();
++	r8a7791_add_standard_devices();
+ }
  
- static struct sh_mobile_sdhi_info sdhi0_platform_data = {
-+	.dma_slave_tx = HPBDMA_SLAVE_SDHI0_TX,
-+	.dma_slave_rx = HPBDMA_SLAVE_SDHI0_RX,
- 	.tmio_flags = TMIO_MMC_WRPROTECT_DISABLE | TMIO_MMC_HAS_IDLE_WAIT,
- 	.tmio_caps = MMC_CAP_SD_HIGHSPEED,
- };
+ static const char * const koelsch_boards_compat_dt[] __initconst = {
 -- 
 1.8.4
