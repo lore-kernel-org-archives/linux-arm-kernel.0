@@ -1,119 +1,218 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Wed, 9 Oct 2013 18:54:56 +0100
-Subject: [PATCH v6 16/19] arm,arm64: do not always merge biovec if we
- are running on Xen
-In-Reply-To: <20130930160646.GV3106@phenom.dumpdata.com>
-References: <alpine.DEB.2.02.1309271653420.5498@kaball.uk.xensource.com>
- <1380298207-29151-16-git-send-email-stefano.stabellini@eu.citrix.com>
- <20130930160646.GV3106@phenom.dumpdata.com>
-Message-ID: <alpine.DEB.2.02.1310091853540.26077@kaball.uk.xensource.com>
+From: john.tobias.ph@gmail.com (John Tobias)
+Date: Wed, 9 Oct 2013 11:00:56 -0700
+Subject: eMMC 4.51
+In-Reply-To: <CA+6rjLzLhA-zzTqWuzFCMXa1v9CgS-O+Rrnqsfpw9=UY_1vuMA@mail.gmail.com>
+References: <CACUGKYPDQJPvtXj3NBm8=eYCioWmq=pRVSORNYNZjD13N5ceeg@mail.gmail.com>
+ <CA+6rjLzLhA-zzTqWuzFCMXa1v9CgS-O+Rrnqsfpw9=UY_1vuMA@mail.gmail.com>
+Message-ID: <CACUGKYPn-qL2_z83wK0EYtDexmyYQX6YVPwHTp5C4_d2M9BH4w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 30 Sep 2013, Konrad Rzeszutek Wilk wrote:
-> On Fri, Sep 27, 2013 at 05:10:04PM +0100, Stefano Stabellini wrote:
-> > This is similar to what it is done on X86: biovecs are prevented from merging
-> > otherwise every dma requests would be forced to bounce on the swiotlb buffer.
-> > 
-> > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> 
-> 
-> This also alters the generic (well, was x86, now it is generic) code.
-> Perhaps that change should be made in a seperate patch and explain
-> what the autotranslate extra check will do for PV, PVH and HVM guests?
-> 
-> Wait, does that mean we had not been merging requests on HVM guests?
-> Is that good or bad?
+Hi Jackey,
 
-With the new introduction of a p2m for xen on arm and arm64, I don't
-need the change to drivers/xen/biomerge.c anymore.
-No more autotranslate extra check.
+The Marvel SD8797 work fine but there are some cases that the firmware
+failed to load during the system boot up. Although, we managed it by
+power cycling the power source of the Marvel chip so that the kernel
+will able to detect and reinitialize again.
 
-> > ---
-> >  arch/arm/include/asm/io.h   |    8 ++++++++
-> >  arch/arm64/include/asm/io.h |    9 +++++++++
-> >  drivers/xen/biomerge.c      |    4 +++-
-> >  3 files changed, 20 insertions(+), 1 deletions(-)
-> > 
-> > diff --git a/arch/arm/include/asm/io.h b/arch/arm/include/asm/io.h
-> > index d070741..c45effc 100644
-> > --- a/arch/arm/include/asm/io.h
-> > +++ b/arch/arm/include/asm/io.h
-> > @@ -24,9 +24,11 @@
-> >  #ifdef __KERNEL__
-> >  
-> >  #include <linux/types.h>
-> > +#include <linux/blk_types.h>
-> >  #include <asm/byteorder.h>
-> >  #include <asm/memory.h>
-> >  #include <asm-generic/pci_iomap.h>
-> > +#include <xen/xen.h>
-> >  
-> >  /*
-> >   * ISA I/O bus memory addresses are 1:1 with the physical address.
-> > @@ -372,6 +374,12 @@ extern void pci_iounmap(struct pci_dev *dev, void __iomem *addr);
-> >  #define BIOVEC_MERGEABLE(vec1, vec2)	\
-> >  	((bvec_to_phys((vec1)) + (vec1)->bv_len) == bvec_to_phys((vec2)))
-> >  
-> > +extern bool xen_biovec_phys_mergeable(const struct bio_vec *vec1,
-> > +				      const struct bio_vec *vec2);
-> > +#define BIOVEC_PHYS_MERGEABLE(vec1, vec2)				\
-> > +	(__BIOVEC_PHYS_MERGEABLE(vec1, vec2) &&				\
-> > +	 (!xen_domain() || xen_biovec_phys_mergeable(vec1, vec2)))
-> > +
-> >  #ifdef CONFIG_MMU
-> >  #define ARCH_HAS_VALID_PHYS_ADDR_RANGE
-> >  extern int valid_phys_addr_range(phys_addr_t addr, size_t size);
-> > diff --git a/arch/arm64/include/asm/io.h b/arch/arm64/include/asm/io.h
-> > index 1d12f89..c163287b 100644
-> > --- a/arch/arm64/include/asm/io.h
-> > +++ b/arch/arm64/include/asm/io.h
-> > @@ -22,11 +22,14 @@
-> >  #ifdef __KERNEL__
-> >  
-> >  #include <linux/types.h>
-> > +#include <linux/blk_types.h>
-> >  
-> >  #include <asm/byteorder.h>
-> >  #include <asm/barrier.h>
-> >  #include <asm/pgtable.h>
-> >  
-> > +#include <xen/xen.h>
-> > +
-> >  /*
-> >   * Generic IO read/write.  These perform native-endian accesses.
-> >   */
-> > @@ -263,5 +266,11 @@ extern int devmem_is_allowed(unsigned long pfn);
-> >   */
-> >  #define xlate_dev_kmem_ptr(p)	p
-> >  
-> > +extern bool xen_biovec_phys_mergeable(const struct bio_vec *vec1,
-> > +				      const struct bio_vec *vec2);
-> > +#define BIOVEC_PHYS_MERGEABLE(vec1, vec2)				\
-> > +	(__BIOVEC_PHYS_MERGEABLE(vec1, vec2) &&				\
-> > +	 (!xen_domain() || xen_biovec_phys_mergeable(vec1, vec2)))
-> > +
-> >  #endif	/* __KERNEL__ */
-> >  #endif	/* __ASM_IO_H */
-> > diff --git a/drivers/xen/biomerge.c b/drivers/xen/biomerge.c
-> > index 0edb91c..f323a2d 100644
-> > --- a/drivers/xen/biomerge.c
-> > +++ b/drivers/xen/biomerge.c
-> > @@ -2,6 +2,7 @@
-> >  #include <linux/io.h>
-> >  #include <linux/export.h>
-> >  #include <xen/page.h>
-> > +#include <xen/features.h>
-> >  
-> >  bool xen_biovec_phys_mergeable(const struct bio_vec *vec1,
-> >  			       const struct bio_vec *vec2)
-> > @@ -9,7 +10,8 @@ bool xen_biovec_phys_mergeable(const struct bio_vec *vec1,
-> >  	unsigned long mfn1 = pfn_to_mfn(page_to_pfn(vec1->bv_page));
-> >  	unsigned long mfn2 = pfn_to_mfn(page_to_pfn(vec2->bv_page));
-> >  
-> > -	return __BIOVEC_PHYS_MERGEABLE(vec1, vec2) &&
-> > +	return !xen_feature(XENFEAT_auto_translated_physmap) &&
-> > +		__BIOVEC_PHYS_MERGEABLE(vec1, vec2) &&
-> >  		((mfn1 == mfn2) || ((mfn1+1) == mfn2));
-> >  }
-> >  EXPORT_SYMBOL(xen_biovec_phys_mergeable);
+The module was running in high speed, 4bit bus width.
+
+Here are some info:
+
+# iperf -c 192.168.x.x -t 60 -i 10
+------------------------------------------------------------
+Client connecting to 192.168.x.x, TCP port 5001
+TCP window size: 20.7 KByte (default)
+------------------------------------------------------------
+[  3] local 192.168.x.x port 52071 connected with 192.168.x.x port 5001
+[ ID] Interval       Transfer     Bandwidth
+[  3]  0.0-10.0 sec  48.0 MBytes  40.3 Mbits/sec
+[  3] 10.0-20.0 sec  53.4 MBytes  44.8 Mbits/sec
+[  3] 20.0-30.0 sec  53.8 MBytes  45.1 Mbits/sec
+[  3] 30.0-40.0 sec  56.4 MBytes  47.3 Mbits/sec
+[  3] 40.0-50.0 sec  54.2 MBytes  45.5 Mbits/sec
+[  3] 50.0-60.0 sec  53.5 MBytes  44.9 Mbits/sec
+[  3]  0.0-60.0 sec   319 MBytes  44.6 Mbits/sec
+
+# iwconfig mlan0
+mlan0     IEEE 802.11abgn  ESSID:"Pxx-xxx"
+          Mode:Managed  Frequency:2.437 GHz  Access Point: BC:Dx:xx:xx:xx:xx
+          Bit Rate=135 Mb/s
+          Retry  long limit:7   RTS thr:off   Fragment thr:off
+          Encryption key:off
+          Power Management:on
+          Link Quality=70/70  Signal level=-28 dBm
+          Rx invalid nwid:0  Rx invalid crypt:0  Rx invalid frag:0
+          Tx excessive retries:0  Invalid misc:0   Missed beacon:0
+
+Regards,
+
+john
+
+
+
+On Wed, Oct 9, 2013 at 12:23 AM, Jackey Shen <jackey.shen.bo@gmail.com> wrote:
+> Hi John,
+>
+> Does wifi module (Marvel SD8797) work fine on your board? What speed does it
+> run at? SDR104?
+>
+> Thanks,
+> Jackey
+>
+> On Wed, Oct 9, 2013 at 10:00 AM, John Tobias <john.tobias.ph@gmail.com>
+> wrote:
+>>
+>> Hello,
+>>
+>> I am using git://gitorious.org/thierryreding/linux-next.git to boot my
+>> custom board based on iMX6 sololite. My board has SanDisk iNAND 4.51
+>> I/F and wifi module (Marvel SD8797). The latest update of
+>> sdhci-esdhc-imx.c supports DDR50/SDR50/SDR104 and I would like to use
+>> it for my device.
+>>
+>> In my .dts file, I have the following settings:
+>>
+>> /* WIFI module */
+>> &usdhc2 {
+>> pinctrl-names = "default", "state_100mhz", "state_200mhz";
+>> pinctrl-0 = <&pinctrl_usdhc2_2_default>;
+>> pinctrl-1 = <&pinctrl_usdhc2_3_100mhz>;
+>> pinctrl-2 = <&pinctrl_usdhc2_4_200mhz>;
+>> bus-width = <4>;
+>> status = "okay";
+>> };
+>>
+>> /* eMMC module  */
+>> &usdhc4 {
+>> pinctrl-names = "default", "state_100mhz", "state_200mhz";
+>> pinctrl-0 = <&pinctrl_usdhc4_2_default>;
+>> pinctrl-1 = <&pinctrl_usdhc4_3_100mhz>;
+>> pinctrl-2 = <&pinctrl_usdhc4_4_200mhz>;
+>> bus-width = <8>;
+>> status = "okay";
+>> compatible = "fsl,imx6sl-usdhc", "fsl,imx6q-usdhc";
+>> reg = <0x0219c000 0x4000>;
+>> };
+>>
+>> Then, in my .dtsi file:
+>>
+>> usdhc2 {
+>> /*WIFI pinmux */
+>> pinctrl_usdhc2_2_default: default {
+>> fsl,pins = <
+>> EVT1_PAD_SD2_CMD__SD2_CMD     0x17039
+>> EVT1_PAD_SD2_CLK__SD2_CLK     0x17039
+>> EVT1_PAD_SD2_DATA0__SD2_DATA0 0x17039
+>> EVT1_PAD_SD2_DATA1__SD2_DATA1 0x17039
+>> EVT1_PAD_SD2_DATA2__SD2_DATA2 0x17039
+>> EVT1_PAD_SD2_DATA3__SD2_DATA3 0x17039
+>> >;
+>> };
+>>
+>> pinctrl_usdhc2_3_100mhz: state_100mhz { /* 100Mhz */
+>> fsl,pins = <
+>> EVT1_PAD_SD2_CMD__SD2_CMD 0x170B9
+>> EVT1_PAD_SD2_CLK__SD2_CLK 0x100B9
+>> EVT1_PAD_SD2_DATA0__SD2_DATA0 0x170B9
+>> EVT1_PAD_SD2_DATA1__SD2_DATA1 0x170B9
+>> EVT1_PAD_SD2_DATA2__SD2_DATA2 0x170B9
+>> EVT1_PAD_SD2_DATA3__SD2_DATA3 0x170B9
+>> >;
+>> };
+>>
+>> pinctrl_usdhc2_4_200mhz: state_200mhz { /* 200Mhz */
+>> fsl,pins = <
+>> EVT1_PAD_SD2_CMD__SD2_CMD 0x170F9
+>> EVT1_PAD_SD2_CLK__SD2_CLK 0x100F9
+>> EVT1_PAD_SD2_DATA0__SD2_DATA0 0x170F9
+>> EVT1_PAD_SD2_DATA1__SD2_DATA1 0x170F9
+>> EVT1_PAD_SD2_DATA2__SD2_DATA2 0x170F9
+>> EVT1_PAD_SD2_DATA3__SD2_DATA3 0x170F9
+>> >;
+>> };
+>> };
+>>
+>> usdhc4 {
+>> /* eMMC pinmux */
+>> pinctrl_usdhc4_2_default: default {
+>> fsl,pins = <
+>> EVT1_PAD_EPDC_BDR1__SD4_CMD       0x17039
+>> EVT1_PAD_EPDC_BDR0__SD4_CLK       0x10039
+>> EVT1_PAD_EPDC_PWR_COM__SD4_DATA0  0x17039
+>> EVT1_PAD_EPDC_PWR_IRQ__SD4_DATA1  0x17039
+>> EVT1_PAD_EPDC_PWR_STAT__SD4_DATA2 0x17039
+>> EVT1_PAD_EPDC_PWR_WAKE__SD4_DATA3 0x17039
+>> EVT1_PAD_FEC_MDC__SD4_DATA4 0x17039
+>> EVT1_PAD_FEC_RX_DATA0__SD4_DATA5  0x17039
+>> EVT1_PAD_FEC_TX_EN__SD4_DATA6     0x17039
+>> EVT1_PAD_FEC_TX_DATA1__SD4_DATA7  0x17039
+>> >;
+>> };
+>>
+>> pinctrl_usdhc4_3_100mhz: state_100mhz { /* 100Mhz */
+>> fsl,pins = <
+>> EVT1_PAD_EPDC_BDR1__SD4_CMD 0x170B9
+>> EVT1_PAD_EPDC_BDR0__SD4_CLK   0x100B9
+>> EVT1_PAD_EPDC_PWR_COM__SD4_DATA0 0x170B9
+>> EVT1_PAD_EPDC_PWR_IRQ__SD4_DATA1 0x170B9
+>> EVT1_PAD_EPDC_PWR_STAT__SD4_DATA2 0x170B9
+>> EVT1_PAD_EPDC_PWR_WAKE__SD4_DATA3 0x170B9
+>> EVT1_PAD_FEC_MDC__SD4_DATA4 0x170B9
+>> EVT1_PAD_FEC_RX_DATA0__SD4_DATA5  0x170B9
+>> EVT1_PAD_FEC_TX_EN__SD4_DATA6     0x170B9
+>> EVT1_PAD_FEC_TX_DATA1__SD4_DATA7  0x170B9
+>> >;
+>> };
+>>
+>> pinctrl_usdhc4_4_200mhz: state_200mhz { /* 200Mhz */
+>> fsl,pins = <
+>> EVT1_PAD_EPDC_BDR1__SD4_CMD 0x170F9
+>> EVT1_PAD_EPDC_BDR0__SD4_CLK   0x100F9
+>> EVT1_PAD_EPDC_PWR_COM__SD4_DATA0 0x170F9
+>> EVT1_PAD_EPDC_PWR_IRQ__SD4_DATA1 0x170F9
+>> EVT1_PAD_EPDC_PWR_STAT__SD4_DATA2 0x170F9
+>> EVT1_PAD_EPDC_PWR_WAKE__SD4_DATA3 0x170F9
+>> EVT1_PAD_FEC_MDC__SD4_DATA4 0x170F9
+>> EVT1_PAD_FEC_RX_DATA0__SD4_DATA5  0x170F9
+>> EVT1_PAD_FEC_TX_EN__SD4_DATA6     0x170F9
+>> EVT1_PAD_FEC_TX_DATA1__SD4_DATA7  0x170F9
+>> >;
+>> };
+>> };
+>>
+>>
+>> 1. After using the said pinmux settings, the sdhci-esdh-imx controller
+>> wasn't able to configure it correctly due the the group name for the
+>> two port were the same (default, state_100mhz, state_200mhz).
+>>
+>> 2. Then, I temporarily disabled usdhc4 to test if the driver able to
+>> enable the SDR50 for my wifi. Then, I was getting the following
+>> errors:
+>>
+>> [    1.655024] mmc0: error -110 whilst initialising SDIO card
+>> [    3.746340] mmc0: error -110 whilst initialising SDIO card
+>> [    3.818624] mmc0: host doesn't support card's voltages
+>> [    3.823783] mmc0: error -22 whilst initialising SDIO card
+>> [    3.901670] mmc0: host doesn't support card's voltages
+>> [    3.906862] mmc0: error -22 whilst initialising SDIO card
+>> [   34.307777] mmc0: host doesn't support card's voltages
+>> [   34.312980] mmc0: error -22 whilst initialising SDIO card
+>>
+>> 3. Then, I tried the eMMC to see if the driver able to enable the
+>> DDR50. After booting it, the kernel detect the eMMC only in hight
+>> speed mode.
+>>
+>>
+>> I would like to know if anyone here can help me to figure out how to
+>> enable the DDR50 for my eMMC and SDR50 for my wifi as well.
+>>
+>> Regards,
+>>
+>> john
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>
+>
