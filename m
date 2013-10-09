@@ -1,25 +1,20 @@
 From: khilman@linaro.org (Kevin Hilman)
-Date: Wed, 9 Oct 2013 14:09:01 -0700
-Subject: [GIT PULL] omap fixes against v3.12-rc3
-In-Reply-To: <20131009205127.GF8313@atomide.com>
-References: <20131008220324.GV8313@atomide.com> <87d2netbvh.fsf@linaro.org>
- <20131009205127.GF8313@atomide.com>
-Message-ID: <CAGa+x85i5OXA2cNEAT+hZC-c01xq8ZwTbb4kse=Vw9pS6_i1Rw@mail.gmail.com>
+Date: Wed, 09 Oct 2013 14:16:49 -0700
+Subject: [GIT PULL] ARM: mvebu: dt changes for v3.13 (round 2)
+In-Reply-To: <20131008174031.GS5402@titan.lakedaemon.net> (Jason Cooper's
+ message of "Tue, 8 Oct 2013 13:40:31 -0400")
+References: <20131008174031.GS5402@titan.lakedaemon.net>
+Message-ID: <87pprervpa.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 9, 2013 at 1:51 PM, Tony Lindgren <tony@atomide.com> wrote:
-> * Kevin Hilman <khilman@linaro.org> [131009 13:50]:
->>
->> FWIW, my automated boot is doing only DT boots on all the OMAP
->> platforms.  However, it's only testing basic boot so far so there's not
->> a whole lot of driver testing yet (but it's coming soon.)
->
-> OK cool. For omap3, off-idle with DT needs the pending
-> pinctrl-single patches, and some yet unknown way of mapping
-> wake-up events to device interrupts. But after that you
-> can also do some PM related tests potentially :)
+Jason Cooper <jason@lakedaemon.net> writes:
 
-Yeah, a review/test of that series is already my TODO list.
+> All,
+>
+> Latest round of DT changes for mvebu.  Nothing really of note here.
+> More dt, less code :)
+
+Pulled into next/dt.
 
 Kevin
