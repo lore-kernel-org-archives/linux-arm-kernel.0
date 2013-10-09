@@ -1,43 +1,147 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  9 Oct 2013 15:50:17 +0900
-Subject: [PATCH 07/13] ARM: shmobile: r8a7791 Arch timer device tree node
+Date: Wed,  9 Oct 2013 15:50:15 +0900
+Subject: [PATCH 05/13] ARM: shmobile: armadillo800eva-reference: add SDHI and
+ MMCIF interfaces
 In-Reply-To: <cover.1381298964.git.horms+renesas@verge.net.au>
 References: <cover.1381298964.git.horms+renesas@verge.net.au>
-Message-ID: <03586acf7808ed65963cd262188b059ff6951d40.1381298964.git.horms+renesas@verge.net.au>
+Message-ID: <e99d7963e0b9469f16f434a5a68a7cba3004a2df.1381298964.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm@opensource.se>
+From: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
 
-Add r8a7791 arch timer device tree information.
+Add SDHI0 and MMCIF interfaces to armadillo800eva-reference with
+regulators and pin configurations. SDHI1 is not added yet, because the
+switch, that connects the interface either to an SD slot or to a WiFi
+SDIO card cannot be described in DT yet.
 
-This needs to be used together with r8a7791 support
-code that ties in the R-Car Gen2 arch timer workarounds.
-
-Signed-off-by: Magnus Damm <damm@opensource.se>
+Signed-off-by: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
+Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7791.dtsi | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ .../boot/dts/r8a7740-armadillo800eva-reference.dts | 58 ++++++++++++++++++++++
+ arch/arm/boot/dts/r8a7740.dtsi                     | 33 ++++++++++++
+ 2 files changed, 91 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
-index b701417..a1a9e5c 100644
---- a/arch/arm/boot/dts/r8a7791.dtsi
-+++ b/arch/arm/boot/dts/r8a7791.dtsi
-@@ -39,6 +39,14 @@
- 		interrupts = <1 9 0xf04>;
+diff --git a/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts b/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts
+index 8b2aab5..1c56c5e 100644
+--- a/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts
++++ b/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts
+@@ -35,6 +35,33 @@
+ 		regulator-boot-on;
  	};
  
-+	timer {
-+		compatible = "arm,armv7-timer";
-+		interrupts = <1 13 0xf08>,
-+				<1 14 0xf08>,
-+				<1 11 0xf08>,
-+				<1 10 0xf08>;
++	vcc_sdhi0: regulator at 1 {
++		compatible = "regulator-fixed";
++
++		regulator-name = "SDHI0 Vcc";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++
++		gpio = <&pfc 75 GPIO_ACTIVE_HIGH>;
++		enable-active-high;
 +	};
 +
- 	irqc0: interrupt-controller at e61c0000 {
- 		compatible = "renesas,irqc";
- 		#interrupt-cells = <2>;
++	vccq_sdhi0: regulator at 2 {
++		compatible = "regulator-gpio";
++
++		regulator-name = "SDHI0 VccQ";
++		regulator-min-microvolt = <1800000>;
++		regulator-max-microvolt = <3300000>;
++		vin-supply = <&vcc_sdhi0>;
++
++		enable-gpio = <&pfc 74 GPIO_ACTIVE_HIGH>;
++		gpios = <&pfc 17 GPIO_ACTIVE_HIGH>;
++		states = <3300000 0
++			  1800000 1>;
++
++		enable-active-high;
++	};
++
+ 	leds {
+ 		compatible = "gpio-leds";
+ 		led1 {
+@@ -92,8 +119,39 @@
+ 		renesas,groups = "tpu0_to2_1";
+ 		renesas,function = "tpu0";
+ 	};
++
++	mmc0_pins: mmc0 {
++		renesas,groups = "mmc0_data8_1", "mmc0_ctrl_1";
++		renesas,function = "mmc0";
++	};
++
++	sdhi0_pins: sdhi0 {
++		renesas,groups = "sdhi0_data4", "sdhi0_ctrl", "sdhi0_wp";
++		renesas,function = "sdhi0";
++	};
+ };
+ 
+ &tpu {
+ 	status = "okay";
+ };
++
++&mmcif0 {
++	pinctrl-0 = <&mmc0_pins>;
++	pinctrl-names = "default";
++
++	vmmc-supply = <&reg_3p3v>;
++	bus-width = <8>;
++	non-removable;
++	status = "okay";
++};
++
++&sdhi0 {
++	pinctrl-0 = <&sdhi0_pins>;
++	pinctrl-names = "default";
++
++	vmmc-supply = <&vcc_sdhi0>;
++	vqmmc-supply = <&vccq_sdhi0>;
++	bus-width = <4>;
++	cd-gpios = <&pfc 167 GPIO_ACTIVE_LOW>;
++	status = "okay";
++};
+diff --git a/arch/arm/boot/dts/r8a7740.dtsi b/arch/arm/boot/dts/r8a7740.dtsi
+index 868bdde..ae1e230 100644
+--- a/arch/arm/boot/dts/r8a7740.dtsi
++++ b/arch/arm/boot/dts/r8a7740.dtsi
+@@ -161,4 +161,37 @@
+ 		status = "disabled";
+ 		#pwm-cells = <3>;
+ 	};
++
++	mmcif0: mmcif at e6bd0000 {
++		compatible = "renesas,sh-mmcif";
++		reg = <0xe6bd0000 0x100>;
++		interrupt-parent = <&gic>;
++		interrupts = <0 56 4
++				0 57 4>;
++		status = "disabled";
++	};
++
++	sdhi0: sdhi at e6850000 {
++		compatible = "renesas,sdhi-r8a7740";
++		reg = <0xe6850000 0x100>;
++		interrupt-parent = <&gic>;
++		interrupts = <0 117 4
++				0 118 4
++				0 119 4>;
++		cap-sd-highspeed;
++		cap-sdio-irq;
++		status = "disabled";
++	};
++
++	sdhi1: sdhi at e6860000 {
++		compatible = "renesas,sdhi-r8a7740";
++		reg = <0xe6860000 0x100>;
++		interrupt-parent = <&gic>;
++		interrupts = <0 121 4
++				0 122 4
++				0 123 4>;
++		cap-sd-highspeed;
++		cap-sdio-irq;
++		status = "disabled";
++	};
+ };
 -- 
 1.8.4
