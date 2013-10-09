@@ -1,46 +1,115 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 9 Oct 2013 12:00:39 +0100
-Subject: KVM virtual timer issue with trinity
-In-Reply-To: <20130912152716.GP9860@cbox>
-References: <20130906163052.GG30450@mudshark.cambridge.arm.com>
- <20130912093750.GE15357@mudshark.cambridge.arm.com>
- <20130912152716.GP9860@cbox>
-Message-ID: <20131009110039.GD6564@mudshark.cambridge.arm.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Wed, 09 Oct 2013 13:14:44 +0200
+Subject: [PATCH v2] PWM: atmel-pwm: use request/free instead of
+ enable/disable
+In-Reply-To: <20131008120516.GA16196@ulmo.nvidia.com>
+References: <1380554553-25676-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <20131008120516.GA16196@ulmo.nvidia.com>
+Message-ID: <52553AA4.4000400@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 12, 2013 at 04:27:16PM +0100, Christoffer Dall wrote:
-> On Thu, Sep 12, 2013 at 10:37:50AM +0100, Will Deacon wrote:
-> > On Fri, Sep 06, 2013 at 05:30:52PM +0100, Will Deacon wrote:
-> > > Running trinity as a normal user in a KVM guest on my TC2 (A15s only)
-> > > eventually leads to a situation where responsiveness is extremely sluggish.
-> > > Further investigation shows that issuing a `sleep 1' command never returns.
-> > > This seems to be because the virtual timer has stopped generating interrupts
-> > > on CPU0 (CPU1 seems ok).
-> > > 
-> > > Dumping the timer state (see below), it looks like CPU0's timer expired in
-> > > the past, but we're perhaps not receiving the interrupt. The trinity logs
-> > > don't reveal anything obvious (and they're huge, so I can't include them
-> > > here).
-> > > 
-> > > I can reproduce this in an hour or so, so if you want me to try anything out
-> > > in the host, I can give it a go. I'm using 3.11 as both the guest and host.
-> > 
-> > Any ideas on things I can do to get to the bottom of this? It's preventing
-> > me from running trinity to find any other issues and there's no reason you
-> > couldn't hit this lockup under other workloads.
-> > 
-> I've been thinking on this, sorry about the late response.
-> 
-> I see something similar when resuming a suspended guest, but I don't
-> have very clever ideas or debug strategies yet.  I plan on looking at
-> this once I get a new revision of the save/restore QEMU patches out.
 
-Marc was saying that you'd managed to resolve the issue with suspend, but I
-can still reproduce the issue with trinity on a 3.12-rc4 kernel (host and
-guest).
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA256
 
-I tried to reproduce in a model, but I ran into a bunch of other unrelated
-problems that look like bugs in the model itself.
+On 08/10/2013 14:05, Thierry Reding wrote:
+> On Mon, Sep 30, 2013 at 05:22:33PM +0200, Alexandre Belloni wrote:
+>> I found that disabling a pwm while it is at a low level will actually
+put it
+>> back at a high level. The main symptom is that leds-pwm is calling
+pwm_disable()
+>> after setting the duty cycle to 0. Hence, instead of getting a
+switched off LED,
+>> you get an LED lit up at full brightness.
+>
+> I wonder why that's the case. What's causing the PWM to go back to full
+> duty cycle when disabled? There was a similar issue with some other PWM
+> driver a while back and the cause was tracked down to be that you had to
+> wait for a full period to make sure the signal was constantly low before
+> switching off the clock. Perhaps something similar is the issue here?
 
-Will
+I tried letting enabling/disabling the PWM channel in
+pwm_enable/pwm_disable and enabling/disabling the clock in
+pwm_request/pwm_free. The issue is still there.
+
+- From the datasheet (also it seems something is fishy there, wrt CPOL):
+
+"Waveforms are fixed at 0 when:
+- - CDTY = CPRD and CPOL = 0
+- - CDTY = 0 and CPOL = 1
+Waveforms are fixed at 1 (once the channel is enabled) when:
+- - CDTY = 0 and CPOL = 0
+- - CDTY = CPRD and CPOL = 1
+The waveform polarity must be set before enabling the channel. This
+immediately affects the channel output level."
+
+So, while I agree with you that it makes us keep the pwm clock enabled
+forever, it makes me believe that we have to let the PWM enabled to get
+that working correctly.
+
+
+I also tried changing the polarity and setting pull down on the pin but
+the level seems to be driven high. One thing that is working though is
+setting the override value before disabling the PWM. Then the level that
+is set is still kept when the pwm is disabled. Unfortunately, that
+feature is only available since the sama5.
+
+>
+>> Solve that by using the request and free callbacks to enable and
+disable the
+>> pwm channels and the clock.
+>
+> "pwm" -> "PWM",  please.
+>
+>> diff --git a/drivers/pwm/pwm-atmel.c b/drivers/pwm/pwm-atmel.c
+> [...]
+>> +static int atmel_pwm_enable(struct pwm_chip *chip, struct pwm_device
+*pwm)
+>> +{
+>> +    /*
+>> +     * This is a dummy function, required to be able to register the pwm
+>> +     * chip, see pwmadd_chip() in pwm/core.c
+>> +     */
+>> +    return 0;
+>> +}
+>> +
+>> +static void atmel_pwm_disable(struct pwm_chip *chip, struct
+pwm_device *pwm)
+>> +{
+>> +    /*
+>> +     * This is a dummy function, required to be able to register the pwm
+>> +     * chip, see pwmadd_chip() in pwm/core.c
+>> +     */
+>> +}
+>
+> This just doesn't feel right. Can somebody please investigate what the
+> real reason is for the behaviour described in the commit message and see
+> if we can't solve this in some other way? .request() and .free() are
+> typically called very early or very late, respectively, so this patch
+> will keep the PWM clock on forever (pretty much).
+>
+> Thierry
+
+
+- -- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-----BEGIN PGP SIGNATURE-----
+Version: GnuPG v1.4.12 (GNU/Linux)
+
+iQIcBAEBCAAGBQJSVTqjAAoJEKbNnwlvZCyzzE4P/igeF8UBUPdEQAYpgG3avTTh
+93oEGu8sHoNSbUJY6O51x5f+96QiwrZF62rjy4PO8BtHR6fGgUt94RtyMacut/aY
+NfRwdwfe24wYwHNpwOCv9uD1ZtiLyD9wAMeIEsoYy57A9XPPuuTOmJamN7jzsh/K
+OvjdmjWcJQPymSTABdus4Zt7ccIgPqMsai8HQYiNqnKbPDUXx20/+QH5Kw2hPxi0
+YPK36xEeEW0pB+v9fVU54abAV3Bh4tEOIJ/7wqWeDxN9WBK8LEG20pb6ZNFI3GJO
+KzEO7Y4fZzPc85RCPfigyyDnOvzHRP5vc1vfSIOxwPqhZLZL6ceBlCHWhAr+CYSU
+mWtNruBP9dhJfRDKtchDv3D63YBDip4DTDh/0jiqT6Qw6LTjSU+bWi1RVlrpa6HY
+Wv6siL0gy4USKk8DJEl/pWBi3SlSbPynT+sZLKrWpz2E3oLjgDNALPIZtMM38xYj
+X7LzZX1v8t6psksnH13Q4yAgyuiIUcJWXTn7wMPZ70DhJ98JpcsV3o9kZQnGTN+A
+sp9/pZTd/7sK5LzZx+aMnMItNLgWy85LRLfHzH2c3vAKETVVPx+Vqgojw0sWMC8E
+U3oA71/nYOFUssCs9kzCNvU/n7p16bGxyPzbHH2D+2CowiFdYVwJhX1iT4TFTkQJ
+ymqGpRABiFB6bmhf4WRg
+=zebD
+-----END PGP SIGNATURE-----
