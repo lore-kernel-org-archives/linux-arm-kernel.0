@@ -1,51 +1,37 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Wed, 9 Oct 2013 10:09:32 +0300
-Subject: [PATCH] ARM: OMAP4: clock: Initialize USB DPLL
-In-Reply-To: <alpine.DEB.2.02.1310090704180.30199@utopia.booyaka.com>
-References: <1363873705-3224-1-git-send-email-rogerq@ti.com>
- <514B1553.6030701@ti.com>
- <alpine.DEB.2.02.1310090704180.30199@utopia.booyaka.com>
-Message-ID: <5255012C.3050709@ti.com>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Wed, 09 Oct 2013 09:10:25 +0200
+Subject: New big-endian patch series against 3.12-rc4
+In-Reply-To: <CAA3XUr31CON02T66_nrV-PsrjyLgzCbXC2WokQeC58z6APAbVQ@mail.gmail.com>
+References: <1381271679-27804-1-git-send-email-ben.dooks@codethink.co.uk>
+ <CAA3XUr31CON02T66_nrV-PsrjyLgzCbXC2WokQeC58z6APAbVQ@mail.gmail.com>
+Message-ID: <52550161.2030406@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/09/2013 10:05 AM, Paul Walmsley wrote:
-> Hi Roger,
-> 
-> On Thu, 21 Mar 2013, Roger Quadros wrote:
-> 
->> +Paul
+On 09/10/13 08:20, Victor Kamensky wrote:
+> Hi Ben,
+>
+> On 8 October 2013 15:34, Ben Dooks<ben.dooks@codethink.co.uk>  wrote:
+>> This is a new series for big-endian on ARM re-based onto 3.12-rc4
+>> and updated with new patches from Victor to fix regressions since 3.11.
 >>
->> On 03/21/2013 03:48 PM, Roger Quadros wrote:
->>> If the bootloader doesn't configure USB DPLL (e.g. in u-boot,
->>> disable CONFIG_USB_EHCI_OMAP), then we get all sorts of problems
->>> like
->>> - division by zero errors at boot [1]
->>> - USB DPLL fails to enter locked state
->>> - USB EHCI Host is non functional
->>> - Device can't enter OFF mode
->>>
->>> Initializing the USB DPLL fixes all these issues.
-> 
-> Looks like I may have lost track of this - do we still need this one?
+>> I have not been able to test this further than building it as I do not
+>> currently have access to any hardware, however there where no big issues
+>> when re-basing. Thanks to Marc Zyngier for pointing out the need for a
+>> rebase.
+>>
+>> The branch is at:
+>>
+>>    git://git.baserock.org/delta/linux baserock/bjdooks/3.12-rc4/core
+>
+> It is rather baserock/312-rc4/be/core isn't it?
+>
+> I've tested baserock/312-rc4/be/core from
+> git://git.baserock.org/delta/linux on TC2. Both LE and BE images.
+> Done full LTP runs on both. LTP BE results match LE one.
 
-No, this is already in with the typo fix. Thanks.
+Thanks, yes the path was wrong.
 
-> 
-> Also:
-> 
->>> diff --git a/arch/arm/mach-omap2/cclock44xx_data.c b/arch/arm/mach-omap2/cclock44xx_data.c
->>> index bfc46c1..6127bb9 100644
->>> --- a/arch/arm/mach-omap2/cclock44xx_data.c
->>> +++ b/arch/arm/mach-omap2/cclock44xx_data.c
->>> @@ -53,6 +53,12 @@
->>>   */
->>>  #define OMAP4_DPLL_ABE_DEFFREQ				98304000
->>>  
->>> +/*
->>> + * OMAP4450 TRM Rev X, section "3.6.3.9.5 DPLL_USB Preferred Settings"
-> 
-> 4450?
-
-cheers,
--roger
+-- 
+Ben Dooks				http://www.codethink.co.uk/
+Senior Engineer				Codethink - Providing Genius
