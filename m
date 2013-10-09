@@ -1,115 +1,107 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 09 Oct 2013 13:14:44 +0200
-Subject: [PATCH v2] PWM: atmel-pwm: use request/free instead of
- enable/disable
-In-Reply-To: <20131008120516.GA16196@ulmo.nvidia.com>
-References: <1380554553-25676-1-git-send-email-alexandre.belloni@free-electrons.com>
- <20131008120516.GA16196@ulmo.nvidia.com>
-Message-ID: <52553AA4.4000400@free-electrons.com>
+From: emilio@elopez.com.ar (=?ISO-8859-1?Q?Emilio_L=F3pez?=)
+Date: Wed, 09 Oct 2013 08:32:35 -0300
+Subject: [PATCH 4/4] ARM: sun6i: Add the reset controller to the DTSI
+In-Reply-To: <1380983960-11087-5-git-send-email-maxime.ripard@free-electrons.com>
+References: <1380983960-11087-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1380983960-11087-5-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <52553ED3.5040802@elopez.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Maxime,
 
------BEGIN PGP SIGNED MESSAGE-----
-Hash: SHA256
-
-On 08/10/2013 14:05, Thierry Reding wrote:
-> On Mon, Sep 30, 2013 at 05:22:33PM +0200, Alexandre Belloni wrote:
->> I found that disabling a pwm while it is at a low level will actually
-put it
->> back at a high level. The main symptom is that leds-pwm is calling
-pwm_disable()
->> after setting the duty cycle to 0. Hence, instead of getting a
-switched off LED,
->> you get an LED lit up at full brightness.
+El 05/10/13 11:39, Maxime Ripard escribi?:
+> The A31 has a reset controller IP that maintains a few other IPs in
+> reset, among which we can find the UARTs, high speed timers or the I2C.
+> Now that we have support for them, add the reset controllers to the DTSI.
 >
-> I wonder why that's the case. What's causing the PWM to go back to full
-> duty cycle when disabled? There was a similar issue with some other PWM
-> driver a while back and the cause was tracked down to be that you had to
-> wait for a full period to make sure the signal was constantly low before
-> switching off the clock. Perhaps something similar is the issue here?
-
-I tried letting enabling/disabling the PWM channel in
-pwm_enable/pwm_disable and enabling/disabling the clock in
-pwm_request/pwm_free. The issue is still there.
-
-- From the datasheet (also it seems something is fishy there, wrt CPOL):
-
-"Waveforms are fixed at 0 when:
-- - CDTY = CPRD and CPOL = 0
-- - CDTY = 0 and CPOL = 1
-Waveforms are fixed at 1 (once the channel is enabled) when:
-- - CDTY = 0 and CPOL = 0
-- - CDTY = CPRD and CPOL = 1
-The waveform polarity must be set before enabling the channel. This
-immediately affects the channel output level."
-
-So, while I agree with you that it makes us keep the pwm clock enabled
-forever, it makes me believe that we have to let the PWM enabled to get
-that working correctly.
-
-
-I also tried changing the polarity and setting pull down on the pin but
-the level seems to be driven high. One thing that is working though is
-setting the override value before disabling the PWM. Then the level that
-is set is still kept when the pwm is disabled. Unfortunately, that
-feature is only available since the sama5.
-
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+>   arch/arm/boot/dts/sun6i-a31.dtsi | 24 ++++++++++++++++++++++++
+>   1 file changed, 24 insertions(+)
 >
->> Solve that by using the request and free callbacks to enable and
-disable the
->> pwm channels and the clock.
+> diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
+> index f244f5f..c99c946 100644
+> --- a/arch/arm/boot/dts/sun6i-a31.dtsi
+> +++ b/arch/arm/boot/dts/sun6i-a31.dtsi
+> @@ -209,6 +209,24 @@
+>   			};
+>   		};
 >
-> "pwm" -> "PWM",  please.
+> +		ahb1_rst: reset at 01c202c0 {
+> +			#reset-cells = <1>;
+> +			compatible = "allwinner,sun6i-a31-ahb1-reset";
+> +			reg = <0x01c202c0 0xc>;
+> +		};
+> +
+> +		apb1_rst: reset at 01c202d0 {
+> +			#reset-cells = <1>;
+> +			compatible = "allwinner,sun6i-a31-apb1-reset";
+> +			reg = <0x01c202d0 0x4>;
+> +		};
+> +
+> +		apb2_rst: reset at 01c202d8 {
+> +			#reset-cells = <1>;
+> +			compatible = "allwinner,sun6i-a31-apb2-reset";
+> +			reg = <0x01c202d8 0x4>;
+> +		};
+> +
+>   		timer at 01c20c00 {
+>   			compatible = "allwinner,sun4i-timer";
+>   			reg = <0x01c20c00 0xa0>;
+> @@ -232,6 +250,7 @@
+>   			reg-shift = <2>;
+>   			reg-io-width = <4>;
+>   			clocks = <&apb2_gates 16>;
+> +			resets = <&apb2_rst 16>;
+>   			status = "disabled";
+>   		};
 >
->> diff --git a/drivers/pwm/pwm-atmel.c b/drivers/pwm/pwm-atmel.c
-> [...]
->> +static int atmel_pwm_enable(struct pwm_chip *chip, struct pwm_device
-*pwm)
->> +{
->> +    /*
->> +     * This is a dummy function, required to be able to register the pwm
->> +     * chip, see pwmadd_chip() in pwm/core.c
->> +     */
->> +    return 0;
->> +}
->> +
->> +static void atmel_pwm_disable(struct pwm_chip *chip, struct
-pwm_device *pwm)
->> +{
->> +    /*
->> +     * This is a dummy function, required to be able to register the pwm
->> +     * chip, see pwmadd_chip() in pwm/core.c
->> +     */
->> +}
+> @@ -242,6 +261,7 @@
+>   			reg-shift = <2>;
+>   			reg-io-width = <4>;
+>   			clocks = <&apb2_gates 17>;
+> +			resets = <&apb2_rst 17>;
+>   			status = "disabled";
+>   		};
 >
-> This just doesn't feel right. Can somebody please investigate what the
-> real reason is for the behaviour described in the commit message and see
-> if we can't solve this in some other way? .request() and .free() are
-> typically called very early or very late, respectively, so this patch
-> will keep the PWM clock on forever (pretty much).
+> @@ -252,6 +272,7 @@
+>   			reg-shift = <2>;
+>   			reg-io-width = <4>;
+>   			clocks = <&apb2_gates 18>;
+> +			resets = <&apb2_rst 18>;
+>   			status = "disabled";
+>   		};
 >
-> Thierry
+> @@ -262,6 +283,7 @@
+>   			reg-shift = <2>;
+>   			reg-io-width = <4>;
+>   			clocks = <&apb2_gates 19>;
+> +			resets = <&apb2_rst 19>;
+>   			status = "disabled";
+>   		};
+>
+> @@ -272,6 +294,7 @@
+>   			reg-shift = <2>;
+>   			reg-io-width = <4>;
+>   			clocks = <&apb2_gates 20>;
+> +			resets = <&apb2_rst 20>;
+>   			status = "disabled";
+>   		};
+>
+> @@ -282,6 +305,7 @@
+>   			reg-shift = <2>;
+>   			reg-io-width = <4>;
+>   			clocks = <&apb2_gates 21>;
+> +			resets = <&apb2rst 21>;
 
+You have a typo here (missing _) which breaks the dt build
 
-- -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
------BEGIN PGP SIGNATURE-----
-Version: GnuPG v1.4.12 (GNU/Linux)
+>   			status = "disabled";
+>   		};
+>
+>
 
-iQIcBAEBCAAGBQJSVTqjAAoJEKbNnwlvZCyzzE4P/igeF8UBUPdEQAYpgG3avTTh
-93oEGu8sHoNSbUJY6O51x5f+96QiwrZF62rjy4PO8BtHR6fGgUt94RtyMacut/aY
-NfRwdwfe24wYwHNpwOCv9uD1ZtiLyD9wAMeIEsoYy57A9XPPuuTOmJamN7jzsh/K
-OvjdmjWcJQPymSTABdus4Zt7ccIgPqMsai8HQYiNqnKbPDUXx20/+QH5Kw2hPxi0
-YPK36xEeEW0pB+v9fVU54abAV3Bh4tEOIJ/7wqWeDxN9WBK8LEG20pb6ZNFI3GJO
-KzEO7Y4fZzPc85RCPfigyyDnOvzHRP5vc1vfSIOxwPqhZLZL6ceBlCHWhAr+CYSU
-mWtNruBP9dhJfRDKtchDv3D63YBDip4DTDh/0jiqT6Qw6LTjSU+bWi1RVlrpa6HY
-Wv6siL0gy4USKk8DJEl/pWBi3SlSbPynT+sZLKrWpz2E3oLjgDNALPIZtMM38xYj
-X7LzZX1v8t6psksnH13Q4yAgyuiIUcJWXTn7wMPZ70DhJ98JpcsV3o9kZQnGTN+A
-sp9/pZTd/7sK5LzZx+aMnMItNLgWy85LRLfHzH2c3vAKETVVPx+Vqgojw0sWMC8E
-U3oA71/nYOFUssCs9kzCNvU/n7p16bGxyPzbHH2D+2CowiFdYVwJhX1iT4TFTkQJ
-ymqGpRABiFB6bmhf4WRg
-=zebD
------END PGP SIGNATURE-----
+Cheers,
+
+Emilio
