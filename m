@@ -1,25 +1,40 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 9 Oct 2013 15:37:57 +0200
-Subject: [PATCH 4/9] i2c: i2c-stu300: replace platform_driver_probe to
- support deferred probing
-In-Reply-To: <1381264542-29396-5-git-send-email-wsa@the-dreams.de>
-References: <1381264542-29396-1-git-send-email-wsa@the-dreams.de>
- <1381264542-29396-5-git-send-email-wsa@the-dreams.de>
-Message-ID: <CACRpkdZ-UjuyybwyJpoO358raqyHe-p46REqPsYMwLZFHrQPoQ@mail.gmail.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Wed, 9 Oct 2013 16:39:39 +0300
+Subject: [PATCH 1/3] ARM: OMAP4: use CLK_SET_RATE_PARENT for dss_dss_clk
+In-Reply-To: <5255587F.5010601@ti.com>
+References: <1381324359-28825-1-git-send-email-tomi.valkeinen@ti.com>
+ <5255587F.5010601@ti.com>
+Message-ID: <52555C9B.20607@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 8, 2013 at 10:35 PM, Wolfram Sang <wsa@the-dreams.de> wrote:
+On 09/10/13 16:22, Tero Kristo wrote:
+> On 10/09/2013 04:12 PM, Tomi Valkeinen wrote:
+>> Set CLK_SET_RATE_PARENT flag for dss_dss_clk so that the DSS's fclk can
+>> be configured without the need to get the parent of the fclk.
+> 
+> I wouldn't touch this file right now, as we are trying to move the clock
+> data over to DT. Legacy boot support probably requires to do this
+> update, but I would rather wait a bit and do the modifications to both
+> DT clock data and this file in the same patch. Same applies for other
+> patches also.
 
-> Subsystems like pinctrl and gpio rightfully make use of deferred probing at
-> core level. Now, deferred drivers won't be retried if they don't have a .probe
-> function specified in the driver struct. Fix this driver to have that, so the
-> devices it supports won't get lost in a deferred probe.
->
-> Signed-off-by: Wolfram Sang <wsa@the-dreams.de>
-> Cc: Linus Walleij <linus.walleij@linaro.org>
+Sounds good. I don't have any particular wishes how this is done, but
+I'd really like these to go into 3.13.
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+The fclk handling in omapdss is quite a mess, and these flags would make
+it possible to clean it up. And the reason it's important to clean up
+the fclk handling ASAP is AM43xx, which has yet another clocking scheme.
 
-Yours,
-Linus Walleij
+If these get only to 3.14, then I can fix the fclk handling only on 3.15.
+
+ Tomi
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 901 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131009/23da6f88/attachment.sig>
