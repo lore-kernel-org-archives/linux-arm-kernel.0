@@ -1,63 +1,47 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  9 Oct 2013 15:50:26 +0900
-Subject: [PATCH 10/13] ARM: shmobile: bockw: add SMSC support on DTS
-In-Reply-To: <cover.1381298964.git.horms+renesas@verge.net.au>
-References: <cover.1381298964.git.horms+renesas@verge.net.au>
-Message-ID: <1e918e00ea2aa2d23a3e0552e907c1da104cdc39.1381298964.git.horms+renesas@verge.net.au>
+From: afzal@ti.com (Afzal Mohammed)
+Date: Wed, 9 Oct 2013 12:52:47 +0530
+Subject: [PATCH] ARM: OMAP2+: wakeupgen: AM43x adaptation
+In-Reply-To: <20131008212436.GR8313@atomide.com>
+References: <1378378535-2967-1-git-send-email-afzal@ti.com>
+ <20131008212436.GR8313@atomide.com>
+Message-ID: <52550447.5070805@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Hi Tony,
 
-This patch enables INTC IRQ and SMSC on BockW board via DT.
+On Wednesday 09 October 2013 02:54 AM, Tony Lindgren wrote:
+> * Afzal Mohammed <afzal@ti.com> [130905 04:03]:
 
-Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/boot/dts/r8a7778-bockw-reference.dts | 27 ++++++++++++++++++++++++++-
- 1 file changed, 26 insertions(+), 1 deletion(-)
+>> -#define MAX_NR_REG_BANKS	5
+>> -#define MAX_IRQS		160
+>> +/* maximum value correspond to that of AM43x */
+>> +#define MAX_NR_REG_BANKS	7
+>> +#define MAX_IRQS		224
+>> +#define DEFAULT_NR_REG_BANKS	5
+>> +#define DEFAULT_IRQS		160
+>>  #define WKG_MASK_ALL		0x00000000
+>>  #define WKG_UNMASK_ALL		0xffffffff
+>>  #define CPU_ENA_OFFSET		0x400
+> 
+> How about define it like this to avoid updating things
+> in multiple places for new SoCs:
+> 
+> #define AM43X_NR_REG_BANKS	7
+> #define MAX_NR_REG_BANKS	AM43X_NR_REG_BANKS
 
-diff --git a/arch/arm/boot/dts/r8a7778-bockw-reference.dts b/arch/arm/boot/dts/r8a7778-bockw-reference.dts
-index 9bb903a..4425fd2 100644
---- a/arch/arm/boot/dts/r8a7778-bockw-reference.dts
-+++ b/arch/arm/boot/dts/r8a7778-bockw-reference.dts
-@@ -22,11 +22,36 @@
- 	compatible = "renesas,bockw-reference", "renesas,r8a7778";
- 
- 	chosen {
--		bootargs = "console=ttySC0,115200 ignore_loglevel rw";
-+		bootargs = "console=ttySC0,115200 ignore_loglevel root=/dev/nfs ip=dhcp rw";
- 	};
- 
- 	memory {
- 		device_type = "memory";
- 		reg = <0x60000000 0x10000000>;
- 	};
-+
-+	fixedregulator3v3: fixedregulator at 0 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "fixed-3.3V";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		regulator-boot-on;
-+		regulator-always-on;
-+	};
-+
-+	lan0 at 18300000 {
-+		compatible = "smsc,lan9220", "smsc,lan9115";
-+		reg = <0x18300000 0x1000>;
-+
-+		phy-mode = "mii";
-+		interrupt-parent = <&irqpin>;
-+		interrupts = <0 0>; /* IRQ0: hwirq 0 on irqpin */
-+		reg-io-width = <4>;
-+		vddvario-supply = <&fixedregulator3v3>;
-+		vdd33a-supply = <&fixedregulator3v3>;
-+	};
-+};
-+
-+&irqpin {
-+	status = "okay";
- };
--- 
-1.8.4
+Yes that is better
+
+>>  	for (i = 0; i < irq_banks; i++) {
+>>  		wakeupgen_writel(0, i, CPU0_ID);
+>> -		wakeupgen_writel(0, i, CPU1_ID);
+>> +		if (!am43x)
+>> +			wakeupgen_writel(0, i, CPU1_ID);
+>>  	}
+> 
+> Why not use soc_is_am43xx() directly here?
+
+Ok, it has been changed in the new version.
+
+Regards
+Afzal
