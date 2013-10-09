@@ -1,25 +1,46 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 9 Oct 2013 11:59:50 +0100
-Subject: [PATCH 5/9] spi: spi-au1550: replace platform_driver_probe to
- support deferred probing
-In-Reply-To: <1381264542-29396-6-git-send-email-wsa@the-dreams.de>
-References: <1381264542-29396-1-git-send-email-wsa@the-dreams.de>
- <1381264542-29396-6-git-send-email-wsa@the-dreams.de>
-Message-ID: <20131009105950.GI21581@sirena.org.uk>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 9 Oct 2013 12:00:39 +0100
+Subject: KVM virtual timer issue with trinity
+In-Reply-To: <20130912152716.GP9860@cbox>
+References: <20130906163052.GG30450@mudshark.cambridge.arm.com>
+ <20130912093750.GE15357@mudshark.cambridge.arm.com>
+ <20130912152716.GP9860@cbox>
+Message-ID: <20131009110039.GD6564@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 08, 2013 at 10:35:37PM +0200, Wolfram Sang wrote:
-> Subsystems like pinctrl and gpio rightfully make use of deferred probing at
-> core level. Now, deferred drivers won't be retried if they don't have a .probe
-> function specified in the driver struct. Fix this driver to have that, so the
-> devices it supports won't get lost in a deferred probe.
+On Thu, Sep 12, 2013 at 04:27:16PM +0100, Christoffer Dall wrote:
+> On Thu, Sep 12, 2013 at 10:37:50AM +0100, Will Deacon wrote:
+> > On Fri, Sep 06, 2013 at 05:30:52PM +0100, Will Deacon wrote:
+> > > Running trinity as a normal user in a KVM guest on my TC2 (A15s only)
+> > > eventually leads to a situation where responsiveness is extremely sluggish.
+> > > Further investigation shows that issuing a `sleep 1' command never returns.
+> > > This seems to be because the virtual timer has stopped generating interrupts
+> > > on CPU0 (CPU1 seems ok).
+> > > 
+> > > Dumping the timer state (see below), it looks like CPU0's timer expired in
+> > > the past, but we're perhaps not receiving the interrupt. The trinity logs
+> > > don't reveal anything obvious (and they're huge, so I can't include them
+> > > here).
+> > > 
+> > > I can reproduce this in an hour or so, so if you want me to try anything out
+> > > in the host, I can give it a go. I'm using 3.11 as both the guest and host.
+> > 
+> > Any ideas on things I can do to get to the bottom of this? It's preventing
+> > me from running trinity to find any other issues and there's no reason you
+> > couldn't hit this lockup under other workloads.
+> > 
+> I've been thinking on this, sorry about the late response.
+> 
+> I see something similar when resuming a suspended guest, but I don't
+> have very clever ideas or debug strategies yet.  I plan on looking at
+> this once I get a new revision of the save/restore QEMU patches out.
 
-Applied 5-9, thanks - if there's patches 1-4 you'll need to resend them.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131009/3c0921b0/attachment.sig>
+Marc was saying that you'd managed to resolve the issue with suspend, but I
+can still reproduce the issue with trinity on a 3.12-rc4 kernel (host and
+guest).
+
+I tried to reproduce in a model, but I ran into a bunch of other unrelated
+problems that look like bugs in the model itself.
+
+Will
