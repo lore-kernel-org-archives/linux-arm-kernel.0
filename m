@@ -1,18 +1,18 @@
-From: r.sricharan@ti.com (Sricharan R)
-Date: Wed, 9 Oct 2013 18:46:42 +0530
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Wed, 9 Oct 2013 09:17:14 -0400
 Subject: [PATCH V4] ARM: OMAP5/DRA7: realtime_counter: Configure CNTFRQ
  register
 In-Reply-To: <525556DD.7040200@ti.com>
 References: <1379520162-31932-1-git-send-email-r.sricharan@ti.com>
  <524D44B9.30208@ti.com> <20131008214523.GU8313@atomide.com>
  <525481A2.4020900@ti.com> <525556DD.7040200@ti.com>
-Message-ID: <5255573A.8050805@ti.com>
+Message-ID: <5255575A.1040002@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 09 October 2013 06:45 PM, Sricharan R wrote:
+On Wednesday 09 October 2013 09:15 AM, Sricharan R wrote:
 > Santosh,
->
+> 
 > On Wednesday 09 October 2013 03:35 AM, Santosh Shilimkar wrote:
 >> On Tuesday 08 October 2013 05:45 PM, Tony Lindgren wrote:
 >>> * Sricharan R <r.sricharan@ti.com> [131003 03:27]:
@@ -85,7 +85,5 @@ On Wednesday 09 October 2013 06:45 PM, Sricharan R wrote:
 >> read the CNTFREQ and pass that to SMC.
 > Sorry,  I did not quite get you here. You mean an asm accessor to
 >  the read the variable that is set in timer.c ?
- Also, is it not ok to move the extern to a .h file instead ?
-
-Regards,
- Sricharan
+> 
+Reading CNTFREQ CP15 directly....
