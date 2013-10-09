@@ -1,36 +1,71 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  9 Oct 2013 15:51:02 +0900
-Subject: [PATCH 10/14] ARM: shmobile: Let KZM9D multiplatform boot with KZM9D
- DTB
+Date: Wed,  9 Oct 2013 15:50:56 +0900
+Subject: [PATCH 08/14] ARM: shmobile: Use KZM9D without reference for
+ multiplatform
 In-Reply-To: <cover.1381299817.git.horms+renesas@verge.net.au>
 References: <cover.1381299817.git.horms+renesas@verge.net.au>
-Message-ID: <91f6c56152c7d8ab874dbbf8146a6727d4dff426.1381299817.git.horms+renesas@verge.net.au>
+Message-ID: <3ae970a688f8f8a74d1b489b8646733a830c904b.1381299817.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Magnus Damm <damm@opensource.se>
 
-Let the multiplatform KZM9D support boot with the
-legacy DTS for KZM9D as well as the KZM9D reference DTS.
+Change the multiplatform kconfig bits for KZM9D from
+CONFIG_MACH_KZM9D_REFERENCE into CONFIG_MACH_KZM9D
+to match the non-multiplatform case.
 
 Signed-off-by: Magnus Damm <damm@opensource.se>
 Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/board-kzm9d-reference.c | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/mach-shmobile/Kconfig  | 10 ++--------
+ arch/arm/mach-shmobile/Makefile |  4 ++++
+ 2 files changed, 6 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/board-kzm9d-reference.c b/arch/arm/mach-shmobile/board-kzm9d-reference.c
-index 8f8bb2f..054d8d5 100644
---- a/arch/arm/mach-shmobile/board-kzm9d-reference.c
-+++ b/arch/arm/mach-shmobile/board-kzm9d-reference.c
-@@ -33,6 +33,7 @@ static void __init kzm9d_add_standard_devices(void)
- }
+diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
+index 6a684ff..c9c4f15 100644
+--- a/arch/arm/mach-shmobile/Kconfig
++++ b/arch/arm/mach-shmobile/Kconfig
+@@ -22,16 +22,10 @@ config ARCH_EMEV2
  
- static const char *kzm9d_boards_compat_dt[] __initdata = {
-+	"renesas,kzm9d",
- 	"renesas,kzm9d-reference",
- 	NULL,
- };
+ comment "SH-Mobile Board Type"
+ 
+-config MACH_KZM9D_REFERENCE
+-	bool "KZM9D board - Reference Device Tree Implementation"
++config MACH_KZM9D
++	bool "KZM9D board"
+ 	depends on ARCH_EMEV2
+ 	select REGULATOR_FIXED_VOLTAGE if REGULATOR
+-	---help---
+-	   Use reference implementation of KZM9D board support
+-	   which makes a greater use of device tree at the expense
+-	   of not supporting a number of devices.
+-
+-	   This is intended to aid developers
+ 
+ comment "SH-Mobile System Configuration"
+ endif
+diff --git a/arch/arm/mach-shmobile/Makefile b/arch/arm/mach-shmobile/Makefile
+index b3840ba..b11466d 100644
+--- a/arch/arm/mach-shmobile/Makefile
++++ b/arch/arm/mach-shmobile/Makefile
+@@ -55,6 +55,9 @@ obj-$(CONFIG_ARCH_R8A7740)	+= pm-r8a7740.o pm-rmobile.o
+ obj-$(CONFIG_ARCH_R8A7779)	+= pm-r8a7779.o
+ 
+ # Board objects
++ifdef CONFIG_ARCH_SHMOBILE_MULTI
++obj-$(CONFIG_MACH_KZM9D)	+= board-kzm9d-reference.o
++else
+ obj-$(CONFIG_MACH_APE6EVM)	+= board-ape6evm.o
+ obj-$(CONFIG_MACH_APE6EVM_REFERENCE)	+= board-ape6evm-reference.o
+ obj-$(CONFIG_MACH_MACKEREL)	+= board-mackerel.o
+@@ -72,6 +75,7 @@ obj-$(CONFIG_MACH_KZM9D)	+= board-kzm9d.o
+ obj-$(CONFIG_MACH_KZM9D_REFERENCE)	+= board-kzm9d-reference.o
+ obj-$(CONFIG_MACH_KZM9G)	+= board-kzm9g.o
+ obj-$(CONFIG_MACH_KZM9G_REFERENCE)	+= board-kzm9g-reference.o
++endif
+ 
+ # Framework support
+ obj-$(CONFIG_SMP)		+= $(smp-y)
 -- 
 1.8.4
