@@ -1,110 +1,56 @@
-From: josephl@nvidia.com (Joseph Lo)
-Date: Wed, 9 Oct 2013 17:20:08 +0800
-Subject: [PATCH 4/7] ARM: tegra: add LP1 support code for Tegra124
-In-Reply-To: <1381310411-11391-1-git-send-email-josephl@nvidia.com>
-References: <1381310411-11391-1-git-send-email-josephl@nvidia.com>
-Message-ID: <1381310411-11391-5-git-send-email-josephl@nvidia.com>
+From: jonathan.austin@arm.com (Jonathan Austin)
+Date: Wed, 09 Oct 2013 10:21:37 +0100
+Subject: [PATCH 0/3] KVM: ARM: Cortex-A7 support and fixes
+In-Reply-To: <CA+eFSM1Gp4ZrEysN-ib3FxBbVYMrKZO2TdP0XwkF=p68PEyq6Q@mail.gmail.com>
+References: <1380210568-23175-1-git-send-email-jonathan.austin@arm.com>
+ <CA+eFSM1Gp4ZrEysN-ib3FxBbVYMrKZO2TdP0XwkF=p68PEyq6Q@mail.gmail.com>
+Message-ID: <52552021.5080800@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The LP1 suspend procedure is the same with Tegra30 and Tegra114. Just
-need to update the difference of the register address, then we can
-continue to share the code.
+Hi Gavin,
 
-Signed-off-by: Joseph Lo <josephl@nvidia.com>
----
- arch/arm/mach-tegra/iomap.h         |  3 +++
- arch/arm/mach-tegra/sleep-tegra30.S | 36 +++++++++++++++++++++++++++++-------
- 2 files changed, 32 insertions(+), 7 deletions(-)
+On 08/10/13 15:16, Gavin Guo wrote:
+> On Thu, Sep 26, 2013 at 11:49 PM, Jonathan Austin
+> <jonathan.austin@arm.com> wrote:
+>> This series adds support for using KVM on ARM Cortex-A7 CPUs. As the Cortex-A7
+>> is architecturally identical to the A15 there is not a huge amount of code
+>> required, however there are a number of fixups necessary to core KVM code that
+>> testing on A7 has revealed.
+>>
+> 
+> Hi Jonathan,
+> 
+> I'd like to help test the kvm on Cortex-A7. I've applied your 3 kernel
+> patches, and download the Virtual Open Systems's kvmtools to test. But
+> the guest os can't be brought up. Could you provide the steps about
+> where to download kvmtools and the command to bring up the guest?
+> 
 
-diff --git a/arch/arm/mach-tegra/iomap.h b/arch/arm/mach-tegra/iomap.h
-index cbee57f..26b1c2a 100644
---- a/arch/arm/mach-tegra/iomap.h
-+++ b/arch/arm/mach-tegra/iomap.h
-@@ -105,6 +105,9 @@
- #define TEGRA_EMC1_BASE			0x7001A800
- #define TEGRA_EMC1_SIZE			SZ_2K
- 
-+#define TEGRA124_EMC_BASE		0x7001B000
-+#define TEGRA124_EMC_SIZE		SZ_2K
-+
- #define TEGRA_CSITE_BASE		0x70040000
- #define TEGRA_CSITE_SIZE		SZ_256K
- 
-diff --git a/arch/arm/mach-tegra/sleep-tegra30.S b/arch/arm/mach-tegra/sleep-tegra30.S
-index c6fc15c..e65a831 100644
---- a/arch/arm/mach-tegra/sleep-tegra30.S
-+++ b/arch/arm/mach-tegra/sleep-tegra30.S
-@@ -408,8 +408,12 @@ _pll_m_c_x_done:
- 	cmp	r10, #TEGRA30
- 	movweq	r0, #:lower16:TEGRA_EMC_BASE	@ r0 reserved for emc base
- 	movteq	r0, #:upper16:TEGRA_EMC_BASE
--	movwne	r0, #:lower16:TEGRA_EMC0_BASE
--	movtne	r0, #:upper16:TEGRA_EMC0_BASE
-+	cmp	r10, #TEGRA114
-+	movweq	r0, #:lower16:TEGRA_EMC0_BASE
-+	movteq	r0, #:upper16:TEGRA_EMC0_BASE
-+	cmp	r10, #TEGRA124
-+	movweq	r0, #:lower16:TEGRA124_EMC_BASE
-+	movteq	r0, #:upper16:TEGRA124_EMC_BASE
- 
- exit_self_refresh:
- 	ldr	r1, [r5, #0xC]		@ restore EMC_XM2VTTGENPADCTRL
-@@ -554,15 +558,25 @@ tegra114_sdram_pad_address:
- 	.word	TEGRA_EMC1_BASE + EMC_XM2VTTGENPADCTRL			@0x2c
- 	.word	TEGRA_EMC1_BASE + EMC_XM2VTTGENPADCTRL2			@0x30
- 
-+tegra124_sdram_pad_address:
-+	.word	TEGRA124_EMC_BASE + EMC_CFG				@0x0
-+	.word	TEGRA124_EMC_BASE + EMC_ZCAL_INTERVAL			@0x4
-+	.word	TEGRA124_EMC_BASE + EMC_AUTO_CAL_INTERVAL		@0x8
-+	.word	TEGRA124_EMC_BASE + EMC_XM2VTTGENPADCTRL		@0xc
-+	.word	TEGRA124_EMC_BASE + EMC_XM2VTTGENPADCTRL2		@0x10
-+	.word	TEGRA_PMC_BASE + PMC_IO_DPD_STATUS			@0x14
-+	.word	TEGRA_CLK_RESET_BASE + CLK_RESET_CLK_SOURCE_MSELECT	@0x18
-+	.word	TEGRA_CLK_RESET_BASE + CLK_RESET_SCLK_BURST		@0x1c
-+
- tegra30_sdram_pad_size:
- 	.word	tegra114_sdram_pad_address - tegra30_sdram_pad_address
- 
- tegra114_sdram_pad_size:
--	.word	tegra30_sdram_pad_size - tegra114_sdram_pad_address
-+	.word	tegra124_sdram_pad_address - tegra114_sdram_pad_address
- 
- 	.type	tegra30_sdram_pad_save, %object
- tegra30_sdram_pad_save:
--	.rept (tegra30_sdram_pad_size - tegra114_sdram_pad_address) / 4
-+	.rept (tegra124_sdram_pad_address - tegra114_sdram_pad_address) / 4
- 	.long	0
- 	.endr
- 
-@@ -698,8 +712,13 @@ tegra30_sdram_self_refresh:
- 	cmp	r10, #TEGRA30
- 	adreq	r2, tegra30_sdram_pad_address
- 	ldreq	r3, tegra30_sdram_pad_size
--	adrne	r2, tegra114_sdram_pad_address
--	ldrne	r3, tegra114_sdram_pad_size
-+	cmp	r10, #TEGRA114
-+	adreq	r2, tegra114_sdram_pad_address
-+	ldreq	r3, tegra114_sdram_pad_size
-+	cmp	r10, #TEGRA124
-+	adreq	r2, tegra124_sdram_pad_address
-+	ldreq	r3, tegra30_sdram_pad_size
-+
- 	mov	r9, #0
- 
- padsave:
-@@ -717,7 +736,10 @@ padsave_done:
- 
- 	cmp	r10, #TEGRA30
- 	ldreq	r0, =TEGRA_EMC_BASE	@ r0 reserved for emc base addr
--	ldrne	r0, =TEGRA_EMC0_BASE
-+	cmp	r10, #TEGRA114
-+	ldreq	r0, =TEGRA_EMC0_BASE
-+	cmp	r10, #TEGRA124
-+	ldreq	r0, =TEGRA124_EMC_BASE
- 
- enter_self_refresh:
- 	cmp	r10, #TEGRA30
--- 
-1.8.4
+Firstly, if you're on a TC2, you need to make sure the A15s are held
+in reset, and you need a shim to boot the kernel in hyp mode. For now
+I'll assume you're *not* in that situation.
+
+Assuming your platform does enter the kernel in Hyp mode (it needs to!)
+then you need a couple of patches to kvmtool:
+
+http://www.spinics.net/lists/kvm/msg96662.html
+
+At the moment, I think you're still in the business of picking up
+individual patches from the list - Will (Deacon) has offered to host
+them in his kvm branch but is waiting until the core A7 support is in
+Christoffer's 'next'.
+
+Once you've applied the patches, build lkvm and a kernel image, copy them
+over to your host, then try something like:
+
+/lkvm run /Image -d /fs.img -m 512 -c 2 --console virtio -p "console=hvc0,38400"
+
+Finally have a check in /proc/cpuinfo to be sure that you've got the kind of CPUs
+you were expecting!
+
+Hope that helps,
+Jonny
+> Thanks,
+> Gavin
+> 
