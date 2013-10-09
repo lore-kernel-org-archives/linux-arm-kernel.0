@@ -1,47 +1,89 @@
 From: nm@ti.com (Nishanth Menon)
-Date: Wed, 9 Oct 2013 16:28:50 -0500
-Subject: [PATCH V6 01/15] ARM: OMAP3+: do not register non-dt OPP tables for
- device tree boot
-In-Reply-To: <1381354144-7134-1-git-send-email-nm@ti.com>
-References: <1381354144-7134-1-git-send-email-nm@ti.com>
-Message-ID: <1381354144-7134-2-git-send-email-nm@ti.com>
+Date: Wed, 9 Oct 2013 16:28:49 -0500
+Subject: [PATCH V6 00/15] ARM: OMAP3+: support cpufreq-cpu0 for device tree
+ boot
+Message-ID: <1381354144-7134-1-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-OMAP3+ supports both device tree and non-device tree boot.
-Device tree bindings for OMAP3+ is supposed to be added via dts following:
-Documentation/devicetree/bindings/power/opp.txt
+Hi,
 
-Since we now have device tree entries for OMAP3+ cpu OPPs,
-The current code wrongly adds duplicate OPPs. So, dont register OPPs
-when booting using device tree.
+The series is based on Tero's V8 of patches[1] - enables the use of
+cpufreq-cpu0 generic driver for all OMAP and related derivatives.
 
-Signed-off-by: Nishanth Menon <nm@ti.com>
----
- arch/arm/mach-omap2/opp.c |    4 ++++
- 1 file changed, 4 insertions(+)
+I will stop copy pasting the series complete history and point at [2].
 
-diff --git a/arch/arm/mach-omap2/opp.c b/arch/arm/mach-omap2/opp.c
-index bd41d59..82fd8c7 100644
---- a/arch/arm/mach-omap2/opp.c
-+++ b/arch/arm/mach-omap2/opp.c
-@@ -17,6 +17,7 @@
-  * GNU General Public License for more details.
-  */
- #include <linux/module.h>
-+#include <linux/of.h>
- #include <linux/opp.h>
- #include <linux/cpu.h>
- 
-@@ -40,6 +41,9 @@ int __init omap_init_opp_table(struct omap_opp_def *opp_def,
- {
- 	int i, r;
- 
-+	if (of_have_populated_dt())
-+		return -EINVAL;
-+
- 	if (!opp_def || !opp_def_size) {
- 		pr_err("%s: invalid params!\n", __func__);
- 		return -EINVAL;
+Main changes since V5:
+- no more clock driver as part of this series[3] - instead depend on clock
+  conversion[1].
+- added DRA7/OMAP5
+
+Notes:
+- i have organized the series such that
+  * patches 1-6 could go to Tony/Kevin/Paul trees
+  * Dts series is further split up given continued uncertaininty of v8 clock dts
+    nodes into two sets
+	- patches 7-10 are based on Benoit's for_13/dts branch and can apply
+	  there independently.
+	- patches 11-15 are dependent on 7-10 patches + clock nodes being
+	  available.
+- Given the uncertainity with clock nodes, I recommend we get rid of the
+  dependencies (1-10) and decide on clock nodes once the story is clearer.
+	- if we feel I should squash up clock nodes 9+14, 10+15, I can do that
+	  as well.
+
+Series is built on top of V3.12-rc4 + the following maintainer tree merges
+	git://git.kernel.org/pub/scm/linux/kernel/git/bcousson/linux-omap-dt for_3.13/dts
+	git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tag 'fixes-against-v3.12-rc3-take2' and omap-for-v3.13/soc branch
+Available here: https://github.com/nmenon/linux-2.6-playground/commits/push/cpufreq-cpu0-omap-all-v6
+
+Test Script: http://pastebin.pandaboard.org/index.php/view/64137893
+
+Test-log:
+BeagleBoard-XM (OMAP36xx): http://pastebin.pandaboard.org/index.php/view/64740438
+PandaBoard-ES (OMAP4460): http://pastebin.pandaboard.org/index.php/view/13763478
+BeagleBone-Black(AM335x): http://pastebin.pandaboard.org/index.php/view/46018613
+OMAP5uEVM (OMAP5432): http://pastebin.pandaboard.org/index.php/view/54353148
+DRA7-EVM (DRA7xx): http://pastebin.pandaboard.org/index.php/view/70955776
+
+J Keerthy (5):
+  ARM: dts: dra7-evm: add smps123 supply for CPU
+  ARM: dts: OMAP5: Add CPU OPP table
+  ARM: dts: DRA7: Add CPU OPP table
+  ARM: dts: OMAP5: add clock nodes for CPU
+  ARM: dts: DRA7: add clock nodes for CPU
+
+Nishanth Menon (10):
+  ARM: OMAP3+: do not register non-dt OPP tables for device tree boot
+  ARM: OMAP2+: AM33XX: add lateinit hook for calling pm late init
+  ARM: OMAP2+: AM43XX: add lateinit hook for calling pm late init
+  ARM: OMAP2+: OMAP5: add lateinit hook for calling pm late init
+  ARM: OMAP2+: DRA7: add lateinit hook for calling pm late init
+  ARM: OMAP3+: use cpu0-cpufreq driver in device tree supported boot
+  ARM: dts: omap5-uevm: add smps123 supply for CPU
+  ARM: dts: OMAP3: add clock nodes for CPU
+  ARM: dts: OMAP4: add clock nodes for CPU
+  ARM: dts: AM33XX: add clock nodes for CPU
+
+ arch/arm/boot/dts/am33xx.dtsi       |    4 ++++
+ arch/arm/boot/dts/dra7-evm.dts      |    4 ++++
+ arch/arm/boot/dts/dra7.dtsi         |   13 ++++++++++++-
+ arch/arm/boot/dts/omap3.dtsi        |    5 +++++
+ arch/arm/boot/dts/omap4.dtsi        |    5 +++++
+ arch/arm/boot/dts/omap5-uevm.dts    |    4 ++++
+ arch/arm/boot/dts/omap5.dtsi        |   15 ++++++++++++++-
+ arch/arm/mach-omap2/board-generic.c |    4 ++++
+ arch/arm/mach-omap2/common.h        |    4 ++++
+ arch/arm/mach-omap2/io.c            |   24 ++++++++++++++++++++++++
+ arch/arm/mach-omap2/opp.c           |    4 ++++
+ arch/arm/mach-omap2/pm.c            |   12 +++++++++---
+ 12 files changed, 93 insertions(+), 5 deletions(-)
+
+[1] http://marc.info/?t=138133284200006&r=1&w=2
+[2] http://marc.info/?l=linux-arm-kernel&m=136804009618594&w=2
+[3] http://marc.info/?t=136804008400001&r=1&w=2
+
+Regards,
+Nishanth Menon
 -- 
 1.7.9.5
