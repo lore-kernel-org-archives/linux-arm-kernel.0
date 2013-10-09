@@ -1,65 +1,76 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 9 Oct 2013 15:05:32 +0200
-Subject: [PATCH 2/6] ARM: at91: prepare common clk transition for sama5d3
- SoC
-In-Reply-To: <1375953690-11207-1-git-send-email-b.brezillon@overkiz.com>
-References: <1375951572-10829-1-git-send-email-b.brezillon@overkiz.com>
- <1375953690-11207-1-git-send-email-b.brezillon@overkiz.com>
-Message-ID: <5255549C.4050009@atmel.com>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Wed, 9 Oct 2013 15:05:53 +0200
+Subject: [RFC] ASoC: pcm: Trigger all commands on error
+In-Reply-To: <20131008104457.GA21581@sirena.org.uk>
+References: <1380883997-18236-1-git-send-email-mpa@pengutronix.de>
+ <20131007172706.GS21581@sirena.org.uk>
+ <20131008082933.GA19005@pengutronix.de>
+ <20131008093413.GX21581@sirena.org.uk>
+ <20131008094839.GB19005@pengutronix.de>
+ <20131008104457.GA21581@sirena.org.uk>
+Message-ID: <20131009130553.GD19005@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/08/2013 11:21, Boris BREZILLON :
-> This patch enclose sama5d3 old clk registration in
-> "#if defined(CONFIG_OLD_CLK_AT91) #endif" sections.
->
-> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
+On Tue, Oct 08, 2013 at 11:44:57AM +0100, Mark Brown wrote:
+> On Tue, Oct 08, 2013 at 11:48:39AM +0200, Markus Pargmann wrote:
+> > On Tue, Oct 08, 2013 at 10:34:13AM +0100, Mark Brown wrote:
+> 
+> > > I meant just unwinding the things done in the trigger call.
+> 
+> > You mean unwinding when we detect the error? If we return the
+> > error code from the trigger function, the pcm_native.c will still
+> > trigger a STOP command which is executed on all components.
+> 
+> Sure, but it's another way of getting consistency and does seem a bit
+> more obvious.
 
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+It is still not consistent as we get an additional STOP after cleanly
+unwinding the START:
 
-And... do not forget to remove completely the code when transition is 
-done (ie: in "[PATCH 6/6] ARM: at91/dt: remove old main clk definition 
-from sama5d3xcm.dtsi").
+snd_pcm_do_start()
+    soc_pcm_trigger() # START
+        codec_dai->driver->ops->trigger() # START
+	platform->driver->ops->trigger() # Assuming an error here
 
+	unwind:
+        codec_dai->driver->ops->trigger() # STOP
 
-> ---
->   arch/arm/mach-at91/sama5d3.c |    6 +++++-
->   1 file changed, 5 insertions(+), 1 deletion(-)
->
-> diff --git a/arch/arm/mach-at91/sama5d3.c b/arch/arm/mach-at91/sama5d3.c
-> index 0003949..3426098 100644
-> --- a/arch/arm/mach-at91/sama5d3.c
-> +++ b/arch/arm/mach-at91/sama5d3.c
-> @@ -19,9 +19,10 @@
->
->   #include "soc.h"
->   #include "generic.h"
-> -#include "clock.h"
->   #include "sam9_smc.h"
->
-> +#if defined(CONFIG_OLD_CLK_AT91)
-> +#include "clock.h"
->   /* --------------------------------------------------------------------
->    *  Clocks
->    * -------------------------------------------------------------------- */
-> @@ -361,6 +362,7 @@ static void __init sama5d3_register_clocks(void)
->   	clk_register(&pck1);
->   	clk_register(&pck2);
->   }
-> +#endif
->
->   /* --------------------------------------------------------------------
->    *  AT91SAM9x5 processor initialization
-> @@ -373,5 +375,7 @@ static void __init sama5d3_map_io(void)
->
->   AT91_SOC_START(sama5d3)
->   	.map_io = sama5d3_map_io,
-> +#if defined(CONFIG_OLD_CLK_AT91)
->   	.register_clocks = sama5d3_register_clocks,
-> +#endif
->   AT91_SOC_END
->
+A failed snd_pcm_do_start() is detected, so undo_start is called:
 
+snd_pcm_undo_start()
+    soc_pcm_trigger() # STOP
+        codec_dai->driver->ops->trigger() # STOP
+	platform->driver->ops->trigger() # STOP
+	cpu_dai->driver->ops->trigger() # STOP
+
+Now all component trigger functions are called without a matching START
+command.
+
+> 
+> > > > Another possibility is to explicitly allow multiple _STOPs. Then I could
+> > > > fix the driver to store the clock state. But I would prefer a generic
+> > > > solution.
+> 
+> > > You're going to have to handle this anyway to be robust - what happens
+> > > if it's the clock enable that fails?
+> 
+> > If clk_enable fails, we can return an error code in the mxs-saif trigger
+> > function. Of course the error handling is missing here, but it is not
+> > necessary to store the state of the clock to handle errors properly.
+> 
+> Right, but then _STOP will be called without the clock having been
+> successfully enabled so you'll have an unbalanced clk_disable().
+
+_STOP is only called as long as the error handling is not working
+properly. Otherwise STOP should not be called for a failed START.
+
+Regards,
+
+Markus
 
 -- 
-Nicolas Ferre
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
