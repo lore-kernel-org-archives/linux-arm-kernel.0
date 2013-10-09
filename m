@@ -1,31 +1,47 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 9 Oct 2013 11:18:24 +0200
-Subject: [PATCH] sh-pfc: r8a7791 PFC support
-In-Reply-To: <20131008040824.3480.69707.sendpatchset@w520>
-References: <20131008040824.3480.69707.sendpatchset@w520>
-Message-ID: <CACRpkdaJGXAW4B3G4qbByvRc7fWjjYynPwk=T_52eFGCQYq_Sw@mail.gmail.com>
+From: ldewangan@nvidia.com (Laxman Dewangan)
+Date: Wed, 9 Oct 2013 15:13:41 +0530
+Subject: [PATCH V3] clk: palmas: add clock driver for palmas
+In-Reply-To: <20131008152812.GA4981@e106331-lin.cambridge.arm.com>
+References: <1381238480-18852-1-git-send-email-ldewangan@nvidia.com>
+ <525408B3.1000107@ti.com> <5254193A.70104@nvidia.com>
+ <20131008152812.GA4981@e106331-lin.cambridge.arm.com>
+Message-ID: <5255254D.4090108@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 8, 2013 at 6:08 AM, Magnus Damm <magnus.damm@gmail.com> wrote:
-
-> From: Hisashi Nakamura <hisashi.nakamura.ak@renesas.com>
+On Tuesday 08 October 2013 08:58 PM, Mark Rutland wrote:
+> On Tue, Oct 08, 2013 at 03:39:54PM +0100, Laxman Dewangan wrote:
+>>
+>>>> +
+>>>> +     Optional subnode properties:
+>>>> +     ti,clock-boot-enable: Enable clock at the time of booting.
+>>> Dumb question: Why is this needed? should'nt relevant drivers do a
+>>> clk_get to enable the relevant clocks?
+>> If some board needs this clock to be always available for rest of system
+>> to work without any specific driver then this flag is useful.
+> Do we _actually_ need this right now, or is this hypothetical?
 >
-> Add PFC support for the r8a7791 SoC including pin groups for
-> on-chip devices such as MSIOF, SCIF, USB, MMC, VIN, SDHI, DU.
+> If we don't need it now, remove it. If you think we need it know, please
+> describe exactly why (i.e. what device needs the clock to work, why does
+> this affect the rest of the board if we don't ahve a driver for that
+> device, why don't we just write a driver for that device).
 >
-> Signed-off-by: Hisashi Nakamura <hisashi.nakamura.ak@renesas.com>
-> Signed-off-by: Kunihito Higashiyama <kunihito.higashiyama.ur@renesas.com>
-> Signed-off-by: Yoshikazu Fujikawa <yoshikazu.fujikawa.ue@renesas.com>
-> Signed-off-by: Nobuyuki HIRAI <nobuyuki.hirai.xe@renesas.com>
-> Signed-off-by: Shinobu Uehara <shinobu.uehara.xc@renesas.com>
-> Signed-off-by: Koji Matsuoka <koji.matsuoka.xm@renesas.com>
-> Signed-off-by: Ryo Kataoka <ryo.kataoka.wt@renesas.com>
-> [damm at opensource.se: Forward ported to upstream, reused existing sh-pfc macros]
-> Signed-off-by: Magnus Damm <damm@opensource.se>
 
-Need Laurent to look at this, he also queues PCF patches nowadays,
-it was a lot of data but I guess life is like that in this controller...
+Ok, I will remove it. Going with nothing free of cost for the 
+driver/system and client need to call the proper APIs.
 
-Yours,
-Linus Walleij
+>>
+>>>> +     ti,external-sleep-control: The clock is enable/disabled by state
+>>>> +             of external enable input pins ENABLE, ENABLE2 and NSLEEP.
+>>>> +             The valid value for the external pins are:
+>>>> +                     1 for ENABLE1
+>>>> +                     2 for ENABLE2
+>>>> +                     3 for NSLEEP.
+> I asked this on the last version (before having noticed this one). What
+> actually drives those pins to control the clock(s)?
+>
+> Is this for setting the clock to be controlled by the external pin, or
+> is the clock hard-wired to a particular pin?
+>
+
+This is for setting the clock to be controlled by the external pin.
