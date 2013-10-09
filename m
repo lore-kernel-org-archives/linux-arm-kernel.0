@@ -1,44 +1,47 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 9 Oct 2013 13:44:25 +0100
-Subject: [PATCH] pinctrl: phandle entries will be applied sequentially
-In-Reply-To: <CACRpkdazPK6SNg9PdWCrjB8nwho1rCueumJWAN=STXdN1zNnMA@mail.gmail.com>
-References: <1381297324-19006-1-git-send-email-shawn.guo@linaro.org>
- <CACRpkdazPK6SNg9PdWCrjB8nwho1rCueumJWAN=STXdN1zNnMA@mail.gmail.com>
-Message-ID: <20131009124425.GG25034@n2100.arm.linux.org.uk>
+From: emilio@elopez.com.ar (=?UTF-8?B?RW1pbGlvIEzDs3Bleg==?=)
+Date: Wed, 09 Oct 2013 09:51:01 -0300
+Subject: [PATCH 0/3] sunxi clock fixes
+In-Reply-To: <1379725392-30202-1-git-send-email-emilio@elopez.com.ar>
+References: <1379725392-30202-1-git-send-email-emilio@elopez.com.ar>
+Message-ID: <52555135.1080501@elopez.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 09, 2013 at 02:40:49PM +0200, Linus Walleij wrote:
-> NAK this this a Linux kernel implementation detail. Sherman Yin
-> fixed this up so the drivers does not have to imply any sequence
-> semantic for this.
-> 
-> Study commit 03b054e9696c3cbd3d5905ec96da15acd0a2fe8d
-> "pinctrl: Pass all configs to driver on pin_config_set()"
-> 
-> It is perfectly legal for a driver to accumulate the settings into
-> e.g. a single register write if it can, e.g.:
-> 
-> u32 val = 0;
-> 
-> for (i = 0; i < num_configs; i++) {
->   switch() {
->   FOO:
->      val |= 1;
->      break;
->    BAR:
->      val |= 2:
->      break;
->    BAZ:
->      val |=4;
->      break;
-> };
-> 
-> writel(val, base+pinreg);
-> 
-> I.e. the driver may choose to apply configs sequentially, but that is
-> not at all necessary.
+Hi Mike,
 
-So, just to be clear, what you're saying is that specifying two settings
-in a pinctrl declaration which provide different values results in
-undefined behaviour?
+El 20/09/13 22:03, Emilio L?pez escribi?:
+> Hi,
+>
+> This small series contains two bug fixes and a patch to solve the issue
+> of accidental clock gating, as discussed earlier on my RFC patch, "of:
+> add a basic memory driver".
+>
+> I believe the two first patches should go into -rcN, although I have not
+> noticed any issues so far coming from the bugs themselves.
+>
+> The third patch should be a no-op for now, and I'd like to have it
+> merged before these clocks actually appear on the driver; in this way
+> they will never be gated accidentally, and it remains bisectable. I will
+> be sending PLL5/6 support patches in short order.
+>
+> Cheers,
+>
+> Emilio
+>
+> Emilio L?pez (3):
+>    clk: sunxi: factors: fix off-by-one masks
+>    clk: sunxi: factors: clear variables before using them
+>    clk: sunxi: protect core clocks from accidental shutdown
+>
+>   drivers/clk/sunxi/clk-factors.c |  4 ++--
+>   drivers/clk/sunxi/clk-sunxi.c   | 28 ++++++++++++++++++++++++++++
+>   2 files changed, 30 insertions(+), 2 deletions(-)
+>
+
+Can you please take a look at this series and pick the patches if you 
+are ok with them? It would be nice to see the first two fixes on -rcN by 
+the way.
+
+Thanks!
+
+Emilio
