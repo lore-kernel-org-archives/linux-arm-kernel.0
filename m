@@ -1,37 +1,35 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 09 Oct 2013 10:04:28 -0600
-Subject: [PATCH 3/4] ARM: tegra: make tegra_resume can work with current
- and later chips
-In-Reply-To: <1381307002.2200.3.camel@jlo-ubuntu-64.nvidia.com>
-References: <1381220587-29697-1-git-send-email-josephl@nvidia.com>	
- <1381220587-29697-4-git-send-email-josephl@nvidia.com>	
- <52543A24.3020108@wwwdotorg.org>	
- <1381288295.10638.23.camel@jlo-ubuntu-64.nvidia.com>
- <1381307002.2200.3.camel@jlo-ubuntu-64.nvidia.com>
-Message-ID: <52557E8C.7080000@wwwdotorg.org>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed,  9 Oct 2013 13:28:07 -0300
+Subject: [PATCH] ARM: mach-imx: clk-imx51-imx53: Remove return value from
+ mx53_clocks_init()
+Message-ID: <1381336087-19821-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/09/2013 02:23 AM, Joseph Lo wrote:
-> On Wed, 2013-10-09 at 11:11 +0800, Joseph Lo wrote:
->> On Wed, 2013-10-09 at 01:00 +0800, Stephen Warren wrote:
->>> On 10/08/2013 02:23 AM, Joseph Lo wrote:
->>>> diff --git a/arch/arm/mach-tegra/reset-handler.S b/arch/arm/mach-tegra/reset-handler.S
->>>
->>>>  not_ca9:
->>>> +	mov32	r9, 0xc0f
->>>> +	cmp	r8, r9
->>>> +	bleq	tegra_init_l2_for_a15
->>>
->>> That's checking whether the CPU type is a Cortex-A15, isn't it? The only
->>> CPUs that exist NVIDIA SoCs are Cortex-A9 and Cortex-A15, so I don't see
->>> why we need to check whether the CPU is a Cortex-A15, given this label
->>> is jumped to only when the CPU isn't a Cortex-A9.
->>
->> Good catch. Will fix.
->>
-> Ah! I just realize the Cortex-A9 will go through here as well. So I
-> still need to code to make sure only Cortex-A15 execute the function.
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
-In that case, there's a bug in the label name; A9 CPUs shouldn't execute
-code that's "not_ca9"...
+Since commit 4d9d18a56 (ARM: imx: remove custom .init_time hook), 
+mx53_clocks_init() does not return an integer anymore, so adjust it in order to
+fix the following build warning:
+
+arch/arm/mach-imx/clk-imx51-imx53.c:579:2: warning: 'return' with a value, in function returning void [enabled by default]
+
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/mach-imx/clk-imx51-imx53.c | 2 --
+ 1 file changed, 2 deletions(-)
+
+diff --git a/arch/arm/mach-imx/clk-imx51-imx53.c b/arch/arm/mach-imx/clk-imx51-imx53.c
+index fa4de9a..ce37af2 100644
+--- a/arch/arm/mach-imx/clk-imx51-imx53.c
++++ b/arch/arm/mach-imx/clk-imx51-imx53.c
+@@ -575,7 +575,5 @@ static void __init mx53_clocks_init(struct device_node *np)
+ 	WARN_ON(!base);
+ 	irq = irq_of_parse_and_map(np, 0);
+ 	mxc_timer_init(base, irq);
+-
+-	return 0;
+ }
+ CLK_OF_DECLARE(imx53_ccm, "fsl,imx53-ccm", mx53_clocks_init);
+-- 
+1.8.1.2
