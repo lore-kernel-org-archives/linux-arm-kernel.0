@@ -1,43 +1,38 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  9 Oct 2013 15:49:43 +0900
-Subject: [PATCH 02/14] ARM: shmobile: r8a7778: add HPB-DMAC support
+Date: Wed,  9 Oct 2013 15:49:44 +0900
+Subject: [PATCH 03/14] ARM: shmobile: r8a7779: add HPB-DMAC support
 In-Reply-To: <cover.1381293239.git.horms+renesas@verge.net.au>
 References: <cover.1381293239.git.horms+renesas@verge.net.au>
-Message-ID: <338c4991ed350abd7c5b3cb807fe022cb712a8ba.1381293239.git.horms+renesas@verge.net.au>
+Message-ID: <441f750236f3d3d435a1e89ad885ec896832b9c6.1381293239.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Max Filippov <max.filippov@cogentembedded.com>
 
-Add HPB-DMAC platform device on R8A7778 SoC along with its slave and channel
+Add HPB-DMAC platform device on R8A7779 SoC along with its slave and channel
 configurations (only for SDHI0 so far).
 
 Signed-off-by: Max Filippov <max.filippov@cogentembedded.com>
 [Sergei: moved *enum* declaring HPB-DMAC slave IDs from now removed <mach/dma.h>
-to <mach/r8a7778.h>, removed #include <mach/dma.h> from setup-r8a7778.c, removed
+to <mach/r8a7779.h>, removed #include <mach/dma.h> from setup-r8a7779.c, removed
 SSI-related *enum* values and SSI-related data from hpb_dmae_slaves[] and
-hpb_dmae_channels[], moved the comments after the element initializers of
+hpb_dmae_channels[], added ASYNCMDR.ASBTMD{20|24|43} and ASYNCMDR.ASMD{20|24|43}
+fields/values, fixed comments to ASYNCMDR.ASBTMD2[123] and ASYNCMDR.ASMD2[123]
+fields/values, renamed all the bit/field/value #define's to include 'HBP_DMAE_'
+prefix to match the driver, moved comments after the element initializers of
 hpb_dmae_channels[].]
 Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/include/mach/r8a7778.h |  8 +++
- arch/arm/mach-shmobile/setup-r8a7778.c        | 85 +++++++++++++++++++++++++++
- 2 files changed, 93 insertions(+)
+ arch/arm/mach-shmobile/include/mach/r8a7779.h |   7 ++
+ arch/arm/mach-shmobile/setup-r8a7779.c        | 154 ++++++++++++++++++++++++++
+ 2 files changed, 161 insertions(+)
 
-diff --git a/arch/arm/mach-shmobile/include/mach/r8a7778.h b/arch/arm/mach-shmobile/include/mach/r8a7778.h
-index ea1dca6..1d6fe97 100644
---- a/arch/arm/mach-shmobile/include/mach/r8a7778.h
-+++ b/arch/arm/mach-shmobile/include/mach/r8a7778.h
-@@ -1,6 +1,7 @@
- /*
-  * Copyright (C) 2013  Renesas Solutions Corp.
-  * Copyright (C) 2013  Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-+ * Copyright (C) 2013  Cogent Embedded, Inc.
-  *
-  * This program is free software; you can redistribute it and/or modify
-  * it under the terms of the GNU General Public License as published by
-@@ -21,6 +22,13 @@
+diff --git a/arch/arm/mach-shmobile/include/mach/r8a7779.h b/arch/arm/mach-shmobile/include/mach/r8a7779.h
+index 11c7400..31e87b9 100644
+--- a/arch/arm/mach-shmobile/include/mach/r8a7779.h
++++ b/arch/arm/mach-shmobile/include/mach/r8a7779.h
+@@ -6,6 +6,13 @@
  #include <linux/sh_eth.h>
  #include <linux/platform_data/camera-rcar.h>
  
@@ -48,34 +43,100 @@ index ea1dca6..1d6fe97 100644
 +	HPBDMA_SLAVE_SDHI0_RX,
 +};
 +
- extern void r8a7778_add_standard_devices(void);
- extern void r8a7778_add_standard_devices_dt(void);
- extern void r8a7778_add_ether_device(struct sh_eth_plat_data *pdata);
-diff --git a/arch/arm/mach-shmobile/setup-r8a7778.c b/arch/arm/mach-shmobile/setup-r8a7778.c
-index e484d14..fa1b7e4 100644
---- a/arch/arm/mach-shmobile/setup-r8a7778.c
-+++ b/arch/arm/mach-shmobile/setup-r8a7778.c
-@@ -24,6 +24,7 @@
+ struct platform_device;
+ 
+ struct r8a7779_pm_ch {
+diff --git a/arch/arm/mach-shmobile/setup-r8a7779.c b/arch/arm/mach-shmobile/setup-r8a7779.c
+index ecd0148..eacb2f7 100644
+--- a/arch/arm/mach-shmobile/setup-r8a7779.c
++++ b/arch/arm/mach-shmobile/setup-r8a7779.c
+@@ -25,6 +25,7 @@
+ #include <linux/irqchip.h>
  #include <linux/irqchip/arm-gic.h>
- #include <linux/of.h>
  #include <linux/of_platform.h>
 +#include <linux/platform_data/dma-rcar-hpbdma.h>
  #include <linux/platform_data/gpio-rcar.h>
  #include <linux/platform_data/irq-renesas-intc-irqpin.h>
  #include <linux/platform_device.h>
-@@ -356,6 +357,88 @@ void __init r8a7778_add_dt_devices(void)
- 	r8a7778_register_tmu(1);
- }
+@@ -632,6 +633,158 @@ static struct platform_device_info *vin_info_table[] __initdata = {
+ 	&vin3_info,
+ };
  
 +/* HPB-DMA */
 +
-+/* Asynchronous mode register (ASYNCMDR) bits */
-+#define HPB_DMAE_ASYNCMDR_ASMD22_MASK	BIT(2)	/* SDHI0 */
-+#define HPB_DMAE_ASYNCMDR_ASMD22_SINGLE	BIT(2)	/* SDHI0 */
-+#define HPB_DMAE_ASYNCMDR_ASMD22_MULTI	0	/* SDHI0 */
-+#define HPB_DMAE_ASYNCMDR_ASMD21_MASK	BIT(1)	/* SDHI0 */
-+#define HPB_DMAE_ASYNCMDR_ASMD21_SINGLE	BIT(1)	/* SDHI0 */
-+#define HPB_DMAE_ASYNCMDR_ASMD21_MULTI	0	/* SDHI0 */
++/* Asynchronous mode register bits */
++#define HPB_DMAE_ASYNCMDR_ASMD43_MASK		BIT(23)	/* MMC1 */
++#define HPB_DMAE_ASYNCMDR_ASMD43_SINGLE		BIT(23)	/* MMC1 */
++#define HPB_DMAE_ASYNCMDR_ASMD43_MULTI		0	/* MMC1 */
++#define HPB_DMAE_ASYNCMDR_ASBTMD43_MASK		BIT(22)	/* MMC1 */
++#define HPB_DMAE_ASYNCMDR_ASBTMD43_BURST	BIT(22)	/* MMC1 */
++#define HPB_DMAE_ASYNCMDR_ASBTMD43_NBURST	0	/* MMC1 */
++#define HPB_DMAE_ASYNCMDR_ASMD24_MASK		BIT(21)	/* MMC0 */
++#define HPB_DMAE_ASYNCMDR_ASMD24_SINGLE		BIT(21)	/* MMC0 */
++#define HPB_DMAE_ASYNCMDR_ASMD24_MULTI		0	/* MMC0 */
++#define HPB_DMAE_ASYNCMDR_ASBTMD24_MASK		BIT(20)	/* MMC0 */
++#define HPB_DMAE_ASYNCMDR_ASBTMD24_BURST	BIT(20)	/* MMC0 */
++#define HPB_DMAE_ASYNCMDR_ASBTMD24_NBURST	0	/* MMC0 */
++#define HPB_DMAE_ASYNCMDR_ASMD41_MASK		BIT(19)	/* SDHI3 */
++#define HPB_DMAE_ASYNCMDR_ASMD41_SINGLE		BIT(19)	/* SDHI3 */
++#define HPB_DMAE_ASYNCMDR_ASMD41_MULTI		0	/* SDHI3 */
++#define HPB_DMAE_ASYNCMDR_ASBTMD41_MASK		BIT(18)	/* SDHI3 */
++#define HPB_DMAE_ASYNCMDR_ASBTMD41_BURST	BIT(18)	/* SDHI3 */
++#define HPB_DMAE_ASYNCMDR_ASBTMD41_NBURST	0	/* SDHI3 */
++#define HPB_DMAE_ASYNCMDR_ASMD40_MASK		BIT(17)	/* SDHI3 */
++#define HPB_DMAE_ASYNCMDR_ASMD40_SINGLE		BIT(17)	/* SDHI3 */
++#define HPB_DMAE_ASYNCMDR_ASMD40_MULTI		0	/* SDHI3 */
++#define HPB_DMAE_ASYNCMDR_ASBTMD40_MASK		BIT(16)	/* SDHI3 */
++#define HPB_DMAE_ASYNCMDR_ASBTMD40_BURST	BIT(16)	/* SDHI3 */
++#define HPB_DMAE_ASYNCMDR_ASBTMD40_NBURST	0	/* SDHI3 */
++#define HPB_DMAE_ASYNCMDR_ASMD39_MASK		BIT(15)	/* SDHI3 */
++#define HPB_DMAE_ASYNCMDR_ASMD39_SINGLE		BIT(15)	/* SDHI3 */
++#define HPB_DMAE_ASYNCMDR_ASMD39_MULTI		0	/* SDHI3 */
++#define HPB_DMAE_ASYNCMDR_ASBTMD39_MASK		BIT(14)	/* SDHI3 */
++#define HPB_DMAE_ASYNCMDR_ASBTMD39_BURST	BIT(14)	/* SDHI3 */
++#define HPB_DMAE_ASYNCMDR_ASBTMD39_NBURST	0	/* SDHI3 */
++#define HPB_DMAE_ASYNCMDR_ASMD27_MASK		BIT(13)	/* SDHI2 */
++#define HPB_DMAE_ASYNCMDR_ASMD27_SINGLE		BIT(13)	/* SDHI2 */
++#define HPB_DMAE_ASYNCMDR_ASMD27_MULTI		0	/* SDHI2 */
++#define HPB_DMAE_ASYNCMDR_ASBTMD27_MASK		BIT(12)	/* SDHI2 */
++#define HPB_DMAE_ASYNCMDR_ASBTMD27_BURST	BIT(12)	/* SDHI2 */
++#define HPB_DMAE_ASYNCMDR_ASBTMD27_NBURST	0	/* SDHI2 */
++#define HPB_DMAE_ASYNCMDR_ASMD26_MASK		BIT(11)	/* SDHI2 */
++#define HPB_DMAE_ASYNCMDR_ASMD26_SINGLE		BIT(11)	/* SDHI2 */
++#define HPB_DMAE_ASYNCMDR_ASMD26_MULTI		0	/* SDHI2 */
++#define HPB_DMAE_ASYNCMDR_ASBTMD26_MASK		BIT(10)	/* SDHI2 */
++#define HPB_DMAE_ASYNCMDR_ASBTMD26_BURST	BIT(10)	/* SDHI2 */
++#define HPB_DMAE_ASYNCMDR_ASBTMD26_NBURST	0	/* SDHI2 */
++#define HPB_DMAE_ASYNCMDR_ASMD25_MASK		BIT(9)	/* SDHI2 */
++#define HPB_DMAE_ASYNCMDR_ASMD25_SINGLE		BIT(9)	/* SDHI2 */
++#define HPB_DMAE_ASYNCMDR_ASMD25_MULTI		0	/* SDHI2 */
++#define HPB_DMAE_ASYNCMDR_ASBTMD25_MASK		BIT(8)	/* SDHI2 */
++#define HPB_DMAE_ASYNCMDR_ASBTMD25_BURST	BIT(8)	/* SDHI2 */
++#define HPB_DMAE_ASYNCMDR_ASBTMD25_NBURST	0	/* SDHI2 */
++#define HPB_DMAE_ASYNCMDR_ASMD23_MASK		BIT(7)	/* SDHI0 */
++#define HPB_DMAE_ASYNCMDR_ASMD23_SINGLE		BIT(7)	/* SDHI0 */
++#define HPB_DMAE_ASYNCMDR_ASMD23_MULTI		0	/* SDHI0 */
++#define HPB_DMAE_ASYNCMDR_ASBTMD23_MASK		BIT(6)	/* SDHI0 */
++#define HPB_DMAE_ASYNCMDR_ASBTMD23_BURST	BIT(6)	/* SDHI0 */
++#define HPB_DMAE_ASYNCMDR_ASBTMD23_NBURST	0	/* SDHI0 */
++#define HPB_DMAE_ASYNCMDR_ASMD22_MASK		BIT(5)	/* SDHI0 */
++#define HPB_DMAE_ASYNCMDR_ASMD22_SINGLE		BIT(5)	/* SDHI0 */
++#define HPB_DMAE_ASYNCMDR_ASMD22_MULTI		0	/* SDHI0 */
++#define HPB_DMAE_ASYNCMDR_ASBTMD22_MASK		BIT(4)	/* SDHI0 */
++#define HPB_DMAE_ASYNCMDR_ASBTMD22_BURST	BIT(4)	/* SDHI0 */
++#define HPB_DMAE_ASYNCMDR_ASBTMD22_NBURST	0	/* SDHI0 */
++#define HPB_DMAE_ASYNCMDR_ASMD21_MASK		BIT(3)	/* SDHI0 */
++#define HPB_DMAE_ASYNCMDR_ASMD21_SINGLE		BIT(3)	/* SDHI0 */
++#define HPB_DMAE_ASYNCMDR_ASMD21_MULTI		0	/* SDHI0 */
++#define HPB_DMAE_ASYNCMDR_ASBTMD21_MASK		BIT(2)	/* SDHI0 */
++#define HPB_DMAE_ASYNCMDR_ASBTMD21_BURST	BIT(2)	/* SDHI0 */
++#define HPB_DMAE_ASYNCMDR_ASBTMD21_NBURST	0	/* SDHI0 */
++#define HPB_DMAE_ASYNCMDR_ASMD20_MASK		BIT(1)	/* SDHI1 */
++#define HPB_DMAE_ASYNCMDR_ASMD20_SINGLE		BIT(1)	/* SDHI1 */
++#define HPB_DMAE_ASYNCMDR_ASMD20_MULTI		0	/* SDHI1 */
++#define HPB_DMAE_ASYNCMDR_ASBTMD20_MASK		BIT(0)	/* SDHI1 */
++#define HPB_DMAE_ASYNCMDR_ASBTMD20_BURST	BIT(0)	/* SDHI1 */
++#define HPB_DMAE_ASYNCMDR_ASBTMD20_NBURST	0	/* SDHI1 */
 +
 +static const struct hpb_dmae_slave_config hpb_dmae_slaves[] = {
 +	{
@@ -87,8 +148,10 @@ index e484d14..fa1b7e4 100644
 +		.rstr	= HPB_DMAE_ASYNCRSTR_ASRST21 |
 +			  HPB_DMAE_ASYNCRSTR_ASRST22 |
 +			  HPB_DMAE_ASYNCRSTR_ASRST23,
-+		.mdr	= HPB_DMAE_ASYNCMDR_ASMD21_MULTI,
-+		.mdm	= HPB_DMAE_ASYNCMDR_ASMD21_MASK,
++		.mdr	= HPB_DMAE_ASYNCMDR_ASMD21_SINGLE |
++			  HPB_DMAE_ASYNCMDR_ASBTMD21_NBURST,
++		.mdm	= HPB_DMAE_ASYNCMDR_ASMD21_MASK |
++			  HPB_DMAE_ASYNCMDR_ASBTMD21_MASK,
 +		.port	= 0x0D0C,
 +		.flags	= HPB_DMAE_SET_ASYNC_RESET | HPB_DMAE_SET_ASYNC_MODE,
 +		.dma_ch	= 21,
@@ -101,8 +164,10 @@ index e484d14..fa1b7e4 100644
 +		.rstr	= HPB_DMAE_ASYNCRSTR_ASRST21 |
 +			  HPB_DMAE_ASYNCRSTR_ASRST22 |
 +			  HPB_DMAE_ASYNCRSTR_ASRST23,
-+		.mdr	= HPB_DMAE_ASYNCMDR_ASMD22_MULTI,
-+		.mdm	= HPB_DMAE_ASYNCMDR_ASMD22_MASK,
++		.mdr	= HPB_DMAE_ASYNCMDR_ASMD22_SINGLE |
++			  HPB_DMAE_ASYNCMDR_ASBTMD22_NBURST,
++		.mdm	= HPB_DMAE_ASYNCMDR_ASMD22_MASK |
++			  HPB_DMAE_ASYNCMDR_ASBTMD22_MASK,
 +		.port	= 0x0D0C,
 +		.flags	= HPB_DMAE_SET_ASYNC_RESET | HPB_DMAE_SET_ASYNC_MODE,
 +		.dma_ch	= 22,
@@ -110,8 +175,8 @@ index e484d14..fa1b7e4 100644
 +};
 +
 +static const struct hpb_dmae_channel hpb_dmae_channels[] = {
-+	HPB_DMAE_CHANNEL(0x7e, HPBDMA_SLAVE_SDHI0_TX), /* ch. 21 */
-+	HPB_DMAE_CHANNEL(0x7e, HPBDMA_SLAVE_SDHI0_RX), /* ch. 22 */
++	HPB_DMAE_CHANNEL(0x93, HPBDMA_SLAVE_SDHI0_TX), /* ch. 21 */
++	HPB_DMAE_CHANNEL(0x93, HPBDMA_SLAVE_SDHI0_RX), /* ch. 22 */
 +};
 +
 +static struct hpb_dmae_pdata dma_platform_data __initdata = {
@@ -124,7 +189,7 @@ index e484d14..fa1b7e4 100644
 +		[XMIT_SZ_16BIT]	= 1,
 +		[XMIT_SZ_32BIT]	= 2,
 +	},
-+	.num_hw_channels	= 39,
++	.num_hw_channels	= 44,
 +};
 +
 +static struct resource hpb_dmae_resources[] __initdata = {
@@ -137,10 +202,10 @@ index e484d14..fa1b7e4 100644
 +	/* Asynchronous mode registers */
 +	DEFINE_RES_MEM(0xffc00400, 4),
 +	/* IRQ for DMA channels */
-+	DEFINE_RES_NAMED(gic_iid(0x7b), 5, NULL, IORESOURCE_IRQ),
++	DEFINE_RES_NAMED(gic_iid(0x8e), 12, NULL, IORESOURCE_IRQ),
 +};
 +
-+static void __init r8a7778_register_hpb_dmae(void)
++static void __init r8a7779_register_hpb_dmae(void)
 +{
 +	platform_device_register_resndata(&platform_bus, "hpb-dma-engine", -1,
 +					  hpb_dmae_resources,
@@ -149,17 +214,16 @@ index e484d14..fa1b7e4 100644
 +					  sizeof(dma_platform_data));
 +}
 +
- void __init r8a7778_add_standard_devices(void)
- {
- 	r8a7778_add_dt_devices();
-@@ -366,6 +449,8 @@ void __init r8a7778_add_standard_devices(void)
- 	r8a7778_register_hspi(0);
- 	r8a7778_register_hspi(1);
- 	r8a7778_register_hspi(2);
-+
-+	r8a7778_register_hpb_dmae();
+ static struct platform_device *r8a7779_devices_dt[] __initdata = {
+ 	&scif0_device,
+ 	&scif1_device,
+@@ -665,6 +818,7 @@ void __init r8a7779_add_standard_devices(void)
+ 			    ARRAY_SIZE(r8a7779_devices_dt));
+ 	platform_add_devices(r8a7779_standard_devices,
+ 			    ARRAY_SIZE(r8a7779_standard_devices));
++	r8a7779_register_hpb_dmae();
  }
  
- void __init r8a7778_init_late(void)
+ void __init r8a7779_add_ether_device(struct sh_eth_plat_data *pdata)
 -- 
 1.8.4
