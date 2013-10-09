@@ -1,190 +1,165 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  9 Oct 2013 15:49:42 +0900
-Subject: [PATCH 01/14] ARM: shmobile: r8a73a4: add a DMAC platform device and
- clock for it
+Date: Wed,  9 Oct 2013 15:49:43 +0900
+Subject: [PATCH 02/14] ARM: shmobile: r8a7778: add HPB-DMAC support
 In-Reply-To: <cover.1381293239.git.horms+renesas@verge.net.au>
 References: <cover.1381293239.git.horms+renesas@verge.net.au>
-Message-ID: <9f754b4a68e53c71f55aaa9564579ae617a2ff11.1381293239.git.horms+renesas@verge.net.au>
+Message-ID: <338c4991ed350abd7c5b3cb807fe022cb712a8ba.1381293239.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+From: Max Filippov <max.filippov@cogentembedded.com>
 
-Add a DMAC platform device and clock definitions for it on r8a73a4.
+Add HPB-DMAC platform device on R8A7778 SoC along with its slave and channel
+configurations (only for SDHI0 so far).
 
-Signed-off-by: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
+Signed-off-by: Max Filippov <max.filippov@cogentembedded.com>
+[Sergei: moved *enum* declaring HPB-DMAC slave IDs from now removed <mach/dma.h>
+to <mach/r8a7778.h>, removed #include <mach/dma.h> from setup-r8a7778.c, removed
+SSI-related *enum* values and SSI-related data from hpb_dmae_slaves[] and
+hpb_dmae_channels[], moved the comments after the element initializers of
+hpb_dmae_channels[].]
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/clock-r8a73a4.c        |  4 +-
- arch/arm/mach-shmobile/include/mach/r8a73a4.h |  9 +++
- arch/arm/mach-shmobile/setup-r8a73a4.c        | 91 +++++++++++++++++++++++++++
- 3 files changed, 103 insertions(+), 1 deletion(-)
+ arch/arm/mach-shmobile/include/mach/r8a7778.h |  8 +++
+ arch/arm/mach-shmobile/setup-r8a7778.c        | 85 +++++++++++++++++++++++++++
+ 2 files changed, 93 insertions(+)
 
-diff --git a/arch/arm/mach-shmobile/clock-r8a73a4.c b/arch/arm/mach-shmobile/clock-r8a73a4.c
-index 8ea5ef6..357b9bc 100644
---- a/arch/arm/mach-shmobile/clock-r8a73a4.c
-+++ b/arch/arm/mach-shmobile/clock-r8a73a4.c
-@@ -504,7 +504,7 @@ static struct clk div6_clks[DIV6_NR] = {
+diff --git a/arch/arm/mach-shmobile/include/mach/r8a7778.h b/arch/arm/mach-shmobile/include/mach/r8a7778.h
+index ea1dca6..1d6fe97 100644
+--- a/arch/arm/mach-shmobile/include/mach/r8a7778.h
++++ b/arch/arm/mach-shmobile/include/mach/r8a7778.h
+@@ -1,6 +1,7 @@
+ /*
+  * Copyright (C) 2013  Renesas Solutions Corp.
+  * Copyright (C) 2013  Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
++ * Copyright (C) 2013  Cogent Embedded, Inc.
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License as published by
+@@ -21,6 +22,13 @@
+ #include <linux/sh_eth.h>
+ #include <linux/platform_data/camera-rcar.h>
  
- /* MSTP */
- enum {
--	MSTP217, MSTP216, MSTP207, MSTP206, MSTP204, MSTP203,
-+	MSTP218, MSTP217, MSTP216, MSTP207, MSTP206, MSTP204, MSTP203,
- 	MSTP329, MSTP323, MSTP318, MSTP317, MSTP316,
- 	MSTP315, MSTP314, MSTP313, MSTP312, MSTP305, MSTP300,
- 	MSTP411, MSTP410, MSTP409,
-@@ -519,6 +519,7 @@ static struct clk mstp_clks[MSTP_NR] = {
- 	[MSTP207] = SH_CLK_MSTP32(&div6_clks[DIV6_MP],	SMSTPCR2, 7, 0), /* SCIFB1 */
- 	[MSTP216] = SH_CLK_MSTP32(&div6_clks[DIV6_MP],	SMSTPCR2, 16, 0), /* SCIFB2 */
- 	[MSTP217] = SH_CLK_MSTP32(&div6_clks[DIV6_MP],	SMSTPCR2, 17, 0), /* SCIFB3 */
-+	[MSTP218] = SH_CLK_MSTP32(&div4_clks[DIV4_HP],	SMSTPCR2, 18, 0), /* DMAC */
- 	[MSTP300] = SH_CLK_MSTP32(&div4_clks[DIV4_HP],	SMSTPCR3, 0, 0), /* IIC2 */
- 	[MSTP305] = SH_CLK_MSTP32(&div6_clks[DIV6_MMC1],SMSTPCR3, 5, 0), /* MMCIF1 */
- 	[MSTP312] = SH_CLK_MSTP32(&div6_clks[DIV6_SDHI2],SMSTPCR3, 12, 0), /* SDHI2 */
-@@ -578,6 +579,7 @@ static struct clk_lookup lookups[] = {
- 	CLKDEV_DEV_ID("sh-sci.3", &mstp_clks[MSTP207]),
- 	CLKDEV_DEV_ID("sh-sci.4", &mstp_clks[MSTP216]),
- 	CLKDEV_DEV_ID("sh-sci.5", &mstp_clks[MSTP217]),
-+	CLKDEV_DEV_ID("sh-dma-engine.0", &mstp_clks[MSTP218]),
- 	CLKDEV_DEV_ID("rcar_thermal", &mstp_clks[MSTP522]),
- 	CLKDEV_DEV_ID("e6520000.i2c", &mstp_clks[MSTP300]),
- 	CLKDEV_DEV_ID("sh_mmcif.1", &mstp_clks[MSTP305]),
-diff --git a/arch/arm/mach-shmobile/include/mach/r8a73a4.h b/arch/arm/mach-shmobile/include/mach/r8a73a4.h
-index 5214338..ce8bdd1 100644
---- a/arch/arm/mach-shmobile/include/mach/r8a73a4.h
-+++ b/arch/arm/mach-shmobile/include/mach/r8a73a4.h
-@@ -1,6 +1,15 @@
- #ifndef __ASM_R8A73A4_H__
- #define __ASM_R8A73A4_H__
- 
-+/* DMA slave IDs */
++/* HPB-DMA slave IDs */
 +enum {
-+	SHDMA_SLAVE_INVALID,
-+	SHDMA_SLAVE_MMCIF0_TX,
-+	SHDMA_SLAVE_MMCIF0_RX,
-+	SHDMA_SLAVE_MMCIF1_TX,
-+	SHDMA_SLAVE_MMCIF1_RX,
++	HPBDMA_SLAVE_DUMMY,
++	HPBDMA_SLAVE_SDHI0_TX,
++	HPBDMA_SLAVE_SDHI0_RX,
 +};
 +
- void r8a73a4_add_standard_devices(void);
- void r8a73a4_add_dt_devices(void);
- void r8a73a4_clock_init(void);
-diff --git a/arch/arm/mach-shmobile/setup-r8a73a4.c b/arch/arm/mach-shmobile/setup-r8a73a4.c
-index 53a8962..b0f2749 100644
---- a/arch/arm/mach-shmobile/setup-r8a73a4.c
-+++ b/arch/arm/mach-shmobile/setup-r8a73a4.c
-@@ -22,8 +22,10 @@
+ extern void r8a7778_add_standard_devices(void);
+ extern void r8a7778_add_standard_devices_dt(void);
+ extern void r8a7778_add_ether_device(struct sh_eth_plat_data *pdata);
+diff --git a/arch/arm/mach-shmobile/setup-r8a7778.c b/arch/arm/mach-shmobile/setup-r8a7778.c
+index e484d14..fa1b7e4 100644
+--- a/arch/arm/mach-shmobile/setup-r8a7778.c
++++ b/arch/arm/mach-shmobile/setup-r8a7778.c
+@@ -24,6 +24,7 @@
+ #include <linux/irqchip/arm-gic.h>
+ #include <linux/of.h>
  #include <linux/of_platform.h>
- #include <linux/platform_data/irq-renesas-irqc.h>
- #include <linux/serial_sci.h>
-+#include <linux/sh_dma.h>
- #include <linux/sh_timer.h>
- #include <mach/common.h>
-+#include <mach/dma-register.h>
- #include <mach/irqs.h>
- #include <mach/r8a73a4.h>
- #include <asm/mach/arch.h>
-@@ -199,12 +201,101 @@ void __init r8a73a4_add_dt_devices(void)
- 	r8a7790_register_cmt(10);
++#include <linux/platform_data/dma-rcar-hpbdma.h>
+ #include <linux/platform_data/gpio-rcar.h>
+ #include <linux/platform_data/irq-renesas-intc-irqpin.h>
+ #include <linux/platform_device.h>
+@@ -356,6 +357,88 @@ void __init r8a7778_add_dt_devices(void)
+ 	r8a7778_register_tmu(1);
  }
  
-+/* DMA */
-+static const struct sh_dmae_slave_config dma_slaves[] = {
++/* HPB-DMA */
++
++/* Asynchronous mode register (ASYNCMDR) bits */
++#define HPB_DMAE_ASYNCMDR_ASMD22_MASK	BIT(2)	/* SDHI0 */
++#define HPB_DMAE_ASYNCMDR_ASMD22_SINGLE	BIT(2)	/* SDHI0 */
++#define HPB_DMAE_ASYNCMDR_ASMD22_MULTI	0	/* SDHI0 */
++#define HPB_DMAE_ASYNCMDR_ASMD21_MASK	BIT(1)	/* SDHI0 */
++#define HPB_DMAE_ASYNCMDR_ASMD21_SINGLE	BIT(1)	/* SDHI0 */
++#define HPB_DMAE_ASYNCMDR_ASMD21_MULTI	0	/* SDHI0 */
++
++static const struct hpb_dmae_slave_config hpb_dmae_slaves[] = {
 +	{
-+		.slave_id	= SHDMA_SLAVE_MMCIF0_TX,
-+		.addr		= 0xee200034,
-+		.chcr		= CHCR_TX(XMIT_SZ_32BIT),
-+		.mid_rid	= 0xd1,
++		.id	= HPBDMA_SLAVE_SDHI0_TX,
++		.addr	= 0xffe4c000 + 0x30,
++		.dcr	= HPB_DMAE_DCR_SPDS_16BIT |
++			  HPB_DMAE_DCR_DMDL |
++			  HPB_DMAE_DCR_DPDS_16BIT,
++		.rstr	= HPB_DMAE_ASYNCRSTR_ASRST21 |
++			  HPB_DMAE_ASYNCRSTR_ASRST22 |
++			  HPB_DMAE_ASYNCRSTR_ASRST23,
++		.mdr	= HPB_DMAE_ASYNCMDR_ASMD21_MULTI,
++		.mdm	= HPB_DMAE_ASYNCMDR_ASMD21_MASK,
++		.port	= 0x0D0C,
++		.flags	= HPB_DMAE_SET_ASYNC_RESET | HPB_DMAE_SET_ASYNC_MODE,
++		.dma_ch	= 21,
 +	}, {
-+		.slave_id	= SHDMA_SLAVE_MMCIF0_RX,
-+		.addr		= 0xee200034,
-+		.chcr		= CHCR_RX(XMIT_SZ_32BIT),
-+		.mid_rid	= 0xd2,
-+	}, {
-+		.slave_id	= SHDMA_SLAVE_MMCIF1_TX,
-+		.addr		= 0xee220034,
-+		.chcr		= CHCR_TX(XMIT_SZ_32BIT),
-+		.mid_rid	= 0xe1,
-+	}, {
-+		.slave_id	= SHDMA_SLAVE_MMCIF1_RX,
-+		.addr		= 0xee220034,
-+		.chcr		= CHCR_RX(XMIT_SZ_32BIT),
-+		.mid_rid	= 0xe2,
++		.id	= HPBDMA_SLAVE_SDHI0_RX,
++		.addr	= 0xffe4c000 + 0x30,
++		.dcr	= HPB_DMAE_DCR_SMDL |
++			  HPB_DMAE_DCR_SPDS_16BIT |
++			  HPB_DMAE_DCR_DPDS_16BIT,
++		.rstr	= HPB_DMAE_ASYNCRSTR_ASRST21 |
++			  HPB_DMAE_ASYNCRSTR_ASRST22 |
++			  HPB_DMAE_ASYNCRSTR_ASRST23,
++		.mdr	= HPB_DMAE_ASYNCMDR_ASMD22_MULTI,
++		.mdm	= HPB_DMAE_ASYNCMDR_ASMD22_MASK,
++		.port	= 0x0D0C,
++		.flags	= HPB_DMAE_SET_ASYNC_RESET | HPB_DMAE_SET_ASYNC_MODE,
++		.dma_ch	= 22,
 +	},
 +};
 +
-+#define DMAE_CHANNEL(a, b)				\
-+	{						\
-+		.offset         = (a) - 0x20,		\
-+		.dmars          = (a) - 0x20 + 0x40,	\
-+		.chclr_bit	= (b),			\
-+		.chclr_offset	= 0x80 - 0x20,		\
-+	}
-+
-+static const struct sh_dmae_channel dma_channels[] = {
-+	DMAE_CHANNEL(0x8000, 0),
-+	DMAE_CHANNEL(0x8080, 1),
-+	DMAE_CHANNEL(0x8100, 2),
-+	DMAE_CHANNEL(0x8180, 3),
-+	DMAE_CHANNEL(0x8200, 4),
-+	DMAE_CHANNEL(0x8280, 5),
-+	DMAE_CHANNEL(0x8300, 6),
-+	DMAE_CHANNEL(0x8380, 7),
-+	DMAE_CHANNEL(0x8400, 8),
-+	DMAE_CHANNEL(0x8480, 9),
-+	DMAE_CHANNEL(0x8500, 10),
-+	DMAE_CHANNEL(0x8580, 11),
-+	DMAE_CHANNEL(0x8600, 12),
-+	DMAE_CHANNEL(0x8680, 13),
-+	DMAE_CHANNEL(0x8700, 14),
-+	DMAE_CHANNEL(0x8780, 15),
-+	DMAE_CHANNEL(0x8800, 16),
-+	DMAE_CHANNEL(0x8880, 17),
-+	DMAE_CHANNEL(0x8900, 18),
-+	DMAE_CHANNEL(0x8980, 19),
++static const struct hpb_dmae_channel hpb_dmae_channels[] = {
++	HPB_DMAE_CHANNEL(0x7e, HPBDMA_SLAVE_SDHI0_TX), /* ch. 21 */
++	HPB_DMAE_CHANNEL(0x7e, HPBDMA_SLAVE_SDHI0_RX), /* ch. 22 */
 +};
 +
-+static const struct sh_dmae_pdata dma_pdata = {
-+	.slave		= dma_slaves,
-+	.slave_num	= ARRAY_SIZE(dma_slaves),
-+	.channel	= dma_channels,
-+	.channel_num	= ARRAY_SIZE(dma_channels),
-+	.ts_low_shift	= TS_LOW_SHIFT,
-+	.ts_low_mask	= TS_LOW_BIT << TS_LOW_SHIFT,
-+	.ts_high_shift	= TS_HI_SHIFT,
-+	.ts_high_mask	= TS_HI_BIT << TS_HI_SHIFT,
-+	.ts_shift	= dma_ts_shift,
-+	.ts_shift_num	= ARRAY_SIZE(dma_ts_shift),
-+	.dmaor_init     = DMAOR_DME,
-+	.chclr_present	= 1,
-+	.chclr_bitwise	= 1,
-+};
-+
-+static struct resource dma_resources[] = {
-+	DEFINE_RES_MEM(0xe6700020, 0x89e0),
-+	DEFINE_RES_IRQ_NAMED(gic_spi(220), "error_irq"),
-+	{
-+		/* IRQ for channels 0-19 */
-+		.start  = gic_spi(200),
-+		.end    = gic_spi(219),
-+		.flags  = IORESOURCE_IRQ,
++static struct hpb_dmae_pdata dma_platform_data __initdata = {
++	.slaves			= hpb_dmae_slaves,
++	.num_slaves		= ARRAY_SIZE(hpb_dmae_slaves),
++	.channels		= hpb_dmae_channels,
++	.num_channels		= ARRAY_SIZE(hpb_dmae_channels),
++	.ts_shift		= {
++		[XMIT_SZ_8BIT]	= 0,
++		[XMIT_SZ_16BIT]	= 1,
++		[XMIT_SZ_32BIT]	= 2,
 +	},
++	.num_hw_channels	= 39,
 +};
 +
-+#define r8a73a4_register_dmac()							\
-+	platform_device_register_resndata(&platform_bus, "sh-dma-engine", 0,	\
-+				dma_resources, ARRAY_SIZE(dma_resources),	\
-+				&dma_pdata, sizeof(dma_pdata))
++static struct resource hpb_dmae_resources[] __initdata = {
++	/* Channel registers */
++	DEFINE_RES_MEM(0xffc08000, 0x1000),
++	/* Common registers */
++	DEFINE_RES_MEM(0xffc09000, 0x170),
++	/* Asynchronous reset registers */
++	DEFINE_RES_MEM(0xffc00300, 4),
++	/* Asynchronous mode registers */
++	DEFINE_RES_MEM(0xffc00400, 4),
++	/* IRQ for DMA channels */
++	DEFINE_RES_NAMED(gic_iid(0x7b), 5, NULL, IORESOURCE_IRQ),
++};
 +
- void __init r8a73a4_add_standard_devices(void)
++static void __init r8a7778_register_hpb_dmae(void)
++{
++	platform_device_register_resndata(&platform_bus, "hpb-dma-engine", -1,
++					  hpb_dmae_resources,
++					  ARRAY_SIZE(hpb_dmae_resources),
++					  &dma_platform_data,
++					  sizeof(dma_platform_data));
++}
++
+ void __init r8a7778_add_standard_devices(void)
  {
- 	r8a73a4_add_dt_devices();
- 	r8a73a4_register_irqc(0);
- 	r8a73a4_register_irqc(1);
- 	r8a73a4_register_thermal();
-+	r8a73a4_register_dmac();
+ 	r8a7778_add_dt_devices();
+@@ -366,6 +449,8 @@ void __init r8a7778_add_standard_devices(void)
+ 	r8a7778_register_hspi(0);
+ 	r8a7778_register_hspi(1);
+ 	r8a7778_register_hspi(2);
++
++	r8a7778_register_hpb_dmae();
  }
  
- void __init r8a73a4_init_early(void)
+ void __init r8a7778_init_late(void)
 -- 
 1.8.4
