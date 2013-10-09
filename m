@@ -1,43 +1,32 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Wed, 9 Oct 2013 18:30:54 +0300
-Subject: [PATCHv8 23/36] ARM: dts: DRA7: link in clock DT data
+Date: Wed, 9 Oct 2013 18:30:53 +0300
+Subject: [PATCHv8 22/36] ARM: OMAP: DRA7: Enable clock init
 In-Reply-To: <1381332668-962-1-git-send-email-t-kristo@ti.com>
 References: <1381332668-962-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1381332668-962-24-git-send-email-t-kristo@ti.com>
+Message-ID: <1381332668-962-23-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Clock tree DT data is now included from base dra7.dtsi file.
+Initializes clock data from device tree.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 Tested-by: Nishanth Menon <nm@ti.com>
 Acked-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/boot/dts/dra7.dtsi |   14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+ arch/arm/mach-omap2/io.c |    1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
-index c01ef76..c98997b 100644
---- a/arch/arm/boot/dts/dra7.dtsi
-+++ b/arch/arm/boot/dts/dra7.dtsi
-@@ -572,4 +572,18 @@
- 			status = "disabled";
- 		};
- 	};
-+
-+	clocks {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges;
-+		/include/ "dra7xx-clocks.dtsi"
-+	};
-+
-+	clockdomains {
-+		coreaon_clkdm: coreaon_clkdm {
-+			compatible = "ti,clockdomain";
-+			clocks = <&dpll_usb_ck>;
-+		};
-+	};
- };
+diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
+index 3263022..ef04dd5 100644
+--- a/arch/arm/mach-omap2/io.c
++++ b/arch/arm/mach-omap2/io.c
+@@ -671,6 +671,7 @@ void __init dra7xx_init_early(void)
+ 	dra7xx_clockdomains_init();
+ 	dra7xx_hwmod_init();
+ 	omap_hwmod_init_postsetup();
++	omap_clk_init = dra7xx_dt_clk_init;
+ }
+ #endif
+ 
 -- 
 1.7.9.5
