@@ -1,25 +1,31 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Wed, 9 Oct 2013 15:55:08 +0800
-Subject: [PATCH v3 2/2] serial: mxs-auart: wait for FIFO to flush before
- shutdown
-In-Reply-To: <1380785524-20490-3-git-send-email-hector.palacios@digi.com>
-References: <1380785524-20490-1-git-send-email-hector.palacios@digi.com>
- <1380785524-20490-3-git-send-email-hector.palacios@digi.com>
-Message-ID: <52550BDC.70204@freescale.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 9 Oct 2013 16:04:03 +0800
+Subject: [PATCH] ARM: imx: reset core along with enable/disable operation
+Message-ID: <1381305843-26478-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2013?10?03? 15:32, Hector Palacios ??:
-> This lead to many bytes not being transferred (specially at low
-> baudrates), as they were still in the DMA buffer when the AUART was
-> shutdown.
-I meet a similar bug with the imx.c which is used for the I.MX.
+>From hotplug stress test result, resetting core during enable/disable
+operation can improve cpu hotplug stability.  So let's set
+SRC reset bit in imx_enable_cpu() for the core when its enable bit is
+accessed.
 
-I did not implement the uart_ops->flush_buffer() hook, so the DMA may fails.
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
+ arch/arm/mach-imx/src.c |    1 +
+ 1 file changed, 1 insertion(+)
 
-So could we add a new flush_buffer hook for mxs-auart?
-
-Please see the Documentation/serail/driver.
-
-thanks
-Huang Shijie
+diff --git a/arch/arm/mach-imx/src.c b/arch/arm/mach-imx/src.c
+index 10a6b1a..4754373 100644
+--- a/arch/arm/mach-imx/src.c
++++ b/arch/arm/mach-imx/src.c
+@@ -91,6 +91,7 @@ void imx_enable_cpu(int cpu, bool enable)
+ 	spin_lock(&scr_lock);
+ 	val = readl_relaxed(src_base + SRC_SCR);
+ 	val = enable ? val | mask : val & ~mask;
++	val |= 1 << (BP_SRC_SCR_CORE1_RST + cpu - 1);
+ 	writel_relaxed(val, src_base + SRC_SCR);
+ 	spin_unlock(&scr_lock);
+ }
+-- 
+1.7.9.5
