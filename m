@@ -1,142 +1,58 @@
-From: bcousson@baylibre.com (Benoit Cousson)
-Date: Wed, 09 Oct 2013 18:45:54 +0200
-Subject: [PATCH v2 2/5] ARM: dts: omap: Add new bindings for OMAP
-In-Reply-To: <5255872A.30702@ti.com>
-References: <1381313521-10422-1-git-send-email-rnayak@ti.com>
- <1381313521-10422-3-git-send-email-rnayak@ti.com>
- <525572A8.9060401@baylibre.com> <5255872A.30702@ti.com>
-Message-ID: <52558842.6040409@baylibre.com>
+From: lbassel@codeaurora.org (Larry Bassel)
+Date: Wed, 9 Oct 2013 09:47:26 -0700
+Subject: [RFC PATCH 1/5] arm: mm: add CONFIG_STRICT_MEMORY_RWX
+In-Reply-To: <1381282292-25251-2-git-send-email-lauraa@codeaurora.org>
+References: <1381282292-25251-1-git-send-email-lauraa@codeaurora.org>
+ <1381282292-25251-2-git-send-email-lauraa@codeaurora.org>
+Message-ID: <20131009164726.GA379@labbmf01-linux.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+ A couple of DT maintainers
+On 08 Oct 13 18:31, Laura Abbott wrote:
+> From: Larry Bassel <lbassel@codeaurora.org>
+> 
+> If this is set, kernel text will be made RX, kernel data and stack
+> RW, rodata R so that writing to kernel text, executing kernel data
+> or stack, or writing to read-only data or kernel text will not
+> succeed.
+> 
+> Signed-off-by: Larry Bassel <lbassel@codeaurora.org>
+> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+> ---
+>  arch/arm/mm/Kconfig |   12 ++++++++++++
+>  1 files changed, 12 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
+> index cd2c88e..c223d5c 100644
+> --- a/arch/arm/mm/Kconfig
+> +++ b/arch/arm/mm/Kconfig
+> @@ -952,3 +952,15 @@ config ARCH_HAS_BARRIERS
+>  	help
+>  	  This option allows the use of custom mandatory barriers
+>  	  included via the mach/barriers.h file.
+> +
+> +config STRICT_MEMORY_RWX
+> +	bool "restrict kernel memory permissions as much as possible"
+> +	default n
+> +	help
+> +	  If this is set, kernel text will be made RX, kernel data and stack
+> +	  RW, rodata R (otherwise all of the kernel 1-to-1 mapping is
+> +	  made RWX).
+> +	  The tradeoff is that several sections are padded to
+> +	  1M boundaries (because their permissions are different and
 
-On 09/10/2013 18:41, Rajendra Nayak wrote:
-> On Wednesday 09 October 2013 08:43 PM, Benoit Cousson wrote:
->> Hi Rajendra,
->>
->> On 09/10/2013 12:11, Rajendra Nayak wrote:
->>> On OMAP we have co-processor IPs, memory controllers,
->>> GPIOs which control regulators and power switches to
->>> PMIC, and SoC internal Bus IPs, some or most of which
->>> should either not be reset or idled or both at init.
->>> (In some cases there are erratas which prevent an IP
->>> from being reset)
->>> Have a way to pass this information from DT.
->>
->> Did you get some acked-by from the DT maintainers?
->> Every new bindings must be carefully reviewed now.
->
-> Nope, I haven't. The patches are on the list for a couple
-> of months now.
+As this presumably (if it is accepted) will also need to run on
+LPAE systems, we should say section not 1M here and below.
 
-Let's see if Mark and Rob are OK with that.
+> +	  splitting the 1M pages into 4K ones causes TLB performance
+> +	  problems), wasting memory.
+> -- 
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+> hosted by The Linux Foundation
+> 
 
-Thanks,
-Benoit
+Larry
 
->
->>
->> Regards,
->> Benoit
->>
->>>
->>> Update the am33xx/omap4 and omap5 dtsi files with the
->>> new bindings for modules which either should not be
->>> idled. reset or both. A later patch would cleanup the
->>> same information that exists today as part of the hwmod
->>> data files.
->>>
->>> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
->>> ---
->>>    .../devicetree/bindings/arm/omap/omap.txt          |    3 ++-
->>>    arch/arm/boot/dts/am33xx.dtsi                      |    2 ++
->>>    arch/arm/boot/dts/omap4.dtsi                       |    3 +++
->>>    arch/arm/boot/dts/omap5.dtsi                       |    2 ++
->>>    4 files changed, 9 insertions(+), 1 deletion(-)
->>>
->>> diff --git a/Documentation/devicetree/bindings/arm/omap/omap.txt b/Documentation/devicetree/bindings/arm/omap/omap.txt
->>> index 91b7049..808c154 100644
->>> --- a/Documentation/devicetree/bindings/arm/omap/omap.txt
->>> +++ b/Documentation/devicetree/bindings/arm/omap/omap.txt
->>> @@ -21,7 +21,8 @@ Required properties:
->>>    Optional properties:
->>>    - ti,no_idle_on_suspend: When present, it prevents the PM to idle the module
->>>      during suspend.
->>> -
->>> +- ti,no-reset-on-init: When present, the module should not be reset at init
->>> +- ti,no-idle-on-init: When present, the module should not be idled at init
->>>
->>>    Example:
->>>
->>> diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
->>> index f9c5da9..ec33ea0 100644
->>> --- a/arch/arm/boot/dts/am33xx.dtsi
->>> +++ b/arch/arm/boot/dts/am33xx.dtsi
->>> @@ -607,6 +607,7 @@
->>>                reg = <0x44d00000 0x4000    /* M3 UMEM */
->>>                       0x44d80000 0x2000>;    /* M3 DMEM */
->>>                ti,hwmods = "wkup_m3";
->>> +            ti,no-reset-on-init;
->>>            };
->>>
->>>            elm: elm at 48080000 {
->>> @@ -637,6 +638,7 @@
->>>            gpmc: gpmc at 50000000 {
->>>                compatible = "ti,am3352-gpmc";
->>>                ti,hwmods = "gpmc";
->>> +            ti,no-idle-on-init;
->>>                reg = <0x50000000 0x2000>;
->>>                interrupts = <100>;
->>>                gpmc,num-cs = <7>;
->>> diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
->>> index 22d9f2b..e8fe797 100644
->>> --- a/arch/arm/boot/dts/omap4.dtsi
->>> +++ b/arch/arm/boot/dts/omap4.dtsi
->>> @@ -214,6 +214,7 @@
->>>                gpmc,num-cs = <8>;
->>>                gpmc,num-waitpins = <4>;
->>>                ti,hwmods = "gpmc";
->>> +            ti,no-idle-on-init;
->>>            };
->>>
->>>            uart1: serial at 4806a000 {
->>> @@ -492,6 +493,7 @@
->>>                reg = <0x4c000000 0x100>;
->>>                interrupts = <GIC_SPI 110 IRQ_TYPE_LEVEL_HIGH>;
->>>                ti,hwmods = "emif1";
->>> +            ti,no-idle-on-init;
->>>                phy-type = <1>;
->>>                hw-caps-read-idle-ctrl;
->>>                hw-caps-ll-interface;
->>> @@ -503,6 +505,7 @@
->>>                reg = <0x4d000000 0x100>;
->>>                interrupts = <GIC_SPI 111 IRQ_TYPE_LEVEL_HIGH>;
->>>                ti,hwmods = "emif2";
->>> +            ti,no-idle-on-init;
->>>                phy-type = <1>;
->>>                hw-caps-read-idle-ctrl;
->>>                hw-caps-ll-interface;
->>> diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
->>> index 7cdea1b..a9d49df 100644
->>> --- a/arch/arm/boot/dts/omap5.dtsi
->>> +++ b/arch/arm/boot/dts/omap5.dtsi
->>> @@ -607,6 +607,7 @@
->>>            emif1: emif at 0x4c000000 {
->>>                compatible    = "ti,emif-4d5";
->>>                ti,hwmods    = "emif1";
->>> +            ti,no-idle-on-init;
->>>                phy-type    = <2>; /* DDR PHY type: Intelli PHY */
->>>                reg = <0x4c000000 0x400>;
->>>                interrupts = <GIC_SPI 110 IRQ_TYPE_LEVEL_HIGH>;
->>> @@ -618,6 +619,7 @@
->>>            emif2: emif at 0x4d000000 {
->>>                compatible    = "ti,emif-4d5";
->>>                ti,hwmods    = "emif2";
->>> +            ti,no-idle-on-init;
->>>                phy-type    = <2>; /* DDR PHY type: Intelli PHY */
->>>                reg = <0x4d000000 0x400>;
->>>                interrupts = <GIC_SPI 111 IRQ_TYPE_LEVEL_HIGH>;
->>>
->>
->
+-- 
+The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
