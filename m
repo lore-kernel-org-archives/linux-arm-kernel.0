@@ -1,60 +1,57 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 9 Oct 2013 13:53:54 +0900
-Subject: [GIT PULL] Second round of Renesas ARM based SoC cleanups for
- v3.13
-In-Reply-To: <cover.1381222967.git.horms+renesas@verge.net.au>
-References: <cover.1381222967.git.horms+renesas@verge.net.au>
-Message-ID: <20131009045354.GA8369@verge.net.au>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Wed, 9 Oct 2013 13:59:46 +0900
+Subject: [PATCH v2 3/3] ARM: shmobile: kzm9d: Use common clock framework
+In-Reply-To: <20131009034057.GO15065@verge.net.au>
+References: <20131008143040.52f36df8edb7ab63224d8433@ops.dti.ne.jp>
+ <20131008143403.c11f294c8a1701a2ab3bc5fd@ops.dti.ne.jp>
+ <20131009034057.GO15065@verge.net.au>
+Message-ID: <CANqRtoQs+31mv0ZULOd3SGshkBkvp-kGoaVOSb10+Ncdp+WNXw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 08, 2013 at 06:05:24PM +0900, Simon Horman wrote:
-> Hi Kevin, Olof and Arnd,
-> 
-> please consider this Second round of Renesas ARM based SoC cleanups for v3.13.
-> It is based on renesas-cleanup-for-v3.13 which you have previously pulled.
+Hi Simon,
 
-This pull-request causes some conflicts in
-arch/arm/mach-shmobile/board-bockw.c. In general the resolution
-strategy should be to take everything.
+On Wed, Oct 9, 2013 at 12:40 PM, Simon Horman <horms@verge.net.au> wrote:
+> On Tue, Oct 08, 2013 at 02:34:03PM +0900, takasi-y at ops.dti.ne.jp wrote:
+>> Use common clock framework version of clock
+>>  drivers/clk/shmobile/clk-emev2.c
+>> instead of sh-clkfwk version
+>>  arch/arm/mach-shmobile/clock-emev2.c
+>> when it is configured as a part of multi-platform.
+>>
+>> Signed-off-by: Takashi Yoshii <takasi-y@ops.dti.ne.jp>
+>
+> Thanks.
+>
+> I plan to add this patch to a new topic branch,
+> topic/emev2-common-clock, in the renesas tree and
+> queue it up from there for inclusion in mainline
+> if/when the first patch of this series is accepted
+> by Mike Turquette.
 
-A sample merge is provided in the renesas-next-20131008 tag
-of my renesas tree.
+Thanks for picking up patches, Simon.
 
-> 
-> 
-> The following changes since commit cde214a890f81797a5eee94fffc89c1de21ed991:
-> 
->   ARM: shmobile: r8a7790: Constify platform data and resources (2013-09-19 14:33:44 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-cleanup2-for-v3.13
-> 
-> for you to fetch changes up to 27113d63daac0aacaa26b1fabfc23391de4284f4:
-> 
->   ARM: shmobile: lager: Constify platform data and resources (2013-09-30 16:33:17 +0900)
-> 
-> ----------------------------------------------------------------
-> Second round of Renesas ARM based SoC cleanups for v3.13
-> 
-> * Constify platform data and resources in lager board code
-> * Clean up registration of VIN and sh_eth in r8a7778 SoC and
->    bockw board code
-> * Make r8a7778_register_hspi() static in r8a7778 SoC code
-> 
-> ----------------------------------------------------------------
-> Kuninori Morimoto (3):
->       ARM: shmobile: r8a7778: cleanup registration of vin
->       ARM: shmobile: r8a7778: cleanup registration of sh_eth
->       ARM: shmobile: r8a7778: r8a7778_register_hspi() become static
-> 
-> Laurent Pinchart (1):
->       ARM: shmobile: lager: Constify platform data and resources
-> 
->  arch/arm/mach-shmobile/board-bockw.c          | 46 ++++++++++++++++++++----
->  arch/arm/mach-shmobile/board-lager.c          | 14 ++++----
->  arch/arm/mach-shmobile/include/mach/r8a7778.h |  3 --
->  arch/arm/mach-shmobile/setup-r8a7778.c        | 50 +--------------------------
->  4 files changed, 47 insertions(+), 66 deletions(-)
-> 
+I think you can simply merge this patch after the following series:
+
+[PATCH 00/05] ARM: shmobile: KZM9D Multiplatform update
+
+There are no build time dependencies on patch 1 and 2 so this patch
+can be merged independently. Regarding run-time operation, the
+multiplatform series above makes KZM9D DT reference only build for
+multiplatform, and in such case CCF is required.
+
+So if you want to keep KZM9D DT reference working until Mike Turquette
+accepts the CCF bits, then I recommend you to wait with "[PATCH 00/05]
+ARM: shmobile: KZM9D Multiplatform update" until all EMEV2 CCF bits
+have been merged.
+
+Another way is to merge "[PATCH 00/05] ARM: shmobile: KZM9D
+Multiplatform update" before the EMEV2 CCF bits, but if so you may as
+well merge this patch as well IMO. This
+multiplatform-update-series-merge-before-CCF plan will result in
+untestable KZM9D DT reference until EMEV2 CCF is merged. Either way is
+fine with me.
+
+Cheers,
+
+/ magnus
