@@ -1,46 +1,44 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed,  9 Oct 2013 00:10:39 -0300
-Subject: [PATCH] ARM: mxs_defconfig: Turn off CONFIG_DEBUG_GPIO
-Message-ID: <1381288239-21678-1-git-send-email-festevam@gmail.com>
+From: josephl@nvidia.com (Joseph Lo)
+Date: Wed, 9 Oct 2013 11:11:35 +0800
+Subject: [PATCH 3/4] ARM: tegra: make tegra_resume can work with current
+ and later chips
+In-Reply-To: <52543A24.3020108@wwwdotorg.org>
+References: <1381220587-29697-1-git-send-email-josephl@nvidia.com>
+ <1381220587-29697-4-git-send-email-josephl@nvidia.com>
+ <52543A24.3020108@wwwdotorg.org>
+Message-ID: <1381288295.10638.23.camel@jlo-ubuntu-64.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+On Wed, 2013-10-09 at 01:00 +0800, Stephen Warren wrote:
+> On 10/08/2013 02:23 AM, Joseph Lo wrote:
+> > Because the CPU0 was the first up and the last down core when cluster
+> > power up/down or platform suspend. So only CPU0 needs the rest of the
+> > functions to reset flow controller and re-enable SCU and L2. We also
+> > move the L2 init function for Cortex-A15 to there. The secondery CPU
+> > can just call cpu_resume.
+> 
+> Is that really true? I thought that starting with Tegra114, all the CPUs
+> were independent, so that any CPU could be the last CPU to be
+> power-gated. Isn't that exactly why we don't need coupled cpuidle or
+> anything similar on Tegra114
+> 
+Yes, it's true. I realize the role of CPU0 is the same across all
+current Tegra chips. Although we can support independent power gate for
+CPU0 in Tegra114/124, for cluster power control it still needs to be set
+up by CPU0 (last down and first up). So I send this patch for tunning
+the code that only need for CPU0.
 
-Having CONFIG_DEBUG_GPIO=y leads to several debug messages polluting kernel log:
+> > diff --git a/arch/arm/mach-tegra/reset-handler.S b/arch/arm/mach-tegra/reset-handler.S
+> 
+> >  not_ca9:
+> > +	mov32	r9, 0xc0f
+> > +	cmp	r8, r9
+> > +	bleq	tegra_init_l2_for_a15
+> 
+> That's checking whether the CPU type is a Cortex-A15, isn't it? The only
+> CPUs that exist NVIDIA SoCs are Cortex-A9 and Cortex-A15, so I don't see
+> why we need to check whether the CPU is a Cortex-A15, given this label
+> is jumped to only when the CPU isn't a Cortex-A9.
 
-[    0.580325] of_get_named_gpio_flags: can't parse gpios property of node '/regulators/3p3v[0]'
-[    0.581185] 3P3V: 3300 mV 
-[    0.584827] of_get_named_gpio_flags exited with status 124
-[    0.585852] vddio-sd0: 3300 mV 
-[    0.590023] of_get_named_gpio_flags exited with status 79
-[    0.590770] fec-3v3: 3300 mV 
-[    0.594805] of_get_named_gpio_flags exited with status 105
-[    0.595491] usb0_vbus: 5000 mV 
-[    0.599687] of_get_named_gpio_flags exited with status 104
-[    0.600380] usb1_vbus: 5000 mV 
-[    0.604463] of_get_named_gpio_flags exited with status 126
-[    0.605153] lcd-3v3: 3300 mV 
-[    0.608970] of_get_named_gpio_flags exited with status 77
-
-Turn this option off, as these messages are not really useful for normal usage.
-
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/configs/mxs_defconfig | 1 -
- 1 file changed, 1 deletion(-)
-
-diff --git a/arch/arm/configs/mxs_defconfig b/arch/arm/configs/mxs_defconfig
-index 2d0c369..6150108 100644
---- a/arch/arm/configs/mxs_defconfig
-+++ b/arch/arm/configs/mxs_defconfig
-@@ -90,7 +90,6 @@ CONFIG_I2C_MXS=y
- CONFIG_SPI=y
- CONFIG_SPI_GPIO=m
- CONFIG_SPI_MXS=y
--CONFIG_DEBUG_GPIO=y
- CONFIG_GPIO_SYSFS=y
- # CONFIG_HWMON is not set
- CONFIG_WATCHDOG=y
--- 
-1.8.1.2
+Good catch. Will fix.
