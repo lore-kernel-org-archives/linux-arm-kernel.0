@@ -1,49 +1,69 @@
 From: nm@ti.com (Nishanth Menon)
-Date: Wed, 9 Oct 2013 18:24:53 -0500
-Subject: [PATCH V6 10/15] ARM: dts: DRA7: Add CPU OPP table
+Date: Wed, 9 Oct 2013 18:24:48 -0500
+Subject: [PATCH V6 05/15] ARM: OMAP2+: DRA7: add lateinit hook for calling pm
+ late init
 In-Reply-To: <1381361098-8283-1-git-send-email-nm@ti.com>
 References: <1381354144-7134-1-git-send-email-nm@ti.com>
  <1381361098-8283-1-git-send-email-nm@ti.com>
-Message-ID: <1381361098-8283-9-git-send-email-nm@ti.com>
+Message-ID: <1381361098-8283-4-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: J Keerthy <j-keerthy@ti.com>
+Call OMAP2+ generic lateinit hook from DRA7 specific late init hook.
+This allows the generic late initializations such as cpufreq hooks
+to be active.
 
-Add DT OPP table for DRA7xx family of devices. This data is decoded by
-OF with of_init_opp_table() helper function.
-
-The data is based on DRA75x, DRA74x Data Manual revision F (Sept 2013).
-
-TODO: add OPP_HIGH after AVS-Class0 is functional
-NOTE: The voltage and frequency values work well only on NOM samples
-and it is mandatory to use ABB/AVS Class 0 support for all OPPs.
-
-Clock nodes are pending clock node alignment.
-
-[nm at ti.com: cleanups and rebase to latest]
+Cc: Benoit Cousson <bcousson@baylibre.com>
+Cc: Kevin Hilman <khilman@deeprootsystems.com>
+Cc: Paul Walmsley <paul@pwsan.com>
+Cc: Tony Lindgren <tony@atomide.com>
 Signed-off-by: Nishanth Menon <nm@ti.com>
-Signed-off-by: J Keerthy <j-keerthy@ti.com>
 ---
- arch/arm/boot/dts/dra7.dtsi |    6 ++++++
- 1 file changed, 6 insertions(+)
+ arch/arm/mach-omap2/board-generic.c |    1 +
+ arch/arm/mach-omap2/common.h        |    1 +
+ arch/arm/mach-omap2/io.c            |    6 ++++++
+ 3 files changed, 8 insertions(+)
 
-diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
-index 02e430b..92cbe3b 100644
---- a/arch/arm/boot/dts/dra7.dtsi
-+++ b/arch/arm/boot/dts/dra7.dtsi
-@@ -36,6 +36,12 @@
- 			device_type = "cpu";
- 			compatible = "arm,cortex-a15";
- 			reg = <0>;
+diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
+index 67dbae2..c0b0848 100644
+--- a/arch/arm/mach-omap2/board-generic.c
++++ b/arch/arm/mach-omap2/board-generic.c
+@@ -255,6 +255,7 @@ DT_MACHINE_START(DRA7XX_DT, "Generic DRA7XX (Flattened Device Tree)")
+ 	.smp		= smp_ops(omap4_smp_ops),
+ 	.map_io		= omap5_map_io,
+ 	.init_early	= dra7xx_init_early,
++	.init_late	= dra7xx_init_late,
+ 	.init_irq	= omap_gic_of_init,
+ 	.init_machine	= omap_generic_init,
+ 	.init_time	= omap5_realtime_timer_init,
+diff --git a/arch/arm/mach-omap2/common.h b/arch/arm/mach-omap2/common.h
+index ceb208b..352fa9d 100644
+--- a/arch/arm/mach-omap2/common.h
++++ b/arch/arm/mach-omap2/common.h
+@@ -114,6 +114,7 @@ void am33xx_init_late(void);
+ void omap5_init_late(void);
+ int omap2_common_pm_late_init(void);
+ void dra7xx_init_early(void);
++void dra7xx_init_late(void);
+ 
+ #ifdef CONFIG_SOC_BUS
+ void omap_soc_device_init(void);
+diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
+index 6226e0d..3b7b543 100644
+--- a/arch/arm/mach-omap2/io.c
++++ b/arch/arm/mach-omap2/io.c
+@@ -702,6 +702,12 @@ void __init dra7xx_init_early(void)
+ 	omap_hwmod_init_postsetup();
+ 	omap_clk_init = dra7xx_dt_clk_init;
+ }
 +
-+			operating-points = <
-+				/* kHz    uV */
-+				1000000	1060000
-+				1176000	1160000
-+				>;
- 		};
- 		cpu at 1 {
- 			device_type = "cpu";
++void __init dra7xx_init_late(void)
++{
++	omap2_common_pm_late_init();
++}
++
+ #endif
+ 
+ 
 -- 
 1.7.9.5
