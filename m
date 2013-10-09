@@ -1,115 +1,50 @@
-From: mcarino@broadcom.com (Marc (Marc-Angelo) Carino)
-Date: Wed, 9 Oct 2013 15:22:48 +0000
-Subject: [BUG,REGRESSION] SATA regression on 12.0-rc4 kernel
-References: <87vc1ahyft.fsf@natisbad.org>
- <20131007125943.GA1332@titan.lakedaemon.net>
- <87bo303nfe.fsf@natisbad.org> <52537015.6040200@gmail.com>
- <87y564waw0.fsf@natisbad.org>
- <CADLC3L3EYU0VSfLMYjo013jSTWm4yZw24y+4HdvOOoEkOc6uhQ@mail.gmail.com>
-Message-ID: <202B57C13565C241A5ED05E38B705C82012397EC@IRVEXCHMB08.corp.ad.broadcom.com>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Wed, 9 Oct 2013 08:25:27 -0700
+Subject: [PATCH 1/2] clk/zynq/clkc: Add 'fclk-enable' feature
+In-Reply-To: <20131008153816.GB4981@e106331-lin.cambridge.arm.com>
+References: <1381242972-14752-1-git-send-email-soren.brinkmann@xilinx.com>
+ <20131008153816.GB4981@e106331-lin.cambridge.arm.com>
+Message-ID: <fe3858e7-e3e2-4806-aeca-a2a4676e09aa@CO1EHSMHS007.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello all,
-
->> What I do not understand is why the log report failed FPDMA commands if
->> the feature is supposed to be SSD-related (looking only at commit
->> messages: 87fb6c31b9 seems SSD-related, ed36911c74 does not). Is it
->> possible that the feature detection is what is causing the issue? Or
->> that the hardware report support w/o having? I can test with a different
->> disk if you think it would help.
-
-Drive misreporting is likely to be the case. Oddly enough, even if the
-drive's firmware did misreport support for the new SEND/RECV commands, it
-appears that a discard/trim request is being made by the block layer.
-
-In addition to the hdparm dump, could you also provide a full kernel boot
-log? The driver should complain if there were any issues retrieving the NCQ
-send/receive log page.
-
-Lastly, could you give another drive brand a try, if possible? I had tested
-the changes on an Intel SATA AHCI controller and a Micron M500 SSD. I should
-be able to scrounge up a Marvell PCIe AHCI controller.
-
-Thanks!
-Marc
-
-On 10/8/2013 10:51 PM, Robert Hancock wrote:
-> On Tue, Oct 8, 2013 at 12:10 AM, Arnaud Ebalard <arno@natisbad.org> wrote:
->> Hi Robert,
->>
->> Robert Hancock <hancockrwd@gmail.com> writes:
->>
->>> On 10/07/2013 01:12 PM, Arnaud Ebalard wrote:
->>>> Hi guys,
->>>>
->>>> yesterday, I reported on arm kernel mailing list what looked like a sata
->>>> regression on my platform (Marvell Armada 370-based NETGEAR ReadyNAS
->>>> 102). I initially thought this was an ARM-related issue. My initial
->>>> email, provided below, contains various details on the platform and the
->>>> error encountered.
->>>>
->>>> Today, before starting a painful git bisect, I decided to git log
->>>> sata_mv.c code and then more generally drivers/ata to quickly end up on
->>>> commit ed36911c747c (libata: Add support for SEND/RECEIVE FPDMA QUEUED)
->>>> against which I got suspicious after looking again at the errors I had:
->>>>
->>>> [  417.288155] ata1.00: exception Emask 0x0 SAct 0x1fff6001 SErr 0x0 action 0x6 frozen
->>>> [  417.295838] ata1.00: failed command: WRITE FPDMA QUEUED
->>>> [  417.301097] ata1.00: cmd 61/48:00:80:ad:0b/00:00:0c:00:00/40 tag 0 ncq 36864 out
->>>> [  417.315896] ata1.00: status: { DRDY }
->>>> [  417.319570] ata1.00: failed command: WRITE FPDMA QUEUED
->>>> [  417.324814] ata1.00: cmd 61/08:68:70:a1:87/00:00:0d:00:00/40 tag 13 ncq 4096 out
->>>> [  417.339619] ata1.00: status: { DRDY }
->>>> [  417.343288] ata1.00: failed command: WRITE FPDMA QUEUED
->>>> [  417.348536] ata1.00: cmd 61/08:70:28:a2:87/00:00:0d:00:00/40 tag 14 ncq 4096 out
->>>> [  417.363341] ata1.00: status: { DRDY }
->>>> [  417.367010] ata1.00: failed command: WRITE FPDMA QUEUED
->>>> [  417.372257] ata1.00: cmd 61/08:80:80:a3:87/00:00:0d:00:00/40 tag 16 ncq 4096 out
->>>> [  417.387061] ata1.00: status: { DRDY }
->>>> [  417.390733] ata1.00: failed command: WRITE FPDMA QUEUED
->>>> [  417.395977] ata1.00: cmd 61/08:88:58:a1:c7/00:00:0d:00:00/40 tag 17 ncq 4096 out
->>>> [  417.410782] ata1.00: status: { DRDY }
->>>>
->>>> Reverting both 87fb6c31b9 (libata: Add support for queued DSM TRIM) and
->>>> ed36911c74 (libata: Add support for SEND/RECEIVE FPDMA QUEUED) makes the
->>>> problem disappear. Note: reverting 87fb6c31b9 is not enough and I cannot
->>>> compile the kernel with only the latter reverted.
->>>>
->>>> If you need more info on the platform or want me to test something some
->>>> fix, do not hesitate.
->>>
->>> I assume that it consistently fails on a non-working kernel and
->>> consistently works with those patches reverted? Given that both of
->>> those patches seem to only be touching SSDs with NCQ trim support, it
->>> seems odd they would be breaking a normal hard drive, but maybe there
->>> is some unexpected side effect..
->>
->> With two different disks (same model though, i.e. 250GB 3.5" WD blue), it
->> consistently works on a 3.11.4 and consistently fails on 3.12-rc3 and
->> 3.12-rc4 (not tested others 3.12-rc). The problem is easy to reproduce,
->> i.e. I just need to perform some disk operations. With the two commits
->> reverted from 3.12-rc4, I can consistently do a "find / -exec sha256sum
->> '{}' \;" w/o anything happening.
->>
->> What I do not understand is why the log report failed FPDMA commands if
->> the feature is supposed to be SSD-related (looking only at commit
->> messages: 87fb6c31b9 seems SSD-related, ed36911c74 does not). Is it
->> possible that the feature detection is what is causing the issue? Or
->> that the hardware report support w/o having? I can test with a different
->> disk if you think it would help.
+On Tue, Oct 08, 2013 at 04:38:17PM +0100, Mark Rutland wrote:
+> On Tue, Oct 08, 2013 at 03:36:11PM +0100, Soren Brinkmann wrote:
+> > In some use cases Zynq's FPGA clocks are used as static clock
+> > generators for IP in the FPGA part of the SOC for which no Linux driver
+> > exists and would control those clocks. To avoid automatic
+> > gating of these clocks in such cases a new property - fclk-enable - is
+> > added to the clock controller's DT description to accomodate such use
+> > cases. It's value is a bitmask, where a set bit results in enabling
+> > the corresponding FCLK through the clkc.
+> > 
+> > FPGA clocks are handled following the rules below:
+> > 
+> > If an FCLK is not enabled by bootloaders, that FCLK will be disabled in
+> > Linux. Drivers can enable and control it through the CCF as usual.
+> > 
+> > If an FCLK is enabled by bootloaders AND the corresponding bit in the
+> > 'fclk-enable' DT property is set, that FCLK will be enabled by the clkc,
+> > resulting in an off by one reference count for that clock. Ensuring it
+> > will always be running.
+> > 
+> > The default value for 'fclk-enable' is '0xf' (all FCLK's enabled by the
+> > bootloader are enabled through the clkc.
 > 
-> The commands that are failing are WRITE FPDMA QUEUED which is a
-> regular NCQ write command. The ones that these commits add support for
-> are FPDMA_SEND and FPDMA_RECV which are used for NCQ trim commands.
-> 
-> It's possible that the feature detection for this is picking up
-> support for FPDMA SEND/RECV on this drive when it shouldn't be. Can
-> you post the output of "hdparm --Istdout /dev/sdX" for one of these
-> drives (where X matches the drive in question)?
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-ide" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
-> 
+> Why? Juding by the diff that's not what the code currently does, so why
+> not leave it as 0, and only set it where required as a work-around?
+The default is set as described here:
+[...]
+> > +	ret = of_property_read_u32(np, "fclk-enable", &fclk_enable);
+> > +	if (ret)
+> > +		fclk_enable = 0xf;
+> > +
+
+The default has been chosen this way, because it avoids trouble with
+customers. Customers expect the FPGA clocks to be running, once they
+configured them in the FPGA tools. If Linux gates them off for some
+reason, it creates confusion and often ends up in customer support.
+But in general I agree. It is kind of a work around and having zero as
+default would be desirable. I'd leave this to Michal.
+
+	S?ren
