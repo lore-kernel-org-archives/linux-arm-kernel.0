@@ -1,46 +1,50 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Wed, 9 Oct 2013 18:30:49 +0300
-Subject: [PATCHv8 18/36] ARM: dts: DRA7: Change apll_pcie_m2_ck to fixed
- factor clock
+Date: Wed, 9 Oct 2013 18:30:48 +0300
+Subject: [PATCHv8 17/36] ARM: dts: clk: Add apll related clocks
 In-Reply-To: <1381332668-962-1-git-send-email-t-kristo@ti.com>
 References: <1381332668-962-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1381332668-962-19-git-send-email-t-kristo@ti.com>
+Message-ID: <1381332668-962-18-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: J Keerthy <j-keerthy@ti.com>
 
-This patch changes apll_pcie_m2_ck to fixed factor
-clock as there are no configurable divider associated to m2.
+The patch adds a mux node to choose the parent of apll_pcie_ck node.
 
 Signed-off-by: J Keerthy <j-keerthy@ti.com>
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 Tested-by: Nishanth Menon <nm@ti.com>
 Acked-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/boot/dts/dra7xx-clocks.dtsi |    9 +++------
- 1 file changed, 3 insertions(+), 6 deletions(-)
+ arch/arm/boot/dts/dra7xx-clocks.dtsi |   14 +++++++++++---
+ 1 file changed, 11 insertions(+), 3 deletions(-)
 
 diff --git a/arch/arm/boot/dts/dra7xx-clocks.dtsi b/arch/arm/boot/dts/dra7xx-clocks.dtsi
-index c830e15..75d5e1b 100644
+index 0d83f95..c830e15 100644
 --- a/arch/arm/boot/dts/dra7xx-clocks.dtsi
 +++ b/arch/arm/boot/dts/dra7xx-clocks.dtsi
-@@ -348,13 +348,10 @@ apll_pcie_clkvcoldo_div: apll_pcie_clkvcoldo_div {
- 
- apll_pcie_m2_ck: apll_pcie_m2_ck at 4a008224 {
- 	#clock-cells = <0>;
--	compatible = "ti,divider-clock";
-+	compatible = "fixed-factor-clock";
- 	clocks = <&apll_pcie_ck>;
--	ti,max-div = <127>;
--	ti,autoidle-shift = <8>;
--	reg = <0x4a008224 0x4>;
--	ti,index-starts-at-one;
--	ti,autoidle-low;
-+	clock-mult = <1>;
-+	clock-div = <1>;
+@@ -315,11 +315,19 @@ dpll_pcie_ref_m2ldo_ck: dpll_pcie_ref_m2ldo_ck at 4a008210 {
+ 	ti,autoidle-low;
  };
  
- sys_clk1_dclk_div: sys_clk1_dclk_div at 4ae061c8 {
++apll_pcie_in_clk_mux: apll_pcie_in_clk_mux at 4ae06118 {
++	compatible = "ti,mux-clock";
++	clocks = <&dpll_pcie_ref_ck>, <&pciesref_acs_clk_ck>;
++	#clock-cells = <0>;
++	reg = <0x4a00821c 0x4>;
++	ti,bit-shift = <7>;
++};
++
+ apll_pcie_ck: apll_pcie_ck at 4a008200 {
+ 	#clock-cells = <0>;
+-	compatible = "ti,omap4-dpll-clock";
+-	clocks = <&dpll_pcie_ref_ck>, <&dpll_pcie_ref_ck>;
+-	reg = <0x4a008200 0x4>, <0x4a008204 0x4>, <0x4a008208 0x4>, <0x4a00820c 0x4>;
++	compatible = "ti,dra7-apll-clock";
++	clocks = <&apll_pcie_in_clk_mux>, <&dpll_pcie_ref_ck>;
++	reg = <0x4a00821c 0x4>, <0x4a008220 0x4>;
+ };
+ 
+ apll_pcie_clkvcoldo: apll_pcie_clkvcoldo {
 -- 
 1.7.9.5
