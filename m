@@ -1,154 +1,18 @@
-From: john.tobias.ph@gmail.com (John Tobias)
-Date: Tue, 8 Oct 2013 19:00:58 -0700
-Subject: eMMC 4.51
-Message-ID: <CACUGKYPDQJPvtXj3NBm8=eYCioWmq=pRVSORNYNZjD13N5ceeg@mail.gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 9 Oct 2013 11:01:12 +0900
+Subject: [PATCH] ARM: shmobile: Select IRQC in case of the r8a7791 SoC
+In-Reply-To: <20131008031608.10122.53864.sendpatchset@w520>
+References: <20131008031608.10122.53864.sendpatchset@w520>
+Message-ID: <20131009020111.GA15065@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Tue, Oct 08, 2013 at 12:16:08PM +0900, Magnus Damm wrote:
+> From: Magnus Damm <damm@opensource.se>
+> 
+> The r8a7791 contains IRQC hardware so make sure
+> the driver gets built by selecting RENESAS_IRQC.
+> 
+> Signed-off-by: Magnus Damm <damm@opensource.se>
 
-I am using git://gitorious.org/thierryreding/linux-next.git to boot my
-custom board based on iMX6 sololite. My board has SanDisk iNAND 4.51
-I/F and wifi module (Marvel SD8797). The latest update of
-sdhci-esdhc-imx.c supports DDR50/SDR50/SDR104 and I would like to use
-it for my device.
-
-In my .dts file, I have the following settings:
-
-/* WIFI module */
-&usdhc2 {
-pinctrl-names = "default", "state_100mhz", "state_200mhz";
-pinctrl-0 = <&pinctrl_usdhc2_2_default>;
-pinctrl-1 = <&pinctrl_usdhc2_3_100mhz>;
-pinctrl-2 = <&pinctrl_usdhc2_4_200mhz>;
-bus-width = <4>;
-status = "okay";
-};
-
-/* eMMC module  */
-&usdhc4 {
-pinctrl-names = "default", "state_100mhz", "state_200mhz";
-pinctrl-0 = <&pinctrl_usdhc4_2_default>;
-pinctrl-1 = <&pinctrl_usdhc4_3_100mhz>;
-pinctrl-2 = <&pinctrl_usdhc4_4_200mhz>;
-bus-width = <8>;
-status = "okay";
-compatible = "fsl,imx6sl-usdhc", "fsl,imx6q-usdhc";
-reg = <0x0219c000 0x4000>;
-};
-
-Then, in my .dtsi file:
-
-usdhc2 {
-/*WIFI pinmux */
-pinctrl_usdhc2_2_default: default {
-fsl,pins = <
-EVT1_PAD_SD2_CMD__SD2_CMD     0x17039
-EVT1_PAD_SD2_CLK__SD2_CLK     0x17039
-EVT1_PAD_SD2_DATA0__SD2_DATA0 0x17039
-EVT1_PAD_SD2_DATA1__SD2_DATA1 0x17039
-EVT1_PAD_SD2_DATA2__SD2_DATA2 0x17039
-EVT1_PAD_SD2_DATA3__SD2_DATA3 0x17039
->;
-};
-
-pinctrl_usdhc2_3_100mhz: state_100mhz { /* 100Mhz */
-fsl,pins = <
-EVT1_PAD_SD2_CMD__SD2_CMD 0x170B9
-EVT1_PAD_SD2_CLK__SD2_CLK 0x100B9
-EVT1_PAD_SD2_DATA0__SD2_DATA0 0x170B9
-EVT1_PAD_SD2_DATA1__SD2_DATA1 0x170B9
-EVT1_PAD_SD2_DATA2__SD2_DATA2 0x170B9
-EVT1_PAD_SD2_DATA3__SD2_DATA3 0x170B9
->;
-};
-
-pinctrl_usdhc2_4_200mhz: state_200mhz { /* 200Mhz */
-fsl,pins = <
-EVT1_PAD_SD2_CMD__SD2_CMD 0x170F9
-EVT1_PAD_SD2_CLK__SD2_CLK 0x100F9
-EVT1_PAD_SD2_DATA0__SD2_DATA0 0x170F9
-EVT1_PAD_SD2_DATA1__SD2_DATA1 0x170F9
-EVT1_PAD_SD2_DATA2__SD2_DATA2 0x170F9
-EVT1_PAD_SD2_DATA3__SD2_DATA3 0x170F9
->;
-};
-};
-
-usdhc4 {
-/* eMMC pinmux */
-pinctrl_usdhc4_2_default: default {
-fsl,pins = <
-EVT1_PAD_EPDC_BDR1__SD4_CMD       0x17039
-EVT1_PAD_EPDC_BDR0__SD4_CLK       0x10039
-EVT1_PAD_EPDC_PWR_COM__SD4_DATA0  0x17039
-EVT1_PAD_EPDC_PWR_IRQ__SD4_DATA1  0x17039
-EVT1_PAD_EPDC_PWR_STAT__SD4_DATA2 0x17039
-EVT1_PAD_EPDC_PWR_WAKE__SD4_DATA3 0x17039
-EVT1_PAD_FEC_MDC__SD4_DATA4 0x17039
-EVT1_PAD_FEC_RX_DATA0__SD4_DATA5  0x17039
-EVT1_PAD_FEC_TX_EN__SD4_DATA6     0x17039
-EVT1_PAD_FEC_TX_DATA1__SD4_DATA7  0x17039
->;
-};
-
-pinctrl_usdhc4_3_100mhz: state_100mhz { /* 100Mhz */
-fsl,pins = <
-EVT1_PAD_EPDC_BDR1__SD4_CMD 0x170B9
-EVT1_PAD_EPDC_BDR0__SD4_CLK   0x100B9
-EVT1_PAD_EPDC_PWR_COM__SD4_DATA0 0x170B9
-EVT1_PAD_EPDC_PWR_IRQ__SD4_DATA1 0x170B9
-EVT1_PAD_EPDC_PWR_STAT__SD4_DATA2 0x170B9
-EVT1_PAD_EPDC_PWR_WAKE__SD4_DATA3 0x170B9
-EVT1_PAD_FEC_MDC__SD4_DATA4 0x170B9
-EVT1_PAD_FEC_RX_DATA0__SD4_DATA5  0x170B9
-EVT1_PAD_FEC_TX_EN__SD4_DATA6     0x170B9
-EVT1_PAD_FEC_TX_DATA1__SD4_DATA7  0x170B9
->;
-};
-
-pinctrl_usdhc4_4_200mhz: state_200mhz { /* 200Mhz */
-fsl,pins = <
-EVT1_PAD_EPDC_BDR1__SD4_CMD 0x170F9
-EVT1_PAD_EPDC_BDR0__SD4_CLK   0x100F9
-EVT1_PAD_EPDC_PWR_COM__SD4_DATA0 0x170F9
-EVT1_PAD_EPDC_PWR_IRQ__SD4_DATA1 0x170F9
-EVT1_PAD_EPDC_PWR_STAT__SD4_DATA2 0x170F9
-EVT1_PAD_EPDC_PWR_WAKE__SD4_DATA3 0x170F9
-EVT1_PAD_FEC_MDC__SD4_DATA4 0x170F9
-EVT1_PAD_FEC_RX_DATA0__SD4_DATA5  0x170F9
-EVT1_PAD_FEC_TX_EN__SD4_DATA6     0x170F9
-EVT1_PAD_FEC_TX_DATA1__SD4_DATA7  0x170F9
->;
-};
-};
-
-
-1. After using the said pinmux settings, the sdhci-esdh-imx controller
-wasn't able to configure it correctly due the the group name for the
-two port were the same (default, state_100mhz, state_200mhz).
-
-2. Then, I temporarily disabled usdhc4 to test if the driver able to
-enable the SDR50 for my wifi. Then, I was getting the following
-errors:
-
-[    1.655024] mmc0: error -110 whilst initialising SDIO card
-[    3.746340] mmc0: error -110 whilst initialising SDIO card
-[    3.818624] mmc0: host doesn't support card's voltages
-[    3.823783] mmc0: error -22 whilst initialising SDIO card
-[    3.901670] mmc0: host doesn't support card's voltages
-[    3.906862] mmc0: error -22 whilst initialising SDIO card
-[   34.307777] mmc0: host doesn't support card's voltages
-[   34.312980] mmc0: error -22 whilst initialising SDIO card
-
-3. Then, I tried the eMMC to see if the driver able to enable the
-DDR50. After booting it, the kernel detect the eMMC only in hight
-speed mode.
-
-
-I would like to know if anyone here can help me to figure out how to
-enable the DDR50 for my eMMC and SDR50 for my wifi as well.
-
-Regards,
-
-john
+Thanks, I have queued this up.
