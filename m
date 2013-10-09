@@ -1,51 +1,27 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 09 Oct 2013 09:58:03 -0600
-Subject: [PATCH] pinctrl: phandle entries will be applied sequentially
-In-Reply-To: <20131009124425.GG25034@n2100.arm.linux.org.uk>
-References: <1381297324-19006-1-git-send-email-shawn.guo@linaro.org>
- <CACRpkdazPK6SNg9PdWCrjB8nwho1rCueumJWAN=STXdN1zNnMA@mail.gmail.com>
- <20131009124425.GG25034@n2100.arm.linux.org.uk>
-Message-ID: <52557D0B.5040901@wwwdotorg.org>
+Date: Wed, 09 Oct 2013 10:00:18 -0600
+Subject: [PATCH 4/5] clk: tegra124: Add new peripheral clocks
+In-Reply-To: <20131009081123.GB3973@tbergstrom-lnx.Nvidia.com>
+References: <1380878014-22088-1-git-send-email-pdeschrijver@nvidia.com>
+ <1380878014-22088-5-git-send-email-pdeschrijver@nvidia.com>
+ <525487C7.6080103@wwwdotorg.org>
+ <20131009081123.GB3973@tbergstrom-lnx.Nvidia.com>
+Message-ID: <52557D92.9050200@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/09/2013 06:44 AM, Russell King - ARM Linux wrote:
-> On Wed, Oct 09, 2013 at 02:40:49PM +0200, Linus Walleij wrote:
->> NAK this this a Linux kernel implementation detail. Sherman Yin
->> fixed this up so the drivers does not have to imply any sequence
->> semantic for this.
+On 10/09/2013 02:11 AM, Peter De Schrijver wrote:
+> On Wed, Oct 09, 2013 at 12:31:35AM +0200, Stephen Warren wrote:
+>> On 10/04/2013 03:12 AM, Peter De Schrijver wrote:
+>>> Tegra124 introduces a number of new peripheral clocks. This patch adds those
+>>> to the common peripheral clock code.
 >>
->> Study commit 03b054e9696c3cbd3d5905ec96da15acd0a2fe8d
->> "pinctrl: Pass all configs to driver on pin_config_set()"
->>
->> It is perfectly legal for a driver to accumulate the settings into
->> e.g. a single register write if it can, e.g.:
->>
->> u32 val = 0;
->>
->> for (i = 0; i < num_configs; i++) {
->>   switch() {
->>   FOO:
->>      val |= 1;
->>      break;
->>    BAR:
->>      val |= 2:
->>      break;
->>    BAZ:
->>      val |=4;
->>      break;
->> };
->>
->> writel(val, base+pinreg);
->>
->> I.e. the driver may choose to apply configs sequentially, but that is
->> not at all necessary.
+>> Don't you need to add AFC[0..5] in this patch and/or patch 5?
 > 
-> So, just to be clear, what you're saying is that specifying two settings
-> in a pinctrl declaration which provide different values results in
-> undefined behaviour?
+> AFC[0..5] are reset only nodes afaik. Up to now, we haven't done that.
+> The goal is to include them once we move to the reset framework.
 
-That makes sense to me, yes. It should be simple to separate out the
-common/shared parts of a configuration, vs. other unique parts, and put
-them into separate "pin configuration nodes", and hence avoid the
-situation completely.
+No, we've always added clock entries for all reset-only clocks into the
+clock driver. Since the port to the reset framework is not available
+yet, we need to continue to do this. Otherwise, we won't be able to
+upstream audio support.
