@@ -1,15 +1,14 @@
 From: nm@ti.com (Nishanth Menon)
-Date: Wed, 9 Oct 2013 18:24:46 -0500
-Subject: [PATCH V6 03/15] ARM: OMAP2+: AM43XX: add lateinit hook for calling
+Date: Wed, 9 Oct 2013 18:24:45 -0500
+Subject: [PATCH V6 02/15] ARM: OMAP2+: AM33XX: add lateinit hook for calling
  pm late init
-In-Reply-To: <1381361098-8283-1-git-send-email-nm@ti.com>
+In-Reply-To: <1381354144-7134-1-git-send-email-nm@ti.com>
 References: <1381354144-7134-1-git-send-email-nm@ti.com>
- <1381361098-8283-1-git-send-email-nm@ti.com>
-Message-ID: <1381361098-8283-2-git-send-email-nm@ti.com>
+Message-ID: <1381361098-8283-1-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Call OMAP2+ generic lateinit hook from AM43x specific late init hook.
+Call OMAP2+ generic lateinit hook from AM specific late init hook.
 This allows the generic late initializations such as cpufreq hooks
 to be active.
 
@@ -25,45 +24,45 @@ Signed-off-by: Nishanth Menon <nm@ti.com>
  3 files changed, 8 insertions(+)
 
 diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
-index b474498..d4371c7 100644
+index 87162e1..b474498 100644
 --- a/arch/arm/mach-omap2/board-generic.c
 +++ b/arch/arm/mach-omap2/board-generic.c
-@@ -235,6 +235,7 @@ static const char *am43_boards_compat[] __initdata = {
- DT_MACHINE_START(AM43_DT, "Generic AM43 (Flattened Device Tree)")
- 	.map_io		= am33xx_map_io,
- 	.init_early	= am43xx_init_early,
-+	.init_late	= am43xx_init_late,
- 	.init_irq	= omap_gic_of_init,
+@@ -180,6 +180,7 @@ DT_MACHINE_START(AM33XX_DT, "Generic AM33XX (Flattened Device Tree)")
+ 	.init_irq	= omap_intc_of_init,
+ 	.handle_irq	= omap3_intc_handle_irq,
  	.init_machine	= omap_generic_init,
- 	.init_time	= omap3_sync32k_timer_init,
++	.init_late	= am33xx_init_late,
+ 	.init_time	= omap3_gptimer_timer_init,
+ 	.dt_compat	= am33xx_boards_compat,
+ 	.restart	= am33xx_restart,
 diff --git a/arch/arm/mach-omap2/common.h b/arch/arm/mach-omap2/common.h
-index 049c58d..09f6736 100644
+index 4a5684b..049c58d 100644
 --- a/arch/arm/mach-omap2/common.h
 +++ b/arch/arm/mach-omap2/common.h
-@@ -98,6 +98,7 @@ void am35xx_init_early(void);
- void ti81xx_init_early(void);
- void am33xx_init_early(void);
- void am43xx_init_early(void);
-+void am43xx_init_late(void);
- void omap4430_init_early(void);
- void omap5_init_early(void);
- void omap3_init_late(void);	/* Do not use this one */
+@@ -109,6 +109,7 @@ void omap35xx_init_late(void);
+ void omap3630_init_late(void);
+ void am35xx_init_late(void);
+ void ti81xx_init_late(void);
++void am33xx_init_late(void);
+ int omap2_common_pm_late_init(void);
+ void dra7xx_init_early(void);
+ 
 diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
-index 38678bf..300eac0 100644
+index a9896ea..38678bf 100644
 --- a/arch/arm/mach-omap2/io.c
 +++ b/arch/arm/mach-omap2/io.c
-@@ -613,6 +613,12 @@ void __init am43xx_init_early(void)
- 	omap2_set_globals_cm(AM33XX_L4_WK_IO_ADDRESS(AM43XX_PRCM_BASE), NULL);
- 	omap3xxx_check_revision();
+@@ -594,6 +594,12 @@ void __init am33xx_init_early(void)
+ 	omap_hwmod_init_postsetup();
+ 	omap_clk_init = am33xx_dt_clk_init;
  }
 +
-+void __init am43xx_init_late(void)
++void __init am33xx_init_late(void)
 +{
 +	omap2_common_pm_late_init();
 +}
 +
  #endif
  
- #ifdef CONFIG_ARCH_OMAP4
+ #ifdef CONFIG_SOC_AM43XX
 -- 
 1.7.9.5
