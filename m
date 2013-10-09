@@ -1,67 +1,313 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  9 Oct 2013 15:49:57 +0900
-Subject: [PATCH 13/14] ARM: shmobile: r8a7779: split r8a7779_init_irq_extpin()
- for DT
+Date: Wed,  9 Oct 2013 15:49:47 +0900
+Subject: [PATCH 06/14] ARM: shmobile: Break out R-Car Gen2 setup code
 In-Reply-To: <cover.1381293239.git.horms+renesas@verge.net.au>
 References: <cover.1381293239.git.horms+renesas@verge.net.au>
-Message-ID: <31e4e292f85189f01949124b04aabb3b50ba3e86.1381293239.git.horms+renesas@verge.net.au>
+Message-ID: <50c517d92eac08b352ccf4b25c93a53947bb855e.1381293239.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+From: Magnus Damm <damm@opensource.se>
 
-r8a7779 INTC needs IRL pin mode settings to determine
-behavior of IRQ0 - IRQ3, and r8a7779_init_irq_extpin()
-is controlling it via irlm parameter.
-But this function registers renesas_intc_irqpin driver
-if irlm was set, and this value depends on platform.
-This is not good for DT.
-This patch splits r8a7779_init_irq_extpin() function
-into "mode settings" and "funtion register" parts
+Move arch timer workaround code and boot mode pin
+handling from setup-r8a7790.c to setup-rcar-gen2.c.
 
-Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+With this in place the same code can be used on
+other R-Car Generation 2 devices such as r8a7791.
+
+Signed-off-by: Magnus Damm <damm@opensource.se>
+[horms+renesas at verge.net.au trivial rebase of board-lager.c
+ for introduction of lager_add_standard_devices()]
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/include/mach/r8a7779.h | 1 +
- arch/arm/mach-shmobile/setup-r8a7779.c        | 6 +++++-
- 2 files changed, 6 insertions(+), 1 deletion(-)
+ arch/arm/mach-shmobile/Makefile                 |  1 +
+ arch/arm/mach-shmobile/board-lager-reference.c  |  2 +-
+ arch/arm/mach-shmobile/board-lager.c            |  2 +-
+ arch/arm/mach-shmobile/clock-r8a7790.c          |  2 +-
+ arch/arm/mach-shmobile/include/mach/r8a7790.h   |  6 +-
+ arch/arm/mach-shmobile/include/mach/rcar-gen2.h |  8 +++
+ arch/arm/mach-shmobile/setup-r8a7790.c          | 68 +-----------------
+ arch/arm/mach-shmobile/setup-rcar-gen2.c        | 91 +++++++++++++++++++++++++
+ 8 files changed, 106 insertions(+), 74 deletions(-)
+ create mode 100644 arch/arm/mach-shmobile/include/mach/rcar-gen2.h
+ create mode 100644 arch/arm/mach-shmobile/setup-rcar-gen2.c
 
-diff --git a/arch/arm/mach-shmobile/include/mach/r8a7779.h b/arch/arm/mach-shmobile/include/mach/r8a7779.h
-index 31e87b9..17af34e 100644
---- a/arch/arm/mach-shmobile/include/mach/r8a7779.h
-+++ b/arch/arm/mach-shmobile/include/mach/r8a7779.h
-@@ -33,6 +33,7 @@ static inline struct r8a7779_pm_ch *to_r8a7779_ch(struct generic_pm_domain *d)
+diff --git a/arch/arm/mach-shmobile/Makefile b/arch/arm/mach-shmobile/Makefile
+index d30ec1a..6b7a02e 100644
+--- a/arch/arm/mach-shmobile/Makefile
++++ b/arch/arm/mach-shmobile/Makefile
+@@ -15,6 +15,7 @@ obj-$(CONFIG_ARCH_R8A7740)	+= setup-r8a7740.o
+ obj-$(CONFIG_ARCH_R8A7778)	+= setup-r8a7778.o
+ obj-$(CONFIG_ARCH_R8A7779)	+= setup-r8a7779.o
+ obj-$(CONFIG_ARCH_R8A7790)	+= setup-r8a7790.o
++obj-$(CONFIG_ARCH_R8A7790)	+= setup-r8a7790.o setup-rcar-gen2.o
+ obj-$(CONFIG_ARCH_R8A7791)	+= setup-r8a7791.o
+ obj-$(CONFIG_ARCH_EMEV2)	+= setup-emev2.o
  
- extern void r8a7779_init_delay(void);
- extern void r8a7779_init_irq_extpin(int irlm);
-+extern void r8a7779_init_irq_extpin_dt(int irlm);
- extern void r8a7779_init_irq_dt(void);
- extern void r8a7779_map_io(void);
- extern void r8a7779_earlytimer_init(void);
-diff --git a/arch/arm/mach-shmobile/setup-r8a7779.c b/arch/arm/mach-shmobile/setup-r8a7779.c
-index eacb2f7..13049e9 100644
---- a/arch/arm/mach-shmobile/setup-r8a7779.c
-+++ b/arch/arm/mach-shmobile/setup-r8a7779.c
-@@ -98,7 +98,7 @@ static struct resource irqpin0_resources[] __initdata = {
- 	DEFINE_RES_IRQ(gic_spi(30)), /* IRQ3 */
- };
+diff --git a/arch/arm/mach-shmobile/board-lager-reference.c b/arch/arm/mach-shmobile/board-lager-reference.c
+index d39a91b..1a1a4a8 100644
+--- a/arch/arm/mach-shmobile/board-lager-reference.c
++++ b/arch/arm/mach-shmobile/board-lager-reference.c
+@@ -40,7 +40,7 @@ static const char *lager_boards_compat_dt[] __initdata = {
+ DT_MACHINE_START(LAGER_DT, "lager")
+ 	.smp		= smp_ops(r8a7790_smp_ops),
+ 	.init_early	= r8a7790_init_early,
++	.init_time	= rcar_gen2_timer_init,
+ 	.init_machine	= lager_add_standard_devices,
+-	.init_time	= r8a7790_timer_init,
+ 	.dt_compat	= lager_boards_compat_dt,
+ MACHINE_END
+diff --git a/arch/arm/mach-shmobile/board-lager.c b/arch/arm/mach-shmobile/board-lager.c
+index 6d1026e..4e040e4 100644
+--- a/arch/arm/mach-shmobile/board-lager.c
++++ b/arch/arm/mach-shmobile/board-lager.c
+@@ -188,7 +188,7 @@ static const char *lager_boards_compat_dt[] __initdata = {
+ DT_MACHINE_START(LAGER_DT, "lager")
+ 	.smp		= smp_ops(r8a7790_smp_ops),
+ 	.init_early	= r8a7790_init_early,
+-	.init_time	= r8a7790_timer_init,
++	.init_time	= rcar_gen2_timer_init,
+ 	.init_machine	= lager_init,
+ 	.dt_compat	= lager_boards_compat_dt,
+ MACHINE_END
+diff --git a/arch/arm/mach-shmobile/clock-r8a7790.c b/arch/arm/mach-shmobile/clock-r8a7790.c
+index 7661e89..a64f965 100644
+--- a/arch/arm/mach-shmobile/clock-r8a7790.c
++++ b/arch/arm/mach-shmobile/clock-r8a7790.c
+@@ -310,7 +310,7 @@ static struct clk_lookup lookups[] = {
  
--void __init r8a7779_init_irq_extpin(int irlm)
-+void __init r8a7779_init_irq_extpin_dt(int irlm)
+ void __init r8a7790_clock_init(void)
  {
- 	void __iomem *icr0 = ioremap_nocache(0xfe780000, PAGE_SIZE);
- 	u32 tmp;
-@@ -116,7 +116,11 @@ void __init r8a7779_init_irq_extpin(int irlm)
- 	tmp |= (1 << 21); /* LVLMODE = 1 */
- 	iowrite32(tmp, icr0);
- 	iounmap(icr0);
-+}
+-	u32 mode = r8a7790_read_mode_pins();
++	u32 mode = rcar_gen2_read_mode_pins();
+ 	int k, ret = 0;
  
-+void __init r8a7779_init_irq_extpin(int irlm)
+ 	switch (mode & (MD(14) | MD(13))) {
+diff --git a/arch/arm/mach-shmobile/include/mach/r8a7790.h b/arch/arm/mach-shmobile/include/mach/r8a7790.h
+index 79e731c..5fbfa28 100644
+--- a/arch/arm/mach-shmobile/include/mach/r8a7790.h
++++ b/arch/arm/mach-shmobile/include/mach/r8a7790.h
+@@ -1,15 +1,13 @@
+ #ifndef __ASM_R8A7790_H__
+ #define __ASM_R8A7790_H__
+ 
++#include <mach/rcar-gen2.h>
++
+ void r8a7790_add_standard_devices(void);
+ void r8a7790_add_dt_devices(void);
+ void r8a7790_clock_init(void);
+ void r8a7790_pinmux_init(void);
+ void r8a7790_init_early(void);
+-void r8a7790_timer_init(void);
+ extern struct smp_operations r8a7790_smp_ops;
+ 
+-#define MD(nr) BIT(nr)
+-u32 r8a7790_read_mode_pins(void);
+-
+ #endif /* __ASM_R8A7790_H__ */
+diff --git a/arch/arm/mach-shmobile/include/mach/rcar-gen2.h b/arch/arm/mach-shmobile/include/mach/rcar-gen2.h
+new file mode 100644
+index 0000000..43f606e
+--- /dev/null
++++ b/arch/arm/mach-shmobile/include/mach/rcar-gen2.h
+@@ -0,0 +1,8 @@
++#ifndef __ASM_RCAR_GEN2_H__
++#define __ASM_RCAR_GEN2_H__
++
++void rcar_gen2_timer_init(void);
++#define MD(nr) BIT(nr)
++u32 rcar_gen2_read_mode_pins(void);
++
++#endif /* __ASM_RCAR_GEN2_H__ */
+diff --git a/arch/arm/mach-shmobile/setup-r8a7790.c b/arch/arm/mach-shmobile/setup-r8a7790.c
+index c7e24ef..c47bceb 100644
+--- a/arch/arm/mach-shmobile/setup-r8a7790.c
++++ b/arch/arm/mach-shmobile/setup-r8a7790.c
+@@ -18,7 +18,6 @@
+  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
+  */
+ 
+-#include <linux/clocksource.h>
+ #include <linux/irq.h>
+ #include <linux/kernel.h>
+ #include <linux/of_platform.h>
+@@ -203,71 +202,6 @@ void __init r8a7790_add_standard_devices(void)
+ 	r8a7790_register_thermal();
+ }
+ 
+-#define MODEMR 0xe6160060
+-
+-u32 __init r8a7790_read_mode_pins(void)
+-{
+-	void __iomem *modemr = ioremap_nocache(MODEMR, 4);
+-	u32 mode;
+-
+-	BUG_ON(!modemr);
+-	mode = ioread32(modemr);
+-	iounmap(modemr);
+-
+-	return mode;
+-}
+-
+-#define CNTCR 0
+-#define CNTFID0 0x20
+-
+-void __init r8a7790_timer_init(void)
+-{
+-#ifdef CONFIG_ARM_ARCH_TIMER
+-	u32 mode = r8a7790_read_mode_pins();
+-	void __iomem *base;
+-	int extal_mhz = 0;
+-	u32 freq;
+-
+-	/* At Linux boot time the r8a7790 arch timer comes up
+-	 * with the counter disabled. Moreover, it may also report
+-	 * a potentially incorrect fixed 13 MHz frequency. To be
+-	 * correct these registers need to be updated to use the
+-	 * frequency EXTAL / 2 which can be determined by the MD pins.
+-	 */
+-
+-	switch (mode & (MD(14) | MD(13))) {
+-	case 0:
+-		extal_mhz = 15;
+-		break;
+-	case MD(13):
+-		extal_mhz = 20;
+-		break;
+-	case MD(14):
+-		extal_mhz = 26;
+-		break;
+-	case MD(13) | MD(14):
+-		extal_mhz = 30;
+-		break;
+-	}
+-
+-	/* The arch timer frequency equals EXTAL / 2 */
+-	freq = extal_mhz * (1000000 / 2);
+-
+-	/* Remap "armgcnt address map" space */
+-	base = ioremap(0xe6080000, PAGE_SIZE);
+-
+-	/* Update registers with correct frequency */
+-	iowrite32(freq, base + CNTFID0);
+-	asm volatile("mcr p15, 0, %0, c14, c0, 0" : : "r" (freq));
+-
+-	/* make sure arch timer is started by setting bit 0 of CNTCR */
+-	iowrite32(1, base + CNTCR);
+-	iounmap(base);
+-#endif /* CONFIG_ARM_ARCH_TIMER */
+-
+-	clocksource_of_init();
+-}
+-
+ void __init r8a7790_init_early(void)
+ {
+ #ifndef CONFIG_ARM_ARCH_TIMER
+@@ -285,7 +219,7 @@ static const char * const r8a7790_boards_compat_dt[] __initconst = {
+ DT_MACHINE_START(R8A7790_DT, "Generic R8A7790 (Flattened Device Tree)")
+ 	.smp		= smp_ops(r8a7790_smp_ops),
+ 	.init_early	= r8a7790_init_early,
+-	.init_time	= r8a7790_timer_init,
++	.init_time	= rcar_gen2_timer_init,
+ 	.dt_compat	= r8a7790_boards_compat_dt,
+ MACHINE_END
+ #endif /* CONFIG_USE_OF */
+diff --git a/arch/arm/mach-shmobile/setup-rcar-gen2.c b/arch/arm/mach-shmobile/setup-rcar-gen2.c
+new file mode 100644
+index 0000000..5734c24
+--- /dev/null
++++ b/arch/arm/mach-shmobile/setup-rcar-gen2.c
+@@ -0,0 +1,91 @@
++/*
++ * R-Car Generation 2 support
++ *
++ * Copyright (C) 2013  Renesas Solutions Corp.
++ * Copyright (C) 2013  Magnus Damm
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; version 2 of the License.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
++ */
++
++#include <linux/clocksource.h>
++#include <linux/io.h>
++#include <linux/kernel.h>
++#include <mach/common.h>
++#include <mach/rcar-gen2.h>
++#include <asm/mach/arch.h>
++
++#define MODEMR 0xe6160060
++
++u32 __init rcar_gen2_read_mode_pins(void)
 +{
-+	r8a7779_init_irq_extpin_dt(irlm);
- 	if (irlm)
- 		platform_device_register_resndata(
- 			&platform_bus, "renesas_intc_irqpin", -1,
++	void __iomem *modemr = ioremap_nocache(MODEMR, 4);
++	u32 mode;
++
++	BUG_ON(!modemr);
++	mode = ioread32(modemr);
++	iounmap(modemr);
++
++	return mode;
++}
++
++#define CNTCR 0
++#define CNTFID0 0x20
++
++void __init rcar_gen2_timer_init(void)
++{
++#ifdef CONFIG_ARM_ARCH_TIMER
++	u32 mode = rcar_gen2_read_mode_pins();
++	void __iomem *base;
++	int extal_mhz = 0;
++	u32 freq;
++
++	/* At Linux boot time the r8a7790 arch timer comes up
++	 * with the counter disabled. Moreover, it may also report
++	 * a potentially incorrect fixed 13 MHz frequency. To be
++	 * correct these registers need to be updated to use the
++	 * frequency EXTAL / 2 which can be determined by the MD pins.
++	 */
++
++	switch (mode & (MD(14) | MD(13))) {
++	case 0:
++		extal_mhz = 15;
++		break;
++	case MD(13):
++		extal_mhz = 20;
++		break;
++	case MD(14):
++		extal_mhz = 26;
++		break;
++	case MD(13) | MD(14):
++		extal_mhz = 30;
++		break;
++	}
++
++	/* The arch timer frequency equals EXTAL / 2 */
++	freq = extal_mhz * (1000000 / 2);
++
++	/* Remap "armgcnt address map" space */
++	base = ioremap(0xe6080000, PAGE_SIZE);
++
++	/* Update registers with correct frequency */
++	iowrite32(freq, base + CNTFID0);
++	asm volatile("mcr p15, 0, %0, c14, c0, 0" : : "r" (freq));
++
++	/* make sure arch timer is started by setting bit 0 of CNTCR */
++	iowrite32(1, base + CNTCR);
++	iounmap(base);
++#endif /* CONFIG_ARM_ARCH_TIMER */
++
++	clocksource_of_init();
++}
 -- 
 1.8.4
