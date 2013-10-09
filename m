@@ -1,96 +1,65 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  9 Oct 2013 15:49:27 +0900
-Subject: [GIT PULL] Second round of Renesas ARM based SoC updates for v3.13
-Message-ID: <cover.1381293239.git.horms+renesas@verge.net.au>
+Date: Wed,  9 Oct 2013 15:49:45 +0900
+Subject: [PATCH 04/14] ARM: shmobile: r8a7790: add I2C clocks and aliases for
+ the DT mode
+In-Reply-To: <cover.1381293239.git.horms+renesas@verge.net.au>
+References: <cover.1381293239.git.horms+renesas@verge.net.au>
+Message-ID: <911a644cfa03d834220621f22bb4a4d41dfe27d4.1381293239.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Kevin and Arnd,
+From: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
 
-please consider this second round of Renesas ARM based SoC updates for v3.13.
+This patch adds clock definitions for the 4 I2C interfaces on r8a7790 and
+clock aliases, suitable for the DT mode.
 
-This pull-request is based on a merge of the following, each of which
-you have already pulled. The reason for the merge is to eliminate conflicts.
-* renesas-soc-for-v3.13
-* renesas-smp-for-v3.13
-* renesas-fixes4-for-v3.13
+Signed-off-by: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/mach-shmobile/clock-r8a7790.c | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-The following changes since commit 243b6db0588b1425cb020e764475e8e1c4eb40d9:
-
-  Merge tag 'renesas-fixes4-for-v3.12' into soc2-base (2013-10-08 09:44:08 +0900)
-
-are available in the git repository at:
-
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-soc2-for-v3.13
-
-for you to fetch changes up to 687c27b07050c21a62c4c975777c89e698649a6b:
-
-  ARM: shmobile: r8a7791 SMP support (2013-10-08 09:53:02 +0900)
-
-----------------------------------------------------------------
-Second Round of Renesas ARM based SoC updates for v3.13
-
-* SMP support for r8a7791 SoC
-* r8a7779_init_irq_extpin() for DT for r8a7779 and r8a7778 SoCs
-* Add HPB-DMAC to r8a7779 and r8a7778 SoCs
-* Add r7s72100 SoC
-* Make use of ARCH timer workaround on r8a7791 SoC
-* Add IRQC platform device support to r8a7791 SoC
-* Add I2C clocks and aliases for the DT mode for r8a7790 SoC
-* Add MAC platform device to r8a73a4 SoC
-
-----------------------------------------------------------------
-Guennadi Liakhovetski (3):
-      ARM: shmobile: r8a73a4: add a DMAC platform device and clock for it
-      ARM: shmobile: r8a7790: add I2C clocks and aliases for the DT mode
-      ARM: shmobile: r8a73a4: add a clock alias for the DMAC in DT mode
-
-Kuninori Morimoto (2):
-      ARM: shmobile: r8a7778: split r8a7778_init_irq_extpin() for DT
-      ARM: shmobile: r8a7779: split r8a7779_init_irq_extpin() for DT
-
-Magnus Damm (7):
-      ARM: shmobile: Break out R-Car Gen2 setup code
-      ARM: shmobile: Introduce r8a7791_add_standard_devices()
-      ARM: shmobile: r8a7791 IRQC platform device support
-      ARM: shmobile: r8a7791 Arch timer workaround
-      ARM: shmobile: Initial r7s72100 SoC support
-      ARM: shmobile: r7s72100 SCIF support
-      ARM: shmobile: r8a7791 SMP support
-
-Max Filippov (2):
-      ARM: shmobile: r8a7778: add HPB-DMAC support
-      ARM: shmobile: r8a7779: add HPB-DMAC support
-
- arch/arm/boot/dts/r7s72100.dtsi                 |  36 +++++
- arch/arm/mach-shmobile/Kconfig                  |   6 +
- arch/arm/mach-shmobile/Makefile                 |   6 +-
- arch/arm/mach-shmobile/board-lager-reference.c  |   2 +-
- arch/arm/mach-shmobile/board-lager.c            |   2 +-
- arch/arm/mach-shmobile/clock-r7s72100.c         | 202 ++++++++++++++++++++++++
- arch/arm/mach-shmobile/clock-r8a73a4.c          |   5 +-
- arch/arm/mach-shmobile/clock-r8a7790.c          |  12 +-
- arch/arm/mach-shmobile/include/mach/r7s72100.h  |   8 +
- arch/arm/mach-shmobile/include/mach/r8a73a4.h   |   9 ++
- arch/arm/mach-shmobile/include/mach/r8a7778.h   |   9 ++
- arch/arm/mach-shmobile/include/mach/r8a7779.h   |   8 +
- arch/arm/mach-shmobile/include/mach/r8a7790.h   |   6 +-
- arch/arm/mach-shmobile/include/mach/r8a7791.h   |   2 +
- arch/arm/mach-shmobile/include/mach/rcar-gen2.h |   8 +
- arch/arm/mach-shmobile/setup-r7s72100.c         |  88 +++++++++++
- arch/arm/mach-shmobile/setup-r8a73a4.c          |  91 +++++++++++
- arch/arm/mach-shmobile/setup-r8a7778.c          |  91 ++++++++++-
- arch/arm/mach-shmobile/setup-r8a7779.c          | 160 ++++++++++++++++++-
- arch/arm/mach-shmobile/setup-r8a7790.c          |  68 +-------
- arch/arm/mach-shmobile/setup-r8a7791.c          |  35 ++++
- arch/arm/mach-shmobile/setup-rcar-gen2.c        |  91 +++++++++++
- arch/arm/mach-shmobile/smp-r8a7791.c            |  62 ++++++++
- 23 files changed, 929 insertions(+), 78 deletions(-)
- create mode 100644 arch/arm/boot/dts/r7s72100.dtsi
- create mode 100644 arch/arm/mach-shmobile/clock-r7s72100.c
- create mode 100644 arch/arm/mach-shmobile/include/mach/r7s72100.h
- create mode 100644 arch/arm/mach-shmobile/include/mach/rcar-gen2.h
- create mode 100644 arch/arm/mach-shmobile/setup-r7s72100.c
- create mode 100644 arch/arm/mach-shmobile/setup-rcar-gen2.c
- create mode 100644 arch/arm/mach-shmobile/smp-r8a7791.c
+diff --git a/arch/arm/mach-shmobile/clock-r8a7790.c b/arch/arm/mach-shmobile/clock-r8a7790.c
+index d99b87b..7661e89 100644
+--- a/arch/arm/mach-shmobile/clock-r8a7790.c
++++ b/arch/arm/mach-shmobile/clock-r8a7790.c
+@@ -52,6 +52,7 @@
+ #define SMSTPCR5 0xe6150144
+ #define SMSTPCR7 0xe615014c
+ #define SMSTPCR8 0xe6150990
++#define SMSTPCR9 0xe6150994
+ 
+ #define SDCKCR		0xE6150074
+ #define SD2CKCR		0xE6150078
+@@ -181,6 +182,7 @@ static struct clk div6_clks[DIV6_NR] = {
+ 
+ /* MSTP */
+ enum {
++	MSTP931, MSTP930, MSTP929, MSTP928,
+ 	MSTP813,
+ 	MSTP726, MSTP725, MSTP724, MSTP723, MSTP722, MSTP721, MSTP720,
+ 	MSTP717, MSTP716,
+@@ -192,6 +194,10 @@ enum {
+ };
+ 
+ static struct clk mstp_clks[MSTP_NR] = {
++	[MSTP931] = SH_CLK_MSTP32(&hp_clk, SMSTPCR9, 31, 0), /* I2C0 */
++	[MSTP930] = SH_CLK_MSTP32(&hp_clk, SMSTPCR9, 30, 0), /* I2C1 */
++	[MSTP929] = SH_CLK_MSTP32(&hp_clk, SMSTPCR9, 29, 0), /* I2C2 */
++	[MSTP928] = SH_CLK_MSTP32(&hp_clk, SMSTPCR9, 28, 0), /* I2C3 */
+ 	[MSTP813] = SH_CLK_MSTP32(&p_clk, SMSTPCR8, 13, 0), /* Ether */
+ 	[MSTP726] = SH_CLK_MSTP32(&zx_clk, SMSTPCR7, 26, 0), /* LVDS0 */
+ 	[MSTP725] = SH_CLK_MSTP32(&zx_clk, SMSTPCR7, 25, 0), /* LVDS1 */
+@@ -271,6 +277,10 @@ static struct clk_lookup lookups[] = {
+ 	CLKDEV_DEV_ID("sh-sci.7", &mstp_clks[MSTP720]),
+ 	CLKDEV_DEV_ID("sh-sci.8", &mstp_clks[MSTP717]),
+ 	CLKDEV_DEV_ID("sh-sci.9", &mstp_clks[MSTP716]),
++	CLKDEV_DEV_ID("e6508000.i2c", &mstp_clks[MSTP931]),
++	CLKDEV_DEV_ID("e6518000.i2c", &mstp_clks[MSTP930]),
++	CLKDEV_DEV_ID("e6530000.i2c", &mstp_clks[MSTP929]),
++	CLKDEV_DEV_ID("e6540000.i2c", &mstp_clks[MSTP928]),
+ 	CLKDEV_DEV_ID("r8a7790-ether", &mstp_clks[MSTP813]),
+ 	CLKDEV_DEV_ID("rcar_thermal", &mstp_clks[MSTP522]),
+ 	CLKDEV_DEV_ID("ee200000.mmcif", &mstp_clks[MSTP315]),
+-- 
+1.8.4
