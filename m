@@ -1,81 +1,36 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  9 Oct 2013 15:50:57 +0900
-Subject: [PATCH 09/14] ARM: shmobile: Remove non-multiplatform KZM9D reference
- support
-In-Reply-To: <cover.1381299817.git.horms+renesas@verge.net.au>
-References: <cover.1381299817.git.horms+renesas@verge.net.au>
-Message-ID: <df8ee58d73ae8590bc4c9ddbe19211e4485f9d17.1381299817.git.horms+renesas@verge.net.au>
+Date: Wed,  9 Oct 2013 15:50:29 +0900
+Subject: [PATCH 13/13] ARM: shmobile: bockw: fixup ether node naming
+In-Reply-To: <cover.1381298964.git.horms+renesas@verge.net.au>
+References: <cover.1381298964.git.horms+renesas@verge.net.au>
+Message-ID: <73c79afa61cdee2553461ee714bb4716372bdd55.1381298964.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm@opensource.se>
+From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-Now when CCF is supported remove the legacy KZM9D reference
-Kconfig bits CONFIG_MACH_KZM9D_REFERENCE for the non-multiplatform
-case.
+According to the ePAPR spec,
+the node name should be "ethernet", not "lan0".
 
-Starting from this commit KZM9D board support is always enabled
-via CONFIG_MACH_KZM9D, and CONFIG_ARCH_MULTIPLATFORM is used
-to select between board-kzm9d.c and board-kzm9d-reference.c
-
-The file board-kzm9d-reference.c can no longer be used together
-with the legacy sh-clk clock framework, instead CCF is used.
-
-Signed-off-by: Magnus Damm <damm@opensource.se>
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Reported-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/Kconfig       | 12 ------------
- arch/arm/mach-shmobile/Makefile      |  1 -
- arch/arm/mach-shmobile/Makefile.boot |  1 -
- 3 files changed, 14 deletions(-)
+ arch/arm/boot/dts/r8a7778-bockw-reference.dts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
-index c9c4f15..a4a4b75 100644
---- a/arch/arm/mach-shmobile/Kconfig
-+++ b/arch/arm/mach-shmobile/Kconfig
-@@ -237,18 +237,6 @@ config MACH_KZM9D
- 	select REGULATOR_FIXED_VOLTAGE if REGULATOR
- 	select USE_OF
+diff --git a/arch/arm/boot/dts/r8a7778-bockw-reference.dts b/arch/arm/boot/dts/r8a7778-bockw-reference.dts
+index 4425fd2..969e386 100644
+--- a/arch/arm/boot/dts/r8a7778-bockw-reference.dts
++++ b/arch/arm/boot/dts/r8a7778-bockw-reference.dts
+@@ -39,7 +39,7 @@
+ 		regulator-always-on;
+ 	};
  
--config MACH_KZM9D_REFERENCE
--	bool "KZM9D board - Reference Device Tree Implementation"
--	depends on ARCH_EMEV2
--	select REGULATOR_FIXED_VOLTAGE if REGULATOR
--	select USE_OF
--	---help---
--	   Use reference implementation of KZM9D board support
--	   which makes a greater use of device tree at the expense
--	   of not supporting a number of devices.
--
--	   This is intended to aid developers
--
- config MACH_KZM9G
- 	bool "KZM-A9-GT board"
- 	depends on ARCH_SH73A0
-diff --git a/arch/arm/mach-shmobile/Makefile b/arch/arm/mach-shmobile/Makefile
-index b11466d..51db2bc 100644
---- a/arch/arm/mach-shmobile/Makefile
-+++ b/arch/arm/mach-shmobile/Makefile
-@@ -72,7 +72,6 @@ obj-$(CONFIG_MACH_ARMADILLO800EVA)	+= board-armadillo800eva.o
- obj-$(CONFIG_MACH_ARMADILLO800EVA_REFERENCE)	+= board-armadillo800eva-reference.o
- obj-$(CONFIG_MACH_KOELSCH)	+= board-koelsch.o
- obj-$(CONFIG_MACH_KZM9D)	+= board-kzm9d.o
--obj-$(CONFIG_MACH_KZM9D_REFERENCE)	+= board-kzm9d-reference.o
- obj-$(CONFIG_MACH_KZM9G)	+= board-kzm9g.o
- obj-$(CONFIG_MACH_KZM9G_REFERENCE)	+= board-kzm9g-reference.o
- endif
-diff --git a/arch/arm/mach-shmobile/Makefile.boot b/arch/arm/mach-shmobile/Makefile.boot
-index c690b50..391d72a 100644
---- a/arch/arm/mach-shmobile/Makefile.boot
-+++ b/arch/arm/mach-shmobile/Makefile.boot
-@@ -9,7 +9,6 @@ loadaddr-$(CONFIG_MACH_BOCKW_REFERENCE) += 0x60008000
- loadaddr-$(CONFIG_MACH_GENMAI) += 0x8008000
- loadaddr-$(CONFIG_MACH_KOELSCH) += 0x40008000
- loadaddr-$(CONFIG_MACH_KZM9D) += 0x40008000
--loadaddr-$(CONFIG_MACH_KZM9D_REFERENCE) += 0x40008000
- loadaddr-$(CONFIG_MACH_KZM9G) += 0x41008000
- loadaddr-$(CONFIG_MACH_KZM9G_REFERENCE) += 0x41008000
- loadaddr-$(CONFIG_MACH_LAGER) += 0x40008000
+-	lan0 at 18300000 {
++	ethernet at 18300000 {
+ 		compatible = "smsc,lan9220", "smsc,lan9115";
+ 		reg = <0x18300000 0x1000>;
+ 
 -- 
 1.8.4
