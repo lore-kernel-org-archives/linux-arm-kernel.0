@@ -1,93 +1,205 @@
-From: gang.chen@asianux.com (Chen Gang)
-Date: Wed, 09 Oct 2013 09:22:25 +0800
-Subject: [PATCH 2/2] ARM: include: asm: use 'int' instead of 'unsigned
- long' for normal register variables within atomic.h
-In-Reply-To: <5254A0E1.9090703@asianux.com>
-References: <20131002104158.GD28311@mudshark.cambridge.arm.com>
- <524C3981.20307@asianux.com> <524D416B.5090709@asianux.com>
- <20131003163200.GE7408@mudshark.cambridge.arm.com>
- <524E8FBC.2080200@asianux.com>
- <20131004153742.GR24303@mudshark.cambridge.arm.com>
- <20131004154208.GS24303@mudshark.cambridge.arm.com>
- <524F5566.4010204@asianux.com>
- <20131008103331.GE17148@mudshark.cambridge.arm.com>
- <5253EC8A.2030305@asianux.com>
- <20131008174945.GJ21189@mudshark.cambridge.arm.com>
- <5254A0E1.9090703@asianux.com>
-Message-ID: <5254AFD1.7070006@asianux.com>
+From: dan.j.williams@intel.com (Dan Williams)
+Date: Tue, 8 Oct 2013 18:28:46 -0700
+Subject: [PATCH] DMA: extend documentation to provide more API details
+In-Reply-To: <Pine.LNX.4.64.1310070900550.20796@axis700.grange>
+References: <Pine.LNX.4.64.1310051925170.8097@axis700.grange>
+ <20131005190200.GZ12758@n2100.arm.linux.org.uk>
+ <Pine.LNX.4.64.1310052203060.8097@axis700.grange>
+ <20131005233137.GA12758@n2100.arm.linux.org.uk>
+ <Pine.LNX.4.64.1310070900550.20796@axis700.grange>
+Message-ID: <CAA9_cmemFPjynwJUSohB5v_A1k3JKDBy1o698HuYG8Pysr6PgQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/09/2013 08:18 AM, Chen Gang wrote:
-> On 10/09/2013 01:49 AM, Will Deacon wrote:
->> On Tue, Oct 08, 2013 at 12:29:14PM +0100, Chen Gang wrote:
->>> Hmm... for atomic_set_mask(), "drivers/gpu/drm/i915/i915_irq.c" also
->>> uses it (it is about Intel Graphics).
+On Mon, Oct 7, 2013 at 12:40 AM, Guennadi Liakhovetski
+<g.liakhovetski@gmx.de> wrote:
+> Hi Russell
+>
+> On Sun, 6 Oct 2013, Russell King - ARM Linux wrote:
+>
+>> On Sat, Oct 05, 2013 at 11:00:45PM +0200, Guennadi Liakhovetski wrote:
+>> > On Sat, 5 Oct 2013, Russell King - ARM Linux wrote:
+>> >
+>> > > On Sat, Oct 05, 2013 at 07:36:20PM +0200, Guennadi Liakhovetski wrote:
+>> > > > +       A DMA transaction descriptor, returned to the user by one of "prep"
+>> > > > +       methods is considered as belogning to the user until it is submitted
+>> > > > +       to the dmaengine driver for transfer. However, it is recommended, that
+>> > > > +       the dmaengine driver keeps references to prepared descriptors too,
+>> > > > +       because if dmaengine_terminate_all() is called at that time, the driver
+>> > > > +       will have to recycle all allocated descriptors for the respective
+>> > > > +       channel.
+>> > >
+>> > > No.  That's quite dangerous.  think about what can happen.
+>> > >
+>> > > Thread 1          Thread 2
+>> > > Driver calls prepare
+>> > >                   dmaengine_terminate_all()
+>> > >                           dmaengine driver frees prepared descriptor
+>> > > driver submits descriptor
+>> > >
+>> > > You now have a descriptor which has been freed submitted to the DMA engine
+>> > > queue.  This will cause chaos.
+>> >
+>> > Yes, I understand this. So, it is intentional, that after a *_prep_* a
+>> > descriptor belongs to the user and - if the user fails - it will simply be
+>> > leaked. A terminate-all shouldn't recycle them and dmaengine driver
+>> > unbinding is impossible at that time, as long as the user hasn't released
+>> > the channel. Ok, I can rework the above just to explain this.
 >>
->> I don't think we care too much about the Intel graphics driver on ARM at the
->> moment.
->>
->>> For some architectures (e.g. frv, mn10300, mr32r, blackfin, and of cause
->>> s390), still use atomic_[set/clear]_mask().
->>
->> We don't care about those either.
->>
->>> And they are inline functions in atomic.h, individual kernel modules may
->>> use them (which source code is not merged into kernel). Can we skip
->>> these individual modules? (I guess we can, but need think of carefully).
->>
->> or those. If somebody starts complaining, then we can add things back.
->>
-> 
-> OK, thanks. For s390, it need use 'unsigned int' instead of 'unsigned
-> long' (which already acked by related maintainers).
-> 
-> So at least, we can use "unsigned int" instead of "unsigned long" for
-> our arm64. :-)
-> 
-> I will send related patch for arm64 (also re-send related patch for s390).
-> 
+>> "the user fails" should be very difficult.  One of the requirements here
+>> is that any "user" submits the prepared descriptor as soon as possible
+>> after preparation.  Some DMA engine implementations hold a spinlock
+>> between preparation and submission so this is absolutely necessary.
+>
+> Ouch...
 
-For arm, we still can do like this (but recommend after the 2 current
-patches applied).
+The pain here is that some engines have a pre-allocated descriptor
+ring, and the prep methods write directly to that ring.  Without
+holding a lock a parallel submission could advance the ring before the
+last one was submitted.  This was done because the original
+implementation of the prep routines started the pattern of writing
+directly to the ring.
 
-For arm64, related inline assembly code also need be changed  (for
-'bic', 'ldxr' and 'stxr', need use '%w0' instead of '%0', and  '%w3'
-instead of '%3'), and 'tmp' also need be changed to unsigned int.
+I think that is the original sin of dmaengine as every other driver
+subsystem in the universe submits a generic request object to a driver
+who then copies the values into the hardware control structure.  For
+dma-slave that overhead is almost certainly worth paying.
 
+>
+>> As Dan Williams explained to me, the reason for the separate submission
+>> step is there to allow the callback information to be set.  So literally
+>> any "user" of this should do this:
+>>
+>>       desc = prepare();
+>>       if (!desc)
+>>               goto failed_to_prepare;
+>>
+>>       desc->callback = function;
+>>       desc->callback_param = param;
+>>       dmaengine_submit(desc);
+>>
+>> There should be very little possiblity of the user failing between those
+>> two calls.
+>
+> I see.
+>
+>> > > > -   On completion of each DMA operation, the next in queue is started and
+>> > > > -   a tasklet triggered. The tasklet will then call the client driver
+>>           ^^^^^^^^^^^^^^^^^^^^
+>> > > > -   completion callback routine for notification, if set.
+>> > > > +   On completion of each DMA operation, the next active transaction in queue is
+>> > > > +   started and the ISR bottom half, e.g. a tasklet or a kernel thread is
+>> > > > +   triggered.
+>> > >
+>> > > Or a kernel thread?  I don't think that's right.  It's always been
+>> > > specified that the callback will happen from tasklet context.
+>> >
+>> > Do you see any problems using, say, a threaded interrupt handler, apart
+>> > from possible performance issues? That seems to be pretty convenient.
+>> > Otherwise we should really mandate somewhere, that bottom half processing
+>> > should take place in a tasklet?
+>>
+>> The documentation has always stated that callbacks will be made from
+>> tasklet context.  The problem with allowing different contexts from
+>> different drivers is taht spinlocking becomes problematical.  Remember
+>> that we have _bh() variants which lock against tasklets but allow IRQs.
+>
+> Spinlocks are local to dmaengine drivers, and I currently see quite a few
+> of them doing spin_lock_irq(save)() instead of _bh(). Some also take that
+> lock in their ISR, like the pl330 does.
 
-Thanks.
+Yes, but in that example the driver still arranges for the callback to
+be in tasklet context (pl330_tasklet).  Threaded irqs should be fine.
+The callbacks just expect no stricter than bh context and cannot
+assume process context.
 
-> Thanks.
-> 
->>>>> And also, excuse me, I am not quite familiar with "exclusive monitor",
->>>>> could you please provide more details about it?
->>>>
->>>> You'll need to take a look at the ARM ARM, in particular the section about
->>>> `Synchronisation and Semaphores'.
->>>>
->>>
->>> Do you mean "ARM ARM" is a book name? (at least, I really need read more
->>> things to familiar with ARM)
+>
+> The disadvantage of using a threaded IRQ, that I see so far, is that you
+> then can only wake up the thread from the ISR, not from other contexts,
+> but even then it should be possible, at least for some designs.
+>
+>> > > > +   The dmaengine driver also has to check the DMA_CTRL_ACK flag by calling
+>> > > > +   async_tx_test_ack() on the transaction. If the function returns true, i.e.
+>> > > > +   if the transaction either has been flagged from the very beginning, or
+>> > > > +   the user has flagged it later, then the transaction descriptor can be
+>> > > > +   recycled immediately by the dmaengine driver.
+>> > >
+>> > > "has to check" I think is wrong.  This is optional for slave only drivers,
+>> > > because most slave stuff doesn't use the ACK stuff - that's more for the
+>> > > async_tx APIs.
+>> >
+>> > "most," but some do? E.g. the mx3_camera driver. Ok, that one is very
+>> > tightly bound to the respective dmaengine driver. But if there are other
+>> > slave drivers, using that, that can run on different platforms and use
+>> > various dmaengine drivers?
 >>
->> Yes, the hilariouly titled "ARM Architecture Reference Manual". You can find
->> it on arm.com, but you have to register:
->>
->> ARMv7: https://silver.arm.com/download/download.tm?pv=1299246
->> ARMv8 (beta): https://silver.arm.com/download/download.tm?pv=1448511
->>
-> 
-> Thank you very much for your information.
-> 
->> Enjoy!
->>
->> Will
->>
->>
-> 
-> Thanks.
-> 
+>> I'm not aware of any which actually make use of the ack stuff.  Only those
+>> which implement the async_tx must implement this because it gets used for
+>> chaining and dependency stuff.  However, there was a plan to remove this
+>> and replace it with proper refcounting.
+>
+> Ok.
 
+Which would dovetail with a generic dma request object, but not a
+pre-requisite to removal of the ack stuff.
 
--- 
-Chen Gang
+>
+>> > > > If the function returns
+>> > > > +   false, the descriptor cannot be recycled yet and the dmaengine driver has
+>> > > > +   to keep polling the descriptor until it is acknowledged by the user.
+>> > > >
+>> > > >     Interface:
+>> > > >         void dma_async_issue_pending(struct dma_chan *chan);
+>> > > > @@ -171,6 +192,14 @@ Further APIs:
+>> > > >     discard data in the DMA FIFO which hasn't been fully transferred.
+>> > > >     No callback functions will be called for any incomplete transfers.
+>> > > >
+>> > > > +   Note:
+>> > > > +       Transactions, aborted by this call are considered as failed. However,
+>> > > > +       if the user requests their status, using dma_async_is_complete() /
+>> > > > +       dma_async_is_complete(), as described below, one of DMA_IN_PROGRESS and
+>> > > > +       DMA_SUCCESS will be returned. So, drivers are advised not to use those
+>> > > > +       calls on transactions, submitted before a call to
+>> > > > +       dmaengine_terminate_all().
+>> > >
+>> > > The last sentence doesn't make sense.
+>> >
+>> > Right, sorry, there is a typo in the second line (to remind: this note is
+>> > for the dmaengine_terminate_all() function):
+>> >
+>> > +   Note:
+>> > +   Transactions, aborted by this call are considered as failed. However,
+>> > +   if the user requests their status, using dma_async_is_tx_complete() /
+>> > +   dma_async_is_complete(), as described below, one of DMA_IN_PROGRESS and
+>> > +   DMA_SUCCESS will be returned. So, drivers are advised not to use those
+>> > +   calls on transactions, submitted before a call to
+>> > +   dmaengine_terminate_all().
+>> >
+>> > What I was trying to say, is that if you submit transactions, then
+>> > terminate them, then try to retrieve their status using
+>> > dma_async_is_tx_complete() / dma_async_is_complete(), this won't produce
+>> > the expected DMA_ERROR result, instead, one of DMA_IN_PROGRESS and
+>> > DMA_SUCCESS will be returned, unless the driver implements some
+>> > sophisticated .device_tx_status() method.
+>>
+>> Remember that dmaengine_terminate_all() is targetted to a specific
+>> channel - it terminates all submitted transactions on that channel
+>> and stops any in-process transaction.  It doesn't affect any other
+>> channel on the controller.
+>>
+>> In the case of slave DMA users, you have to "own" the channel.  This
+>> means it's up to the user to sort out what happens should _they_ call
+>> dmaengine_terminate_all() on it.
+>>
+>> For non-slave DMA users, I don't believe that terminating transactions
+>> is permitted - they're expected to complete.
+>
+> Ok, but the DMA error case remains, right? I.e. in case the dmaengine
+> driver had to drop transactions due to a hardware problem, the client
+> driver has no way to retrieve their status?
+
+In the current model Russell is right, it would need to be a specific
+error callback.
+
+--
+Dan
