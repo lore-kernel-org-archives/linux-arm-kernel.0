@@ -1,102 +1,32 @@
 From: b29396@freescale.com (Dong Aisheng)
-Date: Wed, 9 Oct 2013 19:20:13 +0800
-Subject: [PATCH 07/10] mmc: sdhci-esdhc-imx: add delay line setting support
+Date: Wed, 9 Oct 2013 19:20:14 +0800
+Subject: [PATCH 08/10] mmc: sdhci-esdhc-imx: enable SDR50 tuning for imx6q/dl
 In-Reply-To: <1381317616-1229-1-git-send-email-b29396@freescale.com>
 References: <1381317616-1229-1-git-send-email-b29396@freescale.com>
-Message-ID: <1381317616-1229-8-git-send-email-b29396@freescale.com>
+Message-ID: <1381317616-1229-9-git-send-email-b29396@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The DLL(Delay Line) is newly added to assist in sampling read data.
-The DLL provides the ability to programmatically select a quantized
-delay (in fractions of the clock period) regardless of on-chip variations
-such as process, voltage and temperature (PVT).
-
-This patch adds a user interface to set slave delay line via device tree.
-It's usually used in high speed mode like mmc DDR mode when the signal
-quality is not good caused by board design, e.g. the signal path is too long.
-User can manual set delay line to find a suitable data sampling window
-for card to work properly.
+The imx6q/dl supports SDR50 tunning, enable it for a better timing
+on SDR50 mode.
 
 Signed-off-by: Dong Aisheng <b29396@freescale.com>
 ---
- .../devicetree/bindings/mmc/fsl-imx-esdhc.txt      |    1 +
- drivers/mmc/host/sdhci-esdhc-imx.c                 |   18 ++++++++++++++++++
- include/linux/platform_data/mmc-esdhc-imx.h        |    1 +
- 3 files changed, 20 insertions(+), 0 deletions(-)
+ drivers/mmc/host/sdhci-esdhc-imx.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/mmc/fsl-imx-esdhc.txt b/Documentation/devicetree/bindings/mmc/fsl-imx-esdhc.txt
-index 1dd6225..ebd3ff5 100644
---- a/Documentation/devicetree/bindings/mmc/fsl-imx-esdhc.txt
-+++ b/Documentation/devicetree/bindings/mmc/fsl-imx-esdhc.txt
-@@ -12,6 +12,7 @@ Required properties:
- Optional properties:
- - fsl,cd-controller : Indicate to use controller internal card detection
- - fsl,wp-controller : Indicate to use controller internal write protection
-+- fsl,delay-line : Specify delay line value of manual override for slave delay.
- 
- Examples:
- 
 diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
-index b6ae5c1..91b2d85 100644
+index 91b2d85..8879974 100644
 --- a/drivers/mmc/host/sdhci-esdhc-imx.c
 +++ b/drivers/mmc/host/sdhci-esdhc-imx.c
-@@ -46,6 +46,11 @@
- /* Bits 3 and 6 are not SDHCI standard definitions */
- #define  ESDHC_MIX_CTRL_SDHCI_MASK	0xb7
- 
-+/* dll control register */
-+#define ESDHC_DLL_CTRL			0x60
-+#define ESDHC_DLL_OVERRIDE_VAL_SHIFT	9
-+#define ESDHC_DLL_OVERRIDE_EN_SHIFT	8
-+
- /* tune control register */
- #define ESDHC_TUNE_CTRL_STATUS		0x68
- #define  ESDHC_TUNE_CTRL_STEP		1
-@@ -803,6 +808,7 @@ static int esdhc_set_uhs_signaling(struct sdhci_host *host, unsigned int uhs)
- {
- 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
- 	struct pltfm_imx_data *imx_data = pltfm_host->priv;
-+	struct esdhc_platform_data *boarddata = &imx_data->boarddata;
- 
- 	switch (uhs) {
- 	case MMC_TIMING_UHS_SDR12:
-@@ -823,6 +829,15 @@ static int esdhc_set_uhs_signaling(struct sdhci_host *host, unsigned int uhs)
- 				ESDHC_MIX_CTRL_DDREN,
- 				host->ioaddr + ESDHC_MIX_CTRL);
- 		imx_data->is_ddr = 1;
-+		if (boarddata->delay_line) {
-+			u32 v;
-+			v = boarddata->delay_line <<
-+				ESDHC_DLL_OVERRIDE_VAL_SHIFT |
-+				(1 << ESDHC_DLL_OVERRIDE_EN_SHIFT);
-+			if (is_imx53_esdhc(imx_data))
-+				v <<= 1;
-+			writel(v, host->ioaddr + ESDHC_DLL_CTRL);
-+		}
- 		break;
+@@ -244,7 +244,7 @@ static u32 esdhc_readl_le(struct sdhci_host *host, int reg)
+ 		if (is_imx6q_usdhc(imx_data))
+ 			/* imx6q/dl does not have cap_1 register, fake one */
+ 			val = SDHCI_SUPPORT_DDR50 | SDHCI_SUPPORT_SDR104
+-					| SDHCI_SUPPORT_SDR50;
++				| SDHCI_SUPPORT_SDR50 | SDHCI_USE_SDR50_TUNING;
+ 		else if (is_imx6sl_usdhc(imx_data))
+ 			val = readl(host->ioaddr + SDHCI_CAPABILITIES) & 0xFFFF;
  	}
- 
-@@ -887,6 +902,9 @@ sdhci_esdhc_imx_probe_dt(struct platform_device *pdev,
- 	else
- 		boarddata->support_vsel = true;
- 
-+	if (of_property_read_u32(np, "fsl,delay-line", &boarddata->delay_line))
-+		boarddata->delay_line = 0;
-+
- 	return 0;
- }
- #else
-diff --git a/include/linux/platform_data/mmc-esdhc-imx.h b/include/linux/platform_data/mmc-esdhc-imx.h
-index a0f5a8f..75f70f6 100644
---- a/include/linux/platform_data/mmc-esdhc-imx.h
-+++ b/include/linux/platform_data/mmc-esdhc-imx.h
-@@ -45,5 +45,6 @@ struct esdhc_platform_data {
- 	int max_bus_width;
- 	unsigned int f_max;
- 	bool support_vsel;
-+	unsigned int delay_line;
- };
- #endif /* __ASM_ARCH_IMX_ESDHC_H */
 -- 
 1.7.2.rc3
