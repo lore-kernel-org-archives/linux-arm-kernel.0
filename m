@@ -1,56 +1,56 @@
-From: simon.guinot@sequanux.org (Simon Guinot)
-Date: Wed, 9 Oct 2013 09:36:33 +0200
-Subject: [PATCH v2] clk: armada-370: fix tclk frequencies
-In-Reply-To: <20131003122307.GV31178@titan.lakedaemon.net>
-References: <1380794702-6191-1-git-send-email-simon.guinot@sequanux.org>
- <20131003122307.GV31178@titan.lakedaemon.net>
-Message-ID: <20131009073633.GH1356@kw.sim.vm.gnt>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Wed, 9 Oct 2013 13:07:08 +0530
+Subject: [PATCH 3/3] ARM: OMAP2+: Let DT say what devices should not to
+ idled or reset
+In-Reply-To: <alpine.DEB.2.02.1310090720230.30199@utopia.booyaka.com>
+References: <1376983966-16490-1-git-send-email-rnayak@ti.com>
+ <1376983966-16490-4-git-send-email-rnayak@ti.com>
+ <alpine.DEB.2.02.1310090720230.30199@utopia.booyaka.com>
+Message-ID: <525507A4.9010308@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 03, 2013 at 08:23:07AM -0400, Jason Cooper wrote:
-> Simon,
+On Wednesday 09 October 2013 12:54 PM, Paul Walmsley wrote:
+> Hi Beno?t, Rajendra,
 > 
-> On Thu, Oct 03, 2013 at 12:05:02PM +0200, Simon Guinot wrote:
-> > This patch fixes the tclk frequency array for the Armada-370 SoC.
-> > This bug has been introduced by commit 6b72333d
-> > ("clk: mvebu: add Armada 370 SoC-centric clock init").
-> > 
-> > A wrong tclk frequency affects the following drivers: mvsdio, mvneta,
-> > i2c-mv64xxx and mvebu-devbus. This list may be incomplete.
-> > 
-> > About the mvneta Ethernet driver, note that the tclk frequency is used
-> > to compute the Rx time coalescence. Then, this bug harms the coalescence
-> > configuration and also degrades the networking performances with the
-> > default values.
-> > 
-> > Signed-off-by: Simon Guinot <simon.guinot@sequanux.org>
-> > Cc: Andrew Lunn <andrew@lunn.ch>
-> > Cc: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> > Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> > Cc: Jason Cooper <jason@lakedaemon.net>
-> > Cc: stable at vger.kernel.org
-> > ---
-> >  drivers/clk/mvebu/armada-370.c |    4 ++--
-> >  1 file changed, 2 insertions(+), 2 deletions(-)
+> On Tue, 20 Aug 2013, Rajendra Nayak wrote:
 > 
-> Much better, thanks!
+>> Now that we have DT bindings to specify which devices on the SoC should not
+>> be reset or idled, get rid of the same information existing as part of the
+>> hwmod data files and pass this info from DT instead.
+>>
+>> For GPMC, the HWMOD_INIT_NO_RESET flag seems to be added in hwmod not due to
+>> any errata around the GPMC IP, but rather because any timings
+>> set by the bootloader are not being correctly programmed by the kernel.
+>> This seems like something that needs to be fixed as part of GPMC driver
+>> in the kernel, and hence the flag is left as is in hwmod, which can be
+>> removed once the driver does what its expected to.
+>>
+>> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+>> ---
+>>  arch/arm/boot/dts/am33xx.dtsi              |    2 ++
+>>  arch/arm/boot/dts/omap4.dtsi               |    3 +++
+>>  arch/arm/boot/dts/omap5.dtsi               |    2 ++
+>>  arch/arm/mach-omap2/omap_hwmod_33xx_data.c |    4 ++--
+>>  arch/arm/mach-omap2/omap_hwmod_44xx_data.c |    4 +---
+>>  arch/arm/mach-omap2/omap_hwmod_54xx_data.c |    2 --
+>>  6 files changed, 10 insertions(+), 7 deletions(-)
 > 
-> Acked-by: Jason Cooper <jason@lakedaemon.net>
+> Looking at this one, maybe the best thing for this patch is for Rajendra 
+> to split it into two patches.  Beno?t can merge the DTS patch first, then 
+> I can merge the hwmod side as a cleanup once the first one goes in.  That 
+> will avoid conflicts from other DTS and hwmod changes going into the tree.
 > 
-> This can be applied to v3.11 onwards.
+> Rajendra, when you do the split, please add in the DT documentation part 
+> from patch 2.  Am going to strip that out from the second patch and just 
+> merge the hwmod changes.
+> 
+> Sound good?
 
-Hi Mike,
+Sure Paul, I'll repost the complete series with proper splits such that its
+easier for you and Benoit to pick them up independently.
 
-Please consider applying this patch.
-
-Thanks,
-
-Simon
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131009/9299dbec/attachment.sig>
+> 
+> 
+> - Paul
+> 
