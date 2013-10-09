@@ -1,44 +1,59 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 9 Oct 2013 15:12:20 +0200
-Subject: [PATCH 4/6] ARM: at91/dt: define sama5d3xek's main clk frequency
-In-Reply-To: <1375954563-11343-1-git-send-email-b.brezillon@overkiz.com>
-References: <1375951572-10829-1-git-send-email-b.brezillon@overkiz.com>
- <1375954563-11343-1-git-send-email-b.brezillon@overkiz.com>
-Message-ID: <52555634.7020500@atmel.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Wed, 9 Oct 2013 08:12:33 -0500
+Subject: [PATCH 2/2] ARM: dts: dra7-evm: Add mmc2 node for eMMC support
+In-Reply-To: <1381163104-6318-2-git-send-email-balajitk@ti.com>
+References: <1381163104-6318-1-git-send-email-balajitk@ti.com>
+ <1381163104-6318-2-git-send-email-balajitk@ti.com>
+Message-ID: <52555641.1060907@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/08/2013 11:36, Boris BREZILLON :
-> Define the main clock frequency for the new main clock node
-> in sama5d3xcm.dtsi.
->
-> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
-
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-
+On 10/07/2013 11:25 AM, Balaji T K wrote:
+> Add mmc2 dt node to dra7-evm board
+> and model eMMC vcc as fixed regulator.
+> 
+> Signed-off-by: Balaji T K <balajitk@ti.com>
 > ---
->   arch/arm/boot/dts/sama5d3xcm.dtsi |    6 ++++++
->   1 file changed, 6 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/sama5d3xcm.dtsi b/arch/arm/boot/dts/sama5d3xcm.dtsi
-> index 6a1871b..f19d5bf 100644
-> --- a/arch/arm/boot/dts/sama5d3xcm.dtsi
-> +++ b/arch/arm/boot/dts/sama5d3xcm.dtsi
-> @@ -38,6 +38,12 @@
->   			macb0: ethernet at f0028000 {
->   				phy-mode = "rgmii";
->   			};
+> Rebase to for_3.13/dts
+> and removed ti,non-removable
+> 
+>  arch/arm/boot/dts/dra7-evm.dts |   13 +++++++++++++
+>  1 files changed, 13 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/dra7-evm.dts b/arch/arm/boot/dts/dra7-evm.dts
+> index 65cd15a..3abf5f4 100644
+> --- a/arch/arm/boot/dts/dra7-evm.dts
+> +++ b/arch/arm/boot/dts/dra7-evm.dts
+> @@ -17,6 +17,13 @@
+>  		device_type = "memory";
+>  		reg = <0x80000000 0x60000000>; /* 1536 MB */
+>  	};
 > +
-> +			pmc: pmc at fffffc00 {
-> +				main: mainck {
-> +					clock-frequency = <12000000>;
-> +				};
-> +			};
->   		};
->
->   		nand0: nand at 60000000 {
->
-
+> +	mmc2_3v3: fixedregulator-mmc2 {
+> +		compatible = "regulator-fixed";
+> +		regulator-name = "mmc2_3v3";
+> +		regulator-min-microvolt = <3300000>;
+> +		regulator-max-microvolt = <3300000>;
+> +	};
+>  };
+>  
+>  &dra7_pmx_core {
+> @@ -256,3 +263,9 @@
+>  	vmmc-supply = <&ldo1_reg>;
+>  	bus-width = <4>;
+>  };
+> +
+> +&mmc2 {
+> +	status = "okay";
+> +	vmmc-supply = <&mmc2_3v3>;
+> +	bus-width = <8>;
+> +};
+> 
+boot tested on DRA7-EVM
+voltage rail is correct based on schematics(rev d1) too.
+Reviewed-by: Nishanth Menon <nm@ti.com>
+Tested-by: Nishanth Menon <nm@ti.com>
 
 -- 
-Nicolas Ferre
+Regards,
+Nishanth Menon
