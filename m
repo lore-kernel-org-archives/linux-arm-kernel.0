@@ -1,78 +1,38 @@
-From: gleb@redhat.com (Gleb Natapov)
-Date: Wed, 9 Oct 2013 16:26:11 +0300
-Subject: [PATCH 1/2] ARM: KVM: Yield CPU when vcpu executes a WFE
-In-Reply-To: <169A6E7C-B188-4A4C-B5B7-D2DC94ED70EB@suse.de>
-References: <1381160430-11790-1-git-send-email-marc.zyngier@arm.com>
- <1381160430-11790-2-git-send-email-marc.zyngier@arm.com>
- <52F72A87-9CC3-4B38-ACDA-F5EA66FA7375@suse.de>
- <5252DE5E.6060700@arm.com>
- <1BCAA4EA-CD0A-4E2A-9D22-5B9BD98F2ECD@suse.de>
- <20131007165352.GC9127@redhat.com>
- <169A6E7C-B188-4A4C-B5B7-D2DC94ED70EB@suse.de>
-Message-ID: <20131009132611.GL3574@redhat.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Wed, 9 Oct 2013 16:33:43 +0300
+Subject: [PATCH 3/3] ARM: OMAP3: fix dpll4_m3_ck and dpll4_m4_ck dividers
+In-Reply-To: <525558AA.9050906@ti.com>
+References: <1381324359-28825-1-git-send-email-tomi.valkeinen@ti.com>
+ <1381324359-28825-3-git-send-email-tomi.valkeinen@ti.com>
+ <525558AA.9050906@ti.com>
+Message-ID: <52555B37.80407@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 09, 2013 at 03:09:54PM +0200, Alexander Graf wrote:
+On 09/10/13 16:22, Tero Kristo wrote:
+> On 10/09/2013 04:12 PM, Tomi Valkeinen wrote:
+>> dpll4_m3_ck and dpll4_m4_ck have divider bit fields which are 6 bits
+>> wide. However, only values from 1 to 32 are allowed. This means we have
+>> to add a divider tables and list the dividers explicitly.
+>>
+>> I believe the same issue is there for other dpll4_mx_ck clocks, but as
+>> I'm not familiar with them, I didn't touch them.
 > 
-> On 07.10.2013, at 18:53, Gleb Natapov <gleb@redhat.com> wrote:
-> 
-> > On Mon, Oct 07, 2013 at 06:30:04PM +0200, Alexander Graf wrote:
-> >> 
-> >> On 07.10.2013, at 18:16, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> >> 
-> >>> On 07/10/13 17:04, Alexander Graf wrote:
-> >>>> 
-> >>>> On 07.10.2013, at 17:40, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> >>>> 
-> >>>>> On an (even slightly) oversubscribed system, spinlocks are quickly 
-> >>>>> becoming a bottleneck, as some vcpus are spinning, waiting for a 
-> >>>>> lock to be released, while the vcpu holding the lock may not be 
-> >>>>> running at all.
-> >>>>> 
-> >>>>> This creates contention, and the observed slowdown is 40x for 
-> >>>>> hackbench. No, this isn't a typo.
-> >>>>> 
-> >>>>> The solution is to trap blocking WFEs and tell KVM that we're now
-> >>>>> spinning. This ensures that other vpus will get a scheduling boost,
-> >>>>> allowing the lock to be released more quickly.
-> >>>>> 
-> >>>>>> From a performance point of view: hackbench 1 process 1000
-> >>>>> 
-> >>>>> 2xA15 host (baseline):	1.843s
-> >>>>> 
-> >>>>> 2xA15 guest w/o patch:	2.083s 4xA15 guest w/o patch:	80.212s
-> >>>>> 
-> >>>>> 2xA15 guest w/ patch:	2.072s 4xA15 guest w/ patch:	3.202s
-> >>>> 
-> >>>> I'm confused. You got from 2.083s when not exiting on spin locks to
-> >>>> 2.072 when exiting on _every_ spin lock that didn't immediately
-> >>>> succeed. I would've expected to second number to be worse rather than
-> >>>> better. I assume it's within jitter, I'm still puzzled why you don't
-> >>>> see any significant drop in performance.
-> >>> 
-> >>> The key is in the ARM ARM:
-> >>> 
-> >>> B1.14.9: "When HCR.TWE is set to 1, and the processor is in a Non-secure
-> >>> mode other than Hyp mode, execution of a WFE instruction generates a Hyp
-> >>> Trap exception if, ignoring the value of the HCR.TWE bit, conditions
-> >>> permit the processor to suspend execution."
-> >>> 
-> >>> So, on a non-overcommitted system, you rarely hit a blocking spinlock,
-> >>> hence not trapping. Otherwise, performance would go down the drain very
-> >>> quickly.
-> >> 
-> >> Well, it's the same as pause/loop exiting on x86, but there we have special hardware features to only ever exit after n number of turnarounds. I wonder why we have those when we could just as easily exit on every blocking path.
-> >> 
-> > It will hurt performance if vcpu that holds the lock is running.
-> 
-> Apparently not so on ARM. At least that's what Marc's numbers are showing. I'm not sure what exactly that means. Basically his logic is "if we spin, the holder must have been preempted". And it seems to work out surprisingly well.
-> 
-> 
-For not contended locks it make sense. We need to recheck if x86
-assumption is still true there, but x86 lock is ticketing which
-has not only lock holder preemption, but also lock waiter
-preemption problem which make overcommit problem even worse.
+> I think you can limit the max value with a mask only, no need to define
+> new tables.
 
---
-			Gleb.
+The bit field is 6 bits wide, so the mask is correct. It's just that the
+biggest allowed value is 32, which takes 6 bits, not 63.
+
+Changing the mask to 5 bits would limit the divider to 31, wouldn't it?
+
+ Tomi
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 901 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131009/f34d44f6/attachment-0001.sig>
