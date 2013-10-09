@@ -1,60 +1,90 @@
-From: steve.capper@linaro.org (Steve Capper)
-Date: Wed,  9 Oct 2013 15:15:22 +0100
-Subject: [RFC RESEND 0/2] ARM: mm: HugeTLB + THP support for non-LPAE
-Message-ID: <1381328124-8165-1-git-send-email-steve.capper@linaro.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 09 Oct 2013 15:18:15 +0100
+Subject: [PATCH 1/2] ARM: KVM: Yield CPU when vcpu executes a WFE
+In-Reply-To: <20131009132611.GL3574@redhat.com>
+References: <1381160430-11790-1-git-send-email-marc.zyngier@arm.com>
+ <1381160430-11790-2-git-send-email-marc.zyngier@arm.com>
+ <52F72A87-9CC3-4B38-ACDA-F5EA66FA7375@suse.de> <5252DE5E.6060700@arm.com>
+ <1BCAA4EA-CD0A-4E2A-9D22-5B9BD98F2ECD@suse.de>
+ <20131007165352.GC9127@redhat.com>
+ <169A6E7C-B188-4A4C-B5B7-D2DC94ED70EB@suse.de>
+ <20131009132611.GL3574@redhat.com>
+Message-ID: <525565A7.1080602@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On 09/10/13 14:26, Gleb Natapov wrote:
+> On Wed, Oct 09, 2013 at 03:09:54PM +0200, Alexander Graf wrote:
+>>
+>> On 07.10.2013, at 18:53, Gleb Natapov <gleb@redhat.com> wrote:
+>>
+>>> On Mon, Oct 07, 2013 at 06:30:04PM +0200, Alexander Graf wrote:
+>>>>
+>>>> On 07.10.2013, at 18:16, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>>>>
+>>>>> On 07/10/13 17:04, Alexander Graf wrote:
+>>>>>>
+>>>>>> On 07.10.2013, at 17:40, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>>>>>>
+>>>>>>> On an (even slightly) oversubscribed system, spinlocks are quickly 
+>>>>>>> becoming a bottleneck, as some vcpus are spinning, waiting for a 
+>>>>>>> lock to be released, while the vcpu holding the lock may not be 
+>>>>>>> running at all.
+>>>>>>>
+>>>>>>> This creates contention, and the observed slowdown is 40x for 
+>>>>>>> hackbench. No, this isn't a typo.
+>>>>>>>
+>>>>>>> The solution is to trap blocking WFEs and tell KVM that we're now
+>>>>>>> spinning. This ensures that other vpus will get a scheduling boost,
+>>>>>>> allowing the lock to be released more quickly.
+>>>>>>>
+>>>>>>>> From a performance point of view: hackbench 1 process 1000
+>>>>>>>
+>>>>>>> 2xA15 host (baseline):	1.843s
+>>>>>>>
+>>>>>>> 2xA15 guest w/o patch:	2.083s 4xA15 guest w/o patch:	80.212s
+>>>>>>>
+>>>>>>> 2xA15 guest w/ patch:	2.072s 4xA15 guest w/ patch:	3.202s
+>>>>>>
+>>>>>> I'm confused. You got from 2.083s when not exiting on spin locks to
+>>>>>> 2.072 when exiting on _every_ spin lock that didn't immediately
+>>>>>> succeed. I would've expected to second number to be worse rather than
+>>>>>> better. I assume it's within jitter, I'm still puzzled why you don't
+>>>>>> see any significant drop in performance.
+>>>>>
+>>>>> The key is in the ARM ARM:
+>>>>>
+>>>>> B1.14.9: "When HCR.TWE is set to 1, and the processor is in a Non-secure
+>>>>> mode other than Hyp mode, execution of a WFE instruction generates a Hyp
+>>>>> Trap exception if, ignoring the value of the HCR.TWE bit, conditions
+>>>>> permit the processor to suspend execution."
+>>>>>
+>>>>> So, on a non-overcommitted system, you rarely hit a blocking spinlock,
+>>>>> hence not trapping. Otherwise, performance would go down the drain very
+>>>>> quickly.
+>>>>
+>>>> Well, it's the same as pause/loop exiting on x86, but there we have special hardware features to only ever exit after n number of turnarounds. I wonder why we have those when we could just as easily exit on every blocking path.
+>>>>
+>>> It will hurt performance if vcpu that holds the lock is running.
+>>
+>> Apparently not so on ARM. At least that's what Marc's numbers are showing. I'm not sure what exactly that means. Basically his logic is "if we spin, the holder must have been preempted". And it seems to work out surprisingly well.
 
-I'm resending this series again, to try and provoke some discussion on
-them.
+Yes. I basically assume that contention should be rare, and that ending
+up in a *blocking* WFE is a sign that we're in thrashing mode already
+(no event is pending).
 
-Cheers,
---
-Steve
+>>
+> For not contended locks it make sense. We need to recheck if x86
+> assumption is still true there, but x86 lock is ticketing which
+> has not only lock holder preemption, but also lock waiter
+> preemption problem which make overcommit problem even worse.
 
----  
+Locks are ticketing on ARM as well. But there is one key difference here
+with x86 (or at least what I understand of it, which is very close to
+none): We only trap if we would have blocked anyway. In our case, it is
+almost always better to give up the CPU to someone else rather than
+waiting for some event to take the CPU out of sleep.
 
-The following patches bring both HugeTLB support and Transparent
-HugePage (THP) support to ARM for 2 levels of paging (i.e. without
-LPAE).
-
-This code has been tested on an Arndale board (Exynos 5250), and
-is based on 3.11-rc1, with the hugepage simplification patch:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2013-July/184117.html
-
-HugeTLB and THP support for LPAE has already been merged in 3.11-rc1.
-
-Hugepages can give nice performance boosts to workloads that put
-pressure on the TLBs. I've observed uplifts of ~5% to some tasks
-just by enabling hugepages via the libhugetlbfs tools. Other
-people have observed decent performance boosts when huge pages
-are enabled:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2013-February/148835.html
-
-I would appreciate any discussion on these patches, as there are
-people who have an interest in having huge page support in
-non-LPAE kernels.
-
-Steve Capper (2):
-  ARM: mm: HugeTLB support for non-LPAE systems.
-  ARM: mm: Transparent huge page support for non-LPAE systems.
-
- arch/arm/Kconfig                      |   4 +-
- arch/arm/include/asm/hugetlb-2level.h | 126 +++++++++++++++++++++++++
- arch/arm/include/asm/hugetlb.h        |   4 +
- arch/arm/include/asm/pgtable-2level.h | 170 ++++++++++++++++++++++++++++++++++
- arch/arm/include/asm/pgtable-3level.h |   6 ++
- arch/arm/include/asm/pgtable.h        |   7 +-
- arch/arm/include/asm/tlb.h            |  10 +-
- arch/arm/kernel/head.S                |  10 +-
- arch/arm/mm/fault.c                   |  13 ---
- arch/arm/mm/fsr-2level.c              |   4 +-
- arch/arm/mm/hugetlbpage.c             |   2 +-
- arch/arm/mm/mmu.c                     |  27 ++++++
- 12 files changed, 360 insertions(+), 23 deletions(-)
- create mode 100644 arch/arm/include/asm/hugetlb-2level.h
-
+	M.
 -- 
-1.8.1.4
+Jazz is not dead. It just smells funny...
