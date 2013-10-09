@@ -1,34 +1,25 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 9 Oct 2013 15:42:42 +0800
-Subject: [PATCH] ARM: imx: do not return from imx_cpu_die() call
-Message-ID: <1381304562-22852-1-git-send-email-shawn.guo@linaro.org>
+From: b32955@freescale.com (Huang Shijie)
+Date: Wed, 9 Oct 2013 15:55:08 +0800
+Subject: [PATCH v3 2/2] serial: mxs-auart: wait for FIFO to flush before
+ shutdown
+In-Reply-To: <1380785524-20490-3-git-send-email-hector.palacios@digi.com>
+References: <1380785524-20490-1-git-send-email-hector.palacios@digi.com>
+ <1380785524-20490-3-git-send-email-hector.palacios@digi.com>
+Message-ID: <52550BDC.70204@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When imx_cpu_die() is being called, the cpu should never return from the
-call but just in WFI and wait for hardware to take it down.  So let's
-do cpu_do_idle() repeatly in the call.  Doing this help improve the
-relibility of hotplug operation.
+? 2013?10?03? 15:32, Hector Palacios ??:
+> This lead to many bytes not being transferred (specially at low
+> baudrates), as they were still in the DMA buffer when the AUART was
+> shutdown.
+I meet a similar bug with the imx.c which is used for the I.MX.
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
----
- arch/arm/mach-imx/hotplug.c |    4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+I did not implement the uart_ops->flush_buffer() hook, so the DMA may fails.
 
-diff --git a/arch/arm/mach-imx/hotplug.c b/arch/arm/mach-imx/hotplug.c
-index 3daf1ed..b35e99c 100644
---- a/arch/arm/mach-imx/hotplug.c
-+++ b/arch/arm/mach-imx/hotplug.c
-@@ -52,7 +52,9 @@ void imx_cpu_die(unsigned int cpu)
- 	 * the register being cleared to kill the cpu.
- 	 */
- 	imx_set_cpu_arg(cpu, ~0);
--	cpu_do_idle();
-+
-+	while (1)
-+		cpu_do_idle();
- }
- 
- int imx_cpu_kill(unsigned int cpu)
--- 
-1.7.9.5
+So could we add a new flush_buffer hook for mxs-auart?
+
+Please see the Documentation/serail/driver.
+
+thanks
+Huang Shijie
