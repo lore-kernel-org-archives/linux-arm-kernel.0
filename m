@@ -1,105 +1,77 @@
-From: dinguyen@altera.com (Dinh Nguyen)
-Date: Tue, 8 Oct 2013 18:24:59 -0500
-Subject: [PATCH 8/8] ARM: add initial support for Marvell Berlin SoCs
-In-Reply-To: <1381235073-17134-9-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1381235073-17134-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1381235073-17134-9-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1381274699.5184.2.camel@linux-builds1>
+From: gang.chen@asianux.com (Chen Gang)
+Date: Wed, 09 Oct 2013 08:18:41 +0800
+Subject: [PATCH 2/2] ARM: include: asm: use 'int' instead of 'unsigned
+ long' for normal register variables within atomic.h
+In-Reply-To: <20131008174945.GJ21189@mudshark.cambridge.arm.com>
+References: <20131002104158.GD28311@mudshark.cambridge.arm.com>
+ <524C3981.20307@asianux.com> <524D416B.5090709@asianux.com>
+ <20131003163200.GE7408@mudshark.cambridge.arm.com>
+ <524E8FBC.2080200@asianux.com>
+ <20131004153742.GR24303@mudshark.cambridge.arm.com>
+ <20131004154208.GS24303@mudshark.cambridge.arm.com>
+ <524F5566.4010204@asianux.com>
+ <20131008103331.GE17148@mudshark.cambridge.arm.com>
+ <5253EC8A.2030305@asianux.com>
+ <20131008174945.GJ21189@mudshark.cambridge.arm.com>
+Message-ID: <5254A0E1.9090703@asianux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sebastian,
-
-On Tue, 2013-10-08 at 14:24 +0200, Sebastian Hesselbarth wrote:
-> This adds initial support for the Marvell Berlin (88DE3xxx) SoC family
-> and basic machine setup for Armada 1500 (88DE3100) SoCs.
+On 10/09/2013 01:49 AM, Will Deacon wrote:
+> On Tue, Oct 08, 2013 at 12:29:14PM +0100, Chen Gang wrote:
+>> Hmm... for atomic_set_mask(), "drivers/gpu/drm/i915/i915_irq.c" also
+>> uses it (it is about Intel Graphics).
 > 
-> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> Reviewed-by: Jason Cooper <jason@lakedaemon.net>
-> Reviewed-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> Reviewed-by: Arnd Bergmann <arnd@arndb.de>
-> ---
-> Changelog:
-> RFCv2->v1:
-> - remove custom .init_time, adds dependency for arch-wide of_clk_init call
-> RFCv1->RFCv2:
-> - nuke .map_io (Reported by Arnd Bergmann)
-> - add copyright reference
-> - switch to mach-berlin instead of mach-mvebu
+> I don't think we care too much about the Intel graphics driver on ARM at the
+> moment.
 > 
-> Cc: Jason Cooper <jason@lakedaemon.net>
-> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-kernel at vger.kernel.org
-> ---
->  arch/arm/Kconfig              |    2 ++
->  arch/arm/Makefile             |    1 +
->  arch/arm/mach-berlin/Kconfig  |   24 ++++++++++++++++++++++++
->  arch/arm/mach-berlin/Makefile |    1 +
->  arch/arm/mach-berlin/berlin.c |   39 +++++++++++++++++++++++++++++++++++++++
->  5 files changed, 67 insertions(+)
->  create mode 100644 arch/arm/mach-berlin/Kconfig
->  create mode 100644 arch/arm/mach-berlin/Makefile
->  create mode 100644 arch/arm/mach-berlin/berlin.c
+>> For some architectures (e.g. frv, mn10300, mr32r, blackfin, and of cause
+>> s390), still use atomic_[set/clear]_mask().
 > 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 1ad6fb6..5692426 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -932,6 +932,8 @@ source "arch/arm/mach-bcm/Kconfig"
->  
->  source "arch/arm/mach-bcm2835/Kconfig"
->  
-> +source "arch/arm/mach-berlin/Kconfig"
-> +
->  source "arch/arm/mach-clps711x/Kconfig"
->  
->  source "arch/arm/mach-cns3xxx/Kconfig"
-> diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-> index a37a50f..3ba332b 100644
-> --- a/arch/arm/Makefile
-> +++ b/arch/arm/Makefile
-> @@ -147,6 +147,7 @@ textofs-$(CONFIG_ARCH_MSM8960) := 0x00208000
->  machine-$(CONFIG_ARCH_AT91)		+= at91
->  machine-$(CONFIG_ARCH_BCM)		+= bcm
->  machine-$(CONFIG_ARCH_BCM2835)		+= bcm2835
-> +machine-$(CONFIG_ARCH_BERLIN)		+= berlin
->  machine-$(CONFIG_ARCH_CLPS711X)		+= clps711x
->  machine-$(CONFIG_ARCH_CNS3XXX)		+= cns3xxx
->  machine-$(CONFIG_ARCH_DAVINCI)		+= davinci
-> diff --git a/arch/arm/mach-berlin/Kconfig b/arch/arm/mach-berlin/Kconfig
-> new file mode 100644
-> index 0000000..56a671e
-> --- /dev/null
-> +++ b/arch/arm/mach-berlin/Kconfig
-> @@ -0,0 +1,24 @@
-> +config ARCH_BERLIN
-> +	bool "Marvell Berlin (88DE3xxx) SoCs" if ARCH_MULTI_V7
-> +	select GENERIC_CLOCKEVENTS
-> +	select GENERIC_IRQ_CHIP
-> +	select COMMON_CLK
-> +	select DW_APB_ICTL
-> +	select DW_APB_TIMER_OF
-> +
-> +if ARCH_BERLIN
-> +
-> +menu "Marvell Berlin (88DE3xxx) SoC variants"
-> +
-> +config MACH_MV88DE3100
-> +	bool "Marvell 88DE3100 (Armada 1500)"
-> +	select ARM_GIC
-> +	select CACHE_L2X0
-> +	select CPU_PJ4B
-> +	select HAVE_ARM_TWD if LOCAL_TIMERS
-> +	select HAVE_SMP
-> +	select LOCAL_TIMERS if SMP
+> We don't care about those either.
+> 
+>> And they are inline functions in atomic.h, individual kernel modules may
+>> use them (which source code is not merged into kernel). Can we skip
+>> these individual modules? (I guess we can, but need think of carefully).
+> 
+> or those. If somebody starts complaining, then we can add things back.
+> 
 
-I think because of commit: 
+OK, thanks. For s390, it need use 'unsigned int' instead of 'unsigned
+long' (which already acked by related maintainers).
 
-a894fcc2d [ARM: smp_twd: Divorce smp_twd from local timer API]
+So at least, we can use "unsigned int" instead of "unsigned long" for
+our arm64. :-)
 
-you can remove the LOCAL_TIMERS for HAVE_ARM_TWD.
+I will send related patch for arm64 (also re-send related patch for s390).
 
-Dinh
+Thanks.
+
+>>>> And also, excuse me, I am not quite familiar with "exclusive monitor",
+>>>> could you please provide more details about it?
+>>>
+>>> You'll need to take a look at the ARM ARM, in particular the section about
+>>> `Synchronisation and Semaphores'.
+>>>
+>>
+>> Do you mean "ARM ARM" is a book name? (at least, I really need read more
+>> things to familiar with ARM)
+> 
+> Yes, the hilariouly titled "ARM Architecture Reference Manual". You can find
+> it on arm.com, but you have to register:
+> 
+> ARMv7: https://silver.arm.com/download/download.tm?pv=1299246
+> ARMv8 (beta): https://silver.arm.com/download/download.tm?pv=1448511
+> 
+
+Thank you very much for your information.
+
+> Enjoy!
+> 
+> Will
+> 
+> 
+
+Thanks.
+-- 
+Chen Gang
