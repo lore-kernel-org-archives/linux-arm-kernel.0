@@ -1,48 +1,65 @@
 From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Wed, 9 Oct 2013 21:48:27 +0100
-Subject: [PATCH v8 14/17] ASoC: Samsung: Rename dma_ops by samsung_dma_ops
+Date: Wed, 9 Oct 2013 21:48:30 +0100
+Subject: [PATCH v8 17/17] grant-table: call set_phys_to_machine after mapping
+ grant refs
 In-Reply-To: <alpine.DEB.2.02.1310092109190.26077@kaball.uk.xensource.com>
 References: <alpine.DEB.2.02.1310092109190.26077@kaball.uk.xensource.com>
-Message-ID: <1381351710-1876-14-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <1381351710-1876-17-git-send-email-stefano.stabellini@eu.citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Julien Grall <julien.grall@linaro.org>
+When mapping/unmapping grant refs, call
+set_phys_to_machine to update the P2M with the new mappings for
+autotranslate guests.
 
-The commit "arm: introduce a global dma_ops pointer" introduce compilation issue
-when CONFIG_SND_SOC_SAMSUNG is enabled.
-
-sound/soc/samsung/dma.c:345:27: error: conflicting types for 'dma_ops'
-/local/home/julien/works/arndale/linux/arch/arm/include/asm/dma-mapping.h:16:28:
-note: previous declaration of 'dma_ops' was here
-
-Signed-off-by: Julien Grall <julien.grall@linaro.org>
 Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 ---
- sound/soc/samsung/dma.c |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+ drivers/xen/grant-table.c |   17 +++++++++++++++--
+ 1 files changed, 15 insertions(+), 2 deletions(-)
 
-diff --git a/sound/soc/samsung/dma.c b/sound/soc/samsung/dma.c
-index 21b7926..827c0d8 100644
---- a/sound/soc/samsung/dma.c
-+++ b/sound/soc/samsung/dma.c
-@@ -341,7 +341,7 @@ static int dma_mmap(struct snd_pcm_substream *substream,
- 				     runtime->dma_bytes);
- }
+diff --git a/drivers/xen/grant-table.c b/drivers/xen/grant-table.c
+index 04cdeb8..a36cb03 100644
+--- a/drivers/xen/grant-table.c
++++ b/drivers/xen/grant-table.c
+@@ -49,6 +49,7 @@
+ #include <xen/grant_table.h>
+ #include <xen/interface/memory.h>
+ #include <xen/hvc-console.h>
++#include <xen/swiotlb-xen.h>
+ #include <asm/xen/hypercall.h>
+ #include <asm/xen/interface.h>
  
--static struct snd_pcm_ops dma_ops = {
-+static struct snd_pcm_ops samsung_dma_ops = {
- 	.open		= dma_open,
- 	.close		= dma_close,
- 	.ioctl		= snd_pcm_lib_ioctl,
-@@ -428,7 +428,7 @@ out:
- }
+@@ -889,8 +890,15 @@ int gnttab_map_refs(struct gnttab_map_grant_ref *map_ops,
+ 			gnttab_retry_eagain_gop(GNTTABOP_map_grant_ref, map_ops + i,
+ 						&map_ops[i].status, __func__);
  
- static struct snd_soc_platform_driver samsung_asoc_platform = {
--	.ops		= &dma_ops,
-+	.ops		= &samsung_dma_ops,
- 	.pcm_new	= dma_new,
- 	.pcm_free	= dma_free_dma_buffers,
- };
+-	if (xen_feature(XENFEAT_auto_translated_physmap))
++	if (xen_feature(XENFEAT_auto_translated_physmap)) {
++		for (i = 0; i < count; i++) {
++			if (map_ops[i].status)
++				continue;
++			set_phys_to_machine(map_ops[i].host_addr >> PAGE_SHIFT,
++					map_ops[i].dev_bus_addr >> PAGE_SHIFT);
++		}
+ 		return ret;
++	}
+ 
+ 	if (!in_interrupt() && paravirt_get_lazy_mode() == PARAVIRT_LAZY_NONE) {
+ 		arch_enter_lazy_mmu_mode();
+@@ -933,8 +941,13 @@ int gnttab_unmap_refs(struct gnttab_unmap_grant_ref *unmap_ops,
+ 	if (ret)
+ 		return ret;
+ 
+-	if (xen_feature(XENFEAT_auto_translated_physmap))
++	if (xen_feature(XENFEAT_auto_translated_physmap)) {
++		for (i = 0; i < count; i++) {
++			set_phys_to_machine(unmap_ops[i].host_addr >> PAGE_SHIFT,
++					INVALID_P2M_ENTRY);
++		}
+ 		return ret;
++	}
+ 
+ 	if (!in_interrupt() && paravirt_get_lazy_mode() == PARAVIRT_LAZY_NONE) {
+ 		arch_enter_lazy_mmu_mode();
 -- 
 1.7.2.5
