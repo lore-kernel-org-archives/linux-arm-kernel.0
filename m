@@ -1,97 +1,36 @@
-From: r.sricharan@ti.com (Sricharan R)
-Date: Wed, 9 Oct 2013 18:50:23 +0530
-Subject: [PATCH V4] ARM: OMAP5/DRA7: realtime_counter: Configure CNTFRQ
- register
-In-Reply-To: <5255575A.1040002@ti.com>
-References: <1379520162-31932-1-git-send-email-r.sricharan@ti.com>
- <524D44B9.30208@ti.com> <20131008214523.GU8313@atomide.com>
- <525481A2.4020900@ti.com> <525556DD.7040200@ti.com> <5255575A.1040002@ti.com>
-Message-ID: <52555817.7070703@ti.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Wed, 9 Oct 2013 09:21:49 -0400
+Subject: [PATCH v3 2/2] ARM: Dove: Add the audio device to the Cubox DT
+In-Reply-To: <20131008205617.079142b6@armhf>
+References: <20131008194232.7d74b9e6@armhf> <525448DE.5030004@gmail.com>
+ <20131008181647.GW5402@titan.lakedaemon.net>
+ <20131008205617.079142b6@armhf>
+Message-ID: <20131009132149.GA5402@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 09 October 2013 06:47 PM, Santosh Shilimkar wrote:
-> On Wednesday 09 October 2013 09:15 AM, Sricharan R wrote:
->> Santosh,
->>
->> On Wednesday 09 October 2013 03:35 AM, Santosh Shilimkar wrote:
->>> On Tuesday 08 October 2013 05:45 PM, Tony Lindgren wrote:
->>>> * Sricharan R <r.sricharan@ti.com> [131003 03:27]:
->>>>> On Wednesday 18 September 2013 09:32 PM, Sricharan R wrote:
->>>>>> --- a/arch/arm/boot/dts/omap5.dtsi
->>>>>> +++ b/arch/arm/boot/dts/omap5.dtsi
->>>>>> @@ -52,7 +52,6 @@
->>>>>>  			     <GIC_PPI 14 (GIC_CPU_MASK_RAW(3) | IRQ_TYPE_LEVEL_LOW)>,
->>>>>>  			     <GIC_PPI 11 (GIC_CPU_MASK_RAW(3) | IRQ_TYPE_LEVEL_LOW)>,
->>>>>>  			     <GIC_PPI 10 (GIC_CPU_MASK_RAW(3) | IRQ_TYPE_LEVEL_LOW)>;
->>>>>> -		clock-frequency = <6144000>;
->>>>>>  	};
->>>>>>  
->>>>>>  	gic: interrupt-controller at 48211000 {
->>>> Can the above be done later on in a separate clean-up patch?
->>>> If so I can drop that part as that removes a dependency to the
->>>> .dts patches queued by Benoit.
->>>>
->>> This can be applied separately. 
->>>
->>>  
->>>>>> --- a/arch/arm/mach-omap2/omap-smp.c
->>>>>> +++ b/arch/arm/mach-omap2/omap-smp.c
->>>>>> @@ -41,6 +41,8 @@
->>>>>>  
->>>>>>  u16 pm44xx_errata;
->>>>>>  
->>>>>> +extern unsigned long arch_timer_freq;
->>>>>> +
->>>>>>  /* SCU base address */
->>>>>>  static void __iomem *scu_base;
->>>>>>  
->>>> No externs in *.c files please, checkpatch.pl and sparse should warn
->>>> about this.
->>>>
->>>>>  Are you planning to pull this patch and the below $subject patch as well? They are
->>>>>  acked and tested.
->>>>>
->>>>>  ARM: DRA7: realtime_counter: Add ratio registers for 20MHZ sys-clk frequency
->>>>>
->>>>>   http://www.spinics.net/lists/linux-omap/msg97281.html
->>>> The 20MHz patch I've applied, just noticed the above things
->>>> when was about to apply this.
->>>>
->>> Now re-looking at the patch, I think this extern stuff can be and
->>> should be avoided. It needs order change though like below. Not
->>> tested but should work.
->>>
->>> diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
->>> index fa74a06..c8d8308 100644
->>> --- a/arch/arm/mach-omap2/timer.c
->>> +++ b/arch/arm/mach-omap2/timer.c
->>> @@ -631,10 +631,9 @@ void __init omap4_local_timer_init(void)
->>>  #ifdef CONFIG_SOC_OMAP5
->>>  void __init omap5_realtime_timer_init(void)
->>>  {
->>> -	omap4_sync32k_timer_init();
->>>  	realtime_counter_init();
->>> -
->>>  	clocksource_of_init();
->>> +	omap4_sync32k_timer_init();
->>>  }
->>>  #endif /* CONFIG_SOC_OMAP5 */
->>>  
->>> Then, the CNTFREQ programming needs to be moved to
->>> realtime_counter_init(). It should be actually part of that
->>> first place instead of timer_init().
->>>
->>> On secondary CPU then a simple asm accessor can
->>> read the CNTFREQ and pass that to SMC.
->> Sorry,  I did not quite get you here. You mean an asm accessor to
->>  the read the variable that is set in timer.c ?
->>
-> Reading CNTFREQ CP15 directly....
->
-  Sorry, Still not clear. CNTFREQ is per-cpu register. So when
- the secondary cpu init happens on CPU1, then you mean we will have
- to read it from CPU0 register and pass it for secondary ?
+On Tue, Oct 08, 2013 at 08:56:17PM +0200, Jean-Francois Moine wrote:
+> This patch activates the audio device of the Cubox.
+> 
+> The audio flow (pin mpp_audio1) is output on both I2S and S/PDIF.
+> 
+> The third si5351 clock (#2, pin mpp13) is used as the external clock.
+> 
+> Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
+> ---
+> Jason,
+> 
+> this patch replaces the previous patch v2 2/2
+> 
+> v3:
+> - move the pins declaration to dove.dtsi (Sebastian Hesselbarth)
+> ---
+>  arch/arm/boot/dts/dove.dtsi      | 10 ++++++++++
+>  arch/arm/boot/dts/dove-cubox.dts |  8 ++++++++
+>  2 files changed, 18 insertions(+)
 
-Regards,
- Sricharan
+Applied to mvebu/dt with Sebastian's Ack
+
+thx,
+
+Jason.
