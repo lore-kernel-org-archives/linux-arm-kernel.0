@@ -1,42 +1,34 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Wed, 09 Oct 2013 13:57:29 -0700
-Subject: [GIT PULL]socfpga: DTS updates for v3.13
-In-Reply-To: <1381198434-9583-1-git-send-email-dinguyen@altera.com>
- (dinguyen@altera.com's message of "Mon, 7 Oct 2013 21:13:54 -0500")
-References: <1381198434-9583-1-git-send-email-dinguyen@altera.com>
-Message-ID: <87y562rwli.fsf@linaro.org>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed,  9 Oct 2013 18:02:03 -0300
+Subject: [PATCH] ARM: imx_v6_v7_defconfig: Enable LEDS_GPIO related options
+Message-ID: <1381352523-3047-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-<dinguyen@altera.com> writes:
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
-> Hi Kevin, Olof, and Arnd:
->
-> Please consider these DTS updates for the Altera SOCFPGA platform for v3.13:
->
-> Five of the six patches do NOT have an Ack from the DTS maintainers. I have
-> sent the patches out for review, but since these patches do not change
-> bindings nor add new ones, I don't think they will get too much attention.
->
-> Please advise if you think I need to wait for Ack(s) from them.
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/configs/imx_v6_v7_defconfig | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-The DT maintainers are primarily there to review new/modified bindings,
-so if there are now new/modified bindings, it's not a hard requirement
-for them to review/ack (though we still prefer it.)
-
-In this case, it's mostly just reorganizing and cleanup of existing dts
-data, so there are no problems with us taking it.
-
-That being said, the patch content looks fine, but as a matter of
-process, since you took accepted/queued these patches from Steffen into
-your tree before passing them on to us, you should have a Signed-off-by:
-on them instead of an Acked-by: since you're formally on the delivery
-path. (c.f. sections 12 & 13 of Documentation/SubmittingPatches for all
-the details.)
-
-Could you please respin a branch with the proper signoffs, and then I'll
-queue it up for v3.13.
-
-Thanks,
-
-Kevin
+diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
+index 137fdb0..7e4b176 100644
+--- a/arch/arm/configs/imx_v6_v7_defconfig
++++ b/arch/arm/configs/imx_v6_v7_defconfig
+@@ -207,6 +207,13 @@ CONFIG_MMC_SDHCI_PLTFM=y
+ CONFIG_MMC_SDHCI_ESDHC_IMX=y
+ CONFIG_NEW_LEDS=y
+ CONFIG_LEDS_CLASS=y
++CONFIG_LEDS_GPIO=y
++CONFIG_LEDS_TRIGGERS=y
++CONFIG_LEDS_TRIGGER_TIMER=y
++CONFIG_LEDS_TRIGGER_ONESHOT=y
++CONFIG_LEDS_TRIGGER_HEARTBEAT=y
++CONFIG_LEDS_TRIGGER_BACKLIGHT=y
++CONFIG_LEDS_TRIGGER_GPIO=y
+ CONFIG_RTC_CLASS=y
+ CONFIG_RTC_INTF_DEV_UIE_EMUL=y
+ CONFIG_RTC_DRV_MC13XXX=y
+-- 
+1.8.1.2
