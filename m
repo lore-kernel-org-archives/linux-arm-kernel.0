@@ -1,20 +1,43 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Thu, 10 Oct 2013 00:23:14 +0530
-Subject: [PATCH 2/2] ARM: dts: dra7-evm: Add mmc2 node for eMMC support
-In-Reply-To: <1381163104-6318-2-git-send-email-balajitk@ti.com>
-References: <1381163104-6318-1-git-send-email-balajitk@ti.com>
- <1381163104-6318-2-git-send-email-balajitk@ti.com>
-Message-ID: <5255A61A.5090800@ti.com>
+From: alex.elder@linaro.org (Alex Elder)
+Date: Wed, 09 Oct 2013 13:47:47 -0500
+Subject: [PATCH RESEND] clk: clean up everything on debugfs error
+Message-ID: <5255A4D3.5030701@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 07 October 2013 09:55 PM, Balaji T K wrote:
-> Add mmc2 dt node to dra7-evm board
-> and model eMMC vcc as fixed regulator.
-> 
-> Signed-off-by: Balaji T K <balajitk@ti.com>
+If CONFIG_COMMON_CLK_DEBUG is defined, clk_debug_create_one() is
+called to populate a debugfs directory with a few entries that are
+common for all clock types.
 
-Acked-by: Sekhar Nori <nsekhar@ti.com>
+If an error happens after creating the first one debugfs_remove() is
+called on the clock's directory.  The problem with this is that no
+cleanup is done on the debugfs files already created in that
+directory, so the directory never actually gets removed.   This
+problem is silently ignored.
 
-Thanks,
-Sekhar
+Fix this by calling debugfs_remove_recursive() instead.  Reset the
+clk->dentry field to null afterward, to ensure it can't be mistaken
+as a valid pointer.
+
+Signed-off-by: Alex Elder <elder@linaro.org>
+---
+ drivers/clk/clk.c |    3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+index 2cf2ea6..77fcd06 100644
+--- a/drivers/clk/clk.c
++++ b/drivers/clk/clk.c
+@@ -272,7 +272,8 @@ static int clk_debug_create_one(struct clk *clk,
+struct dentry *pdentry)
+ 	goto out;
+
+ err_out:
+-	debugfs_remove(clk->dentry);
++	debugfs_remove_recursive(clk->dentry);
++	clk->dentry = NULL;
+ out:
+ 	return ret;
+ }
+-- 
+1.7.9.5
