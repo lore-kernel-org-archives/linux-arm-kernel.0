@@ -1,107 +1,160 @@
-From: emilio@elopez.com.ar (=?ISO-8859-1?Q?Emilio_L=F3pez?=)
-Date: Wed, 09 Oct 2013 08:32:35 -0300
-Subject: [PATCH 4/4] ARM: sun6i: Add the reset controller to the DTSI
-In-Reply-To: <1380983960-11087-5-git-send-email-maxime.ripard@free-electrons.com>
-References: <1380983960-11087-1-git-send-email-maxime.ripard@free-electrons.com>
- <1380983960-11087-5-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <52553ED3.5040802@elopez.com.ar>
+From: b29396@freescale.com (Dong Aisheng)
+Date: Wed, 9 Oct 2013 19:20:07 +0800
+Subject: [PATCH 01/10] ARM: dts: imx6sl: add pinctrl uhs states for usdhc
+In-Reply-To: <1381317616-1229-1-git-send-email-b29396@freescale.com>
+References: <1381317616-1229-1-git-send-email-b29396@freescale.com>
+Message-ID: <1381317616-1229-2-git-send-email-b29396@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
+This is needed for SD3.0 cards working on UHS mode.
 
-El 05/10/13 11:39, Maxime Ripard escribi?:
-> The A31 has a reset controller IP that maintains a few other IPs in
-> reset, among which we can find the UARTs, high speed timers or the I2C.
-> Now that we have support for them, add the reset controllers to the DTSI.
->
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> ---
->   arch/arm/boot/dts/sun6i-a31.dtsi | 24 ++++++++++++++++++++++++
->   1 file changed, 24 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
-> index f244f5f..c99c946 100644
-> --- a/arch/arm/boot/dts/sun6i-a31.dtsi
-> +++ b/arch/arm/boot/dts/sun6i-a31.dtsi
-> @@ -209,6 +209,24 @@
->   			};
->   		};
->
-> +		ahb1_rst: reset at 01c202c0 {
-> +			#reset-cells = <1>;
-> +			compatible = "allwinner,sun6i-a31-ahb1-reset";
-> +			reg = <0x01c202c0 0xc>;
-> +		};
-> +
-> +		apb1_rst: reset at 01c202d0 {
-> +			#reset-cells = <1>;
-> +			compatible = "allwinner,sun6i-a31-apb1-reset";
-> +			reg = <0x01c202d0 0x4>;
-> +		};
-> +
-> +		apb2_rst: reset at 01c202d8 {
-> +			#reset-cells = <1>;
-> +			compatible = "allwinner,sun6i-a31-apb2-reset";
-> +			reg = <0x01c202d8 0x4>;
-> +		};
-> +
->   		timer at 01c20c00 {
->   			compatible = "allwinner,sun4i-timer";
->   			reg = <0x01c20c00 0xa0>;
-> @@ -232,6 +250,7 @@
->   			reg-shift = <2>;
->   			reg-io-width = <4>;
->   			clocks = <&apb2_gates 16>;
-> +			resets = <&apb2_rst 16>;
->   			status = "disabled";
->   		};
->
-> @@ -242,6 +261,7 @@
->   			reg-shift = <2>;
->   			reg-io-width = <4>;
->   			clocks = <&apb2_gates 17>;
-> +			resets = <&apb2_rst 17>;
->   			status = "disabled";
->   		};
->
-> @@ -252,6 +272,7 @@
->   			reg-shift = <2>;
->   			reg-io-width = <4>;
->   			clocks = <&apb2_gates 18>;
-> +			resets = <&apb2_rst 18>;
->   			status = "disabled";
->   		};
->
-> @@ -262,6 +283,7 @@
->   			reg-shift = <2>;
->   			reg-io-width = <4>;
->   			clocks = <&apb2_gates 19>;
-> +			resets = <&apb2_rst 19>;
->   			status = "disabled";
->   		};
->
-> @@ -272,6 +294,7 @@
->   			reg-shift = <2>;
->   			reg-io-width = <4>;
->   			clocks = <&apb2_gates 20>;
-> +			resets = <&apb2_rst 20>;
->   			status = "disabled";
->   		};
->
-> @@ -282,6 +305,7 @@
->   			reg-shift = <2>;
->   			reg-io-width = <4>;
->   			clocks = <&apb2_gates 21>;
-> +			resets = <&apb2rst 21>;
+Signed-off-by: Dong Aisheng <b29396@freescale.com>
+---
+ arch/arm/boot/dts/imx6sl-evk.dts |   12 ++++-
+ arch/arm/boot/dts/imx6sl.dtsi    |   77 ++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 86 insertions(+), 3 deletions(-)
 
-You have a typo here (missing _) which breaks the dt build
-
->   			status = "disabled";
->   		};
->
->
-
-Cheers,
-
-Emilio
+diff --git a/arch/arm/boot/dts/imx6sl-evk.dts b/arch/arm/boot/dts/imx6sl-evk.dts
+index 2886a59..d2f46c6 100644
+--- a/arch/arm/boot/dts/imx6sl-evk.dts
++++ b/arch/arm/boot/dts/imx6sl-evk.dts
+@@ -50,8 +50,10 @@
+ };
+ 
+ &usdhc1 {
+-	pinctrl-names = "default";
++	pinctrl-names = "default", "state_100mhz", "state_200mhz";
+ 	pinctrl-0 = <&pinctrl_usdhc1_1>;
++	pinctrl-1 = <&pinctrl_usdhc1_1_100mhz>;
++	pinctrl-2 = <&pinctrl_usdhc1_1_200mhz>;
+ 	bus-width = <8>;
+ 	cd-gpios = <&gpio4 7 0>;
+ 	wp-gpios = <&gpio4 6 0>;
+@@ -59,16 +61,20 @@
+ };
+ 
+ &usdhc2 {
+-	pinctrl-names = "default";
++	pinctrl-names = "default", "state_100mhz", "state_200mhz";
+ 	pinctrl-0 = <&pinctrl_usdhc2_1>;
++	pinctrl-1 = <&pinctrl_usdhc2_1_100mhz>;
++	pinctrl-2 = <&pinctrl_usdhc2_1_200mhz>;
+ 	cd-gpios = <&gpio5 0 0>;
+ 	wp-gpios = <&gpio4 29 0>;
+ 	status = "okay";
+ };
+ 
+ &usdhc3 {
+-	pinctrl-names = "default";
++	pinctrl-names = "default", "state_100mhz", "state_200mhz";
+ 	pinctrl-0 = <&pinctrl_usdhc3_1>;
++	pinctrl-1 = <&pinctrl_usdhc3_1_100mhz>;
++	pinctrl-2 = <&pinctrl_usdhc3_1_200mhz>;
+ 	cd-gpios = <&gpio3 22 0>;
+ 	status = "okay";
+ };
+diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
+index c46651e..d0ae4c6 100644
+--- a/arch/arm/boot/dts/imx6sl.dtsi
++++ b/arch/arm/boot/dts/imx6sl.dtsi
+@@ -572,6 +572,38 @@
+ 							MX6SL_PAD_SD1_DAT7__SD1_DATA7 0x17059
+ 						>;
+ 					};
++
++					pinctrl_usdhc1_1_100mhz: usdhc1grp-1-100mhz {
++						fsl,pins = <
++							MX6SL_PAD_SD1_CMD__SD1_CMD 0x170b9
++							MX6SL_PAD_SD1_CLK__SD1_CLK 0x100b9
++							MX6SL_PAD_SD1_DAT0__SD1_DATA0 0x170b9
++							MX6SL_PAD_SD1_DAT1__SD1_DATA1 0x170b9
++							MX6SL_PAD_SD1_DAT2__SD1_DATA2 0x170b9
++							MX6SL_PAD_SD1_DAT3__SD1_DATA3 0x170b9
++							MX6SL_PAD_SD1_DAT4__SD1_DATA4 0x170b9
++							MX6SL_PAD_SD1_DAT5__SD1_DATA5 0x170b9
++							MX6SL_PAD_SD1_DAT6__SD1_DATA6 0x170b9
++							MX6SL_PAD_SD1_DAT7__SD1_DATA7 0x170b9
++						>;
++					};
++
++					pinctrl_usdhc1_1_200mhz: usdhc1grp-1-200mhz {
++						fsl,pins = <
++							MX6SL_PAD_SD1_CMD__SD1_CMD 0x170f9
++							MX6SL_PAD_SD1_CLK__SD1_CLK 0x100f9
++							MX6SL_PAD_SD1_DAT0__SD1_DATA0 0x170f9
++							MX6SL_PAD_SD1_DAT1__SD1_DATA1 0x170f9
++							MX6SL_PAD_SD1_DAT2__SD1_DATA2 0x170f9
++							MX6SL_PAD_SD1_DAT3__SD1_DATA3 0x170f9
++							MX6SL_PAD_SD1_DAT4__SD1_DATA4 0x170f9
++							MX6SL_PAD_SD1_DAT5__SD1_DATA5 0x170f9
++							MX6SL_PAD_SD1_DAT6__SD1_DATA6 0x170f9
++							MX6SL_PAD_SD1_DAT7__SD1_DATA7 0x170f9
++						>;
++					};
++
++
+ 				};
+ 
+ 				usdhc2 {
+@@ -585,6 +617,29 @@
+ 							MX6SL_PAD_SD2_DAT3__SD2_DATA3 0x17059
+ 						>;
+ 					};
++
++					pinctrl_usdhc2_1_100mhz: usdhc2grp-1-100mhz {
++						fsl,pins = <
++							MX6SL_PAD_SD2_CMD__SD2_CMD    0x170b9
++							MX6SL_PAD_SD2_CLK__SD2_CLK    0x100b9
++							MX6SL_PAD_SD2_DAT0__SD2_DATA0 0x170b9
++							MX6SL_PAD_SD2_DAT1__SD2_DATA1 0x170b9
++							MX6SL_PAD_SD2_DAT2__SD2_DATA2 0x170b9
++							MX6SL_PAD_SD2_DAT3__SD2_DATA3 0x170b9
++						>;
++					};
++
++					pinctrl_usdhc2_1_200mhz: usdhc2grp-1-200mhz {
++						fsl,pins = <
++							MX6SL_PAD_SD2_CMD__SD2_CMD    0x170f9
++							MX6SL_PAD_SD2_CLK__SD2_CLK    0x100f9
++							MX6SL_PAD_SD2_DAT0__SD2_DATA0 0x170f9
++							MX6SL_PAD_SD2_DAT1__SD2_DATA1 0x170f9
++							MX6SL_PAD_SD2_DAT2__SD2_DATA2 0x170f9
++							MX6SL_PAD_SD2_DAT3__SD2_DATA3 0x170f9
++						>;
++					};
++
+ 				};
+ 
+ 				usdhc3 {
+@@ -598,6 +653,28 @@
+ 							MX6SL_PAD_SD3_DAT3__SD3_DATA3 0x17059
+ 						>;
+ 					};
++
++					pinctrl_usdhc3_1_100mhz: usdhc3grp-1-100mhz {
++						fsl,pins = <
++							MX6SL_PAD_SD3_CMD__SD3_CMD    0x170b9
++							MX6SL_PAD_SD3_CLK__SD3_CLK    0x100b9
++							MX6SL_PAD_SD3_DAT0__SD3_DATA0 0x170b9
++							MX6SL_PAD_SD3_DAT1__SD3_DATA1 0x170b9
++							MX6SL_PAD_SD3_DAT2__SD3_DATA2 0x170b9
++							MX6SL_PAD_SD3_DAT3__SD3_DATA3 0x170b9
++						>;
++					};
++
++					pinctrl_usdhc3_1_200mhz: usdhc3grp-1-200mhz {
++						fsl,pins = <
++							MX6SL_PAD_SD3_CMD__SD3_CMD    0x170f9
++							MX6SL_PAD_SD3_CLK__SD3_CLK    0x100f9
++							MX6SL_PAD_SD3_DAT0__SD3_DATA0 0x170f9
++							MX6SL_PAD_SD3_DAT1__SD3_DATA1 0x170f9
++							MX6SL_PAD_SD3_DAT2__SD3_DATA2 0x170f9
++							MX6SL_PAD_SD3_DAT3__SD3_DATA3 0x170f9
++						>;
++					};
+ 				};
+ 			};
+ 
+-- 
+1.7.2.rc3
