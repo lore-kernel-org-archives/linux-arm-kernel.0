@@ -1,38 +1,45 @@
 From: lauraa@codeaurora.org (Laura Abbott)
-Date: Tue,  8 Oct 2013 18:31:27 -0700
-Subject: [RFC] Stricter kernel memory permissions
-Message-ID: <1381282292-25251-1-git-send-email-lauraa@codeaurora.org>
+Date: Tue,  8 Oct 2013 18:31:28 -0700
+Subject: [RFC PATCH 1/5] arm: mm: add CONFIG_STRICT_MEMORY_RWX
+In-Reply-To: <1381282292-25251-1-git-send-email-lauraa@codeaurora.org>
+References: <1381282292-25251-1-git-send-email-lauraa@codeaurora.org>
+Message-ID: <1381282292-25251-2-git-send-email-lauraa@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is an RFC to add more page table protection to ARM. As has been alluded to
-in the past[1], the ARM kernel unconditionally maps everything as RWX which
-presents a security problem. This is a fairly straight port of what we've been
-using for a while for mitigation and is mostly provided as an example. Some
-notes:
+From: Larry Bassel <lbassel@codeaurora.org>
 
-1) The original design mapped regions with permissions (RX/RO/RW) as appropriate
-and then mapped the rest of the memory RW. I couldn't find a way to do this
-cleanly in all cases so I went for the alternate approach: map all memory as RW,
-clear the mapping and the set up the new mapping. This has some increased trade
-offs described in #2
+If this is set, kernel text will be made RX, kernel data and stack
+RW, rodata R so that writing to kernel text, executing kernel data
+or stack, or writing to read-only data or kernel text will not
+succeed.
 
-2) Rather than lose the TLB bonus for section mappings, the regions to be mapped
-RO/RX are aligned to at least section size. For the new method of
-clearing/remapping, this bumps up the alignment requirement to PMD_SIZE. This
-does result in losing a bit of memory which is unfortunate.
+Signed-off-by: Larry Bassel <lbassel@codeaurora.org>
+Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+---
+ arch/arm/mm/Kconfig |   12 ++++++++++++
+ 1 files changed, 12 insertions(+), 0 deletions(-)
 
-3) This has not been tested on LPAE based systems
-
-4) kprobes is broken with this since the text section is now RO. We had some
-patches to allow temporarily marking the text writeable, but those did not take
-into account section restrictions on SMP systems. I can post the patches if
-there is interest.
-
-Credit for the original work goes to Larry Bassel. I reworked parts of the
-patches and added some new code.
-
-Thanks,
-Laura
-
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2013-July/187822.html
+diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
+index cd2c88e..c223d5c 100644
+--- a/arch/arm/mm/Kconfig
++++ b/arch/arm/mm/Kconfig
+@@ -952,3 +952,15 @@ config ARCH_HAS_BARRIERS
+ 	help
+ 	  This option allows the use of custom mandatory barriers
+ 	  included via the mach/barriers.h file.
++
++config STRICT_MEMORY_RWX
++	bool "restrict kernel memory permissions as much as possible"
++	default n
++	help
++	  If this is set, kernel text will be made RX, kernel data and stack
++	  RW, rodata R (otherwise all of the kernel 1-to-1 mapping is
++	  made RWX).
++	  The tradeoff is that several sections are padded to
++	  1M boundaries (because their permissions are different and
++	  splitting the 1M pages into 4K ones causes TLB performance
++	  problems), wasting memory.
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
