@@ -1,92 +1,40 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Wed, 9 Oct 2013 14:51:13 -0400
-Subject: [PATCH v3 5/6] ARM: mm: Recreate kernel mappings in
- early_paging_init()
-In-Reply-To: <20131009100603.GA5985@mudshark.cambridge.arm.com>
-References: <1380835081-12129-1-git-send-email-santosh.shilimkar@ti.com>
- <1380835081-12129-6-git-send-email-santosh.shilimkar@ti.com>
- <20131004155958.GU24303@mudshark.cambridge.arm.com> <524EE8F4.4060407@ti.com>
- <52530CD1.5010309@ti.com> <20131008102642.GC17148@mudshark.cambridge.arm.com>
- <525444BD.80304@ti.com> <20131009100603.GA5985@mudshark.cambridge.arm.com>
-Message-ID: <5255A5A1.60403@ti.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed,  9 Oct 2013 20:49:24 +0200
+Subject: [RFC v2 PATCH 0/4] ARM[64]: kernel mode NEON in atomic contexts
+Message-ID: <1381344568-14866-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 09 October 2013 06:06 AM, Will Deacon wrote:
-> On Tue, Oct 08, 2013 at 06:45:33PM +0100, Santosh Shilimkar wrote:
->> On Tuesday 08 October 2013 06:26 AM, Will Deacon wrote:
->>> On Mon, Oct 07, 2013 at 08:34:41PM +0100, Santosh Shilimkar wrote:
->>>> +		/*
->>>> +		 * Cache cleaning operations for self-modifying code
->>>> +		 * We should clean the entries by MVA but running a
->>>> +		 * for loop over every pv_table entry pointer would
->>>> +		 * just complicate the code. isb() is added to commit
->>>> +		 * all the prior cp15 operations.
->>>> +		 */
->>>> +		flush_cache_louis();
->>>> +		isb();
->>>
->>> I see, you need the new __pv_tables to be visible for your page table
->>> population below, right? In which case, I'm afraid I have to go back on my
->>> original statement; you *do* need that dsb() prior to the isb() if you want
->>> to ensure that the icache maintenance is complete and synchronised.
->>>
->> Need of dsb and isb is what ARM ARM says but then I got bit biased after
->> your reply. 
-> 
-> Yeah, sorry about that. I didn't originally notice that you needed the I-cache
-> flushing before the __pa stuff below.
->
-No problem
- 
->>>> +	}
->>>> +
->>>> +	/* remap level 1 table */
->>>> +	for (i = 0; i < PTRS_PER_PGD; i++) {
->>>> +		*pud0++ = __pud(__pa(pmd0) | PMD_TYPE_TABLE | L_PGD_SWAPPER);
->>>> +		pmd0 += PTRS_PER_PMD;
->>>> +	}
->>>> +
->>>> +	__cpuc_flush_dcache_area(pud_start, sizeof(pud_start) * PTRS_PER_PGD);
->>>> +	outer_clean_range(virt_to_phys(pud_start), sizeof(pud_start) * PTRS_PER_PGD);
->>>
->>> You don't need to flush these page tables if you're SMP. If you use
->>> clean_dcache_area instead, it will do the right thing. The again, why can't
->>> you use pud_populate and pmd_populate for these two loops? Is there an
->>> interaction with coherency here? (if so, why don't you need to flush the
->>> entire cache hierarchy anyway?)
->>>
->> You mean AMRMv7 SMP PT walkers can read from L1 cache and hence doesn't need 
->> flushing L1. While this could be true, for some reason we don't the same
->> behavior and seeing that without flush we are seeing the issue.
-> 
-> I would really like to know why this isn't working for you. I have a feeling
-> that it's related to your interesting coherency issues on keystone. For
-> example, if the physical address put in the ttbr doesn't match the physical
-> address which is mapped to the kernel page tables, then we could get
-> physical aliasing in the caches.
-> 
-It might be. we will keep debugging that.
+This is another stab at a way to enable the use of NEON in atomic
+context. As suggested by Nico, all there is to it is basically to
+stack the registers you are about to use, and unstack them when you're
+done.
 
->> Initially we were doing entire cache flush but moved to the mva based
->> routines on your suggestion.
-> 
-> If the issue is related to coherency and physical aliasing, I really think
-> you should just flush the entire cache hierarchy. It's difficult to identify
-> exactly what state needs to be carried over between the old and new
-> mappings, but I bet it's more than just page tables.
->
-You are probably right. I will go back to the full flush to avoid any
-corner case till we figure out the issue.
- 
->> Regarding the pud_populate(), since we needed L_PGD_SWAPPER, we couldn't
->> use that version but updated patch uses the set_pud() which takes the flag.
->> And pmd_populate() can't be used either because it creates pte based
->> tables which is not what we want.
-> 
-> Ok. It certainly looks better than it did.
-> 
-Thanks a lot. I will refresh the patch with above update.
+Patches #1 and #2 implement this for ARM and ARM64 respectively, #3 and #4
+are the examples I posted earlier adapted to use this new method.
 
-Regards,
-Santosh
+Ard Biesheuvel (4):
+  ARM: add support for kernel mode NEON in atomic context
+  ARM64: add support for kernel mode NEON in atomic context
+  ARM64: add Crypto Extensions based synchronous core AES cipher
+  ARM64: add Crypto Extensions based synchronous AES in CCM mode
+
+ arch/arm/include/asm/fpstate.h        |  15 +-
+ arch/arm/include/asm/neon.h           |  34 +++
+ arch/arm/vfp/vfphw.S                  |  46 ++++
+ arch/arm/vfp/vfpmodule.c              |   3 +
+ arch/arm64/crypto/Makefile            |  12 +
+ arch/arm64/crypto/aes-sync.c          | 453 ++++++++++++++++++++++++++++++++++
+ arch/arm64/crypto/aesce-ccm.S         | 154 ++++++++++++
+ arch/arm64/include/asm/fpsimd.h       |  16 ++
+ arch/arm64/include/asm/fpsimdmacros.h |  37 +++
+ arch/arm64/include/asm/neon.h         |  31 +++
+ arch/arm64/kernel/entry-fpsimd.S      |  24 ++
+ arch/arm64/kernel/fpsimd.c            |   3 +
+ 12 files changed, 827 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm64/crypto/Makefile
+ create mode 100644 arch/arm64/crypto/aes-sync.c
+ create mode 100644 arch/arm64/crypto/aesce-ccm.S
+
+-- 
+1.8.1.2
