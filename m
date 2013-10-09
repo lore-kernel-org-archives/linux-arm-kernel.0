@@ -1,31 +1,24 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 9 Oct 2013 16:04:03 +0800
-Subject: [PATCH] ARM: imx: reset core along with enable/disable operation
-Message-ID: <1381305843-26478-1-git-send-email-shawn.guo@linaro.org>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Wed, 9 Oct 2013 11:11:23 +0300
+Subject: [PATCH 4/5] clk: tegra124: Add new peripheral clocks
+In-Reply-To: <525487C7.6080103@wwwdotorg.org>
+References: <1380878014-22088-1-git-send-email-pdeschrijver@nvidia.com>
+ <1380878014-22088-5-git-send-email-pdeschrijver@nvidia.com>
+ <525487C7.6080103@wwwdotorg.org>
+Message-ID: <20131009081123.GB3973@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->From hotplug stress test result, resetting core during enable/disable
-operation can improve cpu hotplug stability.  So let's set
-SRC reset bit in imx_enable_cpu() for the core when its enable bit is
-accessed.
+On Wed, Oct 09, 2013 at 12:31:35AM +0200, Stephen Warren wrote:
+> On 10/04/2013 03:12 AM, Peter De Schrijver wrote:
+> > Tegra124 introduces a number of new peripheral clocks. This patch adds those
+> > to the common peripheral clock code.
+> 
+> Don't you need to add AFC[0..5] in this patch and/or patch 5?
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
----
- arch/arm/mach-imx/src.c |    1 +
- 1 file changed, 1 insertion(+)
+AFC[0..5] are reset only nodes afaik. Up to now, we haven't done that.
+The goal is to include them once we move to the reset framework.
 
-diff --git a/arch/arm/mach-imx/src.c b/arch/arm/mach-imx/src.c
-index 10a6b1a..4754373 100644
---- a/arch/arm/mach-imx/src.c
-+++ b/arch/arm/mach-imx/src.c
-@@ -91,6 +91,7 @@ void imx_enable_cpu(int cpu, bool enable)
- 	spin_lock(&scr_lock);
- 	val = readl_relaxed(src_base + SRC_SCR);
- 	val = enable ? val | mask : val & ~mask;
-+	val |= 1 << (BP_SRC_SCR_CORE1_RST + cpu - 1);
- 	writel_relaxed(val, src_base + SRC_SCR);
- 	spin_unlock(&scr_lock);
- }
--- 
-1.7.9.5
+Cheers,
+
+Peter.
