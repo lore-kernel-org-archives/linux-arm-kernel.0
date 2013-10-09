@@ -1,23 +1,88 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Wed, 09 Oct 2013 13:31:01 -0700
-Subject: [GIT PULL] ARM: mvebu: dt changes for v3.13
-In-Reply-To: <20130930162747.GH31178@titan.lakedaemon.net> (Jason Cooper's
- message of "Mon, 30 Sep 2013 12:27:47 -0400")
-References: <20130930162747.GH31178@titan.lakedaemon.net>
-Message-ID: <87mwmitce2.fsf@linaro.org>
+From: tj@kernel.org (Tejun Heo)
+Date: Wed, 9 Oct 2013 16:35:40 -0400
+Subject: [v2] ahci: imx: setup power saving methods
+In-Reply-To: <1381224562-2378-2-git-send-email-Hong-Xing.Zhu@freescale.com>
+References: <1381224562-2378-1-git-send-email-Hong-Xing.Zhu@freescale.com>
+ <1381224562-2378-2-git-send-email-Hong-Xing.Zhu@freescale.com>
+Message-ID: <20131009203540.GE5592@mtj.dyndns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jason Cooper <jason@lakedaemon.net> writes:
+Hello,
 
-> Guys,
->
-> Same as mvebu/drivers, these are the changes that missed the last
-> window.  All have been in -next since v3.12-rc1 without a problem.
->
+On Tue, Oct 08, 2013 at 05:29:22PM +0800, Richard Zhu wrote:
+> @@ -1,6 +1,6 @@
+>  /*
+> + * copyright (c) 2013 Freescale Semiconductor, Inc.
+>   * Freescale IMX AHCI SATA platform driver
+> - * Copyright 2013 Freescale Semiconductor, Inc.
 
-Pulled into next/dt.
+I don't really mind making small changes along with other changes but
+would appreciate if you can at least mention the change in the
+changelog.  As it currently stands, I'm not even sure whether the
+above is an intended change or just something slipped.
 
-Thanks,
+> +module_param_named(hp, ahci_imx_hp, int, 0644);
 
-Kevin
+Can you please spellout "hp" to "hotplug" especially for the name
+visible outside?  It isn't a common abbreviation and it's not like we
+despearately lose the extra three chars there.
+
+> @@ -105,6 +114,39 @@ static int imx6q_sata_init(struct device *dev, void __iomem *mmio)
+>  	reg_val = clk_get_rate(imxpriv->ahb_clk) / 1000;
+>  	writel(reg_val, mmio + HOST_TIMER1MS);
+>  
+> +	if (ahci_imx_hp == 0) {
+> +		/*
+> +		 * hot-plug is not supported.
+> +		 * In order to save power consumption, enter PDDQ mode
+> +		 * when there is no device detected on the port.
+> +		 * NOTE: hot-plug wouldn't supported when PDDQ mode is
+> +		 * ever entered.
+> +		 */
+> +		do {
+> +			sstatus = readl(mmio + 0x100 + PORT_SCR_STAT);
+> +			if ((sstatus & 0xF) == 0)
+> +				usleep_range(1000, 2000);
+> +			else
+> +				break;
+> +
+> +			if (iterations == 0) {
+> +				pr_info("No sata disk.\n");
+> +				reg_val = readl(mmio + PORT_PHY_CTL);
+> +				writel(reg_val | PORT_PHY_CTL_PDDQ_LOC,
+> +						mmio + PORT_PHY_CTL);
+> +				regmap_update_bits(imxpriv->gpr, IOMUXC_GPR13,
+> +						IMX6Q_GPR13_SATA_MPLL_CLK_EN,
+> +						!IMX6Q_GPR13_SATA_MPLL_CLK_EN);
+> +				clk_disable_unprepare(imxpriv->sata_ref_clk);
+> +				imxpriv->no_device = 1;
+> +
+> +				return 0;
+> +			}
+> +		} while (iterations-- > 0);
+
+Hmm... I'm not a big fan of this approach as it essentially is an
+incomplete implementation of SATA device detection.  Wouldn't it be
+better to override error_handler?  ie. implement
+ahci_imx_error_handler() which wraps ahci_error_handler() and do
+something like the following,
+
+	static bool first_time = true;
+
+	ahci_error_handler(ap);
+
+	if (!first_time || ahci_imx_hotplug)
+		return;
+
+	first_time = false;
+
+	ata_for_each_dev(dev, link, ENABLED)
+		return;
+
+	DISABLE LINK;
+
+Thanks.
+
+-- 
+tejun
