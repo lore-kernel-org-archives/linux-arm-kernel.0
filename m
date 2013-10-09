@@ -1,35 +1,132 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed,  9 Oct 2013 13:28:07 -0300
-Subject: [PATCH] ARM: mach-imx: clk-imx51-imx53: Remove return value from
- mx53_clocks_init()
-Message-ID: <1381336087-19821-1-git-send-email-festevam@gmail.com>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Wed, 9 Oct 2013 22:11:14 +0530
+Subject: [PATCH v2 2/5] ARM: dts: omap: Add new bindings for OMAP
+In-Reply-To: <525572A8.9060401@baylibre.com>
+References: <1381313521-10422-1-git-send-email-rnayak@ti.com>
+ <1381313521-10422-3-git-send-email-rnayak@ti.com>
+ <525572A8.9060401@baylibre.com>
+Message-ID: <5255872A.30702@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+On Wednesday 09 October 2013 08:43 PM, Benoit Cousson wrote:
+> Hi Rajendra,
+> 
+> On 09/10/2013 12:11, Rajendra Nayak wrote:
+>> On OMAP we have co-processor IPs, memory controllers,
+>> GPIOs which control regulators and power switches to
+>> PMIC, and SoC internal Bus IPs, some or most of which
+>> should either not be reset or idled or both at init.
+>> (In some cases there are erratas which prevent an IP
+>> from being reset)
+>> Have a way to pass this information from DT.
+> 
+> Did you get some acked-by from the DT maintainers?
+> Every new bindings must be carefully reviewed now.
 
-Since commit 4d9d18a56 (ARM: imx: remove custom .init_time hook), 
-mx53_clocks_init() does not return an integer anymore, so adjust it in order to
-fix the following build warning:
+Nope, I haven't. The patches are on the list for a couple
+of months now.
 
-arch/arm/mach-imx/clk-imx51-imx53.c:579:2: warning: 'return' with a value, in function returning void [enabled by default]
-
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/mach-imx/clk-imx51-imx53.c | 2 --
- 1 file changed, 2 deletions(-)
-
-diff --git a/arch/arm/mach-imx/clk-imx51-imx53.c b/arch/arm/mach-imx/clk-imx51-imx53.c
-index fa4de9a..ce37af2 100644
---- a/arch/arm/mach-imx/clk-imx51-imx53.c
-+++ b/arch/arm/mach-imx/clk-imx51-imx53.c
-@@ -575,7 +575,5 @@ static void __init mx53_clocks_init(struct device_node *np)
- 	WARN_ON(!base);
- 	irq = irq_of_parse_and_map(np, 0);
- 	mxc_timer_init(base, irq);
--
--	return 0;
- }
- CLK_OF_DECLARE(imx53_ccm, "fsl,imx53-ccm", mx53_clocks_init);
--- 
-1.8.1.2
+> 
+> Regards,
+> Benoit
+> 
+>>
+>> Update the am33xx/omap4 and omap5 dtsi files with the
+>> new bindings for modules which either should not be
+>> idled. reset or both. A later patch would cleanup the
+>> same information that exists today as part of the hwmod
+>> data files.
+>>
+>> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+>> ---
+>>   .../devicetree/bindings/arm/omap/omap.txt          |    3 ++-
+>>   arch/arm/boot/dts/am33xx.dtsi                      |    2 ++
+>>   arch/arm/boot/dts/omap4.dtsi                       |    3 +++
+>>   arch/arm/boot/dts/omap5.dtsi                       |    2 ++
+>>   4 files changed, 9 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/Documentation/devicetree/bindings/arm/omap/omap.txt b/Documentation/devicetree/bindings/arm/omap/omap.txt
+>> index 91b7049..808c154 100644
+>> --- a/Documentation/devicetree/bindings/arm/omap/omap.txt
+>> +++ b/Documentation/devicetree/bindings/arm/omap/omap.txt
+>> @@ -21,7 +21,8 @@ Required properties:
+>>   Optional properties:
+>>   - ti,no_idle_on_suspend: When present, it prevents the PM to idle the module
+>>     during suspend.
+>> -
+>> +- ti,no-reset-on-init: When present, the module should not be reset at init
+>> +- ti,no-idle-on-init: When present, the module should not be idled at init
+>>
+>>   Example:
+>>
+>> diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
+>> index f9c5da9..ec33ea0 100644
+>> --- a/arch/arm/boot/dts/am33xx.dtsi
+>> +++ b/arch/arm/boot/dts/am33xx.dtsi
+>> @@ -607,6 +607,7 @@
+>>               reg = <0x44d00000 0x4000    /* M3 UMEM */
+>>                      0x44d80000 0x2000>;    /* M3 DMEM */
+>>               ti,hwmods = "wkup_m3";
+>> +            ti,no-reset-on-init;
+>>           };
+>>
+>>           elm: elm at 48080000 {
+>> @@ -637,6 +638,7 @@
+>>           gpmc: gpmc at 50000000 {
+>>               compatible = "ti,am3352-gpmc";
+>>               ti,hwmods = "gpmc";
+>> +            ti,no-idle-on-init;
+>>               reg = <0x50000000 0x2000>;
+>>               interrupts = <100>;
+>>               gpmc,num-cs = <7>;
+>> diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
+>> index 22d9f2b..e8fe797 100644
+>> --- a/arch/arm/boot/dts/omap4.dtsi
+>> +++ b/arch/arm/boot/dts/omap4.dtsi
+>> @@ -214,6 +214,7 @@
+>>               gpmc,num-cs = <8>;
+>>               gpmc,num-waitpins = <4>;
+>>               ti,hwmods = "gpmc";
+>> +            ti,no-idle-on-init;
+>>           };
+>>
+>>           uart1: serial at 4806a000 {
+>> @@ -492,6 +493,7 @@
+>>               reg = <0x4c000000 0x100>;
+>>               interrupts = <GIC_SPI 110 IRQ_TYPE_LEVEL_HIGH>;
+>>               ti,hwmods = "emif1";
+>> +            ti,no-idle-on-init;
+>>               phy-type = <1>;
+>>               hw-caps-read-idle-ctrl;
+>>               hw-caps-ll-interface;
+>> @@ -503,6 +505,7 @@
+>>               reg = <0x4d000000 0x100>;
+>>               interrupts = <GIC_SPI 111 IRQ_TYPE_LEVEL_HIGH>;
+>>               ti,hwmods = "emif2";
+>> +            ti,no-idle-on-init;
+>>               phy-type = <1>;
+>>               hw-caps-read-idle-ctrl;
+>>               hw-caps-ll-interface;
+>> diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
+>> index 7cdea1b..a9d49df 100644
+>> --- a/arch/arm/boot/dts/omap5.dtsi
+>> +++ b/arch/arm/boot/dts/omap5.dtsi
+>> @@ -607,6 +607,7 @@
+>>           emif1: emif at 0x4c000000 {
+>>               compatible    = "ti,emif-4d5";
+>>               ti,hwmods    = "emif1";
+>> +            ti,no-idle-on-init;
+>>               phy-type    = <2>; /* DDR PHY type: Intelli PHY */
+>>               reg = <0x4c000000 0x400>;
+>>               interrupts = <GIC_SPI 110 IRQ_TYPE_LEVEL_HIGH>;
+>> @@ -618,6 +619,7 @@
+>>           emif2: emif at 0x4d000000 {
+>>               compatible    = "ti,emif-4d5";
+>>               ti,hwmods    = "emif2";
+>> +            ti,no-idle-on-init;
+>>               phy-type    = <2>; /* DDR PHY type: Intelli PHY */
+>>               reg = <0x4d000000 0x400>;
+>>               interrupts = <GIC_SPI 111 IRQ_TYPE_LEVEL_HIGH>;
+>>
+> 
