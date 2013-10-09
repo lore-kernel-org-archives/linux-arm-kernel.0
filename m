@@ -1,109 +1,69 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 9 Oct 2013 15:09:21 +0200
-Subject: [PATCH] pinctrl: phandle entries will be applied sequentially
-In-Reply-To: <20131009124425.GG25034@n2100.arm.linux.org.uk>
-References: <1381297324-19006-1-git-send-email-shawn.guo@linaro.org>
- <CACRpkdazPK6SNg9PdWCrjB8nwho1rCueumJWAN=STXdN1zNnMA@mail.gmail.com>
- <20131009124425.GG25034@n2100.arm.linux.org.uk>
-Message-ID: <CACRpkda3J4cCTnFaQFrmZ=box6EeJ8WQZpuQpi2p_BFX+W2vuw@mail.gmail.com>
+From: agraf@suse.de (Alexander Graf)
+Date: Wed, 9 Oct 2013 15:09:54 +0200
+Subject: [PATCH 1/2] ARM: KVM: Yield CPU when vcpu executes a WFE
+In-Reply-To: <20131007165352.GC9127@redhat.com>
+References: <1381160430-11790-1-git-send-email-marc.zyngier@arm.com>
+ <1381160430-11790-2-git-send-email-marc.zyngier@arm.com>
+ <52F72A87-9CC3-4B38-ACDA-F5EA66FA7375@suse.de> <5252DE5E.6060700@arm.com>
+ <1BCAA4EA-CD0A-4E2A-9D22-5B9BD98F2ECD@suse.de>
+ <20131007165352.GC9127@redhat.com>
+Message-ID: <169A6E7C-B188-4A4C-B5B7-D2DC94ED70EB@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 9, 2013 at 2:44 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Wed, Oct 09, 2013 at 02:40:49PM +0200, Linus Walleij wrote:
 
->> NAK this this a Linux kernel implementation detail. Sherman Yin
->> fixed this up so the drivers does not have to imply any sequence
->> semantic for this.
->>
->> Study commit 03b054e9696c3cbd3d5905ec96da15acd0a2fe8d
->> "pinctrl: Pass all configs to driver on pin_config_set()"
->>
->> It is perfectly legal for a driver to accumulate the settings into
->> e.g. a single register write if it can, e.g.:
->>
->> u32 val = 0;
->>
->> for (i = 0; i < num_configs; i++) {
->>   switch() {
->>   FOO:
->>      val |= 1;
->>      break;
->>    BAR:
->>      val |= 2:
->>      break;
->>    BAZ:
->>      val |=4;
->>      break;
->> };
->>
->> writel(val, base+pinreg);
->>
->> I.e. the driver may choose to apply configs sequentially, but that is
->> not at all necessary.
->
-> So, just to be clear, what you're saying is that specifying two settings
-> in a pinctrl declaration which provide different values results in
-> undefined behaviour?
+On 07.10.2013, at 18:53, Gleb Natapov <gleb@redhat.com> wrote:
 
-It's more like the pin control core is passing the array of settings
-to the driver and the behaviour is specified per-driver.
+> On Mon, Oct 07, 2013 at 06:30:04PM +0200, Alexander Graf wrote:
+>> 
+>> On 07.10.2013, at 18:16, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>> 
+>>> On 07/10/13 17:04, Alexander Graf wrote:
+>>>> 
+>>>> On 07.10.2013, at 17:40, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>>>> 
+>>>>> On an (even slightly) oversubscribed system, spinlocks are quickly 
+>>>>> becoming a bottleneck, as some vcpus are spinning, waiting for a 
+>>>>> lock to be released, while the vcpu holding the lock may not be 
+>>>>> running at all.
+>>>>> 
+>>>>> This creates contention, and the observed slowdown is 40x for 
+>>>>> hackbench. No, this isn't a typo.
+>>>>> 
+>>>>> The solution is to trap blocking WFEs and tell KVM that we're now
+>>>>> spinning. This ensures that other vpus will get a scheduling boost,
+>>>>> allowing the lock to be released more quickly.
+>>>>> 
+>>>>>> From a performance point of view: hackbench 1 process 1000
+>>>>> 
+>>>>> 2xA15 host (baseline):	1.843s
+>>>>> 
+>>>>> 2xA15 guest w/o patch:	2.083s 4xA15 guest w/o patch:	80.212s
+>>>>> 
+>>>>> 2xA15 guest w/ patch:	2.072s 4xA15 guest w/ patch:	3.202s
+>>>> 
+>>>> I'm confused. You got from 2.083s when not exiting on spin locks to
+>>>> 2.072 when exiting on _every_ spin lock that didn't immediately
+>>>> succeed. I would've expected to second number to be worse rather than
+>>>> better. I assume it's within jitter, I'm still puzzled why you don't
+>>>> see any significant drop in performance.
+>>> 
+>>> The key is in the ARM ARM:
+>>> 
+>>> B1.14.9: "When HCR.TWE is set to 1, and the processor is in a Non-secure
+>>> mode other than Hyp mode, execution of a WFE instruction generates a Hyp
+>>> Trap exception if, ignoring the value of the HCR.TWE bit, conditions
+>>> permit the processor to suspend execution."
+>>> 
+>>> So, on a non-overcommitted system, you rarely hit a blocking spinlock,
+>>> hence not trapping. Otherwise, performance would go down the drain very
+>>> quickly.
+>> 
+>> Well, it's the same as pause/loop exiting on x86, but there we have special hardware features to only ever exit after n number of turnarounds. I wonder why we have those when we could just as easily exit on every blocking path.
+>> 
+> It will hurt performance if vcpu that holds the lock is running.
 
-So that is from the kernels point of view, no matter whether
-device tree is used or not. A specific driver may instill specific
-behaviour - sequential or not.
+Apparently not so on ARM. At least that's what Marc's numbers are showing. I'm not sure what exactly that means. Basically his logic is "if we spin, the holder must have been preempted". And it seems to work out surprisingly well.
 
-Sherman's driver for the Broadcom Capri had the requirement that
-the configuration of all parameters be done with a single register
-write to avoid side-effects. So it needs to iterate the configs and
-build up a mask and value and write it in one go.
 
-When I look at the i.MX driver (I guess this is what Shawn
-is working on here) it can actually be augmented to do it
-the same way and avoid this mess altogether:
-
-       for (i = 0; i < num_configs; i++) {
-                if (info->flags & SHARE_MUX_CONF_REG) {
-                        u32 reg;
-                        reg = readl(ipctl->base + pin_reg->conf_reg);
-                        reg &= ~0xffff;
-                        reg |= configs[i];
-                        writel(reg, ipctl->base + pin_reg->conf_reg);
-                } else {
-                        writel(configs[i], ipctl->base + pin_reg->conf_reg);
-                }
-                dev_dbg(ipctl->dev, "write: offset 0x%x val 0x%lx\n",
-                        pin_reg->conf_reg, configs[i]);
-        } /* for each config */
-
-As can be seen it will just writel() the config into the register
-for each config, it seems more like there is a bug that also
-the else-clause here should be read-modify-write, or am
-I getting it all wrong?
-
-In some cases some configs may be electrically conflicting
-and completely unsound, like enabling pull-up and pull-down
-at the same time - maybe possible in the hardware
-but insane, so the driver should detect that state in this
-loop and reject such configs, print a warning or make a
-best effort.
-
-I am aware that maybe not all drivers are handling this in
-the most ultimate way today :-/
-
-Then as this patch was against the device tree documentation:
-since the device tree isn't really about sequencing things
-(Grant has been onto us in the past for wanting to put sequences
-in there) we should probably avoid defining such things as
-sequences at all, as that basically moves the hardware
-description toward a sequence description language (jam table),
-and for that the full open firmware or other BIOS thing (ACPI?)
-should be used instead. (If I understood the point correctly.)
-
-I tend to think about the DT language as functional i.e. there
-is no way to say anything about sequencing order from it,
-I may be wrong here though.
-
-Yours,
-Linus Walleij
+Alex
