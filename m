@@ -1,31 +1,30 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Wed, 9 Oct 2013 18:31:44 -0500
-Subject: [PATCH V6 00/15] ARM: OMAP3+: support cpufreq-cpu0 for device
- tree boot
-In-Reply-To: <1381354144-7134-1-git-send-email-nm@ti.com>
-References: <1381354144-7134-1-git-send-email-nm@ti.com>
-Message-ID: <5255E760.8010104@ti.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed,  9 Oct 2013 20:40:27 -0300
+Subject: [PATCH] ARM: imx_v6_v7_defconfig: Select CONFIG_PROVE_LOCKING
+Message-ID: <1381362027-26076-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/09/2013 04:28 PM, Nishanth Menon wrote:
-> Hi,
-> 
-> The series is based on Tero's V8 of patches[1] - enables the use of
-> cpufreq-cpu0 generic driver for all OMAP and related derivatives.
-> 
-> I will stop copy pasting the series complete history and point at [2].
-> 
-> Main changes since V5:
-> - no more clock driver as part of this series[3] - instead depend on clock
->   conversion[1].
-> - added DRA7/OMAP5
-> 
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
-I am having all kind of problems with my git mail setup atm -
-apologies if any patches have arrived twice/in weird sequence :(
+This is very useful for detecting 'circular locking dependency' issues.
 
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/configs/imx_v6_v7_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
+diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
+index 137fdb0..e735eb2 100644
+--- a/arch/arm/configs/imx_v6_v7_defconfig
++++ b/arch/arm/configs/imx_v6_v7_defconfig
+@@ -263,6 +263,7 @@ CONFIG_NLS_ISO8859_15=m
+ CONFIG_NLS_UTF8=y
+ CONFIG_MAGIC_SYSRQ=y
+ # CONFIG_SCHED_DEBUG is not set
++CONFIG_PROVE_LOCKING=y
+ # CONFIG_DEBUG_BUGVERBOSE is not set
+ # CONFIG_FTRACE is not set
+ # CONFIG_ARM_UNWIND is not set
 -- 
-Regards,
-Nishanth Menon
+1.8.1.2
