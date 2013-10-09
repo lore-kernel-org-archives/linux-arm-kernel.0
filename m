@@ -1,146 +1,170 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Wed, 09 Oct 2013 21:27:14 +0200
-Subject: [PATCH 3/8] ARM: l2x0: add Marvell Tauros3 compatible
-In-Reply-To: <20131009085026.GD4981@e106331-lin.cambridge.arm.com>
-References: <1381235073-17134-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1381235073-17134-4-git-send-email-sebastian.hesselbarth@gmail.com>
- <20131008134100.GD1412@e106331-lin.cambridge.arm.com>
- <52542D64.5010800@gmail.com> <525433D3.2090906@free-electrons.com>
- <20131009085026.GD4981@e106331-lin.cambridge.arm.com>
-Message-ID: <5255AE12.2000205@gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 9 Oct 2013 21:32:18 +0200
+Subject: [RFC v2 PATCH 1/4] ARM: add support for kernel mode NEON in
+ atomic context
+In-Reply-To: <alpine.LFD.2.03.1310091509400.3023@syhkavp.arg>
+References: <1381344634-14917-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1381344634-14917-2-git-send-email-ard.biesheuvel@linaro.org>
+ <alpine.LFD.2.03.1310091509400.3023@syhkavp.arg>
+Message-ID: <CAKv+Gu_h_q0WRUo0e0kpeocgjONLDpTpWGWq=tzZhKYR8w3LyQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/09/2013 10:50 AM, Mark Rutland wrote:
-> On Tue, Oct 08, 2013 at 05:33:23PM +0100, Gregory CLEMENT wrote:
->> On 08/10/2013 18:05, Sebastian Hesselbarth wrote:
->>> On 10/08/2013 03:41 PM, Mark Rutland wrote:
->>>> On Tue, Oct 08, 2013 at 01:24:28PM +0100, Sebastian Hesselbarth wrote:
->>>>> This add a compatible for the Marvell Tauros3 cache controller which
->>>>> is compatible with l2x0 cache controllers. While updating the binding
->>>>> documentation, clean up the list of possible compatibles.
->>>>>
->>>>> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
->>>>> ---
-
-Added Jisheng and Lennert to Cc.
-
-Lennert, while looking for differences between ARM PL310 and
-Marvell Tauros3 cache controller in a GPL'ed 2.6 kernel source
-from Asus, I found arch/arm/mm/cache-tauros3.c which states you
-as the original author. If that is wrong, please ignore this.
-
->>> [...]
->>>>> diff --git a/Documentation/devicetree/bindings/arm/l2cc.txt b/Documentation/devicetree/bindings/arm/l2cc.txt
->>>>> index c0c7626..a1d0cbd 100644
->>>>> --- a/Documentation/devicetree/bindings/arm/l2cc.txt
->>>>> +++ b/Documentation/devicetree/bindings/arm/l2cc.txt
->>>>> @@ -7,20 +7,20 @@ The ARM L2 cache representation in the device tree should be done as follows:
->>>>>    Required properties:
->>>>>
->>>>>    - compatible : should be one of:
->>>>> -	"arm,pl310-cache"
->>>>> -	"arm,l220-cache"
->>>>> -	"arm,l210-cache"
->>>>> -	"marvell,aurora-system-cache": Marvell Controller designed to be
->>>>> +  "arm,pl310-cache"
->>>>> +  "arm,l220-cache"
->>>>> +  "arm,l210-cache"
->>>>> +  "bcm,bcm11351-a2-pl310-cache": DEPRECATED by "brcm,bcm11351-a2-pl310-cache"
->>>>> +  "brcm,bcm11351-a2-pl310-cache": For Broadcom bcm11351 chipset where an
->>>>> +     offset needs to be added to the address before passing down to the L2
->>>>> +     cache controller
->>>>> +  "marvell,aurora-system-cache": Marvell Controller designed to be
->>>>>         compatible with the ARM one, with system cache mode (meaning
->>>>>         maintenance operations on L1 are broadcasted to the L2 and L2
->>>>>         performs the same operation).
->>>>> -	"marvell,"aurora-outer-cache: Marvell Controller designed to be
->>>>> -	 compatible with the ARM one with outer cache mode.
->>>>> -	"brcm,bcm11351-a2-pl310-cache": For Broadcom bcm11351 chipset where an
->>>>> -	offset needs to be added to the address before passing down to the L2
->>>>> -	cache controller
->>>>> -	"bcm,bcm11351-a2-pl310-cache": DEPRECATED by
->>>>> -	                               "brcm,bcm11351-a2-pl310-cache"
->>>>> +  "marvell,aurora-outer-cache": Marvell Controller designed to be
->>>>> +     compatible with the ARM one with outer cache mode.
->>>>> +  "marvell,tauros3-cache": Marvell Tauros3 cache controller.
->>>>
->>>> How does the tauros3 cache differ from the other caches supported by the
->>>> l2x0 driver?
->>>
->>> [added Gregory to Cc]
->>>
->>> Good question. I cannot say at this time. I would have guessed that l2cc
->>> on Armada 1500 and Armada 370/XP are more or less the same, as both use
->>> Marvell's PJ4B CPU. Maybe, Gregory or Thomas can shed some light into
->>> this.
-
-As stated above, I did some research on the differences. I think I can
-prepare a patch providing tauros3 specific callbacks for .inv_all,
-.flush_all, .resume, and .save.
-
-For full .setup, I need to do more research on the CTRL/AUX_CTRL bits.
-
-Up to now, I think pl310 specific callbacks (.resume, .save, .setup)
-are _not_ suitable for tauros3. In the source from above, there are
-no TAG_LATENCY_CTRL, DATA_LATENCY_CTRL, ADDR_FILTER_*, nor POWER_CTRL
-registers.
-
->>>>>    - cache-unified : Specifies the cache is a unified cache.
->>>>>    - cache-level : Should be set to 2 for a level 2 cache.
->>>>>    - reg : Physical base address and size of cache controller's memory mapped
->>>>> diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
->>>>> index 447da6f..90c776e 100644
->>>>> --- a/arch/arm/mm/cache-l2x0.c
->>>>> +++ b/arch/arm/mm/cache-l2x0.c
->>>>> @@ -929,6 +929,7 @@ static const struct of_device_id l2x0_ids[] __initconst = {
->>>>>    	  .data = (void *)&aurora_no_outer_data},
->>>>>    	{ .compatible = "marvell,aurora-outer-cache",
->>>>>    	  .data = (void *)&aurora_with_outer_data},
->>>>> +	{ .compatible = "marvell,tauros3-cache", .data = (void *)&l2x0_data },
->>>>
->>>> Are we intending to handle this differently later?
->>>>
->>>> Or is it 100% compatible with the pl210 or pl220? We could just require
->>>> an entry later in the compatible string list instead...
->>>
->>> No public documentation, no clear answer.
->>>
->>> Tauros3 isn't 100% compatible with any of the ARM l2cc above, it has
->>> additional "features" or "bugs" - call it whatever you want.
->>>
->>> I am not an l2cc expert, but basically I see two options:
->>> a) use (possibly) wrong existing compatible in current mv88de3100.dtsi
->>>      now and fix later.
->>> b) add tauros3 compatible now and add (possible) quirks/marvell-specific
->>>      properties later.
->>>
->>> IMHO b) is very likely to happen as l2x0_of_init in patch 8/8 already
->>> sets bits, I wasn't able to verify in public ARM l2cc docu.
+On 9 October 2013 21:24, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+> On Wed, 9 Oct 2013, Ard Biesheuvel wrote:
+>
+>> Some applications, such as WPA CCMP encryption, do substantial
+>> amounts of work in non-process context. In order to support
+>> accelerated NEON implementations under these circumstances, we
+>> need a way to preserve the NEON context that may
+>> (a) belong to a completely unrelated userland process (if the
+>>     NEON unit is turned off atm);
+>> (b) belong to current userland;
+>> (c) belong to current kernel mode in process context.
 >>
->> I agree with Sebastian. I don't have more information that Sebastian, but
->> as it is definitely a different controller of the ones from ARM, it should
->> have its own compatible string. Then latter when we will discover new feature
->> and/or bugs, we will be able to manage them without requiring people to update
->> their dtb. If I understood well it is the philosophy behind the device tree.
+>> The best way to deal with this is to just stack whatever registers
+>> we are going to use, and unstack them when we are done.
+>>
+>> This patch adds kernel_neon_begin_atomic() and kernel_neon_end_atomic(),
+>> which may be called from any context. In !in_interrupt() case, they
+>> just call their non-_atomic counterparts. In atomic context, they
+>> stack resp. unstack the number of NEON registers declared when setting
+>> up the stack area using DEFINE_NEON_REG_STACK().
+>>
+>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>> ---
+>>  arch/arm/include/asm/fpstate.h | 15 +++++++++++++-
+>>  arch/arm/include/asm/neon.h    | 34 +++++++++++++++++++++++++++++++
+>>  arch/arm/vfp/vfphw.S           | 46 ++++++++++++++++++++++++++++++++++++++++++
+>>  arch/arm/vfp/vfpmodule.c       |  3 +++
+>>  4 files changed, 97 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm/include/asm/fpstate.h b/arch/arm/include/asm/fpstate.h
+>> index 3ad4c10..7a6e100 100644
+>> --- a/arch/arm/include/asm/fpstate.h
+>> +++ b/arch/arm/include/asm/fpstate.h
+>> @@ -19,7 +19,7 @@
+>>   *  - FPEXC, FPSCR, FPINST and FPINST2.
+>>   *  - 16 or 32 double precision data registers
+>>   *  - an implementation-dependent word of state for FLDMX/FSTMX (pre-ARMv6)
+>> - *
+>> + *
+>>   *  FPEXC will always be non-zero once the VFP has been used in this process.
+>>   */
+>>
+>> @@ -52,6 +52,19 @@ union vfp_state {
+>>  extern void vfp_flush_thread(union vfp_state *);
+>>  extern void vfp_release_thread(union vfp_state *);
+>>
+>> +/*
+>> + * Variable sized struct for stacking the bottom 'n' NEON registers.
+>> + */
+>> +struct vfp_partial_state {
+>> +     const __u32     num_regs;
+>> +     __u32           fpexc;
+>> +     __u32           fpscr;
+>> +     __u8            qregs[] __aligned(16);
+>> +} __aligned(16);
+>> +
+>> +extern void vfp_load_partial_state(struct vfp_partial_state *);
+>> +extern void vfp_save_partial_state(struct vfp_partial_state *);
+>> +
+>>  #define FP_HARD_SIZE 35
+>>
+>>  struct fp_hard_struct {
+>> diff --git a/arch/arm/include/asm/neon.h b/arch/arm/include/asm/neon.h
+>> index 8f730fe..1efd9fc 100644
+>> --- a/arch/arm/include/asm/neon.h
+>> +++ b/arch/arm/include/asm/neon.h
+>> @@ -8,10 +8,21 @@
+>>   * published by the Free Software Foundation.
+>>   */
+>>
+>> +#include <linux/types.h>
+>> +#include <linux/hardirq.h>
+>> +#include <asm/fpstate.h>
+>>  #include <asm/hwcap.h>
+>>
+>>  #define cpu_has_neon()               (!!(elf_hwcap & HWCAP_NEON))
+>>
+>> +#define DEFINE_NEON_STACK_REGS(v, num)                                       \
+>> +     struct {                                                        \
+>> +             struct vfp_partial_state regs;                          \
+>> +             u8 qregs[(num) > 16 ? 256 : 16 * (((num) + 1) & ~1U)];  \
+>> +     } v = { .regs.num_regs = sizeof(v.qregs)/16 }
+>> +
+>> +#define DEFINE_NEON_STACK_REGS_ALL(name)     DEFINE_NEON_STACK_REGS(name,16)
+>> +
+>>  #ifdef __ARM_NEON__
+>>
+>>  /*
+>> @@ -30,7 +41,30 @@
+>>  #define kernel_neon_begin() \
+>>       BUILD_BUG_ON_MSG(1, "kernel_neon_begin() called from NEON code")
+>>
+>> +#define kernel_neon_begin_atomic(a) \
+>> +     BUILD_BUG_ON_MSG(1, "kernel_neon_begin_atomic() called from NEON code")
+>> +
+>>  #else
+>>  void kernel_neon_begin(void);
+>> +#define kernel_neon_begin_atomic(name) __kernel_neon_begin_atomic(&(name).regs)
+>>  #endif
+>> +
+>> +#define kernel_neon_end_atomic(name) __kernel_neon_end_atomic(&(name).regs)
+>> +
+>>  void kernel_neon_end(void);
+>> +
+>> +static inline void __kernel_neon_begin_atomic(struct vfp_partial_state *regs)
+>> +{
+>> +     if (!in_interrupt())
+>> +             kernel_neon_begin();
 >
-> Please note that I wasn't arguing for people to have to update their
-> dtb. I was only suggesting that we'd have something like:
+> Surely you want "if (!in_atomic())" here?
 >
-> 	compatible = "marvell,tauros3-cache", "arm,l220-cache";
+>> +     else
+>> +             vfp_save_partial_state(regs);
+>> +}
+>> +
+>> +static inline void __kernel_neon_end_atomic(struct vfp_partial_state *regs)
+>> +{
+>> +     if (!in_interrupt())
+>> +             kernel_neon_end();
 >
-> Which would function now, and later the driver could choose to check for
-> "marvell,tauros3-cache" and do something different.
+> Ditto.
+>
 
-Agree, we really should use above compatible style more often.
+If I am reading (and understanding) the source correctly, in_atomic()
+is also true when running with preemption disabled, and in that case,
+you should be able to just do a normal preserve / lazy restore.
 
-> However, given that we don't have sufficient documentation to tell how
-> close the tauros3 cache is to any ARM l2x0 variant, having just the
-> "marvell,tauros3-cache" string in dts and supporting this in the driver
-> makes sense to me.
+-- 
+Ard.
 
-I found some source, which is possibly enough documentation. Also, I am
-counting on Jisheng or Lennert to comment on the hidden magic in
-Tauros3.
 
-Sebastian
+>> +     else
+>> +             vfp_load_partial_state(regs);
+>> +}
+>> diff --git a/arch/arm/vfp/vfphw.S b/arch/arm/vfp/vfphw.S
+>> +     VFPFMXR FPSCR, r3
+>> +     VFPFMXR FPEXC, r2
+>> +     bx      lr
+>> +ENDPROC(vfp_load_partial_state)
+>> +
+>> +#endif
+>> diff --git a/arch/arm/vfp/vfpmodule.c b/arch/arm/vfp/vfpmodule.c
+>> index 52b8f40..3dea5ba 100644
+>> --- a/arch/arm/vfp/vfpmodule.c
+>> +++ b/arch/arm/vfp/vfpmodule.c
+>> @@ -713,6 +713,9 @@ void kernel_neon_end(void)
+>>  }
+>>  EXPORT_SYMBOL(kernel_neon_end);
+>>
+>> +EXPORT_SYMBOL(vfp_save_partial_state);
+>> +EXPORT_SYMBOL(vfp_load_partial_state);
+>> +
+>>  #endif /* CONFIG_KERNEL_MODE_NEON */
+>>
+>>  /*
+>> --
+>> 1.8.1.2
+>>
