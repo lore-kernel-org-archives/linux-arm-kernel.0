@@ -1,71 +1,61 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  9 Oct 2013 15:50:56 +0900
-Subject: [PATCH 08/14] ARM: shmobile: Use KZM9D without reference for
- multiplatform
+Date: Wed,  9 Oct 2013 15:51:05 +0900
+Subject: [PATCH 13/14] ARM: shmobile: bockw: add SMSC support on reference
 In-Reply-To: <cover.1381299817.git.horms+renesas@verge.net.au>
 References: <cover.1381299817.git.horms+renesas@verge.net.au>
-Message-ID: <3ae970a688f8f8a74d1b489b8646733a830c904b.1381299817.git.horms+renesas@verge.net.au>
+Message-ID: <90357fcbf2fcb9e50899fd3b2a91a6dc3cfe5ea5.1381299817.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm@opensource.se>
+From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-Change the multiplatform kconfig bits for KZM9D from
-CONFIG_MACH_KZM9D_REFERENCE into CONFIG_MACH_KZM9D
-to match the non-multiplatform case.
+This patch enables INTC IRQ, and SMSC IRQ.
 
-Signed-off-by: Magnus Damm <damm@opensource.se>
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/Kconfig  | 10 ++--------
- arch/arm/mach-shmobile/Makefile |  4 ++++
- 2 files changed, 6 insertions(+), 8 deletions(-)
+ arch/arm/mach-shmobile/board-bockw-reference.c | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
 
-diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
-index 6a684ff..c9c4f15 100644
---- a/arch/arm/mach-shmobile/Kconfig
-+++ b/arch/arm/mach-shmobile/Kconfig
-@@ -22,16 +22,10 @@ config ARCH_EMEV2
+diff --git a/arch/arm/mach-shmobile/board-bockw-reference.c b/arch/arm/mach-shmobile/board-bockw-reference.c
+index 1a7c893..ae88fda 100644
+--- a/arch/arm/mach-shmobile/board-bockw-reference.c
++++ b/arch/arm/mach-shmobile/board-bockw-reference.c
+@@ -36,15 +36,35 @@ static const struct pinctrl_map bockw_pinctrl_map[] = {
+ 				  "scif0_ctrl", "scif0"),
+ };
  
- comment "SH-Mobile Board Type"
++#define FPGA	0x18200000
++#define IRQ0MR	0x30
++#define COMCTLR	0x101c
+ static void __init bockw_init(void)
+ {
++	static void __iomem *fpga;
++
+ 	r8a7778_clock_init();
++	r8a7778_init_irq_extpin_dt(1);
  
--config MACH_KZM9D_REFERENCE
--	bool "KZM9D board - Reference Device Tree Implementation"
-+config MACH_KZM9D
-+	bool "KZM9D board"
- 	depends on ARCH_EMEV2
- 	select REGULATOR_FIXED_VOLTAGE if REGULATOR
--	---help---
--	   Use reference implementation of KZM9D board support
--	   which makes a greater use of device tree at the expense
--	   of not supporting a number of devices.
--
--	   This is intended to aid developers
+ 	pinctrl_register_mappings(bockw_pinctrl_map,
+ 				  ARRAY_SIZE(bockw_pinctrl_map));
+ 	r8a7778_pinmux_init();
+ 	r8a7778_add_dt_devices();
  
- comment "SH-Mobile System Configuration"
- endif
-diff --git a/arch/arm/mach-shmobile/Makefile b/arch/arm/mach-shmobile/Makefile
-index b3840ba..b11466d 100644
---- a/arch/arm/mach-shmobile/Makefile
-+++ b/arch/arm/mach-shmobile/Makefile
-@@ -55,6 +55,9 @@ obj-$(CONFIG_ARCH_R8A7740)	+= pm-r8a7740.o pm-rmobile.o
- obj-$(CONFIG_ARCH_R8A7779)	+= pm-r8a7779.o
++	fpga = ioremap_nocache(FPGA, SZ_1M);
++	if (fpga) {
++		/*
++		 * CAUTION
++		 *
++		 * IRQ0/1 is cascaded interrupt from FPGA.
++		 * it should be cared in the future
++		 * Now, it is assuming IRQ0 was used only from SMSC.
++		 */
++		u16 val = ioread16(fpga + IRQ0MR);
++		val &= ~(1 << 4); /* enable SMSC911x */
++		iowrite16(val, fpga + IRQ0MR);
++	}
++
+ 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+ }
  
- # Board objects
-+ifdef CONFIG_ARCH_SHMOBILE_MULTI
-+obj-$(CONFIG_MACH_KZM9D)	+= board-kzm9d-reference.o
-+else
- obj-$(CONFIG_MACH_APE6EVM)	+= board-ape6evm.o
- obj-$(CONFIG_MACH_APE6EVM_REFERENCE)	+= board-ape6evm-reference.o
- obj-$(CONFIG_MACH_MACKEREL)	+= board-mackerel.o
-@@ -72,6 +75,7 @@ obj-$(CONFIG_MACH_KZM9D)	+= board-kzm9d.o
- obj-$(CONFIG_MACH_KZM9D_REFERENCE)	+= board-kzm9d-reference.o
- obj-$(CONFIG_MACH_KZM9G)	+= board-kzm9g.o
- obj-$(CONFIG_MACH_KZM9G_REFERENCE)	+= board-kzm9g-reference.o
-+endif
- 
- # Framework support
- obj-$(CONFIG_SMP)		+= $(smp-y)
 -- 
 1.8.4
