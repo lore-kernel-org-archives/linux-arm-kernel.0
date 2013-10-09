@@ -1,66 +1,83 @@
-From: mmarek@suse.cz (Michal Marek)
-Date: Wed, 09 Oct 2013 12:28:10 +0200
-Subject: [PATCH] arm, kbuild: make "make install" not depend on vmlinux
-In-Reply-To: <CAMuHMdW-YWGgZjR9ow6FMW7BrOorbbVAEm9sYsVvPkfg-_=jag@mail.gmail.com>
-References: <CA+55aFxtvT3Yvbxe5JGBThZS13payymFJ7jCLyEiE2iNDvsZtQ@mail.gmail.com>
- <20130711135445.GA21500@sepie.suse.cz>
- <CA+55aFyVjugxM7cUDWi0ASWttYthCxa6e7X3CADknBcSFxWgew@mail.gmail.com>
- <20130712105721.GF8731@rric.localhost> <20130717160506.GI8731@rric.localhost>
- <CA+55aFx4G5gME3ByqE0Wr-_t2x_6WkP3Ta4k1z4jfW+PrcK0og@mail.gmail.com>
- <20130717165743.GK8731@rric.localhost>
- <CA+55aFzhmV7iq+Pv37trMCmdNzk53ORAoj0a6rV14fzKta3Dhw@mail.gmail.com>
- <51E7B3D0.4060609@suse.cz> <20130930084945.GA1963@rric.localhost>
- <20130930163139.GA12450@free.fr>
- <CAMuHMdW-YWGgZjR9ow6FMW7BrOorbbVAEm9sYsVvPkfg-_=jag@mail.gmail.com>
-Message-ID: <52552FBA.7040806@suse.cz>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 9 Oct 2013 19:39:18 +0900
+Subject: [PATCH v2 3/3] ARM: shmobile: kzm9d: Use common clock framework
+In-Reply-To: <CANqRtoSGFEjcBPDAtq3YCDbkiFCftyr8b=qniYqyMafng=zurw@mail.gmail.com>
+References: <20131008143040.52f36df8edb7ab63224d8433@ops.dti.ne.jp>
+ <20131008143403.c11f294c8a1701a2ab3bc5fd@ops.dti.ne.jp>
+ <20131009034057.GO15065@verge.net.au>
+ <CANqRtoQs+31mv0ZULOd3SGshkBkvp-kGoaVOSb10+Ncdp+WNXw@mail.gmail.com>
+ <20131009065438.GA7220@verge.net.au>
+ <CANqRtoSGFEjcBPDAtq3YCDbkiFCftyr8b=qniYqyMafng=zurw@mail.gmail.com>
+Message-ID: <20131009103915.GB17869@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9.10.2013 09:18, Geert Uytterhoeven wrote:
-> On Mon, Sep 30, 2013 at 6:31 PM, Yann E. MORIN <yann.morin.1998@free.fr> wrote:
->> On 2013-09-30 10:49 +0200, Robert Richter spake thusly:
->>> On 18.07.13 11:22:24, Michal Marek wrote:
->>>>> So Michal (or ARM people - whoever wants to take the patch), just take
->>>>> my ack. No objections.
->>>>
->>>> I can add it to the kbuild tree if needed. Otherwise you can add
->>>> Acked-by: Michal Marek <mmarek@suse.cz>.
->>>
->>> This didn't make it upstream yet, can somebody at it to a tree?
->>
->> Since it's been acked-by Linus, I'll queue it in my tree, for Michal to
->> pull from. Expect a pull-request soon.
+On Wed, Oct 09, 2013 at 04:29:56PM +0900, Magnus Damm wrote:
+> Hi Simon,
 > 
-> Sorry for chiming in that late, but I didn't think of this when reading the
-> original submission.
+> On Wed, Oct 9, 2013 at 3:54 PM, Simon Horman <horms@verge.net.au> wrote:
+> > On Wed, Oct 09, 2013 at 01:59:46PM +0900, Magnus Damm wrote:
+> >> Hi Simon,
+> >>
+> >> On Wed, Oct 9, 2013 at 12:40 PM, Simon Horman <horms@verge.net.au> wrote:
+> >> > On Tue, Oct 08, 2013 at 02:34:03PM +0900, takasi-y at ops.dti.ne.jp wrote:
+> >> >> Use common clock framework version of clock
+> >> >>  drivers/clk/shmobile/clk-emev2.c
+> >> >> instead of sh-clkfwk version
+> >> >>  arch/arm/mach-shmobile/clock-emev2.c
+> >> >> when it is configured as a part of multi-platform.
+> >> >>
+> >> >> Signed-off-by: Takashi Yoshii <takasi-y@ops.dti.ne.jp>
+> >> >
+> >> > Thanks.
+> >> >
+> >> > I plan to add this patch to a new topic branch,
+> >> > topic/emev2-common-clock, in the renesas tree and
+> >> > queue it up from there for inclusion in mainline
+> >> > if/when the first patch of this series is accepted
+> >> > by Mike Turquette.
+> >>
+> >> Thanks for picking up patches, Simon.
+> >>
+> >> I think you can simply merge this patch after the following series:
+> >>
+> >> [PATCH 00/05] ARM: shmobile: KZM9D Multiplatform update
+> >
+> > This is already queued up.
 > 
-> Just doing "make oldconfig; make install" used to work.
-
-On ARM and maybe other architectures.
-
-
-> Removing the dependency of "make vmlinux" on vmlinux breaks this, doesn't it?
-
-Yes.
-
-
-> I had the habit of doing the above many years ago, when I was mostly doing
-> native builds, and before I had my own custom linux-install-kernel
-> script that e.g.
-> knows how to copy kernels and modules around to NFS servers.
+> Yes, I know, thanks for that. I tried to explain the dependency in the
+> 00/00 cover letter but I will try to be more clear next time!
 > 
-> Not that I'm strongly attached to it, but there may be other users...
+> >> There are no build time dependencies on patch 1 and 2 so this patch
+> >> can be merged independently. Regarding run-time operation, the
+> >> multiplatform series above makes KZM9D DT reference only build for
+> >> multiplatform, and in such case CCF is required.
+> >>
+> >> So if you want to keep KZM9D DT reference working until Mike Turquette
+> >> accepts the CCF bits, then I recommend you to wait with "[PATCH 00/05]
+> >> ARM: shmobile: KZM9D Multiplatform update" until all EMEV2 CCF bits
+> >> have been merged.
+> >>
+> >> Another way is to merge "[PATCH 00/05] ARM: shmobile: KZM9D
+> >> Multiplatform update" before the EMEV2 CCF bits, but if so you may as
+> >> well merge this patch as well IMO. This
+> >> multiplatform-update-series-merge-before-CCF plan will result in
+> >> untestable KZM9D DT reference until EMEV2 CCF is merged. Either way is
+> >> fine with me.
+> >
+> > I am mainly concerned that the bindings may change before
+> > they are finally merged. And I thought it would be nice to avoid
+> > having to fix up the usage of the bindings if they change.
+> 
+> Sure, but the code in this patch looks like it simply starts DT CCF
+> probing regardless of what the bindings look like. So I don't think
+> you will have to worry about actual bindings detail.
+> 
+> > But I'm happy to just queue-up patches 2 and 3 of this series
+> > now if you prefer.
+> 
+> Well, I meant patch 3 only. Patch 1 and 2 are tied together by dependencies. =)
 
-We can't eat the cake and have it :). What can be done is to make
-arch/arm/boot/install.sh print a friendlier error message, like the x86
-version does:
+Thanks, I understand now.
 
-if [ ! -f "$1" ]; then
-	echo ""                                                   1>&2
-	echo " *** Missing file: $1"                              1>&2
-	echo ' *** You need to run "make" before "make install".' 1>&2
-	echo ""                                                   1>&2
-	exit 1
-fi
-
-Michal
+I'll queue-up 3/3.
