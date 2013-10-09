@@ -1,58 +1,39 @@
-From: dgreid@chromium.org (Dylan Reid)
-Date: Wed, 9 Oct 2013 13:37:56 -0700
-Subject: [PATCH 1/3] dmaengine: pl330: Set residue in tx_status callback.
-In-Reply-To: <20131007034846.GG2954@intel.com>
-References: <1378879685-5352-1-git-send-email-padma.v@samsung.com>
- <1378879685-5352-2-git-send-email-padma.v@samsung.com>
- <00b401ceafac$e3a88170$aaf98450$@samsung.com>
- <CAEUnVG72uTzHrQCoVtdT8UmkPcz2ks_qWT8QMbhHjUW-u3WnNQ@mail.gmail.com>
- <026501cec2fe$1387c630$3a975290$@samsung.com>
- <20131007034846.GG2954@intel.com>
-Message-ID: <CAEUnVG7Xn8+Xhnr2y5-RM6FJTQsjRrJ9g1JWf4o+6B-BtWHbPA@mail.gmail.com>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Wed, 09 Oct 2013 13:42:10 -0700
+Subject: [GIT PULL] omap fixes against v3.12-rc3
+In-Reply-To: <20131008220324.GV8313@atomide.com> (Tony Lindgren's message of
+ "Tue, 8 Oct 2013 15:03:24 -0700")
+References: <20131008220324.GV8313@atomide.com>
+Message-ID: <87d2netbvh.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 6, 2013 at 8:48 PM, Vinod Koul <vinod.koul@intel.com> wrote:
-> On Mon, Oct 07, 2013 at 10:39:34AM +0900, Chanho Park wrote:
->> > > Why didn't you use a cookie value to track the request?
->> > > The cookie is assigned when each transfer is submitted.
->> > > If you save the value in the desc, we can find the request easily.
->> >
->> > If there are several cyclic desc in the work list, is there a better way
->> > to find the "current" one?  The chan struct tracks the last completed and
->> > last submitted cookies, but these will be the first and last
->> > respectively as long as the cyclic transfer is active.  Is there an
->> > "active" cookie stored somewhere that I missed?
->>
->> Assume there are three cookies. If you want to get the second cookie not
->> latest cookie, your way can be also correct in such case?
->> I think tx_status API is to get dma status of the given cookie.
->> You are only considering a cyclic case.
-> For cyclic case you would have possible same descriptor running till you
-> terminate.
+Tony Lindgren <tony@atomide.com> writes:
 
-The cyclic case that makes this interesting is when there are multiple
-cyclic descriptors in the list. The cookie and completed_cookie
-markers don't help to determine which of the descriptors in the list
-is currently active.  dma_cookie_complete isn't called for a cyclic
-desc, the desc is just pushed to the end of the list.
-
+> The following changes since commit 15c03dd4859ab16f9212238f29dd315654aa94f6:
 >
-> For non cyclic, if you have 3 descriptors submitted, the cookie value can be, say
-> 7, 8 and 9. If you query the status of any descriptor and pass the last optional
-> txstate arg then you will know the last cookie completed. so if txstate->last is
-> 7, then 7th was completed and 8 should be running and 9 in queue!
-
-Got it, but the correct desc for cookie 8 will still have to be
-searched for, correct?
-
-Thanks for the advise.
-
-Dylan
-
->> > Looking for the first buffer with status == BUSY is an improvement I'll
->> > make.  Any way to avoid looking through the list?
-> Its already there :)
+>   Linux 3.12-rc3 (2013-09-29 15:02:38 -0700)
 >
-> --
-> ~Vinod
+> are available in the git repository at:
+>
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/fixes-against-v3.12-rc3-take2
+>
+> for you to fetch changes up to d1f1ca36b566aa56effdd7df69750062ec735131:
+>
+>   ARM: OMAP2: RX-51: Add missing max_current to rx51_lp5523_led_config (2013-10-08 11:22:43 -0700)
+>
+> ----------------------------------------------------------------
+> Few fixes for omap3 related hangs and errors that people have
+> noticed now that people are actually using the device tree
+> based booting for omap3.
+
+FWIW, my automated boot is doing only DT boots on all the OMAP
+platforms.  However, it's only testing basic boot so far so there's not
+a whole lot of driver testing yet (but it's coming soon.)
+
+> Also one regression fix for timer compile for dra7xx when
+> omap5 is not selected, and a LED regression fix for n900.
+
+Thanks, pulled into fixes.
+
+Kevin
