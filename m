@@ -1,32 +1,39 @@
-From: josephl@nvidia.com (Joseph Lo)
-Date: Wed, 9 Oct 2013 16:23:22 +0800
-Subject: [PATCH 3/4] ARM: tegra: make tegra_resume can work with current
- and later chips
-In-Reply-To: <1381288295.10638.23.camel@jlo-ubuntu-64.nvidia.com>
-References: <1381220587-29697-1-git-send-email-josephl@nvidia.com>
- <1381220587-29697-4-git-send-email-josephl@nvidia.com>
- <52543A24.3020108@wwwdotorg.org>
- <1381288295.10638.23.camel@jlo-ubuntu-64.nvidia.com>
-Message-ID: <1381307002.2200.3.camel@jlo-ubuntu-64.nvidia.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Wed, 9 Oct 2013 11:32:51 +0300
+Subject: [PATCH V5 4/5] video: exynos_mipi_dsim: Use the generic PHY driver
+In-Reply-To: <1380396467-29278-5-git-send-email-s.nawrocki@samsung.com>
+References: <1380396467-29278-1-git-send-email-s.nawrocki@samsung.com>
+ <1380396467-29278-5-git-send-email-s.nawrocki@samsung.com>
+Message-ID: <525514B3.5020101@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2013-10-09 at 11:11 +0800, Joseph Lo wrote:
-> On Wed, 2013-10-09 at 01:00 +0800, Stephen Warren wrote:
-> > On 10/08/2013 02:23 AM, Joseph Lo wrote:
-> > > diff --git a/arch/arm/mach-tegra/reset-handler.S b/arch/arm/mach-tegra/reset-handler.S
-> > 
-> > >  not_ca9:
-> > > +	mov32	r9, 0xc0f
-> > > +	cmp	r8, r9
-> > > +	bleq	tegra_init_l2_for_a15
-> > 
-> > That's checking whether the CPU type is a Cortex-A15, isn't it? The only
-> > CPUs that exist NVIDIA SoCs are Cortex-A9 and Cortex-A15, so I don't see
-> > why we need to check whether the CPU is a Cortex-A15, given this label
-> > is jumped to only when the CPU isn't a Cortex-A9.
+On 28/09/13 22:27, Sylwester Nawrocki wrote:
+> Use the generic PHY API instead of the platform callback
+> for the MIPI DSIM DPHY enable/reset control.
 > 
-> Good catch. Will fix.
-> 
-Ah! I just realize the Cortex-A9 will go through here as well. So I
-still need to code to make sure only Cortex-A15 execute the function.
+> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> Acked-by: Felipe Balbi <balbi@ti.com>
+> Acked-by: Donghwa Lee <dh09.lee@samsung.com>
+> ---
+> Changes since v4:
+>  - PHY label removed from the platform data structure.
+> ---
+>  drivers/video/exynos/Kconfig           |    1 +
+>  drivers/video/exynos/exynos_mipi_dsi.c |   19 ++++++++++---------
+>  include/video/exynos_mipi_dsim.h       |    5 ++---
+>  3 files changed, 13 insertions(+), 12 deletions(-)
+
+Acked-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
+
+ Tomi
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 901 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131009/6424ec6a/attachment.sig>
