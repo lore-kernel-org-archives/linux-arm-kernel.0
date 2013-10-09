@@ -1,89 +1,47 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Wed,  9 Oct 2013 15:29:51 +0100
-Subject: [RFC PATCH 2/4] ARM: Add common compile-time swab32 for asm code
-In-Reply-To: <1381328993-12724-1-git-send-email-Dave.Martin@arm.com>
-References: <1381328993-12724-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <1381328993-12724-3-git-send-email-Dave.Martin@arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 9 Oct 2013 15:31:20 +0100
+Subject: [PATCH 0/5] Armada DRM stuff
+In-Reply-To: <52532C0B.3090503@gmail.com>
+References: <20131006220728.GG12758@n2100.arm.linux.org.uk>
+ <52532C0B.3090503@gmail.com>
+Message-ID: <20131009143120.GI25034@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-<linux/swab.h> doesn't work for asm code, yet swabbing constants
-for asm is still useful, such as when writing code which needs to
-build with different target endiannesses.
+On Mon, Oct 07, 2013 at 11:47:55PM +0200, Sebastian Hesselbarth wrote:
+> On 10/07/2013 12:07 AM, Russell King - ARM Linux wrote:
+>> The Armada DRM drivers again, along with the TDA998x HDMI output support,
+>> and an illustration to show how to add Armada 610 support (and others.)
+>>
+>> Rob has looked at this a couple of times since its last posting, and
+>> has provided additional useful feedback which has been incorporated.
+>> I believe all the major issues have been addressed now.
+>
+> Tested-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+>
+> on Marvell Armada 510, SolidRun CuBox with quick-hack DT support added.
+>
+> Let's please get this driver mainlined and start working on proper DT
+> support for it. Thanks for driver and the patience to work out all
+> issues!
 
-This patch adds a simple asm_swab32() macro so that this operation
-doesn't need to be reinvented repeatedly.
+Sebastian,
 
-Since <asm/opcodes.h> already defines this operation, this patch
-lifts the definition into assembler.h and makes opcodes.h use it.
+I've added your tested-by now, and also updated the TDA998x patch to use
+the HDMI definitions that Jean-Francois pointed out (which is a really
+small delta, so isn't worth resending the patch set just for that).
+Thanks.
 
-The other swab variants defined by opcodes.h could be transferred
-too, but there is no clear need for that yet.
+All the points brought up in previous reviews concerning the physical
+address exposure, and the location of the DRM helpers have all been
+addressed, so it is now ready to be merged into mainline.  So now the
+question is how to proceed with it.
 
-Signed-off-by: Dave Martin <Dave.Martin@arm.com>
----
- arch/arm/include/asm/assembler.h |   23 +++++++++++++++++++++++
- arch/arm/include/asm/opcodes.h   |    9 +++------
- 2 files changed, 26 insertions(+), 6 deletions(-)
+However, I see no response from any DRM developers, even though they are
+around - they've been responding on a different thread about driver
+model/sysfs abuse by DRM.
 
-diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
-index a71d117..860256c 100644
---- a/arch/arm/include/asm/assembler.h
-+++ b/arch/arm/include/asm/assembler.h
-@@ -380,4 +380,27 @@ THUMB(	orr	\reg , \reg , #PSR_T_BIT	)
- 
- #endif /* __ASSEMBLY__ */
- 
-+/*
-+ * Use asm_swab32() only for compile-time swabbing of constants for
-+ * assembly code.  in inline asm, the argument is a string
-+ * representation of an expression which will be passed through to the
-+ * assembler, so it can't contain embedded C expressions or preprocessor
-+ * macros.  Macros would need to be pre-expanded using __stringify().
-+ */
-+#ifdef __ASSEMBLY__
-+#define __asm_swab32(x) (			\
-+	  (((x) >> 24) & 0x000000ff)		\
-+	| (((x) >> 8)  & 0x0000ff00)		\
-+	| (((x) << 8)  & 0x00ff0000)		\
-+	| (((x) << 24) & 0xff000000)		\
-+)
-+#else /* ! __ASSEMBLY__ */
-+#define __asm_swab32(x) "( "			\
-+	  "(((" x ") >> 24) & 0x000000ff) "	\
-+	"| (((" x ") >> 8)  & 0x0000ff00) "	\
-+	"| (((" x ") << 8)  & 0x00ff0000) "	\
-+	"| (((" x ") << 24) & 0xff000000) "	\
-+")"
-+#endif /* ! __ASSEMBLY__ */
-+
- #endif /* __ASM_ASSEMBLER_H__ */
-diff --git a/arch/arm/include/asm/opcodes.h b/arch/arm/include/asm/opcodes.h
-index e796c59..b2e93c9 100644
---- a/arch/arm/include/asm/opcodes.h
-+++ b/arch/arm/include/asm/opcodes.h
-@@ -9,6 +9,8 @@
- #ifndef __ASM_ARM_OPCODES_H
- #define __ASM_ARM_OPCODES_H
- 
-+#include <asm/assembler.h>
-+
- #ifndef __ASSEMBLY__
- #include <linux/linkage.h>
- extern asmlinkage unsigned int arm_check_condition(u32 opcode, u32 psr);
-@@ -24,12 +26,7 @@ extern asmlinkage unsigned int arm_check_condition(u32 opcode, u32 psr);
-  * These are only intended for use by this header: don't use them directly,
-  * because they will be suboptimal in most cases.
-  */
--#define ___asm_opcode_swab32(x) (	\
--	  (((x) << 24) & 0xFF000000)	\
--	| (((x) <<  8) & 0x00FF0000)	\
--	| (((x) >>  8) & 0x0000FF00)	\
--	| (((x) >> 24) & 0x000000FF)	\
--)
-+#define ___asm_opcode_swab32(x) __asm_swab32(x)
- #define ___asm_opcode_swab16(x) (	\
- 	  (((x) << 8) & 0xFF00)		\
- 	| (((x) >> 8) & 0x00FF)		\
--- 
-1.7.9.5
+I'm going to pull it into my nightly build tree so it can have some
+testing with non-dove builds, and if there's still no response from
+DRM people next week, I'll put it in to linux-next via my tree so at
+least it can get some exposure and integration validation there.
