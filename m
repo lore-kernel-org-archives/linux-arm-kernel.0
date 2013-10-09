@@ -1,34 +1,55 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Wed, 09 Oct 2013 09:08:13 +0200
-Subject: [PATCH 8/8] ARM: add initial support for Marvell Berlin SoCs
-In-Reply-To: <1381274699.5184.2.camel@linux-builds1>
-References: <1381235073-17134-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1381235073-17134-9-git-send-email-sebastian.hesselbarth@gmail.com>
- <1381274699.5184.2.camel@linux-builds1>
-Message-ID: <525500DD.8050204@gmail.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 9 Oct 2013 09:18:46 +0200
+Subject: [PATCH] arm, kbuild: make "make install" not depend on vmlinux
+In-Reply-To: <20130930163139.GA12450@free.fr>
+References: <CA+55aFxtvT3Yvbxe5JGBThZS13payymFJ7jCLyEiE2iNDvsZtQ@mail.gmail.com>
+ <20130711135445.GA21500@sepie.suse.cz>
+ <CA+55aFyVjugxM7cUDWi0ASWttYthCxa6e7X3CADknBcSFxWgew@mail.gmail.com>
+ <20130712105721.GF8731@rric.localhost>
+ <20130717160506.GI8731@rric.localhost>
+ <CA+55aFx4G5gME3ByqE0Wr-_t2x_6WkP3Ta4k1z4jfW+PrcK0og@mail.gmail.com>
+ <20130717165743.GK8731@rric.localhost>
+ <CA+55aFzhmV7iq+Pv37trMCmdNzk53ORAoj0a6rV14fzKta3Dhw@mail.gmail.com>
+ <51E7B3D0.4060609@suse.cz> <20130930084945.GA1963@rric.localhost>
+ <20130930163139.GA12450@free.fr>
+Message-ID: <CAMuHMdW-YWGgZjR9ow6FMW7BrOorbbVAEm9sYsVvPkfg-_=jag@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/09/2013 01:24 AM, Dinh Nguyen wrote:
-> Hi Sebastian,
+On Mon, Sep 30, 2013 at 6:31 PM, Yann E. MORIN <yann.morin.1998@free.fr> wrote:
+> On 2013-09-30 10:49 +0200, Robert Richter spake thusly:
+>> On 18.07.13 11:22:24, Michal Marek wrote:
+>> > > So Michal (or ARM people - whoever wants to take the patch), just take
+>> > > my ack. No objections.
+>> >
+>> > I can add it to the kbuild tree if needed. Otherwise you can add
+>> > Acked-by: Michal Marek <mmarek@suse.cz>.
+>>
+>> This didn't make it upstream yet, can somebody at it to a tree?
 >
-> On Tue, 2013-10-08 at 14:24 +0200, Sebastian Hesselbarth wrote:
->> This adds initial support for the Marvell Berlin (88DE3xxx) SoC family
->> and basic machine setup for Armada 1500 (88DE3100) SoCs.
-[...]
->> +config MACH_MV88DE3100
->> +	bool "Marvell 88DE3100 (Armada 1500)"
->> +	select ARM_GIC
->> +	select CACHE_L2X0
->> +	select CPU_PJ4B
->> +	select HAVE_ARM_TWD if LOCAL_TIMERS
->> +	select HAVE_SMP
->> +	select LOCAL_TIMERS if SMP
->
-> I think because of commit:
->
-> a894fcc2d [ARM: smp_twd: Divorce smp_twd from local timer API]
->
-> you can remove the LOCAL_TIMERS for HAVE_ARM_TWD.
+> Since it's been acked-by Linus, I'll queue it in my tree, for Michal to
+> pull from. Expect a pull-request soon.
 
-Thanks, Dinh, I will have a look at this.
+Sorry for chiming in that late, but I didn't think of this when reading the
+original submission.
+
+Just doing "make oldconfig; make install" used to work.
+Removing the dependency of "make vmlinux" on vmlinux breaks this, doesn't it?
+
+I had the habit of doing the above many years ago, when I was mostly doing
+native builds, and before I had my own custom linux-install-kernel
+script that e.g.
+knows how to copy kernels and modules around to NFS servers.
+
+Not that I'm strongly attached to it, but there may be other users...
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
