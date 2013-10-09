@@ -1,56 +1,38 @@
-From: jonathan.austin@arm.com (Jonathan Austin)
-Date: Wed, 09 Oct 2013 10:21:37 +0100
-Subject: [PATCH 0/3] KVM: ARM: Cortex-A7 support and fixes
-In-Reply-To: <CA+eFSM1Gp4ZrEysN-ib3FxBbVYMrKZO2TdP0XwkF=p68PEyq6Q@mail.gmail.com>
-References: <1380210568-23175-1-git-send-email-jonathan.austin@arm.com>
- <CA+eFSM1Gp4ZrEysN-ib3FxBbVYMrKZO2TdP0XwkF=p68PEyq6Q@mail.gmail.com>
-Message-ID: <52552021.5080800@arm.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 09 Oct 2013 11:24:10 +0200
+Subject: [PATCH 8/8] ARM: add initial support for Marvell Berlin SoCs
+In-Reply-To: <20131009112058.683739d0@xhacker>
+References: <1381235073-17134-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1381235073-17134-9-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20131009112058.683739d0@xhacker>
+Message-ID: <525520BA.3010304@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Gavin,
+Hello Jisheng,
 
-On 08/10/13 15:16, Gavin Guo wrote:
-> On Thu, Sep 26, 2013 at 11:49 PM, Jonathan Austin
-> <jonathan.austin@arm.com> wrote:
->> This series adds support for using KVM on ARM Cortex-A7 CPUs. As the Cortex-A7
->> is architecturally identical to the A15 there is not a huge amount of code
->> required, however there are a number of fixups necessary to core KVM code that
->> testing on A7 has revealed.
->>
-> 
-> Hi Jonathan,
-> 
-> I'd like to help test the kvm on Cortex-A7. I've applied your 3 kernel
-> patches, and download the Virtual Open Systems's kvmtools to test. But
-> the guest os can't be brought up. Could you provide the steps about
-> where to download kvmtools and the command to bring up the guest?
-> 
+[...]
 
-Firstly, if you're on a TC2, you need to make sure the A15s are held
-in reset, and you need a shim to boot the kernel in hyp mode. For now
-I'll assume you're *not* in that situation.
+>> +config MACH_MV88DE3100
+> Can you please use MACH_BERLIN2? This is what we used internally in latest BSP
+>> +	bool "Marvell 88DE3100 (Armada 1500)"
+>> +	select ARM_GIC
+>> +	select CACHE_L2X0
+> The tauros3 and PL310 are different although the programming interface are
+> compatible. In PJ4B and Tauros3, the CP15 cache maintenance commands include
+> both L1 and L2, memory mapped PA-based maintenance operations in L2 are not needed.
+> How to handle this in cache-l2x0.c?
 
-Assuming your platform does enter the kernel in Hyp mode (it needs to!)
-then you need a couple of patches to kvmtool:
+In this case you can do the same things we have done for Aurora when we use
+the "aurora-system-cache" compatible string.
 
-http://www.spinics.net/lists/kvm/msg96662.html
+[...]
 
-At the moment, I think you're still in the business of picking up
-individual patches from the list - Will (Deacon) has offered to host
-them in his kvm branch but is waiting until the core A7 support is in
-Christoffer's 'next'.
+Regards,
+Gregory
 
-Once you've applied the patches, build lkvm and a kernel image, copy them
-over to your host, then try something like:
-
-/lkvm run /Image -d /fs.img -m 512 -c 2 --console virtio -p "console=hvc0,38400"
-
-Finally have a check in /proc/cpuinfo to be sure that you've got the kind of CPUs
-you were expecting!
-
-Hope that helps,
-Jonny
-> Thanks,
-> Gavin
-> 
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
