@@ -1,24 +1,12 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed,  9 Oct 2013 20:50:31 +0200
-Subject: [RFC v2 PATCH 1/4] ARM: add support for kernel mode NEON in atomic
+Date: Wed,  9 Oct 2013 20:50:32 +0200
+Subject: [RFC v2 PATCH 2/4] ARM64: add support for kernel mode NEON in atomic
  context
 In-Reply-To: <1381344634-14917-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1381344634-14917-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1381344634-14917-2-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1381344634-14917-3-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
-
-Some applications, such as WPA CCMP encryption, do substantial
-amounts of work in non-process context. In order to support
-accelerated NEON implementations under these circumstances, we
-need a way to preserve the NEON context that may
-(a) belong to a completely unrelated userland process (if the
-    NEON unit is turned off atm);
-(b) belong to current userland;
-(c) belong to current kernel mode in process context.
-
-The best way to deal with this is to just stack whatever registers
-we are going to use, and unstack them when we are done.
 
 This patch adds kernel_neon_begin_atomic() and kernel_neon_end_atomic(),
 which may be called from any context. In !in_interrupt() case, they
@@ -28,166 +16,177 @@ up the stack area using DEFINE_NEON_REG_STACK().
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm/include/asm/fpstate.h | 15 +++++++++++++-
- arch/arm/include/asm/neon.h    | 34 +++++++++++++++++++++++++++++++
- arch/arm/vfp/vfphw.S           | 46 ++++++++++++++++++++++++++++++++++++++++++
- arch/arm/vfp/vfpmodule.c       |  3 +++
- 4 files changed, 97 insertions(+), 1 deletion(-)
+ arch/arm64/include/asm/fpsimd.h       | 16 +++++++++++++++
+ arch/arm64/include/asm/fpsimdmacros.h | 37 +++++++++++++++++++++++++++++++++++
+ arch/arm64/include/asm/neon.h         | 31 +++++++++++++++++++++++++++++
+ arch/arm64/kernel/entry-fpsimd.S      | 24 +++++++++++++++++++++++
+ arch/arm64/kernel/fpsimd.c            |  3 +++
+ 5 files changed, 111 insertions(+)
 
-diff --git a/arch/arm/include/asm/fpstate.h b/arch/arm/include/asm/fpstate.h
-index 3ad4c10..7a6e100 100644
---- a/arch/arm/include/asm/fpstate.h
-+++ b/arch/arm/include/asm/fpstate.h
-@@ -19,7 +19,7 @@
-  *  - FPEXC, FPSCR, FPINST and FPINST2.
-  *  - 16 or 32 double precision data registers
-  *  - an implementation-dependent word of state for FLDMX/FSTMX (pre-ARMv6)
-- * 
-+ *
-  *  FPEXC will always be non-zero once the VFP has been used in this process.
-  */
- 
-@@ -52,6 +52,19 @@ union vfp_state {
- extern void vfp_flush_thread(union vfp_state *);
- extern void vfp_release_thread(union vfp_state *);
+diff --git a/arch/arm64/include/asm/fpsimd.h b/arch/arm64/include/asm/fpsimd.h
+index c43b4ac..3a741b0 100644
+--- a/arch/arm64/include/asm/fpsimd.h
++++ b/arch/arm64/include/asm/fpsimd.h
+@@ -39,6 +39,19 @@ struct fpsimd_state {
+ 	};
+ };
  
 +/*
-+ * Variable sized struct for stacking the bottom 'n' NEON registers.
++ * Variable sized struct for stacking the bottom n FP/SIMD registers.
++ * Mainly intended for kernel use of v8 Crypto Extensions which only
++ * needs a few registers and may need to execute in atomic context.
 + */
-+struct vfp_partial_state {
-+	const __u32	num_regs;
-+	__u32		fpexc;
-+	__u32		fpscr;
-+	__u8		qregs[] __aligned(16);
++struct fpsimd_partial_state {
++	const u32	num_regs;
++	u32		fpsr;
++	u32		fpcr;
++	__uint128_t	vregs[] __aligned(16);
 +} __aligned(16);
 +
-+extern void vfp_load_partial_state(struct vfp_partial_state *);
-+extern void vfp_save_partial_state(struct vfp_partial_state *);
 +
- #define FP_HARD_SIZE 35
+ #if defined(__KERNEL__) && defined(CONFIG_COMPAT)
+ /* Masks for extracting the FPSR and FPCR from the FPSCR */
+ #define VFP_FPSCR_STAT_MASK	0xf800009f
+@@ -55,6 +68,9 @@ struct task_struct;
+ extern void fpsimd_save_state(struct fpsimd_state *state);
+ extern void fpsimd_load_state(struct fpsimd_state *state);
  
- struct fp_hard_struct {
-diff --git a/arch/arm/include/asm/neon.h b/arch/arm/include/asm/neon.h
-index 8f730fe..1efd9fc 100644
---- a/arch/arm/include/asm/neon.h
-+++ b/arch/arm/include/asm/neon.h
-@@ -8,10 +8,21 @@
++extern void fpsimd_save_partial_state(struct fpsimd_partial_state *state);
++extern void fpsimd_load_partial_state(struct fpsimd_partial_state *state);
++
+ extern void fpsimd_thread_switch(struct task_struct *next);
+ extern void fpsimd_flush_thread(void);
+ 
+diff --git a/arch/arm64/include/asm/fpsimdmacros.h b/arch/arm64/include/asm/fpsimdmacros.h
+index bbec599..1b47587 100644
+--- a/arch/arm64/include/asm/fpsimdmacros.h
++++ b/arch/arm64/include/asm/fpsimdmacros.h
+@@ -62,3 +62,40 @@
+ 	ldr	w\tmpnr, [\state, #16 * 2 + 4]
+ 	msr	fpcr, x\tmpnr
+ .endm
++
++.altmacro
++.macro	q2op, op, q1, q2, state
++	\op	q\q1, q\q2, [\state, #-(16 * \q1) - 16]
++.endm
++
++.macro fpsimd_save_partial state, tmpnr1, tmpnr2
++	mrs	x\tmpnr1, fpsr
++	mrs	x\tmpnr2, fpcr
++	stp	w\tmpnr1, w\tmpnr2, [\state, #4]
++	adr	x\tmpnr1, 0f
++	ldr	w\tmpnr2, [\state]
++	add	\state, \state, x\tmpnr2, lsl #4
++	sub	x\tmpnr1, x\tmpnr1, x\tmpnr2, lsl #1
++	br	x\tmpnr1
++	.irp	qa, 30, 28, 26, 24, 22, 20, 18, 16, 14, 12, 10, 8, 6, 4, 2, 0
++		qb = \qa + 1
++	q2op	stp, \qa, %qb, \state
++	.endr
++0:
++.endm
++
++.macro fpsimd_restore_partial state, tmpnr1, tmpnr2
++	ldp	w\tmpnr1, w\tmpnr2, [\state, #4]
++	msr	fpsr, x\tmpnr1
++	msr	fpcr, x\tmpnr2
++	adr	x\tmpnr1, 0f
++	ldr	w\tmpnr2, [\state]
++	add	\state, \state, x\tmpnr2, lsl #4
++	sub	x\tmpnr1, x\tmpnr1, x\tmpnr2, lsl #1
++	br	x\tmpnr1
++	.irp	qa, 30, 28, 26, 24, 22, 20, 18, 16, 14, 12, 10, 8, 6, 4, 2, 0
++		qb = \qa + 1
++	q2op	ldp, \qa, %qb, \state
++	.endr
++0:
++.endm
+diff --git a/arch/arm64/include/asm/neon.h b/arch/arm64/include/asm/neon.h
+index b0cc58a9..1c8600a 100644
+--- a/arch/arm64/include/asm/neon.h
++++ b/arch/arm64/include/asm/neon.h
+@@ -8,7 +8,38 @@
   * published by the Free Software Foundation.
   */
  
-+#include <linux/types.h>
 +#include <linux/hardirq.h>
-+#include <asm/fpstate.h>
- #include <asm/hwcap.h>
++#include <linux/types.h>
++#include <asm/fpsimd.h>
++
+ #define cpu_has_neon()		(1)
  
- #define cpu_has_neon()		(!!(elf_hwcap & HWCAP_NEON))
- 
-+#define DEFINE_NEON_STACK_REGS(v, num)					\
++#define DEFINE_NEON_STACK_REGS(a, num)					\
 +	struct {							\
-+		struct vfp_partial_state regs;				\
-+		u8 qregs[(num) > 16 ? 256 : 16 * (((num) + 1) & ~1U)];	\
-+	} v = { .regs.num_regs = sizeof(v.qregs)/16 }
++		struct fpsimd_partial_state regs;			\
++		__uint128_t vregs[(num) > 32 ? 32 : ((num) + 1) & ~1U];	\
++	} a = { .regs.num_regs = sizeof(a.vregs) / sizeof(__uint128_t) }
 +
-+#define DEFINE_NEON_STACK_REGS_ALL(name)	DEFINE_NEON_STACK_REGS(name,16)
++#define DEFINE_NEON_STACK_REGS_ALL(name)	DEFINE_NEON_STACK_REGS(name, 32)
 +
- #ifdef __ARM_NEON__
- 
- /*
-@@ -30,7 +41,30 @@
- #define kernel_neon_begin() \
- 	BUILD_BUG_ON_MSG(1, "kernel_neon_begin() called from NEON code")
- 
-+#define kernel_neon_begin_atomic(a) \
-+	BUILD_BUG_ON_MSG(1, "kernel_neon_begin_atomic() called from NEON code")
-+
- #else
  void kernel_neon_begin(void);
-+#define kernel_neon_begin_atomic(name) __kernel_neon_begin_atomic(&(name).regs)
- #endif
-+
-+#define kernel_neon_end_atomic(name) __kernel_neon_end_atomic(&(name).regs)
-+
  void kernel_neon_end(void);
 +
-+static inline void __kernel_neon_begin_atomic(struct vfp_partial_state *regs)
++static inline void __kernel_neon_begin_atomic(struct fpsimd_partial_state *regs)
 +{
 +	if (!in_interrupt())
 +		kernel_neon_begin();
 +	else
-+		vfp_save_partial_state(regs);
++		fpsimd_save_partial_state(regs);
 +}
 +
-+static inline void __kernel_neon_end_atomic(struct vfp_partial_state *regs)
++static inline void __kernel_neon_end_atomic(struct fpsimd_partial_state *regs)
 +{
 +	if (!in_interrupt())
 +		kernel_neon_end();
 +	else
-+		vfp_load_partial_state(regs);
++		fpsimd_load_partial_state(regs);
 +}
-diff --git a/arch/arm/vfp/vfphw.S b/arch/arm/vfp/vfphw.S
-index 3e5d311..747e782 100644
---- a/arch/arm/vfp/vfphw.S
-+++ b/arch/arm/vfp/vfphw.S
-@@ -322,3 +322,49 @@ ENTRY(vfp_put_double)
- 	.endr
- #endif
- ENDPROC(vfp_put_double)
 +
++#define kernel_neon_begin_atomic(a)	__kernel_neon_begin_atomic(&(a).regs)
++#define kernel_neon_end_atomic(a)	__kernel_neon_end_atomic(&(a).regs)
+diff --git a/arch/arm64/kernel/entry-fpsimd.S b/arch/arm64/kernel/entry-fpsimd.S
+index 6a27cd6..82cf648 100644
+--- a/arch/arm64/kernel/entry-fpsimd.S
++++ b/arch/arm64/kernel/entry-fpsimd.S
+@@ -41,3 +41,27 @@ ENTRY(fpsimd_load_state)
+ 	fpsimd_restore x0, 8
+ 	ret
+ ENDPROC(fpsimd_load_state)
 +
 +#ifdef CONFIG_KERNEL_MODE_NEON
 +
-+	.fpu	neon
-+ENTRY(vfp_save_partial_state)
-+	VFPFMRX	r2, FPEXC			@ load the control registers
-+	VFPFMRX	r3, FPSCR
-+	strd	r2, r3, [r0, #4]		@ and save to memory
-+	tst	r2, #FPEXC_EN
-+	bne	0f
-+	orr	r2, r2, #FPEXC_EN		@ enable VFP if it was disabled
-+	VFPFMXR	FPEXC, r2
-+0:	ldr	r1, [r0]			@ load # of regs to preserve
-+	rsbs	r1, r1, #16
-+	add	r2, r0, #16
-+	beq	1f
-+	adr	r3, 1f
-+	add	r3, r3, r1, lsl #1
-+THUMB(	orr	r3, r3, #1)
-+	bx	r3
-+1:	.irp	qq,q14-q15,q12-q13,q10-q11,q8-q9,q6-q7,q4-q5,q2-q3,q0-q1
-+	vst1.8	{\qq}, [r2,:128]!
-+	.endr
-+	bx	lr
-+ENDPROC(vfp_save_partial_state)
++/*
++ * Save the bottom n FP registers.
++ *
++ * x0 - pointer to struct fpsimd_partial_state
++ */
++ENTRY(fpsimd_save_partial_state)
++	fpsimd_save_partial x0, 8, 9
++	ret
++ENDPROC(fpsimd_load_partial_state)
 +
-+ENTRY(vfp_load_partial_state)
-+	ldr	r2, [r0]			@ load # of regs to preserve
-+	rsbs	r1, r2, #16
-+	add	r2, r0, #16
-+	beq	0f
-+	adr	r3, 0f
-+	add	r3, r3, r1, lsl #1
-+THUMB(	orr	r3, r3, #1)
-+	bx	r3
-+0:	.irp	qq,q14-q15,q12-q13,q10-q11,q8-q9,q6-q7,q4-q5,q2-q3,q0-q1
-+	vld1.8	{\qq}, [r2,:128]!
-+	.endr
-+	ldrd	r2, r3, [r0, #4]
-+	VFPFMXR	FPSCR, r3
-+	VFPFMXR	FPEXC, r2
-+	bx	lr
-+ENDPROC(vfp_load_partial_state)
++/*
++ * Load the bottom n FP registers.
++ *
++ * x0 - pointer to struct fpsimd_partial_state
++ */
++ENTRY(fpsimd_load_partial_state)
++	fpsimd_restore_partial x0, 8, 9
++	ret
++ENDPROC(fpsimd_load_partial_state)
 +
 +#endif
-diff --git a/arch/arm/vfp/vfpmodule.c b/arch/arm/vfp/vfpmodule.c
-index 52b8f40..3dea5ba 100644
---- a/arch/arm/vfp/vfpmodule.c
-+++ b/arch/arm/vfp/vfpmodule.c
-@@ -713,6 +713,9 @@ void kernel_neon_end(void)
+diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
+index 1f2e4d5..69c7962 100644
+--- a/arch/arm64/kernel/fpsimd.c
++++ b/arch/arm64/kernel/fpsimd.c
+@@ -109,6 +109,9 @@ void kernel_neon_end(void)
  }
  EXPORT_SYMBOL(kernel_neon_end);
  
-+EXPORT_SYMBOL(vfp_save_partial_state);
-+EXPORT_SYMBOL(vfp_load_partial_state);
++EXPORT_SYMBOL(fpsimd_load_partial_state);
++EXPORT_SYMBOL(fpsimd_save_partial_state);
 +
  #endif /* CONFIG_KERNEL_MODE_NEON */
  
