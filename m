@@ -1,81 +1,30 @@
-From: andreas.herrmann@calxeda.com (Andreas Herrmann)
-Date: Thu, 10 Oct 2013 00:55:03 +0200
-Subject: [PATCH 3/5] iommu/arm-smmu: Introduce stream ID masking
-In-Reply-To: <20131008165920.GG21189@mudshark.cambridge.arm.com>
-References: <1381224444-27303-1-git-send-email-andreas.herrmann@calxeda.com>
- <1381224444-27303-4-git-send-email-andreas.herrmann@calxeda.com>
- <20131008151007.GD21189@mudshark.cambridge.arm.com>
- <20131008152008.GE2935@alberich> <20131008164021.GH2935@alberich>
- <20131008165920.GG21189@mudshark.cambridge.arm.com>
-Message-ID: <20131009225503.GL2935@alberich>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Thu, 10 Oct 2013 07:57:42 +0900
+Subject: [PATCH] ARM: shmobile: Select GPIO in case of the r7s72100 SoC
+Message-ID: <20131009225742.7558.62495.sendpatchset@w520>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 08, 2013 at 12:59:20PM -0400, Will Deacon wrote:
-> On Tue, Oct 08, 2013 at 05:40:21PM +0100, Andreas Herrmann wrote:
-> > On Tue, Oct 08, 2013 at 05:20:08PM +0200, Andreas Herrmann wrote:
-> > To be more specific: For SATA I'd need to specify 10 StreamIds. This
-> > would
-> > 
-> > (1) exceed MAX_MASTER_STREAMIDS (currently it's 8)
-> > 
-> >    (Can easily be fixed by adapting a macro.)
-> > 
-> > (2) exceed number of available SMR groups to map the IDs to a context.
-> > 
-> >    This can be solved by caclulating an appropriate mask for the
-> >    mapping (but with a non-power-of-two number of StreamIds that's
-> >    already non-trivial -- for the trivial case I have some code to do
-> >    this).
-> > 
-> > Both problems are avoided by introducing this patch -- use
-> > smr_mask_bits to map all StreamIDs to the same context and be done
-> > with it. (for the "single-master-SMMU" case)
-> 
-> The problem is, this information *really* doesn't belong in the device tree,
-> but I think computing the general case dynamically is incredibly difficult
-> too (and requires *complete* topological information in the device-tree, so
-> you don't accidentally pull in other devices).
+From: Magnus Damm <damm@opensource.se>
 
-So, if this kind of driver option does not belong to the device tree,
-what's the preferred solution to tell the driver to use smr_mask_bits
-as a mask for stream matching for a certain SMMU (that has only one
-master)?
+The r7s72100 contains GPIO controllers so make sure the GPIO
+subsystem can be built by selecting ARCH_WANT_OPTIONAL_GPIOLIB.
+
+Signed-off-by: Magnus Damm <damm@opensource.se>
+---
+
+ Written against renesas-devel-20131008
+
+ arch/arm/mach-shmobile/Kconfig |    1 +
+ 1 file changed, 1 insertion(+)
+
+--- 0001/arch/arm/mach-shmobile/Kconfig
++++ work/arch/arm/mach-shmobile/Kconfig	2013-10-07 18:26:15.000000000 +0900
+@@ -109,6 +109,7 @@ config ARCH_EMEV2
  
-> > PS: I think (2) needs to be addressed sooner or later. We should use
-> >     only as many SMR groups as really required -- ie. use masking of
-> >     StreamIds if possible. If more than one StreamID is given for a
-> >     master it might be possible to calculate a mask for a
-> >     (power-of-two) number of adjacent StreamIds and then use only one
-> >     SMR group to map these IDs to a context. (But I think that should
-> >     only be done if multiple masters are attached to an SMMU.)
-> 
-> I spent a few weeks looking at doing minimal SMR grouping whilst writing the
-> driver and ended up convincing myself that it's an NP-complete problem (I
-> tried a reduction involving Hamiltonian Cycles). Of course, if you have some
-> ideas here, we can try to implement something for a constrained instance of
-> the problem.
-> 
-> For example, a simple solution is to xor all the IDs together and check no
-> other IDs fall under the resulting mask. However, this again relies on the
-> DT telling us complete topological information as well as the IDs being
-> organised in a particular way.
-
-Yes, it is an ugly problem. But assuming that the StreamIDs in many
-cases have a particular organsiation it should be possible to
-calculate a mask with reasonable effort. (I've attached a patch to do
-this for certain cases).
-
-I think it could be extended, such that in a case where StreamIDs 0,
-... 9 are specified for a master the driver could set up
-
- SMR0 with mask 0x7, id 0 (mapping StreamIDs 0, ..., 7)
- SMR1 for StreamID 8
- SMR2 for StreamID 9
-
-Thus 3 SMR groups would be used instead of 10 (as it is done with the
-current implementation).
-
-
-
-Andreas
+ config ARCH_R7S72100
+ 	bool "RZ/A1H (R7S72100)"
++	select ARCH_WANT_OPTIONAL_GPIOLIB
+ 	select ARM_GIC
+ 	select CPU_V7
+ 	select SH_CLK_CPG
