@@ -1,40 +1,36 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Wed, 9 Oct 2013 16:39:39 +0300
-Subject: [PATCH 1/3] ARM: OMAP4: use CLK_SET_RATE_PARENT for dss_dss_clk
-In-Reply-To: <5255587F.5010601@ti.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Wed, 9 Oct 2013 16:43:29 +0300
+Subject: [PATCH 3/3] ARM: OMAP3: fix dpll4_m3_ck and dpll4_m4_ck dividers
+In-Reply-To: <52555B37.80407@ti.com>
 References: <1381324359-28825-1-git-send-email-tomi.valkeinen@ti.com>
- <5255587F.5010601@ti.com>
-Message-ID: <52555C9B.20607@ti.com>
+ <1381324359-28825-3-git-send-email-tomi.valkeinen@ti.com>
+ <525558AA.9050906@ti.com> <52555B37.80407@ti.com>
+Message-ID: <52555D81.7070100@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/10/13 16:22, Tero Kristo wrote:
-> On 10/09/2013 04:12 PM, Tomi Valkeinen wrote:
->> Set CLK_SET_RATE_PARENT flag for dss_dss_clk so that the DSS's fclk can
->> be configured without the need to get the parent of the fclk.
-> 
-> I wouldn't touch this file right now, as we are trying to move the clock
-> data over to DT. Legacy boot support probably requires to do this
-> update, but I would rather wait a bit and do the modifications to both
-> DT clock data and this file in the same patch. Same applies for other
-> patches also.
+On 10/09/2013 04:33 PM, Tomi Valkeinen wrote:
+> On 09/10/13 16:22, Tero Kristo wrote:
+>> On 10/09/2013 04:12 PM, Tomi Valkeinen wrote:
+>>> dpll4_m3_ck and dpll4_m4_ck have divider bit fields which are 6 bits
+>>> wide. However, only values from 1 to 32 are allowed. This means we have
+>>> to add a divider tables and list the dividers explicitly.
+>>>
+>>> I believe the same issue is there for other dpll4_mx_ck clocks, but as
+>>> I'm not familiar with them, I didn't touch them.
+>>
+>> I think you can limit the max value with a mask only, no need to define
+>> new tables.
+>
+> The bit field is 6 bits wide, so the mask is correct. It's just that the
+> biggest allowed value is 32, which takes 6 bits, not 63.
+>
+> Changing the mask to 5 bits would limit the divider to 31, wouldn't it?
 
-Sounds good. I don't have any particular wishes how this is done, but
-I'd really like these to go into 3.13.
+Oh true. Sucks with legacy clocks then.
 
-The fclk handling in omapdss is quite a mess, and these flags would make
-it possible to clean it up. And the reason it's important to clean up
-the fclk handling ASAP is AM43xx, which has yet another clocking scheme.
+For dt clocks, you should be able to declare max / min divider values 
+for ti,divider-clock type which would take care of this case. Just 
+change the ti,max-div = <63>; field to ... = <32>;
 
-If these get only to 3.14, then I can fix the fclk handling only on 3.15.
-
- Tomi
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 901 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131009/23da6f88/attachment.sig>
+-Tero
