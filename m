@@ -1,82 +1,32 @@
-From: mingo@kernel.org (Ingo Molnar)
-Date: Wed, 9 Oct 2013 08:29:21 +0200
-Subject: [GIT PULL] clocksource: event stream on architected timers and
- tcb_clksrc misc changes
-In-Reply-To: <5252C443.9070501@linaro.org>
-References: <5252C443.9070501@linaro.org>
-Message-ID: <20131009062921.GF7664@gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 09 Oct 2013 07:40:29 +0100
+Subject: [PATCH] ARM: KVM: drop arbitrary limitation to 4 CPU VMs
+In-Reply-To: <CAFEAcA8vgfyEDhYDYDZc16pgdtFOYe-djWcbB0qh6Hrv7X=-PA@mail.gmail.com>
+References: <1381252628-17840-1-git-send-email-marc.zyngier@arm.com>
+ <CAFEAcA8vgfyEDhYDYDZc16pgdtFOYe-djWcbB0qh6Hrv7X=-PA@mail.gmail.com>
+Message-ID: <468864b7e5c2a2b55664713185844b08@www.loen.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 2013-10-09 03:15, Peter Maydell wrote:
+> On 9 October 2013 02:17, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>> It appears we have an arbitrary limitation where we refuse to
+>> create more than 4 virtual A15 in a single VM.
+>>
+>> This limitation doesn't make much sense (the number 4 probably
+>> comes from the maximum number of CPUs in a A15 cluster, but
+>> KVM doesn't have any notion of cluster)
+>
+> "Don't allow configurations that can't exist in hardware" makes
+> sense as a restriction to me... QEMU will also enforce the 4-cpu
+> limit.
 
-* Daniel Lezcano <daniel.lezcano@linaro.org> wrote:
+Nothing prevents anyone from building a multi-cluster A15 system:
+http://www.lsi.com/products/mobile-communication-processors/pages/axxia-communication-processor-axm5500.aspx
 
-> Hi Thomas, Ingo,
-> 
-> - Will Deacon and Sudeep KarkadaNagesha implemented the event stream for 
-> architected timer. The event streams can be used to impose a timeout on 
-> a wfe, to safeguard against any programming error in case an expected 
-> event is not generated or even to implement wfe-based timeouts for 
-> userspace locking implementations. Some files fall under the arm 
-> maintainers' umbrella but those changes have been reviewed and acked by 
-> the relevant people (Catalin Marinas and Olof Johansson).
-> 
-> - Boris Brezillon improved the tcb_clksrc driver by removing a 
-> deprecated flag, checking return code values and using functions from 
-> the common clock framework.
-> 
-> Thanks !
-> 
->    -- Daniel
-> 
-> The following changes since commit 68e90740284c69292881cd38c7ece6f09a18a58f:
-> 
->   Merge branch 'clockevents/3.13' of
-> git://git.linaro.org/people/dlezcano/linux into timers/core
-> (2013-10-03 07:57:02 +0200)
-> 
-> are available in the git repository at:
-> 
->   git://git.linaro.org/people/dlezcano/linux.git clockevents/3.13
-> 
-> for you to fetch changes up to f51380a75652a4600b34ce384c4ff89ce0a15132:
-> 
->   clocksource: tcb_clksrc: Remove IRQF_DISABLED (2013-10-03 16:28:40 +0200)
-> 
-> ----------------------------------------------------------------
-> Boris BREZILLON (3):
->       clocksource: tcb_clksrc: Replace clk_enable/disable with
-> clk_prepare_enable/disable_unprepare
->       clocksource: tcb_clksrc: Improve driver robustness
->       clocksource: tcb_clksrc: Remove IRQF_DISABLED
-> 
-> Daniel Lezcano (1):
->       Merge branch 'timer_evtstrm' of git://linux-arm.org/linux-skn
-> into clockevents/3.13
-> 
-> Sudeep KarkadaNagesha (4):
->       ARM/ARM64: arch_timer: add macros for bits in control register
->       ARM: arch_timer: add support to configure and enable event stream
->       ARM64: arch_timer: add support to configure and enable event stream
->       drivers: clocksource: add CPU PM notifier for ARM architected timer
-> 
-> Will Deacon (1):
->       drivers: clocksource: add support for ARM architected timer
-> event stream
-> 
->  arch/arm/include/asm/arch_timer.h    |   36 +++++++++++++++++---
->  arch/arm/include/uapi/asm/hwcap.h    |    1 +
->  arch/arm/kernel/setup.c              |    1 +
->  arch/arm64/include/asm/arch_timer.h  |   42 +++++++++++++++++++----
->  arch/arm64/include/asm/hwcap.h       |   11 +++---
->  arch/arm64/include/uapi/asm/hwcap.h  |    1 +
->  arch/arm64/kernel/setup.c            |   11 ++++++
->  drivers/clocksource/Kconfig          |   15 +++++++++
->  drivers/clocksource/arm_arch_timer.c |   49 +++++++++++++++++++++++++++
->  drivers/clocksource/tcb_clksrc.c     |   61 ++++++++++++++++++++++++++++------
->  include/clocksource/arm_arch_timer.h |   10 ++++++
->  11 files changed, 211 insertions(+), 27 deletions(-)
+If you want to limit QEMU to specific configurations, that's perfectly 
+fine. The kernel doesn't need to, and kvmtool won't.
 
-Pulled into tip:timers/core, thanks Daniel!
-
-	Ingo
+         M.
+-- 
+Fast, cheap, reliable. Pick two.
