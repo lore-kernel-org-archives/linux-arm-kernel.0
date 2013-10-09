@@ -1,26 +1,22 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 9 Oct 2013 12:40:57 +0900
-Subject: [PATCH v2 3/3] ARM: shmobile: kzm9d: Use common clock framework
-In-Reply-To: <20131008143403.c11f294c8a1701a2ab3bc5fd@ops.dti.ne.jp>
-References: <20131008143040.52f36df8edb7ab63224d8433@ops.dti.ne.jp>
- <20131008143403.c11f294c8a1701a2ab3bc5fd@ops.dti.ne.jp>
-Message-ID: <20131009034057.GO15065@verge.net.au>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 9 Oct 2013 11:49:49 +0800
+Subject: eMMC 4.51
+In-Reply-To: <CACUGKYPDQJPvtXj3NBm8=eYCioWmq=pRVSORNYNZjD13N5ceeg@mail.gmail.com>
+References: <CACUGKYPDQJPvtXj3NBm8=eYCioWmq=pRVSORNYNZjD13N5ceeg@mail.gmail.com>
+Message-ID: <20131009034944.GA8861@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 08, 2013 at 02:34:03PM +0900, takasi-y at ops.dti.ne.jp wrote:
-> Use common clock framework version of clock
->  drivers/clk/shmobile/clk-emev2.c
-> instead of sh-clkfwk version
->  arch/arm/mach-shmobile/clock-emev2.c
-> when it is configured as a part of multi-platform.
+On Tue, Oct 08, 2013 at 07:00:58PM -0700, John Tobias wrote:
+> Hello,
 > 
-> Signed-off-by: Takashi Yoshii <takasi-y@ops.dti.ne.jp>
+> I am using git://gitorious.org/thierryreding/linux-next.git to boot my
+> custom board based on iMX6 sololite. My board has SanDisk iNAND 4.51
+> I/F and wifi module (Marvel SD8797). The latest update of
+> sdhci-esdhc-imx.c supports DDR50/SDR50/SDR104 and I would like to use
+> it for my device.
 
-Thanks.
+The latest update on sdhci-esdhc-imx.c only enables the support of UHS SD card in
+SDR104 mode.  Neither DDR50 nor eMMC is supported so far.
 
-I plan to add this patch to a new topic branch,
-topic/emev2-common-clock, in the renesas tree and
-queue it up from there for inclusion in mainline
-if/when the first patch of this series is accepted
-by Mike Turquette.
+Shawn
