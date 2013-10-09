@@ -1,36 +1,25 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Wed, 9 Oct 2013 16:43:29 +0300
-Subject: [PATCH 3/3] ARM: OMAP3: fix dpll4_m3_ck and dpll4_m4_ck dividers
-In-Reply-To: <52555B37.80407@ti.com>
-References: <1381324359-28825-1-git-send-email-tomi.valkeinen@ti.com>
- <1381324359-28825-3-git-send-email-tomi.valkeinen@ti.com>
- <525558AA.9050906@ti.com> <52555B37.80407@ti.com>
-Message-ID: <52555D81.7070100@ti.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 9 Oct 2013 15:43:44 +0200
+Subject: [PATCH 3/6] pinctrl: single: Prepare for supporting SoC specific
+ features
+In-Reply-To: <20131007173531.GX8949@atomide.com>
+References: <20131003054104.8941.88857.stgit@localhost>
+ <20131003054218.8941.19273.stgit@localhost>
+ <20131007173531.GX8949@atomide.com>
+Message-ID: <CACRpkdZ1CeSXJngo0gKpnag-=mT3FB-byJi3JSAWiS8hbHqBJA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/09/2013 04:33 PM, Tomi Valkeinen wrote:
-> On 09/10/13 16:22, Tero Kristo wrote:
->> On 10/09/2013 04:12 PM, Tomi Valkeinen wrote:
->>> dpll4_m3_ck and dpll4_m4_ck have divider bit fields which are 6 bits
->>> wide. However, only values from 1 to 32 are allowed. This means we have
->>> to add a divider tables and list the dividers explicitly.
->>>
->>> I believe the same issue is there for other dpll4_mx_ck clocks, but as
->>> I'm not familiar with them, I didn't touch them.
->>
->> I think you can limit the max value with a mask only, no need to define
->> new tables.
+On Mon, Oct 7, 2013 at 7:35 PM, Tony Lindgren <tony@atomide.com> wrote:
+
+> Hi Linus W,
 >
-> The bit field is 6 bits wide, so the mask is correct. It's just that the
-> biggest allowed value is 32, which takes 6 bits, not 63.
->
-> Changing the mask to 5 bits would limit the divider to 31, wouldn't it?
+> Any comments on the pinctrl patches 3 - 5 in this series?
 
-Oh true. Sucks with legacy clocks then.
+Yes, after good explanations to my whimsical questions only this:
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-For dt clocks, you should be able to declare max / min divider values 
-for ti,divider-clock type which would take care of this case. Just 
-change the ti,max-div = <63>; field to ... = <32>;
+I guess you'll take these patches through ARM SoC?
 
--Tero
+Yours,
+Linus Walleij
