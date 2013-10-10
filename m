@@ -1,34 +1,44 @@
 From: khilman@linaro.org (Kevin Hilman)
-Date: Thu, 10 Oct 2013 15:14:08 -0700
+Date: Thu, 10 Oct 2013 15:19:00 -0700
 Subject: [GIT PULL] Second round of Renesas ARM based SoC cleanups for
  v3.13
-In-Reply-To: <87k3hkokd5.fsf@linaro.org>
+In-Reply-To: <cover.1381222967.git.horms+renesas@verge.net.au> (Simon Horman's
+ message of "Tue, 8 Oct 2013 18:05:24 +0900")
 References: <cover.1381222967.git.horms+renesas@verge.net.au>
- <20131009045354.GA8369@verge.net.au> <87k3hkokd5.fsf@linaro.org>
-Message-ID: <CAGa+x84b2W3gEFwrrVF6vzGw6iY87SRqUZGvXPjGexSbgg8dEA@mail.gmail.com>
+Message-ID: <87d2ncojl7.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 10, 2013 at 3:02 PM, Kevin Hilman <khilman@linaro.org> wrote:
-> Simon Horman <horms@verge.net.au> writes:
->
->> On Tue, Oct 08, 2013 at 06:05:24PM +0900, Simon Horman wrote:
->>> Hi Kevin, Olof and Arnd,
->>>
->>> please consider this Second round of Renesas ARM based SoC cleanups for v3.13.
->>> It is based on renesas-cleanup-for-v3.13 which you have previously pulled.
->>
->> This pull-request causes some conflicts in
->> arch/arm/mach-shmobile/board-bockw.c. In general the resolution
->> strategy should be to take everything.
->
-> Thanks for the heads up.  I assume you meant board-lager.c though,
-> right?  That's where I saw the conflict.
+Simon Horman <horms+renesas@verge.net.au> writes:
 
-Nevermind, I see the conflict you were referring to now.
+> Hi Kevin, Olof and Arnd,
+>
+> please consider this Second round of Renesas ARM based SoC cleanups for v3.13.
+> It is based on renesas-cleanup-for-v3.13 which you have previously pulled.
+>
+>
+> The following changes since commit cde214a890f81797a5eee94fffc89c1de21ed991:
+>
+>   ARM: shmobile: r8a7790: Constify platform data and resources (2013-09-19 14:33:44 -0700)
+>
+> are available in the git repository at:
+>
+>   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-cleanup2-for-v3.13
+>
+> for you to fetch changes up to 27113d63daac0aacaa26b1fabfc23391de4284f4:
+>
+>   ARM: shmobile: lager: Constify platform data and resources (2013-09-30 16:33:17 +0900)
+>
+> ----------------------------------------------------------------
+> Second round of Renesas ARM based SoC cleanups for v3.13
+>
+> * Constify platform data and resources in lager board code
+> * Clean up registration of VIN and sh_eth in r8a7778 SoC and
+>    bockw board code
+> * Make r8a7778_register_hspi() static in r8a7778 SoC code
 
-The one I found was a conflict between your first cleanup tag and this
-one.  Feel free to base subsequent cleanup branches on the previous
-ones if there are dependencies/conflicts like this.
+Pulled into next/cleanup.
+
+Thanks,
 
 Kevin
