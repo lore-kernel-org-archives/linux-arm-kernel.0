@@ -1,345 +1,39 @@
-From: lokeshvutla@ti.com (Lokesh Vutla)
-Date: Fri, 11 Oct 2013 00:44:53 +0530
-Subject: [PATCH 1/2] ARM: dts: AM4372: Add more nodes
+From: balbi@ti.com (Felipe Balbi)
+Date: Thu, 10 Oct 2013 14:18:17 -0500
+Subject: [PATCH 0/2] ARM: dts: AM4372: Add more nodes
 In-Reply-To: <1381432494-20498-1-git-send-email-lokeshvutla@ti.com>
 References: <1381432494-20498-1-git-send-email-lokeshvutla@ti.com>
-Message-ID: <1381432494-20498-2-git-send-email-lokeshvutla@ti.com>
+Message-ID: <20131010191817.GJ21240@radagast>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Populate nodes for l2-cache-controller, EDMA, mailbox,
-mmc, sham.
+Hi,
 
-And also updating dt properties for epwmss, aes, des.
+On Fri, Oct 11, 2013 at 12:44:52AM +0530, Lokesh Vutla wrote:
+> This patch series add nodes for l2-cache-controller, EDMA, mailbox,
+> mmc, sham, and updates the properties for cpsw, i2c0, matrix-keypad. 
+> 
+> These patches are applied on top of Benoit's for_3.13/dts branch
+> git://git.kernel.org/pub/scm/linux/kernel/git/bcousson/linux-omap-dt.git for_3.13/dts
+> 
+> Testing:
+> Tested EDMA, mmc, sham, aes, des, i2c0, cpsw, matric-keypad on AM4372 EPOS EVM
+> with the addition of following two series:
+> -> Tero's V8 of OMAP DT clock conversion
+>   http://www.mail-archive.com/linux-omap at vger.kernel.org/msg96769.html
+> -> Afzal's V5 of AM43x PRCM basic support
+>   http://www.mail-archive.com/linux-omap at vger.kernel.org/msg96275.html
 
-Few nodes are taken from a different tree that are added by
-Suman Anna <s-anna@ti.com> (Mailbox)
-Balaji T K <balajitk@ti.com> (MMC)
-Mugunthan V N <mugunthanvnm@ti.com> (Pinmux, Ethernet)
+one extra piece of info:
 
-Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
----
- arch/arm/boot/dts/am4372.dtsi |  210 ++++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 209 insertions(+), 1 deletion(-)
+all these patches are fresh out of Wakeup, tested on top of v3.12-rc3.
 
-diff --git a/arch/arm/boot/dts/am4372.dtsi b/arch/arm/boot/dts/am4372.dtsi
-index a403172..c328d5c 100644
---- a/arch/arm/boot/dts/am4372.dtsi
-+++ b/arch/arm/boot/dts/am4372.dtsi
-@@ -19,6 +19,8 @@
- 
- 	aliases {
- 		serial0 = &uart0;
-+		ethernet0 = &cpsw_emac0;
-+		ethernet1 = &cpsw_emac1;
- 	};
- 
- 	cpus {
-@@ -39,11 +41,42 @@
- 		      <0x48240100 0x0100>;
- 	};
- 
-+	l2-cache-controller at 48242000 {
-+		compatible = "arm,pl310-cache";
-+		reg = <0x48242000 0x1000>;
-+		cache-unified;
-+		cache-level = <2>;
-+	};
-+
-+	am43xx_pinmux: pinmux at 44e10800 {
-+		compatible = "pinctrl-single";
-+		reg = <0x44e10800 0x31c>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		pinctrl-single,register-width = <32>;
-+		pinctrl-single,function-mask = <0xffffffff>;
-+	};
-+
- 	ocp {
- 		compatible = "simple-bus";
- 		#address-cells = <1>;
- 		#size-cells = <1>;
- 		ranges;
-+		ti,hwmods = "l3_main";
-+
-+		edma: edma at 49000000 {
-+			compatible = "ti,edma3";
-+			ti,hwmods = "tpcc", "tptc0", "tptc1", "tptc2";
-+			reg =	<0x49000000 0x10000>,
-+				<0x44e10f90 0x10>;
-+			interrupts = <GIC_SPI 12 IRQ_TYPE_LEVEL_HIGH>,
-+					<GIC_SPI 13 IRQ_TYPE_LEVEL_HIGH>,
-+					<GIC_SPI 14 IRQ_TYPE_LEVEL_HIGH>;
-+			#dma-cells = <1>;
-+			dma-channels = <64>;
-+			ti,edma-regions = <4>;
-+			ti,edma-slots = <256>;
-+		};
- 
- 		uart0: serial at 44e09000 {
- 			compatible = "ti,am4372-uart","ti,omap2-uart";
-@@ -92,6 +125,18 @@
- 			status = "disabled";
- 		};
- 
-+		mailbox: mailbox at 480C8000 {
-+			compatible = "ti,omap4-mailbox";
-+			reg = <0x480C8000 0x200>;
-+			interrupts = <GIC_SPI 77 IRQ_TYPE_LEVEL_HIGH>;
-+			ti,hwmods = "mailbox";
-+			ti,mbox-num-users = <4>;
-+			ti,mbox-num-fifos = <8>;
-+			ti,mbox-names = "wkup_m3";
-+			ti,mbox-data = <0 0 0 0>;
-+			status = "disabled";
-+		};
-+
- 		timer1: timer at 44e31000 {
- 			compatible = "ti,am4372-timer-1ms","ti,am335x-timer-1ms";
- 			reg = <0x44e31000 0x400>;
-@@ -203,7 +248,6 @@
- 			reg = <0x44e35000 0x1000>;
- 			interrupts = <GIC_SPI 91 IRQ_TYPE_LEVEL_HIGH>;
- 			ti,hwmods = "wd_timer2";
--			status = "disabled";
- 		};
- 
- 		gpio0: gpio at 44e07000 {
-@@ -318,6 +362,40 @@
- 			status = "disabled";
- 		};
- 
-+		mmc1: mmc at 48060000 {
-+			compatible = "ti,omap4-hsmmc";
-+			reg = <0x48060000 0x1000>;
-+			ti,hwmods = "mmc1";
-+			ti,dual-volt;
-+			ti,needs-special-reset;
-+			dmas = <&edma 24
-+				&edma 25>;
-+			dma-names = "tx", "rx";
-+			interrupts = <GIC_SPI 64 IRQ_TYPE_LEVEL_HIGH>;
-+			status = "disabled";
-+		};
-+
-+		mmc2: mmc at 481d8000 {
-+			compatible = "ti,omap4-hsmmc";
-+			reg = <0x481d8000 0x1000>;
-+			ti,hwmods = "mmc2";
-+			ti,needs-special-reset;
-+			dmas = <&edma 2
-+				&edma 3>;
-+			dma-names = "tx", "rx";
-+			interrupts = <GIC_SPI 28 IRQ_TYPE_LEVEL_HIGH>;
-+			status = "disabled";
-+		};
-+
-+		mmc3: mmc at 47810000 {
-+			compatible = "ti,omap4-hsmmc";
-+			reg = <0x47810000 0x1000>;
-+			ti,hwmods = "mmc3";
-+			ti,needs-special-reset;
-+			interrupts = <GIC_SPI 29 IRQ_TYPE_LEVEL_HIGH>;
-+			status = "disabled";
-+		};
-+
- 		spi1: spi at 481a0000 {
- 			compatible = "ti,am4372-mcspi","ti,omap4-mcspi";
- 			reg = <0x481a0000 0x400>;
-@@ -366,50 +444,173 @@
- 				      GIC_SPI 41 IRQ_TYPE_LEVEL_HIGH
- 				      GIC_SPI 42 IRQ_TYPE_LEVEL_HIGH
- 				      GIC_SPI 43 IRQ_TYPE_LEVEL_HIGH>;
-+			#address-cells = <1>;
-+			#size-cells = <1>;
- 			ti,hwmods = "cpgmac0";
- 			status = "disabled";
-+			cpdma_channels = <8>;
-+			ale_entries = <1024>;
-+			bd_ram_size = <0x2000>;
-+			no_bd_ram = <0>;
-+			rx_descs = <64>;
-+			mac_control = <0x20>;
-+			slaves = <2>;
-+			active_slave = <0>;
-+			cpts_clock_mult = <0x80000000>;
-+			cpts_clock_shift = <29>;
-+			ranges;
-+
-+			davinci_mdio: mdio at 4a101000 {
-+				compatible = "ti,am4372-mdio","ti,davinci_mdio";
-+				reg = <0x4a101000 0x100>;
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				ti,hwmods = "davinci_mdio";
-+				bus_freq = <1000000>;
-+				status = "disabled";
-+			};
-+
-+			cpsw_emac0: slave at 4a100200 {
-+				/* Filled in by U-Boot */
-+				mac-address = [ 00 00 00 00 00 00 ];
-+			};
-+
-+			cpsw_emac1: slave at 4a100300 {
-+				/* Filled in by U-Boot */
-+				mac-address = [ 00 00 00 00 00 00 ];
-+			};
- 		};
- 
- 		epwmss0: epwmss at 48300000 {
- 			compatible = "ti,am4372-pwmss","ti,am33xx-pwmss";
- 			reg = <0x48300000 0x10>;
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			ranges;
- 			ti,hwmods = "epwmss0";
- 			status = "disabled";
-+
-+			ecap0: ecap at 48300100 {
-+				compatible = "ti,am4372-ecap","ti,am33xx-ecap";
-+				reg = <0x48300100 0x80>;
-+				ti,hwmods = "ecap0";
-+				status = "disabled";
-+			};
-+
-+			ehrpwm0: ehrpwm at 48300200 {
-+				compatible = "ti,am4372-ehrpwm","ti,am33xx-ehrpwm";
-+				reg = <0x48300200 0x80>;
-+				ti,hwmods = "ehrpwm0";
-+				status = "disabled";
-+			};
- 		};
- 
- 		epwmss1: epwmss at 48302000 {
- 			compatible = "ti,am4372-pwmss","ti,am33xx-pwmss";
- 			reg = <0x48302000 0x10>;
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			ranges;
- 			ti,hwmods = "epwmss1";
- 			status = "disabled";
-+
-+			ecap1: ecap at 48302100 {
-+				compatible = "ti,am4372-ecap","ti,am33xx-ecap";
-+				reg = <0x48302100 0x80>;
-+				ti,hwmods = "ecap1";
-+				status = "disabled";
-+			};
-+
-+			ehrpwm1: ehrpwm at 48302200 {
-+				compatible = "ti,am4372-ehrpwm","ti,am33xx-ehrpwm";
-+				reg = <0x48302200 0x80>;
-+				ti,hwmods = "ehrpwm1";
-+				status = "disabled";
-+			};
- 		};
- 
- 		epwmss2: epwmss at 48304000 {
- 			compatible = "ti,am4372-pwmss","ti,am33xx-pwmss";
- 			reg = <0x48304000 0x10>;
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			ranges;
- 			ti,hwmods = "epwmss2";
- 			status = "disabled";
-+
-+			ecap2: ecap at 48304100 {
-+				compatible = "ti,am4372-ecap","ti,am33xx-ecap";
-+				reg = <0x48304100 0x80>;
-+				ti,hwmods = "ecap2";
-+				status = "disabled";
-+			};
-+
-+			ehrpwm2: ehrpwm at 48304200 {
-+				compatible = "ti,am4372-ehrpwm","ti,am33xx-ehrpwm";
-+				reg = <0x48304200 0x80>;
-+				ti,hwmods = "ehrpwm2";
-+				status = "disabled";
-+			};
- 		};
- 
- 		epwmss3: epwmss at 48306000 {
- 			compatible = "ti,am4372-pwmss","ti,am33xx-pwmss";
- 			reg = <0x48306000 0x10>;
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			ranges;
- 			ti,hwmods = "epwmss3";
- 			status = "disabled";
-+
-+			ehrpwm3: ehrpwm at 48306200 {
-+				compatible = "ti,am4372-ehrpwm","ti,am33xx-ehrpwm";
-+				reg = <0x48306200 0x80>;
-+				ti,hwmods = "ehrpwm3";
-+				status = "disabled";
-+			};
- 		};
- 
- 		epwmss4: epwmss at 48308000 {
- 			compatible = "ti,am4372-pwmss","ti,am33xx-pwmss";
- 			reg = <0x48308000 0x10>;
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			ranges;
- 			ti,hwmods = "epwmss4";
- 			status = "disabled";
-+
-+			ehrpwm4: ehrpwm at 48308200 {
-+				compatible = "ti,am4372-ehrpwm","ti,am33xx-ehrpwm";
-+				reg = <0x48308200 0x80>;
-+				ti,hwmods = "ehrpwm4";
-+				status = "disabled";
-+			};
- 		};
- 
- 		epwmss5: epwmss at 4830a000 {
- 			compatible = "ti,am4372-pwmss","ti,am33xx-pwmss";
- 			reg = <0x4830a000 0x10>;
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			ranges;
- 			ti,hwmods = "epwmss5";
- 			status = "disabled";
-+
-+			ehrpwm5: ehrpwm at 4830a200 {
-+				compatible = "ti,am4372-ehrpwm","ti,am33xx-ehrpwm";
-+				reg = <0x4830a200 0x80>;
-+				ti,hwmods = "ehrpwm5";
-+				status = "disabled";
-+			};
-+		};
-+
-+		sham: sham at 53100000 {
-+			compatible = "ti,omap5-sham";
-+			ti,hwmods = "sham";
-+			reg = <0x53100000 0x300>;
-+			dmas = <&edma 36>;
-+			dma-names = "rx";
-+			interrupts = <GIC_SPI 109 IRQ_TYPE_LEVEL_HIGH>;
- 		};
- 
- 		aes: aes at 53501000 {
-@@ -417,6 +618,9 @@
- 			ti,hwmods = "aes";
- 			reg = <0x53501000 0xa0>;
- 			interrupts = <GIC_SPI 103 IRQ_TYPE_LEVEL_HIGH>;
-+			dmas = <&edma 6
-+				&edma 5>;
-+			dma-names = "tx", "rx";
- 		};
- 
- 		des: des at 53701000 {
-@@ -424,6 +628,10 @@
- 			ti,hwmods = "des";
- 			reg = <0x53701000 0xa0>;
- 			interrupts = <GIC_SPI 130 IRQ_TYPE_LEVEL_HIGH>;
-+			dmas = <&edma 34
-+				&edma 33>;
-+			dma-names = "tx", "rx";
- 		};
-+
- 	};
- };
 -- 
-1.7.9.5
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131010/eb11c696/attachment.sig>
