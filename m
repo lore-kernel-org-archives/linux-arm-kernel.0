@@ -1,39 +1,46 @@
-From: tharvey@gateworks.com (Tim Harvey)
-Date: Thu, 10 Oct 2013 13:33:45 -0700
-Subject: [PATCH v7 0/2] Add PCIe support for i.MX6q
-In-Reply-To: <0E83723C55F66F43A6041464FE31119D408C77@039-SN2MPN1-011.039d.mgd.msft.net>
-References: <1380165887-13506-1-git-send-email-shawn.guo@linaro.org>
- <201310082256.28474.marex@denx.de>
- <0E83723C55F66F43A6041464FE31119D401869@039-SN2MPN1-011.039d.mgd.msft.net>
- <201310101225.10455.marex@denx.de>
- <0E83723C55F66F43A6041464FE31119D408C77@039-SN2MPN1-011.039d.mgd.msft.net>
-Message-ID: <CAJ+vNU3OhvPNvBY2ZJ_jg2E+c0f+062n2Wj2PZnQ472UXTHOVQ@mail.gmail.com>
+From: taras.kondratiuk@linaro.org (Taras Kondratiuk)
+Date: Thu, 10 Oct 2013 23:36:08 +0300
+Subject: [RFC PATCH] ARM: kexec: Assemble relocate code in ARM mode
+In-Reply-To: <20131010141238.GA4081@localhost.localdomain>
+References: <1381352223-17721-1-git-send-email-taras.kondratiuk@linaro.org>
+ <20131010141238.GA4081@localhost.localdomain>
+Message-ID: <CAArO44tUpwsFRrF2TsaFKyD2PVkdZTWpM1GpZVq3-wjLN=0+dQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 10, 2013 at 3:40 AM, Zhu Richard-R65037
-<r65037@freescale.com> wrote:
+On 10 October 2013 17:12, Dave Martin <Dave.Martin@arm.com> wrote:
+> On Wed, Oct 09, 2013 at 11:57:03PM +0300, Taras Kondratiuk wrote:
+>> In Thumb2 kernel (CONFIG_THUMB2_KERNEL) kexec's relocate code is assembled
+>> in Thumb2 mode, but cpu_v7_reset() jumps to this code in ARM state,
+>> because its address is page aligned and has 0 in LSB.
+>>
+>> Assemble this code in ARM mode to fix the issue.
+>
+> I think the actual issue here is that relocate_new_kernel is not properly
+> annotated as a function symbol.
+>
+> Can you remove the explicit label declaration and try the following:
+>
+>         #include <linux/linkage.h>
+>
+>         ENTRY(relocate_new_kernel)
+>
+>         /* body of relocate_new_kernel */
+>
+>         ENDPROC(relocate_new_kernel)
+>
+>
+> Without this, the linker will treat it as a random pointer to data and
+> never set the Thumb bit.
+>
+> This fails in precisely the same was as an ordinary function call
+> would fail if the destination function doesn't have the needed
+> annotation.
+>
+>
+> There should be no need to switch to ARM if the kernel is just jumping
+> to itself...
 
->      host=10.192.242.95, domain=ap.freescale.net, nis-domain=(none)
->      bootserver=0.0.0.0, rootserver=10.192.225.216, rootpath=
->      nameserver0=10.192.130.201, nameserver1=10.211.0.3, nameserver2=10.196.51.200
-> ALSA device list:
->   #0: wm8962-audio
->   #1: imx-hdmi-soc
-> VFS: Mounted root (nfs filesystem) on device 0:11.
-> devtmpfs: mounted
-> Freeing unused kernel memory: 300K (80c29000 - 80c74000)
-> Kernel panic - not syncing: Attempted to kill init! exitcode=0x0000000b  ? <--System panic here sometimes. :(
-
-Marek,
-
-This is where an imprecise abort is triggered - refer to my comments
-regarding the abort handler at
-http://thread.gmane.org/gmane.linux.drivers.devicetree/44659/focus=46171
-- you should disable the bumping of the PC and/or the handler.
-
-Did this patch ever get applied and if so what git tree?  I would like
-to continue testing it as well with the boards I have that have a
-switch.
-
-Tim
+I think it won't help, because here is no direct jump to this label.
+This code gets copied to a new page and jump is done to the beginning
+of that page.
