@@ -1,51 +1,43 @@
-From: gang.chen@asianux.com (Chen Gang)
-Date: Thu, 10 Oct 2013 10:35:21 +0800
-Subject: [PATCH 3/3] arm64: include: asm: atomic.h: use 'unsigned int' and
- 'atomic_t' instead of 'unsigned long' for atomic_clear_mask()
-In-Reply-To: <5256121A.9030504@asianux.com>
-References: <52561137.3070608@asianux.com> <5256117A.4000009@asianux.com>
- <5256121A.9030504@asianux.com>
-Message-ID: <52561269.60900@asianux.com>
+From: sachin.kamat@linaro.org (Sachin Kamat)
+Date: Thu, 10 Oct 2013 08:59:24 +0530
+Subject: [PATCH 3/3] ARM: dts: exynos4x12: Add maudio/gps_alive power
+ domain for exynos4x12
+In-Reply-To: <1381365007-1782-4-git-send-email-cw00.choi@samsung.com>
+References: <1381365007-1782-1-git-send-email-cw00.choi@samsung.com>
+ <1381365007-1782-4-git-send-email-cw00.choi@samsung.com>
+Message-ID: <CAK9yfHxr27nsmaqkE+seDgZAkpUmOsPqdXdeogY89tAXYEEG2w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In current kernel wide source, for arm64, only s390 scsi drivers use
-atomic_clear_mask(), now, s390 itself need use 'unsigned int' and
-'atomic_t', so need match s390's atomic_clear_mask().
+On 10 October 2013 06:00, Chanwoo Choi <cw00.choi@samsung.com> wrote:
+> This patch maudio/gps_alive power domain to exynos4x12.dtsi.
+>
+> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> ---
+>  arch/arm/boot/dts/exynos4x12.dtsi | 10 ++++++++++
+>  1 file changed, 10 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/exynos4x12.dtsi b/arch/arm/boot/dts/exynos4x12.dtsi
+> index ad531fe..c04418e 100644
+> --- a/arch/arm/boot/dts/exynos4x12.dtsi
+> +++ b/arch/arm/boot/dts/exynos4x12.dtsi
+> @@ -35,6 +35,16 @@
+>                 reg = <0x10023CA0 0x20>;
+>         };
+>
+> +       pd_maudio: maudio-power-domain at 10023CC0 {
+> +               compatible = "samsung,exynos4210-pd";
+> +               reg = <0x10023CC0 0x20>;
+> +       };
+> +
+> +       pd_gps_alive: gps-alive-power-domain at 10023D04 {
+> +               compatible = "samsung,exynos4210-pd";
+> +               reg = <0x10023D00 0x20>;
+
+There is mismatch between node name and register value.
 
 
-Signed-off-by: Chen Gang <gang.chen@asianux.com>
----
- arch/arm64/include/asm/atomic.h |   13 +++++++------
- 1 files changed, 7 insertions(+), 6 deletions(-)
-
-diff --git a/arch/arm64/include/asm/atomic.h b/arch/arm64/include/asm/atomic.h
-index 8363644..58808fc 100644
---- a/arch/arm64/include/asm/atomic.h
-+++ b/arch/arm64/include/asm/atomic.h
-@@ -126,16 +126,17 @@ static inline int atomic_cmpxchg(atomic_t *ptr, int old, int new)
- 	return oldval;
- }
- 
--static inline void atomic_clear_mask(unsigned long mask, unsigned long *addr)
-+static inline void atomic_clear_mask(unsigned int mask, atomic_t *ptr)
- {
--	unsigned long tmp, tmp2;
-+	unsigned int tmp;
-+	unsigned long tmp2;
- 
- 	asm volatile("// atomic_clear_mask\n"
--"1:	ldxr	%0, %2\n"
--"	bic	%0, %0, %3\n"
--"	stxr	%w1, %0, %2\n"
-+"1:	ldxr	%w0, %2\n"
-+"	bic	%w0, %w0, %w3\n"
-+"	stxr	%w1, %w0, %2\n"
- "	cbnz	%w1, 1b"
--	: "=&r" (tmp), "=&r" (tmp2), "+Q" (*addr)
-+	: "=&r" (tmp), "=&r" (tmp2), "+Q" (ptr->counter)
- 	: "Ir" (mask)
- 	: "cc");
- }
 -- 
-1.7.7.6
+With warm regards,
+Sachin
