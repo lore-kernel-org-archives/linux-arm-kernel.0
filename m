@@ -1,76 +1,66 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 10 Oct 2013 19:30:13 -0400
-Subject: [GIT PULL] Keystone SOC updates for v3.13
-In-Reply-To: <87wqlkn4kn.fsf@linaro.org>
-References: <1381267740-31874-1-git-send-email-santosh.shilimkar@ti.com>
- <87wqlkn4kn.fsf@linaro.org>
-Message-ID: <52573885.9010007@ti.com>
+From: sebastian.capella@linaro.org (Sebastian Capella)
+Date: Thu, 10 Oct 2013 16:39:19 -0700
+Subject: [PATCH v3 1/2] init/do_mounts.c: ignore final \n in name_to_dev_t
+In-Reply-To: <878uy0u4j2.fsf@tw-ebiederman.twitter.com>
+References: <1380834638-24035-1-git-send-email-sebastian.capella@linaro.org>
+ <1380834638-24035-2-git-send-email-sebastian.capella@linaro.org>
+ <20131003141523.8b60ab988799af7e2b2c338b@linux-foundation.org>
+ <20131003214246.24540.99218@capellas-linux>
+ <20131003234735.19051.84583@capellas-linux>
+ <20131010175010.17870.58060@capellas-linux>
+ <878uy0u4j2.fsf@tw-ebiederman.twitter.com>
+Message-ID: <20131010233919.27645.5526@capellas-linux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 10 October 2013 06:28 PM, Kevin Hilman wrote:
-> Hi Santosh,
+Quoting Eric W. Biederman (2013-10-10 15:47:45)
+> Sebastian Capella <sebastian.capella@linaro.org> writes:
 > 
-> Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
+> > Quoting Sebastian Capella (2013-10-03 16:47:35)
+> >> Quoting Sebastian Capella (2013-10-03 14:42:46)
+> >> > Quoting Andrew Morton (2013-10-03 14:15:23)
+> >> > > On Thu,  3 Oct 2013 14:10:37 -0700 Sebastian Capella <sebastian.capella@linaro.org> wrote:
+> >> > > 
+> >> > > > Enhance name_to_dev_t to handle trailing newline characters
+> >> > > > on device paths.  Some inputs to name_to_dev_t may come from
+> >> > > > userspace where oftentimes a '\n' is appended to the path.
+> >> > > > Added const to the name buffer in both the function
+> >> > > > declaration and the prototype to reflect input buffer
+> >> > > > handling.
+> >> > > > 
+> >> > > > By handling trailing newlines in name_to_dev_t, userspace
+> >> > > > buffers may be directly passed to name_to_dev_t without
+> >> > > > modification.
+> >> > > 
+> >> > > We have lib/string.c:strim() - perhaps this patch would be
+> >> > > neater if it were to use it?
+> >> > 
+> >> > I was intending to respect the const handling of the input buffer.
+> >> > 
+> >> I looked into removing the const from the store function, but I'm not sure
+> >> this is the right idea, so I'm going to shelf that for now.
+> >> 
+> >> Please let me know your thoughts.
+> >> 
+> What is wrong with requiring userspace to use echo -n ?
 > 
->> Olof,
->>
->> Please pull below Keystone SOC updates for v3.13. As discussed on irc, the
->> pull request is build on top of v3.13-rc4 because of dependent commit
->> c2b9e974{dma/Kconfig: Make TI_EDMA select TI_PRIV_EDMA}. The pull request
->> carries Kconfig update patch {dma: Allow TI_EDMA selectable for ARCH_KEYSTONE}
->> with Vinod Koul's ack as per alignment on the mailing list[1]. The clock
->> driver support is already applied by Mike to his 3.13 clk-next [2]
->>
->> The following changes since commit ef887009524c3631d804a2587ec204c4ff61a5b8:
->>
->>   ARM: keystone: Enable I2C and SPI bus support (2013-10-08 15:37:41 -0400)
->>
->> are available in the git repository at:
->>
->>   git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git tags/keystone-soc-for-arm-soc
->>
->> for you to fetch changes up to ef887009524c3631d804a2587ec204c4ff61a5b8:
->>
->>   ARM: keystone: Enable I2C and SPI bus support (2013-10-08 15:37:41 -0400)
->>
->> ----------------------------------------------------------------
->> SOC updates for Keystone II devices:
->>
->> - Clock tree support
->> - Clock management support using PM core
->> - Keystone config update for EMDA with ack from Vinod
->> - Enable SPI and I2C drivers
->>
->> ----------------------------------------------------------------
->>
->> Santosh Shilimkar (9):
->>   ARM: dts: keystone: Add clock tree data to devicetree
->>   ARM: dts: keystone: Add clock phandle to UART nodes
->>   ARM: keystone: Enable clock drivers
->>   ARM: keystone: add PM bus support for clock management
+> That by far seems the simplest and least error prone solution.
 > 
-> I still don't like this one.  Like I pointed out earlier[1], this
-> doesn't really have anything to do with a bus, so it doesn't belong in
-> drivers/bus (and the 'bus' naming throughout isn't right.)  IMO, it
-> belongs in mach-keystone as the platform glue telling how the PM domains
-> are hooked up on keystone.
-> 
-I did ask follow up question[2] back since I thought there is nothing
-machine specific code in that. Thought you agreed to my argument.
+> Eric
+Trimmed back some of the history above.
 
-> Please move it to mach-keystone, and s/pm_bus/pm_domain/ throughout
-> since it has nothing to do with bus.  The 'bus' naming in davinci is
-> leftover from the pre-pm_domain days when we were overriding functions
-> of the platform_bus.
-> 
-But I respect your view and hence will send and updated pull request
-with the above rename.
+Hi Eric,
 
-Regards,
-Santosh
+Thanks for your comment.  While this does solve the problem for that case,
+I haven't generally seen sysfs files requiring 'echo -n' before.
+If you look in kernel/power/main.c, you can see that in other cases where
+you're echoing a string onto a sysfs file, the code will handle the \n.  
 
-> 
-> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2013-August/196026.html
-> 
-[2] http://lists.infradead.org/pipermail/linux-arm-kernel/2013-August/196027.html
+I expect it would likely be confusing for users.  The net effect would
+be that if you omit the -n, it report something like:
+write error: Invalid argument
+as if you'd mistyped the resume file.
+
+Thanks,
+
+Sebastian
