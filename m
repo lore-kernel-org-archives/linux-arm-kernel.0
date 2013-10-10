@@ -1,42 +1,65 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 10 Oct 2013 10:37:08 +0100
-Subject: [PATCH 3/5] drm/bridge: Add PTN3460 bridge driver
-In-Reply-To: <05c701cec56f$b79eea50$26dcbef0$%dae@samsung.com>
-References: <1380670860-17621-1-git-send-email-seanpaul@chromium.org>
- <1380670860-17621-4-git-send-email-seanpaul@chromium.org>
- <CAAQKjZN_r-=-sj=Vb-o-KUS4ab5=cjCq1ni3VZeMeVc3NL=MMg@mail.gmail.com>
- <CAOw6vbLiJLLKn=gb1=j5TBeM0ijEK13+goG-=mw7MZTyNT1kpQ@mail.gmail.com>
- <CAAQKjZPwyKCpju4Ndd+MB_aN24-zA5xTHFsFsun2617h7YT6dw@mail.gmail.com>
- <CAOesGMgKastzdFHYQzyL8gxkBN=86wFZ4jbgP8BHxfkOuZvJxg@mail.gmail.com>
- <CAAQKjZMhovKLxNfnXnbF-6diM2zF1cWyi+xHGyL3v83vBh4p6g@mail.gmail.com>
- <20131009182905.GY21581@sirena.org.uk>
- <05c701cec56f$b79eea50$26dcbef0$%dae@samsung.com>
-Message-ID: <20131010093708.GC21581@sirena.org.uk>
+From: B35083@freescale.com (Lu Jingchang-B35083)
+Date: Thu, 10 Oct 2013 09:39:04 +0000
+Subject: [PATCH v6 3/3] dma: Add Freescale eDMA engine driver support
+In-Reply-To: <1379498279-16096-1-git-send-email-b35083@freescale.com>
+References: <1379498279-16096-1-git-send-email-b35083@freescale.com>
+Message-ID: <B56CDBE15CE27145A4B77D2D24263E8522EFE6@039-SN1MPN1-004.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 10, 2013 at 01:18:05PM +0900, Inki Dae wrote:
+Hi, Vinod,
 
-> > > I still think the pin could be replaced with a regulator. But
-> > > lvds-bridge node has "powerdown-gpio" property - it say this board
-> > > will use gpio pin - specific to board.  So it seems no problem.
+  Could you please help review this patch? Could it be merged into your next tree?
+  Thanks!
 
-> > No, don't model things that aren't regulators as regulators - it's just
-> > confusing from a usability standpoint and causes breakage when the pins
-> > don't behave like regulators.
 
-> It seems that there was your missing point. That _is not_ what I mentioned.
-> I mean that other boards can use a regulator instead of gpio pin.
+Best Regards,
+Jingchang
 
-What I'm saying is no boards should use a regulator to control that
-GPIO pin, obviously if they're controlling the actual regulators that's
-fine but the reset signal should not be controlled via the regulator
-API (there are some unfortunate cases where people have done that
-already but let's not have any more).
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131010/603848a3/attachment.sig>
+
+> -----Original Message-----
+> From: Lu Jingchang-B35083
+> Sent: Wednesday, September 18, 2013 5:58 PM
+> To: vinod.koul at intel.com
+> Cc: shawn.guo at linaro.org; linux-kernel at vger.kernel.org; linux-arm-
+> kernel at lists.infradead.org; devicetree at vger.kernel.org; Lu Jingchang-
+> B35083; Wang Huan-B18965
+> Subject: [PATCH v6 3/3] dma: Add Freescale eDMA engine driver support
+> 
+> Add Freescale enhanced direct memory(eDMA) controller support.
+> The eDMA controller deploys DMAMUXs routing DMA request sources(slot)
+> to eDMA channels.
+> This module can be found on Vybrid and LS-1 SoCs.
+> 
+> Signed-off-by: Alison Wang <b18965@freescale.com>
+> Signed-off-by: Jingchang Lu <b35083@freescale.com>
+> ---
+> changes in v6:
+>   holding lock in dma_control to prevent race.
+> 
+> changes in v5:
+>   config slave_id when dmaengine_slave_config intead of channel request.
+>   adding residue calculation and dma pause/resume device control.
+> 
+> changes in v4:
+>   using exact compatible string in binding document.
+> 
+> changes in v3:
+>   handle all pending interrupt one time.
+>   add protect lock on dma transfer complete handling.
+>   change desc and tcd alloc flag to GFP_NOWAIT.
+>   add sanity check and error messages.
+> 
+> changes in v2:
+>   using generic dma-channels property instead of fsl,dma-channel.
+>   rename the binding document to fsl-edma.txt.
+> 
+> 
+>  Documentation/devicetree/bindings/dma/fsl-edma.txt |  84 ++
+>  drivers/dma/Kconfig                                |  10 +
+>  drivers/dma/Makefile                               |   1 +
+>  drivers/dma/fsl-edma.c                             | 944
+> +++++++++++++++++++++
+>  4 files changed, 1039 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/dma/fsl-edma.txt
+>  create mode 100644 drivers/dma/fsl-edma.c
