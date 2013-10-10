@@ -1,120 +1,42 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Thu, 10 Oct 2013 12:31:05 +0300
-Subject: [PATCH v2 6/6] mfd: omap-usb: prepare/unprepare clock while
- enable/disable
-In-Reply-To: <1381226799-29158-7-git-send-email-rogerq@ti.com>
-References: <1381226799-29158-1-git-send-email-rogerq@ti.com>
- <1381226799-29158-7-git-send-email-rogerq@ti.com>
-Message-ID: <525673D9.9060900@ti.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 10 Oct 2013 10:37:08 +0100
+Subject: [PATCH 3/5] drm/bridge: Add PTN3460 bridge driver
+In-Reply-To: <05c701cec56f$b79eea50$26dcbef0$%dae@samsung.com>
+References: <1380670860-17621-1-git-send-email-seanpaul@chromium.org>
+ <1380670860-17621-4-git-send-email-seanpaul@chromium.org>
+ <CAAQKjZN_r-=-sj=Vb-o-KUS4ab5=cjCq1ni3VZeMeVc3NL=MMg@mail.gmail.com>
+ <CAOw6vbLiJLLKn=gb1=j5TBeM0ijEK13+goG-=mw7MZTyNT1kpQ@mail.gmail.com>
+ <CAAQKjZPwyKCpju4Ndd+MB_aN24-zA5xTHFsFsun2617h7YT6dw@mail.gmail.com>
+ <CAOesGMgKastzdFHYQzyL8gxkBN=86wFZ4jbgP8BHxfkOuZvJxg@mail.gmail.com>
+ <CAAQKjZMhovKLxNfnXnbF-6diM2zF1cWyi+xHGyL3v83vBh4p6g@mail.gmail.com>
+ <20131009182905.GY21581@sirena.org.uk>
+ <05c701cec56f$b79eea50$26dcbef0$%dae@samsung.com>
+Message-ID: <20131010093708.GC21581@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Samuel,
+On Thu, Oct 10, 2013 at 01:18:05PM +0900, Inki Dae wrote:
 
-Could you please pick this one for 3.13 if OK? Thanks.
+> > > I still think the pin could be replaced with a regulator. But
+> > > lvds-bridge node has "powerdown-gpio" property - it say this board
+> > > will use gpio pin - specific to board.  So it seems no problem.
 
-cheers,
--roger
+> > No, don't model things that aren't regulators as regulators - it's just
+> > confusing from a usability standpoint and causes breakage when the pins
+> > don't behave like regulators.
 
-On 10/08/2013 01:06 PM, Roger Quadros wrote:
-> This should fix the following warning at boot on OMAP5 uEVM
-> [    8.783155] WARNING: CPU: 0 PID: 1 at drivers/clk/clk.c:883 __clk_enable+0x94/0xa4()
-> 
-> CC: Samuel Ortiz <sameo@linux.intel.com>
-> CC: Lee Jones <lee.jones@linaro.org>
-> CC: Tero Kristo <t-kristo@ti.com>
-> Signed-off-by: Roger Quadros <rogerq@ti.com>
-> ---
->  drivers/mfd/omap-usb-host.c |   16 ++++++++--------
->  drivers/mfd/omap-usb-tll.c  |    4 ++--
->  2 files changed, 10 insertions(+), 10 deletions(-)
-> 
-> diff --git a/drivers/mfd/omap-usb-host.c b/drivers/mfd/omap-usb-host.c
-> index 29ee54d..a5b91f1 100644
-> --- a/drivers/mfd/omap-usb-host.c
-> +++ b/drivers/mfd/omap-usb-host.c
-> @@ -328,13 +328,13 @@ static int usbhs_runtime_resume(struct device *dev)
->  	omap_tll_enable(pdata);
->  
->  	if (!IS_ERR(omap->ehci_logic_fck))
-> -		clk_enable(omap->ehci_logic_fck);
-> +		clk_prepare_enable(omap->ehci_logic_fck);
->  
->  	for (i = 0; i < omap->nports; i++) {
->  		switch (pdata->port_mode[i]) {
->  		case OMAP_EHCI_PORT_MODE_HSIC:
->  			if (!IS_ERR(omap->hsic60m_clk[i])) {
-> -				r = clk_enable(omap->hsic60m_clk[i]);
-> +				r = clk_prepare_enable(omap->hsic60m_clk[i]);
->  				if (r) {
->  					dev_err(dev,
->  					 "Can't enable port %d hsic60m clk:%d\n",
-> @@ -343,7 +343,7 @@ static int usbhs_runtime_resume(struct device *dev)
->  			}
->  
->  			if (!IS_ERR(omap->hsic480m_clk[i])) {
-> -				r = clk_enable(omap->hsic480m_clk[i]);
-> +				r = clk_prepare_enable(omap->hsic480m_clk[i]);
->  				if (r) {
->  					dev_err(dev,
->  					 "Can't enable port %d hsic480m clk:%d\n",
-> @@ -354,7 +354,7 @@ static int usbhs_runtime_resume(struct device *dev)
->  
->  		case OMAP_EHCI_PORT_MODE_TLL:
->  			if (!IS_ERR(omap->utmi_clk[i])) {
-> -				r = clk_enable(omap->utmi_clk[i]);
-> +				r = clk_prepare_enable(omap->utmi_clk[i]);
->  				if (r) {
->  					dev_err(dev,
->  					 "Can't enable port %d clk : %d\n",
-> @@ -382,15 +382,15 @@ static int usbhs_runtime_suspend(struct device *dev)
->  		switch (pdata->port_mode[i]) {
->  		case OMAP_EHCI_PORT_MODE_HSIC:
->  			if (!IS_ERR(omap->hsic60m_clk[i]))
-> -				clk_disable(omap->hsic60m_clk[i]);
-> +				clk_disable_unprepare(omap->hsic60m_clk[i]);
->  
->  			if (!IS_ERR(omap->hsic480m_clk[i]))
-> -				clk_disable(omap->hsic480m_clk[i]);
-> +				clk_disable_unprepare(omap->hsic480m_clk[i]);
->  		/* Fall through as utmi_clks were used in HSIC mode */
->  
->  		case OMAP_EHCI_PORT_MODE_TLL:
->  			if (!IS_ERR(omap->utmi_clk[i]))
-> -				clk_disable(omap->utmi_clk[i]);
-> +				clk_disable_unprepare(omap->utmi_clk[i]);
->  			break;
->  		default:
->  			break;
-> @@ -398,7 +398,7 @@ static int usbhs_runtime_suspend(struct device *dev)
->  	}
->  
->  	if (!IS_ERR(omap->ehci_logic_fck))
-> -		clk_disable(omap->ehci_logic_fck);
-> +		clk_disable_unprepare(omap->ehci_logic_fck);
->  
->  	omap_tll_disable(pdata);
->  
-> diff --git a/drivers/mfd/omap-usb-tll.c b/drivers/mfd/omap-usb-tll.c
-> index e59ac4c..1e57712 100644
-> --- a/drivers/mfd/omap-usb-tll.c
-> +++ b/drivers/mfd/omap-usb-tll.c
-> @@ -429,7 +429,7 @@ int omap_tll_enable(struct usbhs_omap_platform_data *pdata)
->  			if (IS_ERR(tll->ch_clk[i]))
->  				continue;
->  
-> -			r = clk_enable(tll->ch_clk[i]);
-> +			r = clk_prepare_enable(tll->ch_clk[i]);
->  			if (r) {
->  				dev_err(tll_dev,
->  				 "Error enabling ch %d clock: %d\n", i, r);
-> @@ -460,7 +460,7 @@ int omap_tll_disable(struct usbhs_omap_platform_data *pdata)
->  	for (i = 0; i < tll->nch; i++) {
->  		if (omap_usb_mode_needs_tll(pdata->port_mode[i])) {
->  			if (!IS_ERR(tll->ch_clk[i]))
-> -				clk_disable(tll->ch_clk[i]);
-> +				clk_disable_unprepare(tll->ch_clk[i]);
->  		}
->  	}
->  
-> 
+> It seems that there was your missing point. That _is not_ what I mentioned.
+> I mean that other boards can use a regulator instead of gpio pin.
+
+What I'm saying is no boards should use a regulator to control that
+GPIO pin, obviously if they're controlling the actual regulators that's
+fine but the reset signal should not be controlled via the regulator
+API (there are some unfortunate cases where people have done that
+already but let's not have any more).
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131010/603848a3/attachment.sig>
