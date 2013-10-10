@@ -1,38 +1,86 @@
-From: tony@atomide.com (Tony Lindgren)
+From: ebiederm@xmission.com (Eric W. Biederman)
 Date: Thu, 10 Oct 2013 15:47:45 -0700
-Subject: [PATCH 0/6] add support for omap wake-up interrupts via
- pinctrl-single, take2
-In-Reply-To: <871u3spzm5.fsf@linaro.org>
-References: <20131003054104.8941.88857.stgit@localhost>
- <871u3spzm5.fsf@linaro.org>
-Message-ID: <20131010224744.GK29913@atomide.com>
+Subject: [PATCH v3 1/2] init/do_mounts.c: ignore final \n in name_to_dev_t
+In-Reply-To: <20131010175010.17870.58060@capellas-linux> (Sebastian Capella's
+ message of "Thu, 10 Oct 2013 10:50:10 -0700")
+References: <1380834638-24035-1-git-send-email-sebastian.capella@linaro.org>
+ <1380834638-24035-2-git-send-email-sebastian.capella@linaro.org>
+ <20131003141523.8b60ab988799af7e2b2c338b@linux-foundation.org>
+ <20131003214246.24540.99218@capellas-linux>
+ <20131003234735.19051.84583@capellas-linux>
+ <20131010175010.17870.58060@capellas-linux>
+Message-ID: <878uy0u4j2.fsf@tw-ebiederman.twitter.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Kevin Hilman <khilman@linaro.org> [131010 14:55]:
-> Tony Lindgren <tony@atomide.com> writes:
-> 
-> > Here's a respin of the pinctrl-single related patches to use chained
-> > irq as suggested by Linus W earlier. This series does not try to
-> > provide any generic automated solution yet, but works by doing a
-> > request_irq() for the wake-up pin, so it should be flexible enough for
-> > both manual control and automated solution.
-> 
-> > This series removes the last nasty blocker for making omap3 to be
-> > device tree only without causing nasty PM regressions.
-> 
-> Indeed, I gave this a spin on several OMAP3 platforms with legacy boot
-> and ran through a series of retention and off-mode tests for idle and
-> suspend with both UART and RTC wakeups.  No regressions found.  So...
-> 
-> Reviewed-by: Kevin Hilman <khilman@linaro.org>
-> Tested-by: Kevin Hilman <khilman@linaro.org>
-> 
-> on 3530/beagle, 3730/beagle-xM, 3530/Overo, 3730/Overo STORM
+Sebastian Capella <sebastian.capella@linaro.org> writes:
 
-Thanks for testing, applying these into omap-for-v3.13/quirk
-because of the dependencies.
+> Quoting Sebastian Capella (2013-10-03 16:47:35)
+>> Quoting Sebastian Capella (2013-10-03 14:42:46)
+>> > Quoting Andrew Morton (2013-10-03 14:15:23)
+>> > > On Thu,  3 Oct 2013 14:10:37 -0700 Sebastian Capella <sebastian.capella@linaro.org> wrote:
+>> > > 
+>> > > > Enhance name_to_dev_t to handle trailing newline characters
+>> > > > on device paths.  Some inputs to name_to_dev_t may come from
+>> > > > userspace where oftentimes a '\n' is appended to the path.
+>> > > > Added const to the name buffer in both the function
+>> > > > declaration and the prototype to reflect input buffer
+>> > > > handling.
+>> > > > 
+>> > > > By handling trailing newlines in name_to_dev_t, userspace
+>> > > > buffers may be directly passed to name_to_dev_t without
+>> > > > modification.
+>> > > 
+>> > > We have lib/string.c:strim() - perhaps this patch would be
+>> > > neater if it were to use it?
+>> > 
+>> > Hi Morton,
+>> > 
+>> > I was intending to respect the const handling of the input buffer.
+>> > 
+>> > The actual buffer in this case is not really const as it comes from
+>> > the file buffering, but removing the const requires changing the
+>> > store function defined in the kobj_attribute, and would propagate
+>> > to many areas in the kernel.
+>> > 
+>> > Modifying the buffer and removing the const was also suggested by Pavel.
+>> > After some discussion I posted this version which did not change the
+>> > buffer or the prototype.
+>> > 
+>> > Please let me know if the preference is to modify the store function
+>> > definition.
+>> > 
+>> > I'll prepare a patchset that removes the consts to see how much is
+>> > changed.
+>> > 
+>> > Thanks,
+>> > 
+>> > Sebastian
+>> 
+>> Hi Andrew,
+>> 
+>> Sorry for calling you Morton earlier.
+>> 
+>> I looked into removing the const from the store function, but I'm not sure
+>> this is the right idea, so I'm going to shelf that for now.
+>> 
+>> Please let me know your thoughts.
+>> 
+>> Thanks,
+>> 
+>> Sebastian
+>  
+> Ping...
+>
+> Hi Andrew,
+>
+> Do you have any feedback on this?
+>
+> Below are the three options considered thus far.  Do
+> you have any additional suggestions or preferences?
 
-Regards,
+What is wrong with requiring userspace to use echo -n ?
 
-Tony
+That by far seems the simplest and least error prone solution.
+
+Eric
