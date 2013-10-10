@@ -1,151 +1,77 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 10 Oct 2013 15:20:49 -0700
-Subject: [PATCH 3/8] ARM: dts: Shared file for omap GPMC connected smsc911x
+Date: Thu, 10 Oct 2013 15:20:44 -0700
+Subject: [PATCH 2/8] ARM: OMAP2+: Add minimal 8250 support for GPMC
 In-Reply-To: <20131010221833.9063.49904.stgit@localhost>
 References: <20131010221833.9063.49904.stgit@localhost>
-Message-ID: <20131010222049.9063.76211.stgit@localhost>
+Message-ID: <20131010222044.9063.71060.stgit@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Looks like at least Igep, Zoom and EVM boards can use a
-common file for the GPMC connected smsc911x.
+Just initialize things using the bootloader timings like
+we've been doing for the legacy booting too. It should be
+possible to patch in the GPMC timings for the based on the
+TL16CP743C/TL16C754C manual at:
+
+http://www.ti.com/lit/ds/slls644g/slls644g.pdf
 
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/boot/dts/omap-gpmc-smsc911x.dtsi |   52 +++++++++++++++++++++++++++++
- arch/arm/boot/dts/omap3-igep0020.dts      |   45 +------------------------
- 2 files changed, 54 insertions(+), 43 deletions(-)
- create mode 100644 arch/arm/boot/dts/omap-gpmc-smsc911x.dtsi
+ arch/arm/mach-omap2/gpmc.c |   38 ++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 38 insertions(+)
 
-diff --git a/arch/arm/boot/dts/omap-gpmc-smsc911x.dtsi b/arch/arm/boot/dts/omap-gpmc-smsc911x.dtsi
-new file mode 100644
-index 0000000..9c18adf
---- /dev/null
-+++ b/arch/arm/boot/dts/omap-gpmc-smsc911x.dtsi
-@@ -0,0 +1,52 @@
+diff --git a/arch/arm/mach-omap2/gpmc.c b/arch/arm/mach-omap2/gpmc.c
+index 579697a..51525fa 100644
+--- a/arch/arm/mach-omap2/gpmc.c
++++ b/arch/arm/mach-omap2/gpmc.c
+@@ -1521,6 +1521,42 @@ err:
+ 	return ret;
+ }
+ 
 +/*
-+ * Common file for GPMC connected smsc911x on omaps
-+ *
-+ * Note that the board specifc DTS file needs to specify
-+ * ranges, pinctrl, reg, interrupt parent and interrupts.
++ * REVISIT: Add timing support from slls644g.pdf
 + */
++static int gpmc_probe_8250(struct platform_device *pdev,
++				struct device_node *child)
++{
++	struct resource res;
++	unsigned long base;
++	int ret, cs;
 +
-+/ {
-+	vddvario: regulator-vddvario {
-+		  compatible = "regulator-fixed";
-+		  regulator-name = "vddvario";
-+		  regulator-always-on;
-+	};
++	if (of_property_read_u32(child, "reg", &cs) < 0) {
++		dev_err(&pdev->dev, "%s has no 'reg' property\n",
++			child->full_name);
++		return -ENODEV;
++	}
 +
-+	vdd33a: regulator-vdd33a {
-+		compatible = "regulator-fixed";
-+		regulator-name = "vdd33a";
-+		regulator-always-on;
-+	};
-+};
++	if (of_address_to_resource(child, 0, &res) < 0) {
++		dev_err(&pdev->dev, "%s has malformed 'reg' property\n",
++			child->full_name);
++		return -ENODEV;
++	}
 +
-+&gpmc {
-+	ethernet at gpmc {
-+		compatible = "smsc,lan9221", "smsc,lan9115";
-+		bank-width = <2>;
-+		gpmc,mux-add-data;
-+		gpmc,cs-on-ns = <0>;
-+		gpmc,cs-rd-off-ns = <186>;
-+		gpmc,cs-wr-off-ns = <186>;
-+		gpmc,adv-on-ns = <12>;
-+		gpmc,adv-rd-off-ns = <48>;
-+		gpmc,adv-wr-off-ns = <48>;
-+		gpmc,oe-on-ns = <54>;
-+		gpmc,oe-off-ns = <168>;
-+		gpmc,we-on-ns = <54>;
-+		gpmc,we-off-ns = <168>;
-+		gpmc,rd-cycle-ns = <186>;
-+		gpmc,wr-cycle-ns = <186>;
-+		gpmc,access-ns = <114>;
-+		gpmc,page-burst-access-ns = <6>;
-+		gpmc,bus-turnaround-ns = <12>;
-+		gpmc,cycle2cycle-delay-ns = <18>;
-+		gpmc,wr-data-mux-bus-ns = <90>;
-+		gpmc,wr-access-ns = <186>;
-+		gpmc,cycle2cycle-samecsen;
-+		gpmc,cycle2cycle-diffcsen;
-+		vmmc-supply = <&vddvario>;
-+		vmmc_aux-supply = <&vdd33a>;
-+		reg-io-width = <4>;
-+		smsc,save-mac-address;
-+	};
-+};
-diff --git a/arch/arm/boot/dts/omap3-igep0020.dts b/arch/arm/boot/dts/omap3-igep0020.dts
-index e8c4828..503d928 100644
---- a/arch/arm/boot/dts/omap3-igep0020.dts
-+++ b/arch/arm/boot/dts/omap3-igep0020.dts
-@@ -10,6 +10,7 @@
-  */
++	ret = gpmc_cs_request(cs, resource_size(&res), &base);
++	if (ret < 0) {
++		dev_err(&pdev->dev, "cannot request GPMC CS %d\n", cs);
++		return ret;
++	}
++
++	if (of_platform_device_create(child, NULL, &pdev->dev))
++		return 0;
++
++	dev_err(&pdev->dev, "failed to create gpmc child %s\n", child->name);
++
++	return -ENODEV;
++}
++
+ static int gpmc_probe_dt(struct platform_device *pdev)
+ {
+ 	int ret;
+@@ -1564,6 +1600,8 @@ static int gpmc_probe_dt(struct platform_device *pdev)
+ 		else if (of_node_cmp(child->name, "ethernet") == 0 ||
+ 			 of_node_cmp(child->name, "nor") == 0)
+ 			ret = gpmc_probe_generic_child(pdev, child);
++		else if (of_node_cmp(child->name, "8250") == 0)
++			ret = gpmc_probe_8250(pdev, child);
  
- #include "omap3-igep.dtsi"
-+#include "omap-gpmc-smsc911x.dtsi"
- 
- / {
- 	model = "IGEPv2";
-@@ -40,18 +41,6 @@
- 			gpios = <&twl_gpio 19 GPIO_ACTIVE_LOW>;
- 		};
- 	};
--
--	vddvario: regulator-vddvario {
--		  compatible = "regulator-fixed";
--		  regulator-name = "vddvario";
--		  regulator-always-on;
--	};
--
--	vdd33a: regulator-vdd33a {
--		compatible = "regulator-fixed";
--		regulator-name = "vdd33a";
--		regulator-always-on;
--	};
- };
- 
- &i2c3 {
-@@ -117,41 +106,11 @@
- 		};
- 	};
- 
--	ethernet at 5,0 {
-+	ethernet at gpmc {
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&smsc911x_pins>;
--		compatible = "smsc,lan9221", "smsc,lan9115";
- 		reg = <5 0 0xff>;
--		bank-width = <2>;
--
--		gpmc,mux-add-data;
--		gpmc,cs-on-ns = <0>;
--		gpmc,cs-rd-off-ns = <186>;
--		gpmc,cs-wr-off-ns = <186>;
--		gpmc,adv-on-ns = <12>;
--		gpmc,adv-rd-off-ns = <48>;
--		gpmc,adv-wr-off-ns = <48>;
--		gpmc,oe-on-ns = <54>;
--		gpmc,oe-off-ns = <168>;
--		gpmc,we-on-ns = <54>;
--		gpmc,we-off-ns = <168>;
--		gpmc,rd-cycle-ns = <186>;
--		gpmc,wr-cycle-ns = <186>;
--		gpmc,access-ns = <114>;
--		gpmc,page-burst-access-ns = <6>;
--		gpmc,bus-turnaround-ns = <12>;
--		gpmc,cycle2cycle-delay-ns = <18>;
--		gpmc,wr-data-mux-bus-ns = <90>;
--		gpmc,wr-access-ns = <186>;
--		gpmc,cycle2cycle-samecsen;
--		gpmc,cycle2cycle-diffcsen;
--
- 		interrupt-parent = <&gpio6>;
- 		interrupts = <16 8>;
--		vmmc-supply = <&vddvario>;
--		vmmc_aux-supply = <&vdd33a>;
--		reg-io-width = <4>;
--
--		smsc,save-mac-address;
- 	};
- };
+ 		if (WARN(ret < 0, "%s: probing gpmc child %s failed\n",
+ 			 __func__, child->full_name))
