@@ -1,115 +1,110 @@
-From: anup@brainfault.org (Anup Patel)
-Date: Thu, 10 Oct 2013 10:21:07 +0530
-Subject: [RFC PATCH] arm64: KVM: honor cacheability attributes on S2 page
- fault
-In-Reply-To: <20130911193855.GN9860@cbox>
-References: <1378806670-2467-1-git-send-email-marc.zyngier@arm.com>
- <CAAhSdy2E6aRndw88_S_3wfyTOYd5rQQTc4+Cw5Hd1DFXuM6EBA@mail.gmail.com>
- <523063AC.8040803@arm.com> <20130911193855.GN9860@cbox>
-Message-ID: <CAAhSdy0EZpzGOpVFOo-GWPs97XLHB8_uTZ7BTu0gP958y8JPeA@mail.gmail.com>
+From: monstr@monstr.eu (Michal Simek)
+Date: Thu, 10 Oct 2013 07:18:01 +0200
+Subject: [PATCH v7 1/5] ARM: add basic support for Trusted Foundations
+In-Reply-To: <CAOesGMjtHBft71nJUEc7K+2UA_LiWBOVWpbYvJDOnF=NLepLLw@mail.gmail.com>
+References: <1380904635-18113-1-git-send-email-acourbot@nvidia.com>
+ <1380904635-18113-2-git-send-email-acourbot@nvidia.com>
+ <5253BF8E.4050802@monstr.eu>
+ <CAOesGMjtHBft71nJUEc7K+2UA_LiWBOVWpbYvJDOnF=NLepLLw@mail.gmail.com>
+Message-ID: <52563889.8030703@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 12, 2013 at 1:08 AM, Christoffer Dall
-<christoffer.dall@linaro.org> wrote:
-> On Wed, Sep 11, 2013 at 01:35:56PM +0100, Marc Zyngier wrote:
->> On 11/09/13 13:21, Anup Patel wrote:
->> > On Tue, Sep 10, 2013 at 3:21 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
->> >> Anup Patel recently brought up the fact that when we run a guest
->> >> with cache disabled, we don't flush the cache to the Point of
->> >> Coherency, hence possibly missing bits of data that have been
->> >> written in the cache, but have not reached memory.
->> >>
->> >> There are several approaches to this issue:
->> >> - Using the DC bit when caches are off: this breaks guests assuming
->> >>   caches off while doing DMA operations. Bootloaders, for example.
->> >> - Fetch the memory attributes on translation fault, and flush the
->> >>   cache while handling the fault. This relies on using the PAR_EL1
->> >>   register to obtain the Stage-1 memory attributes.
->> >>
->> >> While this second solution is clearly not ideal (it duplicates what
->> >> the HW already does to generate HPFAR_EL2), it is more correct than
->> >> not doing anything.
->> >>
->> >> Cc: Anup Patel <anup@brainfault.org>
->> >> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> >> ---
->> >>
->> >>  arch/arm/include/asm/kvm_mmu.h    |  4 ++--
->> >>  arch/arm/kvm/mmu.c                |  2 +-
->> >>  arch/arm64/include/asm/kvm_host.h |  1 +
->> >>  arch/arm64/include/asm/kvm_mmu.h  |  9 +++++++--
->> >>  arch/arm64/kernel/asm-offsets.c   |  1 +
->> >>  arch/arm64/kvm/hyp.S              | 28 ++++++++++++----------------
->> >>  6 files changed, 24 insertions(+), 21 deletions(-)
->> >>
->> >> diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
->> >> index 472ac70..faffdf0 100644
->> >> --- a/arch/arm/include/asm/kvm_mmu.h
->> >> +++ b/arch/arm/include/asm/kvm_mmu.h
->> >> @@ -105,7 +105,7 @@ static inline void kvm_set_s2pte_writable(pte_t *pte)
->> >>
->> >>  struct kvm;
->> >>
->> >> -static inline void coherent_icache_guest_page(struct kvm *kvm, gfn_t gfn)
->> >> +static inline void coherent_icache_guest_page(struct kvm_vcpu *vcpu, gfn_t gfn)
->> >>  {
->> >>         /*
->> >>          * If we are going to insert an instruction page and the icache is
->> >> @@ -120,7 +120,7 @@ static inline void coherent_icache_guest_page(struct kvm *kvm, gfn_t gfn)
->> >>          * need any kind of flushing (DDI 0406C.b - Page B3-1392).
->> >>          */
->> >>         if (icache_is_pipt()) {
->> >> -               unsigned long hva = gfn_to_hva(kvm, gfn);
->> >> +               unsigned long hva = gfn_to_hva(vcpu->kvm, gfn);
->> >>                 __cpuc_coherent_user_range(hva, hva + PAGE_SIZE);
->> >>         } else if (!icache_is_vivt_asid_tagged()) {
->> >>                 /* any kind of VIPT cache */
->> >> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
->> >> index 0988d9e..ffb3cc4 100644
->> >> --- a/arch/arm/kvm/mmu.c
->> >> +++ b/arch/arm/kvm/mmu.c
->> >> @@ -547,7 +547,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
->> >>                 return -EFAULT;
->> >>
->> >>         new_pte = pfn_pte(pfn, PAGE_S2);
->> >> -       coherent_icache_guest_page(vcpu->kvm, gfn);
->> >> +       coherent_icache_guest_page(vcpu, gfn);
->> >>
->> >>         spin_lock(&vcpu->kvm->mmu_lock);
->> >>         if (mmu_notifier_retry(vcpu->kvm, mmu_seq))
->> >> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
->> >> index 331a852..2530f92 100644
->> >> --- a/arch/arm64/include/asm/kvm_host.h
->> >> +++ b/arch/arm64/include/asm/kvm_host.h
->> >> @@ -79,6 +79,7 @@ struct kvm_mmu_memory_cache {
->> >>  struct kvm_vcpu_fault_info {
->> >>         u32 esr_el2;            /* Hyp Syndrom Register */
->> >>         u64 far_el2;            /* Hyp Fault Address Register */
->> >> +       u64 par_el2;            /* Result of FAR_EL2 translation */
->> >
->> > Please rename this to par_el1 because we are saving result of Stage1
->> > translation only.
+On 10/10/2013 01:45 AM, Olof Johansson wrote:
+> On Tue, Oct 8, 2013 at 1:17 AM, Michal Simek <monstr@monstr.eu> wrote:
+>> Hi,
 >>
->> That'd be very confusing, as we deal with PAR_EL1 separately, as part of
->> the guest context.
+>> On 10/04/2013 06:37 PM, Alexandre Courbot wrote:
+>>> Trusted Foundations is a TrustZone-based secure monitor for ARM that
+>>> can be invoked using the same SMC-based API on all supported
+>>> platforms. This patch adds initial basic support for Trusted
+>>> Foundations using the ARM firmware API. Current features are limited
+>>> to the ability to boot secondary processors.
+>>>
+>>> Note: The API followed by Trusted Foundations does *not* follow the SMC
+>>> calling conventions. It has nothing to do with PSCI neither and is only
+>>> relevant to devices that use Trusted Foundations (like most Tegra-based
+>>> retail devices).
+>>>
+>>> Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
+>>> Reviewed-by: Tomasz Figa <t.figa@samsung.com>
+>>> Reviewed-by: Stephen Warren <swarren@nvidia.com>
+>>> ---
+>>>  .../arm/firmware/tl,trusted-foundations.txt        | 17 +++++
+>>>  .../devicetree/bindings/vendor-prefixes.txt        |  1 +
+>>>  arch/arm/Kconfig                                   |  2 +
+>>>  arch/arm/Makefile                                  |  1 +
+>>>  arch/arm/firmware/Kconfig                          | 28 ++++++++
+>>>  arch/arm/firmware/Makefile                         |  1 +
+>>>  arch/arm/firmware/trusted_foundations.c            | 77 ++++++++++++++++++++++
+>>>  arch/arm/include/asm/trusted_foundations.h         | 64 ++++++++++++++++++
+>>>  8 files changed, 191 insertions(+)
+>>>  create mode 100644 Documentation/devicetree/bindings/arm/firmware/tl,trusted-foundations.txt
+>>>  create mode 100644 arch/arm/firmware/Kconfig
+>>>  create mode 100644 arch/arm/firmware/Makefile
+>>>  create mode 100644 arch/arm/firmware/trusted_foundations.c
+>>>  create mode 100644 arch/arm/include/asm/trusted_foundations.h
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/arm/firmware/tl,trusted-foundations.txt b/Documentation/devicetree/bindings/arm/firmware/tl,trusted-foundations.txt
+>>> new file mode 100644
+>>> index 0000000..3954bbd
+>>> --- /dev/null
+>>> +++ b/Documentation/devicetree/bindings/arm/firmware/tl,trusted-foundations.txt
+>>> @@ -0,0 +1,17 @@
+>>> +Trusted Foundations
+>>> +
+>>> +Boards that use the Trusted Foundations secure monitor can signal its
+>>> +presence by declaring a node compatible with "tl,trusted-foundations"
+>>> +under the root node.
+>>> +
+>>> +Required properties:
+>>> +- compatible : "tl,trusted-foundations"
+>>> +- version-major : major version number of Trusted Foundations firmware
+>>> +- version-minor: minor version number of Trusted Foundations firmware
+>>> +
+>>> +Example:
+>>> +     firmware {
+>>> +             compatible = "tl,trusted-foundations";
+>>> +             version-major = <2>;
+>>> +             version-minor = <8>;
+>>> +     };
 >>
->> If anything, I may rename it to "what_I_d_love_HPFAR_to_return" instead.
+>> This is just another example how to add sw description to dts.
+>> I have briefly looked at tegra20.dtsi and there are IPs like timer, intc, etc
+>> which are in the DTS without any bus.
 >>
->
-> while extremely clear, it may be a bit verbose ;)
->
-> I honestly think that 'making up' a register name is a bit confusing as
-> well.  I can live with it, but perhaps fault_ipa, or s1_fault_attr or
-> something like that would work.  Eh.
->
-> -Christoffer
+>> Add this firmware node to the root is just +1 case to this mess
+>> but IMHO will be good to have specific DT part which will be used for
+>> this sw setting which are coming to DTS all the time.
+>>
+>> Grant, Rob: Where is the proper location for these type of description?
+> 
+> Usually we've been using the /firmware hierarchy for these kind of things.
+> 
+> Chrome OS uses /firmware/chromeos for some of the information passing
+> from FW to the OS.
+> 
+> You might want a separate node under /firmware for this, since this is
+> "just" the secure runtime portion of things, there might be need to
+> add things for/from the bootloader too.
 
-Hi Marc,
+Is this documented somewhere? I mean that firmware node should be used for this.
 
-Are you planning to go ahead with this approach ?
+Thanks,
+Michal
 
-We really need this patch for X-Gene L3 cache.
+-- 
+Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
 
-Regards,
-Anup
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 263 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131010/31a83df5/attachment.sig>
