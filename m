@@ -1,71 +1,163 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 10 Oct 2013 10:32:11 -0700
-Subject: [RFCv3 0/7] OMAP SSI driver
-In-Reply-To: <20131010172128.GF28657@earth.universe>
-References: <1381091235-18293-1-git-send-email-sre@debian.org>
- <20131008172815.GA8313@atomide.com>
- <20131010172128.GF28657@earth.universe>
-Message-ID: <20131010173211.GH29913@atomide.com>
+From: marex@denx.de (Marek Vasut)
+Date: Thu, 10 Oct 2013 19:39:44 +0200
+Subject: [PATCH v7 0/2] Add PCIe support for i.MX6q
+In-Reply-To: <CAErSpo64NbDhA0LX95s1T=DvuBhWi7qeqS2maNJn15zbG8GCUA@mail.gmail.com>
+References: <1380165887-13506-1-git-send-email-shawn.guo@linaro.org>
+ <201310101758.35085.marex@denx.de>
+ <CAErSpo64NbDhA0LX95s1T=DvuBhWi7qeqS2maNJn15zbG8GCUA@mail.gmail.com>
+Message-ID: <201310101939.44295.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Sebastian Reichel <sre@debian.org> [131010 10:30]:
-> Hi,
+Hi Bjorn,
+
+> [+cc Yinghai]
 > 
-> On Tue, Oct 08, 2013 at 10:28:15AM -0700, Tony Lindgren wrote:
-> > * Sebastian Reichel <sre@debian.org> [131006 13:36]:
-> > > Here is the third round of the OMAP SSI driver patches.
+> On Thu, Oct 10, 2013 at 9:58 AM, Marek Vasut <marex@denx.de> wrote:
+> >> On Thu, Oct 10, 2013 at 4:25 AM, Marek Vasut <marex@denx.de> wrote:
+> > I tried you suggestion, this is what I got now (and with V7 of the
+> > patches):
 > > 
-> > Thanks for updating these, they look good to me now:
+> > Note that my topology is: rootport->2_port_switch->ethernet_chip , the
+> > other port of the switch is not used .
 > > 
-> > Acked-by: Tony Lindgren <tony@atomide.com>
+> > imx6q-pcie 1ffc000.pcie: phy link never came up
+> > PCI host bridge to bus 0000:00
+> > pci_bus 0000:00: root bus resource [io  0x1000-0x10000]
+> > pci_bus 0000:00: root bus resource [mem 0x01000000-0x01efffff]
+> > pci_bus 0000:00: No busn resource found for root bus, will use [bus
+> > 00-ff] pci_bus 0000:00: scanning bus
+> > pci 0000:00:00.0: [16c3:abcd] type 01 class 0x060400
+> > pci 0000:00:00.0: reg 0x10: [mem 0x00000000-0x000fffff]
+> > pci 0000:00:00.0: reg 0x38: [mem 0x00000000-0x0000ffff pref]
 > 
-> Ok. I guess it's time to check how this gets included in the kernel.
-> 
-> The first patch has already been queued and the last patch could
-> probably go through Beno?t once the DT people have reviewed the
-> updated patches. The other ones would normally go through the
-> hsi tree, but that one was maintained by Carlos Chinea and is 
-> now more or less orphaned.
+> This is probably your Root Port, and it looks like its BARs haven't
+> been programmed.
 
-Yes, I suggest you post the .dts changes completely seprately
-so driver maintainers don't accidentally pick those up.
- 
-> My suggestion is:
-> 
-> 1. I create another patch, which adds entries for hsi subsystem and
->    ssi driver to MAINTAINERS.
-> 
->    It would be nice to have some co-maintainers for the subsystem.
->    Linus Walleij maybe? I think you created the launchpad blueprint [1]?
->    Especially because I have no documentation/specification for HSI, which
->    brings me to my next slightly off topic request.
-> 
->    I would like to have access to SSI documentation and HSI specification.
->    Can the guys from Texas Instruments please give me some pointers how I
->    can get access to the NDA'd documentation? I couldn't find any hints
->    on ti.com.
-> 
-> 2. I create a patch adding Carlos Chinea to CREDITS
-> 
-> 3. I create a git repository and put all of the patches in there, so
->    that they can be pulled into linux-next.
-> 
-> 4. I add a gpg/pgp signed tag with the key used to signed this mail.
-> 
-> Any issues with this or any other suggestions how to proceed? And if following this
-> - should I request an account on kernel.org to host the repository there,
-> or should I just upload it at a random place?
+The BAR programming should be happening in:
 
-That all sounds good to me. It is a *good thing* to have a maintainer
-for a driver subsystem, and if you're willing to pick it up, that's
-the way to go.
+drivers/pci/host/pcie-designware.c
 
-Regards,
+494 void dw_pcie_setup_rc(struct pcie_port *pp)
+495 {
+[...]
+532 
+533         /* setup RC BARs */
+534         dw_pcie_writel_rc(pp, 0x00000004, PCI_BASE_ADDRESS_0);
+535         dw_pcie_writel_rc(pp, 0x00000004, PCI_BASE_ADDRESS_1);
 
-Tony
- 
-> [0] https://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/tree/Next/Trees
-> [1] https://blueprints.launchpad.net/linux-linaro/+spec/hsi-subsystem-maint
+Or am I mistaken?
+
+> > pci 0000:00:00.0: calling pci_fixup_ide_bases+0x0/0x5c
+> > pci 0000:00:00.0: supports D1
+> > pci 0000:00:00.0: PME# supported from D0 D1 D3hot D3cold
+> > pci 0000:00:00.0: PME# disabled
+> > pci_bus 0000:00: fixups for bus
+> > PCI: bus0: Fast back to back transfers disabled
+> > pci 0000:00:00.0: scanning [bus 01-01] behind bridge, pass 0
+> > pci 0000:00:00.0: scanning [bus 00-00] behind bridge, pass 1
+> > pci_bus 0000:01: scanning bus
+> > pci_bus 0000:01: fixups for bus
+> > PCI: bus1: Fast back to back transfers enabled
+> > pci_bus 0000:01: bus scan returning with max=01
+> > pci_bus 0000:01: busn_res: [bus 01-ff] end is updated to 01
+> > pci_bus 0000:00: bus scan returning with max=01
+> > pci_bus 0000:00: busn_res: [bus 00-ff] end is updated to 01
 > 
-> -- Sebastian
+> We should have found the switch (an Upstream Port and two Downstream
+> Ports) and the ethernet device here.  Have you ever seen this work,
+> i.e., have we ever found those devices, with any kernel?
+
+I got it working in U-Boot, but the PCI stack there is ported from older kernel 
+version and the MX6 PCIe driver is entirely custom (even though it's copying the 
+behavior of the MX6 PCIe driver in kernel).
+
+I managed to detect the whole topology in U-Boot:
+
+  00:01.0     - 16c3:abcd - Bridge device
+   01:00.0    - 12d8:2303 - Bridge device
+    02:01.0   - 12d8:2303 - Bridge device
+     03:00.0  - 8086:1531 - Network controller
+    02:02.0   - 12d8:2303 - Bridge device
+
+The 00:01.0 is the MX6 root bridge , the 01:00.0 is the switch's upstream port, 
+02:01.0 and 02:02.0 are the downstream ports and the 03:00.0 is the ethernet 
+controller.
+
+I suspect the PCIe works without issues here.
+
+> It's possible that your host bridge is configured to only generate
+> config cycles for bus 00, i.e., the host bridge resource is actually
+> "[bus 00]".  If that were the case, we'd never see anything on bus 01.
+>  This would be i.MX6q-specific configuration, so I can't help here.
+
+I checked the pcie-designware.c code and maybe this is where this is set up?
+
+543         /* setup bus numbers */
+544         dw_pcie_readl_rc(pp, PCI_PRIMARY_BUS, &val);
+545         val &= 0xff000000;
+546         val |= 0x00010100;
+547         dw_pcie_writel_rc(pp, val, PCI_PRIMARY_BUS);
+
+> I suppose it's conceivable this is related to 928bea96 "PCI: Delay
+> enabling bridges until they're needed".  Per spec (PCI-to-PCI Bridge
+> Spec, r1.2, sec 3.2.4.3), I don't think the bridge enable bits affect
+> config transaction forwarding, but if your Root Port were defective
+> and only forwarded config transactions when enabled, you'd also see
+> this.  You could try forcibly setting the enable bits in
+> pci_scan_bridge() just as an experiment.
+
+Will try. I can also try reverting this or the whole set:
+
+    * pci/yinghai-assign-unassigned-v6:
+      PCI: Assign resources for hot-added host bridge more aggressively
+      PCI: Move resource reallocation code to non-__init
+      PCI: Delay enabling bridges until they're needed
+      PCI: Assign resources on a per-bus basis
+      PCI: Enable unassigned resource reallocation on per-bus basis
+      PCI: Turn on reallocation for unassigned resources with host bridge offset
+      PCI: Look for unassigned resources on per-bus basis
+      PCI: Drop temporary variable in pci_assign_unassigned_resources()
+
+Would that help maybe?
+
+> > PCI: Device 0000:00:00.0 not available because of resource collisions
+> > pcieport: probe of 0000:00:00.0 failed with error -22
+> > pci 0000:00:00.0: fixup irq: got 155
+> > pci 0000:00:00.0: assigning IRQ 155
+> > pci 0000:00:00.0: BAR 0: assigned [mem 0x01000000-0x010fffff]
+> > pci 0000:00:00.0: BAR 0: set to [mem 0x01000000-0x010fffff] (PCI address
+> > [0x1000000-0x10
+> > fffff])
+> > pci 0000:00:00.0: BAR 6: assigned [mem 0x01100000-0x0110ffff pref]
+> 
+> You *are* assigning resources here; I'm not sure why we're trying to
+> bind the pcieport driver before resource assignment.  That seems out
+> of order.
+
+Could it be a bug in the PCIe subsystem then ?
+
+> > pci 0000:00:00.0: PCI bridge to [bus 01]
+> > pci 0000:00:00.0: PCI bridge to [bus 01]
+> > pci_bus 0000:00: resource 4 [io  0x1000-0x10000]
+> > pci_bus 0000:00: resource 5 [mem 0x01000000-0x01efffff]
+> > 
+> > What is this conflicting device 0000:00:01 I observe here? Does it have
+> > to do with the switch ?
+> 
+> I don't see a 0000:00:01.  That's not a complete PCI ID anyway; it
+> means domain 0000, bus 00, device 01, but there's no function number.
+
+It is there somewhere around the middle of the log I pasted, see:
+
+-->8--
+pci_bus 0000:01: scanning bus
+pci_bus 0000:01: fixups for bus
+PCI: bus1: Fast back to back transfers enabled
+pci_bus 0000:01: bus scan returning with max=01
+pci_bus 0000:01: busn_res: [bus 01-ff] end is updated to 01
+pci_bus 0000:00: bus scan returning with max=01
+pci_bus 0000:00: busn_res: [bus 00-ff] end is updated to 01
+--8<--
+
+Thank you for the help!
