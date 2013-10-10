@@ -1,29 +1,23 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Thu, 10 Oct 2013 23:08:21 +0200
-Subject: [PATCH 1/2] ARM: shmobile: bockw: enable HPB-DMAC in defconfig
-In-Reply-To: <20131009235918.GA26091@verge.net.au>
-References: <201309290011.28982.sergei.shtylyov@cogentembedded.com>
- <20130930005033.GC30501@verge.net.au> <52559ACA.4050509@cogentembedded.com>
- <20131009235918.GA26091@verge.net.au>
-Message-ID: <52571745.6080307@cogentembedded.com>
+From: aaro.koskinen@iki.fi (Aaro Koskinen)
+Date: Thu, 10 Oct 2013 23:19:14 +0300
+Subject: [RFCv3 0/7] OMAP SSI driver
+In-Reply-To: <20131010200236.GA6603@earth.universe>
+References: <1381091235-18293-1-git-send-email-sre@debian.org>
+ <20131008172815.GA8313@atomide.com>
+ <20131010172128.GF28657@earth.universe>
+ <20131010182801.GB29989@blackmetal.musicnaut.iki.fi>
+ <20131010200236.GA6603@earth.universe>
+Message-ID: <20131010201914.GC29989@blackmetal.musicnaut.iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Thu, Oct 10, 2013 at 10:02:36PM +0200, Sebastian Reichel wrote:
+> P.S.: You can get a mainline kernel status matrix for the Nokia
+>       N900 on this page: http://elinux.org/N900
 
-On 10-10-2013 1:59, Simon Horman wrote:
+Thanks for summary, and the above page looks very useful. I wonder
+would it make sense to add also N9/N950 there (some functionality is
+shared)? Also TWL4030 DT status could be updated, e.g. watchdog support
+was done already last year with 8899b8d93ec64b7a8e54807a68a958e1206535e2.
 
->>>> Enable HPB-DMAC driver in 'bockw_defconfig'.
-
->>>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-
->>> Thanks, I will queue this up for v3.13.
-
->>     As I understand you're waiting for lazy Vinod to merge the driver fixes? :-)
-
-> I am holding off on sending a pull request for these defconfig updates
-> until Vinod takes the fixes. Could you ping him about them?
-
-    Already done yesterday.
-
-WBR, Sergei
+A.
