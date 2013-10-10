@@ -1,63 +1,112 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Thu, 10 Oct 2013 21:45:09 +0530
-Subject: [PATCH] DMA: extend documentation to provide more API details
-In-Reply-To: <CAA9_cmdSh8j5rmzZ=SsOG_pRa+Aq1odEEWKvVNOUv9G0Ma=dEw@mail.gmail.com>
-References: <Pine.LNX.4.64.1310051925170.8097@axis700.grange>
- <20131005190200.GZ12758@n2100.arm.linux.org.uk>
- <Pine.LNX.4.64.1310052203060.8097@axis700.grange>
- <20131005233137.GA12758@n2100.arm.linux.org.uk>
- <20131006052029.GE2954@intel.com>
- <Pine.LNX.4.64.1310071233340.20796@axis700.grange>
- <20131007111728.GM12758@n2100.arm.linux.org.uk>
- <20131007103936.GH2954@intel.com>
- <CAA9_cmdSh8j5rmzZ=SsOG_pRa+Aq1odEEWKvVNOUv9G0Ma=dEw@mail.gmail.com>
-Message-ID: <20131010161509.GC2954@intel.com>
+From: soren.brinkmann@xilinx.com (Soren Brinkmann)
+Date: Thu, 10 Oct 2013 10:10:17 -0700
+Subject: [PATCH v2 1/2] clk/zynq/clkc: Add 'fclk-enable' feature
+Message-ID: <1381425018-5653-1-git-send-email-soren.brinkmann@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 08, 2013 at 06:34:42PM -0700, Dan Williams wrote:
-> On Mon, Oct 7, 2013 at 3:39 AM, Vinod Koul <vinod.koul@intel.com> wrote:
-> > On Mon, Oct 07, 2013 at 12:17:28PM +0100, Russell King - ARM Linux wrote:
-> >> On Mon, Oct 07, 2013 at 12:45:33PM +0200, Guennadi Liakhovetski wrote:
-> >> > No, not something in the middle. I was thinking about
-> >> >
-> >> > (1) cookie 1-3 are submitted
-> >> > (2) cookie 1 succeeds
-> >> > (3) a DMA error occurs, cookies 2-3 are discarded
-> > discarded using terminate_all right?
-> >
-> >> > (4) cookie 4 is submitted and succeeds
-> >> > (5) the user requests status of cookie 2 and gets success back, AFAICS
-> > No you cant!, you can only request for 4..
-> >>
-> >> This is a side effect of using a sequential cookie based system to indicate
-> >> whether a descriptor has succeeded or not.
-> > In the above case, since user calls terminate_all we can put a rule that
-> > terminate should reset the cookie counter.
-> > So after the terminate_all the cookies are sequentially valid!
-> 
-> I think you and Guennadi address this later in the thread, but I think
-> cookie values should always increase.  I see nothing but trouble if
-> cookie values are allowed to go backwards.
-Ok, my idea was to do this in terminate_all ONLY which is complete reset for a
-channel. Anything done before that should not be valid and should not e
-referenced!
-But am okay to drop the idea...
+In some use cases Zynq's FPGA clocks are used as static clock
+generators for IP in the FPGA part of the SOC for which no Linux driver
+exists and would control those clocks. To avoid automatic
+gating of these clocks in such cases a new property - fclk-enable - is
+added to the clock controller's DT description to accomodate such use
+cases. It's value is a bitmask, where a set bit results in enabling
+the corresponding FCLK through the clkc.
 
-> > Anyways as pointed above user shouldnt check for 2, he should have removed all
-> > refs till 3 before calling terminate.
-> >
-> >> What may be better is to change the wording here: not DMA_SUCCESS but
-> >> DMA_COMPLETED.  That doesn't imply that it has been successful, merely
-> >> that the DMA engine has finished with the transaction.
-> > Agreed that its not indication of success but of DMA completetion. I have seen
-> > cases where slave perhiphral got stuck while sending last FIFO but since DMA
-> > finished transferiing to FIFO it says complete.
-> >
-> > Dan do you agree?
-> 
-> Yes, it's an indication of completion, not necessarily success.
-Sure, will update this..
+FPGA clocks are handled following the rules below:
 
+If an FCLK is not enabled by bootloaders, that FCLK will be disabled in
+Linux. Drivers can enable and control it through the CCF as usual.
+
+If an FCLK is enabled by bootloaders AND the corresponding bit in the
+'fclk-enable' DT property is set, that FCLK will be enabled by the clkc,
+resulting in an off by one reference count for that clock. Ensuring it
+will always be running.
+
+Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+---
+v2:
+ - change default value for fclk-enable to '0'
+---
+ Documentation/devicetree/bindings/clock/zynq-7000.txt |  4 ++++
+ drivers/clk/zynq/clkc.c                               | 18 +++++++++++++++---
+ 2 files changed, 19 insertions(+), 3 deletions(-)
+
+diff --git a/Documentation/devicetree/bindings/clock/zynq-7000.txt b/Documentation/devicetree/bindings/clock/zynq-7000.txt
+index d99af878f5d7..11fdd146ec83 100644
+--- a/Documentation/devicetree/bindings/clock/zynq-7000.txt
++++ b/Documentation/devicetree/bindings/clock/zynq-7000.txt
+@@ -22,6 +22,10 @@ Required properties:
+ Optional properties:
+  - clocks : as described in the clock bindings
+  - clock-names : as described in the clock bindings
++ - fclk-enable : Bit mask to enable FCLKs in cases no proper CCF compatible
++		 driver is available. Bit [0..3] correspond to FCLK0..FCLK3. The
++		 corresponding FCLK will only be enabled if it is actually
++		 running at boot time. (default = 0xf)
+ 
+ Clock inputs:
+ The following strings are optional parameters to the 'clock-names' property in
+diff --git a/drivers/clk/zynq/clkc.c b/drivers/clk/zynq/clkc.c
+index 10772aa72e4e..af3bd0aec538 100644
+--- a/drivers/clk/zynq/clkc.c
++++ b/drivers/clk/zynq/clkc.c
+@@ -102,9 +102,10 @@ static const char *swdt_ext_clk_input_names[] __initdata = {"swdt_ext_clk"};
+ 
+ static void __init zynq_clk_register_fclk(enum zynq_clk fclk,
+ 		const char *clk_name, void __iomem *fclk_ctrl_reg,
+-		const char **parents)
++		const char **parents, int enable)
+ {
+ 	struct clk *clk;
++	u32 enable_reg;
+ 	char *mux_name;
+ 	char *div0_name;
+ 	char *div1_name;
+@@ -147,6 +148,12 @@ static void __init zynq_clk_register_fclk(enum zynq_clk fclk,
+ 	clks[fclk] = clk_register_gate(NULL, clk_name,
+ 			div1_name, CLK_SET_RATE_PARENT, fclk_gate_reg,
+ 			0, CLK_GATE_SET_TO_DISABLE, fclk_gate_lock);
++	enable_reg = readl(fclk_gate_reg) & 1;
++	if (enable & !enable_reg) {
++		if (clk_prepare_enable(clks[fclk]))
++			pr_warn("%s: FCLK%u enable failed\n", __func__,
++					fclk - fclk0);
++	}
+ 	kfree(mux_name);
+ 	kfree(div0_name);
+ 	kfree(div1_name);
+@@ -213,6 +220,7 @@ static void __init zynq_clk_setup(struct device_node *np)
+ 	int ret;
+ 	struct clk *clk;
+ 	char *clk_name;
++	unsigned int fclk_enable = 0;
+ 	const char *clk_output_name[clk_max];
+ 	const char *cpu_parents[4];
+ 	const char *periph_parents[4];
+@@ -238,6 +246,8 @@ static void __init zynq_clk_setup(struct device_node *np)
+ 	periph_parents[2] = clk_output_name[armpll];
+ 	periph_parents[3] = clk_output_name[ddrpll];
+ 
++	of_property_read_u32(np, "fclk-enable", &fclk_enable);
++
+ 	/* ps_clk */
+ 	ret = of_property_read_u32(np, "ps-clk-frequency", &tmp);
+ 	if (ret) {
+@@ -340,10 +350,12 @@ static void __init zynq_clk_setup(struct device_node *np)
+ 	clk_prepare_enable(clks[dci]);
+ 
+ 	/* Peripheral clocks */
+-	for (i = fclk0; i <= fclk3; i++)
++	for (i = fclk0; i <= fclk3; i++) {
++		int enable = !!(fclk_enable & BIT(i - fclk0));
+ 		zynq_clk_register_fclk(i, clk_output_name[i],
+ 				SLCR_FPGA0_CLK_CTRL + 0x10 * (i - fclk0),
+-				periph_parents);
++				periph_parents, enable);
++	}
+ 
+ 	zynq_clk_register_periph_clk(lqspi, 0, clk_output_name[lqspi], NULL,
+ 			SLCR_LQSPI_CLK_CTRL, periph_parents, 0);
 -- 
-~Vinod
+1.8.4
