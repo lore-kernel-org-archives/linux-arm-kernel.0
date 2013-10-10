@@ -1,33 +1,29 @@
 From: gregkh@linuxfoundation.org (Greg KH)
-Date: Thu, 10 Oct 2013 16:11:51 -0700
-Subject: [PATCH V2] ARM: tegra: unify Tegra's Kconfig a bit more
-In-Reply-To: <1381164349-23130-1-git-send-email-swarren@wwwdotorg.org>
-References: <1381164349-23130-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <20131010231151.GG4301@kroah.com>
+Date: Thu, 10 Oct 2013 16:14:19 -0700
+Subject: [PATCH stable] ARM: multi_v7_defconfig: enable ARM_ATAG_DTB_COMPAT
+In-Reply-To: <1381168846-11076-1-git-send-email-khilman@linaro.org>
+References: <1381168846-11076-1-git-send-email-khilman@linaro.org>
+Message-ID: <20131010231419.GH4301@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 07, 2013 at 10:45:49AM -0600, Stephen Warren wrote:
-> From: Stephen Warren <swarren@nvidia.com>
+On Mon, Oct 07, 2013 at 11:00:46AM -0700, Kevin Hilman wrote:
+> From: Olof Johansson <olof@lixom.net>
 > 
-> Move all common select clauses from ARCH_TEGRA_*_SOC to ARCH_TEGRA to
-> eliminate duplication. The USB-related selects all should have been
-> common too, but were missing from Tegra114 previously. Move these to
-> ARCH_TEGRA too. The latter fixes a build break when only Tegra114
-> support was enabled, but not Tegra20 or Tegra30 support.
+> Without this, legacy platforms that can boot with a multiplatform
+> kernel but that need the DTB to be appended, won't have a way to pass
+> firmware-set bootargs to the kernel.
 > 
-> This is 20984c44b5a08620778ea14fa5807489170fd5ca in v3.12-rc1, with
-> a merge conflict resolved.
+> This is needed to boot multi_v7_defconfig on snowball, for instance.
 > 
-> Signed-off-by: Stephen Warren <swarren@nvidia.com>
-> Reported-by: Paul Walmsley <pwalmsley@nvidia.com>
-> [our auto-builders for 3.11.x are failing due to this]
+> Signed-off-by: Olof Johansson <olof@lixom.net>
 > ---
-> v2: I actually applied the patch this time, resolving the merge conflict
->     while I was at it. I built and booted the result too.
+> Greg, This is in Linus' tree as commit a0396b9bd5a4a7baf598b60d2ca53c605c440a42
+> but we neglected to flag this for stable even though it's needed for
+> older kernels too.  Please cherry-pick into stable.  
+> 
+> Intended for v3.11.y.  Thanks.
 
-Thanks for testing it :)
-
-Now queued up.
+Now applied, thanks.
 
 greg k-h
