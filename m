@@ -1,53 +1,48 @@
-From: gang.chen@asianux.com (Chen Gang)
-Date: Thu, 10 Oct 2013 19:03:52 +0800
-Subject: [PATCH 3/3] arm64: include: asm: atomic.h: use 'unsigned int'
- and 'atomic_t' instead of 'unsigned long' for atomic_clear_mask()
-In-Reply-To: <20131010100733.GH3817@mudshark.cambridge.arm.com>
-References: <52561137.3070608@asianux.com> <5256117A.4000009@asianux.com>
- <5256121A.9030504@asianux.com> <52561269.60900@asianux.com>
- <20131010100733.GH3817@mudshark.cambridge.arm.com>
-Message-ID: <52568998.2080108@asianux.com>
+From: steve.capper@linaro.org (Steve Capper)
+Date: Thu, 10 Oct 2013 12:06:18 +0100
+Subject: [RESEND PATCH] ARM: mm: Remove HugeTLB warning from dma-mapping.c
+Message-ID: <1381403178-32061-1-git-send-email-steve.capper@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/10/2013 06:07 PM, Will Deacon wrote:
-> On Thu, Oct 10, 2013 at 03:35:21AM +0100, Chen Gang wrote:
->> In current kernel wide source, for arm64, only s390 scsi drivers use
->> atomic_clear_mask(), now, s390 itself need use 'unsigned int' and
->> 'atomic_t', so need match s390's atomic_clear_mask().
->>
->>
->> Signed-off-by: Chen Gang <gang.chen@asianux.com>
->> ---
->>  arch/arm64/include/asm/atomic.h |   13 +++++++------
->>  1 files changed, 7 insertions(+), 6 deletions(-)
->>
->> diff --git a/arch/arm64/include/asm/atomic.h b/arch/arm64/include/asm/atomic.h
->> index 8363644..58808fc 100644
->> --- a/arch/arm64/include/asm/atomic.h
->> +++ b/arch/arm64/include/asm/atomic.h
->> @@ -126,16 +126,17 @@ static inline int atomic_cmpxchg(atomic_t *ptr, int old, int new)
->>  	return oldval;
->>  }
->>  
->> -static inline void atomic_clear_mask(unsigned long mask, unsigned long *addr)
->> +static inline void atomic_clear_mask(unsigned int mask, atomic_t *ptr)
->>  {
->> -	unsigned long tmp, tmp2;
->> +	unsigned int tmp;
-> 
-> Same comment here as for ARM; I think you want a signed int.
-> 
+The coherant DMA allocator code contained a compile time warning
+when HugeTLB support was enabled. It stated that huge pages were
+not supported by the DMA allocator.
 
-OK, replied in patch 2/3 for ARM.
+Apart from memory pressure, HugeTLB should not affect (or be
+affected by) the higher order pages operated on by the DMA
+allocator. Also, the user space mappings returned by arm_dma_mmap
+are done via remap_pfn_range, so the Transparent Huge Page daemon
+will leave them alone too.
 
-BTW: do arm64 need atomic_clear_mask()?
+This patch removes the huge page warning from dma-mapping.c.
 
+Signed-off-by: Steve Capper <steve.capper@linaro.org>
+---
+Hi, I'm resending this patch as it appears to have slipped through the
+cracks. Without this patch we will get spurious compiler warnings when
+building kernels with huge page support.
 
-> Will
-> 
-> 
-
-Thanks.
+Cheers,
 -- 
-Chen Gang
+Steve
+---
+ arch/arm/mm/dma-mapping.c | 3 ---
+ 1 file changed, 3 deletions(-)
+
+diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+index 7f9b179..9486048 100644
+--- a/arch/arm/mm/dma-mapping.c
++++ b/arch/arm/mm/dma-mapping.c
+@@ -249,9 +249,6 @@ static void __dma_free_buffer(struct page *page, size_t size)
+ }
+ 
+ #ifdef CONFIG_MMU
+-#ifdef CONFIG_HUGETLB_PAGE
+-#warning ARM Coherent DMA allocator does not (yet) support huge TLB
+-#endif
+ 
+ static void *__alloc_from_contiguous(struct device *dev, size_t size,
+ 				     pgprot_t prot, struct page **ret_page,
+-- 
+1.8.1.4
