@@ -1,42 +1,70 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 10 Oct 2013 09:00:19 -0700
-Subject: [PATCH 4/6] pinctrl: single: Add support for wake-up interrupts
-In-Reply-To: <5256AA7F.8030005@ti.com>
-References: <20131003054104.8941.88857.stgit@localhost>
- <20131003054221.8941.87801.stgit@localhost>
- <5256AA7F.8030005@ti.com>
-Message-ID: <20131010160018.GA29913@atomide.com>
+From: zyy@motorola.com (Yuanyuan ZHONG)
+Date: Thu, 10 Oct 2013 11:00:18 -0500
+Subject: [PATCH] arm: vfp: always clear vfp_current_hw_state when forcing
+ reload
+In-Reply-To: <CAFUV4K3dsVDtHhQtuZ6yEQHxxHXaa9LODBZuGFipjAKumF4abQ@mail.gmail.com>
+References: <1380751187-11257-1-git-send-email-zyy@motorola.com>
+ <20131002221123.GC12758@n2100.arm.linux.org.uk>
+ <CAFUV4K3dsVDtHhQtuZ6yEQHxxHXaa9LODBZuGFipjAKumF4abQ@mail.gmail.com>
+Message-ID: <CAFUV4K1CkzGZVEwkXGX38jG0HxerqQq--d-qFiqF9J6wi88xYQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Roger Quadros <rogerq@ti.com> [131010 06:32]:
-> 
-> I tried testing this with the USB EHCI driver, but I'm not getting wake up interrupts
-> while the system is still running and only the EHCI controller is runtime suspended.
-> 
-> It seems we need to somehow call _reconfigure_io_chain() to update the daisy chain
-> whenever the pad wakeup_enable bit is changed.
+Hi Russell, et al
 
-Sounds like this is on omap3? Have you tried calling pcs_soc->rearm() in the
-pcs_irq_handle() like the comments there suggest? At least for me that keeps
-the wake-up interrupts continuously running on omap3 instead of just idle modes.
+If there is no further comments, I'll submit it to patch system.
+Thanks.
 
-Now on omap4, I've noticed the wake up interrupts are on all the time based on tests
-with the serial driver.
- 
-> I think pcs_irq_set_wake() is where need to control system wakeup behaviour for the irq.
-> This is where we should be able to change WAKEUP_EN bit of the pad
-> to enable/disable system wakeup for that pad and also call _reconfigure_io_chain().
-
-Well the irq_set_wake() should only be needed for suspend and resume. For runtime PM
-the wake-events should be always enabled by default as pointed out by Alan Stern
-a while back.
- 
-> This would mean that we don't really need to set WAKEUP_EN for the pads in the DTS file.
-
-Well for runtime PM, we should also do the automatic handling if configured.
-But how to do that best is still open..
-
-Regards,
-
-Tony
+On Wed, Oct 2, 2013 at 5:21 PM, Yuanyuan ZHONG <zyy@motorola.com> wrote:
+> On Wed, Oct 2, 2013 at 5:11 PM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+>> On Wed, Oct 02, 2013 at 04:59:47PM -0500, Yuanyuan Zhong wrote:
+>>> The current thread trying to clear the held vfp state may not be
+>>> the owner of hw state. For example,
+>>>       Core0                   Core1
+>>>                               Thread1 uses VFP.
+>>>                                 Thread1 vfpstate.hard.cpu = 1.
+>>>                                 vfp_current_hw_state[1] points to Thread1
+>>>                                   vfpstate.
+>>>       Going to suspend.
+>>>       Freeze Thread1.
+>>>                               Thread1 is switched out.
+>>>                               VFP HW registers saved to Thread1 vfpstate.
+>>
+>> Correct so far.  At this point:
+>>
+>>                                 vfp_current_hw_state[1] = &thread1->vfpstate;
+>>                                 thread1->vfpstate.hard.cpu = 1;
+>>
+>>>       Core0 disables Core1.
+>>>                               Stopper thread calls vfp_force_reload().
+>>>                               Stopper thread vfpstate.hard.cpu = NR_CPUS.
+>>
+>> Correct, except there's another part to this.  vfp_state_in_hw() returns
+>> true here, since thread1->vfpstate.hard.cpu is the dying CPU (CPU 1), and
+>> vfp_current_hw_state[1] is &thread1->vfpstate.  So we also do this:
+>>
+>>                                 clear FPEXC_EN
+>>                                 vfp_current_hw_state[1] = NULL;
+>>
+> vfp_state_in_hw() returns false. It's checking current_thread_info()
+> which is the stopper thread migration/1, not thread1.
+>>>                               ...
+>>>                               (No PM notifier for non-idle path. So
+>>>                                 vfp_pm_suspend() is NOT called on Core1.)
+>>>                               ...
+>>>                               Core1 is off and VFP HW registers are lost.
+>>>       ...
+>>>       Core0 enables Core1.
+>>>       Core0 thaw Thread1.
+>>>       Thread1 migrate to Core1
+>>>         before using VFP.
+>>>                               Thread1 starts using VFP.
+>>>                               Now we have vfp_current_hw_state[1] points
+>>>                                 to Thread1 vfpstate. And Thread1 has
+>>>                                 vfpstate.hard.cpu = 1.
+>>
+>> No.  With my above correction:
+>>                                 vfp_current_hw_state[1] = NULL
+>>
+>> and that forces a reload of the saved context.
