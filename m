@@ -1,52 +1,59 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Thu, 10 Oct 2013 10:40:40 +0200
-Subject: [RFC] ASoC: pcm: Trigger all commands on error
-In-Reply-To: <20131009145917.GN21581@sirena.org.uk>
-References: <1380883997-18236-1-git-send-email-mpa@pengutronix.de>
- <20131007172706.GS21581@sirena.org.uk>
- <20131008082933.GA19005@pengutronix.de>
- <20131008093413.GX21581@sirena.org.uk>
- <20131008094839.GB19005@pengutronix.de>
- <20131008104457.GA21581@sirena.org.uk>
- <20131009130553.GD19005@pengutronix.de>
- <20131009132004.GL21581@sirena.org.uk>
- <20131009141242.GE19005@pengutronix.de>
- <20131009145917.GN21581@sirena.org.uk>
-Message-ID: <20131010084040.GG19005@pengutronix.de>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 10 Oct 2013 10:43:31 +0200
+Subject: [PATCH 1/2] tty/serial: at91: fix uart/usart selection for older
+ products
+Message-ID: <a58fe8bc7fdd128a2f9cf60785f81ebde4c0c247.1381394411.git.nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 09, 2013 at 03:59:17PM +0100, Mark Brown wrote:
-> On Wed, Oct 09, 2013 at 04:12:42PM +0200, Markus Pargmann wrote:
-> > On Wed, Oct 09, 2013 at 02:20:04PM +0100, Mark Brown wrote:
-> 
-> > > I'm not sure what you mean here.  How would the error be handled without
-> > > calling _STOP?
-> 
-> > The START error should be handled in mxs_saif and there shouldn't be a
-> > _STOP call for mxs_saif_trigger afterwards to handle the failed START.
-> 
-> How would the framework know that the error has been handled - what
-> tells it that the error returned is for an error that has been handled
-> as opposed to an error that has not been handled?
+Since commit 055560b04a8cd063aea916fd083b7aec02c2adb8 (serial: at91:
+distinguish usart and uart) the older products which do not have a
+name field in their register map are unable to use their serial output.
+As the main console output is usually the serial interface (aka DBGU) it
+is pretty unfortunate.
+So, instead of failing during probe() we just silently configure the serial
+peripheral as an uart. It allows us to use these serial outputs.
+The proper solution is proposed in another patch.
 
-I finally understand what you mean. Yes, RFCv1 fixes the behavior for
-the components without _START failures. But it doesn't fix it for the
-failing component.
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ drivers/tty/serial/atmel_serial.c | 9 ++-------
+ 1 file changed, 2 insertions(+), 7 deletions(-)
 
-For mxs-saif, we still have to store if the last START failed to handle
-the following STOP correctly which is not very different from handling
-double STOPs correctly. I don't have an idea how to fix RFCv1 without
-using some state as in RFCv2. Perhaps we should simply fix it in
-mxs-saif and other drivers then?
-
-Regards,
-
-Markus
-
-
+diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
+index d067285..6b0f75e 100644
+--- a/drivers/tty/serial/atmel_serial.c
++++ b/drivers/tty/serial/atmel_serial.c
+@@ -1499,7 +1499,7 @@ static void atmel_set_ops(struct uart_port *port)
+ /*
+  * Get ip name usart or uart
+  */
+-static int atmel_get_ip_name(struct uart_port *port)
++static void atmel_get_ip_name(struct uart_port *port)
+ {
+ 	struct atmel_uart_port *atmel_port = to_atmel_uart_port(port);
+ 	int name = UART_GET_IP_NAME(port);
+@@ -1518,10 +1518,7 @@ static int atmel_get_ip_name(struct uart_port *port)
+ 		atmel_port->is_usart = false;
+ 	} else {
+ 		dev_err(port->dev, "Not supported ip name, set to uart\n");
+-		return -EINVAL;
+ 	}
+-
+-	return 0;
+ }
+ 
+ /*
+@@ -2405,9 +2402,7 @@ static int atmel_serial_probe(struct platform_device *pdev)
+ 	/*
+ 	 * Get port name of usart or uart
+ 	 */
+-	ret = atmel_get_ip_name(&port->uart);
+-	if (ret < 0)
+-		goto err_add_port;
++	atmel_get_ip_name(&port->uart);
+ 
+ 	return 0;
+ 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.8.2.2
