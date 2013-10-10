@@ -1,32 +1,33 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Thu, 10 Oct 2013 16:19:53 +0530
-Subject: [PATCH 1/2] ARM: dts: omap5-uevm: remove always_on,
- boot_on from smps10_out1
-Message-ID: <1381402195-29257-1-git-send-email-kishon@ti.com>
+Date: Thu, 10 Oct 2013 16:19:54 +0530
+Subject: [PATCH 2/2] ARM: dts: omap5: Add dr_mode for dwc3
+In-Reply-To: <1381402195-29257-1-git-send-email-kishon@ti.com>
+References: <1381402195-29257-1-git-send-email-kishon@ti.com>
+Message-ID: <1381402195-29257-2-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-smps10 should be enabled only in the case of host mode. So stop
-doing always_on, boot_on from smps10_out1. The driver will enable it in host
-mode.
+From: George Cherian <george.cherian@ti.com>
 
+Added dr_mode property in dwc3 and set its default mode to device.
+
+Signed-off-by: George Cherian <george.cherian@ti.com>
 Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 ---
- arch/arm/boot/dts/omap5-uevm.dts |    2 --
- 1 file changed, 2 deletions(-)
+ arch/arm/boot/dts/omap5.dtsi |    1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/boot/dts/omap5-uevm.dts b/arch/arm/boot/dts/omap5-uevm.dts
-index d784b3a..e06a04a 100644
---- a/arch/arm/boot/dts/omap5-uevm.dts
-+++ b/arch/arm/boot/dts/omap5-uevm.dts
-@@ -334,8 +334,6 @@
- 					regulator-name = "smps10_out1";
- 					regulator-min-microvolt = <5000000>;
- 					regulator-max-microvolt = <5000000>;
--					regulator-always-on;
--					regulator-boot-on;
- 				};
- 
- 				ldo1_reg: ldo1 {
+diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
+index 6d0a1d5..ef598af 100644
+--- a/arch/arm/boot/dts/omap5.dtsi
++++ b/arch/arm/boot/dts/omap5.dtsi
+@@ -652,6 +652,7 @@
+ 				reg = <0x4a030000 0x10000>;
+ 				interrupts = <GIC_SPI 92 IRQ_TYPE_LEVEL_HIGH>;
+ 				usb-phy = <&usb2_phy>, <&usb3_phy>;
++				dr_mode = "peripheral";
+ 				tx-fifo-resize;
+ 			};
+ 		};
 -- 
 1.7.10.4
