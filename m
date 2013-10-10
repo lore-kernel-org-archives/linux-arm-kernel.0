@@ -1,35 +1,50 @@
-From: soren.brinkmann@xilinx.com (Soren Brinkmann)
-Date: Thu, 10 Oct 2013 10:10:18 -0700
-Subject: [PATCH v2 2/2] arm: dt: zynq: Add fclk-enable property to clkc node
-In-Reply-To: <1381425018-5653-1-git-send-email-soren.brinkmann@xilinx.com>
-References: <1381425018-5653-1-git-send-email-soren.brinkmann@xilinx.com>
-Message-ID: <1381425018-5653-2-git-send-email-soren.brinkmann@xilinx.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 10 Oct 2013 10:15:40 -0700
+Subject: [PATCH V5] ARM: OMAP5/DRA7: realtime_counter: Configure CNTFRQ
+ register
+In-Reply-To: <5256A7AE.6000605@ti.com>
+References: <1381391028-4189-1-git-send-email-r.sricharan@ti.com>
+ <5256A7AE.6000605@ti.com>
+Message-ID: <20131010171540.GG29913@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
----
-This is kind of optional since it does not have any effect due to the changed
-default in 1/2.
+* Santosh Shilimkar <santosh.shilimkar@ti.com> [131010 06:20]:
+> On Thursday 10 October 2013 03:43 AM, Sricharan R wrote:
+> > From: R Sricharan <r.sricharan@ti.com>
+> > 
+> > The realtime counter called master counter, produces the count
+> > used by the private timer peripherals in the MPU_CLUSTER. The
+> > CNTFRQ per cpu register is used to denote the frequency of the counter.
+> > Currently the frequency value is passed from the
+> > DT file, but this is not scalable when we have other non-DT guest
+> > OS. This register must be set to the right value by the
+> > secure rom code. Setting this register helps in propagating the right
+> > frequency value across OSes.
+> > 
+> > More discussions and the reason for adding this in a non-DT
+> > way can be seen from below.
+> > http://www.mail-archive.com/linux-omap at vger.kernel.org/msg93832.html
+> > 
+> > So configuring this secure register for all the cpus here.
+> > 
+> > Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> > Cc: Nishanth Menon <nm@ti.com>
+> > Cc: Rajendra Nayak <rnayak@ti.com>
+> > Cc: Marc Zyngier <marc.zyngier@arm.com>
+> > Cc: Mark Rutland <mark.rutland@arm.com>
+> > Cc: Tony Lindgren <tony@atomide.com>
+> > Tested-by: Nishanth Menon <nm@ti.com>
+> > Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> > Signed-off-by: Sricharan R <r.sricharan@ti.com>
+> > ---
+> >  [V5] Removed the use of extern variable in omap-smp.c
+> >       as per suggestion from Santosh Shilimkar <santosh.shilimkar@ti.com>
+> > 
+> Thanks for the updates Sricharan. Looks fine now.
+> 
+> Tony, Can you apply this version if you are fine with it.
 
-v2:
- - no change
+Yes thanks looks good to me now. Applying into omap-for-v3.13/soc.
 
-
- arch/arm/boot/dts/zynq-7000.dtsi | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm/boot/dts/zynq-7000.dtsi b/arch/arm/boot/dts/zynq-7000.dtsi
-index e32b92b949d2..b48d0403537b 100644
---- a/arch/arm/boot/dts/zynq-7000.dtsi
-+++ b/arch/arm/boot/dts/zynq-7000.dtsi
-@@ -77,6 +77,7 @@
- 					#clock-cells = <1>;
- 					compatible = "xlnx,ps7-clkc";
- 					ps-clk-frequency = <33333333>;
-+					fclk-enable = <0>;
- 					clock-output-names = "armpll", "ddrpll", "iopll", "cpu_6or4x",
- 							"cpu_3or2x", "cpu_2x", "cpu_1x", "ddr2x", "ddr3x",
- 							"dci", "lqspi", "smc", "pcap", "gem0", "gem1",
--- 
-1.8.4
+Tony
