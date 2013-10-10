@@ -1,43 +1,45 @@
-From: sachin.kamat@linaro.org (Sachin Kamat)
-Date: Thu, 10 Oct 2013 08:59:24 +0530
-Subject: [PATCH 3/3] ARM: dts: exynos4x12: Add maudio/gps_alive power
- domain for exynos4x12
-In-Reply-To: <1381365007-1782-4-git-send-email-cw00.choi@samsung.com>
-References: <1381365007-1782-1-git-send-email-cw00.choi@samsung.com>
- <1381365007-1782-4-git-send-email-cw00.choi@samsung.com>
-Message-ID: <CAK9yfHxr27nsmaqkE+seDgZAkpUmOsPqdXdeogY89tAXYEEG2w@mail.gmail.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Wed, 9 Oct 2013 23:45:30 -0400 (EDT)
+Subject: [RFC v2 PATCH 1/4] ARM: add support for kernel mode NEON in
+ atomic context
+In-Reply-To: <CAKv+Gu_h_q0WRUo0e0kpeocgjONLDpTpWGWq=tzZhKYR8w3LyQ@mail.gmail.com>
+References: <1381344634-14917-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1381344634-14917-2-git-send-email-ard.biesheuvel@linaro.org>
+ <alpine.LFD.2.03.1310091509400.3023@syhkavp.arg>
+ <CAKv+Gu_h_q0WRUo0e0kpeocgjONLDpTpWGWq=tzZhKYR8w3LyQ@mail.gmail.com>
+Message-ID: <alpine.LFD.2.03.1310092333410.3023@syhkavp.arg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10 October 2013 06:00, Chanwoo Choi <cw00.choi@samsung.com> wrote:
-> This patch maudio/gps_alive power domain to exynos4x12.dtsi.
->
-> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> ---
->  arch/arm/boot/dts/exynos4x12.dtsi | 10 ++++++++++
->  1 file changed, 10 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/exynos4x12.dtsi b/arch/arm/boot/dts/exynos4x12.dtsi
-> index ad531fe..c04418e 100644
-> --- a/arch/arm/boot/dts/exynos4x12.dtsi
-> +++ b/arch/arm/boot/dts/exynos4x12.dtsi
-> @@ -35,6 +35,16 @@
->                 reg = <0x10023CA0 0x20>;
->         };
->
-> +       pd_maudio: maudio-power-domain at 10023CC0 {
-> +               compatible = "samsung,exynos4210-pd";
-> +               reg = <0x10023CC0 0x20>;
-> +       };
-> +
-> +       pd_gps_alive: gps-alive-power-domain at 10023D04 {
-> +               compatible = "samsung,exynos4210-pd";
-> +               reg = <0x10023D00 0x20>;
+On Wed, 9 Oct 2013, Ard Biesheuvel wrote:
 
-There is mismatch between node name and register value.
+> On 9 October 2013 21:24, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+> > On Wed, 9 Oct 2013, Ard Biesheuvel wrote:
+> >
+> >> +static inline void __kernel_neon_begin_atomic(struct vfp_partial_state *regs)
+> >> +{
+> >> +     if (!in_interrupt())
+> >> +             kernel_neon_begin();
+> >
+> > Surely you want "if (!in_atomic())" here?
+> >
+> >> +     else
+> >> +             vfp_save_partial_state(regs);
+> >> +}
+> >> +
+> >> +static inline void __kernel_neon_end_atomic(struct vfp_partial_state *regs)
+> >> +{
+> >> +     if (!in_interrupt())
+> >> +             kernel_neon_end();
+> >
+> > Ditto.
+> >
+> 
+> If I am reading (and understanding) the source correctly, in_atomic()
+> is also true when running with preemption disabled, and in that case,
+> you should be able to just do a normal preserve / lazy restore.
+
+Hmmm...  OK I agree.
 
 
--- 
-With warm regards,
-Sachin
+Nicolas
