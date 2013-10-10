@@ -1,28 +1,41 @@
 From: gang.chen@asianux.com (Chen Gang)
-Date: Thu, 10 Oct 2013 10:30:15 +0800
-Subject: [PATCH 0/3] s390/arm/arm64: include: asm: atomic.h: use 'unsigned
- int' and 'atomic_t' instead of 'unsigned long' for atomic_*_mask()
-Message-ID: <52561137.3070608@asianux.com>
+Date: Thu, 10 Oct 2013 10:31:22 +0800
+Subject: [PATCH 1/3] s390: include: asm: atomic.h: use 'unsigned int' instead
+ of 'unsigned long' for atomic_*_mask()
+In-Reply-To: <52561137.3070608@asianux.com>
+References: <52561137.3070608@asianux.com>
+Message-ID: <5256117A.4000009@asianux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For atomic_*_mask(), the 'atomic_t' is 32-bit, so for the 'mask', also
-need mach it.
-
-
-Patch 1/3: s390: include: asm: atomic.h: use 'unsigned int' instead of
-'unsigned long' for atomic_*_mask().
-
-Patch 2/3: arm: include: asm: atomic.h: use 'unsigned int' and 'atomic'
-instead of 'unsigned long' for atomic_clear_mask().
-
-Patch 3/3: arm64: include: asm: atomic.h: use 'unsigned int' and
-'atomic_t' instead of 'unsigned long' for atomic_clear_mask().
+The type of 'v->counter' is always 'int', and related inline assembly
+code also process 'int', so use 'unsigned int' instead of 'unsigned
+long' for the 'mask'.
 
 
 Signed-off-by: Chen Gang <gang.chen@asianux.com>
 ---
- arch/arm/include/asm/atomic.h   |   13 +++++++------
- arch/arm64/include/asm/atomic.h |   13 +++++++------
- arch/s390/include/asm/atomic.h  |    4 ++--
- 3 files changed, 16 insertions(+), 14 deletions(-)
+ arch/s390/include/asm/atomic.h |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/s390/include/asm/atomic.h b/arch/s390/include/asm/atomic.h
+index a62ed2d..12c5ec1 100644
+--- a/arch/s390/include/asm/atomic.h
++++ b/arch/s390/include/asm/atomic.h
+@@ -113,12 +113,12 @@ static inline void atomic_add(int i, atomic_t *v)
+ #define atomic_dec_return(_v)		atomic_sub_return(1, _v)
+ #define atomic_dec_and_test(_v)		(atomic_sub_return(1, _v) == 0)
+ 
+-static inline void atomic_clear_mask(unsigned long mask, atomic_t *v)
++static inline void atomic_clear_mask(unsigned int mask, atomic_t *v)
+ {
+ 	__ATOMIC_LOOP(v, ~mask, __ATOMIC_AND);
+ }
+ 
+-static inline void atomic_set_mask(unsigned long mask, atomic_t *v)
++static inline void atomic_set_mask(unsigned int mask, atomic_t *v)
+ {
+ 	__ATOMIC_LOOP(v, mask, __ATOMIC_OR);
+ }
+-- 
+1.7.7.6
