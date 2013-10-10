@@ -1,72 +1,105 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 10 Oct 2013 12:46:20 -0500
-Subject: [PATCH 2/5] usb: gadget: s3c-hsotg: support configurable UTMI
- PHY width
-In-Reply-To: <5256DBD0.8030008@linaro.org>
-References: <1381140752-312-1-git-send-email-matt.porter@linaro.org>
- <1381140752-312-3-git-send-email-matt.porter@linaro.org>
- <20131010152922.GF28375@radagast> <5256DBD0.8030008@linaro.org>
-Message-ID: <20131010174620.GC19802@radagast>
+From: sebastian.capella@linaro.org (Sebastian Capella)
+Date: Thu, 10 Oct 2013 10:50:10 -0700
+Subject: [PATCH v3 1/2] init/do_mounts.c: ignore final \n in name_to_dev_t
+In-Reply-To: <20131003234735.19051.84583@capellas-linux>
+References: <1380834638-24035-1-git-send-email-sebastian.capella@linaro.org>
+ <1380834638-24035-2-git-send-email-sebastian.capella@linaro.org>
+ <20131003141523.8b60ab988799af7e2b2c338b@linux-foundation.org>
+ <20131003214246.24540.99218@capellas-linux>
+ <20131003234735.19051.84583@capellas-linux>
+Message-ID: <20131010175010.17870.58060@capellas-linux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Thu, Oct 10, 2013 at 12:54:40PM -0400, Matt Porter wrote:
-> On 10/10/2013 11:29 AM, Felipe Balbi wrote:
-> >On Mon, Oct 07, 2013 at 06:12:29AM -0400, Matt Porter wrote:
-> >>Extend dwc2 binding with an optional utmi phy width property.
-> >>Enable the s3c-hsotg.c driver to use standard dwc2 binding
-> >>and enable configuration of the UTMI phy width based on the
-> >>property.
-> >>
-> >>Signed-off-by: Matt Porter <matt.porter@linaro.org>
-> >>Reviewed-by: Markus Mayer <markus.mayer@linaro.org>
-> >>Reviewed-by: Tim Kryger <tim.kryger@linaro.org>
-> >>---
-> >>  Documentation/devicetree/bindings/staging/dwc2.txt |  4 ++++
-> >>  drivers/usb/gadget/s3c-hsotg.c                     | 18 +++++++++++++++++-
-> >>  drivers/usb/gadget/s3c-hsotg.h                     |  1 +
-> >>  3 files changed, 22 insertions(+), 1 deletion(-)
-> >>
-> >>diff --git a/Documentation/devicetree/bindings/staging/dwc2.txt b/Documentation/devicetree/bindings/staging/dwc2.txt
-> >>index 1a1b7cf..fb6b8ee 100644
-> >>--- a/Documentation/devicetree/bindings/staging/dwc2.txt
-> >>+++ b/Documentation/devicetree/bindings/staging/dwc2.txt
-> >>@@ -6,10 +6,14 @@ Required properties:
-> >>  - reg : Should contain 1 register range (address and length)
-> >>  - interrupts : Should contain 1 interrupt
-> >>
-> >>+Optional properties:
-> >>+- snps,phy-utmi-width: Must contain the UTMI data width (either 8 or 16)
-> >
-> >isn't this available in any of the configuration registers ?
+Quoting Sebastian Capella (2013-10-03 16:47:35)
+> Quoting Sebastian Capella (2013-10-03 14:42:46)
+> > Quoting Andrew Morton (2013-10-03 14:15:23)
+> > > On Thu,  3 Oct 2013 14:10:37 -0700 Sebastian Capella <sebastian.capella@linaro.org> wrote:
+> > > 
+> > > > Enhance name_to_dev_t to handle trailing newline characters
+> > > > on device paths.  Some inputs to name_to_dev_t may come from
+> > > > userspace where oftentimes a '\n' is appended to the path.
+> > > > Added const to the name buffer in both the function
+> > > > declaration and the prototype to reflect input buffer
+> > > > handling.
+> > > > 
+> > > > By handling trailing newlines in name_to_dev_t, userspace
+> > > > buffers may be directly passed to name_to_dev_t without
+> > > > modification.
+> > > 
+> > > We have lib/string.c:strim() - perhaps this patch would be
+> > > neater if it were to use it?
+> > 
+> > Hi Morton,
+> > 
+> > I was intending to respect the const handling of the input buffer.
+> > 
+> > The actual buffer in this case is not really const as it comes from
+> > the file buffering, but removing the const requires changing the
+> > store function defined in the kobj_attribute, and would propagate
+> > to many areas in the kernel.
+> > 
+> > Modifying the buffer and removing the const was also suggested by Pavel.
+> > After some discussion I posted this version which did not change the
+> > buffer or the prototype.
+> > 
+> > Please let me know if the preference is to modify the store function
+> > definition.
+> > 
+> > I'll prepare a patchset that removes the consts to see how much is
+> > changed.
+> > 
+> > Thanks,
+> > 
+> > Sebastian
 > 
-> Yes and no. HWCFG4 has a UTMI data width field. However, it has 3
-> valid states, "8", "16", or "8 or 16". The BCM281xx implementation is
-> set to the latter and the attached phy is 8-bit.
+> Hi Andrew,
 > 
-> Looking at dwc2 prior to Matthijs Kooijman's patch [1] which starts
-> validating the value of phy_utmi_width in that driver, the pci.c
-> dwc2_module_params .phy_utmi_width field there even had the comment,
-> "/* 16 bits - NOT DETECTABLE */". The autodetect code in
-> dwc2_set_param_phy_utmi_width() will fail if HWCFG4 has the "8 or 16"
-> option as it just decides to default to a phy width of 16 if nothing
-> is configured by the platform glue. This property would also allow
-> this issue to be addressed in that driver.
+> Sorry for calling you Morton earlier.
+> 
+> I looked into removing the const from the store function, but I'm not sure
+> this is the right idea, so I'm going to shelf that for now.
+> 
+> Please let me know your thoughts.
+> 
+> Thanks,
+> 
+> Sebastian
+ 
+Ping...
 
-fair enough, but I'd really like to hear from DT folks if your suggested
-binding is acceptable. It seems like we can equally argue that it's a SW
-configuration or HW description.
+Hi Andrew,
 
-cheers
+Do you have any feedback on this?
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131010/50c83362/attachment.sig>
+Below are the three options considered thus far.  Do
+you have any additional suggestions or preferences?
+
+Thanks,
+
+Sebastian
+
+
+1) copy buffer, remove \n.
+  - v1 patch did this
+  - alternatively could use an array on the stack or a preallocated global
+    Pros:
+     . cleanest change
+    Cons:
+     . adds memcpy
+2) make name_to_dev_t work with readonly buffer to ignore \n
+  - v2 and v3 patches do this
+    Pros:
+     . no memcpy, no big modifications to unrelated code
+    Cons:
+     . seems more appropriate to harden store functions to user input
+       than name_to_dev_t.
+     . a little complicated
+3) remove const from buffer and modify contents in place to remove \n
+  - remove const from sysfs_ops.store, modify dependent definitions
+  - remove const from kobj_attribute.store, modify dependent definitions
+    Pros:
+     . no memcpy
+    Cons:
+     . a lot of modifications
+     . const contract to not modify the input buffer seems the right way.
