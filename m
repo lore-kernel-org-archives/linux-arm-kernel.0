@@ -1,37 +1,66 @@
-From: taras.kondratiuk@linaro.org (Taras Kondratiuk)
-Date: Thu, 10 Oct 2013 16:44:50 +0300
-Subject: [RFC PATCH] ARM: kexec: Assemble relocate code in ARM mode
-In-Reply-To: <20131010090205.GA3817@mudshark.cambridge.arm.com>
-References: <1381352223-17721-1-git-send-email-taras.kondratiuk@linaro.org>
- <20131010090205.GA3817@mudshark.cambridge.arm.com>
-Message-ID: <CAArO44uatC-4nFH+aFGezUUe1FUzdqzJJ-kTkDwBUNa8Aydecw@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 10 Oct 2013 15:52:13 +0200
+Subject: [PATCH] ARM: integrator: get the CM control register by proxy
+Message-ID: <1381413133-16096-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10 October 2013 12:02, Will Deacon <will.deacon@arm.com> wrote:
-> On Wed, Oct 09, 2013 at 09:57:03PM +0100, Taras Kondratiuk wrote:
->> In Thumb2 kernel (CONFIG_THUMB2_KERNEL) kexec's relocate code is assembled
->> in Thumb2 mode, but cpu_v7_reset() jumps to this code in ARM state,
->> because its address is page aligned and has 0 in LSB.
->
-> This used to work, but Dave broken it when he fixed the reset code in
-> 153cd8e839b5 ("ARM: 7553/1: proc-v7: Ensure correct instruction set after
-> cpu_reset").
->
->> Assemble this code in ARM mode to fix the issue.
->
-> In the interest of keeping kexec a possibility for v7m, it might be better
-> to do something similar to head.S (i.e. switch back to thumb if we're a
-> thumb-2 kernel).
->
+The CM_CTRL register was accessed directly from the LED driver,
+which does not work now that we get the base for the register
+from the device tree. Add an accessor function to do this and
+make the LED driver compile again.
 
-Actually only v7 jumps here in ARM, so maybe it worth to wrap the patch with
-CONFIG_CPU_V7? In this case v7m won't be touched.
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ arch/arm/mach-integrator/core.c            | 8 ++++++++
+ arch/arm/mach-integrator/include/mach/cm.h | 3 ++-
+ arch/arm/mach-integrator/leds.c            | 2 +-
+ 3 files changed, 11 insertions(+), 2 deletions(-)
 
-I'll update patch with a stub that switches back to Thumb, but honestly
-I don't see a bit sense of it here. Anyway at the end of this function
-instruction set is switched again.
-
+diff --git a/arch/arm/mach-integrator/core.c b/arch/arm/mach-integrator/core.c
+index 4cdfd73..c07c821 100644
+--- a/arch/arm/mach-integrator/core.c
++++ b/arch/arm/mach-integrator/core.c
+@@ -94,6 +94,14 @@ int __init integrator_init(bool is_cp)
+ static DEFINE_RAW_SPINLOCK(cm_lock);
+ 
+ /**
++ * cm_get - get the value from the CM_CTRL register
++ */
++u32 cm_get(void)
++{
++	return readl(cm_base + INTEGRATOR_HDR_CTRL_OFFSET);
++}
++
++/**
+  * cm_control - update the CM_CTRL register.
+  * @mask: bits to change
+  * @set: bits to set
+diff --git a/arch/arm/mach-integrator/include/mach/cm.h b/arch/arm/mach-integrator/include/mach/cm.h
+index 202e6a5..ae6085f 100644
+--- a/arch/arm/mach-integrator/include/mach/cm.h
++++ b/arch/arm/mach-integrator/include/mach/cm.h
+@@ -1,6 +1,7 @@
+ /*
+- * update the core module control register.
++ * access the core module control register.
+  */
++u32 cm_get(void);
+ void cm_control(u32, u32);
+ 
+ #define CM_CTRL	__io_address(INTEGRATOR_HDR_CTRL)
+diff --git a/arch/arm/mach-integrator/leds.c b/arch/arm/mach-integrator/leds.c
+index 7a7f6d3..ed82535 100644
+--- a/arch/arm/mach-integrator/leds.c
++++ b/arch/arm/mach-integrator/leds.c
+@@ -78,7 +78,7 @@ static void cm_led_set(struct led_classdev *cdev,
+ 
+ static enum led_brightness cm_led_get(struct led_classdev *cdev)
+ {
+-	u32 reg = readl(CM_CTRL);
++	u32 reg = cm_get();
+ 
+ 	return (reg & CM_CTRL_LED) ? LED_FULL : LED_OFF;
+ }
 -- 
-Regards,
-Taras Kondratiuk
+1.8.3.1
