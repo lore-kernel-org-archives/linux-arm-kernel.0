@@ -1,31 +1,18 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Thu, 10 Oct 2013 10:18:06 +0300
-Subject: [PATCHv7 00/36] ARM: OMAP: clock data conversion to DT
-In-Reply-To: <alpine.DEB.2.02.1310091858411.30199@utopia.booyaka.com>
-References: <1380098922-30340-1-git-send-email-t-kristo@ti.com>
- <524EE00F.7010208@ti.com> <20131007021556.GV8949@atomide.com>
- <52525642.8010307@ti.com> <20131007154103.GW8949@atomide.com>
- <20131007190322.GY8949@atomide.com>
- <alpine.DEB.2.02.1310091551540.30199@utopia.booyaka.com>
- <alpine.DEB.2.02.1310091858411.30199@utopia.booyaka.com>
-Message-ID: <525654AE.7060009@ti.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 10 Oct 2013 16:23:17 +0900
+Subject: [PATCH] ARM: shmobile: Select GPIO in case of the r7s72100 SoC
+In-Reply-To: <20131009225742.7558.62495.sendpatchset@w520>
+References: <20131009225742.7558.62495.sendpatchset@w520>
+Message-ID: <20131010072313.GA23789@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/09/2013 09:59 PM, Paul Walmsley wrote:
-> Eh, one correction:
->
-> On Wed, 9 Oct 2013, Paul Walmsley wrote:
->
->> We could easily wind up with kernels that won't boot at all when used
->> with newer DT data.
->
-> This is a misstatement of the issue: the concern here is that newer
-> kernels may not boot at all with older DT data - which could easily be in
-> locked areas of the flash or firmware.
+On Thu, Oct 10, 2013 at 07:57:42AM +0900, Magnus Damm wrote:
+> From: Magnus Damm <damm@opensource.se>
+> 
+> The r7s72100 contains GPIO controllers so make sure the GPIO
+> subsystem can be built by selecting ARCH_WANT_OPTIONAL_GPIOLIB.
+> 
+> Signed-off-by: Magnus Damm <damm@opensource.se>
 
-I wonder who would be crazy enough to put DT data into a locked area, 
-and to what purpose. If you can update the kernel, there is no point 
-locking down DT data, this will just cause you unnecessary misery.
-
--Tero
+Thanks, I have queued this up.
