@@ -1,49 +1,66 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 10 Oct 2013 17:11:26 +0200
-Subject: [PATCH 6/6] cpufreq: probe the Integrator cpufreq driver from DT
-In-Reply-To: <20131008100044.GF28972@e106331-lin.cambridge.arm.com>
-References: <1380816238-3255-1-git-send-email-linus.walleij@linaro.org>
- <20131008100044.GF28972@e106331-lin.cambridge.arm.com>
-Message-ID: <CACRpkdY7kiuBzN=tYW-iGdW+LjvJ+oEg4WwOkxX_XnprOtZXVw@mail.gmail.com>
+From: joelf@ti.com (Joel Fernandes)
+Date: Thu, 10 Oct 2013 10:20:50 -0500
+Subject: [PATCH V6 02/15] ARM: OMAP2+: AM33XX: add lateinit hook for
+ calling pm late init
+In-Reply-To: <20131010133209.GA13105@kahuna>
+References: <1381354144-7134-1-git-send-email-nm@ti.com>
+ <1381361098-8283-1-git-send-email-nm@ti.com> <52563BD8.1060703@ti.com>
+ <20131010133209.GA13105@kahuna>
+Message-ID: <5256C5D2.9030302@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 8, 2013 at 12:00 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+On 10/10/2013 08:32 AM, Nishanth Menon wrote:
+> On 00:32-20131010, Joel Fernandes wrote:
+>> On 10/09/2013 06:24 PM, Nishanth Menon wrote:
+>>> Call OMAP2+ generic lateinit hook from AM specific late init hook.
+>>> This allows the generic late initializations such as cpufreq hooks
+>>> to be active.
+>>>
+>>> Cc: Benoit Cousson <bcousson@baylibre.com>
+>>> Cc: Kevin Hilman <khilman@deeprootsystems.com>
+>>> Cc: Paul Walmsley <paul@pwsan.com>
+>>> Cc: Tony Lindgren <tony@atomide.com>
+>>> Signed-off-by: Nishanth Menon <nm@ti.com>
+>>> ---
+>>>  arch/arm/mach-omap2/board-generic.c |    1 +
+>>>  arch/arm/mach-omap2/common.h        |    1 +
+>>>  arch/arm/mach-omap2/io.c            |    6 ++++++
+>>>  3 files changed, 8 insertions(+)
+>>>
+>>> diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
+>>> index 87162e1..b474498 100644
+>>> --- a/arch/arm/mach-omap2/board-generic.c
+>>> +++ b/arch/arm/mach-omap2/board-generic.c
+>>> @@ -180,6 +180,7 @@ DT_MACHINE_START(AM33XX_DT, "Generic AM33XX (Flattened Device Tree)")
+>>>  	.init_irq	= omap_intc_of_init,
+>>>  	.handle_irq	= omap3_intc_handle_irq,
+>>>  	.init_machine	= omap_generic_init,
+>>> +	.init_late	= am33xx_init_late,
+>>
+>> Instead of adding a new a *_init_late function for every platform, perhaps
+>> better to just do:
+>> .init_late	= omap2_common_pm_late_init;
+>>
+>> since that's the only function you're calling.
+>>
+>> Later if more functions are added, then it can be wrapped around.
+> 
+> And what benefit would that give us? we break consistency of functions
+> available in io.c, considering the work we have already done in
+> out-of-tree patches on ti-forks, we *do know* that there is more
+> incoming and has to be done anyways, I prefer having symmetric
+> functions and a placeholder that folks can add on to.
+> 
 
->> +static int __init integrator_cpufreq_probe(struct platform_device *pdev)
->>  {
->> +     struct device_node *np = pdev->dev.of_node;
->> +
->> +     cm_base = of_iomap(np, 0);
->> +     if (!cm_base)
->> +             return -ENODEV;
->>       return cpufreq_register_driver(&integrator_driver);
->
-> If we fail to register the driver we could unmap cm_base, no?
+Ok, sure if you think such placeholders are right way and there's more code
+later to be added to init_late callbacks.
 
-Using devm_* is better so I'll revise it to do this.
+Adding 6 lines of identical code for every platform seems redundant, I'd just
+define an omap_common_late_init for all platforms for now, and then fork off for
+the future differences. That way we save on LOC and readability in the header as
+well. Your call.
 
->> -static void __exit integrator_cpu_exit(void)
->> +static void __exit integrator_cpufreq_remove(struct platform_device *pdev)
->>  {
->>       cpufreq_unregister_driver(&integrator_driver);
->
-> Unmap here?
+thanks,
 
-Dito. Check v2.
-
->> +static const struct of_device_id integrator_cpufreq_match[] = {
->> +     { .compatible = "arm,core-module-integrator"},
->> +     { },
->> +};
->
-> It feels a little scary that this also got handled by some other code in
-> the previous patch. Is no arbitrarion required between the two when
-> accessing the core module registers?
-
-They are using totally different registers, so it should not be an
-issue. Inside the mach folder there is some arbitration for the
-register that is actually accessed by several consumers.
-
-Yours,
-Linus Walleij
+-Joel
