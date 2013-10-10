@@ -1,60 +1,73 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 10 Oct 2013 12:24:26 +0100
-Subject: [RFC PATCH] arm64: KVM: honor cacheability attributes on S2
- page fault
-In-Reply-To: <525667DB.7090705@arm.com>
-References: <1378806670-2467-1-git-send-email-marc.zyngier@arm.com>
- <CAAhSdy2E6aRndw88_S_3wfyTOYd5rQQTc4+Cw5Hd1DFXuM6EBA@mail.gmail.com>
- <523063AC.8040803@arm.com> <20130911193855.GN9860@cbox>
- <CAAhSdy0EZpzGOpVFOo-GWPs97XLHB8_uTZ7BTu0gP958y8JPeA@mail.gmail.com>
- <525667DB.7090705@arm.com>
-Message-ID: <20131010112425.GB21380@arm.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Thu, 10 Oct 2013 15:12:45 +0100
+Subject: [RFC PATCH] ARM: kexec: Assemble relocate code in ARM mode
+In-Reply-To: <1381352223-17721-1-git-send-email-taras.kondratiuk@linaro.org>
+References: <1381352223-17721-1-git-send-email-taras.kondratiuk@linaro.org>
+Message-ID: <20131010141238.GA4081@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 10, 2013 at 09:39:55AM +0100, Marc Zyngier wrote:
-> On 10/10/13 05:51, Anup Patel wrote:
-> > Are you planning to go ahead with this approach ?
+On Wed, Oct 09, 2013 at 11:57:03PM +0300, Taras Kondratiuk wrote:
+> In Thumb2 kernel (CONFIG_THUMB2_KERNEL) kexec's relocate code is assembled
+> in Thumb2 mode, but cpu_v7_reset() jumps to this code in ARM state,
+> because its address is page aligned and has 0 in LSB.
 > 
-> [adding Catalin, as we heavily discussed this recently]
+> Assemble this code in ARM mode to fix the issue.
+
+I think the actual issue here is that relocate_new_kernel is not properly
+annotated as a function symbol.
+
+Can you remove the explicit label declaration and try the following:
+
+	#include <linux/linkage.h>
+
+	ENTRY(relocate_new_kernel)
+
+	/* body of relocate_new_kernel */
+
+	ENDPROC(relocate_new_kernel)
+
+
+Without this, the linker will treat it as a random pointer to data and
+never set the Thumb bit.
+
+This fails in precisely the same was as an ordinary function call
+would fail if the destination function doesn't have the needed
+annotation.
+
+
+There should be no need to switch to ARM if the kernel is just jumping
+to itself...
+
+Cheers
+---Dave
+
 > 
-> Not as such, as it doesn't solve the full issue. It merely papers over
-> the whole "my cache is off" problem. More specifically, any kind of
-> speculative access from another CPU while caches are off in the guest
-> completely nukes the benefit of this patch.
+> Signed-off-by: Taras Kondratiuk <taras.kondratiuk@linaro.org>
+> ---
+> Based on v3.12-rc4
 > 
-> Also, turning the the caches off is another source of problems, as
-> speculation also screws up set/way invalidation.
-
-Indeed. The set/way operations trapping and broadcasting (or deferring)
-to other CPUs in software just happens to work but there is no
-guarantee, sooner or later we'll hit a problem. I'm even tempted to
-remove flush_dcache_all() calls on the booting path for the arm64
-kernel, we already require that whatever runs before Linux should
-clean&invalidate the caches.
-
-Basically, with KVM a VCPU even if running with caches/MMU disabled can
-still get speculative allocation into the cache. The reason for this is
-the other cacheable memory aliases created by the host kernel and
-qemu/kvmtool. I can't tell whether Xen has this issue but it may be
-easier in Xen to avoid memory aliases.
-
-> > We really need this patch for X-Gene L3 cache.
+> Cc: Dave Martin <dave.martin@linaro.org>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: linaro-kernel at lists.linaro.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> ---
+>  arch/arm/kernel/relocate_kernel.S |    1 +
+>  1 file changed, 1 insertion(+)
 > 
-> So far, I can see two possibilities:
-> - either we mandate caches to be always on (DC bit, and you're not
-> allowed to turn the caches off).
-
-That's my preferred approach. For hotplug, idle, the guest would use an
-HVC call (PSCI) and the host takes care of re-enabling the DC bit. But
-we may not catch all cases (kexec probably).
-
-> - Or we mandate that caches are invalidated (by VA) for each write that
-> is performed with caches off.
-
-For some things like run-time code patching, on ARMv8 we need to do at
-least I-cache maintenance since the CPU can allocate into the I-cache
-(even if there are no aliases).
-
--- 
-Catalin
+> diff --git a/arch/arm/kernel/relocate_kernel.S b/arch/arm/kernel/relocate_kernel.S
+> index d0cdedf..a3af323 100644
+> --- a/arch/arm/kernel/relocate_kernel.S
+> +++ b/arch/arm/kernel/relocate_kernel.S
+> @@ -5,6 +5,7 @@
+>  #include <asm/kexec.h>
+>  
+>  	.globl relocate_new_kernel
+> +	.arm
+>  relocate_new_kernel:
+>  
+>  	ldr	r0,kexec_indirection_page
+> -- 
+> 1.7.9.5
+> 
