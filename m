@@ -1,57 +1,33 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 10 Oct 2013 10:02:05 +0100
-Subject: [RFC PATCH] ARM: kexec: Assemble relocate code in ARM mode
-In-Reply-To: <1381352223-17721-1-git-send-email-taras.kondratiuk@linaro.org>
-References: <1381352223-17721-1-git-send-email-taras.kondratiuk@linaro.org>
-Message-ID: <20131010090205.GA3817@mudshark.cambridge.arm.com>
+From: rogerq@ti.com (Roger Quadros)
+Date: Thu, 10 Oct 2013 12:15:43 +0300
+Subject: [PATCH v2 5/6] Revert "ARM: OMAP2+: Provide alias to USB PHY
+ clock"
+In-Reply-To: <20131009151522.GA8313@atomide.com>
+References: <1381226799-29158-1-git-send-email-rogerq@ti.com>
+ <1381226799-29158-6-git-send-email-rogerq@ti.com> <52550180.1000506@ti.com>
+ <20131009151522.GA8313@atomide.com>
+Message-ID: <5256703F.1070806@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 09, 2013 at 09:57:03PM +0100, Taras Kondratiuk wrote:
-> In Thumb2 kernel (CONFIG_THUMB2_KERNEL) kexec's relocate code is assembled
-> in Thumb2 mode, but cpu_v7_reset() jumps to this code in ARM state,
-> because its address is page aligned and has 0 in LSB.
-
-This used to work, but Dave broken it when he fixed the reset code in
-153cd8e839b5 ("ARM: 7553/1: proc-v7: Ensure correct instruction set after
-cpu_reset").
-
-> Assemble this code in ARM mode to fix the issue.
-
-In the interest of keeping kexec a possibility for v7m, it might be better
-to do something similar to head.S (i.e. switch back to thumb if we're a
-thumb-2 kernel).
-
-Cheers,
-
-Will
-
-> Signed-off-by: Taras Kondratiuk <taras.kondratiuk@linaro.org>
-> ---
-> Based on v3.12-rc4
+On 10/09/2013 06:15 PM, Tony Lindgren wrote:
+> * Roger Quadros <rogerq@ti.com> [131009 00:19]:
+>> Hi Tony,
+>>
+>> On 10/08/2013 01:06 PM, Roger Quadros wrote:
+>>> This reverts commit 741532c4a995be11815cb72d4d7a48f442a22fea.
+>>>
+>>> The proper clock reference is provided in device tree so we
+>>> no longer need this.
+>>
+>> Could you please Ack this one? I think it is best if it goes through Benoit's tree.
 > 
-> Cc: Dave Martin <dave.martin@linaro.org>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: linaro-kernel at lists.linaro.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> ---
->  arch/arm/kernel/relocate_kernel.S |    1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/kernel/relocate_kernel.S b/arch/arm/kernel/relocate_kernel.S
-> index d0cdedf..a3af323 100644
-> --- a/arch/arm/kernel/relocate_kernel.S
-> +++ b/arch/arm/kernel/relocate_kernel.S
-> @@ -5,6 +5,7 @@
->  #include <asm/kexec.h>
->  
->  	.globl relocate_new_kernel
-> +	.arm
->  relocate_new_kernel:
->  
->  	ldr	r0,kexec_indirection_page
-> -- 
-> 1.7.9.5
-> 
-> 
+> I could queue this into my board removal series that will be
+> based on Benoit's branch if that works for you. And this
+> also seems to depend on the omap-for-v3.13/quirk branch
+> that moves all the legacy pdata handling into pdata-quirks.c.
+
+OK Tony. Thanks.
+
+cheers,
+-roger
