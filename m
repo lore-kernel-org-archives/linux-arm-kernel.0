@@ -1,65 +1,56 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Thu, 10 Oct 2013 15:28:40 -0700
-Subject: [GIT PULL] Keystone SOC updates for v3.13
-In-Reply-To: <1381267740-31874-1-git-send-email-santosh.shilimkar@ti.com>
- (Santosh Shilimkar's message of "Tue, 8 Oct 2013 17:29:00 -0400")
-References: <1381267740-31874-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <87wqlkn4kn.fsf@linaro.org>
+From: gnurou@gmail.com (Alexandre Courbot)
+Date: Thu, 10 Oct 2013 15:28:43 -0700
+Subject: [PATCH v7 1/5] ARM: add basic support for Trusted Foundations
+In-Reply-To: <5257288E.6000704@wwwdotorg.org>
+References: <1380904635-18113-1-git-send-email-acourbot@nvidia.com>
+ <1380904635-18113-2-git-send-email-acourbot@nvidia.com>
+ <CAOesGMj74Pui1V5O7zxEipM5Hg6nboVTUCFuMY0c0aUh=wuu3Q@mail.gmail.com>
+ <CAAVeFuLvHdUuDurqA_=tvxJonNP+RekotM_MuysQrJD0PUgcSQ@mail.gmail.com>
+ <5257288E.6000704@wwwdotorg.org>
+Message-ID: <CAAVeFuKAm75TX6mz5n9Pu83+LCP74jPYD43UcA1eCh2SEwaChQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Santosh,
+On Thu, Oct 10, 2013 at 3:22 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> On 10/10/2013 02:58 PM, Alexandre Courbot wrote:
+>> On Wed, Oct 9, 2013 at 4:47 PM, Olof Johansson <olof@lixom.net> wrote:
+>>> On Fri, Oct 4, 2013 at 9:37 AM, Alexandre Courbot <acourbot@nvidia.com> wrote:
+> ...
+>>> But do we really need to panic here? It's a PITA to debug since it'll
+>>> be a very early panic. I'd rather have the system log errors in dmesg
+>>> but continue booting with one cpu.
+>>
+>> Actually the first version of this series continued on one CPU if TF
+>> support was missing (as secondary CPUs would simply fail to boot), but
+>> IIRC Stephen advocated for the current behavior (panic) instead. I
+>> agree such an early panic is hard to debug, especially considering
+>> that most devices using TF (Tegra retail devices) do not even feature
+>> a serial port.
+>>
+>> On the other hand, if we continue booting in these conditions the
+>> system freezes as soon as cpuidle kicks in, so we won't be going very
+>> far anyway. However the console is up when it happens.
+>>
+>> Maybe if there is a way to disable the kernel features TF is supposed
+>> to manage (SMP & cpuidle at the moment) when registration fails, the
+>> system could continue more gracefully (even if on one leg) and warn
+>> the user about this condition. Stephen, can I have your thoughts on
+>> this?
+>
+> If we can disable the features that rely on TF/secure-mode when support
+> is missing, then doing that rather than panic is fine. We do something
+> similar for PCIe on Tegra20, where LP2 cpuidle state must be disabled or
+> PCIe interrupts won't work.
+>
+> I would be inclined to merge the patch as-is right now, since it's only
+> enabling a new feature that won't see any regressions due to this panic,
+> and then add the disable-other-features with a separate patch/series
+> later. Does that seem reasonable?
 
-Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
+According to Olof we should also be moving the DT node under
+/firmware, so I guess another revision is in order to at least get
+this part right.
 
-> Olof,
->
-> Please pull below Keystone SOC updates for v3.13. As discussed on irc, the
-> pull request is build on top of v3.13-rc4 because of dependent commit
-> c2b9e974{dma/Kconfig: Make TI_EDMA select TI_PRIV_EDMA}. The pull request
-> carries Kconfig update patch {dma: Allow TI_EDMA selectable for ARCH_KEYSTONE}
-> with Vinod Koul's ack as per alignment on the mailing list[1]. The clock
-> driver support is already applied by Mike to his 3.13 clk-next [2]
->
-> The following changes since commit ef887009524c3631d804a2587ec204c4ff61a5b8:
->
->   ARM: keystone: Enable I2C and SPI bus support (2013-10-08 15:37:41 -0400)
->
-> are available in the git repository at:
->
->   git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git tags/keystone-soc-for-arm-soc
->
-> for you to fetch changes up to ef887009524c3631d804a2587ec204c4ff61a5b8:
->
->   ARM: keystone: Enable I2C and SPI bus support (2013-10-08 15:37:41 -0400)
->
-> ----------------------------------------------------------------
-> SOC updates for Keystone II devices:
->
-> - Clock tree support
-> - Clock management support using PM core
-> - Keystone config update for EMDA with ack from Vinod
-> - Enable SPI and I2C drivers
->
-> ----------------------------------------------------------------
->
-> Santosh Shilimkar (9):
->   ARM: dts: keystone: Add clock tree data to devicetree
->   ARM: dts: keystone: Add clock phandle to UART nodes
->   ARM: keystone: Enable clock drivers
->   ARM: keystone: add PM bus support for clock management
-
-I still don't like this one.  Like I pointed out earlier[1], this
-doesn't really have anything to do with a bus, so it doesn't belong in
-drivers/bus (and the 'bus' naming throughout isn't right.)  IMO, it
-belongs in mach-keystone as the platform glue telling how the PM domains
-are hooked up on keystone.
-
-Please move it to mach-keystone, and s/pm_bus/pm_domain/ throughout
-since it has nothing to do with bus.  The 'bus' naming in davinci is
-leftover from the pre-pm_domain days when we were overriding functions
-of the platform_bus.
-
-Kevin
-
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2013-August/196026.html
+3.12 also added a powered-down cpuidle state for Tegra which freezes
+the system if TF is enabled as the firmware driver does not support
+idle yet, but this can be fixed later.
