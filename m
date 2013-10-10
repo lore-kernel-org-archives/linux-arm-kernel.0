@@ -1,65 +1,28 @@
-From: B35083@freescale.com (Lu Jingchang-B35083)
-Date: Thu, 10 Oct 2013 09:39:04 +0000
-Subject: [PATCH v6 3/3] dma: Add Freescale eDMA engine driver support
-In-Reply-To: <1379498279-16096-1-git-send-email-b35083@freescale.com>
-References: <1379498279-16096-1-git-send-email-b35083@freescale.com>
-Message-ID: <B56CDBE15CE27145A4B77D2D24263E8522EFE6@039-SN1MPN1-004.039d.mgd.msft.net>
+From: maxime.coquelin@st.com (Maxime COQUELIN)
+Date: Thu, 10 Oct 2013 11:39:02 +0200
+Subject: [PATCH v4 0/4] Add I2C support to ST SoCs
+In-Reply-To: <1381250576-7916-1-git-send-email-maxime.coquelin@st.com>
+References: <1381250576-7916-1-git-send-email-maxime.coquelin@st.com>
+Message-ID: <525675B6.4080404@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Vinod,
+Hi Wolfram,
 
-  Could you please help review this patch? Could it be merged into your next tree?
-  Thanks!
+On 10/08/2013 06:42 PM, Maxime COQUELIN wrote:
+> The goal of this series is to add I2C support to ST SoCs.
+> The DT definition is added for STiH415 and STiH416 SoCs on
+> B2000 and B2020 boards.
+>
+> The series has been tested working on STiH416-B2020 board.
+> It applies on top of v3.12-rc4.
+>
+> Changes since v3:
+>    - Switch back to vendor specific DT properties regarding the anti-glitch
+>      filter configuration, as this IP is the only one having such a filter.
+Do you agree to keep these properties vendor-specifics?
 
+If so, could you take this series for v3.13?
 
-Best Regards,
-Jingchang
-
-
-> -----Original Message-----
-> From: Lu Jingchang-B35083
-> Sent: Wednesday, September 18, 2013 5:58 PM
-> To: vinod.koul at intel.com
-> Cc: shawn.guo at linaro.org; linux-kernel at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org; devicetree at vger.kernel.org; Lu Jingchang-
-> B35083; Wang Huan-B18965
-> Subject: [PATCH v6 3/3] dma: Add Freescale eDMA engine driver support
-> 
-> Add Freescale enhanced direct memory(eDMA) controller support.
-> The eDMA controller deploys DMAMUXs routing DMA request sources(slot)
-> to eDMA channels.
-> This module can be found on Vybrid and LS-1 SoCs.
-> 
-> Signed-off-by: Alison Wang <b18965@freescale.com>
-> Signed-off-by: Jingchang Lu <b35083@freescale.com>
-> ---
-> changes in v6:
->   holding lock in dma_control to prevent race.
-> 
-> changes in v5:
->   config slave_id when dmaengine_slave_config intead of channel request.
->   adding residue calculation and dma pause/resume device control.
-> 
-> changes in v4:
->   using exact compatible string in binding document.
-> 
-> changes in v3:
->   handle all pending interrupt one time.
->   add protect lock on dma transfer complete handling.
->   change desc and tcd alloc flag to GFP_NOWAIT.
->   add sanity check and error messages.
-> 
-> changes in v2:
->   using generic dma-channels property instead of fsl,dma-channel.
->   rename the binding document to fsl-edma.txt.
-> 
-> 
->  Documentation/devicetree/bindings/dma/fsl-edma.txt |  84 ++
->  drivers/dma/Kconfig                                |  10 +
->  drivers/dma/Makefile                               |   1 +
->  drivers/dma/fsl-edma.c                             | 944
-> +++++++++++++++++++++
->  4 files changed, 1039 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/dma/fsl-edma.txt
->  create mode 100644 drivers/dma/fsl-edma.c
+Thanks,
+Maxime
