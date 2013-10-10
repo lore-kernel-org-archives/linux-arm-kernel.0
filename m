@@ -1,69 +1,150 @@
-From: marex@denx.de (Marek Vasut)
-Date: Thu, 10 Oct 2013 12:25:10 +0200
-Subject: [PATCH v7 0/2] Add PCIe support for i.MX6q
-In-Reply-To: <0E83723C55F66F43A6041464FE31119D401869@039-SN2MPN1-011.039d.mgd.msft.net>
-References: <1380165887-13506-1-git-send-email-shawn.guo@linaro.org>
- <201310082256.28474.marex@denx.de>
- <0E83723C55F66F43A6041464FE31119D401869@039-SN2MPN1-011.039d.mgd.msft.net>
-Message-ID: <201310101225.10455.marex@denx.de>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Thu, 10 Oct 2013 15:58:06 +0530
+Subject: [PATCH 2/7] usb: dwc3: adapt dwc3 core to use Generic PHY
+ Framework
+In-Reply-To: <CAFp+6iF0tK_+E-40QhTCyEOaoXt_6aXyT_B6NLo9h5Emd4mMCg@mail.gmail.com>
+References: <1378136591-7463-1-git-send-email-kishon@ti.com>
+ <1378136591-7463-3-git-send-email-kishon@ti.com>
+ <CAFp+6iH7AbiJrVg-8hhv+21OyLp0cPEH0RdMh5tzTT+W_ifPDQ@mail.gmail.com>
+ <52319300.6040509@ti.com>
+ <CAFp+6iF0tK_+E-40QhTCyEOaoXt_6aXyT_B6NLo9h5Emd4mMCg@mail.gmail.com>
+Message-ID: <52568136.9030900@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Richard,
-
-> Hi Marek:
-> Thanks for your kindly tests.
+On Thursday 12 September 2013 03:57 PM, Vivek Gautam wrote:
+> On Thu, Sep 12, 2013 at 3:40 PM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
+>> On Thursday 12 September 2013 02:57 PM, Vivek Gautam wrote:
+>>> Hi Kishon,
+>>>
+>>>
+>>> On Mon, Sep 2, 2013 at 9:13 PM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
+>>>> Adapted dwc3 core to use the Generic PHY Framework. So for init, exit,
+>>>> power_on and power_off the following APIs are used phy_init(), phy_exit(),
+>>>> phy_power_on() and phy_power_off().
+>>>>
+>>>> However using the old USB phy library wont be removed till the PHYs of all
+>>>> other SoC's using dwc3 core is adapted to the Generic PHY Framework.
+>>>>
+>>>> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+>>>> ---
+>>>>  Documentation/devicetree/bindings/usb/dwc3.txt |    6 ++-
+>>>>  drivers/usb/dwc3/Kconfig                       |    1 +
+>>>>  drivers/usb/dwc3/core.c                        |   49 ++++++++++++++++++++++++
+>>>>  drivers/usb/dwc3/core.h                        |    7 ++++
+>>>>  4 files changed, 61 insertions(+), 2 deletions(-)
+>>>>
+>>>> diff --git a/Documentation/devicetree/bindings/usb/dwc3.txt b/Documentation/devicetree/bindings/usb/dwc3.txt
+>>>> index e807635..471366d 100644
+>>>> --- a/Documentation/devicetree/bindings/usb/dwc3.txt
+>>>> +++ b/Documentation/devicetree/bindings/usb/dwc3.txt
+>>>> @@ -6,11 +6,13 @@ Required properties:
+>>>>   - compatible: must be "snps,dwc3"
+>>>>   - reg : Address and length of the register set for the device
+>>>>   - interrupts: Interrupts used by the dwc3 controller.
+>>>> +
+>>>> +Optional properties:
+>>>>   - usb-phy : array of phandle for the PHY device.  The first element
+>>>>     in the array is expected to be a handle to the USB2/HS PHY and
+>>>>     the second element is expected to be a handle to the USB3/SS PHY
+>>>> -
+>>>> -Optional properties:
+>>>> + - phys: from the *Generic PHY* bindings
+>>>> + - phy-names: from the *Generic PHY* bindings
+>>>>   - tx-fifo-resize: determines if the FIFO *has* to be reallocated.
+>>>>
+>>>>  This is usually a subnode to DWC3 glue to which it is connected.
+>>>> diff --git a/drivers/usb/dwc3/Kconfig b/drivers/usb/dwc3/Kconfig
+>>>> index cfc16dd..ad7ce83 100644
+>>>> --- a/drivers/usb/dwc3/Kconfig
+>>>> +++ b/drivers/usb/dwc3/Kconfig
+>>>> @@ -3,6 +3,7 @@ config USB_DWC3
+>>>>         depends on (USB || USB_GADGET) && GENERIC_HARDIRQS && HAS_DMA
+>>>>         depends on EXTCON
+>>>>         select USB_PHY
+>>>> +       select GENERIC_PHY
+>>>>         select USB_XHCI_PLATFORM if USB_SUPPORT && USB_XHCI_HCD
+>>>>         help
+>>>>           Say Y or M here if your system has a Dual Role SuperSpeed
+>>>> diff --git a/drivers/usb/dwc3/core.c b/drivers/usb/dwc3/core.c
+>>>> index 428c29e..485d365 100644
+>>>> --- a/drivers/usb/dwc3/core.c
+>>>> +++ b/drivers/usb/dwc3/core.c
+>>>> @@ -82,6 +82,12 @@ static void dwc3_core_soft_reset(struct dwc3 *dwc)
+>>>>
+>>>>         usb_phy_init(dwc->usb2_phy);
+>>>>         usb_phy_init(dwc->usb3_phy);
+>>>> +
+>>>> +       if (dwc->usb2_generic_phy)
+>>>> +               phy_init(dwc->usb2_generic_phy);
+>>>> +       if (dwc->usb3_generic_phy)
+>>>> +               phy_init(dwc->usb3_generic_phy);
+>>>> +
+>>>>         mdelay(100);
+>>>>
+>>>>         /* Clear USB3 PHY reset */
+>>>> @@ -343,6 +349,11 @@ static void dwc3_core_exit(struct dwc3 *dwc)
+>>>>  {
+>>>>         usb_phy_shutdown(dwc->usb2_phy);
+>>>>         usb_phy_shutdown(dwc->usb3_phy);
+>>>> +
+>>>> +       if (dwc->usb2_generic_phy)
+>>>> +               phy_power_off(dwc->usb2_generic_phy);
+>>>> +       if (dwc->usb3_generic_phy)
+>>>> +               phy_power_off(dwc->usb3_generic_phy);
+>>>>  }
+>>>>
+>>>>  #define DWC3_ALIGN_MASK                (16 - 1)
+>>>> @@ -427,6 +438,23 @@ static int dwc3_probe(struct platform_device *pdev)
+>>>>                 dwc->usb3_phy = devm_usb_get_phy(dev, USB_PHY_TYPE_USB3);
+>>>>         }
+>>>>
+>>>> +       if (of_property_read_bool(node, "phys") || pdata->has_phy) {
+>>>> +               dwc->usb2_generic_phy = devm_phy_get(dev, "usb2-phy");
+>>>> +               if (IS_ERR(dwc->usb2_generic_phy)) {
+>>>> +                       dev_err(dev, "no usb2 phy configured yet");
+>>>> +                       return PTR_ERR(dwc->usb2_generic_phy);
+>>>> +               }
+>>>
+>>> I have a doubt here.
+>>> As i can see in the current phy drivers structuring, for OMAP there
+>>> are two phy drivers :
+>>> omap phy-omap-usb2 (talking to musb controller)
+>>
+>> It talks to dwc3 controller also ;-)
 > 
-> Regarding to my experience on 3.0.35 kernel, besides the programming the
-> RdWr0 vs. RdWr1 mode into the iATU. The INTx should be configured
-> properly, for example, like the following one:
+> Ok
 > 
-> static int __init imx_pcie_map_irq(struct pci_dev *dev, u8 slot, u8 pin)
-> {
->        switch (pin) {
->        case 1: return MXC_INT_PCIE_3;
->        case 2: return MXC_INT_PCIE_2;
->        case 3: return MXC_INT_PCIE_1;
->        case 4: return MXC_INT_PCIE_0;
->        default: return -1;
->        }
-> }
+>>
+>>> and phy-omap-usb3(talking to dwc3 controller).
+>>>
+>>> Now dwc3 controller requests both usb2-phy (supported by phy-omap-usb2
+>>> ?) and usb3-phy (supported by phy-omap-usb3 ?).
+>>> But phy-omap-usb2 is not the one designated to talk to DWC3
+>>> controller, then why does still DWC3 want to request usb2-phy, which
+>>> end of the day will be phy-omap-usb2.
+>>> May be i am wrong here since i don't have knowledge about OMAP h/w architecture.
+>>>
+>>> Is it like phy-omap-usb2 includes UTMI phys for both musb controller
+>>> as well as dwc3 controller ?
+>>
+>> right. It's needed for dwc3 too. The same USB2 PHY IP is used for both MUSB in
+>> OMAP2+ platforms and DWC3 in OMAP5.
 > 
-> static struct hw_pci imx_pci __initdata = {
->         .nr_controllers = 1,
->         .swizzle        = pci_std_swizzle,
->         .setup          = imx_pcie_setup,
->         .scan           = imx_pcie_scan_bus,
->         .map_irq        = imx_pcie_map_irq,
-> };
-> Best Regards
-> Richard Zhu
+> Ok, but on Samsung's exynos5 series of SoCs, the USB2.0 controller has
+> a separate USB-PHY interface talking to phy-samsung-usb2 driver;
+> and DWC3 drd controller has separate USB-PHY interface (including both
+> UTMI+ and PIPE3 control registers) talking to phy-samsung-usb3 driver.
+> So in this case DWC3 doesn't need phy-samsung-usb2 at all. It's phy is
+> configured by just phy-samsung-usb3 driver only.
+> So don't you think DWC3 driver should have the flexibility to have
+> either (mostly usb3-phy) _or_ both "usb2-phy" and "usb3-phy".
+> Thereby,in case of Samsung driver, DWC3 will just have "usb3-phy" and
+> that will be enough to get things working.
+> Want your opinions about it.
 
-Thanks for pointing this out, I'll check this. Are there plans to implement the 
-PCIe switch support already so I won't step into someone else's work?
+Should we have separate properties to indicate whether it has a usb2-phy or
+usb3-phy instead of checking for *phys* property?
 
-In the meantime, this is what I see upon probe with V6 of the patches:
-
-Linux version 3.12.0-rc2-next-20130927+
-[...]
-imx6q-pcie 1ffc000.pcie: phy link never came up
-PCI host bridge to bus 0000:00
-pci_bus 0000:00: root bus resource [io  0x1000-0x10000]
-pci_bus 0000:00: root bus resource [mem 0x01000000-0x01efffff]
-pci_bus 0000:00: No busn resource found for root bus, will use [bus 00-ff]
-PCI: bus0: Fast back to back transfers disabled
-PCI: bus1: Fast back to back transfers enabled
-PCI: Device 0000:00:00.0 not available because of resource collisions
-pcieport: probe of 0000:00:00.0 failed with error -22
-pci 0000:00:00.0: BAR 0: assigned [mem 0x01000000-0x010fffff]
-pci 0000:00:00.0: BAR 6: assigned [mem 0x01100000-0x0110ffff pref]
-pci 0000:00:00.0: PCI bridge to [bus 01]
-pci 0000:00:00.0: PCI bridge to [bus 01]
-
-Is this line normal/expected? Is this related to the PCIe switch I have there?
-pcieport: probe of 0000:00:00.0 failed with error -22
-
-Thank you for your help!
-
-Best regards,
-Marek Vasut
+Thanks
+Kishon
