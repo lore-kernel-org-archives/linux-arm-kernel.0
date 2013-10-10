@@ -1,32 +1,31 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 10 Oct 2013 16:16:30 +0900
-Subject: [PATCH 05/11] ARM: shmobile: bockw: Enable CONFIG_VFP in defconfig
-In-Reply-To: <1381389396-22000-1-git-send-email-horms+renesas@verge.net.au>
-References: <1381389396-22000-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1381389396-22000-6-git-send-email-horms+renesas@verge.net.au>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Thu, 10 Oct 2013 10:18:06 +0300
+Subject: [PATCHv7 00/36] ARM: OMAP: clock data conversion to DT
+In-Reply-To: <alpine.DEB.2.02.1310091858411.30199@utopia.booyaka.com>
+References: <1380098922-30340-1-git-send-email-t-kristo@ti.com>
+ <524EE00F.7010208@ti.com> <20131007021556.GV8949@atomide.com>
+ <52525642.8010307@ti.com> <20131007154103.GW8949@atomide.com>
+ <20131007190322.GY8949@atomide.com>
+ <alpine.DEB.2.02.1310091551540.30199@utopia.booyaka.com>
+ <alpine.DEB.2.02.1310091858411.30199@utopia.booyaka.com>
+Message-ID: <525654AE.7060009@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CONFIG_VFP is required to boot into a Debian armhf user-space.
-This change brings the bockw defconfig into line with
-other shmobile defconfigs.
+On 10/09/2013 09:59 PM, Paul Walmsley wrote:
+> Eh, one correction:
+>
+> On Wed, 9 Oct 2013, Paul Walmsley wrote:
+>
+>> We could easily wind up with kernels that won't boot at all when used
+>> with newer DT data.
+>
+> This is a misstatement of the issue: the concern here is that newer
+> kernels may not boot at all with older DT data - which could easily be in
+> locked areas of the flash or firmware.
 
-Signed-off-by: Simon Horman <horms@verge.net.au>
----
- arch/arm/configs/bockw_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+I wonder who would be crazy enough to put DT data into a locked area, 
+and to what purpose. If you can update the kernel, there is no point 
+locking down DT data, this will just cause you unnecessary misery.
 
-diff --git a/arch/arm/configs/bockw_defconfig b/arch/arm/configs/bockw_defconfig
-index 88bcb04..db7d792 100644
---- a/arch/arm/configs/bockw_defconfig
-+++ b/arch/arm/configs/bockw_defconfig
-@@ -27,6 +27,7 @@ CONFIG_HIGHMEM=y
- CONFIG_ZBOOT_ROM_TEXT=0x0
- CONFIG_ZBOOT_ROM_BSS=0x0
- CONFIG_ARM_APPENDED_DTB=y
-+CONFIG_VFP=y
- # CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
- # CONFIG_SUSPEND is not set
- CONFIG_PM_RUNTIME=y
--- 
-1.8.4
+-Tero
