@@ -1,32 +1,44 @@
-From: sre@debian.org (Sebastian Reichel)
-Date: Thu, 10 Oct 2013 16:19:22 +0200
-Subject: [RFCv3 1/7] ARM: OMAP2+: hwmod-data: Add SSI information
-In-Reply-To: <alpine.DEB.2.02.1310090542270.30199@utopia.booyaka.com>
-References: <1381091235-18293-1-git-send-email-sre@debian.org>
- <1381091235-18293-2-git-send-email-sre@debian.org>
- <alpine.DEB.2.02.1310090542270.30199@utopia.booyaka.com>
-Message-ID: <20131010141921.GE28657@earth.universe>
+From: nm@ti.com (Nishanth Menon)
+Date: Thu, 10 Oct 2013 09:19:50 -0500
+Subject: [PATCH 1/2] ARM: dts: omap5-uevm: remove always_on, boot_on from
+ smps10_out1
+In-Reply-To: <1381402195-29257-1-git-send-email-kishon@ti.com>
+References: <1381402195-29257-1-git-send-email-kishon@ti.com>
+Message-ID: <20131010141949.GA13277@kahuna>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 09, 2013 at 05:43:13AM +0000, Paul Walmsley wrote:
-> On Sun, 6 Oct 2013, Sebastian Reichel wrote:
+On 16:19-20131010, Kishon Vijay Abraham I wrote:
+> smps10 should be enabled only in the case of host mode. So stop
+> doing always_on, boot_on from smps10_out1. The driver will enable it in host
+> mode.
 > 
-> > This patch adds Synchronous Serial Interface (SSI) hwmod support for
-> > OMAP34xx SoCs.
-> > 
-> > Signed-off-by: Sebastian Reichel <sre@debian.org>
+> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+> ---
+>  arch/arm/boot/dts/omap5-uevm.dts |    2 --
+>  1 file changed, 2 deletions(-)
 > 
-> Thanks, queued this one for v3.13.  You can drop it from any future 
-> reposts of this series.
+> diff --git a/arch/arm/boot/dts/omap5-uevm.dts b/arch/arm/boot/dts/omap5-uevm.dts
+> index d784b3a..e06a04a 100644
+> --- a/arch/arm/boot/dts/omap5-uevm.dts
+> +++ b/arch/arm/boot/dts/omap5-uevm.dts
+> @@ -334,8 +334,6 @@
+>  					regulator-name = "smps10_out1";
+>  					regulator-min-microvolt = <5000000>;
+>  					regulator-max-microvolt = <5000000>;
+> -					regulator-always-on;
+> -					regulator-boot-on;
+>  				};
+>  
+>  				ldo1_reg: ldo1 {
+> -- 
+Always good to get rid of regulator-always-on. Thanks for it.
 
-Thanks.
+regulator-boot-on indicates that PMIC enables it by default as part of
+OTP or some internal behavior -> Looking at the measurements done on
+uEVM and OTP information -> regulator-boot-on should be kept here.
 
--- Sebastian
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131010/647ee67a/attachment-0001.sig>
+Hence Nak.
+-- 
+Regards,
+Nishanth Menon
