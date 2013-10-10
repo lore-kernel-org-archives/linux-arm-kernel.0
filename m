@@ -1,76 +1,46 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Thu, 10 Oct 2013 21:14:14 +0530
-Subject: [PATCH v6 3/3] dma: Add Freescale eDMA engine driver support
-In-Reply-To: <B56CDBE15CE27145A4B77D2D24263E8522EFE6@039-SN1MPN1-004.039d.mgd.msft.net>
-References: <1379498279-16096-1-git-send-email-b35083@freescale.com>
- <B56CDBE15CE27145A4B77D2D24263E8522EFE6@039-SN1MPN1-004.039d.mgd.msft.net>
-Message-ID: <20131010154414.GY2954@intel.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Thu, 10 Oct 2013 11:44:41 -0500
+Subject: [PATCH] ARM: dts: omap4-panda-es: Do not reset gpio1
+In-Reply-To: <1381313521-10422-1-git-send-email-rnayak@ti.com>
+References: <1381313521-10422-1-git-send-email-rnayak@ti.com>
+Message-ID: <1381423481-5920-1-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 10, 2013 at 09:39:04AM +0000, Lu Jingchang-B35083 wrote:
-> Hi, Vinod,
-> 
->   Could you please help review this patch? Could it be merged into your next tree?
->   Thanks!
-Where is the patch 1 & 2 of the series, I dont sem to find it.
-Also I need ACK from one of the DT maintainers on the binding before I can carry
-this
+Do not reset GPIO1 at boot-up because GPIO 7 in GPIO1 block is used on
+OMAP4460 PandaBoard-ES to select voltage register in TPS62361 which
+supplies VDD_MPU.
 
---
-~Vinod
-> 
-> 
-> Best Regards,
-> Jingchang
-> 
-> 
-> > -----Original Message-----
-> > From: Lu Jingchang-B35083
-> > Sent: Wednesday, September 18, 2013 5:58 PM
-> > To: vinod.koul at intel.com
-> > Cc: shawn.guo at linaro.org; linux-kernel at vger.kernel.org; linux-arm-
-> > kernel at lists.infradead.org; devicetree at vger.kernel.org; Lu Jingchang-
-> > B35083; Wang Huan-B18965
-> > Subject: [PATCH v6 3/3] dma: Add Freescale eDMA engine driver support
-> > 
-> > Add Freescale enhanced direct memory(eDMA) controller support.
-> > The eDMA controller deploys DMAMUXs routing DMA request sources(slot)
-> > to eDMA channels.
-> > This module can be found on Vybrid and LS-1 SoCs.
-> > 
-> > Signed-off-by: Alison Wang <b18965@freescale.com>
-> > Signed-off-by: Jingchang Lu <b35083@freescale.com>
-> > ---
-> > changes in v6:
-> >   holding lock in dma_control to prevent race.
-> > 
-> > changes in v5:
-> >   config slave_id when dmaengine_slave_config intead of channel request.
-> >   adding residue calculation and dma pause/resume device control.
-> > 
-> > changes in v4:
-> >   using exact compatible string in binding document.
-> > 
-> > changes in v3:
-> >   handle all pending interrupt one time.
-> >   add protect lock on dma transfer complete handling.
-> >   change desc and tcd alloc flag to GFP_NOWAIT.
-> >   add sanity check and error messages.
-> > 
-> > changes in v2:
-> >   using generic dma-channels property instead of fsl,dma-channel.
-> >   rename the binding document to fsl-edma.txt.
-> > 
-> > 
-> >  Documentation/devicetree/bindings/dma/fsl-edma.txt |  84 ++
-> >  drivers/dma/Kconfig                                |  10 +
-> >  drivers/dma/Makefile                               |   1 +
-> >  drivers/dma/fsl-edma.c                             | 944
-> > +++++++++++++++++++++
-> >  4 files changed, 1039 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/dma/fsl-edma.txt
-> >  create mode 100644 drivers/dma/fsl-edma.c
-> 
+Without this, OMAP4460 PandaBoard-ES boards fail to boot-up because
+MPU voltage switches over to VSET0 voltage value (boot voltage) which
+is not sufficient to operate the device at OPP100.
 
+Signed-off-by: Nishanth Menon <nm@ti.com>
+---
+As explained here: http://marc.info/?l=u-boot&m=133066647800872&w=2
+
+GPIO1 reset causes PandaBoard-ES to stop functioning.
+This depends on Patch series from Rajendra:
+http://marc.info/?l=linux-doc&m=138131355520116&w=2
+Applies on Benoit's for_13/dts branch:
+https://git.kernel.org/cgit/linux/kernel/git/bcousson/linux-omap-dt.git/log/?h=for_3.13/dts
+
+Tested on PandaBoard-ES without the u-boot uenv hack
+
+ arch/arm/boot/dts/omap4-panda-es.dts |    4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/arch/arm/boot/dts/omap4-panda-es.dts b/arch/arm/boot/dts/omap4-panda-es.dts
+index 56c4354..816d1c9 100644
+--- a/arch/arm/boot/dts/omap4-panda-es.dts
++++ b/arch/arm/boot/dts/omap4-panda-es.dts
+@@ -62,3 +62,7 @@
+ 		gpios = <&gpio1 8 GPIO_ACTIVE_HIGH>;
+ 	};
+ };
++
++&gpio1 {
++	 ti,no-reset-on-init;
++};
 -- 
+1.7.9.5
