@@ -1,47 +1,35 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 10 Oct 2013 21:13:11 +0200
-Subject: [PATCH 2/5] clocksource: Add Allwinner SoCs HS timers driver
-In-Reply-To: <52436EBE.9010002@codeaurora.org>
-References: <1380117790-19390-1-git-send-email-maxime.ripard@free-electrons.com>
- <1380117790-19390-3-git-send-email-maxime.ripard@free-electrons.com>
- <52436EBE.9010002@codeaurora.org>
-Message-ID: <20131010191311.GL3041@lukather>
+From: lokeshvutla@ti.com (Lokesh Vutla)
+Date: Fri, 11 Oct 2013 00:44:52 +0530
+Subject: [PATCH 0/2] ARM: dts: AM4372: Add more nodes
+Message-ID: <1381432494-20498-1-git-send-email-lokeshvutla@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+This patch series add nodes for l2-cache-controller, EDMA, mailbox, mmc, sham,
+and updates the properties for cpsw, i2c0, matrix-keypad. 
 
-Just following back on this.
+These patches are applied on top of Benoit's for_3.13/dts branch
+git://git.kernel.org/pub/scm/linux/kernel/git/bcousson/linux-omap-dt.git for_3.13/dts
 
-On Wed, Sep 25, 2013 at 04:16:14PM -0700, Stephen Boyd wrote:
-> On 09/25/13 07:03, Maxime Ripard wrote:
-> > +	sun5i_clockevent.cpumask = cpumask_of(0);
-> 
-> Can this timer interrupt any CPU or is it hardwired to CPU0? If the
-> interrupt can go to any CPU this should be cpu_possible_mask instead.
+Testing:
+Tested EDMA, mmc, sham, aes, des, i2c0, cpsw, matric-keypad on AM4372 EPOS EVM
+with the addition of following two series:
+-> Tero's V8 of OMAP DT clock conversion
+  http://www.mail-archive.com/linux-omap at vger.kernel.org/msg96769.html
+-> Afzal's V5 of AM43x PRCM basic support
+  http://www.mail-archive.com/linux-omap at vger.kernel.org/msg96275.html
 
-I've changed the few other things you spotted, but this one making the
-timer unusable.
+Lokesh Vutla (1):
+  ARM: dts: AM4372: Add more nodes
 
-I think what happens here is that we have the A31 I've tested these
-patches on is a quad-core SoC. As such, the device tree has 4 CPUs
-declared. However, we don't have any SMP support for it now. So we end
-up having 4 cpus set as possible, and only one online (the boot cpu),
-which isn't working.
+Mugunthan V N (1):
+  ARM: dts: AM4372: Update Support for EPOS EVM
 
-Would using cpu_online_mask work in our case?
-
-Thanks,
-Maxime
+ arch/arm/boot/dts/am4372.dtsi        |  210 +++++++++++++++++++++++++++++++++-
+ arch/arm/boot/dts/am43x-epos-evm.dts |  168 +++++++++++++++++++++++++++
+ include/dt-bindings/pinctrl/am43xx.h |   31 +++++
+ 3 files changed, 408 insertions(+), 1 deletion(-)
+ create mode 100644 include/dt-bindings/pinctrl/am43xx.h
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131010/7ff5a168/attachment.sig>
+1.7.9.5
