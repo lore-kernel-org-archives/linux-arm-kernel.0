@@ -1,23 +1,39 @@
-From: aaro.koskinen@iki.fi (Aaro Koskinen)
-Date: Thu, 10 Oct 2013 23:19:14 +0300
-Subject: [RFCv3 0/7] OMAP SSI driver
-In-Reply-To: <20131010200236.GA6603@earth.universe>
-References: <1381091235-18293-1-git-send-email-sre@debian.org>
- <20131008172815.GA8313@atomide.com>
- <20131010172128.GF28657@earth.universe>
- <20131010182801.GB29989@blackmetal.musicnaut.iki.fi>
- <20131010200236.GA6603@earth.universe>
-Message-ID: <20131010201914.GC29989@blackmetal.musicnaut.iki.fi>
+From: tharvey@gateworks.com (Tim Harvey)
+Date: Thu, 10 Oct 2013 13:33:45 -0700
+Subject: [PATCH v7 0/2] Add PCIe support for i.MX6q
+In-Reply-To: <0E83723C55F66F43A6041464FE31119D408C77@039-SN2MPN1-011.039d.mgd.msft.net>
+References: <1380165887-13506-1-git-send-email-shawn.guo@linaro.org>
+ <201310082256.28474.marex@denx.de>
+ <0E83723C55F66F43A6041464FE31119D401869@039-SN2MPN1-011.039d.mgd.msft.net>
+ <201310101225.10455.marex@denx.de>
+ <0E83723C55F66F43A6041464FE31119D408C77@039-SN2MPN1-011.039d.mgd.msft.net>
+Message-ID: <CAJ+vNU3OhvPNvBY2ZJ_jg2E+c0f+062n2Wj2PZnQ472UXTHOVQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 10, 2013 at 10:02:36PM +0200, Sebastian Reichel wrote:
-> P.S.: You can get a mainline kernel status matrix for the Nokia
->       N900 on this page: http://elinux.org/N900
+On Thu, Oct 10, 2013 at 3:40 AM, Zhu Richard-R65037
+<r65037@freescale.com> wrote:
 
-Thanks for summary, and the above page looks very useful. I wonder
-would it make sense to add also N9/N950 there (some functionality is
-shared)? Also TWL4030 DT status could be updated, e.g. watchdog support
-was done already last year with 8899b8d93ec64b7a8e54807a68a958e1206535e2.
+>      host=10.192.242.95, domain=ap.freescale.net, nis-domain=(none)
+>      bootserver=0.0.0.0, rootserver=10.192.225.216, rootpath=
+>      nameserver0=10.192.130.201, nameserver1=10.211.0.3, nameserver2=10.196.51.200
+> ALSA device list:
+>   #0: wm8962-audio
+>   #1: imx-hdmi-soc
+> VFS: Mounted root (nfs filesystem) on device 0:11.
+> devtmpfs: mounted
+> Freeing unused kernel memory: 300K (80c29000 - 80c74000)
+> Kernel panic - not syncing: Attempted to kill init! exitcode=0x0000000b  ? <--System panic here sometimes. :(
 
-A.
+Marek,
+
+This is where an imprecise abort is triggered - refer to my comments
+regarding the abort handler at
+http://thread.gmane.org/gmane.linux.drivers.devicetree/44659/focus=46171
+- you should disable the bumping of the PC and/or the handler.
+
+Did this patch ever get applied and if so what git tree?  I would like
+to continue testing it as well with the boards I have that have a
+switch.
+
+Tim
