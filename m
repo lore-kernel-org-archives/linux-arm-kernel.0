@@ -1,44 +1,55 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Thu, 10 Oct 2013 09:19:50 -0500
-Subject: [PATCH 1/2] ARM: dts: omap5-uevm: remove always_on, boot_on from
- smps10_out1
-In-Reply-To: <1381402195-29257-1-git-send-email-kishon@ti.com>
-References: <1381402195-29257-1-git-send-email-kishon@ti.com>
-Message-ID: <20131010141949.GA13277@kahuna>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 10 Oct 2013 16:22:38 +0200
+Subject: [PATCH 3/6] ARM: integrator: delete non-devicetree boot path
+In-Reply-To: <20131008095148.GD28972@e106331-lin.cambridge.arm.com>
+References: <1380816202-3128-1-git-send-email-linus.walleij@linaro.org>
+ <20131008095148.GD28972@e106331-lin.cambridge.arm.com>
+Message-ID: <CACRpkdZvV9Ck-wG9w+=wh1DvvyddYj0k7WUB9aQMT9V4yH+Ykw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16:19-20131010, Kishon Vijay Abraham I wrote:
-> smps10 should be enabled only in the case of host mode. So stop
-> doing always_on, boot_on from smps10_out1. The driver will enable it in host
-> mode.
-> 
-> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
-> ---
->  arch/arm/boot/dts/omap5-uevm.dts |    2 --
->  1 file changed, 2 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/omap5-uevm.dts b/arch/arm/boot/dts/omap5-uevm.dts
-> index d784b3a..e06a04a 100644
-> --- a/arch/arm/boot/dts/omap5-uevm.dts
-> +++ b/arch/arm/boot/dts/omap5-uevm.dts
-> @@ -334,8 +334,6 @@
->  					regulator-name = "smps10_out1";
->  					regulator-min-microvolt = <5000000>;
->  					regulator-max-microvolt = <5000000>;
-> -					regulator-always-on;
-> -					regulator-boot-on;
->  				};
->  
->  				ldo1_reg: ldo1 {
-> -- 
-Always good to get rid of regulator-always-on. Thanks for it.
+On Tue, Oct 8, 2013 at 11:51 AM, Mark Rutland <mark.rutland@arm.com> wrote:
 
-regulator-boot-on indicates that PMIC enables it by default as part of
-OTP or some internal behavior -> Looking at the measurements done on
-uEVM and OTP information -> regulator-boot-on should be kept here.
+>> +       /* Remap the Integrator system controller */
+>> +       ap_syscon_base = ioremap(INTEGRATOR_SC_BASE, 0x100);
+>
+> It seems a shame that this didn't get described in the DT. This hasn't
+> been fully moved over...
 
-Hence Nak.
--- 
-Regards,
-Nishanth Menon
+No. There is still stuff to move over, and not only the system controller,
+also the EBI (external bus interface) on the AP.
+
+But we can still work from this point, or do you mean that we cannot
+proceed to delete the ATAG boot path before we fix this?
+
+My idea is that deleting this makes the code easier to handle after
+the shrink.
+
+>> +       if (!ap_syscon_base) {
+>> +               dev_err(&pdev->dev, "unable to remap the AP syscon for PCIv3\n");
+>> +               return -ENODEV;
+>> +       }
+>> +
+>> +       /* Device tree probe path */
+>> +       if (!np) {
+>> +               dev_err(&pdev->dev, "no device tree node for PCIv3\n");
+>> +               return -ENODEV;
+>> +       }
+>
+> We didn't unmap the syscon registers, yet we mapped them here. Either
+> we've got a useless mapping, or we're mapping it from the wrong block of
+> code...
+
+Sorry I'm not following this. The only thing the patch does is remove the
+ATAG boot path, moving the relevant part of the DT boot path over
+to the DT probe function and renaming it pci_v3_probe() in the process
+which might make the patch messy but that is all it does.
+
+If you mean that we should unmap the syscon base you're right
+but that would be a separate patch, right?
+
+I'll write a separate patch for that instead using devm_* so we
+don't have to unmap it by calling any special function.
+
+Yours,
+Linus Walleij
