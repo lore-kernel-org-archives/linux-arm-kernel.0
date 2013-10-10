@@ -1,54 +1,34 @@
-From: vaibhav.bedia@gmail.com (Vaibhav Bedia)
-Date: Thu, 10 Oct 2013 09:33:10 -0400
-Subject: [PATCH V6 02/15] ARM: OMAP2+: AM33XX: add lateinit hook for
- calling pm late init
-In-Reply-To: <52563BD8.1060703@ti.com>
-References: <1381354144-7134-1-git-send-email-nm@ti.com>
- <1381361098-8283-1-git-send-email-nm@ti.com>
- <52563BD8.1060703@ti.com>
-Message-ID: <CANacCWyoWZHP07UXptM-oANKpvARRmB5zqsxQXfUJrdHhS=a9Q@mail.gmail.com>
+From: maxime.coquelin@st.com (Maxime COQUELIN)
+Date: Thu, 10 Oct 2013 15:33:43 +0200
+Subject: [PATCH v4 0/4] Add I2C support to ST SoCs
+In-Reply-To: <20131010100354.GE2638@katana>
+References: <1381250576-7916-1-git-send-email-maxime.coquelin@st.com>
+ <525675B6.4080404@st.com> <20131010100354.GE2638@katana>
+Message-ID: <5256ACB7.7050302@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Joel.
 
-On Thu, Oct 10, 2013 at 1:32 AM, Joel Fernandes <joelf@ti.com> wrote:
-> On 10/09/2013 06:24 PM, Nishanth Menon wrote:
->> Call OMAP2+ generic lateinit hook from AM specific late init hook.
->> This allows the generic late initializations such as cpufreq hooks
->> to be active.
->>
->> Cc: Benoit Cousson <bcousson@baylibre.com>
->> Cc: Kevin Hilman <khilman@deeprootsystems.com>
->> Cc: Paul Walmsley <paul@pwsan.com>
->> Cc: Tony Lindgren <tony@atomide.com>
->> Signed-off-by: Nishanth Menon <nm@ti.com>
->> ---
->>  arch/arm/mach-omap2/board-generic.c |    1 +
->>  arch/arm/mach-omap2/common.h        |    1 +
->>  arch/arm/mach-omap2/io.c            |    6 ++++++
->>  3 files changed, 8 insertions(+)
->>
->> diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
->> index 87162e1..b474498 100644
->> --- a/arch/arm/mach-omap2/board-generic.c
->> +++ b/arch/arm/mach-omap2/board-generic.c
->> @@ -180,6 +180,7 @@ DT_MACHINE_START(AM33XX_DT, "Generic AM33XX (Flattened Device Tree)")
->>       .init_irq       = omap_intc_of_init,
->>       .handle_irq     = omap3_intc_handle_irq,
->>       .init_machine   = omap_generic_init,
->> +     .init_late      = am33xx_init_late,
->
-> Instead of adding a new a *_init_late function for every platform, perhaps
-> better to just do:
-> .init_late      = omap2_common_pm_late_init;
->
-> since that's the only function you're calling.
->
-For now...
+On 10/10/2013 12:03 PM, Wolfram Sang wrote:
+>>> Changes since v3:
+>>>     - Switch back to vendor specific DT properties regarding the anti-glitch
+>>>       filter configuration, as this IP is the only one having such a filter.
+>> Do you agree to keep these properties vendor-specifics?
+> My preference is generic bindings. There are no other users right now,
+> yet there might be in the future. At least with something similar enough
+> that the bindings will apply. Was hoping for some additional input,
+> though, but I am not depending on it.
+I have to push another revision to change the IRQ flags as reported by 
+Stephen G.
+I will also revert to generic bindings in this revision.
+For their documentation, I will add it as soon as you will have created 
+the DT binding documentation of I2C.
 
-As the PM support gets added there will be other function calls
-and that can and is at times soc specific.
+Is it okay for you?
+>
+>> If so, could you take this series for v3.13?
+> Sure, if it passes the second review...
+For sure!
 
 Regards,
-Vaibhav
+Maxime
