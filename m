@@ -1,78 +1,79 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 10 Oct 2013 17:12:17 +0100
-Subject: [PATCH 2/7] iommu/arm-smmu: Introduce bus notifier block
-In-Reply-To: <1381358286-27065-3-git-send-email-andreas.herrmann@calxeda.com>
-References: <1381358286-27065-1-git-send-email-andreas.herrmann@calxeda.com>
- <1381358286-27065-3-git-send-email-andreas.herrmann@calxeda.com>
-Message-ID: <20131010161217.GD8528@mudshark.cambridge.arm.com>
+From: anup@brainfault.org (Anup Patel)
+Date: Thu, 10 Oct 2013 21:39:03 +0530
+Subject: [RFC PATCH] arm64: KVM: honor cacheability attributes on S2 page
+ fault
+In-Reply-To: <20131010112425.GB21380@arm.com>
+References: <1378806670-2467-1-git-send-email-marc.zyngier@arm.com>
+ <CAAhSdy2E6aRndw88_S_3wfyTOYd5rQQTc4+Cw5Hd1DFXuM6EBA@mail.gmail.com>
+ <523063AC.8040803@arm.com> <20130911193855.GN9860@cbox>
+ <CAAhSdy0EZpzGOpVFOo-GWPs97XLHB8_uTZ7BTu0gP958y8JPeA@mail.gmail.com>
+ <525667DB.7090705@arm.com> <20131010112425.GB21380@arm.com>
+Message-ID: <CAAhSdy20=U3+LZd=3i8dfqfSEaX7V+2z_y641NBLj7PkYZBadQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 09, 2013 at 11:38:01PM +0100, Andreas Herrmann wrote:
->  drivers/iommu/arm-smmu.c |   53 ++++++++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 53 insertions(+)
-> 
-> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-> index 478c8ad..87239e8 100644
-> --- a/drivers/iommu/arm-smmu.c
-> +++ b/drivers/iommu/arm-smmu.c
-> @@ -46,6 +46,7 @@
->  #include <linux/amba/bus.h>
->  
->  #include <asm/pgalloc.h>
-> +#include <asm/dma-iommu.h>
->  
->  /* Driver options */
->  #define ARM_SMMU_OPT_ISOLATE_DEVICES		(1 << 0)
-> @@ -1983,6 +1984,56 @@ static int arm_smmu_device_remove(struct platform_device *pdev)
->  	return 0;
->  }
->  
-> +static int arm_smmu_device_notifier(struct notifier_block *nb,
-> +				unsigned long action, void *data)
-> +{
-> +	struct device *dev = data;
-> +	struct dma_iommu_mapping *mapping;
-> +	struct arm_smmu_device *smmu;
-> +	void __iomem *gr0_base;
-> +	u32 cr0;
-> +	int ret;
-> +
-> +	switch (action) {
-> +	case BUS_NOTIFY_BIND_DRIVER:
-> +
-> +		arm_smmu_add_device(dev);
-> +		smmu = dev->archdata.iommu;
-> +		if (!smmu || !(smmu->options & ARM_SMMU_OPT_ISOLATE_DEVICES))
-> +			break;
-> +
-> +		mapping = arm_iommu_create_mapping(&platform_bus_type,
-> +						0, SZ_128M, 0);
+On Thu, Oct 10, 2013 at 4:54 PM, Catalin Marinas
+<catalin.marinas@arm.com> wrote:
+> On Thu, Oct 10, 2013 at 09:39:55AM +0100, Marc Zyngier wrote:
+>> On 10/10/13 05:51, Anup Patel wrote:
+>> > Are you planning to go ahead with this approach ?
+>>
+>> [adding Catalin, as we heavily discussed this recently]
+>>
+>> Not as such, as it doesn't solve the full issue. It merely papers over
+>> the whole "my cache is off" problem. More specifically, any kind of
+>> speculative access from another CPU while caches are off in the guest
+>> completely nukes the benefit of this patch.
+>>
+>> Also, turning the the caches off is another source of problems, as
+>> speculation also screws up set/way invalidation.
+>
+> Indeed. The set/way operations trapping and broadcasting (or deferring)
+> to other CPUs in software just happens to work but there is no
+> guarantee, sooner or later we'll hit a problem. I'm even tempted to
+> remove flush_dcache_all() calls on the booting path for the arm64
+> kernel, we already require that whatever runs before Linux should
+> clean&invalidate the caches.
+>
+> Basically, with KVM a VCPU even if running with caches/MMU disabled can
+> still get speculative allocation into the cache. The reason for this is
+> the other cacheable memory aliases created by the host kernel and
+> qemu/kvmtool. I can't tell whether Xen has this issue but it may be
+> easier in Xen to avoid memory aliases.
+>
+>> > We really need this patch for X-Gene L3 cache.
+>>
+>> So far, I can see two possibilities:
+>> - either we mandate caches to be always on (DC bit, and you're not
+>> allowed to turn the caches off).
+>
+> That's my preferred approach. For hotplug, idle, the guest would use an
+> HVC call (PSCI) and the host takes care of re-enabling the DC bit. But
+> we may not catch all cases (kexec probably).
+>
+>> - Or we mandate that caches are invalidated (by VA) for each write that
+>> is performed with caches off.
+>
+> For some things like run-time code patching, on ARMv8 we need to do at
+> least I-cache maintenance since the CPU can allocate into the I-cache
+> (even if there are no aliases).
 
-We need to find a better way of doing this; I'm really not happy hardcoding
-that size limit and hoping for the best.
+It seems all approaches considered so far have a corner case in
+one-way or another.
 
-> +		if (IS_ERR(mapping)) {
-> +			ret = PTR_ERR(mapping);
-> +			dev_info(dev, "arm_iommu_create_mapping failed\n");
-> +			break;
-> +		}
-> +
-> +		ret = arm_iommu_attach_device(dev, mapping);
-> +		if (ret < 0) {
-> +			dev_info(dev, "arm_iommu_attach_device failed\n");
-> +			arm_iommu_release_mapping(mapping);
-> +		}
-> +
-> +		gr0_base = ARM_SMMU_GR0_NS(smmu);
-> +		cr0 = readl_relaxed(gr0_base + ARM_SMMU_GR0_sCR0);
-> +		cr0 |= sCR0_USFCFG;
-> +		writel(cr0, gr0_base + ARM_SMMU_GR0_sCR0);
+Coming back to where we started, the actual problem was that when
+Guest starts booting it sees wrong contents because it is runs with
+MMU disable and correct contents are still in external L3 cache of X-Gene.
 
-Why do you need to enable this flag? If no mapping is found, that means *we*
-screwed something up, so we should report that and not rely on the hardware
-potentially raising a fault. I also prefer to allow passthrough for devices
-that don't hit in the stream table, because it allows people to ignore the SMMU
-in their DT if they want to.
+How about reconsidering the approach of flushing Guest RAM (entire or
+portion of it) to PoC by VA once before the first run of a VCPU ?
+OR
+We can also have KVM API using which user space can flush portions
+of Guest RAM before running the VCPU. (I think this was a suggestion
+from Marc Z initially)
 
-Will
+--Anup
+
+>
+> --
+> Catalin
