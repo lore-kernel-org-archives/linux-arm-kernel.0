@@ -1,32 +1,39 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Thu, 10 Oct 2013 12:03:54 +0200
-Subject: [PATCH v4 0/4] Add I2C support to ST SoCs
-In-Reply-To: <525675B6.4080404@st.com>
-References: <1381250576-7916-1-git-send-email-maxime.coquelin@st.com>
- <525675B6.4080404@st.com>
-Message-ID: <20131010100354.GE2638@katana>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 10 Oct 2013 11:07:33 +0100
+Subject: [PATCH 3/3] arm64: include: asm: atomic.h: use 'unsigned int'
+ and 'atomic_t' instead of 'unsigned long' for atomic_clear_mask()
+In-Reply-To: <52561269.60900@asianux.com>
+References: <52561137.3070608@asianux.com> <5256117A.4000009@asianux.com>
+ <5256121A.9030504@asianux.com> <52561269.60900@asianux.com>
+Message-ID: <20131010100733.GH3817@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Oct 10, 2013 at 03:35:21AM +0100, Chen Gang wrote:
+> In current kernel wide source, for arm64, only s390 scsi drivers use
+> atomic_clear_mask(), now, s390 itself need use 'unsigned int' and
+> 'atomic_t', so need match s390's atomic_clear_mask().
+> 
+> 
+> Signed-off-by: Chen Gang <gang.chen@asianux.com>
+> ---
+>  arch/arm64/include/asm/atomic.h |   13 +++++++------
+>  1 files changed, 7 insertions(+), 6 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/atomic.h b/arch/arm64/include/asm/atomic.h
+> index 8363644..58808fc 100644
+> --- a/arch/arm64/include/asm/atomic.h
+> +++ b/arch/arm64/include/asm/atomic.h
+> @@ -126,16 +126,17 @@ static inline int atomic_cmpxchg(atomic_t *ptr, int old, int new)
+>  	return oldval;
+>  }
+>  
+> -static inline void atomic_clear_mask(unsigned long mask, unsigned long *addr)
+> +static inline void atomic_clear_mask(unsigned int mask, atomic_t *ptr)
+>  {
+> -	unsigned long tmp, tmp2;
+> +	unsigned int tmp;
 
-> > Changes since v3:
-> >    - Switch back to vendor specific DT properties regarding the anti-glitch
-> >      filter configuration, as this IP is the only one having such a filter.
-> Do you agree to keep these properties vendor-specifics?
+Same comment here as for ARM; I think you want a signed int.
 
-My preference is generic bindings. There are no other users right now,
-yet there might be in the future. At least with something similar enough
-that the bindings will apply. Was hoping for some additional input,
-though, but I am not depending on it.
-
-> If so, could you take this series for v3.13?
-
-Sure, if it passes the second review...
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131010/64289c85/attachment.sig>
+Will
