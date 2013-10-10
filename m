@@ -1,55 +1,53 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 10 Oct 2013 15:25:46 -0700
-Subject: [PATCH v7 1/5] ARM: add basic support for Trusted Foundations
-In-Reply-To: <5257288E.6000704@wwwdotorg.org>
-References: <1380904635-18113-1-git-send-email-acourbot@nvidia.com>
- <1380904635-18113-2-git-send-email-acourbot@nvidia.com>
- <CAOesGMj74Pui1V5O7zxEipM5Hg6nboVTUCFuMY0c0aUh=wuu3Q@mail.gmail.com>
- <CAAVeFuLvHdUuDurqA_=tvxJonNP+RekotM_MuysQrJD0PUgcSQ@mail.gmail.com>
- <5257288E.6000704@wwwdotorg.org>
-Message-ID: <CAOesGMjZGRU+dnz3u5BhDqvyyZMcCANzBDKFwX5S3h+CFHGhQg@mail.gmail.com>
+From: seanpaul@chromium.org (Sean Paul)
+Date: Thu, 10 Oct 2013 18:26:14 -0400
+Subject: [PATCH v3 1/5] ARM: dts: Add fimd display-timings for exynos5250-snow
+In-Reply-To: <1381443978-5654-1-git-send-email-seanpaul@chromium.org>
+References: <1380839303-4834-1-git-send-email-seanpaul@chromium.org>
+ <1381443978-5654-1-git-send-email-seanpaul@chromium.org>
+Message-ID: <1381443978-5654-2-git-send-email-seanpaul@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 10, 2013 at 3:22 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> On 10/10/2013 02:58 PM, Alexandre Courbot wrote:
->> On Wed, Oct 9, 2013 at 4:47 PM, Olof Johansson <olof@lixom.net> wrote:
->>> On Fri, Oct 4, 2013 at 9:37 AM, Alexandre Courbot <acourbot@nvidia.com> wrote:
-> ...
->>> But do we really need to panic here? It's a PITA to debug since it'll
->>> be a very early panic. I'd rather have the system log errors in dmesg
->>> but continue booting with one cpu.
->>
->> Actually the first version of this series continued on one CPU if TF
->> support was missing (as secondary CPUs would simply fail to boot), but
->> IIRC Stephen advocated for the current behavior (panic) instead. I
->> agree such an early panic is hard to debug, especially considering
->> that most devices using TF (Tegra retail devices) do not even feature
->> a serial port.
->>
->> On the other hand, if we continue booting in these conditions the
->> system freezes as soon as cpuidle kicks in, so we won't be going very
->> far anyway. However the console is up when it happens.
->>
->> Maybe if there is a way to disable the kernel features TF is supposed
->> to manage (SMP & cpuidle at the moment) when registration fails, the
->> system could continue more gracefully (even if on one leg) and warn
->> the user about this condition. Stephen, can I have your thoughts on
->> this?
->
-> If we can disable the features that rely on TF/secure-mode when support
-> is missing, then doing that rather than panic is fine. We do something
-> similar for PCIe on Tegra20, where LP2 cpuidle state must be disabled or
-> PCIe interrupts won't work.
->
-> I would be inclined to merge the patch as-is right now, since it's only
-> enabling a new feature that won't see any regressions due to this panic,
-> and then add the disable-other-features with a separate patch/series
-> later. Does that seem reasonable?
+This patch adds the internal panel timings to the exynos5250-snow board
+dts file.
 
-Yes, I tried to make that clear with my initial feedback: I think it
-would be good to get away from the panic, but we can merge with it now
-and fix it with later patches.
+Signed-off-by: Sean Paul <seanpaul@chromium.org>
+---
 
+v2: No difference
+v3: Added status = "okay"
 
--Olof
+ arch/arm/boot/dts/exynos5250-snow.dts | 18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
+
+diff --git a/arch/arm/boot/dts/exynos5250-snow.dts b/arch/arm/boot/dts/exynos5250-snow.dts
+index fd711e2..28eea9b 100644
+--- a/arch/arm/boot/dts/exynos5250-snow.dts
++++ b/arch/arm/boot/dts/exynos5250-snow.dts
+@@ -186,6 +186,24 @@
+ 		samsung,vbus-gpio = <&gpx1 1 0>;
+ 	};
+ 
++	fimd: fimd at 14400000 {
++		status = "okay";
++		display-timings {
++			native-mode = <&lcd_timing>;
++			lcd_timing: 1366x768 {
++				clock-frequency = <70589280>;
++				hactive = <1366>;
++				vactive = <768>;
++				hfront-porch = <40>;
++				hback-porch = <40>;
++				hsync-len = <32>;
++				vback-porch = <10>;
++				vfront-porch = <12>;
++				vsync-len = <6>;
++			};
++		};
++	};
++
+ 	fixed-rate-clocks {
+ 		xxti {
+ 			compatible = "samsung,clock-xxti";
+-- 
+1.8.4
