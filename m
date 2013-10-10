@@ -1,170 +1,55 @@
-From: robdclark@gmail.com (Rob Clark)
-Date: Thu, 10 Oct 2013 18:23:26 -0400
-Subject: [PATCH 2/5] DRM: Armada: Add Armada DRM driver
-In-Reply-To: <20131010215951.GS25034@n2100.arm.linux.org.uk>
-References: <20131006220728.GG12758@n2100.arm.linux.org.uk>
- <E1VSwVU-0000hu-09@rmk-PC.arm.linux.org.uk>
- <CAF6AEGsvBaX5+c1P=ups+k=d1F3r+JphgYOt5wb7pEM3mihOQw@mail.gmail.com>
- <20131010215951.GS25034@n2100.arm.linux.org.uk>
-Message-ID: <CAF6AEGvNyD8-_t2y69a5Gjey7Jg_LXVYNgpYW1rsFFyTkABg=Q@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 10 Oct 2013 15:25:46 -0700
+Subject: [PATCH v7 1/5] ARM: add basic support for Trusted Foundations
+In-Reply-To: <5257288E.6000704@wwwdotorg.org>
+References: <1380904635-18113-1-git-send-email-acourbot@nvidia.com>
+ <1380904635-18113-2-git-send-email-acourbot@nvidia.com>
+ <CAOesGMj74Pui1V5O7zxEipM5Hg6nboVTUCFuMY0c0aUh=wuu3Q@mail.gmail.com>
+ <CAAVeFuLvHdUuDurqA_=tvxJonNP+RekotM_MuysQrJD0PUgcSQ@mail.gmail.com>
+ <5257288E.6000704@wwwdotorg.org>
+Message-ID: <CAOesGMjZGRU+dnz3u5BhDqvyyZMcCANzBDKFwX5S3h+CFHGhQg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 10, 2013 at 5:59 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Thu, Oct 10, 2013 at 05:25:15PM -0400, Rob Clark wrote:
->> On Sun, Oct 6, 2013 at 6:08 PM, Russell King
->> <rmk+kernel@arm.linux.org.uk> wrote:
->> > +       /*
->> > +        * If we have an overlay plane associated with this CRTC, disable
->> > +        * it before the modeset to avoid its coordinates being outside
->> > +        * the new mode parameters.  DRM doesn't provide help with this.
->> > +        */
+On Thu, Oct 10, 2013 at 3:22 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> On 10/10/2013 02:58 PM, Alexandre Courbot wrote:
+>> On Wed, Oct 9, 2013 at 4:47 PM, Olof Johansson <olof@lixom.net> wrote:
+>>> On Fri, Oct 4, 2013 at 9:37 AM, Alexandre Courbot <acourbot@nvidia.com> wrote:
+> ...
+>>> But do we really need to panic here? It's a PITA to debug since it'll
+>>> be a very early panic. I'd rather have the system log errors in dmesg
+>>> but continue booting with one cpu.
 >>
->> Getting a bit off topic, but yeah.. I'd be in favor of "clarifying"
->> things by having crtc helpers disable planes on setcrtc (rather than
->> only doing this on fbdev/lastclose restore).  I
->> don't know of any userspace that this would cause problems for.  But
->> not really sure if it would be considered an interface break or just
->> "fixing a bug".. since we have different behavior on different
->> drivers, I'd lean towards the latter.
->
-> The reasoning here is if the overlay plane is larger than the mode being
-> set, we will end up having the hardware programmed in an inconsistent
-> state - the overlay plane position/width/height can be outside of the
-> active region, which is invalid for the hardware.  So, it's safer to
-> disable the plane and wait for the next plane to be sent and have that
-> validated against the new mode.
-
-right.  I think disabling the planes is the correct behavior.  So
-nothing to do here for armada.  I mostly just wanted to get some
-opinions about making the crtc helpers do this automatically for us.
-
-> It's not like you would be able to see the plane immediately, because
-> most monitors blank while they retrain to the new mode settings.
->
->> > +static int armada_gem_vm_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
->> > +{
->> > +       struct armada_gem_object *obj = drm_to_armada_gem(vma->vm_private_data);
->> > +       unsigned long addr = (unsigned long)vmf->virtual_address;
->> > +       unsigned long pfn = obj->phys_addr >> PAGE_SHIFT;
->> > +       int ret;
->> > +
->> > +       pfn += (addr - vma->vm_start) >> PAGE_SHIFT;
->> > +       ret = vm_insert_pfn(vma, addr, pfn);
->> > +
->> > +       switch (ret) {
->> > +       case -EIO:
->> > +       case -EAGAIN:
->> > +               set_need_resched();
+>> Actually the first version of this series continued on one CPU if TF
+>> support was missing (as secondary CPUs would simply fail to boot), but
+>> IIRC Stephen advocated for the current behavior (panic) instead. I
+>> agree such an early panic is hard to debug, especially considering
+>> that most devices using TF (Tegra retail devices) do not even feature
+>> a serial port.
 >>
->> probably this thread is applicable here too?
+>> On the other hand, if we continue booting in these conditions the
+>> system freezes as soon as cpuidle kicks in, so we won't be going very
+>> far anyway. However the console is up when it happens.
 >>
->> https://lkml.org/lkml/2013/9/12/417
->>
->> (although.. we have at least a few  slightly differet variants on the
->> same errno -> VM_FAULT_x switch in different drivers.. maybe we should
->> do something better)
+>> Maybe if there is a way to disable the kernel features TF is supposed
+>> to manage (SMP & cpuidle at the moment) when registration fails, the
+>> system could continue more gracefully (even if on one leg) and warn
+>> the user about this condition. Stephen, can I have your thoughts on
+>> this?
 >
-> Hmm.  It seems today's vm_insert_pfn() has the following error return
-> values:
+> If we can disable the features that rely on TF/secure-mode when support
+> is missing, then doing that rather than panic is fine. We do something
+> similar for PCIe on Tegra20, where LP2 cpuidle state must be disabled or
+> PCIe interrupts won't work.
 >
-> -EFAULT - virtual address outside vma
-> -EINVAL - track_pfn_insert() failure
-> -ENOMEM - failed to get locked pte
-> -EBUSY - entry already exists in pte
->
-> So it seems my handling -EIO, -EAGAIN, -ERESTARTSYS and -EINTR are all
-> redundant and can be removed.  I'm not sure if it makes sense for this
-> to be generic - it looks like it's only Intel, gma500 and me who use
-> this, and Intel handles more error codes (due to it calling other
-> functions.)
+> I would be inclined to merge the patch as-is right now, since it's only
+> enabling a new feature that won't see any regressions due to this panic,
+> and then add the disable-other-features with a separate patch/series
+> later. Does that seem reasonable?
 
-I just noticed msm and omapdrm are missing the -EBUSY case (have some
-patches I need to send), which was why I mentioned this.  They do have
-other error cases from other fxns, so maybe something generic/common
-doesn't make sense..  but I realized i915 fixed the same issue a while
-back, so somewhere common has the advantage of somehow not forgetting
-to fix other drivers ;-)
+Yes, I tried to make that clear with my initial feedback: I think it
+would be good to get away from the panic, but we can merge with it now
+and fix it with later patches.
 
-> I'll respin dropping those four unnecessary error codes, and post the
-> delta for this.
->
->> > +/* Prime support */
->> > +struct sg_table *
->> > +armada_gem_prime_map_dma_buf(struct dma_buf_attachment *attach,
->> > +       enum dma_data_direction dir)
->> > +{
->> > +       struct drm_gem_object *obj = attach->dmabuf->priv;
->> > +       struct armada_gem_object *dobj = drm_to_armada_gem(obj);
->> > +       struct scatterlist *sg;
->> > +       struct sg_table *sgt;
->> > +       int i, num;
->> > +
->> > +       sgt = kmalloc(sizeof(*sgt), GFP_KERNEL);
->> > +       if (!sgt)
->> > +               return NULL;
->> > +
->> > +       if (dobj->obj.filp) {
->> > +               struct address_space *mapping;
->> > +               gfp_t gfp;
->> > +               int count;
->> > +
->> > +               count = dobj->obj.size / PAGE_SIZE;
->> > +               if (sg_alloc_table(sgt, count, GFP_KERNEL))
->> > +                       goto free_sgt;
->> > +
->> > +               mapping = file_inode(dobj->obj.filp)->i_mapping;
->> > +               gfp = mapping_gfp_mask(mapping);
->> > +
->> > +               for_each_sg(sgt->sgl, sg, count, i) {
->> > +                       struct page *page;
->> > +
->> > +                       page = shmem_read_mapping_page_gfp(mapping, i, gfp);
->>
->> you could almost use drm_gem_get_pages().. although I guess you
->> otherwise have no need for the page[] array?
->
-> Correct.  The page[] array would just be an additional unnecessary
-> allocation, and therefore would be an additional unnecessary point of
-> failure.
->
->> > +#define DRM_ARMADA_GEM_CREATE          0x00
->> > +#define DRM_ARMADA_GEM_MMAP            0x02
->> > +#define DRM_ARMADA_GEM_PWRITE          0x03
->> > +
->> > +#define ARMADA_IOCTL(dir, name, str) \
->> > +       DRM_##dir(DRM_COMMAND_BASE + DRM_ARMADA_##name, struct drm_armada_##str)
->> > +
->> > +struct drm_armada_gem_create {
->>
->> Any reason not to throw in a 'uint32_t flags' field?  At least then
->> you could indicate what sort of backing memory you want, and do things
->> like allocate linear scanout buffer w/ your gem_create rather than
->> having to use dumb_create.  Maybe not something you need now, but
->> seems like eventually you'll come up with some reason or another to
->> want to pass some flags into gem_create.
->
-> I thought one of the points of the dumb_create stuff was so that there
-> is a standard API for dumb scanout buffers across all DRM drivers.  It
-> has that advantage, and as I understand it, a generic KMS driver for X
-> is on the cards.
 
-Yeah, xf86-video-modesetting currently uses dumb allocation.  So you
-definitely want to continue to support the dumb buffer path.
-
-I can't really think of any immediate need for 'flags'..  but seems
-like sooner or later someone will come up with some need for it, so it
-seemed like a convenient placeholder to have.
-
-Well, technically you can get away w/ adding new fields to the end of
-the ioctl struct, and drm_ioctl() will take care of zero'ing that out
-for you with an old userspace.  So I guess you could just rely on that
-if you ever need to add 'flags' or some other fields.
-
-> Thanks for the review.
-
-no prob
-
-BR,
--R
+-Olof
