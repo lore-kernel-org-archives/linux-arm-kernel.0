@@ -1,28 +1,139 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Thu, 10 Oct 2013 15:02:14 -0700
-Subject: [GIT PULL] Second round of Renesas ARM based SoC cleanups for
- v3.13
-In-Reply-To: <20131009045354.GA8369@verge.net.au> (Simon Horman's message of
- "Wed, 9 Oct 2013 13:53:54 +0900")
-References: <cover.1381222967.git.horms+renesas@verge.net.au>
- <20131009045354.GA8369@verge.net.au>
-Message-ID: <87k3hkokd5.fsf@linaro.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 10 Oct 2013 22:59:51 +0100
+Subject: [PATCH 2/5] DRM: Armada: Add Armada DRM driver
+In-Reply-To: <CAF6AEGsvBaX5+c1P=ups+k=d1F3r+JphgYOt5wb7pEM3mihOQw@mail.gmail.com>
+References: <20131006220728.GG12758@n2100.arm.linux.org.uk>
+ <E1VSwVU-0000hu-09@rmk-PC.arm.linux.org.uk>
+ <CAF6AEGsvBaX5+c1P=ups+k=d1F3r+JphgYOt5wb7pEM3mihOQw@mail.gmail.com>
+Message-ID: <20131010215951.GS25034@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Simon Horman <horms@verge.net.au> writes:
+On Thu, Oct 10, 2013 at 05:25:15PM -0400, Rob Clark wrote:
+> On Sun, Oct 6, 2013 at 6:08 PM, Russell King
+> <rmk+kernel@arm.linux.org.uk> wrote:
+> > +       /*
+> > +        * If we have an overlay plane associated with this CRTC, disable
+> > +        * it before the modeset to avoid its coordinates being outside
+> > +        * the new mode parameters.  DRM doesn't provide help with this.
+> > +        */
+> 
+> Getting a bit off topic, but yeah.. I'd be in favor of "clarifying"
+> things by having crtc helpers disable planes on setcrtc (rather than
+> only doing this on fbdev/lastclose restore).  I
+> don't know of any userspace that this would cause problems for.  But
+> not really sure if it would be considered an interface break or just
+> "fixing a bug".. since we have different behavior on different
+> drivers, I'd lean towards the latter.
 
-> On Tue, Oct 08, 2013 at 06:05:24PM +0900, Simon Horman wrote:
->> Hi Kevin, Olof and Arnd,
->> 
->> please consider this Second round of Renesas ARM based SoC cleanups for v3.13.
->> It is based on renesas-cleanup-for-v3.13 which you have previously pulled.
->
-> This pull-request causes some conflicts in
-> arch/arm/mach-shmobile/board-bockw.c. In general the resolution
-> strategy should be to take everything.
+The reasoning here is if the overlay plane is larger than the mode being
+set, we will end up having the hardware programmed in an inconsistent
+state - the overlay plane position/width/height can be outside of the
+active region, which is invalid for the hardware.  So, it's safer to
+disable the plane and wait for the next plane to be sent and have that
+validated against the new mode.
 
-Thanks for the heads up.  I assume you meant board-lager.c though,
-right?  That's where I saw the conflict.
+It's not like you would be able to see the plane immediately, because
+most monitors blank while they retrain to the new mode settings.
 
-Kevin
+> > +static int armada_gem_vm_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
+> > +{
+> > +       struct armada_gem_object *obj = drm_to_armada_gem(vma->vm_private_data);
+> > +       unsigned long addr = (unsigned long)vmf->virtual_address;
+> > +       unsigned long pfn = obj->phys_addr >> PAGE_SHIFT;
+> > +       int ret;
+> > +
+> > +       pfn += (addr - vma->vm_start) >> PAGE_SHIFT;
+> > +       ret = vm_insert_pfn(vma, addr, pfn);
+> > +
+> > +       switch (ret) {
+> > +       case -EIO:
+> > +       case -EAGAIN:
+> > +               set_need_resched();
+> 
+> probably this thread is applicable here too?
+> 
+> https://lkml.org/lkml/2013/9/12/417
+> 
+> (although.. we have at least a few  slightly differet variants on the
+> same errno -> VM_FAULT_x switch in different drivers.. maybe we should
+> do something better)
+
+Hmm.  It seems today's vm_insert_pfn() has the following error return
+values:
+
+-EFAULT - virtual address outside vma
+-EINVAL - track_pfn_insert() failure
+-ENOMEM - failed to get locked pte
+-EBUSY - entry already exists in pte
+
+So it seems my handling -EIO, -EAGAIN, -ERESTARTSYS and -EINTR are all
+redundant and can be removed.  I'm not sure if it makes sense for this
+to be generic - it looks like it's only Intel, gma500 and me who use
+this, and Intel handles more error codes (due to it calling other
+functions.)
+
+I'll respin dropping those four unnecessary error codes, and post the
+delta for this.
+
+> > +/* Prime support */
+> > +struct sg_table *
+> > +armada_gem_prime_map_dma_buf(struct dma_buf_attachment *attach,
+> > +       enum dma_data_direction dir)
+> > +{
+> > +       struct drm_gem_object *obj = attach->dmabuf->priv;
+> > +       struct armada_gem_object *dobj = drm_to_armada_gem(obj);
+> > +       struct scatterlist *sg;
+> > +       struct sg_table *sgt;
+> > +       int i, num;
+> > +
+> > +       sgt = kmalloc(sizeof(*sgt), GFP_KERNEL);
+> > +       if (!sgt)
+> > +               return NULL;
+> > +
+> > +       if (dobj->obj.filp) {
+> > +               struct address_space *mapping;
+> > +               gfp_t gfp;
+> > +               int count;
+> > +
+> > +               count = dobj->obj.size / PAGE_SIZE;
+> > +               if (sg_alloc_table(sgt, count, GFP_KERNEL))
+> > +                       goto free_sgt;
+> > +
+> > +               mapping = file_inode(dobj->obj.filp)->i_mapping;
+> > +               gfp = mapping_gfp_mask(mapping);
+> > +
+> > +               for_each_sg(sgt->sgl, sg, count, i) {
+> > +                       struct page *page;
+> > +
+> > +                       page = shmem_read_mapping_page_gfp(mapping, i, gfp);
+> 
+> you could almost use drm_gem_get_pages().. although I guess you
+> otherwise have no need for the page[] array?
+
+Correct.  The page[] array would just be an additional unnecessary
+allocation, and therefore would be an additional unnecessary point of
+failure.
+
+> > +#define DRM_ARMADA_GEM_CREATE          0x00
+> > +#define DRM_ARMADA_GEM_MMAP            0x02
+> > +#define DRM_ARMADA_GEM_PWRITE          0x03
+> > +
+> > +#define ARMADA_IOCTL(dir, name, str) \
+> > +       DRM_##dir(DRM_COMMAND_BASE + DRM_ARMADA_##name, struct drm_armada_##str)
+> > +
+> > +struct drm_armada_gem_create {
+> 
+> Any reason not to throw in a 'uint32_t flags' field?  At least then
+> you could indicate what sort of backing memory you want, and do things
+> like allocate linear scanout buffer w/ your gem_create rather than
+> having to use dumb_create.  Maybe not something you need now, but
+> seems like eventually you'll come up with some reason or another to
+> want to pass some flags into gem_create.
+
+I thought one of the points of the dumb_create stuff was so that there
+is a standard API for dumb scanout buffers across all DRM drivers.  It
+has that advantage, and as I understand it, a generic KMS driver for X
+is on the cards.
+
+Thanks for the review.
